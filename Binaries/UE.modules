@@ -1,0 +1,17 @@
+{
+	"BuildId": "5fa16811-4fb6-4d30-975b-8c5a97ad87d4",
+	"Modules": 
+	{
+		"ApplicationCore": "UE-ApplicationCore.dll",
+		"BuildSettings": "UE-BuildSettings.dll",
+		"Core": "UE-Core.dll",
+		"CoreUObject": "UE-CoreUObject.dll",
+		"ImageWrapper": "UE-ImageWrapper.dll",
+		"InputCore": "UE-InputCore.dll",
+		"Json": "UE-Json.dll",
+		"Slate": "UE-Slate.dll",
+		"SlateCore": "UE-SlateCore.dll",
+		"StandaloneRenderer": "UE-StandaloneRenderer.dll",
+		"TraceLog": "UE-TraceLog.dll"
+	}
+}

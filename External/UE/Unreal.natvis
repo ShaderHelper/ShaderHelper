@@ -1,0 +1,2752 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+  <!-- Epic Games, Inc. UE4 Visualizers -->
+  
+  <!-- FString visualizer -->
+  <Type Name="FString">
+    <DisplayString Condition="Data.ArrayNum == 0">Empty</DisplayString>
+    <DisplayString Condition="Data.ArrayNum &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="Data.ArrayMax &lt; Data.ArrayNum">Invalid</DisplayString>
+    <DisplayString Condition="Data.ArrayMax &gt;= Data.ArrayNum">{Data.AllocatorInstance.Data,su}</DisplayString>
+    <StringView Condition="Data.ArrayMax &gt;= Data.ArrayNum">Data.AllocatorInstance.Data,su</StringView>
+  </Type>
+
+  <!-- TStringView default visualizer -->
+  <Type Name="TStringView&lt;*&gt;">
+    <DisplayString Condition="Size == 0">Empty</DisplayString>
+    <DisplayString Condition="Size &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="Size &gt; 0">{DataPtr,[Size]}</DisplayString>
+    <StringView Condition="Size &gt; 0">DataPtr,[Size]</StringView>
+  </Type>
+
+  <!-- TStringView<WIDECHAR> visualizer -->
+  <Type Name="TStringView&lt;WIDECHAR&gt;">
+    <DisplayString Condition="Size == 0">Empty</DisplayString>
+    <DisplayString Condition="Size &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="Size &gt; 0">{DataPtr,[Size]su}</DisplayString>
+    <StringView Condition="Size &gt; 0">DataPtr,[Size]su</StringView>
+  </Type>
+
+  <!-- TStringView<ANSICHAR> visualizer -->
+  <Type Name="TStringView&lt;ANSICHAR&gt;">
+    <DisplayString Condition="Size == 0">Empty</DisplayString>
+    <DisplayString Condition="Size &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="Size &gt; 0">{DataPtr,[Size]s}</DisplayString>
+    <StringView Condition="Size &gt; 0">DataPtr,[Size]s</StringView>
+  </Type>
+
+  <Type Name="TStringBuilderBase&lt;*&gt;">
+    <DisplayString Condition="Base == CurPos">Empty</DisplayString>
+    <DisplayString Condition="sizeof($T1) == 1">{Base,[CurPos-Base]s}</DisplayString>
+    <DisplayString>{Base,[CurPos-Base]su}</DisplayString>
+    <StringView Condition="sizeof($T1) == 1">Base,[CurPos-Base]s</StringView>
+    <StringView>Base,[CurPos-Base]su</StringView>
+  </Type>
+
+  <Type Name="FGuid">
+    <DisplayString>{{{A,Xb}-{(unsigned __int16)(B >> 16),Xb}-{(unsigned __int16)B,Xb}-{(unsigned __int16)(C >> 16),Xb}-{(unsigned __int16)C,Xb}{D,Xb}}}</DisplayString>
+    <Expand>
+      <Item Name="A">A,X</Item>
+      <Item Name="B">B,X</Item>
+      <Item Name="C">C,X</Item>
+      <Item Name="D">D,X</Item>
+    </Expand>
+  </Type>
+
+  <!-- FText visualizer -->
+  <Type Name="FStringTableEntry">
+    <DisplayString>{*DisplayString.Object}</DisplayString>
+  </Type>
+  <Type Name="FTextHistory_StringTableEntry::FStringTableReferenceData">
+	<DisplayString Condition="DisplayString.Object">{*DisplayString.Object}</DisplayString>
+    <DisplayString Condition="!DisplayString.Object">&lt;MISSING STRING TABLE ENTRY&gt;</DisplayString>
+  </Type>
+  <Type Name="FTextHistory_StringTableEntry">
+    <DisplayString>{*StringTableReferenceData.Object}</DisplayString>
+  </Type>
+  <Type Name="FTextHistory_Generated" Inheritable="true">
+    <DisplayString>{DisplayString}</DisplayString>
+  </Type>
+  <Type Name="FTextHistory_Base">
+    <DisplayString Condition="LocalizedString.Object">{*LocalizedString.Object}</DisplayString>
+    <DisplayString Condition="!LocalizedString.Object">{SourceString}</DisplayString>
+  </Type>
+  <Type Name="FText">
+    <DisplayString>{*TextData.Object}</DisplayString>
+  </Type>
+
+  <!-- FName visualizer -->
+
+  <Type Name="FName">
+    <DisplayString Condition="Number">{ComparisonIndex}_{(Number - 1),d}</DisplayString>
+    <DisplayString>{ComparisonIndex}</DisplayString>
+  </Type>
+
+  <Type Name="FName" Priority="High">
+    <DisplayString Condition="Number">{DisplayIndex}_{(Number - 1),d}</DisplayString>
+    <DisplayString>{DisplayIndex}</DisplayString>
+  </Type>
+
+  <Type Name="FMinimalName">
+    <DisplayString Condition="Number">{Index}_{(Number - 1),d}</DisplayString>
+    <DisplayString>{Index}</DisplayString>
+  </Type>
+
+  <Type Name="FNameEntryId">
+    <DisplayString Condition="Value &amp; FNameDebugVisualizer::UnusedMask">Illegal name (block index out of range)</DisplayString>
+    <DisplayString Condition="!GNameBlocksDebug[Value &gt;&gt; FNameDebugVisualizer::OffsetBits]">Illegal name (null block)</DisplayString>
+
+    <DisplayString>{(FNameEntry&amp;)GNameBlocksDebug[Value &gt;&gt; FNameDebugVisualizer::OffsetBits][FNameDebugVisualizer::EntryStride * (Value &amp; FNameDebugVisualizer::OffsetMask)],sb}</DisplayString>
+  </Type>
+
+  <Type Name="FNameEntry">
+    <DisplayString Condition="Header.Len &gt; FNameDebugVisualizer::MaxLength">Illegal name (length > NAME_SIZE)</DisplayString>
+    <DisplayString Condition="Header.bIsWide">{WideName,[Header.Len]su}</DisplayString>
+    <DisplayString>{AnsiName,[Header.Len]s}</DisplayString>
+  </Type>
+
+  <!-- FStatNameAndInfo -->
+  <Type Name="FStatNameAndInfo">
+    <DisplayString>{(EStatOperation::Type)((NameAndInfo.Number >> (EStatAllFields::StartShift + EStatOperation::Shift)) &amp; EStatOperation::Mask),en} {(EStatDataType::Type)((NameAndInfo.Number >> (EStatAllFields::StartShift + EStatDataType::Shift)) &amp; EStatDataType::Mask),en} {NameAndInfo}</DisplayString>
+    <Expand>
+      <Item Name="[Name]">NameAndInfo</Item>
+      <Item Name="[StatOperation]">(EStatOperation::Type)((NameAndInfo.Number >> (EStatAllFields::StartShift + EStatOperation::Shift)) &amp; EStatOperation::Mask)</Item>
+      <Item Name="[StatDataType]">(EStatDataType::Type)((NameAndInfo.Number >> (EStatAllFields::StartShift + EStatDataType::Shift)) &amp; EStatDataType::Mask)</Item>
+      <Item Name="[IsCycle]">((NameAndInfo.Number >> (EStatAllFields::StartShift + EStatMetaFlags::Shift)) &amp; EStatMetaFlags::IsCycle) == EStatMetaFlags::IsCycle</Item>
+      <Item Name="[IsMemory]">((NameAndInfo.Number >> (EStatAllFields::StartShift + EStatMetaFlags::Shift)) &amp; EStatMetaFlags::IsMemory) == EStatMetaFlags::IsMemory</Item>
+      <Item Name="[IsPackedCCAndDuration]">((NameAndInfo.Number >> (EStatAllFields::StartShift + EStatMetaFlags::Shift)) &amp; EStatMetaFlags::IsPackedCCAndDuration) == EStatMetaFlags::IsPackedCCAndDuration</Item>
+      <Item Name="[ShouldClearEveryFrame]">((NameAndInfo.Number >> (EStatAllFields::StartShift + EStatMetaFlags::Shift)) &amp; EStatMetaFlags::ShouldClearEveryFrame) == EStatMetaFlags::ShouldClearEveryFrame</Item>
+    </Expand>
+  </Type>
+
+  <!-- FStatMessage without DebugStatData-->
+  <Type Name="FStatMessage">
+    <DisplayString>{NameAndInfo}</DisplayString>
+  </Type>
+
+  <!-- FStatMessage with DebugStatData -->
+  <Type Name="FStatMessage" Priority="High">
+    <!--ST_None	-->
+    <DisplayString Condition="(EStatDataType::Type)((NameAndInfo.NameAndInfo.Number >> (EStatAllFields::StartShift + EStatDataType::Shift)) &amp; EStatDataType::Mask) == EStatDataType::ST_None">
+      {{NoneType NameAndInfo={NameAndInfo}}}
+    </DisplayString>
+
+    <!--ST_int64 && !IsPackedCCAndDuration && !IsCycle -->
+    <DisplayString Condition="(EStatDataType::Type)((NameAndInfo.NameAndInfo.Number >> (EStatAllFields::StartShift + EStatDataType::Shift)) &amp; EStatDataType::Mask) == EStatDataType::ST_int64 &amp;&amp; ((NameAndInfo.NameAndInfo.Number >> (EStatAllFields::StartShift + EStatMetaFlags::Shift)) &amp; EStatMetaFlags::IsPackedCCAndDuration) != EStatMetaFlags::IsPackedCCAndDuration &amp;&amp; ((NameAndInfo.NameAndInfo.Number >> (EStatAllFields::StartShift + EStatMetaFlags::Shift)) &amp; EStatMetaFlags::IsCycle) != EStatMetaFlags::IsCycle">
+      {{Int64={DebugStatData.Cycles} NameAndInfo={NameAndInfo}}}
+    </DisplayString>
+
+    <!--ST_int64 && !IsPackedCCAndDuration && IsCycle -->
+    <DisplayString Condition="(EStatDataType::Type)((NameAndInfo.NameAndInfo.Number >> (EStatAllFields::StartShift + EStatDataType::Shift)) &amp; EStatDataType::Mask) == EStatDataType::ST_int64 &amp;&amp; ((NameAndInfo.NameAndInfo.Number >> (EStatAllFields::StartShift + EStatMetaFlags::Shift)) &amp; EStatMetaFlags::IsPackedCCAndDuration) != EStatMetaFlags::IsPackedCCAndDuration &amp;&amp; ((NameAndInfo.NameAndInfo.Number >> (EStatAllFields::StartShift + EStatMetaFlags::Shift)) &amp; EStatMetaFlags::IsCycle) == EStatMetaFlags::IsCycle">
+      {{Cycles={DebugStatData.Cycles} NameAndInfo={NameAndInfo}}}
+    </DisplayString>
+
+    <!--ST_int64 && IsPackedCCAndDuration && IsCycle -->
+    <DisplayString Condition="(EStatDataType::Type)((NameAndInfo.NameAndInfo.Number >> (EStatAllFields::StartShift + EStatDataType::Shift)) &amp; EStatDataType::Mask) == EStatDataType::ST_int64 &amp;&amp; ((NameAndInfo.NameAndInfo.Number >> (EStatAllFields::StartShift + EStatMetaFlags::Shift)) &amp; EStatMetaFlags::IsPackedCCAndDuration) == EStatMetaFlags::IsPackedCCAndDuration &amp;&amp; ((NameAndInfo.NameAndInfo.Number >> (EStatAllFields::StartShift + EStatMetaFlags::Shift)) &amp; EStatMetaFlags::IsCycle) == EStatMetaFlags::IsCycle">
+      {{Count={DebugStatData.CCAndDuration[0]},Cycles={DebugStatData.CCAndDuration[1]} NameAndInfo={NameAndInfo}}}
+    </DisplayString>
+
+    <!--ST_double -->
+    <DisplayString Condition="(EStatDataType::Type)((NameAndInfo.NameAndInfo.Number >> (EStatAllFields::StartShift + EStatDataType::Shift)) &amp; EStatDataType::Mask) == EStatDataType::ST_double">
+      {{Float={DebugStatData.Float} NameAndInfo={NameAndInfo}}}
+    </DisplayString>
+
+    <!--ST_FName -->
+    <DisplayString Condition="(EStatDataType::Type)((NameAndInfo.NameAndInfo.Number >> (EStatAllFields::StartShift + EStatDataType::Shift)) &amp; EStatDataType::Mask) == EStatDataType::ST_FName">
+      {{Name={(FNameEntryId&amp;)DebugStatData.Cycles} NameAndInfo={NameAndInfo}}}
+    </DisplayString>
+
+    <!--ST_Ptr -->
+    <DisplayString Condition="(EStatDataType::Type)((NameAndInfo.NameAndInfo.Number >> (EStatAllFields::StartShift + EStatDataType::Shift)) &amp; EStatDataType::Mask) == EStatDataType::ST_Ptr">
+      {{Ptr={DebugStatData.Ptr} NameAndInfo={NameAndInfo}}}
+    </DisplayString>
+  </Type>
+
+  <!-- FAllocationInfo -->
+  <!--
+		uint64 OldPtr;
+		uint64 Ptr;
+		int64 Size;
+		FName EncodedCallstack;
+		uint32 SequenceTag;
+		EMemoryOperation Op; Alloc=1, Free=2, Realloc=3
+		bool bHasBrokenCallstack;
+	-->
+  <Type Name="FAllocationInfo">
+    <!-- Alloc -->
+    <DisplayString Condition="Op == 1" >
+      {{A SeqTag={SequenceTag} Ptr={Ptr} Size={Size} Callstack={EncodedCallstack} bHasBrokenCallstack={bHasBrokenCallstack}}}
+    </DisplayString>
+
+    <!-- Free -->
+    <DisplayString Condition="Op == 2" >
+      {{F SeqTag={SequenceTag} Ptr={Ptr} bHasBrokenCallstack={bHasBrokenCallstack}}}
+    </DisplayString>
+
+    <!-- Realloc -->
+    <DisplayString Condition="Op == 3" >
+      {{R SeqTag={SequenceTag} OldPtr={OldPtr} Ptr={Ptr} NewSize={Size} Callstack={EncodedCallstack} bHasBrokenCallstack={bHasBrokenCallstack}}}
+    </DisplayString>
+  </Type>
+
+  <Type Name="FThreadSafeCounter">
+    <DisplayString>{Counter}</DisplayString>
+  </Type>
+
+  <Type Name="FThreadSafeBool">
+    <DisplayString Condition="Counter==0">False</DisplayString>
+    <DisplayString Condition="Counter==1">True</DisplayString>
+  </Type>
+
+  <!-- FTimespan visualizer -->
+  <Type Name="FTimespan">
+    <DisplayString>Ticks = {Ticks}</DisplayString>
+    <Expand>
+      <Item Name="Total Milliseconds">Ticks / ETimespan::TicksPerMillisecond</Item>
+      <Item Name="Total Seconds">Ticks / ETimespan::TicksPerSecond</Item>
+      <Item Name="Total Minutes">Ticks / ETimespan::TicksPerMinute</Item>
+      <Item Name="Total Hours">Ticks / ETimespan::TicksPerHour</Item>
+      <Item Name="Total Days">Ticks / ETimespan::TicksPerDay</Item>
+    </Expand>
+  </Type>
+
+  <Type Name="FAsyncPackageData">
+    <DisplayString>ExportCount={ExportCount}, ExportBundleCount={ExportBundleCount}, ImportedPackages={ImportedAsyncPackages.ArrayNum}</DisplayString>
+  </Type>
+
+  <Type Name="FEventLoadNode2">
+    <DisplayString Condition="bDone.Element">Done {Spec-&gt;Func,na}</DisplayString>
+    <DisplayString Condition="bFired.Element">Fired {Spec-&gt;Func,na}</DisplayString>
+    <DisplayString>Queued (BarrierCount={BarrierCount.Element}) {Spec-&gt;Func,na}</DisplayString>
+  </Type>
+
+  <Type Name="FExportObject">
+    <DisplayString Condition="Object != 0">{Object-&gt;NamePrivate} ({Object-&gt;ObjectFlags,x})</DisplayString>
+    <DisplayString Condition="!bFiltered &amp;&amp; !bExportLoadFailed">Null (Create)</DisplayString>
+    <DisplayString Condition="bFiltered">Null (Filtered)</DisplayString>
+    <DisplayString>Null (Failed)</DisplayString>
+  </Type>
+
+  <Type Name="FAsyncPackageDesc2">
+    <DisplayString Condition="CustomPackageId.Id != CustomPackageId.InvalidId">{CustomPackageName} ({CustomPackageId.Id,X}) {DiskPackageName} ({DiskPackageId.Id,X})</DisplayString>
+    <DisplayString>{DiskPackageName} ({DiskPackageId.Id,X})</DisplayString>
+  </Type>
+
+  <Type Name="FAsyncPackage2">
+    <DisplayString>{Desc}</DisplayString>
+  </Type>
+
+  <Type Name="FPackageId">
+    <DisplayString Condition="Id != InvalidId">{Id,X}</DisplayString>
+    <DisplayString>Null</DisplayString>
+  </Type>
+  
+  <Type Name="FPackageIndex">
+    <DisplayString Condition="Index &lt; 0">ImportIndex={-Index-1}</DisplayString>
+    <DisplayString Condition="Index &gt; 0">ExportIndex={Index-1}</DisplayString>
+    <DisplayString>Null</DisplayString>
+  </Type>
+
+  <Type Name="FPackageObjectIndex">
+    <DisplayString Condition="TypeAndId != Invalid">{(EType)(TypeAndId >> TypeShift)} {TypeAndId &amp; IndexMask,X}</DisplayString>
+    <DisplayString>Null</DisplayString>
+  </Type>
+
+  <Type Name="TPackageStoreEntryCArrayView&lt;*&gt;">
+    <DisplayString Condition="ArrayNum == 0">Empty</DisplayString>
+    <DisplayString>Num={ArrayNum}, Data[0]={($T1*)((uint8*)this + OffsetToDataFromThis)}</DisplayString>
+    <Expand>
+      <ArrayItems Condition="ArrayNum &gt;= 0">
+        <Size>ArrayNum</Size>
+        <ValuePointer>($T1*)((char*)this + OffsetToDataFromThis)</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+  <Type Name="UE::Math::TVector&lt;*&gt;">
+    <DisplayString>{{X={X} Y={Y} Z={Z}}}</DisplayString>
+    <Expand HideRawView="true">
+      <Item Name="X">X</Item>
+      <Item Name="Y">Y</Item>
+      <Item Name="Z">Z</Item>
+      <Item Name="||V||&#xB2;">X*X + Y*Y + Z*Z</Item>
+    </Expand>
+  </Type>
+
+  <Type Name="UE::Math::TQuat&lt;*&gt;">
+    <DisplayString>{{X={X} Y={Y} Z={Z} W={W}}}</DisplayString>
+    <Expand HideRawView="true">
+      <Item Name="X">X</Item>
+      <Item Name="Y">Y</Item>
+      <Item Name="Z">Z</Item>
+      <Item Name="W">W</Item>
+      <Item Name="||Q||&#xB2;">X*X + Y*Y + Z*Z + W*W</Item>
+    </Expand>
+  </Type>
+
+  <Type Name="FRotator">
+    <DisplayString>{{Pitch={Pitch} Yaw={Yaw} Roll={Roll}}}</DisplayString>
+    <Expand HideRawView="true">
+      <Item Name="Pitch (Y)">Pitch</Item>
+      <Item Name="Yaw (Z)">Yaw</Item>
+      <Item Name="Roll (X)">Roll</Item>
+    </Expand>
+  </Type>
+
+  <Type Name="UE::Math::TTransform&lt;float&gt;">
+    <DisplayString>{{Translation={{X={Translation.m128_f32[0]} Y={Translation.m128_f32[1]} Z={Translation.m128_f32[2]}}} Rotation={{X={Rotation.m128_f32[0]} Y={Rotation.m128_f32[1]} Z={Rotation.m128_f32[2]} W={Rotation.m128_f32[3]}}}}}</DisplayString>
+    <Expand>
+      <Synthetic Name="Translation">
+        <DisplayString>{{X={Translation.m128_f32[0]} Y={Translation.m128_f32[1]} Z={Translation.m128_f32[2]}}}</DisplayString>
+        <Expand>
+          <Item Name="X">Translation.m128_f32[0]</Item>
+          <Item Name="Y">Translation.m128_f32[1]</Item>
+          <Item Name="Z">Translation.m128_f32[2]</Item>
+          <Item Name="||V||&#xB2;">Translation.m128_f32[0]*Translation.m128_f32[0] + Translation.m128_f32[1]*Translation.m128_f32[1] + Translation.m128_f32[2]*Translation.m128_f32[2]</Item>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="Rotation">
+        <DisplayString>{{X={Rotation.m128_f32[0]} Y={Rotation.m128_f32[1]} Z={Rotation.m128_f32[2]} W={Rotation.m128_f32[3]}}}</DisplayString>
+        <Expand>
+          <Item Name="X">Rotation.m128_f32[0]</Item>
+          <Item Name="Y">Rotation.m128_f32[1]</Item>
+          <Item Name="Z">Rotation.m128_f32[2]</Item>
+          <Item Name="W">Rotation.m128_f32[3]</Item>
+          <Item Name="||Q||&#xB2;">Rotation.m128_f32[0]*Rotation.m128_f32[0] + Rotation.m128_f32[1]*Rotation.m128_f32[1] + Rotation.m128_f32[2]*Rotation.m128_f32[2] + Rotation.m128_f32[3]*Rotation.m128_f32[3]</Item>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="Scale3D">
+        <DisplayString>{{X={Scale3D.m128_f32[0]} Y={Scale3D.m128_f32[1]} Z={Scale3D.m128_f32[2]}}}</DisplayString>
+        <Expand>
+          <Item Name="X">Scale3D.m128_f32[0]</Item>
+          <Item Name="Y">Scale3D.m128_f32[1]</Item>
+          <Item Name="Z">Scale3D.m128_f32[2]</Item>
+        </Expand>
+      </Synthetic>
+    </Expand>
+  </Type>
+
+  <Type Name="UE::Math::TTransform&lt;double&gt;">
+    <DisplayString>{{Translation={{X={Translation.XY.m128d_f64[0]} Y={Translation.XY.m128d_f64[1]} Z={Translation.ZW.m128d_f64[0]}}} Rotation={{X={Rotation.XY.m128d_f64[0]} Y={Rotation.XY.m128d_f64[1]} Z={Rotation.ZW.m128d_f64[0]} W={Rotation.ZW.m128d_f64[1]}}}}}</DisplayString>
+    <Expand>
+      <Synthetic Name="Translation">
+        <DisplayString>{{X={Translation.XY.m128d_f64[0]} Y={Translation.XY.m128d_f64[1]} Z={Translation.ZW.m128d_f64[0]}}}</DisplayString>
+        <Expand>
+          <Item Name="X">Translation.XY.m128d_f64[0]</Item>
+          <Item Name="Y">Translation.XY.m128d_f64[1]</Item>
+          <Item Name="Z">Translation.ZW.m128d_f64[0]</Item>
+          <Item Name="||V||&#xB2;">Translation.XY.m128d_f64[0]*Translation.XY.m128d_f64[0] + Translation.XY.m128d_f64[1]*Translation.XY.m128d_f64[1] + Translation.ZW.m128d_f64[0]*Translation.ZW.m128d_f64[0]</Item>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="Rotation">
+        <DisplayString>{{X={Rotation.XY.m128d_f64[0]} Y={Rotation.XY.m128d_f64[1]} Z={Rotation.ZW.m128d_f64[0]} W={Rotation.ZW.m128d_f64[1]}}}</DisplayString>
+        <Expand>
+          <Item Name="X">Rotation.XY.m128d_f64[0]</Item>
+          <Item Name="Y">Rotation.XY.m128d_f64[1]</Item>
+          <Item Name="Z">Rotation.ZW.m128d_f64[0]</Item>
+          <Item Name="W">Rotation.ZW.m128d_f64[1]</Item>
+          <Item Name="||Q||&#xB2;">Rotation.XY.m128d_f64[0]*Rotation.XY.m128d_f64[0] + Rotation.XY.m128d_f64[1]*Rotation.XY.m128d_f64[1] + Rotation.ZW.m128d_f64[0]*Rotation.ZW.m128d_f64[0] + Rotation.ZW.m128d_f64[1]*Rotation.ZW.m128d_f64[1]</Item>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="Scale3D">
+        <DisplayString>{{X={Scale3D.XY.m128d_f64[0]} Y={Scale3D.XY.m128d_f64[1]} Z={Scale3D.ZW.m128d_f64[0]}}}</DisplayString>
+        <Expand>
+          <Item Name="X">Scale3D.XY.m128d_f64[0]</Item>
+          <Item Name="Y">Scale3D.XY.m128d_f64[1]</Item>
+          <Item Name="Z">Scale3D.ZW.m128d_f64[0]</Item>
+        </Expand>
+      </Synthetic>
+    </Expand>
+  </Type>
+
+  <Type Name="UE::Math::TPlane&lt;*&gt;">
+    <DisplayString>{{X={X} Y={Y} Z={Z} W={W}}}</DisplayString>
+    <Expand HideRawView="true">
+      <Item Name="X">X</Item>
+      <Item Name="Y">Y</Item>
+      <Item Name="Z">Z</Item>
+      <Item Name="W">W</Item>
+    </Expand>
+  </Type>
+
+  <!-- TEnumAsByte visualizer -->
+  <Type Name="TEnumAsByte&lt;*&gt;">
+    <DisplayString>{($T1)Value}</DisplayString>
+  </Type>
+
+  <!-- UObjectBase visualizer -->
+  <Type Name="UObjectBase">
+    <DisplayString>(Name={NamePrivate})</DisplayString>
+  </Type>
+
+  <!-- FFieldClass visualizer -->
+  <Type Name="FFieldClass">
+    <DisplayString>(Name={Name})</DisplayString>
+  </Type>
+  
+  <!-- FFieldVariant visualizer -->
+  <Type Name="FFieldVariant">
+    <DisplayString Condition="bIsUObject==0">{Container.Field}</DisplayString>
+    <DisplayString Condition="bIsUObject==1">{Container.Object}</DisplayString>
+    <Expand>
+      <Item Name="Field" Condition="bIsUObject==0">Container.Field</Item>
+      <Item Name="Object" Condition="bIsUObject==1">Container.Object</Item>
+    </Expand>    
+  </Type>
+  
+  <!-- FField visualizer -->
+  <Type Name="FField">
+    <DisplayString>Name={NamePrivate}</DisplayString>
+  </Type>
+
+  <!--TFieldPath visualizer-->
+  <Type Name="TFieldPath&lt;*&gt;">
+    <DisplayString Condition="ResolvedField != nullptr">{ResolvedField->NamePrivate}</DisplayString>
+    <DisplayString Condition="Path.ArrayNum &gt; 0">{((FName*)Path.AllocatorInstance.Data)[Path.ArrayNum - 1]}</DisplayString>
+    <DisplayString>Invalid</DisplayString>
+  </Type>
+
+  <!-- FChunkedFixedUObjectArray visualizer -->
+  <Type Name="FChunkedFixedUObjectArray">
+    <DisplayString Condition="NumElements == 0">Empty</DisplayString>
+    <DisplayString Condition="NumElements &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="NumElements &gt; 0">NumElements={NumElements}, NumChunks={NumChunks}, {NumElementsPerChunk}</DisplayString>
+
+    <Expand>
+      <IndexListItems Condition="NumElements &gt; 0">
+        <Size>NumElements</Size>
+        <ValueNode>
+          Objects[$i / NumElementsPerChunk][$i % NumElementsPerChunk]
+        </ValueNode>
+      </IndexListItems>
+    </Expand>
+  </Type>
+
+  <!-- TArray<*,TFixedAllocator<*> > visualizer -->
+  <Type Name="TArray&lt;*,TFixedAllocator&lt;*&gt;&gt;">
+    <DisplayString Condition="ArrayNum == 0">Empty</DisplayString>
+    <DisplayString Condition="ArrayNum &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &lt; ArrayNum">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &gt;= ArrayNum">Num={ArrayNum}</DisplayString>
+    <Expand>
+      <ArrayItems Condition="ArrayNum &lt;= ArrayMax">
+        <Size>ArrayNum</Size>
+        <ValuePointer>(TArray&lt;$T1,TFixedAllocator&lt;$T2&gt; &gt;::ElementType*)AllocatorInstance.InlineData</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+  <!-- TArray<*,TSizedInlineAllocator<*,*,*> > visualizer -->
+  <Type Name="TArray&lt;*,TSizedInlineAllocator&lt;*,*,*&gt;&gt;">
+    <DisplayString Condition="ArrayNum == 0">Empty</DisplayString>
+    <DisplayString Condition="ArrayNum &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &lt; ArrayNum">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &gt;= ArrayNum">Num={ArrayNum}</DisplayString>
+    <Expand>
+      <ArrayItems Condition="ArrayNum &lt;= ArrayMax">
+        <Size>ArrayNum</Size>
+        <ValuePointer Condition="AllocatorInstance.SecondaryData.Data == 0">(TArray&lt;$T1,TSizedInlineAllocator&lt;$T2,$T3,$T4&gt; &gt;::ElementType*)AllocatorInstance.InlineData</ValuePointer>
+        <ValuePointer Condition="AllocatorInstance.SecondaryData.Data != 0">(TArray&lt;$T1,TSizedInlineAllocator&lt;$T2,$T3,$T4&gt; &gt;::ElementType*)AllocatorInstance.SecondaryData.Data</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+  <!-- TArray<*,TMemoryImageAllocator<*>> visualizer -->
+  <Type Name="TArray&lt;*,TMemoryImageAllocator&lt;*&gt;&gt;">
+    <DisplayString Condition="ArrayNum == 0">Empty</DisplayString>
+    <DisplayString Condition="ArrayNum &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &lt; ArrayNum">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &gt;= ArrayNum">Num={ArrayNum}</DisplayString>
+    <DisplayString>Ptr={AllocatorInstance.Data.UnfrozenPtr}</DisplayString>
+    <Expand>
+      <ArrayItems Condition="ArrayNum &lt;= ArrayMax">
+        <Size>ArrayNum</Size>
+        <ValuePointer Condition="(AllocatorInstance.Data.Frozen.Packed &amp; 1) != 0">(TArray&lt;$T1,TMemoryImageAllocator&lt;$T2&gt; &gt;::ElementType*)( (char*)&amp;AllocatorInstance.Data + (int64(AllocatorInstance.Data.Frozen.Packed) >> 24))</ValuePointer>
+        <ValuePointer Condition="(AllocatorInstance.Data.Frozen.Packed &amp; 1) == 0">(TArray&lt;$T1,TMemoryImageAllocator&lt;$T2&gt; &gt;::ElementType*)AllocatorInstance.Data.UnfrozenPtr</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+  <!-- TArray visualizer -->
+  <Type Name="TArray&lt;*,*&gt;">
+    <DisplayString Condition="ArrayNum == 0">Empty</DisplayString>
+    <DisplayString Condition="ArrayNum &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &lt; ArrayNum">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &gt;= ArrayNum">Num={ArrayNum}</DisplayString>
+    <Expand>
+      <ArrayItems Condition="ArrayNum &lt;= ArrayMax">
+        <Size>ArrayNum</Size>
+        <ValuePointer>(TArray&lt;$T1,$T2&gt;::ElementType*)AllocatorInstance.Data</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+  <!-- TArray<char> visualizers -->
+  <Type Name="TArray&lt;char,*&gt;">
+    <DisplayString Condition="ArrayNum == 0">Empty</DisplayString>
+    <DisplayString Condition="ArrayNum &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &lt; ArrayNum">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &gt;= ArrayNum">Num={ArrayNum} {(char*)AllocatorInstance.Data,[ArrayNum]s}</DisplayString>
+    <StringView Condition="ArrayMax &gt;= ArrayNum">(char*)AllocatorInstance.Data,[ArrayNum]s</StringView>
+    <Expand>
+      <ArrayItems Condition="ArrayNum &lt;= ArrayMax">
+        <Size>ArrayNum</Size>
+        <ValuePointer>(char*)AllocatorInstance.Data</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="TArray&lt;char,TFixedAllocator&lt;*&gt;&gt;">
+    <DisplayString Condition="ArrayNum == 0">Empty</DisplayString>
+    <DisplayString Condition="ArrayNum &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &lt; ArrayNum">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &gt;= ArrayNum">Num={ArrayNum} {(char*)AllocatorInstance.InlineData,[ArrayNum]s}</DisplayString>
+    <StringView Condition="ArrayMax &gt;= ArrayNum">(char*)AllocatorInstance.InlineData,[ArrayNum]s</StringView>
+    <Expand>
+      <ArrayItems Condition="ArrayNum &lt;= ArrayMax">
+        <Size>ArrayNum</Size>
+        <ValuePointer>(char*)AllocatorInstance.InlineData</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="TArray&lt;char,TSizedInlineAllocator&lt;*,*,*&gt;&gt;">
+    <DisplayString Condition="ArrayNum == 0">Empty</DisplayString>
+    <DisplayString Condition="ArrayNum &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &lt; ArrayNum">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &gt;= ArrayNum &amp;&amp; AllocatorInstance.SecondaryData.Data == 0">Num={ArrayNum} {(char*)AllocatorInstance.InlineData,[ArrayNum]s}</DisplayString>
+    <DisplayString Condition="ArrayMax &gt;= ArrayNum &amp;&amp; AllocatorInstance.SecondaryData.Data != 0">Num={ArrayNum} {(char*)AllocatorInstance.SecondaryData.Data,[ArrayNum]s}</DisplayString>
+    <StringView Condition="ArrayMax &gt;= ArrayNum &amp;&amp; AllocatorInstance.SecondaryData.Data == 0">(char*)AllocatorInstance.InlineData,[ArrayNum]s</StringView>
+    <StringView Condition="ArrayMax &gt;= ArrayNum &amp;&amp; AllocatorInstance.SecondaryData.Data != 0">(char*)AllocatorInstance.SecondaryData.Data,[ArrayNum]s</StringView>
+    <Expand>
+      <ArrayItems Condition="ArrayNum &lt;= ArrayMax">
+        <Size>ArrayNum</Size>
+        <ValuePointer Condition="AllocatorInstance.SecondaryData.Data == 0">(char*)AllocatorInstance.InlineData</ValuePointer>
+        <ValuePointer Condition="AllocatorInstance.SecondaryData.Data != 0">(char*)AllocatorInstance.SecondaryData.Data</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+  <!-- TArray<unsigned char> visualizers -->
+  <Type Name="TArray&lt;unsigned char,*&gt;">
+    <DisplayString Condition="ArrayNum == 0">Empty</DisplayString>
+    <DisplayString Condition="ArrayNum &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &lt; ArrayNum">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &gt;= ArrayNum">Num={ArrayNum} {(unsigned char*)AllocatorInstance.Data,[ArrayNum]s}</DisplayString>
+    <StringView Condition="ArrayMax &gt;= ArrayNum">(unsigned char*)AllocatorInstance.Data,[ArrayNum]s</StringView>
+    <Expand>
+      <ArrayItems Condition="ArrayNum &lt;= ArrayMax">
+        <Size>ArrayNum</Size>
+        <ValuePointer>(unsigned char*)AllocatorInstance.Data</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="TArray&lt;unsigned char,TFixedAllocator&lt;*&gt;&gt;">
+    <DisplayString Condition="ArrayNum == 0">Empty</DisplayString>
+    <DisplayString Condition="ArrayNum &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &lt; ArrayNum">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &gt;= ArrayNum">Num={ArrayNum} {(unsigned char*)AllocatorInstance.InlineData,[ArrayNum]s}</DisplayString>
+    <StringView Condition="ArrayMax &gt;= ArrayNum">(unsigned char*)AllocatorInstance.InlineData,[ArrayNum]s</StringView>
+    <Expand>
+      <ArrayItems Condition="ArrayNum &lt;= ArrayMax">
+        <Size>ArrayNum</Size>
+        <ValuePointer>(unsigned char*)AllocatorInstance.InlineData</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="TArray&lt;unsigned char,TSizedInlineAllocator&lt;*,*,*&gt;&gt;">
+    <DisplayString Condition="ArrayNum == 0">Empty</DisplayString>
+    <DisplayString Condition="ArrayNum &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &lt; ArrayNum">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &gt;= ArrayNum &amp;&amp; AllocatorInstance.SecondaryData.Data == 0">Num={ArrayNum} {(unsigned char*)AllocatorInstance.InlineData,[ArrayNum]s}</DisplayString>
+    <DisplayString Condition="ArrayMax &gt;= ArrayNum &amp;&amp; AllocatorInstance.SecondaryData.Data != 0">Num={ArrayNum} {(unsigned char*)AllocatorInstance.SecondaryData.Data,[ArrayNum]s}</DisplayString>
+    <StringView Condition="ArrayMax &gt;= ArrayNum &amp;&amp; AllocatorInstance.SecondaryData.Data == 0">(unsigned char*)AllocatorInstance.InlineData,[ArrayNum]s</StringView>
+    <StringView Condition="ArrayMax &gt;= ArrayNum &amp;&amp; AllocatorInstance.SecondaryData.Data != 0">(unsigned char*)AllocatorInstance.SecondaryData.Data,[ArrayNum]s</StringView>
+    <Expand>
+      <ArrayItems Condition="ArrayNum &lt;= ArrayMax">
+        <Size>ArrayNum</Size>
+        <ValuePointer Condition="AllocatorInstance.SecondaryData.Data == 0">(unsigned char*)AllocatorInstance.InlineData</ValuePointer>
+        <ValuePointer Condition="AllocatorInstance.SecondaryData.Data != 0">(unsigned char*)AllocatorInstance.SecondaryData.Data</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+  <!-- TArray<wchar_t> visualizers -->
+  <Type Name="TArray&lt;wchar_t,*&gt;">
+    <DisplayString Condition="ArrayNum == 0">Empty</DisplayString>
+    <DisplayString Condition="ArrayNum &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &lt; ArrayNum">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &gt;= ArrayNum">Num={ArrayNum} {(wchar_t*)AllocatorInstance.Data,[ArrayNum]su}</DisplayString>
+    <StringView Condition="ArrayMax &gt;= ArrayNum">(wchar_t*)AllocatorInstance.Data,[ArrayNum]su</StringView>
+    <Expand>
+      <ArrayItems Condition="ArrayNum &lt;= ArrayMax">
+        <Size>ArrayNum</Size>
+        <ValuePointer>(wchar_t*)AllocatorInstance.Data</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="TArray&lt;wchar_t,TFixedAllocator&lt;*&gt;&gt;">
+    <DisplayString Condition="ArrayNum == 0">Empty</DisplayString>
+    <DisplayString Condition="ArrayNum &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &lt; ArrayNum">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &gt;= ArrayNum">Num={ArrayNum} {(wchar_t*)AllocatorInstance.InlineData,[ArrayNum]su}</DisplayString>
+    <StringView Condition="ArrayMax &gt;= ArrayNum">(wchar_t*)AllocatorInstance.InlineData,[ArrayNum]su</StringView>
+    <Expand>
+      <ArrayItems Condition="ArrayNum &lt;= ArrayMax">
+        <Size>ArrayNum</Size>
+        <ValuePointer>(wchar_t*)AllocatorInstance.InlineData</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="TArray&lt;wchar_t,TSizedInlineAllocator&lt;*,*,*&gt;&gt;">
+    <DisplayString Condition="ArrayNum == 0">Empty</DisplayString>
+    <DisplayString Condition="ArrayNum &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &lt; ArrayNum">Invalid</DisplayString>
+    <DisplayString Condition="ArrayMax &gt;= ArrayNum &amp;&amp; AllocatorInstance.SecondaryData.Data == 0">Num={ArrayNum} {(wchar_t*)AllocatorInstance.InlineData,[ArrayNum]su}</DisplayString>
+    <DisplayString Condition="ArrayMax &gt;= ArrayNum &amp;&amp; AllocatorInstance.SecondaryData.Data != 0">Num={ArrayNum} {(wchar_t*)AllocatorInstance.SecondaryData.Data,[ArrayNum]su}</DisplayString>
+    <StringView Condition="ArrayMax &gt;= ArrayNum &amp;&amp; AllocatorInstance.SecondaryData.Data == 0">(wchar_t*)AllocatorInstance.InlineData,[ArrayNum]su</StringView>
+    <StringView Condition="ArrayMax &gt;= ArrayNum &amp;&amp; AllocatorInstance.SecondaryData.Data != 0">(wchar_t*)AllocatorInstance.SecondaryData.Data,[ArrayNum]su</StringView>
+    <Expand>
+      <ArrayItems Condition="ArrayNum &lt;= ArrayMax">
+        <Size>ArrayNum</Size>
+        <ValuePointer Condition="AllocatorInstance.SecondaryData.Data == 0">(wchar_t*)AllocatorInstance.InlineData</ValuePointer>
+        <ValuePointer Condition="AllocatorInstance.SecondaryData.Data != 0">(wchar_t*)AllocatorInstance.SecondaryData.Data</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+  <!-- TArrayView visualizer -->
+  <Type Name="TArrayView&lt;*&gt;">
+    <DisplayString Condition="ArrayNum == 0">Empty</DisplayString>
+    <DisplayString Condition="ArrayNum &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="ArrayNum &gt; 0">Num={ArrayNum}</DisplayString>
+    <Expand>
+      <ArrayItems Condition="ArrayNum &gt; 0">
+        <Size>ArrayNum</Size>
+        <ValuePointer>DataPtr</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+  <!-- TIndirectArray visualizer -->
+  <Type Name="TIndirectArray&lt;*,*&gt;">
+    <DisplayString Condition="Array.ArrayNum == 0">Empty</DisplayString>
+    <DisplayString Condition="Array.ArrayNum &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="Array.ArrayMax &lt; Array.ArrayNum">Invalid</DisplayString>
+    <DisplayString Condition="Array.ArrayMax &gt;= Array.ArrayNum">Num={Array.ArrayNum}</DisplayString>
+    <Expand>
+      <IndexListItems Condition="Array.ArrayNum &lt;= Array.ArrayMax">
+        <Size>Array.ArrayNum</Size>
+        <ValueNode>*((TIndirectArray&lt;$T1,$T2&gt;::ElementType**)Array.AllocatorInstance.Data)[$i]</ValueNode>
+      </IndexListItems>
+    </Expand>
+  </Type>
+
+  <!-- TChunkedArray visualizer -->
+  <Type Name="TChunkedArray&lt;*,*&gt;">
+    <DisplayString Condition="NumElements == 0">Empty</DisplayString>
+    <DisplayString Condition="NumElements &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="NumElements &gt; 0">NumElements={NumElements}, NumChunks={Chunks.Array.ArrayNum}, {NumElementsPerChunk}</DisplayString>
+
+    <Expand>
+      <IndexListItems Condition="NumElements &gt; 0">
+        <Size>NumElements</Size>
+        <ValueNode>
+          *(
+          *(
+          (TChunkedArray&lt;$T1,$T2&gt;::ElementType**)Chunks.Array.AllocatorInstance.Data + ($i / NumElementsPerChunk)
+          ) + ($i % NumElementsPerChunk)
+          )
+        </ValueNode>
+      </IndexListItems>
+    </Expand>
+  </Type>
+
+  <!-- TSparseArray visualizer -->
+  <Type Name="TSparseArray&lt;*,*&gt;">
+    <DisplayString Condition="(Data.ArrayNum - NumFreeIndices) &lt;= 0">Empty</DisplayString>
+    <DisplayString Condition="Data.ArrayNum &lt;= Data.ArrayMax">Num={Data.ArrayNum - NumFreeIndices}</DisplayString>
+    <Expand>
+      <IndexListItems Condition="Data.ArrayNum &gt; 0 &amp;&amp; Data.ArrayNum &lt;= Data.ArrayMax">
+        <Size>Data.ArrayNum</Size>
+        <ValueNode Condition="(AllocationFlags.AllocatorInstance.SecondaryData.Data != 0) &amp;&amp; (reinterpret_cast&lt;uint32*&gt;(AllocationFlags.AllocatorInstance.SecondaryData.Data)[$i/32]&gt;&gt;($i%32) &amp; 1) != 0">*reinterpret_cast&lt;ElementType*&gt;(reinterpret_cast&lt;FElementOrFreeListLink*&gt;(Data.AllocatorInstance.Data) + $i)</ValueNode>
+        <ValueNode Condition="(AllocationFlags.AllocatorInstance.SecondaryData.Data == 0) &amp;&amp; (reinterpret_cast&lt;uint32*&gt;(AllocationFlags.AllocatorInstance.InlineData        )[$i/32]&gt;&gt;($i%32) &amp; 1) != 0">*reinterpret_cast&lt;ElementType*&gt;(reinterpret_cast&lt;FElementOrFreeListLink*&gt;(Data.AllocatorInstance.Data) + $i)</ValueNode>
+        <ValueNode Condition="(AllocationFlags.AllocatorInstance.SecondaryData.Data != 0) &amp;&amp; (reinterpret_cast&lt;uint32*&gt;(AllocationFlags.AllocatorInstance.SecondaryData.Data)[$i/32]&gt;&gt;($i%32) &amp; 1) == 0">"Invalid",sb</ValueNode>
+        <ValueNode Condition="(AllocationFlags.AllocatorInstance.SecondaryData.Data == 0) &amp;&amp; (reinterpret_cast&lt;uint32*&gt;(AllocationFlags.AllocatorInstance.InlineData        )[$i/32]&gt;&gt;($i%32) &amp; 1) == 0">"Invalid",sb</ValueNode>
+      </IndexListItems>
+    </Expand>
+  </Type>
+
+  <!-- TBitArray visualizer -->
+  <Type Name="TBitArray&lt;*&gt;">
+    <DisplayString Condition="NumBits == 0">Empty</DisplayString>
+    <DisplayString Condition="NumBits &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="NumBits &gt; 0">NumBits={NumBits}, MaxBits={MaxBits}</DisplayString>
+    <Expand>
+      <IndexListItems Condition="NumBits &gt; 0">
+        <Size>NumBits</Size>
+        <ValueNode Condition="(AllocatorInstance.SecondaryData.Data != 0) &amp;&amp; (reinterpret_cast&lt;uint32*&gt;(AllocatorInstance.SecondaryData.Data	)[$i/32]&gt;&gt;($i%32) &amp; 1) != 0">1</ValueNode>
+        <ValueNode Condition="(AllocatorInstance.SecondaryData.Data == 0) &amp;&amp; (reinterpret_cast&lt;uint32*&gt;(AllocatorInstance.InlineData			)[$i/32]&gt;&gt;($i%32) &amp; 1) != 0">1</ValueNode>
+        <ValueNode Condition="(AllocatorInstance.SecondaryData.Data != 0) &amp;&amp; (reinterpret_cast&lt;uint32*&gt;(AllocatorInstance.SecondaryData.Data	)[$i/32]&gt;&gt;($i%32) &amp; 1) == 0">0</ValueNode>
+        <ValueNode Condition="(AllocatorInstance.SecondaryData.Data == 0) &amp;&amp; (reinterpret_cast&lt;uint32*&gt;(AllocatorInstance.InlineData			)[$i/32]&gt;&gt;($i%32) &amp; 1) == 0">0</ValueNode>
+      </IndexListItems>
+    </Expand>
+  </Type>
+
+  <!-- TStaticArray visualizer -->
+  <Type Name="TStaticArray&lt;*,*,*&gt;">
+    <DisplayString>Num={$T2}</DisplayString>
+    <Expand>
+      <IndexListItems>
+        <Size>$T2</Size>
+        <ValueNode>Storage.Elements[$i].Element</ValueNode>
+      </IndexListItems>
+    </Expand>
+  </Type>
+
+  <!-- TDeque visualizer -->
+  <Type Name="TDeque&lt;*,*&gt;">
+    <DisplayString Condition="Count == 0">Empty</DisplayString>
+    <DisplayString Condition="Count &lt; 0">Invalid</DisplayString>
+    <DisplayString Condition="Capacity &lt; Count">Invalid</DisplayString>
+    <DisplayString Condition="Capacity &gt;= Count">Num={Count}</DisplayString>
+    <Expand>
+      <IndexListItems Condition="Count &lt;= Capacity">
+        <Size>Count</Size>
+        <ValueNode>*(($T1*)Storage.Data + (($i + Head) &lt; Capacity ? ($i + Head) : ($i + Head - Capacity)))</ValueNode>
+      </IndexListItems>
+    </Expand>
+  </Type>
+
+  <Type Name="UE::Deque::Private::TIteratorBase&lt;*,*&gt;">
+    <DisplayString Condition="Data == 0">Invalid</DisplayString>
+    <DisplayString Condition="Offset == Range">End</DisplayString>
+    <DisplayString Condition="Offset &lt; Range">{*($T1*)(Data + Offset)}</DisplayString>
+    <Expand>
+      <Item Name="[ptr]">($T1*)(Data + Offset)</Item>
+    </Expand>
+  </Type>
+    
+  <!-- TRingBuffer visualizer -->
+  <Type Name="TRingBuffer&lt;*,*&gt;">
+    <DisplayString Condition="AfterBack == Front">Empty</DisplayString>
+    <DisplayString Condition="AfterBack - Front &lt;= IndexMask+1">Num={AfterBack - Front}</DisplayString>
+    <DisplayString Condition="AfterBack - Front &gt; IndexMask+1">Invalid</DisplayString>
+    <Expand>
+      <IndexListItems Condition="AfterBack - Front &lt;= IndexMask+1">
+        <Size>AfterBack - Front</Size>
+        <ValueNode>AllocationData[(Front + $i) &amp; IndexMask]</ValueNode>
+      </IndexListItems>
+    </Expand>
+  </Type>
+
+  <!-- TUniquePtr visualizer -->
+  <Type Name="TUniquePtr&lt;*&gt;">
+    <SmartPointer Usage="Minimal">Ptr</SmartPointer>
+    <DisplayString Condition="Ptr == 0">nullptr</DisplayString>
+    <DisplayString Condition="Ptr != 0">Ptr={Ptr}</DisplayString>
+    <Expand>
+      <ExpandedItem Condition="Ptr">*Ptr</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- TSharedPtr visualizer -->
+  <Type Name="TSharedPtr&lt;*,*&gt;">
+    <SmartPointer Usage="Minimal">Object</SmartPointer>
+    <DisplayString Condition="Object == 0">nullptr</DisplayString>
+    <DisplayString Condition="Object != 0">Ptr={(void*)Object}, SharedRefs={SharedReferenceCount.ReferenceController->SharedReferenceCount}, WeakRefs={SharedReferenceCount.ReferenceController->WeakReferenceCount}, Object={*Object}</DisplayString>
+    <Expand>
+      <Item Condition="Object != 0" Name="[SharedReferenceCount]">SharedReferenceCount.ReferenceController->SharedReferenceCount</Item>
+      <Item Condition="Object != 0" Name="[WeakReferenceCount]">SharedReferenceCount.ReferenceController->WeakReferenceCount</Item>
+      <Item Condition="Object != 0" Name="[Ptr]">(void*)Object</Item>
+      <ExpandedItem Condition="Object != 0">*Object</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- TSharedRef visualizer -->
+  <Type Name="TSharedRef&lt;*,*&gt;">
+    <SmartPointer Usage="Minimal">Object</SmartPointer>
+    <DisplayString Condition="Object != 0">Ptr={(void*)Object}, SharedRefs={SharedReferenceCount.ReferenceController->SharedReferenceCount}, WeakRefs={SharedReferenceCount.ReferenceController->WeakReferenceCount}, Object={*Object}</DisplayString>
+    <Expand>
+      <Item Condition="Object != 0" Name="[SharedReferenceCount]">SharedReferenceCount.ReferenceController->SharedReferenceCount</Item>
+      <Item Condition="Object != 0" Name="[WeakReferenceCount]">SharedReferenceCount.ReferenceController->WeakReferenceCount</Item>
+      <Item Condition="Object != 0" Name="[Ptr]">(void*)Object</Item>
+      <ExpandedItem Condition="Object != 0">*Object</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- TWeakPtr visualizer -->
+  <Type Name="TWeakPtr&lt;*,*&gt;">
+    <SmartPointer Usage="Minimal">(WeakReferenceCount.ReferenceController->SharedReferenceCount._Storage._Value > 0) ? Object : ($T1*)0</SmartPointer>
+    <DisplayString Condition="Object == 0">nullptr</DisplayString>
+    <DisplayString Condition="WeakReferenceCount.ReferenceController->SharedReferenceCount._Storage._Value == 0">Object has been destroyed</DisplayString>
+    <DisplayString Condition="Object != 0">Ptr={(void*)Object}, SharedRefs={WeakReferenceCount.ReferenceController->SharedReferenceCount}, WeakRefs={WeakReferenceCount.ReferenceController->WeakReferenceCount}, Object={*Object}</DisplayString>
+    <Expand>
+      <Item Condition="Object != 0" Name="[SharedReferenceCount]">WeakReferenceCount.ReferenceController->SharedReferenceCount</Item>
+      <Item Condition="Object != 0" Name="[WeakReferenceCount]">WeakReferenceCount.ReferenceController->WeakReferenceCount</Item>
+      <Item Condition="Object != 0 &amp;&amp; WeakReferenceCount.ReferenceController->SharedReferenceCount._Storage._Value > 0" Name="[Ptr]">(void*)Object</Item>
+      <ExpandedItem Condition="Object != 0 &amp;&amp; WeakReferenceCount.ReferenceController->SharedReferenceCount._Storage._Value > 0">*Object</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- TMemoryImagePtr visualizer -->
+  <Type Name="TMemoryImagePtr&lt;*&gt;">
+    <SmartPointer Usage="Minimal">UnfrozenPtr</SmartPointer>
+    <DisplayString Condition="UnfrozenPtr == 0">nullptr</DisplayString>
+    <DisplayString Condition="UnfrozenPtr != 0 &amp;&amp; (Packed &amp; 1) != 0">{*($T1*)((char*)this + (int64(Packed) >> 24))}</DisplayString>
+    <DisplayString Condition="UnfrozenPtr != 0 &amp;&amp; (Packed &amp; 1) == 0">{*($T1*)UnfrozenPtr}</DisplayString>
+    <Expand>
+      <Item Condition="UnfrozenPtr != 0 &amp;&amp; (Packed &amp; 1) != 0" Name="Object">($T1*)( (char*)this + (int64(Packed) >> 24))</Item>
+      <Item Condition="UnfrozenPtr != 0 &amp;&amp; (Packed &amp; 1) == 0" Name="Object">($T1*)UnfrozenPtr</Item>
+    </Expand>
+  </Type>
+
+  <Type Name="FHashedNameDebugString">
+    <DisplayString Condition="String.UnfrozenPtr == 0">Empty</DisplayString>
+    <DisplayString Condition="(String.Frozen.Packed &amp; 1) != 0">{(char*)this + (int64(String.Frozen.Packed) >> 24)}</DisplayString>
+    <DisplayString>{String.UnfrozenPtr}</DisplayString>
+  </Type>
+
+  <!-- TMapBase visualizer -->
+  <Type Name="TMapBase&lt;*,*,*,*&gt;">
+    <DisplayString>{Pairs}</DisplayString>
+    <Expand>
+      <ExpandedItem>Pairs</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- TSet visualizer -->
+  <Type Name="TSet&lt;*,*,*&gt;">
+    <DisplayString Condition="Elements.Data.ArrayNum - Elements.NumFreeIndices &lt;= 0">Empty</DisplayString>
+    <DisplayString Condition="Elements.Data.ArrayNum &lt;= Elements.Data.ArrayMax">Num={Elements.Data.ArrayNum - Elements.NumFreeIndices}</DisplayString>
+    <Expand>
+      <CustomListItems Condition="Elements.Data.ArrayNum - Elements.NumFreeIndices &gt; 0 &amp;&amp; Elements.Data.ArrayNum &lt;= Elements.Data.ArrayMax">
+        <Variable Name="Index" InitialValue="0" />
+        <Size>Elements.Data.ArrayNum - Elements.NumFreeIndices</Size>
+        <Loop>
+          <If Condition="
+                 ((Elements.AllocationFlags.AllocatorInstance.SecondaryData.Data != 0) &amp;&amp; ((reinterpret_cast&lt;uint32*&gt;(Elements.AllocationFlags.AllocatorInstance.SecondaryData.Data)[Index/32]&gt;&gt;(Index%32)) &amp; 1) != 0)
+              || ((Elements.AllocationFlags.AllocatorInstance.SecondaryData.Data == 0) &amp;&amp; ((reinterpret_cast&lt;uint32*&gt;(Elements.AllocationFlags.AllocatorInstance.InlineData        )[Index/32]&gt;&gt;(Index%32)) &amp; 1) != 0)
+          ">
+            <Item>((TSetElement &lt;$T1&gt; *)Elements.Data.AllocatorInstance.Data)[Index].Value</Item>
+          </If>
+          <Exec>++Index</Exec>
+        </Loop>
+      </CustomListItems>
+    </Expand>
+  </Type>
+
+  <!-- TSet<*,*,TInlineSetAllocator<*>> visualizer -->
+  <Type Name="TSet&lt;*,*,TInlineSetAllocator&lt;*&gt;&gt;">
+    <DisplayString Condition="Elements.Data.ArrayNum - Elements.NumFreeIndices &lt;= 0">Empty</DisplayString>
+    <DisplayString Condition="Elements.Data.ArrayNum &lt;= Elements.Data.ArrayMax">Num={Elements.Data.ArrayNum - Elements.NumFreeIndices}</DisplayString>
+    <Expand>
+      <CustomListItems Condition="Elements.Data.ArrayNum - Elements.NumFreeIndices &gt; 0 &amp;&amp; Elements.Data.ArrayNum &lt;= Elements.Data.ArrayMax">
+        <Variable Name="Index" InitialValue="0" />
+        <Size>Elements.Data.ArrayNum - Elements.NumFreeIndices</Size>
+        <Loop>
+          <If Condition="
+                 ((Elements.AllocationFlags.AllocatorInstance.SecondaryData.Data != 0) &amp;&amp; ((reinterpret_cast&lt;uint32*&gt;(Elements.AllocationFlags.AllocatorInstance.SecondaryData.Data)[Index/32]&gt;&gt;(Index%32)) &amp; 1) != 0)
+              || ((Elements.AllocationFlags.AllocatorInstance.SecondaryData.Data == 0) &amp;&amp; ((reinterpret_cast&lt;uint32*&gt;(Elements.AllocationFlags.AllocatorInstance.InlineData        )[Index/32]&gt;&gt;(Index%32)) &amp; 1) != 0)
+          ">
+            <If Condition="Elements.Data.AllocatorInstance.SecondaryData.Data == 0">
+              <Item>((TSetElement&lt;$T1&gt; *)Elements.Data.AllocatorInstance.InlineData)[Index].Value</Item>
+            </If>
+            <If Condition="Elements.Data.AllocatorInstance.SecondaryData.Data != 0">
+              <Item>((TSetElement&lt;$T1&gt; *)Elements.Data.AllocatorInstance.SecondaryData.Data)[Index].Value</Item>
+            </If>
+          </If>
+          <Exec>++Index</Exec>
+        </Loop>
+      </CustomListItems>
+    </Expand>
+  </Type>
+
+  <!-- TSet<*,*,TFixedSetAllocator<*>> visualizer -->
+  <Type Name="TSet&lt;*,*,TFixedSetAllocator&lt;*&gt;&gt;">
+    <DisplayString Condition="Elements.Data.ArrayNum - Elements.NumFreeIndices &lt;= 0">Empty</DisplayString>
+    <DisplayString Condition="Elements.Data.ArrayNum &lt;= Elements.Data.ArrayMax">Num={Elements.Data.ArrayNum - Elements.NumFreeIndices}</DisplayString>
+    <Expand>
+      <CustomListItems Condition="Elements.Data.ArrayNum - Elements.NumFreeIndices &gt; 0 &amp;&amp; Elements.Data.ArrayNum &lt;= Elements.Data.ArrayMax">
+        <Variable Name="Index" InitialValue="0" />
+        <Size>Elements.Data.ArrayNum - Elements.NumFreeIndices</Size>
+        <Loop>
+          <If Condition="((reinterpret_cast&lt;uint32*&gt;(Elements.AllocationFlags.AllocatorInstance.InlineData)[Index/32]&gt;&gt;(Index%32)) &amp; 1) != 0">
+            <Item>((TSetElement&lt;$T1&gt; *)Elements.Data.AllocatorInstance.InlineData)[Index].Value</Item>
+          </If>
+          <Exec>++Index</Exec>
+        </Loop>
+      </CustomListItems>
+    </Expand>
+  </Type>
+
+  <!-- FWeakObjectPtr visualizer -->
+  <Type Name="FWeakObjectPtr">
+    <SmartPointer Usage="Minimal">GObjectArrayForDebugVisualizers->Objects[ObjectIndex / 65536][ObjectIndex % 65536].Object</SmartPointer>
+    <DisplayString Condition="ObjectSerialNumber &lt; 1">nullptr</DisplayString>
+    <DisplayString Condition="GObjectArrayForDebugVisualizers->Objects[ObjectIndex / 65536][ObjectIndex % 65536].SerialNumber != ObjectSerialNumber">STALE</DisplayString>
+    <DisplayString>{GObjectArrayForDebugVisualizers->Objects[ObjectIndex / 65536][ObjectIndex % 65536].Object}</DisplayString>
+    <Expand>
+      <ExpandedItem>GObjectArrayForDebugVisualizers->Objects[ObjectIndex / 65536][ObjectIndex % 65536].Object</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- TWeakObjectPtr<*> visualizer -->
+  <Type Name="TWeakObjectPtr&lt;*&gt;">
+    <SmartPointer Usage="Minimal">($T1*)GObjectArrayForDebugVisualizers->Objects[ObjectIndex / 65536][ObjectIndex % 65536].Object</SmartPointer>
+    <DisplayString Condition="ObjectSerialNumber &lt; 1">nullptr</DisplayString>
+    <DisplayString Condition="GObjectArrayForDebugVisualizers->Objects[ObjectIndex / 65536][ObjectIndex % 65536].SerialNumber != ObjectSerialNumber">STALE</DisplayString>
+    <DisplayString>{($T1*)GObjectArrayForDebugVisualizers->Objects[ObjectIndex / 65536][ObjectIndex % 65536].Object}</DisplayString>
+    <Expand>
+      <ExpandedItem>($T1*)GObjectArrayForDebugVisualizers->Objects[ObjectIndex / 65536][ObjectIndex % 65536].Object</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FTypedElementHandle visualizer -->
+  <Type Name="FTypedElementHandle">
+    <DisplayString Condition="DataPtr == 0">Unset</DisplayString>
+    <DisplayString Condition="DataPtr != 0">{*DataPtr}</DisplayString>
+  </Type>
+  
+  <!-- TTypedElementOwner visualizer -->
+  <Type Name="TTypedElementOwner&lt;*,*&gt;">
+    <DisplayString Condition="DataPtr == 0">Unset</DisplayString>
+    <DisplayString Condition="DataPtr != 0">{*DataPtr}</DisplayString>
+  </Type>
+
+  <!-- FVertexID visualizer -->
+  <Type Name="FVertexID">
+    <DisplayString>{IDValue}</DisplayString>
+  </Type>
+
+  <!-- FVertexInstanceID visualizer -->
+  <Type Name="FVertexInstanceID">
+    <DisplayString>{IDValue}</DisplayString>
+  </Type>
+
+  <!-- FEdgeID visualizer -->
+  <Type Name="FEdgeID">
+    <DisplayString>{IDValue}</DisplayString>
+  </Type>
+
+  <!-- FPolygonID visualizer -->
+  <Type Name="FPolygonID">
+    <DisplayString>{IDValue}</DisplayString>
+  </Type>
+
+  <!-- FPolygonGroupID visualizer -->
+  <Type Name="FPolygonGroupID">
+    <DisplayString>{IDValue}</DisplayString>
+  </Type>
+
+  <!-- FTriangleID visualizer -->
+  <Type Name="FTriangleID">
+    <DisplayString>{IDValue}</DisplayString>
+  </Type>
+
+  <!-- TOptional visualizer -->
+  <Type Name="TOptional&lt;*&gt;">
+    <SmartPointer Usage="Minimal">bIsSet ? ($T1*)&amp;Value : nullptr</SmartPointer>
+    <DisplayString Condition="!bIsSet">Unset</DisplayString>
+    <DisplayString Condition="bIsSet">Set: {{{*($T1*)&amp;Value}}}</DisplayString>
+    <Expand>
+      <ExpandedItem Condition="bIsSet">*($T1*)&amp;Value</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- TUnion visualizer -->
+  <Type Name="TUnion&lt;*&gt;">
+    <DisplayString>TUnion{{{CurrentSubtypeIndex}}}</DisplayString>
+    <Expand>
+      <Item Name="[TUnion.CurrentSubtypeIndex]">CurrentSubtypeIndex</Item>
+      <ExpandedItem Condition="CurrentSubtypeIndex==0">*($T1*)&amp;Values.A</ExpandedItem>
+      <ExpandedItem Condition="CurrentSubtypeIndex==1">*($T2*)&amp;Values.B</ExpandedItem>
+      <ExpandedItem Condition="CurrentSubtypeIndex==2">*($T3*)&amp;Values.C</ExpandedItem>
+      <ExpandedItem Condition="CurrentSubtypeIndex==3">*($T4*)&amp;Values.D</ExpandedItem>
+      <ExpandedItem Condition="CurrentSubtypeIndex==4">*($T5*)&amp;Values.E</ExpandedItem>
+      <ExpandedItem Condition="CurrentSubtypeIndex==5">*($T6*)&amp;Values.F</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- TInlineValue visualizer -->
+  <Type Name="TInlineValue&lt;*&gt;">
+    <SmartPointer Usage="Minimal">!bIsValid ? nullptr : bInline ? ($T1*)&amp;Data : *($T1**)&amp;Data</SmartPointer>
+    <DisplayString Condition="!bIsValid">Unset</DisplayString>
+    <DisplayString Condition="bIsValid &amp;&amp; bInline">{{{*($T1*)&amp;Data}}}</DisplayString>
+    <DisplayString Condition="bIsValid &amp;&amp; !bInline">{{{**(($T1**)&amp;Data)}}}</DisplayString>
+    <Expand>
+      <ExpandedItem Condition="bIsValid &amp;&amp; bInline">*($T1*)&amp;Data</ExpandedItem>
+      <ExpandedItem Condition="bIsValid &amp;&amp; !bInline">**(($T1**)&amp;Data)</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- TFunction visualizer -->
+  <Type Name="UE4Function_Private::TDebugHelper&lt;*&gt;">
+    <DisplayString>{*Ptr}</DisplayString>
+    <Expand>
+      <Item Name="[Lambda]">*Ptr</Item>
+    </Expand>
+  </Type>
+  <Type Name="TFunctionRef&lt;*&gt;">
+    <DisplayString Condition="Callable">{DebugPtrStorage}</DisplayString>
+    <DisplayString Condition="!Callable">Unset</DisplayString>
+    <Expand>
+      <ExpandedItem Condition="Callable">DebugPtrStorage</ExpandedItem>
+    </Expand>
+  </Type>
+  <Type Name="TFunction&lt;*&gt;">
+    <AlternativeType Name="TUniqueFunction&lt;*&gt;"></AlternativeType>
+    <DisplayString Condition="Callable != 0">{DebugPtrStorage}</DisplayString>
+    <DisplayString Condition="Callable == 0">Unset</DisplayString>
+    <Expand>
+      <ExpandedItem Condition="Callable != 0">DebugPtrStorage</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FGameplayTagContainer visualizer -->
+  <Type Name="FGameplayTagContainer">
+    <DisplayString Condition="GameplayTags.ArrayNum == 0">Empty</DisplayString>
+    <DisplayString Condition="GameplayTags.ArrayNum == 1">Tag={*((FName*)(GameplayTags.AllocatorInstance.Data))}</DisplayString>
+    <DisplayString Condition="GameplayTags.ArrayNum > 1">Num={GameplayTags.ArrayNum}</DisplayString>
+    <Expand>
+      <ArrayItems Condition="GameplayTags.ArrayNum &lt;= GameplayTags.ArrayMax">
+        <Size>GameplayTags.ArrayNum</Size>
+        <ValuePointer>((FName*)(GameplayTags.AllocatorInstance.Data))</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+  <!-- FActorRepList visualizer -->
+  <Type Name="FActorRepList">
+    <DisplayString >({Num}/{Max} {RefCount})</DisplayString>
+    <Expand>
+      <Item Name="[RefCount]">RefCount</Item>
+      <Item Name="[Num]">Num</Item>
+      <Item Name="[Max]">Max</Item>
+      <ArrayItems>
+        <Size>Num</Size>
+        <ValuePointer>((FActorRepListType*)(Data))</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+  <!-- FBoneIndexWithOperators visualizer -->
+  <Type Name="FBoneIndexWithOperators&lt;*&gt;">
+    <DisplayString>{BoneIndex}</DisplayString>
+  </Type>
+
+  <!-- TTuple visualizer -->
+  <Type Name="TTuple&lt;&gt;">
+    <DisplayString>{{}}</DisplayString>
+    <Expand>
+    </Expand>
+  </Type>
+  <Type Name="TTuple&lt;*&gt;">
+    <DisplayString>{{{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T1,0,1&gt;*)this).Value}}}</DisplayString>
+    <Expand>
+      <Item Name="[0]">((UE4Tuple_Private::TTupleBaseElement&lt;$T1,0,1&gt;*)this)->Value</Item>
+    </Expand>
+  </Type>
+  <Type Name="TTuple&lt;*,*&gt;">
+    <DisplayString>{{{Key},{Value}}}</DisplayString>
+    <Expand>
+      <Item Name="[0:Key]">Key</Item>
+      <Item Name="[1:Value]">Value</Item>
+    </Expand>
+  </Type>
+  <Type Name="TTuple&lt;*,*,*&gt;">
+    <DisplayString>{{{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T1,0,3&gt;*)this).Value},{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T2,1,3&gt;*)this).Value},{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T3,2,3&gt;*)this).Value}}}</DisplayString>
+    <Expand>
+      <Item Name="[0]">((UE4Tuple_Private::TTupleBaseElement&lt;$T1,0,3&gt;*)this)->Value</Item>
+      <Item Name="[1]">((UE4Tuple_Private::TTupleBaseElement&lt;$T2,1,3&gt;*)this)->Value</Item>
+      <Item Name="[2]">((UE4Tuple_Private::TTupleBaseElement&lt;$T3,2,3&gt;*)this)->Value</Item>
+    </Expand>
+  </Type>
+  <Type Name="TTuple&lt;*,*,*,*&gt;">
+    <DisplayString>{{{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T1,0,4&gt;*)this).Value},{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T2,1,4&gt;*)this).Value},{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T3,2,4&gt;*)this).Value},{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T4,3,4&gt;*)this).Value}}}</DisplayString>
+    <Expand>
+      <Item Name="[0]">((UE4Tuple_Private::TTupleBaseElement&lt;$T1,0,4&gt;*)this)->Value</Item>
+      <Item Name="[1]">((UE4Tuple_Private::TTupleBaseElement&lt;$T2,1,4&gt;*)this)->Value</Item>
+      <Item Name="[2]">((UE4Tuple_Private::TTupleBaseElement&lt;$T3,2,4&gt;*)this)->Value</Item>
+      <Item Name="[3]">((UE4Tuple_Private::TTupleBaseElement&lt;$T4,3,4&gt;*)this)->Value</Item>
+    </Expand>
+  </Type>
+  <Type Name="TTuple&lt;*,*,*,*,*&gt;">
+    <DisplayString>{{{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T1,0,5&gt;*)this).Value},{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T2,1,5&gt;*)this).Value},{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T3,2,5&gt;*)this).Value},{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T4,3,5&gt;*)this).Value},{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T5,4,5&gt;*)this).Value}}}</DisplayString>
+    <Expand>
+      <Item Name="[0]">((UE4Tuple_Private::TTupleBaseElement&lt;$T1,0,5&gt;*)this)->Value</Item>
+      <Item Name="[1]">((UE4Tuple_Private::TTupleBaseElement&lt;$T2,1,5&gt;*)this)->Value</Item>
+      <Item Name="[2]">((UE4Tuple_Private::TTupleBaseElement&lt;$T3,2,5&gt;*)this)->Value</Item>
+      <Item Name="[3]">((UE4Tuple_Private::TTupleBaseElement&lt;$T4,3,5&gt;*)this)->Value</Item>
+      <Item Name="[4]">((UE4Tuple_Private::TTupleBaseElement&lt;$T5,4,5&gt;*)this)->Value</Item>
+    </Expand>
+  </Type>
+  <Type Name="TTuple&lt;*,*,*,*,*,*&gt;">
+    <DisplayString>{{{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T1,0,6&gt;*)this).Value},{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T2,1,6&gt;*)this).Value},{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T3,2,6&gt;*)this).Value},{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T4,3,6&gt;*)this).Value},{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T5,4,6&gt;*)this).Value},{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T6,5,6&gt;*)this).Value}}}</DisplayString>
+    <Expand>
+      <Item Name="[0]">((UE4Tuple_Private::TTupleBaseElement&lt;$T1,0,6&gt;*)this)->Value</Item>
+      <Item Name="[1]">((UE4Tuple_Private::TTupleBaseElement&lt;$T2,1,6&gt;*)this)->Value</Item>
+      <Item Name="[2]">((UE4Tuple_Private::TTupleBaseElement&lt;$T3,2,6&gt;*)this)->Value</Item>
+      <Item Name="[3]">((UE4Tuple_Private::TTupleBaseElement&lt;$T4,3,6&gt;*)this)->Value</Item>
+      <Item Name="[4]">((UE4Tuple_Private::TTupleBaseElement&lt;$T5,4,6&gt;*)this)->Value</Item>
+      <Item Name="[5]">((UE4Tuple_Private::TTupleBaseElement&lt;$T6,5,6&gt;*)this)->Value</Item>
+    </Expand>
+  </Type>
+  <Type Name="TTuple&lt;*,*,*,*,*,*,*&gt;">
+    <DisplayString>{{{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T1,0,7&gt;*)this).Value},{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T2,1,7&gt;*)this).Value},{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T3,2,7&gt;*)this).Value},{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T4,3,7&gt;*)this).Value},{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T5,4,7&gt;*)this).Value},{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T6,5,7&gt;*)this).Value},{(*(UE4Tuple_Private::TTupleBaseElement&lt;$T7,6,7&gt;*)this).Value}}}</DisplayString>
+    <Expand>
+      <Item Name="[0]">((UE4Tuple_Private::TTupleBaseElement&lt;$T1,0,7&gt;*)this)->Value</Item>
+      <Item Name="[1]">((UE4Tuple_Private::TTupleBaseElement&lt;$T2,1,7&gt;*)this)->Value</Item>
+      <Item Name="[2]">((UE4Tuple_Private::TTupleBaseElement&lt;$T3,2,7&gt;*)this)->Value</Item>
+      <Item Name="[3]">((UE4Tuple_Private::TTupleBaseElement&lt;$T4,3,7&gt;*)this)->Value</Item>
+      <Item Name="[4]">((UE4Tuple_Private::TTupleBaseElement&lt;$T5,4,7&gt;*)this)->Value</Item>
+      <Item Name="[5]">((UE4Tuple_Private::TTupleBaseElement&lt;$T6,5,7&gt;*)this)->Value</Item>
+      <Item Name="[6]">((UE4Tuple_Private::TTupleBaseElement&lt;$T7,6,7&gt;*)this)->Value</Item>
+    </Expand>
+  </Type>
+
+  <!-- TDelegateBase visualizer -->
+  <Type Name="TBaseStaticDelegateInstance&lt;*&gt;">
+    <DisplayString>{StaticFuncPtr}</DisplayString>
+    <Expand>
+      <Item Name="[StaticFuncPtr]">StaticFuncPtr</Item>
+      <Item Name="[Payload]">Payload</Item>
+      <Item Name="[Handle]">Handle</Item>
+    </Expand>
+  </Type>
+  <Type Name="TBaseFunctorDelegateInstance&lt;*&gt;">
+    <DisplayString>{Functor}</DisplayString>
+    <Expand>
+      <Item Name="[Functor]">Functor</Item>
+      <Item Name="[Payload]">Payload</Item>
+      <Item Name="[Handle]">Handle</Item>
+    </Expand>
+  </Type>
+  <Type Name="TBaseRawMethodDelegateInstance&lt;*,*,*&gt;">
+    <DisplayString>{UserObject}</DisplayString>
+    <Expand>
+      <Item Name="[UserObject]">UserObject</Item>
+      <Item Name="[MethodPtr]">MethodPtr</Item>
+      <Item Name="[Payload]">Payload</Item>
+      <Item Name="[Handle]">Handle</Item>
+    </Expand>
+  </Type>
+  <Type Name="TBaseSPMethodDelegateInstance&lt;*,*,*&gt;">
+    <DisplayString>{UserObject}</DisplayString>
+    <Expand>
+      <Item Name="[UserObject]">UserObject</Item>
+      <Item Name="[MethodPtr]">MethodPtr</Item>
+      <Item Name="[Payload]">Payload</Item>
+      <Item Name="[Handle]">Handle</Item>
+    </Expand>
+  </Type>
+  <Type Name="TBaseUObjectMethodDelegateInstance&lt;*,*,*&gt;">
+    <DisplayString>{UserObject}</DisplayString>
+    <Expand>
+      <Item Name="[UserObject]">UserObject</Item>
+      <Item Name="[MethodPtr]">MethodPtr</Item>
+      <Item Name="[Payload]">Payload</Item>
+      <Item Name="[Handle]">Handle</Item>
+    </Expand>
+  </Type>
+  <Type Name="TBaseUFunctionDelegateInstance&lt;*,*&gt;">
+    <DisplayString>{UserObjectPtr}</DisplayString>
+    <Expand>
+      <Item Name="[UserObject]">UserObjectPtr</Item>
+      <Item Name="[FunctionName]">FunctionName</Item>
+      <Item Name="[Payload]">Payload</Item>
+      <Item Name="[Handle]">Handle</Item>
+    </Expand>
+  </Type>
+  <Type Name="TDelegateBase&lt;*&gt;" Priority="MediumLow">
+    <DisplayString Condition="DelegateSize == 0">Unbound</DisplayString>
+    <DisplayString Condition="DelegateSize &lt;= 2">{*((IDelegateInstance*)(DelegateAllocator.InlineData))}</DisplayString>
+    <DisplayString Condition="DelegateSize &gt; 2">{*((IDelegateInstance*)(DelegateAllocator.SecondaryData.Data))}</DisplayString>
+    <Expand>
+      <ExpandedItem Condition="DelegateSize == 0">DelegateAllocator</ExpandedItem>
+      <ExpandedItem Condition="DelegateSize &lt;= 2">*((IDelegateInstance*)(DelegateAllocator.InlineData))</ExpandedItem>
+      <ExpandedItem Condition="DelegateSize &gt; 2">*((IDelegateInstance*)(DelegateAllocator.SecondaryData.Data))</ExpandedItem>
+    </Expand>
+  </Type>
+  <Type Name="TDelegateBase&lt;*&gt;">
+    <DisplayString Condition="DelegateSize == 0">Unbound</DisplayString>
+    <DisplayString Condition="DelegateSize != 0">{*((IDelegateInstance*)(DelegateAllocator.Data))}</DisplayString>
+    <Expand>
+      <ExpandedItem Condition="DelegateSize == 0">DelegateAllocator</ExpandedItem>
+      <ExpandedItem Condition="DelegateSize != 0">*((IDelegateInstance*)(DelegateAllocator.Data))</ExpandedItem>
+    </Expand>
+  </Type>
+  <Type Name="TMulticastDelegate&lt;*,*&gt;" Priority="MediumLow">
+    <DisplayString Condition="InvocationList.ArrayNum == 0">Empty</DisplayString>
+    <DisplayString Condition="InvocationList.ArrayNum != 0">Num={InvocationList.ArrayNum}</DisplayString>
+    <Expand>
+      <ArrayItems>
+        <Size>InvocationList.ArrayNum</Size>
+        <ValuePointer Condition="InvocationList.AllocatorInstance.SecondaryData.Data == 0">(TDelegateBase&lt;$T2&gt;*)(InvocationList.AllocatorInstance.InlineData)</ValuePointer>
+        <ValuePointer Condition="InvocationList.AllocatorInstance.SecondaryData.Data != 0">(TDelegateBase&lt;$T2&gt;*)(InvocationList.AllocatorInstance.SecondaryData.Data)</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="TMulticastDelegate&lt;*,*&gt;">
+    <DisplayString Condition="InvocationList.ArrayNum == 0">Empty</DisplayString>
+    <DisplayString Condition="InvocationList.ArrayNum != 0">Num={InvocationList.ArrayNum}</DisplayString>
+    <Expand>
+      <ArrayItems>
+        <Size>InvocationList.ArrayNum</Size>
+        <ValuePointer>(TDelegateBase&lt;$T2&gt;*)(InvocationList.AllocatorInstance.Data)</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+  <!-- TAtomic visualizer -->
+  <Type Name="TAtomic&lt;*&gt;">
+    <DisplayString>{Element}</DisplayString>
+    <Expand>
+      <ExpandedItem>Element</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- TRange visualizer -->
+  <Type Name="TRange&lt;*&gt;">
+    <DisplayString Condition="LowerBound.Type.Value == ERangeBoundTypes::Open &amp;&amp; UpperBound.Type.Value == ERangeBoundTypes::Open">[-&#8734;, +&#8734;]</DisplayString>
+    <DisplayString Condition="LowerBound.Type.Value == ERangeBoundTypes::Open &amp;&amp; UpperBound.Type.Value == ERangeBoundTypes::Inclusive">[-&#8734;, {UpperBound.Value}]</DisplayString>
+    <DisplayString Condition="LowerBound.Type.Value == ERangeBoundTypes::Open &amp;&amp; UpperBound.Type.Value == ERangeBoundTypes::Exclusive">[-&#8734;, {UpperBound.Value})</DisplayString>
+
+    <DisplayString Condition="LowerBound.Type.Value == ERangeBoundTypes::Inclusive &amp;&amp; UpperBound.Type.Value == ERangeBoundTypes::Open">[{LowerBound.Value}, +&#8734;)</DisplayString>
+    <DisplayString Condition="LowerBound.Type.Value == ERangeBoundTypes::Inclusive &amp;&amp; UpperBound.Type.Value == ERangeBoundTypes::Inclusive">[{LowerBound.Value}, {UpperBound.Value}]</DisplayString>
+    <DisplayString Condition="LowerBound.Type.Value == ERangeBoundTypes::Inclusive &amp;&amp; UpperBound.Type.Value == ERangeBoundTypes::Exclusive">[{LowerBound.Value}, {UpperBound.Value})</DisplayString>
+
+    <DisplayString Condition="LowerBound.Type.Value == ERangeBoundTypes::Exclusive &amp;&amp; UpperBound.Type.Value == ERangeBoundTypes::Open">({LowerBound.Value}, +&#8734;]</DisplayString>
+    <DisplayString Condition="LowerBound.Type.Value == ERangeBoundTypes::Exclusive &amp;&amp; UpperBound.Type.Value == ERangeBoundTypes::Inclusive">({LowerBound.Value}, {UpperBound.Value}]</DisplayString>
+    <DisplayString Condition="LowerBound.Type.Value == ERangeBoundTypes::Exclusive &amp;&amp; UpperBound.Type.Value == ERangeBoundTypes::Exclusive">({LowerBound.Value}, {UpperBound.Value})</DisplayString>
+  </Type>
+
+  <!-- FFrameNumber visualizer -->
+  <Type Name="FFrameNumber">
+    <DisplayString>{Value}</DisplayString>
+  </Type>
+
+  <!-- FFrameTime visualizer -->
+  <Type Name="FFrameTime">
+    <DisplayString Condition="SubFrame == 0.0">{FrameNumber}</DisplayString>
+    <DisplayString Condition="SubFrame != 0.0">{(double)(FrameNumber.Value)+SubFrame}</DisplayString>
+  </Type>
+
+  <!-- FRHICommandList visualizer -->
+  <Type Name="FRHICommandBase">
+    <DisplayString>{{ RHI Command -> { this->__vfptr[0] } }}</DisplayString>
+  </Type>
+
+  <Type Name="FRHICommandList">
+    <Expand>
+      <LinkedListItems>
+        <HeadPointer>Root</HeadPointer>
+        <NextPointer>Next</NextPointer>
+        <ValueNode>this</ValueNode>
+      </LinkedListItems>
+    </Expand>
+  </Type>
+	
+	<!-- TVariant visualizer -->
+	<Type Name="TVariant&lt;*&gt;">
+		<DisplayString Condition="TypeIndex == 0">{*($T1*)&amp;Storage}</DisplayString>
+		<DisplayString>Uninitialized</DisplayString>
+		<Expand>
+			<Item Name="Storage" Condition="TypeIndex == 0">*($T1*)&amp;Storage</Item>
+			<Item Name="TypeIndex">TypeIndex</Item>
+		</Expand>
+	</Type>
+	<Type Name="TVariant&lt;*,*&gt;">
+		<DisplayString Condition="TypeIndex == 0">{*($T1*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 1">{*($T2*)&amp;Storage}</DisplayString>
+		<DisplayString>Uninitialized</DisplayString>
+		<Expand>
+			<Item Name="Storage" Condition="TypeIndex == 0">*($T1*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 1">*($T2*)&amp;Storage</Item>
+			<Item Name="TypeIndex">TypeIndex</Item>
+		</Expand>
+	</Type>
+	<Type Name="TVariant&lt;*,*,*&gt;">
+		<DisplayString Condition="TypeIndex == 0">{*($T1*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 1">{*($T2*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 2">{*($T3*)&amp;Storage}</DisplayString>
+		<DisplayString>Uninitialized</DisplayString>
+		<Expand>
+			<Item Name="Storage" Condition="TypeIndex == 0">*($T1*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 1">*($T2*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 2">*($T3*)&amp;Storage</Item>
+			<Item Name="TypeIndex">TypeIndex</Item>
+		</Expand>
+	</Type>
+	<Type Name="TVariant&lt;*,*,*,*&gt;">
+		<DisplayString Condition="TypeIndex == 0">{*($T1*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 1">{*($T2*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 2">{*($T3*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 3">{*($T4*)&amp;Storage}</DisplayString>
+		<DisplayString>Uninitialized</DisplayString>
+		<Expand>
+			<Item Name="Storage" Condition="TypeIndex == 0">*($T1*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 1">*($T2*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 2">*($T3*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 3">*($T4*)&amp;Storage</Item>
+			<Item Name="TypeIndex">TypeIndex</Item>
+		</Expand>
+	</Type>
+	<Type Name="TVariant&lt;*,*,*,*,*&gt;">
+		<DisplayString Condition="TypeIndex == 0">{*($T1*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 1">{*($T2*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 2">{*($T3*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 3">{*($T4*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 4">{*($T5*)&amp;Storage}</DisplayString>
+		<DisplayString>Uninitialized</DisplayString>
+		<Expand>
+			<Item Name="Storage" Condition="TypeIndex == 0">*($T1*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 1">*($T2*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 2">*($T3*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 3">*($T4*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 4">*($T5*)&amp;Storage</Item>
+			<Item Name="TypeIndex">TypeIndex</Item>
+		</Expand>
+	</Type>
+	<Type Name="TVariant&lt;*,*,*,*,*,*&gt;">
+		<DisplayString Condition="TypeIndex == 0">{*($T1*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 1">{*($T2*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 2">{*($T3*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 3">{*($T4*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 4">{*($T5*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 5">{*($T6*)&amp;Storage}</DisplayString>
+		<DisplayString>Uninitialized</DisplayString>
+		<Expand>
+			<Item Name="Storage" Condition="TypeIndex == 0">*($T1*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 1">*($T2*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 2">*($T3*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 3">*($T4*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 4">*($T5*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 5">*($T6*)&amp;Storage</Item>
+			<Item Name="TypeIndex">TypeIndex</Item>
+		</Expand>
+	</Type>
+	<Type Name="TVariant&lt;*,*,*,*,*,*,*&gt;">
+		<DisplayString Condition="TypeIndex == 0">{*($T1*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 1">{*($T2*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 2">{*($T3*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 3">{*($T4*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 4">{*($T5*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 5">{*($T6*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 6">{*($T7*)&amp;Storage}</DisplayString>
+		<DisplayString>Uninitialized</DisplayString>
+		<Expand>
+			<Item Name="Storage" Condition="TypeIndex == 0">*($T1*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 1">*($T2*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 2">*($T3*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 3">*($T4*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 4">*($T5*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 5">*($T6*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 6">*($T7*)&amp;Storage</Item>
+			<Item Name="TypeIndex">TypeIndex</Item>
+		</Expand>
+	</Type>
+	<Type Name="TVariant&lt;*,*,*,*,*,*,*,*&gt;">
+		<DisplayString Condition="TypeIndex == 0">{*($T1*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 1">{*($T2*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 2">{*($T3*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 3">{*($T4*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 4">{*($T5*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 5">{*($T6*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 6">{*($T7*)&amp;Storage}</DisplayString>
+		<DisplayString Condition="TypeIndex == 7">{*($T8*)&amp;Storage}</DisplayString>
+		<DisplayString>Uninitialized</DisplayString>
+		<Expand>
+			<Item Name="Storage" Condition="TypeIndex == 0">*($T1*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 1">*($T2*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 2">*($T3*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 3">*($T4*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 4">*($T5*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 5">*($T6*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 6">*($T7*)&amp;Storage</Item>
+			<Item Name="Storage" Condition="TypeIndex == 7">*($T8*)&amp;Storage</Item>
+			<Item Name="TypeIndex">TypeIndex</Item>
+		</Expand>
+	</Type>
+
+  <!-- 
+  *
+  * Animation Visualizers 
+  *
+  -->
+
+  <!-- FBoneContainer -->
+  <Type Name="FBoneContainer">
+    <DisplayString>{{Num={BoneIndicesArray.ArrayNum} Asset={Asset} Skeleton={AssetSkeleton}}}</DisplayString>
+    <Expand>
+      <Item Name="Asset">Asset</Item>
+      <Item Name="AssetSkeletalMesh">AssetSkeletalMesh</Item>
+      <Item Name="AssetSkeleton">AssetSkeleton</Item>
+      <Item Name="RefSkeleton">RefSkeleton</Item>
+      <Synthetic Name="BoneIndicesArray">
+        <DisplayString Condition="BoneIndicesArray.ArrayNum == 0">Empty</DisplayString>
+        <DisplayString Condition="BoneIndicesArray.ArrayNum &lt; 0">Invalid</DisplayString>
+        <DisplayString Condition="BoneIndicesArray.ArrayMax &lt; BoneIndicesArray.ArrayNum">Invalid</DisplayString>
+        <DisplayString Condition="BoneIndicesArray.ArrayMax &gt;= BoneIndicesArray.ArrayNum">Num={BoneIndicesArray.ArrayNum}</DisplayString>
+        <Expand>
+          <CustomListItems Condition="BoneIndicesArray.ArrayNum &lt;= BoneIndicesArray.ArrayMax">
+            <Variable Name="CompactPoseBoneIndex" InitialValue="0"/>
+            <Size>BoneIndicesArray.ArrayNum</Size>
+            <Loop>
+              <Item Name="[{CompactPoseBoneIndex}] {((FMeshBoneInfo*)RefSkeleton->FinalRefBoneInfo.AllocatorInstance.Data)[((unsigned short*)BoneIndicesArray.AllocatorInstance.Data)[CompactPoseBoneIndex]].Name}">
+                ((unsigned short*)BoneIndicesArray.AllocatorInstance.Data)[CompactPoseBoneIndex]
+              </Item>
+              <Exec>++CompactPoseBoneIndex</Exec>
+            </Loop>
+          </CustomListItems>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="BoneSwitchArray">
+        <DisplayString Condition="BoneSwitchArray.NumBits == 0">Empty</DisplayString>
+        <DisplayString Condition="BoneSwitchArray.NumBits &lt; 0">Invalid</DisplayString>
+        <DisplayString Condition="BoneSwitchArray.NumBits &gt; 0">NumBits={BoneSwitchArray.NumBits}, MaxBits={BoneSwitchArray.MaxBits}</DisplayString>
+        <Expand>
+          <CustomListItems Condition="BoneSwitchArray.NumBits &gt; 0">
+            <Variable Name="MeshBoneIndex" InitialValue="0"/>
+            <Size>BoneSwitchArray.NumBits</Size>
+            <Loop Condition="BoneSwitchArray.AllocatorInstance.SecondaryData.Data != 0">
+              <Item Name="[{MeshBoneIndex}] {((FMeshBoneInfo*)RefSkeleton->FinalRefBoneInfo.AllocatorInstance.Data)[MeshBoneIndex].Name}" Condition="MeshBoneIndex &lt; RefSkeleton->FinalRefBoneInfo.ArrayNum">
+                ((uint32*)BoneSwitchArray.AllocatorInstance.SecondaryData.Data)[MeshBoneIndex/32] >> (MeshBoneIndex%32) &amp; 1
+              </Item>
+              <Item Name="[{MeshBoneIndex}]" Condition="MeshBoneIndex &gt;= RefSkeleton->FinalRefBoneInfo.ArrayNum">
+                ((uint32*)BoneSwitchArray.AllocatorInstance.SecondaryData.Data)[MeshBoneIndex/32] >> (MeshBoneIndex%32) &amp; 1
+              </Item>
+              <Exec>++MeshBoneIndex</Exec>
+            </Loop>
+            <Loop Condition="BoneSwitchArray.AllocatorInstance.SecondaryData.Data == 0">
+              <Item Name="[{MeshBoneIndex}] {((FMeshBoneInfo*)RefSkeleton->FinalRefBoneInfo.AllocatorInstance.Data)[MeshBoneIndex].Name}" Condition="MeshBoneIndex &lt; RefSkeleton->FinalRefBoneInfo.ArrayNum">
+                ((uint32*)BoneSwitchArray.AllocatorInstance.InlineData)[MeshBoneIndex/32] >> (MeshBoneIndex%32) &amp; 1
+              </Item>
+              <Item Name="[{MeshBoneIndex}]" Condition="MeshBoneIndex &gt;= RefSkeleton->FinalRefBoneInfo.ArrayNum">
+                ((uint32*)BoneSwitchArray.AllocatorInstance.InlineData)[MeshBoneIndex/32] >> (MeshBoneIndex%32) &amp; 1
+              </Item>
+              <Exec>++MeshBoneIndex</Exec>
+            </Loop>
+          </CustomListItems>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="SkeletonToPoseBoneIndexArray">
+        <DisplayString Condition="SkeletonToPoseBoneIndexArray.ArrayNum == 0">Empty</DisplayString>
+        <DisplayString Condition="SkeletonToPoseBoneIndexArray.ArrayNum &lt; 0">Invalid</DisplayString>
+        <DisplayString Condition="SkeletonToPoseBoneIndexArray.ArrayMax &lt; SkeletonToPoseBoneIndexArray.ArrayNum">Invalid</DisplayString>
+        <DisplayString Condition="SkeletonToPoseBoneIndexArray.ArrayMax &gt;= SkeletonToPoseBoneIndexArray.ArrayNum">Num={SkeletonToPoseBoneIndexArray.ArrayNum}</DisplayString>
+        <Expand>
+          <CustomListItems Condition="SkeletonToPoseBoneIndexArray.ArrayNum &lt;= SkeletonToPoseBoneIndexArray.ArrayMax">
+            <Variable Name="SkeletonBoneIndex" InitialValue="0"/>
+            <Size>SkeletonToPoseBoneIndexArray.ArrayNum</Size>
+            <Loop>
+              <Item Name="[{SkeletonBoneIndex}] {((FMeshBoneInfo*)((USkeleton*)GObjectArrayForDebugVisualizers->Objects[AssetSkeleton.ObjectIndex / 65536][AssetSkeleton.ObjectIndex % 65536].Object)->ReferenceSkeleton.FinalRefBoneInfo.AllocatorInstance.Data)[SkeletonBoneIndex].Name}">
+                ((int*)SkeletonToPoseBoneIndexArray.AllocatorInstance.Data)[SkeletonBoneIndex]
+              </Item>
+              <Exec>++SkeletonBoneIndex</Exec>
+            </Loop>
+          </CustomListItems>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="PoseToSkeletonBoneIndexArray">
+        <DisplayString Condition="PoseToSkeletonBoneIndexArray.ArrayNum == 0">Empty</DisplayString>
+        <DisplayString Condition="PoseToSkeletonBoneIndexArray.ArrayNum &lt; 0">Invalid</DisplayString>
+        <DisplayString Condition="PoseToSkeletonBoneIndexArray.ArrayMax &lt; PoseToSkeletonBoneIndexArray.ArrayNum">Invalid</DisplayString>
+        <DisplayString Condition="PoseToSkeletonBoneIndexArray.ArrayMax &gt;= PoseToSkeletonBoneIndexArray.ArrayNum">Num={PoseToSkeletonBoneIndexArray.ArrayNum}</DisplayString>
+        <Expand>
+          <CustomListItems Condition="PoseToSkeletonBoneIndexArray.ArrayNum &lt;= PoseToSkeletonBoneIndexArray.ArrayMax">
+            <Variable Name="MeshBoneIndex" InitialValue="0"/>
+            <Size>PoseToSkeletonBoneIndexArray.ArrayNum</Size>
+            <Loop>
+              <Item Name="[{MeshBoneIndex}] {((FMeshBoneInfo*)RefSkeleton->FinalRefBoneInfo.AllocatorInstance.Data)[MeshBoneIndex].Name}">
+                ((int*)PoseToSkeletonBoneIndexArray.AllocatorInstance.Data)[MeshBoneIndex]
+              </Item>
+              <Exec>++MeshBoneIndex</Exec>
+            </Loop>
+          </CustomListItems>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="CompactPoseToSkeletonIndex">
+        <DisplayString Condition="CompactPoseToSkeletonIndex.ArrayNum == 0">Empty</DisplayString>
+        <DisplayString Condition="CompactPoseToSkeletonIndex.ArrayNum &lt; 0">Invalid</DisplayString>
+        <DisplayString Condition="CompactPoseToSkeletonIndex.ArrayMax &lt; CompactPoseToSkeletonIndex.ArrayNum">Invalid</DisplayString>
+        <DisplayString Condition="CompactPoseToSkeletonIndex.ArrayMax &gt;= CompactPoseToSkeletonIndex.ArrayNum">Num={CompactPoseToSkeletonIndex.ArrayNum}</DisplayString>
+        <Expand>
+          <CustomListItems Condition="CompactPoseToSkeletonIndex.ArrayNum &lt;= CompactPoseToSkeletonIndex.ArrayMax">
+            <Variable Name="CompactPoseBoneIndex" InitialValue="0"/>
+            <Size>CompactPoseParentBones.ArrayNum</Size>
+            <Loop>
+              <Item Name="[{CompactPoseBoneIndex}] {((FMeshBoneInfo*)RefSkeleton->FinalRefBoneInfo.AllocatorInstance.Data)[((unsigned short*)BoneIndicesArray.AllocatorInstance.Data)[CompactPoseBoneIndex]].Name}">
+                ((int*)CompactPoseToSkeletonIndex.AllocatorInstance.Data)[CompactPoseBoneIndex]
+              </Item>
+              <Exec>++CompactPoseBoneIndex</Exec>
+            </Loop>
+          </CustomListItems>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="SkeletonToCompactPose">
+        <DisplayString Condition="SkeletonToCompactPose.ArrayNum == 0">Empty</DisplayString>
+        <DisplayString Condition="SkeletonToCompactPose.ArrayNum &lt; 0">Invalid</DisplayString>
+        <DisplayString Condition="SkeletonToCompactPose.ArrayMax &lt; SkeletonToCompactPose.ArrayNum">Invalid</DisplayString>
+        <DisplayString Condition="SkeletonToCompactPose.ArrayMax &gt;= SkeletonToCompactPose.ArrayNum">Num={SkeletonToCompactPose.ArrayNum}</DisplayString>
+        <Expand>
+          <CustomListItems Condition="SkeletonToCompactPose.ArrayNum &lt;= SkeletonToCompactPose.ArrayMax">
+            <Variable Name="SkeletonBoneIndex" InitialValue="0"/>
+            <Size>SkeletonToCompactPose.ArrayNum</Size>
+            <Loop>
+              <Item Name="[{SkeletonBoneIndex}] {((FMeshBoneInfo*)((USkeleton*)GObjectArrayForDebugVisualizers->Objects[AssetSkeleton.ObjectIndex / 65536][AssetSkeleton.ObjectIndex % 65536].Object)->ReferenceSkeleton.FinalRefBoneInfo.AllocatorInstance.Data)[SkeletonBoneIndex].Name}">
+                ((int*)SkeletonToCompactPose.AllocatorInstance.Data)[SkeletonBoneIndex]
+              </Item>
+              <Exec>++SkeletonBoneIndex</Exec>
+            </Loop>
+          </CustomListItems>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="CompactPoseParentBones">
+        <DisplayString Condition="CompactPoseParentBones.ArrayNum == 0">Empty</DisplayString>
+        <DisplayString Condition="CompactPoseParentBones.ArrayNum &lt; 0">Invalid</DisplayString>
+        <DisplayString Condition="CompactPoseParentBones.ArrayMax &lt; CompactPoseParentBones.ArrayNum">Invalid</DisplayString>
+        <DisplayString Condition="CompactPoseParentBones.ArrayMax &gt;= CompactPoseParentBones.ArrayNum">Num={CompactPoseParentBones.ArrayNum}</DisplayString>
+        <Expand>
+          <CustomListItems Condition="CompactPoseParentBones.ArrayNum &lt;= CompactPoseParentBones.ArrayMax">
+            <Variable Name="CompactPoseBoneIndex" InitialValue="0"/>
+            <Size>CompactPoseParentBones.ArrayNum</Size>
+            <Loop>
+              <Item Name="[{CompactPoseBoneIndex}] {((FMeshBoneInfo*)RefSkeleton->FinalRefBoneInfo.AllocatorInstance.Data)[((unsigned short*)BoneIndicesArray.AllocatorInstance.Data)[CompactPoseBoneIndex]].Name}">
+                ((FCompactPoseBoneIndex*)CompactPoseParentBones.AllocatorInstance.Data)[CompactPoseBoneIndex]
+              </Item>
+              <Exec>++CompactPoseBoneIndex</Exec>
+            </Loop>
+          </CustomListItems>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="CompactPoseRefPoseBones">
+        <DisplayString Condition="CompactPoseRefPoseBones.ArrayNum == 0">Empty</DisplayString>
+        <DisplayString Condition="CompactPoseRefPoseBones.ArrayNum &lt; 0">Invalid</DisplayString>
+        <DisplayString Condition="CompactPoseRefPoseBones.ArrayMax &lt; CompactPoseRefPoseBones.ArrayNum">Invalid</DisplayString>
+        <DisplayString Condition="CompactPoseRefPoseBones.ArrayMax &gt;= CompactPoseRefPoseBones.ArrayNum">Num={CompactPoseRefPoseBones.ArrayNum}</DisplayString>
+        <Expand>
+          <CustomListItems Condition="CompactPoseRefPoseBones.ArrayNum &lt;= CompactPoseRefPoseBones.ArrayMax">
+            <Variable Name="CompactPoseBoneIndex" InitialValue="0"/>
+            <Size>CompactPoseRefPoseBones.ArrayNum</Size>
+            <Loop>
+              <Item Name="[{CompactPoseBoneIndex}] {((FMeshBoneInfo*)RefSkeleton->FinalRefBoneInfo.AllocatorInstance.Data)[((unsigned short*)BoneIndicesArray.AllocatorInstance.Data)[CompactPoseBoneIndex]].Name}">
+                ((FTransform*)CompactPoseRefPoseBones.AllocatorInstance.Data)[CompactPoseBoneIndex]
+              </Item>
+              <Exec>++CompactPoseBoneIndex</Exec>
+            </Loop>
+          </CustomListItems>
+        </Expand>
+      </Synthetic>
+      <Item Name="VirtualBoneCompactPoseData">VirtualBoneCompactPoseData</Item>
+      <Synthetic Name="UIDToArrayIndexLUT">
+        <DisplayString Condition="UIDToArrayIndexLUT.ArrayNum == 0">Empty</DisplayString>
+        <DisplayString Condition="UIDToArrayIndexLUT.ArrayNum &lt; 0">Invalid</DisplayString>
+        <DisplayString Condition="UIDToArrayIndexLUT.ArrayMax &lt; UIDToArrayIndexLUT.ArrayNum">Invalid</DisplayString>
+        <DisplayString Condition="UIDToArrayIndexLUT.ArrayMax &gt;= UIDToArrayIndexLUT.ArrayNum">Num={UIDToArrayIndexLUT.ArrayNum}</DisplayString>
+        <Expand>
+          <CustomListItems Condition="UIDToArrayIndexLUT.ArrayNum &lt;= UIDToArrayIndexLUT.ArrayMax">
+            <Variable Name="UID" InitialValue="0"/>
+            <Size>UIDToArrayIndexLUT.ArrayNum</Size>
+            <Loop>
+              <Item Name="[{UID}] {((FName*)UIDToNameLUT.AllocatorInstance.Data)[UID]}">
+                ((unsigned short*)UIDToArrayIndexLUT.AllocatorInstance.Data)[UID]
+              </Item>
+              <Exec>++UID</Exec>
+            </Loop>
+          </CustomListItems>
+        </Expand>
+      </Synthetic>
+      <Item Name="UIDToNameLUT">UIDToNameLUT</Item>
+      <Synthetic Name="UIDToCurveTypeLUT">
+        <DisplayString Condition="UIDToCurveTypeLUT.ArrayNum == 0">Empty</DisplayString>
+        <DisplayString Condition="UIDToCurveTypeLUT.ArrayNum &lt; 0">Invalid</DisplayString>
+        <DisplayString Condition="UIDToCurveTypeLUT.ArrayMax &lt; UIDToCurveTypeLUT.ArrayNum">Invalid</DisplayString>
+        <DisplayString Condition="UIDToCurveTypeLUT.ArrayMax &gt;= UIDToCurveTypeLUT.ArrayNum">Num={UIDToCurveTypeLUT.ArrayNum}</DisplayString>
+        <Expand>
+          <CustomListItems Condition="UIDToCurveTypeLUT.ArrayNum &lt;= UIDToCurveTypeLUT.ArrayMax">
+            <Variable Name="UID" InitialValue="0"/>
+            <Size>UIDToCurveTypeLUT.ArrayNum</Size>
+            <Loop>
+              <Item Name="[{UID}] {((FName*)UIDToNameLUT.AllocatorInstance.Data)[UID]}">
+                ((FAnimCurveType*)UIDToCurveTypeLUT.AllocatorInstance.Data)[UID]
+              </Item>
+              <Exec>++UID</Exec>
+            </Loop>
+          </CustomListItems>
+        </Expand>
+      </Synthetic>
+      <Item Name="bDisableRetargeting">bDisableRetargeting</Item>
+      <Item Name="bUseRAWData">bUseRAWData</Item>
+      <Item Name="bUseSourceData">bUseSourceData</Item>
+      <Item Name="RetargetSourceCachedDataLUT">RetargetSourceCachedDataLUT</Item>
+    </Expand>
+  </Type>
+
+  <!-- FCompactPose -->
+  <Type Name="FCompactPose">
+    <DisplayString>{{Num={Bones.ArrayNum} Asset={BoneContainer->Asset} Skeleton={BoneContainer->AssetSkeleton}}}</DisplayString>
+    <Expand>
+      <Item Name="BoneContainer">BoneContainer</Item>
+      <Synthetic Name="Bones" Condition="BoneContainer != 0">
+        <DisplayString Condition="Bones.ArrayNum == 0">Empty</DisplayString>
+        <DisplayString Condition="Bones.ArrayNum &lt; 0">Invalid</DisplayString>
+        <DisplayString Condition="Bones.ArrayMax &lt; Bones.ArrayNum">Invalid</DisplayString>
+        <DisplayString Condition="Bones.ArrayMax &gt;= Bones.ArrayNum">Num={Bones.ArrayNum}</DisplayString>
+        <Expand>
+          <CustomListItems Condition="Bones.ArrayNum &lt;= Bones.ArrayMax">
+            <Variable Name="CompactPoseBoneIndex" InitialValue="0"/>
+            <Size>Bones.ArrayNum</Size>
+            <Loop>
+              <Item Name="[{CompactPoseBoneIndex}] {((FMeshBoneInfo*)BoneContainer->RefSkeleton->FinalRefBoneInfo.AllocatorInstance.Data)[((unsigned short*)BoneContainer->BoneIndicesArray.AllocatorInstance.Data)[CompactPoseBoneIndex]].Name}">
+                ((FTransform*)Bones.AllocatorInstance.Data)[CompactPoseBoneIndex]
+              </Item>
+              <Exec>++CompactPoseBoneIndex</Exec>
+            </Loop>
+          </CustomListItems>
+        </Expand>
+      </Synthetic>
+      <Item Name="Bones" Condition="BoneContainer == 0">Bones</Item>
+    </Expand>
+  </Type>
+
+  <!-- FCSPose<FCompactPose> -->
+  <Type Name="FCSPose&lt;FCompactPose&gt;">
+    <DisplayString>{{Num={Pose.Bones.ArrayNum} Asset={Pose.BoneContainer->Asset} Skeleton={Pose.BoneContainer->AssetSkeleton}}}</DisplayString>
+    <Expand>
+      <Item Name="Pose">Pose</Item>
+      <Synthetic Name="ComponentSpaceFlags">
+        <DisplayString Condition="ComponentSpaceFlags.ArrayNum == 0">Empty</DisplayString>
+        <DisplayString Condition="ComponentSpaceFlags.ArrayNum &lt; 0">Invalid</DisplayString>
+        <DisplayString Condition="ComponentSpaceFlags.ArrayMax &lt; ComponentSpaceFlags.ArrayNum">Invalid</DisplayString>
+        <DisplayString Condition="ComponentSpaceFlags.ArrayMax &gt;= ComponentSpaceFlags.ArrayNum">Num={ComponentSpaceFlags.ArrayNum}</DisplayString>
+        <Expand>
+          <CustomListItems Condition="ComponentSpaceFlags.ArrayNum &lt;= ComponentSpaceFlags.ArrayMax">
+            <Variable Name="CompactPoseBoneIndex" InitialValue="0"/>
+            <Size>ComponentSpaceFlags.ArrayNum</Size>
+            <Loop>
+              <Item Name="[{CompactPoseBoneIndex}] {((FMeshBoneInfo*)Pose.BoneContainer->RefSkeleton->FinalRefBoneInfo.AllocatorInstance.Data)[((unsigned short*)Pose.BoneContainer->BoneIndicesArray.AllocatorInstance.Data)[CompactPoseBoneIndex]].Name}">
+                ((unsigned char*)ComponentSpaceFlags.AllocatorInstance.Data)[CompactPoseBoneIndex]
+              </Item>
+              <Exec>++CompactPoseBoneIndex</Exec>
+            </Loop>
+          </CustomListItems>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="BoneMask">
+        <DisplayString Condition="BoneMask.ArrayNum == 0">Empty</DisplayString>
+        <DisplayString Condition="BoneMask.ArrayNum &lt; 0">Invalid</DisplayString>
+        <DisplayString Condition="BoneMask.ArrayMax &lt; BoneMask.ArrayNum">Invalid</DisplayString>
+        <DisplayString Condition="BoneMask.ArrayMax &gt;= BoneMask.ArrayNum">Num={BoneMask.ArrayNum}</DisplayString>
+        <Expand>
+          <CustomListItems Condition="BoneMask.ArrayNum &lt;= BoneMask.ArrayMax">
+            <Variable Name="CompactPoseBoneIndex" InitialValue="0"/>
+            <Size>BoneMask.ArrayNum</Size>
+            <Loop>
+              <Item Name="[{CompactPoseBoneIndex}] {((FMeshBoneInfo*)Pose.BoneContainer->RefSkeleton->FinalRefBoneInfo.AllocatorInstance.Data)[((unsigned short*)Pose.BoneContainer->BoneIndicesArray.AllocatorInstance.Data)[CompactPoseBoneIndex]].Name}">
+                ((unsigned char*)BoneMask.AllocatorInstance.Data)[CompactPoseBoneIndex]
+              </Item>
+              <Exec>++CompactPoseBoneIndex</Exec>
+            </Loop>
+          </CustomListItems>
+        </Expand>
+      </Synthetic>
+      <Item Name="BonesToConvert">BonesToConvert</Item>
+    </Expand>
+  </Type>
+
+  <!-- FPoseContext -->
+  <Type Name="FPoseContext">
+    <Expand>
+      <Item Name="AnimInstanceProxy">AnimInstanceProxy</Item>
+      <Item Name="Pose">Pose</Item>
+      <Synthetic Name="Curve" Condition="Curve.bInitialized">
+        <DisplayString>{{Num={Curve.Elements.ArrayNum} bInitialized={Curve.bInitialized}}}</DisplayString>
+        <Expand>
+          <Synthetic Name="Elements">
+            <DisplayString Condition="Curve.Elements.ArrayNum == 0">Empty</DisplayString>
+            <DisplayString Condition="Curve.Elements.ArrayNum &lt; 0">Invalid</DisplayString>
+            <DisplayString Condition="Curve.Elements.ArrayMax &lt; Curve.Elements.ArrayNum">Invalid</DisplayString>
+            <DisplayString Condition="Curve.Elements.ArrayMax &gt;= Curve.Elements.ArrayNum">Num={Curve.Elements.ArrayNum}</DisplayString>
+            <Expand>
+              <CustomListItems Condition="Curve.Elements.ArrayNum &lt;= Curve.Elements.ArrayMax">
+                <Variable Name="UID" InitialValue="0"/>
+                <Size>Curve.Elements.ArrayNum</Size>
+                <Loop>
+                  <Item Name="{((FName*)AnimInstanceProxy->Skeleton->AnimCurveMapping->CurveNameList.AllocatorInstance.Data)[UID]}">
+                    ((FCurveElement*)Curve.Elements.AllocatorInstance.Data)[((unsigned short*)Curve.UIDToArrayIndexLUT->AllocatorInstance.Data)[UID]]
+                  </Item>
+                  <Exec>++UID</Exec>
+                </Loop>
+              </CustomListItems>
+            </Expand>
+          </Synthetic>
+          <Synthetic Name="UIDToArrayIndexLUT" Condition="Curve.UIDToArrayIndexLUT != 0">
+            <DisplayString Condition="Curve.UIDToArrayIndexLUT->ArrayNum == 0">Empty</DisplayString>
+            <DisplayString Condition="Curve.UIDToArrayIndexLUT->ArrayNum &lt; 0">Invalid</DisplayString>
+            <DisplayString Condition="Curve.UIDToArrayIndexLUT->ArrayMax &lt; Curve.UIDToArrayIndexLUT->ArrayNum">Invalid</DisplayString>
+            <DisplayString Condition="Curve.UIDToArrayIndexLUT->ArrayMax &gt;= Curve.UIDToArrayIndexLUT->ArrayNum">Num={Curve.UIDToArrayIndexLUT->ArrayNum}</DisplayString>
+            <Expand>
+              <CustomListItems Condition="Curve.UIDToArrayIndexLUT->ArrayNum &lt;= Curve.UIDToArrayIndexLUT->ArrayMax">
+                <Variable Name="UID" InitialValue="0"/>
+                <Size>Curve.UIDToArrayIndexLUT->ArrayNum</Size>
+                <Loop>
+                  <Item Name="[{UID}] {((FName*)AnimInstanceProxy->Skeleton->AnimCurveMapping->CurveNameList.AllocatorInstance.Data)[UID]}">
+                    ((unsigned short*)Curve.UIDToArrayIndexLUT->AllocatorInstance.Data)[UID]
+                  </Item>
+                  <Exec>++UID</Exec>
+                </Loop>
+              </CustomListItems>
+            </Expand>
+          </Synthetic>
+          <Item Name="UIDToArrayIndexLUT" Condition="Curve.UIDToArrayIndexLUT == 0">Curve.UIDToArrayIndexLUT</Item>
+          <Item Name="NumValidCurveCount">Curve.NumValidCurveCount</Item>
+          <Item Name="bInitialized">Curve.bInitialized</Item>
+        </Expand>
+      </Synthetic>
+      <Item Name="Curve" Condition="!Curve.bInitialized">Curve</Item>
+    </Expand>
+  </Type>
+
+  <!-- FComponentSpacePoseContext -->
+  <Type Name="FComponentSpacePoseContext">
+    <Expand>
+      <Item Name="AnimInstanceProxy">AnimInstanceProxy</Item>
+      <Item Name="Pose">Pose</Item>
+      <Synthetic Name="Curve" Condition="Curve.bInitialized">
+        <DisplayString>{{Num={Curve.Elements.ArrayNum} bInitialized={Curve.bInitialized}}}</DisplayString>
+        <Expand>
+          <Synthetic Name="Elements">
+            <DisplayString Condition="Curve.Elements.ArrayNum == 0">Empty</DisplayString>
+            <DisplayString Condition="Curve.Elements.ArrayNum &lt; 0">Invalid</DisplayString>
+            <DisplayString Condition="Curve.Elements.ArrayMax &lt; Curve.Elements.ArrayNum">Invalid</DisplayString>
+            <DisplayString Condition="Curve.Elements.ArrayMax &gt;= Curve.Elements.ArrayNum">Num={Curve.Elements.ArrayNum}</DisplayString>
+            <Expand>
+              <CustomListItems Condition="Curve.Elements.ArrayNum &lt;= Curve.Elements.ArrayMax">
+                <Variable Name="UID" InitialValue="0"/>
+                <Size>Curve.Elements.ArrayNum</Size>
+                <Loop>
+                  <Item Name="{((FName*)AnimInstanceProxy->Skeleton->AnimCurveMapping->CurveNameList.AllocatorInstance.Data)[UID]}">
+                    ((FCurveElement*)Curve.Elements.AllocatorInstance.Data)[((unsigned short*)Curve.UIDToArrayIndexLUT->AllocatorInstance.Data)[UID]]
+                  </Item>
+                  <Exec>++UID</Exec>
+                </Loop>
+              </CustomListItems>
+            </Expand>
+          </Synthetic>
+          <Synthetic Name="UIDToArrayIndexLUT" Condition="Curve.UIDToArrayIndexLUT != 0">
+            <DisplayString Condition="Curve.UIDToArrayIndexLUT->ArrayNum == 0">Empty</DisplayString>
+            <DisplayString Condition="Curve.UIDToArrayIndexLUT->ArrayNum &lt; 0">Invalid</DisplayString>
+            <DisplayString Condition="Curve.UIDToArrayIndexLUT->ArrayMax &lt; Curve.UIDToArrayIndexLUT->ArrayNum">Invalid</DisplayString>
+            <DisplayString Condition="Curve.UIDToArrayIndexLUT->ArrayMax &gt;= Curve.UIDToArrayIndexLUT->ArrayNum">Num={Curve.UIDToArrayIndexLUT->ArrayNum}</DisplayString>
+            <Expand>
+              <CustomListItems Condition="Curve.UIDToArrayIndexLUT->ArrayNum &lt;= Curve.UIDToArrayIndexLUT->ArrayMax">
+                <Variable Name="UID" InitialValue="0"/>
+                <Size>Curve.UIDToArrayIndexLUT->ArrayNum</Size>
+                <Loop>
+                  <Item Name="[{UID}] {((FName*)AnimInstanceProxy->Skeleton->AnimCurveMapping->CurveNameList.AllocatorInstance.Data)[UID]}">
+                    ((unsigned short*)Curve.UIDToArrayIndexLUT->AllocatorInstance.Data)[UID]
+                  </Item>
+                  <Exec>++UID</Exec>
+                </Loop>
+              </CustomListItems>
+            </Expand>
+          </Synthetic>
+          <Item Name="UIDToArrayIndexLUT" Condition="Curve.UIDToArrayIndexLUT == 0">Curve.UIDToArrayIndexLUT</Item>
+          <Item Name="NumValidCurveCount">Curve.NumValidCurveCount</Item>
+          <Item Name="bInitialized">Curve.bInitialized</Item>
+        </Expand>
+      </Synthetic>
+      <Item Name="Curve" Condition="!Curve.bInitialized">Curve</Item>
+    </Expand>
+  </Type>
+
+  <!-- 
+  *
+  * Chaos Visualizers 
+  *
+  -->
+
+  <!-- 2D TVector vizualizer -->
+  <Type Name="Chaos::TVector&lt;int,2&gt;">
+    <DisplayString>{{{X}, {Y}}}</DisplayString>
+  </Type>
+  <Type Name="Chaos::TVector&lt;Chaos::FReal,2&gt;">
+    <DisplayString>{{{X}, {Y}}}</DisplayString>
+  </Type>
+
+  <!-- 3D TVector vizualizer -->
+  <Type Name="Chaos::TVector&lt;*,3&gt;">
+    <DisplayString>{{{X}, {Y}, {Z}}}</DisplayString>
+  </Type>
+
+  <!-- 3D TRotation vizualizer -->
+  <Type Name="Chaos::TRotation&lt;*,3&gt;">
+    <DisplayString>{{{X}, {Y}, {Z}, {W}}}</DisplayString>
+  </Type>
+
+  <!-- 3D TRigidTransform vizualizer -->
+  <Type Name="Chaos::TRigidTransform&lt;*,3&gt;">
+    <Expand>
+      <Item Name="Rotation">(Chaos::TRotation&lt;$T1,3&gt;&amp;)Rotation</Item>
+      <Item Name="Translation">(Chaos::TVector&lt;$T1,3&gt;&amp;)Translation</Item>
+      <Item Name="Scale3D">(Chaos::TVector&lt;$T1,3&gt;&amp;)Scale3D</Item>
+    </Expand>
+  </Type>
+
+
+  <!-- 3x3 PMatrix visualizer. Just show diagonal elements in preview line. -->
+  <Type Name="Chaos::PMatrix&lt;*,3,3&gt;">
+    <DisplayString>{{{M[0][0]}, ..., {M[1][1]}, ..., {M[2][2]}}}</DisplayString>
+  </Type>
+
+  <!-- Chaos Particle Handle Vizualizer. Displays the elements from the SoA for the particle represented by the handle. -->
+  <Type Name="Chaos::TGeometryParticleHandleImp&lt;*,*,*&gt;">
+    <!-- non-transient handle. Shows X for kinematics and P for Dynamics -->
+    <DisplayString Condition="$T3 == 1 &amp;&amp; Type &lt; 2">&lt;{HandleIdx}&gt; ({Type})</DisplayString>
+    <DisplayString Condition="$T3 == 1 &amp;&amp; Type &gt;= 2">&lt;{HandleIdx}&gt; ({((enum Chaos::EObjectStateType*)PBDRigidParticles->MObjectState.AllocatorInstance.Data)[ParticleIdx]})</DisplayString>
+    <!-- transient handle. Shows X for kinematics and P for Dynamics -->
+    <DisplayString Condition="$T3 == 0 &amp;&amp; Type &lt; 2">&lt;T{((Chaos::TGeometryParticleHandleImp&lt;$T1,$T2,1&gt;**)GeometryParticles->MGeometryParticleHandle.AllocatorInstance.Data)[ParticleIdx]->HandleIdx}&gt; ({Type})</DisplayString>
+    <DisplayString Condition="$T3 == 0 &amp;&amp; Type &gt;= 2">&lt;T{((Chaos::TGeometryParticleHandleImp&lt;$T1,$T2,1&gt;**)GeometryParticles->MGeometryParticleHandle.AllocatorInstance.Data)[ParticleIdx]->HandleIdx}&gt; ({((enum Chaos::EObjectStateType*)PBDRigidParticles->MObjectState.AllocatorInstance.Data)[ParticleIdx]})</DisplayString>
+
+    <Expand>
+      <Item Condition="Type &gt;= 2" Optional="true" Name="DebugName">((TSharedPtr&lt;FString,ESPMode::ThreadSafe&gt;*)GeometryParticles->MDebugName.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="Type">Type</Item>
+      <Item Condition="Type &gt;= 0" Name="X">((Chaos::TVector&lt;$T1,$T2&gt;*)GeometryParticles->MX.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="R">((Chaos::TRotation&lt;$T1,$T2&gt;*)GeometryParticles->MR.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="P">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MP.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="Q">((Chaos::TRotation&lt;$T1,$T2&gt;*)PBDRigidParticles->MQ.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 1" Name="V">((Chaos::TVector&lt;$T1,$T2&gt;*)KinematicGeometryParticles->MV.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 1" Name="W">((Chaos::TVector&lt;$T1,$T2&gt;*)KinematicGeometryParticles->MW.AllocatorInstance.Data)[ParticleIdx]</Item>
+
+      <Item Condition="Type &gt;= 0 &amp;&amp; $T3==1" Name="HandleIdx">HandleIdx</Item>
+      <Item Condition="Type &gt;= 0" Name="UniqueIdx">((int32*)GeometryParticles->MUniqueIdx.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="ParticleID">((FParticleID*)GeometryParticles->MParticleIDs.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="Geometry">((Chaos::TSerializablePtr&lt;Chaos::FImplicitObject&gt;*)GeometryParticles->MGeometry.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="DynamicGeometry">((TUniquePtr&lt;Chaos::FImplicitObject,TDefaultDelete&lt;Chaos::FImplicitObject&gt; &gt;*)GeometryParticles->MDynamicGeometry.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <!-- NOTE: The template parameter 1 should be ESPMode::ThreadSafe but it doesn't work for some reason -->
+      <Item Condition="Type &gt;= 0" Name="SharedGeometry">((TSharedPtr&lt;Chaos::FImplicitObject,1&gt;*)GeometryParticles->MSharedGeometry.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="GeometryParticle">((Chaos::TGeometryParticle&lt;$T1,$T2&gt;**)GeometryParticles->MGeometryParticle.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="ShapesArray">((Chaos::FShapesArray*)GeometryParticles->MShapesArray.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="LocalBounds">((Chaos::FAABB3*)GeometryParticles->MLocalBounds.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="WorldSpaceInflatedBounds">((Chaos::FAABB3*)GeometryParticles->MWorldSpaceInflatedBounds.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="ParticleConstraints">((Chaos::FConstraintHandleArray*)GeometryParticles->MParticleConstraints.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="ParticleCollisions">((Chaos::FParticleCollisions*)GeometryParticles->MParticleCollisions.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="SyncState">((Chaos::ESyncState*)GeometryParticles->MSyncState.AllocatorInstance.Data)[ParticleIdx]</Item>
+
+      <Item Condition="Type &gt;= 1" Name="KinematicTarget">((Chaos::TKinematicTarget&lt;$T1,$T2&gt;*)KinematicGeometryParticles->KinematicTargets.AllocatorInstance.Data)[ParticleIdx]</Item>
+
+      <Item Condition="Type &gt;= 2" Name="VSmooth">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MVSmooth.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="WSmooth">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MWSmooth.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="Acceleration">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MAcceleration.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="AngularAcceleration">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MAngularAcceleration.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="LinearImpulseVelocity">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MLinearImpulseVelocity.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="AngularImpulseVelocity">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MAngularImpulseVelocity.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="MaxLinearSpeedSq">((Chaos::FReal*)PBDRigidParticles->MaxLinearSpeedsSq.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="MaxAngularSpeedSq">((Chaos::FReal*)PBDRigidParticles->MaxAngularSpeedsSq.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="M">((Chaos::FReal*)PBDRigidParticles->MM.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="InvM">((Chaos::FReal*)PBDRigidParticles->MInvM.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="I">((Chaos::TVector&lt;float,3&gt;*)PBDRigidParticles->MI.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="InvI">((Chaos::TVector&lt;float,3&gt;*)PBDRigidParticles->MInvI.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="CenterOfMass">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MCenterOfMass.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="RotationOfMass">((Chaos::TRotation&lt;$T1,$T2&gt;*)PBDRigidParticles->MRotationOfMass.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="CollisionParticles">((TUniquePtr&lt;Chaos::FBVHParticles,TDefaultDelete&lt;Chaos::FBVHParticles&gt; &gt;*)PBDRigidParticles->MCollisionParticles.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="CollisionGroup">((int*)PBDRigidParticles->MCollisionGroup.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="CollisionConstraintFlags">((int*)PBDRigidParticles->MCollisionConstraintFlags.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="IslandIndex">((int*)PBDRigidParticles->MIslandIndex.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="Disabled">((bool*)PBDRigidParticles->MDisabled.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="ToBeRemovedOnFracture">((bool*)PBDRigidParticles->MToBeRemovedOnFracture.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="ObjectState">((enum Chaos::EObjectStateType*)PBDRigidParticles->MObjectState.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="P">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MP.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="Q">((Chaos::TRotation&lt;$T1,$T2&gt;*)PBDRigidParticles->MQ.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="PreV">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MPreV.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="PreW">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MPreW.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="SolverBodyIndex">((int32*)PBDRigidParticles->MSolverBodyIndex.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="GravityEnabled">((bool*)PBDRigidParticles->MGravityEnabled.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="CCDEnabled">((bool*)PBDRigidParticles->bCCDEnabled.AllocatorInstance.Data)[ParticleIdx]</Item>
+
+      <Item Condition="Type &gt;= 3" Name="CollisionImpulses">((Chaos::FReal*)PBDRigidClusteredParticles->MCollisionImpulses.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 3" Name="Strain">((Chaos::FReal*)PBDRigidClusteredParticles->MStrains.AllocatorInstance.Data)[ParticleIdx]</Item>
+
+    </Expand>
+  </Type>
+
+  <!-- Chaos Generic Particle Handle Vizualizer. Displays as a particle handle. -->
+  <Type Name="Chaos::FGenericParticleHandle">
+    <DisplayString Condition="Imp.MHandle->Type &lt; 2">&lt;{Imp.MHandle->HandleIdx}&gt; ({Imp.MHandle->Type}) @ {((Chaos::FVec3*)Imp.MHandle->GeometryParticles->MX.AllocatorInstance.Data)[Imp.MHandle->ParticleIdx]}</DisplayString>
+    <DisplayString Condition="Imp.MHandle->Type &gt;= 2">&lt;{Imp.MHandle->HandleIdx}&gt; ({Imp.MHandle->Type}) @ {((Chaos::FVec3*)Imp.MHandle->PBDRigidParticles->MP.AllocatorInstance.Data)[Imp.MHandle->ParticleIdx]}</DisplayString>
+    <Expand>
+      <ExpandedItem>Imp.MHandle</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <Type Name="Chaos::FConstGenericParticleHandle">
+    <DisplayString Condition="Imp.MHandle->Type &lt; 2">&lt;{Imp.MHandle->HandleIdx}&gt; ({Imp.MHandle->Type}) @ {((Chaos::FVec3*)Imp.MHandle->GeometryParticles->MX.AllocatorInstance.Data)[Imp.MHandle->ParticleIdx]}</DisplayString>
+    <DisplayString Condition="Imp.MHandle->Type &gt;= 2">&lt;{Imp.MHandle->HandleIdx}&gt; ({((enum Chaos::EObjectStateType*)Imp.MHandle->PBDRigidParticles->MObjectState.AllocatorInstance.Data)[Imp.MHandle->ParticleIdx]}) @ {((Chaos::FVec3*)Imp.MHandle->PBDRigidParticles->MP.AllocatorInstance.Data)[Imp.MHandle->ParticleIdx]}</DisplayString>
+    <Expand>
+      <ExpandedItem>Imp.MHandle</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- Chaos ClusterId Vizualizer. -->
+  <Type Name="Chaos::ClusterId">
+    <Expand>
+      <Item Name="Id">((Chaos::TPBDRigidParticleHandle&lt;float,3&gt;*)Id]</Item>
+      <Item Name="NumChildren">NumChildren</Item>
+    </Expand>
+  </Type>
+
+
+  <!-- Chaos Particle Handle Vizualizer. Displays the elements from the SoA for the particle represented by the handle. -->
+  <Type Name="Chaos::TRigidParticleHandleImp&lt;*,*,*&gt;">
+    <!-- non-transient handle. Shows X for kinematics and P for Dynamics -->
+    <DisplayString Condition="$T3 == 1 &amp;&amp; Type &lt; 2">&lt;{HandleIdx}&gt; ({Type})</DisplayString>
+    <DisplayString Condition="$T3 == 1 &amp;&amp; Type &gt;= 2">&lt;{HandleIdx}&gt; ({((enum Chaos::EObjectStateType*)PBDRigidParticles->MObjectState.AllocatorInstance.Data)[ParticleIdx]})</DisplayString>
+    <!-- transient handle. Shows X for kinematics and P for Dynamics -->
+    <DisplayString Condition="$T3 == 0 &amp;&amp; Type &lt; 2">&lt;T{((Chaos::TGeometryParticleHandleImp&lt;$T1,$T2,1&gt;**)GeometryParticles->MGeometryParticleHandle.AllocatorInstance.Data)[ParticleIdx]->HandleIdx}&gt; ({Type})</DisplayString>
+    <DisplayString Condition="$T3 == 0 &amp;&amp; Type &gt;= 2">&lt;T{((Chaos::TGeometryParticleHandleImp&lt;$T1,$T2,1&gt;**)GeometryParticles->MGeometryParticleHandle.AllocatorInstance.Data)[ParticleIdx]->HandleIdx}&gt; ({((enum Chaos::EObjectStateType*)PBDRigidParticles->MObjectState.AllocatorInstance.Data)[ParticleIdx]})</DisplayString>
+
+    <Expand>
+      <Item Condition="Type &gt;= 2" Optional="true" Name="DebugName">((TSharedPtr&lt;FString,ESPMode::ThreadSafe&gt;*)GeometryParticles->MDebugName.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="Type">Type</Item>
+      <Item Condition="Type &gt;= 0" Name="X">((Chaos::TVector&lt;$T1,$T2&gt;*)GeometryParticles->MX.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="R">((Chaos::TRotation&lt;$T1,$T2&gt;*)GeometryParticles->MR.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="P">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MP.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="Q">((Chaos::TRotation&lt;$T1,$T2&gt;*)PBDRigidParticles->MQ.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 1" Name="V">((Chaos::TVector&lt;$T1,$T2&gt;*)KinematicGeometryParticles->MV.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 1" Name="W">((Chaos::TVector&lt;$T1,$T2&gt;*)KinematicGeometryParticles->MW.AllocatorInstance.Data)[ParticleIdx]</Item>
+
+      <Item Condition="Type &gt;= 0 &amp;&amp; $T3==1" Name="HandleIdx">HandleIdx</Item>
+      <Item Condition="Type &gt;= 0" Name="UniqueIdx">((int32*)GeometryParticles->MUniqueIdx.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="ParticleID">((FParticleID*)GeometryParticles->MParticleIDs.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="Geometry">((Chaos::TSerializablePtr&lt;Chaos::FImplicitObject&gt;*)GeometryParticles->MGeometry.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="DynamicGeometry">((TUniquePtr&lt;Chaos::FImplicitObject,TDefaultDelete&lt;Chaos::FImplicitObject&gt; &gt;*)GeometryParticles->MDynamicGeometry.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <!-- NOTE: The template parameter 1 should be ESPMode::ThreadSafe but it doesn't work for some reason -->
+      <Item Condition="Type &gt;= 0" Name="SharedGeometry">((TSharedPtr&lt;Chaos::FImplicitObject,1&gt;*)GeometryParticles->MSharedGeometry.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="GeometryParticle">((Chaos::TGeometryParticle&lt;$T1,$T2&gt;**)GeometryParticles->MGeometryParticle.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="ShapesArray">((Chaos::FShapesArray*)GeometryParticles->MShapesArray.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="LocalBounds">((Chaos::FAABB3*)GeometryParticles->MLocalBounds.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="WorldSpaceInflatedBounds">((Chaos::FAABB3*)GeometryParticles->MWorldSpaceInflatedBounds.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="ParticleConstraints">((Chaos::FConstraintHandleArray*)GeometryParticles->MParticleConstraints.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="ParticleCollisions">((Chaos::FParticleCollisions*)GeometryParticles->MParticleCollisions.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="SyncState">((Chaos::ESyncState*)GeometryParticles->MSyncState.AllocatorInstance.Data)[ParticleIdx]</Item>
+
+      <Item Condition="Type &gt;= 1" Name="KinematicTarget">((Chaos::TKinematicTarget&lt;$T1,$T2&gt;*)KinematicGeometryParticles->KinematicTargets.AllocatorInstance.Data)[ParticleIdx]</Item>
+
+      <Item Condition="Type &gt;= 2" Name="VSmooth">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MVSmooth.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="WSmooth">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MWSmooth.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="Acceleration">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MAcceleration.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="AngularAcceleration">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MAngularAcceleration.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="LinearImpulseVelocity">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MLinearImpulseVelocity.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="AngularImpulseVelocity">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MAngularImpulseVelocity.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="MaxLinearSpeedSq">((Chaos::FReal*)PBDRigidParticles->MaxLinearSpeedsSq.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="MaxAngularSpeedSq">((Chaos::FReal*)PBDRigidParticles->MaxAngularSpeedsSq.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="M">((Chaos::FReal*)PBDRigidParticles->MM.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="InvM">((Chaos::FReal*)PBDRigidParticles->MInvM.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="I">((Chaos::PMatrix&lt;$T1,$T2,3&gt;*)PBDRigidParticles->MI.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="InvI">((Chaos::PMatrix&lt;$T1,$T2,3&gt;*)PBDRigidParticles->MInvI.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="CenterOfMass">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MCenterOfMass.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="RotationOfMass">((Chaos::TRotation&lt;$T1,$T2&gt;*)PBDRigidParticles->MRotationOfMass.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="CollisionParticles">((TUniquePtr&lt;Chaos::FBVHParticles,TDefaultDelete&lt;Chaos::FBVHParticles&gt; &gt;*)PBDRigidParticles->MCollisionParticles.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="CollisionGroup">((int*)PBDRigidParticles->MCollisionGroup.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="CollisionConstraintFlags">((int*)PBDRigidParticles->MCollisionConstraintFlags.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="IslandIndex">((int*)PBDRigidParticles->MIslandIndex.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="Disabled">((bool*)PBDRigidParticles->MDisabled.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="ToBeRemovedOnFracture">((bool*)PBDRigidParticles->MToBeRemovedOnFracture.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="ObjectState">((enum Chaos::EObjectStateType*)PBDRigidParticles->MObjectState.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="P">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MP.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="Q">((Chaos::TRotation&lt;$T1,$T2&gt;*)PBDRigidParticles->MQ.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="PreV">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MPreV.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="PreW">((Chaos::TVector&lt;$T1,$T2&gt;*)PBDRigidParticles->MPreW.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="SolverBodyIndex">((int32*)PBDRigidParticles->MSolverBodyIndex.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="GravityEnabled">((bool*)PBDRigidParticles->MGravityEnabled.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="CCDEnabled">((bool*)PBDRigidParticles->bCCDEnabled.AllocatorInstance.Data)[ParticleIdx]</Item>
+
+      <Item Condition="Type &gt;= 3" Name="CollisionImpulses">((Chaos::FReal*)PBDRigidClusteredParticles->MCollisionImpulses.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 3" Name="Strain">((Chaos::FReal*)PBDRigidClusteredParticles->MStrains.AllocatorInstance.Data)[ParticleIdx]</Item>
+
+    </Expand>
+  </Type>
+
+  <!-- Chaos Particle Handle Vizualizer. Displays the elements from the SoA for the particle represented by the handle. -->
+  <Type Name="Chaos::TPBDRigidClusteredParticleHandleImp&lt;*,*,*&gt;">
+    <!-- non-transient handle -->
+    <DisplayString Condition="$T3 == 1">&lt;{HandleIdx}&gt; @ {((Chaos::TVector&lt;$T1,$T2&gt;*)GeometryParticles->MX.AllocatorInstance.Data)[ParticleIdx]} ({Type})</DisplayString>
+    <!-- transient handle -->
+    <DisplayString Condition="$T3 == 0">&lt;T{((Chaos::TPBDRigidClusteredParticleHandleImp&lt;$T1,$T2,1&gt;**)GeometryParticles->MGeometryParticleHandle.AllocatorInstance.Data)[ParticleIdx]->HandleIdx}&gt; @ {((Chaos::TVector&lt;$T1,$T2&gt;*)GeometryParticles->MX.AllocatorInstance.Data)[ParticleIdx]} ({Type})</DisplayString>
+
+
+    <Expand>
+      <Item Condition="Type &gt;= 0" Name="Type">Type</Item>
+      <Item Condition="Type &gt;= 0" Optional="true" Name="DebugName">((FName*)GeometryParticles->MDebugName.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="Disabled">((bool*)PBDRigidParticles->MDisabled.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="ObjectState">((enum Chaos::EObjectStateType*)PBDRigidParticles->MObjectState.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="X">((Chaos::TVector&lt;$T1,$T2&gt;*)GeometryParticles->MX.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="R">((Chaos::TRotation&lt;$T1,$T2&gt;*)GeometryParticles->MR.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="Geometry">((Chaos::TSerializablePtr&lt;Chaos::FImplicitObject&gt;*)GeometryParticles->MGeometry.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="DynamicGeometry">((Chaos::TSerializablePtr&lt;Chaos::FImplicitObject&gt;*)GeometryParticles->MDynamicGeometry.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="ShapesArray">((Chaos::FShapesArray*)GeometryParticles->MShapesArray.AllocatorInstance.Data)[ParticleIdx]</Item>
+
+      <Item Condition="Type &gt;= 2" Name="M">((Chaos::FReal*)PBDRigidParticles->MM.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="InvM">((Chaos::FReal*)PBDRigidParticles->MInvM.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="I">((Chaos::PMatrix&lt;$T1,$T2,3&gt;*)PBDRigidParticles->MI.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 2" Name="InvI">((Chaos::PMatrix&lt;$T1,$T2,3&gt;*)PBDRigidParticles->MInvI.AllocatorInstance.Data)[ParticleIdx]</Item>
+
+      <Item Condition="Type &gt;= 0 &amp;&amp; $T3==1" Name="HandleIdx">HandleIdx</Item>
+      <Item Condition="Type &gt;= 0" Name="UniqueIdx">((int32*)GeometryParticles->MUniqueIdx.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="ParticleID">((int32*)GeometryParticles->MParticleIDs.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="Strain">((Chaos::FReal*)PBDRigidClusteredParticles->MStrains.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="CollisionImpulses">((Chaos::FReal*)PBDRigidClusteredParticles->MCollisionImpulses.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="InternalCluster">((bool*)PBDRigidClusteredParticles->MInternalCluster.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="ClusterGroupIndex">((int32*)PBDRigidClusteredParticles->MClusterGroupIndex.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="ClusterId">((Chaos::ClusterId*)PBDRigidClusteredParticles->MClusterIds.AllocatorInstance.Data)[ParticleIdx]</Item>
+      <Item Condition="Type &gt;= 0" Name="ChildToParent">((Chaos::TRigidTransform&lt;$T1,$T2&gt;*)PBDRigidClusteredParticles->MChildToParent.AllocatorInstance.Data)[ParticleIdx]</Item>
+
+    </Expand>
+  </Type>
+
+
+
+  <!-- Chaos Kinematic Target Vizualizer. -->
+  <Type Name="Chaos::TKinematicTarget&lt;*,*&gt;">
+    <DisplayString>Mode: {Mode}</DisplayString>
+    <Expand>
+      <Item Condition="Mode &gt; 0" Name="Position">Position</Item>
+      <Item Condition="Mode &gt; 0" Name="Rotation">Rotation</Item>
+    </Expand>
+  </Type>
+
+  <!-- Chaos Solver Body Adapter Visualizer -->
+  <Type Name="Chaos::FSolverBodyAdapter">
+    <DisplayString>&lt;{Particle.Imp.MHandle->HandleIdx}&gt; ({Particle.Imp.MHandle->Type}) @ {State.P}</DisplayString>
+  </Type>
+
+  <!-- Chaos Solver Body Visualizer -->
+  <Type Name="Chaos::FSolverBody">
+    <DisplayString Condition="State.InvM != 0">[Dynamic]</DisplayString>
+    <DisplayString Condition="State.InvM == 0">[Kinematic]</DisplayString>
+    <Expand>
+      <ExpandedItem>State</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- Chaos Solver Body Visualizer -->
+  <Type Name="Chaos::FConstraintSolverBody">
+    <Expand>
+      <Item Name="Body">Body</Item>
+      <Item Name="InvMassScale">State.InvMassScale</Item>
+    </Expand>
+  </Type>
+
+  <!-- Chaos Dense matrix visualizer. -->
+  <Type Name="Chaos::TDenseMatrix&lt;*&gt;">
+    <Expand>
+      <ArrayItems>
+        <Rank>2</Rank>
+        <Size>$i == 0 ? NRows : NCols</Size>
+        <ValuePointer>M</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+  <!-- 
+  Particles SoA vizualizer. This works by displaying the persistent handle for the particle which uses the above vizualizer.
+  We are lucky we can do this - I don't think there's an easy way to vizualize SoAs in object order in natvis otherwise.
+  -->
+  <Type Name="Chaos::TGeometryParticlesImp&lt;*,*,*&gt;">
+    <DisplayString Condition="MSize &lt;= 0">Empty</DisplayString>
+    <DisplayString Condition="MSize &gt; 0">Size={MSize}</DisplayString>
+    <Expand>
+      <IndexListItems Condition="MSize &gt; 0">
+        <Size>MSize</Size>
+        <ValueNode>
+          ((Chaos::TGeometryParticleHandleImp&lt;$T1,$T2,1&gt;**)MGeometryParticleHandle.AllocatorInstance.Data)[$i]
+        </ValueNode>
+      </IndexListItems>
+    </Expand>
+  </Type>
+
+  <!-- Chaos Joint Handle Vizualizer. -->
+  <Type Name="Chaos::FPBDJointConstraintHandle">
+    <DisplayString>{ConstraintIndex}: {(((Chaos::FPBDJointState*)((FPBDJointConstraints*)ConstraintContainer)->ConstraintStates.AllocatorInstance.Data)[ConstraintIndex]).Level}</DisplayString>
+    <Expand>
+      <Item Name="ConstraintIndex">ConstraintIndex</Item>
+      <Item Name="ConstraintParticles">((Chaos::FPBDJointConstraints::FParticlePair*)((FPBDJointConstraints*)ConstraintContainer)->ConstraintParticles.AllocatorInstance.Data)[ConstraintIndex]</Item>
+      <Item Name="ConstraintSettings">((Chaos::FPBDJointSettings*)((FPBDJointConstraints*)ConstraintContainer)->ConstraintSettings.AllocatorInstance.Data)[ConstraintIndex]</Item>
+      <Item Name="ConstraintState">((Chaos::FPBDJointState*)((FPBDJointConstraints*)ConstraintContainer)->ConstraintStates.AllocatorInstance.Data)[ConstraintIndex]</Item>
+    </Expand>
+  </Type>
+
+  <!-- Chaos Collision Vizualizer. -->
+  <Type Name="Chaos::FPBDCollisionConstraint">
+    <DisplayString>{Particle[0]} -:- {Particle[1]}</DisplayString>
+  </Type>
+
+  <!-- Chaos Contact Point Visualizer -->
+  <Type Name="Chaos::FContactPoint">
+    <DisplayString Condition="FaceIndex &lt; 0">{ContactType} @ {Phi}</DisplayString>
+    <DisplayString Condition="FaceIndex &gt;= 0">{ContactType} @ {Phi} [{FaceIndex}]</DisplayString>
+  </Type>
+  
+  <!-- Chaos Convex StructureData Vizualizer -->
+  <Type Name="Chaos::FConvexStructureData">
+    <Expand>
+      <Item Name="IndexType">IndexType</Item>
+      <Item Condition="IndexType == 1" Name="Data">Data.DataS</Item>
+      <Item Condition="IndexType == 2" Name="Data">Data.DataM</Item>
+      <Item Condition="IndexType == 3" Name="Data">Data.DataL</Item>
+    </Expand>
+  </Type>
+  
+  <!-- Chaos Implicit Visualizer -->
+  <Type Name="Chaos::FImplicitObject">
+    <DisplayString Condition="CollisionType == Chaos::ImplicitObjectType::Sphere">[Sphere]</DisplayString>
+    <DisplayString Condition="CollisionType == Chaos::ImplicitObjectType::Box">[Box]</DisplayString>
+    <DisplayString Condition="CollisionType == Chaos::ImplicitObjectType::Plane">[Plane]</DisplayString>
+    <DisplayString Condition="CollisionType == Chaos::ImplicitObjectType::Capsule">[Capsule]</DisplayString>
+    <DisplayString Condition="CollisionType == Chaos::ImplicitObjectType::Transformed">[Transformed]</DisplayString>
+    <DisplayString Condition="CollisionType == Chaos::ImplicitObjectType::Union">[Union]</DisplayString>
+    <DisplayString Condition="CollisionType == Chaos::ImplicitObjectType::LevelSet">[LevelSet]</DisplayString>
+    <DisplayString Condition="CollisionType == Chaos::ImplicitObjectType::Unknown">[Unkownn]</DisplayString>
+    <DisplayString Condition="CollisionType == Chaos::ImplicitObjectType::Convex">[Convex]</DisplayString>
+    <DisplayString Condition="CollisionType == Chaos::ImplicitObjectType::TaperedCylinder">[TaperedCylinder]</DisplayString>
+    <DisplayString Condition="CollisionType == Chaos::ImplicitObjectType::Cylinder">[Cylinder]</DisplayString>
+    <DisplayString Condition="CollisionType == Chaos::ImplicitObjectType::TriangleMesh">[TriangleMesh]</DisplayString>
+    <DisplayString Condition="CollisionType == Chaos::ImplicitObjectType::HeightField">[HeightField]</DisplayString>
+    <DisplayString Condition="CollisionType == Chaos::ImplicitObjectType::UnionClustered">[UnionClustered]</DisplayString>
+    <DisplayString Condition="CollisionType == (Chaos::ImplicitObjectType::IsScaled | Chaos::ImplicitObjectType::Convex)">[Scaled Convex]</DisplayString>
+    <DisplayString Condition="CollisionType == (Chaos::ImplicitObjectType::IsScaled | Chaos::ImplicitObjectType::TriangleMesh)">[Scaled TriangleMesh]</DisplayString>
+    <DisplayString Condition="CollisionType == (Chaos::ImplicitObjectType::IsScaled | Chaos::ImplicitObjectType::HeightField)">[Scaled HeightField]</DisplayString>
+    <DisplayString Condition="CollisionType == (Chaos::ImplicitObjectType::IsInstanced | Chaos::ImplicitObjectType::Convex)">[Instanced Convex]</DisplayString>
+    <DisplayString Condition="CollisionType == (Chaos::ImplicitObjectType::IsInstanced | Chaos::ImplicitObjectType::TriangleMesh)">[Instanced TriangleMesh]</DisplayString>
+    <DisplayString Condition="CollisionType == (Chaos::ImplicitObjectType::IsInstanced | Chaos::ImplicitObjectType::HeightField)">[Instanced HeightField]</DisplayString>
+  </Type>
+
+  <!-- Chaos FPerShapeData Visualizer -->
+  <Type Name="Chaos::FPerShapeData">
+    <DisplayString>{Geometry.Ptr}</DisplayString>
+  </Type>
+
+  <!-- Chaos TSerializablePtr Visualizer -->
+  <Type Name="Chaos::TSerializablePtr&lt;*&gt;">
+    <DisplayString>{Ptr}</DisplayString>
+  </Type>
+
+  <!-- FIoChunkId visualizer -->
+  <Type Name="FIoChunkId">
+    <!-- Id is 12 bytes long and the object is considered Invalid if all values are 0 -->
+    <DisplayString Condition="reinterpret_cast&lt;uint32*&gt;(Id)[0] == 0 &amp;&amp; reinterpret_cast&lt;uint32*&gt;(Id)[1] == 0 &amp;&amp; reinterpret_cast&lt;uint32*&gt;(Id)[2] == 0">Invalid</DisplayString>
+    <Expand>
+      <Item Name="ChunkId">*(uint64*)&amp;Id[0]</Item>
+      <Item Name="ChunkIndex">*(uint16*)&amp;Id[8]</Item>
+      <Item Name="EIoChunkType">*(EIoChunkType*)&amp;Id[11]</Item>
+    </Expand>
+  </Type>
+
+  <!-- 
+  *
+  * Niagara Visualizers 
+  *
+  -->
+
+  <!-- FNiagaraVariable visualizer -->
+  <Type Name="FNiagaraVariableBase">
+    <DisplayString>Name={Name}, Type={((FNiagaraTypeDefinition*)(FNiagaraTypeRegistry::RegisteredTypes.AllocatorInstance.InlineData))[TypeDefHandle.RegisteredTypeIndex].ClassStructOrEnum->NamePrivate}</DisplayString>
+  </Type>
+
+  <Type Name="UNiagaraNodeFunctionCall">
+    <DisplayString>Name={NamePrivate}, FunctionName={FunctionDisplayName}</DisplayString>
+  </Type>
+
+  <!-- 
+  *
+  * ObjectHandle/ObjectPtr Visualizers 
+  *
+  -->
+  
+  <!-- FObjectPathId visualizer -->
+  <Type Name="FObjectPathId">
+    <DisplayString Condition="PathId == FObjectPathId::EPathId::None">Empty</DisplayString>
+    <DisplayString Condition="((PathId &amp; FObjectPathId::EPathId::FlagSimple) == FObjectPathId::EPathId::FlagSimple) &amp;&amp; *(uint32*)this == (uint32)FObjectPathId::EPathId::FlagSimple">{*(FNameEntryId*)((uint8*)this+sizeof(uint32))}</DisplayString>
+    <DisplayString Condition="((PathId &amp; FObjectPathId::EPathId::FlagSimple) == FObjectPathId::EPathId::FlagSimple) &amp;&amp; *(uint32*)this != (uint32)FObjectPathId::EPathId::FlagSimple">{*(FNameEntryId*)((uint8*)this+sizeof(uint32))}_{(((*(uint32*)this &amp; ~(uint32)FObjectPathId::EPathId::FlagSimple) >> 1) - 1),d}</DisplayString>
+    <DisplayString Condition="(PathId != FObjectPathId::EPathId::None) &amp;&amp; ((PathId &amp; FObjectPathId::EPathId::FlagSimple) != FObjectPathId::EPathId::FlagSimple)">
+      Complex Path [Num={GComplexObjectPathDebug[((int32)PathId>>1)-1].ArrayNum}]
+    </DisplayString>
+    <Expand>
+      <ExpandedItem Condition="(PathId != FObjectPathId::EPathId::None) &amp;&amp; ((PathId &amp; FObjectPathId::EPathId::FlagSimple) != FObjectPathId::EPathId::FlagSimple)">
+        GComplexObjectPathDebug[((int32)PathId>>1)-1]
+      </ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FPackedObjectRef visualizer.  Expandable items made to match fields of FObjectRef in name and order. -->
+  <Type Name="FPackedObjectRef">
+    <DisplayString Condition="EncodedRef == 0">nullptr</DisplayString>
+    <DisplayString Condition="EncodedRef &amp; 1">{GObjectHandlePackageDebug[*(uint64*)this &gt;&gt; ObjectHandle_Private::PackageIdShift &amp; ObjectHandle_Private::PackageIdMask].PackageName}:{((FObjectPathId*)(GObjectHandlePackageDebug[*(uint64*)this &gt;&gt; ObjectHandle_Private::PackageIdShift &amp; ObjectHandle_Private::PackageIdMask].ObjectPaths.Data))[(*(uint64*)this &gt;&gt; ObjectHandle_Private::ObjectPathIdShift &amp; ObjectHandle_Private::ObjectPathIdMask) - 1]}</DisplayString>
+    <Expand>
+      <Item Condition="EncodedRef &amp; 1" Name="PackageName">
+        GObjectHandlePackageDebug[*(uint64*)this &gt;&gt; ObjectHandle_Private::PackageIdShift &amp; ObjectHandle_Private::PackageIdMask].PackageName
+      </Item>
+      <Item Condition="(EncodedRef &amp; 1) &amp;&amp; (*(uint64*)this &gt;&gt; ObjectHandle_Private::DataClassDescriptorIdShift &amp; ObjectHandle_Private::DataClassDescriptorIdMask)" Name="ClassPackageName">
+        ((FObjectHandleDataClassDescriptor*)(GObjectHandlePackageDebug[*(uint64*)this &gt;&gt; ObjectHandle_Private::PackageIdShift &amp; ObjectHandle_Private::PackageIdMask].DataClassDescriptors.Data))[(*(uint64*)this &gt;&gt; ObjectHandle_Private::DataClassDescriptorIdShift &amp; ObjectHandle_Private::DataClassDescriptorIdMask) - 1].PackageName
+      </Item>
+      <Item Condition="(EncodedRef &amp; 1) &amp;&amp; (*(uint64*)this &gt;&gt; ObjectHandle_Private::DataClassDescriptorIdShift &amp; ObjectHandle_Private::DataClassDescriptorIdMask)" Name="ClassName">
+        ((FObjectHandleDataClassDescriptor*)(GObjectHandlePackageDebug[*(uint64*)this &gt;&gt; ObjectHandle_Private::PackageIdShift &amp; ObjectHandle_Private::PackageIdMask].DataClassDescriptors.Data))[(*(uint64*)this &gt;&gt; ObjectHandle_Private::DataClassDescriptorIdShift &amp; ObjectHandle_Private::DataClassDescriptorIdMask) - 1].ClassName
+      </Item>
+      <Item Condition="EncodedRef &amp; 1" Name="ObjectPath">
+        ((FObjectPathId*)(GObjectHandlePackageDebug[*(uint64*)this &gt;&gt; ObjectHandle_Private::PackageIdShift &amp; ObjectHandle_Private::PackageIdMask].ObjectPaths.Data))[(*(uint64*)this &gt;&gt; ObjectHandle_Private::ObjectPathIdShift &amp; ObjectHandle_Private::ObjectPathIdMask) - 1]
+      </Item>
+    </Expand>
+  </Type>
+  
+  <!-- Tasks -->
+
+  <!-- LowLevelTasks::Tasks_Impl::FTaskBase::FPackedData visualizer -->
+  <Type Name="LowLevelTasks::Tasks_Impl::FTaskBase::FPackedData">
+    <DisplayString>DebugName={(const TCHAR*)(DebugName)}, State={(::LowLevelTasks::ETaskState)(State)}</DisplayString>
+    <Expand>
+      <Item Name="DebugName">(const TCHAR*)(DebugName)</Item>
+      <Item Name="Priority">(::LowLevelTasks::ETaskPriority)(Priority)</Item>
+      <Item Name="State">(::LowLevelTasks::ETaskState)(State)</Item>
+      <Item Name="bAllowBusyWaiting">(bAllowBusyWaiting)</Item>
+    </Expand>
+  </Type>
+
+  <!-- LowLevelTasks::FTask visualizer -->
+  <Type Name="LowLevelTasks::FTask">
+    <DisplayString>{PackedData}</DisplayString>
+  </Type>
+
+  <!-- LowLevelTasks::FScheduler::FEventStack::FTopNode visualizer -->
+  <Type Name="LowLevelTasks::FScheduler::FEventStack::FTopNode">
+    <DisplayString>Address={(FSleepEvent*)(Address &lt;&lt; 3)}}</DisplayString>
+    <Expand>
+      <Item Name="Address">(FSleepEvent*)(Address &lt;&lt; 3)</Item>
+      <Item Name="Revision">(int)Revision</Item>
+    </Expand>
+  </Type>
+
+  <Type Name="UE::Tasks::Private::FTaskBase">
+    <DisplayString Condition="Pipe == nullptr">"{(LowLevelTasks::ETaskState)LowLevelTask.PackedData._Storage._Value.State,en}" state, {(LowLevelTasks::ETaskPriority)LowLevelTask.PackedData._Storage._Value.Priority,en}Pri, "{(const TCHAR*)LowLevelTask.PackedData._Storage._Value.DebugName,sub}", no pipe</DisplayString>
+    <DisplayString>"{(LowLevelTasks::ETaskState)LowLevelTask.PackedData._Storage._Value.State,en}" state, {(LowLevelTasks::ETaskPriority)LowLevelTask.PackedData._Storage._Value.Priority,en}Pri, "{(const TCHAR*)LowLevelTask.PackedData._Storage._Value.DebugName,sub}", pipe "{Pipe-&gt;DebugName,sub}"</DisplayString>
+
+    <Expand>
+      <ExpandedItem>LowLevelTask.PackedData._Storage._Value</ExpandedItem>
+      <Item Name="NumLocks">NumLocks._Storage._Value</Item>
+      <Item Name="Subsequents">Subsequents</Item>
+      <Item Name="Prerequisites">Prerequisites</Item>
+      <Item Name="Pipe">Pipe</Item>
+      <Item Name="RefCount">RefCount</Item>
+    </Expand>
+  </Type>
+
+  <!-- UE::Tasks::TTask<T> -->
+  <Type Name="UE::Tasks::TTask&lt;*&gt;">
+    <DisplayString Condition="Pimpl.Reference != nullptr">{(void*)Pimpl.Reference} {Pimpl.Reference}</DisplayString>
+    <DisplayString>{{empty}}</DisplayString>
+
+    <Expand>
+      <ExpandedItem Condition="Pimpl.Reference != nullptr">Pimpl.Reference</ExpandedItem>
+      <Item Name="Result" Condition="Pimpl.Reference != nullptr">Pimpl.Reference->ResultStorage</Item>
+      <Item Name="RefCount">Pimpl.Reference->RefCount._Storage._Value</Item>
+    </Expand>
+  </Type>
+
+  <!-- UE::Tasks::TTask<void> -->
+  <Type Name="UE::Tasks::TTask&lt;void&gt;">
+    <DisplayString Condition="Pimpl.Reference != nullptr">{(void*)Pimpl.Reference} {Pimpl.Reference}</DisplayString>
+    <DisplayString>{{empty}}</DisplayString>
+
+    <Expand>
+      <ExpandedItem Condition="Pimpl.Reference != nullptr">Pimpl.Reference</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <Type Name="UE::Tasks::FPipe">
+    <DisplayString Condition="LastTask._Storage._Value != nullptr">Blocked by task {LastTask._Storage._Value}</DisplayString>
+    <DisplayString>Free, "{DebugName,sub}"</DisplayString>
+  </Type>
+  
+  <!--Concurrent queues -->
+
+  <!-- TClosableMpscQueue visualizer -->
+  <Type Name="TClosableMpscQueue&lt;*&gt;">
+    <DisplayString Condition="Head._Storage._Value == &amp;Sentinel">{{Empty}}</DisplayString>
+    <DisplayString Condition="Head._Storage._Value == nullptr">{{Closed}}</DisplayString>
+    <DisplayString Condition="Sentinel.Next._Storage._Value-&gt;Next._Storage._Value == nullptr">[1]</DisplayString>
+    <DisplayString Condition="Sentinel.Next._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value == nullptr">[2]</DisplayString>
+    <DisplayString Condition="Sentinel.Next._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value == nullptr">[3]</DisplayString>
+    <DisplayString Condition="Sentinel.Next._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value == nullptr">[4]</DisplayString>
+    <DisplayString Condition="Sentinel.Next._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value == nullptr">[5]</DisplayString>
+    <DisplayString>[...]</DisplayString>
+
+    <Expand>
+      <Item Name="Sentinel">Sentinel.Value</Item>
+      <LinkedListItems>
+        <HeadPointer>Sentinel.Next._Storage._Value</HeadPointer>
+        <NextPointer>Next._Storage._Value</NextPointer>
+        <ValueNode>Value</ValueNode>
+      </LinkedListItems>
+    </Expand>
+  </Type>
+
+  <!-- atomic_queue::AtomicQueue visualizer -->
+  <Type Name="atomic_queue::AtomicQueue&lt;*,*&gt;">
+    <DisplayString Condition="head_._Storage._Value - tail_._Storage._Value &lt;= 0">{{Empty}}</DisplayString>
+    <DisplayString>[{head_._Storage._Value - tail_._Storage._Value}]</DisplayString>
+
+    <Expand>
+      <Item Name="Num">head_._Storage._Value - tail_._Storage._Value</Item>
+      <Item Name="Capacity">$T2</Item>
+      <!--<IndexListItems>
+        <Size>head_._Storage._Value - tail_._Storage._Value</Size>
+        <ValueNode>elements_[(tail_._Storage._Value % $T2 + $i) % $T2]</ValueNode>
+      </IndexListItems>-->
+    </Expand>
+  </Type>
+  
+  <!-- FAAArrayDeque visualizer -->
+  <Type Name="FAAArrayDeque&lt;*&gt;">
+    <DisplayString Condition="head._Storage._Value == tail._Storage._Value &amp;&amp; tail._Storage._Value-&gt;deqidx._Storage._Value == tail._Storage._Value-&gt;enqidx._Storage._Value">[Empty]</DisplayString>
+    <DisplayString Condition="head._Storage._Value == tail._Storage._Value">[{tail._Storage._Value-&gt;enqidx._Storage._Value - tail._Storage._Value-&gt;deqidx._Storage._Value}]</DisplayString>
+    <DisplayString>[&gt;={tail._Storage._Value-&gt;enqidx._Storage._Value - tail._Storage._Value-&gt;deqidx._Storage._Value}]</DisplayString>
+  </Type>
+  
+  <!-- TSpscQueue<T> -->
+  <Type Name="TSpscQueue&lt;*&gt;">
+    <DisplayString Condition="Tail._Storage._Value-&gt;Next._Storage._Value == nullptr">[Empty]</DisplayString>
+    <DisplayString Condition="Tail._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value == nullptr">[1]</DisplayString>
+    <DisplayString Condition="Tail._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value == nullptr">[2]</DisplayString>
+    <DisplayString Condition="Tail._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value == nullptr">[3]</DisplayString>
+    <DisplayString Condition="Tail._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value == nullptr">[4]</DisplayString>
+    <DisplayString Condition="Tail._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value-&gt;Next._Storage._Value == nullptr">[5]</DisplayString>
+    <DisplayString>[>5]</DisplayString>
+
+    <Expand>
+      <LinkedListItems>
+        <HeadPointer>Tail._Storage._Value-&gt;Next._Storage._Value</HeadPointer>
+        <NextPointer>Next._Storage._Value</NextPointer>
+        <ValueNode>Value</ValueNode>
+      </LinkedListItems>
+    </Expand>
+  </Type>
+
+  <!--TTypeCompatibleBytes<T>-->
+  <Type Name="TTypeCompatibleBytes&lt;*&gt;">
+    <DisplayString>{*(ElementTypeAlias_NatVisHelper*)this}</DisplayString>
+    <Expand>
+      <ExpandedItem>*(ElementTypeAlias_NatVisHelper*)this</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FObjectHandleInternal visualizer -->
+  <Type Name="FObjectHandleInternal">
+    <DisplayString Condition="*(uintptr_t*)this == 0">nullptr</DisplayString>
+    <DisplayString Condition="*(uintptr_t*)this &amp; 1">{*(FPackedObjectRef*)this}</DisplayString>
+    <DisplayString Condition="(*(uintptr_t*)this != 0) &amp;&amp; !(*(uintptr_t*)this &amp; 1)">{*(UObject**)this}</DisplayString>
+    <Expand>
+      <ExpandedItem Condition="*(uintptr_t*)this &amp; 1">*(FPackedObjectRef*)this</ExpandedItem>
+      <ExpandedItem Condition="!(*(uintptr_t*)this &amp; 1)">*(UObject**)this</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FObjectPtr visualizer -->
+  <Type Name="FObjectPtr" Priority="High">
+    <SmartPointer Usage="Minimal">Handle</SmartPointer>
+    <DisplayString>{Handle}</DisplayString>
+    <Expand>
+      <ExpandedItem>Handle</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <Type Name="FObjectPtr">
+    <SmartPointer Usage="Minimal">((unsigned long long)Handle.PointerOrRef &amp; 1) ? (UObject*)Handle.PointerOrRef : nullptr</SmartPointer>
+    <DisplayString>{Handle}</DisplayString>
+    <Expand>
+      <ExpandedItem>Handle</ExpandedItem>
+    </Expand>
+  </Type>
+  
+  <!-- TObjectPtr visualizer -->
+  <Type Name="TObjectPtr&lt;*&gt;">
+    <SmartPointer Usage="Minimal">!(*(uintptr_t*)&amp;Handle &amp; 1) ? *($T1**)&amp;Handle : ($T1*)0</SmartPointer>
+    <DisplayString Condition="*(uintptr_t*)&amp;Handle == 0">nullptr</DisplayString>
+    <DisplayString Condition="*(uintptr_t*)&amp;Handle &amp; 1">{*(FPackedObjectRef*)&amp;Handle}</DisplayString>
+    <DisplayString Condition="(*(uintptr_t*)&amp;Handle != 0) &amp;&amp; !(*(uintptr_t*)&amp;Handle &amp; 1)">{*($T1**)&amp;Handle}</DisplayString>
+    <Expand>
+      <ExpandedItem Condition="*(uintptr_t*)&amp;Handle &amp; 1">*(FPackedObjectRef*)&amp;Handle</ExpandedItem>
+      <ExpandedItem Condition="!(*(uintptr_t*)&amp;Handle &amp; 1)">*($T1**)&amp;Handle</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FMD5Hash visualizer -->
+  <Type Name="FMD5Hash">
+    <DisplayString Condition="bIsValid">{uint32(Bytes[0]&lt;&lt;24 | Bytes[1]&lt;&lt;16 | Bytes[2]&lt;&lt;8 | Bytes[3]),xb}{uint32(Bytes[4]&lt;&lt;24 | Bytes[5]&lt;&lt;16 | Bytes[6]&lt;&lt;8 | Bytes[7]),xb}{uint32(Bytes[8]&lt;&lt;24 | Bytes[9]&lt;&lt;16 | Bytes[10]&lt;&lt;8 | Bytes[11]),xb}{uint32(Bytes[12]&lt;&lt;24 | Bytes[13]&lt;&lt;16 | Bytes[14]&lt;&lt;8 | Bytes[15]),xb}</DisplayString>
+    <DisplayString>Invalid</DisplayString>
+    <Expand>
+      <ExpandedItem Condition="bIsValid">Bytes</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FSHAHash visualizer -->
+  <Type Name="FSHAHash">
+    <DisplayString>{uint32(Hash[0]&lt;&lt;24 | Hash[1]&lt;&lt;16 | Hash[2]&lt;&lt;8 | Hash[3]),xb}{uint32(Hash[4]&lt;&lt;24 | Hash[5]&lt;&lt;16 | Hash[6]&lt;&lt;8 | Hash[7]),xb}{uint32(Hash[8]&lt;&lt;24 | Hash[9]&lt;&lt;16 | Hash[10]&lt;&lt;8 | Hash[11]),xb}{uint32(Hash[12]&lt;&lt;24 | Hash[13]&lt;&lt;16 | Hash[14]&lt;&lt;8 | Hash[15]),xb}{uint32(Hash[16]&lt;&lt;24 | Hash[17]&lt;&lt;16 | Hash[18]&lt;&lt;8 | Hash[19]),xb}</DisplayString>
+    <Expand>
+      <ExpandedItem>Hash</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FSharedBuffer visualizer -->
+  <Type Name="FSharedBuffer">
+    <DisplayString Condition="Owner.Owner == 0">Null</DisplayString>
+    <DisplayString>Size={Owner.Owner->Size} Owner={Owner.Owner}</DisplayString>
+    <Expand>
+      <ExpandedItem>Owner.Owner</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FWeakSharedBuffer visualizer -->
+  <Type Name="FWeakSharedBuffer">
+    <DisplayString Condition="Owner.Owner == 0">Null</DisplayString>
+    <DisplayString>Size={Owner.Owner->Size} Owner={Owner.Owner}</DisplayString>
+    <Expand>
+      <ExpandedItem>Owner.Owner</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FUniqueBuffer visualizer -->
+  <Type Name="FUniqueBuffer">
+    <DisplayString Condition="Owner.Owner == 0">Null</DisplayString>
+    <DisplayString>Size={Owner.Owner->Size} Owner={Owner.Owner}</DisplayString>
+    <Expand>
+      <ExpandedItem>Owner.Owner</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FBufferOwner visualizer -->
+  <Type Name="FBufferOwner">
+    <Expand>
+      <Item Name="Data" Condition="this != 0">Data</Item>
+      <Item Name="Size" Condition="this != 0">Size</Item>
+      <Item Name="SharedRefCount" Condition="this != 0">uint32(ReferenceCountsAndFlags._Storage._Value >> 0) &amp; 0x3fffffff</Item>
+      <Item Name="WeakRefCount" Condition="this != 0">uint32(ReferenceCountsAndFlags._Storage._Value >> 30) &amp; 0x3fffffff</Item>
+      <Item Name="Flags" Condition="this != 0">EBufferOwnerFlags(ReferenceCountsAndFlags._Storage._Value &gt;&gt; 60)</Item>
+    </Expand>
+  </Type>
+
+  <!-- FCompositeBuffer visualizer -->
+  <Type Name="FCompositeBuffer">
+    <DisplayString Condition="Segments.ArrayNum == 0">Null</DisplayString>
+    <Expand>
+      <CustomListItems>
+        <Variable Name="SegmentIndex" InitialValue="0"/>
+        <Variable Name="TotalSize" InitialValue="0"/>
+        <Variable Name="SegmentData" InitialValue="(FSharedBuffer*)Segments.AllocatorInstance.SecondaryData.Data"/>
+        <If Condition="SegmentData == nullptr">
+          <Exec>SegmentData = (FSharedBuffer*)Segments.AllocatorInstance.InlineData</Exec>
+        </If>
+        <Loop>
+          <Break Condition="SegmentIndex == Segments.ArrayNum"/>
+          <Exec>TotalSize += SegmentData[SegmentIndex].Owner.Owner->Size</Exec>
+          <Exec>SegmentIndex += 1</Exec>
+        </Loop>
+        <Item Name="Size">TotalSize</Item>
+      </CustomListItems>
+      <Item Name="Segments">Segments</Item>
+    </Expand>
+  </Type>
+
+  <!-- FCompressedBuffer visualizer -->
+  <Type Name="FCompressedBuffer">
+    <DisplayString Condition="CompressedData.Segments.ArrayNum == 0">Null</DisplayString>
+    <Expand>
+      <CustomListItems Condition="CompressedData.Segments.ArrayNum > 0">
+        <Variable Name="HeaderData" InitialValue="(const uint8*)nullptr"/>
+        <Variable Name="SegmentData" InitialValue="(FSharedBuffer*)CompressedData.Segments.AllocatorInstance.SecondaryData.Data"/>
+        <If Condition="SegmentData == nullptr">
+          <Exec>SegmentData = (FSharedBuffer*)CompressedData.Segments.AllocatorInstance.InlineData</Exec>
+        </If>
+        <Exec>HeaderData = (const uint8*)SegmentData[0].Owner.Owner-&gt;Data</Exec>
+        <Item Name="CompressedSize">(uint64(HeaderData[24])&lt;&lt;56) | (uint64(HeaderData[25])&lt;&lt;48) | (uint64(HeaderData[26])&lt;&lt;40) | (uint64(HeaderData[27])&lt;&lt;32) | (uint64(HeaderData[28])&lt;&lt;24) | (uint64(HeaderData[29])&lt;&lt;16) | (uint64(HeaderData[30])&lt;&lt;8) | (uint64(HeaderData[31]))</Item>
+        <Item Name="RawSize">(uint64(HeaderData[16])&lt;&lt;56) | (uint64(HeaderData[17])&lt;&lt;48) | (uint64(HeaderData[18])&lt;&lt;40) | (uint64(HeaderData[19])&lt;&lt;32) | (uint64(HeaderData[20])&lt;&lt;24) | (uint64(HeaderData[21])&lt;&lt;16) | (uint64(HeaderData[22])&lt;&lt;8) | (uint64(HeaderData[23]))</Item>
+        <Item Name="RawHash">*(FBlake3Hash*)(HeaderData + 32)</Item>
+        <Item Name="Method">(UE::CompressedBuffer::Private::EMethod)HeaderData[8]</Item>
+        <Item Name="Compressor">(ECompressedBufferCompressor)HeaderData[9]</Item>
+        <Item Name="CompressionLevel">(ECompressedBufferCompressionLevel)HeaderData[10]</Item>
+        <Item Name="BlockSize">uint64(1)&lt;&lt;HeaderData[11]</Item>
+        <Item Name="BlockCount">(uint32(HeaderData[12])&lt;&lt;24) | (uint32(HeaderData[13])&lt;&lt;16) | (uint32(HeaderData[14])&lt;&lt;8) | (uint32(HeaderData[15]))</Item>
+      </CustomListItems>
+      <Item Name="CompressedData">CompressedData</Item>
+    </Expand>
+  </Type>
+
+  <!-- FBlake3Hash visualizer -->
+  <Type Name="FBlake3Hash">
+    <DisplayString>{uint32(Hash[0]&lt;&lt;24 | Hash[1]&lt;&lt;16 | Hash[2]&lt;&lt;8 | Hash[3]),xb}{uint32(Hash[4]&lt;&lt;24 | Hash[5]&lt;&lt;16 | Hash[6]&lt;&lt;8 | Hash[7]),xb}{uint32(Hash[8]&lt;&lt;24 | Hash[9]&lt;&lt;16 | Hash[10]&lt;&lt;8 | Hash[11]),xb}{uint32(Hash[12]&lt;&lt;24 | Hash[13]&lt;&lt;16 | Hash[14]&lt;&lt;8 | Hash[15]),xb}{uint32(Hash[16]&lt;&lt;24 | Hash[17]&lt;&lt;16 | Hash[18]&lt;&lt;8 | Hash[19]),xb}{uint32(Hash[20]&lt;&lt;24 | Hash[21]&lt;&lt;16 | Hash[22]&lt;&lt;8 | Hash[23]),xb}{uint32(Hash[24]&lt;&lt;24 | Hash[25]&lt;&lt;16 | Hash[26]&lt;&lt;8 | Hash[27]),xb}{uint32(Hash[28]&lt;&lt;24 | Hash[29]&lt;&lt;16 | Hash[30]&lt;&lt;8 | Hash[31]),xb}</DisplayString>
+    <Expand>
+      <ExpandedItem>Hash</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FCbObjectId visualizer -->
+  <Type Name="FCbObjectId">
+    <DisplayString>{uint32(Bytes[0]&lt;&lt;24 | Bytes[1]&lt;&lt;16 | Bytes[2]&lt;&lt;8 | Bytes[3]),xb}{uint32(Bytes[4]&lt;&lt;24 | Bytes[5]&lt;&lt;16 | Bytes[6]&lt;&lt;8 | Bytes[7]),xb}{uint32(Bytes[8]&lt;&lt;24 | Bytes[9]&lt;&lt;16 | Bytes[10]&lt;&lt;8 | Bytes[11]),xb}</DisplayString>
+    <Expand>
+      <ExpandedItem>Bytes</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FIoHash visualizer -->
+  <Type Name="FIoHash">
+    <DisplayString>{uint32(Hash[0]&lt;&lt;24 | Hash[1]&lt;&lt;16 | Hash[2]&lt;&lt;8 | Hash[3]),xb}{uint32(Hash[4]&lt;&lt;24 | Hash[5]&lt;&lt;16 | Hash[6]&lt;&lt;8 | Hash[7]),xb}{uint32(Hash[8]&lt;&lt;24 | Hash[9]&lt;&lt;16 | Hash[10]&lt;&lt;8 | Hash[11]),xb}{uint32(Hash[12]&lt;&lt;24 | Hash[13]&lt;&lt;16 | Hash[14]&lt;&lt;8 | Hash[15]),xb}{uint32(Hash[16]&lt;&lt;24 | Hash[17]&lt;&lt;16 | Hash[18]&lt;&lt;8 | Hash[19]),xb}</DisplayString>
+    <Expand>
+      <ExpandedItem>Hash</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- TSharedString visualizer -->
+  <Type Name="UE::DerivedData::TSharedString&lt;*&gt;">
+    <DisplayString Condition="!Chars">Empty</DisplayString>
+    <DisplayString>{Chars,s8}</DisplayString>
+    <StringView>Chars,s8</StringView>
+    <Expand>
+      <Item Name="Chars" Condition="!!Chars">Chars,[((int32*)Chars)[-1]]</Item>
+      <Item Name="Length" Condition="!!Chars">((int32*)Chars)[-1]</Item>
+      <Item Name="ReferenceCount" Condition="!!Chars">((int32*)Chars)[-2]</Item>
+    </Expand>
+  </Type>
+
+  <!-- FWideSharedString visualizer -->
+  <Type Name="UE::DerivedData::TSharedString&lt;wchar_t&gt;">
+    <DisplayString Condition="!Chars">Empty</DisplayString>
+    <DisplayString>{Chars,su}</DisplayString>
+    <StringView>Chars,su</StringView>
+    <Expand>
+      <Item Name="Chars" Condition="!!Chars">Chars,[((int32*)Chars)[-1]]</Item>
+      <Item Name="Length" Condition="!!Chars">((int32*)Chars)[-1]</Item>
+      <Item Name="ReferenceCount" Condition="!!Chars">((int32*)Chars)[-2]</Item>
+    </Expand>
+  </Type>
+
+  <!-- FRequestOwner visualizer -->
+  <Type Name="UE::DerivedData::FRequestOwner">
+    <DisplayString Condition="Owner.Ptr == nullptr">Null</DisplayString>
+    <DisplayString>{{Priority={((UE::DerivedData::Private::FRequestOwnerShared*)Owner.Ptr)->Priority} Requests={((UE::DerivedData::Private::FRequestOwnerShared*)Owner.Ptr)->Requests} BarrierCount={((UE::DerivedData::Private::FRequestOwnerShared*)Owner.Ptr)->BarrierCount} bIsCanceled={((UE::DerivedData::Private::FRequestOwnerShared*)Owner.Ptr)->bIsCanceled} bKeepAlive={((UE::DerivedData::Private::FRequestOwnerShared*)Owner.Ptr)->bKeepAlive}}}</DisplayString>
+    <Expand>
+      <Item Name="Priority" Condition="Owner.Ptr">((UE::DerivedData::Private::FRequestOwnerShared*)Owner.Ptr)->Priority</Item>
+      <Item Name="Requests" Condition="Owner.Ptr">((UE::DerivedData::Private::FRequestOwnerShared*)Owner.Ptr)->Requests</Item>
+      <Item Name="BarrierCount" Condition="Owner.Ptr">((UE::DerivedData::Private::FRequestOwnerShared*)Owner.Ptr)->BarrierCount</Item>
+      <Item Name="bIsCanceled" Condition="Owner.Ptr">((UE::DerivedData::Private::FRequestOwnerShared*)Owner.Ptr)->bIsCanceled</Item>
+      <Item Name="bKeepAlive" Condition="Owner.Ptr">((UE::DerivedData::Private::FRequestOwnerShared*)Owner.Ptr)->bKeepAlive</Item>
+      <Item Name="[Detail]" Condition="Owner.Ptr">(UE::DerivedData::Private::FRequestOwnerShared*)Owner.Ptr</Item>
+    </Expand>
+  </Type>
+
+  <!-- FValueId visualizer -->
+  <Type Name="UE::DerivedData::FValueId">
+    <DisplayString>{uint32(Bytes[0]&lt;&lt;24 | Bytes[1]&lt;&lt;16 | Bytes[2]&lt;&lt;8 | Bytes[3]),xb}{uint32(Bytes[4]&lt;&lt;24 | Bytes[5]&lt;&lt;16 | Bytes[6]&lt;&lt;8 | Bytes[7]),xb}{uint32(Bytes[8]&lt;&lt;24 | Bytes[9]&lt;&lt;16 | Bytes[10]&lt;&lt;8 | Bytes[11]),xb}</DisplayString>
+    <Expand>
+      <ExpandedItem>Bytes</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FCacheBucket visualizer -->
+  <Type Name="UE::DerivedData::FCacheBucket">
+    <DisplayString>{Name,sb}</DisplayString>
+    <StringView>Name,sb</StringView>
+  </Type>
+
+  <!-- FCacheKey visualizer -->
+  <Type Name="UE::DerivedData::FCacheKey">
+    <DisplayString>{Bucket}/{Hash}</DisplayString>
+  </Type>
+
+  <!-- FCacheRecord visualizer -->
+  <Type Name="UE::DerivedData::FCacheRecord">
+    <DisplayString Condition="Record.Reference == nullptr">Null</DisplayString>
+    <DisplayString>{((UE::DerivedData::Private::FCacheRecordInternal*)Record.Reference)->Key}</DisplayString>
+    <Expand>
+      <ExpandedItem Condition="Record.Reference">(UE::DerivedData::Private::FCacheRecordInternal*)Record.Reference</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FCacheRecordBuilder visualizer -->
+  <Type Name="UE::DerivedData::FCacheRecordBuilder">
+    <DisplayString Condition="RecordBuilder.Ptr == nullptr">Null</DisplayString>
+    <DisplayString>{((UE::DerivedData::Private::FCacheRecordBuilderInternal*)RecordBuilder.Ptr)->Key}</DisplayString>
+    <Expand>
+      <ExpandedItem Condition="RecordBuilder.Ptr">(UE::DerivedData::Private::FCacheRecordBuilderInternal*)RecordBuilder.Ptr</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FCacheRecordPolicy visualizer -->
+  <Type Name="UE::DerivedData::FCacheRecordPolicy">
+    <Expand>
+      <Item Name="RecordPolicy">RecordPolicy</Item>
+      <Item Name="DefaultValuePolicy">DefaultValuePolicy</Item>
+      <Item Name="ValuePolicies" Condition="Shared.Reference">((UE::DerivedData::Private::FCacheRecordPolicyShared*)Shared.Reference)->Values</Item>
+    </Expand>
+  </Type>
+
+  <!-- FCacheRecordPolicyBuilder visualizer -->
+  <Type Name="UE::DerivedData::FCacheRecordPolicyBuilder">
+    <Expand>
+      <Item Name="BasePolicy">BasePolicy</Item>
+      <Item Name="ValuePolicies" Condition="Shared.Reference">((UE::DerivedData::Private::FCacheRecordPolicyShared*)Shared.Reference)->Values</Item>
+    </Expand>
+  </Type>
+
+  <!-- FBuildAction visualizer -->
+  <Type Name="UE::DerivedData::FBuildAction">
+    <DisplayString Condition="Action.Reference == nullptr">Null</DisplayString>
+    <DisplayString>{{Name="{((UE::DerivedData::Private::FBuildActionInternal*)Action.Reference)->Name,s8b}" Function={((UE::DerivedData::Private::FBuildActionInternal*)Action.Reference)->Function,s8b} Key={((UE::DerivedData::Private::FBuildActionInternal*)Action.Reference)->Key.Hash}}}</DisplayString>
+    <Expand>
+      <ExpandedItem Condition="Action.Reference">(UE::DerivedData::Private::FBuildActionInternal*)Action.Reference</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FBuildActionBuilder visualizer -->
+  <Type Name="UE::DerivedData::FBuildActionBuilder">
+    <DisplayString Condition="ActionBuilder.Ptr == nullptr">Null</DisplayString>
+    <DisplayString>{{Name="{((UE::DerivedData::Private::FBuildActionBuilderInternal*)ActionBuilder.Ptr)->Name,s8b}" Function={((UE::DerivedData::Private::FBuildActionBuilderInternal*)ActionBuilder.Ptr)->Function,s8b}}}</DisplayString>
+    <Expand>
+      <ExpandedItem Condition="ActionBuilder.Ptr">(UE::DerivedData::Private::FBuildActionBuilderInternal*)ActionBuilder.Ptr</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FBuildDefinition visualizer -->
+  <Type Name="UE::DerivedData::FBuildDefinition">
+    <DisplayString Condition="Definition.Reference == nullptr">Null</DisplayString>
+    <DisplayString>{{Name="{((UE::DerivedData::Private::FBuildDefinitionInternal*)Definition.Reference)->Name,s8b}" Function={((UE::DerivedData::Private::FBuildDefinitionInternal*)Definition.Reference)->Function,s8b} Key={((UE::DerivedData::Private::FBuildDefinitionInternal*)Definition.Reference)->Key.Hash}}}</DisplayString>
+    <Expand>
+      <ExpandedItem Condition="Definition.Reference">(UE::DerivedData::Private::FBuildDefinitionInternal*)Definition.Reference</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FBuildDefinitionBuilder visualizer -->
+  <Type Name="UE::DerivedData::FBuildDefinitionBuilder">
+    <DisplayString Condition="DefinitionBuilder.Ptr == nullptr">Null</DisplayString>
+    <DisplayString>{{Name="{((UE::DerivedData::Private::FBuildDefinitionBuilderInternal*)DefinitionBuilder.Ptr)->Name,s8b}" Function={((UE::DerivedData::Private::FBuildDefinitionBuilderInternal*)DefinitionBuilder.Ptr)->Function,s8b}}}</DisplayString>
+    <Expand>
+      <ExpandedItem Condition="DefinitionBuilder.Ptr">(UE::DerivedData::Private::FBuildDefinitionBuilderInternal*)DefinitionBuilder.Ptr</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FBuildInputs visualizer -->
+  <Type Name="UE::DerivedData::FBuildInputs">
+    <DisplayString Condition="Inputs.Reference == nullptr">Null</DisplayString>
+    <DisplayString>{{Name="{((UE::DerivedData::Private::FBuildInputsInternal*)Inputs.Reference)->Name,s8b}"}}</DisplayString>
+    <Expand>
+      <ExpandedItem Condition="Inputs.Reference">(UE::DerivedData::Private::FBuildInputsInternal*)Inputs.Reference</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FBuildInputsBuilder visualizer -->
+  <Type Name="UE::DerivedData::FBuildInputsBuilder">
+    <DisplayString Condition="InputsBuilder.Ptr == nullptr">Null</DisplayString>
+    <DisplayString>{{Name="{((UE::DerivedData::Private::FBuildInputsBuilderInternal*)InputsBuilder.Ptr)->Name,s8b}"}}</DisplayString>
+    <Expand>
+      <ExpandedItem Condition="InputsBuilder.Ptr">(UE::DerivedData::Private::FBuildInputsBuilderInternal*)InputsBuilder.Ptr</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FBuildOutput visualizer -->
+  <Type Name="UE::DerivedData::FBuildOutput">
+    <DisplayString Condition="Output.Reference == nullptr">Null</DisplayString>
+    <DisplayString>{{Name="{((UE::DerivedData::Private::FBuildOutputInternal*)Output.Reference)->Name,s8b}" Function={((UE::DerivedData::Private::FBuildOutputInternal*)Output.Reference)->Function,s8b}}}</DisplayString>
+    <Expand>
+      <ExpandedItem>(UE::DerivedData::Private::FBuildOutputInternal*)Output.Reference</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FBuildOutputBuilder visualizer -->
+  <Type Name="UE::DerivedData::FBuildOutputBuilder">
+    <DisplayString Condition="OutputBuilder.Ptr == nullptr">Null</DisplayString>
+    <DisplayString>{{Name="{((UE::DerivedData::Private::FBuildOutputBuilderInternal*)OutputBuilder.Ptr)->Name,s8b}" Function={((UE::DerivedData::Private::FBuildOutputBuilderInternal*)OutputBuilder.Ptr)->Function,s8b} bHasError={((UE::DerivedData::Private::FBuildOutputBuilderInternal*)OutputBuilder.Ptr)->bHasError}}}</DisplayString>
+    <Expand>
+      <ExpandedItem Condition="OutputBuilder.Ptr">(UE::DerivedData::Private::FBuildOutputBuilderInternal*)OutputBuilder.Ptr</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- FBuildPolicy visualizer -->
+  <Type Name="UE::DerivedData::FBuildPolicy">
+    <Expand>
+      <Item Name="CombinedPolicy">CombinedPolicy</Item>
+      <Item Name="DefaultValuePolicy">DefaultValuePolicy</Item>
+      <Item Name="ValuePolicies" Condition="Shared.Reference">((UE::DerivedData::Private::FBuildPolicyShared*)Shared.Reference)->Values</Item>
+    </Expand>
+  </Type>
+
+  <!-- FBuildPolicyBuilder visualizer -->
+  <Type Name="UE::DerivedData::FBuildPolicyBuilder">
+    <Expand>
+      <Item Name="BasePolicy">BasePolicy</Item>
+      <Item Name="ValuePolicies" Condition="Shared.Reference">((UE::DerivedData::Private::FBuildPolicyShared*)Shared.Reference)->Values</Item>
+    </Expand>
+  </Type>
+
+  <!-- FBuildSession visualizer -->
+  <Type Name="UE::DerivedData::FBuildSession">
+    <DisplayString Condition="Session.Ptr == nullptr">Null</DisplayString>
+    <DisplayString>{{Name="{((UE::DerivedData::Private::FBuildSessionInternal*)Session.Ptr)->Name,s8b}"}}</DisplayString>
+    <Expand>
+      <ExpandedItem Condition="Session.Ptr">(UE::DerivedData::Private::FBuildSessionInternal*)Session.Ptr</ExpandedItem>
+    </Expand>
+  </Type>
+
+  <!-- TSlateAttribute -->
+  <Type Name="SWidget::TSlateAttribute&lt;*&gt;">
+    <DisplayString>{Value}</DisplayString>
+  </Type>
+  <Type Name="SWidget::TSlateManagedAttribute&lt;*&gt;">
+    <DisplayString>{Value}</DisplayString>
+  </Type>
+  <Type Name="TWidgetSlotWithAttributeSupport&lt;*&gt;::TSlateSlotAttribute&lt;*&gt;">
+    <DisplayString>{Value}</DisplayString>
+  </Type>
+
+  <!-- SWidget -->
+  <Type Name="SWidget" Inheritable="false">
+    <DisplayString>{{Type={TypeOfWidget}}}</DisplayString>
+    <Expand>
+      <Item Name="[Tag]" Condition="Tag.ComparisonIndex.Value != 0">Tag</Item>
+      <Item Name="[Visibility]">VisibilityAttribute</Item>
+      <Item Name="[Enabled]">EnabledStateAttribute</Item>
+      <Item Name="[DesiredSize]" Condition="DesiredSize.bIsSet">DesiredSize.Value</Item>
+      <Item Name="[ParentWidget]">ParentWidgetPtr</Item>
+      <Item Name="[ActiveTimers]" Condition="ActiveTimers.ArrayNum>0">ActiveTimers</Item>
+      <Item Name="[Attributes]" Condition="bHasRegisteredSlateAttribute">((TSharedRef&lt;FSlateAttributeMetaData,1&gt;*)MetaData.AllocatorInstance.Data)->Object->Attributes</Item>
+    </Expand>
+  </Type>
+
+  <!-- FSlateAttributeMetaData -->
+  <Type Name="FSlateAttributeMetaData">
+    <DisplayString Condition="AffectVisibilityCounter>0">{{Num={Attributes.ArrayNum} AffectVisibility}}</DisplayString>
+    <DisplayString>{{Num={Attributes.ArrayNum}}}</DisplayString>
+  </Type>
+  <Type Name="FSlateAttributeMetaData::FGetterItem">
+    <DisplayString Condition="CachedAttributeDescriptor!=0">{{Name={CachedAttributeDescriptor->Name}}}</DisplayString>
+    <DisplayString></DisplayString>
+  </Type>
+
+  <!-- FPropertyNode visualizer -->
+  <Type Name="FPropertyNode">
+    <DisplayString>{PropertyPath.Data.AllocatorInstance.Data,su}</DisplayString>
+  </Type>
+
+  <!-- FPropertyHandleBase visualizer -->
+  <Type Name="FPropertyHandleBase">
+    <DisplayString>{Implementation.Object->PropertyNode.Object->PropertyPath.Data.AllocatorInstance.Data,su}</DisplayString>
+  </Type>
+
+  <!-- TOnlineIdHandle visualizer -->
+  <Type Name="UE::Online::TOnlineIdHandle&lt;*&gt;">
+    <DisplayString Condition="Value == 0">Invalid</DisplayString>
+    <DisplayString Condition="Value > 0">{{Type={(UE::Online::EOnlineServices)(Value >> 24)} Handle={Value &amp; 0x00FFFFFF}}}</DisplayString>
+    <Expand>
+      <Item Name="[Type]" Condition="Value > 0">(UE::Online::EOnlineServices)(Value >> 24)</Item>
+      <Item Name="[Handle]" Condition="Value > 0">Value &amp; 0x00FFFFFF</Item>
+      <Item Name="[String]" Condition="Value > 0">UE::Online::ToLogString(*this)</Item>
+    </Expand>
+  </Type>
+
+</AutoVisualizer>
