@@ -1,0 +1,132 @@
+// Copyright Epic Games, Inc. All Rights Reserved.
+#pragma once
+
+#include "CoreTypes.h"
+#include "Misc/Guid.h"
+
+// Custom serialization version for changes made in //UE5/Release-* stream
+struct CORE_API FUE5ReleaseStreamObjectVersion
+{
+	enum Type
+	{
+		// Before any version changes were made
+		BeforeCustomVersionWasAdded = 0,
+
+		// Added Lumen reflections to new reflection enum, changed defaults
+		ReflectionMethodEnum,
+		
+		// Serialize HLOD info in WorldPartitionActorDesc
+		WorldPartitionActorDescSerializeHLODInfo,
+
+		// Removing Tessellation from materials and meshes.
+		RemovingTessellation,
+
+		// LevelInstance serialize runtime behavior
+		LevelInstanceSerializeRuntimeBehavior,
+
+		// Refactoring Pose Asset runtime data structures
+		PoseAssetRuntimeRefactor,
+
+		// Serialize the folder path of actor descs
+		WorldPartitionActorDescSerializeActorFolderPath,
+
+		// Change hair strands vertex format
+		HairStrandsVertexFormatChange,
+		
+		// Added max linear and angular speed to Chaos bodies
+		AddChaosMaxLinearAngularSpeed,
+
+		// PackedLevelInstance version
+		PackedLevelInstanceVersion,
+
+		// PackedLevelInstance bounds fix
+		PackedLevelInstanceBoundsFix,
+
+		// Custom property anim graph nodes (linked anim graphs, control rig etc.) now use optional pin manager
+		CustomPropertyAnimGraphNodesUseOptionalPinManager,
+
+		// Add native double and int64 support to FFormatArgumentData
+		TextFormatArgumentData64bitSupport,
+
+		// Material layer stacks are no longer considered 'static parameters'
+		MaterialLayerStacksAreNotParameters,
+
+		// CachedExpressionData is moved from UMaterial to UMaterialInterface
+		MaterialInterfaceSavedCachedData,
+		
+		// Add support for multiple cloth deformer LODs to be able to raytrace cloth with a different LOD than the one it is rendered with
+		AddClothMappingLODBias,
+
+		// Add support for different external actor packaging schemes
+		AddLevelActorPackagingScheme,
+
+		// Add support for linking to the attached parent actor in WorldPartitionActorDesc
+		WorldPartitionActorDescSerializeAttachParent,
+
+		// Converted AActor GridPlacement to bIsSpatiallyLoaded flag
+		ConvertedActorGridPlacementToSpatiallyLoadedFlag,
+
+		// Fixup for bad default value for GridPlacement_DEPRECATED
+		ActorGridPlacementDeprecateDefaultValueFixup,
+
+		// PackedLevelActor started using FWorldPartitionActorDesc (not currently checked against but added as a security)
+		PackedLevelActorUseWorldPartitionActorDesc,
+
+		// Add support for actor folder objects
+		AddLevelActorFolders,
+
+		// Remove FSkeletalMeshLODModel bulk datas
+		RemoveSkeletalMeshLODModelBulkDatas,
+		
+		// Exclude brightness from the EncodedHDRCubemap,
+		ExcludeBrightnessFromEncodedHDRCubemap,
+
+		// Unified volumetric cloud component quality sample count slider between main and reflection views for consistency
+		VolumetricCloudSampleCountUnification,
+
+		// Pose asset GUID generated from source AnimationSequence
+		PoseAssetRawDataGUID,
+
+		// Convolution bloom now take into account FPostProcessSettings::BloomIntensity for scatter dispersion.
+		ConvolutionBloomIntensity,
+
+		// Serialize FHLODSubActors instead of FGuids in WorldPartition HLODActorDesc
+		WorldPartitionHLODActorDescSerializeHLODSubActors,
+		
+		// Large Worlds - serialize double types as doubles
+		LargeWorldCoordinates,
+		
+		// Deserialize old BP float&double types as real numbers for pins
+		BlueprintPinsUseRealNumbers,
+		
+		// Changed shadow defaults for directional light components, version needed to not affect old things
+		UpdatedDirectionalLightShadowDefaults,
+
+		// Refresh geometry collections that had not already generated convex bodies.
+		GeometryCollectionConvexDefaults,
+
+		// Add faster damping calculations to the cloth simulation and rename previous Damping parameter to LocalDamping.
+		ChaosClothFasterDamping,
+
+		// Serialize LandscapeActorGuid in FLandscapeActorDesc sub class.
+		WorldPartitionLandscapeActorDescSerializeLandscapeActorGuid,
+		
+		// add inertia tensor and rotation of mass to convex 
+		AddedInertiaTensorAndRotationOfMassAddedToConvex,
+		
+		// Storing inertia tensor as vec3 instead of matrix.
+		ChaosInertiaConvertedToVec3,
+
+		// For Blueprint real numbers, ensure that legacy float data is serialized as single-precision
+		SerializeFloatPinDefaultValuesAsSinglePrecision,
+
+		// -----<new versions can be added above this line>-------------------------------------------------
+		VersionPlusOne,
+		LatestVersion = VersionPlusOne - 1
+	};
+
+	// The GUID for this custom version number
+	const static FGuid GUID;
+
+	FUE5ReleaseStreamObjectVersion() = delete;
+};

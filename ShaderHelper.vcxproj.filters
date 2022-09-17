@@ -1,0 +1,81 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Source\Misc">
+      <UniqueIdentifier>{9fd53388-591a-4099-81a8-6a0f9534d18b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External">
+      <UniqueIdentifier>{c76eadf3-8819-427a-ab7f-ad152db1b676}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External\UE">
+      <UniqueIdentifier>{4a6c74b3-d829-46ad-97b7-8c7b65c4ad0a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Misc\CommonPath">
+      <UniqueIdentifier>{61b59eaf-86d7-4251-9510-111a994d9061}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External\UE\Visualizers">
+      <UniqueIdentifier>{072158f3-9215-469d-8f6d-f90daa157b22}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Misc\Util">
+      <UniqueIdentifier>{6950e042-cf6f-4864-8b6d-9fddae06b453}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\App">
+      <UniqueIdentifier>{5d5f8139-7543-4009-885e-92da7bbb5534}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\App\Graphics">
+      <UniqueIdentifier>{b974967a-3fc6-4c21-b756-37f74317fb7a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\App\Graphics\Win">
+      <UniqueIdentifier>{82aa1b8e-d414-4973-92e7-adf073b79905}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\App\Graphics\Shader">
+      <UniqueIdentifier>{f7fca21c-97de-4b07-a1ef-b30fb6bc8a0e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\App\UI">
+      <UniqueIdentifier>{1752f735-c783-4e0a-8c9c-27237f36e785}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Source\main.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\CommonHeaderForUE.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Misc\CommonPath\PathHelper.cpp">
+      <Filter>Source\Misc\CommonPath</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\App\ShaderHelperApp.cpp">
+      <Filter>Source\App</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="External\UE\Include\Definitions.h">
+      <Filter>External\UE</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\CommonHeaderForUE.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Misc\CommonPath\BaseResourcePath.h">
+      <Filter>Source\Misc\CommonPath</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Misc\CommonPath\PathHelper.h">
+      <Filter>Source\Misc\CommonPath</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Misc\Util\Auxiliary.h">
+      <Filter>Source\Misc\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\App\ShaderHelperApp.h">
+      <Filter>Source\App</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="External\UE\Unreal.natvis">
+      <Filter>External\UE\Visualizers</Filter>
+    </Natvis>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.3.32825.248
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ShaderHelper", "ShaderHelper.vcxproj", "{E25DA552-BF4E-41C2-93D1-E4336A67BCE7}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E25DA552-BF4E-41C2-93D1-E4336A67BCE7}.Release|x64.ActiveCfg = Release|x64
+		{E25DA552-BF4E-41C2-93D1-E4336A67BCE7}.Release|x64.Build.0 = Release|x64
+		{E25DA552-BF4E-41C2-93D1-E4336A67BCE7}.Release|x86.ActiveCfg = Release|Win32
+		{E25DA552-BF4E-41C2-93D1-E4336A67BCE7}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B5D7C834-1D7F-48DF-806F-89B0E5D3C2FA}
+	EndGlobalSection
+EndGlobal
