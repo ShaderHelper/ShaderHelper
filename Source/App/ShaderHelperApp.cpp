@@ -4,6 +4,8 @@
 #include <HAL/PlatformApplicationMisc.h>
 #include <StandaloneRenderer/StandaloneRenderer.h>
 #include "Misc/CommonPath/BaseResourcePath.h"
+#include "UI/FShaderHelperStyle.h"
+#include "UI/SShaderHelperWindow.h"
 
 namespace {
 	void UE_Init() {
@@ -29,7 +31,7 @@ namespace {
 
 		//This project uses slate as UI framework, so we need to initialize it.
 		FSlateApplication::InitializeAsStandaloneApplication(GetStandardStandaloneRenderer(SH::BaseResourcePath::UE_StandaloneRenderShaderDir));
-		FSlateApplication::InitializeCoreStyle(SH::BaseResourcePath::UE_SlateResourceDir);
+		FSlateApplication::SetCoreStylePath(SH::BaseResourcePath::UE_SlateResourceDir);
 	}
 
 	void UE_ShutDown() {
@@ -56,11 +58,15 @@ namespace SH {
 	void ShaderHelperApp::Init()
 	{
 		UE_Init();
+		FShaderHelperStyle::Init();
+		FSlateApplication::Get().AddWindow(SNew(SShaderHelperWindow));
 	}
 
 	void ShaderHelperApp::ShutDown()
 	{
 		UE_ShutDown();
+		FShaderHelperStyle::ShutDown();
+
 	}
 
 	void ShaderHelperApp::Update(float DeltaTime)

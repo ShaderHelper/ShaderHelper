@@ -155,6 +155,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Source\App\ShaderHelperApp.cpp" />
+    <ClCompile Include="Source\App\UI\FShaderHelperStyle.cpp" />
+    <ClCompile Include="Source\App\UI\SShaderHelperWindow.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="Source\CommonHeaderForUE.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
@@ -164,6 +168,8 @@
   <ItemGroup>
     <ClInclude Include="External\UE\Include\Definitions.h" />
     <ClInclude Include="Source\App\ShaderHelperApp.h" />
+    <ClInclude Include="Source\App\UI\FShaderHelperStyle.h" />
+    <ClInclude Include="Source\App\UI\SShaderHelperWindow.h" />
     <ClInclude Include="Source\CommonHeaderForUE.h" />
     <ClInclude Include="Source\Misc\CommonPath\BaseResourcePath.h" />
     <ClInclude Include="Source\Misc\CommonPath\PathHelper.h" />

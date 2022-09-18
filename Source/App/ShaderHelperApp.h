@@ -39,6 +39,8 @@ namespace SH {
 		static void SetFixedDeltaTime(double InFixedDeltaTime) {
 			FixedDeltaTime = InFixedDeltaTime;
 		}
+	public:
+		static inline const FVector2D DefaultClientSize = FVector2D(800, 600);
 
 	private:
 		static inline double CurrentTime = 0.0;

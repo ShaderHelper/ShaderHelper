@@ -52,6 +52,12 @@
     <ClCompile Include="Source\App\ShaderHelperApp.cpp">
       <Filter>Source\App</Filter>
     </ClCompile>
+    <ClCompile Include="Source\App\UI\SShaderHelperWindow.cpp">
+      <Filter>Source\App\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\App\UI\FShaderHelperStyle.cpp">
+      <Filter>Source\App\UI</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="External\UE\Include\Definitions.h">
@@ -71,6 +77,12 @@
     </ClInclude>
     <ClInclude Include="Source\App\ShaderHelperApp.h">
       <Filter>Source\App</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\App\UI\SShaderHelperWindow.h">
+      <Filter>Source\App\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\App\UI\FShaderHelperStyle.h">
+      <Filter>Source\App\UI</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
