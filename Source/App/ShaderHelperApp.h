@@ -12,7 +12,7 @@ namespace SH {
 		void Init();
 		void ShutDown();
 
-		void Update(float DeltaTime);
+		void Update(double DeltaTime);
 
 		void Run();
 
@@ -40,7 +40,7 @@ namespace SH {
 			FixedDeltaTime = InFixedDeltaTime;
 		}
 	public:
-		static inline const FVector2D DefaultClientSize = FVector2D(800, 600);
+		static inline const FVector2D DefaultClientSize = FVector2D(1280, 720);
 
 	private:
 		static inline double CurrentTime = 0.0;

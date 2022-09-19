@@ -10,16 +10,13 @@ namespace SH {
 		SLATE_BEGIN_ARGS(SShaderHelperWindow) {}
 		SLATE_END_ARGS()
 
-		SShaderHelperWindow();
-		~SShaderHelperWindow();
-
 		void Construct(const FArguments& InArgs);
-
+	private:
+		TSharedRef<SDockTab> SpawnWindowTab(const FSpawnTabArgs& Args);
 		TSharedRef<SWidget> CreateMenuBar();
-		void FillFileMenu();
-		void FillConfigMenu();
-		void FillWindowMenu();
-
+		void FillMenu(FMenuBuilder& MenuBuilder, FString MenuName);
+	private:
+		TSharedPtr<FTabManager> TabManager;
 	};
 
 }

@@ -205,7 +205,8 @@ public:
 	static TSharedRef<FSlateApplication> InitializeAsStandaloneApplication(const TSharedRef< class FSlateRenderer >& PlatformRenderer, const TSharedRef<class GenericApplication>& InPlatformApplication);
 
 	static void InitializeCoreStyle(const FString& StylePath = "");
-	static void SetCoreStylePath(const FString& StylePath);
+	static void SetCoreStylePath(const FString& StylePath) { CoreStylePath = StylePath; }
+	static const FString& GetCoreStylePath() { return CoreStylePath; }
 
 	/**
 	 * Returns true if a Slate application instance is currently initialized and ready
@@ -1978,5 +1979,5 @@ private:
 	FOnWindowDPIScaleChanged OnWindowDPIScaleChangedEvent;
 #endif // WITH_EDITOR
 
-		static inline FString CoreStylePath = FString();
+	static inline FString CoreStylePath = FString();
 };
