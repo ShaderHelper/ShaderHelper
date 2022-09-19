@@ -6,6 +6,7 @@
 #include "Misc/CommonPath/BaseResourcePath.h"
 #include "UI/FShaderHelperStyle.h"
 #include "UI/SShaderHelperWindow.h"
+#include "SlateCore/Fonts/SlateFontInfo.h"
 
 namespace {
 	void UE_Init() {
@@ -30,15 +31,26 @@ namespace {
 		FPlatformApplicationMisc::PostInit();
 
 		//This project uses slate as UI framework, so we need to initialize it.
-		FSlateApplication::InitializeAsStandaloneApplication(GetStandardStandaloneRenderer(SH::BaseResourcePath::UE_StandaloneRenderShaderDir));
+		SetSlateFontPath(SH::BaseResourcePath::UE_SlateFontDir);
 		FSlateApplication::SetCoreStylePath(SH::BaseResourcePath::UE_SlateResourceDir);
+		FSlateApplication::InitializeAsStandaloneApplication(GetStandardStandaloneRenderer(SH::BaseResourcePath::UE_StandaloneRenderShaderDir));
+		
 	}
 
 	void UE_ShutDown() {
-		//FCoreDelegates::OnExit.Broadcast();
-		//FSlateApplication::Shutdown();
-		//FModuleManager::Get().UnloadModulesAtShutdown();
-		//FTaskGraphInterface::Shutdown();
+		FCoreDelegates::OnPreExit.Broadcast();
+		FCoreDelegates::OnExit.Broadcast();
+		FSlateApplication::Shutdown();
+		FModuleManager::Get().UnloadModulesAtShutdown();
+		FTaskGraphInterface::Shutdown();
+
+		FPlatformApplicationMisc::TearDown();
+		FPlatformMisc::PlatformTearDown();
+
+		if (GLog)
+		{
+			GLog->TearDown();
+		}
 	}
 
 	void UE_Update() {
@@ -49,7 +61,7 @@ namespace {
 }
 
 namespace SH {
-
+#pragma optimize("", off)
 	ShaderHelperApp::ShaderHelperApp(const TCHAR* CommandLine)
 	{
 		FCommandLine::Set(CommandLine);
@@ -69,7 +81,7 @@ namespace SH {
 
 	}
 
-	void ShaderHelperApp::Update(float DeltaTime)
+	void ShaderHelperApp::Update(double DeltaTime)
 	{
 		UE_Update();
 
@@ -88,5 +100,5 @@ namespace SH {
 		}
 		ShutDown();
 	}
-
+#pragma optimize("", on)
 }

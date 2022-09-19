@@ -8,6 +8,8 @@
 #include "Fonts/CompositeFont.h"
 #include "SlateFontInfo.generated.h"
 
+SLATECORE_API void SetSlateFontPath(const FString& FontPath);
+SLATECORE_API const FString& GetSlateFontPath();
 /**
  * Sets the maximum font fallback level, for when a character can't be found in the selected font set.
  * UI code that renders strings from a third party (e.g. player chat in a multiplayer game) may want to restrict font fallback to prevent potential performance problems.

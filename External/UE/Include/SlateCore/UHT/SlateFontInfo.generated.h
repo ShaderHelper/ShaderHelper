@@ -13,14 +13,14 @@ PRAGMA_DISABLE_DEPRECATION_WARNINGS
 #endif
 #define SLATECORE_SlateFontInfo_generated_h
 
-#define FID_Engine_Source_Runtime_SlateCore_Public_Fonts_SlateFontInfo_h_33_GENERATED_BODY \
+#define FID_Engine_Source_Runtime_SlateCore_Public_Fonts_SlateFontInfo_h_35_GENERATED_BODY \
 	friend struct Z_Construct_UScriptStruct_FFontOutlineSettings_Statics; \
 	static class UScriptStruct* StaticStruct();
 
 
 template<> SLATECORE_API UScriptStruct* StaticStruct<struct FFontOutlineSettings>();
 
-#define FID_Engine_Source_Runtime_SlateCore_Public_Fonts_SlateFontInfo_h_134_GENERATED_BODY \
+#define FID_Engine_Source_Runtime_SlateCore_Public_Fonts_SlateFontInfo_h_136_GENERATED_BODY \
 	friend struct Z_Construct_UScriptStruct_FSlateFontInfo_Statics; \
 	static class UScriptStruct* StaticStruct();
 

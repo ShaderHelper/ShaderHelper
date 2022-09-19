@@ -14,7 +14,6 @@ struct FSlateDynamicImageBrush;
 class SLATECORE_API FCoreStyle 
 {
 public:
-	static FString CoreStylePath;
 	static TSharedRef<class ISlateStyle> Create( const FName& InStyleSetName = "CoreStyle", const FString& StylePath = "");
 
 	/** 
@@ -42,7 +41,7 @@ public:
 	}
 
 	/** Get the default font for Slate */
-	static TSharedRef<const FCompositeFont> GetDefaultFont(const FString& StylePath = "");
+	static TSharedRef<const FCompositeFont> GetDefaultFont();
 
 	/** Get a font style using the default for for Slate */
 	static FSlateFontInfo GetDefaultFontStyle(const FName InTypefaceFontName, const int32 InSize, const FFontOutlineSettings& InOutlineSettings = FFontOutlineSettings());
