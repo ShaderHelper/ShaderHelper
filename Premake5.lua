@@ -28,8 +28,6 @@ ShaderHelperHierarchy = {
     ["External/UE/Visualizers"] = { "External/UE/Unreal.natvis"},
 }
 
-CurDir = os.getcwd()
-
 project "ShaderHelper"  
     kind "WindowedApp"   
     language "C++"
@@ -40,9 +38,9 @@ project "ShaderHelper"
     objdir ("Intermediate")
 
     pchheader "CommonHeaderForUE.h"
-    pchsource "Source/CommonHeaderForUE.cpp"
+	pchsource "Source/CommonHeaderForUE.cpp"
 	
-	vpaths(ShaderHelperHierarchy)
+    vpaths(ShaderHelperHierarchy)
 
     files 
     { 
@@ -101,7 +99,7 @@ project "ShaderHelper"
         buildoptions 
         { 
             "/utf-8",
-			"/FI\"F:/ShaderHelper/External/UE/Include/Definitions.h\"",
+			"/FI\"$(ProjectDir)/External/UE/Include/Definitions.h\"",
         }
 
     filter "configurations:Dev"  
