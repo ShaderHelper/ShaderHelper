@@ -1,6 +1,7 @@
 # ShaderHelper
 
-This is a lightweight shader editor based on some special Modules from UnrealEngine (Slate, ImageWrapper ...) for easier writing shader myself. :)
+This is a lightweight shader editor based on some special Modules from UnrealEngine (Slate, ImageWrapper ...).
+
 ![Editor Screenshot](./ScreenShot/App.png)
 
 ## Features
