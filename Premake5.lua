@@ -1,6 +1,10 @@
 workspace "ShaderHelper"  
     architecture "x64"
-    configurations { "Dev" } 
+    configurations 
+	{ 
+		"Debug",
+		"Dev"
+	} 
 
 UE_BaseIncludeDir = {
     Core = "External/UE/Include/Core",
@@ -28,7 +32,8 @@ ShaderHelperHierarchy = {
     ["External/UE/Visualizers"] = { "External/UE/Unreal.natvis"},
 }
 
-project "ShaderHelper"  
+project "ShaderHelper"
+	targetname "ShaderHelper-%{cfg.buildcfg}"
     kind "WindowedApp"   
     language "C++"
     cppdialect "C++17"
@@ -37,8 +42,8 @@ project "ShaderHelper"
     targetdir ("Binaries")
     objdir ("Intermediate")
 
-    pchheader "CommonHeaderForUE.h"
-	pchsource "Source/CommonHeaderForUE.cpp"
+    pchheader "CommonHeader.h"
+	pchsource "Source/CommonHeader.cpp"
 	
     vpaths(ShaderHelperHierarchy)
 
@@ -101,6 +106,16 @@ project "ShaderHelper"
             "/utf-8",
 			"/FI\"$(ProjectDir)/External/UE/Include/Definitions.h\"",
         }
+		
+	filter "configurations:Debug"  
+		defines 
+		{
+			"NDEBUG",
+			"_WINDOWS"
+		}
+		runtime "Release"    
+		optimize "Off"
+		symbols "On"
 
     filter "configurations:Dev"  
         defines 
