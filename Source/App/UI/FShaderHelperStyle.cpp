@@ -1,4 +1,4 @@
-#include "CommonHeaderForUE.h"
+#include "CommonHeader.h"
 #include "FShaderHelperStyle.h"
 #include "Misc/CommonPath/BaseResourcePath.h"
 #include <Styling/SlateStyleRegistry.h>

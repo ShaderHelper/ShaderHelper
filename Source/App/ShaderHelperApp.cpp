@@ -1,4 +1,4 @@
-#include "CommonHeaderForUE.h"
+#include "CommonHeader.h"
 #include "ShaderHelperApp.h"
 #include <HAL/PlatformOutputDevices.h>
 #include <HAL/PlatformApplicationMisc.h>
@@ -6,10 +6,18 @@
 #include "Misc/CommonPath/BaseResourcePath.h"
 #include "UI/FShaderHelperStyle.h"
 #include "UI/SShaderHelperWindow.h"
-#include "SlateCore/Fonts/SlateFontInfo.h"
+#include <SlateCore/Fonts/SlateFontInfo.h>
+#include <Misc/OutputDeviceConsole.h>
+#include "Tests/UnitTest.h"
+
+static TUniquePtr<FOutputDeviceConsole>	GScopedLogConsole;
 
 namespace {
 	void UE_Init() {
+#if UNIT_TEST
+		GScopedLogConsole = TUniquePtr<FOutputDeviceConsole>(FPlatformApplicationMisc::CreateConsoleOutputDevice());
+		GLogConsole = GScopedLogConsole.Get();
+#endif
 		//Initializing OutputDevices for features like UE_LOG.
 		FPlatformOutputDevices::SetupOutputDevices();
 
@@ -61,7 +69,6 @@ namespace {
 }
 
 namespace SH {
-#pragma optimize("", off)
 	ShaderHelperApp::ShaderHelperApp(const TCHAR* CommandLine)
 	{
 		FCommandLine::Set(CommandLine);
@@ -71,7 +78,16 @@ namespace SH {
 	{
 		UE_Init();
 		FShaderHelperStyle::Init();
+#if UNIT_TEST
+		if (GLogConsole) { GLogConsole->Show(true); }
+		FName TestName;
+		if (FParse::Value(FCommandLine::Get(), TEXT("UnitTest="), TestName)) {
+			SH::TEST::UnitTest(TestName);
+		}
+#else
 		FSlateApplication::Get().AddWindow(SNew(SShaderHelperWindow));
+#endif
+		
 	}
 
 	void ShaderHelperApp::ShutDown()
@@ -100,5 +116,4 @@ namespace SH {
 		}
 		ShutDown();
 	}
-#pragma optimize("", on)
 }
