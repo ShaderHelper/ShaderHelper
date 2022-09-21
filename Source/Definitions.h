@@ -1,6 +1,6 @@
 #pragma once
 #ifndef UNIT_TEST
-	#define UNIT_TEST 0
+	#define UNIT_TEST 1
 #endif
 
 #if UNIT_TEST

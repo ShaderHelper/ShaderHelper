@@ -4,3 +4,4 @@
 
 //ShaderHelper Headers
 #include "Misc/Util/Auxiliary.h"
+#include "Misc/Util/Vector.h"

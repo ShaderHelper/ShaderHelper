@@ -6,4 +6,6 @@ Intermediate/
 *.tps
 
 *.vcxproj.*
+*.vcxproj
+
 *.sln

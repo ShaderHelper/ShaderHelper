@@ -46,8 +46,18 @@ namespace SH {
 				}
 			
 				{
-					Vector4 vec4 = 2.0 * vec2.ZZZZ;
+					Vector4 vec4 = 2.0 * vec2.ZZZZ; // 2 * {2,2,2,2}
 					TEST_LOG(LogTestAuxiliary, Display, TEXT("Swizzle *: (%lf,%lf,%lf,%lf)."), vec4.X, vec4.Y, vec4.Z, vec4.W);
+				}
+
+				{
+					Vector vec4 = vec1 * vec2.ZZZ; //{1,2,3} * {2,2,2}
+					TEST_LOG(LogTestAuxiliary, Display, TEXT("Swizzle *: (%lf,%lf,%lf)."), vec4.X, vec4.Y, vec4.Z);
+				}
+
+				{
+					Vector2D vec4 = vec1.ZZ / vec2.XZ; // {3,3} / {1,2}
+					TEST_LOG(LogTestAuxiliary, Display, TEXT("Swizzle /: (%lf,%lf)."), vec4.X, vec4.Y);
 				}
 			}
 		}
