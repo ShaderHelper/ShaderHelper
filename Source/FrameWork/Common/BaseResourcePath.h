@@ -1,7 +1,7 @@
 #pragma once
-#include "PathHelper.h"
+#include "../Misc/Path/PathHelper.h"
 
-namespace SH {
+namespace FRAMEWORK {
 	namespace BaseResourcePath {
 		inline const FString UE_StandaloneRenderShaderDir = PathHelper::ExternalDir() / TEXT("UE/Shader/D3D");
 		inline const FString UE_SlateResourceDir = PathHelper::ResourceDir();

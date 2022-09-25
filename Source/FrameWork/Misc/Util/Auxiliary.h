@@ -1,7 +1,7 @@
 #pragma once
 #include "CommonHeader.h"
 
-namespace SH {
+namespace FRAMEWORK {
 	namespace AUX {
 
 		template<typename LeftSeq, typename RightSeq>
@@ -22,7 +22,6 @@ namespace SH {
 			static RetType Div(LType& lhs, RType& rhs) { return RetType(lhs[LeftIndexes] / rhs[RightIndexes]...); }
 
 		};
-
 
 	}	
 }

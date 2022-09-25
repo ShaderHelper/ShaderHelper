@@ -3,17 +3,25 @@
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTestAuxiliary, Log, All);
 DEFINE_LOG_CATEGORY(LogTestAuxiliary);
-
+#include <chrono>
 namespace SH {
 	namespace TEST {
 		void TestAuxiliary()
 		{
+			TEST_LOG(LogTestAuxiliary, Display, TEXT("Unit Test - Auxiliary:"));
 			//Implicit conversion between FVector and Vector.
 			{
 				FVector fvec(1, 2, 3);
 				Vector vec = fvec;
 				FVector fvec2 = vec;
 				TEST_LOG(LogTestAuxiliary, Display, TEXT("Implicit conversion between FVector and Vector: (%lf,%lf,%lf)."), vec.X, vec.Y, vec.Z);
+				//Test compatibility with ue math interfaces.
+				{
+					FTranslationMatrix tranM(vec);
+					TEST_LOG(LogTestAuxiliary, Display, TEXT("Test compatibility : (%s)."), *tranM.ToString());
+					vec = FMath::VRand();
+					TEST_LOG(LogTestAuxiliary, Display, TEXT("Test compatibility : (%s)."), *vec.ToString());
+				}
 			}
 
 			//Test arithmetic operator

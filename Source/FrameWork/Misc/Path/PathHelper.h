@@ -1,7 +1,7 @@
 #pragma once
 #include "CommonHeader.h"
 
-namespace SH {
+namespace FRAMEWORK {
 	class PathHelper {
 	public:
 		static FString ProjectDir();

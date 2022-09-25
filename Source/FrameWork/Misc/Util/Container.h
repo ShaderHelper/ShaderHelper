@@ -1,8 +1,7 @@
-#pragma once
+﻿#pragma once
 #include "CommonHeader.h"
 #include "Auxiliary.h"
-namespace SH {
-
+namespace FRAMEWORK {
 	// ShaderHelper Vector
 	// fwd
 	template<typename T> struct VectorImpl;
@@ -195,6 +194,10 @@ namespace SH {
 
 		operator UE_Vector() {
 			return UE_Vector(X, Y);
+		}
+
+		FString ToString() const {
+			return FString::Printf(TEXT("X=%3.3f Y=%3.3f"), X, Y);
 		}
 	};
 
@@ -400,10 +403,14 @@ namespace SH {
 		operator UE_Vector() {
 			return UE_Vector(X, Y, Z);
 		}
+
+		FString ToString() const {
+			return FString::Printf(TEXT("X=%3.3f Y=%3.3f Z=%3.3f"), X, Y, Z);
+		}
 	};
 
 	template<typename T>
-	struct Vector4Impl
+	struct alignas(16) Vector4Impl
 	{
 		using UE_Vector = UE::Math::TVector4<T>;
 		union
@@ -756,7 +763,7 @@ namespace SH {
 		Vector4Impl(const UE_Vector& Vec) : X(Vec.X), Y(Vec.Y), Z(Vec.Z), W(Vec.W) {}
 		Vector4Impl(T IntT) : X(IntT), Y(IntT), Z(IntT), W(IntT) {}
 		Vector4Impl(T IntX, T IntY, T IntZ, T IntW) : X(IntX), Y(IntY), Z(IntZ), W(IntW) {}
-
+		
 		Vector4Impl operator*(const Vector4Impl& rhs) const {
 			return Vector4Impl(X * rhs.X, Y * rhs.Y, Z * rhs.Z, W * rhs.W);
 		}
@@ -823,5 +830,10 @@ namespace SH {
 		operator UE_Vector() {
 			return UE_Vector(X, Y, Z, W);
 		}
+
+		FString ToString() const {
+			return FString::Printf(TEXT("X=%3.3f Y=%3.3f Z=%3.3f W=%3.3f"), X, Y, Z, W);
+		}
 	};
+
 }
