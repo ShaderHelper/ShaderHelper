@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "PathHelper.h"
 
-namespace SH {
+namespace FRAMEWORK {
 	FString PathHelper::ProjectDir()
 	{
 		FString RetDir = FString(FPlatformProcess::BaseDir()) + TEXT("../");

@@ -104,8 +104,13 @@ project "ShaderHelper"
         buildoptions 
         { 
             "/utf-8",
-			"/FI\"$(ProjectDir)/External/UE/Include/Definitions.h\"",
         }
+		removefiles 
+		{
+			"Source/FrameWork/GpuApi/Mac/**.cpp",
+			"Source/FrameWork/GpuApi/Mac/**.h",
+		}
+		
 		
 	filter "configurations:Debug"  
 		defines 
