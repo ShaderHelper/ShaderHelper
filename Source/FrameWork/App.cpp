@@ -93,6 +93,9 @@ namespace FRAMEWORK {
 		if (AppWindow.IsValid()) {
 			FSlateApplication::Get().AddWindow(AppWindow.ToSharedRef());
 		}
+		else {
+			FSlateApplication::Get().AddWindow(SNew(SWindow));
+		}
 #endif
 	}
 

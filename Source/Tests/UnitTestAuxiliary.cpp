@@ -4,6 +4,7 @@
 DECLARE_LOG_CATEGORY_EXTERN(LogTestAuxiliary, Log, All);
 DEFINE_LOG_CATEGORY(LogTestAuxiliary);
 #include <chrono>
+
 namespace SH {
 	namespace TEST {
 		void TestAuxiliary()
@@ -67,6 +68,22 @@ namespace SH {
 					Vector2D vec4 = vec1.ZZ / vec2.XZ; // {3,3} / {1,2}
 					TEST_LOG(LogTestAuxiliary, Display, TEXT("Swizzle /: (%lf,%lf)."), vec4.X, vec4.Y);
 				}
+			}
+
+			//Test OutPtr
+			{
+				struct Unit { 
+					Unit(int v) : Value(v) {}
+					~Unit() { TEST_LOG(LogTestAuxiliary, Display, TEXT("~Unit:%d"),Value); } 
+					int Value;
+				};
+				TSharedPtr<Unit> t = MakeShared<Unit>(114);
+				
+				auto testf = [](Unit** p) { *p = new Unit(514); };
+				testf(AUX::OutPtr(t));
+
+				auto testf2 = [](void** p) {*p = new Unit(1919); };
+				testf2(AUX::OutPtr<void*>(t));
 			}
 		}
 	}
