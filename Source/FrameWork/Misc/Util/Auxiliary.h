@@ -3,7 +3,7 @@
 
 namespace FRAMEWORK {
 	namespace AUX {
-
+		
 		template<typename LeftSeq, typename RightSeq>
 		struct Op;
 
@@ -79,25 +79,82 @@ namespace FRAMEWORK {
 			Pointer TargetPtr;
 		};
 
-		template<typename Smart, typename Pointer,
-			std::enable_if_t<std::is_same_v<Pointer, void>, bool> = true
-		>
-		decltype(auto) BaseOutPtr(Smart& s) {
-			return OutPtrImpl<Smart, Smart::ElementType*>(s);
-		}
+		//c++14
+		//template<typename Smart, typename Pointer,
+		//	std::enable_if_t<std::is_same_v<Pointer, void>, bool> = true
+		//>
+		//decltype(auto) BaseOutPtr(Smart& s) {
+		//	return OutPtrImpl<Smart, typename Smart::ElementType*>(s);
+		//}
 
-		template<typename Smart, typename Pointer,
-			std::enable_if_t<!std::is_same_v<Pointer, void>, bool> = true
-		>
-		decltype(auto) BaseOutPtr(Smart& s) {
-			return OutPtrImpl<Smart, Pointer>(s);
-		}
+		//template<typename Smart, typename Pointer,
+		//	std::enable_if_t<!std::is_same_v<Pointer, void>, bool> = true
+		//>
+		//decltype(auto) BaseOutPtr(Smart& s) {
+		//	return OutPtrImpl<Smart, Pointer>(s);
+		//}
 
 		//c++23 OutPtr for UE smart pointer.
 		template<typename Pointer = void, typename Smart>
 		decltype(auto) OutPtr(Smart& s) {
-			return BaseOutPtr<Smart,Pointer>(s);
+			if constexpr (std::is_same_v<Pointer, void>) {
+				return OutPtrImpl<Smart, typename Smart::ElementType*>(s);
+			}
+			else {
+				return OutPtrImpl<Smart, Pointer>(s);
+			}
 		}
 
+		template<typename T, int32 Min, T Cur, T... Seq>
+		struct RangeIntegerSequenceImpl {
+			struct LazyInitIntSeq {
+				using Type = TIntegerSequence<T, Cur, Seq...>;
+			};
+			struct LazyInitRangeIntSeq {
+				using Type = typename RangeIntegerSequenceImpl<T, Min, Seq...>::Type;
+			};
+			using Type = typename TChooseClass< Cur >= Min, LazyInitIntSeq, LazyInitRangeIntSeq >::Result::Type;
+		};
+
+		template<typename T, int32 Min, typename Seq>
+		struct RangeIntegerSequence;
+
+		template<typename T, int32 Min, T... Seq>
+		struct RangeIntegerSequence<T, Min, TIntegerSequence<T, Seq...>> {
+			static_assert(Min >= 0 && Min <= sizeof...(Seq) - 1, "Min must greater than 0 and less than Max");
+			using Type = typename RangeIntegerSequenceImpl<T, Min, Seq...>::Type;
+		};
+		
+		//Make TIntegerSequence[min,max], 0 <= min <= max
+		template<typename T,int32 Min, int32 Max>
+		using MakeRangeIntegerSequence = typename RangeIntegerSequence<T, Min, TMakeIntegerSequence<T, Max + 1>>::Type;
+
+		//Pass a run-time var with known range to template
+		//You need to move invocation to a function object.
+		template<template<int> typename Caller, typename T>
+		struct RunCaseWithIntImpl;
+
+		template<template<int> typename Caller, typename T, T... Seq>
+		struct RunCaseWithIntImpl<Caller, TIntegerSequence<T, Seq...>> {
+			static decltype(auto) Invoke(int arg) {
+				return Iter<Seq...>(arg);
+			}
+			template<int x, int... SubSeq>
+			static decltype(auto) Iter(int arg) {
+				if (arg == x) {
+					return Caller<x>{}();
+				}
+				else if constexpr (sizeof...(SubSeq)) {
+					return Iter<SubSeq...>(arg);
+				}
+			}
+		};
+
+		template<int Min, int Max, template<int> typename Caller>
+		decltype(auto) RunCaseWithInt(int arg) {
+			checkf(arg >= Min && arg <= Max, TEXT("arg must be [Min,Max]"));
+			return RunCaseWithIntImpl<Caller, MakeRangeIntegerSequence<int,Min,Max>>::Invoke(arg);
+		}
+		
 	}	
 }

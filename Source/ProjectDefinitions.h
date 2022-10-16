@@ -8,3 +8,6 @@
 	#define TEST_LOG(...) EXPAND(UE_INTERNAL_LOG_IMPL(__VA_ARGS__))
 	#define UE_LOG(...)
 #endif
+
+namespace FRAMEWORK {}
+using namespace FRAMEWORK;

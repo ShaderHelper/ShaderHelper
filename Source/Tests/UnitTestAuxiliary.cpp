@@ -7,6 +7,32 @@ DEFINE_LOG_CATEGORY(LogTestAuxiliary);
 
 namespace SH {
 	namespace TEST {
+		template<int N>
+		struct UnitTmp {
+			int Val = 0;
+			void Run() {
+				TEST_LOG(LogTestAuxiliary, Display, TEXT("TestRunCaseWithInt: %d"), N + Val);
+			}
+		};
+
+		template<int N>
+		struct Functor {
+			void operator()() {
+				auto t = UnitTmp<N>();
+				t.Val = 1;
+				t.Run();
+			}
+		};
+
+		
+		template<typename T, T... Seq>
+		void TestSeq(TIntegerSequence<T, Seq...>) {
+			auto lam = [](T t) {
+				TEST_LOG(LogTestAuxiliary, Display, TEXT("TestSeq: %d"), t);
+			};
+			(lam(Seq), ...);
+		}
+
 		void TestAuxiliary()
 		{
 			TEST_LOG(LogTestAuxiliary, Display, TEXT("Unit Test - Auxiliary:"));
@@ -41,7 +67,11 @@ namespace SH {
 					vec *= 2;
 					TEST_LOG(LogTestAuxiliary, Display, TEXT("*: (%lf,%lf,%lf)."), vec.X, vec.Y, vec.Z);
 				}
-
+				{
+					Vector vec1 = { 1,1,1 };
+					(vec1 += 1) = { 3,3,3 };
+					TEST_LOG(LogTestAuxiliary, Display, TEXT("+=: (%s)."), *vec1.ToString());
+				}
 			}
 
 			//Test Swizzle
@@ -85,6 +115,21 @@ namespace SH {
 				auto testf2 = [](void** p) {*p = new Unit(1919); };
 				testf2(AUX::OutPtr<void*>(t));
 			}
+
+			//Test Seq
+			{
+				TestSeq(AUX::MakeRangeIntegerSequence<uint32, 0, 2>{});
+				//Avoid the following code: 
+				//if (VarFromFile == 2) {
+				//	UnitTmp<2>() ...
+				//}
+				//else if (VarFromFile == 3) {
+				//	UnitTmp<3>() ...
+				//}...
+				int VarFromFile = 60;
+				AUX::RunCaseWithInt<2, 64, Functor>(VarFromFile);
+			}
+
 		}
 	}
 }

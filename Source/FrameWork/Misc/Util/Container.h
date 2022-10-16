@@ -142,19 +142,19 @@ namespace FRAMEWORK {
 			return Vector2Impl(X / rhs.X, Y / rhs.Y);
 		}
 
-		Vector2Impl operator*=(const Vector2Impl& rhs) {
+		Vector2Impl& operator*=(const Vector2Impl& rhs) {
 			X *= rhs.X; Y *= rhs.Y;
 			return *this;
 		}
-		Vector2Impl operator+=(const Vector2Impl& rhs) {
+		Vector2Impl& operator+=(const Vector2Impl& rhs) {
 			X += rhs.X; Y += rhs.Y;
 			return *this;
 		}
-		Vector2Impl operator-=(const Vector2Impl& rhs) {
+		Vector2Impl& operator-=(const Vector2Impl& rhs) {
 			X -= rhs.X; Y -= rhs.Y;
 			return *this;
 		}
-		Vector2Impl operator/=(const Vector2Impl& rhs) {
+		Vector2Impl& operator/=(const Vector2Impl& rhs) {
 			X /= rhs.X; Y /= rhs.Y;
 			return *this;
 		}
@@ -173,6 +173,9 @@ namespace FRAMEWORK {
 		}
 		bool operator==(const Vector2Impl& rhs) const {
 			return X == rhs.X && Y == rhs.Y;
+		}
+		bool operator!=(const Vector2Impl& rhs) const {
+			return X != rhs.X || Y != rhs.Y;
 		}
 
 		Vector2Impl operator*(T rhs) const {
@@ -350,19 +353,19 @@ namespace FRAMEWORK {
 			return VectorImpl(X / rhs.X, Y / rhs.Y, Z / rhs.Z);
 		}
 
-		VectorImpl operator*=(const VectorImpl& rhs) {
+		VectorImpl& operator*=(const VectorImpl& rhs) {
 			X *= rhs.X; Y *= rhs.Y; Z *= rhs.Z;
 			return *this;
 		}
-		VectorImpl operator+=(const VectorImpl& rhs) {
+		VectorImpl& operator+=(const VectorImpl& rhs) {
 			X += rhs.X; Y += rhs.Y; Z += rhs.Z;
 			return *this;
 		}
-		VectorImpl operator-=(const VectorImpl& rhs) {
+		VectorImpl& operator-=(const VectorImpl& rhs) {
 			X -= rhs.X; Y -= rhs.Y; Z -= rhs.Z;
 			return *this;
 		}
-		VectorImpl operator/=(const VectorImpl& rhs) {
+		VectorImpl& operator/=(const VectorImpl& rhs) {
 			X /= rhs.X; Y /= rhs.Y; Z /= rhs.Z;
 			return *this;
 		}
@@ -381,6 +384,9 @@ namespace FRAMEWORK {
 		}
 		bool operator==(const VectorImpl& rhs) const {
 			return X == rhs.X && Y == rhs.Y && Z == rhs.Z;
+		}
+		bool operator!=(const VectorImpl& rhs) const {
+			return X != rhs.X || Y != rhs.Y || Z != rhs.Z;
 		}
 
 		VectorImpl operator*(T rhs) const {
@@ -777,19 +783,19 @@ namespace FRAMEWORK {
 			return Vector4Impl(X / rhs.X, Y / rhs.Y, Z / rhs.Z, W / rhs.W);
 		}
 
-		Vector4Impl operator*=(const Vector4Impl& rhs) {
+		Vector4Impl& operator*=(const Vector4Impl& rhs) {
 			X *= rhs.X; Y *= rhs.Y; Z *= rhs.Z; W *= rhs.W;
 			return *this;
 		}
-		Vector4Impl operator+=(const Vector4Impl& rhs) {
+		Vector4Impl& operator+=(const Vector4Impl& rhs) {
 			X += rhs.X; Y += rhs.Y; Z += rhs.Z; W += rhs.W;
 			return *this;
 		}
-		Vector4Impl operator-=(const Vector4Impl& rhs) {
+		Vector4Impl& operator-=(const Vector4Impl& rhs) {
 			X -= rhs.X; Y -= rhs.Y; Z -= rhs.Z; W -= rhs.W;
 			return *this;
 		}
-		Vector4Impl operator/=(const Vector4Impl& rhs) {
+		Vector4Impl& operator/=(const Vector4Impl& rhs) {
 			X /= rhs.X; Y /= rhs.Y; Z /= rhs.Z; W /= rhs.W;
 			return *this;
 		}
@@ -808,6 +814,9 @@ namespace FRAMEWORK {
 		}
 		bool operator==(const Vector4Impl& rhs) const {
 			return X == rhs.X && Y == rhs.Y && Z == rhs.Z && W == rhs.W;
+		}
+		bool operator!=(const Vector4Impl& rhs) const {
+			return X != rhs.X || Y != rhs.Y || Z != rhs.Z || W != rhs.W;
 		}
 
 		Vector4Impl operator*(T rhs) const {
