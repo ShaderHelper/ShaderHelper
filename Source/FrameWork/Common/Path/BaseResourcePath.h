@@ -1,5 +1,5 @@
 #pragma once
-#include "../Misc/Path/PathHelper.h"
+#include "PathHelper.h"
 
 namespace FRAMEWORK {
 	namespace BaseResourcePath {

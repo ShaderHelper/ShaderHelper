@@ -1,6 +1,6 @@
 #include "CommonHeader.h"
 #include "FShaderHelperStyle.h"
-#include "FrameWork/Common/BaseResourcePath.h"
+#include "FrameWork/Common/Path/BaseResourcePath.h"
 #include <Styling/SlateStyleRegistry.h>
 #include <Styling/StyleColors.h>
 #include <Styling/SlateStyleMacros.h>

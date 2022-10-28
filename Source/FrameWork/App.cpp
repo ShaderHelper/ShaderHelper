@@ -3,11 +3,11 @@
 #include <HAL/PlatformOutputDevices.h>
 #include <HAL/PlatformApplicationMisc.h>
 #include <StandaloneRenderer/StandaloneRenderer.h>
-#include "Common/BaseResourcePath.h"
+#include "Common/Path/BaseResourcePath.h"
 
 #include <SlateCore/Fonts/SlateFontInfo.h>
 #include <Misc/OutputDeviceConsole.h>
-#include "Misc/Util/UnitTest.h"
+#include "Common/Util/UnitTest.h"
 
 static TUniquePtr<FOutputDeviceConsole>	GScopedLogConsole;
 
