@@ -4,6 +4,7 @@
 namespace FRAMEWORK {
 	namespace AUX {
 		
+		//Support arithmetic operations on two objects with subscript operator via TIntegerSequence.
 		template<typename LeftSeq, typename RightSeq>
 		struct Op;
 
@@ -129,31 +130,36 @@ namespace FRAMEWORK {
 		template<typename T,int32 Min, int32 Max>
 		using MakeRangeIntegerSequence = typename RangeIntegerSequence<T, Min, TMakeIntegerSequence<T, Max + 1>>::Type;
 
-		//Pass a run-time var with known range to template
+		//Pass a run-time integer with known range to template
 		//You need to move invocation to a function object.
-		template<template<int> typename Caller, typename T>
+		template<template<int, typename...> typename Caller, typename T, typename... ExtraType>
 		struct RunCaseWithIntImpl;
 
-		template<template<int> typename Caller, typename T, T... Seq>
-		struct RunCaseWithIntImpl<Caller, TIntegerSequence<T, Seq...>> {
-			static decltype(auto) Invoke(int arg) {
-				return Iter<Seq...>(arg);
+		template<template<int, typename...> typename Caller, typename T, T... Seq, typename... ExtraType>
+		struct RunCaseWithIntImpl<Caller, TIntegerSequence<T, Seq...>, ExtraType...> {
+			template<typename... Args>
+			static decltype(auto) Invoke(int val, Args&&... args) {
+				return Iter<Seq...>(val, std::forward<Args>(args)...);
 			}
-			template<int x, int... SubSeq>
-			static decltype(auto) Iter(int arg) {
-				if (arg == x) {
-					return Caller<x>{}();
+			template<int x, int... SubSeq, typename... Args>
+			static decltype(auto) Iter(int val, Args&&... args) {
+				if (val == x) {
+					//Caller<x>.operator() returns Caller<x>, which is not supported.
+					return Caller<x, ExtraType...>{}(std::forward<Args>(args)...);
 				}
 				else if constexpr (sizeof...(SubSeq)) {
-					return Iter<SubSeq...>(arg);
+					return Iter<SubSeq...>(val, std::forward<Args>(args)...);
 				}
+				//C4715 Warning
+				check(false);
+				return Caller<x, ExtraType...>{}(std::forward<Args>(args)...);
 			}
 		};
 
-		template<int Min, int Max, template<int> typename Caller>
-		decltype(auto) RunCaseWithInt(int arg) {
-			checkf(arg >= Min && arg <= Max, TEXT("arg must be [Min,Max]"));
-			return RunCaseWithIntImpl<Caller, MakeRangeIntegerSequence<int,Min,Max>>::Invoke(arg);
+		template<int Min, int Max, template<int, typename...> typename Caller, typename... ExtraType, typename... Args>
+		decltype(auto) RunCaseWithInt(int val, Args&&... args) {
+			checkf(val >= Min && val <= Max, TEXT("val must be [Min,Max]"));
+			return RunCaseWithIntImpl<Caller, MakeRangeIntegerSequence<int,Min,Max>, ExtraType...>::Invoke(val, std::forward<Args>(args)...);
 		}
 		
 	}	

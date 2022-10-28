@@ -1,7 +1,7 @@
 #pragma once
 #include "CommonHeader.h"
 namespace FRAMEWORK {
-	class App
+	class App : public FNoncopyable
 	{
 	public:
 		App(const TCHAR* CommandLine);

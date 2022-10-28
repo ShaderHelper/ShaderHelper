@@ -3,12 +3,12 @@
 #include "UI/FShaderHelperStyle.h"
 #include "UI/SShaderHelperWindow.h"
 #include "Tests/Test.h"
-#include "FrameWork/Misc/Util/UnitTest.h"
+#include "FrameWork/Common/Util/UnitTest.h"
 
 namespace SH {
 #if UNIT_TEST
 	static void UnitTestInit() {
-		UnitTest::Register(FName("Auxiliary"), TEST::TestAuxiliary);
+		UnitTest::Register(FName("Util"), TEST::TestUtil);
 	}
 #endif
 	

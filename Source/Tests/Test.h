@@ -1,6 +1,6 @@
 #pragma once 
 namespace SH {
 	namespace TEST {
-		void TestAuxiliary();
+		void TestUtil();
 	}
 }

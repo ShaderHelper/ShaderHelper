@@ -5,7 +5,7 @@
 
 //ShaderHelper Headers
 #include "ProjectDefinitions.h"
-#include "FrameWork/Misc/Util/Auxiliary.h"
-#include "FrameWork/Misc/Util/Container.h"
+#include "FrameWork/Common/Util/Auxiliary.h"
+#include "FrameWork/Common/Util/Container.h"
 
 
