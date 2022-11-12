@@ -5,6 +5,8 @@ Intermediate/
 *.pdb
 *.tps
 
+*.aps
+
 *.vcxproj.*
 *.vcxproj
 

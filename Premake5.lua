@@ -1,10 +1,10 @@
 workspace "ShaderHelper"  
     architecture "x64"
     configurations 
-	{ 
-		"Debug",
-		"Dev"
-	} 
+    { 
+        "Debug",
+        "Dev"
+    } 
 
 UE_BaseIncludeDir = {
     Core = "External/UE/Include/Core",
@@ -27,13 +27,13 @@ UE_UHTIncludeDir = {
 }
 
 ShaderHelperHierarchy = {
-	["Sources/*"] = {"Source/**.h","Source/**.cpp"},
-	["External/UE"] = { "External/UE/Include/Definitions.h" },
+    ["Sources/*"] = {"Source/**.h","Source/**.cpp"},
+    ["External/UE"] = { "External/UE/Include/Definitions.h" },
     ["External/UE/Visualizers"] = { "External/UE/Unreal.natvis"},
 }
 
 project "ShaderHelper"
-	targetname "ShaderHelper-%{cfg.buildcfg}"
+    targetname "ShaderHelper-%{cfg.buildcfg}"
     kind "WindowedApp"   
     language "C++"
     cppdialect "C++17"
@@ -43,16 +43,15 @@ project "ShaderHelper"
     objdir ("Intermediate")
 
     pchheader "CommonHeader.h"
-	pchsource "Source/CommonHeader.cpp"
-	
+    pchsource "Source/CommonHeader.cpp"
+    
     vpaths(ShaderHelperHierarchy)
 
     files 
     { 
         "Source/**.h", 
         "Source/**.cpp",
-		"External/UE/Unreal.natvis",
-		"External/UE/Include/Definitions.h"
+        "External/UE/Include/Definitions.h"
     }
     
     includedirs
@@ -100,34 +99,43 @@ project "ShaderHelper"
   
 
     filter "system:windows"
-		systemversion "latest"
+        systemversion "latest"
         buildoptions 
         { 
             "/utf-8",
         }
-		removefiles 
-		{
-			"Source/FrameWork/GpuApi/Mac/**.cpp",
-			"Source/FrameWork/GpuApi/Mac/**.h",
-		}
-		
-		
-	filter "configurations:Debug"  
-		defines 
-		{
-			"NDEBUG",
-			"_WINDOWS"
-		}
-		runtime "Release"    
-		optimize "Off"
-		symbols "On"
+        removefiles 
+        {
+            "Source/FrameWork/GpuApi/Mac/**.cpp",
+            "Source/FrameWork/GpuApi/Mac/**.h",
+        }
+        files 
+        {
+            "External/UE/Unreal.natvis",
+            "Resource/ExeIcon/Windows/*",
+        }
+        vpaths
+        {
+            ["Resource/*"] = {"Resource/ExeIcon/Windows/*"},
+        }
+        
+        
+    filter "configurations:Debug"  
+        defines 
+        {
+            "NDEBUG",
+            "_WINDOWS"
+        }
+        runtime "Release"    
+        optimize "Off"
+        symbols "On"
 
     filter "configurations:Dev"  
         defines 
-		{
-			"NDEBUG",
-			"_WINDOWS"
-		}
+        {
+            "NDEBUG",
+            "_WINDOWS"
+        }
         runtime "Release"    
         optimize "On"
         symbols "On"
