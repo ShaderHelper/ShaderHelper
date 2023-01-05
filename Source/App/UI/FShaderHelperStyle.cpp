@@ -1,6 +1,6 @@
 #include "CommonHeader.h"
 #include "FShaderHelperStyle.h"
-#include "Misc/CommonPath/BaseResourcePath.h"
+#include "FrameWork/Common/Path/BaseResourcePath.h"
 #include <Styling/SlateStyleRegistry.h>
 #include <Styling/StyleColors.h>
 #include <Styling/SlateStyleMacros.h>
@@ -27,7 +27,7 @@ namespace SH {
 	TSharedRef<ISlateStyle> FShaderHelperStyle::Create()
 	{
 		TSharedRef<FSlateStyleSet> Style = MakeShared<FSlateStyleSet>("ShaderHelperStyle");
-		Style->SetContentRoot(SH::BaseResourcePath::UE_SlateResourceDir / TEXT("Slate/Custom") );
+		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir / TEXT("Slate/Custom") );
 
 		//Style->Set("ShaderHelper.Logo", new IMAGE_BRUSH("ShaderHelperLogo",FVector2D(24,24), FStyleColors::White));
 		

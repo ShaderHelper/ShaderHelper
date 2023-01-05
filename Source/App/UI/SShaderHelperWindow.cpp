@@ -53,9 +53,21 @@ namespace SH {
 			FTabManager::NewPrimaryArea()
 			->Split
 			(
-				FTabManager::NewStack()
-				->SetSizeCoefficient(0.35f)
-				->AddTab("PreviewTab",ETabState::OpenedTab)
+				FTabManager::NewSplitter()
+				->SetOrientation(Orient_Vertical)
+				->SetSizeCoefficient(0.4f)
+				->Split
+				(
+					FTabManager::NewStack()
+					->SetSizeCoefficient(0.8f)
+					->AddTab("PreviewTab", ETabState::OpenedTab)
+				)
+				->Split
+				(
+					FTabManager::NewStack()
+					->SetSizeCoefficient(0.2f)
+					->AddTab("ResourceTab", ETabState::OpenedTab)
+				)
 				
 			)
 			->Split
@@ -66,21 +78,9 @@ namespace SH {
 			)
 			->Split
 			(
-				FTabManager::NewSplitter()
-				->SetOrientation(Orient_Vertical)
-				->SetSizeCoefficient(0.5f)
-				->Split
-				(
-					FTabManager::NewStack()
-					->SetSizeCoefficient(0.8f)
-					->AddTab("CodeTab",ETabState::OpenedTab)
-				)
-				->Split
-				(
-					FTabManager::NewStack()
-					->SetSizeCoefficient(0.2f)
-					->AddTab("ResourceTab",ETabState::OpenedTab)
-				)
+				FTabManager::NewStack()
+				->SetSizeCoefficient(0.45f)
+				->AddTab("CodeTab", ETabState::OpenedTab)
 			)
 		);
 

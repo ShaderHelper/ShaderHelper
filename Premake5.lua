@@ -1,10 +1,10 @@
 workspace "ShaderHelper"  
     architecture "x64"
     configurations 
-	{ 
-		"Debug",
-		"Dev"
-	} 
+    { 
+        "Debug",
+        "Dev"
+    } 
 
 UE_BaseIncludeDir = {
     Core = "External/UE/Include/Core",
@@ -27,32 +27,27 @@ UE_UHTIncludeDir = {
 }
 
 ShaderHelperHierarchy = {
-	["Sources/*"] = {"Source/**.h","Source/**.cpp"},
-	["External/UE"] = { "External/UE/Include/Definitions.h" },
-    ["External/UE/Visualizers"] = { "External/UE/Unreal.natvis"},
+    ["Sources/*"] = {"Source/**.h","Source/**.cpp"},
+    ["External/UE"] = { "External/UE/Include/SharedPCH.h" },
 }
 
 project "ShaderHelper"
-	targetname "ShaderHelper-%{cfg.buildcfg}"
     kind "WindowedApp"   
+    targetname "ShaderHelper-%{cfg.buildcfg}"
     language "C++"
     cppdialect "C++17"
     staticruntime "off"
+    exceptionhandling "off"
 
-    targetdir ("Binaries")
     objdir ("Intermediate")
 
-    pchheader "CommonHeader.h"
-	pchsource "Source/CommonHeader.cpp"
-	
     vpaths(ShaderHelperHierarchy)
 
     files 
     { 
         "Source/**.h", 
         "Source/**.cpp",
-		"External/UE/Unreal.natvis",
-		"External/UE/Include/Definitions.h"
+        "External/UE/Include/SharedPCH.h",
     }
     
     includedirs
@@ -79,50 +74,112 @@ project "ShaderHelper"
         "%{UE_UHTIncludeDir.CoreUObject}",
         "%{UE_UHTIncludeDir.SlateCore}",
     }
-
-    libdirs
-    {
-        "External/UE/Lib",
-    }
-
-    links
-    {
-        "UE-Core.lib",
-        "UE-ApplicationCore.lib",
-        "UE-Slate.lib",
-        "UE-SlateCore.lib",
-        "UE-StandaloneRenderer.lib",
-        "UE-Projects.lib",
-        "UE-ImageWrapper.lib",
-        "UE-CoreUObject.lib"
-    }
-    
   
 
     filter "system:windows"
-		systemversion "latest"
+        systemversion "latest"
+        runtime "Release"
+        symbols "On"
+        targetdir ("Binaries/Win64")
+        pchheader "CommonHeader.h"
+        pchsource "Source/CommonHeader.cpp"
         buildoptions 
         { 
             "/utf-8",
-			"/FI\"$(ProjectDir)/External/UE/Include/Definitions.h\"",
+            "/GR-",  
         }
-		
-	filter "configurations:Debug"  
-		defines 
-		{
-			"NDEBUG",
-			"_WINDOWS"
-		}
-		runtime "Release"    
-		optimize "Off"
-		symbols "On"
-
-    filter "configurations:Dev"  
+        removefiles 
+        {
+            "Source/FrameWork/GpuApi/Mac/**.cpp",
+            "Source/FrameWork/GpuApi/Mac/**.h",
+            "Source/Launch/MacMain.cpp",
+        }
+        files 
+        {
+            "External/UE/Unreal.natvis",
+            "Resource/ExeIcon/Windows/*",
+            "External/UE/Include/UnrealDefinitionsWin.h",
+        }
+        vpaths
+        {
+            ["Resource/*"] = {"Resource/ExeIcon/Windows/*"},
+            ["External/UE/Visualizers"] = { "External/UE/Unreal.natvis"},
+            ["External/UE"] = { "External/UE/Include/UnrealDefinitionsWin.h" },
+        }
+        libdirs
+        {
+            "External/UE/Lib",
+        }
         defines 
-		{
-			"NDEBUG",
-			"_WINDOWS"
-		}
-        runtime "Release"    
-        optimize "On"
+        {
+            "NDEBUG",
+        }
+        links
+        {
+            "UE-Core",
+            "UE-ApplicationCore",
+            "UE-Slate",
+            "UE-SlateCore",
+            "UE-StandaloneRenderer",
+            "UE-Projects",
+            "UE-ImageWrapper",
+            "UE-CoreUObject"
+        }
+    
+    
+    filter "system:macosx"
+        targetdir ("Binaries/Mac")
+        --pchheader "Source/CommonHeader.h"
+        removefiles 
+        {
+            "Source/FrameWork/GpuApi/Win/**.cpp",
+            "Source/FrameWork/GpuApi/Win/**.h",
+            "Source/Launch/WinMain.cpp",
+        }
+        files
+        {
+            "External/UE/Include/UnrealDefinitionsMac.h",
+            "Resource/ExeIcon/Mac/*",
+        }
+        vpaths
+        {
+            ["External/UE"] = { 
+                "External/UE/Include/UnrealDefinitionsMac.h",
+            },
+        }
+        links {
+            "Cocoa.framework",
+            "Metal.framework",
+            "OpenGL.framework",
+            "Carbon.framework",
+            "IOKit.framework",
+            "Security.framework",
+            "GameController.framework",
+            "QuartzCore.framework",
+            "IOSurface.framework",
+            "%{cfg.targetdir}/UE-Core.dylib",
+            "%{cfg.targetdir}/UE-ApplicationCore.dylib",
+            "%{cfg.targetdir}/UE-Slate.dylib",
+            "%{cfg.targetdir}/UE-SlateCore.dylib",
+            "%{cfg.targetdir}/UE-StandaloneRenderer.dylib",
+            "%{cfg.targetdir}/UE-Projects.dylib",
+            "%{cfg.targetdir}/UE-ImageWrapper.dylib",
+            "%{cfg.targetdir}/UE-CoreUObject.dylib"
+        }
+        runpathdirs {
+            "%{cfg.targetdir}",
+            "%{cfg.targetdir}/../../../ "
+        }
+        buildoptions { 
+            "-x objective-c++",
+            "-fno-rtti", --UE modules disable rtti
+        }
+        xcodebuildsettings { ["MACOSX_DEPLOYMENT_TARGET"] = "10.15" }
+
+        
+    filter {"configurations:Debug"}
+        optimize "Off"
+        
+
+    filter {"configurations:Dev"}
         symbols "On"
