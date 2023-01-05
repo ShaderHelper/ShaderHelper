@@ -1,0 +1,4 @@
+//Make Icon id the same as IDICON_UEGame
+#define IDI_ICON 123
+IDI_ICON               ICON                    "Icon.ico"
+
