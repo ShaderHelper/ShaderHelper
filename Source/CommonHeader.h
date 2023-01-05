@@ -1,9 +1,13 @@
 #pragma once
 // UE Headers
+#if defined(_WIN64)
 #include <UnrealDefinitionsWin.h>
-#include "CommonHeaderForUE.h"
+#elif defined(__APPLE__)
+#include <UnrealDefinitionsMac.h>
+#endif
+#include <SharedPCH.h>
 
-//ShaderHelper Headers
+//Project Headers
 #include "ProjectDefinitions.h"
 #include "FrameWork/Common/Util/Auxiliary.h"
 #include "FrameWork/Common/Util/Container.h"

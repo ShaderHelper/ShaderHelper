@@ -1,6 +1,4 @@
 #pragma once
-#include "CommonHeader.h"
-
 namespace SH {
 
 	class SShaderHelperWindow :

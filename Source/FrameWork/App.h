@@ -1,5 +1,4 @@
 #pragma once
-#include "CommonHeader.h"
 namespace FRAMEWORK {
 	class App : public FNoncopyable
 	{

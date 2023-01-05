@@ -1,5 +1,4 @@
-﻿#pragma once
-#include "CommonHeader.h"
+#pragma once
 #include "Auxiliary.h"
 namespace FRAMEWORK {
 	// ShaderHelper Vector
@@ -23,7 +22,7 @@ namespace FRAMEWORK {
 	template<typename Base, typename Target, uint32... Indexes>
 	struct Swizzle
 	{
-		template <typename Base, typename Target, uint32 ... OtherIndexes>
+		template <typename OtherBase, typename OtherTarget, uint32 ... OtherIndexes>
 		friend struct Swizzle;
 	public:
 		operator Target() const {
