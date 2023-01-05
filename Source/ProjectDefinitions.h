@@ -10,5 +10,14 @@
 	#define UE_LOG(...)
 #endif
 
+#define PER_MODULE_DEFINITION() \
+    REPLACEMENT_OPERATOR_NEW_AND_DELETE
+
 namespace FRAMEWORK {}
-using namespace FRAMEWORK;
+
+//Imports Framework to SH project.
+namespace SH
+{
+    using namespace FRAMEWORK;
+}
+

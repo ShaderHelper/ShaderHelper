@@ -1,6 +1,4 @@
 #pragma once
-#include "CommonHeader.h"
-
 namespace FRAMEWORK {
 	class PathHelper {
 	public:

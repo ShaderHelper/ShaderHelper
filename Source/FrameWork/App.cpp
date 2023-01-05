@@ -94,7 +94,7 @@ namespace FRAMEWORK {
 			FSlateApplication::Get().AddWindow(AppWindow.ToSharedRef());
 		}
 		else {
-			FSlateApplication::Get().AddWindow(SNew(SWindow));
+            FSlateApplication::Get().AddWindow(SNew(SWindow).ClientSize(DefaultClientSize));
 		}
 #endif
 	}

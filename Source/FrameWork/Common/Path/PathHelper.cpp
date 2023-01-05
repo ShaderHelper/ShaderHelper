@@ -4,7 +4,7 @@
 namespace FRAMEWORK {
 	FString PathHelper::ProjectDir()
 	{
-		FString RetDir = FString(FPlatformProcess::BaseDir()) + TEXT("../");
+		FString RetDir = FString(FPlatformProcess::BaseDir()) + TEXT("../../");
 		FPaths::CollapseRelativeDirectories(RetDir);
 		return RetDir;
 	}

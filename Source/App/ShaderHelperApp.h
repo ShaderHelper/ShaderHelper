@@ -1,5 +1,4 @@
 #pragma once
-#include "CommonHeader.h"
 #include "FrameWork/App.h"
 namespace SH {
 	

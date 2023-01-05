@@ -1,5 +1,7 @@
-.vs/
 Intermediate/
+
+# Win
+.vs/
 
 *.exe
 *.pdb
@@ -11,3 +13,10 @@ Intermediate/
 *.vcxproj
 
 *.sln
+
+# Mac
+*.xcodeproj
+*.xcworkspace
+*.app
+*.dSYM
+*.DS_Store

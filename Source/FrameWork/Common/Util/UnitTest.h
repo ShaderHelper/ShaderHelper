@@ -1,7 +1,5 @@
 #pragma once
-#include "CommonHeader.h"
 #if UNIT_TEST
-
 namespace FRAMEWORK {
 	class UnitTest {
 	public:
