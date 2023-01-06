@@ -12,8 +12,11 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
-    
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, windows-2019]
+        
     steps:
       - uses: actions/checkout@v3
 
@@ -42,3 +45,4 @@ jobs:
             Binaries/Win64/
             Resource/
             !Binaries/Win64/*.pdb
+            External/UE/Shader/D3D/
