@@ -17,6 +17,8 @@ jobs:
       matrix:
         os: [windows-latest, windows-2019]
         
+    name: ${{ matrix.os == 'windows-latest' && 'Windows(vs2022)' || matrix.os == 'windows-2019' && 'Windows(vs2019)' }}
+        
     steps:
       - uses: actions/checkout@v3
 
