@@ -2,7 +2,8 @@
 
 This is a lightweight shader editor based on some special Modules from UnrealEngine (Slate, ImageWrapper ...).
 
-![Editor Screenshot](./ScreenShot/App.png)
+<p align="center">
+<img src="https://github.com/mxrhyx233/ShaderHelper/blob/main/ScreenShot/App.png" width="640" height="360">
 
 ## Features
 
@@ -19,9 +20,11 @@ This is a lightweight shader editor based on some special Modules from UnrealEng
 
 * 64-bit version of Windows 10
 * Visual studio 2019 or 2022
-- [x] Windows : Open the `.sln` file created after running `bootstrap.bat` and build the project.
+
+[![Windows](https://github.com/mxrhyx233/ShaderHelper/actions/workflows/Windows.yml/badge.svg)]((https://github.com/mxrhyx233/ShaderHelper/actions/workflows/Windows.yml)) : Open the `.sln` file created after running `bootstrap.bat` and build the project.
 
 ### MacOS Requirements
 * 10.15 system version at least
 * Xcode
-- [x] MacOS : Open the `.xcworkspace` file created after running `bootstrap.command` and build the project.
+
+[![MacOS](https://github.com/mxrhyx233/ShaderHelper/actions/workflows/MacOS.yml/badge.svg)]((https://github.com/mxrhyx233/ShaderHelper/actions/workflows/MacOS.yml)) : Open the `.xcworkspace` file created after running `bootstrap.command` and build the project.
