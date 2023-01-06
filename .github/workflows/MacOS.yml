@@ -1,0 +1,45 @@
+name: MacOS
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macOS-latest, macos-10.15]
+    
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Premake
+        uses: abel0b/setup-premake@v2.2
+        with:
+          version: "5.0.0-beta1"
+
+      - name: Generate Project
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: bootstrap.command
+        shell: sh
+
+      - name: Build solution
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: xcodebuild build -project ShaderHelper.xcodeproj -scheme ShaderHelper -configuration Debug -sdk macosx
+        
+      - name: Upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: ShaderHelper-artifact(${{ matrix.os }})
+          path: |
+            Binaries/Mac/
+            Resource/
+            !Binaries/Mac/*.dSYM
+            External/UE/Shader/OpenGL/
