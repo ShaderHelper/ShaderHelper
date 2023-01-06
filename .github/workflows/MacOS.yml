@@ -34,12 +34,12 @@ jobs:
         working-directory: ${{env.GITHUB_WORKSPACE}}
         run: xcodebuild build -project ShaderHelper.xcodeproj -scheme ShaderHelper -configuration Debug -sdk macosx
         
-      - name: Upload
-        uses: actions/upload-artifact@v3
-        with:
-          name: ShaderHelper-artifact(${{ matrix.os }})
-          path: |
-            Binaries/Mac/
-            Resource/
-            !Binaries/Mac/*.dSYM
-            External/UE/Shader/OpenGL/
+#       - name: Upload
+#         uses: actions/upload-artifact@v3
+#         with:
+#           name: ShaderHelper-artifact(${{ matrix.os }})
+#           path: |
+#             Binaries/Mac/
+#             Resource/
+#             !Binaries/Mac/*.dSYM
+#             External/UE/Shader/OpenGL/
