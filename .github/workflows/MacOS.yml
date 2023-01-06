@@ -27,7 +27,7 @@ jobs:
 
       - name: Generate Project
         working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: bootstrap.command
+        run: ./bootstrap.command
         shell: sh
 
       - name: Build solution
