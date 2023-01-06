@@ -24,7 +24,9 @@ jobs:
 
       - name: Generate Project
         working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: bootstrap.bat
+        run: |
+          shell: cmd
+          bootstrap.bat
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v1.0.2
