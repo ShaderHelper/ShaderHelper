@@ -33,3 +33,12 @@ jobs:
       - name: Build solution
         working-directory: ${{env.GITHUB_WORKSPACE}}
         run: msbuild /m /p:Configuration=Debug ShaderHelper.sln
+        
+      - name: Upload
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ShaderHelper-artifact
+          path: |
+            Binaries/Win64/
+            Resource/
+            !Binaries/Win64/*.pdb
