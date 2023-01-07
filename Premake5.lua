@@ -88,12 +88,6 @@ project "ShaderHelper"
             "/utf-8",
             "/GR-",  
         }
-        removefiles 
-        {
-            "Source/FrameWork/GpuApi/Mac/**.cpp",
-            "Source/FrameWork/GpuApi/Mac/**.h",
-            "Source/Launch/MacMain.cpp",
-        }
         files 
         {
             "External/UE/Unreal.natvis",
@@ -130,12 +124,6 @@ project "ShaderHelper"
     filter "system:macosx"
         targetdir ("Binaries/Mac")
         --pchheader "Source/CommonHeader.h"
-        removefiles 
-        {
-            "Source/FrameWork/GpuApi/Win/**.cpp",
-            "Source/FrameWork/GpuApi/Win/**.h",
-            "Source/Launch/WinMain.cpp",
-        }
         files
         {
             "External/UE/Include/UnrealDefinitionsMac.h",
@@ -176,6 +164,11 @@ project "ShaderHelper"
         }
         xcodebuildsettings { ["MACOSX_DEPLOYMENT_TARGET"] = "10.15" }
 
+    filter {"system:macosx","files:**/Win/*.cpp"}
+        flags {"ExcludeFromBuild"}
+
+    filter {"system:windows","files:**/Mac/*.cpp"}
+        flags {"ExcludeFromBuild"}
         
     filter {"configurations:Debug"}
         optimize "Off"
