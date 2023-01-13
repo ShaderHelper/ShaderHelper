@@ -11,28 +11,11 @@ namespace TEST
 {
     template<int N,typename T = int>
     struct UnitTmp {
-        T Val = 0;
         void Run(const FString& ss) {
-            TEST_LOG(LogTestUtil, Display, TEXT("TestRunCaseWithInt: %d"), N + Val);
+            TEST_LOG(LogTestUtil, Display, TEXT("TestRunCaseWithInt: %d"), N);
             TEST_LOG(LogTestUtil, Display, TEXT("TestRunCaseWithInt: %s"), *ss);
         }
     };
-    template<int N>
-    void UnitTmp2() {
-        TEST_LOG(LogTestUtil, Display, TEXT("TestRunCaseWithInt: %d"), N);
-    }
-
-    template<int N, typename T>
-    struct Functor {
-        int operator()(FString&& ss, int vv) {
-            UnitTmp2<N>();
-            auto t = UnitTmp<N,T>();
-            t.Val = 1 + vv;
-            t.Run(ss);
-            return t.Val;
-        }
-    };
-
     
     template<typename T, T... Seq>
     void TestSeq(TIntegerSequence<T, Seq...>) {
@@ -127,7 +110,7 @@ namespace TEST
 
         //Test Seq
         {
-            TestSeq(AUX::MakeRangeIntegerSequence<uint32, 0, 2>{});
+            TestSeq(AUX::MakeRangeIntegerSequence<-2,2>{});
             //Avoid the following code:
             // template<typename T>
             // void SomeFunction()
@@ -147,9 +130,12 @@ namespace TEST
             //	}
             // }
 
-            int VarFromFile = 62;
-            int v = AUX::RunCaseWithInt<2, 64, Functor, int /*T*/>(VarFromFile, TEXT("String"), 11);
-            TEST_LOG(LogTestUtil, Display, TEXT("TestRunCaseWithInt: %d"), v);
+            int VarFromFile = -12;
+			FString str = "114514";
+			RUNCASE_WITHINT(VarFromFile, -256, 256,
+				TEST_LOG(LogTestUtil, Display, TEXT("---------------TestRunCaseWithInt---------------"));
+				UnitTmp<VarFromFile>{}.Run(str);
+			)
         }
     
         //Test observableUniquePtr

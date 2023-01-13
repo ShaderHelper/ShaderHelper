@@ -106,61 +106,45 @@ namespace AUX
         }
     }
 
-    template<typename T, int32 Min, T Cur, T... Seq>
+    template<int Min, int... Seq>
     struct RangeIntegerSequenceImpl {
-        struct LazyInitIntSeq {
-            using Type = TIntegerSequence<T, Cur, Seq...>;
-        };
-        struct LazyInitRangeIntSeq {
-            using Type = typename RangeIntegerSequenceImpl<T, Min, Seq...>::Type;
-        };
-        using Type = typename TChooseClass< Cur >= Min, LazyInitIntSeq, LazyInitRangeIntSeq >::Result::Type;
+		using Type = TIntegerSequence<int, (Seq + Min)...>;
     };
 
-    template<typename T, int32 Min, typename Seq>
+    template<int Min, typename Seq>
     struct RangeIntegerSequence;
 
-    template<typename T, int32 Min, T... Seq>
-    struct RangeIntegerSequence<T, Min, TIntegerSequence<T, Seq...>> {
-        static_assert(Min >= 0 && Min <= sizeof...(Seq) - 1, "Min must greater than 0 and less than Max");
-        using Type = typename RangeIntegerSequenceImpl<T, Min, Seq...>::Type;
+    template<int Min, int... Seq>
+    struct RangeIntegerSequence<Min, TIntegerSequence<int, Seq...>> {
+        static_assert(sizeof...(Seq) > 0, "Min must be less than Max");
+        using Type = typename RangeIntegerSequenceImpl<Min, Seq...>::Type;
     };
     
-    //Make TIntegerSequence[min,max], 0 <= min <= max
-    template<typename T,int32 Min, int32 Max>
-    using MakeRangeIntegerSequence = typename RangeIntegerSequence<T, Min, TMakeIntegerSequence<T, Max + 1>>::Type;
+    //Make TIntegerSequence[min,max]
+    template<int Min, int Max>
+    using MakeRangeIntegerSequence = typename RangeIntegerSequence<Min, TMakeIntegerSequence<int, Max - Min + 1>>::Type;
 
     //Pass a run-time integer with known range to template
-    //You need to move invocation to a function object.
-    template<template<int, typename...> typename Caller, typename T, typename... ExtraType>
-    struct RunCaseWithIntImpl;
-
-    template<template<int, typename...> typename Caller, typename T, T... Seq, typename... ExtraType>
-    struct RunCaseWithIntImpl<Caller, TIntegerSequence<T, Seq...>, ExtraType...> {
-        template<typename... Args>
-        static decltype(auto) Invoke(int val, Args&&... args) {
-            return Iter<Seq...>(val, std::forward<Args>(args)...);
-        }
-        template<int x, int... SubSeq, typename... Args>
-        static decltype(auto) Iter(int val, Args&&... args) {
-            if (val == x) {
-                //Caller<x>.operator() returns Caller<x>, which is not supported.
-                return Caller<x, ExtraType...>{}(std::forward<Args>(args)...);
-            }
-            else if constexpr (sizeof...(SubSeq) > 0) {
-                return Iter<SubSeq...>(val, std::forward<Args>(args)...);
-            }
-            //C4715 Warning
-            check(false);
-            return Caller<x, ExtraType...>{}(std::forward<Args>(args)...);
-        }
-    };
-
-    template<int Min, int Max, template<int, typename...> typename Caller, typename... ExtraType, typename... Args>
-    decltype(auto) RunCaseWithInt(int val, Args&&... args) {
-        checkf(val >= Min && val <= Max, TEXT("val must be [Min,Max]"));
-        return RunCaseWithIntImpl<Caller, MakeRangeIntegerSequence<int,Min,Max>, ExtraType...>::Invoke(val, std::forward<Args>(args)...);
+    template<typename Func, int... Seq>
+   void RunCaseWithInt(int Var, const Func& func, TIntegerSequence<int, Seq...>) {
+	   (func(Var, std::integral_constant<int, Seq>{}), ...);
     }
-    
+
+#define RUNCASE_WITHINT_IMPL(LambName,VarToken,Min,Max,...)		\
+	checkf(VarToken >= Min && VarToken <= Max, TEXT("%s must be [%d,%d]"), *FString(#VarToken), Min, Max);		\
+	auto LambName = [&](int Var, auto&& t) {		\
+		using RawType = std::decay_t<decltype(t)>;		\
+		constexpr int VarToken = RawType::value;		\
+		if (VarToken == Var) {		\
+			##__VA_ARGS__		\
+		}		\
+	};		\
+	AUX::RunCaseWithInt(VarToken, LambName, AUX::MakeRangeIntegerSequence<Min, Max>{});
+
+#define RUNCASE_WITHINT(VarToken,Min,Max,...)	\
+	RUNCASE_WITHINT_IMPL(PREPROCESSOR_JOIN(Auto_Instance_,__COUNTER__),VarToken,Min,Max,__VA_ARGS__) 
+
+
+
 } // end AUX namespace
 } // end FRAMEWORK namespace
