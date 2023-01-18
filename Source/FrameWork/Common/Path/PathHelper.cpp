@@ -2,6 +2,7 @@
 #include "PathHelper.h"
 
 namespace FRAMEWORK {
+
 	FString PathHelper::ProjectDir()
 	{
 		FString RetDir = FString(FPlatformProcess::BaseDir()) + TEXT("../../");
@@ -18,5 +19,6 @@ namespace FRAMEWORK {
 	{
 		return ProjectDir() / TEXT("External/");
 	}
+	
 }
 

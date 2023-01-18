@@ -2,16 +2,8 @@
 #include "ShaderHelperApp.h"
 #include "UI/FShaderHelperStyle.h"
 #include "UI/SShaderHelperWindow.h"
-#include "Tests/Test.h"
-#include "FrameWork/Common/Util/UnitTest.h"
 
 namespace SH {
-#if UNIT_TEST
-	static void UnitTestInit() {
-		UnitTest::Register(FName("Util"), TEST::TestUtil);
-	}
-#endif
-	
 	ShaderHelperApp::ShaderHelperApp(const TCHAR* CommandLine)
 		:App(CommandLine)
 	{
@@ -26,9 +18,6 @@ namespace SH {
 
 	void ShaderHelperApp::PostInit()
 	{
-#if UNIT_TEST
-		UnitTestInit();
-#endif
 		SAssignNew(AppWindow, SShaderHelperWindow);
 		App::PostInit();
 	}
