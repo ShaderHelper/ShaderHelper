@@ -1,112 +1,70 @@
+include "Premake/Custom.lua"
+
 workspace "ShaderHelper"  
-    architecture "x64"
+    architecture "x64"    
     configurations 
     { 
         "Debug",
         "Dev"
     } 
 
-UE_BaseIncludeDir = {
-    Core = "External/UE/Include/Core",
-    TraceLog = "External/UE/Include/TraceLog",
-    ApplicationCore = "External/UE/Include/ApplicationCore",
-    Slate = "External/UE/Include/Slate",
-    InputCore = "External/UE/Include/InputCore",
-    StandaloneRenderer = "External/UE/Include/StandaloneRenderer",
-    CoreUObject = "External/UE/Include/CoreUObject",
-    SlateCore = "External/UE/Include/SlateCore",
-    Json = "External/UE/Include/Json",
-    ImageWrapper = "External/UE/Include/ImageWrapper",
-}
-
-UE_UHTIncludeDir = {
-    InputCore = "External/UE/Include/InputCore/UHT",
-    Slate = "External/UE/Include/Slate/UHT",
-    CoreUObject = "External/UE/Include/CoreUObject/UHT",
-    SlateCore = "External/UE/Include/SlateCore/UHT",
-}
-
-ShaderHelperHierarchy = {
-    ["Sources/*"] = {"Source/**.h","Source/**.cpp"},
-    ["External/UE"] = { "External/UE/Include/SharedPCH.h" },
-}
-
-project "ShaderHelper"
-    kind "WindowedApp"   
-    targetname "ShaderHelper-%{cfg.buildcfg}"
+    targetname "%{prj.name}-%{cfg.buildcfg}"
     language "C++"
     cppdialect "C++17"
     staticruntime "off"
     exceptionhandling "off"
 
-    objdir ("Intermediate")
+    objdir ("Intermediate/%{prj.name}")
 
-    vpaths(ShaderHelperHierarchy)
-
-    files 
-    { 
-        "Source/**.h", 
-        "Source/**.cpp",
-        "External/UE/Include/SharedPCH.h",
-    }
-    
-    includedirs
-    {
-        "Source",
-    }
-
-    externalincludedirs
-    {
-        "External/UE/Include",
-        "%{UE_BaseIncludeDir.Core}",
-        "%{UE_BaseIncludeDir.TraceLog}",
-        "%{UE_BaseIncludeDir.ApplicationCore}",
-        "%{UE_BaseIncludeDir.Slate}",
-        "%{UE_BaseIncludeDir.InputCore}",
-        "%{UE_BaseIncludeDir.StandaloneRenderer}",
-        "%{UE_BaseIncludeDir.CoreUObject}",
-        "%{UE_BaseIncludeDir.SlateCore}",
-        "%{UE_BaseIncludeDir.Json}",
-        "%{UE_BaseIncludeDir.ImageWrapper}",
-
-        "%{UE_UHTIncludeDir.InputCore}",
-        "%{UE_UHTIncludeDir.Slate}",
-        "%{UE_UHTIncludeDir.CoreUObject}",
-        "%{UE_UHTIncludeDir.SlateCore}",
-    }
-  
+    symbols "On"
 
     filter "system:windows"
         systemversion "latest"
         runtime "Release"
-        symbols "On"
         targetdir ("Binaries/Win64")
-        pchheader "CommonHeader.h"
-        pchsource "Source/CommonHeader.cpp"
+        implibdir ("%{cfg.objdir}/%{cfg.buildcfg}")
+        files {
+            "External/UE/Unreal.natvis",
+        }
+        vpaths {
+            ["Visualizers"] = { "External/UE/Unreal.natvis"},
+        }
         buildoptions 
         { 
             "/utf-8",
             "/GR-",  
         }
-        files 
-        {
-            "External/UE/Unreal.natvis",
-            "Resource/ExeIcon/Windows/*",
-            "External/UE/Include/UnrealDefinitionsWin.h",
-        }
-        vpaths
-        {
-            ["Resource/*"] = {"Resource/ExeIcon/Windows/*"},
-            ["External/UE/Visualizers"] = { "External/UE/Unreal.natvis"},
-            ["External/UE"] = { "External/UE/Include/UnrealDefinitionsWin.h" },
-        }
-        libdirs
-        {
-            "External/UE/Lib",
-        }
         defines 
         {
             "NDEBUG",
+        }
+
+    filter "system:macosx"
+        targetdir ("Binaries/Mac")
+        xcodebuildsettings { ["MACOSX_DEPLOYMENT_TARGET"] = "10.15" }
+        runpathdirs {
+            "%{cfg.targetdir}",
+            "%{cfg.targetdir}/../../../ "
+        }
+
+    filter {"system:macosx","files:**/Win/*.cpp"}
+        flags {"ExcludeFromBuild"}
+
+    filter {"system:windows","files:**/Mac/*.cpp"}
+        flags {"ExcludeFromBuild"}
+
+    filter {"configurations:Debug"}
+        optimize "Off"
+    
+    filter {"configurations:Dev"}
+		optimize "On"
+
+usage "UE"
+    GenerateIncludeDir_UE()
+    filter "system:windows"
+        libdirs
+        {
+            "External/UE/Lib",
         }
         links
         {
@@ -119,23 +77,9 @@ project "ShaderHelper"
             "UE-ImageWrapper",
             "UE-CoreUObject"
         }
-    
-    
     filter "system:macosx"
-        targetdir ("Binaries/Mac")
-        --pchheader "Source/CommonHeader.h"
-        files
+        links 
         {
-            "External/UE/Include/UnrealDefinitionsMac.h",
-            "Resource/ExeIcon/Mac/*",
-        }
-        vpaths
-        {
-            ["External/UE"] = { 
-                "External/UE/Include/UnrealDefinitionsMac.h",
-            },
-        }
-        links {
             "Cocoa.framework",
             "Metal.framework",
             "OpenGL.framework",
@@ -154,25 +98,16 @@ project "ShaderHelper"
             "%{cfg.targetdir}/UE-ImageWrapper.dylib",
             "%{cfg.targetdir}/UE-CoreUObject.dylib"
         }
-        runpathdirs {
-            "%{cfg.targetdir}",
-            "%{cfg.targetdir}/../../../ "
-        }
         buildoptions { 
             "-x objective-c++",
             "-fno-rtti", --UE modules disable rtti
         }
-        xcodebuildsettings { ["MACOSX_DEPLOYMENT_TARGET"] = "10.15" }
 
-    filter {"system:macosx","files:**/Win/*.cpp"}
-        flags {"ExcludeFromBuild"}
+project_ShaderHelper = "Source/ShaderHelper"
+project_FrameWork = "Source/FrameWork"
+project_UnitTestFrameWork = "Source/Tests/UnitTestFrameWork"
 
-    filter {"system:windows","files:**/Mac/*.cpp"}
-        flags {"ExcludeFromBuild"}
-        
-    filter {"configurations:Debug"}
-        optimize "Off"
-        
-
-    filter {"configurations:Dev"}
-        symbols "On"
+include(project_ShaderHelper)
+include(project_FrameWork)
+group("Tests")
+include(project_UnitTestFrameWork)

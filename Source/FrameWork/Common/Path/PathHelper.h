@@ -1,6 +1,6 @@
 #pragma once
 namespace FRAMEWORK {
-	class PathHelper {
+	class FRAMEWORK_API PathHelper {
 	public:
 		static FString ProjectDir();
 		static FString ResourceDir();

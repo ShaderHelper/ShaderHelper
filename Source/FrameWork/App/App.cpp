@@ -7,22 +7,23 @@
 
 #include <SlateCore/Fonts/SlateFontInfo.h>
 #include <Misc/OutputDeviceConsole.h>
-#include "Common/Util/UnitTest.h"
 
-static TUniquePtr<FOutputDeviceConsole>	GScopedLogConsole;
+namespace FRAMEWORK {
 
-namespace {
-	void UE_Init() {
-#if UNIT_TEST
-		GScopedLogConsole = TUniquePtr<FOutputDeviceConsole>(FPlatformApplicationMisc::CreateConsoleOutputDevice());
-		GLogConsole = GScopedLogConsole.Get();
-#endif
+	static TUniquePtr<FOutputDeviceConsole>	GScopedLogConsole;
+
+	void App::UE_Init() {
+		if (bEnableConsoleOutput) {
+			GScopedLogConsole = TUniquePtr<FOutputDeviceConsole>(FPlatformApplicationMisc::CreateConsoleOutputDevice());
+			GLogConsole = GScopedLogConsole.Get();
+		}
+
 		//Initializing OutputDevices for features like UE_LOG.
 		FPlatformOutputDevices::SetupOutputDevices();
 
 		FTaskGraphInterface::Startup(FPlatformMisc::NumberOfCores());
 
-		//Some interfaces with uobject in slate module depend on CoreUobject module.
+		//Some interfaces with uobject in slate module depend on the CoreUobject module.
 		FModuleManager::Get().LoadModule(TEXT("CoreUObject"));
 
 		FPlatformMisc::PlatformPreInit();
@@ -46,7 +47,7 @@ namespace {
 
 	}
 
-	void UE_ShutDown() {
+	void App::UE_ShutDown() {
 		FCoreDelegates::OnPreExit.Broadcast();
 		FCoreDelegates::OnExit.Broadcast();
 		FSlateApplication::Shutdown();
@@ -62,14 +63,11 @@ namespace {
 		}
 	}
 
-	void UE_Update() {
+	void App::UE_Update() {
 		BeginExitIfRequested();
 		FSlateApplication::Get().PumpMessages();
 		FSlateApplication::Get().Tick();
 	}
-}
-
-namespace FRAMEWORK {
 
 	App::App(const TCHAR* CommandLine)
 	{
@@ -83,20 +81,11 @@ namespace FRAMEWORK {
 
 	void App::PostInit()
 	{
-#if UNIT_TEST
-		if (GLogConsole) { GLogConsole->Show(true); }
-		FName TestName;
-		if (FParse::Value(FCommandLine::Get(), TEXT("UnitTest="), TestName)) {
-			UnitTest::Run(TestName);
-		}
-#else
+		if (bEnableConsoleOutput && GLogConsole) { GLogConsole->Show(true); }
+
 		if (AppWindow.IsValid()) {
 			FSlateApplication::Get().AddWindow(AppWindow.ToSharedRef());
 		}
-		else {
-            FSlateApplication::Get().AddWindow(SNew(SWindow).ClientSize(DefaultClientSize));
-		}
-#endif
 	}
 
 	void App::ShutDown()

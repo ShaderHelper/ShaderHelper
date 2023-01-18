@@ -87,6 +87,7 @@ namespace FRAMEWORK {
 		using UE_Vector = UE::Math::TVector2<T>;
 		union
 		{
+			//Working UB
 			struct
 			{
 				T X, Y;
@@ -191,6 +192,7 @@ namespace FRAMEWORK {
 		}
 
 		T operator[](uint32 Index) const {
+			//Maybe break strict-aliasing rule?
 			return *(reinterpret_cast<const T*>(this) + Index);
 		}
 

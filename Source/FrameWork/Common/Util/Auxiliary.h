@@ -1,17 +1,18 @@
 #pragma once
+#include <Misc/GeneratedTypeName.h>
 namespace FRAMEWORK
 {
 namespace AUX
 {
 		
-    //Support arithmetic operations on two objects with subscript operator via TIntegerSequence.
+    //Support Arithmetic operations on two objects that have the subscript operator via the parameter pack provided by TIntegerSequence
     template<typename LeftSeq, typename RightSeq>
     struct Op;
 
     template<uint32 ... LeftIndexes, uint32 ... RightIndexes>
     struct Op<TIntegerSequence<uint32, LeftIndexes...>, TIntegerSequence<uint32, RightIndexes...>> {
 
-        static_assert(sizeof...(LeftIndexes) == sizeof...(RightIndexes), "Op just support same size sequence.");
+        static_assert(sizeof...(LeftIndexes) == sizeof...(RightIndexes), "Op just supports the same size sequence.");
         
         template<typename RetType, typename LType, typename RType>
         static RetType Sum(LType& lhs, RType& rhs) { return RetType(lhs[LeftIndexes] + rhs[RightIndexes]...); }
@@ -124,26 +125,44 @@ namespace AUX
     template<int Min, int Max>
     using MakeRangeIntegerSequence = typename RangeIntegerSequence<Min, TMakeIntegerSequence<int, Max - Min + 1>>::Type;
 
-    //Pass a run-time integer with known range to template
     template<typename Func, int... Seq>
    void RunCaseWithInt(int Var, const Func& func, TIntegerSequence<int, Seq...>) {
-	   (func(Var, std::integral_constant<int, Seq>{}), ...);
+	   (func(Var,std::integral_constant<int, Seq>{}), ...);
     }
 
 #define RUNCASE_WITHINT_IMPL(LambName,VarToken,Min,Max,...)		\
 	checkf(VarToken >= Min && VarToken <= Max, TEXT("%s must be [%d,%d]"), *FString(#VarToken), Min, Max);		\
 	auto LambName = [&](int Var, auto&& t) {		\
-		using RawType = std::decay_t<decltype(t)>;		\
-		constexpr int VarToken = RawType::value;		\
+		constexpr int VarToken = t.value;		\
 		if (VarToken == Var) {		\
 			##__VA_ARGS__		\
 		}		\
 	};		\
 	AUX::RunCaseWithInt(VarToken, LambName, AUX::MakeRangeIntegerSequence<Min, Max>{});
 
+   //Pass a run-time integer with known small range to template
+   //* The large range will lead to code explosion, please carefully choose the range.
+   //* `VarToken` must be a variable name rather than a complex expression. 
+   //	Example: 
+   //	int Var = xxx; RUNCASE_WITHINT(Var,...) (√) 
+   //	struct A{static int Var;} RUNCASE_WITHINT(A::Var,...) (×)
+   //	struct A{static int Var;} int Var = A::Var; RUNCASE_WITHINT(Var,...) (√) 
 #define RUNCASE_WITHINT(VarToken,Min,Max,...)	\
 	RUNCASE_WITHINT_IMPL(PREPROCESSOR_JOIN(Auto_Instance_,__COUNTER__),VarToken,Min,Max,__VA_ARGS__) 
+	
 
+	template<typename T>
+	struct TTypename {
+		static inline FString Value = GetGeneratedTypeName<T>();
+	};
+
+	//Returns a FString that stores the type name from pointer or object. (As an alternative to rtti)
+	//Its result is not the same on different platforms, so it should not be saved but just used as a key value.
+	template<typename T>
+	FString TypeId(const T& Var) {
+		using BaseType = std::remove_cv_t<std::remove_pointer_t<T>>;
+		return TTypename<BaseType>::Value;
+	}
 
 
 } // end AUX namespace

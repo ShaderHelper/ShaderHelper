@@ -1,6 +1,6 @@
 #pragma once
 namespace FRAMEWORK {
-	class App : public FNoncopyable
+	class FRAMEWORK_API App : public FNoncopyable
 	{
 	public:
 		App(const TCHAR* CommandLine);
@@ -36,6 +36,12 @@ namespace FRAMEWORK {
 		static void SetFixedDeltaTime(double InFixedDeltaTime) {
 			FixedDeltaTime = InFixedDeltaTime;
 		}
+
+	private:
+		void UE_Init();
+		void UE_ShutDown();
+		void UE_Update();
+
 	public:
 		static inline const FVector2D DefaultClientSize = FVector2D(1280, 720);
 
@@ -45,6 +51,9 @@ namespace FRAMEWORK {
 		static inline double CurrentTime = 0.0;
 		static inline double DeltaTime = 1 / 30;
 		static inline double FixedDeltaTime = 1 / 30;
+
+		bool bEnableConsoleOutput = false;
+		
 	};
 }
 
