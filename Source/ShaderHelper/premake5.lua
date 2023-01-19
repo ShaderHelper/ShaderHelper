@@ -21,11 +21,11 @@ project "ShaderHelper"
 	}
 
     filter "system:windows"
-        files {"%{_WORKING_DIR}/Resource/ExeIcon/Windows/*"}
-        vpaths {["Resources"] = "%{_WORKING_DIR}/Resource/ExeIcon/Windows/*"}
+        files {"%{_WORKING_DIR}/Resource/Misc/Windows/*"}
+        vpaths {["Resources"] = "%{_WORKING_DIR}/Resource/Misc/Windows/*"}
         pchheader "CommonHeader.h"
         pchsource "CommonHeader.cpp"
 
     filter "system:macosx"
-        files {"%{_WORKING_DIR}/Resource/ExeIcon/Mac/*"}
-        vpaths {["Resources"] = "%{_WORKING_DIR}/Resource/ExeIcon/Mac/*"}
+        files {"%{_WORKING_DIR}/Resource/Misc/Mac/*"}
+        vpaths {["Resources"] = "%{_WORKING_DIR}/Resource/Misc/Mac/*"}
