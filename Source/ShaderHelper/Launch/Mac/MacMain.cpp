@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "App/ShaderHelperApp.h"
+#include <Mac/CocoaThread.h>
 //Ensures the consistency of memory allocation between current project and UE modules.
 PER_MODULE_DEFINITION()
 
@@ -9,11 +10,29 @@ static FString GSavedCommandLine;
 @end
 
 @implementation AppDelegate
--(void)applicationDidFinishLaunching:(NSNotification *)notification
+-(void)run:(id)Arg
 {
     SH::ShaderHelperApp app(*GSavedCommandLine);
     app.Run();
     [NSApp terminate:self];
+}
+
+-(void)applicationDidFinishLaunching:(NSNotification *)notification
+{
+    RunGameThread(self, @selector(run:));
+}
+
+- (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)Sender;
+{
+    if(!IsEngineExitRequested() || ([NSThread gameThread] && [NSThread gameThread] != [NSThread mainThread]))
+    {
+        RequestEngineExit(TEXT("applicationShouldTerminate"));
+        return NSTerminateLater;
+    }
+    else
+    {
+        return NSTerminateNow;
+    }
 }
 @end
 

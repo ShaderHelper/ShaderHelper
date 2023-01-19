@@ -133,9 +133,10 @@ namespace AUX
 #define RUNCASE_WITHINT_IMPL(LambName,VarToken,Min,Max,...)		\
 	checkf(VarToken >= Min && VarToken <= Max, TEXT("%s must be [%d,%d]"), *FString(#VarToken), Min, Max);		\
 	auto LambName = [&](int Var, auto&& t) {		\
-		constexpr int VarToken = t.value;		\
+        using BaseType = std::remove_reference_t<decltype(t)>;      \
+		constexpr int VarToken = BaseType::value;		\
 		if (VarToken == Var) {		\
-			##__VA_ARGS__		\
+            __VA_ARGS__		\
 		}		\
 	};		\
 	AUX::RunCaseWithInt(VarToken, LambName, AUX::MakeRangeIntegerSequence<Min, Max>{});

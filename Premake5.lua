@@ -18,6 +18,8 @@ workspace "ShaderHelper"
 
     symbols "On"
 
+    startproject "ShaderHelper"
+
     filter "system:windows"
         systemversion "latest"
         runtime "Release"
@@ -46,6 +48,9 @@ workspace "ShaderHelper"
             "%{cfg.targetdir}",
             "%{cfg.targetdir}/../../../ "
         }
+
+    filter {"system:macosx","kind:SharedLib"}
+        xcodebuildsettings { ["DYLIB_INSTALL_NAME_BASE"] = "@rpath" }
 
     filter {"system:macosx","files:**/Win/*.cpp"}
         flags {"ExcludeFromBuild"}
