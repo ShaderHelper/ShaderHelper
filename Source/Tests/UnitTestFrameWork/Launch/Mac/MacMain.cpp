@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "App/UnitTestConSole.h"
+#include <Mac/CocoaThread.h>
 //Ensures the consistency of memory allocation between current project and UE modules.
 PER_MODULE_DEFINITION()
 
@@ -9,11 +10,42 @@ static FString GSavedCommandLine;
 @end
 
 @implementation AppDelegate
--(void)applicationDidFinishLaunching:(NSNotification *)notification
+-(void)run:(id)Arg
 {
-	UnitTestConSole app(*GSavedCommandLine);
+    FPlatformMisc::SetGracefulTerminationHandler();
+    FPlatformMisc::SetCrashHandler(nullptr);
+    
+    UnitTestConSole app(*GSavedCommandLine);
     app.Run();
     [NSApp terminate:self];
+}
+
+//handler for the quit apple event used by the Dock menu
+- (void)handleQuitEvent:(NSAppleEventDescriptor*)Event withReplyEvent:(NSAppleEventDescriptor*)ReplyEvent
+{
+    [NSApp terminate:self];
+}
+
+-(void)applicationDidFinishLaunching:(NSNotification *)notification
+{
+    //install the custom quit event handler
+    NSAppleEventManager* appleEventManager = [NSAppleEventManager sharedAppleEventManager];
+    [appleEventManager setEventHandler:self andSelector:@selector(handleQuitEvent:withReplyEvent:) forEventClass:kCoreEventClass andEventID:kAEQuitApplication];
+    
+    RunGameThread(self, @selector(run:));
+}
+
+- (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)Sender;
+{
+    if(!IsEngineExitRequested() || ([NSThread gameThread] && [NSThread gameThread] != [NSThread mainThread]))
+    {
+        RequestEngineExit(TEXT("applicationShouldTerminate"));
+        return NSTerminateLater;
+    }
+    else
+    {
+        return NSTerminateNow;
+    }
 }
 @end
 

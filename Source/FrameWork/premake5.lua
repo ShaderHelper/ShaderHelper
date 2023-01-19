@@ -6,9 +6,6 @@ project "FrameWork"
     kind "SharedLib"   
     location "%{_WORKING_DIR}/ProjectFiles"
 
-	pchheader "CommonHeader.h"
-	pchsource "CommonHeader.cpp"
-
     vpaths(FrameWorkHierarchy)
 
     files {seq(FrameWorkHierarchy)}
@@ -23,6 +20,10 @@ project "FrameWork"
 	}
 
     uses "UE"
+
+    filter "system:windows"
+        pchheader "CommonHeader.h"
+        pchsource "CommonHeader.cpp"
 
 usage "FrameWork"
 	defines {
