@@ -48,6 +48,11 @@ workspace "ShaderHelper"
             "%{cfg.targetdir}",
             "%{cfg.targetdir}/../../../ "
         }
+        buildoptions 
+        { 
+            "-fvisibility=hidden",
+            "-fvisibility-inlines-hidden",  
+        }
 
     filter {"system:macosx","kind:SharedLib"}
         xcodebuildsettings { ["DYLIB_INSTALL_NAME_BASE"] = "@rpath" }
