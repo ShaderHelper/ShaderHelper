@@ -122,9 +122,13 @@ namespace SH {
 			FText::GetEmpty(),
 			FNewMenuDelegate::CreateRaw(this, &SShaderHelperWindow::FillMenu, FString("Window"))
 		);
-
-
-		return MenuBarBuilder.MakeWidget();
+        
+        TSharedRef<SWidget> MenuWidget = MenuBarBuilder.MakeWidget();
+        //Add native menu bar for the window on mac.
+        TabManager->SetMenuMultiBox(MenuBarBuilder.GetMultiBox(), MenuWidget);
+        TabManager->UpdateMainMenu(nullptr, true);
+        
+        return MenuWidget;
 	}
 
 	void SShaderHelperWindow::FillMenu(FMenuBuilder& MenuBuilder, FString MenuName)
