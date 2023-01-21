@@ -45,9 +45,10 @@ private:
     static TLazySingleton& GetLazy(void(*Constructor)(void*))
     {
         auto& SingletonCS = FRAMEWORK::GetSingleTonCS();
+        FString TypeName = FRAMEWORK::AUX::TTypename<T>::Value;
+        auto& SharedInstanceMap = FRAMEWORK::GetSharedInstanceMap(TypeName);
         
         FScopeLock ScopeLock(&SingletonCS);
-        auto& SharedInstanceMap = FRAMEWORK::GetSharedInstanceMap(TypeName);
         FLazySingleton** SingleTon = SharedInstanceMap.Find(TypeName);
         if(!SingleTon) {
             static TLazySingleton StaticSingleton(Constructor);
@@ -57,7 +58,6 @@ private:
         return *static_cast<TLazySingleton*>(*SingleTon);
     }
 
-    static inline FString TypeName = FRAMEWORK::AUX::TTypename<T>::Value;
     alignas(T) unsigned char Data[sizeof(T)];
     T* Ptr;
 
