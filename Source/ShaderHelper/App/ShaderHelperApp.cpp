@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "ShaderHelperApp.h"
-#include "UI/FShaderHelperStyle.h"
-#include "UI/SShaderHelperWindow.h"
+#include "UI/Styles/FShaderHelperStyle.h"
+#include "UI/Widgets/SShaderHelperWindow.h"
 
 namespace SH {
 	ShaderHelperApp::ShaderHelperApp(const TCHAR* CommandLine)

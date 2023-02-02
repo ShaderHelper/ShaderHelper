@@ -1,5 +1,6 @@
 #pragma once
 #include <Misc/GeneratedTypeName.h>
+#include <array>
 namespace FRAMEWORK
 {
 namespace AUX
@@ -125,6 +126,32 @@ namespace AUX
     template<int Min, int Max>
     using MakeRangeIntegerSequence = typename RangeIntegerSequence<Min, TMakeIntegerSequence<int, Max - Min + 1>>::Type;
 
+	template<int Min, int Max, bool(*Pred)(int), int Size, int... Seq>
+	auto MakeIntegerSequeceByPredicateImpl(TIntegerSequence<int, Seq...>) {
+		constexpr auto arr = [] {
+			std::array<int, Size> arr{};
+			int index = 0;
+			for (int i = Min; i <= Max; ++i) {
+				if (Pred(i)) arr[index++] = i;
+			}
+			return arr;
+		}();
+		return TIntegerSequence<int, arr[Seq]...>{};
+	}
+
+	//Predicate must be constexpr.
+	template<int Min, int Max, bool(*Pred)(int)>
+	auto MakeIntegerSequeceByPredicate() {
+		constexpr int Size = [] {
+			int size = 0;
+			for (int i = Min; i <= Max; ++i) {
+				if (Pred(i)) size++;
+			}
+			return size;
+		}();
+		return MakeIntegerSequeceByPredicateImpl<Min, Max, Pred, Size>(TMakeIntegerSequence<int, Size>{});
+	}
+
     template<typename Func, int... Seq>
    void RunCaseWithInt(int Var, const Func& func, TIntegerSequence<int, Seq...>) {
 	   (func(Var,std::integral_constant<int, Seq>{}), ...);
@@ -143,7 +170,7 @@ namespace AUX
 
    //Pass a run-time integer with known small range to template
    //* The large range will lead to code explosion, please carefully choose the range.
-   //* `VarToken` must be a variable name rather than a complex expression. 
+   //* `VarToken` must be a simple variable name rather than a complex expression. 
    //	Example: 
    //	int Var = xxx; RUNCASE_WITHINT(Var,...) (√) 
    //	struct A{static int Var;} RUNCASE_WITHINT(A::Var,...) (×)
@@ -157,7 +184,7 @@ namespace AUX
 		static inline FString Value = GetGeneratedTypeName<T>();
 	};
 
-	//Returns a FString that stores the type name from pointer or object. (As an alternative to rtti)
+	//Returns a FString that stores the type name from pointer or object. (As an alternative to rtti, but just represents the static type name of the expression )
 	//Its result is not the same on different platforms, so it should not be saved but just used as a key value.
 	template<typename T>
 	FString TypeId(const T& Var) {

@@ -1,5 +1,5 @@
 #include "CommonHeader.h"
-#include "FrameWork/Common/Util/Container.h"
+#include "FrameWork/Common/Util/SwizzleVector.h"
 #include "FrameWork/Common/Util/Auxiliary.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTestUtil, Log, All);
@@ -143,6 +143,15 @@ void TestUtil()
 		Vector&& t = Vector{ 1,2,3 };
 		FString s = AUX::TypeId(t);
 		TEST_LOG(LogTestUtil, Display, TEXT("TestTypeID: %s"), *s);
+
+		constexpr auto Pred = [](int Val) {
+			for (int i = 2; i * i <= Val; ++i)
+			{
+				if (Val % i == 0) return false;
+			}
+			return true;
+		};
+		TestSeq(AUX::MakeIntegerSequeceByPredicate<10, 30, Pred>());
 	}
 		
 }

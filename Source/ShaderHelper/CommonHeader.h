@@ -9,7 +9,7 @@
 
 //Project Headers
 #include "ProjectDefinitions.h"
-#include "FrameWork/Common/Util/Container.h"
+#include "FrameWork/Common/Util/SwizzleVector.h"
 #include "FrameWork/Common/Util/Auxiliary.h"
 
 
