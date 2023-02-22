@@ -1,11 +1,12 @@
 #include "CommonHeader.h"
 #include "UnitTestConSole.h"
-
+#include "FrameWork/UI/Widgets/Log/SOutputLog.h"
+#include "FrameWork/UI/Styles/FAppCommonStyle.h"
 
 UnitTestConSole::UnitTestConSole(const TCHAR* CommandLine)
 	:App(CommandLine)
 {
-	bEnableConsoleOutput = true;
+	
 }
 
 void UnitTestConSole::Init()
@@ -13,9 +14,38 @@ void UnitTestConSole::Init()
 	App::Init();
 }
 
+void UnitTestConSole::InitLogWindow()
+{
+	auto SpawnLog = [](const FSpawnTabArgs&) -> TSharedRef<SDockTab>
+	{
+		return SNew(SDockTab)
+			.Label(FText::FromString("OutPutLog"))
+			[
+				SNew(SOutputLog)
+			];
+	};
+	FGlobalTabmanager::Get()->RegisterTabSpawner("LogTab", FOnSpawnTab::CreateLambda(SpawnLog));
+	
+	TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("UnitTestLayout")
+		->AddArea
+		(
+			FTabManager::NewArea(DefaultClientSize.X, DefaultClientSize.Y)
+			->Split
+			(
+				FTabManager::NewStack()
+				->AddTab("LogTab", ETabState::OpenedTab)
+			)
+		);
+		
+	FGlobalTabmanager::Get()->RestoreFrom(Layout, TSharedPtr<SWindow>());
+}
+
 void UnitTestConSole::PostInit()
 {
+	FAppCommonStyle::Init();
+	InitLogWindow();
 	App::PostInit();
+	
 	extern void TestUtil();
 	TestUtil();
 }

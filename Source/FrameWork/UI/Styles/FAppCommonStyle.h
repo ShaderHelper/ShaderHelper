@@ -2,7 +2,7 @@
 
 namespace FRAMEWORK
 {
-	class FAppCommonStyle
+	class FRAMEWORK_API FAppCommonStyle
 	{
 	public:
 		static void Init();

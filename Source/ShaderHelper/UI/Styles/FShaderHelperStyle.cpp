@@ -12,7 +12,8 @@ namespace SH {
 	void FShaderHelperStyle::Init()
 	{
 		if (!Instance.IsValid()) {
-			FSlateStyleRegistry::RegisterSlateStyle(*Create());
+			Instance = Create();
+			FSlateStyleRegistry::RegisterSlateStyle(Get());
 		}
 	}
 

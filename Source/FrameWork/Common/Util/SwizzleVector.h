@@ -88,6 +88,7 @@ namespace FRAMEWORK {
 		union
 		{
 			//Working UB
+			T Data[2];
 			struct
 			{
 				T X, Y;
@@ -171,11 +172,9 @@ namespace FRAMEWORK {
 		bool operator>=(const Vector2Impl& rhs) const {
 			return X >= rhs.X && Y >= rhs.Y;
 		}
-		bool operator==(const Vector2Impl& rhs) const {
-			return X == rhs.X && Y == rhs.Y;
-		}
-		bool operator!=(const Vector2Impl& rhs) const {
-			return X != rhs.X || Y != rhs.Y;
+
+		bool Equals(const Vector2Impl& rhs, T eps = std::numeric_limits<T>::epsilon()) const {
+			return FMath::Abs(X - rhs.X) < eps && FMath::Abs(Y - rhs.Y) < eps;
 		}
 
 		Vector2Impl operator*(T rhs) const {
@@ -191,9 +190,18 @@ namespace FRAMEWORK {
 			return Vector2Impl(X / rhs, Y / rhs);
 		}
 
-		T operator[](uint32 Index) const {
+		const T& operator[](uint32 Index) const {
 			//Maybe break strict-aliasing rule?
-			return *(reinterpret_cast<const T*>(this) + Index);
+			//Even if the msvc doesn't implement this "strict aliasing" optimization at present and we don't choose the gcc compiler
+			//follow the c++ standard as far as possible.
+			//return *(reinterpret_cast<const T*>(this) + Index);
+			checkf(Index >= 0 && Index < 2, TEXT("Invalid Index"));
+			return Data[Index];
+		}
+
+		T& operator[](uint32 Index) {
+			checkf(Index >= 0 && Index < 2, TEXT("Invalid Index"));
+			return Data[Index];
 		}
 
 		operator UE_Vector() {
@@ -211,6 +219,7 @@ namespace FRAMEWORK {
 		using UE_Vector = UE::Math::TVector<T>;
 		union
 		{
+			T Data[3];
 			struct
 			{
 				T X, Y, Z;
@@ -371,6 +380,10 @@ namespace FRAMEWORK {
 			return *this;
 		}
 
+		bool Equals(const VectorImpl& rhs, T eps = std::numeric_limits<T>::epsilon()) const {
+			return FMath::Abs(X - rhs.X) < eps && FMath::Abs(Y - rhs.Y) < eps && FMath::Abs(Z - rhs.Z) < eps;
+		}
+
 		bool operator<(const VectorImpl& rhs) const {
 			return X < rhs.X&& Y < rhs.Y&& Z < rhs.Z;
 		}
@@ -382,12 +395,6 @@ namespace FRAMEWORK {
 		}
 		bool operator>=(const VectorImpl& rhs) const {
 			return X >= rhs.X && Y >= rhs.Y && Z >= rhs.Z;
-		}
-		bool operator==(const VectorImpl& rhs) const {
-			return X == rhs.X && Y == rhs.Y && Z == rhs.Z;
-		}
-		bool operator!=(const VectorImpl& rhs) const {
-			return X != rhs.X || Y != rhs.Y || Z != rhs.Z;
 		}
 
 		VectorImpl operator*(T rhs) const {
@@ -403,8 +410,14 @@ namespace FRAMEWORK {
 			return VectorImpl(X / rhs, Y / rhs, Z / rhs);
 		}
 
-		T operator[](uint32 Index) const {
-			return *(reinterpret_cast<const T*>(this) + Index);
+		const T& operator[](uint32 Index) const {
+			checkf(Index >= 0 && Index < 3, TEXT("Invalid Index"));
+			return Data[Index];
+		}
+
+		T& operator[](uint32 Index) {
+			checkf(Index >= 0 && Index < 3, TEXT("Invalid Index"));
+			return Data[Index];
 		}
 
 		operator UE_Vector() {
@@ -422,6 +435,7 @@ namespace FRAMEWORK {
 		using UE_Vector = UE::Math::TVector4<T>;
 		union
 		{
+			T Data[4];
 			struct
 			{
 				T X, Y, Z, W;
@@ -813,11 +827,15 @@ namespace FRAMEWORK {
 		bool operator>=(const Vector4Impl& rhs) const {
 			return X >= rhs.X && Y >= rhs.Y && Z >= rhs.Z && W >= rhs.W;
 		}
-		bool operator==(const Vector4Impl& rhs) const {
-			return X == rhs.X && Y == rhs.Y && Z == rhs.Z && W == rhs.W;
-		}
-		bool operator!=(const Vector4Impl& rhs) const {
-			return X != rhs.X || Y != rhs.Y || Z != rhs.Z || W != rhs.W;
+		//bool operator==(const Vector4Impl& rhs) const {
+		//	return X == rhs.X && Y == rhs.Y && Z == rhs.Z && W == rhs.W;
+		//}
+		//bool operator!=(const Vector4Impl& rhs) const {
+		//	return X != rhs.X || Y != rhs.Y || Z != rhs.Z || W != rhs.W;
+		//}
+
+		bool Equals(const Vector4Impl& rhs, T eps = std::numeric_limits<T>::epsilon()) const {
+			return FMath::Abs(X - rhs.X) < eps && FMath::Abs(Y - rhs.Y) < eps && FMath::Abs(Z - rhs.Z) < eps && FMath::Abs(W - rhs.W) < eps;
 		}
 
 		Vector4Impl operator*(T rhs) const {
@@ -833,8 +851,14 @@ namespace FRAMEWORK {
 			return Vector4Impl(X / rhs, Y / rhs, Z / rhs, W / rhs);
 		}
 
-		T operator[](uint32 Index) const {
-			return *(reinterpret_cast<const T*>(this) + Index);
+		const T& operator[](uint32 Index) const {
+			checkf(Index >= 0 && Index < 4, TEXT("Invalid Index"));
+			return Data[Index];
+		}
+
+		T& operator[](uint32 Index) {
+			checkf(Index >= 0 && Index < 4, TEXT("Invalid Index"));
+			return Data[Index];
 		}
 
 		operator UE_Vector() {

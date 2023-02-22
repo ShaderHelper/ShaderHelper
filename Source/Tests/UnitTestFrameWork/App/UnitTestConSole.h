@@ -5,12 +5,13 @@ class UnitTestConSole : public App
 {
 public:
 	UnitTestConSole(const TCHAR* CommandLine);
-public:
+private:
+	void Init() override;
+	void ShutDown() override;
+	void PostInit() override;
+	void Update(double DeltaTime) override;
 
-	void Init();
-	void ShutDown();
-	void PostInit();
-	void Update(double DeltaTime);
+	void InitLogWindow();
 };
 	
 

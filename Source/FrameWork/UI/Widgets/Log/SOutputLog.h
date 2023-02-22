@@ -9,31 +9,42 @@ namespace FRAMEWORK
 	*/
 	struct FOutputLogMessage
 	{
-		TSharedRef<FString> Message;
+		TSharedPtr<FString> Message;
 		ELogVerbosity::Type Verbosity;
-		int8 CategoryStartIndex;
 		FName Category;
 		FName Style;
+	};
 
-		FOutputLogMessage(const TSharedRef<FString>& NewMessage, ELogVerbosity::Type NewVerbosity, FName NewCategory, FName NewStyle, int32 InCategoryStartIndex)
-			: Message(NewMessage)
-			, Verbosity(NewVerbosity)
-			, CategoryStartIndex((int8)InCategoryStartIndex)
-			, Category(NewCategory)
-			, Style(NewStyle)
-		{
-		}
+	struct FOutputLogFilter
+	{
+		void AddAvailableLogCategory(FName LogCategory);
+		bool IsMessageAllowed(const FOutputLogMessage& Message);
+
+		bool bShowLogs;
+		bool bShowWarnings;
+		bool bShowErrors;
+		bool bShowAllCategories;
+
+		TArray<FName> AvailableLogCategories;
+		TArray<FName> SelectedLogCategories;
 	};
 
 	class FOutputLogMarshaller : public FBaseTextLayoutMarshaller
 	{
 	public:
-		FOutputLogMarshaller();
-		~FOutputLogMarshaller();
+		FOutputLogMarshaller(FOutputLogFilter* InFilter);
 
 		virtual void SetText(const FString& SourceString, FTextLayout& TargetTextLayout) override;
 		virtual void GetText(FString& TargetString, const FTextLayout& SourceTextLayout) override;
-	private:
+
+		void AddMessage(FOutputLogMessage InMessage);
+		bool SubmitPendingMessages();
+		void AppendPendingMessagesToTextLayout();
+	protected:
+		int32 NextPendingMessageIndex;
+		TArray<FOutputLogMessage> Messages;
+		
+		FOutputLogFilter* Filter;
 		FTextLayout* TextLayout;
 	};
 
@@ -46,12 +57,28 @@ namespace FRAMEWORK
 		void Construct(const FArguments& InArgs);
 		void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 		
-		virtual void OnFilterTextChanged(const FText& InFilterText) override;
-		virtual void OnFilterTextCommitted(const FText& InFilterText, ETextCommit::Type InCommitType) override;
-		virtual TSharedRef<SWidget> MakeAddFilterMenu() override;
-		
+		void OnFilterTextChanged(const FText& InFilterText);
+		void OnFilterTextCommitted(const FText& InFilterText, ETextCommit::Type InCommitType);
+		TSharedRef<SWidget> MakeAddFilterMenu();
+		void MakeSelectCategoriesSubMenu(FMenuBuilder& MenuBuilder);
+
+		void VerbosityLogs_Execute();
+		bool VerbosityLogs_IsChecked() const;
+
+		void VerbosityWarnings_Execute();
+		bool VerbosityWarnings_IsChecked() const;
+
+		void VerbosityErrors_Execute();
+		bool VerbosityErrors_IsChecked() const;
+
+		void RequestForceScroll();
 	protected:
 		virtual void Serialize(const TCHAR* V, ELogVerbosity::Type Verbosity, const class FName& Category) override;
+	protected:
+		TSharedPtr<FOutputLogFilter> Filter;
+		TSharedPtr<SSearchBox> SearchBox;
+
+		bool bIsUserScrolled;
 	};
 }
 

@@ -10,14 +10,7 @@
 
 namespace FRAMEWORK {
 
-	static TUniquePtr<FOutputDeviceConsole>	GScopedLogConsole;
-
 	void App::UE_Init() {
-		if (bEnableConsoleOutput) {
-			GScopedLogConsole = TUniquePtr<FOutputDeviceConsole>(FPlatformApplicationMisc::CreateConsoleOutputDevice());
-			GLogConsole = GScopedLogConsole.Get();
-		}
-
 		//Initializing OutputDevices for features like UE_LOG.
 		FPlatformOutputDevices::SetupOutputDevices();
 
@@ -81,8 +74,6 @@ namespace FRAMEWORK {
 
 	void App::PostInit()
 	{
-		if (bEnableConsoleOutput && GLogConsole) { GLogConsole->Show(true); }
-
 		if (AppWindow.IsValid()) {
 			FSlateApplication::Get().AddWindow(AppWindow.ToSharedRef());
 		}
