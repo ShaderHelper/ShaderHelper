@@ -61,6 +61,12 @@ void TestUtil()
             (vec1 += 1) = { 3,3,3 };
             TEST_LOG(LogTestUtil, Display, TEXT("+=: (%s)."), *vec1.ToString());
         }
+
+		{
+			Vector tmp{ 1.233695,0,0};
+			Vector vec{ 1.233698,0,0 };
+			TEST_LOG(LogTestUtil, Display, TEXT("==: (%d,%d)."), tmp.Equals(vec), tmp.Equals(vec,1e-5));
+		}
     }
 
     //Test Swizzle
@@ -153,6 +159,6 @@ void TestUtil()
 		};
 		TestSeq(AUX::MakeIntegerSequeceByPredicate<10, 30, Pred>());
 	}
-		
+	
 }
 

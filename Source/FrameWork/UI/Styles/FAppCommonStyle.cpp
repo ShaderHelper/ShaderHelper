@@ -13,7 +13,8 @@ namespace FRAMEWORK
 	void FAppCommonStyle::Init()
 	{
 		if (!Instance.IsValid()) {
-			FSlateStyleRegistry::RegisterSlateStyle(*Create());
+			Instance = Create();
+			FSlateStyleRegistry::RegisterSlateStyle(Get());
 		}
 	}
 
@@ -51,6 +52,14 @@ namespace FRAMEWORK
 			.SetHighlightColor(FStyleColors::Black);
 
 		Style->Set("Log.Normal", NormalLogText);
+
+		Style->Set("Log.Warning", FTextBlockStyle(NormalLogText)
+			.SetColorAndOpacity(FStyleColors::Warning)
+		);
+
+		Style->Set("Log.Error", FTextBlockStyle(NormalLogText)
+			.SetColorAndOpacity(FStyleColors::Error)
+		);
 
 		return Style;
 	}

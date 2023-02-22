@@ -6,12 +6,11 @@ namespace SH {
 	{
 	public:
 		ShaderHelperApp(const TCHAR* CommandLine);
-	public:
-
-		void Init();
-		void ShutDown();
-		void PostInit();
-		void Update(double DeltaTime);
+	private:
+		void Init() override;
+		void ShutDown() override;
+		void PostInit() override;
+		void Update(double DeltaTime) override;
 	};
 	
 }

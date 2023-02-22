@@ -18,33 +18,17 @@ namespace FRAMEWORK
 		FTextLayout* TextLayout;
 	};
 
-	struct FLogFilter
-	{
-		bool bShowLogs;
-		bool bShowWarnings;
-		bool bShowErrors;
-		bool bShowAllCategories;
-
-		TArray<FName> AvailableLogCategories;
-		TArray<FName> SelectedLogCategories;
-	};
-
 	class FRAMEWORK_API SLogWidget : public SCompoundWidget
 	{
 	public:
 		SLATE_BEGIN_ARGS(SLogWidget) {}
 			SLATE_ARGUMENT(TSharedPtr<ITextLayoutMarshaller>, Marshaller)
-			SLATE_ARGUMENT(TSharedPtr<FLogFilter>, Filter)
+			SLATE_NAMED_SLOT(FArguments, ExtraContentArea)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs);
-		virtual void OnFilterTextChanged(const FText& InFilterText);
-		virtual void OnFilterTextCommitted(const FText& InFilterText, ETextCommit::Type InCommitType);
-		virtual TSharedRef<SWidget> MakeAddFilterMenu();
-
 	protected:
 		TSharedPtr<SMultiLineEditableTextBox> MessagesTextBox;
-		TSharedPtr<SSearchBox> SearchBox;
 		TSharedPtr<ITextLayoutMarshaller> Marshaller;
 	};
 }

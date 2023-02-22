@@ -34,7 +34,8 @@ workspace "ShaderHelper"
         buildoptions 
         { 
             "/utf-8",
-            "/GR-",  
+            "/GR-",
+            "/Zc:__cplusplus",
         }
         defines 
         {

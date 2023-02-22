@@ -2,8 +2,6 @@
 #include "SShaderHelperWindow.h"
 #include "App/ShaderHelperApp.h"
 
-#define LOCTEXT_NAMESPACE "ShaderHelperWindow"
-
 namespace SH {
 
 	TSharedRef<SDockTab> SShaderHelperWindow::SpawnWindowTab(const FSpawnTabArgs& Args)
@@ -12,20 +10,20 @@ namespace SH {
 		TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab);
 		if (TabName == "PreviewTab") {
 			SAssignNew(SpawnedTab, SDockTab)
-				.Label(LOCTEXT("PreviewTabLabel", "Preview"));
+				.Label(FText::FromString("Preview"));
 		}
 		else if (TabName == "PropetyTab") {
 			SAssignNew(SpawnedTab, SDockTab)
-				.Label(LOCTEXT("PropetyTabLabel", "Propety"));
+				.Label(FText::FromString("Propety"));
 		}
 		else if (TabName == "CodeTab") {
 			SAssignNew(SpawnedTab, SDockTab)
-				.Label(LOCTEXT("CodeTabLabel", "Code"));
+				.Label(FText::FromString("Code"));
 
 		}
 		else if (TabName == "ResourceTab") {
 			SAssignNew(SpawnedTab, SDockTab)
-				.Label(LOCTEXT("ResourceTabLabel", "Resource"));
+				.Label(FText::FromString("Resource"));
 		}
 		else {
 			ensure(false);
@@ -39,13 +37,13 @@ namespace SH {
 		TSharedRef<SDockTab> NewTab = SNew(SDockTab).TabRole(ETabRole::MajorTab);
 		TabManager = FGlobalTabmanager::Get()->NewTabManager(NewTab);
 		TabManager->RegisterTabSpawner("PreviewTab", FOnSpawnTab::CreateRaw(this, &SShaderHelperWindow::SpawnWindowTab))
-			.SetDisplayName(LOCTEXT("PreviewTitle", "Preview"));
+			.SetDisplayName(FText::FromString("Preview"));
 		TabManager->RegisterTabSpawner("PropetyTab", FOnSpawnTab::CreateRaw(this, &SShaderHelperWindow::SpawnWindowTab))
-			.SetDisplayName(LOCTEXT("PropetyTitle", "Propety"));
+			.SetDisplayName(FText::FromString("Propety"));
 		TabManager->RegisterTabSpawner("ResourceTab", FOnSpawnTab::CreateRaw(this, &SShaderHelperWindow::SpawnWindowTab))
-			.SetDisplayName(LOCTEXT("ResourceTitle", "Resource"));
+			.SetDisplayName(FText::FromString("Resource"));
 		TabManager->RegisterTabSpawner("CodeTab", FOnSpawnTab::CreateRaw(this, &SShaderHelperWindow::SpawnWindowTab))
-			.SetDisplayName(LOCTEXT("CodeTitle", "Code"));
+			.SetDisplayName(FText::FromString("Code"));
 
 		TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("ShaderHelperLayout")
 		->AddArea
@@ -85,7 +83,7 @@ namespace SH {
 		);
 
 		SWindow::Construct(SWindow::FArguments()
-			.Title(LOCTEXT("WindowTitle","ShaderHelper"))
+			.Title(FText::FromString("ShaderHelper"))
 			.ClientSize(ShaderHelperApp::DefaultClientSize)
 			[
 				SNew(SVerticalBox)
@@ -108,17 +106,17 @@ namespace SH {
 	{
 		FMenuBarBuilder MenuBarBuilder = FMenuBarBuilder(TSharedPtr<FUICommandList>());
 		MenuBarBuilder.AddPullDownMenu(
-			LOCTEXT("FileMenu", "File"),
+			FText::FromString("File"),
 			FText::GetEmpty(),
 			FNewMenuDelegate::CreateRaw(this, &SShaderHelperWindow::FillMenu, FString("File"))
 		);
 		MenuBarBuilder.AddPullDownMenu(
-			LOCTEXT("ConfigMenu", "Config"),
+			FText::FromString("Config"),
 			FText::GetEmpty(),
 			FNewMenuDelegate::CreateRaw(this, &SShaderHelperWindow::FillMenu, FString("Config"))
 		);
 		MenuBarBuilder.AddPullDownMenu(
-			LOCTEXT("WindowMenu", "Window"),
+			FText::FromString("Window"),
 			FText::GetEmpty(),
 			FNewMenuDelegate::CreateRaw(this, &SShaderHelperWindow::FillMenu, FString("Window"))
 		);
@@ -134,13 +132,13 @@ namespace SH {
 	void SShaderHelperWindow::FillMenu(FMenuBuilder& MenuBuilder, FString MenuName)
 	{
 		if (MenuName == "File") {
-			MenuBuilder.AddMenuEntry(LOCTEXT("Title1", "TODO"), FText::GetEmpty(), FSlateIcon(), FUIAction());
+			MenuBuilder.AddMenuEntry(FText::FromString("TODO"), FText::GetEmpty(), FSlateIcon(), FUIAction());
 		}
 		else if (MenuName == "Config") {
-			MenuBuilder.AddMenuEntry(LOCTEXT("Title1", "TODO"), FText::GetEmpty(), FSlateIcon(), FUIAction());
+			MenuBuilder.AddMenuEntry(FText::FromString("TODO"), FText::GetEmpty(), FSlateIcon(), FUIAction());
 		}
 		else if (MenuName == "Window") {
-			MenuBuilder.AddMenuEntry(LOCTEXT("Title1", "TODO"), FText::GetEmpty(), FSlateIcon(), FUIAction());
+			MenuBuilder.AddMenuEntry(FText::FromString("TODO"), FText::GetEmpty(), FSlateIcon(), FUIAction());
 		}
 	}
 

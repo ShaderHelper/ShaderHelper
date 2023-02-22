@@ -2,8 +2,6 @@
 #include "SLogWidget.h"
 #include "UI/Styles/FAppCommonStyle.h"
 
-#define LOCTEXT_NAMESPACE "SLogWidget"
-
 namespace FRAMEWORK
 {
 	FLogWidgetMarshaller::FLogWidgetMarshaller()
@@ -51,75 +49,12 @@ namespace FRAMEWORK
 			SBox.ToSharedRef()
 		];
 
-		if (InArgs._Filter) {
-			SBox->AddSlot()
+		SBox->AddSlot()
 			.AutoHeight()
 			.Padding(FMargin(0.0f, 4.0f, 0.0f, 4.0f))
 			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot()
-				.Padding(0, 0, 4, 0)
-				.FillWidth(.65f)
-				[
-					SAssignNew(SearchBox, SSearchBox)
-					.HintText(LOCTEXT("SearchLogHint", "Search Log"))
-					.OnTextChanged_Lambda(
-						[this](const FText& InFilterText) { OnFilterTextChanged(InFilterText); }
-					)
-					.OnTextCommitted_Lambda(
-						[this](const FText& InFilterText, ETextCommit::Type InCommitType) { OnFilterTextCommitted(InFilterText, InCommitType); }
-					)
-					.DelayChangeNotificationsWhileTyping(true)
-				]
-				+SHorizontalBox::Slot()
-				.AutoWidth()
-				.HAlign(HAlign_Left)
-				[
-					SNew(SComboButton)
-					.ComboButtonStyle(FAppStyle::Get(), "SimpleComboButton")
-					.ToolTipText(LOCTEXT("AddFilterToolTip", "Add an output log filter."))
-					.OnGetMenuContent_Lambda(
-						[this] { return MakeAddFilterMenu(); }
-					)
-					.ButtonContent()
-					[
-						SNew(SHorizontalBox)
-						+SHorizontalBox::Slot()
-						.AutoWidth()
-						[
-							SNew(SImage)
-							.Image(FAppStyle::Get().GetBrush("Icons.Filter"))
-							.ColorAndOpacity(FSlateColor::UseForeground())
-						]
-						+SHorizontalBox::Slot()
-						.AutoWidth()
-						.Padding(2, 0, 0, 0)
-						[
-							SNew(STextBlock)
-							.Text(LOCTEXT("Filters", "Filters"))
-							.ColorAndOpacity(FSlateColor::UseForeground())
-						]
-					]
-				]
+				InArgs._ExtraContentArea.Widget
 			];
-		}
-	}
-
-
-	void SLogWidget::OnFilterTextChanged(const FText& InFilterText)
-	{
-
-	}
-
-	void SLogWidget::OnFilterTextCommitted(const FText& InFilterText, ETextCommit::Type InCommitType)
-	{
-
-	}
-
-	TSharedRef<SWidget> SLogWidget::MakeAddFilterMenu()
-	{
-		//TODO
-		return MakeShared<SBox>();
 	}
 
 }

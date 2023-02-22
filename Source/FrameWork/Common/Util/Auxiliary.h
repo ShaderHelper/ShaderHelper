@@ -191,7 +191,27 @@ namespace AUX
 		using BaseType = std::remove_cv_t<std::remove_pointer_t<T>>;
 		return TTypename<BaseType>::Value;
 	}
+	
+	//https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2593r0.html#ref-P1830R1
+	template<typename T>
+	inline constexpr bool AlwaysFalse = false;
 
+	template<typename T>
+	T* GetAddrExt(T&& Val) {
+		return std::addressof(Val);
+	}
+
+	//For strict-aliasing rule
+	template<typename To, typename From>
+	To BitCast(const From& src) {
+		static_assert(sizeof(To) == sizeof(From), "sizeof(To) != sizeof(From)");
+		static_assert(std::is_trivially_copyable_v<To>, "Destination type is not trivially copyable");
+		static_assert(std::is_trivially_copyable_v<From>, "Source type is not trivially copyable");
+		
+		To dst;
+		std::memcpy(&dst, &src, sizeof(To));
+		return dst;
+	}
 
 } // end AUX namespace
 } // end FRAMEWORK namespace
