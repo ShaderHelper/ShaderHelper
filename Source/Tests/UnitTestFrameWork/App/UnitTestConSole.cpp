@@ -29,7 +29,7 @@ void UnitTestConSole::InitLogWindow()
 	TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("UnitTestLayout")
 		->AddArea
 		(
-			FTabManager::NewArea(DefaultClientSize.X, DefaultClientSize.Y)
+			FTabManager::NewArea(AppClientSize.X, AppClientSize.Y)
 			->Split
 			(
 				FTabManager::NewStack()

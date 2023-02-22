@@ -31,6 +31,15 @@ namespace FRAMEWORK {
 		static void SetFixedDeltaTime(double InFixedDeltaTime) {
 			FixedDeltaTime = InFixedDeltaTime;
 		}
+
+		static FVector2D& GetClientSize() {
+			return AppClientSize;
+		}
+
+		static void SetClientSize(FVector2D InClientSize) {
+			AppClientSize = MoveTemp(InClientSize);
+		}
+		
 	protected:
 		virtual void Init();
 		virtual void PostInit();
@@ -42,12 +51,10 @@ namespace FRAMEWORK {
 		void UE_ShutDown();
 		void UE_Update();
 
-	public:
-		static inline const FVector2D DefaultClientSize = FVector2D(1280, 720);
-
 	protected:
 		TSharedPtr<SWindow> AppWindow;
-
+		
+		static inline FVector2D AppClientSize = FVector2D(1280, 720);
 		static inline double CurrentTime = 0.0;
 		static inline double DeltaTime = 1 / 30;
 		static inline double FixedDeltaTime = 1 / 30;
