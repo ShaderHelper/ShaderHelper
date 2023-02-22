@@ -21,11 +21,14 @@ project "UnitTestFrameWork"
 	}
 
     filter "system:windows"
+        files {"%{_WORKING_DIR}/Resource/Misc/Windows/*"}
+        vpaths {["Resources"] = "%{_WORKING_DIR}/Resource/Misc/Windows/*"}
         pchheader "CommonHeader.h"
         pchsource "CommonHeader.cpp"
 
     filter "system:macosx"
-        xcodebuildsettings { ["GENERATE_INFOPLIST_FILE"] = "YES" }
+        files {"%{_WORKING_DIR}/Resource/Misc/Mac/*"}
+        vpaths {["Resources"] = "%{_WORKING_DIR}/Resource/Misc/Mac/*"}
 
 
 

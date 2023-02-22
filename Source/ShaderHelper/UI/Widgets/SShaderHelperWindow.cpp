@@ -84,7 +84,7 @@ namespace SH {
 
 		SWindow::Construct(SWindow::FArguments()
 			.Title(FText::FromString("ShaderHelper"))
-			.ClientSize(ShaderHelperApp::DefaultClientSize)
+			.ClientSize(ShaderHelperApp::GetClientSize())
 			[
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot()
