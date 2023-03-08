@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "UnitTestConSole.h"
-#include "FrameWork/UI/Widgets/Log/SOutputLog.h"
-#include "FrameWork/UI/Styles/FAppCommonStyle.h"
+#include "UI/Widgets/Log/SOutputLog.h"
+#include "UI/Styles/FAppCommonStyle.h"
 
 UnitTestConSole::UnitTestConSole(const TCHAR* CommandLine)
 	:App(CommandLine)
@@ -19,12 +19,13 @@ void UnitTestConSole::InitLogWindow()
 	auto SpawnLog = [](const FSpawnTabArgs&) -> TSharedRef<SDockTab>
 	{
 		return SNew(SDockTab)
-			.Label(FText::FromString("OutPutLog"))
+			.Label(FText::FromString("OutputLog"))
+			.TabRole(ETabRole::NomadTab)
 			[
 				SNew(SOutputLog)
 			];
 	};
-	FGlobalTabmanager::Get()->RegisterTabSpawner("LogTab", FOnSpawnTab::CreateLambda(SpawnLog));
+	FGlobalTabmanager::Get()->RegisterNomadTabSpawner("LogTab", FOnSpawnTab::CreateLambda(SpawnLog));
 	
 	TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("UnitTestLayout")
 		->AddArea
@@ -34,6 +35,7 @@ void UnitTestConSole::InitLogWindow()
 			(
 				FTabManager::NewStack()
 				->AddTab("LogTab", ETabState::OpenedTab)
+				->SetForegroundTab(FName("LogTab"))
 			)
 		);
 		

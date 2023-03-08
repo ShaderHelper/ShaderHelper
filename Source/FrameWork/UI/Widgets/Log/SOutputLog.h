@@ -20,10 +20,10 @@ namespace FRAMEWORK
 		void AddAvailableLogCategory(FName LogCategory);
 		bool IsMessageAllowed(const FOutputLogMessage& Message);
 
-		bool bShowLogs;
-		bool bShowWarnings;
-		bool bShowErrors;
-		bool bShowAllCategories;
+		bool bShowLogs = true;
+		bool bShowWarnings = true;
+		bool bShowErrors = true;
+		bool bShowAllCategories = true;
 
 		TArray<FName> AvailableLogCategories;
 		TArray<FName> SelectedLogCategories;
@@ -40,6 +40,9 @@ namespace FRAMEWORK
 		void AddMessage(FOutputLogMessage InMessage);
 		bool SubmitPendingMessages();
 		void AppendPendingMessagesToTextLayout();
+
+		//Gets the num of messages added to TextLayout
+		int32 GetNumMessages() const;
 	protected:
 		int32 NextPendingMessageIndex;
 		TArray<FOutputLogMessage> Messages;
@@ -53,6 +56,9 @@ namespace FRAMEWORK
 	public:
 		SLATE_BEGIN_ARGS(SOutputLog) {}
 		SLATE_END_ARGS()
+
+		SOutputLog();
+		~SOutputLog();
 
 		void Construct(const FArguments& InArgs);
 		void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;

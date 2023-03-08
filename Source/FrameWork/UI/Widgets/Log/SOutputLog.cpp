@@ -6,6 +6,21 @@
 
 namespace FRAMEWORK 
 {
+
+	SOutputLog::SOutputLog()
+		:bIsUserScrolled(false)
+	{
+
+	}
+
+	SOutputLog::~SOutputLog()
+	{
+		if (GLog != nullptr)
+		{
+			GLog->RemoveOutputDevice(this);
+		}
+	}
+
 	void SOutputLog::Construct(const FArguments& InArgs)
 	{
 		TSharedPtr<SHorizontalBox> FilterBox;
@@ -61,6 +76,8 @@ namespace FRAMEWORK
 				FilterBox.ToSharedRef()
 			]
 		);
+
+		GLog->AddOutputDevice(this);
 	}
 
 
@@ -92,7 +109,7 @@ namespace FRAMEWORK
 
 	void SOutputLog::OnFilterTextCommitted(const FText& InFilterText, ETextCommit::Type InCommitType)
 	{
-
+		OnFilterTextChanged(InFilterText);
 	}
 
 	TSharedRef<SWidget> SOutputLog::MakeAddFilterMenu()
@@ -183,7 +200,9 @@ namespace FRAMEWORK
 
 	void SOutputLog::VerbosityLogs_Execute()
 	{
-		Filter->bShowLogs |= 1;
+		Filter->bShowLogs ^= 1;
+		Marshaller->MakeDirty();
+		MessagesTextBox->Refresh();
 	}
 
 	bool SOutputLog::VerbosityLogs_IsChecked() const
@@ -193,7 +212,9 @@ namespace FRAMEWORK
 
 	void SOutputLog::VerbosityWarnings_Execute()
 	{
-		Filter->bShowWarnings |= 1;
+		Filter->bShowWarnings ^= 1;
+		Marshaller->MakeDirty();
+		MessagesTextBox->Refresh();
 	}
 
 	bool SOutputLog::VerbosityWarnings_IsChecked() const
@@ -203,7 +224,9 @@ namespace FRAMEWORK
 
 	void SOutputLog::VerbosityErrors_Execute()
 	{
-		Filter->bShowErrors |= 1;
+		Filter->bShowErrors ^= 1;
+		Marshaller->MakeDirty();
+		MessagesTextBox->Refresh();
 	}
 
 	bool SOutputLog::VerbosityErrors_IsChecked() const
@@ -276,7 +299,7 @@ namespace FRAMEWORK
 	}
 
 	FOutputLogMarshaller::FOutputLogMarshaller(FOutputLogFilter* InFilter)
-		:Filter(InFilter), TextLayout(nullptr)
+		:NextPendingMessageIndex(0), Filter(InFilter), TextLayout(nullptr)
 	{
 
 	}
@@ -346,6 +369,12 @@ namespace FRAMEWORK
 		}
 		
 		TextLayout->AddLines(LinesToAdd);
+	}
+
+	int32 FOutputLogMarshaller::GetNumMessages() const
+	{
+		const int32 NumPendingMessages = Messages.Num() - NextPendingMessageIndex;
+		return Messages.Num() - NumPendingMessages;
 	}
 
 	void FOutputLogFilter::AddAvailableLogCategory(FName LogCategory)

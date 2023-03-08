@@ -101,6 +101,8 @@ namespace FRAMEWORK {
 			SetCurrentTime(CurrentRealTime);
 			SetDeltaTime(DeltaTime);
 			Update(DeltaTime);
+			//if not change GFrameCounter, slate texture may not update.
+			GFrameCounter++;
 		}
 		ShutDown();
 	}

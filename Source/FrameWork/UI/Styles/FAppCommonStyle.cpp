@@ -31,7 +31,7 @@ namespace FRAMEWORK
 		TSharedRef<FSlateStyleSet> Style = MakeShared<FSlateStyleSet>("AppCommonStyle");
 
 		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir / TEXT("Slate"));
-
+		//StarshipCoreStyle is used as the app style.
 		const FEditableTextBoxStyle& NormalEditableTextBoxStyle =  FAppStyle::Get().GetWidgetStyle<FEditableTextBoxStyle>("NormalEditableTextBox");
 		const FTextBlockStyle& NormalText = FAppStyle::Get().GetWidgetStyle<FTextBlockStyle>("NormalText");
 		
@@ -47,9 +47,9 @@ namespace FRAMEWORK
 		const int32 LogFontSize =  9;
 		const FTextBlockStyle NormalLogText = FTextBlockStyle(NormalText)
 			.SetFont(DEFAULT_FONT("Mono", LogFontSize))
-			.SetColorAndOpacity(EStyleColor::User3)
-			.SetSelectedBackgroundColor(EStyleColor::User2)
-			.SetHighlightColor(FStyleColors::Black);
+			.SetColorAndOpacity(FStyleColors::White)
+			.SetSelectedBackgroundColor(FStyleColors::Select)
+			.SetHighlightColor(FStyleColors::Highlight);
 
 		Style->Set("Log.Normal", NormalLogText);
 
@@ -65,3 +65,5 @@ namespace FRAMEWORK
 	}
 
 }
+
+#undef RootToContentDir

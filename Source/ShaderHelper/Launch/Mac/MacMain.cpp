@@ -1,8 +1,6 @@
 #include "CommonHeader.h"
 #include "App/ShaderHelperApp.h"
 #include <Mac/CocoaThread.h>
-//Ensures the consistency of memory allocation between current project and UE modules.
-PER_MODULE_DEFINITION()
 
 static FString GSavedCommandLine;
 
