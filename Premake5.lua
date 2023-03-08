@@ -1,5 +1,12 @@
 include "Premake/Custom.lua"
 
+external_ue = "External/UE"
+external_d3d12memallocator = "External/D3D12MemoryAllocator"
+
+project_shaderHelper = "Source/ShaderHelper"
+project_frameWork = "Source/FrameWork"
+project_unitTestFrameWork = "Source/Tests/UnitTestFrameWork"
+
 workspace "ShaderHelper"  
     architecture "x64"    
     configurations 
@@ -70,55 +77,10 @@ workspace "ShaderHelper"
     filter {"configurations:Dev"}
 		optimize "On"
 
-usage "UE"
-    GenerateIncludeDir_UE()
-    filter "system:windows"
-        libdirs
-        {
-            "External/UE/Lib",
-        }
-        links
-        {
-            "UE-Core",
-            "UE-ApplicationCore",
-            "UE-Slate",
-            "UE-SlateCore",
-            "UE-StandaloneRenderer",
-            "UE-Projects",
-            "UE-ImageWrapper",
-            "UE-CoreUObject"
-        }
-    filter "system:macosx"
-        links 
-        {
-            "Cocoa.framework",
-            "Metal.framework",
-            "OpenGL.framework",
-            "Carbon.framework",
-            "IOKit.framework",
-            "Security.framework",
-            "GameController.framework",
-            "QuartzCore.framework",
-            "IOSurface.framework",
-            "%{cfg.targetdir}/UE-Core.dylib",
-            "%{cfg.targetdir}/UE-ApplicationCore.dylib",
-            "%{cfg.targetdir}/UE-Slate.dylib",
-            "%{cfg.targetdir}/UE-SlateCore.dylib",
-            "%{cfg.targetdir}/UE-StandaloneRenderer.dylib",
-            "%{cfg.targetdir}/UE-Projects.dylib",
-            "%{cfg.targetdir}/UE-ImageWrapper.dylib",
-            "%{cfg.targetdir}/UE-CoreUObject.dylib"
-        }
-        buildoptions { 
-            "-x objective-c++",
-            "-fno-rtti", --UE modules disable rtti
-        }
+include(external_ue)
+include(external_d3d12memallocator)
 
-project_ShaderHelper = "Source/ShaderHelper"
-project_FrameWork = "Source/FrameWork"
-project_UnitTestFrameWork = "Source/Tests/UnitTestFrameWork"
-
-include(project_ShaderHelper)
-include(project_FrameWork)
+include(project_shaderHelper)
+include(project_frameWork)
 group("Tests")
-include(project_UnitTestFrameWork)
+    include(project_unitTestFrameWork)

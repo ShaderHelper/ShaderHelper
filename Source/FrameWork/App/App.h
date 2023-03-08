@@ -1,4 +1,5 @@
 #pragma once
+#include "Common/Util/SwizzleVector.h"
 namespace FRAMEWORK {
 	class FRAMEWORK_API App : public FNoncopyable
 	{
@@ -32,11 +33,11 @@ namespace FRAMEWORK {
 			FixedDeltaTime = InFixedDeltaTime;
 		}
 
-		static FVector2D& GetClientSize() {
+		static Vector2D GetClientSize() {
 			return AppClientSize;
 		}
 
-		static void SetClientSize(FVector2D InClientSize) {
+		static void SetClientSize(Vector2D InClientSize) {
 			AppClientSize = MoveTemp(InClientSize);
 		}
 		
@@ -54,7 +55,7 @@ namespace FRAMEWORK {
 	protected:
 		TSharedPtr<SWindow> AppWindow;
 		
-		static inline FVector2D AppClientSize = FVector2D(1280, 720);
+		static inline Vector2D AppClientSize = Vector2D(1280, 720);
 		static inline double CurrentTime = 0.0;
 		static inline double DeltaTime = 1 / 30;
 		static inline double FixedDeltaTime = 1 / 30;

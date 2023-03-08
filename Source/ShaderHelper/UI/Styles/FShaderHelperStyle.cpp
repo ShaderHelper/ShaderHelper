@@ -1,6 +1,6 @@
 #include "CommonHeader.h"
 #include "FShaderHelperStyle.h"
-#include "FrameWork/Common/Path/BaseResourcePath.h"
+#include "Common/Path/BaseResourcePath.h"
 #include <Styling/SlateStyleRegistry.h>
 #include <Styling/StyleColors.h>
 #include <Styling/SlateStyleMacros.h>
@@ -36,3 +36,5 @@ namespace SH {
 	}
 
 }
+
+#undef RootToContentDir

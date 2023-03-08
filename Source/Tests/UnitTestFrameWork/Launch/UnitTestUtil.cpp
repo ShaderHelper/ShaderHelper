@@ -1,6 +1,6 @@
 #include "CommonHeader.h"
-#include "FrameWork/Common/Util/SwizzleVector.h"
-#include "FrameWork/Common/Util/Auxiliary.h"
+#include "Common/Util/SwizzleVector.h"
+#include "Common/Util/Auxiliary.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTestUtil, Log, All);
 DEFINE_LOG_CATEGORY(LogTestUtil);
@@ -9,7 +9,7 @@ DEFINE_LOG_CATEGORY(LogTestUtil);
 template<int N,typename T = int>
 struct UnitTmp {
     double Run(double a, const FString& ss) {
-        TEST_LOG(LogTestUtil, Display, TEXT("TestRunCaseWithInt: %s"), *ss);
+        UE_LOG(LogTestUtil, Display, TEXT("TestRunCaseWithInt: %s"), *ss);
 		return N + a;
     }
 };
@@ -17,26 +17,26 @@ struct UnitTmp {
 template<typename T, T... Seq>
 void TestSeq(TIntegerSequence<T, Seq...>) {
     auto lam = [](T t) {
-        TEST_LOG(LogTestUtil, Display, TEXT("TestSeq: %d"), t);
+        UE_LOG(LogTestUtil, Display, TEXT("TestSeq: %d"), t);
     };
     (lam(Seq), ...);
 }
 
 void TestUtil()
 {
-    TEST_LOG(LogTestUtil, Display, TEXT("Unit Test - Util:"));
+    UE_LOG(LogTestUtil, Display, TEXT("Unit Test - Util:"));
     //Implicit conversion between FVector and Vector.
     {
         FVector fvec(1, 2, 3);
         Vector vec = fvec;
         FVector fvec2 = vec;
-        TEST_LOG(LogTestUtil, Display, TEXT("Implicit conversion between FVector and Vector: (%lf,%lf,%lf)."), vec.X, vec.Y, vec.Z);
+        UE_LOG(LogTestUtil, Display, TEXT("Implicit conversion between FVector and Vector: (%lf,%lf,%lf)."), vec.X, vec.Y, vec.Z);
         //Test compatibility with ue math interfaces.
         {
             FTranslationMatrix tranM(vec);
-            TEST_LOG(LogTestUtil, Display, TEXT("Test compatibility : (%s)."), *tranM.ToString());
+            UE_LOG(LogTestUtil, Display, TEXT("Test compatibility : (%s)."), *tranM.ToString());
             vec = FMath::VRand();
-            TEST_LOG(LogTestUtil, Display, TEXT("Test compatibility : (%s)."), *vec.ToString());
+            UE_LOG(LogTestUtil, Display, TEXT("Test compatibility : (%s)."), *vec.ToString());
         }
     }
 
@@ -47,25 +47,25 @@ void TestUtil()
         {
             Vector vec = vec1 + vec2;
             vec += 2;
-            TEST_LOG(LogTestUtil, Display, TEXT("+: (%lf,%lf,%lf)."), vec.X, vec.Y, vec.Z);
+            UE_LOG(LogTestUtil, Display, TEXT("+: (%lf,%lf,%lf)."), vec.X, vec.Y, vec.Z);
         }
 
         {
             Vector vec = vec1 * vec2;
             vec = vec * 2.0;
             vec *= 2;
-            TEST_LOG(LogTestUtil, Display, TEXT("*: (%lf,%lf,%lf)."), vec.X, vec.Y, vec.Z);
+            UE_LOG(LogTestUtil, Display, TEXT("*: (%lf,%lf,%lf)."), vec.X, vec.Y, vec.Z);
         }
         {
             Vector vec1 = { 1,1,1 };
             (vec1 += 1) = { 3,3,3 };
-            TEST_LOG(LogTestUtil, Display, TEXT("+=: (%s)."), *vec1.ToString());
+            UE_LOG(LogTestUtil, Display, TEXT("+=: (%s)."), *vec1.ToString());
         }
 
 		{
 			Vector tmp{ 1.233695,0,0};
 			Vector vec{ 1.233698,0,0 };
-			TEST_LOG(LogTestUtil, Display, TEXT("==: (%d,%d)."), tmp.Equals(vec), tmp.Equals(vec,1e-5));
+			UE_LOG(LogTestUtil, Display, TEXT("==: (%d,%d)."), tmp.Equals(vec), tmp.Equals(vec,1e-5));
 		}
     }
 
@@ -73,25 +73,25 @@ void TestUtil()
     {
         Vector vec1 = { 1,2,3 };
         Vector vec2 = vec1.XXY;
-        TEST_LOG(LogTestUtil, Display, TEXT("Swizzle: (%lf,%lf,%lf)."), vec2.X, vec2.Y,vec2.Z);
+        UE_LOG(LogTestUtil, Display, TEXT("Swizzle: (%lf,%lf,%lf)."), vec2.X, vec2.Y,vec2.Z);
         {
             Vector2D vec3 = vec2.XZ + 3.0;
-            TEST_LOG(LogTestUtil, Display, TEXT("Swizzle +: (%lf,%lf)."), vec3.X, vec3.Y);
+            UE_LOG(LogTestUtil, Display, TEXT("Swizzle +: (%lf,%lf)."), vec3.X, vec3.Y);
         }
         
         {
             Vector4 vec4 = 2.0 * vec2.ZZZZ; // 2 * {2,2,2,2}
-            TEST_LOG(LogTestUtil, Display, TEXT("Swizzle *: (%lf,%lf,%lf,%lf)."), vec4.X, vec4.Y, vec4.Z, vec4.W);
+            UE_LOG(LogTestUtil, Display, TEXT("Swizzle *: (%lf,%lf,%lf,%lf)."), vec4.X, vec4.Y, vec4.Z, vec4.W);
         }
 
         {
             Vector vec4 = vec1 * vec2.ZZZ; //{1,2,3} * {2,2,2}
-            TEST_LOG(LogTestUtil, Display, TEXT("Swizzle *: (%lf,%lf,%lf)."), vec4.X, vec4.Y, vec4.Z);
+            UE_LOG(LogTestUtil, Display, TEXT("Swizzle *: (%lf,%lf,%lf)."), vec4.X, vec4.Y, vec4.Z);
         }
 
         {
             Vector2D vec4 = vec1.ZZ / vec2.XZ; // {3,3} / {1,2}
-            TEST_LOG(LogTestUtil, Display, TEXT("Swizzle /: (%lf,%lf)."), vec4.X, vec4.Y);
+            UE_LOG(LogTestUtil, Display, TEXT("Swizzle /: (%lf,%lf)."), vec4.X, vec4.Y);
         }
     }
 
@@ -99,7 +99,7 @@ void TestUtil()
     {
         struct Unit {
             Unit(int v) : Value(v) {}
-            ~Unit() { TEST_LOG(LogTestUtil, Display, TEXT("~Unit:%d"),Value); }
+            ~Unit() { UE_LOG(LogTestUtil, Display, TEXT("~Unit:%d"),Value); }
             int Value;
         };
         TSharedPtr<Unit> t = MakeShared<Unit>(114);
@@ -142,13 +142,13 @@ void TestUtil()
 			Vector vec2 = vec1.ZZZ + 1;
 			Result = UnitTmp<VarFromFile>{}.Run(vec2.X, str);
 		)
-		TEST_LOG(LogTestUtil, Display, TEXT("TestRunCaseWithInt: %lf"), Result);
+		UE_LOG(LogTestUtil, Warning, TEXT("TestRunCaseWithInt: %lf"), Result);
     }
 
 	{
 		Vector&& t = Vector{ 1,2,3 };
 		FString s = AUX::TypeId(t);
-		TEST_LOG(LogTestUtil, Display, TEXT("TestTypeID: %s"), *s);
+		UE_LOG(LogTestUtil, Display, TEXT("TestTypeID: %s"), *s);
 
 		constexpr auto Pred = [](int Val) {
 			for (int i = 2; i * i <= Val; ++i)
