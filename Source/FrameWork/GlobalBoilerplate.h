@@ -13,6 +13,6 @@ namespace FRAMEWORK
 }
 
 #define SH_LOG(CategoryName, Verbosity, Format, ...) \
-	UE_LOG(CategoryName, Verbosity, Format, __VA_ARGS__); \
+	UE_LOG(CategoryName, Verbosity, Format, ##__VA_ARGS__); \
 	GProjectCategoryNames.Emplace(#CategoryName)
 	
