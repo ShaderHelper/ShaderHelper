@@ -1,13 +1,4 @@
 #pragma once
+//only works for current module.
 
-#define PER_MODULE_DEFINITION() \
-	PER_MODULE_BOILERPLATE
-
-namespace FRAMEWORK {}
-
-//Imports Framework to SH project.
-namespace SH
-{
-    using namespace FRAMEWORK;
-}
-
+IMPORT_MODULE(SH, FRAMEWORK)

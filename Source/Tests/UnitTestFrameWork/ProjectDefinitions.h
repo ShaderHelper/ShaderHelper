@@ -1,8 +1,4 @@
 #pragma once
+//only works for current module.
 
-#define PER_MODULE_DEFINITION() \
-	PER_MODULE_BOILERPLATE
-
-namespace FRAMEWORK {}
-using namespace FRAMEWORK;
-
+IMPORT_MODULE(UNITTEST_FRAMEWORK, FRAMEWORK)

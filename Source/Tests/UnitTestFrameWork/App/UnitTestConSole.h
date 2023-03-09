@@ -1,18 +1,22 @@
 #pragma once
 #include "App/App.h"
 
-class UnitTestConSole : public App
+namespace UNITTEST_FRAMEWORK
 {
-public:
-	UnitTestConSole(const TCHAR* CommandLine);
-private:
-	void Init() override;
-	void ShutDown() override;
-	void PostInit() override;
-	void Update(double DeltaTime) override;
+	class UnitTestConSole : public App
+	{
+	public:
+		UnitTestConSole(const TCHAR* CommandLine);
+	private:
+		void Init() override;
+		void ShutDown() override;
+		void PostInit() override;
+		void Update(double DeltaTime) override;
 
-	void InitLogWindow();
-};
+		void InitLogWindow();
+	};
+}
+
 	
 
 

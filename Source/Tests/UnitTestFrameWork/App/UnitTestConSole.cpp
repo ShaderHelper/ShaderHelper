@@ -3,63 +3,69 @@
 #include "UI/Widgets/Log/SOutputLog.h"
 #include "UI/Styles/FAppCommonStyle.h"
 
-UnitTestConSole::UnitTestConSole(const TCHAR* CommandLine)
-	:App(CommandLine)
+namespace UNITTEST_FRAMEWORK
 {
-	
-}
-
-void UnitTestConSole::Init()
-{
-	App::Init();
-}
-
-void UnitTestConSole::InitLogWindow()
-{
-	auto SpawnLog = [](const FSpawnTabArgs&) -> TSharedRef<SDockTab>
-	{
-		return SNew(SDockTab)
-			.Label(FText::FromString("OutputLog"))
-			.TabRole(ETabRole::NomadTab)
-			[
-				SNew(SOutputLog)
-			];
-	};
-	FGlobalTabmanager::Get()->RegisterNomadTabSpawner("LogTab", FOnSpawnTab::CreateLambda(SpawnLog));
-	
-	TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("UnitTestLayout")
-		->AddArea
-		(
-			FTabManager::NewArea(AppClientSize.X, AppClientSize.Y)
-			->Split
-			(
-				FTabManager::NewStack()
-				->AddTab("LogTab", ETabState::OpenedTab)
-				->SetForegroundTab(FName("LogTab"))
-			)
-		);
-		
-	FGlobalTabmanager::Get()->RestoreFrom(Layout, TSharedPtr<SWindow>());
-}
-
-void UnitTestConSole::PostInit()
-{
-	FAppCommonStyle::Init();
-	InitLogWindow();
-	App::PostInit();
-	
 	extern void TestUtil();
-	TestUtil();
+	
+	UnitTestConSole::UnitTestConSole(const TCHAR* CommandLine)
+		:App(CommandLine)
+	{
+
+	}
+
+	void UnitTestConSole::Init()
+	{
+		App::Init();
+	}
+
+	void UnitTestConSole::InitLogWindow()
+	{
+		auto SpawnLog = [](const FSpawnTabArgs&) -> TSharedRef<SDockTab>
+		{
+			return SNew(SDockTab)
+				.Label(FText::FromString("OutputLog"))
+				.TabRole(ETabRole::NomadTab)
+				[
+					SNew(SOutputLog)
+				];
+		};
+		FGlobalTabmanager::Get()->RegisterNomadTabSpawner("LogTab", FOnSpawnTab::CreateLambda(SpawnLog));
+
+		TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("UnitTestLayout")
+			->AddArea
+			(
+				FTabManager::NewArea(static_cast<float>(AppClientSize.X), static_cast<float>(AppClientSize.Y))
+				->Split
+				(
+					FTabManager::NewStack()
+					->AddTab("LogTab", ETabState::OpenedTab)
+					->SetForegroundTab(FName("LogTab"))
+				)
+			);
+
+		FGlobalTabmanager::Get()->RestoreFrom(Layout, TSharedPtr<SWindow>());
+	}
+
+	void UnitTestConSole::PostInit()
+	{
+		FAppCommonStyle::Init();
+		InitLogWindow();
+		App::PostInit();
+
+		TestUtil();
+	}
+
+
+	void UnitTestConSole::ShutDown()
+	{
+		App::ShutDown();
+	}
+
+
+	void UnitTestConSole::Update(double DeltaTime)
+	{
+		App::Update(DeltaTime);
+	}
 }
 
 
-void UnitTestConSole::ShutDown()
-{
-	App::ShutDown();
-}
-
-
-void UnitTestConSole::Update(double DeltaTime)
-{
-	App::Update(DeltaTime);
-}

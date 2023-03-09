@@ -1,5 +1,2 @@
 #pragma once
-
-#define PER_MODULE_DEFINITION() \
-	PER_MODULE_BOILERPLATE
-
+//only works for current module.
