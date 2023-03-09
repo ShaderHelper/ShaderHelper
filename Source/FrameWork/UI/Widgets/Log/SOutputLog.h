@@ -23,10 +23,13 @@ namespace FRAMEWORK
 		bool bShowLogs = true;
 		bool bShowWarnings = true;
 		bool bShowErrors = true;
-		bool bShowAllCategories = true;
+		
+		bool bShowUeLog = false;
+		bool bShowShLog = true;
 
 		TArray<FName> AvailableLogCategories;
 		TArray<FName> SelectedLogCategories;
+		FString FilterString;
 	};
 
 	class FOutputLogMarshaller : public FBaseTextLayoutMarshaller
@@ -66,7 +69,6 @@ namespace FRAMEWORK
 		void OnFilterTextChanged(const FText& InFilterText);
 		void OnFilterTextCommitted(const FText& InFilterText, ETextCommit::Type InCommitType);
 		TSharedRef<SWidget> MakeAddFilterMenu();
-		void MakeSelectCategoriesSubMenu(FMenuBuilder& MenuBuilder);
 
 		void VerbosityLogs_Execute();
 		bool VerbosityLogs_IsChecked() const;
@@ -76,6 +78,12 @@ namespace FRAMEWORK
 
 		void VerbosityErrors_Execute();
 		bool VerbosityErrors_IsChecked() const;
+
+		void UeLog_Execute();
+		bool UeLog_IsChecked() const;
+
+		void ShLog_Execute();
+		bool ShLog_IsChecked() const;
 
 		void RequestForceScroll();
 	protected:

@@ -104,7 +104,9 @@ namespace FRAMEWORK
 
 	void SOutputLog::OnFilterTextChanged(const FText& InFilterText)
 	{
-
+		Filter->FilterString = InFilterText.ToString();
+		Marshaller->MakeDirty();
+		MessagesTextBox->Refresh();
 	}
 
 	void SOutputLog::OnFilterTextCommitted(const FText& InFilterText, ETextCommit::Type InCommitType)
@@ -153,49 +155,33 @@ namespace FRAMEWORK
 		}
 		MenuBuilder.EndSection();
 
-		/*	MenuBuilder.BeginSection("OutputLogMiscEntries", FText::FromString("Miscellaneous"));
-			{
-				MenuBuilder.AddSubMenu(
-					FText::FromString("Categories"),
-					FText::FromString("Select Categories to display."),
-					FNewMenuDelegate::CreateSP(this, &SOutputLog::MakeSelectCategoriesSubMenu)
-				);
-			}*/
-
-		return MenuBuilder.MakeWidget();
-		
-	}
-
-	void SOutputLog::MakeSelectCategoriesSubMenu(FMenuBuilder& MenuBuilder)
-	{
-		/*MenuBuilder.BeginSection("OutputLogCategoriesEntries");
+		MenuBuilder.BeginSection("OutputLogMiscEntries", FText::FromString("Categories"));
 		{
 			MenuBuilder.AddMenuEntry(
-				FText::FromString("Show All"),
-				FText::FromString("Filter the Output Log to show all categories"),
+				FText::FromString("Project"),
+				FText::FromString("Filter the Output Log to show SH_LOG"),
 				FSlateIcon(),
-				FUIAction(FExecuteAction::CreateSP(this, &SOutputLog::CategoriesShowAll_Execute),
+				FUIAction(FExecuteAction::CreateSP(this, &SOutputLog::ShLog_Execute),
 					FCanExecuteAction::CreateLambda([] { return true; }),
-					FIsActionChecked::CreateSP(this, &SOutputLog::CategoriesShowAll_IsChecked)),
+					FIsActionChecked::CreateSP(this, &SOutputLog::ShLog_IsChecked)),
 				NAME_None,
 				EUserInterfaceActionType::ToggleButton
 			);
 
-			for (const FName& Category : Filter.GetAvailableLogCategories())
-			{
-				MenuBuilder.AddMenuEntry(
-					FText::AsCultureInvariant(Category.ToString()),
-					FText::Format(FText::FromString("Filter the Output Log to show category: {0}"), FText::AsCultureInvariant(Category.ToString())),
-					FSlateIcon(),
-					FUIAction(FExecuteAction::CreateSP(this, &SOutputLog::CategoriesSingle_Execute, Category),
-						FCanExecuteAction::CreateLambda([] { return true; }),
-						FIsActionChecked::CreateSP(this, &SOutputLog::CategoriesSingle_IsChecked, Category)),
-					NAME_None,
-					EUserInterfaceActionType::ToggleButton
-				);
-			}
+			MenuBuilder.AddMenuEntry(
+				FText::FromString("UE"),
+				FText::FromString("Filter the Output Log to show UE_LOG"),
+				FSlateIcon(),
+				FUIAction(FExecuteAction::CreateSP(this, &SOutputLog::UeLog_Execute),
+					FCanExecuteAction::CreateLambda([] { return true; }),
+					FIsActionChecked::CreateSP(this, &SOutputLog::UeLog_IsChecked)),
+				NAME_None,
+				EUserInterfaceActionType::ToggleButton
+			);
 		}
-		MenuBuilder.EndSection();*/
+
+		return MenuBuilder.MakeWidget();
+		
 	}
 
 	void SOutputLog::VerbosityLogs_Execute()
@@ -232,6 +218,30 @@ namespace FRAMEWORK
 	bool SOutputLog::VerbosityErrors_IsChecked() const
 	{
 		return Filter->bShowErrors;
+	}
+
+	void SOutputLog::UeLog_Execute()
+	{
+		Filter->bShowUeLog ^= 1;
+		Marshaller->MakeDirty();
+		MessagesTextBox->Refresh();
+	}
+
+	bool SOutputLog::UeLog_IsChecked() const
+	{
+		return Filter->bShowUeLog;
+	}
+
+	void SOutputLog::ShLog_Execute()
+	{
+		Filter->bShowShLog ^= 1;
+		Marshaller->MakeDirty();
+		MessagesTextBox->Refresh();
+	}
+
+	bool SOutputLog::ShLog_IsChecked() const
+	{
+		return Filter->bShowShLog;
 	}
 
 	static const FName NAME_StyleLogError(TEXT("Log.Error"));
@@ -416,6 +426,26 @@ namespace FRAMEWORK
 				return false;
 			}
 		}
+
+		
+		{
+			if (FilterString.Len() > 0 && !Message.Message->Contains(FilterString)) {
+				return false;
+			}
+		}
+
+		{
+			bool bIsShLog = GProjectCategoryNames.Contains(Message.Category);
+			bool bIsUeLog = !bIsShLog;
+			if (!bShowUeLog && bIsUeLog) {
+				return false;
+			}
+
+			if (!bShowShLog && bIsShLog) {
+				return false;
+			}
+		}
+
 		return true;
 	}
 
