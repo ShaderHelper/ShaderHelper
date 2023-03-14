@@ -2,8 +2,7 @@
 #include "Common/Util/SwizzleVector.h"
 #include "Common/Util/Auxiliary.h"
 
-DECLARE_LOG_CATEGORY_EXTERN(LogTestUtil, Log, All);
-DEFINE_LOG_CATEGORY(LogTestUtil);
+DEFINE_LOG_CATEGORY_STATIC(LogTestUtil, Log, All);
 #include <chrono>
 
 namespace UNITTEST_FRAMEWORK
@@ -141,8 +140,8 @@ namespace UNITTEST_FRAMEWORK
 			//Create the variable outside RUNCASE_WITHINT to get the result value you need
 			RUNCASE_WITHINT(VarFromFile, -64, 64,
 				Vector vec1 = { 1,2,3 };
-			Vector vec2 = vec1.ZZZ + 1;
-			Result = UnitTmp<VarFromFile>{}.Run(vec2.X, str);
+				Vector vec2 = vec1.ZZZ + 1;
+				Result = UnitTmp<VarFromFile>{}.Run(vec2.X, str);
 			)
 			SH_LOG(LogTestUtil, Warning, TEXT("TestRunCaseWithInt: %lf"), Result);
 		}

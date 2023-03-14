@@ -20,6 +20,9 @@ project "FrameWork"
 	}
 
     uses "UE"
+    links {
+        "d3d12", "dxgi", "d3dcompiler"
+    }
 
     filter "system:windows"
         pchheader "CommonHeader.h"
