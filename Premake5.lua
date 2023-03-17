@@ -2,6 +2,7 @@ include "Premake/Custom.lua"
 
 external_ue = "External/UE"
 external_d3d12memallocator = "External/D3D12MemoryAllocator"
+external_d3dx12 = "External/D3DX12"
 
 project_shaderHelper = "Source/ShaderHelper"
 project_frameWork = "Source/FrameWork"
@@ -79,6 +80,7 @@ workspace "ShaderHelper"
 
 include(external_ue)
 include(external_d3d12memallocator)
+include(external_d3dx12)
 
 include(project_shaderHelper)
 include(project_frameWork)

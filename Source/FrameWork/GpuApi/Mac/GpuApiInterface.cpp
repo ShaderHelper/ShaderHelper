@@ -5,7 +5,12 @@ namespace FRAMEWORK
 namespace GpuApi
 {
 		
-	bool InitApiEnv()
+	void InitApiEnv()
+	{
+
+	}
+
+	void FlushGpu()
 	{
 
 	}

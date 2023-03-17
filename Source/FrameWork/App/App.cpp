@@ -67,6 +67,12 @@ namespace FRAMEWORK {
 		FCommandLine::Set(CommandLine);
 	}
 
+	App::App(const TCHAR* CommandLine, TUniquePtr<Renderer>&& InRenderer)
+		: AppRenderer(MoveTemp(InRenderer))
+	{
+		FCommandLine::Set(CommandLine);
+	}
+
 	void App::Init()
 	{
 		UE_Init();
@@ -101,6 +107,10 @@ namespace FRAMEWORK {
 			SetCurrentTime(CurrentRealTime);
 			SetDeltaTime(DeltaTime);
 			Update(DeltaTime);
+
+			if (AppRenderer.IsValid()) {
+				AppRenderer->Render();
+			}
 			//if not change GFrameCounter, slate texture may not update.
 			GFrameCounter++;
 		}

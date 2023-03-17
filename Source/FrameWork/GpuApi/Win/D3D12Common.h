@@ -4,6 +4,7 @@
 #include <Windows/PreWindowsApi.h>
 THIRD_PARTY_INCLUDES_START
 #include <d3d12.h>
+#include <d3dx12.h>
 #include <d3d12sdklayers.h>
 #include <dxgi1_4.h>
 THIRD_PARTY_INCLUDES_END
