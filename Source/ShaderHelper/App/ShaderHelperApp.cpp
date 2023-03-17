@@ -4,11 +4,6 @@
 #include "UI/Widgets/SShaderHelperWindow.h"
 
 namespace SH {
-	ShaderHelperApp::ShaderHelperApp(const TCHAR* CommandLine)
-		:App(CommandLine)
-	{
-
-	}
 
 	void ShaderHelperApp::Init()
 	{

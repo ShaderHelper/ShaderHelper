@@ -5,4 +5,6 @@ namespace FRAMEWORK
 	class GpuResource : public FThreadSafeRefCountedObject {};
 	
 	class GpuTextureResource : public GpuResource {};
+
+	class GpuShader : public GpuResource {};
 }

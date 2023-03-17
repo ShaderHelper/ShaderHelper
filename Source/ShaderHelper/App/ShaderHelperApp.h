@@ -5,7 +5,7 @@ namespace SH {
 	class ShaderHelperApp : public App
 	{
 	public:
-		ShaderHelperApp(const TCHAR* CommandLine);
+		using App::App;
 	private:
 		void Init() override;
 		void ShutDown() override;

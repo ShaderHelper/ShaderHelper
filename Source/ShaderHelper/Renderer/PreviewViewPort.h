@@ -20,7 +20,7 @@ namespace SH
 		void SetViewPortRenderTexture(TRefCountPtr<GpuTextureResource> InGpuTex);
 	private:
 		TSharedPtr<FSlateShaderResource> ViewPortRT;
-		uint32 SizeX;
-		uint32 SizeY;
+		int32 SizeX;
+		int32 SizeY;
 	};
 }

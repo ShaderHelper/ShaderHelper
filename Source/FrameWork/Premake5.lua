@@ -1,5 +1,5 @@
 FrameWorkHierarchy = {
-    ["Sources/*"] = {"**.h","**.cpp"},
+    ["Sources/*"] = {"**.h","**.cpp", "**.hpp"},
 }
 
 project "FrameWork"
@@ -19,7 +19,9 @@ project "FrameWork"
 		"FRAMEWORK_API=DLLEXPORT"
 	}
 
-    uses "UE"
+    uses {
+        "UE", "d3dx12", "D3D12MemoryAllocator"
+    }
     links {
         "d3d12", "dxgi", "d3dcompiler"
     }

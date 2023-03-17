@@ -1,13 +1,19 @@
 #pragma once
 #include "Common/Util/SwizzleVector.h"
+#include "Renderer/Renderer.h"
 namespace FRAMEWORK {
 	class FRAMEWORK_API App : public FNoncopyable
 	{
 	public:
 		App(const TCHAR* CommandLine);
+		App(const TCHAR* CommandLine, TUniquePtr<Renderer>&& InRenderer);
 		virtual ~App() = default;
 	public:
 		virtual void Run();
+
+		virtual Renderer* GetRenderer() const {
+			return AppRenderer.Get();
+		}
 
 		static double GetCurrentTime() {
 			return CurrentTime;
@@ -54,6 +60,7 @@ namespace FRAMEWORK {
 
 	protected:
 		TSharedPtr<SWindow> AppWindow;
+		TUniquePtr<Renderer> AppRenderer;
 		
 		static inline Vector2D AppClientSize = Vector2D(1280, 720);
 		static inline double CurrentTime = 0.0;
