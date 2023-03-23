@@ -217,6 +217,12 @@ namespace AUX
 	TSharedPtr<T, Mode> TransOwnerShip(TUniquePtr<T, D>&& InUniquePtr) {
 		return TSharedPtr<T, Mode>(InUniquePtr.Release());
 	}
+
+	template<typename T, typename U>
+	TRefCountPtr<T> StaticCastRefCountPtr(const TRefCountPtr<U>& InRefCountPtr) {
+		T* RawPtr = static_cast<T*>(InRefCountPtr.GetReference());
+		return TRefCountPtr<T>{RawPtr};
+	}
 	
 
 } // end AUX namespace

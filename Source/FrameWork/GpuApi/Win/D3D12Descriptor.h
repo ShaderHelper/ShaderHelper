@@ -33,6 +33,7 @@ namespace FRAMEWORK
 	template<>
 	struct DescriptorHandle<Descriptorvisibility::CpuVisible>
 	{
+		DescriptorHandle() : CpuHandle{} {}
 		DescriptorHandle(uint32 Index, ID3D12DescriptorHeap* DescriptorHeap, uint32 DescriptorSize) {
 			Init(Index, DescriptorHeap, DescriptorSize);
 		}
@@ -58,6 +59,7 @@ namespace FRAMEWORK
 	template<>
 	struct DescriptorHandle<Descriptorvisibility::CpuGpuVisible>
 	{
+		DescriptorHandle() : CpuHandle{}, GpuHandle{} {}
 		DescriptorHandle(uint32 Index, ID3D12DescriptorHeap* DescriptorHeap, uint32 DescriptorSize)
 		{
 			Init(Index, DescriptorHeap, DescriptorSize);
@@ -93,6 +95,10 @@ namespace FRAMEWORK
 		DescriptorHandle<Visibility> Allocate();
 		void Free(DescriptorHandle<Visibility>& Handle);
 		void Reset();
+		ID3D12DescriptorHeap* GetDescriptorHeap() const {
+			return DescriptorHeap;
+		}
+
 	private:
 		TRefCountPtr<ID3D12DescriptorHeap> DescriptorHeap;
 		uint32 DescriptorSize;

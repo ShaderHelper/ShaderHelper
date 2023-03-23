@@ -12,9 +12,14 @@ namespace FRAMEWORK
 	}
 
 
-	void CommandListContext::Reset(uint32 FrameResourceIndex)
+	void CommandListContext::ResetFrameResource(uint32 FrameResourceIndex)
 	{
 		FrameResources[FrameResourceIndex].Reset();
+	}
+
+	void CommandListContext::BindFrameResource(uint32 FrameResourceIndex)
+	{
+		FrameResources[FrameResourceIndex].BindToCommandList(GraphicsCmdList);
 	}
 
 	FrameResource::FrameResource(TRefCountPtr<ID3D12CommandAllocator> InCommandAllocator, DescriptorAllocatorStorage&& InDescriptorAllocators)
@@ -32,12 +37,17 @@ namespace FRAMEWORK
 		DescriptorAllocators.SamplerAllocator->Reset();
 	}
 
-
-	void FrameResource::BindToCommandList(ID3D12GraphicsCommandList* GraphicsCmdList)
+	void FrameResource::BindToCommandList(ID3D12GraphicsCommandList* InGraphicsCmdList)
 	{
-		check(GraphicsCmdList);
+		check(InGraphicsCmdList);
 		//CommandList can be reset when already submit it to gpu.
-		GraphicsCmdList->Reset(CommandAllocator,nullptr);
+		InGraphicsCmdList->Reset(CommandAllocator, nullptr);
+
+		ID3D12DescriptorHeap* Heaps[] = {
+			DescriptorAllocators.SrvAllocator->GetDescriptorHeap(),
+			DescriptorAllocators.SamplerAllocator->GetDescriptorHeap()
+		};
+		InGraphicsCmdList->SetDescriptorHeaps(UE_ARRAY_COUNT(Heaps), Heaps);
 	}
 
 	void InitFrameResource()

@@ -11,4 +11,7 @@
 #include "GlobalBoilerplate.h"
 #include "ProjectDefinitions.h"
 
+#include "Common/Util/SwizzleVector.h"
+#include "Common/Util/Auxiliary.h"
+
 

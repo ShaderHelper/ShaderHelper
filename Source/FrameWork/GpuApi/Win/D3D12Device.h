@@ -14,5 +14,9 @@ namespace FRAMEWORK
 	inline constexpr uint32 FrameSourceNum = AllowableLag + 1;
 	inline uint64 CurCpuFrame;
 	inline uint64 CurGpuFrame;
+
+	inline uint32 GetCurFrameSourceIndex() {
+		return CurCpuFrame % FrameSourceNum;
+	}
  	
 }
