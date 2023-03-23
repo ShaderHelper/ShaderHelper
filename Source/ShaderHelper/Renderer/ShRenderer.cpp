@@ -16,19 +16,21 @@ namespace SH
 
 	void ShRenderer::RenderBegin()
 	{
-
+		GpuApi::StartFrame();
 	}
 
 	void ShRenderer::Render()
 	{
 		RenderBegin();
 		
+		
+
 		RenderEnd();
 	}
 
 	void ShRenderer::RenderEnd()
 	{
-		GpuApi::FlushGpu();
+		GpuApi::EndFrame();
 	}
 
 }

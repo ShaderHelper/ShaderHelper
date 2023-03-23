@@ -15,5 +15,30 @@ namespace GpuApi
 
 	}
 
+	void StartFrame()
+	{
+
+	}
+
+	void EndFrame()
+	{
+
+	}
+
+	TRefCountPtr<GpuTextureResource> CreateGpuTexture(const GpuTextureDesc& InTexDesc)
+	{
+
+	}
+
+	void* MapGpuTexture(TRefCountPtr<GpuTextureResource> InGpuTexture, TextureMapMode InMapMode)
+	{
+
+	}
+
+	void UnMapGpuTexture(TRefCountPtr<GpuTextureResource> InGpuTexture)
+	{
+
+	}
+
 }
 }

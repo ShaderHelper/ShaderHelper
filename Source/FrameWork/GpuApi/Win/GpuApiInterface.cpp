@@ -2,6 +2,8 @@
 #include "GpuApi/GpuApiInterface.h"
 #include "D3D12Device.h"
 #include "D3D12CommandList.h"
+#include "D3D12Texture.h"
+
 namespace FRAMEWORK
 {
 namespace GpuApi
@@ -13,6 +15,17 @@ namespace GpuApi
 	}
 
 	void FlushGpu()
+	{
+		
+	}
+
+	void StartFrame()
+	{
+		uint32 FrameResourceIndex = GetCurFrameSourceIndex();
+		GCommandListContext->BindFrameResource(FrameResourceIndex);
+	}
+
+	void EndFrame()
 	{
 		check(CurCpuFrame >= CurCpuFrame);
 		CurCpuFrame++;
@@ -29,8 +42,23 @@ namespace GpuApi
 		}
 
 		//FrameResource
-		uint32 FrameResourceIndex = CurCpuFrame % FrameSourceNum;
-		GCommandListContext->Reset(FrameResourceIndex);
+		uint32 FrameResourceIndex = GetCurFrameSourceIndex();
+		GCommandListContext->ResetFrameResource(FrameResourceIndex);
+	}
+
+	TRefCountPtr<GpuTextureResource> CreateGpuTexture(const GpuTextureDesc& InTexDesc)
+	{
+		return AUX::StaticCastRefCountPtr<GpuTextureResource>(CreateDx12Texture(InTexDesc));
+	}
+
+	void* MapGpuTexture(TRefCountPtr<GpuTextureResource> InGpuTexture, TextureMapMode InMapMode)
+	{
+
+	}
+
+	void UnMapGpuTexture(TRefCountPtr<GpuTextureResource> InGpuTexture)
+	{
+
 	}
 }
 }

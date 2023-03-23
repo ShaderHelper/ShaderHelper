@@ -6,9 +6,9 @@ namespace FRAMEWORK
 	DescriptorAllocator<MaxSize, Visibility, DescType>::DescriptorAllocator()
 	{
 		D3D12_DESCRIPTOR_HEAP_DESC HeapDesc;
-		HeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE(static_cast<int>(DescType));
+		HeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE(DescType);
 		HeapDesc.NumDescriptors = MaxSize;
-		HeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAGS(static_cast<int>(Visibility));
+		HeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAGS(Visibility);
 		DxCheck(GDevice->CreateDescriptorHeap(&HeapDesc, IID_PPV_ARGS(DescriptorHeap.GetInitReference())));
 		DescriptorSize = GDevice->GetDescriptorHandleIncrementSize(HeapDesc.Type);
 

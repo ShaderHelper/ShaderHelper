@@ -6,7 +6,7 @@ namespace FRAMEWORK
 {
 	extern void InitFrameResource();
 
-	class FrameResource
+	class FrameResource : public FNoncopyable
 	{
 	public:
 		using RtvAllocatorType = CpuDescriptorAllocator<256, DescriptorType::RTV>;
@@ -21,7 +21,8 @@ namespace FRAMEWORK
 		};
 		FrameResource(TRefCountPtr<ID3D12CommandAllocator> InCommandAllocator, DescriptorAllocatorStorage&& InDescriptorAllocators);
 		void Reset();
-		void BindToCommandList(ID3D12GraphicsCommandList* GraphicsCmdList);
+		void BindToCommandList(ID3D12GraphicsCommandList* InGraphicsCmdList);
+		const DescriptorAllocatorStorage& GetDescriptorAllocators() const { return DescriptorAllocators; }
 
 	private:
 		TRefCountPtr<ID3D12CommandAllocator> CommandAllocator;
@@ -34,7 +35,12 @@ namespace FRAMEWORK
 		using FrameResourceStorage = TArray<FrameResource, TFixedAllocator<FrameSourceNum>>;
 	public:
 		CommandListContext(FrameResourceStorage&& InitFrameResources, TRefCountPtr<ID3D12GraphicsCommandList> InGraphicsCmdList);
-		void Reset(uint32 FrameResourceIndex);
+		void ResetFrameResource(uint32 FrameResourceIndex);
+		void BindFrameResource(uint32 FrameResourceIndex);
+		const FrameResource& GetCurFrameResource() const {
+			uint32 Index = GetCurFrameSourceIndex();
+			return FrameResources[Index];
+		}
 
 	private:
 		FrameResourceStorage FrameResources;
