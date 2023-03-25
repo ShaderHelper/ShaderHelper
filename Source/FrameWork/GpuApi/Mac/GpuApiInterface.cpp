@@ -15,12 +15,12 @@ namespace GpuApi
 
 	}
 
-	void StartFrame()
+	void StartRenderFrame()
 	{
 
 	}
 
-	void EndFrame()
+	void EndRenderFrame()
 	{
 
 	}
@@ -30,7 +30,7 @@ namespace GpuApi
 
 	}
 
-	void* MapGpuTexture(TRefCountPtr<GpuTextureResource> InGpuTexture, TextureMapMode InMapMode)
+	void* MapGpuTexture(TRefCountPtr<GpuTextureResource> InGpuTexture, GpuResourceMapMode InMapMode)
 	{
 
 	}

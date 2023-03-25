@@ -15,6 +15,17 @@ namespace FRAMEWORK
 			SH_LOG(LogDx12, Error, TEXT("Invalid Texture dimensions %ux%u"), InTexDesc.Width, InTexDesc.Height);
 			return false;
 		}
+
+		if (InTexDesc.NumMips != 1) {
+			SH_LOG(LogDx12, Error, TEXT("Invalid Texture MipLevels. TODO: Support texture subresource"));
+			return false;
+		}
+
+		if (InTexDesc.Depth > 1) {
+			SH_LOG(LogDx12, Error, TEXT("Invalid Texture Depth. TODO: Support 3d texture"));
+			return false;
+		}
+		
 		return true;
 	}
 
@@ -75,6 +86,11 @@ namespace FRAMEWORK
 		FlagSets Flags{};
 		GetDx12ResourceFlags(InTexDesc.Usage, ResourceFlags, Flags);
 
+		bool bHasInitialData = false;
+		if (!InTexDesc.InitialData.IsEmpty()) {
+			bHasInitialData = true;
+		}
+
 		CD3DX12_RESOURCE_DESC TexDesc = CD3DX12_RESOURCE_DESC::Tex2D(
 			MapTextureFormat(InTexDesc.Format),
 			InTexDesc.Width,
@@ -90,19 +106,35 @@ namespace FRAMEWORK
 
 		D3D12_RESOURCE_STATES InitialState = D3D12_RESOURCE_STATE_COMMON;
 		GetInitialResourceState(Flags, InitialState);
+		//If have initial data, we need to set state to COPY_DEST.
+		//Don't call MapGpuTexture()/UnMapGpuTexture() to avoid generating extra barrier.
+		D3D12_RESOURCE_STATES ActualState = bHasInitialData ? D3D12_RESOURCE_STATE_COPY_DEST : InitialState;
 
 		//Fast Clear Optimization
 		const float ClearColor[4] = { InTexDesc.ClearValues.X, InTexDesc.ClearValues.Y, InTexDesc.ClearValues.Z, InTexDesc.ClearValues.W };
 		CD3DX12_CLEAR_VALUE ClearValues{ MapTextureFormat(InTexDesc.Format), ClearColor };
 
 		TRefCountPtr<ID3D12Resource> TexResource;
-
 		DxCheck(GDevice->CreateCommittedResource(&HeapType, HeapFlag,
-			&TexDesc, InitialState, &ClearValues, IID_PPV_ARGS(TexResource.GetInitReference())));
+			&TexDesc, ActualState, &ClearValues, IID_PPV_ARGS(TexResource.GetInitReference())));
 
+		if (bHasInitialData) {
+			const uint64 UploadBufferSize = GetRequiredIntermediateSize(TexResource, 0, 1);
+			TRefCountPtr<Dx12UploadBuffer> UploadBuffer = new Dx12UploadBuffer(UploadBufferSize);
+			
+			D3D12_SUBRESOURCE_DATA textureData = {};
+			textureData.pData = &InTexDesc.InitialData[0];
+			textureData.RowPitch = InTexDesc.Width * GetFormatByteSize(InTexDesc.Format);
+			textureData.SlicePitch = textureData.RowPitch * InTexDesc.Height;
+
+			UpdateSubresources(GCommandListContext->GetCommandListHandle(), TexResource, UploadBuffer->GetResource(), 0, 0, 1, &textureData);
+			GCommandListContext->Transition(TexResource, ActualState, InitialState);
+		}
+		
 		TRefCountPtr<Dx12Texture> RetTexture = new Dx12Texture{ TexResource };
-
 		CreateTextureView(Flags, RetTexture);
+		
+		GCommandListContext->StateTracker.TrackResourceState(RetTexture->GetResource(), InitialState);
 
 		return RetTexture;
 	}

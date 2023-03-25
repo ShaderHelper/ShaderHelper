@@ -9,11 +9,11 @@ namespace GpuApi
 	//Wait for all gpu work to finish
 	FRAMEWORK_API void FlushGpu();
 
-	FRAMEWORK_API void StartFrame();
-	FRAMEWORK_API void EndFrame();
+	FRAMEWORK_API void StartRenderFrame();
+	FRAMEWORK_API void EndRenderFrame();
 
 	FRAMEWORK_API TRefCountPtr<GpuTextureResource> CreateGpuTexture(const GpuTextureDesc& InTexDesc);
-	FRAMEWORK_API void* MapGpuTexture(TRefCountPtr<GpuTextureResource> InGpuTexture, TextureMapMode InMapMode);
+	FRAMEWORK_API void* MapGpuTexture(TRefCountPtr<GpuTextureResource> InGpuTexture, GpuResourceMapMode InMapMode);
 	FRAMEWORK_API void UnMapGpuTexture(TRefCountPtr<GpuTextureResource> InGpuTexture);
 }
 }
