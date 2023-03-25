@@ -22,6 +22,13 @@ namespace FRAMEWORK
 		FrameResources[FrameResourceIndex].BindToCommandList(GraphicsCmdList);
 	}
 
+	void CommandListContext::Transition(ID3D12Resource* InResource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After)
+	{
+		ensureMsgf(Before == After, TEXT("Transitioning between the same resource sates: %d ?"), Before, After);
+		CD3DX12_RESOURCE_BARRIER Barrier = CD3DX12_RESOURCE_BARRIER::Transition(InResource, Before, After);
+		GraphicsCmdList->ResourceBarrier(1, &Barrier);
+	}
+
 	FrameResource::FrameResource(TRefCountPtr<ID3D12CommandAllocator> InCommandAllocator, DescriptorAllocatorStorage&& InDescriptorAllocators)
 		: CommandAllocator(MoveTemp(InCommandAllocator))
 		, DescriptorAllocators(MoveTemp(InDescriptorAllocators))

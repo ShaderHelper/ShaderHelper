@@ -1,6 +1,7 @@
 #include "D3D12Common.h"
 #include "D3D12Descriptor.h"
 #include "D3D12Device.h"
+#include "D3D12Util.h"
 
 namespace FRAMEWORK
 {
@@ -35,12 +36,17 @@ namespace FRAMEWORK
 		using FrameResourceStorage = TArray<FrameResource, TFixedAllocator<FrameSourceNum>>;
 	public:
 		CommandListContext(FrameResourceStorage&& InitFrameResources, TRefCountPtr<ID3D12GraphicsCommandList> InGraphicsCmdList);
+		ID3D12GraphicsCommandList* GetCommandListHandle() const { return GraphicsCmdList; }
 		void ResetFrameResource(uint32 FrameResourceIndex);
 		void BindFrameResource(uint32 FrameResourceIndex);
 		const FrameResource& GetCurFrameResource() const {
 			uint32 Index = GetCurFrameSourceIndex();
 			return FrameResources[Index];
 		}
+		void Transition(ID3D12Resource* InResource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After);
+
+	public:
+		ResourceStateTracker StateTracker;
 
 	private:
 		FrameResourceStorage FrameResources;

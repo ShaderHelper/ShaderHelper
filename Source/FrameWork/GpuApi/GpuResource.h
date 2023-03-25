@@ -30,7 +30,7 @@ namespace FRAMEWORK
 	};
 	ENUM_CLASS_FLAGS(GpuTextureUsage);
 
-	enum class TextureMapMode
+	enum class GpuResourceMapMode
 	{
 		READ_ONLY,
 		WRITE_ONLY,
@@ -42,10 +42,10 @@ namespace FRAMEWORK
 			uint32 InWidth,
 			uint32 InHeight,
 			GpuTextureFormat InFormat,
-			uint32 InDepth = 1,
-			uint32 InNumMips = 0,
 			GpuTextureUsage InUsage = GpuTextureUsage::None,
-			Vector4f InClearValues = Vector4f{0}
+			Vector4f InClearValues = Vector4f{ 0 },
+			uint32 InDepth = 1,
+			uint32 InNumMips = 1
 		)
 			: Width(InWidth), Height(InHeight), Depth(InDepth)
 			, NumMips(InNumMips)
@@ -55,6 +55,7 @@ namespace FRAMEWORK
 		{
 
 		}
+
 		uint32 Width;
 		uint32 Height;
 		uint32 Depth;
@@ -62,14 +63,36 @@ namespace FRAMEWORK
 		GpuTextureFormat Format;
 		GpuTextureUsage Usage;
 		Vector4f ClearValues;
+
+		TArray<uint8> InitialData;
 	};
 
-	class GpuResource : public FThreadSafeRefCountedObject {
-	public:
-		virtual ~GpuResource() = default;
-	};
+	class GpuResource : public FThreadSafeRefCountedObject {};
+
+	class GpuBuffer : public GpuResource {};
 	
 	class GpuTextureResource : public GpuResource {};
 
 	class GpuShader : public GpuResource {};
+
+	inline uint32 GetFormatByteSize(GpuTextureFormat InFormat)
+	{
+		switch (InFormat)
+		{
+		case GpuTextureFormat::R8G8B8A8_UNORM:
+		case GpuTextureFormat::R10G10B10A2_UNORM:
+		case GpuTextureFormat::R11G11B10_FLOAT:
+			return 4;
+		case GpuTextureFormat::R16G16B16A16_UNORM:
+		case GpuTextureFormat::R16G16B16A16_UINT:
+		case GpuTextureFormat::R16G16B16A16_FLOAT:
+			return 8;
+		case GpuTextureFormat::R32G32B32A32_UINT:
+		case GpuTextureFormat::R32G32B32A32_FLOAT:
+			return 16;
+		default:
+			checkf(false, TEXT("Ivalid Texture Format."));
+			return 0;
+		}
+	}
 }

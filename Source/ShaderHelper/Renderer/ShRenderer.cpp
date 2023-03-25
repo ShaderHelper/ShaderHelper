@@ -16,7 +16,7 @@ namespace SH
 
 	void ShRenderer::RenderBegin()
 	{
-		GpuApi::StartFrame();
+		GpuApi::StartRenderFrame();
 	}
 
 	void ShRenderer::Render()
@@ -30,7 +30,7 @@ namespace SH
 
 	void ShRenderer::RenderEnd()
 	{
-		GpuApi::EndFrame();
+		GpuApi::EndRenderFrame();
 	}
 
 }

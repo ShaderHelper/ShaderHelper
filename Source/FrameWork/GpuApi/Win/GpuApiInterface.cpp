@@ -19,13 +19,13 @@ namespace GpuApi
 		
 	}
 
-	void StartFrame()
+	void StartRenderFrame()
 	{
 		uint32 FrameResourceIndex = GetCurFrameSourceIndex();
 		GCommandListContext->BindFrameResource(FrameResourceIndex);
 	}
 
-	void EndFrame()
+	void EndRenderFrame()
 	{
 		check(CurCpuFrame >= CurCpuFrame);
 		CurCpuFrame++;
@@ -51,14 +51,33 @@ namespace GpuApi
 		return AUX::StaticCastRefCountPtr<GpuTextureResource>(CreateDx12Texture(InTexDesc));
 	}
 
-	void* MapGpuTexture(TRefCountPtr<GpuTextureResource> InGpuTexture, TextureMapMode InMapMode)
+	void* MapGpuTexture(TRefCountPtr<GpuTextureResource> InGpuTexture, GpuResourceMapMode InMapMode)
 	{
-
+		TRefCountPtr<Dx12Texture> Texture = AUX::StaticCastRefCountPtr<Dx12Texture>(InGpuTexture);
+		void* Data{};
+		if (InMapMode == GpuResourceMapMode::WRITE_ONLY) {
+			const uint64 UploadBufferSize = GetRequiredIntermediateSize(Texture->GetResource(), 0, 1);
+			Texture->UploadBuffer = new Dx12UploadBuffer(UploadBufferSize);
+			Data = Texture->UploadBuffer->Map();
+			Texture->bIsMappingForWriting = true;
+		}
+		return Data;
 	}
 
 	void UnMapGpuTexture(TRefCountPtr<GpuTextureResource> InGpuTexture)
 	{
+		TRefCountPtr<Dx12Texture> Texture = AUX::StaticCastRefCountPtr<Dx12Texture>(InGpuTexture);
+		if (Texture->bIsMappingForWriting) {
+			Texture->UploadBuffer->Unmap();
+			ScopedBarrier Barrier{ Texture->GetResource(), D3D12_RESOURCE_STATE_COPY_DEST };
+			ID3D12GraphicsCommandList* CommandListHandle = GCommandListContext->GetCommandListHandle();
 
+			CD3DX12_TEXTURE_COPY_LOCATION DestLoc{ Texture->GetResource() };
+			CD3DX12_TEXTURE_COPY_LOCATION SrcLoc{ Texture->UploadBuffer->GetResource() };
+			CommandListHandle->CopyTextureRegion(&DestLoc, 0, 0, 0, &SrcLoc,nullptr);
+				
+			Texture->bIsMappingForWriting = false;
+		}
 	}
 }
 }
