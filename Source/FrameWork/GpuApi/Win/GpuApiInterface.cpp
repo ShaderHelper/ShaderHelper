@@ -3,6 +3,7 @@
 #include "D3D12Device.h"
 #include "D3D12CommandList.h"
 #include "D3D12Texture.h"
+#include "D3D12Shader.h"
 
 namespace FRAMEWORK
 {
@@ -78,6 +79,17 @@ namespace GpuApi
 				
 			Texture->bIsMappingForWriting = false;
 		}
+	}
+
+	TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName)
+	{
+		return new Dx12Shader(InType, MoveTemp(InSourceText), MoveTemp(InShaderName));
+	}
+
+	bool CompilerShader(TRefCountPtr<GpuShader> InShader)
+	{
+		TRefCountPtr<Dx12Shader> Shader = AUX::StaticCastRefCountPtr<Dx12Shader>(InShader);
+		return GShaderCompiler.Compile(Shader);
 	}
 }
 }
