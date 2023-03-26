@@ -20,10 +20,11 @@ project "FrameWork"
 	}
 
     uses {
-        "UE", "d3dx12", "D3D12MemoryAllocator"
+        "UE", "d3dx12", "D3D12MemoryAllocator",
+        "DXC"
     }
     links {
-        "d3d12", "dxgi", "dxcompiler"
+        "d3d12", "dxgi"
     }
 
     filter "system:windows"

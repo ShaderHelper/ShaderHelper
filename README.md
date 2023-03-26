@@ -1,6 +1,6 @@
 # ShaderHelper (WIP)
 
-This is a lightweight shader editor based on some special Modules from UnrealEngine (Slate, ImageWrapper ...).
+This is a shader editor based on some special Modules from UnrealEngine (Slate, ImageWrapper ...).
 
 <p align="center">
 <img src="https://github.com/mxrhyx233/ShaderHelper/blob/main/ScreenShot/App.png" width="640" height="360">

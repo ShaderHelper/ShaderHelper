@@ -1,27 +1,10 @@
 #include "CommonHeader.h"
 #include "D3D12Shader.h"
 
+#pragma comment (lib, "dxcompiler.lib")
+
 namespace FRAMEWORK
 {
-	 const FString FullScreenVsText = R"(
-		void main(
-		in uint VertID : SV_VertexID,
-		out float4 Pos : SV_Position,
-		out float2 Tex : TexCoord0
-		)
-		{
-			Tex = float2(uint2(VertID, VertID << 1) & 2);
-			Pos = float4(lerp(float2(-1, 1), float2(1, -1), Tex), 0, 1);
-		}
-	)";
-
-	 const FString PsForTest = R"(
-		float4 main() : SV_Target 
-		{
-			return float4(1,1,0,0);
-		}
-	)";
-
 	 DxcCompiler::DxcCompiler()
 	 {
 		 DxCheck(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(Compiler.GetInitReference())));
@@ -52,7 +35,7 @@ namespace FRAMEWORK
 			{
 				TRefCountPtr<IDxcBlobEncoding> BlobEncodingError;
 				OperationResult->GetErrorBuffer(BlobEncodingError.GetInitReference());
-				FString ErrorStr{ BlobEncodingError->GetBufferSize(), (ANSICHAR*)BlobEncodingError->GetBufferPointer()};
+				FString ErrorStr{ (int32)BlobEncodingError->GetBufferSize(), (ANSICHAR*)BlobEncodingError->GetBufferPointer()};
 
 				SH_LOG(LogDx12, Error, TEXT("Shader compilation failed: %s"), *ErrorStr);
 			}
