@@ -75,7 +75,7 @@ namespace FRAMEWORK
 			DescriptorAllocators.SrvAllocator.Reset(new FrameResource::SrvAllocatorType());
 			DescriptorAllocators.SamplerAllocator.Reset(new FrameResource::SamplerAllocatorType());
 
-			FrameResources.Add(FrameResource(MoveTemp(CommandAllocator), MoveTemp(DescriptorAllocators)));
+			FrameResources.Emplace(MoveTemp(CommandAllocator), MoveTemp(DescriptorAllocators));
 		}
 
 		GCommandListContext.Reset(new CommandListContext(MoveTemp(FrameResources), MoveTemp(GraphicsCmdList)));
