@@ -15,5 +15,8 @@ namespace GpuApi
 	FRAMEWORK_API TRefCountPtr<GpuTextureResource> CreateGpuTexture(const GpuTextureDesc& InTexDesc);
 	FRAMEWORK_API void* MapGpuTexture(TRefCountPtr<GpuTextureResource> InGpuTexture, GpuResourceMapMode InMapMode);
 	FRAMEWORK_API void UnMapGpuTexture(TRefCountPtr<GpuTextureResource> InGpuTexture);
+
+	FRAMEWORK_API TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName);
+	FRAMEWORK_API bool CompilerShader(TRefCountPtr<GpuShader> InShader);
 }
 }

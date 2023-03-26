@@ -35,6 +35,12 @@ namespace FRAMEWORK
 		READ_ONLY,
 		WRITE_ONLY,
 	};
+
+	enum class ShaderType
+	{
+		VertexShader,
+		PixelShader
+	};
 	
 	struct GpuTextureDesc
 	{

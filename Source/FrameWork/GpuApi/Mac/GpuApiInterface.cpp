@@ -40,5 +40,15 @@ namespace GpuApi
 
 	}
 
+	TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName)
+	{
+
+	}
+
+	bool CompilerShader(TRefCountPtr<GpuShader> InShader)
+	{
+
+	}
+
 }
 }

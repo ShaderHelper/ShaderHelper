@@ -23,7 +23,7 @@ project "FrameWork"
         "UE", "d3dx12", "D3D12MemoryAllocator"
     }
     links {
-        "d3d12", "dxgi", "d3dcompiler"
+        "d3d12", "dxgi", "dxcompiler"
     }
 
     filter "system:windows"
