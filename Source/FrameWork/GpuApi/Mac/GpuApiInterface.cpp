@@ -25,17 +25,17 @@ namespace GpuApi
 
 	}
 
-	TRefCountPtr<GpuTextureResource> CreateGpuTexture(const GpuTextureDesc& InTexDesc)
+	TRefCountPtr<GpuTexture> CreateGpuTexture(const GpuTextureDesc& InTexDesc)
 	{
 
 	}
 
-	void* MapGpuTexture(TRefCountPtr<GpuTextureResource> InGpuTexture, GpuResourceMapMode InMapMode)
+	void* MapGpuTexture(TRefCountPtr<GpuTexture> InGpuTexture, GpuResourceMapMode InMapMode)
 	{
 
 	}
 
-	void UnMapGpuTexture(TRefCountPtr<GpuTextureResource> InGpuTexture)
+	void UnMapGpuTexture(TRefCountPtr<GpuTexture> InGpuTexture)
 	{
 
 	}
@@ -46,6 +46,16 @@ namespace GpuApi
 	}
 
 	bool CompilerShader(TRefCountPtr<GpuShader> InShader)
+	{
+
+	}
+
+	TRefCountPtr<RenderPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc)
+	{
+
+	}
+
+	void SetRenderPipelineState(TRefCountPtr<RenderPipelineState> InPipelineState)
 	{
 
 	}

@@ -3,16 +3,17 @@
 #include "D3D12Common.h"
 #include "D3D12Descriptor.h"
 #include "D3D12Buffer.h"
+#include "D3D12Util.h"
 
 namespace FRAMEWORK
 {
-	class Dx12Texture : public GpuTextureResource
+	class Dx12Texture : public GpuTexture, public TrackedResource
 	{
 	public:
-		Dx12Texture(TRefCountPtr<ID3D12Resource> InResource)
-			: Resource(MoveTemp(InResource))
+		Dx12Texture(D3D12_RESOURCE_STATES InState, TRefCountPtr<ID3D12Resource> InResource)
+			: TrackedResource(InState), Resource(MoveTemp(InResource))
 		{}
-		ID3D12Resource* GetResource() const { return Resource.GetReference(); }
+		ID3D12Resource* GetResource() const override { return Resource.GetReference(); }
 		
 	private:
 		TRefCountPtr<ID3D12Resource> Resource;

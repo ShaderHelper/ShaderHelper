@@ -14,7 +14,7 @@ namespace SH
 		void RenderBegin();
 		void RenderEnd();
 	private:
-		TRefCountPtr<GpuTextureResource> FinalRT;
+		TRefCountPtr<GpuTexture> FinalRT;
 		TRefCountPtr<GpuShader> Shader;
 	};
 }

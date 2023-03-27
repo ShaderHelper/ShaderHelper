@@ -3,31 +3,48 @@
 
 namespace FRAMEWORK
 {
+	class TrackedResource;
+	
 	class ResourceStateTracker
 	{
 	public:
-		void TrackResourceState(ID3D12Resource* InResource, D3D12_RESOURCE_STATES InState) {
+		void TrackResourceState(TrackedResource* InResource, D3D12_RESOURCE_STATES InState) {
 			ResourceStateMap.Add(InResource, InState);
 		}
 
-		D3D12_RESOURCE_STATES GetResourceState(ID3D12Resource* InResource) const {
-			return ResourceStateMap[InResource];
+		void RemoveResourceState(TrackedResource* InResource) {
+			ResourceStateMap.Remove(InResource);
 		}
 
-		void Empty() {
-			ResourceStateMap.Empty();
+		D3D12_RESOURCE_STATES GetResourceState(TrackedResource* InResource) const {
+			checkf(ResourceStateMap.Contains(InResource), TEXT("Querying the untracked resource."));
+			return ResourceStateMap[InResource];
 		}
 	private:
-		TMap<ID3D12Resource*, D3D12_RESOURCE_STATES> ResourceStateMap;
+		TMap<TrackedResource*, D3D12_RESOURCE_STATES> ResourceStateMap;
+	};
+
+	inline ResourceStateTracker GResourceStateTracker;
+	
+	class TrackedResource
+	{
+	public:
+		TrackedResource(D3D12_RESOURCE_STATES InState) {
+			GResourceStateTracker.TrackResourceState(this, InState);
+		}
+		virtual ~TrackedResource() {
+			GResourceStateTracker.RemoveResourceState(this);
+		}
+		virtual ID3D12Resource* GetResource() const = 0;
 	};
 
 	class ScopedBarrier
 	{
 	public:
-		ScopedBarrier(TRefCountPtr<ID3D12Resource> InResource, D3D12_RESOURCE_STATES InDestState);
+		ScopedBarrier(TrackedResource* InResource, D3D12_RESOURCE_STATES InDestState);
 		~ScopedBarrier();
 	private:
-		TRefCountPtr<ID3D12Resource> Resource;
+		TrackedResource* Resource;
 		D3D12_RESOURCE_STATES DestState;
 		D3D12_RESOURCE_STATES CurState;
 	};

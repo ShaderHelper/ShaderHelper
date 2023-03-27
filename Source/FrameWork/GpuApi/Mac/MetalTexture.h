@@ -2,7 +2,7 @@
 #include "GpuApi/GpuResource.h"
 namespace FRAMEWORK
 {
-	class GpuMetalTexture : public GpuTextureResource
+	class GpuMetalTexture : public GpuTexture
 	{
 
 	};

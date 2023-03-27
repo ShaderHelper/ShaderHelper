@@ -19,6 +19,7 @@ namespace FRAMEWORK
 			, SourceText(MoveTemp(InSourceText))
 		{}
 		const ANSICHAR* GetSourceText() const { return TCHAR_TO_ANSI(*SourceText); }
+		IDxcBlob* GetCompilationResult() const { return ByteCode; }
 		bool IsCompiled() const { return ByteCode.IsValid(); }
 		void SetCompilationResult(TRefCountPtr<IDxcBlob> InByteCode) { ByteCode = MoveTemp(InByteCode); }
 

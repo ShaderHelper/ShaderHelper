@@ -43,8 +43,6 @@ namespace SH
 	void ShRenderer::Render()
 	{
 		RenderBegin();
-		
-		
 
 		RenderEnd();
 	}
