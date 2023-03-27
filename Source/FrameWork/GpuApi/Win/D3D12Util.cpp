@@ -5,20 +5,20 @@
 namespace FRAMEWORK
 {
 	
-	ScopedBarrier::ScopedBarrier(TRefCountPtr<ID3D12Resource> InResource, D3D12_RESOURCE_STATES InDestState)
-		: Resource(MoveTemp(InResource))
+	ScopedBarrier::ScopedBarrier(TrackedResource* InResource, D3D12_RESOURCE_STATES InDestState)
+		: Resource(InResource)
 		, DestState(InDestState)
 	{
-		CurState = GCommandListContext->StateTracker.GetResourceState(Resource);
+		CurState = GResourceStateTracker.GetResourceState(Resource);
 		if (CurState != DestState) {
-			GCommandListContext->Transition(Resource, CurState, DestState);
+			GCommandListContext->Transition(Resource->GetResource(), CurState, DestState);
 		}
 	}
 
 	ScopedBarrier::~ScopedBarrier()
 	{
 		if (CurState != DestState) {
-			GCommandListContext->Transition(Resource, DestState, CurState);
+			GCommandListContext->Transition(Resource->GetResource(), DestState, CurState);
 		}
 	}
 

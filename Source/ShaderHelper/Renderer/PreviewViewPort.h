@@ -17,7 +17,7 @@ namespace SH
 			return ViewPortRT.Get();
 		}
 
-		void SetViewPortRenderTexture(TRefCountPtr<GpuTextureResource> InGpuTex);
+		void SetViewPortRenderTexture(TRefCountPtr<GpuTexture> InGpuTex);
 	private:
 		TSharedPtr<FSlateShaderResource> ViewPortRT;
 		int32 SizeX;

@@ -3,7 +3,7 @@
 
 namespace SH
 {
-	void PreViewPort::SetViewPortRenderTexture(TRefCountPtr<GpuTextureResource> InGpuTex)
+	void PreViewPort::SetViewPortRenderTexture(TRefCountPtr<GpuTexture> InGpuTex)
 	{
 
 	}

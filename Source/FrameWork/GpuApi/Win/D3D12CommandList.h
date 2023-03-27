@@ -45,9 +45,6 @@ namespace FRAMEWORK
 		}
 		void Transition(ID3D12Resource* InResource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After);
 
-	public:
-		ResourceStateTracker StateTracker;
-
 	private:
 		FrameResourceStorage FrameResources;
 		TRefCountPtr<ID3D12GraphicsCommandList> GraphicsCmdList;

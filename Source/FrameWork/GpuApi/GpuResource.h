@@ -3,6 +3,16 @@
 #include <array>
 namespace FRAMEWORK
 {
+	class GpuResource : public FThreadSafeRefCountedObject {};
+
+	class GpuBuffer : public GpuResource {};
+
+	class GpuTexture : public GpuResource {};
+
+	class GpuShader : public GpuResource {};
+
+	class RenderPipelineState : public GpuResource {};
+	
 	enum class GpuTextureFormat
 	{
 		//Unorm
@@ -24,24 +34,18 @@ namespace FRAMEWORK
 	enum class GpuTextureUsage : uint32
 	{
 		None = 0,
-		RenderTarget = 1u << 1,
-		ShaderResource = 1u << 2,
-		Shared = 1u << 3,
+		RenderTarget = 1u << 0,
+		ShaderResource = 1u << 1,
+		Shared = 1u << 2,
 	};
 	ENUM_CLASS_FLAGS(GpuTextureUsage);
 
 	enum class GpuResourceMapMode
 	{
-		READ_ONLY,
-		WRITE_ONLY,
+		Read_Only,
+		Write_Only,
 	};
 
-	enum class ShaderType
-	{
-		VertexShader,
-		PixelShader
-	};
-	
 	struct GpuTextureDesc
 	{
 		GpuTextureDesc(
@@ -73,14 +77,116 @@ namespace FRAMEWORK
 		TArray<uint8> InitialData;
 	};
 
-	class GpuResource : public FThreadSafeRefCountedObject {};
+	enum class ShaderType
+	{
+		VertexShader,
+		PixelShader
+	};
 
-	class GpuBuffer : public GpuResource {};
+	enum class RasterizerCullMode
+	{
+		None,
+		Front,
+		Back,
+	};
+
+	enum class RasterizerFillMode
+	{
+		WireFrame,
+		Solid,
+	};
+
+	struct RasterizerStateDesc
+	{
+		RasterizerStateDesc(RasterizerFillMode InFillMode, RasterizerCullMode InCullMode)
+			: FillMode(InFillMode)
+			, CullMode(InCullMode)
+		{}
+
+		RasterizerFillMode FillMode;
+		RasterizerCullMode CullMode;
+	};
+
+	enum class BlendFactor
+	{
+		Zero,
+		One,
+		SrcColor,
+		InvSrcColor,
+		DestColor,
+		InvDestColor,
+		SrcAlpha,
+		InvSrcAlpha,
+		DestAlpha,
+		InvDestAlpha,
+	};
+
+	enum class BlendOp
+	{
+		Add,
+		Substract,
+		Min,
+		Max,
+	};
+
+	enum class BlendMask : uint32
+	{
+		None = 0,
+		R = 1u << 0,
+		G = 1u << 1,
+		B = 1u << 2,
+		A = 1u << 3,
+	};
+	ENUM_CLASS_FLAGS(BlendMask);
+
+	struct BlendRenderTargetDesc
+	{
+		bool BlendEnable;
+		BlendFactor SrcFactor;
+		BlendFactor DestFactor;
+		BlendFactor SrcAlphaFactor;
+		BlendFactor DestAlphaFactor;
+		BlendMask Mask;
+		BlendOp ColorOp;
+		BlendOp AlphaOp;
+	};
+
+	struct BlendStateDesc
+	{
+		TArray<BlendRenderTargetDesc, TInlineAllocator<8>> RtDesc;
+	};
+
+	enum class StencilOp
+	{
+		Zero,
+		Replace,
+		Keep,
+		Invert,
+		Increase,
+		Decrease,
+	};
+
+	enum class CompareMode
+	{
+		Less,
+		Equal,
+		LessEqual,
+		NotEqual,
+		Always,
+		Greater,
+		GreaterEqual,
+		Never,
+	};
 	
-	class GpuTextureResource : public GpuResource {};
-
-	class GpuShader : public GpuResource {};
-
+	struct PipelineStateDesc
+	{
+		TRefCountPtr<GpuShader> Vs;
+		TRefCountPtr<GpuShader> Ps;
+		RasterizerStateDesc RasterizerState;
+		BlendStateDesc BlendState;
+		GpuTextureFormat RtFormat;
+	};
+	
 	inline uint32 GetFormatByteSize(GpuTextureFormat InFormat)
 	{
 		switch (InFormat)
