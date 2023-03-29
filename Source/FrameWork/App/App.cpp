@@ -67,12 +67,6 @@ namespace FRAMEWORK {
 		FCommandLine::Set(CommandLine);
 	}
 
-	App::App(const TCHAR* CommandLine, TUniquePtr<Renderer>&& InRenderer)
-		: AppRenderer(MoveTemp(InRenderer))
-	{
-		FCommandLine::Set(CommandLine);
-	}
-
 	void App::Init()
 	{
 		UE_Init();

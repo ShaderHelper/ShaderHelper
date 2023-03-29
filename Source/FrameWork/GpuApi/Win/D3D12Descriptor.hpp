@@ -5,7 +5,7 @@ namespace FRAMEWORK
 	template<uint32 MaxSize, Descriptorvisibility Visibility, DescriptorType DescType>
 	DescriptorAllocator<MaxSize, Visibility, DescType>::DescriptorAllocator()
 	{
-		D3D12_DESCRIPTOR_HEAP_DESC HeapDesc;
+		D3D12_DESCRIPTOR_HEAP_DESC HeapDesc{};
 		HeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE(DescType);
 		HeapDesc.NumDescriptors = MaxSize;
 		HeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAGS(Visibility);

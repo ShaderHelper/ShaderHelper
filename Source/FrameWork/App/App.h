@@ -6,46 +6,24 @@ namespace FRAMEWORK {
 	{
 	public:
 		App(const TCHAR* CommandLine);
-		App(const TCHAR* CommandLine, TUniquePtr<Renderer>&& InRenderer);
 		virtual ~App() = default;
 	public:
 		virtual void Run();
 
-		virtual Renderer* GetRenderer() const {
-			return AppRenderer.Get();
-		}
+		Renderer* GetRenderer() const { return AppRenderer.Get();}
+		void SetRenderer(TUniquePtr<Renderer> InRenderer) { AppRenderer = MoveTemp(InRenderer); }
 
-		static double GetCurrentTime() {
-			return CurrentTime;
-		}
+		static double GetCurrentTime() { return CurrentTime; }
+		static void SetCurrentTime(double InTime) { CurrentTime = InTime; }
 
-		static void SetCurrentTime(double InTime) {
-			CurrentTime = InTime;
-		}
+		static double GetDeltaTime() { return DeltaTime; }
+		static void SetDeltaTime(double InDeltaTime) { DeltaTime = InDeltaTime; }
 
-		static double GetDeltaTime() {
-			return DeltaTime;
-		}
+		static double GetFixedDeltaTime() { return FixedDeltaTime; }
+		static void SetFixedDeltaTime(double InFixedDeltaTime) { FixedDeltaTime = InFixedDeltaTime;}
 
-		static void SetDeltaTime(double InDeltaTime) {
-			DeltaTime = InDeltaTime;
-		}
-
-		static double GetFixedDeltaTime() {
-			return FixedDeltaTime;
-		}
-
-		static void SetFixedDeltaTime(double InFixedDeltaTime) {
-			FixedDeltaTime = InFixedDeltaTime;
-		}
-
-		static Vector2D GetClientSize() {
-			return AppClientSize;
-		}
-
-		static void SetClientSize(Vector2D InClientSize) {
-			AppClientSize = MoveTemp(InClientSize);
-		}
+		static Vector2D GetClientSize() { return AppClientSize; }
+		static void SetClientSize(Vector2D InClientSize) {AppClientSize = MoveTemp(InClientSize);}
 		
 	protected:
 		virtual void Init();

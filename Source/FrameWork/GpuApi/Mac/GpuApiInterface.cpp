@@ -30,12 +30,12 @@ namespace GpuApi
 
 	}
 
-	void* MapGpuTexture(TRefCountPtr<GpuTexture> InGpuTexture, GpuResourceMapMode InMapMode)
+	void* MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapMode InMapMode)
 	{
 
 	}
 
-	void UnMapGpuTexture(TRefCountPtr<GpuTexture> InGpuTexture)
+	void UnMapGpuTexture(GpuTexture* InGpuTexture)
 	{
 
 	}
@@ -45,7 +45,7 @@ namespace GpuApi
 
 	}
 
-	bool CompilerShader(TRefCountPtr<GpuShader> InShader)
+	bool CompilerShader(GpuShader* InShader)
 	{
 
 	}
@@ -55,7 +55,17 @@ namespace GpuApi
 
 	}
 
-	void SetRenderPipelineState(TRefCountPtr<RenderPipelineState> InPipelineState)
+	void BindRenderPipelineState(RenderPipelineState* InPipelineState)
+	{
+
+	}
+
+	void BindVertexBuffer()
+	{
+
+	}
+
+	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount)
 	{
 
 	}
