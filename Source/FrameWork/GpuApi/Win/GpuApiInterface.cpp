@@ -23,8 +23,10 @@ namespace GpuApi
 
 	void StartRenderFrame()
 	{
+		//StaticFrameResource
 		uint32 FrameResourceIndex = GetCurFrameSourceIndex();
-		GCommandListContext->BindFrameResource(FrameResourceIndex);
+		GCommandListContext->ResetStaticFrameResource(FrameResourceIndex);
+		GCommandListContext->BindStaticFrameResource(FrameResourceIndex);
 	}
 
 	void EndRenderFrame()
@@ -32,20 +34,19 @@ namespace GpuApi
 		check(CurCpuFrame >= CurCpuFrame);
 		CurCpuFrame++;
 		DxCheck(GGraphicsQueue->Signal(CpuSyncGpuFence, CurCpuFrame));
+		
+		CurGpuFrame = CpuSyncGpuFence->GetCompletedValue();
 		const uint64 CurLag = CurCpuFrame - CurGpuFrame;
-		if (CurLag > AllowableLag) {
+		if (CurLag >= AllowableLag) {
 			//Cpu is waiting for gpu to catch up a frame.
-			const uint64 FenceValue = CpuSyncGpuFence->GetCompletedValue();
-			if (FenceValue < CurGpuFrame + 1) {
-				DxCheck(CpuSyncGpuFence->SetEventOnCompletion(CurGpuFrame + 1, CpuSyncGpuEvent));
-				WaitForSingleObject(CpuSyncGpuEvent, INFINITE);
-			}
-			CurGpuFrame++;
+			DxCheck(CpuSyncGpuFence->SetEventOnCompletion(CurGpuFrame + 1, CpuSyncGpuEvent));
+			WaitForSingleObject(CpuSyncGpuEvent, INFINITE);
+			CurGpuFrame = CurGpuFrame + 1;
 		}
 
-		//FrameResource
-		uint32 FrameResourceIndex = GetCurFrameSourceIndex();
-		GCommandListContext->ResetFrameResource(FrameResourceIndex);
+		GDynamicFrameResourceManager.ReleaseCompletedResources((CurGpuFrame + FrameSourceNum - 1) % FrameSourceNum);
+
+		DxCheck(GCommandListContext->GetCommandListHandle()->Close());
 	}
 
 	TRefCountPtr<GpuTexture> CreateGpuTexture(const GpuTextureDesc& InTexDesc)
@@ -53,9 +54,9 @@ namespace GpuApi
 		return AUX::StaticCastRefCountPtr<GpuTexture>(CreateDx12Texture(InTexDesc));
 	}
 
-	void* MapGpuTexture(TRefCountPtr<GpuTexture> InGpuTexture, GpuResourceMapMode InMapMode)
+	void* MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapMode InMapMode)
 	{
-		TRefCountPtr<Dx12Texture> Texture = AUX::StaticCastRefCountPtr<Dx12Texture>(InGpuTexture);
+		Dx12Texture* Texture = static_cast<Dx12Texture*>(InGpuTexture);
 		void* Data{};
 		if (InMapMode == GpuResourceMapMode::Write_Only) {
 			const uint64 UploadBufferSize = GetRequiredIntermediateSize(Texture->GetResource(), 0, 1);
@@ -66,9 +67,9 @@ namespace GpuApi
 		return Data;
 	}
 
-	void UnMapGpuTexture(TRefCountPtr<GpuTexture> InGpuTexture)
+	void UnMapGpuTexture(GpuTexture* InGpuTexture)
 	{
-		TRefCountPtr<Dx12Texture> Texture = AUX::StaticCastRefCountPtr<Dx12Texture>(InGpuTexture);
+		Dx12Texture* Texture = static_cast<Dx12Texture*>(InGpuTexture);
 		if (Texture->bIsMappingForWriting) {
 			Texture->UploadBuffer->Unmap();
 			ScopedBarrier Barrier{ Texture, D3D12_RESOURCE_STATE_COPY_DEST };
@@ -87,10 +88,9 @@ namespace GpuApi
 		return new Dx12Shader(InType, MoveTemp(InSourceText), MoveTemp(InShaderName));
 	}
 
-	bool CompilerShader(TRefCountPtr<GpuShader> InShader)
+	bool CompilerShader(GpuShader* InShader)
 	{
-		TRefCountPtr<Dx12Shader> Shader = AUX::StaticCastRefCountPtr<Dx12Shader>(InShader);
-		return GShaderCompiler.Compile(Shader);
+		return GShaderCompiler.Compile(static_cast<Dx12Shader*>(InShader));
 	}
 
 
@@ -126,13 +126,24 @@ namespace GpuApi
 
 		TRefCountPtr<ID3D12PipelineState> Pso;
 		DxCheck(GDevice->CreateGraphicsPipelineState(&PsoDesc, IID_PPV_ARGS(Pso.GetInitReference())));
-		return new Dx12Pso(MoveTemp(Pso));
+		return new Dx12Pso(MoveTemp(Pso), MoveTemp(RootSignature),MoveTemp(Vs), MoveTemp(Ps));
 	}
 
-	void SetRenderPipelineState(TRefCountPtr<RenderPipelineState> InPipelineState)
+	void BindRenderPipelineState(RenderPipelineState* InPipelineState)
 	{
-		TRefCountPtr<Dx12Pso> Pso = AUX::StaticCastRefCountPtr<Dx12Pso>(InPipelineState);
-		GCommandListContext->GetCommandListHandle()->SetPipelineState(Pso->GetResource());
+		GCommandListContext->SetPipeline(static_cast<Dx12Pso*>(InPipelineState));
+		GDynamicFrameResourceManager.AddUncompletedResource(InPipelineState);
+	}
+
+	void BindVertexBuffer()
+	{
+		GCommandListContext->GetCommandListHandle()->IASetVertexBuffers(0, 0, nullptr);
+	}
+
+	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount)
+	{
+		GCommandListContext->PrepareDrawingEnv();
+		GCommandListContext->GetCommandListHandle()->DrawInstanced(VertexCount, InstanceCount, StartVertexLocation, StartInstanceLocation);
 	}
 }
 }

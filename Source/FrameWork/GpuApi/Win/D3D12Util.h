@@ -1,5 +1,7 @@
 #pragma once
 #include "D3D12Common.h"
+#include "GpuApi/GpuResource.h"
+#include "D3D12Device.h"
 
 namespace FRAMEWORK
 {
@@ -8,18 +10,10 @@ namespace FRAMEWORK
 	class ResourceStateTracker
 	{
 	public:
-		void TrackResourceState(TrackedResource* InResource, D3D12_RESOURCE_STATES InState) {
-			ResourceStateMap.Add(InResource, InState);
-		}
+		void TrackResourceState(TrackedResource* InResource, D3D12_RESOURCE_STATES InState);
+		void RemoveResourceState(TrackedResource* InResource);
 
-		void RemoveResourceState(TrackedResource* InResource) {
-			ResourceStateMap.Remove(InResource);
-		}
-
-		D3D12_RESOURCE_STATES GetResourceState(TrackedResource* InResource) const {
-			checkf(ResourceStateMap.Contains(InResource), TEXT("Querying the untracked resource."));
-			return ResourceStateMap[InResource];
-		}
+		D3D12_RESOURCE_STATES GetResourceState(TrackedResource* InResource) const;
 	private:
 		TMap<TrackedResource*, D3D12_RESOURCE_STATES> ResourceStateMap;
 	};
@@ -48,4 +42,24 @@ namespace FRAMEWORK
 		D3D12_RESOURCE_STATES DestState;
 		D3D12_RESOURCE_STATES CurState;
 	};
+
+	//To make sure that resources do not ahead release when allow gpu lag several frames behind cpu.
+	class DynamicFrameResourceManager
+	{
+	public:
+		using DynamicResourceArr = TArray<TRefCountPtr<GpuResource>>;
+	public:
+		DynamicFrameResourceManager() { FrameResources.AddDefaulted(FrameSourceNum); }
+		void AddUncompletedResource(TRefCountPtr<GpuResource> InResource) {
+			uint32 FrameSourceIndex = GetCurFrameSourceIndex();
+			FrameResources[FrameSourceIndex].Add(MoveTemp(InResource));
+		}
+		void ReleaseCompletedResources(uint32 FrameSourceIndex) {
+			FrameResources[FrameSourceIndex].Empty();
+		}
+	private:
+		TArray<DynamicResourceArr, TFixedAllocator<FrameSourceNum>> FrameResources;
+	};
+
+	inline DynamicFrameResourceManager GDynamicFrameResourceManager;
 }

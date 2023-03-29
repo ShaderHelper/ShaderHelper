@@ -11,7 +11,7 @@ namespace FRAMEWORK
 	inline TRefCountPtr<ID3D12Fence> CpuSyncGpuFence;
 	inline HANDLE CpuSyncGpuEvent;
 	inline constexpr uint32 AllowableLag = 2;
-	inline constexpr uint32 FrameSourceNum = AllowableLag + 1;
+	inline constexpr uint32 FrameSourceNum = AllowableLag;
 	inline uint64 CurCpuFrame;
 	inline uint64 CurGpuFrame;
 

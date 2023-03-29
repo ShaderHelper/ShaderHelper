@@ -4,6 +4,7 @@
 #include "D3D12Descriptor.h"
 #include "D3D12Buffer.h"
 #include "D3D12Util.h"
+#include "D3D12CommandList.h"
 
 namespace FRAMEWORK
 {
@@ -14,6 +15,12 @@ namespace FRAMEWORK
 			: TrackedResource(InState), Resource(MoveTemp(InResource))
 		{}
 		ID3D12Resource* GetResource() const override { return Resource.GetReference(); }
+
+		~Dx12Texture() {
+			auto& DescriptorAllocators = GCommandListContext->GetCurFrameResource().GetDescriptorAllocators();
+			DescriptorAllocators.RtvAllocator->Free(HandleRTV);
+			DescriptorAllocators.SrvAllocator->Free(HandleSRV);
+		}
 		
 	private:
 		TRefCountPtr<ID3D12Resource> Resource;

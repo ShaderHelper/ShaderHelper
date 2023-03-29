@@ -7,17 +7,18 @@ namespace FRAMEWORK
 	CommandListContext::CommandListContext(FrameResourceStorage&& InitFrameResources, TRefCountPtr<ID3D12GraphicsCommandList> InGraphicsCmdList)
 		: FrameResources(MoveTemp(InitFrameResources))
 		, GraphicsCmdList(MoveTemp(InGraphicsCmdList))
+		, CurrrentPso(nullptr)
 	{
 
 	}
 
 
-	void CommandListContext::ResetFrameResource(uint32 FrameResourceIndex)
+	void CommandListContext::ResetStaticFrameResource(uint32 FrameResourceIndex)
 	{
 		FrameResources[FrameResourceIndex].Reset();
 	}
 
-	void CommandListContext::BindFrameResource(uint32 FrameResourceIndex)
+	void CommandListContext::BindStaticFrameResource(uint32 FrameResourceIndex)
 	{
 		FrameResources[FrameResourceIndex].BindToCommandList(GraphicsCmdList);
 	}
@@ -29,14 +30,21 @@ namespace FRAMEWORK
 		GraphicsCmdList->ResourceBarrier(1, &Barrier);
 	}
 
-	FrameResource::FrameResource(TRefCountPtr<ID3D12CommandAllocator> InCommandAllocator, DescriptorAllocatorStorage&& InDescriptorAllocators)
+	void CommandListContext::PrepareDrawingEnv()
+	{
+		check(CurrrentPso);
+		GraphicsCmdList->SetGraphicsRootSignature(CurrrentPso->GetRootSig());
+		GraphicsCmdList->SetPipelineState(CurrrentPso->GetResource());
+	}
+
+	StaticFrameResource::StaticFrameResource(TRefCountPtr<ID3D12CommandAllocator> InCommandAllocator, DescriptorAllocatorStorage&& InDescriptorAllocators)
 		: CommandAllocator(MoveTemp(InCommandAllocator))
 		, DescriptorAllocators(MoveTemp(InDescriptorAllocators))
 	{
 
 	}
 
-	void FrameResource::Reset()
+	void StaticFrameResource::Reset()
 	{
 		DxCheck(CommandAllocator->Reset());
 		DescriptorAllocators.RtvAllocator->Reset();
@@ -44,7 +52,7 @@ namespace FRAMEWORK
 		DescriptorAllocators.SamplerAllocator->Reset();
 	}
 
-	void FrameResource::BindToCommandList(ID3D12GraphicsCommandList* InGraphicsCmdList)
+	void StaticFrameResource::BindToCommandList(ID3D12GraphicsCommandList* InGraphicsCmdList)
 	{
 		check(InGraphicsCmdList);
 		//CommandList can be reset when already submit it to gpu.
@@ -59,25 +67,25 @@ namespace FRAMEWORK
 
 	void InitFrameResource()
 	{
-		TRefCountPtr<ID3D12GraphicsCommandList> GraphicsCmdList;
-		DxCheck(GDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, nullptr, nullptr, IID_PPV_ARGS(GraphicsCmdList.GetInitReference())));
-		DxCheck(GraphicsCmdList->Close());
-
 		CommandListContext::FrameResourceStorage FrameResources;
-
+		ID3D12CommandAllocator* InitialCommandAllocator = nullptr;
 		for (int i = 0; i < FrameSourceNum; ++i)
 		{
 			TRefCountPtr<ID3D12CommandAllocator> CommandAllocator;
 			DxCheck(GDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(CommandAllocator.GetInitReference())));
+			if (i == 0) { InitialCommandAllocator = CommandAllocator.GetReference(); }
 
-			FrameResource::DescriptorAllocatorStorage DescriptorAllocators;
-			DescriptorAllocators.RtvAllocator.Reset(new FrameResource::RtvAllocatorType());
-			DescriptorAllocators.SrvAllocator.Reset(new FrameResource::SrvAllocatorType());
-			DescriptorAllocators.SamplerAllocator.Reset(new FrameResource::SamplerAllocatorType());
+			StaticFrameResource::DescriptorAllocatorStorage DescriptorAllocators;
+			DescriptorAllocators.RtvAllocator.Reset(new StaticFrameResource::RtvAllocatorType());
+			DescriptorAllocators.SrvAllocator.Reset(new StaticFrameResource::SrvAllocatorType());
+			DescriptorAllocators.SamplerAllocator.Reset(new StaticFrameResource::SamplerAllocatorType());
 
 			FrameResources.Emplace(MoveTemp(CommandAllocator), MoveTemp(DescriptorAllocators));
 		}
 
+		TRefCountPtr<ID3D12GraphicsCommandList> GraphicsCmdList;
+		DxCheck(GDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, InitialCommandAllocator, nullptr, IID_PPV_ARGS(GraphicsCmdList.GetInitReference())));
+		DxCheck(GraphicsCmdList->Close());
 		GCommandListContext.Reset(new CommandListContext(MoveTemp(FrameResources), MoveTemp(GraphicsCmdList)));
 	}
 

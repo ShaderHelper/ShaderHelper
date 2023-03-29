@@ -1,13 +1,16 @@
+#pragma once
 #include "D3D12Common.h"
 #include "D3D12Descriptor.h"
 #include "D3D12Device.h"
 #include "D3D12Util.h"
+#include "D3D12PSO.h"
 
 namespace FRAMEWORK
 {
 	extern void InitFrameResource();
 
-	class FrameResource : public FNoncopyable
+	//The FrameResources that are immutable and always valid.
+	class StaticFrameResource : public FNoncopyable
 	{
 	public:
 		using RtvAllocatorType = CpuDescriptorAllocator<256, DescriptorType::RTV>;
@@ -20,7 +23,7 @@ namespace FRAMEWORK
 			TUniquePtr<SrvAllocatorType> SrvAllocator;
 			TUniquePtr<SamplerAllocatorType> SamplerAllocator;
 		};
-		FrameResource(TRefCountPtr<ID3D12CommandAllocator> InCommandAllocator, DescriptorAllocatorStorage&& InDescriptorAllocators);
+		StaticFrameResource(TRefCountPtr<ID3D12CommandAllocator> InCommandAllocator, DescriptorAllocatorStorage&& InDescriptorAllocators);
 		void Reset();
 		void BindToCommandList(ID3D12GraphicsCommandList* InGraphicsCmdList);
 		const DescriptorAllocatorStorage& GetDescriptorAllocators() const { return DescriptorAllocators; }
@@ -33,21 +36,24 @@ namespace FRAMEWORK
 	class CommandListContext
 	{
 	public:
-		using FrameResourceStorage = TArray<FrameResource, TFixedAllocator<FrameSourceNum>>;
+		using FrameResourceStorage = TArray<StaticFrameResource, TFixedAllocator<FrameSourceNum>>;
 	public:
 		CommandListContext(FrameResourceStorage&& InitFrameResources, TRefCountPtr<ID3D12GraphicsCommandList> InGraphicsCmdList);
 		ID3D12GraphicsCommandList* GetCommandListHandle() const { return GraphicsCmdList; }
-		void ResetFrameResource(uint32 FrameResourceIndex);
-		void BindFrameResource(uint32 FrameResourceIndex);
-		const FrameResource& GetCurFrameResource() const {
+		void ResetStaticFrameResource(uint32 FrameResourceIndex);
+		void BindStaticFrameResource(uint32 FrameResourceIndex);
+		const StaticFrameResource& GetCurFrameResource() const {
 			uint32 Index = GetCurFrameSourceIndex();
 			return FrameResources[Index];
 		}
 		void Transition(ID3D12Resource* InResource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After);
+		void SetPipeline(Dx12Pso* InPso) { CurrrentPso = InPso; }
+		void PrepareDrawingEnv();
 
 	private:
 		FrameResourceStorage FrameResources;
 		TRefCountPtr<ID3D12GraphicsCommandList> GraphicsCmdList;
+		Dx12Pso* CurrrentPso;
 	};
 
 	inline TUniquePtr<CommandListContext> GCommandListContext;

@@ -62,7 +62,7 @@ namespace FRAMEWORK
 
 	static void CreateTextureView(const FlagSets& InFlags, Dx12Texture* InTexture)
 	{
-		const FrameResource::DescriptorAllocatorStorage& DescriptorAllocators = GCommandListContext->GetCurFrameResource().GetDescriptorAllocators();
+		auto& DescriptorAllocators = GCommandListContext->GetCurFrameResource().GetDescriptorAllocators();
 		D3D12_CPU_DESCRIPTOR_HANDLE Hanlde{};
 		if (InFlags.bSRV) {
 			InTexture->HandleSRV = DescriptorAllocators.SrvAllocator->Allocate();
