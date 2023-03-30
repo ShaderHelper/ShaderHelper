@@ -49,16 +49,27 @@ namespace FRAMEWORK
 	public:
 		using DynamicResourceArr = TArray<TRefCountPtr<GpuResource>>;
 	public:
-		DynamicFrameResourceManager() { FrameResources.AddDefaulted(FrameSourceNum); }
-		void AddUncompletedResource(TRefCountPtr<GpuResource> InResource) {
-			uint32 FrameSourceIndex = GetCurFrameSourceIndex();
-			FrameResources[FrameSourceIndex].Add(MoveTemp(InResource));
+		DynamicFrameResourceManager() : LastCpuFrame(0), LastGpuFrame(0) {}
+		void AllocateOneFrame() {
+			FrameResources.Enqueue(DynamicResourceArr{});
+			LastCpuFrame = CurCpuFrame;
 		}
-		void ReleaseCompletedResources(uint32 FrameSourceIndex) {
-			FrameResources[FrameSourceIndex].Empty();
+		void AddUncompletedResource(TRefCountPtr<GpuResource> InResource) {
+			DynamicResourceArr* DynamicResources = FrameResources.Peek();
+			DynamicResources->Add(MoveTemp(InResource));
+		}
+		void ReleaseCompletedResources() {
+			check(LastGpuFrame <= CurGpuFrame);
+			uint64 GpuFrameIncrement = CurGpuFrame - LastGpuFrame;
+			while (GpuFrameIncrement--) {
+				FrameResources.Pop();
+			}
+			LastGpuFrame = CurGpuFrame;
 		}
 	private:
-		TArray<DynamicResourceArr, TFixedAllocator<FrameSourceNum>> FrameResources;
+		uint64 LastCpuFrame;
+		uint64 LastGpuFrame;
+		TQueue<DynamicResourceArr> FrameResources;
 	};
 
 	inline DynamicFrameResourceManager GDynamicFrameResourceManager;

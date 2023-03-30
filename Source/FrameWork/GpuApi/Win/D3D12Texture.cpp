@@ -131,7 +131,7 @@ namespace FRAMEWORK
 			GCommandListContext->Transition(TexResource, ActualState, InitialState);
 		}
 		
-		TRefCountPtr<Dx12Texture> RetTexture = new Dx12Texture{ InitialState, TexResource };
+		TRefCountPtr<Dx12Texture> RetTexture = new Dx12Texture{ InitialState, MoveTemp(TexResource), InTexDesc };
 		CreateTextureView(Flags, RetTexture);
 
 		return RetTexture;

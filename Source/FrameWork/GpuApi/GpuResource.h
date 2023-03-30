@@ -12,6 +12,15 @@ namespace FRAMEWORK
 	class GpuShader : public GpuResource {};
 
 	class RenderPipelineState : public GpuResource {};
+
+	enum class PrimitiveType
+	{
+		Point,
+		Line,
+		LineStrip,
+		Triangle,
+		TriangleStrip,
+	};
 	
 	enum class GpuTextureFormat
 	{
@@ -185,6 +194,22 @@ namespace FRAMEWORK
 		RasterizerStateDesc RasterizerState;
 		BlendStateDesc BlendState;
 		GpuTextureFormat RtFormat;
+	};
+
+	struct GpuViewPortDesc
+	{
+		GpuViewPortDesc(uint32 InWidth, uint32 InHeight, float InZMin = 0.0f , float InZMax = 1.0f, float InTopLeftX = 0.0f, float InTopLeftY = 0.0f)
+			: TopLeftX(InTopLeftX)
+			, TopLeftY(InTopLeftY)
+			, Width(InWidth)
+			, Height(InHeight)
+			, ZMin(InZMin)
+			, ZMax(InZMax)
+		{
+		}
+		float TopLeftX, TopLeftY;
+		uint32 Width, Height;
+		float ZMin, ZMax;
 	};
 	
 	inline uint32 GetFormatByteSize(GpuTextureFormat InFormat)

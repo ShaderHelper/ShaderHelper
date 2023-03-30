@@ -21,4 +21,12 @@ namespace FRAMEWORK
 		TRefCountPtr<ID3D12Resource> Resource;
 		void* MappedData{};
 	};
+
+	class Dx12VertexBuffer : public GpuBuffer
+	{
+	public:
+		bool IsValid() const { return false; }
+	private:
+		TRefCountPtr<ID3D12Resource> Resource;
+	};
 }
