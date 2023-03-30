@@ -60,12 +60,32 @@ namespace GpuApi
 
 	}
 
-	void BindVertexBuffer()
+	void BindVertexBuffer(GpuBuffer* InVertexBuffer)
 	{
 
 	}
 
-	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount)
+	void SetViewPort(const GpuViewPortDesc& InViewPortDesc)
+	{
+
+	}
+
+	void SetRenderTarget(GpuTexture* InGpuTexture)
+	{
+
+	}
+
+	void SetClearColorValue(Vector4f ClearColor)
+	{
+
+	}
+
+	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType)
+	{
+
+	}
+
+	void Submit()
 	{
 
 	}

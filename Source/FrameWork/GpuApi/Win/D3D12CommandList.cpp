@@ -4,10 +4,11 @@
 namespace FRAMEWORK
 {
 	
-	CommandListContext::CommandListContext(FrameResourceStorage&& InitFrameResources, TRefCountPtr<ID3D12GraphicsCommandList> InGraphicsCmdList)
+	CommandListContext::CommandListContext(FrameResourceStorage InitFrameResources, TRefCountPtr<ID3D12GraphicsCommandList> InGraphicsCmdList)
 		: FrameResources(MoveTemp(InitFrameResources))
 		, GraphicsCmdList(MoveTemp(InGraphicsCmdList))
-		, CurrrentPso(nullptr)
+		, CurrentPso(nullptr)
+		, CurrentRenderTarget(nullptr)
 	{
 
 	}
@@ -32,9 +33,32 @@ namespace FRAMEWORK
 
 	void CommandListContext::PrepareDrawingEnv()
 	{
-		check(CurrrentPso);
-		GraphicsCmdList->SetGraphicsRootSignature(CurrrentPso->GetRootSig());
-		GraphicsCmdList->SetPipelineState(CurrrentPso->GetResource());
+		check(CurrentPso);
+		GraphicsCmdList->SetGraphicsRootSignature(CurrentPso->GetRootSig());
+		GraphicsCmdList->SetPipelineState(CurrentPso->GetResource());
+
+
+		GCommandListContext->GetCommandListHandle()->RSSetViewports(1, CurrentViewPort.Get());
+		GCommandListContext->GetCommandListHandle()->RSSetScissorRects(1, CurrentSissorRect.Get());
+
+		check(CurrentRenderTarget);
+		check(CurrentRenderTarget->HandleRTV.IsValid());
+		GCommandListContext->GetCommandListHandle()->OMSetRenderTargets(1, &CurrentRenderTarget->HandleRTV.CpuHandle, false, nullptr);
+
+		Vector4f OptimizedClearValue = CurrentRenderTarget->GetResourceDesc().ClearValues;
+		if (ClearColorValue.IsValid()) {
+			if (!(*ClearColorValue).Equals(OptimizedClearValue))
+			{
+				SH_LOG(LogDx12, Warning, TEXT("OptimizedClearValue(%s) != ClearColorValue(%s) that may result in invalid fast clear optimization."), OptimizedClearValue.ToString(), (*ClearColorValue).ToString());
+			}
+			GCommandListContext->GetCommandListHandle()->ClearRenderTargetView(CurrentRenderTarget->HandleRTV.CpuHandle, (*ClearColorValue).GetData(), 0, nullptr);
+		}
+		else {
+			GCommandListContext->GetCommandListHandle()->ClearRenderTargetView(CurrentRenderTarget->HandleRTV.CpuHandle, OptimizedClearValue.GetData(), 0, nullptr);
+		}
+
+		GDynamicFrameResourceManager.AddUncompletedResource(CurrentPso);
+		GDynamicFrameResourceManager.AddUncompletedResource(CurrentRenderTarget);
 	}
 
 	StaticFrameResource::StaticFrameResource(TRefCountPtr<ID3D12CommandAllocator> InCommandAllocator, DescriptorAllocatorStorage&& InDescriptorAllocators)

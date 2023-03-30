@@ -11,10 +11,11 @@ namespace FRAMEWORK
 	class Dx12Texture : public GpuTexture, public TrackedResource
 	{
 	public:
-		Dx12Texture(D3D12_RESOURCE_STATES InState, TRefCountPtr<ID3D12Resource> InResource)
-			: TrackedResource(InState), Resource(MoveTemp(InResource))
+		Dx12Texture(D3D12_RESOURCE_STATES InState, TRefCountPtr<ID3D12Resource> InResource, GpuTextureDesc InDesc)
+			: TrackedResource(InState), Resource(MoveTemp(InResource)), TexDesc(MoveTemp(InDesc))
 		{}
 		ID3D12Resource* GetResource() const override { return Resource.GetReference(); }
+		const GpuTextureDesc& GetResourceDesc() const { return TexDesc; }
 
 		~Dx12Texture() {
 			auto& DescriptorAllocators = GCommandListContext->GetCurFrameResource().GetDescriptorAllocators();
@@ -24,6 +25,7 @@ namespace FRAMEWORK
 		
 	private:
 		TRefCountPtr<ID3D12Resource> Resource;
+		GpuTextureDesc TexDesc;
 
 	public:
 		DescriptorHandle<Descriptorvisibility::CpuVisible> HandleRTV;

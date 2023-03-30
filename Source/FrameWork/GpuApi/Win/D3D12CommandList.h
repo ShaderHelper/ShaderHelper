@@ -4,6 +4,7 @@
 #include "D3D12Device.h"
 #include "D3D12Util.h"
 #include "D3D12PSO.h"
+#include "D3D12Texture.h"
 
 namespace FRAMEWORK
 {
@@ -38,7 +39,7 @@ namespace FRAMEWORK
 	public:
 		using FrameResourceStorage = TArray<StaticFrameResource, TFixedAllocator<FrameSourceNum>>;
 	public:
-		CommandListContext(FrameResourceStorage&& InitFrameResources, TRefCountPtr<ID3D12GraphicsCommandList> InGraphicsCmdList);
+		CommandListContext(FrameResourceStorage InitFrameResources, TRefCountPtr<ID3D12GraphicsCommandList> InGraphicsCmdList);
 		ID3D12GraphicsCommandList* GetCommandListHandle() const { return GraphicsCmdList; }
 		void ResetStaticFrameResource(uint32 FrameResourceIndex);
 		void BindStaticFrameResource(uint32 FrameResourceIndex);
@@ -47,13 +48,23 @@ namespace FRAMEWORK
 			return FrameResources[Index];
 		}
 		void Transition(ID3D12Resource* InResource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After);
-		void SetPipeline(Dx12Pso* InPso) { CurrrentPso = InPso; }
+		void SetPipeline(Dx12Pso* InPso) { CurrentPso = InPso; }
+		void SetRenderTarget(Dx12Texture* InRT) { CurrentRenderTarget = InRT; }
+		void SetClearColor(TUniquePtr<Vector4f> InClearColor) { ClearColorValue = MoveTemp(InClearColor); }
+		void SetViewPort(TUniquePtr<D3D12_VIEWPORT> InViewPort, TUniquePtr<D3D12_RECT> InSissorRect) {
+			CurrentViewPort = MoveTemp(InViewPort);
+			CurrentSissorRect = MoveTemp(InSissorRect);
+		}
 		void PrepareDrawingEnv();
 
 	private:
 		FrameResourceStorage FrameResources;
 		TRefCountPtr<ID3D12GraphicsCommandList> GraphicsCmdList;
-		Dx12Pso* CurrrentPso;
+		Dx12Pso* CurrentPso;
+		Dx12Texture* CurrentRenderTarget;
+		TUniquePtr<Vector4f> ClearColorValue;
+		TUniquePtr<D3D12_VIEWPORT> CurrentViewPort;
+		TUniquePtr<D3D12_RECT> CurrentSissorRect;
 	};
 
 	inline TUniquePtr<CommandListContext> GCommandListContext;
