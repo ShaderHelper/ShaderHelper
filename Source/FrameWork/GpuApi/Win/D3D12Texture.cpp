@@ -9,6 +9,20 @@ namespace FRAMEWORK
 		bool bRTV;
 		bool bSRV;
 	};
+
+	Dx12Texture::Dx12Texture(D3D12_RESOURCE_STATES InState, TRefCountPtr<ID3D12Resource> InResource, GpuTextureDesc InDesc)
+		: TrackedResource(InState), Resource(MoveTemp(InResource)), TexDesc(MoveTemp(InDesc))
+	{
+
+	}
+
+	Dx12Texture::~Dx12Texture()
+	{
+		auto& DescriptorAllocators = GCommandListContext->GetCurFrameResource().GetDescriptorAllocators();
+		DescriptorAllocators.RtvAllocator->Free(HandleRTV);
+		DescriptorAllocators.SrvAllocator->Free(HandleSRV);
+	}
+
 	static bool ValidateTexture(const GpuTextureDesc& InTexDesc)
 	{
 		if (InTexDesc.Width <= 0 || InTexDesc.Height <= 0) {
