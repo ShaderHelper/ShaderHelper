@@ -20,9 +20,14 @@ project "FrameWork"
 	}
 
     uses {
-        "UE", "d3dx12", "D3D12MemoryAllocator",
-        "DXC", "AgilitySDK"
+        "UE"
     }
+
+    private_uses {
+        "d3dx12", "D3D12MemoryAllocator",
+        "DXC", "AgilitySDK", "WinPixEventRuntime"
+    }
+
     links {
         "d3d12", "dxgi"
     }

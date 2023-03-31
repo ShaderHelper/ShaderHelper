@@ -49,7 +49,7 @@ namespace FRAMEWORK
 		if (ClearColorValue.IsValid()) {
 			if (!(*ClearColorValue).Equals(OptimizedClearValue))
 			{
-				SH_LOG(LogDx12, Warning, TEXT("OptimizedClearValue(%s) != ClearColorValue(%s) that may result in invalid fast clear optimization."), OptimizedClearValue.ToString(), (*ClearColorValue).ToString());
+				SH_LOG(LogDx12, Warning, TEXT("OptimizedClearValue(%s) != ClearColorValue(%s) that may result in invalid fast clear optimization."), *OptimizedClearValue.ToString(), *(*ClearColorValue).ToString());
 			}
 			GCommandListContext->GetCommandListHandle()->ClearRenderTargetView(CurrentRenderTarget->HandleRTV.CpuHandle, (*ClearColorValue).GetData(), 0, nullptr);
 		}

@@ -5,6 +5,7 @@ external_d3d12memallocator = "External/D3D12MemoryAllocator"
 external_d3dx12 = "External/D3DX12"
 external_dxcompiler = "External/DXC"
 external_agilitysdk = "External/AgilitySDK"
+external_pix = "External/WinPixEventRuntime"
 
 project_shaderHelper = "Source/ShaderHelper"
 project_frameWork = "Source/FrameWork"
@@ -89,6 +90,7 @@ include(external_d3d12memallocator)
 include(external_d3dx12)
 include(external_dxcompiler)
 include(external_agilitysdk)
+include(external_pix)
 
 include(project_shaderHelper)
 include(project_frameWork)
