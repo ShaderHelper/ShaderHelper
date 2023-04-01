@@ -37,6 +37,10 @@ namespace SH
 
 	void ShRenderer::RenderBegin()
 	{
+		bCanGpuCapture = FSlateApplication::Get().GetModifierKeys().AreModifersDown(EModifierKey::Control | EModifierKey::Alt);
+		if (bCanGpuCapture) {
+			GpuApi::BeginGpuCapture(TEXT("GpuCapture"));
+		}
 		GpuApi::StartRenderFrame();
 	}
 
@@ -50,6 +54,12 @@ namespace SH
 	void ShRenderer::RenderEnd()
 	{
 		GpuApi::EndRenderFrame();
+		if (bCanGpuCapture) {
+			GpuApi::EndGpuCapture();
+			//just capture one frame.
+			bCanGpuCapture = false;
+			FPlatformMisc::MessageBoxExt(EAppMsgType::Ok, TEXT("Successfully captured the current frame."), TEXT("Message:"));
+		}
 	}
 
 }

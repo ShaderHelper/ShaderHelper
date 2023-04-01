@@ -6,7 +6,8 @@ namespace UNITTEST_FRAMEWORK
 	class UnitTestConSole : public App
 	{
 	public:
-		UnitTestConSole(const TCHAR* CommandLine);
+		using App::App;
+		
 	private:
 		void Init() override;
 		void ShutDown() override;

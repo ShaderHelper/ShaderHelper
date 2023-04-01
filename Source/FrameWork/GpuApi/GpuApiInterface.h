@@ -29,5 +29,8 @@ namespace GpuApi
 	FRAMEWORK_API void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType = PrimitiveType::Triangle);
 	
 	FRAMEWORK_API void Submit();
+
+	FRAMEWORK_API void BeginGpuCapture(const FString& SavedFileName);
+	FRAMEWORK_API void EndGpuCapture();
 }
 }

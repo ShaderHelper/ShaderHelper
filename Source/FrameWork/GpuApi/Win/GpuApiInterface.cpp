@@ -11,14 +11,16 @@ namespace FRAMEWORK
 namespace GpuApi
 {
 	void InitApiEnv()
-	{
+	{	
 		InitDx12Core();
 		InitFrameResource();
 	}
 
 	void FlushGpu()
 	{
-		
+		DxCheck(CpuSyncGpuFence->SetEventOnCompletion(CurCpuFrame, CpuSyncGpuEvent));
+		WaitForSingleObject(CpuSyncGpuEvent, INFINITE);
+		CurGpuFrame = CurCpuFrame;
 	}
 
 	void StartRenderFrame()
@@ -151,8 +153,8 @@ namespace GpuApi
 	void SetViewPort(const GpuViewPortDesc& InViewPortDesc)
 	{
 		D3D12_VIEWPORT ViewPort{};
-		ViewPort.Width = InViewPortDesc.Width;
-		ViewPort.Height = InViewPortDesc.Height;
+		ViewPort.Width = (float)InViewPortDesc.Width;
+		ViewPort.Height = (float)InViewPortDesc.Height;
 		ViewPort.MinDepth = InViewPortDesc.ZMin;
 		ViewPort.MaxDepth = InViewPortDesc.ZMax;
 		ViewPort.TopLeftX = InViewPortDesc.TopLeftX;
@@ -202,5 +204,29 @@ namespace GpuApi
 		ID3D12CommandList* CmdLists = GCommandListContext->GetCommandListHandle();
 		GGraphicsQueue->ExecuteCommandLists(1, &CmdLists);
 	}
+
+	void BeginGpuCapture(const FString& SavedFileName)
+	{
+#if USE_PIX
+		if (GCanGpuCapture) {
+			PIXCaptureParameters params = {};
+			FString FileName = FString::Format(TEXT("{0}.wpix"), { SavedFileName});
+			params.GpuCaptureParameters.FileName = *FileName;
+			FlushGpu();
+			PIXBeginCapture(PIX_CAPTURE_GPU, &params);
+		}
+#endif
+	}
+
+	void EndGpuCapture()
+	{
+#if USE_PIX
+		if (GCanGpuCapture) {
+			FlushGpu();
+			PIXEndCapture(false);
+		}
+#endif
+	}
+	
 }
 }

@@ -4,6 +4,17 @@ namespace FRAMEWORK
 {
 	void InitDx12Core()
 	{
+#if USE_PIX
+		// Check to see if a copy of WinPixGpuCapturer.dll has already been injected into the application.
+		// This may happen if the application is launched through the PIX UI. 
+		if (GetModuleHandle(L"WinPixGpuCapturer.dll") == 0)
+		{
+			if (LoadLibrary(GetLatestWinPixGpuCapturerPath().c_str())) {
+				GCanGpuCapture = true;
+			}
+		}
+#endif
+
 		bool bEnableDebugLayer = FParse::Param(FCommandLine::Get(), TEXT("DxDebug"));
 
 		if (bEnableDebugLayer) {

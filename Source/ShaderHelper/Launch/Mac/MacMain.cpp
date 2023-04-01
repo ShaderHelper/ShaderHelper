@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "App/ShaderHelperApp.h"
+#include "UI/Widgets/SShaderHelperWindow.h"
 #include <Mac/CocoaThread.h>
 
 static FString GSavedCommandLine;
@@ -10,8 +11,10 @@ static FString GSavedCommandLine;
 @implementation AppDelegate
 -(void)run:(id)Arg
 {
-    SH::ShaderHelperApp app(*GSavedCommandLine);
-    app.Run();
+	SH::UE_Init(*GSavedCommandLine);
+	SH::ShaderHelperApp app(SNew(SH::SShaderHelperWindow));
+	app.Run();
+	SH::UE_ShutDown();
     [NSApp terminate:self];
 }
 
