@@ -90,5 +90,15 @@ namespace GpuApi
 
 	}
 
+	void BeginGpuCapture(const FString& SavedFileName)
+	{
+
+	}
+
+	void EndGpuCapture()
+	{
+
+	}
+
 }
 }

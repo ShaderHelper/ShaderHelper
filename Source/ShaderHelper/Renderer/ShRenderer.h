@@ -16,6 +16,7 @@ namespace SH
 	private:
 		TRefCountPtr<GpuTexture> FinalRT;
 		TRefCountPtr<GpuShader> Shader;
+		bool bCanGpuCapture;
 	};
 }
 

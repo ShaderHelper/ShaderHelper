@@ -6,16 +6,12 @@
 namespace UNITTEST_FRAMEWORK
 {
 	extern void TestUtil();
-	
-	UnitTestConSole::UnitTestConSole(const TCHAR* CommandLine)
-		:App(CommandLine)
-	{
-
-	}
 
 	void UnitTestConSole::Init()
 	{
 		App::Init();
+		FAppCommonStyle::Init();
+		InitLogWindow();
 	}
 
 	void UnitTestConSole::InitLogWindow()
@@ -48,8 +44,6 @@ namespace UNITTEST_FRAMEWORK
 
 	void UnitTestConSole::PostInit()
 	{
-		FAppCommonStyle::Init();
-		InitLogWindow();
 		App::PostInit();
 
 		TestUtil();

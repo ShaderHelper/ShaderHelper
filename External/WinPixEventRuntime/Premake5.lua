@@ -5,5 +5,9 @@ usage "WinPixEventRuntime"
         {
             path.getabsolute("./"),
         }
+        includedirs
+        {
+            "./Inc",
+        }
         links "WinPixEventRuntime"
 

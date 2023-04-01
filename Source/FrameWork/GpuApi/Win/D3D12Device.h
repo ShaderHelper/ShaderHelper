@@ -3,6 +3,7 @@
 
 namespace FRAMEWORK
 {
+	inline bool GCanGpuCapture = false;
 	extern void InitDx12Core();
 
 	inline TRefCountPtr<ID3D12Device> GDevice;

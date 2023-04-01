@@ -1,7 +1,6 @@
 #include "CommonHeader.h"
 #include "ShaderHelperApp.h"
 #include "UI/Styles/FShaderHelperStyle.h"
-#include "UI/Widgets/SShaderHelperWindow.h"
 
 namespace SH {
 
@@ -13,7 +12,6 @@ namespace SH {
 
 	void ShaderHelperApp::PostInit()
 	{
-		SAssignNew(AppWindow, SShaderHelperWindow);
 		App::PostInit();
 	}
 

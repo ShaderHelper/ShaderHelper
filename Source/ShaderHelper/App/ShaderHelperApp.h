@@ -6,6 +6,7 @@ namespace SH {
 	{
 	public:
 		using App::App;
+		
 	private:
 		void Init() override;
 		void ShutDown() override;
