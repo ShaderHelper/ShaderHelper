@@ -20,5 +20,10 @@ namespace FRAMEWORK {
 		return ProjectDir() / TEXT("External/");
 	}
 	
+	FString PathHelper::SavedDir()
+	{
+		return ProjectDir() / TEXT("Saved/");
+	}
+
 }
 

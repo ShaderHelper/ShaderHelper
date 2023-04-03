@@ -43,7 +43,7 @@ namespace FRAMEWORK
 
 	private:
 		TRefCountPtr<IDxcLibrary> CompilerLibrary;
-		TRefCountPtr<IDxcCompiler2> Compiler;
+		TRefCountPtr<IDxcCompiler3> Compiler;
 	};
 
 	inline DxcCompiler GShaderCompiler;

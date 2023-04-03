@@ -31,7 +31,7 @@ namespace SH
 	{
 		GpuApi::InitApiEnv();
 
-		GpuTextureDesc Desc{ 256, 256, GpuTextureFormat::R16G16B16A16_UNORM, GpuTextureUsage::Shared | GpuTextureUsage::RenderTarget, Vector4f{0.5f}};
+		GpuTextureDesc Desc{ 256, 256, GpuTextureFormat::R16G16B16A16_UNORM, GpuTextureUsage::Shared | GpuTextureUsage::RenderTarget, Vector4f{0.7f}};
 		FinalRT = GpuApi::CreateGpuTexture(Desc);
 
 		VertexShader = GpuApi::CreateShaderFromSource(ShaderType::VertexShader, FullScreenVsText, TEXT("DefaultFullScreenVS"));
