@@ -11,7 +11,7 @@ namespace FRAMEWORK
 	};
 
 	Dx12Texture::Dx12Texture(D3D12_RESOURCE_STATES InState, TRefCountPtr<ID3D12Resource> InResource, GpuTextureDesc InDesc)
-		: TrackedResource(InState), Resource(MoveTemp(InResource)), TexDesc(MoveTemp(InDesc))
+		: GpuTexture(InDesc.Format), TrackedResource(InState), Resource(MoveTemp(InResource)), TexDesc(MoveTemp(InDesc))
 	{
 
 	}

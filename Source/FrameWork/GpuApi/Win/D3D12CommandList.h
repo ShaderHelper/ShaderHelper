@@ -50,21 +50,35 @@ namespace FRAMEWORK
 		void Transition(ID3D12Resource* InResource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After);
 		void SetPipeline(Dx12Pso* InPso) { CurrentPso = InPso; }
 		void SetRenderTarget(Dx12Texture* InRT) { CurrentRenderTarget = InRT; }
+		void SetVertexBuffer(Dx12VertexBuffer* InBuffer) { CurrentVertexBuffer = InBuffer; }
+		void SetPrimitiveType(PrimitiveType InType) { DrawType = InType; }
 		void SetClearColor(TUniquePtr<Vector4f> InClearColor) { ClearColorValue = MoveTemp(InClearColor); }
 		void SetViewPort(TUniquePtr<D3D12_VIEWPORT> InViewPort, TUniquePtr<D3D12_RECT> InSissorRect) {
 			CurrentViewPort = MoveTemp(InViewPort);
 			CurrentSissorRect = MoveTemp(InSissorRect);
 		}
+
 		void PrepareDrawingEnv();
+		void MarkPipelineDirty(bool IsDirty) { IsPipelineDirty = IsDirty; }
+		void MarkRenderTartgetDirty(bool IsDirty) { IsRenderTargetDirty = IsDirty; }
+		void MarkVertexBufferDirty(bool IsDirty) { IsVertexBufferDirty = IsDirty; }
+		void MarkViewportDirty(bool IsDirty) { IsViewportDirty = IsDirty; }
 
 	private:
 		FrameResourceStorage FrameResources;
 		TRefCountPtr<ID3D12GraphicsCommandList> GraphicsCmdList;
 		Dx12Pso* CurrentPso;
 		Dx12Texture* CurrentRenderTarget;
+		Dx12VertexBuffer* CurrentVertexBuffer;
+		PrimitiveType DrawType;
 		TUniquePtr<Vector4f> ClearColorValue;
 		TUniquePtr<D3D12_VIEWPORT> CurrentViewPort;
 		TUniquePtr<D3D12_RECT> CurrentSissorRect;
+
+		bool IsPipelineDirty = false;
+		bool IsRenderTargetDirty = false;
+		bool IsVertexBufferDirty = false;
+		bool IsViewportDirty = false;
 	};
 
 	inline TUniquePtr<CommandListContext> GCommandListContext;

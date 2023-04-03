@@ -2,10 +2,11 @@
 #include "GpuApi/GpuResource.h"
 namespace SH
 {
-	class PreViewPort : public ISlateViewport
+	class PreviewViewPort : public ISlateViewport
 	{
 	public:
-		PreViewPort() : SizeX(0), SizeY(0) {}
+		PreviewViewPort(int32 InSizeX, int32 InSizeY) : SizeX(InSizeX), SizeY(InSizeY) {}
+
 	public:
 		FIntPoint GetSize() const override
 		{

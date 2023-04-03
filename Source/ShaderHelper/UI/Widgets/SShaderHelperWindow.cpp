@@ -1,6 +1,7 @@
 #include "CommonHeader.h"
 #include "SShaderHelperWindow.h"
 #include "App/ShaderHelperApp.h"
+#include <Widgets/SViewport.h>
 
 namespace SH {
 
@@ -10,7 +11,11 @@ namespace SH {
 		TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab);
 		if (TabName == "PreviewTab") {
 			SAssignNew(SpawnedTab, SDockTab)
-				.Label(FText::FromString("Preview"));
+				.Label(FText::FromString("Preview"))
+				[
+					SNew(SViewport)
+					.ViewportInterface(this->ViewportInterface)
+				];
 		}
 		else if (TabName == "PropetyTab") {
 			SAssignNew(SpawnedTab, SDockTab)
@@ -33,6 +38,8 @@ namespace SH {
 
 	void SShaderHelperWindow::Construct(const FArguments& InArgs)
 	{
+
+		this->ViewportInterface = InArgs._ViewportInterface;
 
 		TSharedRef<SDockTab> NewTab = SNew(SDockTab).TabRole(ETabRole::MajorTab);
 		TabManager = FGlobalTabmanager::Get()->NewTabManager(NewTab);

@@ -1,5 +1,7 @@
 #pragma once
 #include "App/App.h"
+#include "PreviewViewPort.h"
+
 namespace SH {
 	
 	class ShaderHelperApp : public App
@@ -12,6 +14,9 @@ namespace SH {
 		void ShutDown() override;
 		void PostInit() override;
 		void Update(double DeltaTime) override;
+		
+	private:
+		TSharedPtr<PreviewViewPort> ViewPort;
 	};
 	
 }

@@ -6,6 +6,7 @@ namespace SH {
 	{
 	public:
 		SLATE_BEGIN_ARGS(SShaderHelperWindow) {}
+			SLATE_ARGUMENT(TSharedPtr<ISlateViewport>, ViewportInterface)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs);
@@ -15,6 +16,7 @@ namespace SH {
 		void FillMenu(FMenuBuilder& MenuBuilder, FString MenuName);
 	private:
 		TSharedPtr<FTabManager> TabManager;
+		TSharedPtr<ISlateViewport> ViewportInterface;
 	};
 
 }

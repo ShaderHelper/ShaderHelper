@@ -15,8 +15,9 @@ namespace FRAMEWORK
 	 {
 		TRefCountPtr<IDxcBlobEncoding> BlobEncoding;
 		TRefCountPtr<IDxcOperationResult> OperationResult;
-		const ANSICHAR* SourceText = InShader->GetSourceText();
-		DxCheck(CompilerLibrary->CreateBlobWithEncodingFromPinned(SourceText, FCStringAnsi::Strlen(SourceText), CP_UTF8, BlobEncoding.GetInitReference()));
+		auto SourceText = StringCast<ANSICHAR>(*InShader->GetSourceText());
+		const ANSICHAR* SourceTextPtr = SourceText.Get();
+		DxCheck(CompilerLibrary->CreateBlobWithEncodingFromPinned(SourceTextPtr, FCStringAnsi::Strlen(SourceTextPtr), CP_UTF8, BlobEncoding.GetInitReference()));
 		bool IsCompilationSucceeded = SUCCEEDED(Compiler->Compile(BlobEncoding,
 			*InShader->ShaderName, *InShader->EntryPoint, *InShader->ShaderTaget, 
 			nullptr, 0, nullptr, 0, nullptr, 

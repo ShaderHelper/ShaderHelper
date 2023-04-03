@@ -3,32 +3,13 @@
 #include <array>
 namespace FRAMEWORK
 {
-	class GpuResource : public FThreadSafeRefCountedObject {};
-
-	class GpuBuffer : public GpuResource {};
-
-	class GpuTexture : public GpuResource {};
-
-	class GpuShader : public GpuResource {};
-
-	class RenderPipelineState : public GpuResource {};
-
-	enum class PrimitiveType
-	{
-		Point,
-		Line,
-		LineStrip,
-		Triangle,
-		TriangleStrip,
-	};
-	
 	enum class GpuTextureFormat
 	{
 		//Unorm
 		R8G8B8A8_UNORM,
 		R10G10B10A2_UNORM,
 		R16G16B16A16_UNORM,
-		
+
 		//Uint
 		R16G16B16A16_UINT,
 		R32G32B32A32_UINT,
@@ -55,36 +36,15 @@ namespace FRAMEWORK
 		Write_Only,
 	};
 
-	struct GpuTextureDesc
+	enum class PrimitiveType
 	{
-		GpuTextureDesc(
-			uint32 InWidth,
-			uint32 InHeight,
-			GpuTextureFormat InFormat,
-			GpuTextureUsage InUsage = GpuTextureUsage::None,
-			Vector4f InClearValues = Vector4f{ 0 },
-			uint32 InDepth = 1,
-			uint32 InNumMips = 1
-		)
-			: Width(InWidth), Height(InHeight), Depth(InDepth)
-			, NumMips(InNumMips)
-			, Format(InFormat)
-			, Usage(InUsage)
-			, ClearValues(MoveTemp(InClearValues))
-		{
-
-		}
-
-		uint32 Width;
-		uint32 Height;
-		uint32 Depth;
-		uint32 NumMips;
-		GpuTextureFormat Format;
-		GpuTextureUsage Usage;
-		Vector4f ClearValues;
-
-		TArray<uint8> InitialData;
+		Point,
+		Line,
+		LineStrip,
+		Triangle,
+		TriangleStrip,
 	};
+
 
 	enum class ShaderType
 	{
@@ -103,17 +63,6 @@ namespace FRAMEWORK
 	{
 		WireFrame,
 		Solid,
-	};
-
-	struct RasterizerStateDesc
-	{
-		RasterizerStateDesc(RasterizerFillMode InFillMode, RasterizerCullMode InCullMode)
-			: FillMode(InFillMode)
-			, CullMode(InCullMode)
-		{}
-
-		RasterizerFillMode FillMode;
-		RasterizerCullMode CullMode;
 	};
 
 	enum class BlendFactor
@@ -148,23 +97,6 @@ namespace FRAMEWORK
 	};
 	ENUM_CLASS_FLAGS(BlendMask);
 
-	struct BlendRenderTargetDesc
-	{
-		bool BlendEnable;
-		BlendFactor SrcFactor;
-		BlendFactor DestFactor;
-		BlendFactor SrcAlphaFactor;
-		BlendFactor DestAlphaFactor;
-		BlendMask Mask;
-		BlendOp ColorOp;
-		BlendOp AlphaOp;
-	};
-
-	struct BlendStateDesc
-	{
-		TArray<BlendRenderTargetDesc, TInlineAllocator<8>> RtDesc;
-	};
-
 	enum class StencilOp
 	{
 		Zero,
@@ -186,9 +118,114 @@ namespace FRAMEWORK
 		GreaterEqual,
 		Never,
 	};
-	
+
+	class GpuResource : public FThreadSafeRefCountedObject {};
+
+	class GpuBuffer : public GpuResource {};
+
+	class GpuTexture : public GpuResource {
+	public:
+		GpuTexture(GpuTextureFormat InFormat) : Format(InFormat) {}
+		GpuTextureFormat GetFormat() const { return Format; }
+
+	private:
+		GpuTextureFormat Format;
+	};
+
+	class GpuShader : public GpuResource {};
+
+	class RenderPipelineState : public GpuResource {};
+
+	struct GpuTextureDesc
+	{
+		GpuTextureDesc(
+			uint32 InWidth,
+			uint32 InHeight,
+			GpuTextureFormat InFormat,
+			GpuTextureUsage InUsage = GpuTextureUsage::None,
+			Vector4f InClearValues = Vector4f{ 0 },
+			uint32 InDepth = 1,
+			uint32 InNumMips = 1
+		)
+			: Width(InWidth), Height(InHeight), Depth(InDepth)
+			, NumMips(InNumMips)
+			, Format(InFormat)
+			, Usage(InUsage)
+			, ClearValues(MoveTemp(InClearValues))
+		{
+
+		}
+
+		uint32 Width;
+		uint32 Height;
+		uint32 Depth;
+		uint32 NumMips;
+		GpuTextureFormat Format;
+		GpuTextureUsage Usage;
+		Vector4f ClearValues;
+
+		TArray<uint8> InitialData;
+	};
+
+	struct RasterizerStateDesc
+	{
+		RasterizerStateDesc(RasterizerFillMode InFillMode, RasterizerCullMode InCullMode)
+			: FillMode(InFillMode)
+			, CullMode(InCullMode)
+		{}
+
+		RasterizerFillMode FillMode;
+		RasterizerCullMode CullMode;
+	};
+
+	struct BlendRenderTargetDesc
+	{
+		BlendRenderTargetDesc(
+			bool InBlendEnable,
+			BlendFactor InSrcFactor, BlendFactor InDestFactor,
+			BlendFactor InSrcAlphaFactor, BlendFactor InDestAlphaFactor,
+			BlendOp InColorOp, BlendOp InAlphaOp, BlendMask InMask = BlendMask::None)
+			: BlendEnable(InBlendEnable)
+			, SrcFactor(InSrcFactor)
+			, DestFactor(InDestFactor)
+			, SrcAlphaFactor(InSrcAlphaFactor)
+			, DestAlphaFactor(InDestAlphaFactor)
+			, Mask(InMask)
+			, ColorOp(InColorOp)
+			, AlphaOp(InAlphaOp)
+		{
+		}
+		bool BlendEnable;
+		BlendFactor SrcFactor;
+		BlendFactor DestFactor;
+		BlendFactor SrcAlphaFactor;
+		BlendFactor DestAlphaFactor;
+		BlendMask Mask;
+		BlendOp ColorOp;
+		BlendOp AlphaOp;
+	};
+
+	struct BlendStateDesc
+	{
+		using DescStorageType = TArray<BlendRenderTargetDesc, TInlineAllocator<8>>;
+		BlendStateDesc() = default;
+		BlendStateDesc(DescStorageType InDescStorage) : RtDesc(MoveTemp(InDescStorage)) {}
+		DescStorageType RtDesc;
+	};
+
 	struct PipelineStateDesc
 	{
+		PipelineStateDesc(
+			TRefCountPtr<GpuShader> InVs, TRefCountPtr<GpuShader> InPs,
+			RasterizerStateDesc InRasterizerState, BlendStateDesc InBlendState,
+			GpuTextureFormat InRtFormat)
+			: Vs(MoveTemp(InVs))
+			, Ps(MoveTemp(InPs))
+			, RasterizerState(MoveTemp(InRasterizerState))
+			, BlendState(MoveTemp(InBlendState))
+			, RtFormat(InRtFormat)
+		{
+		}
 		TRefCountPtr<GpuShader> Vs;
 		TRefCountPtr<GpuShader> Ps;
 		RasterizerStateDesc RasterizerState;
@@ -198,7 +235,7 @@ namespace FRAMEWORK
 
 	struct GpuViewPortDesc
 	{
-		GpuViewPortDesc(uint32 InWidth, uint32 InHeight, float InZMin = 0.0f , float InZMax = 1.0f, float InTopLeftX = 0.0f, float InTopLeftY = 0.0f)
+		GpuViewPortDesc(uint32 InWidth, uint32 InHeight, float InZMin = 0.0f, float InZMax = 1.0f, float InTopLeftX = 0.0f, float InTopLeftY = 0.0f)
 			: TopLeftX(InTopLeftX)
 			, TopLeftY(InTopLeftY)
 			, Width(InWidth)
@@ -211,7 +248,7 @@ namespace FRAMEWORK
 		uint32 Width, Height;
 		float ZMin, ZMax;
 	};
-	
+
 	inline uint32 GetFormatByteSize(GpuTextureFormat InFormat)
 	{
 		switch (InFormat)
@@ -231,5 +268,14 @@ namespace FRAMEWORK
 			checkf(false, TEXT("Ivalid Texture Format."));
 			return 0;
 		}
+	}
+
+	namespace GpuResourceHelper
+	{
+		const inline BlendStateDesc GDefaultBlendStateDesc{
+			BlendStateDesc::DescStorageType{ 
+				BlendRenderTargetDesc{ false, BlendFactor::SrcAlpha, BlendFactor::InvSrcAlpha, BlendFactor::One, BlendFactor::One, BlendOp::Add, BlendOp::Add }
+			}
+		};
 	}
 }
