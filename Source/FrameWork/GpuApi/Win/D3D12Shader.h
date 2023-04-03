@@ -9,16 +9,17 @@ namespace FRAMEWORK
 	public:
 		Dx12Shader(
 			ShaderType InType, FString InSourceText, FString ShaderName, 
-			FString InEntryPoint = "main", 
-			FString InShaderTarget = "PS_5_0"
+			FString InEntryPoint = "main"
 		)
 			: Type(InType)
 			, ShaderName(MoveTemp(ShaderName))
 			, EntryPoint(MoveTemp(InEntryPoint))
-			, ShaderTaget(MoveTemp(InShaderTarget))
 			, SourceText(MoveTemp(InSourceText))
-		{}
-		const ANSICHAR* GetSourceText() const { return TCHAR_TO_ANSI(*SourceText); }
+		{
+			if (Type == ShaderType::VertexShader) { ShaderTaget = "vs_6_0"; }
+			if (Type == ShaderType::PixelShader) { ShaderTaget = "ps_6_0"; }
+		}
+		FString GetSourceText() const { return SourceText; }
 		IDxcBlob* GetCompilationResult() const { return ByteCode; }
 		bool IsCompiled() const { return ByteCode.IsValid(); }
 		void SetCompilationResult(TRefCountPtr<IDxcBlob> InByteCode) { ByteCode = MoveTemp(InByteCode); }

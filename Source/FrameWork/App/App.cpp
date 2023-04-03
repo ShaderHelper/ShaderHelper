@@ -90,9 +90,8 @@ namespace FRAMEWORK {
 			if (AppRenderer.IsValid()) {
 				AppRenderer->Render();
 			}
-			//if not change GFrameCounter, slate texture may not update.
-
 			FSlateApplication::Get().Tick();
+			//if not change GFrameCounter, slate texture may not update.
 			GFrameCounter++;
 		}
 		ShutDown();

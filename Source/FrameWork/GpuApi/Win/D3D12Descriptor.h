@@ -33,16 +33,16 @@ namespace FRAMEWORK
 	template<>
 	struct DescriptorHandle<Descriptorvisibility::CpuVisible>
 	{
-		DescriptorHandle() : CpuHandle{} {}
-		DescriptorHandle(uint32 Index, ID3D12DescriptorHeap* DescriptorHeap, uint32 DescriptorSize) {
+		DescriptorHandle() : CpuHandle{ CD3DX12_DEFAULT{} } {}
+		DescriptorHandle(uint32 Index, ID3D12DescriptorHeap* DescriptorHeap, uint32 DescriptorSize) : CpuHandle{ CD3DX12_DEFAULT{} }
+		{
 			Init(Index, DescriptorHeap, DescriptorSize);
 		}
 
 		void Init(uint32 Index, ID3D12DescriptorHeap* DescriptorHeap, uint32 DescriptorSize) {
-			if (!IsValid()) {
-				CpuHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(DescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-				CpuHandle.Offset(Index, DescriptorSize);
-			}
+			check(!IsValid());
+			CpuHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(DescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+			CpuHandle.Offset(Index, DescriptorSize);
 		}
 
 		bool IsValid() const {
@@ -50,7 +50,7 @@ namespace FRAMEWORK
 		}
 
 		void Reset() {
-			CpuHandle = {};
+			CpuHandle.ptr = 0;
 		}
 
 		CD3DX12_CPU_DESCRIPTOR_HANDLE CpuHandle;
@@ -59,19 +59,19 @@ namespace FRAMEWORK
 	template<>
 	struct DescriptorHandle<Descriptorvisibility::CpuGpuVisible>
 	{
-		DescriptorHandle() : CpuHandle{}, GpuHandle{} {}
+		DescriptorHandle() : CpuHandle{ CD3DX12_DEFAULT{} }, GpuHandle{ CD3DX12_DEFAULT{} } {}
 		DescriptorHandle(uint32 Index, ID3D12DescriptorHeap* DescriptorHeap, uint32 DescriptorSize)
+			: CpuHandle{ CD3DX12_DEFAULT{} }, GpuHandle{ CD3DX12_DEFAULT{} }
 		{
 			Init(Index, DescriptorHeap, DescriptorSize);
 		}
 
 		void Init(uint32 Index, ID3D12DescriptorHeap* DescriptorHeap, uint32 DescriptorSize) {
-			if (!IsValid()) {
-				CpuHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(DescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-				GpuHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(DescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-				CpuHandle.Offset(Index, DescriptorSize);
-				GpuHandle.Offset(Index, DescriptorSize);
-			}
+			check(!IsValid());
+			CpuHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(DescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+			GpuHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(DescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+			CpuHandle.Offset(Index, DescriptorSize);
+			GpuHandle.Offset(Index, DescriptorSize);
 		}
 
 		bool IsValid() const {
@@ -79,8 +79,8 @@ namespace FRAMEWORK
 		}
 
 		void Reset() {
-			CpuHandle = {};
-			GpuHandle = {};
+			CpuHandle.ptr = 0;
+			GpuHandle.ptr = 0;
 		}
 
 		CD3DX12_CPU_DESCRIPTOR_HANDLE CpuHandle;

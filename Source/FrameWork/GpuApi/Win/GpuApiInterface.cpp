@@ -49,8 +49,6 @@ namespace GpuApi
 		}
 
 		GDynamicFrameResourceManager.ReleaseCompletedResources();
-
-		DxCheck(GCommandListContext->GetCommandListHandle()->Close());
 	}
 
 	TRefCountPtr<GpuTexture> CreateGpuTexture(const GpuTextureDesc& InTexDesc)
@@ -114,8 +112,8 @@ namespace GpuApi
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC PsoDesc{};
 		PsoDesc.pRootSignature = RootSignature;
-		PsoDesc.VS = D3D12_SHADER_BYTECODE{ Vs->GetCompilationResult()->GetBufferPointer(), Vs->GetCompilationResult()->GetBufferSize() };
-		PsoDesc.PS = D3D12_SHADER_BYTECODE{ Ps->GetCompilationResult()->GetBufferPointer(), Ps->GetCompilationResult()->GetBufferSize() };
+		PsoDesc.VS = { Vs->GetCompilationResult()->GetBufferPointer(), Vs->GetCompilationResult()->GetBufferSize() };
+		PsoDesc.PS = { Ps->GetCompilationResult()->GetBufferPointer(), Ps->GetCompilationResult()->GetBufferSize() };
 		PsoDesc.RasterizerState = MapRasterizerState(InPipelineStateDesc.RasterizerState);
 		PsoDesc.BlendState = MapBlendState(InPipelineStateDesc.BlendState);
 		PsoDesc.DepthStencilState.DepthEnable = false;
@@ -136,18 +134,14 @@ namespace GpuApi
 	void BindRenderPipelineState(RenderPipelineState* InPipelineState)
 	{
 		GCommandListContext->SetPipeline(static_cast<Dx12Pso*>(InPipelineState));
+		GCommandListContext->MarkPipelineDirty(true);
 	}
 
 	void BindVertexBuffer(GpuBuffer* InVertexBuffer)
 	{
 		Dx12VertexBuffer* Vb = static_cast<Dx12VertexBuffer*>(InVertexBuffer);
-		if (Vb && Vb->IsValid()) {
-			//TODO
-		}
-		else {
-			GCommandListContext->GetCommandListHandle()->IASetVertexBuffers(0, 0, nullptr);
-		}
-		
+		GCommandListContext->SetVertexBuffer(Vb);
+		GCommandListContext->MarkVertexBufferDirty(true);
 	}
 
 	void SetViewPort(const GpuViewPortDesc& InViewPortDesc)
@@ -162,6 +156,7 @@ namespace GpuApi
 
 		D3D12_RECT ScissorRect = CD3DX12_RECT(0, 0, InViewPortDesc.Width, InViewPortDesc.Height);
 		GCommandListContext->SetViewPort(MakeUnique<D3D12_VIEWPORT>(ViewPort), MakeUnique<D3D12_RECT>(ScissorRect));
+		GCommandListContext->MarkViewportDirty(true);
 	}
 
 
@@ -169,6 +164,7 @@ namespace GpuApi
 	{
 		Dx12Texture* Rt = static_cast<Dx12Texture*>(InGpuTexture);
 		GCommandListContext->SetRenderTarget(Rt);
+		GCommandListContext->MarkRenderTartgetDirty(true);
 	}
 
 	void SetClearColorValue(Vector4f ClearColor)
@@ -176,33 +172,21 @@ namespace GpuApi
 		GCommandListContext->SetClearColor(MakeUnique<Vector4f>(ClearColor));
 	}
 
-	static D3D12_PRIMITIVE_TOPOLOGY MapPrimitiveType(PrimitiveType InType)
-	{
-		switch (InType)
-		{
-		case PrimitiveType::Point:			return D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
-		case PrimitiveType::Line:			return D3D_PRIMITIVE_TOPOLOGY_LINELIST;
-		case PrimitiveType::LineStrip:		return D3D_PRIMITIVE_TOPOLOGY_LINESTRIP;
-		case PrimitiveType::Triangle:		return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		case PrimitiveType::TriangleStrip:	return D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
-		default:
-			SH_LOG(LogDx12, Fatal, TEXT("Invalid PrimitiveType."));
-			return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		}
-	}
-
 	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType)
 	{
+		GCommandListContext->SetPrimitiveType(InType);
 		GCommandListContext->PrepareDrawingEnv();
-		GCommandListContext->GetCommandListHandle()->IASetPrimitiveTopology(MapPrimitiveType(InType));
 		GCommandListContext->GetCommandListHandle()->DrawInstanced(VertexCount, InstanceCount, StartVertexLocation, StartInstanceLocation);
 	}
 
 	void Submit()
 	{
 		check(GGraphicsQueue);
-		ID3D12CommandList* CmdLists = GCommandListContext->GetCommandListHandle();
-		GGraphicsQueue->ExecuteCommandLists(1, &CmdLists);
+		ID3D12GraphicsCommandList* GraphicsCommandList = GCommandListContext->GetCommandListHandle();
+		//The commandLists must be closed before executing them.
+		DxCheck(GraphicsCommandList->Close());
+		ID3D12CommandList* CmdLists[] = { GraphicsCommandList };
+		GGraphicsQueue->ExecuteCommandLists(1, CmdLists);
 	}
 
 	void BeginGpuCapture(const FString& SavedFileName)

@@ -3,12 +3,29 @@
 
 namespace FRAMEWORK
 {
+
+	static D3D12_PRIMITIVE_TOPOLOGY MapPrimitiveType(PrimitiveType InType)
+	{
+		switch (InType)
+		{
+		case PrimitiveType::Point:			return D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
+		case PrimitiveType::Line:			return D3D_PRIMITIVE_TOPOLOGY_LINELIST;
+		case PrimitiveType::LineStrip:		return D3D_PRIMITIVE_TOPOLOGY_LINESTRIP;
+		case PrimitiveType::Triangle:		return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		case PrimitiveType::TriangleStrip:	return D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+		default:
+			SH_LOG(LogDx12, Fatal, TEXT("Invalid PrimitiveType."));
+			return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		}
+	}
 	
 	CommandListContext::CommandListContext(FrameResourceStorage InitFrameResources, TRefCountPtr<ID3D12GraphicsCommandList> InGraphicsCmdList)
 		: FrameResources(MoveTemp(InitFrameResources))
 		, GraphicsCmdList(MoveTemp(InGraphicsCmdList))
 		, CurrentPso(nullptr)
 		, CurrentRenderTarget(nullptr)
+		, CurrentVertexBuffer(nullptr)
+		, DrawType(PrimitiveType::Triangle)
 	{
 
 	}
@@ -33,32 +50,56 @@ namespace FRAMEWORK
 
 	void CommandListContext::PrepareDrawingEnv()
 	{
-		check(CurrentPso);
-		GraphicsCmdList->SetGraphicsRootSignature(CurrentPso->GetRootSig());
-		GraphicsCmdList->SetPipelineState(CurrentPso->GetResource());
-
-
-		GCommandListContext->GetCommandListHandle()->RSSetViewports(1, CurrentViewPort.Get());
-		GCommandListContext->GetCommandListHandle()->RSSetScissorRects(1, CurrentSissorRect.Get());
-
-		check(CurrentRenderTarget);
-		check(CurrentRenderTarget->HandleRTV.IsValid());
-		GCommandListContext->GetCommandListHandle()->OMSetRenderTargets(1, &CurrentRenderTarget->HandleRTV.CpuHandle, false, nullptr);
-
-		Vector4f OptimizedClearValue = CurrentRenderTarget->GetResourceDesc().ClearValues;
-		if (ClearColorValue.IsValid()) {
-			if (!(*ClearColorValue).Equals(OptimizedClearValue))
-			{
-				SH_LOG(LogDx12, Warning, TEXT("OptimizedClearValue(%s) != ClearColorValue(%s) that may result in invalid fast clear optimization."), *OptimizedClearValue.ToString(), *(*ClearColorValue).ToString());
+		if (IsVertexBufferDirty) 
+		{
+			if (CurrentVertexBuffer && CurrentVertexBuffer->IsValid()) {
+				//TODO
+				GDynamicFrameResourceManager.AddUncompletedResource(CurrentVertexBuffer);
 			}
-			GCommandListContext->GetCommandListHandle()->ClearRenderTargetView(CurrentRenderTarget->HandleRTV.CpuHandle, (*ClearColorValue).GetData(), 0, nullptr);
-		}
-		else {
-			GCommandListContext->GetCommandListHandle()->ClearRenderTargetView(CurrentRenderTarget->HandleRTV.CpuHandle, OptimizedClearValue.GetData(), 0, nullptr);
+			else {
+				GCommandListContext->GetCommandListHandle()->IASetVertexBuffers(0, 0, nullptr);
+			}
+			MarkVertexBufferDirty(false);
 		}
 
-		GDynamicFrameResourceManager.AddUncompletedResource(CurrentPso);
-		GDynamicFrameResourceManager.AddUncompletedResource(CurrentRenderTarget);
+		GCommandListContext->GetCommandListHandle()->IASetPrimitiveTopology(MapPrimitiveType(DrawType));
+		
+		if (IsPipelineDirty)
+		{
+			check(CurrentPso);
+			GraphicsCmdList->SetGraphicsRootSignature(CurrentPso->GetRootSig());
+			GraphicsCmdList->SetPipelineState(CurrentPso->GetResource());
+			GDynamicFrameResourceManager.AddUncompletedResource(CurrentPso);
+			MarkPipelineDirty(false);
+		}
+	
+		if (IsViewportDirty)
+		{
+			GCommandListContext->GetCommandListHandle()->RSSetViewports(1, CurrentViewPort.Get());
+			GCommandListContext->GetCommandListHandle()->RSSetScissorRects(1, CurrentSissorRect.Get());
+			MarkViewportDirty(false);
+		}
+
+		if (IsRenderTargetDirty)
+		{
+			check(CurrentRenderTarget);
+			check(CurrentRenderTarget->HandleRTV.IsValid());
+			GCommandListContext->GetCommandListHandle()->OMSetRenderTargets(1, &CurrentRenderTarget->HandleRTV.CpuHandle, false, nullptr);
+
+			Vector4f OptimizedClearValue = CurrentRenderTarget->GetResourceDesc().ClearValues;
+			if (ClearColorValue.IsValid()) {
+				if (!(*ClearColorValue).Equals(OptimizedClearValue))
+				{
+					SH_LOG(LogDx12, Warning, TEXT("OptimizedClearValue(%s) != ClearColorValue(%s) that may result in invalid fast clear optimization."), *OptimizedClearValue.ToString(), *(*ClearColorValue).ToString());
+				}
+				GCommandListContext->GetCommandListHandle()->ClearRenderTargetView(CurrentRenderTarget->HandleRTV.CpuHandle, (*ClearColorValue).GetData(), 0, nullptr);
+			}
+			else {
+				GCommandListContext->GetCommandListHandle()->ClearRenderTargetView(CurrentRenderTarget->HandleRTV.CpuHandle, OptimizedClearValue.GetData(), 0, nullptr);
+			}
+			GDynamicFrameResourceManager.AddUncompletedResource(CurrentRenderTarget);
+			MarkRenderTartgetDirty(false);
+		}
 	}
 
 	StaticFrameResource::StaticFrameResource(TRefCountPtr<ID3D12CommandAllocator> InCommandAllocator, DescriptorAllocatorStorage&& InDescriptorAllocators)
