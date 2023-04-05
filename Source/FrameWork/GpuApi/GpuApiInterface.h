@@ -32,5 +32,10 @@ namespace GpuApi
 
 	FRAMEWORK_API void BeginGpuCapture(const FString& SavedFileName);
 	FRAMEWORK_API void EndGpuCapture();
+	FRAMEWORK_API void BeginCaptureEvent(const FString& EventName);
+	FRAMEWORK_API void EndCpatureEvent();
+
+	//The renderer for drawing ui in UE uses dx11 as backend api, so need a shared resource.
+	FRAMEWORK_API void* GetSharedHandle(GpuTexture* InGpuTexture);
 }
 }

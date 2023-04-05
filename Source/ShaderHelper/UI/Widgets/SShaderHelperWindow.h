@@ -1,4 +1,6 @@
 #pragma once
+#include <Widgets/SViewport.h>
+
 namespace SH {
 
 	class SShaderHelperWindow :
@@ -6,17 +8,21 @@ namespace SH {
 	{
 	public:
 		SLATE_BEGIN_ARGS(SShaderHelperWindow) {}
-			SLATE_ARGUMENT(TSharedPtr<ISlateViewport>, ViewportInterface)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs);
+		void SetViewPortInterface(TSharedRef<ISlateViewport> InSlateViewportInterface) {
+			Viewport->SetViewportInterface(MoveTemp(InSlateViewportInterface));
+		}
+		
 	private:
 		TSharedRef<SDockTab> SpawnWindowTab(const FSpawnTabArgs& Args);
 		TSharedRef<SWidget> CreateMenuBar();
 		void FillMenu(FMenuBuilder& MenuBuilder, FString MenuName);
+
 	private:
 		TSharedPtr<FTabManager> TabManager;
-		TSharedPtr<ISlateViewport> ViewportInterface;
+		TSharedPtr<SViewport> Viewport;
 	};
 
 }

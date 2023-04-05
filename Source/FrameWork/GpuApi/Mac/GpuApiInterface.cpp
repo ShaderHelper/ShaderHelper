@@ -100,5 +100,20 @@ namespace GpuApi
 
 	}
 
+	void BeginCaptureEvent(const FString& EventName)
+	{
+
+	}
+
+	void EndCpatureEvent()
+	{
+
+	}
+
+	void* GetSharedHandle(GpuTexture* InGpuTexture)
+	{
+
+	}
+
 }
 }

@@ -211,6 +211,32 @@ namespace GpuApi
 		}
 #endif
 	}
+
+	void BeginCaptureEvent(const FString& EventName)
+	{
+#if USE_PIX
+		if (GCanGpuCapture) {
+			PIXBeginEvent(GCommandListContext->GetCommandListHandle(), PIX_COLOR_DEFAULT, *EventName);
+		}
+#endif
+	}
+
+	void EndCpatureEvent()
+	{
+#if USE_PIX
+		if (GCanGpuCapture) {
+			PIXEndEvent(GCommandListContext->GetCommandListHandle());
+		}
+#endif
+	}
+
+	void* GetSharedHandle(GpuTexture* InGpuTexture)
+	{
+		void* SharedHandle = nullptr;
+		Dx12Texture* Texture = static_cast<Dx12Texture*>(InGpuTexture);
+		GDevice->CreateSharedHandle(Texture->GetResource(), nullptr, GENERIC_ALL, nullptr, &SharedHandle);
+		return SharedHandle;
+	}
 	
 }
 }
