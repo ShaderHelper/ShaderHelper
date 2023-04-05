@@ -12,6 +12,7 @@ namespace SH
 	public:
 		virtual void* GetSharedHanldeFromFinalRT() const override;
 		virtual void Render() override;
+		void OnViewportResize();
 
 	private:
 		void RenderBegin();

@@ -1,6 +1,8 @@
 #include "CommonHeader.h"
 #include "ShaderHelperApp.h"
 #include "UI/Styles/FShaderHelperStyle.h"
+#include "Renderer/ShRenderer.h"
+#include "UI/Widgets/SShaderHelperWindow.h"
 
 namespace SH {
 
@@ -8,6 +10,14 @@ namespace SH {
 	{
 		App::Init();
 		FShaderHelperStyle::Init();
+
+		ViewPort = MakeShared<PreviewViewPort>();
+		TSharedPtr<SShaderHelperWindow> ActualWindow = StaticCastSharedPtr<SShaderHelperWindow>(AppWindow);
+		ActualWindow->SetViewPortInterface(ViewPort.ToSharedRef());
+
+		ShRenderer* ActualRenderer = static_cast<ShRenderer*>(GetRenderer());
+		ActualRenderer->ViewPort = ViewPort.Get();
+		ViewPort->OnViewportResize.AddRaw(ActualRenderer, &ShRenderer::OnViewportResize);
 	}
 
 	void ShaderHelperApp::PostInit()

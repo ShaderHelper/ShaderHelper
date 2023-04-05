@@ -2,10 +2,12 @@
 #include "GpuApi/GpuResource.h"
 namespace SH
 {
+	DECLARE_MULTICAST_DELEGATE(OnViewportResizeDelegate)
+
 	class PreviewViewPort : public ISlateViewport
 	{
 	public:
-		PreviewViewPort(int32 InSizeX, int32 InSizeY) : SizeX(InSizeX), SizeY(InSizeY) {}
+		PreviewViewPort() : SizeX(0), SizeY(0) {}
 
 	public:
 		FIntPoint GetSize() const override
@@ -18,7 +20,13 @@ namespace SH
 			return ViewPortRT.Get();
 		}
 
-		void SetViewPortRenderTexture(TRefCountPtr<GpuTexture> InGpuTex);
+		bool RequiresVsync() const override { return false; }
+
+		void SetViewPortRenderTexture(GpuTexture* InGpuTex);
+		void OnDrawViewport(const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) override;
+	public:
+		OnViewportResizeDelegate OnViewportResize;
+		
 	private:
 		TSharedPtr<FSlateShaderResource> ViewPortRT;
 		int32 SizeX;

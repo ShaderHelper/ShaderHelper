@@ -90,7 +90,7 @@ namespace FRAMEWORK
 	enum class BlendMask : uint32
 	{
 		None = 0,
-		R = 1u << 0,
+		R = 1u << 0, //Avoid R channel being written to RenderTarget.
 		G = 1u << 1,
 		B = 1u << 2,
 		A = 1u << 3,
@@ -274,7 +274,7 @@ namespace FRAMEWORK
 	{
 		const inline BlendStateDesc GDefaultBlendStateDesc{
 			BlendStateDesc::DescStorageType{ 
-				BlendRenderTargetDesc{ false, BlendFactor::SrcAlpha, BlendFactor::InvSrcAlpha, BlendFactor::One, BlendFactor::One, BlendOp::Add, BlendOp::Add }
+				BlendRenderTargetDesc{ false, BlendFactor::SrcAlpha, BlendFactor::InvSrcAlpha, BlendFactor::One, BlendFactor::One, BlendOp::Add, BlendOp::Add}
 			}
 		};
 	}

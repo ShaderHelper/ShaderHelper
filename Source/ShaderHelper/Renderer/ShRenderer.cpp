@@ -19,7 +19,7 @@ namespace SH
 	const FString PsForTest = R"(
 		float4 main() : SV_Target 
 		{
-			return float4(1,1,0,0);
+			return float4(1,1,0,1);
 		}
 	)";
 #else
@@ -31,24 +31,31 @@ namespace SH
 	{
 		GpuApi::InitApiEnv();
 
-		GpuTextureDesc Desc{ 256, 256, GpuTextureFormat::R16G16B16A16_UNORM, GpuTextureUsage::Shared | GpuTextureUsage::RenderTarget, Vector4f{0.7f}};
-		FinalRT = GpuApi::CreateGpuTexture(Desc);
-
 		VertexShader = GpuApi::CreateShaderFromSource(ShaderType::VertexShader, FullScreenVsText, TEXT("DefaultFullScreenVS"));
 		GpuApi::CompilerShader(VertexShader);
 
 		PixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, PsForTest, TEXT("FullScreenPS"));
 		GpuApi::CompilerShader(PixelShader);
-
-		PipelineStateDesc PipelineDesc{
-			VertexShader, PixelShader, RasterizerStateDesc{RasterizerFillMode::Solid, RasterizerCullMode::Back}, GpuResourceHelper::GDefaultBlendStateDesc, FinalRT->GetFormat()
-		};
-		PipelineState = GpuApi::CreateRenderPipelineState(PipelineDesc);
 	}
 
 	void* ShRenderer::GetSharedHanldeFromFinalRT() const
 	{
 		return nullptr;
+	}
+
+	void ShRenderer::OnViewportResize()
+	{
+		GpuTextureDesc Desc{ (uint32)ViewPort->GetSize().X, (uint32)ViewPort->GetSize().Y, GpuTextureFormat::R16G16B16A16_UNORM, GpuTextureUsage::Shared | GpuTextureUsage::RenderTarget };
+		FinalRT = GpuApi::CreateGpuTexture(Desc);
+
+		check(FinalRT.IsValid());
+		PipelineStateDesc PipelineDesc{
+			VertexShader, PixelShader, RasterizerStateDesc{RasterizerFillMode::Solid, RasterizerCullMode::None}, GpuResourceHelper::GDefaultBlendStateDesc, FinalRT->GetFormat()
+		};
+		PipelineState = GpuApi::CreateRenderPipelineState(PipelineDesc);
+
+	/*	check(ViewPort);
+		ViewPort->SetViewPortRenderTexture(FinalRT);*/
 	}
 
 	void ShRenderer::RenderBegin()
@@ -64,11 +71,18 @@ namespace SH
 	{
 		RenderBegin();
 		//Start to record command buffer
-		GpuApi::BindVertexBuffer(nullptr);
-		GpuApi::BindRenderPipelineState(PipelineState);
-		GpuApi::SetViewPort(GpuViewPortDesc{ 256,256 });
-		GpuApi::SetRenderTarget(FinalRT);
-		GpuApi::DrawPrimitive(0, 3, 0, 1);
+		if (FinalRT.IsValid())
+		{
+			GpuApi::BeginCaptureEvent(TEXT("Full screen pass"));
+
+			GpuApi::BindVertexBuffer(nullptr);
+			GpuApi::BindRenderPipelineState(PipelineState);
+			GpuApi::SetViewPort({ (uint32)ViewPort->GetSize().X, (uint32)ViewPort->GetSize().Y });
+			GpuApi::SetRenderTarget(FinalRT);
+			GpuApi::DrawPrimitive(0, 3, 0, 1);
+
+			GpuApi::EndCpatureEvent();
+		}
 
 		RenderEnd();
 	}
@@ -83,8 +97,6 @@ namespace SH
 			bCanGpuCapture = false;
 			FPlatformMisc::MessageBoxExt(EAppMsgType::Ok, TEXT("Successfully captured the current frame."), TEXT("Message:"));
 		}
-
-		ViewPort->SetViewPortRenderTexture(FinalRT);
 	}
 
 }
