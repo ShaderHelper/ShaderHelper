@@ -77,6 +77,9 @@ namespace GpuApi
 			CD3DX12_TEXTURE_COPY_LOCATION DestLoc{ Texture->ReadBackBuffer->GetResource(), Layout};
 			CD3DX12_TEXTURE_COPY_LOCATION SrcLoc{ Texture->GetResource() };
 			CommandListHandle->CopyTextureRegion(&DestLoc, 0, 0, 0, &SrcLoc, nullptr);
+
+			//To make sure ReadBackBuffer finished copying, so cpu can read the mapped data.
+			FlushGpu();
 			Data = Texture->ReadBackBuffer->Map();
 		}
 		OutRowPitch = Align(InGpuTexture->GetWidth() * GetTextureFormatByteSize(InGpuTexture->GetFormat()), D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);

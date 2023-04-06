@@ -10,7 +10,6 @@ namespace SH
 		ShRenderer();
 		
 	public:
-		virtual void* GetSharedHanldeFromFinalRT() const override;
 		virtual void Render() override;
 		void OnViewportResize();
 

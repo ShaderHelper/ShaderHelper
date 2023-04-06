@@ -38,24 +38,20 @@ namespace SH
 		GpuApi::CompilerShader(PixelShader);
 	}
 
-	void* ShRenderer::GetSharedHanldeFromFinalRT() const
-	{
-		return nullptr;
-	}
-
 	void ShRenderer::OnViewportResize()
 	{
+		check(ViewPort);
 		GpuTextureDesc Desc{ (uint32)ViewPort->GetSize().X, (uint32)ViewPort->GetSize().Y, GpuTextureFormat::R8G8B8A8_UNORM, GpuTextureUsage::Shared | GpuTextureUsage::RenderTarget };
 		FinalRT = GpuApi::CreateGpuTexture(Desc);
+		ViewPort->SetViewPortRenderTexture(FinalRT);
 
 		check(FinalRT.IsValid());
 		PipelineStateDesc PipelineDesc{
 			VertexShader, PixelShader, RasterizerStateDesc{RasterizerFillMode::Solid, RasterizerCullMode::None}, GpuResourceHelper::GDefaultBlendStateDesc, FinalRT->GetFormat()
 		};
 		PipelineState = GpuApi::CreateRenderPipelineState(PipelineDesc);
-
-		check(ViewPort);
-		ViewPort->SetViewPortRenderTexture(FinalRT);
+	
+		Render();
 	}
 
 	void ShRenderer::RenderBegin()

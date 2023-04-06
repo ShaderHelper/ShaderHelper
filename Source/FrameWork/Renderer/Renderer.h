@@ -8,7 +8,6 @@ namespace FRAMEWORK
 		Renderer() = default;
 		virtual ~Renderer() = default;
 	public:
-		virtual void* GetSharedHanldeFromFinalRT() const { return nullptr; };
 		virtual void Render() = 0;
 	};
 }
