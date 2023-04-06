@@ -50,7 +50,7 @@ namespace FRAMEWORK
 		void Transition(ID3D12Resource* InResource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After);
 		void SetPipeline(Dx12Pso* InPso) { CurrentPso = InPso; }
 		void SetRenderTarget(Dx12Texture* InRT) { CurrentRenderTarget = InRT; }
-		void SetVertexBuffer(Dx12VertexBuffer* InBuffer) { CurrentVertexBuffer = InBuffer; }
+		void SetVertexBuffer(Dx12Buffer* InBuffer) { CurrentVertexBuffer = InBuffer; }
 		void SetPrimitiveType(PrimitiveType InType) { DrawType = InType; }
 		void SetClearColor(TUniquePtr<Vector4f> InClearColor) { ClearColorValue = MoveTemp(InClearColor); }
 		void SetViewPort(TUniquePtr<D3D12_VIEWPORT> InViewPort, TUniquePtr<D3D12_RECT> InSissorRect) {
@@ -69,7 +69,7 @@ namespace FRAMEWORK
 		TRefCountPtr<ID3D12GraphicsCommandList> GraphicsCmdList;
 		Dx12Pso* CurrentPso;
 		Dx12Texture* CurrentRenderTarget;
-		Dx12VertexBuffer* CurrentVertexBuffer;
+		Dx12Buffer* CurrentVertexBuffer;
 		PrimitiveType DrawType;
 		TUniquePtr<Vector4f> ClearColorValue;
 		TUniquePtr<D3D12_VIEWPORT> CurrentViewPort;

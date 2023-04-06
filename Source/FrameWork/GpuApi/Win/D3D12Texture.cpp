@@ -11,7 +11,8 @@ namespace FRAMEWORK
 	};
 
 	Dx12Texture::Dx12Texture(D3D12_RESOURCE_STATES InState, TRefCountPtr<ID3D12Resource> InResource, GpuTextureDesc InDesc)
-		: GpuTexture(InDesc.Format), TrackedResource(InState), Resource(MoveTemp(InResource)), TexDesc(MoveTemp(InDesc))
+		: GpuTexture(InDesc.Width, InDesc.Height, InDesc.Format)
+		, TrackedResource(InState), Resource(MoveTemp(InResource)), TexDesc(MoveTemp(InDesc))
 	{
 
 	}
@@ -134,11 +135,11 @@ namespace FRAMEWORK
 
 		if (bHasInitialData) {
 			const uint64 UploadBufferSize = GetRequiredIntermediateSize(TexResource, 0, 1);
-			TRefCountPtr<Dx12UploadBuffer> UploadBuffer = new Dx12UploadBuffer(UploadBufferSize);
+			TRefCountPtr<Dx12Buffer> UploadBuffer = new Dx12Buffer(UploadBufferSize, BufferUsage::Upload);
 			
 			D3D12_SUBRESOURCE_DATA textureData = {};
 			textureData.pData = &InTexDesc.InitialData[0];
-			textureData.RowPitch = InTexDesc.Width * GetFormatByteSize(InTexDesc.Format);
+			textureData.RowPitch = InTexDesc.Width * GetTextureFormatByteSize(InTexDesc.Format);
 			textureData.SlicePitch = textureData.RowPitch * InTexDesc.Height;
 
 			UpdateSubresources(GCommandListContext->GetCommandListHandle(), TexResource, UploadBuffer->GetResource(), 0, 0, 1, &textureData);

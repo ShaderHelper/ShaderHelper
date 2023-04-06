@@ -43,7 +43,7 @@ namespace FRAMEWORK
 
 	void CommandListContext::Transition(ID3D12Resource* InResource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After)
 	{
-		ensureMsgf(Before == After, TEXT("Transitioning between the same resource sates: %d ?"), Before, After);
+		ensureMsgf(Before != After, TEXT("Transitioning between the same resource sates: %d ?"), Before);
 		CD3DX12_RESOURCE_BARRIER Barrier = CD3DX12_RESOURCE_BARRIER::Transition(InResource, Before, After);
 		GraphicsCmdList->ResourceBarrier(1, &Barrier);
 	}
@@ -52,7 +52,7 @@ namespace FRAMEWORK
 	{
 		if (IsVertexBufferDirty) 
 		{
-			if (CurrentVertexBuffer && CurrentVertexBuffer->IsValid()) {
+			if (CurrentVertexBuffer) {
 				//TODO
 				GDynamicFrameResourceManager.AddUncompletedResource(CurrentVertexBuffer);
 			}
