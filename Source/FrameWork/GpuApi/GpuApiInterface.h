@@ -13,7 +13,11 @@ namespace GpuApi
 	FRAMEWORK_API void EndRenderFrame();
 
 	FRAMEWORK_API TRefCountPtr<GpuTexture> CreateGpuTexture(const GpuTextureDesc& InTexDesc);
-	FRAMEWORK_API void* MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapMode InMapMode);
+
+	//Need OutRowPitch to correctly read or write data, because the mapped buffer actually contains the *padded* texture data.
+	//RowPitch != Width x ElementByteSize
+	//RowPitch = align(Width x ElementByteSize, RequiredAlignValue)
+	FRAMEWORK_API void* MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapMode InMapMode, uint32& OutRowPitch);
 	FRAMEWORK_API void UnMapGpuTexture(GpuTexture* InGpuTexture);
 
 	FRAMEWORK_API TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName);

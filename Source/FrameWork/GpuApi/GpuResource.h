@@ -125,10 +125,15 @@ namespace FRAMEWORK
 
 	class GpuTexture : public GpuResource {
 	public:
-		GpuTexture(GpuTextureFormat InFormat) : Format(InFormat) {}
+		GpuTexture(uint32 InWidth, uint32 InHeight, GpuTextureFormat InFormat) 
+			: Width(InWidth), Height(InHeight), Format(InFormat)
+		{}
 		GpuTextureFormat GetFormat() const { return Format; }
+		uint32 GetWidth() const { return Width; }
+		uint32 GetHeight() const { return Height; }
 
 	private:
+		uint32 Width, Height;
 		GpuTextureFormat Format;
 	};
 
@@ -249,7 +254,7 @@ namespace FRAMEWORK
 		float ZMin, ZMax;
 	};
 
-	inline uint32 GetFormatByteSize(GpuTextureFormat InFormat)
+	inline uint32 GetTextureFormatByteSize(GpuTextureFormat InFormat)
 	{
 		switch (InFormat)
 		{

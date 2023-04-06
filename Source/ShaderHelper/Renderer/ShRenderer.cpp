@@ -45,7 +45,7 @@ namespace SH
 
 	void ShRenderer::OnViewportResize()
 	{
-		GpuTextureDesc Desc{ (uint32)ViewPort->GetSize().X, (uint32)ViewPort->GetSize().Y, GpuTextureFormat::R16G16B16A16_UNORM, GpuTextureUsage::Shared | GpuTextureUsage::RenderTarget };
+		GpuTextureDesc Desc{ (uint32)ViewPort->GetSize().X, (uint32)ViewPort->GetSize().Y, GpuTextureFormat::R8G8B8A8_UNORM, GpuTextureUsage::Shared | GpuTextureUsage::RenderTarget };
 		FinalRT = GpuApi::CreateGpuTexture(Desc);
 
 		check(FinalRT.IsValid());
@@ -54,17 +54,17 @@ namespace SH
 		};
 		PipelineState = GpuApi::CreateRenderPipelineState(PipelineDesc);
 
-	/*	check(ViewPort);
-		ViewPort->SetViewPortRenderTexture(FinalRT);*/
+		check(ViewPort);
+		ViewPort->SetViewPortRenderTexture(FinalRT);
 	}
 
 	void ShRenderer::RenderBegin()
 	{
+		GpuApi::StartRenderFrame();
 		bCanGpuCapture = FSlateApplication::Get().GetModifierKeys().AreModifersDown(EModifierKey::Control | EModifierKey::Alt);
 		if (bCanGpuCapture) {
 			GpuApi::BeginGpuCapture(TEXT("GpuCapture"));
 		}
-		GpuApi::StartRenderFrame();
 	}
 
 	void ShRenderer::Render()
@@ -82,6 +82,10 @@ namespace SH
 			GpuApi::DrawPrimitive(0, 3, 0, 1);
 
 			GpuApi::EndCpatureEvent();
+
+			//To make sure finalRT finished drawing
+			GpuApi::FlushGpu();
+			ViewPort->UpdateViewPortRenderTexture(FinalRT);
 		}
 
 		RenderEnd();
@@ -89,14 +93,15 @@ namespace SH
 
 	void ShRenderer::RenderEnd()
 	{
-		GpuApi::Submit();
-		GpuApi::EndRenderFrame();
 		if (bCanGpuCapture) {
 			GpuApi::EndGpuCapture();
 			//just capture one frame.
 			bCanGpuCapture = false;
 			FPlatformMisc::MessageBoxExt(EAppMsgType::Ok, TEXT("Successfully captured the current frame."), TEXT("Message:"));
 		}
+		GpuApi::Submit();
+		GpuApi::EndRenderFrame();
+
 	}
 
 }

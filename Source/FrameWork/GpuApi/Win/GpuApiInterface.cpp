@@ -16,13 +16,6 @@ namespace GpuApi
 		InitFrameResource();
 	}
 
-	void FlushGpu()
-	{
-		DxCheck(CpuSyncGpuFence->SetEventOnCompletion(CurCpuFrame, CpuSyncGpuEvent));
-		WaitForSingleObject(CpuSyncGpuEvent, INFINITE);
-		CurGpuFrame = CurCpuFrame;
-	}
-
 	void StartRenderFrame()
 	{
 		//StaticFrameResource
@@ -56,16 +49,37 @@ namespace GpuApi
 		return AUX::StaticCastRefCountPtr<GpuTexture>(CreateDx12Texture(InTexDesc));
 	}
 
-	void* MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapMode InMapMode)
+	void* MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapMode InMapMode, uint32& OutRowPitch)
 	{
 		Dx12Texture* Texture = static_cast<Dx12Texture*>(InGpuTexture);
 		void* Data{};
 		if (InMapMode == GpuResourceMapMode::Write_Only) {
-			const uint64 UploadBufferSize = GetRequiredIntermediateSize(Texture->GetResource(), 0, 1);
-			Texture->UploadBuffer = new Dx12UploadBuffer(UploadBufferSize);
+			if (!Texture->UploadBuffer.IsValid())
+			{
+				const uint64 BufferSize = GetRequiredIntermediateSize(Texture->GetResource(), 0, 1);
+				Texture->UploadBuffer = new Dx12Buffer(BufferSize, BufferUsage::Upload);
+			}
 			Data = Texture->UploadBuffer->Map();
 			Texture->bIsMappingForWriting = true;
 		}
+		else if (InMapMode == GpuResourceMapMode::Read_Only) {
+			if (!Texture->ReadBackBuffer.IsValid())
+			{
+				const uint64 BufferSize = GetRequiredIntermediateSize(Texture->GetResource(), 0, 1); 
+				Texture->ReadBackBuffer = new Dx12Buffer(BufferSize, BufferUsage::ReadBack);
+			}
+			ScopedBarrier Barrier{ Texture, D3D12_RESOURCE_STATE_COPY_SOURCE };
+			ID3D12GraphicsCommandList* CommandListHandle = GCommandListContext->GetCommandListHandle();
+
+			D3D12_PLACED_SUBRESOURCE_FOOTPRINT Layout{};
+			D3D12_RESOURCE_DESC Desc = Texture->GetResource()->GetDesc();
+			GDevice->GetCopyableFootprints(&Desc, 0, 1, 0, &Layout, nullptr, nullptr, nullptr);
+			CD3DX12_TEXTURE_COPY_LOCATION DestLoc{ Texture->ReadBackBuffer->GetResource(), Layout};
+			CD3DX12_TEXTURE_COPY_LOCATION SrcLoc{ Texture->GetResource() };
+			CommandListHandle->CopyTextureRegion(&DestLoc, 0, 0, 0, &SrcLoc, nullptr);
+			Data = Texture->ReadBackBuffer->Map();
+		}
+		OutRowPitch = Align(InGpuTexture->GetWidth() * GetTextureFormatByteSize(InGpuTexture->GetFormat()), D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
 		return Data;
 	}
 
@@ -78,10 +92,18 @@ namespace GpuApi
 			ID3D12GraphicsCommandList* CommandListHandle = GCommandListContext->GetCommandListHandle();
 
 			CD3DX12_TEXTURE_COPY_LOCATION DestLoc{ Texture->GetResource() };
-			CD3DX12_TEXTURE_COPY_LOCATION SrcLoc{ Texture->UploadBuffer->GetResource() };
-			CommandListHandle->CopyTextureRegion(&DestLoc, 0, 0, 0, &SrcLoc,nullptr);
+
+			D3D12_PLACED_SUBRESOURCE_FOOTPRINT Layout{};
+			D3D12_RESOURCE_DESC Desc = Texture->GetResource()->GetDesc();
+			GDevice->GetCopyableFootprints(&Desc, 0, 1, 0, &Layout, nullptr, nullptr, nullptr);
+			CD3DX12_TEXTURE_COPY_LOCATION SrcLoc{ Texture->UploadBuffer->GetResource(), Layout };
+			CommandListHandle->CopyTextureRegion(&DestLoc, 0, 0, 0, &SrcLoc, nullptr);
 				
 			Texture->bIsMappingForWriting = false;
+		}
+		else
+		{
+			Texture->ReadBackBuffer->Unmap();
 		}
 	}
 
@@ -139,7 +161,7 @@ namespace GpuApi
 
 	void BindVertexBuffer(GpuBuffer* InVertexBuffer)
 	{
-		Dx12VertexBuffer* Vb = static_cast<Dx12VertexBuffer*>(InVertexBuffer);
+		Dx12Buffer* Vb = static_cast<Dx12Buffer*>(InVertexBuffer);
 		GCommandListContext->SetVertexBuffer(Vb);
 		GCommandListContext->MarkVertexBufferDirty(true);
 	}
@@ -189,6 +211,23 @@ namespace GpuApi
 		GGraphicsQueue->ExecuteCommandLists(1, CmdLists);
 	}
 
+	void FlushGpu()
+	{
+#if USE_PIX
+		PIXSetMarker(GCommandListContext->GetCommandListHandle(), 0, TEXT("Flush"));
+#endif
+
+		Submit();
+		DxCheck(GGraphicsQueue->Signal(CpuSyncGpuFence, CurCpuFrame + 114514));
+		DxCheck(CpuSyncGpuFence->SetEventOnCompletion(CurCpuFrame + 114514, CpuSyncGpuEvent));
+		WaitForSingleObject(CpuSyncGpuEvent, INFINITE);
+		CpuSyncGpuFence->Signal(CurCpuFrame);
+		CurGpuFrame = CurCpuFrame;
+
+		GCommandListContext->BindStaticFrameResource(GetCurFrameSourceIndex());
+		GDynamicFrameResourceManager.ReleaseCompletedResources();
+	}
+
 	void BeginGpuCapture(const FString& SavedFileName)
 	{
 #if USE_PIX
@@ -215,18 +254,14 @@ namespace GpuApi
 	void BeginCaptureEvent(const FString& EventName)
 	{
 #if USE_PIX
-		if (GCanGpuCapture) {
-			PIXBeginEvent(GCommandListContext->GetCommandListHandle(), PIX_COLOR_DEFAULT, *EventName);
-		}
+		PIXBeginEvent(GCommandListContext->GetCommandListHandle(), PIX_COLOR_DEFAULT, *EventName);
 #endif
 	}
 
 	void EndCpatureEvent()
 	{
 #if USE_PIX
-		if (GCanGpuCapture) {
-			PIXEndEvent(GCommandListContext->GetCommandListHandle());
-		}
+		PIXEndEvent(GCommandListContext->GetCommandListHandle());
 #endif
 	}
 

@@ -3,10 +3,16 @@
 #include "GpuApi/GpuResource.h"
 namespace FRAMEWORK
 {
-	class Dx12UploadBuffer : public GpuBuffer
+	enum class BufferUsage
+	{
+		Upload = D3D12_HEAP_TYPE_UPLOAD,
+		ReadBack = D3D12_HEAP_TYPE_READBACK,
+	};
+	
+	class Dx12Buffer : public GpuBuffer
 	{
 	public:
-		Dx12UploadBuffer(uint64 BufferSize);
+		Dx12Buffer(uint64 BufferSize, BufferUsage InUsage);
 		ID3D12Resource* GetResource() const { return Resource; }
 		void* Map() {
 			Resource->Map(0, nullptr, static_cast<void**>(&MappedData));
@@ -22,11 +28,4 @@ namespace FRAMEWORK
 		void* MappedData{};
 	};
 
-	class Dx12VertexBuffer : public GpuBuffer
-	{
-	public:
-		bool IsValid() const { return false; }
-	private:
-		TRefCountPtr<ID3D12Resource> Resource;
-	};
 }

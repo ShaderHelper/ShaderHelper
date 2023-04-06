@@ -23,7 +23,8 @@ namespace FRAMEWORK
 	public:
 		DescriptorHandle<Descriptorvisibility::CpuVisible> HandleRTV;
 		DescriptorHandle<Descriptorvisibility::CpuGpuVisible> HandleSRV;
-		TRefCountPtr<Dx12UploadBuffer> UploadBuffer;
+		TRefCountPtr<Dx12Buffer> UploadBuffer;
+		TRefCountPtr<Dx12Buffer> ReadBackBuffer;
 		bool bIsMappingForWriting = false;
 	};
 
