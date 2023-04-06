@@ -14,6 +14,7 @@ namespace SH
 
 	void PreviewViewPort::UpdateViewPortRenderTexture(GpuTexture* InGpuTex)
 	{
+		check((SizeX == InGpuTex->GetWidth()) && (SizeY == InGpuTex->GetHeight()));
 		uint32 PaddedRowPitch;
 		uint8* PaddedData = (uint8*)GpuApi::MapGpuTexture(InGpuTex, GpuResourceMapMode::Read_Only, PaddedRowPitch);
 		uint32 UnpaddedSize = InGpuTex->GetWidth() * InGpuTex->GetHeight() * GetTextureFormatByteSize(InGpuTex->GetFormat());
