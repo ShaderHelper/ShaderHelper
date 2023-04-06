@@ -29,7 +29,7 @@ project "FrameWork"
     }
 
     links {
-        "d3d12", "dxgi"
+        "d3d12", "dxgi", "dxguid"
     }
 
     filter "system:windows"
