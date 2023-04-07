@@ -1,5 +1,5 @@
 FrameWorkHierarchy = {
-    ["Sources/*"] = {"**.h","**.cpp"},
+    ["Sources/*"] = {"**.h","**.cpp", "**.hpp"},
 }
 
 project "FrameWork"
@@ -19,11 +19,22 @@ project "FrameWork"
 		"FRAMEWORK_API=DLLEXPORT"
 	}
 
-    uses "UE"
+    uses {
+        "UE"
+    }
 
     filter "system:windows"
         pchheader "CommonHeader.h"
         pchsource "CommonHeader.cpp"
+        
+        private_uses {
+            "d3dx12", "D3D12MemoryAllocator",
+            "DXC", "AgilitySDK", "WinPixEventRuntime"
+        }
+    
+        links {
+            "d3d12", "dxgi", "dxguid"
+        }
 
 usage "FrameWork"
 	defines {

@@ -5,7 +5,7 @@ usage "UE"
     filter "system:windows"
         libdirs
         {
-            path.getabsolute("Lib"),
+            path.getabsolute("Lib/Win"),
         }
         links
         {
@@ -17,6 +17,10 @@ usage "UE"
             "UE-Projects",
             "UE-ImageWrapper",
             "UE-CoreUObject"
+        }
+        prebuildcommands {
+            "{COPYFILE} %{wks.location}/External/UE/Lib/Win/*.dll %{cfg.targetdir}",
+            "{COPYFILE} %{wks.location}/External/UE/Lib/Win/UE.modules %{cfg.targetdir}"
         }
     filter "system:macosx"
         links 
@@ -38,6 +42,10 @@ usage "UE"
             "%{cfg.targetdir}/UE-Projects.dylib",
             "%{cfg.targetdir}/UE-ImageWrapper.dylib",
             "%{cfg.targetdir}/UE-CoreUObject.dylib"
+        }
+        prebuildcommands {
+            "{COPYFILE} %{wks.location}/External/UE/Lib/Mac/*.dylib %{cfg.targetdir}",
+            "{COPYFILE} %{wks.location}/External/UE/Lib/Mac/UE.modules %{cfg.targetdir}"
         }
         buildoptions { 
             "-x objective-c++",

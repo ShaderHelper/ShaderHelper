@@ -10,7 +10,9 @@
 
 namespace FRAMEWORK {
 
-	void App::UE_Init() {
+	void UE_Init(const TCHAR* CommandLine) {
+		FCommandLine::Set(CommandLine);
+		
 		//Initializing OutputDevices for features like UE_LOG.
 		FPlatformOutputDevices::SetupOutputDevices();
 
@@ -39,8 +41,8 @@ namespace FRAMEWORK {
 		FSlateApplication::InitializeAsStandaloneApplication(GetStandardStandaloneRenderer(FRAMEWORK::BaseResourcePath::UE_StandaloneRenderShaderDir));
 
 	}
-
-	void App::UE_ShutDown() {
+	
+	void UE_ShutDown() {
 		FCoreDelegates::OnPreExit.Broadcast();
 		FCoreDelegates::OnExit.Broadcast();
 		FSlateApplication::Shutdown();
@@ -56,38 +58,17 @@ namespace FRAMEWORK {
 		}
 	}
 
-	void App::UE_Update() {
-		BeginExitIfRequested();
-		FSlateApplication::Get().PumpMessages();
-		FSlateApplication::Get().Tick();
+	App::App(TSharedPtr<SWindow> InWindow)
+		: AppWindow(MoveTemp(InWindow))
+	{
+		FSlateApplication::Get().AddWindow(AppWindow.ToSharedRef());
 	}
 
-	App::App(const TCHAR* CommandLine)
+	App::App(TSharedPtr<SWindow> InWindow, TUniquePtr<Renderer> InRenderer)
+		: AppWindow(MoveTemp(InWindow))
+		, AppRenderer(MoveTemp(InRenderer))
 	{
-		FCommandLine::Set(CommandLine);
-	}
-
-	void App::Init()
-	{
-		UE_Init();
-	}
-
-	void App::PostInit()
-	{
-		if (AppWindow.IsValid()) {
-			FSlateApplication::Get().AddWindow(AppWindow.ToSharedRef());
-		}
-	}
-
-	void App::ShutDown()
-	{
-		UE_ShutDown();
-	}
-
-	void App::Update(double DeltaTime)
-	{
-		UE_Update();
-
+		FSlateApplication::Get().AddWindow(AppWindow.ToSharedRef());
 	}
 
 	void App::Run()
@@ -95,17 +76,25 @@ namespace FRAMEWORK {
 		Init();
 		PostInit();
 		while (!IsEngineExitRequested()) {
+			BeginExitIfRequested();
+
 			double CurrentRealTime = FPlatformTime::Seconds();
 			double LastRealTime = GetCurrentTime();
 			double DeltaTime = CurrentRealTime - LastRealTime;
 			SetCurrentTime(CurrentRealTime);
 			SetDeltaTime(DeltaTime);
+
+			FSlateApplication::Get().PumpMessages();
 			Update(DeltaTime);
+
+			if (AppRenderer.IsValid()) {
+				AppRenderer->Render();
+			}
+			FSlateApplication::Get().Tick();
 			//if not change GFrameCounter, slate texture may not update.
 			GFrameCounter++;
 		}
 		ShutDown();
 	}
-
 
 }

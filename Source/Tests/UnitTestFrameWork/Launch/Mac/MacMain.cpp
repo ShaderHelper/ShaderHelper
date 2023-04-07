@@ -12,10 +12,11 @@ static FString GSavedCommandLine;
 {
     FPlatformMisc::SetGracefulTerminationHandler();
     FPlatformMisc::SetCrashHandler(nullptr);
-    
-	UNITTEST_FRAMEWORK::UnitTestConSole app(*GSavedCommandLine);
+	UNITTEST_FRAMEWORK::UE_Init(*GSavedCommandLine);
+	UNITTEST_FRAMEWORK::UnitTestConSole app;
 	app.SetClientSize(FVector2D(800, 600));
     app.Run();
+	UNITTEST_FRAMEWORK::UE_ShutDown();
     [NSApp terminate:self];
 }
 

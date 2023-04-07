@@ -211,6 +211,10 @@ namespace FRAMEWORK {
 		FString ToString() const {
 			return FString::Printf(TEXT("X=%3.3f Y=%3.3f"), X, Y);
 		}
+
+		const T* GetData() const {
+			return Data;
+		}
 	};
 
 	template<typename T>
@@ -426,6 +430,10 @@ namespace FRAMEWORK {
 
 		FString ToString() const {
 			return FString::Printf(TEXT("X=%3.3f Y=%3.3f Z=%3.3f"), X, Y, Z);
+		}
+
+		const T* GetData() const {
+			return Data;
 		}
 	};
 
@@ -867,6 +875,10 @@ namespace FRAMEWORK {
 
 		FString ToString() const {
 			return FString::Printf(TEXT("X=%3.3f Y=%3.3f Z=%3.3f W=%3.3f"), X, Y, Z, W);
+		}
+
+		const T* GetData() const {
+			return Data;
 		}
 	};
 
