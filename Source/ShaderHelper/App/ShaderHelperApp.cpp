@@ -15,9 +15,12 @@ namespace SH {
 		TSharedPtr<SShaderHelperWindow> ActualWindow = StaticCastSharedPtr<SShaderHelperWindow>(AppWindow);
 		ActualWindow->SetViewPortInterface(ViewPort.ToSharedRef());
 
-		ShRenderer* ActualRenderer = static_cast<ShRenderer*>(GetRenderer());
-		ActualRenderer->ViewPort = ViewPort.Get();
-		ViewPort->OnViewportResize.AddRaw(ActualRenderer, &ShRenderer::OnViewportResize);
+        if(AppRenderer.IsValid())
+        {
+            ShRenderer* ActualRenderer = static_cast<ShRenderer*>(AppRenderer.Get());
+            ActualRenderer->ViewPort = ViewPort.Get();
+            ViewPort->OnViewportResize.AddRaw(ActualRenderer, &ShRenderer::OnViewportResize);
+        }
 	}
 
 	void ShaderHelperApp::PostInit()
