@@ -157,15 +157,15 @@ namespace AUX
 	   (func(Var,std::integral_constant<int, Seq>{}), ...);
     }
 
-#define RUNCASE_WITHINT_IMPL(LambName,VarToken,Min,Max,...)		\
+#define RUNCASE_WITHINT_IMPL(LambName,VarToken,Min,Max,...)														\
 	checkf(VarToken >= Min && VarToken <= Max, TEXT("%s must be [%d,%d]"), *FString(#VarToken), Min, Max);		\
-	auto LambName = [&](int Var, auto&& t) {		\
-        using BaseType = std::remove_reference_t<decltype(t)>;      \
-		constexpr int VarToken = BaseType::value;		\
-		if (VarToken == Var) {		\
-            __VA_ARGS__		\
-		}		\
-	};		\
+	auto LambName = [&](int Var, auto&& t) {																	\
+        using BaseType = std::remove_reference_t<decltype(t)>;													\
+		constexpr int VarToken = BaseType::value;																\
+		if (VarToken == Var) {																					\
+            __VA_ARGS__																							\
+		}																										\
+	};																											\
 	AUX::RunCaseWithInt(VarToken, LambName, AUX::MakeRangeIntegerSequence<Min, Max>{});
 
    //Pass a run-time integer with known small range to template
@@ -212,6 +212,18 @@ namespace AUX
 		std::memcpy(&dst, &src, sizeof(To));
 		return dst;
 	}
+
+	template<ESPMode Mode = ESPMode::ThreadSafe, typename T, typename D>
+	TSharedPtr<T, Mode> TransOwnerShip(TUniquePtr<T, D>&& InUniquePtr) {
+		return TSharedPtr<T, Mode>(InUniquePtr.Release());
+	}
+
+	template<typename T, typename U>
+	TRefCountPtr<T> StaticCastRefCountPtr(const TRefCountPtr<U>& InRefCountPtr) {
+		T* RawPtr = static_cast<T*>(InRefCountPtr.GetReference());
+		return TRefCountPtr<T>{RawPtr};
+	}
+	
 
 } // end AUX namespace
 } // end FRAMEWORK namespace

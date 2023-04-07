@@ -10,7 +10,10 @@ namespace SH {
 		TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab);
 		if (TabName == "PreviewTab") {
 			SAssignNew(SpawnedTab, SDockTab)
-				.Label(FText::FromString("Preview"));
+				.Label(FText::FromString("Preview"))
+				[
+					SAssignNew(Viewport,SViewport)
+				];
 		}
 		else if (TabName == "PropetyTab") {
 			SAssignNew(SpawnedTab, SDockTab)
@@ -33,7 +36,6 @@ namespace SH {
 
 	void SShaderHelperWindow::Construct(const FArguments& InArgs)
 	{
-
 		TSharedRef<SDockTab> NewTab = SNew(SDockTab).TabRole(ETabRole::MajorTab);
 		TabManager = FGlobalTabmanager::Get()->NewTabManager(NewTab);
 		TabManager->RegisterTabSpawner("PreviewTab", FOnSpawnTab::CreateRaw(this, &SShaderHelperWindow::SpawnWindowTab))

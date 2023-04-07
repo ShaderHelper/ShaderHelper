@@ -67,14 +67,25 @@ require 'stack'
 
 	local optimization = (_OPTIONS["usage-optimization-off"] == nil)
 
+	local usageScope = {
+		public = "public",
+		private = "private"
+	}
+
 --
 -- 'uses' api
 --
 
 p.api.register {
 	name = "uses",
-		scope = { "config" },
-		kind = "list:string",
+	scope = { "config" },
+	kind = "list:string",
+	}
+
+p.api.register {
+	name = "private_uses",
+	scope = { "config" },
+	kind = "list:string",
 	}
 
 --
@@ -319,7 +330,7 @@ p.api.register {
 --
 -- @return 1 if push was performed, 0 if not
 ---
-	local function insertUsage( usesTable, usageName, sourceName )
+	local function insertUsage( usesTable, usageName, sourceName, usageScope )
 		local usagePushed = 0
 		-- project can use own usage and it is valid use
 		-- without this check we will get error about double push on stack
@@ -327,7 +338,7 @@ p.api.register {
 			pushUsage( usageName, sourceName )
 			usagePushed = 1
 		end
-		table.insert( usesTable, usageName )
+		table.insert( usesTable, { name = usageName, scope = usageScope } )
 		return usagePushed
 	end
 
@@ -404,15 +415,19 @@ p.api.register {
 
 					usage = usageInfo.block
 					-- sourceProject include own usage
-					if usage then
-						resolveUsage( targetProject, targetBlock, usage )
+					local scope = usageInfo.scope
+					if scope == usageScope.public then
+						if usage then
+							resolveUsage( targetProject, targetBlock, usage )
+						end
+	
+						if usageInfo.type == "project" then
+							-- When referring to a project, 'uses' acts like 'links' too.
+							table.insert(targetBlockResolvedUsesLinks, usageName )
+						end
+	
 					end
-
-					if usageInfo.type == "project" then
-						-- When referring to a project, 'uses' acts like 'links' too.
-						table.insert(targetBlockResolvedUsesLinks, usageName )
-					end
-
+			
 					targetProjectResolvedUses[usageName] = usageInfo
 				end
 			end
@@ -424,16 +439,30 @@ p.api.register {
 				sourceProject.ctx.usesValues = context.fetchvalue( sourceProject.ctx, 'uses' )
 			end 
 
+			if sourceProject.ctx.private_usesValues == nil then
+				sourceProject.ctx.private_usesValues = context.fetchvalue( sourceProject.ctx, 'private_uses' )
+			end 
+
 			local usesToResolve = {}
 			-- push all uses on stack before resolve, it guranty that all uses on current level are before uses are resolved
 			-- this is essential for duplicated uses detection
 			for k,v in ipairs(sourceProject.ctx.usesValues ) do
 				if type(v) == "table" then
 					for _, vName in ipairs(v) do
-						pushCount = pushCount + insertUsage( usesToResolve, vName, sourceProject.name )
+						pushCount = pushCount + insertUsage( usesToResolve, vName, sourceProject.name, usageScope.public )
 					end 
 				else 
-					pushCount = pushCount + insertUsage( usesToResolve, v, sourceProject.name )
+					pushCount = pushCount + insertUsage( usesToResolve, v, sourceProject.name, usageScope.public )
+				end
+			end 
+
+			for k,v in ipairs(sourceProject.ctx.private_usesValues ) do
+				if type(v) == "table" then
+					for _, vName in ipairs(v) do
+						pushCount = pushCount + insertUsage( usesToResolve, vName, sourceProject.name, usageScope.private )
+					end 
+				else 
+					pushCount = pushCount + insertUsage( usesToResolve, v, sourceProject.name, usageScope.private )
 				end
 			end 
 
@@ -467,13 +496,14 @@ p.api.register {
 ---
 
 	resolveUse = function( targetProject, targetBlock,
-							   usageName )
+							   usageItem)
 
 		-- get table of already resolved uses for this projects
 		local resolvedUses = targetProject.resolvedUses
 
 		local usageType = "project"
 		local usageScriptPath = ""
+		local usageName = usageItem.name
 		-- if use already resolved SKIP it
 		if not resolvedUses[usageName] then
 
@@ -524,7 +554,7 @@ p.api.register {
 				end
 			end
 
-			resolvedUses[usageName] = { ["type"] = usageType, ["script"] = usageScriptPath, ["block"] = usage, ["parent"] = targetProject.name }
+			resolvedUses[usageName] = { ["type"] = usageType, ["script"] = usageScriptPath, ["block"] = usage, ["parent"] = targetProject.name , ["scope"] = usageItem.scope}
 		end
 	end
 
@@ -544,19 +574,34 @@ p.api.register {
 		local pushCount = 0
 		usesToResolve = {}
 		
-		for _, usageKey in ipairs(targetBlock.uses) do
-			if type(usageKey) == "table" then
-				for _, usageName in ipairs(usageKey) do
-					pushCount = pushCount + insertUsage( usesToResolve, usageName, targetProject.name )
-				end
-			else
-				pushCount = pushCount + insertUsage( usesToResolve, usageKey, targetProject.name )
-			end 
+		if targetBlock.uses then
+			for _, usageKey in ipairs(targetBlock.uses) do
+				if type(usageKey) == "table" then
+					for _, usageName in ipairs(usageKey) do
+						pushCount = pushCount + insertUsage( usesToResolve, usageName, targetProject.name, usageScope.public )
+					end
+				else
+					pushCount = pushCount + insertUsage( usesToResolve, usageKey, targetProject.name, usageScope.public )
+				end 
+			end
+		end
+	
+		if targetBlock.private_uses then
+			for _, usageKey in ipairs(targetBlock.private_uses) do
+				if type(usageKey) == "table" then
+					for _, usageName in ipairs(usageKey) do
+						pushCount = pushCount + insertUsage( usesToResolve, usageName, targetProject.name, usageScope.private)
+					end
+				else
+					pushCount = pushCount + insertUsage( usesToResolve, usageKey, targetProject.name, usageScope.private )
+				end 
+			end
 		end
 
-		for _, usageName in ipairs(usesToResolve) do
-			resolveUse( targetProject, targetBlock, usageName )
+		for _, usageItem in ipairs(usesToResolve) do
+			resolveUse( targetProject, targetBlock, usageItem )
 		end
+
 		if pushCount > 0 then
 			popUsage(pushCount)
 		end
@@ -582,7 +627,7 @@ p.api.register {
 			end
 			pushUsage( prj.name, '"bake"' )
 			for _, block in pairs(blocks) do
-				if block.uses then
+				if block.uses or block.private_uses then
 					block.resolvedUsesLinks = {}
 					resolveAllUsesInBlock(prj, block)
 					-- When referring to a project, 'uses' acts like 'links' too.
