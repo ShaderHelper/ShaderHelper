@@ -19,6 +19,10 @@ namespace SH
 
 		FSlateShaderResource* GetViewportRenderTargetTexture() const override
 		{
+            if(!ViewPortRT.IsValid()) {
+                return nullptr;
+                
+            }
 			return ViewPortRT->GetSlateResource();;
 		}
 

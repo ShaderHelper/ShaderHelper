@@ -30,7 +30,7 @@ namespace GpuApi
 
 	}
 
-	void* MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapMode InMapMode)
+    void* MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapMode InMapMode, uint32& OutRowPitch)
 	{
 
 	}

@@ -18,9 +18,9 @@ usage "UE"
             "UE-ImageWrapper",
             "UE-CoreUObject"
         }
-        postbuildcommands {
-            '{COPY} "%{wks.location}/External/UE/Lib/Win/*.dll" "%{cfg.targetdir}"',
-            '{COPY} "%{wks.location}/External/UE/Lib/Win/UE.modules" "%{cfg.targetdir}"'
+        prebuildcommands {
+            "{COPYFILE} %{wks.location}/External/UE/Lib/Win/*.dll %{cfg.targetdir}",
+            "{COPYFILE} %{wks.location}/External/UE/Lib/Win/UE.modules %{cfg.targetdir}"
         }
     filter "system:macosx"
         links 
@@ -43,9 +43,9 @@ usage "UE"
             "%{cfg.targetdir}/UE-ImageWrapper.dylib",
             "%{cfg.targetdir}/UE-CoreUObject.dylib"
         }
-        postbuildcommands {
-            '{COPY} "%{wks.location}/External/UE/Lib/Mac/*.dylib" "%{cfg.targetdir}"',
-            '{COPY} "%{wks.location}/External/UE/Lib/Mac/UE.modules" "%{cfg.targetdir}"'
+        prebuildcommands {
+            "{COPYFILE} %{wks.location}/External/UE/Lib/Mac/*.dylib %{cfg.targetdir}",
+            "{COPYFILE} %{wks.location}/External/UE/Lib/Mac/UE.modules %{cfg.targetdir}"
         }
         buildoptions { 
             "-x objective-c++",

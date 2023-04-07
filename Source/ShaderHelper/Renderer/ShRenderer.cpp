@@ -3,7 +3,6 @@
 #include "GpuApi/GpuApiInterface.h"
 namespace SH
 {
-#if PLATFORM_WINDOWS
 	const FString FullScreenVsText = R"(
 		void main(
 		in uint VertID : SV_VertexID,
@@ -22,8 +21,6 @@ namespace SH
 			return float4(1,1,0,1);
 		}
 	)";
-#else
-#endif
 
 	ShRenderer::ShRenderer() 
 		: ViewPort(nullptr)
