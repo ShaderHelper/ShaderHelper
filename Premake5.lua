@@ -2,7 +2,6 @@ include "Premake/Custom.lua"
 
 external_ue = "External/UE"
 external_d3d12memallocator = "External/D3D12MemoryAllocator"
-external_d3dx12 = "External/D3DX12"
 external_dxcompiler = "External/DXC"
 external_agilitysdk = "External/AgilitySDK"
 external_pix = "External/WinPixEventRuntime"
@@ -87,7 +86,6 @@ workspace "ShaderHelper"
 
 include(external_ue)
 include(external_d3d12memallocator)
-include(external_d3dx12)
 include(external_dxcompiler)
 include(external_agilitysdk)
 include(external_pix)

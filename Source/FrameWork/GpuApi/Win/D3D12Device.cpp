@@ -15,16 +15,19 @@ namespace FRAMEWORK
 		}
 #endif
 
+#if GPU_API_DEBUG_LAYER
 		bool bEnableDebugLayer = FParse::Param(FCommandLine::Get(), TEXT("DxDebug"));
-
 		if (bEnableDebugLayer) {
 			TRefCountPtr<ID3D12Debug> Debug;
 			if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(Debug.GetInitReference())))) {
 				Debug->EnableDebugLayer();
 			}
 		}
-
 		DxCheck(CreateDXGIFactory2(bEnableDebugLayer ? DXGI_CREATE_FACTORY_DEBUG : 0, IID_PPV_ARGS(GDxgiFactory.GetInitReference())));
+#else
+		DxCheck(CreateDXGIFactory2(0, IID_PPV_ARGS(GDxgiFactory.GetInitReference())));
+#endif
+
 		TRefCountPtr<IDXGIAdapter1> Adapter;
 		GDxgiFactory->EnumAdapters1(0, Adapter.GetInitReference());
 		
@@ -33,6 +36,25 @@ namespace FRAMEWORK
 		SH_LOG(LogDx12, Display, TEXT("Adapter: %s"), Desc.Description);
 
 		DxCheck(D3D12CreateDevice(Adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(GDevice.GetInitReference())));
+
+#if GPU_API_DEBUG_LAYER
+		if (bEnableDebugLayer) {
+			TRefCountPtr<ID3D12InfoQueue> InfoQueue;
+			if (SUCCEEDED(GDevice->QueryInterface(IID_PPV_ARGS(InfoQueue.GetInitReference()))))
+			{
+				D3D12_MESSAGE_ID DisabledMessages[] =
+				{
+					D3D12_MESSAGE_ID_CREATERESOURCE_STATE_IGNORED,
+				};
+				D3D12_INFO_QUEUE_FILTER Filter{};
+				Filter.DenyList.NumIDs = UE_ARRAY_COUNT(DisabledMessages);
+				Filter.DenyList.pIDList = DisabledMessages;
+				InfoQueue->AddStorageFilterEntries(&Filter);
+				
+				InfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
+			}
+		}
+#endif
 
 		DxCheck(GDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(CpuSyncGpuFence.GetInitReference())));
 		CpuSyncGpuEvent = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
