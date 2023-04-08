@@ -8,7 +8,6 @@
 #include <SharedPCH.h>
 
 //Project Headers
-#include "GlobalBoilerplate.h"
-#include "ProjectDefinitions.h"
+#include "UnitTestFrameWorkPrivateDefinitions.h"
 
 

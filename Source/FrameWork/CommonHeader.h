@@ -8,8 +8,8 @@
 #include <SharedPCH.h>
 
 //Project Headers
-#include "GlobalBoilerplate.h"
-#include "ProjectDefinitions.h"
+#include "FrameWorkPublicDefinitions.h"
+#include "FrameWorkPrivateDefinitions.h"
 
 #include "Common/Util/SwizzleVector.h"
 #include "Common/Util/Auxiliary.h"

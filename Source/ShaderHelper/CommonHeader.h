@@ -8,8 +8,7 @@
 #include <SharedPCH.h>
 
 //Project Headers
-#include "GlobalBoilerplate.h" //From FrameWork
-#include "ProjectDefinitions.h" //From self
+#include "ShaderHelperPrivateDefinitions.h"
 
 //Custom Headers
 #include "Common/Util/SwizzleVector.h"
