@@ -22,6 +22,9 @@ usage "UE"
             "{COPYFILE} %{wks.location}/External/UE/Lib/Win/*.dll %{cfg.targetdir}",
             "{COPYFILE} %{wks.location}/External/UE/Lib/Win/UE.modules %{cfg.targetdir}"
         }
+        buildoptions {
+            "/GR-", --UE modules disable rtti
+        }
     filter "system:macosx"
         links 
         {

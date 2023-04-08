@@ -21,7 +21,7 @@ namespace FRAMEWORK
 	{
 		auto& DescriptorAllocators = GCommandListContext->GetCurFrameResource().GetDescriptorAllocators();
 		DescriptorAllocators.RtvAllocator->Free(HandleRTV);
-		DescriptorAllocators.SrvAllocator->Free(HandleSRV);
+		DescriptorAllocators.ShaderViewAllocator->Free(HandleSRV);
 	}
 
 	static bool ValidateTexture(const GpuTextureDesc& InTexDesc)
@@ -80,7 +80,7 @@ namespace FRAMEWORK
 		auto& DescriptorAllocators = GCommandListContext->GetCurFrameResource().GetDescriptorAllocators();
 		D3D12_CPU_DESCRIPTOR_HANDLE Hanlde{};
 		if (InFlags.bSRV) {
-			InTexture->HandleSRV = DescriptorAllocators.SrvAllocator->Allocate();
+			InTexture->HandleSRV = DescriptorAllocators.ShaderViewAllocator->Allocate();
 			GDevice->CreateShaderResourceView(InTexture->GetResource(), nullptr, InTexture->HandleSRV.CpuHandle);
 		}
 
