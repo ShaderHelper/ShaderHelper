@@ -113,7 +113,7 @@ namespace FRAMEWORK
 	{
 		DxCheck(CommandAllocator->Reset());
 		DescriptorAllocators.RtvAllocator->Reset();
-		DescriptorAllocators.SrvAllocator->Reset();
+		DescriptorAllocators.ShaderViewAllocator->Reset();
 		DescriptorAllocators.SamplerAllocator->Reset();
 	}
 
@@ -124,7 +124,7 @@ namespace FRAMEWORK
 		InGraphicsCmdList->Reset(CommandAllocator, nullptr);
 
 		ID3D12DescriptorHeap* Heaps[] = {
-			DescriptorAllocators.SrvAllocator->GetDescriptorHeap(),
+			DescriptorAllocators.ShaderViewAllocator->GetDescriptorHeap(),
 			DescriptorAllocators.SamplerAllocator->GetDescriptorHeap()
 		};
 		InGraphicsCmdList->SetDescriptorHeaps(UE_ARRAY_COUNT(Heaps), Heaps);
@@ -142,7 +142,7 @@ namespace FRAMEWORK
 
 			StaticFrameResource::DescriptorAllocatorStorage DescriptorAllocators;
 			DescriptorAllocators.RtvAllocator.Reset(new StaticFrameResource::RtvAllocatorType());
-			DescriptorAllocators.SrvAllocator.Reset(new StaticFrameResource::SrvAllocatorType());
+			DescriptorAllocators.ShaderViewAllocator.Reset(new StaticFrameResource::ShaderViewAllocatorType());
 			DescriptorAllocators.SamplerAllocator.Reset(new StaticFrameResource::SamplerAllocatorType());
 
 			FrameResources.Emplace(MoveTemp(CommandAllocator), MoveTemp(DescriptorAllocators));
