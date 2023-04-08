@@ -5,6 +5,7 @@ external_d3d12memallocator = "External/D3D12MemoryAllocator"
 external_dxcompiler = "External/DXC"
 external_agilitysdk = "External/AgilitySDK"
 external_pix = "External/WinPixEventRuntime"
+external_mtlpp = "External/MtlppUE"
 
 project_shaderHelper = "Source/ShaderHelper"
 project_frameWork = "Source/FrameWork"
@@ -44,7 +45,6 @@ workspace "ShaderHelper"
         buildoptions 
         { 
             "/utf-8",
-            "/GR-",
             "/Zc:__cplusplus",
         }
         linkoptions 
@@ -78,6 +78,9 @@ workspace "ShaderHelper"
     filter {"system:windows","files:**/Mac/*.cpp"}
         flags {"ExcludeFromBuild"}
 
+    filter {"system:windows","files:**/.mm"}
+        flags {"ExcludeFromBuild"}
+
     filter {"configurations:Debug"}
         optimize "Off"
     
@@ -89,6 +92,7 @@ include(external_d3d12memallocator)
 include(external_dxcompiler)
 include(external_agilitysdk)
 include(external_pix)
+include(external_mtlpp)
 
 include(project_shaderHelper)
 include(project_frameWork)

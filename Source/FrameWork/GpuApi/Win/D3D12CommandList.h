@@ -15,13 +15,13 @@ namespace FRAMEWORK
 	{
 	public:
 		using RtvAllocatorType = CpuDescriptorAllocator<256, DescriptorType::RTV>;
-		using SrvAllocatorType = GpuDescriptorAllocator<1024, DescriptorType::SRV>;
+		using ShaderViewAllocatorType = GpuDescriptorAllocator<1024, DescriptorType::SHADER_VIEW>;
 		using SamplerAllocatorType = GpuDescriptorAllocator<256, DescriptorType::SAMPLER>;
 
 		struct DescriptorAllocatorStorage
 		{
 			TUniquePtr<RtvAllocatorType> RtvAllocator;
-			TUniquePtr<SrvAllocatorType> SrvAllocator;
+            TUniquePtr<ShaderViewAllocatorType> ShaderViewAllocator;
 			TUniquePtr<SamplerAllocatorType> SamplerAllocator;
 		};
 		StaticFrameResource(TRefCountPtr<ID3D12CommandAllocator> InCommandAllocator, DescriptorAllocatorStorage&& InDescriptorAllocators);

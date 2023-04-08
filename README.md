@@ -18,7 +18,7 @@ This is a shader editor based on some special Modules from UnrealEngine (Slate, 
 
 ### Windows Requirements
 
-* 64-bit version of Windows 10
+* Windows 10 (64-bit) - Version 1909 or later
 * Visual studio 2019 or 2022
 
 [![Windows](https://github.com/mxrhyx233/ShaderHelper/actions/workflows/Windows.yml/badge.svg)](https://github.com/mxrhyx233/ShaderHelper/actions/workflows/Windows.yml) : Open the `.sln` file created after running `bootstrap.bat` and build the project.

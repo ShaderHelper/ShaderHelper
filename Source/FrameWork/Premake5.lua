@@ -1,5 +1,11 @@
 FrameWorkHierarchy = {
     ["Sources/*"] = {"**.h","**.cpp", "**.hpp"},
+    ["External/d3dx12"] = {"../../External/AgilitySDK/Inc/d3dx12.h"},
+    ["External/MtlppUE"] = {
+        "../../External/MtlppUE/src/*.hpp", 
+        "../../External/MtlppUE/src/*.mm", 
+        "../../External/MtlppUE/src/*.inl"
+    }
 }
 
 project "FrameWork"
@@ -35,6 +41,9 @@ project "FrameWork"
         links {
             "d3d12", "dxgi", "dxguid"
         }
+
+    filter "system:macosx"
+        private_uses { "MtlppUE" }
 
 usage "FrameWork"
 	defines {
