@@ -78,7 +78,7 @@ workspace "ShaderHelper"
     filter {"system:windows","files:**/Mac/*.cpp"}
         flags {"ExcludeFromBuild"}
 
-    filter {"system:windows","files:**/.mm"}
+    filter {"system:windows","files:**.mm"}
         flags {"ExcludeFromBuild"}
 
     filter {"configurations:Debug"}
