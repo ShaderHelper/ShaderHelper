@@ -1,7 +1,7 @@
 
 
 usage "UE"
-    GenerateIncludeDir_UE()
+    generateIncludeDir_ue()
     filter "system:windows"
         libdirs
         {
