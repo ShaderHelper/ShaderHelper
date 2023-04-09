@@ -19,7 +19,6 @@ workspace "ShaderHelper"
         "Dev"
     } 
 
-    targetname "%{prj.name}-%{cfg.buildcfg}"
     language "C++"
     cppdialect "C++17"
     staticruntime "off"
@@ -32,6 +31,7 @@ workspace "ShaderHelper"
     startproject "ShaderHelper"
 
     filter "system:windows"
+        targetname "%{prj.name}-%{cfg.buildcfg}"
         systemversion "latest"
         runtime "Release"
         targetdir ("Binaries/Win64")
@@ -57,6 +57,8 @@ workspace "ShaderHelper"
         }
 
     filter "system:macosx"
+        --Premake can not link the corresponding "SharedLib" project in Xcode when targetname contains build configuration.
+        targetname "%{prj.name}"
         targetdir ("Binaries/Mac")
         xcodebuildsettings { ["MACOSX_DEPLOYMENT_TARGET"] = "10.15" }
         runpathdirs {

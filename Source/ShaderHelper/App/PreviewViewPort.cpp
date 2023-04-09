@@ -27,7 +27,7 @@ namespace SH
 		
 		//FSlateD3DTexture::UpdateTexture() updates texture with the unpadded data.
 		ViewPortRT->UpdateTexture(TArray<uint8>{UnpaddedData, (int32)UnpaddedSize});
-		delete UnpaddedData;
+		delete[] UnpaddedData;
 		GpuApi::UnMapGpuTexture(InGpuTex);
 	}
 
