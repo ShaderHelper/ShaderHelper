@@ -13,7 +13,8 @@ namespace FRAMEWORK {
 	void UE_Init(const TCHAR* CommandLine) {
 		FCommandLine::Set(CommandLine);
 		
-		//Initializing OutputDevices for features like UE_LOG.
+		//Initialize OutputDevices for features like UE_LOG, but not make log files.
+		FCommandLine::Append(TEXT("-NODEFAULTLOG"));
 		FPlatformOutputDevices::SetupOutputDevices();
 
 		FTaskGraphInterface::Startup(FPlatformMisc::NumberOfCores());
