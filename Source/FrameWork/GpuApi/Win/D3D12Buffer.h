@@ -18,10 +18,14 @@ namespace FRAMEWORK
 			Resource->Map(0, nullptr, static_cast<void**>(&MappedData));
 			return MappedData;
 		}
-
-		void Unmap() {
+        //Support Persistent Mapped Buffer
+	/*	void Unmap() {
 			Resource->Unmap(0, nullptr);
-		}
+		}*/
+        void* GetMappedData() {
+            check(MappedData);
+            return MappedData;
+        }
 
 	private:
 		TRefCountPtr<ID3D12Resource> Resource;
