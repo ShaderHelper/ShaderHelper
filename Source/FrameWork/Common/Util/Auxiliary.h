@@ -5,7 +5,7 @@ namespace FRAMEWORK
 {
 namespace AUX
 {
-		
+        
     //Support Arithmetic operations on two objects that have the subscript operator via the parameter pack provided by TIntegerSequence
     template<typename LeftSeq, typename RightSeq>
     struct Op;
@@ -110,7 +110,7 @@ namespace AUX
 
     template<int Min, int... Seq>
     struct RangeIntegerSequenceImpl {
-		using Type = TIntegerSequence<int, (Seq + Min)...>;
+        using Type = TIntegerSequence<int, (Seq + Min)...>;
     };
 
     template<int Min, typename Seq>
@@ -126,47 +126,47 @@ namespace AUX
     template<int Min, int Max>
     using MakeRangeIntegerSequence = typename RangeIntegerSequence<Min, TMakeIntegerSequence<int, Max - Min + 1>>::Type;
 
-	template<int Min, int Max, bool(*Pred)(int), int Size, int... Seq>
-	auto MakeIntegerSequeceByPredicateImpl(TIntegerSequence<int, Seq...>) {
-		constexpr auto arr = [] {
-			std::array<int, Size> arr{};
-			int index = 0;
-			for (int i = Min; i <= Max; ++i) {
-				if (Pred(i)) arr[index++] = i;
-			}
-			return arr;
-		}();
-		return TIntegerSequence<int, arr[Seq]...>{};
-	}
+    template<int Min, int Max, bool(*Pred)(int), int Size, int... Seq>
+    auto MakeIntegerSequeceByPredicateImpl(TIntegerSequence<int, Seq...>) {
+        constexpr auto arr = [] {
+            std::array<int, Size> arr{};
+            int index = 0;
+            for (int i = Min; i <= Max; ++i) {
+                if (Pred(i)) arr[index++] = i;
+            }
+            return arr;
+        }();
+        return TIntegerSequence<int, arr[Seq]...>{};
+    }
 
-	//Predicate must be constexpr.
-	template<int Min, int Max, bool(*Pred)(int)>
-	auto MakeIntegerSequeceByPredicate() {
-		constexpr int Size = [] {
-			int size = 0;
-			for (int i = Min; i <= Max; ++i) {
-				if (Pred(i)) size++;
-			}
-			return size;
-		}();
-		return MakeIntegerSequeceByPredicateImpl<Min, Max, Pred, Size>(TMakeIntegerSequence<int, Size>{});
-	}
+    //Predicate must be constexpr.
+    template<int Min, int Max, bool(*Pred)(int)>
+    auto MakeIntegerSequeceByPredicate() {
+        constexpr int Size = [] {
+            int size = 0;
+            for (int i = Min; i <= Max; ++i) {
+                if (Pred(i)) size++;
+            }
+            return size;
+        }();
+        return MakeIntegerSequeceByPredicateImpl<Min, Max, Pred, Size>(TMakeIntegerSequence<int, Size>{});
+    }
 
     template<typename Func, int... Seq>
    void RunCaseWithInt(int Var, const Func& func, TIntegerSequence<int, Seq...>) {
-	   (func(Var,std::integral_constant<int, Seq>{}), ...);
+       (func(Var,std::integral_constant<int, Seq>{}), ...);
     }
-
-#define RUNCASE_WITHINT_IMPL(LambName,VarToken,Min,Max,...)														\
-	checkf(VarToken >= Min && VarToken <= Max, TEXT("%s must be [%d,%d]"), *FString(#VarToken), Min, Max);		\
-	auto LambName = [&](int Var, auto&& t) {																	\
-        using BaseType = std::remove_reference_t<decltype(t)>;													\
-		constexpr int VarToken = BaseType::value;																\
-		if (VarToken == Var) {																					\
-            __VA_ARGS__																							\
-		}																										\
-	};																											\
-	AUX::RunCaseWithInt(VarToken, LambName, AUX::MakeRangeIntegerSequence<Min, Max>{});
+		
+#define RUNCASE_WITHINT_IMPL(LambName,VarToken,Min,Max,...)                                                     \
+    checkf(VarToken >= Min && VarToken <= Max, TEXT("%s must be [%d,%d]"), *FString(#VarToken), Min, Max);      \
+    auto LambName = [&](int Var, auto&& t) {                                                                    \
+        using BaseType = std::remove_reference_t<decltype(t)>;                                                  \
+        constexpr int VarToken = BaseType::value;                                                               \
+        if (VarToken == Var) {                                                                                  \
+            __VA_ARGS__                                                                                         \
+        }                                                                                                       \
+    };                                                                                                          \
+    AUX::RunCaseWithInt(VarToken, LambName, AUX::MakeRangeIntegerSequence<Min, Max>{});
 
    //Pass a run-time integer with known small range to template
    //* The large range will lead to code explosion, please carefully choose the range.
@@ -176,54 +176,54 @@ namespace AUX
    //	struct A{static int Var;} RUNCASE_WITHINT(A::Var,...) (×)
    //	struct A{static int Var;} int Var = A::Var; RUNCASE_WITHINT(Var,...) (√) 
 #define RUNCASE_WITHINT(VarToken,Min,Max,...)	\
-	RUNCASE_WITHINT_IMPL(PREPROCESSOR_JOIN(Auto_Instance_,__COUNTER__),VarToken,Min,Max,__VA_ARGS__) 
-	
+    RUNCASE_WITHINT_IMPL(PREPROCESSOR_JOIN(Auto_Instance_,__COUNTER__),VarToken,Min,Max,__VA_ARGS__) 
+    
 
-	template<typename T>
-	struct TTypename {
-		static inline FString Value = GetGeneratedTypeName<T>();
-	};
+    template<typename T>
+    struct TTypename {
+        static inline FString Value = GetGeneratedTypeName<T>();
+    };
 
-	//Returns a FString that stores the type name from pointer or object. (As an alternative to rtti, but just represents the static type name of the expression )
-	//Its result is not the same on different platforms, so it should not be saved but just used as a key value.
-	template<typename T>
-	FString TypeId(const T& Var) {
-		using BaseType = std::remove_cv_t<std::remove_pointer_t<T>>;
-		return TTypename<BaseType>::Value;
-	}
-	
-	//https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2593r0.html#ref-P1830R1
-	template<typename T>
-	inline constexpr bool AlwaysFalse = false;
+    //Returns a FString that stores the type name from pointer or object. (As an alternative to rtti, but just represents the static type name of the expression )
+    //Its result is not the same on different platforms, so it should not be saved but just used as a key value.
+    template<typename T>
+    FString TypeId(const T& Var) {
+        using BaseType = std::remove_cv_t<std::remove_pointer_t<T>>;
+        return TTypename<BaseType>::Value;
+    }
+    
+    //https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2593r0.html#ref-P1830R1
+    template<typename T>
+    inline constexpr bool AlwaysFalse = false;
 
-	template<typename T>
-	T* GetAddrExt(T&& Val) {
-		return std::addressof(Val);
-	}
+    template<typename T>
+    T* GetAddrExt(T&& Val) {
+        return std::addressof(Val);
+    }
 
-	//For strict-aliasing rule
-	template<typename To, typename From>
-	To BitCast(const From& src) {
-		static_assert(sizeof(To) == sizeof(From), "sizeof(To) != sizeof(From)");
-		static_assert(std::is_trivially_copyable_v<To>, "Destination type is not trivially copyable");
-		static_assert(std::is_trivially_copyable_v<From>, "Source type is not trivially copyable");
-		
-		To dst;
-		std::memcpy(&dst, &src, sizeof(To));
-		return dst;
-	}
+    //For strict-aliasing rule
+    template<typename To, typename From>
+    To BitCast(const From& src) {
+        static_assert(sizeof(To) == sizeof(From), "sizeof(To) != sizeof(From)");
+        static_assert(std::is_trivially_copyable_v<To>, "Destination type is not trivially copyable");
+        static_assert(std::is_trivially_copyable_v<From>, "Source type is not trivially copyable");
+        
+        To dst;
+        std::memcpy(&dst, &src, sizeof(To));
+        return dst;
+    }
 
-	template<ESPMode Mode = ESPMode::ThreadSafe, typename T, typename D>
-	TSharedPtr<T, Mode> TransOwnerShip(TUniquePtr<T, D>&& InUniquePtr) {
-		return TSharedPtr<T, Mode>(InUniquePtr.Release());
-	}
+    template<ESPMode Mode = ESPMode::ThreadSafe, typename T, typename D>
+    TSharedPtr<T, Mode> TransOwnerShip(TUniquePtr<T, D>&& InUniquePtr) {
+        return TSharedPtr<T, Mode>(InUniquePtr.Release());
+    }
 
-	template<typename T, typename U>
-	TRefCountPtr<T> StaticCastRefCountPtr(const TRefCountPtr<U>& InRefCountPtr) {
-		T* RawPtr = static_cast<T*>(InRefCountPtr.GetReference());
-		return TRefCountPtr<T>{RawPtr};
-	}
-	
+    template<typename T, typename U>
+    TRefCountPtr<T> StaticCastRefCountPtr(const TRefCountPtr<U>& InRefCountPtr) {
+        T* RawPtr = static_cast<T*>(InRefCountPtr.GetReference());
+        return TRefCountPtr<T>{RawPtr};
+    }
+    
 
 } // end AUX namespace
 } // end FRAMEWORK namespace

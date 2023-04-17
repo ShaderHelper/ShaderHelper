@@ -5,6 +5,7 @@ namespace FRAMEWORK
 {
 	
 	Dx12Buffer::Dx12Buffer(uint64 BufferSize, BufferUsage InUsage)
+        : MappedData(nullptr)
 	{
 		CD3DX12_HEAP_PROPERTIES HeapType{ D3D12_HEAP_TYPE(InUsage) };
 		D3D12_RESOURCE_STATES InitialState = InUsage == BufferUsage::Upload ? D3D12_RESOURCE_STATE_GENERIC_READ : D3D12_RESOURCE_STATE_COPY_DEST;

@@ -58,8 +58,12 @@ namespace GpuApi
 			{
 				const uint64 BufferSize = GetRequiredIntermediateSize(Texture->GetResource(), 0, 1);
 				Texture->UploadBuffer = new Dx12Buffer(BufferSize, BufferUsage::Upload);
+                Data = Texture->UploadBuffer->Map();
 			}
-			Data = Texture->UploadBuffer->Map();
+            else
+            {
+                Data = Texture->UploadBuffer->GetMappedData();
+            }
 			Texture->bIsMappingForWriting = true;
 		}
 		else if (InMapMode == GpuResourceMapMode::Read_Only) {
@@ -67,7 +71,12 @@ namespace GpuApi
 			{
 				const uint64 BufferSize = GetRequiredIntermediateSize(Texture->GetResource(), 0, 1); 
 				Texture->ReadBackBuffer = new Dx12Buffer(BufferSize, BufferUsage::ReadBack);
+                Data = Texture->ReadBackBuffer->Map();
 			}
+            else
+            {
+                Data = Texture->ReadBackBuffer->GetMappedData();
+            }
 			ScopedBarrier Barrier{ Texture, D3D12_RESOURCE_STATE_COPY_SOURCE };
 			ID3D12GraphicsCommandList* CommandListHandle = GCommandListContext->GetCommandListHandle();
 
@@ -80,7 +89,6 @@ namespace GpuApi
 
 			//To make sure ReadBackBuffer finished copying, so cpu can read the mapped data.
 			FlushGpu();
-			Data = Texture->ReadBackBuffer->Map();
 		}
 		OutRowPitch = Align(InGpuTexture->GetWidth() * GetTextureFormatByteSize(InGpuTexture->GetFormat()), D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
 		return Data;
@@ -90,7 +98,6 @@ namespace GpuApi
 	{
 		Dx12Texture* Texture = static_cast<Dx12Texture*>(InGpuTexture);
 		if (Texture->bIsMappingForWriting) {
-			Texture->UploadBuffer->Unmap();
 			ScopedBarrier Barrier{ Texture, D3D12_RESOURCE_STATE_COPY_DEST };
 			ID3D12GraphicsCommandList* CommandListHandle = GCommandListContext->GetCommandListHandle();
 
@@ -103,10 +110,6 @@ namespace GpuApi
 			CommandListHandle->CopyTextureRegion(&DestLoc, 0, 0, 0, &SrcLoc, nullptr);
 				
 			Texture->bIsMappingForWriting = false;
-		}
-		else
-		{
-			Texture->ReadBackBuffer->Unmap();
 		}
 	}
 
