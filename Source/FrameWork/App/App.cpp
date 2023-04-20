@@ -77,6 +77,10 @@ namespace FRAMEWORK {
 		Init();
 		PostInit();
 		while (!IsEngineExitRequested()) {
+#if PLATFORM_MAC
+            //Ensure that NSObjects autoreleased every frame are immediately released.
+            SCOPED_AUTORELEASE_POOL;
+#endif
 			BeginExitIfRequested();
 
 			double CurrentRealTime = FPlatformTime::Seconds();
