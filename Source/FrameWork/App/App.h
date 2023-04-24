@@ -25,6 +25,8 @@ namespace FRAMEWORK {
 
 		static Vector2D GetClientSize() { return AppClientSize; }
 		static void SetClientSize(Vector2D InClientSize) {AppClientSize = MoveTemp(InClientSize);}
+
+		bool AreAllWindowsHidden() const;
 		
 	protected:
 		virtual void Init() {}

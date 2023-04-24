@@ -224,6 +224,44 @@ namespace AUX
         return TRefCountPtr<T>{RawPtr};
     }
     
+	template<typename T>
+	struct TraitFuncTypeFromFuncPtr;
+
+	template<typename T, typename C>
+	struct TraitFuncTypeFromFuncPtr<T C::*> { using Type = T; };
+
+	template<typename T>
+	using TraitFuncTypeFromFunctor_t = typename TraitFuncTypeFromFuncPtr<decltype(&T::operator())>::Type;
+
+	template<typename T1, typename T2>
+	struct FunctorExt;
+
+#define DefineFunctorExtWithQualifier(...)                                       \
+	template<typename T, typename Ret, typename... ParamType>                    \
+	struct FunctorExt<T, Ret(ParamType...) __VA_ARGS__>                          \
+	{                                                                            \
+		static Ret Call(ParamType... Params)                                     \
+		{                                                                        \
+			return (*FunctorStorage)(Params...);                                 \
+		}                                                                        \
+		static T* FunctorStorage;                                                \
+	};                                                                           \
+	template<typename T, typename Ret, typename... ParamType>                    \
+	T* FunctorExt<T, Ret(ParamType...) __VA_ARGS__>::FunctorStorage = nullptr;   
+
+	DefineFunctorExtWithQualifier();
+	DefineFunctorExtWithQualifier(const);
+
+	//Convert functor with state to function pointer.
+	template<typename T>
+	auto FunctorToFuncPtr(T&& Functor)
+	{
+		using CleanType = std::decay_t<T>;
+		using CurFunctorExt = FunctorExt<CleanType, TraitFuncTypeFromFunctor_t<CleanType>>;
+		CurFunctorExt::FunctorStorage = &Functor;
+		return &CurFunctorExt::Call;
+	}
+
 
 } // end AUX namespace
 } // end FRAMEWORK namespace
