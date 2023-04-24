@@ -23,6 +23,12 @@ namespace UNITTEST_FRAMEWORK
 		(lam(Seq), ...);
 	}
 
+	void TestFunctorToFuncPtr(void(*func)(int,int))
+	{
+		func(1,2);
+	}
+
+
 	void TestUtil()
 	{
 		SH_LOG(LogTestUtil, Display, TEXT("Unit Test - Util:"));
@@ -159,6 +165,15 @@ namespace UNITTEST_FRAMEWORK
 				return true;
 			};
 			TestSeq(AUX::MakeIntegerSequeceByPredicate<10, 30, Pred>());
+		}
+
+		//Test FunctorToFuncPtr
+		{
+			int t = 233;
+			auto f = [t](int a, int b) {
+				SH_LOG(LogTestUtil, Display, TEXT("TestFunctorToFuncPtr:%d"), t + a + b);
+			};
+			TestFunctorToFuncPtr(AUX::FunctorToFuncPtr(f));
 		}
 
 	}

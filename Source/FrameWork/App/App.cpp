@@ -90,16 +90,42 @@ namespace FRAMEWORK {
 			SetDeltaTime(DeltaTime);
 
 			FSlateApplication::Get().PumpMessages();
-			Update(DeltaTime);
 
-			if (AppRenderer.IsValid()) {
-				AppRenderer->Render();
+			bool bIdleMode = AreAllWindowsHidden();
+			if (!bIdleMode)
+			{
+				Update(DeltaTime);
+
+				if (AppRenderer.IsValid()) {
+					AppRenderer->Render();
+				}
+				FSlateApplication::Get().Tick();
+				//if not change GFrameCounter, slate texture may not update.
+				GFrameCounter++;
 			}
-			FSlateApplication::Get().Tick();
-			//if not change GFrameCounter, slate texture may not update.
-			GFrameCounter++;
 		}
 		ShutDown();
+	}
+
+	bool App::AreAllWindowsHidden() const
+	{
+		if (!FSlateApplication::IsInitialized())
+		{
+			return true;
+		}
+		const TArray< TSharedRef<SWindow> > AllWindows = FSlateApplication::Get().GetInteractiveTopLevelWindows();
+
+		bool bAllHidden = true;
+		for (const TSharedRef<SWindow>& Window : AllWindows)
+		{
+			if (!Window->IsWindowMinimized() && Window->IsVisible())
+			{
+				bAllHidden = false;
+				break;
+			}
+		}
+
+		return bAllHidden;
 	}
 
 }
