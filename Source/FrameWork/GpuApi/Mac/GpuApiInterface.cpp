@@ -1,5 +1,8 @@
 #include "CommonHeader.h"
 #include "GpuApi/GpuApiInterface.h"
+#include "MetalCommon.h"
+#include "MetalDevice.h"
+
 namespace FRAMEWORK
 {
 namespace GpuApi
@@ -7,7 +10,7 @@ namespace GpuApi
 		
 	void InitApiEnv()
 	{
-
+        InitMetalCore();
 	}
 
 	void FlushGpu()

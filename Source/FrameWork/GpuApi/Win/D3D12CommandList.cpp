@@ -54,7 +54,7 @@ namespace FRAMEWORK
 		{
 			if (CurrentVertexBuffer) {
 				//TODO
-				GDynamicFrameResourceManager.AddUncompletedResource(CurrentVertexBuffer);
+                GDeferredReleaseManager.AddUncompletedResource(CurrentVertexBuffer);
 			}
 			else {
 				GCommandListContext->GetCommandListHandle()->IASetVertexBuffers(0, 0, nullptr);
@@ -69,12 +69,14 @@ namespace FRAMEWORK
 			check(CurrentPso);
 			GraphicsCmdList->SetGraphicsRootSignature(CurrentPso->GetRootSig());
 			GraphicsCmdList->SetPipelineState(CurrentPso->GetResource());
-			GDynamicFrameResourceManager.AddUncompletedResource(CurrentPso);
+            GDeferredReleaseManager.AddUncompletedResource(CurrentPso);
 			MarkPipelineDirty(false);
 		}
 	
 		if (IsViewportDirty)
 		{
+            check(CurrentViewPort.IsValid());
+            check(CurrentSissorRect.IsValid());
 			GCommandListContext->GetCommandListHandle()->RSSetViewports(1, CurrentViewPort.Get());
 			GCommandListContext->GetCommandListHandle()->RSSetScissorRects(1, CurrentSissorRect.Get());
 			MarkViewportDirty(false);
@@ -87,7 +89,7 @@ namespace FRAMEWORK
 			GCommandListContext->GetCommandListHandle()->OMSetRenderTargets(1, &CurrentRenderTarget->HandleRTV.CpuHandle, false, nullptr);
 
 			Vector4f OptimizedClearValue = CurrentRenderTarget->GetResourceDesc().ClearValues;
-			if (ClearColorValue.IsValid()) {
+			if (ClearColorValue) {
 				if (!(*ClearColorValue).Equals(OptimizedClearValue))
 				{
 					SH_LOG(LogDx12, Warning, TEXT("OptimizedClearValue(%s) != ClearColorValue(%s) that may result in invalid fast clear optimization."), *OptimizedClearValue.ToString(), *(*ClearColorValue).ToString());
@@ -97,7 +99,7 @@ namespace FRAMEWORK
 			else {
 				GCommandListContext->GetCommandListHandle()->ClearRenderTargetView(CurrentRenderTarget->HandleRTV.CpuHandle, OptimizedClearValue.GetData(), 0, nullptr);
 			}
-			GDynamicFrameResourceManager.AddUncompletedResource(CurrentRenderTarget);
+            GDeferredReleaseManager.AddUncompletedResource(CurrentRenderTarget);
 			MarkRenderTartgetDirty(false);
 		}
 	}
