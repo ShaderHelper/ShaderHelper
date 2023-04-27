@@ -23,7 +23,7 @@ namespace GpuApi
 		GCommandListContext->ResetStaticFrameResource(FrameResourceIndex);
 		GCommandListContext->BindStaticFrameResource(FrameResourceIndex);
 
-		GDynamicFrameResourceManager.AllocateOneFrame();
+        GDeferredReleaseManager.AllocateOneFrame();
 	}
 
 	void EndRenderFrame()
@@ -41,7 +41,7 @@ namespace GpuApi
 			CurGpuFrame = CurGpuFrame + 1;
 		}
 
-		GDynamicFrameResourceManager.ReleaseCompletedResources();
+        GDeferredReleaseManager.ReleaseCompletedResources();
 	}
 
 	TRefCountPtr<GpuTexture> CreateGpuTexture(const GpuTextureDesc& InTexDesc)
@@ -183,7 +183,7 @@ namespace GpuApi
 		ViewPort.TopLeftY = InViewPortDesc.TopLeftY;
 
 		D3D12_RECT ScissorRect = CD3DX12_RECT(0, 0, InViewPortDesc.Width, InViewPortDesc.Height);
-		GCommandListContext->SetViewPort(MakeUnique<D3D12_VIEWPORT>(ViewPort), MakeUnique<D3D12_RECT>(ScissorRect));
+		GCommandListContext->SetViewPort(MakeUnique<D3D12_VIEWPORT>(MoveTemp(ViewPort)), MakeUnique<D3D12_RECT>(MoveTemp(ScissorRect)));
 		GCommandListContext->MarkViewportDirty(true);
 	}
 
@@ -197,7 +197,7 @@ namespace GpuApi
 
 	void SetClearColorValue(Vector4f ClearColor)
 	{
-		GCommandListContext->SetClearColor(MakeUnique<Vector4f>(ClearColor));
+		GCommandListContext->SetClearColor(MoveTemp(ClearColor));
 	}
 
 	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType)
@@ -231,7 +231,7 @@ namespace GpuApi
 		CurGpuFrame = CurCpuFrame;
 
 		GCommandListContext->BindStaticFrameResource(GetCurFrameSourceIndex());
-		GDynamicFrameResourceManager.ReleaseCompletedResources();
+        GDeferredReleaseManager.ReleaseCompletedResources();
 	}
 
 	void BeginGpuCapture(const FString& SavedFileName)

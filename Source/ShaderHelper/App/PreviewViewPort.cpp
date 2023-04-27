@@ -18,16 +18,18 @@ namespace SH
 		uint32 PaddedRowPitch;
 		uint8* PaddedData = (uint8*)GpuApi::MapGpuTexture(InGpuTex, GpuResourceMapMode::Read_Only, PaddedRowPitch);
 		uint32 UnpaddedSize = InGpuTex->GetWidth() * InGpuTex->GetHeight() * GetTextureFormatByteSize(InGpuTex->GetFormat());
-		uint8* UnpaddedData = new uint8[UnpaddedSize];
+        
+        TArray<uint8> UnpaddedData;
+        UnpaddedData.Reserve(UnpaddedSize);
 		uint32 UnpaddedRowPitch = InGpuTex->GetWidth() * GetTextureFormatByteSize(InGpuTex->GetFormat());
 		for (uint32 Row = 0; Row < InGpuTex->GetHeight(); ++Row)
 		{
-			FMemory::Memcpy(UnpaddedData + Row * UnpaddedRowPitch, PaddedData + Row * PaddedRowPitch, UnpaddedRowPitch);
+            uint8* DataPtr = UnpaddedData.GetData();
+			FMemory::Memcpy(DataPtr + Row * UnpaddedRowPitch, PaddedData + Row * PaddedRowPitch, UnpaddedRowPitch);
 		}
 		
 		//FSlateD3DTexture::UpdateTexture() updates texture with the unpadded data.
-		ViewPortRT->UpdateTexture(TArray<uint8>{UnpaddedData, (int32)UnpaddedSize});
-		delete[] UnpaddedData;
+		ViewPortRT->UpdateTexture(UnpaddedData);
 		GpuApi::UnMapGpuTexture(InGpuTex);
 	}
 

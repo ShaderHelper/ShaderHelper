@@ -3,9 +3,8 @@
 
 namespace FRAMEWORK
 {
-	inline bool GCanGpuCapture = false;
-	extern void InitDx12Core();
 
+	inline bool GCanGpuCapture = false;
 	inline TRefCountPtr<ID3D12Device> GDevice;
 	inline TRefCountPtr<IDXGIFactory2> GDxgiFactory;
 	inline TRefCountPtr<ID3D12CommandQueue> GGraphicsQueue;
@@ -16,6 +15,7 @@ namespace FRAMEWORK
 	inline uint64 CurCpuFrame;
 	inline uint64 CurGpuFrame;
 
+    extern void InitDx12Core();
 	inline uint32 GetCurFrameSourceIndex() {
 		return CurCpuFrame % FrameSourceNum;
 	}

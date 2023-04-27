@@ -10,7 +10,8 @@
 
 namespace FRAMEWORK {
 
-	void UE_Init(const TCHAR* CommandLine) {
+	void UE_Init(const TCHAR* CommandLine)
+    {
 		FCommandLine::Set(CommandLine);
 		
 		//Initialize OutputDevices for features like UE_LOG, but not make log files.
@@ -43,7 +44,8 @@ namespace FRAMEWORK {
 
 	}
 	
-	void UE_ShutDown() {
+	void UE_ShutDown()
+    {
 		FCoreDelegates::OnPreExit.Broadcast();
 		FCoreDelegates::OnExit.Broadcast();
 		FSlateApplication::Shutdown();

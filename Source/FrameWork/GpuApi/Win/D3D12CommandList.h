@@ -10,7 +10,6 @@ namespace FRAMEWORK
 {
 	extern void InitFrameResource();
 
-	//The FrameResources that are immutable and always valid.
 	class StaticFrameResource : public FNoncopyable
 	{
 	public:
@@ -52,7 +51,7 @@ namespace FRAMEWORK
 		void SetRenderTarget(Dx12Texture* InRT) { CurrentRenderTarget = InRT; }
 		void SetVertexBuffer(Dx12Buffer* InBuffer) { CurrentVertexBuffer = InBuffer; }
 		void SetPrimitiveType(PrimitiveType InType) { DrawType = InType; }
-		void SetClearColor(TUniquePtr<Vector4f> InClearColor) { ClearColorValue = MoveTemp(InClearColor); }
+		void SetClearColor(Vector4f InClearColor) { ClearColorValue = MoveTemp(InClearColor); }
 		void SetViewPort(TUniquePtr<D3D12_VIEWPORT> InViewPort, TUniquePtr<D3D12_RECT> InSissorRect) {
 			CurrentViewPort = MoveTemp(InViewPort);
 			CurrentSissorRect = MoveTemp(InSissorRect);
@@ -71,7 +70,7 @@ namespace FRAMEWORK
 		Dx12Texture* CurrentRenderTarget;
 		Dx12Buffer* CurrentVertexBuffer;
 		PrimitiveType DrawType;
-		TUniquePtr<Vector4f> ClearColorValue;
+		TOptional<Vector4f> ClearColorValue;
 		TUniquePtr<D3D12_VIEWPORT> CurrentViewPort;
 		TUniquePtr<D3D12_RECT> CurrentSissorRect;
 

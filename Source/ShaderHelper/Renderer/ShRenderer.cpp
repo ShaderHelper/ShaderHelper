@@ -26,7 +26,6 @@ namespace SH
 		: ViewPort(nullptr)
 		, bCanGpuCapture(false)
 	{
-		GpuApi::InitApiEnv();
 
 		VertexShader = GpuApi::CreateShaderFromSource(ShaderType::VertexShader, FullScreenVsText, TEXT("DefaultFullScreenVS"));
 		GpuApi::CompilerShader(VertexShader);
@@ -53,16 +52,18 @@ namespace SH
 
 	void ShRenderer::RenderBegin()
 	{
-		GpuApi::StartRenderFrame();
-		bCanGpuCapture = FSlateApplication::Get().GetModifierKeys().AreModifersDown(EModifierKey::Control | EModifierKey::Alt);
-		if (bCanGpuCapture) {
-			GpuApi::BeginGpuCapture(TEXT("GpuCapture"));
-		}
+        Renderer::RenderBegin();
+        
+        bCanGpuCapture = FSlateApplication::Get().GetModifierKeys().AreModifersDown(EModifierKey::Control | EModifierKey::Alt);
+        if (bCanGpuCapture) {
+            GpuApi::BeginGpuCapture(TEXT("GpuCapture"));
+        }
 	}
 
-	void ShRenderer::Render()
+	void ShRenderer::RenderInternal()
 	{
-		RenderBegin();
+        Renderer::RenderInternal();
+        
 		//Start to record command buffer
 		if (FinalRT.IsValid())
 		{
@@ -80,21 +81,18 @@ namespace SH
 			GpuApi::FlushGpu();
 			ViewPort->UpdateViewPortRenderTexture(FinalRT);
 		}
-
-		RenderEnd();
 	}
 
 	void ShRenderer::RenderEnd()
 	{
-		if (bCanGpuCapture) {
-			GpuApi::EndGpuCapture();
-			//just capture one frame.
-			bCanGpuCapture = false;
-			FPlatformMisc::MessageBoxExt(EAppMsgType::Ok, TEXT("Successfully captured the current frame."), TEXT("Message:"));
-		}
-		GpuApi::Submit();
-		GpuApi::EndRenderFrame();
-
+        Renderer::RenderEnd();
+        
+        if (bCanGpuCapture) {
+            GpuApi::EndGpuCapture();
+            //just capture one frame.
+            bCanGpuCapture = false;
+            FPlatformMisc::MessageBoxExt(EAppMsgType::Ok, TEXT("Successfully captured the current frame."), TEXT("Message:"));
+        }
 	}
 
 }
