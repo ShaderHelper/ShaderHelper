@@ -67,15 +67,15 @@ namespace SH
 		//Start to record command buffer
 		if (FinalRT.IsValid())
 		{
-			GpuApi::BeginCaptureEvent(TEXT("Full screen pass"));
-
-			GpuApi::BindVertexBuffer(nullptr);
-			GpuApi::BindRenderPipelineState(PipelineState);
+            GpuRenderPassDesc FullScreenPassDesc;
+            FullScreenPassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{FinalRT});
+            
+            GpuApi::BeginRenderPass(FullScreenPassDesc, TEXT("FullScreenPass"));
+			GpuApi::SetVertexBuffer(nullptr);
+			GpuApi::SetRenderPipelineState(PipelineState);
 			GpuApi::SetViewPort({ (uint32)ViewPort->GetSize().X, (uint32)ViewPort->GetSize().Y });
-			GpuApi::SetRenderTarget(FinalRT);
 			GpuApi::DrawPrimitive(0, 3, 0, 1);
-
-			GpuApi::EndCpatureEvent();
+            GpuApi::EndRenderPass();
 
 			//To make sure finalRT finished drawing
 			GpuApi::FlushGpu();

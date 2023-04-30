@@ -25,11 +25,4 @@ namespace FRAMEWORK
 		TRefCountPtr<Dx12Shader> Vs;
 		TRefCountPtr<Dx12Shader> Ps;
 	};
-
-	D3D12_RASTERIZER_DESC MapRasterizerState(RasterizerStateDesc InDesc);
-	D3D12_BLEND_DESC MapBlendState(BlendStateDesc InDesc);
-	D3D12_BLEND MapBlendFactor(BlendFactor InFactor);
-	D3D12_BLEND_OP MapBlendOp(BlendOp InOp);
-	D3D12_CULL_MODE MapRasterizerCullMode(RasterizerCullMode InMode);
-	D3D12_FILL_MODE MapRasterizerFillMode(RasterizerFillMode InMode);
 }

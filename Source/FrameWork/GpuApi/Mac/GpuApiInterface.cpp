@@ -2,6 +2,8 @@
 #include "GpuApi/GpuApiInterface.h"
 #include "MetalCommon.h"
 #include "MetalDevice.h"
+#include "MetalCommandList.h"
+#include "MetalMap.h"
 
 namespace FRAMEWORK
 {
@@ -20,7 +22,9 @@ namespace GpuApi
 
 	void StartRenderFrame()
 	{
-
+        GetCommandListContext()->SetCommandBuffer(GCommandQueue.CommandBuffer(), [](const mtlpp::CommandBuffer&){
+            dispatch_semaphore_signal(CpuSyncGpuSemaphore);
+        });
 	}
 
 	void EndRenderFrame()
@@ -58,12 +62,12 @@ namespace GpuApi
 
 	}
 
-	void BindRenderPipelineState(RenderPipelineState* InPipelineState)
+	void SetRenderPipelineState(RenderPipelineState* InPipelineState)
 	{
 
 	}
 
-	void BindVertexBuffer(GpuBuffer* InVertexBuffer)
+	void SetVertexBuffer(GpuBuffer* InVertexBuffer)
 	{
 
 	}
@@ -117,6 +121,17 @@ namespace GpuApi
 	{
 
 	}
+
+    void BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName)
+    {
+        mtlpp::RenderPassDescriptor RenderPassDesc = MapRenderPassDesc(PassDesc);
+        GetCommandListContext()->SetRenderPassDesc(MoveTemp(RenderPassDesc));
+    }
+
+    void EndRenderPass()
+    {
+      
+    }
 
 }
 }

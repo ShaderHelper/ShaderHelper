@@ -1,24 +1,9 @@
 #include "CommonHeader.h"
 #include "D3D12CommandList.h"
+#include "D3D12Map.h"
 
 namespace FRAMEWORK
-{
-
-	static D3D12_PRIMITIVE_TOPOLOGY MapPrimitiveType(PrimitiveType InType)
-	{
-		switch (InType)
-		{
-		case PrimitiveType::Point:			return D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
-		case PrimitiveType::Line:			return D3D_PRIMITIVE_TOPOLOGY_LINELIST;
-		case PrimitiveType::LineStrip:		return D3D_PRIMITIVE_TOPOLOGY_LINESTRIP;
-		case PrimitiveType::Triangle:		return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		case PrimitiveType::TriangleStrip:	return D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
-		default:
-			SH_LOG(LogDx12, Fatal, TEXT("Invalid PrimitiveType."));
-			return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		}
-	}
-	
+{	
 	CommandListContext::CommandListContext(FrameResourceStorage InitFrameResources, TRefCountPtr<ID3D12GraphicsCommandList> InGraphicsCmdList)
 		: FrameResources(MoveTemp(InitFrameResources))
 		, GraphicsCmdList(MoveTemp(InGraphicsCmdList))

@@ -43,7 +43,7 @@ namespace FRAMEWORK
 		D3D12_RESOURCE_STATES CurState;
 	};
 
-	//To make sure that resources do not ahead release when allow gpu lag several frames behind cpu.
+	//To make sure that resources bound to pipeline do not ahead release when allow gpu lag several frames behind cpu.
 	class DeferredReleaseManager
 	{
 	public:

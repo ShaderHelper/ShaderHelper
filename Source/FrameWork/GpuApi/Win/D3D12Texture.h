@@ -29,5 +29,4 @@ namespace FRAMEWORK
 	};
 
 	TRefCountPtr<Dx12Texture> CreateDx12Texture(const GpuTextureDesc& InTexDesc);
-	DXGI_FORMAT MapTextureFormat(GpuTextureFormat InTexFormat);
 }

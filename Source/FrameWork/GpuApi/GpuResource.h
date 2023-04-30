@@ -119,6 +119,20 @@ namespace FRAMEWORK
 		Never,
 	};
 
+    enum class RenderTargetLoadAction
+    {
+        DontCare,
+        Load,
+        Clear,
+    };
+
+    enum class RenderTargetStoreAction
+    {
+        DontCare,
+        Store,
+    };
+
+
 	class GpuResource : public FThreadSafeRefCountedObject {};
 
 	class GpuBuffer : public GpuResource {};
@@ -136,6 +150,27 @@ namespace FRAMEWORK
 		uint32 Width, Height;
 		GpuTextureFormat Format;
 	};
+
+    class GpuRenderTargetInfo
+    {
+    public:
+        GpuRenderTargetInfo(GpuTexture* InTexture,
+                        RenderTargetLoadAction InLoadAction = RenderTargetLoadAction::DontCare,
+                        RenderTargetStoreAction InStoreAction = RenderTargetStoreAction::DontCare)
+            : Texture(InTexture)
+            , LoadAction(InLoadAction)
+            , StoreAction(InStoreAction)
+        {}
+    public:
+        GpuTexture* GetRenderTarget() const { return Texture; }
+        
+    public:
+        RenderTargetLoadAction LoadAction;
+        RenderTargetStoreAction StoreAction;
+        
+    private:
+        GpuTexture* Texture;
+    };
 
 	class GpuShader : public GpuResource {};
 
@@ -210,9 +245,11 @@ namespace FRAMEWORK
 		BlendOp AlphaOp;
 	};
 
+    inline constexpr int MaxRenderTargetNum = 8; //follow dx12:D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT
+
 	struct BlendStateDesc
 	{
-		using DescStorageType = TArray<BlendRenderTargetDesc, TInlineAllocator<8>>;
+		using DescStorageType = TArray<BlendRenderTargetDesc, TFixedAllocator<MaxRenderTargetNum>>;
 		BlendStateDesc() = default;
 		BlendStateDesc(DescStorageType InDescStorage) : RtDesc(MoveTemp(InDescStorage)) {}
 		DescStorageType RtDesc;
@@ -274,6 +311,11 @@ namespace FRAMEWORK
 			return 0;
 		}
 	}
+
+    struct GpuRenderPassDesc
+    {
+        TArray<GpuRenderTargetInfo, TFixedAllocator<MaxRenderTargetNum>> ColorRenderTargets;
+    };
 
 	namespace GpuResourceHelper
 	{

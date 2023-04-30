@@ -19,7 +19,7 @@ namespace FRAMEWORK
 			if (Type == ShaderType::VertexShader) { ShaderTaget = "vs_6_0"; }
 			if (Type == ShaderType::PixelShader) { ShaderTaget = "ps_6_0"; }
 		}
-		FString GetSourceText() const { return SourceText; }
+		const FString& GetSourceText() const { return SourceText; }
 		IDxcBlob* GetCompilationResult() const { return ByteCode; }
 		bool IsCompiled() const { return ByteCode.IsValid(); }
 		void SetCompilationResult(TRefCountPtr<IDxcBlob> InByteCode) { ByteCode = MoveTemp(InByteCode); }

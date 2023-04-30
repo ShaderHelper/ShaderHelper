@@ -62,6 +62,20 @@ namespace FRAMEWORK
 		void MarkRenderTartgetDirty(bool IsDirty) { IsRenderTargetDirty = IsDirty; }
 		void MarkVertexBufferDirty(bool IsDirty) { IsVertexBufferDirty = IsDirty; }
 		void MarkViewportDirty(bool IsDirty) { IsViewportDirty = IsDirty; }
+        
+        void ClearBinding() {
+            CurrentPso = nullptr;
+            CurrentRenderTarget = nullptr;
+            CurrentViewPort = nullptr;
+            CurrentSissorRect = nullptr;
+            
+            IsPipelineDirty = false;
+            IsRenderTargetDirty = false;
+            IsVertexBufferDirty = false;
+            IsViewportDirty = false;
+            
+            ClearColorValue.Reset();
+        }
 
 	private:
 		FrameResourceStorage FrameResources;

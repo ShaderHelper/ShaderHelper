@@ -5,6 +5,7 @@
 #include "D3D12Texture.h"
 #include "D3D12Shader.h"
 #include "D3D12PSO.h"
+#include "D3D12Map.h"
 
 namespace FRAMEWORK
 {
@@ -159,13 +160,13 @@ namespace GpuApi
 		return new Dx12Pso(MoveTemp(Pso), MoveTemp(RootSignature),MoveTemp(Vs), MoveTemp(Ps));
 	}
 
-	void BindRenderPipelineState(RenderPipelineState* InPipelineState)
+	void SetRenderPipelineState(RenderPipelineState* InPipelineState)
 	{
 		GCommandListContext->SetPipeline(static_cast<Dx12Pso*>(InPipelineState));
 		GCommandListContext->MarkPipelineDirty(true);
 	}
 
-	void BindVertexBuffer(GpuBuffer* InVertexBuffer)
+	void SetVertexBuffer(GpuBuffer* InVertexBuffer)
 	{
 		Dx12Buffer* Vb = static_cast<Dx12Buffer*>(InVertexBuffer);
 		GCommandListContext->SetVertexBuffer(Vb);
@@ -278,6 +279,20 @@ namespace GpuApi
 		GDevice->CreateSharedHandle(Texture->GetResource(), nullptr, GENERIC_ALL, nullptr, &SharedHandle);
 		return SharedHandle;
 	}
-	
+
+    void BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName)
+    {
+        //To follow metal api design, we don't keep previous the bindings when beginning a new render pass.
+        GCommandListContext->ClearBinding();
+        
+        GpuApi::BeginCaptureEvent(PassName);
+        GpuApi::SetRenderTarget(PassDesc.ColorRenderTarget);
+    }
+
+    void EndRenderPass()
+    {
+        GpuApi::EndCpatureEvent();
+    }
+        
 }
 }

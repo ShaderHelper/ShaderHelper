@@ -3,7 +3,8 @@
 
 namespace FRAMEWORK
 {
-    inline TUniquePtr<mtlpp::Device> GDevice;
+    inline mtlpp::Device GDevice;
+    inline mtlpp::CommandQueue GCommandQueue;
     inline constexpr uint32 AllowableLag = 0;
     inline dispatch_semaphore_t CpuSyncGpuSemaphore;
 
