@@ -24,9 +24,9 @@ namespace GpuApi
 	FRAMEWORK_API bool CompilerShader(GpuShader* InShader);
 
 	FRAMEWORK_API TRefCountPtr<RenderPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc);
-	FRAMEWORK_API void BindRenderPipelineState(RenderPipelineState* InPipelineState);
+	FRAMEWORK_API void SetRenderPipelineState(RenderPipelineState* InPipelineState);
 	
-	FRAMEWORK_API void BindVertexBuffer(GpuBuffer* InVertexBuffer);
+	FRAMEWORK_API void SetVertexBuffer(GpuBuffer* InVertexBuffer);
 	FRAMEWORK_API void SetViewPort(const GpuViewPortDesc& InViewPortDesc);
 	FRAMEWORK_API void SetRenderTarget(GpuTexture* InGpuTexture);
 	FRAMEWORK_API void SetClearColorValue(Vector4f ClearColor);
@@ -41,5 +41,8 @@ namespace GpuApi
 
 	//The renderer for drawing ui in UE uses dx11 as backend api, so need a shared resource.
 	FRAMEWORK_API void* GetSharedHandle(GpuTexture* InGpuTexture);
+    
+    FRAMEWORK_API void BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName);
+    FRAMEWORK_API void EndRenderPass();
 }
 }

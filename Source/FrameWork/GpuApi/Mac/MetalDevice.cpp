@@ -5,7 +5,8 @@ namespace FRAMEWORK
 {
     void InitMetalCore()
     {
-        GDevice.Reset(new mtlpp::Device{ mtlpp::Device::CreateSystemDefaultDevice() });
+        GDevice = mtlpp::Device::CreateSystemDefaultDevice();
+        GCommandQueue = GDevice.NewCommandQueue();
         CpuSyncGpuSemaphore = dispatch_semaphore_create(AllowableLag);
     }
 }

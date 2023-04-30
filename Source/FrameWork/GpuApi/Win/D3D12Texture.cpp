@@ -2,6 +2,8 @@
 #include "D3D12Texture.h"
 #include "D3D12Device.h"
 #include "D3D12CommandList.h"
+#include "D3D12Map.h"
+
 namespace FRAMEWORK
 {
 	struct FlagSets {
@@ -150,23 +152,5 @@ namespace FRAMEWORK
 		CreateTextureView(Flags, RetTexture);
 
 		return RetTexture;
-	}
-
-	DXGI_FORMAT MapTextureFormat(GpuTextureFormat InTexFormat)
-	{
-		switch (InTexFormat)
-		{
-		case GpuTextureFormat::R8G8B8A8_UNORM:		return DXGI_FORMAT_R8G8B8A8_UNORM;
-		case GpuTextureFormat::R10G10B10A2_UNORM:	return DXGI_FORMAT_R10G10B10A2_UNORM;
-		case GpuTextureFormat::R16G16B16A16_UNORM:	return DXGI_FORMAT_R16G16B16A16_UNORM;
-		case GpuTextureFormat::R16G16B16A16_UINT:	return DXGI_FORMAT_R16G16B16A16_UINT;
-		case GpuTextureFormat::R32G32B32A32_UINT:	return DXGI_FORMAT_R32G32B32A32_UINT;
-		case GpuTextureFormat::R16G16B16A16_FLOAT:	return DXGI_FORMAT_R16G16B16A16_FLOAT;
-		case GpuTextureFormat::R32G32B32A32_FLOAT:	return DXGI_FORMAT_R32G32B32A32_FLOAT;
-		case GpuTextureFormat::R11G11B10_FLOAT:		return DXGI_FORMAT_R11G11B10_FLOAT;
-		default:
-			SH_LOG(LogDx12, Fatal, TEXT("Invalid GpuTextureFormat."));
-			return DXGI_FORMAT_R8G8B8A8_UNORM;
-		}
 	}
 }
