@@ -6,6 +6,50 @@
 namespace FRAMEWORK
 {
 
+    inline MTLColorWriteMask MapWriteMask(BlendMask InMask)
+    {
+        MTLColorWriteMask Mask = 0;
+        Mask |= (InMask & BlendMask::R) ? MTLColorWriteMaskRed : 0;
+        Mask |= (InMask & BlendMask::G) ? MTLColorWriteMaskGreen : 0;
+        Mask |= (InMask & BlendMask::B) ? MTLColorWriteMaskBlue : 0;
+        Mask |= (InMask & BlendMask::A) ? MTLColorWriteMaskAlpha : 0;
+        return Mask;
+    }
+
+    inline MTLBlendFactor MapBlendFactor(BlendFactor InFactor)
+    {
+        switch (InFactor)
+        {
+        case BlendFactor::Zero:            return MTLBlendFactorZero;
+        case BlendFactor::One:             return MTLBlendFactorOne;
+        case BlendFactor::SrcColor:        return MTLBlendFactorSourceColor;
+        case BlendFactor::InvSrcColor:     return MTLBlendFactorOneMinusSourceColor;
+        case BlendFactor::DestColor:       return MTLBlendFactorDestinationColor;
+        case BlendFactor::InvDestColor:    return MTLBlendFactorOneMinusDestinationColor;
+        case BlendFactor::SrcAlpha:        return MTLBlendFactorSourceAlpha;
+        case BlendFactor::InvSrcAlpha:     return MTLBlendFactorOneMinusSourceAlpha;
+        case BlendFactor::DestAlpha:       return MTLBlendFactorDestinationAlpha;
+        case BlendFactor::InvDestAlpha:    return MTLBlendFactorOneMinusDestinationAlpha;
+        default:
+            SH_LOG(LogMetal, Fatal, TEXT("Invalid BlendFactor."));
+            return MTLBlendFactorZero;
+        }
+    }
+
+    inline MTLBlendOperation MapBlendOp(BlendOp InOp)
+    {
+        switch (InOp)
+        {
+        case BlendOp::Add:            return MTLBlendOperationAdd;
+        case BlendOp::Substract:      return MTLBlendOperationSubtract;
+        case BlendOp::Min:            return MTLBlendOperationMin;
+        case BlendOp::Max:            return MTLBlendOperationMax;
+        default:
+            SH_LOG(LogMetal, Fatal, TEXT("Invalid BlendOp."));
+            return MTLBlendOperationAdd;
+        }
+    }
+
     inline MTLLoadAction MapLoadAction(RenderTargetLoadAction InLoadAction)
     {
         switch(InLoadAction)
@@ -45,5 +89,37 @@ namespace FRAMEWORK
         }
         return mtlpp::RenderPassDescriptor{RawPassDesc};
     }
-
+    
+    inline MTLPixelFormat MapTextureFormat(const GpuTextureFormat& InTextureFormat)
+    {
+        switch(InTextureFormat)
+        {
+        case GpuTextureFormat::R8G8B8A8_UNORM:        return MTLPixelFormatRGBA8Unorm;
+        case GpuTextureFormat::R10G10B10A2_UNORM:     return MTLPixelFormatRGB10A2Unorm;
+        case GpuTextureFormat::R16G16B16A16_UNORM:    return MTLPixelFormatRGBA16Unorm;
+        case GpuTextureFormat::R16G16B16A16_UINT:     return MTLPixelFormatRGBA16Uint;
+        case GpuTextureFormat::R32G32B32A32_UINT:     return MTLPixelFormatRGBA32Uint;
+        case GpuTextureFormat::R16G16B16A16_FLOAT:    return MTLPixelFormatRGBA16Float;
+        case GpuTextureFormat::R32G32B32A32_FLOAT:    return MTLPixelFormatRGBA32Float;
+        case GpuTextureFormat::R11G11B10_FLOAT:       return MTLPixelFormatRG11B10Float;
+        default:
+            SH_LOG(LogMetal, Fatal, TEXT("Invalid GpuTextureFormat."));
+            return MTLPixelFormatRGBA8Unorm;
+        }
+    }
+    
+    inline MTLPrimitiveType MapPrimitiveType(PrimitiveType InType)
+    {
+        switch (InType)
+        {
+        case PrimitiveType::Point:            return MTLPrimitiveTypePoint;
+        case PrimitiveType::Line:             return MTLPrimitiveTypeLine;
+        case PrimitiveType::LineStrip:        return MTLPrimitiveTypeLineStrip;
+        case PrimitiveType::Triangle:         return MTLPrimitiveTypeTriangle;
+        case PrimitiveType::TriangleStrip:    return MTLPrimitiveTypeTriangleStrip;
+        default:
+            SH_LOG(LogMetal, Fatal, TEXT("Invalid PrimitiveType."));
+            return MTLPrimitiveTypeTriangle;
+        }
+    }
 }

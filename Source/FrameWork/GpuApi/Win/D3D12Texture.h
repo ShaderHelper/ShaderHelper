@@ -28,5 +28,5 @@ namespace FRAMEWORK
 		bool bIsMappingForWriting = false;
 	};
 
-	TRefCountPtr<Dx12Texture> CreateDx12Texture(const GpuTextureDesc& InTexDesc);
+	TRefCountPtr<Dx12Texture> CreateDx12Texture2D(const GpuTextureDesc& InTexDesc);
 }

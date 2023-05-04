@@ -12,7 +12,7 @@ static FString GSavedCommandLine;
 -(void)run:(id)Arg
 {
 	SH::UE_Init(*GSavedCommandLine);
-	SH::ShaderHelperApp app(SNew(SH::SShaderHelperWindow));
+	SH::ShaderHelperApp app(SNew(SH::SShaderHelperWindow), MakeUnique<SH::ShRenderer>());
 	app.Run();
 	SH::UE_ShutDown();
     [NSApp terminate:self];

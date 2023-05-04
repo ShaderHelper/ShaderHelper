@@ -19,19 +19,21 @@ namespace FRAMEWORK
 			if (Type == ShaderType::VertexShader) { ShaderTaget = "vs_6_0"; }
 			if (Type == ShaderType::PixelShader) { ShaderTaget = "ps_6_0"; }
 		}
+        
+    public:
 		const FString& GetSourceText() const { return SourceText; }
+        const FString& GetEntryPoint() const { return EntryPoint; }
+        const FString& GetShaderTarget() const { return ShaderTaget; }
 		IDxcBlob* GetCompilationResult() const { return ByteCode; }
 		bool IsCompiled() const { return ByteCode.IsValid(); }
 		void SetCompilationResult(TRefCountPtr<IDxcBlob> InByteCode) { ByteCode = MoveTemp(InByteCode); }
 
-	public:
-		ShaderType Type;
-		FString ShaderName;
-		FString EntryPoint;
-		FString ShaderTaget;
-
 	private:
-		FString SourceText;
+        ShaderType Type;
+        FString ShaderName;
+        FString EntryPoint;
+        FString SourceText;
+        FString ShaderTaget;
 		TRefCountPtr<IDxcBlob> ByteCode;
 	};
 

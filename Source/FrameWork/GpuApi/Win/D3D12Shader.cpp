@@ -23,9 +23,9 @@ namespace FRAMEWORK
 		TArray<const TCHAR*> Arguments;
 		Arguments.Add(TEXT("/Qstrip_debug"));
 		Arguments.Add(TEXT("/E"));
-		Arguments.Add(*InShader->EntryPoint);
+		Arguments.Add(*InShader->GetEntryPoint());
 		Arguments.Add(TEXT("/T"));
-		Arguments.Add(*InShader->ShaderTaget);
+		Arguments.Add(*InShader->GetShaderTarget());
 #if DEBUG_SHADER
 		Arguments.Add(TEXT("/Zi"));
 #endif

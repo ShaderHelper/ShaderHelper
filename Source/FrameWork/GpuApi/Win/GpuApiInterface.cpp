@@ -47,7 +47,7 @@ namespace GpuApi
 
 	TRefCountPtr<GpuTexture> CreateGpuTexture(const GpuTextureDesc& InTexDesc)
 	{
-		return AUX::StaticCastRefCountPtr<GpuTexture>(CreateDx12Texture(InTexDesc));
+		return AUX::StaticCastRefCountPtr<GpuTexture>(CreateDx12Texture2D(InTexDesc));
 	}
 
 	void* MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapMode InMapMode, uint32& OutRowPitch)
@@ -150,10 +150,15 @@ namespace GpuApi
 		PsoDesc.SampleMask = UINT_MAX;
 		PsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		PsoDesc.NumRenderTargets = 1;
-		PsoDesc.RTVFormats[0] = MapTextureFormat(InPipelineStateDesc.RtFormat);
 		PsoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
 		PsoDesc.SampleDesc.Count = 1;
 		PsoDesc.SampleDesc.Quality = 0;
+        
+        const uint32 RtFormatNum = InPipelineStateDesc.RtFormats.Num();
+        for(uint32 i = 0 ; i < RtFormatNum; i++)
+        {
+            PsoDesc.RTVFormats[i] = MapTextureFormat(InPipelineStateDesc.RtFormats[i]);
+        }
 
 		TRefCountPtr<ID3D12PipelineState> Pso;
 		DxCheck(GDevice->CreateGraphicsPipelineState(&PsoDesc, IID_PPV_ARGS(Pso.GetInitReference())));

@@ -3,5 +3,8 @@
 
 namespace FRAMEWORK
 {
-
+    void CommandListContext::PrepareDrawingEnv()
+    {
+        
+    }
 }

@@ -7,8 +7,13 @@ namespace SH
 	void PreviewViewPort::SetViewPortRenderTexture(GpuTexture* InGpuTex)
 	{
 		FSlateRenderer* UIRenderer = FSlateApplication::Get().GetRenderer();
+#if PLATFORM_WINDOWS
+        //The CreateUpdatableTexture method just supports BGRA8 format in the dx11 implemention of ue standalone renderer framework.
 		void* SharedHandle = GpuApi::GetSharedHandle(InGpuTex);
 		FSlateUpdatableTexture* UpdatableTexture = UIRenderer->CreateSharedHandleTexture(SharedHandle);
+#elif PLATFORM_MAC
+        FSlateUpdatableTexture* UpdatableTexture = UIRenderer->CreateUpdatableTexture(InGpuTex->GetWidth(), InGpuTex->GetHeight());
+#endif
 		ViewPortRT = MakeShareable(UpdatableTexture);
 	}
 
