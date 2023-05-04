@@ -16,6 +16,8 @@ namespace FRAMEWORK
 			, Vs(MoveTemp(InVs))
 			, Ps(MoveTemp(InPs))
 		{}
+        
+    public:
 		ID3D12PipelineState* GetResource() const { return PipelineState; }
 		ID3D12RootSignature* GetRootSig() const { return RootSig; }
 

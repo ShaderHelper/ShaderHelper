@@ -92,7 +92,7 @@ namespace FRAMEWORK
 		}
 	}
 
-	TRefCountPtr<Dx12Texture> CreateDx12Texture(const GpuTextureDesc& InTexDesc)
+	TRefCountPtr<Dx12Texture> CreateDx12Texture2D(const GpuTextureDesc& InTexDesc)
 	{
 		if (!ValidateTexture(InTexDesc)) {
 			return nullptr;

@@ -37,13 +37,15 @@ namespace SH
 	void ShRenderer::OnViewportResize()
 	{
 		check(ViewPort);
+        //Note: ue standalone renderer framework has the lack of robustness. It just only supports a few texture formats, so be careful to choose GpuTextureFormat.
 		GpuTextureDesc Desc{ (uint32)ViewPort->GetSize().X, (uint32)ViewPort->GetSize().Y, GpuTextureFormat::R8G8B8A8_UNORM, GpuTextureUsage::Shared | GpuTextureUsage::RenderTarget };
 		FinalRT = GpuApi::CreateGpuTexture(Desc);
 		ViewPort->SetViewPortRenderTexture(FinalRT);
 
 		check(FinalRT.IsValid());
+        PipelineStateDesc::RtFormatStorageType RenderTargetFormats{ FinalRT->GetFormat() };
 		PipelineStateDesc PipelineDesc{
-			VertexShader, PixelShader, RasterizerStateDesc{RasterizerFillMode::Solid, RasterizerCullMode::None}, GpuResourceHelper::GDefaultBlendStateDesc, FinalRT->GetFormat()
+			VertexShader, PixelShader, RasterizerStateDesc{RasterizerFillMode::Solid, RasterizerCullMode::None}, GpuResourceHelper::GDefaultBlendStateDesc, RenderTargetFormats
 		};
 		PipelineState = GpuApi::CreateRenderPipelineState(PipelineDesc);
 	

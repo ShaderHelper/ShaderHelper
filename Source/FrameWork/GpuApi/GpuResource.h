@@ -89,11 +89,12 @@ namespace FRAMEWORK
 
 	enum class BlendMask : uint32
 	{
-		None = 0,
-		R = 1u << 0, //Avoid R channel being written to RenderTarget.
+		None = 0, //All Color channels are disabled.
+		R = 1u << 0,
 		G = 1u << 1,
 		B = 1u << 2,
 		A = 1u << 3,
+        All = R | G | B | A,
 	};
 	ENUM_CLASS_FLAGS(BlendMask);
 
@@ -224,7 +225,7 @@ namespace FRAMEWORK
 			bool InBlendEnable,
 			BlendFactor InSrcFactor, BlendFactor InDestFactor,
 			BlendFactor InSrcAlphaFactor, BlendFactor InDestAlphaFactor,
-			BlendOp InColorOp, BlendOp InAlphaOp, BlendMask InMask = BlendMask::None)
+			BlendOp InColorOp, BlendOp InAlphaOp, BlendMask InMask = BlendMask::All)
 			: BlendEnable(InBlendEnable)
 			, SrcFactor(InSrcFactor)
 			, DestFactor(InDestFactor)
@@ -251,28 +252,29 @@ namespace FRAMEWORK
 	{
 		using DescStorageType = TArray<BlendRenderTargetDesc, TFixedAllocator<MaxRenderTargetNum>>;
 		BlendStateDesc() = default;
-		BlendStateDesc(DescStorageType InDescStorage) : RtDesc(MoveTemp(InDescStorage)) {}
-		DescStorageType RtDesc;
+		BlendStateDesc(DescStorageType InDescStorage) : RtDescs(MoveTemp(InDescStorage)) {}
+		DescStorageType RtDescs;
 	};
 
 	struct PipelineStateDesc
 	{
+        using RtFormatStorageType = TArray<GpuTextureFormat, TFixedAllocator<MaxRenderTargetNum>>;
 		PipelineStateDesc(
 			TRefCountPtr<GpuShader> InVs, TRefCountPtr<GpuShader> InPs,
 			RasterizerStateDesc InRasterizerState, BlendStateDesc InBlendState,
-			GpuTextureFormat InRtFormat)
+            RtFormatStorageType InRtFormats)
 			: Vs(MoveTemp(InVs))
 			, Ps(MoveTemp(InPs))
 			, RasterizerState(MoveTemp(InRasterizerState))
 			, BlendState(MoveTemp(InBlendState))
-			, RtFormat(InRtFormat)
+			, RtFormats(MoveTemp(InRtFormats))
 		{
 		}
 		TRefCountPtr<GpuShader> Vs;
 		TRefCountPtr<GpuShader> Ps;
 		RasterizerStateDesc RasterizerState;
 		BlendStateDesc BlendState;
-		GpuTextureFormat RtFormat;
+        RtFormatStorageType RtFormats;
 	};
 
 	struct GpuViewPortDesc
