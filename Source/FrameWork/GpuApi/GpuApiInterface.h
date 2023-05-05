@@ -23,13 +23,12 @@ namespace GpuApi
 	FRAMEWORK_API TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName);
 	FRAMEWORK_API bool CompilerShader(GpuShader* InShader);
 
-	FRAMEWORK_API TRefCountPtr<RenderPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc);
-	FRAMEWORK_API void SetRenderPipelineState(RenderPipelineState* InPipelineState);
+	FRAMEWORK_API TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc);
+	FRAMEWORK_API void SetRenderPipelineState(GpuPipelineState* InPipelineState);
 	
 	FRAMEWORK_API void SetVertexBuffer(GpuBuffer* InVertexBuffer);
 	FRAMEWORK_API void SetViewPort(const GpuViewPortDesc& InViewPortDesc);
-	FRAMEWORK_API void SetRenderTarget(GpuTexture* InGpuTexture);
-	FRAMEWORK_API void SetClearColorValue(Vector4f ClearColor);
+
 	FRAMEWORK_API void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType = PrimitiveType::Triangle);
 	
 	FRAMEWORK_API void Submit();

@@ -14,11 +14,9 @@ namespace FRAMEWORK
 		~Dx12Texture();
 
 		ID3D12Resource* GetResource() const override { return Resource.GetReference(); }
-		const GpuTextureDesc& GetResourceDesc() const { return TexDesc; }
 		
 	private:
 		TRefCountPtr<ID3D12Resource> Resource;
-		GpuTextureDesc TexDesc;
 
 	public:
 		DescriptorHandle<Descriptorvisibility::CpuVisible> HandleRTV;

@@ -125,7 +125,7 @@ namespace GpuApi
 	}
 
 
-	TRefCountPtr<RenderPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc)
+	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc)
 	{
 		CD3DX12_ROOT_SIGNATURE_DESC RootSignatureDesc;
 		RootSignatureDesc.Init(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -165,7 +165,7 @@ namespace GpuApi
 		return new Dx12Pso(MoveTemp(Pso), MoveTemp(RootSignature),MoveTemp(Vs), MoveTemp(Ps));
 	}
 
-	void SetRenderPipelineState(RenderPipelineState* InPipelineState)
+	void SetRenderPipelineState(GpuPipelineState* InPipelineState)
 	{
 		GCommandListContext->SetPipeline(static_cast<Dx12Pso*>(InPipelineState));
 		GCommandListContext->MarkPipelineDirty(true);
@@ -191,19 +191,6 @@ namespace GpuApi
 		D3D12_RECT ScissorRect = CD3DX12_RECT(0, 0, InViewPortDesc.Width, InViewPortDesc.Height);
 		GCommandListContext->SetViewPort(MakeUnique<D3D12_VIEWPORT>(MoveTemp(ViewPort)), MakeUnique<D3D12_RECT>(MoveTemp(ScissorRect)));
 		GCommandListContext->MarkViewportDirty(true);
-	}
-
-
-	void SetRenderTarget(GpuTexture* InGpuTexture)
-	{
-		Dx12Texture* Rt = static_cast<Dx12Texture*>(InGpuTexture);
-		GCommandListContext->SetRenderTarget(Rt);
-		GCommandListContext->MarkRenderTartgetDirty(true);
-	}
-
-	void SetClearColorValue(Vector4f ClearColor)
-	{
-		GCommandListContext->SetClearColor(MoveTemp(ClearColor));
 	}
 
 	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType)
@@ -289,9 +276,22 @@ namespace GpuApi
     {
         //To follow metal api design, we don't keep previous the bindings when beginning a new render pass.
         GCommandListContext->ClearBinding();
-        
         GpuApi::BeginCaptureEvent(PassName);
-        GpuApi::SetRenderTarget(PassDesc.ColorRenderTarget);
+        
+        TArray<Dx12Texture*> RTs;
+        TArray<TOptional<Vector4f>> ClearColorValues;
+        
+        for(uint32 i = 0; i < PassDesc.ColorRenderTargets.Num(); i++)
+        {
+            Dx12Texture* Rt = static_cast<Dx12Texture*>(PassDesc.ColorRenderTargets[i].GetRenderTarget());
+            RTs.Add(Rt);
+            ClearColorValues.Add(PassDesc.ColorRenderTargets[i].ClearColor);
+        }
+        
+        GCommandListContext->SetRenderTargets(MoveTemp(RTs));
+        GCommandListContext->SetClearColors(MoveTemp(ClearColorValues));
+        GCommandListContext->MarkRenderTartgetDirty(true);
+        
     }
 
     void EndRenderPass()

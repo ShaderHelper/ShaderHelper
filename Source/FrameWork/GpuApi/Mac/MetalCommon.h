@@ -5,6 +5,8 @@
 DECLARE_LOG_CATEGORY_EXTERN(LogMetal, Log, All);
 inline DEFINE_LOG_CATEGORY(LogMetal);
 
+//func(ConverOcError(Arg)); (√)
+//const TCHAR* XX = ConverOcError(Arg); func(XX); (×)
 inline const TCHAR* ConvertOcError(NSError* Error)
 {
     NSString* ErrorInfo = Error.localizedDescription;

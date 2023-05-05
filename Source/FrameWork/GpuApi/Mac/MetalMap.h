@@ -9,10 +9,10 @@ namespace FRAMEWORK
     inline MTLColorWriteMask MapWriteMask(BlendMask InMask)
     {
         MTLColorWriteMask Mask = 0;
-        Mask |= (InMask & BlendMask::R) ? MTLColorWriteMaskRed : 0;
-        Mask |= (InMask & BlendMask::G) ? MTLColorWriteMaskGreen : 0;
-        Mask |= (InMask & BlendMask::B) ? MTLColorWriteMaskBlue : 0;
-        Mask |= (InMask & BlendMask::A) ? MTLColorWriteMaskAlpha : 0;
+        Mask |= (bool)(InMask & BlendMask::R) ? MTLColorWriteMaskRed : 0;
+        Mask |= (bool)(InMask & BlendMask::G) ? MTLColorWriteMaskGreen : 0;
+        Mask |= (bool)(InMask & BlendMask::B) ? MTLColorWriteMaskBlue : 0;
+        Mask |= (bool)(InMask & BlendMask::A) ? MTLColorWriteMaskAlpha : 0;
         return Mask;
     }
 
