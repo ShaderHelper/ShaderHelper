@@ -8,7 +8,6 @@ namespace FRAMEWORK
 		: FrameResources(MoveTemp(InitFrameResources))
 		, GraphicsCmdList(MoveTemp(InGraphicsCmdList))
 		, CurrentPso(nullptr)
-		, CurrentRenderTarget(nullptr)
 		, CurrentVertexBuffer(nullptr)
 		, DrawType(PrimitiveType::Triangle)
 	{
@@ -42,12 +41,12 @@ namespace FRAMEWORK
                 GDeferredReleaseManager.AddUncompletedResource(CurrentVertexBuffer);
 			}
 			else {
-				GCommandListContext->GetCommandListHandle()->IASetVertexBuffers(0, 0, nullptr);
+                GraphicsCmdList->IASetVertexBuffers(0, 0, nullptr);
 			}
 			MarkVertexBufferDirty(false);
 		}
 
-		GCommandListContext->GetCommandListHandle()->IASetPrimitiveTopology(MapPrimitiveType(DrawType));
+        GraphicsCmdList->IASetPrimitiveTopology(MapPrimitiveType(DrawType));
 		
 		if (IsPipelineDirty)
 		{
@@ -62,32 +61,61 @@ namespace FRAMEWORK
 		{
             check(CurrentViewPort.IsValid());
             check(CurrentSissorRect.IsValid());
-			GCommandListContext->GetCommandListHandle()->RSSetViewports(1, CurrentViewPort.Get());
-			GCommandListContext->GetCommandListHandle()->RSSetScissorRects(1, CurrentSissorRect.Get());
+            GraphicsCmdList->RSSetViewports(1, CurrentViewPort.Get());
+            GraphicsCmdList->RSSetScissorRects(1, CurrentSissorRect.Get());
 			MarkViewportDirty(false);
 		}
 
 		if (IsRenderTargetDirty)
 		{
-			check(CurrentRenderTarget);
-			check(CurrentRenderTarget->HandleRTV.IsValid());
-			GCommandListContext->GetCommandListHandle()->OMSetRenderTargets(1, &CurrentRenderTarget->HandleRTV.CpuHandle, false, nullptr);
-
-			Vector4f OptimizedClearValue = CurrentRenderTarget->GetResourceDesc().ClearValues;
-			if (ClearColorValue) {
-				if (!(*ClearColorValue).Equals(OptimizedClearValue))
-				{
-					SH_LOG(LogDx12, Warning, TEXT("OptimizedClearValue(%s) != ClearColorValue(%s) that may result in invalid fast clear optimization."), *OptimizedClearValue.ToString(), *(*ClearColorValue).ToString());
-				}
-				GCommandListContext->GetCommandListHandle()->ClearRenderTargetView(CurrentRenderTarget->HandleRTV.CpuHandle, (*ClearColorValue).GetData(), 0, nullptr);
-			}
-			else {
-				GCommandListContext->GetCommandListHandle()->ClearRenderTargetView(CurrentRenderTarget->HandleRTV.CpuHandle, OptimizedClearValue.GetData(), 0, nullptr);
-			}
-            GDeferredReleaseManager.AddUncompletedResource(CurrentRenderTarget);
+            const uint32 RenderTargetNum = CurrentRenderTargets.Num();
+			check(RenderTargetNum);
+            check(ClearColorValues.Num() == RenderTargetNum);
+            
+            D3D12_CPU_DESCRIPTOR_HANDLE RenderTargetDescriptors[RenderTargetNum]{};
+            
+            for(uint32 i = 0; i < RenderTargetNum; i++)
+            {
+                Dx12Texture* RenderTarget = CurrentRenderTargets[i];
+                check(RenderTarget);
+                check(RenderTarget->HandleRTV.IsValid());
+                
+                Vector4f OptimizedClearValue = RenderTarget->GetResourceDesc().ClearValues;
+                if (ClearColorValues[i]) {
+                    Vector4f ClearColorValue = *ClearColorValues[i];
+                    if (!ClearColorValue.Equals(OptimizedClearValue))
+                    {
+                        SH_LOG(LogDx12, Warning, TEXT("OptimizedClearValue(%s) != ClearColorValue(%s) that may result in invalid fast clear optimization."), *OptimizedClearValue.ToString(), *ClearColorValue.ToString());
+                    }
+                    GraphicsCmdList->ClearRenderTargetView(RenderTarget->HandleRTV.CpuHandle, ClearColorValues.GetData(), 0, nullptr);
+                }
+                else {
+                    GraphicsCmdList->ClearRenderTargetView(RenderTarget->HandleRTV.CpuHandle, OptimizedClearValue.GetData(), 0, nullptr);
+                }
+                GDeferredReleaseManager.sAddUncompletedResource(RenderTarget);
+                RenderTargetDescriptors[i] = RenderTarget->HandleRTV.CpuHandle;
+            }
+            
+            GraphicsCmdList->OMSetRenderTargets(RenderTargetNum, RenderTargetDescriptors, false, nullptr);
 			MarkRenderTartgetDirty(false);
 		}
 	}
+
+    void CommandListContext::ClearBinding()
+    {
+        CurrentPso = nullptr;
+        CurrentViewPort = nullptr;
+        CurrentSissorRect = nullptr;
+        
+        IsPipelineDirty = false;
+        IsRenderTargetDirty = false;
+        IsVertexBufferDirty = false;
+        IsViewportDirty = false;
+        
+        CurrentRenderTargets.Empty();
+        
+        ClearColorValue.Reset();
+    }
 
 	StaticFrameResource::StaticFrameResource(TRefCountPtr<ID3D12CommandAllocator> InCommandAllocator, DescriptorAllocatorStorage&& InDescriptorAllocators)
 		: CommandAllocator(MoveTemp(InCommandAllocator))

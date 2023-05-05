@@ -6,6 +6,7 @@
 #include "MetalMap.h"
 #include "MetalTexture.h"
 #include "MetalShader.h"
+#include "MetalBuffer.h"
 
 namespace FRAMEWORK
 {
@@ -19,7 +20,8 @@ namespace GpuApi
 
 	void FlushGpu()
 	{
-
+        Submit();
+        dispatch_semaphore_wait(CpuSyncGpuSemaphore, DISPATCH_TIME_FOREVER);
 	}
 
 	void StartRenderFrame()
@@ -31,7 +33,7 @@ namespace GpuApi
 
 	void EndRenderFrame()
 	{
-
+        dispatch_semaphore_wait(CpuSyncGpuSemaphore, DISPATCH_TIME_FOREVER);
 	}
 
 	TRefCountPtr<GpuTexture> CreateGpuTexture(const GpuTextureDesc& InTexDesc)
@@ -41,7 +43,7 @@ namespace GpuApi
 
     void* MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapMode InMapMode, uint32& OutRowPitch)
 	{
-
+        
 	}
 
 	void UnMapGpuTexture(GpuTexture* InGpuTexture)
@@ -59,7 +61,7 @@ namespace GpuApi
         return FRAMEWORK::CompileShader(static_cast<MetalShader*>(InShader));
 	}
 
-	TRefCountPtr<RenderPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc)
+	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc)
 	{
         TRefCountPtr<MetalShader> Vs = AUX::StaticCastRefCountPtr<MetalShader>(InPipelineStateDesc.Vs);
         TRefCountPtr<MetalShader> Ps = AUX::StaticCastRefCountPtr<MetalShader>(InPipelineStateDesc.Ps);
@@ -101,7 +103,7 @@ namespace GpuApi
         return new MetalPipelineState(MoveTemp(PipelineState));
 	}
 
-	void SetRenderPipelineState(RenderPipelineState* InPipelineState)
+	void SetRenderPipelineState(GpuPipelineState* InPipelineState)
 	{
         GetCommandListContext()->SetPipeline(static_cast<MetalPipelineState*>(InPipelineState));
         GetCommandListContext()->MarkPipelineDirty(true);
@@ -109,33 +111,30 @@ namespace GpuApi
 
 	void SetVertexBuffer(GpuBuffer* InVertexBuffer)
 	{
-
+        GetCommandListContext()->SetVertexBuffer(static_cast<MetalBuffer*>(InVertexBuffer));
+        GetCommandListContext()->MarkVertexBufferDirty(true);
 	}
 
 	void SetViewPort(const GpuViewPortDesc& InViewPortDesc)
 	{
-
-	}
-
-	void SetRenderTarget(GpuTexture* InGpuTexture)
-	{
-
-	}
-
-	void SetClearColorValue(Vector4f ClearColor)
-	{
-
+        mtlpp::Viewport Viewport{
+            (double)InViewPortDesc.TopLeftX, (double)InViewPortDesc.TopLeftY,
+            (double)InViewPortDesc.Width, (double)InViewPortDesc.Height,
+            (double)InViewPortDesc.ZMin, (double)InViewPortDesc.ZMax};
+        
+        mtlpp::ScissorRect ScissorRect{0, 0, InViewPortDesc.Width, InViewPortDesc.Height};
+        GetCommandListContext()->SetViewPort(MakeUnique<mtlpp::Viewport>(MoveTemp(Viewport)), MakeUnique<mtlpp::ScissorRect>(MoveTemp(ScissorRect)));
 	}
 
 	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType)
 	{
         GetCommandListContext()->PrepareDrawingEnv();
-        GetCommandListContext()->GetCommandEncoder().Draw(MapPrimitiveType(InType), StartVertexLocation, VertexCount, InstanceCount, InstanceCount);
+        GetCommandListContext()->DrawPrimitive(StartVertexLocation, VertexCount, StartInstanceLocation, InstanceCount, InType);
 	}
 
 	void Submit()
 	{
-
+        GetCommandListContext()->Submit();
 	}
 
 	void BeginGpuCapture(const FString& SavedFileName)
@@ -162,11 +161,12 @@ namespace GpuApi
     {
         mtlpp::RenderPassDescriptor RenderPassDesc = MapRenderPassDesc(PassDesc);
         GetCommandListContext()->SetRenderPassDesc(MoveTemp(RenderPassDesc));
+        GetCommandListContext()->ClearBinding();
     }
 
     void EndRenderPass()
     {
-      
+        
     }
 
 }

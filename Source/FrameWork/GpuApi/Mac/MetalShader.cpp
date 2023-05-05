@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "MetalShader.h"
+#include "MetalDevice.h"
 
 namespace FRAMEWORK
 {
@@ -7,14 +8,13 @@ namespace FRAMEWORK
     {
         ns::AutoReleasedError Err;
         mtlpp::CompileOptions CompOpt;
-        const ns::String ShaderSrc = [NSString stringWithUTF8String:InShader->GetSourceText()];
-        mtlpp::Library ByteCodeLib = g_device.NewLibrary(MoveTemp(ShaderSrc), CompOpt, &Err);
+        mtlpp::Library ByteCodeLib = GDevice.NewLibrary(TCHAR_TO_ANSI(*InShader->GetSourceText()), CompOpt, &Err);
         
         if(!ByteCodeLib) {
             SH_LOG(LogMetal, Error, TEXT("Shader compilation failed: %s"), ConvertOcError(Err.GetPtr()));
         }
         
-        mtlpp::Function ByteCodeFunc = ByteCodeLib.NewFunction(*InShader->GetEntryPoint());
+        mtlpp::Function ByteCodeFunc = ByteCodeLib.NewFunction(TCHAR_TO_ANSI(*InShader->GetEntryPoint()));
         InShader->SetCompilationResult(MoveTemp(ByteCodeFunc));
     }
 }

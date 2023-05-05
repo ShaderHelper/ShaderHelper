@@ -3,7 +3,7 @@
 
 namespace FRAMEWORK
 {
-    class MetalPipelineState : public RenderPipelineState
+    class MetalPipelineState : public GpuPipelineState
     {
     public:
         MetalPipelineState(mtlpp::RenderPipelineState InPipelineState)

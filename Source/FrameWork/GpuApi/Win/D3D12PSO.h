@@ -5,7 +5,7 @@
 
 namespace FRAMEWORK
 {
-	class Dx12Pso : public RenderPipelineState
+	class Dx12Pso : public GpuPipelineState
 	{
 	public:
 		Dx12Pso(TRefCountPtr<ID3D12PipelineState> InPipelineState, 

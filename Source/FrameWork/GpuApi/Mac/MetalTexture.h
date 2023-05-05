@@ -7,8 +7,9 @@ namespace FRAMEWORK
 	class MetalTexture : public GpuTexture
 	{
     public:
-        MetalTexture(mtlpp::Texture InTex)
-            : Tex(MoveTemp(InTex))
+        MetalTexture(mtlpp::Texture InTex, GpuTextureDesc InDesc)
+            : GpuTexture(MoveTemp(InDesc))
+            , Tex(MoveTemp(InTex))
         {}
         
     public:

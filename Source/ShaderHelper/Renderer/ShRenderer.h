@@ -24,7 +24,7 @@ namespace SH
 		TRefCountPtr<GpuTexture> FinalRT;
 		TRefCountPtr<GpuShader> VertexShader;
 		TRefCountPtr<GpuShader> PixelShader;
-		TRefCountPtr<RenderPipelineState> PipelineState;
+		TRefCountPtr<GpuPipelineState> PipelineState;
 		bool bCanGpuCapture;
 	};
 }
