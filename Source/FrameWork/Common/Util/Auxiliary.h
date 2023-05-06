@@ -262,6 +262,17 @@ namespace AUX
 		return &CurFunctorExt::Call;
 	}
 
+//Access a private member without undefined behavior. (see https://quuxplusone.github.io/blog/2020/12/03/steal-a-private-member/)
+#define STEAL_PRIVATE_MEMBER(ClassName, MemberType, MemeberName)       \
+    namespace  \
+    { \
+        MemberType& GetPrivate_##ClassName##_##MemeberName(ClassName& Object); \
+        template <MemberType ClassName::* Ptr> struct Hack_##ClassName##_##MemeberName { \
+            friend MemberType& GetPrivate_##ClassName##_##MemeberName(ClassName& Object) { return Object.*Ptr; } \
+        }; \
+        template struct Hack_##ClassName##_##MemeberName<&ClassName::MemeberName>; \
+    };
+
 
 } // end AUX namespace
 } // end FRAMEWORK namespace

@@ -1,4 +1,5 @@
 #pragma once
+#include "MetalCommon.h"
 #include "GpuApi/GpuResource.h"
 
 namespace FRAMEWORK
