@@ -1,6 +1,7 @@
 #pragma once
 #include "CommonHeader.h"
 #include "GpuResourceCommon.h"
+#include "GpuShader.h"
 
 namespace FRAMEWORK
 {
