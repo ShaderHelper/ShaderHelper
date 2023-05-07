@@ -7,17 +7,13 @@ namespace FRAMEWORK
 	class Dx12Shader : public GpuShader
 	{
 	public:
-		Dx12Shader(
-			ShaderType InType, FString InSourceText, FString ShaderName, 
-			FString InEntryPoint = "main"
-		)
+		Dx12Shader(ShaderType InType, FString InSourceText, FString InShaderName, FString InShaderTaget, FString InEntryPoint)
 			: Type(InType)
-			, ShaderName(MoveTemp(ShaderName))
+			, ShaderName(MoveTemp(InShaderName))
 			, EntryPoint(MoveTemp(InEntryPoint))
 			, SourceText(MoveTemp(InSourceText))
+            , ShaderTaget(MoveTemp(InShaderTaget))
 		{
-			if (Type == ShaderType::VertexShader) { ShaderTaget = "vs_6_0"; }
-			if (Type == ShaderType::PixelShader) { ShaderTaget = "ps_6_0"; }
 		}
         
     public:
@@ -36,6 +32,9 @@ namespace FRAMEWORK
         FString ShaderTaget;
 		TRefCountPtr<IDxcBlob> ByteCode;
 	};
+
+    TRefCountPtr<Dx12Shader> CreateDx12Shader(ShaderType InType, FString InSourceText, FString ShaderName,
+                                              FString InEntryPoint = "main");
 
 	class DxcCompiler
 	{

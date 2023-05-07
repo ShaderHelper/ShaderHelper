@@ -8,23 +8,16 @@ namespace FRAMEWORK
 	class Dx12Pso : public GpuPipelineState
 	{
 	public:
-		Dx12Pso(TRefCountPtr<ID3D12PipelineState> InPipelineState, 
-			TRefCountPtr<ID3D12RootSignature> InRootSig, 
-			TRefCountPtr<Dx12Shader> InVs, TRefCountPtr<Dx12Shader> InPs) 
-			: PipelineState(MoveTemp(InPipelineState)) 
-			, RootSig(MoveTemp(InRootSig))
-			, Vs(MoveTemp(InVs))
-			, Ps(MoveTemp(InPs))
+		Dx12Pso(TRefCountPtr<ID3D12PipelineState> InPipelineState)
+			: PipelineState(MoveTemp(InPipelineState))
 		{}
         
     public:
 		ID3D12PipelineState* GetResource() const { return PipelineState; }
-		ID3D12RootSignature* GetRootSig() const { return RootSig; }
 
 	private:
 		TRefCountPtr<ID3D12PipelineState> PipelineState;
-		TRefCountPtr<ID3D12RootSignature> RootSig;
-		TRefCountPtr<Dx12Shader> Vs;
-		TRefCountPtr<Dx12Shader> Ps;
 	};
+
+    TRefCountPtr<Dx12Pso> CreateDx12Pso(const PipelineStateDesc& InPipelineStateDesc);
 }

@@ -4,6 +4,11 @@
 
 namespace FRAMEWORK
 {
+    TRefCountPtr<MetalShader> CreateMetalShader(ShaderType InType, FString InSourceText, FString ShaderName, FString InEntryPoint)
+    {
+        return new MetalShader(MoveTemp(InType), MoveTemp(InSourceText), MoveTemp(ShaderName), MoveTemp(InEntryPoint));
+    }
+
     bool CompileShader(TRefCountPtr<MetalShader> InShader)
     {
         ns::AutoReleasedError Err;

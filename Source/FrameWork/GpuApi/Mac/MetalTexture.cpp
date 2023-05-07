@@ -25,6 +25,7 @@ namespace FRAMEWORK
         mtlpp::PixelFormat TexFormat = (mtlpp::PixelFormat)MapTextureFormat(InTexDesc.Format);
         mtlpp::TextureDescriptor TexDesc = mtlpp::TextureDescriptor::Texture2DDescriptor(TexFormat, InTexDesc.Width, InTexDesc.Height, InTexDesc.NumMips > 1);
         TexDesc.SetTextureType(mtlpp::TextureType::Texture2D);
+        TexDesc.SetStorageMode(mtlpp::StorageMode::Private);
         SetTextureUsage(InTexDesc.Usage, TexDesc);
         
         mtlpp::Texture Tex = GDevice.NewTexture(MoveTemp(TexDesc));
