@@ -19,4 +19,6 @@ namespace FRAMEWORK
     private:
         mtlpp::RenderPipelineState PipelineState;
     };
+
+    TRefCountPtr<MetalPipelineState> CreateMetalPipelineState(const PipelineStateDesc& InPipelineStateDesc);
 }

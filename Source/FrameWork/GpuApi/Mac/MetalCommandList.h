@@ -13,14 +13,18 @@ namespace FRAMEWORK
         CommandListContext() : CurrentPipelineState(nullptr) , CurrentVertexBuffer(nullptr) {}
         
     public:
+        id<MTLRenderCommandEncoder> GetRenderCommandEncoder() const { return CurrentRenderCommandEncoder.GetPtr(); }
+        id<MTLBlitCommandEncoder> GetBlitCommandEncoder() const { return CurrentBlitCommandEncoder.GetPtr(); }
+        id<MTLCommandBuffer> GetCommandBuffer() const { return CurrentCommandBuffer.GetPtr(); }
+ 
         void SetCommandBuffer(mtlpp::CommandBuffer InCommandBuffer, mtlpp::CommandBufferHandler InHandler) {
             CurrentCommandBuffer = MoveTemp(InCommandBuffer);
             CurrentCommandBuffer.AddCompletedHandler(InHandler);
+            CurrentBlitCommandEncoder = CurrentCommandBuffer.BlitCommandEncoder();
         }
         void SetRenderPassDesc(mtlpp::RenderPassDescriptor InPassDesc) {
-            CurrentCommandEncoder.EndEncoding();
             CurrentRenderPassDesc = MoveTemp(InPassDesc);
-            CurrentCommandEncoder = CurrentCommandBuffer.RenderCommandEncoder(CurrentRenderPassDesc);
+            CurrentRenderCommandEncoder = CurrentCommandBuffer.RenderCommandEncoder(CurrentRenderPassDesc);
         }
         void SetPipeline(MetalPipelineState* InPipelineState) { CurrentPipelineState = InPipelineState; }
         void SetVertexBuffer(MetalBuffer* InBuffer) { CurrentVertexBuffer = InBuffer; }
@@ -36,10 +40,6 @@ namespace FRAMEWORK
         void MarkViewportDirty(bool IsDirty) { IsViewportDirty = IsDirty; }
         void MarkVertexBufferDirty(bool IsDirty) { IsVertexBufferDirty = IsDirty; }
         
-    public:
-        void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType);
-        void Submit();
-        
     private:
         MetalPipelineState* CurrentPipelineState;
         MetalBuffer* CurrentVertexBuffer;
@@ -47,7 +47,8 @@ namespace FRAMEWORK
         TUniquePtr<mtlpp::ScissorRect> CurrentScissorRect;
         
         mtlpp::RenderPassDescriptor  CurrentRenderPassDesc;
-        mtlpp::RenderCommandEncoder CurrentCommandEncoder;
+        mtlpp::RenderCommandEncoder CurrentRenderCommandEncoder;
+        mtlpp::BlitCommandEncoder CurrentBlitCommandEncoder;
         mtlpp::CommandBuffer CurrentCommandBuffer;
         
         bool IsPipelineDirty = true;

@@ -58,7 +58,7 @@ namespace GpuApi
 			if (!Texture->UploadBuffer.IsValid())
 			{
 				const uint64 BufferSize = GetRequiredIntermediateSize(Texture->GetResource(), 0, 1);
-				Texture->UploadBuffer = new Dx12Buffer(BufferSize, BufferUsage::Upload);
+				Texture->UploadBuffer = CreateDx12Buffer(BufferSize, BufferUsage::Upload);
                 Data = Texture->UploadBuffer->Map();
 			}
             else
@@ -71,7 +71,7 @@ namespace GpuApi
 			if (!Texture->ReadBackBuffer.IsValid())
 			{
 				const uint64 BufferSize = GetRequiredIntermediateSize(Texture->GetResource(), 0, 1); 
-				Texture->ReadBackBuffer = new Dx12Buffer(BufferSize, BufferUsage::ReadBack);
+				Texture->ReadBackBuffer = CreateDx12Buffer(BufferSize, BufferUsage::ReadBack);
                 Data = Texture->ReadBackBuffer->Map();
 			}
             else
@@ -116,7 +116,7 @@ namespace GpuApi
 
 	TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName)
 	{
-		return new Dx12Shader(InType, MoveTemp(InSourceText), MoveTemp(InShaderName));
+		return AUX::StaticCastRefCountPtr<GpuShader>(CreateDx12Shader(InType, MoveTemp(InSourceText), MoveTemp(InShaderName)));
 	}
 
 	bool CompilerShader(GpuShader* InShader)
@@ -127,42 +127,7 @@ namespace GpuApi
 
 	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc)
 	{
-		CD3DX12_ROOT_SIGNATURE_DESC RootSignatureDesc;
-		RootSignatureDesc.Init(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-		TRefCountPtr<ID3DBlob> Signature;
-		TRefCountPtr<ID3DBlob> Error;
-		TRefCountPtr<ID3D12RootSignature> RootSignature;
-		DxCheck(D3D12SerializeRootSignature(&RootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, Signature.GetInitReference(), Error.GetInitReference()));
-		DxCheck(GDevice->CreateRootSignature(0, Signature->GetBufferPointer(), Signature->GetBufferSize(), IID_PPV_ARGS(RootSignature.GetInitReference())));
-		//TODO RootSignature Manager.
-
-		TRefCountPtr<Dx12Shader> Vs = AUX::StaticCastRefCountPtr<Dx12Shader>(InPipelineStateDesc.Vs);
-		TRefCountPtr<Dx12Shader> Ps = AUX::StaticCastRefCountPtr<Dx12Shader>(InPipelineStateDesc.Ps);
-
-		D3D12_GRAPHICS_PIPELINE_STATE_DESC PsoDesc{};
-		PsoDesc.pRootSignature = RootSignature;
-		PsoDesc.VS = { Vs->GetCompilationResult()->GetBufferPointer(), Vs->GetCompilationResult()->GetBufferSize() };
-		PsoDesc.PS = { Ps->GetCompilationResult()->GetBufferPointer(), Ps->GetCompilationResult()->GetBufferSize() };
-		PsoDesc.RasterizerState = MapRasterizerState(InPipelineStateDesc.RasterizerState);
-		PsoDesc.BlendState = MapBlendState(InPipelineStateDesc.BlendState);
-		PsoDesc.DepthStencilState.DepthEnable = false;
-		PsoDesc.DepthStencilState.StencilEnable = false;
-		PsoDesc.SampleMask = UINT_MAX;
-		PsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		PsoDesc.NumRenderTargets = 1;
-		PsoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
-		PsoDesc.SampleDesc.Count = 1;
-		PsoDesc.SampleDesc.Quality = 0;
-        
-        const uint32 RtFormatNum = InPipelineStateDesc.RtFormats.Num();
-        for(uint32 i = 0 ; i < RtFormatNum; i++)
-        {
-            PsoDesc.RTVFormats[i] = MapTextureFormat(InPipelineStateDesc.RtFormats[i]);
-        }
-
-		TRefCountPtr<ID3D12PipelineState> Pso;
-		DxCheck(GDevice->CreateGraphicsPipelineState(&PsoDesc, IID_PPV_ARGS(Pso.GetInitReference())));
-		return new Dx12Pso(MoveTemp(Pso), MoveTemp(RootSignature),MoveTemp(Vs), MoveTemp(Ps));
+        return AUX::StaticCastRefCountPtr<GpuPipelineState>(CreateDx12Pso(InPipelineStateDesc));
 	}
 
 	void SetRenderPipelineState(GpuPipelineState* InPipelineState)

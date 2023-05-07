@@ -12,7 +12,8 @@ namespace FRAMEWORK
 	public:
 		Dx12Texture(D3D12_RESOURCE_STATES InState, TRefCountPtr<ID3D12Resource> InResource, GpuTextureDesc InDesc);
 		~Dx12Texture();
-
+        
+    public:
 		ID3D12Resource* GetResource() const override { return Resource.GetReference(); }
 		
 	private:

@@ -7,10 +7,7 @@ namespace FRAMEWORK
     class MetalShader : public GpuShader
     {
     public:
-        MetalShader(
-            ShaderType InType, FString InSourceText, FString ShaderName,
-            FString InEntryPoint = "main"
-        )
+        MetalShader(ShaderType InType, FString InSourceText, FString ShaderName, FString InEntryPoint)
             : Type(InType)
             , ShaderName(MoveTemp(ShaderName))
             , EntryPoint(MoveTemp(InEntryPoint))
@@ -34,7 +31,9 @@ namespace FRAMEWORK
         FString SourceText;
         mtlpp::Function ByteCodeFunc;
     };
-
+    
+    TRefCountPtr<MetalShader> CreateMetalShader(ShaderType InType, FString InSourceText, FString ShaderName,
+                                                FString InEntryPoint = "main");
     bool CompileShader(TRefCountPtr<MetalShader> InShader);
 }
 

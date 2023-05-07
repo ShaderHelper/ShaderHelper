@@ -5,7 +5,28 @@
 #pragma comment (lib, "dxcompiler.lib")
 
 namespace FRAMEWORK
-{		
+{
+
+    TRefCountPtr<Dx12Shader> CreateDx12Shader(ShaderType InType, FString InSourceText, FString ShaderName, FString InEntryPoint)
+    {
+        FString ShaderTarget;
+        if (Type == ShaderType::VertexShader)
+        {
+            ShaderTaget = "vs_6_0";
+            
+        }
+        else if (Type == ShaderType::PixelShader)
+        {
+            ShaderTaget = "ps_6_0";
+        }
+        else
+        {
+            check(false);
+        }
+        
+        return new Dx12Shader(MoveTemp(InType), MoveTemp(InSourceText), MoveTemp(ShaderName), MoveTemp(ShaderTarget), MoveTemp(InEntryPoint));
+    }
+
 	 DxcCompiler::DxcCompiler()
 	 {
 		 DxCheck(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(Compiler.GetInitReference())));
