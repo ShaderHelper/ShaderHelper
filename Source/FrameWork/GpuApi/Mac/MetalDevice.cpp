@@ -7,6 +7,8 @@ namespace FRAMEWORK
     {
         GDevice = mtlpp::Device::CreateSystemDefaultDevice();
         GCommandQueue = GDevice.NewCommandQueue();
-        CpuSyncGpuSemaphore = dispatch_semaphore_create(AllowableLag);
+//        CpuSyncGpuSemaphore = dispatch_semaphore_create(AllowableLag);
+        
+        GCaptureScope = mtlpp::CaptureManager::SharedCaptureManager().NewCaptureScopeWithDevice(GDevice);
     }
 }

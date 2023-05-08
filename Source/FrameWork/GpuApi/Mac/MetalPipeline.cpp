@@ -38,7 +38,7 @@ namespace FRAMEWORK
         }
 
         ns::AutoReleasedError Err;
-        mtlpp::RenderPipelineState PipelineState = GDevice.NewRenderPipelineState(PipelineDesc, (mtlpp::PipelineOption)(1 << 0) ,nullptr ,&Err);
+        mtlpp::RenderPipelineState PipelineState = GDevice.NewRenderPipelineState(PipelineDesc, mtlpp::PipelineOption::NoPipelineOption ,nullptr ,&Err);
         if (!PipelineState)
         {
             SH_LOG(LogMetal, Fatal, TEXT("Failed to create render pipeline: %s"), ConvertOcError(Err.GetPtr()));

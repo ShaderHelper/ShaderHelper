@@ -387,7 +387,7 @@ namespace mtlpp
 #if MTLPP_CONFIG_IMP_CACHE
 		Encoder = mtlpp::ComputeCommandEncoder(m_table->ComputeCommandEncoderWithType(m_ptr, (MTLDispatchType)Type), m_table->TableCache);
 #else
-		Encoder = mtlpp::ComputeCommandEncoder([(id<MTLCommandBuffer>)m_ptr computeCommandEncoderWithDispatchType:(MTLDispatchType)Type], m_table->TableCache);
+		Encoder = mtlpp::ComputeCommandEncoder([(id<MTLCommandBuffer>)m_ptr computeCommandEncoderWithDispatchType:(MTLDispatchType)Type]);
 #endif
 #if MTLPP_CONFIG_VALIDATE
 		Encoder.SetCommandBufferFence(GetCompletionFence());

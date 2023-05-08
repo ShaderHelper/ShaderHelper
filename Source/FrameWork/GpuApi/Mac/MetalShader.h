@@ -33,7 +33,7 @@ namespace FRAMEWORK
     };
     
     TRefCountPtr<MetalShader> CreateMetalShader(ShaderType InType, FString InSourceText, FString ShaderName,
-                                                FString InEntryPoint = "main");
+                                                FString InEntryPoint);
     bool CompileShader(TRefCountPtr<MetalShader> InShader);
 }
 

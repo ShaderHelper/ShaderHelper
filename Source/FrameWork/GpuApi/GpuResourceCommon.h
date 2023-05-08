@@ -9,6 +9,7 @@ namespace FRAMEWORK
     {
         //Unorm
         R8G8B8A8_UNORM,
+        B8G8R8A8_UNORM,
         R10G10B10A2_UNORM,
         R16G16B16A16_UNORM,
 
@@ -158,6 +159,7 @@ namespace FRAMEWORK
         switch (InFormat)
         {
         case GpuTextureFormat::R8G8B8A8_UNORM:
+        case GpuTextureFormat::B8G8R8A8_UNORM:
         case GpuTextureFormat::R10G10B10A2_UNORM:
         case GpuTextureFormat::R11G11B10_FLOAT:
             return 4;

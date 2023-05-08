@@ -29,6 +29,8 @@ namespace GpuApi
 
 	void EndRenderFrame()
 	{
+        Submit();
+        
 		check(CurCpuFrame >= CurGpuFrame);
 		CurCpuFrame++;
 		DxCheck(GGraphicsQueue->Signal(CpuSyncGpuFence, CurCpuFrame));
@@ -114,9 +116,9 @@ namespace GpuApi
 		}
 	}
 
-	TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName)
+	TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName, FString EntryPoint)
 	{
-		return AUX::StaticCastRefCountPtr<GpuShader>(CreateDx12Shader(InType, MoveTemp(InSourceText), MoveTemp(InShaderName)));
+		return AUX::StaticCastRefCountPtr<GpuShader>(CreateDx12Shader(InType, MoveTemp(InSourceText), MoveTemp(InShaderName), MoveTemp(EntryPoint)));
 	}
 
 	bool CompilerShader(GpuShader* InShader)
@@ -211,6 +213,7 @@ namespace GpuApi
 		if (GCanGpuCapture) {
 			FlushGpu();
 			PIXEndCapture(false);
+            FPlatformMisc::MessageBoxExt(EAppMsgType::Ok, TEXT("Successfully captured the current frame."), TEXT("Message:"));
 		}
 #endif
 	}
@@ -239,9 +242,10 @@ namespace GpuApi
 
     void BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName)
     {
+        GpuApi::BeginCaptureEvent(PassName);
+        
         //To follow metal api design, we don't keep previous the bindings when beginning a new render pass.
         GCommandListContext->ClearBinding();
-        GpuApi::BeginCaptureEvent(PassName);
         
         TArray<Dx12Texture*> RTs;
         TArray<TOptional<Vector4f>> ClearColorValues;

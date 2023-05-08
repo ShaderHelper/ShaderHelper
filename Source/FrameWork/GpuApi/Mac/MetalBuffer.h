@@ -11,7 +11,6 @@ namespace FRAMEWORK
         
     public:
         id<MTLBuffer> GetResource() const { return Buffer.GetPtr(); }
-        void* GetContents() const { return Buffer.GetContents(); }
         
     private:
         mtlpp::Buffer Buffer;
