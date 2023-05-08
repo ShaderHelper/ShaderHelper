@@ -21,20 +21,21 @@ namespace GpuApi
 
 	void FlushGpu()
 	{
-        Submit();
-        dispatch_semaphore_wait(CpuSyncGpuSemaphore, DISPATCH_TIME_FOREVER);
+        id<MTLCommandBuffer> CommandBuffer = GetCommandListContext()->GetCommandBuffer();
+        [CommandBuffer commit];
+        [CommandBuffer waitUntilCompleted];
+        GetCommandListContext()->SetCommandBuffer(GCommandQueue.CommandBuffer());
 	}
 
 	void StartRenderFrame()
 	{
-        GetCommandListContext()->SetCommandBuffer(GCommandQueue.CommandBuffer(), [](const mtlpp::CommandBuffer&){
-            dispatch_semaphore_signal(CpuSyncGpuSemaphore);
-        });
+        GetCommandListContext()->SetCommandBuffer(GCommandQueue.CommandBuffer());
 	}
 
 	void EndRenderFrame()
 	{
-        dispatch_semaphore_wait(CpuSyncGpuSemaphore, DISPATCH_TIME_FOREVER);
+        FlushGpu();
+        GCommandQueue.InsertDebugCaptureBoundary();
 	}
 
 	TRefCountPtr<GpuTexture> CreateGpuTexture(const GpuTextureDesc& InTexDesc)
@@ -49,17 +50,22 @@ namespace GpuApi
         {
             const uint32 BytesPerTexel = GetTextureFormatByteSize(InGpuTexture->GetFormat());
             const uint64 UnpaddedSize = InGpuTexture->GetWidth() * InGpuTexture->GetHeight() * BytesPerTexel;
-            TRefCountPtr<MetalBuffer> ReadBackBuffer = CreateMetalBuffer(UnpaddedSize);
+            if (!Texture->ReadBackBuffer.IsValid())
+            {
+                Texture->ReadBackBuffer = CreateMetalBuffer(UnpaddedSize);
+            }
+            
+            //Metal does not consider the alignment when copying back?
             OutRowPitch = InGpuTexture->GetWidth() * BytesPerTexel;
             
-            id<MTLBlitCommandEncoder> BlitCommandEncoder = GetCommandListContext()->GetBlitCommandEncoder();
+            mtlpp::BlitCommandEncoder BlitCommandEncoder = GetCommandListContext()->GetBlitCommandEncoder();
             MTLOrigin Origin = MTLOriginMake(0, 0, 0);
             MTLSize Size = MTLSizeMake(InGpuTexture->GetWidth(), InGpuTexture->GetHeight(), 1);
-       
-            [BlitCommandEncoder copyFromTexture:Texture->GetResource() sourceSlice:0 sourceLevel:0 sourceOrigin:Origin sourceSize:Size toBuffer:ReadBackBuffer->GetResource() destinationOffset:0 destinationBytesPerRow:OutRowPitch destinationBytesPerImage:UnpaddedSize];
+            [BlitCommandEncoder.GetPtr() copyFromTexture:Texture->GetResource() sourceSlice:0 sourceLevel:0 sourceOrigin:Origin sourceSize:Size toBuffer:Texture->ReadBackBuffer->GetResource() destinationOffset:0 destinationBytesPerRow:OutRowPitch destinationBytesPerImage:UnpaddedSize];
+            BlitCommandEncoder.EndEncoding();
             
             FlushGpu();
-            return ReadBackBuffer->GetContents();
+            return [Texture->ReadBackBuffer->GetResource() contents];
         }
 	}
 
@@ -68,9 +74,9 @@ namespace GpuApi
 
 	}
 
-	TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName)
+	TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName, FString EntryPoint)
 	{
-        return AUX::StaticCastRefCountPtr<GpuShader>(CreateMetalShader(InType, MoveTemp(InSourceText), MoveTemp(InShaderName)));
+        return AUX::StaticCastRefCountPtr<GpuShader>(CreateMetalShader(InType, MoveTemp(InSourceText), MoveTemp(InShaderName), MoveTemp(EntryPoint)));
 	}
 
 	bool CompilerShader(GpuShader* InShader)
@@ -115,14 +121,9 @@ namespace GpuApi
 
 	void Submit()
 	{
-        id<MTLBlitCommandEncoder> BlitCommandEncoder = GetCommandListContext()->GetBlitCommandEncoder();
-        [BlitCommandEncoder endEncoding];
         id<MTLCommandBuffer> CommandBuffer = GetCommandListContext()->GetCommandBuffer();
         [CommandBuffer commit];
-        
-        GetCommandListContext()->SetCommandBuffer(GCommandQueue.CommandBuffer(), [](const mtlpp::CommandBuffer&){
-            dispatch_semaphore_signal(CpuSyncGpuSemaphore);
-        });
+        GetCommandListContext()->SetCommandBuffer(GCommandQueue.CommandBuffer());
 	}
 
 	void BeginGpuCapture(const FString& SavedFileName)
@@ -148,7 +149,7 @@ namespace GpuApi
     void BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName)
     {
         mtlpp::RenderPassDescriptor RenderPassDesc = MapRenderPassDesc(PassDesc);
-        GetCommandListContext()->SetRenderPassDesc(MoveTemp(RenderPassDesc));
+        GetCommandListContext()->SetRenderPassDesc(MoveTemp(RenderPassDesc), PassName);
         GetCommandListContext()->ClearBinding();
     }
 

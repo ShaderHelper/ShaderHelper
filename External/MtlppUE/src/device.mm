@@ -716,7 +716,7 @@ namespace mtlpp
 #else
 		return ComputePipelineState([(id<MTLDevice>)m_ptr newComputePipelineStateWithFunction:(id<MTLFunction>)computeFunction.GetPtr()
 																  options:MTLPipelineOption(options)
-															   reflection:outReflection ? outReflection.GetInnerPtr() : nil
+															   reflection:outReflection ? outReflection->GetInnerPtr() : nil
 																	error:error ? error->GetInnerPtr() : nil], nullptr, ns::Ownership::Assign);
 #endif
     }

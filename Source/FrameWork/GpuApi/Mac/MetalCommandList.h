@@ -14,17 +14,19 @@ namespace FRAMEWORK
         
     public:
         id<MTLRenderCommandEncoder> GetRenderCommandEncoder() const { return CurrentRenderCommandEncoder.GetPtr(); }
-        id<MTLBlitCommandEncoder> GetBlitCommandEncoder() const { return CurrentBlitCommandEncoder.GetPtr(); }
+        mtlpp::BlitCommandEncoder GetBlitCommandEncoder() {
+            //Return a new BlitCommandEncoder when we want to copy something every time.
+            return CurrentCommandBuffer.BlitCommandEncoder();
+        }
         id<MTLCommandBuffer> GetCommandBuffer() const { return CurrentCommandBuffer.GetPtr(); }
  
-        void SetCommandBuffer(mtlpp::CommandBuffer InCommandBuffer, mtlpp::CommandBufferHandler InHandler) {
+        void SetCommandBuffer(mtlpp::CommandBuffer InCommandBuffer) {
             CurrentCommandBuffer = MoveTemp(InCommandBuffer);
-            CurrentCommandBuffer.AddCompletedHandler(InHandler);
-            CurrentBlitCommandEncoder = CurrentCommandBuffer.BlitCommandEncoder();
         }
-        void SetRenderPassDesc(mtlpp::RenderPassDescriptor InPassDesc) {
+        void SetRenderPassDesc(mtlpp::RenderPassDescriptor InPassDesc, const FString& PassName) {
             CurrentRenderPassDesc = MoveTemp(InPassDesc);
             CurrentRenderCommandEncoder = CurrentCommandBuffer.RenderCommandEncoder(CurrentRenderPassDesc);
+            CurrentRenderCommandEncoder.GetPtr().label = [NSString stringWithUTF8String:TCHAR_TO_ANSI(*PassName)];
         }
         void SetPipeline(MetalPipelineState* InPipelineState) { CurrentPipelineState = InPipelineState; }
         void SetVertexBuffer(MetalBuffer* InBuffer) { CurrentVertexBuffer = InBuffer; }
@@ -48,7 +50,6 @@ namespace FRAMEWORK
         
         mtlpp::RenderPassDescriptor  CurrentRenderPassDesc;
         mtlpp::RenderCommandEncoder CurrentRenderCommandEncoder;
-        mtlpp::BlitCommandEncoder CurrentBlitCommandEncoder;
         mtlpp::CommandBuffer CurrentCommandBuffer;
         
         bool IsPipelineDirty = true;

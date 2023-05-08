@@ -17,9 +17,15 @@ namespace FRAMEWORK
         
         if(!ByteCodeLib) {
             SH_LOG(LogMetal, Error, TEXT("Shader compilation failed: %s"), ConvertOcError(Err.GetPtr()));
+            return false;
         }
         
         mtlpp::Function ByteCodeFunc = ByteCodeLib.NewFunction(TCHAR_TO_ANSI(*InShader->GetEntryPoint()));
+        if(!ByteCodeFunc) {
+            SH_LOG(LogMetal, Error, TEXT("Shader compilation failed: EntryPoint not found: %s "), *InShader->GetEntryPoint());
+            return false;
+        }
         InShader->SetCompilationResult(MoveTemp(ByteCodeFunc));
+        return true;
     }
 }

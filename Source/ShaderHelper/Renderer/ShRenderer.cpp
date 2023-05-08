@@ -5,7 +5,7 @@ namespace SH
 {
 #if PLATFORM_WINDOWS
 	const FString FullScreenVsText = R"(
-		void main(
+		void MainVS(
 		in uint VertID : SV_VertexID,
 		out float4 Pos : SV_Position,
 		out float2 Tex : TexCoord0
@@ -17,7 +17,7 @@ namespace SH
 	)";
 
 	const FString PsForTest = R"(
-		float4 main() : SV_Target 
+		float4 MainPS() : SV_Target
 		{
 			return float4(1,1,0,1);
 		}
@@ -25,7 +25,7 @@ namespace SH
 #elif PLATFORM_MAC
     const FString FullScreenVsText = R"(
         using namespace metal;
-        vertex float4 vert(
+        vertex float4 MainVS(
                            unsigned int vID [[vertex_id]])
         {
             float2 Tex = float2(uint2(vID, vID << 1) & 2);
@@ -35,7 +35,7 @@ namespace SH
     )";
 
     const FString PsForTest = R"(
-        fragment half4 frag()
+        fragment half4 MainPS()
         {
             return half4(1.0, 1.0, 0.0, 1.0);
         }
@@ -47,18 +47,18 @@ namespace SH
 		, bCanGpuCapture(false)
 	{
 
-		VertexShader = GpuApi::CreateShaderFromSource(ShaderType::VertexShader, FullScreenVsText, TEXT("DefaultFullScreenVS"));
+		VertexShader = GpuApi::CreateShaderFromSource(ShaderType::VertexShader, FullScreenVsText, TEXT("DefaultFullScreenVS"), TEXT("MainVS"));
 		GpuApi::CompilerShader(VertexShader);
 
-		PixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, PsForTest, TEXT("FullScreenPS"));
+		PixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, PsForTest, TEXT("FullScreenPS"), TEXT("MainPS"));
 		GpuApi::CompilerShader(PixelShader);
 	}
 
 	void ShRenderer::OnViewportResize()
 	{
 		check(ViewPort);
-        //Note: ue standalone renderer framework has the lack of robustness. It just only supports a few texture formats, so be careful to choose GpuTextureFormat.
-		GpuTextureDesc Desc{ (uint32)ViewPort->GetSize().X, (uint32)ViewPort->GetSize().Y, GpuTextureFormat::R8G8B8A8_UNORM, GpuTextureUsage::Shared | GpuTextureUsage::RenderTarget };
+        //Note: BGRA8_UNORM is default framebuffer format in ue standalone renderer framework.
+		GpuTextureDesc Desc{ (uint32)ViewPort->GetSize().X, (uint32)ViewPort->GetSize().Y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::Shared | GpuTextureUsage::RenderTarget };
 		FinalRT = GpuApi::CreateGpuTexture(Desc);
 		ViewPort->SetViewPortRenderTexture(FinalRT);
 

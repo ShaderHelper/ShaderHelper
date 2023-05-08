@@ -25,7 +25,6 @@ namespace FRAMEWORK
 
     void Renderer::RenderEnd()
     {
-        GpuApi::Submit();
         GpuApi::EndRenderFrame();
     }
 

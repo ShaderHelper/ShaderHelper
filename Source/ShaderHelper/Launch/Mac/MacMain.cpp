@@ -2,6 +2,7 @@
 #include "App/ShaderHelperApp.h"
 #include "UI/Widgets/SShaderHelperWindow.h"
 #include <Mac/CocoaThread.h>
+#include "Renderer/ShRenderer.h"
 
 static FString GSavedCommandLine;
 

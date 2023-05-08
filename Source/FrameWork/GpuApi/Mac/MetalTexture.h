@@ -1,6 +1,7 @@
 #pragma once
 #include "MetalCommon.h"
 #include "GpuApi/GpuResource.h"
+#include "MetalBuffer.h"
 
 namespace FRAMEWORK
 {
@@ -16,6 +17,9 @@ namespace FRAMEWORK
         id<MTLTexture> GetResource() const {
             return Tex.GetPtr();
         }
+        
+    public:
+        TRefCountPtr<MetalBuffer> ReadBackBuffer;
         
     private:
         mtlpp::Texture Tex;

@@ -34,7 +34,7 @@ namespace FRAMEWORK
 	};
 
     TRefCountPtr<Dx12Shader> CreateDx12Shader(ShaderType InType, FString InSourceText, FString ShaderName,
-                                              FString InEntryPoint = "main");
+                                              FString InEntryPoint);
 
 	class DxcCompiler
 	{

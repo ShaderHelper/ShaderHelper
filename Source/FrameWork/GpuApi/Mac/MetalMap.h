@@ -87,7 +87,7 @@ namespace FRAMEWORK
             RawPassDesc.colorAttachments[i].loadAction = MapLoadAction(RtInfo.LoadAction);
             RawPassDesc.colorAttachments[i].storeAction = MapStoreAction(RtInfo.StoreAction);
         }
-        return mtlpp::RenderPassDescriptor{RawPassDesc};
+        return mtlpp::RenderPassDescriptor{RawPassDesc, ns::Ownership::Assign};
     }
     
     inline MTLPixelFormat MapTextureFormat(const GpuTextureFormat& InTextureFormat)
@@ -95,6 +95,7 @@ namespace FRAMEWORK
         switch(InTextureFormat)
         {
         case GpuTextureFormat::R8G8B8A8_UNORM:        return MTLPixelFormatRGBA8Unorm;
+        case GpuTextureFormat::B8G8R8A8_UNORM:        return MTLPixelFormatBGRA8Unorm;
         case GpuTextureFormat::R10G10B10A2_UNORM:     return MTLPixelFormatRGB10A2Unorm;
         case GpuTextureFormat::R16G16B16A16_UNORM:    return MTLPixelFormatRGBA16Unorm;
         case GpuTextureFormat::R16G16B16A16_UINT:     return MTLPixelFormatRGBA16Uint;
