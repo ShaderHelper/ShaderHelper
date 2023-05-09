@@ -19,7 +19,7 @@ namespace SH
 		uint32 UnpaddedSize = InGpuTex->GetWidth() * InGpuTex->GetHeight() * GetTextureFormatByteSize(InGpuTex->GetFormat());
         
         TArray<uint8> UnpaddedData;
-        UnpaddedData.Reserve(UnpaddedSize);
+        UnpaddedData.SetNumUninitialized(UnpaddedSize);
 		uint32 UnpaddedRowPitch = InGpuTex->GetWidth() * GetTextureFormatByteSize(InGpuTex->GetFormat());
 		for (uint32 Row = 0; Row < InGpuTex->GetHeight(); ++Row)
 		{

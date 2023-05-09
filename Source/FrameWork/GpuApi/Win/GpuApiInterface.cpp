@@ -250,7 +250,7 @@ namespace GpuApi
         TArray<Dx12Texture*> RTs;
         TArray<TOptional<Vector4f>> ClearColorValues;
         
-        for(uint32 i = 0; i < PassDesc.ColorRenderTargets.Num(); i++)
+        for(int32 i = 0; i < PassDesc.ColorRenderTargets.Num(); i++)
         {
             Dx12Texture* Rt = static_cast<Dx12Texture*>(PassDesc.ColorRenderTargets[i].GetRenderTarget());
             RTs.Add(Rt);

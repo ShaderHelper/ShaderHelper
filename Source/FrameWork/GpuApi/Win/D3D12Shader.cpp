@@ -10,14 +10,14 @@ namespace FRAMEWORK
     TRefCountPtr<Dx12Shader> CreateDx12Shader(ShaderType InType, FString InSourceText, FString ShaderName, FString InEntryPoint)
     {
         FString ShaderTarget;
-        if (Type == ShaderType::VertexShader)
+        if (InType == ShaderType::VertexShader)
         {
-            ShaderTaget = "vs_6_0";
+			ShaderTarget = "vs_6_0";
             
         }
-        else if (Type == ShaderType::PixelShader)
+        else if (InType == ShaderType::PixelShader)
         {
-            ShaderTaget = "ps_6_0";
+			ShaderTarget = "ps_6_0";
         }
         else
         {

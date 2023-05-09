@@ -72,7 +72,8 @@ namespace FRAMEWORK
 			check(RenderTargetNum);
             check(ClearColorValues.Num() == RenderTargetNum);
             
-            D3D12_CPU_DESCRIPTOR_HANDLE RenderTargetDescriptors[RenderTargetNum]{};
+			TArray<D3D12_CPU_DESCRIPTOR_HANDLE> RenderTargetDescriptors;
+			RenderTargetDescriptors.SetNumUninitialized(RenderTargetNum);
             
             for(uint32 i = 0; i < RenderTargetNum; i++)
             {
@@ -87,16 +88,16 @@ namespace FRAMEWORK
                     {
                         SH_LOG(LogDx12, Warning, TEXT("OptimizedClearValue(%s) != ClearColorValue(%s) that may result in invalid fast clear optimization."), *OptimizedClearValue.ToString(), *ClearColorValue.ToString());
                     }
-                    GraphicsCmdList->ClearRenderTargetView(RenderTarget->HandleRTV.CpuHandle, ClearColorValues.GetData(), 0, nullptr);
+                    GraphicsCmdList->ClearRenderTargetView(RenderTarget->HandleRTV.CpuHandle, ClearColorValue.GetData(), 0, nullptr);
                 }
                 else {
                     GraphicsCmdList->ClearRenderTargetView(RenderTarget->HandleRTV.CpuHandle, OptimizedClearValue.GetData(), 0, nullptr);
                 }
-                GDeferredReleaseManager.sAddUncompletedResource(RenderTarget);
+                GDeferredReleaseManager.AddUncompletedResource(RenderTarget);
                 RenderTargetDescriptors[i] = RenderTarget->HandleRTV.CpuHandle;
             }
             
-            GraphicsCmdList->OMSetRenderTargets(RenderTargetNum, RenderTargetDescriptors, false, nullptr);
+            GraphicsCmdList->OMSetRenderTargets(RenderTargetNum, RenderTargetDescriptors.GetData(), false, nullptr);
 			MarkRenderTartgetDirty(false);
 		}
 	}
@@ -114,7 +115,7 @@ namespace FRAMEWORK
         
         CurrentRenderTargets.Empty();
         
-        ClearColorValue.Reset();
+        ClearColorValues.Reset();
     }
 
 	StaticFrameResource::StaticFrameResource(TRefCountPtr<ID3D12CommandAllocator> InCommandAllocator, DescriptorAllocatorStorage&& InDescriptorAllocators)
