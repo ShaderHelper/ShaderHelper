@@ -137,7 +137,7 @@ namespace FRAMEWORK
 
 		if (bHasInitialData) {
 			const uint64 UploadBufferSize = GetRequiredIntermediateSize(TexResource, 0, 1);
-			TRefCountPtr<Dx12Buffer> UploadBuffer = new Dx12Buffer(UploadBufferSize, BufferUsage::Upload);
+			TRefCountPtr<Dx12Buffer> UploadBuffer = CreateDx12Buffer(UploadBufferSize, BufferUsage::Upload);
 			
 			D3D12_SUBRESOURCE_DATA textureData = {};
 			textureData.pData = &InTexDesc.InitialData[0];

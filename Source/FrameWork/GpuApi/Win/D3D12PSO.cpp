@@ -42,6 +42,6 @@ namespace FRAMEWORK
 
         TRefCountPtr<ID3D12PipelineState> Pso;
         DxCheck(GDevice->CreateGraphicsPipelineState(&PsoDesc, IID_PPV_ARGS(Pso.GetInitReference())));
-        return new Dx12Pso(MoveTemp(Pso));
+        return new Dx12Pso(MoveTemp(Pso), MoveTemp(RootSignature));
     }
 }
