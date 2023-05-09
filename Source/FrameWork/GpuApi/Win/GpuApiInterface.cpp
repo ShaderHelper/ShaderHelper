@@ -5,6 +5,7 @@
 #include "D3D12Texture.h"
 #include "D3D12Shader.h"
 #include "D3D12PSO.h"
+#include "D3D12Map.h"
 
 namespace FRAMEWORK
 {
@@ -23,11 +24,13 @@ namespace GpuApi
 		GCommandListContext->ResetStaticFrameResource(FrameResourceIndex);
 		GCommandListContext->BindStaticFrameResource(FrameResourceIndex);
 
-		GDynamicFrameResourceManager.AllocateOneFrame();
+        GDeferredReleaseManager.AllocateOneFrame();
 	}
 
 	void EndRenderFrame()
 	{
+        Submit();
+        
 		check(CurCpuFrame >= CurGpuFrame);
 		CurCpuFrame++;
 		DxCheck(GGraphicsQueue->Signal(CpuSyncGpuFence, CurCpuFrame));
@@ -41,12 +44,12 @@ namespace GpuApi
 			CurGpuFrame = CurGpuFrame + 1;
 		}
 
-		GDynamicFrameResourceManager.ReleaseCompletedResources();
+        GDeferredReleaseManager.ReleaseCompletedResources();
 	}
 
 	TRefCountPtr<GpuTexture> CreateGpuTexture(const GpuTextureDesc& InTexDesc)
 	{
-		return AUX::StaticCastRefCountPtr<GpuTexture>(CreateDx12Texture(InTexDesc));
+		return AUX::StaticCastRefCountPtr<GpuTexture>(CreateDx12Texture2D(InTexDesc));
 	}
 
 	void* MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapMode InMapMode, uint32& OutRowPitch)
@@ -57,7 +60,7 @@ namespace GpuApi
 			if (!Texture->UploadBuffer.IsValid())
 			{
 				const uint64 BufferSize = GetRequiredIntermediateSize(Texture->GetResource(), 0, 1);
-				Texture->UploadBuffer = new Dx12Buffer(BufferSize, BufferUsage::Upload);
+				Texture->UploadBuffer = CreateDx12Buffer(BufferSize, BufferUsage::Upload);
                 Data = Texture->UploadBuffer->Map();
 			}
             else
@@ -70,7 +73,7 @@ namespace GpuApi
 			if (!Texture->ReadBackBuffer.IsValid())
 			{
 				const uint64 BufferSize = GetRequiredIntermediateSize(Texture->GetResource(), 0, 1); 
-				Texture->ReadBackBuffer = new Dx12Buffer(BufferSize, BufferUsage::ReadBack);
+				Texture->ReadBackBuffer = CreateDx12Buffer(BufferSize, BufferUsage::ReadBack);
                 Data = Texture->ReadBackBuffer->Map();
 			}
             else
@@ -113,9 +116,9 @@ namespace GpuApi
 		}
 	}
 
-	TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName)
+	TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName, FString EntryPoint)
 	{
-		return new Dx12Shader(InType, MoveTemp(InSourceText), MoveTemp(InShaderName));
+		return AUX::StaticCastRefCountPtr<GpuShader>(CreateDx12Shader(InType, MoveTemp(InSourceText), MoveTemp(InShaderName), MoveTemp(EntryPoint)));
 	}
 
 	bool CompilerShader(GpuShader* InShader)
@@ -124,48 +127,18 @@ namespace GpuApi
 	}
 
 
-	TRefCountPtr<RenderPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc)
+	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc)
 	{
-		CD3DX12_ROOT_SIGNATURE_DESC RootSignatureDesc;
-		RootSignatureDesc.Init(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-		TRefCountPtr<ID3DBlob> Signature;
-		TRefCountPtr<ID3DBlob> Error;
-		TRefCountPtr<ID3D12RootSignature> RootSignature;
-		DxCheck(D3D12SerializeRootSignature(&RootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, Signature.GetInitReference(), Error.GetInitReference()));
-		DxCheck(GDevice->CreateRootSignature(0, Signature->GetBufferPointer(), Signature->GetBufferSize(), IID_PPV_ARGS(RootSignature.GetInitReference())));
-		//TODO RootSignature Manager.
-
-		TRefCountPtr<Dx12Shader> Vs = AUX::StaticCastRefCountPtr<Dx12Shader>(InPipelineStateDesc.Vs);
-		TRefCountPtr<Dx12Shader> Ps = AUX::StaticCastRefCountPtr<Dx12Shader>(InPipelineStateDesc.Ps);
-
-		D3D12_GRAPHICS_PIPELINE_STATE_DESC PsoDesc{};
-		PsoDesc.pRootSignature = RootSignature;
-		PsoDesc.VS = { Vs->GetCompilationResult()->GetBufferPointer(), Vs->GetCompilationResult()->GetBufferSize() };
-		PsoDesc.PS = { Ps->GetCompilationResult()->GetBufferPointer(), Ps->GetCompilationResult()->GetBufferSize() };
-		PsoDesc.RasterizerState = MapRasterizerState(InPipelineStateDesc.RasterizerState);
-		PsoDesc.BlendState = MapBlendState(InPipelineStateDesc.BlendState);
-		PsoDesc.DepthStencilState.DepthEnable = false;
-		PsoDesc.DepthStencilState.StencilEnable = false;
-		PsoDesc.SampleMask = UINT_MAX;
-		PsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		PsoDesc.NumRenderTargets = 1;
-		PsoDesc.RTVFormats[0] = MapTextureFormat(InPipelineStateDesc.RtFormat);
-		PsoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
-		PsoDesc.SampleDesc.Count = 1;
-		PsoDesc.SampleDesc.Quality = 0;
-
-		TRefCountPtr<ID3D12PipelineState> Pso;
-		DxCheck(GDevice->CreateGraphicsPipelineState(&PsoDesc, IID_PPV_ARGS(Pso.GetInitReference())));
-		return new Dx12Pso(MoveTemp(Pso), MoveTemp(RootSignature),MoveTemp(Vs), MoveTemp(Ps));
+        return AUX::StaticCastRefCountPtr<GpuPipelineState>(CreateDx12Pso(InPipelineStateDesc));
 	}
 
-	void BindRenderPipelineState(RenderPipelineState* InPipelineState)
+	void SetRenderPipelineState(GpuPipelineState* InPipelineState)
 	{
 		GCommandListContext->SetPipeline(static_cast<Dx12Pso*>(InPipelineState));
 		GCommandListContext->MarkPipelineDirty(true);
 	}
 
-	void BindVertexBuffer(GpuBuffer* InVertexBuffer)
+	void SetVertexBuffer(GpuBuffer* InVertexBuffer)
 	{
 		Dx12Buffer* Vb = static_cast<Dx12Buffer*>(InVertexBuffer);
 		GCommandListContext->SetVertexBuffer(Vb);
@@ -183,21 +156,8 @@ namespace GpuApi
 		ViewPort.TopLeftY = InViewPortDesc.TopLeftY;
 
 		D3D12_RECT ScissorRect = CD3DX12_RECT(0, 0, InViewPortDesc.Width, InViewPortDesc.Height);
-		GCommandListContext->SetViewPort(MakeUnique<D3D12_VIEWPORT>(ViewPort), MakeUnique<D3D12_RECT>(ScissorRect));
+		GCommandListContext->SetViewPort(MakeUnique<D3D12_VIEWPORT>(MoveTemp(ViewPort)), MakeUnique<D3D12_RECT>(MoveTemp(ScissorRect)));
 		GCommandListContext->MarkViewportDirty(true);
-	}
-
-
-	void SetRenderTarget(GpuTexture* InGpuTexture)
-	{
-		Dx12Texture* Rt = static_cast<Dx12Texture*>(InGpuTexture);
-		GCommandListContext->SetRenderTarget(Rt);
-		GCommandListContext->MarkRenderTartgetDirty(true);
-	}
-
-	void SetClearColorValue(Vector4f ClearColor)
-	{
-		GCommandListContext->SetClearColor(MakeUnique<Vector4f>(ClearColor));
 	}
 
 	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType)
@@ -231,7 +191,7 @@ namespace GpuApi
 		CurGpuFrame = CurCpuFrame;
 
 		GCommandListContext->BindStaticFrameResource(GetCurFrameSourceIndex());
-		GDynamicFrameResourceManager.ReleaseCompletedResources();
+        GDeferredReleaseManager.ReleaseCompletedResources();
 	}
 
 	void BeginGpuCapture(const FString& SavedFileName)
@@ -253,6 +213,7 @@ namespace GpuApi
 		if (GCanGpuCapture) {
 			FlushGpu();
 			PIXEndCapture(false);
+            FPlatformMisc::MessageBoxExt(EAppMsgType::Ok, TEXT("Successfully captured the current frame."), TEXT("Message:"));
 		}
 #endif
 	}
@@ -278,6 +239,34 @@ namespace GpuApi
 		GDevice->CreateSharedHandle(Texture->GetResource(), nullptr, GENERIC_ALL, nullptr, &SharedHandle);
 		return SharedHandle;
 	}
-	
+
+    void BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName)
+    {
+        GpuApi::BeginCaptureEvent(PassName);
+        
+        //To follow metal api design, we don't keep previous the bindings when beginning a new render pass.
+        GCommandListContext->ClearBinding();
+        
+        TArray<Dx12Texture*> RTs;
+        TArray<TOptional<Vector4f>> ClearColorValues;
+        
+        for(int32 i = 0; i < PassDesc.ColorRenderTargets.Num(); i++)
+        {
+            Dx12Texture* Rt = static_cast<Dx12Texture*>(PassDesc.ColorRenderTargets[i].GetRenderTarget());
+            RTs.Add(Rt);
+            ClearColorValues.Add(PassDesc.ColorRenderTargets[i].ClearColor);
+        }
+        
+        GCommandListContext->SetRenderTargets(MoveTemp(RTs));
+        GCommandListContext->SetClearColors(MoveTemp(ClearColorValues));
+        GCommandListContext->MarkRenderTartgetDirty(true);
+        
+    }
+
+    void EndRenderPass()
+    {
+        GpuApi::EndCpatureEvent();
+    }
+        
 }
 }

@@ -2,6 +2,8 @@
 #include "D3D12Texture.h"
 #include "D3D12Device.h"
 #include "D3D12CommandList.h"
+#include "D3D12Map.h"
+
 namespace FRAMEWORK
 {
 	struct FlagSets {
@@ -11,8 +13,8 @@ namespace FRAMEWORK
 	};
 
 	Dx12Texture::Dx12Texture(D3D12_RESOURCE_STATES InState, TRefCountPtr<ID3D12Resource> InResource, GpuTextureDesc InDesc)
-		: GpuTexture(InDesc.Width, InDesc.Height, InDesc.Format)
-		, TrackedResource(InState), Resource(MoveTemp(InResource)), TexDesc(MoveTemp(InDesc))
+		: GpuTexture(MoveTemp(InDesc))
+		, TrackedResource(InState), Resource(MoveTemp(InResource))
 	{
 
 	}
@@ -90,7 +92,7 @@ namespace FRAMEWORK
 		}
 	}
 
-	TRefCountPtr<Dx12Texture> CreateDx12Texture(const GpuTextureDesc& InTexDesc)
+	TRefCountPtr<Dx12Texture> CreateDx12Texture2D(const GpuTextureDesc& InTexDesc)
 	{
 		if (!ValidateTexture(InTexDesc)) {
 			return nullptr;
@@ -135,7 +137,7 @@ namespace FRAMEWORK
 
 		if (bHasInitialData) {
 			const uint64 UploadBufferSize = GetRequiredIntermediateSize(TexResource, 0, 1);
-			TRefCountPtr<Dx12Buffer> UploadBuffer = new Dx12Buffer(UploadBufferSize, BufferUsage::Upload);
+			TRefCountPtr<Dx12Buffer> UploadBuffer = CreateDx12Buffer(UploadBufferSize, BufferUsage::Upload);
 			
 			D3D12_SUBRESOURCE_DATA textureData = {};
 			textureData.pData = &InTexDesc.InitialData[0];
@@ -150,23 +152,5 @@ namespace FRAMEWORK
 		CreateTextureView(Flags, RetTexture);
 
 		return RetTexture;
-	}
-
-	DXGI_FORMAT MapTextureFormat(GpuTextureFormat InTexFormat)
-	{
-		switch (InTexFormat)
-		{
-		case GpuTextureFormat::R8G8B8A8_UNORM:		return DXGI_FORMAT_R8G8B8A8_UNORM;
-		case GpuTextureFormat::R10G10B10A2_UNORM:	return DXGI_FORMAT_R10G10B10A2_UNORM;
-		case GpuTextureFormat::R16G16B16A16_UNORM:	return DXGI_FORMAT_R16G16B16A16_UNORM;
-		case GpuTextureFormat::R16G16B16A16_UINT:	return DXGI_FORMAT_R16G16B16A16_UINT;
-		case GpuTextureFormat::R32G32B32A32_UINT:	return DXGI_FORMAT_R32G32B32A32_UINT;
-		case GpuTextureFormat::R16G16B16A16_FLOAT:	return DXGI_FORMAT_R16G16B16A16_FLOAT;
-		case GpuTextureFormat::R32G32B32A32_FLOAT:	return DXGI_FORMAT_R32G32B32A32_FLOAT;
-		case GpuTextureFormat::R11G11B10_FLOAT:		return DXGI_FORMAT_R11G11B10_FLOAT;
-		default:
-			SH_LOG(LogDx12, Fatal, TEXT("Invalid GpuTextureFormat."));
-			return DXGI_FORMAT_R8G8B8A8_UNORM;
-		}
 	}
 }

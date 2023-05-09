@@ -5,31 +5,24 @@
 
 namespace FRAMEWORK
 {
-	class Dx12Pso : public RenderPipelineState
+	class Dx12Pso : public GpuPipelineState
 	{
 	public:
-		Dx12Pso(TRefCountPtr<ID3D12PipelineState> InPipelineState, 
-			TRefCountPtr<ID3D12RootSignature> InRootSig, 
-			TRefCountPtr<Dx12Shader> InVs, TRefCountPtr<Dx12Shader> InPs) 
-			: PipelineState(MoveTemp(InPipelineState)) 
-			, RootSig(MoveTemp(InRootSig))
-			, Vs(MoveTemp(InVs))
-			, Ps(MoveTemp(InPs))
+		Dx12Pso(TRefCountPtr<ID3D12PipelineState> InPipelineState, TRefCountPtr<ID3D12RootSignature> InRootSig)
+			: PipelineState(MoveTemp(InPipelineState))
+			, RootSignature(MoveTemp(InRootSig))
 		{}
+        
+    public:
 		ID3D12PipelineState* GetResource() const { return PipelineState; }
-		ID3D12RootSignature* GetRootSig() const { return RootSig; }
+		ID3D12RootSignature* GetRootSig() const {
+			return RootSignature;
+		}
 
 	private:
 		TRefCountPtr<ID3D12PipelineState> PipelineState;
-		TRefCountPtr<ID3D12RootSignature> RootSig;
-		TRefCountPtr<Dx12Shader> Vs;
-		TRefCountPtr<Dx12Shader> Ps;
+		TRefCountPtr<ID3D12RootSignature> RootSignature;
 	};
 
-	D3D12_RASTERIZER_DESC MapRasterizerState(RasterizerStateDesc InDesc);
-	D3D12_BLEND_DESC MapBlendState(BlendStateDesc InDesc);
-	D3D12_BLEND MapBlendFactor(BlendFactor InFactor);
-	D3D12_BLEND_OP MapBlendOp(BlendOp InOp);
-	D3D12_CULL_MODE MapRasterizerCullMode(RasterizerCullMode InMode);
-	D3D12_FILL_MODE MapRasterizerFillMode(RasterizerFillMode InMode);
+    TRefCountPtr<Dx12Pso> CreateDx12Pso(const PipelineStateDesc& InPipelineStateDesc);
 }

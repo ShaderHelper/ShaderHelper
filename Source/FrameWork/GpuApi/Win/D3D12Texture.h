@@ -12,13 +12,12 @@ namespace FRAMEWORK
 	public:
 		Dx12Texture(D3D12_RESOURCE_STATES InState, TRefCountPtr<ID3D12Resource> InResource, GpuTextureDesc InDesc);
 		~Dx12Texture();
-
+        
+    public:
 		ID3D12Resource* GetResource() const override { return Resource.GetReference(); }
-		const GpuTextureDesc& GetResourceDesc() const { return TexDesc; }
 		
 	private:
 		TRefCountPtr<ID3D12Resource> Resource;
-		GpuTextureDesc TexDesc;
 
 	public:
 		DescriptorHandle<Descriptorvisibility::CpuVisible> HandleRTV;
@@ -28,6 +27,5 @@ namespace FRAMEWORK
 		bool bIsMappingForWriting = false;
 	};
 
-	TRefCountPtr<Dx12Texture> CreateDx12Texture(const GpuTextureDesc& InTexDesc);
-	DXGI_FORMAT MapTextureFormat(GpuTextureFormat InTexFormat);
+	TRefCountPtr<Dx12Texture> CreateDx12Texture2D(const GpuTextureDesc& InTexDesc);
 }
