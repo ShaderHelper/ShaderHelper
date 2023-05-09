@@ -5,7 +5,28 @@
 #pragma comment (lib, "dxcompiler.lib")
 
 namespace FRAMEWORK
-{		
+{
+
+    TRefCountPtr<Dx12Shader> CreateDx12Shader(ShaderType InType, FString InSourceText, FString ShaderName, FString InEntryPoint)
+    {
+        FString ShaderTarget;
+        if (InType == ShaderType::VertexShader)
+        {
+			ShaderTarget = "vs_6_0";
+            
+        }
+        else if (InType == ShaderType::PixelShader)
+        {
+			ShaderTarget = "ps_6_0";
+        }
+        else
+        {
+            check(false);
+        }
+        
+        return new Dx12Shader(MoveTemp(InType), MoveTemp(InSourceText), MoveTemp(ShaderName), MoveTemp(ShaderTarget), MoveTemp(InEntryPoint));
+    }
+
 	 DxcCompiler::DxcCompiler()
 	 {
 		 DxCheck(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(Compiler.GetInitReference())));
@@ -23,9 +44,9 @@ namespace FRAMEWORK
 		TArray<const TCHAR*> Arguments;
 		Arguments.Add(TEXT("/Qstrip_debug"));
 		Arguments.Add(TEXT("/E"));
-		Arguments.Add(*InShader->EntryPoint);
+		Arguments.Add(*InShader->GetEntryPoint());
 		Arguments.Add(TEXT("/T"));
-		Arguments.Add(*InShader->ShaderTaget);
+		Arguments.Add(*InShader->GetShaderTarget());
 #if DEBUG_SHADER
 		Arguments.Add(TEXT("/Zi"));
 #endif

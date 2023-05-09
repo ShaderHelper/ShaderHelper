@@ -28,7 +28,15 @@ namespace UNITTEST_FRAMEWORK
 		func(1,2);
 	}
 
-
+    struct PrivateUnitTest
+    {
+        int GetVar() const {return Var;}
+    private:
+        int Var = 233;
+    };
+    
+    STEAL_PRIVATE_MEMBER(PrivateUnitTest, int, Var)
+    
 	void TestUtil()
 	{
 		SH_LOG(LogTestUtil, Display, TEXT("Unit Test - Util:"));
@@ -175,6 +183,14 @@ namespace UNITTEST_FRAMEWORK
 			};
 			TestFunctorToFuncPtr(AUX::FunctorToFuncPtr(f));
 		}
+        
+        //Test STEAL_PRIVATE_MEMBER
+        {
+            PrivateUnitTest t;
+            int& Var = GetPrivate_PrivateUnitTest_Var(t);
+            Var = 1;
+            SH_LOG(LogTestUtil, Display, TEXT("Test STEAL_PRIVATE_MEMBER:%d"), Var);
+        }
 
 	}
 

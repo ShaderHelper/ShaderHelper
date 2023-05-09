@@ -2,13 +2,19 @@
 #include "CommonHeader.h"
 namespace FRAMEWORK
 {
-	class Renderer : public FNoncopyable
+	class FRAMEWORK_API Renderer : public FNoncopyable
 	{
 	public:
-		Renderer() = default;
+		Renderer();
 		virtual ~Renderer() = default;
+        
 	public:
-		virtual void Render() = 0;
+        void Render();
+        
+    protected:
+        virtual void RenderInternal() {};
+        virtual void RenderBegin();
+        virtual void RenderEnd();
 	};
 }
 

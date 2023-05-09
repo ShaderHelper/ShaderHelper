@@ -10,12 +10,12 @@ namespace SH
 		ShRenderer();
 		
 	public:
-		virtual void Render() override;
+		void RenderInternal() override;
 		void OnViewportResize();
 
 	private:
-		void RenderBegin();
-		void RenderEnd();
+		void RenderBegin() override;
+		void RenderEnd() override;
 
 	public:
 		PreviewViewPort* ViewPort;
@@ -24,7 +24,7 @@ namespace SH
 		TRefCountPtr<GpuTexture> FinalRT;
 		TRefCountPtr<GpuShader> VertexShader;
 		TRefCountPtr<GpuShader> PixelShader;
-		TRefCountPtr<RenderPipelineState> PipelineState;
+		TRefCountPtr<GpuPipelineState> PipelineState;
 		bool bCanGpuCapture;
 	};
 }

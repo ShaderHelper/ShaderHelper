@@ -43,34 +43,34 @@ namespace FRAMEWORK
 		D3D12_RESOURCE_STATES CurState;
 	};
 
-	//To make sure that resources do not ahead release when allow gpu lag several frames behind cpu.
-	class DynamicFrameResourceManager
+	//To make sure that resources bound to pipeline do not ahead release when allow gpu lag several frames behind cpu.
+	class DeferredReleaseManager
 	{
 	public:
-		using DynamicResourceArr = TArray<TRefCountPtr<GpuResource>>;
+		using PendingResourceArr = TArray<TRefCountPtr<GpuResource>>;
 	public:
-		DynamicFrameResourceManager() : LastCpuFrame(0), LastGpuFrame(0) {}
+        DeferredReleaseManager() : LastCpuFrame(0), LastGpuFrame(0) {}
 		void AllocateOneFrame() {
-			FrameResources.Enqueue(DynamicResourceArr{});
+            PendingResources.Enqueue(PendingResourceArr{});
 			LastCpuFrame = CurCpuFrame;
 		}
 		void AddUncompletedResource(TRefCountPtr<GpuResource> InResource) {
-			DynamicResourceArr* DynamicResources = FrameResources.Peek();
+            PendingResourceArr* DynamicResources = PendingResources.Peek();
 			DynamicResources->Add(MoveTemp(InResource));
 		}
 		void ReleaseCompletedResources() {
 			check(LastGpuFrame <= CurGpuFrame);
 			uint64 GpuFrameIncrement = CurGpuFrame - LastGpuFrame;
 			while (GpuFrameIncrement--) {
-				FrameResources.Pop();
+                PendingResources.Pop();
 			}
 			LastGpuFrame = CurGpuFrame;
 		}
 	private:
 		uint64 LastCpuFrame;
 		uint64 LastGpuFrame;
-		TQueue<DynamicResourceArr> FrameResources;
+		TQueue<PendingResourceArr> PendingResources;
 	};
 
-	inline DynamicFrameResourceManager GDynamicFrameResourceManager;
+	inline DeferredReleaseManager GDeferredReleaseManager;
 }

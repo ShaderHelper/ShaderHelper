@@ -12,7 +12,12 @@ namespace FRAMEWORK
 	class Dx12Buffer : public GpuBuffer
 	{
 	public:
-		Dx12Buffer(uint64 BufferSize, BufferUsage InUsage);
+		Dx12Buffer(TRefCountPtr<ID3D12Resource> InResource)
+            : Resource(MoveTemp(InResource))
+            , MappedData(nullptr)
+        {}
+        
+    public:
 		ID3D12Resource* GetResource() const { return Resource; }
 		void* Map() {
 			Resource->Map(0, nullptr, static_cast<void**>(&MappedData));
@@ -31,5 +36,7 @@ namespace FRAMEWORK
 		TRefCountPtr<ID3D12Resource> Resource;
 		void* MappedData{};
 	};
+
+    TRefCountPtr<Dx12Buffer> CreateDx12Buffer(uint64 BufferSize, BufferUsage InUsage);
 
 }
