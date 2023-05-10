@@ -10,7 +10,6 @@ static FString GSavedCommandLine;
 @implementation AppDelegate
 -(void)run:(id)Arg
 {
-    FPlatformMisc::SetGracefulTerminationHandler();
     FPlatformMisc::SetCrashHandler(nullptr);
 	UNITTEST_FRAMEWORK::UE_Init(*GSavedCommandLine);
 	UNITTEST_FRAMEWORK::UnitTestConSole app;
