@@ -12,6 +12,8 @@ static FString GSavedCommandLine;
 @implementation AppDelegate
 -(void)run:(id)Arg
 {
+    FPlatformMisc::SetCrashHandler(nullptr);
+    
 	SH::UE_Init(*GSavedCommandLine);
 	SH::ShaderHelperApp app(SNew(SH::SShaderHelperWindow), MakeUnique<SH::ShRenderer>());
 	app.Run();
