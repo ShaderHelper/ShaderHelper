@@ -15,11 +15,12 @@ namespace FRAMEWORK {
 		FCommandLine::Set(CommandLine);
 		
 		//Initialize OutputDevices for features like UE_LOG, but not make log files.
+		FCommandLine::Append(TEXT(" "));
 		FCommandLine::Append(TEXT("-NODEFAULTLOG"));
 		FPlatformOutputDevices::SetupOutputDevices();
 
 		FTaskGraphInterface::Startup(FPlatformMisc::NumberOfCores());
-
+		
 		//Some interfaces with uobject in slate module depend on the CoreUobject module.
 		FModuleManager::Get().LoadModule(TEXT("CoreUObject"));
 
