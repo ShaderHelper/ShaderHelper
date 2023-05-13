@@ -1,7 +1,8 @@
 #pragma once
 #include <Widgets/SViewport.h>
 
-namespace SH {
+namespace SH 
+{
 
 	class SShaderHelperWindow :
 		public SWindow
