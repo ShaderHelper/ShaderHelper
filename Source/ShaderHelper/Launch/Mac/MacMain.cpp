@@ -3,6 +3,8 @@
 #include "UI/Widgets/SShaderHelperWindow.h"
 #include <Mac/CocoaThread.h>
 #include "Renderer/ShRenderer.h"
+#include "UI/Styles/FShaderHelperStyle.h"
+#include "UI/Styles/FAppCommonStyle.h"
 
 static FString GSavedCommandLine;
 
@@ -13,8 +15,12 @@ static FString GSavedCommandLine;
 -(void)run:(id)Arg
 {
 	SH::UE_Init(*GSavedCommandLine);
+	SH::FAppCommonStyle::Init();
+	SH::FShaderHelperStyle::Init();
+
 	SH::ShaderHelperApp app(SNew(SH::SShaderHelperWindow), MakeUnique<SH::ShRenderer>());
 	app.Run();
+	
 	SH::UE_ShutDown();
     [NSApp terminate:self];
 }

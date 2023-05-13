@@ -16,7 +16,8 @@ usage "UE"
             "UE-StandaloneRenderer",
             "UE-Projects",
             "UE-ImageWrapper",
-            "UE-CoreUObject"
+            "UE-CoreUObject",
+            "UE-InputCore"
         }
         prebuildcommands {
             "{COPYFILE} %{wks.location}/External/UE/Lib/Win/*.dll %{cfg.targetdir}",
@@ -44,7 +45,8 @@ usage "UE"
             "%{cfg.targetdir}/UE-StandaloneRenderer.dylib",
             "%{cfg.targetdir}/UE-Projects.dylib",
             "%{cfg.targetdir}/UE-ImageWrapper.dylib",
-            "%{cfg.targetdir}/UE-CoreUObject.dylib"
+            "%{cfg.targetdir}/UE-CoreUObject.dylib",
+            "%{cfg.targetdir}/UE-InputCore.dylib"
         }
         prebuildcommands {
             "{COPYFILE} %{wks.location}/External/UE/Lib/Mac/*.dylib %{cfg.targetdir}",

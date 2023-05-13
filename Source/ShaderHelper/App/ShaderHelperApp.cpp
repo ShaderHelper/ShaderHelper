@@ -9,7 +9,6 @@ namespace SH {
 	void ShaderHelperApp::Init()
 	{
 		App::Init();
-		FShaderHelperStyle::Init();
 
 		ViewPort = MakeShared<PreviewViewPort>();
 		TSharedPtr<SShaderHelperWindow> ActualWindow = StaticCastSharedPtr<SShaderHelperWindow>(AppWindow);

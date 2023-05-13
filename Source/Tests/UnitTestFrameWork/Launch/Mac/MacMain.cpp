@@ -1,6 +1,7 @@
 #include "CommonHeader.h"
 #include "App/UnitTestConSole.h"
 #include <Mac/CocoaThread.h>
+#include "UI/Styles/FAppCommonStyle.h"
 
 static FString GSavedCommandLine;
 
@@ -13,9 +14,12 @@ static FString GSavedCommandLine;
     FPlatformMisc::SetGracefulTerminationHandler();
     FPlatformMisc::SetCrashHandler(nullptr);
 	UNITTEST_FRAMEWORK::UE_Init(*GSavedCommandLine);
+	UNITTEST_FRAMEWORK::FAppCommonStyle::Init();
+
+	UNITTEST_FRAMEWORK::UnitTestConSole::SetClientSize({ 800, 600 });
 	UNITTEST_FRAMEWORK::UnitTestConSole app;
-	app.SetClientSize(FVector2D(800, 600));
     app.Run();
+	
 	UNITTEST_FRAMEWORK::UE_ShutDown();
     [NSApp terminate:self];
 }

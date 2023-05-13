@@ -30,7 +30,12 @@ namespace SH {
 		TSharedRef<FSlateStyleSet> Style = MakeShared<FSlateStyleSet>("ShaderHelperStyle");
 		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir / TEXT("Slate/Custom") );
 
-		//Style->Set("ShaderHelper.Logo", new IMAGE_BRUSH("ShaderHelperLogo",FVector2D(24,24), FStyleColors::White));
+
+		FTableRowStyle LineNumberItemStyle;
+		LineNumberItemStyle.SetEvenRowBackgroundBrush(FSlateNoResource());
+		LineNumberItemStyle.SetOddRowBackgroundBrush(FSlateNoResource());
+
+		Style->Set("LineNumberItemStyle", LineNumberItemStyle);
 		
 		return Style;
 	}
