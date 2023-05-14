@@ -1,6 +1,5 @@
 #include "CommonHeader.h"
 #include "SShaderEditorBox.h"
-#include <Widgets/Text/SMultiLineEditableText.h>
 #include "UI/Styles/FShaderHelperStyle.h"
 
 namespace SH
@@ -28,6 +27,13 @@ namespace SH
 				+ SGridPanel::Slot(0, 0)
 				[
 					SNew(SHorizontalBox)
+					+SHorizontalBox::Slot()
+					.AutoWidth()
+					[
+						SNew(SSpacer)
+						.Size(FVector2D(5, 5))
+					]
+
 					+ SHorizontalBox::Slot()
 					.AutoWidth()
 					[
@@ -48,11 +54,13 @@ namespace SH
 					+ SHorizontalBox::Slot()
 					.FillWidth(0.95f)
 					[
-						SNew(SMultiLineEditableText)
-						.Text(InArgs._Text)
+						SAssignNew(ShaderMultiLineEditableText, SMultiLineEditableText)
+						.Font(FShaderHelperStyle::Get().GetFontStyle("CodeFont"))
+						.Text(this, &SShaderEditorBox::GetShadedrCode)
 						.Marshaller(Marshaller)
 						.OnCursorMoved(this, &SShaderEditorBox::OnCursorMoved)
 						.OnTextChanged(this, &SShaderEditorBox::OnShaderTextChanged)
+						.OnTextCommitted(this, &SShaderEditorBox::OnShadedrTextCommitted)
 						.VScrollBar(VScrollBar)
 						.HScrollBar(HScrollBar)
 					]
@@ -73,10 +81,9 @@ namespace SH
 
 	void SShaderEditorBox::OnShaderTextChanged(const FText& InText)
 	{
-		const TArray< FTextLayout::FLineView >& LineViews = Marshaller->TextLayout->GetLineViews();
-		const int32 LineViewNum = LineViews.Num();
-		int32 DiffNum = FMath::Abs(LineViewNum - CurLineNum);
-		if (LineViewNum >= CurLineNum)
+		const int32 LineNum = Marshaller->TextLayout->GetLineCount();
+		int32 DiffNum = FMath::Abs(LineNum - CurLineNum);
+		if (LineNum >= CurLineNum)
 		{
 			while (DiffNum--)
 			{
@@ -89,23 +96,34 @@ namespace SH
 			while (DiffNum--)
 			{
 				CurLineNum--;
+				LineNumberSlateTexts.Pop();
 				LineNumberData.Pop();
 			}
 		}
-		
+		ShaderCode = InText.ToString();
 		LineNumberList->RequestListRefresh();
+	}
+
+	void SShaderEditorBox::OnShadedrTextCommitted(const FText& Name, ETextCommit::Type CommitInfo)
+	{
+		ShaderCode = Name.ToString();
 	}
 
 	const FLinearColor LineNumberTextColor = { 0.3f,0.3f,0.3f,0.8f };
 
 	void SShaderEditorBox::OnCursorMoved(const FTextLocation& InTextLocaction)
 	{
+		if (CurCursorLineIndex == InTextLocaction.GetLineIndex())
+		{
+			return;
+		}
+
 		LastCursorLineIndex = CurCursorLineIndex;
 		CurCursorLineIndex = InTextLocaction.GetLineIndex();
 		if (CurCursorLineIndex < LineNumberSlateTexts.Num())
 		{
 			LineNumberSlateTexts[CurCursorLineIndex]->SetColorAndOpacity(FLinearColor::White);
-			if (LastCursorLineIndex != CurCursorLineIndex && LastCursorLineIndex >= 0)
+			if (LineNumberSlateTexts.IsValidIndex(LastCursorLineIndex))
 			{
 				LineNumberSlateTexts[LastCursorLineIndex]->SetColorAndOpacity(LineNumberTextColor);
 			}
@@ -115,15 +133,17 @@ namespace SH
 	TSharedRef<ITableRow> SShaderEditorBox::GenerateRowForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
 	{
 		TSharedPtr<STextBlock> LineNumberTextBlock = SNew(STextBlock)
+			.Font(FShaderHelperStyle::Get().GetFontStyle("CodeFont"))
 			.ColorAndOpacity(LineNumberTextColor)
 			.Text(*Item)
 			.Justification(ETextJustify::Right)
 			.MinDesiredWidth(15.0f);
 
+		//if the cursor moved to a new line
 		if (CurCursorLineIndex == LineNumberSlateTexts.Num())
 		{
 			LineNumberTextBlock->SetColorAndOpacity(FLinearColor::White);
-			if (LastCursorLineIndex != CurCursorLineIndex && LastCursorLineIndex >= 0)
+			if (LineNumberSlateTexts.IsValidIndex(LastCursorLineIndex))
 			{
 				LineNumberSlateTexts[LastCursorLineIndex]->SetColorAndOpacity(LineNumberTextColor);
 			}
@@ -136,6 +156,11 @@ namespace SH
 			[
 				LineNumberTextBlock.ToSharedRef()
 			];
+	}
+
+	FText SShaderEditorBox::GetShadedrCode() const
+	{
+		return FText::FromString(ShaderCode);
 	}
 
 	void FShaderEditorMarshaller::SetText(const FString& SourceString, FTextLayout& TargetTextLayout)

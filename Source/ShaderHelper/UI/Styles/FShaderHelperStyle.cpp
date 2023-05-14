@@ -6,6 +6,7 @@
 #include <Styling/SlateStyleMacros.h>
 
 #define RootToContentDir Style->RootToContentDir
+#define TTF_FONT( RelativePath, ... ) FSlateFontInfo(RootToContentDir( RelativePath, TEXT(".ttf") ), __VA_ARGS__ )
 
 namespace SH {
 
@@ -28,7 +29,7 @@ namespace SH {
 	TSharedRef<ISlateStyle> FShaderHelperStyle::Create()
 	{
 		TSharedRef<FSlateStyleSet> Style = MakeShared<FSlateStyleSet>("ShaderHelperStyle");
-		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir / TEXT("Slate/Custom") );
+		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir / TEXT("Custom") );
 
 
 		FTableRowStyle LineNumberItemStyle;
@@ -36,10 +37,12 @@ namespace SH {
 		LineNumberItemStyle.SetOddRowBackgroundBrush(FSlateNoResource());
 
 		Style->Set("LineNumberItemStyle", LineNumberItemStyle);
+		Style->Set("CodeFont", TTF_FONT(TEXT("Fonts/Consolas"), 10));
 		
 		return Style;
 	}
 
 }
 
+#undef TTF_FONT
 #undef RootToContentDir
