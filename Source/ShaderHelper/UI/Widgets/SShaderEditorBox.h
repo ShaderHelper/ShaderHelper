@@ -25,21 +25,26 @@ namespace SH
 		
 		void Construct(const FArguments& InArgs);
 
+		void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
+
 		void OnShaderTextChanged(const FText& InText);
 		void OnShadedrTextCommitted(const FText& Name, ETextCommit::Type CommitInfo);
-		void OnCursorMoved(const FTextLocation& InTextLocaction);
 		TSharedRef<ITableRow> GenerateRowForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 
 		FText GetShadedrCode() const;
+		
+	private:
+		void UpdateLineNumberHighlight();
+		void UpdateLineNumberListViewScrollBar();
 
 	private:
-		int32 CurLineNum, CurCursorLineIndex;
-		int32 LastCursorLineIndex;
+		int32 CurLineNum;
 		TArray<LineNumberItemPtr> LineNumberData;
 		TSharedPtr<FShaderEditorMarshaller> Marshaller;
 		TSharedPtr<SMultiLineEditableText> ShaderMultiLineEditableText;
 		TSharedPtr<SListView<LineNumberItemPtr>> LineNumberList;
-		TArray<TSharedPtr<STextBlock>> LineNumberSlateTexts;
 		FString ShaderCode;
+
+		TSharedPtr<SScrollBar> ShaderMultiLineVScrollBar;
 	};
 }
