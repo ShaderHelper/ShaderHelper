@@ -29,6 +29,7 @@ namespace SH
 
 		void OnShaderTextChanged(const FText& InText);
 		void OnShadedrTextCommitted(const FText& Name, ETextCommit::Type CommitInfo);
+		FReply OnTextKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent) const;
 		TSharedRef<ITableRow> GenerateRowForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 
 		FText GetShadedrCode() const;
@@ -36,6 +37,7 @@ namespace SH
 	private:
 		void UpdateLineNumberHighlight();
 		void UpdateLineNumberListViewScrollBar();
+		void HandleAutoIndent() const;
 
 	private:
 		int32 CurLineNum;

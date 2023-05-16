@@ -123,6 +123,11 @@ public:
 	int32 GetOffset() const { return Offset; }
 	bool IsValid() const { return LineIndex != INDEX_NONE && Offset != INDEX_NONE; }
 
+	friend FORCEINLINE uint32 GetTypeHash(const FTextLocation& InSubject)
+	{
+		return HashCombine(InSubject.LineIndex, InSubject.Offset);
+	}
+
 private:
 	int32 LineIndex;
 	int32 Offset;
@@ -364,6 +369,11 @@ public:
 	 * @note This value is unscaled
 	 */
 	FVector2D GetSize() const;
+
+	/**
+	 * Get the size of the text layout that can actually be seen from the parent widget
+	 */
+	FVector2D GetViewSize() const;
 
 	/**
 	 * Get the size of the text layout, including any lines which extend beyond the wrapping boundaries (eg, lines with lots of trailing whitespace, or lines with no break candidates)
