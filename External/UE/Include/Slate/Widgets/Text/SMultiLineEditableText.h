@@ -41,6 +41,26 @@ class FSlateEditableTextLayout;
 class SLATE_API SMultiLineEditableText : public SWidget, public ISlateEditableTextWidget
 {
 public:
+
+	/** Used to merge multiple text edit transactions within a scope */
+	struct FScopedEditableTextTransaction
+	{
+	public:
+		FScopedEditableTextTransaction(TSharedPtr<SMultiLineEditableText> InText)
+			: Text(InText)
+		{
+			Text->BeginEditTransaction();
+		}
+
+		~FScopedEditableTextTransaction()
+		{
+			Text->EndEditTransaction();	
+		};
+
+	private:
+		TSharedPtr<SMultiLineEditableText> Text;
+	};
+	
 	/** Called when the cursor is moved within the text area */
 	DECLARE_DELEGATE_OneParam( FOnCursorMoved, const FTextLocation& );
 
@@ -240,6 +260,14 @@ public:
 	void GetCurrentTextLine(FString& OutTextLine) const;
 
 	/**
+	 * Fill OutTextLine with the text line at the specified index
+	 *
+	 * @param InLineIndex   Index of the line
+	 * @param OutTextLine   FString of the line
+	 */
+	void GetTextLine(const int32 InLineIndex, FString& OutTextLine) const;
+	
+	/**
 	 * Sets the text that appears when there is no text in the text box
 	 */
 	void SetHintText(const TAttribute< FText >& InHintText);
@@ -252,6 +280,12 @@ public:
 
 	/** Get the text that is currently being searched for (if any) */
 	FText GetSearchText() const;
+
+	/** Get the index of the search result (0 if none) */
+	int32 GetSearchResultIndex() const;
+
+	/** Get the total number of search results (0 if none) */
+	int32 GetNumSearchResults() const;
 
 	/** See attribute TextStyle */
 	void SetTextStyle(const FTextBlockStyle* InTextStyle);
@@ -336,11 +370,20 @@ public:
 	/** Select all the text in the document */
 	void SelectAllText();
 
+	/** Select a block of text */
+	void SelectText(const FTextLocation& InSelectionStart, const FTextLocation& InCursorLocation);
+	
 	/** Clear the active text selection */
 	void ClearSelection();
 
 	/** Get the currently selected text */
 	FText GetSelectedText() const;
+
+	/** Get the current selection */
+	FTextSelection GetSelection() const;
+
+	/** Delete any currently selected text */
+	void DeleteSelectedText();
 
 	/** Insert the given text at the current cursor position, correctly taking into account new line characters */
 	void InsertTextAtCursor(const FText& InText);
@@ -378,6 +421,9 @@ public:
 
 	/** Get the interaction position of the cursor (where to insert, delete, etc, text from/to) */
 	FTextLocation GetCursorLocation() const;
+
+	/** Get the character at Location */
+	TCHAR GetCharacterAt(const FTextLocation& Location) const;
 
 	/** Get the horizontal scroll bar widget */
 	TSharedPtr<const SScrollBar> GetHScrollBar() const;
@@ -476,6 +522,13 @@ protected:
 	virtual float UpdateAndClampHorizontalScrollBar(const float InViewOffset, const float InViewFraction, const EVisibility InVisiblityOverride) override;
 	virtual float UpdateAndClampVerticalScrollBar(const float InViewOffset, const float InViewFraction, const EVisibility InVisiblityOverride) override;
 	//~ End ISlateEditableTextWidget Interface
+
+protected:
+	/** Called to begin an undoable editable text transaction, marked as protected for use with FScopedEditableTextTransaction only */
+	void BeginEditTransaction();
+
+	/** Called to end an undoable editable text transaction, marked as protected for use with FScopedEditableTextTransaction only */
+	void EndEditTransaction();
 
 protected:
 	/** The text layout that deals with the editable text */
