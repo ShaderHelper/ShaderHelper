@@ -11,7 +11,11 @@ namespace SH
 {
 
 	const FLinearColor NormalLineNumberTextColor = { 0.3f,0.3f,0.3f,0.8f };
-	const FLinearColor HighlightLineNumberTextColor = { FLinearColor::White };
+	const FLinearColor HighlightLineNumberTextColor = { 0.7f,0.7f,0.7f,0.9f };
+
+	const FLinearColor NormalLineTipColor = { 1.0f,1.0f,1.0f,0.0f };
+	const FLinearColor HighlightLineTipColor = { 1.0f,1.0f,1.0f,0.2f };
+	
 	
 	void SShaderEditorBox::Construct(const FArguments& InArgs)
 	{
@@ -62,16 +66,30 @@ namespace SH
 					+ SHorizontalBox::Slot()
 					.FillWidth(0.95f)
 					[
-						SAssignNew(ShaderMultiLineEditableText, SMultiLineEditableText)
-						.Font(FShaderHelperStyle::Get().GetFontStyle("CodeFont"))
-						.Text(this, &SShaderEditorBox::GetShadedrCode)
-						.Marshaller(Marshaller)
-						.OnTextChanged(this, &SShaderEditorBox::OnShaderTextChanged)
-						.OnTextCommitted(this, &SShaderEditorBox::OnShadedrTextCommitted)
-						.VScrollBar(ShaderMultiLineVScrollBar)
-						.HScrollBar(HScrollBar)
-						.OnKeyCharHandler(this, &SShaderEditorBox::OnTextKeyChar)
-						.OnIsTypedCharValid_Lambda([](const TCHAR InChar) { return true; })
+						SNew(SOverlay)
+						+ SOverlay::Slot()
+						[
+							SAssignNew(ShaderMultiLineEditableText, SMultiLineEditableText)
+							.TextStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditor"))
+							.Text(this, &SShaderEditorBox::GetShadedrCode)
+							.Marshaller(Marshaller)
+							.OnTextChanged(this, &SShaderEditorBox::OnShaderTextChanged)
+							.OnTextCommitted(this, &SShaderEditorBox::OnShadedrTextCommitted)
+							.VScrollBar(ShaderMultiLineVScrollBar)
+							.HScrollBar(HScrollBar)
+							.OnKeyCharHandler(this, &SShaderEditorBox::OnTextKeyChar)
+							.OnIsTypedCharValid_Lambda([](const TCHAR InChar) { return true; })
+						]
+						+ SOverlay::Slot()
+						[
+							SAssignNew(LineTipList, SListView<LineNumberItemPtr>)
+							.ListItemsSource(&LineNumberData)
+							.SelectionMode(ESelectionMode::None)
+							.OnGenerateRow(this, &SShaderEditorBox::GenerateRowTipForItem)
+							.ScrollbarVisibility(EVisibility::Collapsed)
+							.IsFocusable(false)
+							.Visibility(EVisibility::HitTestInvisible)
+						]
 					]
 			
 				]
@@ -86,6 +104,47 @@ namespace SH
 			]
 				
 		];
+	}
+
+	void SShaderEditorBox::UpdateLineTipStyle(const double InCurrentTime)
+	{
+		
+		if (ShaderMultiLineEditableText->AnyTextSelected())
+		{
+			for (int32 i = 0; i < LineNumberData.Num(); i++)
+			{
+				LineNumberItemPtr ItemData = LineNumberData[i];
+				TSharedPtr<STableRow<LineNumberItemPtr>> ItemTableRow = StaticCastSharedPtr<STableRow<LineNumberItemPtr>>(LineTipList->WidgetFromItem(ItemData));
+				if (ItemTableRow.IsValid())
+				{
+					ItemTableRow->SetBorderBackgroundColor(NormalLineTipColor);
+				}
+			}
+			return;
+		}
+
+		const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
+		const int32 CurLineIndex = CursorLocation.GetLineIndex();
+
+		for (int32 i = 0; i < LineNumberData.Num(); i++)
+		{
+			LineNumberItemPtr ItemData = LineNumberData[i];
+			TSharedPtr<STableRow<LineNumberItemPtr>> ItemTableRow = StaticCastSharedPtr<STableRow<LineNumberItemPtr>>(LineTipList->WidgetFromItem(ItemData));
+			if (ItemTableRow.IsValid())
+			{
+				if (i == CurLineIndex)
+				{
+					float Speed = 2.0f;
+					float AnimatedOpacity = FMath::Abs((HighlightLineTipColor.A - 0.1f) * FMath::Sin(FMath::Fmod(InCurrentTime,  PI) * Speed)) + 0.1f;
+					ItemTableRow->SetBorderBackgroundColor(FLinearColor{ HighlightLineTipColor.R, HighlightLineTipColor.G, HighlightLineTipColor.B, AnimatedOpacity });
+				}
+				else
+				{
+					ItemTableRow->SetBorderBackgroundColor(NormalLineTipColor);
+				}
+				
+			}
+		}
 	}
 
 	void SShaderEditorBox::UpdateLineNumberHighlight()
@@ -113,19 +172,21 @@ namespace SH
 		}
 	}
 
-	void SShaderEditorBox::UpdateLineNumberListViewScrollBar()
+	void SShaderEditorBox::UpdateLineNumberAndTipListViewScrollBar()
 	{
 		TSharedPtr<SScrollBarTrack>& Track = GetPrivate_SScrollBar_Track(*ShaderMultiLineVScrollBar);
 		float VOffsetFraction = Track->DistanceFromTop();
 		LineNumberList->SetScrollOffset(VOffsetFraction * LineNumberList->GetNumItemsBeingObserved());
+		LineTipList->SetScrollOffset(VOffsetFraction * LineTipList->GetNumItemsBeingObserved());
 	}
 
 	void SShaderEditorBox::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
 	{
 		SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
 		
-		UpdateLineNumberListViewScrollBar();
+		UpdateLineNumberAndTipListViewScrollBar();
 		UpdateLineNumberHighlight();
+		UpdateLineTipStyle(InCurrentTime);
 	}
 
 	void SShaderEditorBox::OnShaderTextChanged(const FText& InText)
@@ -150,6 +211,7 @@ namespace SH
 		}
 		ShaderCode = InText.ToString();
 		LineNumberList->RequestListRefresh();
+		LineTipList->RequestListRefresh();
 	}
 
 	void SShaderEditorBox::OnShadedrTextCommitted(const FText& Name, ETextCommit::Type CommitInfo)
@@ -232,7 +294,7 @@ namespace SH
 				// Look for an extra close curly brace and auto-indent it as well
 				FString CurLine;
 				Text->GetTextLine(CurLineIndex, CurLine);
-
+				
 				BraceBalance = 0;
 				int32 CloseBraceOffset = 0;
 				for (const TCHAR Char : CurLine)
@@ -504,6 +566,26 @@ namespace SH
 			[
 				LineNumberTextBlock.ToSharedRef()
 			];
+	}
+
+	TSharedRef<ITableRow> SShaderEditorBox::GenerateRowTipForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
+	{
+		//DummyTextBlock is used to keep the same layout as LineNumber and MultiLineEditableText.
+		TSharedPtr<STextBlock> DummyTextBlock = SNew(STextBlock)
+			.Font(FShaderHelperStyle::Get().GetFontStyle("CodeFont"))
+			.Visibility(EVisibility::Hidden);
+
+		TSharedPtr<STableRow<LineNumberItemPtr>> LineTip = SNew(STableRow<LineNumberItemPtr>, OwnerTable)
+			.Style(&FShaderHelperStyle::Get().GetWidgetStyle<FTableRowStyle>("LineTipItemStyle"))
+			.Content()
+			[
+				DummyTextBlock.ToSharedRef()
+			];
+
+	
+		LineTip->SetBorderBackgroundColor(NormalLineTipColor);
+		
+		return LineTip.ToSharedRef();
 	}
 
 	FText SShaderEditorBox::GetShadedrCode() const

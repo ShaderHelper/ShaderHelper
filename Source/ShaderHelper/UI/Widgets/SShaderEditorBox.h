@@ -31,12 +31,14 @@ namespace SH
 		void OnShadedrTextCommitted(const FText& Name, ETextCommit::Type CommitInfo);
 		FReply OnTextKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent) const;
 		TSharedRef<ITableRow> GenerateRowForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
+		TSharedRef<ITableRow> GenerateRowTipForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 
 		FText GetShadedrCode() const;
 		
 	private:
+		void UpdateLineTipStyle(const double InCurrentTime);
 		void UpdateLineNumberHighlight();
-		void UpdateLineNumberListViewScrollBar();
+		void UpdateLineNumberAndTipListViewScrollBar();
 		void HandleAutoIndent() const;
 
 	private:
@@ -45,6 +47,7 @@ namespace SH
 		TSharedPtr<FShaderEditorMarshaller> Marshaller;
 		TSharedPtr<SMultiLineEditableText> ShaderMultiLineEditableText;
 		TSharedPtr<SListView<LineNumberItemPtr>> LineNumberList;
+		TSharedPtr<SListView<LineNumberItemPtr>> LineTipList;
 		FString ShaderCode;
 
 		TSharedPtr<SScrollBar> ShaderMultiLineVScrollBar;

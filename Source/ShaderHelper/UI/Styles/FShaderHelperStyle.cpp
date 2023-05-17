@@ -31,13 +31,25 @@ namespace SH {
 		TSharedRef<FSlateStyleSet> Style = MakeShared<FSlateStyleSet>("ShaderHelperStyle");
 		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir / TEXT("Custom") );
 
-
 		FTableRowStyle LineNumberItemStyle;
 		LineNumberItemStyle.SetEvenRowBackgroundBrush(FSlateNoResource());
 		LineNumberItemStyle.SetOddRowBackgroundBrush(FSlateNoResource());
 
 		Style->Set("LineNumberItemStyle", LineNumberItemStyle);
-		Style->Set("CodeFont", TTF_FONT(TEXT("Fonts/Consolas"), 10));
+
+		FTableRowStyle LineTipItemStyle;
+		LineTipItemStyle.SetEvenRowBackgroundBrush(FSlateColorBrush{ FLinearColor::White});
+		LineTipItemStyle.SetOddRowBackgroundBrush(FSlateColorBrush{ FLinearColor::White });
+		
+		Style->Set("LineTipItemStyle", LineTipItemStyle);
+
+		FSlateFontInfo CodeFont = TTF_FONT(TEXT("Fonts/Consolas"), 10);
+		Style->Set("CodeFont", CodeFont);
+
+		FTextBlockStyle CodeEditorTextStyle = FTextBlockStyle{ FAppStyle::Get().GetWidgetStyle<FTextBlockStyle>("NormalText") }
+			.SetFont(CodeFont)
+			.SetSelectedBackgroundColor(FLinearColor{ 0.1f , 0.3f, 1.0f, 0.4f });
+		Style->Set("CodeEditor", CodeEditorTextStyle);
 		
 		return Style;
 	}
