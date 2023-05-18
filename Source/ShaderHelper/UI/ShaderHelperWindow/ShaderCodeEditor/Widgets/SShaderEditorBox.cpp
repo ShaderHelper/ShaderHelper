@@ -22,7 +22,7 @@ namespace SH
 		SAssignNew(ShaderMultiLineVScrollBar, SScrollBar).Orientation(EOrientation::Orient_Vertical);
 		TSharedPtr<SScrollBar> HScrollBar = SNew(SScrollBar).Orientation(EOrientation::Orient_Horizontal);
 
-		Marshaller = MakeShared<FShaderEditorMarshaller>();
+		Marshaller = MakeShared<FShaderEditorMarshaller>(MakeShared<HlslHighLightTokenizer>());
 
 	    CurLineNum = 1;
 		LineNumberData = { MakeShared<FText>(FText::FromString(FString::FromInt(CurLineNum))) };
@@ -70,7 +70,7 @@ namespace SH
 						+ SOverlay::Slot()
 						[
 							SAssignNew(ShaderMultiLineEditableText, SMultiLineEditableText)
-							.TextStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditor"))
+							.TextStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText"))
 							.Text(this, &SShaderEditorBox::GetShadedrCode)
 							.Marshaller(Marshaller)
 							.OnTextChanged(this, &SShaderEditorBox::OnShaderTextChanged)
@@ -593,9 +593,23 @@ namespace SH
 		return FText::FromString(ShaderCode);
 	}
 
+	FShaderEditorMarshaller::FShaderEditorMarshaller(TSharedPtr<HlslHighLightTokenizer> InTokenizer)
+		: TextLayout(nullptr), Tokenizer(MoveTemp(InTokenizer))
+	{
+		TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::Number, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNumberText"));
+		TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::Keyword, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorKeywordText"));
+		TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::Operator, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorOperatorText"));
+		TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::BuildtinFunc, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuildtinFuncText"));
+		TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::BuildtinType, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuildtinTypeText"));
+		TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::Identifier, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText"));
+		TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::Preprocess, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorPreprocessText"));
+		TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::Comment, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorCommentText"));
+	}
+
 	void FShaderEditorMarshaller::SetText(const FString& SourceString, FTextLayout& TargetTextLayout)
 	{
 		TextLayout = &TargetTextLayout;
+		TArray<HlslHighLightTokenizer::TokenizedLine> TokenizedLines = Tokenizer->Tokenize(SourceString);
 	}
 
 	void FShaderEditorMarshaller::GetText(FString& TargetString, const FTextLayout& SourceTextLayout)

@@ -2,16 +2,29 @@
 #include <Framework/Text/BaseTextLayoutMarshaller.h>
 #include <Widgets/Views/SListView.h>
 #include <Widgets/Text/SMultiLineEditableText.h>
+#include "UI/ShaderHelperWindow/ShaderCodeEditor/ShaderCodeTokenizer.h"
 
 namespace SH
 {
 	class FShaderEditorMarshaller : public FBaseTextLayoutMarshaller
 	{
 	public:
+		FShaderEditorMarshaller(TSharedPtr<HlslHighLightTokenizer> InTokenizer);
+		
+	public:
 		virtual void SetText(const FString& SourceString, FTextLayout& TargetTextLayout) override;
 		virtual void GetText(FString& TargetString, const FTextLayout& SourceTextLayout) override;
 
+		//ReTokenize when the text changed.
+		bool RequiresLiveUpdate() const override
+		{
+			return true;
+		}
+		
+	public:
 		FTextLayout* TextLayout;
+		TSharedPtr<HlslHighLightTokenizer> Tokenizer;
+		TMap<HlslHighLightTokenizer::TokenType, FTextBlockStyle> TokenStyleMap;
 	};
 
 	class SShaderEditorBox : public SCompoundWidget
