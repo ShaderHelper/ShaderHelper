@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "SShaderHelperWindow.h"
 #include "App/ShaderHelperApp.h"
-#include "SShaderEditorBox.h"
+#include "UI/ShaderHelperWindow/ShaderCodeEditor/Widgets/SShaderEditorBox.h"
 
 namespace SH 
 {

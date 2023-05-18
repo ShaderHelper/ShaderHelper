@@ -43,13 +43,43 @@ namespace SH {
 		
 		Style->Set("LineTipItemStyle", LineTipItemStyle);
 
-		FSlateFontInfo CodeFont = TTF_FONT(TEXT("Fonts/Consolas"), 10);
+		FSlateFontInfo CodeFont = TTF_FONT(TEXT("Fonts/DroidSansMono"), 10);
 		Style->Set("CodeFont", CodeFont);
 
-		FTextBlockStyle CodeEditorTextStyle = FTextBlockStyle{ FAppStyle::Get().GetWidgetStyle<FTextBlockStyle>("NormalText") }
+		FTextBlockStyle CodeEditorNormalTextStyle = FTextBlockStyle{}
 			.SetFont(CodeFont)
-			.SetSelectedBackgroundColor(FLinearColor{ 0.1f , 0.3f, 1.0f, 0.4f });
-		Style->Set("CodeEditor", CodeEditorTextStyle);
+			.SetSelectedBackgroundColor(FLinearColor{ 0.1f , 0.3f, 1.0f, 0.4f })
+			.SetColorAndOpacity(FLinearColor::White);
+		
+		FTextBlockStyle CodeEditorOperatorTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
+			.SetColorAndOpacity(FLinearColor{1.0f, 0.65f, 0.0f, 1.0f});
+
+		FTextBlockStyle CodeEditorKeywordTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
+			.SetColorAndOpacity(FLinearColor{1.0f, 0.7f, 0.75f, 1.0f});
+
+		FTextBlockStyle CodeEditorNumberTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
+			.SetColorAndOpacity(FLinearColor{ 0.5f, 1.0f, 0.66f, 1.0f });
+
+		FTextBlockStyle CodeEditorCommentTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
+			.SetColorAndOpacity(FLinearColor::Green);
+
+		FTextBlockStyle CodeEditorBuildtinFuncTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
+			.SetColorAndOpacity(FLinearColor{0.58f, 0.0f, 0.82f,1.0f});
+
+		FTextBlockStyle CodeEditorBuildtinTypeTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
+			.SetColorAndOpacity(FLinearColor{ 0.0f, 0.75f, 1.0f, 1.0f });
+
+		FTextBlockStyle CodeEditorPreprocessTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
+			.SetColorAndOpacity(FLinearColor::Gray);
+			
+		Style->Set("CodeEditorNormalText", CodeEditorNormalTextStyle);
+		Style->Set("CodeEditorOperatorText", CodeEditorOperatorTextStyle);
+		Style->Set("CodeEditorKeywordText", CodeEditorKeywordTextStyle);
+		Style->Set("CodeEditorNumberText", CodeEditorNumberTextStyle);
+		Style->Set("CodeEditorCommentText", CodeEditorCommentTextStyle);
+		Style->Set("CodeEditorBuildtinFuncText", CodeEditorBuildtinFuncTextStyle);
+		Style->Set("CodeEditorBuildtinTypeText", CodeEditorBuildtinTypeTextStyle);
+		Style->Set("CodeEditorPreprocessText", CodeEditorPreprocessTextStyle);
 		
 		return Style;
 	}
