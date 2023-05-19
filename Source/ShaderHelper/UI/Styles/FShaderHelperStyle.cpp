@@ -51,7 +51,7 @@ namespace SH {
 			.SetSelectedBackgroundColor(FLinearColor{ 0.1f , 0.3f, 1.0f, 0.4f })
 			.SetColorAndOpacity(FLinearColor::White);
 		
-		FTextBlockStyle CodeEditorOperatorTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
+		FTextBlockStyle CodeEditorPunctuationTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
 			.SetColorAndOpacity(FLinearColor{1.0f, 0.65f, 0.0f, 1.0f});
 
 		FTextBlockStyle CodeEditorKeywordTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
@@ -73,7 +73,7 @@ namespace SH {
 			.SetColorAndOpacity(FLinearColor::Gray);
 			
 		Style->Set("CodeEditorNormalText", CodeEditorNormalTextStyle);
-		Style->Set("CodeEditorOperatorText", CodeEditorOperatorTextStyle);
+		Style->Set("CodeEditorPunctuationText", CodeEditorPunctuationTextStyle);
 		Style->Set("CodeEditorKeywordText", CodeEditorKeywordTextStyle);
 		Style->Set("CodeEditorNumberText", CodeEditorNumberTextStyle);
 		Style->Set("CodeEditorCommentText", CodeEditorCommentTextStyle);
