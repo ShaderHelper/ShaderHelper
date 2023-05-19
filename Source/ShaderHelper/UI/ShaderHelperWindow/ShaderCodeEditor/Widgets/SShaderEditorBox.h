@@ -61,7 +61,7 @@ namespace SH
 		TSharedPtr<SMultiLineEditableText> ShaderMultiLineEditableText;
 		TSharedPtr<SListView<LineNumberItemPtr>> LineNumberList;
 		TSharedPtr<SListView<LineNumberItemPtr>> LineTipList;
-		FString ShaderCode;
+		mutable FString ShaderCode;
 
 		TSharedPtr<SScrollBar> ShaderMultiLineVScrollBar;
 	};

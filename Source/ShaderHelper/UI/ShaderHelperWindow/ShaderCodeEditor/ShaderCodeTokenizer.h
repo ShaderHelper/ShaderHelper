@@ -9,12 +9,13 @@ namespace SH
 		{
 			Number,
 			Keyword,
-			Operator,
+			Punctuation,
 			BuildtinFunc,
 			BuildtinType,
 			Identifier,
 			Preprocess,
 			Comment,
+			Other,
 		};
 
 		struct Token
