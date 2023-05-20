@@ -41,12 +41,9 @@ namespace SH
 		void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 
 		void OnShaderTextChanged(const FText& InText);
-		void OnShadedrTextCommitted(const FText& Name, ETextCommit::Type CommitInfo);
 		FReply OnTextKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent) const;
 		TSharedRef<ITableRow> GenerateRowForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 		TSharedRef<ITableRow> GenerateRowTipForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
-
-		FText GetShadedrCode() const;
 		
 	private:
 		void UpdateLineTipStyle(const double InCurrentTime);
@@ -61,7 +58,6 @@ namespace SH
 		TSharedPtr<SMultiLineEditableText> ShaderMultiLineEditableText;
 		TSharedPtr<SListView<LineNumberItemPtr>> LineNumberList;
 		TSharedPtr<SListView<LineNumberItemPtr>> LineTipList;
-		mutable FString ShaderCode;
 
 		TSharedPtr<SScrollBar> ShaderMultiLineVScrollBar;
 	};

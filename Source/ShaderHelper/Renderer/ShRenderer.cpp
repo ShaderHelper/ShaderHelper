@@ -44,7 +44,6 @@ namespace SH
 
 	ShRenderer::ShRenderer() 
 		: ViewPort(nullptr)
-		, bCanGpuCapture(false)
 	{
 
 		VertexShader = GpuApi::CreateShaderFromSource(ShaderType::VertexShader, FullScreenVsText, TEXT("DefaultFullScreenVS"), TEXT("MainVS"));
@@ -75,11 +74,6 @@ namespace SH
 	void ShRenderer::RenderBegin()
 	{
         Renderer::RenderBegin();
-        
-        bCanGpuCapture = FSlateApplication::Get().GetModifierKeys().AreModifersDown(EModifierKey::Control | EModifierKey::Alt);
-        if (bCanGpuCapture) {
-            GpuApi::BeginGpuCapture(TEXT("GpuCapture"));
-        }
 	}
 
 	void ShRenderer::RenderInternal()
@@ -108,13 +102,6 @@ namespace SH
 	void ShRenderer::RenderEnd()
 	{
         Renderer::RenderEnd();
-        
-        if (bCanGpuCapture) {
-            GpuApi::EndGpuCapture();
-            //just capture one frame.
-            bCanGpuCapture = false;
-            FPlatformMisc::MessageBoxExt(EAppMsgType::Ok, TEXT("Successfully captured the current frame."), TEXT("Message:"));
-        }
 	}
 
 }

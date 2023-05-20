@@ -179,10 +179,6 @@ namespace GpuApi
 
 	void FlushGpu()
 	{
-#if USE_PIX
-		PIXSetMarker(GCommandListContext->GetCommandListHandle(), 0, TEXT("Flush"));
-#endif
-
 		Submit();
 		DxCheck(GGraphicsQueue->Signal(CpuSyncGpuFence, CurCpuFrame + 114514));
 		DxCheck(CpuSyncGpuFence->SetEventOnCompletion(CurCpuFrame + 114514, CpuSyncGpuEvent));

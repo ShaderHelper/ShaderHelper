@@ -2,7 +2,8 @@
 #include "SShaderEditorBox.h"
 #include "UI/Styles/FShaderHelperStyle.h"
 #include <Widgets/Text/SlateEditableTextLayout.h>
-#include  <Widgets/Layout/SScrollBarTrack.h>
+#include <Widgets/Layout/SScrollBarTrack.h>
+#include <Framework/Text/SlateTextRun.h>
 
 //No exposed methods, and too lazy to modify the source code for UE.
 STEAL_PRIVATE_MEMBER(SScrollBar, TSharedPtr<SScrollBarTrack>, Track)
@@ -71,10 +72,8 @@ namespace SH
 						[
 							SAssignNew(ShaderMultiLineEditableText, SMultiLineEditableText)
 							.TextStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText"))
-							.Text(this, &SShaderEditorBox::GetShadedrCode)
 							.Marshaller(Marshaller)
 							.OnTextChanged(this, &SShaderEditorBox::OnShaderTextChanged)
-							.OnTextCommitted(this, &SShaderEditorBox::OnShadedrTextCommitted)
 							.VScrollBar(ShaderMultiLineVScrollBar)
 							.HScrollBar(HScrollBar)
 							.OnKeyCharHandler(this, &SShaderEditorBox::OnTextKeyChar)
@@ -209,14 +208,8 @@ namespace SH
 				LineNumberData.Pop();
 			}
 		}
-		ShaderCode = InText.ToString();
 		LineNumberList->RequestListRefresh();
 		LineTipList->RequestListRefresh();
-	}
-
-	void SShaderEditorBox::OnShadedrTextCommitted(const FText& Name, ETextCommit::Type CommitInfo)
-	{
-		ShaderCode = Name.ToString();
 	}
 
 	static int32 GetNumSpacesAtStartOfLine(const FString& InLine)
@@ -588,16 +581,6 @@ namespace SH
 		return LineTip.ToSharedRef();
 	}
 
-	FText SShaderEditorBox::GetShadedrCode() const
-	{
-		ShaderCode = R"( 
-		float4 MainPS() : SV_Target
-		{
-			return float4(1,1,0,1);
-		})";
-		return FText::FromString(ShaderCode);
-	}
-
 	FShaderEditorMarshaller::FShaderEditorMarshaller(TSharedPtr<HlslHighLightTokenizer> InTokenizer)
 		: TextLayout(nullptr), Tokenizer(MoveTemp(InTokenizer))
 	{
@@ -616,6 +599,22 @@ namespace SH
 	{
 		TextLayout = &TargetTextLayout;
 		TArray<HlslHighLightTokenizer::TokenizedLine> TokenizedLines = Tokenizer->Tokenize(SourceString);
+		TArray<FTextLayout::FNewLineData> LinesToAdd;
+		for (const HlslHighLightTokenizer::TokenizedLine& TokenizedLine : TokenizedLines)
+		{
+			TSharedRef<FString> LineText = MakeShared<FString>(SourceString.Mid(TokenizedLine.LineRange.BeginIndex, TokenizedLine.LineRange.Len()));
+			TArray<TSharedRef<IRun>> Runs;
+			int32 RunBeginIndexInAllString = TokenizedLine.LineRange.BeginIndex;
+			for (const HlslHighLightTokenizer::Token& Token : TokenizedLine.Tokens)
+			{
+				FTextBlockStyle RunTextStyle = TokenStyleMap[Token.Type];
+				FTextRange NewTokenRange{ Token.Range.BeginIndex - RunBeginIndexInAllString, Token.Range.EndIndex - RunBeginIndexInAllString };
+				Runs.Add(FSlateTextRun::Create(FRunInfo(), LineText, MoveTemp(RunTextStyle), MoveTemp(NewTokenRange)));
+			}
+
+			LinesToAdd.Emplace(MoveTemp(LineText), MoveTemp(Runs));
+		}
+		TextLayout->AddLines(MoveTemp(LinesToAdd));
 	}
 
 	void FShaderEditorMarshaller::GetText(FString& TargetString, const FTextLayout& SourceTextLayout)
