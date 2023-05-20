@@ -25,7 +25,6 @@ namespace SH
 		TRefCountPtr<GpuShader> VertexShader;
 		TRefCountPtr<GpuShader> PixelShader;
 		TRefCountPtr<GpuPipelineState> PipelineState;
-		bool bCanGpuCapture;
 	};
 }
 

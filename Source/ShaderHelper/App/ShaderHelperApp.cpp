@@ -2,14 +2,13 @@
 #include "ShaderHelperApp.h"
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "Renderer/ShRenderer.h"
-#include "UI/Widgets/SShaderHelperWindow.h"
+#include "UI/ShaderHelperWindow/Widgets/SShaderHelperWindow.h"
 
 namespace SH {
 
 	void ShaderHelperApp::Init()
 	{
 		App::Init();
-		FShaderHelperStyle::Init();
 
 		ViewPort = MakeShared<PreviewViewPort>();
 		TSharedPtr<SShaderHelperWindow> ActualWindow = StaticCastSharedPtr<SShaderHelperWindow>(AppWindow);

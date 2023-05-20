@@ -1,8 +1,10 @@
 #include "CommonHeader.h"
 #include "SShaderHelperWindow.h"
 #include "App/ShaderHelperApp.h"
+#include "UI/ShaderHelperWindow/ShaderCodeEditor/Widgets/SShaderEditorBox.h"
 
-namespace SH {
+namespace SH 
+{
 
 	TSharedRef<SDockTab> SShaderHelperWindow::SpawnWindowTab(const FSpawnTabArgs& Args)
 	{
@@ -21,7 +23,10 @@ namespace SH {
 		}
 		else if (TabName == "CodeTab") {
 			SAssignNew(SpawnedTab, SDockTab)
-				.Label(FText::FromString("Code"));
+				.Label(FText::FromString("Code"))
+				[
+					SNew(SShaderEditorBox)
+				];
 
 		}
 		else if (TabName == "ResourceTab") {
@@ -87,6 +92,8 @@ namespace SH {
 		SWindow::Construct(SWindow::FArguments()
 			.Title(FText::FromString("ShaderHelper"))
 			.ClientSize(ShaderHelperApp::GetClientSize())
+			.MinWidth(500)
+			.MinHeight(400)
 			[
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot()

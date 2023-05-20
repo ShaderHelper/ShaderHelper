@@ -10,7 +10,6 @@ namespace UNITTEST_FRAMEWORK
 	void UnitTestConSole::Init()
 	{
 		App::Init();
-		FAppCommonStyle::Init();
 		InitLogWindow();
 	}
 
