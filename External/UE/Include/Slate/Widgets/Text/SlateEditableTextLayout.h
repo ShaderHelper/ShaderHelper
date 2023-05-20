@@ -45,6 +45,12 @@ public:
 
 	void SetSearchText(const TAttribute<FText>& InSearchText);
 	FText GetSearchText() const;
+	
+	/** Get the index of the search result (0 if none) */
+	int32 GetSearchResultIndex() const;
+	
+	/** Get the total number of search results (0 if none) */
+	int32 GetNumSearchResults() const;
 
 	void SetTextStyle(const FTextBlockStyle& InTextStyle);
 	const FTextBlockStyle& GetTextStyle() const;
@@ -78,6 +84,9 @@ public:
 	/** Get the currently selected text */
 	FText GetSelectedText() const;
 
+	/** Get the current selection*/
+	FTextSelection GetSelection() const;
+	
 	/** Set the text shaping method that the internal text layout should use */
 	void SetTextShapingMethod(const TOptional<ETextShapingMethod>& InTextShapingMethod);
 
@@ -215,6 +224,9 @@ public:
 
 	/** Select the word under the given position (the position is local to the text layout space) */
 	void SelectWordAt(const FVector2D& InLocalPosition);
+
+	/** Select a block of text */
+	void SelectText(const FTextLocation& InSelectionStart, const FTextLocation& InCursorLocation);
 
 	/** Clear the active text selection */
 	void ClearSelection();
@@ -386,6 +398,14 @@ public:
 	 */
 	void GetCurrentTextLine(FString& OutTextLine) const;
 
+	/**
+	 * Fill OutTextLine with the text line at the specified index
+	 *
+	 * @param InLineIndex   Index of the line
+	 * @param OutTextLine   FString of the line
+	 */
+	void GetTextLine(const int32 InLineIndex, FString& OutTextLine) const;
+
 private:
 	/** Insert the given text at the current cursor position, correctly taking into account new line characters */
 	void InsertTextAtCursorImpl(const FString& InString);
@@ -537,6 +557,12 @@ private:
 	/** The case-sensitivity of the active search (set from BeginSearch) */
 	ESearchCase::Type SearchCase;
 
+	/** The map to look up the index of each search result (key is the starting location of each matched string)*/
+	TMap<FTextLocation, int32> SearchResultToIndexMap;
+
+	/** The active search result index */ 
+	int32 CurrentSearchResultIndex;
+
 	/** Whether text wraps onto a new line when it's length exceeds this width; if this value is zero or negative, no wrapping occurs. */
 	TAttribute<float> WrapTextAt;
 
@@ -608,6 +634,9 @@ private:
 
 	/** Undo state that will be pushed if text is actually changed between calls to BeginEditTransation() and EndEditTransaction() */
 	TOptional<SlateEditableTextTypes::FUndoState> StateBeforeChangingText;
+
+	/** Track the number transactions that are opened */
+	int32 NumTransactionsOpened;
 
 	/** Original text undo state */
 	SlateEditableTextTypes::FUndoState OriginalText;
