@@ -29,7 +29,7 @@ namespace SH {
 	TSharedRef<ISlateStyle> FShaderHelperStyle::Create()
 	{
 		TSharedRef<FSlateStyleSet> Style = MakeShared<FSlateStyleSet>("ShaderHelperStyle");
-		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir / TEXT("Custom") );
+		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir / TEXT("Slate"));
 
 		FTableRowStyle LineNumberItemStyle;
 		LineNumberItemStyle.SetEvenRowBackgroundBrush(FSlateNoResource());

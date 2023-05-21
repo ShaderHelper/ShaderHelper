@@ -6,6 +6,7 @@
 #include <Styling/SlateStyleMacros.h>
 
 #define RootToContentDir Style->RootToContentDir
+#define TTF_FONT( RelativePath, ... ) FSlateFontInfo(RootToContentDir( RelativePath, TEXT(".ttf") ), __VA_ARGS__ )
 
 namespace FRAMEWORK
 {
@@ -46,7 +47,7 @@ namespace FRAMEWORK
 		
 		const int32 LogFontSize =  9;
 		const FTextBlockStyle NormalLogText = FTextBlockStyle(NormalText)
-			.SetFont(DEFAULT_FONT("Mono", LogFontSize))
+			.SetFont(TTF_FONT(TEXT("Fonts/DroidSansMono"), LogFontSize))
 			.SetColorAndOpacity(FStyleColors::White)
 			.SetSelectedBackgroundColor(FStyleColors::Select)
 			.SetHighlightColor(FStyleColors::Highlight);
