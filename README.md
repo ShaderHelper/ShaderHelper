@@ -1,6 +1,6 @@
 # ShaderHelper (WIP)
 
-This is a shader editor based on some special Modules from UnrealEngine (Slate, ImageWrapper ...). The engine source code is the 5.0.3 version, with only a few changes.
+This is a shader editor based on some special modules from UnrealEngine (Slate, ImageWrapper ...). The engine source code is the 5.0.3 version, with only a few changes.
 
 <p align="center">
 <img src="https://github.com/SjMxr233/ShaderHelper/blob/codeEditor/ScreenShot/App.png" width="640" height="360">
