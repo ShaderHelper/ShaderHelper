@@ -6,6 +6,7 @@ external_dxcompiler = "External/DXC"
 external_agilitysdk = "External/AgilitySDK"
 external_pix = "External/WinPixEventRuntime"
 external_mtlpp = "External/MtlppUE"
+external_shaderConductor = "External/ShaderConductor"
 
 project_shaderHelper = "Source/ShaderHelper"
 project_frameWork = "Source/FrameWork"
@@ -95,6 +96,7 @@ include(external_dxcompiler)
 include(external_agilitysdk)
 include(external_pix)
 include(external_mtlpp)
+include(external_shaderConductor)
 
 include(project_shaderHelper)
 include(project_frameWork)
