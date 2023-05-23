@@ -128,7 +128,7 @@ namespace GpuApi
 
     bool CrossCompileShader(GpuShader* InShader)
     {
-        CompileShader(InShader);
+        return CompileShader(InShader);
     }
 
 	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc)
