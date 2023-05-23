@@ -3,14 +3,14 @@
 
 #include <Windows/PreWindowsApi.h>
 THIRD_PARTY_INCLUDES_START
-#include <d3d12sdklayers.h>
-#include <dxcapi.h>
-#include <d3d12.h>
+#include "d3d12sdklayers.h"
+#include "dxcapi.h"
+#include "d3d12.h"
 //Note that the header include order. Include Agility SDK headers before windows sdk headers.
-#include <d3dx12.h>
+#include "d3dx12.h"
 #include <dxgi1_4.h>
 #if USE_PIX
-#include <pix3.h>
+#include "pix3.h"
 #include <shlobj.h>
 #include <strsafe.h>
 #endif

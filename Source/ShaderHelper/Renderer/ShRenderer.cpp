@@ -3,7 +3,6 @@
 #include "GpuApi/GpuApiInterface.h"
 namespace SH
 {
-#if PLATFORM_WINDOWS
 	const FString FullScreenVsText = R"(
 		void MainVS(
 		in uint VertID : SV_VertexID,
@@ -22,35 +21,16 @@ namespace SH
 			return float4(1,1,0,1);
 		}
 	)";
-#elif PLATFORM_MAC
-    const FString FullScreenVsText = R"(
-        using namespace metal;
-        vertex float4 MainVS(
-                           unsigned int vID [[vertex_id]])
-        {
-            float2 Tex = float2(uint2(vID, vID << 1) & 2);
-            float4 Pos = float4(mix(float2(-1, 1), float2(1, -1), Tex), 0, 1);
-            return Pos;
-        }
-    )";
-
-    const FString PsForTest = R"(
-        fragment half4 MainPS()
-        {
-            return half4(1.0, 1.0, 0.0, 1.0);
-        }
-    )";
-#endif
 
 	ShRenderer::ShRenderer() 
 		: ViewPort(nullptr)
 	{
 
 		VertexShader = GpuApi::CreateShaderFromSource(ShaderType::VertexShader, FullScreenVsText, TEXT("DefaultFullScreenVS"), TEXT("MainVS"));
-		GpuApi::CompilerShader(VertexShader);
+		GpuApi::CrossCompileShader(VertexShader);
 
 		PixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, PsForTest, TEXT("FullScreenPS"), TEXT("MainPS"));
-		GpuApi::CompilerShader(PixelShader);
+		GpuApi::CrossCompileShader(PixelShader);
 	}
 
 	void ShRenderer::OnViewportResize()
