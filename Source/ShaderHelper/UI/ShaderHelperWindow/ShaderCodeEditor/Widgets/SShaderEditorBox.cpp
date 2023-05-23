@@ -133,16 +133,9 @@ namespace SH
 			{
 				if (i == CurLineIndex)
 				{
-#if PLATFORM_WINDOWS
-#pragma warning(push)
-#pragma warning(disable : 4244)
-#endif
-					float Speed = 2.0f;
-					float AnimatedOpacity = FMath::Abs((HighlightLineTipColor.A - 0.1f) * FMath::Sin(FMath::Fmod(InCurrentTime,  PI) * Speed)) + 0.1f;
-					ItemTableRow->SetBorderBackgroundColor(FLinearColor{ HighlightLineTipColor.R, HighlightLineTipColor.G, HighlightLineTipColor.B, AnimatedOpacity });
-#if PLATFORM_WINDOWS
-#pragma warning(pop)
-#endif
+					float Speed = 1.8f;
+					double AnimatedOpacity = (HighlightLineTipColor.A - 0.1f) * FMath::Pow(FMath::Abs(FMath::Sin(InCurrentTime * Speed)),1.8) + 0.1f;
+					ItemTableRow->SetBorderBackgroundColor(FLinearColor{ HighlightLineTipColor.R, HighlightLineTipColor.G, HighlightLineTipColor.B, (float)AnimatedOpacity });
 				}
 				else
 				{
