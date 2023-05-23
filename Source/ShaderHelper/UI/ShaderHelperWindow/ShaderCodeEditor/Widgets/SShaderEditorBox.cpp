@@ -134,7 +134,7 @@ namespace SH
 				if (i == CurLineIndex)
 				{
 					float Speed = 2.0f;
-					float AnimatedOpacity = FMath::Abs((HighlightLineTipColor.A - 0.1f) * FMath::Sin(FMath::Fmod(InCurrentTime,  PI) * Speed)) + 0.1f;
+					float AnimatedOpacity = FMath::Abs((HighlightLineTipColor.A - 0.1f) * FMath::Sin(FMath::Fmod((float)InCurrentTime,  PI) * Speed)) + 0.1f;
 					ItemTableRow->SetBorderBackgroundColor(FLinearColor{ HighlightLineTipColor.R, HighlightLineTipColor.G, HighlightLineTipColor.B, AnimatedOpacity });
 				}
 				else

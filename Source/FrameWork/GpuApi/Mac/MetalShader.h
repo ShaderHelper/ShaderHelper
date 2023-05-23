@@ -17,6 +17,7 @@ namespace FRAMEWORK
         }
         
     public:
+        ShaderType GetShaderType() const {return Type;}
         const FString& GetSourceText() const { return SourceText; }
         const FString& GetEntryPoint() const { return EntryPoint; }
         id<MTLFunction> GetCompilationResult() const { return ByteCodeFunc; }
@@ -34,6 +35,9 @@ namespace FRAMEWORK
     
     TRefCountPtr<MetalShader> CreateMetalShader(ShaderType InType, FString InSourceText, FString ShaderName,
                                                 FString InEntryPoint);
+
     bool CompileShader(TRefCountPtr<MetalShader> InShader);
+    
+    bool CompileShaderFromHlsl(TRefCountPtr<MetalShader> InShader);
 }
 

@@ -24,6 +24,7 @@ ue_uhtIncludeDir = {
 
 function generateIncludeDir_ue()
     externalincludedirs(_WORKING_DIR .. "/External/UE/Include")
+    externalwarnings("off")
 
     for _, v in pairs(ue_baseIncludeDir) do
         externalincludedirs(v)

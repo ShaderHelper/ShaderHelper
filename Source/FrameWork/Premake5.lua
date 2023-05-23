@@ -26,7 +26,7 @@ project "FrameWork"
 	}
 
     uses {
-        "UE"
+        "UE", "ShaderConductor"
     }
 
     filter "system:windows"

@@ -121,11 +121,15 @@ namespace GpuApi
 		return AUX::StaticCastRefCountPtr<GpuShader>(CreateDx12Shader(InType, MoveTemp(InSourceText), MoveTemp(InShaderName), MoveTemp(EntryPoint)));
 	}
 
-	bool CompilerShader(GpuShader* InShader)
+	bool CompileShader(GpuShader* InShader)
 	{
 		return GShaderCompiler.Compile(static_cast<Dx12Shader*>(InShader));
 	}
 
+    bool CrossCompileShader(GpuShader* InShader)
+    {
+        CompileShader(InShader);
+    }
 
 	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc)
 	{

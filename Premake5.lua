@@ -12,8 +12,7 @@ project_shaderHelper = "Source/ShaderHelper"
 project_frameWork = "Source/FrameWork"
 project_unitTestFrameWork = "Source/Tests/UnitTestFrameWork"
 
-workspace "ShaderHelper"  
-    architecture "x64"    
+workspace "ShaderHelper"    
     configurations 
     { 
         "Debug",
@@ -32,6 +31,7 @@ workspace "ShaderHelper"
     startproject "ShaderHelper"
 
     filter "system:windows"
+        architecture "x86_64"  
         targetname "%{prj.name}-%{cfg.buildcfg}"
         systemversion "latest"
         runtime "Release"
@@ -58,6 +58,7 @@ workspace "ShaderHelper"
         }
 
     filter "system:macosx"
+        architecture "universal"
         --Premake can not link the corresponding "SharedLib" project in Xcode when targetname contains build configuration.
         targetname "%{prj.name}"
         targetdir ("Binaries/Mac")
