@@ -26,7 +26,7 @@ project "FrameWork"
 	}
 
     uses {
-        "UE", "ShaderConductor"
+        "UE"
     }
 
     filter "system:windows"
@@ -43,7 +43,9 @@ project "FrameWork"
         }
 
     filter "system:macosx"
-        private_uses { "MtlppUE" }
+        private_uses { 
+            "MtlppUE", "ShaderConductor"
+        }
 
 usage "FrameWork"
     --Note that "DLLIMPORT" macro is defined by UE module. (see MacPlatform.h, WindowsPlatform.h)
