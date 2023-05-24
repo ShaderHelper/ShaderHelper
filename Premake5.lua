@@ -62,7 +62,11 @@ workspace "ShaderHelper"
         --Premake can not link the corresponding "SharedLib" project in Xcode when targetname contains build configuration.
         targetname "%{prj.name}"
         targetdir ("Binaries/Mac")
-        xcodebuildsettings { ["MACOSX_DEPLOYMENT_TARGET"] = "10.15" }
+        xcodebuildsettings { 
+            ["MACOSX_DEPLOYMENT_TARGET"] = "10.15",
+            --This must be set to YES on arm64 mac.
+            ["ENABLE_STRICT_OBJC_MSGSEND"] = "YES",
+        }
         runpathdirs {
             "%{cfg.targetdir}",
             "%{cfg.targetdir}/../../../ "
