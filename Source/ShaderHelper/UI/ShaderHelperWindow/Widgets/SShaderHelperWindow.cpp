@@ -26,6 +26,8 @@ namespace SH
 				.Label(FText::FromString("Code"))
 				[
 					SNew(SShaderEditorBox)
+						.Text(FText::FromString(ShRenderer::DefaultPixelShaderText))
+						.Renderer(Renderer)
 				];
 
 		}
@@ -41,6 +43,8 @@ namespace SH
 
 	void SShaderHelperWindow::Construct(const FArguments& InArgs)
 	{
+		Renderer = InArgs._Renderer;
+
 		TSharedRef<SDockTab> NewTab = SNew(SDockTab).TabRole(ETabRole::MajorTab);
 		TabManager = FGlobalTabmanager::Get()->NewTabManager(NewTab);
 		TabManager->RegisterTabSpawner("PreviewTab", FOnSpawnTab::CreateRaw(this, &SShaderHelperWindow::SpawnWindowTab))

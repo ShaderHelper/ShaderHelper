@@ -4,6 +4,7 @@
 #include <Widgets/Text/SlateEditableTextLayout.h>
 #include <Widgets/Layout/SScrollBarTrack.h>
 #include <Framework/Text/SlateTextRun.h>
+#include "GpuApi/GpuApiInterface.h"
 
 //No exposed methods, and too lazy to modify the source code for UE.
 STEAL_PRIVATE_MEMBER(SScrollBar, TSharedPtr<SScrollBarTrack>, Track)
@@ -20,14 +21,30 @@ namespace SH
 	
 	void SShaderEditorBox::Construct(const FArguments& InArgs)
 	{
+		Renderer = InArgs._Renderer;
 		SAssignNew(ShaderMultiLineVScrollBar, SScrollBar).Orientation(EOrientation::Orient_Vertical);
 		TSharedPtr<SScrollBar> HScrollBar = SNew(SScrollBar).Orientation(EOrientation::Orient_Horizontal);
 
 		Marshaller = MakeShared<FShaderEditorMarshaller>(MakeShared<HlslHighLightTokenizer>());
 
-	    CurLineNum = 1;
-		LineNumberData = { MakeShared<FText>(FText::FromString(FString::FromInt(CurLineNum))) };
-
+		TArray<FTextRange> LineRanges;
+		FTextRange::CalculateLineRangesFromString(InArgs._Text.ToString(), LineRanges);
+		if (LineRanges.Num() > 0)
+		{
+			int32 LineNums = LineRanges.Num();
+			CurLineNum = 0;
+			while (LineNums--)
+			{
+				CurLineNum++;
+				LineNumberData.Add(MakeShared<FText>(FText::FromString(FString::FromInt(CurLineNum))));
+			}
+		}
+		else
+		{
+			CurLineNum = 1;
+			LineNumberData.Add(MakeShared<FText>(FText::FromString(FString::FromInt(CurLineNum))));
+		}
+		
 		ChildSlot
 		[
 			SNew(SBorder)
@@ -71,6 +88,7 @@ namespace SH
 						+ SOverlay::Slot()
 						[
 							SAssignNew(ShaderMultiLineEditableText, SMultiLineEditableText)
+							.Text(InArgs._Text)
 							.TextStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText"))
 							.Marshaller(Marshaller)
 							.OnTextChanged(this, &SShaderEditorBox::OnShaderTextChanged)
@@ -210,6 +228,16 @@ namespace SH
 		}
 		LineNumberList->RequestListRefresh();
 		LineTipList->RequestListRefresh();
+
+		TRefCountPtr<GpuShader> NewPixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, InText.ToString(), {}, TEXT("MainPS"));
+		if (GpuApi::CrossCompileShader(NewPixelShader))
+		{
+			Renderer->UpdatePixelShader(MoveTemp(NewPixelShader));
+		}
+		else
+		{
+			
+		}
 	}
 
 	static int32 GetNumSpacesAtStartOfLine(const FString& InLine)

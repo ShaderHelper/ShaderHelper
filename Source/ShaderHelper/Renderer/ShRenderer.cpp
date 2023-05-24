@@ -3,7 +3,7 @@
 #include "GpuApi/GpuApiInterface.h"
 namespace SH
 {
-	const FString FullScreenVsText = R"(
+	const FString ShRenderer::DefaultVertexShaderText = R"(
 		void MainVS(
 		in uint VertID : SV_VertexID,
 		out float4 Pos : SV_Position,
@@ -15,21 +15,19 @@ namespace SH
 		}
 	)";
 
-	const FString PsForTest = R"(
-		float4 MainPS() : SV_Target
-		{
-			return float4(1,1,0,1);
-		}
-	)";
-
+	const FString ShRenderer::DefaultPixelShaderText = R"(float4 MainPS() : SV_Target
+{
+	return float4(1,1,0,1);
+})";
+	
 	ShRenderer::ShRenderer() 
 		: ViewPort(nullptr)
 	{
 
-		VertexShader = GpuApi::CreateShaderFromSource(ShaderType::VertexShader, FullScreenVsText, TEXT("DefaultFullScreenVS"), TEXT("MainVS"));
+		VertexShader = GpuApi::CreateShaderFromSource(ShaderType::VertexShader, DefaultVertexShaderText, TEXT("DefaultFullScreenVS"), TEXT("MainVS"));
 		GpuApi::CrossCompileShader(VertexShader);
 
-		PixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, PsForTest, TEXT("FullScreenPS"), TEXT("MainPS"));
+		PixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, DefaultPixelShaderText, {}, TEXT("MainPS"));
 		GpuApi::CrossCompileShader(PixelShader);
 	}
 
@@ -40,15 +38,24 @@ namespace SH
 		GpuTextureDesc Desc{ (uint32)ViewPort->GetSize().X, (uint32)ViewPort->GetSize().Y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::Shared | GpuTextureUsage::RenderTarget };
 		FinalRT = GpuApi::CreateGpuTexture(Desc);
 		ViewPort->SetViewPortRenderTexture(FinalRT);
+		ReCreatePipelineState();
+		Render();
+	}
 
+	void ShRenderer::UpdatePixelShader(TRefCountPtr<GpuShader> NewPixelShader)
+	{
+		PixelShader = MoveTemp(NewPixelShader);
+		ReCreatePipelineState();
+	}
+
+	void ShRenderer::ReCreatePipelineState()
+	{
 		check(FinalRT.IsValid());
-        PipelineStateDesc::RtFormatStorageType RenderTargetFormats{ FinalRT->GetFormat() };
+		PipelineStateDesc::RtFormatStorageType RenderTargetFormats{ FinalRT->GetFormat() };
 		PipelineStateDesc PipelineDesc{
 			VertexShader, PixelShader, RasterizerStateDesc{RasterizerFillMode::Solid, RasterizerCullMode::None}, GpuResourceHelper::GDefaultBlendStateDesc, RenderTargetFormats
 		};
 		PipelineState = GpuApi::CreateRenderPipelineState(PipelineDesc);
-	
-		Render();
 	}
 
 	void ShRenderer::RenderBegin()

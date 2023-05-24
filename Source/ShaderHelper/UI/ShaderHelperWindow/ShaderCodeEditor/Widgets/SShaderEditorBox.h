@@ -3,6 +3,7 @@
 #include <Widgets/Views/SListView.h>
 #include <Widgets/Text/SMultiLineEditableText.h>
 #include "UI/ShaderHelperWindow/ShaderCodeEditor/ShaderCodeTokenizer.h"
+#include "Renderer/ShRenderer.h"
 
 namespace SH
 {
@@ -32,8 +33,11 @@ namespace SH
 	public:
 		using LineNumberItemPtr = TSharedPtr<FText>;
 
-		SLATE_BEGIN_ARGS(SShaderEditorBox) {}
+		SLATE_BEGIN_ARGS(SShaderEditorBox) 
+			: _Renderer(nullptr)
+		{}
 			SLATE_ARGUMENT(FText, Text)
+			SLATE_ARGUMENT(ShRenderer*, Renderer)
 		SLATE_END_ARGS()
 		
 		void Construct(const FArguments& InArgs);
@@ -58,7 +62,7 @@ namespace SH
 		TSharedPtr<SMultiLineEditableText> ShaderMultiLineEditableText;
 		TSharedPtr<SListView<LineNumberItemPtr>> LineNumberList;
 		TSharedPtr<SListView<LineNumberItemPtr>> LineTipList;
-
 		TSharedPtr<SScrollBar> ShaderMultiLineVScrollBar;
+		ShRenderer* Renderer;
 	};
 }
