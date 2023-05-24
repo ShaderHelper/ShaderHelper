@@ -20,7 +20,9 @@ static FString GSavedCommandLine;
 	SH::FAppCommonStyle::Init();
 	SH::FShaderHelperStyle::Init();
 
-	SH::ShaderHelperApp app(SNew(SH::SShaderHelperWindow), MakeUnique<SH::ShRenderer>());
+	TUniquePtr<SH::ShRenderer> Renderer = MakeUnique<SH::ShRenderer>();
+	TSharedRef<SH::SShaderHelperWindow> Window = SNew(SH::SShaderHelperWindow).Renderer(Renderer.Get());
+	SH::ShaderHelperApp app(MoveTemp(Window), MoveTemp(Renderer));
 	app.Run();
 	
 	SH::UE_ShutDown();

@@ -12,13 +12,17 @@ namespace SH
 	public:
 		void RenderInternal() override;
 		void OnViewportResize();
+		void UpdatePixelShader(TRefCountPtr<GpuShader> NewPixelShader);
 
 	private:
 		void RenderBegin() override;
 		void RenderEnd() override;
+		void ReCreatePipelineState();
 
 	public:
 		PreviewViewPort* ViewPort;
+		static const FString DefaultVertexShaderText;
+		static const FString DefaultPixelShaderText;
 			
 	private:
 		TRefCountPtr<GpuTexture> FinalRT;
