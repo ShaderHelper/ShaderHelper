@@ -12,6 +12,11 @@ project_shaderHelper = "Source/ShaderHelper"
 project_frameWork = "Source/FrameWork"
 project_unitTestFrameWork = "Source/Tests/UnitTestFrameWork"
 
+newoption {
+    trigger = "UniversalBinary",
+    description = "Build universal app that supports arm64 and x86",
+}
+
 workspace "ShaderHelper"    
     configurations 
     { 
@@ -76,6 +81,12 @@ workspace "ShaderHelper"
             "-fvisibility=hidden",
             "-fvisibility-inlines-hidden",  
         }
+        if _OPTIONS["UniversalBinary"] then
+            xcodebuildsettings {
+                ["ARCHS"] = "x86_64 arm64",
+                ["ONLY_ACTIVE_ARCH"] = "No",
+            }
+        end
 
     filter {"system:macosx","kind:SharedLib"}
         xcodebuildsettings { ["DYLIB_INSTALL_NAME_BASE"] = "@rpath" }

@@ -18,7 +18,13 @@ fi
 xattr -d com.apple.quarantine $PremakePath 2>/dev/null
 
 echo "Premake5: Processing..."
-$PremakePath xcode4 || Error
+
+if [ "$#" -eq 1 ] && [ "$1" == "-UniversalBinary" ]; then
+    $PremakePath --UniversalBinary xcode4 || Error
+else
+    $PremakePath xcode4 || Error
+fi
+
 echo "Premake5 Complete"
 
 echo "Generate LLDB Visualizers..."
