@@ -43,11 +43,14 @@ namespace SH {
 		
 		Style->Set("LineTipItemStyle", LineTipItemStyle);
 
-		FSlateFontInfo CodeFont = TTF_FONT(TEXT("Fonts/DroidSansMono"), 10);
-		Style->Set("CodeFont", CodeFont);
+        TSharedRef<FCompositeFont> CodeFont = MakeShared<FStandaloneCompositeFont>();
+        CodeFont->DefaultTypeface.AppendFont(TEXT("Code"), BaseResourcePath::UE_SlateFontDir / TEXT("DroidSansMono.ttf"), EFontHinting::Default, EFontLoadingPolicy::LazyLoad);
+        CodeFont->FallbackTypeface.Typeface.AppendFont(TEXT("Code"), BaseResourcePath::UE_SlateFontDir / TEXT("DroidSansFallback.ttf"), EFontHinting::Default, EFontLoadingPolicy::LazyLoad);
+        FSlateFontInfo CodeFontInfo = FSlateFontInfo(CodeFont, 10);
+        Style->Set("CodeFont", CodeFontInfo);
 
 		FTextBlockStyle CodeEditorNormalTextStyle = FTextBlockStyle{}
-			.SetFont(CodeFont)
+			.SetFont(CodeFontInfo)
 			.SetSelectedBackgroundColor(FLinearColor{ 0.1f , 0.3f, 1.0f, 0.4f })
 			.SetColorAndOpacity(FLinearColor::White);
 		
