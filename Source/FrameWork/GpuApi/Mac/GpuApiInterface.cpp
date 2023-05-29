@@ -29,13 +29,14 @@ namespace GpuApi
 
 	void StartRenderFrame()
 	{
+        GCaptureScope.BeginScope();
         GetCommandListContext()->SetCommandBuffer(GCommandQueue.CommandBuffer());
 	}
 
 	void EndRenderFrame()
 	{
         FlushGpu();
-        GCommandQueue.InsertDebugCaptureBoundary();
+        GCaptureScope.EndScope();
 	}
 
 	TRefCountPtr<GpuTexture> CreateGpuTexture(const GpuTextureDesc& InTexDesc)

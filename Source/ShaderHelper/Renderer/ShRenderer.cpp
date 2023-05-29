@@ -71,7 +71,7 @@ namespace SH
 		if (FinalRT.IsValid())
 		{
             GpuRenderPassDesc FullScreenPassDesc;
-            FullScreenPassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{FinalRT});
+            FullScreenPassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{FinalRT, RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store});
             
             GpuApi::BeginRenderPass(FullScreenPassDesc, TEXT("FullScreenPass"));
 			GpuApi::SetVertexBuffer(nullptr);

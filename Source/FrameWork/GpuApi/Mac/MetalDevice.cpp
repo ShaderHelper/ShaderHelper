@@ -10,5 +10,7 @@ namespace FRAMEWORK
 //        CpuSyncGpuSemaphore = dispatch_semaphore_create(AllowableLag);
         
         GCaptureScope = mtlpp::CaptureManager::SharedCaptureManager().NewCaptureScopeWithDevice(GDevice);
+        GCaptureScope.SetLabel(@"Default Capture Scope");
+        mtlpp::CaptureManager::SharedCaptureManager().SetDefaultCaptureScope(GCaptureScope);
     }
 }
