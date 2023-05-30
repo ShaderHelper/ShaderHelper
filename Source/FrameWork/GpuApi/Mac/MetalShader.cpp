@@ -70,7 +70,9 @@ namespace FRAMEWORK
         
         FString MslSourceText = {static_cast<const char*>(Result.target.Data()), (int32)Result.target.Size()};
         TRefCountPtr<MetalShader> TempShader = new MetalShader{InShader->GetShaderType(), MoveTemp(MslSourceText), {}, InShader->GetEntryPoint()};
-        bool IsSuccessfullyCompiledMsl = CompileShader(TempShader);
+        
+        FString MslErrorInfo;
+        bool IsSuccessfullyCompiledMsl = CompileShader(TempShader, MslErrorInfo);
         
         if(!IsSuccessfullyCompiledMsl)
         {
