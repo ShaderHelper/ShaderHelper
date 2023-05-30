@@ -23,7 +23,7 @@ namespace SH
 	{
 		Renderer = InArgs._Renderer;
 		SAssignNew(ShaderMultiLineVScrollBar, SScrollBar).Orientation(EOrientation::Orient_Vertical);
-		TSharedPtr<SScrollBar> HScrollBar = SNew(SScrollBar).Orientation(EOrientation::Orient_Horizontal);
+		SAssignNew(ShaderMultiLineHScrollBar, SScrollBar).Orientation(EOrientation::Orient_Horizontal);
 
 		Marshaller = MakeShared<FShaderEditorMarshaller>(MakeShared<HlslHighLightTokenizer>());
 
@@ -87,15 +87,29 @@ namespace SH
 						SNew(SOverlay)
 						+ SOverlay::Slot()
 						[
-							SAssignNew(ShaderMultiLineEditableText, SMultiLineEditableText)
-							.Text(InArgs._Text)
-							.TextStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText"))
-							.Marshaller(Marshaller)
-							.OnTextChanged(this, &SShaderEditorBox::OnShaderTextChanged)
-							.VScrollBar(ShaderMultiLineVScrollBar)
-							.HScrollBar(HScrollBar)
-							.OnKeyCharHandler(this, &SShaderEditorBox::OnTextKeyChar)
-							.OnIsTypedCharValid_Lambda([](const TCHAR InChar) { return true; })
+							SNew(SOverlay)
+							+ SOverlay::Slot()
+							[
+								SAssignNew(ShaderMultiLineEditableText, SMultiLineEditableText)
+								.Text(InArgs._Text)
+								.TextStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText"))
+								.Marshaller(Marshaller)
+								.OnTextChanged(this, &SShaderEditorBox::OnShaderTextChanged)
+								.VScrollBar(ShaderMultiLineVScrollBar)
+								.HScrollBar(ShaderMultiLineHScrollBar)
+								.OnKeyCharHandler(this, &SShaderEditorBox::OnTextKeyChar)
+								.OnIsTypedCharValid_Lambda([](const TCHAR InChar) { return true; })
+							]
+							+ SOverlay::Slot()
+							[
+								SAssignNew(LineErrorInfoList, SListView<LineNumberItemPtr>)
+								.ListItemsSource(&LineNumberData)
+								.SelectionMode(ESelectionMode::None)
+								.OnGenerateRow(this, &SShaderEditorBox::GenerateErrorInfoForItem)
+								.ScrollbarVisibility(EVisibility::Collapsed)
+								.IsFocusable(false)
+								.Visibility(EVisibility::HitTestInvisible)
+							]
 						]
 						+ SOverlay::Slot()
 						[
@@ -116,7 +130,7 @@ namespace SH
 				]
 				+ SGridPanel::Slot(0, 1)
 				[
-					HScrollBar.ToSharedRef()
+					ShaderMultiLineHScrollBar.ToSharedRef()
 				]
 			]
 				
@@ -189,21 +203,47 @@ namespace SH
 		}
 	}
 
-	void SShaderEditorBox::UpdateLineNumberAndTipListViewScrollBar()
+	void SShaderEditorBox::UpdateListViewScrollBar()
 	{
 		TSharedPtr<SScrollBarTrack>& Track = GetPrivate_SScrollBar_Track(*ShaderMultiLineVScrollBar);
 		float VOffsetFraction = Track->DistanceFromTop();
 		LineNumberList->SetScrollOffset(VOffsetFraction * LineNumberList->GetNumItemsBeingObserved());
 		LineTipList->SetScrollOffset(VOffsetFraction * LineTipList->GetNumItemsBeingObserved());
+		LineErrorInfoList->SetScrollOffset(VOffsetFraction * LineTipList->GetNumItemsBeingObserved());
+	}
+
+	void SShaderEditorBox::UpdateErrorInfo()
+	{
+		for (int32 i = 0; i < LineNumberData.Num(); i++)
+		{
+			LineNumberItemPtr ItemData = LineNumberData[i];
+			TSharedPtr<ITableRow> ItemTableRow = LineErrorInfoList->WidgetFromItem(ItemData);
+			if (ItemTableRow.IsValid())
+			{
+				TSharedPtr<STextBlock> ItemWidget = StaticCastSharedPtr<STextBlock>(ItemTableRow->GetContent());
+				if (LineNumToErrorInfo.Contains(i + 1))
+				{
+					ItemWidget->SetText(FText::FromString(LineNumToErrorInfo[i+1]));
+					ItemWidget->SetVisibility(EVisibility::Visible);
+				}
+				else
+				{
+					ItemWidget->SetVisibility(EVisibility::Hidden);
+				}			
+			}
+		}
+
+		//ShaderMultiLineEditableText->SetMargin(FMargin{0, 0, 1000.0f, 0});
 	}
 
 	void SShaderEditorBox::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
 	{
 		SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
 		
-		UpdateLineNumberAndTipListViewScrollBar();
+		UpdateListViewScrollBar();
 		UpdateLineNumberHighlight();
 		UpdateLineTipStyle(InCurrentTime);
+		UpdateErrorInfo();
 	}
 
 	void SShaderEditorBox::OnShaderTextChanged(const FText& InText)
@@ -228,15 +268,36 @@ namespace SH
 		}
 		LineNumberList->RequestListRefresh();
 		LineTipList->RequestListRefresh();
+		LineErrorInfoList->RequestListRefresh();
 
 		TRefCountPtr<GpuShader> NewPixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, InText.ToString(), {}, TEXT("MainPS"));
-		if (GpuApi::CrossCompileShader(NewPixelShader))
+		FString ErrorInfo;
+		LineNumToErrorInfo.Reset();
+		if (GpuApi::CrossCompileShader(NewPixelShader, ErrorInfo))
 		{
 			Renderer->UpdatePixelShader(MoveTemp(NewPixelShader));
 		}
 		else
 		{
-			
+			TArray<ShaderErrorInfo> ErrorInfos = ParseErrorInfoFromDxc(ErrorInfo);
+			for (const ShaderErrorInfo& ErrorInfo : ErrorInfos)
+			{
+				if (!LineNumToErrorInfo.Contains(ErrorInfo.Row))
+				{
+					FString LineText;
+					ShaderMultiLineEditableText->GetTextLine(ErrorInfo.Row - 1, LineText);
+
+					FString DummyText;
+					int32 LineTextNum = LineText.Len();
+					while (LineTextNum--)
+					{
+						DummyText += " ";
+					}
+
+					FString DisplayInfo = DummyText + TEXT("    ◆ ") + ErrorInfo.Info;
+					LineNumToErrorInfo.Add(ErrorInfo.Row, MoveTemp(DisplayInfo));
+				}
+			}
 		}
 	}
 
@@ -607,6 +668,21 @@ namespace SH
 		LineTip->SetBorderBackgroundColor(NormalLineTipColor);
 		
 		return LineTip.ToSharedRef();
+	}
+
+	TSharedRef<ITableRow> SShaderEditorBox::GenerateErrorInfoForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
+	{
+		TSharedPtr<STextBlock> ErrorInfoTextBlock = SNew(STextBlock)
+			.Font(FShaderHelperStyle::Get().GetFontStyle("CodeFont"))
+			.ColorAndOpacity(FLinearColor::Red)
+			.Visibility(EVisibility::Hidden);
+
+		return SNew(STableRow<LineNumberItemPtr>, OwnerTable)
+			.Style(&FShaderHelperStyle::Get().GetWidgetStyle<FTableRowStyle>("LineNumberItemStyle"))
+			.Content()
+			[
+				ErrorInfoTextBlock.ToSharedRef()
+			];
 	}
 
 	FShaderEditorMarshaller::FShaderEditorMarshaller(TSharedPtr<HlslHighLightTokenizer> InTokenizer)

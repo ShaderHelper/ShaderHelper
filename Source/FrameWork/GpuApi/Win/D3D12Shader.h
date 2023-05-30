@@ -40,7 +40,7 @@ namespace FRAMEWORK
 	{
 	public:
 		DxcCompiler();
-		bool Compile(TRefCountPtr<Dx12Shader> InShader) const;
+		bool Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo) const;
 
 	private:
 		TRefCountPtr<IDxcLibrary> CompilerLibrary;
