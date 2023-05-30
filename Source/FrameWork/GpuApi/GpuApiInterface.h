@@ -22,9 +22,9 @@ namespace GpuApi
 
 	FRAMEWORK_API TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName, FString EntryPoint);
     //Accept each platform's own shader.
-	FRAMEWORK_API bool CompileShader(GpuShader* InShader);
+	FRAMEWORK_API bool CompileShader(GpuShader* InShader, FString& OutErrorInfo);
     //Accept hlsl.
-    FRAMEWORK_API bool CrossCompileShader(GpuShader* InShader);
+    FRAMEWORK_API bool CrossCompileShader(GpuShader* InShader, FString& OutErrorInfo);
 
 	FRAMEWORK_API TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc);
 	FRAMEWORK_API void SetRenderPipelineState(GpuPipelineState* InPipelineState);

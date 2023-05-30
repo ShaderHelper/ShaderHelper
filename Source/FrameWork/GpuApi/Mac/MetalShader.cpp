@@ -10,7 +10,7 @@ namespace FRAMEWORK
         return new MetalShader(MoveTemp(InType), MoveTemp(InSourceText), MoveTemp(ShaderName), MoveTemp(InEntryPoint));
     }
 
-    bool CompileShader(TRefCountPtr<MetalShader> InShader)
+    bool CompileShader(TRefCountPtr<MetalShader> InShader, FString& OutErrorInfo)
     {
         ns::AutoReleasedError Err;
         mtlpp::CompileOptions CompOpt;
@@ -18,6 +18,7 @@ namespace FRAMEWORK
         
         if(!ByteCodeLib) {
             SH_LOG(LogMetal, Error, TEXT("Shader compilation failed: %s"), ConvertOcError(Err.GetPtr()));
+			OutErrorInfo = ConvertOcError(Err.GetPtr());
             return false;
         }
         
@@ -42,7 +43,7 @@ namespace FRAMEWORK
         }
     }
 
-    bool CompileShaderFromHlsl(TRefCountPtr<MetalShader> InShader)
+    bool CompileShaderFromHlsl(TRefCountPtr<MetalShader> InShader, FString& OutErrorInfo)
     {
         ShaderConductor::Compiler::SourceDesc SourceDesc{};
         
@@ -63,6 +64,7 @@ namespace FRAMEWORK
         {
             FString ErrorInfo = static_cast<const char*>(Result.errorWarningMsg.Data());
             SH_LOG(LogMetal, Error, TEXT("Shader cross compilation failed: %s"), *ErrorInfo);
+			OutErrorInfo = MoveTemp(ErrorInfo);
             return false;
         }
         

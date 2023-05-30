@@ -17,7 +17,7 @@ namespace SH
 
 	const FString ShRenderer::DefaultPixelShaderText = R"(float4 MainPS() : SV_Target
 {
-	return float4(1,1,0,1);
+    return float4(1,1,0,1);
 })";
 	
 	ShRenderer::ShRenderer() 
@@ -25,10 +25,11 @@ namespace SH
 	{
 
 		VertexShader = GpuApi::CreateShaderFromSource(ShaderType::VertexShader, DefaultVertexShaderText, TEXT("DefaultFullScreenVS"), TEXT("MainVS"));
-		GpuApi::CrossCompileShader(VertexShader);
+		FString ErrorInfo;
+		GpuApi::CrossCompileShader(VertexShader, ErrorInfo);
 
 		PixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, DefaultPixelShaderText, {}, TEXT("MainPS"));
-		GpuApi::CrossCompileShader(PixelShader);
+		GpuApi::CrossCompileShader(PixelShader, ErrorInfo);
 	}
 
 	void ShRenderer::OnViewportResize()

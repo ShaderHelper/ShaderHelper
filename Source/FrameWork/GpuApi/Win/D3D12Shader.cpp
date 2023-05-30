@@ -33,7 +33,7 @@ namespace FRAMEWORK
 		 DxCheck(DxcCreateInstance(CLSID_DxcLibrary, IID_PPV_ARGS(CompilerLibrary.GetInitReference())));
 	 }
 
-	 bool DxcCompiler::Compile(TRefCountPtr<Dx12Shader> InShader) const
+	 bool DxcCompiler::Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo) const
 	 {
 		TRefCountPtr<IDxcBlobEncoding> BlobEncoding;
 		TRefCountPtr<IDxcResult> CompileResult;
@@ -81,6 +81,7 @@ namespace FRAMEWORK
 				if (!ErrorStr.IsEmpty())
 				{
 					SH_LOG(LogDx12, Error, TEXT("Shader compilation failed: %s"), *ErrorStr);
+					OutErrorInfo = MoveTemp(ErrorStr);
 					IsCompilationSucceeded = false;
 				}
 			}

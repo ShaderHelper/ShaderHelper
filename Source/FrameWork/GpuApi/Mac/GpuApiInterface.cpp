@@ -80,14 +80,14 @@ namespace GpuApi
         return AUX::StaticCastRefCountPtr<GpuShader>(CreateMetalShader(InType, MoveTemp(InSourceText), MoveTemp(InShaderName), MoveTemp(EntryPoint)));
 	}
 
-	bool CompileShader(GpuShader* InShader)
+	bool CompileShader(GpuShader* InShader, FString& OutErrorInfo)
 	{
-        return FRAMEWORK::CompileShader(static_cast<MetalShader*>(InShader));
+        return FRAMEWORK::CompileShader(static_cast<MetalShader*>(InShader), OutErrorInfo);
 	}
 
-    bool CrossCompileShader(GpuShader* InShader)
+    bool CrossCompileShader(GpuShader* InShader, FString& OutErrorInfo)
     {
-        return CompileShaderFromHlsl(static_cast<MetalShader*>(InShader));
+        return CompileShaderFromHlsl(static_cast<MetalShader*>(InShader), OutErrorInfo);
     }
 
 	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc)

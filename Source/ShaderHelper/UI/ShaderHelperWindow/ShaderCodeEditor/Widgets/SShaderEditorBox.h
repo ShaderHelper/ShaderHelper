@@ -48,11 +48,12 @@ namespace SH
 		FReply OnTextKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent) const;
 		TSharedRef<ITableRow> GenerateRowForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 		TSharedRef<ITableRow> GenerateRowTipForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
-		
+		TSharedRef<ITableRow> GenerateErrorInfoForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 	private:
 		void UpdateLineTipStyle(const double InCurrentTime);
 		void UpdateLineNumberHighlight();
-		void UpdateLineNumberAndTipListViewScrollBar();
+		void UpdateListViewScrollBar();
+		void UpdateErrorInfo();
 		void HandleAutoIndent() const;
 
 	private:
@@ -62,7 +63,10 @@ namespace SH
 		TSharedPtr<SMultiLineEditableText> ShaderMultiLineEditableText;
 		TSharedPtr<SListView<LineNumberItemPtr>> LineNumberList;
 		TSharedPtr<SListView<LineNumberItemPtr>> LineTipList;
+		TSharedPtr<SListView<LineNumberItemPtr>> LineErrorInfoList;
+		TMap<int32, FString> LineNumToErrorInfo;
 		TSharedPtr<SScrollBar> ShaderMultiLineVScrollBar;
+		TSharedPtr<SScrollBar> ShaderMultiLineHScrollBar;
 		ShRenderer* Renderer;
 	};
 }
