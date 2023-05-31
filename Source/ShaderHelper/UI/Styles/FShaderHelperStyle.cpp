@@ -64,7 +64,7 @@ namespace SH {
 			.SetColorAndOpacity(FLinearColor{ 0.5f, 1.0f, 0.66f, 1.0f });
 			
 		FTextBlockStyle CodeEditorCommentTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
-			.SetColorAndOpacity(FLinearColor{0.0f, 0.4f, 0.0f, 1.0f});
+			.SetColorAndOpacity(FLinearColor{0.2f, 0.9f, 0.2f, 1.0f});
 
 		FTextBlockStyle CodeEditorBuildtinFuncTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
 			.SetColorAndOpacity(FLinearColor{0.58f, 0.43f, 0.82f,1.0f});
@@ -83,6 +83,10 @@ namespace SH {
 		Style->Set("CodeEditorBuildtinFuncText", CodeEditorBuildtinFuncTextStyle);
 		Style->Set("CodeEditorBuildtinTypeText", CodeEditorBuildtinTypeTextStyle);
 		Style->Set("CodeEditorPreprocessText", CodeEditorPreprocessTextStyle);
+
+		FTextBlockStyle CodeEditorErrorInfoStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
+			.SetColorAndOpacity(FLinearColor::Red);
+		Style->Set("CodeEditorErrorInfoText", CodeEditorErrorInfoStyle);
 		
 		return Style;
 	}

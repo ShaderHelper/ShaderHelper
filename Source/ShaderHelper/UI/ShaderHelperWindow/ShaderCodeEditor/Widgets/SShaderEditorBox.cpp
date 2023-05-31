@@ -8,6 +8,8 @@
 
 //No exposed methods, and too lazy to modify the source code for UE.
 STEAL_PRIVATE_MEMBER(SScrollBar, TSharedPtr<SScrollBarTrack>, Track)
+STEAL_PRIVATE_MEMBER(SMultiLineEditableText, TUniquePtr<FSlateEditableTextLayout>, EditableTextLayout)
+STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, TSharedPtr<FSlateTextLayout>, TextLayout)
 
 namespace SH
 {
@@ -25,7 +27,8 @@ namespace SH
 		SAssignNew(ShaderMultiLineVScrollBar, SScrollBar).Orientation(EOrientation::Orient_Vertical);
 		SAssignNew(ShaderMultiLineHScrollBar, SScrollBar).Orientation(EOrientation::Orient_Horizontal);
 
-		Marshaller = MakeShared<FShaderEditorMarshaller>(MakeShared<HlslHighLightTokenizer>());
+		ShaderMarshaller = MakeShared<FShaderEditorMarshaller>(MakeShared<HlslHighLightTokenizer>());
+		EffectMarshller = MakeShared<FShaderEditorEffectMarshaller>(this);
 
 		TArray<FTextRange> LineRanges;
 		FTextRange::CalculateLineRangesFromString(InArgs._Text.ToString(), LineRanges);
@@ -92,8 +95,7 @@ namespace SH
 							[
 								SAssignNew(ShaderMultiLineEditableText, SMultiLineEditableText)
 								.Text(InArgs._Text)
-								.TextStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText"))
-								.Marshaller(Marshaller)
+								.Marshaller(ShaderMarshaller)
 								.OnTextChanged(this, &SShaderEditorBox::OnShaderTextChanged)
 								.VScrollBar(ShaderMultiLineVScrollBar)
 								.HScrollBar(ShaderMultiLineHScrollBar)
@@ -102,12 +104,9 @@ namespace SH
 							]
 							+ SOverlay::Slot()
 							[
-								SAssignNew(LineErrorInfoList, SListView<LineNumberItemPtr>)
-								.ListItemsSource(&LineNumberData)
-								.SelectionMode(ESelectionMode::None)
-								.OnGenerateRow(this, &SShaderEditorBox::GenerateErrorInfoForItem)
-								.ScrollbarVisibility(EVisibility::Collapsed)
-								.IsFocusable(false)
+								SAssignNew(EffectMultiLineEditableText, SMultiLineEditableText)
+								.IsReadOnly(true)
+								.Marshaller(EffectMarshller)
 								.Visibility(EVisibility::HitTestInvisible)
 							]
 						]
@@ -135,6 +134,8 @@ namespace SH
 			]
 				
 		];
+
+		EffectMultiLineEditableText->SetCanTick(false);
 	}
 
 	void SShaderEditorBox::UpdateLineTipStyle(const double InCurrentTime)
@@ -209,31 +210,27 @@ namespace SH
 		float VOffsetFraction = Track->DistanceFromTop();
 		LineNumberList->SetScrollOffset(VOffsetFraction * LineNumberList->GetNumItemsBeingObserved());
 		LineTipList->SetScrollOffset(VOffsetFraction * LineTipList->GetNumItemsBeingObserved());
-		LineErrorInfoList->SetScrollOffset(VOffsetFraction * LineTipList->GetNumItemsBeingObserved());
 	}
 
-	void SShaderEditorBox::UpdateErrorInfo()
+	void SShaderEditorBox::UpdateEffectText()
 	{
-		for (int32 i = 0; i < LineNumberData.Num(); i++)
-		{
-			LineNumberItemPtr ItemData = LineNumberData[i];
-			TSharedPtr<ITableRow> ItemTableRow = LineErrorInfoList->WidgetFromItem(ItemData);
-			if (ItemTableRow.IsValid())
-			{
-				TSharedPtr<STextBlock> ItemWidget = StaticCastSharedPtr<STextBlock>(ItemTableRow->GetContent());
-				if (LineNumToErrorInfo.Contains(i + 1))
-				{
-					ItemWidget->SetText(FText::FromString(LineNumToErrorInfo[i+1]));
-					ItemWidget->SetVisibility(EVisibility::Visible);
-				}
-				else
-				{
-					ItemWidget->SetVisibility(EVisibility::Hidden);
-				}			
-			}
-		}
+		EffectMarshller->MakeDirty();
+		EffectMultiLineEditableText->Refresh();
 
-		//ShaderMultiLineEditableText->SetMargin(FMargin{0, 0, 1000.0f, 0});
+		static float LastXoffset;
+		TUniquePtr<FSlateEditableTextLayout>& EffectEditableTextLayout = GetPrivate_SMultiLineEditableText_EditableTextLayout(*EffectMultiLineEditableText);
+		TUniquePtr<FSlateEditableTextLayout>& ShaderEditableTextLayout = GetPrivate_SMultiLineEditableText_EditableTextLayout(*ShaderMultiLineEditableText);
+		float XOffsetSizeBetweenLayout = FMath::Max(0.f, (float)EffectEditableTextLayout->GetSize().X - (float)ShaderEditableTextLayout->GetSize().X + LastXoffset);
+		ShaderMultiLineEditableText->SetMargin(FMargin{ 0, 0, XOffsetSizeBetweenLayout, 0 });
+		LastXoffset = XOffsetSizeBetweenLayout;
+
+		const FGeometry& ShaderMultiLineGeometry = ShaderMultiLineEditableText->GetTickSpaceGeometry();
+		const FGeometry& EffectMultiLineGeometry = EffectMultiLineEditableText->GetTickSpaceGeometry();
+		FVector2D ShaderScrollOffset = ShaderEditableTextLayout->GetScrollOffset();
+		ShaderScrollOffset.X = FMath::Clamp(ShaderScrollOffset.X, 0.0, FMath::Max(0, ShaderEditableTextLayout->GetSize().X - ShaderMultiLineGeometry.GetLocalSize().X));
+		ShaderScrollOffset.Y = FMath::Clamp(ShaderScrollOffset.Y, 0.0, FMath::Max(0, ShaderEditableTextLayout->GetSize().Y - ShaderMultiLineGeometry.GetLocalSize().Y));
+		TSharedPtr<FSlateTextLayout>& EffectTextLayout = GetPrivate_FSlateEditableTextLayout_TextLayout(*EffectEditableTextLayout);
+		EffectTextLayout->SetVisibleRegion(EffectMultiLineGeometry.GetLocalSize(), ShaderScrollOffset * EffectTextLayout->GetScale());
 	}
 
 	void SShaderEditorBox::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
@@ -243,12 +240,12 @@ namespace SH
 		UpdateListViewScrollBar();
 		UpdateLineNumberHighlight();
 		UpdateLineTipStyle(InCurrentTime);
-		UpdateErrorInfo();
+		UpdateEffectText();
 	}
 
 	void SShaderEditorBox::OnShaderTextChanged(const FText& InText)
 	{
-		const int32 LineNum = Marshaller->TextLayout->GetLineCount();
+		const int32 LineNum = ShaderMarshaller->TextLayout->GetLineCount();
 		int32 DiffNum = FMath::Abs(LineNum - CurLineNum);
 		if (LineNum >= CurLineNum)
 		{
@@ -268,11 +265,10 @@ namespace SH
 		}
 		LineNumberList->RequestListRefresh();
 		LineTipList->RequestListRefresh();
-		LineErrorInfoList->RequestListRefresh();
 
 		TRefCountPtr<GpuShader> NewPixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, InText.ToString(), {}, TEXT("MainPS"));
 		FString ErrorInfo;
-		LineNumToErrorInfo.Reset();
+		EffectMarshller->LineNumToErrorInfo.Reset();
 		if (GpuApi::CrossCompileShader(NewPixelShader, ErrorInfo))
 		{
 			Renderer->UpdatePixelShader(MoveTemp(NewPixelShader));
@@ -282,7 +278,7 @@ namespace SH
 			TArray<ShaderErrorInfo> ErrorInfos = ParseErrorInfoFromDxc(ErrorInfo);
 			for (const ShaderErrorInfo& ErrorInfo : ErrorInfos)
 			{
-				if (!LineNumToErrorInfo.Contains(ErrorInfo.Row))
+				if (!EffectMarshller->LineNumToErrorInfo.Contains(ErrorInfo.Row))
 				{
 					FString LineText;
 					ShaderMultiLineEditableText->GetTextLine(ErrorInfo.Row - 1, LineText);
@@ -294,8 +290,8 @@ namespace SH
 						DummyText += " ";
 					}
 
-					FString DisplayInfo = DummyText + TEXT("    ◆ ") + ErrorInfo.Info;
-					LineNumToErrorInfo.Add(ErrorInfo.Row, MoveTemp(DisplayInfo));
+					FString DisplayInfo = DummyText + TEXT("    ■ ") + ErrorInfo.Info;
+					EffectMarshller->LineNumToErrorInfo.Add(ErrorInfo.Row, MoveTemp(DisplayInfo));
 				}
 			}
 		}
@@ -670,21 +666,6 @@ namespace SH
 		return LineTip.ToSharedRef();
 	}
 
-	TSharedRef<ITableRow> SShaderEditorBox::GenerateErrorInfoForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
-	{
-		TSharedPtr<STextBlock> ErrorInfoTextBlock = SNew(STextBlock)
-			.Font(FShaderHelperStyle::Get().GetFontStyle("CodeFont"))
-			.ColorAndOpacity(FLinearColor::Red)
-			.Visibility(EVisibility::Hidden);
-
-		return SNew(STableRow<LineNumberItemPtr>, OwnerTable)
-			.Style(&FShaderHelperStyle::Get().GetWidgetStyle<FTableRowStyle>("LineNumberItemStyle"))
-			.Content()
-			[
-				ErrorInfoTextBlock.ToSharedRef()
-			];
-	}
-
 	FShaderEditorMarshaller::FShaderEditorMarshaller(TSharedPtr<HlslHighLightTokenizer> InTokenizer)
 		: TextLayout(nullptr), Tokenizer(MoveTemp(InTokenizer))
 	{
@@ -724,6 +705,41 @@ namespace SH
 	void FShaderEditorMarshaller::GetText(FString& TargetString, const FTextLayout& SourceTextLayout)
 	{
 		SourceTextLayout.GetAsText(TargetString);
+	}
+
+	void FShaderEditorEffectMarshaller::SetText(const FString& SourceString, FTextLayout& TargetTextLayout)
+	{
+		TextLayout = &TargetTextLayout;
+		SubmitEffectText();
+	}
+
+	void FShaderEditorEffectMarshaller::GetText(FString& TargetString, const FTextLayout& SourceTextLayout)
+	{
+		SourceTextLayout.GetAsText(TargetString);
+	}
+
+	void FShaderEditorEffectMarshaller::SubmitEffectText()
+	{
+		TArray<FTextLayout::FNewLineData> LinesToAdd;
+		for(int32 i = 0; i < OwnerWidget->GetCurLineNum(); i++)
+		{
+			TArray<TSharedRef<IRun>> Runs;
+			const FTextBlockStyle& ErrorInfoStyle = FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorErrorInfoText");
+			if (LineNumToErrorInfo.Contains(i + 1))
+			{
+				TSharedRef<FString> ErrorInfo = MakeShared<FString>(LineNumToErrorInfo[i + 1]);
+				Runs.Add(FSlateTextRun::Create(FRunInfo(), ErrorInfo, ErrorInfoStyle));
+				LinesToAdd.Emplace(MoveTemp(ErrorInfo), MoveTemp(Runs));
+			}
+			else
+			{
+				TSharedRef<FString> Empty = MakeShared<FString>();
+				Runs.Add(FSlateTextRun::Create(FRunInfo(), Empty, ErrorInfoStyle));
+				LinesToAdd.Emplace(Empty, MoveTemp(Runs));
+			}
+		}
+		
+		TextLayout->AddLines(MoveTemp(LinesToAdd));
 	}
 
 }

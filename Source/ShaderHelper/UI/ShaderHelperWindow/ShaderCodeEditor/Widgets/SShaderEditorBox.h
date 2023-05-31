@@ -28,6 +28,28 @@ namespace SH
 		TMap<HlslHighLightTokenizer::TokenType, FTextBlockStyle> TokenStyleMap;
 	};
 
+	class SShaderEditorBox;
+
+	class FShaderEditorEffectMarshaller : public FBaseTextLayoutMarshaller
+	{
+	public:
+		FShaderEditorEffectMarshaller(SShaderEditorBox* InOwnerWidget) 
+			: OwnerWidget(InOwnerWidget)
+			, TextLayout(nullptr) 
+		{}
+
+	public:
+		virtual void SetText(const FString& SourceString, FTextLayout& TargetTextLayout) override;
+		virtual void GetText(FString& TargetString, const FTextLayout& SourceTextLayout) override;
+		
+		void SubmitEffectText();
+		
+	public:
+		SShaderEditorBox* OwnerWidget;
+		FTextLayout* TextLayout;
+		TMap<int32, FString> LineNumToErrorInfo;
+	};
+
 	class SShaderEditorBox : public SCompoundWidget
 	{
 	public:
@@ -48,23 +70,25 @@ namespace SH
 		FReply OnTextKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent) const;
 		TSharedRef<ITableRow> GenerateRowForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 		TSharedRef<ITableRow> GenerateRowTipForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
-		TSharedRef<ITableRow> GenerateErrorInfoForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
+
+		int32 GetCurLineNum() const { return CurLineNum; }
+
 	private:
 		void UpdateLineTipStyle(const double InCurrentTime);
 		void UpdateLineNumberHighlight();
 		void UpdateListViewScrollBar();
-		void UpdateErrorInfo();
+		void UpdateEffectText();
 		void HandleAutoIndent() const;
 
 	private:
 		int32 CurLineNum;
 		TArray<LineNumberItemPtr> LineNumberData;
-		TSharedPtr<FShaderEditorMarshaller> Marshaller;
+		TSharedPtr<FShaderEditorMarshaller> ShaderMarshaller;
+		TSharedPtr<FShaderEditorEffectMarshaller> EffectMarshller;
 		TSharedPtr<SMultiLineEditableText> ShaderMultiLineEditableText;
+		TSharedPtr<SMultiLineEditableText> EffectMultiLineEditableText;
 		TSharedPtr<SListView<LineNumberItemPtr>> LineNumberList;
 		TSharedPtr<SListView<LineNumberItemPtr>> LineTipList;
-		TSharedPtr<SListView<LineNumberItemPtr>> LineErrorInfoList;
-		TMap<int32, FString> LineNumToErrorInfo;
 		TSharedPtr<SScrollBar> ShaderMultiLineVScrollBar;
 		TSharedPtr<SScrollBar> ShaderMultiLineHScrollBar;
 		ShRenderer* Renderer;
