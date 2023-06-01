@@ -285,13 +285,16 @@ namespace SH
 
 					FString DummyText;
 					int32 LineTextNum = LineText.Len();
-					while (LineTextNum--)
-					{
-						DummyText += " ";
-					}
+                    for(int32 i = 0; i < LineTextNum; i++)
+                    {
+                        DummyText += LineText[i];
+                    }
 
 					FString DisplayInfo = DummyText + TEXT("    ■ ") + ErrorInfo.Info;
-					EffectMarshller->LineNumToErrorInfo.Add(ErrorInfo.Row, MoveTemp(DisplayInfo));
+                    FTextRange DummyRange{0, DummyText.Len()};
+                    FTextRange ErrorRange{DummyText.Len(), DisplayInfo.Len()};
+                    
+                    EffectMarshller->LineNumToErrorInfo.Add(ErrorInfo.Row, {MoveTemp(DummyRange), MoveTemp(ErrorRange), MoveTemp(DisplayInfo)});
 				}
 			}
 		}
@@ -725,16 +728,28 @@ namespace SH
 		{
 			TArray<TSharedRef<IRun>> Runs;
 			const FTextBlockStyle& ErrorInfoStyle = FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorErrorInfoText");
+            
+            FTextBlockStyle DummyInfoStyle = FTextBlockStyle{}
+                .SetFont(FShaderHelperStyle::Get().GetFontStyle("CodeFont"))
+                .SetColorAndOpacity(FLinearColor{0, 0, 0, 0});
+            
 			if (LineNumToErrorInfo.Contains(i + 1))
 			{
-				TSharedRef<FString> ErrorInfo = MakeShared<FString>(LineNumToErrorInfo[i + 1]);
-				Runs.Add(FSlateTextRun::Create(FRunInfo(), ErrorInfo, ErrorInfoStyle));
-				LinesToAdd.Emplace(MoveTemp(ErrorInfo), MoveTemp(Runs));
+                TSharedRef<FString> TotalInfo = MakeShared<FString>(LineNumToErrorInfo[i + 1].TotalInfo);
+                
+                TSharedRef<IRun> DummyRun = FSlateTextRun::Create(FRunInfo(), TotalInfo, DummyInfoStyle, LineNumToErrorInfo[i + 1].DummyRange);
+                Runs.Add(MoveTemp(DummyRun));
+                
+                TSharedRef<IRun> ErrorRun = FSlateTextRun::Create(FRunInfo(), TotalInfo, ErrorInfoStyle, LineNumToErrorInfo[i + 1].ErrorRange);
+				Runs.Add(MoveTemp(ErrorRun));
+                
+				LinesToAdd.Emplace(MoveTemp(TotalInfo), MoveTemp(Runs));
 			}
 			else
 			{
 				TSharedRef<FString> Empty = MakeShared<FString>();
 				Runs.Add(FSlateTextRun::Create(FRunInfo(), Empty, ErrorInfoStyle));
+                
 				LinesToAdd.Emplace(Empty, MoveTemp(Runs));
 			}
 		}
