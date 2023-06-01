@@ -43,11 +43,19 @@ namespace SH
 		virtual void GetText(FString& TargetString, const FTextLayout& SourceTextLayout) override;
 		
 		void SubmitEffectText();
+        
+    public:
+        struct ErrorEffectInfo
+        {
+            FTextRange DummyRange;
+            FTextRange ErrorRange;
+            FString TotalInfo;
+        };
 		
 	public:
 		SShaderEditorBox* OwnerWidget;
 		FTextLayout* TextLayout;
-		TMap<int32, FString> LineNumToErrorInfo;
+		TMap<int32, ErrorEffectInfo> LineNumToErrorInfo;
 	};
 
 	class SShaderEditorBox : public SCompoundWidget
