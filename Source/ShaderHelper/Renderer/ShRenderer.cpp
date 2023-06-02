@@ -26,10 +26,10 @@ namespace SH
 
 		VertexShader = GpuApi::CreateShaderFromSource(ShaderType::VertexShader, DefaultVertexShaderText, TEXT("DefaultFullScreenVS"), TEXT("MainVS"));
 		FString ErrorInfo;
-		GpuApi::CrossCompileShader(VertexShader, ErrorInfo);
+		check(GpuApi::CrossCompileShader(VertexShader, ErrorInfo));
 
 		PixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, DefaultPixelShaderText, {}, TEXT("MainPS"));
-		GpuApi::CrossCompileShader(PixelShader, ErrorInfo);
+		check(GpuApi::CrossCompileShader(PixelShader, ErrorInfo));
 	}
 
 	void ShRenderer::OnViewportResize()

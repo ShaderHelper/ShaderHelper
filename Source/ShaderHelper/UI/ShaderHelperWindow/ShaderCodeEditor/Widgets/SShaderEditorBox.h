@@ -7,10 +7,12 @@
 
 namespace SH
 {
+    class SShaderEditorBox;
+
 	class FShaderEditorMarshaller : public FBaseTextLayoutMarshaller
 	{
 	public:
-		FShaderEditorMarshaller(TSharedPtr<HlslHighLightTokenizer> InTokenizer);
+		FShaderEditorMarshaller(SShaderEditorBox* InOwnerWidget, TSharedPtr<HlslHighLightTokenizer> InTokenizer);
 		
 	public:
 		virtual void SetText(const FString& SourceString, FTextLayout& TargetTextLayout) override;
@@ -23,12 +25,11 @@ namespace SH
 		}
 		
 	public:
+        SShaderEditorBox* OwnerWidget;
 		FTextLayout* TextLayout;
 		TSharedPtr<HlslHighLightTokenizer> Tokenizer;
 		TMap<HlslHighLightTokenizer::TokenType, FTextBlockStyle> TokenStyleMap;
 	};
-
-	class SShaderEditorBox;
 
 	class FShaderEditorEffectMarshaller : public FBaseTextLayoutMarshaller
 	{
@@ -62,7 +63,14 @@ namespace SH
 	{
 	public:
 		using LineNumberItemPtr = TSharedPtr<FText>;
-
+        enum class EditState
+        {
+            Normal,
+            Compiling,
+            Failed,
+        };
+        
+    public:
 		SLATE_BEGIN_ARGS(SShaderEditorBox) 
 			: _Renderer(nullptr)
 		{}
@@ -77,28 +85,40 @@ namespace SH
 		void OnShaderTextChanged(const FText& InText);
 		FReply OnTextKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent) const;
 		TSharedRef<ITableRow> GenerateRowForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
-		TSharedRef<ITableRow> GenerateRowTipForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
+		TSharedRef<ITableRow> GenerateLineTipForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 
 		int32 GetCurLineNum() const { return CurLineNum; }
-
+        const FSlateFontInfo& GetFontInfo() const { return CodeFontInfo; }
+        FText GetEditStateText() const;
+        FText GetFontSizeText() const;
+        FText GetRowColText() const;
+        FSlateColor GetEditStateColor() const;
+        
 	private:
 		void UpdateLineTipStyle(const double InCurrentTime);
 		void UpdateLineNumberHighlight();
 		void UpdateListViewScrollBar();
 		void UpdateEffectText();
 		void HandleAutoIndent() const;
-
+        TSharedRef<SWidget> BuildInfoBar();
+    
 	private:
 		int32 CurLineNum;
 		TArray<LineNumberItemPtr> LineNumberData;
 		TSharedPtr<FShaderEditorMarshaller> ShaderMarshaller;
+        TSharedPtr<SMultiLineEditableText> ShaderMultiLineEditableText;
+        TSharedPtr<SScrollBar> ShaderMultiLineVScrollBar;
+        TSharedPtr<SScrollBar> ShaderMultiLineHScrollBar;
+        
 		TSharedPtr<FShaderEditorEffectMarshaller> EffectMarshller;
-		TSharedPtr<SMultiLineEditableText> ShaderMultiLineEditableText;
 		TSharedPtr<SMultiLineEditableText> EffectMultiLineEditableText;
+        
 		TSharedPtr<SListView<LineNumberItemPtr>> LineNumberList;
 		TSharedPtr<SListView<LineNumberItemPtr>> LineTipList;
-		TSharedPtr<SScrollBar> ShaderMultiLineVScrollBar;
-		TSharedPtr<SScrollBar> ShaderMultiLineHScrollBar;
+
 		ShRenderer* Renderer;
+        EditState CurEditState;
+        FSlateFontInfo CodeFontInfo;
+
 	};
 }
