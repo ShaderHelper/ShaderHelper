@@ -357,6 +357,8 @@ namespace SH
 				}
                 
                 TSharedPtr<STextBlock> ItemErrorMarker = StaticCastSharedRef<STextBlock>(ItemWidget->GetSlot(0).GetWidget());
+                
+                ItemErrorMarker->SetFont(CodeFontInfo);
                 if(EffectMarshller->LineNumToErrorInfo.Contains(i + 1))
                 {
                     ItemErrorMarker->SetColorAndOpacity(FLinearColor::Red);
@@ -802,7 +804,7 @@ namespace SH
 	TSharedRef<ITableRow> SShaderEditorBox::GenerateRowForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
 	{
 		TSharedPtr<STextBlock> LineNumberTextBlock = SNew(STextBlock)
-			.Font(FShaderHelperStyle::Get().GetFontStyle("CodeFont"))
+			.Font(CodeFontInfo)
 			.ColorAndOpacity(NormalLineNumberTextColor)
 			.Text(*Item)
 			.Justification(ETextJustify::Right)
@@ -816,7 +818,7 @@ namespace SH
                 +SHorizontalBox::Slot()
                 [
                     SNew(STextBlock)
-                    .Font(FShaderHelperStyle::Get().GetFontStyle("CodeFont"))
+                    .Font(CodeFontInfo)
                     .ColorAndOpacity(FLinearColor::Transparent)
                     .Text(FText::FromString(TEXT("✘")))
                 ]
@@ -833,7 +835,7 @@ namespace SH
 	{
 		//DummyTextBlock is used to keep the same layout as LineNumber and MultiLineEditableText.
 		TSharedPtr<STextBlock> DummyTextBlock = SNew(STextBlock)
-			.Font(FShaderHelperStyle::Get().GetFontStyle("CodeFont"))
+			.Font(CodeFontInfo)
 			.Visibility(EVisibility::Hidden);
 
 		TSharedPtr<STableRow<LineNumberItemPtr>> LineTip = SNew(STableRow<LineNumberItemPtr>, OwnerTable)
