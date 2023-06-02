@@ -23,11 +23,12 @@ namespace SH
 	
 	void SShaderEditorBox::Construct(const FArguments& InArgs)
 	{
+        CodeFontInfo = FShaderHelperStyle::Get().GetFontStyle("CodeFont");
 		Renderer = InArgs._Renderer;
 		SAssignNew(ShaderMultiLineVScrollBar, SScrollBar).Orientation(EOrientation::Orient_Vertical);
 		SAssignNew(ShaderMultiLineHScrollBar, SScrollBar).Orientation(EOrientation::Orient_Horizontal);
 
-		ShaderMarshaller = MakeShared<FShaderEditorMarshaller>(MakeShared<HlslHighLightTokenizer>());
+		ShaderMarshaller = MakeShared<FShaderEditorMarshaller>(this, MakeShared<HlslHighLightTokenizer>());
 		EffectMarshller = MakeShared<FShaderEditorEffectMarshaller>(this);
 
 		TArray<FTextRange> LineRanges;
@@ -39,14 +40,16 @@ namespace SH
 			while (LineNums--)
 			{
 				CurLineNum++;
-				LineNumberData.Add(MakeShared<FText>(FText::FromString(FString::FromInt(CurLineNum))));
+				LineNumberData.Add(MakeShared<FText>(FText::AsNumber(CurLineNum)));
 			}
 		}
 		else
 		{
 			CurLineNum = 1;
-			LineNumberData.Add(MakeShared<FText>(FText::FromString(FString::FromInt(CurLineNum))));
+			LineNumberData.Add(MakeShared<FText>(FText::AsNumber(CurLineNum)));
 		}
+        
+        CurEditState = EditState::Normal;
 		
 		ChildSlot
 		[
@@ -58,69 +61,70 @@ namespace SH
 				.FillRow(0, 1.0f)
 				+ SGridPanel::Slot(0, 0)
 				[
-					SNew(SHorizontalBox)
-					+SHorizontalBox::Slot()
-					.AutoWidth()
-					[
-						SNew(SSpacer)
-						.Size(FVector2D(5, 5))
-					]
+                    SNew(SVerticalBox)
+                    + SVerticalBox::Slot()
+                    .FillHeight(1.0f)
+                    [
+                        SNew(SHorizontalBox)
+                        + SHorizontalBox::Slot()
+                        .Padding(5, 0, 0, 0)
+                        .AutoWidth()
+                        [
+                            SAssignNew(LineNumberList, SListView<LineNumberItemPtr>)
+                            .ListItemsSource(&LineNumberData)
+                            .SelectionMode(ESelectionMode::None)
+                            .OnGenerateRow(this, &SShaderEditorBox::GenerateRowForItem)
+                            .ScrollbarVisibility(EVisibility::Collapsed)
+                            .IsFocusable(false)
+                        ]
 
-					+ SHorizontalBox::Slot()
-					.AutoWidth()
-					[
-						SAssignNew(LineNumberList, SListView<LineNumberItemPtr>)
-						.ListItemsSource(&LineNumberData)
-						.SelectionMode(ESelectionMode::None)
-						.OnGenerateRow(this, &SShaderEditorBox::GenerateRowForItem)
-						.ScrollbarVisibility(EVisibility::Collapsed)
-						.IsFocusable(false)
-					]
-
-					+ SHorizontalBox::Slot()
-					.AutoWidth()
-					[
-						SNew(SSpacer)
-						.Size(FVector2D(10, 10))
-					]
-
-					+ SHorizontalBox::Slot()
-					.FillWidth(0.95f)
-					[
-						SNew(SOverlay)
-						+ SOverlay::Slot()
-						[
-							SNew(SOverlay)
-							+ SOverlay::Slot()
-							[
-								SAssignNew(ShaderMultiLineEditableText, SMultiLineEditableText)
-								.Text(InArgs._Text)
-								.Marshaller(ShaderMarshaller)
-								.OnTextChanged(this, &SShaderEditorBox::OnShaderTextChanged)
-								.VScrollBar(ShaderMultiLineVScrollBar)
-								.HScrollBar(ShaderMultiLineHScrollBar)
-								.OnKeyCharHandler(this, &SShaderEditorBox::OnTextKeyChar)
-								.OnIsTypedCharValid_Lambda([](const TCHAR InChar) { return true; })
-							]
-							+ SOverlay::Slot()
-							[
-								SAssignNew(EffectMultiLineEditableText, SMultiLineEditableText)
-								.IsReadOnly(true)
-								.Marshaller(EffectMarshller)
-								.Visibility(EVisibility::HitTestInvisible)
-							]
-						]
-						+ SOverlay::Slot()
-						[
-							SAssignNew(LineTipList, SListView<LineNumberItemPtr>)
-							.ListItemsSource(&LineNumberData)
-							.SelectionMode(ESelectionMode::None)
-							.OnGenerateRow(this, &SShaderEditorBox::GenerateRowTipForItem)
-							.ScrollbarVisibility(EVisibility::Collapsed)
-							.IsFocusable(false)
-							.Visibility(EVisibility::HitTestInvisible)
-						]
-					]
+                        + SHorizontalBox::Slot()
+                        .Padding(10, 0, 0, 0)
+                        .FillWidth(1.0f)
+                        [
+                            SNew(SOverlay)
+                            + SOverlay::Slot()
+                            [
+                                SNew(SOverlay)
+                                + SOverlay::Slot()
+                                [
+                                    SAssignNew(ShaderMultiLineEditableText, SMultiLineEditableText)
+                                    .Text(InArgs._Text)
+                                    .Marshaller(ShaderMarshaller)
+                                    .OnTextChanged(this, &SShaderEditorBox::OnShaderTextChanged)
+                                    .VScrollBar(ShaderMultiLineVScrollBar)
+                                    .HScrollBar(ShaderMultiLineHScrollBar)
+                                    .OnKeyCharHandler(this, &SShaderEditorBox::OnTextKeyChar)
+                                    .OnIsTypedCharValid_Lambda([](const TCHAR InChar) { return true; })
+                                ]
+                                + SOverlay::Slot()
+                                [
+                                    SAssignNew(EffectMultiLineEditableText, SMultiLineEditableText)
+                                    .IsReadOnly(true)
+                                    .Marshaller(EffectMarshller)
+                                    .Visibility(EVisibility::HitTestInvisible)
+                                ]
+                            ]
+                            
+                            + SOverlay::Slot()
+                            [
+                                SAssignNew(LineTipList, SListView<LineNumberItemPtr>)
+                                .ListItemsSource(&LineNumberData)
+                                .SelectionMode(ESelectionMode::None)
+                                .OnGenerateRow(this, &SShaderEditorBox::GenerateLineTipForItem)
+                                .ScrollbarVisibility(EVisibility::Collapsed)
+                                .IsFocusable(false)
+                                .Visibility(EVisibility::HitTestInvisible)
+                            ]
+                            
+                        ]
+                    ]
+                    
+                    + SVerticalBox::Slot()
+                    .AutoHeight()
+                    [
+                        BuildInfoBar()
+                    ]
 			
 				]
 				+ SGridPanel::Slot(1, 0)
@@ -134,9 +138,154 @@ namespace SH
 			]
 				
 		];
-
-		EffectMultiLineEditableText->SetCanTick(false);
+        
+        EffectMultiLineEditableText->SetCanTick(false);
 	}
+
+    FText SShaderEditorBox::GetEditStateText() const
+    {
+        switch(CurEditState)
+        {
+        case EditState::Compiling: return FText::FromString(TEXT("COMPILING"));
+        case EditState::Failed:    return FText::FromString(TEXT("FAILED"));
+        default:                   return FText::FromString(TEXT("NORMAL"));
+        }
+    }
+
+    FText SShaderEditorBox::GetFontSizeText() const
+    {
+        return FText::FromString(FString::Printf(TEXT("Font Size: %d"), CodeFontInfo.Size));
+    }
+
+    FSlateColor SShaderEditorBox::GetEditStateColor() const
+    {
+        switch(CurEditState)
+        {
+        case EditState::Compiling: return FLinearColor{1.0f, 0.5f, 0, 1.0f};
+        case EditState::Failed:    return FLinearColor::Red;
+        default:                   return FLinearColor{0.6f, 1.0f , 0.1f, 1.0f};
+        }
+    }
+
+    FText SShaderEditorBox::GetRowColText() const
+    {
+        const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
+        const int32 CursorRow = CursorLocation.GetLineIndex() + 1;
+        const int32 CursorCol = CursorLocation.GetOffset();
+        return FText::FromString(FString::Printf(TEXT("%d:%d"), CursorRow, CursorCol));
+    }
+
+    TSharedRef<SWidget> SShaderEditorBox::BuildInfoBar()
+    {
+        auto BuildFontSizeMenu = [this]() {
+            const int32 MinFontSize = 9;
+            const int32 MaxFontSize = 14;
+            
+            FMenuBuilder MenuBuilder{true, TSharedPtr<FUICommandList>()};
+            for(int32 i = MinFontSize ; i <= MaxFontSize ; i++)
+            {
+                MenuBuilder.AddMenuEntry(
+                    FText::AsNumber(i),
+                    FText::GetEmpty(),
+                    FSlateIcon(),
+                    FUIAction( FExecuteAction::CreateLambda(
+                        [=]()
+                        {
+                            CodeFontInfo.Size = i;
+                            ShaderMarshaller->MakeDirty();
+                            ShaderMultiLineEditableText->Refresh();
+                        })
+                    ,FCanExecuteAction(),
+                    FIsActionChecked::CreateLambda(
+                        [=]()
+                        {
+                            return CodeFontInfo.Size == i;
+                        })),
+                    NAME_None,
+                    EUserInterfaceActionType::RadioButton);
+            }
+
+            return MenuBuilder.MakeWidget();
+        };
+        
+        TSharedRef<SWidget> InfoBar = SNew(SBorder)
+        .BorderImage(FAppStyle::Get().GetBrush("WhiteBrush"))
+        .BorderBackgroundColor(FLinearColor{0.1f, 0.1f, 0.1f, 0.2f})
+        .Padding(0)
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot()
+            .AutoWidth()
+            [
+                SNew(SComboButton)
+                .ComboButtonStyle(&FAppStyle::Get().GetWidgetStyle<FComboButtonStyle>("SimpleComboButton"))
+                .HasDownArrow(false)
+                .ButtonContent()
+                [
+                    SNew(STextBlock)
+                    .Text(FText::FromString(TEXT("❖")))
+                ]
+            ]
+            
+            + SHorizontalBox::Slot()
+            .AutoWidth()
+            [
+                SNew(SBorder)
+                .BorderImage(FAppStyle::Get().GetBrush("WhiteBrush"))
+                .BorderBackgroundColor(this, &SShaderEditorBox::GetEditStateColor)
+                [
+                    SNew(STextBlock)
+                    .ColorAndOpacity(FLinearColor::Black)
+                    .Text(this, &SShaderEditorBox::GetEditStateText)
+                    .Margin(FMargin{10, 0, 10, 0})
+                    
+                ]
+            ]
+            
+            + SHorizontalBox::Slot()
+            .FillWidth(1.0f)
+            [
+                SNullWidget::NullWidget
+            ]
+            
+            + SHorizontalBox::Slot()
+            .AutoWidth()
+            .HAlign(HAlign_Right)
+            .Padding(0, 0, 5, 0)
+            [
+                SNew(SComboButton)
+                .ComboButtonStyle(&FAppStyle::Get().GetWidgetStyle<FComboButtonStyle>("SimpleComboButton"))
+                .HasDownArrow(false)
+                .ButtonContent()
+                [
+                    SNew(STextBlock)
+                    .Text(this, &SShaderEditorBox::GetFontSizeText)
+                ]
+                .MenuContent()
+                [
+                    BuildFontSizeMenu()
+                ]
+            ]
+            
+            + SHorizontalBox::Slot()
+            .AutoWidth()
+            .HAlign(HAlign_Right)
+            [
+                SNew(SBorder)
+                .BorderImage(FAppStyle::Get().GetBrush("WhiteBrush"))
+                .BorderBackgroundColor(this, &SShaderEditorBox::GetEditStateColor)
+                [
+                    SNew(STextBlock)
+                    .ColorAndOpacity(FLinearColor::Black)
+                    .Text(this, &SShaderEditorBox::GetRowColText)
+                    .Margin(FMargin{20, 0, 20, 0})
+                ]
+            ]
+            
+        ];
+        
+        return InfoBar;
+    }
 
 	void SShaderEditorBox::UpdateLineTipStyle(const double InCurrentTime)
 	{
@@ -174,8 +323,11 @@ namespace SH
 				{
 					ItemTableRow->SetBorderBackgroundColor(NormalLineTipColor);
 				}
-				
+                
+                TSharedPtr<STextBlock> DummyTextBlock = StaticCastSharedPtr<STextBlock>(ItemTableRow->GetContent());
+                DummyTextBlock->SetFont(CodeFontInfo);
 			}
+            
 		}
 	}
 
@@ -191,15 +343,28 @@ namespace SH
 			TSharedPtr<ITableRow> ItemTableRow = LineNumberList->WidgetFromItem(ItemData);
 			if (ItemTableRow.IsValid())
 			{
-				TSharedPtr<STextBlock> ItemWidget = StaticCastSharedPtr<STextBlock>(ItemTableRow->GetContent());
+				TSharedPtr<SHorizontalBox> ItemWidget = StaticCastSharedPtr<SHorizontalBox>(ItemTableRow->GetContent());
+                TSharedPtr<STextBlock> ItemLineNumber = StaticCastSharedRef<STextBlock>(ItemWidget->GetSlot(1).GetWidget());
+                
+                ItemLineNumber->SetFont(CodeFontInfo);
 				if (i >= BeginLineNumber && i <= EndLineNumber)
 				{
-					ItemWidget->SetColorAndOpacity(HighlightLineNumberTextColor);
+                    ItemLineNumber->SetColorAndOpacity(HighlightLineNumberTextColor);
 				}
 				else
 				{
-					ItemWidget->SetColorAndOpacity(NormalLineNumberTextColor);
+                    ItemLineNumber->SetColorAndOpacity(NormalLineNumberTextColor);
 				}
+                
+                TSharedPtr<STextBlock> ItemErrorMarker = StaticCastSharedRef<STextBlock>(ItemWidget->GetSlot(0).GetWidget());
+                if(EffectMarshller->LineNumToErrorInfo.Contains(i + 1))
+                {
+                    ItemErrorMarker->SetColorAndOpacity(FLinearColor::Red);
+                }
+                else
+                {
+                    ItemErrorMarker->SetColorAndOpacity(FLinearColor::Transparent);
+                }
 			}
 		}
 	}
@@ -252,7 +417,7 @@ namespace SH
 			while (DiffNum--)
 			{
 				CurLineNum++;
-				LineNumberData.Add(MakeShared<FText>(FText::FromString(FString::FromInt(CurLineNum))));
+				LineNumberData.Add(MakeShared<FText>(FText::AsNumber(CurLineNum)));
 			}
 		}
 		else
@@ -271,10 +436,12 @@ namespace SH
 		EffectMarshller->LineNumToErrorInfo.Reset();
 		if (GpuApi::CrossCompileShader(NewPixelShader, ErrorInfo))
 		{
+            CurEditState = EditState::Normal;
 			Renderer->UpdatePixelShader(MoveTemp(NewPixelShader));
 		}
 		else
 		{
+            CurEditState = EditState::Failed;
 			TArray<ShaderErrorInfo> ErrorInfos = ParseErrorInfoFromDxc(ErrorInfo);
 			for (const ShaderErrorInfo& ErrorInfo : ErrorInfos)
 			{
@@ -645,11 +812,24 @@ namespace SH
 			.Style(&FShaderHelperStyle::Get().GetWidgetStyle<FTableRowStyle>("LineNumberItemStyle"))
 			.Content()
 			[
-				LineNumberTextBlock.ToSharedRef()
+                SNew(SHorizontalBox)
+                +SHorizontalBox::Slot()
+                [
+                    SNew(STextBlock)
+                    .Font(FShaderHelperStyle::Get().GetFontStyle("CodeFont"))
+                    .ColorAndOpacity(FLinearColor::Transparent)
+                    .Text(FText::FromString(TEXT("✘")))
+                ]
+
+                + SHorizontalBox::Slot()
+                [
+                    LineNumberTextBlock.ToSharedRef()
+                ]
+				
 			];
 	}
 
-	TSharedRef<ITableRow> SShaderEditorBox::GenerateRowTipForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
+	TSharedRef<ITableRow> SShaderEditorBox::GenerateLineTipForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
 	{
 		//DummyTextBlock is used to keep the same layout as LineNumber and MultiLineEditableText.
 		TSharedPtr<STextBlock> DummyTextBlock = SNew(STextBlock)
@@ -669,8 +849,10 @@ namespace SH
 		return LineTip.ToSharedRef();
 	}
 
-	FShaderEditorMarshaller::FShaderEditorMarshaller(TSharedPtr<HlslHighLightTokenizer> InTokenizer)
-		: TextLayout(nullptr), Tokenizer(MoveTemp(InTokenizer))
+	FShaderEditorMarshaller::FShaderEditorMarshaller(SShaderEditorBox* InOwnerWidget, TSharedPtr<HlslHighLightTokenizer> InTokenizer)
+		: OwnerWidget(InOwnerWidget)
+        , TextLayout(nullptr)
+        , Tokenizer(MoveTemp(InTokenizer))
 	{
 		TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::Number, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNumberText"));
 		TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::Keyword, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorKeywordText"));
@@ -696,6 +878,7 @@ namespace SH
 			for (const HlslHighLightTokenizer::Token& Token : TokenizedLine.Tokens)
 			{
 				FTextBlockStyle RunTextStyle = TokenStyleMap[Token.Type];
+                RunTextStyle.SetFont(OwnerWidget->GetFontInfo());
 				FTextRange NewTokenRange{ Token.Range.BeginIndex - RunBeginIndexInAllString, Token.Range.EndIndex - RunBeginIndexInAllString };
 				Runs.Add(FSlateTextRun::Create(FRunInfo(), LineText, MoveTemp(RunTextStyle), MoveTemp(NewTokenRange)));
 			}
@@ -727,10 +910,11 @@ namespace SH
 		for(int32 i = 0; i < OwnerWidget->GetCurLineNum(); i++)
 		{
 			TArray<TSharedRef<IRun>> Runs;
-			const FTextBlockStyle& ErrorInfoStyle = FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorErrorInfoText");
+			FTextBlockStyle ErrorInfoStyle = FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorErrorInfoText");
+            ErrorInfoStyle.SetFont(OwnerWidget->GetFontInfo());
             
             FTextBlockStyle DummyInfoStyle = FTextBlockStyle{}
-                .SetFont(FShaderHelperStyle::Get().GetFontStyle("CodeFont"))
+                .SetFont(OwnerWidget->GetFontInfo())
                 .SetColorAndOpacity(FLinearColor{0, 0, 0, 0});
             
 			if (LineNumToErrorInfo.Contains(i + 1))
