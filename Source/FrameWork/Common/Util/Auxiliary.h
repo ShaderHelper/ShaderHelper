@@ -273,6 +273,26 @@ namespace AUX
         template struct Hack_##ClassName##_##MemeberName<&ClassName::MemeberName>;                                  \
     };
 
+//Call a private member function without undefined behavior.
+//Note: The private function overloading is not currently supported.
+#define CALL_PRIVATE_FUNCTION(ClassName, FunctionName, Qualifiers, RetType, ...)                                        \
+    namespace                                                                                                           \
+    {                                                                                                                   \
+        using MemFuncPtr_##ClassName##_##FunctionName = RetType(ClassName::*)(__VA_ARGS__) Qualifiers;                                               \
+        MemFuncPtr_##ClassName##_##FunctionName GetPrivate_##ClassName##_##FunctionName();                                                           \
+        template<MemFuncPtr_##ClassName##_##FunctionName Ptr>                                                                                        \
+        struct Hack_##ClassName##_##FunctionName {                                                                      \
+            friend MemFuncPtr_##ClassName##_##FunctionName GetPrivate_##ClassName##_##FunctionName() { return Ptr; }                                 \
+        };                                                                                                              \
+        template struct Hack_##ClassName##_##FunctionName<&ClassName::FunctionName>;                                    \
+                                                                                                                        \
+        template<typename T, typename... Args>                                                                          \
+        RetType CallPrivate_##ClassName##_##FunctionName(T&& Object, Args&&... args)                                    \
+        {                                                                                                               \
+            MemFuncPtr_##ClassName##_##FunctionName Ptr = GetPrivate_##ClassName##_##FunctionName();                                                 \
+            return (std::forward<T>(Object).*Ptr)(std::forward<Args>(args)...);                                         \
+        }                                                                                                               \
+    };
 
 } // end AUX namespace
 } // end FRAMEWORK namespace

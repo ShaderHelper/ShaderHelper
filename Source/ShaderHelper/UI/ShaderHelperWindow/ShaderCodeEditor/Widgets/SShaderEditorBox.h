@@ -29,6 +29,8 @@ namespace SH
 		FTextLayout* TextLayout;
 		TSharedPtr<HlslHighLightTokenizer> Tokenizer;
 		TMap<HlslHighLightTokenizer::TokenType, FTextBlockStyle> TokenStyleMap;
+		//Key: The line number of Left Brace
+		TMap<int32, HlslHighLightTokenizer::BraceGroup> FoldingBraceGroups;
 	};
 
 	class FShaderEditorEffectMarshaller : public FBaseTextLayoutMarshaller
@@ -93,14 +95,19 @@ namespace SH
         FText GetFontSizeText() const;
         FText GetRowColText() const;
         FSlateColor GetEditStateColor() const;
+		
+	protected:
+		virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
         
 	private:
 		void UpdateLineTipStyle(const double InCurrentTime);
 		void UpdateLineNumberHighlight();
 		void UpdateListViewScrollBar();
 		void UpdateEffectText();
+		void UpdateFold();
 		void HandleAutoIndent() const;
         TSharedRef<SWidget> BuildInfoBar();
+		void GenerateInfoBarBox();
     
 	private:
 		int32 CurLineNum;
@@ -119,6 +126,8 @@ namespace SH
 		ShRenderer* Renderer;
         EditState CurEditState;
         FSlateFontInfo CodeFontInfo;
-
+		TSharedPtr<SHorizontalBox> InfoBarBox;
+		//Element: The line number of Left Brace
+		TArray<int32> LineNumbersOfFoldedBraceGroup;
 	};
 }

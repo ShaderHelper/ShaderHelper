@@ -32,10 +32,14 @@ namespace UNITTEST_FRAMEWORK
     {
         int GetVar() const {return Var;}
     private:
+		void test(int a) && {
+			SH_LOG(LogTestUtil, Display, TEXT("Test CALL_PRIVATE_FUNCTION:%d"), a);
+		}
         int Var = 233;
     };
     
     STEAL_PRIVATE_MEMBER(PrivateUnitTest, int, Var)
+	CALL_PRIVATE_FUNCTION(PrivateUnitTest, test, &&, void, int)
     
 	void TestUtil()
 	{
@@ -191,6 +195,11 @@ namespace UNITTEST_FRAMEWORK
             Var = 1;
             SH_LOG(LogTestUtil, Display, TEXT("Test STEAL_PRIVATE_MEMBER:%d"), Var);
         }
+		
+		//Test CALL_PRIVATE_FUNCTION
+		{
+			CallPrivate_PrivateUnitTest_test(PrivateUnitTest{}, 123);
+		}
 
 	}
 
