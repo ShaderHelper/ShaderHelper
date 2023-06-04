@@ -156,7 +156,7 @@ namespace SH
 		return Ret;
 	}
 
-	TArray<HlslHighLightTokenizer::TokenizedLine> HlslHighLightTokenizer::Tokenize(const FString& HlslCodeString)
+	TArray<HlslHighLightTokenizer::TokenizedLine> HlslHighLightTokenizer::Tokenize(const FString& HlslCodeString, TArray<BraceGroup>& OutBraceGroups)
 	{
 		TArray<HlslHighLightTokenizer::TokenizedLine> TokenizedLines;
 		TArray<FTextRange> LineRanges;
@@ -200,10 +200,15 @@ namespace SH
 			}
 		};
 
+		TArray<BraceGroup::BracePos> LeftBraceStack;
+		int32 CurRow = 0;
+		int32 CurCol = 0;
+
 		StateSet LastLineState = StateSet::Start;
 
 		for (const FTextRange& LineRange : LineRanges)
 		{
+			CurRow++;
 			HlslHighLightTokenizer::TokenizedLine TokenizedLine;
 			TokenizedLine.LineRange = LineRange;
 
@@ -227,6 +232,7 @@ namespace SH
 					const TCHAR* CurString = &HlslCodeString[CurOffset];
 					const TCHAR CurChar = HlslCodeString[CurOffset];
 					int32 RemainingLen = HlslCodeString.Len() - CurOffset;
+					CurCol = CurOffset - LineRange.BeginIndex + 1;
 
 					switch (CurLineState)
 					{
@@ -243,6 +249,21 @@ namespace SH
 								CurOffset += 2;
 							}
 							else if (TOptional<int32> PunctuationLen = IsMatchPunctuation(CurString, RemainingLen, MatchedPunctuation)) {
+
+								if (MatchedPunctuation == "{") {
+									LeftBraceStack.Push({ CurRow, CurCol });
+								}
+								else if (MatchedPunctuation == "}") {
+
+									if (!LeftBraceStack.IsEmpty())
+									{
+										auto LeftBracePos = LeftBraceStack.Pop();
+										BraceGroup Group{ LeftBracePos, {CurRow, CurCol}};
+										OutBraceGroups.Add(MoveTemp(Group));
+									}
+								
+								}
+								
 								if (MatchedPunctuation == "+" || MatchedPunctuation == "-") {
 									if (LastTokenType && (LastTokenType == TokenType::Identifier || LastTokenType == TokenType::Number)) {
 										CurLineState = StateSet::Punctuation;
@@ -257,6 +278,7 @@ namespace SH
 								else {
 									CurLineState = StateSet::Punctuation;
 								}
+
 								CurOffset += *PunctuationLen;
 							}
 							else if (FChar::IsDigit(CurChar)) {

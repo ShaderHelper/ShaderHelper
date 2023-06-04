@@ -35,7 +35,17 @@ namespace SH
 			TArray<Token> Tokens;
 		};
 
+		struct BraceGroup
+		{
+			struct BracePos {
+				int32 Row, Col;
+			};
+
+			BracePos LeftBracePos;
+			BracePos RightBracePos;
+		};
+
 	public:
-		TArray<TokenizedLine> Tokenize(const FString& HlslCodeString);
+		TArray<TokenizedLine> Tokenize(const FString& HlslCodeString, TArray<BraceGroup>& OutBraceGroups);
 	};
 }
