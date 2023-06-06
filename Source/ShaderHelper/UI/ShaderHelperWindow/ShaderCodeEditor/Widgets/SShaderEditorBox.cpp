@@ -10,7 +10,7 @@
 STEAL_PRIVATE_MEMBER(SScrollBar, TSharedPtr<SScrollBarTrack>, Track)
 STEAL_PRIVATE_MEMBER(SMultiLineEditableText, TUniquePtr<FSlateEditableTextLayout>, EditableTextLayout)
 STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, TSharedPtr<FSlateTextLayout>, TextLayout)
-CALL_PRIVATE_FUNCTION(SMultiLineEditableText, OnMouseWheel,, FReply, const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+CALL_PRIVATE_FUNCTION(SMultiLineEditableText_OnMouseWheel, SMultiLineEditableText, OnMouseWheel,, FReply, const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 
 namespace SH
 {
