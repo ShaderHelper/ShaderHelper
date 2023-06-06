@@ -35,12 +35,19 @@ namespace UNITTEST_FRAMEWORK
 		void test(int a) && {
 			SH_LOG(LogTestUtil, Display, TEXT("Test CALL_PRIVATE_FUNCTION:%d"), a);
 		}
+        void overload(int a, int b) {
+            SH_LOG(LogTestUtil, Display, TEXT("Test CALL_PRIVATE_FUNCTION:%d"), a + b);
+        }
+        void overload(float a) {
+            SH_LOG(LogTestUtil, Display, TEXT("Test CALL_PRIVATE_FUNCTION:%f"), a);
+        }
         int Var = 233;
     };
     
     STEAL_PRIVATE_MEMBER(PrivateUnitTest, int, Var)
-	CALL_PRIVATE_FUNCTION(PrivateUnitTest, test, &&, void, int)
-    
+	CALL_PRIVATE_FUNCTION(PrivateUnitTest_test, PrivateUnitTest, test, &&, void, int)
+    CALL_PRIVATE_FUNCTION(PrivateUnitTest_overload1, PrivateUnitTest, overload,, void, int, int)
+    CALL_PRIVATE_FUNCTION(PrivateUnitTest_overload2, PrivateUnitTest, overload,, void, float)
 	void TestUtil()
 	{
 		SH_LOG(LogTestUtil, Display, TEXT("Unit Test - Util:"));
@@ -199,6 +206,8 @@ namespace UNITTEST_FRAMEWORK
 		//Test CALL_PRIVATE_FUNCTION
 		{
 			CallPrivate_PrivateUnitTest_test(PrivateUnitTest{}, 123);
+            CallPrivate_PrivateUnitTest_overload1(PrivateUnitTest{}, 114514, 1);
+            CallPrivate_PrivateUnitTest_overload2(PrivateUnitTest{}, 233.233f);
 		}
 
 	}
