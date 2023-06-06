@@ -274,22 +274,22 @@ namespace AUX
     };
 
 //Call a private member function without undefined behavior.
-//Note: The private function overloading is not currently supported.
-#define CALL_PRIVATE_FUNCTION(ClassName, FunctionName, Qualifiers, RetType, ...)                                        \
+//Note: Not support dynamic dispatch
+#define CALL_PRIVATE_FUNCTION(CalleeName, ClassName, FunctionName, Qualifiers, RetType, ...)                            \
     namespace                                                                                                           \
     {                                                                                                                   \
-        using MemFuncPtr_##ClassName##_##FunctionName = RetType(ClassName::*)(__VA_ARGS__) Qualifiers;                                               \
-        MemFuncPtr_##ClassName##_##FunctionName GetPrivate_##ClassName##_##FunctionName();                                                           \
-        template<MemFuncPtr_##ClassName##_##FunctionName Ptr>                                                                                        \
-        struct Hack_##ClassName##_##FunctionName {                                                                      \
-            friend MemFuncPtr_##ClassName##_##FunctionName GetPrivate_##ClassName##_##FunctionName() { return Ptr; }                                 \
+        using MemFuncPtr_##CalleeName = RetType(ClassName::*)(__VA_ARGS__) Qualifiers;                                  \
+        MemFuncPtr_##CalleeName GetPrivate_##CalleeName();                                                              \
+        template<MemFuncPtr_##CalleeName Ptr>                                                                           \
+        struct Hack_##CalleeName {                                                                                      \
+            friend MemFuncPtr_##CalleeName GetPrivate_##CalleeName() { return Ptr; }                                    \
         };                                                                                                              \
-        template struct Hack_##ClassName##_##FunctionName<&ClassName::FunctionName>;                                    \
+        template struct Hack_##CalleeName<static_cast<MemFuncPtr_##CalleeName>(&ClassName::FunctionName)>;              \
                                                                                                                         \
         template<typename T, typename... Args>                                                                          \
-        RetType CallPrivate_##ClassName##_##FunctionName(T&& Object, Args&&... args)                                    \
+        RetType CallPrivate_##CalleeName(T&& Object, Args&&... args)                                                    \
         {                                                                                                               \
-            MemFuncPtr_##ClassName##_##FunctionName Ptr = GetPrivate_##ClassName##_##FunctionName();                                                 \
+            MemFuncPtr_##CalleeName Ptr = GetPrivate_##CalleeName();                                                    \
             return (std::forward<T>(Object).*Ptr)(std::forward<Args>(args)...);                                         \
         }                                                                                                               \
     };
