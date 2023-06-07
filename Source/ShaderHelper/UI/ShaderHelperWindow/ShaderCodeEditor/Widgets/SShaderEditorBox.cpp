@@ -5,12 +5,16 @@
 #include <Widgets/Layout/SScrollBarTrack.h>
 #include <Framework/Text/SlateTextRun.h>
 #include "GpuApi/GpuApiInterface.h"
+#include <Widgets/Layout/SScaleBox.h>
+#include <Framework/Commands/GenericCommands.h>
+#include <HAL/PlatformApplicationMisc.h>
 
 //No exposed methods, and too lazy to modify the source code for UE.
 STEAL_PRIVATE_MEMBER(SScrollBar, TSharedPtr<SScrollBarTrack>, Track)
 STEAL_PRIVATE_MEMBER(SMultiLineEditableText, TUniquePtr<FSlateEditableTextLayout>, EditableTextLayout)
 STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, TSharedPtr<FSlateTextLayout>, TextLayout)
-CALL_PRIVATE_FUNCTION(SMultiLineEditableText_OnMouseWheel, SMultiLineEditableText, OnMouseWheel,, FReply, const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, TSharedPtr<FUICommandList>, UICommandList)
+CALL_PRIVATE_FUNCTION(SMultiLineEditableText_OnMouseWheel, SMultiLineEditableText, OnMouseWheel,, FReply, const FGeometry&, const FPointerEvent&)
 
 namespace SH
 {
@@ -41,16 +45,17 @@ namespace SH
 			while (LineNums--)
 			{
 				CurLineNum++;
-				LineNumberData.Add(MakeShared<FText>(FText::AsNumber(CurLineNum)));
+				LineNumberData.Add(MakeShared<FText>(FText::FromString(FString::FromInt(CurLineNum))));
 			}
 		}
 		else
 		{
 			CurLineNum = 1;
-			LineNumberData.Add(MakeShared<FText>(FText::AsNumber(CurLineNum)));
+			LineNumberData.Add(MakeShared<FText>(FText::FromString(FString::FromInt(CurLineNum))));
 		}
         
         CurEditState = EditState::Normal;
+		FullShaderSource = InArgs._Text.ToString();
 		
 		ChildSlot
 		[
@@ -68,7 +73,6 @@ namespace SH
                     [
                         SNew(SHorizontalBox)
                         + SHorizontalBox::Slot()
-                        .Padding(5, 0, 0, 0)
                         .AutoWidth()
                         [
                             SAssignNew(LineNumberList, SListView<LineNumberItemPtr>)
@@ -81,7 +85,7 @@ namespace SH
                         ]
 
                         + SHorizontalBox::Slot()
-                        .Padding(10, 0, 0, 0)
+                        .Padding(5, 0, 0, 0)
                         .FillWidth(1.0f)
                         [
                             SNew(SOverlay)
@@ -142,6 +146,17 @@ namespace SH
 		];
         
         EffectMultiLineEditableText->SetCanTick(false);
+
+		//Hook, reset the copy behavior.
+		TUniquePtr<FSlateEditableTextLayout>& ShaderEditableTextLayout = GetPrivate_SMultiLineEditableText_EditableTextLayout(*ShaderMultiLineEditableText);
+		TSharedPtr<FUICommandList>& UICommandList = GetPrivate_FSlateEditableTextLayout_UICommandList(*ShaderEditableTextLayout);
+		UICommandList->UnmapAction(FGenericCommands::Get().Copy);
+
+		UICommandList->MapAction(
+			FGenericCommands::Get().Copy,
+			FExecuteAction::CreateRaw(this, &SShaderEditorBox::CopySelectedText),
+			FCanExecuteAction::CreateRaw(this, &SShaderEditorBox::CanCopySelectedText)
+		);
 	}
 
     FText SShaderEditorBox::GetEditStateText() const
@@ -318,6 +333,32 @@ namespace SH
         return InfoBar;
     }
 
+	void SShaderEditorBox::CopySelectedText()
+	{
+		TUniquePtr<FSlateEditableTextLayout>& ShaderEditableTextLayout = GetPrivate_SMultiLineEditableText_EditableTextLayout(*ShaderMultiLineEditableText);
+		if (ShaderEditableTextLayout->AnyTextSelected())
+		{
+			FString SelectedText = ShaderEditableTextLayout->GetSelectedText().ToString();
+
+			// Copy text to clipboard
+			FPlatformApplicationMisc::ClipboardCopy(*SelectedText);
+		}
+	}
+
+	bool SShaderEditorBox::CanCopySelectedText() const
+	{
+		bool bCanExecute = true;
+
+		TUniquePtr<FSlateEditableTextLayout>& ShaderEditableTextLayout = GetPrivate_SMultiLineEditableText_EditableTextLayout(*ShaderMultiLineEditableText);
+		// Can't execute if there is no text selected
+		if (!ShaderEditableTextLayout->AnyTextSelected())
+		{
+			bCanExecute = false;
+		}
+
+		return bCanExecute;
+	}
+
 	void SShaderEditorBox::UpdateLineTipStyle(const double InCurrentTime)
 	{
 		
@@ -407,6 +448,28 @@ namespace SH
 		return CallPrivate_SMultiLineEditableText_OnMouseWheel(*ShaderMultiLineEditableText, MyGeometry, MouseEvent);
 	}
 
+	FReply SShaderEditorBox::OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+	{
+		Vector2D ScreenSpacePos = MouseEvent.GetScreenSpacePosition();
+		Vector2D BoxSpacePos = MyGeometry.AbsoluteToLocal(ScreenSpacePos);
+		double AllowableX = LineNumberList->GetTickSpaceGeometry().GetLocalSize().X + 5;
+		double AllowableY = MyGeometry.GetLocalSize().Y - InfoBarBox->GetTickSpaceGeometry().GetLocalSize().Y + 5;
+		if (BoxSpacePos.X <= AllowableX && BoxSpacePos.Y <= AllowableY)
+		{
+			UpdateFold(true);
+		}
+		else
+		{
+			UpdateFold(false);
+		}
+		return FReply::Handled();
+	}
+
+	void SShaderEditorBox::OnMouseLeave(const FPointerEvent& MouseEvent)
+	{
+		UpdateFold(false);
+	}
+
 	void SShaderEditorBox::UpdateListViewScrollBar()
 	{
 		TSharedPtr<SScrollBarTrack>& Track = GetPrivate_SScrollBar_Track(*ShaderMultiLineVScrollBar);
@@ -436,9 +499,33 @@ namespace SH
 		EffectTextLayout->SetVisibleRegion(EffectMultiLineGeometry.GetLocalSize(), ShaderScrollOffset * EffectTextLayout->GetScale());
 	}
 
-	void SShaderEditorBox::UpdateFold()
+	void SShaderEditorBox::UpdateFold(bool IsShow)
 	{
+		for (int32 i = 0; i < LineNumberData.Num(); i++)
+		{
+			LineNumberItemPtr ItemData = LineNumberData[i];
+			TSharedPtr<ITableRow> ItemTableRow = LineNumberList->WidgetFromItem(ItemData);
+			if (ItemTableRow.IsValid())
+			{
+				TSharedPtr<SHorizontalBox> ItemWidget = StaticCastSharedPtr<SHorizontalBox>(ItemTableRow->GetContent());
+				TSharedPtr<SScaleBox> ItemArrowBox = StaticCastSharedRef<SScaleBox>(ItemWidget->GetSlot(2).GetWidget());
+				TSharedPtr<SButton> ItemArrowButton = StaticCastSharedRef<SButton>(ItemArrowBox->GetChildren()->GetChildAt(0));
+				if (ShaderMarshaller->FoldingBraceGroups.Contains(i + 1))
+				{
+					if (FoldedLineNumbers.Contains(i + 1))
+					{
+						ItemArrowButton->SetButtonStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FButtonStyle>("ArrowRightButton"));
+						ItemArrowButton->SetVisibility(EVisibility::Visible);
+					}
+					else
+					{
+						ItemArrowButton->SetButtonStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FButtonStyle>("ArrowDownButton"));
+						ItemArrowButton->SetVisibility(IsShow ? EVisibility::Visible : EVisibility::Collapsed);
+					}
+				}
 
+			}
+		}
 	}
 
 	void SShaderEditorBox::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
@@ -448,7 +535,6 @@ namespace SH
 		UpdateListViewScrollBar();
 		UpdateLineNumberHighlight();
 		UpdateLineTipStyle(InCurrentTime);
-		UpdateFold();
 		UpdateEffectText();
 	}
 
@@ -461,7 +547,7 @@ namespace SH
 			while (DiffNum--)
 			{
 				CurLineNum++;
-				LineNumberData.Add(MakeShared<FText>(FText::AsNumber(CurLineNum)));
+				LineNumberData.Add(MakeShared<FText>(FText::FromString(FString::FromInt(CurLineNum))));
 			}
 		}
 		else
@@ -475,7 +561,9 @@ namespace SH
 		LineNumberList->RequestListRefresh();
 		LineTipList->RequestListRefresh();
 
-		TRefCountPtr<GpuShader> NewPixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, InText.ToString(), {}, TEXT("MainPS"));
+		FString NewShaderSouce = InText.ToString();
+		
+		TRefCountPtr<GpuShader> NewPixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, MoveTemp(NewShaderSouce), {}, TEXT("MainPS"));
 		FString ErrorInfo;
 		EffectMarshller->LineNumToErrorInfo.Reset();
 		if (GpuApi::CrossCompileShader(NewPixelShader, ErrorInfo))
@@ -560,7 +648,7 @@ namespace SH
 		const int32 CurLineIndex = CursorLocation.GetLineIndex();
 		const int32 LastLineIndex = CurLineIndex - 1;
 
-		if (LastLineIndex > 0)
+		if (LastLineIndex >= 0)
 		{
 			FString LastLine;
 			Text->GetTextLine(LastLineIndex, LastLine);
@@ -855,14 +943,31 @@ namespace SH
 			.Text(*Item)
 			.Justification(ETextJustify::Right)
 			.MinDesiredWidth(15.0f);
+		
+		int32 LineNumber = FCString::Atoi(*(*Item).ToString());
 
 		TSharedPtr<SButton> FoldingArrow = SNew(SButton)
 			.ContentPadding(FMargin(0, 0))
-			.ButtonStyle(FAppStyle::Get(), "SimpleButton")
-			[
-				SNew(STextBlock)
-				.Font(CodeFontInfo)
-			];
+			.ButtonStyle(FAppStyle::Get(), "InvisibleButton")
+			.OnClicked_Lambda(
+				[=]()
+				{
+					if (!FoldedLineNumbers.Contains(LineNumber))
+					{
+						auto BraceGroup = ShaderMarshaller->FoldingBraceGroups[LineNumber];
+						
+
+					//	FoledLineNumberToLineText[]
+						
+						FoldedLineNumbers.Add(LineNumber);
+					}
+					else
+					{
+						FoldedLineNumbers.Remove(LineNumber);
+					}
+					return FReply::Handled();
+				});
+		
 		FoldingArrow->SetPadding(FMargin{});
 		
 		return SNew(STableRow<LineNumberItemPtr>, OwnerTable)
@@ -886,9 +991,12 @@ namespace SH
                 ]
 
 				+ SHorizontalBox::Slot()
-				.Padding(2, 0, 0, 0)
+				.Padding(5, 0, 0, 0)
 				[
-					FoldingArrow.ToSharedRef()
+					SNew(SScaleBox)
+					[
+						FoldingArrow.ToSharedRef()
+					]
 				]
 				
 			];
@@ -954,7 +1062,7 @@ namespace SH
 			for (const HlslHighLightTokenizer::Token& Token : TokenizedLine.Tokens)
 			{
 				FTextBlockStyle RunTextStyle = TokenStyleMap[Token.Type];
-                RunTextStyle.SetFont(OwnerWidget->GetFontInfo());
+				RunTextStyle.SetFont(OwnerWidget->GetFontInfo());
 				FTextRange NewTokenRange{ Token.Range.BeginIndex - RunBeginIndexInAllString, Token.Range.EndIndex - RunBeginIndexInAllString };
 				Runs.Add(FSlateTextRun::Create(FRunInfo(), LineText, MoveTemp(RunTextStyle), MoveTemp(NewTokenRange)));
 			}
