@@ -95,22 +95,28 @@ namespace SH
         FText GetFontSizeText() const;
         FText GetRowColText() const;
         FSlateColor GetEditStateColor() const;
+		TArray<int32> GetFoldedLineNumbers() const { return FoldedLineNumbers; }
+		FString GetFullShaderSource() const { return FullShaderSource; }
 		
 	protected:
 		virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+		virtual FReply OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+		virtual void OnMouseLeave(const FPointerEvent& MouseEvent) override;
         
 	private:
+		void CopySelectedText();
+		bool CanCopySelectedText() const;
+
 		void UpdateLineTipStyle(const double InCurrentTime);
 		void UpdateLineNumberHighlight();
 		void UpdateListViewScrollBar();
 		void UpdateEffectText();
-		void UpdateFold();
+		void UpdateFold(bool IsShow);
 		void HandleAutoIndent() const;
         TSharedRef<SWidget> BuildInfoBar();
 		void GenerateInfoBarBox();
     
 	private:
-		int32 CurLineNum;
 		TArray<LineNumberItemPtr> LineNumberData;
 		TSharedPtr<FShaderEditorMarshaller> ShaderMarshaller;
         TSharedPtr<SMultiLineEditableText> ShaderMultiLineEditableText;
@@ -128,6 +134,10 @@ namespace SH
         FSlateFontInfo CodeFontInfo;
 		TSharedPtr<SHorizontalBox> InfoBarBox;
 		//Element: The line number of Left Brace
-		TArray<int32> LineNumbersOfFoldedBraceGroup;
+		TArray<int32> FoldedLineNumbers;
+		TMap<int32, TArray<FString>> FoledLineNumberToLineText;
+
+		int32 CurLineNum;
+		FString FullShaderSource;
 	};
 }

@@ -51,7 +51,6 @@ namespace SH {
 
 		FTextBlockStyle CodeEditorNormalTextStyle = FTextBlockStyle{}
 			.SetFont(CodeFontInfo)
-			.SetSelectedBackgroundColor(FLinearColor{ 0.1f , 0.3f, 1.0f, 0.4f })
 			.SetColorAndOpacity(FLinearColor::White);
 		
 		FTextBlockStyle CodeEditorPunctuationTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
@@ -87,6 +86,21 @@ namespace SH {
 		FTextBlockStyle CodeEditorErrorInfoStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
 			.SetColorAndOpacity(FLinearColor::Red);
 		Style->Set("CodeEditorErrorInfoText", CodeEditorErrorInfoStyle);
+		
+		const FVector2D Icon14x14(14.0f, 14.0f);
+		
+		const FButtonStyle ArrowDownButton = FButtonStyle()
+			.SetNormal(IMAGE_BRUSH("Extra/ArrowDown", Icon14x14))
+			.SetHovered(IMAGE_BRUSH("Extra/ArrowDown", Icon14x14))
+			.SetPressed(IMAGE_BRUSH("Extra/ArrowDown", Icon14x14));
+
+		const FButtonStyle ArrowRightButton = FButtonStyle()
+			.SetNormal(IMAGE_BRUSH("Extra/ArrowRight", Icon14x14))
+			.SetHovered(IMAGE_BRUSH("Extra/ArrowRight", Icon14x14))
+			.SetPressed(IMAGE_BRUSH("Extra/ArrowRight", Icon14x14));
+
+		Style->Set("ArrowDownButton", ArrowDownButton);
+		Style->Set("ArrowRightButton", ArrowRightButton);
 		
 		return Style;
 	}
