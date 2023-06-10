@@ -22,7 +22,7 @@ namespace FRAMEWORK
         const FString& GetEntryPoint() const { return EntryPoint; }
         id<MTLFunction> GetCompilationResult() const { return ByteCodeFunc; }
         
-        bool IsCompiled() const { return (bool)ByteCodeFunc; }
+        virtual bool IsCompiled() const override { return (bool)ByteCodeFunc; }
         void SetCompilationResult(mtlpp::Function InByteCodeFunc) { ByteCodeFunc = MoveTemp(InByteCodeFunc); }
         
     private:

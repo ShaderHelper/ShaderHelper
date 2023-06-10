@@ -21,7 +21,7 @@ namespace FRAMEWORK
         const FString& GetEntryPoint() const { return EntryPoint; }
         const FString& GetShaderTarget() const { return ShaderTaget; }
 		IDxcBlob* GetCompilationResult() const { return ByteCode; }
-		bool IsCompiled() const { return ByteCode.IsValid(); }
+		virtual bool IsCompiled() const override { return ByteCode.IsValid(); }
 		void SetCompilationResult(TRefCountPtr<IDxcBlob> InByteCode) { ByteCode = MoveTemp(InByteCode); }
 
 	private:

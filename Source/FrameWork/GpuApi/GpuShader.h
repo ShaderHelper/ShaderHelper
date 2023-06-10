@@ -6,7 +6,10 @@ namespace FRAMEWORK
 {
     class GpuShader : public GpuResource
     {
-        
+	public:
+		virtual bool IsCompiled() const {
+			return false;
+		}
     };
 
 	struct ShaderErrorInfo

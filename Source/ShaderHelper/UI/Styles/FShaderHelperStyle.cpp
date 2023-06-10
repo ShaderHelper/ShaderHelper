@@ -51,6 +51,7 @@ namespace SH {
 
 		FTextBlockStyle CodeEditorNormalTextStyle = FTextBlockStyle{}
 			.SetFont(CodeFontInfo)
+			.SetHighlightColor(FLinearColor::Yellow)
 			.SetColorAndOpacity(FLinearColor::White);
 		
 		FTextBlockStyle CodeEditorPunctuationTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
@@ -73,7 +74,7 @@ namespace SH {
 
 		FTextBlockStyle CodeEditorPreprocessTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
 			.SetColorAndOpacity(FLinearColor{0.35f, 0.35f, 0.35f, 1.0f});
-			
+
 		Style->Set("CodeEditorNormalText", CodeEditorNormalTextStyle);
 		Style->Set("CodeEditorPunctuationText", CodeEditorPunctuationTextStyle);
 		Style->Set("CodeEditorKeywordText", CodeEditorKeywordTextStyle);
