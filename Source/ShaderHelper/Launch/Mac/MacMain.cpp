@@ -1,6 +1,6 @@
 #include "CommonHeader.h"
 #include "App/ShaderHelperApp.h"
-#include "UI/ShaderHelperWindow/Widgets/SShaderHelperWindow.h"
+#include "UI/Widgets/ShaderHelperWindow/SShaderHelperWindow.h"
 #include <Mac/CocoaThread.h>
 #include "Renderer/ShRenderer.h"
 #include "UI/Styles/FShaderHelperStyle.h"

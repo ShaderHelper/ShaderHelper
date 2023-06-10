@@ -19,23 +19,20 @@ namespace SH
 {
     return float4(1,1,0,1);
 })";
-	
-	ShRenderer::ShRenderer() 
+
+	ShRenderer::ShRenderer()
 		: ViewPort(nullptr)
 	{
 
 		VertexShader = GpuApi::CreateShaderFromSource(ShaderType::VertexShader, DefaultVertexShaderText, TEXT("DefaultFullScreenVS"), TEXT("MainVS"));
 		FString ErrorInfo;
 		check(GpuApi::CrossCompileShader(VertexShader, ErrorInfo));
-
-		PixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, DefaultPixelShaderText, {}, TEXT("MainPS"));
-		check(GpuApi::CrossCompileShader(PixelShader, ErrorInfo));
 	}
 
 	void ShRenderer::OnViewportResize()
 	{
 		check(ViewPort);
-        //Note: BGRA8_UNORM is default framebuffer format in ue standalone renderer framework.
+		//Note: BGRA8_UNORM is default framebuffer format in ue standalone renderer framework.
 		GpuTextureDesc Desc{ (uint32)ViewPort->GetSize().X, (uint32)ViewPort->GetSize().Y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::Shared | GpuTextureUsage::RenderTarget };
 		FinalRT = GpuApi::CreateGpuTexture(Desc);
 		ViewPort->SetViewPortRenderTexture(FinalRT);
@@ -46,12 +43,15 @@ namespace SH
 	void ShRenderer::UpdatePixelShader(TRefCountPtr<GpuShader> NewPixelShader)
 	{
 		PixelShader = MoveTemp(NewPixelShader);
-		ReCreatePipelineState();
+		if (FinalRT.IsValid()) {
+			ReCreatePipelineState();
+		}
 	}
 
 	void ShRenderer::ReCreatePipelineState()
 	{
-		check(FinalRT.IsValid());
+		check(VertexShader->IsCompiled());
+		check(PixelShader->IsCompiled());
 		PipelineStateDesc::RtFormatStorageType RenderTargetFormats{ FinalRT->GetFormat() };
 		PipelineStateDesc PipelineDesc{
 			VertexShader, PixelShader, RasterizerStateDesc{RasterizerFillMode::Solid, RasterizerCullMode::None}, GpuResourceHelper::GDefaultBlendStateDesc, RenderTargetFormats

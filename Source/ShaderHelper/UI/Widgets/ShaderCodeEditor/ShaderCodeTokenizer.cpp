@@ -201,7 +201,7 @@ namespace SH
 		};
 
 		TArray<BraceGroup::BracePos> LeftBraceStack;
-		int32 CurRow = 0;
+		int32 CurRow = -1;
 		int32 CurCol = 0;
 
 		StateSet LastLineState = StateSet::Start;
@@ -232,7 +232,7 @@ namespace SH
 					const TCHAR* CurString = &HlslCodeString[CurOffset];
 					const TCHAR CurChar = HlslCodeString[CurOffset];
 					int32 RemainingLen = HlslCodeString.Len() - CurOffset;
-					CurCol = CurOffset - LineRange.BeginIndex + 1;
+					CurCol = CurOffset - LineRange.BeginIndex;
 
 					switch (CurLineState)
 					{

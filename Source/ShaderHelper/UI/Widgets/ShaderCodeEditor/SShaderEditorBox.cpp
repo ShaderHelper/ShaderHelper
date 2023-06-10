@@ -8,11 +8,12 @@
 #include <Widgets/Layout/SScaleBox.h>
 #include <Framework/Commands/GenericCommands.h>
 #include <HAL/PlatformApplicationMisc.h>
+#include <Framework/Text/TextLayout.h>
+#include "ShaderCodeEditorLineHighlighter.h"
 
 //No exposed methods, and too lazy to modify the source code for UE.
 STEAL_PRIVATE_MEMBER(SScrollBar, TSharedPtr<SScrollBarTrack>, Track)
 STEAL_PRIVATE_MEMBER(SMultiLineEditableText, TUniquePtr<FSlateEditableTextLayout>, EditableTextLayout)
-STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, TSharedPtr<FSlateTextLayout>, TextLayout)
 STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, TSharedPtr<FUICommandList>, UICommandList)
 CALL_PRIVATE_FUNCTION(SMultiLineEditableText_OnMouseWheel, SMultiLineEditableText, OnMouseWheel,, FReply, const FGeometry&, const FPointerEvent&)
 
@@ -25,6 +26,8 @@ namespace SH
 	const FLinearColor NormalLineTipColor = { 1.0f,1.0f,1.0f,0.0f };
 	const FLinearColor HighlightLineTipColor = { 1.0f,1.0f,1.0f,0.2f };
 	
+	const FString FoldMarkerText = TEXT("⇿");
+	const FString ErrorMarkerText = TEXT("✘");
 	
 	void SShaderEditorBox::Construct(const FArguments& InArgs)
 	{
@@ -36,27 +39,8 @@ namespace SH
 		ShaderMarshaller = MakeShared<FShaderEditorMarshaller>(this, MakeShared<HlslHighLightTokenizer>());
 		EffectMarshller = MakeShared<FShaderEditorEffectMarshaller>(this);
 
-		TArray<FTextRange> LineRanges;
-		FTextRange::CalculateLineRangesFromString(InArgs._Text.ToString(), LineRanges);
-		if (LineRanges.Num() > 0)
-		{
-			int32 LineNums = LineRanges.Num();
-			CurLineNum = 0;
-			while (LineNums--)
-			{
-				CurLineNum++;
-				LineNumberData.Add(MakeShared<FText>(FText::FromString(FString::FromInt(CurLineNum))));
-			}
-		}
-		else
-		{
-			CurLineNum = 1;
-			LineNumberData.Add(MakeShared<FText>(FText::FromString(FString::FromInt(CurLineNum))));
-		}
-        
-        CurEditState = EditState::Normal;
-		FullShaderSource = InArgs._Text.ToString();
-		
+		FText InitialShaderText = InArgs._Text;
+
 		ChildSlot
 		[
 			SNew(SBorder)
@@ -95,9 +79,8 @@ namespace SH
                                 + SOverlay::Slot()
                                 [
                                     SAssignNew(ShaderMultiLineEditableText, SMultiLineEditableText)
-                                    .Text(InArgs._Text)
+                                    .Text(InitialShaderText)
                                     .Marshaller(ShaderMarshaller)
-                                    .OnTextChanged(this, &SShaderEditorBox::OnShaderTextChanged)
                                     .VScrollBar(ShaderMultiLineVScrollBar)
                                     .HScrollBar(ShaderMultiLineHScrollBar)
                                     .OnKeyCharHandler(this, &SShaderEditorBox::OnTextKeyChar)
@@ -146,6 +129,8 @@ namespace SH
 		];
         
         EffectMultiLineEditableText->SetCanTick(false);
+		
+		CurEditState = EditState::Normal;
 
 		//Hook, reset the copy behavior.
 		TUniquePtr<FSlateEditableTextLayout>& ShaderEditableTextLayout = GetPrivate_SMultiLineEditableText_EditableTextLayout(*ShaderMultiLineEditableText);
@@ -184,12 +169,33 @@ namespace SH
         }
     }
 
+	int32 SShaderEditorBox::GetLineNumber(int32 InLineIndex) const
+	{
+		if (InLineIndex >= 0 && InLineIndex < LineNumberData.Num())
+		{
+			return FCString::Atoi(*LineNumberData[InLineIndex]->ToString());
+		}
+		else
+		{
+			return INDEX_NONE;
+		}
+	}
+
+	int32 SShaderEditorBox::GetLineIndex(int32 InLineNumber) const
+	{
+		int32 LineIndex = LineNumberData.IndexOfByPredicate(
+			[InLineNumber](const LineNumberItemPtr& InItem) 
+			{ return FCString::Atoi(*InItem->ToString()) == InLineNumber; });
+		check(LineIndex != INDEX_NONE);
+		return LineIndex;
+	}
+
 	FText SShaderEditorBox::GetRowColText() const
     {
         const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
-        const int32 CursorRow = CursorLocation.GetLineIndex() + 1;
+        const int32 CursorRow = CursorLocation.GetLineIndex();
         const int32 CursorCol = CursorLocation.GetOffset();
-        return FText::FromString(FString::Printf(TEXT("%d:%d"), CursorRow, CursorCol));
+        return FText::FromString(FString::Printf(TEXT("%d:%d"), GetLineNumber(CursorRow), CursorCol));
     }
 
 
@@ -267,7 +273,7 @@ namespace SH
 					SNew(STextBlock)
 					.ColorAndOpacity(FLinearColor::Red)
 					.Text_Lambda([this] {
-							return FText::FromString(FString::Printf(TEXT("ⓧ %d"), EffectMarshller->LineNumToErrorInfo.Num()));
+							return FText::FromString(FString::Printf(TEXT("ⓧ %d"), EffectMarshller->LineNumberToErrorInfo.Num()));
 						})
 					.Margin(FMargin{5, 0, 0, 0 })
 				];
@@ -316,7 +322,7 @@ namespace SH
 			];
 	}
 
-    TSharedRef<SWidget> SShaderEditorBox::BuildInfoBar()
+	TSharedRef<SWidget> SShaderEditorBox::BuildInfoBar()
     {
 		SAssignNew(InfoBarBox, SHorizontalBox);
 
@@ -357,6 +363,67 @@ namespace SH
 		}
 
 		return bCanExecute;
+	}
+
+	FString SShaderEditorBox::FoldMarker::GetTotalFoldedLineTexts() const
+	{
+		FString TotalFoldedLineTexts;
+		int32 SolvedFoldMarkerNum = 0;
+		for (int32 i = 0; i < FoldedLineTexts.Num(); i++)
+		{
+			int32 MarkerOffset = FoldedLineTexts[i].Find(FoldMarkerText);
+			if (MarkerOffset != INDEX_NONE)
+			{
+				TotalFoldedLineTexts += FoldedLineTexts[i].Mid(0, MarkerOffset);
+				TotalFoldedLineTexts += ChildFoldMarkers[SolvedFoldMarkerNum].GetTotalFoldedLineTexts();
+				TotalFoldedLineTexts += FoldedLineTexts[i].Mid(MarkerOffset + 1);
+			}
+			else
+			{
+				TotalFoldedLineTexts += FoldedLineTexts[i];
+			}
+
+			if (i < FoldedLineTexts.Num() - 1)
+			{
+				TotalFoldedLineTexts += LINE_TERMINATOR;
+			}
+
+		}
+		return TotalFoldedLineTexts;
+	}
+
+	int32 SShaderEditorBox::FoldMarker::GetFoledLineCounts() const
+	{
+		int32 FoledLineCount = FoldedLineTexts.Num() - 1;
+		for (const FoldMarker& ChildMarker : ChildFoldMarkers)
+		{
+			FoledLineCount += ChildMarker.GetFoledLineCounts();
+		}
+		return FoledLineCount;
+	}
+
+	void SShaderEditorBox::UpdateLineNumberData()
+	{
+		if (IsLineNumberDataDirty)
+		{
+			LineNumberData.Empty();
+			int32 CurTextLayoutLine = ShaderMarshaller->TextLayout->GetLineCount();
+			int32 FolendLineCount = 0;
+			for (int32 LineIndex = 0; LineIndex < CurTextLayoutLine; LineIndex++)
+			{
+				LineNumberItemPtr Data = MakeShared<FText>(FText::FromString(FString::FromInt(LineIndex + 1 + FolendLineCount)));
+				if (TOptional<int32> MarkerIndex = FindFoldMarker(LineIndex))
+				{
+					const auto& Marker = DisplayedFoldMarkers[*MarkerIndex];
+					FolendLineCount += Marker.GetFoledLineCounts();
+				}
+				LineNumberData.Add(MoveTemp(Data));
+			}
+
+			LineNumberList->RequestListRefresh();
+			LineTipList->RequestListRefresh();
+			MarkLineNumberDataDirty(false);
+		}
 	}
 
 	void SShaderEditorBox::UpdateLineTipStyle(const double InCurrentTime)
@@ -407,11 +474,11 @@ namespace SH
 	{
 		const FTextSelection Selection = ShaderMultiLineEditableText->GetSelection();
 		
-		const int32 BeginLineNumber = Selection.GetBeginning().GetLineIndex();
-		const int32 EndLineNumber = Selection.GetEnd().GetLineIndex();
-		for (int32 i = 0; i < LineNumberData.Num(); i++)
+		const int32 BeginLineIndex = Selection.GetBeginning().GetLineIndex();
+		const int32 EndLineIndex = Selection.GetEnd().GetLineIndex();
+		for (int32 LineIndex = 0; LineIndex < LineNumberData.Num(); LineIndex++)
 		{
-			LineNumberItemPtr ItemData = LineNumberData[i];
+			LineNumberItemPtr ItemData = LineNumberData[LineIndex];
 			TSharedPtr<ITableRow> ItemTableRow = LineNumberList->WidgetFromItem(ItemData);
 			if (ItemTableRow.IsValid())
 			{
@@ -419,7 +486,7 @@ namespace SH
                 TSharedPtr<STextBlock> ItemLineNumber = StaticCastSharedRef<STextBlock>(ItemWidget->GetSlot(1).GetWidget());
                 
                 ItemLineNumber->SetFont(CodeFontInfo);
-				if (i >= BeginLineNumber && i <= EndLineNumber)
+				if (LineIndex >= BeginLineIndex && LineIndex <= EndLineIndex)
 				{
                     ItemLineNumber->SetColorAndOpacity(HighlightLineNumberTextColor);
 				}
@@ -431,10 +498,24 @@ namespace SH
                 TSharedPtr<STextBlock> ItemErrorMarker = StaticCastSharedRef<STextBlock>(ItemWidget->GetSlot(0).GetWidget());
                 
                 ItemErrorMarker->SetFont(CodeFontInfo);
-                if(EffectMarshller->LineNumToErrorInfo.Contains(i + 1))
+
+				int32 CurLineNumber = GetLineNumber(LineIndex);
+                if(EffectMarshller->LineNumberToErrorInfo.Contains(CurLineNumber))
                 {
                     ItemErrorMarker->SetColorAndOpacity(FLinearColor::Red);
                 }
+				else if (TOptional<int32> MarkerIndex = FindFoldMarker(LineIndex))
+				{
+					int32 FoldedLineCounts = DisplayedFoldMarkers[*MarkerIndex].GetFoledLineCounts();
+					for (int32 i = CurLineNumber; i <= CurLineNumber + FoldedLineCounts + 1; i++)
+					{
+						if (EffectMarshller->LineNumberToErrorInfo.Contains(i))
+						{
+							ItemErrorMarker->SetColorAndOpacity(FLinearColor::Red);
+							break;
+						}
+					}
+				}
                 else
                 {
                     ItemErrorMarker->SetColorAndOpacity(FLinearColor::Transparent);
@@ -495,33 +576,34 @@ namespace SH
 		FVector2D ShaderScrollOffset = ShaderEditableTextLayout->GetScrollOffset();
 		ShaderScrollOffset.X = FMath::Clamp(ShaderScrollOffset.X, 0.0, FMath::Max(0, ShaderEditableTextLayout->GetSize().X - ShaderMultiLineGeometry.GetLocalSize().X));
 		ShaderScrollOffset.Y = FMath::Clamp(ShaderScrollOffset.Y, 0.0, FMath::Max(0, ShaderEditableTextLayout->GetSize().Y - ShaderMultiLineGeometry.GetLocalSize().Y));
-		TSharedPtr<FSlateTextLayout>& EffectTextLayout = GetPrivate_FSlateEditableTextLayout_TextLayout(*EffectEditableTextLayout);
+		FSlateTextLayout* EffectTextLayout = static_cast<FSlateTextLayout*>(EffectMarshller->TextLayout);
 		EffectTextLayout->SetVisibleRegion(EffectMultiLineGeometry.GetLocalSize(), ShaderScrollOffset * EffectTextLayout->GetScale());
 	}
 
-	void SShaderEditorBox::UpdateFold(bool IsShow)
+	void SShaderEditorBox::UpdateFold(bool IsShowArrowDown)
 	{
-		for (int32 i = 0; i < LineNumberData.Num(); i++)
+		for (int32 LineIndex = 0; LineIndex < LineNumberData.Num(); LineIndex++)
 		{
-			LineNumberItemPtr ItemData = LineNumberData[i];
+			LineNumberItemPtr ItemData = LineNumberData[LineIndex];
 			TSharedPtr<ITableRow> ItemTableRow = LineNumberList->WidgetFromItem(ItemData);
 			if (ItemTableRow.IsValid())
 			{
 				TSharedPtr<SHorizontalBox> ItemWidget = StaticCastSharedPtr<SHorizontalBox>(ItemTableRow->GetContent());
 				TSharedPtr<SScaleBox> ItemArrowBox = StaticCastSharedRef<SScaleBox>(ItemWidget->GetSlot(2).GetWidget());
 				TSharedPtr<SButton> ItemArrowButton = StaticCastSharedRef<SButton>(ItemArrowBox->GetChildren()->GetChildAt(0));
-				if (ShaderMarshaller->FoldingBraceGroups.Contains(i + 1))
+				if (ShaderMarshaller->FoldingBraceGroups.Contains(LineIndex))
 				{
-					if (FoldedLineNumbers.Contains(i + 1))
-					{
-						ItemArrowButton->SetButtonStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FButtonStyle>("ArrowRightButton"));
-						ItemArrowButton->SetVisibility(EVisibility::Visible);
-					}
-					else
-					{
-						ItemArrowButton->SetButtonStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FButtonStyle>("ArrowDownButton"));
-						ItemArrowButton->SetVisibility(IsShow ? EVisibility::Visible : EVisibility::Collapsed);
-					}
+					ItemArrowButton->SetButtonStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FButtonStyle>("ArrowDownButton"));
+					ItemArrowButton->SetVisibility(IsShowArrowDown ? EVisibility::Visible : EVisibility::Collapsed);
+				}
+				else if (FindFoldMarker(LineIndex))
+				{
+					ItemArrowButton->SetButtonStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FButtonStyle>("ArrowRightButton"));
+					ItemArrowButton->SetVisibility(EVisibility::Visible);
+				}
+				else
+				{
+					ItemArrowButton->SetVisibility(EVisibility::Collapsed);
 				}
 
 			}
@@ -532,74 +614,53 @@ namespace SH
 	{
 		SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
 		
+		UpdateLineNumberData();
 		UpdateListViewScrollBar();
 		UpdateLineNumberHighlight();
 		UpdateLineTipStyle(InCurrentTime);
 		UpdateEffectText();
 	}
 
-	void SShaderEditorBox::OnShaderTextChanged(const FText& InText)
+	void SShaderEditorBox::OnShaderTextChanged(const FString& NewShaderSouce)
 	{
-		const int32 LineNum = ShaderMarshaller->TextLayout->GetLineCount();
-		int32 DiffNum = FMath::Abs(LineNum - CurLineNum);
-		if (LineNum >= CurLineNum)
-		{
-			while (DiffNum--)
-			{
-				CurLineNum++;
-				LineNumberData.Add(MakeShared<FText>(FText::FromString(FString::FromInt(CurLineNum))));
-			}
-		}
-		else
-		{
-			while (DiffNum--)
-			{
-				CurLineNum--;
-				LineNumberData.Pop();
-			}
-		}
-		LineNumberList->RequestListRefresh();
-		LineTipList->RequestListRefresh();
-
-		FString NewShaderSouce = InText.ToString();
-		
-		TRefCountPtr<GpuShader> NewPixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, MoveTemp(NewShaderSouce), {}, TEXT("MainPS"));
+		TRefCountPtr<GpuShader> NewPixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, NewShaderSouce, {}, TEXT("MainPS"));
 		FString ErrorInfo;
-		EffectMarshller->LineNumToErrorInfo.Reset();
+		EffectMarshller->LineNumberToErrorInfo.Reset();
 		if (GpuApi::CrossCompileShader(NewPixelShader, ErrorInfo))
 		{
-            CurEditState = EditState::Normal;
-			GenerateInfoBarBox();
-			
+			CurEditState = EditState::Normal;
 			Renderer->UpdatePixelShader(MoveTemp(NewPixelShader));
 		}
 		else
 		{
 			CurEditState = EditState::Failed;
-			GenerateInfoBarBox();
-			           
 			TArray<ShaderErrorInfo> ErrorInfos = ParseErrorInfoFromDxc(ErrorInfo);
 			for (const ShaderErrorInfo& ErrorInfo : ErrorInfos)
 			{
-				if (!EffectMarshller->LineNumToErrorInfo.Contains(ErrorInfo.Row))
+				if (!EffectMarshller->LineNumberToErrorInfo.Contains(ErrorInfo.Row))
 				{
 					FString LineText;
 					ShaderMultiLineEditableText->GetTextLine(ErrorInfo.Row - 1, LineText);
 
 					FString DummyText;
 					int32 LineTextNum = LineText.Len();
-                    for(int32 i = 0; i < LineTextNum; i++)
-                    {
-                        DummyText += LineText[i];
-                    }
+					for (int32 i = 0; i < LineTextNum; i++)
+					{
+						DummyText += LineText[i];
+					}
 
 					FString DisplayInfo = DummyText + TEXT("    ■ ") + ErrorInfo.Info;
-                    FTextRange DummyRange{0, DummyText.Len()};
-                    FTextRange ErrorRange{DummyText.Len(), DisplayInfo.Len()};
-                    
-                    EffectMarshller->LineNumToErrorInfo.Add(ErrorInfo.Row, {MoveTemp(DummyRange), MoveTemp(ErrorRange), MoveTemp(DisplayInfo)});
+					FTextRange DummyRange{ 0, DummyText.Len() };
+					FTextRange ErrorRange{ DummyText.Len(), DisplayInfo.Len() };
+
+					EffectMarshller->LineNumberToErrorInfo.Add(ErrorInfo.Row, { MoveTemp(DummyRange), MoveTemp(ErrorRange), MoveTemp(DisplayInfo) });
 				}
 			}
+		}
+
+		if (InfoBarBox.IsValid())
+		{
+			GenerateInfoBarBox();
 		}
 	}
 
@@ -640,7 +701,7 @@ namespace SH
 		return InCharacter == TEXT(' ') || InCharacter == TEXT('\r') || InCharacter == TEXT('\n');
 	}
 
-	void SShaderEditorBox::HandleAutoIndent() const
+	void SShaderEditorBox::HandleAutoIndent()
 	{
 		TSharedPtr<SMultiLineEditableText> Text = ShaderMultiLineEditableText;
 
@@ -713,7 +774,7 @@ namespace SH
 		}
 	}
 
-	FReply SShaderEditorBox::OnTextKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent) const
+	FReply SShaderEditorBox::OnTextKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent)
 	{
 		TSharedPtr<SMultiLineEditableText> Text = ShaderMultiLineEditableText;
 			
@@ -721,7 +782,6 @@ namespace SH
 		{
 			return FReply::Unhandled();
 		}
-
 		const TCHAR Character = InCharacterEvent.GetCharacter();
 
 		if (Character == TEXT('\b'))
@@ -928,11 +988,148 @@ namespace SH
 
 			return FReply::Unhandled();
 		}
+		else if (Character == FoldMarkerText[0])
+		{
+			return FReply::Handled();
+		}
 		else
 		{
 			// Let SMultiLineEditableText::OnKeyChar handle it.
 			return FReply::Unhandled();
 		}
+	}
+
+	TOptional<int32> SShaderEditorBox::FindFoldMarker(int32 InIndex) const
+	{
+		for (int32 i = 0; i < DisplayedFoldMarkers.Num(); i++)
+		{
+			if (DisplayedFoldMarkers[i].LineIndex == InIndex)
+			{
+				return i;
+			}
+		}
+		return {};
+	}
+
+	void SShaderEditorBox::RemoveFoldMarker(int32 InIndex)
+	{
+		for (int32 i = 0; i < DisplayedFoldMarkers.Num(); i++)
+		{
+			if (DisplayedFoldMarkers[i].LineIndex == InIndex)
+			{
+				DisplayedFoldMarkers.RemoveAt(i);
+				return;
+			}
+		}
+	}
+
+	FReply SShaderEditorBox::OnFold(int32 LineNumber)
+	{
+		int32 LineIndex = GetLineIndex(LineNumber);
+		FSlateTextLayout* ShaderTextLayout = static_cast<FSlateTextLayout*>(ShaderMarshaller->TextLayout);
+		TArray< FTextLayout::FLineModel >& Lines = const_cast<TArray<FTextLayout::FLineModel>&>(ShaderTextLayout->GetLineModels());
+		
+		SMultiLineEditableText::FScopedEditableTextTransaction Transaction(ShaderMultiLineEditableText);
+		TOptional<int32> MarkerIndex = FindFoldMarker(LineIndex);
+		if (!MarkerIndex)
+		{	
+			auto BraceGroup = ShaderMarshaller->FoldingBraceGroups[LineIndex];
+			int32 FoldedBeginningRow = BraceGroup.LeftBracePos.Row;
+			int32 FoldedBeginningCol = BraceGroup.LeftBracePos.Col;
+			int32 FoldedEndRow = BraceGroup.RightBracePos.Row;
+			int32 FoldedEndCol = BraceGroup.RightBracePos.Col;
+
+			FTextLayout::FLineModel& EndLine = Lines[FoldedEndRow];
+			TArray<FString> FoldedTexts;
+			
+			FString EndLineRemains;
+			if (EndLine.Text->Len() > FoldedEndCol)
+			{
+				EndLineRemains = EndLine.Text->Mid(FoldedEndCol);
+			}
+			FoldedTexts.Add(*EndLine.Text->Mid(0, EndLine.Text->Len() - EndLineRemains.Len()));
+			ShaderTextLayout->RemoveLine(FoldedEndRow);
+
+			for (int32 LineIndex = FoldedEndRow - 1; LineIndex > FoldedBeginningRow; LineIndex--)
+			{
+				FoldedTexts.Add(*Lines[LineIndex].Text);
+				ShaderTextLayout->RemoveLine(LineIndex);
+			}
+
+			FTextLayout::FLineModel& BeginLine = Lines[FoldedBeginningRow];
+			FoldedTexts.Add(*BeginLine.Text->Mid(FoldedBeginningCol + 1));
+			ShaderTextLayout->RemoveAt(FTextLocation(FoldedBeginningRow, FoldedBeginningCol), BeginLine.Text->Len() - FoldedBeginningCol - 1);
+
+			for (int32 i = 0; i < FoldedTexts.Num() / 2; i++)
+			{
+				FoldedTexts.Swap(i, FoldedTexts.Num() - 1 - i);
+			}
+
+			//Join with the fold marker
+			FoldMarker Marker = { FoldedBeginningRow, BeginLine.Text->Len(), MoveTemp(FoldedTexts) };
+			ShaderTextLayout->InsertAt(FTextLocation{ FoldedBeginningRow, BeginLine.Text->Len() }, FoldMarkerText + EndLineRemains);
+			for (int32 LineIndex = FoldedBeginningRow + 1; LineIndex <= FoldedEndRow; LineIndex++)
+			{
+				if (TOptional<int32> MarkerIndex = FindFoldMarker(LineIndex))
+				{
+					Marker.ChildFoldMarkers.Add(DisplayedFoldMarkers[*MarkerIndex]);
+					RemoveFoldMarker(LineIndex);
+				}
+			}
+			DisplayedFoldMarkers.Add(MoveTemp(Marker));
+			DisplayedFoldMarkers.Sort([](const FoldMarker& A, const FoldMarker& B) { return A.LineIndex < B.LineIndex; });
+			//Finally set the marker style by the marshaller. 
+			ShaderMarshaller->MakeDirty();
+			
+			const FTextLocation CurCursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
+			if (CurCursorLocation.GetLineIndex() >= FoldedBeginningRow && CurCursorLocation.GetLineIndex() <= FoldedEndRow)
+			{
+				const FTextLocation NewCursorLocation(FoldedBeginningRow, BeginLine.Text->Len());
+				ShaderMultiLineEditableText->GoTo(NewCursorLocation);
+			}
+		
+		}
+		else
+		{
+			const FoldMarker* Marker = &DisplayedFoldMarkers[*MarkerIndex];
+			TArray<FString> FoldedLineText = Marker->FoldedLineTexts;
+			FTextLayout::FLineModel& BeginLine = Lines[LineIndex];
+	
+			int32 MarkerCol = BeginLine.Text->Find(FoldMarkerText);
+
+			FString TextOnMarkerRight = BeginLine.Text->Mid(MarkerCol + 1);
+			ShaderTextLayout->RemoveAt(FTextLocation{ LineIndex, MarkerCol }, BeginLine.Text->Len() - MarkerCol);
+			ShaderTextLayout->InsertAt(FTextLocation{ LineIndex, MarkerCol }, FoldedLineText[0]);
+	
+			for (int32 i = 1; i < FoldedLineText.Num(); i++)
+			{
+				TSharedPtr<FString> NewLineText;
+				if (i == FoldedLineText.Num() - 1) {
+					NewLineText = MakeShared<FString>(FoldedLineText[i] + TextOnMarkerRight);
+				}
+				else {
+					NewLineText = MakeShared<FString>(FoldedLineText[i]);
+				}
+				TSharedRef<IRun> Run = FSlateTextRun::Create(FRunInfo(), NewLineText.ToSharedRef(), FTextBlockStyle{}, {0, NewLineText->Len()});
+				
+				FTextLayout::FLineModel LineModel(NewLineText.ToSharedRef());
+				LineModel.Runs.Add(FTextLayout::FRunModel(Run));
+
+				int32 NewLineIndex = LineIndex + i;
+				Lines.Insert(MoveTemp(LineModel), NewLineIndex);
+			}
+
+			for (int32 i = 0; i < Marker->ChildFoldMarkers.Num(); i++)
+			{
+				//The marshaller will help to set the correct line index and offset, we just need to keep relative order between markers.
+				DisplayedFoldMarkers.Insert(Marker->ChildFoldMarkers[i], *MarkerIndex + i + 1);
+			}
+
+			ShaderMarshaller->MakeDirty();
+			RemoveFoldMarker(LineIndex);
+		}
+
+		return FReply::Handled();
 	}
 
 	TSharedRef<ITableRow> SShaderEditorBox::GenerateRowForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
@@ -949,24 +1146,7 @@ namespace SH
 		TSharedPtr<SButton> FoldingArrow = SNew(SButton)
 			.ContentPadding(FMargin(0, 0))
 			.ButtonStyle(FAppStyle::Get(), "InvisibleButton")
-			.OnClicked_Lambda(
-				[=]()
-				{
-					if (!FoldedLineNumbers.Contains(LineNumber))
-					{
-						auto BraceGroup = ShaderMarshaller->FoldingBraceGroups[LineNumber];
-						
-
-					//	FoledLineNumberToLineText[]
-						
-						FoldedLineNumbers.Add(LineNumber);
-					}
-					else
-					{
-						FoldedLineNumbers.Remove(LineNumber);
-					}
-					return FReply::Handled();
-				});
+			.OnClicked(this, &SShaderEditorBox::OnFold, LineNumber);
 		
 		FoldingArrow->SetPadding(FMargin{});
 		
@@ -981,7 +1161,7 @@ namespace SH
                     SNew(STextBlock)
                     .Font(CodeFontInfo)
                     .ColorAndOpacity(FLinearColor::Transparent)
-                    .Text(FText::FromString(TEXT("✘")))
+                    .Text(FText::FromString(ErrorMarkerText))
                 ]
 
                 + SHorizontalBox::Slot()
@@ -1053,23 +1233,81 @@ namespace SH
 			}
 		}
 
-		TArray<FTextLayout::FNewLineData> LinesToAdd;
-		for (const HlslHighLightTokenizer::TokenizedLine& TokenizedLine : TokenizedLines)
+		TArray<SShaderEditorBox::FoldMarker> NewFoldMarkers;
+		for (int32 LineIndex = 0; LineIndex < TokenizedLines.Num(); LineIndex++)
 		{
-			TSharedRef<FString> LineText = MakeShared<FString>(SourceString.Mid(TokenizedLine.LineRange.BeginIndex, TokenizedLine.LineRange.Len()));
+			TSharedRef<FString> LineText = MakeShared<FString>(SourceString.Mid(TokenizedLines[LineIndex].LineRange.BeginIndex, TokenizedLines[LineIndex].LineRange.Len()));
+			int32 MarkerOffset = LineText->Find(FoldMarkerText);
+			if (MarkerOffset != INDEX_NONE)
+			{
+				NewFoldMarkers.Add({ LineIndex, MarkerOffset});
+			}
+		}
+
+		check(NewFoldMarkers.Num() == OwnerWidget->DisplayedFoldMarkers.Num());
+		
+		TArray<FTextLineHighlight> Highlights;
+		for (int32 i = 0; i < OwnerWidget->DisplayedFoldMarkers.Num(); i++)
+		{
+			auto& Marker = OwnerWidget->DisplayedFoldMarkers[i];
+			Marker.LineIndex = NewFoldMarkers[i].LineIndex;
+			Marker.Offset = NewFoldMarkers[i].Offset;
+
+			Highlights.Emplace(Marker.LineIndex, FTextRange{ Marker.Offset, Marker.Offset + 1 }, -1, FoldMarkerHighLighter::Create());
+		}
+
+		FString TextAfterUnfolding;
+		TArray<FTextLayout::FNewLineData> LinesToAdd;
+		for (int32 LineIndex = 0; LineIndex < TokenizedLines.Num(); LineIndex++)
+		{
+			TSharedRef<FString> LineText = MakeShared<FString>(SourceString.Mid(TokenizedLines[LineIndex].LineRange.BeginIndex, TokenizedLines[LineIndex].LineRange.Len()));
+
+			TOptional<int32> MarkerIndex = OwnerWidget->FindFoldMarker(LineIndex);
+			if (MarkerIndex)
+			{
+				const auto& Marker = OwnerWidget->DisplayedFoldMarkers[*MarkerIndex];
+				TextAfterUnfolding += LineText->Mid(0, Marker.Offset);
+				TextAfterUnfolding += Marker.GetTotalFoldedLineTexts();
+				TextAfterUnfolding += LineText->Mid(Marker.Offset + 1);
+			}
+			else
+			{
+				TextAfterUnfolding += *LineText;
+			}
+
+			if (LineIndex < TokenizedLines.Num() - 1) {
+				TextAfterUnfolding += LINE_TERMINATOR;
+			}
+	
 			TArray<TSharedRef<IRun>> Runs;
-			int32 RunBeginIndexInAllString = TokenizedLine.LineRange.BeginIndex;
-			for (const HlslHighLightTokenizer::Token& Token : TokenizedLine.Tokens)
+			int32 RunBeginIndexInAllString = TokenizedLines[LineIndex].LineRange.BeginIndex;
+			for (const HlslHighLightTokenizer::Token& Token : TokenizedLines[LineIndex].Tokens)
 			{
 				FTextBlockStyle RunTextStyle = TokenStyleMap[Token.Type];
 				RunTextStyle.SetFont(OwnerWidget->GetFontInfo());
 				FTextRange NewTokenRange{ Token.Range.BeginIndex - RunBeginIndexInAllString, Token.Range.EndIndex - RunBeginIndexInAllString };
+
+				if (MarkerIndex && LineText->Mid(NewTokenRange.BeginIndex, 1) == FoldMarkerText)
+				{
+					RunTextStyle.SetColorAndOpacity(FLinearColor::Gray);
+				}
+
 				Runs.Add(FSlateTextRun::Create(FRunInfo(), LineText, MoveTemp(RunTextStyle), MoveTemp(NewTokenRange)));
 			}
 
 			LinesToAdd.Emplace(MoveTemp(LineText), MoveTemp(Runs));
 		}
+
 		TextLayout->AddLines(MoveTemp(LinesToAdd));
+
+		//Update fold markers highlight.
+		for (const FTextLineHighlight& Highlight : Highlights)
+		{
+			TextLayout->AddLineHighlight(Highlight);
+		}
+
+		OwnerWidget->OnShaderTextChanged(TextAfterUnfolding);
+		OwnerWidget->MarkLineNumberDataDirty(true);
 	}
 
 	void FShaderEditorMarshaller::GetText(FString& TargetString, const FTextLayout& SourceTextLayout)
@@ -1091,38 +1329,38 @@ namespace SH
 	void FShaderEditorEffectMarshaller::SubmitEffectText()
 	{
 		TArray<FTextLayout::FNewLineData> LinesToAdd;
-		for(int32 i = 0; i < OwnerWidget->GetCurLineNum(); i++)
+		for (int32 LineIndex = 0; LineIndex < OwnerWidget->GetCurDisplayLineCount(); LineIndex++)
 		{
 			TArray<TSharedRef<IRun>> Runs;
 			FTextBlockStyle ErrorInfoStyle = FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorErrorInfoText");
-            ErrorInfoStyle.SetFont(OwnerWidget->GetFontInfo());
-            
-            FTextBlockStyle DummyInfoStyle = FTextBlockStyle{}
-                .SetFont(OwnerWidget->GetFontInfo())
-                .SetColorAndOpacity(FLinearColor{0, 0, 0, 0});
-            
-			if (LineNumToErrorInfo.Contains(i + 1))
+			ErrorInfoStyle.SetFont(OwnerWidget->GetFontInfo());
+
+			FTextBlockStyle DummyInfoStyle = FTextBlockStyle{}
+				.SetFont(OwnerWidget->GetFontInfo())
+				.SetColorAndOpacity(FLinearColor{ 0, 0, 0, 0 });
+
+			int32 CurLineNumber = OwnerWidget->GetLineNumber(LineIndex);
+			if (LineNumberToErrorInfo.Contains(CurLineNumber))
 			{
-                TSharedRef<FString> TotalInfo = MakeShared<FString>(LineNumToErrorInfo[i + 1].TotalInfo);
-                
-                TSharedRef<IRun> DummyRun = FSlateTextRun::Create(FRunInfo(), TotalInfo, DummyInfoStyle, LineNumToErrorInfo[i + 1].DummyRange);
-                Runs.Add(MoveTemp(DummyRun));
-                
-                TSharedRef<IRun> ErrorRun = FSlateTextRun::Create(FRunInfo(), TotalInfo, ErrorInfoStyle, LineNumToErrorInfo[i + 1].ErrorRange);
+				TSharedRef<FString> TotalInfo = MakeShared<FString>(LineNumberToErrorInfo[CurLineNumber].TotalInfo);
+
+				TSharedRef<IRun> DummyRun = FSlateTextRun::Create(FRunInfo(), TotalInfo, DummyInfoStyle, LineNumberToErrorInfo[CurLineNumber].DummyRange);
+				Runs.Add(MoveTemp(DummyRun));
+
+				TSharedRef<IRun> ErrorRun = FSlateTextRun::Create(FRunInfo(), TotalInfo, ErrorInfoStyle, LineNumberToErrorInfo[CurLineNumber].ErrorRange);
 				Runs.Add(MoveTemp(ErrorRun));
-                
+
 				LinesToAdd.Emplace(MoveTemp(TotalInfo), MoveTemp(Runs));
 			}
 			else
 			{
 				TSharedRef<FString> Empty = MakeShared<FString>();
 				Runs.Add(FSlateTextRun::Create(FRunInfo(), Empty, ErrorInfoStyle));
-                
+
 				LinesToAdd.Emplace(Empty, MoveTemp(Runs));
 			}
 		}
-		
+
 		TextLayout->AddLines(MoveTemp(LinesToAdd));
 	}
-
 }

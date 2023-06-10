@@ -2,7 +2,7 @@
 #include <Windows/WindowsHWrapper.h>
 #include "App/ShaderHelperApp.h"
 #include "Renderer/ShRenderer.h"
-#include "UI/ShaderHelperWindow/Widgets/SShaderHelperWindow.h"
+#include "UI/Widgets/ShaderHelperWindow/SShaderHelperWindow.h"
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "UI/Styles/FAppCommonStyle.h"
 

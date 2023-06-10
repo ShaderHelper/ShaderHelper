@@ -2,7 +2,7 @@
 #include <Framework/Text/BaseTextLayoutMarshaller.h>
 #include <Widgets/Views/SListView.h>
 #include <Widgets/Text/SMultiLineEditableText.h>
-#include "UI/ShaderHelperWindow/ShaderCodeEditor/ShaderCodeTokenizer.h"
+#include "UI/Widgets/ShaderCodeEditor/ShaderCodeTokenizer.h"
 #include "Renderer/ShRenderer.h"
 
 namespace SH
@@ -29,7 +29,7 @@ namespace SH
 		FTextLayout* TextLayout;
 		TSharedPtr<HlslHighLightTokenizer> Tokenizer;
 		TMap<HlslHighLightTokenizer::TokenType, FTextBlockStyle> TokenStyleMap;
-		//Key: The line number of Left Brace
+		//Key: The line index of Left Brace in MultiLineEditableText
 		TMap<int32, HlslHighLightTokenizer::BraceGroup> FoldingBraceGroups;
 	};
 
@@ -58,7 +58,7 @@ namespace SH
 	public:
 		SShaderEditorBox* OwnerWidget;
 		FTextLayout* TextLayout;
-		TMap<int32, ErrorEffectInfo> LineNumToErrorInfo;
+		TMap<int32, ErrorEffectInfo> LineNumberToErrorInfo;
 	};
 
 	class SShaderEditorBox : public SCompoundWidget
@@ -71,6 +71,18 @@ namespace SH
             Compiling,
             Failed,
         };
+
+		struct FoldMarker
+		{
+			int32 LineIndex;
+			int32 Offset;
+			TArray<FString> FoldedLineTexts;
+			//Note: ChildFoldMarker's line index and offset is invalid.
+			TArray<FoldMarker> ChildFoldMarkers;
+
+			FString GetTotalFoldedLineTexts() const;
+			int32 GetFoledLineCounts() const;
+		};
         
     public:
 		SLATE_BEGIN_ARGS(SShaderEditorBox) 
@@ -84,20 +96,23 @@ namespace SH
 
 		void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 
-		void OnShaderTextChanged(const FText& InText);
-		FReply OnTextKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent) const;
+		void OnShaderTextChanged(const FString& NewShaderSouce);
+		FReply OnTextKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent);
 		TSharedRef<ITableRow> GenerateRowForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 		TSharedRef<ITableRow> GenerateLineTipForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 
-		int32 GetCurLineNum() const { return CurLineNum; }
         const FSlateFontInfo& GetFontInfo() const { return CodeFontInfo; }
         FText GetEditStateText() const;
         FText GetFontSizeText() const;
         FText GetRowColText() const;
         FSlateColor GetEditStateColor() const;
-		TArray<int32> GetFoldedLineNumbers() const { return FoldedLineNumbers; }
-		FString GetFullShaderSource() const { return FullShaderSource; }
-		
+		int32 GetLineNumber(int32 InLineIndex) const;
+		int32 GetLineIndex(int32 InLineNumber) const;
+		int32 GetCurDisplayLineCount() const { return ShaderMarshaller->TextLayout->GetLineCount(); }
+
+		TOptional<int32> FindFoldMarker(int32 InIndex) const;
+		void MarkLineNumberDataDirty(bool IsDirty) { IsLineNumberDataDirty = IsDirty; }
+
 	protected:
 		virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 		virtual FReply OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
@@ -107,16 +122,24 @@ namespace SH
 		void CopySelectedText();
 		bool CanCopySelectedText() const;
 
+		void UpdateLineNumberData();
 		void UpdateLineTipStyle(const double InCurrentTime);
 		void UpdateLineNumberHighlight();
 		void UpdateListViewScrollBar();
 		void UpdateEffectText();
-		void UpdateFold(bool IsShow);
-		void HandleAutoIndent() const;
+		void UpdateFold(bool IsShowArrowDown);
+		void HandleAutoIndent();
         TSharedRef<SWidget> BuildInfoBar();
 		void GenerateInfoBarBox();
+
+		FReply OnFold(int32 LineNumber);
+		void RemoveFoldMarker(int32 InIndex);
+
+	public:
+		TArray<FoldMarker> DisplayedFoldMarkers;
     
 	private:
+		bool IsLineNumberDataDirty = false;
 		TArray<LineNumberItemPtr> LineNumberData;
 		TSharedPtr<FShaderEditorMarshaller> ShaderMarshaller;
         TSharedPtr<SMultiLineEditableText> ShaderMultiLineEditableText;
@@ -133,11 +156,5 @@ namespace SH
         EditState CurEditState;
         FSlateFontInfo CodeFontInfo;
 		TSharedPtr<SHorizontalBox> InfoBarBox;
-		//Element: The line number of Left Brace
-		TArray<int32> FoldedLineNumbers;
-		TMap<int32, TArray<FString>> FoledLineNumberToLineText;
-
-		int32 CurLineNum;
-		FString FullShaderSource;
 	};
 }
