@@ -112,6 +112,9 @@ namespace SH
 
 		TOptional<int32> FindFoldMarker(int32 InIndex) const;
 		void MarkLineNumberDataDirty(bool IsDirty) { IsLineNumberDataDirty = IsDirty; }
+		
+		//Given a range for displayed text, then return the unfolding result.
+		FString UnFold(const FTextSelection& DisplayedTextRange);
 
 	protected:
 		virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
@@ -121,6 +124,8 @@ namespace SH
 	private:
 		void CopySelectedText();
 		bool CanCopySelectedText() const;
+		void CutSelectedText();
+		bool CanCutSelectedText() const;
 
 		void UpdateLineNumberData();
 		void UpdateLineTipStyle(const double InCurrentTime);

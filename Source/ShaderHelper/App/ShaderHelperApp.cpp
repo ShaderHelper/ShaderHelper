@@ -2,7 +2,7 @@
 #include "ShaderHelperApp.h"
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "Renderer/ShRenderer.h"
-#include "UI/ShaderHelperWindow/Widgets/SShaderHelperWindow.h"
+#include "UI/Widgets/ShaderHelperWindow/SShaderHelperWindow.h"
 
 namespace SH {
 
