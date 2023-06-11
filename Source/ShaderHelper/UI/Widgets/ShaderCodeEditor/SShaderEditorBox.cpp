@@ -149,6 +149,8 @@ namespace SH
 			FExecuteAction::CreateRaw(this, &SShaderEditorBox::CutSelectedText),
 			FCanExecuteAction::CreateRaw(this, &SShaderEditorBox::CanCutSelectedText)
 		);
+
+		FoldingArrowAnim.AddCurve(0, 0.25f, ECurveEaseFunction::Linear);
 	}
 
     FText SShaderEditorBox::GetEditStateText() const
@@ -193,7 +195,6 @@ namespace SH
 		int32 LineIndex = LineNumberData.IndexOfByPredicate(
 			[InLineNumber](const LineNumberItemPtr& InItem) 
 			{ return FCString::Atoi(*InItem->ToString()) == InLineNumber; });
-		check(LineIndex != INDEX_NONE);
 		return LineIndex;
 	}
 
@@ -588,22 +589,22 @@ namespace SH
 	{
 		Vector2D ScreenSpacePos = MouseEvent.GetScreenSpacePosition();
 		Vector2D BoxSpacePos = MyGeometry.AbsoluteToLocal(ScreenSpacePos);
-		double AllowableX = LineNumberList->GetTickSpaceGeometry().GetLocalSize().X + 5;
-		double AllowableY = MyGeometry.GetLocalSize().Y - InfoBarBox->GetTickSpaceGeometry().GetLocalSize().Y + 5;
+		double AllowableX = LineNumberList->GetTickSpaceGeometry().GetLocalSize().X + 6;
+		double AllowableY = MyGeometry.GetLocalSize().Y - InfoBarBox->GetTickSpaceGeometry().GetLocalSize().Y;
 		if (BoxSpacePos.X <= AllowableX && BoxSpacePos.Y <= AllowableY)
 		{
-			UpdateFold(true);
+			FoldingArrowAnim.PlayRelative(AsShared(), true);
 		}
 		else
 		{
-			UpdateFold(false);
+			FoldingArrowAnim.PlayRelative(AsShared(), false);
 		}
 		return FReply::Handled();
 	}
 
 	void SShaderEditorBox::OnMouseLeave(const FPointerEvent& MouseEvent)
 	{
-		UpdateFold(false);
+		FoldingArrowAnim.PlayRelative(AsShared(), false);
 	}
 
 	void SShaderEditorBox::UpdateListViewScrollBar()
@@ -635,8 +636,8 @@ namespace SH
 		EffectTextLayout->SetVisibleRegion(EffectMultiLineGeometry.GetLocalSize(), ShaderScrollOffset * EffectTextLayout->GetScale());
 	}
 
-	void SShaderEditorBox::UpdateFold(bool IsShowArrowDown)
-	{
+	void SShaderEditorBox::UpdateFoldingArrow()
+	{	
 		for (int32 LineIndex = 0; LineIndex < LineNumberData.Num(); LineIndex++)
 		{
 			LineNumberItemPtr ItemData = LineNumberData[LineIndex];
@@ -649,7 +650,8 @@ namespace SH
 				if (ShaderMarshaller->FoldingBraceGroups.Contains(LineIndex))
 				{
 					ItemArrowButton->SetButtonStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FButtonStyle>("ArrowDownButton"));
-					ItemArrowButton->SetVisibility(IsShowArrowDown ? EVisibility::Visible : EVisibility::Collapsed);
+					ItemArrowButton->SetVisibility(EVisibility::Visible);
+					ItemArrowButton->SetBorderBackgroundColor(FLinearColor{1, 1, 1, FoldingArrowAnim.GetLerp()});
 				}
 				else if (FindFoldMarker(LineIndex))
 				{
@@ -658,7 +660,7 @@ namespace SH
 				}
 				else
 				{
-					ItemArrowButton->SetVisibility(EVisibility::Collapsed);
+					ItemArrowButton->SetVisibility(EVisibility::Hidden);
 				}
 
 			}
@@ -674,6 +676,7 @@ namespace SH
 		UpdateLineNumberHighlight();
 		UpdateLineTipStyle(InCurrentTime);
 		UpdateEffectText();
+		UpdateFoldingArrow();
 	}
 
 	void SShaderEditorBox::OnShaderTextChanged(const FString& NewShaderSouce)
@@ -694,8 +697,11 @@ namespace SH
 			{
 				if (!EffectMarshller->LineNumberToErrorInfo.Contains(ErrorInfo.Row))
 				{
+					int32 LineIndex = GetLineIndex(ErrorInfo.Row);
 					FString LineText;
-					ShaderMultiLineEditableText->GetTextLine(ErrorInfo.Row - 1, LineText);
+					if (LineIndex != INDEX_NONE) {
+						ShaderMultiLineEditableText->GetTextLine(LineIndex, LineText);
+					}
 
 					FString DummyText;
 					int32 LineTextNum = LineText.Len();
@@ -864,6 +870,23 @@ namespace SH
 						}
 					}
 
+					if (Line[Offset - 1] == FoldMarkerText[0])
+					{
+						OnFold(GetLineNumber(CursorLocation.GetLineIndex()));
+						return FReply::Handled();
+					}
+
+				}
+				
+			}
+			else
+			{
+				const FTextSelection Selection = Text->GetSelection();
+				int32 StartLineIndex = Selection.GetBeginning().GetLineIndex();
+				int32 EndLineIndex = Selection.GetEnd().GetLineIndex();
+				for (int32 LineIndex = StartLineIndex; LineIndex <= EndLineIndex; LineIndex++)
+				{
+					RemoveFoldMarker(LineIndex);
 				}
 			}
 
@@ -1156,7 +1179,7 @@ namespace SH
 
 			FTextLayout::FLineModel& BeginLine = Lines[FoldedBeginningRow];
 			FoldedTexts.Add(*BeginLine.Text->Mid(FoldedBeginningCol + 1));
-			ShaderTextLayout->RemoveAt(FTextLocation(FoldedBeginningRow, FoldedBeginningCol), BeginLine.Text->Len() - FoldedBeginningCol - 1);
+			ShaderTextLayout->RemoveAt(FTextLocation(FoldedBeginningRow, FoldedBeginningCol + 1), BeginLine.Text->Len() - FoldedBeginningCol - 1);
 
 			for (int32 i = 0; i < FoldedTexts.Num() / 2; i++)
 			{
@@ -1243,7 +1266,8 @@ namespace SH
 
 		TSharedPtr<SButton> FoldingArrow = SNew(SButton)
 			.ContentPadding(FMargin(0, 0))
-			.ButtonStyle(FAppStyle::Get(), "InvisibleButton")
+			.ButtonStyle(FShaderHelperStyle::Get(), "ArrowDownButton")
+			.Visibility(EVisibility::Hidden)
 			.OnClicked(this, &SShaderEditorBox::OnFold, LineNumber);
 		
 		FoldingArrow->SetPadding(FMargin{});

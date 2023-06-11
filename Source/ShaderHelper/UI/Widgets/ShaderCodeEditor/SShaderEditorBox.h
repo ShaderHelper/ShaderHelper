@@ -132,7 +132,7 @@ namespace SH
 		void UpdateLineNumberHighlight();
 		void UpdateListViewScrollBar();
 		void UpdateEffectText();
-		void UpdateFold(bool IsShowArrowDown);
+		void UpdateFoldingArrow();
 		void HandleAutoIndent();
         TSharedRef<SWidget> BuildInfoBar();
 		void GenerateInfoBarBox();
@@ -161,5 +161,7 @@ namespace SH
         EditState CurEditState;
         FSlateFontInfo CodeFontInfo;
 		TSharedPtr<SHorizontalBox> InfoBarBox;
+
+		FCurveSequence FoldingArrowAnim;
 	};
 }
