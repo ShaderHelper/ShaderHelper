@@ -132,15 +132,22 @@ namespace SH
 		
 		CurEditState = EditState::Normal;
 
-		//Hook, reset the copy behavior.
+		//Hook, reset the copy/cut behavior.
 		TUniquePtr<FSlateEditableTextLayout>& ShaderEditableTextLayout = GetPrivate_SMultiLineEditableText_EditableTextLayout(*ShaderMultiLineEditableText);
 		TSharedPtr<FUICommandList>& UICommandList = GetPrivate_FSlateEditableTextLayout_UICommandList(*ShaderEditableTextLayout);
 		UICommandList->UnmapAction(FGenericCommands::Get().Copy);
+		UICommandList->UnmapAction(FGenericCommands::Get().Cut);
 
 		UICommandList->MapAction(
 			FGenericCommands::Get().Copy,
 			FExecuteAction::CreateRaw(this, &SShaderEditorBox::CopySelectedText),
 			FCanExecuteAction::CreateRaw(this, &SShaderEditorBox::CanCopySelectedText)
+		);
+
+		UICommandList->MapAction(
+			FGenericCommands::Get().Cut,
+			FExecuteAction::CreateRaw(this, &SShaderEditorBox::CutSelectedText),
+			FCanExecuteAction::CreateRaw(this, &SShaderEditorBox::CanCutSelectedText)
 		);
 	}
 
@@ -273,7 +280,14 @@ namespace SH
 					SNew(STextBlock)
 					.ColorAndOpacity(FLinearColor::Red)
 					.Text_Lambda([this] {
-							return FText::FromString(FString::Printf(TEXT("ⓧ %d"), EffectMarshller->LineNumberToErrorInfo.Num()));
+							if (EffectMarshller->LineNumberToErrorInfo.Num() > 0)
+							{
+								return FText::FromString(FString::Printf(TEXT("ⓧ %d"), EffectMarshller->LineNumberToErrorInfo.Num()));
+							}
+							else
+							{
+								return FText::FromString(TEXT("ⓧ"));
+							}
 						})
 					.Margin(FMargin{5, 0, 0, 0 })
 				];
@@ -344,7 +358,8 @@ namespace SH
 		TUniquePtr<FSlateEditableTextLayout>& ShaderEditableTextLayout = GetPrivate_SMultiLineEditableText_EditableTextLayout(*ShaderMultiLineEditableText);
 		if (ShaderEditableTextLayout->AnyTextSelected())
 		{
-			FString SelectedText = ShaderEditableTextLayout->GetSelectedText().ToString();
+			const FTextSelection Selection = ShaderEditableTextLayout->GetSelection();
+			FString SelectedText = UnFold(Selection);
 
 			// Copy text to clipboard
 			FPlatformApplicationMisc::ClipboardCopy(*SelectedText);
@@ -358,6 +373,46 @@ namespace SH
 		TUniquePtr<FSlateEditableTextLayout>& ShaderEditableTextLayout = GetPrivate_SMultiLineEditableText_EditableTextLayout(*ShaderMultiLineEditableText);
 		// Can't execute if there is no text selected
 		if (!ShaderEditableTextLayout->AnyTextSelected())
+		{
+			bCanExecute = false;
+		}
+
+		return bCanExecute;
+	}
+
+	void SShaderEditorBox::CutSelectedText()
+	{
+		TUniquePtr<FSlateEditableTextLayout>& ShaderEditableTextLayout = GetPrivate_SMultiLineEditableText_EditableTextLayout(*ShaderMultiLineEditableText);
+		if (ShaderEditableTextLayout->AnyTextSelected())
+		{
+			SMultiLineEditableText::FScopedEditableTextTransaction TextTransaction(ShaderMultiLineEditableText);
+			const FTextSelection Selection = ShaderEditableTextLayout->GetSelection();
+			FString SelectedText = UnFold(Selection);
+
+			int32 StartLineIndex = Selection.GetBeginning().GetLineIndex();
+			int32 EndLineIndex = Selection.GetEnd().GetLineIndex();
+			for (int32 LineIndex = StartLineIndex; LineIndex <= EndLineIndex; LineIndex++)
+			{
+				RemoveFoldMarker(LineIndex);
+			}
+			
+			// Copy text to clipboard
+			FPlatformApplicationMisc::ClipboardCopy(*SelectedText);
+
+			ShaderEditableTextLayout->DeleteSelectedText();
+
+			ShaderEditableTextLayout->UpdateCursorHighlight();
+		}
+	}
+
+	bool SShaderEditorBox::CanCutSelectedText() const
+	{
+		bool bCanExecute = true;
+
+		// Can't paste unless the clipboard has a string in it
+		FString ClipboardContent;
+		FPlatformApplicationMisc::ClipboardPaste(ClipboardContent);
+		if (ClipboardContent.IsEmpty())
 		{
 			bCanExecute = false;
 		}
@@ -988,10 +1043,6 @@ namespace SH
 
 			return FReply::Unhandled();
 		}
-		else if (Character == FoldMarkerText[0])
-		{
-			return FReply::Handled();
-		}
 		else
 		{
 			// Let SMultiLineEditableText::OnKeyChar handle it.
@@ -1009,6 +1060,53 @@ namespace SH
 			}
 		}
 		return {};
+	}
+
+	FString SShaderEditorBox::UnFold(const FTextSelection& DisplayedTextRange)
+	{
+		FString TextAfterUnfolding;
+		
+		const TArray< FTextLayout::FLineModel >& Lines = ShaderMarshaller->TextLayout->GetLineModels();
+		int32 StartLineIndex = DisplayedTextRange.GetBeginning().GetLineIndex();
+		int32 EndLineIndex = DisplayedTextRange.GetEnd().GetLineIndex();
+		int32 StartOffset = DisplayedTextRange.GetBeginning().GetOffset();
+		int32 EndOffset = DisplayedTextRange.GetEnd().GetOffset();
+
+		for (int32 LineIndex = StartLineIndex; LineIndex <= EndLineIndex; LineIndex++)
+		{
+			FString LineText;
+			if (LineIndex == StartLineIndex)
+			{
+				LineText = Lines[LineIndex].Text->Mid(StartOffset);
+			}
+			else if(LineIndex == EndLineIndex)
+			{
+				LineText = Lines[LineIndex].Text->Mid(0, EndOffset + 1);
+			}
+			else
+			{
+				LineText = *Lines[LineIndex].Text;
+			}
+
+			TOptional<int32> MarkerIndex = FindFoldMarker(LineIndex);
+			if (MarkerIndex)
+			{
+				const auto& Marker = DisplayedFoldMarkers[*MarkerIndex];
+				TextAfterUnfolding += LineText.Mid(0, Marker.Offset);
+				TextAfterUnfolding += Marker.GetTotalFoldedLineTexts();
+				TextAfterUnfolding += LineText.Mid(Marker.Offset + 1);
+			}
+			else
+			{
+				TextAfterUnfolding += *LineText;
+			}
+
+			if (LineIndex < EndLineIndex) {
+				TextAfterUnfolding += LINE_TERMINATOR;
+			}
+		}
+	
+		return TextAfterUnfolding;
 	}
 
 	void SShaderEditorBox::RemoveFoldMarker(int32 InIndex)
@@ -1256,31 +1354,15 @@ namespace SH
 			Highlights.Emplace(Marker.LineIndex, FTextRange{ Marker.Offset, Marker.Offset + 1 }, -1, FoldMarkerHighLighter::Create());
 		}
 
-		FString TextAfterUnfolding;
+
 		TArray<FTextLayout::FNewLineData> LinesToAdd;
 		for (int32 LineIndex = 0; LineIndex < TokenizedLines.Num(); LineIndex++)
 		{
 			TSharedRef<FString> LineText = MakeShared<FString>(SourceString.Mid(TokenizedLines[LineIndex].LineRange.BeginIndex, TokenizedLines[LineIndex].LineRange.Len()));
-
-			TOptional<int32> MarkerIndex = OwnerWidget->FindFoldMarker(LineIndex);
-			if (MarkerIndex)
-			{
-				const auto& Marker = OwnerWidget->DisplayedFoldMarkers[*MarkerIndex];
-				TextAfterUnfolding += LineText->Mid(0, Marker.Offset);
-				TextAfterUnfolding += Marker.GetTotalFoldedLineTexts();
-				TextAfterUnfolding += LineText->Mid(Marker.Offset + 1);
-			}
-			else
-			{
-				TextAfterUnfolding += *LineText;
-			}
-
-			if (LineIndex < TokenizedLines.Num() - 1) {
-				TextAfterUnfolding += LINE_TERMINATOR;
-			}
-	
+			
 			TArray<TSharedRef<IRun>> Runs;
 			int32 RunBeginIndexInAllString = TokenizedLines[LineIndex].LineRange.BeginIndex;
+			TOptional<int32> MarkerIndex = OwnerWidget->FindFoldMarker(LineIndex);
 			for (const HlslHighLightTokenizer::Token& Token : TokenizedLines[LineIndex].Tokens)
 			{
 				FTextBlockStyle RunTextStyle = TokenStyleMap[Token.Type];
@@ -1306,6 +1388,8 @@ namespace SH
 			TextLayout->AddLineHighlight(Highlight);
 		}
 
+		FTextSelection UnFoldingRange = FTextSelection{ {0, 0}, {LinesToAdd.Num() - 1, LinesToAdd[LinesToAdd.Num() - 1].Text->Len() - 1} };
+		FString TextAfterUnfolding = OwnerWidget->UnFold(MoveTemp(UnFoldingRange));
 		OwnerWidget->OnShaderTextChanged(TextAfterUnfolding);
 		OwnerWidget->MarkLineNumberDataDirty(true);
 	}
