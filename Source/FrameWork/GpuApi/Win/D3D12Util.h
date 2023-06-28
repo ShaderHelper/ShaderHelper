@@ -55,8 +55,8 @@ namespace FRAMEWORK
 			LastCpuFrame = CurCpuFrame;
 		}
 		void AddUncompletedResource(TRefCountPtr<GpuResource> InResource) {
-            PendingResourceArr* DynamicResources = PendingResources.Peek();
-			DynamicResources->Add(MoveTemp(InResource));
+            PendingResourceArr* Resources = PendingResources.Peek();
+			Resources->Add(MoveTemp(InResource));
 		}
 		void ReleaseCompletedResources() {
 			check(LastGpuFrame <= CurGpuFrame);

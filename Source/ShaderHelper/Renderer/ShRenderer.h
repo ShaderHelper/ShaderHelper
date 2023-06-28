@@ -2,6 +2,8 @@
 #include "Renderer/Renderer.h"
 #include "GpuApi/GpuResource.h"
 #include "App/PreviewViewPort.h"
+#include "Renderer/RenderResource/UniformBuffer.h"
+
 namespace SH
 {
 	class ShRenderer : public Renderer
@@ -23,12 +25,17 @@ namespace SH
 		PreviewViewPort* ViewPort;
 		static const FString DefaultVertexShaderText;
 		static const FString DefaultPixelShaderText;
-			
+		static const FString DefaultPixelShaderInput;
+
 	private:
 		TRefCountPtr<GpuTexture> FinalRT;
 		TRefCountPtr<GpuShader> VertexShader;
 		TRefCountPtr<GpuShader> PixelShader;
 		TRefCountPtr<GpuPipelineState> PipelineState;
+		
+		TUniquePtr<UniformBuffer> BuiltInUniformBuffer;
+		TRefCountPtr<GpuBindGroup> CustomBindGroup;
+		TRefCountPtr<GpuBindGroup> BuiltInBindGroup;
 	};
 }
 

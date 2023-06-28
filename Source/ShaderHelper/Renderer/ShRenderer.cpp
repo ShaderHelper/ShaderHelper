@@ -1,6 +1,7 @@
 #include "CommonHeader.h"
 #include "ShRenderer.h"
 #include "GpuApi/GpuApiInterface.h"
+
 namespace SH
 {
 	const FString ShRenderer::DefaultVertexShaderText = R"(
@@ -15,9 +16,19 @@ namespace SH
 		}
 	)";
 
-	const FString ShRenderer::DefaultPixelShaderText = R"(float4 MainPS() : SV_Target
+	const FString ShRenderer::DefaultPixelShaderInput = 
+R"(
+struct PIn
 {
-    return float4(1,1,0,1);
+	float4 Pos : SV_Position;
+	float2 fragCoord : TexCoord0;
+};
+)";
+
+	const FString ShRenderer::DefaultPixelShaderText = 
+R"(float4 MainPS(PIn Input) : SV_Target
+{
+    return float4(Input.fragCoord.xy,0,1);
 })";
 
 	ShRenderer::ShRenderer()
@@ -27,13 +38,18 @@ namespace SH
 		VertexShader = GpuApi::CreateShaderFromSource(ShaderType::VertexShader, DefaultVertexShaderText, TEXT("DefaultFullScreenVS"), TEXT("MainVS"));
 		FString ErrorInfo;
 		check(GpuApi::CrossCompileShader(VertexShader, ErrorInfo));
+
+		BuiltInUniformBuffer = UniformBufferBuilder{ "BuiltIn" }
+			.AddVector2f("iResolution")
+			.AddFloat("iTime")
+			.AddVector3f("iMouse");
 	}
 
 	void ShRenderer::OnViewportResize()
 	{
 		check(ViewPort);
 		//Note: BGRA8_UNORM is default framebuffer format in ue standalone renderer framework.
-		GpuTextureDesc Desc{ (uint32)ViewPort->GetSize().X, (uint32)ViewPort->GetSize().Y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::Shared | GpuTextureUsage::RenderTarget };
+		GpuTextureDesc Desc{ (uint32)ViewPort->GetSize().X, (uint32)ViewPort->GetSize().Y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget };
 		FinalRT = GpuApi::CreateGpuTexture(Desc);
 		ViewPort->SetViewPortRenderTexture(FinalRT);
 		ReCreatePipelineState();

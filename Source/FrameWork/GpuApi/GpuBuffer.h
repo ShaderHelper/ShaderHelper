@@ -4,8 +4,9 @@
 
 namespace FRAMEWORK
 {
-    class GpuBuffer : public GpuResource
-    {
-        
-    };
+	class GpuBuffer : public GpuResource
+	{
+	public:
+		virtual void* GetMappedData() = 0;
+	};
 }

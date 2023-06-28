@@ -28,10 +28,22 @@ namespace UNITTEST_FRAMEWORK
 		func(1,2);
 	}
 
-    struct PrivateUnitTest
+	struct PrivateUnitTestBase
+	{
+	protected:
+		virtual void Run() {
+			SH_LOG(LogTestUtil, Display, TEXT("PrivateUnitTestBase::Run"));
+		}
+	};
+
+    struct PrivateUnitTest : public PrivateUnitTestBase
     {
         int GetVar() const {return Var;}
-    private:
+	protected:
+		virtual void Run() override {
+			SH_LOG(LogTestUtil, Display, TEXT("PrivateUnitTest::Run"));
+		}
+	private:
 		void test(int a) && {
 			SH_LOG(LogTestUtil, Display, TEXT("Test CALL_PRIVATE_FUNCTION:%d"), a);
 		}
@@ -48,6 +60,8 @@ namespace UNITTEST_FRAMEWORK
 	CALL_PRIVATE_FUNCTION(PrivateUnitTest_test, PrivateUnitTest, test, &&, void, int)
     CALL_PRIVATE_FUNCTION(PrivateUnitTest_overload1, PrivateUnitTest, overload,, void, int, int)
     CALL_PRIVATE_FUNCTION(PrivateUnitTest_overload2, PrivateUnitTest, overload,, void, float)
+	CALL_PRIVATE_FUNCTION(PrivateUnitTestBase_Run, PrivateUnitTestBase, Run,, void)
+
 	void TestUtil()
 	{
 		SH_LOG(LogTestUtil, Display, TEXT("Unit Test - Util:"));
@@ -208,6 +222,7 @@ namespace UNITTEST_FRAMEWORK
 			CallPrivate_PrivateUnitTest_test(PrivateUnitTest{}, 123);
             CallPrivate_PrivateUnitTest_overload1(PrivateUnitTest{}, 114514, 1);
             CallPrivate_PrivateUnitTest_overload2(PrivateUnitTest{}, 233.233f);
+			CallPrivate_PrivateUnitTestBase_Run(PrivateUnitTest{});
 		}
 
 	}

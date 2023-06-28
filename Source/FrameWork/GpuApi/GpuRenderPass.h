@@ -5,6 +5,22 @@
 
 namespace FRAMEWORK
 {
+	struct GpuViewPortDesc
+	{
+		GpuViewPortDesc(uint32 InWidth, uint32 InHeight, float InZMin = 0.0f, float InZMax = 1.0f, float InTopLeftX = 0.0f, float InTopLeftY = 0.0f)
+			: TopLeftX(InTopLeftX)
+			, TopLeftY(InTopLeftY)
+			, Width(InWidth)
+			, Height(InHeight)
+			, ZMin(InZMin)
+			, ZMax(InZMax)
+		{
+		}
+		float TopLeftX, TopLeftY;
+		uint32 Width, Height;
+		float ZMin, ZMax;
+	};
+
     class GpuRenderTargetInfo
     {
     public:
