@@ -6,6 +6,7 @@
 #include "GpuShader.h"
 #include "GpuBuffer.h"
 #include "GpuRenderPass.h"
+#include "GpuBindGroup.h"
 
 namespace FRAMEWORK
 {

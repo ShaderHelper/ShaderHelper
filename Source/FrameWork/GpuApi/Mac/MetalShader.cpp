@@ -58,8 +58,9 @@ namespace FRAMEWORK
         
         ShaderConductor::Compiler::TargetDesc TargetDesc{};
         TargetDesc.language = ShaderConductor::ShadingLanguage::Msl_macOS;
+		TargetDesc.version = "20200";
         
-        const ShaderConductor::Compiler::ResultDesc Result = ShaderConductor::Compiler::Compile(MoveTemp(SourceDesc), {}, MoveTemp(TargetDesc));
+        const ShaderConductor::Compiler::ResultDesc Result = ShaderConductor::Compiler::Compile(SourceDesc, {}, TargetDesc);
         if(Result.errorWarningMsg.Size() > 0)
         {
             FString ErrorInfo = static_cast<const char*>(Result.errorWarningMsg.Data());

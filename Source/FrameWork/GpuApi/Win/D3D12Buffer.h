@@ -7,6 +7,7 @@ namespace FRAMEWORK
 	{
 		Upload = D3D12_HEAP_TYPE_UPLOAD,
 		ReadBack = D3D12_HEAP_TYPE_READBACK,
+		Default = D3D12_HEAP_TYPE_DEFAULT,
 	};
 	
 	class Dx12Buffer : public GpuBuffer
@@ -19,19 +20,20 @@ namespace FRAMEWORK
         
     public:
 		ID3D12Resource* GetResource() const { return Resource; }
+        virtual void* GetMappedData() override {
+			if (!MappedData)
+			{
+				MappedData = Map();
+			}
+            return MappedData;
+        }
+
+	private:
 		void* Map() {
 			Resource->Map(0, nullptr, static_cast<void**>(&MappedData));
 			return MappedData;
 		}
-        //Support Persistent Mapped Buffer
-	/*	void Unmap() {
-			Resource->Unmap(0, nullptr);
-		}*/
-        void* GetMappedData() {
-            check(MappedData);
-            return MappedData;
-        }
-
+		
 	private:
 		TRefCountPtr<ID3D12Resource> Resource;
 		void* MappedData{};

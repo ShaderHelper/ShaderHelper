@@ -61,12 +61,8 @@ namespace GpuApi
 			{
 				const uint64 BufferSize = GetRequiredIntermediateSize(Texture->GetResource(), 0, 1);
 				Texture->UploadBuffer = CreateDx12Buffer(BufferSize, BufferUsage::Upload);
-                Data = Texture->UploadBuffer->Map();
 			}
-            else
-            {
-                Data = Texture->UploadBuffer->GetMappedData();
-            }
+			Data = Texture->UploadBuffer->GetMappedData();
 			Texture->bIsMappingForWriting = true;
 		}
 		else if (InMapMode == GpuResourceMapMode::Read_Only) {
@@ -74,12 +70,9 @@ namespace GpuApi
 			{
 				const uint64 BufferSize = GetRequiredIntermediateSize(Texture->GetResource(), 0, 1); 
 				Texture->ReadBackBuffer = CreateDx12Buffer(BufferSize, BufferUsage::ReadBack);
-                Data = Texture->ReadBackBuffer->Map();
-			}
-            else
-            {
-                Data = Texture->ReadBackBuffer->GetMappedData();
             }
+			Data = Texture->ReadBackBuffer->GetMappedData();
+			
 			ScopedBarrier Barrier{ Texture, D3D12_RESOURCE_STATE_COPY_SOURCE };
 			ID3D12GraphicsCommandList* CommandListHandle = GCommandListContext->GetCommandListHandle();
 
@@ -119,6 +112,22 @@ namespace GpuApi
 	TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName, FString EntryPoint)
 	{
 		return AUX::StaticCastRefCountPtr<GpuShader>(CreateDx12Shader(InType, MoveTemp(InSourceText), MoveTemp(InShaderName), MoveTemp(EntryPoint)));
+	}
+
+	//TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc)
+	//{
+
+	//}
+
+	TRefCountPtr<GpuBuffer> CreateBuffer(uint32 ByteSize, GpuBufferUsage Usage)
+	{
+		if (Usage == GpuBufferUsage::Uniform) {
+			return AUX::StaticCastRefCountPtr<GpuBuffer>(CreateDx12Buffer(ByteSize * FrameSourceNum, BufferUsage::Upload));
+		}
+		else 
+		{
+			return AUX::StaticCastRefCountPtr<GpuBuffer>(CreateDx12Buffer(ByteSize, BufferUsage::Default));
+		}
 	}
 
 	bool CompileShader(GpuShader* InShader, FString& OutErrorInfo)
@@ -164,6 +173,11 @@ namespace GpuApi
 		GCommandListContext->MarkViewportDirty(true);
 	}
 
+	void SetBindGroup(GpuBindGroup* InGpuBindGroup)
+	{
+
+	}
+
 	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType)
 	{
 		GCommandListContext->SetPrimitiveType(InType);
@@ -179,6 +193,8 @@ namespace GpuApi
 		DxCheck(GraphicsCommandList->Close());
 		ID3D12CommandList* CmdLists[] = { GraphicsCommandList };
 		GGraphicsQueue->ExecuteCommandLists(1, CmdLists);
+
+		GCommandListContext->ClearBinding();
 	}
 
 	void FlushGpu()

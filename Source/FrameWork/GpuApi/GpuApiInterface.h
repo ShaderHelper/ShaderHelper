@@ -13,24 +13,28 @@ namespace GpuApi
 	FRAMEWORK_API void EndRenderFrame();
 
 	FRAMEWORK_API TRefCountPtr<GpuTexture> CreateGpuTexture(const GpuTextureDesc& InTexDesc);
+	FRAMEWORK_API TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName, FString EntryPoint);
+	FRAMEWORK_API TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc);
+	FRAMEWORK_API TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc);
+	FRAMEWORK_API TRefCountPtr<GpuBuffer> CreateBuffer(uint32 ByteSize, GpuBufferUsage Usage);
 
 	//Need OutRowPitch to correctly read or write data, because the mapped buffer actually contains the *padded* texture data.
 	//RowPitch != Width x ElementByteSize
 	//RowPitch = align(Width x ElementByteSize, RequiredAlignValue)
 	FRAMEWORK_API void* MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapMode InMapMode, uint32& OutRowPitch);
 	FRAMEWORK_API void UnMapGpuTexture(GpuTexture* InGpuTexture);
-
-	FRAMEWORK_API TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName, FString EntryPoint);
+	
     //Accept each platform's own shader.
 	FRAMEWORK_API bool CompileShader(GpuShader* InShader, FString& OutErrorInfo);
     //Accept hlsl.
     FRAMEWORK_API bool CrossCompileShader(GpuShader* InShader, FString& OutErrorInfo);
 
-	FRAMEWORK_API TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc);
 	FRAMEWORK_API void SetRenderPipelineState(GpuPipelineState* InPipelineState);
 	
 	FRAMEWORK_API void SetVertexBuffer(GpuBuffer* InVertexBuffer);
 	FRAMEWORK_API void SetViewPort(const GpuViewPortDesc& InViewPortDesc);
+
+	FRAMEWORK_API void SetBindGroup(GpuBindGroup* InGpuBindGroup);
 
 	FRAMEWORK_API void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType = PrimitiveType::Triangle);
 	

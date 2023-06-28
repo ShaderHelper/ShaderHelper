@@ -80,6 +80,11 @@ namespace GpuApi
         return AUX::StaticCastRefCountPtr<GpuShader>(CreateMetalShader(InType, MoveTemp(InSourceText), MoveTemp(InShaderName), MoveTemp(EntryPoint)));
 	}
 
+	TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc)
+	{
+		
+	}
+
 	bool CompileShader(GpuShader* InShader, FString& OutErrorInfo)
 	{
         return FRAMEWORK::CompileShader(static_cast<MetalShader*>(InShader), OutErrorInfo);
@@ -93,6 +98,11 @@ namespace GpuApi
 	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc)
 	{
         return AUX::StaticCastRefCountPtr<GpuPipelineState>(CreateMetalPipelineState(InPipelineStateDesc));
+	}
+
+	TRefCountPtr<GpuBuffer> CreateBuffer(const GpuBufferDesc& InBufferDesc)
+	{
+
 	}
 
 	void SetRenderPipelineState(GpuPipelineState* InPipelineState)
@@ -116,6 +126,11 @@ namespace GpuApi
         
         mtlpp::ScissorRect ScissorRect{0, 0, InViewPortDesc.Width, InViewPortDesc.Height};
         GetCommandListContext()->SetViewPort(MakeUnique<mtlpp::Viewport>(MoveTemp(Viewport)), MakeUnique<mtlpp::ScissorRect>(MoveTemp(ScissorRect)));
+	}
+
+	void SetBindGroup(GpuBindGroup* InGpuBindGroup)
+	{
+
 	}
 
 	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType)

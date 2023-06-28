@@ -274,7 +274,7 @@ namespace AUX
     };
 
 //Call a private member function without undefined behavior.
-//Note: Not support dynamic dispatch
+//Note: The virtual dispatch will happen if the function is virtual.
 #define CALL_PRIVATE_FUNCTION(CalleeName, ClassName, FunctionName, Qualifiers, RetType, ...)                            \
     namespace                                                                                                           \
     {                                                                                                                   \
