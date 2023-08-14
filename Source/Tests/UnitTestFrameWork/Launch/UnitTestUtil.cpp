@@ -79,6 +79,23 @@ namespace UNITTEST_FRAMEWORK
 				SH_LOG(LogTestUtil, Display, TEXT("Test compatibility : (%s)."), *vec.ToString());
 			}
 		}
+        
+        //Test assign
+        {
+            Vector vec1 = { 1,2,3 };
+            Vector2f vec2 = { 0.5f,1.1f };
+            
+            vec1 = vec2.YYX; //{1.1, 1.1, 0.5}
+            SH_LOG(LogTestUtil, Display, TEXT("=: (%s)."), *vec1.ToString());
+            
+            Vector3f vec3 = {0.2f, 0.3f, 0.4f};
+            vec1.XY = vec3.YZ; //{0.3,0.4,0.5}
+            SH_LOG(LogTestUtil, Display, TEXT("=: (%s)."), *vec1.ToString());
+            
+            Vector2f vec4 = vec3.XX;
+            vec1.xy = vec4; //{0.2,0.2,0.5}
+            SH_LOG(LogTestUtil, Display, TEXT("=: (%s)."), *vec1.ToString());
+        }
 
 		//Test arithmetic operator
 		{
