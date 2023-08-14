@@ -1,6 +1,7 @@
 #pragma once
 #include <Misc/GeneratedTypeName.h>
 #include <array>
+#include <algorithm>
 namespace FRAMEWORK
 {
 namespace AUX
@@ -23,8 +24,42 @@ namespace AUX
         static RetType Sub(LType& lhs, RType& rhs) { return RetType(lhs[LeftIndexes] - rhs[RightIndexes]...); }
         template<typename RetType, typename LType, typename RType>
         static RetType Div(LType& lhs, RType& rhs) { return RetType(lhs[LeftIndexes] / rhs[RightIndexes]...); }
+        
+        template<typename LType, typename RType>
+        static void Assign(LType& lhs, RType& rhs) { ((lhs[LeftIndexes] = rhs[RightIndexes]), ...); }
 
     };
+
+    template<int... Seq>
+    constexpr bool HasDuplicateCompImpl()
+    {
+        constexpr int MaxValue = []()
+        {
+            std::array<int, sizeof...(Seq)> arr{Seq...};
+            return *std::max_element(arr.begin(), arr.end());
+        }();
+        
+        int num[MaxValue + 1]{};
+        std::array<int, sizeof...(Seq)> arr{Seq...};
+        for(int i = 0; i < arr.size(); i++)
+        {
+            if(++num[arr[i]] > 1)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    template<int... Seq>
+    struct HasDuplicateComp
+    {
+        static_assert(sizeof...(Seq) > 0);
+        static constexpr bool Value = HasDuplicateCompImpl<Seq...>();
+    };
+
+    template<int... Seq>
+    inline constexpr bool HasDuplicateComp_V = HasDuplicateComp<Seq...>::Value;
 
     template<typename Smart, typename Pointer>
     struct OutPtrImpl;
@@ -231,7 +266,7 @@ namespace AUX
 	struct TraitFuncTypeFromFuncPtr<T C::*> { using Type = T; };
 
 	template<typename T>
-	using TraitFuncTypeFromFunctor_t = typename TraitFuncTypeFromFuncPtr<decltype(&T::operator())>::Type;
+	using TraitFuncTypeFromFunctor_T = typename TraitFuncTypeFromFuncPtr<decltype(&T::operator())>::Type;
 
 	template<typename T1, typename T2>
 	struct FunctorExt;
@@ -257,7 +292,7 @@ namespace AUX
 	auto FunctorToFuncPtr(T&& Functor)
 	{
 		using CleanType = std::decay_t<T>;
-		using CurFunctorExt = FunctorExt<CleanType, TraitFuncTypeFromFunctor_t<CleanType>>;
+		using CurFunctorExt = FunctorExt<CleanType, TraitFuncTypeFromFunctor_T<CleanType>>;
 		CurFunctorExt::FunctorStorage = &Functor;
 		return &CurFunctorExt::Call;
 	}
