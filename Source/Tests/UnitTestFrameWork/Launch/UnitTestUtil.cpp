@@ -69,8 +69,20 @@ namespace UNITTEST_FRAMEWORK
 		{
 			FVector fvec(1, 2, 3);
 			Vector vec = fvec;
-			FVector fvec2 = vec;
+			FVector3f fvec2 = vec;
 			SH_LOG(LogTestUtil, Display, TEXT("Implicit conversion between FVector and Vector: (%lf,%lf,%lf)."), vec.X, vec.Y, vec.Z);
+            
+            Vector3d vecx{1.0f};
+            vecx = fvec2;
+            SH_LOG(LogTestUtil, Display, TEXT("assignment between FVector and Vector: (%s)."), *vecx.ToString());
+            
+           // vecx + fvec;
+            vecx.yz -= vec.xx;// {1,1,2}
+            SH_LOG(LogTestUtil, Display, TEXT("assignment between FVector and Vector: (%s)."), *vecx.ToString());
+            
+            vecx.xz /= 2;
+            SH_LOG(LogTestUtil, Display, TEXT("assignment between FVector and Vector: (%s)."), *vecx.ToString());
+            
 			//Test compatibility with ue math interfaces.
 			{
 				FTranslationMatrix tranM(vec);
@@ -92,8 +104,8 @@ namespace UNITTEST_FRAMEWORK
             vec1.XY = vec3.YZ; //{0.3,0.4,0.5}
             SH_LOG(LogTestUtil, Display, TEXT("=: (%s)."), *vec1.ToString());
             
-            Vector2f vec4 = vec3.XX;
-            vec1.xy = vec4; //{0.2,0.2,0.5}
+            Vector vec4 = vec3.XXX;
+            vec1.xy = vec4.xy; //{0.2,0.2,0.5}
             SH_LOG(LogTestUtil, Display, TEXT("=: (%s)."), *vec1.ToString());
         }
 
@@ -109,14 +121,20 @@ namespace UNITTEST_FRAMEWORK
 
 			{
 				Vector vec = vec1 * vec2;
-				vec = vec * 2.0;
-				vec *= 2;
+				vec = 2.0f * vec;
+                vec *= 2; // {4, 8.8, 12}
 				SH_LOG(LogTestUtil, Display, TEXT("*: (%lf,%lf,%lf)."), vec.X, vec.Y, vec.Z);
 			}
+            
+            {
+                Vector vec = 2.0f - vec1;
+                SH_LOG(LogTestUtil, Display, TEXT("-: (%s)."), *vec.ToString());
+            }
+            
 			{
-				Vector vec1 = { 1,1,1 };
-				(vec1 += 1) = { 3,3,3 };
-				SH_LOG(LogTestUtil, Display, TEXT("+=: (%s)."), *vec1.ToString());
+				Vector vec = { 1,1,1 };
+				(vec += 1) = { 3,3,3 };
+				SH_LOG(LogTestUtil, Display, TEXT("+=: (%s)."), *vec.ToString());
 			}
 
 			{
@@ -129,12 +147,17 @@ namespace UNITTEST_FRAMEWORK
 		//Test Swizzle
 		{
 			Vector vec1 = { 1,2,3 };
-			Vector vec2 = vec1.XXY;
+			Vector vec2 = vec1.XXY; //{1,1,2}
 			SH_LOG(LogTestUtil, Display, TEXT("Swizzle: (%lf,%lf,%lf)."), vec2.X, vec2.Y, vec2.Z);
 			{
-				Vector2D vec3 = vec2.XZ + 3.0;
+				Vector2D vec3 = vec2.XZ + 3.0; // {4,5}
 				SH_LOG(LogTestUtil, Display, TEXT("Swizzle +: (%lf,%lf)."), vec3.X, vec3.Y);
 			}
+            
+            {
+                Vector3f vec3 = vec1.zzz - 3.0;
+                SH_LOG(LogTestUtil, Display, TEXT("Swizzle -: (%s)."), *vec3.ToString());
+            }
 
 			{
 				Vector4 vec4 = 2.0 * vec2.ZZZZ; // 2 * {2,2,2,2}
