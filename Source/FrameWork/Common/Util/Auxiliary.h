@@ -27,8 +27,32 @@ namespace AUX
         
         template<typename LType, typename RType>
         static void Assign(LType& lhs, RType& rhs) { ((lhs[LeftIndexes] = rhs[RightIndexes]), ...); }
+        template<typename LType, typename RType>
+        static void AddAssign(LType& lhs, RType& rhs) { ((lhs[LeftIndexes] += rhs[RightIndexes]), ...); }
+        template<typename LType, typename RType>
+        static void SubAssign(LType& lhs, RType& rhs) { ((lhs[LeftIndexes] -= rhs[RightIndexes]), ...); }
+        template<typename LType, typename RType>
+        static void MulAssign(LType& lhs, RType& rhs) { ((lhs[LeftIndexes] *= rhs[RightIndexes]), ...); }
+        template<typename LType, typename RType>
+        static void DivAssign(LType& lhs, RType& rhs) { ((lhs[LeftIndexes] /= rhs[RightIndexes]), ...); }
 
     };
+
+    template<typename Type1, typename Type2, typename = void>
+    struct GetPromotedArithmeticType;
+
+    template<typename Type1, typename Type2>
+    struct GetPromotedArithmeticType<Type1, Type2,
+        std::enable_if_t<
+            std::is_arithmetic_v<Type1> && std::is_arithmetic_v<Type2>
+        >
+    >
+    {
+        using Type = decltype(std::declval<Type1>() + std::declval<Type2>());
+    };
+
+    template<typename Type1, typename Type2>
+    using GetPromotedArithmeticType_T = typename GetPromotedArithmeticType<Type1, Type2>::Type;
 
     template<int... Seq>
     constexpr bool HasDuplicateCompImpl()
@@ -227,7 +251,7 @@ namespace AUX
         return TTypename<BaseType>::Value;
     }
     
-    //https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2593r0.html#ref-P1830R1
+    //https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2593r0.html
     template<typename T>
     inline constexpr bool AlwaysFalse = false;
 
