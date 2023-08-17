@@ -1,5 +1,5 @@
 #pragma once
-#include "CommonHeader.h"
+
 namespace FRAMEWORK
 {
 	class FRAMEWORK_API Renderer : public FNoncopyable

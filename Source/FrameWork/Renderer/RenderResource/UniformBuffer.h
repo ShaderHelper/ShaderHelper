@@ -1,18 +1,18 @@
 #pragma once
-#include "CommonHeader.h"
 #include "GpuApi/GpuApiInterface.h"
 #include <string_view>
 
 namespace FRAMEWORK
 {
-	struct UniformBufferMember
+	struct UniformBufferMemberInfo
 	{
 		uint32 Offset;
 	};
 
 	struct UniformBufferMetaData
 	{
-		TMap<FString, UniformBufferMember> Members;
+		FString UniformBufferName;
+		TMap<FString, UniformBufferMemberInfo> Members;
 		FString UniformBufferDeclaration;
 		uint32 UniformBufferSize = 0;
 	};
@@ -29,6 +29,10 @@ namespace FRAMEWORK
 		T& GetMember(const FString& MemberName) {
 			int32 MemberOffset = MetaData.Members[MemberName].Offset;
 			return *reinterpret_cast<T*>(Buffer->GetMappedData());
+		}
+
+		const UniformBufferMetaData& GetMetaData() const {
+			return MetaData;
 		}
 
 	private:
@@ -49,8 +53,8 @@ namespace FRAMEWORK
 	{
 	public:
 		UniformBufferBuilder(FString InUniformBufferName)
-			: UniformBufferName(MoveTemp(InUniformBufferName))
 		{
+			MetaData.UniformBufferName = MoveTemp(InUniformBufferName);
 		}
 
 	public:
@@ -80,7 +84,7 @@ namespace FRAMEWORK
 
 		operator TUniquePtr<UniformBuffer>() {
 			TRefCountPtr<GpuBuffer> Buffer = GpuApi::CreateBuffer(MetaData.UniformBufferSize, GpuBufferUsage::Uniform);
-			MetaData.UniformBufferDeclaration = FString::Printf(TEXT("cbuffer %s\r\n{\r\n%s\r\n};\r\n"), *UniformBufferName, *UniformBufferMemberNames);
+			MetaData.UniformBufferDeclaration = FString::Printf(TEXT("cbuffer %s\r\n{\r\n%s\r\n};\r\n"), *MetaData.UniformBufferName, *UniformBufferMemberNames);
 			return MakeUnique<UniformBuffer>( MoveTemp(Buffer), MetaData);
 		}
 
@@ -106,12 +110,12 @@ namespace FRAMEWORK
 				MetaData.UniformBufferSize += MemberSize;
 			}
 			UniformBufferMemberNames += FString::Printf(TEXT("%s %s\r\n"), ANSI_TO_TCHAR(UniformBufferMemberTypeString<T>::Value.data()), *MemberName);
-			
+
 			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize });
 		}
 		
 	private:
-		FString UniformBufferName;
+		
 		FString UniformBufferMemberNames;
 		UniformBufferMetaData MetaData;
 	};

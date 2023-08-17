@@ -1,5 +1,4 @@
 #pragma once
-#include "CommonHeader.h"
 #include "GpuResourceCommon.h"
 
 namespace FRAMEWORK
@@ -7,6 +6,9 @@ namespace FRAMEWORK
 	class GpuBuffer : public GpuResource
 	{
 	public:
-		virtual void* GetMappedData() = 0;
+		GpuBuffer(GpuBufferUsage InUsage) : Usage(InUsage) {}
+		GpuBufferUsage GetUsage() const { return Usage; }
+	private:
+		GpuBufferUsage Usage;
 	};
 }

@@ -1,5 +1,4 @@
 #pragma once
-#include "CommonHeader.h"
 #include "GpuResourceCommon.h"
 #include "GpuPipelineState.h"
 #include "GpuTexture.h"
@@ -7,6 +6,7 @@
 #include "GpuBuffer.h"
 #include "GpuRenderPass.h"
 #include "GpuBindGroup.h"
+#include "GpuBindGroupLayout.h"
 
 namespace FRAMEWORK
 {

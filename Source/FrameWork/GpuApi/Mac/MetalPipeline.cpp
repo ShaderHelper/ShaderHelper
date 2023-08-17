@@ -8,8 +8,8 @@ namespace FRAMEWORK
 {
     TRefCountPtr<MetalPipelineState> CreateMetalPipelineState(const PipelineStateDesc& InPipelineStateDesc)
     {
-        TRefCountPtr<MetalShader> Vs = AUX::StaticCastRefCountPtr<MetalShader>(InPipelineStateDesc.Vs);
-        TRefCountPtr<MetalShader> Ps = AUX::StaticCastRefCountPtr<MetalShader>(InPipelineStateDesc.Ps);
+        MetalShader* Vs = static_cast<MetalShader*>(InPipelineStateDesc.Vs);
+        MetalShader* Ps = static_cast<MetalShader*>(InPipelineStateDesc.Ps);
         
         mtlpp::RenderPipelineDescriptor PipelineDesc;
         PipelineDesc.SetVertexFunction(Vs->GetCompilationResult());

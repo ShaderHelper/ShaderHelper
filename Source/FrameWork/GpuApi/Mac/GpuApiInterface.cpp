@@ -82,7 +82,7 @@ namespace GpuApi
 
 	TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc)
 	{
-		
+		return nullptr;
 	}
 
 	bool CompileShader(GpuShader* InShader, FString& OutErrorInfo)
@@ -100,7 +100,7 @@ namespace GpuApi
         return AUX::StaticCastRefCountPtr<GpuPipelineState>(CreateMetalPipelineState(InPipelineStateDesc));
 	}
 
-	TRefCountPtr<GpuBuffer> CreateBuffer(const GpuBufferDesc& InBufferDesc)
+	TRefCountPtr<GpuBuffer> CreateBuffer(uint32 ByteSize, GpuBufferUsage Usage)
 	{
 
 	}
@@ -128,7 +128,7 @@ namespace GpuApi
         GetCommandListContext()->SetViewPort(MakeUnique<mtlpp::Viewport>(MoveTemp(Viewport)), MakeUnique<mtlpp::ScissorRect>(MoveTemp(ScissorRect)));
 	}
 
-	void SetBindGroup(GpuBindGroup* InGpuBindGroup)
+	void SetBindGroups(GpuBindGroup* GlobalBindGroup, GpuBindGroup* PerMatBindGroup, GpuBindGroup* PerShaderBingGroup)
 	{
 
 	}

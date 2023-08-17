@@ -1,9 +1,12 @@
 #pragma once
-#include "CommonHeader.h"
 
 namespace FRAMEWORK
 {
-    inline constexpr int MaxRenderTargetNum = 8; //follow dx12:D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT
+	namespace GpuResourceLimit
+	{
+		inline constexpr int32 MaxRenderTargetNum = 8; //follow dx12:D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT
+		inline constexpr int32 MaxBindableBingGroupNum = 4;
+	}
 
     enum class GpuTextureFormat
     {
@@ -33,12 +36,18 @@ namespace FRAMEWORK
     };
     ENUM_CLASS_FLAGS(GpuTextureUsage);
 
-	enum class GpuBufferUsage
+	enum class GpuBufferUsage : uint32
 	{
-		Vertex,
-		Index,
-		Uniform,
+		Uniform = 1u << 0,
+
+		Static = 1u << 1,
+		Dynamic = 1u << 2,
+		Staging = 1u << 3,
+
+		Persistent = 1u << 4, // 1 or more frames
+		Temporary = 1u << 5,  // at most 1 frame.
 	};
+	ENUM_CLASS_FLAGS(GpuBufferUsage);
 
     enum class GpuResourceMapMode
     {
@@ -142,7 +151,9 @@ namespace FRAMEWORK
         Store,
     };
 
-    class GpuResource : public FThreadSafeRefCountedObject {};
+    class GpuResource : public FThreadSafeRefCountedObject 
+	{
+	};
 
     inline uint32 GetTextureFormatByteSize(GpuTextureFormat InFormat)
     {

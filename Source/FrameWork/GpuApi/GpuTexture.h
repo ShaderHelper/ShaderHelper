@@ -1,5 +1,4 @@
 #pragma once
-#include "CommonHeader.h"
 #include "GpuResourceCommon.h"
 
 namespace FRAMEWORK
@@ -17,6 +16,8 @@ namespace FRAMEWORK
         )
             : Width(InWidth), Height(InHeight), Depth(InDepth)
             , NumMips(InNumMips)
+
+
             , Format(InFormat)
             , Usage(InUsage)
             , ClearValues(MoveTemp(InClearValues))
