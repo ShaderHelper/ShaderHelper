@@ -1,4 +1,5 @@
 #pragma once
+#include <Templates/RefCounting.h>
 #include <Misc/GeneratedTypeName.h>
 #include <array>
 #include <algorithm>

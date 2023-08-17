@@ -1,6 +1,4 @@
 #include "CommonHeader.h"
-#include "Common/Util/SwizzleVector.h"
-#include "Common/Util/Auxiliary.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogTestUtil, Log, All);
 #include <chrono>

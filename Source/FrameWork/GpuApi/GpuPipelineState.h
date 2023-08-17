@@ -1,5 +1,4 @@
 #pragma once
-#include "CommonHeader.h"
 #include "GpuResourceCommon.h"
 #include "GpuShader.h"
 
@@ -45,7 +44,7 @@ namespace FRAMEWORK
 
     struct BlendStateDesc
     {
-        using DescStorageType = TArray<BlendRenderTargetDesc, TFixedAllocator<MaxRenderTargetNum>>;
+        using DescStorageType = TArray<BlendRenderTargetDesc, TFixedAllocator<GpuResourceLimit::MaxRenderTargetNum>>;
         BlendStateDesc() = default;
         BlendStateDesc(DescStorageType InDescStorage) : RtDescs(MoveTemp(InDescStorage)) {}
         DescStorageType RtDescs;
@@ -53,20 +52,20 @@ namespace FRAMEWORK
 
     struct PipelineStateDesc
     {
-        using RtFormatStorageType = TArray<GpuTextureFormat, TFixedAllocator<MaxRenderTargetNum>>;
+        using RtFormatStorageType = TArray<GpuTextureFormat, TFixedAllocator<GpuResourceLimit::MaxRenderTargetNum>>;
         PipelineStateDesc(
-            TRefCountPtr<GpuShader> InVs, TRefCountPtr<GpuShader> InPs,
+            GpuShader* InVs, GpuShader* InPs,
             RasterizerStateDesc InRasterizerState, BlendStateDesc InBlendState,
             RtFormatStorageType InRtFormats)
-            : Vs(MoveTemp(InVs))
-            , Ps(MoveTemp(InPs))
+            : Vs(InVs)
+            , Ps(InPs)
             , RasterizerState(MoveTemp(InRasterizerState))
             , BlendState(MoveTemp(InBlendState))
             , RtFormats(MoveTemp(InRtFormats))
         {
         }
-        TRefCountPtr<GpuShader> Vs;
-        TRefCountPtr<GpuShader> Ps;
+        GpuShader* Vs;
+        GpuShader* Ps;
         RasterizerStateDesc RasterizerState;
         BlendStateDesc BlendState;
         RtFormatStorageType RtFormats;

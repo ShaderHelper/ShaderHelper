@@ -2,7 +2,7 @@
 #include "Renderer/Renderer.h"
 #include "GpuApi/GpuResource.h"
 #include "App/PreviewViewPort.h"
-#include "Renderer/RenderResource/UniformBuffer.h"
+#include "Renderer/RenderResource/ArgumentBuffer.h"
 
 namespace SH
 {
@@ -27,14 +27,16 @@ namespace SH
 		static const FString DefaultPixelShaderText;
 		static const FString DefaultPixelShaderInput;
 
+		TUniquePtr<ArgumentBuffer> CustomArgumentBuffer;
+		TRefCountPtr<GpuBindGroup> CustomBindGroup;
+
 	private:
 		TRefCountPtr<GpuTexture> FinalRT;
 		TRefCountPtr<GpuShader> VertexShader;
 		TRefCountPtr<GpuShader> PixelShader;
 		TRefCountPtr<GpuPipelineState> PipelineState;
 		
-		TUniquePtr<UniformBuffer> BuiltInUniformBuffer;
-		TRefCountPtr<GpuBindGroup> CustomBindGroup;
+		TUniquePtr<ArgumentBuffer> BuiltInArgumentBuffer;
 		TRefCountPtr<GpuBindGroup> BuiltInBindGroup;
 	};
 }

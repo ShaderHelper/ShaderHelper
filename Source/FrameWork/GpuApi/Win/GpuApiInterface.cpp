@@ -1,11 +1,12 @@
 #include "CommonHeader.h"
 #include "GpuApi/GpuApiInterface.h"
-#include "D3D12Device.h"
-#include "D3D12CommandList.h"
-#include "D3D12Texture.h"
-#include "D3D12Shader.h"
-#include "D3D12PSO.h"
-#include "D3D12Map.h"
+#include "Dx12Device.h"
+#include "Dx12CommandList.h"
+#include "Dx12Texture.h"
+#include "Dx12Shader.h"
+#include "Dx12PSO.h"
+#include "Dx12Map.h"
+#include "Dx12Allocation.h"
 
 namespace FRAMEWORK
 {
@@ -15,6 +16,7 @@ namespace GpuApi
 	{	
 		InitDx12Core();
 		InitFrameResource();
+		InitBufferAllocator();
 	}
 
 	void StartRenderFrame()
@@ -24,6 +26,7 @@ namespace GpuApi
 		GCommandListContext->ResetStaticFrameResource(FrameResourceIndex);
 		GCommandListContext->BindStaticFrameResource(FrameResourceIndex);
 
+		GTempUniformBufferAllocator[FrameResourceIndex]->Flush();
         GDeferredReleaseManager.AllocateOneFrame();
 	}
 
@@ -57,21 +60,15 @@ namespace GpuApi
 		Dx12Texture* Texture = static_cast<Dx12Texture*>(InGpuTexture);
 		void* Data{};
 		if (InMapMode == GpuResourceMapMode::Write_Only) {
-			if (!Texture->UploadBuffer.IsValid())
-			{
-				const uint64 BufferSize = GetRequiredIntermediateSize(Texture->GetResource(), 0, 1);
-				Texture->UploadBuffer = CreateDx12Buffer(BufferSize, BufferUsage::Upload);
-			}
-			Data = Texture->UploadBuffer->GetMappedData();
+			const uint64 BufferSize = GetRequiredIntermediateSize(Texture->GetResource(), 0, 1);
+			Texture->UploadBuffer = CreateDx12Buffer(BufferSize, GpuBufferUsage::Dynamic);
+			Data = Texture->UploadBuffer->GetAllocation().GetCpuAddr();
 			Texture->bIsMappingForWriting = true;
 		}
 		else if (InMapMode == GpuResourceMapMode::Read_Only) {
-			if (!Texture->ReadBackBuffer.IsValid())
-			{
-				const uint64 BufferSize = GetRequiredIntermediateSize(Texture->GetResource(), 0, 1); 
-				Texture->ReadBackBuffer = CreateDx12Buffer(BufferSize, BufferUsage::ReadBack);
-            }
-			Data = Texture->ReadBackBuffer->GetMappedData();
+			const uint64 BufferSize = GetRequiredIntermediateSize(Texture->GetResource(), 0, 1); 
+			Texture->ReadBackBuffer = CreateDx12Buffer(BufferSize, GpuBufferUsage::Staging);
+			Data = Texture->ReadBackBuffer->GetAllocation().GetCpuAddr();
 			
 			ScopedBarrier Barrier{ Texture, D3D12_RESOURCE_STATE_COPY_SOURCE };
 			ID3D12GraphicsCommandList* CommandListHandle = GCommandListContext->GetCommandListHandle();
@@ -79,7 +76,9 @@ namespace GpuApi
 			D3D12_PLACED_SUBRESOURCE_FOOTPRINT Layout{};
 			D3D12_RESOURCE_DESC Desc = Texture->GetResource()->GetDesc();
 			GDevice->GetCopyableFootprints(&Desc, 0, 1, 0, &Layout, nullptr, nullptr, nullptr);
-			CD3DX12_TEXTURE_COPY_LOCATION DestLoc{ Texture->ReadBackBuffer->GetResource(), Layout};
+
+			const CommonAllocationData& AllocationData = Texture->ReadBackBuffer->GetAllocation().GetAllocationData().Get<CommonAllocationData>();
+			CD3DX12_TEXTURE_COPY_LOCATION DestLoc{ AllocationData.UnderlyResource, Layout};
 			CD3DX12_TEXTURE_COPY_LOCATION SrcLoc{ Texture->GetResource() };
 			CommandListHandle->CopyTextureRegion(&DestLoc, 0, 0, 0, &SrcLoc, nullptr);
 
@@ -102,11 +101,23 @@ namespace GpuApi
 			D3D12_PLACED_SUBRESOURCE_FOOTPRINT Layout{};
 			D3D12_RESOURCE_DESC Desc = Texture->GetResource()->GetDesc();
 			GDevice->GetCopyableFootprints(&Desc, 0, 1, 0, &Layout, nullptr, nullptr, nullptr);
-			CD3DX12_TEXTURE_COPY_LOCATION SrcLoc{ Texture->UploadBuffer->GetResource(), Layout };
+
+			const CommonAllocationData& AllocationData = Texture->UploadBuffer->GetAllocation().GetAllocationData().Get<CommonAllocationData>();
+			CD3DX12_TEXTURE_COPY_LOCATION SrcLoc{ AllocationData.UnderlyResource, Layout };
 			CommandListHandle->CopyTextureRegion(&DestLoc, 0, 0, 0, &SrcLoc, nullptr);
 				
 			Texture->bIsMappingForWriting = false;
 		}
+	}
+
+	void* MapGpuBuffer(GpuBuffer* InGpuBuffer, GpuResourceMapMode InMapMode)
+	{
+
+	}
+
+	void UnMapGpuBuffer(GpuBuffer* InGpuBuffer)
+	{
+
 	}
 
 	TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName, FString EntryPoint)
@@ -114,20 +125,14 @@ namespace GpuApi
 		return AUX::StaticCastRefCountPtr<GpuShader>(CreateDx12Shader(InType, MoveTemp(InSourceText), MoveTemp(InShaderName), MoveTemp(EntryPoint)));
 	}
 
-	//TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc)
-	//{
-
-	//}
+	TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc)
+	{
+		return nullptr;
+	}
 
 	TRefCountPtr<GpuBuffer> CreateBuffer(uint32 ByteSize, GpuBufferUsage Usage)
 	{
-		if (Usage == GpuBufferUsage::Uniform) {
-			return AUX::StaticCastRefCountPtr<GpuBuffer>(CreateDx12Buffer(ByteSize * FrameSourceNum, BufferUsage::Upload));
-		}
-		else 
-		{
-			return AUX::StaticCastRefCountPtr<GpuBuffer>(CreateDx12Buffer(ByteSize, BufferUsage::Default));
-		}
+		return AUX::StaticCastRefCountPtr<GpuBuffer>(CreateDx12Buffer(ByteSize, Usage));
 	}
 
 	bool CompileShader(GpuShader* InShader, FString& OutErrorInfo)
@@ -173,7 +178,7 @@ namespace GpuApi
 		GCommandListContext->MarkViewportDirty(true);
 	}
 
-	void SetBindGroup(GpuBindGroup* InGpuBindGroup)
+	void SetBindGroups(GpuBindGroup* GlobalBindGroup, GpuBindGroup* PerMatBindGroup, GpuBindGroup* PerShaderBingGroup)
 	{
 
 	}

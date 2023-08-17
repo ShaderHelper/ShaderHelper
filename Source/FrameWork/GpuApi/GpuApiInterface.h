@@ -23,6 +23,9 @@ namespace GpuApi
 	//RowPitch = align(Width x ElementByteSize, RequiredAlignValue)
 	FRAMEWORK_API void* MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapMode InMapMode, uint32& OutRowPitch);
 	FRAMEWORK_API void UnMapGpuTexture(GpuTexture* InGpuTexture);
+
+	FRAMEWORK_API void* MapGpuBuffer(GpuBuffer* InGpuBuffer, GpuResourceMapMode InMapMode);
+	FRAMEWORK_API void UnMapGpuBuffer(GpuBuffer* InGpuBuffer);
 	
     //Accept each platform's own shader.
 	FRAMEWORK_API bool CompileShader(GpuShader* InShader, FString& OutErrorInfo);
@@ -34,7 +37,7 @@ namespace GpuApi
 	FRAMEWORK_API void SetVertexBuffer(GpuBuffer* InVertexBuffer);
 	FRAMEWORK_API void SetViewPort(const GpuViewPortDesc& InViewPortDesc);
 
-	FRAMEWORK_API void SetBindGroup(GpuBindGroup* InGpuBindGroup);
+	FRAMEWORK_API void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3);
 
 	FRAMEWORK_API void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType = PrimitiveType::Triangle);
 	

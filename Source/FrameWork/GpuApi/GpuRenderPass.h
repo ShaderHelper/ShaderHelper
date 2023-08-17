@@ -1,5 +1,4 @@
 #pragma once
-#include "CommonHeader.h"
 #include "GpuResourceCommon.h"
 #include "GpuTexture.h"
 
@@ -47,7 +46,7 @@ namespace FRAMEWORK
 
     struct GpuRenderPassDesc
     {
-        TArray<GpuRenderTargetInfo, TFixedAllocator<MaxRenderTargetNum>> ColorRenderTargets;
+        TArray<GpuRenderTargetInfo, TFixedAllocator<GpuResourceLimit::MaxRenderTargetNum>> ColorRenderTargets;
     };
 
 }

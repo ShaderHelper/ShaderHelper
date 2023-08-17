@@ -39,10 +39,15 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		FString ErrorInfo;
 		check(GpuApi::CrossCompileShader(VertexShader, ErrorInfo));
 
-		BuiltInUniformBuffer = UniformBufferBuilder{ "BuiltIn" }
+		TUniquePtr<UniformBuffer> BuiltInUniformBuffer = UniformBufferBuilder{ "BuiltIn" }
 			.AddVector2f("iResolution")
 			.AddFloat("iTime")
-			.AddVector3f("iMouse");
+			.AddVector2f("iMouse");
+
+		BuiltInArgumentBuffer = ArgumentBufferBuilder{ 0 }
+			.AddUniformBuffer(AUX::TransOwnerShip(MoveTemp(BuiltInUniformBuffer)));
+
+		BuiltInBindGroup = BuiltInArgumentBuffer->CreateBindGroup();
 	}
 
 	void ShRenderer::OnViewportResize()
@@ -94,6 +99,8 @@ R"(float4 MainPS(PIn Input) : SV_Target
 			GpuApi::SetVertexBuffer(nullptr);
 			GpuApi::SetRenderPipelineState(PipelineState);
 			GpuApi::SetViewPort({ (uint32)ViewPort->GetSize().X, (uint32)ViewPort->GetSize().Y });
+	//		GpuApi::SetBindGroupLayouts()
+			GpuApi::SetBindGroups(BuiltInBindGroup, nullptr, nullptr, nullptr);
 			GpuApi::DrawPrimitive(0, 3, 0, 1);
             GpuApi::EndRenderPass();
 
