@@ -46,7 +46,7 @@ namespace FRAMEWORK
 	template<> struct UniformBufferMemberTypeString<Vector3f> { static constexpr std::string_view Value = "float3"; };
 	template<> struct UniformBufferMemberTypeString<Vector4f> { static constexpr std::string_view Value = "float4"; };
 	
-	//For minimizing bandwidth, there is no declared struct for uniform buffer,
+	//There is no declared struct for uniform buffer,
 	//and all uniform buffer is represented by the "UniformBuffer" class, 
 	//which makes it easy for us to simulate hlsl alignment rules when generating cbuffer on the shader side.
 	class UniformBufferBuilder
