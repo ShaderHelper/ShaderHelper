@@ -5,8 +5,6 @@
 namespace FRAMEWORK
 {
 	struct CommonAllocationData
-
-
 	{
 		ID3D12Resource* UnderlyResource;
 		D3D12_GPU_VIRTUAL_ADDRESS ResourceBaseGpuAddr;
@@ -95,8 +93,12 @@ namespace FRAMEWORK
 	class BufferBuddyAllocator
 	{
 	public:
-
+		BufferBuddyAllocator(uint32 InMinBlockSize, uint32 InMaxBlockSize, D3D12_HEAP_TYPE InHeapType, D3D12_RESOURCE_STATES InInitialState);
+		auto Allocate(uint32 InSize, uint32 Alignment);
+		uint32 AllocateBlock(uint32 Order);
 		void Deallocate(uint32 Offset, uint32 Order);
+		bool CanAllocate(uint32 InSize, uint32 Alignment) const;
+		void Reset();
 
 	private:
 		uint32 SizeToUnitSize(uint32 InSize) const
@@ -120,6 +122,8 @@ namespace FRAMEWORK
 		}
 
 		uint32 MinBlockSize, MaxBlockSize;
+		uint32 MaxOrder;
+		TArray<TSet<uint32>> FreeBlocks;
 	};
 
 

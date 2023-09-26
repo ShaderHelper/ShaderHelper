@@ -212,24 +212,37 @@ namespace AUX
         return MakeIntegerSequeceByPredicateImpl<Min, Max, Pred, Size>(TMakeIntegerSequence<int, Size>{});
     }
 
-    template<typename Func, int... Seq>
-   void RunCaseWithInt(int Var, const Func& func, TIntegerSequence<int, Seq...>) {
-       (func(Var,std::integral_constant<int, Seq>{}), ...);
-    }
-		
-#define RUNCASE_WITHINT_IMPL(LambName,VarToken,Min,Max,...)                                                     \
+	template<typename Func, int First, int... Seq>
+	auto RunCaseWithInt(int Var, const Func& Lamb, TIntegerSequence<int, First, Seq...> SeqObj) {
+		if (Var == First)
+		{
+			//Lambda does not support non-type template parameter until c++20.
+			return Lamb(Var, std::integral_constant<int, First>{});
+		}
+		else if constexpr (sizeof...(Seq) > 0)
+		{
+			return RunCaseWithInt(Var, Lamb, TIntegerSequence<int, Seq...>{});
+		}
+		else
+		{
+			// unreachable
+			check(false);
+			return Lamb(Var, std::integral_constant<int, First>{});
+		}
+	}
+
+#define RUNCASE_WITHINT_IMPL(LambName,VarToken,Min,Max,...) [&] {                                               \
     checkf(VarToken >= Min && VarToken <= Max, TEXT("%s must be [%d,%d]"), *FString(#VarToken), Min, Max);      \
     auto LambName = [&](int Var, auto&& t) {                                                                    \
-        using BaseType = std::remove_reference_t<decltype(t)>;                                                  \
-        constexpr int VarToken = BaseType::value;                                                               \
-        if (VarToken == Var) {                                                                                  \
-            __VA_ARGS__                                                                                         \
-        }                                                                                                       \
+        using CleanType = std::remove_reference_t<decltype(t)>;                                                 \
+        constexpr int VarToken = CleanType::value;                                                              \
+        __VA_ARGS__                                                                                             \
     };                                                                                                          \
-    AUX::RunCaseWithInt(VarToken, LambName, AUX::MakeRangeIntegerSequence<Min, Max>{});
+    return AUX::RunCaseWithInt(VarToken, LambName, AUX::MakeRangeIntegerSequence<Min, Max>{});                  \
+    }()
 
    //Pass a run-time integer with known small range to template
-   //* The large range will lead to code explosion, please carefully choose the range.
+   //* The large range maybe lead to code bloat, please carefully choose the range.
    //* `VarToken` must be a simple variable name rather than a complex expression. 
    //	Example: 
    //	int Var = xxx; RUNCASE_WITHINT(Var,...) (√) 

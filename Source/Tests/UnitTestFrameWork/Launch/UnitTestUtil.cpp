@@ -211,15 +211,13 @@ namespace UNITTEST_FRAMEWORK
 			//	}
 			// }
 
-			int VarFromFile = 23;
+			volatile int VarFromFile = 5;
 			FString str = "114514";
-			double Result = 0;
-			//Create the variable outside RUNCASE_WITHINT to get the result value you need
-			RUNCASE_WITHINT(VarFromFile, -64, 64,
-				Vector vec1 = { 1,2,3 };
-				Vector vec2 = vec1.ZZZ + 1;
-				Result = UnitTmp<VarFromFile>{}.Run(vec2.X, str);
-			)
+			Vector vec1 = { 1,2,3 };
+			Vector vec2 = vec1.ZZZ + 1;
+			double Result = RUNCASE_WITHINT(VarFromFile, 2, 64,
+				return UnitTmp<VarFromFile>{}.Run(vec2.X, str);
+			);
 			SH_LOG(LogTestUtil, Warning, TEXT("TestRunCaseWithInt: %lf"), Result);
 		}
 

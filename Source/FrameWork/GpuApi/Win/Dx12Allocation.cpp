@@ -46,6 +46,7 @@ namespace FRAMEWORK
 		: MinBlockSize(InMinBlockSize)
 		, MaxBlockSize(InMaxBlockSize)
 	{
+		AllocatorImpls.Add(MakeUnique<BufferBuddyAllocator>(MinBlockSize,MaxBlockSize, D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 
 	}
 
@@ -100,6 +101,10 @@ namespace FRAMEWORK
 	void TempUniformBufferAllocator::Flush()
 	{
 		CurAllocatorIndex = 0;
+		for (auto& AllocatorImpl : AllocatorImpls)
+		{
+			AllocatorImpl->Flush();
+		}
 	}
 
 	D3D12_GPU_VIRTUAL_ADDRESS CommonAllocationData::GetGpuAddr() const
@@ -137,6 +142,48 @@ namespace FRAMEWORK
 	void* BuddyAllocationData::GetCpuAddr() const
 	{
 
+	}
+
+	BufferBuddyAllocator::BufferBuddyAllocator(uint32 InMinBlockSize, uint32 InMaxBlockSize, D3D12_HEAP_TYPE InHeapType, D3D12_RESOURCE_STATES InInitialState)
+		: MinBlockSize(InMinBlockSize)
+		, MaxBlockSize(InMaxBlockSize)
+	{
+
+	}
+
+	auto BufferBuddyAllocator::Allocate(uint32 InSize, uint32 Alignment)
+	{
+
+	}
+
+	uint32 BufferBuddyAllocator::AllocateBlock(uint32 Order)
+	{
+
+	}
+
+	void BufferBuddyAllocator::Deallocate(uint32 Offset, uint32 Order)
+	{
+
+	}
+
+	bool BufferBuddyAllocator::CanAllocate(uint32 InSize, uint32 Alignment) const
+	{
+		uint32 AlignSize = Align(InSize, Alignment);
+		for (int32 i = MaxOrder; i >= 0; i--)
+		{
+			uint32 CurOrderBlockSize = OrderToUnitSize(i) * MinBlockSize;
+			if (FreeBlocks[i].Num() && CurOrderBlockSize >= AlignSize) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	void BufferBuddyAllocator::Reset()
+	{
+		FreeBlocks.Empty();
+		FreeBlocks.SetNum(MaxOrder);
+		FreeBlocks[MaxOrder].Add(0);
 	}
 
 }

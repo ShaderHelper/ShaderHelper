@@ -6,7 +6,7 @@ namespace FRAMEWORK {
     // Follows hlsl casting rule but
     // disables some implicit conversions:
     //      1. vectorN -> vectorM (N>M)   (eg. float2 a = float3(1,1,1)
-    //      2. scalar <-> vector(eg. float3 a = 1.0f, float a = float4(1,1,1,1) or float a  = .xyz
+    //      2. scalar <- vector(eg. float a = float4(1,1,1,1) or float a  = .xyz
     // disables some arithmetic operations:
     //      1. vectorN op vectorM (N!=M)  (eg. .xyz + .xx)
     //      2. FVector op Vector
@@ -308,7 +308,7 @@ namespace FRAMEWORK {
         template<typename U>
         Vector2Impl(const UE_Vector<U>& Vec) : X(Vec.X), Y(Vec.Y) {}
         
-		explicit Vector2Impl(T IntT) : X(IntT), Y(IntT) {}
+		Vector2Impl(T IntT) : X(IntT), Y(IntT) {}
 		Vector2Impl(T IntX, T IntY) : X(IntX), Y(IntY) {}
         
         template<typename U>
@@ -536,7 +536,7 @@ namespace FRAMEWORK {
         template<typename U>
 		VectorImpl(const UE_Vector<U>& Vec) : X(Vec.X), Y(Vec.Y), Z(Vec.Z) {}
         
-        explicit VectorImpl(T IntT) : X(IntT), Y(IntT), Z(IntT) {}
+        VectorImpl(T IntT) : X(IntT), Y(IntT), Z(IntT) {}
 		VectorImpl(T IntX, T IntY, T IntZ) : X(IntX), Y(IntY), Z(IntZ) {}
         
         template<typename U>
@@ -757,7 +757,7 @@ namespace FRAMEWORK {
         template<typename U>
 		Vector4Impl(const UE_Vector<U>& Vec) : X(Vec.X), Y(Vec.Y), Z(Vec.Z), W(Vec.W) {}
         
-        explicit Vector4Impl(T IntT) : X(IntT), Y(IntT), Z(IntT), W(IntT) {}
+        Vector4Impl(T IntT) : X(IntT), Y(IntT), Z(IntT), W(IntT) {}
 		Vector4Impl(T IntX, T IntY, T IntZ, T IntW) : X(IntX), Y(IntY), Z(IntZ), W(IntW) {}
         
         template<typename U>

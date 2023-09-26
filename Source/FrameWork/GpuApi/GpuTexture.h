@@ -16,8 +16,6 @@ namespace FRAMEWORK
         )
             : Width(InWidth), Height(InHeight), Depth(InDepth)
             , NumMips(InNumMips)
-
-
             , Format(InFormat)
             , Usage(InUsage)
             , ClearValues(MoveTemp(InClearValues))
