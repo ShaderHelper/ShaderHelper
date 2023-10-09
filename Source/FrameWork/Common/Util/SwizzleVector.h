@@ -306,14 +306,14 @@ namespace FRAMEWORK {
 
 		Vector2Impl() = default;
         template<typename U>
-        Vector2Impl(const UE_Vector<U>& Vec) : X(Vec.X), Y(Vec.Y) {}
+        Vector2Impl(const UE_Vector<U>& Vec) : X((T)Vec.X), Y((T)Vec.Y) {}
         
 		Vector2Impl(T IntT) : X(IntT), Y(IntT) {}
 		Vector2Impl(T IntX, T IntY) : X(IntX), Y(IntY) {}
         
         template<typename U>
         Vector2Impl(const Vector2Impl<U>& Vec)
-            : Vector2Impl(Vec.X, Vec.Y)
+            : Vector2Impl((T)Vec.X, (T)Vec.Y)
         {
         }
         
@@ -501,7 +501,7 @@ namespace FRAMEWORK {
 
         template<typename U>
 		operator UE_Vector<U>() const {
-			return UE_Vector<U>(X, Y);
+			return UE_Vector<U>((U)X, (U)Y);
 		}
 
 		FString ToString() const {
@@ -534,14 +534,14 @@ namespace FRAMEWORK {
 
 		VectorImpl() = default;
         template<typename U>
-		VectorImpl(const UE_Vector<U>& Vec) : X(Vec.X), Y(Vec.Y), Z(Vec.Z) {}
+		VectorImpl(const UE_Vector<U>& Vec) : X((T)Vec.X), Y((T)Vec.Y), Z((T)Vec.Z) {}
         
         VectorImpl(T IntT) : X(IntT), Y(IntT), Z(IntT) {}
 		VectorImpl(T IntX, T IntY, T IntZ) : X(IntX), Y(IntY), Z(IntZ) {}
         
         template<typename U>
         VectorImpl(const VectorImpl<U>& Vec)
-            : VectorImpl(Vec.X, Vec.Y, Vec.Z)
+            : VectorImpl((T)Vec.X, (T)Vec.Y, (T)Vec.Z)
         {
         }
         
@@ -722,7 +722,7 @@ namespace FRAMEWORK {
 
         template<typename U>
 		operator UE_Vector<U>() const {
-            return UE_Vector<U>(X, Y, Z);
+            return UE_Vector<U>((U)X, (U)Y, (U)Z);
 		}
 
 		FString ToString() const {
@@ -755,14 +755,14 @@ namespace FRAMEWORK {
 
 		Vector4Impl() = default;
         template<typename U>
-		Vector4Impl(const UE_Vector<U>& Vec) : X(Vec.X), Y(Vec.Y), Z(Vec.Z), W(Vec.W) {}
+		Vector4Impl(const UE_Vector<U>& Vec) : X((T)Vec.X), Y((T)Vec.Y), Z((T)Vec.Z), W((T)Vec.W) {}
         
         Vector4Impl(T IntT) : X(IntT), Y(IntT), Z(IntT), W(IntT) {}
 		Vector4Impl(T IntX, T IntY, T IntZ, T IntW) : X(IntX), Y(IntY), Z(IntZ), W(IntW) {}
         
         template<typename U>
         Vector4Impl(const Vector4Impl<U>& Vec)
-            : Vector4Impl(Vec.X, Vec.Y, Vec.Z, Vec.W)
+            : Vector4Impl((T)Vec.X, (T)Vec.Y, (T)Vec.Z, (T)Vec.W)
         {
         }
         
@@ -943,7 +943,7 @@ namespace FRAMEWORK {
         
         template<typename U>
 		operator UE_Vector<U>() const {
-			return UE_Vector<U>(X, Y, Z, W);
+			return UE_Vector<U>((U)X, (U)Y, (U)Z, (U)W);
 		}
 
 		FString ToString() const {

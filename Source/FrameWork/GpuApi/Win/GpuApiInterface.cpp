@@ -60,13 +60,13 @@ namespace GpuApi
 		Dx12Texture* Texture = static_cast<Dx12Texture*>(InGpuTexture);
 		void* Data{};
 		if (InMapMode == GpuResourceMapMode::Write_Only) {
-			const uint64 BufferSize = GetRequiredIntermediateSize(Texture->GetResource(), 0, 1);
+			const uint32 BufferSize = (uint32)GetRequiredIntermediateSize(Texture->GetResource(), 0, 1);
 			Texture->UploadBuffer = CreateDx12Buffer(BufferSize, GpuBufferUsage::Dynamic);
 			Data = Texture->UploadBuffer->GetAllocation().GetCpuAddr();
 			Texture->bIsMappingForWriting = true;
 		}
 		else if (InMapMode == GpuResourceMapMode::Read_Only) {
-			const uint64 BufferSize = GetRequiredIntermediateSize(Texture->GetResource(), 0, 1); 
+			const uint32 BufferSize = (uint32)GetRequiredIntermediateSize(Texture->GetResource(), 0, 1);
 			Texture->ReadBackBuffer = CreateDx12Buffer(BufferSize, GpuBufferUsage::Staging);
 			Data = Texture->ReadBackBuffer->GetAllocation().GetCpuAddr();
 			
@@ -112,7 +112,21 @@ namespace GpuApi
 
 	void* MapGpuBuffer(GpuBuffer* InGpuBuffer, GpuResourceMapMode InMapMode)
 	{
+		GpuBufferUsage Usage = InGpuBuffer->GetUsage();
+		Dx12Buffer* Buffer = static_cast<Dx12Buffer*>(InGpuBuffer);
+		void* Data = nullptr;
 
+		if (EnumHasAnyFlags(Usage, GpuBufferUsage::Dynamic))
+		{
+			check(InMapMode == GpuResourceMapMode::Write_Only);
+			Data = Buffer->GetAllocation().GetCpuAddr();
+		}
+		else
+		{
+
+		}
+
+		return Data;
 	}
 
 	void UnMapGpuBuffer(GpuBuffer* InGpuBuffer)

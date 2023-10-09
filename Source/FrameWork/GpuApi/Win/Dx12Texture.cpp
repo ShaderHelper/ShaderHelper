@@ -136,7 +136,7 @@ namespace FRAMEWORK
 			&TexDesc, ActualState, &ClearValues, IID_PPV_ARGS(TexResource.GetInitReference())));
 
 		if (bHasInitialData) {
-			const uint64 UploadBufferSize = GetRequiredIntermediateSize(TexResource, 0, 1);
+			const uint32 UploadBufferSize = (uint32)GetRequiredIntermediateSize(TexResource, 0, 1);
 			TRefCountPtr<Dx12Buffer> UploadBuffer = CreateDx12Buffer(UploadBufferSize, GpuBufferUsage::Dynamic);
 			
 			D3D12_SUBRESOURCE_DATA textureData = {};
