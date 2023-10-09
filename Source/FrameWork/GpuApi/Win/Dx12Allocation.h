@@ -10,8 +10,16 @@ namespace FRAMEWORK
 		D3D12_GPU_VIRTUAL_ADDRESS ResourceBaseGpuAddr;
 		void* ResourceBaseCpuAddr;
 		
-		D3D12_GPU_VIRTUAL_ADDRESS GetGpuAddr() const;
-		void* GetCpuAddr() const;
+		D3D12_GPU_VIRTUAL_ADDRESS GetGpuAddr() const
+		{
+			return ResourceBaseGpuAddr;
+		}
+
+		void* GetCpuAddr() const
+		{
+			check(ResourceBaseCpuAddr);
+			return ResourceBaseCpuAddr;
+		}
 	};
 
 	struct BumpAllocationData
@@ -19,10 +27,18 @@ namespace FRAMEWORK
 		ID3D12Resource* UnderlyResource;
 		D3D12_GPU_VIRTUAL_ADDRESS ResourceBaseGpuAddr;
 		void* ResourceBaseCpuAddr;
-		uint32 Offset;
+		uint64 Offset;
 
-		D3D12_GPU_VIRTUAL_ADDRESS GetGpuAddr() const;
-		void* GetCpuAddr() const;
+		D3D12_GPU_VIRTUAL_ADDRESS GetGpuAddr() const
+		{
+			return ResourceBaseGpuAddr + Offset;
+		}
+
+		void* GetCpuAddr() const
+		{
+			check(ResourceBaseCpuAddr);
+			return static_cast<void*>((uint8*)ResourceBaseCpuAddr + Offset);
+		}
 	};
 
 	struct BuddyAllocationData
@@ -30,14 +46,22 @@ namespace FRAMEWORK
 		ID3D12Resource* UnderlyResource;
 		D3D12_GPU_VIRTUAL_ADDRESS ResourceBaseGpuAddr;
 		void* ResourceBaseCpuAddr;
-		BufferBuddyAllocator* FromAllocator;
+		class BufferBuddyAllocator* FromAllocator;
 		uint32 Offset;
-		uint32 Order;
-		bool FrameSource;
+		uint32 Size;
 
 		~BuddyAllocationData();
-		D3D12_GPU_VIRTUAL_ADDRESS GetGpuAddr() const;
-		void* GetCpuAddr() const;
+
+		D3D12_GPU_VIRTUAL_ADDRESS GetGpuAddr() const
+		{
+			return ResourceBaseGpuAddr + Offset;
+		}
+
+		void* GetCpuAddr() const
+		{
+			check(ResourceBaseCpuAddr);
+			return static_cast<void*>((uint8*)ResourceBaseCpuAddr + Offset);
+		}
 	};
 
 	class ResourceAllocation
@@ -94,9 +118,10 @@ namespace FRAMEWORK
 	{
 	public:
 		BufferBuddyAllocator(uint32 InMinBlockSize, uint32 InMaxBlockSize, D3D12_HEAP_TYPE InHeapType, D3D12_RESOURCE_STATES InInitialState);
-		auto Allocate(uint32 InSize, uint32 Alignment);
+		BuddyAllocationData Allocate(uint32 InSize, uint32 Alignment);
 		uint32 AllocateBlock(uint32 Order);
-		void Deallocate(uint32 Offset, uint32 Order);
+		void Deallocate(uint32 Offset, uint32 Size);
+		void DeallocateBlock(uint32 UnitSizeOffset, uint32 BlockOrder);
 		bool CanAllocate(uint32 InSize, uint32 Alignment) const;
 		void Reset();
 
@@ -121,25 +146,28 @@ namespace FRAMEWORK
 			return 1 << Order;
 		}
 
+		TRefCountPtr<ID3D12Resource> Resource;
 		uint32 MinBlockSize, MaxBlockSize;
 		uint32 MaxOrder;
 		TArray<TSet<uint32>> FreeBlocks;
+		void* ResourceBaseCpuAddr = nullptr;
+		D3D12_GPU_VIRTUAL_ADDRESS ResourceBaseGpuAddr;
 	};
 
 
 	class BufferBumpAllocator
 	{
 	public:
-		BufferBumpAllocator(uint32 InSize, uint32 Alignment, D3D12_HEAP_TYPE InHeapType, D3D12_RESOURCE_STATES InInitialState);
+		BufferBumpAllocator(uint32 InSize, D3D12_HEAP_TYPE InHeapType, D3D12_RESOURCE_STATES InInitialState);
 		bool CanAllocate(uint32 InSize, uint32 Alignment) const
 		{
 			return Align(ByteOffset, Alignment) + InSize <= TotalSize;
 		}
-		auto Allocate(uint32 InSize, uint32 Alignment)
+		BumpAllocationData Allocate(uint32 InSize, uint32 Alignment)
 		{
 			uint32 AlignOffset = Align(ByteOffset, Alignment);
 			ByteOffset = AlignOffset + InSize;
-			return MakeTuple(Resource.GetReference(), ResourceBaseCpuAddr, AlignOffset, ResourceBaseGpuAddr);
+			return { Resource.GetReference(), ResourceBaseGpuAddr, ResourceBaseCpuAddr, AlignOffset};
 		}
 		void Flush()
 		{
@@ -164,7 +192,7 @@ namespace FRAMEWORK
 	private:
 		uint32 PageSize;
 		int32 CurAllocatorIndex;
-		TArray<TUniquePtr<BufferBumpAllocator>> AllocatorImpls;
+		TArray<BufferBumpAllocator> AllocatorImpls;
 	};
 
 	class PersistantUniformBufferAllocator
@@ -175,7 +203,7 @@ namespace FRAMEWORK
 
 	private:
 		uint32 MinBlockSize, MaxBlockSize;
-		TArray<TUniquePtr<BufferBuddyAllocator>> AllocatorImpls;
+		TArray<BufferBuddyAllocator> AllocatorImpls;
 	};
 
 	class CommonBufferAllocator
@@ -187,7 +215,7 @@ namespace FRAMEWORK
 	};
 
 	inline TUniquePtr<TempUniformBufferAllocator> GTempUniformBufferAllocator[FrameSourceNum]; //Scope = frame
-	inline TUniquePtr<PersistantUniformBufferAllocator> GPersistantUniformBufferAllocator;
+	inline TUniquePtr<PersistantUniformBufferAllocator> GPersistantUniformBufferAllocator[FrameSourceNum];
 
 	inline TUniquePtr<CommonBufferAllocator> GCommonBufferAllocator;
 

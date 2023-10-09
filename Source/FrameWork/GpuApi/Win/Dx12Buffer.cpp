@@ -7,11 +7,11 @@ namespace FRAMEWORK
 	{
 		if (EnumHasAnyFlags(Usage, GpuBufferUsage::Dynamic))
 		{
-			if (EnumHasAnyFlags(Usage, GpuBufferUsage::Uniform)) {
-				
+			if (EnumHasAnyFlags(Usage, GpuBufferUsage::Uniform)) 
+			{
 				if (EnumHasAnyFlags(Usage, GpuBufferUsage::Persistent))
 				{
-					BuddyAllocationData AllocationData = GPersistantUniformBufferAllocator->Alloc(ByteSize);
+					BuddyAllocationData AllocationData = GPersistantUniformBufferAllocator[GetCurFrameSourceIndex()]->Alloc(ByteSize);
 					return new Dx12Buffer{ Usage, ResourceAllocation{AllocationData} };
 				}
 				else if (EnumHasAnyFlags(Usage, GpuBufferUsage::Temporary))
@@ -37,11 +37,9 @@ namespace FRAMEWORK
 			CommonAllocationData AllocationData = GCommonBufferAllocator->Alloc(ByteSize, 0, D3D12_HEAP_TYPE_READBACK);
 			return new Dx12Buffer{ Usage, ResourceAllocation{AllocationData} };
 		}
-		else
-		{
-			checkf(false, TEXT("Invalid GpuBufferUsage"));
-			return TRefCountPtr<Dx12Buffer>{};
-		}
+
+		checkf(false, TEXT("Invalid GpuBufferUsage"));
+		return TRefCountPtr<Dx12Buffer>{};
 	}
 
 }
