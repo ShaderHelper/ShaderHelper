@@ -18,25 +18,21 @@ namespace FRAMEWORK
 		}
 	}
 
-	CommonAllocationData CommonBufferAllocator::Alloc(uint32 ByteSize, uint32 Alignment, D3D12_HEAP_TYPE InHeapType, D3D12_RESOURCE_STATES InInitialState)
+	CommonAllocationData CommonBufferAllocator::Alloc(uint32 ByteSize, D3D12_HEAP_TYPE InHeapType, D3D12_RESOURCE_STATES InInitialState)
 	{
-		TRefCountPtr<ID3D12Resource> Resource;
+		CommonAllocationData Data{};
 
 		CD3DX12_HEAP_PROPERTIES HeapType{ InHeapType };
 		D3D12_RESOURCE_STATES InitialState = InInitialState;
-		uint32 Width = Align(ByteSize, Alignment);
-		CD3DX12_RESOURCE_DESC BufferDesc = CD3DX12_RESOURCE_DESC::Buffer(Width);
+		CD3DX12_RESOURCE_DESC BufferDesc = CD3DX12_RESOURCE_DESC::Buffer(ByteSize);
 
 		DxCheck(GDevice->CreateCommittedResource(&HeapType, D3D12_HEAP_FLAG_NONE,
-			&BufferDesc, InitialState, nullptr, IID_PPV_ARGS(Resource.GetInitReference())));
+			&BufferDesc, InitialState, nullptr, IID_PPV_ARGS(&Data.UnderlyResource)));
 
-		CommonAllocationData Data{};
-		Data.UnderlyResource = Resource;
-		Data.ResourceBaseGpuAddr = Resource->GetGPUVirtualAddress();
-
+		Data.ResourceBaseGpuAddr = Data.UnderlyResource->GetGPUVirtualAddress();
 		if (InHeapType == D3D12_HEAP_TYPE_UPLOAD || InHeapType == D3D12_HEAP_TYPE_READBACK)
 		{
-			Resource->Map(0, nullptr, static_cast<void**>(&Data.ResourceBaseCpuAddr));
+			Data.UnderlyResource->Map(0, nullptr, static_cast<void**>(&Data.ResourceBaseCpuAddr));
 		}
 
 		return Data;
@@ -157,7 +153,7 @@ namespace FRAMEWORK
 			checkf(false, TEXT("Can't allocate a block that large  "));
 		}
 
-		if (FreeBlocks.Num() == 0)
+		if (FreeBlocks[Order].Num() == 0)
 		{
 			uint32 LeftBlockUnitSizeOffset = AllocateBlock(Order + 1);
 			uint32 CurOrderBlockUnitSize = OrderToUnitSize(Order);
@@ -212,11 +208,11 @@ namespace FRAMEWORK
 	void BufferBuddyAllocator::Reset()
 	{
 		FreeBlocks.Empty();
-		FreeBlocks.SetNum(MaxOrder);
+		FreeBlocks.SetNum(MaxOrder + 1);
 		FreeBlocks[MaxOrder].Add(0);
 	}
 
-	BuddyAllocationData::~BuddyAllocationData()
+	void BuddyAllocationData::Release()
 	{
 		FromAllocator->Deallocate(Offset, Size);
 	}

@@ -38,16 +38,26 @@ namespace FRAMEWORK
 
 	enum class GpuBufferUsage : uint32
 	{
-		Uniform = 1u << 0,
+		Static = 1u << 0,
+		Dynamic = 1u << 1,
+		Staging = 1u << 2,
 
-		Static = 1u << 1,
-		Dynamic = 1u << 2,
-		Staging = 1u << 3,
+		PersistentUniform = 1u << 3, // 1 or more frames
+		TemporaryUniform = 1u << 4,  // at most 1 frame.
 
-		Persistent = 1u << 4, // 1 or more frames
-		Temporary = 1u << 5,  // at most 1 frame.
+		Uniform = PersistentUniform | TemporaryUniform,
 	};
 	ENUM_CLASS_FLAGS(GpuBufferUsage);
+
+	enum class GpuResourceType
+	{
+		Buffer,
+		Texture,
+		BindGroup,
+		BindGroupLayout,
+		PipelineState,
+		Shader,
+	};
 
     enum class GpuResourceMapMode
     {
@@ -153,6 +163,12 @@ namespace FRAMEWORK
 
     class GpuResource : public FThreadSafeRefCountedObject 
 	{
+	public:
+		GpuResource(GpuResourceType InType) : Type(InType) {}
+		GpuResourceType GetType() const { return Type; }
+
+	private:
+		GpuResourceType Type;
 	};
 
     inline uint32 GetTextureFormatByteSize(GpuTextureFormat InFormat)

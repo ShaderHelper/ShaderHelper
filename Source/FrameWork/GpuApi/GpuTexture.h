@@ -5,40 +5,23 @@ namespace FRAMEWORK
 {
     struct GpuTextureDesc
     {
-        GpuTextureDesc(
-            uint32 InWidth,
-            uint32 InHeight,
-            GpuTextureFormat InFormat,
-            GpuTextureUsage InUsage = GpuTextureUsage::None,
-            Vector4f InClearValues = Vector4f{ 0 },
-            uint32 InDepth = 1,
-            uint32 InNumMips = 1
-        )
-            : Width(InWidth), Height(InHeight), Depth(InDepth)
-            , NumMips(InNumMips)
-            , Format(InFormat)
-            , Usage(InUsage)
-            , ClearValues(MoveTemp(InClearValues))
-        {
-
-        }
-
         uint32 Width;
         uint32 Height;
-        uint32 Depth;
-        uint32 NumMips;
-        GpuTextureFormat Format;
-        GpuTextureUsage Usage;
-        Vector4f ClearValues;
+		GpuTextureFormat Format;
 
-        TArray<uint8> InitialData;
+        GpuTextureUsage Usage = GpuTextureUsage::None;
+        Vector4f ClearValues = 0;
+		uint32 Depth = 1;
+		uint32 NumMips = 1;
+		TArray<uint8> InitialData{};
     };
 
     class GpuTexture : public GpuResource
     {
     public:
         GpuTexture(GpuTextureDesc InDesc)
-            : TexDesc(MoveTemp(InDesc))
+            : GpuResource(GpuResourceType::Texture)
+			, TexDesc(MoveTemp(InDesc))
         {}
         
     public:

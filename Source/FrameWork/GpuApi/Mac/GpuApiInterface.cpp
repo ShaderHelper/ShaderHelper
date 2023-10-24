@@ -85,6 +85,11 @@ namespace GpuApi
 		return nullptr;
 	}
 
+	TRefCountPtr<GpuBindGroupLayout> CreateBindGroupLayout(const GpuBindGroupLayoutDesc& InBindGroupLayoutDesc)
+	{
+		return nullptr;
+	}
+
 	bool CompileShader(GpuShader* InShader, FString& OutErrorInfo)
 	{
         return FRAMEWORK::CompileShader(static_cast<MetalShader*>(InShader), OutErrorInfo);
@@ -128,7 +133,7 @@ namespace GpuApi
         GetCommandListContext()->SetViewPort(MakeUnique<mtlpp::Viewport>(MoveTemp(Viewport)), MakeUnique<mtlpp::ScissorRect>(MoveTemp(ScissorRect)));
 	}
 
-	void SetBindGroups(GpuBindGroup* GlobalBindGroup, GpuBindGroup* PerMatBindGroup, GpuBindGroup* PerShaderBingGroup)
+	void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)
 	{
 
 	}

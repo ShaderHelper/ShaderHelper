@@ -2,25 +2,23 @@
 #include "Dx12PSO.h"
 #include "Dx12Map.h"
 #include "Dx12Device.h"
+#include "Dx12RS.h"
 
 namespace FRAMEWORK
 {
     TRefCountPtr<Dx12Pso> CreateDx12Pso(const PipelineStateDesc& InPipelineStateDesc)
     {
-        CD3DX12_ROOT_SIGNATURE_DESC RootSignatureDesc;
-        RootSignatureDesc.Init(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-        TRefCountPtr<ID3DBlob> Signature;
-        TRefCountPtr<ID3DBlob> Error;
-        TRefCountPtr<ID3D12RootSignature> RootSignature;
-        DxCheck(D3D12SerializeRootSignature(&RootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, Signature.GetInitReference(), Error.GetInitReference()));
-        DxCheck(GDevice->CreateRootSignature(0, Signature->GetBufferPointer(), Signature->GetBufferSize(), IID_PPV_ARGS(RootSignature.GetInitReference())));
-        //TODO RootSignature Manager.
-
         Dx12Shader* Vs = static_cast<Dx12Shader*>(InPipelineStateDesc.Vs);
         Dx12Shader* Ps = static_cast<Dx12Shader*>(InPipelineStateDesc.Ps);
 
+		RootSignatureDesc RsDesc{};
+		RsDesc.Layout0 = static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout0);
+		RsDesc.Layout1 = static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout1);
+		RsDesc.Layout2 = static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout2);
+		RsDesc.Layout3 = static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout3);
+
         D3D12_GRAPHICS_PIPELINE_STATE_DESC PsoDesc{};
-        PsoDesc.pRootSignature = RootSignature;
+		PsoDesc.pRootSignature = Dx12RootSignatureManager::GetRootSignature(RsDesc);
         PsoDesc.VS = { Vs->GetCompilationResult()->GetBufferPointer(), Vs->GetCompilationResult()->GetBufferSize() };
         PsoDesc.PS = { Ps->GetCompilationResult()->GetBufferPointer(), Ps->GetCompilationResult()->GetBufferSize() };
         PsoDesc.RasterizerState = MapRasterizerState(InPipelineStateDesc.RasterizerState);
@@ -42,6 +40,6 @@ namespace FRAMEWORK
 
         TRefCountPtr<ID3D12PipelineState> Pso;
         DxCheck(GDevice->CreateGraphicsPipelineState(&PsoDesc, IID_PPV_ARGS(Pso.GetInitReference())));
-        return new Dx12Pso(MoveTemp(Pso), MoveTemp(RootSignature));
+        return new Dx12Pso(MoveTemp(Pso));
     }
 }

@@ -10,6 +10,16 @@ namespace FRAMEWORK
 		, CurrentPso(nullptr)
 		, CurrentVertexBuffer(nullptr)
 		, DrawType(PrimitiveType::Triangle)
+		, CurrentRootSignature(nullptr)
+		, CurrentBindGroup0(nullptr)
+		, CurrentBindGroup1(nullptr)
+		, CurrentBindGroup2(nullptr)
+		, CurrentBindGroup3(nullptr)
+		, IsPipelineDirty(true)
+		, IsRenderTargetDirty(true)
+		, IsVertexBufferDirty(true)
+		, IsViewportDirty(true)
+		, IsRootSigDirty(true)
 	{
 
 	}
@@ -51,10 +61,40 @@ namespace FRAMEWORK
 		if (IsPipelineDirty)
 		{
 			check(CurrentPso);
-			GraphicsCmdList->SetGraphicsRootSignature(CurrentPso->GetRootSig());
 			GraphicsCmdList->SetPipelineState(CurrentPso->GetResource());
             GDeferredReleaseManager.AddUncompletedResource(CurrentPso);
 			MarkPipelineDirty(false);
+		}
+
+		if (IsRootSigDirty)
+		{
+			check(CurrentRootSignature);
+			GraphicsCmdList->SetGraphicsRootSignature(CurrentRootSignature->GetResource());
+			MarkRootSigDirty(false);
+		}
+
+		if (IsBindGroupsDirty)
+		{
+			auto ApplyBindGroup = [this](Dx12BindGroup* InGroup) {
+				Dx12BindGroupLayout* Layout = static_cast<Dx12BindGroupLayout*>(InGroup->GetLayout());
+				for (auto Slot : Layout->GetBindingSlots())
+				{
+					D3D12_GPU_VIRTUAL_ADDRESS GpuAddr = InGroup->GetDynamicBufferGpuAddr(Slot);
+					uint32 RootParameterIndex = CurrentRootSignature->GetDynamicBufferRootParameterIndex(Slot);
+					GCommandListContext->GetCommandListHandle()->SetGraphicsRootConstantBufferView(RootParameterIndex, GpuAddr);
+				}
+			};
+			ApplyBindGroup(CurrentBindGroup0);
+			ApplyBindGroup(CurrentBindGroup1);
+			ApplyBindGroup(CurrentBindGroup2);
+			ApplyBindGroup(CurrentBindGroup3);
+
+			GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup0);
+			GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup1);
+			GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup2);
+			GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup3);
+
+			MarkBindGroupsDirty(false);
 		}
 	
 		if (IsViewportDirty)
@@ -107,11 +147,18 @@ namespace FRAMEWORK
         CurrentPso = nullptr;
         CurrentViewPort = nullptr;
         CurrentSissorRect = nullptr;
+		CurrentRootSignature = nullptr;
+		CurrentBindGroup0 = nullptr;
+		CurrentBindGroup1 = nullptr;
+		CurrentBindGroup2 = nullptr;
+		CurrentBindGroup3 = nullptr;
         
         IsPipelineDirty = false;
         IsRenderTargetDirty = false;
         IsVertexBufferDirty = false;
         IsViewportDirty = false;
+		IsRootSigDirty = false;
+		IsBindGroupsDirty = false;
         
         CurrentRenderTargets.Empty();
         

@@ -28,7 +28,6 @@ namespace SH
 		static const FString DefaultPixelShaderInput;
 
 		TUniquePtr<ArgumentBuffer> CustomArgumentBuffer;
-		TRefCountPtr<GpuBindGroup> CustomBindGroup;
 
 	private:
 		TRefCountPtr<GpuTexture> FinalRT;
@@ -37,7 +36,7 @@ namespace SH
 		TRefCountPtr<GpuPipelineState> PipelineState;
 		
 		TUniquePtr<ArgumentBuffer> BuiltInArgumentBuffer;
-		TRefCountPtr<GpuBindGroup> BuiltInBindGroup;
+		TUniquePtr<ArgumentBufferLayout> BuiltInArgumentBufferLayout;
 	};
 }
 

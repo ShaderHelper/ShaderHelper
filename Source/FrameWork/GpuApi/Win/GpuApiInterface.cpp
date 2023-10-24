@@ -7,6 +7,7 @@
 #include "Dx12PSO.h"
 #include "Dx12Map.h"
 #include "Dx12Allocation.h"
+#include "Dx12RS.h"
 
 namespace FRAMEWORK
 {
@@ -141,7 +142,12 @@ namespace GpuApi
 
 	TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc)
 	{
-		return nullptr;
+		return AUX::StaticCastRefCountPtr<GpuBindGroup>(CreateDx12BindGroup(InBindGroupDesc));
+	}
+
+	TRefCountPtr<GpuBindGroupLayout> CreateBindGroupLayout(const GpuBindGroupLayoutDesc& InBindGroupLayoutDesc)
+	{
+		return AUX::StaticCastRefCountPtr<GpuBindGroupLayout>(CreateDx12BindGroupLayout(InBindGroupLayoutDesc));
 	}
 
 	TRefCountPtr<GpuBuffer> CreateBuffer(uint32 ByteSize, GpuBufferUsage Usage)
@@ -192,9 +198,24 @@ namespace GpuApi
 		GCommandListContext->MarkViewportDirty(true);
 	}
 
-	void SetBindGroups(GpuBindGroup* GlobalBindGroup, GpuBindGroup* PerMatBindGroup, GpuBindGroup* PerShaderBingGroup)
+	void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)
 	{
+		RootSignatureDesc RsDesc{};
+		RsDesc.Layout0 = static_cast<Dx12BindGroupLayout*>(BindGroup0->GetLayout());
+		RsDesc.Layout1 = static_cast<Dx12BindGroupLayout*>(BindGroup1->GetLayout());
+		RsDesc.Layout2 = static_cast<Dx12BindGroupLayout*>(BindGroup2->GetLayout());
+		RsDesc.Layout3 = static_cast<Dx12BindGroupLayout*>(BindGroup3->GetLayout());
 
+		GCommandListContext->SetRootSignature(Dx12RootSignatureManager::GetRootSignature(RsDesc));
+		GCommandListContext->MarkRootSigDirty(true);
+
+		GCommandListContext->SetBindGroups(
+			static_cast<Dx12BindGroup*>(BindGroup0),
+			static_cast<Dx12BindGroup*>(BindGroup1),
+			static_cast<Dx12BindGroup*>(BindGroup2),
+			static_cast<Dx12BindGroup*>(BindGroup3)
+			);
+		GCommandListContext->MarkBindGroupsDirty(true);
 	}
 
 	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType)

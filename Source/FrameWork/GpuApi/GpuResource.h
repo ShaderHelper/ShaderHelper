@@ -13,8 +13,8 @@ namespace FRAMEWORK
 	namespace GpuResourceHelper
 	{
 		const inline BlendStateDesc GDefaultBlendStateDesc{
-			BlendStateDesc::DescStorageType{ 
-				BlendRenderTargetDesc{ false, BlendFactor::SrcAlpha, BlendFactor::InvSrcAlpha, BlendFactor::One, BlendFactor::One, BlendOp::Add, BlendOp::Add}
+			/*.RtDescs = */ {
+				BlendRenderTargetDesc { false, BlendFactor::SrcAlpha, BlendFactor::InvSrcAlpha, BlendFactor::One, BlendFactor::One, BlendOp::Add, BlendOp::Add } 
 			}
 		};
 	}

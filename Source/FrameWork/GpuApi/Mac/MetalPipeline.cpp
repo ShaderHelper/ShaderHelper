@@ -16,7 +16,7 @@ namespace FRAMEWORK
         PipelineDesc.SetFragmentFunction(Ps->GetCompilationResult());
         
         ns::AutoReleased<ns::Array<mtlpp::RenderPipelineColorAttachmentDescriptor>> ColorAttachments = PipelineDesc.GetColorAttachments();
-        BlendStateDesc BlendDesc =InPipelineStateDesc.BlendState;
+        BlendStateDesc BlendDesc = InPipelineStateDesc.BlendState;
         const uint32 BlendRtNum = BlendDesc.RtDescs.Num();
         for(uint32 i = 0; i < BlendRtNum; i++)
         {

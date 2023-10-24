@@ -39,15 +39,18 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		FString ErrorInfo;
 		check(GpuApi::CrossCompileShader(VertexShader, ErrorInfo));
 
-		TUniquePtr<UniformBuffer> BuiltInUniformBuffer = UniformBufferBuilder{ "BuiltIn" }
+		TUniquePtr<UniformBuffer> BuiltInUniformBuffer = UniformBufferBuilder{ "BuiltIn", UniformBufferUsage::Persistant }
 			.AddVector2f("iResolution")
 			.AddFloat("iTime")
-			.AddVector2f("iMouse");
+			.AddVector2f("iMouse")
+			.Build();
 
-		BuiltInArgumentBuffer = ArgumentBufferBuilder{ 0 }
-			.AddUniformBuffer(AUX::TransOwnerShip(MoveTemp(BuiltInUniformBuffer)));
+		auto [NewArgumentBuffer, NewArgumentBufferLayout] = ArgumentBufferBuilder{ 0 }
+			.AddUniformBuffer(AUX::TransOwnerShip(MoveTemp(BuiltInUniformBuffer)))
+			.Build();
 
-		BuiltInBindGroup = BuiltInArgumentBuffer->CreateBindGroup();
+		BuiltInArgumentBuffer = MoveTemp(NewArgumentBuffer);
+		BuiltInArgumentBufferLayout = MoveTemp(NewArgumentBufferLayout);
 	}
 
 	void ShRenderer::OnViewportResize()
@@ -73,9 +76,12 @@ R"(float4 MainPS(PIn Input) : SV_Target
 	{
 		check(VertexShader->IsCompiled());
 		check(PixelShader->IsCompiled());
-		PipelineStateDesc::RtFormatStorageType RenderTargetFormats{ FinalRT->GetFormat() };
 		PipelineStateDesc PipelineDesc{
-			VertexShader, PixelShader, RasterizerStateDesc{RasterizerFillMode::Solid, RasterizerCullMode::None}, GpuResourceHelper::GDefaultBlendStateDesc, RenderTargetFormats
+			VertexShader, PixelShader, 
+			RasterizerStateDesc{RasterizerFillMode::Solid, RasterizerCullMode::None}, 
+			GpuResourceHelper::GDefaultBlendStateDesc,
+			{ FinalRT->GetFormat() },
+			BuiltInArgumentBufferLayout->GetBindLayout()
 		};
 		PipelineState = GpuApi::CreateRenderPipelineState(PipelineDesc);
 	}
@@ -99,8 +105,7 @@ R"(float4 MainPS(PIn Input) : SV_Target
 			GpuApi::SetVertexBuffer(nullptr);
 			GpuApi::SetRenderPipelineState(PipelineState);
 			GpuApi::SetViewPort({ (uint32)ViewPort->GetSize().X, (uint32)ViewPort->GetSize().Y });
-	//		GpuApi::SetBindGroupLayouts()
-			GpuApi::SetBindGroups(BuiltInBindGroup, nullptr, nullptr, nullptr);
+			GpuApi::SetBindGroups(BuiltInArgumentBuffer->GetBindGroup(), nullptr, nullptr, nullptr);
 			GpuApi::DrawPrimitive(0, 3, 0, 1);
             GpuApi::EndRenderPass();
 

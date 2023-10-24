@@ -355,7 +355,7 @@ namespace FRAMEWORK {
         template<typename U,
             typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
         >
-		auto operator-(const Vector2Impl& rhs) const {
+		auto operator-(const Vector2Impl<U>& rhs) const {
 			return Vector2Impl<PromotedType>(X - rhs.X, Y - rhs.Y);
 		}
         template<typename U,

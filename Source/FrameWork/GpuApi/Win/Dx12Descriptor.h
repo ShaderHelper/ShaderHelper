@@ -24,9 +24,11 @@ namespace FRAMEWORK
 	template<uint32 MaxSize, DescriptorType DescType>
 	using GpuDescriptorAllocator = DescriptorAllocator<MaxSize, Descriptorvisibility::CpuGpuVisible, DescType>;
 
-
 	template<Descriptorvisibility Visibility>
 	struct DescriptorHandle;
+
+	using CpuDescriptorHandle = DescriptorHandle<Descriptorvisibility::CpuVisible>;
+	using GpuDescriptorHandle = DescriptorHandle<Descriptorvisibility::CpuGpuVisible>;
 
 	template<>
 	struct DescriptorHandle<Descriptorvisibility::CpuVisible>
