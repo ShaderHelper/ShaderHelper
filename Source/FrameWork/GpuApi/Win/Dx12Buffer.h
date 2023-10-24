@@ -15,6 +15,11 @@ namespace FRAMEWORK
 			Allocation.SetOwner(this);
 		}
 
+		~Dx12Buffer()
+		{
+			Allocation.Release();
+		}
+
 	public:
 		const ResourceAllocation& GetAllocation() const
 		{

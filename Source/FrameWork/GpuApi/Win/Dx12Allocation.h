@@ -9,6 +9,10 @@ namespace FRAMEWORK
 		ID3D12Resource* UnderlyResource;
 		D3D12_GPU_VIRTUAL_ADDRESS ResourceBaseGpuAddr;
 		void* ResourceBaseCpuAddr;
+
+		void Release() {
+			UnderlyResource->Release();
+		}
 		
 		D3D12_GPU_VIRTUAL_ADDRESS GetGpuAddr() const
 		{
@@ -28,6 +32,8 @@ namespace FRAMEWORK
 		D3D12_GPU_VIRTUAL_ADDRESS ResourceBaseGpuAddr;
 		void* ResourceBaseCpuAddr;
 		uint64 Offset;
+
+		void Release() {}
 
 		D3D12_GPU_VIRTUAL_ADDRESS GetGpuAddr() const
 		{
@@ -50,7 +56,7 @@ namespace FRAMEWORK
 		uint32 Offset;
 		uint32 Size;
 
-		~BuddyAllocationData();
+		void Release();
 
 		D3D12_GPU_VIRTUAL_ADDRESS GetGpuAddr() const
 		{
@@ -86,6 +92,13 @@ namespace FRAMEWORK
 
 	public:
 		void SetOwner(GpuResource* InOwner) { Owner = InOwner; }
+		void Release() {
+			return Visit(
+				[](auto&& Arg)
+				{
+					return Arg.Release();
+				}, AllocationData);
+		}
 
 		const AllocationDataVariant& GetAllocationData() const
 		{
@@ -209,7 +222,7 @@ namespace FRAMEWORK
 	class CommonBufferAllocator
 	{
 	public:
-		CommonAllocationData Alloc(uint32 ByteSize, uint32 Alignment,
+		CommonAllocationData Alloc(uint32 ByteSize, 
 			D3D12_HEAP_TYPE InHeapType, D3D12_RESOURCE_STATES InInitialState = D3D12_RESOURCE_STATE_COMMON);
 
 	};

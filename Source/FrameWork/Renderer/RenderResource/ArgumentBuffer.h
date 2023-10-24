@@ -3,63 +3,69 @@
 
 namespace FRAMEWORK
 {
-	struct ArgumentBufferLayout
+	class ArgumentBufferLayout
 	{
+		friend ArgumentBufferBuilder;
+	public:
+		GpuBindGroupLayout* GetBindLayout() const { return BindGroupLayout; }
+
+	private:
 		FString Declaration;
+		GpuBindGroupLayoutDesc LayoutDesc;
 		TRefCountPtr<GpuBindGroupLayout> BindGroupLayout;
 	};
 
-	struct ArgumentBuffer
+	class ArgumentBuffer
 	{
+		friend ArgumentBufferBuilder;
+	public:
+		GpuBindGroup* GetBindGroup() const { return BindGroup; }
+
+	private:
 		TArray<TSharedPtr<UniformBuffer>> UniformBuffers;
+		GpuBindGroupDesc Desc;
 		TRefCountPtr<GpuBindGroup> BindGroup;
-		//TArray<> textures;
-
-	/*	TRefCountPtr<GpuBindGroup> CreateBindGroup() const
-		{
-			GpuBindGroupDesc Desc;
-			for (auto& Ub : UniformBuffers)
-			{
-				auto& UbMetaData = Ub->GetMetaData();
-				Desc.Buffers.Emplace()
-			}
-
-			return GpuApi::CreateBindGroup(Desc);
-		}*/
 	};
 
 	class ArgumentBufferBuilder
 	{
 	public:
-		ArgumentBufferBuilder(int32 InBindGroupSlot)
+		ArgumentBufferBuilder(BindingGroupIndex InIndex)
 		{
-			check(InBindGroupSlot < GpuResourceLimit::MaxBindableBingGroupNum);
-			BindGroupSlot = InBindGroupSlot;
+			check(InIndex < GpuResourceLimit::MaxBindableBingGroupNum);
+			Index = InIndex;
 		}
 		
 	public:
-
-		ArgumentBufferBuilder& AddUniformBuffer(TSharedPtr<UniformBuffer> InUniformBuffer)
+		ArgumentBufferBuilder& AddUniformBuffer(TSharedPtr<UniformBuffer> InUniformBuffer, BindingShaderStage InStage = BindingShaderStage::All)
 		{
+			Buffer.UniformBuffers.Add(InUniformBuffer);
+			Buffer.Desc.Resources.Add({ BindingNum, InUniformBuffer->GetGpuResource() });
+
 			FString UniformBufferDeclaration = InUniformBuffer->GetMetaData().UniformBufferDeclaration;
 			int32 InsertIndex = UniformBufferDeclaration.Find(TEXT("{"));
 			check(InsertIndex != INDEX_NONE);
-			UniformBufferDeclaration.InsertAt(InsertIndex - 1, FString::Printf(TEXT(": register(space%d)\r\n"), BindGroupSlot));
+			UniformBufferDeclaration.InsertAt(InsertIndex - 1, FString::Printf(TEXT(": register(b%d, space%d)\r\n"), BindingNum, Index));
 
-			Buffer.ArgumentBufferDeclaration += MoveTemp(UniformBufferDeclaration);
-			Buffer.UniformBuffers.Add(InUniformBuffer);
+			BufferLayout.Declaration += MoveTemp(UniformBufferDeclaration);
+			BufferLayout.LayoutDesc.Layouts.Add({ BindingNum, BindingType::UniformBuffer, InStage});
+			BufferLayout.LayoutDesc.GroupNumber = Index;
+			BindingNum++;
+	
 			return *this;
 		}
 
-		operator TUniquePtr<ArgumentBuffer>() const
+		auto Build() &&
 		{
-			return MakeUnique<ArgumentBuffer>(Buffer);
+			Buffer.BindGroup = GpuApi::CreateBindGroup(Buffer.Desc);
+			BufferLayout.BindGroupLayout = GpuApi::CreateBindGroupLayout(BufferLayout.LayoutDesc);
+			return MakeTuple(MakeUnique<ArgumentBuffer>(MoveTemp(Buffer)), MakeUnique<ArgumentBufferLayout>(MoveTemp(BufferLayout)));
 		}
 
-		//ArgumentBufferBuilder& AddTexture() 
-		
 	private:
-		int32 BindGroupSlot;
+		BindingGroupIndex Index;
+		int32 BindingNum = 0;
 		ArgumentBuffer Buffer;
+		ArgumentBufferLayout BufferLayout;
 	};
 }

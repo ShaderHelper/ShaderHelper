@@ -20,8 +20,8 @@ namespace FRAMEWORK
 		TRefCountPtr<ID3D12Resource> Resource;
 
 	public:
-		DescriptorHandle<Descriptorvisibility::CpuVisible> HandleRTV;
-		DescriptorHandle<Descriptorvisibility::CpuGpuVisible> HandleSRV;
+		CpuDescriptorHandle HandleRTV;
+		GpuDescriptorHandle HandleSRV;
 		TRefCountPtr<Dx12Buffer> UploadBuffer;
 		TRefCountPtr<Dx12Buffer> ReadBackBuffer;
 		bool bIsMappingForWriting = false;

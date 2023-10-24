@@ -6,47 +6,41 @@ namespace FRAMEWORK
 {
 	struct GpuViewPortDesc
 	{
-		GpuViewPortDesc(uint32 InWidth, uint32 InHeight, float InZMin = 0.0f, float InZMax = 1.0f, float InTopLeftX = 0.0f, float InTopLeftY = 0.0f)
-			: TopLeftX(InTopLeftX)
-			, TopLeftY(InTopLeftY)
-			, Width(InWidth)
-			, Height(InHeight)
-			, ZMin(InZMin)
-			, ZMax(InZMax)
-		{
-		}
-		float TopLeftX, TopLeftY;
 		uint32 Width, Height;
-		float ZMin, ZMax;
+
+		float ZMin = 0.0f;
+		float ZMax = 1.0f;
+		float TopLeftX = 0.0f;
+		float TopLeftY = 0.0f;
 	};
 
-    class GpuRenderTargetInfo
-    {
-    public:
-        GpuRenderTargetInfo(GpuTexture* InTexture,
-                        RenderTargetLoadAction InLoadAction = RenderTargetLoadAction::DontCare,
-                        RenderTargetStoreAction InStoreAction = RenderTargetStoreAction::DontCare)
-            : Texture(InTexture)
-            , LoadAction(InLoadAction)
-            , StoreAction(InStoreAction)
-        {}
-    public:
-        GpuTexture* GetRenderTarget() const { return Texture; }
-        void SetClearColor(Vector4f InClearColor) { ClearColor = MoveTemp(InClearColor); }
-        
-        
-    public:
-        RenderTargetLoadAction LoadAction;
-        RenderTargetStoreAction StoreAction;
-        TOptional<Vector4f> ClearColor;
-        
-    private:
-        GpuTexture* Texture;
-    };
+	class GpuRenderTargetInfo
+	{
+	public:
+		GpuRenderTargetInfo(GpuTexture* InTexture,
+			RenderTargetLoadAction InLoadAction = RenderTargetLoadAction::DontCare,
+			RenderTargetStoreAction InStoreAction = RenderTargetStoreAction::DontCare)
+			: Texture(InTexture)
+			, LoadAction(InLoadAction)
+			, StoreAction(InStoreAction)
+		{}
+	public:
+		GpuTexture* GetRenderTarget() const { return Texture; }
+		void SetClearColor(Vector4f InClearColor) { ClearColor = MoveTemp(InClearColor); }
 
-    struct GpuRenderPassDesc
-    {
-        TArray<GpuRenderTargetInfo, TFixedAllocator<GpuResourceLimit::MaxRenderTargetNum>> ColorRenderTargets;
-    };
+
+	public:
+		RenderTargetLoadAction LoadAction;
+		RenderTargetStoreAction StoreAction;
+		TOptional<Vector4f> ClearColor;
+
+	private:
+		GpuTexture* Texture;
+	};
+
+	struct GpuRenderPassDesc
+	{
+		TArray<GpuRenderTargetInfo, TFixedAllocator<GpuResourceLimit::MaxRenderTargetNum>> ColorRenderTargets;
+	};
 
 }

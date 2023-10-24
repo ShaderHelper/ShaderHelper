@@ -6,6 +6,9 @@ namespace FRAMEWORK
     class GpuShader : public GpuResource
     {
 	public:
+		GpuShader() : GpuResource(GpuResourceType::Shader)
+		{}
+
 		virtual bool IsCompiled() const {
 			return false;
 		}

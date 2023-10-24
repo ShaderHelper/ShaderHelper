@@ -6,8 +6,12 @@ namespace FRAMEWORK
 	class GpuBuffer : public GpuResource
 	{
 	public:
-		GpuBuffer(GpuBufferUsage InUsage) : Usage(InUsage) {}
+		GpuBuffer(GpuBufferUsage InUsage) 
+			: GpuResource(GpuResourceType::Buffer)
+			, Usage(InUsage) 
+		{}
 		GpuBufferUsage GetUsage() const { return Usage; }
+
 	private:
 		GpuBufferUsage Usage;
 	};

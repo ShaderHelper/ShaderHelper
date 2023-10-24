@@ -28,12 +28,15 @@ namespace FRAMEWORK
 		template<typename T>
 		T& GetMember(const FString& MemberName) {
 			int32 MemberOffset = MetaData.Members[MemberName].Offset;
-			return *reinterpret_cast<T*>(Buffer->GetMappedData());
+			void* BufferBaseAddr = GpuApi::MapGpuBuffer(Buffer, GpuResourceMapMode::Write_Only);
+			return *reinterpret_cast<T*>((uint8)BufferBaseAddr + MemberOffset);
 		}
 
 		const UniformBufferMetaData& GetMetaData() const {
 			return MetaData;
 		}
+
+		GpuBuffer* GetGpuResource() const { return Buffer; }
 
 	private:
 		TRefCountPtr<GpuBuffer> Buffer;
@@ -45,6 +48,12 @@ namespace FRAMEWORK
 	template<> struct UniformBufferMemberTypeString<Vector2f> { static constexpr std::string_view Value = "float2"; };
 	template<> struct UniformBufferMemberTypeString<Vector3f> { static constexpr std::string_view Value = "float3"; };
 	template<> struct UniformBufferMemberTypeString<Vector4f> { static constexpr std::string_view Value = "float4"; };
+
+	enum class UniformBufferUsage : uint32
+	{
+		Persistant = (uint32)GpuBufferUsage::PersistentUniform,
+		Temp = (uint32)GpuBufferUsage::TemporaryUniform,
+	};
 	
 	//There is no declared struct for uniform buffer,
 	//and all uniform buffer is represented by the "UniformBuffer" class, 
@@ -52,7 +61,8 @@ namespace FRAMEWORK
 	class UniformBufferBuilder
 	{
 	public:
-		UniformBufferBuilder(FString InUniformBufferName)
+		UniformBufferBuilder(FString InUniformBufferName, UniformBufferUsage InUsage)
+			: Usage(InUsage)
 		{
 			MetaData.UniformBufferName = MoveTemp(InUniformBufferName);
 		}
@@ -82,8 +92,8 @@ namespace FRAMEWORK
 			return *this;
 		}
 
-		operator TUniquePtr<UniformBuffer>() {
-			TRefCountPtr<GpuBuffer> Buffer = GpuApi::CreateBuffer(MetaData.UniformBufferSize, GpuBufferUsage::Uniform);
+		auto Build() && {
+			TRefCountPtr<GpuBuffer> Buffer = GpuApi::CreateBuffer(MetaData.UniformBufferSize, (GpuBufferUsage)Usage);
 			MetaData.UniformBufferDeclaration = FString::Printf(TEXT("cbuffer %s\r\n{\r\n%s\r\n};\r\n"), *MetaData.UniformBufferName, *UniformBufferMemberNames);
 			return MakeUnique<UniformBuffer>( MoveTemp(Buffer), MetaData);
 		}
@@ -115,7 +125,7 @@ namespace FRAMEWORK
 		}
 		
 	private:
-		
+		UniformBufferUsage Usage;
 		FString UniformBufferMemberNames;
 		UniformBufferMetaData MetaData;
 	};

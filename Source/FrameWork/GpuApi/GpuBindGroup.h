@@ -5,28 +5,28 @@
 
 namespace FRAMEWORK
 {
-
+	struct ResourceBinding
+	{
+		BindingSlot Slot;
+		GpuResource* Resource;
+	};
 
 	struct GpuBindGroupDesc
 	{
-		//struct TextureBinding
-		//{
-		//	FString BindingName;
-		//	GpuTexture Texture;
-		//};
-
-		struct BufferBinding
-		{
-			FString BindingName;
-			GpuBuffer* Buffer;
-		};
-
-		//TArray<TextureBinding> Textures;
-		TArray<BufferBinding> Buffers;
+		GpuBindGroupLayout* Layout;
+		TArray<ResourceBinding> Resources;
 	};
 	
 	class GpuBindGroup : public GpuResource
 	{
+	public:
 
+		GpuBindGroup() : GpuResource(GpuResourceType::BindGroup)
+		{}
+
+		GpuBindGroupLayout* GetLayout() const { return Layout; }
+
+	private:
+		GpuBindGroupLayout* Layout;
 	};
 }
