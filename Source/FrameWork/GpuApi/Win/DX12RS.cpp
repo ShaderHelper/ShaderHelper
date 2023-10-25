@@ -13,7 +13,7 @@ namespace FRAMEWORK
 		case FRAMEWORK::BindingType::UniformBuffer:	return D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
 		default:
 			check(false);
-			break;
+			return D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
 		}
 	}
 
@@ -26,7 +26,7 @@ namespace FRAMEWORK
 		case FRAMEWORK::BindingShaderStage::All:	return D3D12_SHADER_VISIBILITY_ALL;
 		default:
 			check(false);
-			break;
+			return D3D12_SHADER_VISIBILITY_ALL;
 		}
 	}
 
@@ -34,15 +34,14 @@ namespace FRAMEWORK
 	Dx12BindGroupLayout::Dx12BindGroupLayout(GpuBindGroupLayoutDesc LayoutDesc)
 		: Desc(MoveTemp(LayoutDesc))
 	{
-		TArray<D3D12_DESCRIPTOR_RANGE1> DescriptorRanges[(int32)BindingShaderStage::Num];
-		for (const auto& BindingLayoutInfo : LayoutDesc.Layouts)
+		for (const auto& BindingLayoutInfo : Desc.Layouts)
 		{
 			BindingSlots.Add(BindingLayoutInfo.Slot);
 			//For the moment, all uniformbuffers in the layout are bound via root descriptor.
 			if (BindingLayoutInfo.Type == BindingType::UniformBuffer)
 			{
 				CD3DX12_ROOT_PARAMETER1 DynamicBufferRootParameter;
-				DynamicBufferRootParameter.InitAsConstantBufferView(BindingLayoutInfo.Slot, LayoutDesc.GroupNumber, 
+				DynamicBufferRootParameter.InitAsConstantBufferView(BindingLayoutInfo.Slot, Desc.GroupNumber,
 					D3D12_ROOT_DESCRIPTOR_FLAG_NONE, MapShaderVisibility(BindingLayoutInfo.Stage));
 				DynamicBufferRootParameters.Add(BindingLayoutInfo.Slot, MoveTemp(DynamicBufferRootParameter));
 			}
@@ -80,6 +79,7 @@ namespace FRAMEWORK
 	}
 
 	Dx12BindGroup::Dx12BindGroup(const GpuBindGroupDesc& InDesc)
+		: GpuBindGroup(InDesc.Layout)
 	{
 		for (const auto& BindingEntry : InDesc.Resources)
 		{
@@ -107,17 +107,22 @@ namespace FRAMEWORK
 	{
 		TArray<CD3DX12_ROOT_PARAMETER1> RootParameters;
 		auto AddRootParameter = [&](const Dx12BindGroupLayout* Layout) {
-			const TArray<BindingSlot>& Slots = Layout->GetBindingSlots();
-			for (auto Slot : Slots)
-			{
-				RootParameters.Add(Layout->GetDynamicBufferRootParameter(Slot));
-				DynamicBufferToRootParameterIndex.Add(Slot, RootParameters.Num() - 1);
-			}
 
-			for (int32 i = 0; i < (int32)BindingShaderStage::Num; i++)
+			if (Layout != nullptr)
 			{
+				const TArray<BindingSlot>& Slots = Layout->GetBindingSlots();
+				for (auto Slot : Slots)
+				{
+					RootParameters.Add(Layout->GetDynamicBufferRootParameter(Slot));
+					DynamicBufferToRootParameterIndex.Add(Slot, RootParameters.Num() - 1);
+				}
 
+				for (int32 i = 0; i < (int32)BindingShaderStage::Num; i++)
+				{
+
+				}
 			}
+	
 		};
 
 		AddRootParameter(InDesc.Layout0);
@@ -125,7 +130,7 @@ namespace FRAMEWORK
 		AddRootParameter(InDesc.Layout2);
 		AddRootParameter(InDesc.Layout3);
 
-		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC RootSignatureDesc = { RootParameters.Num(), RootParameters.GetData() };
+		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC RootSignatureDesc = { (uint32)RootParameters.Num(), RootParameters.GetData() };
 		TRefCountPtr<ID3DBlob> Signature;
 		TRefCountPtr<ID3DBlob> Error;
 		DxCheck(D3D12SerializeVersionedRootSignature(&RootSignatureDesc, Signature.GetInitReference(), Error.GetInitReference()));

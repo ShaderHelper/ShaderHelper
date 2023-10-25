@@ -47,7 +47,7 @@ namespace FRAMEWORK
 		{
 			//Assume the LayoutBinding type is trivially comparable.
 			uint32 Hash = FCrc::MemCrc32(Key.Layouts.GetData(), sizeof(LayoutBinding) * Key.Layouts.Num());
-			return HashCombine(Hash, GetTypeHash(Key.GroupNumber));
+			return HashCombine(Hash, ::GetTypeHash(Key.GroupNumber));
 		}
 
 		BindingGroupIndex GroupNumber;

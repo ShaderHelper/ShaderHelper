@@ -18,7 +18,7 @@ namespace FRAMEWORK
 		RsDesc.Layout3 = static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout3);
 
         D3D12_GRAPHICS_PIPELINE_STATE_DESC PsoDesc{};
-		PsoDesc.pRootSignature = Dx12RootSignatureManager::GetRootSignature(RsDesc);
+		PsoDesc.pRootSignature = Dx12RootSignatureManager::GetRootSignature(RsDesc)->GetResource();
         PsoDesc.VS = { Vs->GetCompilationResult()->GetBufferPointer(), Vs->GetCompilationResult()->GetBufferSize() };
         PsoDesc.PS = { Ps->GetCompilationResult()->GetBufferPointer(), Ps->GetCompilationResult()->GetBufferSize() };
         PsoDesc.RasterizerState = MapRasterizerState(InPipelineStateDesc.RasterizerState);

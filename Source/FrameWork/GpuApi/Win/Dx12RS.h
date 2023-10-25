@@ -61,15 +61,18 @@ namespace FRAMEWORK
 		Dx12BindGroupLayout* Layout3;
 
 		bool operator==(const RootSignatureDesc& Other) const {
-			return Layout0->GetDesc() == Other.Layout0->GetDesc() && Layout1->GetDesc() == Other.Layout1->GetDesc() &&
-				Layout2->GetDesc() == Other.Layout2->GetDesc() && Layout3->GetDesc() == Other.Layout3->GetDesc();
+			return Layout0 && Other.Layout0 && Layout0->GetDesc() == Other.Layout0->GetDesc() &&
+				   Layout1 && Other.Layout1 && Layout1->GetDesc() == Other.Layout1->GetDesc() &&
+				   Layout2 && Other.Layout2 && Layout2->GetDesc() == Other.Layout2->GetDesc() &&
+				   Layout3 && Other.Layout3 && Layout3->GetDesc() == Other.Layout3->GetDesc();
 		}
 
 		friend uint32 GetTypeHash(const RootSignatureDesc& Key) {
-			uint32 Hash = GetTypeHash(Key.Layout0->GetDesc());
-			Hash = HashCombine(Hash, GetTypeHash(Key.Layout1->GetDesc()));
-			Hash = HashCombine(Hash, GetTypeHash(Key.Layout2->GetDesc()));
-			Hash = HashCombine(Hash, GetTypeHash(Key.Layout3->GetDesc()));
+			uint32 Hash = 0;
+			if (Key.Layout0) { HashCombine(Hash, GetTypeHash(Key.Layout0->GetDesc())); }
+			if (Key.Layout1) { HashCombine(Hash, GetTypeHash(Key.Layout1->GetDesc())); }
+			if (Key.Layout2) { HashCombine(Hash, GetTypeHash(Key.Layout2->GetDesc())); }
+			if (Key.Layout3) { HashCombine(Hash, GetTypeHash(Key.Layout3->GetDesc())); }
 			return Hash;
 		}
 	};

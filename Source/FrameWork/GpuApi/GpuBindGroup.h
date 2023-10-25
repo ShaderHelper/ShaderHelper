@@ -20,8 +20,9 @@ namespace FRAMEWORK
 	class GpuBindGroup : public GpuResource
 	{
 	public:
-
-		GpuBindGroup() : GpuResource(GpuResourceType::BindGroup)
+		GpuBindGroup(GpuBindGroupLayout* InLayout) 
+			: GpuResource(GpuResourceType::BindGroup)
+			, Layout(InLayout)
 		{}
 
 		GpuBindGroupLayout* GetLayout() const { return Layout; }

@@ -76,12 +76,15 @@ namespace FRAMEWORK
 		if (IsBindGroupsDirty)
 		{
 			auto ApplyBindGroup = [this](Dx12BindGroup* InGroup) {
-				Dx12BindGroupLayout* Layout = static_cast<Dx12BindGroupLayout*>(InGroup->GetLayout());
-				for (auto Slot : Layout->GetBindingSlots())
+				if (InGroup)
 				{
-					D3D12_GPU_VIRTUAL_ADDRESS GpuAddr = InGroup->GetDynamicBufferGpuAddr(Slot);
-					uint32 RootParameterIndex = CurrentRootSignature->GetDynamicBufferRootParameterIndex(Slot);
-					GCommandListContext->GetCommandListHandle()->SetGraphicsRootConstantBufferView(RootParameterIndex, GpuAddr);
+					Dx12BindGroupLayout* Layout = static_cast<Dx12BindGroupLayout*>(InGroup->GetLayout());
+					for (auto Slot : Layout->GetBindingSlots())
+					{
+						D3D12_GPU_VIRTUAL_ADDRESS GpuAddr = InGroup->GetDynamicBufferGpuAddr(Slot);
+						uint32 RootParameterIndex = CurrentRootSignature->GetDynamicBufferRootParameterIndex(Slot);
+						GCommandListContext->GetCommandListHandle()->SetGraphicsRootConstantBufferView(RootParameterIndex, GpuAddr);
+					}
 				}
 			};
 			ApplyBindGroup(CurrentBindGroup0);

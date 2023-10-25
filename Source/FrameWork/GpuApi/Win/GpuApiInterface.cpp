@@ -201,10 +201,10 @@ namespace GpuApi
 	void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)
 	{
 		RootSignatureDesc RsDesc{};
-		RsDesc.Layout0 = static_cast<Dx12BindGroupLayout*>(BindGroup0->GetLayout());
-		RsDesc.Layout1 = static_cast<Dx12BindGroupLayout*>(BindGroup1->GetLayout());
-		RsDesc.Layout2 = static_cast<Dx12BindGroupLayout*>(BindGroup2->GetLayout());
-		RsDesc.Layout3 = static_cast<Dx12BindGroupLayout*>(BindGroup3->GetLayout());
+		if (BindGroup0) { RsDesc.Layout0 = static_cast<Dx12BindGroupLayout*>(BindGroup0->GetLayout()); }
+		if (BindGroup1) { RsDesc.Layout1 = static_cast<Dx12BindGroupLayout*>(BindGroup1->GetLayout()); }
+		if (BindGroup2) { RsDesc.Layout1 = static_cast<Dx12BindGroupLayout*>(BindGroup2->GetLayout()); }
+		if (BindGroup3) { RsDesc.Layout1 = static_cast<Dx12BindGroupLayout*>(BindGroup3->GetLayout()); }
 
 		GCommandListContext->SetRootSignature(Dx12RootSignatureManager::GetRootSignature(RsDesc));
 		GCommandListContext->MarkRootSigDirty(true);

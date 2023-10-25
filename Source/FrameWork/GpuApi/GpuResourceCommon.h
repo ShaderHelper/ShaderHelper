@@ -42,10 +42,8 @@ namespace FRAMEWORK
 		Dynamic = 1u << 1,
 		Staging = 1u << 2,
 
-		PersistentUniform = 1u << 3, // 1 or more frames
-		TemporaryUniform = 1u << 4,  // at most 1 frame.
-
-		Uniform = PersistentUniform | TemporaryUniform,
+		PersistentUniform = Dynamic | (1u << 3), // 1 or more frames
+		TemporaryUniform = Dynamic | (1u << 4),  // at most 1 frame.
 	};
 	ENUM_CLASS_FLAGS(GpuBufferUsage);
 
