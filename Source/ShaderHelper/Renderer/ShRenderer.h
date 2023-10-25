@@ -15,6 +15,7 @@ namespace SH
 		void RenderInternal() override;
 		void OnViewportResize();
 		void UpdatePixelShader(TRefCountPtr<GpuShader> NewPixelShader);
+		FString GetResourceDeclaration() const;
 
 	private:
 		void RenderBegin() override;
@@ -35,6 +36,11 @@ namespace SH
 		TRefCountPtr<GpuShader> PixelShader;
 		TRefCountPtr<GpuPipelineState> PipelineState;
 		
+		
+		TSharedPtr<UniformBuffer> BuiltInUniformBuffer;
+		float iTime;
+		Vector2f iResolution, iMouse;
+
 		TUniquePtr<ArgumentBuffer> BuiltInArgumentBuffer;
 		TUniquePtr<ArgumentBufferLayout> BuiltInArgumentBufferLayout;
 	};

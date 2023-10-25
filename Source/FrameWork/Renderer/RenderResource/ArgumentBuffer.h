@@ -5,9 +5,10 @@ namespace FRAMEWORK
 {
 	class ArgumentBufferLayout
 	{
-		friend ArgumentBufferBuilder;
+		friend class ArgumentBufferBuilder;
 	public:
 		GpuBindGroupLayout* GetBindLayout() const { return BindGroupLayout; }
+		FString GetDeclaration() const { return Declaration; }
 
 	private:
 		FString Declaration;
@@ -17,7 +18,7 @@ namespace FRAMEWORK
 
 	class ArgumentBuffer
 	{
-		friend ArgumentBufferBuilder;
+		friend class ArgumentBufferBuilder;
 	public:
 		GpuBindGroup* GetBindGroup() const { return BindGroup; }
 
@@ -37,7 +38,7 @@ namespace FRAMEWORK
 		}
 		
 	public:
-		ArgumentBufferBuilder& AddUniformBuffer(TSharedPtr<UniformBuffer> InUniformBuffer, BindingShaderStage InStage = BindingShaderStage::All)
+		ArgumentBufferBuilder&& AddUniformBuffer(TSharedPtr<UniformBuffer> InUniformBuffer, BindingShaderStage InStage = BindingShaderStage::All)
 		{
 			Buffer.UniformBuffers.Add(InUniformBuffer);
 			Buffer.Desc.Resources.Add({ BindingNum, InUniformBuffer->GetGpuResource() });
@@ -52,13 +53,14 @@ namespace FRAMEWORK
 			BufferLayout.LayoutDesc.GroupNumber = Index;
 			BindingNum++;
 	
-			return *this;
+			return MoveTemp(*this);
 		}
 
 		auto Build() &&
 		{
-			Buffer.BindGroup = GpuApi::CreateBindGroup(Buffer.Desc);
 			BufferLayout.BindGroupLayout = GpuApi::CreateBindGroupLayout(BufferLayout.LayoutDesc);
+			Buffer.Desc.Layout = BufferLayout.GetBindLayout();
+			Buffer.BindGroup = GpuApi::CreateBindGroup(Buffer.Desc);
 			return MakeTuple(MakeUnique<ArgumentBuffer>(MoveTemp(Buffer)), MakeUnique<ArgumentBufferLayout>(MoveTemp(BufferLayout)));
 		}
 

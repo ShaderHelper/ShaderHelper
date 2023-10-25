@@ -39,14 +39,16 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		FString ErrorInfo;
 		check(GpuApi::CrossCompileShader(VertexShader, ErrorInfo));
 
-		TUniquePtr<UniformBuffer> BuiltInUniformBuffer = UniformBufferBuilder{ "BuiltIn", UniformBufferUsage::Persistant }
+		TUniquePtr<UniformBuffer> NewBuiltInUniformBuffer = UniformBufferBuilder{ "BuiltIn", UniformBufferUsage::Persistant }
 			.AddVector2f("iResolution")
 			.AddFloat("iTime")
 			.AddVector2f("iMouse")
 			.Build();
+		BuiltInUniformBuffer = AUX::TransOwnerShip(MoveTemp(NewBuiltInUniformBuffer));
+
 
 		auto [NewArgumentBuffer, NewArgumentBufferLayout] = ArgumentBufferBuilder{ 0 }
-			.AddUniformBuffer(AUX::TransOwnerShip(MoveTemp(BuiltInUniformBuffer)))
+			.AddUniformBuffer(BuiltInUniformBuffer)
 			.Build();
 
 		BuiltInArgumentBuffer = MoveTemp(NewArgumentBuffer);
@@ -72,6 +74,11 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		}
 	}
 
+	FString ShRenderer::GetResourceDeclaration() const
+	{
+		return BuiltInArgumentBufferLayout->GetDeclaration();
+	}
+
 	void ShRenderer::ReCreatePipelineState()
 	{
 		check(VertexShader->IsCompiled());
@@ -89,6 +96,8 @@ R"(float4 MainPS(PIn Input) : SV_Target
 	void ShRenderer::RenderBegin()
 	{
         Renderer::RenderBegin();
+		static double StartRenderTime = FPlatformTime::Seconds();
+		iTime = float(FPlatformTime::Seconds() - StartRenderTime);
 	}
 
 	void ShRenderer::RenderInternal()
@@ -105,6 +114,8 @@ R"(float4 MainPS(PIn Input) : SV_Target
 			GpuApi::SetVertexBuffer(nullptr);
 			GpuApi::SetRenderPipelineState(PipelineState);
 			GpuApi::SetViewPort({ (uint32)ViewPort->GetSize().X, (uint32)ViewPort->GetSize().Y });
+
+			BuiltInUniformBuffer->GetMember<float>("iTime") = iTime;
 			GpuApi::SetBindGroups(BuiltInArgumentBuffer->GetBindGroup(), nullptr, nullptr, nullptr);
 			GpuApi::DrawPrimitive(0, 3, 0, 1);
             GpuApi::EndRenderPass();

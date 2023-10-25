@@ -1,6 +1,7 @@
 #pragma once
 #include "GpuResourceCommon.h"
 #include "GpuShader.h"
+#include "GpuBindGroupLayout.h"
 
 namespace FRAMEWORK
 {

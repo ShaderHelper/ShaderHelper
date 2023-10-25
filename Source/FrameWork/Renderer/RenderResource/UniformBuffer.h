@@ -25,11 +25,12 @@ namespace FRAMEWORK
 			, MetaData(MoveTemp(InData))
 		{}
 
+		//Only write data, not read.
 		template<typename T>
 		T& GetMember(const FString& MemberName) {
 			int32 MemberOffset = MetaData.Members[MemberName].Offset;
 			void* BufferBaseAddr = GpuApi::MapGpuBuffer(Buffer, GpuResourceMapMode::Write_Only);
-			return *reinterpret_cast<T*>((uint8)BufferBaseAddr + MemberOffset);
+			return *reinterpret_cast<T*>((uint8*)BufferBaseAddr + MemberOffset);
 		}
 
 		const UniformBufferMetaData& GetMetaData() const {
@@ -68,28 +69,28 @@ namespace FRAMEWORK
 		}
 
 	public:
-		UniformBufferBuilder& AddFloat(const FString& MemberName) 
+		UniformBufferBuilder&& AddFloat(const FString& MemberName) 
 		{
 			AddMember<float>(MemberName);
-			return *this;
+			return MoveTemp(*this);
 		}
 
-		UniformBufferBuilder& AddVector2f(const FString& MemberName) 
+		UniformBufferBuilder&& AddVector2f(const FString& MemberName) 
 		{
 			AddMember<Vector2f>(MemberName);
-			return *this;
+			return MoveTemp(*this);
 		}
 
-		UniformBufferBuilder& AddVector3f(const FString& MemberName) 
+		UniformBufferBuilder&& AddVector3f(const FString& MemberName) 
 		{
 			AddMember<Vector3f>(MemberName);
-			return *this;
+			return MoveTemp(*this);
 		}
 
-		UniformBufferBuilder& AddVector4f(const FString& MemberName) 
+		UniformBufferBuilder&& AddVector4f(const FString& MemberName) 
 		{
 			AddMember<Vector4f>(MemberName);
-			return *this;
+			return MoveTemp(*this);
 		}
 
 		auto Build() && {
@@ -102,6 +103,8 @@ namespace FRAMEWORK
 		template<typename T>
 		void AddMember(const FString& MemberName)
 		{
+			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize });
+
 			uint32 MemberSize = sizeof(T);
 			uint32 SizeBeforeAligning = MetaData.UniformBufferSize;
 			uint32 SizeAfterAligning = Align(MetaData.UniformBufferSize, 16);
@@ -110,7 +113,7 @@ namespace FRAMEWORK
 			{
 				while (SizeAfterAligning > SizeBeforeAligning)
 				{
-					UniformBufferMemberNames += FString::Printf(TEXT("float Padding_%d\r\n"), SizeBeforeAligning);
+					UniformBufferMemberNames += FString::Printf(TEXT("float Padding_%d;\r\n"), SizeBeforeAligning);
 					SizeBeforeAligning += 4;
 				}
 				MetaData.UniformBufferSize = SizeAfterAligning + MemberSize;
@@ -119,9 +122,7 @@ namespace FRAMEWORK
 			{
 				MetaData.UniformBufferSize += MemberSize;
 			}
-			UniformBufferMemberNames += FString::Printf(TEXT("%s %s\r\n"), ANSI_TO_TCHAR(UniformBufferMemberTypeString<T>::Value.data()), *MemberName);
-
-			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize });
+			UniformBufferMemberNames += FString::Printf(TEXT("%s %s;\r\n"), ANSI_TO_TCHAR(UniformBufferMemberTypeString<T>::Value.data()), *MemberName);
 		}
 		
 	private:
