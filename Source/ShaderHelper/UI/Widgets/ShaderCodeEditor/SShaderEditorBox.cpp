@@ -682,13 +682,15 @@ namespace SH
 	void SShaderEditorBox::OnShaderTextChanged(const FString& NewShaderSouce)
 	{
 		FString PixelShaderInput = ShRenderer::DefaultPixelShaderInput;
+		FString PixelShaderMacro = ShRenderer::DefaultPixelShaderMacro;
 		FString ShaderResourceDeclaration = Renderer->GetResourceDeclaration();
 
 		TArray<FString> AddedLines;
 		int32 AddedLineNum = PixelShaderInput.ParseIntoArrayLines(AddedLines, false) - 1;
+		AddedLineNum += PixelShaderMacro.ParseIntoArrayLines(AddedLines, false) - 1;
 		AddedLineNum += ShaderResourceDeclaration.ParseIntoArrayLines(AddedLines, false) - 1;
 
-		FString FinalShaderSource = PixelShaderInput + ShaderResourceDeclaration + NewShaderSouce;
+		FString FinalShaderSource = PixelShaderInput + ShaderResourceDeclaration + PixelShaderMacro + NewShaderSouce;
 		TRefCountPtr<GpuShader> NewPixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, MoveTemp(FinalShaderSource), {}, TEXT("MainPS"));
 		FString ErrorInfo;
 		EffectMarshller->LineNumberToErrorInfo.Reset();

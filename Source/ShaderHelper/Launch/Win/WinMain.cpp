@@ -16,7 +16,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInInstance, _In_opt_ HINSTANCE hPrevInstance,
 	SH::FAppCommonStyle::Init();
 	SH::FShaderHelperStyle::Init();
 	
-	SH::ShaderHelperApp::SetClientSize({1024,576});
+	SH::ShaderHelperApp::SetClientSize({1366,768});
 	TUniquePtr<SH::ShRenderer> Renderer = MakeUnique<SH::ShRenderer>();
 	TSharedRef<SH::SShaderHelperWindow> Window = SNew(SH::SShaderHelperWindow).Renderer(Renderer.Get());
 	SH::ShaderHelperApp app(MoveTemp(Window), MoveTemp(Renderer));
