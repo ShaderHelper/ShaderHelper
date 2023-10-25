@@ -27,6 +27,7 @@ namespace SH
 		static const FString DefaultVertexShaderText;
 		static const FString DefaultPixelShaderText;
 		static const FString DefaultPixelShaderInput;
+		static const FString DefaultPixelShaderMacro;
 
 		TUniquePtr<ArgumentBuffer> CustomArgumentBuffer;
 

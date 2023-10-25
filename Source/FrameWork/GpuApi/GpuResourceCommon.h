@@ -8,11 +8,12 @@ namespace FRAMEWORK
 		inline constexpr int32 MaxBindableBingGroupNum = 4;
 	}
 
-    enum class GpuTextureFormat
-    {
-        //Unorm
-        R8G8B8A8_UNORM,
-        B8G8R8A8_UNORM,
+	enum class GpuTextureFormat
+	{
+		//Unorm
+		R8G8B8A8_UNORM,
+		B8G8R8A8_UNORM,
+		B8G8R8A8_UNORM_SRGB,
         R10G10B10A2_UNORM,
         R16G16B16A16_UNORM,
 
@@ -175,6 +176,7 @@ namespace FRAMEWORK
         {
         case GpuTextureFormat::R8G8B8A8_UNORM:
         case GpuTextureFormat::B8G8R8A8_UNORM:
+		case GpuTextureFormat::B8G8R8A8_UNORM_SRGB:
         case GpuTextureFormat::R10G10B10A2_UNORM:
         case GpuTextureFormat::R11G11B10_FLOAT:
             return 4;
