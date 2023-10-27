@@ -25,7 +25,7 @@ struct PIn
 
 	const FString ShRenderer::DefaultPixelShaderMacro = 
 R"(
-#define fragCoord Input.Pos.xy
+#define fragCoord float2(Input.Pos.x, iResolution.y - Input.Pos.y)
 )";
 
 	const FString ShRenderer::DefaultPixelShaderText = 
@@ -117,7 +117,6 @@ R"(float4 MainPS(PIn Input) : SV_Target
             FullScreenPassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{FinalRT, RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store});
             
             GpuApi::BeginRenderPass(FullScreenPassDesc, TEXT("FullScreenPass"));
-			GpuApi::SetVertexBuffer(nullptr);
 			GpuApi::SetRenderPipelineState(PipelineState);
 			GpuApi::SetViewPort({ (uint32)ViewPort->GetSize().X, (uint32)ViewPort->GetSize().Y });
 

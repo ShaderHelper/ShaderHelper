@@ -19,16 +19,11 @@ namespace FRAMEWORK
 			return DescriptorTableRootParameters_CbvSrvUav[InStage];
 		}
 
-		const GpuBindGroupLayoutDesc& GetDesc() const {
-			return Desc;
-		}
-
 		const TArray<BindingSlot>& GetBindingSlots() const {
 			return BindingSlots;
 		}
 
 	private:
-		GpuBindGroupLayoutDesc Desc;
 		TMap<BindingShaderStage, CD3DX12_ROOT_PARAMETER1> DescriptorTableRootParameters_CbvSrvUav;
 		TMap<BindingSlot, CD3DX12_ROOT_PARAMETER1> DynamicBufferRootParameters;
 		TArray<BindingSlot> BindingSlots;
@@ -61,18 +56,25 @@ namespace FRAMEWORK
 		Dx12BindGroupLayout* Layout3;
 
 		bool operator==(const RootSignatureDesc& Other) const {
-			return Layout0 && Other.Layout0 && Layout0->GetDesc() == Other.Layout0->GetDesc() &&
-				   Layout1 && Other.Layout1 && Layout1->GetDesc() == Other.Layout1->GetDesc() &&
-				   Layout2 && Other.Layout2 && Layout2->GetDesc() == Other.Layout2->GetDesc() &&
-				   Layout3 && Other.Layout3 && Layout3->GetDesc() == Other.Layout3->GetDesc();
+			auto CheckLayout = [](Dx12BindGroupLayout* Layout, Dx12BindGroupLayout* OtherLayout)
+			{
+				if (Layout != OtherLayout)
+				{
+					if (!Layout || !OtherLayout) return false;
+					if (!(Layout->GetDesc() == OtherLayout->GetDesc())) return false;
+				}
+				return true;
+			};
+			return CheckLayout(Layout0, Other.Layout0) && CheckLayout(Layout1, Other.Layout1) && 
+				CheckLayout(Layout2, Other.Layout2) && CheckLayout(Layout3, Other.Layout3);
 		}
 
 		friend uint32 GetTypeHash(const RootSignatureDesc& Key) {
 			uint32 Hash = 0;
-			if (Key.Layout0) { HashCombine(Hash, GetTypeHash(Key.Layout0->GetDesc())); }
-			if (Key.Layout1) { HashCombine(Hash, GetTypeHash(Key.Layout1->GetDesc())); }
-			if (Key.Layout2) { HashCombine(Hash, GetTypeHash(Key.Layout2->GetDesc())); }
-			if (Key.Layout3) { HashCombine(Hash, GetTypeHash(Key.Layout3->GetDesc())); }
+			if (Key.Layout0) { Hash = HashCombine(Hash, GetTypeHash(Key.Layout0->GetDesc())); }
+			if (Key.Layout1) { Hash = HashCombine(Hash, GetTypeHash(Key.Layout1->GetDesc())); }
+			if (Key.Layout2) { Hash = HashCombine(Hash, GetTypeHash(Key.Layout2->GetDesc())); }
+			if (Key.Layout3) { Hash = HashCombine(Hash, GetTypeHash(Key.Layout3->GetDesc())); }
 			return Hash;
 		}
 	};

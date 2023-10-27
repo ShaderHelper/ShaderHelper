@@ -31,10 +31,10 @@ namespace FRAMEWORK
 	class ArgumentBufferBuilder
 	{
 	public:
-		ArgumentBufferBuilder(BindingGroupIndex InIndex)
+		ArgumentBufferBuilder(BindingGroupSlot InSlot)
 		{
-			check(InIndex < GpuResourceLimit::MaxBindableBingGroupNum);
-			Index = InIndex;
+			check(InSlot < GpuResourceLimit::MaxBindableBingGroupNum);
+			GroupNumber = InSlot;
 		}
 		
 	public:
@@ -46,11 +46,11 @@ namespace FRAMEWORK
 			FString UniformBufferDeclaration = InUniformBuffer->GetMetaData().UniformBufferDeclaration;
 			int32 InsertIndex = UniformBufferDeclaration.Find(TEXT("{"));
 			check(InsertIndex != INDEX_NONE);
-			UniformBufferDeclaration.InsertAt(InsertIndex - 1, FString::Printf(TEXT(": register(b%d, space%d)\r\n"), BindingNum, Index));
+			UniformBufferDeclaration.InsertAt(InsertIndex - 1, FString::Printf(TEXT(": register(b%d, space%d)\r\n"), BindingNum, GroupNumber));
 
 			BufferLayout.Declaration += MoveTemp(UniformBufferDeclaration);
 			BufferLayout.LayoutDesc.Layouts.Add({ BindingNum, BindingType::UniformBuffer, InStage});
-			BufferLayout.LayoutDesc.GroupNumber = Index;
+			BufferLayout.LayoutDesc.GroupNumber = GroupNumber;
 			BindingNum++;
 	
 			return MoveTemp(*this);
@@ -65,7 +65,7 @@ namespace FRAMEWORK
 		}
 
 	private:
-		BindingGroupIndex Index;
+		BindingGroupSlot GroupNumber;
 		int32 BindingNum = 0;
 		ArgumentBuffer Buffer;
 		ArgumentBufferLayout BufferLayout;

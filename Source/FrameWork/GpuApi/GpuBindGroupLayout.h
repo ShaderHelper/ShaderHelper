@@ -4,7 +4,7 @@
 namespace FRAMEWORK
 {
 
-	using BindingGroupIndex = int32;
+	using BindingGroupSlot = int32;
 	using BindingSlot = int32;
 
 	enum class BindingShaderStage
@@ -50,14 +50,24 @@ namespace FRAMEWORK
 			return HashCombine(Hash, ::GetTypeHash(Key.GroupNumber));
 		}
 
-		BindingGroupIndex GroupNumber;
+		BindingGroupSlot GroupNumber;
 		TArray<LayoutBinding> Layouts;
 	};
 
 	class GpuBindGroupLayout : public GpuResource
 	{
 	public:
-		GpuBindGroupLayout() : GpuResource(GpuResourceType::BindGroupLayout)
+		GpuBindGroupLayout(GpuBindGroupLayoutDesc InDesc)
+			: GpuResource(GpuResourceType::BindGroupLayout)
+			, Desc(MoveTemp(InDesc))
 		{}
+
+		const GpuBindGroupLayoutDesc& GetDesc() const {
+			return Desc;
+		}
+		BindingGroupSlot GetGroupNumber() const { return Desc.GroupNumber; }
+
+	protected:
+		GpuBindGroupLayoutDesc Desc;
 	};
 }

@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "GpuApi/GpuApiInterface.h"
+#include "GpuApi/GpuApiValidation.h"
 #include "Dx12Device.h"
 #include "Dx12CommandList.h"
 #include "Dx12Texture.h"
@@ -142,6 +143,7 @@ namespace GpuApi
 
 	TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc)
 	{
+		check(ValidateCreateBindGroup(InBindGroupDesc));
 		return AUX::StaticCastRefCountPtr<GpuBindGroup>(CreateDx12BindGroup(InBindGroupDesc));
 	}
 
@@ -200,6 +202,8 @@ namespace GpuApi
 
 	void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)
 	{
+		check(ValidateSetBindGroups(BindGroup0, BindGroup1, BindGroup2, BindGroup3));
+
 		RootSignatureDesc RsDesc{};
 		if (BindGroup0) { RsDesc.Layout0 = static_cast<Dx12BindGroupLayout*>(BindGroup0->GetLayout()); }
 		if (BindGroup1) { RsDesc.Layout1 = static_cast<Dx12BindGroupLayout*>(BindGroup1->GetLayout()); }
