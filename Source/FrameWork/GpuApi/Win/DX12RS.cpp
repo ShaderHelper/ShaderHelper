@@ -32,7 +32,7 @@ namespace FRAMEWORK
 
 
 	Dx12BindGroupLayout::Dx12BindGroupLayout(GpuBindGroupLayoutDesc LayoutDesc)
-		: Desc(MoveTemp(LayoutDesc))
+		: GpuBindGroupLayout(MoveTemp(LayoutDesc))
 	{
 		for (const auto& BindingLayoutInfo : Desc.Layouts)
 		{

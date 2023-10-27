@@ -1,6 +1,7 @@
 FrameWorkHierarchy = {
     ["Sources/*"] = {"**.h","**.cpp", "**.hpp"},
     ["External/d3dx12"] = {"../../External/AgilitySDK/Inc/d3dx12.h"},
+    ["External/magic_enum"] = {"../../External/magic_enum/magic_enum.hpp"},
     ["External/MtlppUE"] = {
         "../../External/MtlppUE/src/*.hpp", 
         "../../External/MtlppUE/src/*.mm", 
@@ -26,7 +27,7 @@ project "FrameWork"
 	}
 
     uses {
-        "UE"
+        "UE", "magic_enum"
     }
 
     filter "system:windows"

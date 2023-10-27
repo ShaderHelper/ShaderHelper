@@ -38,7 +38,7 @@ namespace GpuApi
 	FRAMEWORK_API void SetVertexBuffer(GpuBuffer* InVertexBuffer);
 	FRAMEWORK_API void SetViewPort(const GpuViewPortDesc& InViewPortDesc);
 
-	//Only support 4 BindSlot to adapt some mobile devices.
+	//Only support 4 BindGroups to adapt some mobile devices.
 	FRAMEWORK_API void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3);
 
 	FRAMEWORK_API void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType = PrimitiveType::Triangle);
