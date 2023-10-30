@@ -4,13 +4,13 @@
 #include <HAL/PlatformApplicationMisc.h>
 #include <StandaloneRenderer/StandaloneRenderer.h>
 #include "Common/Path/BaseResourcePath.h"
-
+#include "UI/Styles/FAppCommonStyle.h"
 #include <SlateCore/Fonts/SlateFontInfo.h>
 #include <Misc/OutputDeviceConsole.h>
 
 namespace FRAMEWORK {
 
-	void UE_Init(const TCHAR* CommandLine)
+	static void UE_Init(const TCHAR* CommandLine)
     {
 		FCommandLine::Set(CommandLine);
 		
@@ -45,7 +45,7 @@ namespace FRAMEWORK {
 
 	}
 	
-	void UE_ShutDown()
+	static void UE_ShutDown()
     {
 		FCoreDelegates::OnPreExit.Broadcast();
 		FCoreDelegates::OnExit.Broadcast();
@@ -60,19 +60,6 @@ namespace FRAMEWORK {
 		{
 			GLog->TearDown();
 		}
-	}
-
-	App::App(TSharedPtr<SWindow> InWindow)
-		: AppWindow(MoveTemp(InWindow))
-	{
-		FSlateApplication::Get().AddWindow(AppWindow.ToSharedRef());
-	}
-
-	App::App(TSharedPtr<SWindow> InWindow, TUniquePtr<Renderer> InRenderer)
-		: AppWindow(MoveTemp(InWindow))
-		, AppRenderer(MoveTemp(InRenderer))
-	{
-		FSlateApplication::Get().AddWindow(AppWindow.ToSharedRef());
 	}
 
 	void App::Run()
@@ -129,6 +116,23 @@ namespace FRAMEWORK {
 		}
 
 		return bAllHidden;
+	}
+
+	void App::Init()
+	{
+		UE_Init(*SavedCommandLine);
+		FAppCommonStyle::Init();
+	}
+
+	void App::PostInit()
+	{
+
+	}
+
+	void App::ShutDown()
+	{
+		UE_ShutDown();
+		FAppCommonStyle::ShutDown();
 	}
 
 }

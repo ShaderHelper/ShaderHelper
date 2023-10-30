@@ -51,9 +51,7 @@ namespace GpuApi
 	FRAMEWORK_API void EndCpatureEvent();
 
 	//The renderer for drawing ui in UE uses dx11 as backend api, so need a shared resource.
-#if PLATFORM_WINDOWS
 	FRAMEWORK_API void* GetSharedHandle(GpuTexture* InGpuTexture);
-#endif
     
     FRAMEWORK_API void BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName);
     FRAMEWORK_API void EndRenderPass();

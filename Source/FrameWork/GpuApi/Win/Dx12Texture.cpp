@@ -12,9 +12,10 @@ namespace FRAMEWORK
 		bool bSRV;
 	};
 
-	Dx12Texture::Dx12Texture(D3D12_RESOURCE_STATES InState, TRefCountPtr<ID3D12Resource> InResource, GpuTextureDesc InDesc)
+	Dx12Texture::Dx12Texture(D3D12_RESOURCE_STATES InState, TRefCountPtr<ID3D12Resource> InResource, GpuTextureDesc InDesc, void* InSharedHandle)
 		: GpuTexture(MoveTemp(InDesc))
 		, TrackedResource(InState), Resource(MoveTemp(InResource))
+		, SharedHandle(InSharedHandle)
 	{
 
 	}
@@ -148,8 +149,14 @@ namespace FRAMEWORK
 			UpdateSubresources(GCommandListContext->GetCommandListHandle(), TexResource, AllocationData.UnderlyResource, 0, 0, 1, &textureData);
 			GCommandListContext->Transition(TexResource, ActualState, InitialState);
 		}
+
+		void* SharedHandle = nullptr;
+		if (Flags.bShared)
+		{
+			GDevice->CreateSharedHandle(TexResource, nullptr, GENERIC_ALL, nullptr, &SharedHandle);
+		}
 		
-		TRefCountPtr<Dx12Texture> RetTexture = new Dx12Texture{ InitialState, MoveTemp(TexResource), InTexDesc };
+		TRefCountPtr<Dx12Texture> RetTexture = new Dx12Texture{ InitialState, MoveTemp(TexResource), InTexDesc, SharedHandle};
 		CreateTextureView(Flags, RetTexture);
 
 		return RetTexture;

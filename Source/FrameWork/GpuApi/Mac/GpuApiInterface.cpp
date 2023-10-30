@@ -185,5 +185,10 @@ namespace GpuApi
         [RenderCommandEncoder endEncoding];
     }
 
+	void* GetSharedHandle(GpuTexture* InGpuTexture)
+	{
+		return static_cast<MetalTexture*>(InGpuTexture)->GetSharedHandle();
+	}
+
 }
 }
