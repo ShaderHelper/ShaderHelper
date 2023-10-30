@@ -44,6 +44,7 @@ namespace SH
 	void SShaderHelperWindow::Construct(const FArguments& InArgs)
 	{
 		Renderer = InArgs._Renderer;
+		WindowSize = InArgs._WindowSize;
 
 		TSharedRef<SDockTab> NewTab = SNew(SDockTab).TabRole(ETabRole::MajorTab);
 		TabManager = FGlobalTabmanager::Get()->NewTabManager(NewTab);
@@ -95,7 +96,7 @@ namespace SH
 
 		SWindow::Construct(SWindow::FArguments()
 			.Title(FText::FromString("ShaderHelper"))
-			.ClientSize(ShaderHelperApp::GetClientSize())
+			.ClientSize(WindowSize)
 			.MinWidth(500)
 			.MinHeight(400)
 			[

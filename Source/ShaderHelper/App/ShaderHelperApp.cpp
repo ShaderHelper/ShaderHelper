@@ -9,22 +9,23 @@ namespace SH {
 	void ShaderHelperApp::Init()
 	{
 		App::Init();
+		FShaderHelperStyle::Init();
 
 		ViewPort = MakeShared<PreviewViewPort>();
-		TSharedPtr<SShaderHelperWindow> ActualWindow = StaticCastSharedPtr<SShaderHelperWindow>(AppWindow);
-		ActualWindow->SetViewPortInterface(ViewPort.ToSharedRef());
+		AppRenderer = MakeUnique<ShRenderer>(ViewPort.Get());
 
-        if(AppRenderer.IsValid())
-        {
-            ShRenderer* ActualRenderer = static_cast<ShRenderer*>(AppRenderer.Get());
-            ActualRenderer->ViewPort = ViewPort.Get();
-            ViewPort->OnViewportResize.AddRaw(ActualRenderer, &ShRenderer::OnViewportResize);
-        }
+		AppWindow = SNew(SShaderHelperWindow)
+			.Renderer(static_cast<ShRenderer*>(AppRenderer.Get()))
+			.WindowSize(AppClientSize);
+
+		ViewPort->OnViewportResize.AddRaw(static_cast<ShRenderer*>(AppRenderer.Get()), &ShRenderer::OnViewportResize);
+		StaticCastSharedPtr<SShaderHelperWindow>(AppWindow)->SetViewPortInterface(ViewPort.ToSharedRef());
 	}
 
 	void ShaderHelperApp::PostInit()
 	{
 		App::PostInit();
+		FSlateApplication::Get().AddWindow(AppWindow.ToSharedRef());
 	}
 
 

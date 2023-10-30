@@ -9,7 +9,7 @@ namespace SH
 	class ShRenderer : public Renderer
 	{
 	public:
-		ShRenderer();
+		ShRenderer(PreviewViewPort* InViewPort);
 		
 	public:
 		void RenderInternal() override;
@@ -23,15 +23,13 @@ namespace SH
 		void ReCreatePipelineState();
 
 	public:
-		PreviewViewPort* ViewPort;
 		static const FString DefaultVertexShaderText;
 		static const FString DefaultPixelShaderText;
 		static const FString DefaultPixelShaderInput;
 		static const FString DefaultPixelShaderMacro;
 
-		TUniquePtr<ArgumentBuffer> CustomArgumentBuffer;
-
 	private:
+		PreviewViewPort* ViewPort;
 		TRefCountPtr<GpuTexture> FinalRT;
 		TRefCountPtr<GpuShader> VertexShader;
 		TRefCountPtr<GpuShader> PixelShader;

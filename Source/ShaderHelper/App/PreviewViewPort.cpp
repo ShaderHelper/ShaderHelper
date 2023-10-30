@@ -8,7 +8,8 @@ namespace SH
 	{
 		FSlateRenderer* UIRenderer = FSlateApplication::Get().GetRenderer();
 		void* SharedHandle = GpuApi::GetSharedHandle(InGpuTex);
-        FSlateUpdatableTexture* UpdatableTexture = UIRenderer->CreateSharedHandleTexture(SharedHandle);
+		//May need sync here.
+        FSlateUpdatableTexture* UpdatableTexture = UIRenderer->CreateSharedHandleTexture2(SharedHandle);
 		ViewPortRT = MakeShareable(UpdatableTexture);
 	}
 
@@ -19,18 +20,18 @@ namespace SH
 	//	uint8* PaddedData = (uint8*)GpuApi::MapGpuTexture(InGpuTex, GpuResourceMapMode::Read_Only, PaddedRowPitch);
 	//	uint32 UnpaddedSize = InGpuTex->GetWidth() * InGpuTex->GetHeight() * GetTextureFormatByteSize(InGpuTex->GetFormat());
  //       
- //       TArray<uint8> UnpaddedData;
- //       UnpaddedData.SetNumUninitialized(UnpaddedSize);
-	//	uint32 UnpaddedRowPitch = InGpuTex->GetWidth() * GetTextureFormatByteSize(InGpuTex->GetFormat());
-	//	for (uint32 Row = 0; Row < InGpuTex->GetHeight(); ++Row)
+ //       tarray<uint8> unpaddeddata;
+ //       unpaddeddata.setnumuninitialized(unpaddedsize);
+	//	uint32 unpaddedrowpitch = ingputex->getwidth() * gettextureformatbytesize(ingputex->getformat());
+	//	for (uint32 row = 0; row < ingputex->getheight(); ++row)
 	//	{
  //           uint8* DataPtr = UnpaddedData.GetData();
 	//		FMemory::Memcpy(DataPtr + Row * UnpaddedRowPitch, PaddedData + Row * PaddedRowPitch, UnpaddedRowPitch);
 	//	}
 	//	
-	//	//FSlateD3DTexture::UpdateTexture() updates texture with the unpadded data.
-	//	ViewPortRT->UpdateTexture(UnpaddedData);
-	//	GpuApi::UnMapGpuTexture(InGpuTex);
+	//	//fslated3dtexture::updatetexture() updates texture with the unpadded data.
+	//	viewportrt->updatetexture(unpaddeddata);
+	//	gpuapi::unmapgputexture(ingputex);
 	//}
 
 	void PreviewViewPort::OnDrawViewport(const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled)

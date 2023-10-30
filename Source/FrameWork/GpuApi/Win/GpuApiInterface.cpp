@@ -294,10 +294,7 @@ namespace GpuApi
 
 	void* GetSharedHandle(GpuTexture* InGpuTexture)
 	{
-		void* SharedHandle = nullptr;
-		Dx12Texture* Texture = static_cast<Dx12Texture*>(InGpuTexture);
-		GDevice->CreateSharedHandle(Texture->GetResource(), nullptr, GENERIC_ALL, nullptr, &SharedHandle);
-		return SharedHandle;
+		return static_cast<Dx12Texture*>(InGpuTexture)->GetSharedHandle();
 	}
 
     void BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName)

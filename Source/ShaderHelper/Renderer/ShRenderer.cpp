@@ -36,8 +36,8 @@ R"(float4 MainPS(PIn Input) : SV_Target
     return float4(col,1);
 })";
 
-	ShRenderer::ShRenderer()
-		: ViewPort(nullptr)
+	ShRenderer::ShRenderer(PreviewViewPort* InViewPort)
+		: ViewPort(InViewPort)
 	{
 
 		VertexShader = GpuApi::CreateShaderFromSource(ShaderType::VertexShader, DefaultVertexShaderText, TEXT("DefaultFullScreenVS"), TEXT("MainVS"));

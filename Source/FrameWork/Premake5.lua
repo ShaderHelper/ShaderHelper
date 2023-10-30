@@ -47,6 +47,12 @@ project "FrameWork"
         private_uses { 
             "MtlppUE", "ShaderConductor"
         }
+        links
+        {
+            "Cocoa.framework",
+            "Metal.framework",
+            "CoreVideo.framework",
+        }
 
 usage "FrameWork"
     --Note that "DLLIMPORT" macro is defined by UE module. (see MacPlatform.h, WindowsPlatform.h)
