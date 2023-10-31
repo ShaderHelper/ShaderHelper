@@ -55,18 +55,29 @@ namespace FRAMEWORK
 		class BufferBuddyAllocator* FromAllocator;
 		uint32 Offset;
 		uint32 Size;
+		bool IsFrameSource = false;
 
 		void Release();
 
 		D3D12_GPU_VIRTUAL_ADDRESS GetGpuAddr() const
 		{
+			if (IsFrameSource) {
+				check(Size % FrameSourceNum == 0);
+				uint32 CurrentFrameSize = Size / FrameSourceNum;
+				return ResourceBaseGpuAddr + Offset + CurrentFrameSize * GetCurFrameSourceIndex();
+			}
 			return ResourceBaseGpuAddr + Offset;
 		}
 
 		void* GetCpuAddr() const
 		{
 			check(ResourceBaseCpuAddr);
-			return static_cast<void*>((uint8*)ResourceBaseCpuAddr + Offset);
+			if (IsFrameSource) {
+				check(Size % FrameSourceNum == 0);
+				uint32 CurrentFrameSize = Size / FrameSourceNum;
+				return (uint8*)ResourceBaseCpuAddr + Offset + CurrentFrameSize * GetCurFrameSourceIndex();
+			}
+			return (uint8*)ResourceBaseCpuAddr + Offset;
 		}
 	};
 
@@ -228,7 +239,7 @@ namespace FRAMEWORK
 	};
 
 	inline TUniquePtr<TempUniformBufferAllocator> GTempUniformBufferAllocator[FrameSourceNum]; //Scope = frame
-	inline TUniquePtr<PersistantUniformBufferAllocator> GPersistantUniformBufferAllocator[FrameSourceNum];
+	inline TUniquePtr<PersistantUniformBufferAllocator> GPersistantUniformBufferAllocator;
 
 	inline TUniquePtr<CommonBufferAllocator> GCommonBufferAllocator;
 

@@ -29,18 +29,13 @@ namespace FRAMEWORK
 	//Make sure there are no padding bytes.
 	static_assert(std::has_unique_object_representations_v<LayoutBinding>);
 
-	template <>
-	struct TTypeTraits<LayoutBinding> : public TTypeTraitsBase <LayoutBinding>
-	{
-		enum { IsBytewiseComparable = true };
-	};
-
 	struct GpuBindGroupLayoutDesc
 	{
 		
 		bool operator==(const GpuBindGroupLayoutDesc& Other) const
 		{
-			return GroupNumber == Other.GroupNumber && Layouts == Other.Layouts;
+			return GroupNumber == Other.GroupNumber && 
+				!FMemory::Memcmp(Layouts.GetData(), Other.Layouts.GetData(), sizeof(LayoutBinding) * Layouts.Num());
 		}
 
 		friend uint32 GetTypeHash(const GpuBindGroupLayoutDesc& Key)

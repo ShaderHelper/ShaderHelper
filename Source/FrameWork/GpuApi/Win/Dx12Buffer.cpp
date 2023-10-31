@@ -7,7 +7,7 @@ namespace FRAMEWORK
 	{
 		if (EnumHasAnyFlags(Usage, GpuBufferUsage::PersistentUniform))
 		{
-			BuddyAllocationData AllocationData = GPersistantUniformBufferAllocator[GetCurFrameSourceIndex()]->Alloc(ByteSize);
+			BuddyAllocationData AllocationData = GPersistantUniformBufferAllocator->Alloc(ByteSize);
 			return new Dx12Buffer{ Usage, AllocationData};
 		}
 		else if (EnumHasAnyFlags(Usage, GpuBufferUsage::TemporaryUniform))

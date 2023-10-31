@@ -4,17 +4,17 @@
 
 namespace FRAMEWORK
 {
-	constexpr uint32 PersistantUniformBufferMinBlockSize = 256;
-	constexpr uint32 PersistantUniformBufferMaxBlockSize = 64 * 1024;
+	constexpr uint32 PersistantUniformBufferMinBlockSize = 256 * FrameSourceNum;
+	constexpr uint32 PersistantUniformBufferMaxBlockSize = 64 * 1024 * FrameSourceNum;
 	constexpr uint32 TempUniformBufferPageSize = 64 * 1024; //64kb - cbuffer limit.
 
 	void InitBufferAllocator()
 	{
 		GCommonBufferAllocator = MakeUnique<CommonBufferAllocator>();
+		GPersistantUniformBufferAllocator = MakeUnique<PersistantUniformBufferAllocator>(PersistantUniformBufferMinBlockSize, PersistantUniformBufferMaxBlockSize);
 		for (int32 i = 0; i < FrameSourceNum; i++)
 		{
 			GTempUniformBufferAllocator[i] = MakeUnique<TempUniformBufferAllocator>(TempUniformBufferPageSize);
-			GPersistantUniformBufferAllocator[i] = MakeUnique<PersistantUniformBufferAllocator>(PersistantUniformBufferMinBlockSize, PersistantUniformBufferMaxBlockSize);
 		}
 	}
 
@@ -26,6 +26,7 @@ namespace FRAMEWORK
 		D3D12_RESOURCE_STATES InitialState = InInitialState;
 		CD3DX12_RESOURCE_DESC BufferDesc = CD3DX12_RESOURCE_DESC::Buffer(ByteSize);
 
+		//TODO : d3d12ma
 		DxCheck(GDevice->CreateCommittedResource(&HeapType, D3D12_HEAP_FLAG_NONE,
 			&BufferDesc, InitialState, nullptr, IID_PPV_ARGS(&Data.UnderlyResource)));
 
@@ -47,18 +48,24 @@ namespace FRAMEWORK
 
 	BuddyAllocationData PersistantUniformBufferAllocator::Alloc(uint32 BufferSize)
 	{
-		check(Align(BufferSize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT) <= MaxBlockSize);
+		uint32 FrameSourceBufferSize = Align(BufferSize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT) * FrameSourceNum;
+		check(FrameSourceBufferSize <= MaxBlockSize);
+		BuddyAllocationData Data;
 
 		for (int32 i = 0; i < AllocatorImpls.Num(); i++)
 		{
-			if (AllocatorImpls[i].CanAllocate(BufferSize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT))
+			if (AllocatorImpls[i].CanAllocate(FrameSourceBufferSize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT))
 			{
-				return AllocatorImpls[i].Allocate(BufferSize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+				Data = AllocatorImpls[i].Allocate(FrameSourceBufferSize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+				Data.IsFrameSource = true;
+				return Data;
 			}
 		}
 
 		AllocatorImpls.Emplace(MinBlockSize, MaxBlockSize, D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-		return AllocatorImpls.Last().Allocate(BufferSize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+		Data =  AllocatorImpls.Last().Allocate(FrameSourceBufferSize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+		Data.IsFrameSource = true;
+		return Data;
 	}
 
 	BufferBumpAllocator::BufferBumpAllocator(uint32 InSize, D3D12_HEAP_TYPE InHeapType, D3D12_RESOURCE_STATES InInitialState)
@@ -67,6 +74,7 @@ namespace FRAMEWORK
 		D3D12_RESOURCE_STATES InitialState = InInitialState;
 		CD3DX12_RESOURCE_DESC BufferDesc = CD3DX12_RESOURCE_DESC::Buffer(InSize);
 
+		//TODO: CreatePlacedResource
 		DxCheck(GDevice->CreateCommittedResource(&HeapType, D3D12_HEAP_FLAG_NONE,
 			&BufferDesc, InitialState, nullptr, IID_PPV_ARGS(Resource.GetInitReference())));
 

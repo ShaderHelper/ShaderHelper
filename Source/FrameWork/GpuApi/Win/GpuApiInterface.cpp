@@ -309,7 +309,7 @@ namespace GpuApi
         
         for(int32 i = 0; i < PassDesc.ColorRenderTargets.Num(); i++)
         {
-            Dx12Texture* Rt = static_cast<Dx12Texture*>(PassDesc.ColorRenderTargets[i].GetRenderTarget());
+            Dx12Texture* Rt = static_cast<Dx12Texture*>(PassDesc.ColorRenderTargets[i].Texture);
             RTs.Add(Rt);
             ClearColorValues.Add(PassDesc.ColorRenderTargets[i].ClearColor);
         }
