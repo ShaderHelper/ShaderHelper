@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "GpuApi/GpuApiInterface.h"
+#include "GpuApi/GpuApiValidation.h"
 #include "MetalCommon.h"
 #include "MetalDevice.h"
 #include "MetalCommandList.h"
@@ -8,6 +9,7 @@
 #include "MetalShader.h"
 #include "MetalBuffer.h"
 #include "MetalPipeline.h"
+#include "MetalArgumentBuffer.h"
 
 namespace FRAMEWORK
 {
@@ -53,7 +55,7 @@ namespace GpuApi
             const uint64 UnpaddedSize = InGpuTexture->GetWidth() * InGpuTexture->GetHeight() * BytesPerTexel;
             if (!Texture->ReadBackBuffer.IsValid())
             {
-                Texture->ReadBackBuffer = CreateMetalBuffer(UnpaddedSize);
+                Texture->ReadBackBuffer = CreateMetalBuffer(UnpaddedSize, GpuBufferUsage::Staging);
             }
             
             //Metal does not consider the alignment when copying back?
@@ -66,7 +68,13 @@ namespace GpuApi
             BlitCommandEncoder.EndEncoding();
             
             FlushGpu();
-            return [Texture->ReadBackBuffer->GetResource() contents];
+            return Texture->ReadBackBuffer->GetContents();
+        }
+        else
+        {
+            //TODO
+            check(false);
+            return nullptr;
         }
 	}
 
@@ -75,6 +83,34 @@ namespace GpuApi
 
 	}
 
+    void* MapGpuBuffer(GpuBuffer* InGpuBuffer, GpuResourceMapMode InMapMode)
+    {
+        GpuBufferUsage Usage = InGpuBuffer->GetUsage();
+        MetalBuffer* Buffer = static_cast<MetalBuffer*>(InGpuBuffer);
+        void* Data = nullptr;
+        if(InMapMode == GpuResourceMapMode::Write_Only)
+        {
+            if(EnumHasAnyFlags(Usage, GpuBufferUsage::Static))
+            {
+                
+            }
+            else
+            {
+                Data = Buffer->GetContents();
+            }
+        }
+        else
+        {
+            
+        }
+        return Data;
+    }
+
+    void UnMapGpuBuffer(GpuBuffer* InGpuBuffer)
+    {
+        
+    }
+
 	TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName, FString EntryPoint)
 	{
         return AUX::StaticCastRefCountPtr<GpuShader>(CreateMetalShader(InType, MoveTemp(InSourceText), MoveTemp(InShaderName), MoveTemp(EntryPoint)));
@@ -82,12 +118,14 @@ namespace GpuApi
 
 	TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc)
 	{
-		return nullptr;
+        check(ValidateCreateBindGroup(InBindGroupDesc));
+        return AUX::StaticCastRefCountPtr<GpuBindGroup>(CreateMetalBindGroup(InBindGroupDesc));
 	}
 
 	TRefCountPtr<GpuBindGroupLayout> CreateBindGroupLayout(const GpuBindGroupLayoutDesc& InBindGroupLayoutDesc)
 	{
-		return nullptr;
+        check(ValidateCreateBindGroupLayout(InBindGroupLayoutDesc));
+        return AUX::StaticCastRefCountPtr<GpuBindGroupLayout>(CreateMetalBindGroupLayout(InBindGroupLayoutDesc));
 	}
 
 	bool CompileShader(GpuShader* InShader, FString& OutErrorInfo)
@@ -107,7 +145,7 @@ namespace GpuApi
 
 	TRefCountPtr<GpuBuffer> CreateBuffer(uint32 ByteSize, GpuBufferUsage Usage)
 	{
-
+        return AUX::StaticCastRefCountPtr<GpuBuffer>(CreateMetalBuffer(ByteSize, Usage));
 	}
 
 	void SetRenderPipelineState(GpuPipelineState* InPipelineState)
@@ -127,15 +165,24 @@ namespace GpuApi
         mtlpp::Viewport Viewport{
             (double)InViewPortDesc.TopLeftX, (double)InViewPortDesc.TopLeftY,
             (double)InViewPortDesc.Width, (double)InViewPortDesc.Height,
-            (double)InViewPortDesc.ZMin, (double)InViewPortDesc.ZMax};
+            (double)InViewPortDesc.ZMin, (double)InViewPortDesc.ZMax
+        };
         
         mtlpp::ScissorRect ScissorRect{0, 0, InViewPortDesc.Width, InViewPortDesc.Height};
         GetCommandListContext()->SetViewPort(MakeUnique<mtlpp::Viewport>(MoveTemp(Viewport)), MakeUnique<mtlpp::ScissorRect>(MoveTemp(ScissorRect)));
+        GetCommandListContext()->MarkViewportDirty(true);
 	}
 
 	void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)
 	{
-
+        check(ValidateSetBindGroups(BindGroup0, BindGroup1, BindGroup2, BindGroup3));
+        GetCommandListContext()->SetBindGroups(
+            static_cast<MetalBindGroup*>(BindGroup0),
+            static_cast<MetalBindGroup*>(BindGroup1),
+            static_cast<MetalBindGroup*>(BindGroup2),
+            static_cast<MetalBindGroup*>(BindGroup3)
+        );
+        GetCommandListContext()->MarkBindGroupsDirty(true);
 	}
 
 	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType)

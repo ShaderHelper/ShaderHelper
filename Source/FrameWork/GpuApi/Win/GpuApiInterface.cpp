@@ -149,6 +149,7 @@ namespace GpuApi
 
 	TRefCountPtr<GpuBindGroupLayout> CreateBindGroupLayout(const GpuBindGroupLayoutDesc& InBindGroupLayoutDesc)
 	{
+        check(ValidateCreateBindGroupLayout(InBindGroupLayoutDesc));
 		return AUX::StaticCastRefCountPtr<GpuBindGroupLayout>(CreateDx12BindGroupLayout(InBindGroupLayoutDesc));
 	}
 

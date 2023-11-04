@@ -4,13 +4,14 @@
 #include "Common/Util/Singleton.h"
 #include "GpuApi/GpuResource.h"
 #include "MetalBuffer.h"
+#include "MetalArgumentBuffer.h"
 
 namespace FRAMEWORK
 {
     class CommandListContext
     {
     public:
-        CommandListContext() : CurrentPipelineState(nullptr) , CurrentVertexBuffer(nullptr) {}
+        CommandListContext();
         
     public:
         id<MTLRenderCommandEncoder> GetRenderCommandEncoder() const { return CurrentRenderCommandEncoder.GetPtr(); }
@@ -34,6 +35,12 @@ namespace FRAMEWORK
             CurrentViewport = MoveTemp(InViewPort);
             CurrentScissorRect = MoveTemp(InSissorRect);
         }
+        void SetBindGroups(MetalBindGroup* InGroup0, MetalBindGroup* InGroup1, MetalBindGroup* InGroup2, MetalBindGroup* InGroup3) {
+            CurrentBindGroup0 = InGroup0;
+            CurrentBindGroup1 = InGroup1;
+            CurrentBindGroup2 = InGroup2;
+            CurrentBindGroup3 = InGroup3;
+        }
         
         void PrepareDrawingEnv();
         void ClearBinding();
@@ -41,6 +48,7 @@ namespace FRAMEWORK
         void MarkPipelineDirty(bool IsDirty) { IsPipelineDirty = IsDirty; }
         void MarkViewportDirty(bool IsDirty) { IsViewportDirty = IsDirty; }
         void MarkVertexBufferDirty(bool IsDirty) { IsVertexBufferDirty = IsDirty; }
+        void MarkBindGroupsDirty(bool IsDirty) { IsBindGroupsDirty = IsDirty; }
         
     private:
         MetalPipelineState* CurrentPipelineState;
@@ -52,9 +60,15 @@ namespace FRAMEWORK
         mtlpp::RenderCommandEncoder CurrentRenderCommandEncoder;
         mtlpp::CommandBuffer CurrentCommandBuffer;
         
-        bool IsPipelineDirty = true;
-        bool IsViewportDirty = true;
-        bool IsVertexBufferDirty = true;
+        MetalBindGroup* CurrentBindGroup0;
+        MetalBindGroup* CurrentBindGroup1;
+        MetalBindGroup* CurrentBindGroup2;
+        MetalBindGroup* CurrentBindGroup3;
+        
+        bool IsPipelineDirty : 1;
+        bool IsViewportDirty : 1;
+        bool IsVertexBufferDirty : 1;
+        bool IsBindGroupsDirty : 1;
     };
 
     inline CommandListContext* GetCommandListContext() {

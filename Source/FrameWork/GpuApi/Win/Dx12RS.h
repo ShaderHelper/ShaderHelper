@@ -9,14 +9,14 @@ namespace FRAMEWORK
 	class Dx12BindGroupLayout : public GpuBindGroupLayout
 	{
 	public:
-		Dx12BindGroupLayout(GpuBindGroupLayoutDesc LayoutDesc);
+		Dx12BindGroupLayout(const GpuBindGroupLayoutDesc& LayoutDesc);
 
 		const CD3DX12_ROOT_PARAMETER1& GetDynamicBufferRootParameter(BindingSlot InSlot) const {
 			return DynamicBufferRootParameters[InSlot];
 		}
 
-		const CD3DX12_ROOT_PARAMETER1& GetDescriptorTableRootParameter(BindingShaderStage InStage) const {
-			return DescriptorTableRootParameters_CbvSrvUav[InStage];
+		const CD3DX12_ROOT_PARAMETER1& GetDescriptorTableRootParameter(D3D12_SHADER_VISIBILITY Visibility) const {
+			return DescriptorTableRootParameters_CbvSrvUav[Visibility];
 		}
 
 		const TArray<BindingSlot>& GetBindingSlots() const {
@@ -24,7 +24,7 @@ namespace FRAMEWORK
 		}
 
 	private:
-		TMap<BindingShaderStage, CD3DX12_ROOT_PARAMETER1> DescriptorTableRootParameters_CbvSrvUav;
+        TMap<D3D12_SHADER_VISIBILITY, CD3DX12_ROOT_PARAMETER1> DescriptorTableRootParameters_CbvSrvUav;
 		TMap<BindingSlot, CD3DX12_ROOT_PARAMETER1> DynamicBufferRootParameters;
 		TArray<BindingSlot> BindingSlots;
 	};
@@ -39,12 +39,14 @@ namespace FRAMEWORK
 			return DynamicBufferStorage[InSlot];
 		}
 
-		D3D12_GPU_DESCRIPTOR_HANDLE GetBaseDescriptor(BindingShaderStage InStage) const {
-			return DescriptorTableStorage[InStage];
+		D3D12_GPU_DESCRIPTOR_HANDLE GetBaseDescriptor(D3D12_SHADER_VISIBILITY Visibility) const {
+			return DescriptorTableStorage[Visibility];
 		}
+        
+        void Apply(ID3D12GraphicsCommandList* CommandList, Dx12RootSignature* RootSig);
 
 	private:
-		TMap<BindingShaderStage, D3D12_GPU_DESCRIPTOR_HANDLE> DescriptorTableStorage;
+		TMap<D3D12_SHADER_VISIBILITY, D3D12_GPU_DESCRIPTOR_HANDLE> DescriptorTableStorage;
 		TMap<BindingSlot, D3D12_GPU_VIRTUAL_ADDRESS> DynamicBufferStorage;
 	};
 
@@ -90,13 +92,13 @@ namespace FRAMEWORK
 			return DynamicBufferToRootParameterIndex[InSlot];
 		}
 
-		uint32 GetDescriptorTableRootParameterIndex(BindingShaderStage InStage) const {
-			return DescriptorTableToRootParameterIndex[InStage];
+		uint32 GetDescriptorTableRootParameterIndex(D3D12_SHADER_VISIBILITY Visibility) const {
+			return DescriptorTableToRootParameterIndex[Visibility];
 		}
 
 	private:
 		TMap<BindingSlot, uint32> DynamicBufferToRootParameterIndex;
-		TMap<BindingShaderStage, uint32> DescriptorTableToRootParameterIndex;
+		TMap<D3D12_SHADER_VISIBILITY, uint32> DescriptorTableToRootParameterIndex;
 		TRefCountPtr<ID3D12RootSignature> Resource;
 	};
 

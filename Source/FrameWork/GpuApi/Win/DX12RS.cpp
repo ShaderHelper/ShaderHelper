@@ -23,27 +23,25 @@ namespace FRAMEWORK
 		{
 		case FRAMEWORK::BindingShaderStage::Vertex:	return D3D12_SHADER_VISIBILITY_VERTEX;
 		case FRAMEWORK::BindingShaderStage::Pixel:	return D3D12_SHADER_VISIBILITY_PIXEL;
-		case FRAMEWORK::BindingShaderStage::All:	return D3D12_SHADER_VISIBILITY_ALL;
 		default:
-			check(false);
 			return D3D12_SHADER_VISIBILITY_ALL;
 		}
 	}
 
 
-	Dx12BindGroupLayout::Dx12BindGroupLayout(GpuBindGroupLayoutDesc LayoutDesc)
-		: GpuBindGroupLayout(MoveTemp(LayoutDesc))
+	Dx12BindGroupLayout::Dx12BindGroupLayout(const GpuBindGroupLayoutDesc& LayoutDesc)
+		: GpuBindGroupLayout(LayoutDesc)
 	{
-		for (const auto& BindingLayoutInfo : Desc.Layouts)
+		for (const auto& BindingLayoutEntry : Desc.Layouts)
 		{
-			BindingSlots.Add(BindingLayoutInfo.Slot);
+			BindingSlots.Add(BindingLayoutEntry.Slot);
 			//For the moment, all uniformbuffers in the layout are bound via root descriptor.
-			if (BindingLayoutInfo.Type == BindingType::UniformBuffer)
+			if (BindingLayoutEntry.Type == BindingType::UniformBuffer)
 			{
 				CD3DX12_ROOT_PARAMETER1 DynamicBufferRootParameter;
-				DynamicBufferRootParameter.InitAsConstantBufferView(BindingLayoutInfo.Slot, Desc.GroupNumber,
-					D3D12_ROOT_DESCRIPTOR_FLAG_NONE, MapShaderVisibility(BindingLayoutInfo.Stage));
-				DynamicBufferRootParameters.Add(BindingLayoutInfo.Slot, MoveTemp(DynamicBufferRootParameter));
+				DynamicBufferRootParameter.InitAsConstantBufferView(BindingLayoutEntry.Slot, Desc.GroupNumber,
+					D3D12_ROOT_DESCRIPTOR_FLAG_NONE, MapShaderVisibility(BindingLayoutEntry.Stage));
+				DynamicBufferRootParameters.Add(BindingLayoutEntry.Slot, MoveTemp(DynamicBufferRootParameter));
 			}
 			else
 			{
@@ -79,7 +77,7 @@ namespace FRAMEWORK
 	}
 
 	Dx12BindGroup::Dx12BindGroup(const GpuBindGroupDesc& InDesc)
-		: GpuBindGroup(InDesc.Layout)
+		: GpuBindGroup(InDesc)
 	{
 		for (const auto& BindingEntry : InDesc.Resources)
 		{
@@ -97,6 +95,17 @@ namespace FRAMEWORK
 			}
 		}
 	}
+
+    void Dx12BindGroup::Apply(ID3D12GraphicsCommandList* CommandList, Dx12RootSignature* RootSig)
+    {
+        Dx12BindGroupLayout* Layout = static_cast<Dx12BindGroupLayout*>(GetLayout());
+        for (auto Slot : Layout->GetBindingSlots())
+        {
+            D3D12_GPU_VIRTUAL_ADDRESS GpuAddr = GetDynamicBufferGpuAddr(Slot);
+            uint32 RootParameterIndex = RootSig->GetDynamicBufferRootParameterIndex(Slot);
+            CommandList->SetGraphicsRootConstantBufferView(RootParameterIndex, GpuAddr);
+        }
+    }
 
 	Dx12BindGroup::~Dx12BindGroup()
 	{
@@ -117,10 +126,6 @@ namespace FRAMEWORK
 					DynamicBufferToRootParameterIndex.Add(Slot, RootParameters.Num() - 1);
 				}
 
-				for (int32 i = 0; i < (int32)BindingShaderStage::Num; i++)
-				{
-
-				}
 			}
 	
 		};

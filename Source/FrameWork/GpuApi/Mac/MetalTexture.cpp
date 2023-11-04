@@ -24,6 +24,11 @@ namespace FRAMEWORK
 
     TRefCountPtr<MetalTexture> CreateMetalTexture2D(const GpuTextureDesc& InTexDesc)
     {
+        if(EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::Shared))
+        {
+            return CreateSharedMetalTexture(InTexDesc);
+        }
+        
         mtlpp::PixelFormat TexFormat = (mtlpp::PixelFormat)MapTextureFormat(InTexDesc.Format);
         mtlpp::TextureDescriptor TexDesc = mtlpp::TextureDescriptor::Texture2DDescriptor(TexFormat, InTexDesc.Width, InTexDesc.Height, InTexDesc.NumMips > 1);
         TexDesc.SetTextureType(mtlpp::TextureType::Texture2D);
