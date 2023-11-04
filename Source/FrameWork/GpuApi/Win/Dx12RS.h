@@ -43,7 +43,7 @@ namespace FRAMEWORK
 			return DescriptorTableStorage[Visibility];
 		}
         
-        void Apply(ID3D12GraphicsCommandList* CommandList, Dx12RootSignature* RootSig);
+        void Apply(ID3D12GraphicsCommandList* CommandList, class Dx12RootSignature* RootSig);
 
 	private:
 		TMap<D3D12_SHADER_VISIBILITY, D3D12_GPU_DESCRIPTOR_HANDLE> DescriptorTableStorage;
