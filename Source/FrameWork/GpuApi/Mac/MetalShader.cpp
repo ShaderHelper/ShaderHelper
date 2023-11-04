@@ -56,11 +56,26 @@ namespace FRAMEWORK
         TArray<char> SourceAnsi{TCHAR_TO_ANSI(*InShader->GetSourceText()), InShader->GetSourceText().Len() + 1};
         SourceDesc.source = SourceAnsi.GetData();
         
+        ShaderConductor::MacroDefine SpvMslOptions[] = {
+            {"argument_buffers", "1"},
+            {"enable_decoration_binding", "1"},
+            {"force_active_argument_buffer_resources","1"}
+        };
+        
         ShaderConductor::Compiler::TargetDesc TargetDesc{};
         TargetDesc.language = ShaderConductor::ShadingLanguage::Msl_macOS;
 		TargetDesc.version = "20200";
+        TargetDesc.options = SpvMslOptions;
+        TargetDesc.numOptions = UE_ARRAY_COUNT(SpvMslOptions);
         
-        const ShaderConductor::Compiler::ResultDesc Result = ShaderConductor::Compiler::Compile(SourceDesc, {}, TargetDesc);
+        TArray<const char*> DxcArgs;
+        DxcArgs.Add("-fspv-preserve-bindings");
+        
+        ShaderConductor::Compiler::Options SCOptions;
+        SCOptions.DXCArgs = DxcArgs.GetData();
+        SCOptions.numDXCArgs = DxcArgs.Num();
+        
+        const ShaderConductor::Compiler::ResultDesc Result = ShaderConductor::Compiler::Compile(SourceDesc, SCOptions, TargetDesc);
         if(Result.errorWarningMsg.Size() > 0)
         {
             FString ErrorInfo = static_cast<const char*>(Result.errorWarningMsg.Data());

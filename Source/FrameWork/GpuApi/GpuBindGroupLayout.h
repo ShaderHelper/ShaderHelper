@@ -7,13 +7,13 @@ namespace FRAMEWORK
 	using BindingGroupSlot = int32;
 	using BindingSlot = int32;
 
-	enum class BindingShaderStage
+	enum class BindingShaderStage : uint32
 	{
-		Vertex,
-		Pixel,
-		All,
-		Num,
+		Vertex = 1u << 0,
+		Pixel = 1u << 1,
+		All = Vertex | Pixel,
 	};
+    ENUM_CLASS_FLAGS(BindingShaderStage);
 
 	enum class BindingType
 	{
@@ -52,9 +52,9 @@ namespace FRAMEWORK
 	class GpuBindGroupLayout : public GpuResource
 	{
 	public:
-		GpuBindGroupLayout(GpuBindGroupLayoutDesc InDesc)
+		GpuBindGroupLayout(const GpuBindGroupLayoutDesc& InDesc)
 			: GpuResource(GpuResourceType::BindGroupLayout)
-			, Desc(MoveTemp(InDesc))
+			, Desc(InDesc)
 		{}
 
 		const GpuBindGroupLayoutDesc& GetDesc() const {

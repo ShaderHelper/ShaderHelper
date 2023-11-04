@@ -15,11 +15,12 @@ namespace FRAMEWORK
 		, CurrentBindGroup1(nullptr)
 		, CurrentBindGroup2(nullptr)
 		, CurrentBindGroup3(nullptr)
-		, IsPipelineDirty(true)
-		, IsRenderTargetDirty(true)
-		, IsVertexBufferDirty(true)
-		, IsViewportDirty(true)
-		, IsRootSigDirty(true)
+		, IsPipelineDirty(false)
+		, IsRenderTargetDirty(false)
+		, IsVertexBufferDirty(false)
+		, IsViewportDirty(false)
+		, IsRootSigDirty(false)
+        , IsBindGroupsDirty(false)
 	{
 
 	}
@@ -75,27 +76,30 @@ namespace FRAMEWORK
 
 		if (IsBindGroupsDirty)
 		{
-			auto ApplyBindGroup = [this](Dx12BindGroup* InGroup) {
-				if (InGroup)
-				{
-					Dx12BindGroupLayout* Layout = static_cast<Dx12BindGroupLayout*>(InGroup->GetLayout());
-					for (auto Slot : Layout->GetBindingSlots())
-					{
-						D3D12_GPU_VIRTUAL_ADDRESS GpuAddr = InGroup->GetDynamicBufferGpuAddr(Slot);
-						uint32 RootParameterIndex = CurrentRootSignature->GetDynamicBufferRootParameterIndex(Slot);
-						GCommandListContext->GetCommandListHandle()->SetGraphicsRootConstantBufferView(RootParameterIndex, GpuAddr);
-					}
-				}
-			};
-			ApplyBindGroup(CurrentBindGroup0);
-			ApplyBindGroup(CurrentBindGroup1);
-			ApplyBindGroup(CurrentBindGroup2);
-			ApplyBindGroup(CurrentBindGroup3);
 
-			GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup0);
-			GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup1);
-			GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup2);
-			GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup3);
+            if(CurrentBindGroup0) {
+                CurrentBindGroup0->Apply(GetCommandListHandle(), CurrentRootSignature);
+                GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup0);
+                
+            }
+            
+            if(CurrentBindGroup1) {
+                CurrentBindGroup1->Apply(GetCommandListHandle(), CurrentRootSignature);
+                GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup1);
+                
+            }
+            
+            if(CurrentBindGroup2) {
+                CurrentBindGroup2->Apply(GetCommandListHandle(), CurrentRootSignature);
+                GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup2);
+                
+            }
+            
+            if(CurrentBindGroup3) {
+                CurrentBindGroup3->Apply(GetCommandListHandle(), CurrentRootSignature);
+                GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup3);
+                
+            }
 
 			MarkBindGroupsDirty(false);
 		}

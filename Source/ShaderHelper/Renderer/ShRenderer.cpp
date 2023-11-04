@@ -53,7 +53,7 @@ R"(float4 MainPS(PIn Input) : SV_Target
 
 
 		auto [NewArgumentBuffer, NewArgumentBufferLayout] = ArgumentBufferBuilder{ 0 }
-			.AddUniformBuffer(BuiltInUniformBuffer)
+			.AddUniformBuffer(BuiltInUniformBuffer, BindingShaderStage::Pixel)
 			.Build();
 
 		BuiltInArgumentBuffer = MoveTemp(NewArgumentBuffer);

@@ -53,7 +53,7 @@ namespace FRAMEWORK::GpuApi
 	{
 		const GpuBindGroupLayoutDesc& LayoutDesc = InBindGroupDesc.Layout->GetDesc();
 		const TArray<ResourceBinding>& BindGroupResources = InBindGroupDesc.Resources;
-		for (const LayoutBinding& BindingLayoutEntry : LayoutDesc.Layouts)
+		for (const auto& BindingLayoutEntry : LayoutDesc.Layouts)
 		{
 			BindingSlot LayoutSlot = BindingLayoutEntry.Slot;
 			const ResourceBinding* BindGroupEntryPtr = BindGroupResources.FindByPredicate([LayoutSlot](const ResourceBinding& BindGroupEntry) {
@@ -71,5 +71,20 @@ namespace FRAMEWORK::GpuApi
 		}
 		return true;
 	}
+
+    bool ValidateCreateBindGroupLayout(const GpuBindGroupLayoutDesc& InBindGroupLayoutDesc)
+    {
+        TArray<BindingSlot> Slots;
+        for(const auto& BindingLayoutEntry : InBindGroupLayoutDesc.Layouts)
+        {
+            if(Slots.Contains(BindingLayoutEntry.Slot))
+            {
+                SH_LOG(LogGpuApi, Error, TEXT("GpuApi::CreateBindGroupLayout Error(Duplicated BindingSlot) -  slot detected: (%d)"), BindingLayoutEntry.Slot);
+                return false;
+            }
+            Slots.Add(BindingLayoutEntry.Slot);
+        }
+        return true;
+    }
 
 }

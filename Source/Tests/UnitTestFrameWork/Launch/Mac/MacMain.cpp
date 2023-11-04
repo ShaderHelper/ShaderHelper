@@ -1,4 +1,5 @@
 #include "CommonHeader.h"
+#include "Launch/Mac/MacLaunch.h"
 #include "App/UnitTestConSole.h"
 
 int main(int argc, char *argv[])

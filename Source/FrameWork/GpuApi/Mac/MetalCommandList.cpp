@@ -4,6 +4,21 @@
 
 namespace FRAMEWORK
 {
+    CommandListContext::CommandListContext()
+        : CurrentPipelineState(nullptr)
+        , CurrentVertexBuffer(nullptr)
+        , CurrentBindGroup0(nullptr)
+        , CurrentBindGroup1(nullptr)
+        , CurrentBindGroup2(nullptr)
+        , CurrentBindGroup3(nullptr)
+        , IsPipelineDirty(false)
+        , IsViewportDirty(false)
+        , IsVertexBufferDirty(false)
+        , IsBindGroupsDirty(false)
+    {
+        
+    }
+
     void CommandListContext::PrepareDrawingEnv()
     {
         check(CurrentRenderCommandEncoder);
@@ -23,9 +38,13 @@ namespace FRAMEWORK
             MarkViewportDirty(false);
         }
         
-        if(IsVertexBufferDirty && CurrentVertexBuffer)
+        if(IsBindGroupsDirty)
         {
-            
+            if(CurrentBindGroup0) { CurrentBindGroup0->Apply(GetRenderCommandEncoder()); }
+            if(CurrentBindGroup1) { CurrentBindGroup1->Apply(GetRenderCommandEncoder()); }
+            if(CurrentBindGroup2) { CurrentBindGroup2->Apply(GetRenderCommandEncoder()); }
+            if(CurrentBindGroup3) { CurrentBindGroup3->Apply(GetRenderCommandEncoder()); }
+            MarkBindGroupsDirty(false);
         }
     }
 
@@ -34,6 +53,16 @@ namespace FRAMEWORK
         CurrentPipelineState = nullptr;
         CurrentViewport.Reset();
         CurrentScissorRect.Reset();
+        
+        CurrentBindGroup0 = nullptr;
+        CurrentBindGroup1 = nullptr;
+        CurrentBindGroup2 = nullptr;
+        CurrentBindGroup3 = nullptr;
+        
+        IsPipelineDirty = false;
+        IsViewportDirty = false;
+        IsVertexBufferDirty = false;
+        IsBindGroupsDirty = false;
     }
 
 }
