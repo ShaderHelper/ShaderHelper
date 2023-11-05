@@ -1,5 +1,5 @@
 #pragma once
-#include "D3D12Common.h"
+#include "Dx12Common.h"
 #include "GpuApi/GpuResource.h"
 
 namespace FRAMEWORK

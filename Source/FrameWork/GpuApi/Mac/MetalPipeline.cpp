@@ -8,15 +8,15 @@ namespace FRAMEWORK
 {
     TRefCountPtr<MetalPipelineState> CreateMetalPipelineState(const PipelineStateDesc& InPipelineStateDesc)
     {
-        TRefCountPtr<MetalShader> Vs = AUX::StaticCastRefCountPtr<MetalShader>(InPipelineStateDesc.Vs);
-        TRefCountPtr<MetalShader> Ps = AUX::StaticCastRefCountPtr<MetalShader>(InPipelineStateDesc.Ps);
+        MetalShader* Vs = static_cast<MetalShader*>(InPipelineStateDesc.Vs);
+        MetalShader* Ps = static_cast<MetalShader*>(InPipelineStateDesc.Ps);
         
         mtlpp::RenderPipelineDescriptor PipelineDesc;
         PipelineDesc.SetVertexFunction(Vs->GetCompilationResult());
         PipelineDesc.SetFragmentFunction(Ps->GetCompilationResult());
         
         ns::AutoReleased<ns::Array<mtlpp::RenderPipelineColorAttachmentDescriptor>> ColorAttachments = PipelineDesc.GetColorAttachments();
-        BlendStateDesc BlendDesc =InPipelineStateDesc.BlendState;
+        BlendStateDesc BlendDesc = InPipelineStateDesc.BlendState;
         const uint32 BlendRtNum = BlendDesc.RtDescs.Num();
         for(uint32 i = 0; i < BlendRtNum; i++)
         {

@@ -1,10 +1,11 @@
 #pragma once
-#include "D3D12Common.h"
-#include "D3D12Descriptor.h"
-#include "D3D12Device.h"
-#include "D3D12Util.h"
-#include "D3D12PSO.h"
-#include "D3D12Texture.h"
+#include "Dx12Common.h"
+#include "Dx12Descriptor.h"
+#include "Dx12Device.h"
+#include "Dx12Util.h"
+#include "Dx12PSO.h"
+#include "Dx12Texture.h"
+#include "Dx12RS.h"
 
 namespace FRAMEWORK
 {
@@ -47,6 +48,13 @@ namespace FRAMEWORK
         void SetRenderTargets(TArray<Dx12Texture*> InRTs) { CurrentRenderTargets = MoveTemp(InRTs); }
         void SetVertexBuffer(Dx12Buffer* InBuffer) { CurrentVertexBuffer = InBuffer; }
         void SetPrimitiveType(PrimitiveType InType) { DrawType = InType; }
+		void SetRootSignature(Dx12RootSignature* InRootSignature) { CurrentRootSignature = InRootSignature; }
+		void SetBindGroups(Dx12BindGroup* InGroup0, Dx12BindGroup* InGroup1, Dx12BindGroup* InGroup2, Dx12BindGroup* InGroup3) {
+			CurrentBindGroup0 = InGroup0;
+			CurrentBindGroup1 = InGroup1;
+			CurrentBindGroup2 = InGroup2;
+			CurrentBindGroup3 = InGroup3;
+		}
         void SetViewPort(TUniquePtr<D3D12_VIEWPORT> InViewPort, TUniquePtr<D3D12_RECT> InSissorRect) {
             CurrentViewPort = MoveTemp(InViewPort);
             CurrentSissorRect = MoveTemp(InSissorRect);
@@ -57,6 +65,8 @@ namespace FRAMEWORK
         void MarkRenderTartgetDirty(bool IsDirty) { IsRenderTargetDirty = IsDirty; }
         void MarkVertexBufferDirty(bool IsDirty) { IsVertexBufferDirty = IsDirty; }
         void MarkViewportDirty(bool IsDirty) { IsViewportDirty = IsDirty; }
+		void MarkRootSigDirty(bool IsDirty) { IsRootSigDirty = IsDirty; }
+		void MarkBindGroupsDirty(bool IsDirty) { IsBindGroupsDirty = IsDirty; }
         
         void ClearBinding();
         
@@ -80,10 +90,19 @@ namespace FRAMEWORK
         TArray<Dx12Texture*> CurrentRenderTargets;
         TArray<TOptional<Vector4f>> ClearColorValues;
 
-		bool IsPipelineDirty = true;
-		bool IsRenderTargetDirty = true;
-		bool IsVertexBufferDirty = true;
-		bool IsViewportDirty = true;
+		Dx12RootSignature* CurrentRootSignature;
+		Dx12BindGroup* CurrentBindGroup0;
+		Dx12BindGroup* CurrentBindGroup1;
+		Dx12BindGroup* CurrentBindGroup2;
+		Dx12BindGroup* CurrentBindGroup3;
+
+		//State cache
+		bool IsPipelineDirty : 1;
+		bool IsRenderTargetDirty : 1;
+		bool IsVertexBufferDirty : 1;
+		bool IsViewportDirty : 1;
+		bool IsRootSigDirty : 1;
+		bool IsBindGroupsDirty : 1;
 	};
 
 	inline TUniquePtr<CommandListContext> GCommandListContext;

@@ -1,5 +1,5 @@
 #pragma once
-#include "D3D12Common.h"
+#include "Dx12Common.h"
 namespace FRAMEWORK
 {
 	enum class DescriptorType
@@ -24,9 +24,11 @@ namespace FRAMEWORK
 	template<uint32 MaxSize, DescriptorType DescType>
 	using GpuDescriptorAllocator = DescriptorAllocator<MaxSize, Descriptorvisibility::CpuGpuVisible, DescType>;
 
-
 	template<Descriptorvisibility Visibility>
 	struct DescriptorHandle;
+
+	using CpuDescriptorHandle = DescriptorHandle<Descriptorvisibility::CpuVisible>;
+	using GpuDescriptorHandle = DescriptorHandle<Descriptorvisibility::CpuGpuVisible>;
 
 	template<>
 	struct DescriptorHandle<Descriptorvisibility::CpuVisible>
@@ -105,4 +107,4 @@ namespace FRAMEWORK
 
 }
 
-#include "D3D12Descriptor.hpp"
+#include "Dx12Descriptor.hpp"

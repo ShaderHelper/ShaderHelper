@@ -1,5 +1,5 @@
 #pragma once
-#include "D3D12Common.h"
+#include "Dx12Common.h"
 #include "GpuApi/GpuResource.h"
 
 namespace FRAMEWORK
@@ -97,6 +97,7 @@ namespace FRAMEWORK
         {
         case GpuTextureFormat::R8G8B8A8_UNORM:        return DXGI_FORMAT_R8G8B8A8_UNORM;
         case GpuTextureFormat::B8G8R8A8_UNORM:        return DXGI_FORMAT_B8G8R8A8_UNORM;
+		case GpuTextureFormat::B8G8R8A8_UNORM_SRGB:   return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
         case GpuTextureFormat::R10G10B10A2_UNORM:     return DXGI_FORMAT_R10G10B10A2_UNORM;
         case GpuTextureFormat::R16G16B16A16_UNORM:    return DXGI_FORMAT_R16G16B16A16_UNORM;
         case GpuTextureFormat::R16G16B16A16_UINT:     return DXGI_FORMAT_R16G16B16A16_UINT;

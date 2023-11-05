@@ -1,7 +1,7 @@
 #pragma once
-#include "D3D12Common.h"
+#include "Dx12Common.h"
 #include "GpuApi/GpuResource.h"
-#include "D3D12Device.h"
+#include "Dx12Device.h"
 
 namespace FRAMEWORK
 {
@@ -55,8 +55,8 @@ namespace FRAMEWORK
 			LastCpuFrame = CurCpuFrame;
 		}
 		void AddUncompletedResource(TRefCountPtr<GpuResource> InResource) {
-            PendingResourceArr* DynamicResources = PendingResources.Peek();
-			DynamicResources->Add(MoveTemp(InResource));
+            PendingResourceArr* Resources = PendingResources.Peek();
+			Resources->Add(MoveTemp(InResource));
 		}
 		void ReleaseCompletedResources() {
 			check(LastGpuFrame <= CurGpuFrame);

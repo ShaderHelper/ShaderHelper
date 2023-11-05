@@ -1,5 +1,5 @@
 #include "CommonHeader.h"
-#include "D3D12Device.h"
+#include "Dx12Device.h"
 namespace FRAMEWORK
 {
 	void InitDx12Core()

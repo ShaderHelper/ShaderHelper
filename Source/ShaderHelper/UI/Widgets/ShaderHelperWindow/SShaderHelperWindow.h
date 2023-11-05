@@ -11,6 +11,7 @@ namespace SH
 			: _Renderer(nullptr)
 		{}
 			SLATE_ARGUMENT(ShRenderer*, Renderer)
+			SLATE_ARGUMENT(Vector2D, WindowSize)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs);
@@ -27,6 +28,7 @@ namespace SH
 		ShRenderer* Renderer;
 		TSharedPtr<FTabManager> TabManager;
 		TSharedPtr<SViewport> Viewport;
+		Vector2D WindowSize;
 	};
 
 }

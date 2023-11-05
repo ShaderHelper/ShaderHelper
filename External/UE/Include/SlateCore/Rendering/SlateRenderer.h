@@ -466,7 +466,8 @@ public:
 	 * @return	Newly created updatable texture
 	 */
 	virtual FSlateUpdatableTexture* CreateSharedHandleTexture(void *SharedHandle) = 0;
-
+    virtual FSlateUpdatableTexture* CreateSharedHandleTexture2(void* SharedHandle) { return nullptr; }
+ 
 	/**
 	 * Return an updatable texture to the renderer for release
 	 *

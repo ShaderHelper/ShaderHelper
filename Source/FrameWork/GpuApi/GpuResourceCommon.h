@@ -1,15 +1,19 @@
 #pragma once
-#include "CommonHeader.h"
 
 namespace FRAMEWORK
 {
-    inline constexpr int MaxRenderTargetNum = 8; //follow dx12:D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT
+	namespace GpuResourceLimit
+	{
+		inline constexpr int32 MaxRenderTargetNum = 8; //follow dx12:D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT
+		inline constexpr int32 MaxBindableBingGroupNum = 4; //Only support 4 BindGroups to adapt some mobile devices.
+	}
 
-    enum class GpuTextureFormat
-    {
-        //Unorm
-        R8G8B8A8_UNORM,
-        B8G8R8A8_UNORM,
+	enum class GpuTextureFormat
+	{
+		//Unorm
+		R8G8B8A8_UNORM,
+		B8G8R8A8_UNORM,
+		B8G8R8A8_UNORM_SRGB,
         R10G10B10A2_UNORM,
         R16G16B16A16_UNORM,
 
@@ -33,6 +37,27 @@ namespace FRAMEWORK
     };
     ENUM_CLASS_FLAGS(GpuTextureUsage);
 
+	enum class GpuBufferUsage : uint32
+	{
+		Static = 1u << 0,
+		Dynamic = 1u << 1,
+		Staging = 1u << 2,
+
+		PersistentUniform = Dynamic | (1u << 3), // 1 or more frames
+		TemporaryUniform = Dynamic | (1u << 4),  // at most 1 frame.
+	};
+	ENUM_CLASS_FLAGS(GpuBufferUsage);
+
+	enum class GpuResourceType
+	{
+		Buffer,
+		Texture,
+		BindGroup,
+		BindGroupLayout,
+		PipelineState,
+		Shader,
+	};
+
     enum class GpuResourceMapMode
     {
         Read_Only,
@@ -47,7 +72,6 @@ namespace FRAMEWORK
         Triangle,
         TriangleStrip,
     };
-
 
     enum class ShaderType
     {
@@ -136,23 +160,15 @@ namespace FRAMEWORK
         Store,
     };
 
-    struct GpuViewPortDesc
-    {
-        GpuViewPortDesc(uint32 InWidth, uint32 InHeight, float InZMin = 0.0f, float InZMax = 1.0f, float InTopLeftX = 0.0f, float InTopLeftY = 0.0f)
-            : TopLeftX(InTopLeftX)
-            , TopLeftY(InTopLeftY)
-            , Width(InWidth)
-            , Height(InHeight)
-            , ZMin(InZMin)
-            , ZMax(InZMax)
-        {
-        }
-        float TopLeftX, TopLeftY;
-        uint32 Width, Height;
-        float ZMin, ZMax;
-    };
+    class GpuResource : public FThreadSafeRefCountedObject 
+	{
+	public:
+		GpuResource(GpuResourceType InType) : Type(InType) {}
+		GpuResourceType GetType() const { return Type; }
 
-    class GpuResource : public FThreadSafeRefCountedObject {};
+	private:
+		GpuResourceType Type;
+	};
 
     inline uint32 GetTextureFormatByteSize(GpuTextureFormat InFormat)
     {
@@ -160,6 +176,7 @@ namespace FRAMEWORK
         {
         case GpuTextureFormat::R8G8B8A8_UNORM:
         case GpuTextureFormat::B8G8R8A8_UNORM:
+		case GpuTextureFormat::B8G8R8A8_UNORM_SRGB:
         case GpuTextureFormat::R10G10B10A2_UNORM:
         case GpuTextureFormat::R11G11B10_FLOAT:
             return 4;

@@ -1,6 +1,4 @@
 #include "CommonHeader.h"
-#include "Common/Util/SwizzleVector.h"
-#include "Common/Util/Auxiliary.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogTestUtil, Log, All);
 #include <chrono>
@@ -28,10 +26,22 @@ namespace UNITTEST_FRAMEWORK
 		func(1,2);
 	}
 
-    struct PrivateUnitTest
+	struct PrivateUnitTestBase
+	{
+	protected:
+		virtual void Run() {
+			SH_LOG(LogTestUtil, Display, TEXT("PrivateUnitTestBase::Run"));
+		}
+	};
+
+    struct PrivateUnitTest : public PrivateUnitTestBase
     {
         int GetVar() const {return Var;}
-    private:
+	protected:
+		virtual void Run() override {
+			SH_LOG(LogTestUtil, Display, TEXT("PrivateUnitTest::Run"));
+		}
+	private:
 		void test(int a) && {
 			SH_LOG(LogTestUtil, Display, TEXT("Test CALL_PRIVATE_FUNCTION:%d"), a);
 		}
@@ -48,6 +58,8 @@ namespace UNITTEST_FRAMEWORK
 	CALL_PRIVATE_FUNCTION(PrivateUnitTest_test, PrivateUnitTest, test, &&, void, int)
     CALL_PRIVATE_FUNCTION(PrivateUnitTest_overload1, PrivateUnitTest, overload,, void, int, int)
     CALL_PRIVATE_FUNCTION(PrivateUnitTest_overload2, PrivateUnitTest, overload,, void, float)
+	CALL_PRIVATE_FUNCTION(PrivateUnitTestBase_Run, PrivateUnitTestBase, Run,, void)
+
 	void TestUtil()
 	{
 		SH_LOG(LogTestUtil, Display, TEXT("Unit Test - Util:"));
@@ -55,8 +67,20 @@ namespace UNITTEST_FRAMEWORK
 		{
 			FVector fvec(1, 2, 3);
 			Vector vec = fvec;
-			FVector fvec2 = vec;
+			FVector3f fvec2 = vec;
 			SH_LOG(LogTestUtil, Display, TEXT("Implicit conversion between FVector and Vector: (%lf,%lf,%lf)."), vec.X, vec.Y, vec.Z);
+            
+            Vector3d vecx{1.0f};
+            vecx = fvec2;
+            SH_LOG(LogTestUtil, Display, TEXT("assignment between FVector and Vector: (%s)."), *vecx.ToString());
+            
+           // vecx + fvec;
+            vecx.yz -= vec.xx;// {1,1,2}
+            SH_LOG(LogTestUtil, Display, TEXT("assignment between FVector and Vector: (%s)."), *vecx.ToString());
+            
+            vecx.xz /= 2;
+            SH_LOG(LogTestUtil, Display, TEXT("assignment between FVector and Vector: (%s)."), *vecx.ToString());
+            
 			//Test compatibility with ue math interfaces.
 			{
 				FTranslationMatrix tranM(vec);
@@ -65,6 +89,23 @@ namespace UNITTEST_FRAMEWORK
 				SH_LOG(LogTestUtil, Display, TEXT("Test compatibility : (%s)."), *vec.ToString());
 			}
 		}
+        
+        //Test assign
+        {
+            Vector vec1 = { 1,2,3 };
+            Vector2f vec2 = { 0.5f,1.1f };
+            
+            vec1 = vec2.YYX; //{1.1, 1.1, 0.5}
+            SH_LOG(LogTestUtil, Display, TEXT("=: (%s)."), *vec1.ToString());
+            
+            Vector3f vec3 = {0.2f, 0.3f, 0.4f};
+            vec1.XY = vec3.YZ; //{0.3,0.4,0.5}
+            SH_LOG(LogTestUtil, Display, TEXT("=: (%s)."), *vec1.ToString());
+            
+            Vector vec4 = vec3.XXX;
+            vec1.xy = vec4.xy; //{0.2,0.2,0.5}
+            SH_LOG(LogTestUtil, Display, TEXT("=: (%s)."), *vec1.ToString());
+        }
 
 		//Test arithmetic operator
 		{
@@ -78,14 +119,20 @@ namespace UNITTEST_FRAMEWORK
 
 			{
 				Vector vec = vec1 * vec2;
-				vec = vec * 2.0;
-				vec *= 2;
+				vec = 2.0f * vec;
+                vec *= 2; // {4, 8.8, 12}
 				SH_LOG(LogTestUtil, Display, TEXT("*: (%lf,%lf,%lf)."), vec.X, vec.Y, vec.Z);
 			}
+            
+            {
+                Vector vec = 2.0f - vec1;
+                SH_LOG(LogTestUtil, Display, TEXT("-: (%s)."), *vec.ToString());
+            }
+            
 			{
-				Vector vec1 = { 1,1,1 };
-				(vec1 += 1) = { 3,3,3 };
-				SH_LOG(LogTestUtil, Display, TEXT("+=: (%s)."), *vec1.ToString());
+				Vector vec = { 1,1,1 };
+				(vec += 1) = { 3,3,3 };
+				SH_LOG(LogTestUtil, Display, TEXT("+=: (%s)."), *vec.ToString());
 			}
 
 			{
@@ -98,12 +145,17 @@ namespace UNITTEST_FRAMEWORK
 		//Test Swizzle
 		{
 			Vector vec1 = { 1,2,3 };
-			Vector vec2 = vec1.XXY;
+			Vector vec2 = vec1.XXY; //{1,1,2}
 			SH_LOG(LogTestUtil, Display, TEXT("Swizzle: (%lf,%lf,%lf)."), vec2.X, vec2.Y, vec2.Z);
 			{
-				Vector2D vec3 = vec2.XZ + 3.0;
+				Vector2D vec3 = vec2.XZ + 3.0; // {4,5}
 				SH_LOG(LogTestUtil, Display, TEXT("Swizzle +: (%lf,%lf)."), vec3.X, vec3.Y);
 			}
+            
+            {
+                Vector3f vec3 = vec1.zzz - 3.0;
+                SH_LOG(LogTestUtil, Display, TEXT("Swizzle -: (%s)."), *vec3.ToString());
+            }
 
 			{
 				Vector4 vec4 = 2.0 * vec2.ZZZZ; // 2 * {2,2,2,2}
@@ -159,15 +211,13 @@ namespace UNITTEST_FRAMEWORK
 			//	}
 			// }
 
-			int VarFromFile = 23;
+			volatile int VarFromFile = 5;
 			FString str = "114514";
-			double Result = 0;
-			//Create the variable outside RUNCASE_WITHINT to get the result value you need
-			RUNCASE_WITHINT(VarFromFile, -64, 64,
-				Vector vec1 = { 1,2,3 };
-				Vector vec2 = vec1.ZZZ + 1;
-				Result = UnitTmp<VarFromFile>{}.Run(vec2.X, str);
-			)
+			Vector vec1 = { 1,2,3 };
+			Vector vec2 = vec1.ZZZ + 1;
+			double Result = RUNCASE_WITHINT(VarFromFile, 2, 64,
+				return UnitTmp<VarFromFile>{}.Run(vec2.X, str);
+			);
 			SH_LOG(LogTestUtil, Warning, TEXT("TestRunCaseWithInt: %lf"), Result);
 		}
 
@@ -208,6 +258,7 @@ namespace UNITTEST_FRAMEWORK
 			CallPrivate_PrivateUnitTest_test(PrivateUnitTest{}, 123);
             CallPrivate_PrivateUnitTest_overload1(PrivateUnitTest{}, 114514, 1);
             CallPrivate_PrivateUnitTest_overload2(PrivateUnitTest{}, 233.233f);
+			CallPrivate_PrivateUnitTestBase_Run(PrivateUnitTest{});
 		}
 
 	}

@@ -1,6 +1,8 @@
 #pragma once
+#include <Templates/RefCounting.h>
 #include <Misc/GeneratedTypeName.h>
 #include <array>
+#include <algorithm>
 namespace FRAMEWORK
 {
 namespace AUX
@@ -23,8 +25,66 @@ namespace AUX
         static RetType Sub(LType& lhs, RType& rhs) { return RetType(lhs[LeftIndexes] - rhs[RightIndexes]...); }
         template<typename RetType, typename LType, typename RType>
         static RetType Div(LType& lhs, RType& rhs) { return RetType(lhs[LeftIndexes] / rhs[RightIndexes]...); }
+        
+        template<typename LType, typename RType>
+        static void Assign(LType& lhs, RType& rhs) { ((lhs[LeftIndexes] = rhs[RightIndexes]), ...); }
+        template<typename LType, typename RType>
+        static void AddAssign(LType& lhs, RType& rhs) { ((lhs[LeftIndexes] += rhs[RightIndexes]), ...); }
+        template<typename LType, typename RType>
+        static void SubAssign(LType& lhs, RType& rhs) { ((lhs[LeftIndexes] -= rhs[RightIndexes]), ...); }
+        template<typename LType, typename RType>
+        static void MulAssign(LType& lhs, RType& rhs) { ((lhs[LeftIndexes] *= rhs[RightIndexes]), ...); }
+        template<typename LType, typename RType>
+        static void DivAssign(LType& lhs, RType& rhs) { ((lhs[LeftIndexes] /= rhs[RightIndexes]), ...); }
 
     };
+
+    template<typename Type1, typename Type2, typename = void>
+    struct GetPromotedArithmeticType;
+
+    template<typename Type1, typename Type2>
+    struct GetPromotedArithmeticType<Type1, Type2,
+        std::enable_if_t<
+            std::is_arithmetic_v<Type1> && std::is_arithmetic_v<Type2>
+        >
+    >
+    {
+        using Type = decltype(std::declval<Type1>() + std::declval<Type2>());
+    };
+
+    template<typename Type1, typename Type2>
+    using GetPromotedArithmeticType_T = typename GetPromotedArithmeticType<Type1, Type2>::Type;
+
+    template<int... Seq>
+    constexpr bool HasDuplicateCompImpl()
+    {
+        constexpr int MaxValue = []()
+        {
+            std::array<int, sizeof...(Seq)> arr{Seq...};
+            return *std::max_element(arr.begin(), arr.end());
+        }();
+        
+        int num[MaxValue + 1]{};
+        std::array<int, sizeof...(Seq)> arr{Seq...};
+        for(int i = 0; i < arr.size(); i++)
+        {
+            if(++num[arr[i]] > 1)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    template<int... Seq>
+    struct HasDuplicateComp
+    {
+        static_assert(sizeof...(Seq) > 0);
+        static constexpr bool Value = HasDuplicateCompImpl<Seq...>();
+    };
+
+    template<int... Seq>
+    inline constexpr bool HasDuplicateComp_V = HasDuplicateComp<Seq...>::Value;
 
     template<typename Smart, typename Pointer>
     struct OutPtrImpl;
@@ -152,24 +212,37 @@ namespace AUX
         return MakeIntegerSequeceByPredicateImpl<Min, Max, Pred, Size>(TMakeIntegerSequence<int, Size>{});
     }
 
-    template<typename Func, int... Seq>
-   void RunCaseWithInt(int Var, const Func& func, TIntegerSequence<int, Seq...>) {
-       (func(Var,std::integral_constant<int, Seq>{}), ...);
-    }
-		
-#define RUNCASE_WITHINT_IMPL(LambName,VarToken,Min,Max,...)                                                     \
+	template<typename Func, int First, int... Seq>
+	auto RunCaseWithInt(int Var, const Func& Lamb, TIntegerSequence<int, First, Seq...> SeqObj) {
+		if (Var == First)
+		{
+			//Lambda does not support non-type template parameter until c++20.
+			return Lamb(Var, std::integral_constant<int, First>{});
+		}
+		else if constexpr (sizeof...(Seq) > 0)
+		{
+			return RunCaseWithInt(Var, Lamb, TIntegerSequence<int, Seq...>{});
+		}
+		else
+		{
+			// unreachable
+			check(false);
+			return Lamb(Var, std::integral_constant<int, First>{});
+		}
+	}
+
+#define RUNCASE_WITHINT_IMPL(LambName,VarToken,Min,Max,...) [&] {                                               \
     checkf(VarToken >= Min && VarToken <= Max, TEXT("%s must be [%d,%d]"), *FString(#VarToken), Min, Max);      \
     auto LambName = [&](int Var, auto&& t) {                                                                    \
-        using BaseType = std::remove_reference_t<decltype(t)>;                                                  \
-        constexpr int VarToken = BaseType::value;                                                               \
-        if (VarToken == Var) {                                                                                  \
-            __VA_ARGS__                                                                                         \
-        }                                                                                                       \
+        using CleanType = std::remove_reference_t<decltype(t)>;                                                 \
+        constexpr int VarToken = CleanType::value;                                                              \
+        __VA_ARGS__                                                                                             \
     };                                                                                                          \
-    AUX::RunCaseWithInt(VarToken, LambName, AUX::MakeRangeIntegerSequence<Min, Max>{});
+    return AUX::RunCaseWithInt(VarToken, LambName, AUX::MakeRangeIntegerSequence<Min, Max>{});                  \
+    }()
 
    //Pass a run-time integer with known small range to template
-   //* The large range will lead to code explosion, please carefully choose the range.
+   //* The large range maybe lead to code bloat, please carefully choose the range.
    //* `VarToken` must be a simple variable name rather than a complex expression. 
    //	Example: 
    //	int Var = xxx; RUNCASE_WITHINT(Var,...) (√) 
@@ -192,7 +265,7 @@ namespace AUX
         return TTypename<BaseType>::Value;
     }
     
-    //https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2593r0.html#ref-P1830R1
+    //https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2593r0.html
     template<typename T>
     inline constexpr bool AlwaysFalse = false;
 
@@ -231,7 +304,7 @@ namespace AUX
 	struct TraitFuncTypeFromFuncPtr<T C::*> { using Type = T; };
 
 	template<typename T>
-	using TraitFuncTypeFromFunctor_t = typename TraitFuncTypeFromFuncPtr<decltype(&T::operator())>::Type;
+	using TraitFuncTypeFromFunctor_T = typename TraitFuncTypeFromFuncPtr<decltype(&T::operator())>::Type;
 
 	template<typename T1, typename T2>
 	struct FunctorExt;
@@ -257,7 +330,7 @@ namespace AUX
 	auto FunctorToFuncPtr(T&& Functor)
 	{
 		using CleanType = std::decay_t<T>;
-		using CurFunctorExt = FunctorExt<CleanType, TraitFuncTypeFromFunctor_t<CleanType>>;
+		using CurFunctorExt = FunctorExt<CleanType, TraitFuncTypeFromFunctor_T<CleanType>>;
 		CurFunctorExt::FunctorStorage = &Functor;
 		return &CurFunctorExt::Call;
 	}
@@ -274,7 +347,7 @@ namespace AUX
     };
 
 //Call a private member function without undefined behavior.
-//Note: Not support dynamic dispatch
+//Note: The virtual dispatch will happen if the function is virtual.
 #define CALL_PRIVATE_FUNCTION(CalleeName, ClassName, FunctionName, Qualifiers, RetType, ...)                            \
     namespace                                                                                                           \
     {                                                                                                                   \

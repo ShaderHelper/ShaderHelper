@@ -681,7 +681,17 @@ namespace SH
 
 	void SShaderEditorBox::OnShaderTextChanged(const FString& NewShaderSouce)
 	{
-		TRefCountPtr<GpuShader> NewPixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, NewShaderSouce, {}, TEXT("MainPS"));
+		FString PixelShaderInput = ShRenderer::DefaultPixelShaderInput;
+		FString PixelShaderMacro = ShRenderer::DefaultPixelShaderMacro;
+		FString ShaderResourceDeclaration = Renderer->GetResourceDeclaration();
+
+		TArray<FString> AddedLines;
+		int32 AddedLineNum = PixelShaderInput.ParseIntoArrayLines(AddedLines, false) - 1;
+		AddedLineNum += PixelShaderMacro.ParseIntoArrayLines(AddedLines, false) - 1;
+		AddedLineNum += ShaderResourceDeclaration.ParseIntoArrayLines(AddedLines, false) - 1;
+
+		FString FinalShaderSource = PixelShaderInput + ShaderResourceDeclaration + PixelShaderMacro + NewShaderSouce;
+		TRefCountPtr<GpuShader> NewPixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, MoveTemp(FinalShaderSource), {}, TEXT("MainPS"));
 		FString ErrorInfo;
 		EffectMarshller->LineNumberToErrorInfo.Reset();
 		if (GpuApi::CrossCompileShader(NewPixelShader, ErrorInfo))
@@ -695,9 +705,10 @@ namespace SH
 			TArray<ShaderErrorInfo> ErrorInfos = ParseErrorInfoFromDxc(ErrorInfo);
 			for (const ShaderErrorInfo& ErrorInfo : ErrorInfos)
 			{
-				if (!EffectMarshller->LineNumberToErrorInfo.Contains(ErrorInfo.Row))
+				int32 ErrorInfoLineNumber = ErrorInfo.Row - AddedLineNum;
+				if (!EffectMarshller->LineNumberToErrorInfo.Contains(ErrorInfoLineNumber))
 				{
-					int32 LineIndex = GetLineIndex(ErrorInfo.Row);
+					int32 LineIndex = GetLineIndex(ErrorInfoLineNumber);
 					FString LineText;
 					if (LineIndex != INDEX_NONE) {
 						ShaderMultiLineEditableText->GetTextLine(LineIndex, LineText);
@@ -714,7 +725,7 @@ namespace SH
 					FTextRange DummyRange{ 0, DummyText.Len() };
 					FTextRange ErrorRange{ DummyText.Len(), DisplayInfo.Len() };
 
-					EffectMarshller->LineNumberToErrorInfo.Add(ErrorInfo.Row, { MoveTemp(DummyRange), MoveTemp(ErrorRange), MoveTemp(DisplayInfo) });
+					EffectMarshller->LineNumberToErrorInfo.Add(ErrorInfoLineNumber, { MoveTemp(DummyRange), MoveTemp(ErrorRange), MoveTemp(DisplayInfo) });
 				}
 			}
 		}
