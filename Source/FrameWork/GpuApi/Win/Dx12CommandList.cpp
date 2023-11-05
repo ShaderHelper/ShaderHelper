@@ -1,6 +1,6 @@
 #include "CommonHeader.h"
-#include "D3D12CommandList.h"
-#include "D3D12Map.h"
+#include "Dx12CommandList.h"
+#include "Dx12Map.h"
 
 namespace FRAMEWORK
 {	
@@ -10,6 +10,17 @@ namespace FRAMEWORK
 		, CurrentPso(nullptr)
 		, CurrentVertexBuffer(nullptr)
 		, DrawType(PrimitiveType::Triangle)
+		, CurrentRootSignature(nullptr)
+		, CurrentBindGroup0(nullptr)
+		, CurrentBindGroup1(nullptr)
+		, CurrentBindGroup2(nullptr)
+		, CurrentBindGroup3(nullptr)
+		, IsPipelineDirty(false)
+		, IsRenderTargetDirty(false)
+		, IsVertexBufferDirty(false)
+		, IsViewportDirty(false)
+		, IsRootSigDirty(false)
+        , IsBindGroupsDirty(false)
 	{
 
 	}
@@ -51,10 +62,46 @@ namespace FRAMEWORK
 		if (IsPipelineDirty)
 		{
 			check(CurrentPso);
-			GraphicsCmdList->SetGraphicsRootSignature(CurrentPso->GetRootSig());
 			GraphicsCmdList->SetPipelineState(CurrentPso->GetResource());
             GDeferredReleaseManager.AddUncompletedResource(CurrentPso);
 			MarkPipelineDirty(false);
+		}
+
+		if (IsRootSigDirty)
+		{
+			check(CurrentRootSignature);
+			GraphicsCmdList->SetGraphicsRootSignature(CurrentRootSignature->GetResource());
+			MarkRootSigDirty(false);
+		}
+
+		if (IsBindGroupsDirty)
+		{
+
+            if(CurrentBindGroup0) {
+                CurrentBindGroup0->Apply(GetCommandListHandle(), CurrentRootSignature);
+                GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup0);
+                
+            }
+            
+            if(CurrentBindGroup1) {
+                CurrentBindGroup1->Apply(GetCommandListHandle(), CurrentRootSignature);
+                GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup1);
+                
+            }
+            
+            if(CurrentBindGroup2) {
+                CurrentBindGroup2->Apply(GetCommandListHandle(), CurrentRootSignature);
+                GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup2);
+                
+            }
+            
+            if(CurrentBindGroup3) {
+                CurrentBindGroup3->Apply(GetCommandListHandle(), CurrentRootSignature);
+                GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup3);
+                
+            }
+
+			MarkBindGroupsDirty(false);
 		}
 	
 		if (IsViewportDirty)
@@ -107,11 +154,18 @@ namespace FRAMEWORK
         CurrentPso = nullptr;
         CurrentViewPort = nullptr;
         CurrentSissorRect = nullptr;
+		CurrentRootSignature = nullptr;
+		CurrentBindGroup0 = nullptr;
+		CurrentBindGroup1 = nullptr;
+		CurrentBindGroup2 = nullptr;
+		CurrentBindGroup3 = nullptr;
         
         IsPipelineDirty = false;
         IsRenderTargetDirty = false;
         IsVertexBufferDirty = false;
         IsViewportDirty = false;
+		IsRootSigDirty = false;
+		IsBindGroupsDirty = false;
         
         CurrentRenderTargets.Empty();
         

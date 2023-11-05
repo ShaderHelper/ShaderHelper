@@ -29,15 +29,6 @@ usage "UE"
     filter "system:macosx"
         links 
         {
-            "Cocoa.framework",
-            "Metal.framework",
-            "OpenGL.framework",
-            "Carbon.framework",
-            "IOKit.framework",
-            "Security.framework",
-            "GameController.framework",
-            "QuartzCore.framework",
-            "IOSurface.framework",
             "%{cfg.targetdir}/UE-Core.dylib",
             "%{cfg.targetdir}/UE-ApplicationCore.dylib",
             "%{cfg.targetdir}/UE-Slate.dylib",

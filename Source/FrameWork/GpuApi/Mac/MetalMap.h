@@ -82,7 +82,7 @@ namespace FRAMEWORK
         for(uint32 i = 0 ; i < PassRtNum; i++)
         {
             const GpuRenderTargetInfo& RtInfo = PassDesc.ColorRenderTargets[i];
-            MetalTexture* Rt = static_cast<MetalTexture*>(RtInfo.GetRenderTarget());
+            MetalTexture* Rt = static_cast<MetalTexture*>(RtInfo.Texture);
             RawPassDesc.colorAttachments[i].texture = Rt->GetResource();
             RawPassDesc.colorAttachments[i].loadAction = MapLoadAction(RtInfo.LoadAction);
             RawPassDesc.colorAttachments[i].storeAction = MapStoreAction(RtInfo.StoreAction);

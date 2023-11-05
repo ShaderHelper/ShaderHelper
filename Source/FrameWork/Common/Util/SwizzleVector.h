@@ -2,6 +2,15 @@
 #include "Auxiliary.h"
 namespace FRAMEWORK {
 	// ShaderHelper Vector
+    // Simulates hlsl swizzle operations.
+    // Follows hlsl casting rule but
+    // disables some implicit conversions:
+    //      1. vectorN -> vectorM (N>M)   (eg. float2 a = float3(1,1,1)
+    //      2. scalar <- vector(eg. float a = float4(1,1,1,1) or float a  = .xyz
+    // disables some arithmetic operations:
+    //      1. vectorN op vectorM (N!=M)  (eg. .xyz + .xx)
+    //      2. FVector op Vector
+
 	// fwd
 	template<typename T> struct VectorImpl;
 	template<typename T> struct Vector2Impl;
@@ -19,176 +28,462 @@ namespace FRAMEWORK {
 	using Vector4f = Vector4Impl<float>;
 	using Vector4d = Vector4Impl<double>;
 
-	template<typename Base, typename Target, uint32... Indexes>
+	template<uint32 ElementNum, typename Base, template<typename>typename Target, uint32... Indexes>
 	struct Swizzle
 	{
-		template <typename OtherBase, typename OtherTarget, uint32 ... OtherIndexes>
+		template <uint32 OtherElementNum, typename OtherBase, template<typename>typename OtherTarget, uint32 ... OtherIndexes>
 		friend struct Swizzle;
+        
+        template<typename T>
+        friend struct VectorImpl;
+        template<typename T>
+        friend struct Vector2Impl;
+        template<typename T>
+        friend struct Vector4Impl;
+
+    private:
+        Swizzle() = default;
+        Swizzle(const Swizzle&) = default;
+        
 	public:
-		operator Target() const {
-			return Target(Data[Indexes]...);
+        template<typename T>
+        Swizzle& operator=(const Target<T>& rhs)
+        {
+            static_assert(!AUX::HasDuplicateComp_V<Indexes...>, "cannot assign(contains duplicate components)");
+            AUX::Op<TIntegerSequence<uint32, Indexes...>, TIntegerSequence<uint32, Indexes...>>::Assign(Data, rhs);
+            return *this;
+        }
+        
+        Swizzle& operator=(const Swizzle& rhs)
+        {
+            static_assert(!AUX::HasDuplicateComp_V<Indexes...>, "cannot assign(contains duplicate components)");
+            AUX::Op<TIntegerSequence<uint32, Indexes...>, TIntegerSequence<uint32, Indexes...>>::Assign(Data, rhs.Data);
+            return *this;
+        }
+        
+        template <uint32 OtherElementNum, typename OtherBase, uint32 ... OtherIndexes>
+        Swizzle& operator=(const Swizzle<OtherElementNum, OtherBase, Target, OtherIndexes...>& rhs)
+        {
+            static_assert(!AUX::HasDuplicateComp_V<Indexes...>, "cannot assign(contains duplicate components)");
+            AUX::Op<TIntegerSequence<uint32, Indexes...>, TIntegerSequence<uint32, OtherIndexes...>>::Assign(Data, rhs.Data);
+            return *this;
+		}
+        
+        template <uint32 OtherElementNum, typename OtherBase, uint32 ... OtherIndexes>
+        Swizzle& operator*=(const Swizzle<OtherElementNum, OtherBase, Target, OtherIndexes...>& rhs)
+        {
+            static_assert(!AUX::HasDuplicateComp_V<Indexes...>, "cannot assign(contains duplicate components)");
+            AUX::Op<TIntegerSequence<uint32, Indexes...>, TIntegerSequence<uint32, OtherIndexes...>>::MulAssign(Data, rhs.Data);
+            return *this;
+        }
+        
+        template <uint32 OtherElementNum, typename OtherBase, uint32 ... OtherIndexes>
+        Swizzle& operator+=(const Swizzle<OtherElementNum, OtherBase, Target, OtherIndexes...>& rhs)
+        {
+            static_assert(!AUX::HasDuplicateComp_V<Indexes...>, "cannot assign(contains duplicate components)");
+            AUX::Op<TIntegerSequence<uint32, Indexes...>, TIntegerSequence<uint32, OtherIndexes...>>::AddAssign(Data, rhs.Data);
+            return *this;
+        }
+        
+        template <uint32 OtherElementNum, typename OtherBase, uint32 ... OtherIndexes>
+        Swizzle& operator-=(const Swizzle<OtherElementNum, OtherBase, Target, OtherIndexes...>& rhs)
+        {
+            static_assert(!AUX::HasDuplicateComp_V<Indexes...>, "cannot assign(contains duplicate components)");
+            AUX::Op<TIntegerSequence<uint32, Indexes...>, TIntegerSequence<uint32, OtherIndexes...>>::SubAssign(Data, rhs.Data);
+            return *this;
+        }
+        
+        template <uint32 OtherElementNum, typename OtherBase, uint32 ... OtherIndexes>
+        Swizzle& operator/=(const Swizzle<OtherElementNum, OtherBase, Target, OtherIndexes...>& rhs)
+        {
+            static_assert(!AUX::HasDuplicateComp_V<Indexes...>, "cannot assign(contains duplicate components)");
+            AUX::Op<TIntegerSequence<uint32, Indexes...>, TIntegerSequence<uint32, OtherIndexes...>>::DivAssign(Data, rhs.Data);
+            return *this;
+        }
+        
+        template<typename OtherBase,
+            typename = std::enable_if_t<std::is_arithmetic_v<OtherBase>>
+        >
+        Swizzle& operator*=(OtherBase rhs)
+        {
+            static_assert(!AUX::HasDuplicateComp_V<Indexes...>, "cannot assign(contains duplicate components)");
+            ((Data[Indexes] *= rhs), ...);
+            return *this;
+        }
+        template<typename OtherBase,
+            typename = std::enable_if_t<std::is_arithmetic_v<OtherBase>>
+        >
+        Swizzle& operator+=(OtherBase rhs)
+        {
+            static_assert(!AUX::HasDuplicateComp_V<Indexes...>, "cannot assign(contains duplicate components)");
+            ((Data[Indexes] += rhs), ...);
+            return *this;
+        }
+        template<typename OtherBase,
+            typename = std::enable_if_t<std::is_arithmetic_v<OtherBase>>
+        >
+        Swizzle& operator-=(OtherBase rhs)
+        {
+            static_assert(!AUX::HasDuplicateComp_V<Indexes...>, "cannot assign(contains duplicate components)");
+            ((Data[Indexes] -= rhs), ...);
+            return *this;
+        }
+        template<typename OtherBase,
+            typename = std::enable_if_t<std::is_arithmetic_v<OtherBase>>
+        >
+        Swizzle& operator/=(OtherBase rhs)
+        {
+            static_assert(!AUX::HasDuplicateComp_V<Indexes...>, "cannot assign(contains duplicate components)");
+            ((Data[Indexes] /= rhs), ...);
+            return *this;
+        }
+
+        
+        template<typename OtherBase,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<Base,OtherBase>
+        >
+        friend auto operator+(OtherBase lhs, const Swizzle& rhs) {
+            return Target<PromotedType>{lhs + rhs.Data[Indexes]...};
+        }
+        template<typename OtherBase,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<Base,OtherBase>
+        >
+        friend auto operator*(OtherBase lhs, const Swizzle& rhs) {
+            return Target<PromotedType>{lhs * rhs.Data[Indexes]...};
+        }
+        template<typename OtherBase,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<Base,OtherBase>
+        >
+        friend auto operator-(OtherBase lhs, const Swizzle& rhs) {
+            return Target<PromotedType>{lhs - rhs.Data[Indexes]...};
+        }
+        template<typename OtherBase,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<Base,OtherBase>
+        >
+        friend auto operator/(OtherBase lhs, const Swizzle& rhs) {
+            return Target<PromotedType>{lhs / rhs.Data[Indexes]...};
+        }
+        
+        
+        template<typename OtherBase,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<Base,OtherBase>
+        >
+        friend auto operator+(const Swizzle& lhs, OtherBase rhs) {
+            return Target<PromotedType>{lhs.Data[Indexes] + rhs...};
+        }
+        template<typename OtherBase,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<Base,OtherBase>
+        >
+        friend auto operator*(const Swizzle& lhs, OtherBase rhs) {
+            return Target<PromotedType>{lhs.Data[Indexes] * rhs...};
+        }
+        template<typename OtherBase,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<Base,OtherBase>
+        >
+        friend auto operator-(const Swizzle& lhs, OtherBase rhs) {
+            return Target<PromotedType>{lhs.Data[Indexes] - rhs...};
+        }
+        template<typename OtherBase,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<Base,OtherBase>
+        >
+        friend auto operator/(const Swizzle& lhs, OtherBase rhs) {
+            return Target<PromotedType>{lhs.Data[Indexes] / rhs...};
+        }
+        
+
+        template<typename OtherBase,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<Base,OtherBase>
+        >
+		friend auto operator+(const Target<OtherBase>& lhs, const Swizzle& rhs) {
+			return AUX::Op<TMakeIntegerSequence<uint32, sizeof...(Indexes)>, TIntegerSequence<uint32, Indexes...>>
+            ::template Sum<Target<PromotedType>>(lhs, rhs.Data);
+		}
+        template<typename OtherBase,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<Base,OtherBase>
+        >
+		friend auto operator*(const Target<OtherBase>& lhs, const Swizzle& rhs) {
+			return AUX::Op<TMakeIntegerSequence<uint32, sizeof...(Indexes)>, TIntegerSequence<uint32, Indexes...>>::
+            template Mul<Target<PromotedType>>(lhs, rhs.Data);
+		}
+        template<typename OtherBase,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<Base,OtherBase>
+        >
+		friend auto operator-(const Target<OtherBase>& lhs, const Swizzle& rhs) {
+			return AUX::Op<TMakeIntegerSequence<uint32, sizeof...(Indexes)>, TIntegerSequence<uint32, Indexes...>>::
+            template Sub<Target<PromotedType>>(lhs, rhs.Data);
+		}
+        template<typename OtherBase,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<Base,OtherBase>
+        >
+		friend auto operator/(const Target<OtherBase>& lhs, const Swizzle& rhs) {
+			return AUX::Op<TMakeIntegerSequence<uint32, sizeof...(Indexes)>, TIntegerSequence<uint32, Indexes...>>::
+            template Div<Target<PromotedType>>(lhs, rhs.Data);
+		}
+        template<typename OtherBase,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<Base,OtherBase>
+        >
+		friend auto operator+(const Swizzle& lhs, const Target<OtherBase>& rhs) {
+			return AUX::Op<TIntegerSequence<uint32, Indexes...>, TMakeIntegerSequence<uint32, sizeof...(Indexes)>>::
+            template Sum<Target<PromotedType>>(lhs.Data, rhs);
+		}
+        template<typename OtherBase,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<Base,OtherBase>
+        >
+		friend auto operator*(const Swizzle& lhs, const Target<OtherBase>& rhs) {
+			return AUX::Op<TIntegerSequence<uint32, Indexes...>, TMakeIntegerSequence<uint32, sizeof...(Indexes)>>::
+            template Mul<Target<PromotedType>>(lhs.Data, rhs);
+		}
+        template<typename OtherBase,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<Base,OtherBase>
+        >
+		friend auto operator-(const Swizzle& lhs, const Target<OtherBase>& rhs) {
+			return AUX::Op<TIntegerSequence<uint32, Indexes...>, TMakeIntegerSequence<uint32, sizeof...(Indexes)>>::
+            template Sub<Target<PromotedType>>(lhs.Data, rhs);
+		}
+        template<typename OtherBase,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<Base,OtherBase>
+        >
+		friend auto operator/(const Swizzle& lhs, const Target<OtherBase>& rhs) {
+			return AUX::Op<TIntegerSequence<uint32, Indexes...>, TMakeIntegerSequence<uint32, sizeof...(Indexes)>>::
+            template Div<Target<PromotedType>>(lhs.Data, rhs);
 		}
 
-		Target& operator=(const Target& rhs) const {
-			Data = { rhs[Indexes]... };
-			return *this;
+        
+		template<uint32 OtherElementNum, typename OtherBase, uint32 ... OtherIndexes,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<Base,OtherBase>
+        >
+		auto operator+(const Swizzle<OtherElementNum, OtherBase, Target, OtherIndexes...>& rhs) const {
+			return AUX::Op<TIntegerSequence<uint32, Indexes...>, TIntegerSequence<uint32, OtherIndexes...>>::
+            template Sum<Target<PromotedType>>(Data, rhs.Data);
 		}
-
-		friend Target operator+(const Target& lhs, const Swizzle& rhs) {
-			return AUX::Op<TMakeIntegerSequence<uint32, sizeof...(Indexes)>, TIntegerSequence<uint32, Indexes...>>::template Sum<Target>(lhs, rhs.Data);
+		template<uint32 OtherElementNum, typename OtherBase, uint32 ... OtherIndexes,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<Base,OtherBase>
+        >
+		auto operator*(const Swizzle<OtherElementNum, OtherBase, Target, OtherIndexes...>& rhs) const {
+			return AUX::Op<TIntegerSequence<uint32, Indexes...>, TIntegerSequence<uint32, OtherIndexes...>>::
+            template Mul<Target<PromotedType>>(Data, rhs.Data);
 		}
-		friend Target operator*(const Target& lhs, const Swizzle& rhs) {
-			return AUX::Op<TMakeIntegerSequence<uint32, sizeof...(Indexes)>, TIntegerSequence<uint32, Indexes...>>::template Mul<Target>(lhs, rhs.Data);
+		template<uint32 OtherElementNum, typename OtherBase, uint32 ... OtherIndexes,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<Base,OtherBase>
+        >
+		auto operator-(const Swizzle<OtherElementNum, OtherBase, Target, OtherIndexes...>& rhs) const {
+			return AUX::Op<TIntegerSequence<uint32, Indexes...>, TIntegerSequence<uint32, OtherIndexes...>>::
+            template Sub<Target<PromotedType>>(Data, rhs.Data);
 		}
-		friend Target operator-(const Target& lhs, const Swizzle& rhs) {
-			return AUX::Op<TMakeIntegerSequence<uint32, sizeof...(Indexes)>, TIntegerSequence<uint32, Indexes...>>::template Sub<Target>(lhs, rhs.Data);
+		template<uint32 OtherElementNum, typename OtherBase, uint32 ... OtherIndexes,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<Base,OtherBase>
+        >
+		auto operator/(const Swizzle<OtherElementNum, OtherBase, Target, OtherIndexes...>& rhs) const {
+			return AUX::Op<TIntegerSequence<uint32, Indexes...>, TIntegerSequence<uint32, OtherIndexes...>>::
+            template Div<Target<PromotedType>>(Data, rhs.Data);
 		}
-		friend Target operator/(const Target& lhs, const Swizzle& rhs) {
-			return AUX::Op<TMakeIntegerSequence<uint32, sizeof...(Indexes)>, TIntegerSequence<uint32, Indexes...>>::template Div<Target>(lhs, rhs.Data);
-		}
-
-		friend Target operator+(const Swizzle& lhs, const Target& rhs) {
-			return AUX::Op<TIntegerSequence<uint32, Indexes...>, TMakeIntegerSequence<uint32, sizeof...(Indexes)>>::template Sum<Target>(lhs.Data, rhs);
-		}
-		friend Target operator*(const Swizzle& lhs, const Target& rhs) {
-			return AUX::Op<TIntegerSequence<uint32, Indexes...>, TMakeIntegerSequence<uint32, sizeof...(Indexes)>>::template Mul<Target>(lhs.Data, rhs);
-		}
-		friend Target operator-(const Swizzle& lhs, const Target& rhs) {
-			return AUX::Op<TIntegerSequence<uint32, Indexes...>, TMakeIntegerSequence<uint32, sizeof...(Indexes)>>::template Sub<Target>(lhs.Data, rhs);
-		}
-		friend Target operator/(const Swizzle& lhs, const Target& rhs) {
-			return AUX::Op<TIntegerSequence<uint32, Indexes...>, TMakeIntegerSequence<uint32, sizeof...(Indexes)>>::template Div<Target>(lhs.Data, rhs);
-		}
-
-		template<uint32 ... OtherIndexes>
-		Target operator+(const Swizzle<Base, Target, OtherIndexes...>& rhs) const {
-			return AUX::Op<TIntegerSequence<uint32, Indexes...>, TIntegerSequence<uint32, OtherIndexes...>>:: template Sum<Target>(Data, rhs.Data);
-		}
-		template<uint32 ... OtherIndexes>
-		Target operator*(const Swizzle<Base, Target, OtherIndexes...>& rhs) const {
-			return AUX::Op<TIntegerSequence<uint32, Indexes...>, TIntegerSequence<uint32, OtherIndexes...>>:: template Mul<Target>(Data, rhs.Data);
-		}
-		template<uint32 ... OtherIndexes>
-		Target operator-(const Swizzle<Base, Target, OtherIndexes...>& rhs) const {
-			return AUX::Op<TIntegerSequence<uint32, Indexes...>, TIntegerSequence<uint32, OtherIndexes...>>:: template Sub<Target>(Data, rhs.Data);
-		}
-		template<uint32 ... OtherIndexes>
-		Target operator/(const Swizzle<Base, Target, OtherIndexes...>& rhs) const {
-			return AUX::Op<TIntegerSequence<uint32, Indexes...>, TIntegerSequence<uint32, OtherIndexes...>>:: template Div<Target>(Data, rhs.Data);
-		}
+        
+        
 
 	private:
-		Base Data[sizeof...(Indexes)];
+		Base Data[ElementNum];
 	};
 
 	template<typename T>
 	struct Vector2Impl
 	{
-		using UE_Vector = UE::Math::TVector2<T>;
+        template<typename U>
+        using UE_Vector = UE::Math::TVector2<U>;
 		union
 		{
 			//Working UB
 			T Data[2];
+            struct
+            {
+                T x, y;
+            };
 			struct
 			{
 				T X, Y;
 			};
-			Swizzle<T, Vector2Impl, 0, 0> XX;
-			Swizzle<T, Vector2Impl, 0, 1> XY;
-			Swizzle<T, Vector2Impl, 1, 0> YX;
-			Swizzle<T, Vector2Impl, 1, 1> YY;
-
-			Swizzle<T, VectorImpl<T>, 0, 0, 0> XXX;
-			Swizzle<T, VectorImpl<T>, 0, 0, 1> XXY;
-			Swizzle<T, VectorImpl<T>, 0, 1, 0> XYX;
-			Swizzle<T, VectorImpl<T>, 0, 1, 1> XYY;
-			Swizzle<T, VectorImpl<T>, 1, 0, 0> YXX;
-			Swizzle<T, VectorImpl<T>, 1, 0, 1> YXY;
-			Swizzle<T, VectorImpl<T>, 1, 1, 0> YYX;
-			Swizzle<T, VectorImpl<T>, 1, 1, 1> YYY;
-
-			Swizzle<T, Vector4Impl<T>, 0, 0, 0, 0> XXXX;
-			Swizzle<T, Vector4Impl<T>, 0, 0, 0, 1> XXXY;
-			Swizzle<T, Vector4Impl<T>, 0, 0, 1, 0> XXYX;
-			Swizzle<T, Vector4Impl<T>, 0, 0, 1, 1> XXYY;
-			Swizzle<T, Vector4Impl<T>, 0, 1, 0, 0> XYXX;
-			Swizzle<T, Vector4Impl<T>, 0, 1, 0, 1> XYXY;
-			Swizzle<T, Vector4Impl<T>, 0, 1, 1, 0> XYYX;
-			Swizzle<T, Vector4Impl<T>, 0, 1, 1, 1> XYYY;
-			Swizzle<T, Vector4Impl<T>, 1, 0, 0, 0> YXXX;
-			Swizzle<T, Vector4Impl<T>, 1, 0, 0, 1> YXXY;
-			Swizzle<T, Vector4Impl<T>, 1, 0, 1, 0> YXYX;
-			Swizzle<T, Vector4Impl<T>, 1, 0, 1, 1> YXYY;
-			Swizzle<T, Vector4Impl<T>, 1, 1, 0, 0> YYXX;
-			Swizzle<T, Vector4Impl<T>, 1, 1, 0, 1> YYXY;
-			Swizzle<T, Vector4Impl<T>, 1, 1, 1, 0> YYYX;
-			Swizzle<T, Vector4Impl<T>, 1, 1, 1, 1> YYYY;
+            #include "Vector2SwizzleSet.h"
 		};
 
 		Vector2Impl() = default;
-		Vector2Impl(const UE_Vector& Vec) : X(Vec.X), Y(Vec.Y) {}
+        template<typename U>
+        Vector2Impl(const UE_Vector<U>& Vec) : X((T)Vec.X), Y((T)Vec.Y) {}
+        
 		Vector2Impl(T IntT) : X(IntT), Y(IntT) {}
 		Vector2Impl(T IntX, T IntY) : X(IntX), Y(IntY) {}
+        
+        template<typename U>
+        Vector2Impl(const Vector2Impl<U>& Vec)
+            : Vector2Impl((T)Vec.X, (T)Vec.Y)
+        {
+        }
+        
+        template<uint32 ElementNum, typename Base, uint32... Indexes>
+        Vector2Impl(const Swizzle<ElementNum, Base, Vector2Impl, Indexes...>& SwizzleItem)
+            : Vector2Impl(SwizzleItem.Data[Indexes]...)
+        {
+        }
+        
+        Vector2Impl& operator=(const Vector2Impl& rhs)
+        {
+            Vector2Impl Temp{rhs};
+            Swap(Temp, *this);
+            return *this;
+        }
+        
+        template<typename U> friend auto operator*(const UE_Vector<U>&, const Vector2Impl&) = delete;
+        template<typename U> friend auto operator*(const Vector2Impl&, const UE_Vector<U>&) = delete;
+        template<typename U> friend auto operator+(const UE_Vector<U>&, const Vector2Impl&) = delete;
+        template<typename U> friend auto operator+(const Vector2Impl&, const UE_Vector<U>&) = delete;
+        template<typename U> friend auto operator-(const UE_Vector<U>&, const Vector2Impl&) = delete;
+        template<typename U> friend auto operator-(const Vector2Impl&, const UE_Vector<U>&) = delete;
+        template<typename U> friend auto operator/(const UE_Vector<U>&, const Vector2Impl&) = delete;
+        template<typename U> friend auto operator/(const Vector2Impl&, const UE_Vector<U>&) = delete;
 
-		Vector2Impl operator*(const Vector2Impl& rhs) const {
-			return Vector2Impl(X * rhs.X, Y * rhs.Y);
+        //Follows arithmetic conversions
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+		auto operator*(const Vector2Impl<U>& rhs) const {
+			return Vector2Impl<PromotedType>(X * rhs.X, Y * rhs.Y);
 		}
-		Vector2Impl operator+(const Vector2Impl& rhs) const {
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+		auto operator+(const Vector2Impl<U>& rhs) const {
 			return Vector2Impl(X + rhs.X, Y + rhs.Y);
 		}
-		Vector2Impl operator-(const Vector2Impl& rhs) const {
-			return Vector2Impl(X - rhs.X, Y - rhs.Y);
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+		auto operator-(const Vector2Impl<U>& rhs) const {
+			return Vector2Impl<PromotedType>(X - rhs.X, Y - rhs.Y);
 		}
-		Vector2Impl operator/(const Vector2Impl& rhs) const {
-			return Vector2Impl(X / rhs.X, Y / rhs.Y);
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+		auto operator/(const Vector2Impl<U>& rhs) const {
+			return Vector2Impl<PromotedType>(X / rhs.X, Y / rhs.Y);
 		}
 
-		Vector2Impl& operator*=(const Vector2Impl& rhs) {
+        template<typename U>
+		Vector2Impl& operator*=(const Vector2Impl<U>& rhs) {
 			X *= rhs.X; Y *= rhs.Y;
 			return *this;
 		}
-		Vector2Impl& operator+=(const Vector2Impl& rhs) {
+        template<typename U>
+		Vector2Impl& operator+=(const Vector2Impl<U>& rhs) {
 			X += rhs.X; Y += rhs.Y;
 			return *this;
 		}
-		Vector2Impl& operator-=(const Vector2Impl& rhs) {
+        template<typename U>
+		Vector2Impl& operator-=(const Vector2Impl<U>& rhs) {
 			X -= rhs.X; Y -= rhs.Y;
 			return *this;
 		}
-		Vector2Impl& operator/=(const Vector2Impl& rhs) {
+        template<typename U>
+		Vector2Impl& operator/=(const Vector2Impl<U>& rhs) {
 			X /= rhs.X; Y /= rhs.Y;
 			return *this;
 		}
+        
+        template<typename U>
+        bool operator==(const Vector2Impl<U>& rhs) const {
+            return X == rhs.X && Y == rhs.Y;
+        }
+        template<typename U>
+        bool operator!=(const Vector2Impl<U>& rhs) const {
+            return X != rhs.X || Y != rhs.Y;
+        }
 
-		bool operator<(const Vector2Impl& rhs) const {
-			return X < rhs.X&& Y < rhs.Y;
-		}
-		bool operator>(const Vector2Impl& rhs) const {
-			return X > rhs.X && Y > rhs.Y;
-		}
-		bool operator<=(const Vector2Impl& rhs) const {
-			return X <= rhs.X && Y <= rhs.Y;
-		}
-		bool operator>=(const Vector2Impl& rhs) const {
-			return X >= rhs.X && Y >= rhs.Y;
-		}
-
-		bool Equals(const Vector2Impl& rhs, T eps = std::numeric_limits<T>::epsilon()) const {
+        template<typename U>
+		bool Equals(const Vector2Impl<U>& rhs, T eps = std::numeric_limits<T>::epsilon()) const {
 			return FMath::Abs(X - rhs.X) < eps && FMath::Abs(Y - rhs.Y) < eps;
 		}
+        
+        Vector2Impl operator-() const
+        {
+            return {-X, -Y};
+        }
 
-		Vector2Impl operator*(T rhs) const {
-			return Vector2Impl(X * rhs, Y * rhs);
-		}
-		Vector2Impl operator+(T rhs) const {
-			return Vector2Impl(X + rhs, Y + rhs);
-		}
-		Vector2Impl operator-(T rhs) const {
-			return Vector2Impl(X - rhs, Y - rhs);
-		}
-		Vector2Impl operator/(T rhs) const {
-			return Vector2Impl(X / rhs, Y / rhs);
-		}
+        //Scalar support
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+        auto operator*(U rhs) const {
+            return Vector2Impl<PromotedType>(X * rhs, Y * rhs);
+        }
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+        auto operator+(U rhs) const {
+            return Vector2Impl<PromotedType>(X + rhs, Y + rhs);
+        }
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+        auto operator-(U rhs) const {
+            return Vector2Impl<PromotedType>(X - rhs, Y - rhs);
+        }
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+        auto operator/(U rhs) const {
+            return Vector2Impl<PromotedType>(X / rhs, Y / rhs);
+        }
+        
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+        friend auto operator*(U lhs, const Vector2Impl& rhs) {
+            return rhs.operator*(lhs);
+        }
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+        friend auto operator+(U lhs, const Vector2Impl& rhs) {
+            return rhs.operator+(lhs);
+        }
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+        friend auto operator-(U lhs, const Vector2Impl& rhs) {
+            return -rhs.operator-(lhs);
+        }
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+        friend auto operator/(U lhs, const Vector2Impl& rhs) {
+            return Vector2Impl<PromotedType>(lhs / rhs.X, lhs / rhs.Y);
+        }
+        
+        template<typename U,
+            typename = std::enable_if_t<std::is_arithmetic_v<U>>
+        >
+        Vector2Impl& operator*=(U rhs) {
+            X *= rhs; Y *= rhs;
+            return *this;
+        }
+        template<typename U,
+            typename = std::enable_if_t<std::is_arithmetic_v<U>>
+        >
+        Vector2Impl& operator+=(U rhs) {
+            X += rhs; Y += rhs;
+            return *this;
+        }
+        template<typename U,
+            typename = std::enable_if_t<std::is_arithmetic_v<U>>
+        >
+        Vector2Impl& operator-=(U rhs) {
+            X -= rhs; Y -= rhs;
+            return *this;
+        }
+        template<typename U,
+            typename = std::enable_if_t<std::is_arithmetic_v<U>>
+        >
+        Vector2Impl& operator/=(U rhs) {
+            X /= rhs; Y /= rhs;
+            return *this;
+        }
 
 		const T& operator[](uint32 Index) const {
 			//Maybe break strict-aliasing rule?
@@ -204,8 +499,9 @@ namespace FRAMEWORK {
 			return Data[Index];
 		}
 
-		operator UE_Vector() {
-			return UE_Vector(X, Y);
+        template<typename U>
+		operator UE_Vector<U>() const {
+			return UE_Vector<U>((U)X, (U)Y);
 		}
 
 		FString ToString() const {
@@ -220,199 +516,199 @@ namespace FRAMEWORK {
 	template<typename T>
 	struct VectorImpl
 	{
-		using UE_Vector = UE::Math::TVector<T>;
+        template<typename U>
+		using UE_Vector = UE::Math::TVector<U>;
 		union
 		{
 			T Data[3];
+            struct
+            {
+                T x, y, z;
+            };
 			struct
 			{
 				T X, Y, Z;
 			};
-			Swizzle<T, Vector2Impl<T>, 0, 0> XX;
-			Swizzle<T, Vector2Impl<T>, 0, 1> XY;
-			Swizzle<T, Vector2Impl<T>, 1, 0> YX;
-			Swizzle<T, Vector2Impl<T>, 1, 1> YY;
-			Swizzle<T, Vector2Impl<T>, 0, 2> XZ;
-			Swizzle<T, Vector2Impl<T>, 1, 2> YZ;
-			Swizzle<T, Vector2Impl<T>, 2, 0> ZX;
-			Swizzle<T, Vector2Impl<T>, 2, 1> ZY;
-			Swizzle<T, Vector2Impl<T>, 2, 2> ZZ;
-
-			Swizzle<T, VectorImpl, 0, 0, 0> XXX;
-			Swizzle<T, VectorImpl, 0, 0, 1> XXY;
-			Swizzle<T, VectorImpl, 0, 0, 2> XXZ;
-			Swizzle<T, VectorImpl, 0, 1, 0> XYX;
-			Swizzle<T, VectorImpl, 0, 1, 1> XYY;
-			Swizzle<T, VectorImpl, 0, 1, 2> XYZ;
-			Swizzle<T, VectorImpl, 0, 2, 0> XZX;
-			Swizzle<T, VectorImpl, 0, 2, 1> XZY;
-			Swizzle<T, VectorImpl, 0, 2, 2> XZZ;
-			Swizzle<T, VectorImpl, 1, 0, 0> YXX;
-			Swizzle<T, VectorImpl, 1, 0, 1> YXY;
-			Swizzle<T, VectorImpl, 1, 0, 2> YXZ;
-			Swizzle<T, VectorImpl, 1, 1, 0> YYX;
-			Swizzle<T, VectorImpl, 1, 1, 1> YYY;
-			Swizzle<T, VectorImpl, 1, 1, 2> YYZ;
-			Swizzle<T, VectorImpl, 1, 2, 0> YZX;
-			Swizzle<T, VectorImpl, 1, 2, 1> YZY;
-			Swizzle<T, VectorImpl, 1, 2, 2> YZZ;
-			Swizzle<T, VectorImpl, 2, 0, 0> ZXX;
-			Swizzle<T, VectorImpl, 2, 0, 1> ZXY;
-			Swizzle<T, VectorImpl, 2, 0, 2> ZXZ;
-			Swizzle<T, VectorImpl, 2, 1, 0> ZYX;
-			Swizzle<T, VectorImpl, 2, 1, 1> ZYY;
-			Swizzle<T, VectorImpl, 2, 1, 2> ZYZ;
-			Swizzle<T, VectorImpl, 2, 2, 0> ZZX;
-			Swizzle<T, VectorImpl, 2, 2, 1> ZZY;
-			Swizzle<T, VectorImpl, 2, 2, 2> ZZZ;
-
-			Swizzle<T, Vector4Impl<T>, 0, 0, 0, 0> XXXX;
-			Swizzle<T, Vector4Impl<T>, 0, 0, 0, 1> XXXY;
-			Swizzle<T, Vector4Impl<T>, 0, 0, 0, 2> XXXZ;
-			Swizzle<T, Vector4Impl<T>, 0, 0, 1, 0> XXYX;
-			Swizzle<T, Vector4Impl<T>, 0, 0, 1, 1> XXYY;
-			Swizzle<T, Vector4Impl<T>, 0, 0, 1, 2> XXYZ;
-			Swizzle<T, Vector4Impl<T>, 0, 0, 2, 0> XXZX;
-			Swizzle<T, Vector4Impl<T>, 0, 0, 2, 1> XXZY;
-			Swizzle<T, Vector4Impl<T>, 0, 0, 2, 2> XXZZ;
-			Swizzle<T, Vector4Impl<T>, 0, 1, 0, 0> XYXX;
-			Swizzle<T, Vector4Impl<T>, 0, 1, 0, 1> XYXY;
-			Swizzle<T, Vector4Impl<T>, 0, 1, 0, 2> XYXZ;
-			Swizzle<T, Vector4Impl<T>, 0, 1, 1, 0> XYYX;
-			Swizzle<T, Vector4Impl<T>, 0, 1, 1, 1> XYYY;
-			Swizzle<T, Vector4Impl<T>, 0, 1, 1, 2> XYYZ;
-			Swizzle<T, Vector4Impl<T>, 0, 1, 2, 0> XYZX;
-			Swizzle<T, Vector4Impl<T>, 0, 1, 2, 1> XYZY;
-			Swizzle<T, Vector4Impl<T>, 0, 1, 2, 2> XYZZ;
-			Swizzle<T, Vector4Impl<T>, 0, 2, 0, 0> XZXX;
-			Swizzle<T, Vector4Impl<T>, 0, 2, 0, 1> XZXY;
-			Swizzle<T, Vector4Impl<T>, 0, 2, 0, 2> XZXZ;
-			Swizzle<T, Vector4Impl<T>, 0, 2, 1, 0> XZYX;
-			Swizzle<T, Vector4Impl<T>, 0, 2, 1, 1> XZYY;
-			Swizzle<T, Vector4Impl<T>, 0, 2, 1, 2> XZYZ;
-			Swizzle<T, Vector4Impl<T>, 0, 2, 2, 0> XZZX;
-			Swizzle<T, Vector4Impl<T>, 0, 2, 2, 1> XZZY;
-			Swizzle<T, Vector4Impl<T>, 0, 2, 2, 2> XZZZ;
-			Swizzle<T, Vector4Impl<T>, 1, 0, 0, 0> YXXX;
-			Swizzle<T, Vector4Impl<T>, 1, 0, 0, 1> YXXY;
-			Swizzle<T, Vector4Impl<T>, 1, 0, 0, 2> YXXZ;
-			Swizzle<T, Vector4Impl<T>, 1, 0, 1, 0> YXYX;
-			Swizzle<T, Vector4Impl<T>, 1, 0, 1, 1> YXYY;
-			Swizzle<T, Vector4Impl<T>, 1, 0, 1, 2> YXYZ;
-			Swizzle<T, Vector4Impl<T>, 1, 0, 2, 0> YXZX;
-			Swizzle<T, Vector4Impl<T>, 1, 0, 2, 1> YXZY;
-			Swizzle<T, Vector4Impl<T>, 1, 0, 2, 2> YXZZ;
-			Swizzle<T, Vector4Impl<T>, 1, 1, 0, 0> YYXX;
-			Swizzle<T, Vector4Impl<T>, 1, 1, 0, 1> YYXY;
-			Swizzle<T, Vector4Impl<T>, 1, 1, 0, 2> YYXZ;
-			Swizzle<T, Vector4Impl<T>, 1, 1, 1, 0> YYYX;
-			Swizzle<T, Vector4Impl<T>, 1, 1, 1, 1> YYYY;
-			Swizzle<T, Vector4Impl<T>, 1, 1, 1, 2> YYYZ;
-			Swizzle<T, Vector4Impl<T>, 1, 1, 2, 0> YYZX;
-			Swizzle<T, Vector4Impl<T>, 1, 1, 2, 1> YYZY;
-			Swizzle<T, Vector4Impl<T>, 1, 1, 2, 2> YYZZ;
-			Swizzle<T, Vector4Impl<T>, 1, 2, 0, 0> YZXX;
-			Swizzle<T, Vector4Impl<T>, 1, 2, 0, 1> YZXY;
-			Swizzle<T, Vector4Impl<T>, 1, 2, 0, 2> YZXZ;
-			Swizzle<T, Vector4Impl<T>, 1, 2, 1, 0> YZYX;
-			Swizzle<T, Vector4Impl<T>, 1, 2, 1, 1> YZYY;
-			Swizzle<T, Vector4Impl<T>, 1, 2, 1, 2> YZYZ;
-			Swizzle<T, Vector4Impl<T>, 1, 2, 2, 0> YZZX;
-			Swizzle<T, Vector4Impl<T>, 1, 2, 2, 1> YZZY;
-			Swizzle<T, Vector4Impl<T>, 1, 2, 2, 2> YZZZ;
-			Swizzle<T, Vector4Impl<T>, 2, 0, 0, 0> ZXXX;
-			Swizzle<T, Vector4Impl<T>, 2, 0, 0, 1> ZXXY;
-			Swizzle<T, Vector4Impl<T>, 2, 0, 0, 2> ZXXZ;
-			Swizzle<T, Vector4Impl<T>, 2, 0, 1, 0> ZXYX;
-			Swizzle<T, Vector4Impl<T>, 2, 0, 1, 1> ZXYY;
-			Swizzle<T, Vector4Impl<T>, 2, 0, 1, 2> ZXYZ;
-			Swizzle<T, Vector4Impl<T>, 2, 0, 2, 0> ZXZX;
-			Swizzle<T, Vector4Impl<T>, 2, 0, 2, 1> ZXZY;
-			Swizzle<T, Vector4Impl<T>, 2, 0, 2, 2> ZXZZ;
-			Swizzle<T, Vector4Impl<T>, 2, 1, 0, 0> ZYXX;
-			Swizzle<T, Vector4Impl<T>, 2, 1, 0, 1> ZYXY;
-			Swizzle<T, Vector4Impl<T>, 2, 1, 0, 2> ZYXZ;
-			Swizzle<T, Vector4Impl<T>, 2, 1, 1, 0> ZYYX;
-			Swizzle<T, Vector4Impl<T>, 2, 1, 1, 1> ZYYY;
-			Swizzle<T, Vector4Impl<T>, 2, 1, 1, 2> ZYYZ;
-			Swizzle<T, Vector4Impl<T>, 2, 1, 2, 0> ZYZX;
-			Swizzle<T, Vector4Impl<T>, 2, 1, 2, 1> ZYZY;
-			Swizzle<T, Vector4Impl<T>, 2, 1, 2, 2> ZYZZ;
-			Swizzle<T, Vector4Impl<T>, 2, 2, 0, 0> ZZXX;
-			Swizzle<T, Vector4Impl<T>, 2, 2, 0, 1> ZZXY;
-			Swizzle<T, Vector4Impl<T>, 2, 2, 0, 2> ZZXZ;
-			Swizzle<T, Vector4Impl<T>, 2, 2, 1, 0> ZZYX;
-			Swizzle<T, Vector4Impl<T>, 2, 2, 1, 1> ZZYY;
-			Swizzle<T, Vector4Impl<T>, 2, 2, 1, 2> ZZYZ;
-			Swizzle<T, Vector4Impl<T>, 2, 2, 2, 0> ZZZX;
-			Swizzle<T, Vector4Impl<T>, 2, 2, 2, 1> ZZZY;
-			Swizzle<T, Vector4Impl<T>, 2, 2, 2, 2> ZZZZ;
+            #include "VectorSwizzleSet.h"
 		};
 
 		VectorImpl() = default;
-		VectorImpl(const UE_Vector& Vec) : X(Vec.X), Y(Vec.Y), Z(Vec.Z) {}
-		VectorImpl(T IntT) : X(IntT), Y(IntT), Z(IntT) {}
+        template<typename U>
+		VectorImpl(const UE_Vector<U>& Vec) : X((T)Vec.X), Y((T)Vec.Y), Z((T)Vec.Z) {}
+        
+        VectorImpl(T IntT) : X(IntT), Y(IntT), Z(IntT) {}
 		VectorImpl(T IntX, T IntY, T IntZ) : X(IntX), Y(IntY), Z(IntZ) {}
+        
+        template<typename U>
+        VectorImpl(const VectorImpl<U>& Vec)
+            : VectorImpl((T)Vec.X, (T)Vec.Y, (T)Vec.Z)
+        {
+        }
+        
+        template<uint32 ElementNum, typename Base, uint32... Indexes>
+        VectorImpl(const Swizzle<ElementNum, Base, VectorImpl, Indexes...>& SwizzleItem)
+            : VectorImpl(SwizzleItem.Data[Indexes]...)
+        {
+        }
+        
+        VectorImpl& operator=(const VectorImpl& rhs)
+        {
+            VectorImpl Temp{rhs};
+            Swap(Temp, *this);
+            return *this;
+        }
+        
+        template<typename U> friend auto operator*(const UE_Vector<U>&, const VectorImpl&) = delete;
+        template<typename U> friend auto operator*(const VectorImpl&, const UE_Vector<U>&) = delete;
+        template<typename U> friend auto operator+(const UE_Vector<U>&, const VectorImpl&) = delete;
+        template<typename U> friend auto operator+(const VectorImpl&, const UE_Vector<U>&) = delete;
+        template<typename U> friend auto operator-(const UE_Vector<U>&, const VectorImpl&) = delete;
+        template<typename U> friend auto operator-(const VectorImpl&, const UE_Vector<U>&) = delete;
+        template<typename U> friend auto operator/(const UE_Vector<U>&, const VectorImpl&) = delete;
+        template<typename U> friend auto operator/(const VectorImpl&, const UE_Vector<U>&) = delete;
+        
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+		auto operator*(const VectorImpl<U>& rhs) const {
+			return VectorImpl<PromotedType>(X * rhs.X, Y * rhs.Y, Z * rhs.Z);
+		}
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+		auto operator+(const VectorImpl<U>& rhs) const {
+			return VectorImpl<PromotedType>(X + rhs.X, Y + rhs.Y, Z + rhs.Z);
+		}
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+		auto operator-(const VectorImpl<U>& rhs) const {
+			return VectorImpl<PromotedType>(X - rhs.X, Y - rhs.Y, Z - rhs.Z);
+		}
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+		auto operator/(const VectorImpl<U>& rhs) const {
+			return VectorImpl<PromotedType>(X / rhs.X, Y / rhs.Y, Z / rhs.Z);
+		}
 
-		VectorImpl operator*(const VectorImpl& rhs) const {
-			return VectorImpl(X * rhs.X, Y * rhs.Y, Z * rhs.Z);
-		}
-		VectorImpl operator+(const VectorImpl& rhs) const {
-			return VectorImpl(X + rhs.X, Y + rhs.Y, Z + rhs.Z);
-		}
-		VectorImpl operator-(const VectorImpl& rhs) const {
-			return VectorImpl(X - rhs.X, Y - rhs.Y, Z - rhs.Z);
-		}
-		VectorImpl operator/(const VectorImpl& rhs) const {
-			return VectorImpl(X / rhs.X, Y / rhs.Y, Z / rhs.Z);
-		}
-
-		VectorImpl& operator*=(const VectorImpl& rhs) {
+        template<typename U>
+		VectorImpl& operator*=(const VectorImpl<U>& rhs) {
 			X *= rhs.X; Y *= rhs.Y; Z *= rhs.Z;
 			return *this;
 		}
-		VectorImpl& operator+=(const VectorImpl& rhs) {
+        template<typename U>
+		VectorImpl& operator+=(const VectorImpl<U>& rhs) {
 			X += rhs.X; Y += rhs.Y; Z += rhs.Z;
 			return *this;
 		}
-		VectorImpl& operator-=(const VectorImpl& rhs) {
+        template<typename U>
+		VectorImpl& operator-=(const VectorImpl<U>& rhs) {
 			X -= rhs.X; Y -= rhs.Y; Z -= rhs.Z;
 			return *this;
 		}
-		VectorImpl& operator/=(const VectorImpl& rhs) {
+        template<typename U>
+		VectorImpl& operator/=(const VectorImpl<U>& rhs) {
 			X /= rhs.X; Y /= rhs.Y; Z /= rhs.Z;
 			return *this;
 		}
-
-		bool Equals(const VectorImpl& rhs, T eps = std::numeric_limits<T>::epsilon()) const {
+        
+        template<typename U>
+        bool operator==(const VectorImpl<U>& rhs) const {
+            return X == rhs.X && Y == rhs.Y && Z == rhs.Z;
+        }
+        template<typename U>
+        bool operator!=(const VectorImpl<U>& rhs) const {
+            return X != rhs.X || Y != rhs.Y || Z != rhs.Z;
+        }
+        template<typename U>
+		bool Equals(const VectorImpl<U>& rhs, T eps = std::numeric_limits<T>::epsilon()) const {
 			return FMath::Abs(X - rhs.X) < eps && FMath::Abs(Y - rhs.Y) < eps && FMath::Abs(Z - rhs.Z) < eps;
 		}
+        
+        VectorImpl operator-() const
+        {
+            return {-X, -Y, -Z};
+        }
 
-		bool operator<(const VectorImpl& rhs) const {
-			return X < rhs.X&& Y < rhs.Y&& Z < rhs.Z;
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+		auto operator*(U rhs) const {
+			return VectorImpl<PromotedType>(X * rhs, Y * rhs, Z * rhs);
 		}
-		bool operator>(const VectorImpl& rhs) const {
-			return X > rhs.X && Y > rhs.Y && Z > rhs.Z;
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+		auto operator+(U rhs) const {
+			return VectorImpl<PromotedType>(X + rhs, Y + rhs, Z + rhs);
 		}
-		bool operator<=(const VectorImpl& rhs) const {
-			return X <= rhs.X && Y <= rhs.Y && Z <= rhs.Z;
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+		auto operator-(U rhs) const {
+			return VectorImpl<PromotedType>(X - rhs, Y - rhs, Z - rhs);
 		}
-		bool operator>=(const VectorImpl& rhs) const {
-			return X >= rhs.X && Y >= rhs.Y && Z >= rhs.Z;
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+		auto operator/(U rhs) const {
+			return VectorImpl<PromotedType>(X / rhs, Y / rhs, Z / rhs);
 		}
-
-		VectorImpl operator*(T rhs) const {
-			return VectorImpl(X * rhs, Y * rhs, Z * rhs);
-		}
-		VectorImpl operator+(T rhs) const {
-			return VectorImpl(X + rhs, Y + rhs, Z + rhs);
-		}
-		VectorImpl operator-(T rhs) const {
-			return VectorImpl(X - rhs, Y - rhs, Z - rhs);
-		}
-		VectorImpl operator/(T rhs) const {
-			return VectorImpl(X / rhs, Y / rhs, Z / rhs);
-		}
+        
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+        friend auto operator*(U lhs, const VectorImpl& rhs) {
+            return rhs.operator*(lhs);
+        }
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+        friend auto operator+(U lhs, const VectorImpl& rhs) {
+            return rhs.operator*(lhs);
+        }
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+        friend auto operator-(U lhs, const VectorImpl& rhs) {
+            return -rhs.operator-(lhs);
+        }
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+        friend auto operator/(U lhs, const VectorImpl& rhs) {
+            return VectorImpl<PromotedType>(lhs / rhs.X, lhs / rhs.Y, lhs / rhs.Z);
+        }
+        
+        template<typename U,
+            typename = std::enable_if_t<std::is_arithmetic_v<U>>
+        >
+        VectorImpl& operator*=(U rhs) {
+            X *= rhs; Y *= rhs; Z *= rhs;
+            return *this;
+        }
+        template<typename U,
+            typename = std::enable_if_t<std::is_arithmetic_v<U>>
+        >
+        VectorImpl& operator+=(U rhs) {
+            X += rhs; Y += rhs; Z += rhs;
+            return *this;
+        }
+        template<typename U,
+            typename = std::enable_if_t<std::is_arithmetic_v<U>>
+        >
+        VectorImpl& operator-=(U rhs) {
+            X -= rhs; Y -= rhs; Z -= rhs;
+            return *this;
+        }
+        template<typename U,
+            typename = std::enable_if_t<std::is_arithmetic_v<U>>
+        >
+        VectorImpl& operator/=(U rhs) {
+            X /= rhs; Y /= rhs; Z /= rhs;
+            return *this;
+        }
 
 		const T& operator[](uint32 Index) const {
 			checkf(Index >= 0 && Index < 3, TEXT("Invalid Index"));
@@ -424,8 +720,9 @@ namespace FRAMEWORK {
 			return Data[Index];
 		}
 
-		operator UE_Vector() {
-			return UE_Vector(X, Y, Z);
+        template<typename U>
+		operator UE_Vector<U>() const {
+            return UE_Vector<U>((U)X, (U)Y, (U)Z);
 		}
 
 		FString ToString() const {
@@ -438,426 +735,201 @@ namespace FRAMEWORK {
 	};
 
 	template<typename T>
-	struct alignas(16) Vector4Impl
+	struct Vector4Impl
 	{
-		using UE_Vector = UE::Math::TVector4<T>;
+        template<typename U>
+        using UE_Vector = UE::Math::TVector4<U>;
 		union
 		{
 			T Data[4];
+            struct
+            {
+                T x, y, z, w;
+            };
 			struct
 			{
 				T X, Y, Z, W;
 			};
-			Swizzle<T, Vector2Impl<T>, 0, 0> XX;
-			Swizzle<T, Vector2Impl<T>, 0, 1> XY;
-			Swizzle<T, Vector2Impl<T>, 0, 2> XZ;
-			Swizzle<T, Vector2Impl<T>, 0, 3> XW;
-			Swizzle<T, Vector2Impl<T>, 1, 0> YX;
-			Swizzle<T, Vector2Impl<T>, 1, 1> YY;
-			Swizzle<T, Vector2Impl<T>, 1, 2> YZ;
-			Swizzle<T, Vector2Impl<T>, 1, 3> YW;
-			Swizzle<T, Vector2Impl<T>, 2, 0> ZX;
-			Swizzle<T, Vector2Impl<T>, 2, 1> ZY;
-			Swizzle<T, Vector2Impl<T>, 2, 2> ZZ;
-			Swizzle<T, Vector2Impl<T>, 2, 3> ZW;
-			Swizzle<T, Vector2Impl<T>, 3, 0> WX;
-			Swizzle<T, Vector2Impl<T>, 3, 1> WY;
-			Swizzle<T, Vector2Impl<T>, 3, 2> WZ;
-			Swizzle<T, Vector2Impl<T>, 3, 3> WW;
-
-			Swizzle<T, VectorImpl<T>, 0, 0, 0> XXX;
-			Swizzle<T, VectorImpl<T>, 0, 0, 1> XXY;
-			Swizzle<T, VectorImpl<T>, 0, 0, 2> XXZ;
-			Swizzle<T, VectorImpl<T>, 0, 0, 3> XXW;
-			Swizzle<T, VectorImpl<T>, 0, 1, 0> XYX;
-			Swizzle<T, VectorImpl<T>, 0, 1, 1> XYY;
-			Swizzle<T, VectorImpl<T>, 0, 1, 2> XYZ;
-			Swizzle<T, VectorImpl<T>, 0, 1, 3> XYW;
-			Swizzle<T, VectorImpl<T>, 0, 2, 0> XZX;
-			Swizzle<T, VectorImpl<T>, 0, 2, 1> XZY;
-			Swizzle<T, VectorImpl<T>, 0, 2, 2> XZZ;
-			Swizzle<T, VectorImpl<T>, 0, 2, 3> XZW;
-			Swizzle<T, VectorImpl<T>, 0, 3, 0> XWX;
-			Swizzle<T, VectorImpl<T>, 0, 3, 1> XWY;
-			Swizzle<T, VectorImpl<T>, 0, 3, 2> XWZ;
-			Swizzle<T, VectorImpl<T>, 0, 3, 3> XWW;
-			Swizzle<T, VectorImpl<T>, 1, 0, 0> YXX;
-			Swizzle<T, VectorImpl<T>, 1, 0, 1> YXY;
-			Swizzle<T, VectorImpl<T>, 1, 0, 2> YXZ;
-			Swizzle<T, VectorImpl<T>, 1, 0, 3> YXW;
-			Swizzle<T, VectorImpl<T>, 1, 1, 0> YYX;
-			Swizzle<T, VectorImpl<T>, 1, 1, 1> YYY;
-			Swizzle<T, VectorImpl<T>, 1, 1, 2> YYZ;
-			Swizzle<T, VectorImpl<T>, 1, 1, 3> YYW;
-			Swizzle<T, VectorImpl<T>, 1, 2, 0> YZX;
-			Swizzle<T, VectorImpl<T>, 1, 2, 1> YZY;
-			Swizzle<T, VectorImpl<T>, 1, 2, 2> YZZ;
-			Swizzle<T, VectorImpl<T>, 1, 2, 3> YZW;
-			Swizzle<T, VectorImpl<T>, 1, 3, 0> YWX;
-			Swizzle<T, VectorImpl<T>, 1, 3, 1> YWY;
-			Swizzle<T, VectorImpl<T>, 1, 3, 2> YWZ;
-			Swizzle<T, VectorImpl<T>, 1, 3, 3> YWW;
-			Swizzle<T, VectorImpl<T>, 2, 0, 0> ZXX;
-			Swizzle<T, VectorImpl<T>, 2, 0, 1> ZXY;
-			Swizzle<T, VectorImpl<T>, 2, 0, 2> ZXZ;
-			Swizzle<T, VectorImpl<T>, 2, 0, 3> ZXW;
-			Swizzle<T, VectorImpl<T>, 2, 1, 0> ZYX;
-			Swizzle<T, VectorImpl<T>, 2, 1, 1> ZYY;
-			Swizzle<T, VectorImpl<T>, 2, 1, 2> ZYZ;
-			Swizzle<T, VectorImpl<T>, 2, 1, 3> ZYW;
-			Swizzle<T, VectorImpl<T>, 2, 2, 0> ZZX;
-			Swizzle<T, VectorImpl<T>, 2, 2, 1> ZZY;
-			Swizzle<T, VectorImpl<T>, 2, 2, 2> ZZZ;
-			Swizzle<T, VectorImpl<T>, 2, 2, 3> ZZW;
-			Swizzle<T, VectorImpl<T>, 2, 3, 0> ZWX;
-			Swizzle<T, VectorImpl<T>, 2, 3, 1> ZWY;
-			Swizzle<T, VectorImpl<T>, 2, 3, 2> ZWZ;
-			Swizzle<T, VectorImpl<T>, 2, 3, 3> ZWW;
-			Swizzle<T, VectorImpl<T>, 3, 0, 0> WXX;
-			Swizzle<T, VectorImpl<T>, 3, 0, 1> WXY;
-			Swizzle<T, VectorImpl<T>, 3, 0, 2> WXZ;
-			Swizzle<T, VectorImpl<T>, 3, 0, 3> WXW;
-			Swizzle<T, VectorImpl<T>, 3, 1, 0> WYX;
-			Swizzle<T, VectorImpl<T>, 3, 1, 1> WYY;
-			Swizzle<T, VectorImpl<T>, 3, 1, 2> WYZ;
-			Swizzle<T, VectorImpl<T>, 3, 1, 3> WYW;
-			Swizzle<T, VectorImpl<T>, 3, 2, 0> WZX;
-			Swizzle<T, VectorImpl<T>, 3, 2, 1> WZY;
-			Swizzle<T, VectorImpl<T>, 3, 2, 2> WZZ;
-			Swizzle<T, VectorImpl<T>, 3, 2, 3> WZW;
-			Swizzle<T, VectorImpl<T>, 3, 3, 0> WWX;
-			Swizzle<T, VectorImpl<T>, 3, 3, 1> WWY;
-			Swizzle<T, VectorImpl<T>, 3, 3, 2> WWZ;
-			Swizzle<T, VectorImpl<T>, 3, 3, 3> WWW;
-
-			Swizzle<T, Vector4Impl, 0, 0, 0, 0> XXXX;
-			Swizzle<T, Vector4Impl, 0, 0, 0, 1> XXXY;
-			Swizzle<T, Vector4Impl, 0, 0, 0, 2> XXXZ;
-			Swizzle<T, Vector4Impl, 0, 0, 0, 3> XXXW;
-			Swizzle<T, Vector4Impl, 0, 0, 1, 0> XXYX;
-			Swizzle<T, Vector4Impl, 0, 0, 1, 1> XXYY;
-			Swizzle<T, Vector4Impl, 0, 0, 1, 2> XXYZ;
-			Swizzle<T, Vector4Impl, 0, 0, 1, 3> XXYW;
-			Swizzle<T, Vector4Impl, 0, 0, 2, 0> XXZX;
-			Swizzle<T, Vector4Impl, 0, 0, 2, 1> XXZY;
-			Swizzle<T, Vector4Impl, 0, 0, 2, 2> XXZZ;
-			Swizzle<T, Vector4Impl, 0, 0, 2, 3> XXZW;
-			Swizzle<T, Vector4Impl, 0, 0, 3, 0> XXWX;
-			Swizzle<T, Vector4Impl, 0, 0, 3, 1> XXWY;
-			Swizzle<T, Vector4Impl, 0, 0, 3, 2> XXWZ;
-			Swizzle<T, Vector4Impl, 0, 0, 3, 3> XXWW;
-			Swizzle<T, Vector4Impl, 0, 1, 0, 0> XYXX;
-			Swizzle<T, Vector4Impl, 0, 1, 0, 1> XYXY;
-			Swizzle<T, Vector4Impl, 0, 1, 0, 2> XYXZ;
-			Swizzle<T, Vector4Impl, 0, 1, 0, 3> XYXW;
-			Swizzle<T, Vector4Impl, 0, 1, 1, 0> XYYX;
-			Swizzle<T, Vector4Impl, 0, 1, 1, 1> XYYY;
-			Swizzle<T, Vector4Impl, 0, 1, 1, 2> XYYZ;
-			Swizzle<T, Vector4Impl, 0, 1, 1, 3> XYYW;
-			Swizzle<T, Vector4Impl, 0, 1, 2, 0> XYZX;
-			Swizzle<T, Vector4Impl, 0, 1, 2, 1> XYZY;
-			Swizzle<T, Vector4Impl, 0, 1, 2, 2> XYZZ;
-			Swizzle<T, Vector4Impl, 0, 1, 2, 3> XYZW;
-			Swizzle<T, Vector4Impl, 0, 1, 3, 0> XYWX;
-			Swizzle<T, Vector4Impl, 0, 1, 3, 1> XYWY;
-			Swizzle<T, Vector4Impl, 0, 1, 3, 2> XYWZ;
-			Swizzle<T, Vector4Impl, 0, 1, 3, 3> XYWW;
-			Swizzle<T, Vector4Impl, 0, 2, 0, 0> XZXX;
-			Swizzle<T, Vector4Impl, 0, 2, 0, 1> XZXY;
-			Swizzle<T, Vector4Impl, 0, 2, 0, 2> XZXZ;
-			Swizzle<T, Vector4Impl, 0, 2, 0, 3> XZXW;
-			Swizzle<T, Vector4Impl, 0, 2, 1, 0> XZYX;
-			Swizzle<T, Vector4Impl, 0, 2, 1, 1> XZYY;
-			Swizzle<T, Vector4Impl, 0, 2, 1, 2> XZYZ;
-			Swizzle<T, Vector4Impl, 0, 2, 1, 3> XZYW;
-			Swizzle<T, Vector4Impl, 0, 2, 2, 0> XZZX;
-			Swizzle<T, Vector4Impl, 0, 2, 2, 1> XZZY;
-			Swizzle<T, Vector4Impl, 0, 2, 2, 2> XZZZ;
-			Swizzle<T, Vector4Impl, 0, 2, 2, 3> XZZW;
-			Swizzle<T, Vector4Impl, 0, 2, 3, 0> XZWX;
-			Swizzle<T, Vector4Impl, 0, 2, 3, 1> XZWY;
-			Swizzle<T, Vector4Impl, 0, 2, 3, 2> XZWZ;
-			Swizzle<T, Vector4Impl, 0, 2, 3, 3> XZWW;
-			Swizzle<T, Vector4Impl, 0, 3, 0, 0> XWXX;
-			Swizzle<T, Vector4Impl, 0, 3, 0, 1> XWXY;
-			Swizzle<T, Vector4Impl, 0, 3, 0, 2> XWXZ;
-			Swizzle<T, Vector4Impl, 0, 3, 0, 3> XWXW;
-			Swizzle<T, Vector4Impl, 0, 3, 1, 0> XWYX;
-			Swizzle<T, Vector4Impl, 0, 3, 1, 1> XWYY;
-			Swizzle<T, Vector4Impl, 0, 3, 1, 2> XWYZ;
-			Swizzle<T, Vector4Impl, 0, 3, 1, 3> XWYW;
-			Swizzle<T, Vector4Impl, 0, 3, 2, 0> XWZX;
-			Swizzle<T, Vector4Impl, 0, 3, 2, 1> XWZY;
-			Swizzle<T, Vector4Impl, 0, 3, 2, 2> XWZZ;
-			Swizzle<T, Vector4Impl, 0, 3, 2, 3> XWZW;
-			Swizzle<T, Vector4Impl, 0, 3, 3, 0> XWWX;
-			Swizzle<T, Vector4Impl, 0, 3, 3, 1> XWWY;
-			Swizzle<T, Vector4Impl, 0, 3, 3, 2> XWWZ;
-			Swizzle<T, Vector4Impl, 0, 3, 3, 3> XWWW;
-			Swizzle<T, Vector4Impl, 1, 0, 0, 0> YXXX;
-			Swizzle<T, Vector4Impl, 1, 0, 0, 1> YXXY;
-			Swizzle<T, Vector4Impl, 1, 0, 0, 2> YXXZ;
-			Swizzle<T, Vector4Impl, 1, 0, 0, 3> YXXW;
-			Swizzle<T, Vector4Impl, 1, 0, 1, 0> YXYX;
-			Swizzle<T, Vector4Impl, 1, 0, 1, 1> YXYY;
-			Swizzle<T, Vector4Impl, 1, 0, 1, 2> YXYZ;
-			Swizzle<T, Vector4Impl, 1, 0, 1, 3> YXYW;
-			Swizzle<T, Vector4Impl, 1, 0, 2, 0> YXZX;
-			Swizzle<T, Vector4Impl, 1, 0, 2, 1> YXZY;
-			Swizzle<T, Vector4Impl, 1, 0, 2, 2> YXZZ;
-			Swizzle<T, Vector4Impl, 1, 0, 2, 3> YXZW;
-			Swizzle<T, Vector4Impl, 1, 0, 3, 0> YXWX;
-			Swizzle<T, Vector4Impl, 1, 0, 3, 1> YXWY;
-			Swizzle<T, Vector4Impl, 1, 0, 3, 2> YXWZ;
-			Swizzle<T, Vector4Impl, 1, 0, 3, 3> YXWW;
-			Swizzle<T, Vector4Impl, 1, 1, 0, 0> YYXX;
-			Swizzle<T, Vector4Impl, 1, 1, 0, 1> YYXY;
-			Swizzle<T, Vector4Impl, 1, 1, 0, 2> YYXZ;
-			Swizzle<T, Vector4Impl, 1, 1, 0, 3> YYXW;
-			Swizzle<T, Vector4Impl, 1, 1, 1, 0> YYYX;
-			Swizzle<T, Vector4Impl, 1, 1, 1, 1> YYYY;
-			Swizzle<T, Vector4Impl, 1, 1, 1, 2> YYYZ;
-			Swizzle<T, Vector4Impl, 1, 1, 1, 3> YYYW;
-			Swizzle<T, Vector4Impl, 1, 1, 2, 0> YYZX;
-			Swizzle<T, Vector4Impl, 1, 1, 2, 1> YYZY;
-			Swizzle<T, Vector4Impl, 1, 1, 2, 2> YYZZ;
-			Swizzle<T, Vector4Impl, 1, 1, 2, 3> YYZW;
-			Swizzle<T, Vector4Impl, 1, 1, 3, 0> YYWX;
-			Swizzle<T, Vector4Impl, 1, 1, 3, 1> YYWY;
-			Swizzle<T, Vector4Impl, 1, 1, 3, 2> YYWZ;
-			Swizzle<T, Vector4Impl, 1, 1, 3, 3> YYWW;
-			Swizzle<T, Vector4Impl, 1, 2, 0, 0> YZXX;
-			Swizzle<T, Vector4Impl, 1, 2, 0, 1> YZXY;
-			Swizzle<T, Vector4Impl, 1, 2, 0, 2> YZXZ;
-			Swizzle<T, Vector4Impl, 1, 2, 0, 3> YZXW;
-			Swizzle<T, Vector4Impl, 1, 2, 1, 0> YZYX;
-			Swizzle<T, Vector4Impl, 1, 2, 1, 1> YZYY;
-			Swizzle<T, Vector4Impl, 1, 2, 1, 2> YZYZ;
-			Swizzle<T, Vector4Impl, 1, 2, 1, 3> YZYW;
-			Swizzle<T, Vector4Impl, 1, 2, 2, 0> YZZX;
-			Swizzle<T, Vector4Impl, 1, 2, 2, 1> YZZY;
-			Swizzle<T, Vector4Impl, 1, 2, 2, 2> YZZZ;
-			Swizzle<T, Vector4Impl, 1, 2, 2, 3> YZZW;
-			Swizzle<T, Vector4Impl, 1, 2, 3, 0> YZWX;
-			Swizzle<T, Vector4Impl, 1, 2, 3, 1> YZWY;
-			Swizzle<T, Vector4Impl, 1, 2, 3, 2> YZWZ;
-			Swizzle<T, Vector4Impl, 1, 2, 3, 3> YZWW;
-			Swizzle<T, Vector4Impl, 1, 3, 0, 0> YWXX;
-			Swizzle<T, Vector4Impl, 1, 3, 0, 1> YWXY;
-			Swizzle<T, Vector4Impl, 1, 3, 0, 2> YWXZ;
-			Swizzle<T, Vector4Impl, 1, 3, 0, 3> YWXW;
-			Swizzle<T, Vector4Impl, 1, 3, 1, 0> YWYX;
-			Swizzle<T, Vector4Impl, 1, 3, 1, 1> YWYY;
-			Swizzle<T, Vector4Impl, 1, 3, 1, 2> YWYZ;
-			Swizzle<T, Vector4Impl, 1, 3, 1, 3> YWYW;
-			Swizzle<T, Vector4Impl, 1, 3, 2, 0> YWZX;
-			Swizzle<T, Vector4Impl, 1, 3, 2, 1> YWZY;
-			Swizzle<T, Vector4Impl, 1, 3, 2, 2> YWZZ;
-			Swizzle<T, Vector4Impl, 1, 3, 2, 3> YWZW;
-			Swizzle<T, Vector4Impl, 1, 3, 3, 0> YWWX;
-			Swizzle<T, Vector4Impl, 1, 3, 3, 1> YWWY;
-			Swizzle<T, Vector4Impl, 1, 3, 3, 2> YWWZ;
-			Swizzle<T, Vector4Impl, 1, 3, 3, 3> YWWW;
-			Swizzle<T, Vector4Impl, 2, 0, 0, 0> ZXXX;
-			Swizzle<T, Vector4Impl, 2, 0, 0, 1> ZXXY;
-			Swizzle<T, Vector4Impl, 2, 0, 0, 2> ZXXZ;
-			Swizzle<T, Vector4Impl, 2, 0, 0, 3> ZXXW;
-			Swizzle<T, Vector4Impl, 2, 0, 1, 0> ZXYX;
-			Swizzle<T, Vector4Impl, 2, 0, 1, 1> ZXYY;
-			Swizzle<T, Vector4Impl, 2, 0, 1, 2> ZXYZ;
-			Swizzle<T, Vector4Impl, 2, 0, 1, 3> ZXYW;
-			Swizzle<T, Vector4Impl, 2, 0, 2, 0> ZXZX;
-			Swizzle<T, Vector4Impl, 2, 0, 2, 1> ZXZY;
-			Swizzle<T, Vector4Impl, 2, 0, 2, 2> ZXZZ;
-			Swizzle<T, Vector4Impl, 2, 0, 2, 3> ZXZW;
-			Swizzle<T, Vector4Impl, 2, 0, 3, 0> ZXWX;
-			Swizzle<T, Vector4Impl, 2, 0, 3, 1> ZXWY;
-			Swizzle<T, Vector4Impl, 2, 0, 3, 2> ZXWZ;
-			Swizzle<T, Vector4Impl, 2, 0, 3, 3> ZXWW;
-			Swizzle<T, Vector4Impl, 2, 1, 0, 0> ZYXX;
-			Swizzle<T, Vector4Impl, 2, 1, 0, 1> ZYXY;
-			Swizzle<T, Vector4Impl, 2, 1, 0, 2> ZYXZ;
-			Swizzle<T, Vector4Impl, 2, 1, 0, 3> ZYXW;
-			Swizzle<T, Vector4Impl, 2, 1, 1, 0> ZYYX;
-			Swizzle<T, Vector4Impl, 2, 1, 1, 1> ZYYY;
-			Swizzle<T, Vector4Impl, 2, 1, 1, 2> ZYYZ;
-			Swizzle<T, Vector4Impl, 2, 1, 1, 3> ZYYW;
-			Swizzle<T, Vector4Impl, 2, 1, 2, 0> ZYZX;
-			Swizzle<T, Vector4Impl, 2, 1, 2, 1> ZYZY;
-			Swizzle<T, Vector4Impl, 2, 1, 2, 2> ZYZZ;
-			Swizzle<T, Vector4Impl, 2, 1, 2, 3> ZYZW;
-			Swizzle<T, Vector4Impl, 2, 1, 3, 0> ZYWX;
-			Swizzle<T, Vector4Impl, 2, 1, 3, 1> ZYWY;
-			Swizzle<T, Vector4Impl, 2, 1, 3, 2> ZYWZ;
-			Swizzle<T, Vector4Impl, 2, 1, 3, 3> ZYWW;
-			Swizzle<T, Vector4Impl, 2, 2, 0, 0> ZZXX;
-			Swizzle<T, Vector4Impl, 2, 2, 0, 1> ZZXY;
-			Swizzle<T, Vector4Impl, 2, 2, 0, 2> ZZXZ;
-			Swizzle<T, Vector4Impl, 2, 2, 0, 3> ZZXW;
-			Swizzle<T, Vector4Impl, 2, 2, 1, 0> ZZYX;
-			Swizzle<T, Vector4Impl, 2, 2, 1, 1> ZZYY;
-			Swizzle<T, Vector4Impl, 2, 2, 1, 2> ZZYZ;
-			Swizzle<T, Vector4Impl, 2, 2, 1, 3> ZZYW;
-			Swizzle<T, Vector4Impl, 2, 2, 2, 0> ZZZX;
-			Swizzle<T, Vector4Impl, 2, 2, 2, 1> ZZZY;
-			Swizzle<T, Vector4Impl, 2, 2, 2, 2> ZZZZ;
-			Swizzle<T, Vector4Impl, 2, 2, 2, 3> ZZZW;
-			Swizzle<T, Vector4Impl, 2, 2, 3, 0> ZZWX;
-			Swizzle<T, Vector4Impl, 2, 2, 3, 1> ZZWY;
-			Swizzle<T, Vector4Impl, 2, 2, 3, 2> ZZWZ;
-			Swizzle<T, Vector4Impl, 2, 2, 3, 3> ZZWW;
-			Swizzle<T, Vector4Impl, 2, 3, 0, 0> ZWXX;
-			Swizzle<T, Vector4Impl, 2, 3, 0, 1> ZWXY;
-			Swizzle<T, Vector4Impl, 2, 3, 0, 2> ZWXZ;
-			Swizzle<T, Vector4Impl, 2, 3, 0, 3> ZWXW;
-			Swizzle<T, Vector4Impl, 2, 3, 1, 0> ZWYX;
-			Swizzle<T, Vector4Impl, 2, 3, 1, 1> ZWYY;
-			Swizzle<T, Vector4Impl, 2, 3, 1, 2> ZWYZ;
-			Swizzle<T, Vector4Impl, 2, 3, 1, 3> ZWYW;
-			Swizzle<T, Vector4Impl, 2, 3, 2, 0> ZWZX;
-			Swizzle<T, Vector4Impl, 2, 3, 2, 1> ZWZY;
-			Swizzle<T, Vector4Impl, 2, 3, 2, 2> ZWZZ;
-			Swizzle<T, Vector4Impl, 2, 3, 2, 3> ZWZW;
-			Swizzle<T, Vector4Impl, 2, 3, 3, 0> ZWWX;
-			Swizzle<T, Vector4Impl, 2, 3, 3, 1> ZWWY;
-			Swizzle<T, Vector4Impl, 2, 3, 3, 2> ZWWZ;
-			Swizzle<T, Vector4Impl, 2, 3, 3, 3> ZWWW;
-			Swizzle<T, Vector4Impl, 3, 0, 0, 0> WXXX;
-			Swizzle<T, Vector4Impl, 3, 0, 0, 1> WXXY;
-			Swizzle<T, Vector4Impl, 3, 0, 0, 2> WXXZ;
-			Swizzle<T, Vector4Impl, 3, 0, 0, 3> WXXW;
-			Swizzle<T, Vector4Impl, 3, 0, 1, 0> WXYX;
-			Swizzle<T, Vector4Impl, 3, 0, 1, 1> WXYY;
-			Swizzle<T, Vector4Impl, 3, 0, 1, 2> WXYZ;
-			Swizzle<T, Vector4Impl, 3, 0, 1, 3> WXYW;
-			Swizzle<T, Vector4Impl, 3, 0, 2, 0> WXZX;
-			Swizzle<T, Vector4Impl, 3, 0, 2, 1> WXZY;
-			Swizzle<T, Vector4Impl, 3, 0, 2, 2> WXZZ;
-			Swizzle<T, Vector4Impl, 3, 0, 2, 3> WXZW;
-			Swizzle<T, Vector4Impl, 3, 0, 3, 0> WXWX;
-			Swizzle<T, Vector4Impl, 3, 0, 3, 1> WXWY;
-			Swizzle<T, Vector4Impl, 3, 0, 3, 2> WXWZ;
-			Swizzle<T, Vector4Impl, 3, 0, 3, 3> WXWW;
-			Swizzle<T, Vector4Impl, 3, 1, 0, 0> WYXX;
-			Swizzle<T, Vector4Impl, 3, 1, 0, 1> WYXY;
-			Swizzle<T, Vector4Impl, 3, 1, 0, 2> WYXZ;
-			Swizzle<T, Vector4Impl, 3, 1, 0, 3> WYXW;
-			Swizzle<T, Vector4Impl, 3, 1, 1, 0> WYYX;
-			Swizzle<T, Vector4Impl, 3, 1, 1, 1> WYYY;
-			Swizzle<T, Vector4Impl, 3, 1, 1, 2> WYYZ;
-			Swizzle<T, Vector4Impl, 3, 1, 1, 3> WYYW;
-			Swizzle<T, Vector4Impl, 3, 1, 2, 0> WYZX;
-			Swizzle<T, Vector4Impl, 3, 1, 2, 1> WYZY;
-			Swizzle<T, Vector4Impl, 3, 1, 2, 2> WYZZ;
-			Swizzle<T, Vector4Impl, 3, 1, 2, 3> WYZW;
-			Swizzle<T, Vector4Impl, 3, 1, 3, 0> WYWX;
-			Swizzle<T, Vector4Impl, 3, 1, 3, 1> WYWY;
-			Swizzle<T, Vector4Impl, 3, 1, 3, 2> WYWZ;
-			Swizzle<T, Vector4Impl, 3, 1, 3, 3> WYWW;
-			Swizzle<T, Vector4Impl, 3, 2, 0, 0> WZXX;
-			Swizzle<T, Vector4Impl, 3, 2, 0, 1> WZXY;
-			Swizzle<T, Vector4Impl, 3, 2, 0, 2> WZXZ;
-			Swizzle<T, Vector4Impl, 3, 2, 0, 3> WZXW;
-			Swizzle<T, Vector4Impl, 3, 2, 1, 0> WZYX;
-			Swizzle<T, Vector4Impl, 3, 2, 1, 1> WZYY;
-			Swizzle<T, Vector4Impl, 3, 2, 1, 2> WZYZ;
-			Swizzle<T, Vector4Impl, 3, 2, 1, 3> WZYW;
-			Swizzle<T, Vector4Impl, 3, 2, 2, 0> WZZX;
-			Swizzle<T, Vector4Impl, 3, 2, 2, 1> WZZY;
-			Swizzle<T, Vector4Impl, 3, 2, 2, 2> WZZZ;
-			Swizzle<T, Vector4Impl, 3, 2, 2, 3> WZZW;
-			Swizzle<T, Vector4Impl, 3, 2, 3, 0> WZWX;
-			Swizzle<T, Vector4Impl, 3, 2, 3, 1> WZWY;
-			Swizzle<T, Vector4Impl, 3, 2, 3, 2> WZWZ;
-			Swizzle<T, Vector4Impl, 3, 2, 3, 3> WZWW;
-			Swizzle<T, Vector4Impl, 3, 3, 0, 0> WWXX;
-			Swizzle<T, Vector4Impl, 3, 3, 0, 1> WWXY;
-			Swizzle<T, Vector4Impl, 3, 3, 0, 2> WWXZ;
-			Swizzle<T, Vector4Impl, 3, 3, 0, 3> WWXW;
-			Swizzle<T, Vector4Impl, 3, 3, 1, 0> WWYX;
-			Swizzle<T, Vector4Impl, 3, 3, 1, 1> WWYY;
-			Swizzle<T, Vector4Impl, 3, 3, 1, 2> WWYZ;
-			Swizzle<T, Vector4Impl, 3, 3, 1, 3> WWYW;
-			Swizzle<T, Vector4Impl, 3, 3, 2, 0> WWZX;
-			Swizzle<T, Vector4Impl, 3, 3, 2, 1> WWZY;
-			Swizzle<T, Vector4Impl, 3, 3, 2, 2> WWZZ;
-			Swizzle<T, Vector4Impl, 3, 3, 2, 3> WWZW;
-			Swizzle<T, Vector4Impl, 3, 3, 3, 0> WWWX;
-			Swizzle<T, Vector4Impl, 3, 3, 3, 1> WWWY;
-			Swizzle<T, Vector4Impl, 3, 3, 3, 2> WWWZ;
-			Swizzle<T, Vector4Impl, 3, 3, 3, 3> WWWW;
+            #include "Vector4SwizzleSet.h"
 		};
 
 		Vector4Impl() = default;
-		Vector4Impl(const UE_Vector& Vec) : X(Vec.X), Y(Vec.Y), Z(Vec.Z), W(Vec.W) {}
-		Vector4Impl(T IntT) : X(IntT), Y(IntT), Z(IntT), W(IntT) {}
+        template<typename U>
+		Vector4Impl(const UE_Vector<U>& Vec) : X((T)Vec.X), Y((T)Vec.Y), Z((T)Vec.Z), W((T)Vec.W) {}
+        
+        Vector4Impl(T IntT) : X(IntT), Y(IntT), Z(IntT), W(IntT) {}
 		Vector4Impl(T IntX, T IntY, T IntZ, T IntW) : X(IntX), Y(IntY), Z(IntZ), W(IntW) {}
+        
+        template<typename U>
+        Vector4Impl(const Vector4Impl<U>& Vec)
+            : Vector4Impl((T)Vec.X, (T)Vec.Y, (T)Vec.Z, (T)Vec.W)
+        {
+        }
+        
+        template<uint32 ElementNum, typename Base, uint32... Indexes>
+        Vector4Impl(const Swizzle<ElementNum, Base, Vector4Impl, Indexes...>& SwizzleItem)
+            : Vector4Impl(SwizzleItem.Data[Indexes]...)
+        {
+        }
+        
+        Vector4Impl& operator=(const Vector4Impl& rhs)
+        {
+            Vector4Impl Temp{rhs};
+            Swap(Temp, *this);
+            return *this;
+        }
+        
+        template<typename U> friend auto operator*(const UE_Vector<U>&, const Vector4Impl&) = delete;
+        template<typename U> friend auto operator*(const Vector4Impl&, const UE_Vector<U>&) = delete;
+        template<typename U> friend auto operator+(const UE_Vector<U>&, const Vector4Impl&) = delete;
+        template<typename U> friend auto operator+(const Vector4Impl&, const UE_Vector<U>&) = delete;
+        template<typename U> friend auto operator-(const UE_Vector<U>&, const Vector4Impl&) = delete;
+        template<typename U> friend auto operator-(const Vector4Impl&, const UE_Vector<U>&) = delete;
+        template<typename U> friend auto operator/(const UE_Vector<U>&, const Vector4Impl&) = delete;
+        template<typename U> friend auto operator/(const Vector4Impl&, const UE_Vector<U>&) = delete;
 		
-		Vector4Impl operator*(const Vector4Impl& rhs) const {
-			return Vector4Impl(X * rhs.X, Y * rhs.Y, Z * rhs.Z, W * rhs.W);
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+		auto operator*(const Vector4Impl<U>& rhs) const {
+			return Vector4Impl<PromotedType>(X * rhs.X, Y * rhs.Y, Z * rhs.Z, W * rhs.W);
 		}
-		Vector4Impl operator+(const Vector4Impl& rhs) const {
-			return Vector4Impl(X + rhs.X, Y + rhs.Y, Z + rhs.Z, W + rhs.W);
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+		auto operator+(const Vector4Impl<U>& rhs) const {
+			return Vector4Impl<PromotedType>(X + rhs.X, Y + rhs.Y, Z + rhs.Z, W + rhs.W);
 		}
-		Vector4Impl operator-(const Vector4Impl& rhs) const {
-			return Vector4Impl(X - rhs.X, Y - rhs.Y, Z - rhs.Z, W - rhs.W);
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+		auto operator-(const Vector4Impl<U>& rhs) const {
+			return Vector4Impl<PromotedType>(X - rhs.X, Y - rhs.Y, Z - rhs.Z, W - rhs.W);
 		}
-		Vector4Impl operator/(const Vector4Impl& rhs) const {
-			return Vector4Impl(X / rhs.X, Y / rhs.Y, Z / rhs.Z, W / rhs.W);
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+		auto operator/(const Vector4Impl<U>& rhs) const {
+			return Vector4Impl<PromotedType>(X / rhs.X, Y / rhs.Y, Z / rhs.Z, W / rhs.W);
 		}
 
-		Vector4Impl& operator*=(const Vector4Impl& rhs) {
+        template<typename U>
+		Vector4Impl& operator*=(const Vector4Impl<U>& rhs) {
 			X *= rhs.X; Y *= rhs.Y; Z *= rhs.Z; W *= rhs.W;
 			return *this;
 		}
-		Vector4Impl& operator+=(const Vector4Impl& rhs) {
+        template<typename U>
+		Vector4Impl& operator+=(const Vector4Impl<U>& rhs) {
 			X += rhs.X; Y += rhs.Y; Z += rhs.Z; W += rhs.W;
 			return *this;
 		}
-		Vector4Impl& operator-=(const Vector4Impl& rhs) {
+        template<typename U>
+		Vector4Impl& operator-=(const Vector4Impl<U>& rhs) {
 			X -= rhs.X; Y -= rhs.Y; Z -= rhs.Z; W -= rhs.W;
 			return *this;
 		}
-		Vector4Impl& operator/=(const Vector4Impl& rhs) {
+        template<typename U>
+		Vector4Impl& operator/=(const Vector4Impl<U>& rhs) {
 			X /= rhs.X; Y /= rhs.Y; Z /= rhs.Z; W /= rhs.W;
 			return *this;
 		}
-
-		bool operator<(const Vector4Impl& rhs) const {
-			return X < rhs.X&& Y < rhs.Y&& Z < rhs.Z&& W < rhs.W;
+        
+        template<typename U>
+		bool operator==(const Vector4Impl<U>& rhs) const {
+			return X == rhs.X && Y == rhs.Y && Z == rhs.Z && W == rhs.W;
 		}
-		bool operator>(const Vector4Impl& rhs) const {
-			return X > rhs.X && Y > rhs.Y && Z > rhs.Z && W > rhs.W;
+        template<typename U>
+		bool operator!=(const Vector4Impl<U>& rhs) const {
+			return X != rhs.X || Y != rhs.Y || Z != rhs.Z || W != rhs.W;
 		}
-		bool operator<=(const Vector4Impl& rhs) const {
-			return X <= rhs.X && Y <= rhs.Y && Z <= rhs.Z && W <= rhs.W;
-		}
-		bool operator>=(const Vector4Impl& rhs) const {
-			return X >= rhs.X && Y >= rhs.Y && Z >= rhs.Z && W >= rhs.W;
-		}
-		//bool operator==(const Vector4Impl& rhs) const {
-		//	return X == rhs.X && Y == rhs.Y && Z == rhs.Z && W == rhs.W;
-		//}
-		//bool operator!=(const Vector4Impl& rhs) const {
-		//	return X != rhs.X || Y != rhs.Y || Z != rhs.Z || W != rhs.W;
-		//}
-
-		bool Equals(const Vector4Impl& rhs, T eps = std::numeric_limits<T>::epsilon()) const {
+        template<typename U>
+		bool Equals(const Vector4Impl<U>& rhs, T eps = std::numeric_limits<T>::epsilon()) const {
 			return FMath::Abs(X - rhs.X) < eps && FMath::Abs(Y - rhs.Y) < eps && FMath::Abs(Z - rhs.Z) < eps && FMath::Abs(W - rhs.W) < eps;
 		}
+        
+        Vector4Impl operator-() const
+        {
+            return {-X, -Y, -Z, -W};
+        }
 
-		Vector4Impl operator*(T rhs) const {
-			return Vector4Impl(X * rhs, Y * rhs, Z * rhs, W * rhs);
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+		auto operator*(U rhs) const {
+			return Vector4Impl<PromotedType>(X * rhs, Y * rhs, Z * rhs, W * rhs);
 		}
-		Vector4Impl operator+(T rhs) const {
-			return Vector4Impl(X + rhs, Y + rhs, Z + rhs, W + rhs);
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+		auto operator+(U rhs) const {
+			return Vector4Impl<PromotedType>(X + rhs, Y + rhs, Z + rhs, W + rhs);
 		}
-		Vector4Impl operator-(T rhs) const {
-			return Vector4Impl(X - rhs, Y - rhs, Z - rhs, W - rhs);
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+		auto operator-(U rhs) const {
+			return Vector4Impl<PromotedType>(X - rhs, Y - rhs, Z - rhs, W - rhs);
 		}
-		Vector4Impl operator/(T rhs) const {
-			return Vector4Impl(X / rhs, Y / rhs, Z / rhs, W / rhs);
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+		auto operator/(U rhs) const {
+			return Vector4Impl<PromotedType>(X / rhs, Y / rhs, Z / rhs, W / rhs);
 		}
+        
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+        friend auto operator*(U lhs, const Vector4Impl& rhs) {
+            return rhs.operator*(lhs);
+        }
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+        friend auto operator+(U lhs, const Vector4Impl& rhs) {
+            return rhs.operator*(lhs);
+        }
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+        friend auto operator-(U lhs, const Vector4Impl& rhs) {
+            return -rhs.operator-(lhs);
+        }
+        template<typename U,
+            typename PromotedType = AUX::GetPromotedArithmeticType_T<T,U>
+        >
+        friend auto operator/(U lhs, const Vector4Impl& rhs) {
+            return Vector4Impl<PromotedType>(lhs / rhs.X, lhs / rhs.Y, lhs / rhs.Z, lhs / rhs.W);
+        }
+        
+        template<typename U,
+            typename = std::enable_if_t<std::is_arithmetic_v<U>>
+        >
+        Vector4Impl& operator*=(U rhs) {
+            X *= rhs; Y *= rhs; Z *= rhs; W *= rhs;
+            return *this;
+        }
+        template<typename U,
+            typename = std::enable_if_t<std::is_arithmetic_v<U>>
+        >
+        Vector4Impl& operator+=(U rhs) {
+            X += rhs; Y += rhs; Z += rhs; W += rhs;
+            return *this;
+        }
+        template<typename U,
+            typename = std::enable_if_t<std::is_arithmetic_v<U>>
+        >
+        Vector4Impl& operator-=(U rhs) {
+            X -= rhs; Y -= rhs; Z -= rhs; W -= rhs;
+            return *this;
+        }
+        template<typename U,
+            typename = std::enable_if_t<std::is_arithmetic_v<U>>
+        >
+        Vector4Impl& operator/=(U rhs) {
+            X /= rhs; Y /= rhs; Z /= rhs; W /= rhs;
+            return *this;
+        }
 
 		const T& operator[](uint32 Index) const {
 			checkf(Index >= 0 && Index < 4, TEXT("Invalid Index"));
@@ -868,9 +940,10 @@ namespace FRAMEWORK {
 			checkf(Index >= 0 && Index < 4, TEXT("Invalid Index"));
 			return Data[Index];
 		}
-
-		operator UE_Vector() {
-			return UE_Vector(X, Y, Z, W);
+        
+        template<typename U>
+		operator UE_Vector<U>() const {
+			return UE_Vector<U>((U)X, (U)Y, (U)Z, (U)W);
 		}
 
 		FString ToString() const {

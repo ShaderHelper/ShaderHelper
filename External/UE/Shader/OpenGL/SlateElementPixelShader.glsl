@@ -41,6 +41,8 @@ uniform sampler2DRect ElementRectTexture;
 uniform vec2 Size;
 #endif
 
+uniform bool IsSrgb;
+
 varying vec4 Position;
 varying vec4 TexCoords;
 varying vec4 Color;
@@ -339,9 +341,12 @@ void main()
 		OutColor = GetSplineElementColor();
 	}
 	
-	// gamma correct
-	OutColor.rgb = GammaCorrect(OutColor.rgb);
-	
+    if(IsSrgb)
+    {
+        // gamma correct
+        OutColor.rgb = GammaCorrect(OutColor.rgb);
+    }
+
 	if( EffectsDisabled )
 	{
 	#if USE_LEGACY_DISABLED_EFFECT

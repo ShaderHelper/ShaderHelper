@@ -1,8 +1,8 @@
 #include "CommonHeader.h"
-#include "D3D12Texture.h"
-#include "D3D12Device.h"
-#include "D3D12CommandList.h"
-#include "D3D12Map.h"
+#include "Dx12Texture.h"
+#include "Dx12Device.h"
+#include "Dx12CommandList.h"
+#include "Dx12Map.h"
 
 namespace FRAMEWORK
 {
@@ -12,9 +12,10 @@ namespace FRAMEWORK
 		bool bSRV;
 	};
 
-	Dx12Texture::Dx12Texture(D3D12_RESOURCE_STATES InState, TRefCountPtr<ID3D12Resource> InResource, GpuTextureDesc InDesc)
+	Dx12Texture::Dx12Texture(D3D12_RESOURCE_STATES InState, TRefCountPtr<ID3D12Resource> InResource, GpuTextureDesc InDesc, void* InSharedHandle)
 		: GpuTexture(MoveTemp(InDesc))
 		, TrackedResource(InState), Resource(MoveTemp(InResource))
+		, SharedHandle(InSharedHandle)
 	{
 
 	}
@@ -136,19 +137,26 @@ namespace FRAMEWORK
 			&TexDesc, ActualState, &ClearValues, IID_PPV_ARGS(TexResource.GetInitReference())));
 
 		if (bHasInitialData) {
-			const uint64 UploadBufferSize = GetRequiredIntermediateSize(TexResource, 0, 1);
-			TRefCountPtr<Dx12Buffer> UploadBuffer = CreateDx12Buffer(UploadBufferSize, BufferUsage::Upload);
+			const uint32 UploadBufferSize = (uint32)GetRequiredIntermediateSize(TexResource, 0, 1);
+			TRefCountPtr<Dx12Buffer> UploadBuffer = CreateDx12Buffer(UploadBufferSize, GpuBufferUsage::Dynamic);
 			
 			D3D12_SUBRESOURCE_DATA textureData = {};
 			textureData.pData = &InTexDesc.InitialData[0];
 			textureData.RowPitch = InTexDesc.Width * GetTextureFormatByteSize(InTexDesc.Format);
 			textureData.SlicePitch = textureData.RowPitch * InTexDesc.Height;
 
-			UpdateSubresources(GCommandListContext->GetCommandListHandle(), TexResource, UploadBuffer->GetResource(), 0, 0, 1, &textureData);
+			const CommonAllocationData& AllocationData = UploadBuffer->GetAllocation().GetAllocationData().Get<CommonAllocationData>();
+			UpdateSubresources(GCommandListContext->GetCommandListHandle(), TexResource, AllocationData.UnderlyResource, 0, 0, 1, &textureData);
 			GCommandListContext->Transition(TexResource, ActualState, InitialState);
 		}
+
+		void* SharedHandle = nullptr;
+		if (Flags.bShared)
+		{
+			GDevice->CreateSharedHandle(TexResource, nullptr, GENERIC_ALL, nullptr, &SharedHandle);
+		}
 		
-		TRefCountPtr<Dx12Texture> RetTexture = new Dx12Texture{ InitialState, MoveTemp(TexResource), InTexDesc };
+		TRefCountPtr<Dx12Texture> RetTexture = new Dx12Texture{ InitialState, MoveTemp(TexResource), InTexDesc, SharedHandle};
 		CreateTextureView(Flags, RetTexture);
 
 		return RetTexture;

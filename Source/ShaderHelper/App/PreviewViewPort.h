@@ -29,7 +29,7 @@ namespace SH
 		bool RequiresVsync() const override { return false; }
 
 		void SetViewPortRenderTexture(GpuTexture* InGpuTex);
-		void UpdateViewPortRenderTexture(GpuTexture* InGpuTex);
+	//	void UpdateViewPortRenderTexture(GpuTexture* InGpuTex);
 		void OnDrawViewport(const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) override;
 	public:
 		OnViewportResizeDelegate OnViewportResize;

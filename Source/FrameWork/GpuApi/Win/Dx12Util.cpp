@@ -1,6 +1,6 @@
 #include "CommonHeader.h"
-#include "D3D12Util.h"
-#include "D3D12CommandList.h"
+#include "Dx12Util.h"
+#include "Dx12CommandList.h"
 
 namespace FRAMEWORK
 {

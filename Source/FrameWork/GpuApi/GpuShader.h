@@ -1,5 +1,4 @@
 #pragma once
-#include "CommonHeader.h"
 #include "GpuResourceCommon.h"
 
 namespace FRAMEWORK
@@ -7,6 +6,9 @@ namespace FRAMEWORK
     class GpuShader : public GpuResource
     {
 	public:
+		GpuShader() : GpuResource(GpuResourceType::Shader)
+		{}
+
 		virtual bool IsCompiled() const {
 			return false;
 		}

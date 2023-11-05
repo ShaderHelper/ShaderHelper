@@ -178,6 +178,9 @@ namespace ShaderConductor
             int optimizationLevel = 3; // 0 to 3, no optimization to most optimization
             ShaderModel shaderModel = {6, 0};
 
+            uint32_t numDXCArgs = 0;
+            const char** DXCArgs = nullptr;
+
             int shiftAllTexturesBindings = 0;
             int shiftAllSamplersBindings = 0;
             int shiftAllCBuffersBindings = 0;
@@ -189,6 +192,9 @@ namespace ShaderConductor
             ShadingLanguage language;
             const char* version;
             bool asModule;
+
+            const MacroDefine* options;
+            uint32_t numOptions;
         };
 
         struct ReflectionDesc

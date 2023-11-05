@@ -1,5 +1,4 @@
 #pragma once
-#include "CommonHeader.h"
 
 #include <Windows/PreWindowsApi.h>
 THIRD_PARTY_INCLUDES_START
