@@ -47,7 +47,6 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		TUniquePtr<UniformBuffer> NewBuiltInUniformBuffer = UniformBufferBuilder{ "BuiltIn", UniformBufferUsage::Persistant }
 			.AddVector2f("iResolution")
 			.AddFloat("iTime")
-			.AddVector2f("iMouse")
 			.Build();
 		BuiltInUniformBuffer = AUX::TransOwnerShip(MoveTemp(NewBuiltInUniformBuffer));
 
@@ -85,17 +84,30 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		return BuiltInArgumentBufferLayout->GetDeclaration();
 	}
 
+	TArray<PropertyData> ShRenderer::GetBuiltInPropertyDatas() const
+	{
+		TArray<PropertyData> Datas;
+
+		return Datas;
+	}
+
 	void ShRenderer::ReCreatePipelineState()
 	{
 		check(VertexShader->IsCompiled());
 		check(PixelShader->IsCompiled());
 		PipelineStateDesc PipelineDesc{
-			VertexShader, PixelShader, 
-			RasterizerStateDesc{RasterizerFillMode::Solid, RasterizerCullMode::None}, 
-			GpuResourceHelper::GDefaultBlendStateDesc,
-			{ FinalRT->GetFormat() },
-			BuiltInArgumentBufferLayout->GetBindLayout()
+				VertexShader, PixelShader,
+				RasterizerStateDesc{ RasterizerFillMode::Solid, RasterizerCullMode::None },
+				GpuResourceHelper::GDefaultBlendStateDesc,
+				{ FinalRT->GetFormat() },
+				BuiltInArgumentBufferLayout->GetBindLayout()
 		};
+
+		if (CustomArgumentBuffer.IsValid())
+		{
+			PipelineDesc.BindGroupLayout1 = CustomArgumentBufferLayout->GetBindLayout();
+		}
+	
 		PipelineState = GpuApi::CreateRenderPipelineState(PipelineDesc);
 	}
 
@@ -122,7 +134,15 @@ R"(float4 MainPS(PIn Input) : SV_Target
 
 			BuiltInUniformBuffer->GetMember<float>("iTime") = iTime;
 			BuiltInUniformBuffer->GetMember<Vector2f>("iResolution") = iResolution;
-			GpuApi::SetBindGroups(BuiltInArgumentBuffer->GetBindGroup(), nullptr, nullptr, nullptr);
+			if (CustomArgumentBuffer.IsValid())
+			{
+				GpuApi::SetBindGroups(BuiltInArgumentBuffer->GetBindGroup(), CustomArgumentBuffer->GetBindGroup(), nullptr, nullptr);
+			}
+			else
+			{
+				GpuApi::SetBindGroups(BuiltInArgumentBuffer->GetBindGroup(), nullptr, nullptr, nullptr);
+			}
+			
 			GpuApi::DrawPrimitive(0, 3, 0, 1);
             GpuApi::EndRenderPass();
 		}

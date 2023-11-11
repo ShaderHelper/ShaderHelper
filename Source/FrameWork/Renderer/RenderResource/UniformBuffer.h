@@ -7,6 +7,9 @@ namespace FRAMEWORK
 	struct UniformBufferMemberInfo
 	{
 		uint32 Offset;
+#if !SH_SHIPPING
+		FString TypeName;
+#endif
 	};
 
 	struct UniformBufferMetaData
@@ -28,6 +31,8 @@ namespace FRAMEWORK
 		//Only write data, not read.
 		template<typename T>
 		T& GetMember(const FString& MemberName) {
+			checkf(MetaData.Members.Contains(MemberName), TEXT("The uniform buffer doesn't contain \"%s\" member."), *MemberName);
+			checkf(AUX::TTypename<T>::Value == MetaData.Members[MemberName].TypeName, TEXT("Mismatched type: %s, Expected : %s"), *AUX::TTypename<T>::Value, *MetaData.Members[MemberName].TypeName);
 			int32 MemberOffset = MetaData.Members[MemberName].Offset;
 			void* BufferBaseAddr = GpuApi::MapGpuBuffer(Buffer, GpuResourceMapMode::Write_Only);
 			return *reinterpret_cast<T*>((uint8*)BufferBaseAddr + MemberOffset);
@@ -103,8 +108,12 @@ namespace FRAMEWORK
 		template<typename T>
 		void AddMember(const FString& MemberName)
 		{
+#if !SH_SHIPPING
+			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize, AUX::TTypename<T>::Value });
+#else
 			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize });
-
+#endif
+			
 			uint32 MemberSize = sizeof(T);
 			uint32 SizeBeforeAligning = MetaData.UniformBufferSize;
 			uint32 SizeAfterAligning = Align(MetaData.UniformBufferSize, 16);

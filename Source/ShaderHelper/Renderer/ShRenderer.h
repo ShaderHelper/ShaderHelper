@@ -3,6 +3,7 @@
 #include "GpuApi/GpuResource.h"
 #include "App/PreviewViewPort.h"
 #include "Renderer/RenderResource/ArgumentBuffer.h"
+#include "UI/Widgets/Property/PropertyData.h"
 
 namespace SH
 {
@@ -16,6 +17,12 @@ namespace SH
 		void OnViewportResize();
 		void UpdatePixelShader(TRefCountPtr<GpuShader> NewPixelShader);
 		FString GetResourceDeclaration() const;
+		void SetCustomArgumentBuffer(TUniquePtr<ArgumentBuffer> InArgumentBuffer, TUniquePtr<ArgumentBufferLayout> InArgumentBufferLayout) 
+		{
+			CustomArgumentBuffer = MoveTemp(InArgumentBuffer);
+			CustomArgumentBufferLayout = MoveTemp(InArgumentBufferLayout);
+		}
+		TArray<PropertyData> GetBuiltInPropertyDatas() const;
 
 	private:
 		void RenderBegin() override;
@@ -38,10 +45,13 @@ namespace SH
 		
 		TSharedPtr<UniformBuffer> BuiltInUniformBuffer;
 		float iTime;
-		Vector2f iResolution, iMouse;
+		Vector2f iResolution;
 
 		TUniquePtr<ArgumentBuffer> BuiltInArgumentBuffer;
 		TUniquePtr<ArgumentBufferLayout> BuiltInArgumentBufferLayout;
+
+		TUniquePtr<ArgumentBuffer> CustomArgumentBuffer;
+		TUniquePtr<ArgumentBufferLayout> CustomArgumentBufferLayout;
 	};
 }
 
