@@ -2,6 +2,7 @@
 #include "SShaderHelperWindow.h"
 #include "App/ShaderHelperApp.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
+#include "SShaderHelperPropertyView.h"
 
 namespace SH 
 {
@@ -20,6 +21,10 @@ namespace SH
 		else if (TabName == "PropetyTab") {
 			SAssignNew(SpawnedTab, SDockTab)
 				.Label(FText::FromString("Propety"));
+				[
+					SNew(SShaderHelperPropertyView)
+					.Renderer(Renderer)
+				];
 		}
 		else if (TabName == "CodeTab") {
 			SAssignNew(SpawnedTab, SDockTab)
