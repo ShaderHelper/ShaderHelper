@@ -2,6 +2,7 @@
 #include "Dx12Common.h"
 #include "GpuApi/GpuResource.h"
 #include "Dx12Device.h"
+#include <queue>
 
 namespace FRAMEWORK
 {
@@ -47,30 +48,27 @@ namespace FRAMEWORK
 	class DeferredReleaseManager
 	{
 	public:
-		using PendingResourceArr = TArray<TRefCountPtr<GpuResource>>;
+		using PendingResources = TArray<TRefCountPtr<GpuResource>>;
 	public:
-        DeferredReleaseManager() : LastCpuFrame(0), LastGpuFrame(0) {}
+        DeferredReleaseManager() : LastGpuFrame(0) {}
 		void AllocateOneFrame() {
-            PendingResources.Enqueue(PendingResourceArr{});
-			LastCpuFrame = CurCpuFrame;
+			PendingQueue.push(PendingResources{});
 		}
 		void AddUncompletedResource(TRefCountPtr<GpuResource> InResource) {
-            PendingResourceArr* Resources = PendingResources.Peek();
-			Resources->Add(MoveTemp(InResource));
+			PendingQueue.back().AddUnique(MoveTemp(InResource));
 		}
 		void ReleaseCompletedResources() {
 			check(LastGpuFrame <= CurGpuFrame);
 			uint64 GpuFrameIncrement = CurGpuFrame - LastGpuFrame;
 			while (GpuFrameIncrement--) {
-                PendingResources.Pop();
+				PendingQueue.pop();
 			}
 			LastGpuFrame = CurGpuFrame;
 		}
 	private:
-		uint64 LastCpuFrame;
 		uint64 LastGpuFrame;
-		TQueue<PendingResourceArr> PendingResources;
+		std::queue<PendingResources> PendingQueue;
 	};
 
-	inline DeferredReleaseManager GDeferredReleaseManager;
+	inline DeferredReleaseManager* GDeferredReleaseManager = new DeferredReleaseManager;
 }

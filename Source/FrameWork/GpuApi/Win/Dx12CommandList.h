@@ -105,5 +105,5 @@ namespace FRAMEWORK
 		bool IsBindGroupsDirty : 1;
 	};
 
-	inline TUniquePtr<CommandListContext> GCommandListContext;
+	inline CommandListContext* GCommandListContext;
 }

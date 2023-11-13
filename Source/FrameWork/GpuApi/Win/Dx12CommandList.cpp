@@ -49,7 +49,7 @@ namespace FRAMEWORK
 		{
 			if (CurrentVertexBuffer) {
 				//TODO
-                GDeferredReleaseManager.AddUncompletedResource(CurrentVertexBuffer);
+                GDeferredReleaseManager->AddUncompletedResource(CurrentVertexBuffer);
 			}
 			else {
                 GraphicsCmdList->IASetVertexBuffers(0, 0, nullptr);
@@ -63,7 +63,7 @@ namespace FRAMEWORK
 		{
 			check(CurrentPso);
 			GraphicsCmdList->SetPipelineState(CurrentPso->GetResource());
-            GDeferredReleaseManager.AddUncompletedResource(CurrentPso);
+            GDeferredReleaseManager->AddUncompletedResource(CurrentPso);
 			MarkPipelineDirty(false);
 		}
 
@@ -79,25 +79,25 @@ namespace FRAMEWORK
 
             if(CurrentBindGroup0) {
                 CurrentBindGroup0->Apply(GetCommandListHandle(), CurrentRootSignature);
-                GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup0);
+                GDeferredReleaseManager->AddUncompletedResource(CurrentBindGroup0);
                 
             }
             
             if(CurrentBindGroup1) {
                 CurrentBindGroup1->Apply(GetCommandListHandle(), CurrentRootSignature);
-                GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup1);
+                GDeferredReleaseManager->AddUncompletedResource(CurrentBindGroup1);
                 
             }
             
             if(CurrentBindGroup2) {
                 CurrentBindGroup2->Apply(GetCommandListHandle(), CurrentRootSignature);
-                GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup2);
+                GDeferredReleaseManager->AddUncompletedResource(CurrentBindGroup2);
                 
             }
             
             if(CurrentBindGroup3) {
                 CurrentBindGroup3->Apply(GetCommandListHandle(), CurrentRootSignature);
-                GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup3);
+                GDeferredReleaseManager->AddUncompletedResource(CurrentBindGroup3);
                 
             }
 
@@ -140,7 +140,7 @@ namespace FRAMEWORK
                 else {
                     GraphicsCmdList->ClearRenderTargetView(RenderTarget->HandleRTV.CpuHandle, OptimizedClearValue.GetData(), 0, nullptr);
                 }
-                GDeferredReleaseManager.AddUncompletedResource(RenderTarget);
+                GDeferredReleaseManager->AddUncompletedResource(RenderTarget);
                 RenderTargetDescriptors[i] = RenderTarget->HandleRTV.CpuHandle;
             }
             
@@ -221,7 +221,7 @@ namespace FRAMEWORK
 		TRefCountPtr<ID3D12GraphicsCommandList> GraphicsCmdList;
 		DxCheck(GDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, InitialCommandAllocator, nullptr, IID_PPV_ARGS(GraphicsCmdList.GetInitReference())));
 		DxCheck(GraphicsCmdList->Close());
-		GCommandListContext.Reset(new CommandListContext(MoveTemp(FrameResources), MoveTemp(GraphicsCmdList)));
+		GCommandListContext = new CommandListContext(MoveTemp(FrameResources), MoveTemp(GraphicsCmdList));
 	}
 
 }

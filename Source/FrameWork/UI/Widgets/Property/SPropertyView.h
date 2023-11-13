@@ -1,42 +1,85 @@
 #pragma once
 #include "PropertyData.h"
-#include <type_traits>
 namespace FRAMEWORK
 {
-	template<typename PropertyDataType, typename = void>
 	class SPropertyView : public SCompoundWidget
 	{
+		using PropertyDataType = TSharedRef<PropertyData>;
 	public:
 		SLATE_BEGIN_ARGS(SPropertyView)
 			: _PropertyDatas(nullptr)
 		{}
-			SLATE_ARGUMENT(const TArray<PropertyDataType>*, PropertyDatas)
+			SLATE_ARGUMENT(TArray<PropertyDataType>*, PropertyDatas)
+			SLATE_ARGUMENT(bool, IsExpandAll)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs)
 		{
+			PropertyDatas = InArgs._PropertyDatas;
 			ChildSlot
 			[
-				SAssignNew(PropertyTree, STreeView<PropertyDataType>)
-				.TreeItemsSource(InArgs._PropertyDatas)
-				.OnGetChildren([](PropertyDataType InTreeNode, TArray<PropertyDataType>& OutChildren) {
-					InTreeNode->GetChildren(OutChildren);
-				})
-				.OnGenerateRow([](PropertyDataType InTreeNode, const TSharedRef<STableViewBase>& OwnerTable) {
-					return InTreeNode->GenerateWidgetForTableView();
-				})
+				SNew(SBorder)
+				[
+					SNew(SBorder)
+					.BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
+					.Padding(0)
+					[
+						SAssignNew(PropertyTree, STreeView<PropertyDataType>)
+						.TreeItemsSource(InArgs._PropertyDatas)
+						.OnGetChildren_Lambda([](PropertyDataType InTreeNode, TArray<PropertyDataType>& OutChildren) {
+							InTreeNode->GetChildren(OutChildren);
+						})
+						.OnGenerateRow_Lambda([](PropertyDataType InTreeNode, const TSharedRef<STableViewBase>& OwnerTable) {
+							return InTreeNode->GenerateWidgetForTableView(OwnerTable);
+						})
+					]
+				]
+			
+			
 			];
+
+			if (InArgs._IsExpandAll)
+			{
+				ExpandAllPropertyData(true);
+			}
+		}
+	public:
+		void ExpandItemRecursively(TSharedRef<PropertyData> InItem)
+		{
+			PropertyTree->SetItemExpansion(InItem, true);
+
+			TArray<TSharedRef<PropertyData>> Children;
+			InItem->GetChildren(Children);
+			for (const auto& Child : Children)
+			{
+				ExpandItemRecursively(Child);
+			}
+		}
+
+		void ExpandItem(TSharedRef<PropertyData> InItem)
+		{
+			PropertyTree->SetItemExpansion(InItem, true);
+		}
+
+		void ExpandAllPropertyData(bool IsRecursive)
+		{
+			for (const auto& Data : *PropertyDatas)
+			{
+				if (IsRecursive)
+				{
+					ExpandItemRecursively(Data);
+				}
+				else
+				{
+					ExpandItem(Data);
+				}
+			}
 		}
 
 	private:
+		TArray<PropertyDataType>* PropertyDatas;
 		TSharedPtr<STreeView<PropertyDataType>> PropertyTree;
 		
-	};
-
-	template<typename PropertyDataType>
-	class SPropertyView<PropertyDataType, std::enable_if_t<!std::is_base_of_v<IPropertyData, PropertyDataType>>>
-	{
-		static_assert(AUX::AlwaysFalse<PropertyDataType>, "PropertyDataType must be derived from IPropertyData.");
 	};
 }
 

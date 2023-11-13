@@ -20,7 +20,7 @@ namespace SH
 		}
 		else if (TabName == "PropetyTab") {
 			SAssignNew(SpawnedTab, SDockTab)
-				.Label(FText::FromString("Propety"));
+				.Label(FText::FromString("Propety"))
 				[
 					SNew(SShaderHelperPropertyView)
 					.Renderer(Renderer)

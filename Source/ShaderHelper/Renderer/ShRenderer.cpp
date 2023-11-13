@@ -84,10 +84,15 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		return BuiltInArgumentBufferLayout->GetDeclaration();
 	}
 
-	TArray<PropertyData> ShRenderer::GetBuiltInPropertyDatas() const
+	TArray<TSharedRef<PropertyData>> ShRenderer::GetBuiltInPropertyDatas() const
 	{
-		TArray<PropertyData> Datas;
+		TArray<TSharedRef<PropertyData>> Datas;
 
+		TSharedRef<PropertyCategory> BuiltInCategory = MakeShared<PropertyCategory>("Built In");
+		BuiltInCategory->AddChild(MakeShared<PropertyNumber<float>>("iTime", iTime));
+		BuiltInCategory->AddChild(MakeShared<PropertyNumber<Vector2f>>("iResolution", iResolution));
+
+		Datas.Add(MoveTemp(BuiltInCategory));
 		return Datas;
 	}
 

@@ -4,6 +4,7 @@
 #include <Styling/StyleColors.h>
 #include "Common/Path/BaseResourcePath.h"
 #include <Styling/SlateStyleMacros.h>
+#include <Styling/StarshipCoreStyle.h>
 
 #define RootToContentDir Style->RootToContentDir
 #define TTF_FONT( RelativePath, ... ) FSlateFontInfo(RootToContentDir( RelativePath, TEXT(".ttf") ), __VA_ARGS__ )
@@ -61,6 +62,19 @@ namespace FRAMEWORK
 		Style->Set("Log.Error", FTextBlockStyle(NormalLogText)
 			.SetColorAndOpacity(FStyleColors::Error)
 		);
+
+		Style->Set("PropertyView.TableRow", FTableRowStyle()
+			.SetEvenRowBackgroundBrush(FSlateNoResource())
+			.SetEvenRowBackgroundHoveredBrush(FSlateNoResource())
+			.SetOddRowBackgroundBrush(FSlateNoResource())
+			.SetOddRowBackgroundHoveredBrush(FSlateNoResource())
+			.SetSelectorFocusedBrush(FSlateNoResource())
+			.SetActiveBrush(FSlateNoResource())
+			.SetActiveHoveredBrush(FSlateNoResource())
+			.SetInactiveBrush(FSlateNoResource())
+		);
+
+		Style->Set("PropertyView.CategoryColor", new FSlateColorBrush(FLinearColor{ 0.05f, 0.05f, 0.05f, 1.0f }));
 
 		return Style;
 	}

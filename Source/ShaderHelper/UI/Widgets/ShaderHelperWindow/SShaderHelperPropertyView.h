@@ -6,18 +6,23 @@ namespace SH
 {
 	class SShaderHelperPropertyView : public SCompoundWidget
 	{
-		using PropertyDataType = TSharedRef<PropertyData>;
 	public:
 		SLATE_BEGIN_ARGS(SShaderHelperPropertyView)
 			: _Renderer(nullptr)
 		{}
-			SLATE_ARGUMENT(const ShRenderer*, Renderer)
+			SLATE_ARGUMENT(ShRenderer*, Renderer)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs);
+		TSharedRef<SWidget> GetCategoryMenu() const;
+		void AddUniform_Float() const;
+		void AddUniform_Float2() const;
 
 	private:
-		TSharedPtr<SPropertyView<PropertyDataType>> PropertyTree;
-		TArray<PropertyDataType> PropertyDatas;
+		TSharedPtr<SPropertyView> PropertyTree;
+		TArray<TSharedRef<PropertyData>> PropertyDatas;
+		
+		TSharedPtr<PropertyCategory> CustomPropertyCategory;
+		ShRenderer* Renderer = nullptr;
 	};
 }

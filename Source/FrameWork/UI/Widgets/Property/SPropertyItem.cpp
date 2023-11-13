@@ -5,4 +5,9 @@ namespace FRAMEWORK
 {
 
 
+	void SPropertyItem::Construct(const FArguments& InArgs)
+	{
+
+	}
+
 }
