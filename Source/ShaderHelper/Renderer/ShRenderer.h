@@ -17,12 +17,7 @@ namespace SH
 		void OnViewportResize();
 		void UpdatePixelShader(TRefCountPtr<GpuShader> NewPixelShader);
 		FString GetResourceDeclaration() const;
-		void SetCustomArgumentBuffer(TUniquePtr<ArgumentBuffer> InArgumentBuffer, TUniquePtr<ArgumentBufferLayout> InArgumentBufferLayout) 
-		{
-			CustomArgumentBuffer = MoveTemp(InArgumentBuffer);
-			CustomArgumentBufferLayout = MoveTemp(InArgumentBufferLayout);
-		}
-		TArray<PropertyData> GetBuiltInPropertyDatas() const;
+		TArray<TSharedRef<PropertyData>> GetBuiltInPropertyDatas() const;
 
 	private:
 		void RenderBegin() override;
@@ -35,6 +30,10 @@ namespace SH
 		static const FString DefaultPixelShaderInput;
 		static const FString DefaultPixelShaderMacro;
 
+		TSharedPtr<UniformBuffer> CustomUniformBuffer;
+		TUniquePtr<ArgumentBuffer> CustomArgumentBuffer;
+		TUniquePtr<ArgumentBufferLayout> CustomArgumentBufferLayout;
+
 	private:
 		PreviewViewPort* ViewPort;
 		TRefCountPtr<GpuTexture> FinalRT;
@@ -42,16 +41,12 @@ namespace SH
 		TRefCountPtr<GpuShader> PixelShader;
 		TRefCountPtr<GpuPipelineState> PipelineState;
 		
-		
 		TSharedPtr<UniformBuffer> BuiltInUniformBuffer;
 		float iTime;
 		Vector2f iResolution;
 
 		TUniquePtr<ArgumentBuffer> BuiltInArgumentBuffer;
 		TUniquePtr<ArgumentBufferLayout> BuiltInArgumentBufferLayout;
-
-		TUniquePtr<ArgumentBuffer> CustomArgumentBuffer;
-		TUniquePtr<ArgumentBufferLayout> CustomArgumentBufferLayout;
 	};
 }
 

@@ -2,23 +2,55 @@
 
 namespace FRAMEWORK
 {
-	class IPropertyData
+	class PropertyData
 	{
 	public:
-		virtual TSharedRef<ITableRow> GenerateWidgetForTableView() = 0;
-		virtual void GetChildren(TArray<TSharedRef<IPropertyData>>& OutChildren) = 0;
+		PropertyData(FString InName) : DisplayName(MoveTemp(InName))
+		{}
+		virtual ~PropertyData() = default;
+
+
+		virtual TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) = 0;
+		void GetChildren(TArray<TSharedRef<PropertyData>>& OutChildren) { OutChildren = Children; };
+		void AddChild(TSharedRef<PropertyData> InChild) { Children.Add(InChild); }
+
+	protected:
+		FString DisplayName;
+		TArray<TSharedRef<PropertyData>> Children;
 	};
 
-	class PropertyData : public IPropertyData
+	class PropertyCategory : public PropertyData
 	{
 	public:
-		TSharedRef<ITableRow> GenerateWidgetForTableView() override;
-		void GetChildren(TArray<TSharedRef<IPropertyData>>& OutChildren) override;
+		PropertyCategory(FString InName)
+			: PropertyData(MoveTemp(InName))
+		{}
+
+		void SetAddMenuWidget(TSharedPtr<SWidget> InWidget) { AddMenuWidget = MoveTemp(InWidget); }
+
+		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override;
 
 	private:
-		TArray<TSharedPtr<PropertyData>> Children;
+		TSharedPtr<SWidget> AddMenuWidget;
 	};
-	
+
+	template<typename T>
+	class PropertyNumber : public PropertyData
+	{
+	public:
+		PropertyNumber(FString InName, const T& InValue)
+			: PropertyData(MoveTemp(InName))
+			, Value(InValue)
+		{}
+
+		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override;
+
+	private:
+		T Value;
+	};
+
 }
+
+#include "PropertyData.hpp"
 
 

@@ -29,7 +29,7 @@ namespace GpuApi
 		GCommandListContext->BindStaticFrameResource(FrameResourceIndex);
 
 		GTempUniformBufferAllocator[FrameResourceIndex]->Flush();
-        GDeferredReleaseManager.AllocateOneFrame();
+        GDeferredReleaseManager->AllocateOneFrame();
 	}
 
 	void EndRenderFrame()
@@ -42,14 +42,14 @@ namespace GpuApi
 		
 		CurGpuFrame = CpuSyncGpuFence->GetCompletedValue();
 		const uint64 CurLag = CurCpuFrame - CurGpuFrame;
-		if (CurLag >= AllowableLag) {
+		if (CurLag > AllowableLag) {
 			//Cpu is waiting for gpu to catch up a frame.
 			DxCheck(CpuSyncGpuFence->SetEventOnCompletion(CurGpuFrame + 1, CpuSyncGpuEvent));
 			WaitForSingleObject(CpuSyncGpuEvent, INFINITE);
 			CurGpuFrame = CurGpuFrame + 1;
 		}
 
-        GDeferredReleaseManager.ReleaseCompletedResources();
+        GDeferredReleaseManager->ReleaseCompletedResources();
 	}
 
 	TRefCountPtr<GpuTexture> CreateGpuTexture(const GpuTextureDesc& InTexDesc)
@@ -63,13 +63,17 @@ namespace GpuApi
 		void* Data{};
 		if (InMapMode == GpuResourceMapMode::Write_Only) {
 			const uint32 BufferSize = (uint32)GetRequiredIntermediateSize(Texture->GetResource(), 0, 1);
-			Texture->UploadBuffer = CreateDx12Buffer(BufferSize, GpuBufferUsage::Dynamic);
+			if (!Texture->UploadBuffer) {
+				Texture->UploadBuffer = CreateDx12Buffer(BufferSize, GpuBufferUsage::Dynamic);
+			}
 			Data = Texture->UploadBuffer->GetAllocation().GetCpuAddr();
 			Texture->bIsMappingForWriting = true;
 		}
 		else if (InMapMode == GpuResourceMapMode::Read_Only) {
 			const uint32 BufferSize = (uint32)GetRequiredIntermediateSize(Texture->GetResource(), 0, 1);
-			Texture->ReadBackBuffer = CreateDx12Buffer(BufferSize, GpuBufferUsage::Staging);
+			if (!Texture->ReadBackBuffer) {
+				Texture->ReadBackBuffer = CreateDx12Buffer(BufferSize, GpuBufferUsage::Staging);
+			}
 			Data = Texture->ReadBackBuffer->GetAllocation().GetCpuAddr();
 			
 			ScopedBarrier Barrier{ Texture, D3D12_RESOURCE_STATE_COPY_SOURCE };
@@ -252,7 +256,7 @@ namespace GpuApi
 		CurGpuFrame = CurCpuFrame;
 
 		GCommandListContext->BindStaticFrameResource(GetCurFrameSourceIndex());
-        GDeferredReleaseManager.ReleaseCompletedResources();
+        GDeferredReleaseManager->ReleaseCompletedResources();
 	}
 
 	void BeginGpuCapture(const FString& SavedFileName)
