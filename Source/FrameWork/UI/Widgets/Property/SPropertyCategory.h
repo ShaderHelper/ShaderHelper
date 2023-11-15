@@ -8,6 +8,7 @@ namespace FRAMEWORK
 		SLATE_BEGIN_ARGS(SPropertyCatergory) {}
 			SLATE_ARGUMENT(FString, DisplayName)
 			SLATE_ARGUMENT(TSharedPtr<SWidget>, AddMenuWidget)
+			SLATE_ARGUMENT(bool, IsRootCategory)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs, const TSharedPtr<class ITableRow>& TableRow);

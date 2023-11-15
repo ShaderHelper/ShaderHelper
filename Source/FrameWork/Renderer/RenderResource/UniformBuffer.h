@@ -74,31 +74,31 @@ namespace FRAMEWORK
 		}
 
 	public:
-		UniformBufferBuilder&& AddFloat(const FString& MemberName) 
+		UniformBufferBuilder& AddFloat(const FString& MemberName) 
 		{
 			AddMember<float>(MemberName);
-			return MoveTemp(*this);
+			return *this;
 		}
 
-		UniformBufferBuilder&& AddVector2f(const FString& MemberName) 
+		UniformBufferBuilder& AddVector2f(const FString& MemberName) 
 		{
 			AddMember<Vector2f>(MemberName);
-			return MoveTemp(*this);
+			return *this;
 		}
 
-		UniformBufferBuilder&& AddVector3f(const FString& MemberName) 
+		UniformBufferBuilder& AddVector3f(const FString& MemberName) 
 		{
 			AddMember<Vector3f>(MemberName);
-			return MoveTemp(*this);
+			return *this;
 		}
 
-		UniformBufferBuilder&& AddVector4f(const FString& MemberName) 
+		UniformBufferBuilder& AddVector4f(const FString& MemberName)
 		{
 			AddMember<Vector4f>(MemberName);
-			return MoveTemp(*this);
+			return *this;
 		}
 
-		auto Build() && {
+		auto Build() {
 			TRefCountPtr<GpuBuffer> Buffer = GpuApi::CreateBuffer(MetaData.UniformBufferSize, (GpuBufferUsage)Usage);
 			MetaData.UniformBufferDeclaration = FString::Printf(TEXT("cbuffer %s\r\n{\r\n%s\r\n};\r\n"), *MetaData.UniformBufferName, *UniformBufferMemberNames);
 			return MakeUnique<UniformBuffer>( MoveTemp(Buffer), MetaData);

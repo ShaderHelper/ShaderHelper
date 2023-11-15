@@ -14,15 +14,20 @@ namespace SH
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs);
-		TSharedRef<SWidget> GetCategoryMenu() const;
-		void AddUniform_Float() const;
-		void AddUniform_Float2() const;
+		TSharedRef<SWidget> GetCategoryMenu();
+		void AddUniform_Float();
+		void AddUniform_Float2();
+		void ReCreateUniformBuffer();
+		void ReCreateArgumentBuffer();
+		void OnDeleteProperty();
 
 	private:
-		TSharedPtr<SPropertyView> PropertyTree;
+		TSharedPtr<SPropertyView> PropertyView;
 		TArray<TSharedRef<PropertyData>> PropertyDatas;
 		
+		TSharedPtr<UniformBuffer> CustomUniformBuffer;
 		TSharedPtr<PropertyCategory> CustomPropertyCategory;
+		TSharedPtr<PropertyCategory> CustomUniformCategory;
 		ShRenderer* Renderer = nullptr;
 	};
 }

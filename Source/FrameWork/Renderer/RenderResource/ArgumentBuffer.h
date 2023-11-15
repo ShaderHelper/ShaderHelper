@@ -38,7 +38,7 @@ namespace FRAMEWORK
 		}
 		
 	public:
-		ArgumentBufferBuilder&& AddUniformBuffer(TSharedPtr<UniformBuffer> InUniformBuffer, BindingShaderStage InStage = BindingShaderStage::All)
+		ArgumentBufferBuilder& AddUniformBuffer(TSharedPtr<UniformBuffer> InUniformBuffer, BindingShaderStage InStage = BindingShaderStage::All)
 		{
 			Buffer.UniformBuffers.Add(InUniformBuffer);
 			Buffer.Desc.Resources.Add({ BindingNum, InUniformBuffer->GetGpuResource() });
@@ -53,15 +53,15 @@ namespace FRAMEWORK
 			BufferLayout.LayoutDesc.GroupNumber = GroupNumber;
 			BindingNum++;
 	
-			return MoveTemp(*this);
+			return *this;
 		}
 
-		auto Build() &&
+		auto Build()
 		{
 			BufferLayout.BindGroupLayout = GpuApi::CreateBindGroupLayout(BufferLayout.LayoutDesc);
 			Buffer.Desc.Layout = BufferLayout.GetBindLayout();
 			Buffer.BindGroup = GpuApi::CreateBindGroup(Buffer.Desc);
-			return MakeTuple(MakeUnique<ArgumentBuffer>(MoveTemp(Buffer)), MakeUnique<ArgumentBufferLayout>(MoveTemp(BufferLayout)));
+			return MakeTuple(MakeUnique<ArgumentBuffer>(Buffer), MakeUnique<ArgumentBufferLayout>(BufferLayout));
 		}
 
 	private:
