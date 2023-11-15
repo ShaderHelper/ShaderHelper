@@ -8,11 +8,27 @@ namespace FRAMEWORK
 	void SPropertyCatergory::Construct(const FArguments& InArgs, const TSharedPtr<class ITableRow>& TableRow)
 	{
 		OwnerRowPtr = TableRow.Get();
+
+		const FSlateBrush* CategoryColor = nullptr;
+		FSlateFontInfo CategoryTextFont;
+
+		if (InArgs._IsRootCategory)
+		{
+			CategoryColor = FAppCommonStyle::Get().GetBrush("PropertyView.CategoryColor");
+			CategoryTextFont = FAppStyle::Get().GetFontStyle("SmallFontBold");
+		}
+		else
+		{
+			CategoryColor = FAppCommonStyle::Get().GetBrush("PropertyView.ItemColor");
+			CategoryTextFont = FAppStyle::Get().GetFontStyle("SmallFont");
+		}
+
 		TSharedRef<SHorizontalBox> HBox = SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot()
 			.AutoWidth()
 			[
 				SNew(SExpanderArrow, TableRow)
+				.IndentAmount(0)
 			]
 
 			+ SHorizontalBox::Slot()
@@ -21,6 +37,7 @@ namespace FRAMEWORK
 			[
 				SNew(STextBlock)
 				.Text(FText::FromString(InArgs._DisplayName))
+				.Font(MoveTemp(CategoryTextFont))
 				.ColorAndOpacity(FSlateColor{ FLinearColor{0.8f,0.8f,0.8f} })
 				
 			];
@@ -51,10 +68,10 @@ namespace FRAMEWORK
 		[
 			SNew(SBorder)
 			.BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
-			.Padding(FMargin{0.0f, 4.0f, 0.0f, 0.0f})
+			.Padding(FMargin{0.0f, 3.0f, 0.0f, 0.0f})
 			[
 				SNew(SBorder)
-				.BorderImage(FAppCommonStyle::Get().GetBrush("PropertyView.CategoryColor"))
+				.BorderImage(CategoryColor)
 				[
 					HBox
 				]

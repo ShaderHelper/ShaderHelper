@@ -30,7 +30,6 @@ namespace SH
 		static const FString DefaultPixelShaderInput;
 		static const FString DefaultPixelShaderMacro;
 
-		TSharedPtr<UniformBuffer> CustomUniformBuffer;
 		TUniquePtr<ArgumentBuffer> CustomArgumentBuffer;
 		TUniquePtr<ArgumentBufferLayout> CustomArgumentBufferLayout;
 

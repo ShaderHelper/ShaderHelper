@@ -89,8 +89,17 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		TArray<TSharedRef<PropertyData>> Datas;
 
 		TSharedRef<PropertyCategory> BuiltInCategory = MakeShared<PropertyCategory>("Built In");
-		BuiltInCategory->AddChild(MakeShared<PropertyNumber<float>>("iTime", iTime));
-		BuiltInCategory->AddChild(MakeShared<PropertyNumber<Vector2f>>("iResolution", iResolution));
+		TSharedRef<PropertyCategory> UniformSubCategory = MakeShared<PropertyCategory>("Uniform");
+		BuiltInCategory->AddChild(UniformSubCategory);
+
+		auto iTimeProperty = MakeShared<PropertyNumber<float>>("iTime", TAttribute<float>::CreateLambda([this] { return iTime; }));
+		iTimeProperty->SetEnabled(false);
+
+		auto iResolutionProperty = MakeShared<PropertyNumber<Vector2f>>("iResolution", TAttribute<Vector2f>::CreateLambda([this] {return iResolution; }));
+		iResolutionProperty->SetEnabled(false);
+
+		UniformSubCategory->AddChild(MoveTemp(iTimeProperty));
+		UniformSubCategory->AddChild(MoveTemp(iResolutionProperty));
 
 		Datas.Add(MoveTemp(BuiltInCategory));
 		return Datas;

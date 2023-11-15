@@ -44,6 +44,11 @@ namespace FRAMEWORK
 			}
 		}
 	public:
+		void Refresh()
+		{
+			PropertyTree->RequestTreeRefresh();
+		}
+
 		void ExpandItemRecursively(TSharedRef<PropertyData> InItem)
 		{
 			PropertyTree->SetItemExpansion(InItem, true);

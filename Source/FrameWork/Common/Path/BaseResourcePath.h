@@ -10,9 +10,10 @@ namespace BaseResourcePath
 #elif PLATFORM_WINDOWS
     inline const FString UE_StandaloneRenderShaderDir = PathHelper::ExternalDir() / TEXT("UE/Shader/D3D");
 #endif
-	
-    inline const FString UE_SlateResourceDir = PathHelper::ResourceDir();
-    inline const FString UE_SlateFontDir = UE_SlateResourceDir / TEXT("Slate/Fonts");
+	inline const FString UE_CoreStyleDir = PathHelper::ResourceDir();
+    inline const FString UE_SlateResourceDir = PathHelper::ResourceDir() / TEXT("Slate");
+	inline const FString Custom_SlateResourceDir = PathHelper::ResourceDir() / TEXT("CustomSlate");
+    inline const FString UE_SlateFontDir = UE_SlateResourceDir / TEXT("Fonts");
 }
 }
 

@@ -40,7 +40,7 @@ namespace FRAMEWORK {
 
 		//This project uses slate as UI framework, so we need to initialize it.
 		SetSlateFontPath(FRAMEWORK::BaseResourcePath::UE_SlateFontDir);
-		FSlateApplication::SetCoreStylePath(FRAMEWORK::BaseResourcePath::UE_SlateResourceDir);
+		FSlateApplication::SetCoreStylePath(FRAMEWORK::BaseResourcePath::UE_CoreStyleDir);
 		FSlateApplication::InitializeAsStandaloneApplication(GetStandardStandaloneRenderer(FRAMEWORK::BaseResourcePath::UE_StandaloneRenderShaderDir));
 
 	}
