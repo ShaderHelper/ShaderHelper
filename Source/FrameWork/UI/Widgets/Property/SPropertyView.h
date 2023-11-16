@@ -11,6 +11,7 @@ namespace FRAMEWORK
 		{}
 			SLATE_ARGUMENT(TArray<PropertyDataType>*, PropertyDatas)
 			SLATE_ARGUMENT(bool, IsExpandAll)
+			SLATE_EVENT(FOnContextMenuOpening, OnContextMenuOpening)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs)
@@ -32,6 +33,8 @@ namespace FRAMEWORK
 						.OnGenerateRow_Lambda([](PropertyDataType InTreeNode, const TSharedRef<STableViewBase>& OwnerTable) {
 							return InTreeNode->GenerateWidgetForTableView(OwnerTable);
 						})
+						.SelectionMode(ESelectionMode::Single)
+						.OnContextMenuOpening(InArgs._OnContextMenuOpening)
 					]
 				]
 			
@@ -44,6 +47,12 @@ namespace FRAMEWORK
 			}
 		}
 	public:
+
+		TArray<PropertyDataType> GetSelectedItems() const
+		{
+			return PropertyTree->GetSelectedItems();
+		}
+
 		void Refresh()
 		{
 			PropertyTree->RequestTreeRefresh();

@@ -18,6 +18,7 @@ namespace FRAMEWORK
 		FText GetNameText() const { return DisplayNameText; }
 	private:
 		FText DisplayNameText;
+		TFunction<void(const FString&)> OnDisplayNameChanged;
 	};
 }
 

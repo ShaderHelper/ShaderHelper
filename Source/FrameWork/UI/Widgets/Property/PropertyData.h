@@ -3,7 +3,7 @@
 
 namespace FRAMEWORK
 {
-	class PropertyData
+	class PropertyData : public TSharedFromThis<PropertyData>
 	{
 	public:
 		PropertyData(FString InName) : DisplayName(MoveTemp(InName))
@@ -12,13 +12,30 @@ namespace FRAMEWORK
 
 
 		virtual TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) = 0;
-		void GetChildren(TArray<TSharedRef<PropertyData>>& OutChildren) { OutChildren = Children; };
+		void GetChildren(TArray<TSharedRef<PropertyData>>& OutChildren) const { OutChildren = Children; };
+		int32 GetChildrenNum() const { return Children.Num(); }
+		FString GetDisplayName() const { return DisplayName; }
+		PropertyData* GetParent() const { return Parent; }
+
 		void AddChild(TSharedRef<PropertyData> InChild) 
 		{ 
 			InChild->Parent = this;
 			Children.Add(InChild); 
 		}
-		virtual void AddToUniformBuffer(UniformBufferBuilder& Builder) {}
+
+		void Remove()
+		{
+			check(Parent);
+			Parent->RemoveChild(AsShared());
+		}
+
+		void RemoveChild(TSharedRef<PropertyData> InChild)
+		{
+			Children.Remove(InChild);
+		}
+
+		virtual void AddToUniformBuffer(UniformBufferBuilder& Builder) const {}
+		virtual void UpdateUniformBuffer(UniformBuffer* Buffer) const {}
 
 	protected:
 		FString DisplayName;
@@ -43,10 +60,10 @@ namespace FRAMEWORK
 	};
 
 	template<typename T>
-	class PropertyNumber : public PropertyData
+	class PropertyItem : public PropertyData
 	{
 	public:
-		PropertyNumber(FString InName, const TAttribute<T>& InValue)
+		PropertyItem(FString InName, const TAttribute<T>& InValue)
 			: PropertyData(MoveTemp(InName))
 			, ValueAttribute(InValue)
 		{}
@@ -54,7 +71,8 @@ namespace FRAMEWORK
 		void SetEnabled(bool Enabled) { IsEnabled = Enabled; }
 		void SetOnValueChanged(const TFunction<void(T)>& ValueChanged) { OnValueChanged = ValueChanged; }
 		void SetOnDisplayNameChanged(const TFunction<void(const FString&)> DisplayNameChanged) { OnDisplayNameChanged = DisplayNameChanged; }
-		void AddToUniformBuffer(UniformBufferBuilder& Builder) override;
+		void AddToUniformBuffer(UniformBufferBuilder& Builder) const override;
+		virtual void UpdateUniformBuffer(UniformBuffer* Buffer) const override;
 		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override;
 
 	private:

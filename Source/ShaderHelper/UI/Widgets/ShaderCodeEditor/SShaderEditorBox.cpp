@@ -681,6 +681,8 @@ namespace SH
 
 	void SShaderEditorBox::OnShaderTextChanged(const FString& NewShaderSouce)
 	{
+		CurrentShaderSource = NewShaderSouce;
+
 		FString PixelShaderInput = ShRenderer::DefaultPixelShaderInput;
 		FString PixelShaderMacro = ShRenderer::DefaultPixelShaderMacro;
 		FString ShaderResourceDeclaration = Renderer->GetResourceDeclaration();

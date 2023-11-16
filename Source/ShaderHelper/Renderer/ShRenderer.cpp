@@ -81,7 +81,12 @@ R"(float4 MainPS(PIn Input) : SV_Target
 
 	FString ShRenderer::GetResourceDeclaration() const
 	{
-		return BuiltInArgumentBufferLayout->GetDeclaration();
+		FString Declaration = BuiltInArgumentBufferLayout->GetDeclaration();
+		if (CustomArgumentBufferLayout)
+		{
+			Declaration += CustomArgumentBufferLayout->GetDeclaration();
+		}
+		return Declaration;
 	}
 
 	TArray<TSharedRef<PropertyData>> ShRenderer::GetBuiltInPropertyDatas() const
@@ -92,10 +97,10 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		TSharedRef<PropertyCategory> UniformSubCategory = MakeShared<PropertyCategory>("Uniform");
 		BuiltInCategory->AddChild(UniformSubCategory);
 
-		auto iTimeProperty = MakeShared<PropertyNumber<float>>("iTime", TAttribute<float>::CreateLambda([this] { return iTime; }));
+		auto iTimeProperty = MakeShared<PropertyItem<float>>("iTime", TAttribute<float>::CreateLambda([this] { return iTime; }));
 		iTimeProperty->SetEnabled(false);
 
-		auto iResolutionProperty = MakeShared<PropertyNumber<Vector2f>>("iResolution", TAttribute<Vector2f>::CreateLambda([this] {return iResolution; }));
+		auto iResolutionProperty = MakeShared<PropertyItem<Vector2f>>("iResolution", TAttribute<Vector2f>::CreateLambda([this] {return iResolution; }));
 		iResolutionProperty->SetEnabled(false);
 
 		UniformSubCategory->AddChild(MoveTemp(iTimeProperty));

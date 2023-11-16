@@ -7,6 +7,8 @@ namespace SH
 	void SShaderHelperPropertyView::Construct(const FArguments& InArgs)
 	{
 		Renderer = InArgs._Renderer;
+		ShaderEditor = InArgs._ShaderEditor;
+
 		PropertyDatas = Renderer->GetBuiltInPropertyDatas();
 
 		CustomPropertyCategory = MakeShared<PropertyCategory>("Custom");
@@ -17,7 +19,7 @@ namespace SH
 		[
 			SAssignNew(PropertyView, SPropertyView)
 			.PropertyDatas(&PropertyDatas)
-			//.OnContextMenuOpening()
+			.OnContextMenuOpening(this, &SShaderHelperPropertyView::CreateContextMenu)
 			.IsExpandAll(true)
 		];
 	}
@@ -26,16 +28,18 @@ namespace SH
 	{
 		FMenuBuilder MenuBuilder{ true, TSharedPtr<FUICommandList>() };
 
+		FSlateIcon Icon{ FAppStyle::Get().GetStyleSetName(), "Icons.Plus" };
+
 		MenuBuilder.AddMenuEntry(
 				FText::FromString("Float"),
 				FText::GetEmpty(),
-				FSlateIcon(),
+				Icon,
 				FUIAction{ FExecuteAction::CreateSP(this, &SShaderHelperPropertyView::AddUniform_Float) });
 
 		MenuBuilder.AddMenuEntry(
 			FText::FromString("Float2"),
 			FText::GetEmpty(),
-			FSlateIcon(),
+			Icon,
 			FUIAction{ FExecuteAction::CreateSP(this, &SShaderHelperPropertyView::AddUniform_Float2) });
 
 		return MenuBuilder.MakeWidget();
@@ -51,16 +55,19 @@ namespace SH
 			CustomPropertyCategory->AddChild(CustomUniformCategory.ToSharedRef());
 		}
 
-		FString NewUniformName = FString::Format(TEXT("Float_{0}"), { AddNum });
-		auto NewUniformProperty = MakeShared<PropertyNumber<float>>(NewUniformName, 0);
-		NewUniformProperty->SetOnValueChanged([this, NewUniformName](float NewValue) {
-			CustomUniformBuffer->GetMember<float>(NewUniformName) = NewValue;
+		FString NewUniformName = FString::Format(TEXT("Float_{0}"), { AddNum++ });
+		auto NewUniformProperty = MakeShared<PropertyItem<float>>(NewUniformName, 0);
+		NewUniformProperty->SetOnValueChanged([this, NewUniformProperty](float NewValue) {
+			NewUniformProperty->UpdateUniformBuffer(CustomUniformBuffer.Get());
+		});
+		NewUniformProperty->SetOnDisplayNameChanged([this](const FString& NewDisplayName) {
+			ReCreateCustomUniformBuffer();
 		});
 
 		CustomUniformCategory->AddChild(MoveTemp(NewUniformProperty));
 
 		PropertyView->Refresh();
-		ReCreateUniformBuffer();
+		ReCreateCustomUniformBuffer();
 	}
 
 	void SShaderHelperPropertyView::AddUniform_Float2()
@@ -73,48 +80,95 @@ namespace SH
 			CustomPropertyCategory->AddChild(CustomUniformCategory.ToSharedRef());
 		}
 
-		FString NewUniformName = FString::Format(TEXT("Float2_{0}"), { AddNum });
-		auto NewUniformProperty = MakeShared<PropertyNumber<Vector2f>>(NewUniformName, Vector2f{ 0 });
-		NewUniformProperty->SetOnValueChanged([this, NewUniformName](Vector2f NewValue) {
-			CustomUniformBuffer->GetMember<Vector2f>(NewUniformName) = NewValue;
+		FString NewUniformName = FString::Format(TEXT("Float2_{0}"), { AddNum++ });
+		auto NewUniformProperty = MakeShared<PropertyItem<Vector2f>>(NewUniformName, Vector2f{ 0 });
+		NewUniformProperty->SetOnValueChanged([this, NewUniformProperty](Vector2f NewValue) {
+			NewUniformProperty->UpdateUniformBuffer(CustomUniformBuffer.Get());
+		});
+		NewUniformProperty->SetOnDisplayNameChanged([this](const FString& NewDisplayName) {
+			ReCreateCustomUniformBuffer();
 		});
 
 		CustomUniformCategory->AddChild(MoveTemp(NewUniformProperty));
 
 		PropertyView->Refresh();
-		ReCreateUniformBuffer();
+		ReCreateCustomUniformBuffer();
 	}
 
-	void SShaderHelperPropertyView::ReCreateUniformBuffer()
+	void SShaderHelperPropertyView::ReCreateCustomUniformBuffer()
 	{
 		UniformBufferBuilder Builder{"Custom", UniformBufferUsage::Persistant };
 
 		TArray<TSharedRef<PropertyData>> Uniforms;
 		CustomUniformCategory->GetChildren(Uniforms);
 
-		for (auto& Uniform : Uniforms)
+		for (const auto& Uniform : Uniforms)
 		{
 			Uniform->AddToUniformBuffer(Builder);
 		}
 
 		CustomUniformBuffer = AUX::TransOwnerShip(Builder.Build());
+		for (const auto& Uniform : Uniforms)
+		{
+			Uniform->UpdateUniformBuffer(CustomUniformBuffer.Get());
+		}
 
-		ReCreateArgumentBuffer();
+		ReCreateCustomArgumentBuffer();
+
+		if (SShaderEditorBox* ShaderEditorBox = ShaderEditor.Get())
+		{
+			ShaderEditorBox->ReCompile();
+		}
 	}
 
-	void SShaderHelperPropertyView::ReCreateArgumentBuffer()
+	void SShaderHelperPropertyView::ReCreateCustomArgumentBuffer()
 	{
-		//auto [NewArgumentBuffer, NewArgumentBufferLayout] = ArgumentBufferBuilder{ 1 }
-		//	.AddUniformBuffer(CustomUniformBuffer, BindingShaderStage::Pixel)
-		//	.Build();
+		auto [NewArgumentBuffer, NewArgumentBufferLayout] = ArgumentBufferBuilder{ 1 }
+			.AddUniformBuffer(CustomUniformBuffer, BindingShaderStage::Pixel)
+			.Build();
 
-		//Renderer->CustomArgumentBuffer = MoveTemp(NewArgumentBuffer);
-		//Renderer->CustomArgumentBufferLayout = MoveTemp(NewArgumentBufferLayout);
+		Renderer->CustomArgumentBuffer = MoveTemp(NewArgumentBuffer);
+		Renderer->CustomArgumentBufferLayout = MoveTemp(NewArgumentBufferLayout);
 	}
 
-	void SShaderHelperPropertyView::OnDeleteProperty()
+	void SShaderHelperPropertyView::OnDeleteProperty(TSharedRef<PropertyData> InProperty)
 	{
+		int32 LastUniformCategoryChildrenNum = CustomUniformCategory->GetChildrenNum();
+		InProperty->Remove();
 
+		bool IsUniformProperty = CustomUniformCategory->GetChildrenNum() - LastUniformCategoryChildrenNum > 0;
+
+		if (CustomUniformCategory->GetChildrenNum() == 0)
+		{
+			CustomUniformCategory->Remove();
+			CustomUniformCategory = nullptr;
+		}
+
+		PropertyView->Refresh();
+
+		if (IsUniformProperty)
+		{
+			ReCreateCustomUniformBuffer();
+		}
+	}
+
+	TSharedPtr<SWidget> SShaderHelperPropertyView::CreateContextMenu()
+	{
+		TArray<TSharedRef<PropertyData>> SelectedItems = PropertyView->GetSelectedItems();
+		if (SelectedItems.Num() == 0)
+		{
+			return nullptr;
+		}
+
+		FMenuBuilder MenuBuilder{ true, TSharedPtr<FUICommandList>() };
+
+		MenuBuilder.AddMenuEntry(
+			FText::FromString("Delete"),
+			FText::GetEmpty(),
+			FSlateIcon(FAppStyle::Get().GetStyleSetName(), "Icons.Delete"),
+			FUIAction{ FExecuteAction::CreateSP(this, &SShaderHelperPropertyView::OnDeleteProperty, SelectedItems[0]) });
+
+		return MenuBuilder.MakeWidget();
 	}
 
 }

@@ -88,8 +88,8 @@ namespace FRAMEWORK
 		Dx12RootSignature(const RootSignatureDesc& InDesc);
 		ID3D12RootSignature* GetResource() const { return Resource; }
 
-		uint32 GetDynamicBufferRootParameterIndex(BindingSlot InSlot) const {
-			return DynamicBufferToRootParameterIndex[InSlot];
+		uint32 GetDynamicBufferRootParameterIndex(BindingSlot InSlot, BindingGroupSlot InGroupSlot) const {
+			return DynamicBufferToRootParameterIndex[InGroupSlot][InSlot];
 		}
 
 		uint32 GetDescriptorTableRootParameterIndex(D3D12_SHADER_VISIBILITY Visibility) const {
@@ -97,7 +97,7 @@ namespace FRAMEWORK
 		}
 
 	private:
-		TMap<BindingSlot, uint32> DynamicBufferToRootParameterIndex;
+		TMap<BindingSlot, uint32> DynamicBufferToRootParameterIndex[GpuResourceLimit::MaxBindableBingGroupNum];
 		TMap<D3D12_SHADER_VISIBILITY, uint32> DescriptorTableToRootParameterIndex;
 		TRefCountPtr<ID3D12RootSignature> Resource;
 	};

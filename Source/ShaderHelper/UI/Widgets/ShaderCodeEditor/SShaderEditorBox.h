@@ -109,6 +109,8 @@ namespace SH
 		int32 GetLineNumber(int32 InLineIndex) const;
 		int32 GetLineIndex(int32 InLineNumber) const;
 		int32 GetCurDisplayLineCount() const { return ShaderMarshaller->TextLayout->GetLineCount(); }
+		FString GetCurShaderSource() const { return CurrentShaderSource; }
+		void ReCompile() { OnShaderTextChanged(CurrentShaderSource); }
 
 		TOptional<int32> FindFoldMarker(int32 InIndex) const;
 		void MarkLineNumberDataDirty(bool IsDirty) { IsLineNumberDataDirty = IsDirty; }
@@ -144,6 +146,8 @@ namespace SH
 		TArray<FoldMarker> DisplayedFoldMarkers;
     
 	private:
+		FString CurrentShaderSource;
+
 		bool IsLineNumberDataDirty = false;
 		TArray<LineNumberItemPtr> LineNumberData;
 		TSharedPtr<FShaderEditorMarshaller> ShaderMarshaller;

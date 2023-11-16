@@ -6,9 +6,29 @@
 
 namespace FRAMEWORK
 {
+	class SNeverSelectedTableRow : public STableRow<TSharedRef<PropertyData>>
+	{
+	public:
+		SLATE_BEGIN_ARGS(SNeverSelectedTableRow) {}
+		SLATE_END_ARGS()
+
+		void Construct(const FArguments& InArgs, const TSharedRef<STableViewBase>& OwnerTableView)
+		{
+			STableRow<TSharedRef<PropertyData>>::Construct(
+				STableRow<TSharedRef<PropertyData>>::FArguments(),
+				OwnerTableView);
+		}
+
+	protected:
+		virtual ESelectionMode::Type GetSelectionMode() const override
+		{
+			return ESelectionMode::None;
+		}
+	};
+
 	inline TSharedRef<ITableRow> PropertyCategory::GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable)
 	{
-		auto Row = SNew(STableRow<TSharedRef<PropertyData>>, OwnerTable);
+		auto Row = SNew(SNeverSelectedTableRow, OwnerTable);
 
 		TSharedRef<SPropertyCatergory> RowContent = SNew(SPropertyCatergory, Row)
 			.DisplayName(DisplayName)
@@ -19,20 +39,32 @@ namespace FRAMEWORK
 	}
 
 	template<> 
-	inline void PropertyNumber<float>::AddToUniformBuffer(UniformBufferBuilder& Builder)
+	inline void PropertyItem<float>::AddToUniformBuffer(UniformBufferBuilder& Builder) const
 	{
 		Builder.AddFloat(DisplayName);
 	}
 	template<>
-	inline void PropertyNumber<Vector2f>::AddToUniformBuffer(UniformBufferBuilder& Builder)
+	inline void PropertyItem<float>::UpdateUniformBuffer(UniformBuffer* Buffer) const
 	{
-		Builder.AddVector2f(DisplayName);
+		Buffer->GetMember<float>(DisplayName) = ValueAttribute.Get();
 	}
 
 	template<>
-	inline TSharedRef<ITableRow> PropertyNumber<float>::GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable)
+	inline void PropertyItem<Vector2f>::AddToUniformBuffer(UniformBufferBuilder& Builder) const
 	{
-		auto Row = SNew(STableRow<TSharedRef<PropertyData>>, OwnerTable);
+		Builder.AddVector2f(DisplayName);
+	}
+	template<>
+	inline void PropertyItem<Vector2f>::UpdateUniformBuffer(UniformBuffer* Buffer) const
+	{
+		Buffer->GetMember<Vector2f>(DisplayName) = ValueAttribute.Get();
+	}
+
+	template<>
+	inline TSharedRef<ITableRow> PropertyItem<float>::GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable)
+	{
+		auto Row = IsEnabled ? 
+			SNew(STableRow<TSharedRef<PropertyData>>, OwnerTable) : SNew(SNeverSelectedTableRow, OwnerTable);
 
 		auto ValueWidget = SNew(SSpinBox<float>)
 			.MaxFractionalDigits(3)
@@ -40,11 +72,19 @@ namespace FRAMEWORK
 				ValueAttribute = NewValue; 
 				if (OnValueChanged) { OnValueChanged(ValueAttribute.Get()); }
 			})
+			.OnValueCommitted_Lambda([this](float NewValue, ETextCommit::Type) {
+				ValueAttribute = NewValue;
+				if (OnValueChanged) { OnValueChanged(ValueAttribute.Get()); }
+			})
 			.Value_Lambda([this] { return ValueAttribute.Get(); });
 
 		Row->SetRowContent(
 			SNew(SPropertyItem)
 			.DisplayName(DisplayName)
+			.OnDisplayNameChanged([this](const FString& NewDisplayName) {
+				DisplayName = NewDisplayName;
+				this->OnDisplayNameChanged(NewDisplayName);
+			})
 			.ValueWidget(MoveTemp(ValueWidget))
 			.IsEnabled(IsEnabled)
 		);
@@ -52,9 +92,10 @@ namespace FRAMEWORK
 	}
 
 	template<>
-	inline TSharedRef<ITableRow> PropertyNumber<Vector2f>::GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable)
+	inline TSharedRef<ITableRow> PropertyItem<Vector2f>::GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable)
 	{
-		auto Row = SNew(STableRow<TSharedRef<PropertyData>>, OwnerTable);
+		auto Row = IsEnabled ?
+			SNew(STableRow<TSharedRef<PropertyData>>, OwnerTable) : SNew(SNeverSelectedTableRow, OwnerTable);
 
 		auto ValueWidget = SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot()
@@ -81,6 +122,10 @@ namespace FRAMEWORK
 		Row->SetRowContent(
 			SNew(SPropertyItem)
 			.DisplayName(DisplayName)
+			.OnDisplayNameChanged([this](const FString& NewDisplayName) {
+				DisplayName = NewDisplayName;
+				this->OnDisplayNameChanged(NewDisplayName);
+			})
 			.ValueWidget(MoveTemp(ValueWidget))
 			.IsEnabled(IsEnabled)
 		);

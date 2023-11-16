@@ -9,6 +9,7 @@ namespace FRAMEWORK
 	void SPropertyItem::Construct(const FArguments& InArgs)
 	{
 		DisplayNameText = FText::FromString(InArgs._DisplayName);
+		OnDisplayNameChanged = InArgs._OnDisplayNameChanged;
 		TSharedRef<SHorizontalBox> HBox = SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot()
 			.AutoWidth()
@@ -26,11 +27,11 @@ namespace FRAMEWORK
 				SNew(SInlineEditableTextBlock)
 				.IsSelected_Lambda([] {return true; })
 				.Text(this, &SPropertyItem::GetNameText)
-				.OnTextCommitted_Lambda([&](const FText& NewText, ETextCommit::Type) {
+				.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
 					DisplayNameText = NewText;
-					if (InArgs._OnDisplayNameChanged)
+					if (OnDisplayNameChanged)
 					{
-						InArgs._OnDisplayNameChanged(NewText.ToString());
+						OnDisplayNameChanged(NewText.ToString());
 					}
 				})
 				.Font(FAppStyle::Get().GetFontStyle("SmallFont"))
