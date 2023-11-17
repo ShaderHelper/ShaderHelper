@@ -29,17 +29,57 @@ namespace FRAMEWORK
             CurrentRenderCommandEncoder = CurrentCommandBuffer.RenderCommandEncoder(CurrentRenderPassDesc);
             CurrentRenderCommandEncoder.GetPtr().label = [NSString stringWithUTF8String:TCHAR_TO_ANSI(*PassName)];
         }
-        void SetPipeline(MetalPipelineState* InPipelineState) { CurrentPipelineState = InPipelineState; }
-        void SetVertexBuffer(MetalBuffer* InBuffer) { CurrentVertexBuffer = InBuffer; }
-        void SetViewPort(TUniquePtr<mtlpp::Viewport> InViewPort, TUniquePtr<mtlpp::ScissorRect> InSissorRect) {
-            CurrentViewport = MoveTemp(InViewPort);
-            CurrentScissorRect = MoveTemp(InSissorRect);
+
+        void SetPipeline(MetalPipelineState* InPipelineState) 
+		{
+			if (InPipelineState != CurrentPipelineState)
+			{
+				CurrentPipelineState = InPipelineState;
+				MarkPipelineDirty(true);
+			}
+		}
+
+        void SetVertexBuffer(MetalBuffer* InBuffer) 
+		{ 
+			if (CurrentVertexBuffer != InBuffer)
+			{
+				CurrentVertexBuffer = InBuffer;
+				MarkVertexBufferDirty(true);
+			}
+		}
+
+        void SetViewPort(mtlpp::Viewport InViewPort, mtlpp::ScissorRect InSissorRect) 
+		{
+			if (!CurrentViewport || FMemory::Memcmp(CurrentViewPort.Get() , &InViewPort, sizeof(mtlpp::Viewport))
+			{
+				CurrentViewport = MakeUnique<mtlpp::Viewport>(MoveTemp(InViewPort));
+				CurrentScissorRect = MakeUnique<mtlpp::ScissorRect>(MoveTemp(InSissorRect));
+				MarkViewportDirty(true);
+			}
+           
         }
-        void SetBindGroups(MetalBindGroup* InGroup0, MetalBindGroup* InGroup1, MetalBindGroup* InGroup2, MetalBindGroup* InGroup3) {
-            CurrentBindGroup0 = InGroup0;
-            CurrentBindGroup1 = InGroup1;
-            CurrentBindGroup2 = InGroup2;
-            CurrentBindGroup3 = InGroup3;
+
+        void SetBindGroups(MetalBindGroup* InGroup0, MetalBindGroup* InGroup1, MetalBindGroup* InGroup2, MetalBindGroup* InGroup3) 
+		{
+			if (InGroup0 != CurrentBindGroup0) {
+				CurrentBindGroup0 = InGroup0;
+				MarkBindGroup0Dirty(true);
+			}
+
+			if (InGroup1 != CurrentBindGroup1) {
+				CurrentBindGroup1 = InGroup1;
+				MarkBindGroup1Dirty(true);
+			}
+
+			if (InGroup2 != CurrentBindGroup2) {
+				CurrentBindGroup2 = InGroup2;
+				MarkBindGroup2Dirty(true);
+			}
+
+			if (InGroup3 != CurrentBindGroup3) {
+				CurrentBindGroup3 = InGroup3;
+				MarkBindGroup3Dirty(true);
+			}
         }
         
         void PrepareDrawingEnv();
@@ -48,7 +88,11 @@ namespace FRAMEWORK
         void MarkPipelineDirty(bool IsDirty) { IsPipelineDirty = IsDirty; }
         void MarkViewportDirty(bool IsDirty) { IsViewportDirty = IsDirty; }
         void MarkVertexBufferDirty(bool IsDirty) { IsVertexBufferDirty = IsDirty; }
-        void MarkBindGroupsDirty(bool IsDirty) { IsBindGroupsDirty = IsDirty; }
+
+		void MarkBindGroup0Dirty(bool IsDirty) { IsBindGroup0Dirty = IsDirty; }
+		void MarkBindGroup1Dirty(bool IsDirty) { IsBindGroup1Dirty = IsDirty; }
+		void MarkBindGroup2Dirty(bool IsDirty) { IsBindGroup2Dirty = IsDirty; }
+		void MarkBindGroup3Dirty(bool IsDirty) { IsBindGroup3Dirty = IsDirty; }
         
     private:
         MetalPipelineState* CurrentPipelineState;
@@ -68,7 +112,11 @@ namespace FRAMEWORK
         bool IsPipelineDirty : 1;
         bool IsViewportDirty : 1;
         bool IsVertexBufferDirty : 1;
-        bool IsBindGroupsDirty : 1;
+		
+		bool IsBindGroup0Dirty : 1;
+		bool IsBindGroup1Dirty : 1;
+		bool IsBindGroup2Dirty : 1;
+		bool IsBindGroup3Dirty : 1;
     };
 
     inline CommandListContext* GetCommandListContext() {

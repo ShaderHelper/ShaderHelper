@@ -52,6 +52,7 @@ namespace SH
 		if (!CustomUniformCategory)
 		{
 			CustomUniformCategory = MakeShared<PropertyCategory>("Uniform");
+			PropertyView->ExpandItem(CustomUniformCategory.ToSharedRef());
 			CustomPropertyCategory->AddChild(CustomUniformCategory.ToSharedRef());
 		}
 
@@ -77,6 +78,7 @@ namespace SH
 		if (!CustomUniformCategory)
 		{
 			CustomUniformCategory = MakeShared<PropertyCategory>("Uniform");
+			PropertyView->ExpandItem(CustomUniformCategory.ToSharedRef());
 			CustomPropertyCategory->AddChild(CustomUniformCategory.ToSharedRef());
 		}
 
@@ -97,23 +99,48 @@ namespace SH
 
 	void SShaderHelperPropertyView::ReCreateCustomUniformBuffer()
 	{
-		UniformBufferBuilder Builder{"Custom", UniformBufferUsage::Persistant };
-
 		TArray<TSharedRef<PropertyData>> Uniforms;
 		CustomUniformCategory->GetChildren(Uniforms);
 
-		for (const auto& Uniform : Uniforms)
+		if (Uniforms.Num() == 0)
 		{
-			Uniform->AddToUniformBuffer(Builder);
+			CustomUniformBuffer = nullptr;
 		}
-
-		CustomUniformBuffer = AUX::TransOwnerShip(Builder.Build());
-		for (const auto& Uniform : Uniforms)
+		else
 		{
-			Uniform->UpdateUniformBuffer(CustomUniformBuffer.Get());
+			UniformBufferBuilder Builder{ "Custom", UniformBufferUsage::Persistant };
+			for (const auto& Uniform : Uniforms)
+			{
+				Uniform->AddToUniformBuffer(Builder);
+			}
+
+			CustomUniformBuffer = AUX::TransOwnerShip(Builder.Build());
+			for (const auto& Uniform : Uniforms)
+			{
+				Uniform->UpdateUniformBuffer(CustomUniformBuffer.Get());
+			}
 		}
 
 		ReCreateCustomArgumentBuffer();
+	}
+
+	void SShaderHelperPropertyView::ReCreateCustomArgumentBuffer()
+	{
+
+		if (!CustomUniformBuffer.IsValid()/*&& TODO*/)
+		{
+			Renderer->UpdateCustomArgumentBuffer(nullptr);
+			Renderer->UpdateCustomArgumentBufferLayout(nullptr);
+		}
+		else
+		{
+			auto [NewArgumentBuffer, NewArgumentBufferLayout] = ArgumentBufferBuilder{ 1 }
+				.AddUniformBuffer(CustomUniformBuffer, BindingShaderStage::Pixel)
+				.Build();
+
+			Renderer->UpdateCustomArgumentBuffer(AUX::TransOwnerShip(MoveTemp(NewArgumentBuffer)));
+			Renderer->UpdateCustomArgumentBufferLayout(AUX::TransOwnerShip(MoveTemp(NewArgumentBufferLayout)));
+		}
 
 		if (SShaderEditorBox* ShaderEditorBox = ShaderEditor.Get())
 		{
@@ -121,35 +148,23 @@ namespace SH
 		}
 	}
 
-	void SShaderHelperPropertyView::ReCreateCustomArgumentBuffer()
-	{
-		auto [NewArgumentBuffer, NewArgumentBufferLayout] = ArgumentBufferBuilder{ 1 }
-			.AddUniformBuffer(CustomUniformBuffer, BindingShaderStage::Pixel)
-			.Build();
-
-		Renderer->CustomArgumentBuffer = MoveTemp(NewArgumentBuffer);
-		Renderer->CustomArgumentBufferLayout = MoveTemp(NewArgumentBufferLayout);
-	}
-
 	void SShaderHelperPropertyView::OnDeleteProperty(TSharedRef<PropertyData> InProperty)
 	{
 		int32 LastUniformCategoryChildrenNum = CustomUniformCategory->GetChildrenNum();
 		InProperty->Remove();
 
-		bool IsUniformProperty = CustomUniformCategory->GetChildrenNum() - LastUniformCategoryChildrenNum > 0;
-
-		if (CustomUniformCategory->GetChildrenNum() == 0)
-		{
-			CustomUniformCategory->Remove();
-			CustomUniformCategory = nullptr;
-		}
-
-		PropertyView->Refresh();
-
+		bool IsUniformProperty = LastUniformCategoryChildrenNum - CustomUniformCategory->GetChildrenNum() > 0;
 		if (IsUniformProperty)
 		{
 			ReCreateCustomUniformBuffer();
+			if (CustomUniformCategory->GetChildrenNum() == 0)
+			{
+				CustomUniformCategory->Remove();
+				CustomUniformCategory = nullptr;
+			}
 		}
+
+		PropertyView->Refresh();
 	}
 
 	TSharedPtr<SWidget> SShaderHelperPropertyView::CreateContextMenu()

@@ -87,7 +87,7 @@ namespace FRAMEWORK
 			if (BindingResource->GetType() == GpuResourceType::Buffer)
 			{
 				Dx12Buffer* Buffer = static_cast<Dx12Buffer*>(BindingResource);
-				DynamicBufferStorage.Add(Slot, Buffer->GetAllocation().GetGpuAddr());
+				DynamicBufferStorage.Add(Slot, Buffer);
 			}
 			else
 			{

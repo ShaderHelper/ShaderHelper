@@ -151,13 +151,11 @@ namespace GpuApi
 	void SetRenderPipelineState(GpuPipelineState* InPipelineState)
 	{
         GetCommandListContext()->SetPipeline(static_cast<MetalPipelineState*>(InPipelineState));
-        GetCommandListContext()->MarkPipelineDirty(true);
 	}
 
 	void SetVertexBuffer(GpuBuffer* InVertexBuffer)
 	{
         GetCommandListContext()->SetVertexBuffer(static_cast<MetalBuffer*>(InVertexBuffer));
-        GetCommandListContext()->MarkVertexBufferDirty(true);
 	}
 
 	void SetViewPort(const GpuViewPortDesc& InViewPortDesc)
@@ -169,8 +167,7 @@ namespace GpuApi
         };
         
         mtlpp::ScissorRect ScissorRect{0, 0, InViewPortDesc.Width, InViewPortDesc.Height};
-        GetCommandListContext()->SetViewPort(MakeUnique<mtlpp::Viewport>(MoveTemp(Viewport)), MakeUnique<mtlpp::ScissorRect>(MoveTemp(ScissorRect)));
-        GetCommandListContext()->MarkViewportDirty(true);
+        GetCommandListContext()->SetViewPort(MoveTemp(Viewport), MoveTemp(ScissorRect));
 	}
 
 	void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)

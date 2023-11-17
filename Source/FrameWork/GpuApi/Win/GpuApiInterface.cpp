@@ -180,14 +180,12 @@ namespace GpuApi
 	void SetRenderPipelineState(GpuPipelineState* InPipelineState)
 	{
 		GCommandListContext->SetPipeline(static_cast<Dx12Pso*>(InPipelineState));
-		GCommandListContext->MarkPipelineDirty(true);
 	}
 
 	void SetVertexBuffer(GpuBuffer* InVertexBuffer)
 	{
 		Dx12Buffer* Vb = static_cast<Dx12Buffer*>(InVertexBuffer);
 		GCommandListContext->SetVertexBuffer(Vb);
-		GCommandListContext->MarkVertexBufferDirty(true);
 	}
 
 	void SetViewPort(const GpuViewPortDesc& InViewPortDesc)
@@ -201,30 +199,27 @@ namespace GpuApi
 		ViewPort.TopLeftY = InViewPortDesc.TopLeftY;
 
 		D3D12_RECT ScissorRect = CD3DX12_RECT(0, 0, InViewPortDesc.Width, InViewPortDesc.Height);
-		GCommandListContext->SetViewPort(MakeUnique<D3D12_VIEWPORT>(MoveTemp(ViewPort)), MakeUnique<D3D12_RECT>(MoveTemp(ScissorRect)));
-		GCommandListContext->MarkViewportDirty(true);
+		GCommandListContext->SetViewPort(MoveTemp(ViewPort), MoveTemp(ScissorRect));
 	}
 
 	void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)
 	{
 		check(ValidateSetBindGroups(BindGroup0, BindGroup1, BindGroup2, BindGroup3));
 
-		RootSignatureDesc RsDesc{};
-		if (BindGroup0) { RsDesc.Layout0 = static_cast<Dx12BindGroupLayout*>(BindGroup0->GetLayout()); }
-		if (BindGroup1) { RsDesc.Layout1 = static_cast<Dx12BindGroupLayout*>(BindGroup1->GetLayout()); }
-		if (BindGroup2) { RsDesc.Layout1 = static_cast<Dx12BindGroupLayout*>(BindGroup2->GetLayout()); }
-		if (BindGroup3) { RsDesc.Layout1 = static_cast<Dx12BindGroupLayout*>(BindGroup3->GetLayout()); }
+		RootSignatureDesc RsDesc{
+			BindGroup0 ? static_cast<Dx12BindGroupLayout*>(BindGroup0->GetLayout()) : nullptr,
+			BindGroup1 ? static_cast<Dx12BindGroupLayout*>(BindGroup1->GetLayout()) : nullptr,
+			BindGroup2 ? static_cast<Dx12BindGroupLayout*>(BindGroup2->GetLayout()) : nullptr,
+			BindGroup3 ? static_cast<Dx12BindGroupLayout*>(BindGroup3->GetLayout()) : nullptr
+		};
 
 		GCommandListContext->SetRootSignature(Dx12RootSignatureManager::GetRootSignature(RsDesc));
-		GCommandListContext->MarkRootSigDirty(true);
-
 		GCommandListContext->SetBindGroups(
 			static_cast<Dx12BindGroup*>(BindGroup0),
 			static_cast<Dx12BindGroup*>(BindGroup1),
 			static_cast<Dx12BindGroup*>(BindGroup2),
 			static_cast<Dx12BindGroup*>(BindGroup3)
 			);
-		GCommandListContext->MarkBindGroupsDirty(true);
 	}
 
 	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType)
@@ -319,10 +314,7 @@ namespace GpuApi
             ClearColorValues.Add(PassDesc.ColorRenderTargets[i].ClearColor);
         }
         
-        GCommandListContext->SetRenderTargets(MoveTemp(RTs));
-        GCommandListContext->SetClearColors(MoveTemp(ClearColorValues));
-        GCommandListContext->MarkRenderTartgetDirty(true);
-        
+        GCommandListContext->SetRenderTargets(MoveTemp(RTs), MoveTemp(ClearColorValues));    
     }
 
     void EndRenderPass()

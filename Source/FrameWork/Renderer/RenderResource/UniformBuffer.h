@@ -99,6 +99,7 @@ namespace FRAMEWORK
 		}
 
 		auto Build() {
+			checkf(MetaData.UniformBufferSize > 0, TEXT("Nothing added to the builder."));
 			TRefCountPtr<GpuBuffer> Buffer = GpuApi::CreateBuffer(MetaData.UniformBufferSize, (GpuBufferUsage)Usage);
 			MetaData.UniformBufferDeclaration = FString::Printf(TEXT("cbuffer %s\r\n{\r\n%s\r\n};\r\n"), *MetaData.UniformBufferName, *UniformBufferMemberNames);
 			return MakeUnique<UniformBuffer>( MoveTemp(Buffer), MetaData);
@@ -107,13 +108,7 @@ namespace FRAMEWORK
 	private:
 		template<typename T>
 		void AddMember(const FString& MemberName)
-		{
-#if !SH_SHIPPING
-			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize, AUX::TTypename<T>::Value });
-#else
-			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize });
-#endif
-			
+		{			
 			uint32 MemberSize = sizeof(T);
 			uint32 SizeBeforeAligning = MetaData.UniformBufferSize;
 			uint32 SizeAfterAligning = Align(MetaData.UniformBufferSize, 16);
@@ -131,6 +126,13 @@ namespace FRAMEWORK
 			{
 				MetaData.UniformBufferSize += MemberSize;
 			}
+
+#if !SH_SHIPPING
+			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize - MemberSize, AUX::TTypename<T>::Value });
+#else
+			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize - MemberSize });
+#endif
+
 			UniformBufferMemberNames += FString::Printf(TEXT("%s %s;\r\n"), ANSI_TO_TCHAR(UniformBufferMemberTypeString<T>::Value.data()), *MemberName);
 		}
 		

@@ -72,10 +72,10 @@ namespace FRAMEWORK
 				ValueAttribute = NewValue; 
 				if (OnValueChanged) { OnValueChanged(ValueAttribute.Get()); }
 			})
-			.OnValueCommitted_Lambda([this](float NewValue, ETextCommit::Type) {
+		/*	.OnValueCommitted_Lambda([this](float NewValue, ETextCommit::Type) {
 				ValueAttribute = NewValue;
 				if (OnValueChanged) { OnValueChanged(ValueAttribute.Get()); }
-			})
+			})*/
 			.Value_Lambda([this] { return ValueAttribute.Get(); });
 
 		Row->SetRowContent(
