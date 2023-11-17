@@ -679,10 +679,9 @@ namespace SH
 		UpdateFoldingArrow();
 	}
 
-	void SShaderEditorBox::OnShaderTextChanged(const FString& NewShaderSouce)
+	bool SShaderEditorBox::OnShaderTextChanged(const FString& NewShaderSouce)
 	{
 		CurrentShaderSource = NewShaderSouce;
-
 		FString PixelShaderInput = ShRenderer::DefaultPixelShaderInput;
 		FString PixelShaderMacro = ShRenderer::DefaultPixelShaderMacro;
 		FString ShaderResourceDeclaration = Renderer->GetResourceDeclaration();
@@ -693,6 +692,13 @@ namespace SH
 		AddedLineNum += ShaderResourceDeclaration.ParseIntoArrayLines(AddedLines, false) - 1;
 
 		FString FinalShaderSource = PixelShaderInput + ShaderResourceDeclaration + PixelShaderMacro + NewShaderSouce;
+		if (CurrentFullShaderSource == FinalShaderSource)
+		{
+			return CurEditState == EditState::Normal;
+		}
+
+		CurrentFullShaderSource = FinalShaderSource;
+
 		TRefCountPtr<GpuShader> NewPixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, MoveTemp(FinalShaderSource), {}, TEXT("MainPS"));
 		FString ErrorInfo;
 		EffectMarshller->LineNumberToErrorInfo.Reset();
@@ -704,6 +710,7 @@ namespace SH
 		else
 		{
 			CurEditState = EditState::Failed;
+			Renderer->UpdatePixelShader(nullptr);
 			TArray<ShaderErrorInfo> ErrorInfos = ParseErrorInfoFromDxc(ErrorInfo);
 			for (const ShaderErrorInfo& ErrorInfo : ErrorInfos)
 			{
@@ -736,6 +743,8 @@ namespace SH
 		{
 			GenerateInfoBarBox();
 		}
+
+		return CurEditState == EditState::Normal;
 	}
 
 	static int32 GetNumSpacesAtStartOfLine(const FString& InLine)

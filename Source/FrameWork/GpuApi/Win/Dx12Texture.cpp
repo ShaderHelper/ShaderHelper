@@ -133,8 +133,17 @@ namespace FRAMEWORK
 		CD3DX12_CLEAR_VALUE ClearValues{ MapTextureFormat(InTexDesc.Format), ClearColor };
 
 		TRefCountPtr<ID3D12Resource> TexResource;
-		DxCheck(GDevice->CreateCommittedResource(&HeapType, HeapFlag,
-			&TexDesc, ActualState, &ClearValues, IID_PPV_ARGS(TexResource.GetInitReference())));
+
+		if(Flags.bRTV)
+		{ 
+			DxCheck(GDevice->CreateCommittedResource(&HeapType, HeapFlag,
+				&TexDesc, ActualState, &ClearValues, IID_PPV_ARGS(TexResource.GetInitReference())));
+		}
+		else
+		{
+			DxCheck(GDevice->CreateCommittedResource(&HeapType, HeapFlag,
+				&TexDesc, ActualState, nullptr, IID_PPV_ARGS(TexResource.GetInitReference())));
+		}
 
 		TRefCountPtr<Dx12Buffer> UploadBuffer;
 		if (bHasInitialData) {

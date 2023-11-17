@@ -11,11 +11,10 @@ namespace FRAMEWORK
         Dx12Shader* Vs = static_cast<Dx12Shader*>(InPipelineStateDesc.Vs);
         Dx12Shader* Ps = static_cast<Dx12Shader*>(InPipelineStateDesc.Ps);
 
-		RootSignatureDesc RsDesc{};
-		RsDesc.Layout0 = static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout0);
-		RsDesc.Layout1 = static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout1);
-		RsDesc.Layout2 = static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout2);
-		RsDesc.Layout3 = static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout3);
+		RootSignatureDesc RsDesc{
+			static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout0), static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout1),
+			static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout2), static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout3)
+		};
 
         D3D12_GRAPHICS_PIPELINE_STATE_DESC PsoDesc{};
 		PsoDesc.pRootSignature = Dx12RootSignatureManager::GetRootSignature(RsDesc)->GetResource();
