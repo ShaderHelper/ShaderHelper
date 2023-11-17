@@ -4,6 +4,7 @@
 #include <Styling/StyleColors.h>
 #include "Common/Path/BaseResourcePath.h"
 #include <Styling/SlateStyleMacros.h>
+#include <Styling/StarshipCoreStyle.h>
 
 #define RootToContentDir Style->RootToContentDir
 #define TTF_FONT( RelativePath, ... ) FSlateFontInfo(RootToContentDir( RelativePath, TEXT(".ttf") ), __VA_ARGS__ )
@@ -30,8 +31,10 @@ namespace FRAMEWORK
 	TSharedRef<ISlateStyle> FAppCommonStyle::Create()
 	{
 		TSharedRef<FSlateStyleSet> Style = MakeShared<FSlateStyleSet>("AppCommonStyle");
+		Style->SetContentRoot(BaseResourcePath::Custom_SlateResourceDir);
+		Style->Set("PropertyView.RowIndentDropShadow", new IMAGE_BRUSH("DropShadow", FVector2D(2, 2)));
 
-		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir / TEXT("Slate"));
+		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir);
 		//StarshipCoreStyle is used as the app style.
 		const FEditableTextBoxStyle& NormalEditableTextBoxStyle =  FAppStyle::Get().GetWidgetStyle<FEditableTextBoxStyle>("NormalEditableTextBox");
 		const FTextBlockStyle& NormalText = FAppStyle::Get().GetWidgetStyle<FTextBlockStyle>("NormalText");
@@ -62,6 +65,9 @@ namespace FRAMEWORK
 			.SetColorAndOpacity(FStyleColors::Error)
 		);
 
+		Style->Set("PropertyView.CategoryColor", new FSlateColorBrush(FLinearColor{ 0.04f, 0.04f, 0.04f, 1.0f }));
+		Style->Set("PropertyView.ItemColor", new FSlateColorBrush(FLinearColor{ 0.02f, 0.02f, 0.02f, 1.0f }));
+		Style->Set("PropertyView.ItemHoverdColor", new FSlateColorBrush(FLinearColor{ 0.03f, 0.03f, 0.03f, 1.0f }));
 		return Style;
 	}
 

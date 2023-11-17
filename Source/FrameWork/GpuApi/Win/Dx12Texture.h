@@ -23,6 +23,7 @@ namespace FRAMEWORK
 		
 	private:
 		TRefCountPtr<ID3D12Resource> Resource;
+		void* SharedHandle;
 
 	public:
 		CpuDescriptorHandle HandleRTV;
@@ -30,7 +31,7 @@ namespace FRAMEWORK
 		TRefCountPtr<Dx12Buffer> UploadBuffer;
 		TRefCountPtr<Dx12Buffer> ReadBackBuffer;
 		bool bIsMappingForWriting = false;
-		void* SharedHandle;
+		
 	};
 
 	TRefCountPtr<Dx12Texture> CreateDx12Texture2D(const GpuTextureDesc& InTexDesc);

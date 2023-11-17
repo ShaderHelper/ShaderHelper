@@ -14,7 +14,10 @@ namespace FRAMEWORK
         , IsPipelineDirty(false)
         , IsViewportDirty(false)
         , IsVertexBufferDirty(false)
-        , IsBindGroupsDirty(false)
+        , IsBindGroup0Dirty(false)
+		, IsBindGroup1Dirty(false)
+		, IsBindGroup2Dirty(false)
+		, IsBindGroup3Dirty(false)
     {
         
     }
@@ -31,27 +34,39 @@ namespace FRAMEWORK
         
         if(IsViewportDirty)
         {
-            check(CurrentViewport.IsValid());
+            check(CurrentViewPort.IsValid());
             check(CurrentScissorRect.IsValid());
-            CurrentRenderCommandEncoder.SetViewport(*CurrentViewport);
+            CurrentRenderCommandEncoder.SetViewport(*CurrentViewPort);
             CurrentRenderCommandEncoder.SetScissorRect(*CurrentScissorRect);
             MarkViewportDirty(false);
         }
         
-        if(IsBindGroupsDirty)
-        {
-            if(CurrentBindGroup0) { CurrentBindGroup0->Apply(GetRenderCommandEncoder()); }
-            if(CurrentBindGroup1) { CurrentBindGroup1->Apply(GetRenderCommandEncoder()); }
-            if(CurrentBindGroup2) { CurrentBindGroup2->Apply(GetRenderCommandEncoder()); }
-            if(CurrentBindGroup3) { CurrentBindGroup3->Apply(GetRenderCommandEncoder()); }
-            MarkBindGroupsDirty(false);
-        }
+        if(CurrentBindGroup0 && IsBindGroup0Dirty) 
+		{ 
+			CurrentBindGroup0->Apply(GetRenderCommandEncoder()); 
+			MarkBindGroup0Dirty(false);
+		}
+        if(CurrentBindGroup1 && IsBindGroup1Dirty)
+		{ 
+			CurrentBindGroup1->Apply(GetRenderCommandEncoder()); 
+			MarkBindGroup1Dirty(false);
+		}
+		if(CurrentBindGroup2 && IsBindGroup2Dirty)
+		{ 
+			CurrentBindGroup2->Apply(GetRenderCommandEncoder());
+			MarkBindGroup2Dirty(false);
+		}
+        if(CurrentBindGroup3 && IsBindGroup3Dirty)
+		{ 
+			CurrentBindGroup3->Apply(GetRenderCommandEncoder());
+			MarkBindGroup3Dirty(false);
+		}
     }
 
     void CommandListContext::ClearBinding()
     {
         CurrentPipelineState = nullptr;
-        CurrentViewport.Reset();
+        CurrentViewPort.Reset();
         CurrentScissorRect.Reset();
         
         CurrentBindGroup0 = nullptr;
@@ -59,10 +74,6 @@ namespace FRAMEWORK
         CurrentBindGroup2 = nullptr;
         CurrentBindGroup3 = nullptr;
         
-        IsPipelineDirty = false;
-        IsViewportDirty = false;
-        IsVertexBufferDirty = false;
-        IsBindGroupsDirty = false;
     }
 
 }

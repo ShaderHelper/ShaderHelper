@@ -5,13 +5,13 @@ namespace FRAMEWORK
 {
 
 	inline bool GCanGpuCapture = false;
-	inline TRefCountPtr<ID3D12Device> GDevice;
-	inline TRefCountPtr<IDXGIFactory2> GDxgiFactory;
-	inline TRefCountPtr<ID3D12CommandQueue> GGraphicsQueue;
-	inline TRefCountPtr<ID3D12Fence> CpuSyncGpuFence;
+	inline ID3D12Device* GDevice;
+	inline IDXGIFactory2* GDxgiFactory;
+	inline ID3D12CommandQueue* GGraphicsQueue;
+	inline ID3D12Fence* CpuSyncGpuFence;
 	inline HANDLE CpuSyncGpuEvent;
 	inline constexpr uint32 AllowableLag = 2;
-	inline constexpr uint32 FrameSourceNum = AllowableLag;
+	inline constexpr uint32 FrameSourceNum = AllowableLag + 1;
 	inline uint64 CurCpuFrame;
 	inline uint64 CurGpuFrame;
 

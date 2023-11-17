@@ -55,7 +55,11 @@ namespace FRAMEWORK
 		class BufferBuddyAllocator* FromAllocator;
 		uint32 Offset;
 		uint32 Size;
+
+		//Just for Upload heap resource(eg. constant buffer)
 		bool IsFrameSource = false;
+		//Allow to update resource on demand with frame resource strategy.
+		mutable uint32 LastFrameBlockIndexWritten = 0;
 
 		void Release();
 
@@ -63,8 +67,8 @@ namespace FRAMEWORK
 		{
 			if (IsFrameSource) {
 				check(Size % FrameSourceNum == 0);
-				uint32 CurrentFrameSize = Size / FrameSourceNum;
-				return ResourceBaseGpuAddr + Offset + CurrentFrameSize * GetCurFrameSourceIndex();
+				uint32 FrameBlockSize = Size / FrameSourceNum;
+				return ResourceBaseGpuAddr + Offset + FrameBlockSize * LastFrameBlockIndexWritten;
 			}
 			return ResourceBaseGpuAddr + Offset;
 		}
@@ -74,8 +78,16 @@ namespace FRAMEWORK
 			check(ResourceBaseCpuAddr);
 			if (IsFrameSource) {
 				check(Size % FrameSourceNum == 0);
-				uint32 CurrentFrameSize = Size / FrameSourceNum;
-				return (uint8*)ResourceBaseCpuAddr + Offset + CurrentFrameSize * GetCurFrameSourceIndex();
+				uint32 FrameBlockSize = Size / FrameSourceNum;
+				void* CurAddress = (uint8*)ResourceBaseCpuAddr + Offset + FrameBlockSize * GetCurFrameSourceIndex();
+				if (LastFrameBlockIndexWritten != GetCurFrameSourceIndex())
+				{
+					//Inherit the result last written
+					void* LastAddress = (uint8*)ResourceBaseCpuAddr + Offset + FrameBlockSize * LastFrameBlockIndexWritten;
+					FMemory::Memcpy(CurAddress, LastAddress, FrameBlockSize);
+					LastFrameBlockIndexWritten = GetCurFrameSourceIndex();
+				}
+				return CurAddress;
 			}
 			return (uint8*)ResourceBaseCpuAddr + Offset;
 		}
