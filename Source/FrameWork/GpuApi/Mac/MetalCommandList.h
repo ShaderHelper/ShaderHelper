@@ -50,9 +50,9 @@ namespace FRAMEWORK
 
         void SetViewPort(mtlpp::Viewport InViewPort, mtlpp::ScissorRect InSissorRect) 
 		{
-			if (!CurrentViewport || FMemory::Memcmp(CurrentViewPort.Get() , &InViewPort, sizeof(mtlpp::Viewport))
+			if (!CurrentViewPort || FMemory::Memcmp(CurrentViewPort.Get() , &InViewPort, sizeof(mtlpp::Viewport)))
 			{
-				CurrentViewport = MakeUnique<mtlpp::Viewport>(MoveTemp(InViewPort));
+                CurrentViewPort = MakeUnique<mtlpp::Viewport>(MoveTemp(InViewPort));
 				CurrentScissorRect = MakeUnique<mtlpp::ScissorRect>(MoveTemp(InSissorRect));
 				MarkViewportDirty(true);
 			}
@@ -97,7 +97,7 @@ namespace FRAMEWORK
     private:
         MetalPipelineState* CurrentPipelineState;
         MetalBuffer* CurrentVertexBuffer;
-        TUniquePtr<mtlpp::Viewport> CurrentViewport;
+        TUniquePtr<mtlpp::Viewport> CurrentViewPort;
         TUniquePtr<mtlpp::ScissorRect> CurrentScissorRect;
         
         mtlpp::RenderPassDescriptor  CurrentRenderPassDesc;

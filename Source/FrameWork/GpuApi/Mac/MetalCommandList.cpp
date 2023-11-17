@@ -34,9 +34,9 @@ namespace FRAMEWORK
         
         if(IsViewportDirty)
         {
-            check(CurrentViewport.IsValid());
+            check(CurrentViewPort.IsValid());
             check(CurrentScissorRect.IsValid());
-            CurrentRenderCommandEncoder.SetViewport(*CurrentViewport);
+            CurrentRenderCommandEncoder.SetViewport(*CurrentViewPort);
             CurrentRenderCommandEncoder.SetScissorRect(*CurrentScissorRect);
             MarkViewportDirty(false);
         }
@@ -66,7 +66,7 @@ namespace FRAMEWORK
     void CommandListContext::ClearBinding()
     {
         CurrentPipelineState = nullptr;
-        CurrentViewport.Reset();
+        CurrentViewPort.Reset();
         CurrentScissorRect.Reset();
         
         CurrentBindGroup0 = nullptr;
