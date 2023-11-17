@@ -179,7 +179,6 @@ namespace GpuApi
             static_cast<MetalBindGroup*>(BindGroup2),
             static_cast<MetalBindGroup*>(BindGroup3)
         );
-        GetCommandListContext()->MarkBindGroupsDirty(true);
 	}
 
 	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType)
