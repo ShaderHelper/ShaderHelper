@@ -20,7 +20,10 @@ namespace FRAMEWORK
 		, IsVertexBufferDirty(false)
 		, IsViewportDirty(false)
 		, IsRootSigDirty(false)
-        , IsBindGroupsDirty(false)
+        , IsBindGroup0Dirty(false)
+		, IsBindGroup1Dirty(false)
+		, IsBindGroup2Dirty(false)
+		, IsBindGroup3Dirty(false)
 	{
 
 	}
@@ -49,7 +52,7 @@ namespace FRAMEWORK
 		{
 			if (CurrentVertexBuffer) {
 				//TODO
-                GDeferredReleaseManager.AddUncompletedResource(CurrentVertexBuffer);
+                GDeferredReleaseManager->AddUncompletedResource(CurrentVertexBuffer);
 			}
 			else {
                 GraphicsCmdList->IASetVertexBuffers(0, 0, nullptr);
@@ -63,7 +66,7 @@ namespace FRAMEWORK
 		{
 			check(CurrentPso);
 			GraphicsCmdList->SetPipelineState(CurrentPso->GetResource());
-            GDeferredReleaseManager.AddUncompletedResource(CurrentPso);
+            GDeferredReleaseManager->AddUncompletedResource(CurrentPso);
 			MarkPipelineDirty(false);
 		}
 
@@ -74,40 +77,32 @@ namespace FRAMEWORK
 			MarkRootSigDirty(false);
 		}
 
-		if (IsBindGroupsDirty)
-		{
+		if (CurrentBindGroup0 && IsBindGroup0Dirty) {
+			CurrentBindGroup0->Apply(GetCommandListHandle(), CurrentRootSignature);
+			GDeferredReleaseManager->AddUncompletedResource(CurrentBindGroup0);
+			MarkBindGroup0Dirty(false);
+		}
 
-            if(CurrentBindGroup0) {
-                CurrentBindGroup0->Apply(GetCommandListHandle(), CurrentRootSignature);
-                GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup0);
-                
-            }
-            
-            if(CurrentBindGroup1) {
-                CurrentBindGroup1->Apply(GetCommandListHandle(), CurrentRootSignature);
-                GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup1);
-                
-            }
-            
-            if(CurrentBindGroup2) {
-                CurrentBindGroup2->Apply(GetCommandListHandle(), CurrentRootSignature);
-                GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup2);
-                
-            }
-            
-            if(CurrentBindGroup3) {
-                CurrentBindGroup3->Apply(GetCommandListHandle(), CurrentRootSignature);
-                GDeferredReleaseManager.AddUncompletedResource(CurrentBindGroup3);
-                
-            }
+		if (CurrentBindGroup1 && IsBindGroup1Dirty) {
+			CurrentBindGroup1->Apply(GetCommandListHandle(), CurrentRootSignature);
+			GDeferredReleaseManager->AddUncompletedResource(CurrentBindGroup1);
+			MarkBindGroup1Dirty(false);
+		}
 
-			MarkBindGroupsDirty(false);
+		if (CurrentBindGroup2 && IsBindGroup2Dirty) {
+			CurrentBindGroup2->Apply(GetCommandListHandle(), CurrentRootSignature);
+			GDeferredReleaseManager->AddUncompletedResource(CurrentBindGroup2);
+			MarkBindGroup2Dirty(false);
+		}
+
+		if (CurrentBindGroup3 && IsBindGroup3Dirty) {
+			CurrentBindGroup3->Apply(GetCommandListHandle(), CurrentRootSignature);
+			GDeferredReleaseManager->AddUncompletedResource(CurrentBindGroup3);
+			MarkBindGroup3Dirty(false);
 		}
 	
 		if (IsViewportDirty)
 		{
-            check(CurrentViewPort.IsValid());
-            check(CurrentSissorRect.IsValid());
             GraphicsCmdList->RSSetViewports(1, CurrentViewPort.Get());
             GraphicsCmdList->RSSetScissorRects(1, CurrentSissorRect.Get());
 			MarkViewportDirty(false);
@@ -140,7 +135,7 @@ namespace FRAMEWORK
                 else {
                     GraphicsCmdList->ClearRenderTargetView(RenderTarget->HandleRTV.CpuHandle, OptimizedClearValue.GetData(), 0, nullptr);
                 }
-                GDeferredReleaseManager.AddUncompletedResource(RenderTarget);
+                GDeferredReleaseManager->AddUncompletedResource(RenderTarget);
                 RenderTargetDescriptors[i] = RenderTarget->HandleRTV.CpuHandle;
             }
             
@@ -159,13 +154,6 @@ namespace FRAMEWORK
 		CurrentBindGroup1 = nullptr;
 		CurrentBindGroup2 = nullptr;
 		CurrentBindGroup3 = nullptr;
-        
-        IsPipelineDirty = false;
-        IsRenderTargetDirty = false;
-        IsVertexBufferDirty = false;
-        IsViewportDirty = false;
-		IsRootSigDirty = false;
-		IsBindGroupsDirty = false;
         
         CurrentRenderTargets.Empty();
         
@@ -221,7 +209,7 @@ namespace FRAMEWORK
 		TRefCountPtr<ID3D12GraphicsCommandList> GraphicsCmdList;
 		DxCheck(GDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, InitialCommandAllocator, nullptr, IID_PPV_ARGS(GraphicsCmdList.GetInitReference())));
 		DxCheck(GraphicsCmdList->Close());
-		GCommandListContext.Reset(new CommandListContext(MoveTemp(FrameResources), MoveTemp(GraphicsCmdList)));
+		GCommandListContext = new CommandListContext(MoveTemp(FrameResources), MoveTemp(GraphicsCmdList));
 	}
 
 }

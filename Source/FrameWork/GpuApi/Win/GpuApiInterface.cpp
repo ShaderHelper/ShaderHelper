@@ -29,7 +29,7 @@ namespace GpuApi
 		GCommandListContext->BindStaticFrameResource(FrameResourceIndex);
 
 		GTempUniformBufferAllocator[FrameResourceIndex]->Flush();
-        GDeferredReleaseManager.AllocateOneFrame();
+        GDeferredReleaseManager->AllocateOneFrame();
 	}
 
 	void EndRenderFrame()
@@ -42,14 +42,14 @@ namespace GpuApi
 		
 		CurGpuFrame = CpuSyncGpuFence->GetCompletedValue();
 		const uint64 CurLag = CurCpuFrame - CurGpuFrame;
-		if (CurLag >= AllowableLag) {
+		if (CurLag > AllowableLag) {
 			//Cpu is waiting for gpu to catch up a frame.
 			DxCheck(CpuSyncGpuFence->SetEventOnCompletion(CurGpuFrame + 1, CpuSyncGpuEvent));
 			WaitForSingleObject(CpuSyncGpuEvent, INFINITE);
 			CurGpuFrame = CurGpuFrame + 1;
 		}
 
-        GDeferredReleaseManager.ReleaseCompletedResources();
+        GDeferredReleaseManager->ReleaseCompletedResources();
 	}
 
 	TRefCountPtr<GpuTexture> CreateGpuTexture(const GpuTextureDesc& InTexDesc)
@@ -63,13 +63,17 @@ namespace GpuApi
 		void* Data{};
 		if (InMapMode == GpuResourceMapMode::Write_Only) {
 			const uint32 BufferSize = (uint32)GetRequiredIntermediateSize(Texture->GetResource(), 0, 1);
-			Texture->UploadBuffer = CreateDx12Buffer(BufferSize, GpuBufferUsage::Dynamic);
+			if (!Texture->UploadBuffer) {
+				Texture->UploadBuffer = CreateDx12Buffer(BufferSize, GpuBufferUsage::Dynamic);
+			}
 			Data = Texture->UploadBuffer->GetAllocation().GetCpuAddr();
 			Texture->bIsMappingForWriting = true;
 		}
 		else if (InMapMode == GpuResourceMapMode::Read_Only) {
 			const uint32 BufferSize = (uint32)GetRequiredIntermediateSize(Texture->GetResource(), 0, 1);
-			Texture->ReadBackBuffer = CreateDx12Buffer(BufferSize, GpuBufferUsage::Staging);
+			if (!Texture->ReadBackBuffer) {
+				Texture->ReadBackBuffer = CreateDx12Buffer(BufferSize, GpuBufferUsage::Staging);
+			}
 			Data = Texture->ReadBackBuffer->GetAllocation().GetCpuAddr();
 			
 			ScopedBarrier Barrier{ Texture, D3D12_RESOURCE_STATE_COPY_SOURCE };
@@ -176,14 +180,12 @@ namespace GpuApi
 	void SetRenderPipelineState(GpuPipelineState* InPipelineState)
 	{
 		GCommandListContext->SetPipeline(static_cast<Dx12Pso*>(InPipelineState));
-		GCommandListContext->MarkPipelineDirty(true);
 	}
 
 	void SetVertexBuffer(GpuBuffer* InVertexBuffer)
 	{
 		Dx12Buffer* Vb = static_cast<Dx12Buffer*>(InVertexBuffer);
 		GCommandListContext->SetVertexBuffer(Vb);
-		GCommandListContext->MarkVertexBufferDirty(true);
 	}
 
 	void SetViewPort(const GpuViewPortDesc& InViewPortDesc)
@@ -197,30 +199,27 @@ namespace GpuApi
 		ViewPort.TopLeftY = InViewPortDesc.TopLeftY;
 
 		D3D12_RECT ScissorRect = CD3DX12_RECT(0, 0, InViewPortDesc.Width, InViewPortDesc.Height);
-		GCommandListContext->SetViewPort(MakeUnique<D3D12_VIEWPORT>(MoveTemp(ViewPort)), MakeUnique<D3D12_RECT>(MoveTemp(ScissorRect)));
-		GCommandListContext->MarkViewportDirty(true);
+		GCommandListContext->SetViewPort(MoveTemp(ViewPort), MoveTemp(ScissorRect));
 	}
 
 	void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)
 	{
 		check(ValidateSetBindGroups(BindGroup0, BindGroup1, BindGroup2, BindGroup3));
 
-		RootSignatureDesc RsDesc{};
-		if (BindGroup0) { RsDesc.Layout0 = static_cast<Dx12BindGroupLayout*>(BindGroup0->GetLayout()); }
-		if (BindGroup1) { RsDesc.Layout1 = static_cast<Dx12BindGroupLayout*>(BindGroup1->GetLayout()); }
-		if (BindGroup2) { RsDesc.Layout1 = static_cast<Dx12BindGroupLayout*>(BindGroup2->GetLayout()); }
-		if (BindGroup3) { RsDesc.Layout1 = static_cast<Dx12BindGroupLayout*>(BindGroup3->GetLayout()); }
+		RootSignatureDesc RsDesc{
+			BindGroup0 ? static_cast<Dx12BindGroupLayout*>(BindGroup0->GetLayout()) : nullptr,
+			BindGroup1 ? static_cast<Dx12BindGroupLayout*>(BindGroup1->GetLayout()) : nullptr,
+			BindGroup2 ? static_cast<Dx12BindGroupLayout*>(BindGroup2->GetLayout()) : nullptr,
+			BindGroup3 ? static_cast<Dx12BindGroupLayout*>(BindGroup3->GetLayout()) : nullptr
+		};
 
 		GCommandListContext->SetRootSignature(Dx12RootSignatureManager::GetRootSignature(RsDesc));
-		GCommandListContext->MarkRootSigDirty(true);
-
 		GCommandListContext->SetBindGroups(
 			static_cast<Dx12BindGroup*>(BindGroup0),
 			static_cast<Dx12BindGroup*>(BindGroup1),
 			static_cast<Dx12BindGroup*>(BindGroup2),
 			static_cast<Dx12BindGroup*>(BindGroup3)
 			);
-		GCommandListContext->MarkBindGroupsDirty(true);
 	}
 
 	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType)
@@ -252,7 +251,7 @@ namespace GpuApi
 		CurGpuFrame = CurCpuFrame;
 
 		GCommandListContext->BindStaticFrameResource(GetCurFrameSourceIndex());
-        GDeferredReleaseManager.ReleaseCompletedResources();
+        GDeferredReleaseManager->ReleaseCompletedResources();
 	}
 
 	void BeginGpuCapture(const FString& SavedFileName)
@@ -315,10 +314,7 @@ namespace GpuApi
             ClearColorValues.Add(PassDesc.ColorRenderTargets[i].ClearColor);
         }
         
-        GCommandListContext->SetRenderTargets(MoveTemp(RTs));
-        GCommandListContext->SetClearColors(MoveTemp(ClearColorValues));
-        GCommandListContext->MarkRenderTartgetDirty(true);
-        
+        GCommandListContext->SetRenderTargets(MoveTemp(RTs), MoveTemp(ClearColorValues));    
     }
 
     void EndRenderPass()

@@ -23,7 +23,7 @@ namespace FRAMEWORK
 				Debug->EnableDebugLayer();
 			}
 		}
-		DxCheck(CreateDXGIFactory2(bEnableDebugLayer ? DXGI_CREATE_FACTORY_DEBUG : 0, IID_PPV_ARGS(GDxgiFactory.GetInitReference())));
+		DxCheck(CreateDXGIFactory2(bEnableDebugLayer ? DXGI_CREATE_FACTORY_DEBUG : 0, IID_PPV_ARGS(&GDxgiFactory)));
 #else
 		DxCheck(CreateDXGIFactory2(0, IID_PPV_ARGS(GDxgiFactory.GetInitReference())));
 #endif
@@ -35,7 +35,7 @@ namespace FRAMEWORK
 		Adapter->GetDesc1(&Desc);
 		SH_LOG(LogDx12, Display, TEXT("Adapter: %s"), Desc.Description);
 
-		DxCheck(D3D12CreateDevice(Adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(GDevice.GetInitReference())));
+		DxCheck(D3D12CreateDevice(Adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&GDevice)));
 
 #if GPU_API_DEBUG_LAYER
 		if (bEnableDebugLayer) {
@@ -56,13 +56,16 @@ namespace FRAMEWORK
 		}
 #endif
 
-		DxCheck(GDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(CpuSyncGpuFence.GetInitReference())));
+		DxCheck(GDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&CpuSyncGpuFence)));
 		CpuSyncGpuEvent = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
 
 		D3D12_COMMAND_QUEUE_DESC QueueDesc{};
 		QueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 		QueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-		DxCheck(GDevice->CreateCommandQueue(&QueueDesc, IID_PPV_ARGS(GGraphicsQueue.GetInitReference())));
+		DxCheck(GDevice->CreateCommandQueue(&QueueDesc, IID_PPV_ARGS(&GGraphicsQueue)));
+#if GPU_API_DEBUG_LAYER
+		GGraphicsQueue->SetName(TEXT("GpuApi-dx12 global graphics queue"));
+#endif
 	}
 
 }

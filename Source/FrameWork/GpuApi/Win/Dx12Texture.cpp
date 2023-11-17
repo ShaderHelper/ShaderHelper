@@ -133,12 +133,22 @@ namespace FRAMEWORK
 		CD3DX12_CLEAR_VALUE ClearValues{ MapTextureFormat(InTexDesc.Format), ClearColor };
 
 		TRefCountPtr<ID3D12Resource> TexResource;
-		DxCheck(GDevice->CreateCommittedResource(&HeapType, HeapFlag,
-			&TexDesc, ActualState, &ClearValues, IID_PPV_ARGS(TexResource.GetInitReference())));
 
+		if(Flags.bRTV)
+		{ 
+			DxCheck(GDevice->CreateCommittedResource(&HeapType, HeapFlag,
+				&TexDesc, ActualState, &ClearValues, IID_PPV_ARGS(TexResource.GetInitReference())));
+		}
+		else
+		{
+			DxCheck(GDevice->CreateCommittedResource(&HeapType, HeapFlag,
+				&TexDesc, ActualState, nullptr, IID_PPV_ARGS(TexResource.GetInitReference())));
+		}
+
+		TRefCountPtr<Dx12Buffer> UploadBuffer;
 		if (bHasInitialData) {
 			const uint32 UploadBufferSize = (uint32)GetRequiredIntermediateSize(TexResource, 0, 1);
-			TRefCountPtr<Dx12Buffer> UploadBuffer = CreateDx12Buffer(UploadBufferSize, GpuBufferUsage::Dynamic);
+			UploadBuffer = CreateDx12Buffer(UploadBufferSize, GpuBufferUsage::Dynamic);
 			
 			D3D12_SUBRESOURCE_DATA textureData = {};
 			textureData.pData = &InTexDesc.InitialData[0];
@@ -157,6 +167,7 @@ namespace FRAMEWORK
 		}
 		
 		TRefCountPtr<Dx12Texture> RetTexture = new Dx12Texture{ InitialState, MoveTemp(TexResource), InTexDesc, SharedHandle};
+		RetTexture->UploadBuffer = MoveTemp(UploadBuffer);
 		CreateTextureView(Flags, RetTexture);
 
 		return RetTexture;

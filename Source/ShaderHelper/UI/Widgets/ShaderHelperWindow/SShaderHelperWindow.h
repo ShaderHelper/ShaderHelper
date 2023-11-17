@@ -29,6 +29,8 @@ namespace SH
 		TSharedPtr<FTabManager> TabManager;
 		TSharedPtr<SViewport> Viewport;
 		Vector2D WindowSize;
+
+		TSharedPtr<class SShaderEditorBox> ShaderEditor;
 	};
 
 }

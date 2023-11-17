@@ -3,6 +3,7 @@
 #include "Dx12Common.h"
 #include "GpuApi/GpuResource.h"
 #include "Dx12Descriptor.h"
+#include "Dx12Buffer.h"
 
 namespace FRAMEWORK
 {
@@ -36,7 +37,7 @@ namespace FRAMEWORK
 		~Dx12BindGroup();
 
 		D3D12_GPU_VIRTUAL_ADDRESS GetDynamicBufferGpuAddr(BindingSlot InSlot) const {
-			return DynamicBufferStorage[InSlot];
+			return DynamicBufferStorage[InSlot]->GetAllocation().GetGpuAddr();
 		}
 
 		D3D12_GPU_DESCRIPTOR_HANDLE GetBaseDescriptor(D3D12_SHADER_VISIBILITY Visibility) const {
@@ -47,36 +48,41 @@ namespace FRAMEWORK
 
 	private:
 		TMap<D3D12_SHADER_VISIBILITY, D3D12_GPU_DESCRIPTOR_HANDLE> DescriptorTableStorage;
-		TMap<BindingSlot, D3D12_GPU_VIRTUAL_ADDRESS> DynamicBufferStorage;
+		TMap<BindingSlot, Dx12Buffer*> DynamicBufferStorage;
 	};
 
 	struct RootSignatureDesc
 	{
+		RootSignatureDesc(Dx12BindGroupLayout* InLayout0, Dx12BindGroupLayout* InLayout1,
+			Dx12BindGroupLayout* InLayout2, Dx12BindGroupLayout* InLayout3)
+			: Layout0(InLayout0), Layout1(InLayout1), Layout2(InLayout2), Layout3(InLayout3)
+		{
+			if (Layout0) { LayoutDesc0 = Layout0->GetDesc(); }
+			if (Layout1) { LayoutDesc1 = Layout1->GetDesc(); }
+			if (Layout2) { LayoutDesc2 = Layout2->GetDesc(); }
+			if (Layout3) { LayoutDesc3 = Layout3->GetDesc(); }
+		}
+
 		Dx12BindGroupLayout* Layout0;
 		Dx12BindGroupLayout* Layout1;
 		Dx12BindGroupLayout* Layout2;
 		Dx12BindGroupLayout* Layout3;
+		TOptional<GpuBindGroupLayoutDesc> LayoutDesc0;
+		TOptional<GpuBindGroupLayoutDesc> LayoutDesc1;
+		TOptional<GpuBindGroupLayoutDesc> LayoutDesc2;
+		TOptional<GpuBindGroupLayoutDesc> LayoutDesc3;
 
 		bool operator==(const RootSignatureDesc& Other) const {
-			auto CheckLayout = [](Dx12BindGroupLayout* Layout, Dx12BindGroupLayout* OtherLayout)
-			{
-				if (Layout != OtherLayout)
-				{
-					if (!Layout || !OtherLayout) return false;
-					if (!(Layout->GetDesc() == OtherLayout->GetDesc())) return false;
-				}
-				return true;
-			};
-			return CheckLayout(Layout0, Other.Layout0) && CheckLayout(Layout1, Other.Layout1) && 
-				CheckLayout(Layout2, Other.Layout2) && CheckLayout(Layout3, Other.Layout3);
+			return LayoutDesc0 == Other.LayoutDesc0 && LayoutDesc1 == Other.LayoutDesc1 &&
+				LayoutDesc2 == Other.LayoutDesc2 && LayoutDesc3 == Other.LayoutDesc3;
 		}
 
 		friend uint32 GetTypeHash(const RootSignatureDesc& Key) {
 			uint32 Hash = 0;
-			if (Key.Layout0) { Hash = HashCombine(Hash, GetTypeHash(Key.Layout0->GetDesc())); }
-			if (Key.Layout1) { Hash = HashCombine(Hash, GetTypeHash(Key.Layout1->GetDesc())); }
-			if (Key.Layout2) { Hash = HashCombine(Hash, GetTypeHash(Key.Layout2->GetDesc())); }
-			if (Key.Layout3) { Hash = HashCombine(Hash, GetTypeHash(Key.Layout3->GetDesc())); }
+			if (Key.LayoutDesc0) { Hash = HashCombine(Hash, GetTypeHash(*Key.LayoutDesc0)); }
+			if (Key.LayoutDesc1) { Hash = HashCombine(Hash, GetTypeHash(*Key.LayoutDesc1)); }
+			if (Key.LayoutDesc2) { Hash = HashCombine(Hash, GetTypeHash(*Key.LayoutDesc2)); }
+			if (Key.LayoutDesc3) { Hash = HashCombine(Hash, GetTypeHash(*Key.LayoutDesc3)); }
 			return Hash;
 		}
 	};
@@ -88,8 +94,8 @@ namespace FRAMEWORK
 		Dx12RootSignature(const RootSignatureDesc& InDesc);
 		ID3D12RootSignature* GetResource() const { return Resource; }
 
-		uint32 GetDynamicBufferRootParameterIndex(BindingSlot InSlot) const {
-			return DynamicBufferToRootParameterIndex[InSlot];
+		uint32 GetDynamicBufferRootParameterIndex(BindingSlot InSlot, BindingGroupSlot InGroupSlot) const {
+			return DynamicBufferToRootParameterIndex[InGroupSlot][InSlot];
 		}
 
 		uint32 GetDescriptorTableRootParameterIndex(D3D12_SHADER_VISIBILITY Visibility) const {
@@ -97,7 +103,7 @@ namespace FRAMEWORK
 		}
 
 	private:
-		TMap<BindingSlot, uint32> DynamicBufferToRootParameterIndex;
+		TMap<BindingSlot, uint32> DynamicBufferToRootParameterIndex[GpuResourceLimit::MaxBindableBingGroupNum];
 		TMap<D3D12_SHADER_VISIBILITY, uint32> DescriptorTableToRootParameterIndex;
 		TRefCountPtr<ID3D12RootSignature> Resource;
 	};

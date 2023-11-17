@@ -87,7 +87,7 @@ namespace FRAMEWORK
 			if (BindingResource->GetType() == GpuResourceType::Buffer)
 			{
 				Dx12Buffer* Buffer = static_cast<Dx12Buffer*>(BindingResource);
-				DynamicBufferStorage.Add(Slot, Buffer->GetAllocation().GetGpuAddr());
+				DynamicBufferStorage.Add(Slot, Buffer);
 			}
 			else
 			{
@@ -102,7 +102,7 @@ namespace FRAMEWORK
         for (auto Slot : Layout->GetBindingSlots())
         {
             D3D12_GPU_VIRTUAL_ADDRESS GpuAddr = GetDynamicBufferGpuAddr(Slot);
-            uint32 RootParameterIndex = RootSig->GetDynamicBufferRootParameterIndex(Slot);
+            uint32 RootParameterIndex = RootSig->GetDynamicBufferRootParameterIndex(Slot, Layout->GetGroupNumber());
             CommandList->SetGraphicsRootConstantBufferView(RootParameterIndex, GpuAddr);
         }
     }
@@ -120,10 +120,11 @@ namespace FRAMEWORK
 			if (Layout != nullptr)
 			{
 				const TArray<BindingSlot>& Slots = Layout->GetBindingSlots();
+				BindingGroupSlot CurGroupNumber = Layout->GetGroupNumber();
 				for (auto Slot : Slots)
 				{
 					RootParameters.Add(Layout->GetDynamicBufferRootParameter(Slot));
-					DynamicBufferToRootParameterIndex.Add(Slot, RootParameters.Num() - 1);
+					DynamicBufferToRootParameterIndex[CurGroupNumber].Add(Slot, RootParameters.Num() - 1);
 				}
 
 			}

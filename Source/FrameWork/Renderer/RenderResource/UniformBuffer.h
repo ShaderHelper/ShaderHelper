@@ -7,6 +7,9 @@ namespace FRAMEWORK
 	struct UniformBufferMemberInfo
 	{
 		uint32 Offset;
+#if !SH_SHIPPING
+		FString TypeName;
+#endif
 	};
 
 	struct UniformBufferMetaData
@@ -28,6 +31,8 @@ namespace FRAMEWORK
 		//Only write data, not read.
 		template<typename T>
 		T& GetMember(const FString& MemberName) {
+			checkf(MetaData.Members.Contains(MemberName), TEXT("The uniform buffer doesn't contain \"%s\" member."), *MemberName);
+			checkf(AUX::TTypename<T>::Value == MetaData.Members[MemberName].TypeName, TEXT("Mismatched type: %s, Expected : %s"), *AUX::TTypename<T>::Value, *MetaData.Members[MemberName].TypeName);
 			int32 MemberOffset = MetaData.Members[MemberName].Offset;
 			void* BufferBaseAddr = GpuApi::MapGpuBuffer(Buffer, GpuResourceMapMode::Write_Only);
 			return *reinterpret_cast<T*>((uint8*)BufferBaseAddr + MemberOffset);
@@ -69,31 +74,32 @@ namespace FRAMEWORK
 		}
 
 	public:
-		UniformBufferBuilder&& AddFloat(const FString& MemberName) 
+		UniformBufferBuilder& AddFloat(const FString& MemberName) 
 		{
 			AddMember<float>(MemberName);
-			return MoveTemp(*this);
+			return *this;
 		}
 
-		UniformBufferBuilder&& AddVector2f(const FString& MemberName) 
+		UniformBufferBuilder& AddVector2f(const FString& MemberName) 
 		{
 			AddMember<Vector2f>(MemberName);
-			return MoveTemp(*this);
+			return *this;
 		}
 
-		UniformBufferBuilder&& AddVector3f(const FString& MemberName) 
+		UniformBufferBuilder& AddVector3f(const FString& MemberName) 
 		{
 			AddMember<Vector3f>(MemberName);
-			return MoveTemp(*this);
+			return *this;
 		}
 
-		UniformBufferBuilder&& AddVector4f(const FString& MemberName) 
+		UniformBufferBuilder& AddVector4f(const FString& MemberName)
 		{
 			AddMember<Vector4f>(MemberName);
-			return MoveTemp(*this);
+			return *this;
 		}
 
-		auto Build() && {
+		auto Build() {
+			checkf(MetaData.UniformBufferSize > 0, TEXT("Nothing added to the builder."));
 			TRefCountPtr<GpuBuffer> Buffer = GpuApi::CreateBuffer(MetaData.UniformBufferSize, (GpuBufferUsage)Usage);
 			MetaData.UniformBufferDeclaration = FString::Printf(TEXT("cbuffer %s\r\n{\r\n%s\r\n};\r\n"), *MetaData.UniformBufferName, *UniformBufferMemberNames);
 			return MakeUnique<UniformBuffer>( MoveTemp(Buffer), MetaData);
@@ -102,9 +108,7 @@ namespace FRAMEWORK
 	private:
 		template<typename T>
 		void AddMember(const FString& MemberName)
-		{
-			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize });
-
+		{			
 			uint32 MemberSize = sizeof(T);
 			uint32 SizeBeforeAligning = MetaData.UniformBufferSize;
 			uint32 SizeAfterAligning = Align(MetaData.UniformBufferSize, 16);
@@ -122,6 +126,13 @@ namespace FRAMEWORK
 			{
 				MetaData.UniformBufferSize += MemberSize;
 			}
+
+#if !SH_SHIPPING
+			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize - MemberSize, AUX::TTypename<T>::Value });
+#else
+			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize - MemberSize });
+#endif
+
 			UniformBufferMemberNames += FString::Printf(TEXT("%s %s;\r\n"), ANSI_TO_TCHAR(UniformBufferMemberTypeString<T>::Value.data()), *MemberName);
 		}
 		

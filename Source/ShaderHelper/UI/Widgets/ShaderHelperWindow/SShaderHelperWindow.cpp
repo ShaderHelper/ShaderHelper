@@ -2,6 +2,7 @@
 #include "SShaderHelperWindow.h"
 #include "App/ShaderHelperApp.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
+#include "SShaderHelperPropertyView.h"
 
 namespace SH 
 {
@@ -19,13 +20,20 @@ namespace SH
 		}
 		else if (TabName == "PropetyTab") {
 			SAssignNew(SpawnedTab, SDockTab)
-				.Label(FText::FromString("Propety"));
+				.Label(FText::FromString("Propety"))
+				[
+					SNew(SShaderHelperPropertyView)
+					.Renderer(Renderer)
+					.ShaderEditor_Lambda([this] {
+						return ShaderEditor.Get();
+					})
+				];
 		}
 		else if (TabName == "CodeTab") {
 			SAssignNew(SpawnedTab, SDockTab)
 				.Label(FText::FromString("Code"))
 				[
-					SNew(SShaderEditorBox)
+					SAssignNew(ShaderEditor, SShaderEditorBox)
 						.Text(FText::FromString(ShRenderer::DefaultPixelShaderText))
 						.Renderer(Renderer)
 				];
@@ -83,13 +91,13 @@ namespace SH
 			->Split
 			(
 				FTabManager::NewStack()
-				->SetSizeCoefficient(0.15f)
+				->SetSizeCoefficient(0.18f)
 				->AddTab("PropetyTab", ETabState::OpenedTab)
 			)
 			->Split
 			(
 				FTabManager::NewStack()
-				->SetSizeCoefficient(0.45f)
+				->SetSizeCoefficient(0.42f)
 				->AddTab("CodeTab", ETabState::OpenedTab)
 			)
 		);
