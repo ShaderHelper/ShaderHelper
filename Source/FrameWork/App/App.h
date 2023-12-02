@@ -30,7 +30,7 @@ namespace FRAMEWORK {
 		virtual void Init();
 		virtual void PostInit();
 		virtual void ShutDown();
-		virtual void Update(double DeltaTime) {}
+		virtual void Update(double DeltaTime);
 
 	protected:
 		TSharedPtr<SWindow> AppWindow;

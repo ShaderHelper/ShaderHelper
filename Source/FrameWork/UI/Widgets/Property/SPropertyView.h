@@ -22,7 +22,6 @@ namespace FRAMEWORK
 				SNew(SBorder)
 				[
 					SNew(SBorder)
-					.BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
 					.Padding(0)
 					[
 						SAssignNew(PropertyTree, STreeView<PropertyDataType>)

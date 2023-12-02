@@ -7,16 +7,4 @@
 #include "GpuRenderPass.h"
 #include "GpuBindGroup.h"
 #include "GpuBindGroupLayout.h"
-
-namespace FRAMEWORK
-{
-	namespace GpuResourceHelper
-	{
-		const inline BlendStateDesc GDefaultBlendStateDesc{
-			/*.RtDescs = */ {
-				BlendRenderTargetDesc { false, BlendFactor::SrcAlpha, BlendFactor::InvSrcAlpha, BlendFactor::One, BlendFactor::One, BlendOp::Add, BlendOp::Add } 
-			}
-		};
-	}
-
-}
+#include "GpuResourceHelper.h"
