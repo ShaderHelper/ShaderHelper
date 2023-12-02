@@ -7,6 +7,8 @@
 #include "UI/Styles/FAppCommonStyle.h"
 #include <SlateCore/Fonts/SlateFontInfo.h>
 #include <Misc/OutputDeviceConsole.h>
+#include <DirectoryWatcher/DirectoryWatcherModule.h>
+#include <DirectoryWatcher/IDirectoryWatcher.h>
 
 namespace FRAMEWORK {
 
@@ -133,6 +135,13 @@ namespace FRAMEWORK {
 	{
 		UE_ShutDown();
 		FAppCommonStyle::ShutDown();
+	}
+
+	void App::Update(double DeltaTime)
+	{
+		FDirectoryWatcherModule& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>(TEXT("DirectoryWatcher"));
+		IDirectoryWatcher* DirectoryWatcher = DirectoryWatcherModule.Get();
+		DirectoryWatcher->Tick((float)DeltaTime);
 	}
 
 }

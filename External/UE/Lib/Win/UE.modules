@@ -2,6 +2,8 @@
 	"BuildId": "5fa16811-4fb6-4d30-975b-8c5a97ad87d4",
 	"Modules": 
 	{
+		"DesktopPlatform": "UE-DesktopPlatform.dll",
+		"DirectoryWatcher": "UE-DirectoryWatcher.dll",
 		"ApplicationCore": "UE-ApplicationCore.dll",
 		"BuildSettings": "UE-BuildSettings.dll",
 		"Core": "UE-Core.dll",

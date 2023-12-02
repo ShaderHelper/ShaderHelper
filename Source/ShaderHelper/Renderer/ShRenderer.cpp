@@ -1,7 +1,6 @@
 #include "CommonHeader.h"
 #include "ShRenderer.h"
 #include "GpuApi/GpuApiInterface.h"
-#include "Renderer/RenderResource/RenderResourceUtil.h"
 
 namespace SH
 {
@@ -59,7 +58,7 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		BuiltInArgumentBuffer = MoveTemp(NewArgumentBuffer);
 		BuiltInArgumentBufferLayout = MoveTemp(NewArgumentBufferLayout);
 
-		FinalRT = RenderResourceUtil::TempRenderTarget(GpuTextureFormat::B8G8R8A8_UNORM);
+		FinalRT = GpuResourceHelper::TempRenderTarget(GpuTextureFormat::B8G8R8A8_UNORM);
 	}
 
 	void ShRenderer::OnViewportResize()
@@ -125,7 +124,7 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		check(NewPixelShader->IsCompiled());
 		PipelineStateDesc PipelineDesc{
 				VertexShader, NewPixelShader,
-				RasterizerStateDesc{ RasterizerFillMode::Solid, RasterizerCullMode::None },
+				GpuResourceHelper::GDefaultRasterizerStateDesc,
 				GpuResourceHelper::GDefaultBlendStateDesc,
 				{ FinalRT->GetFormat() },
 				BuiltInArgumentBufferLayout->GetBindLayout()

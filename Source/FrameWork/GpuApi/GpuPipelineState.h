@@ -15,11 +15,11 @@ namespace FRAMEWORK
     {
         bool BlendEnable;
         BlendFactor SrcFactor;
+		BlendOp ColorOp;
         BlendFactor DestFactor;
         BlendFactor SrcAlphaFactor;
+		BlendOp AlphaOp;
         BlendFactor DestAlphaFactor;
-        BlendOp ColorOp;
-        BlendOp AlphaOp;
 
 		BlendMask Mask = BlendMask::All;
     };

@@ -3,13 +3,19 @@
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "Renderer/ShRenderer.h"
 #include "UI/Widgets/ShaderHelperWindow/SShaderHelperWindow.h"
+#include "ProjectManager/ProjectManager.h"
+#include "Common/Path/PathHelper.h"
 
 namespace SH {
+
+	const FString DefaultProjectPath = PathHelper::InitialDir() / TEXT("TemplateProject/Default/Default.shprj");
 
 	void ShaderHelperApp::Init()
 	{
 		App::Init();
 		FShaderHelperStyle::Init();
+
+		TSingleton<ProjectManager>::Get().Load(DefaultProjectPath);
 
 		ViewPort = MakeShared<PreviewViewPort>();
 		AppRenderer = MakeUnique<ShRenderer>(ViewPort.Get());

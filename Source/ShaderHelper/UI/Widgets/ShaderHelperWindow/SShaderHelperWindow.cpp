@@ -2,6 +2,7 @@
 #include "SShaderHelperWindow.h"
 #include "App/ShaderHelperApp.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
+#include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
 #include "SShaderHelperPropertyView.h"
 
 namespace SH 
@@ -41,7 +42,10 @@ namespace SH
 		}
 		else if (TabName == "ResourceTab") {
 			SAssignNew(SpawnedTab, SDockTab)
-				.Label(FText::FromString("Resource"));
+				.Label(FText::FromString("Resource"))
+				[
+					SNew(SAssetBrowser)
+				];
 		}
 		else {
 			ensure(false);
@@ -77,13 +81,13 @@ namespace SH
 				->Split
 				(
 					FTabManager::NewStack()
-					->SetSizeCoefficient(0.8f)
+					->SetSizeCoefficient(0.7f)
 					->AddTab("PreviewTab", ETabState::OpenedTab)
 				)
 				->Split
 				(
 					FTabManager::NewStack()
-					->SetSizeCoefficient(0.2f)
+					->SetSizeCoefficient(0.3f)
 					->AddTab("ResourceTab", ETabState::OpenedTab)
 				)
 				

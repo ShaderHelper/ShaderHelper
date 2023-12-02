@@ -65,9 +65,9 @@ namespace FRAMEWORK
 			.SetColorAndOpacity(FStyleColors::Error)
 		);
 
-		Style->Set("PropertyView.CategoryColor", new FSlateColorBrush(FLinearColor{ 0.04f, 0.04f, 0.04f, 1.0f }));
-		Style->Set("PropertyView.ItemColor", new FSlateColorBrush(FLinearColor{ 0.02f, 0.02f, 0.02f, 1.0f }));
-		Style->Set("PropertyView.ItemHoverdColor", new FSlateColorBrush(FLinearColor{ 0.03f, 0.03f, 0.03f, 1.0f }));
+		Style->Set("PropertyView.CategoryColor", new FSlateColorBrush(FLinearColor{ 0.07f, 0.07f, 0.07f, 1.0f }));
+		Style->Set("PropertyView.ItemColor", new FSlateColorBrush(FLinearColor{ 0.04f, 0.04f, 0.04f, 1.0f }));
+		Style->Set("PropertyView.ItemHoverdColor", new FSlateColorBrush(FLinearColor{ 0.05f, 0.05f, 0.05f, 1.0f }));
 		return Style;
 	}
 
