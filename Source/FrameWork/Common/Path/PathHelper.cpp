@@ -25,5 +25,15 @@ namespace FRAMEWORK {
 		return InitialDir() / TEXT("Saved");
 	}
 
+	FString PathHelper::SavedShaderDir()
+	{
+		return SavedDir() / TEXT("Shader");
+	}
+
+	FString PathHelper::SavedConfigDir()
+	{
+		return SavedDir() / TEXT("Config");
+	}
+
 }
 
