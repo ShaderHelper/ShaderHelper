@@ -96,7 +96,7 @@ namespace FRAMEWORK
 				TRefCountPtr<IDxcBlobUtf16> PdbNameBlob;
 				DxCheck(CompileResult->GetOutput(DXC_OUT_PDB, IID_PPV_ARGS(PdbBlob.GetInitReference()), PdbNameBlob.GetInitReference()));
 				const FString PdbName = PdbNameBlob->GetStringPointer();
-				const FString PdbFile = PathHelper::SavedDir() / PdbName;
+				const FString PdbFile = PathHelper::SavedShaderDir() / PdbName;
 				
 				TArray<uint8> BinaryData{ (uint8*)PdbBlob->GetBufferPointer(), (int32)PdbBlob->GetBufferSize() };
 				FFileHelper::SaveArrayToFile(BinaryData, *PdbFile);

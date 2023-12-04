@@ -6,5 +6,7 @@ namespace FRAMEWORK {
 		static FString ResourceDir();
 		static FString ExternalDir();
 		static FString SavedDir();
+		static FString SavedShaderDir();
+		static FString SavedConfigDir();
 	};
 }

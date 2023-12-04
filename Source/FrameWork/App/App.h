@@ -33,7 +33,6 @@ namespace FRAMEWORK {
 		virtual void Update(double DeltaTime);
 
 	protected:
-		TSharedPtr<SWindow> AppWindow;
 		TUniquePtr<Renderer> AppRenderer;
 		
 		Vector2D AppClientSize = Vector2D(1280, 720);

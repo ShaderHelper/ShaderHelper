@@ -18,6 +18,7 @@ namespace FRAMEWORK
 				SNew(SBorder)
 				[
 					SNew(SDirectoryTree)
+					.DirectoryShowed(InArgs._DirectoryShowed)
 				]
 				
 			]

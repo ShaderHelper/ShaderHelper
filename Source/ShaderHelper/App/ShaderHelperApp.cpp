@@ -3,7 +3,7 @@
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "Renderer/ShRenderer.h"
 #include "UI/Widgets/ShaderHelperWindow/SShaderHelperWindow.h"
-#include "ProjectManager/ProjectManager.h"
+#include "ProjectManager/ShProjectManager.h"
 #include "Common/Path/PathHelper.h"
 
 namespace SH {
@@ -14,24 +14,54 @@ namespace SH {
 	{
 		App::Init();
 		FShaderHelperStyle::Init();
+		//Need to schedule when to call RequestEngineExit to exit the app
+		FSlateApplication::Get().SetExitRequestedHandler(nullptr);
 
-		TSingleton<ProjectManager>::Get().Load(DefaultProjectPath);
+		TSingleton<ShProjectManager>::Get().OpenProject(DefaultProjectPath);
 
 		ViewPort = MakeShared<PreviewViewPort>();
 		AppRenderer = MakeUnique<ShRenderer>(ViewPort.Get());
+		ViewPort->OnViewportResize.AddRaw(static_cast<ShRenderer*>(AppRenderer.Get()), &ShRenderer::OnViewportResize);
+		
+		InitEditorUI();
+	}
 
-		AppWindow = SNew(SShaderHelperWindow)
+	void ShaderHelperApp::InitEditorUI()
+	{
+		TSharedRef<SShaderHelperWindow> EditorWindow = SNew(SShaderHelperWindow)
 			.Renderer(static_cast<ShRenderer*>(AppRenderer.Get()))
+			.OnResetWindowLayout_Lambda([this] { IsReInitEditorUI = true; })
 			.WindowSize(AppClientSize);
 
-		ViewPort->OnViewportResize.AddRaw(static_cast<ShRenderer*>(AppRenderer.Get()), &ShRenderer::OnViewportResize);
-		StaticCastSharedPtr<SShaderHelperWindow>(AppWindow)->SetViewPortInterface(ViewPort.ToSharedRef());
+		EditorWindow->SetOnWindowClosed(FOnWindowClosed::CreateLambda([this](const TSharedRef<SWindow>&) {
+			if (!IsReInitEditorUI)
+			{
+				RequestEngineExit(TEXT("Normal Slate Window Closed"));
+			}
+			else
+			{
+				ReInitEditorUi();
+			}
+		}));
+
+		FSlateApplication::Get().AddWindow(EditorWindow);
+		EditorWindow->SetViewPortInterface(ViewPort.ToSharedRef());
+	}
+
+	void ShaderHelperApp::ReInitEditorUi()
+	{
+		InitEditorUI();
+		IsReInitEditorUI = false;
+	}
+
+	void ShaderHelperApp::InitLauncherUI()
+	{
+
 	}
 
 	void ShaderHelperApp::PostInit()
 	{
 		App::PostInit();
-		FSlateApplication::Get().AddWindow(AppWindow.ToSharedRef());
 	}
 
 

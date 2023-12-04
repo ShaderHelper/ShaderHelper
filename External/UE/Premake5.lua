@@ -53,7 +53,8 @@ usage "UE"
             "UE-CoreUObject",
             "UE-InputCore",
             "UE-DesktopPlatform",
-            "UE-DirectoryWatcher"
+            "UE-DirectoryWatcher",
+			"UE-Json"
         }
         prebuildcommands {
             "{COPYFILE} %{wks.location}/External/UE/Lib/Win/*.dll %{cfg.targetdir}",
@@ -75,7 +76,8 @@ usage "UE"
             "%{cfg.targetdir}/UE-CoreUObject.dylib",
             "%{cfg.targetdir}/UE-InputCore.dylib",
             "%{cfg.targetdir}/UE-DesktopPlatform.dylib",
-            "%{cfg.targetdir}/UE-DirectoryWatcher.dylib"
+            "%{cfg.targetdir}/UE-DirectoryWatcher.dylib",
+			"%{cfg.targetdir}/UE-Json.dylib"
         }
         prebuildcommands {
             "{COPYFILE} %{wks.location}/External/UE/Lib/Mac/*.dylib %{cfg.targetdir}",

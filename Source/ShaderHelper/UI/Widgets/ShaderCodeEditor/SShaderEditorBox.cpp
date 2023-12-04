@@ -227,13 +227,13 @@ namespace SH
 							CodeFontInfo.Size = i;
 							ShaderMarshaller->MakeDirty();
 							ShaderMultiLineEditableText->Refresh();
-						})
-						, FCanExecuteAction(),
-							FIsActionChecked::CreateLambda(
-								[=]()
-								{
-									return CodeFontInfo.Size == i;
-								})),
+						}), 
+						FCanExecuteAction(),
+						FIsActionChecked::CreateLambda(
+						[=]()
+						{
+							return CodeFontInfo.Size == i;
+						})),
 						NAME_None,
 						EUserInterfaceActionType::RadioButton);
 			}

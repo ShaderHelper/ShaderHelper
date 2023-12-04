@@ -6,9 +6,11 @@ namespace FRAMEWORK
 	{
 	public:
 		SLATE_BEGIN_ARGS(SAssetBrowser) {}
+			SLATE_ARGUMENT(FString, DirectoryShowed)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs);
+		
 	};
 }
 

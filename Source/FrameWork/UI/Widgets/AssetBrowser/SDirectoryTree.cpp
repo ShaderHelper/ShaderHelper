@@ -13,25 +13,25 @@ namespace FRAMEWORK
 		{
 			if (IDirectoryWatcher* DirectoryWatcher = Module->Get())
 			{
-				DirectoryWatcher->UnregisterDirectoryChangedCallback_Handle(TSingleton<ProjectManager>::Get().GetActiveContentDirectory(), DirectoryWatcherHandle);
+				DirectoryWatcher->UnregisterDirectoryChangedCallback_Handle(DirectoryShowed, DirectoryWatcherHandle);
 			}
 		}
 	}
 
 	void SDirectoryTree::Construct(const FArguments& InArgs)
 	{
+		DirectoryShowed = InArgs._DirectoryShowed;
+
 		FDirectoryWatcherModule& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>(TEXT("DirectoryWatcher"));
 		IDirectoryWatcher* DirectoryWatcher = DirectoryWatcherModule.Get();
 
-		FString ProjectContentDir = TSingleton<ProjectManager>::Get().GetActiveContentDirectory();
-
-		DirectoryWatcher->RegisterDirectoryChangedCallback_Handle(ProjectContentDir,
+		DirectoryWatcher->RegisterDirectoryChangedCallback_Handle(DirectoryShowed,
 			IDirectoryWatcher::FDirectoryChanged::CreateRaw(this, &SDirectoryTree::OnDirectoryChanged), 
 			DirectoryWatcherHandle, IDirectoryWatcher::WatchOptions::IncludeDirectoryChanges);
 
 		auto ContentDirectoryData = MakeShared<DirectoryData>();
 		DirectoryDatas.Add(ContentDirectoryData);
-		PopulateDirectoryData(ContentDirectoryData, ProjectContentDir);
+		PopulateDirectoryData(ContentDirectoryData, DirectoryShowed);
 
 		ChildSlot
 		[

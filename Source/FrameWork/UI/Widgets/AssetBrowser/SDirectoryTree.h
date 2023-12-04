@@ -14,6 +14,7 @@ namespace FRAMEWORK
 	{
 	public:
 		SLATE_BEGIN_ARGS(SDirectoryTree) {}
+			SLATE_ARGUMENT(FString, DirectoryShowed)
 		SLATE_END_ARGS()
 
 		~SDirectoryTree();
@@ -32,5 +33,6 @@ namespace FRAMEWORK
 		FDelegateHandle DirectoryWatcherHandle;
 		TArray<TSharedRef<DirectoryData>> DirectoryDatas;
 		TSharedPtr<STreeView<TSharedRef<DirectoryData>>> DirectoryTree;
+		FString DirectoryShowed;
 	};
 }
