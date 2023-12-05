@@ -13,7 +13,7 @@ namespace FRAMEWORK
 		{
 			if (IDirectoryWatcher* DirectoryWatcher = Module->Get())
 			{
-				DirectoryWatcher->UnregisterDirectoryChangedCallback_Handle(DirectoryShowed, DirectoryWatcherHandle);
+				DirectoryWatcher->UnregisterDirectoryChangedCallback_Handle(FPaths::GetPath(DirectoryShowed), DirectoryWatcherHandle);
 			}
 		}
 	}
@@ -25,13 +25,14 @@ namespace FRAMEWORK
 		FDirectoryWatcherModule& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>(TEXT("DirectoryWatcher"));
 		IDirectoryWatcher* DirectoryWatcher = DirectoryWatcherModule.Get();
 
-		DirectoryWatcher->RegisterDirectoryChangedCallback_Handle(DirectoryShowed,
+		DirectoryWatcher->RegisterDirectoryChangedCallback_Handle(FPaths::GetPath(DirectoryShowed),
 			IDirectoryWatcher::FDirectoryChanged::CreateRaw(this, &SDirectoryTree::OnDirectoryChanged), 
 			DirectoryWatcherHandle, IDirectoryWatcher::WatchOptions::IncludeDirectoryChanges);
 
-		auto ContentDirectoryData = MakeShared<DirectoryData>();
-		DirectoryDatas.Add(ContentDirectoryData);
-		PopulateDirectoryData(ContentDirectoryData, DirectoryShowed);
+		auto RootDirectoryData = MakeShared<DirectoryData>();
+		RootDirectoryData->IsRootDirectory = true;
+		DirectoryDatas.Add(RootDirectoryData);
+		PopulateDirectoryData(RootDirectoryData, DirectoryShowed);
 
 		ChildSlot
 		[
@@ -42,7 +43,7 @@ namespace FRAMEWORK
 			.SelectionMode(ESelectionMode::Single)
 		];
 
-		DirectoryTree->SetItemExpansion(ContentDirectoryData, true);
+		DirectoryTree->SetItemExpansion(RootDirectoryData, true);
 	}
 
 	void SDirectoryTree::PopulateDirectoryData(TSharedRef<DirectoryData> InDirectoryData, const FString& DirectoryPath)
@@ -63,6 +64,15 @@ namespace FRAMEWORK
 
 	TSharedRef<ITableRow> SDirectoryTree::OnGenerateRow(TSharedRef<DirectoryData> InTreeNode, const TSharedRef<STableViewBase>& OwnerTable)
 	{
+		FSlateColor DirectoryTextColor = FLinearColor{ 0.8f,0.8f,0.8f };
+		FSlateFontInfo DirectoryTextFont = FAppStyle::Get().GetFontStyle("SmallFont");
+
+		if (InTreeNode->IsRootDirectory)
+		{
+			DirectoryTextColor = FLinearColor::White;
+			DirectoryTextFont = FAppStyle::Get().GetFontStyle("SmallFontBold");
+		}
+
 		return SNew(STableRow<TSharedRef<DirectoryData>>, OwnerTable)
 			.Style(&FAppStyle::Get().GetWidgetStyle<FTableRowStyle>("SimpleTableView.Row"))
 			[
@@ -91,7 +101,8 @@ namespace FRAMEWORK
 				[
 					SNew(STextBlock)
 					.Text(FText::FromString(FPaths::GetBaseFilename(InTreeNode->DirectoryPath)))
-					.Font(FAppStyle::Get().GetFontStyle("SmallFont"))
+					.Font(MoveTemp(DirectoryTextFont))
+					.ColorAndOpacity(DirectoryTextColor)
 				]
 			];
 	}
@@ -151,6 +162,11 @@ namespace FRAMEWORK
 
 			DirectoryTree->RequestTreeRefresh();
 		}
+		else if (DirectoryPath == DirectoryDatas[0]->DirectoryPath)
+		{
+			PopulateDirectoryData(DirectoryDatas[0], DirectoryDatas[0]->DirectoryPath);
+			DirectoryTree->RequestTreeRefresh();
+		}
 	}
 
 	void SDirectoryTree::RemoveDirectory(const FString& DirectoryPath)
@@ -167,6 +183,11 @@ namespace FRAMEWORK
 				}
 			}
 
+			DirectoryTree->RequestTreeRefresh();
+		}
+		else if (DirectoryPath == DirectoryDatas[0]->DirectoryPath)
+		{
+			PopulateDirectoryData(DirectoryDatas[0], DirectoryDatas[0]->DirectoryPath);
 			DirectoryTree->RequestTreeRefresh();
 		}
 	}
