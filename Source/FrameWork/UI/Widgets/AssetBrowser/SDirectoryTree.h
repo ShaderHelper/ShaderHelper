@@ -6,6 +6,7 @@ namespace FRAMEWORK
 {
 	struct DirectoryData
 	{
+		bool IsRootDirectory = false;
 		FString DirectoryPath;
 		TArray<TSharedRef<DirectoryData>> Children;
 	};

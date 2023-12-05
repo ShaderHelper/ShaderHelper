@@ -1,10 +1,18 @@
 #pragma once
-#include "GpuApi/GpuApiInterface.h"
 
-namespace FRAMEWORK::RenderResourceUtil
+namespace FRAMEWORK
 {
-	extern FRAMEWORK_API TRefCountPtr<GpuTexture> GlobalBlackTex;
+	namespace AssetImporter
+	{
+		//Implement it if you have custom asset type.
+		template<typename T>
+		T* Import(const FString& AssetPath);
+	}
 
-	FRAMEWORK_API void Init();
-	FRAMEWORK_API TRefCountPtr<GpuTexture> TempRenderTarget(GpuTextureFormat InFormat);
+	class AssetObject
+	{
+	public:
+		virtual ~AssetObject() = default;
+	};
+
 }
