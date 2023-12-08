@@ -1,14 +1,14 @@
 #pragma once
-#include "UI/Widgets/Property/SPropertyView.h"
+#include "UI/Widgets/Property/PropertyView/SPropertyView.h"
 #include "Renderer/ShRenderer.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 
 namespace SH
 {
-	class SShaderHelperPropertyView : public SCompoundWidget
+	class SShaderPassPropertyView : public SCompoundWidget
 	{
 	public:
-		SLATE_BEGIN_ARGS(SShaderHelperPropertyView)
+		SLATE_BEGIN_ARGS(SShaderPassPropertyView)
 			: _Renderer(nullptr)
 		{}
 			SLATE_ARGUMENT(ShRenderer*, Renderer)

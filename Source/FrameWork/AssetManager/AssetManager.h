@@ -3,61 +3,31 @@
 
 namespace FRAMEWORK
 {
-	class AssetManager;
-
 	template<typename T>
-	class AssetRef
+	class AssetPtr
 	{
-		friend AssetManager;
+		friend class AssetManager;
 
 		template <typename OtherType>
-		friend class AssetRef;
+		friend class AssetPtr;
 	private:
-		AssetRef(T& InAsset)
-			: Asset(&InAsset)
-		{
-			TSingleton<AssetManager>::Get().AddRef(Asset);
-		}
+		AssetPtr(T* InAsset);
 
 	public:
-		AssetRef(const AssetRef& InAssetRef)
-			: Asset(InAssetRef.Asset)
-		{
-			TSingleton<AssetManager>::Get().AddRef(Asset);
-		}
+		AssetPtr(const AssetPtr& InAssetRef);
 
 		template<typename OtherType,
 			typename = decltype(ImplicitConv<T*>((OtherType*)nullptr))
 		>
-		AssetRef(const AssetRef<OtherType>& OtherAssetRef)
-			: Asset(OtherAssetRef.Asset)
-		{
-			TSingleton<AssetManager>::Get().AddRef(Asset);
-		}
+		AssetPtr(const AssetPtr<OtherType>& OtherAssetRef);
 
-		AssetRef& operator=(const AssetRef& OtherAssetRef)
-		{
-			AssetRef Temp{ OtherAssetRef };
-			Swap(Temp, *this);
-			return *this;
-		}
+		AssetPtr& operator=(const AssetPtr& OtherAssetRef);
 
-		~AssetRef()
-		{
-			TSingleton<AssetManager>::Get().ReleaseRef(Asset);
-		}
+		~AssetPtr();
 
-		T* operator->() const
-		{
-			check(Asset != nullptr);
-			return Asset;
-		}
+		T* operator->() const;
 
-		T& Get() const
-		{
-			check(Asset != nullptr);
-			return *Asset;
-		}
+		T* Get() const;
 
 	private:
 		T* Asset;
@@ -68,13 +38,13 @@ namespace FRAMEWORK
 	public:
 	
 		/*	template<typename T>
-			AssetRef<T> LoadAssetByPath(const FString& AssetPath)
+			AssetPtr<T> LoadAssetByPath(const FString& AssetPath)
 			{
 				return AssetImporter::Import<T>(AssetPath);
 			}
 
 			template<typename T>
-			AssetRef<T> LoadAssetByGuid()
+			AssetPtr<T> LoadAssetByGuid()
 			{
 				return AssetImporter::Import<T>();
 			}*/
@@ -86,4 +56,8 @@ namespace FRAMEWORK
 	private:
 		//TMap<, AssetObject*> Asssets;
 	};
+
 }
+
+//Resolve circular dependency
+#include "AssetPtr.hpp"

@@ -31,6 +31,7 @@ namespace SH
 		void ResetWindowLayout();
 		WindowLayoutConfigInfo LoadWindowLayout(const FString& InWindowLayoutConfigFileName);
 		void SaveWindowLayout(const TSharedRef<FTabManager::FLayout>& InLayout);
+		void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 		
 	private:
 		TSharedRef<SDockTab> SpawnWindowTab(const FSpawnTabArgs& Args);

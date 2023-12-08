@@ -3,7 +3,7 @@
 #include "GpuApi/GpuResource.h"
 #include "App/PreviewViewPort.h"
 #include "Renderer/RenderResource/ArgumentBuffer.h"
-#include "UI/Widgets/Property/PropertyData.h"
+#include "UI/Widgets/Property/PropertyData/PropertyData.h"
 
 namespace SH
 {

@@ -1,7 +1,9 @@
 #pragma once
+#include "AssetViewItem/AssetViewItem.h"
 
 namespace FRAMEWORK
 {
+
 	class FRAMEWORK_API SAssetView : public SCompoundWidget
 	{
 	public:
@@ -9,5 +11,9 @@ namespace FRAMEWORK
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs);
+
+	private:
+		TArray<TSharedRef<AssetViewItem>> AssetViewItems;
 	};
+
 }

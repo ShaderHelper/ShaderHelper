@@ -3,7 +3,7 @@
 #include "App/ShaderHelperApp.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 #include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
-#include "SShaderHelperPropertyView.h"
+#include "UI/Widgets/Property/PropertyView/SShaderPassPropertyView.h"
 #include "ProjectManager/ShProjectManager.h"
 #include <Json/Serialization/JsonSerializer.h>
 #include <Core/Misc/FileHelper.h>
@@ -39,7 +39,7 @@ namespace SH
 			SAssignNew(SpawnedTab, SDockTab)
 				.Label(FText::FromName(PropretyTabId))
 				[
-					SNew(SShaderHelperPropertyView)
+					SNew(SShaderPassPropertyView)
 					.Renderer(Renderer)
 					.ShaderEditor_Lambda([this] {
 						return ShaderEditor.Get();
@@ -90,10 +90,11 @@ namespace SH
 		TSharedRef<SDockTab> NewTab = SNew(SDockTab).TabRole(ETabRole::MajorTab);
 		TabManager = FGlobalTabmanager::Get()->NewTabManager(NewTab);
 		TabManager->SetOnPersistLayout(FTabManager::FOnPersistLayout::CreateRaw(this, &SShaderHelperWindow::SaveWindowLayout));
-		TabManager->RegisterTabSpawner(PreviewTabId, FOnSpawnTab::CreateRaw(this, &SShaderHelperWindow::SpawnWindowTab));
-		TabManager->RegisterTabSpawner(PropretyTabId, FOnSpawnTab::CreateRaw(this, &SShaderHelperWindow::SpawnWindowTab));
-		TabManager->RegisterTabSpawner(AssetTabId, FOnSpawnTab::CreateRaw(this, &SShaderHelperWindow::SpawnWindowTab));
-		TabManager->RegisterTabSpawner(CodeTabId, FOnSpawnTab::CreateRaw(this, &SShaderHelperWindow::SpawnWindowTab));
+
+		for (const FName& TabId : TabIds)
+		{
+			TabManager->RegisterTabSpawner(TabId, FOnSpawnTab::CreateRaw(this, &SShaderHelperWindow::SpawnWindowTab));
+		}
 
 		DefaultTabLayout = FTabManager::NewLayout("ShaderHelperLayout")
 		->AddArea
@@ -169,6 +170,8 @@ namespace SH
 				]
 			]
 		);
+
+		SetCanTick(true);
 			
 	}
 
@@ -233,6 +236,18 @@ namespace SH
 		if (FJsonSerializer::Serialize(RootJsonObject, Writer))
 		{
 			FFileHelper::SaveStringToFile(NewJsonContents, *WindowLayoutConfigFileName);
+		}
+	}
+
+	void SShaderHelperWindow::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
+	{
+		if (IsWindowMinimized())
+		{
+			const TArray< TSharedRef<SWindow> > AllWindows = FSlateApplication::Get().GetInteractiveTopLevelWindows();
+			for (const TSharedRef<SWindow>& Window : AllWindows)
+			{
+				Window->Minimize();
+			}
 		}
 	}
 

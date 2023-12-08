@@ -1,5 +1,6 @@
 #pragma once
-#include "PropertyData.h"
+#include "UI/Widgets/Property/PropertyData/PropertyData.h"
+
 namespace FRAMEWORK
 {
 	class SPropertyView : public SCompoundWidget
@@ -21,20 +22,16 @@ namespace FRAMEWORK
 			[
 				SNew(SBorder)
 				[
-					SNew(SBorder)
-					.Padding(0)
-					[
-						SAssignNew(PropertyTree, STreeView<PropertyDataType>)
-						.TreeItemsSource(InArgs._PropertyDatas)
-						.OnGetChildren_Lambda([](PropertyDataType InTreeNode, TArray<PropertyDataType>& OutChildren) {
-							InTreeNode->GetChildren(OutChildren);
-						})
-						.OnGenerateRow_Lambda([](PropertyDataType InTreeNode, const TSharedRef<STableViewBase>& OwnerTable) {
-							return InTreeNode->GenerateWidgetForTableView(OwnerTable);
-						})
-						.SelectionMode(ESelectionMode::Single)
-						.OnContextMenuOpening(InArgs._OnContextMenuOpening)
-					]
+					SAssignNew(PropertyTree, STreeView<PropertyDataType>)
+					.TreeItemsSource(InArgs._PropertyDatas)
+					.OnGetChildren_Lambda([](PropertyDataType InTreeNode, TArray<PropertyDataType>& OutChildren) {
+						InTreeNode->GetChildren(OutChildren);
+					})
+					.OnGenerateRow_Lambda([](PropertyDataType InTreeNode, const TSharedRef<STableViewBase>& OwnerTable) {
+						return InTreeNode->GenerateWidgetForTableView(OwnerTable);
+					})
+					.SelectionMode(ESelectionMode::Single)
+					.OnContextMenuOpening(InArgs._OnContextMenuOpening)
 				]
 			
 			
