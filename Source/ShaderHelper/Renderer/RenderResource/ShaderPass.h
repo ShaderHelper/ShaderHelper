@@ -1,10 +1,9 @@
 #pragma once
-#include "ArgumentBuffer.h"
 #include "AssetManager/AssetObject.h"
 
-namespace FRAMEWORK
+namespace SH
 {
-	class ShaderPass : AssetObject
+	class ShaderPass : public AssetObject
 	{
 	public:
 	private:

@@ -223,8 +223,8 @@ namespace UNITTEST_FRAMEWORK
 
 		{
 			Vector&& t = Vector{ 1,2,3 };
-			FString s = AUX::TypeId(t);
-			SH_LOG(LogTestUtil, Display, TEXT("TestTypeID: %s"), *s);
+			FString s = AUX::GetRawTypeName(&t);
+			SH_LOG(LogTestUtil, Display, TEXT("TestTypeName: %s"), *s);
 
 			constexpr auto Pred = [](int Val) {
 				for (int i = 2; i * i <= Val; ++i)

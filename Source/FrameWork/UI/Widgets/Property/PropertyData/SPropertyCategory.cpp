@@ -67,7 +67,6 @@ namespace FRAMEWORK
 		ChildSlot
 		[
 			SNew(SBorder)
-			.BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
 			.Padding(FMargin{0.0f, 3.0f, 0.0f, 0.0f})
 			[
 				SNew(SBorder)

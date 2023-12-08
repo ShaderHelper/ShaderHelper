@@ -3,17 +3,14 @@
 
 namespace FRAMEWORK
 {
-	class Texture2D : AssetObject
+	class Texture2D : public AssetObject
 	{
-
+	public:
+		virtual void Serialize(FArchive& Ar);
+		virtual void PostLoad();
+		virtual FString FileExtension() const;
+		//virtual TUniquePtr<class AssetFactory> Factory();
+		//virtual TSharedPtr<class AssetViewItem> AssetViewItem() const;
 	};
 
-	namespace AssetImporter
-	{
-		template<>
-		Texture2D* Import<Texture2D>(const FString& AssetPath)
-		{
-			return nullptr;
-		}
-	}
 }

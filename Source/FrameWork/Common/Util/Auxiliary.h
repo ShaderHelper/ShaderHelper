@@ -251,19 +251,24 @@ namespace AUX
 #define RUNCASE_WITHINT(VarToken,Min,Max,...)	\
     RUNCASE_WITHINT_IMPL(PREPROCESSOR_JOIN(Auto_Instance_,__COUNTER__),VarToken,Min,Max,__VA_ARGS__) 
     
-
+	//Returns a FString that stores the type name. (As an alternative to rtti, but just represents the static type name of the expression )
+	//Its result may not the same on different platforms, so it should not be saved but just used as a key value.
     template<typename T>
     struct TTypename {
         static inline FString Value = GetGeneratedTypeName<T>();
     };
 
-    //Returns a FString that stores the type name from pointer or object. (As an alternative to rtti, but just represents the static type name of the expression )
-    //Its result is not the same on different platforms, so it should not be saved but just used as a key value.
     template<typename T>
-    FString TypeId(const T& Var) {
-        using BaseType = std::remove_cv_t<std::remove_pointer_t<T>>;
-        return TTypename<BaseType>::Value;
+    FString GetRawTypeName(const T& Var = nullptr) {
+        using RawType = std::remove_cv_t<std::remove_pointer_t<T>>;
+        return TTypename<RawType>::Value;
     }
+
+	template<typename T>
+	static const FString TypeName = TTypename<T>::Value;
+
+	template<typename T>
+	static const FString RawTypeName = GetRawTypeName<T>();
     
     //https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2593r0.html
     template<typename T>
@@ -329,8 +334,8 @@ namespace AUX
 	template<typename T>
 	auto FunctorToFuncPtr(T&& Functor)
 	{
-		using CleanType = std::decay_t<T>;
-		using CurFunctorExt = FunctorExt<CleanType, TraitFuncTypeFromFunctor_T<CleanType>>;
+		using RawType = std::decay_t<T>;
+		using CurFunctorExt = FunctorExt<RawType, TraitFuncTypeFromFunctor_T<RawType>>;
 		CurFunctorExt::FunctorStorage = &Functor;
 		return &CurFunctorExt::Call;
 	}

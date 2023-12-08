@@ -1,10 +1,10 @@
 #include "CommonHeader.h"
-#include "SShaderHelperPropertyView.h"
+#include "SShaderPassPropertyView.h"
 
 namespace SH
 {
 
-	void SShaderHelperPropertyView::Construct(const FArguments& InArgs)
+	void SShaderPassPropertyView::Construct(const FArguments& InArgs)
 	{
 		Renderer = InArgs._Renderer;
 		ShaderEditor = InArgs._ShaderEditor;
@@ -19,12 +19,12 @@ namespace SH
 		[
 			SAssignNew(PropertyView, SPropertyView)
 			.PropertyDatas(&PropertyDatas)
-			.OnContextMenuOpening(this, &SShaderHelperPropertyView::CreateContextMenu)
+			.OnContextMenuOpening(this, &SShaderPassPropertyView::CreateContextMenu)
 			.IsExpandAll(true)
 		];
 	}
 
-	TSharedRef<SWidget> SShaderHelperPropertyView::GetCategoryMenu()
+	TSharedRef<SWidget> SShaderPassPropertyView::GetCategoryMenu()
 	{
 		FMenuBuilder MenuBuilder{ true, TSharedPtr<FUICommandList>() };
 
@@ -34,18 +34,18 @@ namespace SH
 				FText::FromString("Float"),
 				FText::GetEmpty(),
 				Icon,
-				FUIAction{ FExecuteAction::CreateSP(this, &SShaderHelperPropertyView::AddUniform_Float) });
+				FUIAction{ FExecuteAction::CreateSP(this, &SShaderPassPropertyView::AddUniform_Float) });
 
 		MenuBuilder.AddMenuEntry(
 			FText::FromString("Float2"),
 			FText::GetEmpty(),
 			Icon,
-			FUIAction{ FExecuteAction::CreateSP(this, &SShaderHelperPropertyView::AddUniform_Float2) });
+			FUIAction{ FExecuteAction::CreateSP(this, &SShaderPassPropertyView::AddUniform_Float2) });
 
 		return MenuBuilder.MakeWidget();
 	}
 
-	void SShaderHelperPropertyView::AddUniform_Float()
+	void SShaderPassPropertyView::AddUniform_Float()
 	{
 		static int32 AddNum;
 
@@ -71,7 +71,7 @@ namespace SH
 		ReCreateCustomUniformBuffer();
 	}
 
-	void SShaderHelperPropertyView::AddUniform_Float2()
+	void SShaderPassPropertyView::AddUniform_Float2()
 	{
 		static int32 AddNum;
 
@@ -97,7 +97,7 @@ namespace SH
 		ReCreateCustomUniformBuffer();
 	}
 
-	void SShaderHelperPropertyView::ReCreateCustomUniformBuffer()
+	void SShaderPassPropertyView::ReCreateCustomUniformBuffer()
 	{
 		TArray<TSharedRef<PropertyData>> Uniforms;
 		CustomUniformCategory->GetChildren(Uniforms);
@@ -124,7 +124,7 @@ namespace SH
 		ReCreateCustomArgumentBuffer();
 	}
 
-	void SShaderHelperPropertyView::ReCreateCustomArgumentBuffer()
+	void SShaderPassPropertyView::ReCreateCustomArgumentBuffer()
 	{
 
 		if (!CustomUniformBuffer.IsValid()/*&& TODO*/)
@@ -148,7 +148,7 @@ namespace SH
 		}
 	}
 
-	void SShaderHelperPropertyView::OnDeleteProperty(TSharedRef<PropertyData> InProperty)
+	void SShaderPassPropertyView::OnDeleteProperty(TSharedRef<PropertyData> InProperty)
 	{
 		int32 LastUniformCategoryChildrenNum = CustomUniformCategory->GetChildrenNum();
 		InProperty->Remove();
@@ -167,7 +167,7 @@ namespace SH
 		PropertyView->Refresh();
 	}
 
-	TSharedPtr<SWidget> SShaderHelperPropertyView::CreateContextMenu()
+	TSharedPtr<SWidget> SShaderPassPropertyView::CreateContextMenu()
 	{
 		TArray<TSharedRef<PropertyData>> SelectedItems = PropertyView->GetSelectedItems();
 		if (SelectedItems.Num() == 0)
@@ -181,7 +181,7 @@ namespace SH
 			FText::FromString("Delete"),
 			FText::GetEmpty(),
 			FSlateIcon(FAppStyle::Get().GetStyleSetName(), "Icons.Delete"),
-			FUIAction{ FExecuteAction::CreateSP(this, &SShaderHelperPropertyView::OnDeleteProperty, SelectedItems[0]) });
+			FUIAction{ FExecuteAction::CreateSP(this, &SShaderPassPropertyView::OnDeleteProperty, SelectedItems[0]) });
 
 		return MenuBuilder.MakeWidget();
 	}

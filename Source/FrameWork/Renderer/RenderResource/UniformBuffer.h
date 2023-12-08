@@ -32,7 +32,7 @@ namespace FRAMEWORK
 		template<typename T>
 		T& GetMember(const FString& MemberName) {
 			checkf(MetaData.Members.Contains(MemberName), TEXT("The uniform buffer doesn't contain \"%s\" member."), *MemberName);
-			checkf(AUX::TTypename<T>::Value == MetaData.Members[MemberName].TypeName, TEXT("Mismatched type: %s, Expected : %s"), *AUX::TTypename<T>::Value, *MetaData.Members[MemberName].TypeName);
+			checkf(AUX::TypeName<T> == MetaData.Members[MemberName].TypeName, TEXT("Mismatched type: %s, Expected : %s"), *AUX::TypeName<T>, *MetaData.Members[MemberName].TypeName);
 			int32 MemberOffset = MetaData.Members[MemberName].Offset;
 			void* BufferBaseAddr = GpuApi::MapGpuBuffer(Buffer, GpuResourceMapMode::Write_Only);
 			return *reinterpret_cast<T*>((uint8*)BufferBaseAddr + MemberOffset);
@@ -128,7 +128,7 @@ namespace FRAMEWORK
 			}
 
 #if !SH_SHIPPING
-			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize - MemberSize, AUX::TTypename<T>::Value });
+			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize - MemberSize, AUX::TypeName<T> });
 #else
 			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize - MemberSize });
 #endif

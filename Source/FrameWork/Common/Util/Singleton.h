@@ -45,7 +45,7 @@ private:
     static TLazySingleton& GetLazy(void(*Constructor)(void*))
     {
         auto& SingletonCS = FRAMEWORK::GetSingleTonCS();
-        FString TypeName = FRAMEWORK::AUX::TTypename<T>::Value;
+        FString TypeName = FRAMEWORK::AUX::TypeName<T>;
         auto& SharedInstanceMap = FRAMEWORK::GetSharedInstanceMap(TypeName);
         
         FScopeLock ScopeLock(&SingletonCS);
