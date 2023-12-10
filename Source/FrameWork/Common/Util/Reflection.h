@@ -12,7 +12,11 @@ namespace FRAMEWORK::ShReflectToy
 	{
 		void* GetDefaultObject()
 		{
-			return DefaultObject;
+			if (DefaultObjectGetter)
+			{
+				return DefaultObjectGetter();
+			}
+			return nullptr;
 		}
 
 		MetaType* GetBaseClass()
@@ -41,7 +45,7 @@ namespace FRAMEWORK::ShReflectToy
 
 		FString TypeName;
 		FString RegisteredName;
-		void* DefaultObject;
+		TFunction<void*()> DefaultObjectGetter;
 		TFunction<MetaType*()> BaseMetaTypeGetter;
 	};
 
@@ -56,7 +60,7 @@ namespace FRAMEWORK::ShReflectToy
 			Meta->RegisteredName = Meta->TypeName;
 			if constexpr(std::is_default_constructible_v<T>)
 			{
-				Meta->DefaultObject = new T;
+				Meta->DefaultObjectGetter = [] { return new T; }
 			}
 		}
 
@@ -107,11 +111,11 @@ namespace FRAMEWORK::ShReflectToy
 	TArray<MetaType*> GetChildMetaTypes()
 	{
 		TArray<MetaType*> MetaTypes;
-		for (auto [_, MetaTypeUniquePtr] : RegisteredMetaTypes)
+		for (auto [_, MetaTypeValue] : RegisteredMetaTypes)
 		{
-			if (MetaTypeUniquePtr->IsDerivedFrom<T>)
+			if (MetaTypeValue->IsDerivedFrom<T>)
 			{
-				MetaTypes.Add(MetaTypeUniquePtr.Get());
+				MetaTypes.Add(MetaTypeValue);
 			}
 		}
 		return MetaTypes;

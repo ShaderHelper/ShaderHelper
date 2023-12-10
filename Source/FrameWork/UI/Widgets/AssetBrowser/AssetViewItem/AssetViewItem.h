@@ -8,5 +8,4 @@ namespace FRAMEWORK
 		virtual TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) = 0;
 		virtual ~AssetViewItem() = default;
 	};
-
 }

@@ -4,11 +4,11 @@
 #include <HAL/PlatformApplicationMisc.h>
 #include <StandaloneRenderer/StandaloneRenderer.h>
 #include "Common/Path/BaseResourcePath.h"
-#include "UI/Styles/FAppCommonStyle.h"
 #include <SlateCore/Fonts/SlateFontInfo.h>
 #include <Misc/OutputDeviceConsole.h>
 #include <DirectoryWatcher/DirectoryWatcherModule.h>
 #include <DirectoryWatcher/IDirectoryWatcher.h>
+#include "GpuApi/GpuApiInterface.h"
 
 namespace FRAMEWORK {
 
@@ -64,10 +64,23 @@ namespace FRAMEWORK {
 		}
 	}
 
+	App::App(const Vector2D& InClientSize, const TCHAR* CommandLine)
+		: AppClientSize(InClientSize)
+		, SavedCommandLine(CommandLine)
+	{
+		UE_Init(*SavedCommandLine);
+		GpuApi::InitApiEnv();
+	}
+
+	App::~App()
+	{
+		UE_ShutDown();
+	}
+
 	void App::Run()
 	{
-		Init();
-		PostInit();
+		double CurrentRealTime = FPlatformTime::Seconds();
+		double LastRealTime = CurrentRealTime;
 		while (!IsEngineExitRequested()) {
 #if PLATFORM_MAC
             //Ensure that NSObjects autoreleased every frame are immediately released.
@@ -75,11 +88,11 @@ namespace FRAMEWORK {
 #endif
 			BeginExitIfRequested();
 
-			double CurrentRealTime = FPlatformTime::Seconds();
-			double LastRealTime = GetCurrentTime();
-			double DeltaTime = CurrentRealTime - LastRealTime;
-			SetCurrentTime(CurrentRealTime);
-			SetDeltaTime(DeltaTime);
+			CurrentRealTime = FPlatformTime::Seconds();
+			double NewDeltaTime = CurrentRealTime - LastRealTime;
+
+			LastRealTime = CurrentRealTime;
+			DeltaTime = NewDeltaTime;
 
 			FSlateApplication::Get().PumpMessages();
 
@@ -88,15 +101,11 @@ namespace FRAMEWORK {
 			{
 				Update(DeltaTime);
 
-				if (AppRenderer.IsValid()) {
-					AppRenderer->Render();
-				}
 				FSlateApplication::Get().Tick();
 				//if not change GFrameCounter, slate texture may not update.
 				GFrameCounter++;
 			}
 		}
-		ShutDown();
 	}
 
 	bool App::AreAllWindowsHidden() const
@@ -118,23 +127,6 @@ namespace FRAMEWORK {
 		}
 
 		return bAllHidden;
-	}
-
-	void App::Init()
-	{
-		UE_Init(*SavedCommandLine);
-		FAppCommonStyle::Init();
-	}
-
-	void App::PostInit()
-	{
-
-	}
-
-	void App::ShutDown()
-	{
-		UE_ShutDown();
-		FAppCommonStyle::ShutDown();
 	}
 
 	void App::Update(double DeltaTime)

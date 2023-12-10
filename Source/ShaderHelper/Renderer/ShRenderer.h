@@ -1,7 +1,6 @@
 #pragma once
 #include "Renderer/Renderer.h"
 #include "GpuApi/GpuResource.h"
-#include "App/PreviewViewPort.h"
 #include "Renderer/RenderResource/ArgumentBuffer.h"
 #include "UI/Widgets/Property/PropertyData/PropertyData.h"
 
@@ -10,15 +9,16 @@ namespace SH
 	class ShRenderer : public Renderer
 	{
 	public:
-		ShRenderer(PreviewViewPort* InViewPort);
+		ShRenderer();
 		
 	public:
 		void RenderInternal() override;
-		void OnViewportResize();
+		void OnViewportResize(const Vector2f& InResolution);
 		void UpdatePixelShader(TRefCountPtr<GpuShader> InNewPixelShader);
 		void UpdateCustomArgumentBuffer(TSharedPtr<ArgumentBuffer> InBuffer) { NewCustomArgumentBuffer = MoveTemp(InBuffer); }
 		void UpdateCustomArgumentBufferLayout(TSharedPtr<ArgumentBufferLayout> InLayout) { NewCustomArgumentBufferLayout = MoveTemp(InLayout); }
 		FString GetResourceDeclaration() const;
+		GpuTexture* GetFinalRT() const { return FinalRT; }
 		TArray<TSharedRef<PropertyData>> GetBuiltInPropertyDatas() const;
 
 	private:
@@ -35,7 +35,6 @@ namespace SH
 		static const FString DefaultPixelShaderMacro;
 
 	private:
-		PreviewViewPort* ViewPort;
 		TRefCountPtr<GpuTexture> FinalRT;
 		TRefCountPtr<GpuShader> VertexShader;
 		TSharedPtr<UniformBuffer> BuiltInUniformBuffer;

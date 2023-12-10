@@ -1,10 +1,12 @@
 #pragma once
 #include <Widgets/SViewport.h>
 #include "Renderer/ShRenderer.h"
+#include "Editor/Editor.h"
+#include "PreviewViewPort.h"
+
 namespace SH 
 {
-	class SShaderHelperWindow :
-		public SWindow
+	class ShaderHelperEditor : public Editor
 	{
 	public:
 		struct WindowLayoutConfigInfo
@@ -14,42 +16,36 @@ namespace SH
 			TSharedPtr<FTabManager::FLayout> TabLayout;
 		};
 
-		~SShaderHelperWindow();
+		ShaderHelperEditor(const Vector2f& InWindowSize, ShRenderer* InRenderer);
+		~ShaderHelperEditor();
 
-		SLATE_BEGIN_ARGS(SShaderHelperWindow) 
-			: _Renderer(nullptr)
-		{}
-			SLATE_ARGUMENT(ShRenderer*, Renderer)
-			SLATE_ARGUMENT(FVector2D, WindowSize)
-			SLATE_EVENT(FSimpleDelegate, OnResetWindowLayout)
-		SLATE_END_ARGS()
-
-		void Construct(const FArguments& InArgs);
-		void SetViewPortInterface(TSharedRef<ISlateViewport> InSlateViewportInterface) {
-			Viewport->SetViewportInterface(MoveTemp(InSlateViewportInterface));
-		}
 		void ResetWindowLayout();
 		WindowLayoutConfigInfo LoadWindowLayout(const FString& InWindowLayoutConfigFileName);
 		void SaveWindowLayout(const TSharedRef<FTabManager::FLayout>& InLayout);
-		void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
+		void OnViewportResize(const Vector2f& InSize);;
+		void Update(double DeltaTime);
 		
 	private:
 		TSharedRef<SDockTab> SpawnWindowTab(const FSpawnTabArgs& Args);
 		TSharedRef<SWidget> CreateMenuBar();
 		void FillMenu(FMenuBuilder& MenuBuilder, FString MenuName);
+		void InitEditorUI();
+
+	public:
+		FSimpleDelegate OnResetWindowLayout;
+		FSimpleDelegate OnWindowClosed;
 		
 	private:
 		ShRenderer* Renderer;
 		bool bSaveWindowLayout = true;
 		TSharedPtr<FTabManager::FLayout> DefaultTabLayout;
-		TSharedPtr<SVerticalBox> LayoutBox;
+		TSharedPtr<SDockTab> TabManagerTab;
 		TSharedPtr<FTabManager> TabManager;
-		TSharedPtr<SViewport> Viewport;
+		TSharedPtr<SWindow> Window;
+		TSharedPtr<PreviewViewPort> ViewPort;
 		FVector2D WindowSize;
 
-		TSharedPtr<class SShaderEditorBox> ShaderEditor;
-
-		FSimpleDelegate OnResetWindowLayout;
+		TWeakPtr<SBox> PropertyViewBox;
 	};
 
 }

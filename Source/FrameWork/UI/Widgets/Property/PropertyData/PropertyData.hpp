@@ -9,9 +9,6 @@ namespace FRAMEWORK
 	class SNeverSelectedTableRow : public STableRow<TSharedRef<PropertyData>>
 	{
 	public:
-		SLATE_BEGIN_ARGS(SNeverSelectedTableRow) {}
-		SLATE_END_ARGS()
-
 		void Construct(const FArguments& InArgs, const TSharedRef<STableViewBase>& OwnerTableView)
 		{
 			STableRow<TSharedRef<PropertyData>>::Construct(

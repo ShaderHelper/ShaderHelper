@@ -4,10 +4,6 @@
 namespace FRAMEWORK
 {
 
-	//FString AssetManager::GuidToAssetPath()
-	//{
-
-	//}
 
 	void AssetManager::AddRef(AssetObject* InAssetObject)
 	{

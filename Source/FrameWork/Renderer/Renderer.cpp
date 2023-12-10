@@ -5,10 +5,10 @@
 namespace FRAMEWORK
 {
 
-    Renderer::Renderer()
-    {
-        GpuApi::InitApiEnv();
-    }
+	Renderer::Renderer()
+	{
+
+	}
 
     void Renderer::Render()
     {

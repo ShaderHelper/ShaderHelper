@@ -43,7 +43,7 @@ namespace SH
 			SizeY = DrawSize.Y;
 			if (OnViewportResize.IsBound())
 			{
-				OnViewportResize.Broadcast();
+				OnViewportResize.Broadcast(Vector2f{ (float)SizeX, (float)SizeY });
 			}
 		}
 
