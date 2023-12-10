@@ -13,8 +13,9 @@ namespace FRAMEWORK
 		virtual void PostLoad() {}
 
 		virtual FString FileExtension() const = 0;
-		virtual TUniquePtr<class AssetFactory> Factory() const = 0;
-		virtual TSharedPtr<class AssetViewItem> AssetViewItem() const = 0;
+		virtual class GpuTexture* Gethumbnail() const { return nullptr; }
+		virtual struct FSlateBrush* GetImage() const { return nullptr; }
+		virtual TSharedRef<class SWidget> GetPropertyView() const = 0;
 	};
 
 }

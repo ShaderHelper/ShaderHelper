@@ -37,3 +37,7 @@ namespace FRAMEWORK
 #define SH_LOG(CategoryName, Verbosity, Format, ...) \
     UE_LOG(CategoryName, Verbosity, Format, ##__VA_ARGS__); \
     GProjectCategoryNames.Emplace(#CategoryName)
+
+#define ADD_AGILITY_SDK()	\
+	extern "C" { _declspec(dllexport) extern const UINT D3D12SDKVersion = 602; }	\
+	extern "C" { _declspec(dllexport) extern const char* D3D12SDKPath = u8".\\AgilitySDK\\"; }

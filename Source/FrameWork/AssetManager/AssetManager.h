@@ -33,28 +33,36 @@ namespace FRAMEWORK
 		T* Asset;
 	};
 
+	class GpuTexture;
+
 	class AssetManager
 	{
 	public:
-	
-		/*	template<typename T>
-			AssetPtr<T> LoadAssetByPath(const FString& AssetPath)
+		/*	
+			template<typename T>
+			AssetPtr<T> LoadAssetByPath(const FString& InAssetPath)
 			{
-				return AssetImporter::Import<T>(AssetPath);
+
 			}
 
 			template<typename T>
 			AssetPtr<T> LoadAssetByGuid()
 			{
-				return AssetImporter::Import<T>();
-			}*/
+				
+			}
 
-		FString GuidToAssetPath();
+			FString GetPath(guid) const;
+		*/
+
+		//void AddThumbnail(AssetObject* InAssetObject, GpuTexture* InThumbnail);
 		void AddRef(AssetObject* InAssetObject);
 		void ReleaseRef(AssetObject* InAssetObject);
 
 	private:
+		//TMap<, FString> GuidToPath;
 		//TMap<, AssetObject*> Asssets;
+		//TMap<AssetObject*, uint32> AssetRefCounts;
+		//TMap<AssetObject*, GpuTexture*> AssetThumbnailPool;
 	};
 
 }

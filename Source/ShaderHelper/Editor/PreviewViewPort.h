@@ -4,7 +4,7 @@
 
 namespace SH
 {
-	DECLARE_MULTICAST_DELEGATE(OnViewportResizeDelegate)
+	DECLARE_MULTICAST_DELEGATE_OneParam(OnViewportResizeDelegate, const Vector2f&)
 
 	class PreviewViewPort : public ISlateViewport
 	{

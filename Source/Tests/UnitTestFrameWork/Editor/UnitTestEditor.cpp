@@ -1,19 +1,25 @@
 #include "CommonHeader.h"
-#include "UnitTestConSole.h"
+#include "UnitTestEditor.h"
 #include "UI/Widgets/Log/SOutputLog.h"
-#include "UI/Styles/FAppCommonStyle.h"
 
 namespace UNITTEST_FRAMEWORK
 {
 	extern void TestUtil();
 
-	void UnitTestConSole::Init()
+	UnitTestEditor::UnitTestEditor(const Vector2f& InWindowSize)
+		: WindowSize(InWindowSize)
 	{
-		App::Init();
 		InitLogWindow();
+
+		TestUtil();
 	}
 
-	void UnitTestConSole::InitLogWindow()
+	UnitTestEditor::~UnitTestEditor()
+	{
+		
+	}
+
+	void UnitTestEditor::InitLogWindow()
 	{
 		auto SpawnLog = [](const FSpawnTabArgs&) -> TSharedRef<SDockTab>
 		{
@@ -29,7 +35,7 @@ namespace UNITTEST_FRAMEWORK
 		TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("UnitTestLayout")
 			->AddArea
 			(
-				FTabManager::NewArea(static_cast<float>(AppClientSize.X), static_cast<float>(AppClientSize.Y))
+				FTabManager::NewArea(WindowSize.x, WindowSize.y)
 				->Split
 				(
 					FTabManager::NewStack()
@@ -41,24 +47,4 @@ namespace UNITTEST_FRAMEWORK
 		FGlobalTabmanager::Get()->RestoreFrom(Layout, TSharedPtr<SWindow>());
 	}
 
-	void UnitTestConSole::PostInit()
-	{
-		App::PostInit();
-
-		TestUtil();
-	}
-
-
-	void UnitTestConSole::ShutDown()
-	{
-		App::ShutDown();
-	}
-
-
-	void UnitTestConSole::Update(double DeltaTime)
-	{
-		App::Update(DeltaTime);
-	}
 }
-
-

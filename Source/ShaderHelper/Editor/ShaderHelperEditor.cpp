@@ -1,5 +1,5 @@
 #include "CommonHeader.h"
-#include "SShaderHelperWindow.h"
+#include "ShaderHelperEditor.h"
 #include "App/ShaderHelperApp.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 #include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
@@ -8,10 +8,12 @@
 #include <Json/Serialization/JsonSerializer.h>
 #include <Core/Misc/FileHelper.h>
 #include "Common/Path/PathHelper.h"
+#include "UI/Styles/FShaderHelperStyle.h"
+
 
 namespace SH 
 {
-
+	const FString DefaultProjectPath = PathHelper::InitialDir() / TEXT("TemplateProject/Default/Default.shprj");
 	static const FString WindowLayoutConfigFileName = PathHelper::SavedConfigDir() / TEXT("WindowLayout.json");
 
 	const FName PreviewTabId = "Preview";
@@ -23,117 +25,71 @@ namespace SH
 		PreviewTabId, PropretyTabId, CodeTabId, AssetTabId
 	};
 
-	TSharedRef<SDockTab> SShaderHelperWindow::SpawnWindowTab(const FSpawnTabArgs& Args)
+	ShaderHelperEditor::ShaderHelperEditor(const Vector2f& InWindowSize, ShRenderer* InRenderer)
+		: Renderer(InRenderer)
+		, WindowSize(InWindowSize)
 	{
-		const FTabId& TabId = Args.GetTabId();
-		TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab);
+		FShaderHelperStyle::Init();
+		TSingleton<ShProjectManager>::Get().OpenProject(DefaultProjectPath);
 
-		if (TabId == PreviewTabId) {
-			SAssignNew(SpawnedTab, SDockTab)
-				.Label(FText::FromName(PreviewTabId))
-				[
-					Viewport.ToSharedRef()
-				];
-		}
-		else if (TabId == PropretyTabId) {
-			SAssignNew(SpawnedTab, SDockTab)
-				.Label(FText::FromName(PropretyTabId))
-				[
-					SNew(SShaderPassPropertyView)
-					.Renderer(Renderer)
-					.ShaderEditor_Lambda([this] {
-						return ShaderEditor.Get();
-					})
-				];
-		}
-		else if (TabId == CodeTabId) {
-			SAssignNew(SpawnedTab, SDockTab)
-				.Label(FText::FromName(CodeTabId))
-				[
-					SAssignNew(ShaderEditor, SShaderEditorBox)
-						.Text(FText::FromString(ShRenderer::DefaultPixelShaderText))
-						.Renderer(Renderer)
-				];
+		ViewPort = MakeShared<PreviewViewPort>();
+		ViewPort->OnViewportResize.AddRaw(this, &ShaderHelperEditor::OnViewportResize);
 
-		}
-		else if (TabId == AssetTabId) {
-			SAssignNew(SpawnedTab, SDockTab)
-				.Label(FText::FromName(AssetTabId))
-				[
-					SNew(SAssetBrowser)
-					.DirectoryShowed(TSingleton<ShProjectManager>::Get().GetActiveContentDirectory())
-				];
-		}
-		else {
-			ensure(false);
-		}
-		return SpawnedTab;
+		InitEditorUI();
 	}
 
-	SShaderHelperWindow::~SShaderHelperWindow()
+	ShaderHelperEditor::~ShaderHelperEditor()
 	{
-		if (bSaveWindowLayout)
-		{
-			TabManager->SavePersistentLayout();
-		}
-
-		//Clean tab window
-		TabManager->CloseAllAreas();
+		FShaderHelperStyle::ShutDown();
 	}
 
-	void SShaderHelperWindow::Construct(const FArguments& InArgs)
+	void ShaderHelperEditor::InitEditorUI()
 	{
-		Renderer = InArgs._Renderer;
-		WindowSize = InArgs._WindowSize;
-		OnResetWindowLayout = InArgs._OnResetWindowLayout;
-
-		TSharedRef<SDockTab> NewTab = SNew(SDockTab).TabRole(ETabRole::MajorTab);
-		TabManager = FGlobalTabmanager::Get()->NewTabManager(NewTab);
-		TabManager->SetOnPersistLayout(FTabManager::FOnPersistLayout::CreateRaw(this, &SShaderHelperWindow::SaveWindowLayout));
+		TabManagerTab = SNew(SDockTab);
+		TabManager = FGlobalTabmanager::Get()->NewTabManager(TabManagerTab.ToSharedRef());
+		TabManager->SetOnPersistLayout(FTabManager::FOnPersistLayout::CreateRaw(this, &ShaderHelperEditor::SaveWindowLayout));
 
 		for (const FName& TabId : TabIds)
 		{
-			TabManager->RegisterTabSpawner(TabId, FOnSpawnTab::CreateRaw(this, &SShaderHelperWindow::SpawnWindowTab));
+			TabManager->RegisterTabSpawner(TabId, FOnSpawnTab::CreateRaw(this, &ShaderHelperEditor::SpawnWindowTab));
 		}
 
 		DefaultTabLayout = FTabManager::NewLayout("ShaderHelperLayout")
-		->AddArea
-		(
-			FTabManager::NewPrimaryArea()
-			->Split
+			->AddArea
 			(
-				FTabManager::NewSplitter()
-				->SetOrientation(Orient_Vertical)
-				->SetSizeCoefficient(0.4f)
+				FTabManager::NewPrimaryArea()
 				->Split
 				(
-					FTabManager::NewStack()
-					->SetSizeCoefficient(0.7f)
-					->AddTab(PreviewTabId, ETabState::OpenedTab)
-				)
-				->Split
-				(
-					FTabManager::NewStack()
-					->SetSizeCoefficient(0.3f)
-					->AddTab(AssetTabId, ETabState::OpenedTab)
-				)
-				
-			)
-			->Split
-			(
-				FTabManager::NewStack()
-				->SetSizeCoefficient(0.18f)
-				->AddTab(PropretyTabId, ETabState::OpenedTab)
-			)
-			->Split
-			(
-				FTabManager::NewStack()
-				->SetSizeCoefficient(0.42f)
-				->AddTab(CodeTabId, ETabState::OpenedTab)
-			)
-		);
+					FTabManager::NewSplitter()
+					->SetOrientation(Orient_Vertical)
+					->SetSizeCoefficient(0.4f)
+					->Split
+					(
+						FTabManager::NewStack()
+						->SetSizeCoefficient(0.7f)
+						->AddTab(PreviewTabId, ETabState::OpenedTab)
+					)
+					->Split
+					(
+						FTabManager::NewStack()
+						->SetSizeCoefficient(0.3f)
+						->AddTab(AssetTabId, ETabState::OpenedTab)
+					)
 
-		SAssignNew(Viewport, SViewport);
+				)
+				->Split
+				(
+					FTabManager::NewStack()
+					->SetSizeCoefficient(0.18f)
+					->AddTab(PropretyTabId, ETabState::OpenedTab)
+				)
+				->Split
+				(
+					FTabManager::NewStack()
+					->SetSizeCoefficient(0.42f)
+					->AddTab(CodeTabId, ETabState::OpenedTab)
+				)
+			);
 
 		FVector2D UsedWindowPos = FVector2D::ZeroVector;
 		EAutoCenter AutoCenterRule = EAutoCenter::PreferredWorkArea;
@@ -148,44 +104,97 @@ namespace SH
 			UsedWindowPos = LoadedPos;
 			AutoCenterRule = EAutoCenter::None;
 		}
-	
 
-		SWindow::Construct(SWindow::FArguments()
+		SAssignNew(Window, SWindow)
 			.Title(FText::FromString("ShaderHelper"))
 			.ScreenPosition(UsedWindowPos)
 			.AutoCenter(AutoCenterRule)
 			.ClientSize(UsedWindowSize)
-			.AdjustInitialSizeAndPositionForDPIScale(false)
+			.AdjustInitialSizeAndPositionForDPIScale(false);
+
+		TabManagerTab->AssignParentWidget(Window);
+
+		FSlateApplication::Get().AddWindow(Window.ToSharedRef());
+
+		Window->SetContent(
+			SNew(SVerticalBox)
+			+SVerticalBox::Slot()
+			.AutoHeight()
 			[
-				SAssignNew(LayoutBox, SVerticalBox)
-				+ SVerticalBox::Slot()
-				.AutoHeight()
-				[
-					CreateMenuBar()
-				]
-				+ SVerticalBox::Slot()
-				.FillHeight(1.0f)
-				[
-					TabManager->RestoreFrom(UsedLayout, TSharedPtr<SWindow>()).ToSharedRef()
-				]
+				CreateMenuBar()
+			]
+			+ SVerticalBox::Slot()
+			.FillHeight(1.0f)
+			[
+				TabManager->RestoreFrom(UsedLayout, Window).ToSharedRef()
 			]
 		);
 
-		SetCanTick(true);
-			
+		Window->SetRequestDestroyWindowOverride(FRequestDestroyWindowOverride::CreateLambda([this](const TSharedRef<SWindow>& InWindow) {
+			if (bSaveWindowLayout) { TabManager->SavePersistentLayout(); }
+			FSlateApplication::Get().RequestDestroyWindow(InWindow);
+		}));
+
+		Window->SetOnWindowClosed(FOnWindowClosed::CreateLambda([this](const TSharedRef<SWindow>&) {
+			OnWindowClosed.ExecuteIfBound();
+		}));
 	}
 
-	void SShaderHelperWindow::ResetWindowLayout()
+	void ShaderHelperEditor::Update(double DeltaTime)
+	{
+	
+	}
+
+
+	TSharedRef<SDockTab> ShaderHelperEditor::SpawnWindowTab(const FSpawnTabArgs& Args)
+	{
+		const FTabId& TabId = Args.GetTabId();
+		TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab);
+
+		if (TabId == PreviewTabId) {
+			SpawnedTab->SetLabel(FText::FromName(PreviewTabId));
+			SpawnedTab->SetContent(
+				SNew(SViewport)
+				.ViewportInterface(ViewPort)
+			);
+		}
+		else if (TabId == PropretyTabId) {
+			SpawnedTab->SetLabel(FText::FromName(PropretyTabId));
+			SpawnedTab->SetContent(
+				SAssignNew(PropertyViewBox, SBox)
+			);
+		}
+		else if (TabId == CodeTabId) {
+			SpawnedTab->SetLabel(FText::FromName(CodeTabId));
+			SpawnedTab->SetContent(
+				SNew(SShaderEditorBox)
+				.Text(FText::FromString(ShRenderer::DefaultPixelShaderText))
+				.Renderer(Renderer)
+			);
+		}
+		else if (TabId == AssetTabId) {
+			SpawnedTab->SetLabel(FText::FromName(AssetTabId));
+			SpawnedTab->SetContent(
+				SNew(SAssetBrowser)
+				.DirectoryShowed(TSingleton<ShProjectManager>::Get().GetActiveContentDirectory())
+			);
+		}
+		else {
+			ensure(false);
+		}
+		return SpawnedTab;
+	}
+
+	void ShaderHelperEditor::ResetWindowLayout()
 	{
 		//Clean window layout cache to use default layout.
 		IFileManager::Get().Delete(*WindowLayoutConfigFileName);
 		bSaveWindowLayout = false;
 		OnResetWindowLayout.ExecuteIfBound();
-		TabManager->CloseAllAreas();
-		FSlateApplication::Get().RequestDestroyWindow(SharedThis(this));
+		Window->RequestDestroyWindow();
 	}
 
-	SShaderHelperWindow::WindowLayoutConfigInfo SShaderHelperWindow::LoadWindowLayout(const FString& InWindowLayoutConfigFileName)
+	ShaderHelperEditor::WindowLayoutConfigInfo ShaderHelperEditor::LoadWindowLayout(const FString& InWindowLayoutConfigFileName)
 	{
 		TSharedPtr<FJsonObject> RootJsonObject;
 		FString JsonContent;
@@ -212,17 +221,17 @@ namespace SH
 		return { Pos, WindowSize, RelLayout };
 	}
 
-	void SShaderHelperWindow::SaveWindowLayout(const TSharedRef<FTabManager::FLayout>& InLayout)
+	void ShaderHelperEditor::SaveWindowLayout(const TSharedRef<FTabManager::FLayout>& InLayout)
 	{
 		TSharedRef<FJsonObject> RootJsonObject = MakeShared<FJsonObject>();
 
 		TSharedRef<FJsonObject> RootWindowSizeJsonObject = MakeShared<FJsonObject>();
-		Vector2D CurClientSize = GetClientSizeInScreen();
+		Vector2D CurClientSize = Window->GetClientSizeInScreen();
 		RootWindowSizeJsonObject->SetNumberField(TEXT("Width"), CurClientSize.X);
 		RootWindowSizeJsonObject->SetNumberField(TEXT("Height"), CurClientSize.Y);
 
 		TSharedRef<FJsonObject> RootWindowPosJsonObject = MakeShared<FJsonObject>();
-		Vector2D CurPos = GetPositionInScreen();
+		Vector2D CurPos = Window->GetPositionInScreen();
 		RootWindowPosJsonObject->SetNumberField(TEXT("X"), CurPos.X);
 		RootWindowPosJsonObject->SetNumberField(TEXT("Y"), CurPos.Y);
 
@@ -239,35 +248,29 @@ namespace SH
 		}
 	}
 
-	void SShaderHelperWindow::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
+	void ShaderHelperEditor::OnViewportResize(const Vector2f& InSize)
 	{
-		if (IsWindowMinimized())
-		{
-			const TArray< TSharedRef<SWindow> > AllWindows = FSlateApplication::Get().GetInteractiveTopLevelWindows();
-			for (const TSharedRef<SWindow>& Window : AllWindows)
-			{
-				Window->Minimize();
-			}
-		}
+		Renderer->OnViewportResize(InSize);
+		ViewPort->SetViewPortRenderTexture(Renderer->GetFinalRT());
 	}
 
-	TSharedRef<SWidget> SShaderHelperWindow::CreateMenuBar()
+	TSharedRef<SWidget> ShaderHelperEditor::CreateMenuBar()
 	{
 		FMenuBarBuilder MenuBarBuilder = FMenuBarBuilder(TSharedPtr<FUICommandList>());
 		MenuBarBuilder.AddPullDownMenu(
 			FText::FromString("File"),
 			FText::GetEmpty(),
-			FNewMenuDelegate::CreateRaw(this, &SShaderHelperWindow::FillMenu, FString("File"))
+			FNewMenuDelegate::CreateRaw(this, &ShaderHelperEditor::FillMenu, FString("File"))
 		);
 		MenuBarBuilder.AddPullDownMenu(
 			FText::FromString("Config"),
 			FText::GetEmpty(),
-			FNewMenuDelegate::CreateRaw(this, &SShaderHelperWindow::FillMenu, FString("Config"))
+			FNewMenuDelegate::CreateRaw(this, &ShaderHelperEditor::FillMenu, FString("Config"))
 		);
 		MenuBarBuilder.AddPullDownMenu(
 			FText::FromString("Window"),
 			FText::GetEmpty(),
-			FNewMenuDelegate::CreateRaw(this, &SShaderHelperWindow::FillMenu, FString("Window"))
+			FNewMenuDelegate::CreateRaw(this, &ShaderHelperEditor::FillMenu, FString("Window"))
 		);
         
         TSharedRef<SWidget> MenuWidget = MenuBarBuilder.MakeWidget();
@@ -278,7 +281,7 @@ namespace SH
         return MenuWidget;
 	}
 
-	void SShaderHelperWindow::FillMenu(FMenuBuilder& MenuBuilder, FString MenuName)
+	void ShaderHelperEditor::FillMenu(FMenuBuilder& MenuBuilder, FString MenuName)
 	{
 		auto InvokeTabLambda = [this](const FName& TabId)
 		{
@@ -328,11 +331,10 @@ namespace SH
 				MenuBuilder.AddMenuEntry(FText::FromString("Reset Window Layout"), FText::GetEmpty(), 
 					FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "Icons.Refresh" }, 
 					FUIAction(
-						FExecuteAction::CreateRaw(this, &SShaderHelperWindow::ResetWindowLayout)
+						FExecuteAction::CreateRaw(this, &ShaderHelperEditor::ResetWindowLayout)
 					));
 			}
 			MenuBuilder.EndSection();
 		}
 	}
-
 }

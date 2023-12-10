@@ -1,13 +1,16 @@
 #include "CommonHeader.h"
 #include <Windows/WindowsHWrapper.h>
-#include "App/UnitTestConSole.h"
-#include "UI/Styles/FAppCommonStyle.h"
+#include "App/UnitTestApp.h"
+
+ADD_AGILITY_SDK()
 
 int WINAPI WinMain(_In_ HINSTANCE hInInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR, _In_ int nCmdShow)
 {
 	hInstance = hInInstance;
-	UNITTEST_FRAMEWORK::UnitTestConSole app(GetCommandLineW());
-	app.SetClientSize({ 800,600 });
+	UNITTEST_FRAMEWORK::UnitTestApp app(
+		{800, 600},
+		GetCommandLineW()
+	);
 	app.Run();
 	return 0;
 }

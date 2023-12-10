@@ -36,8 +36,7 @@ R"(float4 MainPS(PIn Input) : SV_Target
     return float4(col,1);
 })";
 
-	ShRenderer::ShRenderer(PreviewViewPort* InViewPort)
-		: ViewPort(InViewPort)
+	ShRenderer::ShRenderer()
 	{
 
 		VertexShader = GpuApi::CreateShaderFromSource(ShaderType::VertexShader, DefaultVertexShaderText, TEXT("DefaultFullScreenVS"), TEXT("MainVS"));
@@ -61,14 +60,12 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		FinalRT = GpuResourceHelper::TempRenderTarget(GpuTextureFormat::B8G8R8A8_UNORM);
 	}
 
-	void ShRenderer::OnViewportResize()
+	void ShRenderer::OnViewportResize(const Vector2f& InResolution)
 	{
-		check(ViewPort);
-		iResolution = { (float)ViewPort->GetSize().X, (float)ViewPort->GetSize().Y };
+		iResolution = InResolution;
 		//Note: BGRA8_UNORM is default framebuffer format in ue standalone renderer framework.
-		GpuTextureDesc Desc{ (uint32)ViewPort->GetSize().X, (uint32)ViewPort->GetSize().Y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
+		GpuTextureDesc Desc{ (uint32)iResolution.x, (uint32)iResolution.y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
 		FinalRT = GpuApi::CreateGpuTexture(Desc);
-		ViewPort->SetViewPortRenderTexture(FinalRT);
 		ReCreatePipelineState();
 		Render();
 	}
@@ -144,7 +141,7 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		FullScreenPassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ FinalRT, RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
 		GpuApi::BeginRenderPass(FullScreenPassDesc, TEXT("FullScreenPass"));
 		GpuApi::SetRenderPipelineState(NewPipelineState);
-		GpuApi::SetViewPort({ (uint32)ViewPort->GetSize().X, (uint32)ViewPort->GetSize().Y });
+		GpuApi::SetViewPort({ (uint32)iResolution.x, (uint32)iResolution.y });
 		if (NewCustomArgumentBuffer.IsValid())
 		{
 			GpuApi::SetBindGroups(BuiltInArgumentBuffer->GetBindGroup(), NewCustomArgumentBuffer->GetBindGroup(), nullptr, nullptr);
@@ -163,7 +160,7 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		FullScreenPassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ FinalRT, RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
 		GpuApi::BeginRenderPass(FullScreenPassDesc, TEXT("FullScreenPass"));
 		GpuApi::SetRenderPipelineState(OldPipelineState);
-		GpuApi::SetViewPort({ (uint32)ViewPort->GetSize().X, (uint32)ViewPort->GetSize().Y });
+		GpuApi::SetViewPort({ (uint32)iResolution.x, (uint32)iResolution.y });
 		if (OldCustomArgumentBuffer.IsValid())
 		{
 			GpuApi::SetBindGroups(BuiltInArgumentBuffer->GetBindGroup(), OldCustomArgumentBuffer->GetBindGroup(), nullptr, nullptr);

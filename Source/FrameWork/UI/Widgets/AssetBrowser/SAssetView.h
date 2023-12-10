@@ -8,6 +8,7 @@ namespace FRAMEWORK
 	{
 	public:
 		SLATE_BEGIN_ARGS(SAssetView) {}
+			SLATE_EVENT(FOnContextMenuOpening, OnContextMenuOpening)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs);

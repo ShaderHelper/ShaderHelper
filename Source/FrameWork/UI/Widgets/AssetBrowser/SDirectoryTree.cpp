@@ -1,33 +1,12 @@
 #include "CommonHeader.h"
 #include "SDirectoryTree.h"
 #include <DesktopPlatform/DesktopPlatformModule.h>
-#include "ProjectManager/ProjectManager.h"
-#include <DirectoryWatcher/DirectoryWatcherModule.h>
-#include <DirectoryWatcher/IDirectoryWatcher.h>
-
+#include "UI/Styles/FAppCommonStyle.h"
 namespace FRAMEWORK
 {
-	SDirectoryTree::~SDirectoryTree()
-	{
-		if (FDirectoryWatcherModule* Module = FModuleManager::GetModulePtr<FDirectoryWatcherModule>(TEXT("DirectoryWatcher")))
-		{
-			if (IDirectoryWatcher* DirectoryWatcher = Module->Get())
-			{
-				DirectoryWatcher->UnregisterDirectoryChangedCallback_Handle(FPaths::GetPath(DirectoryShowed), DirectoryWatcherHandle);
-			}
-		}
-	}
-
 	void SDirectoryTree::Construct(const FArguments& InArgs)
 	{
 		DirectoryShowed = InArgs._DirectoryShowed;
-
-		FDirectoryWatcherModule& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>(TEXT("DirectoryWatcher"));
-		IDirectoryWatcher* DirectoryWatcher = DirectoryWatcherModule.Get();
-
-		DirectoryWatcher->RegisterDirectoryChangedCallback_Handle(FPaths::GetPath(DirectoryShowed),
-			IDirectoryWatcher::FDirectoryChanged::CreateRaw(this, &SDirectoryTree::OnDirectoryChanged), 
-			DirectoryWatcherHandle, IDirectoryWatcher::WatchOptions::IncludeDirectoryChanges);
 
 		auto RootDirectoryData = MakeShared<DirectoryData>();
 		RootDirectoryData->IsRootDirectory = true;
@@ -74,7 +53,7 @@ namespace FRAMEWORK
 		}
 
 		return SNew(STableRow<TSharedRef<DirectoryData>>, OwnerTable)
-			.Style(&FAppStyle::Get().GetWidgetStyle<FTableRowStyle>("SimpleTableView.Row"))
+			.Style(&FAppCommonStyle::Get().GetWidgetStyle<FTableRowStyle>("DirectoryTreeView.Row"))
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot()
@@ -110,24 +89,6 @@ namespace FRAMEWORK
 	void SDirectoryTree::OnGetChildren(TSharedRef<DirectoryData> InTreeNode, TArray<TSharedRef<DirectoryData>>& OutChildren)
 	{
 		OutChildren = InTreeNode->Children;
-	}
-
-	void SDirectoryTree::OnDirectoryChanged(const TArray<FFileChangeData>& InFileChanges)
-	{
-		for (const FFileChangeData& FileChange : InFileChanges)
-		{
-			if (FPaths::GetExtension(FileChange.Filename).IsEmpty())
-			{
-				if (FileChange.Action == FFileChangeData::FCA_Added)
-				{
-					AddDirectory(FPaths::ConvertRelativePathToFull(FileChange.Filename));
-				}
-				else if (FileChange.Action == FFileChangeData::FCA_Removed)
-				{
-					RemoveDirectory(FPaths::ConvertRelativePathToFull(FileChange.Filename));
-				}
-			}
-		}
 	}
 
 	TSharedPtr<DirectoryData> SDirectoryTree::FindTreeItemFromTree(const FString& TargetDirPath, TSharedRef<DirectoryData> StartTreeItem)

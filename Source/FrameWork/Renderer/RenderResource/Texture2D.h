@@ -9,8 +9,9 @@ namespace FRAMEWORK
 		virtual void Serialize(FArchive& Ar);
 		virtual void PostLoad();
 		virtual FString FileExtension() const;
-		//virtual TUniquePtr<class AssetFactory> Factory();
-		//virtual TSharedPtr<class AssetViewItem> AssetViewItem() const;
+
+	private:
+		TRefCountPtr<GpuTexture> GpuData;
 	};
 
 }

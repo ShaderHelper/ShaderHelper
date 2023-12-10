@@ -1,28 +1,26 @@
 #pragma once
 #include "App/App.h"
-#include "PreviewViewPort.h"
+#include "Editor/ShaderHelperEditor.h"
 
 namespace SH {
 	
 	class ShaderHelperApp : public App
 	{
 	public:
-		using App::App;
-		
+		ShaderHelperApp(const Vector2D& InClientSize, const TCHAR* CommandLine);
+		~ShaderHelperApp();
+
 	private:
-		void Init() override;
 
-		void InitEditorUI();
-		void ReInitEditorUi();
-		void InitLauncherUI();
-
-		void ShutDown() override;
-		void PostInit() override;
+		void InitEditor();
+		void ReInitEditor();
 		void Update(double DeltaTime) override;
 		
 	private:
-		bool IsReInitEditorUI = false;
-		TSharedPtr<PreviewViewPort> ViewPort;
+		TUniquePtr<ShRenderer> Renderer;
+		TUniquePtr<ShaderHelperEditor> Editor;
+		bool IsReInitEditor = false;
+		//TWeakPtr<class SShaderHelperWindow> EditorWindowWeakPtr;
 	};
 	
 }
