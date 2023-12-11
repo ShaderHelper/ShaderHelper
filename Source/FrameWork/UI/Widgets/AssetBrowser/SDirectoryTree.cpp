@@ -2,16 +2,19 @@
 #include "SDirectoryTree.h"
 #include <DesktopPlatform/DesktopPlatformModule.h>
 #include "UI/Styles/FAppCommonStyle.h"
+
 namespace FRAMEWORK
 {
 	void SDirectoryTree::Construct(const FArguments& InArgs)
 	{
-		DirectoryShowed = InArgs._DirectoryShowed;
+		ContentPathShowed = InArgs._ContentPathShowed;
+		OnSelectionChanged = InArgs._OnSelectionChanged;
+		CurSelectedDirectory = InArgs._InitialDirectory;
 
 		auto RootDirectoryData = MakeShared<DirectoryData>();
 		RootDirectoryData->IsRootDirectory = true;
 		DirectoryDatas.Add(RootDirectoryData);
-		PopulateDirectoryData(RootDirectoryData, DirectoryShowed);
+		PopulateDirectoryData(RootDirectoryData, ContentPathShowed);
 
 		ChildSlot
 		[
@@ -20,9 +23,30 @@ namespace FRAMEWORK
 			.OnGenerateRow(this, &SDirectoryTree::OnGenerateRow)
 			.OnGetChildren(this, &SDirectoryTree::OnGetChildren)
 			.SelectionMode(ESelectionMode::Single)
+			.OnSelectionChanged_Lambda([this](TSharedPtr<DirectoryData> SelectedData, ESelectInfo::Type) {
+				if (SelectedData) 
+				{
+					CurSelectedDirectory = SelectedData->DirectoryPath;
+					OnSelectionChanged.ExecuteIfBound(SelectedData->DirectoryPath);
+				}
+				else
+				{
+					SetSelection(CurSelectedDirectory);
+				}
+			})
 		];
 
 		DirectoryTree->SetItemExpansion(RootDirectoryData, true);
+
+		if (CurSelectedDirectory.IsEmpty())
+		{
+			DirectoryTree->SetSelection(RootDirectoryData);
+		}
+		else
+		{
+			SetSelection(CurSelectedDirectory);
+		}
+		
 	}
 
 	void SDirectoryTree::PopulateDirectoryData(TSharedRef<DirectoryData> InDirectoryData, const FString& DirectoryPath)
@@ -150,6 +174,14 @@ namespace FRAMEWORK
 		{
 			PopulateDirectoryData(DirectoryDatas[0], DirectoryDatas[0]->DirectoryPath);
 			DirectoryTree->RequestTreeRefresh();
+		}
+	}
+
+	void SDirectoryTree::SetSelection(const FString& SelectedDirectory)
+	{
+		if (TSharedPtr<DirectoryData> Data = FindTreeItemFromTree(SelectedDirectory, DirectoryDatas[0]))
+		{
+			DirectoryTree->SetSelection(Data.ToSharedRef());
 		}
 	}
 

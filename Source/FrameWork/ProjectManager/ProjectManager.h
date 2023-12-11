@@ -9,15 +9,15 @@ namespace FRAMEWORK
 		{}
 		virtual ~Project() = default;
 
-		virtual void Load(const FString& ProjectPath) = 0;
-		virtual void Save(const FString& ProjectPath) = 0;
+		virtual void Open(const FString& ProjectPath) = 0;
+		virtual void Save() = 0;
 
 		const FString& GetFilePath() const
 		{
 			return Path;
 		}
 
-	private:
+	protected:
 		FString Path;
 	};
 
@@ -36,12 +36,17 @@ namespace FRAMEWORK
 		virtual void OpenProject(const FString& ProjectPath)
 		{
 			ActiveProject = MakeUnique<ProjectDataType>(ProjectPath);
-			ActiveProject->Load(ProjectPath);
+			ActiveProject->Open(ProjectPath);
 		}
 
-		virtual void SaveProject(const FString& ProjectPath)
+		virtual void SaveProject()
 		{
-			ActiveProject->Save(ProjectPath);
+			ActiveProject->Save();
+		}
+
+		ProjectDataType& GetProject()
+		{
+			return *ActiveProject;
 		}
 
 		FString GetActiveProjectDirectory() const
@@ -52,8 +57,26 @@ namespace FRAMEWORK
 
 		FString GetActiveContentDirectory() const
 		{
-			check(ActiveProject);
 			return GetActiveProjectDirectory() / TEXT("Content");
+		}
+
+		FString GetActiveSavedDirectory() const
+		{
+			return GetActiveProjectDirectory() / TEXT("Saved");
+		}
+
+		//FullPath and ProjectPath need be on the same drive.
+		FString GetRelativePathToProject(const FString& FullPath) const
+		{
+			FString RelPath = FullPath;
+			FString SlashDirectory = GetActiveProjectDirectory() + TEXT("/");
+			FPaths::MakePathRelativeTo(RelPath, *SlashDirectory);
+			return RelPath;
+		}
+
+		FString ConvertRelativePathToFull(const FString& RelativePathToProject) const
+		{
+			return FPaths::ConvertRelativePathToFull(GetActiveProjectDirectory(), RelativePathToProject);
 		}
 
 	protected:

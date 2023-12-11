@@ -11,16 +11,12 @@ namespace SH {
 		~ShaderHelperApp();
 
 	private:
-
 		void InitEditor();
-		void ReInitEditor();
 		void Update(double DeltaTime) override;
 		
 	private:
 		TUniquePtr<ShRenderer> Renderer;
 		TUniquePtr<ShaderHelperEditor> Editor;
-		bool IsReInitEditor = false;
-		//TWeakPtr<class SShaderHelperWindow> EditorWindowWeakPtr;
 	};
 	
 }

@@ -23,31 +23,22 @@ namespace SH {
 	{
 		Editor.Reset();
 		Editor = MakeUnique<ShaderHelperEditor>(AppClientSize, Renderer.Get());
-		Editor->OnResetWindowLayout.BindLambda([this] { IsReInitEditor = true; });
-		Editor->OnWindowClosed.BindLambda([this] {
-			if (!IsReInitEditor)
+		Editor->OnWindowClosed.BindLambda([this](bool ReInitEditor) {
+			if (!ReInitEditor)
 			{
 				RequestEngineExit(TEXT("Normal Slate Window Closed"));
 			}
 			else
 			{
-				ReInitEditor();
+				InitEditor();
 			}
 		});
 	}
-
-	void ShaderHelperApp::ReInitEditor()
-	{
-		InitEditor();
-		IsReInitEditor = false;
-	}
-
 	void ShaderHelperApp::Update(double DeltaTime)
 	{
 		App::Update(DeltaTime);
 
 		Renderer->Render();
-		Editor->Update(DeltaTime);
 	}
 
 }

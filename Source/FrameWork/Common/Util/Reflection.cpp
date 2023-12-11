@@ -3,6 +3,17 @@
 
 namespace FRAMEWORK::ShReflectToy
 {
-	TMap<FString, MetaType*> TypeNameToMetaType;
-	TMap<FString, MetaType*> RegisteredMetaTypes;
+	
+	TMap<FString, MetaType*>& GetTypeNameToMetaType()
+	{
+		static TMap<FString, MetaType*> TypeNameToMetaType;
+		return TypeNameToMetaType;
+	}
+
+	TMap<FString, MetaType*>& GetRegisteredMetaTypes()
+	{
+		static TMap<FString, MetaType*> RegisteredMetaTypes;
+		return RegisteredMetaTypes;
+	}
+
 }

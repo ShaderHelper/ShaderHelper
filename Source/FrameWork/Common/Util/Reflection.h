@@ -5,8 +5,8 @@ namespace FRAMEWORK::ShReflectToy
 {
 	struct MetaType;
 
-	FRAMEWORK_API extern TMap<FString, MetaType*> TypeNameToMetaType;
-	FRAMEWORK_API extern TMap<FString, MetaType*> RegisteredMetaTypes;
+	FRAMEWORK_API TMap<FString, MetaType*>& GetTypeNameToMetaType();
+	FRAMEWORK_API TMap<FString, MetaType*>& GetRegisteredMetaTypes();
 
 	struct MetaType
 	{
@@ -31,10 +31,15 @@ namespace FRAMEWORK::ShReflectToy
 		template<typename T>
 		bool IsDerivedFrom()
 		{
+			if (TypeName == GetGeneratedTypeName<T>())
+			{
+				return true;
+			}
+
 			MetaType* BaseMetaType = GetBaseClass();
 			while(BaseMetaType)
 			{
-				if (BaseMetaType->TypeName == AUX::TypeName<T>)
+				if (BaseMetaType->TypeName == GetGeneratedTypeName<T>())
 				{
 					return true;
 				}
@@ -56,11 +61,12 @@ namespace FRAMEWORK::ShReflectToy
 		MetaTypeBuilder()
 		{
 			Meta = new MetaType{};
-			Meta->TypeName = AUX::TypeName<T>;
+			//Dont use AUX::TypeName<T>, there is a unordered dynamic initialization problem.
+			Meta->TypeName = GetGeneratedTypeName<T>();
 			Meta->RegisteredName = Meta->TypeName;
 			if constexpr(std::is_default_constructible_v<T>)
 			{
-				Meta->DefaultObjectGetter = [] { return new T; }
+				Meta->DefaultObjectGetter = [] { return new T; };
 			}
 		}
 
@@ -73,16 +79,17 @@ namespace FRAMEWORK::ShReflectToy
 		template<typename Base>
 		MetaTypeBuilder& BaseClass()
 		{
+			check((std::is_base_of_v<Base, T>));
 			Meta->BaseMetaTypeGetter = [] {
-				return TypeNameToMetaType[AUX::TypeName<Base>];
+				return GetTypeNameToMetaType()[GetGeneratedTypeName<Base>()];
 			};
 			return *this;
 		}
 
 		~MetaTypeBuilder()
 		{
-			TypeNameToMetaType.Add(Meta->TypeName, Meta);
-			RegisteredMetaTypes.Add(Meta->RegisteredName, Meta);
+			GetTypeNameToMetaType().Add(Meta->TypeName, Meta);
+			GetRegisteredMetaTypes().Add(Meta->RegisteredName, Meta);
 		}
 
 	private:
@@ -104,18 +111,18 @@ namespace FRAMEWORK::ShReflectToy
 	template<typename T>
 	MetaType* GetMetaType()
 	{
-		return TypeNameToMetaType[AUX::TypeName<T>];
+		return GetTypeNameToMetaType()[GetGeneratedTypeName<T>()];
 	}
 
 	template<typename T>
-	TArray<MetaType*> GetChildMetaTypes()
+	TArray<MetaType*> GetMetaTypes()
 	{
 		TArray<MetaType*> MetaTypes;
-		for (auto [_, MetaTypeValue] : RegisteredMetaTypes)
+		for (auto [_, MetaTypePtr] : GetRegisteredMetaTypes())
 		{
-			if (MetaTypeValue->IsDerivedFrom<T>)
+			if (MetaTypePtr->IsDerivedFrom<T>())
 			{
-				MetaTypes.Add(MetaTypeValue);
+				MetaTypes.Add(MetaTypePtr);
 			}
 		}
 		return MetaTypes;
