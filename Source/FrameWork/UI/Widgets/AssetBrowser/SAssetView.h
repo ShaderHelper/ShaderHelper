@@ -8,13 +8,16 @@ namespace FRAMEWORK
 	{
 	public:
 		SLATE_BEGIN_ARGS(SAssetView) {}
-			SLATE_EVENT(FOnContextMenuOpening, OnContextMenuOpening)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs);
+		void SetNewViewDirectory(const FString& NewViewDirectory);
+		TSharedPtr<SWidget> CreateContextMenu();
+		void ImportAsset();
 
 	private:
 		TArray<TSharedRef<AssetViewItem>> AssetViewItems;
+		FString ImportAssetPath;
 	};
 
 }

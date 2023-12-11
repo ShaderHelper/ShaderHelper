@@ -12,8 +12,12 @@ namespace FRAMEWORK
 	class FRAMEWORK_API SDirectoryTree : public SCompoundWidget
 	{
 	public:
+		DECLARE_DELEGATE_OneParam(OnSelectionChangedDelegate, const FString&)
+
 		SLATE_BEGIN_ARGS(SDirectoryTree) {}
-			SLATE_ARGUMENT(FString, DirectoryShowed)
+			SLATE_ARGUMENT(FString, ContentPathShowed)
+			SLATE_ARGUMENT(FString, InitialDirectory)
+			SLATE_EVENT(OnSelectionChangedDelegate, OnSelectionChanged)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs);
@@ -25,9 +29,13 @@ namespace FRAMEWORK
 		void AddDirectory(const FString& DirectoryPath);
 		void RemoveDirectory(const FString& DirectoryPath);
 
+		void SetSelection(const FString& SelectedDirectory);
+
 	private:
 		TArray<TSharedRef<DirectoryData>> DirectoryDatas;
 		TSharedPtr<STreeView<TSharedRef<DirectoryData>>> DirectoryTree;
-		FString DirectoryShowed;
+		FString ContentPathShowed;
+		OnSelectionChangedDelegate OnSelectionChanged;
+		FString CurSelectedDirectory;
 	};
 }

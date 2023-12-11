@@ -14,6 +14,7 @@
 namespace SH 
 {
 	const FString DefaultProjectPath = PathHelper::InitialDir() / TEXT("TemplateProject/Default/Default.shprj");
+
 	static const FString WindowLayoutConfigFileName = PathHelper::SavedConfigDir() / TEXT("WindowLayout.json");
 
 	const FName PreviewTabId = "Preview";
@@ -35,6 +36,8 @@ namespace SH
 		ViewPort = MakeShared<PreviewViewPort>();
 		ViewPort->OnViewportResize.AddRaw(this, &ShaderHelperEditor::OnViewportResize);
 
+		EditorStateSaveFileName = TSingleton<ShProjectManager>::Get().GetActiveSavedDirectory() / TEXT("EditorState.json");
+		LoadEditorState(EditorStateSaveFileName);
 		InitEditorUI();
 	}
 
@@ -80,13 +83,13 @@ namespace SH
 				->Split
 				(
 					FTabManager::NewStack()
-					->SetSizeCoefficient(0.18f)
+					->SetSizeCoefficient(0.15f)
 					->AddTab(PropretyTabId, ETabState::OpenedTab)
 				)
 				->Split
 				(
 					FTabManager::NewStack()
-					->SetSizeCoefficient(0.42f)
+					->SetSizeCoefficient(0.45f)
 					->AddTab(CodeTabId, ETabState::OpenedTab)
 				)
 			);
@@ -131,20 +134,14 @@ namespace SH
 		);
 
 		Window->SetRequestDestroyWindowOverride(FRequestDestroyWindowOverride::CreateLambda([this](const TSharedRef<SWindow>& InWindow) {
-			if (bSaveWindowLayout) { TabManager->SavePersistentLayout(); }
+			if (!bReInitEditor) { TabManager->SavePersistentLayout(); }
 			FSlateApplication::Get().RequestDestroyWindow(InWindow);
 		}));
 
 		Window->SetOnWindowClosed(FOnWindowClosed::CreateLambda([this](const TSharedRef<SWindow>&) {
-			OnWindowClosed.ExecuteIfBound();
+			OnWindowClosed.ExecuteIfBound(bReInitEditor);
 		}));
 	}
-
-	void ShaderHelperEditor::Update(double DeltaTime)
-	{
-	
-	}
-
 
 	TSharedRef<SDockTab> ShaderHelperEditor::SpawnWindowTab(const FSpawnTabArgs& Args)
 	{
@@ -153,6 +150,7 @@ namespace SH
 
 		if (TabId == PreviewTabId) {
 			SpawnedTab->SetLabel(FText::FromName(PreviewTabId));
+			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Visible"));
 			SpawnedTab->SetContent(
 				SNew(SViewport)
 				.ViewportInterface(ViewPort)
@@ -160,12 +158,14 @@ namespace SH
 		}
 		else if (TabId == PropretyTabId) {
 			SpawnedTab->SetLabel(FText::FromName(PropretyTabId));
+			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Info"));
 			SpawnedTab->SetContent(
 				SAssignNew(PropertyViewBox, SBox)
 			);
 		}
 		else if (TabId == CodeTabId) {
 			SpawnedTab->SetLabel(FText::FromName(CodeTabId));
+			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Edit"));
 			SpawnedTab->SetContent(
 				SNew(SShaderEditorBox)
 				.Text(FText::FromString(ShRenderer::DefaultPixelShaderText))
@@ -174,9 +174,15 @@ namespace SH
 		}
 		else if (TabId == AssetTabId) {
 			SpawnedTab->SetLabel(FText::FromName(AssetTabId));
+			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Server"));
 			SpawnedTab->SetContent(
 				SNew(SAssetBrowser)
-				.DirectoryShowed(TSingleton<ShProjectManager>::Get().GetActiveContentDirectory())
+				.ContentPathShowed(TSingleton<ShProjectManager>::Get().GetActiveContentDirectory())
+				.InitialDirectory(CurEditorState.SelectedDirectory)
+				.OnDirectoryChanged_Lambda([this](const FString& NewSelectedDirectory) {
+					CurEditorState.SelectedDirectory = NewSelectedDirectory;
+					SaveEditorState();
+				})
 			);
 		}
 		else {
@@ -189,8 +195,7 @@ namespace SH
 	{
 		//Clean window layout cache to use default layout.
 		IFileManager::Get().Delete(*WindowLayoutConfigFileName);
-		bSaveWindowLayout = false;
-		OnResetWindowLayout.ExecuteIfBound();
+		bReInitEditor = true;
 		Window->RequestDestroyWindow();
 	}
 
@@ -248,6 +253,30 @@ namespace SH
 		}
 	}
 
+	void ShaderHelperEditor::LoadEditorState(const FString& InFile)
+	{
+		FString JsonContent;
+		if (FFileHelper::LoadFileToString(JsonContent, *InFile))
+		{
+			TSharedPtr<FJsonObject> EditorStateJsonObject;
+			TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(JsonContent);
+			FJsonSerializer::Deserialize(Reader, EditorStateJsonObject);
+			CurEditorState.InitFromJson(EditorStateJsonObject);
+		}
+
+	}
+
+	void ShaderHelperEditor::SaveEditorState()
+	{
+		TSharedRef<FJsonObject> EditorStateJsonObject = CurEditorState.ToJson();
+		FString NewJsonContents;
+		TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&NewJsonContents);
+		if (FJsonSerializer::Serialize(EditorStateJsonObject, Writer))
+		{
+			FFileHelper::SaveStringToFile(NewJsonContents, *EditorStateSaveFileName);
+		}
+	}
+
 	void ShaderHelperEditor::OnViewportResize(const Vector2f& InSize)
 	{
 		Renderer->OnViewportResize(InSize);
@@ -302,7 +331,24 @@ namespace SH
 		};
 
 		if (MenuName == "File") {
-			MenuBuilder.AddMenuEntry(FText::FromString("TODO"), FText::GetEmpty(), FSlateIcon(), FUIAction());
+			MenuBuilder.BeginSection("Project", FText::FromString("Project"));
+			{
+				MenuBuilder.AddMenuEntry(FText::FromString("New..."), FText::GetEmpty(), FSlateIcon(), 
+					FUIAction(
+
+					));
+				MenuBuilder.AddMenuEntry(FText::FromString("Open..."), FText::GetEmpty(), FSlateIcon(),
+					FUIAction(
+
+					));
+				MenuBuilder.AddMenuEntry(FText::FromString("Save"), FText::GetEmpty(), FSlateIcon(), 
+					FUIAction(
+						FExecuteAction::CreateLambda([] { TSingleton<ShProjectManager>::Get().SaveProject(); })
+					));
+
+			}
+			MenuBuilder.EndSection();
+			
 		}
 		else if (MenuName == "Config") {
 			MenuBuilder.AddMenuEntry(FText::FromString("TODO"), FText::GetEmpty(), FSlateIcon(), FUIAction());
@@ -337,4 +383,20 @@ namespace SH
 			MenuBuilder.EndSection();
 		}
 	}
+
+	void ShaderHelperEditor::EditorState::InitFromJson(const TSharedPtr<FJsonObject>& InJson)
+	{
+		SelectedDirectory =  TSingleton<ShProjectManager>::Get().ConvertRelativePathToFull(
+			InJson->GetStringField("SelectedRelativeDirectory")
+		);
+	}
+
+	TSharedRef<FJsonObject> ShaderHelperEditor::EditorState::ToJson() const
+	{
+		TSharedRef<FJsonObject> JsonObject = MakeShareable(new FJsonObject());
+		JsonObject->SetStringField("SelectedRelativeDirectory", 
+			TSingleton<ShProjectManager>::Get().GetRelativePathToProject(SelectedDirectory));
+		return JsonObject;
+	}
+
 }

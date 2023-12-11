@@ -9,6 +9,8 @@ namespace SH
 	class ShaderHelperEditor : public Editor
 	{
 	public:
+		DECLARE_DELEGATE_OneParam(OnEditorWindowClosed, bool)
+
 		struct WindowLayoutConfigInfo
 		{
 			FVector2D Position;
@@ -22,8 +24,9 @@ namespace SH
 		void ResetWindowLayout();
 		WindowLayoutConfigInfo LoadWindowLayout(const FString& InWindowLayoutConfigFileName);
 		void SaveWindowLayout(const TSharedRef<FTabManager::FLayout>& InLayout);
+		void LoadEditorState(const FString& InFile);
+		void SaveEditorState();
 		void OnViewportResize(const Vector2f& InSize);;
-		void Update(double DeltaTime);
 		
 	private:
 		TSharedRef<SDockTab> SpawnWindowTab(const FSpawnTabArgs& Args);
@@ -32,12 +35,11 @@ namespace SH
 		void InitEditorUI();
 
 	public:
-		FSimpleDelegate OnResetWindowLayout;
-		FSimpleDelegate OnWindowClosed;
+		OnEditorWindowClosed OnWindowClosed;
 		
 	private:
 		ShRenderer* Renderer;
-		bool bSaveWindowLayout = true;
+		bool bReInitEditor = false;
 		TSharedPtr<FTabManager::FLayout> DefaultTabLayout;
 		TSharedPtr<SDockTab> TabManagerTab;
 		TSharedPtr<FTabManager> TabManager;
@@ -46,6 +48,15 @@ namespace SH
 		FVector2D WindowSize;
 
 		TWeakPtr<SBox> PropertyViewBox;
+
+		struct EditorState
+		{
+			void InitFromJson(const TSharedPtr<FJsonObject>& InJson);
+			TSharedRef<FJsonObject> ToJson() const;
+
+			FString SelectedDirectory;
+		} CurEditorState;
+		FString EditorStateSaveFileName;
 	};
 
 }

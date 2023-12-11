@@ -9,7 +9,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInInstance, _In_opt_ HINSTANCE hPrevInstance,
 {
 	hInstance = hInInstance;
 	SH::ShaderHelperApp app(
-		{ 1366,768 },
+		{ 1600,800 },
 		GetCommandLineW()
 	);
 	app.Run();

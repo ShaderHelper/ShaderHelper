@@ -4,7 +4,6 @@
 #include "SDirectoryTree.h"
 #include <DirectoryWatcher/DirectoryWatcherModule.h>
 #include <DirectoryWatcher/IDirectoryWatcher.h>
-#include <DesktopPlatform/DesktopPlatformModule.h>
 
 namespace FRAMEWORK
 {
@@ -15,21 +14,30 @@ namespace FRAMEWORK
 		{
 			if (IDirectoryWatcher* DirectoryWatcher = Module->Get())
 			{
-				DirectoryWatcher->UnregisterDirectoryChangedCallback_Handle(FPaths::GetPath(DirectoryShowed), DirectoryWatcherHandle);
+				DirectoryWatcher->UnregisterDirectoryChangedCallback_Handle(FPaths::GetPath(ContentPathShowed), DirectoryWatcherHandle);
 			}
 		}
 	}
 
 	void SAssetBrowser::Construct(const FArguments& InArgs)
 	{
-		DirectoryShowed = InArgs._DirectoryShowed;
+		ContentPathShowed = InArgs._ContentPathShowed;
+		OnDirectoryChanged = InArgs._OnDirectoryChanged;
+		SelectedDirectory = InArgs._InitialDirectory;
 
 		FDirectoryWatcherModule& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>(TEXT("DirectoryWatcher"));
 		IDirectoryWatcher* DirectoryWatcher = DirectoryWatcherModule.Get();
 
-		DirectoryWatcher->RegisterDirectoryChangedCallback_Handle(FPaths::GetPath(DirectoryShowed),
+		DirectoryWatcher->RegisterDirectoryChangedCallback_Handle(FPaths::GetPath(ContentPathShowed),
 			IDirectoryWatcher::FDirectoryChanged::CreateRaw(this, &SAssetBrowser::OnFileChanged),
 			DirectoryWatcherHandle, IDirectoryWatcher::WatchOptions::IncludeDirectoryChanges);
+
+		SAssignNew(AssetView, SAssetView);
+
+		SAssignNew(DirectoryTree, SDirectoryTree)
+			.ContentPathShowed(InArgs._ContentPathShowed)
+			.InitialDirectory(InArgs._InitialDirectory)
+			.OnSelectionChanged_Raw(this, &SAssetBrowser::OnDirectoryTreeSelectionChanged);
 
 		ChildSlot
 		[
@@ -40,8 +48,7 @@ namespace FRAMEWORK
 			[
 				SNew(SBorder)
 				[
-					SAssignNew(DirectoryTree, SDirectoryTree)
-					.DirectoryShowed(InArgs._DirectoryShowed)
+					DirectoryTree.ToSharedRef()
 				]
 				
 			]
@@ -51,8 +58,7 @@ namespace FRAMEWORK
 				SNew(SBorder)
 				.BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
 				[
-					SAssignNew(AssetView, SAssetView)
-					.OnContextMenuOpening(this, &SAssetBrowser::CreateContextMenu)
+					AssetView.ToSharedRef()
 				]
 			]
 		];
@@ -82,31 +88,9 @@ namespace FRAMEWORK
 		}
 	}
 
-	TSharedPtr<SWidget> SAssetBrowser::CreateContextMenu()
+	void SAssetBrowser::OnDirectoryTreeSelectionChanged(const FString& SelectedDirectory)
 	{
-		FMenuBuilder MenuBuilder{ true, TSharedPtr<FUICommandList>() };
-
-		MenuBuilder.BeginSection("NewAsset", FText::FromString("New Asset"));
-		{
-			MenuBuilder.AddMenuEntry(
-				FText::FromString("Import"),
-				FText::GetEmpty(),
-				FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "Icons.Import" },
-				FUIAction{ FExecuteAction::CreateRaw(this, &SAssetBrowser::ImportAsset) });
-		}
-		MenuBuilder.EndSection();
-
-		return MenuBuilder.MakeWidget();
+		AssetView->SetNewViewDirectory(SelectedDirectory);
+		OnDirectoryChanged.ExecuteIfBound(SelectedDirectory);
 	}
-
-	void SAssetBrowser::ImportAsset()
-	{
-		IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
-		if (DesktopPlatform)
-		{
-			TArray<FString> OpenedFileNames;
-			//DesktopPlatform->OpenFileDialog(nullptr, "Import Asset", )
-		}
-	}
-
 }

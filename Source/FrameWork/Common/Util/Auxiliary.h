@@ -265,10 +265,10 @@ namespace AUX
     }
 
 	template<typename T>
-	static const FString TypeName = TTypename<T>::Value;
+	inline const FString TypeName = TTypename<T>::Value;
 
 	template<typename T>
-	static const FString RawTypeName = GetRawTypeName<T>();
+	inline const FString RawTypeName = GetRawTypeName<T>();
     
     //https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2593r0.html
     template<typename T>
