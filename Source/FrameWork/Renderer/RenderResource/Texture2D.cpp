@@ -1,6 +1,7 @@
 #include "CommonHeader.h"
 #include "Texture2D.h"
 #include "Common/Util/Reflection.h"
+#include "GpuApi/GpuApiInterface.h"
 
 namespace FRAMEWORK
 {
@@ -9,9 +10,26 @@ namespace FRAMEWORK
 						.BaseClass<AssetObject>();
 	)
 
-	void Texture2D::Serialize(FArchive& Ar)
+	Texture2D::Texture2D()
+		: Width(0), Height(0)
 	{
 
+	}
+
+	Texture2D::Texture2D(int32 InWidth, int32 InHeight, const TArray<uint8>& InRawData)
+		: Width(InWidth)
+		, Height(InHeight)
+		, RawData(InRawData)
+	{
+		Guid = FGuid::NewGuid();
+	}
+
+	void Texture2D::Serialize(FArchive& Ar)
+	{
+		Ar << Guid;
+		Ar << Width;
+		Ar << Height;
+		Ar << RawData;
 	}
 
 	void Texture2D::PostLoad()
@@ -22,6 +40,16 @@ namespace FRAMEWORK
 	FString Texture2D::FileExtension() const
 	{
 		return "Texture";
+	}
+
+	GpuTexture* Texture2D::Gethumbnail() const
+	{
+		return nullptr;
+	}
+
+	TSharedRef<SWidget> Texture2D::GetPropertyView() const
+	{
+		return SNullWidget::NullWidget;
 	}
 
 }
