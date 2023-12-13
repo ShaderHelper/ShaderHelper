@@ -17,7 +17,8 @@ namespace FRAMEWORK
 
 	private:
 		TArray<TSharedRef<AssetViewItem>> AssetViewItems;
-		FString ImportAssetPath;
+		FString CacheImportAssetPath;
+		FString CurViewDirectory;
 	};
 
 }

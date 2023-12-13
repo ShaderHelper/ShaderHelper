@@ -1,7 +1,12 @@
 #pragma once
 
+struct FSlateBrush;
+class SWidget;
+
 namespace FRAMEWORK
 {
+	class GpuTexture;
+
 	class AssetObject
 	{
 	public:
@@ -13,9 +18,9 @@ namespace FRAMEWORK
 		virtual void PostLoad() {}
 
 		virtual FString FileExtension() const = 0;
-		virtual class GpuTexture* Gethumbnail() const { return nullptr; }
-		virtual struct FSlateBrush* GetImage() const { return nullptr; }
-		virtual TSharedRef<class SWidget> GetPropertyView() const = 0;
+		virtual GpuTexture* Gethumbnail() const { return nullptr; }
+		virtual FSlateBrush* GetImage() const { return nullptr; }
+		virtual TSharedRef<SWidget> GetPropertyView() const = 0;
 	};
 
 }
