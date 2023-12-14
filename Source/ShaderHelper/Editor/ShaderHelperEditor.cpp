@@ -10,10 +10,9 @@
 #include "Common/Path/PathHelper.h"
 #include "UI/Styles/FShaderHelperStyle.h"
 
-
 namespace SH 
 {
-	const FString DefaultProjectPath = PathHelper::InitialDir() / TEXT("TemplateProject/Default/Default.shprj");
+	const FString DefaultProjectPath = PathHelper::WorkSpaceDir() / TEXT("TemplateProject/Default/Default.shprj");
 
 	static const FString WindowLayoutConfigFileName = PathHelper::SavedConfigDir() / TEXT("WindowLayout.json");
 

@@ -1,5 +1,6 @@
 #pragma once
 #include "AssetObject.h"
+#include "Common/Util/Reflection.h"
 
 namespace FRAMEWORK
 {
@@ -11,59 +12,108 @@ namespace FRAMEWORK
 		template <typename OtherType>
 		friend class AssetPtr;
 	private:
-		AssetPtr(T* InAsset);
+		AssetPtr(T* InAsset, const FGuid& InGuid);
 
 	public:
-		AssetPtr(const AssetPtr& InAssetRef);
+		AssetPtr(std::nullptr_t = nullptr);
+		AssetPtr(const AssetPtr& InAssetPtr);
 
 		template<typename OtherType,
 			typename = decltype(ImplicitConv<T*>((OtherType*)nullptr))
 		>
-		AssetPtr(const AssetPtr<OtherType>& OtherAssetRef);
+		AssetPtr(const AssetPtr<OtherType>& OtherAssetPtr);
 
-		AssetPtr& operator=(const AssetPtr& OtherAssetRef);
+		AssetPtr& operator=(const AssetPtr& OtherAssetPtr);
 
 		~AssetPtr();
 
 		T* operator->() const;
 
 		T* Get() const;
+		FGuid GetGuid() const;
 
 	private:
 		T* Asset;
+		FGuid Guid;
 	};
 
 	class GpuTexture;
 
-	class AssetManager
+	class FRAMEWORK_API AssetManager
 	{
 	public:
-		/*	
-			template<typename T>
-			AssetPtr<T> LoadAssetByPath(const FString& InAssetPath)
-			{
+		void MountProject(const FString& InProjectContentDir);
 
+		template<typename T>
+		AssetPtr<T> LoadAssetByPath(const FString& InAssetPath)
+		{
+			static_assert(std::is_base_of_v<AssetObject, T>);
+
+			FGuid Guid = GetGuid(InAssetPath);
+			if (Assets.Contains(Guid))
+			{
+				return { Assets[Guid], Guid };
 			}
 
-			template<typename T>
-			AssetPtr<T> LoadAssetByGuid()
+			TArray<ShReflectToy::MetaType*> AssetObjectMetaTypes = ShReflectToy::GetMetaTypes<AssetObject>();
+			FString AssetExt = FPaths::GetExtension(InAssetPath);
+			AssetObject* NewAssetObject = nullptr;
+			for (auto MetaTypePtr : AssetObjectMetaTypes)
 			{
-				
+				AssetObject* DefaultAssetObject = static_cast<AssetObject*>(MetaTypePtr->GetDefaultObject());
+				if (DefaultAssetObject && DefaultAssetObject->FileExtension().Contains(AssetExt))
+				{
+					NewAssetObject = static_cast<AssetObject*>(MetaTypePtr->Construct());
+					break;
+				}
 			}
+			check(NewAssetObject);
+			TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*InAssetPath));
+			NewAssetObject->Serialize(*Ar);
+			NewAssetObject->PostLoad();
+			Assets.Add(Guid, NewAssetObject);
+			return { static_cast<T*>(NewAssetObject), Guid };
+		}
 
-			FString GetPath(guid) const;
-		*/
+		template<typename T>
+		AssetPtr<T> LoadAssetByGuid(const FGuid& InGuid)
+		{
+			return LoadAssetByPath<T>(GetPath(InGuid));
+		}
 
-		//void AddThumbnail(AssetObject* InAssetObject, GpuTexture* InThumbnail);
+		FString GetPath(const FGuid& InGuid) const;
+		FGuid GetGuid(const FString& InPath) const;
+
+		void Clear();
+		TArray<FString> GetManageredExts() const;
+		
+	private:
 		void AddRef(AssetObject* InAssetObject);
 		void ReleaseRef(AssetObject* InAssetObject);
 
+
 	private:
-		//TMap<, FString> GuidToPath;
-		//TMap<, AssetObject*> Asssets;
-		//TMap<AssetObject*, uint32> AssetRefCounts;
-		//TMap<AssetObject*, GpuTexture*> AssetThumbnailPool;
+		TMap<FString, FGuid> PathToGuid;
+		TMap<FGuid, AssetObject*> Assets;
+		TMap<AssetObject*, uint32> AssetRefCounts;
+		TMap<FGuid, GpuTexture*> AssetThumbnailPool;
 	};
+
+	template<typename T>
+	FArchive& operator<<(FArchive& Ar, AssetPtr<T>& InOutAssetPtr)
+	{
+		if (Ar.IsLoading())
+		{
+			FGuid AssetGuid;
+			Ar << AssetGuid;
+			InOutAssetPtr = TSingleton<AssetManager>::Get().LoadAssetByGuid<T>(AssetGuid);
+		}
+		else
+		{
+			Ar << InOutAssetPtr->GetGuid();
+		}
+		return Ar;
+	}
 
 }
 

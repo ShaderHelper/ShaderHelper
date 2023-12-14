@@ -19,6 +19,12 @@ namespace FRAMEWORK::ShReflectToy
 			return nullptr;
 		}
 
+		void* Construct()
+		{
+			check(DefaultObjectGetter);
+			return DefaultObjectGetter();
+		}
+
 		MetaType* GetBaseClass()
 		{
 			if (BaseMetaTypeGetter)
@@ -131,4 +137,11 @@ namespace FRAMEWORK::ShReflectToy
 #define GLOBAL_REFLECTION_REGISTER(...)	\
 	static const int PREPROCESSOR_JOIN(ReflectionGlobalRegister_,__COUNTER__) = [] { __VA_ARGS__; return 0; }();
 
+#define MANUAL_RTTI_BASE_TYPE() \
+	template<typename T> bool IsOfType() const { return IsOfTypeImpl(T::GetTypeId());} \
+	virtual bool IsOfTypeImpl(const FString& Type) const { return false; }
+
+#define MANUAL_RTTI_TYPE(TYPE, Base) \
+	static const FString& GetTypeId() { static FString Type = TEXT(#TYPE); return Type; } \
+	virtual bool IsOfTypeImpl(const FString& Type) const override { return GetTypeId() == Type || Base::IsOfTypeImpl(Type); }
 }

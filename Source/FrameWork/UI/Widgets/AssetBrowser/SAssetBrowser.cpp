@@ -32,7 +32,10 @@ namespace FRAMEWORK
 			IDirectoryWatcher::FDirectoryChanged::CreateRaw(this, &SAssetBrowser::OnFileChanged),
 			DirectoryWatcherHandle, IDirectoryWatcher::WatchOptions::IncludeDirectoryChanges);
 
-		SAssignNew(AssetView, SAssetView);
+		SAssignNew(AssetView, SAssetView)
+			.OnFolderDoubleClick([this](const FString& FolderPath) {
+				DirectoryTree->SetSelection(FolderPath);
+			});
 
 		SAssignNew(DirectoryTree, SDirectoryTree)
 			.ContentPathShowed(InArgs._ContentPathShowed)
@@ -75,15 +78,24 @@ namespace FRAMEWORK
 				if (FileChange.Action == FFileChangeData::FCA_Added)
 				{
 					DirectoryTree->AddDirectory(FullFileName);
+					AssetView->AddFolder(FullFileName);
 				}
 				else if (FileChange.Action == FFileChangeData::FCA_Removed)
 				{
 					DirectoryTree->RemoveDirectory(FullFileName);
+					AssetView->RemoveFolder(FullFileName);
 				}
 			}
 			else
 			{
-
+				if (FileChange.Action == FFileChangeData::FCA_Added)
+				{
+					AssetView->AddFile(FullFileName);
+				}
+				else if (FileChange.Action == FFileChangeData::FCA_Removed)
+				{
+					AssetView->RemoveFile(FullFileName);
+				}
 			}
 		}
 	}

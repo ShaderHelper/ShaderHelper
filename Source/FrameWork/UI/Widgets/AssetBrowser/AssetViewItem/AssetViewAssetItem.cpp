@@ -1,5 +1,5 @@
 #include "CommonHeader.h"
-#include "AssetViewThumbnailItem.h"
+#include "AssetViewAssetItem.h"
 
 namespace FRAMEWORK
 {

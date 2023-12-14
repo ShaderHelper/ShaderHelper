@@ -7,4 +7,15 @@ namespace FRAMEWORK
 	GLOBAL_REFLECTION_REGISTER(
 		ShReflectToy::AddClass<AssetObject>();
 	)
+
+	AssetObject::AssetObject()
+	{
+		Guid = FGuid::NewGuid();
+	}
+
+	void AssetObject::Serialize(FArchive& Ar)
+	{
+		Ar << Guid;
+	}
+
 }
