@@ -21,12 +21,13 @@ namespace FRAMEWORK
 		, Height(InHeight)
 		, RawData(InRawData)
 	{
-		Guid = FGuid::NewGuid();
+		
 	}
 
 	void Texture2D::Serialize(FArchive& Ar)
 	{
-		Ar << Guid;
+		AssetObject::Serialize(Ar);
+
 		Ar << Width;
 		Ar << Height;
 		Ar << RawData;

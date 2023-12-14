@@ -21,6 +21,7 @@
 #include "Common/Util/SwizzleVector.h"
 #include "Common/Util/Auxiliary.h"
 #include "Common/Util/Singleton.h"
+#include "Common/Util/Reflection.h"
 
 #define PER_MODULE_DEFINITION() \
     PER_MODULE_BOILERPLATE

@@ -1,29 +1,36 @@
 #include "CommonHeader.h"
 #include "SAssetView.h"
-#include <Slate/Widgets/Views/STileView.h>
 #include <DirectoryWatcher/DirectoryWatcherModule.h>
 #include <DirectoryWatcher/IDirectoryWatcher.h>
 #include <DesktopPlatform/DesktopPlatformModule.h>
 #include "Common/Util/Reflection.h"
 #include "AssetManager/AssetImporter/AssetImporter.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
+#include "AssetManager/AssetManager.h"
+#include "UI/Widgets/AssetBrowser/AssetViewItem/AssetViewFolderItem.h"
+#include "UI/Widgets/AssetBrowser/AssetViewItem/AssetViewAssetItem.h"
 
 namespace FRAMEWORK
 {
 
 	void SAssetView::Construct(const FArguments& InArgs)
 	{
+		OnFolderDoubleClick = InArgs._OnFolderDoubleClick;
+
 		ChildSlot
 		[
 			SNew(SOverlay)
 			+ SOverlay::Slot()
 			[
-				SNew(STileView<TSharedRef<AssetViewItem>>)
+				SAssignNew(AssetTileView, STileView<TSharedRef<AssetViewItem>>)
 				.ListItemsSource(&AssetViewItems)
+				.ItemWidth(64)
+				.ItemHeight(64)
 				.OnContextMenuOpening(this, &SAssetView::CreateContextMenu)
 				.OnGenerateTile_Lambda([](TSharedRef<AssetViewItem> InTileItem, const TSharedRef<STableViewBase>& OwnerTable) {
 					return InTileItem->GenerateWidgetForTableView(OwnerTable);
 				})
+				.OnMouseButtonDoubleClick(this, &SAssetView::OnMouseButtonDoubleClick)
 			]
 
 			+ SOverlay::Slot()
@@ -42,6 +49,28 @@ namespace FRAMEWORK
 		AssetViewItems.Empty();
 		CacheImportAssetPath = NewViewDirectory;
 		CurViewDirectory = NewViewDirectory;
+		PopulateAssetView(CurViewDirectory);
+	}
+
+	void SAssetView::PopulateAssetView(const FString& ViewDirectory)
+	{
+		AssetViewItems.Reset();
+
+		TArray<FString> FileOrFolderNames;
+		IFileManager::Get().FindFiles(FileOrFolderNames, *(ViewDirectory / TEXT("*")), true, true);
+		for (const FString& FileOrFolderName : FileOrFolderNames)
+		{
+			if (FPaths::GetExtension(FileOrFolderName).IsEmpty())
+			{
+				AssetViewItems.Add(MakeShared<AssetViewFolderItem>(ViewDirectory / FileOrFolderName));
+			}
+			else
+			{
+
+			}
+		}
+
+		AssetTileView->RequestListRefresh();
 	}
 
 	TSharedPtr<SWidget> SAssetView::CreateContextMenu()
@@ -59,6 +88,26 @@ namespace FRAMEWORK
 		MenuBuilder.EndSection();
 
 		return MenuBuilder.MakeWidget();
+	}
+
+	void SAssetView::AddFolder(const FString& InFolderName)
+	{
+
+	}
+
+	void SAssetView::RemoveFolder(const FString& InFolderName)
+	{
+
+	}
+
+	void SAssetView::AddFile(const FString& InFileName)
+	{
+
+	}
+
+	void SAssetView::RemoveFile(const FString& InFileName)
+	{
+
 	}
 
 	void SAssetView::ImportAsset()
@@ -115,9 +164,21 @@ namespace FRAMEWORK
 					}
 					else
 					{
-						MessageDialog::Open("Import asset failed.");
+						MessageDialog::Open("Failed to import asset.");
 					}
 				}
+			}
+		}
+	}
+
+	void SAssetView::OnMouseButtonDoubleClick(TSharedRef<AssetViewItem> ViewItem)
+	{
+		if (ViewItem->IsOfType<AssetViewFolderItem>())
+		{
+			TSharedRef<AssetViewFolderItem> FolderViewItem = StaticCastSharedRef<AssetViewFolderItem>(ViewItem);
+			if (OnFolderDoubleClick)
+			{
+				OnFolderDoubleClick(FolderViewItem->GetFolderPath());
 			}
 		}
 	}

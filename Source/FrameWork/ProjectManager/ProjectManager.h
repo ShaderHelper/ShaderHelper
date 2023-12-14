@@ -1,4 +1,5 @@
 #pragma once
+#include "AssetManager/AssetManager.h"
 
 namespace FRAMEWORK
 {
@@ -28,18 +29,20 @@ namespace FRAMEWORK
 	public:
 		virtual ~ProjectManager() = default;
 
-		virtual void NewProject()
+		void NewProject()
 		{
 
 		}
 
-		virtual void OpenProject(const FString& ProjectPath)
+		void OpenProject(const FString& ProjectPath)
 		{
 			ActiveProject = MakeUnique<ProjectDataType>(ProjectPath);
 			ActiveProject->Open(ProjectPath);
+			TSingleton<AssetManager>::Get().Clear();
+			TSingleton<AssetManager>::Get().MountProject(GetActiveContentDirectory());
 		}
 
-		virtual void SaveProject()
+		void SaveProject()
 		{
 			ActiveProject->Save();
 		}

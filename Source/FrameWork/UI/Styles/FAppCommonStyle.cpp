@@ -33,7 +33,8 @@ namespace FRAMEWORK
 		TSharedRef<FSlateStyleSet> Style = MakeShared<FSlateStyleSet>("AppCommonStyle");
 		Style->SetContentRoot(BaseResourcePath::Custom_SlateResourceDir);
 		Style->Set("PropertyView.RowIndentDropShadow", new IMAGE_BRUSH("DropShadow", FVector2D(2, 2)));
-		Style->Set("MessageDialog.Boqi", new IMAGE_BRUSH("Boqi", FVector2D(32.0f, 32.0f)));
+		Style->Set("MessageDialog.Boqi", new IMAGE_BRUSH("Boqi", FVector2D(32.0, 32.0)));
+		Style->Set("AssetBrowser.Folder", new IMAGE_BRUSH_SVG("folder", FVector2D(64.0, 64.0)));
 
 		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir);
 		//StarshipCoreStyle is used as the app style.

@@ -17,7 +17,6 @@ namespace FRAMEWORK
 		TSharedRef<SWidget> GetPropertyView() const override;
 
 	private:
-		FGuid Guid;
 		int32 Width, Height;
 		//BGRA8
 		TArray<uint8> RawData;

@@ -3,9 +3,11 @@
 
 namespace FRAMEWORK
 {
-	class AssetViewThumbnailItem : public AssetViewItem
+	class AssetViewAssetItem : public AssetViewItem
 	{
 	public:
+		MANUAL_RTTI_TYPE(AssetViewAssetItem, AssetViewItem)
+
 		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override;
 	};
 

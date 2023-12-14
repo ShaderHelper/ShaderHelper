@@ -2,6 +2,7 @@
 #include "SDirectoryTree.h"
 #include <DesktopPlatform/DesktopPlatformModule.h>
 #include "UI/Styles/FAppCommonStyle.h"
+#include <Styling/StyleColors.h>
 
 namespace FRAMEWORK
 {
