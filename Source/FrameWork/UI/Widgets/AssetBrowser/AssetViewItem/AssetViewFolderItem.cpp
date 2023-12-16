@@ -7,15 +7,10 @@
 namespace FRAMEWORK
 {
 
-	AssetViewFolderItem::AssetViewFolderItem(const FString& InFolderPath)
-		: FolderPath(InFolderPath)
-	{
-
-	}
-
 	TSharedRef<ITableRow> AssetViewFolderItem::GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable)
 	{
-		auto Row = SNew(STableRow<TSharedRef<AssetViewItem>>, OwnerTable);
+		auto Row = SNew(STableRow<TSharedRef<AssetViewItem>>, OwnerTable)
+			.Style(&FAppCommonStyle::Get().GetWidgetStyle<FTableRowStyle>("AssetView.Row"));
 
 		Row->SetContent(
 			SNew(SVerticalBox)
@@ -30,7 +25,7 @@ namespace FRAMEWORK
 					.ColorAndOpacity_Lambda([Row] {
 						if (Row->IsSelected())
 						{
-							return FSlateColor{FLinearColor{0.7f, 0.7f, 0.9f}};
+							return FSlateColor{FLinearColor{0.5f, 0.5f, 1.0f}};
 						}
 						else
 						{
@@ -44,16 +39,23 @@ namespace FRAMEWORK
 			.AutoHeight()
 			.HAlign(HAlign_Center)
 			[
-				SNew(SInlineEditableTextBlock)
-				.IsSelected_Lambda([] {return true; })
+				SAssignNew(FolderEditableTextBlock, SInlineEditableTextBlock)
 				.Font(FAppStyle::Get().GetFontStyle("SmallFont"))
-				.Text(FText::FromString(FPaths::GetBaseFilename(FolderPath)))
+				.Text(FText::FromString(FPaths::GetBaseFilename(Path)))
 				.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
+					FString NewFolderPath =  FPaths::GetPath(Path) / NewText.ToString();
+					IFileManager::Get().Move(*NewFolderPath, *Path);
 				})
 				.OverflowPolicy(ETextOverflowPolicy::Ellipsis)
 			]
 		);
+
 		return Row;
+	}
+
+	void AssetViewFolderItem::EnterRenameState()
+	{
+		FolderEditableTextBlock->EnterEditingMode();
 	}
 
 }

@@ -9,12 +9,24 @@
 #include "AssetManager/AssetManager.h"
 #include "UI/Widgets/AssetBrowser/AssetViewItem/AssetViewFolderItem.h"
 #include "UI/Widgets/AssetBrowser/AssetViewItem/AssetViewAssetItem.h"
+#include "UI/Styles/FAppCommonStyle.h"
+#include <Framework/Commands/GenericCommands.h>
 
 namespace FRAMEWORK
 {
 
 	void SAssetView::Construct(const FArguments& InArgs)
 	{
+		UICommandList = MakeShared<FUICommandList>();
+		UICommandList->MapAction(
+			FGenericCommands::Get().Delete,
+			FExecuteAction::CreateRaw(this, &SAssetView::OnHandleDeleteAction)
+		);
+		UICommandList->MapAction(
+			FGenericCommands::Get().Rename,
+			FExecuteAction::CreateRaw(this, &SAssetView::OnHandleRenameAction)
+		);
+
 		OnFolderDoubleClick = InArgs._OnFolderDoubleClick;
 
 		ChildSlot
@@ -75,9 +87,27 @@ namespace FRAMEWORK
 
 	TSharedPtr<SWidget> SAssetView::CreateContextMenu()
 	{
+		TArray<TSharedRef<AssetViewItem>> SelectedItems = AssetTileView->GetSelectedItems();
+		if (SelectedItems.Num() > 0)
+		{
+			FMenuBuilder MenuBuilder{ true, UICommandList };
+			MenuBuilder.BeginSection("Control", FText::FromString("Control"));
+			{
+				MenuBuilder.AddMenuEntry(
+					FText::FromString("Open"),
+					FText::GetEmpty(),
+					FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "Icons.FolderOpen" },
+					FUIAction{ FExecuteAction::CreateRaw(this, &SAssetView::OnHandleOpenAction) });
+				MenuBuilder.AddMenuEntry(FGenericCommands::Get().Rename);
+				MenuBuilder.AddMenuEntry(FGenericCommands::Get().Delete);
+			}
+			MenuBuilder.EndSection();
+			return MenuBuilder.MakeWidget();
+		}
+
 		FMenuBuilder MenuBuilder{ true, TSharedPtr<FUICommandList>() };
 
-		MenuBuilder.BeginSection("NewAsset", FText::FromString("New Asset"));
+		MenuBuilder.BeginSection("Asset", FText::FromString("Asset"));
 		{
 			MenuBuilder.AddMenuEntry(
 				FText::FromString("Import"),
@@ -87,17 +117,41 @@ namespace FRAMEWORK
 		}
 		MenuBuilder.EndSection();
 
+		MenuBuilder.BeginSection("Folder", FText::FromString("Folder"));
+		{
+			MenuBuilder.AddMenuEntry(
+				FText::FromString("New Folder"),
+				FText::GetEmpty(),
+				FSlateIcon{ FAppCommonStyle::Get().GetStyleSetName(), "Icons.FolderPlus" },
+				FUIAction{ FExecuteAction::CreateLambda([this] {
+					int32 Number = 0;
+					FString NewDirectoryPath = *(CurViewDirectory / TEXT("New Folder"));
+					while(IFileManager::Get().DirectoryExists(*NewDirectoryPath))
+					{
+						NewDirectoryPath = *(CurViewDirectory / FString::Format(TEXT("New Folder {0}"), { Number++ }));
+					}
+					IFileManager::Get().MakeDirectory(*NewDirectoryPath);
+				})});
+		}
+		MenuBuilder.EndSection();
+
 		return MenuBuilder.MakeWidget();
 	}
 
 	void SAssetView::AddFolder(const FString& InFolderName)
 	{
-
+		TSharedRef<AssetViewFolderItem> NewFolderItem = MakeShared<AssetViewFolderItem>(InFolderName);
+		AssetViewItems.Add(NewFolderItem);
+		SortViewItems();
+		AssetTileView->RequestListRefresh();
 	}
 
 	void SAssetView::RemoveFolder(const FString& InFolderName)
 	{
-
+		AssetViewItems.RemoveAll([&InFolderName](const TSharedRef<AssetViewItem>& Element) {
+			return Element->GetPath() == InFolderName;
+		});
+		AssetTileView->RequestListRefresh();
 	}
 
 	void SAssetView::AddFile(const FString& InFileName)
@@ -164,23 +218,71 @@ namespace FRAMEWORK
 					}
 					else
 					{
-						MessageDialog::Open("Failed to import asset.");
+						MessageDialog::Open(MessageDialog::Ok, "Failed to import asset.");
 					}
 				}
 			}
 		}
 	}
 
+	void SAssetView::SortViewItems()
+	{
+		AssetViewItems.Sort([](const TSharedRef<AssetViewItem>& A, const TSharedRef<AssetViewItem>& B) {
+			return A->GetPath() < B->GetPath();
+		});
+	}
+
+	FReply SAssetView::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+	{
+		if (UICommandList.IsValid() && UICommandList->ProcessCommandBindings(InKeyEvent))
+		{
+			return FReply::Handled();
+		}
+		return FReply::Unhandled();
+	}
+
 	void SAssetView::OnMouseButtonDoubleClick(TSharedRef<AssetViewItem> ViewItem)
 	{
 		if (ViewItem->IsOfType<AssetViewFolderItem>())
 		{
-			TSharedRef<AssetViewFolderItem> FolderViewItem = StaticCastSharedRef<AssetViewFolderItem>(ViewItem);
 			if (OnFolderDoubleClick)
 			{
-				OnFolderDoubleClick(FolderViewItem->GetFolderPath());
+				OnFolderDoubleClick(ViewItem->GetPath());
 			}
 		}
+	}
+
+	void SAssetView::OnHandleDeleteAction()
+	{
+		if (MessageDialog::Open(MessageDialog::OkCancel, "Delete selected Item?"))
+		{
+			TArray<TSharedRef<AssetViewItem>> SelectedItems = AssetTileView->GetSelectedItems();
+			if (SelectedItems[0]->IsOfType<AssetViewFolderItem>())
+			{
+				IFileManager::Get().DeleteDirectory(*SelectedItems[0]->GetPath(), false, true);
+			}
+			else if (SelectedItems[0]->IsOfType<AssetViewAssetItem>())
+			{
+				IFileManager::Get().Delete(*SelectedItems[0]->GetPath());
+			}
+		}
+	
+	}
+
+	void SAssetView::OnHandleRenameAction()
+	{
+		TArray<TSharedRef<AssetViewItem>> SelectedItems = AssetTileView->GetSelectedItems();
+		if (SelectedItems[0]->IsOfType<AssetViewFolderItem>())
+		{
+			TSharedRef<AssetViewFolderItem> SelectedFolderItem = StaticCastSharedRef<AssetViewFolderItem>(SelectedItems[0]);
+			SelectedFolderItem->EnterRenameState();
+		}
+	}
+
+	void SAssetView::OnHandleOpenAction()
+	{
+		TArray<TSharedRef<AssetViewItem>> SelectedItems = AssetTileView->GetSelectedItems();
+		OnMouseButtonDoubleClick(SelectedItems[0]);
 	}
 
 }

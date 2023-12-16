@@ -7,7 +7,12 @@ namespace FRAMEWORK
 	public:
 		MANUAL_RTTI_BASE_TYPE()
 
-		virtual TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) = 0;
+		AssetViewItem(const FString& InPath) : Path(InPath) {}
 		virtual ~AssetViewItem() = default;
+		virtual TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) = 0;
+		FString GetPath() const { return Path; }
+
+	protected:
+		FString Path;
 	};
 }

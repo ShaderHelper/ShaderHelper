@@ -9,13 +9,10 @@ namespace FRAMEWORK
 	void SDirectoryTree::Construct(const FArguments& InArgs)
 	{
 		ContentPathShowed = InArgs._ContentPathShowed;
-		OnSelectionChanged = InArgs._OnSelectionChanged;
-		CurSelectedDirectory = InArgs._InitialDirectory;
-
-		auto RootDirectoryData = MakeShared<DirectoryData>();
-		RootDirectoryData->IsRootDirectory = true;
-		DirectoryDatas.Add(RootDirectoryData);
-		PopulateDirectoryData(RootDirectoryData, ContentPathShowed);
+		OnSelectedDirectoryChanged = InArgs._OnSelectedDirectoryChanged;
+		OnExpandedDirectoriesChanged = InArgs._OnExpandedDirectoriesChanged;
+		CurSelectedDirectory = InArgs._InitialSelectedDirectory;
+		DirectoriesToExpand = InArgs._InitialDirectoriesToExpand;
 
 		ChildSlot
 		[
@@ -28,26 +25,34 @@ namespace FRAMEWORK
 				if (SelectedData) 
 				{
 					CurSelectedDirectory = SelectedData->DirectoryPath;
-					OnSelectionChanged.ExecuteIfBound(SelectedData->DirectoryPath);
+					OnSelectedDirectoryChanged.ExecuteIfBound(SelectedData->DirectoryPath);
 				}
 				else
 				{
 					SetSelection(CurSelectedDirectory);
 				}
 			})
+			.OnExpansionChanged_Lambda([this](TSharedRef<DirectoryData> InData, bool bExpanded){
+				if (bExpanded) {
+					DirectoriesToExpand.Add(InData->DirectoryPath);
+				}
+				else {
+					DirectoriesToExpand.Remove(InData->DirectoryPath);
+				}
+				OnExpandedDirectoriesChanged.ExecuteIfBound(DirectoriesToExpand);
+			})
 		];
-
-		DirectoryTree->SetItemExpansion(RootDirectoryData, true);
 
 		if (CurSelectedDirectory.IsEmpty())
 		{
-			DirectoryTree->SetSelection(RootDirectoryData);
-		}
-		else
-		{
-			SetSelection(CurSelectedDirectory);
+			CurSelectedDirectory = ContentPathShowed;
 		}
 		
+		auto RootDirectoryData = MakeShared<DirectoryData>();
+		RootDirectoryData->IsRootDirectory = true;
+		DirectoryDatas.Add(RootDirectoryData);
+		PopulateDirectoryData(RootDirectoryData, ContentPathShowed);
+
 	}
 
 	void SDirectoryTree::PopulateDirectoryData(TSharedRef<DirectoryData> InDirectoryData, const FString& DirectoryPath)
@@ -61,8 +66,19 @@ namespace FRAMEWORK
 		for (const FString& SubDirectoryName : SubDirectoryNames)
 		{
 			TSharedRef<DirectoryData> SubDirectoryData = MakeShared<DirectoryData>();
+			SubDirectoryData->Parent = &*InDirectoryData;
 			InDirectoryData->Children.Add(SubDirectoryData);
 			PopulateDirectoryData(SubDirectoryData, DirectoryPath / SubDirectoryName);
+		}
+
+		if (DirectoriesToExpand.Contains(DirectoryPath))
+		{
+			DirectoryTree->SetItemExpansion(InDirectoryData, true);
+		}
+
+		if (CurSelectedDirectory == DirectoryPath)
+		{
+			DirectoryTree->SetSelection(InDirectoryData);
 		}
 	}
 
@@ -145,7 +161,7 @@ namespace FRAMEWORK
 			TSharedRef<DirectoryData> NewDirTreeItem = MakeShared<DirectoryData>();
 			PopulateDirectoryData(NewDirTreeItem, DirectoryPath);
 			ParentDirTreeItem->Children.Add(NewDirTreeItem);
-
+			SortSubDirectory(ParentDirectoryPath);
 			DirectoryTree->RequestTreeRefresh();
 		}
 		else if (DirectoryPath == DirectoryDatas[0]->DirectoryPath)
@@ -183,6 +199,24 @@ namespace FRAMEWORK
 		if (TSharedPtr<DirectoryData> Data = FindTreeItemFromTree(SelectedDirectory, DirectoryDatas[0]))
 		{
 			DirectoryTree->SetSelection(Data.ToSharedRef());
+		}
+	}
+
+	void SDirectoryTree::SetExpansion(const FString& ExpandedDirectory)
+	{
+		if (TSharedPtr<DirectoryData> Data = FindTreeItemFromTree(ExpandedDirectory, DirectoryDatas[0]))
+		{
+			DirectoryTree->SetItemExpansion(Data.ToSharedRef(), true);
+		}
+	}
+
+	void SDirectoryTree::SortSubDirectory(const FString& ParentDirectory)
+	{
+		if (TSharedPtr<DirectoryData> ParentDirTreeItem = FindTreeItemFromTree(ParentDirectory, DirectoryDatas[0]))
+		{
+			ParentDirTreeItem->Children.Sort([](const TSharedRef<DirectoryData>& A, const TSharedRef<DirectoryData>& B) {
+				return A->DirectoryPath < B->DirectoryPath;
+			});
 		}
 	}
 

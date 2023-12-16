@@ -55,6 +55,7 @@ namespace SH
 			TSharedRef<FJsonObject> ToJson() const;
 
 			FString SelectedDirectory;
+			TArray<FString> DirectoriesToExpand;
 		} CurEditorState;
 		FString EditorStateSaveFileName;
 	};

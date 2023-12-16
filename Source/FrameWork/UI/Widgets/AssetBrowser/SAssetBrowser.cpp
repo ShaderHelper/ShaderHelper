@@ -1,7 +1,6 @@
 #include "CommonHeader.h"
 #include "SAssetBrowser.h"
 #include "SAssetView.h"
-#include "SDirectoryTree.h"
 #include <DirectoryWatcher/DirectoryWatcherModule.h>
 #include <DirectoryWatcher/IDirectoryWatcher.h>
 
@@ -22,8 +21,8 @@ namespace FRAMEWORK
 	void SAssetBrowser::Construct(const FArguments& InArgs)
 	{
 		ContentPathShowed = InArgs._ContentPathShowed;
-		OnDirectoryChanged = InArgs._OnDirectoryChanged;
-		SelectedDirectory = InArgs._InitialDirectory;
+		OnSelectedDirectoryChanged = InArgs._OnSelectedDirectoryChanged;
+		OnExpandedDirectoriesChanged = InArgs._OnExpandedDirectoriesChanged;
 
 		FDirectoryWatcherModule& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>(TEXT("DirectoryWatcher"));
 		IDirectoryWatcher* DirectoryWatcher = DirectoryWatcherModule.Get();
@@ -34,13 +33,16 @@ namespace FRAMEWORK
 
 		SAssignNew(AssetView, SAssetView)
 			.OnFolderDoubleClick([this](const FString& FolderPath) {
+				DirectoryTree->SetExpansion(FPaths::GetPath(FolderPath));
 				DirectoryTree->SetSelection(FolderPath);
 			});
 
 		SAssignNew(DirectoryTree, SDirectoryTree)
 			.ContentPathShowed(InArgs._ContentPathShowed)
-			.InitialDirectory(InArgs._InitialDirectory)
-			.OnSelectionChanged_Raw(this, &SAssetBrowser::OnDirectoryTreeSelectionChanged);
+			.InitialSelectedDirectory(InArgs._InitialSelectedDirectory)
+			.InitialDirectoriesToExpand(InArgs._InitialDirectoriesToExpand)
+			.OnExpandedDirectoriesChanged(OnExpandedDirectoriesChanged)
+			.OnSelectedDirectoryChanged_Raw(this, &SAssetBrowser::OnDirectoryTreeSelectionChanged);
 
 		ChildSlot
 		[
@@ -103,6 +105,6 @@ namespace FRAMEWORK
 	void SAssetBrowser::OnDirectoryTreeSelectionChanged(const FString& SelectedDirectory)
 	{
 		AssetView->SetNewViewDirectory(SelectedDirectory);
-		OnDirectoryChanged.ExecuteIfBound(SelectedDirectory);
+		OnSelectedDirectoryChanged.ExecuteIfBound(SelectedDirectory);
 	}
 }

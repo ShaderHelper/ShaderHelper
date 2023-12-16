@@ -177,9 +177,14 @@ namespace SH
 			SpawnedTab->SetContent(
 				SNew(SAssetBrowser)
 				.ContentPathShowed(TSingleton<ShProjectManager>::Get().GetActiveContentDirectory())
-				.InitialDirectory(CurEditorState.SelectedDirectory)
-				.OnDirectoryChanged_Lambda([this](const FString& NewSelectedDirectory) {
+				.InitialSelectedDirectory(CurEditorState.SelectedDirectory)
+				.InitialDirectoriesToExpand(CurEditorState.DirectoriesToExpand)
+				.OnSelectedDirectoryChanged_Lambda([this](const FString& NewSelectedDirectory) {
 					CurEditorState.SelectedDirectory = NewSelectedDirectory;
+					SaveEditorState();
+				})
+				.OnExpandedDirectoriesChanged_Lambda([this](const TArray<FString>& NewExpandedDirectories) {
+					CurEditorState.DirectoriesToExpand = NewExpandedDirectories;
 					SaveEditorState();
 				})
 			);
@@ -231,6 +236,7 @@ namespace SH
 
 		TSharedRef<FJsonObject> RootWindowSizeJsonObject = MakeShared<FJsonObject>();
 		Vector2D CurClientSize = Window->GetClientSizeInScreen();
+		CurClientSize -= Vector2D{2, 10};
 		RootWindowSizeJsonObject->SetNumberField(TEXT("Width"), CurClientSize.X);
 		RootWindowSizeJsonObject->SetNumberField(TEXT("Height"), CurClientSize.Y);
 
@@ -388,6 +394,14 @@ namespace SH
 		SelectedDirectory =  TSingleton<ShProjectManager>::Get().ConvertRelativePathToFull(
 			InJson->GetStringField("SelectedRelativeDirectory")
 		);
+
+		TArray<TSharedPtr<FJsonValue>> JsonRelativeDirectories = InJson->GetArrayField("RelativeDirectoriesToExpand");
+		for (const auto& JsonRelativeDirectory : JsonRelativeDirectories)
+		{
+			DirectoriesToExpand.Add(
+				TSingleton<ShProjectManager>::Get().ConvertRelativePathToFull(JsonRelativeDirectory->AsString())
+			);
+		}
 	}
 
 	TSharedRef<FJsonObject> ShaderHelperEditor::EditorState::ToJson() const
@@ -395,6 +409,16 @@ namespace SH
 		TSharedRef<FJsonObject> JsonObject = MakeShareable(new FJsonObject());
 		JsonObject->SetStringField("SelectedRelativeDirectory", 
 			TSingleton<ShProjectManager>::Get().GetRelativePathToProject(SelectedDirectory));
+
+		TArray<TSharedPtr<FJsonValue>> JsonRelativeDirectories;
+		for (const FString& Directory : DirectoriesToExpand)
+		{
+			TSharedPtr<FJsonValue> JsonRelativeDriectory = MakeShared<FJsonValueString>(
+				TSingleton<ShProjectManager>::Get().GetRelativePathToProject(Directory));
+			JsonRelativeDirectories.Add(MoveTemp(JsonRelativeDriectory));
+		}
+
+		JsonObject->SetArrayField("RelativeDirectoriesToExpand", MoveTemp(JsonRelativeDirectories));
 		return JsonObject;
 	}
 
