@@ -2,7 +2,12 @@
 
 namespace FRAMEWORK::MessageDialog
 {
+	enum MessageType
+	{
+		Ok,
+		OkCancel,
+	};
 
-	FRAMEWORK_API void Open(const FString& InMessage);
+	FRAMEWORK_API bool Open(MessageType MsgType, const FString& InMessage);
 	
 }

@@ -10,16 +10,26 @@ namespace FRAMEWORK::MessageDialog
 		SLATE_BEGIN_ARGS(SMessageDialog) {}
 			SLATE_ARGUMENT(SWindow*, ParentWindow)
 			SLATE_ARGUMENT(FString, Message)
+			SLATE_ARGUMENT(MessageType, MsgType)
+			SLATE_ARGUMENT(bool*, ReturnResult)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs);
+
 	private:
+		MessageType MsgType;
 		SWindow* ParentWindow;
+		bool* ReturnResult;
 	};
 
 	void SMessageDialog::Construct(const FArguments& InArgs)
 	{
+		MsgType = InArgs._MsgType;
 		ParentWindow = InArgs._ParentWindow;
+		ReturnResult = InArgs._ReturnResult;
+
+		TSharedPtr<SHorizontalBox> ButtonBox;
+
 		ChildSlot
 		[
 			SNew(SBorder)
@@ -35,7 +45,16 @@ namespace FRAMEWORK::MessageDialog
 				[
 					SNew(SImage)
 					.DesiredSizeOverride(FVector2D(64.f, 64.f))
-					.Image(FAppCommonStyle::Get().GetBrush("MessageDialog.Boqi"))
+					.Image_Lambda([this] {
+						if (MsgType == MessageType::Ok)
+						{	
+							return FAppCommonStyle::Get().GetBrush("MessageDialog.Boqi");
+						}
+						else
+						{
+							return FAppCommonStyle::Get().GetBrush("MessageDialog.Boqi2");
+						}
+					})
 				]
 
 				+ SHorizontalBox::Slot()
@@ -51,27 +70,69 @@ namespace FRAMEWORK::MessageDialog
 					]
 
 					+ SVerticalBox::Slot()
-					.HAlign(HAlign_Right)
 					.VAlign(VAlign_Bottom)
+					.HAlign(HAlign_Right)
 					[
-						SNew(SButton)
-						.ButtonStyle(&FAppStyle::Get().GetWidgetStyle<FButtonStyle>("PrimaryButton"))
-						.Text(FText::FromString("OK"))
-						.OnClicked_Lambda([this] {
-							ParentWindow->RequestDestroyWindow();
-							return FReply::Handled();
-						})
+						SAssignNew(ButtonBox, SHorizontalBox)
 					]
 				]
 
 			]
 
 		];
+
+		if (MsgType == MessageType::Ok)
+		{
+			ButtonBox->AddSlot()
+			.AutoWidth()
+			[
+				SNew(SButton)
+				.ButtonStyle(&FAppStyle::Get().GetWidgetStyle<FButtonStyle>("PrimaryButton"))
+				.Text(FText::FromString("Ok"))
+				.OnClicked_Lambda([this] {
+					*ReturnResult = true;
+					ParentWindow->RequestDestroyWindow();
+					return FReply::Handled();
+				})
+			];
+		}
+		else
+		{
+			ButtonBox->AddSlot()
+			.AutoWidth()
+			.Padding(FMargin{0,0,10,0})
+			[
+				SNew(SButton)
+				.ButtonStyle(&FAppStyle::Get().GetWidgetStyle<FButtonStyle>("PrimaryButton"))
+				.Text(FText::FromString("Ok"))
+				.OnClicked_Lambda([this] {
+					*ReturnResult = true;
+					ParentWindow->RequestDestroyWindow();
+					return FReply::Handled();
+				})
+			];
+
+			ButtonBox->AddSlot()
+			.AutoWidth()
+			[
+				SNew(SButton)
+				.Text(FText::FromString("Cancel"))
+				.OnClicked_Lambda([this] {
+					*ReturnResult = false;
+					ParentWindow->RequestDestroyWindow();
+					return FReply::Handled();
+				})
+			];
+		}
+
 	}
 
-	void Open(const FString& InMessage)
+	bool Open(MessageType MsgType, const FString& InMessage)
 	{
+		bool Result;
+
 		TSharedRef<SWindow> ModalWindow = SNew(SWindow)
+			.bDragAnywhere(true)
 			.CreateTitleBar(false)
 			.SizingRule(ESizingRule::Autosized)
 			.AutoCenter(EAutoCenter::PreferredWorkArea)
@@ -80,11 +141,14 @@ namespace FRAMEWORK::MessageDialog
 			.AdjustInitialSizeAndPositionForDPIScale(false);
 
 		TSharedRef<SMessageDialog> MessageDialog = SNew(SMessageDialog)
+			.ReturnResult(&Result)
+			.MsgType(MsgType)
 			.ParentWindow(&*ModalWindow)
 			.Message(InMessage);
 
 		ModalWindow->SetContent(MessageDialog);
 		FSlateApplication::Get().AddModalWindow(ModalWindow, nullptr);
+		return Result;
 	}
 
 }

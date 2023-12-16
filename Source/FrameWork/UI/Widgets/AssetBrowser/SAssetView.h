@@ -21,8 +21,14 @@ namespace FRAMEWORK
 		void AddFile(const FString& InFileName);
 		void RemoveFile(const FString& InFileName);
 		void ImportAsset();
+		void SortViewItems();
+
+		FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 	private:
 		void OnMouseButtonDoubleClick(TSharedRef<AssetViewItem> ViewItem);
+		void OnHandleDeleteAction();
+		void OnHandleRenameAction();
+		void OnHandleOpenAction();
 
 	private:
 		TSharedPtr<STileView<TSharedRef<AssetViewItem>>> AssetTileView;
@@ -30,6 +36,7 @@ namespace FRAMEWORK
 		FString CacheImportAssetPath;
 		FString CurViewDirectory;
 		TFunction<void(const FString&)> OnFolderDoubleClick;
+		TSharedPtr<FUICommandList> UICommandList;
 	};
 
 }

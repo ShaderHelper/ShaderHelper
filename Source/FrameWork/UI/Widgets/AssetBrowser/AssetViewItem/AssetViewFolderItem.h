@@ -6,13 +6,14 @@ namespace FRAMEWORK
 	class AssetViewFolderItem : public AssetViewItem
 	{
 	public:
+		using AssetViewItem::AssetViewItem;
+
 		MANUAL_RTTI_TYPE(AssetViewFolderItem, AssetViewItem)
 
-		AssetViewFolderItem(const FString& InFolderPath);
 		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override;
-		FString GetFolderPath() const { return FolderPath; }
-		
+		void EnterRenameState();
+
 	private:
-		FString FolderPath;
+		TSharedPtr<class SInlineEditableTextBlock> FolderEditableTextBlock;
 	};
 }
