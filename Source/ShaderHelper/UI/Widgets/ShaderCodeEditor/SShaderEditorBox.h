@@ -88,7 +88,6 @@ namespace SH
 		SLATE_BEGIN_ARGS(SShaderEditorBox) 
 			: _Renderer(nullptr)
 		{}
-			SLATE_ARGUMENT(FText, Text)
 			SLATE_ARGUMENT(ShRenderer*, Renderer)
 		SLATE_END_ARGS()
 		

@@ -2,7 +2,7 @@
 #include <Widgets/SViewport.h>
 #include "Renderer/ShRenderer.h"
 #include "Editor/Editor.h"
-#include "PreviewViewPort.h"
+#include "Editor/PreviewViewPort.h"
 
 namespace SH 
 {

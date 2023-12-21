@@ -18,7 +18,7 @@ namespace FRAMEWORK
 		virtual void PostLoad() {}
 
 		virtual FString FileExtension() const = 0;
-		virtual GpuTexture* Gethumbnail() const { return nullptr; }
+		virtual GpuTexture* GetThumbnail() const { return nullptr; }
 		virtual FSlateBrush* GetImage() const { return nullptr; }
 		virtual TSharedRef<SWidget> GetPropertyView() const = 0;
 

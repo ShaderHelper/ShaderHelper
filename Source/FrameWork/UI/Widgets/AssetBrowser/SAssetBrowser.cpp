@@ -32,6 +32,7 @@ namespace FRAMEWORK
 			DirectoryWatcherHandle, IDirectoryWatcher::WatchOptions::IncludeDirectoryChanges);
 
 		SAssignNew(AssetView, SAssetView)
+			.ContentPathShowed(InArgs._ContentPathShowed)
 			.OnFolderDoubleClick([this](const FString& FolderPath) {
 				DirectoryTree->SetExpansion(FPaths::GetPath(FolderPath));
 				DirectoryTree->SetSelection(FolderPath);
@@ -62,6 +63,7 @@ namespace FRAMEWORK
 			[
 				SNew(SBorder)
 				.BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
+				.Padding(0)
 				[
 					AssetView.ToSharedRef()
 				]
@@ -75,6 +77,11 @@ namespace FRAMEWORK
 		{
 			FString Extension = FPaths::GetExtension(FileChange.Filename);
 			FString FullFileName = FPaths::ConvertRelativePathToFull(FileChange.Filename);
+			if (!FPaths::IsUnderDirectory(FullFileName, ContentPathShowed))
+			{
+				continue;
+			}
+
 			if (Extension.IsEmpty())
 			{
 				if (FileChange.Action == FFileChangeData::FCA_Added)

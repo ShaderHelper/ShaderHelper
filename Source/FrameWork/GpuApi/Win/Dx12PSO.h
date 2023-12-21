@@ -2,10 +2,11 @@
 #include "Dx12Common.h"
 #include "GpuApi/GpuResource.h"
 #include "Dx12Shader.h"
+#include "Dx12Util.h"
 
 namespace FRAMEWORK
 {
-	class Dx12Pso : public GpuPipelineState
+	class Dx12Pso : public GpuPipelineState, public Dx12DeferredDeleteObject<Dx12Pso>
 	{
 	public:
 		Dx12Pso(TRefCountPtr<ID3D12PipelineState> InPipelineState)

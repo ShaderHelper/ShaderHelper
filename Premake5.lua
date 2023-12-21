@@ -95,11 +95,9 @@ workspace "ShaderHelper"
     filter {"system:macosx","files:**/Win/*.cpp"}
         flags {"ExcludeFromBuild"}
 
-    filter {"system:windows","files:**/Mac/*.cpp"}
+    filter {"system:windows","files:**/Mac/*.cpp or **.mm or **.hlsl"}
         flags {"ExcludeFromBuild"}
-
-    filter {"system:windows","files:**.mm"}
-        flags {"ExcludeFromBuild"}
+	
 
     filter {"configurations:Debug"}
         optimize "Off"

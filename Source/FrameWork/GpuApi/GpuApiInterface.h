@@ -9,8 +9,8 @@ namespace GpuApi
 	//Wait for all gpu work to finish
 	FRAMEWORK_API void FlushGpu();
 
-	FRAMEWORK_API void StartRenderFrame();
-	FRAMEWORK_API void EndRenderFrame();
+	FRAMEWORK_API void BeginFrame();
+	FRAMEWORK_API void EndFrame();
 
 	FRAMEWORK_API TRefCountPtr<GpuTexture> CreateGpuTexture(const GpuTextureDesc& InTexDesc);
 	FRAMEWORK_API TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName, FString EntryPoint);
@@ -50,7 +50,7 @@ namespace GpuApi
 	FRAMEWORK_API void BeginCaptureEvent(const FString& EventName);
 	FRAMEWORK_API void EndCpatureEvent();
 
-	//The renderer for drawing ui in UE uses dx11 as backend api, so need a shared resource.
+	//The renderer for drawing ui in UE uses dx11/opengl as backend api, so need a shared resource.
 	FRAMEWORK_API void* GetSharedHandle(GpuTexture* InGpuTexture);
     
     FRAMEWORK_API void BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName);

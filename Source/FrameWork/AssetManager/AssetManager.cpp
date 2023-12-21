@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "AssetManager.h"
+#include "GpuApi/GpuResource.h"
 
 namespace FRAMEWORK
 {
@@ -31,6 +32,21 @@ namespace FRAMEWORK
 	FGuid AssetManager::GetGuid(const FString& InPath) const
 	{
 		return PathToGuid[InPath];
+	}
+
+	void AssetManager::AddAssetThumbnail(const FGuid& InGuid, TRefCountPtr<GpuTexture> InThumbnail)
+	{
+		AssetThumbnailPool.Add(InGuid, InThumbnail);
+	}
+
+	GpuTexture* AssetManager::FindAssetThumbnail(const FGuid& InGuid) const
+	{
+		if (AssetThumbnailPool.Contains(InGuid))
+		{
+			return AssetThumbnailPool[InGuid];
+		}
+
+		return nullptr;
 	}
 
 	void AssetManager::Clear()

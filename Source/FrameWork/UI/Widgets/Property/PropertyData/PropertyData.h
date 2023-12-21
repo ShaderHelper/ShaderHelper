@@ -1,5 +1,5 @@
 #pragma once
-#include "Renderer/RenderResource/UniformBuffer.h"
+#include "RenderResource/UniformBuffer.h"
 
 namespace FRAMEWORK
 {

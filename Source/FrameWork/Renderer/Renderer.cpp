@@ -21,12 +21,12 @@ namespace FRAMEWORK
 
     void Renderer::RenderBegin()
     {
-        GpuApi::StartRenderFrame();
+        
     }
 
     void Renderer::RenderEnd()
     {
-        GpuApi::EndRenderFrame();
+        
     }
 
 }

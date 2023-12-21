@@ -17,25 +17,19 @@ namespace GpuApi
 	void InitApiEnv()
 	{	
 		InitDx12Core();
-		InitFrameResource();
+		InitCommandListContext();
 		InitBufferAllocator();
 	}
 
-	void StartRenderFrame()
+	void BeginFrame()
 	{
-		//StaticFrameResource
 		uint32 FrameResourceIndex = GetCurFrameSourceIndex();
-		GCommandListContext->ResetStaticFrameResource(FrameResourceIndex);
-		GCommandListContext->BindStaticFrameResource(FrameResourceIndex);
-
 		GTempUniformBufferAllocator[FrameResourceIndex]->Flush();
         GDeferredReleaseManager->AllocateOneFrame();
 	}
 
-	void EndRenderFrame()
+	void EndFrame()
 	{
-        Submit();
-        
 		check(CurCpuFrame >= CurGpuFrame);
 		CurCpuFrame++;
 		DxCheck(GGraphicsQueue->Signal(CpuSyncGpuFence, CurCpuFrame));
@@ -231,13 +225,7 @@ namespace GpuApi
 
 	void Submit()
 	{
-		check(GGraphicsQueue);
-		ID3D12GraphicsCommandList* GraphicsCommandList = GCommandListContext->GetCommandListHandle();
-		//The commandLists must be closed before executing them.
-		DxCheck(GraphicsCommandList->Close());
-		ID3D12CommandList* CmdLists[] = { GraphicsCommandList };
-		GGraphicsQueue->ExecuteCommandLists(1, CmdLists);
-
+		GCommandListContext->SubmitCommandList();
 		GCommandListContext->ClearBinding();
 	}
 
@@ -250,7 +238,6 @@ namespace GpuApi
 		CpuSyncGpuFence->Signal(CurCpuFrame);
 		CurGpuFrame = CurCpuFrame;
 
-		GCommandListContext->BindStaticFrameResource(GetCurFrameSourceIndex());
         GDeferredReleaseManager->ReleaseCompletedResources();
 	}
 

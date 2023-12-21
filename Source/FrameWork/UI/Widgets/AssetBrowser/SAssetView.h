@@ -4,11 +4,13 @@
 
 namespace FRAMEWORK
 {
+	class SAssetBrowser;
 
 	class FRAMEWORK_API SAssetView : public SCompoundWidget
 	{
 	public:
 		SLATE_BEGIN_ARGS(SAssetView) {}
+			SLATE_ARGUMENT(FString, ContentPathShowed)
 			SLATE_ARGUMENT(TFunction<void(const FString&)>, OnFolderDoubleClick)
 		SLATE_END_ARGS()
 
@@ -16,6 +18,7 @@ namespace FRAMEWORK
 		void SetNewViewDirectory(const FString& NewViewDirectory);
 		void PopulateAssetView(const FString& ViewDirectory);
 		TSharedPtr<SWidget> CreateContextMenu();
+		TSharedPtr<SWidget> CreateItemContextMenu(TSharedRef<AssetViewItem> ViewItem);
 		void AddFolder(const FString& InFolderName);
 		void RemoveFolder(const FString& InFolderName);
 		void AddFile(const FString& InFileName);
@@ -37,6 +40,7 @@ namespace FRAMEWORK
 		FString CurViewDirectory;
 		TFunction<void(const FString&)> OnFolderDoubleClick;
 		TSharedPtr<FUICommandList> UICommandList;
+		FString ContentPathShowed;
 	};
 
 }
