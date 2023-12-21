@@ -2,11 +2,11 @@
 #include "GpuApi/GpuResource.h"
 #include <Textures/SlateUpdatableTexture.h>
 
-namespace SH
+namespace FRAMEWORK
 {
 	DECLARE_MULTICAST_DELEGATE_OneParam(OnViewportResizeDelegate, const Vector2f&)
 
-	class PreviewViewPort : public ISlateViewport
+	class FRAMEWORK_API PreviewViewPort : public ISlateViewport
 	{
 	public:
 		PreviewViewPort() : SizeX(0), SizeY(0) {}

@@ -5,7 +5,7 @@
 #include <ImageWrapper/IImageWrapper.h>
 #include <ImageWrapper/ImageWrapperHelper.h>
 #include <Misc/FileHelper.h>
-#include "Renderer/RenderResource/Texture2D.h"
+#include "RenderResource/Texture2D.h"
 
 namespace FRAMEWORK
 {

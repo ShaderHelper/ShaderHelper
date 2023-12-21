@@ -14,6 +14,7 @@ namespace FRAMEWORK {
 		
 	protected:
 		virtual void Update(double DeltaTime);
+		virtual void Render();
 
 	protected:		
 		Vector2D AppClientSize;

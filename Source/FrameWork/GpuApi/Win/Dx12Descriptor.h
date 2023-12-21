@@ -1,49 +1,24 @@
 #pragma once
 #include "Dx12Common.h"
+#include "Dx12Allocation.h"
+
 namespace FRAMEWORK
 {
 	enum class DescriptorType
 	{
-		SHADER_VIEW = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
-		SAMPLER = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
-		RTV = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
-		DSV = D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
+		CbvSrvUav = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+		Sampler = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
+		Rtv = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+		Dsv = D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
 	};
 
-	enum class Descriptorvisibility
+	class CpuDescriptorAllocator;
+
+	class CpuDescriptor : public FNoncopyable
 	{
-		CpuGpuVisible = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
-		CpuVisible = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
-	};
-	
-	template<uint32 MaxSize, Descriptorvisibility Visibility, DescriptorType DescType> class DescriptorAllocator;
-
-	template<uint32 MaxSize, DescriptorType DescType>
-	using CpuDescriptorAllocator = DescriptorAllocator<MaxSize, Descriptorvisibility::CpuVisible, DescType>;
-
-	template<uint32 MaxSize, DescriptorType DescType>
-	using GpuDescriptorAllocator = DescriptorAllocator<MaxSize, Descriptorvisibility::CpuGpuVisible, DescType>;
-
-	template<Descriptorvisibility Visibility>
-	struct DescriptorHandle;
-
-	using CpuDescriptorHandle = DescriptorHandle<Descriptorvisibility::CpuVisible>;
-	using GpuDescriptorHandle = DescriptorHandle<Descriptorvisibility::CpuGpuVisible>;
-
-	template<>
-	struct DescriptorHandle<Descriptorvisibility::CpuVisible>
-	{
-		DescriptorHandle() : CpuHandle{ CD3DX12_DEFAULT{} } {}
-		DescriptorHandle(uint32 Index, ID3D12DescriptorHeap* DescriptorHeap, uint32 DescriptorSize) : CpuHandle{ CD3DX12_DEFAULT{} }
-		{
-			Init(Index, DescriptorHeap, DescriptorSize);
-		}
-
-		void Init(uint32 Index, ID3D12DescriptorHeap* DescriptorHeap, uint32 DescriptorSize) {
-			check(!IsValid());
-			CpuHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(DescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-			CpuHandle.Offset(Index, DescriptorSize);
-		}
+	public:
+		CpuDescriptor(CD3DX12_CPU_DESCRIPTOR_HANDLE InHandle, CpuDescriptorAllocator* InAllocator);
+		~CpuDescriptor();
 
 		bool IsValid() const {
 			return CpuHandle.ptr != 0;
@@ -53,48 +28,23 @@ namespace FRAMEWORK
 			CpuHandle.ptr = 0;
 		}
 
-		CD3DX12_CPU_DESCRIPTOR_HANDLE CpuHandle;
-	};
-
-	template<>
-	struct DescriptorHandle<Descriptorvisibility::CpuGpuVisible>
-	{
-		DescriptorHandle() : CpuHandle{ CD3DX12_DEFAULT{} }, GpuHandle{ CD3DX12_DEFAULT{} } {}
-		DescriptorHandle(uint32 Index, ID3D12DescriptorHeap* DescriptorHeap, uint32 DescriptorSize)
-			: CpuHandle{ CD3DX12_DEFAULT{} }, GpuHandle{ CD3DX12_DEFAULT{} }
+		D3D12_CPU_DESCRIPTOR_HANDLE GetHandle() const
 		{
-			Init(Index, DescriptorHeap, DescriptorSize);
+			check(IsValid());
+			return CpuHandle;
 		}
 
-		void Init(uint32 Index, ID3D12DescriptorHeap* DescriptorHeap, uint32 DescriptorSize) {
-			check(!IsValid());
-			CpuHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(DescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-			GpuHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(DescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-			CpuHandle.Offset(Index, DescriptorSize);
-			GpuHandle.Offset(Index, DescriptorSize);
-		}
-
-		bool IsValid() const {
-			return CpuHandle.ptr != 0 && GpuHandle.ptr != 0;
-		}
-
-		void Reset() {
-			CpuHandle.ptr = 0;
-			GpuHandle.ptr = 0;
-		}
-
+	private:
+		CpuDescriptorAllocator* FromAllocator;
 		CD3DX12_CPU_DESCRIPTOR_HANDLE CpuHandle;
-		CD3DX12_GPU_DESCRIPTOR_HANDLE GpuHandle;
 	};
-	
-	template<uint32 MaxSize, Descriptorvisibility Visibility, DescriptorType DescType>
-	class DescriptorAllocator : public FNoncopyable
+
+	class CpuDescriptorAllocator
 	{
 	public:
-		DescriptorAllocator();
-		DescriptorHandle<Visibility> Allocate();
-		void Free(DescriptorHandle<Visibility>& Handle);
-		void Reset();
+		CpuDescriptorAllocator(uint32 MaxSize, DescriptorType DescType);
+		TUniquePtr<CpuDescriptor> Allocate();
+		void Free(CpuDescriptor& Handle);
 		ID3D12DescriptorHeap* GetDescriptorHeap() const {
 			return DescriptorHeap;
 		}
@@ -105,6 +55,51 @@ namespace FRAMEWORK
 		TQueue<uint32> AllocateIndexs;
 	};
 
-}
+	class GpuDescriptorAllocator;
 
-#include "Dx12Descriptor.hpp"
+	class GpuDescriptorRange : public FNoncopyable
+	{
+	public:
+		GpuDescriptorRange(uint32 InDescriptorNum, uint32 InOffsetInHeap,
+			CD3DX12_CPU_DESCRIPTOR_HANDLE InCpuHandle, CD3DX12_GPU_DESCRIPTOR_HANDLE InGpuHandle,
+			GpuDescriptorAllocator* InAllocator);
+		~GpuDescriptorRange();
+
+		D3D12_CPU_DESCRIPTOR_HANDLE GetCpuHandle() const
+		{
+			return CpuHandle;
+		}
+
+		D3D12_GPU_DESCRIPTOR_HANDLE GetGpuHandle() const
+		{
+			return GpuHandle;
+		}
+
+		uint32 GetDescriptorNum() const { return DescriptorNum; }
+
+	private:
+		uint32 DescriptorNum;
+		uint32 OffsetInHeap;
+		CD3DX12_CPU_DESCRIPTOR_HANDLE CpuHandle;
+		CD3DX12_GPU_DESCRIPTOR_HANDLE GpuHandle;
+		GpuDescriptorAllocator* FromAllocator;
+	};
+
+
+	class GpuDescriptorAllocator
+	{
+	public:
+		GpuDescriptorAllocator(uint32 MaxSize, DescriptorType DescType);
+		TUniquePtr<GpuDescriptorRange> Allocate(uint32 InDescriptorNum);
+		void Deallocate(uint32 OffsetInHeap, uint32 DescriptorNum);
+		ID3D12DescriptorHeap* GetDescriptorHeap() const {
+			return DescriptorHeap;
+		}
+
+	private:
+		BuddyAllocator InternalAllocator;
+		TRefCountPtr<ID3D12DescriptorHeap> DescriptorHeap;
+		uint32 DescriptorSize;
+	};
+
+}

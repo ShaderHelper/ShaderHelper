@@ -150,11 +150,12 @@ namespace FRAMEWORK
 
 	};
 
-	class BufferBuddyAllocator
+	class BuddyAllocator
 	{
 	public:
-		BufferBuddyAllocator(uint32 InMinBlockSize, uint32 InMaxBlockSize, D3D12_HEAP_TYPE InHeapType, D3D12_RESOURCE_STATES InInitialState);
-		BuddyAllocationData Allocate(uint32 InSize, uint32 Alignment);
+		BuddyAllocator(uint32 InMinBlockSize, uint32 InMaxBlockSize);
+
+		uint32 Allocate(uint32 InSize, uint32 Alignment);
 		uint32 AllocateBlock(uint32 Order);
 		void Deallocate(uint32 Offset, uint32 Size);
 		void DeallocateBlock(uint32 UnitSizeOffset, uint32 BlockOrder);
@@ -167,12 +168,12 @@ namespace FRAMEWORK
 			return (InSize + MinBlockSize - 1) / MinBlockSize;
 		}
 
-		uint32 UnitSizeToOrder(uint32 InSize) const 
+		uint32 UnitSizeToOrder(uint32 InSize) const
 		{
 			return FMath::CeilLogTwo(InSize);
 		}
 
-		uint32 GetBuddyOffset(uint32 InOffset, uint32 InSize) const 
+		uint32 GetBuddyOffset(uint32 InOffset, uint32 InSize) const
 		{
 			return InOffset ^ InSize;
 		}
@@ -182,10 +183,22 @@ namespace FRAMEWORK
 			return 1 << Order;
 		}
 
-		TRefCountPtr<ID3D12Resource> Resource;
 		uint32 MinBlockSize, MaxBlockSize;
 		uint32 MaxOrder;
 		TArray<TSet<uint32>> FreeBlocks;
+	};
+
+	class BufferBuddyAllocator
+	{
+	public:
+		BufferBuddyAllocator(uint32 InMinBlockSize, uint32 InMaxBlockSize, D3D12_HEAP_TYPE InHeapType, D3D12_RESOURCE_STATES InInitialState);
+		BuddyAllocationData Allocate(uint32 InSize, uint32 Alignment);
+		void Deallocate(uint32 Offset, uint32 Size);
+		bool CanAllocate(uint32 InSize, uint32 Alignment) const;
+
+	private:
+		BuddyAllocator InternalAllocator;
+		TRefCountPtr<ID3D12Resource> Resource;
 		void* ResourceBaseCpuAddr = nullptr;
 		D3D12_GPU_VIRTUAL_ADDRESS ResourceBaseGpuAddr;
 	};
@@ -250,10 +263,10 @@ namespace FRAMEWORK
 
 	};
 
-	inline TUniquePtr<TempUniformBufferAllocator> GTempUniformBufferAllocator[FrameSourceNum]; //Scope = frame
-	inline TUniquePtr<PersistantUniformBufferAllocator> GPersistantUniformBufferAllocator;
+	inline TempUniformBufferAllocator* GTempUniformBufferAllocator[FrameSourceNum]; //Scope = frame
+	inline PersistantUniformBufferAllocator* GPersistantUniformBufferAllocator;
 
-	inline TUniquePtr<CommonBufferAllocator> GCommonBufferAllocator;
+	inline CommonBufferAllocator* GCommonBufferAllocator;
 
 	extern void InitBufferAllocator();
 }

@@ -4,9 +4,10 @@
 
 namespace FRAMEWORK
 {	
-	CommandListContext::CommandListContext(FrameResourceStorage InitFrameResources, TRefCountPtr<ID3D12GraphicsCommandList> InGraphicsCmdList)
-		: FrameResources(MoveTemp(InitFrameResources))
-		, GraphicsCmdList(MoveTemp(InGraphicsCmdList))
+	CommandListContext::CommandListContext()
+		: RtvAllocator(256, DescriptorType::Rtv)
+		, Cpu_CbvSrvUavAllocator(1024, DescriptorType::CbvSrvUav)
+		, Gpu_CbvSrvUavAllocator(1024 , DescriptorType::CbvSrvUav)
 		, CurrentPso(nullptr)
 		, CurrentVertexBuffer(nullptr)
 		, DrawType(PrimitiveType::Triangle)
@@ -26,33 +27,117 @@ namespace FRAMEWORK
 		, IsBindGroup3Dirty(false)
 	{
 
+		DxCheck(GDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(CommandAllocator.GetInitReference())));
+		DxCheck(GDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, CommandAllocator, nullptr, IID_PPV_ARGS(GraphicsCmdList.GetInitReference())));
+		DxCheck(GraphicsCmdList->Close());
+		InitCommandListState();
+	}
+
+	void CommandListContext::InitCommandListState()
+	{
+		check(CommandAllocator);
+		DxCheck(GraphicsCmdList->Reset(CommandAllocator, nullptr));
+
+		ID3D12DescriptorHeap* Heaps[] = {
+			Gpu_CbvSrvUavAllocator.GetDescriptorHeap(),
+		};
+		GraphicsCmdList->SetDescriptorHeaps(UE_ARRAY_COUNT(Heaps), Heaps);
+	}
+
+	ID3D12GraphicsCommandList* CommandListContext::GetCommandListHandle()
+	{
+		if (CommandAllocator)
+		{
+			return GraphicsCmdList;
+		}
+
+		TRefCountPtr<ID3D12CommandAllocator> FreeCmdAllocator = RetrieveFreeCommandAllocator();
+		if (FreeCmdAllocator)
+		{
+			CommandAllocator = FreeCmdAllocator;
+		}
+		else
+		{
+			TRefCountPtr<ID3D12CommandAllocator> NewCmdAllocator;
+			DxCheck(GDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(NewCmdAllocator.GetInitReference())));
+			CommandAllocator = MoveTemp(NewCmdAllocator);
+		}
+
+		InitCommandListState();
+		return GraphicsCmdList;
 	}
 
 
-	void CommandListContext::ResetStaticFrameResource(uint32 FrameResourceIndex)
+	TRefCountPtr<ID3D12CommandAllocator> CommandListContext::RetrieveFreeCommandAllocator()
 	{
-		FrameResources[FrameResourceIndex].Reset();
+		for (auto It = PendingCommandAllocators.CreateIterator(); It; It++)
+		{
+			auto& PendingCmdAllocator = *It;
+			if (PendingCmdAllocator.IsFree())
+			{
+				PendingCmdAllocator.Reset();
+				FreeCommandAllocatorPool.Enqueue(PendingCmdAllocator);
+				It.RemoveCurrent();
+				break;
+			}			
+		}
+
+		if (!FreeCommandAllocatorPool.IsEmpty())
+		{
+			TRefCountPtr<ID3D12CommandAllocator> FreeCmdAllocator;
+			FreeCommandAllocatorPool.Dequeue(FreeCmdAllocator);
+			return FreeCmdAllocator;
+		}
+		
+		return nullptr;
 	}
 
-	void CommandListContext::BindStaticFrameResource(uint32 FrameResourceIndex)
+	TUniquePtr<CpuDescriptor> CommandListContext::AllocRtv()
 	{
-		FrameResources[FrameResourceIndex].BindToCommandList(GraphicsCmdList);
+		return RtvAllocator.Allocate();
 	}
 
-	void CommandListContext::Transition(ID3D12Resource* InResource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After)
+	TUniquePtr<CpuDescriptor> CommandListContext::AllocCpuCbvSrvUav()
 	{
-		ensureMsgf(Before != After, TEXT("Transitioning between the same resource sates: %d ?"), Before);
-		CD3DX12_RESOURCE_BARRIER Barrier = CD3DX12_RESOURCE_BARRIER::Transition(InResource, Before, After);
-		GraphicsCmdList->ResourceBarrier(1, &Barrier);
+		return Cpu_CbvSrvUavAllocator.Allocate();
+	}
+
+	TUniquePtr<GpuDescriptorRange> CommandListContext::AllocGpuCbvSrvUavRange(uint32 InDescriptorNum)
+	{
+		return Gpu_CbvSrvUavAllocator.Allocate(InDescriptorNum);
+	}
+
+	void CommandListContext::Transition(TrackedResource* InResource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After)
+	{
+		if (Before != After)
+		{
+			CD3DX12_RESOURCE_BARRIER Barrier = CD3DX12_RESOURCE_BARRIER::Transition(InResource->GetResource(), Before, After);
+			GraphicsCmdList->ResourceBarrier(1, &Barrier);
+			GResourceStateTracker.SetResourceState(InResource, After);
+		}
+	
+	}
+
+	void CommandListContext::SubmitCommandList()
+	{
+		check(GGraphicsQueue);
+		//The commandLists must be closed before executing them.
+		DxCheck(GraphicsCmdList->Close());
+		ID3D12CommandList* CmdLists[] = { GraphicsCmdList };
+		GGraphicsQueue->ExecuteCommandLists(1, CmdLists);
+
+		PendingCommandAllocators.Add(CommandAllocator);
+
+		CommandAllocator = nullptr;
 	}
 
 	void CommandListContext::PrepareDrawingEnv()
 	{
+		check(GraphicsCmdList);
+
 		if (IsVertexBufferDirty) 
 		{
 			if (CurrentVertexBuffer) {
-				//TODO
-                GDeferredReleaseManager->AddUncompletedResource(CurrentVertexBuffer);
 			}
 			else {
                 GraphicsCmdList->IASetVertexBuffers(0, 0, nullptr);
@@ -66,7 +151,6 @@ namespace FRAMEWORK
 		{
 			check(CurrentPso);
 			GraphicsCmdList->SetPipelineState(CurrentPso->GetResource());
-            GDeferredReleaseManager->AddUncompletedResource(CurrentPso);
 			MarkPipelineDirty(false);
 		}
 
@@ -79,25 +163,21 @@ namespace FRAMEWORK
 
 		if (CurrentBindGroup0 && IsBindGroup0Dirty) {
 			CurrentBindGroup0->Apply(GetCommandListHandle(), CurrentRootSignature);
-			GDeferredReleaseManager->AddUncompletedResource(CurrentBindGroup0);
 			MarkBindGroup0Dirty(false);
 		}
 
 		if (CurrentBindGroup1 && IsBindGroup1Dirty) {
 			CurrentBindGroup1->Apply(GetCommandListHandle(), CurrentRootSignature);
-			GDeferredReleaseManager->AddUncompletedResource(CurrentBindGroup1);
 			MarkBindGroup1Dirty(false);
 		}
 
 		if (CurrentBindGroup2 && IsBindGroup2Dirty) {
 			CurrentBindGroup2->Apply(GetCommandListHandle(), CurrentRootSignature);
-			GDeferredReleaseManager->AddUncompletedResource(CurrentBindGroup2);
 			MarkBindGroup2Dirty(false);
 		}
 
 		if (CurrentBindGroup3 && IsBindGroup3Dirty) {
 			CurrentBindGroup3->Apply(GetCommandListHandle(), CurrentRootSignature);
-			GDeferredReleaseManager->AddUncompletedResource(CurrentBindGroup3);
 			MarkBindGroup3Dirty(false);
 		}
 	
@@ -121,7 +201,7 @@ namespace FRAMEWORK
             {
                 Dx12Texture* RenderTarget = CurrentRenderTargets[i];
                 check(RenderTarget);
-                check(RenderTarget->HandleRTV.IsValid());
+                check(RenderTarget->RTV->IsValid());
                 
                 Vector4f OptimizedClearValue = RenderTarget->GetResourceDesc().ClearValues;
                 if (ClearColorValues[i]) {
@@ -130,13 +210,12 @@ namespace FRAMEWORK
                     {
                         SH_LOG(LogDx12, Warning, TEXT("OptimizedClearValue(%s) != ClearColorValue(%s) that may result in invalid fast clear optimization."), *OptimizedClearValue.ToString(), *ClearColorValue.ToString());
                     }
-                    GraphicsCmdList->ClearRenderTargetView(RenderTarget->HandleRTV.CpuHandle, ClearColorValue.GetData(), 0, nullptr);
+                    GraphicsCmdList->ClearRenderTargetView(RenderTarget->RTV->GetHandle(), ClearColorValue.GetData(), 0, nullptr);
                 }
                 else {
-                    GraphicsCmdList->ClearRenderTargetView(RenderTarget->HandleRTV.CpuHandle, OptimizedClearValue.GetData(), 0, nullptr);
+                    GraphicsCmdList->ClearRenderTargetView(RenderTarget->RTV->GetHandle(), OptimizedClearValue.GetData(), 0, nullptr);
                 }
-                GDeferredReleaseManager->AddUncompletedResource(RenderTarget);
-                RenderTargetDescriptors[i] = RenderTarget->HandleRTV.CpuHandle;
+                RenderTargetDescriptors[i] = RenderTarget->RTV->GetHandle();
             }
             
             GraphicsCmdList->OMSetRenderTargets(RenderTargetNum, RenderTargetDescriptors.GetData(), false, nullptr);
@@ -160,56 +239,15 @@ namespace FRAMEWORK
         ClearColorValues.Reset();
     }
 
-	StaticFrameResource::StaticFrameResource(TRefCountPtr<ID3D12CommandAllocator> InCommandAllocator, DescriptorAllocatorStorage&& InDescriptorAllocators)
-		: CommandAllocator(MoveTemp(InCommandAllocator))
-		, DescriptorAllocators(MoveTemp(InDescriptorAllocators))
+	void InitCommandListContext()
 	{
-
+		GCommandListContext = new CommandListContext();
 	}
 
-	void StaticFrameResource::Reset()
+	CommandListContext::PendingCommandAllocator::PendingCommandAllocator(TRefCountPtr<ID3D12CommandAllocator> InCmdAllocator)
+		: CommandAllocator(InCmdAllocator)
 	{
-		DxCheck(CommandAllocator->Reset());
-		DescriptorAllocators.RtvAllocator->Reset();
-		DescriptorAllocators.ShaderViewAllocator->Reset();
-		DescriptorAllocators.SamplerAllocator->Reset();
+		DxCheck(GDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(Fence.GetInitReference())));
+		DxCheck(GGraphicsQueue->Signal(Fence, 1));
 	}
-
-	void StaticFrameResource::BindToCommandList(ID3D12GraphicsCommandList* InGraphicsCmdList)
-	{
-		check(InGraphicsCmdList);
-		//CommandList can be reset when already submit it to gpu.
-		InGraphicsCmdList->Reset(CommandAllocator, nullptr);
-
-		ID3D12DescriptorHeap* Heaps[] = {
-			DescriptorAllocators.ShaderViewAllocator->GetDescriptorHeap(),
-			DescriptorAllocators.SamplerAllocator->GetDescriptorHeap()
-		};
-		InGraphicsCmdList->SetDescriptorHeaps(UE_ARRAY_COUNT(Heaps), Heaps);
-	}
-
-	void InitFrameResource()
-	{
-		CommandListContext::FrameResourceStorage FrameResources;
-		ID3D12CommandAllocator* InitialCommandAllocator = nullptr;
-		for (int i = 0; i < FrameSourceNum; ++i)
-		{
-			TRefCountPtr<ID3D12CommandAllocator> CommandAllocator;
-			DxCheck(GDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(CommandAllocator.GetInitReference())));
-			if (i == 0) { InitialCommandAllocator = CommandAllocator.GetReference(); }
-
-			StaticFrameResource::DescriptorAllocatorStorage DescriptorAllocators;
-			DescriptorAllocators.RtvAllocator.Reset(new StaticFrameResource::RtvAllocatorType());
-			DescriptorAllocators.ShaderViewAllocator.Reset(new StaticFrameResource::ShaderViewAllocatorType());
-			DescriptorAllocators.SamplerAllocator.Reset(new StaticFrameResource::SamplerAllocatorType());
-
-			FrameResources.Emplace(MoveTemp(CommandAllocator), MoveTemp(DescriptorAllocators));
-		}
-
-		TRefCountPtr<ID3D12GraphicsCommandList> GraphicsCmdList;
-		DxCheck(GDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, InitialCommandAllocator, nullptr, IID_PPV_ARGS(GraphicsCmdList.GetInitReference())));
-		DxCheck(GraphicsCmdList->Close());
-		GCommandListContext = new CommandListContext(MoveTemp(FrameResources), MoveTemp(GraphicsCmdList));
-	}
-
 }

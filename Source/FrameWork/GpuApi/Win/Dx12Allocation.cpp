@@ -10,11 +10,11 @@ namespace FRAMEWORK
 
 	void InitBufferAllocator()
 	{
-		GCommonBufferAllocator = MakeUnique<CommonBufferAllocator>();
-		GPersistantUniformBufferAllocator = MakeUnique<PersistantUniformBufferAllocator>(PersistantUniformBufferMinBlockSize, PersistantUniformBufferMaxBlockSize);
+		GCommonBufferAllocator = new CommonBufferAllocator;
+		GPersistantUniformBufferAllocator = new PersistantUniformBufferAllocator(PersistantUniformBufferMinBlockSize, PersistantUniformBufferMaxBlockSize);
 		for (int32 i = 0; i < FrameSourceNum; i++)
 		{
-			GTempUniformBufferAllocator[i] = MakeUnique<TempUniformBufferAllocator>(TempUniformBufferPageSize);
+			GTempUniformBufferAllocator[i] = new TempUniformBufferAllocator(TempUniformBufferPageSize);
 		}
 	}
 
@@ -29,6 +29,7 @@ namespace FRAMEWORK
 		//TODO : d3d12ma
 		DxCheck(GDevice->CreateCommittedResource(&HeapType, D3D12_HEAP_FLAG_NONE,
 			&BufferDesc, InitialState, nullptr, IID_PPV_ARGS(&Data.UnderlyResource)));
+		Data.UnderlyResource->SetName(TEXT("Common Buffer"));
 
 		Data.ResourceBaseGpuAddr = Data.UnderlyResource->GetGPUVirtualAddress();
 		if (InHeapType == D3D12_HEAP_TYPE_UPLOAD || InHeapType == D3D12_HEAP_TYPE_READBACK)
@@ -77,6 +78,7 @@ namespace FRAMEWORK
 		//TODO: CreatePlacedResource
 		DxCheck(GDevice->CreateCommittedResource(&HeapType, D3D12_HEAP_FLAG_NONE,
 			&BufferDesc, InitialState, nullptr, IID_PPV_ARGS(Resource.GetInitReference())));
+		Resource->SetName(TEXT("Bump Buffer"));
 
 		if (HeapType.Type == D3D12_HEAP_TYPE_UPLOAD)
 		{
@@ -120,20 +122,15 @@ namespace FRAMEWORK
 	}
 
 	BufferBuddyAllocator::BufferBuddyAllocator(uint32 InMinBlockSize, uint32 InMaxBlockSize, D3D12_HEAP_TYPE InHeapType, D3D12_RESOURCE_STATES InInitialState)
-		: MinBlockSize(InMinBlockSize)
-		, MaxBlockSize(InMaxBlockSize)
+		: InternalAllocator(InMinBlockSize, InMaxBlockSize)
 	{
-		check(MaxBlockSize % MinBlockSize == 0);
-		check(FMath::IsPowerOfTwo(MaxBlockSize / MinBlockSize));
-		MaxOrder = UnitSizeToOrder(SizeToUnitSize(MaxBlockSize));
-		Reset();
-
 		CD3DX12_HEAP_PROPERTIES HeapType{ InHeapType };
 		D3D12_RESOURCE_STATES InitialState = InInitialState;
-		CD3DX12_RESOURCE_DESC BufferDesc = CD3DX12_RESOURCE_DESC::Buffer(MaxBlockSize);
+		CD3DX12_RESOURCE_DESC BufferDesc = CD3DX12_RESOURCE_DESC::Buffer(InMaxBlockSize);
 
 		DxCheck(GDevice->CreateCommittedResource(&HeapType, D3D12_HEAP_FLAG_NONE,
 			&BufferDesc, InitialState, nullptr, IID_PPV_ARGS(Resource.GetInitReference())));
+		Resource->SetName(TEXT("Buddy Buffer"));
 
 		if (HeapType.Type == D3D12_HEAP_TYPE_UPLOAD)
 		{
@@ -145,14 +142,40 @@ namespace FRAMEWORK
 	BuddyAllocationData BufferBuddyAllocator::Allocate(uint32 InSize, uint32 Alignment)
 	{
 		uint32 AlignSize = Align(InSize, Alignment);
-		uint32 Order = UnitSizeToOrder(SizeToUnitSize(AlignSize));
-		uint32 FreeBlockUnitSizeOffset = AllocateBlock(Order);
-
-		uint32 FreeBlockByteSizeOffset = FreeBlockUnitSizeOffset * MinBlockSize;
+		uint32 FreeBlockByteSizeOffset = InternalAllocator.Allocate(InSize, Alignment);
 		return {Resource.GetReference(), ResourceBaseGpuAddr, ResourceBaseCpuAddr, this, FreeBlockByteSizeOffset, AlignSize};
 	}
 
-	uint32 BufferBuddyAllocator::AllocateBlock(uint32 Order)
+	void BufferBuddyAllocator::Deallocate(uint32 Offset, uint32 Size)
+	{
+		InternalAllocator.Deallocate(Offset, Size);
+	}
+
+	bool BufferBuddyAllocator::CanAllocate(uint32 InSize, uint32 Alignment) const
+	{
+		return InternalAllocator.CanAllocate(InSize, Alignment);
+	}
+
+	BuddyAllocator::BuddyAllocator(uint32 InMinBlockSize, uint32 InMaxBlockSize)
+		: MinBlockSize(InMinBlockSize)
+		, MaxBlockSize(InMaxBlockSize)
+	{
+		check(MaxBlockSize % MinBlockSize == 0);
+		check(FMath::IsPowerOfTwo(MaxBlockSize / MinBlockSize));
+		MaxOrder = UnitSizeToOrder(SizeToUnitSize(MaxBlockSize));
+		Reset();
+	}
+
+	uint32 BuddyAllocator::Allocate(uint32 InSize, uint32 Alignment)
+	{
+		uint32 AlignSize = Align(InSize, Alignment);
+		uint32 Order = UnitSizeToOrder(SizeToUnitSize(AlignSize));
+		uint32 FreeBlockUnitSizeOffset = AllocateBlock(Order);
+		uint32 FreeBlockByteSizeOffset = FreeBlockUnitSizeOffset * MinBlockSize;
+		return FreeBlockByteSizeOffset;
+	}
+
+	uint32 BuddyAllocator::AllocateBlock(uint32 Order)
 	{
 		uint32 UnitSizeOffset;
 
@@ -178,14 +201,14 @@ namespace FRAMEWORK
 		return UnitSizeOffset;
 	}
 
-	void BufferBuddyAllocator::Deallocate(uint32 Offset, uint32 Size)
+	void BuddyAllocator::Deallocate(uint32 Offset, uint32 Size)
 	{
 		uint32 UnitSizeOffset = SizeToUnitSize(Offset);
 		uint32 Order = UnitSizeToOrder(SizeToUnitSize(Size));
 		DeallocateBlock(UnitSizeOffset, Order);
 	}
 
-	void BufferBuddyAllocator::DeallocateBlock(uint32 UnitSizeOffset, uint32 BlockOrder)
+	void BuddyAllocator::DeallocateBlock(uint32 UnitSizeOffset, uint32 BlockOrder)
 	{
 		uint32 CurOrderBlockUnitSize = OrderToUnitSize(BlockOrder);
 		uint32 BuddyBlockUnitSizeOffset = GetBuddyOffset(UnitSizeOffset, CurOrderBlockUnitSize);
@@ -200,7 +223,7 @@ namespace FRAMEWORK
 		}
 	}
 
-	bool BufferBuddyAllocator::CanAllocate(uint32 InSize, uint32 Alignment) const
+	bool BuddyAllocator::CanAllocate(uint32 InSize, uint32 Alignment) const
 	{
 		uint32 AlignSize = Align(InSize, Alignment);
 		for (int32 i = MaxOrder; i >= 0; i--)
@@ -213,7 +236,7 @@ namespace FRAMEWORK
 		return false;
 	}
 
-	void BufferBuddyAllocator::Reset()
+	void BuddyAllocator::Reset()
 	{
 		FreeBlocks.Empty();
 		FreeBlocks.SetNum(MaxOrder + 1);

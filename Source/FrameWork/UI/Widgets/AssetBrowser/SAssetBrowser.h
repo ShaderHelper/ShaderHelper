@@ -1,6 +1,5 @@
 #pragma once
 #include "SDirectoryTree.h"
-
 struct FFileChangeData;
 
 namespace FRAMEWORK

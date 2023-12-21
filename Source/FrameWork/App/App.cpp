@@ -94,16 +94,23 @@ namespace FRAMEWORK {
 			LastRealTime = CurrentRealTime;
 			DeltaTime = NewDeltaTime;
 
-			FSlateApplication::Get().PumpMessages();
-
 			bool bIdleMode = AreAllWindowsHidden();
 			if (!bIdleMode)
 			{
-				Update(DeltaTime);
-
-				FSlateApplication::Get().Tick();
-				//if not change GFrameCounter, slate texture may not update.
-				GFrameCounter++;
+				GpuApi::BeginFrame();
+				{
+					Update(DeltaTime);
+					Render();
+					FSlateApplication::Get().PumpMessages();
+					FSlateApplication::Get().Tick();
+					//if not change GFrameCounter, slate texture may not update.
+					GFrameCounter++;
+				}
+				GpuApi::EndFrame();
+			}
+			else
+			{
+				FSlateApplication::Get().PumpMessages();
 			}
 		}
 	}
@@ -134,6 +141,11 @@ namespace FRAMEWORK {
 		FDirectoryWatcherModule& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>(TEXT("DirectoryWatcher"));
 		IDirectoryWatcher* DirectoryWatcher = DirectoryWatcherModule.Get();
 		DirectoryWatcher->Tick((float)DeltaTime);
+	}
+
+	void App::Render()
+	{
+
 	}
 
 }

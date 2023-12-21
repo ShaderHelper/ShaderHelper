@@ -84,10 +84,12 @@ namespace FRAMEWORK
 		FString GetPath(const FGuid& InGuid) const;
 		FGuid GetGuid(const FString& InPath) const;
 
+		void AddAssetThumbnail(const FGuid& InGuid, TRefCountPtr<GpuTexture> InThumbnail);
+		GpuTexture* FindAssetThumbnail(const FGuid& InGuid) const;
+
 		void Clear();
 		TArray<FString> GetManageredExts() const;
 		
-	private:
 		void AddRef(AssetObject* InAssetObject);
 		void ReleaseRef(AssetObject* InAssetObject);
 
@@ -96,7 +98,7 @@ namespace FRAMEWORK
 		TMap<FString, FGuid> PathToGuid;
 		TMap<FGuid, AssetObject*> Assets;
 		TMap<AssetObject*, uint32> AssetRefCounts;
-		TMap<FGuid, GpuTexture*> AssetThumbnailPool;
+		TMap<FGuid, TRefCountPtr<GpuTexture>> AssetThumbnailPool;
 	};
 
 	template<typename T>

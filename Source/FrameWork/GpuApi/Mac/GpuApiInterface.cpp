@@ -29,13 +29,13 @@ namespace GpuApi
         GetCommandListContext()->SetCommandBuffer(GCommandQueue.CommandBuffer());
 	}
 
-	void StartRenderFrame()
+	void BeginFrame()
 	{
         GCaptureScope.BeginScope();
         GetCommandListContext()->SetCommandBuffer(GCommandQueue.CommandBuffer());
 	}
 
-	void EndRenderFrame()
+	void EndFrame()
 	{
         FlushGpu();
         GCaptureScope.EndScope();

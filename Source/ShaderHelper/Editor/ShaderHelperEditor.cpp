@@ -167,7 +167,6 @@ namespace SH
 			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Edit"));
 			SpawnedTab->SetContent(
 				SNew(SShaderEditorBox)
-				.Text(FText::FromString(ShRenderer::DefaultPixelShaderText))
 				.Renderer(Renderer)
 			);
 		}

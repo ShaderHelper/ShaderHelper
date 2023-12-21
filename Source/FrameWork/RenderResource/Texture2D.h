@@ -13,7 +13,7 @@ namespace FRAMEWORK
 		void Serialize(FArchive& Ar) override;
 		void PostLoad() override;
 		FString FileExtension() const override;
-		GpuTexture* Gethumbnail() const override;
+		GpuTexture* GetThumbnail() const override;
 		TSharedRef<SWidget> GetPropertyView() const override;
 
 	private:

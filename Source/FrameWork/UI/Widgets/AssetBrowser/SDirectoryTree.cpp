@@ -52,7 +52,6 @@ namespace FRAMEWORK
 		RootDirectoryData->IsRootDirectory = true;
 		DirectoryDatas.Add(RootDirectoryData);
 		PopulateDirectoryData(RootDirectoryData, ContentPathShowed);
-
 	}
 
 	void SDirectoryTree::PopulateDirectoryData(TSharedRef<DirectoryData> InDirectoryData, const FString& DirectoryPath)

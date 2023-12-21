@@ -27,33 +27,65 @@ namespace FRAMEWORK
 			FExecuteAction::CreateRaw(this, &SAssetView::OnHandleRenameAction)
 		);
 
+		ContentPathShowed = InArgs._ContentPathShowed;
 		OnFolderDoubleClick = InArgs._OnFolderDoubleClick;
 
 		ChildSlot
 		[
-			SNew(SOverlay)
-			+ SOverlay::Slot()
+			SNew(SVerticalBox)
+			+ SVerticalBox::Slot()
 			[
-				SAssignNew(AssetTileView, STileView<TSharedRef<AssetViewItem>>)
-				.ListItemsSource(&AssetViewItems)
-				.ItemWidth(64)
-				.ItemHeight(64)
-				.OnContextMenuOpening(this, &SAssetView::CreateContextMenu)
-				.OnGenerateTile_Lambda([](TSharedRef<AssetViewItem> InTileItem, const TSharedRef<STableViewBase>& OwnerTable) {
-					return InTileItem->GenerateWidgetForTableView(OwnerTable);
-				})
-				.OnMouseButtonDoubleClick(this, &SAssetView::OnMouseButtonDoubleClick)
+				SNew(SOverlay)
+				+ SOverlay::Slot()
+				[
+					SAssignNew(AssetTileView, STileView<TSharedRef<AssetViewItem>>)
+					.SelectionMode(ESelectionMode::Single)
+					.ListItemsSource(&AssetViewItems)
+					.ItemWidth(58)
+					.ItemHeight(58)
+					.OnContextMenuOpening(this, &SAssetView::CreateContextMenu)
+					.OnGenerateTile_Lambda([](TSharedRef<AssetViewItem> InTileItem, const TSharedRef<STableViewBase>& OwnerTable) {
+						return InTileItem->GenerateWidgetForTableView(OwnerTable);
+					})
+					.OnMouseButtonDoubleClick(this, &SAssetView::OnMouseButtonDoubleClick)
+				]
+
+				+ SOverlay::Slot()
+				.HAlign(HAlign_Center)
+				.VAlign(VAlign_Center)
+				[
+					SNew(STextBlock)
+					.Text(FText::FromString("The folder is empty"))
+					.Visibility_Lambda([this] {	return AssetViewItems.Num() != 0 ? EVisibility::Collapsed : EVisibility::Visible; })
+				]
 			]
 
-			+ SOverlay::Slot()
-			.HAlign(HAlign_Center)
-			.VAlign(VAlign_Center)
+			+ SVerticalBox::Slot()
+			.AutoHeight()
 			[
-				SNew(STextBlock)
-				.Text(FText::FromString("The folder is empty"))
-				.Visibility_Lambda([this] {	return AssetViewItems.Num() != 0 ? EVisibility::Collapsed : EVisibility::Visible; })
+				SNew(SBorder)
+				[
+					SNew(STextBlock)
+					.Font(FAppStyle::Get().GetFontStyle("SmallFont"))
+					.Text_Lambda([this] {
+						TArray<TSharedRef<AssetViewItem>> SelectedItems = AssetTileView->GetSelectedItems();
+						if (SelectedItems.Num() > 0)
+						{
+							FString RelativeName = SelectedItems[0]->GetPath();
+							FPaths::MakePathRelativeTo(RelativeName, *ContentPathShowed);
+							return FText::FromString(MoveTemp(RelativeName));
+						}
+						else
+						{
+							FString RelativeName = CurViewDirectory;
+							FPaths::MakePathRelativeTo(RelativeName, *ContentPathShowed);
+							return FText::FromString(MoveTemp(RelativeName));
+						}
+					})
+				]
 			]
 		];
+
 	}
 
 	void SAssetView::SetNewViewDirectory(const FString& NewViewDirectory)
@@ -78,10 +110,11 @@ namespace FRAMEWORK
 			}
 			else
 			{
-
+				AssetViewItems.Add(MakeShared<AssetViewAssetItem>(ViewDirectory / FileOrFolderName));
 			}
 		}
 
+		SortViewItems();
 		AssetTileView->RequestListRefresh();
 	}
 
@@ -90,22 +123,17 @@ namespace FRAMEWORK
 		TArray<TSharedRef<AssetViewItem>> SelectedItems = AssetTileView->GetSelectedItems();
 		if (SelectedItems.Num() > 0)
 		{
-			FMenuBuilder MenuBuilder{ true, UICommandList };
-			MenuBuilder.BeginSection("Control", FText::FromString("Control"));
-			{
-				MenuBuilder.AddMenuEntry(
-					FText::FromString("Open"),
-					FText::GetEmpty(),
-					FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "Icons.FolderOpen" },
-					FUIAction{ FExecuteAction::CreateRaw(this, &SAssetView::OnHandleOpenAction) });
-				MenuBuilder.AddMenuEntry(FGenericCommands::Get().Rename);
-				MenuBuilder.AddMenuEntry(FGenericCommands::Get().Delete);
-			}
-			MenuBuilder.EndSection();
-			return MenuBuilder.MakeWidget();
+			return CreateItemContextMenu(SelectedItems[0]);
 		}
 
 		FMenuBuilder MenuBuilder{ true, TSharedPtr<FUICommandList>() };
+		MenuBuilder.AddMenuEntry(
+			FText::FromString("Show in Explorer"),
+			FText::GetEmpty(),
+			FSlateIcon{},
+			FUIAction{ FExecuteAction::CreateLambda([this] {
+				FPlatformProcess::ExploreFolder(*CurViewDirectory);
+			}) });
 
 		MenuBuilder.BeginSection("Asset", FText::FromString("Asset"));
 		{
@@ -138,16 +166,59 @@ namespace FRAMEWORK
 		return MenuBuilder.MakeWidget();
 	}
 
+	TSharedPtr<SWidget> SAssetView::CreateItemContextMenu(TSharedRef<AssetViewItem> ViewItem)
+	{
+		FMenuBuilder MenuBuilder{ true, UICommandList };
+		MenuBuilder.AddMenuEntry(
+			FText::FromString("Show in Explorer"),
+			FText::GetEmpty(),
+			FSlateIcon{},
+			FUIAction{ FExecuteAction::CreateLambda([ViewItem] {
+				FPlatformProcess::ExploreFolder(*ViewItem->GetPath());
+			}) });
+		MenuBuilder.BeginSection("Control", FText::FromString("Control"));
+		{
+			MenuBuilder.AddMenuEntry(
+				FText::FromString("Open"),
+				FText::GetEmpty(),
+				FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "Icons.FolderOpen" },
+				FUIAction{ FExecuteAction::CreateRaw(this, &SAssetView::OnHandleOpenAction) });
+			MenuBuilder.AddMenuEntry(FGenericCommands::Get().Rename);
+			MenuBuilder.AddMenuEntry(FGenericCommands::Get().Delete);
+		}
+		MenuBuilder.EndSection();
+		return MenuBuilder.MakeWidget();
+	}
+
 	void SAssetView::AddFolder(const FString& InFolderName)
 	{
+		if (InFolderName == CurViewDirectory || FPaths::GetPath(InFolderName) != CurViewDirectory)
+		{
+			return;
+		}
+
 		TSharedRef<AssetViewFolderItem> NewFolderItem = MakeShared<AssetViewFolderItem>(InFolderName);
-		AssetViewItems.Add(NewFolderItem);
+		AssetViewItems.Add(MoveTemp(NewFolderItem));
 		SortViewItems();
 		AssetTileView->RequestListRefresh();
 	}
 
 	void SAssetView::RemoveFolder(const FString& InFolderName)
 	{
+		if (InFolderName == CurViewDirectory)
+		{
+			if (OnFolderDoubleClick)
+			{
+				OnFolderDoubleClick(FPaths::GetPath(InFolderName));
+			}
+			return;
+		}
+
+		if (FPaths::GetPath(InFolderName) != CurViewDirectory)
+		{
+			return;
+		}
+
 		AssetViewItems.RemoveAll([&InFolderName](const TSharedRef<AssetViewItem>& Element) {
 			return Element->GetPath() == InFolderName;
 		});
@@ -156,7 +227,15 @@ namespace FRAMEWORK
 
 	void SAssetView::AddFile(const FString& InFileName)
 	{
+		if (FPaths::GetPath(InFileName) != CurViewDirectory)
+		{
+			return;
+		}
 
+		TSharedRef<AssetViewAssetItem> NewAssetItem = MakeShared<AssetViewAssetItem>(InFileName);
+		AssetViewItems.Add(MoveTemp(NewAssetItem));
+		SortViewItems();
+		AssetTileView->RequestListRefresh();
 	}
 
 	void SAssetView::RemoveFile(const FString& InFileName)
@@ -228,6 +307,15 @@ namespace FRAMEWORK
 	void SAssetView::SortViewItems()
 	{
 		AssetViewItems.Sort([](const TSharedRef<AssetViewItem>& A, const TSharedRef<AssetViewItem>& B) {
+			if (A->IsOfType<AssetViewFolderItem>() && B->IsOfType<AssetViewAssetItem>())
+			{
+				return true;
+			}
+			else if (A->IsOfType<AssetViewAssetItem>() && B->IsOfType<AssetViewFolderItem>())
+			{
+				return false;
+			}
+
 			return A->GetPath() < B->GetPath();
 		});
 	}

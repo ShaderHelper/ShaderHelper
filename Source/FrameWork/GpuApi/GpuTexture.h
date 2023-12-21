@@ -8,8 +8,8 @@ namespace FRAMEWORK
         uint32 Width;
         uint32 Height;
 		GpuTextureFormat Format;
-
-        GpuTextureUsage Usage = GpuTextureUsage::None;
+		GpuTextureUsage Usage = GpuTextureUsage::None;
+ 
         Vector4f ClearValues = 0;
 		uint32 Depth = 1;
 		uint32 NumMips = 1;
