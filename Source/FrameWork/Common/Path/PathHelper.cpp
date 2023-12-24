@@ -35,5 +35,10 @@ namespace FRAMEWORK {
 		return SavedDir() / TEXT("Config");
 	}
 
+	FString PathHelper::ShaderDir()
+	{
+		return ResourceDir() / TEXT("Shaders");
+	}
+
 }
 

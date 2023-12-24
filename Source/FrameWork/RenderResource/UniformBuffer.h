@@ -14,7 +14,6 @@ namespace FRAMEWORK
 
 	struct UniformBufferMetaData
 	{
-		FString UniformBufferName;
 		TMap<FString, UniformBufferMemberInfo> Members;
 		FString UniformBufferDeclaration;
 		uint32 UniformBufferSize = 0;
@@ -38,8 +37,8 @@ namespace FRAMEWORK
 			return *reinterpret_cast<T*>((uint8*)BufferBaseAddr + MemberOffset);
 		}
 
-		const UniformBufferMetaData& GetMetaData() const {
-			return MetaData;
+		FString GetDeclaration() const {
+			return MetaData.UniformBufferDeclaration;
 		}
 
 		GpuBuffer* GetGpuResource() const { return Buffer; }
@@ -67,10 +66,11 @@ namespace FRAMEWORK
 	class UniformBufferBuilder
 	{
 	public:
-		UniformBufferBuilder(FString InUniformBufferName, UniformBufferUsage InUsage)
+		UniformBufferBuilder(UniformBufferUsage InUsage)
 			: Usage(InUsage)
 		{
-			MetaData.UniformBufferName = MoveTemp(InUniformBufferName);
+			DeclarationHead = TEXT("cbuffer {0}\r\n{\r\n");
+			DeclarationEnd = TEXT("};\r\n");
 		}
 
 	public:
@@ -98,10 +98,15 @@ namespace FRAMEWORK
 			return *this;
 		}
 
-		auto Build() {
+		FString GetLayoutDeclaration()
+		{
+			return DeclarationHead + UniformBufferMemberNames + DeclarationEnd;
+		}
+
+		TUniquePtr<UniformBuffer> Build() {
 			checkf(MetaData.UniformBufferSize > 0, TEXT("Nothing added to the builder."));
 			TRefCountPtr<GpuBuffer> Buffer = GpuApi::CreateBuffer(MetaData.UniformBufferSize, (GpuBufferUsage)Usage);
-			MetaData.UniformBufferDeclaration = FString::Printf(TEXT("cbuffer %s\r\n{\r\n%s\r\n};\r\n"), *MetaData.UniformBufferName, *UniformBufferMemberNames);
+			MetaData.UniformBufferDeclaration = GetLayoutDeclaration();
 			return MakeUnique<UniformBuffer>( MoveTemp(Buffer), MetaData);
 		}
 
@@ -138,6 +143,7 @@ namespace FRAMEWORK
 		
 	private:
 		UniformBufferUsage Usage;
+		FString DeclarationHead, DeclarationEnd;
 		FString UniformBufferMemberNames;
 		UniformBufferMetaData MetaData;
 	};

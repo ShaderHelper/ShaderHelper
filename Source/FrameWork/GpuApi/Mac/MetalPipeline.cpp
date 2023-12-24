@@ -6,7 +6,7 @@
 
 namespace FRAMEWORK
 {
-    TRefCountPtr<MetalPipelineState> CreateMetalPipelineState(const PipelineStateDesc& InPipelineStateDesc)
+	TRefCountPtr<MetalPipelineState> CreateMetalPipelineState(const GpuPipelineStateDesc& InPipelineStateDesc)
     {
         MetalShader* Vs = static_cast<MetalShader*>(InPipelineStateDesc.Vs);
         MetalShader* Ps = static_cast<MetalShader*>(InPipelineStateDesc.Ps);

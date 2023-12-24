@@ -138,8 +138,9 @@ namespace GpuApi
         return CompileShaderFromHlsl(static_cast<MetalShader*>(InShader), OutErrorInfo);
     }
 
-	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc)
+	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const GpuPipelineStateDesc& InPipelineStateDesc)
 	{
+		check(ValidateCreateRenderPipelineState(InPipelineStateDesc));
         return AUX::StaticCastRefCountPtr<GpuPipelineState>(CreateMetalPipelineState(InPipelineStateDesc));
 	}
 

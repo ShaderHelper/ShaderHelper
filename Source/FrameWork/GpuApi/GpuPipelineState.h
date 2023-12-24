@@ -29,7 +29,7 @@ namespace FRAMEWORK
 		TArray<BlendRenderTargetDesc, TFixedAllocator<GpuResourceLimit::MaxRenderTargetNum>> RtDescs;
     };
 
-    struct PipelineStateDesc
+    struct GpuPipelineStateDesc
     {
         GpuShader* Vs;
         GpuShader* Ps;

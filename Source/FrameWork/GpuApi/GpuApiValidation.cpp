@@ -87,4 +87,23 @@ namespace FRAMEWORK::GpuApi
         return true;
     }
 
+	bool ValidateCreateRenderPipelineState(const GpuPipelineStateDesc& InPipelineStateDesc)
+	{
+		auto ValidateBindGroupNumber = [](GpuBindGroupLayout* BindGroupLayout, BindingGroupSlot ExpectedSlot)
+		{
+			if (BindGroupLayout)
+			{
+				BindingGroupSlot GroupNumber = BindGroupLayout->GetGroupNumber();
+				if (GroupNumber != ExpectedSlot) {
+					SH_LOG(LogGpuApi, Error, TEXT("GpuApi::CreateRenderPipelineState Error(Mismatched BindingGroupSlot) - BindGroupLayout%d : (%d), Expected : (%d)"), ExpectedSlot, GroupNumber, ExpectedSlot);
+					return false;
+				}
+			}
+			return true;
+		};
+		return ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout0, 0) && ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout1, 1)
+			&& ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout2, 2) && ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout3, 3);
+		return true;
+	}
+
 }

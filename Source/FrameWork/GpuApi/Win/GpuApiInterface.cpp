@@ -166,8 +166,9 @@ namespace GpuApi
         return CompileShader(InShader, OutErrorInfo);
     }
 
-	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc)
+	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const GpuPipelineStateDesc& InPipelineStateDesc)
 	{
+		check(ValidateCreateRenderPipelineState(InPipelineStateDesc));
         return AUX::StaticCastRefCountPtr<GpuPipelineState>(CreateDx12Pso(InPipelineStateDesc));
 	}
 

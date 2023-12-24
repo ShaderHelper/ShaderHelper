@@ -9,4 +9,5 @@ namespace FRAMEWORK::GpuApi
 	bool ValidateSetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3);
 	bool ValidateCreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc);
     bool ValidateCreateBindGroupLayout(const GpuBindGroupLayoutDesc& InBindGroupLayoutDesc);
+	bool ValidateCreateRenderPipelineState(const GpuPipelineStateDesc& InPipelineStateDesc);
 }

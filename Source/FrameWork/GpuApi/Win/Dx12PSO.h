@@ -20,5 +20,5 @@ namespace FRAMEWORK
 		TRefCountPtr<ID3D12PipelineState> PipelineState;
 	};
 
-    TRefCountPtr<Dx12Pso> CreateDx12Pso(const PipelineStateDesc& InPipelineStateDesc);
+    TRefCountPtr<Dx12Pso> CreateDx12Pso(const GpuPipelineStateDesc& InPipelineStateDesc);
 }

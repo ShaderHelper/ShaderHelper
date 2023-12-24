@@ -39,20 +39,21 @@ R"(float4 MainPS(PIn Input) : SV_Target
 	ShRenderer::ShRenderer()
 		: iTime(0)
 		, iResolution{0,0}
+		, bCompileSuccessful(true)
 	{
 
-		TUniquePtr<UniformBuffer> NewBuiltInUniformBuffer = UniformBufferBuilder{ "BuiltIn", UniformBufferUsage::Persistant }
-			.AddVector2f("iResolution")
-			.AddFloat("iTime")
-			.Build();
-		BuiltInUniformBuffer = AUX::TransOwnerShip(MoveTemp(NewBuiltInUniformBuffer));
+		BuiltInUniformBuffer = UniformBufferBuilder{ UniformBufferUsage::Persistant }
+								.AddVector2f("iResolution")
+								.AddFloat("iTime")
+								.Build();
 
-		auto [NewArgumentBuffer, NewArgumentBufferLayout] = ArgumentBufferBuilder{ 0 }
-			.AddUniformBuffer(BuiltInUniformBuffer, BindingShaderStage::Pixel)
-			.Build();
+		BuiltInBindGroupLayout = GpuBindGroupLayoutBuilder{ 0 }
+								.AddUniformBuffer("BuiltIn", BuiltInUniformBuffer->GetDeclaration(), BindingShaderStage::Pixel)
+								.Build();
 
-		BuiltInArgumentBuffer = MoveTemp(NewArgumentBuffer);
-		BuiltInArgumentBufferLayout = MoveTemp(NewArgumentBufferLayout);
+		BuiltInBindGroup = GpuBindGrouprBuilder{ BuiltInBindGroupLayout }
+							.SetUniformBuffer("BuiltIn", BuiltInUniformBuffer->GetGpuResource())
+							.Build();
 
 		VertexShader = GpuApi::CreateShaderFromSource(ShaderType::VertexShader, DefaultVertexShaderText, TEXT("DefaultFullScreenVS"), TEXT("MainVS"));
 		FString ErrorInfo;
@@ -60,7 +61,6 @@ R"(float4 MainPS(PIn Input) : SV_Target
 
 		NewPixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, GetPixelShaderDeclaration() + DefaultPixelShaderBody, TEXT("DefaultFullScreenPS"), TEXT("MainPS"));
 		check(GpuApi::CrossCompileShader(NewPixelShader, ErrorInfo));
-		bCompileSuccessful = NewPixelShader.IsValid();
 
 		FinalRT = GpuResourceHelper::TempRenderTarget(GpuTextureFormat::B8G8R8A8_UNORM);
 
@@ -84,8 +84,8 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		if (bCompileSuccessful)
 		{
 			OldPixelShader = NewPixelShader;
-			OldCustomArgumentBuffer = NewCustomArgumentBuffer;
-			OldCustomArgumentBufferLayout = NewCustomArgumentBufferLayout;
+			OldCustomBindGroup = NewCustomBindGroup;
+			OldCustomBindGroupLayout = NewCustomBindGroupLayout;
 			ReCreatePipelineState();
 			OldPipelineState = NewPipelineState;
 		}
@@ -93,10 +93,10 @@ R"(float4 MainPS(PIn Input) : SV_Target
 
 	FString ShRenderer::GetPixelShaderDeclaration() const
 	{
-		FString Declaration = BuiltInArgumentBufferLayout->GetDeclaration();
-		if (NewCustomArgumentBufferLayout)
+		FString Declaration = BuiltInBindGroupLayout->GetCodegenDeclaration();
+		if (NewCustomBindGroupLayout)
 		{
-			Declaration += NewCustomArgumentBufferLayout->GetDeclaration();
+			Declaration += NewCustomBindGroupLayout->GetCodegenDeclaration();
 		}
 		return DefaultPixelShaderInput + Declaration + DefaultPixelShaderMacro;
 	}
@@ -131,18 +131,14 @@ R"(float4 MainPS(PIn Input) : SV_Target
 	{
 		check(VertexShader->IsCompiled());
 		check(NewPixelShader->IsCompiled());
-		PipelineStateDesc PipelineDesc{
-				VertexShader, NewPixelShader,
-				GpuResourceHelper::GDefaultRasterizerStateDesc,
-				GpuResourceHelper::GDefaultBlendStateDesc,
-				{ FinalRT->GetFormat() },
-				BuiltInArgumentBufferLayout->GetBindLayout()
+		GpuPipelineStateDesc PipelineDesc{
+			VertexShader, NewPixelShader,
+			GpuResourceHelper::GDefaultRasterizerStateDesc,
+			GpuResourceHelper::GDefaultBlendStateDesc,
+			{ FinalRT->GetFormat() }
 		};
-
-		if (NewCustomArgumentBufferLayout.IsValid())
-		{
-			PipelineDesc.BindGroupLayout1 = NewCustomArgumentBufferLayout->GetBindLayout();
-		}
+		PipelineDesc.BindGroupLayout0 = BuiltInBindGroupLayout;
+		PipelineDesc.BindGroupLayout1 = NewCustomBindGroupLayout;
 	
 		NewPipelineState = GpuApi::CreateRenderPipelineState(PipelineDesc);
 	}
@@ -155,14 +151,7 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		{
 			GpuApi::SetRenderPipelineState(NewPipelineState);
 			GpuApi::SetViewPort({ (uint32)iResolution.x, (uint32)iResolution.y });
-			if (NewCustomArgumentBuffer.IsValid())
-			{
-				GpuApi::SetBindGroups(BuiltInArgumentBuffer->GetBindGroup(), NewCustomArgumentBuffer->GetBindGroup(), nullptr, nullptr);
-			}
-			else
-			{
-				GpuApi::SetBindGroups(BuiltInArgumentBuffer->GetBindGroup(), nullptr, nullptr, nullptr);
-			}
+			GpuApi::SetBindGroups(BuiltInBindGroup, NewCustomBindGroup, nullptr, nullptr);
 			GpuApi::DrawPrimitive(0, 3, 0, 1);
 		}
 		GpuApi::EndRenderPass();
@@ -176,14 +165,7 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		{
 			GpuApi::SetRenderPipelineState(OldPipelineState);
 			GpuApi::SetViewPort({ (uint32)iResolution.x, (uint32)iResolution.y });
-			if (OldCustomArgumentBuffer.IsValid())
-			{
-				GpuApi::SetBindGroups(BuiltInArgumentBuffer->GetBindGroup(), OldCustomArgumentBuffer->GetBindGroup(), nullptr, nullptr);
-			}
-			else
-			{
-				GpuApi::SetBindGroups(BuiltInArgumentBuffer->GetBindGroup(), nullptr, nullptr, nullptr);
-			}
+			GpuApi::SetBindGroups(BuiltInBindGroup, OldCustomBindGroup, nullptr, nullptr);
 			GpuApi::DrawPrimitive(0, 3, 0, 1);
 		}
 		GpuApi::EndRenderPass();

@@ -11,7 +11,8 @@ external_magicenum = "External/magic_enum"
 
 project_shaderHelper = "Source/ShaderHelper"
 project_frameWork = "Source/FrameWork"
-project_unitTestFrameWork = "Source/Tests/UnitTestFrameWork"
+project_unitTestUtil = "Source/Tests/UnitTestUtil"
+project_unitTestGpuApi = "Source/Tests/UnitTestGpuApi"
 
 newoption {
     trigger = "UniversalBinary",
@@ -117,4 +118,5 @@ include(external_magicenum)
 include(project_shaderHelper)
 include(project_frameWork)
 group("Tests")
-    include(project_unitTestFrameWork)
+    include(project_unitTestUtil)
+	include(project_unitTestGpuApi)

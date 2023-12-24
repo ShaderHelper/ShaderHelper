@@ -1,14 +1,14 @@
-UnitTestFrameWorkHierarchy = {
+UnitTestGpuApiHierarchy = {
     ["Sources/*"] = {"**.h","**.cpp"},
 }
 
-project "UnitTestFrameWork"
+project "UnitTestGpuApi"
     kind "WindowedApp"   
     location "%{_WORKING_DIR}/ProjectFiles"
 
-    vpaths(UnitTestFrameWorkHierarchy)
+    vpaths(UnitTestGpuApiHierarchy)
 
-    files {seq(UnitTestFrameWorkHierarchy)}
+    files {seq(UnitTestGpuApiHierarchy)}
 
     includedirs
     {
