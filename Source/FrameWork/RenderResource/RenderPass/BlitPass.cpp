@@ -20,19 +20,18 @@ namespace FRAMEWORK
 		GpuPipelineStateDesc PipelineDesc{
 			PassShader->GetVertexShader(), 
 			PassShader->GetPixelShader(),
-			GpuResourceHelper::GDefaultRasterizerStateDesc,
-			GpuResourceHelper::GDefaultBlendStateDesc,
-			{ PassInput.OutputRenderTarget->GetFormat() }
+			{ 
+				{ PassInput.OutputRenderTarget->GetFormat() }
+			}
 		};
 		Binding.ApplyBindGroupLayout(PipelineDesc);
 
 		TRefCountPtr<GpuPipelineState> Pipeline = GpuApi::CreateRenderPipelineState(PipelineDesc);
 
 		Graph.AddPass("BlitPass", MoveTemp(BlitPassDesc),
-			[PassShader, Pipeline, Binding, ViewRect = PassInput.ViewRect] {
-				GpuApi::SetRenderPipelineState(Pipeline);
-				GpuApi::SetViewPort({ ViewRect.X,  ViewRect.Y });
+			[Pipeline, Binding] {
 				Binding.ApplyBindGroup();
+				GpuApi::SetRenderPipelineState(Pipeline);
 				GpuApi::DrawPrimitive(0, 3, 0, 1);
 			}
 		);

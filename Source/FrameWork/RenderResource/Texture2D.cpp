@@ -50,7 +50,7 @@ namespace FRAMEWORK
 	GpuTexture* Texture2D::GetThumbnail() const
 	{
 		check(GpuData.IsValid());
-
+		
 		if (GpuTexture* Thumbnail = TSingleton<AssetManager>::Get().FindAssetThumbnail(Guid))
 		{
 			return Thumbnail;
@@ -63,7 +63,7 @@ namespace FRAMEWORK
 		{
 			BlitPassInput Input;
 			Input.InputTex = GpuData;
-			Input.InputTexSampler =
+			Input.InputTexSampler = GpuApi::CreateSampler({});
 			Input.OutputRenderTarget = Thumbnail;
 
 			AddBlitPass(Graph, MoveTemp(Input));

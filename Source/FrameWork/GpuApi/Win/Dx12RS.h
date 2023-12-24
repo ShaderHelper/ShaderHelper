@@ -17,17 +17,12 @@ namespace FRAMEWORK
 		}
 
 		const CD3DX12_ROOT_PARAMETER1& GetDescriptorTableRootParameter(D3D12_SHADER_VISIBILITY Visibility) const {
-			return DescriptorTableRootParameters_CbvSrvUav[Visibility];
-		}
-
-		const TArray<BindingSlot>& GetBindingSlots() const {
-			return BindingSlots;
+			return DescriptorTableRootParameters[Visibility];
 		}
 
 	private:
-        TMap<D3D12_SHADER_VISIBILITY, CD3DX12_ROOT_PARAMETER1> DescriptorTableRootParameters_CbvSrvUav;
+        TMap<D3D12_SHADER_VISIBILITY, CD3DX12_ROOT_PARAMETER1> DescriptorTableRootParameters;
 		TMap<BindingSlot, CD3DX12_ROOT_PARAMETER1> DynamicBufferRootParameters;
-		TArray<BindingSlot> BindingSlots;
 	};
 
 	class Dx12BindGroup : public GpuBindGroup
@@ -43,12 +38,17 @@ namespace FRAMEWORK
 		D3D12_GPU_DESCRIPTOR_HANDLE GetBaseDescriptor(D3D12_SHADER_VISIBILITY Visibility) const {
 			return DescriptorTableStorage[Visibility];
 		}
+
+		const TArray<D3D12_STATIC_SAMPLER_DESC>& GetStaticSamplers() const {
+			return StaticSamplers;
+		}
         
         void Apply(ID3D12GraphicsCommandList* CommandList, class Dx12RootSignature* RootSig);
 
 	private:
 		TMap<D3D12_SHADER_VISIBILITY, D3D12_GPU_DESCRIPTOR_HANDLE> DescriptorTableStorage;
 		TMap<BindingSlot, Dx12Buffer*> DynamicBufferStorage;
+		TArray<D3D12_STATIC_SAMPLER_DESC> StaticSamplers;
 	};
 
 	struct RootSignatureDesc
@@ -63,6 +63,11 @@ namespace FRAMEWORK
 			if (Layout3) { LayoutDesc3 = Layout3->GetDesc(); }
 		}
 
+		void SetStaticSamplers(const TArray<D3D12_STATIC_SAMPLER_DESC>& InStaticSamplers)
+		{
+			StaticSamplers = InStaticSamplers;
+		}
+
 		Dx12BindGroupLayout* Layout0;
 		Dx12BindGroupLayout* Layout1;
 		Dx12BindGroupLayout* Layout2;
@@ -72,13 +77,16 @@ namespace FRAMEWORK
 		TOptional<GpuBindGroupLayoutDesc> LayoutDesc2;
 		TOptional<GpuBindGroupLayoutDesc> LayoutDesc3;
 
+		TArray<D3D12_STATIC_SAMPLER_DESC> StaticSamplers;
+
 		bool operator==(const RootSignatureDesc& Other) const {
 			return LayoutDesc0 == Other.LayoutDesc0 && LayoutDesc1 == Other.LayoutDesc1 &&
-				LayoutDesc2 == Other.LayoutDesc2 && LayoutDesc3 == Other.LayoutDesc3;
+				LayoutDesc2 == Other.LayoutDesc2 && LayoutDesc3 == Other.LayoutDesc3 &&
+				!FMemory::Memcmp(StaticSamplers.GetData(), Other.StaticSamplers.GetData(), sizeof(D3D12_STATIC_SAMPLER_DESC) * StaticSamplers.Num());
 		}
 
 		friend uint32 GetTypeHash(const RootSignatureDesc& Key) {
-			uint32 Hash = 0;
+			uint32 Hash = FCrc::MemCrc32(Key.StaticSamplers.GetData(), sizeof(D3D12_STATIC_SAMPLER_DESC) * Key.StaticSamplers.Num());
 			if (Key.LayoutDesc0) { Hash = HashCombine(Hash, GetTypeHash(*Key.LayoutDesc0)); }
 			if (Key.LayoutDesc1) { Hash = HashCombine(Hash, GetTypeHash(*Key.LayoutDesc1)); }
 			if (Key.LayoutDesc2) { Hash = HashCombine(Hash, GetTypeHash(*Key.LayoutDesc2)); }

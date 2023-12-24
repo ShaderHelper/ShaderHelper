@@ -6,12 +6,10 @@ namespace FRAMEWORK
 {
 	struct BlitPassInput
 	{
-		GpuTexture* InputTex;
-		GpuSampler* InputTexSampler;
+		TRefCountPtr<GpuTexture> InputTex;
+		TRefCountPtr<GpuSampler> InputTexSampler;
 
-		GpuTexture* OutputRenderTarget;
-
-		FUintVector2 ViewRect;
+		TRefCountPtr<GpuTexture> OutputRenderTarget;
 	};
 
 	void AddBlitPass(RenderGraph& Graph, const BlitPassInput& PassInput);

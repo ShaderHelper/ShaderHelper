@@ -10,7 +10,6 @@ namespace FRAMEWORK
 		, Gpu_CbvSrvUavAllocator(1024 , DescriptorType::CbvSrvUav)
 		, CurrentPso(nullptr)
 		, CurrentVertexBuffer(nullptr)
-		, DrawType(PrimitiveType::Triangle)
 		, CurrentRootSignature(nullptr)
 		, CurrentBindGroup0(nullptr)
 		, CurrentBindGroup1(nullptr)
@@ -135,6 +134,30 @@ namespace FRAMEWORK
 	{
 		check(GraphicsCmdList);
 
+		if (!CurrentViewPort.IsSet())
+		{
+			check(CurrentRenderTargets.Num() > 0);
+
+			D3D12_VIEWPORT DefaultViewPort{};
+			DefaultViewPort.Width = (float)CurrentRenderTargets[0]->GetWidth();
+			DefaultViewPort.Height = (float)CurrentRenderTargets[0]->GetHeight();
+			DefaultViewPort.MinDepth = 0;
+			DefaultViewPort.MaxDepth = 1;
+			DefaultViewPort.TopLeftX = 0;
+			DefaultViewPort.TopLeftY = 0;
+
+			D3D12_RECT DefaultScissorRect = CD3DX12_RECT(0, 0, (LONG)DefaultViewPort.Width, (LONG)DefaultViewPort.Height);
+
+			SetViewPort(MoveTemp(DefaultViewPort), MoveTemp(DefaultScissorRect));
+		}
+
+		if(IsViewportDirty)
+		{
+			GraphicsCmdList->RSSetViewports(1, &*CurrentViewPort);
+			GraphicsCmdList->RSSetScissorRects(1, &*CurrentSissorRect);
+			MarkViewportDirty(false);
+		}
+
 		if (IsVertexBufferDirty) 
 		{
 			if (CurrentVertexBuffer) {
@@ -144,13 +167,12 @@ namespace FRAMEWORK
 			}
 			MarkVertexBufferDirty(false);
 		}
-
-        GraphicsCmdList->IASetPrimitiveTopology(MapPrimitiveType(DrawType));
 		
 		if (IsPipelineDirty)
 		{
 			check(CurrentPso);
 			GraphicsCmdList->SetPipelineState(CurrentPso->GetResource());
+			GraphicsCmdList->IASetPrimitiveTopology(CurrentPso->GetPritimiveTopology());
 			MarkPipelineDirty(false);
 		}
 
@@ -179,13 +201,6 @@ namespace FRAMEWORK
 		if (CurrentBindGroup3 && IsBindGroup3Dirty) {
 			CurrentBindGroup3->Apply(GetCommandListHandle(), CurrentRootSignature);
 			MarkBindGroup3Dirty(false);
-		}
-	
-		if (IsViewportDirty)
-		{
-            GraphicsCmdList->RSSetViewports(1, CurrentViewPort.Get());
-            GraphicsCmdList->RSSetScissorRects(1, CurrentSissorRect.Get());
-			MarkViewportDirty(false);
 		}
 
 		if (IsRenderTargetDirty)
@@ -226,8 +241,8 @@ namespace FRAMEWORK
     void CommandListContext::ClearBinding()
     {
         CurrentPso = nullptr;
-        CurrentViewPort = nullptr;
-        CurrentSissorRect = nullptr;
+		CurrentViewPort.Reset();
+        CurrentSissorRect.Reset();
 		CurrentRootSignature = nullptr;
 		CurrentBindGroup0 = nullptr;
 		CurrentBindGroup1 = nullptr;

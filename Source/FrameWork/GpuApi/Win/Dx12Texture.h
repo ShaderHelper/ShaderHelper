@@ -7,6 +7,16 @@
 
 namespace FRAMEWORK
 {
+	class Dx12Sampler : public GpuSampler
+	{
+	public:
+		D3D12_FILTER Filter;
+		D3D12_TEXTURE_ADDRESS_MODE AddressU;
+		D3D12_TEXTURE_ADDRESS_MODE AddressV;
+		D3D12_TEXTURE_ADDRESS_MODE AddressW;
+		D3D12_COMPARISON_FUNC ComparisonFunc;
+	};
+
 	class Dx12Texture : public GpuTexture, public TrackedResource, public Dx12DeferredDeleteObject<Dx12Texture>
 	{
 	public:
@@ -34,4 +44,5 @@ namespace FRAMEWORK
 	};
 
 	TRefCountPtr<Dx12Texture> CreateDx12Texture2D(const GpuTextureDesc& InTexDesc);
+	TRefCountPtr<Dx12Sampler> CreateDx12Sampler(const GpuSamplerDesc& InSamplerDesc);
 }

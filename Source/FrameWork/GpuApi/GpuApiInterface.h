@@ -18,6 +18,7 @@ namespace GpuApi
 	FRAMEWORK_API TRefCountPtr<GpuBindGroupLayout> CreateBindGroupLayout(const GpuBindGroupLayoutDesc& InBindGroupLayoutDesc);
 	FRAMEWORK_API TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const GpuPipelineStateDesc& InPipelineStateDesc);
 	FRAMEWORK_API TRefCountPtr<GpuBuffer> CreateBuffer(uint32 ByteSize, GpuBufferUsage Usage);
+	FRAMEWORK_API TRefCountPtr<GpuSampler> CreateSampler(const GpuSamplerDesc& InSamplerDesc);
 
 	//Need OutRowPitch to correctly read or write data, because the mapped buffer actually contains the *padded* texture data.
 	//RowPitch != Width x ElementByteSize
@@ -36,12 +37,14 @@ namespace GpuApi
 	FRAMEWORK_API void SetRenderPipelineState(GpuPipelineState* InPipelineState);
 	
 	FRAMEWORK_API void SetVertexBuffer(GpuBuffer* InVertexBuffer);
+
+	//If omitted, it defaults to GpuApi::SetViewPort(GpuViewPortDesc{RenderTarget.Width, RenderTarget.Height}).
 	FRAMEWORK_API void SetViewPort(const GpuViewPortDesc& InViewPortDesc);
 
 	//Only support 4 BindGroups to adapt some mobile devices.
 	FRAMEWORK_API void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3);
 
-	FRAMEWORK_API void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType = PrimitiveType::Triangle);
+	FRAMEWORK_API void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount);
 	
 	FRAMEWORK_API void Submit();
 

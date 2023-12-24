@@ -34,7 +34,6 @@ namespace FRAMEWORK
 	{
 		for (const auto& BindingLayoutEntry : Desc.Layouts)
 		{
-			BindingSlots.Add(BindingLayoutEntry.Slot);
 			//For the moment, all uniformbuffers in the layout are bound via root descriptor.
 			if (BindingLayoutEntry.Type == BindingType::UniformBuffer)
 			{
@@ -79,15 +78,37 @@ namespace FRAMEWORK
 	Dx12BindGroup::Dx12BindGroup(const GpuBindGroupDesc& InDesc)
 		: GpuBindGroup(InDesc)
 	{
+		BindingGroupSlot GoupSlot = GetLayout()->GetGroupNumber();
 		for (const auto& BindingEntry : InDesc.Resources)
 		{
 			BindingSlot Slot = BindingEntry.Slot;
 			GpuResource* BindingResource = BindingEntry.Resource;
+			BindingShaderStage CurBindingEntryVisibility = GetLayout()->GetDesc().FindBinding(Slot)->Stage;
 
 			if (BindingResource->GetType() == GpuResourceType::Buffer)
 			{
 				Dx12Buffer* Buffer = static_cast<Dx12Buffer*>(BindingResource);
 				DynamicBufferStorage.Add(Slot, Buffer);
+			}
+			else if(BindingResource->GetType() == GpuResourceType::Sampler)
+			{
+				Dx12Sampler* Sampler = static_cast<Dx12Sampler*>(BindingResource);
+
+				D3D12_STATIC_SAMPLER_DESC StaticDesc{};
+				StaticDesc.Filter = Sampler->Filter;
+				StaticDesc.AddressU = Sampler->AddressU;
+				StaticDesc.AddressV = Sampler->AddressV;
+				StaticDesc.AddressW = Sampler->AddressW;
+				StaticDesc.MipLODBias = 0;
+				StaticDesc.MaxAnisotropy = 1;
+				StaticDesc.ComparisonFunc = Sampler->ComparisonFunc;
+				StaticDesc.MinLOD = 0;
+				StaticDesc.MaxLOD = D3D12_FLOAT32_MAX;
+				StaticDesc.ShaderRegister = Slot;
+				StaticDesc.RegisterSpace = GoupSlot;
+				StaticDesc.ShaderVisibility = MapShaderVisibility(CurBindingEntryVisibility);
+
+				StaticSamplers.Add(MoveTemp(StaticDesc));
 			}
 			else
 			{
@@ -99,8 +120,9 @@ namespace FRAMEWORK
     void Dx12BindGroup::Apply(ID3D12GraphicsCommandList* CommandList, Dx12RootSignature* RootSig)
     {
         Dx12BindGroupLayout* Layout = static_cast<Dx12BindGroupLayout*>(GetLayout());
-        for (auto Slot : Layout->GetBindingSlots())
+        for (const auto& BindingLayoutEntry : Layout->GetDesc().Layouts)
         {
+			BindingSlot Slot = BindingLayoutEntry.Slot;
             D3D12_GPU_VIRTUAL_ADDRESS GpuAddr = GetDynamicBufferGpuAddr(Slot);
             uint32 RootParameterIndex = RootSig->GetDynamicBufferRootParameterIndex(Slot, Layout->GetGroupNumber());
             CommandList->SetGraphicsRootConstantBufferView(RootParameterIndex, GpuAddr);
@@ -119,12 +141,20 @@ namespace FRAMEWORK
 
 			if (Layout != nullptr)
 			{
-				const TArray<BindingSlot>& Slots = Layout->GetBindingSlots();
 				BindingGroupSlot CurGroupNumber = Layout->GetGroupNumber();
-				for (auto Slot : Slots)
+				for (const auto& BindingLayoutEntry : Layout->GetDesc().Layouts)
 				{
-					RootParameters.Add(Layout->GetDynamicBufferRootParameter(Slot));
-					DynamicBufferToRootParameterIndex[CurGroupNumber].Add(Slot, RootParameters.Num() - 1);
+					BindingSlot Slot = BindingLayoutEntry.Slot;
+					if (BindingLayoutEntry.Type == BindingType::UniformBuffer)
+					{
+						RootParameters.Add(Layout->GetDynamicBufferRootParameter(Slot));
+						DynamicBufferToRootParameterIndex[CurGroupNumber].Add(Slot, RootParameters.Num() - 1);
+					}
+					else
+					{
+
+					}
+					
 				}
 
 			}
@@ -136,7 +166,11 @@ namespace FRAMEWORK
 		AddRootParameter(InDesc.Layout2);
 		AddRootParameter(InDesc.Layout3);
 
-		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC RootSignatureDesc = { (uint32)RootParameters.Num(), RootParameters.GetData() };
+		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC RootSignatureDesc = { 
+			(uint32)RootParameters.Num(), RootParameters.GetData(),
+			(uint32)InDesc.StaticSamplers.Num(), InDesc.StaticSamplers.GetData()
+		};
+
 		TRefCountPtr<ID3DBlob> Signature;
 		TRefCountPtr<ID3DBlob> Error;
 		DxCheck(D3D12SerializeVersionedRootSignature(&RootSignatureDesc, Signature.GetInitReference(), Error.GetInitReference()));

@@ -9,8 +9,8 @@ namespace FRAMEWORK
 	public:
 		struct Parameters
 		{
-			GpuTexture* InputTex;
-			GpuSampler* InputTexSampler;
+			TRefCountPtr<GpuTexture> InputTex;
+			TRefCountPtr<GpuSampler> InputTexSampler;
 		};
 
 		BlitShader();

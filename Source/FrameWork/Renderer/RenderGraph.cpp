@@ -20,6 +20,7 @@ namespace FRAMEWORK
 			}
 			GpuApi::EndRenderPass();
 		}
+		GpuApi::Submit();
 	}
 
 }

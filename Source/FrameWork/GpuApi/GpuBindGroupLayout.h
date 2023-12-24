@@ -29,7 +29,7 @@ namespace FRAMEWORK
 		BindingShaderStage Stage = BindingShaderStage::All;
 	};
 	//Make sure there are no padding bytes.
-	static_assert(std::has_unique_object_representations_v<LayoutBinding>);
+	static_assert(sizeof(LayoutBinding) == sizeof(BindingSlot) + sizeof(BindingType) + sizeof(BindingShaderStage));
 
 	struct GpuBindGroupLayoutDesc
 	{
@@ -47,7 +47,7 @@ namespace FRAMEWORK
 			return HashCombine(Hash, ::GetTypeHash(Key.GroupNumber));
 		}
 
-		LayoutBinding* FindBinding(BindingSlot InSlot)
+		const LayoutBinding* FindBinding(BindingSlot InSlot) const
 		{
 			return Layouts.FindByPredicate([InSlot](const LayoutBinding& LayoutEntry) {
 				return InSlot == LayoutEntry.Slot;
