@@ -36,7 +36,7 @@ namespace FRAMEWORK
 			ShaderBindGroupLayout = MoveTemp(InBindGroupLayout);
 		}
 
-		void ApplyBindGroupLayout(GpuPipelineStateDesc OutDesc)
+		void ApplyBindGroupLayout(GpuPipelineStateDesc& OutDesc)
 		{
 			OutDesc.BindGroupLayout0 = GlobalBindGroupLayout;
 			OutDesc.BindGroupLayout2 = ShaderBindGroupLayout;

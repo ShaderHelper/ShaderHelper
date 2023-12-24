@@ -149,6 +149,11 @@ namespace GpuApi
         return AUX::StaticCastRefCountPtr<GpuBuffer>(CreateMetalBuffer(ByteSize, Usage));
 	}
 
+	TRefCountPtr<GpuSampler> CreateSampler(const GpuSamplerDesc& InSamplerDesc)
+	{
+
+	}
+
 	void SetRenderPipelineState(GpuPipelineState* InPipelineState)
 	{
         GetCommandListContext()->SetPipeline(static_cast<MetalPipelineState*>(InPipelineState));
@@ -182,7 +187,7 @@ namespace GpuApi
         );
 	}
 
-	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType)
+	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount)
 	{
         GetCommandListContext()->PrepareDrawingEnv();
         id<MTLRenderCommandEncoder> RenderCommandEncoder = GetCommandListContext()->GetRenderCommandEncoder();

@@ -156,6 +156,11 @@ namespace GpuApi
 		return AUX::StaticCastRefCountPtr<GpuBuffer>(CreateDx12Buffer(ByteSize, Usage));
 	}
 
+	TRefCountPtr<GpuSampler> CreateSampler(const GpuSamplerDesc& InSamplerDesc)
+	{
+		return AUX::StaticCastRefCountPtr<GpuSampler>(CreateDx12Sampler(InSamplerDesc));
+	}
+
 	bool CompileShader(GpuShader* InShader, FString& OutErrorInfo)
 	{
 		return GShaderCompiler.Compile(static_cast<Dx12Shader*>(InShader), OutErrorInfo);
@@ -186,14 +191,14 @@ namespace GpuApi
 	void SetViewPort(const GpuViewPortDesc& InViewPortDesc)
 	{
 		D3D12_VIEWPORT ViewPort{};
-		ViewPort.Width = (float)InViewPortDesc.Width;
-		ViewPort.Height = (float)InViewPortDesc.Height;
+		ViewPort.Width = InViewPortDesc.Width;
+		ViewPort.Height = InViewPortDesc.Height;
 		ViewPort.MinDepth = InViewPortDesc.ZMin;
 		ViewPort.MaxDepth = InViewPortDesc.ZMax;
 		ViewPort.TopLeftX = InViewPortDesc.TopLeftX;
 		ViewPort.TopLeftY = InViewPortDesc.TopLeftY;
 
-		D3D12_RECT ScissorRect = CD3DX12_RECT(0, 0, InViewPortDesc.Width, InViewPortDesc.Height);
+		D3D12_RECT ScissorRect = CD3DX12_RECT(0, 0, (LONG)InViewPortDesc.Width, (LONG)InViewPortDesc.Height);
 		GCommandListContext->SetViewPort(MoveTemp(ViewPort), MoveTemp(ScissorRect));
 	}
 
@@ -208,18 +213,24 @@ namespace GpuApi
 			BindGroup3 ? static_cast<Dx12BindGroupLayout*>(BindGroup3->GetLayout()) : nullptr
 		};
 
+		Dx12BindGroup* Dx12BindGroup0 = static_cast<Dx12BindGroup*>(BindGroup0);
+		Dx12BindGroup* Dx12BindGroup1 = static_cast<Dx12BindGroup*>(BindGroup1);
+		Dx12BindGroup* Dx12BindGroup2 = static_cast<Dx12BindGroup*>(BindGroup2);
+		Dx12BindGroup* Dx12BindGroup3 = static_cast<Dx12BindGroup*>(BindGroup3);
+
+		TArray<D3D12_STATIC_SAMPLER_DESC> StaticSamplers;
+		if (BindGroup0) StaticSamplers.Append(Dx12BindGroup0->GetStaticSamplers());
+		if (BindGroup1) StaticSamplers.Append(Dx12BindGroup1->GetStaticSamplers());
+		if (BindGroup2) StaticSamplers.Append(Dx12BindGroup2->GetStaticSamplers());
+		if (BindGroup3) StaticSamplers.Append(Dx12BindGroup3->GetStaticSamplers());
+		RsDesc.SetStaticSamplers(MoveTemp(StaticSamplers));
+
 		GCommandListContext->SetRootSignature(Dx12RootSignatureManager::GetRootSignature(RsDesc));
-		GCommandListContext->SetBindGroups(
-			static_cast<Dx12BindGroup*>(BindGroup0),
-			static_cast<Dx12BindGroup*>(BindGroup1),
-			static_cast<Dx12BindGroup*>(BindGroup2),
-			static_cast<Dx12BindGroup*>(BindGroup3)
-			);
+		GCommandListContext->SetBindGroups(Dx12BindGroup0, Dx12BindGroup1, Dx12BindGroup2, Dx12BindGroup3);
 	}
 
-	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType)
+	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount)
 	{
-		GCommandListContext->SetPrimitiveType(InType);
 		GCommandListContext->PrepareDrawingEnv();
 		GCommandListContext->GetCommandListHandle()->DrawInstanced(VertexCount, InstanceCount, StartVertexLocation, StartInstanceLocation);
 	}

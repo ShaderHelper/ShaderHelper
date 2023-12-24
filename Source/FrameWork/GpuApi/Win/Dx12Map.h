@@ -39,25 +39,6 @@ namespace FRAMEWORK
         }
     }
 
-	inline D3D12_BLEND_DESC MapBlendState(BlendStateDesc InDesc)
-	{
-		CD3DX12_BLEND_DESC Desc = CD3DX12_BLEND_DESC(CD3DX12_DEFAULT{});
-		const uint32 BlendRtNum = InDesc.RtDescs.Num();
-		for (uint32 i = 0; i < BlendRtNum; i++)
-		{
-			Desc.RenderTarget[i].BlendEnable = InDesc.RtDescs[i].BlendEnable;
-			Desc.RenderTarget[i].SrcBlend = MapBlendFactor(InDesc.RtDescs[i].SrcFactor);
-			Desc.RenderTarget[i].SrcBlendAlpha = MapBlendFactor(InDesc.RtDescs[i].SrcAlphaFactor);
-			Desc.RenderTarget[i].DestBlend = MapBlendFactor(InDesc.RtDescs[i].DestFactor);
-			Desc.RenderTarget[i].DestBlendAlpha = MapBlendFactor(InDesc.RtDescs[i].DestAlphaFactor);
-			Desc.RenderTarget[i].BlendOp = MapBlendOp(InDesc.RtDescs[i].ColorOp);
-			Desc.RenderTarget[i].BlendOpAlpha = MapBlendOp(InDesc.RtDescs[i].AlphaOp);
-			Desc.RenderTarget[i].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE(uint32(InDesc.RtDescs[i].Mask));
-		}
-		return Desc;
-	}
-
-
     inline D3D12_CULL_MODE MapRasterizerCullMode(RasterizerCullMode InMode)
     {
         switch (InMode)
@@ -115,14 +96,46 @@ namespace FRAMEWORK
     {
         switch (InType)
         {
-        case PrimitiveType::Point:            return D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
-        case PrimitiveType::Line:             return D3D_PRIMITIVE_TOPOLOGY_LINELIST;
+        case PrimitiveType::PointList:            return D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
+        case PrimitiveType::LineList:             return D3D_PRIMITIVE_TOPOLOGY_LINELIST;
         case PrimitiveType::LineStrip:        return D3D_PRIMITIVE_TOPOLOGY_LINESTRIP;
-        case PrimitiveType::Triangle:         return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+        case PrimitiveType::TriangleList:         return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
         case PrimitiveType::TriangleStrip:    return D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
         default:
             SH_LOG(LogDx12, Fatal, TEXT("Invalid PrimitiveType."));
             return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
         }
     }
+
+	inline D3D12_COMPARISON_FUNC MapComparisonFunc(CompareMode InMode)
+	{
+		switch (InMode)
+		{
+		case CompareMode::Less:				return D3D12_COMPARISON_FUNC_LESS;
+		case CompareMode::LessEqual:		return D3D12_COMPARISON_FUNC_LESS_EQUAL;
+		case CompareMode::Never:			return D3D12_COMPARISON_FUNC_NEVER;
+		case CompareMode::Always:			return D3D12_COMPARISON_FUNC_ALWAYS;
+		case CompareMode::Equal:			return D3D12_COMPARISON_FUNC_EQUAL;
+		case CompareMode::Greater:			return D3D12_COMPARISON_FUNC_GREATER;
+		case CompareMode::GreaterEqual:		return D3D12_COMPARISON_FUNC_GREATER_EQUAL;
+		case CompareMode::NotEqual:			return D3D12_COMPARISON_FUNC_NOT_EQUAL;
+		default:
+			SH_LOG(LogDx12, Fatal, TEXT("Invalid ComparisonFunc."));
+			return D3D12_COMPARISON_FUNC_NEVER;
+		}
+	}
+
+	inline D3D12_TEXTURE_ADDRESS_MODE MapTextureAddressMode(SamplerAddressMode InMode)
+	{
+		switch (InMode)
+		{
+		case SamplerAddressMode::Clamp:		return D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+		case SamplerAddressMode::Mirror:	return D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+		case SamplerAddressMode::Wrap:		return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		default:
+			SH_LOG(LogDx12, Fatal, TEXT("Invalid TextureAddressMode."));
+			return D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+		}
+	}
+
 }

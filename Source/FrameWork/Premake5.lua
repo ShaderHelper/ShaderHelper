@@ -36,7 +36,6 @@ project "FrameWork"
         pchsource "CommonHeader.cpp"
         
         private_uses {
-            "D3D12MemoryAllocator",
             "DXC", "AgilitySDK", "WinPixEventRuntime"
         }
     

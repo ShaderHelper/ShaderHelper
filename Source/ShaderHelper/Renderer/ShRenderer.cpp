@@ -39,7 +39,6 @@ R"(float4 MainPS(PIn Input) : SV_Target
 	ShRenderer::ShRenderer()
 		: iTime(0)
 		, iResolution{0,0}
-		, bCompileSuccessful(true)
 	{
 
 		BuiltInUniformBuffer = UniformBufferBuilder{ UniformBufferUsage::Persistant }
@@ -59,8 +58,8 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		FString ErrorInfo;
 		check(GpuApi::CrossCompileShader(VertexShader, ErrorInfo));
 
-		NewPixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, GetPixelShaderDeclaration() + DefaultPixelShaderBody, TEXT("DefaultFullScreenPS"), TEXT("MainPS"));
-		check(GpuApi::CrossCompileShader(NewPixelShader, ErrorInfo));
+		PixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, GetPixelShaderDeclaration() + DefaultPixelShaderBody, TEXT("DefaultFullScreenPS"), TEXT("MainPS"));
+		check(GpuApi::CrossCompileShader(PixelShader, ErrorInfo));
 
 		FinalRT = GpuResourceHelper::TempRenderTarget(GpuTextureFormat::B8G8R8A8_UNORM);
 
@@ -79,24 +78,16 @@ R"(float4 MainPS(PIn Input) : SV_Target
 
 	void ShRenderer::UpdatePixelShader(TRefCountPtr<GpuShader> InNewPixelShader)
 	{
-		NewPixelShader = MoveTemp(InNewPixelShader);
-		bCompileSuccessful = NewPixelShader.IsValid();
-		if (bCompileSuccessful)
-		{
-			OldPixelShader = NewPixelShader;
-			OldCustomBindGroup = NewCustomBindGroup;
-			OldCustomBindGroupLayout = NewCustomBindGroupLayout;
-			ReCreatePipelineState();
-			OldPipelineState = NewPipelineState;
-		}
+		PixelShader = MoveTemp(InNewPixelShader);
+		ReCreatePipelineState();
 	}
 
 	FString ShRenderer::GetPixelShaderDeclaration() const
 	{
 		FString Declaration = BuiltInBindGroupLayout->GetCodegenDeclaration();
-		if (NewCustomBindGroupLayout)
+		if (CustomBindGroupLayout)
 		{
-			Declaration += NewCustomBindGroupLayout->GetCodegenDeclaration();
+			Declaration += CustomBindGroupLayout->GetCodegenDeclaration();
 		}
 		return DefaultPixelShaderInput + Declaration + DefaultPixelShaderMacro;
 	}
@@ -130,45 +121,15 @@ R"(float4 MainPS(PIn Input) : SV_Target
 	void ShRenderer::ReCreatePipelineState()
 	{
 		check(VertexShader->IsCompiled());
-		check(NewPixelShader->IsCompiled());
+		check(PixelShader->IsCompiled());
 		GpuPipelineStateDesc PipelineDesc{
-			VertexShader, NewPixelShader,
-			GpuResourceHelper::GDefaultRasterizerStateDesc,
-			GpuResourceHelper::GDefaultBlendStateDesc,
-			{ FinalRT->GetFormat() }
-		};
-		PipelineDesc.BindGroupLayout0 = BuiltInBindGroupLayout;
-		PipelineDesc.BindGroupLayout1 = NewCustomBindGroupLayout;
-	
-		NewPipelineState = GpuApi::CreateRenderPipelineState(PipelineDesc);
-	}
-
-	void ShRenderer::RenderNewRenderPass()
-	{
-		GpuRenderPassDesc FullScreenPassDesc;
-		FullScreenPassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ FinalRT, RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
-		GpuApi::BeginRenderPass(FullScreenPassDesc, TEXT("FullScreenPass"));
-		{
-			GpuApi::SetRenderPipelineState(NewPipelineState);
-			GpuApi::SetViewPort({ (uint32)iResolution.x, (uint32)iResolution.y });
-			GpuApi::SetBindGroups(BuiltInBindGroup, NewCustomBindGroup, nullptr, nullptr);
-			GpuApi::DrawPrimitive(0, 3, 0, 1);
-		}
-		GpuApi::EndRenderPass();
-	}
-
-	void ShRenderer::RenderOldRenderPass()
-	{
-		GpuRenderPassDesc FullScreenPassDesc;
-		FullScreenPassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ FinalRT, RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
-		GpuApi::BeginRenderPass(FullScreenPassDesc, TEXT("FullScreenPass"));
-		{
-			GpuApi::SetRenderPipelineState(OldPipelineState);
-			GpuApi::SetViewPort({ (uint32)iResolution.x, (uint32)iResolution.y });
-			GpuApi::SetBindGroups(BuiltInBindGroup, OldCustomBindGroup, nullptr, nullptr);
-			GpuApi::DrawPrimitive(0, 3, 0, 1);
-		}
-		GpuApi::EndRenderPass();
+			VertexShader, PixelShader,
+			{ 
+				{  FinalRT->GetFormat() }
+			},
+			{ BuiltInBindGroupLayout, CustomBindGroupLayout }
+		};	
+		PipelineState = GpuApi::CreateRenderPipelineState(PipelineDesc);
 	}
 
 	void ShRenderer::RenderBegin()
@@ -186,14 +147,17 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		BuiltInUniformBuffer->GetMember<Vector2f>("iResolution") = iResolution;
 
 		//Start to record command buffer
-		if (bCompileSuccessful)
+		GpuRenderPassDesc FullScreenPassDesc;
+		FullScreenPassDesc.ColorRenderTargets = {
+			{ FinalRT, RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store },
+		};
+		GpuApi::BeginRenderPass(FullScreenPassDesc, TEXT("FullScreenPass"));
 		{
-			RenderNewRenderPass();
+			GpuApi::SetRenderPipelineState(PipelineState);
+			GpuApi::SetBindGroups(BuiltInBindGroup, CustomBindGroup, nullptr, nullptr);
+			GpuApi::DrawPrimitive(0, 3, 0, 1);
 		}
-		else
-		{
-			RenderOldRenderPass();
-		}
+		GpuApi::EndRenderPass();
 		
 		GpuApi::Submit();
 	}

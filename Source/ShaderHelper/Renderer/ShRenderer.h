@@ -14,11 +14,14 @@ namespace SH
 		void RenderInternal() override;
 		void OnViewportResize(const Vector2f& InResolution);
 		void UpdatePixelShader(TRefCountPtr<GpuShader> InNewPixelShader);
-		void UpdateCustomBindGroup(TRefCountPtr<GpuBindGroup> InBindGroup) { NewCustomBindGroup = MoveTemp(InBindGroup); }
-		void UpdateCustomBindGroupLayout(TRefCountPtr<GpuBindGroupLayout> InBindGroupLayout) { NewCustomBindGroupLayout = MoveTemp(InBindGroupLayout); }
+		void UpdateCustomBindGroup(TRefCountPtr<GpuBindGroup> InBindGroup) { CustomBindGroup = MoveTemp(InBindGroup); }
+		void UpdateCustomBindGroupLayout(TRefCountPtr<GpuBindGroupLayout> InBindGroupLayout) { CustomBindGroupLayout = MoveTemp(InBindGroupLayout); }
 		FString GetPixelShaderDeclaration() const;
 		FString GetDefaultPixelShaderBody() const;
 		GpuTexture* GetFinalRT() const { return FinalRT; }
+
+
+		//Deprecated
 		TArray<TSharedRef<PropertyData>> GetBuiltInPropertyDatas() const;
 
 	private:
@@ -31,27 +34,18 @@ namespace SH
 	private:
 		TRefCountPtr<GpuTexture> FinalRT;
 		TRefCountPtr<GpuShader> VertexShader;
-		TUniquePtr<UniformBuffer> BuiltInUniformBuffer;
+		TRefCountPtr<GpuShader> PixelShader;
+		TRefCountPtr<GpuPipelineState> PipelineState;
+
 		float iTime;
 		Vector2f iResolution;
+		TUniquePtr<UniformBuffer> BuiltInUniformBuffer;
 
 		TRefCountPtr<GpuBindGroup> BuiltInBindGroup;
 		TRefCountPtr<GpuBindGroupLayout> BuiltInBindGroupLayout;
 
-		//keep previous state if failed to compile new pixel shader.
-		bool bCompileSuccessful;
-
-		TRefCountPtr<GpuPipelineState> NewPipelineState;
-		TRefCountPtr<GpuPipelineState> OldPipelineState;
-
-		TRefCountPtr<GpuShader> NewPixelShader;
-		TRefCountPtr<GpuShader> OldPixelShader;
-
-		TRefCountPtr<GpuBindGroup> NewCustomBindGroup;
-		TRefCountPtr<GpuBindGroup> OldCustomBindGroup;
-
-		TRefCountPtr<GpuBindGroupLayout> NewCustomBindGroupLayout;
-		TRefCountPtr<GpuBindGroupLayout> OldCustomBindGroupLayout;
+		TRefCountPtr<GpuBindGroup> CustomBindGroup;
+		TRefCountPtr<GpuBindGroupLayout> CustomBindGroupLayout;
 	};
 }
 

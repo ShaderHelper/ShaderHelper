@@ -26,7 +26,6 @@ namespace FRAMEWORK
 		D3D12_RESOURCE_STATES InitialState = InInitialState;
 		CD3DX12_RESOURCE_DESC BufferDesc = CD3DX12_RESOURCE_DESC::Buffer(ByteSize);
 
-		//TODO : d3d12ma
 		DxCheck(GDevice->CreateCommittedResource(&HeapType, D3D12_HEAP_FLAG_NONE,
 			&BufferDesc, InitialState, nullptr, IID_PPV_ARGS(&Data.UnderlyResource)));
 		Data.UnderlyResource->SetName(TEXT("Common Buffer"));

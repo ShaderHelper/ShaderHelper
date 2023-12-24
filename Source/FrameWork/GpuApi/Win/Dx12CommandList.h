@@ -47,7 +47,7 @@ namespace FRAMEWORK
 			}
 			
 		}
-        void SetPrimitiveType(PrimitiveType InType) { DrawType = InType; }
+
 		void SetRootSignature(Dx12RootSignature* InRootSignature) 
 		{ 
 			if (CurrentRootSignature != InRootSignature)
@@ -80,10 +80,10 @@ namespace FRAMEWORK
 
         void SetViewPort(D3D12_VIEWPORT InViewPort, D3D12_RECT InSissorRect) 
 		{
-			if (!CurrentViewPort || FMemory::Memcmp(CurrentViewPort.Get(), &InViewPort, sizeof(D3D12_VIEWPORT)))
+			if (!CurrentViewPort || FMemory::Memcmp(&*CurrentViewPort, &InViewPort, sizeof(D3D12_VIEWPORT)))
 			{
-				CurrentViewPort = MakeUnique<D3D12_VIEWPORT>(MoveTemp(InViewPort));
-				CurrentSissorRect = MakeUnique<D3D12_RECT>(MoveTemp(InSissorRect));
+				CurrentViewPort = MoveTemp(InViewPort);
+				CurrentSissorRect = MoveTemp(InSissorRect);
 				MarkViewportDirty(true);
 			}
         }
@@ -146,12 +146,10 @@ namespace FRAMEWORK
 		CpuDescriptorAllocator Cpu_CbvSrvUavAllocator;
 		GpuDescriptorAllocator Gpu_CbvSrvUavAllocator;
 		
-
 		Dx12Pso* CurrentPso;
 		Dx12Buffer* CurrentVertexBuffer;
-		PrimitiveType DrawType;
-		TUniquePtr<D3D12_VIEWPORT> CurrentViewPort;
-		TUniquePtr<D3D12_RECT> CurrentSissorRect;
+		TOptional<D3D12_VIEWPORT> CurrentViewPort;
+		TOptional<D3D12_RECT> CurrentSissorRect;
         TArray<Dx12Texture*> CurrentRenderTargets;
         TArray<TOptional<Vector4f>> ClearColorValues;
 
