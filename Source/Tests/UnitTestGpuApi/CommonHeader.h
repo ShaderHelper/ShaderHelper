@@ -3,7 +3,7 @@
 //shall not be included by other headers.
 //should be included as the first header by all source files.
 
-#include "UnitTestFrameWorkPublicDefinitions.h"
-#include "UnitTestFrameWorkPrivateDefinitions.h"
+#include "UnitTestGpuApiPublicDefinitions.h"
+#include "UnitTestGpuApiPrivateDefinitions.h"
 
 

@@ -10,10 +10,10 @@ namespace FRAMEWORK
 		GpuTextureFormat Format;
 		GpuTextureUsage Usage = GpuTextureUsage::None;
  
+		TArray<uint8> InitialData{};
         Vector4f ClearValues = 0;
 		uint32 Depth = 1;
 		uint32 NumMips = 1;
-		TArray<uint8> InitialData{};
     };
 
     class GpuTexture : public GpuResource

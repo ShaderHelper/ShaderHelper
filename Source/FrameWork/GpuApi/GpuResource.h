@@ -2,6 +2,7 @@
 #include "GpuResourceCommon.h"
 #include "GpuPipelineState.h"
 #include "GpuTexture.h"
+#include "GpuSampler.h"
 #include "GpuShader.h"
 #include "GpuBuffer.h"
 #include "GpuRenderPass.h"

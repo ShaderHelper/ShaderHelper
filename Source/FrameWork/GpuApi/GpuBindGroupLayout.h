@@ -18,6 +18,8 @@ namespace FRAMEWORK
 	enum class BindingType
 	{
 		UniformBuffer,
+		Texture,
+		Sampler,
 	};
 
 	struct LayoutBinding
@@ -45,8 +47,18 @@ namespace FRAMEWORK
 			return HashCombine(Hash, ::GetTypeHash(Key.GroupNumber));
 		}
 
+		LayoutBinding* FindBinding(BindingSlot InSlot)
+		{
+			return Layouts.FindByPredicate([InSlot](const LayoutBinding& LayoutEntry) {
+				return InSlot == LayoutEntry.Slot;
+			});
+		}
+
 		BindingGroupSlot GroupNumber;
 		TArray<LayoutBinding> Layouts;
+
+		FString CodegenDeclaration;
+		TMap<FString, BindingSlot> CodegenBindingNameToSlot;
 	};
 
 	class GpuBindGroupLayout : public GpuResource
@@ -61,8 +73,29 @@ namespace FRAMEWORK
 			return Desc;
 		}
 		BindingGroupSlot GetGroupNumber() const { return Desc.GroupNumber; }
+		FString GetCodegenDeclaration() const { return Desc.CodegenDeclaration; }
 
 	protected:
 		GpuBindGroupLayoutDesc Desc;
 	};
+
+	class FRAMEWORK_API GpuBindGroupLayoutBuilder
+	{
+	public:
+		GpuBindGroupLayoutBuilder(BindingGroupSlot InGroupSlot);
+		//!! If have bindings that are not from codegen, must first call this method for each binding, to make sure the bindings are compact.
+		GpuBindGroupLayoutBuilder& AddExistingBinding(BindingSlot InSlot, BindingType ResourceType, BindingShaderStage InStage = BindingShaderStage::All);
+
+		//Add the codegen bindings, then get the CodegenDeclaration that will be injected into a shader.
+		GpuBindGroupLayoutBuilder& AddUniformBuffer(const FString& BindingName, const FString& UniformBufferLayoutDeclaration, BindingShaderStage InStage = BindingShaderStage::All);
+		GpuBindGroupLayoutBuilder& AddTexture(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
+		GpuBindGroupLayoutBuilder& AddSampler(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
+
+		TRefCountPtr<GpuBindGroupLayout> Build();
+
+	private:
+		BindingSlot AutoSlot;
+		GpuBindGroupLayoutDesc LayoutDesc;
+	};
+
 }

@@ -6,7 +6,7 @@ int main(int argc, char *argv[])
 {
 	auto RunBlock = [](const TCHAR* CommandLine)
 	{
-		UNITTEST_FRAMEWORK::UnitTestApp app(
+		UNITTEST_GPUAPI::UnitTestApp app(
 			{ 800,600 },
 			CommandLine
 		);

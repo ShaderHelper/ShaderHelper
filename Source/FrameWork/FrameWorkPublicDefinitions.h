@@ -41,4 +41,4 @@ namespace FRAMEWORK
 
 #define ADD_AGILITY_SDK()	\
 	extern "C" { _declspec(dllexport) extern const UINT D3D12SDKVersion = 602; }	\
-	extern "C" { _declspec(dllexport) extern const char* D3D12SDKPath = u8".\\AgilitySDK\\"; }
+	extern "C" { _declspec(dllexport) extern const char* D3D12SDKPath = ".\\AgilitySDK\\"; }

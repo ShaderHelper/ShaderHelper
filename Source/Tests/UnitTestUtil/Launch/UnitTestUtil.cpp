@@ -3,7 +3,7 @@
 DEFINE_LOG_CATEGORY_STATIC(LogTestUtil, Log, All);
 #include <chrono>
 
-namespace UNITTEST_FRAMEWORK
+namespace UNITTEST_UTIL
 {
 	template<int N, typename T = int>
 	struct UnitTmp {

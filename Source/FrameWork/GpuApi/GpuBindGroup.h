@@ -2,6 +2,7 @@
 #include "GpuResourceCommon.h"
 #include "GpuTexture.h"
 #include "GpuBuffer.h"
+#include "GpuBindGroupLayout.h"
 
 namespace FRAMEWORK
 {
@@ -31,4 +32,21 @@ namespace FRAMEWORK
 	protected:
         GpuBindGroupDesc Desc;
 	};
+
+	class FRAMEWORK_API GpuBindGrouprBuilder
+	{
+	public:
+		GpuBindGrouprBuilder(GpuBindGroupLayout* InLayout);
+
+		GpuBindGrouprBuilder& SetExistingBinding(BindingSlot InSlot, GpuResource* InResource);
+		GpuBindGrouprBuilder& SetUniformBuffer(const FString& BindingName, GpuResource* InResource);
+		GpuBindGrouprBuilder& SetTexture(const FString& BindingName, GpuResource* InResource);
+		GpuBindGrouprBuilder& SetSampler(const FString& BindingName, GpuResource* InResource);
+
+		TRefCountPtr<GpuBindGroup> Build();
+
+	private:
+		GpuBindGroupDesc Desc;
+	};
+
 }

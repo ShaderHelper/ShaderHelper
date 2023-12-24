@@ -108,7 +108,7 @@ namespace SH
 		}
 		else
 		{
-			UniformBufferBuilder Builder{ "Custom", UniformBufferUsage::Persistant };
+			UniformBufferBuilder Builder{ UniformBufferUsage::Persistant };
 			for (const auto& Uniform : Uniforms)
 			{
 				Uniform->AddToUniformBuffer(Builder);
@@ -127,25 +127,25 @@ namespace SH
 	void SShaderPassPropertyView::ReCreateCustomArgumentBuffer()
 	{
 
-		if (!CustomUniformBuffer.IsValid()/*&& TODO*/)
-		{
-			Renderer->UpdateCustomArgumentBuffer(nullptr);
-			Renderer->UpdateCustomArgumentBufferLayout(nullptr);
-		}
-		else
-		{
-			auto [NewArgumentBuffer, NewArgumentBufferLayout] = ArgumentBufferBuilder{ 1 }
-				.AddUniformBuffer(CustomUniformBuffer, BindingShaderStage::Pixel)
-				.Build();
+		//if (!CustomUniformBuffer.IsValid()/*&& TODO*/)
+		//{
+		//	Renderer->UpdateCustomArgumentBuffer(nullptr);
+		//	Renderer->UpdateCustomArgumentBufferLayout(nullptr);
+		//}
+		//else
+		//{
+		//	auto [NewArgumentBuffer, NewArgumentBufferLayout] = ArgumentBufferBuilder{ 1 }
+		//		.AddUniformBuffer("Custom", CustomUniformBuffer, BindingShaderStage::Pixel)
+		//		.Build();
 
-			Renderer->UpdateCustomArgumentBuffer(AUX::TransOwnerShip(MoveTemp(NewArgumentBuffer)));
-			Renderer->UpdateCustomArgumentBufferLayout(AUX::TransOwnerShip(MoveTemp(NewArgumentBufferLayout)));
-		}
+		//	Renderer->UpdateCustomArgumentBuffer(AUX::TransOwnerShip(MoveTemp(NewArgumentBuffer)));
+		//	Renderer->UpdateCustomArgumentBufferLayout(AUX::TransOwnerShip(MoveTemp(NewArgumentBufferLayout)));
+		//}
 
-		if (SShaderEditorBox* ShaderEditorBox = ShaderEditor.Get())
-		{
-			ShaderEditorBox->ReCompile();
-		}
+		//if (SShaderEditorBox* ShaderEditorBox = ShaderEditor.Get())
+		//{
+		//	ShaderEditorBox->ReCompile();
+		//}
 	}
 
 	void SShaderPassPropertyView::OnDeleteProperty(TSharedRef<PropertyData> InProperty)

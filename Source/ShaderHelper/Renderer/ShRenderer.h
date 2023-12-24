@@ -1,7 +1,6 @@
 #pragma once
 #include "Renderer/Renderer.h"
 #include "GpuApi/GpuResource.h"
-#include "RenderResource/ArgumentBuffer.h"
 #include "UI/Widgets/Property/PropertyData/PropertyData.h"
 
 namespace SH
@@ -15,8 +14,8 @@ namespace SH
 		void RenderInternal() override;
 		void OnViewportResize(const Vector2f& InResolution);
 		void UpdatePixelShader(TRefCountPtr<GpuShader> InNewPixelShader);
-		void UpdateCustomArgumentBuffer(TSharedPtr<ArgumentBuffer> InBuffer) { NewCustomArgumentBuffer = MoveTemp(InBuffer); }
-		void UpdateCustomArgumentBufferLayout(TSharedPtr<ArgumentBufferLayout> InLayout) { NewCustomArgumentBufferLayout = MoveTemp(InLayout); }
+		void UpdateCustomBindGroup(TRefCountPtr<GpuBindGroup> InBindGroup) { NewCustomBindGroup = MoveTemp(InBindGroup); }
+		void UpdateCustomBindGroupLayout(TRefCountPtr<GpuBindGroupLayout> InBindGroupLayout) { NewCustomBindGroupLayout = MoveTemp(InBindGroupLayout); }
 		FString GetPixelShaderDeclaration() const;
 		FString GetDefaultPixelShaderBody() const;
 		GpuTexture* GetFinalRT() const { return FinalRT; }
@@ -32,12 +31,12 @@ namespace SH
 	private:
 		TRefCountPtr<GpuTexture> FinalRT;
 		TRefCountPtr<GpuShader> VertexShader;
-		TSharedPtr<UniformBuffer> BuiltInUniformBuffer;
+		TUniquePtr<UniformBuffer> BuiltInUniformBuffer;
 		float iTime;
 		Vector2f iResolution;
 
-		TUniquePtr<ArgumentBuffer> BuiltInArgumentBuffer;
-		TUniquePtr<ArgumentBufferLayout> BuiltInArgumentBufferLayout;
+		TRefCountPtr<GpuBindGroup> BuiltInBindGroup;
+		TRefCountPtr<GpuBindGroupLayout> BuiltInBindGroupLayout;
 
 		//keep previous state if failed to compile new pixel shader.
 		bool bCompileSuccessful;
@@ -48,11 +47,11 @@ namespace SH
 		TRefCountPtr<GpuShader> NewPixelShader;
 		TRefCountPtr<GpuShader> OldPixelShader;
 
-		TSharedPtr<ArgumentBuffer> NewCustomArgumentBuffer;
-		TSharedPtr<ArgumentBuffer> OldCustomArgumentBuffer;
+		TRefCountPtr<GpuBindGroup> NewCustomBindGroup;
+		TRefCountPtr<GpuBindGroup> OldCustomBindGroup;
 
-		TSharedPtr<ArgumentBufferLayout> NewCustomArgumentBufferLayout;
-		TSharedPtr<ArgumentBufferLayout> OldCustomArgumentBufferLayout;
+		TRefCountPtr<GpuBindGroupLayout> NewCustomBindGroupLayout;
+		TRefCountPtr<GpuBindGroupLayout> OldCustomBindGroupLayout;
 	};
 }
 

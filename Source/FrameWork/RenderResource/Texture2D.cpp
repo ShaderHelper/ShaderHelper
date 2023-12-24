@@ -3,6 +3,8 @@
 #include "Common/Util/Reflection.h"
 #include "GpuApi/GpuApiInterface.h"
 #include "AssetManager/AssetManager.h"
+#include "Renderer/RenderGraph.h"
+#include "RenderResource/RenderPass/BlitPass.h"
 
 namespace FRAMEWORK
 {
@@ -36,8 +38,7 @@ namespace FRAMEWORK
 
 	void Texture2D::PostLoad()
 	{
-		GpuTextureDesc Desc{ (uint32)Width, (uint32)Height, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource };
-		Desc.InitialData = RawData;
+		GpuTextureDesc Desc{ (uint32)Width, (uint32)Height, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource , RawData };
 		GpuData = GpuApi::CreateGpuTexture(MoveTemp(Desc));
 	}
 
@@ -49,26 +50,28 @@ namespace FRAMEWORK
 	GpuTexture* Texture2D::GetThumbnail() const
 	{
 		check(GpuData.IsValid());
-		return nullptr;
+
 		if (GpuTexture* Thumbnail = TSingleton<AssetManager>::Get().FindAssetThumbnail(Guid))
 		{
 			return Thumbnail;
 		}
 
-		/*GpuTextureDesc Desc{ 128, 128, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
+		GpuTextureDesc Desc{ 128, 128, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
 		TRefCountPtr<GpuTexture> Thumbnail = GpuApi::CreateGpuTexture(MoveTemp(Desc));
 
-		GpuRenderPassDesc BlitPassDesc;
-		BlitPassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ Thumbnail, RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
-		GpuApi::BeginRenderPass(BlitPassDesc, TEXT("BlitPass"));
+		RenderGraph Graph;
 		{
+			BlitPassInput Input;
+			Input.InputTex = GpuData;
+			Input.InputTexSampler =
+			Input.OutputRenderTarget = Thumbnail;
 
-			GpuApi::DrawPrimitive(0, 3, 0, 1);
+			AddBlitPass(Graph, MoveTemp(Input));
 		}
-		GpuApi::EndRenderPass();
+		Graph.Execute();
 
 		TSingleton<AssetManager>::Get().AddAssetThumbnail(Guid, Thumbnail);
-		return Thumbnail;*/
+		return Thumbnail;
 	}
 
 	TSharedRef<SWidget> Texture2D::GetPropertyView() const

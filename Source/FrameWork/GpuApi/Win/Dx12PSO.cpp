@@ -6,7 +6,7 @@
 
 namespace FRAMEWORK
 {
-    TRefCountPtr<Dx12Pso> CreateDx12Pso(const PipelineStateDesc& InPipelineStateDesc)
+    TRefCountPtr<Dx12Pso> CreateDx12Pso(const GpuPipelineStateDesc& InPipelineStateDesc)
     {
         Dx12Shader* Vs = static_cast<Dx12Shader*>(InPipelineStateDesc.Vs);
         Dx12Shader* Ps = static_cast<Dx12Shader*>(InPipelineStateDesc.Ps);
