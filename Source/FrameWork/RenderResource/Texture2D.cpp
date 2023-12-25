@@ -50,7 +50,7 @@ namespace FRAMEWORK
 	GpuTexture* Texture2D::GetThumbnail() const
 	{
 		check(GpuData.IsValid());
-		
+
 		if (GpuTexture* Thumbnail = TSingleton<AssetManager>::Get().FindAssetThumbnail(Guid))
 		{
 			return Thumbnail;

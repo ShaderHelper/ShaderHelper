@@ -1,5 +1,6 @@
 #pragma once
 #include "GpuResourceCommon.h"
+#include <Core/Containers/SortedMap.h>
 
 namespace FRAMEWORK
 {
@@ -24,38 +25,41 @@ namespace FRAMEWORK
 
 	struct LayoutBinding
 	{
-		BindingSlot Slot;
 		BindingType Type;
 		BindingShaderStage Stage = BindingShaderStage::All;
+		
+		bool operator==(const LayoutBinding& Other) const
+		{
+			return Type == Other.Type && Stage == Other.Stage;
+		}
+
+		friend uint32 GetTypeHash(const LayoutBinding& Key)
+		{
+			return HashCombine(::GetTypeHash(Key.Type), ::GetTypeHash(Key.Stage));
+		}
 	};
-	//Make sure there are no padding bytes.
-	static_assert(sizeof(LayoutBinding) == sizeof(BindingSlot) + sizeof(BindingType) + sizeof(BindingShaderStage));
 
 	struct GpuBindGroupLayoutDesc
 	{
 		
 		bool operator==(const GpuBindGroupLayoutDesc& Other) const
 		{
-			return GroupNumber == Other.GroupNumber && 
-				!FMemory::Memcmp(Layouts.GetData(), Other.Layouts.GetData(), sizeof(LayoutBinding) * Layouts.Num());
+			return GroupNumber == Other.GroupNumber && Layouts == Other.Layouts;
 		}
 
 		friend uint32 GetTypeHash(const GpuBindGroupLayoutDesc& Key)
 		{
-			//Assume the LayoutBinding type is trivially comparable.
-			uint32 Hash = FCrc::MemCrc32(Key.Layouts.GetData(), sizeof(LayoutBinding) * Key.Layouts.Num());
-			return HashCombine(Hash, ::GetTypeHash(Key.GroupNumber));
-		}
-
-		const LayoutBinding* FindBinding(BindingSlot InSlot) const
-		{
-			return Layouts.FindByPredicate([InSlot](const LayoutBinding& LayoutEntry) {
-				return InSlot == LayoutEntry.Slot;
-			});
+			uint32 Hash = ::GetTypeHash(Key.GroupNumber);
+			for (const auto& [K, V] : Key.Layouts)
+			{
+				Hash = HashCombine(Hash, ::GetTypeHash(K));
+				Hash = HashCombine(Hash, GetTypeHash(V));
+			}
+			return Hash;
 		}
 
 		BindingGroupSlot GroupNumber;
-		TArray<LayoutBinding> Layouts;
+		TSortedMap<BindingSlot, LayoutBinding> Layouts;
 
 		FString CodegenDeclaration;
 		TMap<FString, BindingSlot> CodegenBindingNameToSlot;

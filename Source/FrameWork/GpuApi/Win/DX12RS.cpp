@@ -10,10 +10,10 @@ namespace FRAMEWORK
 	{
 		switch (InType)
 		{
-		case FRAMEWORK::BindingType::UniformBuffer:	return D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+		case BindingType::Texture:			return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 		default:
 			check(false);
-			return D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+			return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 		}
 	}
 
@@ -21,8 +21,8 @@ namespace FRAMEWORK
 	{
 		switch (InStage)
 		{
-		case FRAMEWORK::BindingShaderStage::Vertex:	return D3D12_SHADER_VISIBILITY_VERTEX;
-		case FRAMEWORK::BindingShaderStage::Pixel:	return D3D12_SHADER_VISIBILITY_PIXEL;
+		case BindingShaderStage::Vertex:	return D3D12_SHADER_VISIBILITY_VERTEX;
+		case BindingShaderStage::Pixel:	return D3D12_SHADER_VISIBILITY_PIXEL;
 		default:
 			return D3D12_SHADER_VISIBILITY_ALL;
 		}
@@ -32,20 +32,39 @@ namespace FRAMEWORK
 	Dx12BindGroupLayout::Dx12BindGroupLayout(const GpuBindGroupLayoutDesc& LayoutDesc)
 		: GpuBindGroupLayout(LayoutDesc)
 	{
-		for (const auto& BindingLayoutEntry : Desc.Layouts)
+		TMap<D3D12_SHADER_VISIBILITY, TArray<CD3DX12_DESCRIPTOR_RANGE1>> DescriptorTableRanges;
+		for (const auto& [Slot, LayoutBindingEntry] : Desc.Layouts)
 		{
+			D3D12_SHADER_VISIBILITY BindingVisibilty = MapShaderVisibility(LayoutBindingEntry.Stage);
 			//For the moment, all uniformbuffers in the layout are bound via root descriptor.
-			if (BindingLayoutEntry.Type == BindingType::UniformBuffer)
+			if (LayoutBindingEntry.Type == BindingType::UniformBuffer)
 			{
 				CD3DX12_ROOT_PARAMETER1 DynamicBufferRootParameter;
-				DynamicBufferRootParameter.InitAsConstantBufferView(BindingLayoutEntry.Slot, Desc.GroupNumber,
-					D3D12_ROOT_DESCRIPTOR_FLAG_NONE, MapShaderVisibility(BindingLayoutEntry.Stage));
-				DynamicBufferRootParameters.Add(BindingLayoutEntry.Slot, MoveTemp(DynamicBufferRootParameter));
+				DynamicBufferRootParameter.InitAsConstantBufferView(Slot, Desc.GroupNumber,
+					D3D12_ROOT_DESCRIPTOR_FLAG_NONE, BindingVisibilty);
+				DynamicBufferRootParameters.Add(Slot, MoveTemp(DynamicBufferRootParameter));
 			}
-			else
+			else 
 			{
+				if (LayoutBindingEntry.Type == BindingType::Texture)
+				{
+					CD3DX12_DESCRIPTOR_RANGE1 Range{};
+					Range.RangeType = BindingTypeToDescriptorRangeType(LayoutBindingEntry.Type);
+					Range.NumDescriptors = 1;
+					Range.BaseShaderRegister = Slot;
+					Range.RegisterSpace = LayoutDesc.GroupNumber;
 
+					DescriptorTableRanges.FindOrAdd(BindingVisibilty).Add(MoveTemp(Range));
+				}
 			}
+		}
+
+		for (const auto& [DxVisibility, Ranges] : DescriptorTableRanges)
+		{
+			CD3DX12_ROOT_PARAMETER1 DescriptorTableRootParameter;
+			DescriptorTableRootParameter.InitAsDescriptorTable((uint32)Ranges.Num(), Ranges.GetData(), DxVisibility);
+
+			DescriptorTableRootParameters.Add(DxVisibility, MoveTemp(DescriptorTableRootParameter));
 		}
 	}
 
@@ -79,11 +98,12 @@ namespace FRAMEWORK
 		: GpuBindGroup(InDesc)
 	{
 		BindingGroupSlot GoupSlot = GetLayout()->GetGroupNumber();
-		for (const auto& BindingEntry : InDesc.Resources)
+		TMap<D3D12_SHADER_VISIBILITY, TArray<D3D12_CPU_DESCRIPTOR_HANDLE>> SrcDescriptorRange;
+
+		for (const auto& [Slot, ResourceBindingEntry] : InDesc.Resources)
 		{
-			BindingSlot Slot = BindingEntry.Slot;
-			GpuResource* BindingResource = BindingEntry.Resource;
-			BindingShaderStage CurBindingEntryVisibility = GetLayout()->GetDesc().FindBinding(Slot)->Stage;
+			GpuResource* BindingResource = ResourceBindingEntry.Resource;
+			D3D12_SHADER_VISIBILITY BindingVisibility = MapShaderVisibility(GetLayout()->GetDesc().Layouts[Slot].Stage);
 
 			if (BindingResource->GetType() == GpuResourceType::Buffer)
 			{
@@ -106,23 +126,35 @@ namespace FRAMEWORK
 				StaticDesc.MaxLOD = D3D12_FLOAT32_MAX;
 				StaticDesc.ShaderRegister = Slot;
 				StaticDesc.RegisterSpace = GoupSlot;
-				StaticDesc.ShaderVisibility = MapShaderVisibility(CurBindingEntryVisibility);
+				StaticDesc.ShaderVisibility = BindingVisibility;
 
 				StaticSamplers.Add(MoveTemp(StaticDesc));
 			}
 			else
 			{
-
+				if (BindingResource->GetType() == GpuResourceType::Texture)
+				{
+					Dx12Texture* Texture = static_cast<Dx12Texture*>(BindingResource);
+					SrcDescriptorRange.FindOrAdd(BindingVisibility).Add(Texture->SRV->GetHandle());
+				}
 			}
 		}
+
+		for (const auto& [DxVisibility, SrcRange] : SrcDescriptorRange)
+		{
+			uint32 NumDescriptors = SrcRange.Num();
+			TUniquePtr<GpuDescriptorRange> GpuHeapRanges = GCommandListContext->AllocGpuCbvSrvUavRange(NumDescriptors);
+			GDevice->CopyDescriptorsSimple(NumDescriptors, GpuHeapRanges->GetCpuHandle(), *SrcRange.GetData(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			DescriptorTableStorage.Add(DxVisibility, MoveTemp(GpuHeapRanges));
+		}
+	
 	}
 
     void Dx12BindGroup::Apply(ID3D12GraphicsCommandList* CommandList, Dx12RootSignature* RootSig)
     {
         Dx12BindGroupLayout* Layout = static_cast<Dx12BindGroupLayout*>(GetLayout());
-        for (const auto& BindingLayoutEntry : Layout->GetDesc().Layouts)
+        for (const auto& [Slot, _] : Layout->GetDesc().Layouts)
         {
-			BindingSlot Slot = BindingLayoutEntry.Slot;
             D3D12_GPU_VIRTUAL_ADDRESS GpuAddr = GetDynamicBufferGpuAddr(Slot);
             uint32 RootParameterIndex = RootSig->GetDynamicBufferRootParameterIndex(Slot, Layout->GetGroupNumber());
             CommandList->SetGraphicsRootConstantBufferView(RootParameterIndex, GpuAddr);
@@ -142,10 +174,9 @@ namespace FRAMEWORK
 			if (Layout != nullptr)
 			{
 				BindingGroupSlot CurGroupNumber = Layout->GetGroupNumber();
-				for (const auto& BindingLayoutEntry : Layout->GetDesc().Layouts)
+				for (const auto& [Slot, LayoutBindingEntry] : Layout->GetDesc().Layouts)
 				{
-					BindingSlot Slot = BindingLayoutEntry.Slot;
-					if (BindingLayoutEntry.Type == BindingType::UniformBuffer)
+					if (LayoutBindingEntry.Type == BindingType::UniformBuffer)
 					{
 						RootParameters.Add(Layout->GetDynamicBufferRootParameter(Slot));
 						DynamicBufferToRootParameterIndex[CurGroupNumber].Add(Slot, RootParameters.Num() - 1);

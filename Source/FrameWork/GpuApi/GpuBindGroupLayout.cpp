@@ -14,8 +14,8 @@ namespace FRAMEWORK
 
 	GpuBindGroupLayoutBuilder& GpuBindGroupLayoutBuilder::AddExistingBinding(BindingSlot InSlot, BindingType ResourceType, BindingShaderStage InStage)
 	{
-		checkf(LayoutDesc.FindBinding(InSlot), *FString::Printf(TEXT("Slot:%d already existed."), InSlot));
-		LayoutDesc.Layouts.Add({ InSlot, ResourceType, InStage });
+		checkf(LayoutDesc.Layouts.Contains(InSlot), *FString::Printf(TEXT("Slot:%d already existed."), InSlot));
+		LayoutDesc.Layouts.Add(InSlot, {ResourceType, InStage });
 		return *this;
 	}
 
@@ -25,31 +25,31 @@ namespace FRAMEWORK
 		FString FinalUniformBufferDeclaration = FString::Format(*UniformBufferLayoutDeclaration, { BindingName });
 		int32 InsertIndex = FinalUniformBufferDeclaration.Find(TEXT("{"));
 		check(InsertIndex != INDEX_NONE);
-		while (LayoutDesc.FindBinding(AutoSlot)) { AutoSlot++; };
+		while (LayoutDesc.Layouts.Contains(AutoSlot)) { AutoSlot++; };
 		FinalUniformBufferDeclaration.InsertAt(InsertIndex - 1, FString::Printf(TEXT(": register(b%d, space%d)\r\n"), AutoSlot, LayoutDesc.GroupNumber));
 
 		LayoutDesc.CodegenDeclaration += MoveTemp(FinalUniformBufferDeclaration);
 		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, AutoSlot);
-		LayoutDesc.Layouts.Add({ AutoSlot++, BindingType::UniformBuffer, InStage });
+		LayoutDesc.Layouts.Add(AutoSlot++, {BindingType::UniformBuffer, InStage });
 
 		return *this;
 	}
 
 	GpuBindGroupLayoutBuilder& GpuBindGroupLayoutBuilder::AddTexture(const FString& BindingName, BindingShaderStage InStage)
 	{
-		while (LayoutDesc.FindBinding(AutoSlot)) { AutoSlot++; };
+		while (LayoutDesc.Layouts.Contains(AutoSlot)) { AutoSlot++; };
 		LayoutDesc.CodegenDeclaration += FString::Printf(TEXT("Texture2D %s : register(t%d, space%d);\r\n"), *BindingName, AutoSlot, LayoutDesc.GroupNumber);
 		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, AutoSlot);
-		LayoutDesc.Layouts.Add({ AutoSlot++, BindingType::Texture, InStage });
+		LayoutDesc.Layouts.Add(AutoSlot++, {BindingType::Texture, InStage });
 		return *this;
 	}
 
 	GpuBindGroupLayoutBuilder& GpuBindGroupLayoutBuilder::AddSampler(const FString& BindingName, BindingShaderStage InStage)
 	{
-		while (LayoutDesc.FindBinding(AutoSlot)) { AutoSlot++; };
+		while (LayoutDesc.Layouts.Contains(AutoSlot)) { AutoSlot++; };
 		LayoutDesc.CodegenDeclaration += FString::Printf(TEXT("SamplerState %s : register(s%d, space%d);\r\n"), *BindingName, AutoSlot, LayoutDesc.GroupNumber);
 		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, AutoSlot);
-		LayoutDesc.Layouts.Add({ AutoSlot++, BindingType::Sampler, InStage });
+		LayoutDesc.Layouts.Add(AutoSlot++, {BindingType::Sampler, InStage });
 		return *this;
 	}
 
