@@ -8,14 +8,13 @@ namespace FRAMEWORK
 {
 	struct ResourceBinding
 	{
-		BindingSlot Slot;
 		GpuResource* Resource;
 	};
 
 	struct GpuBindGroupDesc
 	{
 		GpuBindGroupLayout* Layout;
-		TArray<ResourceBinding> Resources;
+		TSortedMap<BindingSlot, ResourceBinding> Resources;
 	};
 	
 	class GpuBindGroup : public GpuResource

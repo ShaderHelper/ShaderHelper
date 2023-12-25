@@ -22,10 +22,9 @@ namespace FRAMEWORK::GpuApi
 		return ValidateBindGroupNumber(BindGroup0, 0) && ValidateBindGroupNumber(BindGroup1, 1) && ValidateBindGroupNumber(BindGroup2, 2) && ValidateBindGroupNumber(BindGroup3, 3);
 	}
 
-	static bool ValidateBindGroupResource(const ResourceBinding& InResourceBinding, BindingType LayoutEntryType)
+	static bool ValidateBindGroupResource(BindingSlot Slot, const ResourceBinding& InResourceBinding, BindingType LayoutEntryType)
 	{
 		GpuResource* GroupEntryResource = InResourceBinding.Resource;
-		BindingSlot Slot = InResourceBinding.Slot;
 		GpuResourceType GroupEntryType = GroupEntryResource->GetType();
 		if (LayoutEntryType == BindingType::UniformBuffer)
 		{
@@ -52,20 +51,15 @@ namespace FRAMEWORK::GpuApi
 	bool ValidateCreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc)
 	{
 		const GpuBindGroupLayoutDesc& LayoutDesc = InBindGroupDesc.Layout->GetDesc();
-		const TArray<ResourceBinding>& BindGroupResources = InBindGroupDesc.Resources;
-		for (const auto& BindingLayoutEntry : LayoutDesc.Layouts)
+		for (const auto& [Slot, LayoutBindingEntry] : LayoutDesc.Layouts)
 		{
-			BindingSlot LayoutSlot = BindingLayoutEntry.Slot;
-			const ResourceBinding* BindGroupEntryPtr = BindGroupResources.FindByPredicate([LayoutSlot](const ResourceBinding& BindGroupEntry) {
-				return BindGroupEntry.Slot == LayoutSlot;
-				});
-			if (BindGroupEntryPtr)
+			if (auto* ResourceBindingEntry = InBindGroupDesc.Resources.Find(Slot))
 			{
-				return ValidateBindGroupResource(*BindGroupEntryPtr, BindingLayoutEntry.Type);
+				return ValidateBindGroupResource(Slot, *ResourceBindingEntry, LayoutBindingEntry.Type);
 			}
 			else
 			{
-				SH_LOG(LogGpuApi, Error, TEXT("GpuApi::CreateBindGroup Error(Missing BindingSlot) - Not find the slot : (%d)"), LayoutSlot);
+				SH_LOG(LogGpuApi, Error, TEXT("GpuApi::CreateBindGroup Error(Missing BindingSlot) - Not find the slot : (%d)"), Slot);
 				return false;
 			}
 		}
@@ -75,14 +69,14 @@ namespace FRAMEWORK::GpuApi
     bool ValidateCreateBindGroupLayout(const GpuBindGroupLayoutDesc& InBindGroupLayoutDesc)
     {
         TArray<BindingSlot> Slots;
-        for(const auto& BindingLayoutEntry : InBindGroupLayoutDesc.Layouts)
+        for(const auto& [Slot, _] : InBindGroupLayoutDesc.Layouts)
         {
-            if(Slots.Contains(BindingLayoutEntry.Slot))
+            if(Slots.Contains(Slot))
             {
-                SH_LOG(LogGpuApi, Error, TEXT("GpuApi::CreateBindGroupLayout Error(Duplicated BindingSlot) -  slot detected: (%d)"), BindingLayoutEntry.Slot);
+                SH_LOG(LogGpuApi, Error, TEXT("GpuApi::CreateBindGroupLayout Error(Duplicated BindingSlot) -  slot detected: (%d)"), Slot);
                 return false;
             }
-            Slots.Add(BindingLayoutEntry.Slot);
+            Slots.Add(Slot);
         }
         return true;
     }

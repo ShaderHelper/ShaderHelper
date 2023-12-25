@@ -25,7 +25,7 @@ namespace FRAMEWORK
 		TMap<BindingSlot, CD3DX12_ROOT_PARAMETER1> DynamicBufferRootParameters;
 	};
 
-	class Dx12BindGroup : public GpuBindGroup
+	class Dx12BindGroup : public GpuBindGroup, public Dx12DeferredDeleteObject<Dx12BindGroup>
 	{
 	public:
 		Dx12BindGroup(const GpuBindGroupDesc& InDesc);
@@ -35,8 +35,8 @@ namespace FRAMEWORK
 			return DynamicBufferStorage[InSlot]->GetAllocation().GetGpuAddr();
 		}
 
-		D3D12_GPU_DESCRIPTOR_HANDLE GetBaseDescriptor(D3D12_SHADER_VISIBILITY Visibility) const {
-			return DescriptorTableStorage[Visibility];
+		D3D12_GPU_DESCRIPTOR_HANDLE GetDescriptorTableStart(D3D12_SHADER_VISIBILITY Visibility) const {
+			return DescriptorTableStorage[Visibility].GetGpuHandle();
 		}
 
 		const TArray<D3D12_STATIC_SAMPLER_DESC>& GetStaticSamplers() const {
@@ -46,7 +46,7 @@ namespace FRAMEWORK
         void Apply(ID3D12GraphicsCommandList* CommandList, class Dx12RootSignature* RootSig);
 
 	private:
-		TMap<D3D12_SHADER_VISIBILITY, D3D12_GPU_DESCRIPTOR_HANDLE> DescriptorTableStorage;
+		TMap<D3D12_SHADER_VISIBILITY, TUniquePtr<GpuDescriptorRange>> DescriptorTableStorage;
 		TMap<BindingSlot, Dx12Buffer*> DynamicBufferStorage;
 		TArray<D3D12_STATIC_SAMPLER_DESC> StaticSamplers;
 	};
@@ -79,7 +79,8 @@ namespace FRAMEWORK
 
 		TArray<D3D12_STATIC_SAMPLER_DESC> StaticSamplers;
 
-		bool operator==(const RootSignatureDesc& Other) const {
+		bool operator==(const RootSignatureDesc& Other) const
+		{
 			return LayoutDesc0 == Other.LayoutDesc0 && LayoutDesc1 == Other.LayoutDesc1 &&
 				LayoutDesc2 == Other.LayoutDesc2 && LayoutDesc3 == Other.LayoutDesc3 &&
 				!FMemory::Memcmp(StaticSamplers.GetData(), Other.StaticSamplers.GetData(), sizeof(D3D12_STATIC_SAMPLER_DESC) * StaticSamplers.Num());
@@ -106,13 +107,13 @@ namespace FRAMEWORK
 			return DynamicBufferToRootParameterIndex[InGroupSlot][InSlot];
 		}
 
-		uint32 GetDescriptorTableRootParameterIndex(D3D12_SHADER_VISIBILITY Visibility) const {
-			return DescriptorTableToRootParameterIndex[Visibility];
+		uint32 GetDescriptorTableRootParameterIndex(D3D12_SHADER_VISIBILITY Visibility, BindingGroupSlot InGroupSlot) const {
+			return DescriptorTableToRootParameterIndex[InGroupSlot][Visibility];
 		}
 
 	private:
 		TMap<BindingSlot, uint32> DynamicBufferToRootParameterIndex[GpuResourceLimit::MaxBindableBingGroupNum];
-		TMap<D3D12_SHADER_VISIBILITY, uint32> DescriptorTableToRootParameterIndex;
+		TMap<D3D12_SHADER_VISIBILITY, uint32> DescriptorTableToRootParameterIndex[GpuResourceLimit::MaxBindableBingGroupNum];
 		TRefCountPtr<ID3D12RootSignature> Resource;
 	};
 
