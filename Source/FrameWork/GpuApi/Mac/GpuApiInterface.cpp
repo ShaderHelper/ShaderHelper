@@ -116,6 +116,11 @@ namespace GpuApi
         return AUX::StaticCastRefCountPtr<GpuShader>(CreateMetalShader(InType, MoveTemp(InSourceText), MoveTemp(InShaderName), MoveTemp(EntryPoint)));
 	}
 
+	TRefCountPtr<GpuShader> CreateShaderFromFile(ShaderType InType, const FString& FileName, FString EntryPoint)
+	{
+
+	}
+
 	TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc)
 	{
         check(ValidateCreateBindGroup(InBindGroupDesc));

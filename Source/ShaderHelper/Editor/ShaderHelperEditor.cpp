@@ -12,7 +12,7 @@
 
 namespace SH 
 {
-	const FString DefaultProjectPath = PathHelper::WorkSpaceDir() / TEXT("TemplateProject/Default/Default.shprj");
+	const FString DefaultProjectPath = PathHelper::WorkspaceDir() / TEXT("TemplateProject/Default/Default.shprj");
 
 	static const FString WindowLayoutConfigFileName = PathHelper::SavedConfigDir() / TEXT("WindowLayout.json");
 

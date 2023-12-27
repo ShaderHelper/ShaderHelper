@@ -101,6 +101,8 @@ namespace FRAMEWORK
 		void MarkBindGroup3Dirty(bool IsDirty) { IsBindGroup3Dirty = IsDirty; }
         
         void ClearBinding();
+
+		bool IsClose() { return bCmdListClose; }
         
     public:
 		void Transition(TrackedResource* InResource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After);
@@ -111,8 +113,10 @@ namespace FRAMEWORK
 		TRefCountPtr<ID3D12CommandAllocator> RetrieveFreeCommandAllocator();
 
 		TUniquePtr<CpuDescriptor> AllocRtv();
+		TUniquePtr<CpuDescriptor> AllocSampler();
 		TUniquePtr<CpuDescriptor> AllocCpuCbvSrvUav();
 		TUniquePtr<GpuDescriptorRange> AllocGpuCbvSrvUavRange(uint32 InDescriptorNum);
+		TUniquePtr<GpuDescriptorRange> AllocGpuSamplerRange(uint32 InDescriptorNum);
 
         
 	private:
@@ -136,6 +140,7 @@ namespace FRAMEWORK
 			TRefCountPtr<ID3D12Fence> Fence;
 		};
 
+		bool bCmdListClose;
 		TRefCountPtr<ID3D12GraphicsCommandList> GraphicsCmdList;
 		TRefCountPtr<ID3D12CommandAllocator> CommandAllocator;
 		//Command Allocators that have already been submitted to GPU.
@@ -145,6 +150,8 @@ namespace FRAMEWORK
 		CpuDescriptorAllocator RtvAllocator;
 		CpuDescriptorAllocator Cpu_CbvSrvUavAllocator;
 		GpuDescriptorAllocator Gpu_CbvSrvUavAllocator;
+		CpuDescriptorAllocator Cpu_SamplerAllocator;
+		GpuDescriptorAllocator Gpu_SamplerAllocator;
 		
 		Dx12Pso* CurrentPso;
 		Dx12Buffer* CurrentVertexBuffer;

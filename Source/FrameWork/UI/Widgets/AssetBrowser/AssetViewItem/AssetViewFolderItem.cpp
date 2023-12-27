@@ -25,7 +25,7 @@ namespace FRAMEWORK
 					.ColorAndOpacity_Lambda([Row] {
 						if (Row->IsSelected())
 						{
-							return FSlateColor{FLinearColor{0.5f, 0.5f, 1.0f}};
+							return FSlateColor{FLinearColor{0.75f, 0.9f, 0.98f, 1.0f}};
 						}
 						else
 						{

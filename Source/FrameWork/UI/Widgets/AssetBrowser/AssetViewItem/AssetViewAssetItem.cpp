@@ -46,8 +46,8 @@ namespace FRAMEWORK
 			[
 				SNew(SBorder)
 				.BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
-			.Padding(FMargin(5.0f, 3.0f, 5.0f, 5.0f))
-			[
+				.Padding(FMargin(5.0f, 4.0f, 5.0f, 6.0f))
+				[
 					SNew(SOverlay)
 					+ SOverlay::Slot()
 					[

@@ -56,10 +56,12 @@ R"(float4 MainPS(PIn Input) : SV_Target
 
 		VertexShader = GpuApi::CreateShaderFromSource(ShaderType::VertexShader, DefaultVertexShaderText, TEXT("DefaultFullScreenVS"), TEXT("MainVS"));
 		FString ErrorInfo;
-		check(GpuApi::CrossCompileShader(VertexShader, ErrorInfo));
+		GpuApi::CrossCompileShader(VertexShader, ErrorInfo);
+		check(ErrorInfo.IsEmpty());
 
 		PixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, GetPixelShaderDeclaration() + DefaultPixelShaderBody, TEXT("DefaultFullScreenPS"), TEXT("MainPS"));
-		check(GpuApi::CrossCompileShader(PixelShader, ErrorInfo));
+		GpuApi::CrossCompileShader(PixelShader, ErrorInfo);
+		check(ErrorInfo.IsEmpty());
 
 		FinalRT = GpuResourceHelper::TempRenderTarget(GpuTextureFormat::B8G8R8A8_UNORM);
 

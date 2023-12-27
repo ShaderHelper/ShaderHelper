@@ -7,16 +7,12 @@ namespace FRAMEWORK
 	class Dx12Shader : public GpuShader
 	{
 	public:
-		Dx12Shader(ShaderType InType, FString InSourceText, FString InShaderName, FString InShaderTaget, FString InEntryPoint)
-			: Type(InType)
-			, ShaderName(MoveTemp(InShaderName))
-			, EntryPoint(MoveTemp(InEntryPoint))
-			, SourceText(MoveTemp(InSourceText))
-            , ShaderTaget(MoveTemp(InShaderTaget))
-		{
-		}
+		Dx12Shader(FString InFileName, ShaderType InType, const FString& ExtraDeclaration, FString InShaderTaget, FString InEntryPoint);
+		Dx12Shader(ShaderType InType, FString InSourceText, FString InShaderName, FString InShaderTaget, FString InEntryPoint);
         
     public:
+		TOptional<FString> GetFileName() const { return FileName; }
+		const TArray<FString>& GetIncludeDirs() const { return IncludeDirs; }
 		const FString& GetSourceText() const { return SourceText; }
         const FString& GetEntryPoint() const { return EntryPoint; }
         const FString& GetShaderTarget() const { return ShaderTaget; }
@@ -31,10 +27,13 @@ namespace FRAMEWORK
         FString SourceText;
         FString ShaderTaget;
 		TRefCountPtr<IDxcBlob> ByteCode;
+
+		TOptional<FString> FileName;
+		TArray<FString> IncludeDirs;
 	};
 
-    TRefCountPtr<Dx12Shader> CreateDx12Shader(ShaderType InType, FString InSourceText, FString ShaderName,
-                                              FString InEntryPoint);
+	TRefCountPtr<Dx12Shader> CreateDx12Shader(FString FileName, ShaderType InType, FString ExtraDeclaration, FString EntryPoint);
+    TRefCountPtr<Dx12Shader> CreateDx12Shader(ShaderType InType, FString InSourceText, FString ShaderName, FString InEntryPoint);
 
 	class DxcCompiler
 	{
@@ -43,8 +42,9 @@ namespace FRAMEWORK
 		bool Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo) const;
 
 	private:
-		TRefCountPtr<IDxcLibrary> CompilerLibrary;
 		TRefCountPtr<IDxcCompiler3> Compiler;
+		TRefCountPtr<IDxcUtils> CompierUitls;
+		TRefCountPtr<IDxcIncludeHandler> CompilerIncludeHandler;
 	};
 
 	inline DxcCompiler GShaderCompiler;

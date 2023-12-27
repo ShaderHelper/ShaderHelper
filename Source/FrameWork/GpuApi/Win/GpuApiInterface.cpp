@@ -30,6 +30,12 @@ namespace GpuApi
 
 	void EndFrame()
 	{
+		//If there are recorded commands between last Submit() and EndFrame()
+		if (!GCommandListContext->IsClose())
+		{
+			Submit();
+		}
+
 		check(CurCpuFrame >= CurGpuFrame);
 		CurCpuFrame++;
 		DxCheck(GGraphicsQueue->Signal(CpuSyncGpuFence, CurCpuFrame));
@@ -139,6 +145,11 @@ namespace GpuApi
 		return AUX::StaticCastRefCountPtr<GpuShader>(CreateDx12Shader(InType, MoveTemp(InSourceText), MoveTemp(InShaderName), MoveTemp(EntryPoint)));
 	}
 
+	TRefCountPtr<GpuShader> CreateShaderFromFile(FString FileName, ShaderType InType, FString EntryPoint, FString ExtraDeclaration)
+	{
+		return AUX::StaticCastRefCountPtr<GpuShader>(CreateDx12Shader(MoveTemp(FileName), InType, MoveTemp(ExtraDeclaration), MoveTemp(EntryPoint)));
+	}
+
 	TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc)
 	{
 		check(ValidateCreateBindGroup(InBindGroupDesc));
@@ -217,13 +228,6 @@ namespace GpuApi
 		Dx12BindGroup* Dx12BindGroup1 = static_cast<Dx12BindGroup*>(BindGroup1);
 		Dx12BindGroup* Dx12BindGroup2 = static_cast<Dx12BindGroup*>(BindGroup2);
 		Dx12BindGroup* Dx12BindGroup3 = static_cast<Dx12BindGroup*>(BindGroup3);
-
-		TArray<D3D12_STATIC_SAMPLER_DESC> StaticSamplers;
-		if (BindGroup0) StaticSamplers.Append(Dx12BindGroup0->GetStaticSamplers());
-		if (BindGroup1) StaticSamplers.Append(Dx12BindGroup1->GetStaticSamplers());
-		if (BindGroup2) StaticSamplers.Append(Dx12BindGroup2->GetStaticSamplers());
-		if (BindGroup3) StaticSamplers.Append(Dx12BindGroup3->GetStaticSamplers());
-		RsDesc.SetStaticSamplers(MoveTemp(StaticSamplers));
 
 		GCommandListContext->SetRootSignature(Dx12RootSignatureManager::GetRootSignature(RsDesc));
 		GCommandListContext->SetBindGroups(Dx12BindGroup0, Dx12BindGroup1, Dx12BindGroup2, Dx12BindGroup3);

@@ -8,6 +8,8 @@ namespace FRAMEWORK
 		: RtvAllocator(256, DescriptorType::Rtv)
 		, Cpu_CbvSrvUavAllocator(1024, DescriptorType::CbvSrvUav)
 		, Gpu_CbvSrvUavAllocator(1024 , DescriptorType::CbvSrvUav)
+		, Cpu_SamplerAllocator(256, DescriptorType::Sampler)
+		, Gpu_SamplerAllocator(256, DescriptorType::Sampler)
 		, CurrentPso(nullptr)
 		, CurrentVertexBuffer(nullptr)
 		, CurrentRootSignature(nullptr)
@@ -36,9 +38,11 @@ namespace FRAMEWORK
 	{
 		check(CommandAllocator);
 		DxCheck(GraphicsCmdList->Reset(CommandAllocator, nullptr));
+		bCmdListClose = false;
 
 		ID3D12DescriptorHeap* Heaps[] = {
 			Gpu_CbvSrvUavAllocator.GetDescriptorHeap(),
+			Gpu_SamplerAllocator.GetDescriptorHeap()
 		};
 		GraphicsCmdList->SetDescriptorHeaps(UE_ARRAY_COUNT(Heaps), Heaps);
 	}
@@ -96,6 +100,11 @@ namespace FRAMEWORK
 		return RtvAllocator.Allocate();
 	}
 
+	TUniquePtr<CpuDescriptor> CommandListContext::AllocSampler()
+	{
+		return Cpu_SamplerAllocator.Allocate();
+	}
+
 	TUniquePtr<CpuDescriptor> CommandListContext::AllocCpuCbvSrvUav()
 	{
 		return Cpu_CbvSrvUavAllocator.Allocate();
@@ -104,6 +113,11 @@ namespace FRAMEWORK
 	TUniquePtr<GpuDescriptorRange> CommandListContext::AllocGpuCbvSrvUavRange(uint32 InDescriptorNum)
 	{
 		return Gpu_CbvSrvUavAllocator.Allocate(InDescriptorNum);
+	}
+
+	TUniquePtr<GpuDescriptorRange> CommandListContext::AllocGpuSamplerRange(uint32 InDescriptorNum)
+	{
+		return Gpu_SamplerAllocator.Allocate(InDescriptorNum);
 	}
 
 	void CommandListContext::Transition(TrackedResource* InResource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After)
@@ -122,6 +136,8 @@ namespace FRAMEWORK
 		check(GGraphicsQueue);
 		//The commandLists must be closed before executing them.
 		DxCheck(GraphicsCmdList->Close());
+		bCmdListClose = true;
+
 		ID3D12CommandList* CmdLists[] = { GraphicsCmdList };
 		GGraphicsQueue->ExecuteCommandLists(1, CmdLists);
 

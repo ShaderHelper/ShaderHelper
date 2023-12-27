@@ -6,31 +6,63 @@
 
 namespace FRAMEWORK
 {
+	Dx12Shader::Dx12Shader(FString InFileName, ShaderType InType, const FString& ExtraDeclaration, FString InShaderTaget, FString InEntryPoint)
+		: Type(InType)
+		, FileName(MoveTemp(InFileName))
+		, EntryPoint(MoveTemp(InEntryPoint))
+		, ShaderTaget(MoveTemp(InShaderTaget))
+	{
+		ShaderName = FPaths::GetBaseFilename(*FileName);
+		FString ShaderFileText;
+		FFileHelper::LoadFileToString(ShaderFileText, **FileName);
+		SourceText = ExtraDeclaration + MoveTemp(ShaderFileText);
 
-    TRefCountPtr<Dx12Shader> CreateDx12Shader(ShaderType InType, FString InSourceText, FString ShaderName, FString InEntryPoint)
-    {
-        FString ShaderTarget;
-        if (InType == ShaderType::VertexShader)
-        {
+		IncludeDirs.Add(FPaths::GetPath(*FileName));
+	}
+
+	Dx12Shader::Dx12Shader(ShaderType InType, FString InSourceText, FString InShaderName, FString InShaderTaget, FString InEntryPoint)
+		: Type(InType)
+		, ShaderName(MoveTemp(InShaderName))
+		, EntryPoint(MoveTemp(InEntryPoint))
+		, SourceText(MoveTemp(InSourceText))
+		, ShaderTaget(MoveTemp(InShaderTaget))
+	{
+	}
+
+	FString DecideShaderTarget(ShaderType InType)
+	{
+		FString ShaderTarget;
+		if (InType == ShaderType::VertexShader)
+		{
 			ShaderTarget = "vs_6_0";
-            
-        }
-        else if (InType == ShaderType::PixelShader)
-        {
+
+		}
+		else if (InType == ShaderType::PixelShader)
+		{
 			ShaderTarget = "ps_6_0";
-        }
-        else
-        {
-            check(false);
-        }
-        
-        return new Dx12Shader(MoveTemp(InType), MoveTemp(InSourceText), MoveTemp(ShaderName), MoveTemp(ShaderTarget), MoveTemp(InEntryPoint));
+		}
+		else
+		{
+			check(false);
+		}
+		return ShaderTarget;
+	}
+
+	TRefCountPtr<Dx12Shader> CreateDx12Shader(FString FileName, ShaderType InType, FString ExtraDeclaration, FString EntryPoint)
+	{
+		return new Dx12Shader( MoveTemp(FileName), InType, MoveTemp(ExtraDeclaration), DecideShaderTarget(InType), MoveTemp(EntryPoint));
+	}
+
+	TRefCountPtr<Dx12Shader> CreateDx12Shader(ShaderType InType, FString InSourceText, FString ShaderName, FString InEntryPoint)
+    {
+        return new Dx12Shader(MoveTemp(InType), MoveTemp(InSourceText), MoveTemp(ShaderName), DecideShaderTarget(InType), MoveTemp(InEntryPoint));
     }
 
-	 DxcCompiler::DxcCompiler()
+	DxcCompiler::DxcCompiler()
 	 {
 		 DxCheck(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(Compiler.GetInitReference())));
-		 DxCheck(DxcCreateInstance(CLSID_DxcLibrary, IID_PPV_ARGS(CompilerLibrary.GetInitReference())));
+		 DxCheck(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(CompierUitls.GetInitReference())));
+		 DxCheck(CompierUitls->CreateDefaultIncludeHandler(CompilerIncludeHandler.GetInitReference()));
 	 }
 
 	 bool DxcCompiler::Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo) const
@@ -39,7 +71,7 @@ namespace FRAMEWORK
 		TRefCountPtr<IDxcResult> CompileResult;
 		auto SourceText = StringCast<ANSICHAR>(*InShader->GetSourceText());
 		const ANSICHAR* SourceTextPtr = SourceText.Get();
-		DxCheck(CompilerLibrary->CreateBlobWithEncodingFromPinned(SourceTextPtr, FCStringAnsi::Strlen(SourceTextPtr), CP_UTF8, BlobEncoding.GetInitReference()));
+		DxCheck(CompierUitls->CreateBlobFromPinned(SourceTextPtr, FCStringAnsi::Strlen(SourceTextPtr), CP_UTF8, BlobEncoding.GetInitReference()));
 
 		TArray<const TCHAR*> Arguments;
 		Arguments.Add(TEXT("/Qstrip_debug"));
@@ -50,6 +82,13 @@ namespace FRAMEWORK
 #if DEBUG_SHADER
 		Arguments.Add(TEXT("/Zi"));
 #endif
+
+		for(const FString& IncludeDir : InShader->GetIncludeDirs())
+		{
+			Arguments.Add(TEXT("-I"));
+			Arguments.Add(*IncludeDir);
+		}
+
 		
 		DxcBuffer SourceBuffer = { 0 };
 		SourceBuffer.Ptr = BlobEncoding->GetBufferPointer();
@@ -63,8 +102,9 @@ namespace FRAMEWORK
 				SourceBuffer.Encoding = Encoding;
 			}
 		}
+
 		bool IsApiSucceeded = SUCCEEDED(Compiler->Compile(&SourceBuffer,
-			Arguments.GetData(), Arguments.Num(), nullptr,
+			Arguments.GetData(), Arguments.Num(), CompilerIncludeHandler,
 			IID_PPV_ARGS(CompileResult.GetInitReference()))
 		);
 
@@ -106,7 +146,5 @@ namespace FRAMEWORK
 		
 		return IsCompilationSucceeded;
 	 }
-
-
 
 }
