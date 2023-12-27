@@ -24,6 +24,11 @@ namespace FRAMEWORK
 		}
 	}
 
+	void AssetManager::UpdatePathToGuid(const FString& InPath, const FGuid& InGuid)
+	{
+		PathToGuid.FindOrAdd(InPath) = InGuid;
+	}
+
 	FString AssetManager::GetPath(const FGuid& InGuid) const
 	{
 		return *PathToGuid.FindKey(InGuid);

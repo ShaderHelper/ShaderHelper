@@ -7,14 +7,14 @@
 
 namespace FRAMEWORK
 {
-	class Dx12Sampler : public GpuSampler
+	class Dx12Sampler : public GpuSampler, public Dx12DeferredDeleteObject<Dx12Sampler>
 	{
 	public:
-		D3D12_FILTER Filter;
-		D3D12_TEXTURE_ADDRESS_MODE AddressU;
-		D3D12_TEXTURE_ADDRESS_MODE AddressV;
-		D3D12_TEXTURE_ADDRESS_MODE AddressW;
-		D3D12_COMPARISON_FUNC ComparisonFunc;
+		Dx12Sampler(TUniquePtr<CpuDescriptor> InHandle) : Handle(MoveTemp(InHandle)) {}
+		CpuDescriptor* GetCpuDescriptor() const { return Handle.Get(); }
+	
+	private:
+		TUniquePtr<CpuDescriptor> Handle;
 	};
 
 	class Dx12Texture : public GpuTexture, public TrackedResource, public Dx12DeferredDeleteObject<Dx12Texture>

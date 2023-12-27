@@ -14,16 +14,26 @@ namespace FRAMEWORK
 							.AddExistingBinding(1, BindingType::Sampler, BindingShaderStage::Pixel)
 							.Build();
 		
-		FString ShaderFileSource;
-		FFileHelper::LoadFileToString(ShaderFileSource, *(PathHelper::ShaderDir() / "Blit.hlsl"));
-		FString ShaderSource = BindGroupLayout->GetCodegenDeclaration() + ShaderFileSource;
+		Vs = GpuApi::CreateShaderFromFile(
+			PathHelper::ShaderDir() / "Blit.hlsl", 
+			ShaderType::VertexShader,
+			TEXT("MainVS"),
+			BindGroupLayout->GetCodegenDeclaration()
+		);
 
-		Vs = GpuApi::CreateShaderFromSource(ShaderType::VertexShader, ShaderSource, TEXT("BlitVS"), TEXT("MainVS"));
-		Ps = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, ShaderSource, TEXT("BlitPS"), TEXT("MainPS"));
+		Ps = GpuApi::CreateShaderFromFile(
+			PathHelper::ShaderDir() / "Blit.hlsl",
+			ShaderType::PixelShader,
+			TEXT("MainPS"),
+			BindGroupLayout->GetCodegenDeclaration()
+		);
 
 		FString ErrorInfo;
 		GpuApi::CrossCompileShader(Vs, ErrorInfo);
+		check(ErrorInfo.IsEmpty());
+
 		GpuApi::CrossCompileShader(Ps, ErrorInfo);
+		check(ErrorInfo.IsEmpty());
 	}
 
 	TRefCountPtr<GpuBindGroup> BlitShader::GetBindGroup(const Parameters& InParameters) const

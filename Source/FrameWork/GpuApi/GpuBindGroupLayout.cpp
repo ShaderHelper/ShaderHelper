@@ -14,7 +14,7 @@ namespace FRAMEWORK
 
 	GpuBindGroupLayoutBuilder& GpuBindGroupLayoutBuilder::AddExistingBinding(BindingSlot InSlot, BindingType ResourceType, BindingShaderStage InStage)
 	{
-		checkf(LayoutDesc.Layouts.Contains(InSlot), *FString::Printf(TEXT("Slot:%d already existed."), InSlot));
+		checkf(!LayoutDesc.Layouts.Contains(InSlot), *FString::Printf(TEXT("Slot:%d already existed."), InSlot));
 		LayoutDesc.Layouts.Add(InSlot, {ResourceType, InStage });
 		return *this;
 	}

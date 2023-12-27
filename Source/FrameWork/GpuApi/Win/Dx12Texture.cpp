@@ -169,28 +169,35 @@ namespace FRAMEWORK
 
 	TRefCountPtr<Dx12Sampler> CreateDx12Sampler(const GpuSamplerDesc& InSamplerDesc)
 	{
-		Dx12Sampler* Sampler = new Dx12Sampler;
-		Sampler->AddressU = MapTextureAddressMode(InSamplerDesc.AddressU);
-		Sampler->AddressV = MapTextureAddressMode(InSamplerDesc.AddressV);
-		Sampler->AddressW = MapTextureAddressMode(InSamplerDesc.AddressW);
-		Sampler->ComparisonFunc = MapComparisonFunc(InSamplerDesc.Compare);
+		D3D12_SAMPLER_DESC DxSamplerDesc{};
+		DxSamplerDesc.AddressU = MapTextureAddressMode(InSamplerDesc.AddressU);
+		DxSamplerDesc.AddressV = MapTextureAddressMode(InSamplerDesc.AddressV);
+		DxSamplerDesc.AddressW = MapTextureAddressMode(InSamplerDesc.AddressW);
+		DxSamplerDesc.ComparisonFunc = MapComparisonFunc(InSamplerDesc.Compare);
+		DxSamplerDesc.MipLODBias = 0;
+		DxSamplerDesc.MaxAnisotropy = 1;
+		DxSamplerDesc.MinLOD = 0;
+		DxSamplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
 
 		bool ComparisonEnable = InSamplerDesc.Compare != CompareMode::Never;
 
 		switch (InSamplerDesc.Filer)
 		{
 		case SamplerFilter::Point:			
-			Sampler->Filter = ComparisonEnable ? D3D12_FILTER_COMPARISON_MIN_MAG_MIP_POINT : D3D12_FILTER_MIN_MAG_MIP_POINT;
+			DxSamplerDesc.Filter = ComparisonEnable ? D3D12_FILTER_COMPARISON_MIN_MAG_MIP_POINT : D3D12_FILTER_MIN_MAG_MIP_POINT;
 			break;
 		case SamplerFilter::Bilinear:
-			Sampler->Filter = ComparisonEnable ? D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT : D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+			DxSamplerDesc.Filter = ComparisonEnable ? D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT : D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
 			break;
 		case SamplerFilter::Trilinear:
-			Sampler->Filter = ComparisonEnable ? D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR : D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+			DxSamplerDesc.Filter = ComparisonEnable ? D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR : D3D12_FILTER_MIN_MAG_MIP_LINEAR;
 			break;
 		}
 
-		return Sampler;
+		TUniquePtr<CpuDescriptor> SamplerDescriptor = GCommandListContext->AllocSampler();
+		GDevice->CreateSampler(&DxSamplerDesc, SamplerDescriptor->GetHandle());
+
+		return new Dx12Sampler(MoveTemp(SamplerDescriptor));
 	}
 
 }

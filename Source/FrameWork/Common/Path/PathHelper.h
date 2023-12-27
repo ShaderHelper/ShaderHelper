@@ -4,7 +4,7 @@ namespace FRAMEWORK {
 	class FRAMEWORK_API PathHelper {
 	public:
 		// ShaderHelper/
-		static FString WorkSpaceDir();
+		static FString WorkspaceDir();
 		// ShaderHelper/Resource
 		static FString ResourceDir();
 		static FString ExternalDir();

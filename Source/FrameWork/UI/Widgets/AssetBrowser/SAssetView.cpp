@@ -240,7 +240,16 @@ namespace FRAMEWORK
 
 	void SAssetView::RemoveFile(const FString& InFileName)
 	{
+		if (FPaths::GetPath(InFileName) != CurViewDirectory)
+		{
+			return;
+		}
 
+		AssetViewItems.RemoveAll([&InFileName](const TSharedRef<AssetViewItem>& Element) {
+			return Element->GetPath() == InFileName;
+		});
+		SortViewItems();
+		AssetTileView->RequestListRefresh();
 	}
 
 	void SAssetView::ImportAsset()
@@ -294,6 +303,9 @@ namespace FRAMEWORK
 						FString SavedFileName = CurViewDirectory / FPaths::GetBaseFilename(OpenedFileNames[0]) + "." + ImportedAssetObject->FileExtension();
 						TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFileName));
 						ImportedAssetObject->Serialize(*Ar);
+						
+						TSingleton<AssetManager>::Get().UpdatePathToGuid(SavedFileName, ImportedAssetObject->GetGuid());
+
 					}
 					else
 					{

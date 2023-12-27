@@ -28,8 +28,6 @@ namespace SH
 		void RenderBegin() override;
 		void RenderEnd() override;
 		void ReCreatePipelineState();
-		void RenderNewRenderPass();
-		void RenderOldRenderPass();
 
 	private:
 		TRefCountPtr<GpuTexture> FinalRT;

@@ -81,6 +81,8 @@ namespace FRAMEWORK
 			return LoadAssetByPath<T>(GetPath(InGuid));
 		}
 
+		void UpdatePathToGuid(const FString& InPath, const FGuid& InGuid);
+
 		FString GetPath(const FGuid& InGuid) const;
 		FGuid GetGuid(const FString& InPath) const;
 
