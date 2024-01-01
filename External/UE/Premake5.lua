@@ -1,4 +1,38 @@
 
+ue_baseIncludeDir = {
+    core = _WORKING_DIR .. "/External/UE/Include/Core",
+    traceLog = _WORKING_DIR .. "/External/UE/Include/TraceLog",
+    applicationCore = _WORKING_DIR .. "/External/UE/Include/ApplicationCore",
+    slate = _WORKING_DIR .. "/External/UE/Include/Slate",
+    inputCore = _WORKING_DIR .. "/External/UE/Include/InputCore",
+    standaloneRenderer = _WORKING_DIR .. "/External/UE/Include/StandaloneRenderer",
+    coreUObject = _WORKING_DIR .. "/External/UE/Include/CoreUObject",
+    slateCore = _WORKING_DIR .. "/External/UE/Include/SlateCore",
+    json = _WORKING_DIR .. "/External/UE/Include/Json",
+    imageWrapper = _WORKING_DIR .. "/External/UE/Include/ImageWrapper",
+	desktopPlatform = _WORKING_DIR .. "/External/UE/Include/DesktopPlatform",
+	directoryWatcher = _WORKING_DIR .. "/External/UE/Include/DirectoryWatcher",
+}
+
+ue_uhtIncludeDir = {
+    inputCore = _WORKING_DIR .. "/External/UE/Include/InputCore/UHT",
+    slate = _WORKING_DIR .. "/External/UE/Include/Slate/UHT",
+    coreUObject = _WORKING_DIR .. "/External/UE/Include/CoreUObject/UHT",
+    slateCore = _WORKING_DIR .. "/External/UE/Include/SlateCore/UHT",
+}
+
+function generateIncludeDir_ue()
+    externalincludedirs(_WORKING_DIR .. "/External/UE/Include")
+    externalwarnings("off")
+
+    for _, v in pairs(ue_baseIncludeDir) do
+        externalincludedirs(v)
+    end
+
+    for _, v in pairs(ue_uhtIncludeDir) do
+        externalincludedirs(v)
+    end
+end
 
 usage "UE"
     generateIncludeDir_ue()
@@ -17,7 +51,10 @@ usage "UE"
             "UE-Projects",
             "UE-ImageWrapper",
             "UE-CoreUObject",
-            "UE-InputCore"
+            "UE-InputCore",
+            "UE-DesktopPlatform",
+            "UE-DirectoryWatcher",
+			"UE-Json"
         }
         prebuildcommands {
             "{COPYFILE} %{wks.location}/External/UE/Lib/Win/*.dll %{cfg.targetdir}",
@@ -37,7 +74,10 @@ usage "UE"
             "%{cfg.targetdir}/UE-Projects.dylib",
             "%{cfg.targetdir}/UE-ImageWrapper.dylib",
             "%{cfg.targetdir}/UE-CoreUObject.dylib",
-            "%{cfg.targetdir}/UE-InputCore.dylib"
+            "%{cfg.targetdir}/UE-InputCore.dylib",
+            "%{cfg.targetdir}/UE-DesktopPlatform.dylib",
+            "%{cfg.targetdir}/UE-DirectoryWatcher.dylib",
+			"%{cfg.targetdir}/UE-Json.dylib"
         }
         prebuildcommands {
             "{COPYFILE} %{wks.location}/External/UE/Lib/Mac/*.dylib %{cfg.targetdir}",

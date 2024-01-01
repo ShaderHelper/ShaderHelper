@@ -20,5 +20,5 @@ namespace FRAMEWORK
         mtlpp::RenderPipelineState PipelineState;
     };
 
-    TRefCountPtr<MetalPipelineState> CreateMetalPipelineState(const PipelineStateDesc& InPipelineStateDesc);
+    TRefCountPtr<MetalPipelineState> CreateMetalPipelineState(const GpuPipelineStateDesc& InPipelineStateDesc);
 }

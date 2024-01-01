@@ -14,6 +14,11 @@ namespace FRAMEWORK
 		ResourceStateMap.Remove(InResource);
 	}
 
+	void ResourceStateTracker::SetResourceState(TrackedResource* InResource, D3D12_RESOURCE_STATES NewState)
+	{
+		ResourceStateMap[InResource] = NewState;
+	}
+
 	D3D12_RESOURCE_STATES ResourceStateTracker::GetResourceState(TrackedResource* InResource) const
 	{
 		checkf(ResourceStateMap.Contains(InResource), TEXT("Querying the untracked resource."));
@@ -27,14 +32,14 @@ namespace FRAMEWORK
 	{
 		CurState = GResourceStateTracker.GetResourceState(Resource);
 		if (CurState != DestState) {
-			GCommandListContext->Transition(Resource->GetResource(), CurState, DestState);
+			GCommandListContext->Transition(Resource, CurState, DestState);
 		}
 	}
 
 	ScopedBarrier::~ScopedBarrier()
 	{
 		if (CurState != DestState) {
-			GCommandListContext->Transition(Resource->GetResource(), DestState, CurState);
+			GCommandListContext->Transition(Resource, DestState, CurState);
 		}
 	}
 

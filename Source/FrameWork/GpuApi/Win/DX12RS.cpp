@@ -10,43 +10,89 @@ namespace FRAMEWORK
 	{
 		switch (InType)
 		{
-		case FRAMEWORK::BindingType::UniformBuffer:	return D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+		case BindingType::Texture:			return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		case BindingType::Sampler:			return D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
 		default:
 			check(false);
-			return D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+			return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 		}
 	}
-
-	D3D12_SHADER_VISIBILITY MapShaderVisibility(BindingShaderStage InStage)
-	{
-		switch (InStage)
-		{
-		case FRAMEWORK::BindingShaderStage::Vertex:	return D3D12_SHADER_VISIBILITY_VERTEX;
-		case FRAMEWORK::BindingShaderStage::Pixel:	return D3D12_SHADER_VISIBILITY_PIXEL;
-		default:
-			return D3D12_SHADER_VISIBILITY_ALL;
-		}
-	}
-
 
 	Dx12BindGroupLayout::Dx12BindGroupLayout(const GpuBindGroupLayoutDesc& LayoutDesc)
 		: GpuBindGroupLayout(LayoutDesc)
 	{
-		for (const auto& BindingLayoutEntry : Desc.Layouts)
+
+		auto SetRootParameterInfo = [&](BindingSlot Slot,const LayoutBinding& LayoutBindingEntry, D3D12_SHADER_VISIBILITY BindingVisibility)
 		{
-			BindingSlots.Add(BindingLayoutEntry.Slot);
 			//For the moment, all uniformbuffers in the layout are bound via root descriptor.
-			if (BindingLayoutEntry.Type == BindingType::UniformBuffer)
+			if (LayoutBindingEntry.Type == BindingType::UniformBuffer)
 			{
 				CD3DX12_ROOT_PARAMETER1 DynamicBufferRootParameter;
-				DynamicBufferRootParameter.InitAsConstantBufferView(BindingLayoutEntry.Slot, Desc.GroupNumber,
-					D3D12_ROOT_DESCRIPTOR_FLAG_NONE, MapShaderVisibility(BindingLayoutEntry.Stage));
-				DynamicBufferRootParameters.Add(BindingLayoutEntry.Slot, MoveTemp(DynamicBufferRootParameter));
+				DynamicBufferRootParameter.InitAsConstantBufferView(Slot, Desc.GroupNumber,
+					D3D12_ROOT_DESCRIPTOR_FLAG_NONE, BindingVisibility);
+				DynamicBufferRootParameters.Add(Slot, MoveTemp(DynamicBufferRootParameter));
 			}
 			else
 			{
+				CD3DX12_DESCRIPTOR_RANGE1 Range{};
+				Range.RangeType = BindingTypeToDescriptorRangeType(LayoutBindingEntry.Type);
+				Range.NumDescriptors = 1;
+				Range.BaseShaderRegister = Slot;
+				Range.RegisterSpace = LayoutDesc.GroupNumber;
 
+				if (LayoutBindingEntry.Type == BindingType::Texture)
+				{
+					DescriptorTableRanges_CbvSrvUav.FindOrAdd(BindingVisibility).Add(MoveTemp(Range));
+				}
+				else if (LayoutBindingEntry.Type == BindingType::Sampler)
+				{
+					DescriptorTableRanges_Sampler.FindOrAdd(BindingVisibility).Add(MoveTemp(Range));
+				}
+				else
+				{
+					check(false);
+				}
+				
 			}
+		};
+
+		for (const auto& [Slot, LayoutBindingEntry] : Desc.Layouts)
+		{
+			BindingShaderStage RHIShaderStage = LayoutBindingEntry.Stage;
+			
+			//we dont just set it always to D3D12_SHADER_VISIBILITY_ALL, which might produce inconsistent result on different backend and have some performance impacts
+			if (EnumHasAllFlags(RHIShaderStage, BindingShaderStage::All))
+			{
+				SetRootParameterInfo(Slot, LayoutBindingEntry, D3D12_SHADER_VISIBILITY_ALL);
+			}
+			else
+			{
+				if (EnumHasAnyFlags(RHIShaderStage, BindingShaderStage::Vertex))
+				{
+					SetRootParameterInfo(Slot, LayoutBindingEntry, D3D12_SHADER_VISIBILITY_VERTEX);
+				}
+
+				if (EnumHasAnyFlags(RHIShaderStage, BindingShaderStage::Pixel))
+				{
+					SetRootParameterInfo(Slot, LayoutBindingEntry, D3D12_SHADER_VISIBILITY_PIXEL);
+				}
+			}
+		}
+
+		for (const auto& [BindingVisibility, Ranges] : DescriptorTableRanges_CbvSrvUav)
+		{
+			CD3DX12_ROOT_PARAMETER1 DescriptorTableRootParameter;
+			DescriptorTableRootParameter.InitAsDescriptorTable((uint32)Ranges.Num(), Ranges.GetData(), BindingVisibility);
+
+			DescriptorTableRootParameters_CbvSrvUav.Add(BindingVisibility, MoveTemp(DescriptorTableRootParameter));
+		}
+
+		for (const auto& [BindingVisibility, Ranges] : DescriptorTableRanges_Sampler)
+		{
+			CD3DX12_ROOT_PARAMETER1 DescriptorTableRootParameter;
+			DescriptorTableRootParameter.InitAsDescriptorTable((uint32)Ranges.Num(), Ranges.GetData(), BindingVisibility);
+
+			DescriptorTableRootParameters_Sampler.Add(BindingVisibility, MoveTemp(DescriptorTableRootParameter));
 		}
 	}
 
@@ -79,10 +125,29 @@ namespace FRAMEWORK
 	Dx12BindGroup::Dx12BindGroup(const GpuBindGroupDesc& InDesc)
 		: GpuBindGroup(InDesc)
 	{
-		for (const auto& BindingEntry : InDesc.Resources)
+		BindingGroupSlot GoupSlot = GetLayout()->GetGroupNumber();
+		TMap<D3D12_SHADER_VISIBILITY, TArray<D3D12_CPU_DESCRIPTOR_HANDLE>> SrcDescriptorRange_CbvSrvUav;
+		TMap<D3D12_SHADER_VISIBILITY, TArray<D3D12_CPU_DESCRIPTOR_HANDLE>> SrcDescriptorRange_Sampler;
+
+		auto SetBindingWithVisibility = [&](BindingSlot Slot, const ResourceBinding& ResourceBindingEntry, D3D12_SHADER_VISIBILITY BindingVisibility)
 		{
-			BindingSlot Slot = BindingEntry.Slot;
-			GpuResource* BindingResource = BindingEntry.Resource;
+			GpuResource* BindingResource = ResourceBindingEntry.Resource;
+			if (BindingResource->GetType() == GpuResourceType::Sampler)
+			{
+				Dx12Sampler* Sampler = static_cast<Dx12Sampler*>(BindingResource);
+				SrcDescriptorRange_Sampler.FindOrAdd(BindingVisibility).Add(Sampler->GetCpuDescriptor()->GetHandle());
+			}
+			else if (BindingResource->GetType() == GpuResourceType::Texture)
+			{
+				Dx12Texture* Texture = static_cast<Dx12Texture*>(BindingResource);
+				SrcDescriptorRange_CbvSrvUav.FindOrAdd(BindingVisibility).Add(Texture->SRV->GetHandle());
+			}
+		};
+
+		for (const auto& [Slot, ResourceBindingEntry] : InDesc.Resources)
+		{
+			GpuResource* BindingResource = ResourceBindingEntry.Resource;
+			BindingShaderStage RHIShaderStage = GetLayout()->GetDesc().Layouts[Slot].Stage;
 
 			if (BindingResource->GetType() == GpuResourceType::Buffer)
 			{
@@ -91,26 +156,75 @@ namespace FRAMEWORK
 			}
 			else
 			{
+				if (EnumHasAllFlags(RHIShaderStage, BindingShaderStage::All))
+				{
+					SetBindingWithVisibility(Slot, ResourceBindingEntry, D3D12_SHADER_VISIBILITY_ALL);
+				}
+				else
+				{
+					if (EnumHasAnyFlags(RHIShaderStage, BindingShaderStage::Vertex))
+					{
+						SetBindingWithVisibility(Slot, ResourceBindingEntry, D3D12_SHADER_VISIBILITY_VERTEX);
+					}
 
+					if (EnumHasAnyFlags(RHIShaderStage, BindingShaderStage::Pixel))
+					{
+						SetBindingWithVisibility(Slot, ResourceBindingEntry, D3D12_SHADER_VISIBILITY_PIXEL);
+					}
+				}
 			}
 		}
+
+		for (const auto& [DxVisibility, SrcRange] : SrcDescriptorRange_CbvSrvUav)
+		{
+			uint32 NumDescriptors = SrcRange.Num();
+			TUniquePtr<GpuDescriptorRange> GpuHeapRanges = GCommandListContext->AllocGpuCbvSrvUavRange(NumDescriptors);
+			GDevice->CopyDescriptorsSimple(NumDescriptors, GpuHeapRanges->GetCpuHandle(), *SrcRange.GetData(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			DescriptorTableStorage_CbvSrvUav.Add(DxVisibility, MoveTemp(GpuHeapRanges));
+		}
+
+		for (const auto& [DxVisibility, SrcRange] : SrcDescriptorRange_Sampler)
+		{
+			uint32 NumDescriptors = SrcRange.Num();
+			TUniquePtr<GpuDescriptorRange> GpuHeapRanges = GCommandListContext->AllocGpuSamplerRange(NumDescriptors);
+			GDevice->CopyDescriptorsSimple(NumDescriptors, GpuHeapRanges->GetCpuHandle(), *SrcRange.GetData(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+			DescriptorTableStorage_Sampler.Add(DxVisibility, MoveTemp(GpuHeapRanges));
+		}
+	
 	}
 
     void Dx12BindGroup::Apply(ID3D12GraphicsCommandList* CommandList, Dx12RootSignature* RootSig)
     {
         Dx12BindGroupLayout* Layout = static_cast<Dx12BindGroupLayout*>(GetLayout());
-        for (auto Slot : Layout->GetBindingSlots())
+		uint32 GroupSlot = Layout->GetGroupNumber();
+        for (const auto& [Slot, LayoutBindingEntry] : Layout->GetDesc().Layouts)
         {
-            D3D12_GPU_VIRTUAL_ADDRESS GpuAddr = GetDynamicBufferGpuAddr(Slot);
-            uint32 RootParameterIndex = RootSig->GetDynamicBufferRootParameterIndex(Slot, Layout->GetGroupNumber());
-            CommandList->SetGraphicsRootConstantBufferView(RootParameterIndex, GpuAddr);
+			if (LayoutBindingEntry.Type == BindingType::UniformBuffer)
+			{
+				D3D12_GPU_VIRTUAL_ADDRESS GpuAddr = GetDynamicBufferGpuAddr(Slot);
+				uint32 RootParameterIndex = RootSig->GetDynamicBufferRootParameterIndex(Slot, GroupSlot);
+				CommandList->SetGraphicsRootConstantBufferView(RootParameterIndex, GpuAddr);
+			}
+  
         }
+
+		for (int Visibility = 0; Visibility <= D3D12_SHADER_VISIBILITY_MESH; Visibility++)
+		{
+			D3D12_SHADER_VISIBILITY DxVisibility = static_cast<D3D12_SHADER_VISIBILITY>(Visibility);
+			if (RootSig->GetCbvSrvUavTableToRootParameterIndex(DxVisibility, GroupSlot))
+			{
+				uint32 RootParameterIndex = *RootSig->GetCbvSrvUavTableToRootParameterIndex(DxVisibility, GroupSlot);
+				CommandList->SetGraphicsRootDescriptorTable(RootParameterIndex, GetDescriptorTableStart_CbvSrvUav(DxVisibility));
+			}
+
+			if (RootSig->GetSamplerTableToRootParameterIndex(DxVisibility, GroupSlot))
+			{
+				uint32 RootParameterIndex = *RootSig->GetSamplerTableToRootParameterIndex(DxVisibility, GroupSlot);
+				CommandList->SetGraphicsRootDescriptorTable(RootParameterIndex, GetDescriptorTableStart_Sampler(DxVisibility));
+			}
+		}
+
     }
-
-	Dx12BindGroup::~Dx12BindGroup()
-	{
-
-	}
 
 	Dx12RootSignature::Dx12RootSignature(const RootSignatureDesc& InDesc)
 	{
@@ -119,14 +233,35 @@ namespace FRAMEWORK
 
 			if (Layout != nullptr)
 			{
-				const TArray<BindingSlot>& Slots = Layout->GetBindingSlots();
 				BindingGroupSlot CurGroupNumber = Layout->GetGroupNumber();
-				for (auto Slot : Slots)
+				//Root Descriptor
+				for (const auto& [Slot, LayoutBindingEntry] : Layout->GetDesc().Layouts)
 				{
-					RootParameters.Add(Layout->GetDynamicBufferRootParameter(Slot));
-					DynamicBufferToRootParameterIndex[CurGroupNumber].Add(Slot, RootParameters.Num() - 1);
+					if (LayoutBindingEntry.Type == BindingType::UniformBuffer)
+					{
+						RootParameters.Add(Layout->GetDynamicBufferRootParameter(Slot));
+						DynamicBufferToRootParameterIndex[CurGroupNumber].Add(Slot, RootParameters.Num() - 1);
+					}
+					
 				}
 
+				//Descriptor table
+				for (int Visibility = 0; Visibility <= D3D12_SHADER_VISIBILITY_MESH; Visibility++)
+				{
+					D3D12_SHADER_VISIBILITY DxVisibility = static_cast<D3D12_SHADER_VISIBILITY>(Visibility);
+					if (Layout->GetDescriptorTableRootParameter_CbvSrvUav(DxVisibility))
+					{
+						RootParameters.Add(*Layout->GetDescriptorTableRootParameter_CbvSrvUav(DxVisibility));
+						CbvSrvUavTableToRootParameterIndex[CurGroupNumber].Add(DxVisibility, RootParameters.Num() - 1);
+					}
+
+					if (Layout->GetDescriptorTableRootParameter_Sampler(DxVisibility))
+					{
+						RootParameters.Add(*Layout->GetDescriptorTableRootParameter_Sampler(DxVisibility));
+						SamplerTableToRootParameterIndex[CurGroupNumber].Add(DxVisibility, RootParameters.Num() - 1);
+					}
+				}
+	
 			}
 	
 		};
@@ -136,7 +271,10 @@ namespace FRAMEWORK
 		AddRootParameter(InDesc.Layout2);
 		AddRootParameter(InDesc.Layout3);
 
-		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC RootSignatureDesc = { (uint32)RootParameters.Num(), RootParameters.GetData() };
+		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC RootSignatureDesc = { 
+			(uint32)RootParameters.Num(), RootParameters.GetData(),
+		};
+
 		TRefCountPtr<ID3DBlob> Signature;
 		TRefCountPtr<ID3DBlob> Error;
 		DxCheck(D3D12SerializeVersionedRootSignature(&RootSignatureDesc, Signature.GetInitReference(), Error.GetInitReference()));

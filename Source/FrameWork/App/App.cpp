@@ -4,9 +4,11 @@
 #include <HAL/PlatformApplicationMisc.h>
 #include <StandaloneRenderer/StandaloneRenderer.h>
 #include "Common/Path/BaseResourcePath.h"
-#include "UI/Styles/FAppCommonStyle.h"
 #include <SlateCore/Fonts/SlateFontInfo.h>
 #include <Misc/OutputDeviceConsole.h>
+#include <DirectoryWatcher/DirectoryWatcherModule.h>
+#include <DirectoryWatcher/IDirectoryWatcher.h>
+#include "GpuApi/GpuApiInterface.h"
 
 namespace FRAMEWORK {
 
@@ -62,10 +64,23 @@ namespace FRAMEWORK {
 		}
 	}
 
+	App::App(const Vector2D& InClientSize, const TCHAR* CommandLine)
+		: AppClientSize(InClientSize)
+		, SavedCommandLine(CommandLine)
+	{
+		UE_Init(*SavedCommandLine);
+		GpuApi::InitApiEnv();
+	}
+
+	App::~App()
+	{
+		UE_ShutDown();
+	}
+
 	void App::Run()
 	{
-		Init();
-		PostInit();
+		double CurrentRealTime = FPlatformTime::Seconds();
+		double LastRealTime = CurrentRealTime;
 		while (!IsEngineExitRequested()) {
 #if PLATFORM_MAC
             //Ensure that NSObjects autoreleased every frame are immediately released.
@@ -73,28 +88,31 @@ namespace FRAMEWORK {
 #endif
 			BeginExitIfRequested();
 
-			double CurrentRealTime = FPlatformTime::Seconds();
-			double LastRealTime = GetCurrentTime();
-			double DeltaTime = CurrentRealTime - LastRealTime;
-			SetCurrentTime(CurrentRealTime);
-			SetDeltaTime(DeltaTime);
+			CurrentRealTime = FPlatformTime::Seconds();
+			double NewDeltaTime = CurrentRealTime - LastRealTime;
 
-			FSlateApplication::Get().PumpMessages();
+			LastRealTime = CurrentRealTime;
+			DeltaTime = NewDeltaTime;
 
 			bool bIdleMode = AreAllWindowsHidden();
 			if (!bIdleMode)
 			{
-				Update(DeltaTime);
-
-				if (AppRenderer.IsValid()) {
-					AppRenderer->Render();
+				GpuApi::BeginFrame();
+				{
+					Update(DeltaTime);
+					Render();
+					FSlateApplication::Get().PumpMessages();
+					FSlateApplication::Get().Tick();
+					//if not change GFrameCounter, slate texture may not update.
+					GFrameCounter++;
 				}
-				FSlateApplication::Get().Tick();
-				//if not change GFrameCounter, slate texture may not update.
-				GFrameCounter++;
+				GpuApi::EndFrame();
+			}
+			else
+			{
+				FSlateApplication::Get().PumpMessages();
 			}
 		}
-		ShutDown();
 	}
 
 	bool App::AreAllWindowsHidden() const
@@ -118,21 +136,16 @@ namespace FRAMEWORK {
 		return bAllHidden;
 	}
 
-	void App::Init()
+	void App::Update(double DeltaTime)
 	{
-		UE_Init(*SavedCommandLine);
-		FAppCommonStyle::Init();
+		FDirectoryWatcherModule& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>(TEXT("DirectoryWatcher"));
+		IDirectoryWatcher* DirectoryWatcher = DirectoryWatcherModule.Get();
+		DirectoryWatcher->Tick((float)DeltaTime);
 	}
 
-	void App::PostInit()
+	void App::Render()
 	{
 
-	}
-
-	void App::ShutDown()
-	{
-		UE_ShutDown();
-		FAppCommonStyle::ShutDown();
 	}
 
 }

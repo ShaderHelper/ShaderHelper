@@ -33,6 +33,9 @@ namespace FRAMEWORK
 		TSharedRef<FSlateStyleSet> Style = MakeShared<FSlateStyleSet>("AppCommonStyle");
 		Style->SetContentRoot(BaseResourcePath::Custom_SlateResourceDir);
 		Style->Set("PropertyView.RowIndentDropShadow", new IMAGE_BRUSH("DropShadow", FVector2D(2, 2)));
+		Style->Set("MessageDialog.Boqi", new IMAGE_BRUSH("Boqi", FVector2D(32.0, 32.0)));
+		Style->Set("MessageDialog.Boqi2", new IMAGE_BRUSH_SVG("Boqi2", FVector2D(32.0, 32.0)));
+		Style->Set("AssetBrowser.Folder", new IMAGE_BRUSH_SVG("folder", FVector2D(64.0, 64.0)));
 
 		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir);
 		//StarshipCoreStyle is used as the app style.
@@ -65,9 +68,23 @@ namespace FRAMEWORK
 			.SetColorAndOpacity(FStyleColors::Error)
 		);
 
-		Style->Set("PropertyView.CategoryColor", new FSlateColorBrush(FLinearColor{ 0.04f, 0.04f, 0.04f, 1.0f }));
-		Style->Set("PropertyView.ItemColor", new FSlateColorBrush(FLinearColor{ 0.02f, 0.02f, 0.02f, 1.0f }));
-		Style->Set("PropertyView.ItemHoverdColor", new FSlateColorBrush(FLinearColor{ 0.03f, 0.03f, 0.03f, 1.0f }));
+		Style->Set("PropertyView.CategoryColor", new FSlateColorBrush(FLinearColor{ 0.07f, 0.07f, 0.07f, 1.0f }));
+		Style->Set("PropertyView.ItemColor", new FSlateColorBrush(FLinearColor{ 0.04f, 0.04f, 0.04f, 1.0f }));
+		Style->Set("PropertyView.ItemHoverdColor", new FSlateColorBrush(FLinearColor{ 0.05f, 0.05f, 0.05f, 1.0f }));
+
+		const FTableRowStyle DirectoryTableRowStyle =
+			FTableRowStyle(FAppStyle::Get().GetWidgetStyle<FTableRowStyle>("SimpleTableView.Row"))
+			.SetSelectedTextColor(FStyleColors::Foreground);
+		Style->Set("DirectoryTreeView.Row", DirectoryTableRowStyle);
+
+		const FTableRowStyle AssetViewTableRowStyle =
+			FTableRowStyle(FAppStyle::Get().GetWidgetStyle<FTableRowStyle>("TableView.Row"))
+			.SetEvenRowBackgroundHoveredBrush(FSlateNoResource())
+			.SetOddRowBackgroundHoveredBrush(FSlateNoResource());
+		Style->Set("AssetView.Row", AssetViewTableRowStyle);
+
+		Style->Set("Icons.FolderPlus", new IMAGE_BRUSH_SVG("Starship/Common/folder-plus", FVector2D(16.0, 16.0)));
+
 		return Style;
 	}
 

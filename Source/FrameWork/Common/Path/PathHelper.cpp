@@ -3,7 +3,7 @@
 
 namespace FRAMEWORK {
 
-	FString PathHelper::ProjectDir()
+	FString PathHelper::WorkspaceDir()
 	{
 		FString RetDir = FString(FPlatformProcess::BaseDir()) + TEXT("../../");
 		FPaths::CollapseRelativeDirectories(RetDir);
@@ -12,17 +12,32 @@ namespace FRAMEWORK {
 
 	FString PathHelper::ResourceDir()
 	{
-		return ProjectDir() / TEXT("Resource/");
+		return WorkspaceDir() / TEXT("Resource");
 	}
 
 	FString PathHelper::ExternalDir()
 	{
-		return ProjectDir() / TEXT("External/");
+		return WorkspaceDir() / TEXT("External");
 	}
 	
 	FString PathHelper::SavedDir()
 	{
-		return ProjectDir() / TEXT("Saved/");
+		return WorkspaceDir() / TEXT("Saved");
+	}
+
+	FString PathHelper::SavedShaderDir()
+	{
+		return SavedDir() / TEXT("Shader");
+	}
+
+	FString PathHelper::SavedConfigDir()
+	{
+		return SavedDir() / TEXT("Config");
+	}
+
+	FString PathHelper::ShaderDir()
+	{
+		return ResourceDir() / TEXT("Shaders");
 	}
 
 }

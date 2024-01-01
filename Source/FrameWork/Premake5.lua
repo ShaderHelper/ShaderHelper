@@ -1,12 +1,13 @@
 FrameWorkHierarchy = {
     ["Sources/*"] = {"**.h","**.cpp", "**.hpp"},
-    ["External/d3dx12"] = {"../../External/AgilitySDK/Inc/d3dx12.h"},
-    ["External/magic_enum"] = {"../../External/magic_enum/magic_enum.hpp"},
+    ["External/d3dx12"] = {"%{_WORKING_DIR}/External/AgilitySDK/Inc/d3dx12.h"},
+    ["External/magic_enum"] = {"%{_WORKING_DIR}/External/magic_enum/magic_enum.hpp"},
     ["External/MtlppUE"] = {
-        "../../External/MtlppUE/src/*.hpp", 
-        "../../External/MtlppUE/src/*.mm", 
-        "../../External/MtlppUE/src/*.inl"
-    }
+        "%{_WORKING_DIR}/External/MtlppUE/src/*.hpp", 
+        "%{_WORKING_DIR}/External/MtlppUE/src/*.mm", 
+        "%{_WORKING_DIR}/External/MtlppUE/src/*.inl"
+    },
+	["Resource/Shaders"] = {"%{_WORKING_DIR}/Resource/Shaders/*"}
 }
 
 project "FrameWork"
@@ -35,7 +36,6 @@ project "FrameWork"
         pchsource "CommonHeader.cpp"
         
         private_uses {
-            "D3D12MemoryAllocator",
             "DXC", "AgilitySDK", "WinPixEventRuntime"
         }
     

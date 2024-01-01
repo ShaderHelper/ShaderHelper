@@ -9,15 +9,17 @@ namespace GpuApi
 	//Wait for all gpu work to finish
 	FRAMEWORK_API void FlushGpu();
 
-	FRAMEWORK_API void StartRenderFrame();
-	FRAMEWORK_API void EndRenderFrame();
+	FRAMEWORK_API void BeginFrame();
+	FRAMEWORK_API void EndFrame();
 
 	FRAMEWORK_API TRefCountPtr<GpuTexture> CreateGpuTexture(const GpuTextureDesc& InTexDesc);
 	FRAMEWORK_API TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName, FString EntryPoint);
+	FRAMEWORK_API TRefCountPtr<GpuShader> CreateShaderFromFile(FString FileName, ShaderType InType, FString EntryPoint, FString ExtraDeclaration = {});
 	FRAMEWORK_API TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc);
 	FRAMEWORK_API TRefCountPtr<GpuBindGroupLayout> CreateBindGroupLayout(const GpuBindGroupLayoutDesc& InBindGroupLayoutDesc);
-	FRAMEWORK_API TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc);
+	FRAMEWORK_API TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const GpuPipelineStateDesc& InPipelineStateDesc);
 	FRAMEWORK_API TRefCountPtr<GpuBuffer> CreateBuffer(uint32 ByteSize, GpuBufferUsage Usage);
+	FRAMEWORK_API TRefCountPtr<GpuSampler> CreateSampler(const GpuSamplerDesc& InSamplerDesc);
 
 	//Need OutRowPitch to correctly read or write data, because the mapped buffer actually contains the *padded* texture data.
 	//RowPitch != Width x ElementByteSize
@@ -36,12 +38,14 @@ namespace GpuApi
 	FRAMEWORK_API void SetRenderPipelineState(GpuPipelineState* InPipelineState);
 	
 	FRAMEWORK_API void SetVertexBuffer(GpuBuffer* InVertexBuffer);
+
+	//If omitted, it defaults to GpuApi::SetViewPort(GpuViewPortDesc{RenderTarget.Width, RenderTarget.Height}).
 	FRAMEWORK_API void SetViewPort(const GpuViewPortDesc& InViewPortDesc);
 
 	//Only support 4 BindGroups to adapt some mobile devices.
 	FRAMEWORK_API void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3);
 
-	FRAMEWORK_API void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType = PrimitiveType::Triangle);
+	FRAMEWORK_API void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount);
 	
 	FRAMEWORK_API void Submit();
 
@@ -50,7 +54,7 @@ namespace GpuApi
 	FRAMEWORK_API void BeginCaptureEvent(const FString& EventName);
 	FRAMEWORK_API void EndCpatureEvent();
 
-	//The renderer for drawing ui in UE uses dx11 as backend api, so need a shared resource.
+	//The renderer for drawing ui in UE uses dx11/opengl as backend api, so need a shared resource.
 	FRAMEWORK_API void* GetSharedHandle(GpuTexture* InGpuTexture);
     
     FRAMEWORK_API void BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName);

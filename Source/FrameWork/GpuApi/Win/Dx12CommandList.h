@@ -9,39 +9,15 @@
 
 namespace FRAMEWORK
 {
-	extern void InitFrameResource();
-
-	class StaticFrameResource : public FNoncopyable
-	{
-	public:
-		using RtvAllocatorType = CpuDescriptorAllocator<256, DescriptorType::RTV>;
-		using ShaderViewAllocatorType = GpuDescriptorAllocator<1024, DescriptorType::SHADER_VIEW>;
-		using SamplerAllocatorType = GpuDescriptorAllocator<256, DescriptorType::SAMPLER>;
-
-		struct DescriptorAllocatorStorage
-		{
-			TUniquePtr<RtvAllocatorType> RtvAllocator;
-            TUniquePtr<ShaderViewAllocatorType> ShaderViewAllocator;
-			TUniquePtr<SamplerAllocatorType> SamplerAllocator;
-		};
-		StaticFrameResource(TRefCountPtr<ID3D12CommandAllocator> InCommandAllocator, DescriptorAllocatorStorage&& InDescriptorAllocators);
-		void Reset();
-		void BindToCommandList(ID3D12GraphicsCommandList* InGraphicsCmdList);
-		const DescriptorAllocatorStorage& GetDescriptorAllocators() const { return DescriptorAllocators; }
-
-	private:
-		TRefCountPtr<ID3D12CommandAllocator> CommandAllocator;
-		DescriptorAllocatorStorage DescriptorAllocators;
-	};
+	extern void InitCommandListContext();
 
 	class CommandListContext
 	{
 	public:
-		using FrameResourceStorage = TArray<StaticFrameResource, TFixedAllocator<FrameSourceNum>>;
-        CommandListContext(FrameResourceStorage InitFrameResources, TRefCountPtr<ID3D12GraphicsCommandList> InGraphicsCmdList);
+        CommandListContext();
         
     public:
-		ID3D12GraphicsCommandList* GetCommandListHandle() const { return GraphicsCmdList; }
+		ID3D12GraphicsCommandList* GetCommandListHandle();
 
         void SetPipeline(Dx12Pso* InPso) 
 		{ 
@@ -71,7 +47,7 @@ namespace FRAMEWORK
 			}
 			
 		}
-        void SetPrimitiveType(PrimitiveType InType) { DrawType = InType; }
+
 		void SetRootSignature(Dx12RootSignature* InRootSignature) 
 		{ 
 			if (CurrentRootSignature != InRootSignature)
@@ -104,10 +80,10 @@ namespace FRAMEWORK
 
         void SetViewPort(D3D12_VIEWPORT InViewPort, D3D12_RECT InSissorRect) 
 		{
-			if (!CurrentViewPort || FMemory::Memcmp(CurrentViewPort.Get(), &InViewPort, sizeof(D3D12_VIEWPORT)))
+			if (!CurrentViewPort || FMemory::Memcmp(&*CurrentViewPort, &InViewPort, sizeof(D3D12_VIEWPORT)))
 			{
-				CurrentViewPort = MakeUnique<D3D12_VIEWPORT>(MoveTemp(InViewPort));
-				CurrentSissorRect = MakeUnique<D3D12_RECT>(MoveTemp(InSissorRect));
+				CurrentViewPort = MoveTemp(InViewPort);
+				CurrentSissorRect = MoveTemp(InSissorRect);
 				MarkViewportDirty(true);
 			}
         }
@@ -125,24 +101,62 @@ namespace FRAMEWORK
 		void MarkBindGroup3Dirty(bool IsDirty) { IsBindGroup3Dirty = IsDirty; }
         
         void ClearBinding();
+
+		bool IsClose() { return bCmdListClose; }
         
     public:
-		void ResetStaticFrameResource(uint32 FrameResourceIndex);
-		void BindStaticFrameResource(uint32 FrameResourceIndex);
-		const StaticFrameResource& GetCurFrameResource() const {
-			uint32 Index = GetCurFrameSourceIndex();
-			return FrameResources[Index];
-		}
-		void Transition(ID3D12Resource* InResource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After);
+		void Transition(TrackedResource* InResource, D3D12_RESOURCE_STATES Before, D3D12_RESOURCE_STATES After);
+		void SubmitCommandList();
+
+	public:
+		void InitCommandListState();
+		TRefCountPtr<ID3D12CommandAllocator> RetrieveFreeCommandAllocator();
+
+		TUniquePtr<CpuDescriptor> AllocRtv();
+		TUniquePtr<CpuDescriptor> AllocSampler();
+		TUniquePtr<CpuDescriptor> AllocCpuCbvSrvUav();
+		TUniquePtr<GpuDescriptorRange> AllocGpuCbvSrvUavRange(uint32 InDescriptorNum);
+		TUniquePtr<GpuDescriptorRange> AllocGpuSamplerRange(uint32 InDescriptorNum);
+
         
 	private:
-		FrameResourceStorage FrameResources;
+		class PendingCommandAllocator
+		{
+		public:
+			PendingCommandAllocator() = default;
+			PendingCommandAllocator(TRefCountPtr<ID3D12CommandAllocator> InCmdAllocator);
+
+			bool IsFree() { 
+				return !!Fence->GetCompletedValue(); 
+			}
+			void Reset() { 
+				DxCheck(CommandAllocator->Reset()); 
+			}
+			
+			operator TRefCountPtr<ID3D12CommandAllocator>() const { return CommandAllocator; }
+
+		private:
+			TRefCountPtr<ID3D12CommandAllocator> CommandAllocator;
+			TRefCountPtr<ID3D12Fence> Fence;
+		};
+
+		bool bCmdListClose;
 		TRefCountPtr<ID3D12GraphicsCommandList> GraphicsCmdList;
+		TRefCountPtr<ID3D12CommandAllocator> CommandAllocator;
+		//Command Allocators that have already been submitted to GPU.
+		TArray<PendingCommandAllocator> PendingCommandAllocators;
+		TQueue<TRefCountPtr<ID3D12CommandAllocator>> FreeCommandAllocatorPool;
+
+		CpuDescriptorAllocator RtvAllocator;
+		CpuDescriptorAllocator Cpu_CbvSrvUavAllocator;
+		GpuDescriptorAllocator Gpu_CbvSrvUavAllocator;
+		CpuDescriptorAllocator Cpu_SamplerAllocator;
+		GpuDescriptorAllocator Gpu_SamplerAllocator;
+		
 		Dx12Pso* CurrentPso;
 		Dx12Buffer* CurrentVertexBuffer;
-		PrimitiveType DrawType;
-		TUniquePtr<D3D12_VIEWPORT> CurrentViewPort;
-		TUniquePtr<D3D12_RECT> CurrentSissorRect;
+		TOptional<D3D12_VIEWPORT> CurrentViewPort;
+		TOptional<D3D12_RECT> CurrentSissorRect;
         TArray<Dx12Texture*> CurrentRenderTargets;
         TArray<TOptional<Vector4f>> ClearColorValues;
 
