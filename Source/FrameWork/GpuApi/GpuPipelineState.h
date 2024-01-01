@@ -11,36 +11,36 @@ namespace FRAMEWORK
         RasterizerCullMode CullMode;
     };
 
-    struct BlendRenderTargetDesc
+    struct PipelineTargetDesc
     {
-        bool BlendEnable;
-        BlendFactor SrcFactor;
-        BlendFactor DestFactor;
-        BlendFactor SrcAlphaFactor;
-        BlendFactor DestAlphaFactor;
-        BlendOp ColorOp;
-        BlendOp AlphaOp;
+		GpuTextureFormat TargetFormat;
 
+		bool BlendEnable = false;
+		BlendFactor SrcFactor = BlendFactor::SrcAlpha;
+		BlendOp ColorOp = BlendOp::Add;
+		BlendFactor DestFactor = BlendFactor::InvSrcAlpha;
+		BlendFactor SrcAlphaFactor = BlendFactor::One;
+		BlendOp AlphaOp = BlendOp::Add;
+		BlendFactor DestAlphaFactor = BlendFactor::One;
 		BlendMask Mask = BlendMask::All;
     };
 
-    struct BlendStateDesc
-    {
-		TArray<BlendRenderTargetDesc, TFixedAllocator<GpuResourceLimit::MaxRenderTargetNum>> RtDescs;
-    };
-
-    struct PipelineStateDesc
+    struct GpuPipelineStateDesc
     {
         GpuShader* Vs;
         GpuShader* Ps;
-        RasterizerStateDesc RasterizerState;
-        BlendStateDesc BlendState;
-		TArray<GpuTextureFormat, TFixedAllocator<GpuResourceLimit::MaxRenderTargetNum>> RtFormats;
+		TArray<PipelineTargetDesc, TFixedAllocator<GpuResourceLimit::MaxRenderTargetNum>> Targets;
 
-		GpuBindGroupLayout* BindGroupLayout0 = nullptr;
-		GpuBindGroupLayout* BindGroupLayout1 = nullptr;
-		GpuBindGroupLayout* BindGroupLayout2 = nullptr;
-		GpuBindGroupLayout* BindGroupLayout3 = nullptr;
+		struct
+		{
+			GpuBindGroupLayout* BindGroupLayout0 = nullptr;
+			GpuBindGroupLayout* BindGroupLayout1 = nullptr;
+			GpuBindGroupLayout* BindGroupLayout2 = nullptr;
+			GpuBindGroupLayout* BindGroupLayout3 = nullptr;
+		};
+
+		RasterizerStateDesc RasterizerState{ RasterizerFillMode::Solid, RasterizerCullMode::None };
+		PrimitiveType Primitive = PrimitiveType::TriangleList;
     };
 
     class GpuPipelineState : public GpuResource

@@ -39,7 +39,7 @@ namespace SH
 		ShaderMarshaller = MakeShared<FShaderEditorMarshaller>(this, MakeShared<HlslHighLightTokenizer>());
 		EffectMarshller = MakeShared<FShaderEditorEffectMarshaller>(this);
 
-		FText InitialShaderText = InArgs._Text;
+		FText InitialShaderText = FText::FromString(Renderer->GetDefaultPixelShaderBody());
 
 		ChildSlot
 		[
@@ -227,13 +227,13 @@ namespace SH
 							CodeFontInfo.Size = i;
 							ShaderMarshaller->MakeDirty();
 							ShaderMultiLineEditableText->Refresh();
-						})
-						, FCanExecuteAction(),
-							FIsActionChecked::CreateLambda(
-								[=]()
-								{
-									return CodeFontInfo.Size == i;
-								})),
+						}), 
+						FCanExecuteAction(),
+						FIsActionChecked::CreateLambda(
+						[=]()
+						{
+							return CodeFontInfo.Size == i;
+						})),
 						NAME_None,
 						EUserInterfaceActionType::RadioButton);
 			}
@@ -682,16 +682,12 @@ namespace SH
 	bool SShaderEditorBox::OnShaderTextChanged(const FString& NewShaderSouce)
 	{
 		CurrentShaderSource = NewShaderSouce;
-		FString PixelShaderInput = ShRenderer::DefaultPixelShaderInput;
-		FString PixelShaderMacro = ShRenderer::DefaultPixelShaderMacro;
-		FString ShaderResourceDeclaration = Renderer->GetResourceDeclaration();
+		FString ShaderResourceDeclaration = Renderer->GetPixelShaderDeclaration();
 
 		TArray<FString> AddedLines;
-		int32 AddedLineNum = PixelShaderInput.ParseIntoArrayLines(AddedLines, false) - 1;
-		AddedLineNum += PixelShaderMacro.ParseIntoArrayLines(AddedLines, false) - 1;
-		AddedLineNum += ShaderResourceDeclaration.ParseIntoArrayLines(AddedLines, false) - 1;
+		int32 AddedLineNum = ShaderResourceDeclaration.ParseIntoArrayLines(AddedLines, false) - 1;
 
-		FString FinalShaderSource = PixelShaderInput + ShaderResourceDeclaration + PixelShaderMacro + NewShaderSouce;
+		FString FinalShaderSource = ShaderResourceDeclaration + NewShaderSouce;
 		if (CurrentFullShaderSource == FinalShaderSource)
 		{
 			return CurEditState == EditState::Normal;
@@ -710,7 +706,6 @@ namespace SH
 		else
 		{
 			CurEditState = EditState::Failed;
-			Renderer->UpdatePixelShader(nullptr);
 			TArray<ShaderErrorInfo> ErrorInfos = ParseErrorInfoFromDxc(ErrorInfo);
 			for (const ShaderErrorInfo& ErrorInfo : ErrorInfos)
 			{

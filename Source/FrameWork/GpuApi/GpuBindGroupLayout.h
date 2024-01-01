@@ -1,5 +1,6 @@
 #pragma once
 #include "GpuResourceCommon.h"
+#include <Core/Containers/SortedMap.h>
 
 namespace FRAMEWORK
 {
@@ -18,35 +19,50 @@ namespace FRAMEWORK
 	enum class BindingType
 	{
 		UniformBuffer,
+		Texture,
+		Sampler,
 	};
 
 	struct LayoutBinding
 	{
-		BindingSlot Slot;
 		BindingType Type;
 		BindingShaderStage Stage = BindingShaderStage::All;
+		
+		bool operator==(const LayoutBinding& Other) const
+		{
+			return Type == Other.Type && Stage == Other.Stage;
+		}
+
+		friend uint32 GetTypeHash(const LayoutBinding& Key)
+		{
+			return HashCombine(::GetTypeHash(Key.Type), ::GetTypeHash(Key.Stage));
+		}
 	};
-	//Make sure there are no padding bytes.
-	static_assert(std::has_unique_object_representations_v<LayoutBinding>);
 
 	struct GpuBindGroupLayoutDesc
 	{
 		
 		bool operator==(const GpuBindGroupLayoutDesc& Other) const
 		{
-			return GroupNumber == Other.GroupNumber && 
-				!FMemory::Memcmp(Layouts.GetData(), Other.Layouts.GetData(), sizeof(LayoutBinding) * Layouts.Num());
+			return GroupNumber == Other.GroupNumber && Layouts == Other.Layouts;
 		}
 
 		friend uint32 GetTypeHash(const GpuBindGroupLayoutDesc& Key)
 		{
-			//Assume the LayoutBinding type is trivially comparable.
-			uint32 Hash = FCrc::MemCrc32(Key.Layouts.GetData(), sizeof(LayoutBinding) * Key.Layouts.Num());
-			return HashCombine(Hash, ::GetTypeHash(Key.GroupNumber));
+			uint32 Hash = ::GetTypeHash(Key.GroupNumber);
+			for (const auto& [K, V] : Key.Layouts)
+			{
+				Hash = HashCombine(Hash, ::GetTypeHash(K));
+				Hash = HashCombine(Hash, GetTypeHash(V));
+			}
+			return Hash;
 		}
 
 		BindingGroupSlot GroupNumber;
-		TArray<LayoutBinding> Layouts;
+		TSortedMap<BindingSlot, LayoutBinding> Layouts;
+
+		FString CodegenDeclaration;
+		TMap<FString, BindingSlot> CodegenBindingNameToSlot;
 	};
 
 	class GpuBindGroupLayout : public GpuResource
@@ -61,8 +77,30 @@ namespace FRAMEWORK
 			return Desc;
 		}
 		BindingGroupSlot GetGroupNumber() const { return Desc.GroupNumber; }
+		FString GetCodegenDeclaration() const { return Desc.CodegenDeclaration; }
 
 	protected:
 		GpuBindGroupLayoutDesc Desc;
 	};
+
+	class FRAMEWORK_API GpuBindGroupLayoutBuilder
+	{
+	public:
+		GpuBindGroupLayoutBuilder(BindingGroupSlot InGroupSlot);
+		//!! If have bindings that are not from codegen, must first call this method for each binding, to make sure the bindings are compact.
+		GpuBindGroupLayoutBuilder& AddExistingBinding(BindingSlot InSlot, BindingType ResourceType, BindingShaderStage InStage = BindingShaderStage::All);
+
+		//Add the codegen bindings, then get the CodegenDeclaration that will be injected into a shader.
+		GpuBindGroupLayoutBuilder& AddUniformBuffer(const FString& BindingName, const FString& UniformBufferLayoutDeclaration, BindingShaderStage InStage = BindingShaderStage::All);
+		GpuBindGroupLayoutBuilder& AddTexture(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
+		//TODO StaticSampler ? It will be embed into BingGroupLayout, vulkan has the same concept, but metal might not have.
+		GpuBindGroupLayoutBuilder& AddSampler(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
+
+		TRefCountPtr<GpuBindGroupLayout> Build();
+
+	private:
+		BindingSlot AutoSlot;
+		GpuBindGroupLayoutDesc LayoutDesc;
+	};
+
 }

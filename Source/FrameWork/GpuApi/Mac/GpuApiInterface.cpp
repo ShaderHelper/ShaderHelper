@@ -29,13 +29,13 @@ namespace GpuApi
         GetCommandListContext()->SetCommandBuffer(GCommandQueue.CommandBuffer());
 	}
 
-	void StartRenderFrame()
+	void BeginFrame()
 	{
         GCaptureScope.BeginScope();
         GetCommandListContext()->SetCommandBuffer(GCommandQueue.CommandBuffer());
 	}
 
-	void EndRenderFrame()
+	void EndFrame()
 	{
         FlushGpu();
         GCaptureScope.EndScope();
@@ -116,6 +116,11 @@ namespace GpuApi
         return AUX::StaticCastRefCountPtr<GpuShader>(CreateMetalShader(InType, MoveTemp(InSourceText), MoveTemp(InShaderName), MoveTemp(EntryPoint)));
 	}
 
+	TRefCountPtr<GpuShader> CreateShaderFromFile(ShaderType InType, const FString& FileName, FString EntryPoint)
+	{
+
+	}
+
 	TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc)
 	{
         check(ValidateCreateBindGroup(InBindGroupDesc));
@@ -138,14 +143,20 @@ namespace GpuApi
         return CompileShaderFromHlsl(static_cast<MetalShader*>(InShader), OutErrorInfo);
     }
 
-	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const PipelineStateDesc& InPipelineStateDesc)
+	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const GpuPipelineStateDesc& InPipelineStateDesc)
 	{
+		check(ValidateCreateRenderPipelineState(InPipelineStateDesc));
         return AUX::StaticCastRefCountPtr<GpuPipelineState>(CreateMetalPipelineState(InPipelineStateDesc));
 	}
 
 	TRefCountPtr<GpuBuffer> CreateBuffer(uint32 ByteSize, GpuBufferUsage Usage)
 	{
         return AUX::StaticCastRefCountPtr<GpuBuffer>(CreateMetalBuffer(ByteSize, Usage));
+	}
+
+	TRefCountPtr<GpuSampler> CreateSampler(const GpuSamplerDesc& InSamplerDesc)
+	{
+
 	}
 
 	void SetRenderPipelineState(GpuPipelineState* InPipelineState)
@@ -181,7 +192,7 @@ namespace GpuApi
         );
 	}
 
-	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount, PrimitiveType InType)
+	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount)
 	{
         GetCommandListContext()->PrepareDrawingEnv();
         id<MTLRenderCommandEncoder> RenderCommandEncoder = GetCommandListContext()->GetRenderCommandEncoder();

@@ -6,7 +6,8 @@ namespace FRAMEWORK
 {
 	struct GpuViewPortDesc
 	{
-		uint32 Width, Height;
+		float Width;
+		float Height;
 
 		float ZMin = 0.0f;
 		float ZMax = 1.0f;

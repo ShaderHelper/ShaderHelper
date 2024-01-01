@@ -1,16 +1,14 @@
 #include "CommonHeader.h"
 #include "Renderer.h"
 #include "GpuApi/GpuApiInterface.h"
-#include "Renderer/RenderResource/RenderResourceUtil.h"
 
 namespace FRAMEWORK
 {
 
-    Renderer::Renderer()
-    {
-        GpuApi::InitApiEnv();
-		RenderResourceUtil::Init();
-    }
+	Renderer::Renderer()
+	{
+
+	}
 
     void Renderer::Render()
     {
@@ -23,12 +21,12 @@ namespace FRAMEWORK
 
     void Renderer::RenderBegin()
     {
-        GpuApi::StartRenderFrame();
+        
     }
 
     void Renderer::RenderEnd()
     {
-        GpuApi::EndRenderFrame();
+        
     }
 
 }

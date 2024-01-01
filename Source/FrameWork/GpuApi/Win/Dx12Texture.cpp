@@ -20,13 +20,6 @@ namespace FRAMEWORK
 
 	}
 
-	Dx12Texture::~Dx12Texture()
-	{
-		auto& DescriptorAllocators = GCommandListContext->GetCurFrameResource().GetDescriptorAllocators();
-		DescriptorAllocators.RtvAllocator->Free(HandleRTV);
-		DescriptorAllocators.ShaderViewAllocator->Free(HandleSRV);
-	}
-
 	static bool ValidateTexture(const GpuTextureDesc& InTexDesc)
 	{
 		if (InTexDesc.Width <= 0 || InTexDesc.Height <= 0) {
@@ -80,16 +73,15 @@ namespace FRAMEWORK
 
 	static void CreateTextureView(const FlagSets& InFlags, Dx12Texture* InTexture)
 	{
-		auto& DescriptorAllocators = GCommandListContext->GetCurFrameResource().GetDescriptorAllocators();
-		D3D12_CPU_DESCRIPTOR_HANDLE Hanlde{};
+
 		if (InFlags.bSRV) {
-			InTexture->HandleSRV = DescriptorAllocators.ShaderViewAllocator->Allocate();
-			GDevice->CreateShaderResourceView(InTexture->GetResource(), nullptr, InTexture->HandleSRV.CpuHandle);
+			InTexture->SRV = GCommandListContext->AllocCpuCbvSrvUav();
+			GDevice->CreateShaderResourceView(InTexture->GetResource(), nullptr, InTexture->SRV->GetHandle());
 		}
 
 		if (InFlags.bRTV) {
-			InTexture->HandleRTV = DescriptorAllocators.RtvAllocator->Allocate();
-			GDevice->CreateRenderTargetView(InTexture->GetResource(), nullptr, InTexture->HandleRTV.CpuHandle);
+			InTexture->RTV = GCommandListContext->AllocRtv();
+			GDevice->CreateRenderTargetView(InTexture->GetResource(), nullptr, InTexture->RTV->GetHandle());
 		}
 	}
 
@@ -144,6 +136,7 @@ namespace FRAMEWORK
 			DxCheck(GDevice->CreateCommittedResource(&HeapType, HeapFlag,
 				&TexDesc, ActualState, nullptr, IID_PPV_ARGS(TexResource.GetInitReference())));
 		}
+		TexResource->SetName(TEXT("Texture"));
 
 		TRefCountPtr<Dx12Buffer> UploadBuffer;
 		if (bHasInitialData) {
@@ -157,7 +150,8 @@ namespace FRAMEWORK
 
 			const CommonAllocationData& AllocationData = UploadBuffer->GetAllocation().GetAllocationData().Get<CommonAllocationData>();
 			UpdateSubresources(GCommandListContext->GetCommandListHandle(), TexResource, AllocationData.UnderlyResource, 0, 0, 1, &textureData);
-			GCommandListContext->Transition(TexResource, ActualState, InitialState);
+			CD3DX12_RESOURCE_BARRIER Barrier = CD3DX12_RESOURCE_BARRIER::Transition(TexResource, ActualState, InitialState);
+			GCommandListContext->GetCommandListHandle()->ResourceBarrier(1, &Barrier);
 		}
 
 		void* SharedHandle = nullptr;
@@ -172,4 +166,38 @@ namespace FRAMEWORK
 
 		return RetTexture;
 	}
+
+	TRefCountPtr<Dx12Sampler> CreateDx12Sampler(const GpuSamplerDesc& InSamplerDesc)
+	{
+		D3D12_SAMPLER_DESC DxSamplerDesc{};
+		DxSamplerDesc.AddressU = MapTextureAddressMode(InSamplerDesc.AddressU);
+		DxSamplerDesc.AddressV = MapTextureAddressMode(InSamplerDesc.AddressV);
+		DxSamplerDesc.AddressW = MapTextureAddressMode(InSamplerDesc.AddressW);
+		DxSamplerDesc.ComparisonFunc = MapComparisonFunc(InSamplerDesc.Compare);
+		DxSamplerDesc.MipLODBias = 0;
+		DxSamplerDesc.MaxAnisotropy = 1;
+		DxSamplerDesc.MinLOD = 0;
+		DxSamplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
+
+		bool ComparisonEnable = InSamplerDesc.Compare != CompareMode::Never;
+
+		switch (InSamplerDesc.Filer)
+		{
+		case SamplerFilter::Point:			
+			DxSamplerDesc.Filter = ComparisonEnable ? D3D12_FILTER_COMPARISON_MIN_MAG_MIP_POINT : D3D12_FILTER_MIN_MAG_MIP_POINT;
+			break;
+		case SamplerFilter::Bilinear:
+			DxSamplerDesc.Filter = ComparisonEnable ? D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT : D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+			break;
+		case SamplerFilter::Trilinear:
+			DxSamplerDesc.Filter = ComparisonEnable ? D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR : D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+			break;
+		}
+
+		TUniquePtr<CpuDescriptor> SamplerDescriptor = GCommandListContext->AllocSampler();
+		GDevice->CreateSampler(&DxSamplerDesc, SamplerDescriptor->GetHandle());
+
+		return new Dx12Sampler(MoveTemp(SamplerDescriptor));
+	}
+
 }

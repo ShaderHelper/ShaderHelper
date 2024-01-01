@@ -1,7 +1,9 @@
 {
-	"BuildId": "a361bd38-3bc1-43e5-8a82-16059b7ea6fc",
+	"BuildId": "a361bd38-3bc1-43e5-8a82-16059b7ea6fd",
 	"Modules": 
 	{
+		"DesktopPlatform": "UE-DesktopPlatform.dylib",
+		"DirectoryWatcher": "UE-DirectoryWatcher.dylib",
 		"ApplicationCore": "UE-ApplicationCore.dylib",
 		"BuildSettings": "UE-BuildSettings.dylib",
 		"Core": "UE-Core.dylib",

@@ -1,7 +1,6 @@
 include "Premake/Custom.lua"
 
 external_ue = "External/UE"
-external_d3d12memallocator = "External/D3D12MemoryAllocator"
 external_dxcompiler = "External/DXC"
 external_agilitysdk = "External/AgilitySDK"
 external_pix = "External/WinPixEventRuntime"
@@ -11,7 +10,8 @@ external_magicenum = "External/magic_enum"
 
 project_shaderHelper = "Source/ShaderHelper"
 project_frameWork = "Source/FrameWork"
-project_unitTestFrameWork = "Source/Tests/UnitTestFrameWork"
+project_unitTestUtil = "Source/Tests/UnitTestUtil"
+project_unitTestGpuApi = "Source/Tests/UnitTestGpuApi"
 
 newoption {
     trigger = "UniversalBinary",
@@ -95,11 +95,9 @@ workspace "ShaderHelper"
     filter {"system:macosx","files:**/Win/*.cpp"}
         flags {"ExcludeFromBuild"}
 
-    filter {"system:windows","files:**/Mac/*.cpp"}
+    filter {"system:windows","files:**/Mac/*.cpp or **.mm or **.hlsl"}
         flags {"ExcludeFromBuild"}
-
-    filter {"system:windows","files:**.mm"}
-        flags {"ExcludeFromBuild"}
+	
 
     filter {"configurations:Debug"}
         optimize "Off"
@@ -108,7 +106,6 @@ workspace "ShaderHelper"
 		optimize "On"
 
 include(external_ue)
-include(external_d3d12memallocator)
 include(external_dxcompiler)
 include(external_agilitysdk)
 include(external_pix)
@@ -119,4 +116,5 @@ include(external_magicenum)
 include(project_shaderHelper)
 include(project_frameWork)
 group("Tests")
-    include(project_unitTestFrameWork)
+    include(project_unitTestUtil)
+	include(project_unitTestGpuApi)
