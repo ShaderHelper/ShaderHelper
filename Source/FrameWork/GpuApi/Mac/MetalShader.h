@@ -11,12 +11,15 @@ namespace FRAMEWORK
         
     public:
         id<MTLFunction> GetCompilationResult() const { return ByteCodeFunc; }
+        const FString& GetMslText() const { return MslText; }
         
         virtual bool IsCompiled() const override { return (bool)ByteCodeFunc; }
         void SetCompilationResult(mtlpp::Function InByteCodeFunc) { ByteCodeFunc = MoveTemp(InByteCodeFunc); }
+        void SetMslText(FString InText) { MslText = MoveTemp(InText); }
         
     private:
         mtlpp::Function ByteCodeFunc;
+        FString MslText;
     };
     
     TRefCountPtr<MetalShader> CreateMetalShader(FString FileName, ShaderType InType, FString ExtraDeclaration,

@@ -19,6 +19,7 @@ namespace GpuApi
 	void InitApiEnv()
 	{
         InitMetalCore();
+        GetCommandListContext()->SetCommandBuffer(GCommandQueue.CommandBuffer());
 	}
 
 	void FlushGpu()
@@ -32,7 +33,6 @@ namespace GpuApi
 	void BeginFrame()
 	{
         GCaptureScope.BeginScope();
-        GetCommandListContext()->SetCommandBuffer(GCommandQueue.CommandBuffer());
 	}
 
 	void EndFrame()
@@ -131,11 +131,6 @@ namespace GpuApi
 	{
         check(ValidateCreateBindGroupLayout(InBindGroupLayoutDesc));
         return AUX::StaticCastRefCountPtr<GpuBindGroupLayout>(CreateMetalBindGroupLayout(InBindGroupLayoutDesc));
-	}
-
-	bool CompileShader(GpuShader* InShader, FString& OutErrorInfo)
-	{
-        return FRAMEWORK::CompileShader(static_cast<MetalShader*>(InShader), OutErrorInfo);
 	}
 
     bool CrossCompileShader(GpuShader* InShader, FString& OutErrorInfo)

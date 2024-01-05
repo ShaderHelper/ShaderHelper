@@ -69,6 +69,7 @@ namespace FRAMEWORK
 			InDirectoryData->Children.Add(SubDirectoryData);
 			PopulateDirectoryData(SubDirectoryData, DirectoryPath / SubDirectoryName);
 		}
+        SortSubDirectory(DirectoryPath);
 
 		if (DirectoriesToExpand.Contains(DirectoryPath))
 		{

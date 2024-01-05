@@ -39,14 +39,19 @@ namespace FRAMEWORK
 			.AutoHeight()
 			.HAlign(HAlign_Center)
 			[
-				SAssignNew(FolderEditableTextBlock, SInlineEditableTextBlock)
-				.Font(FAppStyle::Get().GetFontStyle("SmallFont"))
-				.Text(FText::FromString(FPaths::GetBaseFilename(Path)))
-				.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
-					FString NewFolderPath =  FPaths::GetPath(Path) / NewText.ToString();
-					IFileManager::Get().Move(*NewFolderPath, *Path);
-				})
-				.OverflowPolicy(ETextOverflowPolicy::Ellipsis)
+                SNew(SBox)
+                .Padding(FMargin(2.0f, 0.0f, 2.0f, 0.0f))
+                [
+                    SAssignNew(FolderEditableTextBlock, SInlineEditableTextBlock)
+                    .Font(FAppStyle::Get().GetFontStyle("SmallFont"))
+                    .Text(FText::FromString(FPaths::GetBaseFilename(Path)))
+                    .OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
+                        FString NewFolderPath =  FPaths::GetPath(Path) / NewText.ToString();
+                        IFileManager::Get().Move(*NewFolderPath, *Path);
+                    })
+                    .OverflowPolicy(ETextOverflowPolicy::Ellipsis)
+                ]
+				
 			]
 		);
 

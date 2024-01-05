@@ -1,6 +1,7 @@
 #include "CommonHeader.h"
 #include "SAssetBrowser.h"
 #include "SAssetView.h"
+#include "AssetManager/AssetManager.h"
 #include <DirectoryWatcher/DirectoryWatcherModule.h>
 #include <DirectoryWatcher/IDirectoryWatcher.h>
 
@@ -95,9 +96,14 @@ namespace FRAMEWORK
 					AssetView->RemoveFolder(FullFileName);
 				}
 			}
-			else
+			else if(TSingleton<AssetManager>::Get().GetManageredExts().Contains(Extension))
 			{
-				if (FileChange.Action == FFileChangeData::FCA_Added)
+#if PLATFORM_MAC
+                //There is only a modified event on mac when a file have been added?
+                if (FileChange.Action == FFileChangeData::FCA_Modified)
+#else
+                if (FileChange.Action == FFileChangeData::FCA_Added)
+#endif
 				{
 					AssetView->AddFile(FullFileName);
 				}

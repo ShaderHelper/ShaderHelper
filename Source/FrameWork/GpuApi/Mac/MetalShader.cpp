@@ -15,21 +15,25 @@ namespace FRAMEWORK
         return new MetalShader(MoveTemp(FileName), InType, MoveTemp(ExtraDeclaration), MoveTemp(EntryPoint));
     }
 
-    bool CompileShader(TRefCountPtr<MetalShader> InShader, FString& OutErrorInfo)
+    bool CompileShaderFromMSL(TRefCountPtr<MetalShader> InShader, FString& OutErrorInfo)
     {
+        check(!InShader->GetMslText().IsEmpty());
+        
         ns::AutoReleasedError Err;
         mtlpp::CompileOptions CompOpt;
-        mtlpp::Library ByteCodeLib = GDevice.NewLibrary(TCHAR_TO_ANSI(*InShader->GetSourceText()), CompOpt, &Err);
+        CompOpt.SetLanguageVersion(mtlpp::LanguageVersion::Version2_2);
+        
+        mtlpp::Library ByteCodeLib = GDevice.NewLibrary(TCHAR_TO_ANSI(*InShader->GetMslText()), CompOpt, &Err);
         
         if(!ByteCodeLib) {
-            SH_LOG(LogMetal, Error, TEXT("Shader compilation failed: %s"), ConvertOcError(Err.GetPtr()));
-			OutErrorInfo = ConvertOcError(Err.GetPtr());
+            OutErrorInfo = [Err.GetPtr() localizedDescription];
+            SH_LOG(LogMetal, Error, TEXT("Msl compilation failed: %s"), *OutErrorInfo);
             return false;
         }
         
         mtlpp::Function ByteCodeFunc = ByteCodeLib.NewFunction(TCHAR_TO_ANSI(*InShader->GetEntryPoint()));
         if(!ByteCodeFunc) {
-            SH_LOG(LogMetal, Error, TEXT("Shader compilation failed: EntryPoint not found: %s "), *InShader->GetEntryPoint());
+            SH_LOG(LogMetal, Error, TEXT("Msl compilation failed: EntryPoint not found: %s "), *InShader->GetEntryPoint());
             return false;
         }
         InShader->SetCompilationResult(MoveTemp(ByteCodeFunc));
@@ -99,23 +103,23 @@ namespace FRAMEWORK
         if(Result.errorWarningMsg.Size() > 0)
         {
             FString ErrorInfo = static_cast<const char*>(Result.errorWarningMsg.Data());
-            SH_LOG(LogMetal, Error, TEXT("Shader cross compilation failed: %s"), *ErrorInfo);
+            SH_LOG(LogMetal, Error, TEXT("Hlsl compilation failed: %s"), *ErrorInfo);
 			OutErrorInfo = MoveTemp(ErrorInfo);
             return false;
         }
         
         FString MslSourceText = {static_cast<const char*>(Result.target.Data()), (int32)Result.target.Size()};
-        TRefCountPtr<MetalShader> TempShader = new MetalShader{InShader->GetShaderType(), MoveTemp(MslSourceText), {}, InShader->GetEntryPoint()};
+        InShader->SetMslText(MoveTemp(MslSourceText));
         
         FString MslErrorInfo;
-        bool IsSuccessfullyCompiledMsl = CompileShader(TempShader, MslErrorInfo);
+        bool IsSuccessfullyCompiledMsl = CompileShaderFromMSL(InShader, MslErrorInfo);
         
         if(!IsSuccessfullyCompiledMsl)
         {
+            OutErrorInfo = MoveTemp(MslErrorInfo);
             return false;
         }
         
-        InShader->SetCompilationResult(TempShader->GetCompilationResult());
         return true;
 
     }
