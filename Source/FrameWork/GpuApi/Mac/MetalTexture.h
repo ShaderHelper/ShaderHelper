@@ -5,6 +5,22 @@
 
 namespace FRAMEWORK
 {
+    
+    class MetalSampler : public GpuSampler
+    {
+    public:
+        MetalSampler(mtlpp::SamplerState InSampler)
+            : Sampler(MoveTemp(InSampler))
+        {}
+        
+        id<MTLSamplerState> GetResource() const {
+            return Sampler.GetPtr();
+        }
+        
+    private:
+        mtlpp::SamplerState Sampler;
+    };
+
 	class MetalTexture : public GpuTexture
 	{
     public:
@@ -29,6 +45,7 @@ namespace FRAMEWORK
         }
         
     public:
+        TRefCountPtr<MetalBuffer> UploadBuffer;
         TRefCountPtr<MetalBuffer> ReadBackBuffer;
         
     private:
@@ -38,4 +55,6 @@ namespace FRAMEWORK
 
     TRefCountPtr<MetalTexture> CreateMetalTexture2D(const GpuTextureDesc& InTexDesc);
     TRefCountPtr<MetalTexture> CreateSharedMetalTexture(const GpuTextureDesc& InTexDesc);
+
+    TRefCountPtr<MetalSampler> CreateMetalSampler(const GpuSamplerDesc& InSamplerDesc);
 }

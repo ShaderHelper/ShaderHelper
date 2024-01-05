@@ -7,8 +7,9 @@ namespace FRAMEWORK
     class MetalPipelineState : public GpuPipelineState
     {
     public:
-        MetalPipelineState(mtlpp::RenderPipelineState InPipelineState)
+        MetalPipelineState(mtlpp::RenderPipelineState InPipelineState, MTLPrimitiveType InPrimitiveType)
             : PipelineState(MoveTemp(InPipelineState))
+            , PrimitiveType(InPrimitiveType)
         {}
         
     public:
@@ -16,8 +17,13 @@ namespace FRAMEWORK
             return PipelineState.GetPtr();
         }
         
+        MTLPrimitiveType GetPrimitiveType() const {
+            return PrimitiveType;
+        }
+        
     private:
         mtlpp::RenderPipelineState PipelineState;
+        MTLPrimitiveType PrimitiveType;
     };
 
     TRefCountPtr<MetalPipelineState> CreateMetalPipelineState(const GpuPipelineStateDesc& InPipelineStateDesc);
