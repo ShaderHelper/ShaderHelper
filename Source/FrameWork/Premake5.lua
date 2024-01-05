@@ -10,6 +10,23 @@ FrameWorkHierarchy = {
 	["Resource/Shaders"] = {"%{_WORKING_DIR}/Resource/Shaders/*"}
 }
 
+if os.target() == premake.MACOSX then
+	defaultGpuApi = "Metal"
+elseif os.target() == premake.WINDOWS then
+	defaultGpuApi = "Dx12"
+end
+
+newoption {
+    trigger = "GpuApi",
+	value = "API",
+    description = "Choose a gpu api",
+	default = defaultGpuApi,
+	allowed = {
+		{ "Dx12", "Directx12 (Windows only)"},
+		{ "Metal", "Metal (Mac only)"},
+	}
+}
+
 project "FrameWork"
     kind "SharedLib"   
     location "%{_WORKING_DIR}/ProjectFiles"
@@ -30,6 +47,11 @@ project "FrameWork"
     uses {
         "UE", "magic_enum"
     }
+	
+	filter {"options:not GpuApi=Dx12","files:**/Dx12/*.cpp"}
+        flags {"ExcludeFromBuild"}
+	filter {"options:not GpuApi=Metal","files:**/Metal/*.cpp"}
+        flags {"ExcludeFromBuild"}
 
     filter "system:windows"
         pchheader "CommonHeader.h"
