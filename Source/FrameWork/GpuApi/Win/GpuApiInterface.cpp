@@ -52,7 +52,7 @@ namespace GpuApi
         GDeferredReleaseManager->ReleaseCompletedResources();
 	}
 
-	TRefCountPtr<GpuTexture> CreateGpuTexture(const GpuTextureDesc& InTexDesc)
+	TRefCountPtr<GpuTexture> CreateTexture(const GpuTextureDesc& InTexDesc)
 	{
 		return AUX::StaticCastRefCountPtr<GpuTexture>(CreateDx12Texture2D(InTexDesc));
 	}

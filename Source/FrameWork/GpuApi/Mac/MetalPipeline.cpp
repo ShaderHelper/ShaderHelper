@@ -16,25 +16,19 @@ namespace FRAMEWORK
         PipelineDesc.SetFragmentFunction(Ps->GetCompilationResult());
         
         ns::AutoReleased<ns::Array<mtlpp::RenderPipelineColorAttachmentDescriptor>> ColorAttachments = PipelineDesc.GetColorAttachments();
-        BlendStateDesc BlendDesc = InPipelineStateDesc.BlendState;
-        const uint32 BlendRtNum = BlendDesc.RtDescs.Num();
-        for(uint32 i = 0; i < BlendRtNum; i++)
+        for(uint32 i = 0; i < InPipelineStateDesc.Targets.Num(); i++)
         {
-            BlendRenderTargetDesc BlendRtInfo = BlendDesc.RtDescs[i];
-            ColorAttachments[i].SetBlendingEnabled(BlendRtInfo.BlendEnable);
-            ColorAttachments[i].SetSourceRgbBlendFactor((mtlpp::BlendFactor)MapBlendFactor(BlendRtInfo.SrcFactor));
-            ColorAttachments[i].SetSourceAlphaBlendFactor((mtlpp::BlendFactor)MapBlendFactor(BlendRtInfo.SrcAlphaFactor));
-            ColorAttachments[i].SetDestinationRgbBlendFactor((mtlpp::BlendFactor)MapBlendFactor(BlendRtInfo.DestFactor));
-            ColorAttachments[i].SetDestinationAlphaBlendFactor((mtlpp::BlendFactor)MapBlendFactor(BlendRtInfo.DestAlphaFactor));
-            ColorAttachments[i].SetRgbBlendOperation((mtlpp::BlendOperation)MapBlendOp(BlendRtInfo.ColorOp));
-            ColorAttachments[i].SetAlphaBlendOperation((mtlpp::BlendOperation)MapBlendOp(BlendRtInfo.AlphaOp));
-            ColorAttachments[i].SetWriteMask((mtlpp::ColorWriteMask)MapWriteMask(BlendRtInfo.Mask));
-        }
-        
-        const uint32 RtFormatNum = InPipelineStateDesc.RtFormats.Num();
-        for(uint32 i = 0; i < RtFormatNum; i++)
-        {
-            ColorAttachments[i].SetPixelFormat((mtlpp::PixelFormat)MapTextureFormat(InPipelineStateDesc.RtFormats[i]));
+            const PipelineTargetDesc& Target = InPipelineStateDesc.Targets[i];
+            ColorAttachments[i].SetBlendingEnabled(Target.BlendEnable);
+            ColorAttachments[i].SetSourceRgbBlendFactor((mtlpp::BlendFactor)MapBlendFactor(Target.SrcFactor));
+            ColorAttachments[i].SetSourceAlphaBlendFactor((mtlpp::BlendFactor)MapBlendFactor(Target.SrcAlphaFactor));
+            ColorAttachments[i].SetDestinationRgbBlendFactor((mtlpp::BlendFactor)MapBlendFactor(Target.DestFactor));
+            ColorAttachments[i].SetDestinationAlphaBlendFactor((mtlpp::BlendFactor)MapBlendFactor(Target.DestAlphaFactor));
+            ColorAttachments[i].SetRgbBlendOperation((mtlpp::BlendOperation)MapBlendOp(Target.ColorOp));
+            ColorAttachments[i].SetAlphaBlendOperation((mtlpp::BlendOperation)MapBlendOp(Target.AlphaOp));
+            ColorAttachments[i].SetWriteMask((mtlpp::ColorWriteMask)MapWriteMask(Target.Mask));
+            
+            ColorAttachments[i].SetPixelFormat((mtlpp::PixelFormat)MapTextureFormat(Target.TargetFormat));
         }
 
         ns::AutoReleasedError Err;
@@ -45,6 +39,6 @@ namespace FRAMEWORK
             //TDOO: fallback to default pipeline.
         }
         
-        return new MetalPipelineState(MoveTemp(PipelineState));
+        return new MetalPipelineState(MoveTemp(PipelineState), MapPrimitiveType(InPipelineStateDesc.Primitive));
     }
 }

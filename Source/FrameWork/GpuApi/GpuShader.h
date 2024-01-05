@@ -1,17 +1,82 @@
 #pragma once
 #include "GpuResourceCommon.h"
+#include <Misc/FileHelper.h>
 
 namespace FRAMEWORK
 {
     class GpuShader : public GpuResource
     {
 	public:
-		GpuShader() : GpuResource(GpuResourceType::Shader)
-		{}
+        //FromFile
+        GpuShader(FString InFileName, ShaderType InType, const FString& ExtraDeclaration, FString InEntryPoint)
+            : GpuResource(GpuResourceType::Shader)
+            , Type(InType)
+            , FileName(MoveTemp(InFileName))
+            , EntryPoint(MoveTemp(InEntryPoint))
+            , ShaderTarget(DecideShaderTarget(InType))
+        {
+            ShaderName = FPaths::GetBaseFilename(*FileName);
+            FString ShaderFileText;
+            FFileHelper::LoadFileToString(ShaderFileText, **FileName);
+            SourceText = ExtraDeclaration + MoveTemp(ShaderFileText);
 
-		virtual bool IsCompiled() const {
-			return false;
-		}
+            IncludeDirs.Add(FPaths::GetPath(*FileName));
+        }
+    
+        //FromSource
+        GpuShader(ShaderType InType, FString InSourceText, FString InShaderName, FString InEntryPoint)
+            : GpuResource(GpuResourceType::Shader)
+            , Type(InType)
+            , ShaderName(MoveTemp(InShaderName))
+            , EntryPoint(MoveTemp(InEntryPoint))
+            , SourceText(MoveTemp(InSourceText))
+            , ShaderTarget(DecideShaderTarget(InType))
+        {
+            
+        }
+        
+        virtual bool IsCompiled() const {
+            return false;
+        }
+        
+        TOptional<FString> GetFileName() const { return FileName; }
+        const TArray<FString>& GetIncludeDirs() const { return IncludeDirs; }
+        
+        ShaderType GetShaderType() const {return Type;}
+        const FString& GetSourceText() const { return SourceText; }
+        const FString& GetEntryPoint() const { return EntryPoint; }
+        const FString& GetShaderTarget() const { return ShaderTarget; }
+        
+    private:
+        FString DecideShaderTarget(ShaderType InType)
+        {
+            FString ShaderTarget;
+            if (InType == ShaderType::VertexShader)
+            {
+                ShaderTarget = "vs_6_0";
+
+            }
+            else if (InType == ShaderType::PixelShader)
+            {
+                ShaderTarget = "ps_6_0";
+            }
+            else
+            {
+                check(false);
+            }
+            return ShaderTarget;
+        }
+        
+    private:
+        ShaderType Type;
+        FString ShaderName;
+        FString EntryPoint;
+        //Hlsl
+        FString SourceText;
+        FString ShaderTarget;
+        
+        TOptional<FString> FileName;
+        TArray<FString> IncludeDirs;
     };
 
 	struct ShaderErrorInfo

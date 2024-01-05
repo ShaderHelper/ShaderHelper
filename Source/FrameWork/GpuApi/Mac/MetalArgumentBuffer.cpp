@@ -1,6 +1,7 @@
 #include "CommonHeader.h"
 #include "MetalDevice.h"
 #include "MetalArgumentBuffer.h"
+#include "MetalTexture.h"
 
 namespace FRAMEWORK
 {
@@ -27,29 +28,42 @@ namespace FRAMEWORK
     {
         TArray<MTLArgumentDescriptor*> VertexArgDescs;
         TArray<MTLArgumentDescriptor*> FragmentArgDescs;
-        for(const auto& BindingLayoutEntry : Desc.Layouts)
+        for(const auto& [Slot, LayoutBindingEntry]  : Desc.Layouts)
         {
+            RenderStages.Add(Slot, MapShaderVisibility(LayoutBindingEntry.Stage));
+            
             MTLArgumentDescriptor* ArgDesc = [MTLArgumentDescriptor argumentDescriptor];
-            ArgDesc.index = BindingLayoutEntry.Slot;
-            if(BindingLayoutEntry.Type == BindingType::UniformBuffer)
+            ArgDesc.index = Slot;
+            if(LayoutBindingEntry.Type == BindingType::UniformBuffer)
             {
                 ArgDesc.dataType = MTLDataTypePointer;
                 ArgDesc.access = MTLArgumentAccessReadOnly;
-                ResourceUsages.Add(BindingLayoutEntry.Slot, MTLResourceUsageRead);
-                RenderStages.Add(BindingLayoutEntry.Slot, MapShaderVisibility(BindingLayoutEntry.Stage));
+                ResourceUsages.Add(Slot, MTLResourceUsageRead);
+            }
+            else if(LayoutBindingEntry.Type == BindingType::Texture)
+            {
+                ArgDesc.dataType = MTLDataTypeTexture;
+                ArgDesc.textureType = MTLTextureType2D;
+                ArgDesc.access = MTLArgumentAccessReadOnly;
+                ResourceUsages.Add(Slot, MTLResourceUsageRead);
+            }
+            else if(LayoutBindingEntry.Type == BindingType::Sampler)
+            {
+                ArgDesc.dataType = MTLDataTypeSampler;
+                ArgDesc.access = MTLArgumentAccessReadOnly;
+                ResourceUsages.Add(Slot, MTLResourceUsageRead);
             }
             else
             {
-                //TODO
                 check(false);
             }
             
-            if(EnumHasAnyFlags(BindingLayoutEntry.Stage, BindingShaderStage::Vertex))
+            if(EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Vertex))
             {
                 VertexArgDescs.Add(ArgDesc);
             }
             
-            if(EnumHasAnyFlags(BindingLayoutEntry.Stage, BindingShaderStage::Pixel))
+            if(EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Pixel))
             {
                 FragmentArgDescs.Add(ArgDesc);
             }
@@ -86,26 +100,52 @@ namespace FRAMEWORK
             [FragmentArgumentEncoder setArgumentBuffer:FragmentArgumentBuffer->GetResource() offset:0];
         }
         
-        for(const auto& BindingEntry : InDesc.Resources)
+        for(const auto& [Slot, ResourceBindingEntry] : InDesc.Resources)
         {
-            MTLRenderStages Stage = BindGroupLayout->GetRenderStages(BindingEntry.Slot);
-            if(BindingEntry.Resource->GetType() == GpuResourceType::Buffer)
+            MTLRenderStages Stage = BindGroupLayout->GetRenderStages(Slot);
+            if(ResourceBindingEntry.Resource->GetType() == GpuResourceType::Buffer)
             {
-                MetalBuffer* Buffer = static_cast<MetalBuffer*>(BindingEntry.Resource);
+                MetalBuffer* Buffer = static_cast<MetalBuffer*>(ResourceBindingEntry.Resource);
                 if(Stage & MTLRenderStageVertex)
                 {
-                    [VertexArgumentEncoder setBuffer:Buffer->GetResource() offset:0 atIndex:BindingEntry.Slot];
+                    [VertexArgumentEncoder setBuffer:Buffer->GetResource() offset:0 atIndex:Slot];
                 }
                 
                 if(Stage & MTLRenderStageFragment)
                 {
-                    [FragmentArgumentEncoder setBuffer:Buffer->GetResource() offset:0 atIndex:BindingEntry.Slot];
+                    [FragmentArgumentEncoder setBuffer:Buffer->GetResource() offset:0 atIndex:Slot];
                 }
-                BindGroupResources.Add(BindingEntry.Slot, Buffer->GetResource());
+                BindGroupResources.Add(Slot, Buffer->GetResource());
+            }
+            else if(ResourceBindingEntry.Resource->GetType() == GpuResourceType::Texture)
+            {
+                MetalTexture* Tex = static_cast<MetalTexture*>(ResourceBindingEntry.Resource);
+                if(Stage & MTLRenderStageVertex)
+                {
+                    [VertexArgumentEncoder setTexture:Tex->GetResource() atIndex:Slot];
+                }
+                
+                if(Stage & MTLRenderStageFragment)
+                {
+                    [FragmentArgumentEncoder setTexture:Tex->GetResource() atIndex:Slot];
+                }
+                BindGroupResources.Add(Slot, Tex->GetResource());
+            }
+            else if(ResourceBindingEntry.Resource->GetType() == GpuResourceType::Sampler)
+            {
+                MetalSampler* Sampler = static_cast<MetalSampler*>(ResourceBindingEntry.Resource);
+                if(Stage & MTLRenderStageVertex)
+                {
+                    [VertexArgumentEncoder setSamplerState:Sampler->GetResource() atIndex:Slot];
+                }
+                if(Stage & MTLRenderStageFragment)
+                {
+                    [FragmentArgumentEncoder setSamplerState:Sampler->GetResource() atIndex:Slot];
+                }
             }
             else
             {
-                
+                check(false);
             }
         }
     }

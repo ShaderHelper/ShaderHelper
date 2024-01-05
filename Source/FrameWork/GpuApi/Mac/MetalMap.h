@@ -113,14 +113,45 @@ namespace FRAMEWORK
     {
         switch (InType)
         {
-        case PrimitiveType::Point:            return MTLPrimitiveTypePoint;
-        case PrimitiveType::Line:             return MTLPrimitiveTypeLine;
-        case PrimitiveType::LineStrip:        return MTLPrimitiveTypeLineStrip;
-        case PrimitiveType::Triangle:         return MTLPrimitiveTypeTriangle;
-        case PrimitiveType::TriangleStrip:    return MTLPrimitiveTypeTriangleStrip;
+        case PrimitiveType::PointList:            return MTLPrimitiveTypePoint;
+        case PrimitiveType::LineList:             return MTLPrimitiveTypeLine;
+        case PrimitiveType::LineStrip:            return MTLPrimitiveTypeLineStrip;
+        case PrimitiveType::TriangleList:         return MTLPrimitiveTypeTriangle;
+        case PrimitiveType::TriangleStrip:        return MTLPrimitiveTypeTriangleStrip;
         default:
             SH_LOG(LogMetal, Fatal, TEXT("Invalid PrimitiveType."));
             return MTLPrimitiveTypeTriangle;
+        }
+    }
+
+    inline MTLCompareFunction MapCompareFunction(CompareMode InMode)
+    {
+        switch(InMode)
+        {
+        case CompareMode::Less:             return MTLCompareFunctionLess;
+        case CompareMode::LessEqual:        return MTLCompareFunctionLessEqual;
+        case CompareMode::Never:            return MTLCompareFunctionNever;
+        case CompareMode::Always:           return MTLCompareFunctionAlways;
+        case CompareMode::Equal:            return MTLCompareFunctionEqual;
+        case CompareMode::Greater:          return MTLCompareFunctionGreater;
+        case CompareMode::GreaterEqual:     return MTLCompareFunctionGreaterEqual;
+        case CompareMode::NotEqual:         return MTLCompareFunctionNotEqual;
+        default:
+            SH_LOG(LogMetal, Fatal, TEXT("Invalid CompareMode."));
+            return MTLCompareFunctionNever;
+        }
+    }
+
+    inline MTLSamplerAddressMode MapSamplerAddressMode(SamplerAddressMode InMode)
+    {
+        switch (InMode)
+        {
+        case SamplerAddressMode::Clamp:     return MTLSamplerAddressModeClampToEdge;
+        case SamplerAddressMode::Mirror:    return MTLSamplerAddressModeMirrorRepeat;
+        case SamplerAddressMode::Wrap:      return MTLSamplerAddressModeRepeat;
+        default:
+            SH_LOG(LogMetal, Fatal, TEXT("Invalid SamplerAddressMode."));
+            return MTLSamplerAddressModeClampToEdge;
         }
     }
 }

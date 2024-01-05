@@ -39,7 +39,7 @@ namespace FRAMEWORK
 	void Texture2D::PostLoad()
 	{
 		GpuTextureDesc Desc{ (uint32)Width, (uint32)Height, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource , RawData };
-		GpuData = GpuApi::CreateGpuTexture(MoveTemp(Desc));
+		GpuData = GpuApi::CreateTexture(MoveTemp(Desc));
 	}
 
 	FString Texture2D::FileExtension() const
@@ -57,7 +57,7 @@ namespace FRAMEWORK
 		}
 
 		GpuTextureDesc Desc{ 128, 128, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
-		TRefCountPtr<GpuTexture> Thumbnail = GpuApi::CreateGpuTexture(MoveTemp(Desc));
+		TRefCountPtr<GpuTexture> Thumbnail = GpuApi::CreateTexture(MoveTemp(Desc));
 
 		RenderGraph Graph;
 		{

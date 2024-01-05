@@ -73,7 +73,7 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		iResolution = InResolution;
 		//Note: BGRA8_UNORM is default framebuffer format in ue standalone renderer framework.
 		GpuTextureDesc Desc{ (uint32)iResolution.x, (uint32)iResolution.y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
-		FinalRT = GpuApi::CreateGpuTexture(Desc);
+		FinalRT = GpuApi::CreateTexture(Desc);
 		ReCreatePipelineState();
 		Render();
 	}
