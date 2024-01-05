@@ -48,6 +48,7 @@ namespace FRAMEWORK
         SamplerDesc.tAddressMode = MapSamplerAddressMode(InSamplerDesc.AddressV);
         SamplerDesc.rAddressMode = MapSamplerAddressMode(InSamplerDesc.AddressW);
         SamplerDesc.compareFunction = MapCompareFunction(InSamplerDesc.Compare);
+        SamplerDesc.supportArgumentBuffers = true;
         
         return mtlpp::SamplerDescriptor{SamplerDesc, ns::Ownership::Assign};
     }

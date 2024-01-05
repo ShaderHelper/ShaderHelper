@@ -35,7 +35,7 @@ namespace FRAMEWORK
         mtlpp::RenderPipelineState PipelineState = GDevice.NewRenderPipelineState(PipelineDesc, mtlpp::PipelineOption::NoPipelineOption ,nullptr ,&Err);
         if (!PipelineState)
         {
-            SH_LOG(LogMetal, Fatal, TEXT("Failed to create render pipeline: %s"), ConvertOcError(Err.GetPtr()));
+            SH_LOG(LogMetal, Fatal, TEXT("Failed to create render pipeline: %s"), *FString([Err.GetPtr() description]));
             //TDOO: fallback to default pipeline.
         }
         

@@ -31,9 +31,6 @@ namespace GpuApi
 	FRAMEWORK_API void* MapGpuBuffer(GpuBuffer* InGpuBuffer, GpuResourceMapMode InMapMode);
 	FRAMEWORK_API void UnMapGpuBuffer(GpuBuffer* InGpuBuffer);
 	
-    //Accept each platform's own shader.
-	FRAMEWORK_API bool CompileShader(GpuShader* InShader, FString& OutErrorInfo);
-    //Accept hlsl.
     FRAMEWORK_API bool CrossCompileShader(GpuShader* InShader, FString& OutErrorInfo);
 
 	FRAMEWORK_API void SetRenderPipelineState(GpuPipelineState* InPipelineState);

@@ -20,7 +20,7 @@ namespace FRAMEWORK
             return CurrentCommandBuffer.BlitCommandEncoder();
         }
         id<MTLCommandBuffer> GetCommandBuffer() const { return CurrentCommandBuffer.GetPtr(); }
- 
+        //TODO: Manage CommandBuffer
         void SetCommandBuffer(mtlpp::CommandBuffer InCommandBuffer) {
             CurrentCommandBuffer = MoveTemp(InCommandBuffer);
         }

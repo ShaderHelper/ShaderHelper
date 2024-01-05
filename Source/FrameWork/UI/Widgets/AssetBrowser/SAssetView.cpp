@@ -104,11 +104,12 @@ namespace FRAMEWORK
 		IFileManager::Get().FindFiles(FileOrFolderNames, *(ViewDirectory / TEXT("*")), true, true);
 		for (const FString& FileOrFolderName : FileOrFolderNames)
 		{
-			if (FPaths::GetExtension(FileOrFolderName).IsEmpty())
+            FString Ext = FPaths::GetExtension(FileOrFolderName);
+			if (Ext.IsEmpty())
 			{
 				AssetViewItems.Add(MakeShared<AssetViewFolderItem>(ViewDirectory / FileOrFolderName));
 			}
-			else
+			else if(TSingleton<AssetManager>::Get().GetManageredExts().Contains(Ext))
 			{
 				AssetViewItems.Add(MakeShared<AssetViewAssetItem>(ViewDirectory / FileOrFolderName));
 			}
@@ -271,11 +272,13 @@ namespace FRAMEWORK
 				}
 			}
 			
-			FString DialogType = "All files|";
+			FString DialogType = "All files ({0})|";
+            FString CanImportExts;
 			for (const FString& FileExt : FileExts)
 			{
-				DialogType += FString::Format(TEXT("*.{0};"), {FileExt});
+                CanImportExts += FString::Format(TEXT("*.{0};"), {FileExt});
 			}
+            DialogType = FString::Format(*DialogType, {CanImportExts}) + CanImportExts;
 
 			TArray<FString> OpenedFileNames;
 			TSharedPtr<SWindow> ParentWindow = FSlateApplication::Get().FindWidgetWindow(AsShared());

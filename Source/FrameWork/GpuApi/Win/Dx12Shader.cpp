@@ -79,7 +79,7 @@ namespace FRAMEWORK
 				FString ErrorStr{ (int32)BlobEncodingError->GetBufferSize(), (ANSICHAR*)BlobEncodingError->GetBufferPointer() };
 				if (!ErrorStr.IsEmpty())
 				{
-					SH_LOG(LogDx12, Error, TEXT("Shader compilation failed: %s"), *ErrorStr);
+					SH_LOG(LogDx12, Error, TEXT("Hlsl compilation failed: %s"), *ErrorStr);
 					OutErrorInfo = MoveTemp(ErrorStr);
 					IsCompilationSucceeded = false;
 				}
