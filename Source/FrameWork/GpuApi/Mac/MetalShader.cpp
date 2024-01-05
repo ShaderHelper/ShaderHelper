@@ -7,7 +7,12 @@ namespace FRAMEWORK
 {
     TRefCountPtr<MetalShader> CreateMetalShader(ShaderType InType, FString InSourceText, FString ShaderName, FString InEntryPoint)
     {
-        return new MetalShader(MoveTemp(InType), MoveTemp(InSourceText), MoveTemp(ShaderName), MoveTemp(InEntryPoint));
+        return new MetalShader(InType, MoveTemp(InSourceText), MoveTemp(ShaderName), MoveTemp(InEntryPoint));
+    }
+
+    TRefCountPtr<MetalShader> CreateMetalShader(FString FileName, ShaderType InType, FString ExtraDeclaration, FString EntryPoint)
+    {
+        return new MetalShader(MoveTemp(FileName), InType, MoveTemp(ExtraDeclaration), MoveTemp(EntryPoint));
     }
 
     bool CompileShader(TRefCountPtr<MetalShader> InShader, FString& OutErrorInfo)
@@ -70,6 +75,21 @@ namespace FRAMEWORK
         
         TArray<const char*> DxcArgs;
         DxcArgs.Add("-fspv-preserve-bindings");
+        
+        DxcArgs.Add("/T");
+        std::string ShaderTarget{TCHAR_TO_ANSI(*InShader->GetShaderTarget())};
+        DxcArgs.Add(ShaderTarget.data());
+        
+        TArray<std::string> AnsiIncludeDirs;
+        for(const FString& IncludeDir : InShader->GetIncludeDirs())
+        {
+            AnsiIncludeDirs.Emplace(TCHAR_TO_ANSI(*IncludeDir));
+        }
+        for(const std::string& AnsiIncludeDir : AnsiIncludeDirs)
+        {
+            DxcArgs.Add("-I");
+            DxcArgs.Add(AnsiIncludeDir.data());
+        }
         
         ShaderConductor::Compiler::Options SCOptions;
         SCOptions.DXCArgs = DxcArgs.GetData();

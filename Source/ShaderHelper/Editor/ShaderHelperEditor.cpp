@@ -331,6 +331,10 @@ namespace SH
 
 		auto IsLiveTabLambda = [this](const FName& TabId)
 		{
+            if(!TabManager) {
+                return false;
+            }
+            
 			return TabManager->FindExistingLiveTab(TabId).IsValid();
 		};
 

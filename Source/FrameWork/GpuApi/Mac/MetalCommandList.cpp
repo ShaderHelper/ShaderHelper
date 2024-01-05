@@ -25,6 +25,21 @@ namespace FRAMEWORK
     void CommandListContext::PrepareDrawingEnv()
     {
         check(CurrentRenderCommandEncoder);
+        if(!CurrentViewPort.IsSet())
+        {
+            mtlpp::Texture Rt = CurrentRenderPassDesc.GetColorAttachments()[0].GetTexture();
+
+            mtlpp::Viewport Viewport{
+                0, 0,
+                (double)Rt.GetWidth(), (double)Rt.GetHeight(),
+                0, 1.0
+            };
+            
+            mtlpp::ScissorRect ScissorRect{0, 0, Rt.GetWidth(), Rt.GetHeight()};
+            
+            SetViewPort(MoveTemp(Viewport), MoveTemp(ScissorRect));
+        }
+        
         if(IsPipelineDirty)
         {
             check(CurrentPipelineState);
@@ -34,8 +49,6 @@ namespace FRAMEWORK
         
         if(IsViewportDirty)
         {
-            check(CurrentViewPort.IsValid());
-            check(CurrentScissorRect.IsValid());
             CurrentRenderCommandEncoder.SetViewport(*CurrentViewPort);
             CurrentRenderCommandEncoder.SetScissorRect(*CurrentScissorRect);
             MarkViewportDirty(false);
@@ -61,6 +74,12 @@ namespace FRAMEWORK
 			CurrentBindGroup3->Apply(GetRenderCommandEncoder());
 			MarkBindGroup3Dirty(false);
 		}
+    }
+
+    void CommandListContext::Draw(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount)
+    {
+        check(CurrentPipelineState);
+        [GetRenderCommandEncoder() drawPrimitives:CurrentPipelineState->GetPrimitiveType() vertexStart:StartVertexLocation vertexCount:VertexCount instanceCount:InstanceCount baseInstance:StartInstanceLocation];
     }
 
     void CommandListContext::ClearBinding()

@@ -1,12 +1,11 @@
 #pragma once
+#include "GpuApi/GpuTexture.h"
 
 struct FSlateBrush;
 class SWidget;
 
 namespace FRAMEWORK
 {
-	class GpuTexture;
-
 	class AssetObject
 	{
 	public:
