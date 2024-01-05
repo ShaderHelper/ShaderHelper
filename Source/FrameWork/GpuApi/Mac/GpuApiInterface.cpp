@@ -41,7 +41,7 @@ namespace GpuApi
         GCaptureScope.EndScope();
 	}
 
-	TRefCountPtr<GpuTexture> CreateGpuTexture(const GpuTextureDesc& InTexDesc)
+	TRefCountPtr<GpuTexture> CreateTexture(const GpuTextureDesc& InTexDesc)
 	{
         return AUX::StaticCastRefCountPtr<GpuTexture>(CreateMetalTexture2D(InTexDesc));
 	}
@@ -116,9 +116,9 @@ namespace GpuApi
         return AUX::StaticCastRefCountPtr<GpuShader>(CreateMetalShader(InType, MoveTemp(InSourceText), MoveTemp(InShaderName), MoveTemp(EntryPoint)));
 	}
 
-	TRefCountPtr<GpuShader> CreateShaderFromFile(ShaderType InType, const FString& FileName, FString EntryPoint)
+    TRefCountPtr<GpuShader> CreateShaderFromFile(FString FileName, ShaderType InType, FString EntryPoint, FString ExtraDeclaration)
 	{
-
+        return AUX::StaticCastRefCountPtr<GpuShader>(CreateMetalShader(MoveTemp(FileName), InType, MoveTemp(ExtraDeclaration), MoveTemp(EntryPoint)));
 	}
 
 	TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc)
@@ -156,7 +156,7 @@ namespace GpuApi
 
 	TRefCountPtr<GpuSampler> CreateSampler(const GpuSamplerDesc& InSamplerDesc)
 	{
-
+        return AUX::StaticCastRefCountPtr<GpuSampler>(CreateMetalSampler(InSamplerDesc));
 	}
 
 	void SetRenderPipelineState(GpuPipelineState* InPipelineState)
@@ -177,7 +177,7 @@ namespace GpuApi
             (double)InViewPortDesc.ZMin, (double)InViewPortDesc.ZMax
         };
         
-        mtlpp::ScissorRect ScissorRect{0, 0, InViewPortDesc.Width, InViewPortDesc.Height};
+        mtlpp::ScissorRect ScissorRect{0, 0, (uint32)InViewPortDesc.Width, (uint32)InViewPortDesc.Height};
         GetCommandListContext()->SetViewPort(MoveTemp(Viewport), MoveTemp(ScissorRect));
 	}
 
@@ -195,8 +195,7 @@ namespace GpuApi
 	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount)
 	{
         GetCommandListContext()->PrepareDrawingEnv();
-        id<MTLRenderCommandEncoder> RenderCommandEncoder = GetCommandListContext()->GetRenderCommandEncoder();
-        [RenderCommandEncoder drawPrimitives:MapPrimitiveType(InType) vertexStart:StartVertexLocation vertexCount:VertexCount instanceCount:InstanceCount baseInstance:StartInstanceLocation];
+        GetCommandListContext()->Draw(StartVertexLocation, VertexCount, StartInstanceLocation, InstanceCount);
 	}
 
 	void Submit()

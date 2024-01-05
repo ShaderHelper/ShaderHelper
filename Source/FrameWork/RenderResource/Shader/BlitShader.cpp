@@ -17,15 +17,13 @@ namespace FRAMEWORK
 		Vs = GpuApi::CreateShaderFromFile(
 			PathHelper::ShaderDir() / "Blit.hlsl", 
 			ShaderType::VertexShader,
-			TEXT("MainVS"),
-			BindGroupLayout->GetCodegenDeclaration()
+			TEXT("MainVS")
 		);
 
 		Ps = GpuApi::CreateShaderFromFile(
 			PathHelper::ShaderDir() / "Blit.hlsl",
 			ShaderType::PixelShader,
-			TEXT("MainPS"),
-			BindGroupLayout->GetCodegenDeclaration()
+			TEXT("MainPS")
 		);
 
 		FString ErrorInfo;

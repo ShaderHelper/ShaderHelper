@@ -50,10 +50,10 @@ namespace FRAMEWORK
 
         void SetViewPort(mtlpp::Viewport InViewPort, mtlpp::ScissorRect InSissorRect) 
 		{
-			if (!CurrentViewPort || FMemory::Memcmp(CurrentViewPort.Get() , &InViewPort, sizeof(mtlpp::Viewport)))
+			if (!CurrentViewPort || FMemory::Memcmp(&*CurrentViewPort , &InViewPort, sizeof(mtlpp::Viewport)))
 			{
-                CurrentViewPort = MakeUnique<mtlpp::Viewport>(MoveTemp(InViewPort));
-				CurrentScissorRect = MakeUnique<mtlpp::ScissorRect>(MoveTemp(InSissorRect));
+                CurrentViewPort = MoveTemp(InViewPort);
+				CurrentScissorRect = MoveTemp(InSissorRect);
 				MarkViewportDirty(true);
 			}
            
@@ -93,13 +93,15 @@ namespace FRAMEWORK
 		void MarkBindGroup1Dirty(bool IsDirty) { IsBindGroup1Dirty = IsDirty; }
 		void MarkBindGroup2Dirty(bool IsDirty) { IsBindGroup2Dirty = IsDirty; }
 		void MarkBindGroup3Dirty(bool IsDirty) { IsBindGroup3Dirty = IsDirty; }
+    public:
+        void Draw(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount);
         
     private:
         MetalPipelineState* CurrentPipelineState;
         MetalBuffer* CurrentVertexBuffer;
-        TUniquePtr<mtlpp::Viewport> CurrentViewPort;
-        TUniquePtr<mtlpp::ScissorRect> CurrentScissorRect;
-        
+        TOptional<mtlpp::Viewport> CurrentViewPort;
+        TOptional<mtlpp::ScissorRect> CurrentScissorRect;
+                
         mtlpp::RenderPassDescriptor  CurrentRenderPassDesc;
         mtlpp::RenderCommandEncoder CurrentRenderCommandEncoder;
         mtlpp::CommandBuffer CurrentCommandBuffer;

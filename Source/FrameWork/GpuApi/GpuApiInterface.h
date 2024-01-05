@@ -12,8 +12,9 @@ namespace GpuApi
 	FRAMEWORK_API void BeginFrame();
 	FRAMEWORK_API void EndFrame();
 
-	FRAMEWORK_API TRefCountPtr<GpuTexture> CreateGpuTexture(const GpuTextureDesc& InTexDesc);
+	FRAMEWORK_API TRefCountPtr<GpuTexture> CreateTexture(const GpuTextureDesc& InTexDesc);
 	FRAMEWORK_API TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName, FString EntryPoint);
+    //The file directory will be considered as a include dir by default.
 	FRAMEWORK_API TRefCountPtr<GpuShader> CreateShaderFromFile(FString FileName, ShaderType InType, FString EntryPoint, FString ExtraDeclaration = {});
 	FRAMEWORK_API TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc);
 	FRAMEWORK_API TRefCountPtr<GpuBindGroupLayout> CreateBindGroupLayout(const GpuBindGroupLayoutDesc& InBindGroupLayoutDesc);

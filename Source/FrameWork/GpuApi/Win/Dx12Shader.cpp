@@ -6,56 +6,15 @@
 
 namespace FRAMEWORK
 {
-	Dx12Shader::Dx12Shader(FString InFileName, ShaderType InType, const FString& ExtraDeclaration, FString InShaderTaget, FString InEntryPoint)
-		: Type(InType)
-		, FileName(MoveTemp(InFileName))
-		, EntryPoint(MoveTemp(InEntryPoint))
-		, ShaderTaget(MoveTemp(InShaderTaget))
-	{
-		ShaderName = FPaths::GetBaseFilename(*FileName);
-		FString ShaderFileText;
-		FFileHelper::LoadFileToString(ShaderFileText, **FileName);
-		SourceText = ExtraDeclaration + MoveTemp(ShaderFileText);
-
-		IncludeDirs.Add(FPaths::GetPath(*FileName));
-	}
-
-	Dx12Shader::Dx12Shader(ShaderType InType, FString InSourceText, FString InShaderName, FString InShaderTaget, FString InEntryPoint)
-		: Type(InType)
-		, ShaderName(MoveTemp(InShaderName))
-		, EntryPoint(MoveTemp(InEntryPoint))
-		, SourceText(MoveTemp(InSourceText))
-		, ShaderTaget(MoveTemp(InShaderTaget))
-	{
-	}
-
-	FString DecideShaderTarget(ShaderType InType)
-	{
-		FString ShaderTarget;
-		if (InType == ShaderType::VertexShader)
-		{
-			ShaderTarget = "vs_6_0";
-
-		}
-		else if (InType == ShaderType::PixelShader)
-		{
-			ShaderTarget = "ps_6_0";
-		}
-		else
-		{
-			check(false);
-		}
-		return ShaderTarget;
-	}
 
 	TRefCountPtr<Dx12Shader> CreateDx12Shader(FString FileName, ShaderType InType, FString ExtraDeclaration, FString EntryPoint)
 	{
-		return new Dx12Shader( MoveTemp(FileName), InType, MoveTemp(ExtraDeclaration), DecideShaderTarget(InType), MoveTemp(EntryPoint));
+		return new Dx12Shader( MoveTemp(FileName), InType, MoveTemp(ExtraDeclaration), MoveTemp(EntryPoint));
 	}
 
 	TRefCountPtr<Dx12Shader> CreateDx12Shader(ShaderType InType, FString InSourceText, FString ShaderName, FString InEntryPoint)
     {
-        return new Dx12Shader(MoveTemp(InType), MoveTemp(InSourceText), MoveTemp(ShaderName), DecideShaderTarget(InType), MoveTemp(InEntryPoint));
+        return new Dx12Shader(InType, MoveTemp(InSourceText), MoveTemp(ShaderName), MoveTemp(InEntryPoint));
     }
 
 	DxcCompiler::DxcCompiler()

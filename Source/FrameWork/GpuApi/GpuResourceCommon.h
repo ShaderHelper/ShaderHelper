@@ -39,9 +39,9 @@ namespace FRAMEWORK
 
 	enum class GpuBufferUsage : uint32
 	{
-		Static = 1u << 0,
-		Dynamic = 1u << 1,
-		Staging = 1u << 2,
+		Static = 1u << 0,  // Gpu r/w
+		Dynamic = 1u << 1, // Cpu w, Gpu r
+		Staging = 1u << 2, // Cpu r, Gpu w
 
 		PersistentUniform = Dynamic | (1u << 3), // 1 or more frames
 		TemporaryUniform = Dynamic | (1u << 4),  // at most 1 frame.
