@@ -81,7 +81,7 @@ namespace FRAMEWORK
 			return LoadAssetByPath<T>(GetPath(InGuid));
 		}
 
-		void UpdatePathToGuid(const FString& InPath, const FGuid& InGuid);
+		void UpdateGuidToPath(const FGuid& InGuid, const FString& InPath);
 
 		FString GetPath(const FGuid& InGuid) const;
 		FGuid GetGuid(const FString& InPath) const;
@@ -97,7 +97,7 @@ namespace FRAMEWORK
 
 
 	private:
-		TMap<FString, FGuid> PathToGuid;
+		TMap<FGuid, FString> GuidToPath;
 		TMap<FGuid, AssetObject*> Assets;
 		TMap<AssetObject*, uint32> AssetRefCounts;
 		TMap<FGuid, TRefCountPtr<GpuTexture>> AssetThumbnailPool;

@@ -18,25 +18,25 @@ namespace FRAMEWORK
 				FGuid Guid;
 				*Ar << Guid;
 
-				PathToGuid.Add(FileName, Guid);
+                GuidToPath.Add(Guid, FileName);
 			}
 		
 		}
 	}
 
-	void AssetManager::UpdatePathToGuid(const FString& InPath, const FGuid& InGuid)
+	void AssetManager::UpdateGuidToPath(const FGuid& InGuid, const FString& InPath)
 	{
-		PathToGuid.FindOrAdd(InPath) = InGuid;
+        GuidToPath.FindOrAdd(InGuid) = InPath;
 	}
 
 	FString AssetManager::GetPath(const FGuid& InGuid) const
 	{
-		return *PathToGuid.FindKey(InGuid);
+        return GuidToPath[InGuid];
 	}
 
 	FGuid AssetManager::GetGuid(const FString& InPath) const
 	{
-		return PathToGuid[InPath];
+        return *GuidToPath.FindKey(InPath);
 	}
 
 	void AssetManager::AddAssetThumbnail(const FGuid& InGuid, TRefCountPtr<GpuTexture> InThumbnail)
@@ -56,7 +56,7 @@ namespace FRAMEWORK
 
 	void AssetManager::Clear()
 	{
-		PathToGuid.Empty();
+        GuidToPath.Empty();
 		AssetRefCounts.Empty();
 		AssetThumbnailPool.Empty();
 

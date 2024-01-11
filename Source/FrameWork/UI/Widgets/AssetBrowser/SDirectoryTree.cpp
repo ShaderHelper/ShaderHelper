@@ -3,6 +3,8 @@
 #include <DesktopPlatform/DesktopPlatformModule.h>
 #include "UI/Styles/FAppCommonStyle.h"
 #include <Styling/StyleColors.h>
+#include "UI/Widgets/Misc/CommonTableRow.h"
+#include "AssetViewItem/AssetViewItem.h"
 
 namespace FRAMEWORK
 {
@@ -82,6 +84,15 @@ namespace FRAMEWORK
 		}
 	}
 
+    FReply SDirectoryTree::HandleOnDrop(const FDragDropEvent& DragDropEvent, FString DropTargetPath)
+    {
+        TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
+        FString DropFilePath = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Path;
+        FString NewFilePath = DropTargetPath / FPaths::GetCleanFilename(DropFilePath);
+        IFileManager::Get().Move(*NewFilePath, *DropFilePath);
+        return FReply::Handled();
+    }
+
 	TSharedRef<ITableRow> SDirectoryTree::OnGenerateRow(TSharedRef<DirectoryData> InTreeNode, const TSharedRef<STableViewBase>& OwnerTable)
 	{
 		FSlateColor DirectoryTextColor = FLinearColor{ 0.8f,0.8f,0.8f };
@@ -92,39 +103,64 @@ namespace FRAMEWORK
 			DirectoryTextColor = FLinearColor::White;
 			DirectoryTextFont = FAppStyle::Get().GetFontStyle("SmallFontBold");
 		}
+        
+        auto Row = SNew(SDropTargetTableRow<TSharedRef<DirectoryData>>, OwnerTable)
+            .Style(&FAppCommonStyle::Get().GetWidgetStyle<FTableRowStyle>("DirectoryTreeView.Row"))
+            .OnDrop_Raw(this, &SDirectoryTree::HandleOnDrop, InTreeNode->DirectoryPath);
+        
+        Row->SetDragFilter([=](const TSharedPtr<FDragDropOperation>& Operation){
+            if(Operation.IsValid())
+            {
+                if(Operation->IsOfType<AssetViewItemDragDropOp>())
+                {
+                    FString DropFilePath = StaticCastSharedPtr<AssetViewItemDragDropOp>(Operation)->Path;
+                    if(FPaths::GetExtension(DropFilePath).IsEmpty() && DropFilePath == InTreeNode->DirectoryPath)
+                    {
+                        return false;
+                    }
+                    else if(FPaths::GetPath(DropFilePath) == InTreeNode->DirectoryPath)
+                    {
+                        return false;
+                    }
+                    return true;
+                }
+            }
+            return false;
+        });
+        
+        Row->SetContent(
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot()
+            .AutoWidth()
+            .Padding(2, 0, 4, 0)
+            .VAlign(VAlign_Center)
+            [
+                SNew(SImage)
+                .DesiredSizeOverride(FVector2D(10.0f, 10.0f))
+                .Image_Lambda([=]() {
+                        if (DirectoryTree->IsItemExpanded(InTreeNode))
+                        {
+                            return FAppStyle::Get().GetBrush("Icons.FolderOpen");
+                        }
+                        else
+                        {
+                            return FAppStyle::Get().GetBrush("Icons.FolderClosed");
+                        }
+                    })
+            ]
+            + SHorizontalBox::Slot()
+            .AutoWidth()
+            .VAlign(VAlign_Center)
+            [
+                SNew(STextBlock)
+                .Text(FText::FromString(FPaths::GetBaseFilename(InTreeNode->DirectoryPath)))
+                .Font(MoveTemp(DirectoryTextFont))
+                .ColorAndOpacity(DirectoryTextColor)
+            ]
+        );
 
-		return SNew(STableRow<TSharedRef<DirectoryData>>, OwnerTable)
-			.Style(&FAppCommonStyle::Get().GetWidgetStyle<FTableRowStyle>("DirectoryTreeView.Row"))
-			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				.Padding(2, 0, 4, 0)
-				.VAlign(VAlign_Center)
-				[
-					SNew(SImage)
-					.DesiredSizeOverride(FVector2D(10.0f, 10.0f))
-					.Image_Lambda([=]() {
-							if (DirectoryTree->IsItemExpanded(InTreeNode))
-							{
-								return FAppStyle::Get().GetBrush("Icons.FolderOpen");
-							}
-							else
-							{
-								return FAppStyle::Get().GetBrush("Icons.FolderClosed");
-							}
-						})
-				]
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				.VAlign(VAlign_Center)
-				[
-					SNew(STextBlock)
-					.Text(FText::FromString(FPaths::GetBaseFilename(InTreeNode->DirectoryPath)))
-					.Font(MoveTemp(DirectoryTextFont))
-					.ColorAndOpacity(DirectoryTextColor)
-				]
-			];
+        return Row;
+				
 	}
 
 	void SDirectoryTree::OnGetChildren(TSharedRef<DirectoryData> InTreeNode, TArray<TSharedRef<DirectoryData>>& OutChildren)
@@ -184,6 +220,11 @@ namespace FRAMEWORK
 					break;
 				}
 			}
+            
+            if(ParentDirTreeItem->Children.Num() == 0)
+            {
+                DirectoryTree->SetItemExpansion(ParentDirTreeItem.ToSharedRef(), false);
+            }
 
 			DirectoryTree->RequestTreeRefresh();
 		}
