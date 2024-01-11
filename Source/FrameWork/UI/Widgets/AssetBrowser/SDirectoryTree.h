@@ -36,6 +36,8 @@ namespace FRAMEWORK
 		void SetSelection(const FString& SelectedDirectory);
 		void SetExpansion(const FString& ExpandedDirectory);
 		void SortSubDirectory(const FString& ParentDirectory);
+        
+        FReply HandleOnDrop(const FDragDropEvent& DragDropEvent, FString DropTargetPath);
 
 	private:
 		TArray<TSharedRef<DirectoryData>> DirectoryDatas;

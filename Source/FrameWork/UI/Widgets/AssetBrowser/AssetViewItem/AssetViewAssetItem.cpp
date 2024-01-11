@@ -17,10 +17,20 @@ namespace FRAMEWORK
 		ImageBrush = Asset->GetImage();
 	}
 
+    FReply AssetViewAssetItem::HandleOnDragDetected(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+    {
+        if(MouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton))
+        {
+            return FReply::Handled().BeginDragDrop(AssetViewItemDragDropOp::New(Path));
+        }
+        return FReply::Unhandled();
+    }
+
 	TSharedRef<ITableRow> AssetViewAssetItem::GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable)
 	{
 		auto Row = SNew(STableRow<TSharedRef<AssetViewItem>>, OwnerTable)
-			.Style(&FAppCommonStyle::Get().GetWidgetStyle<FTableRowStyle>("AssetView.Row"));
+			.Style(&FAppCommonStyle::Get().GetWidgetStyle<FTableRowStyle>("AssetView.Row"))
+            .OnDragDetected_Raw(this, &AssetViewAssetItem::HandleOnDragDetected);
 
 		TSharedPtr<SWidget> Display;
 
@@ -80,11 +90,12 @@ namespace FRAMEWORK
                 SNew(SBox)
                 .Padding(FMargin(2.0f, 0.0f, 2.0f, 0.0f))
                 [
-                    SAssignNew(FolderEditableTextBlock, SInlineEditableTextBlock)
+                    SAssignNew(AssetEditableTextBlock, SInlineEditableTextBlock)
                     .Font(FAppStyle::Get().GetFontStyle("SmallFont"))
                     .Text(FText::FromString(FPaths::GetBaseFilename(Path)))
                     .OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
-                        FString NewFilePath = FPaths::GetPath(Path) / NewText.ToString();
+                        FString NewFilePath = FPaths::GetPath(Path) / NewText.ToString() + "."
+                            + FPaths::GetExtension(Path);
                         IFileManager::Get().Move(*NewFilePath, *Path);
                     })
                     .OverflowPolicy(ETextOverflowPolicy::Ellipsis)
@@ -95,5 +106,10 @@ namespace FRAMEWORK
 
 		return Row;
 	}
+
+    void AssetViewAssetItem::EnterRenameState()
+    {
+        AssetEditableTextBlock->EnterEditingMode();
+    }
 
 }
