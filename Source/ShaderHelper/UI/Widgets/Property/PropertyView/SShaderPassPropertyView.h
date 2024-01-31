@@ -21,18 +21,18 @@ namespace SH
 		void AddUniform_Float2();
 		void ReCreateCustomUniformBuffer();
 		void ReCreateCustomArgumentBuffer();
-		void OnDeleteProperty(TSharedRef<PropertyData> InProperty);
+		void OnDeleteProperty(TSharedRef<FRAMEWORK::PropertyData> InProperty);
 		TSharedPtr<SWidget> CreateContextMenu();
 
 	private:
 		TAttribute<SShaderEditorBox*> ShaderEditor;
 
-		TSharedPtr<SPropertyView> PropertyView;
-		TArray<TSharedRef<PropertyData>> PropertyDatas;
+		TSharedPtr<FRAMEWORK::SPropertyView> PropertyView;
+		TArray<TSharedRef<FRAMEWORK::PropertyData>> PropertyDatas;
 		
-		TSharedPtr<UniformBuffer> CustomUniformBuffer;
-		TSharedPtr<PropertyCategory> CustomPropertyCategory;
-		TSharedPtr<PropertyCategory> CustomUniformCategory;
+		TSharedPtr<FRAMEWORK::UniformBuffer> CustomUniformBuffer;
+		TSharedPtr<FRAMEWORK::PropertyCategory> CustomPropertyCategory;
+		TSharedPtr<FRAMEWORK::PropertyCategory> CustomUniformCategory;
 		ShRenderer* Renderer = nullptr;
 	};
 }

@@ -8,6 +8,8 @@
 #define RootToContentDir Style->RootToContentDir
 #define TTF_FONT( RelativePath, ... ) FSlateFontInfo(RootToContentDir( RelativePath, TEXT(".ttf") ), __VA_ARGS__ )
 
+using namespace FRAMEWORK;
+
 namespace SH {
 
 	void FShaderHelperStyle::Init()

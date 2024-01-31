@@ -3,5 +3,4 @@
 
 //import framework module
 #include "FrameWorkPublicDefinitions.h"
-IMPORT_MODULE_NAMESPACE(UNITTEST_UTIL, FRAMEWORK)
 //

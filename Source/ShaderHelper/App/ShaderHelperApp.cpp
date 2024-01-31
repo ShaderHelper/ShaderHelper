@@ -2,6 +2,8 @@
 #include "ShaderHelperApp.h"
 #include "Renderer/ShRenderer.h"
 
+using namespace FRAMEWORK;
+
 namespace SH {
 
 	ShaderHelperApp::ShaderHelperApp(const Vector2D& InClientSize, const TCHAR* CommandLine)

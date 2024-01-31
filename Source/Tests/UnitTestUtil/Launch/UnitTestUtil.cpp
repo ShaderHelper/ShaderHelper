@@ -3,6 +3,8 @@
 DEFINE_LOG_CATEGORY_STATIC(LogTestUtil, Log, All);
 #include <chrono>
 
+using namespace FRAMEWORK;
+
 namespace UNITTEST_UTIL
 {
 	template<int N, typename T = int>

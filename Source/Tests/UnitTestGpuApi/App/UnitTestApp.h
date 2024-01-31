@@ -4,10 +4,10 @@
 
 namespace UNITTEST_GPUAPI
 {
-	class UnitTestApp : public App
+	class UnitTestApp : public FRAMEWORK::App
 	{
 	public:
-		UnitTestApp(const Vector2D& InClientSize, const TCHAR* CommandLine);
+		UnitTestApp(const FRAMEWORK::Vector2D& InClientSize, const TCHAR* CommandLine);
 		void Update(double DeltaTime) override;
 	};
 }

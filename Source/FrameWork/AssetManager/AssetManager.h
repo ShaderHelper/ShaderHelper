@@ -1,5 +1,5 @@
 #pragma once
-#include "AssetObject.h"
+#include "AssetObject/AssetObject.h"
 #include "Common/Util/Reflection.h"
 
 namespace FRAMEWORK

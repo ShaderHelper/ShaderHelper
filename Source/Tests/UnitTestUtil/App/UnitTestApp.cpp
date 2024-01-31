@@ -2,6 +2,8 @@
 #include "UnitTestApp.h"
 #include "Editor/UnitTestEditor.h"
 
+using namespace FRAMEWORK;
+
 namespace UNITTEST_UTIL
 {
 	UnitTestApp::UnitTestApp(const Vector2D& InClientSize, const TCHAR* CommandLine)

@@ -2,6 +2,8 @@
 #include "ShRenderer.h"
 #include "GpuApi/GpuApiInterface.h"
 
+using namespace FRAMEWORK;
+
 namespace SH
 {
 	const FString DefaultVertexShaderText = R"(

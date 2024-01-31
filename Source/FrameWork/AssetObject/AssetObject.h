@@ -2,7 +2,6 @@
 #include "GpuApi/GpuTexture.h"
 
 struct FSlateBrush;
-class SWidget;
 
 namespace FRAMEWORK
 {
@@ -19,7 +18,6 @@ namespace FRAMEWORK
 		virtual FString FileExtension() const = 0;
 		virtual GpuTexture* GetThumbnail() const { return nullptr; }
 		virtual FSlateBrush* GetImage() const { return nullptr; }
-		virtual TSharedRef<SWidget> GetPropertyView() const = 0;
 
 		FGuid GetGuid() const { return Guid; }
 

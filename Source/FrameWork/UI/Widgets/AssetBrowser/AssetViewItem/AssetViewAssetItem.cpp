@@ -96,7 +96,10 @@ namespace FRAMEWORK
                     .OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
                         FString NewFilePath = FPaths::GetPath(Path) / NewText.ToString() + "."
                             + FPaths::GetExtension(Path);
-                        IFileManager::Get().Move(*NewFilePath, *Path);
+                        if(NewFilePath != Path)
+                        {
+                            IFileManager::Get().Move(*NewFilePath, *Path);
+                        }
                     })
                     .OverflowPolicy(ETextOverflowPolicy::Ellipsis)
                 ]
