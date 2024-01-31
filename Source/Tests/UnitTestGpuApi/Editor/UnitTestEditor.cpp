@@ -4,7 +4,7 @@
 namespace UNITTEST_GPUAPI
 {
 
-	UnitTestEditor::UnitTestEditor(const Vector2f& InWindowSize)
+	UnitTestEditor::UnitTestEditor(const FRAMEWORK::Vector2f& InWindowSize)
 		: WindowSize(InWindowSize)
 	{
 

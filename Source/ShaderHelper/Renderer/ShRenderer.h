@@ -5,24 +5,24 @@
 
 namespace SH
 {
-	class ShRenderer : public Renderer
+	class ShRenderer : public FRAMEWORK::Renderer
 	{
 	public:
 		ShRenderer();
 		
 	public:
 		void RenderInternal() override;
-		void OnViewportResize(const Vector2f& InResolution);
-		void UpdatePixelShader(TRefCountPtr<GpuShader> InNewPixelShader);
-		void UpdateCustomBindGroup(TRefCountPtr<GpuBindGroup> InBindGroup) { CustomBindGroup = MoveTemp(InBindGroup); }
-		void UpdateCustomBindGroupLayout(TRefCountPtr<GpuBindGroupLayout> InBindGroupLayout) { CustomBindGroupLayout = MoveTemp(InBindGroupLayout); }
+		void OnViewportResize(const FRAMEWORK::Vector2f& InResolution);
+		void UpdatePixelShader(TRefCountPtr<FRAMEWORK::GpuShader> InNewPixelShader);
+		void UpdateCustomBindGroup(TRefCountPtr<FRAMEWORK::GpuBindGroup> InBindGroup) { CustomBindGroup = MoveTemp(InBindGroup); }
+		void UpdateCustomBindGroupLayout(TRefCountPtr<FRAMEWORK::GpuBindGroupLayout> InBindGroupLayout) { CustomBindGroupLayout = MoveTemp(InBindGroupLayout); }
 		FString GetPixelShaderDeclaration() const;
 		FString GetDefaultPixelShaderBody() const;
-		GpuTexture* GetFinalRT() const { return FinalRT; }
+        FRAMEWORK::GpuTexture* GetFinalRT() const { return FinalRT; }
 
 
 		//Deprecated
-		TArray<TSharedRef<PropertyData>> GetBuiltInPropertyDatas() const;
+		TArray<TSharedRef<FRAMEWORK::PropertyData>> GetBuiltInPropertyDatas() const;
 
 	private:
 		void RenderBegin() override;
@@ -30,20 +30,20 @@ namespace SH
 		void ReCreatePipelineState();
 
 	private:
-		TRefCountPtr<GpuTexture> FinalRT;
-		TRefCountPtr<GpuShader> VertexShader;
-		TRefCountPtr<GpuShader> PixelShader;
-		TRefCountPtr<GpuPipelineState> PipelineState;
+		TRefCountPtr<FRAMEWORK::GpuTexture> FinalRT;
+		TRefCountPtr<FRAMEWORK::GpuShader> VertexShader;
+		TRefCountPtr<FRAMEWORK::GpuShader> PixelShader;
+		TRefCountPtr<FRAMEWORK::GpuPipelineState> PipelineState;
 
 		float iTime;
-		Vector2f iResolution;
-		TUniquePtr<UniformBuffer> BuiltInUniformBuffer;
+        FRAMEWORK::Vector2f iResolution;
+		TUniquePtr<FRAMEWORK::UniformBuffer> BuiltInUniformBuffer;
 
-		TRefCountPtr<GpuBindGroup> BuiltInBindGroup;
-		TRefCountPtr<GpuBindGroupLayout> BuiltInBindGroupLayout;
+		TRefCountPtr<FRAMEWORK::GpuBindGroup> BuiltInBindGroup;
+		TRefCountPtr<FRAMEWORK::GpuBindGroupLayout> BuiltInBindGroupLayout;
 
-		TRefCountPtr<GpuBindGroup> CustomBindGroup;
-		TRefCountPtr<GpuBindGroupLayout> CustomBindGroupLayout;
+		TRefCountPtr<FRAMEWORK::GpuBindGroup> CustomBindGroup;
+		TRefCountPtr<FRAMEWORK::GpuBindGroupLayout> CustomBindGroupLayout;
 	};
 }
 

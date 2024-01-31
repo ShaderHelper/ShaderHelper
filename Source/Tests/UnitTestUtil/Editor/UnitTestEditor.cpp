@@ -2,6 +2,8 @@
 #include "UnitTestEditor.h"
 #include "UI/Widgets/Log/SOutputLog.h"
 
+using namespace FRAMEWORK;
+
 namespace UNITTEST_UTIL
 {
 	extern void TestUtil();

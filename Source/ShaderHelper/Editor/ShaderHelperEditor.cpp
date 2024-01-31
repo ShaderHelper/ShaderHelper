@@ -10,6 +10,8 @@
 #include "Common/Path/PathHelper.h"
 #include "UI/Styles/FShaderHelperStyle.h"
 
+using namespace FRAMEWORK;
+
 namespace SH 
 {
 	const FString DefaultProjectPath = PathHelper::WorkspaceDir() / TEXT("TemplateProject/Default/Default.shprj");
@@ -151,8 +153,12 @@ namespace SH
 			SpawnedTab->SetLabel(FText::FromName(PreviewTabId));
 			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Visible"));
 			SpawnedTab->SetContent(
-				SNew(SViewport)
-				.ViewportInterface(ViewPort)
+                SNew(SBorder)
+                [
+                    SNew(SViewport)
+                    .ViewportInterface(ViewPort)
+                ]
+			
 			);
 		}
 		else if (TabId == PropretyTabId) {

@@ -3,7 +3,7 @@
 
 namespace SH
 {
-	class ShProject : public Project
+	class ShProject : public FRAMEWORK::Project
 	{
 	public:
 		enum class Version
@@ -20,6 +20,6 @@ namespace SH
 		Version Ver = Version::Initial;
 	};
 
-	using ShProjectManager = ProjectManager<ShProject>;
+	using ShProjectManager = FRAMEWORK::ProjectManager<ShProject>;
 
 }

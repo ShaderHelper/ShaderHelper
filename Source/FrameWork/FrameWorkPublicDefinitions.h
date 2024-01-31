@@ -26,10 +26,6 @@
 #define PER_MODULE_DEFINITION() \
     PER_MODULE_BOILERPLATE
 
-#define IMPORT_MODULE_NAMESPACE(CurrentModuleName, ImportedModuleName) \
-    namespace ImportedModuleName{} \
-    namespace CurrentModuleName { using namespace ImportedModuleName; }
-
 namespace FRAMEWORK
 {
     extern FRAMEWORK_API TArray<FName> GProjectCategoryNames;

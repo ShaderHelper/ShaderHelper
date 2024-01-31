@@ -4,10 +4,10 @@
 
 namespace SH {
 	
-	class ShaderHelperApp : public App
+	class ShaderHelperApp : public FRAMEWORK::App
 	{
 	public:
-		ShaderHelperApp(const Vector2D& InClientSize, const TCHAR* CommandLine);
+		ShaderHelperApp(const FRAMEWORK::Vector2D& InClientSize, const TCHAR* CommandLine);
 		~ShaderHelperApp();
 
 	private:

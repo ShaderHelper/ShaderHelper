@@ -1,5 +1,5 @@
 #pragma once
-#include "AssetManager/AssetObject.h"
+#include "AssetObject.h"
 
 namespace FRAMEWORK
 {
@@ -14,7 +14,6 @@ namespace FRAMEWORK
 		void PostLoad() override;
 		FString FileExtension() const override;
 		GpuTexture* GetThumbnail() const override;
-		TSharedRef<SWidget> GetPropertyView() const override;
 
 	private:
 		int32 Width, Height;

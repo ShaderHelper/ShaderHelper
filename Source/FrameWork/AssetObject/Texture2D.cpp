@@ -73,10 +73,4 @@ namespace FRAMEWORK
 		TSingleton<AssetManager>::Get().AddAssetThumbnail(Guid, Thumbnail);
 		return Thumbnail;
 	}
-
-	TSharedRef<SWidget> Texture2D::GetPropertyView() const
-	{
-		return SNullWidget::NullWidget;
-	}
-
 }
