@@ -43,22 +43,10 @@ usage "UE"
         }
         links
         {
-            "UE-Core",
-            "UE-ApplicationCore",
-            "UE-Slate",
-            "UE-SlateCore",
-            "UE-StandaloneRenderer",
-            "UE-Projects",
-            "UE-ImageWrapper",
-            "UE-CoreUObject",
-            "UE-InputCore",
-            "UE-DesktopPlatform",
-            "UE-DirectoryWatcher",
-			"UE-Json"
+            "UE",
         }
         prebuildcommands {
             "{COPYFILE} %{wks.location}/External/UE/Lib/Win/*.dll %{cfg.targetdir}",
-            "{COPYFILE} %{wks.location}/External/UE/Lib/Win/UE.modules %{cfg.targetdir}"
         }
         buildoptions {
             "/GR-", --UE modules disable rtti
@@ -66,22 +54,10 @@ usage "UE"
     filter "system:macosx"
         links 
         {
-            "%{cfg.targetdir}/UE-Core.dylib",
-            "%{cfg.targetdir}/UE-ApplicationCore.dylib",
-            "%{cfg.targetdir}/UE-Slate.dylib",
-            "%{cfg.targetdir}/UE-SlateCore.dylib",
-            "%{cfg.targetdir}/UE-StandaloneRenderer.dylib",
-            "%{cfg.targetdir}/UE-Projects.dylib",
-            "%{cfg.targetdir}/UE-ImageWrapper.dylib",
-            "%{cfg.targetdir}/UE-CoreUObject.dylib",
-            "%{cfg.targetdir}/UE-InputCore.dylib",
-            "%{cfg.targetdir}/UE-DesktopPlatform.dylib",
-            "%{cfg.targetdir}/UE-DirectoryWatcher.dylib",
-			"%{cfg.targetdir}/UE-Json.dylib"
+            "%{cfg.targetdir}/UE.dylib",
         }
         prebuildcommands {
             "{COPYFILE} %{wks.location}/External/UE/Lib/Mac/*.dylib %{cfg.targetdir}",
-            "{COPYFILE} %{wks.location}/External/UE/Lib/Mac/UE.modules %{cfg.targetdir}"
         }
         buildoptions { 
             "-x objective-c++",

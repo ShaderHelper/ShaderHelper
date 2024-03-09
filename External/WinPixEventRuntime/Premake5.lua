@@ -1,9 +1,9 @@
 usage "WinPixEventRuntime"
     filter "system:windows"
-        prebuildcommands "{COPYFILE} %{wks.location}/External/WinPixEventRuntime/*.dll %{cfg.targetdir}"
+        prebuildcommands "{COPYFILE} %{wks.location}/External/WinPixEventRuntime/Lib/*.dll %{cfg.targetdir}"
         libdirs
         {
-            path.getabsolute("./"),
+            path.getabsolute("./Lib"),
         }
         includedirs
         {
