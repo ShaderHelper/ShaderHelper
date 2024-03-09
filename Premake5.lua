@@ -53,6 +53,7 @@ workspace "ShaderHelper"
         { 
             "/utf-8",
             "/Zc:__cplusplus",
+			"/Zc:hiddenFriend",
         }
         linkoptions 
         { 

@@ -1,2 +1,2 @@
 #pragma once
-//only works for current module.
+//Only works for the current module.

@@ -20,8 +20,6 @@ namespace FRAMEWORK {
 		Vector2D AppClientSize;
 		double DeltaTime;
 		double FixedDeltaTime = 1 / 30;
-
-		FString SavedCommandLine;
 	};
 }
 

@@ -26,7 +26,7 @@ namespace FRAMEWORK
 		{}
 
 		GpuBindGroupLayout* GetLayout() const { return Desc.Layout; }
-        GpuBindGroupDesc GetDesc() const { return Desc; }
+        const GpuBindGroupDesc& GetDesc() const { return Desc; }
 
 	protected:
         GpuBindGroupDesc Desc;

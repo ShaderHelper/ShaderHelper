@@ -4,7 +4,7 @@
 namespace FRAMEWORK
 {
 
-	inline bool GCanGpuCapture = false;
+	inline bool GCanGpuCapture;
 	inline ID3D12Device* GDevice;
 	inline IDXGIFactory2* GDxgiFactory;
 	inline ID3D12CommandQueue* GGraphicsQueue;

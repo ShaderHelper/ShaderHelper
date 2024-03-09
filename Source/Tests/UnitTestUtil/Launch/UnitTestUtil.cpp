@@ -71,6 +71,9 @@ namespace UNITTEST_UTIL
 			Vector vec = fvec;
 			FVector3f fvec2 = vec;
 			SH_LOG(LogTestUtil, Display, TEXT("Implicit conversion between FVector and Vector: (%lf,%lf,%lf)."), vec.X, vec.Y, vec.Z);
+
+			Vector vv{};// {0,0,0}
+			SH_LOG(LogTestUtil, Display, TEXT("Vector Value Init: (%s)."), *vv.ToString());
             
             Vector3d vecx{1.0f};
             vecx = fvec2;
