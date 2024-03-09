@@ -39,14 +39,15 @@ usage "UE"
     filter "system:windows"
         libdirs
         {
-            path.getabsolute("Lib/Win"),
+            path.getabsolute("Lib"),
         }
         links
         {
             "UE",
         }
         prebuildcommands {
-            "{COPYFILE} %{wks.location}/External/UE/Lib/Win/*.dll %{cfg.targetdir}",
+            "{COPYFILE} %{wks.location}/External/UE/Lib/*.dll %{cfg.targetdir}",
+			"{COPYFILE} %{wks.location}/External/UE/Lib/*.pdb %{cfg.targetdir}"
         }
         buildoptions {
             "/GR-", --UE modules disable rtti
@@ -57,7 +58,8 @@ usage "UE"
             "%{cfg.targetdir}/UE.dylib",
         }
         prebuildcommands {
-            "{COPYFILE} %{wks.location}/External/UE/Lib/Mac/*.dylib %{cfg.targetdir}",
+            "{COPYFILE} %{wks.location}/External/UE/Lib/*.dylib %{cfg.targetdir}",
+			"{COPYFILE} %{wks.location}/External/UE/Lib/*.dSYM %{cfg.targetdir}"
         }
         buildoptions { 
             "-x objective-c++",

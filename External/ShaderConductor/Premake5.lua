@@ -1,9 +1,9 @@
 usage "ShaderConductor"
     filter "system:macosx"
-        prebuildcommands "{COPYFILE} %{wks.location}/External/ShaderConductor/Lib/Mac/*.dylib %{cfg.targetdir}"
+        prebuildcommands "{COPYFILE} %{wks.location}/External/ShaderConductor/Lib/*.dylib %{cfg.targetdir}"
         libdirs
         {
-            path.getabsolute("./Lib/Mac"),
+            path.getabsolute("./Lib"),
         }
         links
         {
