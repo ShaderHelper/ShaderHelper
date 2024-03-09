@@ -1,5 +1,5 @@
 #pragma once
-//Other modules should include the header when depending the module.
+//Other modules should include the header when depending on the module.
 
 #if defined(_MSC_VER)
 //Stupid IntelliSense warnings

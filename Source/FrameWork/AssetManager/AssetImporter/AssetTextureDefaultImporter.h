@@ -3,7 +3,7 @@
 
 namespace FRAMEWORK
 {
-	class AssetTextureImporter : public AssetImporter
+	class AssetTextureDefaultImporter : public AssetImporter
 	{
 	public:
 		TUniquePtr<AssetObject> CreateAssetObject(const FString& InFilePath) override;

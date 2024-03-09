@@ -5,6 +5,7 @@ namespace FRAMEWORK::ShReflectToy
 {
 	struct MetaType;
 
+	//TODO compile-time hash type name
 	FRAMEWORK_API TMap<FString, MetaType*>& GetTypeNameToMetaType();
 	FRAMEWORK_API TMap<FString, MetaType*>& GetRegisteredMetaTypes();
 
