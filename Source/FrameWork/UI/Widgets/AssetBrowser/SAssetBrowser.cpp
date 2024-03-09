@@ -87,6 +87,19 @@ namespace FRAMEWORK
 			{
 				if (FileChange.Action == FFileChangeData::FCA_Added)
 				{
+                    TArray<FString> FileNames;
+                    IFileManager::Get().FindFilesRecursive(FileNames, *FullFileName, TEXT("*"), true, false);
+                    for (const FString& FileName : FileNames)
+                    {
+                        if (TSingleton<AssetManager>::Get().GetManageredExts().Contains(FPaths::GetExtension(FileName)))
+                        {
+                            TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*FileName));
+                            FGuid AssetId;
+                            *Ar << AssetId;
+                            TSingleton<AssetManager>::Get().UpdateGuidToPath(AssetId, FileName);
+                        }
+                    }
+                    
 					DirectoryTree->AddDirectory(FullFileName);
 					AssetView->AddFolder(FullFileName);
 				}
@@ -98,15 +111,16 @@ namespace FRAMEWORK
 			}
 			else if(TSingleton<AssetManager>::Get().GetManageredExts().Contains(Extension))
 			{
-#if PLATFORM_MAC
                 //There is only a modified event on mac when a file have been added?
-                if (FileChange.Action == FFileChangeData::FCA_Modified)
-#else
-                if (FileChange.Action == FFileChangeData::FCA_Added)
-#endif
-				{
-					AssetView->AddFile(FullFileName);
-				}
+                if (FileChange.Action == FFileChangeData::FCA_Added || FileChange.Action == FFileChangeData::FCA_Modified)
+                {
+                    TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*FullFileName));
+                    FGuid AssetId;
+                    *Ar << AssetId;
+                    TSingleton<AssetManager>::Get().UpdateGuidToPath(AssetId, FullFileName);
+                    
+                    AssetView->AddFile(FullFileName);
+                }
 				else if (FileChange.Action == FFileChangeData::FCA_Removed)
 				{
 					AssetView->RemoveFile(FullFileName);

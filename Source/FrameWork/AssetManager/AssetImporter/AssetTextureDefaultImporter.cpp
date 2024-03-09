@@ -1,20 +1,20 @@
 #include "CommonHeader.h"
-#include "AssetTextureImporter.h"
+#include "AssetTextureDefaultImporter.h"
 #include "Common/Util/Reflection.h"
 #include <ImageWrapper/IImageWrapperModule.h>
 #include <ImageWrapper/IImageWrapper.h>
 #include <ImageWrapper/ImageWrapperHelper.h>
 #include <Misc/FileHelper.h>
-#include "RenderResource/Texture2D.h"
+#include "AssetObject/Texture2D.h"
 
 namespace FRAMEWORK
 {
 	GLOBAL_REFLECTION_REGISTER(
-		ShReflectToy::AddClass<AssetTextureImporter>()
+		ShReflectToy::AddClass<AssetTextureDefaultImporter>()
 						.BaseClass<AssetImporter>()
 	)
 
-	TUniquePtr<AssetObject> AssetTextureImporter::CreateAssetObject(const FString& InFilePath)
+	TUniquePtr<AssetObject> AssetTextureDefaultImporter::CreateAssetObject(const FString& InFilePath)
 	{
 		IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>("ImageWrapper");
 		EImageFormat ImportFormat = ImageWrapperHelper::GetImageFormat(FPaths::GetExtension(InFilePath));
@@ -35,7 +35,7 @@ namespace FRAMEWORK
 		return nullptr;
 	}
 
-	TArray<FString> AssetTextureImporter::SupportFileExts() const
+	TArray<FString> AssetTextureDefaultImporter::SupportFileExts() const
 	{
 		return { "png", "jpeg", "jpg", "tga" };
 	}

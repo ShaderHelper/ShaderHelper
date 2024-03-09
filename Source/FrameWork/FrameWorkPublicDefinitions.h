@@ -1,5 +1,5 @@
 #pragma once
-//Other modules should include the header when depending the module.
+//Other modules should include the header when depending on the module.
 
 #if defined(_MSC_VER)
 //Stupid IntelliSense warnings
@@ -25,10 +25,6 @@
 
 #define PER_MODULE_DEFINITION() \
     PER_MODULE_BOILERPLATE
-
-#define IMPORT_MODULE_NAMESPACE(CurrentModuleName, ImportedModuleName) \
-    namespace ImportedModuleName{} \
-    namespace CurrentModuleName { using namespace ImportedModuleName; }
 
 namespace FRAMEWORK
 {

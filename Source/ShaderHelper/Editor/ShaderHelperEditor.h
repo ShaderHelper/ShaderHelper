@@ -6,7 +6,7 @@
 
 namespace SH 
 {
-	class ShaderHelperEditor : public Editor
+	class ShaderHelperEditor : public FRAMEWORK::Editor
 	{
 	public:
 		DECLARE_DELEGATE_OneParam(OnEditorWindowClosed, bool)
@@ -18,7 +18,7 @@ namespace SH
 			TSharedPtr<FTabManager::FLayout> TabLayout;
 		};
 
-		ShaderHelperEditor(const Vector2f& InWindowSize, ShRenderer* InRenderer);
+		ShaderHelperEditor(const FRAMEWORK::Vector2f& InWindowSize, ShRenderer* InRenderer);
 		~ShaderHelperEditor();
 
 		void ResetWindowLayout();
@@ -26,7 +26,7 @@ namespace SH
 		void SaveWindowLayout(const TSharedRef<FTabManager::FLayout>& InLayout);
 		void LoadEditorState(const FString& InFile);
 		void SaveEditorState();
-		void OnViewportResize(const Vector2f& InSize);;
+		void OnViewportResize(const FRAMEWORK::Vector2f& InSize);;
 		
 	private:
 		TSharedRef<SDockTab> SpawnWindowTab(const FSpawnTabArgs& Args);
@@ -44,7 +44,7 @@ namespace SH
 		TSharedPtr<SDockTab> TabManagerTab;
 		TSharedPtr<FTabManager> TabManager;
 		TSharedPtr<SWindow> Window;
-		TSharedPtr<PreviewViewPort> ViewPort;
+		TSharedPtr<FRAMEWORK::PreviewViewPort> ViewPort;
 		FVector2D WindowSize;
 
 		TWeakPtr<SBox> PropertyViewBox;

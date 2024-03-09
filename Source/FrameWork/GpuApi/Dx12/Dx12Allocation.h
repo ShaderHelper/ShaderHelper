@@ -84,6 +84,7 @@ namespace FRAMEWORK
 				{
 					//Inherit the result last written
 					void* LastAddress = (uint8*)ResourceBaseCpuAddr + Offset + FrameBlockSize * LastFrameBlockIndexWritten;
+                    //TODO: Avoid reading data from write-combined memory
 					FMemory::Memcpy(CurAddress, LastAddress, FrameBlockSize);
 					LastFrameBlockIndexWritten = GetCurFrameSourceIndex();
 				}

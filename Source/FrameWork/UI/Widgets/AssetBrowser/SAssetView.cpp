@@ -306,9 +306,6 @@ namespace FRAMEWORK
 						FString SavedFileName = CurViewDirectory / FPaths::GetBaseFilename(OpenedFileNames[0]) + "." + ImportedAssetObject->FileExtension();
 						TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFileName));
 						ImportedAssetObject->Serialize(*Ar);
-						
-						TSingleton<AssetManager>::Get().UpdatePathToGuid(SavedFileName, ImportedAssetObject->GetGuid());
-
 					}
 					else
 					{
@@ -380,6 +377,11 @@ namespace FRAMEWORK
 			TSharedRef<AssetViewFolderItem> SelectedFolderItem = StaticCastSharedRef<AssetViewFolderItem>(SelectedItems[0]);
 			SelectedFolderItem->EnterRenameState();
 		}
+        else if (SelectedItems[0]->IsOfType<AssetViewAssetItem>())
+        {
+            TSharedRef<AssetViewAssetItem> SelectedAssetItem = StaticCastSharedRef<AssetViewAssetItem>(SelectedItems[0]);
+            SelectedAssetItem->EnterRenameState();
+        }
 	}
 
 	void SAssetView::OnHandleOpenAction()

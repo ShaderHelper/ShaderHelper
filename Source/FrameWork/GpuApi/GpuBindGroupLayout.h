@@ -77,7 +77,7 @@ namespace FRAMEWORK
 			return Desc;
 		}
 		BindingGroupSlot GetGroupNumber() const { return Desc.GroupNumber; }
-		FString GetCodegenDeclaration() const { return Desc.CodegenDeclaration; }
+		const FString& GetCodegenDeclaration() const { return Desc.CodegenDeclaration; }
 
 	protected:
 		GpuBindGroupLayoutDesc Desc;

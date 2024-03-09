@@ -1,6 +1,8 @@
 #include "CommonHeader.h"
 #include "SShaderPassPropertyView.h"
 
+using namespace FRAMEWORK;
+
 namespace SH
 {
 

@@ -3,14 +3,51 @@
 #include "UI/Styles/FAppCommonStyle.h"
 #include <Widgets/Text/SInlineEditableTextBlock.h>
 #include <Styling/StyleColors.h>
+#include "UI/Widgets/Misc/CommonTableRow.h"
 
 namespace FRAMEWORK
 {
 
+    FReply AssetViewFolderItem::HandleOnDragDetected(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+    {
+        if(MouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton))
+        {
+            return FReply::Handled().BeginDragDrop(AssetViewItemDragDropOp::New(Path));
+        }
+        return FReply::Unhandled();
+    }
+
+    FReply AssetViewFolderItem::HandleOnDrop(const FDragDropEvent& DragDropEvent)
+    {
+        TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
+        FString DropFilePath = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Path;
+        FString NewFilePath = Path / FPaths::GetCleanFilename(DropFilePath);
+        IFileManager::Get().Move(*NewFilePath, *DropFilePath);
+        return FReply::Handled();
+    }
+
 	TSharedRef<ITableRow> AssetViewFolderItem::GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable)
 	{
-		auto Row = SNew(STableRow<TSharedRef<AssetViewItem>>, OwnerTable)
-			.Style(&FAppCommonStyle::Get().GetWidgetStyle<FTableRowStyle>("AssetView.Row"));
+		auto Row = SNew(SDropTargetTableRow<TSharedRef<AssetViewItem>>, OwnerTable)
+            .Style(&FAppCommonStyle::Get().GetWidgetStyle<FTableRowStyle>("AssetView.Row"))
+            .OnDragDetected_Raw(this, &AssetViewFolderItem::HandleOnDragDetected)
+            .OnDrop_Raw(this, &AssetViewFolderItem::HandleOnDrop);
+        
+        Row->SetDragFilter([this](const TSharedPtr<FDragDropOperation>& Operation){
+            if(Operation.IsValid())
+            {
+                if(Operation->IsOfType<AssetViewItemDragDropOp>())
+                {
+                    FString DropFilePath = StaticCastSharedPtr<AssetViewItemDragDropOp>(Operation)->Path;
+                    if(DropFilePath == Path)
+                    {
+                        return false;
+                    }
+                    return true;
+                }
+            }
+            return false;
+        });
 
 		Row->SetContent(
 			SNew(SVerticalBox)

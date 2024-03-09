@@ -251,8 +251,8 @@ namespace AUX
 #define RUNCASE_WITHINT(VarToken,Min,Max,...)	\
     RUNCASE_WITHINT_IMPL(PREPROCESSOR_JOIN(Auto_Instance_,__COUNTER__),VarToken,Min,Max,__VA_ARGS__) 
     
-	//Returns a FString that stores the type name. (As an alternative to rtti, but just represents the static type name of the expression )
-	//Its result may not the same on different platforms, so it should not be saved but just used as a key value.
+	//Returns a FString that stores the type name. (As an alternative to rtti, but just represents the static type name)
+	//Its result may not be same on different platforms, so it should not be saved but just used as a key value.
     template<typename T>
     struct TTypename {
         static inline FString Value = GetGeneratedTypeName<T>();

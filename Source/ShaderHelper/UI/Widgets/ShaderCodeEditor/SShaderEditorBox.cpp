@@ -17,6 +17,8 @@ STEAL_PRIVATE_MEMBER(SMultiLineEditableText, TUniquePtr<FSlateEditableTextLayout
 STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, TSharedPtr<FUICommandList>, UICommandList)
 CALL_PRIVATE_FUNCTION(SMultiLineEditableText_OnMouseWheel, SMultiLineEditableText, OnMouseWheel,, FReply, const FGeometry&, const FPointerEvent&)
 
+using namespace FRAMEWORK;
+
 namespace SH
 {
 

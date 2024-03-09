@@ -66,9 +66,8 @@ namespace FRAMEWORK {
 
 	App::App(const Vector2D& InClientSize, const TCHAR* CommandLine)
 		: AppClientSize(InClientSize)
-		, SavedCommandLine(CommandLine)
 	{
-		UE_Init(*SavedCommandLine);
+		UE_Init(CommandLine);
 		GpuApi::InitApiEnv();
 	}
 
