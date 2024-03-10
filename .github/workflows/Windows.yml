@@ -42,7 +42,7 @@ jobs:
 
       - name: Build solution
         working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: msbuild /m /p:Configuration=Debug ShaderHelper.sln
+        run: msbuild /p:Configuration=Debug ShaderHelper.sln
         
       - name: Upload
         uses: actions/upload-artifact@v3
