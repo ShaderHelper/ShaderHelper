@@ -1,6 +1,6 @@
 #!/bin/sh
 echo
-CurrentPath="`dirname "$0"`"
+CurrentPath="$(cd "$(dirname "$0")" && pwd)"
 cd $CurrentPath
 
 function Error() {
