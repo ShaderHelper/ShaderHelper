@@ -26,6 +26,11 @@ jobs:
         uses: abel0b/setup-premake@v2.2
         with:
           version: "5.0.0-beta1"
+        
+      - name: download dependency
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: downloadDep.bat
+        shell: cmd
 
       - name: Generate Project
         working-directory: ${{env.GITHUB_WORKSPACE}}

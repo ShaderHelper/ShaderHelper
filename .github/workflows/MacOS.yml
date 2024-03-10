@@ -25,6 +25,11 @@ jobs:
         with:
           version: "5.0.0-beta1"
 
+      - name: download dependency
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: ./downloadDep.command
+        shell: sh
+
       - name: Generate Project
         working-directory: ${{env.GITHUB_WORKSPACE}}
         run: ./bootstrap.command -UniversalBinary
