@@ -46,8 +46,8 @@ usage "UE"
             "UE",
         }
         prebuildcommands {
-            "{COPYFILE} %{wks.location}/External/UE/Lib/*.dll %{cfg.targetdir}",
-			"{COPYFILE} %{wks.location}/External/UE/Lib/*.pdb %{cfg.targetdir}"
+            "{COPYFILE} \"%{wks.location}/External/UE/Lib/*.dll\" %{cfg.targetdir}",
+			"{COPYFILE} \"%{wks.location}/External/UE/Lib/*.pdb\" %{cfg.targetdir}"
         }
         buildoptions {
             "/GR-", --UE modules disable rtti

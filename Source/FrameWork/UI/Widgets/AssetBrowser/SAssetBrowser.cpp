@@ -111,8 +111,11 @@ namespace FRAMEWORK
 			}
 			else if(TSingleton<AssetManager>::Get().GetManageredExts().Contains(Extension))
 			{
-                //There is only a modified event on mac when a file have been added?
+#if PLATFORM_MAC
                 if (FileChange.Action == FFileChangeData::FCA_Added || FileChange.Action == FFileChangeData::FCA_Modified)
+#else
+                if (FileChange.Action == FFileChangeData::FCA_Added)
+#endif
                 {
                     TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*FullFileName));
                     FGuid AssetId;
