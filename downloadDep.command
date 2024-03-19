@@ -20,8 +20,8 @@ echo
 
 echo "Downloading UE-lib..."
     UE_Lib_Dir="$CurrentPath/External/UE/Lib"
-    UE_Lib_Url0="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/335e7bb11f5e5a7a06aa0e58259ddf06/UE-Lib-Mac.zip.00"
-    UE_Lib_Url1="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/f99bc2c455183ce718cea8cb51bf3e75/UE-Lib-Mac.zip.01"
+    UE_Lib_Url0="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/3bcaab5a1760606521b5d809aea1e1db/UE-Lib-Mac.zip.00"
+    UE_Lib_Url1="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/57fcc7c09d8da453e7821d32d5d18053/UE-Lib-Mac.zip.01"
     cd "$UE_Lib_Dir"
     curl -LO $UE_Lib_Url0 || Error
     curl -LO $UE_Lib_Url1 || Error

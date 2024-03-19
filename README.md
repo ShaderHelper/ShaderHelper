@@ -16,6 +16,8 @@ This is a shader editor based on some special modules from UnrealEngine (Slate, 
 
 ## Build Instructions
 
+> Run `downloadSource` in `External/UE` folder if you need to debug the ue source code.
+
 ### Windows Requirements
 [![Windows](https://github.com/mxrhyx233/ShaderHelper/actions/workflows/Windows.yml/badge.svg)](https://github.com/mxrhyx233/ShaderHelper/actions/workflows/Windows.yml)
 * Windows 10 (64-bit) - Version 1909 or later

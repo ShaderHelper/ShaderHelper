@@ -21,7 +21,7 @@ echo.
 
 echo Donwloading UE-lib...
 	set UE-lib_Dir=%CURRENTDIR%/External/UE/Lib
-	set UE-lib_Url="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/ca1aeaa595a8eb0d20d13c64315d7158/UE-Lib-Win.zip"
+	set UE-lib_Url="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/a073247dcbe52e672722609b215df293/UE-Lib-Win.zip"
 	cd /D %UE-lib_Dir%
 	curl -LO %UE-lib_Url% || goto error
 	tar -zxf UE-Lib-Win.zip || goto error
