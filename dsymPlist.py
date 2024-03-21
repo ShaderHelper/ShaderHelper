@@ -16,7 +16,7 @@ def create_dsym_bundle(dsymFilePath):
     return dsym_bundle_path
 
 def parse_dsym(dsymFilePath):
-    uuid_info = subprocess.run("dwarfdump --uuid " + dsymFilePath, shell=True, capture_output=True, text=True).stdout
+    uuid_info = subprocess.run("dwarfdump --uuid \"{}\"".format(dsymFilePath), shell=True, capture_output=True, text=True).stdout
     lines = uuid_info.strip().split("\n")
     arch_to_uuid = {}
     for line in lines:

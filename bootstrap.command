@@ -27,15 +27,9 @@ fi
 
 echo "Premake5 Complete"
 
-LldbMarker="#SHADERHELPER_LLDB_V1"
 LldbPath=~/.lldbinit
-UeSrcPath="$CurrentPath/External/UE/Src"
-if [ ! -f $LldbPath ] || ! grep -q $LldbMarker $LldbPath; then
-    echo "Generate LLDB..."
-    echo "$LldbMarker" >> $LldbPath
-    echo "settings set target.inline-breakpoint-strategy always" >> $LldbPath
-    echo "settings set target.source-map /UePlaceholder \"$UeSrcPath\"" >> $LldbPath
-    echo "command script import \"`pwd`/External/UE/UEDataFormatters_2ByteChars.py\"" >> $LldbPath
-fi
+echo "Generate LLDB..."
+echo "settings set target.inline-breakpoint-strategy always" > $LldbPath
+echo "command script import \"`pwd`/External/UE/UEDataFormatters_2ByteChars.py\"" >> $LldbPath
 
 echo "Generate Complete"

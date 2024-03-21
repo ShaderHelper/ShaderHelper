@@ -26,6 +26,7 @@ echo "Downloading UE..."
     curl -LO $UE_Lib_Url0 || Error
     curl -LO $UE_Lib_Url1 || Error
     cat UE-Lib-Mac.zip.* > UE-Lib-Mac.zip || Error
+    rm -rf UE.dSYM
     tar -zxf UE-Lib-Mac.zip || Error
     rm UE-Lib-Mac.zip*
 
