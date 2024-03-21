@@ -59,6 +59,7 @@ usage "UE"
         }
         prebuildcommands {
             "{COPYFILE} %{wks.location}/External/UE/Lib/*.dylib %{cfg.targetdir}",
+            "{COPYFILE} -r %{wks.location}/External/UE/Lib/*.dSYM %{cfg.targetdir}"
         }
         buildoptions { 
             "-x objective-c++",

@@ -38,7 +38,7 @@ echo "Downloading UE..."
     rm UE-Src.zip
 
     echo "Processing UE.dSYM..."
-    python3 "$CurrentPath/dsymPlist.py" --dsymFilePath "$UE_Lib_Dir/UE.dSYM" --srcDir "$UE_Src_Dir" || Error
+    python3 "$CurrentPath/dsymPlist.py" --dsymFilePath "$UE_Lib_Dir/UE.dSYM" --srcDir "$UE_Src_Dir" --buildSrcDir "/UePlaceholder" || Error
 echo
 
 echo "Script Complete"
