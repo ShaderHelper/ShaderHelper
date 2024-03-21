@@ -59,7 +59,11 @@ usage "UE"
         }
         prebuildcommands {
             "{COPYFILE} %{wks.location}/External/UE/Lib/*.dylib %{cfg.targetdir}",
-            "{COPYFILE} -r %{wks.location}/External/UE/Lib/*.dSYM %{cfg.targetdir}"
+            "{COPYFILE} %{wks.location}/External/UE/Lib/*.dSYM %{cfg.targetdir}",
+        }
+        postbuildcommands {
+            "sh %{wks.location}/External/UE/lldbinit.sh",
+            "python3 %{wks.location}/External/dsymPlist.py --dsymFilePath %{cfg.targetdir}/UE.dSYM --srcDir %{wks.location}/External/UE/Src --buildSrcDir /UePlaceholder --relativePath"
         }
         buildoptions { 
             "-x objective-c++",

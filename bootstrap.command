@@ -26,10 +26,3 @@ else
 fi
 
 echo "Premake5 Complete"
-
-LldbPath=~/.lldbinit
-echo "Generate LLDB..."
-echo "settings set target.inline-breakpoint-strategy always" > $LldbPath
-echo "command script import \"`pwd`/External/UE/UEDataFormatters_2ByteChars.py\"" >> $LldbPath
-
-echo "Generate Complete"

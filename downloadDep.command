@@ -26,7 +26,6 @@ echo "Downloading UE..."
     curl -LO $UE_Lib_Url0 || Error
     curl -LO $UE_Lib_Url1 || Error
     cat UE-Lib-Mac.zip.* > UE-Lib-Mac.zip || Error
-    rm -rf UE.dSYM
     tar -zxf UE-Lib-Mac.zip || Error
     rm UE-Lib-Mac.zip*
 
@@ -36,9 +35,6 @@ echo "Downloading UE..."
     curl -LO $UE_Src_Url || Error
     tar -zxf UE-Src.zip || Error
     rm UE-Src.zip
-
-    echo "Processing UE.dSYM..."
-    python3 "$CurrentPath/dsymPlist.py" --dsymFilePath "$UE_Lib_Dir/UE.dSYM" --srcDir "$UE_Src_Dir" --buildSrcDir "/UePlaceholder" || Error
 echo
 
 echo "Script Complete"

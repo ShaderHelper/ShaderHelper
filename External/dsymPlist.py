@@ -11,6 +11,8 @@ bundle_dwarf_path = path.join(bundle_resource_path, "DWARF")
 
 def create_dsym_bundle(dsymFilePath):
     dsym_bundle_path = path.dirname(dsymFilePath) + "/TempDsymBundle"
+    if path.exists(dsym_bundle_path):
+        shutil.rmtree(dsym_bundle_path)
     os.makedirs(path.join(dsym_bundle_path, bundle_dwarf_path))
     return dsym_bundle_path
 
@@ -41,18 +43,29 @@ def main():
     parser.add_argument("--dsymFilePath", required=True)
     parser.add_argument("--srcDir", required=True)
     parser.add_argument("--buildSrcDir", required=True)
+    parser.add_argument("--relativePath", action='store_true')
 
     args = parser.parse_args()
-    dsym_bundle_path = create_dsym_bundle(args.dsymFilePath)
+    args_dsymFilePath = args.dsymFilePath
+    args_srcDir = args.srcDir
+    args_buildSrcDir = args.buildSrcDir
+    if args.relativePath:
+        args_dsymFilePath = path.normpath(path.join(os.getcwd(), args_dsymFilePath))
+        args_srcDir = path.normpath(path.join(os.getcwd(), args_srcDir))
+        args_buildSrcDir = path.normpath(path.join(os.getcwd(), args_buildSrcDir))
 
-    arch_to_uuid = parse_dsym(args.dsymFilePath)
-    fill_bundle(dsym_bundle_path, arch_to_uuid, args.dsymFilePath, args.srcDir, args.buildSrcDir)
+    dsym_bundle_path = create_dsym_bundle(args_dsymFilePath)
 
-    origin_dsym_name = path.splitext(path.basename(args.dsymFilePath))[0]
+    arch_to_uuid = parse_dsym(args_dsymFilePath)
+    fill_bundle(dsym_bundle_path, arch_to_uuid, args_dsymFilePath, args_srcDir, args_buildSrcDir)
+
+    origin_dsym_name = path.splitext(path.basename(args_dsymFilePath))[0]
     new_dsym_name = origin_dsym_name + ".dylib.dSYM"
     final_dsym_bundle = path.join(path.dirname(dsym_bundle_path), new_dsym_name)
 
-    shutil.rmtree(final_dsym_bundle)
+    if path.exists(final_dsym_bundle):
+        shutil.rmtree(final_dsym_bundle)
+
     os.rename(dsym_bundle_path, final_dsym_bundle)
 
 main()
