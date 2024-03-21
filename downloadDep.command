@@ -18,7 +18,7 @@ echo "Downloading ShaderConductor..."
     rm ShaderConductor-Mac.zip
 echo
 
-echo "Downloading UE-lib..."
+echo "Downloading UE..."
     UE_Lib_Dir="$CurrentPath/External/UE/Lib"
     UE_Lib_Url0="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/3bcaab5a1760606521b5d809aea1e1db/UE-Lib-Mac.zip.00"
     UE_Lib_Url1="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/57fcc7c09d8da453e7821d32d5d18053/UE-Lib-Mac.zip.01"
@@ -28,6 +28,16 @@ echo "Downloading UE-lib..."
     cat UE-Lib-Mac.zip.* > UE-Lib-Mac.zip || Error
     tar -zxf UE-Lib-Mac.zip || Error
     rm UE-Lib-Mac.zip*
+
+    UE_Src_Dir="$CurrentPath/External/UE/Src"
+    UE_Src_Url="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/c0c6af00cb2edf593ac76e9ca9135e2f/UE-Src.zip"
+    cd "$UE_Src_Dir"
+    curl -LO $UE_Src_Url || Error
+    tar -zxf UE-Src.zip || Error
+    rm UE-Src.zip
+
+    echo "Processing UE.dSYM..."
+    python3 "$CurrentPath/dsymPlist.py" --dsymFilePath "$UE_Lib_Dir/UE.dSYM" --srcDir "$UE_Src_Dir" || Error
 echo
 
 echo "Script Complete"
