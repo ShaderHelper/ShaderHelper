@@ -46,6 +46,12 @@ workspace "ShaderHelper"
         files {
             "External/UE/Unreal.natvis",
         }
+
+        workspace_items
+        {
+            ["UE"] = {"External/UE/Src"},
+        }
+        
         vpaths {
             ["Visualizers"] = { "External/UE/Unreal.natvis"},
         }

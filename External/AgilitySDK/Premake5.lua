@@ -1,3 +1,7 @@
+AgilitySDKHierarchy = {
+    ["External/AgilitySDK"] = {"%{_WORKING_DIR}/External/AgilitySDK/Inc/*.h"},
+}
+
 usage "AgilitySDK"
     filter "system:windows"
         --xcopy /Q /Y /I
@@ -7,3 +11,5 @@ usage "AgilitySDK"
             "./Inc",
         }
 
+        vpaths(AgilitySDKHierarchy)
+        files {seq(AgilitySDKHierarchy)}

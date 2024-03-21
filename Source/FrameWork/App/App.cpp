@@ -2,12 +2,12 @@
 #include "App.h"
 #include <HAL/PlatformOutputDevices.h>
 #include <HAL/PlatformApplicationMisc.h>
-#include <StandaloneRenderer/StandaloneRenderer.h>
+#include <StandaloneRenderer.h>
 #include "Common/Path/BaseResourcePath.h"
-#include <SlateCore/Fonts/SlateFontInfo.h>
+#include <Fonts/SlateFontInfo.h>
 #include <Misc/OutputDeviceConsole.h>
-#include <DirectoryWatcher/DirectoryWatcherModule.h>
-#include <DirectoryWatcher/IDirectoryWatcher.h>
+#include <DirectoryWatcherModule.h>
+#include <IDirectoryWatcher.h>
 #include "GpuApi/GpuApiInterface.h"
 
 namespace FRAMEWORK {

@@ -1,12 +1,5 @@
 FrameWorkHierarchy = {
     ["Sources/*"] = {"**.h","**.cpp", "**.hpp"},
-    ["External/d3dx12"] = {"%{_WORKING_DIR}/External/AgilitySDK/Inc/d3dx12.h"},
-    ["External/magic_enum"] = {"%{_WORKING_DIR}/External/magic_enum/magic_enum.hpp"},
-    ["External/MtlppUE"] = {
-        "%{_WORKING_DIR}/External/MtlppUE/src/*.hpp", 
-        "%{_WORKING_DIR}/External/MtlppUE/src/*.mm", 
-        "%{_WORKING_DIR}/External/MtlppUE/src/*.inl"
-    },
 	["Resource/Shaders"] = {"%{_WORKING_DIR}/Resource/Shaders/*"}
 }
 

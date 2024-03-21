@@ -1,6 +1,6 @@
 #pragma once
 #include "GpuResourceCommon.h"
-#include <Core/Containers/SortedMap.h>
+#include <Containers/SortedMap.h>
 
 namespace FRAMEWORK
 {

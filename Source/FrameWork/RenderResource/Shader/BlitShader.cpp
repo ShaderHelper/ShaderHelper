@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "BlitShader.h"
 #include "GpuApi/GpuApiInterface.h"
-#include <Core/Misc/FileHelper.h>
+#include <Misc/FileHelper.h>
 #include "Common/Path/PathHelper.h"
 
 namespace FRAMEWORK

@@ -5,8 +5,8 @@
 #include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
 #include "UI/Widgets/Property/PropertyView/SShaderPassPropertyView.h"
 #include "ProjectManager/ShProjectManager.h"
-#include <Json/Serialization/JsonSerializer.h>
-#include <Core/Misc/FileHelper.h>
+#include <Serialization/JsonSerializer.h>
+#include <Misc/FileHelper.h>
 #include "Common/Path/PathHelper.h"
 #include "UI/Styles/FShaderHelperStyle.h"
 

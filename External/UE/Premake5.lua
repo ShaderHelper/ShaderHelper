@@ -1,36 +1,23 @@
 
-ue_baseIncludeDir = {
-    core = _WORKING_DIR .. "/External/UE/Include/Core",
-    traceLog = _WORKING_DIR .. "/External/UE/Include/TraceLog",
-    applicationCore = _WORKING_DIR .. "/External/UE/Include/ApplicationCore",
-    slate = _WORKING_DIR .. "/External/UE/Include/Slate",
-    inputCore = _WORKING_DIR .. "/External/UE/Include/InputCore",
-    standaloneRenderer = _WORKING_DIR .. "/External/UE/Include/StandaloneRenderer",
-    coreUObject = _WORKING_DIR .. "/External/UE/Include/CoreUObject",
-    slateCore = _WORKING_DIR .. "/External/UE/Include/SlateCore",
-    json = _WORKING_DIR .. "/External/UE/Include/Json",
-    imageWrapper = _WORKING_DIR .. "/External/UE/Include/ImageWrapper",
-	desktopPlatform = _WORKING_DIR .. "/External/UE/Include/DesktopPlatform",
-	directoryWatcher = _WORKING_DIR .. "/External/UE/Include/DirectoryWatcher",
-}
-
-ue_uhtIncludeDir = {
-    inputCore = _WORKING_DIR .. "/External/UE/Include/InputCore/UHT",
-    slate = _WORKING_DIR .. "/External/UE/Include/Slate/UHT",
-    coreUObject = _WORKING_DIR .. "/External/UE/Include/CoreUObject/UHT",
-    slateCore = _WORKING_DIR .. "/External/UE/Include/SlateCore/UHT",
+ue_module = {
+    "Core", "TraceLog", "ApplicationCore", "Slate",
+    "InputCore", "StandaloneRenderer", "CoreUObject",
+    "SlateCore", "Json", "ImageWrapper", "DesktopPlatform",
+    "DirectoryWatcher"
 }
 
 function generateIncludeDir_ue()
-    externalincludedirs(_WORKING_DIR .. "/External/UE/Include")
+    local ueSrcDir = _WORKING_DIR .. "/External/UE/Src/"
+    local ueUhtDir = _WORKING_DIR .. "/External/UE/Src/UHT/"
+    externalincludedirs(ueSrcDir)
     externalwarnings("off")
 
-    for _, v in pairs(ue_baseIncludeDir) do
-        externalincludedirs(v)
-    end
+    for _ , module in pairs(ue_module) do
+        externalincludedirs(ueSrcDir .. module .. "/Public")
+        externalincludedirs(ueSrcDir .. module .. "/Internal")
+        externalincludedirs(ueSrcDir .. module .. "/Classes")
 
-    for _, v in pairs(ue_uhtIncludeDir) do
-        externalincludedirs(v)
+        externalincludedirs(ueUhtDir .. module)
     end
 end
 

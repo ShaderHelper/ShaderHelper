@@ -19,13 +19,20 @@ echo Donwloading DXC...
 	del DXC.zip
 echo.
 
-echo Donwloading UE-lib...
+echo Donwloading UE...
 	set UE-lib_Dir=%CURRENTDIR%/External/UE/Lib
 	set UE-lib_Url="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/a073247dcbe52e672722609b215df293/UE-Lib-Win.zip"
 	cd /D %UE-lib_Dir%
 	curl -LO %UE-lib_Url% || goto error
 	tar -zxf UE-Lib-Win.zip || goto error
 	del UE-Lib-Win.zip
+	
+	set UE-Src_Dir=%CURRENTDIR%/External/UE/Src
+	set UE-Src_Url="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/5b7a7f9b02abe11002315e44c9adc7ce/UE-Src.zip"
+	cd /D %UE-Src_Dir%
+	curl -LO %UE-Src_Url% || goto error
+	tar -zxf UE-Src.zip || goto error
+	del UE-Src.zip
 echo.
 
 echo Script complete

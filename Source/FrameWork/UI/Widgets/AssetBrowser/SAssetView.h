@@ -1,6 +1,6 @@
 #pragma once
 #include "AssetViewItem/AssetViewItem.h"
-#include <Slate/Widgets/Views/STileView.h>
+#include <Widgets/Views/STileView.h>
 
 namespace FRAMEWORK
 {

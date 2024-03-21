@@ -1,8 +1,8 @@
 #include "CommonHeader.h"
 #include "SAssetView.h"
-#include <DirectoryWatcher/DirectoryWatcherModule.h>
-#include <DirectoryWatcher/IDirectoryWatcher.h>
-#include <DesktopPlatform/DesktopPlatformModule.h>
+#include <DirectoryWatcherModule.h>
+#include <IDirectoryWatcher.h>
+#include <DesktopPlatformModule.h>
 #include "Common/Util/Reflection.h"
 #include "AssetManager/AssetImporter/AssetImporter.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"

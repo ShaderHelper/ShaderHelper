@@ -2,8 +2,8 @@
 #include "SAssetBrowser.h"
 #include "SAssetView.h"
 #include "AssetManager/AssetManager.h"
-#include <DirectoryWatcher/DirectoryWatcherModule.h>
-#include <DirectoryWatcher/IDirectoryWatcher.h>
+#include <DirectoryWatcherModule.h>
+#include <IDirectoryWatcher.h>
 
 namespace FRAMEWORK
 {

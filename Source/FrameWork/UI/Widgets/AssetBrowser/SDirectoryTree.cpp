@@ -1,6 +1,6 @@
 #include "CommonHeader.h"
 #include "SDirectoryTree.h"
-#include <DesktopPlatform/DesktopPlatformModule.h>
+#include <DesktopPlatformModule.h>
 #include "UI/Styles/FAppCommonStyle.h"
 #include <Styling/StyleColors.h>
 #include "UI/Widgets/Misc/CommonTableRow.h"
