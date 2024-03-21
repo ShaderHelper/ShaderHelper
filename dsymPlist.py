@@ -50,6 +50,9 @@ def main():
 
     origin_dsym_name = path.splitext(path.basename(args.dsymFilePath))[0]
     new_dsym_name = origin_dsym_name + ".dylib.dSYM"
-    os.rename(dsym_bundle_path, path.join(path.dirname(dsym_bundle_path), new_dsym_name))
+    final_dsym_bundle = path.join(path.dirname(dsym_bundle_path), new_dsym_name)
+
+    shutil.rmtree(final_dsym_bundle)
+    os.rename(dsym_bundle_path, final_dsym_bundle)
 
 main()
