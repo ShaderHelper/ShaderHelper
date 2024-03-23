@@ -22,7 +22,8 @@ This is a shader editor based on some special modules from UnrealEngine (Slate, 
 * x86_64
 * Visual studio 2019 or 2022
 
-First run `downloadDep.bat` to get external dependencies, then open the `.sln` file created after running `bootstrap.bat` and build the project.
+First run `downloadDep.bat` to get external dependencies, then open the `.sln` file created after running `bootstrap.bat` and build the project.  
+> Note: `bootstrap.bat` generates project files corresponding to the latest version of visual studio you have installed by default. If you need an older version, specify it manually like this: `bootstrap.bat vs20XX`
 
 ### MacOS Requirements
 [![MacOS](https://github.com/mxrhyx233/ShaderHelper/actions/workflows/MacOS.yml/badge.svg)](https://github.com/mxrhyx233/ShaderHelper/actions/workflows/MacOS.yml)

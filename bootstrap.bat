@@ -10,8 +10,18 @@ set CURRENTDIR=%cd%
 cd /D %CURRENTDIR%
 
 set PREMAK5_PATH="%CURRENTDIR%/Premake/premake5.exe"
+set VsVersion=%~1
+
 echo Generating...
 echo.
+
+if not "%VsVersion%"=="" (
+	call :GenerateVsProject
+
+	pause
+	exit /b 0
+)
+
 echo Try to search a particular version of visual studio.
 
 if not exist %VSWHERE_PATH% (
@@ -23,17 +33,23 @@ if not exist %VSWHERE_PATH% (
 		echo Successfully find the latest visual studio : %%i
 		echo.
 		
-		echo Premake5: Processing...
-		call %PREMAK5_PATH% vs%%i || goto error
-		echo.
-		
-		echo Script complete
+		set VsVersion=vs%%i
+		call :GenerateVsProject
+
 		pause
 		exit /b 0
 	)
 	
 	echo ERROR: Could not find vs2019 or vs2022, please make sure you installed it.
 )
+
+:GenerateVsProject
+echo Premake5: Processing...
+echo "%VsVersion%"
+call %PREMAK5_PATH% %VsVersion% || goto error
+echo.	
+echo Premake5 complete
+
 
 :error
 echo.
