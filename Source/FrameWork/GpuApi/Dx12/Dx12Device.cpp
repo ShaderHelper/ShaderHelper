@@ -28,8 +28,7 @@ namespace FRAMEWORK
 		DxCheck(CreateDXGIFactory2(0, IID_PPV_ARGS(GDxgiFactory.GetInitReference())));
 #endif
 
-		TRefCountPtr<IDXGIAdapter1> Adapter;
-		GDxgiFactory->EnumAdapters1(0, Adapter.GetInitReference());
+		GDxgiFactory->EnumAdapters1(0, &Adapter);
 		
 		DXGI_ADAPTER_DESC1 Desc = { };
 		Adapter->GetDesc1(&Desc);

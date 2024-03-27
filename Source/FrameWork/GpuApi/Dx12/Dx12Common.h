@@ -78,15 +78,8 @@ namespace FRAMEWORK
 		return TEXT("Unknown Error");
 	}
 
-	inline void OutputDxError(HRESULT hr, const ANSICHAR * Code, const ANSICHAR * Filename, uint32 Line)
-	{
-		FString ErrorCodeText = GetErrorText(hr);
-		SH_LOG(LogDx12, Fatal, TEXT("DxError(%s) encountered during calling %s.(%s-%u)"), *ErrorCodeText, ANSI_TO_TCHAR(Code), ANSI_TO_TCHAR(Filename), Line);
-		if (hr == E_OUTOFMEMORY) {
-			FPlatformMisc::MessageBoxExt(EAppMsgType::Ok, TEXT("Out of video memory. Please make sure you have the enough memory."), TEXT("Error:"));
-			std::_Exit(0);
-		}
-	}
+	void OutputDxError(HRESULT hr, const ANSICHAR* Code, const ANSICHAR* Filename, uint32 Line);
+
 #if USE_PIX
 	inline std::wstring GetLatestWinPixGpuCapturerPath()
 	{

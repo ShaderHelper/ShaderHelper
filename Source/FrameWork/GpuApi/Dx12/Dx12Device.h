@@ -7,6 +7,7 @@ namespace FRAMEWORK
 	inline bool GCanGpuCapture;
 	inline ID3D12Device* GDevice;
 	inline IDXGIFactory2* GDxgiFactory;
+	inline IDXGIAdapter1* Adapter;
 	inline ID3D12CommandQueue* GGraphicsQueue;
 	inline ID3D12Fence* CpuSyncGpuFence;
 	inline HANDLE CpuSyncGpuEvent;
