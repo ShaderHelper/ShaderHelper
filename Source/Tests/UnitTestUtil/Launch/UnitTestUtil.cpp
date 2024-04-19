@@ -236,7 +236,7 @@ namespace UNITTEST_UTIL
 				return true;
 			};
 			TestSeq(AUX::MakeIntegerSequenceByPredicate<10, 30, Pred>());
-			TestSeq(AUX::ReversInegerSequence(TIntegerSequence<int, 2, 3, 5>{}));
+			TestSeq(AUX::ReverseInegerSequence(TIntegerSequence<int, 2, 3, 5>{}));
 		}
 
 		//Test FunctorToFuncPtr

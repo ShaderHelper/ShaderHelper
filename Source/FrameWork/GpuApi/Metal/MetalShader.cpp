@@ -54,8 +54,10 @@ namespace FRAMEWORK
 
     bool CompileShaderFromHlsl(TRefCountPtr<MetalShader> InShader, FString& OutErrorInfo)
     {
-        ShaderConductor::Compiler::SourceDesc SourceDesc{};
+        TArray<ShaderConductor::MacroDefine> Defines;
+        Defines.Add({"FINAL_METAL"});
         
+        ShaderConductor::Compiler::SourceDesc SourceDesc{};
         SourceDesc.stage = MapShaderCunductorStage(InShader->GetShaderType());
         
         //len + 1 for copying null terminator
@@ -99,9 +101,12 @@ namespace FRAMEWORK
 
 		if (InShader->HasFlag(GpuShaderFlag::Enable16bitType))
 		{
+            Defines.Add({"ENABLE_16BIT_TYPE"});
 			SCOptions.enable16bitTypes = true;
 		}
         
+        SourceDesc.defines = Defines.GetData();
+        SourceDesc.numDefines = Defines.Num();
         const ShaderConductor::Compiler::ResultDesc Result = ShaderConductor::Compiler::Compile(SourceDesc, SCOptions, TargetDesc);
         if(Result.errorWarningMsg.Size() > 0)
         {

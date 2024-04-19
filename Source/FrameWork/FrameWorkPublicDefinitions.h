@@ -26,6 +26,10 @@
 #define PER_MODULE_DEFINITION() \
     PER_MODULE_BOILERPLATE
 
+#define PER_APP_DEFINITION(AppName) \
+    static const int AppNameSetter = [] { FApp::SetProjectName(TEXT(AppName)); return 0; }(); \
+    PER_MODULE_DEFINITION()
+
 namespace FRAMEWORK
 {
     extern FRAMEWORK_API TArray<FName> GProjectCategoryNames;

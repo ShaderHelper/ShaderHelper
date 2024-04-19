@@ -26,6 +26,7 @@ namespace FRAMEWORK
 		R32G32B32A32_FLOAT,
 		R11G11B10_FLOAT,
 		R16_FLOAT,
+        R32_FLOAT,
 		NUM,
 	};
 
@@ -197,6 +198,7 @@ namespace FRAMEWORK
 		case GpuTextureFormat::B8G8R8A8_UNORM_SRGB:
         case GpuTextureFormat::R10G10B10A2_UNORM:
         case GpuTextureFormat::R11G11B10_FLOAT:
+        case GpuTextureFormat::R32_FLOAT:
             return 4;
         case GpuTextureFormat::R16G16B16A16_UNORM:
         case GpuTextureFormat::R16G16B16A16_UINT:

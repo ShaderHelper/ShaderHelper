@@ -187,7 +187,7 @@ namespace AUX
     using MakeRangeIntegerSequence = typename RangeIntegerSequence<Min, TMakeIntegerSequence<int, Max - Min + 1>>::Type;
 
 	template<int... Seq, int... Indexes>
-	auto ReversInegerSequenceImpl(TIntegerSequence<int, Seq...> IntegerSeq, TIntegerSequence<int, Indexes...> IndexesSeq)
+	auto ReverseInegerSequenceImpl(TIntegerSequence<int, Seq...> IntegerSeq, TIntegerSequence<int, Indexes...> IndexesSeq)
 	{
 		constexpr auto arr = [] {
 			std::array<int, sizeof...(Seq)> target{};
@@ -202,9 +202,9 @@ namespace AUX
 	}
 
 	template<int... Seq>
-	auto ReversInegerSequence(TIntegerSequence<int, Seq...> IntegerSeq)
+	auto ReverseInegerSequence(TIntegerSequence<int, Seq...> IntegerSeq)
 	{
-		return ReversInegerSequenceImpl(IntegerSeq, TMakeIntegerSequence<int, sizeof...(Seq)>{});
+		return ReverseInegerSequenceImpl(IntegerSeq, TMakeIntegerSequence<int, sizeof...(Seq)>{});
 	}
 
     template<int Min, int Max, bool(*Pred)(int), int Size, int... Seq>

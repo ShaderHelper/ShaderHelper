@@ -78,6 +78,8 @@ namespace FRAMEWORK
 				Arguments.Add(TEXT("ENABLE_16BIT_TYPE"));
 			}
 		};
+        Arguments.Add(TEXT("-D"));
+        Arguments.Add(TEXT("FINAL_HLSL"));
 		
 		DxcBuffer SourceBuffer = { 0 };
 		SourceBuffer.Ptr = BlobEncoding->GetBufferPointer();

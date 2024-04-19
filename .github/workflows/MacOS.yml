@@ -40,6 +40,7 @@ jobs:
         run: |
           xcodebuild build -workspace ShaderHelper.xcworkspace -scheme ShaderHelper -configuration Debug -sdk macosx
           xcodebuild build -workspace ShaderHelper.xcworkspace -scheme UnitTestUtil -configuration Debug -sdk macosx
+          xcodebuild build -workspace ShaderHelper.xcworkspace -scheme UnitTestGpuApi -configuration Debug -sdk macosx
         
 #       - name: Upload
 #         uses: actions/upload-artifact@v3

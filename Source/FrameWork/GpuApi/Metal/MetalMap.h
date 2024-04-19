@@ -87,6 +87,14 @@ namespace FRAMEWORK
             RawPassDesc.colorAttachments[i].loadAction = MapLoadAction(RtInfo.LoadAction);
             RawPassDesc.colorAttachments[i].storeAction = MapStoreAction(RtInfo.StoreAction);
         }
+        
+        if(PassRtNum <= 0)
+        {
+            //targetless rasterization
+            RawPassDesc.renderTargetWidth = 1;
+            RawPassDesc.renderTargetHeight = 1;
+            RawPassDesc.defaultRasterSampleCount = 1;
+        }
         return mtlpp::RenderPassDescriptor{RawPassDesc, ns::Ownership::Assign};
     }
     
@@ -104,6 +112,7 @@ namespace FRAMEWORK
         case GpuTextureFormat::R32G32B32A32_FLOAT:    return MTLPixelFormatRGBA32Float;
         case GpuTextureFormat::R11G11B10_FLOAT:       return MTLPixelFormatRG11B10Float;
 		case GpuTextureFormat::R16_FLOAT:             return MTLPixelFormatR16Float;
+        case GpuTextureFormat::R32_FLOAT:             return MTLPixelFormatR32Float;
         default:
             SH_LOG(LogMetal, Fatal, TEXT("Invalid GpuTextureFormat."));
             return MTLPixelFormatRGBA8Unorm;

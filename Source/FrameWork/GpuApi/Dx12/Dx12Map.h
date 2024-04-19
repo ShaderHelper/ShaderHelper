@@ -87,6 +87,7 @@ namespace FRAMEWORK
         case GpuTextureFormat::R32G32B32A32_FLOAT:    return DXGI_FORMAT_R32G32B32A32_FLOAT;
         case GpuTextureFormat::R11G11B10_FLOAT:       return DXGI_FORMAT_R11G11B10_FLOAT;
 		case GpuTextureFormat::R16_FLOAT:             return DXGI_FORMAT_R16_FLOAT;
+        case GpuTextureFormat::R32_FLOAT:             return DXGI_FORMAT_R32_FLOAT;
         default:
             SH_LOG(LogDx12, Fatal, TEXT("Invalid GpuTextureFormat."));
             return DXGI_FORMAT_R8G8B8A8_UNORM;

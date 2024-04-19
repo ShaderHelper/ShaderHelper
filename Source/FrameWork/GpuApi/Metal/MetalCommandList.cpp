@@ -27,20 +27,20 @@ namespace FRAMEWORK
         check(CurrentRenderCommandEncoder);
         if(!CurrentViewPort.IsSet())
         {
-			if (CurrentRenderPassDesc.GetColorAttachments().GetSize() > 0)
-			{
-				mtlpp::Texture Rt = CurrentRenderPassDesc.GetColorAttachments()[0].GetTexture();
+            auto ColorAttachments = CurrentRenderPassDesc.GetColorAttachments();
+            mtlpp::Texture Rt = ColorAttachments[0].GetTexture();
+            if(Rt)
+            {
+                mtlpp::Viewport Viewport{
+                    0, 0,
+                    (double)Rt.GetWidth(), (double)Rt.GetHeight(),
+                    0, 1.0
+                };
 
-				mtlpp::Viewport Viewport{
-					0, 0,
-					(double)Rt.GetWidth(), (double)Rt.GetHeight(),
-					0, 1.0
-				};
+                mtlpp::ScissorRect ScissorRect{ 0, 0, Rt.GetWidth(), Rt.GetHeight() };
 
-				mtlpp::ScissorRect ScissorRect{ 0, 0, Rt.GetWidth(), Rt.GetHeight() };
-
-				SetViewPort(MoveTemp(Viewport), MoveTemp(ScissorRect));
-			}
+                SetViewPort(MoveTemp(Viewport), MoveTemp(ScissorRect));
+            }
         }
         
         if(IsPipelineDirty)
