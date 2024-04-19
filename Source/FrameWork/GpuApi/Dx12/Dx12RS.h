@@ -12,24 +12,24 @@ namespace FRAMEWORK
 	public:
 		Dx12BindGroupLayout(const GpuBindGroupLayoutDesc& LayoutDesc);
 
-		const CD3DX12_ROOT_PARAMETER1& GetDynamicBufferRootParameter(BindingSlot InSlot) const {
+		const CD3DX12_ROOT_PARAMETER& GetDynamicBufferRootParameter(BindingSlot InSlot) const {
 			return DynamicBufferRootParameters[InSlot];
 		}
 
-		TOptional<CD3DX12_ROOT_PARAMETER1> GetDescriptorTableRootParameter_CbvSrvUav(D3D12_SHADER_VISIBILITY Visibility) const {
-			return DescriptorTableRootParameters_CbvSrvUav.Contains(Visibility) ? DescriptorTableRootParameters_CbvSrvUav[Visibility] : TOptional<CD3DX12_ROOT_PARAMETER1>();
+		TOptional<CD3DX12_ROOT_PARAMETER> GetDescriptorTableRootParameter_CbvSrvUav(D3D12_SHADER_VISIBILITY Visibility) const {
+			return DescriptorTableRootParameters_CbvSrvUav.Contains(Visibility) ? DescriptorTableRootParameters_CbvSrvUav[Visibility] : TOptional<CD3DX12_ROOT_PARAMETER>();
 		}
 
-		TOptional<CD3DX12_ROOT_PARAMETER1> GetDescriptorTableRootParameter_Sampler(D3D12_SHADER_VISIBILITY Visibility) const {
-			return DescriptorTableRootParameters_Sampler.Contains(Visibility) ? DescriptorTableRootParameters_Sampler[Visibility] : TOptional<CD3DX12_ROOT_PARAMETER1>();
+		TOptional<CD3DX12_ROOT_PARAMETER> GetDescriptorTableRootParameter_Sampler(D3D12_SHADER_VISIBILITY Visibility) const {
+			return DescriptorTableRootParameters_Sampler.Contains(Visibility) ? DescriptorTableRootParameters_Sampler[Visibility] : TOptional<CD3DX12_ROOT_PARAMETER>();
 		}
 
 	private:
-		TMap<D3D12_SHADER_VISIBILITY, TArray<CD3DX12_DESCRIPTOR_RANGE1>> DescriptorTableRanges_CbvSrvUav;
-		TMap<D3D12_SHADER_VISIBILITY, TArray<CD3DX12_DESCRIPTOR_RANGE1>> DescriptorTableRanges_Sampler;
-        TMap<D3D12_SHADER_VISIBILITY, CD3DX12_ROOT_PARAMETER1> DescriptorTableRootParameters_CbvSrvUav;
-		TMap<D3D12_SHADER_VISIBILITY, CD3DX12_ROOT_PARAMETER1> DescriptorTableRootParameters_Sampler;
-		TMap<BindingSlot, CD3DX12_ROOT_PARAMETER1> DynamicBufferRootParameters;
+		TMap<D3D12_SHADER_VISIBILITY, TArray<CD3DX12_DESCRIPTOR_RANGE>> DescriptorTableRanges_CbvSrvUav;
+		TMap<D3D12_SHADER_VISIBILITY, TArray<CD3DX12_DESCRIPTOR_RANGE>> DescriptorTableRanges_Sampler;
+        TMap<D3D12_SHADER_VISIBILITY, CD3DX12_ROOT_PARAMETER> DescriptorTableRootParameters_CbvSrvUav;
+		TMap<D3D12_SHADER_VISIBILITY, CD3DX12_ROOT_PARAMETER> DescriptorTableRootParameters_Sampler;
+		TMap<BindingSlot, CD3DX12_ROOT_PARAMETER> DynamicBufferRootParameters;
 	};
 
 	class Dx12BindGroup : public GpuBindGroup, public Dx12DeferredDeleteObject<Dx12BindGroup>

@@ -17,10 +17,7 @@ namespace UNITTEST_UTIL
 
 	template<typename T, T... Seq>
 	void TestSeq(TIntegerSequence<T, Seq...>) {
-		auto lam = [](T t) {
-			SH_LOG(LogTestUtil, Display, TEXT("TestSeq: %d"), t);
-		};
-		(lam(Seq), ...);
+		SH_LOG(LogTestUtil, Display, TEXT("TestSeq: %s"), *(FString::Printf(TEXT("%d, "), Seq) + ...));
 	}
 
 	void TestFunctorToFuncPtr(void(*func)(int,int))
@@ -238,7 +235,8 @@ namespace UNITTEST_UTIL
 				}
 				return true;
 			};
-			TestSeq(AUX::MakeIntegerSequeceByPredicate<10, 30, Pred>());
+			TestSeq(AUX::MakeIntegerSequenceByPredicate<10, 30, Pred>());
+			TestSeq(AUX::ReversInegerSequence(TIntegerSequence<int, 2, 3, 5>{}));
 		}
 
 		//Test FunctorToFuncPtr
@@ -265,7 +263,7 @@ namespace UNITTEST_UTIL
             CallPrivate_PrivateUnitTest_overload2(PrivateUnitTest{}, 233.233f);
 			CallPrivate_PrivateUnitTestBase_Run(PrivateUnitTest{});
 		}
-
+		
 	}
 
 }

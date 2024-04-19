@@ -27,17 +27,20 @@ namespace FRAMEWORK
         check(CurrentRenderCommandEncoder);
         if(!CurrentViewPort.IsSet())
         {
-            mtlpp::Texture Rt = CurrentRenderPassDesc.GetColorAttachments()[0].GetTexture();
+			if (CurrentRenderPassDesc.GetColorAttachments().GetSize() > 0)
+			{
+				mtlpp::Texture Rt = CurrentRenderPassDesc.GetColorAttachments()[0].GetTexture();
 
-            mtlpp::Viewport Viewport{
-                0, 0,
-                (double)Rt.GetWidth(), (double)Rt.GetHeight(),
-                0, 1.0
-            };
-            
-            mtlpp::ScissorRect ScissorRect{0, 0, Rt.GetWidth(), Rt.GetHeight()};
-            
-            SetViewPort(MoveTemp(Viewport), MoveTemp(ScissorRect));
+				mtlpp::Viewport Viewport{
+					0, 0,
+					(double)Rt.GetWidth(), (double)Rt.GetHeight(),
+					0, 1.0
+				};
+
+				mtlpp::ScissorRect ScissorRect{ 0, 0, Rt.GetWidth(), Rt.GetHeight() };
+
+				SetViewPort(MoveTemp(Viewport), MoveTemp(ScissorRect));
+			}
         }
         
         if(IsPipelineDirty)
@@ -49,9 +52,12 @@ namespace FRAMEWORK
         
         if(IsViewportDirty)
         {
-            CurrentRenderCommandEncoder.SetViewport(*CurrentViewPort);
-            CurrentRenderCommandEncoder.SetScissorRect(*CurrentScissorRect);
-            MarkViewportDirty(false);
+			if (CurrentViewPort)
+			{
+				CurrentRenderCommandEncoder.SetViewport(*CurrentViewPort);
+				CurrentRenderCommandEncoder.SetScissorRect(*CurrentScissorRect);
+				MarkViewportDirty(false);
+			}
         }
         
         if(CurrentBindGroup0 && IsBindGroup0Dirty) 

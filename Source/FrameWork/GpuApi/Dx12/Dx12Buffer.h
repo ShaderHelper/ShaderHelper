@@ -10,16 +10,12 @@ namespace FRAMEWORK
 	class Dx12Buffer : public GpuBuffer, public Dx12DeferredDeleteObject<Dx12Buffer>
 	{
 	public:
-		Dx12Buffer(GpuBufferUsage InUsage, ResourceAllocation InAllocation)
+		Dx12Buffer(GpuBufferUsage InUsage, ResourceAllocation InAllocation, bool IsDeferred)
             : GpuBuffer(InUsage)
+			, Dx12DeferredDeleteObject(IsDeferred)
 			, Allocation(MoveTemp(InAllocation))
         {
 			Allocation.SetOwner(this);
-		}
-
-		~Dx12Buffer()
-		{
-			Allocation.Release();
 		}
 
 	public:
@@ -32,5 +28,5 @@ namespace FRAMEWORK
 		ResourceAllocation Allocation;
 	};
 
-	TRefCountPtr<Dx12Buffer> CreateDx12Buffer(uint32 ByteSize, GpuBufferUsage Usage);
+	TRefCountPtr<Dx12Buffer> CreateDx12Buffer(uint32 ByteSize, GpuBufferUsage Usage, bool IsDeferred = true);
 }

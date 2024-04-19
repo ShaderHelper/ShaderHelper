@@ -4,6 +4,7 @@
 namespace FRAMEWORK
 {
 
+	inline bool GDred;
 	inline bool GCanGpuCapture;
 	inline ID3D12Device* GDevice;
 	inline IDXGIFactory2* GDxgiFactory;
@@ -15,6 +16,7 @@ namespace FRAMEWORK
 	inline constexpr uint32 FrameSourceNum = AllowableLag + 1;
 	inline uint64 CurCpuFrame;
 	inline uint64 CurGpuFrame;
+	inline D3D_SHADER_MODEL GMaxShaderModel;
 
     extern void InitDx12Core();
 	inline uint32 GetCurFrameSourceIndex() {

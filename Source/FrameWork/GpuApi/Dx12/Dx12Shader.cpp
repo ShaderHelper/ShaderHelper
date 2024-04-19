@@ -2,6 +2,7 @@
 #include "Dx12Shader.h"
 #include "Common/Path/PathHelper.h"
 #include <Misc/FileHelper.h>
+#include "GpuApi/GpuFeature.h"
 #pragma comment (lib, "dxcompiler.lib")
 
 namespace FRAMEWORK
@@ -24,6 +25,24 @@ namespace FRAMEWORK
 		 DxCheck(CompierUitls->CreateDefaultIncludeHandler(CompilerIncludeHandler.GetInitReference()));
 	 }
 
+	FString GetShaderProfile(ShaderType InType, GpuShaderModel InModel)
+	{
+		FString ProfileName;
+		if (InType == ShaderType::VertexShader) {
+			ProfileName += "vs";
+		}
+		else if (InType == ShaderType::PixelShader) {
+			ProfileName += "ps";
+		}
+
+		ProfileName += "_";
+		ProfileName += FString::FromInt(InModel.Major);
+		ProfileName += "_";
+		ProfileName += FString::FromInt(InModel.Minor);
+
+		return ProfileName;
+	}
+
 	 bool DxcCompiler::Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo) const
 	 {
 		TRefCountPtr<IDxcBlobEncoding> BlobEncoding;
@@ -36,8 +55,10 @@ namespace FRAMEWORK
 		Arguments.Add(TEXT("/Qstrip_debug"));
 		Arguments.Add(TEXT("/E"));
 		Arguments.Add(*InShader->GetEntryPoint());
+
+		FString ShaderProfile = GetShaderProfile(InShader->GetShaderType(), InShader->GetShaderModelVer());
 		Arguments.Add(TEXT("/T"));
-		Arguments.Add(*InShader->GetShaderTarget());
+		Arguments.Add(*ShaderProfile);
 #if DEBUG_SHADER
 		Arguments.Add(TEXT("/Zi"));
 #endif
@@ -48,6 +69,15 @@ namespace FRAMEWORK
 			Arguments.Add(*IncludeDir);
 		}
 
+		ValidateGpuFeature(GpuFeature::Support16bitType, TEXT("Hardware does not support 16bitType, shader model <= 6.2"))
+		{
+			if (InShader->HasFlag(GpuShaderFlag::Enable16bitType))
+			{
+				Arguments.Add(TEXT("-enable-16bit-types"));
+				Arguments.Add(TEXT("-D"));
+				Arguments.Add(TEXT("ENABLE_16BIT_TYPE"));
+			}
+		};
 		
 		DxcBuffer SourceBuffer = { 0 };
 		SourceBuffer.Ptr = BlobEncoding->GetBufferPointer();

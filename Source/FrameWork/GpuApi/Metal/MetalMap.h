@@ -103,6 +103,7 @@ namespace FRAMEWORK
         case GpuTextureFormat::R16G16B16A16_FLOAT:    return MTLPixelFormatRGBA16Float;
         case GpuTextureFormat::R32G32B32A32_FLOAT:    return MTLPixelFormatRGBA32Float;
         case GpuTextureFormat::R11G11B10_FLOAT:       return MTLPixelFormatRG11B10Float;
+		case GpuTextureFormat::R16_FLOAT:             return MTLPixelFormatR16Float;
         default:
             SH_LOG(LogMetal, Fatal, TEXT("Invalid GpuTextureFormat."));
             return MTLPixelFormatRGBA8Unorm;

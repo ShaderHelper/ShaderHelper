@@ -1,6 +1,6 @@
 FrameWorkHierarchy = {
     ["Sources/*"] = {"**.h","**.cpp", "**.hpp"},
-	["Resource/Shaders"] = {"%{_WORKING_DIR}/Resource/Shaders/*"}
+	["Resource/Shaders/*"] = {"%{_WORKING_DIR}/Resource/Shaders/**.hlsl"}
 }
 
 if os.target() == premake.MACOSX then

@@ -18,7 +18,7 @@ This is a shader editor based on some special modules from UnrealEngine (Slate, 
 
 ### Windows Requirements
 [![Windows](https://github.com/mxrhyx233/ShaderHelper/actions/workflows/Windows.yml/badge.svg)](https://github.com/mxrhyx233/ShaderHelper/actions/workflows/Windows.yml)
-* Windows 10 (64-bit) - Version 1909 or later
+* Windows 10 (64-bit)
 * x86_64
 * Visual studio 2019 or 2022
 

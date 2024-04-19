@@ -30,7 +30,7 @@ echo "Downloading UE..."
     rm UE-Lib-Mac.zip*
 
     UE_Src_Dir="$CurrentPath/External/UE/Src"
-    UE_Src_Url="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/5b7a7f9b02abe11002315e44c9adc7ce/UE-Src.zip"
+    UE_Src_Url="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/073096f75c69486222f4295105e8729e/UE-Src.zip"
     cd "$UE_Src_Dir"
     curl -LO $UE_Src_Url || Error
     tar -zxf UE-Src.zip || Error

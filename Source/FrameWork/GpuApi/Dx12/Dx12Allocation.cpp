@@ -27,8 +27,7 @@ namespace FRAMEWORK
 		CD3DX12_RESOURCE_DESC BufferDesc = CD3DX12_RESOURCE_DESC::Buffer(ByteSize);
 
 		DxCheck(GDevice->CreateCommittedResource(&HeapType, D3D12_HEAP_FLAG_NONE,
-			&BufferDesc, InitialState, nullptr, IID_PPV_ARGS(&Data.UnderlyResource)));
-		Data.UnderlyResource->SetName(TEXT("Common Buffer"));
+			&BufferDesc, InitialState, nullptr, IID_PPV_ARGS(Data.UnderlyResource.GetInitReference())));
 
 		Data.ResourceBaseGpuAddr = Data.UnderlyResource->GetGPUVirtualAddress();
 		if (InHeapType == D3D12_HEAP_TYPE_UPLOAD || InHeapType == D3D12_HEAP_TYPE_READBACK)
@@ -77,7 +76,7 @@ namespace FRAMEWORK
 		//TODO: CreatePlacedResource
 		DxCheck(GDevice->CreateCommittedResource(&HeapType, D3D12_HEAP_FLAG_NONE,
 			&BufferDesc, InitialState, nullptr, IID_PPV_ARGS(Resource.GetInitReference())));
-		Resource->SetName(TEXT("Bump Buffer"));
+		Resource->SetName(TEXT("BumpBuffer"));
 
 		if (HeapType.Type == D3D12_HEAP_TYPE_UPLOAD)
 		{
@@ -129,7 +128,7 @@ namespace FRAMEWORK
 
 		DxCheck(GDevice->CreateCommittedResource(&HeapType, D3D12_HEAP_FLAG_NONE,
 			&BufferDesc, InitialState, nullptr, IID_PPV_ARGS(Resource.GetInitReference())));
-		Resource->SetName(TEXT("Buddy Buffer"));
+		Resource->SetName(TEXT("BuddyBuffer"));
 
 		if (HeapType.Type == D3D12_HEAP_TYPE_UPLOAD)
 		{
@@ -142,7 +141,8 @@ namespace FRAMEWORK
 	{
 		uint32 AlignSize = Align(InSize, Alignment);
 		uint32 FreeBlockByteSizeOffset = InternalAllocator.Allocate(InSize, Alignment);
-		return {Resource.GetReference(), ResourceBaseGpuAddr, ResourceBaseCpuAddr, this, FreeBlockByteSizeOffset, AlignSize};
+		auto SubAllocSeciton = MakeShared<BuddySubAllocSection>(Resource.GetReference(), ResourceBaseGpuAddr, ResourceBaseCpuAddr, this, FreeBlockByteSizeOffset, AlignSize);
+		return { MoveTemp(SubAllocSeciton) };
 	}
 
 	void BufferBuddyAllocator::Deallocate(uint32 Offset, uint32 Size)
@@ -242,7 +242,7 @@ namespace FRAMEWORK
 		FreeBlocks[MaxOrder].Add(0);
 	}
 
-	void BuddyAllocationData::Release()
+	BuddySubAllocSection::~BuddySubAllocSection()
 	{
 		FromAllocator->Deallocate(Offset, Size);
 	}

@@ -6,7 +6,7 @@ THIRD_PARTY_INCLUDES_START
 #include "dxcapi.h"
 #include "d3d12.h"
 //Note that the header include order. Include Agility SDK headers before windows sdk headers.
-#include "d3dx12.h"
+#include "d3dx12/d3dx12.h"
 #include <dxgi1_4.h>
 #if USE_PIX
 #include "pix3.h"

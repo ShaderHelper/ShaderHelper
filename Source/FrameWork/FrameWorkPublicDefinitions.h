@@ -36,5 +36,5 @@ namespace FRAMEWORK
     GProjectCategoryNames.Emplace(#CategoryName)
 
 #define ADD_AGILITY_SDK()	\
-	extern "C" { _declspec(dllexport) extern const UINT D3D12SDKVersion = 602; }	\
+	extern "C" { _declspec(dllexport) extern const UINT D3D12SDKVersion = 610; }	\
 	extern "C" { _declspec(dllexport) extern const char* D3D12SDKPath = ".\\AgilitySDK\\"; }

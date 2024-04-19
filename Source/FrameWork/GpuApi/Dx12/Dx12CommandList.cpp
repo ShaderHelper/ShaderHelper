@@ -152,26 +152,30 @@ namespace FRAMEWORK
 
 		if (!CurrentViewPort.IsSet())
 		{
-			check(CurrentRenderTargets.Num() > 0);
+			if (CurrentRenderTargets.Num() > 0)
+			{
+				D3D12_VIEWPORT DefaultViewPort{};
+				DefaultViewPort.Width = (float)CurrentRenderTargets[0]->GetWidth();
+				DefaultViewPort.Height = (float)CurrentRenderTargets[0]->GetHeight();
+				DefaultViewPort.MinDepth = 0;
+				DefaultViewPort.MaxDepth = 1;
+				DefaultViewPort.TopLeftX = 0;
+				DefaultViewPort.TopLeftY = 0;
 
-			D3D12_VIEWPORT DefaultViewPort{};
-			DefaultViewPort.Width = (float)CurrentRenderTargets[0]->GetWidth();
-			DefaultViewPort.Height = (float)CurrentRenderTargets[0]->GetHeight();
-			DefaultViewPort.MinDepth = 0;
-			DefaultViewPort.MaxDepth = 1;
-			DefaultViewPort.TopLeftX = 0;
-			DefaultViewPort.TopLeftY = 0;
+				D3D12_RECT DefaultScissorRect = CD3DX12_RECT(0, 0, (LONG)DefaultViewPort.Width, (LONG)DefaultViewPort.Height);
 
-			D3D12_RECT DefaultScissorRect = CD3DX12_RECT(0, 0, (LONG)DefaultViewPort.Width, (LONG)DefaultViewPort.Height);
-
-			SetViewPort(MoveTemp(DefaultViewPort), MoveTemp(DefaultScissorRect));
+				SetViewPort(MoveTemp(DefaultViewPort), MoveTemp(DefaultScissorRect));
+			}
 		}
 
 		if(IsViewportDirty)
 		{
-			GraphicsCmdList->RSSetViewports(1, &*CurrentViewPort);
-			GraphicsCmdList->RSSetScissorRects(1, &*CurrentSissorRect);
-			MarkViewportDirty(false);
+			if (CurrentViewPort)
+			{
+				GraphicsCmdList->RSSetViewports(1, &*CurrentViewPort);
+				GraphicsCmdList->RSSetScissorRects(1, &*CurrentSissorRect);
+				MarkViewportDirty(false);
+			}
 		}
 
 		if (IsVertexBufferDirty) 
@@ -279,6 +283,7 @@ namespace FRAMEWORK
 		: CommandAllocator(InCmdAllocator)
 	{
 		DxCheck(GDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(Fence.GetInitReference())));
+		Fence->SetName(TEXT("CommandAllocatorFence"));
 		DxCheck(GGraphicsQueue->Signal(Fence, 1));
 	}
 }

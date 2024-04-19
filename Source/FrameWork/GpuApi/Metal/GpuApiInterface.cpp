@@ -154,6 +154,16 @@ namespace GpuApi
         return AUX::StaticCastRefCountPtr<GpuSampler>(CreateMetalSampler(InSamplerDesc));
 	}
 
+	void SetTextureName(const FString& TexName, GpuTexture* InTexture)
+	{
+
+	}
+
+	void SetBufferName(const FString& BufferName, GpuBuffer* InBuffer)
+	{
+
+	}
+
 	void SetRenderPipelineState(GpuPipelineState* InPipelineState)
 	{
         GetCommandListContext()->SetPipeline(static_cast<MetalPipelineState*>(InPipelineState));

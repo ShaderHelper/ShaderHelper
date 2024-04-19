@@ -26,16 +26,14 @@ namespace GpuApi
 		uint32 FrameResourceIndex = GetCurFrameSourceIndex();
 		GTempUniformBufferAllocator[FrameResourceIndex]->Flush();
         GDeferredReleaseManager->AllocateOneFrame();
+#if USE_PIX
+		PIXSetMarker(GCommandListContext->GetCommandListHandle(), PIX_COLOR_DEFAULT, *FString::Printf(TEXT("Render frame: %d"), CurCpuFrame));
+#endif
 	}
 
 	void EndFrame()
 	{
-		//If there are recorded commands between last Submit() and EndFrame()
-		if (!GCommandListContext->IsClose())
-		{
-			Submit();
-		}
-
+		Submit();
 		check(CurCpuFrame >= CurGpuFrame);
 		CurCpuFrame++;
 		DxCheck(GGraphicsQueue->Signal(CpuSyncGpuFence, CurCpuFrame));
@@ -172,7 +170,22 @@ namespace GpuApi
 		return AUX::StaticCastRefCountPtr<GpuSampler>(CreateDx12Sampler(InSamplerDesc));
 	}
 
-    bool CrossCompileShader(GpuShader* InShader, FString& OutErrorInfo)
+	void SetTextureName(const FString& TexName, GpuTexture* InTexture)
+	{
+		static_cast<Dx12Texture*>(InTexture)->GetResource()->SetName(*TexName);
+	}
+
+	void SetBufferName(const FString& BufferName, GpuBuffer* InBuffer)
+	{
+		GpuBufferUsage BufferUsage = InBuffer->GetUsage();
+		if (BufferUsage == GpuBufferUsage::Static || BufferUsage == GpuBufferUsage::Dynamic || BufferUsage == GpuBufferUsage::Staging)
+		{
+			Dx12Buffer* Buffer = static_cast<Dx12Buffer*>(InBuffer);
+			Buffer->GetAllocation().GetAllocationData().Get<CommonAllocationData>().UnderlyResource->SetName(*BufferName);
+		}
+	}
+
+	bool CrossCompileShader(GpuShader* InShader, FString& OutErrorInfo)
     {
         return GShaderCompiler.Compile(static_cast<Dx12Shader*>(InShader), OutErrorInfo);
     }
@@ -236,8 +249,11 @@ namespace GpuApi
 
 	void Submit()
 	{
-		GCommandListContext->SubmitCommandList();
-		GCommandListContext->ClearBinding();
+		if (!GCommandListContext->IsClose())
+		{
+			GCommandListContext->SubmitCommandList();
+			GCommandListContext->ClearBinding();
+		}
 	}
 
 	void FlushGpu()
@@ -271,7 +287,6 @@ namespace GpuApi
 		if (GCanGpuCapture) {
 			FlushGpu();
 			PIXEndCapture(false);
-            FPlatformMisc::MessageBoxExt(EAppMsgType::Ok, TEXT("Successfully captured the current frame."), TEXT("Message:"));
 		}
 #endif
 	}

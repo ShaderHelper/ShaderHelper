@@ -136,7 +136,6 @@ namespace FRAMEWORK
 			DxCheck(GDevice->CreateCommittedResource(&HeapType, HeapFlag,
 				&TexDesc, ActualState, nullptr, IID_PPV_ARGS(TexResource.GetInitReference())));
 		}
-		TexResource->SetName(TEXT("Texture"));
 
 		TRefCountPtr<Dx12Buffer> UploadBuffer;
 		if (bHasInitialData) {

@@ -186,8 +186,29 @@ namespace AUX
     template<int Min, int Max>
     using MakeRangeIntegerSequence = typename RangeIntegerSequence<Min, TMakeIntegerSequence<int, Max - Min + 1>>::Type;
 
+	template<int... Seq, int... Indexes>
+	auto ReversInegerSequenceImpl(TIntegerSequence<int, Seq...> IntegerSeq, TIntegerSequence<int, Indexes...> IndexesSeq)
+	{
+		constexpr auto arr = [] {
+			std::array<int, sizeof...(Seq)> target{};
+			std::array<int, sizeof...(Seq)> source{ Seq... };
+			for (int index = 0; index < target.size(); index++)
+			{
+				target[index] = source[target.size() - index - 1];
+			}
+			return target;
+		}();
+		return TIntegerSequence<int, arr[Indexes]...>{};
+	}
+
+	template<int... Seq>
+	auto ReversInegerSequence(TIntegerSequence<int, Seq...> IntegerSeq)
+	{
+		return ReversInegerSequenceImpl(IntegerSeq, TMakeIntegerSequence<int, sizeof...(Seq)>{});
+	}
+
     template<int Min, int Max, bool(*Pred)(int), int Size, int... Seq>
-    auto MakeIntegerSequeceByPredicateImpl(TIntegerSequence<int, Seq...>) {
+    auto MakeIntegerSequenceByPredicateImpl(TIntegerSequence<int, Seq...>) {
         constexpr auto arr = [] {
             std::array<int, Size> arr{};
             int index = 0;
@@ -201,7 +222,7 @@ namespace AUX
 
     //Predicate must be constexpr.
     template<int Min, int Max, bool(*Pred)(int)>
-    auto MakeIntegerSequeceByPredicate() {
+    auto MakeIntegerSequenceByPredicate() {
         constexpr int Size = [] {
             int size = 0;
             for (int i = Min; i <= Max; ++i) {
@@ -209,7 +230,7 @@ namespace AUX
             }
             return size;
         }();
-        return MakeIntegerSequeceByPredicateImpl<Min, Max, Pred, Size>(TMakeIntegerSequence<int, Size>{});
+        return MakeIntegerSequenceByPredicateImpl<Min, Max, Pred, Size>(TMakeIntegerSequence<int, Size>{});
     }
 
 	template<typename Func, int First, int... Seq>
@@ -301,6 +322,11 @@ namespace AUX
         T* RawPtr = static_cast<T*>(InRefCountPtr.GetReference());
         return TRefCountPtr<T>{RawPtr};
     }
+
+	template<typename T, typename U>
+	TUniquePtr<T> StaticCastUniquePtr(TUniquePtr<U>&& InUniquePtr) {
+		return TUniquePtr<T>{ InUniquePtr.Release() };
+	}
     
 	template<typename T>
 	struct TraitFuncTypeFromFuncPtr;

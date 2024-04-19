@@ -85,10 +85,12 @@ namespace FRAMEWORK
 	class Dx12DeferredDeleteObject
 	{
 	public:
-		Dx12DeferredDeleteObject()
+		Dx12DeferredDeleteObject(bool IsDeferred = true)
 		{
 			static_assert(std::is_base_of_v<GpuResource, T>);
-			GDeferredReleaseManager->AddUncompletedResource(static_cast<T*>(this));
+			if (IsDeferred) {
+				GDeferredReleaseManager->AddUncompletedResource(static_cast<T*>(this));
+			}
 		}
 		virtual ~Dx12DeferredDeleteObject() = default;
 	};

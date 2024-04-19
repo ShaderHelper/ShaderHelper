@@ -4,6 +4,28 @@
 
 namespace FRAMEWORK
 {
+#if GPU_API_DEBUG
+	FString GetDredInfo()
+	{
+		FString DredInfo;
+		TRefCountPtr<ID3D12DeviceRemovedExtendedData1> DredData;
+		if (SUCCEEDED(GDevice->QueryInterface(IID_PPV_ARGS(DredData.GetInitReference()))))
+		{
+			D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT1 DredAutoBreadcrumbsOutput;
+			if (SUCCEEDED(DredData->GetAutoBreadcrumbsOutput1(&DredAutoBreadcrumbsOutput)))
+			{
+				const D3D12_AUTO_BREADCRUMB_NODE1* HeadAutoBreadcrumbNode = DredAutoBreadcrumbsOutput.pHeadAutoBreadcrumbNode;
+				//TODO, pCommandlistdebugname always is nullptr and pLastBreadcrumbValue 0.
+			}
+			D3D12_DRED_PAGE_FAULT_OUTPUT DreaPageFaultOutput;
+			if (SUCCEEDED(DredData->GetPageFaultAllocationOutput(&DreaPageFaultOutput)))
+			{
+
+			}
+		}
+		return DredInfo;
+	}
+#endif
 
 	void OutputDxError(HRESULT hr, const ANSICHAR* Code, const ANSICHAR* Filename, uint32 Line)
 	{
@@ -34,7 +56,19 @@ namespace FRAMEWORK
 			}
 		}
 
-		SH_LOG(LogDx12, Fatal, TEXT("DxError(%s) encountered during calling %s.(%s-%u)"), *ErrorCodeText, ANSI_TO_TCHAR(Code), ANSI_TO_TCHAR(Filename), Line);
+		if (hr == DXGI_ERROR_DEVICE_REMOVED)
+		{
+			hr = GDevice->GetDeviceRemovedReason();
+			if (GDred)
+			{
+				GetDredInfo();
+			}
+			SH_LOG(LogDx12, Fatal, TEXT("DxError(%s) with reason(%s) encountered during calling %s.(%s-%u)"), *ErrorCodeText, GetErrorText(hr), ANSI_TO_TCHAR(Code), ANSI_TO_TCHAR(Filename), Line);
+		}
+		else
+		{
+			SH_LOG(LogDx12, Fatal, TEXT("DxError(%s) encountered during calling %s.(%s-%u)"), *ErrorCodeText, ANSI_TO_TCHAR(Code), ANSI_TO_TCHAR(Filename), Line);
+		}
 		std::_Exit(0);
 	}
 

@@ -3,32 +3,32 @@
 namespace FRAMEWORK
 {
 
-	TRefCountPtr<Dx12Buffer> CreateDx12Buffer(uint32 ByteSize, GpuBufferUsage Usage)
+	TRefCountPtr<Dx12Buffer> CreateDx12Buffer(uint32 ByteSize, GpuBufferUsage Usage, bool IsDeferred)
 	{
 		if (EnumHasAllFlags(Usage, GpuBufferUsage::PersistentUniform))
 		{
 			BuddyAllocationData AllocationData = GPersistantUniformBufferAllocator->Alloc(ByteSize);
-			return new Dx12Buffer{ Usage, AllocationData};
+			return new Dx12Buffer{ Usage, AllocationData, IsDeferred };
 		}
 		else if (EnumHasAllFlags(Usage, GpuBufferUsage::TemporaryUniform))
 		{
 			BumpAllocationData AllocationData = GTempUniformBufferAllocator[GetCurFrameSourceIndex()]->Alloc(ByteSize);
-			return new Dx12Buffer{ Usage, AllocationData};
+			return new Dx12Buffer{ Usage, AllocationData, IsDeferred };
 		}
 		else if (EnumHasAnyFlags(Usage, GpuBufferUsage::Dynamic))
 		{
 			CommonAllocationData AllocationData = GCommonBufferAllocator->Alloc(ByteSize, D3D12_HEAP_TYPE_UPLOAD);
-			return new Dx12Buffer{ Usage, AllocationData};	
+			return new Dx12Buffer{ Usage, AllocationData, IsDeferred };
 		}
 		else if (EnumHasAnyFlags(Usage, GpuBufferUsage::Static))
 		{
 			CommonAllocationData AllocationData = GCommonBufferAllocator->Alloc(ByteSize, D3D12_HEAP_TYPE_DEFAULT);
-			return new Dx12Buffer{ Usage, AllocationData};
+			return new Dx12Buffer{ Usage, AllocationData, IsDeferred };
 		}
 		else if (EnumHasAnyFlags(Usage, GpuBufferUsage::Staging))
 		{
 			CommonAllocationData AllocationData = GCommonBufferAllocator->Alloc(ByteSize, D3D12_HEAP_TYPE_READBACK);
-			return new Dx12Buffer{ Usage, AllocationData};
+			return new Dx12Buffer{ Usage, AllocationData, IsDeferred };
 		}
 
 		checkf(false, TEXT("Invalid GpuBufferUsage"));

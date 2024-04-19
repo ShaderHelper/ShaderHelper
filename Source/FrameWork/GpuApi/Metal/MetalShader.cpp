@@ -80,10 +80,6 @@ namespace FRAMEWORK
         TArray<const char*> DxcArgs;
         DxcArgs.Add("-fspv-preserve-bindings");
         
-        DxcArgs.Add("/T");
-        std::string ShaderTarget{TCHAR_TO_ANSI(*InShader->GetShaderTarget())};
-        DxcArgs.Add(ShaderTarget.data());
-        
         TArray<std::string> AnsiIncludeDirs;
         for(const FString& IncludeDir : InShader->GetIncludeDirs())
         {
@@ -98,6 +94,13 @@ namespace FRAMEWORK
         ShaderConductor::Compiler::Options SCOptions;
         SCOptions.DXCArgs = DxcArgs.GetData();
         SCOptions.numDXCArgs = DxcArgs.Num();
+		GpuShaderModel Sm = InShader->GetShaderModelVer();
+		SCOptions.shaderModel = {Sm.Major, Sm.Minor};
+
+		if (InShader->HasFlag(GpuShaderFlag::Enable16bitType))
+		{
+			SCOptions.enable16bitTypes = true;
+		}
         
         const ShaderConductor::Compiler::ResultDesc Result = ShaderConductor::Compiler::Compile(SourceDesc, SCOptions, TargetDesc);
         if(Result.errorWarningMsg.Size() > 0)

@@ -6,13 +6,9 @@ namespace FRAMEWORK
 {
 	struct CommonAllocationData
 	{
-		ID3D12Resource* UnderlyResource;
+		TRefCountPtr<ID3D12Resource> UnderlyResource;
 		D3D12_GPU_VIRTUAL_ADDRESS ResourceBaseGpuAddr;
 		void* ResourceBaseCpuAddr;
-
-		void Release() {
-			UnderlyResource->Release();
-		}
 		
 		D3D12_GPU_VIRTUAL_ADDRESS GetGpuAddr() const
 		{
@@ -33,8 +29,6 @@ namespace FRAMEWORK
 		void* ResourceBaseCpuAddr;
 		uint64 Offset;
 
-		void Release() {}
-
 		D3D12_GPU_VIRTUAL_ADDRESS GetGpuAddr() const
 		{
 			return ResourceBaseGpuAddr + Offset;
@@ -47,50 +41,67 @@ namespace FRAMEWORK
 		}
 	};
 
-	struct BuddyAllocationData
+	class BufferBuddyAllocator;
+
+	struct BuddySubAllocSection : public FNoncopyable
 	{
+		BuddySubAllocSection(ID3D12Resource* InUnderlyResource, D3D12_GPU_VIRTUAL_ADDRESS InResourceBaseGpuAddr,
+			void* InResourceBaseCpuAddr, BufferBuddyAllocator* InFromAllocator,
+			uint32 InOffset, uint32 InSize)
+			: UnderlyResource(InUnderlyResource)
+			, ResourceBaseGpuAddr(InResourceBaseGpuAddr)
+			, ResourceBaseCpuAddr(InResourceBaseCpuAddr)
+			, FromAllocator(InFromAllocator)
+			, Offset(InOffset)
+			, Size(InSize)
+		{}
+
 		ID3D12Resource* UnderlyResource;
 		D3D12_GPU_VIRTUAL_ADDRESS ResourceBaseGpuAddr;
 		void* ResourceBaseCpuAddr;
-		class BufferBuddyAllocator* FromAllocator;
+		BufferBuddyAllocator* FromAllocator;
 		uint32 Offset;
 		uint32 Size;
 
+		~BuddySubAllocSection();
+	};
+
+	struct BuddyAllocationData
+	{
+		TSharedPtr<BuddySubAllocSection> Section;
 		//Just for Upload heap resource(eg. constant buffer)
 		bool IsFrameSource = false;
 		//Allow to update resource on demand with frame resource strategy.
 		mutable uint32 LastFrameBlockIndexWritten = 0;
 
-		void Release();
-
 		D3D12_GPU_VIRTUAL_ADDRESS GetGpuAddr() const
 		{
 			if (IsFrameSource) {
-				check(Size % FrameSourceNum == 0);
-				uint32 FrameBlockSize = Size / FrameSourceNum;
-				return ResourceBaseGpuAddr + Offset + FrameBlockSize * LastFrameBlockIndexWritten;
+				check(Section->Size % FrameSourceNum == 0);
+				uint32 FrameBlockSize = Section->Size / FrameSourceNum;
+				return Section->ResourceBaseGpuAddr + Section->Offset + FrameBlockSize * LastFrameBlockIndexWritten;
 			}
-			return ResourceBaseGpuAddr + Offset;
+			return Section->ResourceBaseGpuAddr + Section->Offset;
 		}
 
 		void* GetCpuAddr() const
 		{
-			check(ResourceBaseCpuAddr);
+			check(Section->ResourceBaseCpuAddr);
 			if (IsFrameSource) {
-				check(Size % FrameSourceNum == 0);
-				uint32 FrameBlockSize = Size / FrameSourceNum;
-				void* CurAddress = (uint8*)ResourceBaseCpuAddr + Offset + FrameBlockSize * GetCurFrameSourceIndex();
+				check(Section->Size % FrameSourceNum == 0);
+				uint32 FrameBlockSize = Section->Size / FrameSourceNum;
+				void* CurAddress = (uint8*)Section->ResourceBaseCpuAddr + Section->Offset + FrameBlockSize * GetCurFrameSourceIndex();
 				if (LastFrameBlockIndexWritten != GetCurFrameSourceIndex())
 				{
 					//Inherit the result last written
-					void* LastAddress = (uint8*)ResourceBaseCpuAddr + Offset + FrameBlockSize * LastFrameBlockIndexWritten;
+					void* LastAddress = (uint8*)Section->ResourceBaseCpuAddr + Section->Offset + FrameBlockSize * LastFrameBlockIndexWritten;
                     //TODO: Avoid reading data from write-combined memory
 					FMemory::Memcpy(CurAddress, LastAddress, FrameBlockSize);
 					LastFrameBlockIndexWritten = GetCurFrameSourceIndex();
 				}
 				return CurAddress;
 			}
-			return (uint8*)ResourceBaseCpuAddr + Offset;
+			return (uint8*)Section->ResourceBaseCpuAddr + Section->Offset;
 		}
 	};
 
@@ -116,13 +127,6 @@ namespace FRAMEWORK
 
 	public:
 		void SetOwner(GpuResource* InOwner) { Owner = InOwner; }
-		void Release() {
-			return Visit(
-				[](auto&& Arg)
-				{
-					return Arg.Release();
-				}, AllocationData);
-		}
 
 		const AllocationDataVariant& GetAllocationData() const
 		{

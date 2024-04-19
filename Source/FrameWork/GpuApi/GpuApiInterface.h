@@ -22,6 +22,9 @@ namespace GpuApi
 	FRAMEWORK_API TRefCountPtr<GpuBuffer> CreateBuffer(uint32 ByteSize, GpuBufferUsage Usage);
 	FRAMEWORK_API TRefCountPtr<GpuSampler> CreateSampler(const GpuSamplerDesc& InSamplerDesc);
 
+	FRAMEWORK_API void SetTextureName(const FString& TexName, GpuTexture* InTexture);
+	FRAMEWORK_API void SetBufferName(const FString& BufferName, GpuBuffer* InBuffer);
+
 	//Need OutRowPitch to correctly read or write data, because the mapped buffer actually contains the *padded* texture data.
 	//RowPitch != Width x ElementByteSize
 	//RowPitch = align(Width x ElementByteSize, RequiredAlignValue)

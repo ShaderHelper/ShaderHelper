@@ -27,14 +27,13 @@ namespace FRAMEWORK
 			//For the moment, all uniformbuffers in the layout are bound via root descriptor.
 			if (LayoutBindingEntry.Type == BindingType::UniformBuffer)
 			{
-				CD3DX12_ROOT_PARAMETER1 DynamicBufferRootParameter;
-				DynamicBufferRootParameter.InitAsConstantBufferView(Slot, Desc.GroupNumber,
-					D3D12_ROOT_DESCRIPTOR_FLAG_NONE, BindingVisibility);
+				CD3DX12_ROOT_PARAMETER DynamicBufferRootParameter;
+				DynamicBufferRootParameter.InitAsConstantBufferView(Slot, Desc.GroupNumber, BindingVisibility);
 				DynamicBufferRootParameters.Add(Slot, MoveTemp(DynamicBufferRootParameter));
 			}
 			else
 			{
-				CD3DX12_DESCRIPTOR_RANGE1 Range{};
+				CD3DX12_DESCRIPTOR_RANGE Range{};
 				Range.RangeType = BindingTypeToDescriptorRangeType(LayoutBindingEntry.Type);
 				Range.NumDescriptors = 1;
 				Range.BaseShaderRegister = Slot;
@@ -81,7 +80,7 @@ namespace FRAMEWORK
 
 		for (const auto& [BindingVisibility, Ranges] : DescriptorTableRanges_CbvSrvUav)
 		{
-			CD3DX12_ROOT_PARAMETER1 DescriptorTableRootParameter;
+			CD3DX12_ROOT_PARAMETER DescriptorTableRootParameter;
 			DescriptorTableRootParameter.InitAsDescriptorTable((uint32)Ranges.Num(), Ranges.GetData(), BindingVisibility);
 
 			DescriptorTableRootParameters_CbvSrvUav.Add(BindingVisibility, MoveTemp(DescriptorTableRootParameter));
@@ -89,7 +88,7 @@ namespace FRAMEWORK
 
 		for (const auto& [BindingVisibility, Ranges] : DescriptorTableRanges_Sampler)
 		{
-			CD3DX12_ROOT_PARAMETER1 DescriptorTableRootParameter;
+			CD3DX12_ROOT_PARAMETER DescriptorTableRootParameter;
 			DescriptorTableRootParameter.InitAsDescriptorTable((uint32)Ranges.Num(), Ranges.GetData(), BindingVisibility);
 
 			DescriptorTableRootParameters_Sampler.Add(BindingVisibility, MoveTemp(DescriptorTableRootParameter));
@@ -228,7 +227,7 @@ namespace FRAMEWORK
 
 	Dx12RootSignature::Dx12RootSignature(const RootSignatureDesc& InDesc)
 	{
-		TArray<CD3DX12_ROOT_PARAMETER1> RootParameters;
+		TArray<CD3DX12_ROOT_PARAMETER> RootParameters;
 		auto AddRootParameter = [&](const Dx12BindGroupLayout* Layout) {
 
 			if (Layout != nullptr)

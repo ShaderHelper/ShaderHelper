@@ -4,10 +4,18 @@
 #define JOIN(A, B) JOIN_IMPL(A, B)
 
 //Note that dont use the same slot in a shader even if declare a different type
-#define DECLARE_TEXTURE(Type, Name, RegisterSlot) \
+#define DECLARE_SHADER_TEXTURE(Type, Name, RegisterSlot) \
 	Type Name : register(JOIN(t, RegisterSlot), space2);
 
-#define DECLARE_SAMPLER(Type, Name, RegisterSlot) \
+#define DECLARE_SHADER_SAMPLER(Type, Name, RegisterSlot) \
 	Type Name : register(JOIN(s, RegisterSlot), space2);
+
+//---
+
+#define DECLARE_GLOBAL_TEXTURE(Type, Name, RegisterSlot) \
+	Type Name : register(JOIN(t, RegisterSlot), space0);
+
+#define DECLARE_GLOBAL_SAMPLER(Type, Name, RegisterSlot) \
+	Type Name : register(JOIN(s, RegisterSlot), space0);
 
 

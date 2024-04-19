@@ -25,6 +25,7 @@ namespace FRAMEWORK
 		R16G16B16A16_FLOAT,
 		R32G32B32A32_FLOAT,
 		R11G11B10_FLOAT,
+		R16_FLOAT,
 		NUM,
 	};
 
@@ -189,6 +190,8 @@ namespace FRAMEWORK
     {
         switch (InFormat)
         {
+		case GpuTextureFormat::R16_FLOAT:
+			return 2;
         case GpuTextureFormat::R8G8B8A8_UNORM:
         case GpuTextureFormat::B8G8R8A8_UNORM:
 		case GpuTextureFormat::B8G8R8A8_UNORM_SRGB:

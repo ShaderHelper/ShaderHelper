@@ -13,7 +13,9 @@ namespace FRAMEWORK
         
         mtlpp::RenderPipelineDescriptor PipelineDesc;
         PipelineDesc.SetVertexFunction(Vs->GetCompilationResult());
-        PipelineDesc.SetFragmentFunction(Ps->GetCompilationResult());
+		if (Ps) {
+			PipelineDesc.SetFragmentFunction(Ps->GetCompilationResult());
+		}
         
         ns::AutoReleased<ns::Array<mtlpp::RenderPipelineColorAttachmentDescriptor>> ColorAttachments = PipelineDesc.GetColorAttachments();
         for(uint32 i = 0; i < InPipelineStateDesc.Targets.Num(); i++)
