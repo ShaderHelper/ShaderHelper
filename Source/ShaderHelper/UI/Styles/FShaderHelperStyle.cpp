@@ -103,7 +103,8 @@ namespace SH {
 
 		Style->Set("ArrowDownButton", ArrowDownButton);
 		Style->Set("ArrowRightButton", ArrowRightButton);
-		
+
+		Style->Set("Icons.World", new IMAGE_BRUSH_SVG("Starship/Common/world", FVector2D{16.0f,16.0f}));
 		return Style;
 	}
 

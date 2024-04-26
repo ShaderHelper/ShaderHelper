@@ -16,7 +16,6 @@ project "ShaderHelper"
     }
 
     uses {
-		"UE",
 		"FrameWork",
 	}
 

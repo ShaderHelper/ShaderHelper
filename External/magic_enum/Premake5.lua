@@ -8,6 +8,3 @@ usage "magic_enum"
         path.getabsolute("./"),
     }
 
-    vpaths(magic_enumHierarchy)
-    files {seq(magic_enumHierarchy)}
-

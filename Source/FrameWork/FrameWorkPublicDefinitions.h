@@ -42,3 +42,8 @@ namespace FRAMEWORK
 #define ADD_AGILITY_SDK()	\
 	extern "C" { _declspec(dllexport) extern const UINT D3D12SDKVersion = 610; }	\
 	extern "C" { _declspec(dllexport) extern const char* D3D12SDKPath = ".\\AgilitySDK\\"; }
+
+#include <Internationalization/StringTableRegistry.h>
+#define LOCALIZATION(Key) \
+	FText::FromStringTable(TEXT("Localization"), Key)
+	

@@ -9,6 +9,7 @@
 #include <Misc/FileHelper.h>
 #include "Common/Path/PathHelper.h"
 #include "UI/Styles/FShaderHelperStyle.h"
+#include "magic_enum.hpp"
 
 using namespace FRAMEWORK;
 
@@ -16,7 +17,7 @@ namespace SH
 {
 	const FString DefaultProjectPath = PathHelper::WorkspaceDir() / TEXT("TemplateProject/Default/Default.shprj");
 
-	static const FString WindowLayoutConfigFileName = PathHelper::SavedConfigDir() / TEXT("WindowLayout.json");
+	static const FString WindowLayoutFileName = PathHelper::SavedDir() / TEXT("WindowLayout.json");
 
 	const FName PreviewTabId = "Preview";
 	const FName PropretyTabId = "Propety";
@@ -100,9 +101,9 @@ namespace SH
 		FVector2D UsedWindowSize = WindowSize;
 		TSharedRef<FTabManager::FLayout> UsedLayout = DefaultTabLayout.ToSharedRef();
 		//Override default layout
-		if (IFileManager::Get().FileExists(*WindowLayoutConfigFileName))
+		if (IFileManager::Get().FileExists(*WindowLayoutFileName))
 		{
-			auto [LoadedPos, LoadedSize, LoadedLayout] = LoadWindowLayout(WindowLayoutConfigFileName);
+			auto [LoadedPos, LoadedSize, LoadedLayout] = LoadWindowLayout(WindowLayoutFileName);
 			UsedLayout = LoadedLayout.ToSharedRef();
 			UsedWindowSize = LoadedSize;
 			UsedWindowPos = LoadedPos;
@@ -110,7 +111,7 @@ namespace SH
 		}
 
 		SAssignNew(Window, SWindow)
-			.Title(FText::FromString("ShaderHelper"))
+			.Title(LOCALIZATION("ShaderHelper"))
 			.ScreenPosition(UsedWindowPos)
 			.AutoCenter(AutoCenterRule)
 			.ClientSize(UsedWindowSize)
@@ -150,7 +151,7 @@ namespace SH
 		TSharedRef<SDockTab> SpawnedTab = SNew(SDockTab);
 
 		if (TabId == PreviewTabId) {
-			SpawnedTab->SetLabel(FText::FromName(PreviewTabId));
+			SpawnedTab->SetLabel(LOCALIZATION(PreviewTabId.ToString()));
 			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Visible"));
 			SpawnedTab->SetContent(
                 SNew(SBorder)
@@ -162,14 +163,14 @@ namespace SH
 			);
 		}
 		else if (TabId == PropretyTabId) {
-			SpawnedTab->SetLabel(FText::FromName(PropretyTabId));
+			SpawnedTab->SetLabel(LOCALIZATION(PropretyTabId.ToString()));
 			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Info"));
 			SpawnedTab->SetContent(
 				SAssignNew(PropertyViewBox, SBox)
 			);
 		}
 		else if (TabId == CodeTabId) {
-			SpawnedTab->SetLabel(FText::FromName(CodeTabId));
+			SpawnedTab->SetLabel(LOCALIZATION(CodeTabId.ToString()));
 			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Edit"));
 			SpawnedTab->SetContent(
 				SNew(SShaderEditorBox)
@@ -177,7 +178,7 @@ namespace SH
 			);
 		}
 		else if (TabId == AssetTabId) {
-			SpawnedTab->SetLabel(FText::FromName(AssetTabId));
+			SpawnedTab->SetLabel(LOCALIZATION(AssetTabId.ToString()));
 			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Server"));
 			SpawnedTab->SetContent(
 				SNew(SAssetBrowser)
@@ -203,7 +204,7 @@ namespace SH
 	void ShaderHelperEditor::ResetWindowLayout()
 	{
 		//Clean window layout cache to use default layout.
-		IFileManager::Get().Delete(*WindowLayoutConfigFileName);
+		IFileManager::Get().Delete(*WindowLayoutFileName);
 		bReInitEditor = true;
 		Window->RequestDestroyWindow();
 	}
@@ -259,7 +260,7 @@ namespace SH
 		TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&NewJsonContents);
 		if (FJsonSerializer::Serialize(RootJsonObject, Writer))
 		{
-			FFileHelper::SaveStringToFile(NewJsonContents, *WindowLayoutConfigFileName);
+			FFileHelper::SaveStringToFile(NewJsonContents, *WindowLayoutFileName);
 		}
 	}
 
@@ -297,17 +298,17 @@ namespace SH
 	{
 		FMenuBarBuilder MenuBarBuilder = FMenuBarBuilder(TSharedPtr<FUICommandList>());
 		MenuBarBuilder.AddPullDownMenu(
-			FText::FromString("File"),
+			LOCALIZATION("File"),
 			FText::GetEmpty(),
 			FNewMenuDelegate::CreateRaw(this, &ShaderHelperEditor::FillMenu, FString("File"))
 		);
 		MenuBarBuilder.AddPullDownMenu(
-			FText::FromString("Config"),
+			LOCALIZATION("Config"),
 			FText::GetEmpty(),
 			FNewMenuDelegate::CreateRaw(this, &ShaderHelperEditor::FillMenu, FString("Config"))
 		);
 		MenuBarBuilder.AddPullDownMenu(
-			FText::FromString("Window"),
+			LOCALIZATION("Window"),
 			FText::GetEmpty(),
 			FNewMenuDelegate::CreateRaw(this, &ShaderHelperEditor::FillMenu, FString("Window"))
 		);
@@ -347,15 +348,15 @@ namespace SH
 		if (MenuName == "File") {
 			MenuBuilder.BeginSection("Project", FText::FromString("Project"));
 			{
-				MenuBuilder.AddMenuEntry(FText::FromString("New..."), FText::GetEmpty(), FSlateIcon(), 
+				MenuBuilder.AddMenuEntry(LOCALIZATION("NewEx"), FText::GetEmpty(), FSlateIcon(),
 					FUIAction(
 
 					));
-				MenuBuilder.AddMenuEntry(FText::FromString("Open..."), FText::GetEmpty(), FSlateIcon(),
+				MenuBuilder.AddMenuEntry(LOCALIZATION("OpenEx"), FText::GetEmpty(), FSlateIcon(),
 					FUIAction(
 
 					));
-				MenuBuilder.AddMenuEntry(FText::FromString("Save"), FText::GetEmpty(), FSlateIcon(), 
+				MenuBuilder.AddMenuEntry(LOCALIZATION("Save"), FText::GetEmpty(), FSlateIcon(),
 					FUIAction(
 						FExecuteAction::CreateLambda([] { TSingleton<ShProjectManager>::Get().SaveProject(); })
 					));
@@ -365,14 +366,40 @@ namespace SH
 			
 		}
 		else if (MenuName == "Config") {
-			MenuBuilder.AddMenuEntry(FText::FromString("TODO"), FText::GetEmpty(), FSlateIcon(), FUIAction());
+			MenuBuilder.AddSubMenu(LOCALIZATION("Language"), FText::GetEmpty(), FNewMenuDelegate::CreateLambda(
+				[](FMenuBuilder& MenuBuilder) {
+					for (int Index{}; Index != static_cast<int>(SupportedLanguage::Num); Index++)
+					{
+						SupportedLanguage Lang{ Index };
+						MenuBuilder.AddMenuEntry(
+							LOCALIZATION(magic_enum::enum_name(Lang).data()),
+							FText::GetEmpty(), FSlateIcon(),
+							FUIAction(
+								FExecuteAction::CreateLambda(
+									[Lang]()
+									{
+										Editor::SetLanguage(Lang);
+									}),
+								FCanExecuteAction(),
+								FIsActionChecked::CreateLambda(
+									[Lang]()
+									{
+										return Editor::CurLanguage == Lang;
+									})
+							),
+							NAME_None,
+							EUserInterfaceActionType::ToggleButton
+						);
+					}
+				}),
+				false, FSlateIcon(FShaderHelperStyle::Get().GetStyleSetName(), "Icons.World"));
 		}
 		else if (MenuName == "Window") {
 			MenuBuilder.BeginSection("WindowTabControl", FText::FromString("Tab Control"));
 			{
 				for (const FName& TabId : TabIds)
 				{
-					MenuBuilder.AddMenuEntry(FText::FromName(TabId), FText::GetEmpty(),
+					MenuBuilder.AddMenuEntry(LOCALIZATION(TabId.ToString()), FText::GetEmpty(),
 						FSlateIcon{},
 						FUIAction(
 							FExecuteAction::CreateLambda(InvokeTabLambda, TabId),
@@ -388,7 +415,7 @@ namespace SH
 
 			MenuBuilder.BeginSection("WindowLayout", FText::FromString("Layout"));
 			{
-				MenuBuilder.AddMenuEntry(FText::FromString("Reset Window Layout"), FText::GetEmpty(), 
+				MenuBuilder.AddMenuEntry(LOCALIZATION("ResetWindowLayout"), FText::GetEmpty(),
 					FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "Icons.Refresh" }, 
 					FUIAction(
 						FExecuteAction::CreateRaw(this, &ShaderHelperEditor::ResetWindowLayout)

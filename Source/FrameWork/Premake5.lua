@@ -1,6 +1,6 @@
 FrameWorkHierarchy = {
     ["Sources/*"] = {"**.h","**.cpp", "**.hpp"},
-	["Resource/Shaders/*"] = {"%{_WORKING_DIR}/Resource/Shaders/**.hlsl"}
+	["Shaders/*"] = {"%{_WORKING_DIR}/Resource/Shaders/**.hlsl"}
 }
 
 if os.target() == premake.MACOSX then
@@ -24,10 +24,6 @@ project "FrameWork"
     kind "SharedLib"   
     location "%{_WORKING_DIR}/ProjectFiles"
 
-    vpaths(FrameWorkHierarchy)
-
-    files {seq(FrameWorkHierarchy)}
-
     includedirs
     {
         "./",
@@ -41,6 +37,13 @@ project "FrameWork"
         "UE", "magic_enum"
     }
 	
+	addToProjectHierarchy(FrameWorkHierarchy);
+	addToProjectHierarchy(UeHierarchy);
+    addToProjectHierarchy(magic_enumHierarchy);
+	
+	filter {"files:**/External/UE/Src/**.cpp or **/External/UE/Src/**.mm"}
+        flags {"ExcludeFromBuild"}
+	
 	filter {"options:not GpuApi=Dx12","files:**/Dx12/*.cpp"}
         flags {"ExcludeFromBuild"}
 	filter {"options:not GpuApi=Metal","files:**/Metal/*.cpp"}
@@ -53,7 +56,10 @@ project "FrameWork"
         private_uses {
             "DXC", "AgilitySDK", "WinPixEventRuntime"
         }
-    
+		addToProjectHierarchy(AgilitySDKHierarchy);
+		addToProjectHierarchy(DXCHierarchy);
+		addToProjectHierarchy(WinPixEventRuntimeHierarchy);
+		
         links {
             "d3d12", "dxgi", "dxguid"
         }

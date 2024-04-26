@@ -15,6 +15,3 @@ usage "WinPixEventRuntime"
         }
         links "WinPixEventRuntime"
 
-        vpaths(WinPixEventRuntimeHierarchy)
-        files {seq(WinPixEventRuntimeHierarchy)}
-

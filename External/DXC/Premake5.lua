@@ -14,6 +14,3 @@ usage "DXC"
             "./Inc",
         }
 
-        vpaths(DXCHierarchy)
-        files {seq(DXCHierarchy)}
-
