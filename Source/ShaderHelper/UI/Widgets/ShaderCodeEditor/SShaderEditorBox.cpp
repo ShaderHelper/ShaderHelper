@@ -167,7 +167,7 @@ namespace SH
 
     FText SShaderEditorBox::GetFontSizeText() const
     {
-		return FText::Format(LOCALIZATION("FontSize"), CodeFontInfo.Size);
+		return LOCALIZATION("FontSize");
     }
 
     FSlateColor SShaderEditorBox::GetEditStateColor() const

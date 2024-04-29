@@ -5,7 +5,7 @@ struct FSlateBrush;
 
 namespace FRAMEWORK
 {
-	class AssetObject
+	class FRAMEWORK_API AssetObject
 	{
 	public:
 		AssetObject();
@@ -18,6 +18,7 @@ namespace FRAMEWORK
 		virtual FString FileExtension() const = 0;
 		virtual GpuTexture* GetThumbnail() const { return nullptr; }
 		virtual FSlateBrush* GetImage() const { return nullptr; }
+		virtual bool CanImport() const { return false; }
 
 		FGuid GetGuid() const { return Guid; }
 

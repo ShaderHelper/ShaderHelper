@@ -10,6 +10,7 @@
 #include "Common/Path/PathHelper.h"
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "magic_enum.hpp"
+#include "UI/Widgets/Misc/CommonDockTab.h"
 
 using namespace FRAMEWORK;
 

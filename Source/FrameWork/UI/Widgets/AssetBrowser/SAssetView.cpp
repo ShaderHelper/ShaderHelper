@@ -309,7 +309,7 @@ namespace FRAMEWORK
 					}
 					else
 					{
-						MessageDialog::Open(MessageDialog::Ok, "Failed to import asset.");
+						MessageDialog::Open(MessageDialog::Ok, LOCALIZATION("AssetImportFailure"));
 					}
 				}
 			}
@@ -354,7 +354,7 @@ namespace FRAMEWORK
 
 	void SAssetView::OnHandleDeleteAction()
 	{
-		if (MessageDialog::Open(MessageDialog::OkCancel, "Delete selected Item?"))
+		if (MessageDialog::Open(MessageDialog::OkCancel, LOCALIZATION("DeleteAssetTip")))
 		{
 			TArray<TSharedRef<AssetViewItem>> SelectedItems = AssetTileView->GetSelectedItems();
 			if (SelectedItems[0]->IsOfType<AssetViewFolderItem>())
