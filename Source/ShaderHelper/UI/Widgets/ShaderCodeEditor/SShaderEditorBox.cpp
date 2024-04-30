@@ -159,15 +159,15 @@ namespace SH
     {
         switch(CurEditState)
         {
-        case EditState::Compiling: return FText::FromString(TEXT("COMPILING"));
-        case EditState::Failed:    return FText::FromString(TEXT("FAILED"));
-        default:                   return FText::FromString(TEXT("NORMAL"));
+        case EditState::Compiling: return LOCALIZATION("COMPILING");
+        case EditState::Failed:    return LOCALIZATION("FAILED");
+        default:                   return LOCALIZATION("NORMAL");
         }
     }
 
     FText SShaderEditorBox::GetFontSizeText() const
     {
-        return FText::FromString(FString::Printf(TEXT("Font Size:%d"), CodeFontInfo.Size));
+		return LOCALIZATION("FontSize");
     }
 
     FSlateColor SShaderEditorBox::GetEditStateColor() const

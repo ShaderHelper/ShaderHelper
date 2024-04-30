@@ -10,6 +10,3 @@ usage "AgilitySDK"
         {
             "./Inc",
         }
-
-        vpaths(AgilitySDKHierarchy)
-        files {seq(AgilitySDKHierarchy)}

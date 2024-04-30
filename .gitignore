@@ -3,6 +3,7 @@ Intermediate/
 Binaries/
 Saved/
 External/UE/Src/
+*.zip
 
 # Win
 .vs/

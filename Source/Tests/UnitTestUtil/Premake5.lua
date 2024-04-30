@@ -16,7 +16,6 @@ project "UnitTestUtil"
     }
 
     uses {
-		"UE",
 		"Framework",
 	}
 

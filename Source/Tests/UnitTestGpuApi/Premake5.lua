@@ -16,7 +16,6 @@ project "UnitTestGpuApi"
     }
 
     uses {
-		"UE",
 		"Framework",
 	}
 

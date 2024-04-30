@@ -2,6 +2,7 @@
 
 namespace FRAMEWORK
 {
+	//The TableRow with bounding box when a drag-drop operation is detected.
     template<typename T>
     class SDropTargetTableRow : public STableRow<T>
     {

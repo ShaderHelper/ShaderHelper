@@ -12,6 +12,11 @@ function seq(tab)
     return seq
 end
 
+function addToProjectHierarchy(Hierarchy)
+	vpaths(Hierarchy)
+    files {seq(Hierarchy)}
+end
+
 require('vstudio')
 p.api.register {
   name = "workspace_items",

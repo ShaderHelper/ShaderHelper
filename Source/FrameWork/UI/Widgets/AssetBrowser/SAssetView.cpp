@@ -55,7 +55,7 @@ namespace FRAMEWORK
 				.VAlign(VAlign_Center)
 				[
 					SNew(STextBlock)
-					.Text(FText::FromString("The folder is empty"))
+					.Text(LOCALIZATION("EmptyFolderTip"))
 					.Visibility_Lambda([this] {	return AssetViewItems.Num() != 0 ? EVisibility::Collapsed : EVisibility::Visible; })
 				]
 			]
@@ -129,7 +129,7 @@ namespace FRAMEWORK
 
 		FMenuBuilder MenuBuilder{ true, TSharedPtr<FUICommandList>() };
 		MenuBuilder.AddMenuEntry(
-			FText::FromString("Show in Explorer"),
+			LOCALIZATION("ShowInExplorer"),
 			FText::GetEmpty(),
 			FSlateIcon{},
 			FUIAction{ FExecuteAction::CreateLambda([this] {
@@ -139,7 +139,7 @@ namespace FRAMEWORK
 		MenuBuilder.BeginSection("Asset", FText::FromString("Asset"));
 		{
 			MenuBuilder.AddMenuEntry(
-				FText::FromString("Import"),
+				LOCALIZATION("Import"),
 				FText::GetEmpty(),
 				FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "Icons.Import" },
 				FUIAction{ FExecuteAction::CreateRaw(this, &SAssetView::ImportAsset) });
@@ -149,7 +149,7 @@ namespace FRAMEWORK
 		MenuBuilder.BeginSection("Folder", FText::FromString("Folder"));
 		{
 			MenuBuilder.AddMenuEntry(
-				FText::FromString("New Folder"),
+				LOCALIZATION("NewFolder"),
 				FText::GetEmpty(),
 				FSlateIcon{ FAppCommonStyle::Get().GetStyleSetName(), "Icons.FolderPlus" },
 				FUIAction{ FExecuteAction::CreateLambda([this] {
@@ -171,7 +171,7 @@ namespace FRAMEWORK
 	{
 		FMenuBuilder MenuBuilder{ true, UICommandList };
 		MenuBuilder.AddMenuEntry(
-			FText::FromString("Show in Explorer"),
+			LOCALIZATION("ShowInExplorer"),
 			FText::GetEmpty(),
 			FSlateIcon{},
 			FUIAction{ FExecuteAction::CreateLambda([ViewItem] {
@@ -180,7 +180,7 @@ namespace FRAMEWORK
 		MenuBuilder.BeginSection("Control", FText::FromString("Control"));
 		{
 			MenuBuilder.AddMenuEntry(
-				FText::FromString("Open"),
+				LOCALIZATION("Open"),
 				FText::GetEmpty(),
 				FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "Icons.FolderOpen" },
 				FUIAction{ FExecuteAction::CreateRaw(this, &SAssetView::OnHandleOpenAction) });
@@ -309,7 +309,7 @@ namespace FRAMEWORK
 					}
 					else
 					{
-						MessageDialog::Open(MessageDialog::Ok, "Failed to import asset.");
+						MessageDialog::Open(MessageDialog::Ok, LOCALIZATION("AssetImportFailure"));
 					}
 				}
 			}
@@ -354,7 +354,7 @@ namespace FRAMEWORK
 
 	void SAssetView::OnHandleDeleteAction()
 	{
-		if (MessageDialog::Open(MessageDialog::OkCancel, "Delete selected Item?"))
+		if (MessageDialog::Open(MessageDialog::OkCancel, LOCALIZATION("DeleteAssetTip")))
 		{
 			TArray<TSharedRef<AssetViewItem>> SelectedItems = AssetTileView->GetSelectedItems();
 			if (SelectedItems[0]->IsOfType<AssetViewFolderItem>())

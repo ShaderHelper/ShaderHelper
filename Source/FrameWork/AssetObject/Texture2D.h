@@ -14,6 +14,7 @@ namespace FRAMEWORK
 		void PostLoad() override;
 		FString FileExtension() const override;
 		GpuTexture* GetThumbnail() const override;
+		bool CanImport() const override { return true; }
 
 	private:
 		int32 Width, Height;

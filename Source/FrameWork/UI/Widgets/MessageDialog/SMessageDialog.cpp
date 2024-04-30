@@ -9,7 +9,7 @@ namespace FRAMEWORK::MessageDialog
 	public:
 		SLATE_BEGIN_ARGS(SMessageDialog) {}
 			SLATE_ARGUMENT(SWindow*, ParentWindow)
-			SLATE_ARGUMENT(FString, Message)
+			SLATE_ARGUMENT(FText, Message)
 			SLATE_ARGUMENT(MessageType, MsgType)
 			SLATE_ARGUMENT(bool*, ReturnResult)
 		SLATE_END_ARGS()
@@ -65,7 +65,7 @@ namespace FRAMEWORK::MessageDialog
 					.AutoHeight()
 					[
 						SNew(STextBlock)
-						.Text(FText::FromString(InArgs._Message))
+						.Text(InArgs._Message)
 						.ColorAndOpacity(FLinearColor::White)
 					]
 
@@ -104,7 +104,7 @@ namespace FRAMEWORK::MessageDialog
 			[
 				SNew(SButton)
 				.ButtonStyle(&FAppStyle::Get().GetWidgetStyle<FButtonStyle>("PrimaryButton"))
-				.Text(FText::FromString("Ok"))
+				.Text(LOCALIZATION("Ok"))
 				.OnClicked_Lambda([this] {
 					*ReturnResult = true;
 					ParentWindow->RequestDestroyWindow();
@@ -116,7 +116,7 @@ namespace FRAMEWORK::MessageDialog
 			.AutoWidth()
 			[
 				SNew(SButton)
-				.Text(FText::FromString("Cancel"))
+				.Text(LOCALIZATION("Cancel"))
 				.OnClicked_Lambda([this] {
 					*ReturnResult = false;
 					ParentWindow->RequestDestroyWindow();
@@ -127,7 +127,7 @@ namespace FRAMEWORK::MessageDialog
 
 	}
 
-	bool Open(MessageType MsgType, const FString& InMessage)
+	bool Open(MessageType MsgType, const FText& InMessage)
 	{
 		bool Result;
 
