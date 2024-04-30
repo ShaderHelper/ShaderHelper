@@ -9,7 +9,7 @@ function Check() {
         ModulePath="$CurrentPath/$1/downloadDep.bat"
     fi
 
-    DiffOutput=$(git diff HEAD@{1} --quiet --stat -- "$ModulePath")
+    DiffOutput=$(git diff HEAD@{1} --stat -- "$ModulePath")
 
     if [ ! -z "$DiffOutput" ]; then
         echo "$1 has changed, trying to download the latest version!!"
