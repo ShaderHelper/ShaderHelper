@@ -1,4 +1,4 @@
-include "Premake/Custom.lua"
+include "Premake/custom.lua"
 
 external_ue = "External/UE"
 external_dxcompiler = "External/DXC"

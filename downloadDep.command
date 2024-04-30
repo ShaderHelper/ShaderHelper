@@ -10,7 +10,7 @@ function Error() {
 }
 
 echo "#!/bin/sh" > .git/hooks/post-merge
-echo "sh External/CheckDependency.sh" >> .git/hooks/post-merge
+echo "sh External/checkDependency.sh" >> .git/hooks/post-merge
 chmod ug+x .git/hooks/*
 
 sh "$CurrentPath/External/ShaderConductor/downloadDep.sh" || Error
