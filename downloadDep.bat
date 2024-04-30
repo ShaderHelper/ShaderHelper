@@ -1,6 +1,6 @@
 @echo off
-echo "#!/bin/sh" > .git/hooks/post-merge
-echo "sh External/checkDependency.sh" >> .git/hooks/post-merge
+echo #!/bin/sh > .git/hooks/post-merge
+echo ./External/checkDependency.sh >> .git/hooks/post-merge
 
 call "%~dp0External/AgilitySDK/downloadDep.bat" || goto error
 call "%~dp0External/DXC/downloadDep.bat" || goto error
