@@ -10,6 +10,6 @@ echo Downloading AgilitySDK...
 	del AgilitySDK.zip
 echo.
 exit /b 0
-
+ 
 :error
 exit /b 1
