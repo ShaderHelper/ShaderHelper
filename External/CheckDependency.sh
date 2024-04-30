@@ -14,7 +14,7 @@ function Check() {
     if [ ! -z "$DiffOutput" ]; then
         echo "$1 has changed, trying to download the latest version!!"
         if [[ "$OSTYPE" == "darwin"* ]]; then
-           ./"$ModulePath"
+           sh "$ModulePath"
         else
            "$ModulePath"
         fi

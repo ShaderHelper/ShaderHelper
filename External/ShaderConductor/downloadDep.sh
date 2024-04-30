@@ -1,5 +1,4 @@
 #!/bin/sh
-echo
 CurrentPath="$(cd "$(dirname "$0")" && pwd)"
 
 echo "Downloading ShaderConductor..."
@@ -10,3 +9,5 @@ echo "Downloading ShaderConductor..."
     tar -zxf ShaderConductor-Mac.zip || exit 1
     rm ShaderConductor-Mac.zip
 echo
+
+exit 0
