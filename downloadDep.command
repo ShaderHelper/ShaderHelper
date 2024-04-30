@@ -9,8 +9,9 @@ function Error() {
     exit 1
 }
 
-echo #!/bin/sh > .git/hooks/post-merge
-echo ./External/CheckDependency.sh >> .git/hooks/post-merge
+echo "#!/bin/sh" > .git/hooks/post-merge
+echo "sh External/CheckDependency.sh" >> .git/hooks/post-merge
+chmod ug+x .git/hooks/*
 
 sh "$CurrentPath/External/ShaderConductor/downloadDep.sh" || Error
 sh "$CurrentPath/External/UE/downloadDep.sh" || Error
