@@ -21,11 +21,6 @@ jobs:
         
     steps:
       - uses: actions/checkout@v3
-
-      - name: Setup Premake
-        uses: abel0b/setup-premake@v2.2
-        with:
-          version: "5.0.0-beta1"
         
       - name: download dependency
         working-directory: ${{env.GITHUB_WORKSPACE}}
