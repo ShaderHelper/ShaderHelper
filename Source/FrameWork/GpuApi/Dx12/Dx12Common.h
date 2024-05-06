@@ -33,7 +33,7 @@ inline DEFINE_LOG_CATEGORY(LogDx12);
 
 namespace FRAMEWORK
 {
-	inline TCHAR* GetErrorText(HRESULT hr)
+	inline const TCHAR* GetErrorText(HRESULT hr)
 	{
 		switch (hr)
 		{

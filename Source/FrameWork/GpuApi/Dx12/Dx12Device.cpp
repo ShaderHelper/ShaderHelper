@@ -158,7 +158,7 @@ namespace FRAMEWORK
 
 		DxCheck(GDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&CpuSyncGpuFence)));
 		CpuSyncGpuFence->SetName(TEXT("CpuSyncGpuFence"));
-		CpuSyncGpuEvent = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
+		CpuSyncGpuEvent = CreateEventEx(nullptr, nullptr, false, EVENT_ALL_ACCESS);
 
 		D3D12_COMMAND_QUEUE_DESC QueueDesc{};
 		QueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;

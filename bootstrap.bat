@@ -49,10 +49,12 @@ echo "%VsVersion%"
 call %PREMAK5_PATH% %VsVersion% || goto error
 echo.	
 echo Premake5 complete
+pause
+exit /b 0
 
 
 :error
 echo.
-echo Errors encountered during execution.
+echo Errors encountered during execution!!!!!
 pause
 exit /b 1

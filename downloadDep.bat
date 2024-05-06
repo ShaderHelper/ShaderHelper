@@ -12,6 +12,6 @@ exit /b 0
 
 :error
 echo.
-echo Errors encountered during execution.
+echo Errors encountered during execution!!!!!.
 pause
 exit /b 1

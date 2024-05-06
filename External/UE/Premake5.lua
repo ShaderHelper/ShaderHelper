@@ -20,7 +20,7 @@ function generateIncludeDir_ue()
     local ueSrcDir = _WORKING_DIR .. "/External/UE/Src/"
     local ueUhtDir = _WORKING_DIR .. "/External/UE/Src/UHT/"
     externalincludedirs(ueSrcDir)
-    externalwarnings("off")
+    externalwarnings("Off")
 
     for _ , module in pairs(ue_module) do
         externalincludedirs(ueSrcDir .. module .. "/Public")
@@ -49,6 +49,7 @@ usage "UE"
         }
         buildoptions {
             "/GR-", --UE modules disable rtti
+			"/experimental:external", --before vs2019 16.10
         }
     filter "system:macosx"
         links 

@@ -59,7 +59,9 @@ workspace "ShaderHelper"
         { 
             "/utf-8",
             "/Zc:__cplusplus",
-			"/Zc:hiddenFriend",
+			
+			--https://devblogs.microsoft.com/cppblog/improving-the-state-of-debug-performance-in-c/
+			"/permissive-", --implicitly contains "/Zc:hiddenFriend" "/Zc:strictStrings"
         }
         linkoptions 
         { 
