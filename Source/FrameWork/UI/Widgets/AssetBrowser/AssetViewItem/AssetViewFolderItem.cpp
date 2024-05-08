@@ -76,9 +76,9 @@ namespace FRAMEWORK
 			.AutoHeight()
 			.HAlign(HAlign_Center)
 			[
-                SNew(SBox)
-                .Padding(FMargin(2.0f, 0.0f, 2.0f, 0.0f))
-                [
+				SNew(SBox)
+					.Padding(FMargin(2.0f, 0.0f, 2.0f, 0.0f))
+					[
                     SAssignNew(FolderEditableTextBlock, SInlineEditableTextBlock)
                     .Font(FAppStyle::Get().GetFontStyle("SmallFont"))
                     .Text(FText::FromString(FPaths::GetBaseFilename(Path)))

@@ -37,8 +37,21 @@ namespace FRAMEWORK
 		if (AssetThumbnail)
 		{
 			ThumbnailViewport->SetViewPortRenderTexture(AssetThumbnail);
-			Display = SNew(SViewport)
-				.ViewportInterface(ThumbnailViewport);
+			Display =
+				SNew(SViewport)
+				.ViewportInterface(ThumbnailViewport)
+				.ViewportSize(TAttribute<FVector2D>::CreateLambda(
+					[this] { 
+						float PreviewBoxWidth = (float)PreviewBox->GetCachedGeometry().GetLocalSize().X;
+						float PreviewBoxHeight = (float)PreviewBox->GetCachedGeometry().GetLocalSize().Y;
+						float ThumbnailWidth = (float)AssetThumbnail->GetWidth();
+						float ThumbnailHeight = (float)AssetThumbnail->GetHeight();
+						 
+						float ScaleFactor = FMath::Clamp(ThumbnailWidth > ThumbnailHeight ? PreviewBoxWidth / ThumbnailWidth : PreviewBoxHeight / ThumbnailHeight, 0 , 1);
+						return FVector2D(ThumbnailWidth, ThumbnailHeight) * ScaleFactor;
+					}
+				));
+	
 		}
 		else if (ImageBrush)
 		{
@@ -54,8 +67,10 @@ namespace FRAMEWORK
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot()
 			[
-				SNew(SBorder)
+				SAssignNew(PreviewBox, SBorder)
 				.BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
+				.HAlign(HAlign_Center)
+				.VAlign(VAlign_Center)
 				.Padding(FMargin(5.0f, 4.0f, 5.0f, 6.0f))
 				[
 					SNew(SOverlay)

@@ -13,6 +13,8 @@ namespace FRAMEWORK
 			SLATE_ARGUMENT(TArray<FString>, InitialDirectoriesToExpand)
 			SLATE_EVENT(SelectedDirectoryChangedDelegate, OnSelectedDirectoryChanged)
 			SLATE_EVENT(ExpandedDirectoriesChangedDelegate, OnExpandedDirectoriesChanged)
+			SLATE_ARGUMENT(float , InitAssetViewSize)
+			SLATE_EVENT(FOnFloatValueChanged, OnAssetViewSizeChanged)
 		SLATE_END_ARGS()
 
 		~SAssetBrowser();
@@ -28,6 +30,7 @@ namespace FRAMEWORK
 		FString ContentPathShowed;
 		SelectedDirectoryChangedDelegate OnSelectedDirectoryChanged;
 		ExpandedDirectoriesChangedDelegate OnExpandedDirectoriesChanged;
+		FOnFloatValueChanged OnAssetViewSizeChanged;
 	};
 }
 

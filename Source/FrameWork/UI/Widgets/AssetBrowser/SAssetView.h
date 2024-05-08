@@ -9,6 +9,10 @@ namespace FRAMEWORK
 	class FRAMEWORK_API SAssetView : public SCompoundWidget
 	{
 	public:
+		static constexpr float MinAssetViewSize = 50;
+		static constexpr float MaxAssetViewSize = 150;
+
+	public:
 		SLATE_BEGIN_ARGS(SAssetView) {}
 			SLATE_ARGUMENT(FString, ContentPathShowed)
 			SLATE_ARGUMENT(TFunction<void(const FString&)>, OnFolderDoubleClick)
@@ -26,6 +30,11 @@ namespace FRAMEWORK
 		void ImportAsset();
 		void SortViewItems();
 
+		void SetAssetViewSize(float InAssetViewSize) { 
+			AssetViewSize = InAssetViewSize; 
+			AssetTileView->RequestListRefresh();
+		}
+
 		FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 	private:
 		void OnMouseButtonDoubleClick(TSharedRef<AssetViewItem> ViewItem);
@@ -41,6 +50,8 @@ namespace FRAMEWORK
 		TFunction<void(const FString&)> OnFolderDoubleClick;
 		TSharedPtr<FUICommandList> UICommandList;
 		FString ContentPathShowed;
+
+		float AssetViewSize;
 	};
 
 }

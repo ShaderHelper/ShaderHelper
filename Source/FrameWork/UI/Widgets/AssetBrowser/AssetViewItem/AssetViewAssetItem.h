@@ -23,6 +23,8 @@ namespace FRAMEWORK
 
 		GpuTexture* AssetThumbnail = nullptr;
 		const FSlateBrush* ImageBrush = nullptr;
+
+		TSharedPtr<SBorder> PreviewBox;
 	};
 
 }

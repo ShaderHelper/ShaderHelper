@@ -4,6 +4,8 @@
 #include "AssetManager/AssetManager.h"
 #include <DirectoryWatcherModule.h>
 #include <IDirectoryWatcher.h>
+#include <Widgets/Input/SSlider.h>
+#include <Widgets/Input/SSearchBox.h>
 
 namespace FRAMEWORK
 {
@@ -24,6 +26,7 @@ namespace FRAMEWORK
 		ContentPathShowed = InArgs._ContentPathShowed;
 		OnSelectedDirectoryChanged = InArgs._OnSelectedDirectoryChanged;
 		OnExpandedDirectoriesChanged = InArgs._OnExpandedDirectoriesChanged;
+		OnAssetViewSizeChanged = InArgs._OnAssetViewSizeChanged;
 
 		FDirectoryWatcherModule& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>(TEXT("DirectoryWatcher"));
 		IDirectoryWatcher* DirectoryWatcher = DirectoryWatcherModule.Get();
@@ -38,6 +41,7 @@ namespace FRAMEWORK
 				DirectoryTree->SetExpansion(FPaths::GetPath(FolderPath));
 				DirectoryTree->SetSelection(FolderPath);
 			});
+		AssetView->SetAssetViewSize(InArgs._InitAssetViewSize);
 
 		SAssignNew(DirectoryTree, SDirectoryTree)
 			.ContentPathShowed(InArgs._ContentPathShowed)
@@ -48,27 +52,66 @@ namespace FRAMEWORK
 
 		ChildSlot
 		[
-			SNew(SSplitter)
-			.PhysicalSplitterHandleSize(2.0f)
-			+ SSplitter::Slot()
-			.Value(0.25f)
+			SNew(SVerticalBox)
+			+ SVerticalBox::Slot()
+			.AutoHeight()
 			[
-				SNew(SBorder)
+				SNew(SHorizontalBox)
+				+SHorizontalBox::Slot()
+				.HAlign(HAlign_Left)
 				[
-					DirectoryTree.ToSharedRef()
-				]
+					SNew(SBox)
+					.WidthOverride(200)
+					[
+						SNew(SSearchBox)
+					]
 				
-			]
-			+ SSplitter::Slot()
-			.Value(0.75f)
-			[
-				SNew(SBorder)
-				.BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
-				.Padding(0)
+				]
+				+ SHorizontalBox::Slot()
+				.HAlign(HAlign_Right)
 				[
-					AssetView.ToSharedRef()
+					SNew(SBox)
+					.WidthOverride(100)
+					[
+						SNew(SSlider)
+						.Orientation(Orient_Horizontal)
+						.Value(InArgs._InitAssetViewSize)
+						.MinValue(SAssetView::MinAssetViewSize)
+						.MaxValue(SAssetView::MaxAssetViewSize)
+						.OnValueChanged_Lambda([this](float NewValue) {
+							AssetView->SetAssetViewSize(NewValue); 
+							OnAssetViewSizeChanged.ExecuteIfBound(NewValue);
+						})
+					]
+			
 				]
 			]
+
+			+ SVerticalBox::Slot()
+			[
+				SNew(SSplitter)
+				.PhysicalSplitterHandleSize(2.0f)
+				+ SSplitter::Slot()
+				.Value(0.25f)
+				[
+					SNew(SBorder)
+					[
+						DirectoryTree.ToSharedRef()
+					]
+
+				]
+				+ SSplitter::Slot()
+				.Value(0.75f)
+				[
+					SNew(SBorder)
+					.BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
+					.Padding(0)
+					[
+						AssetView.ToSharedRef()
+					]
+				]
+			]
+			
 		];
 	}
 

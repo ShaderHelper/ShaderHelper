@@ -56,14 +56,14 @@ namespace FRAMEWORK
 			return Thumbnail;
 		}
 
-		GpuTextureDesc Desc{ 128, 128, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
+		GpuTextureDesc Desc{ Width / 2, Height / 2, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
 		TRefCountPtr<GpuTexture> Thumbnail = GpuApi::CreateTexture(MoveTemp(Desc));
 
 		RenderGraph Graph;
 		{
 			BlitPassInput Input;
 			Input.InputTex = GpuData;
-			Input.InputTexSampler = GpuApi::CreateSampler({});
+			Input.InputTexSampler = GpuApi::CreateSampler({ SamplerFilter::Bilinear});
 			Input.OutputRenderTarget = Thumbnail;
 
 			AddBlitPass(Graph, MoveTemp(Input));

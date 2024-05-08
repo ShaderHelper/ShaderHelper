@@ -54,6 +54,7 @@ namespace SH
 			void InitFromJson(const TSharedPtr<FJsonObject>& InJson);
 			TSharedRef<FJsonObject> ToJson() const;
 
+			float AssetViewSize = 60;
 			FString SelectedDirectory;
 			TArray<FString> DirectoriesToExpand;
 		} CurEditorState;

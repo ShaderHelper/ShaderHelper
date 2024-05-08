@@ -184,6 +184,7 @@ namespace SH
 			SpawnedTab->SetContent(
 				SNew(SAssetBrowser)
 				.ContentPathShowed(TSingleton<ShProjectManager>::Get().GetActiveContentDirectory())
+				.InitAssetViewSize(CurEditorState.AssetViewSize)
 				.InitialSelectedDirectory(CurEditorState.SelectedDirectory)
 				.InitialDirectoriesToExpand(CurEditorState.DirectoriesToExpand)
 				.OnSelectedDirectoryChanged_Lambda([this](const FString& NewSelectedDirectory) {
@@ -192,6 +193,10 @@ namespace SH
 				})
 				.OnExpandedDirectoriesChanged_Lambda([this](const TArray<FString>& NewExpandedDirectories) {
 					CurEditorState.DirectoriesToExpand = NewExpandedDirectories;
+					SaveEditorState();
+				})
+				.OnAssetViewSizeChanged_Lambda([this](float NewValue) {
+					CurEditorState.AssetViewSize = NewValue;
 					SaveEditorState();
 				})
 			);
@@ -428,6 +433,7 @@ namespace SH
 
 	void ShaderHelperEditor::EditorState::InitFromJson(const TSharedPtr<FJsonObject>& InJson)
 	{
+		AssetViewSize = (float)InJson->GetNumberField("AssetViewSize");
 		SelectedDirectory =  TSingleton<ShProjectManager>::Get().ConvertRelativePathToFull(
 			InJson->GetStringField("SelectedRelativeDirectory")
 		);
@@ -444,6 +450,7 @@ namespace SH
 	TSharedRef<FJsonObject> ShaderHelperEditor::EditorState::ToJson() const
 	{
 		TSharedRef<FJsonObject> JsonObject = MakeShareable(new FJsonObject());
+		JsonObject->SetNumberField("AssetViewSize", AssetViewSize);
 		JsonObject->SetStringField("SelectedRelativeDirectory", 
 			TSingleton<ShProjectManager>::Get().GetRelativePathToProject(SelectedDirectory));
 

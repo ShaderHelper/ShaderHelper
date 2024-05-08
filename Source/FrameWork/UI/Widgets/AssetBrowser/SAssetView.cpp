@@ -41,8 +41,8 @@ namespace FRAMEWORK
 					SAssignNew(AssetTileView, STileView<TSharedRef<AssetViewItem>>)
 					.SelectionMode(ESelectionMode::Single)
 					.ListItemsSource(&AssetViewItems)
-					.ItemWidth(58)
-					.ItemHeight(58)
+					.ItemWidth(TAttribute<float>::CreateLambda([this] { return AssetViewSize; }))
+					.ItemHeight(TAttribute<float>::CreateLambda([this] { return AssetViewSize; }))
 					.OnContextMenuOpening(this, &SAssetView::CreateContextMenu)
 					.OnGenerateTile_Lambda([](TSharedRef<AssetViewItem> InTileItem, const TSharedRef<STableViewBase>& OwnerTable) {
 						return InTileItem->GenerateWidgetForTableView(OwnerTable);
