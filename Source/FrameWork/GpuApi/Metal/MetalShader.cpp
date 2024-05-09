@@ -82,16 +82,19 @@ namespace FRAMEWORK
         TArray<const char*> DxcArgs;
         DxcArgs.Add("-fspv-preserve-bindings");
         
-        TArray<std::string> AnsiIncludeDirs;
-        for(const FString& IncludeDir : InShader->GetIncludeDirs())
-        {
-            AnsiIncludeDirs.Emplace(TCHAR_TO_ANSI(*IncludeDir));
-        }
-        for(const std::string& AnsiIncludeDir : AnsiIncludeDirs)
-        {
-            DxcArgs.Add("-I");
-            DxcArgs.Add(AnsiIncludeDir.data());
-        }
+        SourceDesc.loadIncludeCallback = [InShader](const char* includeName) -> ShaderConductor::Blob {
+            for(const FString& IncludeDir : InShader->GetIncludeDirs())
+            {
+                TArray<uint8> IncludeBlob;
+                FString IncludedFile = FPaths::Combine(IncludeDir, includeName);
+                if(IFileManager::Get().FileExists(*IncludedFile))
+                {
+                    FFileHelper::LoadFileToArray(IncludeBlob, *IncludedFile);
+                    return ShaderConductor::Blob(IncludeBlob.GetData(), IncludeBlob.Num());
+                }
+            }
+            return {};
+        };
         
         ShaderConductor::Compiler::Options SCOptions;
         SCOptions.DXCArgs = DxcArgs.GetData();

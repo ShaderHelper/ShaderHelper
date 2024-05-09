@@ -21,7 +21,7 @@ namespace SH
 		ShaderHelperEditor(const FRAMEWORK::Vector2f& InWindowSize, ShRenderer* InRenderer);
 		~ShaderHelperEditor();
 
-		void ResetWindowLayout();
+		void ResetWindow(bool bResetWindowLayout);
 		WindowLayoutConfigInfo LoadWindowLayout(const FString& InWindowLayoutConfigFileName);
 		void SaveWindowLayout(const TSharedRef<FTabManager::FLayout>& InLayout);
 		void LoadEditorState(const FString& InFile);

@@ -19,7 +19,7 @@ namespace FRAMEWORK
 
 	}
 
-	Texture2D::Texture2D(int32 InWidth, int32 InHeight, const TArray<uint8>& InRawData)
+	Texture2D::Texture2D(uint32 InWidth, uint32 InHeight, const TArray<uint8>& InRawData)
 		: Width(InWidth)
 		, Height(InHeight)
 		, RawData(InRawData)

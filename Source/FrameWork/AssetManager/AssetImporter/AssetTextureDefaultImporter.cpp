@@ -40,4 +40,9 @@ namespace FRAMEWORK
 		return { "png", "jpeg", "jpg", "tga" };
 	}
 
+    ShReflectToy::MetaType* AssetTextureDefaultImporter::SupportAsset()
+    {
+        return ShReflectToy::GetMetaType<Texture2D>();
+    }
+
 }
