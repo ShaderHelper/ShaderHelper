@@ -28,7 +28,7 @@ workspace "ShaderHelper"
     language "C++"
     cppdialect "C++17"
     staticruntime "off"
-    exceptionhandling "on"
+    exceptionhandling "off"
 
     objdir ("Intermediate/%{prj.name}")
 
