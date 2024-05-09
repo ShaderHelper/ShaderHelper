@@ -12,6 +12,6 @@ namespace FRAMEWORK
 		virtual TUniquePtr<AssetObject> CreateAssetObject(const FString& InFilePath) = 0;
 		virtual TArray<FString> SupportFileExts() const = 0;
         
-        virtual class ShReflectToy::MetaType* SupportAsset() = 0;
+        virtual struct ShReflectToy::MetaType* SupportAsset() = 0;
 	};
 }
