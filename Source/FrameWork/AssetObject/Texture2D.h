@@ -7,17 +7,16 @@ namespace FRAMEWORK
 	{
 	public:
 		Texture2D();
-		Texture2D(int32 InWidth, int32 InHeight, const TArray<uint8>& InRawData);
+		Texture2D(uint32 InWidth, uint32 InHeight, const TArray<uint8>& InRawData);
 
 	public:
 		void Serialize(FArchive& Ar) override;
 		void PostLoad() override;
 		FString FileExtension() const override;
 		GpuTexture* GetThumbnail() const override;
-		bool CanImport() const override { return true; }
 
 	private:
-		int32 Width, Height;
+        uint32 Width, Height;
 		//BGRA8
 		TArray<uint8> RawData;
 		TRefCountPtr<GpuTexture> GpuData;

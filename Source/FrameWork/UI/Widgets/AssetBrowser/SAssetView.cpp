@@ -118,6 +118,21 @@ namespace FRAMEWORK
 		SortViewItems();
 		AssetTileView->RequestListRefresh();
 	}
+    
+    static bool IsImportedAsset(const ShReflectToy::MetaType* InAssetMetaType)
+    {
+        TArray<ShReflectToy::MetaType*> AssetImporterMetaTypes = ShReflectToy::GetMetaTypes<AssetImporter>();
+        for (auto MetaTypePtr : AssetImporterMetaTypes)
+        {
+            void* Importer = MetaTypePtr->GetDefaultObject();
+            if (Importer)
+            {
+                AssetImporter* CurImporter = static_cast<AssetImporter*>(Importer);
+                if(InAssetMetaType == CurImporter->SupportAsset()) return true;
+            }
+        }
+        return false;
+    }
 
 	TSharedPtr<SWidget> SAssetView::CreateContextMenu()
 	{
@@ -138,11 +153,37 @@ namespace FRAMEWORK
 
 		MenuBuilder.BeginSection("Asset", FText::FromString("Asset"));
 		{
+            MenuBuilder.AddSubMenu(LOCALIZATION("Create"), FText::GetEmpty(), FNewMenuDelegate::CreateLambda(
+                [this](FMenuBuilder& MenuBuilder) {
+                    TArray<ShReflectToy::MetaType*> AssetMetaTypes = ShReflectToy::GetMetaTypes<AssetObject>();
+                    for(auto MetaTypePtr : AssetMetaTypes)
+                    {
+                        if(!IsImportedAsset(MetaTypePtr))
+                        {
+                            void* Asset = MetaTypePtr->GetDefaultObject();
+                            if(Asset)
+                            {
+                                AssetObject* CurAsset = static_cast<AssetObject*>(Asset);
+                                MenuBuilder.AddMenuEntry(
+                                    LOCALIZATION(CurAsset->FileExtension()),
+                                    FText::GetEmpty(),
+                                    FSlateIcon(),
+                                    FUIAction(),
+                                    NAME_None,
+                                    EUserInterfaceActionType::Button
+                                );
+                            }
+                        }
+                    }
+                }),
+               false, FSlateIcon{FAppStyle::Get().GetStyleSetName(), "Icons.Plus"});
+            
 			MenuBuilder.AddMenuEntry(
 				LOCALIZATION("Import"),
 				FText::GetEmpty(),
 				FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "Icons.Import" },
-				FUIAction{ FExecuteAction::CreateRaw(this, &SAssetView::ImportAsset) });
+				FUIAction{ FExecuteAction::CreateRaw(this, &SAssetView::ImportAsset) }
+            );
 		}
 		MenuBuilder.EndSection();
 
@@ -252,6 +293,11 @@ namespace FRAMEWORK
 		SortViewItems();
 		AssetTileView->RequestListRefresh();
 	}
+
+    void SAssetView::CreateAsset()
+    {
+        
+    }
 
 	void SAssetView::ImportAsset()
 	{
