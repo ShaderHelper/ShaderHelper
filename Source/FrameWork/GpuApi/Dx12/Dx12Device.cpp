@@ -65,14 +65,21 @@ namespace FRAMEWORK
 				TRefCountPtr<IDXGIInfoQueue> DxgiInfoQueue;
 				if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(DxgiInfoQueue.GetInitReference()))))
 				{
-					DXGI_INFO_QUEUE_MESSAGE_CATEGORY DisabledCategory[] =
+					DXGI_INFO_QUEUE_MESSAGE_ID DisabledMessageId[] =
 					{
-						DXGI_INFO_QUEUE_MESSAGE_CATEGORY_STATE_CREATION,
+						0,
 					};
 
+					/*DXGI_INFO_QUEUE_MESSAGE_CATEGORY DisabledCategory[] =
+					{
+						DXGI_INFO_QUEUE_MESSAGE_CATEGORY_STATE_CREATION,
+					};*/
+
 					DXGI_INFO_QUEUE_FILTER Filter{};
-					Filter.DenyList.NumCategories = UE_ARRAY_COUNT(DisabledCategory);
-					Filter.DenyList.pCategoryList = DisabledCategory;
+					Filter.DenyList.NumIDs = UE_ARRAY_COUNT(DisabledMessageId);
+					Filter.DenyList.pIDList = DisabledMessageId;
+					//Filter.DenyList.NumCategories = UE_ARRAY_COUNT(DisabledCategory);
+					//Filter.DenyList.pCategoryList = DisabledCategory;*/
 					DxgiInfoQueue->AddStorageFilterEntries(DXGI_DEBUG_DXGI, &Filter);
 
 					DxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_DXGI, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
@@ -137,14 +144,15 @@ namespace FRAMEWORK
 				D3D12_MESSAGE_ID DisabledMessageId[] =
 				{
 					D3D12_MESSAGE_ID_CREATERESOURCE_STATE_IGNORED,
+					D3D12_MESSAGE_ID_UNKNOWN,
 				};
-				D3D12_MESSAGE_CATEGORY DisabledCategory[] =
+				/*D3D12_MESSAGE_CATEGORY DisabledCategory[] =
 				{
 					D3D12_MESSAGE_CATEGORY_STATE_CREATION,
-				};
+				};*/
 				D3D12_INFO_QUEUE_FILTER Filter{};
-				Filter.DenyList.NumCategories = UE_ARRAY_COUNT(DisabledCategory);
-				Filter.DenyList.pCategoryList = DisabledCategory;
+				//Filter.DenyList.NumCategories = UE_ARRAY_COUNT(DisabledCategory);
+				//Filter.DenyList.pCategoryList = DisabledCategory;
 				Filter.DenyList.NumIDs = UE_ARRAY_COUNT(DisabledMessageId);
 				Filter.DenyList.pIDList = DisabledMessageId;
 				D3dInfoQueue->AddStorageFilterEntries(&Filter);

@@ -22,6 +22,7 @@ THIRD_PARTY_INCLUDES_END
 		HRESULT hr = Call;                                      \
 		if(FAILED(hr)) {                                        \
 			OutputDxError(hr, #Call, __FILE__, __LINE__);       \
+			std::abort();                                       \
 		}                                                       \
 	} while (0)
 

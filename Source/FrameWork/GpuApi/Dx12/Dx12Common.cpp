@@ -63,13 +63,12 @@ namespace FRAMEWORK
 			{
 				GetDredInfo();
 			}
-			SH_LOG(LogDx12, Fatal, TEXT("DxError(%s) with reason(%s) encountered during calling %s.(%s-%u)"), *ErrorCodeText, GetErrorText(hr), ANSI_TO_TCHAR(Code), ANSI_TO_TCHAR(Filename), Line);
+			SH_LOG(LogDx12, Error, TEXT("DxError(%s) with reason(%s) encountered during calling %s.(%s-%u)"), *ErrorCodeText, GetErrorText(hr), ANSI_TO_TCHAR(Code), ANSI_TO_TCHAR(Filename), Line);
 		}
 		else
 		{
-			SH_LOG(LogDx12, Fatal, TEXT("DxError(%s) encountered during calling %s.(%s-%u)"), *ErrorCodeText, ANSI_TO_TCHAR(Code), ANSI_TO_TCHAR(Filename), Line);
+			SH_LOG(LogDx12, Error, TEXT("DxError(%s) encountered during calling %s.(%s-%u)"), *ErrorCodeText, ANSI_TO_TCHAR(Code), ANSI_TO_TCHAR(Filename), Line);
 		}
-		std::_Exit(0);
 	}
 
 }
