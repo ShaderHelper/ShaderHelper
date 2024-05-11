@@ -28,7 +28,6 @@ namespace FRAMEWORK
 		void AddFile(const FString& InFileName);
 		void RemoveFile(const FString& InFileName);
 		void ImportAsset();
-        void CreateAsset();
 		void SortViewItems();
 
 		void SetAssetViewSize(float InAssetViewSize) { 

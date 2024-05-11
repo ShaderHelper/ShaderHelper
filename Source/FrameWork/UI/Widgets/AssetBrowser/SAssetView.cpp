@@ -168,7 +168,18 @@ namespace FRAMEWORK
                                     LOCALIZATION(CurAsset->FileExtension()),
                                     FText::GetEmpty(),
                                     FSlateIcon(),
-                                    FUIAction(),
+                                    FUIAction(FExecuteAction::CreateLambda([CurAsset, this] {
+                                        int32 Number = 1;
+                                        FString GeneratedFileName = "New" + CurAsset->FileExtension();
+                                        FString SavedFileName = CurViewDirectory / GeneratedFileName + "." + CurAsset->FileExtension();
+                                        while(IFileManager::Get().FileExists(*SavedFileName))
+                                        {
+                                            GeneratedFileName = FString::Format(TEXT("New{0} {1}"), { CurAsset->FileExtension(), Number++});
+                                            SavedFileName = CurViewDirectory / GeneratedFileName + "." + CurAsset->FileExtension();
+                                        }
+                                        TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFileName));
+                                        CurAsset->Serialize(*Ar);
+                                    })),
                                     NAME_None,
                                     EUserInterfaceActionType::Button
                                 );
@@ -194,11 +205,11 @@ namespace FRAMEWORK
 				FText::GetEmpty(),
 				FSlateIcon{ FAppCommonStyle::Get().GetStyleSetName(), "Icons.FolderPlus" },
 				FUIAction{ FExecuteAction::CreateLambda([this] {
-					int32 Number = 0;
-					FString NewDirectoryPath = *(CurViewDirectory / TEXT("New Folder"));
+					int32 Number = 1;
+					FString NewDirectoryPath = *(CurViewDirectory / TEXT("NewFolder"));
 					while(IFileManager::Get().DirectoryExists(*NewDirectoryPath))
 					{
-						NewDirectoryPath = *(CurViewDirectory / FString::Format(TEXT("New Folder {0}"), { Number++ }));
+						NewDirectoryPath = *(CurViewDirectory / FString::Format(TEXT("NewFolder {0}"), { Number++ }));
 					}
 					IFileManager::Get().MakeDirectory(*NewDirectoryPath);
 				})});
@@ -293,11 +304,6 @@ namespace FRAMEWORK
 		SortViewItems();
 		AssetTileView->RequestListRefresh();
 	}
-
-    void SAssetView::CreateAsset()
-    {
-        
-    }
 
 	void SAssetView::ImportAsset()
 	{

@@ -4,6 +4,7 @@
 #include <Widgets/Text/SInlineEditableTextBlock.h>
 #include <Styling/StyleColors.h>
 #include "UI/Widgets/Misc/CommonTableRow.h"
+#include "UI/Widgets/MessageDialog/SMessageDialog.h"
 
 namespace FRAMEWORK
 {
@@ -84,7 +85,17 @@ namespace FRAMEWORK
                     .Text(FText::FromString(FPaths::GetBaseFilename(Path)))
                     .OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
                         FString NewFolderPath =  FPaths::GetPath(Path) / NewText.ToString();
-                        IFileManager::Get().Move(*NewFolderPath, *Path);
+                        if(NewFolderPath != Path)
+                        {
+                            if(IFileManager::Get().DirectoryExists(*NewFolderPath))
+                            {
+                                MessageDialog::Open(MessageDialog::Ok, LOCALIZATION("AssetRenameFailure"));
+                            }
+                            else
+                            {
+                                IFileManager::Get().Move(*NewFolderPath, *Path);
+                            }
+                        }
                     })
                     .OverflowPolicy(ETextOverflowPolicy::Ellipsis)
                 ]

@@ -31,6 +31,9 @@ namespace SH {
 	TSharedRef<ISlateStyle> FShaderHelperStyle::Create()
 	{
 		TSharedRef<FSlateStyleSet> Style = MakeShared<FSlateStyleSet>("ShaderHelperStyle");
+        Style->SetContentRoot(BaseResourcePath::Custom_SlateResourceDir);
+        Style->Set("AssetBrowser.ShaderPass", new IMAGE_BRUSH_SVG("ShaderPass", FVector2D(64.0, 64.0)));
+        
 		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir);
 
 		FTableRowStyle LineNumberItemStyle;

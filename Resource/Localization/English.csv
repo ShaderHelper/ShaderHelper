@@ -37,3 +37,4 @@ AssetImportFailure,Failed to import asset.,
 DeleteAssetTip,Delete selected Item?,
 CodeTabTip,Select any ShaderPass asset to edit the code.,
 ShaderPass,ShaderPass,
+AssetRenameFailure,Destination name already exists!
