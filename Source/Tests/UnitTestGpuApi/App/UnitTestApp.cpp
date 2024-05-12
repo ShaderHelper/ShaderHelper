@@ -1,9 +1,9 @@
 #include "CommonHeader.h"
 #include "UnitTestApp.h"
 #include "Editor/UnitTestEditor.h"
-#include "GpuApi/GpuApiInterface.h"
 #include "Common/Path/PathHelper.h"
 #include "GpuApi/GpuFeature.h"
+
 
 using namespace FRAMEWORK;
 
@@ -13,6 +13,40 @@ namespace UNITTEST_GPUAPI
 		: App(InClientSize, CommandLine)
 	{
 		Editor = MakeUnique<UnitTestEditor>(AppClientSize);
+
+		// Create Rhi backend.
+		GpuRhiConfig Config;
+		Config.EnableValidationCheck = false;
+		Config.BackendType = GpuRhiBackendType::Dummy;
+
+		if (FParse::Param(FCommandLine::Get(), TEXT("validation")))
+		{
+			Config.EnableValidationCheck = true;
+		}
+		FString BackendName;
+		if (FParse::Value(FCommandLine::Get(), TEXT("backend="), BackendName))
+		{
+			if(BackendName.Equals(TEXT("Dummy")))
+			{
+				Config.BackendType = GpuRhiBackendType::Dummy;
+			}
+			else if (BackendName.Equals(TEXT("Metal")))
+			{
+				Config.BackendType = GpuRhiBackendType::Metal;
+			}
+			else if (BackendName.Equals(TEXT("DX12")))
+			{
+				Config.BackendType = GpuRhiBackendType::DX12;
+			}
+			else if (BackendName.Equals(TEXT("Vulkan")))
+			{
+				Config.BackendType = GpuRhiBackendType::Vulkan;
+			}
+			else {
+				// invalid backend name, use default backend type.
+			}
+		}
+		Rhi = GpuRhi::CreateGpuRhi(Config);
 	}
 
 	void UnitTestApp::Update(double DeltaTime)
@@ -24,15 +58,15 @@ namespace UNITTEST_GPUAPI
 	{
 		App::Render();
 
-		GpuApi::BeginGpuCapture("TestCast");
+		 Rhi->BeginGpuCapture("TestCast");
 
 		uint16 TestData = 0xFD5E; //NaN
 		TArray<uint8> RawData((uint8*)&TestData, sizeof(TestData));
 
 		GpuTextureDesc Desc{ 1, 1, GpuTextureFormat::R16_FLOAT, GpuTextureUsage::ShaderResource , RawData };
-		TRefCountPtr<GpuTexture> TestTex = GpuApi::CreateTexture(Desc);
+		TRefCountPtr<GpuTexture> TestTex =  Rhi->CreateTexture(Desc);
 
-		TRefCountPtr<GpuShader> Vs = GpuApi::CreateShaderFromFile(
+		TRefCountPtr<GpuShader> Vs =  Rhi->CreateShaderFromFile(
 			PathHelper::ShaderDir() / "Test/TestCast.hlsl",
 			ShaderType::VertexShader,
 			TEXT("MainVS")
@@ -42,7 +76,7 @@ namespace UNITTEST_GPUAPI
 		}
 	
 		FString ErrorInfo;
-		GpuApi::CrossCompileShader(Vs, ErrorInfo);
+		 Rhi->CrossCompileShader(Vs, ErrorInfo);
 		check(ErrorInfo.IsEmpty());
 
 		TRefCountPtr<GpuBindGroupLayout> BindGroupLayout = GpuBindGroupLayoutBuilder{ 0 }
@@ -57,17 +91,17 @@ namespace UNITTEST_GPUAPI
 		PipelineDesc.Vs = Vs;
 		PipelineDesc.BindGroupLayout0 = BindGroupLayout;
 
-		TRefCountPtr<GpuPipelineState> Pipeline = GpuApi::CreateRenderPipelineState(PipelineDesc);
+		TRefCountPtr<GpuPipelineState> Pipeline =  Rhi->CreateRenderPipelineState(PipelineDesc);
 
-		GpuApi::BeginRenderPass({}, TEXT("TestCast"));
+		 Rhi->BeginRenderPass({}, TEXT("TestCast"));
 		{
-			GpuApi::SetRenderPipelineState(Pipeline);
-			GpuApi::SetBindGroups(BindGroup, nullptr, nullptr, nullptr);
-			GpuApi::DrawPrimitive(0, 3, 0, 1);
+			 Rhi->SetRenderPipelineState(Pipeline);
+			 Rhi->SetBindGroups(BindGroup, nullptr, nullptr, nullptr);
+			 Rhi->DrawPrimitive(0, 3, 0, 1);
 		}
-		GpuApi::EndRenderPass();
+		 Rhi->EndRenderPass();
 
-		GpuApi::EndGpuCapture();
+		 Rhi->EndGpuCapture();
 	}
 
 }
