@@ -58,19 +58,19 @@ public:
 
 	TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc &InBindGroupDesc) override
 	{
-		check(GpuApi::ValidateCreateBindGroup(InBindGroupDesc));
+		check(ValidateCreateBindGroup(InBindGroupDesc));
 		return RhiBackend->CreateBindGroup(InBindGroupDesc);
 	}
 
 	TRefCountPtr<GpuBindGroupLayout> CreateBindGroupLayout(const GpuBindGroupLayoutDesc &InBindGroupLayoutDesc) override
 	{
-		check(GpuApi::ValidateCreateBindGroupLayout(InBindGroupLayoutDesc));
+		check(ValidateCreateBindGroupLayout(InBindGroupLayoutDesc));
 		return RhiBackend->CreateBindGroupLayout(InBindGroupLayoutDesc);
 	}
 
 	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const GpuPipelineStateDesc &InPipelineStateDesc) override
 	{
-		check(GpuApi::ValidateCreateRenderPipelineState(InPipelineStateDesc));
+		check(ValidateCreateRenderPipelineState(InPipelineStateDesc));
 		return RhiBackend->CreateRenderPipelineState(InPipelineStateDesc);
 	}
 
@@ -136,7 +136,7 @@ public:
 
 	void SetBindGroups(GpuBindGroup *BindGroup0, GpuBindGroup *BindGroup1, GpuBindGroup *BindGroup2, GpuBindGroup *BindGroup3) override
 	{
-		check(GpuApi::ValidateSetBindGroups(BindGroup0, BindGroup1, BindGroup2, BindGroup3));
+		check(ValidateSetBindGroups(BindGroup0, BindGroup1, BindGroup2, BindGroup3));
 		RhiBackend->SetBindGroups(BindGroup0, BindGroup1, BindGroup2, BindGroup3);
 	}
 

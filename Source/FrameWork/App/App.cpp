@@ -71,11 +71,11 @@ namespace FRAMEWORK {
 
 		// Create Rhi backend.
 		GpuRhiConfig Config;
-		Config.EnableValidationCheck = false;
+		Config.EnableValidationCheck = true;
 		Config.BackendType = GpuRhiBackendType::Default;
 
-		if (FParse::Param(FCommandLine::Get(), TEXT("validation"))) {
-			Config.EnableValidationCheck = true;
+		if (FParse::Param(FCommandLine::Get(), TEXT("disableValidation"))) {
+			Config.EnableValidationCheck = false;
 		}
 		FString BackendName;
 		if (FParse::Value(FCommandLine::Get(), TEXT("backend="), BackendName)) {
