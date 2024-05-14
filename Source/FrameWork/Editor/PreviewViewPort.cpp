@@ -1,13 +1,13 @@
 #include "CommonHeader.h"
 #include "PreviewViewPort.h"
-#include "GpuApi/GpuApiInterface.h"
+#include "GpuApi/GpuRhi.h"
 
 namespace FRAMEWORK
 {
 	void PreviewViewPort::SetViewPortRenderTexture(GpuTexture* InGpuTex)
 	{
 		FSlateRenderer* UIRenderer = FSlateApplication::Get().GetRenderer();
-		void* SharedHandle = GpuApi::GetSharedHandle(InGpuTex);
+		void* SharedHandle = GGpuRhi->GetSharedHandle(InGpuTex);
 		//May need sync here.
         FSlateUpdatableTexture* UpdatableTexture = UIRenderer->CreateSharedHandleTexture2(SharedHandle);
 		ViewPortRT = MakeShareable(UpdatableTexture);
@@ -17,7 +17,7 @@ namespace FRAMEWORK
 	//{
 	//	check((SizeX == InGpuTex->GetWidth()) && (SizeY == InGpuTex->GetHeight()));
 	//	uint32 PaddedRowPitch;
-	//	uint8* PaddedData = (uint8*)GpuApi::MapGpuTexture(InGpuTex, GpuResourceMapMode::Read_Only, PaddedRowPitch);
+	//	uint8* PaddedData = (uint8*)GGpuRhi->MapGpuTexture(InGpuTex, GpuResourceMapMode::Read_Only, PaddedRowPitch);
 	//	uint32 UnpaddedSize = InGpuTex->GetWidth() * InGpuTex->GetHeight() * GetTextureFormatByteSize(InGpuTex->GetFormat());
  //       
  //       tarray<uint8> unpaddeddata;

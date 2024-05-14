@@ -26,13 +26,13 @@ namespace FRAMEWORK
 		};
 		Binding.ApplyBindGroupLayout(PipelineDesc);
 
-		TRefCountPtr<GpuPipelineState> Pipeline = GpuApi::CreateRenderPipelineState(PipelineDesc);
+		TRefCountPtr<GpuPipelineState> Pipeline = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
 
 		Graph.AddPass("BlitPass", MoveTemp(BlitPassDesc),
 			[Pipeline, Binding] {
 				Binding.ApplyBindGroup();
-				GpuApi::SetRenderPipelineState(Pipeline);
-				GpuApi::DrawPrimitive(0, 3, 0, 1);
+				GGpuRhi->SetRenderPipelineState(Pipeline);
+				GGpuRhi->DrawPrimitive(0, 3, 0, 1);
 			}
 		);
 	}

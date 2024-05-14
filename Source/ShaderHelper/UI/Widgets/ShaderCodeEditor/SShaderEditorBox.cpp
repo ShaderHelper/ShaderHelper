@@ -4,7 +4,7 @@
 #include <Widgets/Text/SlateEditableTextLayout.h>
 #include <Widgets/Layout/SScrollBarTrack.h>
 #include <Framework/Text/SlateTextRun.h>
-#include "GpuApi/GpuApiInterface.h"
+#include "GpuApi/GpuRhi.h"
 #include <Widgets/Layout/SScaleBox.h>
 #include <Framework/Commands/GenericCommands.h>
 #include <HAL/PlatformApplicationMisc.h>
@@ -697,10 +697,10 @@ namespace SH
 
 		CurrentFullShaderSource = FinalShaderSource;
 
-		TRefCountPtr<GpuShader> NewPixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, MoveTemp(FinalShaderSource), {}, TEXT("MainPS"));
+		TRefCountPtr<GpuShader> NewPixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, MoveTemp(FinalShaderSource), {}, TEXT("MainPS"));
 		FString ErrorInfo;
 		EffectMarshller->LineNumberToErrorInfo.Reset();
-		if (GpuApi::CrossCompileShader(NewPixelShader, ErrorInfo))
+		if (GGpuRhi->CrossCompileShader(NewPixelShader, ErrorInfo))
 		{
 			CurEditState = EditState::Normal;
 			Renderer->UpdatePixelShader(MoveTemp(NewPixelShader));

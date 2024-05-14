@@ -1,6 +1,6 @@
 #include "CommonHeader.h"
 #include "GpuBindGroupLayout.h"
-#include "GpuApiInterface.h"
+#include "GpuRhi.h"
 
 namespace FRAMEWORK
 {
@@ -55,7 +55,7 @@ namespace FRAMEWORK
 
 	TRefCountPtr<GpuBindGroupLayout> GpuBindGroupLayoutBuilder::Build()
 	{
-		return GpuApi::CreateBindGroupLayout(LayoutDesc);
+		return GGpuRhi->CreateBindGroupLayout(LayoutDesc);
 	}
 
 }

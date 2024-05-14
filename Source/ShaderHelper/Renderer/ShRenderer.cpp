@@ -1,6 +1,6 @@
 #include "CommonHeader.h"
 #include "ShRenderer.h"
-#include "GpuApi/GpuApiInterface.h"
+#include "GpuApi/GpuRhi.h"
 
 using namespace FRAMEWORK;
 
@@ -56,13 +56,13 @@ R"(float4 MainPS(PIn Input) : SV_Target
 							.SetUniformBuffer("BuiltIn", BuiltInUniformBuffer->GetGpuResource())
 							.Build();
 
-		VertexShader = GpuApi::CreateShaderFromSource(ShaderType::VertexShader, DefaultVertexShaderText, TEXT("DefaultFullScreenVS"), TEXT("MainVS"));
+		VertexShader = GGpuRhi->CreateShaderFromSource(ShaderType::VertexShader, DefaultVertexShaderText, TEXT("DefaultFullScreenVS"), TEXT("MainVS"));
 		FString ErrorInfo;
-		GpuApi::CrossCompileShader(VertexShader, ErrorInfo);
+		GGpuRhi->CrossCompileShader(VertexShader, ErrorInfo);
 		check(ErrorInfo.IsEmpty());
 
-		PixelShader = GpuApi::CreateShaderFromSource(ShaderType::PixelShader, GetPixelShaderDeclaration() + DefaultPixelShaderBody, TEXT("DefaultFullScreenPS"), TEXT("MainPS"));
-		GpuApi::CrossCompileShader(PixelShader, ErrorInfo);
+		PixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, GetPixelShaderDeclaration() + DefaultPixelShaderBody, TEXT("DefaultFullScreenPS"), TEXT("MainPS"));
+		GGpuRhi->CrossCompileShader(PixelShader, ErrorInfo);
 		check(ErrorInfo.IsEmpty());
 
 		FinalRT = GpuResourceHelper::TempRenderTarget(GpuTextureFormat::B8G8R8A8_UNORM);
@@ -75,8 +75,8 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		iResolution = InResolution;
 		//Note: BGRA8_UNORM is default framebuffer format in ue standalone renderer framework.
 		GpuTextureDesc Desc{ (uint32)iResolution.x, (uint32)iResolution.y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
-		FinalRT = GpuApi::CreateTexture(Desc);
-		GpuApi::SetTextureName("FinalRT", FinalRT);
+		FinalRT = GGpuRhi->CreateTexture(Desc);
+		GGpuRhi->SetTextureName("FinalRT", FinalRT);
 		ReCreatePipelineState();
 		Render();
 	}
@@ -134,7 +134,7 @@ R"(float4 MainPS(PIn Input) : SV_Target
 			},
 			{ BuiltInBindGroupLayout, CustomBindGroupLayout }
 		};	
-		PipelineState = GpuApi::CreateRenderPipelineState(PipelineDesc);
+		PipelineState = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
 	}
 
 	void ShRenderer::RenderBegin()
@@ -156,15 +156,15 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		FullScreenPassDesc.ColorRenderTargets = {
 			{ FinalRT, RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store },
 		};
-		GpuApi::BeginRenderPass(FullScreenPassDesc, TEXT("FullScreenPass"));
+		GGpuRhi->BeginRenderPass(FullScreenPassDesc, TEXT("FullScreenPass"));
 		{
-			GpuApi::SetRenderPipelineState(PipelineState);
-			GpuApi::SetBindGroups(BuiltInBindGroup, CustomBindGroup, nullptr, nullptr);
-			GpuApi::DrawPrimitive(0, 3, 0, 1);
+			GGpuRhi->SetRenderPipelineState(PipelineState);
+			GGpuRhi->SetBindGroups(BuiltInBindGroup, CustomBindGroup, nullptr, nullptr);
+			GGpuRhi->DrawPrimitive(0, 3, 0, 1);
 		}
-		GpuApi::EndRenderPass();
+		GGpuRhi->EndRenderPass();
 		
-		GpuApi::Submit();
+		GGpuRhi->Submit();
 	}
 
 	void ShRenderer::RenderEnd()

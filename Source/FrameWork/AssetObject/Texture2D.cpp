@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "Texture2D.h"
 #include "Common/Util/Reflection.h"
-#include "GpuApi/GpuApiInterface.h"
+#include "GpuApi/GpuRhi.h"
 #include "AssetManager/AssetManager.h"
 #include "Renderer/RenderGraph.h"
 #include "RenderResource/RenderPass/BlitPass.h"
@@ -39,7 +39,7 @@ namespace FRAMEWORK
 	void Texture2D::PostLoad()
 	{
 		GpuTextureDesc Desc{ (uint32)Width, (uint32)Height, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource , RawData };
-		GpuData = GpuApi::CreateTexture(MoveTemp(Desc));
+		GpuData = GGpuRhi->CreateTexture(MoveTemp(Desc));
 	}
 
 	FString Texture2D::FileExtension() const
@@ -57,13 +57,13 @@ namespace FRAMEWORK
 		}
 
 		GpuTextureDesc Desc{ Width / 2, Height / 2, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
-		TRefCountPtr<GpuTexture> Thumbnail = GpuApi::CreateTexture(MoveTemp(Desc));
+		TRefCountPtr<GpuTexture> Thumbnail = GGpuRhi->CreateTexture(MoveTemp(Desc));
 
 		RenderGraph Graph;
 		{
 			BlitPassInput Input;
 			Input.InputTex = GpuData;
-			Input.InputTexSampler = GpuApi::CreateSampler({ SamplerFilter::Bilinear});
+			Input.InputTexSampler = GGpuRhi->CreateSampler({ SamplerFilter::Bilinear});
 			Input.OutputRenderTarget = Thumbnail;
 
 			AddBlitPass(Graph, MoveTemp(Input));

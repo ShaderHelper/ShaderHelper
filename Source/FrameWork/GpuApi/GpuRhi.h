@@ -73,7 +73,7 @@ public: // command apis
 
 	virtual void SetVertexBuffer(GpuBuffer *InVertexBuffer) = 0;
 
-	// If omitted, it defaults to GpuApi::SetViewPort(GpuViewPortDesc{RenderTarget.Width, RenderTarget.Height}).
+	// If omitted, it defaults to GGpuRhi->SetViewPort(GpuViewPortDesc{RenderTarget.Width, RenderTarget.Height}).
 	virtual void SetViewPort(const GpuViewPortDesc &InViewPortDesc) = 0;
 
 	// Only support 4 BindGroups to adapt some mobile devices.

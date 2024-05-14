@@ -1,6 +1,6 @@
 #include "CommonHeader.h"
 #include "Renderer.h"
-#include "GpuApi/GpuApiInterface.h"
+#include "GpuApi/GpuRhi.h"
 
 namespace FRAMEWORK
 {
