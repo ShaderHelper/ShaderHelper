@@ -6,10 +6,21 @@ namespace FRAMEWORK
 {
 enum class GpuRhiBackendType
 {
-	Dummy,
+#if PLATFORM_WINDOWS
 	DX12,
+#elif PLATFORM_MAC
 	Metal,
+#endif
 	Vulkan,
+
+// default backend for different platforms.
+#if PLATFORM_WINDOWS
+	Default = DX12,
+#elif PLATFORM_MAC
+	Default = Metal,
+#else
+	Default = Vulkan
+#endif
 };
 
 struct GpuRhiConfig

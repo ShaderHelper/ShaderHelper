@@ -2,7 +2,11 @@
 
 #include "GpuRhi.h"
 
+#if PLATFORM_WINDOWS
 #include "./Dx12/Dx12GpuRhiBackend.h"
+#elif PLATFORM_MAC
+#include "./Metal/MetalGpuRhiBackend.h"
+#endif
 #include "GpuApiValidation.h"
 
 namespace FRAMEWORK
@@ -189,11 +193,15 @@ TUniquePtr<GpuRhi> GpuRhi::CreateGpuRhi(const GpuRhiConfig &InConfig)
 {
 	TUniquePtr<GpuRhi> RhiBackend;
 	switch (InConfig.BackendType) {
+#if PLATFORM_WINDOWS
 	case GpuRhiBackendType::DX12: RhiBackend = MakeUnique<Dx12GpuRhiBackend>(); break;
-	case GpuRhiBackendType::Dummy:
-	case GpuRhiBackendType::Metal:
+#elif PLATFORM_MAC
+	case GpuRhiBackendType::Metal: RhiBackend = MakeUnique<MetalGpuRhiBackend>(); break;
+#endif
 	case GpuRhiBackendType::Vulkan:
-	// TODO: create other backends here.
+		// TODO: create vulkan backends.
+		unimplemented();
+		break;
 	default: // unreachable
 		checkf(false, TEXT("Invalid GpuApiBackendType."));
 		break;

@@ -17,7 +17,7 @@ namespace UNITTEST_GPUAPI
 		// Create Rhi backend.
 		GpuRhiConfig Config;
 		Config.EnableValidationCheck = false;
-		Config.BackendType = GpuRhiBackendType::Dummy;
+		Config.BackendType = GpuRhiBackendType::Default;
 
 		if (FParse::Param(FCommandLine::Get(), TEXT("validation")))
 		{
@@ -26,22 +26,21 @@ namespace UNITTEST_GPUAPI
 		FString BackendName;
 		if (FParse::Value(FCommandLine::Get(), TEXT("backend="), BackendName))
 		{
-			if(BackendName.Equals(TEXT("Dummy")))
+			if (BackendName.Equals(TEXT("Vulkan")))
 			{
-				Config.BackendType = GpuRhiBackendType::Dummy;
+				Config.BackendType = GpuRhiBackendType::Vulkan;
 			}
+#if PLATFORM_MAC
 			else if (BackendName.Equals(TEXT("Metal")))
 			{
 				Config.BackendType = GpuRhiBackendType::Metal;
 			}
+#elif PLATFORM_WINDOWS
 			else if (BackendName.Equals(TEXT("DX12")))
 			{
 				Config.BackendType = GpuRhiBackendType::DX12;
 			}
-			else if (BackendName.Equals(TEXT("Vulkan")))
-			{
-				Config.BackendType = GpuRhiBackendType::Vulkan;
-			}
+#endif
 			else {
 				// invalid backend name, use default backend type.
 			}
