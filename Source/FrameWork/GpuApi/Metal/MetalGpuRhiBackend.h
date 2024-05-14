@@ -7,8 +7,8 @@ namespace FRAMEWORK
 class MetalGpuRhiBackend : public GpuRhi
 {
 public:
-	Dx12GpuRhiBackend();
-	virtual ~Dx12GpuRhiBackend();
+	MetalGpuRhiBackend();
+	virtual ~MetalGpuRhiBackend();
 
 public:
 	void InitApiEnv() override;
