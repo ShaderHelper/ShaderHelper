@@ -1,5 +1,5 @@
 #pragma once
-#include "GpuApi/GpuApiInterface.h"
+#include "GpuApi/GpuRhi.h"
 #include <string_view>
 
 namespace FRAMEWORK
@@ -33,7 +33,7 @@ namespace FRAMEWORK
 			checkf(MetaData.Members.Contains(MemberName), TEXT("The uniform buffer doesn't contain \"%s\" member."), *MemberName);
 			checkf(AUX::TypeName<T> == MetaData.Members[MemberName].TypeName, TEXT("Mismatched type: %s, Expected : %s"), *AUX::TypeName<T>, *MetaData.Members[MemberName].TypeName);
 			int32 MemberOffset = MetaData.Members[MemberName].Offset;
-			void* BufferBaseAddr = GpuApi::MapGpuBuffer(Buffer, GpuResourceMapMode::Write_Only);
+			void* BufferBaseAddr = GGpuRhi->MapGpuBuffer(Buffer, GpuResourceMapMode::Write_Only);
 			return *reinterpret_cast<T*>((uint8*)BufferBaseAddr + MemberOffset);
 		}
 
@@ -105,7 +105,7 @@ namespace FRAMEWORK
 
 		TUniquePtr<UniformBuffer> Build() {
 			checkf(MetaData.UniformBufferSize > 0, TEXT("Nothing added to the builder."));
-			TRefCountPtr<GpuBuffer> Buffer = GpuApi::CreateBuffer(MetaData.UniformBufferSize, (GpuBufferUsage)Usage);
+			TRefCountPtr<GpuBuffer> Buffer = GGpuRhi->CreateBuffer(MetaData.UniformBufferSize, (GpuBufferUsage)Usage);
 			MetaData.UniformBufferDeclaration = GetLayoutDeclaration();
 			return MakeUnique<UniformBuffer>( MoveTemp(Buffer), MetaData);
 		}

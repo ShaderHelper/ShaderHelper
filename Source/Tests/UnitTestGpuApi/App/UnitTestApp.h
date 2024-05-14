@@ -1,6 +1,7 @@
 #pragma once
 #include "App/App.h"
 #include "Editor/UnitTestEditor.h"
+#include "GpuApi/GpuRhi.h"
 
 namespace UNITTEST_GPUAPI
 {

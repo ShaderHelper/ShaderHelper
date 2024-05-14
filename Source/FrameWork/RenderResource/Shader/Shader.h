@@ -1,5 +1,5 @@
 #pragma once
-#include "GpuApi/GpuApiInterface.h"
+#include "GpuApi/GpuRhi.h"
 
 namespace FRAMEWORK
 {
@@ -44,7 +44,7 @@ namespace FRAMEWORK
 
 		void ApplyBindGroup() const
 		{
-			GpuApi::SetBindGroups(GlobalBindGroup, nullptr, ShaderBindGroup, nullptr);
+			GGpuRhi->SetBindGroups(GlobalBindGroup, nullptr, ShaderBindGroup, nullptr);
 		}
 
 	private:

@@ -2,7 +2,7 @@
 #include "GpuApiValidation.h"
 #include "magic_enum.hpp"
 
-namespace FRAMEWORK::GpuApi
+namespace FRAMEWORK
 {
 
 	bool ValidateSetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)
@@ -13,7 +13,7 @@ namespace FRAMEWORK::GpuApi
 			{
 				BindingGroupSlot GroupNumber = BindGroup->GetLayout()->GetGroupNumber();
 				if (GroupNumber != ExpectedSlot) {
-					SH_LOG(LogGpuApi, Error, TEXT("GpuApi::SetBindGroups Error(Mismatched BindingGroupSlot) - BindGroup%d : (%d), Expected : (%d)"), ExpectedSlot, GroupNumber, ExpectedSlot);
+					SH_LOG(LogGpuApi, Error, TEXT("GpuRhi::SetBindGroups Error(Mismatched BindingGroupSlot) - BindGroup%d : (%d), Expected : (%d)"), ExpectedSlot, GroupNumber, ExpectedSlot);
 					return false;
 				}
 			}
@@ -30,7 +30,7 @@ namespace FRAMEWORK::GpuApi
 		{
 			if (GroupEntryType != GpuResourceType::Buffer)
 			{
-				SH_LOG(LogGpuApi, Error, TEXT("GpuApi::CreateBindGroup Error(Mismatched GpuResourceType)"
+				SH_LOG(LogGpuApi, Error, TEXT("GpuRhi::CreateBindGroup Error(Mismatched GpuResourceType)"
 					" - Slot%d : (%s), Expected : (Buffer)"), Slot, ANSI_TO_TCHAR(magic_enum::enum_name(GroupEntryType).data()));
 				return false;
 			}
@@ -39,7 +39,7 @@ namespace FRAMEWORK::GpuApi
 				GpuBufferUsage BufferUsage = static_cast<GpuBuffer*>(GroupEntryResource)->GetUsage();
 				if (BufferUsage != GpuBufferUsage::PersistentUniform && BufferUsage != GpuBufferUsage::TemporaryUniform)
 				{
-					SH_LOG(LogGpuApi, Error, TEXT("GpuApi::CreateBindGroup Error(Mismatched GpuBufferUsage)"
+					SH_LOG(LogGpuApi, Error, TEXT("GpuRhi::CreateBindGroup Error(Mismatched GpuBufferUsage)"
 						" - Slot%d : (%s), Expected : (PersistentUniform or TemporaryUniform)"), Slot, ANSI_TO_TCHAR(magic_enum::enum_name(BufferUsage).data()));
 					return false;
 				}
@@ -59,7 +59,7 @@ namespace FRAMEWORK::GpuApi
 			}
 			else
 			{
-				SH_LOG(LogGpuApi, Error, TEXT("GpuApi::CreateBindGroup Error(Missing BindingSlot) - Not find the slot : (%d)"), Slot);
+				SH_LOG(LogGpuApi, Error, TEXT("GpuRhi::CreateBindGroup Error(Missing BindingSlot) - Not find the slot : (%d)"), Slot);
 				return false;
 			}
 		}
@@ -73,7 +73,7 @@ namespace FRAMEWORK::GpuApi
         {
             if(Slots.Contains(Slot))
             {
-                SH_LOG(LogGpuApi, Error, TEXT("GpuApi::CreateBindGroupLayout Error(Duplicated BindingSlot) -  slot detected: (%d)"), Slot);
+                SH_LOG(LogGpuApi, Error, TEXT("GpuRhi::CreateBindGroupLayout Error(Duplicated BindingSlot) -  slot detected: (%d)"), Slot);
                 return false;
             }
             Slots.Add(Slot);
@@ -89,7 +89,7 @@ namespace FRAMEWORK::GpuApi
 			{
 				BindingGroupSlot GroupNumber = BindGroupLayout->GetGroupNumber();
 				if (GroupNumber != ExpectedSlot) {
-					SH_LOG(LogGpuApi, Error, TEXT("GpuApi::CreateRenderPipelineState Error(Mismatched BindingGroupSlot) - BindGroupLayout%d : (%d), Expected : (%d)"), ExpectedSlot, GroupNumber, ExpectedSlot);
+					SH_LOG(LogGpuApi, Error, TEXT("GpuRhi::CreateRenderPipelineState Error(Mismatched BindingGroupSlot) - BindGroupLayout%d : (%d), Expected : (%d)"), ExpectedSlot, GroupNumber, ExpectedSlot);
 					return false;
 				}
 			}

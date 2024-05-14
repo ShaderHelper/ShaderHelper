@@ -1,6 +1,6 @@
 #include "CommonHeader.h"
 #include "BlitShader.h"
-#include "GpuApi/GpuApiInterface.h"
+#include "GpuApi/GpuRhi.h"
 #include <Misc/FileHelper.h>
 #include "Common/Path/PathHelper.h"
 
@@ -14,23 +14,23 @@ namespace FRAMEWORK
 							.AddExistingBinding(1, BindingType::Sampler, BindingShaderStage::Pixel)
 							.Build();
 		
-		Vs = GpuApi::CreateShaderFromFile(
+		Vs = GGpuRhi->CreateShaderFromFile(
 			PathHelper::ShaderDir() / "Blit.hlsl", 
 			ShaderType::VertexShader,
 			TEXT("MainVS")
 		);
 
-		Ps = GpuApi::CreateShaderFromFile(
+		Ps = GGpuRhi->CreateShaderFromFile(
 			PathHelper::ShaderDir() / "Blit.hlsl",
 			ShaderType::PixelShader,
 			TEXT("MainPS")
 		);
 
 		FString ErrorInfo;
-		GpuApi::CrossCompileShader(Vs, ErrorInfo);
+		GGpuRhi->CrossCompileShader(Vs, ErrorInfo);
 		check(ErrorInfo.IsEmpty());
 
-		GpuApi::CrossCompileShader(Ps, ErrorInfo);
+		GGpuRhi->CrossCompileShader(Ps, ErrorInfo);
 		check(ErrorInfo.IsEmpty());
 	}
 

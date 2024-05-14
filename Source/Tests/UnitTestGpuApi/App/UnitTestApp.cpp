@@ -1,9 +1,9 @@
 #include "CommonHeader.h"
 #include "UnitTestApp.h"
 #include "Editor/UnitTestEditor.h"
-#include "GpuApi/GpuApiInterface.h"
 #include "Common/Path/PathHelper.h"
 #include "GpuApi/GpuFeature.h"
+
 
 using namespace FRAMEWORK;
 
@@ -24,15 +24,15 @@ namespace UNITTEST_GPUAPI
 	{
 		App::Render();
 
-		GpuApi::BeginGpuCapture("TestCast");
+		GGpuRhi->BeginGpuCapture("TestCast");
 
 		uint16 TestData = 0xFD5E; //NaN
 		TArray<uint8> RawData((uint8*)&TestData, sizeof(TestData));
 
 		GpuTextureDesc Desc{ 1, 1, GpuTextureFormat::R16_FLOAT, GpuTextureUsage::ShaderResource , RawData };
-		TRefCountPtr<GpuTexture> TestTex = GpuApi::CreateTexture(Desc);
+		TRefCountPtr<GpuTexture> TestTex = GGpuRhi->CreateTexture(Desc);
 
-		TRefCountPtr<GpuShader> Vs = GpuApi::CreateShaderFromFile(
+		TRefCountPtr<GpuShader> Vs = GGpuRhi->CreateShaderFromFile(
 			PathHelper::ShaderDir() / "Test/TestCast.hlsl",
 			ShaderType::VertexShader,
 			TEXT("MainVS")
@@ -42,7 +42,7 @@ namespace UNITTEST_GPUAPI
 		}
 	
 		FString ErrorInfo;
-		GpuApi::CrossCompileShader(Vs, ErrorInfo);
+		GGpuRhi->CrossCompileShader(Vs, ErrorInfo);
 		check(ErrorInfo.IsEmpty());
 
 		TRefCountPtr<GpuBindGroupLayout> BindGroupLayout = GpuBindGroupLayoutBuilder{ 0 }
@@ -57,17 +57,17 @@ namespace UNITTEST_GPUAPI
 		PipelineDesc.Vs = Vs;
 		PipelineDesc.BindGroupLayout0 = BindGroupLayout;
 
-		TRefCountPtr<GpuPipelineState> Pipeline = GpuApi::CreateRenderPipelineState(PipelineDesc);
+		TRefCountPtr<GpuPipelineState> Pipeline = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
 
-		GpuApi::BeginRenderPass({}, TEXT("TestCast"));
+		GGpuRhi->BeginRenderPass({}, TEXT("TestCast"));
 		{
-			GpuApi::SetRenderPipelineState(Pipeline);
-			GpuApi::SetBindGroups(BindGroup, nullptr, nullptr, nullptr);
-			GpuApi::DrawPrimitive(0, 3, 0, 1);
+			GGpuRhi->SetRenderPipelineState(Pipeline);
+			GGpuRhi->SetBindGroups(BindGroup, nullptr, nullptr, nullptr);
+			GGpuRhi->DrawPrimitive(0, 3, 0, 1);
 		}
-		GpuApi::EndRenderPass();
+		GGpuRhi->EndRenderPass();
 
-		GpuApi::EndGpuCapture();
+		GGpuRhi->EndGpuCapture();
 	}
 
 }

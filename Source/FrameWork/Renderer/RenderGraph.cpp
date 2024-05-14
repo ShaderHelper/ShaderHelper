@@ -1,6 +1,6 @@
 #include "CommonHeader.h"
 #include "RenderGraph.h"
-#include "GpuApi/GpuApiInterface.h"
+#include "GpuApi/GpuRhi.h"
 
 namespace FRAMEWORK
 {
@@ -14,13 +14,13 @@ namespace FRAMEWORK
 	{
 		for (const auto& Pass: RGPasses)
 		{
-			GpuApi::BeginRenderPass(Pass.Info, Pass.Name);
+			GGpuRhi->BeginRenderPass(Pass.Info, Pass.Name);
 			{
 				Pass.Execution();
 			}
-			GpuApi::EndRenderPass();
+			GGpuRhi->EndRenderPass();
 		}
-		GpuApi::Submit();
+		GGpuRhi->Submit();
 	}
 
 }

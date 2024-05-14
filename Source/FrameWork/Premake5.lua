@@ -3,23 +3,6 @@ FrameWorkHierarchy = {
 	["Shaders/*"] = {"%{_WORKING_DIR}/Resource/Shaders/**.hlsl"}
 }
 
-if os.target() == premake.MACOSX then
-	defaultGpuApi = "Metal"
-elseif os.target() == premake.WINDOWS then
-	defaultGpuApi = "Dx12"
-end
-
-newoption {
-    trigger = "GpuApi",
-	value = "API",
-    description = "Choose a gpu api",
-	default = defaultGpuApi,
-	allowed = {
-		{ "Dx12", "Directx12 (Windows only)"},
-		{ "Metal", "Metal (Mac only)"},
-	}
-}
-
 project "FrameWork"
     kind "SharedLib"   
     location "%{_WORKING_DIR}/ProjectFiles"
@@ -43,10 +26,11 @@ project "FrameWork"
 	
 	filter {"files:**/External/UE/Src/**.cpp or **/External/UE/Src/**.mm"}
         flags {"ExcludeFromBuild"}
-	
-	filter {"options:not GpuApi=Dx12","files:**/Dx12/*.cpp"}
+		
+    filter {"system:macosx","files:**/Dx12/*.cpp"}
         flags {"ExcludeFromBuild"}
-	filter {"options:not GpuApi=Metal","files:**/Metal/*.cpp"}
+
+    filter {"system:windows","files:**/Metal/*.cpp"}
         flags {"ExcludeFromBuild"}
 
     filter "system:windows"
