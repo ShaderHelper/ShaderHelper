@@ -8,7 +8,7 @@
 #include <Misc/OutputDeviceConsole.h>
 #include <DirectoryWatcherModule.h>
 #include <IDirectoryWatcher.h>
-#include "GpuApi/GpuApiInterface.h"
+#include "GpuApi/GpuRhi.h"
 
 namespace FRAMEWORK {
 
@@ -68,7 +68,35 @@ namespace FRAMEWORK {
 		: AppClientSize(InClientSize)
 	{
 		UE_Init(CommandLine);
-		GpuApi::InitApiEnv();
+
+		// Create Rhi backend.
+		GpuRhiConfig Config;
+		Config.EnableValidationCheck = false;
+		Config.BackendType = GpuRhiBackendType::Default;
+
+		if (FParse::Param(FCommandLine::Get(), TEXT("validation"))) {
+			Config.EnableValidationCheck = true;
+		}
+		FString BackendName;
+		if (FParse::Value(FCommandLine::Get(), TEXT("backend="), BackendName)) {
+			if (BackendName.Equals(TEXT("Vulkan"))) {
+				Config.BackendType = GpuRhiBackendType::Vulkan;
+			}
+#if PLATFORM_MAC
+			else if (BackendName.Equals(TEXT("Metal"))) {
+				Config.BackendType = GpuRhiBackendType::Metal;
+			}
+#elif PLATFORM_WINDOWS
+			else if (BackendName.Equals(TEXT("DX12"))) {
+				Config.BackendType = GpuRhiBackendType::DX12;
+			}
+#endif
+			else {
+				// invalid backend name, use default backend type.
+			}
+		}
+		GpuRhi::InitGpuRhi(Config);
+		GGpuRhi->InitApiEnv();
 	}
 
 	App::~App()
@@ -96,7 +124,7 @@ namespace FRAMEWORK {
 			bool bIdleMode = AreAllWindowsHidden();
 			if (!bIdleMode)
 			{
-				GpuApi::BeginFrame();
+				GGpuRhi->BeginFrame();
 				{
 					Update(DeltaTime);
 					Render();
@@ -105,7 +133,7 @@ namespace FRAMEWORK {
 					//if not change GFrameCounter, slate texture may not update.
 					GFrameCounter++;
 				}
-				GpuApi::EndFrame();
+				GGpuRhi->EndFrame();
 			}
 			else
 			{

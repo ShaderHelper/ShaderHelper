@@ -189,7 +189,7 @@ private:
 	TUniquePtr<GpuRhi> RhiBackend;
 };
 
-TUniquePtr<GpuRhi> GpuRhi::CreateGpuRhi(const GpuRhiConfig &InConfig)
+bool GpuRhi::InitGpuRhi(const GpuRhiConfig &InConfig)
 {
 	TUniquePtr<GpuRhi> RhiBackend;
 	switch (InConfig.BackendType) {
@@ -204,14 +204,17 @@ TUniquePtr<GpuRhi> GpuRhi::CreateGpuRhi(const GpuRhiConfig &InConfig)
 		break;
 	default: // unreachable
 		checkf(false, TEXT("Invalid GpuApiBackendType."));
-		break;
+		return false;
 	}
 
 	if (InConfig.EnableValidationCheck) {
-		return MakeUnique<GpuRhiValidation>(MoveTemp(RhiBackend));
+		GGpuRhi = MakeUnique<GpuRhiValidation>(MoveTemp(RhiBackend));
 	} else {
-		return RhiBackend;
+		GGpuRhi = MoveTemp(RhiBackend);
 	}
+	return true;
 }
+
+TUniquePtr<GpuRhi> GGpuRhi;
 
 }

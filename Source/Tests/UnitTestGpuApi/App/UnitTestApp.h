@@ -14,7 +14,6 @@ namespace UNITTEST_GPUAPI
 
 	private:
 		TUniquePtr<UnitTestEditor> Editor;
-		TUniquePtr<FRAMEWORK::GpuRhi> Rhi;
 	};
 }
 

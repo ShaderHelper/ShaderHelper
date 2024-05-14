@@ -95,6 +95,9 @@ public: // command apis
 	virtual void EndRenderPass() = 0;
 
 public:
-	static TUniquePtr<GpuRhi> CreateGpuRhi(const GpuRhiConfig &InConfig);
+	static bool InitGpuRhi(const GpuRhiConfig &InConfig);
 };
+
+FRAMEWORK_API extern TUniquePtr<GpuRhi> GGpuRhi;
+
 }
