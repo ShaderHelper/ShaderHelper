@@ -18,7 +18,8 @@ namespace FRAMEWORK
 		virtual FString FileExtension() const = 0;
 		virtual GpuTexture* GetThumbnail() const { return nullptr; }
 		virtual const FSlateBrush* GetImage() const { return nullptr; }
-
+        
+        FString GetFileName() const;
 		FGuid GetGuid() const { return Guid; }
 
 	protected:

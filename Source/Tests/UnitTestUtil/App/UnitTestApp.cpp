@@ -9,7 +9,7 @@ namespace UNITTEST_UTIL
 	UnitTestApp::UnitTestApp(const Vector2D& InClientSize, const TCHAR* CommandLine)
 		: App(InClientSize, CommandLine)
 	{
-		Editor = MakeUnique<UnitTestEditor>(AppClientSize);
+		AppEditor = MakeUnique<UnitTestEditor>(AppClientSize);
 	}
 
 	void UnitTestApp::Update(double DeltaTime)

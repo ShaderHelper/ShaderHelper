@@ -40,7 +40,6 @@ namespace SH
 		: Renderer(InRenderer)
 		, WindowSize(InWindowSize)
 	{
-		FShaderHelperStyle::Init();
 		TSingleton<ShProjectManager>::Get().OpenProject(DefaultProjectPath);
 
 		ViewPort = MakeShared<PreviewViewPort>();
@@ -53,7 +52,7 @@ namespace SH
 
 	ShaderHelperEditor::~ShaderHelperEditor()
 	{
-		FShaderHelperStyle::ShutDown();
+
 	}
 
 	void ShaderHelperEditor::InitEditorUI()
@@ -131,7 +130,7 @@ namespace SH
 		FSlateApplication::Get().AddWindow(Window.ToSharedRef());
 
 		Window->SetContent(
-			SNew(SVerticalBox)
+			SAssignNew(WindowContentBox, SVerticalBox)
 			+SVerticalBox::Slot()
 			.AutoHeight()
 			[
@@ -143,14 +142,10 @@ namespace SH
 				TabManager->RestoreFrom(UsedLayout, Window).ToSharedRef()
 			]
 		);
-
+        
 		Window->SetRequestDestroyWindowOverride(FRequestDestroyWindowOverride::CreateLambda([this](const TSharedRef<SWindow>& InWindow) {
-			if (!bReInitEditor) { TabManager->SavePersistentLayout(); }
+			TabManager->SavePersistentLayout();
 			FSlateApplication::Get().RequestDestroyWindow(InWindow);
-		}));
-
-		Window->SetOnWindowClosed(FOnWindowClosed::CreateLambda([this](const TSharedRef<SWindow>&) {
-			OnWindowClosed.ExecuteIfBound(bReInitEditor);
 		}));
 	}
 
@@ -181,7 +176,8 @@ namespace SH
 			);
 		}
 		else if (TabId == CodeTabId) {
-            SpawnedTab = SNew(SDummyTab)
+            SpawnedTab = SNew(SDockTab)
+            .Visibility(EVisibility::Collapsed)
             [
                 SNew(SVerticalBox)
                 + SVerticalBox::Slot()
@@ -231,15 +227,34 @@ namespace SH
 		return SpawnedTab.ToSharedRef();
 	}
 
-	void ShaderHelperEditor::ResetWindow(bool bResetWindowLayout)
+	void ShaderHelperEditor::ResetWindowLayout()
 	{
-		//Clean window layout cache to use default layout.
-        if(bResetWindowLayout) {
-            IFileManager::Get().Delete(*WindowLayoutFileName);
+        TabManager->UnregisterAllTabSpawners();
+        for (const FName& TabId : TabIds)
+        {
+            TabManager->RegisterTabSpawner(TabId, FOnSpawnTab::CreateRaw(this, &ShaderHelperEditor::SpawnWindowTab));
         }
-		bReInitEditor = true;
-		Window->RequestDestroyWindow();
+        WindowContentBox->GetSlot(1).AttachWidget(TabManager->RestoreFrom(DefaultTabLayout.ToSharedRef(), Window).ToSharedRef());
 	}
+
+    void ShaderHelperEditor::OpenShaderPassTab(AssetPtr<ShaderPass> InShaderPass)
+    {
+        if(!CurEditorState.OpenedShaderPasses.Contains(InShaderPass))
+        {
+            auto NewShaderPassTab = SNew(SDockTab)
+                .Label_Lambda([InShaderPass] { return FText::FromString(InShaderPass->GetFileName());})
+                .OnTabClosed_Lambda([this](TSharedRef<SDockTab> ClosedTab) {
+                    CurEditorState.OpenedShaderPasses.Remove(*CurEditorState.OpenedShaderPasses.FindKey(ClosedTab));
+                });
+            TabManager->InsertNewDocumentTab(InsertPointTabId, FTabManager::ESearchPreference::RequireClosedTab, NewShaderPassTab);
+            
+            CurEditorState.OpenedShaderPasses.Add(InShaderPass, NewShaderPassTab);
+        }
+        else
+        {
+            CurEditorState.OpenedShaderPasses[InShaderPass]->ActivateInParent(ETabActivationCause::SetDirectly);
+        }
+    }
 
 	ShaderHelperEditor::WindowLayoutConfigInfo ShaderHelperEditor::LoadWindowLayout(const FString& InWindowLayoutConfigFileName)
 	{
@@ -411,7 +426,6 @@ namespace SH
 									[this, Lang]()
 									{
 										Editor::SetLanguage(Lang);
-                                        ResetWindow(false);
 									}),
 								FCanExecuteAction(),
 								FIsActionChecked::CreateLambda(
@@ -451,7 +465,7 @@ namespace SH
 				MenuBuilder.AddMenuEntry(LOCALIZATION("ResetWindowLayout"), FText::GetEmpty(),
 					FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "Icons.Refresh" }, 
 					FUIAction(
-						FExecuteAction::CreateRaw(this, &ShaderHelperEditor::ResetWindow, true)
+						FExecuteAction::CreateRaw(this, &ShaderHelperEditor::ResetWindowLayout)
 					));
 			}
 			MenuBuilder.EndSection();

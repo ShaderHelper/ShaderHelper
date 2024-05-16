@@ -15,7 +15,7 @@ namespace FRAMEWORK
 	public:
 		SLATE_BEGIN_ARGS(SAssetView) {}
 			SLATE_ARGUMENT(FString, ContentPathShowed)
-			SLATE_ARGUMENT(TFunction<void(const FString&)>, OnFolderDoubleClick)
+			SLATE_ARGUMENT(TFunction<void(const FString&)>, OnFolderOpen)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs);
@@ -40,14 +40,14 @@ namespace FRAMEWORK
 		void OnMouseButtonDoubleClick(TSharedRef<AssetViewItem> ViewItem);
 		void OnHandleDeleteAction();
 		void OnHandleRenameAction();
-		void OnHandleOpenAction();
+		void OnHandleOpenAction(TSharedRef<AssetViewItem> ViewItem);
 
 	private:
 		TSharedPtr<STileView<TSharedRef<AssetViewItem>>> AssetTileView;
 		TArray<TSharedRef<AssetViewItem>> AssetViewItems;
 		FString CacheImportAssetPath;
 		FString CurViewDirectory;
-		TFunction<void(const FString&)> OnFolderDoubleClick;
+		TFunction<void(const FString&)> OnFolderOpen;
 		TSharedPtr<FUICommandList> UICommandList;
 		FString ContentPathShowed;
 

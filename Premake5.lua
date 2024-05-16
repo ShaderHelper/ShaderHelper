@@ -82,10 +82,6 @@ workspace "ShaderHelper"
             --This must be set to YES on arm64 mac.
             ["ENABLE_STRICT_OBJC_MSGSEND"] = "YES",
         }
-        runpathdirs {
-            "%{cfg.targetdir}",
-            "%{cfg.targetdir}/../../../ "
-        }
         buildoptions 
         { 
             "-fvisibility=hidden",
@@ -97,6 +93,11 @@ workspace "ShaderHelper"
                 ["ONLY_ACTIVE_ARCH"] = "No",
             }
         end
+
+    filter {"system:macosx","kind:WindowedApp"}
+        runpathdirs {
+            "%{cfg.targetdir}/../../../"
+        }
 
     filter {"system:macosx","kind:SharedLib"}
         xcodebuildsettings { ["DYLIB_INSTALL_NAME_BASE"] = "@rpath" }

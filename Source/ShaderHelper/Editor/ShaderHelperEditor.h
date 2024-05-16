@@ -3,6 +3,8 @@
 #include "Renderer/ShRenderer.h"
 #include "Editor/Editor.h"
 #include "Editor/PreviewViewPort.h"
+#include "AssetObject/ShaderPass.h"
+#include "AssetManager/AssetManager.h"
 
 namespace SH 
 {
@@ -21,12 +23,14 @@ namespace SH
 		ShaderHelperEditor(const FRAMEWORK::Vector2f& InWindowSize, ShRenderer* InRenderer);
 		~ShaderHelperEditor();
 
-		void ResetWindow(bool bResetWindowLayout);
+		void ResetWindowLayout();
 		WindowLayoutConfigInfo LoadWindowLayout(const FString& InWindowLayoutConfigFileName);
 		void SaveWindowLayout(const TSharedRef<FTabManager::FLayout>& InLayout);
 		void LoadEditorState(const FString& InFile);
 		void SaveEditorState();
-		void OnViewportResize(const FRAMEWORK::Vector2f& InSize);;
+		void OnViewportResize(const FRAMEWORK::Vector2f& InSize);
+        
+        void OpenShaderPassTab(FRAMEWORK::AssetPtr<ShaderPass> InShaderPass);
 		
 	private:
 		TSharedRef<SDockTab> SpawnWindowTab(const FSpawnTabArgs& Args);
@@ -39,7 +43,6 @@ namespace SH
 		
 	private:
 		ShRenderer* Renderer;
-		bool bReInitEditor = false;
 		TSharedPtr<FTabManager::FLayout> DefaultTabLayout;
 		TSharedPtr<SDockTab> TabManagerTab;
 		TSharedPtr<FTabManager> TabManager;
@@ -47,6 +50,7 @@ namespace SH
 		TSharedPtr<FRAMEWORK::PreviewViewPort> ViewPort;
 		FVector2D WindowSize;
 
+        TSharedPtr<SVerticalBox> WindowContentBox;
 		TWeakPtr<SBox> PropertyViewBox;
 
 		struct EditorState
@@ -57,6 +61,8 @@ namespace SH
 			float AssetViewSize = 60;
 			FString SelectedDirectory;
 			TArray<FString> DirectoriesToExpand;
+            
+            TMap<FRAMEWORK::AssetPtr<ShaderPass>, TSharedPtr<SDockTab>> OpenedShaderPasses;
 		} CurEditorState;
 		FString EditorStateSaveFileName;
 	};

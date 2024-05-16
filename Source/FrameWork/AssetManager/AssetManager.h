@@ -52,7 +52,7 @@ namespace FRAMEWORK
 			FGuid Guid = GetGuid(InAssetPath);
 			if (Assets.Contains(Guid))
 			{
-				return { Assets[Guid], Guid };
+				return { static_cast<T*>(Assets[Guid]), Guid };
 			}
 
 			TArray<ShReflectToy::MetaType*> AssetObjectMetaTypes = ShReflectToy::GetMetaTypes<AssetObject>();

@@ -12,21 +12,14 @@ using namespace FRAMEWORK;
 
 namespace SH {
 
-	void FShaderHelperStyle::Init()
-	{
-		if (!Instance.IsValid()) {
-			Instance = Create();
-			FSlateStyleRegistry::RegisterSlateStyle(Get());
-		}
-	}
-
-	void FShaderHelperStyle::ShutDown()
-	{
-		if (Instance.IsValid()) {
-			FSlateStyleRegistry::UnRegisterSlateStyle(Get());
-			Instance.Reset();
-		}
-	}
+    const ISlateStyle& FShaderHelperStyle::Get()
+    {
+        if (!Instance.IsValid()) {
+            Instance = Create();
+            FSlateStyleRegistry::RegisterSlateStyle(Get());
+        }
+        return *Instance;
+    }
 
 	TSharedRef<ISlateStyle> FShaderHelperStyle::Create()
 	{

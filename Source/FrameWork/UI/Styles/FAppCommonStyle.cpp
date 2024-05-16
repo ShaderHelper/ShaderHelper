@@ -11,22 +11,14 @@
 
 namespace FRAMEWORK
 {
-	
-	void FAppCommonStyle::Init()
-	{
-		if (!Instance.IsValid()) {
-			Instance = Create();
-			FSlateStyleRegistry::RegisterSlateStyle(Get());
-		}
-	}
-
-	void FAppCommonStyle::ShutDown()
-	{
-		if (Instance.IsValid()) {
-			FSlateStyleRegistry::UnRegisterSlateStyle(Get());
-			Instance.Reset();
-		}
-	}
+    const ISlateStyle& FAppCommonStyle::Get()
+    {
+        if (!Instance.IsValid()) {
+            Instance = Create();
+            FSlateStyleRegistry::RegisterSlateStyle(Get());
+        }
+        return *Instance;
+    }
 
 	TSharedRef<ISlateStyle> FAppCommonStyle::Create()
 	{

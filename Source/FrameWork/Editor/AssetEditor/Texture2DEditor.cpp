@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "Texture2DEditor.h"
+#include "AssetObject/Texture2D.h"
 
 namespace FRAMEWORK
 {
@@ -8,7 +9,12 @@ namespace FRAMEWORK
 						.BaseClass<AssetOp>();
 	)
 
-	void Texture2DOp::Open(AssetObject* InObject)
+    ShReflectToy::MetaType* Texture2DOp::SupportAsset()
+    {
+        return ShReflectToy::GetMetaType<Texture2D>();
+    }
+
+	void Texture2DOp::Open(const FString& InAssetPath)
 	{
 
 	}

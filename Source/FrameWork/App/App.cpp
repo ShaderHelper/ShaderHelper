@@ -11,7 +11,6 @@
 #include "GpuApi/GpuRhi.h"
 
 namespace FRAMEWORK {
-
 	static void UE_Init(const TCHAR* CommandLine)
     {
 		FCommandLine::Set(CommandLine);
@@ -172,7 +171,10 @@ namespace FRAMEWORK {
 
 	void App::Render()
 	{
-
+        if(AppRenderer)
+        {
+            AppRenderer->Render();
+        }
 	}
 
 }
