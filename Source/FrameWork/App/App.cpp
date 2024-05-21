@@ -11,6 +11,7 @@
 #include "GpuApi/GpuRhi.h"
 
 namespace FRAMEWORK {
+	TUniquePtr<App> GApp;
 
 	static void UE_Init(const TCHAR* CommandLine)
     {
@@ -130,6 +131,7 @@ namespace FRAMEWORK {
 					Render();
 					FSlateApplication::Get().PumpMessages();
 					FSlateApplication::Get().Tick();
+                    FTicker::GetCoreTicker().Tick(DeltaTime);
 					//if not change GFrameCounter, slate texture may not update.
 					GFrameCounter++;
 				}
@@ -172,7 +174,10 @@ namespace FRAMEWORK {
 
 	void App::Render()
 	{
-
+        if(AppRenderer)
+        {
+            AppRenderer->Render();
+        }
 	}
 
 }

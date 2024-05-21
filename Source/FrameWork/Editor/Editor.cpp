@@ -48,13 +48,11 @@ namespace FRAMEWORK
 
 		SetLanguage(CurLanguage);
 		ResetGenericCommandsLabelAndTip();
-
-		FAppCommonStyle::Init();
 	}
 
 	Editor::~Editor()
 	{
-		FAppCommonStyle::ShutDown();
+	
 	}
 
 	void Editor::SetLanguage(SupportedLanguage InLanguage)

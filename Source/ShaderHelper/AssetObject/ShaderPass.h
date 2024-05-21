@@ -11,10 +11,10 @@ namespace SH
 	public:
 		void Serialize(FArchive& Ar) override;
 		FString FileExtension() const override;
-		FSlateBrush* GetImage() const override;
+		const FSlateBrush* GetImage() const override;
 
 	private:
-		FString ShaderText;
+		FString PixelShaderBody;
 	};
 
 }

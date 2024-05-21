@@ -11,6 +11,7 @@
 #include "UI/Widgets/AssetBrowser/AssetViewItem/AssetViewAssetItem.h"
 #include "UI/Styles/FAppCommonStyle.h"
 #include <Framework/Commands/GenericCommands.h>
+#include "Editor/AssetEditor/AssetEditor.h"
 
 namespace FRAMEWORK
 {
@@ -28,7 +29,7 @@ namespace FRAMEWORK
 		);
 
 		ContentPathShowed = InArgs._ContentPathShowed;
-		OnFolderDoubleClick = InArgs._OnFolderDoubleClick;
+        OnFolderOpen = InArgs._OnFolderOpen;
 
 		ChildSlot
 		[
@@ -168,7 +169,18 @@ namespace FRAMEWORK
                                     LOCALIZATION(CurAsset->FileExtension()),
                                     FText::GetEmpty(),
                                     FSlateIcon(),
-                                    FUIAction(),
+                                    FUIAction(FExecuteAction::CreateLambda([CurAsset, this] {
+                                        int32 Number = 1;
+                                        FString GeneratedFileName = "New" + CurAsset->FileExtension();
+                                        FString SavedFileName = CurViewDirectory / GeneratedFileName + "." + CurAsset->FileExtension();
+                                        while(IFileManager::Get().FileExists(*SavedFileName))
+                                        {
+                                            GeneratedFileName = FString::Format(TEXT("New{0} {1}"), { CurAsset->FileExtension(), Number++});
+                                            SavedFileName = CurViewDirectory / GeneratedFileName + "." + CurAsset->FileExtension();
+                                        }
+                                        TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFileName));
+                                        CurAsset->Serialize(*Ar);
+                                    })),
                                     NAME_None,
                                     EUserInterfaceActionType::Button
                                 );
@@ -194,11 +206,11 @@ namespace FRAMEWORK
 				FText::GetEmpty(),
 				FSlateIcon{ FAppCommonStyle::Get().GetStyleSetName(), "Icons.FolderPlus" },
 				FUIAction{ FExecuteAction::CreateLambda([this] {
-					int32 Number = 0;
-					FString NewDirectoryPath = *(CurViewDirectory / TEXT("New Folder"));
+					int32 Number = 1;
+					FString NewDirectoryPath = *(CurViewDirectory / TEXT("NewFolder"));
 					while(IFileManager::Get().DirectoryExists(*NewDirectoryPath))
 					{
-						NewDirectoryPath = *(CurViewDirectory / FString::Format(TEXT("New Folder {0}"), { Number++ }));
+						NewDirectoryPath = *(CurViewDirectory / FString::Format(TEXT("NewFolder {0}"), { Number++ }));
 					}
 					IFileManager::Get().MakeDirectory(*NewDirectoryPath);
 				})});
@@ -224,7 +236,8 @@ namespace FRAMEWORK
 				LOCALIZATION("Open"),
 				FText::GetEmpty(),
 				FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "Icons.FolderOpen" },
-				FUIAction{ FExecuteAction::CreateRaw(this, &SAssetView::OnHandleOpenAction) });
+				FUIAction{ FExecuteAction::CreateRaw(this, &SAssetView::OnHandleOpenAction, ViewItem)}
+            );
 			MenuBuilder.AddMenuEntry(FGenericCommands::Get().Rename);
 			MenuBuilder.AddMenuEntry(FGenericCommands::Get().Delete);
 		}
@@ -249,9 +262,9 @@ namespace FRAMEWORK
 	{
 		if (InFolderName == CurViewDirectory)
 		{
-			if (OnFolderDoubleClick)
+			if (OnFolderOpen)
 			{
-				OnFolderDoubleClick(FPaths::GetPath(InFolderName));
+                OnFolderOpen(FPaths::GetPath(InFolderName));
 			}
 			return;
 		}
@@ -293,11 +306,6 @@ namespace FRAMEWORK
 		SortViewItems();
 		AssetTileView->RequestListRefresh();
 	}
-
-    void SAssetView::CreateAsset()
-    {
-        
-    }
 
 	void SAssetView::ImportAsset()
 	{
@@ -389,13 +397,7 @@ namespace FRAMEWORK
 
 	void SAssetView::OnMouseButtonDoubleClick(TSharedRef<AssetViewItem> ViewItem)
 	{
-		if (ViewItem->IsOfType<AssetViewFolderItem>())
-		{
-			if (OnFolderDoubleClick)
-			{
-				OnFolderDoubleClick(ViewItem->GetPath());
-			}
-		}
+        OnHandleOpenAction(MoveTemp(ViewItem));
 	}
 
 	void SAssetView::OnHandleDeleteAction()
@@ -430,10 +432,33 @@ namespace FRAMEWORK
         }
 	}
 
-	void SAssetView::OnHandleOpenAction()
+	void SAssetView::OnHandleOpenAction(TSharedRef<AssetViewItem> ViewItem)
 	{
-		TArray<TSharedRef<AssetViewItem>> SelectedItems = AssetTileView->GetSelectedItems();
-		OnMouseButtonDoubleClick(SelectedItems[0]);
+        if (ViewItem->IsOfType<AssetViewFolderItem>())
+        {
+            if (OnFolderOpen)
+            {
+                OnFolderOpen(ViewItem->GetPath());
+            }
+        }
+        else if(ViewItem->IsOfType<AssetViewAssetItem>())
+        {
+            TArray<ShReflectToy::MetaType*> AssetOpMetaTypes = ShReflectToy::GetMetaTypes<AssetOp>();
+            for (auto MetaTypePtr : AssetOpMetaTypes)
+            {
+                void* AssetOpPtr = MetaTypePtr->GetDefaultObject();
+                if (AssetOpPtr)
+                {
+                    AssetOp* CurAssetOp = static_cast<AssetOp*>(AssetOpPtr);
+                    AssetObject* RelatedAssetDefaultObject = static_cast<AssetObject*>(CurAssetOp->SupportAsset()->GetDefaultObject());
+                    if(RelatedAssetDefaultObject->FileExtension() ==  FPaths::GetExtension(ViewItem->GetPath()))
+                    {
+                        CurAssetOp->Open(ViewItem->GetPath());
+                        break;
+                    }
+                }
+            }
+        }
 	}
 
 }

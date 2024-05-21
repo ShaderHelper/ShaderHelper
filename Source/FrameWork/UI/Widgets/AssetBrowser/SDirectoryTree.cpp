@@ -36,7 +36,7 @@ namespace FRAMEWORK
 			})
 			.OnExpansionChanged_Lambda([this](TSharedRef<DirectoryData> InData, bool bExpanded){
 				if (bExpanded) {
-					DirectoriesToExpand.Add(InData->DirectoryPath);
+					DirectoriesToExpand.AddUnique(InData->DirectoryPath);
 				}
 				else {
 					DirectoriesToExpand.Remove(InData->DirectoryPath);

@@ -11,13 +11,8 @@ namespace SH {
 		~ShaderHelperApp();
 
 	private:
-		void InitEditor();
 		void Update(double DeltaTime) override;
 		void Render() override;
-
-	private:
-		TUniquePtr<ShRenderer> Renderer;
-		TUniquePtr<ShaderHelperEditor> Editor;
 	};
 	
 }

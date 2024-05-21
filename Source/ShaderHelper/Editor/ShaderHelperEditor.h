@@ -3,6 +3,8 @@
 #include "Renderer/ShRenderer.h"
 #include "Editor/Editor.h"
 #include "Editor/PreviewViewPort.h"
+#include "AssetObject/ShaderPass.h"
+#include "AssetManager/AssetManager.h"
 
 namespace SH 
 {
@@ -21,16 +23,19 @@ namespace SH
 		ShaderHelperEditor(const FRAMEWORK::Vector2f& InWindowSize, ShRenderer* InRenderer);
 		~ShaderHelperEditor();
 
-		void ResetWindow(bool bResetWindowLayout);
+		void ResetWindowLayout();
 		WindowLayoutConfigInfo LoadWindowLayout(const FString& InWindowLayoutConfigFileName);
 		void SaveWindowLayout(const TSharedRef<FTabManager::FLayout>& InLayout);
 		void LoadEditorState(const FString& InFile);
 		void SaveEditorState();
-		void OnViewportResize(const FRAMEWORK::Vector2f& InSize);;
+		void OnViewportResize(const FRAMEWORK::Vector2f& InSize);
+        
+        void OpenShaderPassTab(FRAMEWORK::AssetPtr<ShaderPass> InShaderPass);
 		
 	private:
 		TSharedRef<SDockTab> SpawnWindowTab(const FSpawnTabArgs& Args);
-		TSharedRef<SWidget> CreateMenuBar();
+        TSharedRef<SDockTab> SpawnShaderPassTab(const FSpawnTabArgs& Args);
+        FMenuBarBuilder CreateMenuBarBuilder();
 		void FillMenu(FMenuBuilder& MenuBuilder, FString MenuName);
 		void InitEditorUI();
 
@@ -39,14 +44,21 @@ namespace SH
 		
 	private:
 		ShRenderer* Renderer;
-		bool bReInitEditor = false;
 		TSharedPtr<FTabManager::FLayout> DefaultTabLayout;
 		TSharedPtr<SDockTab> TabManagerTab;
 		TSharedPtr<FTabManager> TabManager;
+        FDelegateHandle SaveLayoutTicker;
+        
+        TSharedPtr<SDockTab> CodeTab;
+        TSharedPtr<FTabManager> CodeTabManager;
+        TWeakPtr<class SDockingTabStack> LastActivedShaderPassTabStack;
+        TSharedPtr<class SDockingArea> CodeTabMainArea;
+        
 		TSharedPtr<SWindow> Window;
 		TSharedPtr<FRAMEWORK::PreviewViewPort> ViewPort;
 		FVector2D WindowSize;
 
+        TSharedPtr<SVerticalBox> WindowContentBox;
 		TWeakPtr<SBox> PropertyViewBox;
 
 		struct EditorState
@@ -57,6 +69,8 @@ namespace SH
 			float AssetViewSize = 60;
 			FString SelectedDirectory;
 			TArray<FString> DirectoriesToExpand;
+            TSharedPtr<FTabManager::FLayout> CodeTabLayout;
+            TMap<FRAMEWORK::AssetPtr<ShaderPass>, TSharedPtr<SDockTab>> OpenedShaderPasses;
 		} CurEditorState;
 		FString EditorStateSaveFileName;
 	};

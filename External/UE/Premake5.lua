@@ -16,6 +16,11 @@ ue_module = {
     "DirectoryWatcher"
 }
 
+function addPrivateIncludeDir_ue(ueModuleName)
+    local ueSrcDir = _WORKING_DIR .. "/External/UE/Src/"
+    externalincludedirs(ueSrcDir .. ueModuleName .. "/Private")
+end
+
 function generateIncludeDir_ue()
     local ueSrcDir = _WORKING_DIR .. "/External/UE/Src/"
     local ueUhtDir = _WORKING_DIR .. "/External/UE/Src/UHT/"

@@ -11,9 +11,6 @@ namespace UNITTEST_GPUAPI
 		UnitTestApp(const FRAMEWORK::Vector2D& InClientSize, const TCHAR* CommandLine);
 		void Update(double DeltaTime) override;
 		void Render() override;
-
-	private:
-		TUniquePtr<UnitTestEditor> Editor;
 	};
 }
 

@@ -3,7 +3,7 @@ echo
 CurrentPath="$(cd "$(dirname "$0")" && pwd)"
 cd "$CurrentPath"
 
-function Error() {
+Error() {
     echo "Erros encountered during execution."
     echo
     exit 1

@@ -19,6 +19,8 @@ project "ShaderHelper"
 		"FrameWork",
 	}
 
+    addPrivateIncludeDir_ue("Slate")
+
     filter "system:windows"
         files {"%{_WORKING_DIR}/Resource/Misc/Windows/*"}
         vpaths {["Resource"] = "%{_WORKING_DIR}/Resource/Misc/Windows/*"}

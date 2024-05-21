@@ -12,25 +12,21 @@ using namespace FRAMEWORK;
 
 namespace SH {
 
-	void FShaderHelperStyle::Init()
-	{
-		if (!Instance.IsValid()) {
-			Instance = Create();
-			FSlateStyleRegistry::RegisterSlateStyle(Get());
-		}
-	}
-
-	void FShaderHelperStyle::ShutDown()
-	{
-		if (Instance.IsValid()) {
-			FSlateStyleRegistry::UnRegisterSlateStyle(Get());
-			Instance.Reset();
-		}
-	}
+    const ISlateStyle& FShaderHelperStyle::Get()
+    {
+        if (!Instance.IsValid()) {
+            Instance = Create();
+            FSlateStyleRegistry::RegisterSlateStyle(Get());
+        }
+        return *Instance;
+    }
 
 	TSharedRef<ISlateStyle> FShaderHelperStyle::Create()
 	{
 		TSharedRef<FSlateStyleSet> Style = MakeShared<FSlateStyleSet>("ShaderHelperStyle");
+        Style->SetContentRoot(BaseResourcePath::Custom_SlateResourceDir);
+        Style->Set("AssetBrowser.ShaderPass", new IMAGE_BRUSH_SVG("ShaderPass", FVector2D(64.0, 64.0)));
+        
 		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir);
 
 		FTableRowStyle LineNumberItemStyle;

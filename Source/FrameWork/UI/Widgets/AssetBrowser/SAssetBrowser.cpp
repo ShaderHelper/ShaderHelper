@@ -37,7 +37,7 @@ namespace FRAMEWORK
 
 		SAssignNew(AssetView, SAssetView)
 			.ContentPathShowed(InArgs._ContentPathShowed)
-			.OnFolderDoubleClick([this](const FString& FolderPath) {
+			.OnFolderOpen([this](const FString& FolderPath) {
 				DirectoryTree->SetExpansion(FPaths::GetPath(FolderPath));
 				DirectoryTree->SetSelection(FolderPath);
 			});

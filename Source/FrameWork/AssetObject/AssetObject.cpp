@@ -1,6 +1,7 @@
 #include "CommonHeader.h"
 #include "AssetObject.h"
 #include "Common/Util/Reflection.h"
+#include "AssetManager/AssetManager.h"
 
 namespace FRAMEWORK
 {
@@ -17,5 +18,10 @@ namespace FRAMEWORK
 	{
 		Ar << Guid;
 	}
+
+    FString AssetObject::GetFileName() const
+    {
+        return FPaths::GetBaseFilename(TSingleton<AssetManager>::Get().GetPath(Guid));
+    }
 
 }

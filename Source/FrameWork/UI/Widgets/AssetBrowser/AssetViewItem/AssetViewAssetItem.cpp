@@ -4,6 +4,7 @@
 #include <Widgets/Text/SInlineEditableTextBlock.h>
 #include <Widgets/SViewport.h>
 #include "AssetManager/AssetManager.h"
+#include "UI/Widgets/MessageDialog/SMessageDialog.h"
 
 namespace FRAMEWORK
 {
@@ -113,7 +114,14 @@ namespace FRAMEWORK
                             + FPaths::GetExtension(Path);
                         if(NewFilePath != Path)
                         {
-                            IFileManager::Get().Move(*NewFilePath, *Path);
+                            if(IFileManager::Get().FileExists(*NewFilePath))
+                            {
+                                MessageDialog::Open(MessageDialog::Ok, LOCALIZATION("AssetRenameFailure"));
+                            }
+                            else
+                            {
+                                IFileManager::Get().Move(*NewFilePath, *Path);
+                            }
                         }
                     })
                     .OverflowPolicy(ETextOverflowPolicy::Ellipsis)

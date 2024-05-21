@@ -31,4 +31,4 @@ First run `downloadDep.bat` to get external dependencies, then open the `.sln` f
 * x86_64 or arm64
 * Xcode
 
-First run `downloadDep.command` to get external dependencies, then open the `.xcworkspace` file created after running `bootstrap.command` and build the project.
+First run `downloadDep.sh` to get external dependencies, then open the `.xcworkspace` file created after running `bootstrap.sh` and build the project.

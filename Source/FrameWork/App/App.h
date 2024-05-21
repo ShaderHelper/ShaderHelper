@@ -1,5 +1,6 @@
 #pragma once
 #include "Common/Util/SwizzleVector.h"
+#include "Editor/Editor.h"
 #include "Renderer/Renderer.h"
 namespace FRAMEWORK {
 	class FRAMEWORK_API App : public FNoncopyable
@@ -11,16 +12,25 @@ namespace FRAMEWORK {
 	public:
 		void Run();
 		bool AreAllWindowsHidden() const;
+        
+        Editor* GetEditor() const { return AppEditor.Get(); }
+        Renderer* GetRenderer() const { return AppRenderer.Get(); }
 		
 	protected:
 		virtual void Update(double DeltaTime);
 		virtual void Render();
+        
+    public:
+        TUniquePtr<Editor> AppEditor;
+        TUniquePtr<Renderer> AppRenderer;
 
 	protected:		
 		Vector2D AppClientSize;
 		double DeltaTime;
 		double FixedDeltaTime = 1 / 30;
 	};
+
+    FRAMEWORK_API extern TUniquePtr<App> GApp;
 }
 
 

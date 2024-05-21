@@ -8,6 +8,7 @@ namespace SH
 	public:
 		ShaderPassOp() = default;
 
-		void Open(FRAMEWORK::AssetObject* InObject) override;
+        struct FRAMEWORK::ShReflectToy::MetaType* SupportAsset() override;
+		void Open(const FString& InAssetPath) override;
 	};
 }
