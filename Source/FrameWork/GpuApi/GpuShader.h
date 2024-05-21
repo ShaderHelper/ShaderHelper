@@ -31,6 +31,7 @@ namespace FRAMEWORK
         TOptional<FString> GetFileName() const { return FileName; }
         const TArray<FString>& GetIncludeDirs() const { return IncludeDirs; }
         
+        const FString& GetShaderName() const { return ShaderName; }
         ShaderType GetShaderType() const {return Type;}
         const FString& GetSourceText() const { return SourceText; }
         const FString& GetEntryPoint() const { return EntryPoint; }

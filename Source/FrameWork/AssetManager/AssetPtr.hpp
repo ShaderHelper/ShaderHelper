@@ -66,6 +66,12 @@ namespace FRAMEWORK
 		return Guid;
 	}
 
+    template<typename T>
+    AssetPtr<T>::operator bool() const
+    {
+        return Asset != nullptr;
+    }
+
     template<typename T1, typename T2>
     bool operator==(const AssetPtr<T1>& Lhs, const AssetPtr<T2>& Rhs)
     {

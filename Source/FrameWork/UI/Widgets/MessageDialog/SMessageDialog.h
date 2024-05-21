@@ -8,6 +8,6 @@ namespace FRAMEWORK::MessageDialog
 		OkCancel,
 	};
 
-	FRAMEWORK_API bool Open(MessageType MsgType, const FText& InMessage);
+	FRAMEWORK_API bool Open(MessageType MsgType, const TAttribute<FText>& InMessage);
 	
 }

@@ -34,7 +34,8 @@ namespace SH
 		
 	private:
 		TSharedRef<SDockTab> SpawnWindowTab(const FSpawnTabArgs& Args);
-		TSharedRef<SWidget> CreateMenuBar();
+        TSharedRef<SDockTab> SpawnShaderPassTab(const FSpawnTabArgs& Args);
+        FMenuBarBuilder CreateMenuBarBuilder();
 		void FillMenu(FMenuBuilder& MenuBuilder, FString MenuName);
 		void InitEditorUI();
 
@@ -46,6 +47,13 @@ namespace SH
 		TSharedPtr<FTabManager::FLayout> DefaultTabLayout;
 		TSharedPtr<SDockTab> TabManagerTab;
 		TSharedPtr<FTabManager> TabManager;
+        FDelegateHandle SaveLayoutTicker;
+        
+        TSharedPtr<SDockTab> CodeTab;
+        TSharedPtr<FTabManager> CodeTabManager;
+        TWeakPtr<class SDockingTabStack> LastActivedShaderPassTabStack;
+        TSharedPtr<class SDockingArea> CodeTabMainArea;
+        
 		TSharedPtr<SWindow> Window;
 		TSharedPtr<FRAMEWORK::PreviewViewPort> ViewPort;
 		FVector2D WindowSize;
@@ -61,7 +69,7 @@ namespace SH
 			float AssetViewSize = 60;
 			FString SelectedDirectory;
 			TArray<FString> DirectoriesToExpand;
-            
+            TSharedPtr<FTabManager::FLayout> CodeTabLayout;
             TMap<FRAMEWORK::AssetPtr<ShaderPass>, TSharedPtr<SDockTab>> OpenedShaderPasses;
 		} CurEditorState;
 		FString EditorStateSaveFileName;

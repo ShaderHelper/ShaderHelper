@@ -127,7 +127,7 @@ namespace FRAMEWORK::MessageDialog
 
 	}
 
-	bool Open(MessageType MsgType, const FText& InMessage)
+	bool Open(MessageType MsgType, const TAttribute<FText>& InMessage)
 	{
 		bool Result;
 
@@ -144,7 +144,7 @@ namespace FRAMEWORK::MessageDialog
 			.ReturnResult(&Result)
 			.MsgType(MsgType)
 			.ParentWindow(&*ModalWindow)
-			.Message(InMessage);
+			.Message(InMessage.Get());
 
 		ModalWindow->SetContent(MessageDialog);
 		FSlateApplication::Get().AddModalWindow(ModalWindow, nullptr);

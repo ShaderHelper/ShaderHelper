@@ -2,6 +2,7 @@
 #include "MetalShader.h"
 #include "MetalDevice.h"
 #include "ShaderConductor.hpp"
+#include "Common/Path/PathHelper.h"
 
 namespace FRAMEWORK
 {
@@ -120,6 +121,9 @@ namespace FRAMEWORK
         }
         
         FString MslSourceText = {static_cast<const char*>(Result.target.Data()), (int32)Result.target.Size()};
+#if DEBUG_SHADER
+        FFileHelper::SaveStringToFile(MslSourceText, *(PathHelper::SavedShaderDir() / InShader->GetShaderName() + ".metal"));
+#endif
         InShader->SetMslText(MoveTemp(MslSourceText));
         
         FString MslErrorInfo;

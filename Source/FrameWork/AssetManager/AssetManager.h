@@ -31,6 +31,8 @@ namespace FRAMEWORK
 
 		T* Get() const;
 		FGuid GetGuid() const;
+        
+        explicit operator bool() const;
 
 	private:
 		T* Asset;
@@ -69,10 +71,16 @@ namespace FRAMEWORK
 			}
 			check(NewAssetObject);
 			TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*InAssetPath));
-			NewAssetObject->Serialize(*Ar);
-			NewAssetObject->PostLoad();
-			Assets.Add(Guid, NewAssetObject);
-			return { static_cast<T*>(NewAssetObject), Guid };
+            if(Ar)
+            {
+                NewAssetObject->Serialize(*Ar);
+                NewAssetObject->PostLoad();
+                Assets.Add(Guid, NewAssetObject);
+                return { static_cast<T*>(NewAssetObject), Guid };
+            }
+            
+            //Failed to load the asset
+            return nullptr;
 		}
 
 		template<typename T>

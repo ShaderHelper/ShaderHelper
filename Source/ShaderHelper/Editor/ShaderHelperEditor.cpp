@@ -10,7 +10,8 @@
 #include "Common/Path/PathHelper.h"
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "magic_enum.hpp"
-#include "UI/Widgets/Misc/CommonDockTab.h"
+#include <Framework/Docking/SDockingTabStack.h>
+#include "UI/Widgets/SShaderPassTab.h"
 
 using namespace FRAMEWORK;
 
@@ -24,7 +25,7 @@ namespace SH
 	const FName PropretyTabId = "Propety";
 
 	const FName CodeTabId = "Code";
-    const FName InsertPointTabId = "CodeInsertPoint";
+    const FName InitialInsertPointTabId = "CodeInsertPoint";
 
     const FName AssetTabId = "Asset";
 
@@ -46,6 +47,7 @@ namespace SH
 		ViewPort->OnViewportResize.AddRaw(this, &ShaderHelperEditor::OnViewportResize);
 
 		EditorStateSaveFileName = TSingleton<ShProjectManager>::Get().GetActiveSavedDirectory() / TEXT("EditorState.json");
+        
 		LoadEditorState(EditorStateSaveFileName);
 		InitEditorUI();
 	}
@@ -94,7 +96,6 @@ namespace SH
 					FTabManager::NewStack()
 					->SetSizeCoefficient(0.45f)
 					->AddTab(CodeTabId, ETabState::OpenedTab)
-                    ->AddTab(InsertPointTabId, ETabState::ClosedTab)
 				)
                 ->Split
                  (
@@ -128,13 +129,16 @@ namespace SH
 		TabManagerTab->AssignParentWidget(Window);
 
 		FSlateApplication::Get().AddWindow(Window.ToSharedRef());
+        
+        auto MenuBarBuilder = CreateMenuBarBuilder();
+        auto MenuBarWidget = MenuBarBuilder.MakeWidget();
 
 		Window->SetContent(
 			SAssignNew(WindowContentBox, SVerticalBox)
 			+SVerticalBox::Slot()
 			.AutoHeight()
 			[
-				CreateMenuBar()
+                MenuBarWidget
 			]
 			+ SVerticalBox::Slot()
 			.FillHeight(1.0f)
@@ -142,12 +146,51 @@ namespace SH
 				TabManager->RestoreFrom(UsedLayout, Window).ToSharedRef()
 			]
 		);
+        TabManager->FindExistingLiveTab(CodeTabId)->GetParentDockTabStack()->SetCanDropToAttach(false);
+        
+        //Add native menu bar for the window on mac.
+        TabManager->SetMenuMultiBox(MenuBarBuilder.GetMultiBox(), MenuBarWidget);
+        TabManager->UpdateMainMenu(nullptr, true);
+        
+        SaveLayoutTicker = FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this](float) {
+            TabManager->SavePersistentLayout();
+            CurEditorState.CodeTabLayout = CodeTabManager->PersistLayout();
+            SaveEditorState();
+            return true;
+        }), 2.0f);
         
 		Window->SetRequestDestroyWindowOverride(FRequestDestroyWindowOverride::CreateLambda([this](const TSharedRef<SWindow>& InWindow) {
 			TabManager->SavePersistentLayout();
+            CurEditorState.CodeTabLayout = CodeTabManager->PersistLayout();
+            SaveEditorState();
 			FSlateApplication::Get().RequestDestroyWindow(InWindow);
 		}));
 	}
+
+    TSharedRef<SDockTab> ShaderHelperEditor::SpawnShaderPassTab(const FSpawnTabArgs& Args)
+    {
+        FGuid ShaderPassGuid{Args.GetTabId().ToString()};
+        auto LoadedShaderPass = TSingleton<AssetManager>::Get().LoadAssetByGuid<ShaderPass>(ShaderPassGuid);
+        auto NewShaderPassTab = SNew(SShaderPassTab)
+            .TabRole(ETabRole::DocumentTab)
+            .Label_Lambda([LoadedShaderPass] { return FText::FromString(LoadedShaderPass->GetFileName());})
+            .OnTabClosed_Lambda([=](TSharedRef<SDockTab> ClosedTab) {
+                CurEditorState.OpenedShaderPasses.Remove(*CurEditorState.OpenedShaderPasses.FindKey(ClosedTab));
+                //Do not persist the tab being closed.
+                ClosedTab->GetParentDockTabStack()->OnTabRemoved(Args.GetTabId());
+            });
+        NewShaderPassTab->SetTabIcon(LoadedShaderPass->GetImage());
+        NewShaderPassTab->SetOnTabActivated(SDockTab::FOnTabActivatedCallback::CreateLambda([this](TSharedRef<SDockTab> InTab, ETabActivationCause) {
+            if(!CodeTabMainArea) return;
+            
+            if(TSharedPtr<SDockingTabStack> TabStack = CodeTabManager->FindTabInLiveArea(FTabMatcher{InTab->GetLayoutIdentifier()}, CodeTabMainArea.ToSharedRef()))
+            {
+                LastActivedShaderPassTabStack = TabStack;
+            }
+        }));
+        CurEditorState.OpenedShaderPasses.Add(LoadedShaderPass, NewShaderPassTab);
+        return NewShaderPassTab;
+    }
 
 	TSharedRef<SDockTab> ShaderHelperEditor::SpawnWindowTab(const FSpawnTabArgs& Args)
 	{
@@ -176,20 +219,61 @@ namespace SH
 			);
 		}
 		else if (TabId == CodeTabId) {
-            SpawnedTab = SNew(SDockTab)
-            .Visibility(EVisibility::Collapsed)
-            [
-                SNew(SVerticalBox)
-                + SVerticalBox::Slot()
-                .VAlign(VAlign_Center)
-                .HAlign(HAlign_Center)
-                [
-                    SNew(STextBlock)
-                    .Text(LOCALIZATION("CodeTabTip"))
-                    .Font(FShaderHelperStyle::Get().GetFontStyle("CodeFont"))
-                ]
-           
-            ];
+            //Use the previous CodeTab when resetting whindow layout.
+            if(CodeTab) {
+                return CodeTab.ToSharedRef();
+            }
+            
+            SpawnedTab = SAssignNew(CodeTab, SDockTab)
+                .Visibility(EVisibility::Collapsed);
+            
+            CodeTabManager = FGlobalTabmanager::Get()->NewTabManager(SpawnedTab.ToSharedRef());
+            
+            for(const auto& [OpenedShaderPass, _] : CurEditorState.OpenedShaderPasses)
+            {
+                FName ShaderPassTabId{*OpenedShaderPass.GetGuid().ToString()};
+                CodeTabManager->RegisterTabSpawner(ShaderPassTabId, FOnSpawnTab::CreateRaw(this, &ShaderHelperEditor::SpawnShaderPassTab));
+            }
+ 
+            if(!CurEditorState.CodeTabLayout)
+            {
+                CurEditorState.CodeTabLayout = FTabManager::NewLayout("CodeTabLayout")
+                ->AddArea
+                (
+                    FTabManager::NewPrimaryArea()
+                    ->Split
+                    (
+                        FTabManager::NewStack()
+                        ->AddTab(InitialInsertPointTabId, ETabState::ClosedTab)
+                    )
+                 ) , Args.GetOwnerWindow();
+            }
+            
+            auto MenuBarBuilder = CreateMenuBarBuilder();
+            auto MenuBarWidget = MenuBarBuilder.MakeWidget();
+            CodeTabManager->SetMenuMultiBox(MenuBarBuilder.GetMultiBox(), MenuBarWidget);
+            CodeTabManager->UpdateMainMenu(nullptr, true);
+            
+            SpawnedTab->SetContent(
+               SNew(SOverlay)
+               +SOverlay::Slot()
+               [
+                   SNew(SVerticalBox)
+                   + SVerticalBox::Slot()
+                   .VAlign(VAlign_Center)
+                   .HAlign(HAlign_Center)
+                   [
+                       SNew(STextBlock)
+                       .Text(LOCALIZATION("CodeTabTip"))
+                       .Font(FShaderHelperStyle::Get().GetFontStyle("CodeFont"))
+                   ]
+               ]
+               +SOverlay::Slot()
+               [
+                   CodeTabManager->RestoreFrom(CurEditorState.CodeTabLayout.ToSharedRef(), Args.GetOwnerWindow()).ToSharedRef()
+               ]
+           );
+            CodeTabMainArea = CodeTabManager->FindPotentiallyClosedTab(InitialInsertPointTabId)->GetDockArea();
 //			SpawnedTab->SetLabel(LOCALIZATION(CodeTabId.ToString()));
 //			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Edit"));
 //			SpawnedTab->SetContent(
@@ -234,25 +318,34 @@ namespace SH
         {
             TabManager->RegisterTabSpawner(TabId, FOnSpawnTab::CreateRaw(this, &ShaderHelperEditor::SpawnWindowTab));
         }
+        
+        TabManager->CloseAllAreas();
         WindowContentBox->GetSlot(1).AttachWidget(TabManager->RestoreFrom(DefaultTabLayout.ToSharedRef(), Window).ToSharedRef());
+        TabManager->FindExistingLiveTab(CodeTabId)->GetParentDockTabStack()->SetCanDropToAttach(false);
 	}
 
     void ShaderHelperEditor::OpenShaderPassTab(AssetPtr<ShaderPass> InShaderPass)
     {
-        if(!CurEditorState.OpenedShaderPasses.Contains(InShaderPass))
+        TSharedPtr<SDockTab>* TabPtr = CurEditorState.OpenedShaderPasses.Find(InShaderPass);
+        if(TabPtr == nullptr || !*TabPtr)
         {
-            auto NewShaderPassTab = SNew(SDockTab)
-                .Label_Lambda([InShaderPass] { return FText::FromString(InShaderPass->GetFileName());})
-                .OnTabClosed_Lambda([this](TSharedRef<SDockTab> ClosedTab) {
-                    CurEditorState.OpenedShaderPasses.Remove(*CurEditorState.OpenedShaderPasses.FindKey(ClosedTab));
-                });
-            TabManager->InsertNewDocumentTab(InsertPointTabId, FTabManager::ESearchPreference::RequireClosedTab, NewShaderPassTab);
-            
-            CurEditorState.OpenedShaderPasses.Add(InShaderPass, NewShaderPassTab);
+            FName ShaderPassTabId{*InShaderPass->GetGuid().ToString()};
+            auto NewShaderPassTab = SpawnShaderPassTab({Window, ShaderPassTabId});
+            if(LastActivedShaderPassTabStack.IsValid() && LastActivedShaderPassTabStack.Pin()->GetAllChildTabs().IsValidIndex(0))
+            {
+                auto FirstTab = LastActivedShaderPassTabStack.Pin()->GetAllChildTabs()[0];
+                CodeTabManager->InsertNewDocumentTab(FirstTab->GetLayoutIdentifier().TabType, ShaderPassTabId, FTabManager::FLiveTabSearch{}, NewShaderPassTab, true);
+            }
+            else
+            {
+                CodeTabManager->InsertNewDocumentTab(InitialInsertPointTabId, ShaderPassTabId, FTabManager::FRequireClosedTab{}, NewShaderPassTab, true);
+            }
+          
         }
         else
         {
-            CurEditorState.OpenedShaderPasses[InShaderPass]->ActivateInParent(ETabActivationCause::SetDirectly);
+            (*TabPtr)->ActivateInParent(ETabActivationCause::SetDirectly);
+            FSlateApplication::Get().SetAllUserFocus(*TabPtr);
         }
     }
 
@@ -341,7 +434,7 @@ namespace SH
 		ViewPort->SetViewPortRenderTexture(Renderer->GetFinalRT());
 	}
 
-	TSharedRef<SWidget> ShaderHelperEditor::CreateMenuBar()
+    FMenuBarBuilder ShaderHelperEditor::CreateMenuBarBuilder()
 	{
 		FMenuBarBuilder MenuBarBuilder = FMenuBarBuilder(TSharedPtr<FUICommandList>());
 		MenuBarBuilder.AddPullDownMenu(
@@ -359,13 +452,7 @@ namespace SH
 			FText::GetEmpty(),
 			FNewMenuDelegate::CreateRaw(this, &ShaderHelperEditor::FillMenu, FString("Window"))
 		);
-        
-        TSharedRef<SWidget> MenuWidget = MenuBarBuilder.MakeWidget();
-        //Add native menu bar for the window on mac.
-        TabManager->SetMenuMultiBox(MenuBarBuilder.GetMultiBox(), MenuWidget);
-        TabManager->UpdateMainMenu(nullptr, true);
-        
-        return MenuWidget;
+        return MenuBarBuilder;
 	}
 
 	void ShaderHelperEditor::FillMenu(FMenuBuilder& MenuBuilder, FString MenuName)
@@ -426,6 +513,7 @@ namespace SH
 									[this, Lang]()
 									{
 										Editor::SetLanguage(Lang);
+                                        TabManager->UpdateMainMenu(nullptr, true);
 									}),
 								FCanExecuteAction(),
 								FIsActionChecked::CreateLambda(
@@ -486,6 +574,18 @@ namespace SH
 				TSingleton<ShProjectManager>::Get().ConvertRelativePathToFull(JsonRelativeDirectory->AsString())
 			);
 		}
+        TArray<TSharedPtr<FJsonValue>> JsonOpenedShaderPasses = InJson->GetArrayField("OpenedShaderPasses");
+        for(const auto& JsonOpenedShaderPass : JsonOpenedShaderPasses)
+        {
+            auto LoadedShaderPass = TSingleton<AssetManager>::Get().LoadAssetByGuid<ShaderPass>(FGuid(JsonOpenedShaderPass->AsString()));
+            if(LoadedShaderPass)
+            {
+                OpenedShaderPasses.Add(MoveTemp(LoadedShaderPass), nullptr);
+            }
+        }
+        
+        TSharedPtr<FJsonObject> CodeTabLayoutJsonObject = InJson->GetObjectField(TEXT("CodeTabLayout"));
+        CodeTabLayout = FTabManager::FLayout::NewFromJson(MoveTemp(CodeTabLayoutJsonObject));
 	}
 
 	TSharedRef<FJsonObject> ShaderHelperEditor::EditorState::ToJson() const
@@ -502,8 +602,23 @@ namespace SH
 				TSingleton<ShProjectManager>::Get().GetRelativePathToProject(Directory));
 			JsonRelativeDirectories.Add(MoveTemp(JsonRelativeDriectory));
 		}
-
-		JsonObject->SetArrayField("RelativeDirectoriesToExpand", MoveTemp(JsonRelativeDirectories));
+        JsonObject->SetArrayField("RelativeDirectoriesToExpand", JsonRelativeDirectories);
+        
+        TArray<TSharedPtr<FJsonValue>> JsonOpenedShaderPasses;
+        for(const auto& [OpenedShaderPass, _] : OpenedShaderPasses)
+        {
+            TSharedPtr<FJsonValue> JsonShaderPassGuid = MakeShared<FJsonValueString>(OpenedShaderPass->GetGuid().ToString());
+            JsonOpenedShaderPasses.Add(MoveTemp(JsonShaderPassGuid));
+        }
+        JsonObject->SetArrayField("OpenedShaderPasses", JsonOpenedShaderPasses);
+        
+        if(CodeTabLayout)
+        {
+            TSharedRef<FJsonObject> CodeTabLayoutJsonObject = CodeTabLayout->ToJson();
+            JsonObject->SetObjectField("CodeTabLayout", CodeTabLayoutJsonObject);
+        }
+  
+        
 		return JsonObject;
 	}
 
