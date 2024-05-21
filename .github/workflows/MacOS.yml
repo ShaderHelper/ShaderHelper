@@ -22,12 +22,12 @@ jobs:
 
       - name: download dependency
         working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: ./downloadDep.command
+        run: ./downloadDep.sh
         shell: sh
 
       - name: Generate Project
         working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: ./bootstrap.command -UniversalBinary
+        run: ./bootstrap.sh -UniversalBinary
         shell: sh
 
       - name: Build solution

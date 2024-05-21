@@ -30,7 +30,7 @@ namespace FRAMEWORK {
 		double FixedDeltaTime = 1 / 30;
 	};
 
-    FRAMEWORK_API inline TUniquePtr<App> GApp;
+    FRAMEWORK_API extern TUniquePtr<App> GApp;
 }
 
 

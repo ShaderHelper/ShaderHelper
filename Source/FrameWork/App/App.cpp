@@ -11,6 +11,8 @@
 #include "GpuApi/GpuRhi.h"
 
 namespace FRAMEWORK {
+	TUniquePtr<App> GApp;
+
 	static void UE_Init(const TCHAR* CommandLine)
     {
 		FCommandLine::Set(CommandLine);

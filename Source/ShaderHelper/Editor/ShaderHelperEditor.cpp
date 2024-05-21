@@ -151,14 +151,14 @@ namespace SH
         //Add native menu bar for the window on mac.
         TabManager->SetMenuMultiBox(MenuBarBuilder.GetMultiBox(), MenuBarWidget);
         TabManager->UpdateMainMenu(nullptr, true);
-        
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
         SaveLayoutTicker = FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this](float) {
             TabManager->SavePersistentLayout();
             CurEditorState.CodeTabLayout = CodeTabManager->PersistLayout();
             SaveEditorState();
             return true;
         }), 2.0f);
-        
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		Window->SetRequestDestroyWindowOverride(FRequestDestroyWindowOverride::CreateLambda([this](const TSharedRef<SWindow>& InWindow) {
 			TabManager->SavePersistentLayout();
             CurEditorState.CodeTabLayout = CodeTabManager->PersistLayout();
