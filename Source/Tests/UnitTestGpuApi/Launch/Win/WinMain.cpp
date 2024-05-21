@@ -11,6 +11,6 @@ int WINAPI WinMain(_In_ HINSTANCE hInInstance, _In_opt_ HINSTANCE hPrevInstance,
        FVector2D{ 800, 600 },
        GetCommandLineW()
     );
-    FRAMEWORK::GApp.Run();
+    FRAMEWORK::GApp->Run();
 	return 0;
 }
