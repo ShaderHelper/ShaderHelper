@@ -131,7 +131,9 @@ namespace FRAMEWORK {
 					Render();
 					FSlateApplication::Get().PumpMessages();
 					FSlateApplication::Get().Tick();
-                    FTicker::GetCoreTicker().Tick(DeltaTime);
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
+                    FTicker::GetCoreTicker().Tick((float)DeltaTime);
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 					//if not change GFrameCounter, slate texture may not update.
 					GFrameCounter++;
 				}

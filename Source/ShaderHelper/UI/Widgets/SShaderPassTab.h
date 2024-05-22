@@ -16,7 +16,7 @@ namespace SH {
                 .HAlign(HAlign_Right)
                 [
                     SNew(STextBlock)
-                    .ColorAndOpacity(FLinearColor{0.5f,0.5f,0.5f,0.3f})
+                    .ColorAndOpacity(FLinearColor{0.5f,0.5f,0.5f,0.4f})
                     .Text(FText::FromString("|"))
                     .Visibility(this, &SShaderPassTab::HandleEndMarkIsVisible)
                 ]

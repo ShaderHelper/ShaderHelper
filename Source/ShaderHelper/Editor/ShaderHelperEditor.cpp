@@ -180,6 +180,12 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                 ClosedTab->GetParentDockTabStack()->OnTabRemoved(Args.GetTabId());
             });
         NewShaderPassTab->SetTabIcon(LoadedShaderPass->GetImage());
+		NewShaderPassTab->SetOnTabRelocated(FSimpleDelegate::CreateLambda([=] {
+			if (TSharedPtr<SDockingTabStack> TabStack = CodeTabManager->FindTabInLiveArea(FTabMatcher{ NewShaderPassTab->GetLayoutIdentifier() }, CodeTabMainArea.ToSharedRef()))
+			{
+				LastActivedShaderPassTabStack = TabStack;
+			}
+		}));
         NewShaderPassTab->SetOnTabActivated(SDockTab::FOnTabActivatedCallback::CreateLambda([this](TSharedRef<SDockTab> InTab, ETabActivationCause) {
             if(!CodeTabMainArea) return;
             
