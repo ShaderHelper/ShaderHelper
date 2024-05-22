@@ -32,6 +32,9 @@ project "FrameWork"
 
     filter {"system:windows","files:**/Metal/*.cpp"}
         flags {"ExcludeFromBuild"}
+    
+    filter {"system:linux","files:**/Dx12/*.cpp or **/Metal/*.cpp"}
+        flags {"ExcludeFromBuild"}
 
     filter "system:windows"
         pchheader "CommonHeader.h"
@@ -58,6 +61,8 @@ project "FrameWork"
             "Metal.framework",
             "CoreVideo.framework",
         }
+    filter "system:linux"
+        rtti "Off"
 
 usage "FrameWork"
     --Note that "DLLIMPORT" macro is defined by UE module. (see MacPlatform.h, WindowsPlatform.h)

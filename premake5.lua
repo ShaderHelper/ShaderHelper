@@ -94,6 +94,20 @@ workspace "ShaderHelper"
             }
         end
 
+    filter "system:linux"
+        architecture "x86_64"
+        targetname "%{prj.name}-%{cfg.buildcfg}"
+        targetdir ("Binaries/Linux")
+        runpathdirs {
+            "%{cfg.targetdir}",
+            "%{cfg.targetdir}/../../../ "
+        }
+        buildoptions 
+        { 
+            "-fvisibility=hidden",
+            "-fvisibility-inlines-hidden",  
+        }
+
     filter {"system:macosx","kind:WindowedApp"}
         runpathdirs {
             "%{cfg.targetdir}/../../../"
@@ -102,12 +116,17 @@ workspace "ShaderHelper"
     filter {"system:macosx","kind:SharedLib"}
         xcodebuildsettings { ["DYLIB_INSTALL_NAME_BASE"] = "@rpath" }
 
-    filter {"system:macosx","files:**/Win/*.cpp"}
+    filter {"system:macosx","files:**/Linux/*.cpp or **/Win/*.cpp"}
         flags {"ExcludeFromBuild"}
 
-    filter {"system:windows","files:**/Mac/*.cpp or **.mm or **.hlsl"}
+    filter {"system:windows","files:**/Linux/*.cpp or **/Mac/*.cpp or **.mm or **.hlsl"}
         flags {"ExcludeFromBuild"}
-	
+
+    filter {"system:linux","files:**/Win/*.cpp or **/Mac/*.cpp or **.mm or **.hlsl"}
+        flags {"ExcludeFromBuild"}
+    
+    filter {"system:linux"}
+        toolset "clang"
 
     filter {"configurations:Debug"}
         optimize "Off"

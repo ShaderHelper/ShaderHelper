@@ -3,6 +3,7 @@
 #include <Misc/GeneratedTypeName.h>
 #include <array>
 #include <algorithm>
+#include <cstring>
 namespace FRAMEWORK
 {
 namespace AUX

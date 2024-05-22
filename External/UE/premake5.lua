@@ -73,6 +73,15 @@ usage "UE"
             "-x objective-c++",
             "-fno-rtti", --UE modules disable rtti
         }
-
-        
-
+    filter "system:linux"
+        libdirs
+        {
+            path.getabsolute("Lib"),
+        }
+        links
+        {
+            "UE",
+        }
+        buildoptions { 
+            "-fno-rtti", --UE modules disable rtti
+        }
