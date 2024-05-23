@@ -1,14 +1,14 @@
-UnitTestUtilHierarchy = {
+ShaderHelperHierarchy = {
     ["Sources/*"] = {"**.h","**.cpp"},
 }
 
-project "UnitTestUtil"
+project "ShaderHelper"
     kind "WindowedApp"   
     location "%{_WORKING_DIR}/ProjectFiles"
 
-    vpaths(UnitTestUtilHierarchy)
+    vpaths(ShaderHelperHierarchy)
 
-    files {seq(UnitTestUtilHierarchy)}
+    files {seq(ShaderHelperHierarchy)}
 
     includedirs
     {
@@ -16,8 +16,10 @@ project "UnitTestUtil"
     }
 
     uses {
-		"Framework",
+		"FrameWork",
 	}
+
+    addPrivateIncludeDir_ue("Slate")
 
     filter "system:windows"
         files {"%{_WORKING_DIR}/Resource/Misc/Windows/*"}
@@ -29,7 +31,6 @@ project "UnitTestUtil"
         files {"%{_WORKING_DIR}/Resource/Misc/Mac/*"}
         vpaths {["Resource"] = "%{_WORKING_DIR}/Resource/Misc/Mac/*"}
 
-
-
-        
-
+    filter "system:linux"
+        files {"%{_WORKING_DIR}/Resource/Misc/Linux/*"}
+        vpaths {["Resource"] = "%{_WORKING_DIR}/Resource/Misc/Linux/*"}

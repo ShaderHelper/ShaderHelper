@@ -28,3 +28,10 @@ External/UE/Src/
 *.dylib
 *.dSYM
 *.DS_Store
+
+# Linux
+*.debug
+*.so
+*.sym
+*.make
+Makefile

@@ -15,6 +15,8 @@
 #include <UnrealDefinitionsWin.h>
 #elif defined(__APPLE__)
 #include <UnrealDefinitionsMac.h>
+#elif defined(__linux__)
+#include <UnrealDefinitionsLinux.h>
 #endif
 
 #include <SharedPCH.h>

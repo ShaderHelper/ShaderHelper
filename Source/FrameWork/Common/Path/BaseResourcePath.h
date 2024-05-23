@@ -5,7 +5,7 @@ namespace FRAMEWORK
 {
 namespace BaseResourcePath
 {
-#if PLATFORM_MAC
+#if PLATFORM_MAC || PLATFORM_LINUX
     inline const FString UE_StandaloneRenderShaderDir = PathHelper::ExternalDir() / TEXT("UE/Shader/OpenGL");
 #elif PLATFORM_WINDOWS
     inline const FString UE_StandaloneRenderShaderDir = PathHelper::ExternalDir() / TEXT("UE/Shader/D3D");
