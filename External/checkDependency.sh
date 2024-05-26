@@ -1,10 +1,11 @@
 #!/bin/sh
 CurrentPath="$(cd "$(dirname "$0")" && pwd)"
 
-function Check() {
-
-    if [[ "$OSTYPE" == "darwin"* ]]; then
+Check() {
+    if [ "$(uname)" = "Darwin" ]; then
         ModulePath="$CurrentPath/$1/downloadDep.sh"
+    elif [ "$(uname)" = "Linux" ]; then
+        ModulePath="$CurrentPath/$1/downloadDepLinux.sh"
     else
         ModulePath="$CurrentPath/$1/downloadDep.bat"
     fi
@@ -13,7 +14,7 @@ function Check() {
 
     if [ ! -z "$DiffOutput" ]; then
         echo "$1 has changed, trying to download the latest version!!"
-        if [[ "$OSTYPE" == "darwin"* ]]; then
+        if [ "$(uname)" = "Darwin" ] || [ "$(uname)" = "Linux" ]; then
            sh "$ModulePath"
         else
            "$ModulePath"
@@ -23,12 +24,13 @@ function Check() {
 }
 
 echo "Checking dependencies..."
-if [[ "$OSTYPE" == "darwin"* ]]; then
+if [ "$(uname)" = "Darwin" ]; then
     Check "ShaderConductor"
+    Check "UE"
+elif [ "$(uname)" = "Linux" ]; then
     Check "UE"
 else
     Check "AgilitySDK"
     Check "DXC"
     Check "UE"
 fi
-
