@@ -3,11 +3,11 @@
 
 namespace FRAMEWORK
 {
-	class GpuBuffer : public GpuResource
+	class GpuBuffer : public GpuTrackedResource
 	{
 	public:
 		GpuBuffer(GpuBufferUsage InUsage) 
-			: GpuResource(GpuResourceType::Buffer)
+			: GpuTrackedResource(GpuResourceType::Buffer)
 			, Usage(InUsage) 
 		{}
 		GpuBufferUsage GetUsage() const { return Usage; }

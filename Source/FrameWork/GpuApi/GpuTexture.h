@@ -16,11 +16,11 @@ namespace FRAMEWORK
 		uint32 NumMips = 1;
     };
 
-    class GpuTexture : public GpuResource
+    class GpuTexture : public GpuTrackedResource
     {
     public:
         GpuTexture(GpuTextureDesc InDesc)
-            : GpuResource(GpuResourceType::Texture)
+            : GpuTrackedResource(GpuResourceType::Texture)
 			, TexDesc(MoveTemp(InDesc))
         {}
         

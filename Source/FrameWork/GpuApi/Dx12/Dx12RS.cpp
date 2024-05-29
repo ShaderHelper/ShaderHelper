@@ -2,7 +2,7 @@
 #include "Dx12RS.h"
 #include "Dx12Device.h"
 #include "Dx12Buffer.h"
-#include "Dx12CommandList.h"
+#include "Dx12CommandRecorder.h"
 
 namespace FRAMEWORK
 {
@@ -177,7 +177,7 @@ namespace FRAMEWORK
 		for (const auto& [DxVisibility, SrcRange] : SrcDescriptorRange_CbvSrvUav)
 		{
 			uint32 NumDescriptors = SrcRange.Num();
-			TUniquePtr<GpuDescriptorRange> GpuHeapRanges = GCommandListContext->AllocGpuCbvSrvUavRange(NumDescriptors);
+			TUniquePtr<GpuDescriptorRange> GpuHeapRanges = AllocGpuCbvSrvUavRange(NumDescriptors);
 			GDevice->CopyDescriptorsSimple(NumDescriptors, GpuHeapRanges->GetCpuHandle(), *SrcRange.GetData(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 			DescriptorTableStorage_CbvSrvUav.Add(DxVisibility, MoveTemp(GpuHeapRanges));
 		}
@@ -185,14 +185,14 @@ namespace FRAMEWORK
 		for (const auto& [DxVisibility, SrcRange] : SrcDescriptorRange_Sampler)
 		{
 			uint32 NumDescriptors = SrcRange.Num();
-			TUniquePtr<GpuDescriptorRange> GpuHeapRanges = GCommandListContext->AllocGpuSamplerRange(NumDescriptors);
+			TUniquePtr<GpuDescriptorRange> GpuHeapRanges = AllocGpuSamplerRange(NumDescriptors);
 			GDevice->CopyDescriptorsSimple(NumDescriptors, GpuHeapRanges->GetCpuHandle(), *SrcRange.GetData(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
 			DescriptorTableStorage_Sampler.Add(DxVisibility, MoveTemp(GpuHeapRanges));
 		}
 	
 	}
 
-    void Dx12BindGroup::Apply(ID3D12GraphicsCommandList* CommandList, Dx12RootSignature* RootSig)
+    void Dx12BindGroup::ApplyDrawBinding(ID3D12GraphicsCommandList* CommandList, Dx12RootSignature* RootSig)
     {
         Dx12BindGroupLayout* Layout = static_cast<Dx12BindGroupLayout*>(GetLayout());
 		uint32 GroupSlot = Layout->GetGroupNumber();

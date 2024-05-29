@@ -102,4 +102,17 @@ namespace FRAMEWORK
 		uint32 DescriptorSize;
 	};
 
+	extern TUniquePtr<CpuDescriptorAllocator> RtvAllocator;
+	extern TUniquePtr<CpuDescriptorAllocator> Cpu_CbvSrvUavAllocator;
+	extern TUniquePtr<GpuDescriptorAllocator> Gpu_CbvSrvUavAllocator;
+	extern TUniquePtr<CpuDescriptorAllocator> Cpu_SamplerAllocator;
+	extern TUniquePtr<GpuDescriptorAllocator> Gpu_SamplerAllocator;
+
+	void InitDescriptorAllocator();
+	TUniquePtr<CpuDescriptor> AllocRtv();
+	TUniquePtr<CpuDescriptor> AllocSampler();
+	TUniquePtr<CpuDescriptor> AllocCpuCbvSrvUav();
+	TUniquePtr<GpuDescriptorRange> AllocGpuCbvSrvUavRange(uint32 InDescriptorNum);
+	TUniquePtr<GpuDescriptorRange> AllocGpuSamplerRange(uint32 InDescriptorNum);
+
 }

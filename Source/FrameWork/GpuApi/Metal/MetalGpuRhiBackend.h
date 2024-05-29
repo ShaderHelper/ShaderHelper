@@ -20,7 +20,7 @@ public:
 	TRefCountPtr<GpuShader> CreateShaderFromFile(FString FileName, ShaderType InType, FString EntryPoint, FString ExtraDeclaration) override;
 	TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc &InBindGroupDesc) override;
 	TRefCountPtr<GpuBindGroupLayout> CreateBindGroupLayout(const GpuBindGroupLayoutDesc &InBindGroupLayoutDesc) override;
-	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const GpuPipelineStateDesc &InPipelineStateDesc) override;
+	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const GpuRenderPipelineStateDesc &InPipelineStateDesc) override;
 	TRefCountPtr<GpuBuffer> CreateBuffer(uint32 ByteSize, GpuBufferUsage Usage) override;
 	TRefCountPtr<GpuSampler> CreateSampler(const GpuSamplerDesc &InSamplerDesc) override;
 	void SetTextureName(const FString &TexName, GpuTexture *InTexture) override;

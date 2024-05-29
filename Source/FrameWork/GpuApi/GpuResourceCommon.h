@@ -8,6 +8,16 @@ namespace FRAMEWORK
 		inline constexpr int32 MaxBindableBingGroupNum = 4; //Only support 4 BindGroups to adapt some mobile devices.
 	}
 
+	enum class GpuResourceState : uint32
+	{
+		Unknown = 0,
+		Srv = 1u << 0,
+		Rtv = 1u << 1,
+		CopySrc = 1u << 2,
+		CopyDst = 1u << 3,
+	};
+	ENUM_CLASS_FLAGS(GpuResourceState);
+
 	enum class GpuTextureFormat
 	{
 		//Unorm
@@ -185,6 +195,14 @@ namespace FRAMEWORK
 
 	private:
 		GpuResourceType Type;
+	};
+
+	class GpuTrackedResource : public GpuResource
+	{
+	public:
+		using GpuResource::GpuResource;
+
+		GpuResourceState State{};
 	};
 
     inline uint32 GetTextureFormatByteSize(GpuTextureFormat InFormat)

@@ -183,7 +183,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		NewShaderPassTab->SetOnTabRelocated(FSimpleDelegate::CreateLambda([=] {
 			if (TSharedPtr<SDockingTabStack> TabStack = CodeTabManager->FindTabInLiveArea(FTabMatcher{ NewShaderPassTab->GetLayoutIdentifier() }, CodeTabMainArea.ToSharedRef()))
 			{
-				LastActivedShaderPassTabStack = TabStack;
+				ShaderPassTabStackInsertPoint = TabStack;
 			}
 		}));
         NewShaderPassTab->SetOnTabActivated(SDockTab::FOnTabActivatedCallback::CreateLambda([this](TSharedRef<SDockTab> InTab, ETabActivationCause) {
@@ -191,7 +191,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
             
             if(TSharedPtr<SDockingTabStack> TabStack = CodeTabManager->FindTabInLiveArea(FTabMatcher{InTab->GetLayoutIdentifier()}, CodeTabMainArea.ToSharedRef()))
             {
-                LastActivedShaderPassTabStack = TabStack;
+				ShaderPassTabStackInsertPoint = TabStack;
             }
         }));
         CurEditorState.OpenedShaderPasses.Add(LoadedShaderPass, NewShaderPassTab);
@@ -337,9 +337,9 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
         {
             FName ShaderPassTabId{*InShaderPass->GetGuid().ToString()};
             auto NewShaderPassTab = SpawnShaderPassTab({Window, ShaderPassTabId});
-            if(LastActivedShaderPassTabStack.IsValid() && LastActivedShaderPassTabStack.Pin()->GetAllChildTabs().IsValidIndex(0))
+            if(ShaderPassTabStackInsertPoint.IsValid() && ShaderPassTabStackInsertPoint.Pin()->GetAllChildTabs().IsValidIndex(0))
             {
-                auto FirstTab = LastActivedShaderPassTabStack.Pin()->GetAllChildTabs()[0];
+                auto FirstTab = ShaderPassTabStackInsertPoint.Pin()->GetAllChildTabs()[0];
                 CodeTabManager->InsertNewDocumentTab(FirstTab->GetLayoutIdentifier().TabType, ShaderPassTabId, FTabManager::FLiveTabSearch{}, NewShaderPassTab, true);
             }
             else

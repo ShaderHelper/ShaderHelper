@@ -6,10 +6,10 @@
 
 namespace FRAMEWORK
 {
-	class Dx12Pso : public GpuPipelineState, public Dx12DeferredDeleteObject<Dx12Pso>
+	class Dx12RenderPso : public GpuPipelineState, public Dx12DeferredDeleteObject<Dx12RenderPso>
 	{
 	public:
-		Dx12Pso(TRefCountPtr<ID3D12PipelineState> InPipelineState, D3D_PRIMITIVE_TOPOLOGY InPritimiveTopology)
+		Dx12RenderPso(TRefCountPtr<ID3D12PipelineState> InPipelineState, D3D_PRIMITIVE_TOPOLOGY InPritimiveTopology)
 			: PipelineState(MoveTemp(InPipelineState))
 			, PritimiveTopology(InPritimiveTopology)
 		{}
@@ -23,5 +23,5 @@ namespace FRAMEWORK
 		D3D_PRIMITIVE_TOPOLOGY PritimiveTopology;
 	};
 
-    TRefCountPtr<Dx12Pso> CreateDx12Pso(const GpuPipelineStateDesc& InPipelineStateDesc);
+    TRefCountPtr<Dx12RenderPso> CreateDx12RenderPso(const GpuRenderPipelineStateDesc& InPipelineStateDesc);
 }

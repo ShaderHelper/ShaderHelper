@@ -68,7 +68,7 @@ TRefCountPtr<GpuBindGroupLayout> MetalGpuRhiBackend::CreateBindGroupLayout(const
 	return AUX::StaticCastRefCountPtr<GpuBindGroupLayout>(CreateMetalBindGroupLayout(InBindGroupLayoutDesc));
 }
 
-TRefCountPtr<GpuPipelineState> MetalGpuRhiBackend::CreateRenderPipelineState(const GpuPipelineStateDesc &InPipelineStateDesc)
+TRefCountPtr<GpuPipelineState> MetalGpuRhiBackend::CreateRenderPipelineState(const GpuRenderPipelineStateDesc &InPipelineStateDesc)
 {
 	return AUX::StaticCastRefCountPtr<GpuPipelineState>(CreateMetalPipelineState(InPipelineStateDesc));
 }

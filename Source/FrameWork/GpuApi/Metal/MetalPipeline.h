@@ -26,5 +26,5 @@ namespace FRAMEWORK
         MTLPrimitiveType PrimitiveType;
     };
 
-    TRefCountPtr<MetalPipelineState> CreateMetalPipelineState(const GpuPipelineStateDesc& InPipelineStateDesc);
+    TRefCountPtr<MetalPipelineState> CreateMetalPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc);
 }

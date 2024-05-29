@@ -25,7 +25,7 @@ namespace FRAMEWORK
 		BlendMask Mask = BlendMask::All;
     };
 
-    struct GpuPipelineStateDesc
+    struct GpuRenderPipelineStateDesc
     {
         GpuShader* Vs;
         GpuShader* Ps;

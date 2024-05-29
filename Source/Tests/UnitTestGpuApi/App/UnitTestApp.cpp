@@ -26,7 +26,7 @@ namespace UNITTEST_GPUAPI
 
 		GGpuRhi->BeginGpuCapture("TestCast");
 
-		uint16 TestData = 0xFD5E; //NaN
+		uint16 TestData = 0xFD5E; //NaN 64862
 		TArray<uint8> RawData((uint8*)&TestData, sizeof(TestData));
 
 		GpuTextureDesc Desc{ 1, 1, GpuTextureFormat::R16_FLOAT, GpuTextureUsage::ShaderResource , RawData };
@@ -53,19 +53,24 @@ namespace UNITTEST_GPUAPI
 			.SetExistingBinding(0, TestTex)
 			.Build();
 
-		GpuPipelineStateDesc PipelineDesc{};
+		GpuRenderPipelineStateDesc PipelineDesc{};
 		PipelineDesc.Vs = Vs;
 		PipelineDesc.BindGroupLayout0 = BindGroupLayout;
 
 		TRefCountPtr<GpuPipelineState> Pipeline = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
 
-		GGpuRhi->BeginRenderPass({}, TEXT("TestCast"));
+		auto CmdRecorder = GGpuRhi->BeginRecording();
 		{
-			GGpuRhi->SetRenderPipelineState(Pipeline);
-			GGpuRhi->SetBindGroups(BindGroup, nullptr, nullptr, nullptr);
-			GGpuRhi->DrawPrimitive(0, 3, 0, 1);
+			auto PassRecorder = CmdRecorder->BeginRenderPass({}, TEXT("TestCast"));
+			{
+				PassRecorder->SetRenderPipelineState(Pipeline);
+				PassRecorder->SetBindGroups(BindGroup, nullptr, nullptr, nullptr);
+				PassRecorder->DrawPrimitive(0, 3, 0, 1);
+			}
+			CmdRecorder->EndRenderPass(PassRecorder);
 		}
-		GGpuRhi->EndRenderPass();
+		GGpuRhi->EndRecording(CmdRecorder);
+		GGpuRhi->Submit({CmdRecorder});
 
 		GGpuRhi->EndGpuCapture();
 	}

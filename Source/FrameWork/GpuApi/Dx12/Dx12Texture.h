@@ -17,14 +17,14 @@ namespace FRAMEWORK
 		TUniquePtr<CpuDescriptor> Handle;
 	};
 
-	class Dx12Texture : public GpuTexture, public TrackedResource, public Dx12DeferredDeleteObject<Dx12Texture>
+	class Dx12Texture : public GpuTexture, public Dx12DeferredDeleteObject<Dx12Texture>
 	{
 	public:
-		Dx12Texture(D3D12_RESOURCE_STATES InState, TRefCountPtr<ID3D12Resource> InResource, 
+		Dx12Texture(TRefCountPtr<ID3D12Resource> InResource, 
 			GpuTextureDesc InDesc, void* InSharedHandle = nullptr);
         
     public:
-		ID3D12Resource* GetResource() const override { return Resource.GetReference(); }
+		ID3D12Resource* GetResource() const { return Resource.GetReference(); }
 		void* GetSharedHandle() const { 
 			check(SharedHandle);
 			return SharedHandle; 
@@ -43,6 +43,6 @@ namespace FRAMEWORK
 		
 	};
 
-	TRefCountPtr<Dx12Texture> CreateDx12Texture2D(const GpuTextureDesc& InTexDesc);
+	TRefCountPtr<Dx12Texture> CreateDx12Texture2D(const GpuTextureDesc& InTexDesc, GpuResourceState InitState);
 	TRefCountPtr<Dx12Sampler> CreateDx12Sampler(const GpuSamplerDesc& InSamplerDesc);
 }

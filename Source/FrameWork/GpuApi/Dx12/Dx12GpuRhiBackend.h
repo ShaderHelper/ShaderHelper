@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GpuApi/GpuRhi.h"
+#include "Dx12CommandRecorder.h"
 
 namespace FRAMEWORK
 {
@@ -12,36 +13,30 @@ public:
 
 public:
 	void InitApiEnv() override;
-	void FlushGpu() override;
+	void WaitGpu() override;
 	void BeginFrame() override;
 	void EndFrame() override;
-	TRefCountPtr<GpuTexture> CreateTexture(const GpuTextureDesc &InTexDesc) override;
+	TRefCountPtr<GpuTexture> CreateTexture(const GpuTextureDesc &InTexDesc, GpuResourceState InitState) override;
+	TRefCountPtr<GpuBuffer> CreateBuffer(uint32 ByteSize, GpuBufferUsage Usage, GpuResourceState InitState) override;
 	TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName, FString EntryPoint) override;
 	TRefCountPtr<GpuShader> CreateShaderFromFile(FString FileName, ShaderType InType, FString EntryPoint, FString ExtraDeclaration) override;
 	TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc &InBindGroupDesc) override;
 	TRefCountPtr<GpuBindGroupLayout> CreateBindGroupLayout(const GpuBindGroupLayoutDesc &InBindGroupLayoutDesc) override;
-	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const GpuPipelineStateDesc &InPipelineStateDesc) override;
-	TRefCountPtr<GpuBuffer> CreateBuffer(uint32 ByteSize, GpuBufferUsage Usage) override;
+	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc) override;
 	TRefCountPtr<GpuSampler> CreateSampler(const GpuSamplerDesc &InSamplerDesc) override;
-	void SetTextureName(const FString &TexName, GpuTexture *InTexture) override;
-	void SetBufferName(const FString &BufferName, GpuBuffer *InBuffer) override;
-	void *MapGpuTexture(GpuTexture *InGpuTexture, GpuResourceMapMode InMapMode, uint32 &OutRowPitch) override;
-	void UnMapGpuTexture(GpuTexture *InGpuTexture) override;
-	void *MapGpuBuffer(GpuBuffer *InGpuBuffer, GpuResourceMapMode InMapMode) override;
-	void UnMapGpuBuffer(GpuBuffer *InGpuBuffer) override;
+	void SetResourceName(const FString& Name, GpuResource* InResource) override;
 	bool CrossCompileShader(GpuShader *InShader, FString &OutErrorInfo) override;
-	void SetRenderPipelineState(GpuPipelineState *InPipelineState) override;
-	void SetVertexBuffer(GpuBuffer *InVertexBuffer) override;
-	void SetViewPort(const GpuViewPortDesc &InViewPortDesc) override;
-	void SetBindGroups(GpuBindGroup *BindGroup0, GpuBindGroup *BindGroup1, GpuBindGroup *BindGroup2, GpuBindGroup *BindGroup3) override;
-	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount) override;
-	void Submit() override;
 	void BeginGpuCapture(const FString &SavedFileName) override;
 	void EndGpuCapture() override;
-	void BeginCaptureEvent(const FString &EventName) override;
-	void EndCaptureEvent() override;
 	void *GetSharedHandle(GpuTexture *InGpuTexture) override;
-	void BeginRenderPass(const GpuRenderPassDesc &PassDesc, const FString &PassName) override;
-	void EndRenderPass() override;
+	GpuCmdRecorder* BeginRecording(const FString& RecorderName = {}) override;
+	void EndRecording(GpuCmdRecorder* InCmdRecorder) override;
+	void Submit(const TArray<GpuCmdRecorder*>& CmdRecorders) override;
+	virtual void* MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapMode InMapMode, uint32& OutRowPitch) override;
+	virtual void UnMapGpuTexture(GpuTexture* InGpuTexture) override;
+	virtual void* MapGpuBuffer(GpuBuffer* InGpuBuffer, GpuResourceMapMode InMapMode) override;
+	virtual void UnMapGpuBuffer(GpuBuffer* InGpuBuffer) override;
 };
+
+inline Dx12GpuRhiBackend* GDx12GpuRhi;
 }

@@ -28,5 +28,6 @@ namespace FRAMEWORK
 		ResourceAllocation Allocation;
 	};
 
-	TRefCountPtr<Dx12Buffer> CreateDx12Buffer(uint32 ByteSize, GpuBufferUsage Usage, bool IsDeferred = true);
+	TRefCountPtr<Dx12Buffer> CreateDx12Buffer(D3D12_RESOURCE_STATES InitState, uint32 ByteSize, GpuBufferUsage Usage, bool IsDeferred = true);
+	TRefCountPtr<Dx12Buffer> CreateDx12ConstantBuffer(uint32 ByteSize, GpuBufferUsage Usage, bool IsDeferred = true);
 }

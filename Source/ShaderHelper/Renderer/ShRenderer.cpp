@@ -76,7 +76,7 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		//Note: BGRA8_UNORM is default framebuffer format in ue standalone renderer framework.
 		GpuTextureDesc Desc{ (uint32)iResolution.x, (uint32)iResolution.y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
 		FinalRT = GGpuRhi->CreateTexture(Desc);
-		GGpuRhi->SetTextureName("FinalRT", FinalRT);
+		GGpuRhi->SetResourceName("FinalRT", FinalRT);
 		ReCreatePipelineState();
 		Render();
 	}
@@ -127,7 +127,7 @@ R"(float4 MainPS(PIn Input) : SV_Target
 	{
 		check(VertexShader->IsCompiled());
 		check(PixelShader->IsCompiled());
-		GpuPipelineStateDesc PipelineDesc{
+		GpuRenderPipelineStateDesc PipelineDesc{
 			VertexShader, PixelShader,
 			{ 
 				{  FinalRT->GetFormat() }
@@ -156,15 +156,19 @@ R"(float4 MainPS(PIn Input) : SV_Target
 		FullScreenPassDesc.ColorRenderTargets = {
 			{ FinalRT, RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store },
 		};
-		GGpuRhi->BeginRenderPass(FullScreenPassDesc, TEXT("FullScreenPass"));
+
+		auto CmdRecorder = GGpuRhi->BeginRecording();
 		{
-			GGpuRhi->SetRenderPipelineState(PipelineState);
-			GGpuRhi->SetBindGroups(BuiltInBindGroup, CustomBindGroup, nullptr, nullptr);
-			GGpuRhi->DrawPrimitive(0, 3, 0, 1);
+			auto PassRecorder = CmdRecorder->BeginRenderPass(FullScreenPassDesc, TEXT("FullScreenPass"));
+			{
+				PassRecorder->SetRenderPipelineState(PipelineState);
+				PassRecorder->SetBindGroups(BuiltInBindGroup, CustomBindGroup, nullptr, nullptr);
+				PassRecorder->DrawPrimitive(0, 3, 0, 1);
+			}
+			CmdRecorder->EndRenderPass(PassRecorder);
 		}
-		GGpuRhi->EndRenderPass();
-		
-		GGpuRhi->Submit();
+		GGpuRhi->EndRecording(CmdRecorder);
+		GGpuRhi->Submit({ CmdRecorder });
 	}
 
 	void ShRenderer::RenderEnd()

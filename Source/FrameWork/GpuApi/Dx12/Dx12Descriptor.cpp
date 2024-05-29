@@ -3,6 +3,47 @@
 
 namespace FRAMEWORK
 {
+
+	TUniquePtr<CpuDescriptorAllocator> RtvAllocator;
+	TUniquePtr<CpuDescriptorAllocator> Cpu_CbvSrvUavAllocator;
+	TUniquePtr<GpuDescriptorAllocator> Gpu_CbvSrvUavAllocator;
+	TUniquePtr<CpuDescriptorAllocator> Cpu_SamplerAllocator;
+	TUniquePtr<GpuDescriptorAllocator> Gpu_SamplerAllocator;
+
+	void InitDescriptorAllocator()
+	{
+		RtvAllocator = MakeUnique<CpuDescriptorAllocator>(256, DescriptorType::Rtv);
+		Cpu_CbvSrvUavAllocator = MakeUnique<CpuDescriptorAllocator>(1024, DescriptorType::CbvSrvUav);
+		Gpu_CbvSrvUavAllocator = MakeUnique<GpuDescriptorAllocator>(1024, DescriptorType::CbvSrvUav);
+		Cpu_SamplerAllocator = MakeUnique<CpuDescriptorAllocator>(256, DescriptorType::Sampler);
+		Gpu_SamplerAllocator = MakeUnique<GpuDescriptorAllocator>(256, DescriptorType::Sampler);
+	}
+
+	TUniquePtr<CpuDescriptor> AllocRtv()
+	{
+		return RtvAllocator->Allocate();
+	}
+
+	TUniquePtr<CpuDescriptor> AllocSampler()
+	{
+		return Cpu_SamplerAllocator->Allocate();
+	}
+
+	TUniquePtr<CpuDescriptor> AllocCpuCbvSrvUav()
+	{
+		return Cpu_CbvSrvUavAllocator->Allocate();
+	}
+
+	TUniquePtr<GpuDescriptorRange> AllocGpuCbvSrvUavRange(uint32 InDescriptorNum)
+	{
+		return Gpu_CbvSrvUavAllocator->Allocate(InDescriptorNum);
+	}
+
+	TUniquePtr<GpuDescriptorRange> AllocGpuSamplerRange(uint32 InDescriptorNum)
+	{
+		return Gpu_SamplerAllocator->Allocate(InDescriptorNum);
+	}
+
 	CpuDescriptorAllocator::CpuDescriptorAllocator(uint32 MaxSize, DescriptorType DescType)
 	{
 		D3D12_DESCRIPTOR_HEAP_DESC HeapDesc{};
