@@ -1,0 +1,38 @@
+name: Linux
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04]
+    
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: download dependency
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: ./downloadDep.sh
+        shell: sh
+
+      - name: Generate Project
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: ./bootstrap.sh
+        shell: sh
+
+      - name: Build solution
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: |
+          # make ShaderHelper
+          make UnitTestUtil
+          # make UnitTestGpuApi
