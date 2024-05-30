@@ -1,14 +1,12 @@
 ShaderHelperHierarchy = {
-    ["Sources/*"] = {"**.h","**.cpp"},
+    ["Sources/*"] = {"**"},
 }
 
 project "ShaderHelper"
     kind "WindowedApp"   
     location "%{_WORKING_DIR}/ProjectFiles"
 
-    vpaths(ShaderHelperHierarchy)
-
-    files {seq(ShaderHelperHierarchy)}
+    addToProjectHierarchy(ShaderHelperHierarchy)
 
     includedirs
     {

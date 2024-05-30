@@ -1,11 +1,12 @@
 FrameWorkHierarchy = {
-    ["Sources/*"] = {"**.h","**.cpp", "**.hpp"},
-	["Shaders/*"] = {"%{_WORKING_DIR}/Resource/Shaders/**.hlsl"}
+    ["Sources/*"] = {"**"},
 }
 
 project "FrameWork"
     kind "SharedLib"   
     location "%{_WORKING_DIR}/ProjectFiles"
+
+	addToProjectHierarchy(FrameWorkHierarchy)
 
     includedirs
     {
@@ -20,13 +21,9 @@ project "FrameWork"
         "UE", "magic_enum"
     }
 	
-	addToProjectHierarchy(FrameWorkHierarchy);
-	addToProjectHierarchy(UeHierarchy);
-    addToProjectHierarchy(magic_enumHierarchy);
-	
-	filter {"files:**/External/UE/Src/**.cpp or **/External/UE/Src/**.mm"}
-        flags {"ExcludeFromBuild"}
-		
+	addToProjectHierarchy(UeHierarchy)
+    addToProjectHierarchy(magic_enumHierarchy)
+			
     filter {"system:macosx","files:**/Dx12/*.cpp"}
         flags {"ExcludeFromBuild"}
 
@@ -43,9 +40,9 @@ project "FrameWork"
         private_uses {
             "DXC", "AgilitySDK", "WinPixEventRuntime"
         }
-		addToProjectHierarchy(AgilitySDKHierarchy);
-		addToProjectHierarchy(DXCHierarchy);
-		addToProjectHierarchy(WinPixEventRuntimeHierarchy);
+		addToProjectHierarchy(AgilitySDKHierarchy)
+		addToProjectHierarchy(DXCHierarchy)
+		addToProjectHierarchy(WinPixEventRuntimeHierarchy)
 		
         links {
             "d3d12", "dxgi", "dxguid"
@@ -53,16 +50,17 @@ project "FrameWork"
 
     filter "system:macosx"
         private_uses { 
-            "MtlppUE", "ShaderConductor"
+            "ShaderConductor", "metal-cpp"
         }
+        addToProjectHierarchy(shaderConductorHierarchy)
+        addToProjectHierarchy(metalcppHierarchy)
+        
         links
         {
             "Cocoa.framework",
             "Metal.framework",
             "CoreVideo.framework",
         }
-    filter "system:linux"
-        rtti "Off"
 
 usage "FrameWork"
     --Note that "DLLIMPORT" macro is defined by UE module. (see MacPlatform.h, WindowsPlatform.h)

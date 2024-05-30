@@ -1,5 +1,5 @@
 WinPixEventRuntimeHierarchy = {
-    ["External/WinPixEventRuntime"] = {"%{_WORKING_DIR}/External/WinPixEventRuntime/Inc/*.h"},
+    ["External/WinPixEventRuntime/*"] = {"%{_WORKING_DIR}/External/WinPixEventRuntime/**"},
 }
 
 usage "WinPixEventRuntime"

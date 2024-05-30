@@ -1,5 +1,5 @@
 DXCHierarchy = {
-    ["External/DXC"] = {"%{_WORKING_DIR}/External/DXC/Inc/*.h"},
+    ["External/DXC/*"] = {"%{_WORKING_DIR}/External/DXC/**"},
 }
 
 usage "DXC"

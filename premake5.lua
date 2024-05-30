@@ -4,7 +4,7 @@ external_ue = "External/UE"
 external_dxcompiler = "External/DXC"
 external_agilitysdk = "External/AgilitySDK"
 external_pix = "External/WinPixEventRuntime"
-external_mtlpp = "External/MtlppUE"
+external_metalcpp = "External/metal-cpp"
 external_shaderConductor = "External/ShaderConductor"
 external_magicenum = "External/magic_enum"
 
@@ -138,7 +138,7 @@ include(external_ue)
 include(external_dxcompiler)
 include(external_agilitysdk)
 include(external_pix)
-include(external_mtlpp)
+include(external_metalcpp)
 include(external_shaderConductor)
 include(external_magicenum)
 

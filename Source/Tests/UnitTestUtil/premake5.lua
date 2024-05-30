@@ -1,14 +1,12 @@
 UnitTestUtilHierarchy = {
-    ["Sources/*"] = {"**.h","**.cpp"},
+    ["Sources/*"] = {"**"},
 }
 
 project "UnitTestUtil"
     kind "WindowedApp"   
     location "%{_WORKING_DIR}/ProjectFiles"
 
-    vpaths(UnitTestUtilHierarchy)
-
-    files {seq(UnitTestUtilHierarchy)}
+    addToProjectHierarchy(UnitTestUtilHierarchy)
 
     includedirs
     {
