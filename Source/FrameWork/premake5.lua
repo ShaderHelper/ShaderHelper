@@ -66,6 +66,8 @@ project "FrameWork"
             "Metal.framework",
             "CoreVideo.framework",
         }
+    filter "system:linux"
+        rtti "Off"
 
 usage "FrameWork"
     --Note that "DLLIMPORT" macro is defined by UE module. (see MacPlatform.h, WindowsPlatform.h)
