@@ -1,5 +1,7 @@
 FrameWorkHierarchy = {
     ["Sources/*"] = {"**"},
+    ["Shaders/*"] = {"%{_WORKING_DIR}/Resource/Shaders/**.hlsl"},
+    ["Premake/*"] = {"%{_WORKING_DIR}/Premake/**.lua"}
 }
 
 project "FrameWork"
@@ -23,6 +25,9 @@ project "FrameWork"
 	
 	addToProjectHierarchy(UeHierarchy)
     addToProjectHierarchy(magic_enumHierarchy)
+
+    filter {"files:**/External/UE/**"}
+        flags {"ExcludeFromBuild"}
 			
     filter {"system:macosx","files:**/Dx12/*.cpp"}
         flags {"ExcludeFromBuild"}

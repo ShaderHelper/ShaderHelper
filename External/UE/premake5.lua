@@ -31,9 +31,6 @@ end
 
 usage "UE"
     generateIncludeDir_ue()
-    filter {"files:**/External/UE/**"}
-        flags {"ExcludeFromBuild"}
-
     filter "system:windows"
         libdirs
         {
