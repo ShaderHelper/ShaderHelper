@@ -118,7 +118,7 @@ namespace FRAMEWORK
 				return false;
 			}
 		}
-		return true;
+		return ValidateGpuResourceState(InitState);
 	}
 
 	bool ValidateBarrier(GpuTrackedResource* InResource, GpuResourceState NewState)
@@ -132,6 +132,17 @@ namespace FRAMEWORK
 				return false;
 			}
 		}
+		return ValidateGpuResourceState(NewState);
+	}
+
+	bool ValidateGpuResourceState(GpuResourceState InState)
+	{
+		if (EnumHasAnyFlags(InState, GpuResourceState::WriteMask) && EnumHasAnyFlags(InState, GpuResourceState::ReadMask))
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("GpuResourceState Error(Only a wirte state can be set)"));
+			return false;
+		}
+
 		return true;
 	}
 

@@ -7,16 +7,24 @@ namespace FRAMEWORK
 
 	inline D3D12_RESOURCE_STATES MapResourceState(GpuResourceState InResourceState)
 	{
-		D3D12_RESOURCE_STATES DxResourceState{};
 		switch (InResourceState)
 		{
-		case GpuResourceState::Srv:               return D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
-		case GpuResourceState::Rtv:               return D3D12_RESOURCE_STATE_RENDER_TARGET;
-		case GpuResourceState::CopyDst:           return D3D12_RESOURCE_STATE_COPY_DEST;
-		case GpuResourceState::CopySrc:           return D3D12_RESOURCE_STATE_COPY_SOURCE;
+		case GpuResourceState::RenderTargetWrite:                return D3D12_RESOURCE_STATE_RENDER_TARGET;
+		case GpuResourceState::CopyDst:                          return D3D12_RESOURCE_STATE_COPY_DEST;
 		default:
-			check(false);
-			return D3D12_RESOURCE_STATE_COMMON;
+			check(!EnumHasAnyFlags(InResourceState, GpuResourceState::WriteMask));
+			D3D12_RESOURCE_STATES State{};
+			if (EnumHasAnyFlags(InResourceState, GpuResourceState::ShaderResourceRead))
+			{
+				State |= D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
+			}
+			if (EnumHasAnyFlags(InResourceState, GpuResourceState::CopySrc))
+			{
+				State |= D3D12_RESOURCE_STATE_COPY_SOURCE;
+			}
+
+			check(State != D3D12_RESOURCE_STATE_COMMON);
+			return State;
 		}
 	}
 
