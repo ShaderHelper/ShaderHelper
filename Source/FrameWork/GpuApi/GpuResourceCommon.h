@@ -11,10 +11,16 @@ namespace FRAMEWORK
 	enum class GpuResourceState : uint32
 	{
 		Unknown = 0,
-		Srv = 1u << 0,
-		Rtv = 1u << 1,
-		CopySrc = 1u << 2,
+		//Read state
+		ShaderResourceRead = 1u << 0,
+		CopySrc = 1u << 1,
+
+		//Write State
+		RenderTargetWrite = 1u << 2,
 		CopyDst = 1u << 3,
+
+		ReadMask = ShaderResourceRead | CopySrc,
+		WriteMask = RenderTargetWrite | CopyDst,
 	};
 	ENUM_CLASS_FLAGS(GpuResourceState);
 

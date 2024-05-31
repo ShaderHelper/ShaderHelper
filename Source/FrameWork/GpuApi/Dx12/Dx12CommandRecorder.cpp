@@ -378,7 +378,7 @@ namespace FRAMEWORK
 			Barrier = CD3DX12_RESOURCE_BARRIER::Transition(static_cast<Dx12Texture*>(InResource)->GetResource(), BeforeDx12State, AfterDx12State);
 		}
 		else {
-			unimplemented();
+			check(false);
 		}
 		InResource->State = NewState;
 		CmdList->ResourceBarrier(1, &Barrier);

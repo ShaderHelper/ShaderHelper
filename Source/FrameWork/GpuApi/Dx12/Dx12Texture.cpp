@@ -53,7 +53,7 @@ namespace FRAMEWORK
 			OutFlags.bShared = true;
 		}
 
-		if (!EnumHasAnyFlags(OutResourceFlag, D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE)) {
+		if (EnumHasAnyFlags(InFlags, GpuTextureUsage::ShaderResource)) {
 			OutFlags.bSRV = true;
 		}
 	}
@@ -61,14 +61,23 @@ namespace FRAMEWORK
 	static D3D12_RESOURCE_STATES GetInitialResourceState(const FlagSets& InFlags, GpuResourceState& OutState)
 	{
 		bool bWritable = InFlags.bRTV;
-		if (InFlags.bSRV && !bWritable) {
-			OutState = GpuResourceState::Srv;
-			return D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
-		}
+		bool bReadable = InFlags.bSRV;
+		check(!(bWritable && bReadable));
 
-		if (InFlags.bRTV) {
-			OutState = GpuResourceState::Rtv;
-			return D3D12_RESOURCE_STATE_RENDER_TARGET;
+		if (bReadable)
+		{
+			if (InFlags.bSRV) {
+				OutState = GpuResourceState::ShaderResourceRead;
+				return D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
+			}
+
+		}
+		else
+		{
+			if (InFlags.bRTV) {
+				OutState = GpuResourceState::RenderTargetWrite;
+				return D3D12_RESOURCE_STATE_RENDER_TARGET;
+			}
 		}
 
 		check(false);
@@ -95,6 +104,12 @@ namespace FRAMEWORK
 			return nullptr;
 		}
 
+		bool bHasInitialData = false;
+		if (!InTexDesc.InitialData.IsEmpty())
+		{
+			bHasInitialData = true;
+		}
+
 		D3D12_RESOURCE_FLAGS ResourceFlags = D3D12_RESOURCE_FLAG_NONE;
 		
 		FlagSets Flags{};
@@ -113,7 +128,8 @@ namespace FRAMEWORK
 		CD3DX12_HEAP_PROPERTIES HeapType{ D3D12_HEAP_TYPE_DEFAULT };
 		D3D12_HEAP_FLAGS HeapFlag = Flags.bShared ? D3D12_HEAP_FLAG_SHARED : D3D12_HEAP_FLAG_NONE;
 
-		D3D12_RESOURCE_STATES InitialState = InitState == GpuResourceState::Unknown ? GetInitialResourceState(Flags, InitState) : MapResourceState(InitState);
+		D3D12_RESOURCE_STATES FinalState = InitState == GpuResourceState::Unknown ? GetInitialResourceState(Flags, InitState) : MapResourceState(InitState);
+		D3D12_RESOURCE_STATES InitialState = bHasInitialData ? D3D12_RESOURCE_STATE_COPY_DEST : FinalState;
 
 		//Fast Clear Optimization
 		const float ClearColor[4] = { InTexDesc.ClearValues.X, InTexDesc.ClearValues.Y, InTexDesc.ClearValues.Z, InTexDesc.ClearValues.W };
@@ -139,11 +155,11 @@ namespace FRAMEWORK
 		}
 
 		TRefCountPtr<Dx12Texture> RetTexture = new Dx12Texture{ MoveTemp(TexResource), InTexDesc, SharedHandle };
-		RetTexture->State = InitState;
+		RetTexture->State = bHasInitialData ? GpuResourceState::CopyDst : InitState;
 		CreateTextureView(Flags, RetTexture);
 
 		TRefCountPtr<Dx12Buffer> UploadBuffer;
-		if (!InTexDesc.InitialData.IsEmpty()) {
+		if (bHasInitialData) {
 			const uint32 UploadBufferSize = (uint32)GetRequiredIntermediateSize(RetTexture->GetResource(), 0, 1);
 			UploadBuffer = CreateDx12Buffer(D3D12_RESOURCE_STATE_COPY_SOURCE, UploadBufferSize, GpuBufferUsage::Dynamic);
 
@@ -153,9 +169,8 @@ namespace FRAMEWORK
 			textureData.SlicePitch = textureData.RowPitch * InTexDesc.Height;
 
 			const CommonAllocationData& AllocationData = UploadBuffer->GetAllocation().GetAllocationData().Get<CommonAllocationData>();
-			auto CmdRecorder = GDx12GpuRhi->BeginRecording();
+			GpuCmdRecorder* CmdRecorder = GDx12GpuRhi->BeginRecording();
 			{
-				CmdRecorder->Barrier(RetTexture, GpuResourceState::CopyDst);
 				UpdateSubresources(static_cast<Dx12CmdRecorder*>(CmdRecorder)->GetCommandList(), RetTexture->GetResource(), AllocationData.UnderlyResource, 0, 0, 1, &textureData);
 				CmdRecorder->Barrier(RetTexture, InitState);
 			}

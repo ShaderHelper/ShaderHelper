@@ -19,4 +19,5 @@ namespace FRAMEWORK
 	bool ValidateCreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc);
 	bool ValidateCreateBuffer(uint32 ByteSize, GpuBufferUsage Usage, GpuResourceState InitState);
 	bool ValidateBarrier(GpuTrackedResource* InResource, GpuResourceState NewState);
+	bool ValidateGpuResourceState(GpuResourceState InState);
 }
