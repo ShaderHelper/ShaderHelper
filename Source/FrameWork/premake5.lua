@@ -65,6 +65,8 @@ project "FrameWork"
             "Cocoa.framework",
             "Metal.framework",
             "CoreVideo.framework",
+            "QuartzCore.framework",
+            "Foundation.framework",
         }
     filter "system:linux"
         rtti "Off"

@@ -4,6 +4,7 @@ Binaries/
 Saved/
 External/UE/Src/
 *.zip
+.vscode/
 
 # Win
 .vs/

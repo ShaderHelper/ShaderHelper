@@ -82,8 +82,8 @@ public:
 public:
 	virtual void InitApiEnv() = 0;
 
-public: // command apis
-	// Wait for all gpu work to finish
+public:
+	// Wait for all gpu works that have already been submitted to finish
 	virtual void WaitGpu() = 0;
 
 	virtual void BeginFrame() = 0;

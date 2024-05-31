@@ -1,13 +1,105 @@
 #pragma once
 #include "MetalCommon.h"
 #include "MetalPipeline.h"
-#include "Common/Util/Singleton.h"
 #include "GpuApi/GpuResource.h"
 #include "MetalBuffer.h"
 #include "MetalArgumentBuffer.h"
 
 namespace FRAMEWORK
 {
+
+    class MtlStateCache
+    {
+    public:
+        MtlStateCache();
+        void ApplyDrawState(MTL::RenderCommandEncoder* RenderCommandEncoder);
+        void Clear();
+        
+        void SetPipeline(MetalRenderPipelineState* InPipelineState);
+        void SetVertexBuffer(MetalBuffer* InBuffer);
+        void SetViewPort(MTL::Viewport InViewPort, MTL::ScissorRect InSissorRect);
+        void SetBindGroups(MetalBindGroup* InGroup0, MetalBindGroup* InGroup1, MetalBindGroup* InGroup2, MetalBindGroup* InGroup3);
+        
+    public:
+        bool IsPipelineDirty : 1;
+        bool IsViewportDirty : 1;
+        bool IsVertexBufferDirty : 1;
+       
+        bool IsBindGroup0Dirty : 1;
+        bool IsBindGroup1Dirty : 1;
+        bool IsBindGroup2Dirty : 1;
+        bool IsBindGroup3Dirty : 1;
+        
+    private:
+        MetalRenderPipelineState* CurrentRenderPipelineState;
+        MetalBuffer* CurrentVertexBuffer;
+        TOptional<MTL::Viewport> CurrentViewPort;
+        TOptional<MTL::ScissorRect> CurrentScissorRect;
+        MTL::RenderPassDescriptor*  CurrentRenderPassDesc;
+        
+        MetalBindGroup* CurrentBindGroup0;
+        MetalBindGroup* CurrentBindGroup1;
+        MetalBindGroup* CurrentBindGroup2;
+        MetalBindGroup* CurrentBindGroup3;
+    };
+
+    class MtlRenderPassRecorder : public GpuRenderPassRecorder
+    {
+    public:
+        MtlRenderPassRecorder(MTLRenderCommandEncoderPtr InCmdEncoder, MtlStateCache& InStateCache)
+            : CmdEncoder(MoveTemp(InCmdEncoder))
+            , StateCache(InStateCache)
+        {}
+        
+        MTL::RenderCommandEncoder* GetEncoder() const { return CmdEncoder.get(); }
+        
+    public:
+        void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount) override;
+        void SetRenderPipelineState(GpuPipelineState* InPipelineState) override;
+        void SetVertexBuffer(GpuBuffer* InVertexBuffer) override;
+        void SetViewPort(const GpuViewPortDesc& InViewPortDesc) override;
+        void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override;
+        
+    private:
+        MTLRenderCommandEncoderPtr CmdEncoder;
+        MtlStateCache& StateCache;
+    };
+
+    class MtlCmdRecorder : public GpuCmdRecorder
+    {
+    public:
+        MtlCmdRecorder(MTLCommandBufferPtr InCmdBuffer)
+            : CmdBuffer(MoveTemp(InCmdBuffer))
+        {}
+    public:
+        GpuRenderPassRecorder* BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName) override;
+        void EndRenderPass(GpuRenderPassRecorder* InRenderPassRecorder) override;
+        void BeginCaptureEvent(const FString& EventName) override;
+        void EndCaptureEvent() override;
+        void Barrier(GpuTrackedResource* InResource, GpuResourceState NewState) override;
+        void CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture) override;
+        void CopyTextureToBuffer(GpuTexture* InTexture, GpuBuffer* InBuffer) override;
+        
+    public:
+        bool IsSubmitted{};
+        MtlStateCache StateCache;
+        
+    private:
+        MTLCommandBufferPtr CmdBuffer;
+        TArray<TUniquePtr<MtlRenderPassRecorder>> RenderPassRecorders;
+    };
+    
+    TArray<TUniquePtr<MtlCmdRecorder>> GMtlCmdRecorderPool;
+    inline void ClearSubmitted()
+    {
+        for(auto It = GMtlCmdRecorderPool.CreateIterator(); It; It++)
+        {
+            if((*It)->IsSubmitted) {
+                It.RemoveCurrent();
+            }
+        }
+    }
+
     class CommandListContext
     {
     public:
@@ -30,98 +122,8 @@ namespace FRAMEWORK
             CurrentRenderCommandEncoder.GetPtr().label = [NSString stringWithUTF8String:TCHAR_TO_ANSI(*PassName)];
         }
 
-        void SetPipeline(MetalPipelineState* InPipelineState) 
-		{
-			if (InPipelineState != CurrentPipelineState)
-			{
-				CurrentPipelineState = InPipelineState;
-				MarkPipelineDirty(true);
-			}
-		}
-
-        void SetVertexBuffer(MetalBuffer* InBuffer) 
-		{ 
-			if (CurrentVertexBuffer != InBuffer)
-			{
-				CurrentVertexBuffer = InBuffer;
-				MarkVertexBufferDirty(true);
-			}
-		}
-
-        void SetViewPort(mtlpp::Viewport InViewPort, mtlpp::ScissorRect InSissorRect) 
-		{
-			if (!CurrentViewPort || FMemory::Memcmp(&*CurrentViewPort , &InViewPort, sizeof(mtlpp::Viewport)))
-			{
-                CurrentViewPort = MoveTemp(InViewPort);
-				CurrentScissorRect = MoveTemp(InSissorRect);
-				MarkViewportDirty(true);
-			}
-           
-        }
-
-        void SetBindGroups(MetalBindGroup* InGroup0, MetalBindGroup* InGroup1, MetalBindGroup* InGroup2, MetalBindGroup* InGroup3) 
-		{
-			if (InGroup0 != CurrentBindGroup0) {
-				CurrentBindGroup0 = InGroup0;
-				MarkBindGroup0Dirty(true);
-			}
-
-			if (InGroup1 != CurrentBindGroup1) {
-				CurrentBindGroup1 = InGroup1;
-				MarkBindGroup1Dirty(true);
-			}
-
-			if (InGroup2 != CurrentBindGroup2) {
-				CurrentBindGroup2 = InGroup2;
-				MarkBindGroup2Dirty(true);
-			}
-
-			if (InGroup3 != CurrentBindGroup3) {
-				CurrentBindGroup3 = InGroup3;
-				MarkBindGroup3Dirty(true);
-			}
-        }
         
-        void PrepareDrawingEnv();
-        void ClearBinding();
-        
-        void MarkPipelineDirty(bool IsDirty) { IsPipelineDirty = IsDirty; }
-        void MarkViewportDirty(bool IsDirty) { IsViewportDirty = IsDirty; }
-        void MarkVertexBufferDirty(bool IsDirty) { IsVertexBufferDirty = IsDirty; }
-
-		void MarkBindGroup0Dirty(bool IsDirty) { IsBindGroup0Dirty = IsDirty; }
-		void MarkBindGroup1Dirty(bool IsDirty) { IsBindGroup1Dirty = IsDirty; }
-		void MarkBindGroup2Dirty(bool IsDirty) { IsBindGroup2Dirty = IsDirty; }
-		void MarkBindGroup3Dirty(bool IsDirty) { IsBindGroup3Dirty = IsDirty; }
-    public:
-        void Draw(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount);
-        
-    private:
-        MetalPipelineState* CurrentPipelineState;
-        MetalBuffer* CurrentVertexBuffer;
-        TOptional<mtlpp::Viewport> CurrentViewPort;
-        TOptional<mtlpp::ScissorRect> CurrentScissorRect;
-                
-        mtlpp::RenderPassDescriptor  CurrentRenderPassDesc;
-        mtlpp::RenderCommandEncoder CurrentRenderCommandEncoder;
-        mtlpp::CommandBuffer CurrentCommandBuffer;
-        
-        MetalBindGroup* CurrentBindGroup0;
-        MetalBindGroup* CurrentBindGroup1;
-        MetalBindGroup* CurrentBindGroup2;
-        MetalBindGroup* CurrentBindGroup3;
-        
-        bool IsPipelineDirty : 1;
-        bool IsViewportDirty : 1;
-        bool IsVertexBufferDirty : 1;
-		
-		bool IsBindGroup0Dirty : 1;
-		bool IsBindGroup1Dirty : 1;
-		bool IsBindGroup2Dirty : 1;
-		bool IsBindGroup3Dirty : 1;
+ 
     };
 
-    inline CommandListContext* GetCommandListContext() {
-        return &TSingleton<CommandListContext>::Get();
-    }
 }

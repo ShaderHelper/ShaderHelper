@@ -1,26 +1,10 @@
 #include "CommonHeader.h"
-#include "MetalCommandList.h"
+#include "MetalCommandRecorder.h"
 #include "MetalMap.h"
+#include "MetalDevice.h"
 
 namespace FRAMEWORK
 {
-    CommandListContext::CommandListContext()
-        : CurrentPipelineState(nullptr)
-        , CurrentVertexBuffer(nullptr)
-        , CurrentBindGroup0(nullptr)
-        , CurrentBindGroup1(nullptr)
-        , CurrentBindGroup2(nullptr)
-        , CurrentBindGroup3(nullptr)
-        , IsPipelineDirty(false)
-        , IsViewportDirty(false)
-        , IsVertexBufferDirty(false)
-        , IsBindGroup0Dirty(false)
-		, IsBindGroup1Dirty(false)
-		, IsBindGroup2Dirty(false)
-		, IsBindGroup3Dirty(false)
-    {
-        
-    }
 
     void CommandListContext::PrepareDrawingEnv()
     {
@@ -88,17 +72,20 @@ namespace FRAMEWORK
         [GetRenderCommandEncoder() drawPrimitives:CurrentPipelineState->GetPrimitiveType() vertexStart:StartVertexLocation vertexCount:VertexCount instanceCount:InstanceCount baseInstance:StartInstanceLocation];
     }
 
-    void CommandListContext::ClearBinding()
+    GpuRenderPassRecorder* MtlCmdRecorder::BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName)
     {
-        CurrentPipelineState = nullptr;
-        CurrentViewPort.Reset();
-        CurrentScissorRect.Reset();
+        MTL::RenderCommandEncoder* Encoder= CmdBuffer->renderCommandEncoder(MapRenderPassDesc(PassDesc));
+        Encoder->setLabel(FStringToNSString(PassName));
+        Encoder->
         
-        CurrentBindGroup0 = nullptr;
-        CurrentBindGroup1 = nullptr;
-        CurrentBindGroup2 = nullptr;
-        CurrentBindGroup3 = nullptr;
-        
+        auto PassRecorder = MakeUnique<MtlRenderPassRecorder>(NS::RetainPtr(Encoder)));
+        RenderPassRecorders.Add(MoveTemp(PassRecorder));
+        return RenderPassRecorders.Last().Get();
     }
 
+    void MtlCmdRecorder::EndRenderPass(GpuRenderPassRecorder* InRenderPassRecorder)
+    {
+        MtlRenderPassRecorder* PassRecorder = static_cast<MtlRenderPassRecorder*>(InRenderPassRecorder);
+        PassRecorder->GetEncoder()->endEncoding();
+    }
 }

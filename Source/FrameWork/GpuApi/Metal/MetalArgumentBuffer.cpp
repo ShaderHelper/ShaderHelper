@@ -71,12 +71,16 @@ namespace FRAMEWORK
         
         if(VertexArgDescs.Num() > 0)
         {
-            VertexArgumentEncoder = GDevice.NewArgumentEncoderWithArguments([NSArray arrayWithObjects:VertexArgDescs.GetData() count:VertexArgDescs.Num()]);
+            VertexArgumentEncoder = NS::TransferPtr(GDevice->newArgumentEncoderWithArguments(
+                [NSArray arrayWithObjects:VertexArgDescs.GetData() count:VertexArgDescs.Num()]
+            ));
         }
         
         if(FragmentArgDescs.Num() > 0)
         {
-            FragmentArgumentEncoder = GDevice.NewArgumentEncoderWithArguments([NSArray arrayWithObjects:FragmentArgDescs.GetData() count:FragmentArgDescs.Num()]);
+            FragmentArgumentEncoder = NS::TransferPtr(GDevice->newArgumentEncoderWithArguments(
+                [NSArray arrayWithObjects:FragmentArgDescs.GetData() count:FragmentArgDescs.Num()]
+            ));
         }
 
     }
@@ -85,8 +89,8 @@ namespace FRAMEWORK
         : GpuBindGroup(InDesc)
     {
         MetalBindGroupLayout* BindGroupLayout = static_cast<MetalBindGroupLayout*>(InDesc.Layout);
-        id<MTLArgumentEncoder> VertexArgumentEncoder = BindGroupLayout->GetVertexArgumentEncoder();
-        id<MTLArgumentEncoder> FragmentArgumentEncoder = BindGroupLayout->GetFragmentArgumentEncoder();
+        id<MTLArgumentEncoder> VertexArgumentEncoder = (id<MTLArgumentEncoder>)BindGroupLayout->GetVertexArgumentEncoder();
+        id<MTLArgumentEncoder> FragmentArgumentEncoder = (id<MTLArgumentEncoder>)BindGroupLayout->GetFragmentArgumentEncoder();
         
         if(VertexArgumentEncoder != nullptr)
         {

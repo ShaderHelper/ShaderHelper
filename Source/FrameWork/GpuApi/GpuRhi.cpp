@@ -230,7 +230,7 @@ public:
 		{
 			GpuCmdRecorderValidation* CmdRecorderValidation = static_cast<GpuCmdRecorderValidation*>(CmdRecorders[Index]);
 			checkf(CmdRecorderValidation->State == CmdRecorderState::End, 
-				*FString::Printf(TEXT("Error State:%s for the GpuCmdRecorder(%d) %s that being submitted. Note that do not submit a CmdRecorder that has been submitted or not properly ended."), 
+				*FString::Printf(TEXT("Error State:%s for the GpuCmdRecorder(%d) %s being submitted. Note that do not submit a CmdRecorder that has been submitted or not properly ended."), 
 					ANSI_TO_TCHAR(magic_enum::enum_name(CmdRecorderValidation->State).data()), Index, *CmdRecorderValidation->Name)
 			);
 			CmdRecorderValidation->State = CmdRecorderState::Finish;

@@ -8,7 +8,7 @@
 
 namespace FRAMEWORK
 {
-    static void SetTextureUsage(GpuTextureUsage InUsage, mtlpp::TextureDescriptor& OutTexDesc)
+    static void SetTextureUsage(GpuTextureUsage InUsage, MTL::TextureDescriptor* OutTexDesc)
     {
         MTLTextureUsage Usage = MTLTextureUsageUnknown;
         if(EnumHasAnyFlags(InUsage, GpuTextureUsage::RenderTarget))
@@ -20,10 +20,10 @@ namespace FRAMEWORK
         {
             Usage |= MTLTextureUsageShaderRead;
         }
-        OutTexDesc.SetUsage((mtlpp::TextureUsage)Usage);
+        OutTexDesc->setUsage(Usage);
     }
 
-    mtlpp::SamplerDescriptor MapSamplerDesc(const GpuSamplerDesc& InSamplerDesc)
+    MTLSamplerDescriptor* MapSamplerDesc(const GpuSamplerDesc& InSamplerDesc)
     {
         MTLSamplerDescriptor* SamplerDesc = [MTLSamplerDescriptor new];
         switch(InSamplerDesc.Filer)
@@ -50,12 +50,12 @@ namespace FRAMEWORK
         SamplerDesc.compareFunction = MapCompareFunction(InSamplerDesc.Compare);
         SamplerDesc.supportArgumentBuffers = true;
         
-        return mtlpp::SamplerDescriptor{SamplerDesc, ns::Ownership::Assign};
+        return [SamplerDesc autorelease];
     }
 
     TRefCountPtr<MetalSampler> CreateMetalSampler(const GpuSamplerDesc& InSamplerDesc)
     {
-        mtlpp::SamplerState Sampler = GDevice.NewSamplerState(MapSamplerDesc(InSamplerDesc));
+        MTLSamplerStatePtr Sampler = NS::TransferPtr(GDevice->newSamplerState(MapSamplerDesc(InSamplerDesc)));
         return new MetalSampler(MoveTemp(Sampler));
     }
 
@@ -66,13 +66,13 @@ namespace FRAMEWORK
             return CreateSharedMetalTexture(InTexDesc);
         }
         
-        mtlpp::PixelFormat TexFormat = (mtlpp::PixelFormat)MapTextureFormat(InTexDesc.Format);
-        mtlpp::TextureDescriptor TexDesc = mtlpp::TextureDescriptor::Texture2DDescriptor(TexFormat, InTexDesc.Width, InTexDesc.Height, InTexDesc.NumMips > 1);
-        TexDesc.SetTextureType(mtlpp::TextureType::Texture2D);
-        TexDesc.SetStorageMode(mtlpp::StorageMode::Private);
+        MTL::PixelFormat TexFormat = (MTL::PixelFormat)MapTextureFormat(InTexDesc.Format);
+        MTL::TextureDescriptor* TexDesc = MTL::TextureDescriptor::texture2DDescriptor(TexFormat, InTexDesc.Width, InTexDesc.Height, InTexDesc.NumMips > 1);
+        TexDesc->setTextureType(MTL::Texture2D);
+        TexDesc->setStorageMode(MTL::StorageModePrivate);
         SetTextureUsage(InTexDesc.Usage, TexDesc);
         
-        mtlpp::Texture Tex = GDevice.NewTexture(MoveTemp(TexDesc));
+        MTLTexturePtr Tex = NS::TransferPtr(GDevice->newTexture(TexDesc));
         TRefCountPtr<MetalTexture> RetTexture = new MetalTexture(MoveTemp(Tex), InTexDesc);
         
         if (!InTexDesc.InitialData.IsEmpty()) {

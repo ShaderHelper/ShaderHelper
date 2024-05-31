@@ -9,8 +9,12 @@ namespace FRAMEWORK
     {
     public:
         MetalBindGroupLayout(const GpuBindGroupLayoutDesc& LayoutDesc);
-        id<MTLArgumentEncoder> GetVertexArgumentEncoder() const { return VertexArgumentEncoder; }
-        id<MTLArgumentEncoder> GetFragmentArgumentEncoder() const { return FragmentArgumentEncoder; }
+        id<MTLArgumentEncoder> GetVertexArgumentEncoder() const { 
+            return (id<MTLArgumentEncoder>)VertexArgumentEncoder.get(); 
+        }
+        id<MTLArgumentEncoder> GetFragmentArgumentEncoder() const { 
+            return (id<MTLArgumentEncoder>)FragmentArgumentEncoder.get(); 
+        }
         
         MTLResourceUsage GetResourceUsage(BindingSlot InSlot) const {
             return ResourceUsages[InSlot];
@@ -22,8 +26,8 @@ namespace FRAMEWORK
         
         
     private:
-        mtlpp::ArgumentEncoder VertexArgumentEncoder;
-        mtlpp::ArgumentEncoder FragmentArgumentEncoder;
+        MTLArgumentEncoderPtr VertexArgumentEncoder;
+        MTLArgumentEncoderPtr FragmentArgumentEncoder;
         TMap<BindingSlot, MTLResourceUsage> ResourceUsages;
         TMap<BindingSlot, MTLRenderStages> RenderStages;
     };

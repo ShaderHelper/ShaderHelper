@@ -3,7 +3,7 @@ metalcppHierarchy = {
 }
 
 usage "metal-cpp"
-    includedirs
+    externalincludedirs
     {
         path.getabsolute("./"),
     }

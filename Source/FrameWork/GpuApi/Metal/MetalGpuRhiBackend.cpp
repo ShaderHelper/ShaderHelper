@@ -4,7 +4,7 @@
 
 #include "MetalArgumentBuffer.h"
 #include "MetalBuffer.h"
-#include "MetalCommandList.h"
+#include "MetalCommandRecorder.h"
 #include "MetalCommon.h"
 #include "MetalDevice.h"
 #include "MetalMap.h"
@@ -21,12 +21,10 @@ MetalGpuRhiBackend::~MetalGpuRhiBackend() { }
 void MetalGpuRhiBackend::InitApiEnv()
 {
 	InitMetalCore();
-	GetCommandListContext()->SetCommandBuffer(GCommandQueue.CommandBuffer());
 }
 
-void MetalGpuRhiBackend::FlushGpu()
+void MetalGpuRhiBackend::WaitGpu()
 {
-	id<MTLCommandBuffer> CommandBuffer = GetCommandListContext()->GetCommandBuffer();
 	[CommandBuffer commit];
 	[CommandBuffer waitUntilCompleted];
 	GetCommandListContext()->SetCommandBuffer(GCommandQueue.CommandBuffer());
@@ -34,13 +32,11 @@ void MetalGpuRhiBackend::FlushGpu()
 
 void MetalGpuRhiBackend::BeginFrame()
 {
-	GCaptureScope.BeginScope();
 }
 
 void MetalGpuRhiBackend::EndFrame()
 {
-	FlushGpu();
-	GCaptureScope.EndScope();
+	WaitGpu();
 }
 
 TRefCountPtr<GpuTexture> MetalGpuRhiBackend::CreateTexture(const GpuTextureDesc &InTexDesc)
@@ -81,16 +77,6 @@ TRefCountPtr<GpuBuffer> MetalGpuRhiBackend::CreateBuffer(uint32 ByteSize, GpuBuf
 TRefCountPtr<GpuSampler> MetalGpuRhiBackend::CreateSampler(const GpuSamplerDesc &InSamplerDesc)
 {
 	return AUX::StaticCastRefCountPtr<GpuSampler>(CreateMetalSampler(InSamplerDesc));
-}
-
-void MetalGpuRhiBackend::SetTextureName(const FString &TexName, GpuTexture *InTexture)
-{
-	// not implemented.
-}
-
-void MetalGpuRhiBackend::SetBufferName(const FString &BufferName, GpuBuffer *InBuffer)
-{
-	// not implemented.
 }
 
 void *MetalGpuRhiBackend::MapGpuTexture(GpuTexture *InGpuTexture, GpuResourceMapMode InMapMode, uint32 &OutRowPitch)
@@ -206,31 +192,21 @@ void MetalGpuRhiBackend::EndGpuCapture()
 	// not implemented.
 }
 
-void MetalGpuRhiBackend::BeginCaptureEvent(const FString &EventName)
-{
-	// not implemented.
-}
-
-void MetalGpuRhiBackend::EndCaptureEvent()
-{
-	// not implemented.
-}
-
 void *MetalGpuRhiBackend::GetSharedHandle(GpuTexture *InGpuTexture)
 {
 	return static_cast<MetalTexture *>(InGpuTexture)->GetSharedHandle();
 }
 
-void MetalGpuRhiBackend::BeginRenderPass(const GpuRenderPassDesc &PassDesc, const FString &PassName)
+GpuCmdRecorder* MetalGpuRhiBackend::BeginRecording(const FString& RecorderName)
 {
-	mtlpp::RenderPassDescriptor RenderPassDesc = MapRenderPassDesc(PassDesc);
-	GetCommandListContext()->SetRenderPassDesc(MoveTemp(RenderPassDesc), PassName);
-	GetCommandListContext()->ClearBinding();
+    auto CmdRecorder = MakeUnique<MtlCmdRecorder>(NS::RetainPtr(GCommandQueue->commandBuffer()));
+    GMtlCmdRecorderPool.Add(MoveTemp(CmdRecorder));
+    return GMtlCmdRecorderPool.Last().Get();
 }
 
-void MetalGpuRhiBackend::EndRenderPass()
+void MetalGpuRhiBackend::EndRecording(GpuCmdRecorder* InCmdRecorder)
 {
-	id<MTLRenderCommandEncoder> RenderCommandEncoder = GetCommandListContext()->GetRenderCommandEncoder();
-	[RenderCommandEncoder endEncoding];
+    
 }
+
 }

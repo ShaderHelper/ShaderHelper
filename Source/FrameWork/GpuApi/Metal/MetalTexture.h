@@ -9,22 +9,22 @@ namespace FRAMEWORK
     class MetalSampler : public GpuSampler
     {
     public:
-        MetalSampler(mtlpp::SamplerState InSampler)
+        MetalSampler(MTLSamplerStatePtr InSampler)
             : Sampler(MoveTemp(InSampler))
         {}
         
         id<MTLSamplerState> GetResource() const {
-            return Sampler.GetPtr();
+            return (id<MTLSamplerState>)Sampler.get();
         }
         
     private:
-        mtlpp::SamplerState Sampler;
+        MTLSamplerStatePtr Sampler;
     };
 
 	class MetalTexture : public GpuTexture
 	{
     public:
-        MetalTexture(mtlpp::Texture InTex, GpuTextureDesc InDesc, CVPixelBufferRef InSharedHandle = nullptr)
+        MetalTexture(MTLTexturePtr InTex, GpuTextureDesc InDesc, CVPixelBufferRef InSharedHandle = nullptr)
             : GpuTexture(MoveTemp(InDesc))
             , Tex(MoveTemp(InTex))
             , SharedHandle(InSharedHandle)
@@ -36,7 +36,7 @@ namespace FRAMEWORK
         
     public:
         id<MTLTexture> GetResource() const {
-            return Tex.GetPtr();
+            return (id<MTLTexture>)Tex.get();
         }
         
         CVPixelBufferRef GetSharedHandle() const {
@@ -49,7 +49,7 @@ namespace FRAMEWORK
         TRefCountPtr<MetalBuffer> ReadBackBuffer;
         
     private:
-        mtlpp::Texture Tex;
+        MTLTexturePtr Tex;
         CVPixelBufferRef SharedHandle;
 	};
 
