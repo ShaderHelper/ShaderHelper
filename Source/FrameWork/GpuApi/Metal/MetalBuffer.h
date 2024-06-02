@@ -13,7 +13,7 @@ namespace FRAMEWORK
         {}
         
     public:
-        id<MTLBuffer> GetResource() const { return (id<MTLBuffer>)Buffer.get(); }
+        MTL::Buffer* GetResource() const { return Buffer.get(); }
         void* GetContents() {
             void* Data = Buffer->contents();
             check(Data);

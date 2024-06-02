@@ -10,15 +10,15 @@ namespace FRAMEWORK
         using GpuShader::GpuShader;
         
     public:
-        id<MTLFunction> GetCompilationResult() const { return ByteCodeFunc; }
+        MTL::Function* GetCompilationResult() const { return ByteCodeFunc.get(); }
         const FString& GetMslText() const { return MslText; }
         
         virtual bool IsCompiled() const override { return (bool)ByteCodeFunc; }
-        void SetCompilationResult(mtlpp::Function InByteCodeFunc) { ByteCodeFunc = MoveTemp(InByteCodeFunc); }
+        void SetCompilationResult(MTLFunctionPtr InByteCodeFunc) { ByteCodeFunc = MoveTemp(InByteCodeFunc); }
         void SetMslText(FString InText) { MslText = MoveTemp(InText); }
         
     private:
-        mtlpp::Function ByteCodeFunc;
+        MTLFunctionPtr ByteCodeFunc;
         FString MslText;
     };
     

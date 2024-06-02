@@ -1,5 +1,9 @@
 #pragma once
 
+#ifndef USE_PIX
+    #define USE_PIX GPU_API_CAPTURE
+#endif
+
 #include <Windows/PreWindowsApi.h>
 THIRD_PARTY_INCLUDES_START
 #include "d3d12sdklayers.h"

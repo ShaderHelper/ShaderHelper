@@ -13,8 +13,8 @@ namespace FRAMEWORK
             : Sampler(MoveTemp(InSampler))
         {}
         
-        id<MTLSamplerState> GetResource() const {
-            return (id<MTLSamplerState>)Sampler.get();
+        MTL::SamplerState* GetResource() const {
+            return Sampler.get();
         }
         
     private:
@@ -35,8 +35,8 @@ namespace FRAMEWORK
         }
         
     public:
-        id<MTLTexture> GetResource() const {
-            return (id<MTLTexture>)Tex.get();
+        MTL::Texture* GetResource() const {
+            return Tex.get();
         }
         
         CVPixelBufferRef GetSharedHandle() const {

@@ -27,7 +27,7 @@ namespace FRAMEWORK
 		void SetBindGroups(Dx12BindGroup* InGroup0, Dx12BindGroup* InGroup1, Dx12BindGroup* InGroup2, Dx12BindGroup* InGroup3);
 
 	public:
-		bool IsPipelineDirty : 1;
+		bool IsRenderPipelineDirty : 1;
 		bool IsRenderTargetDirty : 1;
 		bool IsVertexBufferDirty : 1;
 		bool IsViewportDirty : 1;

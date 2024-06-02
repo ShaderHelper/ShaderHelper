@@ -4,6 +4,7 @@
 #include "GpuApi/GpuResource.h"
 #include "MetalBuffer.h"
 #include "MetalArgumentBuffer.h"
+#include "GpuApi/GpuRhi.h"
 
 namespace FRAMEWORK
 {
@@ -11,7 +12,7 @@ namespace FRAMEWORK
     class MtlStateCache
     {
     public:
-        MtlStateCache();
+        MtlStateCache(MTLRenderPassDescriptorPtr InRenderPassDesc);
         void ApplyDrawState(MTL::RenderCommandEncoder* RenderCommandEncoder);
         void Clear();
         
@@ -19,9 +20,13 @@ namespace FRAMEWORK
         void SetVertexBuffer(MetalBuffer* InBuffer);
         void SetViewPort(MTL::Viewport InViewPort, MTL::ScissorRect InSissorRect);
         void SetBindGroups(MetalBindGroup* InGroup0, MetalBindGroup* InGroup1, MetalBindGroup* InGroup2, MetalBindGroup* InGroup3);
+        MTL::PrimitiveType GetPrimitiveType() const {
+            check(CurrentRenderPipelineState);
+            return (MTL::PrimitiveType)CurrentRenderPipelineState->GetPrimitiveType();
+        }
         
     public:
-        bool IsPipelineDirty : 1;
+        bool IsRenderPipelineDirty : 1;
         bool IsViewportDirty : 1;
         bool IsVertexBufferDirty : 1;
        
@@ -35,20 +40,21 @@ namespace FRAMEWORK
         MetalBuffer* CurrentVertexBuffer;
         TOptional<MTL::Viewport> CurrentViewPort;
         TOptional<MTL::ScissorRect> CurrentScissorRect;
-        MTL::RenderPassDescriptor*  CurrentRenderPassDesc;
         
         MetalBindGroup* CurrentBindGroup0;
         MetalBindGroup* CurrentBindGroup1;
         MetalBindGroup* CurrentBindGroup2;
         MetalBindGroup* CurrentBindGroup3;
+        
+        MTLRenderPassDescriptorPtr RenderPassDesc;
     };
 
     class MtlRenderPassRecorder : public GpuRenderPassRecorder
     {
     public:
-        MtlRenderPassRecorder(MTLRenderCommandEncoderPtr InCmdEncoder, MtlStateCache& InStateCache)
+        MtlRenderPassRecorder(MTLRenderCommandEncoderPtr InCmdEncoder, MTLRenderPassDescriptorPtr InRenderPassDesc)
             : CmdEncoder(MoveTemp(InCmdEncoder))
-            , StateCache(InStateCache)
+            , StateCache(MoveTemp(InRenderPassDesc))
         {}
         
         MTL::RenderCommandEncoder* GetEncoder() const { return CmdEncoder.get(); }
@@ -62,7 +68,7 @@ namespace FRAMEWORK
         
     private:
         MTLRenderCommandEncoderPtr CmdEncoder;
-        MtlStateCache& StateCache;
+        MtlStateCache StateCache;
     };
 
     class MtlCmdRecorder : public GpuCmdRecorder
@@ -71,6 +77,9 @@ namespace FRAMEWORK
         MtlCmdRecorder(MTLCommandBufferPtr InCmdBuffer)
             : CmdBuffer(MoveTemp(InCmdBuffer))
         {}
+        
+        MTL::CommandBuffer* GetCommandBuffer() const { return CmdBuffer.get(); }
+        
     public:
         GpuRenderPassRecorder* BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName) override;
         void EndRenderPass(GpuRenderPassRecorder* InRenderPassRecorder) override;
@@ -82,14 +91,14 @@ namespace FRAMEWORK
         
     public:
         bool IsSubmitted{};
-        MtlStateCache StateCache;
         
     private:
         MTLCommandBufferPtr CmdBuffer;
         TArray<TUniquePtr<MtlRenderPassRecorder>> RenderPassRecorders;
     };
     
-    TArray<TUniquePtr<MtlCmdRecorder>> GMtlCmdRecorderPool;
+    inline MtlCmdRecorder* LastSubmittedCmdRecorder;
+    inline TArray<TUniquePtr<MtlCmdRecorder>> GMtlCmdRecorderPool;
     inline void ClearSubmitted()
     {
         for(auto It = GMtlCmdRecorderPool.CreateIterator(); It; It++)
@@ -99,31 +108,5 @@ namespace FRAMEWORK
             }
         }
     }
-
-    class CommandListContext
-    {
-    public:
-        CommandListContext();
-        
-    public:
-        id<MTLRenderCommandEncoder> GetRenderCommandEncoder() const { return CurrentRenderCommandEncoder.GetPtr(); }
-        mtlpp::BlitCommandEncoder GetBlitCommandEncoder() {
-            //Return a new BlitCommandEncoder when we want to copy something every time.
-            return CurrentCommandBuffer.BlitCommandEncoder();
-        }
-        id<MTLCommandBuffer> GetCommandBuffer() const { return CurrentCommandBuffer.GetPtr(); }
-        //TODO: Manage CommandBuffer
-        void SetCommandBuffer(mtlpp::CommandBuffer InCommandBuffer) {
-            CurrentCommandBuffer = MoveTemp(InCommandBuffer);
-        }
-        void SetRenderPassDesc(mtlpp::RenderPassDescriptor InPassDesc, const FString& PassName) {
-            CurrentRenderPassDesc = MoveTemp(InPassDesc);
-            CurrentRenderCommandEncoder = CurrentCommandBuffer.RenderCommandEncoder(CurrentRenderPassDesc);
-            CurrentRenderCommandEncoder.GetPtr().label = [NSString stringWithUTF8String:TCHAR_TO_ANSI(*PassName)];
-        }
-
-        
  
-    };
-
 }

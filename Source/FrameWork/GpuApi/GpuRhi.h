@@ -114,7 +114,7 @@ public:
 	virtual void UnMapGpuBuffer(GpuBuffer* InGpuBuffer) = 0;
 
 	//Capture command recorders that are requested and submitted within the BeginGpuCapture/EndGpuCapture scope.
-	virtual void BeginGpuCapture(const FString &SavedFileName) = 0;
+	virtual void BeginGpuCapture(const FString &CaptureName) = 0;
 	virtual void EndGpuCapture() = 0;
 
 	// The renderer for drawing ui in UE uses dx11/opengl as backend api, so need a shared resource.

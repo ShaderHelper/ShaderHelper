@@ -25,7 +25,7 @@ public:
     TRefCountPtr<GpuSampler> CreateSampler(const GpuSamplerDesc &InSamplerDesc) override;
     void SetResourceName(const FString& Name, GpuResource* InResource) override;
     bool CrossCompileShader(GpuShader *InShader, FString &OutErrorInfo) override;
-    void BeginGpuCapture(const FString &SavedFileName) override;
+    void BeginGpuCapture(const FString &CaptureName) override;
     void EndGpuCapture() override;
     void *GetSharedHandle(GpuTexture *InGpuTexture) override;
     GpuCmdRecorder* BeginRecording(const FString& RecorderName = {}) override;
@@ -36,4 +36,6 @@ public:
     virtual void* MapGpuBuffer(GpuBuffer* InGpuBuffer, GpuResourceMapMode InMapMode) override;
     virtual void UnMapGpuBuffer(GpuBuffer* InGpuBuffer) override;
 };
+
+inline MetalGpuRhiBackend* GMtlGpuRhi;
 }

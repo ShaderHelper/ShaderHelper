@@ -193,9 +193,9 @@ public:
 		return RhiBackend->CrossCompileShader(InShader, OutErrorInfo);
 	}
 
-	void BeginGpuCapture(const FString &SavedFileName) override
+	void BeginGpuCapture(const FString &CaptureName) override
 	{
-		RhiBackend->BeginGpuCapture(SavedFileName);
+		RhiBackend->BeginGpuCapture(CaptureName);
 	}
 
 	void EndGpuCapture() override

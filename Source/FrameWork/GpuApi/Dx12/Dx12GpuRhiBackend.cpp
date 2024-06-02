@@ -10,6 +10,7 @@
 #include "Dx12RS.h"
 #include "Dx12Shader.h"
 #include "Dx12Texture.h"
+#include "Common/Path/PathHelper.h"
 
 namespace FRAMEWORK
 {
@@ -224,12 +225,12 @@ void Dx12GpuRhiBackend::UnMapGpuBuffer(GpuBuffer* InGpuBuffer)
 	// do nothing.
 }
 
-void Dx12GpuRhiBackend::BeginGpuCapture(const FString &SavedFileName)
+void Dx12GpuRhiBackend::BeginGpuCapture(const FString &CaptureName)
 {
-#if USE_PIX
-	if (GCanGpuCapture) {
+#if GPU_API_CAPTURE && USE_PIX
+	if (GCanPIXCapture) {
 		PIXCaptureParameters params = {};
-		FString FileName = FString::Format(TEXT("{0}.wpix"), { SavedFileName });
+		FString FileName = FString::Format(TEXT("{0}.wpix"), { PathHelper::SavedCaptureDir() / CaptureName });
 		params.GpuCaptureParameters.FileName = *FileName;
 		PIXBeginCapture(PIX_CAPTURE_GPU, &params);
 	}
@@ -238,8 +239,8 @@ void Dx12GpuRhiBackend::BeginGpuCapture(const FString &SavedFileName)
 
 void Dx12GpuRhiBackend::EndGpuCapture()
 {
-#if USE_PIX
-	if (GCanGpuCapture) {
+#if GPU_API_CAPTURE && USE_PIX
+	if (GCanPIXCapture) {
 		PIXEndCapture(false);
 	}
 #endif

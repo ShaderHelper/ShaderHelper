@@ -11,34 +11,34 @@ namespace FRAMEWORK
         MetalShader* Vs = static_cast<MetalShader*>(InPipelineStateDesc.Vs);
         MetalShader* Ps = static_cast<MetalShader*>(InPipelineStateDesc.Ps);
         
-        MTLRenderPipelineStatePtr PipelineDesc = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
+        MTLRenderPipelineDescriptorPtr PipelineDesc = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
         PipelineDesc->setVertexFunction(Vs->GetCompilationResult());
 		if (Ps) {
 			PipelineDesc->setFragmentFunction(Ps->GetCompilationResult());
 		}
         
-        MTL::RenderPipelineColorAttachmentDescriptorArray* ColorAttachments = PipelineDesc.colorAttachments();
+        MTL::RenderPipelineColorAttachmentDescriptorArray* ColorAttachments = PipelineDesc->colorAttachments();
         for(uint32 i = 0; i < InPipelineStateDesc.Targets.Num(); i++)
         {
             const PipelineTargetDesc& Target = InPipelineStateDesc.Targets[i];
 
             MTL::RenderPipelineColorAttachmentDescriptor* ColorAttachment = ColorAttachments->object(i);
             ColorAttachment->setBlendingEnabled(Target.BlendEnable);
-            ColorAttachment->setSourceRgbBlendFactor(MapBlendFactor(Target.SrcFactor));
-            ColorAttachment->setSourceAlphaBlendFactor(MapBlendFactor(Target.SrcAlphaFactor));
-            ColorAttachment->setDestinationRgbBlendFactor(MapBlendFactor(Target.DestFactor));
-            ColorAttachment->setDestinationAlphaBlendFactor(MapBlendFactor(Target.DestAlphaFactor));
-            ColorAttachment->setRgbBlendOperation(MapBlendOp(Target.ColorOp));
-            ColorAttachment->setAlphaBlendOperation((MapBlendOp(Target.AlphaOp));
+            ColorAttachment->setSourceRGBBlendFactor((MTL::BlendFactor)MapBlendFactor(Target.SrcFactor));
+            ColorAttachment->setSourceAlphaBlendFactor((MTL::BlendFactor)MapBlendFactor(Target.SrcAlphaFactor));
+            ColorAttachment->setDestinationRGBBlendFactor((MTL::BlendFactor)MapBlendFactor(Target.DestFactor));
+            ColorAttachment->setDestinationAlphaBlendFactor((MTL::BlendFactor)MapBlendFactor(Target.DestAlphaFactor));
+            ColorAttachment->setRgbBlendOperation((MTL::BlendOperation)MapBlendOp(Target.ColorOp));
+            ColorAttachment->setAlphaBlendOperation((MTL::BlendOperation)MapBlendOp(Target.AlphaOp));
             ColorAttachment->setWriteMask(MapWriteMask(Target.Mask));
-            ColorAttachment->setPixelFormat(MapTextureFormat(Target.TargetFormat));
+            ColorAttachment->setPixelFormat((MTL::PixelFormat)MapTextureFormat(Target.TargetFormat));
         }
 
         NS::Error* err = nullptr;
-        MTLRenderPipelinePtr PipelineState = GDevice->newRenderPipelineState(PipelineDesc, MTL::PipelineOptionNone ,nullptr ,&err);
+        MTLRenderPipelineStatePtr PipelineState = NS::TransferPtr(GDevice->newRenderPipelineState(PipelineDesc.get(), MTL::PipelineOptionNone ,nullptr ,&err));
         if (!PipelineState)
         {
-            SH_LOG(LogMetal, Fatal, TEXT("Failed to create render pipeline: %s"), *NSStringToFString(err->localizedDescription));
+            SH_LOG(LogMetal, Fatal, TEXT("Failed to create render pipeline: %s"), *NSStringToFString(err->localizedDescription()));
             //TDOO: fallback to default pipeline.
         }
         

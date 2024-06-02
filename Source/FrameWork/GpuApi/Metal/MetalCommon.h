@@ -5,6 +5,12 @@
 #include <Foundation/Foundation.hpp>
 #include <QuartzCore/QuartzCore.hpp>
 
+#ifndef GENERATE_XCODE_GPUTRACE
+#define GENERATE_XCODE_GPUTRACE 0
+#endif
+
+
+
 DECLARE_LOG_CATEGORY_EXTERN(LogMetal, Log, All);
 inline DEFINE_LOG_CATEGORY(LogMetal);
 

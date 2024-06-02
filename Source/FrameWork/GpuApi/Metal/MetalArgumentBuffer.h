@@ -9,11 +9,11 @@ namespace FRAMEWORK
     {
     public:
         MetalBindGroupLayout(const GpuBindGroupLayoutDesc& LayoutDesc);
-        id<MTLArgumentEncoder> GetVertexArgumentEncoder() const { 
-            return (id<MTLArgumentEncoder>)VertexArgumentEncoder.get(); 
+        MTL::ArgumentEncoder* GetVertexArgumentEncoder() const {
+            return VertexArgumentEncoder.get();
         }
-        id<MTLArgumentEncoder> GetFragmentArgumentEncoder() const { 
-            return (id<MTLArgumentEncoder>)FragmentArgumentEncoder.get(); 
+        MTL::ArgumentEncoder* GetFragmentArgumentEncoder() const {
+            return FragmentArgumentEncoder.get();
         }
         
         MTLResourceUsage GetResourceUsage(BindingSlot InSlot) const {
@@ -37,12 +37,12 @@ namespace FRAMEWORK
     {
     public:
         MetalBindGroup(const GpuBindGroupDesc& InDesc);
-        void Apply(id<MTLRenderCommandEncoder> Encoder);
+        void Apply(MTL::RenderCommandEncoder* Encoder);
         
     private:
         TRefCountPtr<MetalBuffer> VertexArgumentBuffer;
         TRefCountPtr<MetalBuffer> FragmentArgumentBuffer;
-        TMap<BindingSlot, id<MTLResource>> BindGroupResources;
+        TMap<BindingSlot, MTL::Resource*> BindGroupResources;
     };
 
     TRefCountPtr<MetalBindGroupLayout> CreateMetalBindGroupLayout(const GpuBindGroupLayoutDesc& LayoutDesc);

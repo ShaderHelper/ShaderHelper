@@ -39,7 +39,7 @@ namespace FRAMEWORK
 		if (GetModuleHandle(L"WinPixGpuCapturer.dll") == 0)
 		{
 			if (LoadLibrary(GetLatestWinPixGpuCapturerPath().c_str())) {
-				GCanGpuCapture = true;
+                GCanPIXCapture = true;
 			}
 		}
 #endif

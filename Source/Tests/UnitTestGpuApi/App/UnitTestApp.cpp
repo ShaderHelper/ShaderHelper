@@ -24,7 +24,7 @@ namespace UNITTEST_GPUAPI
 	{
 		App::Render();
 
-		GGpuRhi->BeginGpuCapture("TestCast");
+		//GGpuRhi->BeginGpuCapture("TestCast");
 
 		uint16 TestData = 0xFD5E; //NaN 64862
 		TArray<uint8> RawData((uint8*)&TestData, sizeof(TestData));
@@ -72,7 +72,7 @@ namespace UNITTEST_GPUAPI
 		GGpuRhi->EndRecording(CmdRecorder);
 		GGpuRhi->Submit({CmdRecorder});
 
-		GGpuRhi->EndGpuCapture();
+		//GGpuRhi->EndGpuCapture();
 	}
 
 }

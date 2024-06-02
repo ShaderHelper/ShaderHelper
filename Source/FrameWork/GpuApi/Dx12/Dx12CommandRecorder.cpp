@@ -12,7 +12,7 @@ namespace FRAMEWORK
 		, CurrentBindGroup1(nullptr)
 		, CurrentBindGroup2(nullptr)
 		, CurrentBindGroup3(nullptr)
-		, IsPipelineDirty(false)
+		, IsRenderPipelineDirty(false)
 		, IsRenderTargetDirty(false)
 		, IsVertexBufferDirty(false)
 		, IsViewportDirty(false)
@@ -67,12 +67,12 @@ namespace FRAMEWORK
 			IsVertexBufferDirty = false;
 		}
 
-		if (IsPipelineDirty)
+		if (IsRenderPipelineDirty)
 		{
 			check(CurrentPso);
 			InCmdList->SetPipelineState(CurrentPso->GetResource());
 			InCmdList->IASetPrimitiveTopology(CurrentPso->GetPritimiveTopology());
-			IsPipelineDirty = false;
+            IsRenderPipelineDirty = false;
 		}
 
 		if (IsRootSigDirty)
@@ -154,7 +154,7 @@ namespace FRAMEWORK
 
 		ClearColorValues.Reset();
 
-		IsPipelineDirty = false;
+        IsRenderPipelineDirty = false;
 		IsRenderTargetDirty = false;
 		IsVertexBufferDirty = false;
 		IsViewportDirty = false;
@@ -189,7 +189,7 @@ namespace FRAMEWORK
 		if (CurrentPso != InPso)
 		{
 			CurrentPso = InPso;
-			IsPipelineDirty = true;
+            IsRenderPipelineDirty = true;
 		}
 	}
 
@@ -352,14 +352,14 @@ namespace FRAMEWORK
 
 	void Dx12CmdRecorder::BeginCaptureEvent(const FString& EventName)
 	{
-#if USE_PIX
+#if GPU_API_CAPTURE && USE_PIX
 		PIXBeginEvent(CmdList.GetReference(), PIX_COLOR_DEFAULT, *EventName);
 #endif
 	}
 
 	void Dx12CmdRecorder::EndCaptureEvent()
 	{
-#if USE_PIX
+#if GPU_API_CAPTURE && USE_PIX
 		PIXEndEvent(CmdList.GetReference());
 #endif
 	}
