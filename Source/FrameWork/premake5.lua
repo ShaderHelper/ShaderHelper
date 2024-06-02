@@ -1,11 +1,14 @@
 FrameWorkHierarchy = {
-    ["Sources/*"] = {"**.h","**.cpp", "**.hpp"},
-	["Shaders/*"] = {"%{_WORKING_DIR}/Resource/Shaders/**.hlsl"}
+    ["Sources/*"] = {"**"},
+    ["Shaders/*"] = {"%{_WORKING_DIR}/Resource/Shaders/**.hlsl"},
+    ["Premake/*"] = {"%{_WORKING_DIR}/Premake/**.lua"}
 }
 
 project "FrameWork"
     kind "SharedLib"   
     location "%{_WORKING_DIR}/ProjectFiles"
+
+	addToProjectHierarchy(FrameWorkHierarchy)
 
     includedirs
     {
@@ -20,13 +23,12 @@ project "FrameWork"
         "UE", "magic_enum"
     }
 	
-	addToProjectHierarchy(FrameWorkHierarchy);
-	addToProjectHierarchy(UeHierarchy);
-    addToProjectHierarchy(magic_enumHierarchy);
-	
-	filter {"files:**/External/UE/Src/**.cpp or **/External/UE/Src/**.mm"}
+	addToProjectHierarchy(UeHierarchy)
+    addToProjectHierarchy(magic_enumHierarchy)
+
+    filter {"files:**/External/UE/**"}
         flags {"ExcludeFromBuild"}
-		
+			
     filter {"system:macosx","files:**/Dx12/*.cpp"}
         flags {"ExcludeFromBuild"}
 
@@ -43,9 +45,9 @@ project "FrameWork"
         private_uses {
             "DXC", "AgilitySDK", "WinPixEventRuntime"
         }
-		addToProjectHierarchy(AgilitySDKHierarchy);
-		addToProjectHierarchy(DXCHierarchy);
-		addToProjectHierarchy(WinPixEventRuntimeHierarchy);
+		addToProjectHierarchy(AgilitySDKHierarchy)
+		addToProjectHierarchy(DXCHierarchy)
+		addToProjectHierarchy(WinPixEventRuntimeHierarchy)
 		
         links {
             "d3d12", "dxgi", "dxguid"
@@ -53,13 +55,18 @@ project "FrameWork"
 
     filter "system:macosx"
         private_uses { 
-            "MtlppUE", "ShaderConductor"
+            "ShaderConductor", "metal-cpp"
         }
+        addToProjectHierarchy(shaderConductorHierarchy)
+        addToProjectHierarchy(metalcppHierarchy)
+        
         links
         {
             "Cocoa.framework",
             "Metal.framework",
             "CoreVideo.framework",
+            "QuartzCore.framework",
+            "Foundation.framework",
         }
     filter "system:linux"
         rtti "Off"

@@ -1,12 +1,5 @@
 UeHierarchy = {
-    ["External/UE/Src/**"] = {
-		"%{_WORKING_DIR}/External/UE/Src/**.h",
-		"%{_WORKING_DIR}/External/UE/Src/**.cpp", 
-		"%{_WORKING_DIR}/External/UE/Src/**.hpp"
-	},
-	["External/UE/Shader/**"] = {
-		"%{_WORKING_DIR}/External/UE/Shader/**.*",
-	},
+    ["External/UE/*"] = { "%{_WORKING_DIR}/External/UE/**" },
 }
 
 ue_module = {
@@ -38,7 +31,6 @@ end
 
 usage "UE"
     generateIncludeDir_ue()
-		
     filter "system:windows"
         libdirs
         {

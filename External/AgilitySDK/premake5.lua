@@ -1,5 +1,5 @@
 AgilitySDKHierarchy = {
-    ["External/AgilitySDK"] = {"%{_WORKING_DIR}/External/AgilitySDK/Inc/*.h"},
+    ["External/AgilitySDK/*"] = {"%{_WORKING_DIR}/External/AgilitySDK/**"},
 }
 
 usage "AgilitySDK"

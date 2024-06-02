@@ -73,7 +73,6 @@ namespace FRAMEWORK
 		D3D12_RESOURCE_STATES InitialState = InInitialState;
 		CD3DX12_RESOURCE_DESC BufferDesc = CD3DX12_RESOURCE_DESC::Buffer(InSize);
 
-		//TODO: CreatePlacedResource
 		DxCheck(GDevice->CreateCommittedResource(&HeapType, D3D12_HEAP_FLAG_NONE,
 			&BufferDesc, InitialState, nullptr, IID_PPV_ARGS(Resource.GetInitReference())));
 		Resource->SetName(TEXT("BumpBuffer"));

@@ -5,6 +5,29 @@
 namespace FRAMEWORK
 {
 
+	inline D3D12_RESOURCE_STATES MapResourceState(GpuResourceState InResourceState)
+	{
+		switch (InResourceState)
+		{
+		case GpuResourceState::RenderTargetWrite:                return D3D12_RESOURCE_STATE_RENDER_TARGET;
+		case GpuResourceState::CopyDst:                          return D3D12_RESOURCE_STATE_COPY_DEST;
+		default:
+			check(!EnumHasAnyFlags(InResourceState, GpuResourceState::WriteMask));
+			D3D12_RESOURCE_STATES State{};
+			if (EnumHasAnyFlags(InResourceState, GpuResourceState::ShaderResourceRead))
+			{
+				State |= D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
+			}
+			if (EnumHasAnyFlags(InResourceState, GpuResourceState::CopySrc))
+			{
+				State |= D3D12_RESOURCE_STATE_COPY_SOURCE;
+			}
+
+			check(State != D3D12_RESOURCE_STATE_COMMON);
+			return State;
+		}
+	}
+
     inline D3D12_BLEND MapBlendFactor(BlendFactor InFactor)
     {
         switch (InFactor)

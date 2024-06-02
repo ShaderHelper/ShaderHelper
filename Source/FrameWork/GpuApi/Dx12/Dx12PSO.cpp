@@ -27,8 +27,10 @@ namespace FRAMEWORK
 		}
 	}
 
-    TRefCountPtr<Dx12Pso> CreateDx12Pso(const GpuPipelineStateDesc& InPipelineStateDesc)
+    TRefCountPtr<Dx12RenderPso> CreateDx12RenderPso(const GpuRenderPipelineStateDesc& InPipelineStateDesc)
     {
+		const uint32 TargetNum = InPipelineStateDesc.Targets.Num();
+
         Dx12Shader* Vs = static_cast<Dx12Shader*>(InPipelineStateDesc.Vs);
         Dx12Shader* Ps = static_cast<Dx12Shader*>(InPipelineStateDesc.Ps);
 
@@ -50,13 +52,12 @@ namespace FRAMEWORK
         PsoDesc.DepthStencilState.StencilEnable = false;
         PsoDesc.SampleMask = UINT_MAX;
         PsoDesc.PrimitiveTopologyType = MapTopologyType(MapPrimitiveType(InPipelineStateDesc.Primitive));
-        PsoDesc.NumRenderTargets = 1;
+        PsoDesc.NumRenderTargets = TargetNum;
         PsoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
         PsoDesc.SampleDesc.Count = 1;
         PsoDesc.SampleDesc.Quality = 0;
         
 		CD3DX12_BLEND_DESC BlendDesc = CD3DX12_BLEND_DESC(CD3DX12_DEFAULT{});
-        const uint32 TargetNum = InPipelineStateDesc.Targets.Num();
         for(uint32 i = 0 ; i < TargetNum; i++)
         {
             PsoDesc.RTVFormats[i] = MapTextureFormat(InPipelineStateDesc.Targets[i].TargetFormat);
@@ -75,6 +76,6 @@ namespace FRAMEWORK
 
         TRefCountPtr<ID3D12PipelineState> Pso;
         DxCheck(GDevice->CreateGraphicsPipelineState(&PsoDesc, IID_PPV_ARGS(Pso.GetInitReference())));
-        return new Dx12Pso(MoveTemp(Pso), MapPrimitiveType(InPipelineStateDesc.Primitive));
+        return new Dx12RenderPso(MoveTemp(Pso), MapPrimitiveType(InPipelineStateDesc.Primitive));
     }
 }

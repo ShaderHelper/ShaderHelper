@@ -1,29 +1,42 @@
 #pragma once
-#include "GpuApi/GpuResource.h"
+#include "GpuApi/GpuRhi.h"
 
 namespace FRAMEWORK
 {
 	//TODO
 
-	using PassExecution = TFunction<void()>;
+	using RenderPassExecution = TFunction<void(GpuRenderPassRecorder*)>;
+
+	enum class RGPassFlag
+	{
+		Render,
+		Compute,
+	};
 
 	struct RGPass
 	{
 		FString Name;
-		GpuRenderPassDesc Info;
-		PassExecution Execution;
+		RGPassFlag Flag;
+	};
+
+	struct RGRenderPass : RGPass
+	{
+		GpuRenderPassDesc Desc;
+		RenderPassExecution Execution;
 	};
 
 	class RenderGraph
 	{
 	public:
-		RenderGraph() = default;
-		void AddPass(const FString& PassName, const GpuRenderPassDesc& PassInfo,
-			const PassExecution& InExecution);
+		RenderGraph();
+		RenderGraph(GpuCmdRecorder* InCmdRecorder);
+		void AddRenderPass(const FString& PassName, const GpuRenderPassDesc& PassInfo,
+			const RenderPassExecution& InExecution);
 
 		void Execute();
 
 	private:
-		TArray<RGPass> RGPasses;
+		TArray<TUniquePtr<RGPass>> RGPasses;
+		GpuCmdRecorder* CmdRecorder;
 	};
 }

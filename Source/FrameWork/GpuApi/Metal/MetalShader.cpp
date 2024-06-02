@@ -20,19 +20,19 @@ namespace FRAMEWORK
     {
         check(!InShader->GetMslText().IsEmpty());
         
-        ns::AutoReleasedError Err;
-        mtlpp::CompileOptions CompOpt;
-        CompOpt.SetLanguageVersion(mtlpp::LanguageVersion::Version2_2);
+        NS::Error* err = nullptr;
+        NS::SharedPtr<MTL::CompileOptions> CompOpt = NS::TransferPtr(MTL::CompileOptions::alloc()->init());
+        CompOpt->setLanguageVersion(MTL::LanguageVersion2_2);
         
-        mtlpp::Library ByteCodeLib = GDevice.NewLibrary(TCHAR_TO_ANSI(*InShader->GetMslText()), CompOpt, &Err);
+        MTLLibraryPtr ByteCodeLib = NS::TransferPtr(GDevice->newLibrary(FStringToNSString(InShader->GetMslText()), CompOpt.get(), &err));
         
         if(!ByteCodeLib) {
-            OutErrorInfo = [Err.GetPtr() localizedDescription];
+            OutErrorInfo = NSStringToFString(err->localizedDescription());
             SH_LOG(LogMetal, Error, TEXT("Msl compilation failed: %s"), *OutErrorInfo);
             return false;
         }
         
-        mtlpp::Function ByteCodeFunc = ByteCodeLib.NewFunction(TCHAR_TO_ANSI(*InShader->GetEntryPoint()));
+        MTLFunctionPtr ByteCodeFunc = NS::TransferPtr(ByteCodeLib->newFunction(FStringToNSString(InShader->GetEntryPoint())));
         if(!ByteCodeFunc) {
             SH_LOG(LogMetal, Error, TEXT("Msl compilation failed: EntryPoint not found: %s "), *InShader->GetEntryPoint());
             return false;

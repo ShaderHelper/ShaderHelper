@@ -7,21 +7,21 @@ namespace FRAMEWORK
     class MetalBuffer : public GpuBuffer
     {
     public:
-        MetalBuffer(mtlpp::Buffer InBuffer, GpuBufferUsage Usage)
+        MetalBuffer(MTLBufferPtr InBuffer, GpuBufferUsage Usage)
             : GpuBuffer(Usage)
             , Buffer(MoveTemp(InBuffer))
         {}
         
     public:
-        id<MTLBuffer> GetResource() const { return Buffer.GetPtr(); }
+        MTL::Buffer* GetResource() const { return Buffer.get(); }
         void* GetContents() {
-            void* Data = Buffer.GetContents();
+            void* Data = Buffer->contents();
             check(Data);
             return Data;
         }
         
     private:
-        mtlpp::Buffer Buffer;
+        MTLBufferPtr Buffer;
     };
 
     TRefCountPtr<MetalBuffer> CreateMetalBuffer(uint64 BufferSize, GpuBufferUsage Usage);

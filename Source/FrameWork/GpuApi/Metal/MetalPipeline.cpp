@@ -6,41 +6,42 @@
 
 namespace FRAMEWORK
 {
-	TRefCountPtr<MetalPipelineState> CreateMetalPipelineState(const GpuPipelineStateDesc& InPipelineStateDesc)
+	TRefCountPtr<MetalRenderPipelineState> CreateMetalRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc)
     {
         MetalShader* Vs = static_cast<MetalShader*>(InPipelineStateDesc.Vs);
         MetalShader* Ps = static_cast<MetalShader*>(InPipelineStateDesc.Ps);
         
-        mtlpp::RenderPipelineDescriptor PipelineDesc;
-        PipelineDesc.SetVertexFunction(Vs->GetCompilationResult());
+        MTLRenderPipelineDescriptorPtr PipelineDesc = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
+        PipelineDesc->setVertexFunction(Vs->GetCompilationResult());
 		if (Ps) {
-			PipelineDesc.SetFragmentFunction(Ps->GetCompilationResult());
+			PipelineDesc->setFragmentFunction(Ps->GetCompilationResult());
 		}
         
-        ns::AutoReleased<ns::Array<mtlpp::RenderPipelineColorAttachmentDescriptor>> ColorAttachments = PipelineDesc.GetColorAttachments();
+        MTL::RenderPipelineColorAttachmentDescriptorArray* ColorAttachments = PipelineDesc->colorAttachments();
         for(uint32 i = 0; i < InPipelineStateDesc.Targets.Num(); i++)
         {
             const PipelineTargetDesc& Target = InPipelineStateDesc.Targets[i];
-            ColorAttachments[i].SetBlendingEnabled(Target.BlendEnable);
-            ColorAttachments[i].SetSourceRgbBlendFactor((mtlpp::BlendFactor)MapBlendFactor(Target.SrcFactor));
-            ColorAttachments[i].SetSourceAlphaBlendFactor((mtlpp::BlendFactor)MapBlendFactor(Target.SrcAlphaFactor));
-            ColorAttachments[i].SetDestinationRgbBlendFactor((mtlpp::BlendFactor)MapBlendFactor(Target.DestFactor));
-            ColorAttachments[i].SetDestinationAlphaBlendFactor((mtlpp::BlendFactor)MapBlendFactor(Target.DestAlphaFactor));
-            ColorAttachments[i].SetRgbBlendOperation((mtlpp::BlendOperation)MapBlendOp(Target.ColorOp));
-            ColorAttachments[i].SetAlphaBlendOperation((mtlpp::BlendOperation)MapBlendOp(Target.AlphaOp));
-            ColorAttachments[i].SetWriteMask((mtlpp::ColorWriteMask)MapWriteMask(Target.Mask));
-            
-            ColorAttachments[i].SetPixelFormat((mtlpp::PixelFormat)MapTextureFormat(Target.TargetFormat));
+
+            MTL::RenderPipelineColorAttachmentDescriptor* ColorAttachment = ColorAttachments->object(i);
+            ColorAttachment->setBlendingEnabled(Target.BlendEnable);
+            ColorAttachment->setSourceRGBBlendFactor((MTL::BlendFactor)MapBlendFactor(Target.SrcFactor));
+            ColorAttachment->setSourceAlphaBlendFactor((MTL::BlendFactor)MapBlendFactor(Target.SrcAlphaFactor));
+            ColorAttachment->setDestinationRGBBlendFactor((MTL::BlendFactor)MapBlendFactor(Target.DestFactor));
+            ColorAttachment->setDestinationAlphaBlendFactor((MTL::BlendFactor)MapBlendFactor(Target.DestAlphaFactor));
+            ColorAttachment->setRgbBlendOperation((MTL::BlendOperation)MapBlendOp(Target.ColorOp));
+            ColorAttachment->setAlphaBlendOperation((MTL::BlendOperation)MapBlendOp(Target.AlphaOp));
+            ColorAttachment->setWriteMask(MapWriteMask(Target.Mask));
+            ColorAttachment->setPixelFormat((MTL::PixelFormat)MapTextureFormat(Target.TargetFormat));
         }
 
-        ns::AutoReleasedError Err;
-        mtlpp::RenderPipelineState PipelineState = GDevice.NewRenderPipelineState(PipelineDesc, mtlpp::PipelineOption::NoPipelineOption ,nullptr ,&Err);
+        NS::Error* err = nullptr;
+        MTLRenderPipelineStatePtr PipelineState = NS::TransferPtr(GDevice->newRenderPipelineState(PipelineDesc.get(), MTL::PipelineOptionNone ,nullptr ,&err));
         if (!PipelineState)
         {
-            SH_LOG(LogMetal, Fatal, TEXT("Failed to create render pipeline: %s"), *FString([Err.GetPtr() description]));
+            SH_LOG(LogMetal, Fatal, TEXT("Failed to create render pipeline: %s"), *NSStringToFString(err->localizedDescription()));
             //TDOO: fallback to default pipeline.
         }
         
-        return new MetalPipelineState(MoveTemp(PipelineState), MapPrimitiveType(InPipelineStateDesc.Primitive));
+        return new MetalRenderPipelineState(MoveTemp(PipelineState), MapPrimitiveType(InPipelineStateDesc.Primitive));
     }
 }

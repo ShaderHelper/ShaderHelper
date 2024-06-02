@@ -36,15 +36,15 @@ namespace FRAMEWORK
 			ShaderBindGroupLayout = MoveTemp(InBindGroupLayout);
 		}
 
-		void ApplyBindGroupLayout(GpuPipelineStateDesc& OutDesc)
+		void ApplyBindGroupLayout(GpuRenderPipelineStateDesc& OutDesc)
 		{
 			OutDesc.BindGroupLayout0 = GlobalBindGroupLayout;
 			OutDesc.BindGroupLayout2 = ShaderBindGroupLayout;
 		}
 
-		void ApplyBindGroup() const
+		void ApplyBindGroup(GpuRenderPassRecorder* InPassRecorder) const
 		{
-			GGpuRhi->SetBindGroups(GlobalBindGroup, nullptr, ShaderBindGroup, nullptr);
+			InPassRecorder->SetBindGroups(GlobalBindGroup, nullptr, ShaderBindGroup, nullptr);
 		}
 
 	private:

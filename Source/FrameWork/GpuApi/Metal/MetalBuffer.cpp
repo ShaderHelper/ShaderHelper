@@ -6,15 +6,15 @@ namespace FRAMEWORK
 {
     TRefCountPtr<MetalBuffer> CreateMetalBuffer(uint64 BufferSize, GpuBufferUsage Usage)
     {
-        mtlpp::Buffer Buffer;
+        MTL::Buffer* Buffer = nullptr;
         if(EnumHasAnyFlags(Usage, GpuBufferUsage::Static))
         {
-            Buffer = GDevice.NewBuffer(BufferSize, mtlpp::ResourceOptions::StorageModePrivate);
+            Buffer = GDevice->newBuffer(BufferSize, MTL::ResourceStorageModePrivate);
         }
         else
         {
-            Buffer = GDevice.NewBuffer(BufferSize, mtlpp::ResourceOptions::StorageModeShared);
+            Buffer = GDevice->newBuffer(BufferSize, MTL::ResourceStorageModeShared);
         }
-        return new MetalBuffer(MoveTemp(Buffer), Usage);
+        return new MetalBuffer(NS::TransferPtr(Buffer), Usage);
     }
 }

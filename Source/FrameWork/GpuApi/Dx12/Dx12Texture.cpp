@@ -1,8 +1,9 @@
 #include "CommonHeader.h"
 #include "Dx12Texture.h"
 #include "Dx12Device.h"
-#include "Dx12CommandList.h"
+#include "Dx12CommandRecorder.h"
 #include "Dx12Map.h"
+#include "Dx12GpuRhiBackend.h"
 
 namespace FRAMEWORK
 {
@@ -12,9 +13,9 @@ namespace FRAMEWORK
 		bool bSRV;
 	};
 
-	Dx12Texture::Dx12Texture(D3D12_RESOURCE_STATES InState, TRefCountPtr<ID3D12Resource> InResource, GpuTextureDesc InDesc, void* InSharedHandle)
+	Dx12Texture::Dx12Texture(TRefCountPtr<ID3D12Resource> InResource, GpuTextureDesc InDesc, void* InSharedHandle)
 		: GpuTexture(MoveTemp(InDesc))
-		, TrackedResource(InState), Resource(MoveTemp(InResource))
+		, Resource(MoveTemp(InResource))
 		, SharedHandle(InSharedHandle)
 	{
 
@@ -52,54 +53,67 @@ namespace FRAMEWORK
 			OutFlags.bShared = true;
 		}
 
-		if (!EnumHasAnyFlags(OutResourceFlag, D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE)) {
+		if (EnumHasAnyFlags(InFlags, GpuTextureUsage::ShaderResource)) {
 			OutFlags.bSRV = true;
 		}
 	}
 
-	static void GetInitialResourceState(const FlagSets& InFlags, D3D12_RESOURCE_STATES& OutResourceState) 
+	static D3D12_RESOURCE_STATES GetInitialResourceState(const FlagSets& InFlags, GpuResourceState& OutState)
 	{
-		
 		bool bWritable = InFlags.bRTV;
-		if (InFlags.bSRV && !bWritable) {
-			OutResourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		bool bReadable = InFlags.bSRV;
+		check(!(bWritable && bReadable));
+
+		if (bReadable)
+		{
+			if (InFlags.bSRV) {
+				OutState = GpuResourceState::ShaderResourceRead;
+				return D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
+			}
+
+		}
+		else
+		{
+			if (InFlags.bRTV) {
+				OutState = GpuResourceState::RenderTargetWrite;
+				return D3D12_RESOURCE_STATE_RENDER_TARGET;
+			}
 		}
 
-		if (InFlags.bRTV) {
-			OutResourceState = D3D12_RESOURCE_STATE_RENDER_TARGET;
-		}
-		
+		check(false);
+		return D3D12_RESOURCE_STATE_COMMON;
 	}
 
 	static void CreateTextureView(const FlagSets& InFlags, Dx12Texture* InTexture)
 	{
 
 		if (InFlags.bSRV) {
-			InTexture->SRV = GCommandListContext->AllocCpuCbvSrvUav();
+			InTexture->SRV = AllocCpuCbvSrvUav();
 			GDevice->CreateShaderResourceView(InTexture->GetResource(), nullptr, InTexture->SRV->GetHandle());
 		}
 
 		if (InFlags.bRTV) {
-			InTexture->RTV = GCommandListContext->AllocRtv();
+			InTexture->RTV = AllocRtv();
 			GDevice->CreateRenderTargetView(InTexture->GetResource(), nullptr, InTexture->RTV->GetHandle());
 		}
 	}
 
-	TRefCountPtr<Dx12Texture> CreateDx12Texture2D(const GpuTextureDesc& InTexDesc)
+	TRefCountPtr<Dx12Texture> CreateDx12Texture2D(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
 	{
 		if (!ValidateTexture(InTexDesc)) {
 			return nullptr;
+		}
+
+		bool bHasInitialData = false;
+		if (!InTexDesc.InitialData.IsEmpty())
+		{
+			bHasInitialData = true;
 		}
 
 		D3D12_RESOURCE_FLAGS ResourceFlags = D3D12_RESOURCE_FLAG_NONE;
 		
 		FlagSets Flags{};
 		GetDx12ResourceFlags(InTexDesc.Usage, ResourceFlags, Flags);
-
-		bool bHasInitialData = false;
-		if (!InTexDesc.InitialData.IsEmpty()) {
-			bHasInitialData = true;
-		}
 
 		CD3DX12_RESOURCE_DESC TexDesc = CD3DX12_RESOURCE_DESC::Tex2D(
 			MapTextureFormat(InTexDesc.Format),
@@ -114,11 +128,8 @@ namespace FRAMEWORK
 		CD3DX12_HEAP_PROPERTIES HeapType{ D3D12_HEAP_TYPE_DEFAULT };
 		D3D12_HEAP_FLAGS HeapFlag = Flags.bShared ? D3D12_HEAP_FLAG_SHARED : D3D12_HEAP_FLAG_NONE;
 
-		D3D12_RESOURCE_STATES InitialState = D3D12_RESOURCE_STATE_COMMON;
-		GetInitialResourceState(Flags, InitialState);
-		//If have initial data, we need to set state to COPY_DEST.
-		//Don't call MapGpuTexture()/UnMapGpuTexture() to avoid generating extra barrier.
-		D3D12_RESOURCE_STATES ActualState = bHasInitialData ? D3D12_RESOURCE_STATE_COPY_DEST : InitialState;
+		D3D12_RESOURCE_STATES FinalState = InitState == GpuResourceState::Unknown ? GetInitialResourceState(Flags, InitState) : MapResourceState(InitState);
+		D3D12_RESOURCE_STATES InitialState = bHasInitialData ? D3D12_RESOURCE_STATE_COPY_DEST : FinalState;
 
 		//Fast Clear Optimization
 		const float ClearColor[4] = { InTexDesc.ClearValues.X, InTexDesc.ClearValues.Y, InTexDesc.ClearValues.Z, InTexDesc.ClearValues.W };
@@ -129,28 +140,12 @@ namespace FRAMEWORK
 		if(Flags.bRTV)
 		{ 
 			DxCheck(GDevice->CreateCommittedResource(&HeapType, HeapFlag,
-				&TexDesc, ActualState, &ClearValues, IID_PPV_ARGS(TexResource.GetInitReference())));
+				&TexDesc, InitialState, &ClearValues, IID_PPV_ARGS(TexResource.GetInitReference())));
 		}
 		else
 		{
 			DxCheck(GDevice->CreateCommittedResource(&HeapType, HeapFlag,
-				&TexDesc, ActualState, nullptr, IID_PPV_ARGS(TexResource.GetInitReference())));
-		}
-
-		TRefCountPtr<Dx12Buffer> UploadBuffer;
-		if (bHasInitialData) {
-			const uint32 UploadBufferSize = (uint32)GetRequiredIntermediateSize(TexResource, 0, 1);
-			UploadBuffer = CreateDx12Buffer(UploadBufferSize, GpuBufferUsage::Dynamic);
-			
-			D3D12_SUBRESOURCE_DATA textureData = {};
-			textureData.pData = &InTexDesc.InitialData[0];
-			textureData.RowPitch = InTexDesc.Width * GetTextureFormatByteSize(InTexDesc.Format);
-			textureData.SlicePitch = textureData.RowPitch * InTexDesc.Height;
-
-			const CommonAllocationData& AllocationData = UploadBuffer->GetAllocation().GetAllocationData().Get<CommonAllocationData>();
-			UpdateSubresources(GCommandListContext->GetCommandListHandle(), TexResource, AllocationData.UnderlyResource, 0, 0, 1, &textureData);
-			CD3DX12_RESOURCE_BARRIER Barrier = CD3DX12_RESOURCE_BARRIER::Transition(TexResource, ActualState, InitialState);
-			GCommandListContext->GetCommandListHandle()->ResourceBarrier(1, &Barrier);
+				&TexDesc, InitialState, nullptr, IID_PPV_ARGS(TexResource.GetInitReference())));
 		}
 
 		void* SharedHandle = nullptr;
@@ -158,11 +153,31 @@ namespace FRAMEWORK
 		{
 			GDevice->CreateSharedHandle(TexResource, nullptr, GENERIC_ALL, nullptr, &SharedHandle);
 		}
-		
-		TRefCountPtr<Dx12Texture> RetTexture = new Dx12Texture{ InitialState, MoveTemp(TexResource), InTexDesc, SharedHandle};
-		RetTexture->UploadBuffer = MoveTemp(UploadBuffer);
+
+		TRefCountPtr<Dx12Texture> RetTexture = new Dx12Texture{ MoveTemp(TexResource), InTexDesc, SharedHandle };
+		RetTexture->State = bHasInitialData ? GpuResourceState::CopyDst : InitState;
 		CreateTextureView(Flags, RetTexture);
 
+		TRefCountPtr<Dx12Buffer> UploadBuffer;
+		if (bHasInitialData) {
+			const uint32 UploadBufferSize = (uint32)GetRequiredIntermediateSize(RetTexture->GetResource(), 0, 1);
+			UploadBuffer = CreateDx12Buffer(D3D12_RESOURCE_STATE_COPY_SOURCE, UploadBufferSize, GpuBufferUsage::Dynamic);
+
+			D3D12_SUBRESOURCE_DATA textureData = {};
+			textureData.pData = &InTexDesc.InitialData[0];
+			textureData.RowPitch = InTexDesc.Width * GetTextureFormatByteSize(InTexDesc.Format);
+			textureData.SlicePitch = textureData.RowPitch * InTexDesc.Height;
+
+			const CommonAllocationData& AllocationData = UploadBuffer->GetAllocation().GetAllocationData().Get<CommonAllocationData>();
+			GpuCmdRecorder* CmdRecorder = GDx12GpuRhi->BeginRecording();
+			{
+				UpdateSubresources(static_cast<Dx12CmdRecorder*>(CmdRecorder)->GetCommandList(), RetTexture->GetResource(), AllocationData.UnderlyResource, 0, 0, 1, &textureData);
+				CmdRecorder->Barrier(RetTexture, InitState);
+			}
+			GDx12GpuRhi->EndRecording(CmdRecorder);
+			GDx12GpuRhi->Submit({ CmdRecorder });
+		}
+	
 		return RetTexture;
 	}
 
@@ -193,7 +208,7 @@ namespace FRAMEWORK
 			break;
 		}
 
-		TUniquePtr<CpuDescriptor> SamplerDescriptor = GCommandListContext->AllocSampler();
+		TUniquePtr<CpuDescriptor> SamplerDescriptor = AllocSampler();
 		GDevice->CreateSampler(&DxSamplerDesc, SamplerDescriptor->GetHandle());
 
 		return new Dx12Sampler(MoveTemp(SamplerDescriptor));

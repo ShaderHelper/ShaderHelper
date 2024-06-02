@@ -3,12 +3,8 @@
 
 namespace FRAMEWORK
 {
-    inline mtlpp::Device GDevice;
-    inline mtlpp::CommandQueue GCommandQueue;
-//    inline constexpr uint32 AllowableLag = 0;
-//    inline dispatch_semaphore_t CpuSyncGpuSemaphore;
-    
-    inline mtlpp::CaptureScope GCaptureScope;
+    inline MTL::Device* GDevice;
+    inline MTL::CommandQueue* GCommandQueue;
 
     extern void InitMetalCore();
 }

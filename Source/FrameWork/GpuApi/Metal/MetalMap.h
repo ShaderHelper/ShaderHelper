@@ -75,7 +75,7 @@ namespace FRAMEWORK
         }
     }
     
-    inline mtlpp::RenderPassDescriptor MapRenderPassDesc(const GpuRenderPassDesc& PassDesc)
+    inline MTLRenderPassDescriptor* MapRenderPassDesc(const GpuRenderPassDesc& PassDesc)
     {
         MTLRenderPassDescriptor* RawPassDesc = [MTLRenderPassDescriptor new];
         uint32 PassRtNum = PassDesc.ColorRenderTargets.Num();
@@ -83,7 +83,7 @@ namespace FRAMEWORK
         {
             const GpuRenderTargetInfo& RtInfo = PassDesc.ColorRenderTargets[i];
             MetalTexture* Rt = static_cast<MetalTexture*>(RtInfo.Texture);
-            RawPassDesc.colorAttachments[i].texture = Rt->GetResource();
+            RawPassDesc.colorAttachments[i].texture = (id<MTLTexture>)Rt->GetResource();
             RawPassDesc.colorAttachments[i].loadAction = MapLoadAction(RtInfo.LoadAction);
             RawPassDesc.colorAttachments[i].storeAction = MapStoreAction(RtInfo.StoreAction);
         }
@@ -95,7 +95,7 @@ namespace FRAMEWORK
             RawPassDesc.renderTargetHeight = 1;
             RawPassDesc.defaultRasterSampleCount = 1;
         }
-        return mtlpp::RenderPassDescriptor{RawPassDesc, ns::Ownership::Assign};
+        return [RawPassDesc autorelease];
     }
     
     inline MTLPixelFormat MapTextureFormat(const GpuTextureFormat& InTextureFormat)

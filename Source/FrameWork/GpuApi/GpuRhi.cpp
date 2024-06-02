@@ -8,9 +8,106 @@
 #include "./Metal/MetalGpuRhiBackend.h"
 #endif
 #include "GpuApiValidation.h"
+#include "magic_enum.hpp"
 
 namespace FRAMEWORK
 {
+
+class GpuRenderPassRecorderValidation : public GpuRenderPassRecorder
+{
+public:
+	GpuRenderPassRecorderValidation(GpuRenderPassRecorder* InRecorder) : PassRecorder(InRecorder) {}
+
+public:
+	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount) override
+	{
+		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));
+		PassRecorder->DrawPrimitive(StartVertexLocation, VertexCount, StartInstanceLocation, InstanceCount);
+	}
+	void SetRenderPipelineState(GpuPipelineState* InPipelineState) override
+	{
+		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));
+		PassRecorder->SetRenderPipelineState(InPipelineState);
+	}
+	void SetVertexBuffer(GpuBuffer* InVertexBuffer) override
+	{
+		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));
+		PassRecorder->SetVertexBuffer(InVertexBuffer);
+	}
+	void SetViewPort(const GpuViewPortDesc& InViewPortDesc) override
+	{
+		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));
+		PassRecorder->SetViewPort(InViewPortDesc);
+	}
+	void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override
+	{
+		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));
+		check(ValidateSetBindGroups(BindGroup0, BindGroup1, BindGroup2, BindGroup3));
+		PassRecorder->SetBindGroups(BindGroup0, BindGroup1, BindGroup2, BindGroup3);
+	}
+
+	GpuRenderPassRecorder* PassRecorder;
+	bool IsEnd{};
+};
+
+class GpuCmdRecorderValidation : public GpuCmdRecorder
+{
+public:
+	GpuCmdRecorderValidation(const FString& InName, GpuCmdRecorder* InCmdRecorder) 
+		: Name(InName) , CmdRecorder(InCmdRecorder) 
+	{}
+
+public:
+	GpuRenderPassRecorder* BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName) override
+	{
+		check(State == CmdRecorderState::Begin);
+		auto PassRecorderValidation = MakeUnique<GpuRenderPassRecorderValidation>(CmdRecorder->BeginRenderPass(PassDesc, PassName));
+		RequestedPassRecorders.Add(MoveTemp(PassRecorderValidation));
+		return RequestedPassRecorders.Last().Get();
+	}
+	void EndRenderPass(GpuRenderPassRecorder* InRenderPassRecorder) override
+	{
+		check(State == CmdRecorderState::Begin);
+		GpuRenderPassRecorderValidation* PassRecorderValidation = static_cast<GpuRenderPassRecorderValidation*>(InRenderPassRecorder);
+		CmdRecorder->EndRenderPass(PassRecorderValidation->PassRecorder);
+		PassRecorderValidation->IsEnd = true;
+	}
+	void BeginCaptureEvent(const FString& EventName) override
+	{
+		CmdRecorder->BeginCaptureEvent(EventName);
+	}
+	void EndCaptureEvent() override
+	{
+		CmdRecorder->EndCaptureEvent();
+	}
+	void Barrier(GpuTrackedResource* InResource, GpuResourceState NewState) override
+	{
+		check(State == CmdRecorderState::Begin);
+		check(ValidateBarrier(InResource, NewState));
+		CmdRecorder->Barrier(InResource, NewState);
+	}
+
+	void CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture) override
+	{
+		check(State == CmdRecorderState::Begin);
+		check(EnumHasAnyFlags(InBuffer->State, GpuResourceState::CopySrc) && EnumHasAnyFlags(InTexture->State, GpuResourceState::CopyDst));
+		CmdRecorder->CopyBufferToTexture(InBuffer, InTexture);
+	}
+
+	void CopyTextureToBuffer(GpuTexture* InTexture, GpuBuffer* InBuffer) override
+	{
+		check(State == CmdRecorderState::Begin);
+		check(EnumHasAnyFlags(InBuffer->State, GpuResourceState::CopyDst) && EnumHasAnyFlags(InTexture->State, GpuResourceState::CopySrc));
+		CmdRecorder->CopyTextureToBuffer(InTexture, InBuffer);
+	}
+
+	FString Name;
+	GpuCmdRecorder* CmdRecorder;
+	CmdRecorderState State;
+	TArray<TUniquePtr<GpuRenderPassRecorderValidation>> RequestedPassRecorders;
+};
+
+
 // Rhi validation layer, check validation before dispatch commands to concrete api backend.
 class GpuRhiValidation : public GpuRhi
 {
@@ -27,9 +124,9 @@ public:
 	}
 
 public:
-	void FlushGpu() override
+	void WaitGpu() override
 	{
-		RhiBackend->FlushGpu();
+		RhiBackend->WaitGpu();
 	}
 
 	void BeginFrame() override
@@ -39,11 +136,18 @@ public:
 	void EndFrame() override
 	{
 		RhiBackend->EndFrame();
+		RequestedCmdRecorders.Empty();
 	}
 
-	TRefCountPtr<GpuTexture> CreateTexture(const GpuTextureDesc &InTexDesc) override
+	TRefCountPtr<GpuTexture> CreateTexture(const GpuTextureDesc &InTexDesc, GpuResourceState InitState) override
 	{
-		return RhiBackend->CreateTexture(InTexDesc);
+		return RhiBackend->CreateTexture(InTexDesc, InitState);
+	}
+
+	TRefCountPtr<GpuBuffer> CreateBuffer(uint32 ByteSize, GpuBufferUsage Usage, GpuResourceState InitState) override
+	{
+		check(ValidateCreateBuffer(ByteSize, Usage, InitState));
+		return RhiBackend->CreateBuffer(ByteSize, Usage, InitState);
 	}
 
 	TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName, FString EntryPoint) override
@@ -68,15 +172,10 @@ public:
 		return RhiBackend->CreateBindGroupLayout(InBindGroupLayoutDesc);
 	}
 
-	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const GpuPipelineStateDesc &InPipelineStateDesc) override
+	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc) override
 	{
 		check(ValidateCreateRenderPipelineState(InPipelineStateDesc));
 		return RhiBackend->CreateRenderPipelineState(InPipelineStateDesc);
-	}
-
-	TRefCountPtr<GpuBuffer> CreateBuffer(uint32 ByteSize, GpuBufferUsage Usage) override
-	{
-		return RhiBackend->CreateBuffer(ByteSize, Usage);
 	}
 
 	TRefCountPtr<GpuSampler> CreateSampler(const GpuSamplerDesc &InSamplerDesc) override
@@ -84,34 +183,9 @@ public:
 		return RhiBackend->CreateSampler(InSamplerDesc);
 	}
 
-	void SetTextureName(const FString &TexName, GpuTexture *InTexture) override
+	void SetResourceName(const FString& Name, GpuResource* InResource) override
 	{
-		RhiBackend->SetTextureName(TexName, InTexture);
-	}
-
-	void SetBufferName(const FString &BufferName, GpuBuffer *InBuffer) override
-	{
-		RhiBackend->SetBufferName(BufferName, InBuffer);
-	}
-
-	void *MapGpuTexture(GpuTexture *InGpuTexture, GpuResourceMapMode InMapMode, uint32 &OutRowPitch) override
-	{
-		return RhiBackend->MapGpuTexture(InGpuTexture, InMapMode, OutRowPitch);
-	}
-
-	void UnMapGpuTexture(GpuTexture *InGpuTexture) override
-	{
-		RhiBackend->UnMapGpuTexture(InGpuTexture);
-	}
-
-	void *MapGpuBuffer(GpuBuffer *InGpuBuffer, GpuResourceMapMode InMapMode) override
-	{
-		return RhiBackend->MapGpuBuffer(InGpuBuffer, InMapMode);
-	}
-
-	void UnMapGpuBuffer(GpuBuffer *InGpuBuffer) override
-	{
-		RhiBackend->UnMapGpuBuffer(InGpuBuffer);
+		RhiBackend->SetResourceName(Name, InResource);
 	}
 
 	bool CrossCompileShader(GpuShader *InShader, FString &OutErrorInfo) override
@@ -119,40 +193,9 @@ public:
 		return RhiBackend->CrossCompileShader(InShader, OutErrorInfo);
 	}
 
-	void SetRenderPipelineState(GpuPipelineState *InPipelineState) override
+	void BeginGpuCapture(const FString &CaptureName) override
 	{
-		RhiBackend->SetRenderPipelineState(InPipelineState);
-	}
-
-	void SetVertexBuffer(GpuBuffer *InVertexBuffer) override
-	{
-		RhiBackend->SetVertexBuffer(InVertexBuffer);
-	}
-
-	void SetViewPort(const GpuViewPortDesc &InViewPortDesc) override
-	{
-		RhiBackend->SetViewPort(InViewPortDesc);
-	}
-
-	void SetBindGroups(GpuBindGroup *BindGroup0, GpuBindGroup *BindGroup1, GpuBindGroup *BindGroup2, GpuBindGroup *BindGroup3) override
-	{
-		check(ValidateSetBindGroups(BindGroup0, BindGroup1, BindGroup2, BindGroup3));
-		RhiBackend->SetBindGroups(BindGroup0, BindGroup1, BindGroup2, BindGroup3);
-	}
-
-	void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount) override
-	{
-		RhiBackend->DrawPrimitive(StartInstanceLocation, VertexCount, StartInstanceLocation, InstanceCount);
-	}
-
-	void Submit() override
-	{
-		RhiBackend->Submit();
-	}
-
-	void BeginGpuCapture(const FString &SavedFileName) override
-	{
-		RhiBackend->BeginGpuCapture(SavedFileName);
+		RhiBackend->BeginGpuCapture(CaptureName);
 	}
 
 	void EndGpuCapture() override
@@ -160,33 +203,66 @@ public:
 		RhiBackend->EndGpuCapture();
 	}
 
-	void BeginCaptureEvent(const FString &EventName) override
-	{
-		RhiBackend->BeginCaptureEvent(EventName);
-	}
-
-	void EndCaptureEvent() override
-	{
-		RhiBackend->EndCaptureEvent();
-	}
-
 	void *GetSharedHandle(GpuTexture *InGpuTexture) override
 	{
 		return RhiBackend->GetSharedHandle(InGpuTexture);
 	}
 
-	void BeginRenderPass(const GpuRenderPassDesc &PassDesc, const FString &PassName) override
+	GpuCmdRecorder* BeginRecording(const FString& RecorderName) override
 	{
-		RhiBackend->BeginRenderPass(PassDesc, PassName);
+		auto CmdRecorder = MakeUnique<GpuCmdRecorderValidation>(RecorderName, RhiBackend->BeginRecording(RecorderName));
+		CmdRecorder->State = CmdRecorderState::Begin;
+		RequestedCmdRecorders.Add(MoveTemp(CmdRecorder));
+		return RequestedCmdRecorders.Last().Get();
 	}
 
-	void EndRenderPass() override
+	void EndRecording(GpuCmdRecorder* InCmdRecorder) override
 	{
-		RhiBackend->EndRenderPass();
+		GpuCmdRecorderValidation* CmdRecorderValidation = static_cast<GpuCmdRecorderValidation*>(InCmdRecorder);
+		RhiBackend->EndRecording(CmdRecorderValidation->CmdRecorder);
+		CmdRecorderValidation->State = CmdRecorderState::End;
+	}
+
+	void Submit(const TArray<GpuCmdRecorder*>& CmdRecorders) override
+	{
+		TArray<GpuCmdRecorder*> RealCmdRecorders;
+		for (int Index = 0; Index < CmdRecorders.Num(); Index++)
+		{
+			GpuCmdRecorderValidation* CmdRecorderValidation = static_cast<GpuCmdRecorderValidation*>(CmdRecorders[Index]);
+			checkf(CmdRecorderValidation->State == CmdRecorderState::End, 
+				*FString::Printf(TEXT("Error State:%s for the GpuCmdRecorder(%d) %s being submitted. Note that do not submit a CmdRecorder that has been submitted or not properly ended."), 
+					ANSI_TO_TCHAR(magic_enum::enum_name(CmdRecorderValidation->State).data()), Index, *CmdRecorderValidation->Name)
+			);
+			CmdRecorderValidation->State = CmdRecorderState::Finish;
+			RealCmdRecorders.Add(CmdRecorderValidation->CmdRecorder);
+		}
+		RhiBackend->Submit(MoveTemp(RealCmdRecorders));
+
+	}
+
+	void* MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapMode InMapMode, uint32& OutRowPitch) override
+	{
+		return RhiBackend->MapGpuTexture(InGpuTexture, InMapMode, OutRowPitch);
+	}
+
+	void UnMapGpuTexture(GpuTexture* InGpuTexture) override
+	{
+		RhiBackend->UnMapGpuTexture(InGpuTexture);
+	}
+
+	void* MapGpuBuffer(GpuBuffer* InGpuBuffer, GpuResourceMapMode InMapMode) override
+	{
+		return RhiBackend->MapGpuBuffer(InGpuBuffer, InMapMode);
+	}
+
+	void UnMapGpuBuffer(GpuBuffer* InGpuBuffer) override
+	{
+		RhiBackend->UnMapGpuBuffer(InGpuBuffer);
 	}
 
 private:
 	TUniquePtr<GpuRhi> RhiBackend;
+	TArray<TUniquePtr<GpuCmdRecorderValidation>> RequestedCmdRecorders;
 };
 
 bool GpuRhi::InitGpuRhi(const GpuRhiConfig &InConfig)
@@ -215,6 +291,6 @@ bool GpuRhi::InitGpuRhi(const GpuRhiConfig &InConfig)
 	return true;
 }
 
+GpuCmdRecorder* GGpuCmdRecorder;
 TUniquePtr<GpuRhi> GGpuRhi;
-
 }

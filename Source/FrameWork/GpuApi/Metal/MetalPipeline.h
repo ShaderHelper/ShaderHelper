@@ -4,17 +4,17 @@
 
 namespace FRAMEWORK
 {
-    class MetalPipelineState : public GpuPipelineState
+    class MetalRenderPipelineState : public GpuPipelineState
     {
     public:
-        MetalPipelineState(mtlpp::RenderPipelineState InPipelineState, MTLPrimitiveType InPrimitiveType)
+        MetalRenderPipelineState(MTLRenderPipelineStatePtr InPipelineState, MTLPrimitiveType InPrimitiveType)
             : PipelineState(MoveTemp(InPipelineState))
             , PrimitiveType(InPrimitiveType)
         {}
         
     public:
-        id<MTLRenderPipelineState> GetResource() const {
-            return PipelineState.GetPtr();
+        MTL::RenderPipelineState* GetResource() const {
+            return PipelineState.get();
         }
         
         MTLPrimitiveType GetPrimitiveType() const {
@@ -22,9 +22,9 @@ namespace FRAMEWORK
         }
         
     private:
-        mtlpp::RenderPipelineState PipelineState;
+        MTLRenderPipelineStatePtr PipelineState;
         MTLPrimitiveType PrimitiveType;
     };
 
-    TRefCountPtr<MetalPipelineState> CreateMetalPipelineState(const GpuPipelineStateDesc& InPipelineStateDesc);
+    TRefCountPtr<MetalRenderPipelineState> CreateMetalRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc);
 }

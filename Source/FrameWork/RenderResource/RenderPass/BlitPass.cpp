@@ -17,7 +17,7 @@ namespace FRAMEWORK
 		Binding.SetShaderBindGroup(PassShader.GetBindGroup(ShaderParameter));
 		Binding.SetShaderBindGroupLayout(PassShader.GetBindGroupLayout());
 
-		GpuPipelineStateDesc PipelineDesc{
+		GpuRenderPipelineStateDesc PipelineDesc{
 			PassShader.GetVertexShader(), 
 			PassShader.GetPixelShader(),
 			{ 
@@ -28,11 +28,11 @@ namespace FRAMEWORK
 
 		TRefCountPtr<GpuPipelineState> Pipeline = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
 
-		Graph.AddPass("BlitPass", MoveTemp(BlitPassDesc),
-			[Pipeline, Binding] {
-				Binding.ApplyBindGroup();
-				GGpuRhi->SetRenderPipelineState(Pipeline);
-				GGpuRhi->DrawPrimitive(0, 3, 0, 1);
+		Graph.AddRenderPass("BlitPass", MoveTemp(BlitPassDesc),
+			[Pipeline, Binding](GpuRenderPassRecorder* PassRecorder) {
+				Binding.ApplyBindGroup(PassRecorder);
+				PassRecorder->SetRenderPipelineState(Pipeline);
+				PassRecorder->DrawPrimitive(0, 3, 0, 1);
 			}
 		);
 	}

@@ -4,11 +4,12 @@
 #include "MetalDevice.h"
 #import <CoreVideo/CVMetalTexture.h>
 #import <CoreVideo/CVMetalTextureCache.h>
-#include "MetalCommandList.h"
+#include "MetalCommandRecorder.h"
+#include "MetalGpuRhiBackend.h"
 
 namespace FRAMEWORK
 {
-    static void SetTextureUsage(GpuTextureUsage InUsage, mtlpp::TextureDescriptor& OutTexDesc)
+    static void SetTextureUsage(GpuTextureUsage InUsage, MTL::TextureDescriptor* OutTexDesc)
     {
         MTLTextureUsage Usage = MTLTextureUsageUnknown;
         if(EnumHasAnyFlags(InUsage, GpuTextureUsage::RenderTarget))
@@ -20,10 +21,10 @@ namespace FRAMEWORK
         {
             Usage |= MTLTextureUsageShaderRead;
         }
-        OutTexDesc.SetUsage((mtlpp::TextureUsage)Usage);
+        OutTexDesc->setUsage(Usage);
     }
 
-    mtlpp::SamplerDescriptor MapSamplerDesc(const GpuSamplerDesc& InSamplerDesc)
+    MTLSamplerDescriptor* MapSamplerDesc(const GpuSamplerDesc& InSamplerDesc)
     {
         MTLSamplerDescriptor* SamplerDesc = [MTLSamplerDescriptor new];
         switch(InSamplerDesc.Filer)
@@ -50,12 +51,12 @@ namespace FRAMEWORK
         SamplerDesc.compareFunction = MapCompareFunction(InSamplerDesc.Compare);
         SamplerDesc.supportArgumentBuffers = true;
         
-        return mtlpp::SamplerDescriptor{SamplerDesc, ns::Ownership::Assign};
+        return [SamplerDesc autorelease];
     }
 
     TRefCountPtr<MetalSampler> CreateMetalSampler(const GpuSamplerDesc& InSamplerDesc)
     {
-        mtlpp::SamplerState Sampler = GDevice.NewSamplerState(MapSamplerDesc(InSamplerDesc));
+        MTLSamplerStatePtr Sampler = NS::TransferPtr(GDevice->newSamplerState((MTL::SamplerDescriptor*)MapSamplerDesc(InSamplerDesc)));
         return new MetalSampler(MoveTemp(Sampler));
     }
 
@@ -66,13 +67,13 @@ namespace FRAMEWORK
             return CreateSharedMetalTexture(InTexDesc);
         }
         
-        mtlpp::PixelFormat TexFormat = (mtlpp::PixelFormat)MapTextureFormat(InTexDesc.Format);
-        mtlpp::TextureDescriptor TexDesc = mtlpp::TextureDescriptor::Texture2DDescriptor(TexFormat, InTexDesc.Width, InTexDesc.Height, InTexDesc.NumMips > 1);
-        TexDesc.SetTextureType(mtlpp::TextureType::Texture2D);
-        TexDesc.SetStorageMode(mtlpp::StorageMode::Private);
+        MTL::PixelFormat TexFormat = (MTL::PixelFormat)MapTextureFormat(InTexDesc.Format);
+        MTL::TextureDescriptor* TexDesc = MTL::TextureDescriptor::texture2DDescriptor(TexFormat, InTexDesc.Width, InTexDesc.Height, InTexDesc.NumMips > 1);
+        TexDesc->setTextureType(MTL::TextureType2D);
+        TexDesc->setStorageMode(MTL::StorageModePrivate);
         SetTextureUsage(InTexDesc.Usage, TexDesc);
         
-        mtlpp::Texture Tex = GDevice.NewTexture(MoveTemp(TexDesc));
+        MTLTexturePtr Tex = NS::TransferPtr(GDevice->newTexture(TexDesc));
         TRefCountPtr<MetalTexture> RetTexture = new MetalTexture(MoveTemp(Tex), InTexDesc);
         
         if (!InTexDesc.InitialData.IsEmpty()) {
@@ -80,13 +81,12 @@ namespace FRAMEWORK
             TRefCountPtr<MetalBuffer> UploadBuffer = CreateMetalBuffer(BytesImage, GpuBufferUsage::Dynamic);
             uint8* BufferData = (uint8*)UploadBuffer->GetContents();
             FMemory::Memcpy(BufferData, InTexDesc.InitialData.GetData(), BytesImage);
-            
-            mtlpp::BlitCommandEncoder BlitCommandEncoder = GetCommandListContext()->GetBlitCommandEncoder();
-            
-            const uint32 BytesPerTexel = GetTextureFormatByteSize(InTexDesc.Format);
-            const uint32 BytesPerRow = InTexDesc.Width * BytesPerTexel;
-            [BlitCommandEncoder.GetPtr() copyFromBuffer:UploadBuffer->GetResource() sourceOffset:0 sourceBytesPerRow:BytesPerRow sourceBytesPerImage:BytesImage sourceSize:MTLSizeMake(InTexDesc.Width, InTexDesc.Height, 1) toTexture:RetTexture->GetResource() destinationSlice:0 destinationLevel:0 destinationOrigin:MTLOriginMake(0, 0, 0)];
-            BlitCommandEncoder.EndEncoding();
+            auto CmdRecorder = GMtlGpuRhi->BeginRecording();
+            {
+                CmdRecorder->CopyBufferToTexture(UploadBuffer, RetTexture);
+            }
+            GMtlGpuRhi->EndRecording(CmdRecorder);
+            GMtlGpuRhi->Submit({CmdRecorder});
             
             RetTexture->UploadBuffer = MoveTemp(UploadBuffer);
         }
@@ -126,7 +126,7 @@ namespace FRAMEWORK
         cvret = CVMetalTextureCacheCreate(
                         kCFAllocatorDefault,
                         nil,
-                        GDevice,
+                        (id<MTLDevice>)GDevice,
                         nil,
                         &CVMTLTextureCache);
         
@@ -144,6 +144,6 @@ namespace FRAMEWORK
         
         CFRelease(CVMTLTextureCache);
         CVBufferRelease(CVMTLTexture);
-        return new MetalTexture(mtlpp::Texture(Texture, nullptr, ns::Ownership::Assign), InTexDesc, CVPixelBuffer);
+        return new MetalTexture(NS::TransferPtr((MTL::Texture*)Texture), InTexDesc, CVPixelBuffer);
     }
 }

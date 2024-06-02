@@ -71,12 +71,16 @@ namespace FRAMEWORK
         
         if(VertexArgDescs.Num() > 0)
         {
-            VertexArgumentEncoder = GDevice.NewArgumentEncoderWithArguments([NSArray arrayWithObjects:VertexArgDescs.GetData() count:VertexArgDescs.Num()]);
+            VertexArgumentEncoder = NS::TransferPtr(GDevice->newArgumentEncoder(
+                (NS::Array*)[NSArray arrayWithObjects:VertexArgDescs.GetData() count:VertexArgDescs.Num()]
+            ));
         }
         
         if(FragmentArgDescs.Num() > 0)
         {
-            FragmentArgumentEncoder = GDevice.NewArgumentEncoderWithArguments([NSArray arrayWithObjects:FragmentArgDescs.GetData() count:FragmentArgDescs.Num()]);
+            FragmentArgumentEncoder = NS::TransferPtr(GDevice->newArgumentEncoder(
+                (NS::Array*)[NSArray arrayWithObjects:FragmentArgDescs.GetData() count:FragmentArgDescs.Num()]
+            ));
         }
 
     }
@@ -85,19 +89,19 @@ namespace FRAMEWORK
         : GpuBindGroup(InDesc)
     {
         MetalBindGroupLayout* BindGroupLayout = static_cast<MetalBindGroupLayout*>(InDesc.Layout);
-        id<MTLArgumentEncoder> VertexArgumentEncoder = BindGroupLayout->GetVertexArgumentEncoder();
-        id<MTLArgumentEncoder> FragmentArgumentEncoder = BindGroupLayout->GetFragmentArgumentEncoder();
+        MTL::ArgumentEncoder* VertexArgumentEncoder = BindGroupLayout->GetVertexArgumentEncoder();
+        MTL::ArgumentEncoder* FragmentArgumentEncoder = BindGroupLayout->GetFragmentArgumentEncoder();
         
         if(VertexArgumentEncoder != nullptr)
         {
-            VertexArgumentBuffer = CreateMetalBuffer(VertexArgumentEncoder.encodedLength, GpuBufferUsage::Dynamic);
-            [VertexArgumentEncoder setArgumentBuffer:VertexArgumentBuffer->GetResource() offset:0];
+            VertexArgumentBuffer = CreateMetalBuffer(VertexArgumentEncoder->encodedLength(), GpuBufferUsage::Dynamic);
+            VertexArgumentEncoder->setArgumentBuffer(VertexArgumentBuffer->GetResource(), 0);
         }
         
         if(FragmentArgumentEncoder != nullptr)
         {
-            FragmentArgumentBuffer = CreateMetalBuffer(FragmentArgumentEncoder.encodedLength, GpuBufferUsage::Dynamic);
-            [FragmentArgumentEncoder setArgumentBuffer:FragmentArgumentBuffer->GetResource() offset:0];
+            FragmentArgumentBuffer = CreateMetalBuffer(FragmentArgumentEncoder->encodedLength(), GpuBufferUsage::Dynamic);
+            FragmentArgumentEncoder->setArgumentBuffer(FragmentArgumentBuffer->GetResource(), 0);
         }
         
         for(const auto& [Slot, ResourceBindingEntry] : InDesc.Resources)
@@ -108,12 +112,12 @@ namespace FRAMEWORK
                 MetalBuffer* Buffer = static_cast<MetalBuffer*>(ResourceBindingEntry.Resource);
                 if(Stage & MTLRenderStageVertex)
                 {
-                    [VertexArgumentEncoder setBuffer:Buffer->GetResource() offset:0 atIndex:Slot];
+                    VertexArgumentEncoder->setBuffer(Buffer->GetResource(), 0, Slot);
                 }
                 
                 if(Stage & MTLRenderStageFragment)
                 {
-                    [FragmentArgumentEncoder setBuffer:Buffer->GetResource() offset:0 atIndex:Slot];
+                    FragmentArgumentEncoder->setBuffer(Buffer->GetResource(), 0, Slot);
                 }
                 BindGroupResources.Add(Slot, Buffer->GetResource());
             }
@@ -122,12 +126,12 @@ namespace FRAMEWORK
                 MetalTexture* Tex = static_cast<MetalTexture*>(ResourceBindingEntry.Resource);
                 if(Stage & MTLRenderStageVertex)
                 {
-                    [VertexArgumentEncoder setTexture:Tex->GetResource() atIndex:Slot];
+                    VertexArgumentEncoder->setTexture(Tex->GetResource(), Slot);
                 }
                 
                 if(Stage & MTLRenderStageFragment)
                 {
-                    [FragmentArgumentEncoder setTexture:Tex->GetResource() atIndex:Slot];
+                    FragmentArgumentEncoder->setTexture(Tex->GetResource(), Slot);
                 }
                 BindGroupResources.Add(Slot, Tex->GetResource());
             }
@@ -136,11 +140,11 @@ namespace FRAMEWORK
                 MetalSampler* Sampler = static_cast<MetalSampler*>(ResourceBindingEntry.Resource);
                 if(Stage & MTLRenderStageVertex)
                 {
-                    [VertexArgumentEncoder setSamplerState:Sampler->GetResource() atIndex:Slot];
+                    VertexArgumentEncoder->setSamplerState(Sampler->GetResource(), Slot);
                 }
                 if(Stage & MTLRenderStageFragment)
                 {
-                    [FragmentArgumentEncoder setSamplerState:Sampler->GetResource() atIndex:Slot];
+                    FragmentArgumentEncoder->setSamplerState(Sampler->GetResource(), Slot);
                 }
             }
             else
@@ -150,22 +154,22 @@ namespace FRAMEWORK
         }
     }
 
-    void MetalBindGroup::Apply(id<MTLRenderCommandEncoder> Encoder)
+    void MetalBindGroup::Apply(MTL::RenderCommandEncoder* Encoder)
     {
         MetalBindGroupLayout* BindGroupLayout = static_cast<MetalBindGroupLayout*>(GetLayout());
         for(auto [Slot ,MtlResource] : BindGroupResources)
         {
-            [Encoder useResource:MtlResource usage:BindGroupLayout->GetResourceUsage(Slot) stages:BindGroupLayout->GetRenderStages(Slot)];
+            Encoder->useResource(MtlResource, BindGroupLayout->GetResourceUsage(Slot), BindGroupLayout->GetRenderStages(Slot));
         }
         
         if(VertexArgumentBuffer)
         {
-            [Encoder setVertexBuffer:VertexArgumentBuffer->GetResource() offset:0 atIndex:BindGroupLayout->GetGroupNumber()];
+            Encoder->setVertexBuffer(VertexArgumentBuffer->GetResource(), 0, BindGroupLayout->GetGroupNumber());
         }
         
         if(FragmentArgumentBuffer)
         {
-            [Encoder setFragmentBuffer:FragmentArgumentBuffer->GetResource() offset:0 atIndex:BindGroupLayout->GetGroupNumber()];
+            Encoder->setFragmentBuffer(FragmentArgumentBuffer->GetResource(), 0, BindGroupLayout->GetGroupNumber());
         }
         
     }

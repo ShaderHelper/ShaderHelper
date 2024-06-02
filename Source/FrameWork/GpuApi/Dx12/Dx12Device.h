@@ -5,7 +5,7 @@ namespace FRAMEWORK
 {
 
 	inline bool GDred;
-	inline bool GCanGpuCapture;
+	inline bool GCanPIXCapture;
 	inline ID3D12Device* GDevice;
 	inline IDXGIFactory2* GDxgiFactory;
 	inline IDXGIAdapter1* Adapter;

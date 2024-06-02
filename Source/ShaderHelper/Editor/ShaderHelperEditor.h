@@ -51,7 +51,7 @@ namespace SH
         
         TSharedPtr<SDockTab> CodeTab;
         TSharedPtr<FTabManager> CodeTabManager;
-        TWeakPtr<class SDockingTabStack> LastActivedShaderPassTabStack;
+        TWeakPtr<class SDockingTabStack> ShaderPassTabStackInsertPoint;
         TSharedPtr<class SDockingArea> CodeTabMainArea;
         
 		TSharedPtr<SWindow> Window;

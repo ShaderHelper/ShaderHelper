@@ -49,7 +49,8 @@ namespace FRAMEWORK
 			return DescriptorTableStorage_Sampler[Visibility]->GetGpuHandle();
 		}
         
-        void Apply(ID3D12GraphicsCommandList* CommandList, class Dx12RootSignature* RootSig);
+        void ApplyDrawBinding(ID3D12GraphicsCommandList* CommandList, class Dx12RootSignature* RootSig);
+		//void ApplyComputeBinding();
 
 	private:
 		TMap<D3D12_SHADER_VISIBILITY, TUniquePtr<GpuDescriptorRange>> DescriptorTableStorage_CbvSrvUav;
