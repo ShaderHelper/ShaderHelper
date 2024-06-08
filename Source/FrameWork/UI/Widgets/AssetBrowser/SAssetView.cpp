@@ -126,7 +126,7 @@ namespace FRAMEWORK
     
     static bool IsImportedAsset(const MetaType* InAssetMetaType)
     {
-        return GetDefaultObject<AssetImporter>([=](AssetImporter* CurImporter) { return InAssetMetaType == CurImporter->SupportAsset(); } );
+        return GetDefaultObject<AssetImporter>([=](AssetImporter* CurImporter) { return InAssetMetaType == CurImporter->SupportAsset(); } ) != nullptr;
     }
 
 	TSharedPtr<SWidget> SAssetView::CreateContextMenu()

@@ -229,7 +229,7 @@ void Dx12GpuRhiBackend::BeginGpuCapture(const FString &CaptureName)
 {
 #if GPU_API_CAPTURE && USE_PIX
 	if (GCanPIXCapture) {
-        IFileManager()::Get().MakeDirectory(*PathHelper::SavedCaptureDir());
+        IFileManager::Get().MakeDirectory(*PathHelper::SavedCaptureDir());
 		PIXCaptureParameters params = {};
 		FString FileName = FString::Format(TEXT("{0}.wpix"), { PathHelper::SavedCaptureDir() / CaptureName });
 		params.GpuCaptureParameters.FileName = *FileName;
