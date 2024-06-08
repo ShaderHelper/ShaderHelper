@@ -30,6 +30,7 @@ namespace FRAMEWORK
 
 		ContentPathShowed = InArgs._ContentPathShowed;
         OnFolderOpen = InArgs._OnFolderOpen;
+        State = InArgs._State;
 
 		ChildSlot
 		[
@@ -42,8 +43,8 @@ namespace FRAMEWORK
 					SAssignNew(AssetTileView, STileView<TSharedRef<AssetViewItem>>)
 					.SelectionMode(ESelectionMode::Single)
 					.ListItemsSource(&AssetViewItems)
-					.ItemWidth(TAttribute<float>::CreateLambda([this] { return AssetViewSize; }))
-					.ItemHeight(TAttribute<float>::CreateLambda([this] { return AssetViewSize; }))
+					.ItemWidth(TAttribute<float>::CreateLambda([this] { return State->AssetViewSize; }))
+					.ItemHeight(TAttribute<float>::CreateLambda([this] { return State->AssetViewSize; }))
 					.OnContextMenuOpening(this, &SAssetView::CreateContextMenu)
 					.OnGenerateTile_Lambda([](TSharedRef<AssetViewItem> InTileItem, const TSharedRef<STableViewBase>& OwnerTable) {
 						return InTileItem->GenerateWidgetForTableView(OwnerTable);
@@ -91,10 +92,13 @@ namespace FRAMEWORK
 
 	void SAssetView::SetNewViewDirectory(const FString& NewViewDirectory)
 	{
-		AssetViewItems.Empty();
-		CacheImportAssetPath = NewViewDirectory;
-		CurViewDirectory = NewViewDirectory;
-		PopulateAssetView(CurViewDirectory);
+        if(CurViewDirectory != NewViewDirectory)
+        {
+            AssetViewItems.Empty();
+            CacheImportAssetPath = NewViewDirectory;
+            CurViewDirectory = NewViewDirectory;
+            PopulateAssetView(CurViewDirectory);
+        }
 	}
 
 	void SAssetView::PopulateAssetView(const FString& ViewDirectory)
@@ -120,19 +124,9 @@ namespace FRAMEWORK
 		AssetTileView->RequestListRefresh();
 	}
     
-    static bool IsImportedAsset(const ShReflectToy::MetaType* InAssetMetaType)
+    static bool IsImportedAsset(const MetaType* InAssetMetaType)
     {
-        TArray<ShReflectToy::MetaType*> AssetImporterMetaTypes = ShReflectToy::GetMetaTypes<AssetImporter>();
-        for (auto MetaTypePtr : AssetImporterMetaTypes)
-        {
-            void* Importer = MetaTypePtr->GetDefaultObject();
-            if (Importer)
-            {
-                AssetImporter* CurImporter = static_cast<AssetImporter*>(Importer);
-                if(InAssetMetaType == CurImporter->SupportAsset()) return true;
-            }
-        }
-        return false;
+        return GetDefaultObject<AssetImporter>([=](AssetImporter* CurImporter) { return InAssetMetaType == CurImporter->SupportAsset(); } ) != nullptr;
     }
 
 	TSharedPtr<SWidget> SAssetView::CreateContextMenu()
@@ -156,7 +150,7 @@ namespace FRAMEWORK
 		{
             MenuBuilder.AddSubMenu(LOCALIZATION("Create"), FText::GetEmpty(), FNewMenuDelegate::CreateLambda(
                 [this](FMenuBuilder& MenuBuilder) {
-                    TArray<ShReflectToy::MetaType*> AssetMetaTypes = ShReflectToy::GetMetaTypes<AssetObject>();
+                    TArray<MetaType*> AssetMetaTypes = GetMetaTypes<AssetObject>();
                     for(auto MetaTypePtr : AssetMetaTypes)
                     {
                         if(!IsImportedAsset(MetaTypePtr))
@@ -253,9 +247,14 @@ namespace FRAMEWORK
 		}
 
 		TSharedRef<AssetViewFolderItem> NewFolderItem = MakeShared<AssetViewFolderItem>(InFolderName);
-		AssetViewItems.Add(MoveTemp(NewFolderItem));
-		SortViewItems();
-		AssetTileView->RequestListRefresh();
+        if(!AssetViewItems.ContainsByPredicate([&](const TSharedRef<AssetViewItem>& InItem){
+            return InItem->GetPath() == InFolderName;
+        }))
+        {
+            AssetViewItems.Add(MoveTemp(NewFolderItem));
+            SortViewItems();
+            AssetTileView->RequestListRefresh();
+        }
 	}
 
 	void SAssetView::RemoveFolder(const FString& InFolderName)
@@ -288,9 +287,14 @@ namespace FRAMEWORK
 		}
 
 		TSharedRef<AssetViewAssetItem> NewAssetItem = MakeShared<AssetViewAssetItem>(InFileName);
-		AssetViewItems.Add(MoveTemp(NewAssetItem));
-		SortViewItems();
-		AssetTileView->RequestListRefresh();
+        if(!AssetViewItems.ContainsByPredicate([&](const TSharedRef<AssetViewItem>& InItem){
+            return InItem->GetPath() == InFileName;
+        }))
+        {
+            AssetViewItems.Add(MoveTemp(NewAssetItem));
+            SortViewItems();
+            AssetTileView->RequestListRefresh();
+        }
 	}
 
 	void SAssetView::RemoveFile(const FString& InFileName)
@@ -313,18 +317,11 @@ namespace FRAMEWORK
 		if (DesktopPlatform)
 		{
 			TArray<FString> FileExts;
-			TArray<ShReflectToy::MetaType*> AssetImporterMetaTypes = ShReflectToy::GetMetaTypes<AssetImporter>();
-			TArray<AssetImporter*> AssetImporters;
-			for (auto MetaTypePtr : AssetImporterMetaTypes)
-			{
-				void* Importer = MetaTypePtr->GetDefaultObject();
-				if (Importer)
-				{
-					AssetImporter* CurImporter = static_cast<AssetImporter*>(Importer);
-					FileExts = CurImporter->SupportFileExts();
-					AssetImporters.Add(CurImporter);
-				}
-			}
+            TArray<AssetImporter*> AssetImporters;
+            ForEachDefaultObject<AssetImporter>([&](AssetImporter* CurImporter){
+                FileExts.Append(CurImporter->SupportFileExts());
+                AssetImporters.Add(CurImporter);
+            });
 			
 			FString DialogType = "All files ({0})|";
             FString CanImportExts;
@@ -443,21 +440,11 @@ namespace FRAMEWORK
         }
         else if(ViewItem->IsOfType<AssetViewAssetItem>())
         {
-            TArray<ShReflectToy::MetaType*> AssetOpMetaTypes = ShReflectToy::GetMetaTypes<AssetOp>();
-            for (auto MetaTypePtr : AssetOpMetaTypes)
+            if(AssetOp* AssetOp_ = GetAssetOp(ViewItem->GetPath()))
             {
-                void* AssetOpPtr = MetaTypePtr->GetDefaultObject();
-                if (AssetOpPtr)
-                {
-                    AssetOp* CurAssetOp = static_cast<AssetOp*>(AssetOpPtr);
-                    AssetObject* RelatedAssetDefaultObject = static_cast<AssetObject*>(CurAssetOp->SupportAsset()->GetDefaultObject());
-                    if(RelatedAssetDefaultObject->FileExtension() ==  FPaths::GetExtension(ViewItem->GetPath()))
-                    {
-                        CurAssetOp->Open(ViewItem->GetPath());
-                        break;
-                    }
-                }
+                AssetOp_->OnOpen(ViewItem->GetPath());
             }
+            
         }
 	}
 

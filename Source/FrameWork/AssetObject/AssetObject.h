@@ -20,6 +20,7 @@ namespace FRAMEWORK
 		virtual const FSlateBrush* GetImage() const { return nullptr; }
         
         FString GetFileName() const;
+        FString GetPath() const;
 		FGuid GetGuid() const { return Guid; }
 
 	protected:

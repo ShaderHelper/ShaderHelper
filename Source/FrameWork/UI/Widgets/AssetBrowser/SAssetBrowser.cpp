@@ -6,6 +6,7 @@
 #include <IDirectoryWatcher.h>
 #include <Widgets/Input/SSlider.h>
 #include <Widgets/Input/SSearchBox.h>
+#include "Editor/AssetEditor/AssetEditor.h"
 
 namespace FRAMEWORK
 {
@@ -21,12 +22,106 @@ namespace FRAMEWORK
 		}
 	}
 
+    void SAssetBrowser::SetCurrentDisplyPath(const FString& DisplayDir)
+    {
+        AssetView->SetNewViewDirectory(DisplayDir);
+        DirectoryTree->SetExpansionRecursive(FPaths::GetPath(DisplayDir));
+        DirectoryTree->SetSelection(DisplayDir);
+    }
+
+    void SAssetBrowser::InitDirectory(AssetBrowserDirectory& OutDirectory, const FString& Path)
+    {
+        OutDirectory.Path = Path;
+        
+        TArray<FString> FileNames;
+        IFileManager::Get().FindFiles(FileNames, *(Path / TEXT("*")), true, false);
+        for (const FString& FileName : FileNames)
+        {
+            if (TSingleton<AssetManager>::Get().GetManageredExts().Contains(FPaths::GetExtension(FileName)))
+            {
+                OutDirectory.Files.Add(Path / FileName);
+            }
+        }
+        
+        TArray<FString> FolderNames;
+        IFileManager::Get().FindFiles(FolderNames, *(Path / TEXT("*")), false, true);
+        for(const FString& FolderName : FolderNames)
+        {
+            InitDirectory(OutDirectory.Directories.AddDefaulted_GetRef(), Path / FolderName);
+        }
+    }
+
+    AssetBrowserDirectory* SAssetBrowser::FindBrowserDirectory(AssetBrowserDirectory& CurDirectory, const FString& SearchDir)
+    {
+        if(CurDirectory.Path == SearchDir)
+        {
+            return &CurDirectory;
+        }
+        
+        for(int32 i = 0 ; i < CurDirectory.Directories.Num(); i++)
+        {
+            if(CurDirectory.Directories[i].Path == SearchDir)
+            {
+                return &CurDirectory.Directories[i];
+            }
+            else if(auto* Directory = FindBrowserDirectory(CurDirectory.Directories[i], SearchDir))
+            {
+                return Directory;
+            }
+        }
+        
+        return nullptr;
+    }
+
+    void SAssetBrowser::AddFile(const FString& File)
+    {
+        AssetBrowserDirectory& ParDirectory = *FindBrowserDirectory(ContentDirectory, FPaths::GetPath(File));
+        ParDirectory.Files.Add(File);
+    }
+
+    void SAssetBrowser::RemoveFile(const FString& File)
+    {
+        AssetBrowserDirectory& ParDirectory = *FindBrowserDirectory(ContentDirectory, FPaths::GetPath(File));
+        ParDirectory.Files.Remove(File);
+    }
+
+    void SAssetBrowser::AddBrowserDirectory(const FString& DirName)
+    {
+        AssetBrowserDirectory NewDirectory;
+        InitDirectory(NewDirectory, DirName);
+        AssetBrowserDirectory& ParDirectory = *FindBrowserDirectory(ContentDirectory, FPaths::GetPath(DirName));
+        ParDirectory.Directories.Add(MoveTemp(NewDirectory));
+    }
+
+    void SAssetBrowser::RemoveBrowserDirectory(const FString& DirName)
+    {
+        AssetBrowserDirectory& ParDirectory = *FindBrowserDirectory(ContentDirectory, FPaths::GetPath(DirName));
+        ParDirectory.Directories.Remove(AssetBrowserDirectory{DirName});
+    }
+
+    TArray<FString> SAssetBrowser::FindFilesUnderBrowserDirectory(const FString& DirName)
+    {
+        AssetBrowserDirectory& CurDirectory = *FindBrowserDirectory(ContentDirectory, DirName);
+        TArray<FString> Files = CurDirectory.Files;
+        for(const AssetBrowserDirectory& Directory : CurDirectory.Directories)
+        {
+            Files.Append(FindFilesUnderBrowserDirectory(Directory.Path));
+        }
+        return Files;
+    }
+
 	void SAssetBrowser::Construct(const FArguments& InArgs)
 	{
 		ContentPathShowed = InArgs._ContentPathShowed;
-		OnSelectedDirectoryChanged = InArgs._OnSelectedDirectoryChanged;
-		OnExpandedDirectoriesChanged = InArgs._OnExpandedDirectoriesChanged;
-		OnAssetViewSizeChanged = InArgs._OnAssetViewSizeChanged;
+        InitDirectory(ContentDirectory, ContentPathShowed);
+        if(InArgs._State)
+        {
+            State = InArgs._State;
+        }
+        else
+        {
+            State = MakeShared<AssetBrowserPersistentState>();
+        }
 
 		FDirectoryWatcherModule& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>(TEXT("DirectoryWatcher"));
 		IDirectoryWatcher* DirectoryWatcher = DirectoryWatcherModule.Get();
@@ -36,18 +131,16 @@ namespace FRAMEWORK
 			DirectoryWatcherHandle, IDirectoryWatcher::WatchOptions::IncludeDirectoryChanges);
 
 		SAssignNew(AssetView, SAssetView)
+            .State(&State->AssetViewState)
 			.ContentPathShowed(InArgs._ContentPathShowed)
 			.OnFolderOpen([this](const FString& FolderPath) {
 				DirectoryTree->SetExpansion(FPaths::GetPath(FolderPath));
 				DirectoryTree->SetSelection(FolderPath);
 			});
-		AssetView->SetAssetViewSize(InArgs._InitAssetViewSize);
 
 		SAssignNew(DirectoryTree, SDirectoryTree)
+            .State(&State->DirectoryTreeState)
 			.ContentPathShowed(InArgs._ContentPathShowed)
-			.InitialSelectedDirectory(InArgs._InitialSelectedDirectory)
-			.InitialDirectoriesToExpand(InArgs._InitialDirectoriesToExpand)
-			.OnExpandedDirectoriesChanged(OnExpandedDirectoriesChanged)
 			.OnSelectedDirectoryChanged_Raw(this, &SAssetBrowser::OnDirectoryTreeSelectionChanged);
 
 		ChildSlot
@@ -75,12 +168,11 @@ namespace FRAMEWORK
 					[
 						SNew(SSlider)
 						.Orientation(Orient_Horizontal)
-						.Value(InArgs._InitAssetViewSize)
+						.Value(State->AssetViewState.AssetViewSize)
 						.MinValue(SAssetView::MinAssetViewSize)
 						.MaxValue(SAssetView::MaxAssetViewSize)
 						.OnValueChanged_Lambda([this](float NewValue) {
-							AssetView->SetAssetViewSize(NewValue); 
-							OnAssetViewSizeChanged.ExecuteIfBound(NewValue);
+							AssetView->SetAssetViewSize(NewValue);
 						})
 					]
 			
@@ -136,20 +228,36 @@ namespace FRAMEWORK
                     {
                         if (TSingleton<AssetManager>::Get().GetManageredExts().Contains(FPaths::GetExtension(FileName)))
                         {
-                            TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*FileName));
-                            FGuid AssetId;
-                            *Ar << AssetId;
-                            TSingleton<AssetManager>::Get().UpdateGuidToPath(AssetId, FileName);
+                            TSingleton<AssetManager>::Get().UpdateGuidToPath(FileName);
+                            
+                            if(AssetOp* AssetOp_ = GetAssetOp(FileName))
+                            {
+                                AssetOp_->OnAdd(FileName);
+                            }
                         }
                     }
                     
 					DirectoryTree->AddDirectory(FullFileName);
 					AssetView->AddFolder(FullFileName);
+                    AddBrowserDirectory(FullFileName);
 				}
 				else if (FileChange.Action == FFileChangeData::FCA_Removed)
 				{
-					DirectoryTree->RemoveDirectory(FullFileName);
-					AssetView->RemoveFolder(FullFileName);
+                    DirectoryTree->RemoveDirectory(FullFileName);
+                    AssetView->RemoveFolder(FullFileName);
+                    SetCurrentDisplyPath(FPaths::GetPath(FullFileName));
+                    
+                    TArray<FString> FileNames = FindFilesUnderBrowserDirectory(FullFileName);
+                    for(const FString& FileName : FileNames)
+                    {
+                        if(AssetOp* AssetOp_ = GetAssetOp(FileName))
+                        {
+                            AssetOp_->OnDelete(FileName);
+                        }
+                        TSingleton<AssetManager>::Get().RemoveGuidToPath(FileName);
+                    }
+                    
+                    RemoveBrowserDirectory(FullFileName);
 				}
 			}
 			else if(TSingleton<AssetManager>::Get().GetManageredExts().Contains(Extension))
@@ -160,16 +268,28 @@ namespace FRAMEWORK
                 if (FileChange.Action == FFileChangeData::FCA_Added)
 #endif
                 {
-                    TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*FullFileName));
-                    FGuid AssetId;
-                    *Ar << AssetId;
-                    TSingleton<AssetManager>::Get().UpdateGuidToPath(AssetId, FullFileName);
+                    TSingleton<AssetManager>::Get().UpdateGuidToPath(FullFileName);
+                    
+                    if(AssetOp* AssetOp_ = GetAssetOp(FullFileName))
+                    {
+                        AssetOp_->OnAdd(FullFileName);
+                    }
                     
                     AssetView->AddFile(FullFileName);
+                    AddFile(FullFileName);
                 }
 				else if (FileChange.Action == FFileChangeData::FCA_Removed)
 				{
+                    
 					AssetView->RemoveFile(FullFileName);
+                    RemoveFile(FullFileName);
+                
+                    if(AssetOp* AssetOp_ = GetAssetOp(FullFileName))
+                    {
+                        AssetOp_->OnDelete(FullFileName);
+                    }
+                    
+                    TSingleton<AssetManager>::Get().RemoveGuidToPath(FullFileName);
 				}
 			}
 		}
@@ -178,6 +298,5 @@ namespace FRAMEWORK
 	void SAssetBrowser::OnDirectoryTreeSelectionChanged(const FString& SelectedDirectory)
 	{
 		AssetView->SetNewViewDirectory(SelectedDirectory);
-		OnSelectedDirectoryChanged.ExecuteIfBound(SelectedDirectory);
 	}
 }

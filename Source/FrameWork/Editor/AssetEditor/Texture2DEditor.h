@@ -8,7 +8,7 @@ namespace FRAMEWORK
 	public:
 		Texture2DOp() = default;
 
-        struct ShReflectToy::MetaType* SupportAsset() override;
-		void Open(const FString& InAssetPath) override;
+        struct MetaType* SupportAsset() override;
+		void OnOpen(const FString& InAssetPath) override;
 	};
 }

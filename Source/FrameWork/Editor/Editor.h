@@ -18,6 +18,8 @@ namespace FRAMEWORK {
 		static void SetLanguage(SupportedLanguage InLanguage);
 		static inline SupportedLanguage CurLanguage = SupportedLanguage::English;
 		static inline TUniquePtr<FConfigFile> EditorConfig = MakeUnique<FConfigFile>();
+        
+        virtual void Update(double DeltaTime) {}
 	};
 }
 

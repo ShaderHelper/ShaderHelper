@@ -6,6 +6,7 @@ namespace FRAMEWORK
 {
 	struct UniformBufferMemberInfo
 	{
+        TSharedPtr<void> ReadableData;
 		uint32 Offset;
 #if !SH_SHIPPING
 		FString TypeName;
@@ -19,6 +20,30 @@ namespace FRAMEWORK
 		uint32 UniformBufferSize = 0;
 	};
 
+    template<typename T>
+    class UniformBufferMemberWrapper
+    {
+    public:
+        UniformBufferMemberWrapper(T* InReadableData, T* InWritableData)
+        : ReadableData(InReadableData), WritableData(InWritableData)
+        {}
+        
+        void operator=(const T& InData)
+        {
+            *ReadableData = InData;
+            *WritableData = InData;
+        }
+        
+        operator T() const
+        {
+            return *ReadableData;
+        }
+        
+    private:
+        T* ReadableData;
+        T* WritableData;
+    };
+
 	class UniformBuffer
 	{
 	public:
@@ -27,14 +52,15 @@ namespace FRAMEWORK
 			, MetaData(MoveTemp(InData))
 		{}
 
-		//Only write data, not read.
 		template<typename T>
-		T& GetMember(const FString& MemberName) {
+        UniformBufferMemberWrapper<T> GetMember(const FString& MemberName) {
 			checkf(MetaData.Members.Contains(MemberName), TEXT("The uniform buffer doesn't contain \"%s\" member."), *MemberName);
 			checkf(AUX::TypeName<T> == MetaData.Members[MemberName].TypeName, TEXT("Mismatched type: %s, Expected : %s"), *AUX::TypeName<T>, *MetaData.Members[MemberName].TypeName);
 			int32 MemberOffset = MetaData.Members[MemberName].Offset;
 			void* BufferBaseAddr = GGpuRhi->MapGpuBuffer(Buffer, GpuResourceMapMode::Write_Only);
-			return *reinterpret_cast<T*>((uint8*)BufferBaseAddr + MemberOffset);
+            T* BufferWritableData = reinterpret_cast<T*>((uint8*)BufferBaseAddr + MemberOffset);
+            T* BufferReadableData = reinterpret_cast<T*>(MetaData.Members[MemberName].ReadableData.Get());
+            return {BufferReadableData, BufferWritableData};
 		}
 
 		FString GetDeclaration() const {
@@ -133,9 +159,9 @@ namespace FRAMEWORK
 			}
 
 #if !SH_SHIPPING
-			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize - MemberSize, AUX::TypeName<T> });
+			MetaData.Members.Add(MemberName, { MakeShared<T>(), MetaData.UniformBufferSize - MemberSize, AUX::TypeName<T> });
 #else
-			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize - MemberSize });
+			MetaData.Members.Add(MemberName, { MakeShared<T>(), MetaData.UniformBufferSize - MemberSize });
 #endif
 
 			UniformBufferMemberNames += FString::Printf(TEXT("%s %s;\r\n"), ANSI_TO_TCHAR(UniformBufferMemberTypeString<T>::Value.data()), *MemberName);

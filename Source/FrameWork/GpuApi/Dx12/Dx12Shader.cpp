@@ -61,6 +61,7 @@ namespace FRAMEWORK
 		Arguments.Add(*ShaderProfile);
 #if DEBUG_SHADER
 		Arguments.Add(TEXT("/Zi"));
+        Arguments.Add(TEXT("/Od"));
 #endif
 
 		for(const FString& IncludeDir : InShader->GetIncludeDirs())

@@ -28,6 +28,11 @@ namespace SH {
         Style->Set("AssetBrowser.ShaderPass", new IMAGE_BRUSH_SVG("ShaderPass", FVector2D(64.0, 64.0)));
         
 		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir);
+        
+        FButtonStyle SuperSimpleButton = FButtonStyle(FAppStyle::Get().GetWidgetStyle<FButtonStyle>("SimpleButton"))
+            .SetPressed(FSlateNoResource())
+            .SetHovered(FSlateNoResource());
+        Style->Set("SuperSimpleButton", SuperSimpleButton);
 
 		FTableRowStyle LineNumberItemStyle;
 		LineNumberItemStyle.SetEvenRowBackgroundBrush(FSlateNoResource());

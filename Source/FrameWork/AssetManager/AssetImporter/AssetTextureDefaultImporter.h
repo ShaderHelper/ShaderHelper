@@ -9,7 +9,7 @@ namespace FRAMEWORK
 		TUniquePtr<AssetObject> CreateAssetObject(const FString& InFilePath) override;
 		TArray<FString> SupportFileExts() const override;
         
-        struct ShReflectToy::MetaType* SupportAsset() override;
+        struct MetaType* SupportAsset() override;
         
 	};
 }

@@ -1,20 +1,34 @@
 #pragma once
 #include "SDirectoryTree.h"
+#include "SAssetView.h"
 struct FFileChangeData;
 
 namespace FRAMEWORK
 {
+    struct AssetBrowserDirectory
+    {
+        FString Path;
+        TArray<AssetBrowserDirectory> Directories;
+        TArray<FString> Files;
+        
+        bool operator==(const AssetBrowserDirectory& Rhs) const
+        {
+            return Path == Rhs.Path;
+        }
+    };
+
+    struct AssetBrowserPersistentState
+    {
+        DirectoryTreePersistentState DirectoryTreeState;
+        AssetViewPersistentState AssetViewState;
+    };
+
 	class FRAMEWORK_API SAssetBrowser : public SCompoundWidget
 	{
 	public:
 		SLATE_BEGIN_ARGS(SAssetBrowser) {}
 			SLATE_ARGUMENT(FString, ContentPathShowed)
-			SLATE_ARGUMENT(FString, InitialSelectedDirectory)
-			SLATE_ARGUMENT(TArray<FString>, InitialDirectoriesToExpand)
-			SLATE_EVENT(SelectedDirectoryChangedDelegate, OnSelectedDirectoryChanged)
-			SLATE_EVENT(ExpandedDirectoriesChangedDelegate, OnExpandedDirectoriesChanged)
-			SLATE_ARGUMENT(float , InitAssetViewSize)
-			SLATE_EVENT(FOnFloatValueChanged, OnAssetViewSizeChanged)
+            SLATE_ARGUMENT(TSharedPtr<AssetBrowserPersistentState>, State)
 		SLATE_END_ARGS()
 
 		~SAssetBrowser();
@@ -22,15 +36,26 @@ namespace FRAMEWORK
 		void Construct(const FArguments& InArgs);
 		void OnFileChanged(const TArray<FFileChangeData>& InFileChanges);
 		void OnDirectoryTreeSelectionChanged(const FString& SelectedDirectory);
+        
+        void SetCurrentDisplyPath(const FString& DisplayDir);
+        
+    private:
+        void InitDirectory(AssetBrowserDirectory& OutDirectory, const FString& Dir);
+        AssetBrowserDirectory* FindBrowserDirectory(AssetBrowserDirectory& CurDirectory, const FString& SearchDir);
+        void AddFile(const FString& File);
+        void RemoveFile(const FString& File);
+        void AddBrowserDirectory(const FString& DirName);
+        void RemoveBrowserDirectory(const FString& DirName);
+        TArray<FString> FindFilesUnderBrowserDirectory(const FString& DirName);
 
 	private:
 		TSharedPtr<SDirectoryTree> DirectoryTree;
-		TSharedPtr<class SAssetView> AssetView;
+		TSharedPtr<SAssetView> AssetView;
 		FDelegateHandle DirectoryWatcherHandle;
 		FString ContentPathShowed;
-		SelectedDirectoryChangedDelegate OnSelectedDirectoryChanged;
-		ExpandedDirectoriesChangedDelegate OnExpandedDirectoriesChanged;
-		FOnFloatValueChanged OnAssetViewSizeChanged;
+        
+        AssetBrowserDirectory ContentDirectory;
+        TSharedPtr<AssetBrowserPersistentState> State;
 	};
 }
 

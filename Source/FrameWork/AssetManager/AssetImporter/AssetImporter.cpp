@@ -4,7 +4,5 @@
 
 namespace FRAMEWORK
 {
-	GLOBAL_REFLECTION_REGISTER(
-		ShReflectToy::AddClass<AssetImporter>();
-	)
+	GLOBAL_REFLECTION_REGISTER(AddClass<AssetImporter>())
 }

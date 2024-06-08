@@ -172,6 +172,11 @@ PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		FDirectoryWatcherModule& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>(TEXT("DirectoryWatcher"));
 		IDirectoryWatcher* DirectoryWatcher = DirectoryWatcherModule.Get();
 		DirectoryWatcher->Tick((float)DeltaTime);
+        
+        if(AppEditor)
+        {
+            AppEditor->Update(DeltaTime);
+        }
 	}
 
 	void App::Render()

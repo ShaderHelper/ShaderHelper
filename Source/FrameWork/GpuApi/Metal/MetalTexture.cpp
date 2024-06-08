@@ -81,7 +81,7 @@ namespace FRAMEWORK
             TRefCountPtr<MetalBuffer> UploadBuffer = CreateMetalBuffer(BytesImage, GpuBufferUsage::Dynamic);
             uint8* BufferData = (uint8*)UploadBuffer->GetContents();
             FMemory::Memcpy(BufferData, InTexDesc.InitialData.GetData(), BytesImage);
-            auto CmdRecorder = GMtlGpuRhi->BeginRecording();
+            auto CmdRecorder = GMtlGpuRhi->BeginRecording("InitTexture");
             {
                 CmdRecorder->CopyBufferToTexture(UploadBuffer, RetTexture);
             }
