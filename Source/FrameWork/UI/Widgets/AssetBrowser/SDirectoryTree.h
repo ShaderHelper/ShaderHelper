@@ -10,18 +10,22 @@ namespace FRAMEWORK
 		DirectoryData* Parent = nullptr;
 	};
 
-	DECLARE_DELEGATE_OneParam(SelectedDirectoryChangedDelegate, const FString&)
-	DECLARE_DELEGATE_OneParam(ExpandedDirectoriesChangedDelegate, const TArray<FString>&)
+    struct DirectoryTreePersistentState
+    {
+        FString CurSelectedDirectory;
+        TArray<FString> DirectoriesToExpand;
+    };
+
+    DECLARE_DELEGATE_OneParam(SelectedDirectoryChangedDelegate, const FString&)
 
 	class FRAMEWORK_API SDirectoryTree : public SCompoundWidget
 	{
 	public:
-		SLATE_BEGIN_ARGS(SDirectoryTree) {}
+		SLATE_BEGIN_ARGS(SDirectoryTree) : _State(nullptr)
+        {}
 			SLATE_ARGUMENT(FString, ContentPathShowed)
-			SLATE_ARGUMENT(FString, InitialSelectedDirectory)
-			SLATE_ARGUMENT(TArray<FString>, InitialDirectoriesToExpand)
-			SLATE_EVENT(SelectedDirectoryChangedDelegate, OnSelectedDirectoryChanged)
-			SLATE_EVENT(ExpandedDirectoriesChangedDelegate, OnExpandedDirectoriesChanged)
+            SLATE_ARGUMENT(DirectoryTreePersistentState*, State)
+            SLATE_EVENT(SelectedDirectoryChangedDelegate, OnSelectedDirectoryChanged)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs);
@@ -35,6 +39,7 @@ namespace FRAMEWORK
 
 		void SetSelection(const FString& SelectedDirectory);
 		void SetExpansion(const FString& ExpandedDirectory);
+        void SetExpansionRecursive(const FString& ExpandedDirectory);
 		void SortSubDirectory(const FString& ParentDirectory);
         
         FReply HandleOnDrop(const FDragDropEvent& DragDropEvent, FString DropTargetPath);
@@ -43,9 +48,7 @@ namespace FRAMEWORK
 		TArray<TSharedRef<DirectoryData>> DirectoryDatas;
 		TSharedPtr<STreeView<TSharedRef<DirectoryData>>> DirectoryTree;
 		FString ContentPathShowed;
-		SelectedDirectoryChangedDelegate OnSelectedDirectoryChanged;
-		ExpandedDirectoriesChangedDelegate OnExpandedDirectoriesChanged;
-		FString CurSelectedDirectory;
-		TArray<FString> DirectoriesToExpand;
+        SelectedDirectoryChangedDelegate OnSelectedDirectoryChanged;
+        DirectoryTreePersistentState* State;
 	};
 }

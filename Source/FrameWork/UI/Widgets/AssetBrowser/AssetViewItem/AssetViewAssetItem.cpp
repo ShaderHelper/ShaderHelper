@@ -34,9 +34,16 @@ namespace FRAMEWORK
             .OnDragDetected_Raw(this, &AssetViewAssetItem::HandleOnDragDetected);
 
 		TSharedPtr<SWidget> Display;
+        
+        SAssignNew(PreviewBox, SBorder)
+        .BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
+        .Padding(FMargin(5.0f, 4.0f, 5.0f, 6.0f));
 
 		if (AssetThumbnail)
 		{
+            PreviewBox->SetHAlign(HAlign_Center);
+            PreviewBox->SetVAlign(VAlign_Center);
+            
 			ThumbnailViewport->SetViewPortRenderTexture(AssetThumbnail);
 			Display =
 				SNew(SViewport)
@@ -63,40 +70,35 @@ namespace FRAMEWORK
 		{
 			Display = SNew(SImage);
 		}
+        
+        PreviewBox->SetContent(
+           SNew(SOverlay)
+           + SOverlay::Slot()
+           [
+               Display.ToSharedRef()
+           ]
+           +SOverlay::Slot()
+           [
+               SNew(SImage)
+               .Image(FAppStyle::Get().GetBrush("Brushes.Select"))
+               .ColorAndOpacity_Lambda([Row] {
+                   if (Row->IsSelected())
+                   {
+                       return FSlateColor{ FLinearColor{1.0f, 1.0f, 1.0f, 0.2f} };
+                   }
+                   else
+                   {
+                       return FSlateColor{ FLinearColor{1.0f, 1.0f, 1.0f, 0.0f} };
+                   }
+               })
+           ]
+        );
 
 		Row->SetContent(
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot()
 			[
-				SAssignNew(PreviewBox, SBorder)
-				.BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
-				.HAlign(HAlign_Center)
-				.VAlign(VAlign_Center)
-				.Padding(FMargin(5.0f, 4.0f, 5.0f, 6.0f))
-				[
-					SNew(SOverlay)
-					+ SOverlay::Slot()
-					[
-						Display.ToSharedRef()
-					]
-					+SOverlay::Slot()
-					[
-						SNew(SImage)
-						.Image(FAppStyle::Get().GetBrush("Brushes.Select"))
-						.ColorAndOpacity_Lambda([Row] {
-							if (Row->IsSelected())
-							{
-								return FSlateColor{ FLinearColor{1.0f, 1.0f, 1.0f, 0.2f} };
-							}
-							else
-							{
-								return FSlateColor{ FLinearColor{1.0f, 1.0f, 1.0f, 0.0f} };
-							}
-						})
-					]
-					
-				]
-				
+                PreviewBox.ToSharedRef()
 			]
 
 			+SVerticalBox::Slot()

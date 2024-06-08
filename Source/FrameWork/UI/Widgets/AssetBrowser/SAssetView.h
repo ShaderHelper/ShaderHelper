@@ -6,6 +6,11 @@ namespace FRAMEWORK
 {
 	class SAssetBrowser;
 
+    struct AssetViewPersistentState
+    {
+        float AssetViewSize = 60;
+    };
+
 	class FRAMEWORK_API SAssetView : public SCompoundWidget
 	{
 	public:
@@ -13,9 +18,11 @@ namespace FRAMEWORK
 		static constexpr float MaxAssetViewSize = 150;
 
 	public:
-		SLATE_BEGIN_ARGS(SAssetView) {}
+        SLATE_BEGIN_ARGS(SAssetView) : _State(nullptr)
+        {}
 			SLATE_ARGUMENT(FString, ContentPathShowed)
 			SLATE_ARGUMENT(TFunction<void(const FString&)>, OnFolderOpen)
+            SLATE_ARGUMENT(AssetViewPersistentState*, State)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs);
@@ -31,7 +38,7 @@ namespace FRAMEWORK
 		void SortViewItems();
 
 		void SetAssetViewSize(float InAssetViewSize) { 
-			AssetViewSize = InAssetViewSize; 
+            State->AssetViewSize = InAssetViewSize;
 			AssetTileView->RequestListRefresh();
 		}
 
@@ -51,7 +58,7 @@ namespace FRAMEWORK
 		TSharedPtr<FUICommandList> UICommandList;
 		FString ContentPathShowed;
 
-		float AssetViewSize;
+        AssetViewPersistentState* State;
 	};
 
 }

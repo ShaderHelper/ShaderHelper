@@ -8,9 +8,8 @@
 
 namespace FRAMEWORK
 {
-	GLOBAL_REFLECTION_REGISTER(
-		ShReflectToy::AddClass<Texture2D>()
-						.BaseClass<AssetObject>();
+	GLOBAL_REFLECTION_REGISTER(AddClass<Texture2D>()
+                                .BaseClass<AssetObject>()
 	)
 
 	Texture2D::Texture2D()
@@ -44,7 +43,7 @@ namespace FRAMEWORK
 
 	FString Texture2D::FileExtension() const
 	{
-		return "Texture";
+		return "texture";
 	}
 
 	GpuTexture* Texture2D::GetThumbnail() const

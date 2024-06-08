@@ -169,7 +169,7 @@ namespace FRAMEWORK
 			textureData.SlicePitch = textureData.RowPitch * InTexDesc.Height;
 
 			const CommonAllocationData& AllocationData = UploadBuffer->GetAllocation().GetAllocationData().Get<CommonAllocationData>();
-			GpuCmdRecorder* CmdRecorder = GDx12GpuRhi->BeginRecording();
+			GpuCmdRecorder* CmdRecorder = GDx12GpuRhi->BeginRecording("InitTexture");
 			{
 				UpdateSubresources(static_cast<Dx12CmdRecorder*>(CmdRecorder)->GetCommandList(), RetTexture->GetResource(), AllocationData.UnderlyResource, 0, 0, 1, &textureData);
 				CmdRecorder->Barrier(RetTexture, InitState);

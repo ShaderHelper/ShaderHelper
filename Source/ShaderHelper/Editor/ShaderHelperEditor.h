@@ -5,14 +5,13 @@
 #include "Editor/PreviewViewPort.h"
 #include "AssetObject/ShaderPass.h"
 #include "AssetManager/AssetManager.h"
+#include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
 
 namespace SH 
 {
 	class ShaderHelperEditor : public FRAMEWORK::Editor
 	{
 	public:
-		DECLARE_DELEGATE_OneParam(OnEditorWindowClosed, bool)
-
 		struct WindowLayoutConfigInfo
 		{
 			FVector2D Position;
@@ -22,7 +21,11 @@ namespace SH
 
 		ShaderHelperEditor(const FRAMEWORK::Vector2f& InWindowSize, ShRenderer* InRenderer);
 		~ShaderHelperEditor();
-
+    public:
+        FTabManager* GetCodeTabManager() const { return CodeTabManager.Get(); }
+        
+    public:
+        void Update(double DeltaTime) override;
 		void ResetWindowLayout();
 		WindowLayoutConfigInfo LoadWindowLayout(const FString& InWindowLayoutConfigFileName);
 		void SaveWindowLayout(const TSharedRef<FTabManager::FLayout>& InLayout);
@@ -31,16 +34,15 @@ namespace SH
 		void OnViewportResize(const FRAMEWORK::Vector2f& InSize);
         
         void OpenShaderPassTab(FRAMEWORK::AssetPtr<ShaderPass> InShaderPass);
+        void TryRestoreShaderPassTab(FRAMEWORK::AssetPtr<ShaderPass> InShaderPass);
 		
 	private:
 		TSharedRef<SDockTab> SpawnWindowTab(const FSpawnTabArgs& Args);
         TSharedRef<SDockTab> SpawnShaderPassTab(const FSpawnTabArgs& Args);
+        TSharedRef<SWidget> SpawnShaderPassPath(const FString& InShaderPassPath);
         FMenuBarBuilder CreateMenuBarBuilder();
 		void FillMenu(FMenuBuilder& MenuBuilder, FString MenuName);
 		void InitEditorUI();
-
-	public:
-		OnEditorWindowClosed OnWindowClosed;
 		
 	private:
 		ShRenderer* Renderer;
@@ -48,6 +50,7 @@ namespace SH
 		TSharedPtr<SDockTab> TabManagerTab;
 		TSharedPtr<FTabManager> TabManager;
         FDelegateHandle SaveLayoutTicker;
+        TSharedPtr<FRAMEWORK::SAssetBrowser> AssetBrowser;
         
         TSharedPtr<SDockTab> CodeTab;
         TSharedPtr<FTabManager> CodeTabManager;
@@ -66,12 +69,13 @@ namespace SH
 			void InitFromJson(const TSharedPtr<FJsonObject>& InJson);
 			TSharedRef<FJsonObject> ToJson() const;
 
-			float AssetViewSize = 60;
-			FString SelectedDirectory;
-			TArray<FString> DirectoriesToExpand;
+            TSharedPtr<FRAMEWORK::AssetBrowserPersistentState> AssetBrowserState = MakeShared<FRAMEWORK::AssetBrowserPersistentState>();
             TSharedPtr<FTabManager::FLayout> CodeTabLayout;
             TMap<FRAMEWORK::AssetPtr<ShaderPass>, TSharedPtr<SDockTab>> OpenedShaderPasses;
 		} CurEditorState;
+        
+        //used to restore the ShaderEditorBox when the shaderpass asset path is changed.
+        TMap<FRAMEWORK::AssetPtr<ShaderPass>, TSharedPtr<class SShaderEditorBox>> PendingShaderPasseTabs;
 		FString EditorStateSaveFileName;
 	};
 

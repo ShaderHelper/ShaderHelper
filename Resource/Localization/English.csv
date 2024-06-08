@@ -1,4 +1,4 @@
-﻿Key,SourceString,Comment
+Key,SourceString,Comment
 ShaderHelper,ShaderHelper,
 File,File,
 Config,Config,
@@ -36,5 +36,5 @@ Cancel,Cancel,
 AssetImportFailure,Failed to import asset.,
 DeleteAssetTip,Delete selected Item?,
 CodeTabTip,Select any ShaderPass asset to edit the code.,
-ShaderPass,ShaderPass,
+shaderpass,ShaderPass,
 AssetRenameFailure,Destination name already exists!

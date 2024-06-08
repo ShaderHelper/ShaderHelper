@@ -8,7 +8,11 @@ namespace SH
 	public:
 		ShaderPassOp() = default;
 
-        struct FRAMEWORK::ShReflectToy::MetaType* SupportAsset() override;
-		void Open(const FString& InAssetPath) override;
+        struct FRAMEWORK::MetaType* SupportAsset() override;
+		void OnOpen(const FString& InAssetPath) override;
+        
+        //OnDelete and OnAdd will be triggered one after the other if rename or move the asset.
+        void OnAdd(const FString& InAssetPath) override;
+        void OnDelete(const FString& InAssetPath) override;
 	};
 }

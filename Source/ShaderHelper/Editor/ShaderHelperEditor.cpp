@@ -13,6 +13,8 @@
 #include <Framework/Docking/SDockingTabStack.h>
 #include "UI/Widgets/SShaderPassTab.h"
 
+STEAL_PRIVATE_MEMBER(FTabManager, TArray<TSharedRef<FTabManager::FArea>>, CollapsedDockAreas)
+
 using namespace FRAMEWORK;
 
 namespace SH 
@@ -167,24 +169,138 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		}));
 	}
 
+    TSharedRef<SWidget> ShaderHelperEditor::SpawnShaderPassPath(const FString& InShaderPassPath)
+    {
+        auto PathContainer = SNew(SHorizontalBox);
+        FString ShaderPassRelativePath = TSingleton<ShProjectManager>::Get().GetRelativePathToProject(InShaderPassPath);
+        TArray<FString> FileNames;
+        ShaderPassRelativePath.ParseIntoArray(FileNames, TEXT("/"));
+        FString RelativePathHierarchy;
+        for(int32 i = 0; i < FileNames.Num(); i++)
+        {
+            FString FileName = FileNames[i];
+            if(i == FileNames.Num() - 1)
+            {
+                PathContainer->AddSlot()
+                .AutoWidth()
+                .VAlign(VAlign_Center)
+                .HAlign(HAlign_Center)
+                .Padding(2.0f, 0.0f, 0.0f, 0.0f)
+                [
+                    SNew(STextBlock)
+                    .Text(FText::FromString(FileName))
+                ];
+            }
+            else
+            {
+                RelativePathHierarchy = FPaths::Combine(RelativePathHierarchy, FileName);
+                PathContainer->AddSlot()
+                .AutoWidth()
+                .VAlign(VAlign_Center)
+                .HAlign(HAlign_Center)
+                .Padding(2.0f, 0.0f, 0.0f, 0.0f)
+                [
+                    SNew(SHorizontalBox)
+                    +SHorizontalBox::Slot()
+                    .AutoWidth()
+                    .Padding(2.0f)
+                    [
+                        SNew(SImage)
+                        .DesiredSizeOverride(FVector2D{12.0f, 12.0f})
+                        .Image(FAppStyle::Get().GetBrush("Icons.FolderClosed"))
+                    ]
+                    +SHorizontalBox::Slot()
+                    [
+                        SNew(SButton)
+                        .ContentPadding(FMargin{})
+                        .ButtonStyle(&FShaderHelperStyle::Get().GetWidgetStyle< FButtonStyle >("SuperSimpleButton"))
+                        .Text(FText::FromString(FileName + TEXT("  ❯")))
+                        .OnClicked_Lambda([=]{
+                            AssetBrowser->SetCurrentDisplyPath(TSingleton<ShProjectManager>::Get().ConvertRelativePathToFull(RelativePathHierarchy));
+                            return FReply::Handled();
+                        })
+                    ]
+                ];
+            }
+
+        }
+        
+        return SNew(SScrollBox)
+            .Orientation(EOrientation::Orient_Horizontal)
+            .ScrollBarVisibility(EVisibility::Collapsed)
+            +SScrollBox::Slot()
+            [
+                PathContainer
+            ];
+    }
+
+    void ShaderHelperEditor::Update(double DeltaTime)
+    {
+        
+    }
+
     TSharedRef<SDockTab> ShaderHelperEditor::SpawnShaderPassTab(const FSpawnTabArgs& Args)
     {
         FGuid ShaderPassGuid{Args.GetTabId().ToString()};
+        FName TabId = Args.GetTabId().TabType;
         auto LoadedShaderPass = TSingleton<AssetManager>::Get().LoadAssetByGuid<ShaderPass>(ShaderPassGuid);
+        TSharedPtr<SShaderEditorBox> ShaderEditor;
+        if(PendingShaderPasseTabs.Contains(LoadedShaderPass))
+        {
+            ShaderEditor = PendingShaderPasseTabs[LoadedShaderPass];
+            PendingShaderPasseTabs.Remove(LoadedShaderPass);
+        }
+        else
+        {
+            ShaderEditor = SNew(SShaderEditorBox).ShaderPassAsset(LoadedShaderPass.Get());
+        }
         auto NewShaderPassTab = SNew(SShaderPassTab)
             .TabRole(ETabRole::DocumentTab)
-            .Label_Lambda([LoadedShaderPass] { return FText::FromString(LoadedShaderPass->GetFileName());})
+            .Label(FText::FromString(LoadedShaderPass->GetFileName()))
             .OnTabClosed_Lambda([=](TSharedRef<SDockTab> ClosedTab) {
                 CurEditorState.OpenedShaderPasses.Remove(*CurEditorState.OpenedShaderPasses.FindKey(ClosedTab));
-                //Do not persist the tab being closed.
-                ClosedTab->GetParentDockTabStack()->OnTabRemoved(Args.GetTabId());
-            });
+                PendingShaderPasseTabs.Add(LoadedShaderPass, ShaderEditor);
+                auto DockTabStack = ClosedTab->GetParentDockTabStack();
+                PRAGMA_DISABLE_DEPRECATION_WARNINGS
+                //Persist the tab being closed until next frame to be able to restore the tab.
+                FDelegateHandle TickerHandle = FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([=](float) {
+                    //If the shaderpass tab was not restored on the last frame.
+                    if(PendingShaderPasseTabs.Contains(LoadedShaderPass))
+                    {
+                        CodeTabManager->UnregisterTabSpawner(TabId);
+                        PendingShaderPasseTabs.Remove(LoadedShaderPass);
+                        //Clear the PersistLayout when closing a shaderpass tab. we don't intend to restore it, so just destroy it.
+                        DockTabStack->OnTabRemoved(Args.GetTabId());
+                        TArray<TSharedRef<FTabManager::FArea>>& CollapsedDockAreas = GetPrivate_FTabManager_CollapsedDockAreas(*CodeTabManager);
+                        CollapsedDockAreas.Empty();
+                    }
+                    FTicker::GetCoreTicker().RemoveTicker(TickerHandle);
+                    return false;
+                }));
+                PRAGMA_ENABLE_DEPRECATION_WARNINGS
+            })
+            [
+                SNew(SVerticalBox)
+                +SVerticalBox::Slot()
+                .AutoHeight()
+                [
+                    SpawnShaderPassPath(LoadedShaderPass->GetPath())
+                ]
+                +SVerticalBox::Slot()
+                [
+                    ShaderEditor.ToSharedRef()
+                ]
+            ];
+        
         NewShaderPassTab->SetTabIcon(LoadedShaderPass->GetImage());
-		NewShaderPassTab->SetOnTabRelocated(FSimpleDelegate::CreateLambda([=] {
-			if (TSharedPtr<SDockingTabStack> TabStack = CodeTabManager->FindTabInLiveArea(FTabMatcher{ NewShaderPassTab->GetLayoutIdentifier() }, CodeTabMainArea.ToSharedRef()))
-			{
-				ShaderPassTabStackInsertPoint = TabStack;
-			}
+        NewShaderPassTab->SetOnTabRelocated(FSimpleDelegate::CreateLambda([this, NewShaderPassTab = TWeakPtr<SShaderPassTab>{NewShaderPassTab}] {
+            if(NewShaderPassTab.IsValid())
+            {
+                if (TSharedPtr<SDockingTabStack> TabStack = CodeTabManager->FindTabInLiveArea(FTabMatcher{ NewShaderPassTab.Pin()->GetLayoutIdentifier() }, CodeTabMainArea.ToSharedRef()))
+                {
+                    ShaderPassTabStackInsertPoint = TabStack;
+                }
+            }
 		}));
         NewShaderPassTab->SetOnTabActivated(SDockTab::FOnTabActivatedCallback::CreateLambda([this](TSharedRef<SDockTab> InTab, ETabActivationCause) {
             if(!CodeTabMainArea) return;
@@ -280,35 +396,15 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                ]
            );
             CodeTabMainArea = CodeTabManager->FindPotentiallyClosedTab(InitialInsertPointTabId)->GetDockArea();
-//			SpawnedTab->SetLabel(LOCALIZATION(CodeTabId.ToString()));
-//			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Edit"));
-//			SpawnedTab->SetContent(
-//				SNew(SShaderEditorBox)
-//				.Renderer(Renderer)
-//			);
 		}
 		else if (TabId == AssetTabId) {
             SpawnedTab = SNew(SDockTab);
 			SpawnedTab->SetLabel(LOCALIZATION(AssetTabId.ToString()));
 			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Server"));
 			SpawnedTab->SetContent(
-				SNew(SAssetBrowser)
+				SAssignNew(AssetBrowser, SAssetBrowser)
 				.ContentPathShowed(TSingleton<ShProjectManager>::Get().GetActiveContentDirectory())
-				.InitAssetViewSize(CurEditorState.AssetViewSize)
-				.InitialSelectedDirectory(CurEditorState.SelectedDirectory)
-				.InitialDirectoriesToExpand(CurEditorState.DirectoriesToExpand)
-				.OnSelectedDirectoryChanged_Lambda([this](const FString& NewSelectedDirectory) {
-					CurEditorState.SelectedDirectory = NewSelectedDirectory;
-					SaveEditorState();
-				})
-				.OnExpandedDirectoriesChanged_Lambda([this](const TArray<FString>& NewExpandedDirectories) {
-					CurEditorState.DirectoriesToExpand = NewExpandedDirectories;
-					SaveEditorState();
-				})
-				.OnAssetViewSizeChanged_Lambda([this](float NewValue) {
-					CurEditorState.AssetViewSize = NewValue;
-					SaveEditorState();
-				})
+                .State(CurEditorState.AssetBrowserState)
 			);
 		}
 		else {
@@ -330,12 +426,24 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
         TabManager->FindExistingLiveTab(CodeTabId)->GetParentDockTabStack()->SetCanDropToAttach(false);
 	}
 
+    void ShaderHelperEditor::TryRestoreShaderPassTab(AssetPtr<ShaderPass> InShaderPass)
+    {
+        if(PendingShaderPasseTabs.Contains(InShaderPass))
+        {
+            FName ShaderPassTabId{*InShaderPass->GetGuid().ToString()};
+            CodeTabManager->TryInvokeTab(ShaderPassTabId);
+        }
+    }
+
     void ShaderHelperEditor::OpenShaderPassTab(AssetPtr<ShaderPass> InShaderPass)
     {
         TSharedPtr<SDockTab>* TabPtr = CurEditorState.OpenedShaderPasses.Find(InShaderPass);
         if(TabPtr == nullptr || !*TabPtr)
         {
             FName ShaderPassTabId{*InShaderPass->GetGuid().ToString()};
+            //Register the tab spawner to restore the tab if need.
+            CodeTabManager->RegisterTabSpawner(ShaderPassTabId, FOnSpawnTab::CreateRaw(this, &ShaderHelperEditor::SpawnShaderPassTab))
+                .SetReuseTabMethod(FOnFindTabToReuse::CreateLambda([](const FTabId&){ return nullptr; }));
             auto NewShaderPassTab = SpawnShaderPassTab({Window, ShaderPassTabId});
             if(ShaderPassTabStackInsertPoint.IsValid() && ShaderPassTabStackInsertPoint.Pin()->GetAllChildTabs().IsValidIndex(0))
             {
@@ -568,15 +676,15 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 	void ShaderHelperEditor::EditorState::InitFromJson(const TSharedPtr<FJsonObject>& InJson)
 	{
-		AssetViewSize = (float)InJson->GetNumberField("AssetViewSize");
-		SelectedDirectory =  TSingleton<ShProjectManager>::Get().ConvertRelativePathToFull(
+        AssetBrowserState->AssetViewState.AssetViewSize = (float)InJson->GetNumberField("AssetViewSize");
+        AssetBrowserState->DirectoryTreeState.CurSelectedDirectory =  TSingleton<ShProjectManager>::Get().ConvertRelativePathToFull(
 			InJson->GetStringField("SelectedRelativeDirectory")
 		);
 
 		TArray<TSharedPtr<FJsonValue>> JsonRelativeDirectories = InJson->GetArrayField("RelativeDirectoriesToExpand");
 		for (const auto& JsonRelativeDirectory : JsonRelativeDirectories)
 		{
-			DirectoriesToExpand.Add(
+            AssetBrowserState->DirectoryTreeState.DirectoriesToExpand.Add(
 				TSingleton<ShProjectManager>::Get().ConvertRelativePathToFull(JsonRelativeDirectory->AsString())
 			);
 		}
@@ -597,12 +705,12 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	TSharedRef<FJsonObject> ShaderHelperEditor::EditorState::ToJson() const
 	{
 		TSharedRef<FJsonObject> JsonObject = MakeShareable(new FJsonObject());
-		JsonObject->SetNumberField("AssetViewSize", AssetViewSize);
+		JsonObject->SetNumberField("AssetViewSize", AssetBrowserState->AssetViewState.AssetViewSize);
 		JsonObject->SetStringField("SelectedRelativeDirectory", 
-			TSingleton<ShProjectManager>::Get().GetRelativePathToProject(SelectedDirectory));
+			TSingleton<ShProjectManager>::Get().GetRelativePathToProject(AssetBrowserState->DirectoryTreeState.CurSelectedDirectory));
 
 		TArray<TSharedPtr<FJsonValue>> JsonRelativeDirectories;
-		for (const FString& Directory : DirectoriesToExpand)
+		for (const FString& Directory : AssetBrowserState->DirectoryTreeState.DirectoriesToExpand)
 		{
 			TSharedPtr<FJsonValue> JsonRelativeDriectory = MakeShared<FJsonValueString>(
 				TSingleton<ShProjectManager>::Get().GetRelativePathToProject(Directory));

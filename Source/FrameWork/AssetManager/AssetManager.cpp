@@ -24,10 +24,19 @@ namespace FRAMEWORK
 		}
 	}
 
-	void AssetManager::UpdateGuidToPath(const FGuid& InGuid, const FString& InPath)
+	void AssetManager::UpdateGuidToPath(const FString& InPath)
 	{
-        GuidToPath.FindOrAdd(InGuid) = InPath;
+        TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*InPath));
+        FGuid Guid;
+        *Ar << Guid;
+        GuidToPath.FindOrAdd(Guid) = InPath;
 	}
+
+    void AssetManager::RemoveGuidToPath(const FString& InPath)
+    {
+        FGuid Guid = TSingleton<AssetManager>::Get().GetGuid(InPath);
+        GuidToPath.Remove(Guid);
+    }
 
 	FString AssetManager::GetPath(const FGuid& InGuid) const
 	{
@@ -36,6 +45,7 @@ namespace FRAMEWORK
 
 	FGuid AssetManager::GetGuid(const FString& InPath) const
 	{
+        check(GuidToPath.FindKey(InPath) != nullptr);
         return *GuidToPath.FindKey(InPath);
 	}
 
@@ -71,15 +81,9 @@ namespace FRAMEWORK
 	TArray<FString> AssetManager::GetManageredExts() const
 	{
 		TArray<FString> ManageredExts;
-		TArray<ShReflectToy::MetaType*> AssetObjectMetaTypes = ShReflectToy::GetMetaTypes<AssetObject>();
-		for (auto MetaTypePtr : AssetObjectMetaTypes)
-		{
-			AssetObject* DefaultAssetObject = static_cast<AssetObject*>(MetaTypePtr->GetDefaultObject());
-			if (DefaultAssetObject)
-			{
-				ManageredExts.Add(DefaultAssetObject->FileExtension());
-			}
-		}
+        ForEachDefaultObject<AssetObject>([&](AssetObject* CurAssetObject){
+            ManageredExts.Add(CurAssetObject->FileExtension());
+        });
 		return ManageredExts;
 	}
 

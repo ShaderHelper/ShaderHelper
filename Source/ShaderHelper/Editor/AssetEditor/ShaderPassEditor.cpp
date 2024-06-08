@@ -9,20 +9,37 @@ using namespace FRAMEWORK;
 
 namespace SH
 {
-	GLOBAL_REFLECTION_REGISTER(
-		ShReflectToy::AddClass<ShaderPassOp>()
-						.BaseClass<AssetOp>();
+	GLOBAL_REFLECTION_REGISTER(AddClass<ShaderPassOp>()
+                                .BaseClass<AssetOp>()
 	)
 
-    ShReflectToy::MetaType* ShaderPassOp::SupportAsset()
+    MetaType* ShaderPassOp::SupportAsset()
     {
-        return ShReflectToy::GetMetaType<ShaderPass>();
+        return GetMetaType<ShaderPass>();
     }
 
-	void ShaderPassOp::Open(const FString& InAssetPath)
+	void ShaderPassOp::OnOpen(const FString& InAssetPath)
 	{
         AssetPtr<ShaderPass> LoadedShaderPassAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderPass>(InAssetPath);
         auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
         ShEditor->OpenShaderPassTab(MoveTemp(LoadedShaderPassAsset));
 	}
+
+    void ShaderPassOp::OnAdd(const FString& InAssetPath)
+    {
+        AssetPtr<ShaderPass> LoadedShaderPassAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderPass>(InAssetPath);
+        auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+        ShEditor->TryRestoreShaderPassTab(MoveTemp(LoadedShaderPassAsset));
+    }
+
+    void ShaderPassOp::OnDelete(const FString& InAssetPath)
+    {
+        auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+        FName TabId{TSingleton<AssetManager>::Get().GetGuid(InAssetPath).ToString()};
+        TSharedPtr<SDockTab> ExistingTab = ShEditor->GetCodeTabManager()->FindExistingLiveTab(TabId);
+        if (ExistingTab)
+        {
+            ExistingTab->RequestCloseTab();
+        }
+    }
 }

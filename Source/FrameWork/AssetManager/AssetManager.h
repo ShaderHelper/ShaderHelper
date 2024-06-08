@@ -57,18 +57,10 @@ namespace FRAMEWORK
 				return { static_cast<T*>(Assets[Guid]), Guid };
 			}
 
-			TArray<ShReflectToy::MetaType*> AssetObjectMetaTypes = ShReflectToy::GetMetaTypes<AssetObject>();
 			FString AssetExt = FPaths::GetExtension(InAssetPath);
-			AssetObject* NewAssetObject = nullptr;
-			for (auto MetaTypePtr : AssetObjectMetaTypes)
-			{
-				AssetObject* DefaultAssetObject = static_cast<AssetObject*>(MetaTypePtr->GetDefaultObject());
-				if (DefaultAssetObject && DefaultAssetObject->FileExtension().Contains(AssetExt))
-				{
-					NewAssetObject = static_cast<AssetObject*>(MetaTypePtr->Construct());
-					break;
-				}
-			}
+            AssetObject* NewAssetObject = GetDefaultObject<AssetObject>([&](AssetObject* CurAssetObject){
+                return CurAssetObject->FileExtension().Contains(AssetExt);
+            });
 			check(NewAssetObject);
 			TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*InAssetPath));
             if(Ar)
@@ -89,7 +81,8 @@ namespace FRAMEWORK
 			return LoadAssetByPath<T>(GetPath(InGuid));
 		}
 
-		void UpdateGuidToPath(const FGuid& InGuid, const FString& InPath);
+		void UpdateGuidToPath(const FString& InPath);
+        void RemoveGuidToPath(const FString& InPath);
 
 		FString GetPath(const FGuid& InGuid) const;
 		FGuid GetGuid(const FString& InPath) const;

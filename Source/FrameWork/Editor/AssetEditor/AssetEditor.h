@@ -10,7 +10,11 @@ namespace FRAMEWORK
 		virtual ~AssetOp() = default;
 
 	public:
-        virtual struct ShReflectToy::MetaType* SupportAsset() = 0;
-		virtual void Open(const FString& InAssetPath) = 0;
+        virtual struct MetaType* SupportAsset() = 0;
+        virtual void OnOpen(const FString& InAssetPath) {}
+        virtual void OnAdd(const FString& InAssetPath) {}
+        virtual void OnDelete(const FString& InAssetPath) {}
 	};
+    
+    AssetOp* GetAssetOp(const FString& InAssetPath);
 }

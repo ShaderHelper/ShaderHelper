@@ -26,7 +26,10 @@ void MetalGpuRhiBackend::InitApiEnv()
 
 void MetalGpuRhiBackend::WaitGpu()
 {
-    LastSubmittedCmdRecorder->GetCommandBuffer()->waitUntilCompleted();
+    if(LastSubmittedCmdRecorder)
+    {
+        LastSubmittedCmdRecorder->GetCommandBuffer()->waitUntilCompleted();
+    }
 }
 
 void MetalGpuRhiBackend::BeginFrame()

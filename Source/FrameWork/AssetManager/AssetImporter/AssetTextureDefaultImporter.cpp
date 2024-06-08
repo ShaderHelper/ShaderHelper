@@ -9,9 +9,8 @@
 
 namespace FRAMEWORK
 {
-	GLOBAL_REFLECTION_REGISTER(
-		ShReflectToy::AddClass<AssetTextureDefaultImporter>()
-						.BaseClass<AssetImporter>()
+	GLOBAL_REFLECTION_REGISTER(AddClass<AssetTextureDefaultImporter>()
+                                .BaseClass<AssetImporter>()
 	)
 
 	TUniquePtr<AssetObject> AssetTextureDefaultImporter::CreateAssetObject(const FString& InFilePath)
@@ -40,9 +39,9 @@ namespace FRAMEWORK
 		return { "png", "jpeg", "jpg", "tga" };
 	}
 
-    ShReflectToy::MetaType* AssetTextureDefaultImporter::SupportAsset()
+    MetaType* AssetTextureDefaultImporter::SupportAsset()
     {
-        return ShReflectToy::GetMetaType<Texture2D>();
+        return GetMetaType<Texture2D>();
     }
 
 }

@@ -1,7 +1,7 @@
 #pragma once
 #include "Auxiliary.h"
 
-namespace FRAMEWORK::ShReflectToy
+namespace FRAMEWORK
 {
 	struct MetaType;
 
@@ -134,6 +134,40 @@ namespace FRAMEWORK::ShReflectToy
 		}
 		return MetaTypes;
 	}
+
+    template<typename T>
+    T* GetDefaultObject(const TFunctionRef<bool(T*)>& Pred)
+    {
+        TArray<MetaType*> MetaTypes = GetMetaTypes<T>();
+        for (auto MetaTypePtr : MetaTypes)
+        {
+            void* DefaultObject = MetaTypePtr->GetDefaultObject();
+            if (DefaultObject)
+            {
+                T* RelDefaultObject = static_cast<T*>(DefaultObject);
+                if(Pred(RelDefaultObject))
+                {
+                    return RelDefaultObject;
+                }
+            }
+        }
+        return nullptr;
+    }
+    
+    template<typename T>
+    void ForEachDefaultObject(const TFunctionRef<void(T*)>& Pred)
+    {
+        TArray<MetaType*> MetaTypes = GetMetaTypes<T>();
+        for (auto MetaTypePtr : MetaTypes)
+        {
+            void* DefaultObject = MetaTypePtr->GetDefaultObject();
+            if (DefaultObject)
+            {
+                T* RelDefaultObject = static_cast<T*>(DefaultObject);
+                Pred(RelDefaultObject);
+            }
+        }
+    }
 
 #define GLOBAL_REFLECTION_REGISTER(...)	\
 	static const int PREPROCESSOR_JOIN(ReflectionGlobalRegister_,__COUNTER__) = [] { __VA_ARGS__; return 0; }();

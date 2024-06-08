@@ -5,9 +5,7 @@
 
 namespace FRAMEWORK
 {
-	GLOBAL_REFLECTION_REGISTER(
-		ShReflectToy::AddClass<AssetObject>();
-	)
+	GLOBAL_REFLECTION_REGISTER(AddClass<AssetObject>())
 
 	AssetObject::AssetObject()
 	{
@@ -21,7 +19,12 @@ namespace FRAMEWORK
 
     FString AssetObject::GetFileName() const
     {
-        return FPaths::GetBaseFilename(TSingleton<AssetManager>::Get().GetPath(Guid));
+        return FPaths::GetBaseFilename(GetPath());
+    }
+
+    FString AssetObject::GetPath() const
+    {
+        return TSingleton<AssetManager>::Get().GetPath(Guid);
     }
 
 }
