@@ -399,5 +399,17 @@ namespace AUX
         }                                                                                                               \
     };
 
+	//std::unreachable
+	[[noreturn]] FORCEINLINE void Unreachable()
+	{
+		check(false);
+#if PLATFORM_WINDOWS
+		__assume(false);
+#else
+		__builtin_unreachable();
+#endif
+	}
+
+
 } // end AUX namespace
 } // end FRAMEWORK namespace

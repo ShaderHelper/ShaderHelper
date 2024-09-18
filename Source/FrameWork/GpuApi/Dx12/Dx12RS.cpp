@@ -13,8 +13,7 @@ namespace FRAMEWORK
 		case BindingType::Texture:			return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 		case BindingType::Sampler:			return D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
 		default:
-			check(false);
-			return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+			AUX::Unreachable();
 		}
 	}
 

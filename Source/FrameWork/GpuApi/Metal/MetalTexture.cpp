@@ -100,8 +100,7 @@ namespace FRAMEWORK
         {
         case MTLPixelFormatBGRA8Unorm:  return kCVPixelFormatType_32BGRA;
         default:
-            check(false);
-            return kCVPixelFormatType_32BGRA;
+			AUX::Unreachable();
         }
     }
 

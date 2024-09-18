@@ -43,8 +43,7 @@ namespace FRAMEWORK
         case BlendFactor::DestAlpha:       return D3D12_BLEND_DEST_ALPHA;
         case BlendFactor::InvDestAlpha:    return D3D12_BLEND_INV_DEST_ALPHA;
         default:
-            SH_LOG(LogDx12, Fatal, TEXT("Invalid BlendFactor."));
-            return D3D12_BLEND_ZERO;
+			AUX::Unreachable();
         }
     }
 
@@ -57,8 +56,7 @@ namespace FRAMEWORK
         case BlendOp::Min:            return D3D12_BLEND_OP_MIN;
         case BlendOp::Max:            return D3D12_BLEND_OP_MAX;
         default:
-            SH_LOG(LogDx12, Fatal, TEXT("Invalid BlendOp."));
-            return D3D12_BLEND_OP_ADD;
+			AUX::Unreachable();
         }
     }
 
@@ -70,8 +68,7 @@ namespace FRAMEWORK
         case RasterizerCullMode::Front:    return D3D12_CULL_MODE_FRONT;
         case RasterizerCullMode::Back:     return D3D12_CULL_MODE_BACK;
         default:
-            SH_LOG(LogDx12, Fatal, TEXT("Invalid CullMode."));
-            return D3D12_CULL_MODE_NONE;
+			AUX::Unreachable();
         }
     }
 
@@ -82,8 +79,7 @@ namespace FRAMEWORK
         case RasterizerFillMode::WireFrame:    return D3D12_FILL_MODE_WIREFRAME;
         case RasterizerFillMode::Solid:        return D3D12_FILL_MODE_SOLID;
         default:
-            SH_LOG(LogDx12, Fatal, TEXT("Invalid CullMode."));
-            return D3D12_FILL_MODE_SOLID;
+			AUX::Unreachable();
         }
     }
 
@@ -111,9 +107,8 @@ namespace FRAMEWORK
         case GpuTextureFormat::R11G11B10_FLOAT:       return DXGI_FORMAT_R11G11B10_FLOAT;
 		case GpuTextureFormat::R16_FLOAT:             return DXGI_FORMAT_R16_FLOAT;
         case GpuTextureFormat::R32_FLOAT:             return DXGI_FORMAT_R32_FLOAT;
-        default:
-            SH_LOG(LogDx12, Fatal, TEXT("Invalid GpuTextureFormat."));
-            return DXGI_FORMAT_R8G8B8A8_UNORM;
+		default:
+			AUX::Unreachable();
         }
     }
 
@@ -127,8 +122,7 @@ namespace FRAMEWORK
         case PrimitiveType::TriangleList:         return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
         case PrimitiveType::TriangleStrip:    return D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
         default:
-            SH_LOG(LogDx12, Fatal, TEXT("Invalid PrimitiveType."));
-            return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+			AUX::Unreachable();
         }
     }
 
@@ -145,8 +139,7 @@ namespace FRAMEWORK
 		case CompareMode::GreaterEqual:		return D3D12_COMPARISON_FUNC_GREATER_EQUAL;
 		case CompareMode::NotEqual:			return D3D12_COMPARISON_FUNC_NOT_EQUAL;
 		default:
-			SH_LOG(LogDx12, Fatal, TEXT("Invalid ComparisonFunc."));
-			return D3D12_COMPARISON_FUNC_NEVER;
+			AUX::Unreachable();
 		}
 	}
 
@@ -158,8 +151,7 @@ namespace FRAMEWORK
 		case SamplerAddressMode::Mirror:	return D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
 		case SamplerAddressMode::Wrap:		return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 		default:
-			SH_LOG(LogDx12, Fatal, TEXT("Invalid TextureAddressMode."));
-			return D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+			AUX::Unreachable();
 		}
 	}
 

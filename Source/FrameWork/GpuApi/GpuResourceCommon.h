@@ -232,8 +232,7 @@ namespace FRAMEWORK
         case GpuTextureFormat::R32G32B32A32_FLOAT:
             return 16;
         default:
-            checkf(false, TEXT("Ivalid Texture Format."));
-            return 0;
+			AUX::Unreachable();
         }
     }
 }

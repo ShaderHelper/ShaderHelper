@@ -136,7 +136,7 @@ namespace FRAMEWORK
 	}
 
     template<typename T>
-    T* GetDefaultObject(const TFunctionRef<bool(T*)>& Pred)
+    T* GetDefaultObject(TFunctionRef<bool(T*)> Pred)
     {
         TArray<MetaType*> MetaTypes = GetMetaTypes<T>();
         for (auto MetaTypePtr : MetaTypes)
@@ -155,7 +155,7 @@ namespace FRAMEWORK
     }
     
     template<typename T>
-    void ForEachDefaultObject(const TFunctionRef<void(T*)>& Pred)
+    void ForEachDefaultObject(TFunctionRef<void(T*)> Pred)
     {
         TArray<MetaType*> MetaTypes = GetMetaTypes<T>();
         for (auto MetaTypePtr : MetaTypes)

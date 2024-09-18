@@ -1,6 +1,8 @@
 #include "CommonHeader.h"
 #include "ShaderCodeTokenizer.h"
 
+using namespace FRAMEWORK;
+
 namespace SH
 {
 	const char* Punctuations[] = {
@@ -433,8 +435,7 @@ namespace SH
 						CurLineState = StateSet::End;
 						break;
 					default:
-						checkf(false, TEXT("Invalid State in Tokenizer."));
-						break;
+						AUX::Unreachable();
 					}
 				}
 

@@ -31,8 +31,7 @@ namespace FRAMEWORK
         case BlendFactor::DestAlpha:       return MTLBlendFactorDestinationAlpha;
         case BlendFactor::InvDestAlpha:    return MTLBlendFactorOneMinusDestinationAlpha;
         default:
-            SH_LOG(LogMetal, Fatal, TEXT("Invalid BlendFactor."));
-            return MTLBlendFactorZero;
+			AUX::Unreachable();
         }
     }
 
@@ -45,8 +44,7 @@ namespace FRAMEWORK
         case BlendOp::Min:            return MTLBlendOperationMin;
         case BlendOp::Max:            return MTLBlendOperationMax;
         default:
-            SH_LOG(LogMetal, Fatal, TEXT("Invalid BlendOp."));
-            return MTLBlendOperationAdd;
+			AUX::Unreachable();
         }
     }
 
@@ -58,8 +56,7 @@ namespace FRAMEWORK
         case RenderTargetLoadAction::Load:          return MTLLoadActionLoad;
         case RenderTargetLoadAction::Clear:         return MTLLoadActionClear;
         default:
-            SH_LOG(LogMetal, Fatal, TEXT("Invalid LoadAction."));
-            return MTLLoadActionDontCare;
+			AUX::Unreachable();
         }
     }
 
@@ -70,8 +67,7 @@ namespace FRAMEWORK
         case RenderTargetStoreAction::DontCare:      return MTLStoreActionDontCare;
         case RenderTargetStoreAction::Store:         return MTLStoreActionStore;
         default:
-            SH_LOG(LogMetal, Fatal, TEXT("Invalid StoreAction."));
-            return MTLStoreActionDontCare;
+			AUX::Unreachable();
         }
     }
     
@@ -114,8 +110,7 @@ namespace FRAMEWORK
 		case GpuTextureFormat::R16_FLOAT:             return MTLPixelFormatR16Float;
         case GpuTextureFormat::R32_FLOAT:             return MTLPixelFormatR32Float;
         default:
-            SH_LOG(LogMetal, Fatal, TEXT("Invalid GpuTextureFormat."));
-            return MTLPixelFormatRGBA8Unorm;
+			AUX::Unreachable();
         }
     }
     
@@ -129,8 +124,7 @@ namespace FRAMEWORK
         case PrimitiveType::TriangleList:         return MTLPrimitiveTypeTriangle;
         case PrimitiveType::TriangleStrip:        return MTLPrimitiveTypeTriangleStrip;
         default:
-            SH_LOG(LogMetal, Fatal, TEXT("Invalid PrimitiveType."));
-            return MTLPrimitiveTypeTriangle;
+			AUX::Unreachable();
         }
     }
 
@@ -147,8 +141,7 @@ namespace FRAMEWORK
         case CompareMode::GreaterEqual:     return MTLCompareFunctionGreaterEqual;
         case CompareMode::NotEqual:         return MTLCompareFunctionNotEqual;
         default:
-            SH_LOG(LogMetal, Fatal, TEXT("Invalid CompareMode."));
-            return MTLCompareFunctionNever;
+			AUX::Unreachable();
         }
     }
 
@@ -160,8 +153,7 @@ namespace FRAMEWORK
         case SamplerAddressMode::Mirror:    return MTLSamplerAddressModeMirrorRepeat;
         case SamplerAddressMode::Wrap:      return MTLSamplerAddressModeRepeat;
         default:
-            SH_LOG(LogMetal, Fatal, TEXT("Invalid SamplerAddressMode."));
-            return MTLSamplerAddressModeClampToEdge;
+			AUX::Unreachable();
         }
     }
 }

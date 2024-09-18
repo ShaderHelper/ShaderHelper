@@ -22,8 +22,7 @@ namespace FRAMEWORK
 			return D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 
 		default:
-			check(false);
-			return D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			AUX::Unreachable();
 		}
 	}
 

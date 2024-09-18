@@ -48,8 +48,7 @@ namespace FRAMEWORK
         case ShaderType::VertexShader:         return ShaderConductor::ShaderStage::VertexShader;
         case ShaderType::PixelShader:          return ShaderConductor::ShaderStage::PixelShader;
         default:
-            SH_LOG(LogMetal, Fatal, TEXT("Invalid ShaderType."));
-            return ShaderConductor::ShaderStage::VertexShader;
+			AUX::Unreachable();
         }
     }
 
