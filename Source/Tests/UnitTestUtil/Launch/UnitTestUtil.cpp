@@ -263,7 +263,40 @@ namespace UNITTEST_UTIL
             CallPrivate_PrivateUnitTest_overload2(PrivateUnitTest{}, 233.233f);
 			CallPrivate_PrivateUnitTestBase_Run(PrivateUnitTest{});
 		}
-		
+
+		//Test AUX::initializer_list
+		{
+			static FString LogInfo;
+			struct Unit
+			{
+				Unit(int) {}
+				Unit(const Unit&) {
+					LogInfo += " copy";
+				}
+				Unit(Unit&&) {
+					LogInfo += " move";
+				}
+			};
+
+			auto test = [](AUX::initializer_list<Unit> InitList)
+			{
+				TArray<Unit> Arr;
+				for (const auto& ItemWrapper : InitList)
+				{
+					Arr.Add(ItemWrapper.Extract());
+				}
+			};
+
+			SH_LOG(LogTestUtil, Display, TEXT("Test AUX::initializer_list: "));
+			{
+				Unit t{ 1 };
+				test({ t });
+				SH_LOG(LogTestUtil, Display, TEXT("Lvalue(%s )"), *LogInfo);
+				LogInfo.Empty();
+				test({ std::move(t) });
+				SH_LOG(LogTestUtil, Display, TEXT("Rvalue(%s )"), *LogInfo);
+			}
+		}
 	}
 
 }

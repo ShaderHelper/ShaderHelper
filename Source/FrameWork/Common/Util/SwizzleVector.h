@@ -486,9 +486,6 @@ namespace FRAMEWORK {
         }
 
 		const T& operator[](uint32 Index) const {
-			//Maybe break strict-aliasing rule?
-			//Even if the msvc doesn't implement this "strict aliasing" optimization at present and we don't choose the gcc compiler
-			//follow the c++ standard as far as possible.
 			//return *(reinterpret_cast<const T*>(this) + Index);
 			checkf(Index >= 0 && Index < 2, TEXT("Invalid Index"));
 			return Data[Index];

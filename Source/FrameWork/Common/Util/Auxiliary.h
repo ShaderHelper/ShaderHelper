@@ -169,6 +169,17 @@ namespace AUX
         }
     }
 
+	//std::unreachable
+	[[noreturn]] FORCEINLINE void Unreachable()
+	{
+		check(false);
+#if PLATFORM_WINDOWS
+		__assume(false);
+#else
+		__builtin_unreachable();
+#endif
+	}
+
     template<int Min, int... Seq>
     struct RangeIntegerSequenceImpl {
         using Type = TIntegerSequence<int, (Seq + Min)...>;
@@ -247,9 +258,7 @@ namespace AUX
 		}
 		else
 		{
-			// unreachable
-			check(false);
-			return Lamb(Var, std::integral_constant<int, First>{});
+			Unreachable();
 		}
 	}
 
@@ -399,17 +408,56 @@ namespace AUX
         }                                                                                                               \
     };
 
-	//std::unreachable
-	[[noreturn]] FORCEINLINE void Unreachable()
+	template<typename T>
+	class InitListWrapper : FNoncopyable
 	{
-		check(false);
-#if PLATFORM_WINDOWS
-		__assume(false);
-#else
-		__builtin_unreachable();
-#endif
-	}
+	public:
+		InitListWrapper(const T& InValue) : ValueRef(&InValue) {}
+		InitListWrapper(T&& InValue)
+		{
+			new (&Value) T(std::move(InValue));
+		}
 
+		template<typename... Args, typename Arg0 = std::tuple_element_t<0, std::tuple<std::decay_t<Args>...>>,
+			typename = std::enable_if_t<!std::is_same_v<T, Arg0>>,
+			typename = std::enable_if_t<std::is_constructible_v<T, Args...>>
+		>
+		InitListWrapper(Args&&... InArg)
+		{
+			new (&Value) T(std::forward<Args>(InArg)...);
+		}
+
+		T Extract() const
+		{
+			if constexpr (std::is_copy_constructible_v<T>)
+			{
+				if (ValueRef) {
+					return *ValueRef;
+				}
+			}
+			return reinterpret_cast<T&&>(Value);
+		}
+
+	private:
+		mutable TTypeCompatibleBytes<T> Value;
+		const T* ValueRef = nullptr;
+	};
+
+	//Set up AUX::initializer_list if you want to move elements from initializer_list.
+	template<typename T>
+	using initializer_list = std::initializer_list<InitListWrapper<T>>;
+
+	template<typename T>
+	TArray<T> MakeTArray(AUX::initializer_list<T> InitList)
+	{
+		TArray<T> Arr;
+		Arr.Reserve(InitList.size());
+		for (const auto& ItemWrapper : InitList)
+		{
+			Arr.Add(ItemWrapper.Extract());
+		}
+		return Arr;
+	}
 
 } // end AUX namespace
 } // end FRAMEWORK namespace
