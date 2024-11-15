@@ -245,43 +245,6 @@ namespace AUX
         return MakeIntegerSequenceByPredicateImpl<Min, Max, Pred, Size>(TMakeIntegerSequence<int, Size>{});
     }
 
-	template<typename Func, int First, int... Seq>
-	auto RunCaseWithInt(int Var, const Func& Lamb, TIntegerSequence<int, First, Seq...> SeqObj) {
-		if (Var == First)
-		{
-			//Lambda does not support non-type template parameter until c++20.
-			return Lamb(Var, std::integral_constant<int, First>{});
-		}
-		else if constexpr (sizeof...(Seq) > 0)
-		{
-			return RunCaseWithInt(Var, Lamb, TIntegerSequence<int, Seq...>{});
-		}
-		else
-		{
-			Unreachable();
-		}
-	}
-
-#define RUNCASE_WITHINT_IMPL(LambName,VarToken,Min,Max,...) [&] {                                               \
-    checkf(VarToken >= Min && VarToken <= Max, TEXT("%s must be [%d,%d]"), *FString(#VarToken), Min, Max);      \
-    auto LambName = [&](int Var, auto&& t) {                                                                    \
-        using CleanType = std::remove_reference_t<decltype(t)>;                                                 \
-        constexpr int VarToken = CleanType::value;                                                              \
-        __VA_ARGS__                                                                                             \
-    };                                                                                                          \
-    return AUX::RunCaseWithInt(VarToken, LambName, AUX::MakeRangeIntegerSequence<Min, Max>{});                  \
-    }()
-
-   //Pass a run-time integer with known small range to template
-   //* The large range maybe lead to code bloat, please carefully choose the range.
-   //* `VarToken` must be a simple variable name rather than a complex expression. 
-   //	Example: 
-   //	int Var = xxx; RUNCASE_WITHINT(Var,...) (√) 
-   //	struct A{static int Var;} RUNCASE_WITHINT(A::Var,...) (×)
-   //	struct A{static int Var;} int Var = A::Var; RUNCASE_WITHINT(Var,...) (√) 
-#define RUNCASE_WITHINT(VarToken,Min,Max,...)	\
-    RUNCASE_WITHINT_IMPL(PREPROCESSOR_JOIN(Auto_Instance_,__COUNTER__),VarToken,Min,Max,__VA_ARGS__) 
-    
 	//Returns a FString that stores the type name. (As an alternative to rtti, but just represents the static type name)
 	//Its result may not be same on different platforms, so it should not be saved but just used as a key value.
     template<typename T>
@@ -340,38 +303,49 @@ namespace AUX
     
 	template<typename T>
 	struct TraitFuncTypeFromFuncPtr;
+	template<typename FuncType, typename C>
+	struct TraitFuncTypeFromFuncPtr<FuncType C::*> { using Type = FuncType; };
 
-	template<typename T, typename C>
-	struct TraitFuncTypeFromFuncPtr<T C::*> { using Type = T; };
+	template<typename Ret, typename... ParamType>
+	struct TraitRetAndParamTypeFromFuncTypeBase { using Type = std::tuple<Ret, ParamType...>; };
+	template<typename FuncType>
+	struct TraitRetAndParamTypeFromFuncType;
+	template<typename Ret, typename... ParamType>
+	struct TraitRetAndParamTypeFromFuncType<Ret(ParamType...)> : TraitRetAndParamTypeFromFuncTypeBase<Ret, ParamType...> {};
+	template<typename Ret, typename... ParamType>
+	struct TraitRetAndParamTypeFromFuncType<Ret(ParamType...) const> : TraitRetAndParamTypeFromFuncTypeBase<Ret, ParamType...> {};
+	template<typename FuncType>
+	using TraitRetAndParamTypeFromFuncType_T = typename TraitRetAndParamTypeFromFuncType<FuncType>::Type;
 
-	template<typename T>
-	using TraitFuncTypeFromFunctor_T = typename TraitFuncTypeFromFuncPtr<decltype(&T::operator())>::Type;
+	template<typename RetAndParamTypeList>
+	struct TraitRetFromRetAndParamTypeList;
+	template<typename Ret, typename... ParamType>
+	struct TraitRetFromRetAndParamTypeList<std::tuple<Ret, ParamType...>> { using Type = Ret; };
+	template<typename RetAndParamTypeList>
+	using TraitRetFromRetAndParamTypeList_T = typename TraitRetFromRetAndParamTypeList<RetAndParamTypeList>::Type;
 
-	template<typename T1, typename T2>
+	template<typename Func>
+	using TraitFuncTypeFromFunctor_T = typename TraitFuncTypeFromFuncPtr<decltype(&Func::operator())>::Type;
+
+	template<typename Func, typename RetAndParamTypeList>
 	struct FunctorExt;
+	template<typename Func, typename Ret, typename... ParamType>
+	struct FunctorExt<Func, std::tuple<Ret, ParamType...>>
+	{                                                                            
+		static Ret Call(ParamType... Params)                                     
+		{                                                                        
+			return (*FunctorStorage)(Params...);                                 
+		}                                                                        
+		static inline Func* FunctorStorage = nullptr;
+	};                                                                           
 
-#define DefineFunctorExtWithQualifier(...)                                       \
-	template<typename T, typename Ret, typename... ParamType>                    \
-	struct FunctorExt<T, Ret(ParamType...) __VA_ARGS__>                          \
-	{                                                                            \
-		static Ret Call(ParamType... Params)                                     \
-		{                                                                        \
-			return (*FunctorStorage)(Params...);                                 \
-		}                                                                        \
-		static T* FunctorStorage;                                                \
-	};                                                                           \
-	template<typename T, typename Ret, typename... ParamType>                    \
-	T* FunctorExt<T, Ret(ParamType...) __VA_ARGS__>::FunctorStorage = nullptr;   
-
-	DefineFunctorExtWithQualifier();
-	DefineFunctorExtWithQualifier(const);
-
-	//Convert functor with state to function pointer.
+	//Convert the functor(non-generic lambda) with state to a function pointer.
 	template<typename T>
 	auto FunctorToFuncPtr(T&& Functor)
 	{
-		using RawType = std::decay_t<T>;
-		using CurFunctorExt = FunctorExt<RawType, TraitFuncTypeFromFunctor_T<RawType>>;
+		using CleanType = std::decay_t<T>;
+		using RetAndParamTypeList = TraitRetAndParamTypeFromFuncType_T<TraitFuncTypeFromFunctor_T<CleanType>>;
+		using CurFunctorExt = FunctorExt<CleanType, RetAndParamTypeList>;
 		CurFunctorExt::FunctorStorage = &Functor;
 		return &CurFunctorExt::Call;
 	}
@@ -458,6 +432,128 @@ namespace AUX
 		}
 		return Arr;
 	}
+
+	template<typename F, typename RetAndParamTypeList>
+	struct RunTimeConvCall;			
+	template<typename F, typename Ret>
+	struct RunTimeConvCallBase
+	{
+		virtual Ret Call() = 0;
+		virtual ~RunTimeConvCallBase() = default;
+	};
+	template<typename F, typename Ret, typename ParamType>
+	struct RunTimeConvCall<F, std::tuple<Ret, ParamType>> : RunTimeConvCallBase<F, Ret>
+	{
+		RunTimeConvCall(const F* InLamb, ParamType InParam)
+			:Lamb(InLamb), Param(InParam) {}
+
+		Ret Call() override
+		{
+			if constexpr(!std::is_same_v<Ret, void>)
+			{
+				Ret Result = (*Lamb)(Param);
+				Lamb = nullptr;
+				return Result;
+			}
+		}
+		~RunTimeConvCall()
+		{
+			if (Lamb)
+			{
+				(*Lamb)(Param);
+			}
+		}
+		const F* Lamb;
+		ParamType Param;
+	};
+	template<typename Func, typename Ret>
+	struct RunTimeConvCallRet
+	{
+
+		operator Ret() const
+		{
+			return CallPtr->Call();
+		}
+
+		~RunTimeConvCallRet()
+		{
+			delete CallPtr;
+		}
+
+		RunTimeConvCallBase<Func, Ret>* CallPtr;
+	};
+
+	template<typename Func, typename VarType, VarType First, VarType... Seq>
+	auto RunTimeConvImpl(VarType Var, const Func& Lamb, TIntegerSequence<VarType, First, Seq...> SeqObj) {
+		if (Var == First)
+		{
+			//std::integral_constant: Lambda does not support non-type template parameter until c++20.
+			using FuncPtr = decltype(&Func::template operator()<std::integral_constant<VarType, First>>);
+			using RetAndParamTypeList = TraitRetAndParamTypeFromFuncType_T<typename TraitFuncTypeFromFuncPtr<FuncPtr>::Type>;
+			using Ret = TraitRetFromRetAndParamTypeList_T<RetAndParamTypeList>;
+			RunTimeConvCallBase<Func, Ret>* CallPtr = new RunTimeConvCall<Func, RetAndParamTypeList>{&Lamb, std::integral_constant<VarType, First>{}};
+			return RunTimeConvCallRet<Func, Ret>{CallPtr};
+		}
+		else if constexpr (sizeof...(Seq) > 0)
+		{
+			return RunTimeConvImpl(Var, Lamb, TIntegerSequence<VarType, Seq...>{});
+		}
+		else
+		{
+			Unreachable();
+		}
+	}
+
+	template<typename VarType, VarType Min, VarType Max>
+	struct RunTimeConvWrapper
+	{
+		RunTimeConvWrapper(VarType InVar) : Var(InVar) {}
+		template<typename F>
+		auto operator+(F&& InLamb)
+		{
+			return RunTimeConvImpl(Var, InLamb, AUX::MakeRangeIntegerSequence<Min, Max>{});
+		}
+
+		VarType Var;
+	};
+
+	//Pass a run-time integer with known small range to template
+	//* The large range maybe lead to code bloat, please carefully choose the range.
+	//* `VarToken` must be a simple variable name rather than a complex expression. 
+	//	Example: 
+	//	int Var = xxx; RUNTIME_CONV(Var,...) (√) 
+	//	struct A{static int Var;} RUNTIME_CONV(A::Var,...) (×)
+	//	struct A{static int Var;} int Var = A::Var; RUNTIME_CONV(Var,...) (√) 
+#define RUNTIME_INTEGER_CONV(VarToken,Min,Max)	  \
+		AUX::RunTimeConvWrapper<decltype(VarToken), decltype(VarToken)(Min), decltype(VarToken)(Max)>{VarToken} + [&](auto VarToken)
+
+
+	enum class ConstexprForState
+	{
+		Normal,
+		Break,
+		Continue
+	};
+	template<auto Start, auto End, auto Inc, typename Func>
+	void ConstexprFor(const Func& InFunc)
+	{
+		using ParamType = std::integral_constant<decltype(Start), Start>;
+		constexpr bool IsProperFormat = std::is_invocable_r_v<ConstexprForState, Func, ParamType>;
+		static_assert(IsProperFormat, "Improper functor format.");
+		if constexpr (Start <= End)
+		{
+			ConstexprForState State = InFunc(ParamType{});
+			if (State != ConstexprForState::Break)
+			{
+				ConstexprFor<Start + 1, End, Inc>(InFunc);
+			}
+		}
+	}
+
+#define ConstexprForEnd() return AUX::ConstexprForState::Normal;
+#define ConstexprForBreak() return AUX::ConstexprForState::Break;
+#define ConstexprForContinue()	return AUX::ConstexprForState::Continue;
+
 
 } // end AUX namespace
 } // end FRAMEWORK namespace

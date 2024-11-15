@@ -7,12 +7,13 @@ using namespace FRAMEWORK;
 
 namespace UNITTEST_UTIL
 {
-	template<int N, typename T = int>
+	template<int N>
 	struct UnitTmp {
-		double Run(double a, const FString& ss) {
-			SH_LOG(LogTestUtil, Display, TEXT("TestRunCaseWithInt: %s"), *ss);
-			return N + a;
+		void Run(const FString& ss) {
+			SH_LOG(LogTestUtil, Display, TEXT("Test RUNTIME_INTEGER_CONV: %s"), *ss);
 		}
+
+		double Result = N;
 	};
 
 	template<typename T, T... Seq>
@@ -195,32 +196,46 @@ namespace UNITTEST_UTIL
 		{
 			TestSeq(AUX::MakeRangeIntegerSequence<-2, 2>{});
 			//Avoid the following code:
-			// template<typename T>
 			// void SomeFunction()
 			// {
 			//	int VarFromFile = 5;
 			// 	if (VarFromFile == 2) {
-			//		UnitTmp<2,T>() ...
+			//		UnitTmp<2>() ...
 			//	}
 			//	else if (VarFromFile == 3) {
-			//		UnitTmp<3,T>() ...
+			//		UnitTmp<3>() ...
 			//	}
 			//	.
 			//	.
 			//	.
 			//	else (VarFromFile == 64) {
-			//		UnitTmp<64,T>() ...
+			//		UnitTmp<64>() ...
 			//	}
 			// }
 
-			volatile int VarFromFile = 5;
+			int VarFromFile = 5;
 			FString str = "114514";
-			Vector vec1 = { 1,2,3 };
-			Vector vec2 = vec1.ZZZ + 1;
-			double Result = RUNCASE_WITHINT(VarFromFile, 2, 64,
-				return UnitTmp<VarFromFile>{}.Run(vec2.X, str);
-			);
-			SH_LOG(LogTestUtil, Warning, TEXT("TestRunCaseWithInt: %lf"), Result);
+			RUNTIME_INTEGER_CONV(VarFromFile, 2, 64) 
+			{
+				UnitTmp<VarFromFile>{}.Run(str);
+			};
+
+			double Result = RUNTIME_INTEGER_CONV(VarFromFile, 2, 64) {
+				return UnitTmp<VarFromFile>{}.Result;
+			};
+			SH_LOG(LogTestUtil, Warning, TEXT("Test RUNTIME_INTEGER_CONV: %lf"), Result);
+
+			//Or
+			AUX::ConstexprFor<2, 64, 1>([&](auto Index) {
+				if(VarFromFile == Index)
+				{
+					Result = UnitTmp<Index>{}.Result + 1;
+					ConstexprForBreak();
+				}
+				//Anyway, ConstexprForEnd must be added the scope end.
+				ConstexprForEnd();
+			});
+			SH_LOG(LogTestUtil, Warning, TEXT("Test ConstexprFor: %lf"), Result);
 		}
 
 		{
@@ -245,6 +260,7 @@ namespace UNITTEST_UTIL
 			auto f = [t](int a, int b) {
 				SH_LOG(LogTestUtil, Display, TEXT("TestFunctorToFuncPtr:%d"), t + a + b);
 			};
+
 			TestFunctorToFuncPtr(AUX::FunctorToFuncPtr(f));
 		}
         
