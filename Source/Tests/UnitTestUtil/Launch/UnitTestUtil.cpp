@@ -269,7 +269,8 @@ namespace UNITTEST_UTIL
 			};
 
 			//Or
-			AUX::ConstexprFor<2, 4, 1>([&](auto Index) {
+			//ps: error on vs2019
+			/*AUX::ConstexprFor<2, 4, 1>([&](auto Index) {
 				if (VarFromFile == Index)
 				{
 					AUX::ConstexprFor<5, 7, 1>([&](auto Index2) {
@@ -281,7 +282,7 @@ namespace UNITTEST_UTIL
 					});
 				}
 				ConstexprForEnd();
-			});
+			});*/
 
 		}
 
