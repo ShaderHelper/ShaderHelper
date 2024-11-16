@@ -1,5 +1,5 @@
 #include "CommonHeader.h"
-
+#include "magic_enum.hpp"
 DEFINE_LOG_CATEGORY_STATIC(LogTestUtil, Log, All);
 #include <chrono>
 
@@ -7,13 +7,27 @@ using namespace FRAMEWORK;
 
 namespace UNITTEST_UTIL
 {
-	template<int N>
+	enum class EnumClassTest
+	{
+		A,
+		B,
+		Num
+	};
+
+	template<int N, int M = 0>
 	struct UnitTmp {
 		void Run(const FString& ss) {
 			SH_LOG(LogTestUtil, Display, TEXT("Test RUNTIME_INTEGER_CONV: %s"), *ss);
 		}
 
-		double Result = N;
+		double Result = N + M;
+	};
+
+	template<EnumClassTest E>
+	struct UnitTmp2 {
+		void Run() {
+			SH_LOG(LogTestUtil, Display, TEXT("Test RUNTIME_INTEGER_CONV: %s"), ANSI_TO_TCHAR(magic_enum::enum_name(E).data()));
+		}
 	};
 
 	template<typename T, T... Seq>
@@ -194,7 +208,7 @@ namespace UNITTEST_UTIL
 
 		//Test Seq
 		{
-			TestSeq(AUX::MakeRangeIntegerSequence<-2, 2>{});
+			TestSeq(AUX::MakeRangeIntegerSequence<int, -2, 2>{});
 			//Avoid the following code:
 			// void SomeFunction()
 			// {
@@ -213,14 +227,14 @@ namespace UNITTEST_UTIL
 			//	}
 			// }
 
-			int VarFromFile = 5;
+			int VarFromFile = 2;
 			FString str = "114514";
-			RUNTIME_INTEGER_CONV(VarFromFile, 2, 64) 
+			RUNTIME_INTEGER_CONV_OneVar(VarFromFile, 2, 4)
 			{
 				UnitTmp<VarFromFile>{}.Run(str);
 			};
 
-			double Result = RUNTIME_INTEGER_CONV(VarFromFile, 2, 64) {
+			double Result = RUNTIME_INTEGER_CONV_OneVar(VarFromFile, 2, 64) {
 				return UnitTmp<VarFromFile>{}.Result;
 			};
 			SH_LOG(LogTestUtil, Warning, TEXT("Test RUNTIME_INTEGER_CONV: %lf"), Result);
@@ -236,6 +250,39 @@ namespace UNITTEST_UTIL
 				ConstexprForEnd();
 			});
 			SH_LOG(LogTestUtil, Warning, TEXT("Test ConstexprFor: %lf"), Result);
+
+			//enum?
+			EnumClassTest e = EnumClassTest::B;
+			int ee = static_cast<int>(e);
+			RUNTIME_INTEGER_CONV_OneVar(ee, 0, static_cast<int>(EnumClassTest::Num))
+			{
+				UnitTmp2<EnumClassTest(ee())>{}.Run();
+			};
+
+			int Var2FromFile = 5;
+			//Multiple run-time var
+			RUNTIME_INTEGER_CONV_TwoVar(
+				VarFromFile, 2, 4,
+				Var2FromFile, 5, 7)
+			{
+				UnitTmp<VarFromFile, Var2FromFile>{};
+			};
+
+			//Or
+			AUX::ConstexprFor<2, 4, 1>([&](auto Index) {
+				if (VarFromFile == Index)
+				{
+					AUX::ConstexprFor<5, 7, 1>([&](auto Index2) {
+						if (Var2FromFile == Index2)
+						{
+							UnitTmp<Index, Index2>{};
+						}
+						ConstexprForEnd();
+					});
+				}
+				ConstexprForEnd();
+			});
+
 		}
 
 		{
@@ -250,7 +297,7 @@ namespace UNITTEST_UTIL
 				}
 				return true;
 			};
-			TestSeq(AUX::MakeIntegerSequenceByPredicate<10, 30, Pred>());
+			TestSeq(AUX::MakeIntegerSequenceByPredicate<int, 10, 30, Pred>());
 			TestSeq(AUX::ReverseInegerSequence(TIntegerSequence<int, 2, 3, 5>{}));
 		}
 

@@ -180,69 +180,69 @@ namespace AUX
 #endif
 	}
 
-    template<int Min, int... Seq>
+    template<typename T, T Min, T... Seq>
     struct RangeIntegerSequenceImpl {
-        using Type = TIntegerSequence<int, (Seq + Min)...>;
+        using Type = TIntegerSequence<T, (Seq + Min)...>;
     };
 
-    template<int Min, typename Seq>
+    template<typename T, T Min, typename Seq>
     struct RangeIntegerSequence;
 
-    template<int Min, int... Seq>
-    struct RangeIntegerSequence<Min, TIntegerSequence<int, Seq...>> {
+    template<typename T, T Min, T... Seq>
+    struct RangeIntegerSequence<T, Min, TIntegerSequence<T, Seq...>> {
         static_assert(sizeof...(Seq) > 0, "Min must be less than Max");
-        using Type = typename RangeIntegerSequenceImpl<Min, Seq...>::Type;
+        using Type = typename RangeIntegerSequenceImpl<T, Min, Seq...>::Type;
     };
     
     //Make TIntegerSequence[min,max]
-    template<int Min, int Max>
-    using MakeRangeIntegerSequence = typename RangeIntegerSequence<Min, TMakeIntegerSequence<int, Max - Min + 1>>::Type;
+    template<typename T, T Min, T Max>
+    using MakeRangeIntegerSequence = typename RangeIntegerSequence<T, Min, TMakeIntegerSequence<T, Max - Min + 1>>::Type;
 
-	template<int... Seq, int... Indexes>
-	auto ReverseInegerSequenceImpl(TIntegerSequence<int, Seq...> IntegerSeq, TIntegerSequence<int, Indexes...> IndexesSeq)
+	template<typename T, T... Seq, int... Indexes>
+	auto ReverseInegerSequenceImpl(TIntegerSequence<T, Seq...> IntegerSeq, TIntegerSequence<int, Indexes...> IndexesSeq)
 	{
 		constexpr auto arr = [] {
-			std::array<int, sizeof...(Seq)> target{};
-			std::array<int, sizeof...(Seq)> source{ Seq... };
+			std::array<T, sizeof...(Seq)> target{};
+			std::array<T, sizeof...(Seq)> source{ Seq... };
 			for (int index = 0; index < target.size(); index++)
 			{
 				target[index] = source[target.size() - index - 1];
 			}
 			return target;
 		}();
-		return TIntegerSequence<int, arr[Indexes]...>{};
+		return TIntegerSequence<T, arr[Indexes]...>{};
 	}
 
-	template<int... Seq>
-	auto ReverseInegerSequence(TIntegerSequence<int, Seq...> IntegerSeq)
+	template<typename T, T... Seq>
+	auto ReverseInegerSequence(TIntegerSequence<T, Seq...> IntegerSeq)
 	{
 		return ReverseInegerSequenceImpl(IntegerSeq, TMakeIntegerSequence<int, sizeof...(Seq)>{});
 	}
 
-    template<int Min, int Max, bool(*Pred)(int), int Size, int... Seq>
-    auto MakeIntegerSequenceByPredicateImpl(TIntegerSequence<int, Seq...>) {
+    template<typename T, T Min, T Max, bool(*Pred)(T), int Size, int... Seq>
+    auto MakeIntegerSequenceByPredicateImpl(TIntegerSequence<T, Seq...>) {
         constexpr auto arr = [] {
-            std::array<int, Size> arr{};
+            std::array<T, Size> arr{};
             int index = 0;
-            for (int i = Min; i <= Max; ++i) {
+            for (T i = Min; i <= Max; ++i) {
                 if (Pred(i)) arr[index++] = i;
             }
             return arr;
         }();
-        return TIntegerSequence<int, arr[Seq]...>{};
+        return TIntegerSequence<T, arr[Seq]...>{};
     }
 
     //Predicate must be constexpr.
-    template<int Min, int Max, bool(*Pred)(int)>
+    template<typename T, T Min, T Max, bool(*Pred)(T)>
     auto MakeIntegerSequenceByPredicate() {
         constexpr int Size = [] {
             int size = 0;
-            for (int i = Min; i <= Max; ++i) {
+            for (T i = Min; i <= Max; ++i) {
                 if (Pred(i)) size++;
             }
             return size;
         }();
-        return MakeIntegerSequenceByPredicateImpl<Min, Max, Pred, Size>(TMakeIntegerSequence<int, Size>{});
+        return MakeIntegerSequenceByPredicateImpl<T, Min, Max, Pred, Size>(TMakeIntegerSequence<int, Size>{});
     }
 
 	//Returns a FString that stores the type name. (As an alternative to rtti, but just represents the static type name)
@@ -441,17 +441,17 @@ namespace AUX
 		virtual Ret Call() = 0;
 		virtual ~RunTimeConvCallBase() = default;
 	};
-	template<typename F, typename Ret, typename ParamType>
-	struct RunTimeConvCall<F, std::tuple<Ret, ParamType>> : RunTimeConvCallBase<F, Ret>
+	template<typename F, typename Ret, typename... ParamTypes>
+	struct RunTimeConvCall<F, std::tuple<Ret, ParamTypes...>> : RunTimeConvCallBase<F, Ret>
 	{
-		RunTimeConvCall(const F* InLamb, ParamType InParam)
-			:Lamb(InLamb), Param(InParam) {}
+		RunTimeConvCall(const F* InLamb)
+			:Lamb(InLamb) {}
 
 		Ret Call() override
 		{
 			if constexpr(!std::is_same_v<Ret, void>)
 			{
-				Ret Result = (*Lamb)(Param);
+				Ret Result = (*Lamb)(std::get<ParamTypes>(Params)...);
 				Lamb = nullptr;
 				return Result;
 			}
@@ -460,16 +460,16 @@ namespace AUX
 		{
 			if (Lamb)
 			{
-				(*Lamb)(Param);
+				(*Lamb)(std::get<ParamTypes>(Params)...);
 			}
 		}
 		const F* Lamb;
-		ParamType Param;
+		std::tuple<ParamTypes...> Params;
 	};
+
 	template<typename Func, typename Ret>
 	struct RunTimeConvCallRet
 	{
-
 		operator Ret() const
 		{
 			return CallPtr->Call();
@@ -483,20 +483,55 @@ namespace AUX
 		RunTimeConvCallBase<Func, Ret>* CallPtr;
 	};
 
-	template<typename Func, typename VarType, VarType First, VarType... Seq>
-	auto RunTimeConvImpl(VarType Var, const Func& Lamb, TIntegerSequence<VarType, First, Seq...> SeqObj) {
-		if (Var == First)
+	template<typename VarType, VarType Min, VarType Max>
+	struct RunTimeConvWrapper
+	{
+		RunTimeConvWrapper(const FString& VarName, VarType InVar) : Var(InVar) 
 		{
-			//std::integral_constant: Lambda does not support non-type template parameter until c++20.
-			using FuncPtr = decltype(&Func::template operator()<std::integral_constant<VarType, First>>);
-			using RetAndParamTypeList = TraitRetAndParamTypeFromFuncType_T<typename TraitFuncTypeFromFuncPtr<FuncPtr>::Type>;
-			using Ret = TraitRetFromRetAndParamTypeList_T<RetAndParamTypeList>;
-			RunTimeConvCallBase<Func, Ret>* CallPtr = new RunTimeConvCall<Func, RetAndParamTypeList>{&Lamb, std::integral_constant<VarType, First>{}};
-			return RunTimeConvCallRet<Func, Ret>{CallPtr};
+			checkf(InVar >= Min && InVar <= Max, TEXT("%s:%d must be [%d,%d]"), *VarName, InVar, Min, Max);
 		}
-		else if constexpr (sizeof...(Seq) > 0)
+	
+		VarType Var;
+	};
+
+	template<
+		int CurVarWrapperIndex,
+		typename... ResultTypes,
+		typename RunTimeConvWrapperTuple,
+		typename VarType, 
+		VarType Cur, VarType Min, VarType Max, 
+		typename Func
+	>
+	auto RunTimeConvImpl(
+		const RunTimeConvWrapperTuple& RunTimeConvWrappers,
+		const RunTimeConvWrapper<VarType, Min, Max>& CurVarWrapper, 
+		const Func& Lamb,
+		std::integral_constant<VarType, Cur>
+		) 
+	{
+		VarType Var = CurVarWrapper.Var;
+		if (Var == Cur)
 		{
-			return RunTimeConvImpl(Var, Lamb, TIntegerSequence<VarType, Seq...>{});
+			if constexpr (CurVarWrapperIndex + 1 < std::tuple_size_v<RunTimeConvWrapperTuple>)
+			{
+				return RunTimeConvImpl<CurVarWrapperIndex + 1, ResultTypes... , std::integral_constant<VarType, Cur>>
+					(RunTimeConvWrappers, std::get<CurVarWrapperIndex + 1>(RunTimeConvWrappers), Lamb);
+			}
+			else
+			{
+				//std::integral_constant: Lambda does not support non-type template parameter until c++20.
+				using FuncPtr = decltype(&Func::template operator()<ResultTypes..., std::integral_constant<VarType, Cur>>);
+				using RetAndParamTypeList = TraitRetAndParamTypeFromFuncType_T<typename TraitFuncTypeFromFuncPtr<FuncPtr>::Type>;
+				using Ret = TraitRetFromRetAndParamTypeList_T<RetAndParamTypeList>;
+				//Erasure param types to make the same return type.
+				RunTimeConvCallBase<Func, Ret>* CallPtr = new RunTimeConvCall<Func, RetAndParamTypeList>{ &Lamb };
+				return RunTimeConvCallRet<Func, Ret>{CallPtr};
+			}
+	
+		}
+		else if constexpr (Cur < Max)
+		{
+			return RunTimeConvImpl<CurVarWrapperIndex, ResultTypes...>(RunTimeConvWrappers, std::get<CurVarWrapperIndex>(RunTimeConvWrappers), Lamb, std::integral_constant<VarType, Cur + 1>{});
 		}
 		else
 		{
@@ -504,28 +539,56 @@ namespace AUX
 		}
 	}
 
-	template<typename VarType, VarType Min, VarType Max>
-	struct RunTimeConvWrapper
+	template<
+		int CurVarWrapperIndex,
+		typename... ResultTypes,
+		typename RunTimeConvWrapperTuple,
+		typename VarType,
+		VarType Min, VarType Max,
+		typename Func,
+		VarType Cur = Min
+	>
+	auto RunTimeConvImpl(
+		const RunTimeConvWrapperTuple& RunTimeConvWrappers,
+		const RunTimeConvWrapper<VarType, Min, Max>& CurVarWrapper,
+		const Func& Lamb
+		)
 	{
-		RunTimeConvWrapper(VarType InVar) : Var(InVar) {}
+		return RunTimeConvImpl<CurVarWrapperIndex, ResultTypes...>(RunTimeConvWrappers, CurVarWrapper, Lamb, std::integral_constant<VarType, Cur>{});
+	}
+
+	template<typename... RunTimeConvWrapperTypes>
+	struct MultiRunTimeConvWrapper                    
+	{
 		template<typename F>
 		auto operator+(F&& InLamb)
 		{
-			return RunTimeConvImpl(Var, InLamb, AUX::MakeRangeIntegerSequence<Min, Max>{});
+			return RunTimeConvImpl<0>(RunTimeConvWrappers, std::get<0>(RunTimeConvWrappers), InLamb);
 		}
-
-		VarType Var;
+		std::tuple<RunTimeConvWrapperTypes...>RunTimeConvWrappers;
 	};
 
-	//Pass a run-time integer with known small range to template
+#define RUNTIMECONVWRAPPER_TYPE_1(VarToken,Min,Max) AUX::RunTimeConvWrapper<decltype(VarToken), decltype(VarToken)(Min), decltype(VarToken)(Max)>
+#define RUNTIMECONVWRAPPER_TYPE_2(VarToken1,Min1,Max1,VarToken2,Min2,Max2) RUNTIMECONVWRAPPER_TYPE_1(VarToken1, Min1, Max1),RUNTIMECONVWRAPPER_TYPE_1(VarToken2, Min2, Max2)
+
+#define RUNTIMECONVWRAPPER_VALUE_1(VarToken) {#VarToken, VarToken}
+#define RUNTIMECONVWRAPPER_VALUE_2(VarToken1, VarToken2) RUNTIMECONVWRAPPER_VALUE_1(VarToken1),RUNTIMECONVWRAPPER_VALUE_1(VarToken2)
+
+#define RUNTIMECONVWRAPPER_LAMB_PARAM_1(VarToken) auto VarToken
+#define RUNTIMECONVWRAPPER_LAMB_PARAM_2(VarToken1, VarToken2) RUNTIMECONVWRAPPER_LAMB_PARAM_1(VarToken1),RUNTIMECONVWRAPPER_LAMB_PARAM_1(VarToken2)
+
+#define RUNTIME_INTEGER_CONV_IMPL(RunTimeConvWrapperTypes, RunTimeConvWrapperValues, RunTimeConvWrapperLambParam) \
+	AUX::MultiRunTimeConvWrapper<RunTimeConvWrapperTypes> { {RunTimeConvWrapperValues} } + [&](RunTimeConvWrapperLambParam)
+
+	//Magic: Pass run-time integers with known small range to template
 	//* The large range maybe lead to code bloat, please carefully choose the range.
 	//* `VarToken` must be a simple variable name rather than a complex expression. 
 	//	Example: 
-	//	int Var = xxx; RUNTIME_CONV(Var,...) (√) 
-	//	struct A{static int Var;} RUNTIME_CONV(A::Var,...) (×)
-	//	struct A{static int Var;} int Var = A::Var; RUNTIME_CONV(Var,...) (√) 
-#define RUNTIME_INTEGER_CONV(VarToken,Min,Max)	  \
-		AUX::RunTimeConvWrapper<decltype(VarToken), decltype(VarToken)(Min), decltype(VarToken)(Max)>{VarToken} + [&](auto VarToken)
+	//	int Var = xxx; RUNTIME_INTEGER_CONV_OneVar(Var,...) (√) 
+	//	struct A{static int Var;} RUNTIME_INTEGER_CONV_OneVar(A::Var,...) (×)
+	//	struct A{static int Var;} int Var = A::Var; RUNTIME_INTEGER_CONV_OneVar(Var,...) (√) 
+#define RUNTIME_INTEGER_CONV_OneVar(VarToken,Min,Max) RUNTIME_INTEGER_CONV_IMPL(RUNTIMECONVWRAPPER_TYPE_1(VarToken,Min,Max),RUNTIMECONVWRAPPER_VALUE_1(VarToken),RUNTIMECONVWRAPPER_LAMB_PARAM_1(VarToken))
+#define RUNTIME_INTEGER_CONV_TwoVar(VarToken1,Min1,Max1,VarToken2,Min2,Max2) RUNTIME_INTEGER_CONV_IMPL(RUNTIMECONVWRAPPER_TYPE_2(VarToken1,Min1,Max1,VarToken2,Min2,Max2),RUNTIMECONVWRAPPER_VALUE_2(VarToken1,VarToken2),RUNTIMECONVWRAPPER_LAMB_PARAM_2(VarToken1,VarToken2))
 
 
 	enum class ConstexprForState
