@@ -57,8 +57,8 @@ namespace FRAMEWORK
 
 		FString TypeName;
 		FString RegisteredName;
-		TFunction<void*()> DefaultObjectGetter;
-		TFunction<MetaType*()> BaseMetaTypeGetter;
+		void*(*DefaultObjectGetter)();
+		MetaType*(*BaseMetaTypeGetter)();
 	};
 
 	template<typename T>
@@ -73,7 +73,10 @@ namespace FRAMEWORK
 			Meta->RegisteredName = Meta->TypeName;
 			if constexpr(std::is_default_constructible_v<T>)
 			{
-				Meta->DefaultObjectGetter = [] { return new T; };
+				Meta->DefaultObjectGetter = []() { 
+					static void* DefaultObj = new T;
+					return DefaultObj;
+				};
 			}
 		}
 
@@ -155,7 +158,7 @@ namespace FRAMEWORK
     }
     
     template<typename T>
-    void ForEachDefaultObject(TFunctionRef<void(T*)> Pred)
+    void ForEachDefaultObject(TFunctionRef<void(T*)> Func)
     {
         TArray<MetaType*> MetaTypes = GetMetaTypes<T>();
         for (auto MetaTypePtr : MetaTypes)
@@ -164,7 +167,7 @@ namespace FRAMEWORK
             if (DefaultObject)
             {
                 T* RelDefaultObject = static_cast<T*>(DefaultObject);
-                Pred(RelDefaultObject);
+				Func(RelDefaultObject);
             }
         }
     }

@@ -419,6 +419,7 @@ namespace FRAMEWORK
 		DxCheck(CommandAllocator->Reset());
 		DxCheck(CmdList->Reset(CommandAllocator, nullptr));
 		DxCheck(Fence->Signal(0));
+		RequestedRenderPassRecorders.Empty();
 		StateCache.Clear();
 		BindDescriptorHeap();
 	}
