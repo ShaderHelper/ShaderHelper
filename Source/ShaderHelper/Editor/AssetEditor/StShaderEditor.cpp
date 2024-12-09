@@ -1,6 +1,6 @@
 #include "CommonHeader.h"
-#include "ShaderPassEditor.h"
-#include "AssetObject/ShaderPass.h"
+#include "StShaderEditor.h"
+#include "AssetObject/StShader.h"
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "AssetManager/AssetManager.h"
@@ -9,30 +9,30 @@ using namespace FRAMEWORK;
 
 namespace SH
 {
-	GLOBAL_REFLECTION_REGISTER(AddClass<ShaderPassOp>()
+	GLOBAL_REFLECTION_REGISTER(AddClass<StShaderOp>()
                                 .BaseClass<AssetOp>()
 	)
 
-    MetaType* ShaderPassOp::SupportAsset()
+    MetaType* StShaderOp::SupportAsset()
     {
-        return GetMetaType<ShaderPass>();
+        return GetMetaType<StShader>();
     }
 
-	void ShaderPassOp::OnOpen(const FString& InAssetPath)
+	void StShaderOp::OnOpen(const FString& InAssetPath)
 	{
-        AssetPtr<ShaderPass> LoadedShaderPassAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderPass>(InAssetPath);
+        AssetPtr<StShader> LoadedStShaderAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<StShader>(InAssetPath);
         auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-        ShEditor->OpenShaderPassTab(MoveTemp(LoadedShaderPassAsset));
+        ShEditor->OpenStShaderTab(MoveTemp(LoadedStShaderAsset));
 	}
 
-    void ShaderPassOp::OnAdd(const FString& InAssetPath)
+    void StShaderOp::OnAdd(const FString& InAssetPath)
     {
-        AssetPtr<ShaderPass> LoadedShaderPassAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderPass>(InAssetPath);
+        AssetPtr<StShader> LoadedStShaderAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<StShader>(InAssetPath);
         auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-        ShEditor->TryRestoreShaderPassTab(MoveTemp(LoadedShaderPassAsset));
+        ShEditor->TryRestoreStShaderTab(MoveTemp(LoadedStShaderAsset));
     }
 
-    void ShaderPassOp::OnDelete(const FString& InAssetPath)
+    void StShaderOp::OnDelete(const FString& InAssetPath)
     {
         auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
         FName TabId{TSingleton<AssetManager>::Get().GetGuid(InAssetPath).ToString()};

@@ -10,7 +10,10 @@ STEAL_PRIVATE_MEMBER(FUICommandInfo, FText, Description)
 
 namespace FRAMEWORK 
 {
-	static const FString BaseEditorConfig = PathHelper::SavedConfigDir() / TEXT("BaseEditor.ini");
+	FString BaseEditorConfig()
+	{
+		return PathHelper::SavedConfigDir() / TEXT("BaseEditor.ini");
+	}
 
 	static void ResetGenericCommandsLabelAndTip()
 	{
@@ -34,9 +37,9 @@ namespace FRAMEWORK
 
 	Editor::Editor()
 	{
-		if (IFileManager::Get().FileExists(*BaseEditorConfig))
+		if (IFileManager::Get().FileExists(*BaseEditorConfig()))
 		{
-			EditorConfig->Read(BaseEditorConfig);
+			EditorConfig->Read(BaseEditorConfig());
 
 			FString Lang;
 			EditorConfig->GetString(TEXT("Common"), TEXT("Language"), Lang);
@@ -64,7 +67,7 @@ namespace FRAMEWORK
 		CurLanguage = InLanguage;
 
 		EditorConfig->SetString(TEXT("Common"), TEXT("Language"), ANSI_TO_TCHAR(magic_enum::enum_name(CurLanguage).data()));
-		EditorConfig->Write(BaseEditorConfig);
+		EditorConfig->Write(BaseEditorConfig());
 	}
 
 }

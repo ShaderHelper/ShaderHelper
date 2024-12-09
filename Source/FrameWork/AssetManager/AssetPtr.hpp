@@ -10,9 +10,8 @@ namespace FRAMEWORK
 	}
 
 	template<typename T>
-	AssetPtr<T>::AssetPtr(T* InAsset, const FGuid& InGuid)
+	AssetPtr<T>::AssetPtr(T* InAsset)
 		: Asset(InAsset)
-		, Guid(InGuid)
 	{
 		TSingleton<AssetManager>::Get().AddRef(Asset);
 	}
@@ -20,7 +19,6 @@ namespace FRAMEWORK
 	template<typename T>
 	AssetPtr<T>::AssetPtr(const AssetPtr& InAssetPtr)
 		: Asset(InAssetPtr.Asset)
-		, Guid(InAssetPtr.Guid)
 	{
 		TSingleton<AssetManager>::Get().AddRef(Asset);
 	}
@@ -29,7 +27,6 @@ namespace FRAMEWORK
 	template<typename OtherType, typename>
 	AssetPtr<T>::AssetPtr(const AssetPtr<OtherType>& OtherAssetPtr)
 		: Asset(OtherAssetPtr.Asset)
-		, Guid(OtherAssetPtr.Guid)
 	{
 		TSingleton<AssetManager>::Get().AddRef(Asset);
 	}
@@ -63,7 +60,7 @@ namespace FRAMEWORK
 	template<typename T>
 	FGuid AssetPtr<T>::GetGuid() const
 	{
-		return Guid;
+		return Asset->GetGuid();
 	}
 
     template<typename T>

@@ -21,22 +21,16 @@ require('vstudio')
 p.api.register {
   name = "workspace_items",
   scope = "workspace",
-  kind = "list:keyed:list:string",
+  kind = "table",
 }
 
 workspaceFolderUUID = {}
 
 function addWorkspaceItemsByFolder(wks, folders, parentFolderUUID)
     for name, subPaths in pairs(folders) do
-        local folderUUID = os.uuid("Solution Items:"..wks.name .. ":" .. path.getdirectory(subPaths[1]))
-
-        if parentFolderUUID then
-            workspaceFolderUUID[folderUUID] = parentFolderUUID
-        end
-
         local fileSections = {}
         local nextFolders = {}
-        for _, pathValue in ipairs(subPaths) do
+        local resolvePath = function(pathValue)
             if os.isdir(pathValue) then
                 local nextFolderSubPaths = {}
                 local folderName = path.getbasename(pathValue)
@@ -55,24 +49,41 @@ function addWorkspaceItemsByFolder(wks, folders, parentFolderUUID)
             end
         end
 
-        p.push('Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "'..name..'", "'..name..'", "{' .. folderUUID .. '}"')
-        p.push("ProjectSection(SolutionItems) = preProject")
-
-        for _, fileSection in ipairs(fileSections) do
-            p.w(fileSection.." = "..fileSection)
+        local folderUUID
+        if type(subPaths) == "string" then
+            folderUUID = os.uuid("Solution Items:"..wks.name .. ":" .. path.getdirectory(subPaths))
+            resolvePath(subPaths)
+        else
+            folderUUID = os.uuid("Solution Items:"..wks.name .. ":" .. path.getdirectory(subPaths[1]))
+            for _, pathValue in ipairs(subPaths) do
+                resolvePath(pathValue)
+            end
         end
 
-        p.pop("EndProjectSection")
-        p.pop("EndProject")
+        if parentFolderUUID then
+            workspaceFolderUUID[folderUUID] = parentFolderUUID
+        end
 
-        addWorkspaceItemsByFolder(wks, nextFolders, folderUUID)
+        if type(name) == "number" then
+            addWorkspaceItemsByFolder(wks, nextFolders, nil)
+        else
+            p.push('Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "'..name..'", "'..name..'", "{' .. folderUUID .. '}"')
+            p.push("ProjectSection(SolutionItems) = preProject")
+    
+            for _, fileSection in ipairs(fileSections) do
+                p.w(fileSection.." = "..fileSection)
+            end
+    
+            p.pop("EndProjectSection")
+            p.pop("EndProject")
+    
+            addWorkspaceItemsByFolder(wks, nextFolders, folderUUID)
+        end
     end
 end
 
 p.override(p.vstudio.sln2005, "projects", function(base, wks)
-    for _, items in ipairs(wks.workspace_items) do
-        addWorkspaceItemsByFolder(wks, items, nil)
-    end
+  addWorkspaceItemsByFolder(wks, wks.workspace_items, nil)
   base(wks)
 end)
 

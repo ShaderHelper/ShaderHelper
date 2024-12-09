@@ -5,6 +5,7 @@ namespace FRAMEWORK
 {
 	class AssetOp
 	{
+		REFLECTION_TYPE(AssetOp)
 	public:
 		AssetOp() = default;
 		virtual ~AssetOp() = default;

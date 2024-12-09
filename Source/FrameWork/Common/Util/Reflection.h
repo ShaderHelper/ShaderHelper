@@ -7,23 +7,23 @@ namespace FRAMEWORK
 
 	//TODO compile-time hash type name
 	FRAMEWORK_API TMap<FString, MetaType*>& GetTypeNameToMetaType();
-	FRAMEWORK_API TMap<FString, MetaType*>& GetRegisteredMetaTypes();
+	FRAMEWORK_API TMap<FString, MetaType*>& GetRegisteredNameToMetaType();
 
 	struct MetaType
 	{
 		void* GetDefaultObject()
 		{
-			if (DefaultObjectGetter)
+			if (!DefaultObject && Constructor)
 			{
-				return DefaultObjectGetter();
+				DefaultObject = Constructor();
 			}
-			return nullptr;
+			return DefaultObject;
 		}
 
 		void* Construct()
 		{
-			check(DefaultObjectGetter);
-			return DefaultObjectGetter();
+			check(Constructor);
+			return Constructor();
 		}
 
 		MetaType* GetBaseClass()
@@ -56,9 +56,10 @@ namespace FRAMEWORK
 		}
 
 		FString TypeName;
-		FString RegisteredName;
-		void*(*DefaultObjectGetter)();
+		TOptional<FString> RegisteredName; //Portable
+		void*(*Constructor)();
 		MetaType*(*BaseMetaTypeGetter)();
+		void* DefaultObject;
 	};
 
 	template<typename T>
@@ -70,12 +71,10 @@ namespace FRAMEWORK
 			Meta = new MetaType{};
 			//Dont use AUX::TypeName<T>, there is a unordered dynamic initialization problem.
 			Meta->TypeName = GetGeneratedTypeName<T>();
-			Meta->RegisteredName = Meta->TypeName;
 			if constexpr(std::is_default_constructible_v<T>)
 			{
-				Meta->DefaultObjectGetter = []() { 
-					static void* DefaultObj = new T;
-					return DefaultObj;
+				Meta->Constructor = []() -> void* { 
+					return new T;
 				};
 			}
 		}
@@ -99,7 +98,10 @@ namespace FRAMEWORK
 		~MetaTypeBuilder()
 		{
 			GetTypeNameToMetaType().Add(Meta->TypeName, Meta);
-			GetRegisteredMetaTypes().Add(Meta->RegisteredName, Meta);
+			if (Meta->RegisteredName)
+			{
+				GetRegisteredNameToMetaType().Add(*Meta->RegisteredName, Meta);
+			}
 		}
 
 	private:
@@ -124,11 +126,34 @@ namespace FRAMEWORK
 		return GetTypeNameToMetaType()[GetGeneratedTypeName<T>()];
 	}
 
+	MetaType* GetMetaType(const FString& InRegisteredName)
+	{
+		return GetRegisteredNameToMetaType()[InRegisteredName];
+	}
+
+	FString GetRegisteredName(MetaType* InMt)
+	{
+		const FString* Rel = GetRegisteredNameToMetaType().FindKey(InMt);
+		check(Rel);
+		return *Rel;
+	}
+
+	template<typename To, typename From>
+	To* DynamicCast(From* InPtr)
+	{
+		MetaType* Mt = InPtr->MetaType();
+		if (Mt->IsDerivedFrom<To>())
+		{
+			return static_cast<To*>(InPtr);
+		}
+		return nullptr;
+	}
+
 	template<typename T>
 	TArray<MetaType*> GetMetaTypes()
 	{
 		TArray<MetaType*> MetaTypes;
-		for (auto [_, MetaTypePtr] : GetRegisteredMetaTypes())
+		for (auto [_, MetaTypePtr] : GetTypeNameToMetaType())
 		{
 			if (MetaTypePtr->IsDerivedFrom<T>())
 			{
@@ -156,7 +181,7 @@ namespace FRAMEWORK
         }
         return nullptr;
     }
-    
+
     template<typename T>
     void ForEachDefaultObject(TFunctionRef<void(T*)> Func)
     {
@@ -174,6 +199,8 @@ namespace FRAMEWORK
 
 #define GLOBAL_REFLECTION_REGISTER(...)	\
 	static const int PREPROCESSOR_JOIN(ReflectionGlobalRegister_,__COUNTER__) = [] { __VA_ARGS__; return 0; }();
+
+#define REFLECTION_TYPE(Type) public: virtual FRAMEWORK::MetaType* MetaType() const {  return FRAMEWORK::GetMetaType<Type>(); }
 
 #define MANUAL_RTTI_BASE_TYPE() \
 	template<typename T> bool IsOfType() const { return IsOfTypeImpl(T::GetTypeId());} \

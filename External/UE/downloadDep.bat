@@ -4,7 +4,7 @@ set CURRENTDIR=%~dp0
 
 echo Downloading UE...
 	set UE-lib_Dir=%CURRENTDIR%/Lib
-	set UE-lib_Url="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/914856048d1b2fcdee05c18953c0477f/UE-Lib-Win.zip"
+	set UE-lib_Url="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/65921c99a2f27dfa82c4b263feb8d194/UE-Lib-Win.zip"
 	pushd "%UE-lib_Dir%" || goto error
 	curl -LO %UE-lib_Url% || goto error
 	C:/Windows/System32/tar.exe -zxf UE-Lib-Win.zip || goto error
@@ -12,7 +12,7 @@ echo Downloading UE...
 	popd
 	
 	set UE-Src_Dir=%CURRENTDIR%/Src
-	set UE-Src_Url="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/f30840d7db9555d978d1019783976812/UE-Src.tar"
+	set UE-Src_Url="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/c54de905c2350d3e380d3464a4a885df/UE-Src.tar"
 	pushd "%UE-Src_Dir%" || goto error
 	curl -LO %UE-Src_Url% || goto error
 	C:/Windows/System32/tar.exe -zxf UE-Src.tar || goto error

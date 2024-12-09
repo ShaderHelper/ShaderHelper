@@ -5,6 +5,7 @@ PER_MODULE_DEFINITION()
 
 namespace FRAMEWORK
 {
+	FString GAppName;
     TArray<FName> GProjectCategoryNames;
 }
 

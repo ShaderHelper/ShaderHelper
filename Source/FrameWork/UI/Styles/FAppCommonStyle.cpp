@@ -28,6 +28,7 @@ namespace FRAMEWORK
 		Style->Set("MessageDialog.Boqi", new IMAGE_BRUSH("Boqi", FVector2D(32.0, 32.0)));
 		Style->Set("MessageDialog.Boqi2", new IMAGE_BRUSH_SVG("Boqi2", FVector2D(32.0, 32.0)));
 		Style->Set("AssetBrowser.Folder", new IMAGE_BRUSH_SVG("folder", FVector2D(64.0, 64.0)));
+		Style->Set("Graph.Background", new IMAGE_BRUSH("SolidBackground", FVector2D(16.0, 16.0)));
 
 		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir);
 		//StarshipCoreStyle is used as the app style.
@@ -76,7 +77,8 @@ namespace FRAMEWORK
 		Style->Set("AssetView.Row", AssetViewTableRowStyle);
 
 		Style->Set("Icons.FolderPlus", new IMAGE_BRUSH_SVG("Starship/Common/folder-plus", FVector2D(16.0, 16.0)));
-
+		Style->Set("Icons.Graph", new IMAGE_BRUSH_SVG("Starship/Insights/Callers_20", FVector2D(20.0, 20.0)));
+		
 		return Style;
 	}
 

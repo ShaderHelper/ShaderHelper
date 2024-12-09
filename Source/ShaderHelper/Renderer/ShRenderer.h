@@ -16,8 +16,6 @@ namespace SH
 		void UpdatePixelShader(TRefCountPtr<FRAMEWORK::GpuShader> InNewPixelShader);
 		void UpdateCustomBindGroup(TRefCountPtr<FRAMEWORK::GpuBindGroup> InBindGroup) { CustomBindGroup = MoveTemp(InBindGroup); }
 		void UpdateCustomBindGroupLayout(TRefCountPtr<FRAMEWORK::GpuBindGroupLayout> InBindGroupLayout) { CustomBindGroupLayout = MoveTemp(InBindGroupLayout); }
-		FString GetPixelShaderDeclaration() const;
-		FString GetDefaultPixelShaderBody() const;
         FRAMEWORK::GpuTexture* GetFinalRT() const { return FinalRT; }
 
 

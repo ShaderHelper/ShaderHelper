@@ -5,10 +5,10 @@
 
 namespace SH
 {
-	class SShaderPassPropertyView : public SCompoundWidget
+	class SShaderPropertyView : public SCompoundWidget
 	{
 	public:
-		SLATE_BEGIN_ARGS(SShaderPassPropertyView)
+		SLATE_BEGIN_ARGS(SShaderPropertyView)
 			: _Renderer(nullptr)
 		{}
 			SLATE_ARGUMENT(ShRenderer*, Renderer)

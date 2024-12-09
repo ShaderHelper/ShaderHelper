@@ -35,6 +35,8 @@ Ok,Ok,
 Cancel,Cancel,
 AssetImportFailure,Failed to import asset.,
 DeleteAssetTip,Delete selected Item?,
-CodeTabTip,Select any ShaderPass asset to edit the code.,
-shaderpass,ShaderPass,
-AssetRenameFailure,Destination name already exists!
+CodeTabTip,Select any shader asset to edit.,
+StShader,ShaderToyShader,
+AssetRenameFailure,Destination name already exists!,
+Graph,Graph
+ShaderToy,ShaderToyGraph

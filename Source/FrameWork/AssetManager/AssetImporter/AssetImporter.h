@@ -5,6 +5,7 @@ namespace FRAMEWORK
 {
 	class AssetImporter
 	{
+		REFLECTION_TYPE(AssetImporter)
 	public:
 		AssetImporter() = default;
 		virtual ~AssetImporter() = default;

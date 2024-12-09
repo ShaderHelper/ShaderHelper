@@ -3,7 +3,7 @@
 #include "Renderer/ShRenderer.h"
 #include "Editor/Editor.h"
 #include "Editor/PreviewViewPort.h"
-#include "AssetObject/ShaderPass.h"
+#include "AssetObject/StShader.h"
 #include "AssetManager/AssetManager.h"
 #include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
 
@@ -33,13 +33,13 @@ namespace SH
 		void SaveEditorState();
 		void OnViewportResize(const FRAMEWORK::Vector2f& InSize);
         
-        void OpenShaderPassTab(FRAMEWORK::AssetPtr<ShaderPass> InShaderPass);
-        void TryRestoreShaderPassTab(FRAMEWORK::AssetPtr<ShaderPass> InShaderPass);
+        void OpenStShaderTab(FRAMEWORK::AssetPtr<StShader> InStShader);
+        void TryRestoreStShaderTab(FRAMEWORK::AssetPtr<StShader> InStShader);
 		
 	private:
 		TSharedRef<SDockTab> SpawnWindowTab(const FSpawnTabArgs& Args);
-        TSharedRef<SDockTab> SpawnShaderPassTab(const FSpawnTabArgs& Args);
-        TSharedRef<SWidget> SpawnShaderPassPath(const FString& InShaderPassPath);
+        TSharedRef<SDockTab> SpawnStShaderTab(const FSpawnTabArgs& Args);
+        TSharedRef<SWidget> SpawnStShaderPath(const FString& InStShaderPath);
         FMenuBarBuilder CreateMenuBarBuilder();
 		void FillMenu(FMenuBuilder& MenuBuilder, FString MenuName);
 		void InitEditorUI();
@@ -54,7 +54,7 @@ namespace SH
         
         TSharedPtr<SDockTab> CodeTab;
         TSharedPtr<FTabManager> CodeTabManager;
-        TWeakPtr<class SDockingTabStack> ShaderPassTabStackInsertPoint;
+        TWeakPtr<class SDockingTabStack> StShaderTabStackInsertPoint;
         TSharedPtr<class SDockingArea> CodeTabMainArea;
         
 		TSharedPtr<SWindow> Window;
@@ -71,11 +71,11 @@ namespace SH
 
             TSharedPtr<FRAMEWORK::AssetBrowserPersistentState> AssetBrowserState = MakeShared<FRAMEWORK::AssetBrowserPersistentState>();
             TSharedPtr<FTabManager::FLayout> CodeTabLayout;
-            TMap<FRAMEWORK::AssetPtr<ShaderPass>, TSharedPtr<SDockTab>> OpenedShaderPasses;
+            TMap<FRAMEWORK::AssetPtr<StShader>, TSharedPtr<SDockTab>> OpenedStShaders;
 		} CurEditorState;
         
-        //used to restore the ShaderEditorBox when the shaderpass asset path is changed.
-        TMap<FRAMEWORK::AssetPtr<ShaderPass>, TSharedPtr<class SShaderEditorBox>> PendingShaderPasseTabs;
+        //used to restore the ShaderEditorBox when the StShader asset path is changed.
+        TMap<FRAMEWORK::AssetPtr<StShader>, TSharedPtr<class SShaderEditorBox>> PendingStShadereTabs;
 		FString EditorStateSaveFileName;
 	};
 

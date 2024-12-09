@@ -12,7 +12,7 @@ namespace FRAMEWORK
 		template <typename OtherType>
 		friend class AssetPtr;
 	private:
-		AssetPtr(T* InAsset, const FGuid& InGuid);
+		AssetPtr(T* InAsset);
 
 	public:
 		AssetPtr(std::nullptr_t = nullptr);
@@ -36,7 +36,6 @@ namespace FRAMEWORK
 
 	private:
 		T* Asset;
-		FGuid Guid;
 	};
 
 	class GpuTexture;
@@ -54,13 +53,25 @@ namespace FRAMEWORK
 			FGuid Guid = GetGuid(InAssetPath);
 			if (Assets.Contains(Guid))
 			{
-				return { static_cast<T*>(Assets[Guid]), Guid };
+				return { static_cast<T*>(Assets[Guid]) };
 			}
 
+			AssetObject* NewAssetObject = nullptr;
 			FString AssetExt = FPaths::GetExtension(InAssetPath);
-            AssetObject* NewAssetObject = GetDefaultObject<AssetObject>([&](AssetObject* CurAssetObject){
-                return CurAssetObject->FileExtension().Contains(AssetExt);
-            });
+			TArray<MetaType*> MetaTypes = GetMetaTypes<T>();
+			for (auto MetaTypePtr : MetaTypes)
+			{
+				void* DefaultObject = MetaTypePtr->GetDefaultObject();
+				if (DefaultObject)
+				{
+					T* RelDefaultObject = static_cast<T*>(DefaultObject);
+					if (RelDefaultObject->FileExtension().Contains(AssetExt))
+					{
+						NewAssetObject = static_cast<AssetObject*>(MetaTypePtr->Construct());
+						break;
+					}
+				}
+			}
 			check(NewAssetObject);
 			TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*InAssetPath));
             if(Ar)
@@ -68,7 +79,7 @@ namespace FRAMEWORK
                 NewAssetObject->Serialize(*Ar);
                 NewAssetObject->PostLoad();
                 Assets.Add(Guid, NewAssetObject);
-                return { static_cast<T*>(NewAssetObject), Guid };
+                return { static_cast<T*>(NewAssetObject) };
             }
             
             //Failed to load the asset
