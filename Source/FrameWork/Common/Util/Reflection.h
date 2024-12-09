@@ -126,12 +126,12 @@ namespace FRAMEWORK
 		return GetTypeNameToMetaType()[GetGeneratedTypeName<T>()];
 	}
 
-	MetaType* GetMetaType(const FString& InRegisteredName)
+	inline MetaType* GetMetaType(const FString& InRegisteredName)
 	{
 		return GetRegisteredNameToMetaType()[InRegisteredName];
 	}
 
-	FString GetRegisteredName(MetaType* InMt)
+	inline FString GetRegisteredName(MetaType* InMt)
 	{
 		const FString* Rel = GetRegisteredNameToMetaType().FindKey(InMt);
 		check(Rel);

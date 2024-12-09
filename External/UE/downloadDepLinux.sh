@@ -10,7 +10,7 @@ echo "Downloading UE..."
     rm UE-Lib-Linux.tar
 
     UE_Src_Dir="$CurrentPath/Src"
-    UE_Src_Url="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/3a46fe7be96581ef9783c37631599e3e/UE-Src.tar"
+    UE_Src_Url="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/2a7926fdee3e4db7e919136e2f88659e/UE-Src.tar"
     cd "$UE_Src_Dir" || exit 1
     wget $UE_Src_Url || exit 1
     tar -zxf UE-Src.tar || exit 1

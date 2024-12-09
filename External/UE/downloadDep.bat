@@ -12,7 +12,7 @@ echo Downloading UE...
 	popd
 	
 	set UE-Src_Dir=%CURRENTDIR%/Src
-	set UE-Src_Url="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/3a46fe7be96581ef9783c37631599e3e/UE-Src.tar"
+	set UE-Src_Url="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/2a7926fdee3e4db7e919136e2f88659e/UE-Src.tar"
 	pushd "%UE-Src_Dir%" || goto error
 	curl -LO %UE-Src_Url% || goto error
 	C:/Windows/System32/tar.exe -zxf UE-Src.tar || goto error
