@@ -5,6 +5,7 @@ namespace FRAMEWORK
 {
 	class Texture2DOp : public AssetOp
 	{
+		REFLECTION_TYPE(Texture2DOp)
 	public:
 		Texture2DOp() = default;
 

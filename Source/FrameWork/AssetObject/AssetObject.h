@@ -7,6 +7,7 @@ namespace FRAMEWORK
 {
 	class FRAMEWORK_API AssetObject
 	{
+		REFLECTION_TYPE(AssetObject)
 	public:
 		AssetObject();
 		virtual ~AssetObject() = default;

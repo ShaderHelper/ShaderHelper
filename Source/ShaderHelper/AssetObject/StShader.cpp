@@ -1,37 +1,25 @@
 #include "CommonHeader.h"
-#include "ShaderPass.h"
+#include "StShader.h"
 #include "UI/Styles/FShaderHelperStyle.h"
+#include "Common/Path/PathHelper.h"
 
 using namespace FRAMEWORK;
 
 namespace SH
 {
-const FString DefaultPixelShaderInput =
-R"(
-struct PIn
-{
-    float4 Pos : SV_Position;
-};
-)";
-
-const FString DefaultPixelShaderMacro =
-R"(
-#define fragCoord float2(Input.Pos.x, iResolution.y - Input.Pos.y)
-)";
-
 const FString DefaultPixelShaderBody =
-R"(float4 MainPS(PIn Input) : SV_Target
+R"(void mainImage(out float4 fragColor, in float2 fragCoord)
 {
     float2 uv = fragCoord/iResolution.xy;
     float3 col = 0.5 + 0.5*cos(iTime + uv.xyx + float3(0,2,4));
-    return float4(col,1);
+    fragColor = float4(col,1);
 })";
 
-	GLOBAL_REFLECTION_REGISTER(AddClass<ShaderPass>()
+	GLOBAL_REFLECTION_REGISTER(AddClass<StShader>()
                                 .BaseClass<AssetObject>()
 	)
 
-	ShaderPass::ShaderPass()
+	StShader::StShader()
 	{
         PixelShaderBody = DefaultPixelShaderBody;
         
@@ -49,31 +37,28 @@ R"(float4 MainPS(PIn Input) : SV_Target
                             .Build();
 	}
 
-	void ShaderPass::Serialize(FArchive& Ar)
+	void StShader::Serialize(FArchive& Ar)
 	{
 		AssetObject::Serialize(Ar);
 
 		Ar << PixelShaderBody;
 	}
 
-	FString ShaderPass::FileExtension() const
+	FString StShader::FileExtension() const
 	{
-		return "shaderpass";
+		return "StShader";
 	}
 
-	const FSlateBrush* ShaderPass::GetImage() const
+	const FSlateBrush* StShader::GetImage() const
 	{
-		return FShaderHelperStyle::Get().GetBrush("AssetBrowser.ShaderPass");
+		return FShaderHelperStyle::Get().GetBrush("AssetBrowser.Shader");
 	}
 
-    FString ShaderPass::GetResourceDeclaration() const
+    FString StShader::GetResourceDeclaration() const
     {
-        FString Declaration = BuiltInBindGroupLayout->GetCodegenDeclaration();
-        if (CustomBindGroupLayout)
-        {
-            Declaration += CustomBindGroupLayout->GetCodegenDeclaration();
-        }
-        return DefaultPixelShaderInput + Declaration + DefaultPixelShaderMacro;
+		FString Template;
+		FFileHelper::LoadFileToString(Template, *(PathHelper::ShaderDir() / "ShaderHelper/StShaderTemplate.hlsl"));
+		return BuiltInBindGroupLayout->GetCodegenDeclaration() + Template;
     }
 
 }

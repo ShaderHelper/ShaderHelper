@@ -4,10 +4,11 @@
 
 namespace SH
 {
-	class ShaderPass : public FRAMEWORK::AssetObject
+	class StShader : public FRAMEWORK::AssetObject
 	{
+		REFLECTION_TYPE(StShader)
 	public:
-		ShaderPass();
+		StShader();
 
 	public:
 		void Serialize(FArchive& Ar) override;

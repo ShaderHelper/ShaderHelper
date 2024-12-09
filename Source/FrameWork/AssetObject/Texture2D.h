@@ -5,6 +5,7 @@ namespace FRAMEWORK
 {
 	class Texture2D : public AssetObject
 	{
+		REFLECTION_TYPE(Texture2D)
 	public:
 		Texture2D();
 		Texture2D(uint32 InWidth, uint32 InHeight, const TArray<uint8>& InRawData);

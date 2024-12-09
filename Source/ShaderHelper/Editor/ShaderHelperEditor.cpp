@@ -3,7 +3,7 @@
 #include "App/ShaderHelperApp.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 #include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
-#include "UI/Widgets/Property/PropertyView/SShaderPassPropertyView.h"
+#include "UI/Widgets/Property/PropertyView/SShaderPropertyView.h"
 #include "ProjectManager/ShProjectManager.h"
 #include <Serialization/JsonSerializer.h>
 #include <Misc/FileHelper.h>
@@ -11,7 +11,8 @@
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "magic_enum.hpp"
 #include <Framework/Docking/SDockingTabStack.h>
-#include "UI/Widgets/SShaderPassTab.h"
+#include "UI/Widgets/SShaderTab.h"
+#include "UI/Widgets/Graph/SGraphPanel.h"
 
 STEAL_PRIVATE_MEMBER(FTabManager, TArray<TSharedRef<FTabManager::FArea>>, CollapsedDockAreas)
 
@@ -30,13 +31,14 @@ namespace SH
     const FName InitialInsertPointTabId = "CodeInsertPoint";
 
     const FName AssetTabId = "Asset";
+	const FName GraphTabId = "Graph";
 
 	const TArray<FName> TabIds{
-		PreviewTabId, PropretyTabId, CodeTabId, AssetTabId,
+		PreviewTabId, PropretyTabId, CodeTabId, AssetTabId, GraphTabId
 	};
 
     const TArray<FName> WindowMenuTabIds{
-        PreviewTabId, PropretyTabId, AssetTabId,
+        PreviewTabId, PropretyTabId, AssetTabId, GraphTabId
     };
 
 	ShaderHelperEditor::ShaderHelperEditor(const Vector2f& InWindowSize, ShRenderer* InRenderer)
@@ -82,8 +84,27 @@ namespace SH
 					->Split
 					(
 						FTabManager::NewStack()
-						->SetSizeCoefficient(0.7f)
+						->SetSizeCoefficient(0.5f)
 						->AddTab(PreviewTabId, ETabState::OpenedTab)
+					)
+					->Split
+					(
+						FTabManager::NewStack()
+						->SetSizeCoefficient(0.5f)
+						->AddTab(GraphTabId, ETabState::OpenedTab)
+					)
+
+				)
+				->Split
+				(
+					FTabManager::NewSplitter()
+					->SetOrientation(Orient_Vertical)
+					->SetSizeCoefficient(0.4f)
+					->Split
+					(
+						FTabManager::NewStack()
+						->SetSizeCoefficient(0.7f)
+						->AddTab(CodeTabId, ETabState::OpenedTab)
 					)
 					->Split
 					(
@@ -91,13 +112,6 @@ namespace SH
 						->SetSizeCoefficient(0.3f)
 						->AddTab(AssetTabId, ETabState::OpenedTab)
 					)
-
-				)
-				->Split
-				(
-					FTabManager::NewStack()
-					->SetSizeCoefficient(0.45f)
-					->AddTab(CodeTabId, ETabState::OpenedTab)
 				)
                 ->Split
                  (
@@ -169,12 +183,12 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		}));
 	}
 
-    TSharedRef<SWidget> ShaderHelperEditor::SpawnShaderPassPath(const FString& InShaderPassPath)
+    TSharedRef<SWidget> ShaderHelperEditor::SpawnStShaderPath(const FString& InStShaderPath)
     {
         auto PathContainer = SNew(SHorizontalBox);
-        FString ShaderPassRelativePath = TSingleton<ShProjectManager>::Get().GetRelativePathToProject(InShaderPassPath);
+        FString StShaderRelativePath = TSingleton<ShProjectManager>::Get().GetRelativePathToProject(InStShaderPath);
         TArray<FString> FileNames;
-        ShaderPassRelativePath.ParseIntoArray(FileNames, TEXT("/"));
+        StShaderRelativePath.ParseIntoArray(FileNames, TEXT("/"));
         FString RelativePathHierarchy;
         for(int32 i = 0; i < FileNames.Num(); i++)
         {
@@ -239,37 +253,37 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
         
     }
 
-    TSharedRef<SDockTab> ShaderHelperEditor::SpawnShaderPassTab(const FSpawnTabArgs& Args)
+    TSharedRef<SDockTab> ShaderHelperEditor::SpawnStShaderTab(const FSpawnTabArgs& Args)
     {
-        FGuid ShaderPassGuid{Args.GetTabId().ToString()};
+        FGuid StShaderGuid{Args.GetTabId().ToString()};
         FName TabId = Args.GetTabId().TabType;
-        auto LoadedShaderPass = TSingleton<AssetManager>::Get().LoadAssetByGuid<ShaderPass>(ShaderPassGuid);
+        auto LoadedStShader = TSingleton<AssetManager>::Get().LoadAssetByGuid<StShader>(StShaderGuid);
         TSharedPtr<SShaderEditorBox> ShaderEditor;
-        if(PendingShaderPasseTabs.Contains(LoadedShaderPass))
+        if(PendingStShadereTabs.Contains(LoadedStShader))
         {
-            ShaderEditor = PendingShaderPasseTabs[LoadedShaderPass];
-            PendingShaderPasseTabs.Remove(LoadedShaderPass);
+            ShaderEditor = PendingStShadereTabs[LoadedStShader];
+            PendingStShadereTabs.Remove(LoadedStShader);
         }
         else
         {
-            ShaderEditor = SNew(SShaderEditorBox).ShaderPassAsset(LoadedShaderPass.Get());
+            ShaderEditor = SNew(SShaderEditorBox).StShaderAsset(LoadedStShader.Get());
         }
-        auto NewShaderPassTab = SNew(SShaderPassTab)
+        auto NewStShaderTab = SNew(SShaderTab)
             .TabRole(ETabRole::DocumentTab)
-            .Label(FText::FromString(LoadedShaderPass->GetFileName()))
+            .Label(FText::FromString(LoadedStShader->GetFileName()))
             .OnTabClosed_Lambda([=](TSharedRef<SDockTab> ClosedTab) {
-                CurEditorState.OpenedShaderPasses.Remove(*CurEditorState.OpenedShaderPasses.FindKey(ClosedTab));
-                PendingShaderPasseTabs.Add(LoadedShaderPass, ShaderEditor);
+                CurEditorState.OpenedStShaders.Remove(*CurEditorState.OpenedStShaders.FindKey(ClosedTab));
+                PendingStShadereTabs.Add(LoadedStShader, ShaderEditor);
                 auto DockTabStack = ClosedTab->GetParentDockTabStack();
                 PRAGMA_DISABLE_DEPRECATION_WARNINGS
                 //Persist the tab being closed until next frame to be able to restore the tab.
                 FDelegateHandle TickerHandle = FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([=](float) {
-                    //If the shaderpass tab was not restored on the last frame.
-                    if(PendingShaderPasseTabs.Contains(LoadedShaderPass))
+                    //If the StShader tab was not restored on the last frame.
+                    if(PendingStShadereTabs.Contains(LoadedStShader))
                     {
                         CodeTabManager->UnregisterTabSpawner(TabId);
-                        PendingShaderPasseTabs.Remove(LoadedShaderPass);
-                        //Clear the PersistLayout when closing a shaderpass tab. we don't intend to restore it, so just destroy it.
+                        PendingStShadereTabs.Remove(LoadedStShader);
+                        //Clear the PersistLayout when closing a StShader tab. we don't intend to restore it, so just destroy it.
                         DockTabStack->OnTabRemoved(Args.GetTabId());
                         TArray<TSharedRef<FTabManager::FArea>>& CollapsedDockAreas = GetPrivate_FTabManager_CollapsedDockAreas(*CodeTabManager);
                         CollapsedDockAreas.Empty();
@@ -284,7 +298,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                 +SVerticalBox::Slot()
                 .AutoHeight()
                 [
-                    SpawnShaderPassPath(LoadedShaderPass->GetPath())
+                    SpawnStShaderPath(LoadedStShader->GetPath())
                 ]
                 +SVerticalBox::Slot()
                 [
@@ -292,26 +306,26 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                 ]
             ];
         
-        NewShaderPassTab->SetTabIcon(LoadedShaderPass->GetImage());
-        NewShaderPassTab->SetOnTabRelocated(FSimpleDelegate::CreateLambda([this, NewShaderPassTab = TWeakPtr<SShaderPassTab>{NewShaderPassTab}] {
-            if(NewShaderPassTab.IsValid())
+        NewStShaderTab->SetTabIcon(LoadedStShader->GetImage());
+        NewStShaderTab->SetOnTabRelocated(FSimpleDelegate::CreateLambda([this, NewStShaderTab = TWeakPtr<SShaderTab>{NewStShaderTab}] {
+            if(NewStShaderTab.IsValid())
             {
-                if (TSharedPtr<SDockingTabStack> TabStack = CodeTabManager->FindTabInLiveArea(FTabMatcher{ NewShaderPassTab.Pin()->GetLayoutIdentifier() }, CodeTabMainArea.ToSharedRef()))
+                if (TSharedPtr<SDockingTabStack> TabStack = CodeTabManager->FindTabInLiveArea(FTabMatcher{ NewStShaderTab.Pin()->GetLayoutIdentifier() }, CodeTabMainArea.ToSharedRef()))
                 {
-                    ShaderPassTabStackInsertPoint = TabStack;
+                    StShaderTabStackInsertPoint = TabStack;
                 }
             }
 		}));
-        NewShaderPassTab->SetOnTabActivated(SDockTab::FOnTabActivatedCallback::CreateLambda([this](TSharedRef<SDockTab> InTab, ETabActivationCause) {
+        NewStShaderTab->SetOnTabActivated(SDockTab::FOnTabActivatedCallback::CreateLambda([this](TSharedRef<SDockTab> InTab, ETabActivationCause) {
             if(!CodeTabMainArea) return;
             
             if(TSharedPtr<SDockingTabStack> TabStack = CodeTabManager->FindTabInLiveArea(FTabMatcher{InTab->GetLayoutIdentifier()}, CodeTabMainArea.ToSharedRef()))
             {
-				ShaderPassTabStackInsertPoint = TabStack;
+				StShaderTabStackInsertPoint = TabStack;
             }
         }));
-        CurEditorState.OpenedShaderPasses.Add(LoadedShaderPass, NewShaderPassTab);
-        return NewShaderPassTab;
+        CurEditorState.OpenedStShaders.Add(LoadedStShader, NewStShaderTab);
+        return NewStShaderTab;
     }
 
 	TSharedRef<SDockTab> ShaderHelperEditor::SpawnWindowTab(const FSpawnTabArgs& Args)
@@ -351,10 +365,10 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
             
             CodeTabManager = FGlobalTabmanager::Get()->NewTabManager(SpawnedTab.ToSharedRef());
             
-            for(const auto& [OpenedShaderPass, _] : CurEditorState.OpenedShaderPasses)
+            for(const auto& [OpenedStShader, _] : CurEditorState.OpenedStShaders)
             {
-                FName ShaderPassTabId{*OpenedShaderPass.GetGuid().ToString()};
-                CodeTabManager->RegisterTabSpawner(ShaderPassTabId, FOnSpawnTab::CreateRaw(this, &ShaderHelperEditor::SpawnShaderPassTab));
+                FName StShaderTabId{*OpenedStShader.GetGuid().ToString()};
+                CodeTabManager->RegisterTabSpawner(StShaderTabId, FOnSpawnTab::CreateRaw(this, &ShaderHelperEditor::SpawnStShaderTab));
             }
  
             if(!CurEditorState.CodeTabLayout)
@@ -407,6 +421,14 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                 .State(CurEditorState.AssetBrowserState)
 			);
 		}
+		else if (TabId == GraphTabId) {
+			SAssignNew(SpawnedTab, SDockTab)
+			.Label(LOCALIZATION(GraphTabId.ToString()))
+			[
+				SNew(SGraphPanel)
+			];
+			SpawnedTab->SetTabIcon(FAppCommonStyle::Get().GetBrush("Icons.Graph"));
+		}
 		else {
 			ensure(false);
 		}
@@ -426,33 +448,33 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
         TabManager->FindExistingLiveTab(CodeTabId)->GetParentDockTabStack()->SetCanDropToAttach(false);
 	}
 
-    void ShaderHelperEditor::TryRestoreShaderPassTab(AssetPtr<ShaderPass> InShaderPass)
+    void ShaderHelperEditor::TryRestoreStShaderTab(AssetPtr<StShader> InStShader)
     {
-        if(PendingShaderPasseTabs.Contains(InShaderPass))
+        if(PendingStShadereTabs.Contains(InStShader))
         {
-            FName ShaderPassTabId{*InShaderPass->GetGuid().ToString()};
-            CodeTabManager->TryInvokeTab(ShaderPassTabId);
+            FName StShaderTabId{*InStShader->GetGuid().ToString()};
+            CodeTabManager->TryInvokeTab(StShaderTabId);
         }
     }
 
-    void ShaderHelperEditor::OpenShaderPassTab(AssetPtr<ShaderPass> InShaderPass)
+    void ShaderHelperEditor::OpenStShaderTab(AssetPtr<StShader> InStShader)
     {
-        TSharedPtr<SDockTab>* TabPtr = CurEditorState.OpenedShaderPasses.Find(InShaderPass);
+        TSharedPtr<SDockTab>* TabPtr = CurEditorState.OpenedStShaders.Find(InStShader);
         if(TabPtr == nullptr || !*TabPtr)
         {
-            FName ShaderPassTabId{*InShaderPass->GetGuid().ToString()};
+            FName StShaderTabId{*InStShader->GetGuid().ToString()};
             //Register the tab spawner to restore the tab if need.
-            CodeTabManager->RegisterTabSpawner(ShaderPassTabId, FOnSpawnTab::CreateRaw(this, &ShaderHelperEditor::SpawnShaderPassTab))
+            CodeTabManager->RegisterTabSpawner(StShaderTabId, FOnSpawnTab::CreateRaw(this, &ShaderHelperEditor::SpawnStShaderTab))
                 .SetReuseTabMethod(FOnFindTabToReuse::CreateLambda([](const FTabId&){ return nullptr; }));
-            auto NewShaderPassTab = SpawnShaderPassTab({Window, ShaderPassTabId});
-            if(ShaderPassTabStackInsertPoint.IsValid() && ShaderPassTabStackInsertPoint.Pin()->GetAllChildTabs().IsValidIndex(0))
+            auto NewStShaderTab = SpawnStShaderTab({Window, StShaderTabId});
+            if(StShaderTabStackInsertPoint.IsValid() && StShaderTabStackInsertPoint.Pin()->GetAllChildTabs().IsValidIndex(0))
             {
-                auto FirstTab = ShaderPassTabStackInsertPoint.Pin()->GetAllChildTabs()[0];
-                CodeTabManager->InsertNewDocumentTab(FirstTab->GetLayoutIdentifier().TabType, ShaderPassTabId, FTabManager::FLiveTabSearch{}, NewShaderPassTab, true);
+                auto FirstTab = StShaderTabStackInsertPoint.Pin()->GetAllChildTabs()[0];
+                CodeTabManager->InsertNewDocumentTab(FirstTab->GetLayoutIdentifier().TabType, StShaderTabId, FTabManager::FLiveTabSearch{}, NewStShaderTab, true);
             }
             else
             {
-                CodeTabManager->InsertNewDocumentTab(InitialInsertPointTabId, ShaderPassTabId, FTabManager::FRequireClosedTab{}, NewShaderPassTab, true);
+                CodeTabManager->InsertNewDocumentTab(InitialInsertPointTabId, StShaderTabId, FTabManager::FRequireClosedTab{}, NewStShaderTab, true);
             }
           
         }
@@ -688,13 +710,13 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 				TSingleton<ShProjectManager>::Get().ConvertRelativePathToFull(JsonRelativeDirectory->AsString())
 			);
 		}
-        TArray<TSharedPtr<FJsonValue>> JsonOpenedShaderPasses = InJson->GetArrayField("OpenedShaderPasses");
-        for(const auto& JsonOpenedShaderPass : JsonOpenedShaderPasses)
+        TArray<TSharedPtr<FJsonValue>> JsonOpenedStShaderes = InJson->GetArrayField("OpenedStShaders");
+        for(const auto& JsonOpenedStShader : JsonOpenedStShaderes)
         {
-            auto LoadedShaderPass = TSingleton<AssetManager>::Get().LoadAssetByGuid<ShaderPass>(FGuid(JsonOpenedShaderPass->AsString()));
-            if(LoadedShaderPass)
+            auto LoadedStShader = TSingleton<AssetManager>::Get().LoadAssetByGuid<StShader>(FGuid(JsonOpenedStShader->AsString()));
+            if(LoadedStShader)
             {
-                OpenedShaderPasses.Add(MoveTemp(LoadedShaderPass), nullptr);
+                OpenedStShaders.Add(MoveTemp(LoadedStShader), nullptr);
             }
         }
         
@@ -718,13 +740,13 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		}
         JsonObject->SetArrayField("RelativeDirectoriesToExpand", JsonRelativeDirectories);
         
-        TArray<TSharedPtr<FJsonValue>> JsonOpenedShaderPasses;
-        for(const auto& [OpenedShaderPass, _] : OpenedShaderPasses)
+        TArray<TSharedPtr<FJsonValue>> JsonOpenedStShaderes;
+        for(const auto& [OpenedStShader, _] : OpenedStShaders)
         {
-            TSharedPtr<FJsonValue> JsonShaderPassGuid = MakeShared<FJsonValueString>(OpenedShaderPass->GetGuid().ToString());
-            JsonOpenedShaderPasses.Add(MoveTemp(JsonShaderPassGuid));
+            TSharedPtr<FJsonValue> JsonStShaderGuid = MakeShared<FJsonValueString>(OpenedStShader->GetGuid().ToString());
+            JsonOpenedStShaderes.Add(MoveTemp(JsonStShaderGuid));
         }
-        JsonObject->SetArrayField("OpenedShaderPasses", JsonOpenedShaderPasses);
+        JsonObject->SetArrayField("OpenedStShaders", JsonOpenedStShaderes);
         
         if(CodeTabLayout)
         {

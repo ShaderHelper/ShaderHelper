@@ -3,10 +3,11 @@
 
 namespace SH
 {
-	class ShaderPassOp : public FRAMEWORK::AssetOp
+	class StShaderOp : public FRAMEWORK::AssetOp
 	{
+		REFLECTION_TYPE(StShaderOp)
 	public:
-		ShaderPassOp() = default;
+		StShaderOp() = default;
 
         struct FRAMEWORK::MetaType* SupportAsset() override;
 		void OnOpen(const FString& InAssetPath) override;

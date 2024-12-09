@@ -8,7 +8,7 @@
 namespace SH
 {
     class SShaderEditorBox;
-    class ShaderPass;
+    class StShader;
 
 	class FShaderEditorMarshaller : public FBaseTextLayoutMarshaller
 	{
@@ -87,9 +87,9 @@ namespace SH
         
     public:
 		SLATE_BEGIN_ARGS(SShaderEditorBox) 
-			: _ShaderPassAsset(nullptr)
+			: _StShaderAsset(nullptr)
 		{}
-			SLATE_ARGUMENT(ShaderPass*, ShaderPassAsset)
+			SLATE_ARGUMENT(StShader*, StShaderAsset)
 		SLATE_END_ARGS()
 		
 		void Construct(const FArguments& InArgs);
@@ -162,7 +162,7 @@ namespace SH
 		TSharedPtr<SListView<LineNumberItemPtr>> LineNumberList;
 		TSharedPtr<SListView<LineNumberItemPtr>> LineTipList;
 
-		ShaderPass* ShaderPassAsset;
+		StShader* StShaderAsset;
         EditState CurEditState;
         FSlateFontInfo CodeFontInfo;
 		TSharedPtr<SHorizontalBox> InfoBarBox;

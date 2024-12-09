@@ -43,18 +43,13 @@ workspace "ShaderHelper"
         runtime "Release"
         targetdir ("Binaries/Win64")
         implibdir ("%{cfg.objdir}/%{cfg.buildcfg}")
-        files {
-            "External/UE/Unreal.natvis",
-        }
 
-        -- workspace_items
-        -- {
-            -- ["UE"] = {"External/UE/Src"},
-        -- }
-        
-        vpaths {
+        workspace_items
+        {
+            "Resource/Shaders",
             ["Visualizers"] = { "External/UE/Unreal.natvis"},
         }
+
         buildoptions 
         { 
             "/utf-8",

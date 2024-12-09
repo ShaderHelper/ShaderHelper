@@ -10,7 +10,7 @@
 #include <HAL/PlatformApplicationMisc.h>
 #include <Framework/Text/TextLayout.h>
 #include "ShaderCodeEditorLineHighlighter.h"
-#include "AssetObject/ShaderPass.h"
+#include "AssetObject/StShader.h"
 
 //No exposed methods, and too lazy to modify the source code for UE.
 STEAL_PRIVATE_MEMBER(SScrollBar, TSharedPtr<SScrollBarTrack>, Track)
@@ -35,14 +35,14 @@ namespace SH
 	void SShaderEditorBox::Construct(const FArguments& InArgs)
 	{
         CodeFontInfo = FShaderHelperStyle::Get().GetFontStyle("CodeFont");
-        ShaderPassAsset = InArgs._ShaderPassAsset;
+        StShaderAsset = InArgs._StShaderAsset;
 		SAssignNew(ShaderMultiLineVScrollBar, SScrollBar).Orientation(EOrientation::Orient_Vertical);
 		SAssignNew(ShaderMultiLineHScrollBar, SScrollBar).Orientation(EOrientation::Orient_Horizontal);
 
 		ShaderMarshaller = MakeShared<FShaderEditorMarshaller>(this, MakeShared<HlslHighLightTokenizer>());
 		EffectMarshller = MakeShared<FShaderEditorEffectMarshaller>(this);
 
-		FText InitialShaderText = FText::FromString(ShaderPassAsset->GetPixelShaderBody());
+		FText InitialShaderText = FText::FromString(StShaderAsset->GetPixelShaderBody());
 
 		ChildSlot
 		[
@@ -685,7 +685,7 @@ namespace SH
 	bool SShaderEditorBox::OnShaderTextChanged(const FString& NewShaderSouce)
 	{
 		CurrentShaderSource = NewShaderSouce;
-		FString ShaderResourceDeclaration = ShaderPassAsset->GetResourceDeclaration();
+		FString ShaderResourceDeclaration = StShaderAsset->GetResourceDeclaration();
 
 		TArray<FString> AddedLines;
 		int32 AddedLineNum = ShaderResourceDeclaration.ParseIntoArrayLines(AddedLines, false) - 1;

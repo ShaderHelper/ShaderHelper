@@ -22,7 +22,7 @@ namespace FRAMEWORK {
 	
 	FString PathHelper::SavedDir()
 	{
-		return WorkspaceDir() / TEXT("Saved");
+		return WorkspaceDir() / TEXT("Saved") / GAppName;
 	}
 
 	FString PathHelper::SavedShaderDir()
@@ -43,6 +43,11 @@ namespace FRAMEWORK {
 	FString PathHelper::ShaderDir()
 	{
 		return ResourceDir() / TEXT("Shaders");
+	}
+
+	FString PathHelper::ErrorDir()
+	{
+		return SavedDir() / TEXT("Error");
 	}
 
 }

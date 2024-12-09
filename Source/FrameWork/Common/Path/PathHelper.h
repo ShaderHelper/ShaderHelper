@@ -13,5 +13,6 @@ namespace FRAMEWORK {
 		static FString SavedConfigDir();
         static FString SavedCaptureDir();
 		static FString ShaderDir();
+		static FString ErrorDir();
 	};
 }

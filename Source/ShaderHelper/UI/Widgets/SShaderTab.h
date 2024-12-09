@@ -1,7 +1,7 @@
 #pragma once
 
 namespace SH {
-    class SShaderPassTab : public SDockTab
+    class SShaderTab : public SDockTab
     {
     public:
         void Construct( const FArguments& InArgs )
@@ -18,7 +18,7 @@ namespace SH {
                     SNew(STextBlock)
                     .ColorAndOpacity(FLinearColor{0.5f,0.5f,0.5f,0.4f})
                     .Text(FText::FromString("|"))
-                    .Visibility(this, &SShaderPassTab::HandleEndMarkIsVisible)
+                    .Visibility(this, &SShaderTab::HandleEndMarkIsVisible)
                 ]
             ];
         }

@@ -5,6 +5,7 @@ namespace FRAMEWORK
 {
 	class AssetTextureDefaultImporter : public AssetImporter
 	{
+		REFLECTION_TYPE(AssetTextureDefaultImporter)
 	public:
 		TUniquePtr<AssetObject> CreateAssetObject(const FString& InFilePath) override;
 		TArray<FString> SupportFileExts() const override;

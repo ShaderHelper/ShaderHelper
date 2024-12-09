@@ -9,17 +9,28 @@
 #include <DirectoryWatcherModule.h>
 #include <IDirectoryWatcher.h>
 #include "GpuApi/GpuRhi.h"
+#include <HAL/ExceptionHandling.h>
+#include <HAL/PlatformOutputDevices.h>
+#include <Misc/OutputDeviceFile.h>
 
 namespace FRAMEWORK {
 	TUniquePtr<App> GApp;
 
 	static void UE_Init(const TCHAR* CommandLine)
     {
+		GUseCrashReportClient = false;
+#if PLATFORM_WINDOWS
+		IFileManager::Get().MakeDirectory(*PathHelper::ErrorDir(), true);
+		FCString::Strcpy(MiniDumpFilenameW, *(PathHelper::ErrorDir() / FString::Printf(TEXT("%s.dmp"), *GAppName)));
+
+		FOutputDeviceFile* LogDevice = static_cast<FOutputDeviceFile*>(FPlatformOutputDevices::GetLog());
+		LogDevice->SetFilename(*(PathHelper::SavedDir() / FString::Printf(TEXT("%s.log"), *GAppName)));
+
+		GError = FPlatformApplicationMisc::GetErrorOutputDevice();
+#endif
+
 		FCommandLine::Set(CommandLine);
 		
-		//Initialize OutputDevices for features like UE_LOG, but not make log files.
-		FCommandLine::Append(TEXT(" "));
-		FCommandLine::Append(TEXT("-NODEFAULTLOG"));
 		FPlatformOutputDevices::SetupOutputDevices();
 
 		FTaskGraphInterface::Startup(FPlatformMisc::NumberOfCores());

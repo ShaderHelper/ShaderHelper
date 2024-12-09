@@ -1,6 +1,7 @@
 #include "CommonHeader.h"
 #include <Windows/WindowsHWrapper.h>
 #include "App/ShaderHelperApp.h"
+#include "Launch/Win/WinLaunch.h"
 
 //Add these info for AgilitySDK.
 ADD_AGILITY_SDK()
@@ -8,10 +9,15 @@ ADD_AGILITY_SDK()
 int WINAPI WinMain(_In_ HINSTANCE hInInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR, _In_ int nCmdShow)
 {
 	hInstance = hInInstance;
-    FRAMEWORK::GApp = MakeUnique<SH::ShaderHelperApp>(
-        FVector2D{ 1600, 800 },
-        GetCommandLineW()
-    );
-    FRAMEWORK::GApp->Run();
+	WinLaunch([](const TCHAR* CommandLine)
+		{
+			FRAMEWORK::GApp = MakeUnique<SH::ShaderHelperApp>(
+				FVector2D{ 1600, 800 },
+				CommandLine
+			);
+			FRAMEWORK::GApp->Run();
+		}
+	, GetCommandLineW());
+
 	return 0;
 }

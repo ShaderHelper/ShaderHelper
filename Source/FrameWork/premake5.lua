@@ -1,6 +1,6 @@
 FrameWorkHierarchy = {
     ["Sources/*"] = {"**"},
-    ["Shaders/*"] = {"%{_WORKING_DIR}/Resource/Shaders/**.hlsl"},
+   -- ["Shaders/*"] = {"%{_WORKING_DIR}/Resource/Shaders/**.hlsl"},
     ["Premake/*"] = {"%{_WORKING_DIR}/Premake/**.lua"}
 }
 

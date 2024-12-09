@@ -10,10 +10,10 @@ namespace FRAMEWORK
 		return TypeNameToMetaType;
 	}
 
-	TMap<FString, MetaType*>& GetRegisteredMetaTypes()
+	TMap<FString, MetaType*>& GetRegisteredNameToMetaType()
 	{
-		static TMap<FString, MetaType*> RegisteredMetaTypes;
-		return RegisteredMetaTypes;
+		static TMap<FString, MetaType*> RegisteredNameToMetaType;
+		return RegisteredNameToMetaType;
 	}
 
 }

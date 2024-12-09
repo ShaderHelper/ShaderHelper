@@ -153,32 +153,28 @@ namespace FRAMEWORK
                     TArray<MetaType*> AssetMetaTypes = GetMetaTypes<AssetObject>();
                     for(auto MetaTypePtr : AssetMetaTypes)
                     {
-                        if(!IsImportedAsset(MetaTypePtr))
+                        if(!IsImportedAsset(MetaTypePtr) && MetaTypePtr->Constructor)
                         {
-                            void* Asset = MetaTypePtr->GetDefaultObject();
-                            if(Asset)
-                            {
-                                AssetObject* CurAsset = static_cast<AssetObject*>(Asset);
-                                MenuBuilder.AddMenuEntry(
-                                    LOCALIZATION(CurAsset->FileExtension()),
-                                    FText::GetEmpty(),
-                                    FSlateIcon(),
-                                    FUIAction(FExecuteAction::CreateLambda([CurAsset, this] {
-                                        int32 Number = 1;
-                                        FString GeneratedFileName = "New" + CurAsset->FileExtension();
-                                        FString SavedFileName = CurViewDirectory / GeneratedFileName + "." + CurAsset->FileExtension();
-                                        while(IFileManager::Get().FileExists(*SavedFileName))
-                                        {
-                                            GeneratedFileName = FString::Format(TEXT("New{0} {1}"), { CurAsset->FileExtension(), Number++});
-                                            SavedFileName = CurViewDirectory / GeneratedFileName + "." + CurAsset->FileExtension();
-                                        }
-                                        TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFileName));
-                                        CurAsset->Serialize(*Ar);
-                                    })),
-                                    NAME_None,
-                                    EUserInterfaceActionType::Button
-                                );
-                            }
+							AssetObject* NewAsset = static_cast<AssetObject*>(MetaTypePtr->Construct());
+							MenuBuilder.AddMenuEntry(
+								LOCALIZATION(NewAsset->FileExtension()),
+								FText::GetEmpty(),
+								FSlateIcon(),
+								FUIAction(FExecuteAction::CreateLambda([NewAsset, this] {
+									int32 Number = 1;
+									FString GeneratedFileName = "New" + NewAsset->FileExtension();
+									FString SavedFileName = CurViewDirectory / GeneratedFileName + "." + NewAsset->FileExtension();
+									while (IFileManager::Get().FileExists(*SavedFileName))
+									{
+										GeneratedFileName = FString::Format(TEXT("New{0}{1}"), { NewAsset->FileExtension(), Number++ });
+										SavedFileName = CurViewDirectory / GeneratedFileName + "." + NewAsset->FileExtension();
+									}
+									TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFileName));
+									NewAsset->Serialize(*Ar);
+									})),
+								NAME_None,
+								EUserInterfaceActionType::Button
+							);
                         }
                     }
                 }),

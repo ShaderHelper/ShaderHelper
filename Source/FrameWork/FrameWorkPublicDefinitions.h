@@ -25,17 +25,18 @@
 #include "Common/Util/Singleton.h"
 #include "Common/Util/Reflection.h"
 
+namespace FRAMEWORK
+{
+	extern FRAMEWORK_API FString GAppName;
+    extern FRAMEWORK_API TArray<FName> GProjectCategoryNames;
+}
+
 #define PER_MODULE_DEFINITION() \
     PER_MODULE_BOILERPLATE
 
 #define PER_APP_DEFINITION(AppName) \
-    static const int AppNameSetter = [] { FApp::SetProjectName(TEXT(AppName)); return 0; }(); \
+    static const int AppNameSetter = [] { FRAMEWORK::GAppName = TEXT(AppName); return 0; }(); \
     PER_MODULE_DEFINITION()
-
-namespace FRAMEWORK
-{
-    extern FRAMEWORK_API TArray<FName> GProjectCategoryNames;
-}
 
 #define SH_LOG(CategoryName, Verbosity, Format, ...) \
     UE_LOG(CategoryName, Verbosity, Format, ##__VA_ARGS__); \
