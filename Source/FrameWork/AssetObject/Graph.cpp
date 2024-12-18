@@ -18,13 +18,16 @@ namespace FRAMEWORK
 	void Graph::Serialize(FArchive& Ar)
 	{
 		AssetObject::Serialize(Ar);
-
+		
 		int NodeNum = NodeDatas.Num();
 		Ar << NodeNum;
-		/*if (Ar.IsSaving())
+		if (Ar.IsSaving())
 		{
 			for (int Index = 0; Index < NodeNum; Index++)
 			{
+				//Serialize polymorphic pointers
+				FString TypeName = GetRegisteredName(NodeDatas[Index]->MetaType());
+				Ar << TypeName;
 				NodeDatas[Index]->Serialize(Ar);
 			}
 		}
@@ -33,20 +36,18 @@ namespace FRAMEWORK
 			NodeDatas.Reserve(NodeNum);
 			for (int Index = 0; Index < NodeNum; Index++)
 			{
-				auto LoadedNodeData = MakeUnique<GraphNode>()
-				NodeDatas.Add()
+				FString TypeName;
+				Ar << TypeName;
+				GraphNode* LoadedNodeData = static_cast<GraphNode*>(GetMetaType(TypeName)->Construct());
+				LoadedNodeData->Serialize(Ar);
+				NodeDatas.Emplace(LoadedNodeData);
 			}
-		}*/
+		}
 	}
 
 	const FSlateBrush* Graph::GetImage() const
 	{
 		return FAppStyle::Get().GetBrush("Icons.Blueprints");
-	}
-
-	void Graph::AddNodeData(TSharedPtr<GraphNode> InNodeData)
-	{
-		NodeDatas.Add(MoveTemp(InNodeData));
 	}
 
 	TSharedRef<SGraphNode> GraphNode::CreateNodeWidget()

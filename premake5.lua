@@ -22,9 +22,9 @@ workspace "ShaderHelper"
     configurations 
     { 
         "Debug",
-        "Dev"
+        "Shipping" --RelWithDebInfo
     } 
-
+    targetname "%{prj.name}"
     language "C++"
     cppdialect "C++17"
     staticruntime "off"
@@ -38,7 +38,6 @@ workspace "ShaderHelper"
 
     filter "system:windows"
         architecture "x86_64"  
-        targetname "%{prj.name}-%{cfg.buildcfg}"
         systemversion "latest"
         runtime "Release"
         targetdir ("Binaries/Win64")
@@ -69,8 +68,6 @@ workspace "ShaderHelper"
 
     filter "system:macosx"
         architecture "universal"
-        --Premake can not link the corresponding "SharedLib" project in Xcode when targetname contains build configuration.
-        targetname "%{prj.name}"
         targetdir ("Binaries/Mac")
         xcodebuildsettings { 
             ["MACOSX_DEPLOYMENT_TARGET"] = "10.15",
@@ -91,7 +88,6 @@ workspace "ShaderHelper"
 
     filter "system:linux"
         architecture "x86_64"
-        targetname "%{prj.name}-%{cfg.buildcfg}"
         targetdir ("Binaries/Linux")
         runpathdirs {
             "%{cfg.targetdir}",
@@ -126,8 +122,12 @@ workspace "ShaderHelper"
     filter {"configurations:Debug"}
         optimize "Off"
     
-    filter {"configurations:Dev"}
+    filter {"configurations:Shipping"}
 		optimize "On"
+
+    --Premake can not link the corresponding "SharedLib" project in Xcode when targetname contains build configuration.
+    filter {"system:windows or linux", "configurations:not Shipping"}
+        targetsuffix "-%{cfg.buildcfg}"
 
 include(external_ue)
 include(external_dxcompiler)

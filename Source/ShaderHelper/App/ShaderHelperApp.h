@@ -1,6 +1,8 @@
 #pragma once
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
+#include "Editor/ProjectLauncher.h"
+#include "ProjectManager/ShProjectManager.h"
 
 namespace SH {
 	
@@ -13,6 +15,9 @@ namespace SH {
 	private:
 		void Update(double DeltaTime) override;
 		void Render() override;
+
+	private:
+		TSharedPtr<FRAMEWORK::ProjectLauncher<ShProject>> Launcher;
 	};
 	
 }

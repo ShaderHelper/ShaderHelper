@@ -13,6 +13,7 @@
 #include <Framework/Docking/SDockingTabStack.h>
 #include "UI/Widgets/SShaderTab.h"
 #include "UI/Widgets/Graph/SGraphPanel.h"
+#include <DesktopPlatformModule.h>
 
 STEAL_PRIVATE_MEMBER(FTabManager, TArray<TSharedRef<FTabManager::FArea>>, CollapsedDockAreas)
 
@@ -20,8 +21,6 @@ using namespace FRAMEWORK;
 
 namespace SH 
 {
-	const FString DefaultProjectPath = PathHelper::WorkspaceDir() / TEXT("TemplateProject/Default/Default.shprj");
-
 	static const FString WindowLayoutFileName = PathHelper::SavedDir() / TEXT("WindowLayout.json");
 
 	const FName PreviewTabId = "Preview";
@@ -45,14 +44,11 @@ namespace SH
 		: Renderer(InRenderer)
 		, WindowSize(InWindowSize)
 	{
-		TSingleton<ShProjectManager>::Get().OpenProject(DefaultProjectPath);
+		CurProject = &TSingleton<ShProjectManager>::Get().GetProject();
 
 		ViewPort = MakeShared<PreviewViewPort>();
 		ViewPort->OnViewportResize.AddRaw(this, &ShaderHelperEditor::OnViewportResize);
 
-		EditorStateSaveFileName = TSingleton<ShProjectManager>::Get().GetActiveSavedDirectory() / TEXT("EditorState.json");
-        
-		LoadEditorState(EditorStateSaveFileName);
 		InitEditorUI();
 	}
 
@@ -136,7 +132,10 @@ namespace SH
 		}
 
 		SAssignNew(Window, SWindow)
-			.Title(LOCALIZATION("ShaderHelper"))
+			.Title(TAttribute<FText>::CreateLambda([this] { 
+				FString ProjectPath = TSingleton<ShProjectManager>::Get().GetProject().GetFilePath();
+				return FText::FromString(LOCALIZATION("ShaderHelper").ToString() + FString::Printf(TEXT(" [%s]"), *ProjectPath));
+			}))
 			.ScreenPosition(UsedWindowPos)
 			.AutoCenter(AutoCenterRule)
 			.ClientSize(UsedWindowSize)
@@ -170,15 +169,15 @@ namespace SH
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
         SaveLayoutTicker = FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this](float) {
             TabManager->SavePersistentLayout();
-            CurEditorState.CodeTabLayout = CodeTabManager->PersistLayout();
-            SaveEditorState();
+            CurProject->CodeTabLayout = CodeTabManager->PersistLayout();
+			TSingleton<ShProjectManager>::Get().SaveProject();
             return true;
         }), 2.0f);
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		Window->SetRequestDestroyWindowOverride(FRequestDestroyWindowOverride::CreateLambda([this](const TSharedRef<SWindow>& InWindow) {
 			TabManager->SavePersistentLayout();
-            CurEditorState.CodeTabLayout = CodeTabManager->PersistLayout();
-            SaveEditorState();
+            CurProject->CodeTabLayout = CodeTabManager->PersistLayout();
+			TSingleton<ShProjectManager>::Get().SaveProject();
 			FSlateApplication::Get().RequestDestroyWindow(InWindow);
 		}));
 	}
@@ -272,7 +271,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
             .TabRole(ETabRole::DocumentTab)
             .Label(FText::FromString(LoadedStShader->GetFileName()))
             .OnTabClosed_Lambda([=](TSharedRef<SDockTab> ClosedTab) {
-                CurEditorState.OpenedStShaders.Remove(*CurEditorState.OpenedStShaders.FindKey(ClosedTab));
+                CurProject->OpenedStShaders.Remove(*CurProject->OpenedStShaders.FindKey(ClosedTab));
                 PendingStShadereTabs.Add(LoadedStShader, ShaderEditor);
                 auto DockTabStack = ClosedTab->GetParentDockTabStack();
                 PRAGMA_DISABLE_DEPRECATION_WARNINGS
@@ -324,7 +323,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 				StShaderTabStackInsertPoint = TabStack;
             }
         }));
-        CurEditorState.OpenedStShaders.Add(LoadedStShader, NewStShaderTab);
+        CurProject->OpenedStShaders.Add(LoadedStShader, NewStShaderTab);
         return NewStShaderTab;
     }
 
@@ -365,15 +364,15 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
             
             CodeTabManager = FGlobalTabmanager::Get()->NewTabManager(SpawnedTab.ToSharedRef());
             
-            for(const auto& [OpenedStShader, _] : CurEditorState.OpenedStShaders)
+            for(const auto& [OpenedStShader, _] : CurProject->OpenedStShaders)
             {
                 FName StShaderTabId{*OpenedStShader.GetGuid().ToString()};
                 CodeTabManager->RegisterTabSpawner(StShaderTabId, FOnSpawnTab::CreateRaw(this, &ShaderHelperEditor::SpawnStShaderTab));
             }
  
-            if(!CurEditorState.CodeTabLayout)
+            if(!CurProject->CodeTabLayout)
             {
-                CurEditorState.CodeTabLayout = FTabManager::NewLayout("CodeTabLayout")
+                CurProject->CodeTabLayout = FTabManager::NewLayout("CodeTabLayout")
                 ->AddArea
                 (
                     FTabManager::NewPrimaryArea()
@@ -406,7 +405,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                ]
                +SOverlay::Slot()
                [
-                   CodeTabManager->RestoreFrom(CurEditorState.CodeTabLayout.ToSharedRef(), Args.GetOwnerWindow()).ToSharedRef()
+                   CodeTabManager->RestoreFrom(CurProject->CodeTabLayout.ToSharedRef(), Args.GetOwnerWindow()).ToSharedRef()
                ]
            );
             CodeTabMainArea = CodeTabManager->FindPotentiallyClosedTab(InitialInsertPointTabId)->GetDockArea();
@@ -418,7 +417,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 			SpawnedTab->SetContent(
 				SAssignNew(AssetBrowser, SAssetBrowser)
 				.ContentPathShowed(TSingleton<ShProjectManager>::Get().GetActiveContentDirectory())
-                .State(CurEditorState.AssetBrowserState)
+                .State(&CurProject->AssetBrowserState)
 			);
 		}
 		else if (TabId == GraphTabId) {
@@ -459,7 +458,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
     void ShaderHelperEditor::OpenStShaderTab(AssetPtr<StShader> InStShader)
     {
-        TSharedPtr<SDockTab>* TabPtr = CurEditorState.OpenedStShaders.Find(InStShader);
+        TSharedPtr<SDockTab>* TabPtr = CurProject->OpenedStShaders.Find(InStShader);
         if(TabPtr == nullptr || !*TabPtr)
         {
             FName StShaderTabId{*InStShader->GetGuid().ToString()};
@@ -540,30 +539,6 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		}
 	}
 
-	void ShaderHelperEditor::LoadEditorState(const FString& InFile)
-	{
-		FString JsonContent;
-		if (FFileHelper::LoadFileToString(JsonContent, *InFile))
-		{
-			TSharedPtr<FJsonObject> EditorStateJsonObject;
-			TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(JsonContent);
-			FJsonSerializer::Deserialize(Reader, EditorStateJsonObject);
-			CurEditorState.InitFromJson(EditorStateJsonObject);
-		}
-
-	}
-
-	void ShaderHelperEditor::SaveEditorState()
-	{
-		TSharedRef<FJsonObject> EditorStateJsonObject = CurEditorState.ToJson();
-		FString NewJsonContents;
-		TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&NewJsonContents);
-		if (FJsonSerializer::Serialize(EditorStateJsonObject, Writer))
-		{
-			FFileHelper::SaveStringToFile(NewJsonContents, *EditorStateSaveFileName);
-		}
-	}
-
 	void ShaderHelperEditor::OnViewportResize(const Vector2f& InSize)
 	{
 		Renderer->OnViewportResize(InSize);
@@ -618,19 +593,20 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		if (MenuName == "File") {
 			MenuBuilder.BeginSection("Project", FText::FromString("Project"));
 			{
-				MenuBuilder.AddMenuEntry(LOCALIZATION("NewEx"), FText::GetEmpty(), FSlateIcon(),
+				MenuBuilder.AddMenuEntry(LOCALIZATION("New"), FText::GetEmpty(), FSlateIcon(),
 					FUIAction(
 
 					));
 				MenuBuilder.AddMenuEntry(LOCALIZATION("OpenEx"), FText::GetEmpty(), FSlateIcon(),
 					FUIAction(
-
+				
 					));
 				MenuBuilder.AddMenuEntry(LOCALIZATION("Save"), FText::GetEmpty(), FSlateIcon(),
 					FUIAction(
-						FExecuteAction::CreateLambda([] { TSingleton<ShProjectManager>::Get().SaveProject(); })
+						FExecuteAction::CreateLambda([&] { 
+							TSingleton<ShProjectManager>::Get().SaveProject();
+						})
 					));
-
 			}
 			MenuBuilder.EndSection();
 			
@@ -694,68 +670,6 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 			}
 			MenuBuilder.EndSection();
 		}
-	}
-
-	void ShaderHelperEditor::EditorState::InitFromJson(const TSharedPtr<FJsonObject>& InJson)
-	{
-        AssetBrowserState->AssetViewState.AssetViewSize = (float)InJson->GetNumberField("AssetViewSize");
-        AssetBrowserState->DirectoryTreeState.CurSelectedDirectory =  TSingleton<ShProjectManager>::Get().ConvertRelativePathToFull(
-			InJson->GetStringField("SelectedRelativeDirectory")
-		);
-
-		TArray<TSharedPtr<FJsonValue>> JsonRelativeDirectories = InJson->GetArrayField("RelativeDirectoriesToExpand");
-		for (const auto& JsonRelativeDirectory : JsonRelativeDirectories)
-		{
-            AssetBrowserState->DirectoryTreeState.DirectoriesToExpand.Add(
-				TSingleton<ShProjectManager>::Get().ConvertRelativePathToFull(JsonRelativeDirectory->AsString())
-			);
-		}
-        TArray<TSharedPtr<FJsonValue>> JsonOpenedStShaderes = InJson->GetArrayField("OpenedStShaders");
-        for(const auto& JsonOpenedStShader : JsonOpenedStShaderes)
-        {
-            auto LoadedStShader = TSingleton<AssetManager>::Get().LoadAssetByGuid<StShader>(FGuid(JsonOpenedStShader->AsString()));
-            if(LoadedStShader)
-            {
-                OpenedStShaders.Add(MoveTemp(LoadedStShader), nullptr);
-            }
-        }
-        
-        TSharedPtr<FJsonObject> CodeTabLayoutJsonObject = InJson->GetObjectField(TEXT("CodeTabLayout"));
-        CodeTabLayout = FTabManager::FLayout::NewFromJson(MoveTemp(CodeTabLayoutJsonObject));
-	}
-
-	TSharedRef<FJsonObject> ShaderHelperEditor::EditorState::ToJson() const
-	{
-		TSharedRef<FJsonObject> JsonObject = MakeShareable(new FJsonObject());
-		JsonObject->SetNumberField("AssetViewSize", AssetBrowserState->AssetViewState.AssetViewSize);
-		JsonObject->SetStringField("SelectedRelativeDirectory", 
-			TSingleton<ShProjectManager>::Get().GetRelativePathToProject(AssetBrowserState->DirectoryTreeState.CurSelectedDirectory));
-
-		TArray<TSharedPtr<FJsonValue>> JsonRelativeDirectories;
-		for (const FString& Directory : AssetBrowserState->DirectoryTreeState.DirectoriesToExpand)
-		{
-			TSharedPtr<FJsonValue> JsonRelativeDriectory = MakeShared<FJsonValueString>(
-				TSingleton<ShProjectManager>::Get().GetRelativePathToProject(Directory));
-			JsonRelativeDirectories.Add(MoveTemp(JsonRelativeDriectory));
-		}
-        JsonObject->SetArrayField("RelativeDirectoriesToExpand", JsonRelativeDirectories);
-        
-        TArray<TSharedPtr<FJsonValue>> JsonOpenedStShaderes;
-        for(const auto& [OpenedStShader, _] : OpenedStShaders)
-        {
-            TSharedPtr<FJsonValue> JsonStShaderGuid = MakeShared<FJsonValueString>(OpenedStShader->GetGuid().ToString());
-            JsonOpenedStShaderes.Add(MoveTemp(JsonStShaderGuid));
-        }
-        JsonObject->SetArrayField("OpenedStShaders", JsonOpenedStShaderes);
-        
-        if(CodeTabLayout)
-        {
-            TSharedRef<FJsonObject> CodeTabLayoutJsonObject = CodeTabLayout->ToJson();
-            JsonObject->SetObjectField("CodeTabLayout", CodeTabLayoutJsonObject);
-        }
-  
-        
-		return JsonObject;
 	}
 
 }

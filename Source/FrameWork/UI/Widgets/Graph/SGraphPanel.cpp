@@ -1,6 +1,7 @@
 #include "CommonHeader.h"
 #include "SGraphPanel.h"
 #include "UI/Styles/FAppCommonStyle.h"
+#include "AssetObject/Graph.h"
 
 namespace FRAMEWORK
 {
@@ -12,7 +13,14 @@ namespace FRAMEWORK
 
 	void SGraphPanel::Construct(const FArguments& InArgs)
 	{
-		//Nodes.Add();
+		GraphData = InArgs._GraphData;
+		if (GraphData)
+		{
+			for (auto& NodeData : GraphData->NodeDatas)
+			{
+				Nodes.Add(NodeData->CreateNodeWidget());
+			}
+		}
 	}
 
 	void SGraphPanel::OnArrangeChildren(const FGeometry& AllottedGeometry, FArrangedChildren& ArrangedChildren) const

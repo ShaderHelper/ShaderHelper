@@ -27,9 +27,6 @@ namespace FRAMEWORK
 		void Serialize(FArchive& Ar) override;
 		const FSlateBrush* GetImage() const override;
 
-		void AddNodeData(TSharedPtr<GraphNode> InNodeData);
-
-	protected:
 		TArray<TSharedPtr<GraphNode>> NodeDatas;
 	};
 }

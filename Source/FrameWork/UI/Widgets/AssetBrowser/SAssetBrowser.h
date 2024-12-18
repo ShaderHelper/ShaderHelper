@@ -21,6 +21,16 @@ namespace FRAMEWORK
     {
         DirectoryTreePersistentState DirectoryTreeState;
         AssetViewPersistentState AssetViewState;
+
+		friend FArchive& operator<<(FArchive& Ar, AssetBrowserPersistentState& State)
+		{
+			Ar << State.DirectoryTreeState.CurSelectedDirectory;
+			Ar << State.DirectoryTreeState.DirectoriesToExpand;
+
+			Ar << State.AssetViewState.AssetViewSize;
+
+			return Ar;
+		}
     };
 
 	class FRAMEWORK_API SAssetBrowser : public SCompoundWidget
@@ -28,7 +38,7 @@ namespace FRAMEWORK
 	public:
 		SLATE_BEGIN_ARGS(SAssetBrowser) {}
 			SLATE_ARGUMENT(FString, ContentPathShowed)
-            SLATE_ARGUMENT(TSharedPtr<AssetBrowserPersistentState>, State)
+            SLATE_ARGUMENT(AssetBrowserPersistentState*, State)
 		SLATE_END_ARGS()
 
 		~SAssetBrowser();
@@ -55,7 +65,7 @@ namespace FRAMEWORK
 		FString ContentPathShowed;
         
         AssetBrowserDirectory ContentDirectory;
-        TSharedPtr<AssetBrowserPersistentState> State;
+        AssetBrowserPersistentState* State;
 	};
 }
 
