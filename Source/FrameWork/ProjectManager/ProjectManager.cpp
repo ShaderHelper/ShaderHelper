@@ -4,6 +4,8 @@
 #include <Windows/AllowWindowsPlatformTypes.h>
 	#include <shlobj_core.h>
 #include <Windows/HideWindowsPlatformTypes.h>
+#elif PLATFORM_MAC
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #endif
 
 namespace FRAMEWORK
@@ -35,6 +37,8 @@ namespace FRAMEWORK
 				SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, NULL, NULL);
 			}
 		}
+#elif PLATFORM_MAC
+        OSStatus Stat = LSSetDefaultRoleHandlerForContentType(CFSTR("com.shaderhelper.shprj"), kLSRolesAll, CFSTR("com.shaderhelper.app"));
 #endif
 	}
 
