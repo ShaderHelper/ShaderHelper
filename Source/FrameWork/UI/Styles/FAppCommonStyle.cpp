@@ -29,6 +29,8 @@ namespace FRAMEWORK
 		Style->Set("MessageDialog.Boqi2", new IMAGE_BRUSH_SVG("Boqi2", FVector2D(32.0, 32.0)));
 		Style->Set("AssetBrowser.Folder", new IMAGE_BRUSH_SVG("folder", FVector2D(64.0, 64.0)));
 		Style->Set("Graph.Background", new IMAGE_BRUSH("SolidBackground", FVector2D(16.0, 16.0)));
+		Style->Set("ProjectLauncher.Background", new IMAGE_BRUSH("Launcher", FVector2D(560, 270)));
+		Style->Set("ProjectLauncher.Logo", new IMAGE_BRUSH("ShaderHelper", FVector2D(100, 30)));
 
 		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir);
 		//StarshipCoreStyle is used as the app style.
@@ -76,8 +78,16 @@ namespace FRAMEWORK
 			.SetOddRowBackgroundHoveredBrush(FSlateNoResource());
 		Style->Set("AssetView.Row", AssetViewTableRowStyle);
 
+		Style->Set("Icons.Folder", new IMAGE_BRUSH_SVG("Starship/Common/folder-closed", FVector2D(16.0, 16.0)));
 		Style->Set("Icons.FolderPlus", new IMAGE_BRUSH_SVG("Starship/Common/folder-plus", FVector2D(16.0, 16.0)));
 		Style->Set("Icons.Graph", new IMAGE_BRUSH_SVG("Starship/Insights/Callers_20", FVector2D(20.0, 20.0)));
+		Style->Set("Icons.File", new IMAGE_BRUSH_SVG("Starship/Common/file", FVector2D(16.0, 16.0)));
+
+		FButtonStyle CloseButton = FButtonStyle()
+			.SetNormal(IMAGE_BRUSH_SVG("Starship/Common/close-small", FVector2D(30.0, 30.0), FLinearColor{0.7f,0.7f,0.7f}))
+			.SetPressed(IMAGE_BRUSH_SVG("Starship/Common/close-small", FVector2D(30.0, 30.0), FLinearColor{ 0.7f,0.7f,0.7f }))
+			.SetHovered(IMAGE_BRUSH_SVG("Starship/Common/close-small", FVector2D(30.0, 30.0)));
+		Style->Set("CloseButton", CloseButton);
 		
 		return Style;
 	}

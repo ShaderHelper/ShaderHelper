@@ -42,7 +42,9 @@ namespace FRAMEWORK
 	template<typename T>
 	AssetPtr<T>::~AssetPtr()
 	{
-		TSingleton<AssetManager>::Get().ReleaseRef(Asset);
+		if (Asset) {
+			TSingleton<AssetManager>::Get().ReleaseRef(Asset);
+		}
 	}
 
 	template<typename T>

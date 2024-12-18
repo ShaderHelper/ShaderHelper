@@ -35,6 +35,11 @@
         return NSTerminateNow;
     }
 }
+
+- (BOOL)application:(NSApplication *)sender openFile:(NSString *)filename
+{
+    self.SavedCommandLine += TEXT(" -Project=") + FString(filename);
+}
 @end
 
 @implementation MacLaunch

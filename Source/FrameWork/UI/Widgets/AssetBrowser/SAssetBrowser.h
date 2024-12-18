@@ -28,7 +28,7 @@ namespace FRAMEWORK
 	public:
 		SLATE_BEGIN_ARGS(SAssetBrowser) {}
 			SLATE_ARGUMENT(FString, ContentPathShowed)
-            SLATE_ARGUMENT(TSharedPtr<AssetBrowserPersistentState>, State)
+            SLATE_ARGUMENT(AssetBrowserPersistentState*, State)
 		SLATE_END_ARGS()
 
 		~SAssetBrowser();
@@ -55,7 +55,7 @@ namespace FRAMEWORK
 		FString ContentPathShowed;
         
         AssetBrowserDirectory ContentDirectory;
-        TSharedPtr<AssetBrowserPersistentState> State;
+        AssetBrowserPersistentState* State;
 	};
 }
 

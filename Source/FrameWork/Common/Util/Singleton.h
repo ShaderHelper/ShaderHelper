@@ -71,13 +71,6 @@ private:
         Ptr = Constructor ? (T*)Data : nullptr;
     }
 
-#if (!defined(DISABLE_LAZY_SINGLETON_DESTRUCTION) || !DISABLE_LAZY_SINGLETON_DESTRUCTION)
-    ~TLazySingleton()
-    {
-        Reset();
-    }
-#endif
-
     T* TryGetValue()
     {
         return Ptr;

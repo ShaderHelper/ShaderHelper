@@ -310,57 +310,56 @@ namespace FRAMEWORK
 	void SAssetView::ImportAsset()
 	{
 		IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
-		if (DesktopPlatform)
-		{
-			TArray<FString> FileExts;
-            TArray<AssetImporter*> AssetImporters;
-            ForEachDefaultObject<AssetImporter>([&](AssetImporter* CurImporter){
-                FileExts.Append(CurImporter->SupportFileExts());
-                AssetImporters.Add(CurImporter);
-            });
+
+		TArray<FString> FileExts;
+        TArray<AssetImporter*> AssetImporters;
+        ForEachDefaultObject<AssetImporter>([&](AssetImporter* CurImporter){
+            FileExts.Append(CurImporter->SupportFileExts());
+            AssetImporters.Add(CurImporter);
+        });
 			
-			FString DialogType = "All files ({0})|";
-            FString CanImportExts;
-			for (const FString& FileExt : FileExts)
-			{
-                CanImportExts += FString::Format(TEXT("*.{0};"), {FileExt});
-			}
-            DialogType = FString::Format(*DialogType, {CanImportExts}) + CanImportExts;
+		FString DialogType = "All files ({0})|";
+        FString CanImportExts;
+		for (const FString& FileExt : FileExts)
+		{
+            CanImportExts += FString::Format(TEXT("*.{0};"), {FileExt});
+		}
+        DialogType = FString::Format(*DialogType, {CanImportExts}) + CanImportExts;
 
-			TArray<FString> OpenedFileNames;
-			TSharedPtr<SWindow> ParentWindow = FSlateApplication::Get().FindWidgetWindow(AsShared());
-			void* ParentWindowHandle = (ParentWindow.IsValid() && ParentWindow->GetNativeWindow().IsValid()) ? ParentWindow->GetNativeWindow()->GetOSWindowHandle() : nullptr;
-			if (DesktopPlatform->OpenFileDialog(ParentWindowHandle, "Import Asset", CacheImportAssetPath, "", MoveTemp(DialogType), EFileDialogFlags::None, OpenedFileNames))
+		TArray<FString> OpenedFileNames;
+		TSharedPtr<SWindow> ParentWindow = FSlateApplication::Get().FindWidgetWindow(AsShared());
+		void* ParentWindowHandle = (ParentWindow.IsValid() && ParentWindow->GetNativeWindow().IsValid()) ? ParentWindow->GetNativeWindow()->GetOSWindowHandle() : nullptr;
+		if (DesktopPlatform->OpenFileDialog(ParentWindowHandle, "Import Asset", CacheImportAssetPath, "", MoveTemp(DialogType), EFileDialogFlags::None, OpenedFileNames))
+		{
+			if (OpenedFileNames.Num() > 0)
 			{
-				if (OpenedFileNames.Num() > 0)
+				CacheImportAssetPath = FPaths::GetPath(OpenedFileNames[0]);
+				AssetImporter* FinalImporter = nullptr;
+				FString OpenedFileExt = FPaths::GetExtension(OpenedFileNames[0]);
+				for (AssetImporter* AssetImporterPtr : AssetImporters)
 				{
-					CacheImportAssetPath = OpenedFileNames[0];
-					AssetImporter* FinalImporter = nullptr;
-					FString OpenedFileExt = FPaths::GetExtension(OpenedFileNames[0]);
-					for (AssetImporter* AssetImporterPtr : AssetImporters)
+					if(AssetImporterPtr->SupportFileExts().Contains(OpenedFileExt))
 					{
-						if(AssetImporterPtr->SupportFileExts().Contains(OpenedFileExt))
-						{
-							FinalImporter = AssetImporterPtr;
-							break;
-						}
+						FinalImporter = AssetImporterPtr;
+						break;
 					}
+				}
 
-					check(FinalImporter);
-					TUniquePtr<AssetObject> ImportedAssetObject = FinalImporter->CreateAssetObject(OpenedFileNames[0]);
-					if (ImportedAssetObject)
-					{
-						FString SavedFileName = CurViewDirectory / FPaths::GetBaseFilename(OpenedFileNames[0]) + "." + ImportedAssetObject->FileExtension();
-						TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFileName));
-						ImportedAssetObject->Serialize(*Ar);
-					}
-					else
-					{
-						MessageDialog::Open(MessageDialog::Ok, LOCALIZATION("AssetImportFailure"));
-					}
+				check(FinalImporter);
+				TUniquePtr<AssetObject> ImportedAssetObject = FinalImporter->CreateAssetObject(OpenedFileNames[0]);
+				if (ImportedAssetObject)
+				{
+					FString SavedFileName = CurViewDirectory / FPaths::GetBaseFilename(OpenedFileNames[0]) + "." + ImportedAssetObject->FileExtension();
+					TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFileName));
+					ImportedAssetObject->Serialize(*Ar);
+				}
+				else
+				{
+					MessageDialog::Open(MessageDialog::Ok, LOCALIZATION("AssetImportFailure"));
 				}
 			}
 		}
+
 	}
 
 	void SAssetView::SortViewItems()

@@ -29,8 +29,6 @@ namespace SH
 		void ResetWindowLayout();
 		WindowLayoutConfigInfo LoadWindowLayout(const FString& InWindowLayoutConfigFileName);
 		void SaveWindowLayout(const TSharedRef<FTabManager::FLayout>& InLayout);
-		void LoadEditorState(const FString& InFile);
-		void SaveEditorState();
 		void OnViewportResize(const FRAMEWORK::Vector2f& InSize);
         
         void OpenStShaderTab(FRAMEWORK::AssetPtr<StShader> InStShader);
@@ -63,20 +61,10 @@ namespace SH
 
         TSharedPtr<SVerticalBox> WindowContentBox;
 		TWeakPtr<SBox> PropertyViewBox;
-
-		struct EditorState
-		{
-			void InitFromJson(const TSharedPtr<FJsonObject>& InJson);
-			TSharedRef<FJsonObject> ToJson() const;
-
-            TSharedPtr<FRAMEWORK::AssetBrowserPersistentState> AssetBrowserState = MakeShared<FRAMEWORK::AssetBrowserPersistentState>();
-            TSharedPtr<FTabManager::FLayout> CodeTabLayout;
-            TMap<FRAMEWORK::AssetPtr<StShader>, TSharedPtr<SDockTab>> OpenedStShaders;
-		} CurEditorState;
         
+		class ShProject* CurProject;
         //used to restore the ShaderEditorBox when the StShader asset path is changed.
         TMap<FRAMEWORK::AssetPtr<StShader>, TSharedPtr<class SShaderEditorBox>> PendingStShadereTabs;
-		FString EditorStateSaveFileName;
 	};
 
 }

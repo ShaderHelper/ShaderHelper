@@ -28,6 +28,7 @@ namespace FRAMEWORK
 		virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
 
 	private:
+		Graph* GraphData;
 		TSlotlessChildren<SGraphNode> Nodes;
 		Vector2D ViewOffset;
 	};

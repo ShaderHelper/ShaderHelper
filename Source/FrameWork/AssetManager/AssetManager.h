@@ -118,15 +118,24 @@ namespace FRAMEWORK
 	template<typename T>
 	FArchive& operator<<(FArchive& Ar, AssetPtr<T>& InOutAssetPtr)
 	{
+		bool IsValid = !!InOutAssetPtr;
+		Ar << IsValid;
 		if (Ar.IsLoading())
 		{
-			FGuid AssetGuid;
-			Ar << AssetGuid;
-			InOutAssetPtr = TSingleton<AssetManager>::Get().LoadAssetByGuid<T>(AssetGuid);
+			if (IsValid)
+			{
+				FGuid AssetGuid;
+				Ar << AssetGuid;
+				InOutAssetPtr = TSingleton<AssetManager>::Get().LoadAssetByGuid<T>(AssetGuid);
+			}
 		}
 		else
 		{
-			Ar << InOutAssetPtr->GetGuid();
+			if (IsValid)
+			{
+				FGuid AssetGuid = InOutAssetPtr->GetGuid();;
+				Ar << AssetGuid;
+			}
 		}
 		return Ar;
 	}

@@ -25,6 +25,11 @@ namespace FRAMEWORK {
 		return WorkspaceDir() / TEXT("Saved") / GAppName;
 	}
 
+	FString PathHelper::SavedLogDir()
+	{
+		return SavedDir() / TEXT("Log");
+	}
+
 	FString PathHelper::SavedShaderDir()
 	{
 		return SavedDir() / TEXT("Shader");

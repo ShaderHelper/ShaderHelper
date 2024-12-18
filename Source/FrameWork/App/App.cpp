@@ -19,12 +19,14 @@ namespace FRAMEWORK {
 	static void UE_Init(const TCHAR* CommandLine)
     {
 		GUseCrashReportClient = false;
+		//Debug check() crsah report
+		//GIgnoreDebugger = true;
 #if PLATFORM_WINDOWS
 		IFileManager::Get().MakeDirectory(*PathHelper::ErrorDir(), true);
 		FCString::Strcpy(MiniDumpFilenameW, *(PathHelper::ErrorDir() / FString::Printf(TEXT("%s.dmp"), *GAppName)));
 
 		FOutputDeviceFile* LogDevice = static_cast<FOutputDeviceFile*>(FPlatformOutputDevices::GetLog());
-		LogDevice->SetFilename(*(PathHelper::SavedDir() / FString::Printf(TEXT("%s.log"), *GAppName)));
+		LogDevice->SetFilename(*(PathHelper::SavedLogDir() / FString::Printf(TEXT("%s.log"), *GAppName)));
 
 		GError = FPlatformApplicationMisc::GetErrorOutputDevice();
 #endif

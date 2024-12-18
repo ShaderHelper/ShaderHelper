@@ -114,14 +114,7 @@ namespace FRAMEWORK
 	{
 		ContentPathShowed = InArgs._ContentPathShowed;
         InitDirectory(ContentDirectory, ContentPathShowed);
-        if(InArgs._State)
-        {
-            State = InArgs._State;
-        }
-        else
-        {
-            State = MakeShared<AssetBrowserPersistentState>();
-        }
+        State = InArgs._State;
 
 		FDirectoryWatcherModule& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>(TEXT("DirectoryWatcher"));
 		IDirectoryWatcher* DirectoryWatcher = DirectoryWatcherModule.Get();
