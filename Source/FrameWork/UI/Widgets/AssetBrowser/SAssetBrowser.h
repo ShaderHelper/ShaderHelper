@@ -21,16 +21,6 @@ namespace FRAMEWORK
     {
         DirectoryTreePersistentState DirectoryTreeState;
         AssetViewPersistentState AssetViewState;
-
-		friend FArchive& operator<<(FArchive& Ar, AssetBrowserPersistentState& State)
-		{
-			Ar << State.DirectoryTreeState.CurSelectedDirectory;
-			Ar << State.DirectoryTreeState.DirectoriesToExpand;
-
-			Ar << State.AssetViewState.AssetViewSize;
-
-			return Ar;
-		}
     };
 
 	class FRAMEWORK_API SAssetBrowser : public SCompoundWidget

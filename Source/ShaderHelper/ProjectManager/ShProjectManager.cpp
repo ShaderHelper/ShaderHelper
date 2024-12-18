@@ -27,7 +27,18 @@ namespace SH
 	void ShProject::Serialize(FArchive& Ar)
 	{
 		Ar << Ver;
-		Ar << AssetBrowserState;
+
+		//### AssetBrowserState ###
+		FString RelSelectedDirectory = TSingleton<ShProjectManager>::Get().GetRelativePathToProject(AssetBrowserState.DirectoryTreeState.CurSelectedDirectory);
+		Ar << RelSelectedDirectory;
+		for (const FString& Directory : AssetBrowserState.DirectoryTreeState.DirectoriesToExpand)
+		{
+			FString RelDir = TSingleton<ShProjectManager>::Get().GetRelativePathToProject(RelSelectedDirectory);
+			Ar << RelDir;
+		}
+		Ar << AssetBrowserState.AssetViewState.AssetViewSize;
+		//###
+
 		Ar << Graph;
 		
 		int StShaderNum = OpenedStShaders.Num();
