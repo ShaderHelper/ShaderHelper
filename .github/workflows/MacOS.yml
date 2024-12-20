@@ -33,9 +33,9 @@ jobs:
       - name: Build solution
         working-directory: ${{env.GITHUB_WORKSPACE}}
         run: |
-          xcodebuild build -workspace ShaderHelper.xcworkspace -scheme ShaderHelper -configuration Debug -sdk macosx
-          xcodebuild build -workspace ShaderHelper.xcworkspace -scheme UnitTestUtil -configuration Debug -sdk macosx
-          xcodebuild build -workspace ShaderHelper.xcworkspace -scheme UnitTestGpuApi -configuration Debug -sdk macosx
+          xcodebuild build -workspace ShaderHelper.xcworkspace -scheme ShaderHelper -configuration Shipping -sdk macosx
+          xcodebuild build -workspace ShaderHelper.xcworkspace -scheme UnitTestUtil -configuration Shipping -sdk macosx
+          xcodebuild build -workspace ShaderHelper.xcworkspace -scheme UnitTestGpuApi -configuration Shipping -sdk macosx
         
 #       - name: Upload
 #         uses: actions/upload-artifact@v3

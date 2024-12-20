@@ -37,14 +37,14 @@ jobs:
 
       - name: Build solution
         working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: msbuild /p:Configuration=Debug ShaderHelper.sln
+        run: msbuild /p:Configuration=Shipping ShaderHelper.sln
         
-      - name: Upload
-        uses: actions/upload-artifact@v3
-        with:
-          name: ShaderHelper-artifact(${{ matrix.os }})
-          path: |
-            Binaries/Win64/
-            Resource/
-            !Binaries/Win64/*.pdb
-            External/UE/Shader/D3D/
+#      - name: Upload
+#        uses: actions/upload-artifact@v3
+#        with:
+#          name: ShaderHelper-artifact(${{ matrix.os }})
+#          path: |
+#            Binaries/Win64/
+#            Resource/
+#            !Binaries/Win64/*.pdb
+#            External/UE/Shader/D3D/

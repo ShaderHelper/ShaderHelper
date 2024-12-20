@@ -124,6 +124,7 @@ workspace "ShaderHelper"
     
     filter {"configurations:Shipping"}
 		optimize "On"
+		defines "SH_SHIPPING=1"
 
     --Premake can not link the corresponding "SharedLib" project in Xcode when targetname contains build configuration.
     filter {"system:windows or linux", "configurations:not Shipping"}

@@ -16,6 +16,8 @@
 STEAL_PRIVATE_MEMBER(SScrollBar, TSharedPtr<SScrollBarTrack>, Track)
 STEAL_PRIVATE_MEMBER(SMultiLineEditableText, TUniquePtr<FSlateEditableTextLayout>, EditableTextLayout)
 STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, TSharedPtr<FUICommandList>, UICommandList)
+STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, TSharedPtr<SlateEditableTextTypes::FCursorLineHighlighter>, CursorLineHighlighter)
+STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, SlateEditableTextTypes::FCursorInfo, CursorInfo)
 CALL_PRIVATE_FUNCTION(SMultiLineEditableText_OnMouseWheel, SMultiLineEditableText, OnMouseWheel,, FReply, const FGeometry&, const FPointerEvent&)
 
 using namespace FRAMEWORK;
@@ -154,6 +156,11 @@ namespace SH
 		);
 
 		FoldingArrowAnim.AddCurve(0, 0.25f, ECurveEaseFunction::Linear);
+
+		//Hook the default FCursorLineHighlighter.
+		TSharedPtr<SlateEditableTextTypes::FCursorLineHighlighter>& CursorLineHighlighter = GetPrivate_FSlateEditableTextLayout_CursorLineHighlighter(*ShaderEditableTextLayout);
+		SlateEditableTextTypes::FCursorInfo& CursorInfo = GetPrivate_FSlateEditableTextLayout_CursorInfo(*ShaderEditableTextLayout);
+		CursorLineHighlighter = CursorHightLighter::Create(&CursorInfo);
 	}
 
     FText SShaderEditorBox::GetEditStateText() const
@@ -728,7 +735,7 @@ namespace SH
 						DummyText += LineText[i];
 					}
 
-					FString DisplayInfo = DummyText + TEXT("    ■ ") + ErrorInfo.Info;
+					FString DisplayInfo = DummyText + TEXT("  ") + ErrorInfo.Info;
 					FTextRange DummyRange{ 0, DummyText.Len() };
 					FTextRange ErrorRange{ DummyText.Len(), DisplayInfo.Len() };
 

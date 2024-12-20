@@ -58,7 +58,7 @@ namespace FRAMEWORK {
 		SetSlateFontPath(FRAMEWORK::BaseResourcePath::UE_SlateFontDir);
 		FSlateApplication::SetCoreStylePath(FRAMEWORK::BaseResourcePath::UE_CoreStyleDir);
 		FSlateApplication::InitializeAsStandaloneApplication(GetStandardStandaloneRenderer(FRAMEWORK::BaseResourcePath::UE_StandaloneRenderShaderDir));
-
+	
 	}
 	
 	static void UE_ShutDown()
