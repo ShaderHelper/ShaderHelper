@@ -123,6 +123,8 @@ namespace FRAMEWORK
 	template<typename T>
 	MetaType* GetMetaType()
 	{
+		checkf(GetTypeNameToMetaType().Contains(GetGeneratedTypeName<T>()), 
+			TEXT("Please ensure that have registered the type: %s."), *AUX::TypeName<T>);
 		return GetTypeNameToMetaType()[GetGeneratedTypeName<T>()];
 	}
 

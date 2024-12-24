@@ -32,6 +32,11 @@ namespace FRAMEWORK
 		Style->Set("ProjectLauncher.Background", new IMAGE_BRUSH("Launcher", FVector2D(560, 270)));
 		Style->Set("ProjectLauncher.Logo", new IMAGE_BRUSH("ShaderHelper", FVector2D(100, 30)));
 
+		Style->Set("Graph.NodeShadow", new BOX_BRUSH("NodeShadow", FMargin(18.0f / 64.0f)));
+		Style->Set("Graph.NodeTitleBackground", new FSlateRoundedBoxBrush(FStyleColors::Panel, FVector4(5.0, 5.0, 0, 0)));
+		Style->Set("Graph.NodeContentBackground", new FSlateRoundedBoxBrush(FStyleColors::Panel, FVector4(0, 0, 5.0, 5.0)));
+		Style->Set("Graph.NodeOutline", new FSlateRoundedBoxBrush(FStyleColors::White, 5.0f));
+
 		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir);
 		//StarshipCoreStyle is used as the app style.
 		const FEditableTextBoxStyle& NormalEditableTextBoxStyle =  FAppStyle::Get().GetWidgetStyle<FEditableTextBoxStyle>("NormalEditableTextBox");

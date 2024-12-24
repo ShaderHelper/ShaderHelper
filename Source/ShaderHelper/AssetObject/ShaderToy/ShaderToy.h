@@ -3,15 +3,16 @@
 
 namespace SH
 {
+
 	class ShaderToy : public FRAMEWORK::Graph
 	{
 		REFLECTION_TYPE(ShaderToy)
 	public:
-		ShaderToy();
+		ShaderToy() = default;
 
 	public:
 		void Serialize(FArchive& Ar) override;
 		FString FileExtension() const override;
-
+		void PostLoad() override;
 	};
 }

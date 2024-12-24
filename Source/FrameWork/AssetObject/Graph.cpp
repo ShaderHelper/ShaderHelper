@@ -1,19 +1,16 @@
 #include "CommonHeader.h"
 #include "Graph.h"
 #include "UI/Widgets/Graph/SGraphNode.h"
-
+#include "Styling/StyleColors.h"
 namespace FRAMEWORK
 {
 	GLOBAL_REFLECTION_REGISTER(AddClass<GraphNode>("GraphNode"))
 
+	GLOBAL_REFLECTION_REGISTER(AddClass<GraphPin>())
+
 	GLOBAL_REFLECTION_REGISTER(AddClass<Graph>()
 								.BaseClass<AssetObject>()
 	)
-
-	Graph::Graph()
-	{
-
-	}
 
 	void Graph::Serialize(FArchive& Ar)
 	{
@@ -57,7 +54,18 @@ namespace FRAMEWORK
 
 	void GraphNode::Serialize(FArchive& Ar)
 	{
+		Ar << Guid;
+		Ar << Position;
+	}
 
+	FSlateColor GraphNode::GetNodeColor() const
+	{
+		return FStyleColors::Title;
+	}
+
+	void GraphPin::Serialize(FArchive& Ar)
+	{
+		Ar << Direction;
 	}
 
 }

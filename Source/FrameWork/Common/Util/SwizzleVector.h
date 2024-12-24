@@ -952,4 +952,24 @@ namespace FRAMEWORK {
 		}
 	};
 
+	template<typename T>
+	FArchive& operator<<(FArchive& Ar, Vector2Impl<T>& Vec)
+	{
+		Ar << Vec.x << Vec.y;
+		return Ar;
+	}
+
+	template<typename T>
+	FArchive& operator<<(FArchive& Ar, VectorImpl<T>& Vec)
+	{
+		Ar << Vec.x << Vec.y << Vec.z;
+		return Ar;
+	}
+
+	template<typename T>
+	FArchive& operator<<(FArchive& Ar, Vector4Impl<T>& Vec)
+	{
+		Ar << Vec.x << Vec.y << Vec.z << Vec.w;
+		return Ar;
+	}
 }

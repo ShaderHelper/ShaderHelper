@@ -46,7 +46,7 @@ R"(void mainImage(out float4 fragColor, in float2 fragCoord)
 
 	FString StShader::FileExtension() const
 	{
-		return "StShader";
+		return "stShader";
 	}
 
 	const FSlateBrush* StShader::GetImage() const

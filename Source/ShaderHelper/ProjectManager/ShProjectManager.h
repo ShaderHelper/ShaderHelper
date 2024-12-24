@@ -6,22 +6,21 @@
 
 namespace SH
 {
+	enum class ShProjectVersion
+	{
+		Initial
+	};
+
 	class ShProject : public FRAMEWORK::Project
 	{
 	public:
-		enum class Version
-		{
-			Initial
-		};
-
-		using Project::Project;
+		ShProject(FString InPath);
 
 		virtual void Open(const FString& ProjectPath) override;
 		virtual void Save() override;
 		virtual void Save(const FString& InPath) override;
-		void Serialize(FArchive& Ar);
+		void Serialize(FArchive& Ar) override;
 
-		Version Ver = Version::Initial;
 		FRAMEWORK::AssetBrowserPersistentState AssetBrowserState;
 		FRAMEWORK::AssetPtr<FRAMEWORK::Graph> Graph;
 		TMap<FRAMEWORK::AssetPtr<StShader>, TSharedPtr<class SDockTab>> OpenedStShaders;
@@ -29,5 +28,4 @@ namespace SH
 	};
 
 	using ShProjectManager = FRAMEWORK::ProjectManager<ShProject>;
-
 }

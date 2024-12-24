@@ -9,6 +9,7 @@ namespace FRAMEWORK
     {
         return GetDefaultObject<AssetOp>([&](AssetOp* CurAssetOp){
             AssetObject* RelatedAssetDefaultObject = static_cast<AssetObject*>(CurAssetOp->SupportAsset()->GetDefaultObject());
+			checkf(RelatedAssetDefaultObject, TEXT("Please ensure %s is constructible."), *CurAssetOp->SupportAsset()->TypeName);
             return RelatedAssetDefaultObject->FileExtension() ==  FPaths::GetExtension(InAssetPath);
         });
     }

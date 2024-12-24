@@ -5,6 +5,8 @@
 #include <Misc/FileHelper.h>
 namespace FRAMEWORK
 {
+	FRAMEWORK_API extern int GProjectVer;
+
 	class Project
 	{
 	public:
@@ -15,6 +17,10 @@ namespace FRAMEWORK
 		virtual void Open(const FString& ProjectPath) = 0;
 		virtual void Save() = 0;
 		virtual void Save(const FString& InPath) = 0;
+		virtual void Serialize(FArchive& Ar)
+		{
+			Ar << GProjectVer;
+		}
 
 		const FString& GetFilePath() const
 		{

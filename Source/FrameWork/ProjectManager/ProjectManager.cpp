@@ -10,6 +10,7 @@
 
 namespace FRAMEWORK
 {
+	int GProjectVer;
 
 	void AddProjectAssociation()
 	{

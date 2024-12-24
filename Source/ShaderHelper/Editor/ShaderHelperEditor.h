@@ -4,8 +4,10 @@
 #include "Editor/Editor.h"
 #include "Editor/PreviewViewPort.h"
 #include "AssetObject/StShader.h"
+#include "AssetObject/Graph.h"
 #include "AssetManager/AssetManager.h"
 #include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
+#include "UI/Widgets/Graph/SGraphPanel.h"
 
 namespace SH 
 {
@@ -34,6 +36,8 @@ namespace SH
         void OpenStShaderTab(FRAMEWORK::AssetPtr<StShader> InStShader);
         void TryRestoreStShaderTab(FRAMEWORK::AssetPtr<StShader> InStShader);
 		
+		void OpenGraph(FRAMEWORK::AssetPtr<FRAMEWORK::Graph> InGraphData);
+
 	private:
 		TSharedRef<SDockTab> SpawnWindowTab(const FSpawnTabArgs& Args);
         TSharedRef<SDockTab> SpawnStShaderTab(const FSpawnTabArgs& Args);
@@ -65,6 +69,8 @@ namespace SH
 		class ShProject* CurProject;
         //used to restore the ShaderEditorBox when the StShader asset path is changed.
         TMap<FRAMEWORK::AssetPtr<StShader>, TSharedPtr<class SShaderEditorBox>> PendingStShadereTabs;
+
+		TSharedPtr<FRAMEWORK::SGraphPanel> GraphPanel;
 	};
 
 }

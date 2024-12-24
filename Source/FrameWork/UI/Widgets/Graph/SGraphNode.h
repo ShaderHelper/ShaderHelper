@@ -11,11 +11,11 @@ namespace FRAMEWORK
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs);
+		void SetOwner(class SGraphPanel* InOwner) { Owner = InOwner; }
+		virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 
 	public:
-		Vector2D GetPosition() const;
-
-	private:
 		class GraphNode* NodeData;
+		SGraphPanel* Owner;
 	};
 }

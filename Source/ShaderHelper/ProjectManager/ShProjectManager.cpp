@@ -6,6 +6,12 @@ using namespace FRAMEWORK;
 
 namespace SH
 {
+
+	ShProject::ShProject(FString InPath) : Project(MoveTemp(InPath))
+	{
+		GProjectVer = static_cast<int>(ShProjectVersion::Initial);
+	}
+
 	void ShProject::Open(const FString& ProjectPath)
 	{
 		TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*ProjectPath));
@@ -26,7 +32,7 @@ namespace SH
 
 	void ShProject::Serialize(FArchive& Ar)
 	{
-		Ar << Ver;
+		Project::Serialize(Ar);
 
 		//### AssetBrowserState ###
 		FString RelSelectedDirectory = TSingleton<ShProjectManager>::Get().GetRelativePathToProject(AssetBrowserState.DirectoryTreeState.CurSelectedDirectory);

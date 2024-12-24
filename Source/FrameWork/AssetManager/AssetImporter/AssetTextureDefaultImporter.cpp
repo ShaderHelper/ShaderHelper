@@ -39,9 +39,9 @@ namespace FRAMEWORK
 		return { "png", "jpeg", "jpg", "tga" };
 	}
 
-    MetaType* AssetTextureDefaultImporter::SupportAsset()
-    {
-        return GetMetaType<Texture2D>();
-    }
+	MetaType* AssetTextureDefaultImporter::SupportAsset()
+	{
+		return GetMetaType<Texture2D>();
+	}
 
 }

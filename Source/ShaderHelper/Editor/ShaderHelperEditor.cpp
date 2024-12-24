@@ -424,7 +424,8 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 			SAssignNew(SpawnedTab, SDockTab)
 			.Label(LOCALIZATION(GraphTabId.ToString()))
 			[
-				SNew(SGraphPanel)
+				SAssignNew(GraphPanel, SGraphPanel)
+				.GraphData(CurProject->Graph.Get())
 			];
 			SpawnedTab->SetTabIcon(FAppCommonStyle::Get().GetBrush("Icons.Graph"));
 		}
@@ -456,7 +457,13 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
         }
     }
 
-    void ShaderHelperEditor::OpenStShaderTab(AssetPtr<StShader> InStShader)
+	void ShaderHelperEditor::OpenGraph(AssetPtr<Graph> InGraphData)
+	{
+		GraphPanel->SetGraphData(InGraphData.Get());
+		CurProject->Graph = InGraphData;
+	}
+
+	void ShaderHelperEditor::OpenStShaderTab(AssetPtr<StShader> InStShader)
     {
         TSharedPtr<SDockTab>* TabPtr = CurProject->OpenedStShaders.Find(InStShader);
         if(TabPtr == nullptr || !*TabPtr)

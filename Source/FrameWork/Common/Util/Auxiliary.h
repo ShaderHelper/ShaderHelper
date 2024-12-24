@@ -447,20 +447,25 @@ namespace AUX
 		RunTimeConvCall(const F* InLamb)
 			:Lamb(InLamb) {}
 
+		template<int... Indexes>
+		Ret CallImpl(TIntegerSequence<int, Indexes...>)
+		{
+			return (*Lamb)(std::get<Indexes>(Params)...);
+		}
+
 		Ret Call() override
 		{
-			if constexpr(!std::is_same_v<Ret, void>)
+			ON_SCOPE_EXIT
 			{
-				Ret Result = (*Lamb)(std::get<ParamTypes>(Params)...);
 				Lamb = nullptr;
-				return Result;
-			}
+			};
+			return CallImpl(TMakeIntegerSequence<int, sizeof...(ParamTypes)>{});
 		}
 		~RunTimeConvCall()
 		{
 			if (Lamb)
 			{
-				(*Lamb)(std::get<ParamTypes>(Params)...);
+				CallImpl(TMakeIntegerSequence<int, sizeof...(ParamTypes)>{});
 			}
 		}
 		const F* Lamb;

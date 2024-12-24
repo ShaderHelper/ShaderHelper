@@ -2,6 +2,8 @@
 #include "AssetObject.h"
 #include "Common/Util/Reflection.h"
 #include "AssetManager/AssetManager.h"
+#include "ProjectManager/ProjectManager.h"
+#include "Common/FrameWorkCore.h"
 
 namespace FRAMEWORK
 {
@@ -15,6 +17,7 @@ namespace FRAMEWORK
 	void AssetObject::Serialize(FArchive& Ar)
 	{
 		Ar << Guid;
+		Ar << GFrameWorkVer << GProjectVer;
 	}
 
     FString AssetObject::GetFileName() const

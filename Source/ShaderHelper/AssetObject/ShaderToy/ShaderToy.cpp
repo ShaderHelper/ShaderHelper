@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "ShaderToy.h"
+#include "Nodes/ShaderToyOutputNode.h"
 
 using namespace FRAMEWORK;
 
@@ -9,11 +10,6 @@ namespace SH
 								.BaseClass<Graph>()
 	)
 
-	ShaderToy::ShaderToy()
-	{
-
-	}
-
 	void ShaderToy::Serialize(FArchive& Ar)
 	{
 		Graph::Serialize(Ar);
@@ -21,7 +17,16 @@ namespace SH
 
 	FString ShaderToy::FileExtension() const
 	{
-		return "ShaderToy";
+		return "shaderToy";
+	}
+
+
+	void ShaderToy::PostLoad()
+	{
+		if (NodeDatas.IsEmpty())
+		{
+			AddNode(MakeShared<ShaderToyOuputNode>());
+		}
 	}
 
 }

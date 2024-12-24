@@ -10,7 +10,7 @@ namespace FRAMEWORK::GpuResourceHelper
 		return GGpuRhi->CreateTexture(MoveTemp(Desc));
 	}
 
-	TRefCountPtr<GpuTexture> GetGlobalBlackTex()
+	GpuTexture* GetGlobalBlackTex()
 	{
 		GpuTextureDesc Desc{ 1, 1, GpuTextureFormat::R8G8B8A8_UNORM, GpuTextureUsage::ShaderResource };
 		static TRefCountPtr<GpuTexture> GlobalBlackTex = GGpuRhi->CreateTexture(MoveTemp(Desc));
