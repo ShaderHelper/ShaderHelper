@@ -13,6 +13,6 @@ namespace SH
 	public:
 		void Serialize(FArchive& Ar) override;
 		FString FileExtension() const override;
-		void PostLoad() override;
+		TArray<FRAMEWORK::MetaType*> SupportNodes() const override;
 	};
 }

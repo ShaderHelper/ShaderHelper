@@ -11,8 +11,8 @@ namespace SH
 		void Serialize(FArchive& Ar) override;
 		FText GetNodeTitle() const override { return LOCALIZATION("Output"); }
 		TArray<FRAMEWORK::GraphPin*> GetPins() override;
-		void Exec();
+		void Exec() override;
 
-		GpuTexturePin ResultPin{ LOCALIZATION("Result"), FRAMEWORK::PinDirection::Input };
+		GpuTexturePin ResultPin{ LOCALIZATION("Texture"), FRAMEWORK::PinDirection::Input };
 	};
 }

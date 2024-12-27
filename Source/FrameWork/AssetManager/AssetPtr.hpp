@@ -13,14 +13,18 @@ namespace FRAMEWORK
 	AssetPtr<T>::AssetPtr(T* InAsset)
 		: Asset(InAsset)
 	{
-		TSingleton<AssetManager>::Get().AddRef(Asset);
+		if (Asset) {
+			TSingleton<AssetManager>::Get().AddRef(Asset);
+		}
 	}
 
 	template<typename T>
 	AssetPtr<T>::AssetPtr(const AssetPtr& InAssetPtr)
 		: Asset(InAssetPtr.Asset)
 	{
-		TSingleton<AssetManager>::Get().AddRef(Asset);
+		if (Asset) {
+			TSingleton<AssetManager>::Get().AddRef(Asset);
+		}
 	}
 
 	template<typename T>
@@ -28,7 +32,9 @@ namespace FRAMEWORK
 	AssetPtr<T>::AssetPtr(const AssetPtr<OtherType>& OtherAssetPtr)
 		: Asset(OtherAssetPtr.Asset)
 	{
-		TSingleton<AssetManager>::Get().AddRef(Asset);
+		if (Asset) {
+			TSingleton<AssetManager>::Get().AddRef(Asset);
+		}
 	}
 
 	template<typename T>
@@ -65,10 +71,16 @@ namespace FRAMEWORK
 		return Asset->GetGuid();
 	}
 
+	template<typename T>
+	bool AssetPtr<T>::IsValid() const
+	{
+		return (Asset != nullptr) && TSingleton<AssetManager>::Get().IsLoadedAsset(Asset);
+	}
+
     template<typename T>
     AssetPtr<T>::operator bool() const
     {
-        return Asset != nullptr;
+        return IsValid();
     }
 
     template<typename T1, typename T2>

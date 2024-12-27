@@ -14,18 +14,18 @@ namespace FRAMEWORK
 		REFLECTION_TYPE(GraphPin)
 	public:
 		GraphPin() = default;
-		GraphPin(const FText& InName, PinDirection InDirection, FLinearColor InColor = FLinearColor::White) 
-			: PinName(InName), Direction(InDirection), PinColor(InColor)
+		GraphPin(const FText& InName, PinDirection InDirection) 
+			: PinName(InName), Direction(InDirection)
 		{}
 		virtual ~GraphPin() = default;
 
 	public:
 		virtual void Serialize(FArchive& Ar);
 		virtual void LinkTo(GraphPin* TargetPin) {}
+		virtual FLinearColor GetPinColor() const { return FLinearColor::White; }
 
 		FGuid Guid = FGuid::NewGuid();
 		FText PinName = FText::FromString("Unknown");
-		FLinearColor PinColor = FLinearColor::White;
 		PinDirection Direction = PinDirection::Output;
 	};
 
@@ -46,9 +46,10 @@ namespace FRAMEWORK
 		virtual void Exec() {}
 
 		FGuid Guid = FGuid::NewGuid();
-		TOptional<Vector2D> Position;
-		TMultiMap<GraphPin*, GraphPin*> OutPinToInPin;
-		TMap<GraphNode*, int> TargetNodeCounts;
+		Vector2D Position{0};
+		TOptional<int32> Layer;
+		TMultiMap<FGuid, FGuid> OutPinToInPin;
+		TMap<FGuid, int> TargetNodeCounts;
 	};
 
 	class FRAMEWORK_API Graph : public AssetObject
@@ -61,10 +62,23 @@ namespace FRAMEWORK
 		void Serialize(FArchive& Ar) override;
 		const FSlateBrush* GetImage() const override;
 		void AddNode(TSharedPtr<GraphNode> InNode) { NodeDatas.Add(MoveTemp(InNode)); }
+		void RemoveNode(FGuid Id) {
+			NodeDatas.RemoveAll([Id](const TSharedPtr<GraphNode>& Element) {
+				return Element->Guid == Id;
+			});
+		}
+
+		GraphNode* GetNode(FGuid Id) const {
+			return (*NodeDatas.FindByPredicate([Id](const TSharedPtr<GraphNode>& Element) {
+				return Element->Guid == Id;
+			})).Get();
+		}
 		const TArray<TSharedPtr<GraphNode>>& GetNodes() const { return NodeDatas; }
+
+		virtual TArray<MetaType*> SupportNodes() const { return {}; }
 	
 	protected:
 		TArray<TSharedPtr<GraphNode>> NodeDatas;
-		TMultiMap<TSharedPtr<GraphNode>, TSharedPtr<GraphNode>> NodeDeps;
+		TMultiMap<FGuid, FGuid> NodeDeps;
 	};
 }

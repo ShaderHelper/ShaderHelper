@@ -96,7 +96,7 @@ namespace FRAMEWORK
 				];
 			
 
-			TSharedRef<SVerticalBox> RightContent =
+			RightContent =
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot()
 				.Padding(0.0f, 0.0f, 0.0f, space)
@@ -106,7 +106,7 @@ namespace FRAMEWORK
 					SNew(STextBlock).Text(LOCALIZATION("RecentProjects"))
 				];
 
-			auto InsertDummy = [=](int32 SlotIndex = -1) {
+			auto InsertDummy = [this](int32 SlotIndex = -1) {
 				RightContent->InsertSlot(SlotIndex)
 					.Padding(0.0f, 0.0f, 0.0f, space)
 					.HAlign(HAlign_Left)
@@ -132,7 +132,8 @@ namespace FRAMEWORK
 						.Icon(FAppStyle::Get().GetBrush("AppIcon.Small"))
 						.IconSize(FVector2D{ 16,16 });
 
-					RecentProjcetButton->SetOnClicked(FOnClicked::CreateLambda([=, RecentProjcetButton = TWeakPtr<SIconButton>{ RecentProjcetButton }] {
+					RecentProjcetButton->SetOnClicked(FOnClicked::CreateLambda(
+						[RecentProjcetButton = TWeakPtr<SIconButton>{ RecentProjcetButton }, RecentProjcetPath, InsertDummy, this] {
 							if (IFileManager::Get().FileExists(*RecentProjcetPath))
 							{
 								TSingleton<ProjectManager<T>>::Get().OpenProject(RecentProjcetPath);
@@ -217,9 +218,9 @@ namespace FRAMEWORK
 					[
 						SNew(SButton)
 							.ButtonStyle(&FAppCommonStyle::Get().GetWidgetStyle< FButtonStyle >("CloseButton"))
-							.OnClicked_Lambda([=] {
-							Window->RequestDestroyWindow();
-							return FReply::Handled();
+							.OnClicked_Lambda([this] {
+								Window->RequestDestroyWindow();
+								return FReply::Handled();
 							})
 					]
 				]
@@ -239,7 +240,7 @@ namespace FRAMEWORK
 						.Padding(25.0f,0,0,0)
 						[
 
-							RightContent
+							RightContent.ToSharedRef()
 						]
 					]
 				]
@@ -247,10 +248,18 @@ namespace FRAMEWORK
 			FSlateApplication::Get().AddWindow(Window.ToSharedRef());
 		}
 
+	~ProjectLauncher()
+	{
+		if (Window.IsValid())
+		{
+			FSlateApplication::Get().DestroyWindowImmediately(Window.ToSharedRef());
+		}
+	}
+
 	private:
 		TFunction<void()> LaunchProjectFunc;
 		TSharedPtr<SWindow> Window;
-
+		TSharedPtr<SVerticalBox> RightContent;
 		FString ProjectName = "Project1";
 		FString ProjectDir = PathHelper::WorkspaceDir() / "Projects";
 		FString CacheSelectDir = PathHelper::WorkspaceDir();

@@ -15,6 +15,7 @@ namespace FRAMEWORK {
         
         Editor* GetEditor() const { return AppEditor.Get(); }
         Renderer* GetRenderer() const { return AppRenderer.Get(); }
+		Vector2D GetClientSize() const { return AppClientSize; }
 		
 	protected:
 		virtual void Update(double DeltaTime);

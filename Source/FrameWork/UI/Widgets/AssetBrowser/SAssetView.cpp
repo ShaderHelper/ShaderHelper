@@ -169,9 +169,15 @@ namespace FRAMEWORK
 										GeneratedFileName = FString::Format(TEXT("New{0}{1}"), { NewAsset->FileExtension(), Number++ });
 										SavedFileName = CurViewDirectory / GeneratedFileName + "." + NewAsset->FileExtension();
 									}
+
+									if (AssetOp* AssetOp_ = GetAssetOp(NewAsset->DynamicMetaType()))
+									{
+										AssetOp_->OnCreate(NewAsset);
+									}
+
 									TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFileName));
 									NewAsset->Serialize(*Ar);
-									})),
+								})),
 								NAME_None,
 								EUserInterfaceActionType::Button
 							);
@@ -394,9 +400,15 @@ namespace FRAMEWORK
 
 	void SAssetView::OnHandleDeleteAction()
 	{
+		TArray<TSharedRef<AssetViewItem>> SelectedItems = AssetTileView->GetSelectedItems();
+		if (SelectedItems.IsEmpty())
+		{
+			return;
+		}
+
 		if (MessageDialog::Open(MessageDialog::OkCancel, LOCALIZATION("DeleteAssetTip")))
 		{
-			TArray<TSharedRef<AssetViewItem>> SelectedItems = AssetTileView->GetSelectedItems();
+
 			if (SelectedItems[0]->IsOfType<AssetViewFolderItem>())
 			{
 				IFileManager::Get().DeleteDirectory(*SelectedItems[0]->GetPath(), false, true);

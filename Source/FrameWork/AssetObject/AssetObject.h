@@ -15,10 +15,16 @@ namespace FRAMEWORK
 		//Use the serialization system from unreal engine
 		virtual void Serialize(FArchive& Ar);
 		virtual void PostLoad() {}
+		virtual void Save();
+		virtual void MarkDirty();
+		bool IsDirty() const;
 
 		virtual FString FileExtension() const = 0;
+
+		//Determine the asset icon in the asset browser.
 		virtual GpuTexture* GetThumbnail() const { return nullptr; }
 		virtual const FSlateBrush* GetImage() const { return nullptr; }
+		//
         
         FString GetFileName() const;
         FString GetPath() const;

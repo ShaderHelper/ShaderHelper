@@ -91,6 +91,8 @@ namespace SH
 		{}
 			SLATE_ARGUMENT(StShader*, StShaderAsset)
 		SLATE_END_ARGS()
+
+		~SShaderEditorBox();
 		
 		void Construct(const FArguments& InArgs);
 

@@ -1,6 +1,7 @@
 #include "CommonHeader.h"
 #include "ShaderToy.h"
-#include "Nodes/ShaderToyOutputNode.h"
+#include "AssetObject/ShaderToy/Nodes/ShaderToyOutputNode.h"
+#include "AssetObject/ShaderToy/Nodes/ShaderToyPassNode.h"
 
 using namespace FRAMEWORK;
 
@@ -20,13 +21,12 @@ namespace SH
 		return "shaderToy";
 	}
 
-
-	void ShaderToy::PostLoad()
+	TArray<MetaType*> ShaderToy::SupportNodes() const
 	{
-		if (NodeDatas.IsEmpty())
-		{
-			AddNode(MakeShared<ShaderToyOuputNode>());
-		}
+		return {
+			GetMetaType<ShaderToyOuputNode>(),
+			GetMetaType<ShaderToyPassNode>()
+		};
 	}
 
 }

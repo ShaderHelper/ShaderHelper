@@ -40,12 +40,13 @@ namespace FRAMEWORK
 
 	FString AssetManager::GetPath(const FGuid& InGuid) const
 	{
+		check(IsValidAsset(InGuid));
         return GuidToPath[InGuid];
 	}
 
 	FGuid AssetManager::GetGuid(const FString& InPath) const
 	{
-        check(GuidToPath.FindKey(InPath) != nullptr);
+        check(IsValidAsset(InPath));
         return *GuidToPath.FindKey(InPath);
 	}
 

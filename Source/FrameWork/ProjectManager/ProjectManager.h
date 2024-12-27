@@ -6,8 +6,9 @@
 namespace FRAMEWORK
 {
 	FRAMEWORK_API extern int GProjectVer;
+	FRAMEWORK_API extern class Project* GProject;
 
-	class Project
+	class FRAMEWORK_API Project
 	{
 	public:
 		Project(FString InPath) : Path(MoveTemp(InPath)) 
@@ -15,19 +16,23 @@ namespace FRAMEWORK
 		virtual ~Project() = default;
 
 		virtual void Open(const FString& ProjectPath) = 0;
-		virtual void Save() = 0;
 		virtual void Save(const FString& InPath) = 0;
+		virtual void SavePendingAssets();
 		virtual void Serialize(FArchive& Ar)
 		{
 			Ar << GProjectVer;
 		}
-
+		void AddPendingAsset(AssetObject* InAsset) { PendingAssets.AddUnique(InAsset); }
+		void RemovePendingAsset(AssetObject* InAsset) { if(PendingAssets.Contains(InAsset)) PendingAssets.Remove(InAsset);}
+		bool IsPendingAsset(const AssetObject* InAsset) { return PendingAssets.Contains(InAsset); }
+		bool AnyPendingAsset() const { return !PendingAssets.IsEmpty(); }
 		const FString& GetFilePath() const
 		{
 			return Path;
 		}
 
 	protected:
+		TArray<AssetObject*> PendingAssets;
 		FString Path;
 	};
 
@@ -61,6 +66,8 @@ namespace FRAMEWORK
 			IFileManager::Get().MakeDirectory(*(ProjectDir / ProjectName / "Content"), true);
 			FString ProjectPath = ProjectDir / ProjectName / ProjectName + ".shprj";
 			ActiveProject = MakeUnique<ProjectDataType>(ProjectPath);
+			GProject = ActiveProject.Get();
+
 			AddToProjMgmt(ProjectPath);
 			SaveProject(MoveTemp(ProjectPath));
 			return ActiveProject.Get();
@@ -69,6 +76,8 @@ namespace FRAMEWORK
 		ProjectDataType* OpenProject(const FString& ProjectPath)
 		{
 			ActiveProject = MakeUnique<ProjectDataType>(ProjectPath);
+			GProject = ActiveProject.Get();
+
 			TSingleton<AssetManager>::Get().Clear();
 			TSingleton<AssetManager>::Get().MountProject(GetActiveContentDirectory());
 			ActiveProject->Open(ProjectPath);
@@ -84,11 +93,12 @@ namespace FRAMEWORK
 
 		void AddToProjMgmt(const FString& InProjectPath)
 		{
-			if (RecentProjcetPaths.Find(InProjectPath) == INDEX_NONE)
+			if (RecentProjcetPaths.Contains(InProjectPath))
 			{
-				RecentProjcetPaths.Insert(InProjectPath, 0);
-				SaveProjMgmt();
+				RemoveFromProjMgmt(InProjectPath);
 			}
+			RecentProjcetPaths.Insert(InProjectPath, 0);
+			SaveProjMgmt();
 		}
 
 		void SaveProjMgmt()
@@ -107,9 +117,14 @@ namespace FRAMEWORK
 			FFileHelper::SaveStringToFile(NewJsonContents, *(PathHelper::SavedDir() / TEXT("ProjMgmt.json")));
 		}
 
-		void SaveProject()
+		void SaveProject(bool bSavePendingAsset = false)
 		{
-			ActiveProject->Save();
+			if (bSavePendingAsset)
+			{
+				ActiveProject->SavePendingAssets();
+			}
+
+			ActiveProject->Save(ActiveProject->GetFilePath());
 		}
 
 		void SaveProject(const FString& Path)

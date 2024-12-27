@@ -105,7 +105,7 @@ namespace FRAMEWORK
             .Style(&FAppCommonStyle::Get().GetWidgetStyle<FTableRowStyle>("DirectoryTreeView.Row"))
             .OnDrop_Raw(this, &SDirectoryTree::HandleOnDrop, InTreeNode->DirectoryPath);
         
-        Row->SetDragFilter([=](const TSharedPtr<FDragDropOperation>& Operation){
+        Row->SetDragFilter([InTreeNode](const TSharedPtr<FDragDropOperation>& Operation){
             if(Operation.IsValid())
             {
                 if(Operation->IsOfType<AssetViewItemDragDropOp>())
@@ -134,7 +134,7 @@ namespace FRAMEWORK
             [
                 SNew(SImage)
                 .DesiredSizeOverride(FVector2D(10.0f, 10.0f))
-                .Image_Lambda([=]() {
+                .Image_Lambda([this, InTreeNode]() {
                         if (DirectoryTree->IsItemExpanded(InTreeNode))
                         {
                             return FAppStyle::Get().GetBrush("Icons.FolderOpen");

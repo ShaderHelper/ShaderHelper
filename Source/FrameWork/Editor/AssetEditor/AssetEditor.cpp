@@ -13,4 +13,11 @@ namespace FRAMEWORK
             return RelatedAssetDefaultObject->FileExtension() ==  FPaths::GetExtension(InAssetPath);
         });
     }
+
+	AssetOp* GetAssetOp(MetaType* InAssetMetaType)
+	{
+		return GetDefaultObject<AssetOp>([&](AssetOp* CurAssetOp) {
+			return CurAssetOp->SupportAsset() == InAssetMetaType;
+		});
+	}
 }

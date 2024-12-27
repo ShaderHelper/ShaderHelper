@@ -18,11 +18,6 @@ namespace SH
 		Serialize(*Ar);
 	}
 
-	void ShProject::Save()
-	{
-		Save(Path);
-	}
-
 	void ShProject::Save(const FString& InPath)
 	{
 		Path = InPath;

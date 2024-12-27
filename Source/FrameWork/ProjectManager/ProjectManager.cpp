@@ -11,6 +11,7 @@
 namespace FRAMEWORK
 {
 	int GProjectVer;
+	Project* GProject;
 
 	void AddProjectAssociation()
 	{
@@ -41,6 +42,15 @@ namespace FRAMEWORK
 #elif PLATFORM_MAC
         OSStatus Stat = LSSetDefaultRoleHandlerForContentType(CFSTR("com.shaderhelper.shprj"), kLSRolesAll, CFSTR("com.shaderhelper.app"));
 #endif
+	}
+
+	void Project::SavePendingAssets()
+	{
+		TArray<AssetObject*> Temp = PendingAssets;
+		for (auto Asset : Temp)
+		{
+			Asset->Save();
+		}
 	}
 
 }

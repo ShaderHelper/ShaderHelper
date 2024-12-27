@@ -4,6 +4,7 @@
 #include "Editor/ShaderHelperEditor.h"
 #include "AssetManager/AssetManager.h"
 #include "App/App.h"
+#include "AssetObject/ShaderToy/Nodes/ShaderToyOutputNode.h"
 
 using namespace FRAMEWORK;
 
@@ -23,6 +24,17 @@ namespace SH
 		AssetPtr<ShaderToy> LoadedShaderToy = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderToy>(InAssetPath);
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		ShEditor->OpenGraph(LoadedShaderToy);
+	}
+
+	void ShaderToyOp::OnCreate(AssetObject* InAsset)
+	{
+		static_cast<ShaderToy*>(InAsset)->AddNode(MakeShared<ShaderToyOuputNode>());
+	}
+
+	void ShaderToyOp::OnDelete(const FString& InAssetPath)
+	{
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->OpenGraph(nullptr);
 	}
 
 }

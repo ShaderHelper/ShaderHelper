@@ -7,6 +7,7 @@
 #include "AssetObject/Graph.h"
 #include "AssetManager/AssetManager.h"
 #include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
+#include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 #include "UI/Widgets/Graph/SGraphPanel.h"
 
 namespace SH 
@@ -53,7 +54,8 @@ namespace SH
 		TSharedPtr<FTabManager> TabManager;
         FDelegateHandle SaveLayoutTicker;
         TSharedPtr<FRAMEWORK::SAssetBrowser> AssetBrowser;
-        
+		TSharedPtr<SShaderEditorBox> ShaderEditor;
+
         TSharedPtr<SDockTab> CodeTab;
         TSharedPtr<FTabManager> CodeTabManager;
         TWeakPtr<class SDockingTabStack> StShaderTabStackInsertPoint;

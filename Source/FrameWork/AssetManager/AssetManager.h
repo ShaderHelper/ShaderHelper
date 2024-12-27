@@ -31,7 +31,8 @@ namespace FRAMEWORK
 
 		T* Get() const;
 		FGuid GetGuid() const;
-        
+
+		bool IsValid() const;
         explicit operator bool() const;
 
 	private:
@@ -49,6 +50,10 @@ namespace FRAMEWORK
 		AssetPtr<T> LoadAssetByPath(const FString& InAssetPath)
 		{
 			static_assert(std::is_base_of_v<AssetObject, T>);
+			if (!IsValidAsset(InAssetPath))
+			{
+				return nullptr;
+			}
 
 			FGuid Guid = GetGuid(InAssetPath);
 			if (Assets.Contains(Guid))
@@ -89,7 +94,17 @@ namespace FRAMEWORK
 		template<typename T>
 		AssetPtr<T> LoadAssetByGuid(const FGuid& InGuid)
 		{
-			return LoadAssetByPath<T>(GetPath(InGuid));
+			return IsValidAsset(InGuid) ? LoadAssetByPath<T>(GetPath(InGuid)) : nullptr;
+		}
+
+		AssetObject* FindLoadedAsset(const FGuid& Id)
+		{
+			return Assets.Contains(Id) ? Assets[Id] : nullptr;
+		}
+
+		bool IsLoadedAsset(AssetObject* InAsset) const
+		{
+			return AssetRefCounts.Contains(InAsset);
 		}
 
 		void UpdateGuidToPath(const FString& InPath);
@@ -97,6 +112,10 @@ namespace FRAMEWORK
 
 		FString GetPath(const FGuid& InGuid) const;
 		FGuid GetGuid(const FString& InPath) const;
+
+		//The asset may be deleted outside
+		bool IsValidAsset(const FGuid& Id) const { return GuidToPath.Contains(Id); }
+		bool IsValidAsset(const FString& InPath) const { return GuidToPath.FindKey(InPath) != nullptr; }
 
 		void AddAssetThumbnail(const FGuid& InGuid, TRefCountPtr<GpuTexture> InThumbnail);
 		GpuTexture* FindAssetThumbnail(const FGuid& InGuid) const;

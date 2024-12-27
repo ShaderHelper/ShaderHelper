@@ -33,7 +33,7 @@ namespace FRAMEWORK
 		Style->Set("ProjectLauncher.Logo", new IMAGE_BRUSH("ShaderHelper", FVector2D(100, 30)));
 
 		Style->Set("Graph.NodeShadow", new BOX_BRUSH("NodeShadow", FMargin(18.0f / 64.0f)));
-		Style->Set("Graph.NodeTitleBackground", new FSlateRoundedBoxBrush(FStyleColors::Panel, FVector4(5.0, 5.0, 0, 0)));
+		Style->Set("Graph.NodeTitleBackground", new FSlateRoundedBoxBrush(FStyleColors::White, FVector4(5.0, 5.0, 0, 0)));
 		Style->Set("Graph.NodeContentBackground", new FSlateRoundedBoxBrush(FStyleColors::Panel, FVector4(0, 0, 5.0, 5.0)));
 		Style->Set("Graph.NodeOutline", new FSlateRoundedBoxBrush(FStyleColors::White, 5.0f));
 
@@ -87,6 +87,8 @@ namespace FRAMEWORK
 		Style->Set("Icons.FolderPlus", new IMAGE_BRUSH_SVG("Starship/Common/folder-plus", FVector2D(16.0, 16.0)));
 		Style->Set("Icons.Graph", new IMAGE_BRUSH_SVG("Starship/Insights/Callers_20", FVector2D(20.0, 20.0)));
 		Style->Set("Icons.File", new IMAGE_BRUSH_SVG("Starship/Common/file", FVector2D(16.0, 16.0)));
+		
+		Style->Set("CommonCommands.Save", new IMAGE_BRUSH_SVG("Starship/Common/save", FVector2D(16.0, 16.0)));
 
 		FButtonStyle CloseButton = FButtonStyle()
 			.SetNormal(IMAGE_BRUSH_SVG("Starship/Common/close-small", FVector2D(30.0, 30.0), FLinearColor{0.7f,0.7f,0.7f}))

@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "Graph.h"
 #include "UI/Widgets/Graph/SGraphNode.h"
-#include "Styling/StyleColors.h"
+#include <Styling/StyleColors.h>
 namespace FRAMEWORK
 {
 	GLOBAL_REFLECTION_REGISTER(AddClass<GraphNode>("GraphNode"))
@@ -23,7 +23,7 @@ namespace FRAMEWORK
 			for (int Index = 0; Index < NodeNum; Index++)
 			{
 				//Serialize polymorphic pointers
-				FString TypeName = GetRegisteredName(NodeDatas[Index]->MetaType());
+				FString TypeName = GetRegisteredName(NodeDatas[Index]->DynamicMetaType());
 				Ar << TypeName;
 				NodeDatas[Index]->Serialize(Ar);
 			}
@@ -56,6 +56,7 @@ namespace FRAMEWORK
 	{
 		Ar << Guid;
 		Ar << Position;
+		Ar << Layer;
 	}
 
 	FSlateColor GraphNode::GetNodeColor() const

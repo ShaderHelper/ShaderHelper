@@ -15,7 +15,9 @@ namespace FRAMEWORK
         virtual void OnOpen(const FString& InAssetPath) {}
         virtual void OnAdd(const FString& InAssetPath) {}
         virtual void OnDelete(const FString& InAssetPath) {}
+		virtual void OnCreate(AssetObject* InAsset) {};
 	};
     
     AssetOp* GetAssetOp(const FString& InAssetPath);
+	AssetOp* GetAssetOp(MetaType* InAssetMetaType);
 }

@@ -20,7 +20,25 @@ namespace FRAMEWORK
 		Ar << GFrameWorkVer << GProjectVer;
 	}
 
-    FString AssetObject::GetFileName() const
+	void AssetObject::Save()
+	{
+		TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*GetPath()));
+		Serialize(*Ar);
+
+		GProject->RemovePendingAsset(this);
+	}
+
+	void AssetObject::MarkDirty()
+	{
+		GProject->AddPendingAsset(this);
+	}
+
+	bool AssetObject::IsDirty() const
+	{
+		return GProject->IsPendingAsset(this);
+	}
+
+	FString AssetObject::GetFileName() const
     {
         return FPaths::GetBaseFilename(GetPath());
     }

@@ -9,6 +9,10 @@ namespace SH
 		.BaseClass<GraphPin>()
 	)
 
+	GLOBAL_REFLECTION_REGISTER(AddClass<SlotPin>()
+		.BaseClass<GraphPin>()
+	)
+
 	void GpuTexturePin::Serialize(FArchive& Ar)
 	{
 
@@ -26,4 +30,15 @@ namespace SH
 		}
 		return Value;
 	}
+
+	void SlotPin::Serialize(FArchive& Ar)
+	{
+
+	}
+
+	void SlotPin::LinkTo(GraphPin* TargetPin)
+	{
+
+	}
+
 }

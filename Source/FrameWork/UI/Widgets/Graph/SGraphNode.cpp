@@ -4,6 +4,7 @@
 #include "Styling/StyleColors.h"
 #include "SGraphPanel.h"
 #include "UI/Styles/FAppCommonStyle.h"
+#include <Framework/Commands/GenericCommands.h>
 
 namespace FRAMEWORK
 {
@@ -11,6 +12,12 @@ namespace FRAMEWORK
 	void SGraphNode::Construct(const FArguments& InArgs)
 	{
 		NodeData = InArgs._NodeData;
+
+		UICommandList = MakeShared<FUICommandList>();
+		UICommandList->MapAction(
+			FGenericCommands::Get().Delete,
+			FExecuteAction::CreateRaw(this, &SGraphNode::OnHandleDeleteAction)
+		);
 
 		TSharedRef<SVerticalBox> PinContainer = SNew(SVerticalBox);
 
@@ -33,7 +40,7 @@ namespace FRAMEWORK
 			[
 				SNew(SBorder)
 				.BorderImage(FAppCommonStyle::Get().GetBrush("Graph.NodeContentBackground"))
-				.Padding(FMargin{ 0.0f, 5.0f, 0.0f, 0.0f })
+				.Padding(FMargin{ 0.0f, 4.0f, 0.0f, 0.0f })
 				[
 					PinContainer
 				]
@@ -42,42 +49,62 @@ namespace FRAMEWORK
 
 		for (GraphPin* Pin : NodeData->GetPins())
 		{
-			auto PinContent = SNew(SHorizontalBox)
+			auto PinIcon = SNew(SImage)
+				.ColorAndOpacity(Pin->GetPinColor())
+				.DesiredSizeOverride(FVector2D{ 13,13 })
+				.Image(FAppStyle::Get().GetBrush("Icons.BulletPoint"));
+			auto PinDesc = SNew(SBox).MinDesiredWidth(100.0f)
+				[
+					SNew(STextBlock)
+						.Text(Pin->PinName)
+				];
+
+			auto InputPinContent = SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot()
 				.AutoWidth()
 				.VAlign(VAlign_Center)
 				[
-					SNew(SImage)
-						.ColorAndOpacity(Pin->PinColor)
-						.DesiredSizeOverride(FVector2D{13,13})
-						.Image(FAppStyle::Get().GetBrush("Icons.BulletPoint"))
+					PinIcon
 				]
 				+ SHorizontalBox::Slot()
-				.Padding(5.0f, 0.0f, 0.0f, 0.0f)
-				.HAlign(HAlign_Left)
+				.Padding(4.0f, 0.0f, 0.0f, 0.0f)
+				.AutoWidth()
 				[
-					SNew(SBox).MinDesiredWidth(100.0f)
-					[
-						SNew(STextBlock)
-							.Text(Pin->PinName)
-					]
-					
+					PinDesc
+				];
+
+			auto OutputPinContent = SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot()
+				.Padding(0.0f, 0.0f, 4.0f, 0.0f)
+				.AutoWidth()
+				[
+					PinDesc
+				]
+				+SHorizontalBox::Slot()
+				.AutoWidth()
+				.VAlign(VAlign_Center)
+				[
+					PinIcon
 				];
 
 			if (Pin->Direction == PinDirection::Input)
 			{
-				PinContainer->AddSlot().HAlign(HAlign_Left)
-				.Padding(0.0f, 0.0f, 0.0f, 5.0f)
+				PinDesc->SetHAlign(HAlign_Left);
+
+				PinContainer->AddSlot()
+				.Padding(0.0f, 0.0f, 0.0f, 4.0f)
 				[
-					PinContent
+					InputPinContent
 				];
 			}
 			else
 			{
-				PinContainer->AddSlot().HAlign(HAlign_Right)
-				.Padding(0.0f, 0.0f, 0.0f, 5.0f)
+				PinDesc->SetHAlign(HAlign_Right);
+
+				PinContainer->AddSlot()
+				.Padding(0.0f, 0.0f, 0.0f, 4.0f)
 				[
-					PinContent
+					OutputPinContent
 				];
 			}
 		}
@@ -90,11 +117,48 @@ namespace FRAMEWORK
 
 	FReply SGraphNode::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 	{
-		if (MouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton))
+		if (MouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton) || MouseEvent.IsMouseButtonDown(EKeys::RightMouseButton))
 		{
-			Owner->SetSelectedNode(this);
+			Owner->SetSelectedNode(StaticCastSharedRef<SGraphNode>(AsShared()));
 			return FReply::Handled();
 		}
 		return FReply::Unhandled();
 	}
+
+	FReply SGraphNode::OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+	{
+		if (MouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
+		{
+			FWidgetPath WidgetPath = MouseEvent.GetEventPath() != nullptr ? *MouseEvent.GetEventPath() : FWidgetPath();
+			FSlateApplication::Get().PushMenu(AsShared(), WidgetPath, CreateContextMenu(), FSlateApplication::Get().GetCursorPos(), FPopupTransitionEffect::ContextMenu);
+			return FReply::Handled();
+		}
+		return FReply::Unhandled();
+	}
+
+	TSharedRef<SWidget> SGraphNode::CreateContextMenu()
+	{
+		FMenuBuilder MenuBuilder{ true, UICommandList };
+		MenuBuilder.BeginSection("Control", FText::FromString("Control"));
+		{
+			MenuBuilder.AddMenuEntry(FGenericCommands::Get().Delete);
+		}
+		MenuBuilder.EndSection();
+		return MenuBuilder.MakeWidget();
+	}
+
+	void SGraphNode::OnHandleDeleteAction()
+	{
+		Owner->DeleteNode(StaticCastSharedRef<SGraphNode>(AsShared()));
+	}
+
+	FReply SGraphNode::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+	{
+		if (UICommandList.IsValid() && UICommandList->ProcessCommandBindings(InKeyEvent))
+		{
+			return FReply::Handled();
+		}
+		return FReply::Unhandled();
+	}
+
 }

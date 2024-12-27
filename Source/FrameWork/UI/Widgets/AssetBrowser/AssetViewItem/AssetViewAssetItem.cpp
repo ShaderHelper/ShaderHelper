@@ -98,7 +98,25 @@ namespace FRAMEWORK
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot()
 			[
-                PreviewBox.ToSharedRef()
+				SNew(SOverlay)
+				+SOverlay::Slot()
+				[
+					PreviewBox.ToSharedRef()
+				]
+                +SOverlay::Slot()
+				.VAlign(VAlign_Top)
+				.HAlign(HAlign_Right)
+				[
+					SNew(STextBlock).Text(FText::FromString("*"))
+					.Visibility_Lambda([this] {
+						FGuid Id = TSingleton<AssetManager>::Get().GetGuid(Path);
+						AssetObject* Asset = TSingleton<AssetManager>::Get().FindLoadedAsset(Id);
+						if (Asset && Asset->IsDirty()) {
+							return EVisibility::Visible;
+						}
+						return EVisibility::Collapsed;
+					})
+				]
 			]
 
 			+SVerticalBox::Slot()

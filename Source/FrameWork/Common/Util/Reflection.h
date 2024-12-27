@@ -143,7 +143,7 @@ namespace FRAMEWORK
 	template<typename To, typename From>
 	To* DynamicCast(From* InPtr)
 	{
-		MetaType* Mt = InPtr->MetaType();
+		MetaType* Mt = InPtr->DynamicMetaType();
 		if (Mt->IsDerivedFrom<To>())
 		{
 			return static_cast<To*>(InPtr);
@@ -202,7 +202,7 @@ namespace FRAMEWORK
 #define GLOBAL_REFLECTION_REGISTER(...)	\
 	static const int PREPROCESSOR_JOIN(ReflectionGlobalRegister_,__COUNTER__) = [] { __VA_ARGS__; return 0; }();
 
-#define REFLECTION_TYPE(Type) public: virtual FRAMEWORK::MetaType* MetaType() const {  return FRAMEWORK::GetMetaType<Type>(); }
+#define REFLECTION_TYPE(Type) public: virtual FRAMEWORK::MetaType* DynamicMetaType() const {  return FRAMEWORK::GetMetaType<Type>(); }
 
 #define MANUAL_RTTI_BASE_TYPE() \
 	template<typename T> bool IsOfType() const { return IsOfTypeImpl(T::GetTypeId());} \

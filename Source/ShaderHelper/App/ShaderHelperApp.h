@@ -16,7 +16,7 @@ namespace SH {
 		void Update(double DeltaTime) override;
 		void Render() override;
 
-	private:
+	public:
 		TSharedPtr<FRAMEWORK::ProjectLauncher<ShProject>> Launcher;
 	};
 	

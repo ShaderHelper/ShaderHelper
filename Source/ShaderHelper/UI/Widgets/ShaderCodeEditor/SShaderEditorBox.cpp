@@ -34,6 +34,11 @@ namespace SH
 	const FString FoldMarkerText = TEXT("⇿");
 	const FString ErrorMarkerText = TEXT("✘");
 	
+	SShaderEditorBox::~SShaderEditorBox()
+	{
+
+	}
+
 	void SShaderEditorBox::Construct(const FArguments& InArgs)
 	{
         CodeFontInfo = FShaderHelperStyle::Get().GetFontStyle("CodeFont");
@@ -232,7 +237,7 @@ namespace SH
 					FText::GetEmpty(),
 					FSlateIcon(),
 					FUIAction(FExecuteAction::CreateLambda(
-						[=]()
+						[this, i]()
 						{
 							CodeFontInfo.Size = i;
 							ShaderMarshaller->MakeDirty();

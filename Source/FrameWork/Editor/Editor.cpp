@@ -4,6 +4,7 @@
 #include "Common/Path/PathHelper.h"
 #include "magic_enum.hpp"
 #include <Framework/Commands/GenericCommands.h>
+#include "UI/Widgets/Misc/CommonCommands.h"
 
 STEAL_PRIVATE_MEMBER(FUICommandInfo, FText, Label)
 STEAL_PRIVATE_MEMBER(FUICommandInfo, FText, Description)
@@ -51,6 +52,8 @@ namespace FRAMEWORK
 
 		SetLanguage(CurLanguage);
 		ResetGenericCommandsLabelAndTip();
+
+		CommonCommands::Register();
 	}
 
 	Editor::~Editor()

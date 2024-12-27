@@ -11,5 +11,7 @@ namespace SH
 
 		struct FRAMEWORK::MetaType* SupportAsset() override;
 		void OnOpen(const FString& InAssetPath) override;
+		void OnCreate(FRAMEWORK::AssetObject* InAsset) override;
+		void OnDelete(const FString& InAssetPath) override;
 	};
 }
