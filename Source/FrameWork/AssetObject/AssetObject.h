@@ -17,7 +17,7 @@ namespace FRAMEWORK
 		virtual void PostLoad() {}
 		virtual void Save();
 		virtual void MarkDirty();
-		bool IsDirty() const;
+		bool IsDirty();
 
 		virtual FString FileExtension() const = 0;
 

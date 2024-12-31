@@ -5,6 +5,8 @@
 #include <Styling/StyleColors.h>
 #include "UI/Widgets/Misc/CommonTableRow.h"
 #include "AssetViewItem/AssetViewItem.h"
+#include "ProjectManager/ProjectManager.h"
+#include "UI/Widgets/MessageDialog/SMessageDialog.h"
 
 namespace FRAMEWORK
 {
@@ -85,8 +87,18 @@ namespace FRAMEWORK
     {
         TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
         FString DropFilePath = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Path;
-        FString NewFilePath = DropTargetPath / FPaths::GetCleanFilename(DropFilePath);
-        IFileManager::Get().Move(*NewFilePath, *DropFilePath);
+
+		bool CanDo = true;
+		if (GProject->IsPendingAsset(DropFilePath))
+		{
+			CanDo = MessageDialog::Open(MessageDialog::OkCancel, LOCALIZATION("OpPendingAssetTip"));
+		}
+
+		if (CanDo)
+		{
+			FString NewFilePath = DropTargetPath / FPaths::GetCleanFilename(DropFilePath);
+			IFileManager::Get().Move(*NewFilePath, *DropFilePath);
+		}
         return FReply::Handled();
     }
 

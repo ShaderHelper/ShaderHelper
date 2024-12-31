@@ -37,7 +37,7 @@ namespace FRAMEWORK
 		virtual ~GraphNode() = default;
 
 	public:
-		virtual TSharedRef<class SGraphNode> CreateNodeWidget();
+		virtual TSharedRef<class SGraphNode> CreateNodeWidget(class SGraphPanel* OwnerPanel);
 		virtual TSharedPtr<SWidget> ExtraNodeWidget() { return {}; }
 		virtual void Serialize(FArchive& Ar);
 		virtual FText GetNodeTitle() const { return FText::FromString("Unknown"); }
@@ -49,7 +49,6 @@ namespace FRAMEWORK
 		Vector2D Position{0};
 		TOptional<int32> Layer;
 		TMultiMap<FGuid, FGuid> OutPinToInPin;
-		TMap<FGuid, int> TargetNodeCounts;
 	};
 
 	class FRAMEWORK_API Graph : public AssetObject

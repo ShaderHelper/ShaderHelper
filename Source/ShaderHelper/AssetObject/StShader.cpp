@@ -37,6 +37,11 @@ R"(void mainImage(out float4 fragColor, in float2 fragCoord)
                             .Build();
 	}
 
+	StShader::~StShader()
+	{
+		
+	}
+
 	void StShader::Serialize(FArchive& Ar)
 	{
 		AssetObject::Serialize(Ar);

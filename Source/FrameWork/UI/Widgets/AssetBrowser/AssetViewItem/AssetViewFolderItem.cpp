@@ -5,25 +5,32 @@
 #include <Styling/StyleColors.h>
 #include "UI/Widgets/Misc/CommonTableRow.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
+#include "ProjectManager/ProjectManager.h"
 
 namespace FRAMEWORK
 {
 
     FReply AssetViewFolderItem::HandleOnDragDetected(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
     {
-        if(MouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton))
-        {
-            return FReply::Handled().BeginDragDrop(AssetViewItemDragDropOp::New(Path));
-        }
-        return FReply::Unhandled();
+        return FReply::Handled().BeginDragDrop(AssetViewItemDragDropOp::New(Path));
     }
 
     FReply AssetViewFolderItem::HandleOnDrop(const FDragDropEvent& DragDropEvent)
     {
         TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
         FString DropFilePath = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Path;
-        FString NewFilePath = Path / FPaths::GetCleanFilename(DropFilePath);
-        IFileManager::Get().Move(*NewFilePath, *DropFilePath);
+
+		bool CanDo = true;
+		if (GProject->IsPendingAsset(DropFilePath))
+		{
+			CanDo = MessageDialog::Open(MessageDialog::OkCancel, LOCALIZATION("OpPendingAssetTip"));
+		}
+
+		if (CanDo)
+		{
+			FString NewFilePath = Path / FPaths::GetCleanFilename(DropFilePath);
+			IFileManager::Get().Move(*NewFilePath, *DropFilePath);
+		}
         return FReply::Handled();
     }
 

@@ -4,24 +4,29 @@
 
 namespace FRAMEWORK
 {
-	template<typename T>
+	enum class AssetOwnerShip
+	{
+		Assign,
+		Retain,
+	};
+
+	template<typename T, AssetOwnerShip OwnerShip = AssetOwnerShip::Retain>
 	class AssetPtr
 	{
 		friend class AssetManager;
 
-		template <typename OtherType>
+		template <typename OtherType, AssetOwnerShip OwnerShip>
 		friend class AssetPtr;
-	private:
-		AssetPtr(T* InAsset);
 
 	public:
+		AssetPtr(T* InAsset);
 		AssetPtr(std::nullptr_t = nullptr);
 		AssetPtr(const AssetPtr& InAssetPtr);
 
-		template<typename OtherType,
+		template<typename OtherType, AssetOwnerShip OtherOwnerShip,
 			typename = decltype(ImplicitConv<T*>((OtherType*)nullptr))
 		>
-		AssetPtr(const AssetPtr<OtherType>& OtherAssetPtr);
+		AssetPtr(const AssetPtr<OtherType, OtherOwnerShip>& OtherAssetPtr);
 
 		AssetPtr& operator=(const AssetPtr& OtherAssetPtr);
 
@@ -38,6 +43,9 @@ namespace FRAMEWORK
 	private:
 		T* Asset;
 	};
+
+	template<typename T>
+	using AssetWeakPtr = AssetPtr<T, AssetOwnerShip::Assign>;
 
 	class GpuTexture;
 
@@ -102,6 +110,7 @@ namespace FRAMEWORK
 			return Assets.Contains(Id) ? Assets[Id] : nullptr;
 		}
 
+		//If an asset was deleted, the manager will Free it, so any AssetPtr that refers to it may be invalid.
 		bool IsLoadedAsset(AssetObject* InAsset) const
 		{
 			return AssetRefCounts.Contains(InAsset);
@@ -121,6 +130,7 @@ namespace FRAMEWORK
 		GpuTexture* FindAssetThumbnail(const FGuid& InGuid) const;
 
 		void Clear();
+		void ClearAsset(const FString& InAssetPath);
 		TArray<FString> GetManageredExts() const;
 		
 		void AddRef(AssetObject* InAssetObject);
@@ -133,32 +143,6 @@ namespace FRAMEWORK
 		TMap<AssetObject*, uint32> AssetRefCounts;
 		TMap<FGuid, TRefCountPtr<GpuTexture>> AssetThumbnailPool;
 	};
-
-	template<typename T>
-	FArchive& operator<<(FArchive& Ar, AssetPtr<T>& InOutAssetPtr)
-	{
-		bool IsValid = !!InOutAssetPtr;
-		Ar << IsValid;
-		if (Ar.IsLoading())
-		{
-			if (IsValid)
-			{
-				FGuid AssetGuid;
-				Ar << AssetGuid;
-				InOutAssetPtr = TSingleton<AssetManager>::Get().LoadAssetByGuid<T>(AssetGuid);
-			}
-		}
-		else
-		{
-			if (IsValid)
-			{
-				FGuid AssetGuid = InOutAssetPtr->GetGuid();;
-				Ar << AssetGuid;
-			}
-		}
-		return Ar;
-	}
-
 }
 
 //Resolve circular dependency

@@ -9,15 +9,15 @@ namespace SH
 		REFLECTION_TYPE(ShaderToyPassNode)
 	public:
 		void Serialize(FArchive& Ar) override;
-		FText GetNodeTitle() const override { return LOCALIZATION("RenderPass"); }
+		FText GetNodeTitle() const override { return FText::FromString("RenderPass"); }
 		TArray<FRAMEWORK::GraphPin*> GetPins() override;
 		FSlateColor GetNodeColor() const override { return FLinearColor{ 1.0f, 0.6f, 0.2f }; }
 		void Exec() override;
 
-		SlotPin Slot1{ LOCALIZATION("Slot1"), FRAMEWORK::PinDirection::Input };
-		SlotPin Slot2{ LOCALIZATION("Slot2"), FRAMEWORK::PinDirection::Input };
-		SlotPin Slot3{ LOCALIZATION("Slot3"), FRAMEWORK::PinDirection::Input };
-		SlotPin Slot4{ LOCALIZATION("Slot4"), FRAMEWORK::PinDirection::Input };
-		GpuTexturePin PassOutput{ LOCALIZATION("Texture"), FRAMEWORK::PinDirection::Output };
+		ChannelPin Slot0{ FText::FromString("iChannel0"), FRAMEWORK::PinDirection::Input };
+		ChannelPin Slot1{ FText::FromString("iChannel1"), FRAMEWORK::PinDirection::Input };
+		ChannelPin Slot2{ FText::FromString("iChannel2"), FRAMEWORK::PinDirection::Input };
+		ChannelPin Slot3{ FText::FromString("iChannel3"), FRAMEWORK::PinDirection::Input };
+		GpuTexturePin PassOutput{ FText::FromString("Texture"), FRAMEWORK::PinDirection::Output };
 	};
 }

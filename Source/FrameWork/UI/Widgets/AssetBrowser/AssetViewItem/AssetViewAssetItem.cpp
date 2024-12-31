@@ -5,6 +5,7 @@
 #include <Widgets/SViewport.h>
 #include "AssetManager/AssetManager.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
+#include "ProjectManager/ProjectManager.h"
 
 namespace FRAMEWORK
 {
@@ -20,11 +21,7 @@ namespace FRAMEWORK
 
     FReply AssetViewAssetItem::HandleOnDragDetected(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
     {
-        if(MouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton))
-        {
-            return FReply::Handled().BeginDragDrop(AssetViewItemDragDropOp::New(Path));
-        }
-        return FReply::Unhandled();
+        return FReply::Handled().BeginDragDrop(AssetViewItemDragDropOp::New(Path));
     }
 
 	TSharedRef<ITableRow> AssetViewAssetItem::GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable)
@@ -111,6 +108,7 @@ namespace FRAMEWORK
 					.Visibility_Lambda([this] {
 						FGuid Id = TSingleton<AssetManager>::Get().GetGuid(Path);
 						AssetObject* Asset = TSingleton<AssetManager>::Get().FindLoadedAsset(Id);
+
 						if (Asset && Asset->IsDirty()) {
 							return EVisibility::Visible;
 						}
@@ -140,7 +138,17 @@ namespace FRAMEWORK
                             }
                             else
                             {
-                                IFileManager::Get().Move(*NewFilePath, *Path);
+								if (GProject->IsPendingAsset(Path))
+								{
+									if (MessageDialog::Open(MessageDialog::OkCancel, LOCALIZATION("OpPendingAssetTip")))
+									{
+										IFileManager::Get().Move(*NewFilePath, *Path);
+									}
+								}
+								else
+								{
+									IFileManager::Get().Move(*NewFilePath, *Path);
+								}
                             }
                         }
                     })

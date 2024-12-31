@@ -66,6 +66,7 @@ namespace FRAMEWORK::MessageDialog
 					[
 						SNew(STextBlock)
 						.Text(InArgs._Message)
+						.WrapTextAt(250.0f)
 						.ColorAndOpacity(FLinearColor::White)
 					]
 

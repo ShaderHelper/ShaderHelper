@@ -33,7 +33,7 @@ namespace FRAMEWORK
 		GProject->AddPendingAsset(this);
 	}
 
-	bool AssetObject::IsDirty() const
+	bool AssetObject::IsDirty()
 	{
 		return GProject->IsPendingAsset(this);
 	}

@@ -9,10 +9,10 @@ namespace SH
 		REFLECTION_TYPE(ShaderToyOuputNode)
 	public:
 		void Serialize(FArchive& Ar) override;
-		FText GetNodeTitle() const override { return LOCALIZATION("Output"); }
+		FText GetNodeTitle() const override { return FText::FromString("Output"); }
 		TArray<FRAMEWORK::GraphPin*> GetPins() override;
 		void Exec() override;
 
-		GpuTexturePin ResultPin{ LOCALIZATION("Texture"), FRAMEWORK::PinDirection::Input };
+		GpuTexturePin ResultPin{ FText::FromString("Texture"), FRAMEWORK::PinDirection::Input };
 	};
 }

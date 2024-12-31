@@ -5,6 +5,8 @@
 #include "UI/Widgets/Misc/CommonCommands.h"
 #include <Widgets/Input/SSearchBox.h>
 #include <Styling/StyleColors.h>
+#include "Common/Util/Math.h"
+
 namespace FRAMEWORK
 {
 
@@ -41,10 +43,26 @@ namespace FRAMEWORK
 
 	TSharedPtr<SGraphNode> SGraphPanel::AddNodeFromData(GraphNode* InNodeData)
 	{
-		auto NodeWidget = InNodeData->CreateNodeWidget();
-		NodeWidget->SetOwner(this);
+		auto NodeWidget = InNodeData->CreateNodeWidget(this);
 		Nodes.Add(NodeWidget);
 		return NodeWidget;
+	}
+
+	void SGraphPanel::AddLink(SGraphPin* Output, SGraphPin* Input)
+	{
+		SGraphNode* OutputOwner = Output->Owner;
+		SGraphNode* InputOwner = Input->Owner;
+		OutputOwner->NodeData->OutPinToInPin.Add(Output->PinData->Guid, Input->PinData->Guid);
+		
+		Links.AddUnique(Output, Input);
+	}
+
+	void SGraphPanel::RemoveInputLink(SGraphPin* Input)
+	{
+		if (auto Key = Links.FindKey(Input))
+		{
+			Links.Remove(*Key);
+		}
 	}
 
 	Vector2D SGraphPanel::PanelCoordToGraphCoord(const Vector2D& InCoord) const
@@ -114,11 +132,38 @@ namespace FRAMEWORK
 
 	}
 
+	FReply SGraphPanel::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+	{
+		if (MouseEvent.IsMouseButtonDown(EKeys::RightMouseButton) && MouseEvent.IsControlDown())
+		{
+			CutLineStart = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
+			return FReply::Handled();
+		}
+		return FReply::Unhandled();
+	}
+
 	FReply SGraphPanel::OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 	{
 		if (MouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
 		{
-			if (GraphData)
+			if (CutLineStart)
+			{
+				for (TMultiMap<SGraphPin*, SGraphPin*>::TIterator It = Links.CreateIterator(); It; ++It)
+				{
+					Vector2D C0 = MyGeometry.AbsoluteToLocal(It.Key()->GetTickSpaceGeometry().GetAbsolutePositionAtCoordinates({0.5, 0.5}));
+					Vector2D C3 = MyGeometry.AbsoluteToLocal(It.Value()->GetTickSpaceGeometry().GetAbsolutePositionAtCoordinates({0.5, 0.5}));
+					double Offset = FMath::Abs(C0.x - C3.x) / 2;
+					Vector2D C1 = {C0.x + Offset, C0.y};
+					Vector2D C2 = { C3.x - Offset, C3.y };
+
+					if (LineBezierIntersection(*CutLineStart, CutLineEnd, C0, C1, C2, C3))
+					{
+						It.RemoveCurrent();
+					}
+				}
+				CutLineStart.Reset();
+			}
+			else if (GraphData)
 			{
 				FWidgetPath WidgetPath = MouseEvent.GetEventPath() != nullptr ? *MouseEvent.GetEventPath() : FWidgetPath();
 				FSlateApplication::Get().PushMenu(AsShared(), WidgetPath, CreateContextMenu(), FSlateApplication::Get().GetCursorPos(), FPopupTransitionEffect::ContextMenu);
@@ -133,33 +178,60 @@ namespace FRAMEWORK
 	{
 		const bool bIsLeftMouseButtonDown = MouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton);
 		const bool bIsMiddleMouseButtonDown = MouseEvent.IsMouseButtonDown(EKeys::MiddleMouseButton);
-		const Vector2D CursorDelta = MouseEvent.GetCursorDelta();
+		const bool bIsRightMouseButtonDown = MouseEvent.IsMouseButtonDown(EKeys::RightMouseButton);
 
 		Vector2D CurMousePos = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
 		Vector2D DeltaPos = CurMousePos - MousePos;
 		MousePos = CurMousePos;
 
+		Vector2D Offset = DeltaPos / (1.0f + ZoomValue);
 		if (bIsLeftMouseButtonDown)
 		{
 			if (SelectedNode.IsValid())
 			{
-				SelectedNode.Pin()->NodeData->Position += DeltaPos;
+				SelectedNode.Pin()->NodeData->Position += Offset;
 				GraphData->MarkDirty();
 			}
 			return FReply::Handled();
 		}
 		else if (bIsMiddleMouseButtonDown)
 		{
-			ViewOffset -= CursorDelta;
+			ViewOffset -= Offset;
 			return FReply::Handled();
 		}
+		else if (bIsRightMouseButtonDown)
+		{
+			CutLineEnd = MousePos;
+			return FReply::Handled();
+		}
+
 		return FReply::Unhandled();
 	}
 
 	FReply SGraphPanel::OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 	{
+		if (PreviewStart) {
+			return FReply::Unhandled();
+		}
 		ZoomValue += MouseEvent.GetWheelDelta() * 0.1f;
 		ZoomValue = FMath::Clamp(ZoomValue, -0.5f, 1.0f);
+		return FReply::Handled();
+	}
+
+	FReply SGraphPanel::OnDragOver(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)
+	{
+		TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
+		if (DragDropOp->IsOfType<GraphDragDropOp>())
+		{
+			PreviewEnd = MyGeometry.AbsoluteToLocal(DragDropEvent.GetScreenSpacePosition());
+			return FReply::Handled();
+		}
+		return FReply::Unhandled();
+	}
+
+	FReply SGraphPanel::OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)
+	{
+		PreviewStart.Reset();
 		return FReply::Handled();
 	}
 
@@ -170,6 +242,14 @@ namespace FRAMEWORK
 			return FReply::Handled();
 		}
 		return FReply::Unhandled();
+	}
+
+	void SGraphPanel::DrawConnection(const FPaintGeometry& PaintGeometry, FSlateWindowElementList& OutDrawElements, int32 Layer, PinDirection InStartDir, const Vector2D& Start, const Vector2D& End) const
+	{
+		double Offset = FMath::Abs(End.x - Start.x) / 2;
+		double StartOffset = InStartDir == PinDirection::Output ? Offset : -Offset;
+		double EndOffset = -StartOffset;
+		FSlateDrawElement::MakeCubicBezierSpline(OutDrawElements, Layer, PaintGeometry, Start, { Start.x + StartOffset, Start.y }, {End.x + EndOffset, End.y}, End, 2.0f);
 	}
 
 	int32 SGraphPanel::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
@@ -210,11 +290,28 @@ namespace FRAMEWORK
 				FSlateDrawElement::MakeBox(
 					OutDrawElements,
 					NodeLayerId,
-					CurWidget.Geometry.ToInflatedPaintGeometry(FVector2D{ 1.2,1.2}),
+					CurWidget.Geometry.ToInflatedPaintGeometry(FVector2D{ 1, 1}),
 					FAppCommonStyle::Get().GetBrush("Graph.NodeOutline"),
 					ESlateDrawEffect::None
 				);
 			}
+		}
+
+		if (PreviewStart)
+		{
+			DrawConnection(AllottedGeometry.ToPaintGeometry(), OutDrawElements, LayerId, PreviewStartDir, *PreviewStart, PreviewEnd);
+		}
+
+		for (auto [OutPin, InPin] : Links)
+		{
+			Vector2D OutPos = AllottedGeometry.AbsoluteToLocal(OutPin->GetPaintSpaceGeometry().GetAbsolutePositionAtCoordinates({ 0.5, 0.5 }));
+			Vector2D InPos = AllottedGeometry.AbsoluteToLocal(InPin->GetPaintSpaceGeometry().GetAbsolutePositionAtCoordinates({ 0.5, 0.5 }));
+			DrawConnection(AllottedGeometry.ToPaintGeometry(), OutDrawElements, LayerId, PinDirection::Output, OutPos, InPos);
+		}
+
+		if (CutLineStart)
+		{
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), {*CutLineStart, CutLineEnd}, ESlateDrawEffect::None, FLinearColor::Red);
 		}
 
 		return LayerId;
@@ -271,10 +368,22 @@ namespace FRAMEWORK
 		FSlateApplication::Get().DismissAllMenus();
 	}
 
-	void SGraphPanel::DeleteNode(TSharedRef<SGraphNode> InNode)
+	void SGraphPanel::DeleteNode(TSharedPtr<SGraphNode> InNode)
 	{
 		GraphData->RemoveNode(InNode->NodeData->Guid);
-		Nodes.Remove(MoveTemp(InNode));
+		Nodes.Remove(InNode.ToSharedRef());
+
+		for (TMultiMap<SGraphPin*, SGraphPin*>::TIterator It = Links.CreateIterator(); It; ++It)
+		{
+			if (It.Key()->Owner == InNode.Get())
+			{
+				It.RemoveCurrent();
+			}
+			else if (It.Value()->Owner == InNode.Get())
+			{
+				It.RemoveCurrent();
+			}
+		}
 
 		GraphData->MarkDirty();
 	}

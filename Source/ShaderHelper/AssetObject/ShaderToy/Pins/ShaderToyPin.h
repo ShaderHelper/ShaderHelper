@@ -18,9 +18,9 @@ namespace SH
 		TRefCountPtr<FRAMEWORK::GpuTexture> Value;
 	};
 
-	class SlotPin : public FRAMEWORK::GraphPin
+	class ChannelPin : public FRAMEWORK::GraphPin
 	{
-		REFLECTION_TYPE(SlotPin)
+		REFLECTION_TYPE(ChannelPin)
 	public:
 		using GraphPin::GraphPin;
 

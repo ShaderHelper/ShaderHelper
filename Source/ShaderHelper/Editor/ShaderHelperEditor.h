@@ -35,7 +35,7 @@ namespace SH
 		void OnViewportResize(const FRAMEWORK::Vector2f& InSize);
         
         void OpenStShaderTab(FRAMEWORK::AssetPtr<StShader> InStShader);
-        void TryRestoreStShaderTab(FRAMEWORK::AssetPtr<StShader> InStShader);
+        //void TryRestoreStShaderTab(FRAMEWORK::AssetPtr<StShader> InStShader);
 		
 		void OpenGraph(FRAMEWORK::AssetPtr<FRAMEWORK::Graph> InGraphData);
 

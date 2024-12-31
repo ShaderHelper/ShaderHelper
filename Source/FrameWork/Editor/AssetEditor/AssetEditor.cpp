@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "AssetEditor.h"
+#include "ProjectManager/ProjectManager.h"
 
 namespace FRAMEWORK
 {
@@ -20,4 +21,11 @@ namespace FRAMEWORK
 			return CurAssetOp->SupportAsset() == InAssetMetaType;
 		});
 	}
+
+	void AssetOp::OnDelete(const FString& InAssetPath)
+	{
+		TSingleton<AssetManager>::Get().ClearAsset(InAssetPath);
+		GProject->RemovePendingAsset(InAssetPath);
+	}
+
 }

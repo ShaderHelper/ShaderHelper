@@ -9,7 +9,7 @@ namespace FRAMEWORK
 	public:
 
 		CommonCommands()
-			: TCommands<CommonCommands>(TEXT("CommonCommands"), NSLOCTEXT("CommonCommands", "Common Commands", "Common Commands"), NAME_None, FAppCommonStyle::Get().GetStyleSetName())
+			: TCommands<CommonCommands>(TEXT("CommonCommands"), {}, NAME_None, FAppCommonStyle::Get().GetStyleSetName())
 		{
 		}
 
@@ -20,7 +20,7 @@ namespace FRAMEWORK
 		virtual void RegisterCommands() override
 		{
 #define LOCTEXT_NAMESPACE "CommonCommands"
-			UI_COMMAND(Save, "Save", "Save the current item", EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::S));
+			UI_COMMAND(Save, "", "", EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::S));
 
 #undef LOCTEXT_NAMESPACE
 		}

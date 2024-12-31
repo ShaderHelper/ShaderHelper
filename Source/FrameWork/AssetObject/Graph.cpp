@@ -1,6 +1,7 @@
 #include "CommonHeader.h"
 #include "Graph.h"
 #include "UI/Widgets/Graph/SGraphNode.h"
+#include "UI/Widgets/Graph/SGraphPanel.h"
 #include <Styling/StyleColors.h>
 namespace FRAMEWORK
 {
@@ -47,9 +48,9 @@ namespace FRAMEWORK
 		return FAppStyle::Get().GetBrush("Icons.Blueprints");
 	}
 
-	TSharedRef<SGraphNode> GraphNode::CreateNodeWidget()
+	TSharedRef<SGraphNode> GraphNode::CreateNodeWidget(SGraphPanel* OwnerPanel)
 	{
-		return SNew(SGraphNode).NodeData(this);
+		return SNew(SGraphNode, OwnerPanel).NodeData(this);
 	}
 
 	void GraphNode::Serialize(FArchive& Ar)

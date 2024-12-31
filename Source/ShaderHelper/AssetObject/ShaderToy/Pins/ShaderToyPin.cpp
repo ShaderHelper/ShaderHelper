@@ -9,7 +9,7 @@ namespace SH
 		.BaseClass<GraphPin>()
 	)
 
-	GLOBAL_REFLECTION_REGISTER(AddClass<SlotPin>()
+	GLOBAL_REFLECTION_REGISTER(AddClass<ChannelPin>()
 		.BaseClass<GraphPin>()
 	)
 
@@ -31,12 +31,12 @@ namespace SH
 		return Value;
 	}
 
-	void SlotPin::Serialize(FArchive& Ar)
+	void ChannelPin::Serialize(FArchive& Ar)
 	{
 
 	}
 
-	void SlotPin::LinkTo(GraphPin* TargetPin)
+	void ChannelPin::LinkTo(GraphPin* TargetPin)
 	{
 
 	}

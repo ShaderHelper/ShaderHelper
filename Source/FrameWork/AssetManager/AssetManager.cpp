@@ -79,6 +79,14 @@ namespace FRAMEWORK
 		Assets.Empty();
 	}
 
+	void AssetManager::ClearAsset(const FString& InAssetPath)
+	{
+		if (AssetObject** Ptr = Assets.Find(GetGuid(InAssetPath)))
+		{
+			AssetRefCounts.Remove(*Ptr);
+		}
+	}
+
 	TArray<FString> AssetManager::GetManageredExts() const
 	{
 		TArray<FString> ManageredExts;

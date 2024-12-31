@@ -481,17 +481,21 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
         TabManager->FindExistingLiveTab(CodeTabId)->GetParentDockTabStack()->SetCanDropToAttach(false);
 	}
 
-    void ShaderHelperEditor::TryRestoreStShaderTab(AssetPtr<StShader> InStShader)
-    {
-        if(PendingStShadereTabs.Contains(InStShader))
-        {
-            FName StShaderTabId{*InStShader->GetGuid().ToString()};
-            CodeTabManager->TryInvokeTab(StShaderTabId);
-        }
-    }
+    //void ShaderHelperEditor::TryRestoreStShaderTab(AssetPtr<StShader> InStShader)
+    //{
+    //    if(PendingStShadereTabs.Contains(InStShader))
+    //    {
+    //        FName StShaderTabId{*InStShader->GetGuid().ToString()};
+    //        CodeTabManager->TryInvokeTab(StShaderTabId);
+    //    }
+    //}
 
 	void ShaderHelperEditor::OpenGraph(AssetPtr<Graph> InGraphData)
 	{
+		if(CurProject-> Graph == InGraphData)
+		{
+			return;
+		}
 		GraphPanel->SetGraphData(InGraphData.Get());
 		CurProject->Graph = InGraphData;
 	}

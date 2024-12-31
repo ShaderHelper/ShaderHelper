@@ -24,7 +24,17 @@ namespace FRAMEWORK
 		}
 		void AddPendingAsset(AssetObject* InAsset) { PendingAssets.AddUnique(InAsset); }
 		void RemovePendingAsset(AssetObject* InAsset) { if(PendingAssets.Contains(InAsset)) PendingAssets.Remove(InAsset);}
-		bool IsPendingAsset(const AssetObject* InAsset) { return PendingAssets.Contains(InAsset); }
+		void RemovePendingAsset(const FString& InPath) {
+			PendingAssets.RemoveAll([InPath](const AssetObject* Element) {
+				return Element->GetPath() == InPath;
+			});
+		}
+		bool IsPendingAsset(AssetObject* InAsset) const { return PendingAssets.Contains(InAsset); }
+		bool IsPendingAsset(const FString& InPath) {
+			return PendingAssets.ContainsByPredicate([InPath](const AssetObject* Element) {
+				return Element->GetPath() == InPath;
+			});
+		}
 		bool AnyPendingAsset() const { return !PendingAssets.IsEmpty(); }
 		const FString& GetFilePath() const
 		{

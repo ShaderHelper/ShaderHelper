@@ -9,6 +9,7 @@ namespace SH
 		REFLECTION_TYPE(StShader)
 	public:
 		StShader();
+		~StShader();
 
 	public:
 		void Serialize(FArchive& Ar) override;

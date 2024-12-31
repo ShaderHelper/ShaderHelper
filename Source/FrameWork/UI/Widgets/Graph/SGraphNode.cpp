@@ -4,14 +4,16 @@
 #include "Styling/StyleColors.h"
 #include "SGraphPanel.h"
 #include "UI/Styles/FAppCommonStyle.h"
+#include "UI/Widgets/Graph/SGraphPin.h"
 #include <Framework/Commands/GenericCommands.h>
 
 namespace FRAMEWORK
 {
 	
-	void SGraphNode::Construct(const FArguments& InArgs)
+	void SGraphNode::Construct(const FArguments& InArgs, SGraphPanel* InOwnerPanel)
 	{
 		NodeData = InArgs._NodeData;
+		Owner = InOwnerPanel;
 
 		UICommandList = MakeShared<FUICommandList>();
 		UICommandList->MapAction(
@@ -49,10 +51,7 @@ namespace FRAMEWORK
 
 		for (GraphPin* Pin : NodeData->GetPins())
 		{
-			auto PinIcon = SNew(SImage)
-				.ColorAndOpacity(Pin->GetPinColor())
-				.DesiredSizeOverride(FVector2D{ 13,13 })
-				.Image(FAppStyle::Get().GetBrush("Icons.BulletPoint"));
+			auto PinIcon = SNew(SGraphPin, this).PinData(Pin);
 			auto PinDesc = SNew(SBox).MinDesiredWidth(100.0f)
 				[
 					SNew(STextBlock)
@@ -67,7 +66,7 @@ namespace FRAMEWORK
 					PinIcon
 				]
 				+ SHorizontalBox::Slot()
-				.Padding(4.0f, 0.0f, 0.0f, 0.0f)
+				.Padding(2.0f, 0.0f, 0.0f, 0.0f)
 				.AutoWidth()
 				[
 					PinDesc
@@ -75,12 +74,12 @@ namespace FRAMEWORK
 
 			auto OutputPinContent = SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot()
-				.Padding(0.0f, 0.0f, 4.0f, 0.0f)
+				.Padding(0.0f, 0.0f, 2.0f, 0.0f)
 				.AutoWidth()
 				[
 					PinDesc
 				]
-				+SHorizontalBox::Slot()
+				+ SHorizontalBox::Slot()
 				.AutoWidth()
 				.VAlign(VAlign_Center)
 				[
@@ -159,6 +158,16 @@ namespace FRAMEWORK
 			return FReply::Handled();
 		}
 		return FReply::Unhandled();
+	}
+
+	void SGraphNode::AddDep(SGraphNode* InNode)
+	{
+
+	}
+
+	void SGraphNode::RemoveDep(SGraphNode* InNode)
+	{
+
 	}
 
 }

@@ -33,6 +33,8 @@ namespace SH
 
 	void ShaderToyOp::OnDelete(const FString& InAssetPath)
 	{
+		AssetOp::OnDelete(InAssetPath);
+
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		ShEditor->OpenGraph(nullptr);
 	}
