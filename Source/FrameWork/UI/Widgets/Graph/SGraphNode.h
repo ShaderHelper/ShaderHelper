@@ -24,8 +24,10 @@ namespace FRAMEWORK
 		class GraphNode* NodeData;
 		SGraphPanel* Owner;
 		TSharedPtr<FUICommandList> UICommandList;
+		TArray<class SGraphPin*> Pins;
 
 	private:
 		TMap<SGraphNode*, int> OutDegreeDeps;
+		FVector2D MousePos;
 	};
 }

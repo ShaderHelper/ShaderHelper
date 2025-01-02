@@ -255,51 +255,30 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
             ];
     }
 
-    void ShaderHelperEditor::Update(double DeltaTime)
-    {
-        
-    }
-
     TSharedRef<SDockTab> ShaderHelperEditor::SpawnStShaderTab(const FSpawnTabArgs& Args)
     {
         FGuid StShaderGuid{Args.GetTabId().ToString()};
         FName TabId = Args.GetTabId().TabType;
         auto LoadedStShader = TSingleton<AssetManager>::Get().LoadAssetByGuid<StShader>(StShaderGuid);
 
-        if(PendingStShadereTabs.Contains(LoadedStShader))
-        {
-            ShaderEditor = PendingStShadereTabs[LoadedStShader];
-            PendingStShadereTabs.Remove(LoadedStShader);
-        }
-        else
-        {
-            ShaderEditor = SNew(SShaderEditorBox).StShaderAsset(LoadedStShader.Get());
-        }
+        ShaderEditor = SNew(SShaderEditorBox).StShaderAsset(LoadedStShader.Get());
         auto NewStShaderTab = SNew(SShaderTab)
             .TabRole(ETabRole::DocumentTab)
-            .Label(FText::FromString(LoadedStShader->GetFileName()))
+			.Label_Lambda([this, LoadedStShader] {
+				FString DirtyChar;
+				if (CurProject->IsPendingAsset(LoadedStShader.Get()))
+				{
+					DirtyChar = "*";
+				}
+				return FText::FromString(LoadedStShader->GetFileName() + DirtyChar);
+			})
             .OnTabClosed_Lambda([this, LoadedStShader, TabId, Args](TSharedRef<SDockTab> ClosedTab) {
                 CurProject->OpenedStShaders.Remove(*CurProject->OpenedStShaders.FindKey(ClosedTab));
-                PendingStShadereTabs.Add(LoadedStShader, ShaderEditor);
-                auto DockTabStack = ClosedTab->GetParentDockTabStack();
-                PRAGMA_DISABLE_DEPRECATION_WARNINGS
-                //Persist the tab being closed until next frame to be able to restore the tab.
-                FDelegateHandle TickerHandle = FTicker::GetCoreTicker().AddTicker(
-					FTickerDelegate::CreateLambda([=](float) {
-                    //If the StShader tab was not restored on the last frame.
-                    if(PendingStShadereTabs.Contains(LoadedStShader))
-                    {
-                        CodeTabManager->UnregisterTabSpawner(TabId);
-                        PendingStShadereTabs.Remove(LoadedStShader);
-                        //Clear the PersistLayout when closing a StShader tab. we don't intend to restore it, so just destroy it.
-                        DockTabStack->OnTabRemoved(Args.GetTabId());
-                        TArray<TSharedRef<FTabManager::FArea>>& CollapsedDockAreas = GetPrivate_FTabManager_CollapsedDockAreas(*CodeTabManager);
-                        CollapsedDockAreas.Empty();
-                    }
-                    FTicker::GetCoreTicker().RemoveTicker(TickerHandle);
-                    return false;
-                }));
-                PRAGMA_ENABLE_DEPRECATION_WARNINGS
+				//Clear the PersistLayout when closing a StShader tab. we don't intend to restore it, so just destroy it.
+				auto DockTabStack = ClosedTab->GetParentDockTabStack();
+				DockTabStack->OnTabRemoved(Args.GetTabId());
+				TArray<TSharedRef<FTabManager::FArea>>& CollapsedDockAreas = GetPrivate_FTabManager_CollapsedDockAreas(*CodeTabManager);
+				CollapsedDockAreas.Empty();
             })
             [
                 SNew(SVerticalBox)
@@ -376,7 +355,8 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
             for(const auto& [OpenedStShader, _] : CurProject->OpenedStShaders)
             {
                 FName StShaderTabId{*OpenedStShader.GetGuid().ToString()};
-                CodeTabManager->RegisterTabSpawner(StShaderTabId, FOnSpawnTab::CreateRaw(this, &ShaderHelperEditor::SpawnStShaderTab));
+				CodeTabManager->RegisterTabSpawner(
+					StShaderTabId, FOnSpawnTab::CreateRaw(this, &ShaderHelperEditor::SpawnStShaderTab));
             }
  
             if(!CurProject->CodeTabLayout)
@@ -452,6 +432,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 				.Padding(6.0f)
 				[
 					SNew(STextBlock)
+					.Visibility(EVisibility::HitTestInvisible)
 					.ColorAndOpacity(FLinearColor::White)
 					.Font(FShaderHelperStyle::Get().GetFontStyle("CodeFont"))
 					.ShadowOffset(FVector2D{2,2})
@@ -481,21 +462,8 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
         TabManager->FindExistingLiveTab(CodeTabId)->GetParentDockTabStack()->SetCanDropToAttach(false);
 	}
 
-    //void ShaderHelperEditor::TryRestoreStShaderTab(AssetPtr<StShader> InStShader)
-    //{
-    //    if(PendingStShadereTabs.Contains(InStShader))
-    //    {
-    //        FName StShaderTabId{*InStShader->GetGuid().ToString()};
-    //        CodeTabManager->TryInvokeTab(StShaderTabId);
-    //    }
-    //}
-
 	void ShaderHelperEditor::OpenGraph(AssetPtr<Graph> InGraphData)
 	{
-		if(CurProject-> Graph == InGraphData)
-		{
-			return;
-		}
 		GraphPanel->SetGraphData(InGraphData.Get());
 		CurProject->Graph = InGraphData;
 	}
@@ -506,9 +474,6 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
         if(TabPtr == nullptr || !*TabPtr)
         {
             FName StShaderTabId{*InStShader->GetGuid().ToString()};
-            //Register the tab spawner to restore the tab if need.
-            CodeTabManager->RegisterTabSpawner(StShaderTabId, FOnSpawnTab::CreateRaw(this, &ShaderHelperEditor::SpawnStShaderTab))
-                .SetReuseTabMethod(FOnFindTabToReuse::CreateLambda([](const FTabId&){ return nullptr; }));
             auto NewStShaderTab = SpawnStShaderTab({Window, StShaderTabId});
             if(StShaderTabStackInsertPoint.IsValid() && StShaderTabStackInsertPoint.Pin()->GetAllChildTabs().IsValidIndex(0))
             {

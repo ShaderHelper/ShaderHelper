@@ -58,7 +58,7 @@ namespace FRAMEWORK
 					OwnerPanel->AddLink(StartPin, EndPin);
 				}
 				OwnerPanel->PreviewStart.Reset();
-				return FReply::Handled();
+				return FReply::Handled().ReleaseMouseLock();
 			}
 		}
 		return FReply::Unhandled();

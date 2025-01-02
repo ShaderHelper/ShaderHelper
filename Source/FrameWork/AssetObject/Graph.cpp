@@ -57,7 +57,7 @@ namespace FRAMEWORK
 	{
 		Ar << Guid;
 		Ar << Position;
-		Ar << Layer;
+		Ar << OutPinToInPin;
 	}
 
 	FSlateColor GraphNode::GetNodeColor() const
@@ -67,6 +67,7 @@ namespace FRAMEWORK
 
 	void GraphPin::Serialize(FArchive& Ar)
 	{
+		Ar << Guid;
 		Ar << Direction;
 	}
 

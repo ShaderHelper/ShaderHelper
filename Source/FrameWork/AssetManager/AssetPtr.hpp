@@ -130,6 +130,7 @@ namespace FRAMEWORK
 			{
 				FGuid AssetGuid;
 				Ar << AssetGuid;
+				//Maybe return a null AssetPtr because of outside deleting.
 				InOutAssetPtr = TSingleton<AssetManager>::Get().LoadAssetByGuid<T>(AssetGuid);
 			}
 		}

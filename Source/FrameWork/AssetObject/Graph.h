@@ -47,7 +47,6 @@ namespace FRAMEWORK
 
 		FGuid Guid = FGuid::NewGuid();
 		Vector2D Position{0};
-		TOptional<int32> Layer;
 		TMultiMap<FGuid, FGuid> OutPinToInPin;
 	};
 
@@ -58,22 +57,22 @@ namespace FRAMEWORK
 		Graph() = default;
 
 	public:
-		void Serialize(FArchive& Ar) override;
-		const FSlateBrush* GetImage() const override;
 		void AddNode(TSharedPtr<GraphNode> InNode) { NodeDatas.Add(MoveTemp(InNode)); }
 		void RemoveNode(FGuid Id) {
 			NodeDatas.RemoveAll([Id](const TSharedPtr<GraphNode>& Element) {
 				return Element->Guid == Id;
-			});
+				});
 		}
-
-		GraphNode* GetNode(FGuid Id) const {
+		TSharedPtr<GraphNode> GetNode(FGuid Id) const {
 			return (*NodeDatas.FindByPredicate([Id](const TSharedPtr<GraphNode>& Element) {
 				return Element->Guid == Id;
-			})).Get();
+				}));
 		}
 		const TArray<TSharedPtr<GraphNode>>& GetNodes() const { return NodeDatas; }
 
+	public:
+		void Serialize(FArchive& Ar) override;
+		const FSlateBrush* GetImage() const override;
 		virtual TArray<MetaType*> SupportNodes() const { return {}; }
 	
 	protected:

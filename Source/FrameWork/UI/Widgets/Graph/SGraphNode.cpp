@@ -52,6 +52,7 @@ namespace FRAMEWORK
 		for (GraphPin* Pin : NodeData->GetPins())
 		{
 			auto PinIcon = SNew(SGraphPin, this).PinData(Pin);
+			Pins.Add(&*PinIcon);
 			auto PinDesc = SNew(SBox).MinDesiredWidth(100.0f)
 				[
 					SNew(STextBlock)
@@ -118,7 +119,12 @@ namespace FRAMEWORK
 	{
 		if (MouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton) || MouseEvent.IsMouseButtonDown(EKeys::RightMouseButton))
 		{
-			Owner->SetSelectedNode(StaticCastSharedRef<SGraphNode>(AsShared()));
+			if (!Owner->IsSelectedNode(this))
+			{
+				Owner->ClearSelectedNode();
+				Owner->AddSelectedNode(SharedThis(this));
+			}
+			MousePos = MouseEvent.GetScreenSpacePosition();
 			return FReply::Handled();
 		}
 		return FReply::Unhandled();
@@ -130,6 +136,16 @@ namespace FRAMEWORK
 		{
 			FWidgetPath WidgetPath = MouseEvent.GetEventPath() != nullptr ? *MouseEvent.GetEventPath() : FWidgetPath();
 			FSlateApplication::Get().PushMenu(AsShared(), WidgetPath, CreateContextMenu(), FSlateApplication::Get().GetCursorPos(), FPopupTransitionEffect::ContextMenu);
+			return FReply::Handled();
+		}
+		else if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+		{
+			FVector2D Offset = MouseEvent.GetScreenSpacePosition() - MousePos;
+			if (Owner->IsMultiSelect() && Offset.Equals(FVector2D::Zero(), 0.01))
+			{
+				Owner->ClearSelectedNode();
+				Owner->AddSelectedNode(SharedThis(this));
+			}
 			return FReply::Handled();
 		}
 		return FReply::Unhandled();
@@ -148,7 +164,7 @@ namespace FRAMEWORK
 
 	void SGraphNode::OnHandleDeleteAction()
 	{
-		Owner->DeleteNode(StaticCastSharedRef<SGraphNode>(AsShared()));
+		Owner->DeleteSelectedNodes();
 	}
 
 	FReply SGraphNode::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
@@ -162,12 +178,22 @@ namespace FRAMEWORK
 
 	void SGraphNode::AddDep(SGraphNode* InNode)
 	{
-
+		if (OutDegreeDeps.Contains(InNode))
+		{
+			OutDegreeDeps[InNode]++;
+		}
+		else
+		{
+			OutDegreeDeps.Add(InNode);
+		}
 	}
 
 	void SGraphNode::RemoveDep(SGraphNode* InNode)
 	{
-
+		if (OutDegreeDeps[InNode] - 1 <= 0)
+		{
+			OutDegreeDeps.Remove(InNode);
+		}
 	}
 
 }

@@ -15,7 +15,7 @@ namespace SH
 
 	void GpuTexturePin::Serialize(FArchive& Ar)
 	{
-
+		GraphPin::Serialize(Ar);
 	}
 
 	void GpuTexturePin::LinkTo(GraphPin* TargetPin)
@@ -33,7 +33,7 @@ namespace SH
 
 	void ChannelPin::Serialize(FArchive& Ar)
 	{
-
+		GraphPin::Serialize(Ar);
 	}
 
 	void ChannelPin::LinkTo(GraphPin* TargetPin)

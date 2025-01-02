@@ -28,14 +28,12 @@ namespace SH
         FTabManager* GetCodeTabManager() const { return CodeTabManager.Get(); }
         
     public:
-        void Update(double DeltaTime) override;
 		void ResetWindowLayout();
 		WindowLayoutConfigInfo LoadWindowLayout(const FString& InWindowLayoutConfigFileName);
 		void SaveWindowLayout(const TSharedRef<FTabManager::FLayout>& InLayout);
 		void OnViewportResize(const FRAMEWORK::Vector2f& InSize);
         
         void OpenStShaderTab(FRAMEWORK::AssetPtr<StShader> InStShader);
-        //void TryRestoreStShaderTab(FRAMEWORK::AssetPtr<StShader> InStShader);
 		
 		void OpenGraph(FRAMEWORK::AssetPtr<FRAMEWORK::Graph> InGraphData);
 
@@ -69,8 +67,6 @@ namespace SH
 		TWeakPtr<SBox> PropertyViewBox;
         
 		class ShProject* CurProject;
-        //used to restore the ShaderEditorBox when the StShader asset path is changed.
-        TMap<FRAMEWORK::AssetPtr<StShader>, TSharedPtr<class SShaderEditorBox>> PendingStShadereTabs;
 
 		TSharedPtr<FRAMEWORK::SGraphPanel> GraphPanel;
 	};

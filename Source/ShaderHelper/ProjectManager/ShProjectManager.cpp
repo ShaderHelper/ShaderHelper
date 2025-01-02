@@ -93,7 +93,15 @@ namespace SH
 			{
 				AssetPtr<StShader> LoadedStShader;
 				Ar << LoadedStShader;
-				OpenedStShaders.Add(MoveTemp(LoadedStShader), nullptr);
+				if (LoadedStShader)
+				{
+					OpenedStShaders.Add(MoveTemp(LoadedStShader), nullptr);
+				}
+				else
+				{
+					//TODO
+					HasCodeTabLayout = false;
+				}
 			}
 
 			if (HasCodeTabLayout)

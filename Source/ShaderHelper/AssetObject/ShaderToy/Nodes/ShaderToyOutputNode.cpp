@@ -12,6 +12,8 @@ namespace SH
 	void ShaderToyOuputNode::Serialize(FArchive& Ar)
 	{
 		GraphNode::Serialize(Ar);
+
+		ResultPin.Serialize(Ar);
 	}
 
 	TArray<GraphPin*> ShaderToyOuputNode::GetPins()

@@ -15,9 +15,6 @@ namespace SH
 		void Exec() override;
 
 		ChannelPin Slot0{ FText::FromString("iChannel0"), FRAMEWORK::PinDirection::Input };
-		ChannelPin Slot1{ FText::FromString("iChannel1"), FRAMEWORK::PinDirection::Input };
-		ChannelPin Slot2{ FText::FromString("iChannel2"), FRAMEWORK::PinDirection::Input };
-		ChannelPin Slot3{ FText::FromString("iChannel3"), FRAMEWORK::PinDirection::Input };
 		GpuTexturePin PassOutput{ FText::FromString("Texture"), FRAMEWORK::PinDirection::Output };
 	};
 }

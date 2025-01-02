@@ -28,13 +28,17 @@ namespace FRAMEWORK
 	public:
 		void Clear();
 		void SetGraphData(Graph* InGraphData);
-		void SetSelectedNode(TSharedPtr<SGraphNode> InNode);
+		void AddSelectedNode(TSharedRef<SGraphNode> InNode);
+		void ClearSelectedNode() { SelectedNodes.Empty(); }
+		bool IsSelectedNode(SGraphNode* InNode) const { return SelectedNodes.Contains(InNode); }
+		bool IsMultiSelect() const { return SelectedNodes.Num() > 1; }
+		Vector2D GetMousePos() const { return MousePos; }
 
 		virtual void OnArrangeChildren(const FGeometry& AllottedGeometry, FArrangedChildren& ArrangedChildren) const override;
 		virtual FVector2D ComputeDesiredSize(float) const override;
 		virtual FChildren* GetChildren() override;
 
-		virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
+		virtual FReply OnPreviewMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 		virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 		virtual FReply OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 		virtual FReply OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
@@ -50,8 +54,10 @@ namespace FRAMEWORK
 		TSharedRef<ITableRow> GenerateNodeItems(TSharedPtr<FText> Item, const TSharedRef<STableViewBase>& OwnerTable);
 		void OnMenuItemSelected(TSharedPtr<FText> InSelectedItem, ESelectInfo::Type SelectInfo);
 
-		void DeleteNode(TSharedPtr<SGraphNode> InNode);
+		void DeleteSelectedNodes();
+		void DeleteNode(SGraphNode* Node);
 		
+		SGraphPin* GetGraphPin(FGuid PinId);
 		TSharedPtr<SGraphNode> AddNodeFromData(GraphNode* InNodeData);
 		void AddLink(SGraphPin* Output, SGraphPin* Input);
 		void RemoveInputLink(SGraphPin* Input);
@@ -68,14 +74,16 @@ namespace FRAMEWORK
 		TOptional<Vector2D> CutLineStart;
 		Vector2D CutLineEnd;
 
+		TOptional<Vector2D> MarqueeStart;
+		Vector2D MarqueeEnd;
+
 	protected:
 		Graph* GraphData;
 		TSlotlessChildren<SGraphNode> Nodes;
 		Vector2D MousePos;
 		Vector2D ViewOffset;
 		float ZoomValue;
-		mutable int32 CurMaxNodeLayer;
-		TWeakPtr<SGraphNode> SelectedNode;
+		TArray<SGraphNode*> SelectedNodes;
 		TSharedPtr<FUICommandList> UICommandList;
 		TArray<TSharedPtr<FText>> MenuNodeItems;
 

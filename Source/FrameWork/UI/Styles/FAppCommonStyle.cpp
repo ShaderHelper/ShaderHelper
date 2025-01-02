@@ -96,6 +96,7 @@ namespace FRAMEWORK
 			.SetHovered(IMAGE_BRUSH_SVG("Starship/Common/close-small", FVector2D(30.0, 30.0)));
 		Style->Set("CloseButton", CloseButton);
 		
+		Style->Set("Graph.Selector", new BORDER_BRUSH("Common/Selector", FMargin(6.0f / 32.0f)));
 		return Style;
 	}
 

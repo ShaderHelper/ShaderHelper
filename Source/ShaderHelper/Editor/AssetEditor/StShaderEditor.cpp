@@ -27,9 +27,7 @@ namespace SH
 
     void StShaderOp::OnAdd(const FString& InAssetPath)
     {
-		/*AssetPtr<StShader> LoadedStShaderAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<StShader>(InAssetPath);
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->TryRestoreStShaderTab(MoveTemp(LoadedStShaderAsset));*/
+
     }
 
     void StShaderOp::OnDelete(const FString& InAssetPath)

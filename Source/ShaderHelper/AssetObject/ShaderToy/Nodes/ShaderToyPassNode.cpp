@@ -12,11 +12,14 @@ namespace SH
 	void ShaderToyPassNode::Serialize(FArchive& Ar)
 	{
 		GraphNode::Serialize(Ar);
+		
+		Slot0.Serialize(Ar);
+		PassOutput.Serialize(Ar);
 	}
 
 	TArray<GraphPin*> ShaderToyPassNode::GetPins()
 	{
-		return { &PassOutput,&Slot0,&Slot1,&Slot2,&Slot3 };
+		return { &PassOutput,&Slot0};
 	}
 
 	void ShaderToyPassNode::Exec()

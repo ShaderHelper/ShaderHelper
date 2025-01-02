@@ -694,20 +694,26 @@ namespace SH
 		UpdateFoldingArrow();
 	}
 
-	bool SShaderEditorBox::OnShaderTextChanged(const FString& NewShaderSouce)
+	bool SShaderEditorBox::OnShaderTextChanged(const FString& InShaderSouce)
 	{
-		CurrentShaderSource = NewShaderSouce;
+		FString NewShaderSource = InShaderSouce.Replace(TEXT("\r\n"), TEXT("\n"));
+		CurrentShaderSource = NewShaderSource;
+		if (NewShaderSource != StShaderAsset->GetPixelShaderBody())
+		{
+			StShaderAsset->MarkDirty();
+		}
+
 		FString ShaderResourceDeclaration = StShaderAsset->GetResourceDeclaration();
 
 		TArray<FString> AddedLines;
 		int32 AddedLineNum = ShaderResourceDeclaration.ParseIntoArrayLines(AddedLines, false) - 1;
 
-		FString FinalShaderSource = ShaderResourceDeclaration + NewShaderSouce;
+		FString FinalShaderSource = ShaderResourceDeclaration + NewShaderSource;
 		if (CurrentFullShaderSource == FinalShaderSource)
 		{
 			return CurEditState == EditState::Normal;
 		}
-
+		
 		CurrentFullShaderSource = FinalShaderSource;
 
 		TRefCountPtr<GpuShader> NewPixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, MoveTemp(FinalShaderSource), {}, TEXT("MainPS"));
