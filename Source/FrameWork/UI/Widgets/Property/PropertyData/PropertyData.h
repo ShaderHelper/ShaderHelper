@@ -1,7 +1,7 @@
 #pragma once
 #include "RenderResource/UniformBuffer.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	class PropertyData : public TSharedFromThis<PropertyData>
 	{

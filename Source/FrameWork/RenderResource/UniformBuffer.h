@@ -2,7 +2,7 @@
 #include "GpuApi/GpuRhi.h"
 #include <string_view>
 
-namespace FRAMEWORK
+namespace FW
 {
 	struct UniformBufferMemberInfo
 	{

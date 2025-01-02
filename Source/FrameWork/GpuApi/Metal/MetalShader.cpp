@@ -4,7 +4,7 @@
 #include "ShaderConductor.hpp"
 #include "Common/Path/PathHelper.h"
 
-namespace FRAMEWORK
+namespace FW
 {
     TRefCountPtr<MetalShader> CreateMetalShader(ShaderType InType, FString InSourceText, FString ShaderName, FString InEntryPoint)
     {

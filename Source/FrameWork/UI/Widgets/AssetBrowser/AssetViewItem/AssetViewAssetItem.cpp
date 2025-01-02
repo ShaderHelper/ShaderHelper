@@ -6,8 +6,9 @@
 #include "AssetManager/AssetManager.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "ProjectManager/ProjectManager.h"
+#include "App/App.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	AssetViewAssetItem::AssetViewAssetItem(const FString& InPath)
@@ -134,13 +135,13 @@ namespace FRAMEWORK
                         {
                             if(IFileManager::Get().FileExists(*NewFilePath))
                             {
-                                MessageDialog::Open(MessageDialog::Ok, LOCALIZATION("AssetRenameFailure"));
+                                MessageDialog::Open(MessageDialog::Ok, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("AssetRenameFailure"));
                             }
                             else
                             {
 								if (GProject->IsPendingAsset(Path))
 								{
-									if (MessageDialog::Open(MessageDialog::OkCancel, LOCALIZATION("OpPendingAssetTip")))
+									if (MessageDialog::Open(MessageDialog::OkCancel, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("OpPendingAssetTip")))
 									{
 										IFileManager::Get().Move(*NewFilePath, *Path);
 									}

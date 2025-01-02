@@ -2,7 +2,7 @@
 #include "Dx12Common.h"
 #include "Dx12Device.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 #if GPU_API_DEBUG
 	FString GetDredInfo()

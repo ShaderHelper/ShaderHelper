@@ -2,7 +2,7 @@
 #include "UnitTestApp.h"
 #include "Editor/UnitTestEditor.h"
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace UNITTEST_UTIL
 {

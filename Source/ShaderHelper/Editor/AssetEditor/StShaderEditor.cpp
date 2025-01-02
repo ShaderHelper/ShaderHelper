@@ -5,7 +5,7 @@
 #include "Editor/ShaderHelperEditor.h"
 #include "AssetManager/AssetManager.h"
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace SH
 {

@@ -4,7 +4,7 @@
 #include <Misc/OutputDeviceHelper.h>
 #include <Framework/Text/SlateTextRun.h>
 
-namespace FRAMEWORK 
+namespace FW 
 {
 
 	SOutputLog::SOutputLog()

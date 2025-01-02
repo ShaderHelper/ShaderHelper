@@ -4,7 +4,7 @@
 #include "UI/Styles/FAppCommonStyle.h"
 #include <Widgets/Input/SSpinBox.h>
 
-namespace FRAMEWORK
+namespace FW
 {
 	class SNeverSelectedTableRow : public STableRow<TSharedRef<PropertyData>>
 	{

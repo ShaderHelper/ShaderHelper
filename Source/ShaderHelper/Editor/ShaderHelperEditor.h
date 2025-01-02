@@ -1,6 +1,5 @@
 #pragma once
 #include <Widgets/SViewport.h>
-#include "Renderer/ShRenderer.h"
 #include "Editor/Editor.h"
 #include "Editor/PreviewViewPort.h"
 #include "AssetObject/StShader.h"
@@ -12,7 +11,7 @@
 
 namespace SH 
 {
-	class ShaderHelperEditor : public FRAMEWORK::Editor
+	class ShaderHelperEditor : public FW::Editor
 	{
 	public:
 		struct WindowLayoutConfigInfo
@@ -22,20 +21,20 @@ namespace SH
 			TSharedPtr<FTabManager::FLayout> TabLayout;
 		};
 
-		ShaderHelperEditor(const FRAMEWORK::Vector2f& InWindowSize, ShRenderer* InRenderer);
+		ShaderHelperEditor(const FW::Vector2f& InWindowSize);
 		~ShaderHelperEditor();
     public:
         FTabManager* GetCodeTabManager() const { return CodeTabManager.Get(); }
+		TSharedPtr<SWindow> GetMainWindow() const override { return Window; }
         
     public:
 		void ResetWindowLayout();
 		WindowLayoutConfigInfo LoadWindowLayout(const FString& InWindowLayoutConfigFileName);
 		void SaveWindowLayout(const TSharedRef<FTabManager::FLayout>& InLayout);
-		void OnViewportResize(const FRAMEWORK::Vector2f& InSize);
         
-        void OpenStShaderTab(FRAMEWORK::AssetPtr<StShader> InStShader);
+        void OpenStShaderTab(FW::AssetPtr<StShader> InStShader);
 		
-		void OpenGraph(FRAMEWORK::AssetPtr<FRAMEWORK::Graph> InGraphData);
+		void OpenGraph(FW::AssetPtr<FW::Graph> InGraphData);
 
 	private:
 		TSharedRef<SDockTab> SpawnWindowTab(const FSpawnTabArgs& Args);
@@ -46,12 +45,11 @@ namespace SH
 		void InitEditorUI();
 		
 	private:
-		ShRenderer* Renderer;
 		TSharedPtr<FTabManager::FLayout> DefaultTabLayout;
 		TSharedPtr<SDockTab> TabManagerTab;
 		TSharedPtr<FTabManager> TabManager;
         FDelegateHandle SaveLayoutTicker;
-        TSharedPtr<FRAMEWORK::SAssetBrowser> AssetBrowser;
+        TSharedPtr<FW::SAssetBrowser> AssetBrowser;
 		TSharedPtr<SShaderEditorBox> ShaderEditor;
 
         TSharedPtr<SDockTab> CodeTab;
@@ -60,7 +58,7 @@ namespace SH
         TSharedPtr<class SDockingArea> CodeTabMainArea;
         
 		TSharedPtr<SWindow> Window;
-		TSharedPtr<FRAMEWORK::PreviewViewPort> ViewPort;
+		TSharedPtr<FW::PreviewViewPort> ViewPort;
 		FVector2D WindowSize;
 
         TSharedPtr<SVerticalBox> WindowContentBox;
@@ -68,7 +66,7 @@ namespace SH
         
 		class ShProject* CurProject;
 
-		TSharedPtr<FRAMEWORK::SGraphPanel> GraphPanel;
+		TSharedPtr<FW::SGraphPanel> GraphPanel;
 	};
 
 }

@@ -6,7 +6,7 @@
 #include "App/App.h"
 #include "AssetObject/ShaderToy/Nodes/ShaderToyOutputNode.h"
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace SH
 {

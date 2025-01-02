@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "SShaderPropertyView.h"
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace SH
 {
@@ -11,7 +11,7 @@ namespace SH
 		Renderer = InArgs._Renderer;
 		ShaderEditor = InArgs._ShaderEditor;
 
-		PropertyDatas = Renderer->GetBuiltInPropertyDatas();
+		//PropertyDatas = Renderer->GetBuiltInPropertyDatas();
 
 		CustomPropertyCategory = MakeShared<PropertyCategory>("Custom");
 		CustomPropertyCategory->SetAddMenuWidget(GetCategoryMenu());

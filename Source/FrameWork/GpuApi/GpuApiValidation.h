@@ -4,7 +4,7 @@
 DECLARE_LOG_CATEGORY_EXTERN(LogRhiValidation , Log, All);
 inline DEFINE_LOG_CATEGORY(LogRhiValidation);
 
-namespace FRAMEWORK
+namespace FW
 {
 	enum class CmdRecorderState
 	{

@@ -2,7 +2,7 @@
 #include "Dx12Common.h"
 #include "GpuApi/GpuResource.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	class Dx12Shader : public GpuShader
 	{

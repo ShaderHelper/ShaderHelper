@@ -5,7 +5,7 @@
 #include "GpuApi/GpuFeature.h"
 #pragma comment (lib, "dxcompiler.lib")
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	TRefCountPtr<Dx12Shader> CreateDx12Shader(FString FileName, ShaderType InType, FString ExtraDeclaration, FString EntryPoint)

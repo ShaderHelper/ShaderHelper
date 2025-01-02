@@ -1,7 +1,7 @@
 #pragma once
 #include "MetalCommon.h"
 
-namespace FRAMEWORK
+namespace FW
 {
     inline MTL::Device* GDevice;
     inline MTL::CommandQueue* GCommandQueue;

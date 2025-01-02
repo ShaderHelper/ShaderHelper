@@ -1,7 +1,7 @@
 #pragma once
 #include <Widgets/Input/SMultiLineEditableTextBox.h>
 #include "SLogWidget.h"
-namespace FRAMEWORK 
+namespace FW 
 {
 	/**
 	* A single log message for the output log, holding a message and

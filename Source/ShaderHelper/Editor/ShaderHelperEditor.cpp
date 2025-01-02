@@ -15,7 +15,7 @@
 
 STEAL_PRIVATE_MEMBER(FTabManager, TArray<TSharedRef<FTabManager::FArea>>, CollapsedDockAreas)
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace SH 
 {
@@ -38,15 +38,12 @@ namespace SH
         PreviewTabId, PropretyTabId, AssetTabId, GraphTabId
     };
 
-	ShaderHelperEditor::ShaderHelperEditor(const Vector2f& InWindowSize, ShRenderer* InRenderer)
-		: Renderer(InRenderer)
-		, WindowSize(InWindowSize)
+	ShaderHelperEditor::ShaderHelperEditor(const Vector2f& InWindowSize)
+		: WindowSize(InWindowSize)
 	{
 		CurProject = &TSingleton<ShProjectManager>::Get().GetProject();
 
 		ViewPort = MakeShared<PreviewViewPort>();
-		ViewPort->OnViewportResize.AddRaw(this, &ShaderHelperEditor::OnViewportResize);
-
 		InitEditorUI();
 	}
 
@@ -178,7 +175,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		Window->SetRequestDestroyWindowOverride(FRequestDestroyWindowOverride::CreateLambda([this](const TSharedRef<SWindow>& InWindow) {
 			TabManager->SavePersistentLayout();
             CurProject->CodeTabLayout = CodeTabManager->PersistLayout();
-			if (CurProject->AnyPendingAsset() && MessageDialog::Open(MessageDialog::OkCancel, LOCALIZATION("SaveAssetTip")))
+			if (CurProject->AnyPendingAsset() && MessageDialog::Open(MessageDialog::OkCancel, Window, LOCALIZATION("SaveAssetTip")))
 			{
 				TSingleton<ShProjectManager>::Get().SaveProject(true);
 			}
@@ -548,12 +545,6 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		}
 	}
 
-	void ShaderHelperEditor::OnViewportResize(const Vector2f& InSize)
-	{
-		Renderer->OnViewportResize(InSize);
-		ViewPort->SetViewPortRenderTexture(Renderer->GetFinalRT());
-	}
-
     FMenuBarBuilder ShaderHelperEditor::CreateMenuBarBuilder()
 	{
 		FMenuBarBuilder MenuBarBuilder = FMenuBarBuilder(TSharedPtr<FUICommandList>());
@@ -604,11 +595,11 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 			{
 				MenuBuilder.AddMenuEntry(LOCALIZATION("Project"), FText::GetEmpty(), FSlateIcon(),
 					FUIAction(
-							FExecuteAction::CreateLambda([] {
+							FExecuteAction::CreateLambda([this] {
 								auto ShApp = static_cast<ShaderHelperApp*>(GApp.Get());
-								ShApp->Launcher = MakeShared<ProjectLauncher<ShProject>>([=] {
-									ShApp->AppEditor = MakeUnique<ShaderHelperEditor>(ShApp->GetClientSize(), static_cast<ShRenderer*>(ShApp->GetRenderer()));
-								});
+								ShApp->Launcher = MakeShared<ProjectLauncher<ShProject>>([this, ShApp] {
+									ShApp->AppEditor = MakeUnique<ShaderHelperEditor>(ShApp->GetClientSize());
+								}, Window);
 							})
 					));
 				MenuBuilder.AddMenuEntry(LOCALIZATION("Save"), FText::GetEmpty(), FSlateIcon(),

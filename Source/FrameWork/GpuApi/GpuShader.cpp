@@ -2,7 +2,7 @@
 #include "GpuShader.h"
 #include "Common/Path/PathHelper.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	GpuShader::GpuShader(FString InFileName, ShaderType InType, const FString& ExtraDeclaration, FString InEntryPoint)

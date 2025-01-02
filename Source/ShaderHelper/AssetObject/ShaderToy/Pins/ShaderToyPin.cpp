@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "ShaderToyPin.h"
 #include "GpuApi/GpuResourceHelper.h"
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace SH
 {
@@ -18,9 +18,9 @@ namespace SH
 		GraphPin::Serialize(Ar);
 	}
 
-	void GpuTexturePin::LinkTo(GraphPin* TargetPin)
+	bool GpuTexturePin::Accept(GraphPin* TargetPin)
 	{
-
+		return true;
 	}
 
 	GpuTexture* GpuTexturePin::GetValue() const
@@ -36,9 +36,9 @@ namespace SH
 		GraphPin::Serialize(Ar);
 	}
 
-	void ChannelPin::LinkTo(GraphPin* TargetPin)
+	bool ChannelPin::Accept(GraphPin* TargetPin)
 	{
-
+		return true;
 	}
 
 }

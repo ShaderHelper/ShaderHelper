@@ -1,7 +1,7 @@
 #pragma once
 #include "PathHelper.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 namespace BaseResourcePath
 {

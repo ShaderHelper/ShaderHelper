@@ -1,6 +1,6 @@
 #pragma once
 
-namespace FRAMEWORK
+namespace FW
 {
 	class SGraphNode : public SCompoundWidget
 	{

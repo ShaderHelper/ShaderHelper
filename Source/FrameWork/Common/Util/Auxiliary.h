@@ -4,7 +4,7 @@
 #include <array>
 #include <algorithm>
 #include <cstring>
-namespace FRAMEWORK
+namespace FW
 {
 namespace AUX
 {
@@ -624,4 +624,4 @@ namespace AUX
 
 
 } // end AUX namespace
-} // end FRAMEWORK namespace
+} // end FW namespace

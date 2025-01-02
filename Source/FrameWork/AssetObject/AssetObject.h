@@ -3,7 +3,7 @@
 
 struct FSlateBrush;
 
-namespace FRAMEWORK
+namespace FW
 {
 	class FRAMEWORK_API AssetObject
 	{

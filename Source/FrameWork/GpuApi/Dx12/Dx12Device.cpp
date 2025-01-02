@@ -3,7 +3,7 @@
 #include <dxgidebug.h>
 #include "GpuApi/GpuFeature.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	static D3D_SHADER_MODEL GetMaxShaderModel(ID3D12Device* InDevice)
 	{

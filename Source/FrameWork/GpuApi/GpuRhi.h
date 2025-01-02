@@ -2,7 +2,7 @@
 
 #include "GpuResource.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 enum class GpuRhiBackendType
 {

@@ -4,10 +4,10 @@
 
 namespace UNITTEST_UTIL
 {
-	class UnitTestApp : public FRAMEWORK::App
+	class UnitTestApp : public FW::App
 	{
 	public:
-		UnitTestApp(const FRAMEWORK::Vector2D& InClientSize, const TCHAR* CommandLine);
+		UnitTestApp(const FW::Vector2D& InClientSize, const TCHAR* CommandLine);
 		void Update(double DeltaTime) override;
 	};
 }

@@ -5,7 +5,7 @@
 #include "Dx12Map.h"
 #include "Dx12GpuRhiBackend.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	struct FlagSets {
 		bool bShared;

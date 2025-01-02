@@ -7,7 +7,7 @@
 #include <Styling/StyleColors.h>
 #include "Common/Util/Math.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	SGraphPanel::SGraphPanel() 
@@ -51,11 +51,14 @@ namespace FRAMEWORK
 
 	void SGraphPanel::AddLink(SGraphPin* Output, SGraphPin* Input)
 	{
-		SGraphNode* OutputOwner = Output->Owner;
-		SGraphNode* InputOwner = Input->Owner;
-		OutputOwner->NodeData->OutPinToInPin.AddUnique(Output->PinData->Guid, Input->PinData->Guid);
-		OutputOwner->AddDep(InputOwner);
-		Links.AddUnique(Output, Input);
+		if (Input->PinData->Accept(Output->PinData))
+		{
+			SGraphNode* OutputOwner = Output->Owner;
+			SGraphNode* InputOwner = Input->Owner;
+			OutputOwner->NodeData->OutPinToInPin.AddUnique(Output->PinData->Guid, Input->PinData->Guid);
+			OutputOwner->AddDep(InputOwner);
+			Links.AddUnique(Output, Input);
+		}
 	}
 
 	void SGraphPanel::RemoveInputLink(SGraphPin* Input)
@@ -64,6 +67,7 @@ namespace FRAMEWORK
 		{
 			SGraphPin* Output = *Key;
 			Links.Remove(Output, Input);
+			Output->Owner->RemoveDep(Input->Owner);
 			auto Kkey = Output->Owner->NodeData->OutPinToInPin.FindKey(Input->PinData->Guid);
 			Output->Owner->NodeData->OutPinToInPin.Remove(*Kkey, Input->PinData->Guid);
 		}
@@ -227,6 +231,7 @@ namespace FRAMEWORK
 					if (LineBezierIntersection(*CutLineStart, CutLineEnd, C0, C1, C2, C3))
 					{
 						It.RemoveCurrent();
+						OuputPin->Owner->RemoveDep(InputPin->Owner);
 						OuputPin->Owner->NodeData->OutPinToInPin.Remove(OuputPin->PinData->Guid, InputPin->PinData->Guid);
 						
 						GraphData->MarkDirty();
@@ -470,7 +475,26 @@ namespace FRAMEWORK
 
 	void SGraphPanel::DeleteNode(SGraphNode* Node)
 	{
+		for (TMultiMap<SGraphPin*, SGraphPin*>::TIterator It = Links.CreateIterator(); It; ++It)
+		{
+			SGraphPin* OuputPin = It.Key();
+			SGraphPin* InputPin = It.Value();
+			if (OuputPin->Owner == Node)
+			{
+				It.RemoveCurrent();
+				OuputPin->Owner->RemoveDep(InputPin->Owner);
+				Node->NodeData->OutPinToInPin.Remove(OuputPin->PinData->Guid, InputPin->PinData->Guid);
+			}
+			else if (InputPin->Owner == Node)
+			{
+				It.RemoveCurrent();
+				OuputPin->Owner->RemoveDep(InputPin->Owner);
+				OuputPin->Owner->NodeData->OutPinToInPin.Remove(OuputPin->PinData->Guid, InputPin->PinData->Guid);
+			}
+		}
+
 		GraphData->RemoveNode(Node->NodeData->Guid);
+
 		int RemoveIndex = -1;
 		for (int i = 0; i < Nodes.Num(); i++)
 		{
@@ -482,23 +506,8 @@ namespace FRAMEWORK
 		}
 		check(RemoveIndex != -1);
 		Nodes.RemoveAt(RemoveIndex);
-		SelectedNodes.Remove(Node);
 
-		for (TMultiMap<SGraphPin*, SGraphPin*>::TIterator It = Links.CreateIterator(); It; ++It)
-		{
-			SGraphPin* OuputPin = It.Key();
-			SGraphPin* InputPin = It.Value();
-			if (It.Key()->Owner == Node)
-			{
-				It.RemoveCurrent();
-				Node->NodeData->OutPinToInPin.Remove(OuputPin->PinData->Guid, InputPin->PinData->Guid);
-			}
-			else if (It.Value()->Owner == Node)
-			{
-				It.RemoveCurrent();
-				OuputPin->Owner->NodeData->OutPinToInPin.Remove(OuputPin->PinData->Guid, InputPin->PinData->Guid);
-			}
-		}
+		SelectedNodes.Remove(Node);
 
 		GraphData->MarkDirty();
 	}

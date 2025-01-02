@@ -10,11 +10,11 @@ int WINAPI WinMain(_In_ HINSTANCE hInInstance, _In_opt_ HINSTANCE hPrevInstance,
 	hInstance = hInInstance;
 	WinLaunch([](const TCHAR* CommandLine)
 		{
-			FRAMEWORK::GApp = MakeUnique<UNITTEST_UTIL::UnitTestApp>(
+			FW::GApp = MakeUnique<UNITTEST_UTIL::UnitTestApp>(
 				FVector2D{ 800, 600 },
 				CommandLine
 			);
-			FRAMEWORK::GApp->Run();
+			FW::GApp->Run();
 		}
 	, GetCommandLineW());
 	return 0;

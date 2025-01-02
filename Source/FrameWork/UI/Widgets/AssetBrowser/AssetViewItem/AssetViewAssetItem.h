@@ -2,7 +2,7 @@
 #include "AssetViewItem.h"
 #include "Editor/PreviewViewPort.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	class AssetViewAssetItem : public AssetViewItem

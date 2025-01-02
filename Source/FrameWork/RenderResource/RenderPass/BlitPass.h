@@ -2,7 +2,7 @@
 #include "Renderer/RenderGraph.h"
 #include "GpuApi/GpuResource.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	struct BlitPassInput
 	{

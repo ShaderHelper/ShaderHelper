@@ -3,15 +3,15 @@
 
 namespace SH
 {
-	class ShaderToyOp : public FRAMEWORK::AssetOp
+	class ShaderToyOp : public FW::AssetOp
 	{
 		REFLECTION_TYPE(ShaderToyOp)
 	public:
 		ShaderToyOp() = default;
 
-		struct FRAMEWORK::MetaType* SupportAsset() override;
+		struct FW::MetaType* SupportAsset() override;
 		void OnOpen(const FString& InAssetPath) override;
-		void OnCreate(FRAMEWORK::AssetObject* InAsset) override;
+		void OnCreate(FW::AssetObject* InAsset) override;
 		void OnDelete(const FString& InAssetPath) override;
 	};
 }

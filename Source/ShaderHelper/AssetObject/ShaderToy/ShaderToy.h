@@ -4,7 +4,12 @@
 namespace SH
 {
 
-	class ShaderToy : public FRAMEWORK::Graph
+	struct ShaderToyExecContext : FW::GraphExecContext
+	{
+
+	};
+
+	class ShaderToy : public FW::Graph
 	{
 		REFLECTION_TYPE(ShaderToy)
 	public:
@@ -13,6 +18,6 @@ namespace SH
 	public:
 		void Serialize(FArchive& Ar) override;
 		FString FileExtension() const override;
-		TArray<FRAMEWORK::MetaType*> SupportNodes() const override;
+		TArray<FW::MetaType*> SupportNodes() const override;
 	};
 }

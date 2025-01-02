@@ -1,6 +1,6 @@
 #pragma once
 #include "Auxiliary.h"
-namespace FRAMEWORK {
+namespace FW {
 	// ShaderHelper Vector
     // Simulates hlsl swizzle operations.
     // Follows hlsl casting rule but

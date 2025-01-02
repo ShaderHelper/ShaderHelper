@@ -2,7 +2,7 @@
 #include "Dx12Common.h"
 #include "GpuApi/GpuResource.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	inline D3D12_RESOURCE_STATES MapResourceState(GpuResourceState InResourceState)

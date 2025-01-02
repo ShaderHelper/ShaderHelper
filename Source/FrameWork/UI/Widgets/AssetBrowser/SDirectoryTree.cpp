@@ -7,8 +7,9 @@
 #include "AssetViewItem/AssetViewItem.h"
 #include "ProjectManager/ProjectManager.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
+#include "App/App.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	void SDirectoryTree::Construct(const FArguments& InArgs)
 	{
@@ -91,7 +92,7 @@ namespace FRAMEWORK
 		bool CanDo = true;
 		if (GProject->IsPendingAsset(DropFilePath))
 		{
-			CanDo = MessageDialog::Open(MessageDialog::OkCancel, LOCALIZATION("OpPendingAssetTip"));
+			CanDo = MessageDialog::Open(MessageDialog::OkCancel, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("OpPendingAssetTip"));
 		}
 
 		if (CanDo)

@@ -1,12 +1,12 @@
 #include "CommonHeader.h"
 #include "UnitTestEditor.h"
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace UNITTEST_GPUAPI
 {
 
-	UnitTestEditor::UnitTestEditor(const FRAMEWORK::Vector2f& InWindowSize)
+	UnitTestEditor::UnitTestEditor(const FW::Vector2f& InWindowSize)
 		: WindowSize(InWindowSize)
 	{
 		FSlateApplication::Get().AddWindow(SNew(SWindow));

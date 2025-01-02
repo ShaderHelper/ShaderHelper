@@ -5,7 +5,7 @@
 #include "ProjectManager/ProjectManager.h"
 #include "Common/FrameWorkCore.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	GLOBAL_REFLECTION_REGISTER(AddClass<AssetObject>())
 

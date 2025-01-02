@@ -2,7 +2,7 @@
 #include "AssetViewItem/AssetViewItem.h"
 #include <Widgets/Views/STileView.h>
 
-namespace FRAMEWORK
+namespace FW
 {
 	class SAssetBrowser;
 

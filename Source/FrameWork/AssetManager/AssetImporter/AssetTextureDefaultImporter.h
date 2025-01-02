@@ -1,7 +1,7 @@
 #pragma once
 #include "AssetImporter.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	class AssetTextureDefaultImporter : public AssetImporter
 	{

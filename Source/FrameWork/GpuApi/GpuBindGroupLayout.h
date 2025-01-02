@@ -2,7 +2,7 @@
 #include "GpuResourceCommon.h"
 #include <Containers/SortedMap.h>
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	using BindingGroupSlot = int32;

@@ -6,8 +6,9 @@
 #include "UI/Widgets/Misc/CommonTableRow.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "ProjectManager/ProjectManager.h"
+#include "App/App.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
     FReply AssetViewFolderItem::HandleOnDragDetected(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
@@ -23,7 +24,7 @@ namespace FRAMEWORK
 		bool CanDo = true;
 		if (GProject->IsPendingAsset(DropFilePath))
 		{
-			CanDo = MessageDialog::Open(MessageDialog::OkCancel, LOCALIZATION("OpPendingAssetTip"));
+			CanDo = MessageDialog::Open(MessageDialog::OkCancel, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("OpPendingAssetTip"));
 		}
 
 		if (CanDo)
@@ -96,7 +97,7 @@ namespace FRAMEWORK
                         {
                             if(IFileManager::Get().DirectoryExists(*NewFolderPath))
                             {
-                                MessageDialog::Open(MessageDialog::Ok, LOCALIZATION("AssetRenameFailure"));
+                                MessageDialog::Open(MessageDialog::Ok, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("AssetRenameFailure"));
                             }
                             else
                             {

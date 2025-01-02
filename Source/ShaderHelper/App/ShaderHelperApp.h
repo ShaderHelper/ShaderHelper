@@ -6,10 +6,10 @@
 
 namespace SH {
 	
-	class ShaderHelperApp : public FRAMEWORK::App
+	class ShaderHelperApp : public FW::App
 	{
 	public:
-		ShaderHelperApp(const FRAMEWORK::Vector2D& InClientSize, const TCHAR* CommandLine);
+		ShaderHelperApp(const FW::Vector2D& InClientSize, const TCHAR* CommandLine);
 		~ShaderHelperApp();
 
 	private:
@@ -17,7 +17,7 @@ namespace SH {
 		void Render() override;
 
 	public:
-		TSharedPtr<FRAMEWORK::ProjectLauncher<ShProject>> Launcher;
+		TSharedPtr<FW::ProjectLauncher<ShProject>> Launcher;
 	};
 	
 }

@@ -9,7 +9,7 @@
 STEAL_PRIVATE_MEMBER(FUICommandInfo, FText, Label)
 STEAL_PRIVATE_MEMBER(FUICommandInfo, FText, Description)
 
-namespace FRAMEWORK 
+namespace FW 
 {
 	FString BaseEditorConfig()
 	{

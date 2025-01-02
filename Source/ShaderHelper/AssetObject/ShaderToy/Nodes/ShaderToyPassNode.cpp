@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "ShaderToyPassNode.h"
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace SH
 {
@@ -22,7 +22,7 @@ namespace SH
 		return { &PassOutput,&Slot0};
 	}
 
-	void ShaderToyPassNode::Exec()
+	void ShaderToyPassNode::Exec(GraphExecContext& Context)
 	{
 
 	}

@@ -3,7 +3,7 @@
 #include <Widgets/Input/SMultiLineEditableTextBox.h>
 #include <Widgets/Input/SSearchBox.h>
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	class FLogWidgetMarshaller : public FBaseTextLayoutMarshaller

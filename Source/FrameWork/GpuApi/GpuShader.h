@@ -2,7 +2,7 @@
 #include "GpuResourceCommon.h"
 #include <Misc/FileHelper.h>
 
-namespace FRAMEWORK
+namespace FW
 {
 	enum class GpuShaderFlag
 	{

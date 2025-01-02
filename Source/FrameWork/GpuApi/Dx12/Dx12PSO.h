@@ -4,7 +4,7 @@
 #include "Dx12Shader.h"
 #include "Dx12Util.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	class Dx12RenderPso : public GpuPipelineState, public Dx12DeferredDeleteObject<Dx12RenderPso>
 	{

@@ -1,7 +1,7 @@
 #pragma once
 #include "AssetViewItem.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	class AssetViewFolderItem : public AssetViewItem
 	{

@@ -2,7 +2,7 @@
 
 #include "GpuApi/GpuRhi.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 class MetalGpuRhiBackend : public GpuRhi
 {

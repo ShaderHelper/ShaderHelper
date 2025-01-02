@@ -2,7 +2,7 @@
 #include "ShProjectManager.h"
 #include <Serialization/JsonSerializer.h>
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace SH
 {

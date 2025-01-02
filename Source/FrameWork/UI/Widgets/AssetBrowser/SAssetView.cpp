@@ -14,8 +14,9 @@
 #include "Editor/AssetEditor/AssetEditor.h"
 #include "ProjectManager/ProjectManager.h"
 #include "UI/Widgets/Misc/CommonCommands.h"
+#include "App/App.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	void SAssetView::Construct(const FArguments& InArgs)
@@ -371,7 +372,7 @@ namespace FRAMEWORK
 				}
 				else
 				{
-					MessageDialog::Open(MessageDialog::Ok, LOCALIZATION("AssetImportFailure"));
+					MessageDialog::Open(MessageDialog::Ok, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("AssetImportFailure"));
 				}
 			}
 		}
@@ -416,7 +417,7 @@ namespace FRAMEWORK
 			return;
 		}
 
-		if (MessageDialog::Open(MessageDialog::OkCancel, LOCALIZATION("DeleteAssetTip")))
+		if (MessageDialog::Open(MessageDialog::OkCancel, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("DeleteAssetTip")))
 		{
 			if (SelectedItems[0]->IsOfType<AssetViewFolderItem>())
 			{

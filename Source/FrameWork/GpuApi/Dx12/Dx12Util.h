@@ -4,7 +4,7 @@
 #include "Dx12Device.h"
 #include <queue>
 
-namespace FRAMEWORK
+namespace FW
 {
 	//To make sure that gpu resources do not ahead release when allow gpu lag several frames behind cpu.
 	class DeferredReleaseManager

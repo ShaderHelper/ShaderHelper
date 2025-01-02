@@ -5,7 +5,7 @@
 #include "Dx12Buffer.h"
 #include "Dx12Util.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	class Dx12Sampler : public GpuSampler, public Dx12DeferredDeleteObject<Dx12Sampler>
 	{

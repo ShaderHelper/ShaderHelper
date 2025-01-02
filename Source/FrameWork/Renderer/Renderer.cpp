@@ -2,7 +2,7 @@
 #include "Renderer.h"
 #include "GpuApi/GpuRhi.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	Renderer::Renderer()

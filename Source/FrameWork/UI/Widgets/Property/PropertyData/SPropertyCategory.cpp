@@ -2,7 +2,7 @@
 #include "SPropertyCategory.h"
 #include "UI/Styles/FAppCommonStyle.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	void SPropertyCatergory::Construct(const FArguments& InArgs, const TSharedPtr<class ITableRow>& TableRow)

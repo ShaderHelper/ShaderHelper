@@ -3,13 +3,13 @@
 
 namespace SH
 {
-	class StShaderOp : public FRAMEWORK::AssetOp
+	class StShaderOp : public FW::AssetOp
 	{
 		REFLECTION_TYPE(StShaderOp)
 	public:
 		StShaderOp() = default;
 
-        struct FRAMEWORK::MetaType* SupportAsset() override;
+        struct FW::MetaType* SupportAsset() override;
 		void OnOpen(const FString& InAssetPath) override;
        
         void OnAdd(const FString& InAssetPath) override;

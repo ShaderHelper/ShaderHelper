@@ -2,7 +2,7 @@
 #include "AssetEditor.h"
 #include "ProjectManager/ProjectManager.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	GLOBAL_REFLECTION_REGISTER(AddClass<AssetOp>())
 

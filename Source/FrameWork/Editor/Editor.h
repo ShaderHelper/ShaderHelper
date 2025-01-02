@@ -1,6 +1,6 @@
 #pragma once
 
-namespace FRAMEWORK {
+namespace FW {
 
 	enum class SupportedLanguage
 	{
@@ -20,6 +20,7 @@ namespace FRAMEWORK {
 		static inline TUniquePtr<FConfigFile> EditorConfig = MakeUnique<FConfigFile>();
         
         virtual void Update(double DeltaTime) {}
+		virtual TSharedPtr<SWindow> GetMainWindow() const { return {}; }
 	};
 }
 

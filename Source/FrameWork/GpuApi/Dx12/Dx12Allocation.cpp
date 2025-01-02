@@ -2,7 +2,7 @@
 #include "Dx12Allocation.h"
 #include "Dx12Device.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	constexpr uint32 PersistantUniformBufferMinBlockSize = 256 * FrameSourceNum;
 	constexpr uint32 PersistantUniformBufferMaxBlockSize = 64 * 1024 * FrameSourceNum;

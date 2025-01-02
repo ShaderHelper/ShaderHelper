@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "ShaderCodeTokenizer.h"
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace SH
 {

@@ -2,7 +2,7 @@
 #include "GpuBindGroup.h"
 #include "GpuRhi.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	GpuBindGrouprBuilder::GpuBindGrouprBuilder(GpuBindGroupLayout* InLayout)

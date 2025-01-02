@@ -7,7 +7,7 @@
 #include "MetalCommandRecorder.h"
 #include "MetalGpuRhiBackend.h"
 
-namespace FRAMEWORK
+namespace FW
 {
     static void SetTextureUsage(GpuTextureUsage InUsage, MTL::TextureDescriptor* OutTexDesc)
     {

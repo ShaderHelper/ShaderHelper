@@ -3,7 +3,7 @@
 #include "AssetObject/ShaderToy/Nodes/ShaderToyOutputNode.h"
 #include "AssetObject/ShaderToy/Nodes/ShaderToyPassNode.h"
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace SH
 {

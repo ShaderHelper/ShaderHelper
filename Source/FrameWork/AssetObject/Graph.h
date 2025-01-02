@@ -1,8 +1,11 @@
 #pragma once
 #include "AssetObject.h"
 
-namespace FRAMEWORK
+namespace FW
 {
+	struct GraphExecContext {
+	};
+
 	enum class PinDirection
 	{
 		Input,
@@ -21,7 +24,7 @@ namespace FRAMEWORK
 
 	public:
 		virtual void Serialize(FArchive& Ar);
-		virtual void LinkTo(GraphPin* TargetPin) {}
+		virtual bool Accept(GraphPin* TargetPin) { return false; }
 		virtual FLinearColor GetPinColor() const { return FLinearColor::White; }
 
 		FGuid Guid = FGuid::NewGuid();
@@ -43,7 +46,7 @@ namespace FRAMEWORK
 		virtual FText GetNodeTitle() const { return FText::FromString("Unknown"); }
 		virtual FSlateColor GetNodeColor() const;
 		virtual TArray<GraphPin*> GetPins() { return {}; }
-		virtual void Exec() {}
+		virtual void Exec(GraphExecContext& Context) {}
 
 		FGuid Guid = FGuid::NewGuid();
 		Vector2D Position{0};
@@ -69,14 +72,19 @@ namespace FRAMEWORK
 				}));
 		}
 		const TArray<TSharedPtr<GraphNode>>& GetNodes() const { return NodeDatas; }
+		void AddDep(GraphNode* Node1, GraphNode* Node2) { NodeDeps.Add(Node1->Guid, Node2->Guid); }
+		void RemoveDep(GraphNode* Node1, GraphNode* Node2) { NodeDeps.Remove(Node1->Guid, Node2->Guid); }
 
 	public:
 		void Serialize(FArchive& Ar) override;
 		const FSlateBrush* GetImage() const override;
 		virtual TArray<MetaType*> SupportNodes() const { return {}; }
+		virtual void Exec(GraphExecContext& Context);
 	
 	protected:
+		//Keep layer order
 		TArray<TSharedPtr<GraphNode>> NodeDatas;
+
 		TMultiMap<FGuid, FGuid> NodeDeps;
 	};
 }

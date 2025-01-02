@@ -13,7 +13,7 @@
 #include "MetalTexture.h"
 #include "Common/Path/PathHelper.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 MetalGpuRhiBackend::MetalGpuRhiBackend() { GMtlGpuRhi = this; }
 

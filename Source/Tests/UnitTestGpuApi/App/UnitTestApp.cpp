@@ -5,7 +5,7 @@
 #include "GpuApi/GpuFeature.h"
 
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace UNITTEST_GPUAPI
 {

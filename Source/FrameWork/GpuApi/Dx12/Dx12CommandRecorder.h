@@ -8,7 +8,7 @@
 #include "Dx12RS.h"
 #include "GpuApi/GpuRhi.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	class Dx12StateCache
 	{

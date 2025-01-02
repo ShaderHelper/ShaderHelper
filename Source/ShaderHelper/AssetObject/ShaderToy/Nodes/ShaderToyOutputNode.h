@@ -4,15 +4,15 @@
 
 namespace SH
 {
-	class ShaderToyOuputNode : public FRAMEWORK::GraphNode
+	class ShaderToyOuputNode : public FW::GraphNode
 	{
 		REFLECTION_TYPE(ShaderToyOuputNode)
 	public:
 		void Serialize(FArchive& Ar) override;
 		FText GetNodeTitle() const override { return FText::FromString("Output"); }
-		TArray<FRAMEWORK::GraphPin*> GetPins() override;
-		void Exec() override;
+		TArray<FW::GraphPin*> GetPins() override;
+		void Exec(FW::GraphExecContext& Context) override;
 
-		GpuTexturePin ResultPin{ FText::FromString("Texture"), FRAMEWORK::PinDirection::Input };
+		GpuTexturePin ResultPin{ FText::FromString("Texture"), FW::PinDirection::Input };
 	};
 }

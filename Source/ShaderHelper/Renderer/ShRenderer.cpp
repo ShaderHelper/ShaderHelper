@@ -3,7 +3,7 @@
 #include "GpuApi/GpuRhi.h"
 #include "Common/Path/PathHelper.h"
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace SH
 {
@@ -66,27 +66,6 @@ R"(void mainImage(out float4 fragColor, in float2 fragCoord)
 	{
 		PixelShader = MoveTemp(InNewPixelShader);
 		ReCreatePipelineState();
-	}
-
-	TArray<TSharedRef<PropertyData>> ShRenderer::GetBuiltInPropertyDatas() const
-	{
-		TArray<TSharedRef<PropertyData>> Datas;
-
-		TSharedRef<PropertyCategory> BuiltInCategory = MakeShared<PropertyCategory>("Built In");
-		TSharedRef<PropertyCategory> UniformSubCategory = MakeShared<PropertyCategory>("Uniform");
-		BuiltInCategory->AddChild(UniformSubCategory);
-
-		auto iTimeProperty = MakeShared<PropertyItem<float>>("iTime", TAttribute<float>::CreateLambda([this] { return iTime; }));
-		iTimeProperty->SetEnabled(false);
-
-		auto iResolutionProperty = MakeShared<PropertyItem<Vector2f>>("iResolution", TAttribute<Vector2f>::CreateLambda([this] {return iResolution; }));
-		iResolutionProperty->SetEnabled(false);
-
-		UniformSubCategory->AddChild(MoveTemp(iTimeProperty));
-		UniformSubCategory->AddChild(MoveTemp(iResolutionProperty));
-
-		Datas.Add(MoveTemp(BuiltInCategory));
-		return Datas;
 	}
 
 	void ShRenderer::ReCreatePipelineState()

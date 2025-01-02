@@ -3,7 +3,7 @@
 #include "SAssetView.h"
 struct FFileChangeData;
 
-namespace FRAMEWORK
+namespace FW
 {
     struct AssetBrowserDirectory
     {

@@ -6,7 +6,7 @@
 #include "Renderer/RenderGraph.h"
 #include "RenderResource/RenderPass/BlitPass.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	GLOBAL_REFLECTION_REGISTER(AddClass<Texture2D>()
                                 .BaseClass<AssetObject>()

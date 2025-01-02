@@ -1,6 +1,6 @@
 #pragma once
 
-namespace FRAMEWORK
+namespace FW
 {
 	template<typename T, AssetOwnerShip OwnerShip>
 	AssetPtr<T, OwnerShip>::AssetPtr(std::nullptr_t)

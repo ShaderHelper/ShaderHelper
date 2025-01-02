@@ -6,7 +6,7 @@
 #include "MetalArgumentBuffer.h"
 #include "GpuApi/GpuRhi.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
     class MtlStateCache

@@ -1,6 +1,6 @@
 #pragma once
 
-namespace FRAMEWORK
+namespace FW
 {
 	//The TableRow with bounding box when a drag-drop operation is detected.
     template<typename T>

@@ -8,7 +8,7 @@
 #include <Widgets/Input/SSearchBox.h>
 #include "Editor/AssetEditor/AssetEditor.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	SAssetBrowser::~SAssetBrowser()

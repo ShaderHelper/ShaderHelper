@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "Reflection.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	
 	TMap<FString, MetaType*>& GetTypeNameToMetaType()

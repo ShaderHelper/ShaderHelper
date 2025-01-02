@@ -3,7 +3,7 @@
 #include "AssetObject/Graph.h"
 #include "UI/Widgets/Graph/SGraphPanel.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	void SGraphPin::Construct(const FArguments& InArgs, SGraphNode* InOwner)

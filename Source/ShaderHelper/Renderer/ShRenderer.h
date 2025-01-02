@@ -5,22 +5,17 @@
 
 namespace SH
 {
-	class ShRenderer : public FRAMEWORK::Renderer
+	class ShRenderer : public FW::Renderer
 	{
 	public:
 		ShRenderer();
 		
 	public:
 		void RenderInternal() override;
-		void OnViewportResize(const FRAMEWORK::Vector2f& InResolution);
-		void UpdatePixelShader(TRefCountPtr<FRAMEWORK::GpuShader> InNewPixelShader);
-		void UpdateCustomBindGroup(TRefCountPtr<FRAMEWORK::GpuBindGroup> InBindGroup) { CustomBindGroup = MoveTemp(InBindGroup); }
-		void UpdateCustomBindGroupLayout(TRefCountPtr<FRAMEWORK::GpuBindGroupLayout> InBindGroupLayout) { CustomBindGroupLayout = MoveTemp(InBindGroupLayout); }
-        FRAMEWORK::GpuTexture* GetFinalRT() const { return FinalRT; }
-
-
-		//Deprecated
-		TArray<TSharedRef<FRAMEWORK::PropertyData>> GetBuiltInPropertyDatas() const;
+		void OnViewportResize(const FW::Vector2f& InResolution);
+		void UpdatePixelShader(TRefCountPtr<FW::GpuShader> InNewPixelShader);
+		void UpdateCustomBindGroup(TRefCountPtr<FW::GpuBindGroup> InBindGroup) { CustomBindGroup = MoveTemp(InBindGroup); }
+		void UpdateCustomBindGroupLayout(TRefCountPtr<FW::GpuBindGroupLayout> InBindGroupLayout) { CustomBindGroupLayout = MoveTemp(InBindGroupLayout); }
 
 	private:
 		void RenderBegin() override;
@@ -28,20 +23,20 @@ namespace SH
 		void ReCreatePipelineState();
 
 	private:
-		TRefCountPtr<FRAMEWORK::GpuTexture> FinalRT;
-		TRefCountPtr<FRAMEWORK::GpuShader> VertexShader;
-		TRefCountPtr<FRAMEWORK::GpuShader> PixelShader;
-		TRefCountPtr<FRAMEWORK::GpuPipelineState> PipelineState;
+		TRefCountPtr<FW::GpuTexture> FinalRT;
+		TRefCountPtr<FW::GpuShader> VertexShader;
+		TRefCountPtr<FW::GpuShader> PixelShader;
+		TRefCountPtr<FW::GpuPipelineState> PipelineState;
 
 		float iTime;
-        FRAMEWORK::Vector2f iResolution;
-		TUniquePtr<FRAMEWORK::UniformBuffer> BuiltInUniformBuffer;
+        FW::Vector2f iResolution;
+		TUniquePtr<FW::UniformBuffer> BuiltInUniformBuffer;
 
-		TRefCountPtr<FRAMEWORK::GpuBindGroup> BuiltInBindGroup;
-		TRefCountPtr<FRAMEWORK::GpuBindGroupLayout> BuiltInBindGroupLayout;
+		TRefCountPtr<FW::GpuBindGroup> BuiltInBindGroup;
+		TRefCountPtr<FW::GpuBindGroupLayout> BuiltInBindGroupLayout;
 
-		TRefCountPtr<FRAMEWORK::GpuBindGroup> CustomBindGroup;
-		TRefCountPtr<FRAMEWORK::GpuBindGroupLayout> CustomBindGroupLayout;
+		TRefCountPtr<FW::GpuBindGroup> CustomBindGroup;
+		TRefCountPtr<FW::GpuBindGroupLayout> CustomBindGroupLayout;
 	};
 }
 

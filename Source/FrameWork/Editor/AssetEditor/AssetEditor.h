@@ -1,7 +1,7 @@
 #pragma once
 #include "AssetObject/AssetObject.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	class FRAMEWORK_API AssetOp
 	{

@@ -2,7 +2,7 @@
 #include "AssetManager.h"
 #include "GpuApi/GpuResource.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	void AssetManager::MountProject(const FString& InProjectContentDir)

@@ -9,7 +9,7 @@
 #define RootToContentDir Style->RootToContentDir
 #define TTF_FONT( RelativePath, ... ) FSlateFontInfo(RootToContentDir( RelativePath, TEXT(".ttf") ), __VA_ARGS__ )
 
-namespace FRAMEWORK
+namespace FW
 {
     const ISlateStyle& FAppCommonStyle::Get()
     {

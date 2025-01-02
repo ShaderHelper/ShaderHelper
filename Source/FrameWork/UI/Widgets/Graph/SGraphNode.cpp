@@ -7,7 +7,7 @@
 #include "UI/Widgets/Graph/SGraphPin.h"
 #include <Framework/Commands/GenericCommands.h>
 
-namespace FRAMEWORK
+namespace FW
 {
 	
 	void SGraphNode::Construct(const FArguments& InArgs, SGraphPanel* InOwnerPanel)
@@ -185,14 +185,16 @@ namespace FRAMEWORK
 		else
 		{
 			OutDegreeDeps.Add(InNode);
+			Owner->GetGraphData()->AddDep( InNode->NodeData, this->NodeData);
 		}
 	}
 
 	void SGraphNode::RemoveDep(SGraphNode* InNode)
 	{
-		if (OutDegreeDeps[InNode] - 1 <= 0)
+		if (--OutDegreeDeps[InNode] <= 0)
 		{
 			OutDegreeDeps.Remove(InNode);
+			Owner->GetGraphData()->RemoveDep(InNode->NodeData, this->NodeData);
 		}
 	}
 

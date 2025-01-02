@@ -2,7 +2,7 @@
 #include "BlitPass.h"
 #include "RenderResource/Shader/BlitShader.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	void AddBlitPass(RenderGraph& Graph, const BlitPassInput& PassInput)

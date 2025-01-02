@@ -4,7 +4,7 @@
 #include "MetalMap.h"
 #include "MetalDevice.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	TRefCountPtr<MetalRenderPipelineState> CreateMetalRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc)
     {

@@ -4,7 +4,7 @@
 
 namespace SH
 {
-	class StShader : public FRAMEWORK::AssetObject
+	class StShader : public FW::AssetObject
 	{
 		REFLECTION_TYPE(StShader)
 	public:
@@ -20,13 +20,13 @@ namespace SH
 
 	private:
 		FString PixelShaderBody;
-        TUniquePtr<FRAMEWORK::UniformBuffer> BuiltInUniformBuffer;
+        TUniquePtr<FW::UniformBuffer> BuiltInUniformBuffer;
         
-        TRefCountPtr<FRAMEWORK::GpuBindGroup> BuiltInBindGroup;
-        TRefCountPtr<FRAMEWORK::GpuBindGroupLayout> BuiltInBindGroupLayout;
+        TRefCountPtr<FW::GpuBindGroup> BuiltInBindGroup;
+        TRefCountPtr<FW::GpuBindGroupLayout> BuiltInBindGroupLayout;
 
-        TRefCountPtr<FRAMEWORK::GpuBindGroup> CustomBindGroup;
-        TRefCountPtr<FRAMEWORK::GpuBindGroupLayout> CustomBindGroupLayout;
+        TRefCountPtr<FW::GpuBindGroup> CustomBindGroup;
+        TRefCountPtr<FW::GpuBindGroupLayout> CustomBindGroupLayout;
 	};
 
 }

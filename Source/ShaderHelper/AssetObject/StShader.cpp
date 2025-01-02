@@ -3,7 +3,7 @@
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "Common/Path/PathHelper.h"
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace SH
 {

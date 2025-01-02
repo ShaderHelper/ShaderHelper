@@ -2,7 +2,7 @@
 #include "GpuResourceCommon.h"
 #include "GpuTexture.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	struct GpuViewPortDesc
 	{

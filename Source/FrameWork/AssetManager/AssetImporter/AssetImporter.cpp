@@ -2,7 +2,7 @@
 #include "AssetImporter.h"
 #include "Common/Util/Reflection.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	GLOBAL_REFLECTION_REGISTER(AddClass<AssetImporter>())
 }

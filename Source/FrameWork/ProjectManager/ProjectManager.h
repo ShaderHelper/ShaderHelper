@@ -3,7 +3,7 @@
 #include <Serialization/JsonSerializer.h>
 #include "Common/Path/PathHelper.h"
 #include <Misc/FileHelper.h>
-namespace FRAMEWORK
+namespace FW
 {
 	FRAMEWORK_API extern int GProjectVer;
 	FRAMEWORK_API extern class Project* GProject;

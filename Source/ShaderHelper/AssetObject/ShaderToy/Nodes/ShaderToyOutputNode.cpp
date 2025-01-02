@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "ShaderToyOutputNode.h"
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace SH
 {
@@ -21,7 +21,7 @@ namespace SH
 		return { &ResultPin };
 	}
 
-	void ShaderToyOuputNode::Exec()
+	void ShaderToyOuputNode::Exec(GraphExecContext& Context)
 	{
 
 	}

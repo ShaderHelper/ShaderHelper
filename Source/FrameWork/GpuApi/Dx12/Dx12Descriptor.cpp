@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "Dx12Descriptor.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	TUniquePtr<CpuDescriptorAllocator> RtvAllocator;

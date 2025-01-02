@@ -2,7 +2,7 @@
 #include "AssetObject/AssetObject.h"
 #include "Common/Util/Reflection.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	enum class AssetOwnerShip
 	{

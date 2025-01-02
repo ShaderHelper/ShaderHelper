@@ -3,7 +3,7 @@
 #include "UI/Styles/FAppCommonStyle.h"
 #include <Widgets/Text/SInlineEditableTextBlock.h>
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	void SPropertyItem::Construct(const FArguments& InArgs)

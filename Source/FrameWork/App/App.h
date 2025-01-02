@@ -2,7 +2,7 @@
 #include "Common/Util/SwizzleVector.h"
 #include "Editor/Editor.h"
 #include "Renderer/Renderer.h"
-namespace FRAMEWORK {
+namespace FW {
 	class FRAMEWORK_API App : public FNoncopyable
 	{
 	public:

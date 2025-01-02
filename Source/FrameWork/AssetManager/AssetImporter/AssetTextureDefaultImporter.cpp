@@ -7,7 +7,7 @@
 #include <Misc/FileHelper.h>
 #include "AssetObject/Texture2D.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	GLOBAL_REFLECTION_REGISTER(AddClass<AssetTextureDefaultImporter>()
                                 .BaseClass<AssetImporter>()

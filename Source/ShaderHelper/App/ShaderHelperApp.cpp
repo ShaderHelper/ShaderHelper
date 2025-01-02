@@ -2,7 +2,7 @@
 #include "ShaderHelperApp.h"
 #include "Renderer/ShRenderer.h"
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace SH {
 
@@ -15,13 +15,13 @@ namespace SH {
 		if (FParse::Value(CommandLine, TEXT("Project="), ProjectPath, false))
 		{
 			TSingleton<ShProjectManager>::Get().OpenProject(ProjectPath.Replace(TEXT("\\"), TEXT("/")));
-			AppEditor = MakeUnique<ShaderHelperEditor>(AppClientSize, static_cast<ShRenderer*>(GetRenderer()));
+			AppEditor = MakeUnique<ShaderHelperEditor>(AppClientSize);
 		}
 		else
 		{
 			Launcher = MakeShared<ProjectLauncher<ShProject>>([this] {
-				AppEditor = MakeUnique<ShaderHelperEditor>(AppClientSize, static_cast<ShRenderer*>(GetRenderer()));
-			});
+				AppEditor = MakeUnique<ShaderHelperEditor>(AppClientSize);
+			}, nullptr);
 		}
    
 	}

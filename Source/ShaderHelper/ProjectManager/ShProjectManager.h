@@ -11,7 +11,7 @@ namespace SH
 		Initial
 	};
 
-	class ShProject : public FRAMEWORK::Project
+	class ShProject : public FW::Project
 	{
 	public:
 		ShProject(FString InPath);
@@ -20,11 +20,11 @@ namespace SH
 		virtual void Save(const FString& InPath) override;
 		void Serialize(FArchive& Ar) override;
 
-		FRAMEWORK::AssetBrowserPersistentState AssetBrowserState;
-		FRAMEWORK::AssetPtr<FRAMEWORK::Graph> Graph;
-		TMap<FRAMEWORK::AssetPtr<StShader>, TSharedPtr<class SDockTab>> OpenedStShaders;
+		FW::AssetBrowserPersistentState AssetBrowserState;
+		FW::AssetPtr<FW::Graph> Graph;
+		TMap<FW::AssetPtr<StShader>, TSharedPtr<class SDockTab>> OpenedStShaders;
 		TSharedPtr<FTabManager::FLayout> CodeTabLayout;
 	};
 
-	using ShProjectManager = FRAMEWORK::ProjectManager<ShProject>;
+	using ShProjectManager = FW::ProjectManager<ShProject>;
 }

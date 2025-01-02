@@ -8,7 +8,7 @@
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #endif
 
-namespace FRAMEWORK
+namespace FW
 {
 	int GProjectVer;
 	Project* GProject;

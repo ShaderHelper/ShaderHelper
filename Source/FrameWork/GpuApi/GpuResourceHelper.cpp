@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "GpuRhi.h"
 
-namespace FRAMEWORK::GpuResourceHelper
+namespace FW::GpuResourceHelper
 {
 
 	TRefCountPtr<GpuTexture> TempRenderTarget(GpuTextureFormat InFormat)

@@ -7,13 +7,13 @@
 #include "ProjectManager/ProjectManager.h"
 #include "Editor.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	template<typename T>
 	class ProjectLauncher : Editor
 	{
 	public:
-		ProjectLauncher(TFunction<void()> InLaunchProjectFunc) : LaunchProjectFunc(MoveTemp(InLaunchProjectFunc))
+		ProjectLauncher(TFunction<void()> InLaunchProjectFunc, TSharedPtr<SWindow> Owner) : LaunchProjectFunc(MoveTemp(InLaunchProjectFunc))
 		{
 			AddProjectAssociation();
 
@@ -83,7 +83,7 @@ namespace FRAMEWORK
 							FString NewProjectPath = ProjectDir / ProjectName;
 							if (IFileManager::Get().DirectoryExists(*NewProjectPath))
 							{
-								MessageDialog::Open(MessageDialog::Ok, FText::FromString("The project path already exists."));
+								MessageDialog::Open(MessageDialog::Ok, Window, FText::FromString("The project path already exists."));
 							}
 							else
 							{
@@ -142,7 +142,7 @@ namespace FRAMEWORK
 							}
 							else
 							{
-								MessageDialog::Open(MessageDialog::Ok, FText::FromString("The project file does not exist."));
+								MessageDialog::Open(MessageDialog::Ok, Window, FText::FromString("The project file does not exist."));
 								TSingleton<ProjectManager<T>>::Get().RemoveFromProjMgmt(RecentProjcetPath);
 								InsertDummy(RightContent->NumSlots() - 1);
 								RightContent->RemoveSlot(RecentProjcetButton.Pin().ToSharedRef());
@@ -245,7 +245,15 @@ namespace FRAMEWORK
 					]
 				]
 			];
-			FSlateApplication::Get().AddWindow(Window.ToSharedRef());
+
+			if (Owner)
+			{
+				FSlateApplication::Get().AddWindowAsNativeChild(Window.ToSharedRef(), Owner.ToSharedRef());
+			}
+			else
+			{
+				FSlateApplication::Get().AddWindow(Window.ToSharedRef());
+			}
 		}
 
 	~ProjectLauncher()

@@ -6,7 +6,7 @@
 //We will get the same instance when calling TSingleton<T>::Get() from any modules.
 //TSingleton<T>::Get() keeps Thread-safe.
 
-namespace FRAMEWORK
+namespace FW
 {
 namespace PRIVATE
 {
@@ -23,7 +23,7 @@ namespace PRIVATE
 }
 
 template<typename T>
-class TLazySingleton<FRAMEWORK::PRIVATE::CrossModuleWrapper<T>> final : public FLazySingleton
+class TLazySingleton<FW::PRIVATE::CrossModuleWrapper<T>> final : public FLazySingleton
 {
 public:
     static T& Get()
@@ -44,9 +44,9 @@ public:
 private:
     static TLazySingleton& GetLazy(void(*Constructor)(void*))
     {
-        auto& SingletonCS = FRAMEWORK::GetSingleTonCS();
-        FString TypeName = FRAMEWORK::AUX::TypeName<T>;
-        auto& SharedInstanceMap = FRAMEWORK::GetSharedInstanceMap(TypeName);
+        auto& SingletonCS = FW::GetSingleTonCS();
+        FString TypeName = FW::AUX::TypeName<T>;
+        auto& SharedInstanceMap = FW::GetSharedInstanceMap(TypeName);
         
         FScopeLock ScopeLock(&SingletonCS);
         FLazySingleton** SingleTon = SharedInstanceMap.Find(TypeName);

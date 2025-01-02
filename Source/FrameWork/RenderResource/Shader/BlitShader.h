@@ -2,7 +2,7 @@
 #include "GpuApi/GpuResource.h"
 #include "Shader.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	class BlitShader : public Shader
 	{

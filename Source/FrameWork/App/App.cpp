@@ -13,7 +13,7 @@
 #include <HAL/PlatformOutputDevices.h>
 #include <Misc/OutputDeviceFile.h>
 
-namespace FRAMEWORK {
+namespace FW {
 	TUniquePtr<App> GApp;
 
 	static void UE_Init(const TCHAR* CommandLine)
@@ -55,9 +55,9 @@ namespace FRAMEWORK {
 		FPlatformApplicationMisc::PostInit();
 
 		//This project uses slate as UI framework, so we need to initialize it.
-		SetSlateFontPath(FRAMEWORK::BaseResourcePath::UE_SlateFontDir);
-		FSlateApplication::SetCoreStylePath(FRAMEWORK::BaseResourcePath::UE_CoreStyleDir);
-		FSlateApplication::InitializeAsStandaloneApplication(GetStandardStandaloneRenderer(FRAMEWORK::BaseResourcePath::UE_StandaloneRenderShaderDir));
+		SetSlateFontPath(FW::BaseResourcePath::UE_SlateFontDir);
+		FSlateApplication::SetCoreStylePath(FW::BaseResourcePath::UE_CoreStyleDir);
+		FSlateApplication::InitializeAsStandaloneApplication(GetStandardStandaloneRenderer(FW::BaseResourcePath::UE_StandaloneRenderShaderDir));
 	
 	}
 	

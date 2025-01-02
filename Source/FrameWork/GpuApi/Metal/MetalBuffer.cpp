@@ -2,7 +2,7 @@
 #include "MetalBuffer.h"
 #include "MetalDevice.h"
 
-namespace FRAMEWORK
+namespace FW
 {
     TRefCountPtr<MetalBuffer> CreateMetalBuffer(uint64 BufferSize, GpuBufferUsage Usage)
     {

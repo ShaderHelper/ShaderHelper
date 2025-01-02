@@ -4,7 +4,7 @@
 #include "Dx12Buffer.h"
 #include "Dx12CommandRecorder.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	D3D12_DESCRIPTOR_RANGE_TYPE BindingTypeToDescriptorRangeType(BindingType InType)
 	{

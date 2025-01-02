@@ -1,7 +1,7 @@
 #pragma once
 #include "UI/Widgets/Property/PropertyData/PropertyData.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	class SPropertyView : public SCompoundWidget
 	{

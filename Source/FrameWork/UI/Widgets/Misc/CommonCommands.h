@@ -2,7 +2,7 @@
 #include <Framework/Commands/Commands.h>
 #include "UI/Styles/FAppCommonStyle.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	class CommonCommands : public TCommands<CommonCommands>
 	{

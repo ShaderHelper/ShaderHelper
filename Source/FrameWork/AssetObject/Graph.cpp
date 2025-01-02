@@ -3,7 +3,9 @@
 #include "UI/Widgets/Graph/SGraphNode.h"
 #include "UI/Widgets/Graph/SGraphPanel.h"
 #include <Styling/StyleColors.h>
-namespace FRAMEWORK
+#include <Algo/TopologicalSort.h>
+
+namespace FW
 {
 	GLOBAL_REFLECTION_REGISTER(AddClass<GraphNode>("GraphNode"))
 
@@ -41,11 +43,34 @@ namespace FRAMEWORK
 				NodeDatas.Emplace(LoadedNodeData);
 			}
 		}
+
+		Ar << NodeDeps;
 	}
 
 	const FSlateBrush* Graph::GetImage() const
 	{
 		return FAppStyle::Get().GetBrush("Icons.Blueprints");
+	}
+
+	void Graph::Exec(GraphExecContext& Context)
+	{
+		TArray<TSharedPtr<GraphNode>> ExecNodes = NodeDatas;
+
+		bool bHasSucceeded = Algo::TopologicalSort(ExecNodes, [this](const TSharedPtr<GraphNode>& Element) {
+			TArray<FGuid> DepIds;
+			NodeDeps.MultiFind(Element->Guid, DepIds);
+			TArray<TSharedPtr<GraphNode>> DepNodes;
+			for (FGuid Id : DepIds)
+			{
+				DepNodes.Add(GetNode(Id));
+			}
+			return DepNodes;
+		});
+
+		for (auto Node : ExecNodes)
+		{
+			Node->Exec(Context);
+		}
 	}
 
 	TSharedRef<SGraphNode> GraphNode::CreateNodeWidget(SGraphPanel* OwnerPanel)

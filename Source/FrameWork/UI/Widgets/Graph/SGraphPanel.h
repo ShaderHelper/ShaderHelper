@@ -3,7 +3,7 @@
 #include "AssetObject/Graph.h"
 #include "UI/Widgets/Graph/SGraphPin.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	class GraphDragDropOp : public FDragDropOperation
 	{
@@ -28,6 +28,7 @@ namespace FRAMEWORK
 	public:
 		void Clear();
 		void SetGraphData(Graph* InGraphData);
+		Graph* GetGraphData() const { return GraphData; }
 		void AddSelectedNode(TSharedRef<SGraphNode> InNode);
 		void ClearSelectedNode() { SelectedNodes.Empty(); }
 		bool IsSelectedNode(SGraphNode* InNode) const { return SelectedNodes.Contains(InNode); }

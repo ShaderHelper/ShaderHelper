@@ -2,7 +2,7 @@
 #include "Dx12Common.h"
 #include "Dx12Device.h"
 #include "GpuApi/GpuResource.h"
-namespace FRAMEWORK
+namespace FW
 {
 	struct CommonAllocationData
 	{

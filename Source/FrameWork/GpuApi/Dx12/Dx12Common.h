@@ -36,7 +36,7 @@ THIRD_PARTY_INCLUDES_END
 DECLARE_LOG_CATEGORY_EXTERN(LogDx12, Log, All);
 inline DEFINE_LOG_CATEGORY(LogDx12);
 
-namespace FRAMEWORK
+namespace FW
 {
 	inline const TCHAR* GetErrorText(HRESULT hr)
 	{
