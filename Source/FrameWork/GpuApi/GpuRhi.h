@@ -61,6 +61,7 @@ public:
 	//TODO
 };
 
+//Recorder is designed as transient within one frame, can not reuse it
 class GpuCmdRecorder : public GpuComputeCmdRecorder
 {
 public:

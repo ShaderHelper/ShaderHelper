@@ -1,4 +1,5 @@
 #pragma once
+#include <Widgets/Text/SInlineEditableTextBlock.h>
 
 namespace FW
 {
@@ -15,6 +16,7 @@ namespace FW
 		virtual FReply OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 		TSharedRef<SWidget> CreateContextMenu();
 		void OnHandleDeleteAction();
+		void OnHandleRenameAction();
 		virtual bool SupportsKeyboardFocus() const override { return true; }
 		FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 		void AddDep(SGraphNode* InNode);
@@ -29,5 +31,6 @@ namespace FW
 	private:
 		TMap<SGraphNode*, int> OutDegreeDeps;
 		FVector2D MousePos;
+		TSharedPtr<SInlineEditableTextBlock> NodeTitleEditText;
 	};
 }

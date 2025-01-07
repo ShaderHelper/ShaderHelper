@@ -8,8 +8,10 @@ namespace SH
 	{
 		REFLECTION_TYPE(ShaderToyOuputNode)
 	public:
+		ShaderToyOuputNode();
+
+	public:
 		void Serialize(FArchive& Ar) override;
-		FText GetNodeTitle() const override { return FText::FromString("Output"); }
 		TArray<FW::GraphPin*> GetPins() override;
 		void Exec(FW::GraphExecContext& Context) override;
 

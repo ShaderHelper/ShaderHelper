@@ -3,12 +3,6 @@
 
 namespace SH
 {
-
-	struct ShaderToyExecContext : FW::GraphExecContext
-	{
-
-	};
-
 	class ShaderToy : public FW::Graph
 	{
 		REFLECTION_TYPE(ShaderToy)

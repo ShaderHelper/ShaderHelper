@@ -17,7 +17,7 @@ namespace SH
 		ShProject(FString InPath);
 
 		virtual void Open(const FString& ProjectPath) override;
-		virtual void Save(const FString& InPath) override;
+		virtual void SaveAs(const FString& InPath) override;
 		void Serialize(FArchive& Ar) override;
 
 		FW::AssetBrowserPersistentState AssetBrowserState;

@@ -9,6 +9,8 @@ namespace FW
 	public:
 		AssetOp() = default;
 		virtual ~AssetOp() = default;
+		//Manually trigger OnOpen
+		static void OpenAsset(AssetObject* InAsset);
 
 	public:
         virtual struct MetaType* SupportAsset() = 0;

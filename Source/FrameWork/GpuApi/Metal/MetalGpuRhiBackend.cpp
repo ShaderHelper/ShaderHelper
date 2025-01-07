@@ -218,6 +218,7 @@ void *MetalGpuRhiBackend::GetSharedHandle(GpuTexture *InGpuTexture)
 
 GpuCmdRecorder* MetalGpuRhiBackend::BeginRecording(const FString& RecorderName)
 {
+	//mtl commandbuffer is transient(lightweight) and do not support reuse, so create new one per request.
     MTLCommandBufferPtr Cb = NS::RetainPtr(GCommandQueue->commandBuffer());
     if(!RecorderName.IsEmpty())
     {

@@ -2,7 +2,6 @@
 #include "ShaderHelperEditor.h"
 #include "App/ShaderHelperApp.h"
 #include "UI/Widgets/Property/PropertyView/SShaderPropertyView.h"
-#include "ProjectManager/ShProjectManager.h"
 #include <Serialization/JsonSerializer.h>
 #include <Misc/FileHelper.h>
 #include "Common/Path/PathHelper.h"
@@ -12,6 +11,7 @@
 #include "UI/Widgets/SShaderTab.h"
 #include "UI/Widgets/Graph/SGraphPanel.h"
 #include <DesktopPlatformModule.h>
+#include "Editor/AssetEditor/AssetEditor.h"
 
 STEAL_PRIVATE_MEMBER(FTabManager, TArray<TSharedRef<FTabManager::FArea>>, CollapsedDockAreas)
 
@@ -38,17 +38,17 @@ namespace SH
         PreviewTabId, PropretyTabId, AssetTabId, GraphTabId
     };
 
-	ShaderHelperEditor::ShaderHelperEditor(const Vector2f& InWindowSize)
-		: WindowSize(InWindowSize)
+	ShaderHelperEditor::ShaderHelperEditor(const Vector2f& InWindowSize, ShRenderer* InRenderer)
+		: Renderer(InRenderer)
+		, WindowSize(InWindowSize)
 	{
-		CurProject = &TSingleton<ShProjectManager>::Get().GetProject();
-
+		CurProject = TSingleton<ShProjectManager>::Get().GetProject();
 		ViewPort = MakeShared<PreviewViewPort>();
-		InitEditorUI();
 	}
 
 	ShaderHelperEditor::~ShaderHelperEditor()
 	{
+		Renderer->ClearRenderComp();
 		PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		FTicker::GetCoreTicker().RemoveTicker(SaveLayoutTicker);
 		PRAGMA_ENABLE_DEPRECATION_WARNINGS
@@ -131,7 +131,7 @@ namespace SH
 
 		SAssignNew(Window, SWindow)
 			.Title(TAttribute<FText>::CreateLambda([this] { 
-				FString ProjectPath = TSingleton<ShProjectManager>::Get().GetProject().GetFilePath();
+				FString ProjectPath = CurProject->GetFilePath();
 				return FText::FromString(LOCALIZATION("ShaderHelper").ToString() + FString::Printf(TEXT(" [%s]"), *ProjectPath));
 			}))
 			.ScreenPosition(UsedWindowPos)
@@ -168,7 +168,7 @@ PRAGMA_DISABLE_DEPRECATION_WARNINGS
         SaveLayoutTicker = FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this](float) {
             TabManager->SavePersistentLayout();
             CurProject->CodeTabLayout = CodeTabManager->PersistLayout();
-			TSingleton<ShProjectManager>::Get().SaveProject();
+			CurProject->Save();
             return true;
         }), 2.0f);
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
@@ -177,12 +177,15 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
             CurProject->CodeTabLayout = CodeTabManager->PersistLayout();
 			if (CurProject->AnyPendingAsset() && MessageDialog::Open(MessageDialog::OkCancel, Window, LOCALIZATION("SaveAssetTip")))
 			{
-				TSingleton<ShProjectManager>::Get().SaveProject(true);
+				CurProject->SavePendingAssets();
+				CurProject->Save();
 			}
 			else
 			{
-				TSingleton<ShProjectManager>::Get().SaveProject();
+				CurProject->Save();
 			}
+			auto ShApp = static_cast<ShaderHelperApp*>(GApp.Get());
+			ShApp->Launcher.Reset();
 			FSlateApplication::Get().RequestDestroyWindow(InWindow);
 		}));
 	}
@@ -421,7 +424,6 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 				+SOverlay::Slot()
 				[
 					SAssignNew(GraphPanel, SGraphPanel)
-						.GraphData(CurProject->Graph.Get())
 				]
 				+SOverlay::Slot()
 				.VAlign(VAlign_Top)
@@ -439,6 +441,11 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 				]
 			];
 			SpawnedTab->SetTabIcon(FAppCommonStyle::Get().GetBrush("Icons.Graph"));
+			if (CurProject->Graph)
+			{
+				AssetOp::OpenAsset(CurProject->Graph.Get());
+			}
+			
 		}
 		else {
 			ensure(false);
@@ -459,8 +466,15 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
         TabManager->FindExistingLiveTab(CodeTabId)->GetParentDockTabStack()->SetCanDropToAttach(false);
 	}
 
-	void ShaderHelperEditor::OpenGraph(AssetPtr<Graph> InGraphData)
+	void ShaderHelperEditor::OpenGraph(AssetPtr<Graph> InGraphData, TSharedPtr<RenderComponent> InGraphRenderComp)
 	{
+		Renderer->UnRegisterRenderComp(GraphRenderComp.Get());
+		GraphRenderComp = InGraphRenderComp;
+		if (GraphRenderComp)
+		{
+			Renderer->RegisterRenderComp(GraphRenderComp.Get());
+		}
+
 		GraphPanel->SetGraphData(InGraphData.Get());
 		CurProject->Graph = InGraphData;
 	}
@@ -598,14 +612,27 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 							FExecuteAction::CreateLambda([this] {
 								auto ShApp = static_cast<ShaderHelperApp*>(GApp.Get());
 								ShApp->Launcher = MakeShared<ProjectLauncher<ShProject>>([this, ShApp] {
-									ShApp->AppEditor = MakeUnique<ShaderHelperEditor>(ShApp->GetClientSize());
-								}, Window);
+									ShApp->AppEditor = MakeUnique<ShaderHelperEditor>(ShApp->GetClientSize(), static_cast<ShRenderer*>(ShApp->GetRenderer()));
+									static_cast<ShaderHelperEditor*>(ShApp->AppEditor.Get())->InitEditorUI();
+								});
+								ShApp->Launcher->SetBeforeLaunchFunc(FSimpleDelegate::CreateLambda([this] {
+									if (CurProject->AnyPendingAsset() && MessageDialog::Open(MessageDialog::OkCancel, Window, LOCALIZATION("SaveAssetTip")))
+									{
+										CurProject->SavePendingAssets();
+										CurProject->Save();
+									}
+									else
+									{
+										CurProject->Save();
+									}
+								}));
 							})
 					));
 				MenuBuilder.AddMenuEntry(LOCALIZATION("Save"), FText::GetEmpty(), FSlateIcon(),
 					FUIAction(
-						FExecuteAction::CreateLambda([] { 
-							TSingleton<ShProjectManager>::Get().SaveProject(true);
+						FExecuteAction::CreateLambda([this] { 
+							CurProject->SavePendingAssets();
+							CurProject->Save();
 						})
 					));
 			}

@@ -18,7 +18,7 @@ namespace SH
 		Serialize(*Ar);
 	}
 
-	void ShProject::Save(const FString& InPath)
+	void ShProject::SaveAs(const FString& InPath)
 	{
 		Path = InPath;
 		TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*InPath));

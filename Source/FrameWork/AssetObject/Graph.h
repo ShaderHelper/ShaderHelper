@@ -43,7 +43,6 @@ namespace FW
 		virtual TSharedRef<class SGraphNode> CreateNodeWidget(class SGraphPanel* OwnerPanel);
 		virtual TSharedPtr<SWidget> ExtraNodeWidget() { return {}; }
 		virtual void Serialize(FArchive& Ar);
-		virtual FText GetNodeTitle() const { return FText::FromString("Unknown"); }
 		virtual FSlateColor GetNodeColor() const;
 		virtual TArray<GraphPin*> GetPins() { return {}; }
 		virtual void Exec(GraphExecContext& Context) {}
@@ -51,6 +50,7 @@ namespace FW
 		FGuid Guid = FGuid::NewGuid();
 		Vector2D Position{0};
 		TMultiMap<FGuid, FGuid> OutPinToInPin;
+		FText NodeTitle = FText::FromString("Unknown");
 	};
 
 	class FRAMEWORK_API Graph : public AssetObject

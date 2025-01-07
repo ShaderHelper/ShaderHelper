@@ -101,6 +101,16 @@ namespace FW
 		return nullptr;
 	}
 
+	SGraphPin* SGraphPanel::GetOuputPinInLink(SGraphPin* InputPin) const
+	{
+		auto KeyPtr = Links.FindKey(InputPin);
+		if (KeyPtr)
+		{
+			return *KeyPtr;
+		}
+		return nullptr;
+	}
+
 	void SGraphPanel::SetGraphData(Graph* InGraphData)
 	{
 		Clear();
@@ -122,7 +132,7 @@ namespace FW
 
 			for (auto NodeMetaType : GraphData->SupportNodes())
 			{
-				FText NodeTitle = static_cast<GraphNode*>(NodeMetaType->GetDefaultObject())->GetNodeTitle();
+				FText NodeTitle = static_cast<GraphNode*>(NodeMetaType->GetDefaultObject())->NodeTitle;
 				MenuNodeItems.Add(MakeShared<FText>(MoveTemp(NodeTitle)));
 			}
 		}
@@ -450,7 +460,7 @@ namespace FW
 	void SGraphPanel::OnMenuItemSelected(TSharedPtr<FText> InSelectedItem, ESelectInfo::Type SelectInfo)
 	{
 		GraphNode* DefaultNodeData = GetDefaultObject<GraphNode>([InSelectedItem](GraphNode* CurNode) {
-			return CurNode->GetNodeTitle().EqualTo(*InSelectedItem);
+			return CurNode->NodeTitle.EqualTo(*InSelectedItem);
 		});
 
 		GraphNode* NewNodeData = static_cast<GraphNode*>(DefaultNodeData->DynamicMetaType()->Construct());

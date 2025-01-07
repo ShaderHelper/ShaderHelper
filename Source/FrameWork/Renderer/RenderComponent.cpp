@@ -1,10 +1,7 @@
 #include "CommonHeader.h"
-#include "Renderer.h"
+#include "RenderComponent.h"
 
 namespace FW
 {
 
-
 }
-
-

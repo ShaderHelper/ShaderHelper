@@ -25,7 +25,7 @@ namespace FW
 		RenderPassExecution Execution;
 	};
 
-	class RenderGraph
+	class FRAMEWORK_API RenderGraph : FNoncopyable
 	{
 	public:
 		RenderGraph();

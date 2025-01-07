@@ -49,7 +49,7 @@ namespace SH
 		ShaderMarshaller = MakeShared<FShaderEditorMarshaller>(this, MakeShared<HlslHighLightTokenizer>());
 		EffectMarshller = MakeShared<FShaderEditorEffectMarshaller>(this);
 
-		FText InitialShaderText = FText::FromString(StShaderAsset->GetPixelShaderBody());
+		FText InitialShaderText = FText::FromString(StShaderAsset->PixelShaderBody);
 
 		ChildSlot
 		[
@@ -698,7 +698,7 @@ namespace SH
 	{
 		FString NewShaderSource = InShaderSouce.Replace(TEXT("\r\n"), TEXT("\n"));
 		CurrentShaderSource = NewShaderSource;
-		if (NewShaderSource != StShaderAsset->GetPixelShaderBody())
+		if (NewShaderSource != StShaderAsset->PixelShaderBody)
 		{
 			StShaderAsset->MarkDirty();
 		}

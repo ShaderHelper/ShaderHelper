@@ -9,6 +9,12 @@ namespace UNITTEST_UTIL
 	UnitTestApp::UnitTestApp(const Vector2D& InClientSize, const TCHAR* CommandLine)
 		: App(InClientSize, CommandLine)
 	{
+		
+	}
+
+	void UnitTestApp::Init()
+	{
+		App::Init();
 		AppEditor = MakeUnique<UnitTestEditor>(AppClientSize);
 	}
 

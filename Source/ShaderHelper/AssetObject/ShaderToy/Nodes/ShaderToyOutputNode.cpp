@@ -9,6 +9,11 @@ namespace SH
 		.BaseClass<GraphNode>()
 	)
 
+	ShaderToyOuputNode::ShaderToyOuputNode()
+	{
+		NodeTitle = FText::FromString("Present");
+	}
+
 	void ShaderToyOuputNode::Serialize(FArchive& Ar)
 	{
 		GraphNode::Serialize(Ar);

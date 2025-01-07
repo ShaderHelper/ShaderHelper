@@ -15,10 +15,11 @@ namespace SH
 		void Serialize(FArchive& Ar) override;
 		FString FileExtension() const override;
 		const FSlateBrush* GetImage() const override;
-        const FString& GetPixelShaderBody() const { return PixelShaderBody; }
-        FString GetResourceDeclaration() const;
 
-	private:
+        FString GetResourceDeclaration() const;
+		FString GetFullShader() const;
+
+	public:
 		FString PixelShaderBody;
         TUniquePtr<FW::UniformBuffer> BuiltInUniformBuffer;
         

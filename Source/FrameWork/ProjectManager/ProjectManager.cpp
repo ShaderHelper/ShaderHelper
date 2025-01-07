@@ -44,6 +44,11 @@ namespace FW
 #endif
 	}
 
+	void Project::Save()
+	{
+		SaveAs(Path);
+	}
+
 	void Project::SavePendingAssets()
 	{
 		TArray<AssetObject*> Temp = PendingAssets;

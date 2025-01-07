@@ -13,7 +13,7 @@ namespace FW
 	class ProjectLauncher : Editor
 	{
 	public:
-		ProjectLauncher(TFunction<void()> InLaunchProjectFunc, TSharedPtr<SWindow> Owner) : LaunchProjectFunc(MoveTemp(InLaunchProjectFunc))
+		ProjectLauncher(TFunction<void()> InLaunchProjectFunc) : LaunchProjectFunc(MoveTemp(InLaunchProjectFunc))
 		{
 			AddProjectAssociation();
 
@@ -87,6 +87,7 @@ namespace FW
 							}
 							else
 							{
+								BeforeLaunchDelegate.ExecuteIfBound();
 								TSingleton<ProjectManager<T>>::Get().NewProject(ProjectName, ProjectDir);
 								LaunchProjectFunc();
 								Window->RequestDestroyWindow();
@@ -136,6 +137,7 @@ namespace FW
 						[RecentProjcetButton = TWeakPtr<SIconButton>{ RecentProjcetButton }, RecentProjcetPath, InsertDummy, this] {
 							if (IFileManager::Get().FileExists(*RecentProjcetPath))
 							{
+								BeforeLaunchDelegate.ExecuteIfBound();
 								TSingleton<ProjectManager<T>>::Get().OpenProject(RecentProjcetPath);
 								LaunchProjectFunc();
 								Window->RequestDestroyWindow();
@@ -178,6 +180,7 @@ namespace FW
 							{
 								if (OpenedFileNames.Num() > 0)
 								{
+									BeforeLaunchDelegate.ExecuteIfBound();
 									CacheOpenProjectDir = FPaths::GetPath(OpenedFileNames[0]);
 									TSingleton<ProjectManager<T>>::Get().OpenProject(FPaths::ConvertRelativePathToFull(OpenedFileNames[0]));
 									LaunchProjectFunc();
@@ -246,25 +249,25 @@ namespace FW
 				]
 			];
 
-			if (Owner)
+			FSlateApplication::Get().AddWindow(Window.ToSharedRef());
+		}
+
+		~ProjectLauncher()
+		{
+			if (Window.IsValid())
 			{
-				FSlateApplication::Get().AddWindowAsNativeChild(Window.ToSharedRef(), Owner.ToSharedRef());
-			}
-			else
-			{
-				FSlateApplication::Get().AddWindow(Window.ToSharedRef());
+				FSlateApplication::Get().DestroyWindowImmediately(Window.ToSharedRef());
 			}
 		}
 
-	~ProjectLauncher()
-	{
-		if (Window.IsValid())
+	public:
+		void SetBeforeLaunchFunc(FSimpleDelegate InBeforeLaunchDelegate)
 		{
-			FSlateApplication::Get().DestroyWindowImmediately(Window.ToSharedRef());
+			BeforeLaunchDelegate = MoveTemp(InBeforeLaunchDelegate);
 		}
-	}
 
 	private:
+		FSimpleDelegate BeforeLaunchDelegate;
 		TFunction<void()> LaunchProjectFunc;
 		TSharedPtr<SWindow> Window;
 		TSharedPtr<SVerticalBox> RightContent;

@@ -12,6 +12,9 @@ namespace SH {
 		ShaderHelperApp(const FW::Vector2D& InClientSize, const TCHAR* CommandLine);
 		~ShaderHelperApp();
 
+	public:
+		void Init() override;
+
 	private:
 		void Update(double DeltaTime) override;
 		void Render() override;

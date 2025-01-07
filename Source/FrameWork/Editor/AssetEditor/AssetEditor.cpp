@@ -6,6 +6,12 @@ namespace FW
 {
 	GLOBAL_REFLECTION_REGISTER(AddClass<AssetOp>())
 
+	void AssetOp::OpenAsset(AssetObject* InAsset)
+	{
+		AssetOp* Op = GetAssetOp(InAsset->DynamicMetaType());
+		Op->OnOpen(InAsset->GetPath());
+	}
+
     AssetOp* GetAssetOp(const FString& InAssetPath)
     {
         return GetDefaultObject<AssetOp>([&](AssetOp* CurAssetOp){

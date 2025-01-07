@@ -83,6 +83,7 @@ namespace FW
 		Ar << Guid;
 		Ar << Position;
 		Ar << OutPinToInPin;
+		Ar << NodeTitle;
 	}
 
 	FSlateColor GraphNode::GetNodeColor() const

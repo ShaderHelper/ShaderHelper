@@ -78,10 +78,21 @@ namespace FW {
 		}
 	}
 
-	App::App(const Vector2D& InClientSize, const TCHAR* CommandLine)
-		: AppClientSize(InClientSize)
+	App::App(const Vector2D& InClientSize, const TCHAR* InCommandLine)
+		: AppClientSize(InClientSize), CommandLine(InCommandLine)
 	{
-		UE_Init(CommandLine);
+	
+	}
+
+	App::~App()
+	{
+		UE_ShutDown();
+	}
+
+
+	void App::Init()
+	{
+		UE_Init(*CommandLine);
 
 		// Create Rhi backend.
 		GpuRhiConfig Config;
@@ -90,7 +101,7 @@ namespace FW {
 
 		if (FParse::Param(FCommandLine::Get(), TEXT("disableValidation"))) {
 			Config.EnableValidationCheck = false;
-		}
+	}
 		FString BackendName;
 		if (FParse::Value(FCommandLine::Get(), TEXT("backend="), BackendName)) {
 			if (BackendName.Equals(TEXT("Vulkan"))) {
@@ -111,15 +122,12 @@ namespace FW {
 		}
 		GpuRhi::InitGpuRhi(Config);
 		GGpuRhi->InitApiEnv();
-	}
-
-	App::~App()
-	{
-		UE_ShutDown();
-	}
+}
 
 	void App::Run()
 	{
+		Init();
+
 		double CurrentRealTime = FPlatformTime::Seconds();
 		double LastRealTime = CurrentRealTime;
 		while (!IsEngineExitRequested()) {
@@ -199,5 +207,4 @@ PRAGMA_DISABLE_DEPRECATION_WARNINGS
             AppRenderer->Render();
         }
 	}
-
 }

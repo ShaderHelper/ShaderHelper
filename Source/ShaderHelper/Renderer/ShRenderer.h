@@ -1,7 +1,6 @@
 #pragma once
 #include "Renderer/Renderer.h"
-#include "GpuApi/GpuResource.h"
-#include "UI/Widgets/Property/PropertyData/PropertyData.h"
+#include "Renderer/RenderComponent.h"
 
 namespace SH
 {
@@ -9,34 +8,14 @@ namespace SH
 	{
 	public:
 		ShRenderer();
-		
-	public:
-		void RenderInternal() override;
-		void OnViewportResize(const FW::Vector2f& InResolution);
-		void UpdatePixelShader(TRefCountPtr<FW::GpuShader> InNewPixelShader);
-		void UpdateCustomBindGroup(TRefCountPtr<FW::GpuBindGroup> InBindGroup) { CustomBindGroup = MoveTemp(InBindGroup); }
-		void UpdateCustomBindGroupLayout(TRefCountPtr<FW::GpuBindGroupLayout> InBindGroupLayout) { CustomBindGroupLayout = MoveTemp(InBindGroupLayout); }
+		void RegisterRenderComp(FW::RenderComponent* InRenderComp) { RenderComps.Add(InRenderComp); }
+		void UnRegisterRenderComp(FW::RenderComponent* InRenderComp) { RenderComps.Remove(InRenderComp); }
+		void ClearRenderComp() { RenderComps.Empty(); }
+
+		void Render() override;
 
 	private:
-		void RenderBegin() override;
-		void RenderEnd() override;
-		void ReCreatePipelineState();
-
-	private:
-		TRefCountPtr<FW::GpuTexture> FinalRT;
-		TRefCountPtr<FW::GpuShader> VertexShader;
-		TRefCountPtr<FW::GpuShader> PixelShader;
-		TRefCountPtr<FW::GpuPipelineState> PipelineState;
-
-		float iTime;
-        FW::Vector2f iResolution;
-		TUniquePtr<FW::UniformBuffer> BuiltInUniformBuffer;
-
-		TRefCountPtr<FW::GpuBindGroup> BuiltInBindGroup;
-		TRefCountPtr<FW::GpuBindGroupLayout> BuiltInBindGroupLayout;
-
-		TRefCountPtr<FW::GpuBindGroup> CustomBindGroup;
-		TRefCountPtr<FW::GpuBindGroupLayout> CustomBindGroupLayout;
+		TArray<FW::RenderComponent*> RenderComps;
 	};
 }
 

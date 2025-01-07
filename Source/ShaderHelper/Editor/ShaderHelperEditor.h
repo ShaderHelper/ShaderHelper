@@ -8,6 +8,9 @@
 #include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 #include "UI/Widgets/Graph/SGraphPanel.h"
+#include "Renderer/RenderComponent.h"
+#include "Renderer/Renderer.h"
+#include "ProjectManager/ShProjectManager.h"
 
 namespace SH 
 {
@@ -21,20 +24,23 @@ namespace SH
 			TSharedPtr<FTabManager::FLayout> TabLayout;
 		};
 
-		ShaderHelperEditor(const FW::Vector2f& InWindowSize);
+		ShaderHelperEditor(const FW::Vector2f& InWindowSize, ShRenderer* InRenderer);
 		~ShaderHelperEditor();
     public:
         FTabManager* GetCodeTabManager() const { return CodeTabManager.Get(); }
 		TSharedPtr<SWindow> GetMainWindow() const override { return Window; }
+		FW::PreviewViewPort* GetViewPort() const { return ViewPort.Get(); }
         
     public:
+		void InitEditorUI();
+
 		void ResetWindowLayout();
 		WindowLayoutConfigInfo LoadWindowLayout(const FString& InWindowLayoutConfigFileName);
 		void SaveWindowLayout(const TSharedRef<FTabManager::FLayout>& InLayout);
         
         void OpenStShaderTab(FW::AssetPtr<StShader> InStShader);
 		
-		void OpenGraph(FW::AssetPtr<FW::Graph> InGraphData);
+		void OpenGraph(FW::AssetPtr<FW::Graph> InGraphData, TSharedPtr<FW::RenderComponent> InGraphRenderComp);
 
 	private:
 		TSharedRef<SDockTab> SpawnWindowTab(const FSpawnTabArgs& Args);
@@ -42,7 +48,6 @@ namespace SH
         TSharedRef<SWidget> SpawnStShaderPath(const FString& InStShaderPath);
         FMenuBarBuilder CreateMenuBarBuilder();
 		void FillMenu(FMenuBuilder& MenuBuilder, FString MenuName);
-		void InitEditorUI();
 		
 	private:
 		TSharedPtr<FTabManager::FLayout> DefaultTabLayout;
@@ -64,9 +69,12 @@ namespace SH
         TSharedPtr<SVerticalBox> WindowContentBox;
 		TWeakPtr<SBox> PropertyViewBox;
         
-		class ShProject* CurProject;
+		TSharedPtr<ShProject> CurProject;
 
 		TSharedPtr<FW::SGraphPanel> GraphPanel;
+
+		ShRenderer* Renderer;
+		TSharedPtr<FW::RenderComponent> GraphRenderComp;
 	};
 
 }

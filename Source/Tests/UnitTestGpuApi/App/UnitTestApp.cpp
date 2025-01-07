@@ -12,6 +12,13 @@ namespace UNITTEST_GPUAPI
 	UnitTestApp::UnitTestApp(const Vector2D& InClientSize, const TCHAR* CommandLine)
 		: App(InClientSize, CommandLine)
 	{
+		
+	}
+
+	void UnitTestApp::Init()
+	{
+		App::Init();
+		//Add swindow otherwise the run loop will immediately exit.
 		AppEditor = MakeUnique<UnitTestEditor>(AppClientSize);
 	}
 

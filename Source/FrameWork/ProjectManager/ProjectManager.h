@@ -16,7 +16,8 @@ namespace FW
 		virtual ~Project() = default;
 
 		virtual void Open(const FString& ProjectPath) = 0;
-		virtual void Save(const FString& InPath) = 0;
+		virtual void SaveAs(const FString& InPath) = 0;
+		virtual void Save();
 		virtual void SavePendingAssets();
 		virtual void Serialize(FArchive& Ar)
 		{
@@ -75,17 +76,17 @@ namespace FW
 			IFileManager::Get().MakeDirectory(*(ProjectDir / ProjectName), true);
 			IFileManager::Get().MakeDirectory(*(ProjectDir / ProjectName / "Content"), true);
 			FString ProjectPath = ProjectDir / ProjectName / ProjectName + ".shprj";
-			ActiveProject = MakeUnique<ProjectDataType>(ProjectPath);
+			ActiveProject = MakeShared<ProjectDataType>(ProjectPath);
 			GProject = ActiveProject.Get();
 
 			AddToProjMgmt(ProjectPath);
-			SaveProject(MoveTemp(ProjectPath));
+			ActiveProject->Save();
 			return ActiveProject.Get();
 		}
 
 		ProjectDataType* OpenProject(const FString& ProjectPath)
 		{
-			ActiveProject = MakeUnique<ProjectDataType>(ProjectPath);
+			ActiveProject = MakeShared<ProjectDataType>(ProjectPath);
 			GProject = ActiveProject.Get();
 
 			TSingleton<AssetManager>::Get().Clear();
@@ -127,24 +128,9 @@ namespace FW
 			FFileHelper::SaveStringToFile(NewJsonContents, *(PathHelper::SavedDir() / TEXT("ProjMgmt.json")));
 		}
 
-		void SaveProject(bool bSavePendingAsset = false)
+		TSharedPtr<ProjectDataType> GetProject() const
 		{
-			if (bSavePendingAsset)
-			{
-				ActiveProject->SavePendingAssets();
-			}
-
-			ActiveProject->Save(ActiveProject->GetFilePath());
-		}
-
-		void SaveProject(const FString& Path)
-		{
-			ActiveProject->Save(Path);
-		}
-
-		ProjectDataType& GetProject()
-		{
-			return *ActiveProject;
+			return ActiveProject;
 		}
 
 		FString GetActiveProjectDirectory() const
@@ -175,7 +161,7 @@ namespace FW
 		const TArray<FString>& GetRecentProjcetPaths() const { return RecentProjcetPaths; }
 
 	protected:
-		TUniquePtr<ProjectDataType> ActiveProject;
+		TSharedPtr<ProjectDataType> ActiveProject;
 		TArray<FString> RecentProjcetPaths;
 	};
 

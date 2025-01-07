@@ -66,4 +66,12 @@ R"(void mainImage(out float4 fragColor, in float2 fragCoord)
 		return BuiltInBindGroupLayout->GetCodegenDeclaration() + Template;
     }
 
+	FString StShader::GetFullShader() const
+	{
+		FString FullShader;
+		FFileHelper::LoadFileToString(FullShader, *(PathHelper::ShaderDir() / "ShaderHelper/StShaderTemplate.hlsl"));
+		FullShader = BuiltInBindGroupLayout->GetCodegenDeclaration() + FullShader + PixelShaderBody;
+		return FullShader;
+	}
+
 }

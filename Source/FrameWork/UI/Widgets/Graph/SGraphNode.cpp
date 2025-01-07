@@ -20,6 +20,10 @@ namespace FW
 			FGenericCommands::Get().Delete,
 			FExecuteAction::CreateRaw(this, &SGraphNode::OnHandleDeleteAction)
 		);
+		UICommandList->MapAction(
+			FGenericCommands::Get().Rename,
+			FExecuteAction::CreateRaw(this, &SGraphNode::OnHandleRenameAction)
+		);
 
 		TSharedRef<SVerticalBox> PinContainer = SNew(SVerticalBox);
 
@@ -34,8 +38,11 @@ namespace FW
 				.BorderBackgroundColor(NodeData->GetNodeColor())
 				.HAlign(HAlign_Center)
 				[
-					SNew(STextBlock)
-					.Text(NodeData->GetNodeTitle())
+					SAssignNew(NodeTitleEditText, SInlineEditableTextBlock)
+					.Text_Lambda([this] { return NodeData->NodeTitle; })
+					.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
+						NodeData->NodeTitle = NewText;
+					})
 				]
 			]
 			+SVerticalBox::Slot()
@@ -92,6 +99,8 @@ namespace FW
 				PinDesc->SetHAlign(HAlign_Left);
 
 				PinContainer->AddSlot()
+				.HAlign(HAlign_Left)
+				.AutoHeight()
 				.Padding(0.0f, 0.0f, 0.0f, 4.0f)
 				[
 					InputPinContent
@@ -102,6 +111,8 @@ namespace FW
 				PinDesc->SetHAlign(HAlign_Right);
 
 				PinContainer->AddSlot()
+				.HAlign(HAlign_Right)
+				.AutoHeight()
 				.Padding(0.0f, 0.0f, 0.0f, 4.0f)
 				[
 					OutputPinContent
@@ -157,6 +168,7 @@ namespace FW
 		MenuBuilder.BeginSection("Control", FText::FromString("Control"));
 		{
 			MenuBuilder.AddMenuEntry(FGenericCommands::Get().Delete);
+			MenuBuilder.AddMenuEntry(FGenericCommands::Get().Rename);
 		}
 		MenuBuilder.EndSection();
 		return MenuBuilder.MakeWidget();
@@ -165,6 +177,11 @@ namespace FW
 	void SGraphNode::OnHandleDeleteAction()
 	{
 		Owner->DeleteSelectedNodes();
+	}
+
+	void SGraphNode::OnHandleRenameAction()
+	{
+		NodeTitleEditText->EnterEditingMode();
 	}
 
 	FReply SGraphNode::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)

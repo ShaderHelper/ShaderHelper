@@ -59,6 +59,7 @@ namespace FW
 		void DeleteNode(SGraphNode* Node);
 		
 		SGraphPin* GetGraphPin(FGuid PinId);
+		SGraphPin* GetOuputPinInLink(SGraphPin* InputPin) const;
 		TSharedPtr<SGraphNode> AddNodeFromData(GraphNode* InNodeData);
 		void AddLink(SGraphPin* Output, SGraphPin* Input);
 		void RemoveInputLink(SGraphPin* Input);

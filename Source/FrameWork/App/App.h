@@ -20,13 +20,15 @@ namespace FW {
 	protected:
 		virtual void Update(double DeltaTime);
 		virtual void Render();
+		virtual void Init();
         
     public:
         TUniquePtr<Editor> AppEditor;
         TUniquePtr<Renderer> AppRenderer;
 
-	protected:		
+	protected:
 		Vector2D AppClientSize;
+		FString CommandLine;
 		double DeltaTime;
 		double FixedDeltaTime = 1 / 30;
 	};
