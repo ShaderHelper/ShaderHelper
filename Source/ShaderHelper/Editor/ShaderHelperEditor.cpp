@@ -338,7 +338,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 			SpawnedTab->SetLabel(LOCALIZATION(PropretyTabId.ToString()));
 			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Info"));
 			SpawnedTab->SetContent(
-				SAssignNew(PropertyViewBox, SBox)
+				SAssignNew(PropertyView, SPropertyView)
 			);
 		}
 		else if (TabId == CodeTabId) {
@@ -440,7 +440,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 					})
 				]
 			];
-			SpawnedTab->SetTabIcon(FAppCommonStyle::Get().GetBrush("Icons.Graph"));
+			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Blueprints"));
 			if (CurProject->Graph)
 			{
 				AssetOp::OpenAsset(CurProject->Graph.Get());

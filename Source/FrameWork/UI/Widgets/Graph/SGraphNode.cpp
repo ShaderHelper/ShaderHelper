@@ -39,9 +39,9 @@ namespace FW
 				.HAlign(HAlign_Center)
 				[
 					SAssignNew(NodeTitleEditText, SInlineEditableTextBlock)
-					.Text_Lambda([this] { return NodeData->NodeTitle; })
+					.Text_Lambda([this] { return NodeData->ObjectName; })
 					.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
-						NodeData->NodeTitle = NewText;
+						NodeData->ObjectName = NewText;
 					})
 				]
 			]
@@ -63,7 +63,7 @@ namespace FW
 			auto PinDesc = SNew(SBox).MinDesiredWidth(100.0f)
 				[
 					SNew(STextBlock)
-						.Text(Pin->PinName)
+						.Text(Pin->ObjectName)
 				];
 
 			auto InputPinContent = SNew(SHorizontalBox)

@@ -182,6 +182,7 @@ namespace FW
 										AssetOp_->OnCreate(NewAsset);
 									}
 
+									NewAsset->ObjectName = FText::FromString(FPaths::GetBaseFilename(SavedFileName));
 									TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFileName));
 									NewAsset->Serialize(*Ar);
 								})),

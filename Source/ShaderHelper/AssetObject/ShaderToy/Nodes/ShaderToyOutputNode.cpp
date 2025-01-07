@@ -5,13 +5,13 @@ using namespace FW;
 
 namespace SH
 {
-	GLOBAL_REFLECTION_REGISTER(AddClass<ShaderToyOuputNode>("ShaderToyOuputNode")
+	GLOBAL_REFLECTION_REGISTER(AddClass<ShaderToyOuputNode>("Present Node")
 		.BaseClass<GraphNode>()
 	)
 
 	ShaderToyOuputNode::ShaderToyOuputNode()
 	{
-		NodeTitle = FText::FromString("Present");
+		ObjectName = FText::FromString("Present");
 	}
 
 	void ShaderToyOuputNode::Serialize(FArchive& Ar)

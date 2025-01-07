@@ -3,12 +3,11 @@
 
 namespace FW
 {
-	class FRAMEWORK_API AssetOp
+	class FRAMEWORK_API AssetOp : public ShObjectOp
 	{
 		REFLECTION_TYPE(AssetOp)
 	public:
 		AssetOp() = default;
-		virtual ~AssetOp() = default;
 		//Manually trigger OnOpen
 		static void OpenAsset(AssetObject* InAsset);
 

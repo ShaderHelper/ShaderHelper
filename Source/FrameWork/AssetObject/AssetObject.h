@@ -1,19 +1,17 @@
 #pragma once
 #include "GpuApi/GpuTexture.h"
-
+#include "Common/FrameWorkCore.h"
 struct FSlateBrush;
 
 namespace FW
 {
-	class FRAMEWORK_API AssetObject
+	class FRAMEWORK_API AssetObject : public ShObject
 	{
 		REFLECTION_TYPE(AssetObject)
 	public:
-		AssetObject();
-		virtual ~AssetObject() = default;
+		AssetObject() = default;
 
-		//Use the serialization system from unreal engine
-		virtual void Serialize(FArchive& Ar);
+		virtual void Serialize(FArchive& Ar) override;
 		virtual void PostLoad() {}
 		virtual void Save();
 		virtual void MarkDirty();
@@ -28,10 +26,6 @@ namespace FW
         
         FString GetFileName() const;
         FString GetPath() const;
-		FGuid GetGuid() const { return Guid; }
-
-	protected:
-		FGuid Guid;
 	};
 
 }

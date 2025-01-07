@@ -8,7 +8,7 @@
 
 namespace FW
 {
-	GLOBAL_REFLECTION_REGISTER(AddClass<Texture2D>()
+	GLOBAL_REFLECTION_REGISTER(AddClass<Texture2D>("Texture2D")
                                 .BaseClass<AssetObject>()
 	)
 
@@ -37,6 +37,8 @@ namespace FW
 
 	void Texture2D::PostLoad()
 	{
+		AssetObject::PostLoad();
+
 		GpuTextureDesc Desc{ (uint32)Width, (uint32)Height, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource , RawData };
 		GpuData = GGpuRhi->CreateTexture(MoveTemp(Desc));
 	}

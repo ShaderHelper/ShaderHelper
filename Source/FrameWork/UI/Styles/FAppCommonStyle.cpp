@@ -85,7 +85,7 @@ namespace FW
 
 		Style->Set("Icons.Folder", new IMAGE_BRUSH_SVG("Starship/Common/folder-closed", FVector2D(16.0, 16.0)));
 		Style->Set("Icons.FolderPlus", new IMAGE_BRUSH_SVG("Starship/Common/folder-plus", FVector2D(16.0, 16.0)));
-		Style->Set("Icons.Graph", new IMAGE_BRUSH_SVG("Starship/Insights/Callers_20", FVector2D(20.0, 20.0)));
+		//Style->Set("Icons.Graph", new IMAGE_BRUSH_SVG("Starship/Insights/Callers_20", FVector2D(20.0, 20.0)));
 		Style->Set("Icons.File", new IMAGE_BRUSH_SVG("Starship/Common/file", FVector2D(16.0, 16.0)));
 		
 		Style->Set("CommonCommands.Save", new IMAGE_BRUSH_SVG("Starship/Common/save", FVector2D(16.0, 16.0)));

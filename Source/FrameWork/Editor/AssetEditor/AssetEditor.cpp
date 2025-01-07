@@ -4,7 +4,9 @@
 
 namespace FW
 {
-	GLOBAL_REFLECTION_REGISTER(AddClass<AssetOp>())
+	GLOBAL_REFLECTION_REGISTER(AddClass<AssetOp>()
+								.BaseClass<ShObjectOp>()
+	)
 
 	void AssetOp::OpenAsset(AssetObject* InAsset)
 	{

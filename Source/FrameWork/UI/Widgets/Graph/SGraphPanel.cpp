@@ -55,7 +55,7 @@ namespace FW
 		{
 			SGraphNode* OutputOwner = Output->Owner;
 			SGraphNode* InputOwner = Input->Owner;
-			OutputOwner->NodeData->OutPinToInPin.AddUnique(Output->PinData->Guid, Input->PinData->Guid);
+			OutputOwner->NodeData->OutPinToInPin.AddUnique(Output->PinData->GetGuid(), Input->PinData->GetGuid());
 			OutputOwner->AddDep(InputOwner);
 			Links.AddUnique(Output, Input);
 		}
@@ -68,8 +68,8 @@ namespace FW
 			SGraphPin* Output = *Key;
 			Links.Remove(Output, Input);
 			Output->Owner->RemoveDep(Input->Owner);
-			auto Kkey = Output->Owner->NodeData->OutPinToInPin.FindKey(Input->PinData->Guid);
-			Output->Owner->NodeData->OutPinToInPin.Remove(*Kkey, Input->PinData->Guid);
+			auto Kkey = Output->Owner->NodeData->OutPinToInPin.FindKey(Input->PinData->GetGuid());
+			Output->Owner->NodeData->OutPinToInPin.Remove(*Kkey, Input->PinData->GetGuid());
 		}
 	}
 
@@ -92,7 +92,7 @@ namespace FW
 		{
 			for (auto PinPtr: Nodes[i]->Pins)
 			{
-				if (PinPtr->PinData->Guid == PinId)
+				if (PinPtr->PinData->GetGuid() == PinId)
 				{
 					return PinPtr;
 				}
@@ -132,7 +132,7 @@ namespace FW
 
 			for (auto NodeMetaType : GraphData->SupportNodes())
 			{
-				FText NodeTitle = static_cast<GraphNode*>(NodeMetaType->GetDefaultObject())->NodeTitle;
+				FText NodeTitle = static_cast<GraphNode*>(NodeMetaType->GetDefaultObject())->ObjectName;
 				MenuNodeItems.Add(MakeShared<FText>(MoveTemp(NodeTitle)));
 			}
 		}
@@ -145,8 +145,8 @@ namespace FW
 			//Layer order
 			Nodes.Remove(InNode);
 			Nodes.Add(InNode);
-			TSharedPtr<GraphNode> NodeData = GraphData->GetNode(InNode->NodeData->Guid);
-			GraphData->RemoveNode(InNode->NodeData->Guid);
+			TSharedPtr<GraphNode> NodeData = GraphData->GetNode(InNode->NodeData->GetGuid());
+			GraphData->RemoveNode(InNode->NodeData->GetGuid());
 			GraphData->AddNode(NodeData);
 
 			SelectedNodes.Add(&*InNode);
@@ -242,7 +242,7 @@ namespace FW
 					{
 						It.RemoveCurrent();
 						OuputPin->Owner->RemoveDep(InputPin->Owner);
-						OuputPin->Owner->NodeData->OutPinToInPin.Remove(OuputPin->PinData->Guid, InputPin->PinData->Guid);
+						OuputPin->Owner->NodeData->OutPinToInPin.Remove(OuputPin->PinData->GetGuid(), InputPin->PinData->GetGuid());
 						
 						GraphData->MarkDirty();
 					}
@@ -460,7 +460,7 @@ namespace FW
 	void SGraphPanel::OnMenuItemSelected(TSharedPtr<FText> InSelectedItem, ESelectInfo::Type SelectInfo)
 	{
 		GraphNode* DefaultNodeData = GetDefaultObject<GraphNode>([InSelectedItem](GraphNode* CurNode) {
-			return CurNode->NodeTitle.EqualTo(*InSelectedItem);
+			return CurNode->ObjectName.EqualTo(*InSelectedItem);
 		});
 
 		GraphNode* NewNodeData = static_cast<GraphNode*>(DefaultNodeData->DynamicMetaType()->Construct());
@@ -493,17 +493,17 @@ namespace FW
 			{
 				It.RemoveCurrent();
 				OuputPin->Owner->RemoveDep(InputPin->Owner);
-				Node->NodeData->OutPinToInPin.Remove(OuputPin->PinData->Guid, InputPin->PinData->Guid);
+				Node->NodeData->OutPinToInPin.Remove(OuputPin->PinData->GetGuid(), InputPin->PinData->GetGuid());
 			}
 			else if (InputPin->Owner == Node)
 			{
 				It.RemoveCurrent();
 				OuputPin->Owner->RemoveDep(InputPin->Owner);
-				OuputPin->Owner->NodeData->OutPinToInPin.Remove(OuputPin->PinData->Guid, InputPin->PinData->Guid);
+				OuputPin->Owner->NodeData->OutPinToInPin.Remove(OuputPin->PinData->GetGuid(), InputPin->PinData->GetGuid());
 			}
 		}
 
-		GraphData->RemoveNode(Node->NodeData->Guid);
+		GraphData->RemoveNode(Node->NodeData->GetGuid());
 
 		int RemoveIndex = -1;
 		for (int i = 0; i < Nodes.Num(); i++)

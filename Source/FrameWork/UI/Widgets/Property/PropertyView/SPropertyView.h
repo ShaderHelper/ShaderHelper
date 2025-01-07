@@ -9,6 +9,7 @@ namespace FW
 	public:
 		SLATE_BEGIN_ARGS(SPropertyView)
 			: _PropertyDatas(nullptr)
+			, _IsExpandAll(false)
 		{}
 			SLATE_ARGUMENT(TArray<PropertyDataType>*, PropertyDatas)
 			SLATE_ARGUMENT(bool, IsExpandAll)

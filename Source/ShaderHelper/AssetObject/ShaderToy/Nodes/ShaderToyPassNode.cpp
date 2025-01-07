@@ -7,13 +7,13 @@ using namespace FW;
 
 namespace SH
 {
-	GLOBAL_REFLECTION_REGISTER(AddClass<ShaderToyPassNode>("ShaderToyPassNode")
+	GLOBAL_REFLECTION_REGISTER(AddClass<ShaderToyPassNode>("RenderPass Node")
 		.BaseClass<GraphNode>()
 	)
 
 	ShaderToyPassNode::ShaderToyPassNode()
 	{
-		NodeTitle = FText::FromString("RenderPass");
+		ObjectName = FText::FromString("RenderPass");
 	}
 
 	void ShaderToyPassNode::Serialize(FArchive& Ar)
@@ -42,12 +42,12 @@ namespace SH
 	{
 		PassShader = MoveTemp(InPassShader);
 
-		VertexShader = GGpuRhi->CreateShaderFromSource(ShaderType::VertexShader, PassShader->GetFullShader(), FString::Printf(TEXT("%sVS"), *NodeTitle.ToString()), TEXT("MainVS"));
+		VertexShader = GGpuRhi->CreateShaderFromSource(ShaderType::VertexShader, PassShader->GetFullShader(), FString::Printf(TEXT("%sVS"), *ObjectName.ToString()), TEXT("MainVS"));
 		FString ErrorInfo;
 		GGpuRhi->CrossCompileShader(VertexShader, ErrorInfo);
 		check(ErrorInfo.IsEmpty());
 
-		PixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, PassShader->GetFullShader(), FString::Printf(TEXT("%sPS"), *NodeTitle.ToString()), TEXT("MainPS"));
+		PixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, PassShader->GetFullShader(), FString::Printf(TEXT("%sPS"), *ObjectName.ToString()), TEXT("MainPS"));
 		GGpuRhi->CrossCompileShader(PixelShader, ErrorInfo);
 		check(ErrorInfo.IsEmpty());
 	}
@@ -85,7 +85,7 @@ namespace SH
 		};
 		TRefCountPtr<GpuPipelineState> PipelineState = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
 
-		ShaderToyContext.RG->AddRenderPass(NodeTitle.ToString(), MoveTemp(PassDesc),
+		ShaderToyContext.RG->AddRenderPass(ObjectName.ToString(), MoveTemp(PassDesc),
 			[this, PipelineState, &ShaderToyContext](GpuRenderPassRecorder* PassRecorder) {
 				PassRecorder->SetRenderPipelineState(PipelineState);
 				PassRecorder->SetBindGroups(PassShader->BuiltInBindGroup, nullptr, nullptr, nullptr);

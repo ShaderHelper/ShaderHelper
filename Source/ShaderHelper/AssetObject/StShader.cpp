@@ -15,7 +15,7 @@ R"(void mainImage(out float4 fragColor, in float2 fragCoord)
     fragColor = float4(col,1);
 })";
 
-	GLOBAL_REFLECTION_REGISTER(AddClass<StShader>()
+	GLOBAL_REFLECTION_REGISTER(AddClass<StShader>("ShaderToy Shader")
                                 .BaseClass<AssetObject>()
 	)
 

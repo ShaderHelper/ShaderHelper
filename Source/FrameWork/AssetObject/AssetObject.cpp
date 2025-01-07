@@ -7,17 +7,12 @@
 
 namespace FW
 {
-	GLOBAL_REFLECTION_REGISTER(AddClass<AssetObject>())
-
-	AssetObject::AssetObject()
-	{
-		Guid = FGuid::NewGuid();
-	}
+	GLOBAL_REFLECTION_REGISTER(AddClass<AssetObject>()
+								.BaseClass<ShObject>())
 
 	void AssetObject::Serialize(FArchive& Ar)
 	{
-		Ar << Guid;
-		Ar << GFrameWorkVer << GProjectVer;
+		ShObject::Serialize(Ar);
 	}
 
 	void AssetObject::Save()

@@ -7,9 +7,13 @@
 
 namespace FW
 {
-	GLOBAL_REFLECTION_REGISTER(AddClass<GraphNode>("GraphNode"))
+	GLOBAL_REFLECTION_REGISTER(AddClass<GraphNode>("GraphNode")
+								.BaseClass<ShObject>()
+	)
 
-	GLOBAL_REFLECTION_REGISTER(AddClass<GraphPin>())
+	GLOBAL_REFLECTION_REGISTER(AddClass<GraphPin>()
+								.BaseClass<ShObject>()
+	)
 
 	GLOBAL_REFLECTION_REGISTER(AddClass<Graph>()
 								.BaseClass<AssetObject>()
@@ -58,7 +62,7 @@ namespace FW
 
 		bool bHasSucceeded = Algo::TopologicalSort(ExecNodes, [this](const TSharedPtr<GraphNode>& Element) {
 			TArray<FGuid> DepIds;
-			NodeDeps.MultiFind(Element->Guid, DepIds);
+			NodeDeps.MultiFind(Element->GetGuid(), DepIds);
 			TArray<TSharedPtr<GraphNode>> DepNodes;
 			for (FGuid Id : DepIds)
 			{
@@ -80,10 +84,9 @@ namespace FW
 
 	void GraphNode::Serialize(FArchive& Ar)
 	{
-		Ar << Guid;
+		ShObject::Serialize(Ar);
 		Ar << Position;
 		Ar << OutPinToInPin;
-		Ar << NodeTitle;
 	}
 
 	FSlateColor GraphNode::GetNodeColor() const
@@ -91,9 +94,15 @@ namespace FW
 		return FStyleColors::Title;
 	}
 
+	GraphPin::GraphPin(const FText& InName, PinDirection InDirection)
+		: Direction(InDirection)
+	{
+		ObjectName = InName;
+	}
+
 	void GraphPin::Serialize(FArchive& Ar)
 	{
-		Ar << Guid;
+		ShObject::Serialize(Ar);
 		Ar << Direction;
 	}
 

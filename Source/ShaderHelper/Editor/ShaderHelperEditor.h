@@ -11,6 +11,7 @@
 #include "Renderer/RenderComponent.h"
 #include "Renderer/Renderer.h"
 #include "ProjectManager/ShProjectManager.h"
+#include "UI/Widgets/Property/PropertyView/SPropertyView.h"
 
 namespace SH 
 {
@@ -67,7 +68,7 @@ namespace SH
 		FVector2D WindowSize;
 
         TSharedPtr<SVerticalBox> WindowContentBox;
-		TWeakPtr<SBox> PropertyViewBox;
+		TSharedPtr<FW::SPropertyView> PropertyView;
         
 		TSharedPtr<ShProject> CurProject;
 
