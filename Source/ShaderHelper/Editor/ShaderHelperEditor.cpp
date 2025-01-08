@@ -52,7 +52,11 @@ namespace SH
 		PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		FTicker::GetCoreTicker().RemoveTicker(SaveLayoutTicker);
 		PRAGMA_ENABLE_DEPRECATION_WARNINGS
-		FSlateApplication::Get().DestroyWindowImmediately(Window.ToSharedRef());
+        if(FSlateApplication::IsInitialized())
+        {
+            FSlateApplication::Get().DestroyWindowImmediately(Window.ToSharedRef());
+        }
+		
 	}
 
 	void ShaderHelperEditor::InitEditorUI()

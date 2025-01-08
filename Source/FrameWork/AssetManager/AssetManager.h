@@ -15,7 +15,7 @@ namespace FW
 	{
 		friend class AssetManager;
 
-		template <typename OtherType, AssetOwnerShip OwnerShip>
+		template <typename OtherType, AssetOwnerShip OtherOwnerShip>
 		friend class AssetPtr;
 
 	public:

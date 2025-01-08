@@ -17,7 +17,7 @@ namespace FW
 		{
 			AddProjectAssociation();
 
-			const float space = 4.0f;
+			constexpr float space = 4.0f;
 			TSharedRef<SVerticalBox> LeftContent =
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot()

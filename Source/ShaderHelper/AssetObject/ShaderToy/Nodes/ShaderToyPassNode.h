@@ -17,7 +17,7 @@ namespace SH
 		void Serialize(FArchive& Ar) override;
 		TSharedPtr<SWidget> ExtraNodeWidget() override;
 		TArray<FW::GraphPin*> GetPins() override;
-		FSlateColor GetNodeColor() const override { return FLinearColor{ 1.0f, 0.6f, 0.2f }; }
+		FSlateColor GetNodeColor() const override { return FLinearColor{ 0.27f, 0.13f, 0.0f }; }
 		void Exec(FW::GraphExecContext& Context) override;
 
 		void SetPassShader(FW::AssetPtr<StShader> InPassShader);
