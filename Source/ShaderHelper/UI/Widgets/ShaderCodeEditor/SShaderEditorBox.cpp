@@ -54,7 +54,8 @@ namespace SH
 		ChildSlot
 		[
 			SNew(SBorder)
-			.BorderBackgroundColor(FLinearColor::Black)
+            .BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
+            .Padding(0)
 			[
 				SNew(SGridPanel)
 				.FillColumn(0, 1.0f)
@@ -261,20 +262,6 @@ namespace SH
 		InfoBarBox->AddSlot()
 			.AutoWidth()
 			[
-				SNew(SComboButton)
-				.ComboButtonStyle(&FAppStyle::Get().GetWidgetStyle<FComboButtonStyle>("SimpleComboButton"))
-				.HasDownArrow(false)
-				.ButtonContent()
-				[
-					SNew(STextBlock)
-					.Font(InforBarFontInfo)
-					.Text(FText::FromString(TEXT("❖")))
-				]
-			];
-
-		InfoBarBox->AddSlot()
-			.AutoWidth()
-			[
 				SNew(SBorder)
 				.BorderImage(FAppStyle::Get().GetBrush("WhiteBrush"))
 				.BorderBackgroundColor(this, &SShaderEditorBox::GetEditStateColor)
@@ -318,7 +305,6 @@ namespace SH
 		InfoBarBox->AddSlot()
 			.AutoWidth()
 			.HAlign(HAlign_Right)
-			.Padding(0, 0, 5, 0)
 			[
 				SNew(SComboButton)
 				.ComboButtonStyle(&FAppStyle::Get().GetWidgetStyle<FComboButtonStyle>("SimpleComboButton"))
@@ -359,9 +345,6 @@ namespace SH
 		GenerateInfoBarBox();
 
         TSharedRef<SWidget> InfoBar = SNew(SBorder)
-        .BorderImage(FAppStyle::Get().GetBrush("WhiteBrush"))
-        .BorderBackgroundColor(FLinearColor{0.1f, 0.1f, 0.1f, 0.2f})
-        .Padding(0)
         [
 			InfoBarBox.ToSharedRef()
         ];
@@ -703,12 +686,12 @@ namespace SH
 			StShaderAsset->MarkDirty();
 		}
 
-		FString ShaderResourceDeclaration = StShaderAsset->GetResourceDeclaration();
+		FString ShaderTemplateWithBinding = StShaderAsset->GetTemplateWithBinding();
 
 		TArray<FString> AddedLines;
-		int32 AddedLineNum = ShaderResourceDeclaration.ParseIntoArrayLines(AddedLines, false) - 1;
+		int32 AddedLineNum = ShaderTemplateWithBinding.ParseIntoArrayLines(AddedLines, false) - 1;
 
-		FString FinalShaderSource = ShaderResourceDeclaration + NewShaderSource;
+		FString FinalShaderSource = ShaderTemplateWithBinding + NewShaderSource;
 		if (CurrentFullShaderSource == FinalShaderSource)
 		{
 			return CurEditState == EditState::Normal;

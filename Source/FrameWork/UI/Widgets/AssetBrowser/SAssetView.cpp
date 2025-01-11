@@ -369,6 +369,7 @@ namespace FW
 				{
 					FString SavedFileName = CurViewDirectory / FPaths::GetBaseFilename(OpenedFileNames[0]) + "." + ImportedAssetObject->FileExtension();
 					TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFileName));
+                    ImportedAssetObject->ObjectName = FText::FromString(FPaths::GetBaseFilename(SavedFileName));
 					ImportedAssetObject->Serialize(*Ar);
 				}
 				else

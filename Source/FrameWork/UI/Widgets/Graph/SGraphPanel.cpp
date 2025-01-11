@@ -119,7 +119,7 @@ namespace FW
 		{
 			for (auto& NodeData : GraphData->GetNodes())
 			{
-				AddNodeFromData(NodeData.Get());
+				AddNodeFromData(NodeData);
 			}
 
 			for (auto& NodeData : GraphData->GetNodes())
@@ -145,7 +145,7 @@ namespace FW
 			//Layer order
 			Nodes.Remove(InNode);
 			Nodes.Add(InNode);
-			TSharedPtr<GraphNode> NodeData = GraphData->GetNode(InNode->NodeData->GetGuid());
+            ObjectPtr<GraphNode> NodeData = GraphData->GetNode(InNode->NodeData->GetGuid());
 			GraphData->RemoveNode(InNode->NodeData->GetGuid());
 			GraphData->AddNode(NodeData);
 
@@ -288,7 +288,10 @@ namespace FW
 				{
 					Node->NodeData->Position += Offset;
 				}
-				GraphData->MarkDirty();
+                if(!Offset.Equals(Vector2D{0}))
+                {
+                    GraphData->MarkDirty();
+                }
 			}
 			return FReply::Handled();
 		}
@@ -351,12 +354,14 @@ namespace FW
 		ArrangeChildren(AllottedGeometry, ArrangedChildren);
 		const int32 PanelLayer = LayerId;
 
+        const FSlateBrush* BackGround = FAppStyle::Get().GetBrush("Brushes.Recessed");
 		FSlateDrawElement::MakeBox(
 			OutDrawElements,
 			PanelLayer,
 			AllottedGeometry.ToPaintGeometry(),
-			FAppCommonStyle::Get().GetBrush("Graph.Background"),
-			ESlateDrawEffect::None
+            BackGround,
+			ESlateDrawEffect::None,
+            BackGround->GetTint(InWidgetStyle)
 		);
 
 		const FPaintArgs NewArgs = Args.WithNewParent(this);
@@ -468,7 +473,7 @@ namespace FW
 
 		auto NodeWidget = AddNodeFromData(NewNodeData);
 		ClearSelectedNode();
-		GraphData->AddNode(MakeShareable(NewNodeData));
+		GraphData->AddNode(NewNodeData);
 		AddSelectedNode(NodeWidget.ToSharedRef());
 		GraphData->MarkDirty();
 

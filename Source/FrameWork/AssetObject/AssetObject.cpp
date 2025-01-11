@@ -3,17 +3,26 @@
 #include "Common/Util/Reflection.h"
 #include "AssetManager/AssetManager.h"
 #include "ProjectManager/ProjectManager.h"
-#include "Common/FrameWorkCore.h"
 
 namespace FW
 {
 	GLOBAL_REFLECTION_REGISTER(AddClass<AssetObject>()
 								.BaseClass<ShObject>())
 
+    AssetObject::~AssetObject()
+    {
+        TSingleton<AssetManager>::Get().RemoveAsset(this);
+    }
+
 	void AssetObject::Serialize(FArchive& Ar)
 	{
 		ShObject::Serialize(Ar);
 	}
+
+    void AssetObject::PostLoad()
+    {
+        ObjectName =  FText::FromString(GetFileName());
+    }
 
 	void AssetObject::Save()
 	{

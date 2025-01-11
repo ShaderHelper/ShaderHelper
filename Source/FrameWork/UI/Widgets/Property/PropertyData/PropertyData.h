@@ -1,10 +1,11 @@
 #pragma once
-#include "RenderResource/UniformBuffer.h"
+#include "SPropertyCategory.h"
 
 namespace FW
 {
 	class PropertyData : public TSharedFromThis<PropertyData>
 	{
+        MANUAL_RTTI_BASE_TYPE()
 	public:
 		PropertyData(FString InName) : DisplayName(MoveTemp(InName))
 		{}
@@ -33,9 +34,20 @@ namespace FW
 		{
 			Children.Remove(InChild);
 		}
-
-		virtual void AddToUniformBuffer(UniformBufferBuilder& Builder) const {}
-		virtual void UpdateUniformBuffer(UniformBuffer* Buffer) const {}
+        
+        TSharedPtr<PropertyData> GetData(const FString& InName) const
+        {
+            for(auto Child : Children)
+            {
+                if(Child->GetDisplayName() == InName)
+                {
+                    return Child;
+                }
+            }
+            return {};
+        }
+    public:
+        bool Expanded = false;
 
 	protected:
 		FString DisplayName;
@@ -45,6 +57,7 @@ namespace FW
 
 	class PropertyCategory : public PropertyData
 	{
+        MANUAL_RTTI_TYPE(PropertyCategory, PropertyData)
 	public:
 		PropertyCategory(FString InName)
 			: PropertyData(MoveTemp(InName))
@@ -53,37 +66,21 @@ namespace FW
 		void SetAddMenuWidget(TSharedPtr<SWidget> InWidget) { AddMenuWidget = MoveTemp(InWidget); }
 		bool IsRootCategory() const { return Parent == nullptr; }
 
-		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override;
+		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
+        {
+            auto Row = SNew(STableRow<TSharedRef<PropertyData>>, OwnerTable);
 
+            TSharedRef<SPropertyCatergory> RowContent = SNew(SPropertyCatergory, Row)
+                .DisplayName(DisplayName)
+                .IsRootCategory(IsRootCategory())
+                .AddMenuWidget(AddMenuWidget);
+            Row->SetRowContent(RowContent);
+            return Row;
+        }
 	private:
 		TSharedPtr<SWidget> AddMenuWidget;
 	};
-
-	template<typename T>
-	class PropertyItem : public PropertyData
-	{
-	public:
-		PropertyItem(FString InName, const TAttribute<T>& InValue)
-			: PropertyData(MoveTemp(InName))
-			, ValueAttribute(InValue)
-		{}
-
-		void SetEnabled(bool Enabled) { IsEnabled = Enabled; }
-		void SetOnValueChanged(const TFunction<void(T)>& ValueChanged) { OnValueChanged = ValueChanged; }
-		void SetOnDisplayNameChanged(const TFunction<void(const FString&)> DisplayNameChanged) { OnDisplayNameChanged = DisplayNameChanged; }
-		void AddToUniformBuffer(UniformBufferBuilder& Builder) const override;
-		virtual void UpdateUniformBuffer(UniformBuffer* Buffer) const override;
-		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override;
-
-	private:
-		TAttribute<T> ValueAttribute;
-		bool IsEnabled = true;
-		TFunction<void(T)> OnValueChanged;
-		TFunction<void(const FString&)> OnDisplayNameChanged;
-	};
-
 }
 
-#include "PropertyData.hpp"
 
 

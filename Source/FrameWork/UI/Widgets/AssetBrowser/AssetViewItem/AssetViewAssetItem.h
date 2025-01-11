@@ -7,11 +7,10 @@ namespace FW
 
 	class AssetViewAssetItem : public AssetViewItem
 	{
+        MANUAL_RTTI_TYPE(AssetViewAssetItem, AssetViewItem)
 	public:
 		AssetViewAssetItem(const FString& InPath);
-
-		MANUAL_RTTI_TYPE(AssetViewAssetItem, AssetViewItem)
-
+        
 		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override;
         void EnterRenameState();
         

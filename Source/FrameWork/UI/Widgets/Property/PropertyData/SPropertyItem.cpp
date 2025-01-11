@@ -5,64 +5,54 @@
 
 namespace FW
 {
+    void SPropertyItem::SetValueWidget(TSharedPtr<SWidget> InWidget)
+    {
+        HBox->AddSlot().AttachWidget(InWidget.ToSharedRef());
+    }
 
 	void SPropertyItem::Construct(const FArguments& InArgs)
 	{
-		DisplayNameText = FText::FromString(InArgs._DisplayName);
+        DisplayName = InArgs._DisplayName;
 		OnDisplayNameChanged = InArgs._OnDisplayNameChanged;
-		TSharedRef<SHorizontalBox> HBox = SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot()
-			.AutoWidth()
-			[
-				SNew(SImage)
-				.DesiredSizeOverride(FVector2D(10.0f, 0.0f))
-				.Image(FAppCommonStyle::Get().GetBrush("PropertyView.RowIndentDropShadow"))
-			]
-
+        auto ItemTextBlock = SNew(SInlineEditableTextBlock)
+            .IsReadOnly(!OnDisplayNameChanged)
+            .Text_Lambda([this] {
+                return FText::FromString(*DisplayName);
+            })
+            .OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
+                *DisplayName = NewText.ToString();
+                if (OnDisplayNameChanged)
+                {
+                    OnDisplayNameChanged(NewText.ToString());
+                }
+            })
+            .Font(FAppStyle::Get().GetFontStyle("NormalFont"))
+            .ColorAndOpacity(FSlateColor{ FLinearColor{0.5f,0.5f,0.5f} });
+        
+        float Indent = InArgs._Indent ? 21.0f : 4.0f;
+		HBox = SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot()
 			.VAlign(VAlign_Center)
-			.Padding(4.0f, 0.0f, 14.0f, 0.0f)
-			.FillWidth(1)
+			.Padding(Indent, 0.0f, 8.0f, 0.0f)
 			[
-				SNew(SInlineEditableTextBlock)
-				.IsSelected_Lambda([] {return true; })
-				.Text(this, &SPropertyItem::GetNameText)
-				.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
-					DisplayNameText = NewText;
-					if (OnDisplayNameChanged)
-					{
-						OnDisplayNameChanged(NewText.ToString());
-					}
-				})
-				.Font(FAppStyle::Get().GetFontStyle("SmallFont"))
-				.ColorAndOpacity(FSlateColor{ FLinearColor{0.8f,0.8f,0.8f} })
-			]
-			+ SHorizontalBox::Slot()
-			.FillWidth(3)
-			[
-				InArgs._ValueWidget.ToSharedRef()
-			];
+                ItemTextBlock
+            ];
 
 		HBox->SetEnabled(InArgs._IsEnabled);
 
 		ChildSlot
 		[
-			SNew(SBorder)
-			.Padding(FMargin{ 0.0f, 3.0f, 0.0f, 0.0f })
-			[
-				SNew(SBorder)
-				.BorderImage_Lambda([this] {
-					if (this->IsHovered())
-					{
-						return FAppCommonStyle::Get().GetBrush("PropertyView.ItemHoverdColor");
-					}
-					return FAppCommonStyle::Get().GetBrush("PropertyView.ItemColor");
-				})
-				[
-					HBox
-				]
+	
+            SNew(SBorder)
+            .Padding(FMargin{0,4,0,4})
+            .BorderImage_Lambda([this] {
+                return FAppCommonStyle::Get().GetBrush("PropertyView.ItemColor");
+            })
+            [
+                HBox.ToSharedRef()
+            ]
 
-			]
+			
 		];
 	}
 

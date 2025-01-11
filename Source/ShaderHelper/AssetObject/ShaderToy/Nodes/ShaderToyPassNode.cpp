@@ -2,6 +2,8 @@
 #include "ShaderToyPassNode.h"
 #include "Renderer/ShaderToyRenderComp.h"
 #include <Widgets/SViewport.h>
+#include "App/App.h"
+#include "Editor/ShaderHelperEditor.h"
 
 using namespace FW;
 
@@ -10,6 +12,20 @@ namespace SH
 	GLOBAL_REFLECTION_REGISTER(AddClass<ShaderToyPassNode>("RenderPass Node")
 		.BaseClass<GraphNode>()
 	)
+    GLOBAL_REFLECTION_REGISTER(AddClass<ShaderToyPassNodeOp>()
+        .BaseClass<ShObjectOp>()
+    )
+
+    MetaType* ShaderToyPassNodeOp::SupportType()
+    {
+        return GetMetaType<ShaderToyPassNode>();
+    }
+
+    void ShaderToyPassNodeOp::OnSelect(ShObject* InObject)
+    {
+        auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+        ShEditor->ShowProperty(InObject);
+    }
 
 	ShaderToyPassNode::ShaderToyPassNode()
 	{
@@ -60,38 +76,38 @@ namespace SH
 			return;
 		}
 
-		ShaderToyExecContext& ShaderToyContext = static_cast<ShaderToyExecContext&>(Context);
-		PassShader->BuiltInUniformBuffer->GetMember<Vector2f>("iResolution") = ShaderToyContext.iResolution;
-		PassShader->BuiltInUniformBuffer->GetMember<float>("iTime") = ShaderToyContext.iTime;
-
-		GpuTextureDesc Desc{ (uint32)ShaderToyContext.iResolution.x, (uint32)ShaderToyContext.iResolution.y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
-		TRefCountPtr<GpuTexture> PassOuputTex = GGpuRhi->CreateTexture(MoveTemp(Desc));
-		Preview->SetViewPortRenderTexture(PassOuputTex);
-		PassOutput.SetValue(PassOuputTex);
-
-		GpuRenderPassDesc PassDesc;
-		PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassOuputTex, RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
-
-		GpuRenderPipelineStateDesc PipelineDesc{
-			//Shader
-			VertexShader,
-			PixelShader,
-			//Targets
-			{
-				{ PassOuputTex->GetFormat() }
-			},
-			//BindGroupLayout
-			{ PassShader->BuiltInBindGroupLayout }
-		};
-		TRefCountPtr<GpuPipelineState> PipelineState = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
-
-		ShaderToyContext.RG->AddRenderPass(ObjectName.ToString(), MoveTemp(PassDesc),
-			[this, PipelineState, &ShaderToyContext](GpuRenderPassRecorder* PassRecorder) {
-				PassRecorder->SetRenderPipelineState(PipelineState);
-				PassRecorder->SetBindGroups(PassShader->BuiltInBindGroup, nullptr, nullptr, nullptr);
-				PassRecorder->DrawPrimitive(0, 3, 0, 1);
-			}
-		);
+//		ShaderToyExecContext& ShaderToyContext = static_cast<ShaderToyExecContext&>(Context);
+//		PassShader->BuiltInUniformBuffer->GetMember<Vector2f>("iResolution") = ShaderToyContext.iResolution;
+//		PassShader->BuiltInUniformBuffer->GetMember<float>("iTime") = ShaderToyContext.iTime;
+//
+//		GpuTextureDesc Desc{ (uint32)ShaderToyContext.iResolution.x, (uint32)ShaderToyContext.iResolution.y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
+//		TRefCountPtr<GpuTexture> PassOuputTex = GGpuRhi->CreateTexture(MoveTemp(Desc));
+//		Preview->SetViewPortRenderTexture(PassOuputTex);
+//		PassOutput.SetValue(PassOuputTex);
+//
+//		GpuRenderPassDesc PassDesc;
+//		PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassOuputTex, RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
+//
+//		GpuRenderPipelineStateDesc PipelineDesc{
+//			//Shader
+//			VertexShader,
+//			PixelShader,
+//			//Targets
+//			{
+//				{ PassOuputTex->GetFormat() }
+//			},
+//			//BindGroupLayout
+//			{ PassShader->BuiltInBindGroupLayout }
+//		};
+//		TRefCountPtr<GpuPipelineState> PipelineState = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
+//
+//		ShaderToyContext.RG->AddRenderPass(ObjectName.ToString(), MoveTemp(PassDesc),
+//			[this, PipelineState, &ShaderToyContext](GpuRenderPassRecorder* PassRecorder) {
+//				PassRecorder->SetRenderPipelineState(PipelineState);
+//				PassRecorder->SetBindGroups(PassShader->BuiltInBindGroup, nullptr, nullptr, nullptr);
+//				PassRecorder->DrawPrimitive(0, 3, 0, 1);
+//			}
+//		);
 	}
 
 }

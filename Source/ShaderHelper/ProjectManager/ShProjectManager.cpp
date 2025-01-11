@@ -12,6 +12,11 @@ namespace SH
 		GProjectVer = static_cast<int>(ShProjectVersion::Initial);
 	}
 
+    ShProject::~ShProject()
+    {
+
+    }
+
 	void ShProject::Open(const FString& ProjectPath)
 	{
 		TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*ProjectPath));

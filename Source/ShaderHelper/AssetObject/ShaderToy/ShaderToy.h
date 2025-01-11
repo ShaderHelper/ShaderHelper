@@ -8,6 +8,7 @@ namespace SH
 		REFLECTION_TYPE(ShaderToy)
 	public:
 		ShaderToy() = default;
+        ~ShaderToy();
 
 	public:
 		void Serialize(FArchive& Ar) override;

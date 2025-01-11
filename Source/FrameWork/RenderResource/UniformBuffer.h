@@ -6,11 +6,14 @@ namespace FW
 {
 	struct UniformBufferMemberInfo
 	{
-        TSharedPtr<void> ReadableData;
 		uint32 Offset;
-#if !SH_SHIPPING
-		FString TypeName;
-#endif
+        FString TypeName;
+        
+        friend FArchive& operator<<(FArchive& Ar, UniformBufferMemberInfo& Info)
+        {
+            Ar << Info.Offset << Info.TypeName;
+            return Ar;
+        }
 	};
 
 	struct UniformBufferMetaData
@@ -50,16 +53,22 @@ namespace FW
 		UniformBuffer(TRefCountPtr<GpuBuffer> InBuffer, UniformBufferMetaData InData)
 			: Buffer(MoveTemp(InBuffer))
 			, MetaData(MoveTemp(InData))
-		{}
+		{
+            ReadableBackBuffer = FMemory::Malloc(MetaData.UniformBufferSize);
+        }
+        
+        ~UniformBuffer()
+        {
+            FMemory::Free(ReadableBackBuffer);
+        }
 
 		template<typename T>
         UniformBufferMemberWrapper<T> GetMember(const FString& MemberName) {
 			checkf(MetaData.Members.Contains(MemberName), TEXT("The uniform buffer doesn't contain \"%s\" member."), *MemberName);
-			checkf(AUX::TypeName<T> == MetaData.Members[MemberName].TypeName, TEXT("Mismatched type: %s, Expected : %s"), *AUX::TypeName<T>, *MetaData.Members[MemberName].TypeName);
 			int32 MemberOffset = MetaData.Members[MemberName].Offset;
 			void* BufferBaseAddr = GGpuRhi->MapGpuBuffer(Buffer, GpuResourceMapMode::Write_Only);
             T* BufferWritableData = reinterpret_cast<T*>((uint8*)BufferBaseAddr + MemberOffset);
-            T* BufferReadableData = reinterpret_cast<T*>(MetaData.Members[MemberName].ReadableData.Get());
+            T* BufferReadableData = reinterpret_cast<T*>((uint8*)ReadableBackBuffer + MemberOffset);
             return {BufferReadableData, BufferWritableData};
 		}
 
@@ -71,6 +80,8 @@ namespace FW
 
 	private:
 		TRefCountPtr<GpuBuffer> Buffer;
+        //Avoid directly reading write-combined memory
+        void* ReadableBackBuffer;
 		UniformBufferMetaData MetaData;
 	};
 
@@ -98,6 +109,14 @@ namespace FW
 			DeclarationHead = TEXT("cbuffer {0}\r\n{\r\n");
 			DeclarationEnd = TEXT("};\r\n");
 		}
+        
+        friend FArchive& operator<<(FArchive& Ar, UniformBufferBuilder& UbBuilder)
+        {
+            Ar << UbBuilder.Usage;
+            Ar << UbBuilder.DeclarationHead << UbBuilder.UniformBufferMemberNames << UbBuilder.DeclarationEnd;
+            Ar << UbBuilder.MetaData.Members << UbBuilder.MetaData.UniformBufferDeclaration << UbBuilder.MetaData.UniformBufferSize;
+            return Ar;
+        }
 
 	public:
 		UniformBufferBuilder& AddFloat(const FString& MemberName) 
@@ -124,10 +143,11 @@ namespace FW
 			return *this;
 		}
 
-		FString GetLayoutDeclaration()
+		FString GetLayoutDeclaration() const
 		{
 			return DeclarationHead + UniformBufferMemberNames + DeclarationEnd;
 		}
+        const UniformBufferMetaData& GetMetaData() const { return MetaData; }
 
 		TUniquePtr<UniformBuffer> Build() {
 			checkf(MetaData.UniformBufferSize > 0, TEXT("Nothing added to the builder."));
@@ -136,7 +156,7 @@ namespace FW
 			return MakeUnique<UniformBuffer>( MoveTemp(Buffer), MetaData);
 		}
 
-	private:
+    private:
 		template<typename T>
 		void AddMember(const FString& MemberName)
 		{			
@@ -158,13 +178,10 @@ namespace FW
 				MetaData.UniformBufferSize += MemberSize;
 			}
 
-#if !SH_SHIPPING
-			MetaData.Members.Add(MemberName, { MakeShared<T>(), MetaData.UniformBufferSize - MemberSize, AUX::TypeName<T> });
-#else
-			MetaData.Members.Add(MemberName, { MakeShared<T>(), MetaData.UniformBufferSize - MemberSize });
-#endif
+            FString TypeName = ANSI_TO_TCHAR(UniformBufferMemberTypeString<T>::Value.data());
+			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize - MemberSize, TypeName});
 
-			UniformBufferMemberNames += FString::Printf(TEXT("%s %s;\r\n"), ANSI_TO_TCHAR(UniformBufferMemberTypeString<T>::Value.data()), *MemberName);
+			UniformBufferMemberNames += FString::Printf(TEXT("%s %s;\r\n"), *TypeName, *MemberName);
 		}
 		
 	private:

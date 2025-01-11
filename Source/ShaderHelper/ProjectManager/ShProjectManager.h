@@ -15,6 +15,7 @@ namespace SH
 	{
 	public:
 		ShProject(FString InPath);
+        ~ShProject();
 
 		virtual void Open(const FString& ProjectPath) override;
 		virtual void SaveAs(const FString& InPath) override;

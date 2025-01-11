@@ -58,12 +58,12 @@ namespace FW
 
 	void Graph::Exec(GraphExecContext& Context)
 	{
-		TArray<TSharedPtr<GraphNode>> ExecNodes = NodeDatas;
+		TArray<ObjectPtr<GraphNode>> ExecNodes = NodeDatas;
 
-		bool bHasSucceeded = Algo::TopologicalSort(ExecNodes, [this](const TSharedPtr<GraphNode>& Element) {
+		bool bHasSucceeded = Algo::TopologicalSort(ExecNodes, [this](const ObjectPtr<GraphNode>& Element) {
 			TArray<FGuid> DepIds;
 			NodeDeps.MultiFind(Element->GetGuid(), DepIds);
-			TArray<TSharedPtr<GraphNode>> DepNodes;
+			TArray<ObjectPtr<GraphNode>> DepNodes;
 			for (FGuid Id : DepIds)
 			{
 				DepNodes.Add(GetNode(Id));

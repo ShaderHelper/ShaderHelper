@@ -3,67 +3,43 @@
 
 namespace FW
 {
-	class SPropertyView : public SCompoundWidget
+	class FRAMEWORK_API SPropertyView : public SCompoundWidget
 	{
-		using PropertyDataType = TSharedRef<PropertyData>;
 	public:
 		SLATE_BEGIN_ARGS(SPropertyView)
-			: _PropertyDatas(nullptr)
-			, _IsExpandAll(false)
+			: _ObjectData(nullptr)
 		{}
-			SLATE_ARGUMENT(TArray<PropertyDataType>*, PropertyDatas)
-			SLATE_ARGUMENT(bool, IsExpandAll)
-			SLATE_EVENT(FOnContextMenuOpening, OnContextMenuOpening)
+            SLATE_ARGUMENT(ShObject*, ObjectData)
 		SLATE_END_ARGS()
 
-		void Construct(const FArguments& InArgs)
-		{
-			PropertyDatas = InArgs._PropertyDatas;
-			ChildSlot
-			[
-				SNew(SBorder)
-				[
-					SAssignNew(PropertyTree, STreeView<PropertyDataType>)
-					.TreeItemsSource(InArgs._PropertyDatas)
-					.OnGetChildren_Lambda([](PropertyDataType InTreeNode, TArray<PropertyDataType>& OutChildren) {
-						InTreeNode->GetChildren(OutChildren);
-					})
-					.OnGenerateRow_Lambda([](PropertyDataType InTreeNode, const TSharedRef<STableViewBase>& OwnerTable) {
-						return InTreeNode->GenerateWidgetForTableView(OwnerTable);
-					})
-					.SelectionMode(ESelectionMode::Single)
-					.OnContextMenuOpening(InArgs._OnContextMenuOpening)
-				]
-			
-			
-			];
-
-			if (InArgs._IsExpandAll)
-			{
-				ExpandAllPropertyData(true);
-			}
-		}
+        void Construct(const FArguments& InArgs);
 	public:
+        void SetObjectData(ShObject* InObjectData);
 
-		TArray<PropertyDataType> GetSelectedItems() const
+		TArray<TSharedRef<PropertyData>> GetSelectedItems() const
 		{
 			return PropertyTree->GetSelectedItems();
 		}
+        
+        TArray<TSharedRef<PropertyData>> GetLinearizedItems(TSharedRef<PropertyData> InItem) const;
 
 		void Refresh()
 		{
 			PropertyTree->RequestTreeRefresh();
 		}
 
-		void ExpandItemRecursively(TSharedRef<PropertyData> InItem)
+		void TryExpandItemRecursively(TSharedRef<PropertyData> InItem)
 		{
-			PropertyTree->SetItemExpansion(InItem, true);
+            if(InItem->Expanded)
+            {
+                ExpandItem(InItem);
+            }
 
 			TArray<TSharedRef<PropertyData>> Children;
 			InItem->GetChildren(Children);
 			for (const auto& Child : Children)
 			{
-				ExpandItemRecursively(Child);
+                TryExpandItemRecursively(Child);
 			}
 		}
 
@@ -72,24 +48,11 @@ namespace FW
 			PropertyTree->SetItemExpansion(InItem, true);
 		}
 
-		void ExpandAllPropertyData(bool IsRecursive)
-		{
-			for (const auto& Data : *PropertyDatas)
-			{
-				if (IsRecursive)
-				{
-					ExpandItemRecursively(Data);
-				}
-				else
-				{
-					ExpandItem(Data);
-				}
-			}
-		}
-
 	private:
-		TArray<PropertyDataType>* PropertyDatas;
-		TSharedPtr<STreeView<PropertyDataType>> PropertyTree;
+        ObserverObjectPtr<ShObject> ObjectData;
+        bool Locked = false;
+		TArray<TSharedRef<PropertyData>>* PropertyDatas;
+		TSharedPtr<STreeView<TSharedRef<PropertyData>>> PropertyTree;
 		
 	};
 }

@@ -7,6 +7,16 @@
 
 namespace SH
 {
+    class ShaderToyPassNodeOp : public FW::ShObjectOp
+    {
+        REFLECTION_TYPE(ShaderToyPassNodeOp)
+    public:
+        ShaderToyPassNodeOp() = default;
+        
+        FW::MetaType* SupportType() override;
+        void OnSelect(FW::ShObject* InObject) override;
+    };
+
 	class ShaderToyPassNode : public FW::GraphNode
 	{
 		REFLECTION_TYPE(ShaderToyPassNode)

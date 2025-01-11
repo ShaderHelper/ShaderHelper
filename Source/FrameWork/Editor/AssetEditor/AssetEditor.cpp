@@ -17,8 +17,8 @@ namespace FW
     AssetOp* GetAssetOp(const FString& InAssetPath)
     {
         return GetDefaultObject<AssetOp>([&](AssetOp* CurAssetOp){
-            AssetObject* RelatedAssetDefaultObject = static_cast<AssetObject*>(CurAssetOp->SupportAsset()->GetDefaultObject());
-			checkf(RelatedAssetDefaultObject, TEXT("Please ensure %s is constructible."), *CurAssetOp->SupportAsset()->TypeName);
+            AssetObject* RelatedAssetDefaultObject = static_cast<AssetObject*>(CurAssetOp->SupportType()->GetDefaultObject());
+			checkf(RelatedAssetDefaultObject, TEXT("Please ensure %s is constructible."), *CurAssetOp->SupportType()->TypeName);
             return RelatedAssetDefaultObject->FileExtension() ==  FPaths::GetExtension(InAssetPath);
         });
     }
@@ -26,14 +26,13 @@ namespace FW
 	AssetOp* GetAssetOp(MetaType* InAssetMetaType)
 	{
 		return GetDefaultObject<AssetOp>([&](AssetOp* CurAssetOp) {
-			return CurAssetOp->SupportAsset() == InAssetMetaType;
+			return CurAssetOp->SupportType() == InAssetMetaType;
 		});
 	}
 
 	void AssetOp::OnDelete(const FString& InAssetPath)
 	{
 		TSingleton<AssetManager>::Get().ClearAsset(InAssetPath);
-		GProject->RemovePendingAsset(InAssetPath);
 	}
 
 }

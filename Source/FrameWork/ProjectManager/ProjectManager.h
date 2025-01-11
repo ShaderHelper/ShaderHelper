@@ -25,25 +25,21 @@ namespace FW
 		}
 		void AddPendingAsset(AssetObject* InAsset) { PendingAssets.AddUnique(InAsset); }
 		void RemovePendingAsset(AssetObject* InAsset) { if(PendingAssets.Contains(InAsset)) PendingAssets.Remove(InAsset);}
-		void RemovePendingAsset(const FString& InPath) {
-			PendingAssets.RemoveAll([InPath](const AssetObject* Element) {
-				return Element->GetPath() == InPath;
-			});
-		}
+
 		bool IsPendingAsset(AssetObject* InAsset) const { return PendingAssets.Contains(InAsset); }
 		bool IsPendingAsset(const FString& InPath) {
 			return PendingAssets.ContainsByPredicate([InPath](const AssetObject* Element) {
 				return Element->GetPath() == InPath;
 			});
 		}
-		bool AnyPendingAsset() const { return !PendingAssets.IsEmpty(); }
+        bool AnyPendingAsset() const;
 		const FString& GetFilePath() const
 		{
 			return Path;
 		}
 
 	protected:
-		TArray<AssetObject*> PendingAssets;
+		TArray<ObserverObjectPtr<AssetObject>> PendingAssets;
 		FString Path;
 	};
 

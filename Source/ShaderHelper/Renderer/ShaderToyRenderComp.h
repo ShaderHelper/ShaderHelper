@@ -19,6 +19,7 @@ namespace SH
 	{
 	public:
 		ShaderToyRenderComp(ShaderToy* InShaderToyGraph, FW::PreviewViewPort* InViewPort);
+        ~ShaderToyRenderComp();
 
 	public:
 		void OnViewportResize(const FW::Vector2f& InResolution);
@@ -29,5 +30,6 @@ namespace SH
 		ShaderToy* ShaderToyGraph;
 		FW::PreviewViewPort* ViewPort;
 		ShaderToyExecContext Context;
+        FDelegateHandle ResizeHandle;
 	};
 }

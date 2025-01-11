@@ -37,11 +37,17 @@ namespace FW
 		{
 			return HashCombine(::GetTypeHash(Key.Type), ::GetTypeHash(Key.Stage));
 		}
+        
+        friend FArchive& operator<<(FArchive& Ar, LayoutBinding& Binding)
+        {
+            Ar << Binding.Type;
+            Ar << Binding.Stage;
+            return Ar;
+        }
 	};
 
 	struct GpuBindGroupLayoutDesc
 	{
-		
 		bool operator==(const GpuBindGroupLayoutDesc& Other) const
 		{
 			return GroupNumber == Other.GroupNumber && Layouts == Other.Layouts;
@@ -57,6 +63,25 @@ namespace FW
 			}
 			return Hash;
 		}
+        
+        friend FArchive& operator<<(FArchive& Ar, GpuBindGroupLayoutDesc& BindLayoutDesc)
+        {
+            Ar << BindLayoutDesc.GroupNumber;
+            Ar << BindLayoutDesc.Layouts;
+            Ar << BindLayoutDesc.CodegenDeclaration;
+            Ar << BindLayoutDesc.CodegenBindingNameToSlot;
+            return Ar;
+        }
+        
+        BindingType GetBindingType(BindingSlot InSlot) const
+        {
+            return Layouts[InSlot].Type;
+        }
+        
+        bool HasBinding(const FString& BindingName) const
+        {
+            return CodegenBindingNameToSlot.Contains(BindingName);
+        }
 
 		BindingGroupSlot GroupNumber;
 		TSortedMap<BindingSlot, LayoutBinding> Layouts;
@@ -96,7 +121,16 @@ namespace FW
 		//TODO StaticSampler ? It will be embed into BingGroupLayout, vulkan has the same concept, but metal might not have.
 		GpuBindGroupLayoutBuilder& AddSampler(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
 
+        const FString& GetCodegenDeclaration() const { return LayoutDesc.CodegenDeclaration; }
+        const GpuBindGroupLayoutDesc& GetLayoutDesc() const { return LayoutDesc; }
 		TRefCountPtr<GpuBindGroupLayout> Build();
+        
+        friend FArchive& operator<<(FArchive& Ar, GpuBindGroupLayoutBuilder& BindLayoutBuilder)
+        {
+            Ar << BindLayoutBuilder.AutoSlot;
+            Ar << BindLayoutBuilder.LayoutDesc;
+            return Ar;
+        }
 
 	private:
 		BindingSlot AutoSlot;

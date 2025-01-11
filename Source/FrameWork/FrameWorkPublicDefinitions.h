@@ -28,6 +28,8 @@
 #include "Common/Util/Auxiliary.h"
 #include "Common/Util/Singleton.h"
 #include "Common/Util/Reflection.h"
+#include "Common/FrameWorkCore.h"
+#include "Common/ObjectPtr.h"
 
 namespace FW
 {
@@ -39,7 +41,11 @@ namespace FW
     PER_MODULE_BOILERPLATE
 
 #define PER_APP_DEFINITION(AppName) \
-    static const int AppNameSetter = [] { FW::GAppName = TEXT(AppName); return 0; }(); \
+    static const int AppNameSetter = [] { \
+    FW::GAppName = TEXT(AppName); \
+    /*Parts of the ApplicationCore depend on ue ProjectName*/ \
+    FApp::SetProjectName(TEXT(AppName));  \
+    return 0; }(); \
     PER_MODULE_DEFINITION()
 
 #define SH_LOG(CategoryName, Verbosity, Format, ...) \

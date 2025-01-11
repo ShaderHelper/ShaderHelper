@@ -1,6 +1,6 @@
 #pragma once
 #include "GpuApi/GpuTexture.h"
-#include "Common/FrameWorkCore.h"
+
 struct FSlateBrush;
 
 namespace FW
@@ -10,9 +10,17 @@ namespace FW
 		REFLECTION_TYPE(AssetObject)
 	public:
 		AssetObject() = default;
+        ~AssetObject();
+        
+        //The asset can be deleted outside
+        void Destroy()
+        {
+            NumRefs = 0;
+            delete this;
+        }
 
 		virtual void Serialize(FArchive& Ar) override;
-		virtual void PostLoad() {}
+        virtual void PostLoad();
 		virtual void Save();
 		virtual void MarkDirty();
 		bool IsDirty();

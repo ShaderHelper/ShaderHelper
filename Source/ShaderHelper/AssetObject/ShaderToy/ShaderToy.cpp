@@ -11,6 +11,11 @@ namespace SH
 								.BaseClass<Graph>()
 	)
 
+    ShaderToy::~ShaderToy()
+    {
+
+    }
+
 	void ShaderToy::Serialize(FArchive& Ar)
 	{
 		Graph::Serialize(Ar);

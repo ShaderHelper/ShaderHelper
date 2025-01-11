@@ -15,7 +15,7 @@ namespace SH
 		.BaseClass<AssetOp>()
 	)
 
-	MetaType* ShaderToyOp::SupportAsset()
+	MetaType* ShaderToyOp::SupportType()
 	{
 		return GetMetaType<ShaderToy>();
 	}
@@ -24,12 +24,12 @@ namespace SH
 	{
 		AssetPtr<ShaderToy> LoadedShaderToy = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderToy>(InAssetPath);
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->OpenGraph(LoadedShaderToy, MakeShared<ShaderToyRenderComp>(LoadedShaderToy.Get(), ShEditor->GetViewPort()));
+		ShEditor->OpenGraph(LoadedShaderToy, MakeShared<ShaderToyRenderComp>(LoadedShaderToy, ShEditor->GetViewPort()));
 	}
 
 	void ShaderToyOp::OnCreate(AssetObject* InAsset)
 	{
-		static_cast<ShaderToy*>(InAsset)->AddNode(MakeShared<ShaderToyOuputNode>());
+		static_cast<ShaderToy*>(InAsset)->AddNode(new ShaderToyOuputNode);
 	}
 
 	void ShaderToyOp::OnDelete(const FString& InAssetPath)

@@ -9,7 +9,8 @@ namespace SH
 	public:
 		StShaderOp() = default;
 
-        struct FW::MetaType* SupportAsset() override;
+        FW::MetaType* SupportType() override;
+        void OnSelect(FW::ShObject* InObject) override;
 		void OnOpen(const FString& InAssetPath) override;
        
         void OnAdd(const FString& InAssetPath) override;

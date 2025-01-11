@@ -142,11 +142,16 @@ namespace FW
 
 	template<typename To, typename From>
 	To* DynamicCast(From* InPtr)
-	{
+    {
+        if(!InPtr)
+        {
+            return nullptr;
+        }
+        
 		MetaType* Mt = InPtr->DynamicMetaType();
 		if (Mt->IsDerivedFrom<To>())
 		{
-			return static_cast<To*>(InPtr);
+			return (To*)(InPtr);
 		}
 		return nullptr;
 	}
@@ -205,10 +210,12 @@ namespace FW
 #define REFLECTION_TYPE(Type) public: virtual FW::MetaType* DynamicMetaType() const {  return FW::GetMetaType<Type>(); }
 
 #define MANUAL_RTTI_BASE_TYPE() \
+    public: \
 	template<typename T> bool IsOfType() const { return IsOfTypeImpl(T::GetTypeId());} \
 	virtual bool IsOfTypeImpl(const FString& Type) const { return false; }
 
 #define MANUAL_RTTI_TYPE(TYPE, Base) \
+    public: \
 	static const FString& GetTypeId() { static FString Type = TEXT(#TYPE); return Type; } \
 	virtual bool IsOfTypeImpl(const FString& Type) const override { return GetTypeId() == Type || Base::IsOfTypeImpl(Type); }
 }

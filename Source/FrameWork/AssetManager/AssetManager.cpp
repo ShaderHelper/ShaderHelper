@@ -68,24 +68,21 @@ namespace FW
 	void AssetManager::Clear()
 	{
         GuidToPath.Empty();
-		AssetRefCounts.Empty();
 		AssetThumbnailPool.Empty();
-
-		for (auto [_, AssetObjectPtr] : Assets)
-		{
-			delete AssetObjectPtr;
-		}
-
-		Assets.Empty();
 	}
 
 	void AssetManager::ClearAsset(const FString& InAssetPath)
 	{
 		if (AssetObject** Ptr = Assets.Find(GetGuid(InAssetPath)))
 		{
-			AssetRefCounts.Remove(*Ptr);
+            (*Ptr)->Destroy();
 		}
 	}
+
+    void AssetManager::RemoveAsset(AssetObject* InAsset)
+    {
+       Assets.Remove(*Assets.FindKey(InAsset));
+    }
 
 	TArray<FString> AssetManager::GetManageredExts() const
 	{
@@ -94,34 +91,6 @@ namespace FW
             ManageredExts.Add(CurAssetObject->FileExtension());
         });
 		return ManageredExts;
-	}
-
-	void AssetManager::AddRef(AssetObject* InAssetObject)
-	{
-		if (!AssetRefCounts.Contains(InAssetObject))
-		{
-			check(Assets.FindKey(InAssetObject));
-			AssetRefCounts.Add(InAssetObject, 1);
-		}
-		else
-		{
-			AssetRefCounts[InAssetObject]++;
-		}
-	}
-
-	void AssetManager::ReleaseRef(AssetObject* InAssetObject)
-	{
-		if (AssetRefCounts[InAssetObject] == 1)
-		{
-			FGuid Guid = *Assets.FindKey(InAssetObject);
-			Assets.Remove(Guid);
-			AssetRefCounts.Remove(InAssetObject);
-			delete InAssetObject;
-		}
-		else
-		{
-			AssetRefCounts[InAssetObject]--;
-		}
 	}
 
 }

@@ -12,7 +12,6 @@ namespace FW
 		static void OpenAsset(AssetObject* InAsset);
 
 	public:
-        virtual struct MetaType* SupportAsset() = 0;
         virtual void OnOpen(const FString& InAssetPath) {}
 		//OnDelete and OnAdd will be triggered one after the other if rename or move the asset.
         virtual void OnAdd(const FString& InAssetPath) {}

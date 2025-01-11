@@ -13,9 +13,15 @@ namespace SH
                                 .BaseClass<AssetOp>()
 	)
 
-    MetaType* StShaderOp::SupportAsset()
+    MetaType* StShaderOp::SupportType()
     {
         return GetMetaType<StShader>();
+    }
+
+    void StShaderOp::OnSelect(ShObject* InObject)
+    {
+        auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+        ShEditor->ShowProperty(InObject);
     }
 
 	void StShaderOp::OnOpen(const FString& InAssetPath)

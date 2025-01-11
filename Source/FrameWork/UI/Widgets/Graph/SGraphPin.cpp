@@ -66,22 +66,26 @@ namespace FW
 
 	FReply SGraphPin::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 	{
-		if (PinData->Direction == PinDirection::Input && OwnerPanel->GetOuputPinInLink(this))
-		{
-			SGraphPin* OutputPin = OwnerPanel->GetOuputPinInLink(this);
-			OwnerPanel->PreviewStartDir = OutputPin->PinData->Direction;
-			OwnerPanel->PreviewStart = OwnerPanel->GetTickSpaceGeometry().AbsoluteToLocal(OutputPin->GetTickSpaceGeometry().GetAbsolutePositionAtCoordinates(FVector2D(0.5f, 0.5f)));
-			OwnerPanel->PreviewEnd = OwnerPanel->GetTickSpaceGeometry().AbsoluteToLocal(MyGeometry.GetAbsolutePositionAtCoordinates(FVector2D(0.5f, 0.5f)));
-			OwnerPanel->RemoveInputLink(this);
-			return FReply::Handled().BeginDragDrop(MakeShared<GraphDragDropOp>(OutputPin));
-		}
-		else
-		{
-			OwnerPanel->PreviewStartDir = PinData->Direction;
-			OwnerPanel->PreviewStart = OwnerPanel->GetTickSpaceGeometry().AbsoluteToLocal(MyGeometry.GetAbsolutePositionAtCoordinates(FVector2D(0.5f, 0.5f)));
-			OwnerPanel->PreviewEnd = *OwnerPanel->PreviewStart;
-			return FReply::Handled().BeginDragDrop(MakeShared<GraphDragDropOp>(this));
-		}
+        if (MouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton))
+        {
+            if (PinData->Direction == PinDirection::Input && OwnerPanel->GetOuputPinInLink(this))
+            {
+                SGraphPin* OutputPin = OwnerPanel->GetOuputPinInLink(this);
+                OwnerPanel->PreviewStartDir = OutputPin->PinData->Direction;
+                OwnerPanel->PreviewStart = OwnerPanel->GetTickSpaceGeometry().AbsoluteToLocal(OutputPin->GetTickSpaceGeometry().GetAbsolutePositionAtCoordinates(FVector2D(0.5f, 0.5f)));
+                OwnerPanel->PreviewEnd = OwnerPanel->GetTickSpaceGeometry().AbsoluteToLocal(MyGeometry.GetAbsolutePositionAtCoordinates(FVector2D(0.5f, 0.5f)));
+                OwnerPanel->RemoveInputLink(this);
+                return FReply::Handled().BeginDragDrop(MakeShared<GraphDragDropOp>(OutputPin));
+            }
+            else
+            {
+                OwnerPanel->PreviewStartDir = PinData->Direction;
+                OwnerPanel->PreviewStart = OwnerPanel->GetTickSpaceGeometry().AbsoluteToLocal(MyGeometry.GetAbsolutePositionAtCoordinates(FVector2D(0.5f, 0.5f)));
+                OwnerPanel->PreviewEnd = *OwnerPanel->PreviewStart;
+                return FReply::Handled().BeginDragDrop(MakeShared<GraphDragDropOp>(this));
+            }
+        }
+        return FReply::Unhandled();
 	}
 
 }

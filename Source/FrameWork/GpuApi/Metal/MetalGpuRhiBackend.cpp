@@ -29,6 +29,7 @@ void MetalGpuRhiBackend::WaitGpu()
     if(LastSubmittedCmdRecorder)
     {
         LastSubmittedCmdRecorder->GetCommandBuffer()->waitUntilCompleted();
+        LastSubmittedCmdRecorder = nullptr;
     }
 }
 

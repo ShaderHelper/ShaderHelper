@@ -194,7 +194,10 @@ namespace FW
 
 			SAssignNew(Window, SWindow)
 				.Title(FText::FromString("Launcher"))
+                .SupportsMinimize(false)
 				.CreateTitleBar(false)
+                .SupportsMaximize(false)
+                .HasCloseButton(false)
 				.SizingRule(ESizingRule::Autosized)
 				.bDragAnywhere(true)
 			[

@@ -136,6 +136,8 @@ namespace FW
 				Owner->AddSelectedNode(SharedThis(this));
 			}
 			MousePos = MouseEvent.GetScreenSpacePosition();
+            ShObjectOp* Op = GetShObjectOp(NodeData);
+            Op->OnSelect(NodeData);
 			return FReply::Handled();
 		}
 		return FReply::Unhandled();

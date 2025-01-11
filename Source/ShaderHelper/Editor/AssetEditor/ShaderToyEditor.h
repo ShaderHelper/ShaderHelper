@@ -9,7 +9,7 @@ namespace SH
 	public:
 		ShaderToyOp() = default;
 
-		struct FW::MetaType* SupportAsset() override;
+		FW::MetaType* SupportType() override;
 		void OnOpen(const FString& InAssetPath) override;
 		void OnCreate(FW::AssetObject* InAsset) override;
 		void OnDelete(const FString& InAssetPath) override;

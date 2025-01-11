@@ -11,8 +11,13 @@ namespace SH
 		: ShaderToyGraph(InShaderToyGraph)
 		, ViewPort(InViewPort)
 	{
-		ViewPort->OnViewportResize.AddRaw(this, &ShaderToyRenderComp::OnViewportResize);
+        ResizeHandle = ViewPort->OnViewportResize.AddRaw(this, &ShaderToyRenderComp::OnViewportResize);
 	}
+
+    ShaderToyRenderComp::~ShaderToyRenderComp()
+    {
+        ViewPort->OnViewportResize.Remove(ResizeHandle);
+    }
 
 	void ShaderToyRenderComp::OnViewportResize(const Vector2f& InResolution)
 	{

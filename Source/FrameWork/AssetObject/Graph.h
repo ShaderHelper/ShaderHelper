@@ -52,18 +52,18 @@ namespace FW
 		Graph() = default;
 
 	public:
-		void AddNode(TSharedPtr<GraphNode> InNode) { NodeDatas.Add(MoveTemp(InNode)); }
+		void AddNode(ObjectPtr<GraphNode> InNode) { NodeDatas.Add(MoveTemp(InNode)); }
 		void RemoveNode(FGuid Id) {
-			NodeDatas.RemoveAll([Id](const TSharedPtr<GraphNode>& Element) {
+			NodeDatas.RemoveAll([Id](const ObjectPtr<GraphNode>& Element) {
 				return Element->GetGuid() == Id;
 				});
 		}
-		TSharedPtr<GraphNode> GetNode(FGuid Id) const {
-			return (*NodeDatas.FindByPredicate([Id](const TSharedPtr<GraphNode>& Element) {
+        ObjectPtr<GraphNode> GetNode(FGuid Id) const {
+			return (*NodeDatas.FindByPredicate([Id](const ObjectPtr<GraphNode>& Element) {
 				return Element->GetGuid() == Id;
 				}));
 		}
-		const TArray<TSharedPtr<GraphNode>>& GetNodes() const { return NodeDatas; }
+		const TArray<ObjectPtr<GraphNode>>& GetNodes() const { return NodeDatas; }
 		void AddDep(GraphNode* Node1, GraphNode* Node2) { NodeDeps.Add(Node1->GetGuid(), Node2->GetGuid()); }
 		void RemoveDep(GraphNode* Node1, GraphNode* Node2) { NodeDeps.Remove(Node1->GetGuid(), Node2->GetGuid()); }
 
@@ -75,7 +75,7 @@ namespace FW
 	
 	protected:
 		//Keep layer order
-		TArray<TSharedPtr<GraphNode>> NodeDatas;
+		TArray<ObjectPtr<GraphNode>> NodeDatas;
 
 		TMultiMap<FGuid, FGuid> NodeDeps;
 	};

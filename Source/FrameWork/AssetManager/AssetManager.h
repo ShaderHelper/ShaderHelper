@@ -1,53 +1,13 @@
 #pragma once
 #include "AssetObject/AssetObject.h"
-#include "Common/Util/Reflection.h"
 
 namespace FW
 {
-	enum class AssetOwnerShip
-	{
-		Assign,
-		Retain,
-	};
-
-	template<typename T, AssetOwnerShip OwnerShip = AssetOwnerShip::Retain>
-	class AssetPtr
-	{
-		friend class AssetManager;
-
-		template <typename OtherType, AssetOwnerShip OtherOwnerShip>
-		friend class AssetPtr;
-
-	public:
-		AssetPtr(T* InAsset);
-		AssetPtr(std::nullptr_t = nullptr);
-		AssetPtr(const AssetPtr& InAssetPtr);
-
-		template<typename OtherType, AssetOwnerShip OtherOwnerShip,
-			typename = decltype(ImplicitConv<T*>((OtherType*)nullptr))
-		>
-		AssetPtr(const AssetPtr<OtherType, OtherOwnerShip>& OtherAssetPtr);
-
-		AssetPtr& operator=(const AssetPtr& OtherAssetPtr);
-
-		~AssetPtr();
-
-		T* operator->() const;
-
-		T* Get() const;
-		FGuid GetGuid() const;
-
-		bool IsValid() const;
-        explicit operator bool() const;
-
-	private:
-		T* Asset;
-	};
-
-	template<typename T>
-	using AssetWeakPtr = AssetPtr<T, AssetOwnerShip::Assign>;
-
 	class GpuTexture;
+    template<typename T, ObjectOwnerShip> struct ObjectPtr;
+
+    template<typename T, typename = std::enable_if_t<std::is_base_of_v<AssetObject, T>>>
+    using AssetPtr = ObjectPtr<T, ObjectOwnerShip::Retain>;
 
 	class FRAMEWORK_API AssetManager
 	{
@@ -110,12 +70,6 @@ namespace FW
 			return Assets.Contains(Id) ? Assets[Id] : nullptr;
 		}
 
-		//If an asset was deleted, the manager will Free it, so any AssetPtr that refers to it may be invalid.
-		bool IsLoadedAsset(AssetObject* InAsset) const
-		{
-			return AssetRefCounts.Contains(InAsset);
-		}
-
 		void UpdateGuidToPath(const FString& InPath);
         void RemoveGuidToPath(const FString& InPath);
 
@@ -126,24 +80,44 @@ namespace FW
 		bool IsValidAsset(const FGuid& Id) const { return GuidToPath.Contains(Id); }
 		bool IsValidAsset(const FString& InPath) const { return GuidToPath.FindKey(InPath) != nullptr; }
 
+        void Clear();
+        void ClearAsset(const FString& InAssetPath);
+
 		void AddAssetThumbnail(const FGuid& InGuid, TRefCountPtr<GpuTexture> InThumbnail);
 		GpuTexture* FindAssetThumbnail(const FGuid& InGuid) const;
 
-		void Clear();
-		void ClearAsset(const FString& InAssetPath);
+        void RemoveAsset(AssetObject* InAsset);
 		TArray<FString> GetManageredExts() const;
-		
-		void AddRef(AssetObject* InAssetObject);
-		void ReleaseRef(AssetObject* InAssetObject);
-
 
 	private:
 		TMap<FGuid, FString> GuidToPath;
-		TMap<FGuid, AssetObject*> Assets;
-		TMap<AssetObject*, uint32> AssetRefCounts;
+		TMap<FGuid, AssetObject*> Assets; //Loaded asset
 		TMap<FGuid, TRefCountPtr<GpuTexture>> AssetThumbnailPool;
 	};
-}
 
-//Resolve circular dependency
-#include "AssetPtr.hpp"
+    template<typename T>
+    FArchive& operator<<(FArchive& Ar, AssetPtr<T>& InOutAssetPtr)
+    {
+        bool IsValid = !!InOutAssetPtr;
+        Ar << IsValid;
+        if (Ar.IsLoading())
+        {
+            if (IsValid)
+            {
+                FGuid AssetGuid;
+                Ar << AssetGuid;
+                //Maybe return a null AssetPtr because of outside deleting.
+                InOutAssetPtr = TSingleton<AssetManager>::Get().LoadAssetByGuid<T>(AssetGuid);
+            }
+        }
+        else
+        {
+            if (IsValid)
+            {
+                FGuid AssetGuid = InOutAssetPtr->GetGuid();;
+                Ar << AssetGuid;
+            }
+        }
+        return Ar;
+    }
+}

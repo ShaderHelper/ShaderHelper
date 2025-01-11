@@ -10,24 +10,39 @@ namespace SH
 	public:
 		StShader();
 		~StShader();
+        
+        static FW::UniformBufferBuilder& GetBuiltInUbBuilder();
+        static FW::GpuBindGroupLayoutBuilder& GetBuiltInBindingLayoutBuilder();
 
 	public:
 		void Serialize(FArchive& Ar) override;
 		FString FileExtension() const override;
 		const FSlateBrush* GetImage() const override;
 
-        FString GetResourceDeclaration() const;
+        FString GetBinding() const;
+        FString GetTemplateWithBinding() const;
 		FString GetFullShader() const;
-
+        
+        TArray<TSharedRef<FW::PropertyData>>* GetPropertyDatas() override;
+        TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromBinding();
+        TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromUniform(const FW::UniformBufferBuilder& InBuilder);
+        
+        template<typename UniformType>
+        void AddUniform();
+        void AddSlot();
+        void RefreshBuilder();
+        
+    private:
+        TSharedRef<SWidget> GetCategoryMenu();
+        
 	public:
 		FString PixelShaderBody;
-        TUniquePtr<FW::UniformBuffer> BuiltInUniformBuffer;
+        //Custom
+        FW::UniformBufferBuilder CustomUniformBufferBuilder{FW::UniformBufferUsage::Persistant};
+        FW::GpuBindGroupLayoutBuilder CustomBindGroupLayoutBuilder{1};
         
-        TRefCountPtr<FW::GpuBindGroup> BuiltInBindGroup;
-        TRefCountPtr<FW::GpuBindGroupLayout> BuiltInBindGroupLayout;
-
-        TRefCountPtr<FW::GpuBindGroup> CustomBindGroup;
-        TRefCountPtr<FW::GpuBindGroupLayout> CustomBindGroupLayout;
+        TSharedPtr<FW::PropertyCategory> CustomCategory;
+        //
 	};
 
 }

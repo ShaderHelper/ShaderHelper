@@ -42,6 +42,8 @@ namespace SH
         void OpenStShaderTab(FW::AssetPtr<StShader> InStShader);
 		
 		void OpenGraph(FW::AssetPtr<FW::Graph> InGraphData, TSharedPtr<FW::RenderComponent> InGraphRenderComp);
+        void RefreshProperty();
+        void ShowProperty(FW::ShObject* InObjectData);
 
 	private:
 		TSharedRef<SDockTab> SpawnWindowTab(const FSpawnTabArgs& Args);
@@ -69,6 +71,7 @@ namespace SH
 
         TSharedPtr<SVerticalBox> WindowContentBox;
 		TSharedPtr<FW::SPropertyView> PropertyView;
+        FW::ShObject* CurPropertyObject = nullptr;
         
 		TSharedPtr<ShProject> CurProject;
 
