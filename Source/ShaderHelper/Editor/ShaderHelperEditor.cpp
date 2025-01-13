@@ -241,7 +241,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                     [
                         SNew(SButton)
                         .ContentPadding(FMargin{})
-                        .ButtonStyle(&FShaderHelperStyle::Get().GetWidgetStyle< FButtonStyle >("SuperSimpleButton"))
+                        .ButtonStyle(&FAppCommonStyle::Get().GetWidgetStyle< FButtonStyle >("SuperSimpleButton"))
                         .Text(FText::FromString(FileName + TEXT("  ❯")))
                         .OnClicked_Lambda([RelativePathHierarchy, this]{
                             AssetBrowser->SetCurrentDisplyPath(TSingleton<ShProjectManager>::Get().ConvertRelativePathToFull(RelativePathHierarchy));

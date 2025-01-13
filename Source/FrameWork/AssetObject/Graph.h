@@ -21,7 +21,7 @@ namespace FW
 
 	public:
 		virtual void Serialize(FArchive& Ar) override;
-		virtual bool Accept(GraphPin* TargetPin) { return false; }
+		virtual bool Accept(GraphPin* SourcePin) { return false; }
 		virtual FLinearColor GetPinColor() const { return FLinearColor::White; }
 
 		PinDirection Direction = PinDirection::Output;

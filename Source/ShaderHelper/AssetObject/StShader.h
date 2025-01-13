@@ -25,11 +25,10 @@ namespace SH
         
         TArray<TSharedRef<FW::PropertyData>>* GetPropertyDatas() override;
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromBinding();
-        TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromUniform(const FW::UniformBufferBuilder& InBuilder);
+        TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromUniform(const FW::UniformBufferBuilder& InBuilder, bool Enabled);
         
         template<typename UniformType>
         void AddUniform();
-        void AddSlot();
         void RefreshBuilder();
         
     private:

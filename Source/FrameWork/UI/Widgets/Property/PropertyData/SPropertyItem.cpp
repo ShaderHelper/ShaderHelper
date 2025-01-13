@@ -5,31 +5,34 @@
 
 namespace FW
 {
-    void SPropertyItem::SetValueWidget(TSharedPtr<SWidget> InWidget)
+    void SPropertyItem::AddWidget(TSharedPtr<SWidget> InWidget)
     {
-        HBox->AddSlot().AttachWidget(InWidget.ToSharedRef());
+        HBox->AddSlot().VAlign(VAlign_Center)
+        [
+            InWidget.ToSharedRef()
+        ];
     }
 
 	void SPropertyItem::Construct(const FArguments& InArgs)
 	{
         DisplayName = InArgs._DisplayName;
-		OnDisplayNameChanged = InArgs._OnDisplayNameChanged;
         auto ItemTextBlock = SNew(SInlineEditableTextBlock)
-            .IsReadOnly(!OnDisplayNameChanged)
+            .IsSelected_Lambda([] {return true; })
+            .IsReadOnly(!InArgs._OnDisplayNameChanged)
             .Text_Lambda([this] {
                 return FText::FromString(*DisplayName);
             })
-            .OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
-                *DisplayName = NewText.ToString();
-                if (OnDisplayNameChanged)
+            .OnTextCommitted_Lambda([this, InArgs](const FText& NewText, ETextCommit::Type) {
+                if (*DisplayName != NewText.ToString() && InArgs._OnDisplayNameChanged)
                 {
-                    OnDisplayNameChanged(NewText.ToString());
+                    *DisplayName = NewText.ToString();
+                    InArgs._OnDisplayNameChanged(NewText.ToString());
                 }
             })
             .Font(FAppStyle::Get().GetFontStyle("NormalFont"))
             .ColorAndOpacity(FSlateColor{ FLinearColor{0.5f,0.5f,0.5f} });
         
-        float Indent = InArgs._Indent ? 21.0f : 4.0f;
+        float Indent = InArgs._Indent ? 22.0f : 4.0f;
 		HBox = SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot()
 			.VAlign(VAlign_Center)
@@ -37,8 +40,6 @@ namespace FW
 			[
                 ItemTextBlock
             ];
-
-		HBox->SetEnabled(InArgs._IsEnabled);
 
 		ChildSlot
 		[

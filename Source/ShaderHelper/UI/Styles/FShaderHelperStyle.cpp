@@ -28,11 +28,6 @@ namespace SH {
         Style->Set("AssetBrowser.Shader", new IMAGE_BRUSH_SVG("Shader", FVector2D(64.0, 64.0)));
         
 		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir);
-        
-        FButtonStyle SuperSimpleButton = FButtonStyle(FAppStyle::Get().GetWidgetStyle<FButtonStyle>("SimpleButton"))
-            .SetPressed(FSlateNoResource())
-            .SetHovered(FSlateNoResource());
-        Style->Set("SuperSimpleButton", SuperSimpleButton);
 
 		FTableRowStyle LineNumberItemStyle;
 		LineNumberItemStyle.SetEvenRowBackgroundBrush(FSlateNoResource());
@@ -89,6 +84,10 @@ namespace SH {
 		FTextBlockStyle CodeEditorErrorInfoStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
 			.SetColorAndOpacity(FLinearColor::Red);
 		Style->Set("CodeEditorErrorInfoText", CodeEditorErrorInfoStyle);
+        
+        FTextBlockStyle MinorText = FTextBlockStyle{CodeEditorNormalTextStyle}
+            .SetColorAndOpacity(FLinearColor{0.2f,0.2f,0.2f,1.0f});
+        Style->Set("MinorText", MinorText);
 		
 		const FVector2D Icon14x14(14.0f, 14.0f);
 		

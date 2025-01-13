@@ -24,4 +24,3 @@ float4 MainPS(PIn Input) : SV_Target
 }
 
 //@mainImage@
-

@@ -34,6 +34,9 @@ namespace SH
 
 	public:
 		ChannelPin Slot0{ FText::FromString("iChannel0"), FW::PinDirection::Input };
+        ChannelPin Slot1{ FText::FromString("iChannel1"), FW::PinDirection::Input };
+        ChannelPin Slot2{ FText::FromString("iChannel2"), FW::PinDirection::Input };
+        ChannelPin Slot3{ FText::FromString("iChannel3"), FW::PinDirection::Input };
 		GpuTexturePin PassOutput{ FText::FromString("Texture"), FW::PinDirection::Output };
 
 	private:

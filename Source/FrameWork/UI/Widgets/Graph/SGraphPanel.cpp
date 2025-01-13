@@ -389,7 +389,7 @@ namespace FW
 				FSlateDrawElement::MakeBox(
 					OutDrawElements,
 					NodeLayer,
-					CurWidget.Geometry.ToInflatedPaintGeometry(FVector2D{ 1, 1}),
+					CurWidget.Geometry.ToInflatedPaintGeometry(FVector2D{ 2, 2}),
 					FAppCommonStyle::Get().GetBrush("Graph.NodeOutline"),
 					ESlateDrawEffect::None
 				);

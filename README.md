@@ -5,15 +5,6 @@ This is a shader editor based on some special modules from UnrealEngine (Slate, 
 <p align="center">
 <img src="https://github.com/SjMxr233/ShaderHelper/blob/main/ScreenShot/App.png" width="640" height="360">
 
-## Features
-
-* TODO
-
-## Coding Standard
-
-* Use `<>` syntax to include the headers from UnrealEngine.
-* Custom ui should use the same naming conventions as UnrealEngine.
-
 ## Build Instructions
 
 ### Windows Requirements

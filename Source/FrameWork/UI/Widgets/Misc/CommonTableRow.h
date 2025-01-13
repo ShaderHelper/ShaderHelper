@@ -106,5 +106,4 @@ namespace FW
         bool TickDrag = false;
         TFunction<bool(const TSharedPtr<FDragDropOperation>&)> Filter;
     };
-	
 }

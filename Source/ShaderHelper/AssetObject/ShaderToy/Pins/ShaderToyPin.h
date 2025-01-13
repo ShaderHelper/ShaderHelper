@@ -11,7 +11,7 @@ namespace SH
 		using GraphPin::GraphPin;
 
 		void Serialize(FArchive& Ar) override;
-		bool Accept(GraphPin* TargetPin) override;
+		bool Accept(GraphPin* SourcePin) override;
 		FLinearColor GetPinColor() const override { return FLinearColor{0.24f, 0.7f, 0.44f}; }
 
 		void SetValue(TRefCountPtr<FW::GpuTexture> InValue) { Value = MoveTemp(InValue); }

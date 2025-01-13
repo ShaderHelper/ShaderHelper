@@ -3,7 +3,7 @@
 
 namespace FW
 {
-	class PropertyData : public TSharedFromThis<PropertyData>
+	class PropertyData
 	{
         MANUAL_RTTI_BASE_TYPE()
 	public:
@@ -27,12 +27,14 @@ namespace FW
 		void Remove()
 		{
 			check(Parent);
-			Parent->RemoveChild(AsShared());
+			Parent->RemoveChild(this);
 		}
 
-		void RemoveChild(TSharedRef<PropertyData> InChild)
+		void RemoveChild(PropertyData* InChild)
 		{
-			Children.Remove(InChild);
+            Children.RemoveAll([=](TSharedRef<PropertyData>& Item){
+                return InChild == &*Item;
+            });
 		}
         
         TSharedPtr<PropertyData> GetData(const FString& InName) const

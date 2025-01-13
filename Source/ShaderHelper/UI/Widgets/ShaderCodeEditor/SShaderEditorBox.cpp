@@ -698,11 +698,12 @@ namespace SH
 		}
 		
 		CurrentFullShaderSource = FinalShaderSource;
-
-		TRefCountPtr<GpuShader> NewPixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, MoveTemp(FinalShaderSource), {}, TEXT("MainPS"));
+        FString ShaderName = StShaderAsset->GetFileName();
+		TRefCountPtr<GpuShader> NewPixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, MoveTemp(FinalShaderSource), ShaderName, TEXT("MainPS"));
 		FString ErrorInfo;
 		EffectMarshller->LineNumberToErrorInfo.Reset();
-		if (GGpuRhi->CrossCompileShader(NewPixelShader, ErrorInfo))
+		//if (GGpuRhi->CrossCompileShader(NewPixelShader, ErrorInfo))
+        if(1)
 		{
 			CurEditState = EditState::Normal;
 			//Renderer->UpdatePixelShader(MoveTemp(NewPixelShader));

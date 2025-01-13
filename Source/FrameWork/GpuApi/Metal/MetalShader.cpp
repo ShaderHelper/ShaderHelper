@@ -73,11 +73,14 @@ namespace FW
             {"force_active_argument_buffer_resources","1"}
         };
         
-        ShaderConductor::Compiler::TargetDesc TargetDesc{};
-        TargetDesc.language = ShaderConductor::ShadingLanguage::Msl_macOS;
-		TargetDesc.version = "20200";
-        TargetDesc.options = SpvMslOptions;
-        TargetDesc.numOptions = UE_ARRAY_COUNT(SpvMslOptions);
+        ShaderConductor::Compiler::TargetDesc SpvTargetDesc{};
+        SpvTargetDesc.language = ShaderConductor::ShadingLanguage::SpirV;
+        
+        ShaderConductor::Compiler::TargetDesc MslTargetDesc{};
+        MslTargetDesc.language = ShaderConductor::ShadingLanguage::Msl_macOS;
+        MslTargetDesc.version = "20200";
+        MslTargetDesc.options = SpvMslOptions;
+        MslTargetDesc.numOptions = UE_ARRAY_COUNT(SpvMslOptions);
         
         TArray<const char*> DxcArgs;
         DxcArgs.Add("-fspv-preserve-bindings");
@@ -110,18 +113,28 @@ namespace FW
         
         SourceDesc.defines = Defines.GetData();
         SourceDesc.numDefines = Defines.Num();
-        const ShaderConductor::Compiler::ResultDesc Result = ShaderConductor::Compiler::Compile(SourceDesc, SCOptions, TargetDesc);
-        if(Result.errorWarningMsg.Size() > 0)
+        
+        ShaderConductor::Compiler::TargetDesc TargetDescs[2] = {SpvTargetDesc, MslTargetDesc};
+        ShaderConductor::Compiler::ResultDesc Results[2];
+        ShaderConductor::Compiler::Compile(SourceDesc, SCOptions, TargetDescs, 2, Results);
+        if(Results[1].errorWarningMsg.Size() > 0)
         {
-            FString ErrorInfo = static_cast<const char*>(Result.errorWarningMsg.Data());
+            FString ErrorInfo = static_cast<const char*>(Results[1].errorWarningMsg.Data());
             SH_LOG(LogMetal, Error, TEXT("Hlsl compilation failed: %s"), *ErrorInfo);
 			OutErrorInfo = MoveTemp(ErrorInfo);
             return false;
         }
         
-        FString MslSourceText = {static_cast<const char*>(Result.target.Data()), (int32)Result.target.Size()};
+        FString MslSourceText = {(int32)Results[1].target.Size(), static_cast<const char*>(Results[1].target.Data())};
 #if DEBUG_SHADER
-        FFileHelper::SaveStringToFile(MslSourceText, *(PathHelper::SavedShaderDir() / InShader->GetShaderName() + ".metal"));
+        ShaderConductor::Compiler::DisassembleDesc SpvasmDesc{ShaderConductor::ShadingLanguage::SpirV, static_cast<const uint8_t*>(Results[0].target.Data()), Results[0].target.Size()};
+        ShaderConductor::Compiler::ResultDesc SpvasmResult = ShaderConductor::Compiler::Disassemble(SpvasmDesc);
+        FString SpvSourceText = {(int32)SpvasmResult.target.Size(), static_cast<const char*>(SpvasmResult.target.Data())};
+        
+        FString ShaderName = InShader->GetShaderName();
+        FFileHelper::SaveStringToFile(InShader->GetSourceText(), *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl"));
+        FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".spvasm"));
+        FFileHelper::SaveStringToFile(MslSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".metal"));
 #endif
         InShader->SetMslText(MoveTemp(MslSourceText));
         

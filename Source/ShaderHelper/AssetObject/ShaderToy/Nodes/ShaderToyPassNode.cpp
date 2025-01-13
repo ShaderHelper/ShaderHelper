@@ -51,7 +51,7 @@ namespace SH
 
 	TArray<GraphPin*> ShaderToyPassNode::GetPins()
 	{
-		return { &PassOutput,&Slot0};
+		return { &PassOutput,&Slot0,&Slot1,&Slot2,&Slot3};
 	}
 
 	void ShaderToyPassNode::SetPassShader(AssetPtr<StShader> InPassShader)

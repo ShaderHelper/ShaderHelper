@@ -49,7 +49,7 @@ namespace FW
 			[
 				SNew(SBorder)
 				.BorderImage(FAppCommonStyle::Get().GetBrush("Graph.NodeContentBackground"))
-				.Padding(FMargin{ 0.0f, 4.0f, 0.0f, 0.0f })
+				.Padding(FMargin{ 0.0f, 3.0f, 0.0f, 0.0f })
 				[
 					PinContainer
 				]
@@ -101,7 +101,7 @@ namespace FW
 				PinContainer->AddSlot()
 				.HAlign(HAlign_Left)
 				.AutoHeight()
-				.Padding(0.0f, 0.0f, 0.0f, 4.0f)
+				.Padding(0.0f, 0.0f, 0.0f, 3.0f)
 				[
 					InputPinContent
 				];
@@ -113,7 +113,7 @@ namespace FW
 				PinContainer->AddSlot()
 				.HAlign(HAlign_Right)
 				.AutoHeight()
-				.Padding(0.0f, 0.0f, 0.0f, 4.0f)
+				.Padding(0.0f, 0.0f, 0.0f, 3.0f)
 				[
 					OutputPinContent
 				];

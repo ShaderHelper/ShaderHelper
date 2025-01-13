@@ -11,7 +11,7 @@ using namespace FW;
 namespace SH
 {
 const FString DefaultPixelShaderBody =
-R"(void mainImage(out float4 fragColor, in float2 fragCoord)
+R"(void mainImage(out float4 fragColor,in float2 fragCoord)
 {
     float2 uv = fragCoord/iResolution.xy;
     float3 col = 0.5 + 0.5*cos(iTime + uv.xyx + float3(0,2,4));
@@ -57,7 +57,15 @@ R"(void mainImage(out float4 fragColor, in float2 fragCoord)
         static GpuBindGroupLayoutBuilder BuiltInBindingLayout{ 0 };
         static int Init = [&] {
             BuiltInBindingLayout
-                .AddUniformBuffer("Uniform", GetBuiltInUbBuilder().GetLayoutDeclaration(), BindingShaderStage::Pixel);
+                .AddUniformBuffer("Uniform", GetBuiltInUbBuilder().GetLayoutDeclaration(), BindingShaderStage::Pixel)
+                .AddTexture("iChannel0", BindingShaderStage::Pixel)
+                .AddSampler("iChannel0Sampler", BindingShaderStage::Pixel)
+                .AddTexture("iChannel1", BindingShaderStage::Pixel)
+                .AddSampler("iChannel1Sampler", BindingShaderStage::Pixel)
+                .AddTexture("iChannel2", BindingShaderStage::Pixel)
+                .AddSampler("iChannel2Sampler", BindingShaderStage::Pixel)
+                .AddTexture("iChannel3", BindingShaderStage::Pixel)
+                .AddSampler("iChannel3Sampler", BindingShaderStage::Pixel);
             return 0;
         }();
         return BuiltInBindingLayout;
@@ -105,8 +113,7 @@ R"(void mainImage(out float4 fragColor, in float2 fragCoord)
             CustomUniformCategory->GetChildren(UniformDatas);
             for(auto UniformData : UniformDatas)
             {
-                FString MemberName, _;
-                UniformData->GetDisplayName().Split(" ", &MemberName, &_);
+                FString MemberName = UniformData->GetDisplayName();
                 if(UniformData->IsOfType<PropertyItem<float>>())
                 {
                     NewCustomUniformBufferBuilder.AddFloat(MemberName);
@@ -134,19 +141,34 @@ R"(void mainImage(out float4 fragColor, in float2 fragCoord)
             CustomCategory->AddChild(CustomUniformCategory.ToSharedRef());
         }
         FString NewUniformName = FString::Format(TEXT("Tmp{0}"), { AddNum++ });
-        FString TypeInfo = FString::Printf(TEXT(" (%s)"), ANSI_TO_TCHAR(UniformBufferMemberTypeString<UniformType>::Value.data()));
-        auto NewUniformProperty = MakeShared<PropertyItem<UniformType>>(NewUniformName + TypeInfo);
-        CustomUniformCategory->AddChild(MoveTemp(NewUniformProperty));
-        RefreshBuilder();
         
+        auto TypeInfoWidget = SNew(STextBlock).TextStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("MinorText"));
+        FText TypeInfo = FText::FromString(FString{ANSI_TO_TCHAR(UniformBufferMemberTypeString<UniformType>::Value.data())});
+        TypeInfoWidget->SetText(TypeInfo);
+        auto NewUniformProperty = MakeShared<PropertyItem<UniformType>>(NewUniformName);
+        NewUniformProperty->SetEmbedWidget(TypeInfoWidget);
+        NewUniformProperty->SetOnDisplayNameChanged([this](const FString&){
+            RefreshBuilder();
+            MarkDirty();
+        });
+        //Avoid self/cycle ref
+        NewUniformProperty->SetOnDelete([this, self = &*NewUniformProperty]{
+            self->Remove();
+            if(self->GetParent()->GetChildrenNum() <= 0)
+            {
+                self->GetParent()->Remove();
+            }
+            RefreshBuilder();
+            MarkDirty();
+            static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+        });
+        
+        CustomUniformCategory->AddChild(MoveTemp(NewUniformProperty));
+        
+        RefreshBuilder();
         MarkDirty();
         auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
         ShEditor->RefreshProperty();
-    }
-
-    void StShader::AddSlot()
-    {
-        
     }
 
     TSharedRef<SWidget> StShader::GetCategoryMenu()
@@ -164,32 +186,50 @@ R"(void mainImage(out float4 fragColor, in float2 fragCoord)
             FSlateIcon(),
             FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform<Vector2f>) }
         );
-        MenuBuilder.AddMenuEntry(
-            FText::FromString("slot"),
-            FText::GetEmpty(),
-            FSlateIcon(),
-            FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddSlot) }
-        );
         return MenuBuilder.MakeWidget();
     }
 
-    TArray<TSharedRef<PropertyData>> StShader::PropertyDatasFromUniform(const UniformBufferBuilder& InBuilder)
+    TArray<TSharedRef<PropertyData>> StShader::PropertyDatasFromUniform(const UniformBufferBuilder& InBuilder, bool Enabled)
     {
         TArray<TSharedRef<PropertyData>> Datas;
         const UniformBufferMetaData& MetaData = InBuilder.GetMetaData();
         for(const auto& [MemberName, MemberInfo]: MetaData.Members)
         {
-            FString TypeInfo = FString::Printf(TEXT(" (%s)"), *MemberInfo.TypeName);
+            auto TypeInfoWidget = SNew(STextBlock).TextStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("MinorText"));
+            FText TypeInfo = FText::FromString(MemberInfo.TypeName);
+            TypeInfoWidget->SetText(TypeInfo);
+            TSharedPtr<PropertyItemBase> Property;
             if(MemberInfo.TypeName == "float")
             {
-                auto UniformProperty = MakeShared<PropertyItem<float>>(MemberName + TypeInfo);
-                Datas.Add(UniformProperty);
+                Property = MakeShared<PropertyItem<float>>(MemberName);
             }
             else if(MemberInfo.TypeName == "float2")
             {
-                auto UniformProperty = MakeShared<PropertyItem<Vector2f>>(MemberName + TypeInfo);
-                Datas.Add(UniformProperty);
+                Property = MakeShared<PropertyItem<Vector2f>>(MemberName);
             }
+            else
+            {
+                check(false);
+            }
+            Property->SetEnabled(Enabled);
+            Property->SetEmbedWidget(TypeInfoWidget);
+            Property->SetOnDisplayNameChanged([this](const FString&){
+                RefreshBuilder();
+                MarkDirty();
+            });
+            if(Enabled) {
+                Property->SetOnDelete([this, self = &*Property]{
+                    self->Remove();
+                    if(self->GetParent()->GetChildrenNum() <= 0)
+                    {
+                        self->GetParent()->Remove();
+                    }
+                    RefreshBuilder();
+                    MarkDirty();
+                    static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+                });
+            }
+            Datas.Add(Property.ToSharedRef());
         }
         return Datas;
     }
@@ -204,7 +244,7 @@ R"(void mainImage(out float4 fragColor, in float2 fragCoord)
                 if(BuiltInLayoutDesc.GetBindingType(Slot) == BindingType::UniformBuffer)
                 {
                     auto UniformCategory = MakeShared<PropertyCategory>(BindingName);
-                    auto PropertyDataUniforms = PropertyDatasFromUniform(GetBuiltInUbBuilder());
+                    auto PropertyDataUniforms = PropertyDatasFromUniform(GetBuiltInUbBuilder(), false);
                     for(auto Data : PropertyDataUniforms)
                     {
                         UniformCategory->AddChild(Data);
@@ -212,6 +252,22 @@ R"(void mainImage(out float4 fragColor, in float2 fragCoord)
                     BuiltInCategory->AddChild(MoveTemp(UniformCategory));
                 }
             }
+            auto SlotCategory = MakeShared<PropertyCategory>("Slot");
+            {
+                auto iChannel0Item = MakeShared<PropertyItemBase>("iChannel0");
+                iChannel0Item->SetEnabled(false);
+                auto iChannel1Item = MakeShared<PropertyItemBase>("iChannel1");
+                iChannel1Item->SetEnabled(false);
+                auto iChannel2Item = MakeShared<PropertyItemBase>("iChannel2");
+                iChannel2Item->SetEnabled(false);
+                auto iChannel3Item = MakeShared<PropertyItemBase>("iChannel3");
+                iChannel3Item->SetEnabled(false);
+                SlotCategory->AddChild(MoveTemp(iChannel0Item));
+                SlotCategory->AddChild(MoveTemp(iChannel1Item));
+                SlotCategory->AddChild(MoveTemp(iChannel2Item));
+                SlotCategory->AddChild(MoveTemp(iChannel3Item));
+            }
+            BuiltInCategory->AddChild(MoveTemp(SlotCategory));
         }
         
         CustomCategory = MakeShared<PropertyCategory>("Custom");
@@ -222,7 +278,7 @@ R"(void mainImage(out float4 fragColor, in float2 fragCoord)
                 if(CustomLayoutDesc.GetBindingType(Slot) == BindingType::UniformBuffer)
                 {
                     auto UniformCategory = MakeShared<PropertyCategory>(BindingName);
-                    auto PropertyDataUniforms = PropertyDatasFromUniform(CustomUniformBufferBuilder);
+                    auto PropertyDataUniforms = PropertyDatasFromUniform(CustomUniformBufferBuilder, true);
                     for(auto Data : PropertyDataUniforms)
                     {
                         UniformCategory->AddChild(Data);
