@@ -105,7 +105,7 @@ namespace FW
         
         FTextBlockStyle MinorText = FTextBlockStyle{}
             .SetFont(TTF_FONT(TEXT("Fonts/DroidSansMono"), 8))
-            .SetColorAndOpacity(FLinearColor{0.2f,0.2f,0.2f,1.0f});
+            .SetColorAndOpacity(FLinearColor{0.4f,0.4f,0.4f,1.0f});
         FTextBlockStyle SmallMinorText = FTextBlockStyle{MinorText}
             .SetFontSize(7);
         Style->Set("MinorText", MinorText);

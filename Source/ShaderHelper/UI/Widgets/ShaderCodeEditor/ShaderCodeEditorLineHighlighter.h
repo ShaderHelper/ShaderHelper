@@ -1,5 +1,7 @@
 #pragma once
 #include <Widgets/Text/SlateEditableTextTypes.h>
+#include "App/App.h"
+
 namespace SH
 {
 	class FoldMarkerHighLighter : public ISlateLineHighlighter
@@ -66,7 +68,8 @@ namespace SH
 			if (FVector2D::Distance(CursorPos, NewLine.Offset) < 20.0f)
 			{
 				float Speed = 20.0f;
-				CursorPos = FMath::LerpStable(CursorPos, NewLine.Offset, FSlateApplication::Get().GetDeltaTime() * Speed);
+				//FSlateApplication::Get().GetDeltaTime() will get a strange value here, which may be connected with hook.
+				CursorPos = FMath::LerpStable(CursorPos, NewLine.Offset, FW::GApp->GetDeltaTime() * Speed);
 			}
 			else
 			{

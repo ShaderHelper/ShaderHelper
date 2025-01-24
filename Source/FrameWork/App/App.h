@@ -16,6 +16,7 @@ namespace FW {
         Editor* GetEditor() const { return AppEditor.Get(); }
         Renderer* GetRenderer() const { return AppRenderer.Get(); }
 		Vector2D GetClientSize() const { return AppClientSize; }
+		double GetDeltaTime() const { return DeltaTime; }
 		
 	protected:
 		virtual void Update(double DeltaTime);

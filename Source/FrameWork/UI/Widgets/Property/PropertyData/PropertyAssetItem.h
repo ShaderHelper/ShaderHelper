@@ -74,6 +74,13 @@ namespace FW
             PreviewBox->SetOnMouseLeave(FSimpleNoReplyPointerEventHandler::CreateLambda([this](const FPointerEvent&){
                 bPreviewUnderMouse = false;
             }));
+			PreviewBox->SetToolTipText(TAttribute<FText>::CreateLambda([this] {
+				if (auto& AssetRef = *(AssetPtr<AssetObject>*)AssetPtrRef)
+				{
+					return FText::FromString(AssetRef->GetPath());
+				}
+				return FText{};
+			}));
             
             RefreshAssetView();
             ChildSlot

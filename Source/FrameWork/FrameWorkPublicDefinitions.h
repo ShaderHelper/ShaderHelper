@@ -50,7 +50,7 @@ namespace FW
 
 #define SH_LOG(CategoryName, Verbosity, Format, ...) \
     UE_LOG(CategoryName, Verbosity, Format, ##__VA_ARGS__); \
-    GProjectCategoryNames.Emplace(#CategoryName)
+    FW::GProjectCategoryNames.Emplace(#CategoryName)
 
 #define ADD_AGILITY_SDK()	\
 	extern "C" { _declspec(dllexport) extern const UINT D3D12SDKVersion = 610; }	\
