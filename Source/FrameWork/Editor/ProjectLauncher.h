@@ -17,18 +17,18 @@ namespace FW
 		{
 			AddProjectAssociation();
 
-			constexpr float space = 4.0f;
+			constexpr float Space = 4.0f;
 			TSharedRef<SVerticalBox> LeftContent =
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot()
-				.Padding(0.0f, 0.0f, 0.0f, space)
+				.Padding(0.0f, 0.0f, 0.0f, Space)
 				.HAlign(HAlign_Left)
 				.VAlign(VAlign_Center)
 				[
 					SNew(STextBlock).Text(LOCALIZATION("ProjectName"))
 				]
 				+ SVerticalBox::Slot()
-				.Padding(0.0f, 0.0f, 0.0f, space)
+				.Padding(0.0f, 0.0f, 0.0f, Space)
 				.VAlign(VAlign_Center)
 				[
 					SNew(SEditableTextBox).Text(FText::FromString(ProjectName))
@@ -37,7 +37,7 @@ namespace FW
 					})
 				]
 				+ SVerticalBox::Slot()
-				.Padding(0.0f, 0.0f, 0.0f, space)
+				.Padding(0.0f, 0.0f, 0.0f, Space)
 				.VAlign(VAlign_Center)
 				[
 					SNew(SHorizontalBox)
@@ -66,7 +66,7 @@ namespace FW
 					]
 				]
 				+ SVerticalBox::Slot()
-				.Padding(0.0f, 0.0f, 0.0f, space)
+				.Padding(0.0f, 0.0f, 0.0f, Space)
 				[
 					SNew(SEditableTextBox).Text_Lambda([this] { return FText::FromString(ProjectDir); })
 					.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
@@ -100,16 +100,16 @@ namespace FW
 			RightContent =
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot()
-				.Padding(0.0f, 0.0f, 0.0f, space)
+				.Padding(0.0f, 0.0f, 0.0f, Space)
 				.HAlign(HAlign_Left)
 				.VAlign(VAlign_Center)
 				[
 					SNew(STextBlock).Text(LOCALIZATION("RecentProjects"))
 				];
 
-			auto InsertDummy = [this](int32 SlotIndex = -1) {
+			auto InsertDummy = [this, Space](int32 SlotIndex = -1) {
 				RightContent->InsertSlot(SlotIndex)
-					.Padding(0.0f, 0.0f, 0.0f, space)
+					.Padding(0.0f, 0.0f, 0.0f, Space)
 					.HAlign(HAlign_Left)
 					.VAlign(VAlign_Center)
 					[
@@ -152,7 +152,7 @@ namespace FW
 							return FReply::Handled();
 						}));
 					RightContent->AddSlot()
-						.Padding(0.0f, 0.0f, 0.0f, space)
+						.Padding(0.0f, 0.0f, 0.0f, Space)
 						.HAlign(HAlign_Left)
 						.VAlign(VAlign_Center)
 						[
