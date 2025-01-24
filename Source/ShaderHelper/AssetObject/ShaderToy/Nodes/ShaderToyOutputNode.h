@@ -25,8 +25,8 @@ namespace SH
 	public:
 		void Serialize(FArchive& Ar) override;
 		TArray<FW::GraphPin*> GetPins() override;
-		void Exec(FW::GraphExecContext& Context) override;
+		bool Exec(FW::GraphExecContext& Context) override;
 
-		GpuTexturePin ResultPin{ FText::FromString("Texture"), FW::PinDirection::Input };
+		GpuTexturePin ResultPin{ FText::FromString("RT"), FW::PinDirection::Input };
 	};
 }

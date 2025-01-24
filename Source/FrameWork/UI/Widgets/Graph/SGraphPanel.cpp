@@ -383,8 +383,19 @@ namespace FW
 				FAppCommonStyle::Get().GetBrush("Graph.NodeShadow"),
 				ESlateDrawEffect::None
 			);
-
-			if (SelectedNodes.Contains( &*CurNodeWidget))
+            
+            if(CurNodeWidget->NodeData->AnyError)
+            {
+                FSlateDrawElement::MakeBox(
+                    OutDrawElements,
+                    NodeLayer,
+                    CurWidget.Geometry.ToInflatedPaintGeometry(FVector2D{ 2, 2}),
+                    FAppCommonStyle::Get().GetBrush("Graph.NodeOutline"),
+                    ESlateDrawEffect::None,
+                    FLinearColor::Red
+                );
+            }
+			else if (SelectedNodes.Contains( &*CurNodeWidget))
 			{
 				FSlateDrawElement::MakeBox(
 					OutDrawElements,
@@ -424,6 +435,18 @@ namespace FW
 				FAppCommonStyle::Get().GetBrush("Graph.Selector")
 			);
 		}
+        
+        if(GraphData && GraphData->AnyError)
+        {
+            FSlateDrawElement::MakeBox(
+                OutDrawElements,
+                MaxTopNodeLayer,
+                AllottedGeometry.ToPaintGeometry(),
+                FAppCommonStyle::Get().GetBrush("Graph.Shadow"),
+                ESlateDrawEffect::None,
+                FLinearColor::Red
+            );
+        }
 
 		return MaxTopNodeLayer;
 	}
@@ -469,6 +492,7 @@ namespace FW
 		});
 
 		GraphNode* NewNodeData = static_cast<GraphNode*>(DefaultNodeData->DynamicMetaType()->Construct());
+        NewNodeData->Outer = GraphData;
 		NewNodeData->Position = PanelCoordToGraphCoord(MousePos);
 
 		auto NodeWidget = AddNodeFromData(NewNodeData);

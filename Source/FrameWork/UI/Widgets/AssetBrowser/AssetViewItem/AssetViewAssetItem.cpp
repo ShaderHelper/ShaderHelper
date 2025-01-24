@@ -59,14 +59,10 @@ namespace FW
 				));
 	
 		}
-		else if (ImageBrush)
+		else
 		{
 			Display = SNew(SImage)
 				.Image(ImageBrush);
-		}
-		else
-		{
-			Display = SNew(SImage);
 		}
         
         PreviewBox->SetContent(

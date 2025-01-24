@@ -7,15 +7,15 @@
 
 namespace FW
 {
-	GLOBAL_REFLECTION_REGISTER(AddClass<GraphNode>("GraphNode")
+	REFLECTION_REGISTER(AddClass<GraphNode>("GraphNode")
 								.BaseClass<ShObject>()
 	)
 
-	GLOBAL_REFLECTION_REGISTER(AddClass<GraphPin>()
+	REFLECTION_REGISTER(AddClass<GraphPin>()
 								.BaseClass<ShObject>()
 	)
 
-	GLOBAL_REFLECTION_REGISTER(AddClass<Graph>()
+	REFLECTION_REGISTER(AddClass<Graph>()
 								.BaseClass<AssetObject>()
 	)
 
@@ -43,6 +43,7 @@ namespace FW
 				FString TypeName;
 				Ar << TypeName;
 				GraphNode* LoadedNodeData = static_cast<GraphNode*>(GetMetaType(TypeName)->Construct());
+                LoadedNodeData->Outer = this;
 				LoadedNodeData->Serialize(Ar);
 				NodeDatas.Emplace(LoadedNodeData);
 			}
@@ -60,7 +61,7 @@ namespace FW
 	{
 		TArray<ObjectPtr<GraphNode>> ExecNodes = NodeDatas;
 
-		bool bHasSucceeded = Algo::TopologicalSort(ExecNodes, [this](const ObjectPtr<GraphNode>& Element) {
+        AnyError = !Algo::TopologicalSort(ExecNodes, [this](const ObjectPtr<GraphNode>& Element) {
 			TArray<FGuid> DepIds;
 			NodeDeps.MultiFind(Element->GetGuid(), DepIds);
 			TArray<ObjectPtr<GraphNode>> DepNodes;
@@ -70,11 +71,24 @@ namespace FW
 			}
 			return DepNodes;
 		});
+        
+        if(AnyError)
+        {
+            SH_LOG(LogGraph, Error, TEXT("Cycle not allowed."));
+            return;
+        }
 
 		for (auto Node : ExecNodes)
 		{
-			Node->Exec(Context);
+			Node->AnyError = !Node->Exec(Context);
+            if(Node->AnyError)
+            {
+                AnyError = true;
+                return;
+            }
 		}
+        
+        AnyError = false;
 	}
 
 	TSharedRef<SGraphNode> GraphNode::CreateNodeWidget(SGraphPanel* OwnerPanel)

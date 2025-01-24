@@ -7,7 +7,7 @@ using namespace FW;
 
 namespace SH
 {
-	GLOBAL_REFLECTION_REGISTER(AddClass<ShaderToy>("ShaderToy Graph")
+    REFLECTION_REGISTER(AddClass<ShaderToy>("ShaderToy Graph")
 								.BaseClass<Graph>()
 	)
 

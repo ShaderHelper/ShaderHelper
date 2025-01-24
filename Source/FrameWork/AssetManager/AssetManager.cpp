@@ -81,7 +81,11 @@ namespace FW
 
     void AssetManager::RemoveAsset(AssetObject* InAsset)
     {
-       Assets.Remove(*Assets.FindKey(InAsset));
+        if(auto KeyPtr = Assets.FindKey(InAsset))
+        {
+            Assets.Remove(*KeyPtr);
+        }
+
     }
 
 	TArray<FString> AssetManager::GetManageredExts() const

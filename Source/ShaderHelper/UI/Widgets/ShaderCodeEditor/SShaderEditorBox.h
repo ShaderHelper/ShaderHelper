@@ -4,6 +4,7 @@
 #include <Widgets/Text/SMultiLineEditableText.h>
 #include "UI/Widgets/ShaderCodeEditor/ShaderCodeTokenizer.h"
 #include "Renderer/ShRenderer.h"
+#include "GpuApi/GpuShader.h"
 
 namespace SH
 {
@@ -98,7 +99,7 @@ namespace SH
 
 		void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 
-		bool OnShaderTextChanged(const FString& InShaderSouce);
+		void OnShaderTextChanged(const FString& InShaderSouce);
 		FReply OnTextKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent);
 		TSharedRef<ITableRow> GenerateRowForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 		TSharedRef<ITableRow> GenerateLineTipForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
@@ -111,8 +112,7 @@ namespace SH
 		int32 GetLineNumber(int32 InLineIndex) const;
 		int32 GetLineIndex(int32 InLineNumber) const;
 		int32 GetCurDisplayLineCount() const { return ShaderMarshaller->TextLayout->GetLineCount(); }
-		FString GetCurFullShaderSource() const { return CurrentFullShaderSource; }
-		bool ReCompile() { return OnShaderTextChanged(CurrentShaderSource); }
+        void Compile();
 
 		TOptional<int32> FindFoldMarker(int32 InIndex) const;
 		void MarkLineNumberDataDirty(bool IsDirty) { IsLineNumberDataDirty = IsDirty; }
@@ -143,13 +143,14 @@ namespace SH
 
 		FReply OnFold(int32 LineNumber);
 		void RemoveFoldMarker(int32 InIndex);
+        
+        void RefreshLineNumberToErrorInfo();
 
 	public:
 		TArray<FoldMarker> DisplayedFoldMarkers;
     
 	private:
 		FString CurrentShaderSource;
-		FString CurrentFullShaderSource;
 
 		bool IsLineNumberDataDirty = false;
 		TArray<LineNumberItemPtr> LineNumberData;
@@ -170,5 +171,7 @@ namespace SH
 		TSharedPtr<SHorizontalBox> InfoBarBox;
 
 		FCurveSequence FoldingArrowAnim;
+        
+        TArray<FW::ShaderErrorInfo> ErrorInfos;
 	};
 }

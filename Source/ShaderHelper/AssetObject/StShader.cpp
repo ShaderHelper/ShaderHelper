@@ -18,7 +18,7 @@ R"(void mainImage(out float4 fragColor,in float2 fragCoord)
     fragColor = float4(col,1);
 })";
 
-	GLOBAL_REFLECTION_REGISTER(AddClass<StShader>("ShaderToy Shader")
+    REFLECTION_REGISTER(AddClass<StShader>("ShaderToy Shader")
                                 .BaseClass<AssetObject>()
 	)
 
@@ -39,6 +39,16 @@ R"(void mainImage(out float4 fragColor,in float2 fragCoord)
 		Ar << PixelShaderBody;
         Ar << CustomUniformBufferBuilder << CustomBindGroupLayoutBuilder;
 	}
+
+    void StShader::PostLoad()
+    {
+        VertexShader = GGpuRhi->CreateShaderFromSource(ShaderType::VertexShader, GetFullShader(), GetFileName(), TEXT("MainVS"));
+        FString ErrorInfo;
+        GGpuRhi->CrossCompileShader(VertexShader, ErrorInfo);
+
+        PixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, GetFullShader(), GetFileName(), TEXT("MainPS"));
+        GGpuRhi->CrossCompileShader(PixelShader, ErrorInfo);
+    }
 
     UniformBufferBuilder& StShader::GetBuiltInUbBuilder()
     {
@@ -137,15 +147,15 @@ R"(void mainImage(out float4 fragColor,in float2 fragCoord)
         auto CustomUniformCategory = CustomCategory->GetData("Uniform");
         if (!CustomUniformCategory)
         {
-            CustomUniformCategory = MakeShared<PropertyCategory>("Uniform");
+            CustomUniformCategory = MakeShared<PropertyCategory>(this, "Uniform");
             CustomCategory->AddChild(CustomUniformCategory.ToSharedRef());
         }
         FString NewUniformName = FString::Format(TEXT("Tmp{0}"), { AddNum++ });
         
-        auto TypeInfoWidget = SNew(STextBlock).TextStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("MinorText"));
+        auto TypeInfoWidget = SNew(STextBlock).TextStyle(&FAppCommonStyle::Get().GetWidgetStyle<FTextBlockStyle>("MinorText"));
         FText TypeInfo = FText::FromString(FString{ANSI_TO_TCHAR(UniformBufferMemberTypeString<UniformType>::Value.data())});
         TypeInfoWidget->SetText(TypeInfo);
-        auto NewUniformProperty = MakeShared<PropertyItem<UniformType>>(NewUniformName);
+        auto NewUniformProperty = MakeShared<PropertyItem<UniformType>>(this, NewUniformName);
         NewUniformProperty->SetEmbedWidget(TypeInfoWidget);
         NewUniformProperty->SetOnDisplayNameChanged([this](const FString&){
             RefreshBuilder();
@@ -195,17 +205,17 @@ R"(void mainImage(out float4 fragColor,in float2 fragCoord)
         const UniformBufferMetaData& MetaData = InBuilder.GetMetaData();
         for(const auto& [MemberName, MemberInfo]: MetaData.Members)
         {
-            auto TypeInfoWidget = SNew(STextBlock).TextStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("MinorText"));
+            auto TypeInfoWidget = SNew(STextBlock).TextStyle(&FAppCommonStyle::Get().GetWidgetStyle<FTextBlockStyle>("MinorText"));
             FText TypeInfo = FText::FromString(MemberInfo.TypeName);
             TypeInfoWidget->SetText(TypeInfo);
             TSharedPtr<PropertyItemBase> Property;
             if(MemberInfo.TypeName == "float")
             {
-                Property = MakeShared<PropertyItem<float>>(MemberName);
+                Property = MakeShared<PropertyItem<float>>(this, MemberName);
             }
             else if(MemberInfo.TypeName == "float2")
             {
-                Property = MakeShared<PropertyItem<Vector2f>>(MemberName);
+                Property = MakeShared<PropertyItem<Vector2f>>(this, MemberName);
             }
             else
             {
@@ -236,14 +246,14 @@ R"(void mainImage(out float4 fragColor,in float2 fragCoord)
 
     TArray<TSharedRef<PropertyData>> StShader::PropertyDatasFromBinding()
     {
-        auto BuiltInCategory = MakeShared<PropertyCategory>("Built In");
+        auto BuiltInCategory = MakeShared<PropertyCategory>(this, "Built In");
         {
             const GpuBindGroupLayoutDesc& BuiltInLayoutDesc = GetBuiltInBindingLayoutBuilder().GetLayoutDesc();
             for(const auto& [BindingName, Slot] : BuiltInLayoutDesc.CodegenBindingNameToSlot)
             {
                 if(BuiltInLayoutDesc.GetBindingType(Slot) == BindingType::UniformBuffer)
                 {
-                    auto UniformCategory = MakeShared<PropertyCategory>(BindingName);
+                    auto UniformCategory = MakeShared<PropertyCategory>(this, BindingName);
                     auto PropertyDataUniforms = PropertyDatasFromUniform(GetBuiltInUbBuilder(), false);
                     for(auto Data : PropertyDataUniforms)
                     {
@@ -252,15 +262,15 @@ R"(void mainImage(out float4 fragColor,in float2 fragCoord)
                     BuiltInCategory->AddChild(MoveTemp(UniformCategory));
                 }
             }
-            auto SlotCategory = MakeShared<PropertyCategory>("Slot");
+            auto SlotCategory = MakeShared<PropertyCategory>(this, "Slot");
             {
-                auto iChannel0Item = MakeShared<PropertyItemBase>("iChannel0");
+                auto iChannel0Item = MakeShared<PropertyItemBase>(this, "iChannel0");
                 iChannel0Item->SetEnabled(false);
-                auto iChannel1Item = MakeShared<PropertyItemBase>("iChannel1");
+                auto iChannel1Item = MakeShared<PropertyItemBase>(this, "iChannel1");
                 iChannel1Item->SetEnabled(false);
-                auto iChannel2Item = MakeShared<PropertyItemBase>("iChannel2");
+                auto iChannel2Item = MakeShared<PropertyItemBase>(this, "iChannel2");
                 iChannel2Item->SetEnabled(false);
-                auto iChannel3Item = MakeShared<PropertyItemBase>("iChannel3");
+                auto iChannel3Item = MakeShared<PropertyItemBase>(this, "iChannel3");
                 iChannel3Item->SetEnabled(false);
                 SlotCategory->AddChild(MoveTemp(iChannel0Item));
                 SlotCategory->AddChild(MoveTemp(iChannel1Item));
@@ -270,14 +280,14 @@ R"(void mainImage(out float4 fragColor,in float2 fragCoord)
             BuiltInCategory->AddChild(MoveTemp(SlotCategory));
         }
         
-        CustomCategory = MakeShared<PropertyCategory>("Custom");
+        CustomCategory = MakeShared<PropertyCategory>(this, "Custom");
         {
             const GpuBindGroupLayoutDesc& CustomLayoutDesc = CustomBindGroupLayoutBuilder.GetLayoutDesc();
             for(const auto& [BindingName, Slot] : CustomLayoutDesc.CodegenBindingNameToSlot)
             {
                 if(CustomLayoutDesc.GetBindingType(Slot) == BindingType::UniformBuffer)
                 {
-                    auto UniformCategory = MakeShared<PropertyCategory>(BindingName);
+                    auto UniformCategory = MakeShared<PropertyCategory>(this, BindingName);
                     auto PropertyDataUniforms = PropertyDatasFromUniform(CustomUniformBufferBuilder, true);
                     for(auto Data : PropertyDataUniforms)
                     {

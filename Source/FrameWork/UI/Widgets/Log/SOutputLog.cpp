@@ -3,6 +3,7 @@
 #include "UI/Styles/FAppCommonStyle.h"
 #include <Misc/OutputDeviceHelper.h>
 #include <Framework/Text/SlateTextRun.h>
+#include "UI/Widgets/Misc/SIconButton.h"
 
 namespace FW 
 {
@@ -36,6 +37,16 @@ namespace FW
 			.OnTextCommitted(this, &SOutputLog::OnFilterTextCommitted)
 			.DelayChangeNotificationsWhileTyping(true)
 		]
+        + SHorizontalBox::Slot()
+        .AutoWidth()
+        [
+            SNew(SIconButton).Icon(FAppStyle::Get().GetBrush("GenericCommands.Delete"))
+            .OnClicked_Lambda([this] {
+                OutPutLogMarshaller->Clear();
+                MessagesTextBox->Refresh();
+                return FReply::Handled();
+            })
+        ]
 		+ SHorizontalBox::Slot()
 		.AutoWidth()
 		.HAlign(HAlign_Left)
@@ -66,7 +77,7 @@ namespace FW
 		];
 
 		Filter = MakeShared<FOutputLogFilter>();
-		TSharedRef<ITextLayoutMarshaller> OutPutLogMarshaller = MakeShared<FOutputLogMarshaller>(Filter.Get());
+		OutPutLogMarshaller = MakeShared<FOutputLogMarshaller>(Filter.Get());
 
 		SLogWidget::Construct(
 			SLogWidget::FArguments()
@@ -313,6 +324,12 @@ namespace FW
 	{
 
 	}
+
+    void FOutputLogMarshaller::Clear()
+    {
+        Messages.Empty();
+        MakeDirty();
+    }
 
 	void FOutputLogMarshaller::SetText(const FString& SourceString, FTextLayout& TargetTextLayout)
 	{

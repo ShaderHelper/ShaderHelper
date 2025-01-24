@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "Reflection.h"
+#include "AssetObject/AssetObject.h"
 
 namespace FW
 {
@@ -15,5 +16,15 @@ namespace FW
 		static TMap<FString, MetaType*> RegisteredNameToMetaType;
 		return RegisteredNameToMetaType;
 	}
+
+    bool MetaMemberData::IsAssetRef()
+    {
+        if(bShObjectRef)
+        {
+            MetaType* ShObjectMetaType = GetShObjectMetaType();
+            return ShObjectMetaType->IsDerivedFrom<AssetObject>();
+        }
+        return false;
+    }
 
 }

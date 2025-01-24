@@ -87,19 +87,22 @@ namespace FW
     FReply SDirectoryTree::HandleOnDrop(const FDragDropEvent& DragDropEvent, FString DropTargetPath)
     {
         TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
-        FString DropFilePath = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Path;
+        if(DragDropOp->IsOfType<AssetViewItemDragDropOp>())
+        {
+            FString DropFilePath = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Path;
 
-		bool CanDo = true;
-		if (GProject->IsPendingAsset(DropFilePath))
-		{
-			CanDo = MessageDialog::Open(MessageDialog::OkCancel, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("OpPendingAssetTip"));
-		}
+            bool CanDo = true;
+            if (GProject->IsPendingAsset(DropFilePath))
+            {
+                CanDo = MessageDialog::Open(MessageDialog::OkCancel, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("OpPendingAssetTip"));
+            }
 
-		if (CanDo)
-		{
-			FString NewFilePath = DropTargetPath / FPaths::GetCleanFilename(DropFilePath);
-			IFileManager::Get().Move(*NewFilePath, *DropFilePath);
-		}
+            if (CanDo)
+            {
+                FString NewFilePath = DropTargetPath / FPaths::GetCleanFilename(DropFilePath);
+                IFileManager::Get().Move(*NewFilePath, *DropFilePath);
+            }
+        }
         return FReply::Handled();
     }
 

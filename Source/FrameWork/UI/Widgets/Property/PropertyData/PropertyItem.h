@@ -3,6 +3,7 @@
 #include "UI/Styles/FAppCommonStyle.h"
 #include <Widgets/Input/SSpinBox.h>
 #include "UI/Widgets/Misc/SIconButton.h"
+#include "AssetManager/AssetManager.h"
 
 namespace FW
 {
@@ -67,8 +68,8 @@ namespace FW
     {
         MANUAL_RTTI_TYPE(PropertyItem<T>, PropertyItemBase)
     public:
-        PropertyItem(FString InName, T* InValueRef = nullptr)
-            : PropertyItemBase(MoveTemp(InName))
+        PropertyItem(ShObject* InOwner, FString InName, T* InValueRef = nullptr)
+            : PropertyItemBase(InOwner, MoveTemp(InName))
             , ValueRef(InValueRef)
         {}
 
@@ -133,4 +134,5 @@ namespace FW
 	}
 }
 
+#include "PropertyAssetItem.h"
 

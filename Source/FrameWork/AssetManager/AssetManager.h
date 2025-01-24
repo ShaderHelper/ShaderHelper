@@ -4,7 +4,6 @@
 namespace FW
 {
 	class GpuTexture;
-    template<typename T, ObjectOwnerShip> struct ObjectPtr;
 
     template<typename T, typename = std::enable_if_t<std::is_base_of_v<AssetObject, T>>>
     using AssetPtr = ObjectPtr<T, ObjectOwnerShip::Retain>;
@@ -46,6 +45,8 @@ namespace FW
 				}
 			}
 			check(NewAssetObject);
+            NewAssetObject->ObjectName = FText::FromString(FPaths::GetBaseFilename(InAssetPath));
+            
 			TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*InAssetPath));
             if(Ar)
             {

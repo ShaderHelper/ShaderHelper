@@ -576,7 +576,6 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 		TSharedRef<FJsonObject> RootWindowSizeJsonObject = MakeShared<FJsonObject>();
 		Vector2D CurClientSize = Window->GetClientSizeInScreen();
-		CurClientSize -= Vector2D{2, 10};
 		RootWindowSizeJsonObject->SetNumberField(TEXT("Width"), CurClientSize.X);
 		RootWindowSizeJsonObject->SetNumberField(TEXT("Height"), CurClientSize.Y);
 
@@ -667,7 +666,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 								}));
 							})
 					));
-				MenuBuilder.AddMenuEntry(LOCALIZATION("Save"), FText::GetEmpty(), FSlateIcon(),
+				MenuBuilder.AddMenuEntry(LOCALIZATION("SaveAll"), FText::GetEmpty(), FSlateIcon(),
 					FUIAction(
 						FExecuteAction::CreateLambda([this] { 
 							CurProject->SavePendingAssets();

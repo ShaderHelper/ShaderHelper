@@ -46,6 +46,7 @@ namespace FW
 
 		//Gets the num of messages added to TextLayout
 		int32 GetNumMessages() const;
+        void Clear();
 	protected:
 		int32 NextPendingMessageIndex;
 		TArray<FOutputLogMessage> Messages;
@@ -91,7 +92,7 @@ namespace FW
 	protected:
 		TSharedPtr<FOutputLogFilter> Filter;
 		TSharedPtr<SSearchBox> SearchBox;
-
+        TSharedPtr<FOutputLogMarshaller> OutPutLogMarshaller;
 		bool bIsUserScrolled;
 	};
 }

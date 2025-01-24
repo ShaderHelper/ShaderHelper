@@ -20,7 +20,7 @@ namespace FW
         }
 
 		virtual void Serialize(FArchive& Ar) override;
-        virtual void PostLoad();
+        virtual void PostLoad() {}
 		virtual void Save();
 		virtual void MarkDirty();
 		bool IsDirty();
@@ -29,11 +29,12 @@ namespace FW
 
 		//Determine the asset icon in the asset browser.
 		virtual GpuTexture* GetThumbnail() const { return nullptr; }
-		virtual const FSlateBrush* GetImage() const { return nullptr; }
+        virtual const FSlateBrush* GetImage() const;
 		//
         
         FString GetFileName() const;
         FString GetPath() const;
 	};
 
+    FRAMEWORK_API MetaType* GetAssetMetaType(const FString& InPath);
 }

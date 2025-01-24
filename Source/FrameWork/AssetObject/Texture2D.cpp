@@ -8,7 +8,7 @@
 
 namespace FW
 {
-	GLOBAL_REFLECTION_REGISTER(AddClass<Texture2D>("Texture2D")
+    REFLECTION_REGISTER(AddClass<Texture2D>("Texture2D")
                                 .BaseClass<AssetObject>()
 	)
 

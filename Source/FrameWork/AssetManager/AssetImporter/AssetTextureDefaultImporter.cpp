@@ -9,7 +9,7 @@
 
 namespace FW
 {
-	GLOBAL_REFLECTION_REGISTER(AddClass<AssetTextureDefaultImporter>()
+    REFLECTION_REGISTER(AddClass<AssetTextureDefaultImporter>()
                                 .BaseClass<AssetImporter>()
 	)
 

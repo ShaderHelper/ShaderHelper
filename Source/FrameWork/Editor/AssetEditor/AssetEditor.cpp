@@ -4,7 +4,7 @@
 
 namespace FW
 {
-	GLOBAL_REFLECTION_REGISTER(AddClass<AssetOp>()
+    REFLECTION_REGISTER(AddClass<AssetOp>()
 								.BaseClass<ShObjectOp>()
 	)
 

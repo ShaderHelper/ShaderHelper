@@ -4,5 +4,5 @@
 
 namespace FW
 {
-	GLOBAL_REFLECTION_REGISTER(AddClass<AssetImporter>())
+    REFLECTION_REGISTER(AddClass<AssetImporter>())
 }

@@ -4,7 +4,7 @@
 
 namespace FW
 {
-	class CommonCommands : public TCommands<CommonCommands>
+	class FRAMEWORK_API CommonCommands : public TCommands<CommonCommands>
 	{
 	public:
 

@@ -39,6 +39,7 @@ namespace FW
 				.HAlign(HAlign_Center)
 				[
 					SAssignNew(NodeTitleEditText, SInlineEditableTextBlock)
+                    .IsSelected_Lambda([] {return false; })
 					.Text_Lambda([this] { return NodeData->ObjectName; })
 					.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
 						NodeData->ObjectName = NewText;

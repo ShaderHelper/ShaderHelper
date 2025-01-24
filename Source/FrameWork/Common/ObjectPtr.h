@@ -1,9 +1,7 @@
 #pragma once
-#include "AssetManager/AssetManager.h"
 
 namespace FW
 {
-
     template <typename T, ObjectOwnerShip OwnerShip = ObjectOwnerShip::Retain>
     class ObjectPtr
     {

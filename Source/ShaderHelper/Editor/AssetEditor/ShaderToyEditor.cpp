@@ -11,7 +11,7 @@ using namespace FW;
 
 namespace SH
 {
-	GLOBAL_REFLECTION_REGISTER(AddClass<ShaderToyOp>()
+    REFLECTION_REGISTER(AddClass<ShaderToyOp>()
 		.BaseClass<AssetOp>()
 	)
 
@@ -29,7 +29,7 @@ namespace SH
 
 	void ShaderToyOp::OnCreate(AssetObject* InAsset)
 	{
-		static_cast<ShaderToy*>(InAsset)->AddNode(new ShaderToyOuputNode);
+		static_cast<ShaderToy*>(InAsset)->AddNode(NewShObject<ShaderToyOuputNode>(InAsset));
 	}
 
 	void ShaderToyOp::OnDelete(const FString& InAssetPath)

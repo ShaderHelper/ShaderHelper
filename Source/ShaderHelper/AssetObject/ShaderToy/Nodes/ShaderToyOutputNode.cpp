@@ -7,10 +7,10 @@ using namespace FW;
 
 namespace SH
 {
-	GLOBAL_REFLECTION_REGISTER(AddClass<ShaderToyOuputNode>("Present Node")
+    REFLECTION_REGISTER(AddClass<ShaderToyOuputNode>("Present Node")
 		.BaseClass<GraphNode>()
 	)
-    GLOBAL_REFLECTION_REGISTER(AddClass<ShaderToyOuputNodeOp>()
+    REFLECTION_REGISTER(AddClass<ShaderToyOuputNodeOp>()
         .BaseClass<ShObjectOp>()
     )
 
@@ -47,8 +47,8 @@ namespace SH
 		return { &ResultPin };
 	}
 
-	void ShaderToyOuputNode::Exec(GraphExecContext& Context)
+	bool ShaderToyOuputNode::Exec(GraphExecContext& Context)
 	{
-
+        return true;
 	}
 }

@@ -9,10 +9,11 @@ using namespace FW;
 
 namespace SH
 {
-	GLOBAL_REFLECTION_REGISTER(AddClass<ShaderToyPassNode>("RenderPass Node")
+    REFLECTION_REGISTER(AddClass<ShaderToyPassNode>("ShaderPass Node")
 		.BaseClass<GraphNode>()
+        .Data<&ShaderToyPassNode::Shader, MetaInfo::Property>("Shader")
 	)
-    GLOBAL_REFLECTION_REGISTER(AddClass<ShaderToyPassNodeOp>()
+    REFLECTION_REGISTER(AddClass<ShaderToyPassNodeOp>()
         .BaseClass<ShObjectOp>()
     )
 
@@ -29,7 +30,7 @@ namespace SH
 
 	ShaderToyPassNode::ShaderToyPassNode()
 	{
-		ObjectName = FText::FromString("RenderPass");
+		ObjectName = FText::FromString("ShaderPass");
 	}
 
 	void ShaderToyPassNode::Serialize(FArchive& Ar)
@@ -38,6 +39,7 @@ namespace SH
 		
 		Slot0.Serialize(Ar);
 		PassOutput.Serialize(Ar);
+        Ar << Shader;
 	}
 
 	TSharedPtr<SWidget> ShaderToyPassNode::ExtraNodeWidget()
@@ -54,26 +56,12 @@ namespace SH
 		return { &PassOutput,&Slot0,&Slot1,&Slot2,&Slot3};
 	}
 
-	void ShaderToyPassNode::SetPassShader(AssetPtr<StShader> InPassShader)
+	bool ShaderToyPassNode::Exec(GraphExecContext& Context)
 	{
-		PassShader = MoveTemp(InPassShader);
-
-		VertexShader = GGpuRhi->CreateShaderFromSource(ShaderType::VertexShader, PassShader->GetFullShader(), FString::Printf(TEXT("%sVS"), *ObjectName.ToString()), TEXT("MainVS"));
-		FString ErrorInfo;
-		GGpuRhi->CrossCompileShader(VertexShader, ErrorInfo);
-		check(ErrorInfo.IsEmpty());
-
-		PixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, PassShader->GetFullShader(), FString::Printf(TEXT("%sPS"), *ObjectName.ToString()), TEXT("MainPS"));
-		GGpuRhi->CrossCompileShader(PixelShader, ErrorInfo);
-		check(ErrorInfo.IsEmpty());
-	}
-
-
-	void ShaderToyPassNode::Exec(GraphExecContext& Context)
-	{
-		if (!PassShader.IsValid())
+		if (!Shader.IsValid())
 		{
-			return;
+            SH_LOG(LogGraph, Error, TEXT("Node:%s does not specify the corresponding stShader."), *ObjectName.ToString());
+            return false;
 		}
 
 //		ShaderToyExecContext& ShaderToyContext = static_cast<ShaderToyExecContext&>(Context);
@@ -108,6 +96,7 @@ namespace SH
 //				PassRecorder->DrawPrimitive(0, 3, 0, 1);
 //			}
 //		);
+        return true;
 	}
 
 }

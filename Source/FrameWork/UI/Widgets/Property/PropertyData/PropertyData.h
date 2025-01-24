@@ -7,7 +7,9 @@ namespace FW
 	{
         MANUAL_RTTI_BASE_TYPE()
 	public:
-		PropertyData(FString InName) : DisplayName(MoveTemp(InName))
+		PropertyData(ShObject* InOwner, FString InName)
+            : Owner(InOwner)
+            , DisplayName(MoveTemp(InName))
 		{}
 		virtual ~PropertyData() = default;
 
@@ -52,6 +54,7 @@ namespace FW
         bool Expanded = false;
 
 	protected:
+        ShObject* Owner;
 		FString DisplayName;
 		PropertyData* Parent = nullptr;
 		TArray<TSharedRef<PropertyData>> Children;
@@ -61,9 +64,7 @@ namespace FW
 	{
         MANUAL_RTTI_TYPE(PropertyCategory, PropertyData)
 	public:
-		PropertyCategory(FString InName)
-			: PropertyData(MoveTemp(InName))
-		{}
+        using PropertyData::PropertyData;
 
 		void SetAddMenuWidget(TSharedPtr<SWidget> InWidget) { AddMenuWidget = MoveTemp(InWidget); }
 		bool IsRootCategory() const { return Parent == nullptr; }

@@ -1,21 +1,26 @@
 #pragma once
-#include "UI/Widgets/Property/PropertyData/PropertyData.h"
 
 namespace FW
 {
-	enum class FrameWorkVer
-	{
-		Initial,
-	};
-
+    class PropertyData;
+    class AssetObject;
+    
     enum class ObjectOwnerShip
     {
         Assign,
         Retain,
     };
 
+    template<typename T, ObjectOwnerShip> class ObjectPtr;
+        
+	enum class FrameWorkVer
+	{
+		Initial,
+	};
+
 	inline FrameWorkVer GFrameWorkVer = FrameWorkVer::Initial;
 
+    //Note: All ShObject must be default constructible.
 	class FRAMEWORK_API ShObject : FNoncopyable
 	{
 		REFLECTION_TYPE(ShObject)
@@ -23,11 +28,12 @@ namespace FW
 		ShObject();
 		virtual ~ShObject();
         
+    public:
 		FGuid GetGuid() const { return Guid; }
 		//Use the serialization system from unreal engine
 		virtual void Serialize(FArchive& Ar);
         //
-        virtual TArray<TSharedRef<PropertyData>>* GetPropertyDatas() { return nullptr; };
+        virtual TArray<TSharedRef<PropertyData>>* GetPropertyDatas();
     
         uint32 Add() const
         {
@@ -46,15 +52,29 @@ namespace FW
         {
             return uint32(NumRefs);
         }
+        
+        AssetObject* GetOuterMost();
 
 	public:
 		FText ObjectName;
+        
+        //For all Shobject except AssetObject
+        //The OuterMost should be an AssetObject
+        ShObject* Outer;
 
 	protected:
 		FGuid Guid;
         TArray<TSharedRef<PropertyData>> PropertyDatas;
         mutable int32 NumRefs;
 	};
+
+    template<typename T>
+    ObjectPtr<T, ObjectOwnerShip::Retain> NewShObject(ShObject* InOuter = nullptr)
+    {
+        T* NewObj = new T;
+        NewObj->Outer = InOuter;
+        return NewObj;
+    }
 
 	class FRAMEWORK_API ShObjectOp
 	{

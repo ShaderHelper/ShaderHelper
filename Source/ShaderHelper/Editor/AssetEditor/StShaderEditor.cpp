@@ -9,7 +9,7 @@ using namespace FW;
 
 namespace SH
 {
-	GLOBAL_REFLECTION_REGISTER(AddClass<StShaderOp>()
+    REFLECTION_REGISTER(AddClass<StShaderOp>()
                                 .BaseClass<AssetOp>()
 	)
 

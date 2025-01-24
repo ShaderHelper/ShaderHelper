@@ -83,7 +83,10 @@ namespace FW
         MslTargetDesc.numOptions = UE_ARRAY_COUNT(SpvMslOptions);
         
         TArray<const char*> DxcArgs;
-        DxcArgs.Add("-fspv-preserve-bindings");
+        DxcArgs.Add("-fspv-preserve-bindings"); //For bindgroup-argumentbuffer
+        //TODO: Parse spv
+        //DxcArgs.Add("-Od");
+        //DxcArgs.Add("-fspv-debug=line");
         
         SourceDesc.loadIncludeCallback = [InShader](const char* includeName) -> ShaderConductor::Blob {
             for(const FString& IncludeDir : InShader->GetIncludeDirs())

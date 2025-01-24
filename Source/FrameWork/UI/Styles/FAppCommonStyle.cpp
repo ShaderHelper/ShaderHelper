@@ -31,6 +31,7 @@ namespace FW
 		Style->Set("ProjectLauncher.Background", new IMAGE_BRUSH("Launcher", FVector2D(560, 270)));
 		Style->Set("ProjectLauncher.Logo", new IMAGE_BRUSH("ShaderHelper", FVector2D(100, 30)));
 
+        Style->Set("Graph.Shadow", new BOX_BRUSH( "WindowBorder", 0.48f ) );
 		Style->Set("Graph.NodeShadow", new BOX_BRUSH("NodeShadow", FMargin(18.0f / 64.0f)));
 		Style->Set("Graph.NodeTitleBackground", new FSlateRoundedBoxBrush(FStyleColors::White, FVector4(5.0, 5.0, 0, 0)));
 		Style->Set("Graph.NodeContentBackground", new FSlateRoundedBoxBrush(FStyleColors::Panel, FVector4(0, 0, 5.0, 5.0)));
@@ -101,6 +102,14 @@ namespace FW
         Style->Set("SuperSimpleButton", SuperSimpleButton);
 		
 		Style->Set("Graph.Selector", new BORDER_BRUSH("Common/Selector", FMargin(6.0f / 32.0f)));
+        
+        FTextBlockStyle MinorText = FTextBlockStyle{}
+            .SetFont(TTF_FONT(TEXT("Fonts/DroidSansMono"), 8))
+            .SetColorAndOpacity(FLinearColor{0.2f,0.2f,0.2f,1.0f});
+        FTextBlockStyle SmallMinorText = FTextBlockStyle{MinorText}
+            .SetFontSize(7);
+        Style->Set("MinorText", MinorText);
+        Style->Set("SmallMinorText", SmallMinorText);
 		return Style;
 	}
 

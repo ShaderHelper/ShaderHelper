@@ -76,7 +76,7 @@ namespace FW
             .Padding(4.0)
         ];
         PropertyDatas = ObjectData->GetPropertyDatas();
-        if(PropertyDatas)
+        if(PropertyDatas && !PropertyDatas->IsEmpty())
         {
             PropertyContent->SetContent(
                 SAssignNew(PropertyTree, STreeView<TSharedRef<PropertyData>>)

@@ -1,6 +1,8 @@
 #pragma once
 #include "AssetObject/AssetObject.h"
 #include "RenderResource/UniformBuffer.h"
+#include "UI/Widgets/Property/PropertyData/PropertyData.h"
+
 
 namespace SH
 {
@@ -16,6 +18,7 @@ namespace SH
 
 	public:
 		void Serialize(FArchive& Ar) override;
+        void PostLoad() override;
 		FString FileExtension() const override;
 		const FSlateBrush* GetImage() const override;
 
@@ -36,6 +39,8 @@ namespace SH
         
 	public:
 		FString PixelShaderBody;
+        TRefCountPtr<FW::GpuShader> VertexShader, PixelShader;
+        
         //Custom
         FW::UniformBufferBuilder CustomUniformBufferBuilder{FW::UniformBufferUsage::Persistant};
         FW::GpuBindGroupLayoutBuilder CustomBindGroupLayoutBuilder{1};

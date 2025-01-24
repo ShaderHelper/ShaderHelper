@@ -84,10 +84,6 @@ namespace SH {
 		FTextBlockStyle CodeEditorErrorInfoStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
 			.SetColorAndOpacity(FLinearColor::Red);
 		Style->Set("CodeEditorErrorInfoText", CodeEditorErrorInfoStyle);
-        
-        FTextBlockStyle MinorText = FTextBlockStyle{CodeEditorNormalTextStyle}
-            .SetColorAndOpacity(FLinearColor{0.2f,0.2f,0.2f,1.0f});
-        Style->Set("MinorText", MinorText);
 		
 		const FVector2D Icon14x14(14.0f, 14.0f);
 		

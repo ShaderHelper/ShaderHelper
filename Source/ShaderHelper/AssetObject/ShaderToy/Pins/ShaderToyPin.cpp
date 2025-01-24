@@ -5,11 +5,11 @@ using namespace FW;
 
 namespace SH
 {
-	GLOBAL_REFLECTION_REGISTER(AddClass<GpuTexturePin>()
+    REFLECTION_REGISTER(AddClass<GpuTexturePin>()
 		.BaseClass<GraphPin>()
 	)
 
-	GLOBAL_REFLECTION_REGISTER(AddClass<ChannelPin>()
+    REFLECTION_REGISTER(AddClass<ChannelPin>()
 		.BaseClass<GraphPin>()
 	)
 

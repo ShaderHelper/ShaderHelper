@@ -4,10 +4,58 @@
 namespace FW
 {
 	struct MetaType;
+    enum class ObjectOwnerShip;
+    template<typename T, ObjectOwnerShip> class ObjectPtr;
+    template<typename T>
+    struct is_object_ptr { static constexpr bool value = false;};
+    template<typename T, ObjectOwnerShip OwnerShip>
+    struct is_object_ptr<ObjectPtr<T, OwnerShip>> { static constexpr bool value = true; };
+    template<typename T>
+    struct object_ptr_trait;
+    template<typename T, ObjectOwnerShip OwnerShip>
+    struct object_ptr_trait<ObjectPtr<T, OwnerShip>> { using type = T;};
 
-	//TODO compile-time hash type name
 	FRAMEWORK_API TMap<FString, MetaType*>& GetTypeNameToMetaType();
 	FRAMEWORK_API TMap<FString, MetaType*>& GetRegisteredNameToMetaType();
+
+    enum class MetaInfo
+    {
+        None,
+        Property, //will occur in the property panel.
+    };
+
+    struct MetaMemberData
+    {
+        template<typename T>
+        bool IsType()
+        {
+            return TypeName == AUX::TypeName<T>;
+        }
+        
+        template<typename T>
+        void SetValue(void* Instance, const T& Value)
+        {
+            Set(Instance, &Value);
+        }
+        
+        template<typename T>
+        T GetValue(void* Instance)
+        {
+            return *static_cast<T*>(Get(Instance));
+        }
+        
+        bool IsAssetRef();
+        
+        FString MemberName;
+        FString TypeName;
+        void(*Set)(void*, void*);
+        void*(*Get)(void*);
+        MetaInfo InfoType;
+        void* InfoData;
+        
+        bool bShObjectRef;
+        MetaType*(*GetShObjectMetaType)();
+    };
 
 	struct MetaType
 	{
@@ -60,7 +108,21 @@ namespace FW
 		void*(*Constructor)();
 		MetaType*(*BaseMetaTypeGetter)();
 		void* DefaultObject;
+        TArray<MetaMemberData> Datas;
 	};
+
+    template<typename T>
+    MetaType* GetMetaType()
+    {
+        checkf(GetTypeNameToMetaType().Contains(GetGeneratedTypeName<T>()),
+            TEXT("Please ensure that have registered the type: %s."), *AUX::TypeName<T>);
+        return GetTypeNameToMetaType()[GetGeneratedTypeName<T>()];
+    }
+
+    inline MetaType* GetMetaType(const FString& InRegisteredName)
+    {
+        return GetRegisteredNameToMetaType()[InRegisteredName];
+    }
 
 	template<typename T>
 	class MetaTypeBuilder
@@ -94,6 +156,34 @@ namespace FW
 			};
 			return *this;
 		}
+        
+        template<auto DataPtr, MetaInfo InfoType = MetaInfo::None>
+        MetaTypeBuilder& Data(const FString& InMemberName, void* InfoData = nullptr)
+        {
+            using MemberType = typename AUX::TraitMemberTypeFromMemberPtr<decltype(DataPtr)>::Type;
+            using RawType = std::decay_t<MemberType>;
+            MetaMemberData MemberData{};
+            MemberData.MemberName = InMemberName;
+            MemberData.TypeName = GetGeneratedTypeName<RawType>();
+            MemberData.Set = [](void* Instance, void* Value){
+                (T*)Instance->*DataPtr = *(MemberType*)Value;
+            };
+            MemberData.Get = [](void* Instance) -> void* {
+                return &((T*)Instance->*DataPtr);
+            };
+            MemberData.InfoType = InfoType;
+            MemberData.InfoData = InfoData;
+            if(is_object_ptr<RawType>::value)
+            {
+                MemberData.bShObjectRef = true;
+                //the metatype of member may not be registered at the moment, so lazy get.
+                using ShObjectType = typename object_ptr_trait<RawType>::type;
+                MemberData.GetShObjectMetaType = [] { return GetMetaType<ShObjectType>(); };
+            }
+ 
+            Meta->Datas.Add(MoveTemp(MemberData));
+            return *this;
+        }
 
 		~MetaTypeBuilder()
 		{
@@ -118,19 +208,6 @@ namespace FW
 	MetaTypeBuilder<T> AddClass()
 	{
 		return MetaTypeBuilder<T>{};
-	}
-
-	template<typename T>
-	MetaType* GetMetaType()
-	{
-		checkf(GetTypeNameToMetaType().Contains(GetGeneratedTypeName<T>()), 
-			TEXT("Please ensure that have registered the type: %s."), *AUX::TypeName<T>);
-		return GetTypeNameToMetaType()[GetGeneratedTypeName<T>()];
-	}
-
-	inline MetaType* GetMetaType(const FString& InRegisteredName)
-	{
-		return GetRegisteredNameToMetaType()[InRegisteredName];
 	}
 
 	inline FString GetRegisteredName(MetaType* InMt)
@@ -204,10 +281,26 @@ namespace FW
         }
     }
 
-#define GLOBAL_REFLECTION_REGISTER(...)	\
+    inline TArray<MetaMemberData*> GetProperties(MetaType* InMt)
+    {
+        TArray<MetaMemberData*> Datas;
+        for(auto& Data : InMt->Datas)
+        {
+            if(Data.InfoType == MetaInfo::Property)
+            {
+                Datas.Add(&Data);
+            }
+        }
+        return Datas;
+    }
+
+#define REFLECTION_REGISTER(...)	\
 	static const int PREPROCESSOR_JOIN(ReflectionGlobalRegister_,__COUNTER__) = [] { __VA_ARGS__; return 0; }();
 
-#define REFLECTION_TYPE(Type) public: virtual FW::MetaType* DynamicMetaType() const {  return FW::GetMetaType<Type>(); }
+#define REFLECTION_TYPE(Type)       \
+    public:                         \
+        virtual FW::MetaType* DynamicMetaType() const {  return FW::GetMetaType<Type>(); }
+    
 
 #define MANUAL_RTTI_BASE_TYPE() \
     public: \

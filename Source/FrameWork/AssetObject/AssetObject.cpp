@@ -3,11 +3,20 @@
 #include "Common/Util/Reflection.h"
 #include "AssetManager/AssetManager.h"
 #include "ProjectManager/ProjectManager.h"
+#include "UI/Styles/FAppCommonStyle.h"
 
 namespace FW
 {
-	GLOBAL_REFLECTION_REGISTER(AddClass<AssetObject>()
+    REFLECTION_REGISTER(AddClass<AssetObject>()
 								.BaseClass<ShObject>())
+
+    MetaType* GetAssetMetaType(const FString& InPath)
+    {
+        FString Ext = FPaths::GetExtension(InPath);
+        return GetDefaultObject<AssetObject>([&](AssetObject* CurCDO){
+            return CurCDO->FileExtension() == Ext;
+        })->DynamicMetaType();
+    }
 
     AssetObject::~AssetObject()
     {
@@ -18,11 +27,6 @@ namespace FW
 	{
 		ShObject::Serialize(Ar);
 	}
-
-    void AssetObject::PostLoad()
-    {
-        ObjectName =  FText::FromString(GetFileName());
-    }
 
 	void AssetObject::Save()
 	{
@@ -50,6 +54,11 @@ namespace FW
     FString AssetObject::GetPath() const
     {
         return TSingleton<AssetManager>::Get().GetPath(Guid);
+    }
+
+    const FSlateBrush* AssetObject::GetImage() const
+    {
+        return FAppCommonStyle::Get().GetBrush("Icons.File");
     }
 
 }

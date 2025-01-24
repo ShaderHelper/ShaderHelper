@@ -77,7 +77,8 @@ workspace "ShaderHelper"
         buildoptions 
         { 
             "-fvisibility=hidden",
-            "-fvisibility-inlines-hidden",  
+            "-fvisibility-inlines-hidden",
+            "-fno-strict-aliasing",
         }
         if _OPTIONS["UniversalBinary"] then
             xcodebuildsettings {
@@ -96,7 +97,8 @@ workspace "ShaderHelper"
         buildoptions 
         { 
             "-fvisibility=hidden",
-            "-fvisibility-inlines-hidden",  
+            "-fvisibility-inlines-hidden",
+            "-fno-strict-aliasing",  
         }
 
     filter {"system:macosx","kind:WindowedApp"}

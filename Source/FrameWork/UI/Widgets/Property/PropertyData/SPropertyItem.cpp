@@ -7,7 +7,8 @@ namespace FW
 {
     void SPropertyItem::AddWidget(TSharedPtr<SWidget> InWidget)
     {
-        HBox->AddSlot().VAlign(VAlign_Center)
+        HBox->AddSlot()
+            .VAlign(VAlign_Center)
         [
             InWidget.ToSharedRef()
         ];
@@ -36,7 +37,7 @@ namespace FW
 		HBox = SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot()
 			.VAlign(VAlign_Center)
-			.Padding(Indent, 0.0f, 8.0f, 0.0f)
+			.Padding(Indent, 0.0f, 0.0f, 0.0f)
 			[
                 ItemTextBlock
             ];

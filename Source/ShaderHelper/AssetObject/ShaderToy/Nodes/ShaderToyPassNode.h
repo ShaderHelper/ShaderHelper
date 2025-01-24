@@ -28,20 +28,19 @@ namespace SH
 		TSharedPtr<SWidget> ExtraNodeWidget() override;
 		TArray<FW::GraphPin*> GetPins() override;
 		FSlateColor GetNodeColor() const override { return FLinearColor{ 0.27f, 0.13f, 0.0f }; }
-		void Exec(FW::GraphExecContext& Context) override;
-
-		void SetPassShader(FW::AssetPtr<StShader> InPassShader);
+		bool Exec(FW::GraphExecContext& Context) override;
 
 	public:
 		ChannelPin Slot0{ FText::FromString("iChannel0"), FW::PinDirection::Input };
         ChannelPin Slot1{ FText::FromString("iChannel1"), FW::PinDirection::Input };
         ChannelPin Slot2{ FText::FromString("iChannel2"), FW::PinDirection::Input };
         ChannelPin Slot3{ FText::FromString("iChannel3"), FW::PinDirection::Input };
-		GpuTexturePin PassOutput{ FText::FromString("Texture"), FW::PinDirection::Output };
+		GpuTexturePin PassOutput{ FText::FromString("RT"), FW::PinDirection::Output };
+        
+    public:
+        FW::AssetPtr<StShader> Shader;
 
 	private:
 		TSharedPtr<FW::PreviewViewPort> Preview;
-		FW::AssetPtr<StShader> PassShader;
-		TRefCountPtr<FW::GpuShader> VertexShader, PixelShader;
 	};
 }
