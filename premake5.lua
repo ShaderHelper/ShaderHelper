@@ -77,7 +77,8 @@ workspace "ShaderHelper"
         buildoptions 
         { 
             "-fvisibility=hidden",
-            "-fvisibility-inlines-hidden",  
+            "-fvisibility-inlines-hidden",
+            "-fno-strict-aliasing",
         }
         if _OPTIONS["UniversalBinary"] then
             xcodebuildsettings {
@@ -96,7 +97,8 @@ workspace "ShaderHelper"
         buildoptions 
         { 
             "-fvisibility=hidden",
-            "-fvisibility-inlines-hidden",  
+            "-fvisibility-inlines-hidden",
+            "-fno-strict-aliasing",  
         }
 
     filter {"system:macosx","kind:WindowedApp"}
@@ -124,6 +126,7 @@ workspace "ShaderHelper"
     
     filter {"configurations:Shipping"}
 		optimize "On"
+		defines "SH_SHIPPING=1"
 
     --Premake can not link the corresponding "SharedLib" project in Xcode when targetname contains build configuration.
     filter {"system:windows or linux", "configurations:not Shipping"}

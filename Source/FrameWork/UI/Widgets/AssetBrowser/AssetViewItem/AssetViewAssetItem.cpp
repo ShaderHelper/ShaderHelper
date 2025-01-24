@@ -5,8 +5,10 @@
 #include <Widgets/SViewport.h>
 #include "AssetManager/AssetManager.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
+#include "ProjectManager/ProjectManager.h"
+#include "App/App.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	AssetViewAssetItem::AssetViewAssetItem(const FString& InPath)
@@ -20,11 +22,7 @@ namespace FRAMEWORK
 
     FReply AssetViewAssetItem::HandleOnDragDetected(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
     {
-        if(MouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton))
-        {
-            return FReply::Handled().BeginDragDrop(AssetViewItemDragDropOp::New(Path));
-        }
-        return FReply::Unhandled();
+        return FReply::Handled().BeginDragDrop(AssetViewItemDragDropOp::New(Path));
     }
 
 	TSharedRef<ITableRow> AssetViewAssetItem::GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable)
@@ -61,14 +59,10 @@ namespace FRAMEWORK
 				));
 	
 		}
-		else if (ImageBrush)
+		else
 		{
 			Display = SNew(SImage)
 				.Image(ImageBrush);
-		}
-		else
-		{
-			Display = SNew(SImage);
 		}
         
         PreviewBox->SetContent(
@@ -98,7 +92,26 @@ namespace FRAMEWORK
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot()
 			[
-                PreviewBox.ToSharedRef()
+				SNew(SOverlay)
+				+SOverlay::Slot()
+				[
+					PreviewBox.ToSharedRef()
+				]
+                +SOverlay::Slot()
+				.VAlign(VAlign_Top)
+				.HAlign(HAlign_Right)
+				[
+					SNew(STextBlock).Text(FText::FromString("*"))
+					.Visibility_Lambda([this] {
+						FGuid Id = TSingleton<AssetManager>::Get().GetGuid(Path);
+						AssetObject* Asset = TSingleton<AssetManager>::Get().FindLoadedAsset(Id);
+
+						if (Asset && Asset->IsDirty()) {
+							return EVisibility::Visible;
+						}
+						return EVisibility::Collapsed;
+					})
+				]
 			]
 
 			+SVerticalBox::Slot()
@@ -118,11 +131,21 @@ namespace FRAMEWORK
                         {
                             if(IFileManager::Get().FileExists(*NewFilePath))
                             {
-                                MessageDialog::Open(MessageDialog::Ok, LOCALIZATION("AssetRenameFailure"));
+                                MessageDialog::Open(MessageDialog::Ok, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("AssetRenameFailure"));
                             }
                             else
                             {
-                                IFileManager::Get().Move(*NewFilePath, *Path);
+								if (GProject->IsPendingAsset(Path))
+								{
+									if (MessageDialog::Open(MessageDialog::OkCancel, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("OpPendingAssetTip")))
+									{
+										IFileManager::Get().Move(*NewFilePath, *Path);
+									}
+								}
+								else
+								{
+									IFileManager::Get().Move(*NewFilePath, *Path);
+								}
                             }
                         }
                     })

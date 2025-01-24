@@ -2,7 +2,7 @@
 #include "AssetViewItem/AssetViewItem.h"
 #include <Widgets/Views/STileView.h>
 
-namespace FRAMEWORK
+namespace FW
 {
 	class SAssetBrowser;
 
@@ -47,6 +47,7 @@ namespace FRAMEWORK
 		void OnMouseButtonDoubleClick(TSharedRef<AssetViewItem> ViewItem);
 		void OnHandleDeleteAction();
 		void OnHandleRenameAction();
+		void OnHandleSaveAction();
 		void OnHandleOpenAction(TSharedRef<AssetViewItem> ViewItem);
 
 	private:

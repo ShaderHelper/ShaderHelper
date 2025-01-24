@@ -2,7 +2,7 @@
 #include "Dx12Common.h"
 #include "Dx12Allocation.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	enum class DescriptorType
 	{

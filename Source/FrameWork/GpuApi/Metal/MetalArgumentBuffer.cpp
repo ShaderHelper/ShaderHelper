@@ -3,7 +3,7 @@
 #include "MetalArgumentBuffer.h"
 #include "MetalTexture.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
     static MTLRenderStages MapShaderVisibility(BindingShaderStage InStage)

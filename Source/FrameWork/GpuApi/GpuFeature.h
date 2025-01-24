@@ -1,6 +1,6 @@
 #pragma once
 
-namespace FRAMEWORK::GpuFeature
+namespace FW::GpuFeature
 {
 #define ValidateGpuFeature(FeatureFlag, Msg)                \
 	if(!FeatureFlag) {                                      \

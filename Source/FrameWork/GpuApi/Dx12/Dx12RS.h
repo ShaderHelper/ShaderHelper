@@ -5,7 +5,7 @@
 #include "Dx12Descriptor.h"
 #include "Dx12Buffer.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	class Dx12BindGroupLayout : public GpuBindGroupLayout
 	{

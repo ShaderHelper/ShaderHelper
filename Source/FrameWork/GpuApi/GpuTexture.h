@@ -1,7 +1,7 @@
 #pragma once
 #include "GpuResourceCommon.h"
 
-namespace FRAMEWORK
+namespace FW
 {
     struct GpuTextureDesc
     {

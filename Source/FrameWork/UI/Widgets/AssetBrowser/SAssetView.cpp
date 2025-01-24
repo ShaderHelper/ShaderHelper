@@ -12,8 +12,11 @@
 #include "UI/Styles/FAppCommonStyle.h"
 #include <Framework/Commands/GenericCommands.h>
 #include "Editor/AssetEditor/AssetEditor.h"
+#include "ProjectManager/ProjectManager.h"
+#include "UI/Widgets/Misc/CommonCommands.h"
+#include "App/App.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	void SAssetView::Construct(const FArguments& InArgs)
@@ -26,6 +29,10 @@ namespace FRAMEWORK
 		UICommandList->MapAction(
 			FGenericCommands::Get().Rename,
 			FExecuteAction::CreateRaw(this, &SAssetView::OnHandleRenameAction)
+		);
+		UICommandList->MapAction(
+			CommonCommands::Get().Save,
+			FExecuteAction::CreateRaw(this, &SAssetView::OnHandleSaveAction)
 		);
 
 		ContentPathShowed = InArgs._ContentPathShowed;
@@ -169,9 +176,16 @@ namespace FRAMEWORK
 										GeneratedFileName = FString::Format(TEXT("New{0}{1}"), { NewAsset->FileExtension(), Number++ });
 										SavedFileName = CurViewDirectory / GeneratedFileName + "." + NewAsset->FileExtension();
 									}
+
+									if (AssetOp* AssetOp_ = GetAssetOp(NewAsset->DynamicMetaType()))
+									{
+										AssetOp_->OnCreate(NewAsset);
+									}
+
+									NewAsset->ObjectName = FText::FromString(FPaths::GetBaseFilename(SavedFileName));
 									TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFileName));
 									NewAsset->Serialize(*Ar);
-									})),
+								})),
 								NAME_None,
 								EUserInterfaceActionType::Button
 							);
@@ -228,6 +242,10 @@ namespace FRAMEWORK
 				FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "Icons.FolderOpen" },
 				FUIAction{ FExecuteAction::CreateRaw(this, &SAssetView::OnHandleOpenAction, ViewItem)}
             );
+			if (ViewItem->IsOfType<AssetViewAssetItem>())
+			{
+				MenuBuilder.AddMenuEntry(CommonCommands::Get().Save, NAME_None, LOCALIZATION("Save"));
+			}
 			MenuBuilder.AddMenuEntry(FGenericCommands::Get().Rename);
 			MenuBuilder.AddMenuEntry(FGenericCommands::Get().Delete);
 		}
@@ -351,11 +369,12 @@ namespace FRAMEWORK
 				{
 					FString SavedFileName = CurViewDirectory / FPaths::GetBaseFilename(OpenedFileNames[0]) + "." + ImportedAssetObject->FileExtension();
 					TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFileName));
+                    ImportedAssetObject->ObjectName = FText::FromString(FPaths::GetBaseFilename(SavedFileName));
 					ImportedAssetObject->Serialize(*Ar);
 				}
 				else
 				{
-					MessageDialog::Open(MessageDialog::Ok, LOCALIZATION("AssetImportFailure"));
+					MessageDialog::Open(MessageDialog::Ok, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("AssetImportFailure"));
 				}
 			}
 		}
@@ -394,9 +413,14 @@ namespace FRAMEWORK
 
 	void SAssetView::OnHandleDeleteAction()
 	{
-		if (MessageDialog::Open(MessageDialog::OkCancel, LOCALIZATION("DeleteAssetTip")))
+		TArray<TSharedRef<AssetViewItem>> SelectedItems = AssetTileView->GetSelectedItems();
+		if (SelectedItems.IsEmpty())
 		{
-			TArray<TSharedRef<AssetViewItem>> SelectedItems = AssetTileView->GetSelectedItems();
+			return;
+		}
+
+		if (MessageDialog::Open(MessageDialog::OkCancel, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("DeleteItemTip")))
+		{
 			if (SelectedItems[0]->IsOfType<AssetViewFolderItem>())
 			{
 				IFileManager::Get().DeleteDirectory(*SelectedItems[0]->GetPath(), false, true);
@@ -412,16 +436,41 @@ namespace FRAMEWORK
 	void SAssetView::OnHandleRenameAction()
 	{
 		TArray<TSharedRef<AssetViewItem>> SelectedItems = AssetTileView->GetSelectedItems();
+		if (SelectedItems.IsEmpty())
+		{
+			return;
+		}
+
 		if (SelectedItems[0]->IsOfType<AssetViewFolderItem>())
 		{
 			TSharedRef<AssetViewFolderItem> SelectedFolderItem = StaticCastSharedRef<AssetViewFolderItem>(SelectedItems[0]);
 			SelectedFolderItem->EnterRenameState();
 		}
-        else if (SelectedItems[0]->IsOfType<AssetViewAssetItem>())
-        {
-            TSharedRef<AssetViewAssetItem> SelectedAssetItem = StaticCastSharedRef<AssetViewAssetItem>(SelectedItems[0]);
-            SelectedAssetItem->EnterRenameState();
-        }
+		else if (SelectedItems[0]->IsOfType<AssetViewAssetItem>())
+		{
+			TSharedRef<AssetViewAssetItem> SelectedAssetItem = StaticCastSharedRef<AssetViewAssetItem>(SelectedItems[0]);
+			SelectedAssetItem->EnterRenameState();
+		}
+	}
+
+	void SAssetView::OnHandleSaveAction()
+	{
+		TArray<TSharedRef<AssetViewItem>> SelectedItems = AssetTileView->GetSelectedItems();
+		if (SelectedItems.IsEmpty())
+		{
+			return;
+		}
+
+		if (SelectedItems[0]->IsOfType<AssetViewAssetItem>())
+		{
+			TSharedRef<AssetViewAssetItem> SelectedAssetItem = StaticCastSharedRef<AssetViewAssetItem>(SelectedItems[0]);
+			FGuid AssetId = TSingleton<AssetManager>::Get().GetGuid(SelectedAssetItem->GetPath());
+			AssetObject* AssetObj = TSingleton<AssetManager>::Get().FindLoadedAsset(AssetId);
+			if (AssetObj && AssetObj->IsDirty())
+			{
+				AssetObj->Save();
+			}
+		}
 	}
 
 	void SAssetView::OnHandleOpenAction(TSharedRef<AssetViewItem> ViewItem)

@@ -1,10 +1,6 @@
 #include "CommonHeader.h"
 #include "ShaderHelperEditor.h"
 #include "App/ShaderHelperApp.h"
-#include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
-#include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
-#include "UI/Widgets/Property/PropertyView/SShaderPropertyView.h"
-#include "ProjectManager/ShProjectManager.h"
 #include <Serialization/JsonSerializer.h>
 #include <Misc/FileHelper.h>
 #include "Common/Path/PathHelper.h"
@@ -14,10 +10,12 @@
 #include "UI/Widgets/SShaderTab.h"
 #include "UI/Widgets/Graph/SGraphPanel.h"
 #include <DesktopPlatformModule.h>
+#include "Editor/AssetEditor/AssetEditor.h"
+#include "UI/Widgets/Log/SOutputLog.h"
 
 STEAL_PRIVATE_MEMBER(FTabManager, TArray<TSharedRef<FTabManager::FArea>>, CollapsedDockAreas)
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace SH 
 {
@@ -31,30 +29,35 @@ namespace SH
 
     const FName AssetTabId = "Asset";
 	const FName GraphTabId = "Graph";
+    const FName LogTabId = "Log";
 
 	const TArray<FName> TabIds{
-		PreviewTabId, PropretyTabId, CodeTabId, AssetTabId, GraphTabId
+		PreviewTabId, PropretyTabId, CodeTabId, AssetTabId, GraphTabId, LogTabId
 	};
 
     const TArray<FName> WindowMenuTabIds{
-        PreviewTabId, PropretyTabId, AssetTabId, GraphTabId
+        PreviewTabId, PropretyTabId, AssetTabId, GraphTabId, LogTabId
     };
 
 	ShaderHelperEditor::ShaderHelperEditor(const Vector2f& InWindowSize, ShRenderer* InRenderer)
 		: Renderer(InRenderer)
 		, WindowSize(InWindowSize)
 	{
-		CurProject = &TSingleton<ShProjectManager>::Get().GetProject();
-
+		CurProject = TSingleton<ShProjectManager>::Get().GetProject();
 		ViewPort = MakeShared<PreviewViewPort>();
-		ViewPort->OnViewportResize.AddRaw(this, &ShaderHelperEditor::OnViewportResize);
-
-		InitEditorUI();
 	}
 
 	ShaderHelperEditor::~ShaderHelperEditor()
 	{
-
+		Renderer->ClearRenderComp();
+		PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		FTicker::GetCoreTicker().RemoveTicker(SaveLayoutTicker);
+		PRAGMA_ENABLE_DEPRECATION_WARNINGS
+        if(FSlateApplication::IsInitialized())
+        {
+            FSlateApplication::Get().DestroyWindowImmediately(Window.ToSharedRef());
+        }
+		
 	}
 
 	void ShaderHelperEditor::InitEditorUI()
@@ -107,6 +110,8 @@ namespace SH
 						FTabManager::NewStack()
 						->SetSizeCoefficient(0.3f)
 						->AddTab(AssetTabId, ETabState::OpenedTab)
+                        ->AddTab(LogTabId, ETabState::OpenedTab)
+                        ->SetForegroundTab(AssetTabId)
 					)
 				)
                 ->Split
@@ -133,7 +138,7 @@ namespace SH
 
 		SAssignNew(Window, SWindow)
 			.Title(TAttribute<FText>::CreateLambda([this] { 
-				FString ProjectPath = TSingleton<ShProjectManager>::Get().GetProject().GetFilePath();
+				FString ProjectPath = CurProject->GetFilePath();
 				return FText::FromString(LOCALIZATION("ShaderHelper").ToString() + FString::Printf(TEXT(" [%s]"), *ProjectPath));
 			}))
 			.ScreenPosition(UsedWindowPos)
@@ -170,14 +175,24 @@ PRAGMA_DISABLE_DEPRECATION_WARNINGS
         SaveLayoutTicker = FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this](float) {
             TabManager->SavePersistentLayout();
             CurProject->CodeTabLayout = CodeTabManager->PersistLayout();
-			TSingleton<ShProjectManager>::Get().SaveProject();
+			CurProject->Save();
             return true;
         }), 2.0f);
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		Window->SetRequestDestroyWindowOverride(FRequestDestroyWindowOverride::CreateLambda([this](const TSharedRef<SWindow>& InWindow) {
 			TabManager->SavePersistentLayout();
             CurProject->CodeTabLayout = CodeTabManager->PersistLayout();
-			TSingleton<ShProjectManager>::Get().SaveProject();
+			if (CurProject->AnyPendingAsset() && MessageDialog::Open(MessageDialog::OkCancel, Window, LOCALIZATION("SaveAssetTip")))
+			{
+				CurProject->SavePendingAssets();
+				CurProject->Save();
+			}
+			else
+			{
+				CurProject->Save();
+			}
+			auto ShApp = static_cast<ShaderHelperApp*>(GApp.Get());
+			ShApp->Launcher.Reset();
 			FSlateApplication::Get().RequestDestroyWindow(InWindow);
 		}));
 	}
@@ -226,9 +241,9 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                     [
                         SNew(SButton)
                         .ContentPadding(FMargin{})
-                        .ButtonStyle(&FShaderHelperStyle::Get().GetWidgetStyle< FButtonStyle >("SuperSimpleButton"))
+                        .ButtonStyle(&FAppCommonStyle::Get().GetWidgetStyle< FButtonStyle >("SuperSimpleButton"))
                         .Text(FText::FromString(FileName + TEXT("  ❯")))
-                        .OnClicked_Lambda([=]{
+                        .OnClicked_Lambda([RelativePathHierarchy, this]{
                             AssetBrowser->SetCurrentDisplyPath(TSingleton<ShProjectManager>::Get().ConvertRelativePathToFull(RelativePathHierarchy));
                             return FReply::Handled();
                         })
@@ -247,50 +262,30 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
             ];
     }
 
-    void ShaderHelperEditor::Update(double DeltaTime)
-    {
-        
-    }
-
     TSharedRef<SDockTab> ShaderHelperEditor::SpawnStShaderTab(const FSpawnTabArgs& Args)
     {
         FGuid StShaderGuid{Args.GetTabId().ToString()};
         FName TabId = Args.GetTabId().TabType;
         auto LoadedStShader = TSingleton<AssetManager>::Get().LoadAssetByGuid<StShader>(StShaderGuid);
-        TSharedPtr<SShaderEditorBox> ShaderEditor;
-        if(PendingStShadereTabs.Contains(LoadedStShader))
-        {
-            ShaderEditor = PendingStShadereTabs[LoadedStShader];
-            PendingStShadereTabs.Remove(LoadedStShader);
-        }
-        else
-        {
-            ShaderEditor = SNew(SShaderEditorBox).StShaderAsset(LoadedStShader.Get());
-        }
+
+        ShaderEditor = SNew(SShaderEditorBox).StShaderAsset(LoadedStShader);
         auto NewStShaderTab = SNew(SShaderTab)
             .TabRole(ETabRole::DocumentTab)
-            .Label(FText::FromString(LoadedStShader->GetFileName()))
-            .OnTabClosed_Lambda([=](TSharedRef<SDockTab> ClosedTab) {
+			.Label_Lambda([this, LoadedStShader] {
+				FString DirtyChar;
+				if (CurProject->IsPendingAsset(LoadedStShader))
+				{
+					DirtyChar = "*";
+				}
+				return FText::FromString(LoadedStShader->GetFileName() + DirtyChar);
+			})
+            .OnTabClosed_Lambda([this, LoadedStShader, TabId, Args](TSharedRef<SDockTab> ClosedTab) {
                 CurProject->OpenedStShaders.Remove(*CurProject->OpenedStShaders.FindKey(ClosedTab));
-                PendingStShadereTabs.Add(LoadedStShader, ShaderEditor);
-                auto DockTabStack = ClosedTab->GetParentDockTabStack();
-                PRAGMA_DISABLE_DEPRECATION_WARNINGS
-                //Persist the tab being closed until next frame to be able to restore the tab.
-                FDelegateHandle TickerHandle = FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([=](float) {
-                    //If the StShader tab was not restored on the last frame.
-                    if(PendingStShadereTabs.Contains(LoadedStShader))
-                    {
-                        CodeTabManager->UnregisterTabSpawner(TabId);
-                        PendingStShadereTabs.Remove(LoadedStShader);
-                        //Clear the PersistLayout when closing a StShader tab. we don't intend to restore it, so just destroy it.
-                        DockTabStack->OnTabRemoved(Args.GetTabId());
-                        TArray<TSharedRef<FTabManager::FArea>>& CollapsedDockAreas = GetPrivate_FTabManager_CollapsedDockAreas(*CodeTabManager);
-                        CollapsedDockAreas.Empty();
-                    }
-                    FTicker::GetCoreTicker().RemoveTicker(TickerHandle);
-                    return false;
-                }));
-                PRAGMA_ENABLE_DEPRECATION_WARNINGS
+				//Clear the PersistLayout when closing a StShader tab. we don't intend to restore it, so just destroy it.
+				auto DockTabStack = ClosedTab->GetParentDockTabStack();
+				DockTabStack->OnTabRemoved(Args.GetTabId());
+				TArray<TSharedRef<FTabManager::FArea>>& CollapsedDockAreas = GetPrivate_FTabManager_CollapsedDockAreas(*CodeTabManager);
+				CollapsedDockAreas.Empty();
             })
             [
                 SNew(SVerticalBox)
@@ -301,7 +296,10 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                 ]
                 +SVerticalBox::Slot()
                 [
-                    ShaderEditor.ToSharedRef()
+                    SNew(SBorder)
+                    [
+                        ShaderEditor.ToSharedRef()
+                    ]
                 ]
             ];
         
@@ -315,9 +313,9 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                 }
             }
 		}));
-        NewStShaderTab->SetOnTabActivated(SDockTab::FOnTabActivatedCallback::CreateLambda([this](TSharedRef<SDockTab> InTab, ETabActivationCause) {
+        NewStShaderTab->SetOnTabActivated(SDockTab::FOnTabActivatedCallback::CreateLambda([this, LoadedStShader](TSharedRef<SDockTab> InTab, ETabActivationCause) {
             if(!CodeTabMainArea) return;
-            
+            GetShObjectOp(LoadedStShader)->OnSelect(LoadedStShader);
             if(TSharedPtr<SDockingTabStack> TabStack = CodeTabManager->FindTabInLiveArea(FTabMatcher{InTab->GetLayoutIdentifier()}, CodeTabMainArea.ToSharedRef()))
             {
 				StShaderTabStackInsertPoint = TabStack;
@@ -332,7 +330,16 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		const FTabId& TabId = Args.GetTabId();
 		TSharedPtr<SDockTab> SpawnedTab;
 
-		if (TabId == PreviewTabId) {
+        if(TabId == LogTabId)
+        {
+            SpawnedTab = SNew(SDockTab)
+            .Label(LOCALIZATION(LogTabId.ToString()))
+            [
+                SNew(SOutputLog)
+            ];
+            SpawnedTab->SetTabIcon(FAppCommonStyle::Get().GetBrush("Icons.Log"));
+        }
+		else if (TabId == PreviewTabId) {
             SpawnedTab = SNew(SDockTab);
 			SpawnedTab->SetLabel(LOCALIZATION(PreviewTabId.ToString()));
 			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Visible"));
@@ -350,7 +357,12 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 			SpawnedTab->SetLabel(LOCALIZATION(PropretyTabId.ToString()));
 			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Info"));
 			SpawnedTab->SetContent(
-				SAssignNew(PropertyViewBox, SBox)
+                SNew(SBorder)
+                .Padding(FMargin{2,2,3,2})
+                [
+                    SAssignNew(PropertyView, SPropertyView)
+                    .ObjectData(CurPropertyObject)
+                ]
 			);
 		}
 		else if (TabId == CodeTabId) {
@@ -366,8 +378,9 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
             
             for(const auto& [OpenedStShader, _] : CurProject->OpenedStShaders)
             {
-                FName StShaderTabId{*OpenedStShader.GetGuid().ToString()};
-                CodeTabManager->RegisterTabSpawner(StShaderTabId, FOnSpawnTab::CreateRaw(this, &ShaderHelperEditor::SpawnStShaderTab));
+                FName StShaderTabId{*OpenedStShader->GetGuid().ToString()};
+				CodeTabManager->RegisterTabSpawner(
+					StShaderTabId, FOnSpawnTab::CreateRaw(this, &ShaderHelperEditor::SpawnStShaderTab));
             }
  
             if(!CurProject->CodeTabLayout)
@@ -422,11 +435,45 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		}
 		else if (TabId == GraphTabId) {
 			SAssignNew(SpawnedTab, SDockTab)
-			.Label(LOCALIZATION(GraphTabId.ToString()))
+			.Label_Lambda([this] {
+				FString DirtyChar;
+				if (CurProject->IsPendingAsset(CurProject->Graph))
+				{
+					DirtyChar = "*";
+				}
+				return FText::FromString(LOCALIZATION(GraphTabId.ToString()).ToString() + DirtyChar);
+			})
 			[
-				SNew(SGraphPanel)
+                SNew(SBorder)
+                [
+                    SNew(SOverlay)
+                    +SOverlay::Slot()
+                    [
+                        SAssignNew(GraphPanel, SGraphPanel)
+                    ]
+                    +SOverlay::Slot()
+                    .VAlign(VAlign_Top)
+                    .HAlign(HAlign_Left)
+                    .Padding(6.0f)
+                    [
+                        SNew(STextBlock)
+                        .Visibility(EVisibility::HitTestInvisible)
+                        .ColorAndOpacity(FLinearColor::White)
+                        .Font(FShaderHelperStyle::Get().GetFontStyle("CodeFont"))
+                        .ShadowOffset(FVector2D{2,2})
+                        .Text_Lambda([this] {
+                            return CurProject->Graph ? FText::FromString("> " + CurProject->Graph->GetFileName() + "." + CurProject->Graph->FileExtension()) : FText{};
+                        })
+                    ]
+                ]
+		
 			];
-			SpawnedTab->SetTabIcon(FAppCommonStyle::Get().GetBrush("Icons.Graph"));
+			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Blueprints"));
+			if (CurProject->Graph)
+			{
+				AssetOp::OpenAsset(CurProject->Graph);
+			}
+			
 		}
 		else {
 			ensure(false);
@@ -447,24 +494,36 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
         TabManager->FindExistingLiveTab(CodeTabId)->GetParentDockTabStack()->SetCanDropToAttach(false);
 	}
 
-    void ShaderHelperEditor::TryRestoreStShaderTab(AssetPtr<StShader> InStShader)
+	void ShaderHelperEditor::OpenGraph(AssetPtr<Graph> InGraphData, TSharedPtr<RenderComponent> InGraphRenderComp)
+	{
+		Renderer->UnRegisterRenderComp(GraphRenderComp.Get());
+		GraphRenderComp = InGraphRenderComp;
+		if (GraphRenderComp)
+		{
+			Renderer->RegisterRenderComp(GraphRenderComp.Get());
+		}
+
+		GraphPanel->SetGraphData(InGraphData);
+		CurProject->Graph = InGraphData;
+	}
+
+    void ShaderHelperEditor::RefreshProperty()
     {
-        if(PendingStShadereTabs.Contains(InStShader))
-        {
-            FName StShaderTabId{*InStShader->GetGuid().ToString()};
-            CodeTabManager->TryInvokeTab(StShaderTabId);
-        }
+        PropertyView->Refresh();
     }
 
-    void ShaderHelperEditor::OpenStShaderTab(AssetPtr<StShader> InStShader)
+    void ShaderHelperEditor::ShowProperty(ShObject* InObjectData)
+    {
+        CurPropertyObject = InObjectData;
+        PropertyView->SetObjectData(InObjectData);
+    }
+
+	void ShaderHelperEditor::OpenStShaderTab(AssetPtr<StShader> InStShader)
     {
         TSharedPtr<SDockTab>* TabPtr = CurProject->OpenedStShaders.Find(InStShader);
         if(TabPtr == nullptr || !*TabPtr)
         {
             FName StShaderTabId{*InStShader->GetGuid().ToString()};
-            //Register the tab spawner to restore the tab if need.
-            CodeTabManager->RegisterTabSpawner(StShaderTabId, FOnSpawnTab::CreateRaw(this, &ShaderHelperEditor::SpawnStShaderTab))
-                .SetReuseTabMethod(FOnFindTabToReuse::CreateLambda([](const FTabId&){ return nullptr; }));
             auto NewStShaderTab = SpawnStShaderTab({Window, StShaderTabId});
             if(StShaderTabStackInsertPoint.IsValid() && StShaderTabStackInsertPoint.Pin()->GetAllChildTabs().IsValidIndex(0))
             {
@@ -475,7 +534,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
             {
                 CodeTabManager->InsertNewDocumentTab(InitialInsertPointTabId, StShaderTabId, FTabManager::FRequireClosedTab{}, NewStShaderTab, true);
             }
-          
+            NewStShaderTab->ActivateInParent(ETabActivationCause::SetDirectly);
         }
         else
         {
@@ -517,7 +576,6 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 		TSharedRef<FJsonObject> RootWindowSizeJsonObject = MakeShared<FJsonObject>();
 		Vector2D CurClientSize = Window->GetClientSizeInScreen();
-		CurClientSize -= Vector2D{2, 10};
 		RootWindowSizeJsonObject->SetNumberField(TEXT("Width"), CurClientSize.X);
 		RootWindowSizeJsonObject->SetNumberField(TEXT("Height"), CurClientSize.Y);
 
@@ -537,12 +595,6 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		{
 			FFileHelper::SaveStringToFile(NewJsonContents, *WindowLayoutFileName);
 		}
-	}
-
-	void ShaderHelperEditor::OnViewportResize(const Vector2f& InSize)
-	{
-		Renderer->OnViewportResize(InSize);
-		ViewPort->SetViewPortRenderTexture(Renderer->GetFinalRT());
 	}
 
     FMenuBarBuilder ShaderHelperEditor::CreateMenuBarBuilder()
@@ -593,18 +645,32 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		if (MenuName == "File") {
 			MenuBuilder.BeginSection("Project", FText::FromString("Project"));
 			{
-				MenuBuilder.AddMenuEntry(LOCALIZATION("New"), FText::GetEmpty(), FSlateIcon(),
+				MenuBuilder.AddMenuEntry(LOCALIZATION("Project"), FText::GetEmpty(), FSlateIcon(),
 					FUIAction(
-
+							FExecuteAction::CreateLambda([this] {
+								auto ShApp = static_cast<ShaderHelperApp*>(GApp.Get());
+								ShApp->Launcher = MakeShared<ProjectLauncher<ShProject>>([this, ShApp] {
+									ShApp->AppEditor = MakeUnique<ShaderHelperEditor>(ShApp->GetClientSize(), static_cast<ShRenderer*>(ShApp->GetRenderer()));
+									static_cast<ShaderHelperEditor*>(ShApp->AppEditor.Get())->InitEditorUI();
+								});
+								ShApp->Launcher->SetBeforeLaunchFunc(FSimpleDelegate::CreateLambda([this] {
+									if (CurProject->AnyPendingAsset() && MessageDialog::Open(MessageDialog::OkCancel, Window, LOCALIZATION("SaveAssetTip")))
+									{
+										CurProject->SavePendingAssets();
+										CurProject->Save();
+									}
+									else
+									{
+										CurProject->Save();
+									}
+								}));
+							})
 					));
-				MenuBuilder.AddMenuEntry(LOCALIZATION("OpenEx"), FText::GetEmpty(), FSlateIcon(),
+				MenuBuilder.AddMenuEntry(LOCALIZATION("SaveAll"), FText::GetEmpty(), FSlateIcon(),
 					FUIAction(
-				
-					));
-				MenuBuilder.AddMenuEntry(LOCALIZATION("Save"), FText::GetEmpty(), FSlateIcon(),
-					FUIAction(
-						FExecuteAction::CreateLambda([&] { 
-							TSingleton<ShProjectManager>::Get().SaveProject();
+						FExecuteAction::CreateLambda([this] { 
+							CurProject->SavePendingAssets();
+							CurProject->Save();
 						})
 					));
 			}

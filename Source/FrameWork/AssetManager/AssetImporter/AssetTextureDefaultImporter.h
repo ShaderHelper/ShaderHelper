@@ -1,7 +1,7 @@
 #pragma once
 #include "AssetImporter.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	class AssetTextureDefaultImporter : public AssetImporter
 	{
@@ -10,7 +10,7 @@ namespace FRAMEWORK
 		TUniquePtr<AssetObject> CreateAssetObject(const FString& InFilePath) override;
 		TArray<FString> SupportFileExts() const override;
         
-        struct MetaType* SupportAsset() override;
+        MetaType* SupportAsset() override;
         
 	};
 }

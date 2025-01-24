@@ -3,7 +3,7 @@
 #include "GpuApi/GpuRhi.h"
 #include "Dx12CommandRecorder.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 class Dx12GpuRhiBackend : public GpuRhi
 {

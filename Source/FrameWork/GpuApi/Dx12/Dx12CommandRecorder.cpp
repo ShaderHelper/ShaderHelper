@@ -2,7 +2,7 @@
 #include "Dx12CommandRecorder.h"
 #include "Dx12Map.h"
 
-namespace FRAMEWORK
+namespace FW
 {	
 	Dx12StateCache::Dx12StateCache()
 		: CurrentPso(nullptr)

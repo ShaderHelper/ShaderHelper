@@ -2,7 +2,7 @@
 #include "GpuApi/GpuResource.h"
 #include "MetalCommon.h"
 
-namespace FRAMEWORK
+namespace FW
 {
     class MetalShader : public GpuShader
     {

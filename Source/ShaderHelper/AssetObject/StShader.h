@@ -1,31 +1,52 @@
 #pragma once
 #include "AssetObject/AssetObject.h"
 #include "RenderResource/UniformBuffer.h"
+#include "UI/Widgets/Property/PropertyData/PropertyData.h"
+
 
 namespace SH
 {
-	class StShader : public FRAMEWORK::AssetObject
+	class StShader : public FW::AssetObject
 	{
 		REFLECTION_TYPE(StShader)
 	public:
 		StShader();
+		~StShader();
+        
+        static FW::UniformBufferBuilder& GetBuiltInUbBuilder();
+        static FW::GpuBindGroupLayoutBuilder& GetBuiltInBindingLayoutBuilder();
 
 	public:
 		void Serialize(FArchive& Ar) override;
+        void PostLoad() override;
 		FString FileExtension() const override;
 		const FSlateBrush* GetImage() const override;
-        const FString& GetPixelShaderBody() const { return PixelShaderBody; }
-        FString GetResourceDeclaration() const;
 
-	private:
-		FString PixelShaderBody;
-        TUniquePtr<FRAMEWORK::UniformBuffer> BuiltInUniformBuffer;
+        FString GetBinding() const;
+        FString GetTemplateWithBinding() const;
+		FString GetFullShader() const;
         
-        TRefCountPtr<FRAMEWORK::GpuBindGroup> BuiltInBindGroup;
-        TRefCountPtr<FRAMEWORK::GpuBindGroupLayout> BuiltInBindGroupLayout;
-
-        TRefCountPtr<FRAMEWORK::GpuBindGroup> CustomBindGroup;
-        TRefCountPtr<FRAMEWORK::GpuBindGroupLayout> CustomBindGroupLayout;
+        TArray<TSharedRef<FW::PropertyData>>* GetPropertyDatas() override;
+        TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromBinding();
+        TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromUniform(const FW::UniformBufferBuilder& InBuilder, bool Enabled);
+        
+        template<typename UniformType>
+        void AddUniform();
+        void RefreshBuilder();
+        
+    private:
+        TSharedRef<SWidget> GetCategoryMenu();
+        
+	public:
+		FString PixelShaderBody;
+        TRefCountPtr<FW::GpuShader> VertexShader, PixelShader;
+        
+        //Custom
+        FW::UniformBufferBuilder CustomUniformBufferBuilder{FW::UniformBufferUsage::Persistant};
+        FW::GpuBindGroupLayoutBuilder CustomBindGroupLayoutBuilder{1};
+        
+        TSharedPtr<FW::PropertyCategory> CustomCategory;
+        //
 	};
 
 }

@@ -1,6 +1,6 @@
 #pragma once
 
-namespace FRAMEWORK
+namespace FW
 {
     
     class AssetViewItemDragDropOp : public FDragDropOperation
@@ -25,9 +25,8 @@ namespace FRAMEWORK
     
 	class AssetViewItem
 	{
+        MANUAL_RTTI_BASE_TYPE()
 	public:
-		MANUAL_RTTI_BASE_TYPE()
-
 		AssetViewItem(const FString& InPath) : Path(InPath) {}
 		virtual ~AssetViewItem() = default;
 		virtual TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) = 0;

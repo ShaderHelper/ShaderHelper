@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "Dx12Descriptor.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	TUniquePtr<CpuDescriptorAllocator> RtvAllocator;
@@ -12,7 +12,7 @@ namespace FRAMEWORK
 
 	void InitDescriptorAllocator()
 	{
-		RtvAllocator = MakeUnique<CpuDescriptorAllocator>(256, DescriptorType::Rtv);
+		RtvAllocator = MakeUnique<CpuDescriptorAllocator>(1024, DescriptorType::Rtv);
 		Cpu_CbvSrvUavAllocator = MakeUnique<CpuDescriptorAllocator>(1024, DescriptorType::CbvSrvUav);
 		Gpu_CbvSrvUavAllocator = MakeUnique<GpuDescriptorAllocator>(1024, DescriptorType::CbvSrvUav);
 		Cpu_SamplerAllocator = MakeUnique<CpuDescriptorAllocator>(256, DescriptorType::Sampler);
@@ -61,7 +61,8 @@ namespace FRAMEWORK
 	TUniquePtr<CpuDescriptor> CpuDescriptorAllocator::Allocate()
 	{
 		uint32 Index;
-		checkf(AllocateIndexs.Dequeue(Index), TEXT("No space left in the DescriptorAllocator."));
+		bool IsValid = AllocateIndexs.Dequeue(Index);
+		checkf(IsValid, TEXT("No space left in the DescriptorAllocator."));
 		CD3DX12_CPU_DESCRIPTOR_HANDLE CpuHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(DescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 		CpuHandle.Offset(Index, DescriptorSize);
 		return MakeUnique<CpuDescriptor>(CpuHandle, this);

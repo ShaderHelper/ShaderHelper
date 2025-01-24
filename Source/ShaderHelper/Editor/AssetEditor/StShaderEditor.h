@@ -3,16 +3,16 @@
 
 namespace SH
 {
-	class StShaderOp : public FRAMEWORK::AssetOp
+	class StShaderOp : public FW::AssetOp
 	{
 		REFLECTION_TYPE(StShaderOp)
 	public:
 		StShaderOp() = default;
 
-        struct FRAMEWORK::MetaType* SupportAsset() override;
+        FW::MetaType* SupportType() override;
+        void OnSelect(FW::ShObject* InObject) override;
 		void OnOpen(const FString& InAssetPath) override;
-        
-        //OnDelete and OnAdd will be triggered one after the other if rename or move the asset.
+       
         void OnAdd(const FString& InAssetPath) override;
         void OnDelete(const FString& InAssetPath) override;
 	};

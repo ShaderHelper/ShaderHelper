@@ -2,7 +2,7 @@
 #include "UnitTestEditor.h"
 #include "UI/Widgets/Log/SOutputLog.h"
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace UNITTEST_UTIL
 {

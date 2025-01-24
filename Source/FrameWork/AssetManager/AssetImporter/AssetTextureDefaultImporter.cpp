@@ -7,9 +7,9 @@
 #include <Misc/FileHelper.h>
 #include "AssetObject/Texture2D.h"
 
-namespace FRAMEWORK
+namespace FW
 {
-	GLOBAL_REFLECTION_REGISTER(AddClass<AssetTextureDefaultImporter>()
+    REFLECTION_REGISTER(AddClass<AssetTextureDefaultImporter>()
                                 .BaseClass<AssetImporter>()
 	)
 
@@ -39,9 +39,9 @@ namespace FRAMEWORK
 		return { "png", "jpeg", "jpg", "tga" };
 	}
 
-    MetaType* AssetTextureDefaultImporter::SupportAsset()
-    {
-        return GetMetaType<Texture2D>();
-    }
+	MetaType* AssetTextureDefaultImporter::SupportAsset()
+	{
+		return GetMetaType<Texture2D>();
+	}
 
 }

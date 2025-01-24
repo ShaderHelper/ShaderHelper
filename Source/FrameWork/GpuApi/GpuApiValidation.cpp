@@ -2,7 +2,7 @@
 #include "GpuApiValidation.h"
 #include "magic_enum.hpp"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	bool ValidateSetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)

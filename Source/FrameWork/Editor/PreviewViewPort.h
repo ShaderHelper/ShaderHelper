@@ -2,7 +2,7 @@
 #include "GpuApi/GpuResource.h"
 #include <Textures/SlateUpdatableTexture.h>
 
-namespace FRAMEWORK
+namespace FW
 {
 	DECLARE_MULTICAST_DELEGATE_OneParam(OnViewportResizeDelegate, const Vector2f&)
 

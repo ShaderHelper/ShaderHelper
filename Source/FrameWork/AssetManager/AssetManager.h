@@ -1,44 +1,12 @@
 #pragma once
 #include "AssetObject/AssetObject.h"
-#include "Common/Util/Reflection.h"
 
-namespace FRAMEWORK
+namespace FW
 {
-	template<typename T>
-	class AssetPtr
-	{
-		friend class AssetManager;
-
-		template <typename OtherType>
-		friend class AssetPtr;
-	private:
-		AssetPtr(T* InAsset);
-
-	public:
-		AssetPtr(std::nullptr_t = nullptr);
-		AssetPtr(const AssetPtr& InAssetPtr);
-
-		template<typename OtherType,
-			typename = decltype(ImplicitConv<T*>((OtherType*)nullptr))
-		>
-		AssetPtr(const AssetPtr<OtherType>& OtherAssetPtr);
-
-		AssetPtr& operator=(const AssetPtr& OtherAssetPtr);
-
-		~AssetPtr();
-
-		T* operator->() const;
-
-		T* Get() const;
-		FGuid GetGuid() const;
-        
-        explicit operator bool() const;
-
-	private:
-		T* Asset;
-	};
-
 	class GpuTexture;
+
+    template<typename T, typename = std::enable_if_t<std::is_base_of_v<AssetObject, T>>>
+    using AssetPtr = ObjectPtr<T, ObjectOwnerShip::Retain>;
 
 	class FRAMEWORK_API AssetManager
 	{
@@ -49,6 +17,10 @@ namespace FRAMEWORK
 		AssetPtr<T> LoadAssetByPath(const FString& InAssetPath)
 		{
 			static_assert(std::is_base_of_v<AssetObject, T>);
+			if (!IsValidAsset(InAssetPath))
+			{
+				return nullptr;
+			}
 
 			FGuid Guid = GetGuid(InAssetPath);
 			if (Assets.Contains(Guid))
@@ -73,6 +45,8 @@ namespace FRAMEWORK
 				}
 			}
 			check(NewAssetObject);
+            NewAssetObject->ObjectName = FText::FromString(FPaths::GetBaseFilename(InAssetPath));
+            
 			TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*InAssetPath));
             if(Ar)
             {
@@ -89,7 +63,12 @@ namespace FRAMEWORK
 		template<typename T>
 		AssetPtr<T> LoadAssetByGuid(const FGuid& InGuid)
 		{
-			return LoadAssetByPath<T>(GetPath(InGuid));
+			return IsValidAsset(InGuid) ? LoadAssetByPath<T>(GetPath(InGuid)) : nullptr;
+		}
+
+		AssetObject* FindLoadedAsset(const FGuid& Id)
+		{
+			return Assets.Contains(Id) ? Assets[Id] : nullptr;
 		}
 
 		void UpdateGuidToPath(const FString& InPath);
@@ -98,49 +77,48 @@ namespace FRAMEWORK
 		FString GetPath(const FGuid& InGuid) const;
 		FGuid GetGuid(const FString& InPath) const;
 
+		//The asset may be deleted outside
+		bool IsValidAsset(const FGuid& Id) const { return GuidToPath.Contains(Id); }
+		bool IsValidAsset(const FString& InPath) const { return GuidToPath.FindKey(InPath) != nullptr; }
+
+        void Clear();
+        void ClearAsset(const FString& InAssetPath);
+
 		void AddAssetThumbnail(const FGuid& InGuid, TRefCountPtr<GpuTexture> InThumbnail);
 		GpuTexture* FindAssetThumbnail(const FGuid& InGuid) const;
 
-		void Clear();
+        void RemoveAsset(AssetObject* InAsset);
 		TArray<FString> GetManageredExts() const;
-		
-		void AddRef(AssetObject* InAssetObject);
-		void ReleaseRef(AssetObject* InAssetObject);
-
 
 	private:
 		TMap<FGuid, FString> GuidToPath;
-		TMap<FGuid, AssetObject*> Assets;
-		TMap<AssetObject*, uint32> AssetRefCounts;
+		TMap<FGuid, AssetObject*> Assets; //Loaded asset
 		TMap<FGuid, TRefCountPtr<GpuTexture>> AssetThumbnailPool;
 	};
 
-	template<typename T>
-	FArchive& operator<<(FArchive& Ar, AssetPtr<T>& InOutAssetPtr)
-	{
-		bool IsValid = !!InOutAssetPtr;
-		Ar << IsValid;
-		if (Ar.IsLoading())
-		{
-			if (IsValid)
-			{
-				FGuid AssetGuid;
-				Ar << AssetGuid;
-				InOutAssetPtr = TSingleton<AssetManager>::Get().LoadAssetByGuid<T>(AssetGuid);
-			}
-		}
-		else
-		{
-			if (IsValid)
-			{
-				FGuid AssetGuid = InOutAssetPtr->GetGuid();;
-				Ar << AssetGuid;
-			}
-		}
-		return Ar;
-	}
-
+    template<typename T>
+    FArchive& operator<<(FArchive& Ar, AssetPtr<T>& InOutAssetPtr)
+    {
+        bool IsValid = !!InOutAssetPtr;
+        Ar << IsValid;
+        if (Ar.IsLoading())
+        {
+            if (IsValid)
+            {
+                FGuid AssetGuid;
+                Ar << AssetGuid;
+                //Maybe return a null AssetPtr because of outside deleting.
+                InOutAssetPtr = TSingleton<AssetManager>::Get().LoadAssetByGuid<T>(AssetGuid);
+            }
+        }
+        else
+        {
+            if (IsValid)
+            {
+                FGuid AssetGuid = InOutAssetPtr->GetGuid();;
+                Ar << AssetGuid;
+            }
+        }
+        return Ar;
+    }
 }
-
-//Resolve circular dependency
-#include "AssetPtr.hpp"

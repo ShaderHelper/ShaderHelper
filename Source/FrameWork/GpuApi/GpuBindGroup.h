@@ -4,7 +4,7 @@
 #include "GpuBuffer.h"
 #include "GpuBindGroupLayout.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	struct ResourceBinding
 	{

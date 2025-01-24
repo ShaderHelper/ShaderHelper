@@ -1,7 +1,7 @@
 #pragma once
 #include "AssetObject/AssetObject.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	class AssetImporter
 	{
@@ -13,6 +13,6 @@ namespace FRAMEWORK
 		virtual TUniquePtr<AssetObject> CreateAssetObject(const FString& InFilePath) = 0;
 		virtual TArray<FString> SupportFileExts() const = 0;
         
-        virtual struct MetaType* SupportAsset() = 0;
+        virtual MetaType* SupportAsset() = 0;
 	};
 }

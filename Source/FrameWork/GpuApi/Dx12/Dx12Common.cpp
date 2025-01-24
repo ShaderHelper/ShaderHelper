@@ -2,7 +2,7 @@
 #include "Dx12Common.h"
 #include "Dx12Device.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 #if GPU_API_DEBUG
 	FString GetDredInfo()
@@ -61,7 +61,9 @@ namespace FRAMEWORK
 			hr = GDevice->GetDeviceRemovedReason();
 			if (GDred)
 			{
+#if GPU_API_DEBUG
 				GetDredInfo();
+#endif
 			}
 			SH_LOG(LogDx12, Error, TEXT("DxError(%s) with reason(%s) encountered during calling %s.(%s-%u)"), *ErrorCodeText, GetErrorText(hr), ANSI_TO_TCHAR(Code), ANSI_TO_TCHAR(Filename), Line);
 		}

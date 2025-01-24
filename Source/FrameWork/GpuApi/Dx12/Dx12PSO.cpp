@@ -4,7 +4,7 @@
 #include "Dx12Device.h"
 #include "Dx12RS.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	D3D12_PRIMITIVE_TOPOLOGY_TYPE MapTopologyType(D3D_PRIMITIVE_TOPOLOGY InTopology)
 	{

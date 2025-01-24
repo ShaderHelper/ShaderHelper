@@ -3,7 +3,7 @@
 #include "GpuApi/GpuResource.h"
 #include "MetalBuffer.h"
 
-namespace FRAMEWORK
+namespace FW
 {
     
     class MetalSampler : public GpuSampler

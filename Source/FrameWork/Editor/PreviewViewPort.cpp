@@ -2,7 +2,7 @@
 #include "PreviewViewPort.h"
 #include "GpuApi/GpuRhi.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	void PreviewViewPort::SetViewPortRenderTexture(GpuTexture* InGpuTex)
 	{

@@ -1,7 +1,7 @@
 #pragma once
 #include "Dx12Common.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	inline bool GDred;

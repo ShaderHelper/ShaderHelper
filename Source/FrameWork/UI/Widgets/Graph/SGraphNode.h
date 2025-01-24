@@ -1,6 +1,7 @@
 #pragma once
+#include <Widgets/Text/SInlineEditableTextBlock.h>
 
-namespace FRAMEWORK
+namespace FW
 {
 	class SGraphNode : public SCompoundWidget
 	{
@@ -10,12 +11,26 @@ namespace FRAMEWORK
 			SLATE_ARGUMENT(class GraphNode*, NodeData)
 		SLATE_END_ARGS()
 
-		void Construct(const FArguments& InArgs);
+		void Construct(const FArguments& InArgs, class SGraphPanel* InOwnerPanel);
+		virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+		virtual FReply OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+		TSharedRef<SWidget> CreateContextMenu();
+		void OnHandleDeleteAction();
+		void OnHandleRenameAction();
+		virtual bool SupportsKeyboardFocus() const override { return true; }
+		FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
+		void AddDep(SGraphNode* InNode);
+		void RemoveDep(SGraphNode* InNode);
 
 	public:
-		Vector2D GetPosition() const;
+		class GraphNode* NodeData;
+		SGraphPanel* Owner;
+		TSharedPtr<FUICommandList> UICommandList;
+		TArray<class SGraphPin*> Pins;
 
 	private:
-		class GraphNode* NodeData;
+		TMap<SGraphNode*, int> OutDegreeDeps;
+		FVector2D MousePos;
+		TSharedPtr<SInlineEditableTextBlock> NodeTitleEditText;
 	};
 }

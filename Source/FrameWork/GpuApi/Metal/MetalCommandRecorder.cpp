@@ -3,7 +3,7 @@
 #include "MetalMap.h"
 #include "MetalDevice.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
     MtlStateCache::MtlStateCache(MTLRenderPassDescriptorPtr InRenderPassDesc)

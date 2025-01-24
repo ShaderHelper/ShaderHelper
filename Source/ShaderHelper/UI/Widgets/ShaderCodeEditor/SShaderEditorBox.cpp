@@ -11,14 +11,17 @@
 #include <Framework/Text/TextLayout.h>
 #include "ShaderCodeEditorLineHighlighter.h"
 #include "AssetObject/StShader.h"
+#include "UI/Widgets/Misc/CommonCommands.h"
 
 //No exposed methods, and too lazy to modify the source code for UE.
 STEAL_PRIVATE_MEMBER(SScrollBar, TSharedPtr<SScrollBarTrack>, Track)
 STEAL_PRIVATE_MEMBER(SMultiLineEditableText, TUniquePtr<FSlateEditableTextLayout>, EditableTextLayout)
 STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, TSharedPtr<FUICommandList>, UICommandList)
+STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, TSharedPtr<SlateEditableTextTypes::FCursorLineHighlighter>, CursorLineHighlighter)
+STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, SlateEditableTextTypes::FCursorInfo, CursorInfo)
 CALL_PRIVATE_FUNCTION(SMultiLineEditableText_OnMouseWheel, SMultiLineEditableText, OnMouseWheel,, FReply, const FGeometry&, const FPointerEvent&)
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace SH
 {
@@ -32,6 +35,11 @@ namespace SH
 	const FString FoldMarkerText = TEXT("⇿");
 	const FString ErrorMarkerText = TEXT("✘");
 	
+	SShaderEditorBox::~SShaderEditorBox()
+	{
+
+	}
+
 	void SShaderEditorBox::Construct(const FArguments& InArgs)
 	{
         CodeFontInfo = FShaderHelperStyle::Get().GetFontStyle("CodeFont");
@@ -42,12 +50,13 @@ namespace SH
 		ShaderMarshaller = MakeShared<FShaderEditorMarshaller>(this, MakeShared<HlslHighLightTokenizer>());
 		EffectMarshller = MakeShared<FShaderEditorEffectMarshaller>(this);
 
-		FText InitialShaderText = FText::FromString(StShaderAsset->GetPixelShaderBody());
+		FText InitialShaderText = FText::FromString(StShaderAsset->PixelShaderBody);
 
 		ChildSlot
 		[
 			SNew(SBorder)
-			.BorderBackgroundColor(FLinearColor::Black)
+            .BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
+            .Padding(0)
 			[
 				SNew(SGridPanel)
 				.FillColumn(0, 1.0f)
@@ -132,8 +141,6 @@ namespace SH
 		];
         
         EffectMultiLineEditableText->SetCanTick(false);
-		
-		CurEditState = EditState::Normal;
 
 		//Hook, reset the copy/cut behavior.
 		TUniquePtr<FSlateEditableTextLayout>& ShaderEditableTextLayout = GetPrivate_SMultiLineEditableText_EditableTextLayout(*ShaderMultiLineEditableText);
@@ -152,8 +159,25 @@ namespace SH
 			FExecuteAction::CreateRaw(this, &SShaderEditorBox::CutSelectedText),
 			FCanExecuteAction::CreateRaw(this, &SShaderEditorBox::CanCutSelectedText)
 		);
+        
+        UICommandList->MapAction(
+            CommonCommands::Get().Save,
+            FExecuteAction::CreateLambda([this] {
+                StShaderAsset->PixelShaderBody = CurrentShaderSource;
+                StShaderAsset->Save();
+                Compile();
+            })
+        );
 
 		FoldingArrowAnim.AddCurve(0, 0.25f, ECurveEaseFunction::Linear);
+
+		//Hook the default FCursorLineHighlighter.
+		TSharedPtr<SlateEditableTextTypes::FCursorLineHighlighter>& CursorLineHighlighter = GetPrivate_FSlateEditableTextLayout_CursorLineHighlighter(*ShaderEditableTextLayout);
+		SlateEditableTextTypes::FCursorInfo& CursorInfo = GetPrivate_FSlateEditableTextLayout_CursorInfo(*ShaderEditableTextLayout);
+		CursorLineHighlighter = CursorHightLighter::Create(&CursorInfo);
+        
+        UpdateLineNumberData();
+        Compile();
 	}
 
     FText SShaderEditorBox::GetEditStateText() const
@@ -225,7 +249,7 @@ namespace SH
 					FText::GetEmpty(),
 					FSlateIcon(),
 					FUIAction(FExecuteAction::CreateLambda(
-						[=]()
+						[this, i]()
 						{
 							CodeFontInfo.Size = i;
 							ShaderMarshaller->MakeDirty();
@@ -245,20 +269,6 @@ namespace SH
 		};
 
 		InfoBarBox->ClearChildren();
-
-		InfoBarBox->AddSlot()
-			.AutoWidth()
-			[
-				SNew(SComboButton)
-				.ComboButtonStyle(&FAppStyle::Get().GetWidgetStyle<FComboButtonStyle>("SimpleComboButton"))
-				.HasDownArrow(false)
-				.ButtonContent()
-				[
-					SNew(STextBlock)
-					.Font(InforBarFontInfo)
-					.Text(FText::FromString(TEXT("❖")))
-				]
-			];
 
 		InfoBarBox->AddSlot()
 			.AutoWidth()
@@ -306,7 +316,6 @@ namespace SH
 		InfoBarBox->AddSlot()
 			.AutoWidth()
 			.HAlign(HAlign_Right)
-			.Padding(0, 0, 5, 0)
 			[
 				SNew(SComboButton)
 				.ComboButtonStyle(&FAppStyle::Get().GetWidgetStyle<FComboButtonStyle>("SimpleComboButton"))
@@ -347,9 +356,6 @@ namespace SH
 		GenerateInfoBarBox();
 
         TSharedRef<SWidget> InfoBar = SNew(SBorder)
-        .BorderImage(FAppStyle::Get().GetBrush("WhiteBrush"))
-        .BorderBackgroundColor(FLinearColor{0.1f, 0.1f, 0.1f, 0.2f})
-        .Padding(0)
         [
 			InfoBarBox.ToSharedRef()
         ];
@@ -682,67 +688,82 @@ namespace SH
 		UpdateFoldingArrow();
 	}
 
-	bool SShaderEditorBox::OnShaderTextChanged(const FString& NewShaderSouce)
+    void SShaderEditorBox::RefreshLineNumberToErrorInfo()
+    {
+        EffectMarshller->LineNumberToErrorInfo.Reset();
+        for (const ShaderErrorInfo& ErrorInfo : ErrorInfos)
+        {
+            FString ShaderTemplateWithBinding = StShaderAsset->GetTemplateWithBinding();
+            TArray<FString> AddedLines;
+            int32 AddedLineNum = ShaderTemplateWithBinding.ParseIntoArrayLines(AddedLines, false) - 1;
+            
+            int32 ErrorInfoLineNumber = ErrorInfo.Row - AddedLineNum;
+            if (!EffectMarshller->LineNumberToErrorInfo.Contains(ErrorInfoLineNumber))
+            {
+                int32 LineIndex = GetLineIndex(ErrorInfoLineNumber);
+                FString LineText;
+                if (LineIndex != INDEX_NONE) {
+                    ShaderMultiLineEditableText->GetTextLine(LineIndex, LineText);
+                }
+
+                FString DummyText;
+                int32 LineTextNum = LineText.Len();
+                for (int32 i = 0; i < LineTextNum; i++)
+                {
+                    DummyText += LineText[i];
+                }
+
+                FString DisplayInfo = DummyText + TEXT("  ") + ErrorInfo.Info;
+                FTextRange DummyRange{ 0, DummyText.Len() };
+                FTextRange ErrorRange{ DummyText.Len(), DisplayInfo.Len() };
+
+                EffectMarshller->LineNumberToErrorInfo.Add(ErrorInfoLineNumber, { MoveTemp(DummyRange), MoveTemp(ErrorRange), MoveTemp(DisplayInfo) });
+            }
+        }
+    }
+
+    void SShaderEditorBox::Compile()
+    {
+        FString ShaderTemplateWithBinding = StShaderAsset->GetTemplateWithBinding();
+        FString FinalShaderSource = ShaderTemplateWithBinding + CurrentShaderSource;
+        
+        FString ShaderName = StShaderAsset->GetFileName();
+        StShaderAsset->PixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, MoveTemp(FinalShaderSource), ShaderName, TEXT("MainPS"));
+        FString ErrorInfo;
+        if (GGpuRhi->CrossCompileShader(StShaderAsset->PixelShader, ErrorInfo))
+        {
+            CurEditState = EditState::Normal;
+        }
+        else
+        {
+            CurEditState = EditState::Failed;
+            ErrorInfos = ParseErrorInfoFromDxc(ErrorInfo);
+            RefreshLineNumberToErrorInfo();
+        }
+
+        if (InfoBarBox.IsValid())
+        {
+            GenerateInfoBarBox();
+        }
+
+    }
+
+	void SShaderEditorBox::OnShaderTextChanged(const FString& InShaderSouce)
 	{
-		CurrentShaderSource = NewShaderSouce;
-		FString ShaderResourceDeclaration = StShaderAsset->GetResourceDeclaration();
-
-		TArray<FString> AddedLines;
-		int32 AddedLineNum = ShaderResourceDeclaration.ParseIntoArrayLines(AddedLines, false) - 1;
-
-		FString FinalShaderSource = ShaderResourceDeclaration + NewShaderSouce;
-		if (CurrentFullShaderSource == FinalShaderSource)
+		FString NewShaderSource = InShaderSouce.Replace(TEXT("\r\n"), TEXT("\n"));
+		if (NewShaderSource != StShaderAsset->PixelShaderBody)
 		{
-			return CurEditState == EditState::Normal;
+			StShaderAsset->MarkDirty();
 		}
-
-		CurrentFullShaderSource = FinalShaderSource;
-
-		TRefCountPtr<GpuShader> NewPixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, MoveTemp(FinalShaderSource), {}, TEXT("MainPS"));
-		FString ErrorInfo;
-		EffectMarshller->LineNumberToErrorInfo.Reset();
-		if (GGpuRhi->CrossCompileShader(NewPixelShader, ErrorInfo))
-		{
-			CurEditState = EditState::Normal;
-			//Renderer->UpdatePixelShader(MoveTemp(NewPixelShader));
-		}
-		else
-		{
-			CurEditState = EditState::Failed;
-			TArray<ShaderErrorInfo> ErrorInfos = ParseErrorInfoFromDxc(ErrorInfo);
-			for (const ShaderErrorInfo& ErrorInfo : ErrorInfos)
-			{
-				int32 ErrorInfoLineNumber = ErrorInfo.Row - AddedLineNum;
-				if (!EffectMarshller->LineNumberToErrorInfo.Contains(ErrorInfoLineNumber))
-				{
-					int32 LineIndex = GetLineIndex(ErrorInfoLineNumber);
-					FString LineText;
-					if (LineIndex != INDEX_NONE) {
-						ShaderMultiLineEditableText->GetTextLine(LineIndex, LineText);
-					}
-
-					FString DummyText;
-					int32 LineTextNum = LineText.Len();
-					for (int32 i = 0; i < LineTextNum; i++)
-					{
-						DummyText += LineText[i];
-					}
-
-					FString DisplayInfo = DummyText + TEXT("    ■ ") + ErrorInfo.Info;
-					FTextRange DummyRange{ 0, DummyText.Len() };
-					FTextRange ErrorRange{ DummyText.Len(), DisplayInfo.Len() };
-
-					EffectMarshller->LineNumberToErrorInfo.Add(ErrorInfoLineNumber, { MoveTemp(DummyRange), MoveTemp(ErrorRange), MoveTemp(DisplayInfo) });
-				}
-			}
-		}
-
-		if (InfoBarBox.IsValid())
-		{
-			GenerateInfoBarBox();
-		}
-
-		return CurEditState == EditState::Normal;
+        
+        if(CurrentShaderSource != NewShaderSource)
+        {
+            CurrentShaderSource = NewShaderSource;
+            
+            //TODO: directly go through dxc frontend?
+            EffectMarshller->LineNumberToErrorInfo.Reset();
+            ErrorInfos.Empty();
+        }
 	}
 
 	static int32 GetNumSpacesAtStartOfLine(const FString& InLine)
@@ -1148,7 +1169,7 @@ namespace SH
 				TextAfterUnfolding += LINE_TERMINATOR;
 			}
 		}
-	
+        RefreshLineNumberToErrorInfo();
 		return TextAfterUnfolding;
 	}
 
@@ -1269,7 +1290,7 @@ namespace SH
 			ShaderMarshaller->MakeDirty();
 			RemoveFoldMarker(LineIndex);
 		}
-
+        RefreshLineNumberToErrorInfo();
 		return FReply::Handled();
 	}
 

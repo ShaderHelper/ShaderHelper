@@ -5,8 +5,11 @@
 #include <Styling/StyleColors.h>
 #include "UI/Widgets/Misc/CommonTableRow.h"
 #include "AssetViewItem/AssetViewItem.h"
+#include "ProjectManager/ProjectManager.h"
+#include "UI/Widgets/MessageDialog/SMessageDialog.h"
+#include "App/App.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	void SDirectoryTree::Construct(const FArguments& InArgs)
 	{
@@ -84,9 +87,22 @@ namespace FRAMEWORK
     FReply SDirectoryTree::HandleOnDrop(const FDragDropEvent& DragDropEvent, FString DropTargetPath)
     {
         TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
-        FString DropFilePath = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Path;
-        FString NewFilePath = DropTargetPath / FPaths::GetCleanFilename(DropFilePath);
-        IFileManager::Get().Move(*NewFilePath, *DropFilePath);
+        if(DragDropOp->IsOfType<AssetViewItemDragDropOp>())
+        {
+            FString DropFilePath = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Path;
+
+            bool CanDo = true;
+            if (GProject->IsPendingAsset(DropFilePath))
+            {
+                CanDo = MessageDialog::Open(MessageDialog::OkCancel, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("OpPendingAssetTip"));
+            }
+
+            if (CanDo)
+            {
+                FString NewFilePath = DropTargetPath / FPaths::GetCleanFilename(DropFilePath);
+                IFileManager::Get().Move(*NewFilePath, *DropFilePath);
+            }
+        }
         return FReply::Handled();
     }
 
@@ -105,7 +121,7 @@ namespace FRAMEWORK
             .Style(&FAppCommonStyle::Get().GetWidgetStyle<FTableRowStyle>("DirectoryTreeView.Row"))
             .OnDrop_Raw(this, &SDirectoryTree::HandleOnDrop, InTreeNode->DirectoryPath);
         
-        Row->SetDragFilter([=](const TSharedPtr<FDragDropOperation>& Operation){
+        Row->SetDragFilter([InTreeNode](const TSharedPtr<FDragDropOperation>& Operation){
             if(Operation.IsValid())
             {
                 if(Operation->IsOfType<AssetViewItemDragDropOp>())
@@ -134,7 +150,7 @@ namespace FRAMEWORK
             [
                 SNew(SImage)
                 .DesiredSizeOverride(FVector2D(10.0f, 10.0f))
-                .Image_Lambda([=]() {
+                .Image_Lambda([this, InTreeNode]() {
                         if (DirectoryTree->IsItemExpanded(InTreeNode))
                         {
                             return FAppStyle::Get().GetBrush("Icons.FolderOpen");

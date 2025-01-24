@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "RenderGraph.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	RenderGraph::RenderGraph()

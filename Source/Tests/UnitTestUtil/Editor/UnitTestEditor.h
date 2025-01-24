@@ -4,17 +4,17 @@
 namespace UNITTEST_UTIL 
 {
 
-	class UnitTestEditor : public FRAMEWORK::Editor
+	class UnitTestEditor : public FW::Editor
 	{
 	public:
-		UnitTestEditor(const FRAMEWORK::Vector2f& InWindowSize);
+		UnitTestEditor(const FW::Vector2f& InWindowSize);
 		virtual ~UnitTestEditor();
 
 	private:
 		void InitLogWindow();
 
 	private:
-        FRAMEWORK::Vector2f WindowSize;
+        FW::Vector2f WindowSize;
 	};
 
 }

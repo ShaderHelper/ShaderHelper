@@ -8,7 +8,7 @@
 #define RootToContentDir Style->RootToContentDir
 #define TTF_FONT( RelativePath, ... ) FSlateFontInfo(RootToContentDir( RelativePath, TEXT(".ttf") ), __VA_ARGS__ )
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace SH {
 
@@ -28,11 +28,6 @@ namespace SH {
         Style->Set("AssetBrowser.Shader", new IMAGE_BRUSH_SVG("Shader", FVector2D(64.0, 64.0)));
         
 		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir);
-        
-        FButtonStyle SuperSimpleButton = FButtonStyle(FAppStyle::Get().GetWidgetStyle<FButtonStyle>("SimpleButton"))
-            .SetPressed(FSlateNoResource())
-            .SetHovered(FSlateNoResource());
-        Style->Set("SuperSimpleButton", SuperSimpleButton);
 
 		FTableRowStyle LineNumberItemStyle;
 		LineNumberItemStyle.SetEvenRowBackgroundBrush(FSlateNoResource());

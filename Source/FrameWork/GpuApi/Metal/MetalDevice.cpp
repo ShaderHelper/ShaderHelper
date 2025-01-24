@@ -2,7 +2,7 @@
 #include "MetalDevice.h"
 #include "GpuApi/GpuFeature.h"
 
-namespace FRAMEWORK
+namespace FW
 {
     void InitMetalCore()
     {

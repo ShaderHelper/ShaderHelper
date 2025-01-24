@@ -1,7 +1,7 @@
 #pragma once
 #include "AssetObject.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	class Texture2D : public AssetObject
 	{

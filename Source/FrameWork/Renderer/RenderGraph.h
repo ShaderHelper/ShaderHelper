@@ -1,7 +1,7 @@
 #pragma once
 #include "GpuApi/GpuRhi.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	//TODO
 
@@ -25,7 +25,7 @@ namespace FRAMEWORK
 		RenderPassExecution Execution;
 	};
 
-	class RenderGraph
+	class FRAMEWORK_API RenderGraph : FNoncopyable
 	{
 	public:
 		RenderGraph();

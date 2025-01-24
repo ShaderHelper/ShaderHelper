@@ -8,8 +8,10 @@
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #endif
 
-namespace FRAMEWORK
+namespace FW
 {
+	int GProjectVer;
+	Project* GProject;
 
 	void AddProjectAssociation()
 	{
@@ -40,6 +42,38 @@ namespace FRAMEWORK
 #elif PLATFORM_MAC
         OSStatus Stat = LSSetDefaultRoleHandlerForContentType(CFSTR("com.shaderhelper.shprj"), kLSRolesAll, CFSTR("com.shaderhelper.app"));
 #endif
+	}
+
+	void Project::Save()
+	{
+		SaveAs(Path);
+	}
+
+    bool Project::AnyPendingAsset() const
+    {
+        for(auto Asset : PendingAssets)
+        {
+            if(Asset.IsValid()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+	void Project::SavePendingAssets()
+	{
+		TArray<ObserverObjectPtr<AssetObject>> Temp = PendingAssets;
+		for (auto Asset : Temp)
+		{
+            if(Asset.IsValid())
+            {
+                Asset->Save();
+            }
+			else
+            {
+                RemovePendingAsset(Asset);
+            }
+		}
 	}
 
 }

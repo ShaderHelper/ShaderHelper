@@ -2,7 +2,7 @@
 #include "SLogWidget.h"
 #include "UI/Styles/FAppCommonStyle.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	FLogWidgetMarshaller::FLogWidgetMarshaller()
 		:TextLayout(nullptr)

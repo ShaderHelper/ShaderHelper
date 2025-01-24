@@ -6,12 +6,12 @@ int main(int argc, char *argv[])
 {
 	auto RunBlock = [](const TCHAR* CommandLine)
 	{
-        FRAMEWORK::GApp = MakeUnique<UNITTEST_UTIL::UnitTestApp>(
+        FW::GApp = MakeUnique<UNITTEST_UTIL::UnitTestApp>(
             FVector2D{ 800, 600 },
             CommandLine
         );
-        FRAMEWORK::GApp->Run();
-        FRAMEWORK::GApp.Reset();
+        FW::GApp->Run();
+        FW::GApp.Reset();
 	};
 	[MacLaunch launch : argc argv : argv runBlock : RunBlock] ;
 	return 0;

@@ -2,7 +2,7 @@
 #include "MetalCommon.h"
 #include "GpuApi/GpuResource.h"
 
-namespace FRAMEWORK
+namespace FW
 {
     class MetalRenderPipelineState : public GpuPipelineState
     {

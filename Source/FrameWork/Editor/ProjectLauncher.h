@@ -7,7 +7,7 @@
 #include "ProjectManager/ProjectManager.h"
 #include "Editor.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	template<typename T>
 	class ProjectLauncher : Editor
@@ -17,18 +17,18 @@ namespace FRAMEWORK
 		{
 			AddProjectAssociation();
 
-			const float space = 4.0f;
+			constexpr float Space = 4.0f;
 			TSharedRef<SVerticalBox> LeftContent =
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot()
-				.Padding(0.0f, 0.0f, 0.0f, space)
+				.Padding(0.0f, 0.0f, 0.0f, Space)
 				.HAlign(HAlign_Left)
 				.VAlign(VAlign_Center)
 				[
 					SNew(STextBlock).Text(LOCALIZATION("ProjectName"))
 				]
 				+ SVerticalBox::Slot()
-				.Padding(0.0f, 0.0f, 0.0f, space)
+				.Padding(0.0f, 0.0f, 0.0f, Space)
 				.VAlign(VAlign_Center)
 				[
 					SNew(SEditableTextBox).Text(FText::FromString(ProjectName))
@@ -37,7 +37,7 @@ namespace FRAMEWORK
 					})
 				]
 				+ SVerticalBox::Slot()
-				.Padding(0.0f, 0.0f, 0.0f, space)
+				.Padding(0.0f, 0.0f, 0.0f, Space)
 				.VAlign(VAlign_Center)
 				[
 					SNew(SHorizontalBox)
@@ -66,7 +66,7 @@ namespace FRAMEWORK
 					]
 				]
 				+ SVerticalBox::Slot()
-				.Padding(0.0f, 0.0f, 0.0f, space)
+				.Padding(0.0f, 0.0f, 0.0f, Space)
 				[
 					SNew(SEditableTextBox).Text_Lambda([this] { return FText::FromString(ProjectDir); })
 					.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
@@ -83,10 +83,11 @@ namespace FRAMEWORK
 							FString NewProjectPath = ProjectDir / ProjectName;
 							if (IFileManager::Get().DirectoryExists(*NewProjectPath))
 							{
-								MessageDialog::Open(MessageDialog::Ok, FText::FromString("The project path already exists."));
+								MessageDialog::Open(MessageDialog::Ok, Window, FText::FromString("The project path already exists."));
 							}
 							else
 							{
+								BeforeLaunchDelegate.ExecuteIfBound();
 								TSingleton<ProjectManager<T>>::Get().NewProject(ProjectName, ProjectDir);
 								LaunchProjectFunc();
 								Window->RequestDestroyWindow();
@@ -96,19 +97,19 @@ namespace FRAMEWORK
 				];
 			
 
-			TSharedRef<SVerticalBox> RightContent =
+			RightContent =
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot()
-				.Padding(0.0f, 0.0f, 0.0f, space)
+				.Padding(0.0f, 0.0f, 0.0f, Space)
 				.HAlign(HAlign_Left)
 				.VAlign(VAlign_Center)
 				[
 					SNew(STextBlock).Text(LOCALIZATION("RecentProjects"))
 				];
 
-			auto InsertDummy = [=](int32 SlotIndex = -1) {
+			auto InsertDummy = [this, Space](int32 SlotIndex = -1) {
 				RightContent->InsertSlot(SlotIndex)
-					.Padding(0.0f, 0.0f, 0.0f, space)
+					.Padding(0.0f, 0.0f, 0.0f, Space)
 					.HAlign(HAlign_Left)
 					.VAlign(VAlign_Center)
 					[
@@ -132,16 +133,18 @@ namespace FRAMEWORK
 						.Icon(FAppStyle::Get().GetBrush("AppIcon.Small"))
 						.IconSize(FVector2D{ 16,16 });
 
-					RecentProjcetButton->SetOnClicked(FOnClicked::CreateLambda([=, RecentProjcetButton = TWeakPtr<SIconButton>{ RecentProjcetButton }] {
+					RecentProjcetButton->SetOnClicked(FOnClicked::CreateLambda(
+						[RecentProjcetButton = TWeakPtr<SIconButton>{ RecentProjcetButton }, RecentProjcetPath, InsertDummy, this] {
 							if (IFileManager::Get().FileExists(*RecentProjcetPath))
 							{
+								BeforeLaunchDelegate.ExecuteIfBound();
 								TSingleton<ProjectManager<T>>::Get().OpenProject(RecentProjcetPath);
 								LaunchProjectFunc();
 								Window->RequestDestroyWindow();
 							}
 							else
 							{
-								MessageDialog::Open(MessageDialog::Ok, FText::FromString("The project file does not exist."));
+								MessageDialog::Open(MessageDialog::Ok, Window, FText::FromString("The project file does not exist."));
 								TSingleton<ProjectManager<T>>::Get().RemoveFromProjMgmt(RecentProjcetPath);
 								InsertDummy(RightContent->NumSlots() - 1);
 								RightContent->RemoveSlot(RecentProjcetButton.Pin().ToSharedRef());
@@ -149,7 +152,7 @@ namespace FRAMEWORK
 							return FReply::Handled();
 						}));
 					RightContent->AddSlot()
-						.Padding(0.0f, 0.0f, 0.0f, space)
+						.Padding(0.0f, 0.0f, 0.0f, Space)
 						.HAlign(HAlign_Left)
 						.VAlign(VAlign_Center)
 						[
@@ -177,6 +180,7 @@ namespace FRAMEWORK
 							{
 								if (OpenedFileNames.Num() > 0)
 								{
+									BeforeLaunchDelegate.ExecuteIfBound();
 									CacheOpenProjectDir = FPaths::GetPath(OpenedFileNames[0]);
 									TSingleton<ProjectManager<T>>::Get().OpenProject(FPaths::ConvertRelativePathToFull(OpenedFileNames[0]));
 									LaunchProjectFunc();
@@ -190,7 +194,10 @@ namespace FRAMEWORK
 
 			SAssignNew(Window, SWindow)
 				.Title(FText::FromString("Launcher"))
+                .SupportsMinimize(false)
 				.CreateTitleBar(false)
+                .SupportsMaximize(false)
+                .HasCloseButton(false)
 				.SizingRule(ESizingRule::Autosized)
 				.bDragAnywhere(true)
 			[
@@ -217,9 +224,9 @@ namespace FRAMEWORK
 					[
 						SNew(SButton)
 							.ButtonStyle(&FAppCommonStyle::Get().GetWidgetStyle< FButtonStyle >("CloseButton"))
-							.OnClicked_Lambda([=] {
-							Window->RequestDestroyWindow();
-							return FReply::Handled();
+							.OnClicked_Lambda([this] {
+								Window->RequestDestroyWindow();
+								return FReply::Handled();
 							})
 					]
 				]
@@ -239,18 +246,34 @@ namespace FRAMEWORK
 						.Padding(25.0f,0,0,0)
 						[
 
-							RightContent
+							RightContent.ToSharedRef()
 						]
 					]
 				]
 			];
+
 			FSlateApplication::Get().AddWindow(Window.ToSharedRef());
 		}
 
+		~ProjectLauncher()
+		{
+			if (Window.IsValid())
+			{
+				FSlateApplication::Get().DestroyWindowImmediately(Window.ToSharedRef());
+			}
+		}
+
+	public:
+		void SetBeforeLaunchFunc(FSimpleDelegate InBeforeLaunchDelegate)
+		{
+			BeforeLaunchDelegate = MoveTemp(InBeforeLaunchDelegate);
+		}
+
 	private:
+		FSimpleDelegate BeforeLaunchDelegate;
 		TFunction<void()> LaunchProjectFunc;
 		TSharedPtr<SWindow> Window;
-
+		TSharedPtr<SVerticalBox> RightContent;
 		FString ProjectName = "Project1";
 		FString ProjectDir = PathHelper::WorkspaceDir() / "Projects";
 		FString CacheSelectDir = PathHelper::WorkspaceDir();

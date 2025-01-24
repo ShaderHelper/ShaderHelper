@@ -13,7 +13,7 @@
 #include <HAL/PlatformOutputDevices.h>
 #include <Misc/OutputDeviceFile.h>
 
-namespace FRAMEWORK {
+namespace FW {
 	TUniquePtr<App> GApp;
 
 	static void UE_Init(const TCHAR* CommandLine)
@@ -55,10 +55,10 @@ namespace FRAMEWORK {
 		FPlatformApplicationMisc::PostInit();
 
 		//This project uses slate as UI framework, so we need to initialize it.
-		SetSlateFontPath(FRAMEWORK::BaseResourcePath::UE_SlateFontDir);
-		FSlateApplication::SetCoreStylePath(FRAMEWORK::BaseResourcePath::UE_CoreStyleDir);
-		FSlateApplication::InitializeAsStandaloneApplication(GetStandardStandaloneRenderer(FRAMEWORK::BaseResourcePath::UE_StandaloneRenderShaderDir));
-
+		SetSlateFontPath(FW::BaseResourcePath::UE_SlateFontDir);
+		FSlateApplication::SetCoreStylePath(FW::BaseResourcePath::UE_CoreStyleDir);
+		FSlateApplication::InitializeAsStandaloneApplication(GetStandardStandaloneRenderer(FW::BaseResourcePath::UE_StandaloneRenderShaderDir));
+	
 	}
 	
 	static void UE_ShutDown()
@@ -78,10 +78,21 @@ namespace FRAMEWORK {
 		}
 	}
 
-	App::App(const Vector2D& InClientSize, const TCHAR* CommandLine)
-		: AppClientSize(InClientSize)
+	App::App(const Vector2D& InClientSize, const TCHAR* InCommandLine)
+		: AppClientSize(InClientSize), CommandLine(InCommandLine)
 	{
-		UE_Init(CommandLine);
+	
+	}
+
+	App::~App()
+	{
+		UE_ShutDown();
+	}
+
+
+	void App::Init()
+	{
+		UE_Init(*CommandLine);
 
 		// Create Rhi backend.
 		GpuRhiConfig Config;
@@ -90,7 +101,7 @@ namespace FRAMEWORK {
 
 		if (FParse::Param(FCommandLine::Get(), TEXT("disableValidation"))) {
 			Config.EnableValidationCheck = false;
-		}
+	}
 		FString BackendName;
 		if (FParse::Value(FCommandLine::Get(), TEXT("backend="), BackendName)) {
 			if (BackendName.Equals(TEXT("Vulkan"))) {
@@ -111,15 +122,12 @@ namespace FRAMEWORK {
 		}
 		GpuRhi::InitGpuRhi(Config);
 		GGpuRhi->InitApiEnv();
-	}
-
-	App::~App()
-	{
-		UE_ShutDown();
-	}
+}
 
 	void App::Run()
 	{
+		Init();
+
 		double CurrentRealTime = FPlatformTime::Seconds();
 		double LastRealTime = CurrentRealTime;
 		while (!IsEngineExitRequested()) {
@@ -199,5 +207,4 @@ PRAGMA_DISABLE_DEPRECATION_WARNINGS
             AppRenderer->Render();
         }
 	}
-
 }

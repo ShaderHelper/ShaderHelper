@@ -13,7 +13,7 @@
 #include "MetalTexture.h"
 #include "Common/Path/PathHelper.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 MetalGpuRhiBackend::MetalGpuRhiBackend() { GMtlGpuRhi = this; }
 
@@ -29,6 +29,7 @@ void MetalGpuRhiBackend::WaitGpu()
     if(LastSubmittedCmdRecorder)
     {
         LastSubmittedCmdRecorder->GetCommandBuffer()->waitUntilCompleted();
+        LastSubmittedCmdRecorder = nullptr;
     }
 }
 
@@ -218,6 +219,7 @@ void *MetalGpuRhiBackend::GetSharedHandle(GpuTexture *InGpuTexture)
 
 GpuCmdRecorder* MetalGpuRhiBackend::BeginRecording(const FString& RecorderName)
 {
+	//mtl commandbuffer is transient(lightweight) and do not support reuse, so create new one per request.
     MTLCommandBufferPtr Cb = NS::RetainPtr(GCommandQueue->commandBuffer());
     if(!RecorderName.IsEmpty())
     {

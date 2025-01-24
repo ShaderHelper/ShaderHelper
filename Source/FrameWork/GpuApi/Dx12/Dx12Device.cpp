@@ -3,7 +3,7 @@
 #include <dxgidebug.h>
 #include "GpuApi/GpuFeature.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	static D3D_SHADER_MODEL GetMaxShaderModel(ID3D12Device* InDevice)
 	{
@@ -120,7 +120,7 @@ namespace FRAMEWORK
 
 		DxCheck(CreateDXGIFactory2(bEnableDebugLayer ? DXGI_CREATE_FACTORY_DEBUG : 0, IID_PPV_ARGS(&GDxgiFactory)));
 #else
-		DxCheck(CreateDXGIFactory2(0, IID_PPV_ARGS(GDxgiFactory.GetInitReference())));
+		DxCheck(CreateDXGIFactory2(0, IID_PPV_ARGS(&GDxgiFactory)));
 #endif
 
 		GDxgiFactory->EnumAdapters1(0, &Adapter);

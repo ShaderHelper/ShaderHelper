@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "Singleton.h"
 
-namespace FRAMEWORK
+namespace FW
 {
     TMap<FString, FLazySingleton*>& GetSharedInstanceMap(const FString& TypeName) {
         static TMap<FString, FLazySingleton*> SharedInstanceMap;

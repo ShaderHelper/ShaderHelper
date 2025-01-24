@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "PathHelper.h"
 
-namespace FRAMEWORK {
+namespace FW {
 
 	FString PathHelper::WorkspaceDir()
 	{

@@ -5,25 +5,36 @@
 #include <Styling/StyleColors.h>
 #include "UI/Widgets/Misc/CommonTableRow.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
+#include "ProjectManager/ProjectManager.h"
+#include "App/App.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
     FReply AssetViewFolderItem::HandleOnDragDetected(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
     {
-        if(MouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton))
-        {
-            return FReply::Handled().BeginDragDrop(AssetViewItemDragDropOp::New(Path));
-        }
-        return FReply::Unhandled();
+        return FReply::Handled().BeginDragDrop(AssetViewItemDragDropOp::New(Path));
     }
 
     FReply AssetViewFolderItem::HandleOnDrop(const FDragDropEvent& DragDropEvent)
     {
         TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
-        FString DropFilePath = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Path;
-        FString NewFilePath = Path / FPaths::GetCleanFilename(DropFilePath);
-        IFileManager::Get().Move(*NewFilePath, *DropFilePath);
+        if(DragDropOp->IsOfType<AssetViewItemDragDropOp>())
+        {
+            FString DropFilePath = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Path;
+
+            bool CanDo = true;
+            if (GProject->IsPendingAsset(DropFilePath))
+            {
+                CanDo = MessageDialog::Open(MessageDialog::OkCancel, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("OpPendingAssetTip"));
+            }
+
+            if (CanDo)
+            {
+                FString NewFilePath = Path / FPaths::GetCleanFilename(DropFilePath);
+                IFileManager::Get().Move(*NewFilePath, *DropFilePath);
+            }
+        }
         return FReply::Handled();
     }
 
@@ -89,7 +100,7 @@ namespace FRAMEWORK
                         {
                             if(IFileManager::Get().DirectoryExists(*NewFolderPath))
                             {
-                                MessageDialog::Open(MessageDialog::Ok, LOCALIZATION("AssetRenameFailure"));
+                                MessageDialog::Open(MessageDialog::Ok, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("AssetRenameFailure"));
                             }
                             else
                             {

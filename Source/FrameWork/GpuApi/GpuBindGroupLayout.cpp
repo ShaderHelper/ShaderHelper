@@ -2,7 +2,7 @@
 #include "GpuBindGroupLayout.h"
 #include "GpuRhi.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	
 	GpuBindGroupLayoutBuilder::GpuBindGroupLayoutBuilder(BindingGroupSlot InGroupSlot)

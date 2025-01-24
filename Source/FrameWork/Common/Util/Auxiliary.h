@@ -4,7 +4,7 @@
 #include <array>
 #include <algorithm>
 #include <cstring>
-namespace FRAMEWORK
+namespace FW
 {
 namespace AUX
 {
@@ -273,18 +273,6 @@ namespace AUX
         return std::addressof(Val);
     }
 
-    //For strict-aliasing rule
-    template<typename To, typename From>
-    To BitCast(const From& src) {
-        static_assert(sizeof(To) == sizeof(From), "sizeof(To) != sizeof(From)");
-        static_assert(std::is_trivially_copyable_v<To>, "Destination type is not trivially copyable");
-        static_assert(std::is_trivially_copyable_v<From>, "Source type is not trivially copyable");
-        
-        To dst;
-        std::memcpy(&dst, &src, sizeof(To));
-        return dst;
-    }
-
     template<ESPMode Mode = ESPMode::ThreadSafe, typename T, typename D>
     TSharedPtr<T, Mode> TransOwnerShip(TUniquePtr<T, D>&& InUniquePtr) {
         return TSharedPtr<T, Mode>(InUniquePtr.Release());
@@ -302,9 +290,9 @@ namespace AUX
 	}
     
 	template<typename T>
-	struct TraitFuncTypeFromFuncPtr;
+	struct TraitMemberTypeFromMemberPtr;
 	template<typename FuncType, typename C>
-	struct TraitFuncTypeFromFuncPtr<FuncType C::*> { using Type = FuncType; };
+	struct TraitMemberTypeFromMemberPtr<FuncType C::*> { using Type = FuncType; };
 
 	template<typename Ret, typename... ParamType>
 	struct TraitRetAndParamTypeFromFuncTypeBase { using Type = std::tuple<Ret, ParamType...>; };
@@ -325,7 +313,7 @@ namespace AUX
 	using TraitRetFromRetAndParamTypeList_T = typename TraitRetFromRetAndParamTypeList<RetAndParamTypeList>::Type;
 
 	template<typename Func>
-	using TraitFuncTypeFromFunctor_T = typename TraitFuncTypeFromFuncPtr<decltype(&Func::operator())>::Type;
+	using TraitFuncTypeFromFunctor_T = typename TraitMemberTypeFromMemberPtr<decltype(&Func::operator())>::Type;
 
 	template<typename Func, typename RetAndParamTypeList>
 	struct FunctorExt;
@@ -447,20 +435,25 @@ namespace AUX
 		RunTimeConvCall(const F* InLamb)
 			:Lamb(InLamb) {}
 
+		template<int... Indexes>
+		Ret CallImpl(TIntegerSequence<int, Indexes...>)
+		{
+			return (*Lamb)(std::get<Indexes>(Params)...);
+		}
+
 		Ret Call() override
 		{
-			if constexpr(!std::is_same_v<Ret, void>)
+			ON_SCOPE_EXIT
 			{
-				Ret Result = (*Lamb)(std::get<ParamTypes>(Params)...);
 				Lamb = nullptr;
-				return Result;
-			}
+			};
+			return CallImpl(TMakeIntegerSequence<int, sizeof...(ParamTypes)>{});
 		}
 		~RunTimeConvCall()
 		{
 			if (Lamb)
 			{
-				(*Lamb)(std::get<ParamTypes>(Params)...);
+				CallImpl(TMakeIntegerSequence<int, sizeof...(ParamTypes)>{});
 			}
 		}
 		const F* Lamb;
@@ -521,7 +514,7 @@ namespace AUX
 			{
 				//std::integral_constant: Lambda does not support non-type template parameter until c++20.
 				using FuncPtr = decltype(&Func::template operator()<ResultTypes..., std::integral_constant<VarType, Cur>>);
-				using RetAndParamTypeList = TraitRetAndParamTypeFromFuncType_T<typename TraitFuncTypeFromFuncPtr<FuncPtr>::Type>;
+				using RetAndParamTypeList = TraitRetAndParamTypeFromFuncType_T<typename TraitMemberTypeFromMemberPtr<FuncPtr>::Type>;
 				using Ret = TraitRetFromRetAndParamTypeList_T<RetAndParamTypeList>;
 				//Erasure param types to make the same return type.
 				RunTimeConvCallBase<Func, Ret>* CallPtr = new RunTimeConvCall<Func, RetAndParamTypeList>{ &Lamb };
@@ -619,4 +612,4 @@ namespace AUX
 
 
 } // end AUX namespace
-} // end FRAMEWORK namespace
+} // end FW namespace

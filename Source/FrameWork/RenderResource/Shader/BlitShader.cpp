@@ -4,7 +4,7 @@
 #include <Misc/FileHelper.h>
 #include "Common/Path/PathHelper.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	BlitShader::BlitShader()

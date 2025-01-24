@@ -1,6 +1,6 @@
 #pragma once
 
-namespace FRAMEWORK::MessageDialog
+namespace FW::MessageDialog
 {
 	enum MessageType
 	{
@@ -8,6 +8,6 @@ namespace FRAMEWORK::MessageDialog
 		OkCancel,
 	};
 
-	FRAMEWORK_API bool Open(MessageType MsgType, const TAttribute<FText>& InMessage);
+	FRAMEWORK_API bool Open(MessageType MsgType, TSharedPtr<SWindow> Parent, const TAttribute<FText>& InMessage);
 	
 }

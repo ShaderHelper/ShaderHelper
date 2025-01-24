@@ -3,9 +3,12 @@
 #include <Serialization/JsonSerializer.h>
 #include "Common/Path/PathHelper.h"
 #include <Misc/FileHelper.h>
-namespace FRAMEWORK
+namespace FW
 {
-	class Project
+	FRAMEWORK_API extern int GProjectVer;
+	FRAMEWORK_API extern class Project* GProject;
+
+	class FRAMEWORK_API Project
 	{
 	public:
 		Project(FString InPath) : Path(MoveTemp(InPath)) 
@@ -13,15 +16,30 @@ namespace FRAMEWORK
 		virtual ~Project() = default;
 
 		virtual void Open(const FString& ProjectPath) = 0;
-		virtual void Save() = 0;
-		virtual void Save(const FString& InPath) = 0;
+		virtual void SaveAs(const FString& InPath) = 0;
+		virtual void Save();
+		virtual void SavePendingAssets();
+		virtual void Serialize(FArchive& Ar)
+		{
+			Ar << GProjectVer;
+		}
+		void AddPendingAsset(AssetObject* InAsset) { PendingAssets.AddUnique(InAsset); }
+		void RemovePendingAsset(AssetObject* InAsset) { if(PendingAssets.Contains(InAsset)) PendingAssets.Remove(InAsset);}
 
+		bool IsPendingAsset(AssetObject* InAsset) const { return PendingAssets.Contains(InAsset); }
+		bool IsPendingAsset(const FString& InPath) {
+			return PendingAssets.ContainsByPredicate([InPath](const AssetObject* Element) {
+				return Element->GetPath() == InPath;
+			});
+		}
+        bool AnyPendingAsset() const;
 		const FString& GetFilePath() const
 		{
 			return Path;
 		}
 
 	protected:
+		TArray<ObserverObjectPtr<AssetObject>> PendingAssets;
 		FString Path;
 	};
 
@@ -54,15 +72,19 @@ namespace FRAMEWORK
 			IFileManager::Get().MakeDirectory(*(ProjectDir / ProjectName), true);
 			IFileManager::Get().MakeDirectory(*(ProjectDir / ProjectName / "Content"), true);
 			FString ProjectPath = ProjectDir / ProjectName / ProjectName + ".shprj";
-			ActiveProject = MakeUnique<ProjectDataType>(ProjectPath);
+			ActiveProject = MakeShared<ProjectDataType>(ProjectPath);
+			GProject = ActiveProject.Get();
+
 			AddToProjMgmt(ProjectPath);
-			SaveProject(MoveTemp(ProjectPath));
+			ActiveProject->Save();
 			return ActiveProject.Get();
 		}
 
 		ProjectDataType* OpenProject(const FString& ProjectPath)
 		{
-			ActiveProject = MakeUnique<ProjectDataType>(ProjectPath);
+			ActiveProject = MakeShared<ProjectDataType>(ProjectPath);
+			GProject = ActiveProject.Get();
+
 			TSingleton<AssetManager>::Get().Clear();
 			TSingleton<AssetManager>::Get().MountProject(GetActiveContentDirectory());
 			ActiveProject->Open(ProjectPath);
@@ -78,11 +100,12 @@ namespace FRAMEWORK
 
 		void AddToProjMgmt(const FString& InProjectPath)
 		{
-			if (RecentProjcetPaths.Find(InProjectPath) == INDEX_NONE)
+			if (RecentProjcetPaths.Contains(InProjectPath))
 			{
-				RecentProjcetPaths.Insert(InProjectPath, 0);
-				SaveProjMgmt();
+				RemoveFromProjMgmt(InProjectPath);
 			}
+			RecentProjcetPaths.Insert(InProjectPath, 0);
+			SaveProjMgmt();
 		}
 
 		void SaveProjMgmt()
@@ -101,19 +124,9 @@ namespace FRAMEWORK
 			FFileHelper::SaveStringToFile(NewJsonContents, *(PathHelper::SavedDir() / TEXT("ProjMgmt.json")));
 		}
 
-		void SaveProject()
+		TSharedPtr<ProjectDataType> GetProject() const
 		{
-			ActiveProject->Save();
-		}
-
-		void SaveProject(const FString& Path)
-		{
-			ActiveProject->Save(Path);
-		}
-
-		ProjectDataType& GetProject()
-		{
-			return *ActiveProject;
+			return ActiveProject;
 		}
 
 		FString GetActiveProjectDirectory() const
@@ -144,7 +157,7 @@ namespace FRAMEWORK
 		const TArray<FString>& GetRecentProjcetPaths() const { return RecentProjcetPaths; }
 
 	protected:
-		TUniquePtr<ProjectDataType> ActiveProject;
+		TSharedPtr<ProjectDataType> ActiveProject;
 		TArray<FString> RecentProjcetPaths;
 	};
 

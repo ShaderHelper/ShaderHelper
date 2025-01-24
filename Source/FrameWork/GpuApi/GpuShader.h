@@ -2,7 +2,7 @@
 #include "GpuResourceCommon.h"
 #include <Misc/FileHelper.h>
 
-namespace FRAMEWORK
+namespace FW
 {
 	enum class GpuShaderFlag
 	{
@@ -18,12 +18,13 @@ namespace FRAMEWORK
     class GpuShader : public GpuResource
     {
 	public:
-        //FromFile
+        //From file
 		GpuShader(FString InFileName, ShaderType InType, const FString& ExtraDeclaration, FString InEntryPoint);
     
-        //FromSource
+        //From source
 		GpuShader(ShaderType InType, FString InSourceText, FString InShaderName, FString InEntryPoint);
         
+        //Successfully got the bytecode result and no error occurred.
         virtual bool IsCompiled() const {
             return false;
         }

@@ -19,13 +19,19 @@
 #include <UnrealDefinitionsLinux.h>
 #endif
 
+#define DO_CHECK !SH_SHIPPING
+
+//Ue Headers.
 #include <SharedPCH.h>
+
 #include "Common/Util/SwizzleVector.h"
 #include "Common/Util/Auxiliary.h"
 #include "Common/Util/Singleton.h"
 #include "Common/Util/Reflection.h"
+#include "Common/FrameWorkCore.h"
+#include "Common/ObjectPtr.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 	extern FRAMEWORK_API FString GAppName;
     extern FRAMEWORK_API TArray<FName> GProjectCategoryNames;
@@ -35,12 +41,16 @@ namespace FRAMEWORK
     PER_MODULE_BOILERPLATE
 
 #define PER_APP_DEFINITION(AppName) \
-    static const int AppNameSetter = [] { FRAMEWORK::GAppName = TEXT(AppName); return 0; }(); \
+    static const int AppNameSetter = [] { \
+    FW::GAppName = TEXT(AppName); \
+    /*Parts of the ApplicationCore depend on ue ProjectName*/ \
+    FApp::SetProjectName(TEXT(AppName));  \
+    return 0; }(); \
     PER_MODULE_DEFINITION()
 
 #define SH_LOG(CategoryName, Verbosity, Format, ...) \
     UE_LOG(CategoryName, Verbosity, Format, ##__VA_ARGS__); \
-    GProjectCategoryNames.Emplace(#CategoryName)
+    FW::GProjectCategoryNames.Emplace(#CategoryName)
 
 #define ADD_AGILITY_SDK()	\
 	extern "C" { _declspec(dllexport) extern const UINT D3D12SDKVersion = 610; }	\

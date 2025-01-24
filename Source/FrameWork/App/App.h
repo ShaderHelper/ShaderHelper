@@ -2,7 +2,7 @@
 #include "Common/Util/SwizzleVector.h"
 #include "Editor/Editor.h"
 #include "Renderer/Renderer.h"
-namespace FRAMEWORK {
+namespace FW {
 	class FRAMEWORK_API App : public FNoncopyable
 	{
 	public:
@@ -15,17 +15,21 @@ namespace FRAMEWORK {
         
         Editor* GetEditor() const { return AppEditor.Get(); }
         Renderer* GetRenderer() const { return AppRenderer.Get(); }
+		Vector2D GetClientSize() const { return AppClientSize; }
+		double GetDeltaTime() const { return DeltaTime; }
 		
 	protected:
 		virtual void Update(double DeltaTime);
 		virtual void Render();
+		virtual void Init();
         
     public:
         TUniquePtr<Editor> AppEditor;
         TUniquePtr<Renderer> AppRenderer;
 
-	protected:		
+	protected:
 		Vector2D AppClientSize;
+		FString CommandLine;
 		double DeltaTime;
 		double FixedDeltaTime = 1 / 30;
 	};

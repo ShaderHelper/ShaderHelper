@@ -1,6 +1,6 @@
 #pragma once
 
-namespace FRAMEWORK
+namespace FW
 {
 	class FRAMEWORK_API FAppCommonStyle
 	{

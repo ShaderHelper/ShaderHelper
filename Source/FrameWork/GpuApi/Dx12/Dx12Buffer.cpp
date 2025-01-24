@@ -1,6 +1,6 @@
 #include "CommonHeader.h"
 #include "Dx12Buffer.h"
-namespace FRAMEWORK
+namespace FW
 {
 
 	TRefCountPtr<Dx12Buffer> CreateDx12Buffer(D3D12_RESOURCE_STATES InitState, uint32 ByteSize, GpuBufferUsage Usage, bool IsDeferred)

@@ -2,39 +2,34 @@
 #include "StShader.h"
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "Common/Path/PathHelper.h"
+#include "App/App.h"
+#include "Editor/ShaderHelperEditor.h"
+#include "UI/Widgets/Property/PropertyData/PropertyItem.h"
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace SH
 {
 const FString DefaultPixelShaderBody =
-R"(void mainImage(out float4 fragColor, in float2 fragCoord)
+R"(void mainImage(out float4 fragColor,in float2 fragCoord)
 {
     float2 uv = fragCoord/iResolution.xy;
     float3 col = 0.5 + 0.5*cos(iTime + uv.xyx + float3(0,2,4));
     fragColor = float4(col,1);
 })";
 
-	GLOBAL_REFLECTION_REGISTER(AddClass<StShader>()
+    REFLECTION_REGISTER(AddClass<StShader>("ShaderToy Shader")
                                 .BaseClass<AssetObject>()
 	)
 
 	StShader::StShader()
 	{
         PixelShaderBody = DefaultPixelShaderBody;
-        
-        BuiltInUniformBuffer = UniformBufferBuilder{ UniformBufferUsage::Persistant }
-                                .AddVector2f("iResolution")
-                                .AddFloat("iTime")
-                                .Build();
+	}
 
-        BuiltInBindGroupLayout = GpuBindGroupLayoutBuilder{ 0 }
-                                .AddUniformBuffer("BuiltIn", BuiltInUniformBuffer->GetDeclaration(), BindingShaderStage::Pixel)
-                                .Build();
+	StShader::~StShader()
+	{
 
-        BuiltInBindGroup = GpuBindGrouprBuilder{ BuiltInBindGroupLayout }
-                            .SetUniformBuffer("BuiltIn", BuiltInUniformBuffer->GetGpuResource())
-                            .Build();
 	}
 
 	void StShader::Serialize(FArchive& Ar)
@@ -42,11 +37,53 @@ R"(void mainImage(out float4 fragColor, in float2 fragCoord)
 		AssetObject::Serialize(Ar);
 
 		Ar << PixelShaderBody;
+        Ar << CustomUniformBufferBuilder << CustomBindGroupLayoutBuilder;
 	}
+
+    void StShader::PostLoad()
+    {
+        VertexShader = GGpuRhi->CreateShaderFromSource(ShaderType::VertexShader, GetFullShader(), GetFileName(), TEXT("MainVS"));
+        FString ErrorInfo;
+        GGpuRhi->CrossCompileShader(VertexShader, ErrorInfo);
+
+        PixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, GetFullShader(), GetFileName(), TEXT("MainPS"));
+        GGpuRhi->CrossCompileShader(PixelShader, ErrorInfo);
+    }
+
+    UniformBufferBuilder& StShader::GetBuiltInUbBuilder()
+    {
+        static UniformBufferBuilder BuiltInUbLayout{ UniformBufferUsage::Persistant };
+        static int Init = [&] {
+            BuiltInUbLayout
+                .AddVector2f("iResolution")
+                .AddFloat("iTime");
+            return 0;
+        }();
+        return BuiltInUbLayout;
+    }
+
+    GpuBindGroupLayoutBuilder& StShader::GetBuiltInBindingLayoutBuilder()
+    {
+        static GpuBindGroupLayoutBuilder BuiltInBindingLayout{ 0 };
+        static int Init = [&] {
+            BuiltInBindingLayout
+                .AddUniformBuffer("Uniform", GetBuiltInUbBuilder().GetLayoutDeclaration(), BindingShaderStage::Pixel)
+                .AddTexture("iChannel0", BindingShaderStage::Pixel)
+                .AddSampler("iChannel0Sampler", BindingShaderStage::Pixel)
+                .AddTexture("iChannel1", BindingShaderStage::Pixel)
+                .AddSampler("iChannel1Sampler", BindingShaderStage::Pixel)
+                .AddTexture("iChannel2", BindingShaderStage::Pixel)
+                .AddSampler("iChannel2Sampler", BindingShaderStage::Pixel)
+                .AddTexture("iChannel3", BindingShaderStage::Pixel)
+                .AddSampler("iChannel3Sampler", BindingShaderStage::Pixel);
+            return 0;
+        }();
+        return BuiltInBindingLayout;
+    }
 
 	FString StShader::FileExtension() const
 	{
-		return "StShader";
+		return "stShader";
 	}
 
 	const FSlateBrush* StShader::GetImage() const
@@ -54,11 +91,223 @@ R"(void mainImage(out float4 fragColor, in float2 fragCoord)
 		return FShaderHelperStyle::Get().GetBrush("AssetBrowser.Shader");
 	}
 
-    FString StShader::GetResourceDeclaration() const
+    FString StShader::GetBinding() const
+    {
+        return GetBuiltInBindingLayoutBuilder().GetCodegenDeclaration() + CustomBindGroupLayoutBuilder.GetCodegenDeclaration();
+    }
+
+    FString StShader::GetTemplateWithBinding() const
     {
 		FString Template;
 		FFileHelper::LoadFileToString(Template, *(PathHelper::ShaderDir() / "ShaderHelper/StShaderTemplate.hlsl"));
-		return BuiltInBindGroupLayout->GetCodegenDeclaration() + Template;
+        return GetBinding() + Template;
+    }
+
+	FString StShader::GetFullShader() const
+	{
+		FString Template;
+		FFileHelper::LoadFileToString(Template, *(PathHelper::ShaderDir() / "ShaderHelper/StShaderTemplate.hlsl"));
+        FString FullShader = GetBinding() + Template + PixelShaderBody;
+		return FullShader;
+	}
+
+    void StShader::RefreshBuilder()
+    {
+        FW::UniformBufferBuilder NewCustomUniformBufferBuilder{FW::UniformBufferUsage::Persistant};
+        FW::GpuBindGroupLayoutBuilder NewCustomBindGroupLayoutBuilder{1};
+        
+        auto CustomUniformCategory = CustomCategory->GetData("Uniform");
+        if(CustomUniformCategory)
+        {
+            TArray<TSharedRef<PropertyData>> UniformDatas;
+            CustomUniformCategory->GetChildren(UniformDatas);
+            for(auto UniformData : UniformDatas)
+            {
+                FString MemberName = UniformData->GetDisplayName();
+                if(UniformData->IsOfType<PropertyItem<float>>())
+                {
+                    NewCustomUniformBufferBuilder.AddFloat(MemberName);
+                }
+                else if(UniformData->IsOfType<PropertyItem<Vector2f>>())
+                {
+                    NewCustomUniformBufferBuilder.AddVector2f(MemberName);
+                }
+            }
+            NewCustomBindGroupLayoutBuilder.AddUniformBuffer("Uniform", NewCustomUniformBufferBuilder.GetLayoutDeclaration(), BindingShaderStage::Pixel);
+        }
+        
+        CustomUniformBufferBuilder = NewCustomUniformBufferBuilder;
+        CustomBindGroupLayoutBuilder = NewCustomBindGroupLayoutBuilder;
+    }
+    
+    template<typename UniformType>
+    void StShader::AddUniform()
+    {
+        static int32 AddNum;
+        auto CustomUniformCategory = CustomCategory->GetData("Uniform");
+        if (!CustomUniformCategory)
+        {
+            CustomUniformCategory = MakeShared<PropertyCategory>(this, "Uniform");
+            CustomCategory->AddChild(CustomUniformCategory.ToSharedRef());
+        }
+        FString NewUniformName = FString::Format(TEXT("Tmp{0}"), { AddNum++ });
+        
+        auto TypeInfoWidget = SNew(STextBlock).TextStyle(&FAppCommonStyle::Get().GetWidgetStyle<FTextBlockStyle>("MinorText"));
+        FText TypeInfo = FText::FromString(FString{ANSI_TO_TCHAR(UniformBufferMemberTypeString<UniformType>::Value.data())});
+        TypeInfoWidget->SetText(TypeInfo);
+        auto NewUniformProperty = MakeShared<PropertyItem<UniformType>>(this, NewUniformName);
+        NewUniformProperty->SetEmbedWidget(TypeInfoWidget);
+        NewUniformProperty->SetOnDisplayNameChanged([this](const FString&){
+            RefreshBuilder();
+            MarkDirty();
+        });
+        //Avoid self/cycle ref
+        NewUniformProperty->SetOnDelete([this, self = &*NewUniformProperty]{
+            self->Remove();
+            if(self->GetParent()->GetChildrenNum() <= 0)
+            {
+                self->GetParent()->Remove();
+            }
+            RefreshBuilder();
+            MarkDirty();
+            static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+        });
+        
+        CustomUniformCategory->AddChild(MoveTemp(NewUniformProperty));
+        
+        RefreshBuilder();
+        MarkDirty();
+        auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+        ShEditor->RefreshProperty();
+    }
+
+    TSharedRef<SWidget> StShader::GetCategoryMenu()
+    {
+        FMenuBuilder MenuBuilder{ true, TSharedPtr<FUICommandList>() };
+        MenuBuilder.AddMenuEntry(
+            FText::FromString("float"),
+            FText::GetEmpty(),
+            FSlateIcon(),
+            FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform<float>) })
+        ;
+        MenuBuilder.AddMenuEntry(
+            FText::FromString("float2"),
+            FText::GetEmpty(),
+            FSlateIcon(),
+            FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform<Vector2f>) }
+        );
+        return MenuBuilder.MakeWidget();
+    }
+
+    TArray<TSharedRef<PropertyData>> StShader::PropertyDatasFromUniform(const UniformBufferBuilder& InBuilder, bool Enabled)
+    {
+        TArray<TSharedRef<PropertyData>> Datas;
+        const UniformBufferMetaData& MetaData = InBuilder.GetMetaData();
+        for(const auto& [MemberName, MemberInfo]: MetaData.Members)
+        {
+            auto TypeInfoWidget = SNew(STextBlock).TextStyle(&FAppCommonStyle::Get().GetWidgetStyle<FTextBlockStyle>("MinorText"));
+            FText TypeInfo = FText::FromString(MemberInfo.TypeName);
+            TypeInfoWidget->SetText(TypeInfo);
+            TSharedPtr<PropertyItemBase> Property;
+            if(MemberInfo.TypeName == "float")
+            {
+                Property = MakeShared<PropertyItem<float>>(this, MemberName);
+            }
+            else if(MemberInfo.TypeName == "float2")
+            {
+                Property = MakeShared<PropertyItem<Vector2f>>(this, MemberName);
+            }
+            else
+            {
+                check(false);
+            }
+            Property->SetEnabled(Enabled);
+            Property->SetEmbedWidget(TypeInfoWidget);
+            Property->SetOnDisplayNameChanged([this](const FString&){
+                RefreshBuilder();
+                MarkDirty();
+            });
+            if(Enabled) {
+                Property->SetOnDelete([this, self = &*Property]{
+                    self->Remove();
+                    if(self->GetParent()->GetChildrenNum() <= 0)
+                    {
+                        self->GetParent()->Remove();
+                    }
+                    RefreshBuilder();
+                    MarkDirty();
+                    static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+                });
+            }
+            Datas.Add(Property.ToSharedRef());
+        }
+        return Datas;
+    }
+
+    TArray<TSharedRef<PropertyData>> StShader::PropertyDatasFromBinding()
+    {
+        auto BuiltInCategory = MakeShared<PropertyCategory>(this, "Built In");
+        {
+            const GpuBindGroupLayoutDesc& BuiltInLayoutDesc = GetBuiltInBindingLayoutBuilder().GetLayoutDesc();
+            for(const auto& [BindingName, Slot] : BuiltInLayoutDesc.CodegenBindingNameToSlot)
+            {
+                if(BuiltInLayoutDesc.GetBindingType(Slot) == BindingType::UniformBuffer)
+                {
+                    auto UniformCategory = MakeShared<PropertyCategory>(this, BindingName);
+                    auto PropertyDataUniforms = PropertyDatasFromUniform(GetBuiltInUbBuilder(), false);
+                    for(auto Data : PropertyDataUniforms)
+                    {
+                        UniformCategory->AddChild(Data);
+                    }
+                    BuiltInCategory->AddChild(MoveTemp(UniformCategory));
+                }
+            }
+            auto SlotCategory = MakeShared<PropertyCategory>(this, "Slot");
+            {
+                auto iChannel0Item = MakeShared<PropertyItemBase>(this, "iChannel0");
+                iChannel0Item->SetEnabled(false);
+                auto iChannel1Item = MakeShared<PropertyItemBase>(this, "iChannel1");
+                iChannel1Item->SetEnabled(false);
+                auto iChannel2Item = MakeShared<PropertyItemBase>(this, "iChannel2");
+                iChannel2Item->SetEnabled(false);
+                auto iChannel3Item = MakeShared<PropertyItemBase>(this, "iChannel3");
+                iChannel3Item->SetEnabled(false);
+                SlotCategory->AddChild(MoveTemp(iChannel0Item));
+                SlotCategory->AddChild(MoveTemp(iChannel1Item));
+                SlotCategory->AddChild(MoveTemp(iChannel2Item));
+                SlotCategory->AddChild(MoveTemp(iChannel3Item));
+            }
+            BuiltInCategory->AddChild(MoveTemp(SlotCategory));
+        }
+        
+        CustomCategory = MakeShared<PropertyCategory>(this, "Custom");
+        {
+            const GpuBindGroupLayoutDesc& CustomLayoutDesc = CustomBindGroupLayoutBuilder.GetLayoutDesc();
+            for(const auto& [BindingName, Slot] : CustomLayoutDesc.CodegenBindingNameToSlot)
+            {
+                if(CustomLayoutDesc.GetBindingType(Slot) == BindingType::UniformBuffer)
+                {
+                    auto UniformCategory = MakeShared<PropertyCategory>(this, BindingName);
+                    auto PropertyDataUniforms = PropertyDatasFromUniform(CustomUniformBufferBuilder, true);
+                    for(auto Data : PropertyDataUniforms)
+                    {
+                        UniformCategory->AddChild(Data);
+                    }
+                    CustomCategory->AddChild(MoveTemp(UniformCategory));
+                }
+            }
+        }
+        CustomCategory->SetAddMenuWidget(GetCategoryMenu());
+        return {BuiltInCategory, CustomCategory.ToSharedRef()};
+    }
+
+    TArray<TSharedRef<PropertyData>>* StShader::GetPropertyDatas()
+    {
+        if(PropertyDatas.IsEmpty())
+        {
+            PropertyDatas = PropertyDatasFromBinding();
+        }
+        return &PropertyDatas;
     }
 
 }

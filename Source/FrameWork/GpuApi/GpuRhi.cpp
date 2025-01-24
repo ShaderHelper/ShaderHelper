@@ -10,7 +10,7 @@
 #include "GpuApiValidation.h"
 #include "magic_enum.hpp"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 class GpuRenderPassRecorderValidation : public GpuRenderPassRecorder

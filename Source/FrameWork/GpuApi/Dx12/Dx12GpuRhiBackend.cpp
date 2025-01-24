@@ -12,7 +12,7 @@
 #include "Dx12Texture.h"
 #include "Common/Path/PathHelper.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 Dx12GpuRhiBackend::Dx12GpuRhiBackend() { 
 	GDx12GpuRhi = this;

@@ -3,7 +3,7 @@
 DEFINE_LOG_CATEGORY_STATIC(LogTestUtil, Log, All);
 #include <chrono>
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace UNITTEST_UTIL
 {

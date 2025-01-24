@@ -1,20 +1,15 @@
 #pragma once
 
-namespace FRAMEWORK
+namespace FW
 {
 	class FRAMEWORK_API Renderer : public FNoncopyable
 	{
 	public:
-		Renderer();
+		Renderer() = default;
 		virtual ~Renderer() = default;
         
 	public:
-        void Render();
-        
-    protected:
-        virtual void RenderInternal() {};
-        virtual void RenderBegin();
-        virtual void RenderEnd();
+		virtual void Render() = 0;
 	};
 }
 

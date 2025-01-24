@@ -1,7 +1,7 @@
 #pragma once
 #include <Widgets/Input/SMultiLineEditableTextBox.h>
 #include "SLogWidget.h"
-namespace FRAMEWORK 
+namespace FW 
 {
 	/**
 	* A single log message for the output log, holding a message and
@@ -46,6 +46,7 @@ namespace FRAMEWORK
 
 		//Gets the num of messages added to TextLayout
 		int32 GetNumMessages() const;
+        void Clear();
 	protected:
 		int32 NextPendingMessageIndex;
 		TArray<FOutputLogMessage> Messages;
@@ -91,7 +92,7 @@ namespace FRAMEWORK
 	protected:
 		TSharedPtr<FOutputLogFilter> Filter;
 		TSharedPtr<SSearchBox> SearchBox;
-
+        TSharedPtr<FOutputLogMarshaller> OutPutLogMarshaller;
 		bool bIsUserScrolled;
 	};
 }

@@ -3,29 +3,38 @@
 
 struct FSlateBrush;
 
-namespace FRAMEWORK
+namespace FW
 {
-	class FRAMEWORK_API AssetObject
+	class FRAMEWORK_API AssetObject : public ShObject
 	{
 		REFLECTION_TYPE(AssetObject)
 	public:
-		AssetObject();
-		virtual ~AssetObject() = default;
+		AssetObject() = default;
+        ~AssetObject();
+        
+        //The asset can be deleted outside
+        void Destroy()
+        {
+            NumRefs = 0;
+            delete this;
+        }
 
-		//Use the serialization system from unreal engine
-		virtual void Serialize(FArchive& Ar);
-		virtual void PostLoad() {}
+		virtual void Serialize(FArchive& Ar) override;
+        virtual void PostLoad() {}
+		virtual void Save();
+		virtual void MarkDirty();
+		bool IsDirty();
 
 		virtual FString FileExtension() const = 0;
+
+		//Determine the asset icon in the asset browser.
 		virtual GpuTexture* GetThumbnail() const { return nullptr; }
-		virtual const FSlateBrush* GetImage() const { return nullptr; }
+        virtual const FSlateBrush* GetImage() const;
+		//
         
         FString GetFileName() const;
         FString GetPath() const;
-		FGuid GetGuid() const { return Guid; }
-
-	protected:
-		FGuid Guid;
 	};
 
+    FRAMEWORK_API MetaType* GetAssetMetaType(const FString& InPath);
 }

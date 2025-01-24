@@ -11,11 +11,11 @@ int WINAPI WinMain(_In_ HINSTANCE hInInstance, _In_opt_ HINSTANCE hPrevInstance,
 	hInstance = hInInstance;
 	WinLaunch([](const TCHAR* CommandLine)
 		{
-			FRAMEWORK::GApp = MakeUnique<SH::ShaderHelperApp>(
+			FW::GApp = MakeUnique<SH::ShaderHelperApp>(
 				FVector2D{ 1600, 800 },
 				CommandLine
 			);
-			FRAMEWORK::GApp->Run();
+			FW::GApp->Run();
 		}
 	, GetCommandLineW());
 

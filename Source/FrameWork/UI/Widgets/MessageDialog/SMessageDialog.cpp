@@ -2,7 +2,7 @@
 #include "SMessageDialog.h"
 #include "UI/Styles/FAppCommonStyle.h"
 
-namespace FRAMEWORK::MessageDialog
+namespace FW::MessageDialog
 {
 	class FRAMEWORK_API SMessageDialog : public SCompoundWidget
 	{
@@ -66,6 +66,7 @@ namespace FRAMEWORK::MessageDialog
 					[
 						SNew(STextBlock)
 						.Text(InArgs._Message)
+						.WrapTextAt(250.0f)
 						.ColorAndOpacity(FLinearColor::White)
 					]
 
@@ -127,7 +128,7 @@ namespace FRAMEWORK::MessageDialog
 
 	}
 
-	bool Open(MessageType MsgType, const TAttribute<FText>& InMessage)
+	bool Open(MessageType MsgType, TSharedPtr<SWindow> Parent, const TAttribute<FText>& InMessage)
 	{
 		bool Result;
 
@@ -147,7 +148,7 @@ namespace FRAMEWORK::MessageDialog
 			.Message(InMessage.Get());
 
 		ModalWindow->SetContent(MessageDialog);
-		FSlateApplication::Get().AddModalWindow(ModalWindow, nullptr);
+		FSlateApplication::Get().AddModalWindow(ModalWindow, Parent);
 		return Result;
 	}
 

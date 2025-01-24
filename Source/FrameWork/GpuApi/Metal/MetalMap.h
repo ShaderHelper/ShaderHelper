@@ -3,7 +3,7 @@
 #include "GpuApi/GpuResource.h"
 #include "MetalTexture.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
     inline MTLColorWriteMask MapWriteMask(BlendMask InMask)

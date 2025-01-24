@@ -2,7 +2,7 @@
 #include "SPropertyCategory.h"
 #include "UI/Styles/FAppCommonStyle.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	void SPropertyCatergory::Construct(const FArguments& InArgs, const TSharedPtr<class ITableRow>& TableRow)
@@ -15,12 +15,12 @@ namespace FRAMEWORK
 		if (InArgs._IsRootCategory)
 		{
 			CategoryColor = FAppCommonStyle::Get().GetBrush("PropertyView.CategoryColor");
-			CategoryTextFont = FAppStyle::Get().GetFontStyle("SmallFontBold");
+			CategoryTextFont = FAppStyle::Get().GetFontStyle("NormalFontBold");
 		}
 		else
 		{
 			CategoryColor = FAppCommonStyle::Get().GetBrush("PropertyView.ItemColor");
-			CategoryTextFont = FAppStyle::Get().GetFontStyle("SmallFont");
+			CategoryTextFont = FAppStyle::Get().GetFontStyle("NormalFont");
 		}
 
 		TSharedRef<SHorizontalBox> HBox = SNew(SHorizontalBox)
@@ -38,8 +38,6 @@ namespace FRAMEWORK
 				SNew(STextBlock)
 				.Text(FText::FromString(InArgs._DisplayName))
 				.Font(MoveTemp(CategoryTextFont))
-				.ColorAndOpacity(FSlateColor{ FLinearColor{0.8f,0.8f,0.8f} })
-				
 			];
 
 		if (InArgs._AddMenuWidget)
@@ -67,6 +65,7 @@ namespace FRAMEWORK
 		ChildSlot
 		[
 			SNew(SBorder)
+            .BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
 			.Padding(FMargin{0.0f, 3.0f, 0.0f, 0.0f})
 			[
 				SNew(SBorder)

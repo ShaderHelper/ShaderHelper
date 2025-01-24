@@ -2,7 +2,7 @@
 #include "AssetManager.h"
 #include "GpuApi/GpuResource.h"
 
-namespace FRAMEWORK
+namespace FW
 {
 
 	void AssetManager::MountProject(const FString& InProjectContentDir)
@@ -40,12 +40,13 @@ namespace FRAMEWORK
 
 	FString AssetManager::GetPath(const FGuid& InGuid) const
 	{
+		check(IsValidAsset(InGuid));
         return GuidToPath[InGuid];
 	}
 
 	FGuid AssetManager::GetGuid(const FString& InPath) const
 	{
-        check(GuidToPath.FindKey(InPath) != nullptr);
+        check(IsValidAsset(InPath));
         return *GuidToPath.FindKey(InPath);
 	}
 
@@ -67,16 +68,25 @@ namespace FRAMEWORK
 	void AssetManager::Clear()
 	{
         GuidToPath.Empty();
-		AssetRefCounts.Empty();
 		AssetThumbnailPool.Empty();
-
-		for (auto [_, AssetObjectPtr] : Assets)
-		{
-			delete AssetObjectPtr;
-		}
-
-		Assets.Empty();
 	}
+
+	void AssetManager::ClearAsset(const FString& InAssetPath)
+	{
+		if (AssetObject** Ptr = Assets.Find(GetGuid(InAssetPath)))
+		{
+            (*Ptr)->Destroy();
+		}
+	}
+
+    void AssetManager::RemoveAsset(AssetObject* InAsset)
+    {
+        if(auto KeyPtr = Assets.FindKey(InAsset))
+        {
+            Assets.Remove(*KeyPtr);
+        }
+
+    }
 
 	TArray<FString> AssetManager::GetManageredExts() const
 	{
@@ -85,34 +95,6 @@ namespace FRAMEWORK
             ManageredExts.Add(CurAssetObject->FileExtension());
         });
 		return ManageredExts;
-	}
-
-	void AssetManager::AddRef(AssetObject* InAssetObject)
-	{
-		if (!AssetRefCounts.Contains(InAssetObject))
-		{
-			check(Assets.FindKey(InAssetObject));
-			AssetRefCounts.Add(InAssetObject, 1);
-		}
-		else
-		{
-			AssetRefCounts[InAssetObject]++;
-		}
-	}
-
-	void AssetManager::ReleaseRef(AssetObject* InAssetObject)
-	{
-		if (AssetRefCounts[InAssetObject] == 1)
-		{
-			FGuid Guid = *Assets.FindKey(InAssetObject);
-			Assets.Remove(Guid);
-			AssetRefCounts.Remove(InAssetObject);
-			delete InAssetObject;
-		}
-		else
-		{
-			AssetRefCounts[InAssetObject]--;
-		}
 	}
 
 }

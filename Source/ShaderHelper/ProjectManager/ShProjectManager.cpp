@@ -2,22 +2,28 @@
 #include "ShProjectManager.h"
 #include <Serialization/JsonSerializer.h>
 
-using namespace FRAMEWORK;
+using namespace FW;
 
 namespace SH
 {
+
+	ShProject::ShProject(FString InPath) : Project(MoveTemp(InPath))
+	{
+		GProjectVer = static_cast<int>(ShProjectVersion::Initial);
+	}
+
+    ShProject::~ShProject()
+    {
+
+    }
+
 	void ShProject::Open(const FString& ProjectPath)
 	{
 		TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*ProjectPath));
 		Serialize(*Ar);
 	}
 
-	void ShProject::Save()
-	{
-		Save(Path);
-	}
-
-	void ShProject::Save(const FString& InPath)
+	void ShProject::SaveAs(const FString& InPath)
 	{
 		Path = InPath;
 		TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*InPath));
@@ -26,15 +32,36 @@ namespace SH
 
 	void ShProject::Serialize(FArchive& Ar)
 	{
-		Ar << Ver;
+		Project::Serialize(Ar);
 
 		//### AssetBrowserState ###
-		FString RelSelectedDirectory = TSingleton<ShProjectManager>::Get().GetRelativePathToProject(AssetBrowserState.DirectoryTreeState.CurSelectedDirectory);
-		Ar << RelSelectedDirectory;
-		for (const FString& Directory : AssetBrowserState.DirectoryTreeState.DirectoriesToExpand)
+		if (Ar.IsSaving())
 		{
-			FString RelDir = TSingleton<ShProjectManager>::Get().GetRelativePathToProject(RelSelectedDirectory);
-			Ar << RelDir;
+			FString RelSelectedDirectory = TSingleton<ShProjectManager>::Get().GetRelativePathToProject(AssetBrowserState.DirectoryTreeState.CurSelectedDirectory);
+			int ExpandDirNum = AssetBrowserState.DirectoryTreeState.DirectoriesToExpand.Num();
+			Ar << RelSelectedDirectory;
+			Ar << ExpandDirNum;
+			for (const FString& Directory : AssetBrowserState.DirectoryTreeState.DirectoriesToExpand)
+			{
+				FString RelDir = TSingleton<ShProjectManager>::Get().GetRelativePathToProject(Directory);
+				Ar << RelDir;
+			}
+		}
+		else
+		{
+			FString RelSelectedDirectory;
+			Ar << RelSelectedDirectory;
+			AssetBrowserState.DirectoryTreeState.CurSelectedDirectory = TSingleton<ShProjectManager>::Get().ConvertRelativePathToFull(RelSelectedDirectory);
+			int ExpandDirNum = 0;
+			Ar << ExpandDirNum;
+			AssetBrowserState.DirectoryTreeState.DirectoriesToExpand.Reserve(ExpandDirNum);
+			for (int i = 0; i < ExpandDirNum; i++)
+			{
+				FString RelDir;
+				Ar << RelDir;
+				AssetBrowserState.DirectoryTreeState.DirectoriesToExpand.Add(TSingleton<ShProjectManager>::Get().ConvertRelativePathToFull(MoveTemp(RelDir)));
+			}
+
 		}
 		Ar << AssetBrowserState.AssetViewState.AssetViewSize;
 		//###
@@ -71,7 +98,15 @@ namespace SH
 			{
 				AssetPtr<StShader> LoadedStShader;
 				Ar << LoadedStShader;
-				OpenedStShaders.Add(MoveTemp(LoadedStShader), nullptr);
+				if (LoadedStShader)
+				{
+					OpenedStShaders.Add(MoveTemp(LoadedStShader), nullptr);
+				}
+				else
+				{
+					//TODO
+					HasCodeTabLayout = false;
+				}
 			}
 
 			if (HasCodeTabLayout)

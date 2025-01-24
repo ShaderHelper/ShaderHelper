@@ -1,12 +1,12 @@
 #pragma once
 
-namespace FRAMEWORK
+namespace FW
 {
 	class SIconButton : public SButton
 	{
 	public:
 		SLATE_BEGIN_ARGS(SIconButton) : _Icon(nullptr) {}
-			SLATE_ARGUMENT(const FSlateBrush*, Icon)
+            SLATE_ATTRIBUTE(const FSlateBrush*, Icon)
 			SLATE_ARGUMENT(TOptional<FVector2D>, IconSize)
 			SLATE_ARGUMENT(FText, Label)
 			SLATE_EVENT(FOnClicked, OnClicked)
@@ -15,9 +15,9 @@ namespace FRAMEWORK
 		void Construct(const FArguments& InArgs)
 		{
 			TSharedRef<SHorizontalBox> HBox = SNew(SHorizontalBox);
-			float Space = InArgs._Icon ? 6.0f : 0.0f;
+			float Space = InArgs._Icon.IsSet() ? 6.0f : 0.0f;
 
-			if (InArgs._Icon)
+			if (InArgs._Icon.IsSet())
 			{
 				HBox->AddSlot()
 					.AutoWidth()
