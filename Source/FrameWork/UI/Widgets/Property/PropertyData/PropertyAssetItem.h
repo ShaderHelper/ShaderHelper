@@ -1,3 +1,4 @@
+#pragma once
 #include "GpuApi/GpuTexture.h"
 #include "Editor/PreviewViewPort.h"
 #include <Widgets/SViewport.h>

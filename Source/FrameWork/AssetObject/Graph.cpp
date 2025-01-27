@@ -57,7 +57,7 @@ namespace FW
 		return FAppStyle::Get().GetBrush("Icons.Blueprints");
 	}
 
-	void Graph::Exec(GraphExecContext& Context)
+	bool Graph::Exec(GraphExecContext& Context)
 	{
 		TArray<ObjectPtr<GraphNode>> ExecNodes = NodeDatas;
 
@@ -75,7 +75,7 @@ namespace FW
         if(AnyError)
         {
             SH_LOG(LogGraph, Error, TEXT("Cycle not allowed."));
-            return;
+            return AnyError;
         }
 
 		for (auto Node : ExecNodes)
@@ -84,11 +84,12 @@ namespace FW
             if(Node->AnyError)
             {
                 AnyError = true;
-                return;
+                return AnyError;
             }
 		}
         
         AnyError = false;
+        return AnyError;
 	}
 
 	TSharedRef<SGraphNode> GraphNode::CreateNodeWidget(SGraphPanel* OwnerPanel)

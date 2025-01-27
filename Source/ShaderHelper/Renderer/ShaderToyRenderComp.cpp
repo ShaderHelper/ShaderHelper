@@ -1,6 +1,7 @@
 #include "CommonHeader.h"
 #include "ShaderToyRenderComp.h"
 #include "GpuApi/GpuRhi.h"
+#include "ProjectManager/ShProjectManager.h"
 
 using namespace FW;
 
@@ -34,18 +35,24 @@ namespace SH
 
 	void ShaderToyRenderComp::RenderBegin()
 	{
-		static double RenderTimeStart = FPlatformTime::Seconds();
-		Context.iTime = float(FPlatformTime::Seconds() - RenderTimeStart);
+		Context.iTime = TSingleton<ShProjectManager>::Get().GetProject()->TimelineCurTime;
 	}
 
 	void ShaderToyRenderComp::RenderInternal()
 	{
-		RenderGraph Graph;
-		Context.RG = &Graph;
-		{
-			ShaderToyGraph->Exec(Context);
-		}
-		Graph.Execute();
+        if(!TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop)
+        {
+            RenderGraph Graph;
+            Context.RG = &Graph;
+            {
+                bool AnyError = ShaderToyGraph->Exec(Context);
+                if(AnyError)
+                {
+                    TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = true;
+                }
+            }
+            Graph.Execute();
+        }
 	}
 
 

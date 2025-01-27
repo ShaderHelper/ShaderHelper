@@ -12,6 +12,7 @@
 #include <DesktopPlatformModule.h>
 #include "Editor/AssetEditor/AssetEditor.h"
 #include "UI/Widgets/Log/SOutputLog.h"
+#include "UI/Widgets/Timeline/STimeline.h"
 
 STEAL_PRIVATE_MEMBER(FTabManager, TArray<TSharedRef<FTabManager::FArea>>, CollapsedDockAreas)
 
@@ -161,10 +162,16 @@ namespace SH
                 MenuBarWidget
 			]
 			+ SVerticalBox::Slot()
-			.FillHeight(1.0f)
+			.FillHeight(0.965f)
 			[
 				TabManager->RestoreFrom(UsedLayout, Window).ToSharedRef()
 			]
+            +SVerticalBox::Slot()
+            .FillHeight(0.035f)
+            [
+                SNew(STimeline).bStop(&CurProject->TimelineStop)
+                    .CurTime(&CurProject->TimelineCurTime).MaxTime(&CurProject->TimelineMaxTime)
+            ]
 		);
         TabManager->FindExistingLiveTab(CodeTabId)->GetParentDockTabStack()->SetCanDropToAttach(false);
         

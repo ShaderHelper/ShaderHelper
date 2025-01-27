@@ -75,7 +75,7 @@ namespace FW
 		void Serialize(FArchive& Ar) override;
 		const FSlateBrush* GetImage() const override;
 		virtual TArray<MetaType*> SupportNodes() const { return {}; }
-		virtual void Exec(GraphExecContext& Context);
+		virtual bool Exec(GraphExecContext& Context);
     public:
         bool AnyError = false;
 	

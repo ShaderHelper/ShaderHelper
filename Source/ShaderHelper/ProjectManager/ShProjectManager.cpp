@@ -118,6 +118,8 @@ namespace SH
 			}
 
 		}
+        
+        Ar << TimelineMaxTime;
 
 	}
 
