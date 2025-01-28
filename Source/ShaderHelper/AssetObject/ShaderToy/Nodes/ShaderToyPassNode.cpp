@@ -4,6 +4,7 @@
 #include <Widgets/SViewport.h>
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
+#include "UI/Widgets/Property/PropertyData/PropertyUniformItem.h"
 
 using namespace FW;
 
@@ -33,14 +34,44 @@ namespace SH
 		ObjectName = FText::FromString("ShaderPass");
 	}
 
+    void ShaderToyPassNode::InitPins()
+    {
+        auto Slot0 = NewShObject<ChannelPin>(this);
+        Slot0->ObjectName = FText::FromString("iChannel0");
+        Slot0->Direction = PinDirection::Input;
+        auto Slot1 = NewShObject<ChannelPin>(this);
+        Slot1->ObjectName = FText::FromString("iChannel1");
+        Slot1->Direction = PinDirection::Input;
+        auto Slot2 = NewShObject<ChannelPin>(this);
+        Slot2->ObjectName = FText::FromString("iChannel2");
+        Slot2->Direction = PinDirection::Input;
+        auto Slot3 = NewShObject<ChannelPin>(this);
+        Slot3->ObjectName = FText::FromString("iChannel3");
+        Slot3->Direction = PinDirection::Input;
+        
+        auto PassOutput = NewShObject<GpuTexturePin>(this);
+        PassOutput->ObjectName = FText::FromString("RT");
+        PassOutput->Direction = PinDirection::Output;
+        
+        Pins = {PassOutput, Slot0, Slot1, Slot2, Slot3};
+    }
+
 	void ShaderToyPassNode::Serialize(FArchive& Ar)
 	{
 		GraphNode::Serialize(Ar);
 		
-		Slot0.Serialize(Ar);
-		PassOutput.Serialize(Ar);
         Ar << Shader;
 	}
+
+    void ShaderToyPassNode::PostLoad()
+    {
+        GraphNode::PostLoad();
+        
+        if(Shader)
+        {
+            Shader->OnRefreshBuilder = FSimpleDelegate::CreateRaw(this, &ShaderToyPassNode::RefreshProperty);
+        }
+    }
 
 	TSharedPtr<SWidget> ShaderToyPassNode::ExtraNodeWidget()
 	{
@@ -51,10 +82,125 @@ namespace SH
 			];
 	}
 
-	TArray<GraphPin*> ShaderToyPassNode::GetPins()
-	{
-		return { &PassOutput,&Slot0,&Slot1,&Slot2,&Slot3};
-	}
+    TArray<TSharedRef<PropertyData>> ShaderToyPassNode::PropertyDatasFromUniform(UniformBuffer* InUb, bool Enabled)
+    {
+        if(!InUb) return {};
+        TArray<TSharedRef<PropertyData>> Datas;
+        const UniformBufferMetaData& MetaData = InUb->GetMetaData();
+        for(const auto& [MemberName, MemberInfo]: MetaData.Members)
+        {
+            TSharedPtr<PropertyItemBase> Property;
+            if(MemberInfo.TypeName == "float")
+            {
+                auto FloatProperty = MakeShared<PropertyUniformItem<float>>(this, MemberName, InUb->GetMember<float>(MemberName));
+                Property = FloatProperty;
+            }
+            else if(MemberInfo.TypeName == "float2")
+            {
+                auto Float2Porperty = MakeShared<PropertyUniformItem<Vector2f>>(this, MemberName, InUb->GetMember<Vector2f>(MemberName));
+                Property = Float2Porperty;
+            }
+            else
+            {
+                check(false);
+            }
+            Property->SetEnabled(Enabled);
+            Datas.Add(Property.ToSharedRef());
+        }
+        return Datas;
+    }
+
+    TArray<TSharedRef<PropertyData>> ShaderToyPassNode::PropertyDatasFromBinding()
+    {
+        auto BuiltInCategory = MakeShared<PropertyCategory>(this, "Built In");
+        {
+            const GpuBindGroupLayoutDesc& BuiltInLayoutDesc = StShader::GetBuiltInBindLayoutBuilder().GetLayoutDesc();
+            for(const auto& [BindingName, Slot] : BuiltInLayoutDesc.CodegenBindingNameToSlot)
+            {
+                if(BuiltInLayoutDesc.GetBindingType(Slot) == BindingType::UniformBuffer)
+                {
+                    auto UniformCategory = MakeShared<PropertyCategory>(this, BindingName);
+                    auto PropertyDataUniforms = PropertyDatasFromUniform(StShader::GetBuiltInUb(), false);
+                    for(auto Data : PropertyDataUniforms)
+                    {
+                        UniformCategory->AddChild(Data);
+                    }
+                    BuiltInCategory->AddChild(MoveTemp(UniformCategory));
+                }
+            }
+            auto SlotCategory = MakeShared<PropertyCategory>(this, "Slot");
+            {
+                auto iChannel0Item = MakeShared<PropertyItemBase>(this, "iChannel0");
+                iChannel0Item->SetEnabled(false);
+                auto iChannel1Item = MakeShared<PropertyItemBase>(this, "iChannel1");
+                iChannel1Item->SetEnabled(false);
+                auto iChannel2Item = MakeShared<PropertyItemBase>(this, "iChannel2");
+                iChannel2Item->SetEnabled(false);
+                auto iChannel3Item = MakeShared<PropertyItemBase>(this, "iChannel3");
+                iChannel3Item->SetEnabled(false);
+                SlotCategory->AddChild(MoveTemp(iChannel0Item));
+                SlotCategory->AddChild(MoveTemp(iChannel1Item));
+                SlotCategory->AddChild(MoveTemp(iChannel2Item));
+                SlotCategory->AddChild(MoveTemp(iChannel3Item));
+            }
+            BuiltInCategory->AddChild(MoveTemp(SlotCategory));
+        }
+        
+        auto CustomCategory = MakeShared<PropertyCategory>(this, "Custom");
+        {
+            const GpuBindGroupLayoutDesc& CustomLayoutDesc = Shader->CustomBindGroupLayoutBuilder.GetLayoutDesc();
+            for(const auto& [BindingName, Slot] : CustomLayoutDesc.CodegenBindingNameToSlot)
+            {
+                if(CustomLayoutDesc.GetBindingType(Slot) == BindingType::UniformBuffer)
+                {
+                    auto UniformCategory = MakeShared<PropertyCategory>(this, BindingName);
+                    auto PropertyDataUniforms = PropertyDatasFromUniform(Shader->CustomUniformBuffer.Get(), true);
+                    for(auto Data : PropertyDataUniforms)
+                    {
+                        UniformCategory->AddChild(Data);
+                    }
+                    CustomCategory->AddChild(MoveTemp(UniformCategory));
+                }
+            }
+        }
+        return {BuiltInCategory, CustomCategory};
+    }
+
+    void ShaderToyPassNode::PostPropertyChanged(PropertyData* InProperty)
+    {
+        ShObject::PostPropertyChanged(InProperty);
+        
+        //Shader asset changed.
+        if(InProperty->GetDisplayName() == "Shader")
+        {
+            Shader->OnRefreshBuilder = FSimpleDelegate::CreateRaw(this, &ShaderToyPassNode::RefreshProperty);
+            RefreshProperty();
+        }
+    }
+
+    void ShaderToyPassNode::RefreshProperty()
+    {
+        PropertyDatas.Empty();
+        GetPropertyDatas();
+        auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+        ShEditor->RefreshProperty();
+    }
+
+    TArray<TSharedRef<PropertyData>>* ShaderToyPassNode::GetPropertyDatas()
+    {
+        if(PropertyDatas.IsEmpty())
+        {
+            //Reflection data
+            ShObject::GetPropertyDatas();
+            
+            //Custom
+            if(Shader)
+            {
+                PropertyDatas.Append(PropertyDatasFromBinding());
+            }
+        }
+        return &PropertyDatas;
+    }
 
 	bool ShaderToyPassNode::Exec(GraphExecContext& Context)
 	{
@@ -63,39 +209,47 @@ namespace SH
             SH_LOG(LogGraph, Error, TEXT("Node:%s does not specify the corresponding stShader."), *ObjectName.ToString());
             return false;
 		}
+        else if(!Shader->PixelShader->IsCompiled())
+        {
+            SH_LOG(LogGraph, Error, TEXT("Node:%s shader error, please check the shader file."), *ObjectName.ToString());
+            return false;
+        }
 
-//		ShaderToyExecContext& ShaderToyContext = static_cast<ShaderToyExecContext&>(Context);
-//		PassShader->BuiltInUniformBuffer->GetMember<Vector2f>("iResolution") = ShaderToyContext.iResolution;
-//		PassShader->BuiltInUniformBuffer->GetMember<float>("iTime") = ShaderToyContext.iTime;
-//
-//		GpuTextureDesc Desc{ (uint32)ShaderToyContext.iResolution.x, (uint32)ShaderToyContext.iResolution.y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
-//		TRefCountPtr<GpuTexture> PassOuputTex = GGpuRhi->CreateTexture(MoveTemp(Desc));
-//		Preview->SetViewPortRenderTexture(PassOuputTex);
-//		PassOutput.SetValue(PassOuputTex);
-//
-//		GpuRenderPassDesc PassDesc;
-//		PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassOuputTex, RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
-//
-//		GpuRenderPipelineStateDesc PipelineDesc{
-//			//Shader
-//			VertexShader,
-//			PixelShader,
-//			//Targets
-//			{
-//				{ PassOuputTex->GetFormat() }
-//			},
-//			//BindGroupLayout
-//			{ PassShader->BuiltInBindGroupLayout }
-//		};
-//		TRefCountPtr<GpuPipelineState> PipelineState = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
-//
-//		ShaderToyContext.RG->AddRenderPass(ObjectName.ToString(), MoveTemp(PassDesc),
-//			[this, PipelineState, &ShaderToyContext](GpuRenderPassRecorder* PassRecorder) {
-//				PassRecorder->SetRenderPipelineState(PipelineState);
-//				PassRecorder->SetBindGroups(PassShader->BuiltInBindGroup, nullptr, nullptr, nullptr);
-//				PassRecorder->DrawPrimitive(0, 3, 0, 1);
-//			}
-//		);
+		ShaderToyExecContext& ShaderToyContext = static_cast<ShaderToyExecContext&>(Context);
+
+        auto PassOutput = static_cast<GpuTexturePin*>(GetPin("RT"));
+        if(PassOutput->GetValue()->GetWidth() != ShaderToyContext.iResolution.x ||
+           PassOutput->GetValue()->GetHeight() != ShaderToyContext.iResolution.y)
+        {
+            GpuTextureDesc Desc{ (uint32)ShaderToyContext.iResolution.x, (uint32)ShaderToyContext.iResolution.y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
+            TRefCountPtr<GpuTexture> PassOuputTex = GGpuRhi->CreateTexture(MoveTemp(Desc));
+            Preview->SetViewPortRenderTexture(PassOuputTex);
+            PassOutput->SetValue(PassOuputTex);
+        }
+
+		GpuRenderPassDesc PassDesc;
+		PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassOutput->GetValue(), RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
+
+		GpuRenderPipelineStateDesc PipelineDesc{
+			//Shader
+            Shader->VertexShader,
+            Shader->PixelShader,
+			//Targets
+			{
+				{ PassOutput->GetValue()->GetFormat() }
+			},
+			//BindGroupLayout
+			{ StShader::GetBuiltInBindLayout() }
+		};
+		TRefCountPtr<GpuPipelineState> PipelineState = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
+
+		ShaderToyContext.RG->AddRenderPass(ObjectName.ToString(), MoveTemp(PassDesc),
+			[this, PipelineState](GpuRenderPassRecorder* PassRecorder) {
+				PassRecorder->SetRenderPipelineState(PipelineState);
+				PassRecorder->SetBindGroups(StShader::GetBuiltInBindGroup(), nullptr, nullptr, nullptr);
+				PassRecorder->DrawPrimitive(0, 3, 0, 1);
+			}
+		);
         return true;
 	}
 

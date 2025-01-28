@@ -119,17 +119,12 @@ namespace FW
 					check(RenderTarget->RTV->IsValid());
 
 					Vector4f OptimizedClearValue = RenderTarget->GetResourceDesc().ClearValues;
-					if (ClearColorValues[i]) {
-						Vector4f ClearColorValue = *ClearColorValues[i];
-						if (!ClearColorValue.Equals(OptimizedClearValue))
-						{
-							SH_LOG(LogDx12, Warning, TEXT("OptimizedClearValue(%s) != ClearColorValue(%s) that may result in invalid fast clear optimization."), *OptimizedClearValue.ToString(), *ClearColorValue.ToString());
-						}
-						InCmdList->ClearRenderTargetView(RenderTarget->RTV->GetHandle(), ClearColorValue.GetData(), 0, nullptr);
-					}
-					else {
-						InCmdList->ClearRenderTargetView(RenderTarget->RTV->GetHandle(), OptimizedClearValue.GetData(), 0, nullptr);
-					}
+                    Vector4f ClearColorValue = ClearColorValues[i];
+                    if (!ClearColorValue.Equals(OptimizedClearValue))
+                    {
+                        SH_LOG(LogDx12, Warning, TEXT("OptimizedClearValue(%s) != ClearColorValue(%s) that may result in invalid fast clear optimization."), *OptimizedClearValue.ToString(), *ClearColorValue.ToString());
+                    }
+                    InCmdList->ClearRenderTargetView(RenderTarget->RTV->GetHandle(), ClearColorValue.GetData(), 0, nullptr);
 					RenderTargetDescriptors[i] = RenderTarget->RTV->GetHandle();
 				}
 
@@ -202,7 +197,7 @@ namespace FW
 		}
 	}
 
-	void Dx12StateCache::SetRenderTargets(TArray<Dx12Texture*> InRTs, TArray<TOptional<Vector4f>> InClearColorValues)
+	void Dx12StateCache::SetRenderTargets(TArray<Dx12Texture*> InRTs, TArray<Vector4f> InClearColorValues)
 	{
 		if (InRTs != CurrentRenderTargets || InClearColorValues != ClearColorValues)
 		{
@@ -331,7 +326,7 @@ namespace FW
 		BeginCaptureEvent(PassName);
 
 		TArray<Dx12Texture*> RTs;
-		TArray<TOptional<Vector4f>> ClearColorValues;
+		TArray<Vector4f> ClearColorValues;
 
 		for (int32 i = 0; i < PassDesc.ColorRenderTargets.Num(); i++) {
 			Dx12Texture* Rt = static_cast<Dx12Texture*>(PassDesc.ColorRenderTargets[i].Texture);

@@ -13,6 +13,7 @@ namespace SH
 		, ViewPort(InViewPort)
 	{
         ResizeHandle = ViewPort->OnViewportResize.AddRaw(this, &ShaderToyRenderComp::OnViewportResize);
+        OnViewportResize({ (float)ViewPort->GetSize().X, (float)ViewPort->GetSize().Y });
 	}
 
     ShaderToyRenderComp::~ShaderToyRenderComp()
@@ -23,14 +24,15 @@ namespace SH
 	void ShaderToyRenderComp::OnViewportResize(const Vector2f& InResolution)
 	{
 		Context.iResolution = InResolution;
-
-		//Note: BGRA8_UNORM is default framebuffer format in ue standalone renderer framework.
-		GpuTextureDesc Desc{ (uint32)InResolution.x, (uint32)InResolution.y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
-		Context.FinalRT = GGpuRhi->CreateTexture(Desc);
-		GGpuRhi->SetResourceName("FinalRT", Context.FinalRT);
-
-		ViewPort->SetViewPortRenderTexture(Context.FinalRT);
-		RenderInternal();
+        
+        //Note: BGRA8_UNORM is default framebuffer format in ue standalone renderer framework.
+        GpuTextureDesc Desc{ (uint32)InResolution.x, (uint32)InResolution.y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
+        Context.FinalRT = GGpuRhi->CreateTexture(Desc);
+        GGpuRhi->SetResourceName("FinalRT", Context.FinalRT);
+        ViewPort->SetViewPortRenderTexture(Context.FinalRT);
+        
+        RenderBegin();
+        RenderInternal();
 	}
 
 	void ShaderToyRenderComp::RenderBegin()
@@ -45,6 +47,10 @@ namespace SH
             RenderGraph Graph;
             Context.RG = &Graph;
             {
+                //Update builtin uniformbuffer value.
+                StShader::GetBuiltInUb()->GetMember<Vector2f>("iResolution") = Context.iResolution;
+                StShader::GetBuiltInUb()->GetMember<float>("iTime") = Context.iTime;
+                
                 bool AnyError = ShaderToyGraph->Exec(Context);
                 if(AnyError)
                 {

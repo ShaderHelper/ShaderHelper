@@ -55,6 +55,7 @@ namespace FW
 			, MetaData(MoveTemp(InData))
 		{
             ReadableBackBuffer = FMemory::Malloc(MetaData.UniformBufferSize);
+            FMemory::Memset(ReadableBackBuffer, 0, MetaData.UniformBufferSize);
         }
         
         ~UniformBuffer()
@@ -77,6 +78,7 @@ namespace FW
 		}
 
 		GpuBuffer* GetGpuResource() const { return Buffer; }
+        const UniformBufferMetaData& GetMetaData() const { return MetaData; }
 
 	private:
 		TRefCountPtr<GpuBuffer> Buffer;
@@ -148,12 +150,15 @@ namespace FW
 			return DeclarationHead + UniformBufferMemberNames + DeclarationEnd;
 		}
         const UniformBufferMetaData& GetMetaData() const { return MetaData; }
-
+        
 		TUniquePtr<UniformBuffer> Build() {
-			checkf(MetaData.UniformBufferSize > 0, TEXT("Nothing added to the builder."));
-			TRefCountPtr<GpuBuffer> Buffer = GGpuRhi->CreateBuffer(MetaData.UniformBufferSize, (GpuBufferUsage)Usage);
-			MetaData.UniformBufferDeclaration = GetLayoutDeclaration();
-			return MakeUnique<UniformBuffer>( MoveTemp(Buffer), MetaData);
+            if(MetaData.UniformBufferSize > 0)
+            {
+                TRefCountPtr<GpuBuffer> Buffer = GGpuRhi->CreateBuffer(MetaData.UniformBufferSize, (GpuBufferUsage)Usage);
+                MetaData.UniformBufferDeclaration = GetLayoutDeclaration();
+                return MakeUnique<UniformBuffer>( MoveTemp(Buffer), MetaData);
+            }
+            return {};
 		}
 
     private:

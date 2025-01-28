@@ -29,15 +29,21 @@ namespace SH
 
 	void ShaderToyOp::OnCreate(AssetObject* InAsset)
 	{
-		static_cast<ShaderToy*>(InAsset)->AddNode(NewShObject<ShaderToyOuputNode>(InAsset));
+        auto OutputNode = NewShObject<ShaderToyOuputNode>(InAsset);
+        OutputNode->InitPins();
+		static_cast<ShaderToy*>(InAsset)->AddNode(MoveTemp(OutputNode));
 	}
 
 	void ShaderToyOp::OnDelete(const FString& InAssetPath)
 	{
-		AssetOp::OnDelete(InAssetPath);
-
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->OpenGraph(nullptr, nullptr);
+        auto Graph = TSingleton<ShProjectManager>::Get().GetProject()->Graph;
+        if(Graph && Graph->GetPath() == InAssetPath)
+        {
+            ShEditor->OpenGraph(nullptr, nullptr);
+        }
+        
+        AssetOp::OnDelete(InAssetPath);
 	}
 
 }

@@ -727,7 +727,7 @@ namespace SH
         FString ShaderTemplateWithBinding = StShaderAsset->GetTemplateWithBinding();
         FString FinalShaderSource = ShaderTemplateWithBinding + CurrentShaderSource;
         
-        FString ShaderName = StShaderAsset->GetFileName();
+        FString ShaderName = StShaderAsset->GetFileName() + "Ps";
         StShaderAsset->PixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, MoveTemp(FinalShaderSource), ShaderName, TEXT("MainPS"));
         FString ErrorInfo;
         if (GGpuRhi->CrossCompileShader(StShaderAsset->PixelShader, ErrorInfo))

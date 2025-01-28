@@ -24,22 +24,22 @@ namespace SH
 		ShaderToyPassNode();
 
 	public:
+        void InitPins() override;
 		void Serialize(FArchive& Ar) override;
+        void PostLoad() override;
 		TSharedPtr<SWidget> ExtraNodeWidget() override;
-		TArray<FW::GraphPin*> GetPins() override;
 		FSlateColor GetNodeColor() const override { return FLinearColor{ 0.27f, 0.13f, 0.0f }; }
 		bool Exec(FW::GraphExecContext& Context) override;
 
-	public:
-		ChannelPin Slot0{ FText::FromString("iChannel0"), FW::PinDirection::Input };
-        ChannelPin Slot1{ FText::FromString("iChannel1"), FW::PinDirection::Input };
-        ChannelPin Slot2{ FText::FromString("iChannel2"), FW::PinDirection::Input };
-        ChannelPin Slot3{ FText::FromString("iChannel3"), FW::PinDirection::Input };
-		GpuTexturePin PassOutput{ FText::FromString("RT"), FW::PinDirection::Output };
+        void RefreshProperty();
+        void PostPropertyChanged(FW::PropertyData* InProperty) override;
+        TArray<TSharedRef<FW::PropertyData>>* GetPropertyDatas() override;
+        TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromBinding();
+        TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromUniform(FW::UniformBuffer* InUb, bool Enabled);
         
     public:
         FW::AssetPtr<StShader> Shader;
-
+        
 	private:
 		TSharedPtr<FW::PreviewViewPort> Preview;
 	};

@@ -2,7 +2,7 @@
 #include "FrameWorkCore.h"
 #include "ProjectManager/ProjectManager.h"
 #include "UI/Widgets/Property/PropertyData/PropertyData.h"
-#include "UI/Widgets/Property/PropertyData/PropertyItem.h"
+#include "UI/Widgets/Property/PropertyData/PropertyAssetItem.h"
 
 namespace FW
 {
@@ -43,14 +43,23 @@ namespace FW
         GlobalValidShObjects.Remove(this);
     }
 
+    void ShObject::SetOuter(ShObject* InOuter)
+    {
+        Outer = InOuter;
+        if(Outer)
+        {
+            Outer->SubObjects.Add(this);
+        }
+    }
+
     AssetObject* ShObject::GetOuterMost()
     {
         ShObject* Cur = this;
-        ShObject* CurOuter = Outer;
+        ShObject* CurOuter = GetOuter();
         while(CurOuter)
         {
             Cur = CurOuter;
-            CurOuter = CurOuter->Outer;
+            CurOuter = CurOuter->GetOuter();
         }
         
         checkf(Cur->DynamicMetaType()->IsDerivedFrom<AssetObject>(), TEXT("The OuterMost should be an AssetObject"));
@@ -63,6 +72,27 @@ namespace FW
 		Ar << ObjectName;
 		Ar << GFrameWorkVer << GProjectVer;
 	}
+
+    void ShObject::PostLoad()
+    {
+        //PostLoad subobjects
+        for(auto It = SubObjects.CreateIterator(); It; It++)
+        {
+            if(*It)
+            {
+                (*It)->PostLoad();
+            }
+            else
+            {
+                It.RemoveCurrent();
+            }
+        }
+    }
+
+    void ShObject::PostPropertyChanged(PropertyData* InProperty)
+    {
+        GetOuterMost()->MarkDirty();
+    }
 
     TArray<TSharedRef<PropertyData>>* ShObject::GetPropertyDatas()
     {

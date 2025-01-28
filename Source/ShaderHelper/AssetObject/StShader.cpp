@@ -18,6 +18,14 @@ R"(void mainImage(out float4 fragColor,in float2 fragCoord)
     fragColor = float4(col,1);
 })";
 
+const FString DefaultVertexShader =
+R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
+{
+    float2 uv = float2(uint2(VertID, VertID << 1) & 2);
+    Pos = float4(lerp(float2(-1, 1), float2(1, -1), uv), 0, 1);
+})";
+
+
     REFLECTION_REGISTER(AddClass<StShader>("ShaderToy Shader")
                                 .BaseClass<AssetObject>()
 	)
@@ -42,12 +50,36 @@ R"(void mainImage(out float4 fragColor,in float2 fragCoord)
 
     void StShader::PostLoad()
     {
-        VertexShader = GGpuRhi->CreateShaderFromSource(ShaderType::VertexShader, GetFullShader(), GetFileName(), TEXT("MainVS"));
+        AssetObject::PostLoad();
+        
+        VertexShader = GGpuRhi->CreateShaderFromSource(ShaderType::VertexShader, DefaultVertexShader, GetFileName() + "Vs", TEXT("MainVS"));
         FString ErrorInfo;
         GGpuRhi->CrossCompileShader(VertexShader, ErrorInfo);
 
-        PixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, GetFullShader(), GetFileName(), TEXT("MainPS"));
+        PixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, GetFullPs(), GetFileName() + "Ps", TEXT("MainPS"));
         GGpuRhi->CrossCompileShader(PixelShader, ErrorInfo);
+        
+        CustomUniformBuffer = CustomUniformBufferBuilder.Build();
+    }
+
+    UniformBuffer* StShader::GetBuiltInUb()
+    {
+        static TUniquePtr<UniformBuffer> BuiltInUb = GetBuiltInUbBuilder().Build();
+        return BuiltInUb.Get();
+    }
+
+    GpuBindGroup* StShader::GetBuiltInBindGroup()
+    {
+        static TRefCountPtr<GpuBindGroup> BuiltInBindGroup = GpuBindGrouprBuilder{ GetBuiltInBindLayout() }
+            .SetUniformBuffer("Uniform", GetBuiltInUb()->GetGpuResource())
+            .Build();
+        return BuiltInBindGroup;
+    }
+
+    GpuBindGroupLayout* StShader::GetBuiltInBindLayout()
+    {
+        static TRefCountPtr<GpuBindGroupLayout> BuiltInBindLayout = GetBuiltInBindLayoutBuilder().Build();
+        return BuiltInBindLayout;
     }
 
     UniformBufferBuilder& StShader::GetBuiltInUbBuilder()
@@ -62,11 +94,11 @@ R"(void mainImage(out float4 fragColor,in float2 fragCoord)
         return BuiltInUbLayout;
     }
 
-    GpuBindGroupLayoutBuilder& StShader::GetBuiltInBindingLayoutBuilder()
+    GpuBindGroupLayoutBuilder& StShader::GetBuiltInBindLayoutBuilder()
     {
-        static GpuBindGroupLayoutBuilder BuiltInBindingLayout{ 0 };
+        static GpuBindGroupLayoutBuilder BuiltInBindLayout{ 0 };
         static int Init = [&] {
-            BuiltInBindingLayout
+            BuiltInBindLayout
                 .AddUniformBuffer("Uniform", GetBuiltInUbBuilder().GetLayoutDeclaration(), BindingShaderStage::Pixel)
                 .AddTexture("iChannel0", BindingShaderStage::Pixel)
                 .AddSampler("iChannel0Sampler", BindingShaderStage::Pixel)
@@ -78,7 +110,7 @@ R"(void mainImage(out float4 fragColor,in float2 fragCoord)
                 .AddSampler("iChannel3Sampler", BindingShaderStage::Pixel);
             return 0;
         }();
-        return BuiltInBindingLayout;
+        return BuiltInBindLayout;
     }
 
 	FString StShader::FileExtension() const
@@ -93,7 +125,7 @@ R"(void mainImage(out float4 fragColor,in float2 fragCoord)
 
     FString StShader::GetBinding() const
     {
-        return GetBuiltInBindingLayoutBuilder().GetCodegenDeclaration() + CustomBindGroupLayoutBuilder.GetCodegenDeclaration();
+        return GetBuiltInBindLayoutBuilder().GetCodegenDeclaration() + CustomBindGroupLayoutBuilder.GetCodegenDeclaration();
     }
 
     FString StShader::GetTemplateWithBinding() const
@@ -103,7 +135,7 @@ R"(void mainImage(out float4 fragColor,in float2 fragCoord)
         return GetBinding() + Template;
     }
 
-	FString StShader::GetFullShader() const
+	FString StShader::GetFullPs() const
 	{
 		FString Template;
 		FFileHelper::LoadFileToString(Template, *(PathHelper::ShaderDir() / "ShaderHelper/StShaderTemplate.hlsl"));
@@ -138,6 +170,10 @@ R"(void mainImage(out float4 fragColor,in float2 fragCoord)
         
         CustomUniformBufferBuilder = NewCustomUniformBufferBuilder;
         CustomBindGroupLayoutBuilder = NewCustomBindGroupLayoutBuilder;
+        
+        CustomUniformBuffer = CustomUniformBufferBuilder.Build();
+        
+        OnRefreshBuilder.ExecuteIfBound();
     }
     
     template<typename UniformType>
@@ -248,7 +284,7 @@ R"(void mainImage(out float4 fragColor,in float2 fragCoord)
     {
         auto BuiltInCategory = MakeShared<PropertyCategory>(this, "Built In");
         {
-            const GpuBindGroupLayoutDesc& BuiltInLayoutDesc = GetBuiltInBindingLayoutBuilder().GetLayoutDesc();
+            const GpuBindGroupLayoutDesc& BuiltInLayoutDesc = GetBuiltInBindLayoutBuilder().GetLayoutDesc();
             for(const auto& [BindingName, Slot] : BuiltInLayoutDesc.CodegenBindingNameToSlot)
             {
                 if(BuiltInLayoutDesc.GetBindingType(Slot) == BindingType::UniformBuffer)

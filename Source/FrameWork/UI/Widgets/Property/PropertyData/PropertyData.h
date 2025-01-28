@@ -51,7 +51,7 @@ namespace FW
             return {};
         }
     public:
-        bool Expanded = false;
+        bool Expanded = true;
 
 	protected:
         ShObject* Owner;

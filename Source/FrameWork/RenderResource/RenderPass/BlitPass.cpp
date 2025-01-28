@@ -10,7 +10,7 @@ namespace FW
 		GpuRenderPassDesc BlitPassDesc;
 		BlitPassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassInput.OutputRenderTarget, RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
 
-		BlitShader PassShader;
+		static BlitShader PassShader;
 
 		BindingContext Binding;
 		BlitShader::Parameters ShaderParameter{ PassInput.InputTex, PassInput.InputTexSampler };

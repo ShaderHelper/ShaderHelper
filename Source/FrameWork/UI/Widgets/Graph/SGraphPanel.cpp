@@ -70,6 +70,7 @@ namespace FW
 			Output->Owner->RemoveDep(Input->Owner);
 			auto Kkey = Output->Owner->NodeData->OutPinToInPin.FindKey(Input->PinData->GetGuid());
 			Output->Owner->NodeData->OutPinToInPin.Remove(*Kkey, Input->PinData->GetGuid());
+            Input->PinData->Refuse();
 		}
 	}
 
@@ -492,8 +493,12 @@ namespace FW
 		});
 
 		GraphNode* NewNodeData = static_cast<GraphNode*>(DefaultNodeData->DynamicMetaType()->Construct());
-        NewNodeData->Outer = GraphData;
+        NewNodeData->InitPins();
+        NewNodeData->SetOuter(GraphData);
 		NewNodeData->Position = PanelCoordToGraphCoord(MousePos);
+        
+        ShObjectOp* Op = GetShObjectOp(NewNodeData);
+        Op->OnSelect(NewNodeData);
 
 		auto NodeWidget = AddNodeFromData(NewNodeData);
 		ClearSelectedNode();

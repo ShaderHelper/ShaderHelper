@@ -140,7 +140,8 @@ namespace SH
 		SAssignNew(Window, SWindow)
 			.Title(TAttribute<FText>::CreateLambda([this] { 
 				FString ProjectPath = CurProject->GetFilePath();
-				return FText::FromString(LOCALIZATION("ShaderHelper").ToString() + FString::Printf(TEXT(" [%s]"), *ProjectPath));
+                double Fps = 1 / GApp->GetDeltaTime();
+				return FText::FromString(LOCALIZATION("ShaderHelper").ToString() + FString::Printf(TEXT(" [%s] Fps:%d"), *ProjectPath, (int)Fps));
 			}))
 			.ScreenPosition(UsedWindowPos)
 			.AutoCenter(AutoCenterRule)
@@ -512,6 +513,11 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 		GraphPanel->SetGraphData(InGraphData);
 		CurProject->Graph = InGraphData;
+        
+        if(!InGraphData)
+        {
+            ViewPort->Clear();
+        }
 	}
 
     void ShaderHelperEditor::RefreshProperty()

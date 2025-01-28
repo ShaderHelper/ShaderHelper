@@ -20,7 +20,6 @@ namespace FW
         }
 
 		virtual void Serialize(FArchive& Ar) override;
-        virtual void PostLoad() {}
 		virtual void Save();
 		virtual void MarkDirty();
 		bool IsDirty();

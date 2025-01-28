@@ -37,5 +37,6 @@ public:
     virtual void UnMapGpuBuffer(GpuBuffer* InGpuBuffer) override;
 };
 
+inline TArray<TRefCountPtr<GpuResource>> GDeferredReleaseOneFrame;
 inline MetalGpuRhiBackend* GMtlGpuRhi;
 }

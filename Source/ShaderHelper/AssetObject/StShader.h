@@ -13,8 +13,11 @@ namespace SH
 		StShader();
 		~StShader();
         
+        static FW::UniformBuffer* GetBuiltInUb();
         static FW::UniformBufferBuilder& GetBuiltInUbBuilder();
-        static FW::GpuBindGroupLayoutBuilder& GetBuiltInBindingLayoutBuilder();
+        static FW::GpuBindGroupLayout* GetBuiltInBindLayout();
+        static FW::GpuBindGroup* GetBuiltInBindGroup();
+        static FW::GpuBindGroupLayoutBuilder& GetBuiltInBindLayoutBuilder();
 
 	public:
 		void Serialize(FArchive& Ar) override;
@@ -24,7 +27,7 @@ namespace SH
 
         FString GetBinding() const;
         FString GetTemplateWithBinding() const;
-		FString GetFullShader() const;
+		FString GetFullPs() const;
         
         TArray<TSharedRef<FW::PropertyData>>* GetPropertyDatas() override;
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromBinding();
@@ -40,8 +43,12 @@ namespace SH
 	public:
 		FString PixelShaderBody;
         TRefCountPtr<FW::GpuShader> VertexShader, PixelShader;
+        FSimpleDelegate OnRefreshBuilder;
         
         //Custom
+        TUniquePtr<FW::UniformBuffer> CustomUniformBuffer;
+        TRefCountPtr<FW::GpuBindGroupLayout> CustomBindLayout;
+        TRefCountPtr<FW::GpuBindGroup> CustomBindGroup;
         FW::UniformBufferBuilder CustomUniformBufferBuilder{FW::UniformBufferUsage::Persistant};
         FW::GpuBindGroupLayoutBuilder CustomBindGroupLayoutBuilder{1};
         

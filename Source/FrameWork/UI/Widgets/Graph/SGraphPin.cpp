@@ -51,11 +51,13 @@ namespace FW
 				{
 					OwnerPanel->RemoveInputLink(StartPin);
 					OwnerPanel->AddLink(EndPin, StartPin);
+                    OwnerPanel->GetGraphData()->MarkDirty();
 				}
 				else
 				{
 					OwnerPanel->RemoveInputLink(EndPin);
 					OwnerPanel->AddLink(StartPin, EndPin);
+                    OwnerPanel->GetGraphData()->MarkDirty();
 				}
 				OwnerPanel->PreviewStart.Reset();
 				return FReply::Handled().ReleaseMouseLock();
@@ -75,6 +77,8 @@ namespace FW
                 OwnerPanel->PreviewStart = OwnerPanel->GetTickSpaceGeometry().AbsoluteToLocal(OutputPin->GetTickSpaceGeometry().GetAbsolutePositionAtCoordinates(FVector2D(0.5f, 0.5f)));
                 OwnerPanel->PreviewEnd = OwnerPanel->GetTickSpaceGeometry().AbsoluteToLocal(MyGeometry.GetAbsolutePositionAtCoordinates(FVector2D(0.5f, 0.5f)));
                 OwnerPanel->RemoveInputLink(this);
+                OwnerPanel->GetGraphData()->MarkDirty();
+                
                 return FReply::Handled().BeginDragDrop(MakeShared<GraphDragDropOp>(OutputPin));
             }
             else

@@ -16,26 +16,18 @@ namespace FW
 
 	void RenderGraph::AddRenderPass(const FString& PassName, const GpuRenderPassDesc& PassInfo, const RenderPassExecution& InExecution)
 	{
-		auto Pass = MakeUnique<RGRenderPass>(
-			RGRenderPass{ {PassName, RGPassFlag::Render}, PassInfo, InExecution}
-		);
-		RGPasses.Add(MoveTemp(Pass));
+        RGRenderPasses.Add({PassName, PassInfo, InExecution});
 	}
 
 	void RenderGraph::Execute()
 	{
-		for (const auto& Pass: RGPasses)
+		for (const auto& RenderPass: RGRenderPasses)
 		{
-			if (Pass->Flag == RGPassFlag::Render)
-			{
-				RGRenderPass* RenderPass = static_cast<RGRenderPass*>(Pass.Get());
-				auto PassRecorder = CmdRecorder->BeginRenderPass(RenderPass->Desc, RenderPass->Name);
-				{
-					RenderPass->Execution(PassRecorder);
-				}
-				CmdRecorder->EndRenderPass(PassRecorder);
-			}
-
+            auto PassRecorder = CmdRecorder->BeginRenderPass(RenderPass.Desc, RenderPass.Name);
+            {
+                RenderPass.Execution(PassRecorder);
+            }
+            CmdRecorder->EndRenderPass(PassRecorder);
 		}
 		GGpuRhi->EndRecording(CmdRecorder);
 		GGpuRhi->Submit({CmdRecorder});

@@ -11,7 +11,7 @@ namespace FW
 		GpuTextureUsage Usage = GpuTextureUsage::None;
  
 		TArray<uint8> InitialData{};
-        Vector4f ClearValues = 0;
+        Vector4f ClearValues{0,0,0,1};
 		uint32 Depth = 1;
 		uint32 NumMips = 1;
     };

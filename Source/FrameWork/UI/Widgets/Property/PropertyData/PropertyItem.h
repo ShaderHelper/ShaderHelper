@@ -5,6 +5,7 @@
 #include "UI/Widgets/Misc/SIconButton.h"
 #include "AssetManager/AssetManager.h"
 
+
 namespace FW
 {
     //{ Name | Embed | Value } DeleteIcon
@@ -73,29 +74,26 @@ namespace FW
             , ValueRef(InValueRef)
         {}
 
-        void SetOnValueChanged(const TFunction<void(T)>& ValueChanged) { OnValueChanged = ValueChanged; }
         TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override;
-
     private:
         T* ValueRef;
-        TFunction<void(T)> OnValueChanged;
     };
 
 	template<>
 	inline TSharedRef<ITableRow> PropertyItem<float>::GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable)
 	{
         auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
-//        if(ValueRef)
-//        {
-//            auto ValueWidget = SNew(SSpinBox<float>)
-//                .MaxFractionalDigits(3)
-//                .OnValueChanged_Lambda([this](float NewValue) {
-//                    *ValueRef = NewValue;
-//                    if (OnValueChanged) { OnValueChanged(NewValue); }
-//                })
-//                .Value_Lambda([this] { return *ValueRef; });
-//            Item->AddWidget(MoveTemp(ValueWidget));
-//        }
+        if(ValueRef)
+        {
+            auto ValueWidget = SNew(SSpinBox<float>)
+                .MaxFractionalDigits(3)
+                .OnValueChanged_Lambda([this](float NewValue) {
+                    *ValueRef = NewValue;
+                    Owner->PostPropertyChanged(this);
+                })
+                .Value_Lambda([this] { return *ValueRef; });
+            Item->AddWidget(MoveTemp(ValueWidget));
+        }
         
 		return Row;
 	}
@@ -104,35 +102,33 @@ namespace FW
 	inline TSharedRef<ITableRow> PropertyItem<Vector2f>::GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable)
 	{
         auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
-//        if(ValueRef)
-//        {
-//            auto ValueWidget = SNew(SHorizontalBox)
-//                + SHorizontalBox::Slot()
-//                [
-//                    SNew(SSpinBox<float>)
-//                    .MaxFractionalDigits(3)
-//                    .OnValueChanged_Lambda([this](float NewValue) {
-//                        ValueRef->x = NewValue;
-//                        if (OnValueChanged) { OnValueChanged(*ValueRef); }
-//                    })
-//                    .Value_Lambda([this] { return ValueRef->x; })
-//                ]
-//                + SHorizontalBox::Slot()
-//                [
-//                    SNew(SSpinBox<float>)
-//                    .MaxFractionalDigits(3)
-//                    .OnValueChanged_Lambda([this](float NewValue) {
-//                        ValueRef->y = NewValue;
-//                        if (OnValueChanged) { OnValueChanged(*ValueRef); };
-//                    })
-//                    .Value_Lambda([this] { return ValueRef->y; })
-//                ];
-//            Item->AddWidget(MoveTemp(ValueWidget));
-//        }
+        if(ValueRef)
+        {
+            auto ValueWidget = SNew(SHorizontalBox)
+                + SHorizontalBox::Slot()
+                [
+                    SNew(SSpinBox<float>)
+                    .MaxFractionalDigits(3)
+                    .OnValueChanged_Lambda([this](float NewValue) {
+                        ValueRef->x = NewValue;
+                        Owner->PostPropertyChanged(this);
+                    })
+                    .Value_Lambda([this] { return ValueRef->x; })
+                ]
+                + SHorizontalBox::Slot()
+                [
+                    SNew(SSpinBox<float>)
+                    .MaxFractionalDigits(3)
+                    .OnValueChanged_Lambda([this](float NewValue) {
+                        ValueRef->y = NewValue;
+                        Owner->PostPropertyChanged(this);
+                    })
+                    .Value_Lambda([this] { return ValueRef->y; })
+                ];
+            Item->AddWidget(MoveTemp(ValueWidget));
+        }
 
 		return Row;
 	}
 }
-
-#include "PropertyAssetItem.h"
 
