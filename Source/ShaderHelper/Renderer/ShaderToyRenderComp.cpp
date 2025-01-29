@@ -25,8 +25,10 @@ namespace SH
 	{
 		Context.iResolution = InResolution;
         
+        TArray<uint8> Datas;
+        Datas.SetNumZeroed(4 * (uint32)InResolution.x * (uint32)InResolution.y);
         //Note: BGRA8_UNORM is default framebuffer format in ue standalone renderer framework.
-        GpuTextureDesc Desc{ (uint32)InResolution.x, (uint32)InResolution.y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
+        GpuTextureDesc Desc{ (uint32)InResolution.x, (uint32)InResolution.y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared , Datas};
         Context.FinalRT = GGpuRhi->CreateTexture(Desc);
         GGpuRhi->SetResourceName("FinalRT", Context.FinalRT);
         ViewPort->SetViewPortRenderTexture(Context.FinalRT);

@@ -164,6 +164,9 @@ PRAGMA_DISABLE_DEPRECATION_WARNINGS
 			{
 				FSlateApplication::Get().PumpMessages();
 			}
+            
+            //Reduce cpu usage
+            FPlatformProcess::Sleep(0.01);
 		}
 	}
 

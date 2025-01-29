@@ -115,10 +115,12 @@ namespace SH
         void Compile();
 
 		TOptional<int32> FindFoldMarker(int32 InIndex) const;
-		void MarkLineNumberDataDirty(bool IsDirty) { IsLineNumberDataDirty = IsDirty; }
 		
 		//Given a range for displayed text, then return the unfolding result.
 		FString UnFold(const FTextSelection& DisplayedTextRange);
+        
+        void UpdateLineNumberData();
+        void RefreshLineNumberToErrorInfo();
 
 	protected:
 		virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
@@ -131,9 +133,6 @@ namespace SH
 		void CutSelectedText();
 		bool CanCutSelectedText() const;
 
-		void UpdateLineNumberData();
-		void UpdateLineTipStyle(const double InCurrentTime);
-		void UpdateLineNumberHighlight();
 		void UpdateListViewScrollBar();
 		void UpdateEffectText();
 		void UpdateFoldingArrow();
@@ -143,8 +142,6 @@ namespace SH
 
 		FReply OnFold(int32 LineNumber);
 		void RemoveFoldMarker(int32 InIndex);
-        
-        void RefreshLineNumberToErrorInfo();
 
 	public:
 		TArray<FoldMarker> DisplayedFoldMarkers;
@@ -152,7 +149,6 @@ namespace SH
 	private:
 		FString CurrentShaderSource;
 
-		bool IsLineNumberDataDirty = false;
 		TArray<LineNumberItemPtr> LineNumberData;
 		TSharedPtr<FShaderEditorMarshaller> ShaderMarshaller;
         TSharedPtr<SMultiLineEditableText> ShaderMultiLineEditableText;
