@@ -261,13 +261,24 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
         }
         
-        return SNew(SScrollBox)
-            .Orientation(EOrientation::Orient_Horizontal)
-            .ScrollBarVisibility(EVisibility::Collapsed)
-            +SScrollBox::Slot()
-            [
-                PathContainer
-            ];
+        return PathContainer;
+    }
+
+    void ShaderHelperEditor::UpdateStShaderPath(const FString& InStShaderPath)
+    {
+        AssetObject* Asset = TSingleton<AssetManager>::Get().FindLoadedAsset(InStShaderPath);
+        if(Asset)
+        {
+            StShader* Shader = static_cast<StShader*>(Asset);
+            if(auto* PathBox = StShaderPathBoxMap.Find(Shader))
+            {
+                (*PathBox)->ClearChildren();
+                (*PathBox)->AddSlot()
+                [
+                    SpawnStShaderPath(Shader->GetPath())
+                ];
+            }
+        }
     }
 
     TSharedRef<SDockTab> ShaderHelperEditor::SpawnStShaderTab(const FSpawnTabArgs& Args)
@@ -277,6 +288,16 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
         auto LoadedStShader = TSingleton<AssetManager>::Get().LoadAssetByGuid<StShader>(StShaderGuid);
 
         ShaderEditor = SNew(SShaderEditorBox).StShaderAsset(LoadedStShader);
+        
+        auto PathBox = SNew(SScrollBox)
+            .Orientation(EOrientation::Orient_Horizontal)
+            .ScrollBarVisibility(EVisibility::Collapsed)
+            +SScrollBox::Slot()
+            [
+                SpawnStShaderPath(LoadedStShader->GetPath())
+            ];
+        StShaderPathBoxMap.Add(LoadedStShader, PathBox);
+        
         auto NewStShaderTab = SNew(SShaderTab)
             .TabRole(ETabRole::DocumentTab)
 			.Label_Lambda([this, LoadedStShader] {
@@ -290,6 +311,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
             .OnTabClosed_Lambda([this, TabId, Args](TSharedRef<SDockTab> ClosedTab) {
                 auto StShaderAsset = *CurProject->OpenedStShaders.FindKey(ClosedTab);
                 CurProject->OpenedStShaders.Remove(StShaderAsset);
+                StShaderPathBoxMap.Remove(StShaderAsset);
 				//Clear the PersistLayout when closing a StShader tab. we don't intend to restore it, so just destroy it.
 				auto DockTabStack = ClosedTab->GetParentDockTabStack();
 				DockTabStack->OnTabRemoved(Args.GetTabId());
@@ -301,7 +323,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                 +SVerticalBox::Slot()
                 .AutoHeight()
                 [
-                    SpawnStShaderPath(LoadedStShader->GetPath())
+                    PathBox
                 ]
                 +SVerticalBox::Slot()
                 [

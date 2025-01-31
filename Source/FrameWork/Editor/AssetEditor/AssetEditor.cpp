@@ -30,6 +30,14 @@ namespace FW
 		});
 	}
 
+    void AssetOp::OnRename(const FString& OldPath, const FString& NewPath)
+    {
+        AssetObject* Asset = TSingleton<AssetManager>::Get().FindLoadedAsset(NewPath);
+        if(Asset) {
+            Asset->ObjectName = FText::FromString(FPaths::GetBaseFilename(NewPath));
+        }
+    }
+
 	void AssetOp::OnDelete(const FString& InAssetPath)
 	{
 		TSingleton<AssetManager>::Get().ClearAsset(InAssetPath);

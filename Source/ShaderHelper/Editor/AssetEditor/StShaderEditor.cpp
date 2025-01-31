@@ -31,6 +31,18 @@ namespace SH
         ShEditor->OpenStShaderTab(MoveTemp(LoadedStShaderAsset));
 	}
 
+    void StShaderOp::OnRename(const FString& OldPath, const FString& NewPath)
+    {
+        AssetOp::OnRename(OldPath, NewPath);
+        OnMove(OldPath, NewPath);
+    }
+
+    void StShaderOp::OnMove(const FString& OldPath, const FString& NewPath)
+    {
+        auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+        ShEditor->UpdateStShaderPath(NewPath);
+    }
+
     void StShaderOp::OnAdd(const FString& InAssetPath)
     {
 
