@@ -6,6 +6,7 @@
 #include "App/App.h"
 #include "AssetObject/ShaderToy/Nodes/ShaderToyOutputNode.h"
 #include "Renderer/ShaderToyRenderComp.h"
+#include "UI/Widgets/MessageDialog/SMessageDialog.h"
 
 using namespace FW;
 
@@ -24,7 +25,10 @@ namespace SH
 	{
 		AssetPtr<ShaderToy> LoadedShaderToy = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderToy>(InAssetPath);
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->OpenGraph(LoadedShaderToy, MakeShared<ShaderToyRenderComp>(LoadedShaderToy, ShEditor->GetViewPort()));
+        auto ShProject = TSingleton<ShProjectManager>::Get().GetProject();
+        
+        ShProject->TimelineStop = true;
+        ShEditor->OpenGraph(LoadedShaderToy, MakeShared<ShaderToyRenderComp>(LoadedShaderToy, ShEditor->GetViewPort()));
 	}
 
 	void ShaderToyOp::OnCreate(AssetObject* InAsset)

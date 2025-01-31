@@ -7,11 +7,12 @@ namespace FW
 	struct UniformBufferMemberInfo
 	{
 		uint32 Offset;
+        uint32 Size;
         FString TypeName;
         
         friend FArchive& operator<<(FArchive& Ar, UniformBufferMemberInfo& Info)
         {
-            Ar << Info.Offset << Info.TypeName;
+            Ar << Info.Offset << Info.Size << Info.TypeName;
             return Ar;
         }
 	};
@@ -37,7 +38,7 @@ namespace FW
             *WritableData = InData;
         }
         
-        operator T() const
+        operator T&()
         {
             return *ReadableData;
         }
@@ -54,6 +55,7 @@ namespace FW
 			: Buffer(MoveTemp(InBuffer))
 			, MetaData(MoveTemp(InData))
 		{
+            WriteCombinedBuffer = GGpuRhi->MapGpuBuffer(Buffer, GpuResourceMapMode::Write_Only);
             ReadableBackBuffer = FMemory::Malloc(MetaData.UniformBufferSize);
             FMemory::Memset(ReadableBackBuffer, 0, MetaData.UniformBufferSize);
         }
@@ -66,9 +68,8 @@ namespace FW
 		template<typename T>
         UniformBufferMemberWrapper<T> GetMember(const FString& MemberName) {
 			checkf(MetaData.Members.Contains(MemberName), TEXT("The uniform buffer doesn't contain \"%s\" member."), *MemberName);
-			int32 MemberOffset = MetaData.Members[MemberName].Offset;
-			void* BufferBaseAddr = GGpuRhi->MapGpuBuffer(Buffer, GpuResourceMapMode::Write_Only);
-            T* BufferWritableData = reinterpret_cast<T*>((uint8*)BufferBaseAddr + MemberOffset);
+            uint32 MemberOffset = MetaData.Members[MemberName].Offset;
+            T* BufferWritableData = reinterpret_cast<T*>((uint8*)WriteCombinedBuffer + MemberOffset);
             T* BufferReadableData = reinterpret_cast<T*>((uint8*)ReadableBackBuffer + MemberOffset);
             return {BufferReadableData, BufferWritableData};
 		}
@@ -79,9 +80,48 @@ namespace FW
 
 		GpuBuffer* GetGpuResource() const { return Buffer; }
         const UniformBufferMetaData& GetMetaData() const { return MetaData; }
+        uint32 GetSize() const { return MetaData.UniformBufferSize; }
+        
+        void* GetReadableData() const { return ReadableBackBuffer; }
+        void* GetWriteCombinedData() const { return WriteCombinedBuffer; }
+        
+        void SetData(uint8* InData)
+        {
+            FMemory::Memcpy(ReadableBackBuffer, InData, MetaData.UniformBufferSize);
+            FMemory::Memcpy(WriteCombinedBuffer, InData, MetaData.UniformBufferSize);
+        }
+        
+        bool HasMember(const FString& MemberName)
+        {
+            return MetaData.Members.Contains(MemberName);
+        }
+        
+        void CopySameMember(const UniformBuffer& Src)
+        {
+            const auto& SrcMetaData = Src.GetMetaData();
+            for(const auto& [MemberName, MemberInfo]: SrcMetaData.Members)
+            {
+                if(HasMember(MemberName))
+                {
+                    uint32 MemberSize = MetaData.Members[MemberName].Size;
+                    
+                    uint32 DstMemberOffset = MetaData.Members[MemberName].Offset;
+                    void* DstMemberWritableData = (uint8*)WriteCombinedBuffer + DstMemberOffset;
+                    void* DstMemberReadableData = (uint8*)ReadableBackBuffer + DstMemberOffset;
+                    
+                    uint32 SrcMemberOffset = SrcMetaData.Members[MemberName].Offset;
+                    void* SrcMemberWritableData = (uint8*)Src.GetWriteCombinedData() + SrcMemberOffset;
+                    void* SrcMemberReadableData = (uint8*)Src.GetReadableData() + SrcMemberOffset;
+
+                    FMemory::Memcpy(DstMemberWritableData, SrcMemberWritableData, MemberSize);
+                    FMemory::Memcpy(DstMemberReadableData, SrcMemberReadableData, MemberSize);
+                }
+            }
+        }
 
 	private:
 		TRefCountPtr<GpuBuffer> Buffer;
+        void* WriteCombinedBuffer;
         //Avoid directly reading write-combined memory
         void* ReadableBackBuffer;
 		UniformBufferMetaData MetaData;
@@ -160,11 +200,17 @@ namespace FW
             }
             return {};
 		}
+        
+        bool HasMember(const FString& MemberName)
+        {
+            return MetaData.Members.Contains(MemberName);
+        }
 
     private:
 		template<typename T>
 		void AddMember(const FString& MemberName)
-		{			
+		{
+            checkf(!HasMember(MemberName), TEXT("UniformBuffer can not have the same member name:%s."), *MemberName);
 			uint32 MemberSize = sizeof(T);
 			uint32 SizeBeforeAligning = MetaData.UniformBufferSize;
 			uint32 SizeAfterAligning = Align(MetaData.UniformBufferSize, 16);
@@ -184,7 +230,7 @@ namespace FW
 			}
 
             FString TypeName = ANSI_TO_TCHAR(UniformBufferMemberTypeString<T>::Value.data());
-			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize - MemberSize, TypeName});
+			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize - MemberSize, MemberSize, TypeName});
 
 			UniformBufferMemberNames += FString::Printf(TEXT("%s %s;\r\n"), *TypeName, *MemberName);
 		}

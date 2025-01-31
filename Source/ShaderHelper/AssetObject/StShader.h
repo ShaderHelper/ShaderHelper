@@ -33,27 +33,24 @@ namespace SH
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromBinding();
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromUniform(const FW::UniformBufferBuilder& InBuilder, bool Enabled);
         
-        template<typename UniformType>
-        void AddUniform();
+        void AddUniform(FString TypeName);
         void RefreshBuilder();
         
     private:
         TSharedRef<SWidget> GetCategoryMenu();
+        bool HasBindingName(const FString& InName);
+        TSharedPtr<FW::PropertyData> CreateUniformPropertyData(const FString& InTypeName, const FString& UniformMemberName, bool Enabled);
         
 	public:
+        bool bCurPsCompilationSucceed;
 		FString PixelShaderBody;
         TRefCountPtr<FW::GpuShader> VertexShader, PixelShader;
         FSimpleDelegate OnRefreshBuilder;
         
-        //Custom
-        TUniquePtr<FW::UniformBuffer> CustomUniformBuffer;
-        TRefCountPtr<FW::GpuBindGroupLayout> CustomBindLayout;
-        TRefCountPtr<FW::GpuBindGroup> CustomBindGroup;
+        TSharedPtr<FW::PropertyCategory> BuiltInCategory;
+        TSharedPtr<FW::PropertyCategory> CustomCategory;
         FW::UniformBufferBuilder CustomUniformBufferBuilder{FW::UniformBufferUsage::Persistant};
         FW::GpuBindGroupLayoutBuilder CustomBindGroupLayoutBuilder{1};
-        
-        TSharedPtr<FW::PropertyCategory> CustomCategory;
-        //
 	};
 
 }

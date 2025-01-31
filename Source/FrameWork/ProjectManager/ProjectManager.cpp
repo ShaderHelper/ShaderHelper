@@ -51,28 +51,15 @@ namespace FW
 
     bool Project::AnyPendingAsset() const
     {
-        for(auto Asset : PendingAssets)
-        {
-            if(Asset.IsValid()) {
-                return true;
-            }
-        }
-        return false;
+        return !PendingAssets.IsEmpty();
     }
 
 	void Project::SavePendingAssets()
 	{
-		TArray<ObserverObjectPtr<AssetObject>> Temp = PendingAssets;
+		TArray<AssetPtr<AssetObject>> Temp = PendingAssets;
 		for (auto Asset : Temp)
 		{
-            if(Asset.IsValid())
-            {
-                Asset->Save();
-            }
-			else
-            {
-                RemovePendingAsset(Asset);
-            }
+            Asset->Save();
 		}
 	}
 

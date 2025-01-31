@@ -9,6 +9,12 @@ namespace FW
 	struct GraphExecContext {
 	};
 
+    struct ExecRet
+    {
+        bool AnyError;
+        bool Terminate;
+    };
+
 	enum class PinDirection
 	{
 		Input,
@@ -45,7 +51,7 @@ namespace FW
 		virtual TSharedPtr<SWidget> ExtraNodeWidget() { return {}; }
 		virtual void Serialize(FArchive& Ar) override;
 		virtual FSlateColor GetNodeColor() const;
-        virtual bool Exec(GraphExecContext& Context) { return true; }
+        virtual ExecRet Exec(GraphExecContext& Context) = 0;
         virtual void InitPins() {}
         GraphPin* GetPin(const FGuid& Id);
         GraphPin* GetPin(const FString& InName);
@@ -83,7 +89,7 @@ namespace FW
 		void Serialize(FArchive& Ar) override;
 		const FSlateBrush* GetImage() const override;
 		virtual TArray<MetaType*> SupportNodes() const { return {}; }
-		virtual bool Exec(GraphExecContext& Context);
+		virtual ExecRet Exec(GraphExecContext& Context);
     public:
         bool AnyError = false;
 	

@@ -4,6 +4,7 @@
 #include "Common/Path/PathHelper.h"
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
+#include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "UI/Widgets/Property/PropertyData/PropertyItem.h"
 
 using namespace FW;
@@ -57,9 +58,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         GGpuRhi->CrossCompileShader(VertexShader, ErrorInfo);
 
         PixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, GetFullPs(), GetFileName() + "Ps", TEXT("MainPS"));
-        GGpuRhi->CrossCompileShader(PixelShader, ErrorInfo);
-        
-        CustomUniformBuffer = CustomUniformBufferBuilder.Build();
+        bCurPsCompilationSucceed = GGpuRhi->CrossCompileShader(PixelShader, ErrorInfo);
     }
 
     UniformBuffer* StShader::GetBuiltInUb()
@@ -156,11 +155,11 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
             for(auto UniformData : UniformDatas)
             {
                 FString MemberName = UniformData->GetDisplayName();
-                if(UniformData->IsOfType<PropertyItem<float>>())
+                if(UniformData->IsOfType<PropertyFloatItem>())
                 {
                     NewCustomUniformBufferBuilder.AddFloat(MemberName);
                 }
-                else if(UniformData->IsOfType<PropertyItem<Vector2f>>())
+                else if(UniformData->IsOfType<PropertyVector2fItem>())
                 {
                     NewCustomUniformBufferBuilder.AddVector2f(MemberName);
                 }
@@ -171,28 +170,80 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         CustomUniformBufferBuilder = NewCustomUniformBufferBuilder;
         CustomBindGroupLayoutBuilder = NewCustomBindGroupLayoutBuilder;
         
-        CustomUniformBuffer = CustomUniformBufferBuilder.Build();
-        
         OnRefreshBuilder.ExecuteIfBound();
     }
-    
-    template<typename UniformType>
-    void StShader::AddUniform()
+
+    bool StShader::HasBindingName(const FString& InName)
     {
-        static int32 AddNum;
-        auto CustomUniformCategory = CustomCategory->GetData("Uniform");
-        if (!CustomUniformCategory)
-        {
-            CustomUniformCategory = MakeShared<PropertyCategory>(this, "Uniform");
-            CustomCategory->AddChild(CustomUniformCategory.ToSharedRef());
-        }
-        FString NewUniformName = FString::Format(TEXT("Tmp{0}"), { AddNum++ });
+        TArray<TSharedRef<PropertyData>> BindingDatas;
         
+        auto BuiltInUniformCategory = BuiltInCategory->GetData("Uniform");
+        BuiltInUniformCategory->GetChildren(BindingDatas);
+        for(const auto& Data: BindingDatas)
+        {
+            if(Data->GetDisplayName() == InName)
+            {
+                return true;
+            }
+        }
+        auto BuiltInSlotCategory = BuiltInCategory->GetData("Slot");
+        BuiltInSlotCategory->GetChildren(BindingDatas);
+        for(const auto& Data: BindingDatas)
+        {
+            if(Data->GetDisplayName() == InName)
+            {
+                return true;
+            }
+        }
+        
+        if(CustomCategory)
+        {
+            auto CustomUniformCategory = CustomCategory->GetData("Uniform");
+            CustomUniformCategory->GetChildren(BindingDatas);
+            for(const auto& Data: BindingDatas)
+            {
+                if(Data->GetDisplayName() == InName)
+                {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+
+    TSharedPtr<PropertyData> StShader::CreateUniformPropertyData(const FString& InTypeName, const FString& UniformMemberName, bool Enabled)
+    {
         auto TypeInfoWidget = SNew(STextBlock).TextStyle(&FAppCommonStyle::Get().GetWidgetStyle<FTextBlockStyle>("MinorText"));
-        FText TypeInfo = FText::FromString(FString{ANSI_TO_TCHAR(UniformBufferMemberTypeString<UniformType>::Value.data())});
+        FText TypeInfo = FText::FromString(InTypeName);
         TypeInfoWidget->SetText(TypeInfo);
-        auto NewUniformProperty = MakeShared<PropertyItem<UniformType>>(this, NewUniformName);
+        
+        TSharedPtr<PropertyItemBase> NewUniformProperty;
+        if(InTypeName == "float")
+        {
+            NewUniformProperty = MakeShared<PropertyFloatItem>(this, UniformMemberName);
+        }
+        else if(InTypeName == "float2")
+        {
+            NewUniformProperty = MakeShared<PropertyVector2fItem>(this, UniformMemberName);
+        }
+        else
+        {
+            check(false);
+        }
+        NewUniformProperty->SetEnabled(Enabled);
         NewUniformProperty->SetEmbedWidget(TypeInfoWidget);
+        NewUniformProperty->SetCanChangeToName([this](const FString& NewUniformMemberName){
+            if(!HasBindingName(NewUniformMemberName))
+            {
+                return true;
+            }
+            else
+            {
+                MessageDialog::Open(MessageDialog::Ok, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("DuplicateBindingName"));
+                return false;
+            }
+        });
         NewUniformProperty->SetOnDisplayNameChanged([this](const FString&){
             RefreshBuilder();
             MarkDirty();
@@ -209,7 +260,27 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
             static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
         });
         
-        CustomUniformCategory->AddChild(MoveTemp(NewUniformProperty));
+        return NewUniformProperty;
+    }
+    
+    void StShader::AddUniform(FString TypeName)
+    {
+        auto CustomUniformCategory = CustomCategory->GetData("Uniform");
+        if (!CustomUniformCategory)
+        {
+            CustomUniformCategory = MakeShared<PropertyCategory>(this, "Uniform");
+            CustomCategory->AddChild(CustomUniformCategory.ToSharedRef());
+        }
+        
+        int Number = 0;
+        FString NewUniformName = FString::Format(TEXT("Tmp{0}"), { Number++ });
+        while(HasBindingName(NewUniformName))
+        {
+            NewUniformName = FString::Format(TEXT("Tmp{0}"), { Number++ });
+        }
+        
+        auto NewUniformPropertyData = CreateUniformPropertyData(TypeName, NewUniformName, true);
+        CustomUniformCategory->AddChild(NewUniformPropertyData.ToSharedRef());
         
         RefreshBuilder();
         MarkDirty();
@@ -224,13 +295,13 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
             FText::FromString("float"),
             FText::GetEmpty(),
             FSlateIcon(),
-            FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform<float>) })
-        ;
+            FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, FString("float")) }
+        );
         MenuBuilder.AddMenuEntry(
             FText::FromString("float2"),
             FText::GetEmpty(),
             FSlateIcon(),
-            FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform<Vector2f>) }
+            FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, FString("float2")) }
         );
         return MenuBuilder.MakeWidget();
     }
@@ -241,40 +312,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         const UniformBufferMetaData& MetaData = InBuilder.GetMetaData();
         for(const auto& [MemberName, MemberInfo]: MetaData.Members)
         {
-            auto TypeInfoWidget = SNew(STextBlock).TextStyle(&FAppCommonStyle::Get().GetWidgetStyle<FTextBlockStyle>("MinorText"));
-            FText TypeInfo = FText::FromString(MemberInfo.TypeName);
-            TypeInfoWidget->SetText(TypeInfo);
-            TSharedPtr<PropertyItemBase> Property;
-            if(MemberInfo.TypeName == "float")
-            {
-                Property = MakeShared<PropertyItem<float>>(this, MemberName);
-            }
-            else if(MemberInfo.TypeName == "float2")
-            {
-                Property = MakeShared<PropertyItem<Vector2f>>(this, MemberName);
-            }
-            else
-            {
-                check(false);
-            }
-            Property->SetEnabled(Enabled);
-            Property->SetEmbedWidget(TypeInfoWidget);
-            Property->SetOnDisplayNameChanged([this](const FString&){
-                RefreshBuilder();
-                MarkDirty();
-            });
-            if(Enabled) {
-                Property->SetOnDelete([this, self = &*Property]{
-                    self->Remove();
-                    if(self->GetParent()->GetChildrenNum() <= 0)
-                    {
-                        self->GetParent()->Remove();
-                    }
-                    RefreshBuilder();
-                    MarkDirty();
-                    static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
-                });
-            }
+            auto Property = CreateUniformPropertyData(MemberInfo.TypeName, MemberName, Enabled);
             Datas.Add(Property.ToSharedRef());
         }
         return Datas;
@@ -282,7 +320,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 
     TArray<TSharedRef<PropertyData>> StShader::PropertyDatasFromBinding()
     {
-        auto BuiltInCategory = MakeShared<PropertyCategory>(this, "Built In");
+        BuiltInCategory = MakeShared<PropertyCategory>(this, "Built In");
         {
             const GpuBindGroupLayoutDesc& BuiltInLayoutDesc = GetBuiltInBindLayoutBuilder().GetLayoutDesc();
             for(const auto& [BindingName, Slot] : BuiltInLayoutDesc.CodegenBindingNameToSlot)
@@ -334,7 +372,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
             }
         }
         CustomCategory->SetAddMenuWidget(GetCategoryMenu());
-        return {BuiltInCategory, CustomCategory.ToSharedRef()};
+        return {BuiltInCategory.ToSharedRef(), CustomCategory.ToSharedRef()};
     }
 
     TArray<TSharedRef<PropertyData>>* StShader::GetPropertyDatas()

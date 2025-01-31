@@ -28,6 +28,12 @@ namespace FW
 		ShObject::Serialize(Ar);
 	}
 
+    void AssetObject::PostLoad()
+    {
+        ShObject::PostLoad();
+        ObjectName = FText::FromString(GetFileName());
+    }
+
 	void AssetObject::Save()
 	{
 		TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*GetPath()));

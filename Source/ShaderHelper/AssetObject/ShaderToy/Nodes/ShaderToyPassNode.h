@@ -29,11 +29,15 @@ namespace SH
         void PostLoad() override;
 		TSharedPtr<SWidget> ExtraNodeWidget() override;
 		FSlateColor GetNodeColor() const override { return FLinearColor{ 0.27f, 0.13f, 0.0f }; }
-		bool Exec(FW::GraphExecContext& Context) override;
+        FW::ExecRet Exec(FW::GraphExecContext& Context) override;
 
-        void RefreshProperty();
+        
         void PostPropertyChanged(FW::PropertyData* InProperty) override;
         TArray<TSharedRef<FW::PropertyData>>* GetPropertyDatas() override;
+    
+    private:
+        void ClearBindingProperty();
+        void RefreshProperty();
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromBinding();
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromUniform(FW::UniformBuffer* InUb, bool Enabled);
         
@@ -42,5 +46,12 @@ namespace SH
         
 	private:
 		TSharedPtr<FW::PreviewViewPort> Preview;
+        //For Serialize
+        uint32 CustomUbSize = 0;
+        uint8* CustomUniformBufferData = nullptr;
+        
+        TUniquePtr<FW::UniformBuffer> CustomUniformBuffer;
+        TRefCountPtr<FW::GpuBindGroupLayout> CustomBindLayout;
+        TRefCountPtr<FW::GpuBindGroup> CustomBindGroup;
 	};
 }

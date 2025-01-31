@@ -307,6 +307,7 @@ namespace FW
 	template<typename T> bool IsOfType() const { return IsOfTypeImpl(T::GetTypeId());} \
 	virtual bool IsOfTypeImpl(const FString& Type) const { return false; }
 
+//Don't support MANUAL_RTTI_TYPE(PropertyItem<T>, PropertyItemBase)
 #define MANUAL_RTTI_TYPE(TYPE, Base) \
     public: \
 	static const FString& GetTypeId() { static FString Type = TEXT(#TYPE); return Type; } \

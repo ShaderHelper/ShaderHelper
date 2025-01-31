@@ -53,8 +53,8 @@ namespace SH
                 StShader::GetBuiltInUb()->GetMember<Vector2f>("iResolution") = Context.iResolution;
                 StShader::GetBuiltInUb()->GetMember<float>("iTime") = Context.iTime;
                 
-                bool AnyError = ShaderToyGraph->Exec(Context);
-                if(AnyError)
+                ExecRet GraphRet = ShaderToyGraph->Exec(Context);
+                if(GraphRet.Terminate)
                 {
                     TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = true;
                 }

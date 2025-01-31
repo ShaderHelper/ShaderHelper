@@ -51,7 +51,7 @@ namespace SH
 		GraphNode::Serialize(Ar);
 	}
 
-	bool ShaderToyOuputNode::Exec(GraphExecContext& Context)
+    ExecRet ShaderToyOuputNode::Exec(GraphExecContext& Context)
 	{
         ShaderToyExecContext& ShaderToyContext = static_cast<ShaderToyExecContext&>(Context);
         
@@ -64,6 +64,6 @@ namespace SH
 
         AddBlitPass(*ShaderToyContext.RG, MoveTemp(Input));
         
-        return true;
+        return {};
 	}
 }

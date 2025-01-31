@@ -45,8 +45,6 @@ namespace FW
 				}
 			}
 			check(NewAssetObject);
-            NewAssetObject->ObjectName = FText::FromString(FPaths::GetBaseFilename(InAssetPath));
-            
 			TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*InAssetPath));
             if(Ar)
             {

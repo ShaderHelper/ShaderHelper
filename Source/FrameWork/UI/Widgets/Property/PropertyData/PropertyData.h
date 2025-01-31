@@ -18,6 +18,7 @@ namespace FW
 		void GetChildren(TArray<TSharedRef<PropertyData>>& OutChildren) const { OutChildren = Children; };
 		int32 GetChildrenNum() const { return Children.Num(); }
 		FString GetDisplayName() const { return DisplayName; }
+
 		PropertyData* GetParent() const { return Parent; }
 
 		void AddChild(TSharedRef<PropertyData> InChild) 

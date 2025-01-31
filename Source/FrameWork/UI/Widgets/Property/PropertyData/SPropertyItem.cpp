@@ -26,8 +26,19 @@ namespace FW
             .OnTextCommitted_Lambda([this, InArgs](const FText& NewText, ETextCommit::Type) {
                 if (*DisplayName != NewText.ToString() && InArgs._OnDisplayNameChanged)
                 {
-                    *DisplayName = NewText.ToString();
-                    InArgs._OnDisplayNameChanged(NewText.ToString());
+                    if(InArgs._CanChangeToName)
+                    {
+                        if(InArgs._CanChangeToName(NewText.ToString()))
+                        {
+                            *DisplayName = NewText.ToString();
+                            InArgs._OnDisplayNameChanged(NewText.ToString());
+                        }
+                    }
+                    else
+                    {
+                        *DisplayName = NewText.ToString();
+                        InArgs._OnDisplayNameChanged(NewText.ToString());
+                    }
                 }
             })
             .Font(FAppStyle::Get().GetFontStyle("NormalFont"))

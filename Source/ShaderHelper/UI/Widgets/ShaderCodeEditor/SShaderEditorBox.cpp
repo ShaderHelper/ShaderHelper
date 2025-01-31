@@ -163,7 +163,6 @@ namespace SH
         UICommandList->MapAction(
             CommonCommands::Get().Save,
             FExecuteAction::CreateLambda([this] {
-                StShaderAsset->PixelShaderBody = CurrentShaderSource;
                 StShaderAsset->Save();
                 Compile();
             })
@@ -268,6 +267,21 @@ namespace SH
 		};
 
 		InfoBarBox->ClearChildren();
+        
+        InfoBarBox->AddSlot()
+            .AutoWidth()
+            [
+                SNew(SButton)
+                .OnClicked_Lambda([this]{
+                    Compile();
+                    return FReply::Handled();
+                })
+                [
+                    SNew(STextBlock)
+                    .Font(InforBarFontInfo)
+                    .Text(FText::FromString(TEXT("❖")))
+                ]
+            ];
 
 		InfoBarBox->AddSlot()
 			.AutoWidth()
@@ -275,6 +289,7 @@ namespace SH
 				SNew(SBorder)
 				.BorderImage(FAppStyle::Get().GetBrush("WhiteBrush"))
 				.BorderBackgroundColor(this, &SShaderEditorBox::GetEditStateColor)
+                .VAlign(VAlign_Center)
 				[
 					SNew(STextBlock)
 					.Font(InforBarFontInfo)
@@ -283,28 +298,6 @@ namespace SH
 					.Margin(FMargin{ 10, 0, 10, 0 })
 				]
 			];
-
-		if (CurEditState == EditState::Failed)
-		{
-			InfoBarBox->AddSlot()
-				.AutoWidth()
-				.VAlign(EVerticalAlignment::VAlign_Center)
-				[
-					SNew(STextBlock)
-					.ColorAndOpacity(FLinearColor::Red)
-					.Text_Lambda([this] {
-							if (EffectMarshller->LineNumberToErrorInfo.Num() > 0)
-							{
-								return FText::FromString(FString::Printf(TEXT("ⓧ %d"), EffectMarshller->LineNumberToErrorInfo.Num()));
-							}
-							else
-							{
-								return FText::FromString(TEXT("ⓧ"));
-							}
-						})
-					.Margin(FMargin{5, 0, 0, 0 })
-				];
-		}
 
 		InfoBarBox->AddSlot()
 			.FillWidth(1.0f)
@@ -338,6 +331,7 @@ namespace SH
 				SNew(SBorder)
 				.BorderImage(FAppStyle::Get().GetBrush("WhiteBrush"))
 				.BorderBackgroundColor(this, &SShaderEditorBox::GetEditStateColor)
+                .VAlign(VAlign_Center)
 				[
 					SNew(STextBlock)
 					.Font(InforBarFontInfo)
@@ -632,24 +626,23 @@ namespace SH
         FString FinalShaderSource = ShaderTemplateWithBinding + CurrentShaderSource;
         
         FString ShaderName = StShaderAsset->GetFileName() + "Ps";
-        StShaderAsset->PixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, MoveTemp(FinalShaderSource), ShaderName, TEXT("MainPS"));
+        TRefCountPtr<GpuShader> CurPixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, MoveTemp(FinalShaderSource), ShaderName, TEXT("MainPS"));
         FString ErrorInfo;
-        if (GGpuRhi->CrossCompileShader(StShaderAsset->PixelShader, ErrorInfo))
+        if (GGpuRhi->CrossCompileShader(CurPixelShader, ErrorInfo))
         {
+            StShaderAsset->PixelShader = CurPixelShader;
+            StShaderAsset->bCurPsCompilationSucceed = true;
             CurEditState = EditState::Normal;
+            ErrorInfos.Reset();
+            RefreshLineNumberToErrorInfo();
         }
         else
         {
+            StShaderAsset->bCurPsCompilationSucceed = false;
             CurEditState = EditState::Failed;
             ErrorInfos = ParseErrorInfoFromDxc(ErrorInfo);
             RefreshLineNumberToErrorInfo();
         }
-
-        if (InfoBarBox.IsValid())
-        {
-            GenerateInfoBarBox();
-        }
-
     }
 
 	void SShaderEditorBox::OnShaderTextChanged(const FString& InShaderSouce)
@@ -657,6 +650,7 @@ namespace SH
 		FString NewShaderSource = InShaderSouce.Replace(TEXT("\r\n"), TEXT("\n"));
 		if (NewShaderSource != StShaderAsset->PixelShaderBody)
 		{
+            StShaderAsset->PixelShaderBody = NewShaderSource;
 			StShaderAsset->MarkDirty();
 		}
         

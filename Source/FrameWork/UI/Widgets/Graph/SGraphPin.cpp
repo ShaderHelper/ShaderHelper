@@ -49,13 +49,13 @@ namespace FW
 			{
 				if (PinData->Direction == PinDirection::Output)
 				{
-					OwnerPanel->RemoveInputLink(StartPin);
+					OwnerPanel->RemoveLink(StartPin);
 					OwnerPanel->AddLink(EndPin, StartPin);
                     OwnerPanel->GetGraphData()->MarkDirty();
 				}
 				else
 				{
-					OwnerPanel->RemoveInputLink(EndPin);
+					OwnerPanel->RemoveLink(EndPin);
 					OwnerPanel->AddLink(StartPin, EndPin);
                     OwnerPanel->GetGraphData()->MarkDirty();
 				}
@@ -76,7 +76,7 @@ namespace FW
                 OwnerPanel->PreviewStartDir = OutputPin->PinData->Direction;
                 OwnerPanel->PreviewStart = OwnerPanel->GetTickSpaceGeometry().AbsoluteToLocal(OutputPin->GetTickSpaceGeometry().GetAbsolutePositionAtCoordinates(FVector2D(0.5f, 0.5f)));
                 OwnerPanel->PreviewEnd = OwnerPanel->GetTickSpaceGeometry().AbsoluteToLocal(MyGeometry.GetAbsolutePositionAtCoordinates(FVector2D(0.5f, 0.5f)));
-                OwnerPanel->RemoveInputLink(this);
+                OwnerPanel->RemoveLink(this);
                 OwnerPanel->GetGraphData()->MarkDirty();
                 
                 return FReply::Handled().BeginDragDrop(MakeShared<GraphDragDropOp>(OutputPin));

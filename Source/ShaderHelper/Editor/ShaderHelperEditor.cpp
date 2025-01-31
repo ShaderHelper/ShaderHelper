@@ -287,8 +287,9 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 				}
 				return FText::FromString(LoadedStShader->GetFileName() + DirtyChar);
 			})
-            .OnTabClosed_Lambda([this, LoadedStShader, TabId, Args](TSharedRef<SDockTab> ClosedTab) {
-                CurProject->OpenedStShaders.Remove(*CurProject->OpenedStShaders.FindKey(ClosedTab));
+            .OnTabClosed_Lambda([this, TabId, Args](TSharedRef<SDockTab> ClosedTab) {
+                auto StShaderAsset = *CurProject->OpenedStShaders.FindKey(ClosedTab);
+                CurProject->OpenedStShaders.Remove(StShaderAsset);
 				//Clear the PersistLayout when closing a StShader tab. we don't intend to restore it, so just destroy it.
 				auto DockTabStack = ClosedTab->GetParentDockTabStack();
 				DockTabStack->OnTabRemoved(Args.GetTabId());

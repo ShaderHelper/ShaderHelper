@@ -102,6 +102,13 @@ namespace FW
 
 	bool ValidateCreateBuffer(uint32 ByteSize, GpuBufferUsage Usage, GpuResourceState InitState)
 	{
+        if(ByteSize <= 0)
+        {
+            //[MTLDebugDevice newBufferWithLength:options:]:642: failed assertion `Buffer Validation Cannot create buffer of zero length`.
+            SH_LOG(LogRhiValidation, Error, TEXT("CreateBuffer Error(Incorrect buffer size:%d)"), ByteSize);
+            return false;
+        }
+        
 		if (Usage == GpuBufferUsage::Staging || Usage == GpuBufferUsage::Static || Usage == GpuBufferUsage::Dynamic)
 		{
 			if (InitState == GpuResourceState::Unknown)

@@ -25,6 +25,6 @@ namespace SH
 	public:
         void InitPins() override;
 		void Serialize(FArchive& Ar) override;
-		bool Exec(FW::GraphExecContext& Context) override;
+        FW::ExecRet Exec(FW::GraphExecContext& Context) override;
 	};
 }

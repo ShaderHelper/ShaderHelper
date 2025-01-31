@@ -69,7 +69,7 @@ namespace FW
         return nullptr;
     }
 
-	bool Graph::Exec(GraphExecContext& Context)
+    ExecRet Graph::Exec(GraphExecContext& Context)
 	{
 		TArray<ObjectPtr<GraphNode>> ExecNodes = NodeDatas;
 
@@ -87,21 +87,24 @@ namespace FW
         if(AnyError)
         {
             SH_LOG(LogGraph, Error, TEXT("Cycle not allowed."));
-            return AnyError;
+            return {true, true};
         }
 
 		for (auto Node : ExecNodes)
 		{
-			Node->AnyError = !Node->Exec(Context);
+            ExecRet NodeRet = Node->Exec(Context);;
+            Node->AnyError = NodeRet.AnyError;
             if(Node->AnyError)
             {
                 AnyError = true;
-                return AnyError;
+                if(NodeRet.Terminate)
+                {
+                    return {true ,true};
+                }
             }
 		}
-        
-        AnyError = false;
-        return AnyError;
+    
+        return {AnyError, false};
 	}
 
 	TSharedRef<SGraphNode> GraphNode::CreateNodeWidget(SGraphPanel* OwnerPanel)

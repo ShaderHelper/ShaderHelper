@@ -25,11 +25,15 @@ namespace FW
 
 		void Refresh()
 		{
-			PropertyTree->RequestTreeRefresh();
-            for(const auto& Data : *PropertyDatas)
+            if(PropertyTree)
             {
-                TryExpandItemRecursively(Data);
+                PropertyTree->RequestTreeRefresh();
+                for(const auto& Data : *PropertyDatas)
+                {
+                    TryExpandItemRecursively(Data);
+                }
             }
+
 		}
 
 		void TryExpandItemRecursively(TSharedRef<PropertyData> InItem)

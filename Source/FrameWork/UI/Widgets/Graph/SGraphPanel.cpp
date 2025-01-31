@@ -61,7 +61,7 @@ namespace FW
 		}
 	}
 
-	void SGraphPanel::RemoveInputLink(SGraphPin* Input)
+	void SGraphPanel::RemoveLink(SGraphPin* Input)
 	{
 		if (auto Key = Links.FindKey(Input))
 		{
@@ -229,10 +229,8 @@ namespace FW
 		{
 			if (CutLineStart)
 			{
-				for (TMultiMap<SGraphPin*, SGraphPin*>::TIterator It = Links.CreateIterator(); It; ++It)
+                for (auto [OuputPin, InputPin] : Links)
 				{
-					SGraphPin* OuputPin = It.Key();
-					SGraphPin* InputPin = It.Value();
 					Vector2D C0 = MyGeometry.AbsoluteToLocal(OuputPin->GetTickSpaceGeometry().GetAbsolutePositionAtCoordinates({0.5, 0.5}));
 					Vector2D C3 = MyGeometry.AbsoluteToLocal(InputPin->GetTickSpaceGeometry().GetAbsolutePositionAtCoordinates({0.5, 0.5}));
 					double Offset = FMath::Abs(C0.x - C3.x) / 2;
@@ -241,9 +239,7 @@ namespace FW
 
 					if (LineBezierIntersection(*CutLineStart, CutLineEnd, C0, C1, C2, C3))
 					{
-						It.RemoveCurrent();
-						OuputPin->Owner->RemoveDep(InputPin->Owner);
-						OuputPin->Owner->NodeData->OutPinToInPin.Remove(OuputPin->PinData->GetGuid(), InputPin->PinData->GetGuid());
+                        RemoveLink(InputPin);
 						
 						GraphData->MarkDirty();
 					}
@@ -289,7 +285,7 @@ namespace FW
 				{
 					Node->NodeData->Position += Offset;
 				}
-                if(!Offset.Equals(Vector2D{0}))
+                if(FMath::Abs(DeltaPos.x) > 0.8 || FMath::Abs(DeltaPos.y) > 0.8)
                 {
                     GraphData->MarkDirty();
                 }
@@ -519,21 +515,11 @@ namespace FW
 
 	void SGraphPanel::DeleteNode(SGraphNode* Node)
 	{
-		for (TMultiMap<SGraphPin*, SGraphPin*>::TIterator It = Links.CreateIterator(); It; ++It)
+		for (auto [OuputPin, InputPin] : Links)
 		{
-			SGraphPin* OuputPin = It.Key();
-			SGraphPin* InputPin = It.Value();
-			if (OuputPin->Owner == Node)
+			if (OuputPin->Owner == Node || InputPin->Owner == Node)
 			{
-				It.RemoveCurrent();
-				OuputPin->Owner->RemoveDep(InputPin->Owner);
-				Node->NodeData->OutPinToInPin.Remove(OuputPin->PinData->GetGuid(), InputPin->PinData->GetGuid());
-			}
-			else if (InputPin->Owner == Node)
-			{
-				It.RemoveCurrent();
-				OuputPin->Owner->RemoveDep(InputPin->Owner);
-				OuputPin->Owner->NodeData->OutPinToInPin.Remove(OuputPin->PinData->GetGuid(), InputPin->PinData->GetGuid());
+                RemoveLink(InputPin);
 			}
 		}
 

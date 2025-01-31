@@ -16,7 +16,8 @@ namespace FW
         using PropertyData::PropertyData;
         
         void SetEnabled(bool Enabled) { IsEnabled = Enabled; }
-        void SetOnDisplayNameChanged(const TFunction<void(const FString&)> DisplayNameChanged) { OnDisplayNameChanged = DisplayNameChanged; }
+        void SetCanChangeToName(const TFunction<bool(const FString&)>& CanChange) { CanChangeToName = CanChange; }
+        void SetOnDisplayNameChanged(const TFunction<void(const FString&)>& DisplayNameChanged) { OnDisplayNameChanged = DisplayNameChanged; }
         void SetEmbedWidget(TSharedPtr<SWidget> InWidget) { EmbedWidget = MoveTemp(InWidget); }
         void SetOnDelete(const TFunction<void()>& OnDeleteFunc) { OnDelete = OnDeleteFunc;}
         
@@ -26,6 +27,7 @@ namespace FW
             Row->SetEnabled(IsEnabled);
                 
             SAssignNew(Item, SPropertyItem)
+                    .CanChangeToName(CanChangeToName)
                     .DisplayName(&DisplayName)
                     .OnDisplayNameChanged(OnDisplayNameChanged)
                     .Indent(!!Parent);
@@ -60,75 +62,95 @@ namespace FW
         TFunction<void()> OnDelete;
         TSharedPtr<SWidget> EmbedWidget;
         TSharedPtr<SPropertyItem> Item;
+        TFunction<bool(const FString&)> CanChangeToName;
         TFunction<void(const FString&)> OnDisplayNameChanged;
     };
 
 
-    template<typename T>
-    class PropertyItem : public PropertyItemBase
+    class PropertyFloatItem : public PropertyItemBase
     {
-        MANUAL_RTTI_TYPE(PropertyItem<T>, PropertyItemBase)
+        MANUAL_RTTI_TYPE(PropertyFloatItem, PropertyItemBase)
     public:
-        PropertyItem(ShObject* InOwner, FString InName, T* InValueRef = nullptr)
+        PropertyFloatItem(ShObject* InOwner, FString InName, float* InValueRef = nullptr)
             : PropertyItemBase(InOwner, MoveTemp(InName))
             , ValueRef(InValueRef)
         {}
+        
+        TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
+        {
+            auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
+            if(ValueRef)
+            {
+                auto ValueWidget = SNew(SSpinBox<float>)
+                    .MaxFractionalDigits(3)
+                    .OnValueChanged_Lambda([this](float NewValue) {
+                        if(*ValueRef != NewValue)
+                        {
+                            *ValueRef = NewValue;
+                            Owner->PostPropertyChanged(this);
+                        }
+                    })
+                    .Value_Lambda([this] { return *ValueRef; });
+                Item->AddWidget(MoveTemp(ValueWidget));
+            }
+            
+            return Row;
+        }
 
-        TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override;
     private:
-        T* ValueRef;
+        float* ValueRef;
     };
 
-	template<>
-	inline TSharedRef<ITableRow> PropertyItem<float>::GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable)
-	{
-        auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
-        if(ValueRef)
-        {
-            auto ValueWidget = SNew(SSpinBox<float>)
-                .MaxFractionalDigits(3)
-                .OnValueChanged_Lambda([this](float NewValue) {
-                    *ValueRef = NewValue;
-                    Owner->PostPropertyChanged(this);
-                })
-                .Value_Lambda([this] { return *ValueRef; });
-            Item->AddWidget(MoveTemp(ValueWidget));
-        }
+    class PropertyVector2fItem : public PropertyItemBase
+    {
+        MANUAL_RTTI_TYPE(PropertyVector2fItem, PropertyItemBase)
+    public:
+        PropertyVector2fItem(ShObject* InOwner, FString InName, Vector2f* InValueRef = nullptr)
+            : PropertyItemBase(InOwner, MoveTemp(InName))
+            , ValueRef(InValueRef)
+        {}
         
-		return Row;
-	}
-
-	template<>
-	inline TSharedRef<ITableRow> PropertyItem<Vector2f>::GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable)
-	{
-        auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
-        if(ValueRef)
+        TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
         {
-            auto ValueWidget = SNew(SHorizontalBox)
-                + SHorizontalBox::Slot()
-                [
-                    SNew(SSpinBox<float>)
-                    .MaxFractionalDigits(3)
-                    .OnValueChanged_Lambda([this](float NewValue) {
-                        ValueRef->x = NewValue;
-                        Owner->PostPropertyChanged(this);
-                    })
-                    .Value_Lambda([this] { return ValueRef->x; })
-                ]
-                + SHorizontalBox::Slot()
-                [
-                    SNew(SSpinBox<float>)
-                    .MaxFractionalDigits(3)
-                    .OnValueChanged_Lambda([this](float NewValue) {
-                        ValueRef->y = NewValue;
-                        Owner->PostPropertyChanged(this);
-                    })
-                    .Value_Lambda([this] { return ValueRef->y; })
-                ];
-            Item->AddWidget(MoveTemp(ValueWidget));
+            auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
+            if(ValueRef)
+            {
+                auto ValueWidget = SNew(SHorizontalBox)
+                    + SHorizontalBox::Slot()
+                    [
+                        SNew(SSpinBox<float>)
+                        .MaxFractionalDigits(3)
+                        .OnValueChanged_Lambda([this](float NewValue) {
+                            if(ValueRef->x != NewValue)
+                            {
+                                ValueRef->x = NewValue;
+                                Owner->PostPropertyChanged(this);
+                            }
+                        })
+                        .Value_Lambda([this] { return ValueRef->x; })
+                    ]
+                    + SHorizontalBox::Slot()
+                    [
+                        SNew(SSpinBox<float>)
+                        .MaxFractionalDigits(3)
+                        .OnValueChanged_Lambda([this](float NewValue) {
+                            if(ValueRef->y != NewValue)
+                            {
+                                ValueRef->y = NewValue;
+                                Owner->PostPropertyChanged(this);
+                            }
+                        })
+                        .Value_Lambda([this] { return ValueRef->y; })
+                    ];
+                Item->AddWidget(MoveTemp(ValueWidget));
+            }
+
+            return Row;
         }
 
-		return Row;
-	}
+    private:
+        Vector2f* ValueRef;
+    };
+
 }
 

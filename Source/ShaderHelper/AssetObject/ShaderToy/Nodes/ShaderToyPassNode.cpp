@@ -61,6 +61,17 @@ namespace SH
 		GraphNode::Serialize(Ar);
 		
         Ar << Shader;
+        
+        Ar << CustomUbSize;
+        if(CustomUbSize > 0)
+        {
+            if(Ar.IsLoading())
+            {
+                CustomUniformBufferData = (uint8*)FMemory::Malloc(CustomUbSize);
+            }
+            Ar.Serialize(CustomUniformBufferData, CustomUbSize);
+        }
+
 	}
 
     void ShaderToyPassNode::PostLoad()
@@ -69,13 +80,25 @@ namespace SH
         
         if(Shader)
         {
+            Shader->OnDestroy = FSimpleDelegate::CreateRaw(this, &ShaderToyPassNode::ClearBindingProperty);
             Shader->OnRefreshBuilder = FSimpleDelegate::CreateRaw(this, &ShaderToyPassNode::RefreshProperty);
+            
+            CustomBindLayout = Shader->CustomBindGroupLayoutBuilder.Build();
+            CustomUniformBuffer = Shader->CustomUniformBufferBuilder.Build();
+            auto CustomBindGroupBuilder = GpuBindGrouprBuilder{ CustomBindLayout };
+            if(CustomUniformBuffer.IsValid())
+            {
+                CustomUniformBuffer->SetData(CustomUniformBufferData);
+                CustomUniformBufferData = (uint8*)CustomUniformBuffer->GetReadableData();
+                CustomBindGroupBuilder.SetUniformBuffer("Uniform", CustomUniformBuffer->GetGpuResource());
+            }
+            CustomBindGroup = CustomBindGroupBuilder.Build();
         }
     }
 
 	TSharedPtr<SWidget> ShaderToyPassNode::ExtraNodeWidget()
 	{
-		Preview = MakeShared<PreviewViewPort>();
+        Preview = MakeShared<PreviewViewPort>();
 		return SNew(SBox).Padding(4.0f)
 			[
 				SNew(SViewport).ViewportInterface(Preview).ViewportSize(FVector2D{ 80, 80 })
@@ -154,7 +177,7 @@ namespace SH
                 if(CustomLayoutDesc.GetBindingType(Slot) == BindingType::UniformBuffer)
                 {
                     auto UniformCategory = MakeShared<PropertyCategory>(this, BindingName);
-                    auto PropertyDataUniforms = PropertyDatasFromUniform(Shader->CustomUniformBuffer.Get(), true);
+                    auto PropertyDataUniforms = PropertyDatasFromUniform(CustomUniformBuffer.Get(), true);
                     for(auto Data : PropertyDataUniforms)
                     {
                         UniformCategory->AddChild(Data);
@@ -173,15 +196,49 @@ namespace SH
         //Shader asset changed.
         if(InProperty->GetDisplayName() == "Shader")
         {
+            Shader->OnDestroy = FSimpleDelegate::CreateRaw(this, &ShaderToyPassNode::ClearBindingProperty);
             Shader->OnRefreshBuilder = FSimpleDelegate::CreateRaw(this, &ShaderToyPassNode::RefreshProperty);
             RefreshProperty();
         }
     }
 
+    void ShaderToyPassNode::ClearBindingProperty()
+    {
+        CustomBindLayout.SafeRelease();
+        CustomUniformBuffer.Reset();
+        CustomBindGroup.SafeRelease();
+        
+        PropertyDatas.Empty();
+        ShObject::GetPropertyDatas();
+        GetOuterMost()->MarkDirty();
+        
+        auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+        ShEditor->RefreshProperty();
+    }
+
     void ShaderToyPassNode::RefreshProperty()
     {
+        CustomBindLayout = Shader->CustomBindGroupLayoutBuilder.Build();
+        auto CustomBindGroupBuilder = GpuBindGrouprBuilder{ CustomBindLayout };
+        
+        auto NewCustomUniformBuffer = Shader->CustomUniformBufferBuilder.Build();
+        if(NewCustomUniformBuffer.IsValid())
+        {
+            if(CustomUniformBuffer.IsValid())
+            {
+                NewCustomUniformBuffer->CopySameMember(*CustomUniformBuffer);
+            }
+            CustomUniformBuffer = MoveTemp(NewCustomUniformBuffer);
+            CustomUniformBufferData = (uint8*)CustomUniformBuffer->GetReadableData();
+            CustomUbSize = CustomUniformBuffer->GetSize();
+            CustomBindGroupBuilder.SetUniformBuffer("Uniform", CustomUniformBuffer->GetGpuResource());
+        }
+        CustomBindGroup = CustomBindGroupBuilder.Build();
+        
         PropertyDatas.Empty();
         GetPropertyDatas();
+        GetOuterMost()->MarkDirty();
+        
         auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
         ShEditor->RefreshProperty();
     }
@@ -193,7 +250,7 @@ namespace SH
             //Reflection data
             ShObject::GetPropertyDatas();
             
-            //Custom
+            //Custom binding
             if(Shader)
             {
                 PropertyDatas.Append(PropertyDatasFromBinding());
@@ -202,55 +259,59 @@ namespace SH
         return &PropertyDatas;
     }
 
-	bool ShaderToyPassNode::Exec(GraphExecContext& Context)
+    ExecRet ShaderToyPassNode::Exec(GraphExecContext& Context)
 	{
 		if (!Shader.IsValid())
 		{
             SH_LOG(LogGraph, Error, TEXT("Node:%s does not specify the corresponding stShader."), *ObjectName.ToString());
-            return false;
+            return {true, true};
 		}
-        else if(!Shader->PixelShader->IsCompiled())
+        
+        if(Shader->PixelShader->IsCompiled())
         {
-            SH_LOG(LogGraph, Error, TEXT("Node:%s shader error, please check the shader file."), *ObjectName.ToString());
-            return false;
+            ShaderToyExecContext& ShaderToyContext = static_cast<ShaderToyExecContext&>(Context);
+
+            auto PassOutput = static_cast<GpuTexturePin*>(GetPin("RT"));
+            if(PassOutput->GetValue()->GetWidth() != ShaderToyContext.iResolution.x ||
+               PassOutput->GetValue()->GetHeight() != ShaderToyContext.iResolution.y)
+            {
+                GpuTextureDesc Desc{ (uint32)ShaderToyContext.iResolution.x, (uint32)ShaderToyContext.iResolution.y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
+                TRefCountPtr<GpuTexture> PassOuputTex = GGpuRhi->CreateTexture(MoveTemp(Desc));
+                Preview->SetViewPortRenderTexture(PassOuputTex);
+                PassOutput->SetValue(PassOuputTex);
+            }
+
+            GpuRenderPassDesc PassDesc;
+            PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassOutput->GetValue(), RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
+
+            GpuRenderPipelineStateDesc PipelineDesc{
+                //Shader
+                Shader->VertexShader,
+                Shader->PixelShader,
+                //Targets
+                {
+                    { PassOutput->GetValue()->GetFormat() }
+                },
+                //BindGroupLayout
+                { StShader::GetBuiltInBindLayout(), CustomBindLayout }
+            };
+            TRefCountPtr<GpuPipelineState> PipelineState = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
+
+            ShaderToyContext.RG->AddRenderPass(ObjectName.ToString(), MoveTemp(PassDesc),
+                [this, PipelineState](GpuRenderPassRecorder* PassRecorder) {
+                    PassRecorder->SetRenderPipelineState(PipelineState);
+                    PassRecorder->SetBindGroups(StShader::GetBuiltInBindGroup(), CustomBindGroup, nullptr, nullptr);
+                    PassRecorder->DrawPrimitive(0, 3, 0, 1);
+                }
+            );
         }
-
-		ShaderToyExecContext& ShaderToyContext = static_cast<ShaderToyExecContext&>(Context);
-
-        auto PassOutput = static_cast<GpuTexturePin*>(GetPin("RT"));
-        if(PassOutput->GetValue()->GetWidth() != ShaderToyContext.iResolution.x ||
-           PassOutput->GetValue()->GetHeight() != ShaderToyContext.iResolution.y)
+        
+        if(!Shader->bCurPsCompilationSucceed)
         {
-            GpuTextureDesc Desc{ (uint32)ShaderToyContext.iResolution.x, (uint32)ShaderToyContext.iResolution.y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
-            TRefCountPtr<GpuTexture> PassOuputTex = GGpuRhi->CreateTexture(MoveTemp(Desc));
-            Preview->SetViewPortRenderTexture(PassOuputTex);
-            PassOutput->SetValue(PassOuputTex);
+            return {true, false};
         }
-
-		GpuRenderPassDesc PassDesc;
-		PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassOutput->GetValue(), RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
-
-		GpuRenderPipelineStateDesc PipelineDesc{
-			//Shader
-            Shader->VertexShader,
-            Shader->PixelShader,
-			//Targets
-			{
-				{ PassOutput->GetValue()->GetFormat() }
-			},
-			//BindGroupLayout
-			{ StShader::GetBuiltInBindLayout() }
-		};
-		TRefCountPtr<GpuPipelineState> PipelineState = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
-
-		ShaderToyContext.RG->AddRenderPass(ObjectName.ToString(), MoveTemp(PassDesc),
-			[this, PipelineState](GpuRenderPassRecorder* PassRecorder) {
-				PassRecorder->SetRenderPipelineState(PipelineState);
-				PassRecorder->SetBindGroups(StShader::GetBuiltInBindGroup(), nullptr, nullptr, nullptr);
-				PassRecorder->DrawPrimitive(0, 3, 0, 1);
-			}
-		);
-        return true;
+        
+        return {};
 	}
 
 }
