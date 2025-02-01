@@ -4,6 +4,7 @@
 #include "UI/Styles/FAppCommonStyle.h"
 #include <Widgets/Input/SNumericEntryBox.h>
 #include <Fonts/FontMeasure.h>
+#include "App/App.h"
 
 namespace FW
 {
@@ -77,7 +78,8 @@ namespace FW
     void STimeline::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
     {
         if(!*bStop) {
-            *CurTime += InDeltaTime;
+            //InDeltaTime can not be used, because ue limits the value to 1/8.0f for slate.
+            *CurTime += GApp->GetDeltaTime();
             if(*CurTime > *MaxTime)
             {
                 *CurTime = 0;

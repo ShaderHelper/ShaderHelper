@@ -40,7 +40,7 @@ namespace SH {
 		}
 	}
 
-	void ShaderHelperApp::Update(double DeltaTime)
+	void ShaderHelperApp::Update(float DeltaTime)
 	{
 		App::Update(DeltaTime);
 	}

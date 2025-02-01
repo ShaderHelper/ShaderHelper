@@ -16,7 +16,7 @@ namespace SH {
 		void Init() override;
 
 	private:
-		void Update(double DeltaTime) override;
+		void Update(float DeltaTime) override;
 		void Render() override;
 
 	public:

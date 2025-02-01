@@ -22,7 +22,7 @@ namespace UNITTEST_GPUAPI
 		AppEditor = MakeUnique<UnitTestEditor>(AppClientSize);
 	}
 
-	void UnitTestApp::Update(double DeltaTime)
+	void UnitTestApp::Update(float DeltaTime)
 	{
 		App::Update(DeltaTime);
 	}

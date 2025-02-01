@@ -16,10 +16,10 @@ namespace FW {
         Editor* GetEditor() const { return AppEditor.Get(); }
         Renderer* GetRenderer() const { return AppRenderer.Get(); }
 		Vector2D GetClientSize() const { return AppClientSize; }
-		double GetDeltaTime() const { return DeltaTime; }
+		float GetDeltaTime() const { return DeltaTime; }
 		
 	protected:
-		virtual void Update(double DeltaTime);
+		virtual void Update(float DeltaTime);
 		virtual void Render();
 		virtual void Init();
         
@@ -30,7 +30,7 @@ namespace FW {
 	protected:
 		Vector2D AppClientSize;
 		FString CommandLine;
-		double DeltaTime;
+		float DeltaTime = 0.01f;
 		double FixedDeltaTime = 1 / 30;
 	};
 

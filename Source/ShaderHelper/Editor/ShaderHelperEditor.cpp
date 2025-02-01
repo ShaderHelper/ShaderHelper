@@ -140,8 +140,8 @@ namespace SH
 		SAssignNew(Window, SWindow)
 			.Title(TAttribute<FText>::CreateLambda([this] { 
 				FString ProjectPath = CurProject->GetFilePath();
-                double Fps = 1 / GApp->GetDeltaTime();
-				return FText::FromString(LOCALIZATION("ShaderHelper").ToString() + FString::Printf(TEXT(" [%s] Fps:%d"), *ProjectPath, (int)Fps));
+                int Fps = FMath::RoundToInt(1 / GApp->GetDeltaTime());
+				return FText::FromString(LOCALIZATION("ShaderHelper").ToString() + FString::Printf(TEXT(" [%s] Fps:%d"), *ProjectPath, Fps));
 			}))
 			.ScreenPosition(UsedWindowPos)
 			.AutoCenter(AutoCenterRule)

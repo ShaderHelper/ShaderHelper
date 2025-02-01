@@ -32,6 +32,7 @@ namespace SH
 	ShaderToyPassNode::ShaderToyPassNode()
 	{
 		ObjectName = FText::FromString("ShaderPass");
+        Preview = MakeShared<PreviewViewPort>();
 	}
 
     void ShaderToyPassNode::InitPins()
@@ -98,7 +99,6 @@ namespace SH
 
 	TSharedPtr<SWidget> ShaderToyPassNode::ExtraNodeWidget()
 	{
-        Preview = MakeShared<PreviewViewPort>();
 		return SNew(SBox).Padding(4.0f)
 			[
 				SNew(SViewport).ViewportInterface(Preview).ViewportSize(FVector2D{ 80, 80 })
