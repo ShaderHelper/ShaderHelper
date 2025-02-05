@@ -69,7 +69,7 @@ namespace SH
 		using LineNumberItemPtr = TSharedPtr<FText>;
         enum class EditState
         {
-            Normal,
+            Succeed,
             Compiling,
             Failed,
         };
@@ -168,6 +168,12 @@ namespace SH
 
 		FCurveSequence FoldingArrowAnim;
         
+        //CodeComplete and real-time diagnostic
+        TUniquePtr<FThread> ISenseThread;
+        TQueue<FString> ISenseQueue;
+        std::atomic<bool> bQuitISense{};
+        std::atomic<bool> bRefreshIsense{};
+        FEvent* ISenseEvent = nullptr;
         TArray<FW::ShaderErrorInfo> ErrorInfos;
 	};
 }

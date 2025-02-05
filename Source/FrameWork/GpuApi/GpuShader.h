@@ -61,5 +61,6 @@ namespace FW
 		FString Info;
 	};
 
-	FRAMEWORK_API TArray<ShaderErrorInfo> ParseErrorInfoFromDxc(FStringView HlslErrorInfo);
+    FRAMEWORK_API TArray<ShaderErrorInfo> GetDiagnosticFromDxc(FStringView HlslSource);
+    FRAMEWORK_API void GetCodeCompleteFromDxc(FStringView HlslSource, uint32 Row, uint32 Col);
 }

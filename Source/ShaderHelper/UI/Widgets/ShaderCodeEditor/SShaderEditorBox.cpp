@@ -37,7 +37,10 @@ namespace SH
 	
 	SShaderEditorBox::~SShaderEditorBox()
 	{
-
+        bQuitISense = true;
+        ISenseEvent->Trigger();
+        ISenseThread->Join();
+        FPlatformProcess::ReturnSynchEventToPool(ISenseEvent);
 	}
 
 	void SShaderEditorBox::Construct(const FArguments& InArgs)
@@ -51,6 +54,24 @@ namespace SH
 		EffectMarshller = MakeShared<FShaderEditorEffectMarshaller>(this);
 
 		FText InitialShaderText = FText::FromString(StShaderAsset->PixelShaderBody);
+        CurrentShaderSource = StShaderAsset->PixelShaderBody;
+        
+        ISenseEvent = FPlatformProcess::GetSynchEventFromPool();
+        ISenseThread = MakeUnique<FThread>(TEXT("ISenseThread"), [this]{
+            while(!bQuitISense)
+            {
+                FString HlslSource;
+                while(ISenseQueue.Dequeue(HlslSource));
+                if(!HlslSource.IsEmpty())
+                {
+                    ErrorInfos = GetDiagnosticFromDxc(HlslSource);
+                    bRefreshIsense.store(true, std::memory_order_release);
+                }
+
+                ISenseEvent->Wait();
+                FPlatformProcess::SleepNoStats(0.01f);
+            }
+        });
 
 		ChildSlot
 		[
@@ -175,7 +196,7 @@ namespace SH
 		SlateEditableTextTypes::FCursorInfo& CursorInfo = GetPrivate_FSlateEditableTextLayout_CursorInfo(*ShaderEditableTextLayout);
 		CursorLineHighlighter = CursorHightLighter::Create(&CursorInfo);
         
-        Compile();
+        CurEditState = StShaderAsset->bCurPsCompilationSucceed ? EditState::Succeed : EditState::Failed;
 	}
 
     FText SShaderEditorBox::GetEditStateText() const
@@ -184,7 +205,7 @@ namespace SH
         {
         case EditState::Compiling: return LOCALIZATION("COMPILING");
         case EditState::Failed:    return LOCALIZATION("FAILED");
-        default:                   return LOCALIZATION("NORMAL");
+        default:                   return LOCALIZATION("SUCCEED");
         }
     }
 
@@ -573,6 +594,12 @@ namespace SH
 	void SShaderEditorBox::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
 	{
 		SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
+        
+        if(bRefreshIsense.load(std::memory_order_acquire))
+        {
+            RefreshLineNumberToErrorInfo();
+            bRefreshIsense.store(false, std::memory_order_relaxed);
+        }
 		
 		UpdateListViewScrollBar();
 		UpdateEffectText();
@@ -632,16 +659,12 @@ namespace SH
         {
             StShaderAsset->PixelShader = CurPixelShader;
             StShaderAsset->bCurPsCompilationSucceed = true;
-            CurEditState = EditState::Normal;
-            ErrorInfos.Reset();
-            RefreshLineNumberToErrorInfo();
+            CurEditState = EditState::Succeed;
         }
         else
         {
             StShaderAsset->bCurPsCompilationSucceed = false;
             CurEditState = EditState::Failed;
-            ErrorInfos = ParseErrorInfoFromDxc(ErrorInfo);
-            RefreshLineNumberToErrorInfo();
         }
     }
 
@@ -658,9 +681,11 @@ namespace SH
         {
             CurrentShaderSource = NewShaderSource;
             
-            //TODO: directly go through dxc frontend?
-            EffectMarshller->LineNumberToErrorInfo.Reset();
-            ErrorInfos.Empty();
+            FString ShaderTemplateWithBinding = StShaderAsset->GetTemplateWithBinding();
+            FString FinalShaderSource = ShaderTemplateWithBinding + CurrentShaderSource;
+            
+            ISenseQueue.Enqueue(FinalShaderSource);
+            ISenseEvent->Trigger();
         }
 	}
 
@@ -1390,7 +1415,6 @@ namespace SH
 		FString TextAfterUnfolding = OwnerWidget->UnFold(MoveTemp(UnFoldingRange));
 		OwnerWidget->OnShaderTextChanged(TextAfterUnfolding);
         OwnerWidget->UpdateLineNumberData();
-        OwnerWidget->RefreshLineNumberToErrorInfo();
 	}
 
 	void FShaderEditorMarshaller::GetText(FString& TargetString, const FTextLayout& SourceTextLayout)
