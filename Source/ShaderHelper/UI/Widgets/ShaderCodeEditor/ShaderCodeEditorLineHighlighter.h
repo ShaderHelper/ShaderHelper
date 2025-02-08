@@ -53,6 +53,8 @@ namespace SH
 		{
 			FTextLayout::FLineView NewLine = Line;
 			NewLine.Offset.X += OffsetX;
+            
+            LineHeight = Line.TextHeight;
 
 			if (CursorPos.IsZero()) {
 				CursorPos = NewLine.Offset;
@@ -83,7 +85,9 @@ namespace SH
 
 	protected:
 		using FCursorLineHighlighter::FCursorLineHighlighter;
-
+        
+    public:
+        mutable float LineHeight = 0;
 		mutable FVector2D CursorPos = FVector2D::Zero();
 	};
 }

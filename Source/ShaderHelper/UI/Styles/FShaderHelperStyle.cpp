@@ -101,6 +101,18 @@ namespace SH {
 		Style->Set("ArrowRightButton", ArrowRightButton);
 
 		Style->Set("Icons.World", new IMAGE_BRUSH_SVG("Starship/Common/world", FVector2D{16.0f,16.0f}));
+        
+        const FScrollBarStyle ScrollBar = FScrollBarStyle()
+            .SetVerticalBackgroundImage(FSlateColorBrush(FStyleColors::Recessed))
+            .SetNormalThumbImage(FSlateColorBrush(FStyleColors::Hover))
+            .SetDraggedThumbImage(FSlateColorBrush(FStyleColors::Hover2))
+            .SetHoveredThumbImage(FSlateColorBrush(FStyleColors::Hover2))
+            .SetThickness(5.0f);
+        ;
+        {
+            Style->Set("CustomScrollbar", ScrollBar);
+        }
+        
 		return Style;
 	}
 

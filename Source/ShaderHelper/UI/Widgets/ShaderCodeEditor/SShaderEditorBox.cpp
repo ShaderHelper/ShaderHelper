@@ -12,6 +12,8 @@
 #include "ShaderCodeEditorLineHighlighter.h"
 #include "AssetObject/StShader.h"
 #include "UI/Widgets/Misc/CommonCommands.h"
+#include <Widgets/SCanvas.h>
+#include "magic_enum.hpp"
 
 //No exposed methods, and too lazy to modify the source code for UE.
 STEAL_PRIVATE_MEMBER(SScrollBar, TSharedPtr<SScrollBarTrack>, Track)
@@ -54,17 +56,60 @@ namespace SH
 		EffectMarshller = MakeShared<FShaderEditorEffectMarshaller>(this);
 
 		FText InitialShaderText = FText::FromString(StShaderAsset->PixelShaderBody);
-        CurrentShaderSource = StShaderAsset->PixelShaderBody;
+        CurrentEditorSource = StShaderAsset->PixelShaderBody;
         
         ISenseEvent = FPlatformProcess::GetSynchEventFromPool();
         ISenseThread = MakeUnique<FThread>(TEXT("ISenseThread"), [this]{
             while(!bQuitISense)
             {
-                FString HlslSource;
-                while(ISenseQueue.Dequeue(HlslSource));
-                if(!HlslSource.IsEmpty())
+                ISenseTask Task;
+                while(ISenseQueue.Dequeue(Task));
+                if(!Task.HlslSource.IsEmpty())
                 {
-                    ErrorInfos = GetDiagnosticFromDxc(HlslSource);
+                    ISenseTU TU{Task.HlslSource};
+                    ErrorInfos = TU.GetDiagnostic();
+                    
+                    CandidateInfos.Reset();
+                    if(Task.CursorToken != " ")
+                    {
+                        CandidateInfos = TU.GetCodeComplete(Task.Row, Task.Col);
+                        if(Task.CursorToken != ".")
+                        {
+                            for(const auto& Candidate : DefaultCandidates())
+                            {
+                                CandidateInfos.AddUnique(Candidate);
+                            }
+                        }
+ 
+                        for(auto It = CandidateInfos.CreateIterator(); It; ++It)
+                        {
+                            if(Task.CursorToken != ".")
+                            {
+                                if((*It).Text.Find(*Task.CursorToken) == INDEX_NONE)
+                                {
+                                    It.RemoveCurrent();
+                                }
+                            }
+                            else
+                            {
+                                if((*It).Kind == HLSL::CandidateKind::Type)
+                                {
+                                    It.RemoveCurrent();
+                                }
+                            }
+                        }
+                        
+                        CandidateInfos.Sort([&](const ShaderCandidateInfo& A, const ShaderCandidateInfo& B){
+                            int AIndex = A.Text.Find(*Task.CursorToken);
+                            int BIndex = B.Text.Find(*Task.CursorToken);
+                            if(AIndex != BIndex)
+                            {
+                                return AIndex < BIndex;
+                            }
+                            return A.Text.Len() < B.Text.Len();
+                        });
+                    }
+                    
                     bRefreshIsense.store(true, std::memory_order_release);
                 }
 
@@ -72,6 +117,9 @@ namespace SH
                 FPlatformProcess::SleepNoStats(0.01f);
             }
         });
+        
+        auto CustomScrollBar = SNew(SScrollBar).Padding(0)
+            .Style(&FShaderHelperStyle::Get().GetWidgetStyle<FScrollBarStyle>("CustomScrollbar"));
 
 		ChildSlot
 		[
@@ -118,6 +166,9 @@ namespace SH
                                     .HScrollBar(ShaderMultiLineHScrollBar)
                                     .OnKeyCharHandler(this, &SShaderEditorBox::OnTextKeyChar)
                                     .OnIsTypedCharValid_Lambda([](const TCHAR InChar) { return true; })
+                                    .OnCursorMoved_Lambda([this](const FTextLocation&){
+                                        CodeCompletion->SetVisibility(EVisibility::Collapsed);
+                                    })
                                 ]
                                 + SOverlay::Slot()
                                 [
@@ -125,6 +176,47 @@ namespace SH
                                     .IsReadOnly(true)
                                     .Marshaller(EffectMarshller)
                                     .Visibility(EVisibility::HitTestInvisible)
+                                ]
+                                + SOverlay::Slot()
+                                [
+                                    SNew(SCanvas)
+                                    + SCanvas::Slot()
+                                    .Size_Lambda([this]{
+                                        float Height = CustomCursorHighlighter->LineHeight * CandidateItems.Num();
+                                        return FVector2D{240, FMath::Min(200, Height)};
+                                    })
+                                    .Position_Lambda([this]{
+                                        FVector2D TipPos = CustomCursorHighlighter->CursorPos;
+                                        TipPos.Y += CustomCursorHighlighter->LineHeight;
+                                        return TipPos;
+                                    })
+                                    [
+                                        SAssignNew(CodeCompletion, SBorder)
+                                        .Visibility(EVisibility::Collapsed)
+                                        .BorderImage(FAppStyle::Get().GetBrush("Brushes.AccentGray"))
+                                        .Padding(1.0)
+                                        [
+                                            SNew(SHorizontalBox)
+                                            +SHorizontalBox::Slot()
+                                            [
+                                                SAssignNew(CodeCompletionList, SListView<CandidateItemPtr>)
+                                                .ListItemsSource(&CandidateItems)
+                                                .SelectionMode(ESelectionMode::Single)
+                                                .OnGenerateRow(this, &SShaderEditorBox::GenerateCodeCompletionItem)
+                                                .EnableAnimatedScrolling(true)
+                                                .ConsumeMouseWheel(EConsumeMouseWheel::Always)
+                                                .ExternalScrollbar(CustomScrollBar)
+//                                                .OnSelectionChanged_Lambda([this](CandidateItemPtr SelectedData, ESelectInfo::Type) {
+//
+//                                                })
+                                            ]
+                                            +SHorizontalBox::Slot()
+                                            .AutoWidth()
+                                            [
+                                                CustomScrollBar
+                                            ]
+                                        ]
+                                    ]
                                 ]
                             ]
                             
@@ -194,7 +286,9 @@ namespace SH
 		//Hook the default FCursorLineHighlighter.
 		TSharedPtr<SlateEditableTextTypes::FCursorLineHighlighter>& CursorLineHighlighter = GetPrivate_FSlateEditableTextLayout_CursorLineHighlighter(*ShaderEditableTextLayout);
 		SlateEditableTextTypes::FCursorInfo& CursorInfo = GetPrivate_FSlateEditableTextLayout_CursorInfo(*ShaderEditableTextLayout);
-		CursorLineHighlighter = CursorHightLighter::Create(&CursorInfo);
+        
+        CustomCursorHighlighter = CursorHightLighter::Create(&CursorInfo);
+        CursorLineHighlighter = CustomCursorHighlighter;
         
         CurEditState = StShaderAsset->bCurPsCompilationSucceed ? EditState::Succeed : EditState::Failed;
 	}
@@ -248,7 +342,7 @@ namespace SH
     {
         const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
         const int32 CursorRow = CursorLocation.GetLineIndex();
-        const int32 CursorCol = CursorLocation.GetOffset();
+        const int32 CursorCol = CursorLocation.GetOffset() + 1;
         return FText::FromString(FString::Printf(TEXT("%d:%d"), GetLineNumber(CursorRow), CursorCol));
     }
 
@@ -273,6 +367,8 @@ namespace SH
 							CodeFontInfo.Size = i;
 							ShaderMarshaller->MakeDirty();
 							ShaderMultiLineEditableText->Refresh();
+                            EffectMarshller->MakeDirty();
+                            EffectMultiLineEditableText->Refresh();
 						}), 
 						FCanExecuteAction(),
 						FIsActionChecked::CreateLambda(
@@ -293,6 +389,7 @@ namespace SH
             .AutoWidth()
             [
                 SNew(SButton)
+                .IsFocusable(false)
                 .OnClicked_Lambda([this]{
                     Compile();
                     return FReply::Handled();
@@ -383,7 +480,7 @@ namespace SH
 		if (ShaderEditableTextLayout->AnyTextSelected())
 		{
 			const FTextSelection Selection = ShaderEditableTextLayout->GetSelection();
-			FString SelectedText = UnFold(Selection);
+			FString SelectedText = UnFoldText(Selection);
 
 			// Copy text to clipboard
 			FPlatformApplicationMisc::ClipboardCopy(*SelectedText);
@@ -411,7 +508,7 @@ namespace SH
 		{
 			SMultiLineEditableText::FScopedEditableTextTransaction TextTransaction(ShaderMultiLineEditableText);
 			const FTextSelection Selection = ShaderEditableTextLayout->GetSelection();
-			FString SelectedText = UnFold(Selection);
+			FString SelectedText = UnFoldText(Selection);
 
 			int32 StartLineIndex = Selection.GetBeginning().GetLineIndex();
 			int32 EndLineIndex = Selection.GetEnd().GetLineIndex();
@@ -483,7 +580,7 @@ namespace SH
 
 	void SShaderEditorBox::UpdateLineNumberData()
 	{
-        LineNumberData.Empty();
+        LineNumberData.Reset();
         int32 CurTextLayoutLine = ShaderMarshaller->TextLayout->GetLineCount();
         int32 FolendLineCount = 0;
         for (int32 LineIndex = 0; LineIndex < CurTextLayoutLine; LineIndex++)
@@ -598,13 +695,69 @@ namespace SH
         if(bRefreshIsense.load(std::memory_order_acquire))
         {
             RefreshLineNumberToErrorInfo();
+            RefreshCodeCompletionTip();
             bRefreshIsense.store(false, std::memory_order_relaxed);
+        }
+        if(FSlateApplication::Get().GetUserFocusedWidget(0))
+        {
+            SH_LOG(LogTemp, Display, TEXT("%s"), *FSlateApplication::Get().GetUserFocusedWidget(0)->ToString());
         }
 		
 		UpdateListViewScrollBar();
 		UpdateEffectText();
 		UpdateFoldingArrow();
 	}
+
+    FReply SShaderEditorBox::OnFocusReceived(const FGeometry& MyGeometry, const FFocusEvent& InFocusEvent)
+    {
+        return FReply::Handled().SetUserFocus(ShaderMultiLineEditableText.ToSharedRef());
+    }
+
+    TSharedRef<ITableRow> SShaderEditorBox::GenerateCodeCompletionItem(CandidateItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
+    {
+        return SNew(STableRow<CandidateItemPtr>, OwnerTable)
+        [
+            SNew(SHorizontalBox)
+            +SHorizontalBox::Slot()
+            .FillWidth(0.75f)
+            [
+                SNew(STextBlock).Font(CodeFontInfo)
+                .Text(FText::FromString(Item->Text))
+                .HighlightText(FText::FromString(CurToken))
+                .OverflowPolicy(ETextOverflowPolicy::Ellipsis)
+            ]
+            +SHorizontalBox::Slot()
+            .FillWidth(0.25f)
+            [
+                SNew(STextBlock)
+                .Justification(ETextJustify::Right)
+                .Text(FText::FromString(FString{magic_enum::enum_name(Item->Kind).data()}))
+            ]
+        ];
+    }
+
+    void SShaderEditorBox::RefreshCodeCompletionTip()
+    {
+        CandidateItems.Reset();
+        for(const auto& CandidateInfo : CandidateInfos)
+        {
+            CandidateItems.Add(MakeShared<ShaderCandidateInfo>(CandidateInfo));
+            if(CandidateItems.Num() >= 40)
+            {
+                break;
+            }
+        }
+        
+        if(CandidateItems.Num() > 0)
+        {
+            CodeCompletionList->RequestListRefresh();
+            CodeCompletion->SetVisibility(EVisibility::Visible);
+        }
+        else
+        {
+            CodeCompletion->SetVisibility(EVisibility::Collapsed);
+        }
+    }
 
     void SShaderEditorBox::RefreshLineNumberToErrorInfo()
     {
@@ -677,16 +830,41 @@ namespace SH
 			StShaderAsset->MarkDirty();
 		}
         
-        if(CurrentShaderSource != NewShaderSource)
+        CurrentShaderSource = NewShaderSource;
+        FString ShaderTemplateWithBinding = StShaderAsset->GetTemplateWithBinding();
+        FString FinalShaderSource = ShaderTemplateWithBinding + CurrentShaderSource;
+        const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
+        const int32 CursorRow = CursorLocation.GetLineIndex();
+        const int32 CursorCol = CursorLocation.GetOffset() + 1;
+        TArray<FString> AddedLines;
+        int32 AddedLineNum = ShaderTemplateWithBinding.ParseIntoArrayLines(AddedLines, false) - 1;
+        
+        FString CurLineText;
+        ShaderMultiLineEditableText->GetTextLine(CursorRow, CurLineText);
+        FString CursorLeft = CurLineText.Mid(0, CursorCol);
+        
+        TArray<HlslHighLightTokenizer::BraceGroup> _;
+        TArray<HlslHighLightTokenizer::TokenizedLine> TokenizedLines = ShaderMarshaller->Tokenizer->Tokenize(CursorLeft, _);
+        FString LeftToken = CursorLeft.Mid(TokenizedLines[0].Tokens.Last().Range.BeginIndex, TokenizedLines[0].Tokens.Last().Range.Len());;
+        CurToken = LeftToken;
+        
+        ISenseTask Task{};
+        Task.HlslSource = MoveTemp(FinalShaderSource);
+        Task.Row = GetLineNumber(CursorRow) + AddedLineNum;
+        
+        FString MatchedPunctuation;
+        if(IsMatchPunctuation(*LeftToken, LeftToken.Len(), MatchedPunctuation))
         {
-            CurrentShaderSource = NewShaderSource;
-            
-            FString ShaderTemplateWithBinding = StShaderAsset->GetTemplateWithBinding();
-            FString FinalShaderSource = ShaderTemplateWithBinding + CurrentShaderSource;
-            
-            ISenseQueue.Enqueue(FinalShaderSource);
-            ISenseEvent->Trigger();
+            Task.Col = CursorCol;
         }
+        else
+        {
+            Task.Col = CursorCol - LeftToken.Len();
+        }
+        Task.CursorToken = MoveTemp(LeftToken);
+        
+        ISenseQueue.Enqueue(MoveTemp(Task));
+        ISenseEvent->Trigger();
 	}
 
 	static int32 GetNumSpacesAtStartOfLine(const FString& InLine)
@@ -1049,7 +1227,7 @@ namespace SH
 		return {};
 	}
 
-	FString SShaderEditorBox::UnFold(const FTextSelection& DisplayedTextRange)
+	FString SShaderEditorBox::UnFoldText(const FTextSelection& DisplayedTextRange)
 	{
 		FString TextAfterUnfolding;
 		
@@ -1116,6 +1294,8 @@ namespace SH
 		
 		SMultiLineEditableText::FScopedEditableTextTransaction Transaction(ShaderMultiLineEditableText);
 		TOptional<int32> MarkerIndex = FindFoldMarker(LineIndex);
+        
+        const FTextLocation& CurCursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
 		if (!MarkerIndex)
 		{	
 			auto BraceGroup = ShaderMarshaller->FoldingBraceGroups[LineIndex];
@@ -1165,7 +1345,21 @@ namespace SH
 			DisplayedFoldMarkers.Sort([](const FoldMarker& A, const FoldMarker& B) { return A.LineIndex < B.LineIndex; });
 			//Finally set the marker style by the marshaller. 
 			ShaderMarshaller->MakeDirty();
+            
+            //The cursor is within the fold now.
+            if (CurCursorLocation.GetLineIndex() >= FoldedBeginningRow && CurCursorLocation.GetLineIndex() <= FoldedEndRow)
+            {
+                const FTextLocation NewCursorLocation(FoldedBeginningRow, BeginLine.Text->Len());
+                ShaderMultiLineEditableText->GoTo(NewCursorLocation);
+            }
+            else if(CurCursorLocation.GetLineIndex() > FoldedEndRow)
+            {
+                int32 FoldedLineNum = FoldedEndRow - FoldedBeginningRow;
+                const FTextLocation NewCursorLocation(CurCursorLocation.GetLineIndex() - FoldedLineNum, CurCursorLocation.GetOffset());
+                ShaderMultiLineEditableText->GoTo(NewCursorLocation);
+            }
 		}
+        //UnFold
 		else
 		{
 			const FoldMarker* Marker = &DisplayedFoldMarkers[*MarkerIndex];
@@ -1204,11 +1398,14 @@ namespace SH
 
 			ShaderMarshaller->MakeDirty();
 			RemoveFoldMarker(LineIndex);
+            
+            if(CurCursorLocation.GetLineIndex() > LineIndex)
+            {
+                const FTextLocation NewCursorLocation(CurCursorLocation.GetLineIndex() + FoldedLineText.Num() - 1, CurCursorLocation.GetOffset());
+                ShaderMultiLineEditableText->GoTo(NewCursorLocation);
+            }
 		}
         
-        const FTextLocation NewCursorLocation(LineIndex);
-        ShaderMultiLineEditableText->GoTo(NewCursorLocation);
-
 		return FReply::Handled();
 	}
 
@@ -1237,6 +1434,7 @@ namespace SH
 			.ContentPadding(FMargin(0, 0))
 			.ButtonStyle(FShaderHelperStyle::Get(), "ArrowDownButton")
 			.Visibility(EVisibility::Hidden)
+            .IsFocusable(false)
 			.OnClicked(this, &SShaderEditorBox::OnFold, LineNumber);
 		
 		FoldingArrow->SetPadding(FMargin{});
@@ -1412,8 +1610,12 @@ namespace SH
 		}
 
 		FTextSelection UnFoldingRange = FTextSelection{ {0, 0}, {LinesToAdd.Num() - 1, LinesToAdd[LinesToAdd.Num() - 1].Text->Len() - 1} };
-		FString TextAfterUnfolding = OwnerWidget->UnFold(MoveTemp(UnFoldingRange));
-		OwnerWidget->OnShaderTextChanged(TextAfterUnfolding);
+		FString TextAfterUnfolding = OwnerWidget->UnFoldText(MoveTemp(UnFoldingRange));
+        if(OwnerWidget->CurrentEditorSource != SourceString)
+        {
+            OwnerWidget->CurrentEditorSource = SourceString;
+            OwnerWidget->OnShaderTextChanged(TextAfterUnfolding);
+        }
         OwnerWidget->UpdateLineNumberData();
 	}
 
