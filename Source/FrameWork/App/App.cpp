@@ -32,6 +32,7 @@ namespace FW {
 #endif
 
 		FCommandLine::Set(CommandLine);
+        FFileHelper::SaveStringToFile(CommandLine, *(PathHelper::SavedDir() / TEXT("Cmd.txt")));
 		
 		FPlatformOutputDevices::SetupOutputDevices();
 

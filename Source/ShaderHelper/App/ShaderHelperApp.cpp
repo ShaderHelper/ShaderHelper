@@ -1,6 +1,7 @@
 #include "CommonHeader.h"
 #include "ShaderHelperApp.h"
 #include "Renderer/ShRenderer.h"
+#include "Common/Path/PathHelper.h"
 
 using namespace FW;
 
@@ -25,7 +26,7 @@ namespace SH {
 		AppRenderer = MakeUnique<ShRenderer>();
 
 		FString ProjectPath;
-		if (FParse::Value(*CommandLine, TEXT("Project="), ProjectPath, false))
+        if (PathHelper::ParseProjectPath(CommandLine, ProjectPath))
 		{
 			TSingleton<ShProjectManager>::Get().OpenProject(ProjectPath.Replace(TEXT("\\"), TEXT("/")));
 			AppEditor = MakeUnique<ShaderHelperEditor>(AppClientSize, static_cast<ShRenderer*>(GetRenderer()));
