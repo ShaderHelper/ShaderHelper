@@ -70,10 +70,10 @@ namespace SH
                     ErrorInfos = TU.GetDiagnostic();
                     
                     CandidateInfos.Reset();
-                    if(Task.CursorToken != " ")
+                    if(!Task.CursorToken.IsEmpty())
                     {
                         CandidateInfos = TU.GetCodeComplete(Task.Row, Task.Col);
-                        if(Task.CursorToken != ".")
+                        if(Task.IsMemberAccess == false)
                         {
                             for(const auto& Candidate : DefaultCandidates())
                             {
@@ -83,16 +83,23 @@ namespace SH
  
                         for(auto It = CandidateInfos.CreateIterator(); It; ++It)
                         {
+                            if(Task.IsMemberAccess)
+                            {
+                                if((*It).Text.Find("operator") != INDEX_NONE)
+                                {
+                                    It.RemoveCurrent();
+                                    continue;
+                                }
+                                else if((*It).Kind == HLSL::CandidateKind::Type)
+                                {
+                                    It.RemoveCurrent();
+                                    continue;
+                                }
+                            }
+                            
                             if(Task.CursorToken != ".")
                             {
                                 if((*It).Text.Find(*Task.CursorToken) == INDEX_NONE)
-                                {
-                                    It.RemoveCurrent();
-                                }
-                            }
-                            else
-                            {
-                                if((*It).Kind == HLSL::CandidateKind::Type)
                                 {
                                     It.RemoveCurrent();
                                 }
@@ -106,7 +113,11 @@ namespace SH
                             {
                                 return AIndex < BIndex;
                             }
-                            return A.Text.Len() < B.Text.Len();
+                            else if(A.Text.Len() != B.Text.Len())
+                            {
+                                return A.Text.Len() < B.Text.Len();
+                            }
+                            return A.Text.Compare(B.Text) < 0;
                         });
                     }
                     
@@ -164,10 +175,14 @@ namespace SH
                                     .Marshaller(ShaderMarshaller)
                                     .VScrollBar(ShaderMultiLineVScrollBar)
                                     .HScrollBar(ShaderMultiLineHScrollBar)
-                                    .OnKeyCharHandler(this, &SShaderEditorBox::OnTextKeyChar)
+                                    .OnKeyCharHandler(this, &SShaderEditorBox::HandleKeyChar)
+                                    .OnKeyDownHandler(this, &SShaderEditorBox::HandleKeyDown)
                                     .OnIsTypedCharValid_Lambda([](const TCHAR InChar) { return true; })
                                     .OnCursorMoved_Lambda([this](const FTextLocation&){
-                                        CodeCompletion->SetVisibility(EVisibility::Collapsed);
+                                        if(!bKeyChar) {
+                                            bTryComplete = false;
+                                        }
+                                        bKeyChar = false;
                                     })
                                 ]
                                 + SOverlay::Slot()
@@ -183,16 +198,26 @@ namespace SH
                                     + SCanvas::Slot()
                                     .Size_Lambda([this]{
                                         float Height = CustomCursorHighlighter->LineHeight * CandidateItems.Num();
-                                        return FVector2D{240, FMath::Min(200, Height)};
+                                        float HSize = FMath::Min(200, Height);
+                                        return FVector2D{240, HSize};
                                     })
                                     .Position_Lambda([this]{
                                         FVector2D TipPos = CustomCursorHighlighter->CursorPos;
                                         TipPos.Y += CustomCursorHighlighter->LineHeight;
+                                        FVector2D Area = ShaderMultiLineEditableText->GetTickSpaceGeometry().GetLocalSize();
+                                        float HSize = FMath::Min(200, CustomCursorHighlighter->LineHeight * CandidateItems.Num());
+                                        if(TipPos.Y + HSize > Area.Y)
+                                        {
+                                            TipPos.Y -= CustomCursorHighlighter->LineHeight;
+                                            TipPos.Y -= HSize;
+                                        }
                                         return TipPos;
                                     })
                                     [
-                                        SAssignNew(CodeCompletion, SBorder)
-                                        .Visibility(EVisibility::Collapsed)
+                                        SNew(SBorder)
+                                        .Visibility_Lambda([this]{
+                                            return bTryComplete? EVisibility::Visible : EVisibility::Collapsed;
+                                        })
                                         .BorderImage(FAppStyle::Get().GetBrush("Brushes.AccentGray"))
                                         .Padding(1.0)
                                         [
@@ -206,9 +231,13 @@ namespace SH
                                                 .EnableAnimatedScrolling(true)
                                                 .ConsumeMouseWheel(EConsumeMouseWheel::Always)
                                                 .ExternalScrollbar(CustomScrollBar)
-//                                                .OnSelectionChanged_Lambda([this](CandidateItemPtr SelectedData, ESelectInfo::Type) {
-//
-//                                                })
+                                                .OnSelectionChanged_Lambda([this](CandidateItemPtr SelectedItem, ESelectInfo::Type){
+                                                    CurSelectedCandidate = SelectedItem;
+                                                })
+                                                .OnMouseButtonClick_Lambda([this](CandidateItemPtr ClickedItem){
+                                                    InsertCompletionText(ClickedItem->Text);
+                                                    FSlateApplication::Get().SetUserFocus(0, ShaderMultiLineEditableText);
+                                                })
                                             ]
                                             +SHorizontalBox::Slot()
                                             .AutoWidth()
@@ -698,10 +727,6 @@ namespace SH
             RefreshCodeCompletionTip();
             bRefreshIsense.store(false, std::memory_order_relaxed);
         }
-        if(FSlateApplication::Get().GetUserFocusedWidget(0))
-        {
-            SH_LOG(LogTemp, Display, TEXT("%s"), *FSlateApplication::Get().GetUserFocusedWidget(0)->ToString());
-        }
 		
 		UpdateListViewScrollBar();
 		UpdateEffectText();
@@ -711,6 +736,29 @@ namespace SH
     FReply SShaderEditorBox::OnFocusReceived(const FGeometry& MyGeometry, const FFocusEvent& InFocusEvent)
     {
         return FReply::Handled().SetUserFocus(ShaderMultiLineEditableText.ToSharedRef());
+    }
+
+    void SShaderEditorBox::InsertCompletionText(const FString& InText)
+    {
+        const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
+        const int32 CursorRow = CursorLocation.GetLineIndex();
+        const int32 CursorCol = CursorLocation.GetOffset();
+        FString CursorLineText;
+        ShaderMultiLineEditableText->GetTextLine(CursorRow, CursorLineText);
+        FString CursorLeftText = CursorLineText.Mid(0, CursorCol);
+        int32 InsertCol = CursorLeftText.Find(*CurToken, ESearchCase::CaseSensitive, ESearchDir::FromEnd);
+        check(InsertCol != INDEX_NONE);
+        if(CurToken == ".")
+        {
+            InsertCol += 1;
+        }
+        
+        bTryComplete = false;
+        FSlateTextLayout* ShaderTextLayout = static_cast<FSlateTextLayout*>(ShaderMarshaller->TextLayout);
+        const FTextLocation NewCursorLocation(CursorRow, InsertCol);
+        ShaderMultiLineEditableText->GoTo(NewCursorLocation);
+        ShaderTextLayout->RemoveAt({CursorRow, InsertCol}, CurToken.Len());
+        ShaderMultiLineEditableText->InsertTextAtCursor(InText);
     }
 
     TSharedRef<ITableRow> SShaderEditorBox::GenerateCodeCompletionItem(CandidateItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
@@ -751,12 +799,9 @@ namespace SH
         if(CandidateItems.Num() > 0)
         {
             CodeCompletionList->RequestListRefresh();
-            CodeCompletion->SetVisibility(EVisibility::Visible);
+            CodeCompletionList->SetSelection(CandidateItems[0]);
         }
-        else
-        {
-            CodeCompletion->SetVisibility(EVisibility::Collapsed);
-        }
+
     }
 
     void SShaderEditorBox::RefreshLineNumberToErrorInfo()
@@ -833,35 +878,48 @@ namespace SH
         CurrentShaderSource = NewShaderSource;
         FString ShaderTemplateWithBinding = StShaderAsset->GetTemplateWithBinding();
         FString FinalShaderSource = ShaderTemplateWithBinding + CurrentShaderSource;
-        const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
-        const int32 CursorRow = CursorLocation.GetLineIndex();
-        const int32 CursorCol = CursorLocation.GetOffset() + 1;
-        TArray<FString> AddedLines;
-        int32 AddedLineNum = ShaderTemplateWithBinding.ParseIntoArrayLines(AddedLines, false) - 1;
-        
-        FString CurLineText;
-        ShaderMultiLineEditableText->GetTextLine(CursorRow, CurLineText);
-        FString CursorLeft = CurLineText.Mid(0, CursorCol);
-        
-        TArray<HlslHighLightTokenizer::BraceGroup> _;
-        TArray<HlslHighLightTokenizer::TokenizedLine> TokenizedLines = ShaderMarshaller->Tokenizer->Tokenize(CursorLeft, _);
-        FString LeftToken = CursorLeft.Mid(TokenizedLines[0].Tokens.Last().Range.BeginIndex, TokenizedLines[0].Tokens.Last().Range.Len());;
-        CurToken = LeftToken;
         
         ISenseTask Task{};
         Task.HlslSource = MoveTemp(FinalShaderSource);
-        Task.Row = GetLineNumber(CursorRow) + AddedLineNum;
         
-        FString MatchedPunctuation;
-        if(IsMatchPunctuation(*LeftToken, LeftToken.Len(), MatchedPunctuation))
+        if(bTryComplete)
         {
-            Task.Col = CursorCol;
+            //Note: The cursor has advanced here. CursorLocation starts from 0, but libclang 1
+            const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
+            const int32 CursorRow = CursorLocation.GetLineIndex();
+            const int32 CursorCol = CursorLocation.GetOffset();
+            TArray<FString> AddedLines;
+            int32 AddedLineNum = ShaderTemplateWithBinding.ParseIntoArrayLines(AddedLines, false) - 1;
+            
+            FString CurLineText;
+            ShaderMultiLineEditableText->GetTextLine(CursorRow, CurLineText);
+            FString CursorLeft = CurLineText.Mid(0, CursorCol);
+            
+            TArray<HlslHighLightTokenizer::BraceGroup> _;
+            TArray<HlslHighLightTokenizer::TokenizedLine> TokenizedLines = ShaderMarshaller->Tokenizer->Tokenize(CursorLeft, _, true);
+            FString LeftToken = CursorLeft.Mid(TokenizedLines[0].Tokens.Last().Range.BeginIndex, TokenizedLines[0].Tokens.Last().Range.Len());
+            if(TokenizedLines[0].Tokens.Num() > 1)
+            {
+                FString LeftToken2 = CursorLeft.Mid(TokenizedLines[0].Tokens.Last(1).Range.BeginIndex, TokenizedLines[0].Tokens.Last(1).Range.Len());
+                if(LeftToken2 == ".")
+                {
+                    Task.IsMemberAccess = true;
+                }
+            }
+            CurToken = LeftToken;
+            
+            Task.Row = GetLineNumber(CursorRow) + AddedLineNum;
+            if(LeftToken == ".")
+            {
+                Task.IsMemberAccess = true;
+                Task.Col = CursorCol + 1;
+            }
+            else
+            {
+                Task.Col = CursorCol + 1 - LeftToken.Len();
+            }
+            Task.CursorToken = MoveTemp(LeftToken);
         }
-        else
-        {
-            Task.Col = CursorCol - LeftToken.Len();
-        }
-        Task.CursorToken = MoveTemp(LeftToken);
         
         ISenseQueue.Enqueue(MoveTemp(Task));
         ISenseEvent->Trigger();
@@ -897,11 +955,6 @@ namespace SH
 	{
 		return InCharacter == TEXT('{') ? TEXT('}') :
 			(InCharacter == TEXT('[') ? TEXT(']') : TEXT(')'));
-	}
-
-	static bool IsWhiteSpace(const TCHAR& InCharacter)
-	{
-		return InCharacter == TEXT(' ') || InCharacter == TEXT('\r') || InCharacter == TEXT('\n');
 	}
 
 	void SShaderEditorBox::HandleAutoIndent()
@@ -977,7 +1030,43 @@ namespace SH
 		}
 	}
 
-	FReply SShaderEditorBox::OnTextKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent)
+    FReply SShaderEditorBox::HandleKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+    {
+        const FKey Key = InKeyEvent.GetKey();
+
+        if(bTryComplete && CandidateItems.Num())
+        {
+            if(Key == EKeys::Up)
+            {
+                int32 Index = CandidateItems.Find(CurSelectedCandidate);
+                if(Index == 0)
+                {
+                    Index = CandidateItems.Num();
+                }
+                auto TargetItem = CandidateItems[Index - 1];
+                CodeCompletionList->SetSelection(TargetItem);
+                CodeCompletionList->RequestScrollIntoView(TargetItem);
+                return FReply::Handled();
+            }
+            else if(Key == EKeys::Down)
+            {
+                int32 Index = CandidateItems.Find(CurSelectedCandidate);
+                auto TargetItem = CandidateItems[(Index + 1) % CandidateItems.Num()];
+                CodeCompletionList->SetSelection(TargetItem);
+                CodeCompletionList->RequestScrollIntoView(TargetItem);
+                return FReply::Handled();
+            }
+            else if(Key == EKeys::Enter || Key == EKeys::Tab)
+            {
+                return FReply::Handled();
+            }
+        }
+            
+        // Let SMultiLineEditableText::OnKeyDown handle it.
+        return FReply::Unhandled();
+    }
+
+	FReply SShaderEditorBox::HandleKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent)
 	{
 		TSharedPtr<SMultiLineEditableText> Text = ShaderMultiLineEditableText;
 			
@@ -986,7 +1075,7 @@ namespace SH
 			return FReply::Unhandled();
 		}
 		const TCHAR Character = InCharacterEvent.GetCharacter();
-
+        
 		if (Character == TEXT('\b'))
 		{
 			if (!Text->AnyTextSelected())
@@ -1036,92 +1125,106 @@ namespace SH
 		}
 		else if (Character == TEXT('\t'))
 		{
-			SMultiLineEditableText::FScopedEditableTextTransaction Transaction(Text);
+            if(bTryComplete && CandidateItems.Num())
+            {
+                InsertCompletionText(CurSelectedCandidate->Text);
+            }
+            else
+            {
+                SMultiLineEditableText::FScopedEditableTextTransaction Transaction(Text);
 
-			const FTextLocation CursorLocation = Text->GetCursorLocation();
+                const FTextLocation CursorLocation = Text->GetCursorLocation();
 
-			const bool bShouldIncreaseIndentation = InCharacterEvent.GetModifierKeys().IsShiftDown() ? false : true;
+                const bool bShouldIncreaseIndentation = InCharacterEvent.GetModifierKeys().IsShiftDown() ? false : true;
 
-			// When there is no text selected, shift tab should also decrease line indentation
-			const bool bShouldIndentLine = Text->AnyTextSelected() || (!Text->AnyTextSelected() && !bShouldIncreaseIndentation);
+                // When there is no text selected, shift tab should also decrease line indentation
+                const bool bShouldIndentLine = Text->AnyTextSelected() || (!Text->AnyTextSelected() && !bShouldIncreaseIndentation);
 
-			if (bShouldIndentLine)
-			{
-				// Indent the whole line if there is a text selection
-				const FTextSelection Selection = Text->GetSelection();
-				const FTextLocation SelectionStart =
-					CursorLocation == Selection.GetBeginning() ? Selection.GetEnd() : Selection.GetBeginning();
+                if (bShouldIndentLine)
+                {
+                    // Indent the whole line if there is a text selection
+                    const FTextSelection Selection = Text->GetSelection();
+                    const FTextLocation SelectionStart =
+                        CursorLocation == Selection.GetBeginning() ? Selection.GetEnd() : Selection.GetBeginning();
 
-				// Shift the selection according to the new indentation
-				FTextLocation NewCursorLocation;
-				FTextLocation NewSelectionStart;
+                    // Shift the selection according to the new indentation
+                    FTextLocation NewCursorLocation;
+                    FTextLocation NewSelectionStart;
 
-				const int32 StartLine = Selection.GetBeginning().GetLineIndex();
-				const int32 EndLine = Selection.GetEnd().GetLineIndex();
+                    const int32 StartLine = Selection.GetBeginning().GetLineIndex();
+                    const int32 EndLine = Selection.GetEnd().GetLineIndex();
 
-				for (int32 Index = StartLine; Index <= EndLine; Index++)
-				{
-					const FTextLocation LineStart(Index, 0);
-					Text->GoTo(LineStart);
+                    for (int32 Index = StartLine; Index <= EndLine; Index++)
+                    {
+                        const FTextLocation LineStart(Index, 0);
+                        Text->GoTo(LineStart);
 
-					FString Line;
-					Text->GetTextLine(Index, Line);
-					const int32 NumSpaces = GetNumSpacesAtStartOfLine(Line);
-					const int32 NumExtraSpaces = NumSpaces % 4;
+                        FString Line;
+                        Text->GetTextLine(Index, Line);
+                        const int32 NumSpaces = GetNumSpacesAtStartOfLine(Line);
+                        const int32 NumExtraSpaces = NumSpaces % 4;
 
-					// Tab to nearest 4.
-					int32 NumSpacesForIndentation;
-					if (bShouldIncreaseIndentation)
-					{
-						NumSpacesForIndentation = NumExtraSpaces == 0 ? 4 : 4 - NumExtraSpaces;
-						Text->InsertTextAtCursor(FString::ChrN(NumSpacesForIndentation, TEXT(' ')));
-					}
-					else
-					{
-						NumSpacesForIndentation = NumExtraSpaces == 0 ? FMath::Min(4, NumSpaces) : NumExtraSpaces;
-						Text->SelectText(LineStart, FTextLocation(LineStart, NumSpacesForIndentation));
-						Text->DeleteSelectedText();
-					}
+                        // Tab to nearest 4.
+                        int32 NumSpacesForIndentation;
+                        if (bShouldIncreaseIndentation)
+                        {
+                            NumSpacesForIndentation = NumExtraSpaces == 0 ? 4 : 4 - NumExtraSpaces;
+                            Text->InsertTextAtCursor(FString::ChrN(NumSpacesForIndentation, TEXT(' ')));
+                        }
+                        else
+                        {
+                            NumSpacesForIndentation = NumExtraSpaces == 0 ? FMath::Min(4, NumSpaces) : NumExtraSpaces;
+                            Text->SelectText(LineStart, FTextLocation(LineStart, NumSpacesForIndentation));
+                            Text->DeleteSelectedText();
+                        }
 
-					const int32 CursorShiftDirection = bShouldIncreaseIndentation ? 1 : -1;
-					const int32 CursorShift = NumSpacesForIndentation * CursorShiftDirection;
+                        const int32 CursorShiftDirection = bShouldIncreaseIndentation ? 1 : -1;
+                        const int32 CursorShift = NumSpacesForIndentation * CursorShiftDirection;
 
-					if (Index == CursorLocation.GetLineIndex())
-					{
-						NewCursorLocation = FTextLocation(CursorLocation, CursorShift);
-					}
+                        if (Index == CursorLocation.GetLineIndex())
+                        {
+                            NewCursorLocation = FTextLocation(CursorLocation, CursorShift);
+                        }
 
-					if (Index == SelectionStart.GetLineIndex())
-					{
-						NewSelectionStart = FTextLocation(SelectionStart, CursorShift);
-					}
-				}
+                        if (Index == SelectionStart.GetLineIndex())
+                        {
+                            NewSelectionStart = FTextLocation(SelectionStart, CursorShift);
+                        }
+                    }
 
-				Text->SelectText(NewSelectionStart, NewCursorLocation);
-			}
-			else
-			{
-				FString Line;
-				Text->GetCurrentTextLine(Line);
+                    Text->SelectText(NewSelectionStart, NewCursorLocation);
+                }
+                else
+                {
+                    FString Line;
+                    Text->GetCurrentTextLine(Line);
 
-				const int32 Offset = CursorLocation.GetOffset();
+                    const int32 Offset = CursorLocation.GetOffset();
 
-				// Tab to nearest 4.
-				if (ensure(bShouldIncreaseIndentation))
-				{
-					const int32 NumSpacesForIndentation = 4 - Offset % 4;
-					Text->InsertTextAtCursor(FString::ChrN(NumSpacesForIndentation, TEXT(' ')));
-				}
-			}
-
+                    // Tab to nearest 4.
+                    if (ensure(bShouldIncreaseIndentation))
+                    {
+                        const int32 NumSpacesForIndentation = 4 - Offset % 4;
+                        Text->InsertTextAtCursor(FString::ChrN(NumSpacesForIndentation, TEXT(' ')));
+                    }
+                }
+            }
+	
 			return FReply::Handled();
 		}
 		else if (Character == TEXT('\n') || Character == TEXT('\r'))
 		{
-			SMultiLineEditableText::FScopedEditableTextTransaction Transaction(Text);
-
-			// at this point, the text after the text cursor is already in a new line
-			HandleAutoIndent();
+            if(bTryComplete && CandidateItems.Num())
+            {
+                InsertCompletionText(CurSelectedCandidate->Text);
+            }
+            else
+            {
+                SMultiLineEditableText::FScopedEditableTextTransaction Transaction(Text);
+                
+                // at this point, the text after the text cursor is already in a new line
+                HandleAutoIndent();
+            }
 
 			return FReply::Handled();
 		}
@@ -1138,7 +1241,7 @@ namespace SH
 			{
 				const TCHAR NextChar = Text->GetCharacterAt(CursorLocation);
 
-				if (IsWhiteSpace(NextChar))
+				if (FChar::IsWhitespace(NextChar))
 				{
 					bShouldAutoInsertBraces = true;
 				}
@@ -1208,11 +1311,14 @@ namespace SH
 
 			return FReply::Unhandled();
 		}
-		else
-		{
-			// Let SMultiLineEditableText::OnKeyChar handle it.
-			return FReply::Unhandled();
-		}
+        else if(FChar::IsIdentifier(Character) || Character == TEXT('.'))
+        {
+            bTryComplete = true;
+            bKeyChar = true;
+        }
+
+        // Let SMultiLineEditableText::OnKeyChar handle it.
+        return FReply::Unhandled();
 	}
 
 	TOptional<int32> SShaderEditorBox::FindFoldMarker(int32 InIndex) const
@@ -1292,7 +1398,7 @@ namespace SH
 		FSlateTextLayout* ShaderTextLayout = static_cast<FSlateTextLayout*>(ShaderMarshaller->TextLayout);
 		TArray< FTextLayout::FLineModel >& Lines = const_cast<TArray<FTextLayout::FLineModel>&>(ShaderTextLayout->GetLineModels());
 		
-		SMultiLineEditableText::FScopedEditableTextTransaction Transaction(ShaderMultiLineEditableText);
+		//SMultiLineEditableText::FScopedEditableTextTransaction Transaction(ShaderMultiLineEditableText);
 		TOptional<int32> MarkerIndex = FindFoldMarker(LineIndex);
         
         const FTextLocation& CurCursorLocation = ShaderMultiLineEditableText->GetCursorLocation();

@@ -83,7 +83,7 @@ namespace SH
 		return Ret;
 	}
 
-	TArray<HlslHighLightTokenizer::TokenizedLine> HlslHighLightTokenizer::Tokenize(const FString& HlslCodeString, TArray<BraceGroup>& OutBraceGroups)
+	TArray<HlslHighLightTokenizer::TokenizedLine> HlslHighLightTokenizer::Tokenize(const FString& HlslCodeString, TArray<BraceGroup>& OutBraceGroups, bool IgnoreWhitespace)
 	{
 		TArray<HlslHighLightTokenizer::TokenizedLine> TokenizedLines;
 		TArray<FTextRange> LineRanges;
@@ -232,6 +232,13 @@ namespace SH
 								CurLineState = StateSet::Macro;
 								CurOffset += 1;
 							}
+                            //Skip
+                            else if(IgnoreWhitespace && FChar::IsWhitespace(CurChar))
+                            {
+                                CurLineState = StateSet::Start;
+                                CurOffset += 1;
+                                TokenStart += 1;
+                            }
 							else {
 								CurLineState = StateSet::Other;
 								CurOffset += 1;

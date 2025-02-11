@@ -83,6 +83,7 @@ namespace SH
             FString CursorToken;
             uint32 Row = 0;
             uint32 Col = 0;
+            bool IsMemberAccess = false;
         };
 
 		struct FoldMarker
@@ -115,7 +116,9 @@ namespace SH
             return true;
         }
         virtual FReply OnFocusReceived(const FGeometry& MyGeometry, const FFocusEvent& InFocusEvent) override;
-		FReply OnTextKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent);
+        //If type a char, trigger KeyDown and then KeyChar.
+		FReply HandleKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent);
+        FReply HandleKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent);
 		TSharedRef<ITableRow> GenerateRowForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 		TSharedRef<ITableRow> GenerateLineTipForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
         TSharedRef<ITableRow> GenerateCodeCompletionItem(CandidateItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
@@ -159,6 +162,8 @@ namespace SH
 
 		FReply OnFold(int32 LineNumber);
 		void RemoveFoldMarker(int32 InIndex);
+        
+        void InsertCompletionText(const FString& InText);
 
 	public:
 		TArray<FoldMarker> DisplayedFoldMarkers;
@@ -197,9 +202,11 @@ namespace SH
         
         FString CurToken;
         TArray<FW::ShaderCandidateInfo> CandidateInfos;
-        TSharedPtr<SBorder> CodeCompletion;
         TSharedPtr<SListView<CandidateItemPtr>> CodeCompletionList;
+        CandidateItemPtr CurSelectedCandidate;
         TArray<CandidateItemPtr> CandidateItems;
+        bool bTryComplete = false;
+        bool bKeyChar = false;
         //
 	};
 }

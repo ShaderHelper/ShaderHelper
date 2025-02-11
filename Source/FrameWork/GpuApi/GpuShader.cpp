@@ -130,6 +130,8 @@ namespace FW
         case DxcCursor_MacroDefinition:
             return HLSL::CandidateKind::Macro;
         case DxcCursor_FunctionDecl:
+        case DxcCursor_CXXMethod:
+        case DxcCursor_FunctionTemplate:
             return HLSL::CandidateKind::Func;
         case DxcCursor_TypedefDecl:
         case DxcCursor_StructDecl:
