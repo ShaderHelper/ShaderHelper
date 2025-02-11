@@ -177,10 +177,11 @@ namespace FW
             
             DxcCursorKind Kind;
             CompletionResult->GetCursorKind(&Kind);
-            //SH_LOG(LogTemp,Display,TEXT("-------%d-------"),  Kind);
+            
             HLSL::CandidateKind CandidateKind = MapCursorDecl(Kind);
             if(CandidateKind != HLSL::CandidateKind::Unknown)
             {
+                //SH_LOG(LogTemp,Display,TEXT("-------%d-------"),  Kind);
                 CompletionResult->GetCompletionString(CompletionString.GetInitReference());
                 uint32 NumChunk{};
                 CompletionString->GetNumCompletionChunks(&NumChunk);
@@ -188,15 +189,23 @@ namespace FW
                 {
                     DxcCompletionChunkKind CompletionChunkKind;
                     CompletionString->GetCompletionChunkKind(ChunkNumber, &CompletionChunkKind);
+                    char* CompletionText;
+                    CompletionString->GetCompletionChunkText(ChunkNumber, &CompletionText);
+                    if(CompletionChunkKind == DxcCompletionChunk_ResultType)
+                    {
+                        if(FString{CompletionText}.Contains(TEXT("__attribute__((ext_vector_type(")))
+                        {
+                            break;
+                        }
+                    }
+                    
                     //SH_LOG(LogTemp,Display,TEXT("----%d----"), CompletionChunkKind);
                     if(CompletionChunkKind == DxcCompletionChunk_TypedText)
                     {
-                        char* CompletionText;
-                        CompletionString->GetCompletionChunkText(ChunkNumber, &CompletionText);
                         //SH_LOG(LogTemp,Display,TEXT("%s"), ANSI_TO_TCHAR(CompletionText));
                         Candidates.AddUnique({CandidateKind, CompletionText});
-                        CoTaskMemFree(CompletionText);
                     }
+                    CoTaskMemFree(CompletionText);
                 }
             }
             

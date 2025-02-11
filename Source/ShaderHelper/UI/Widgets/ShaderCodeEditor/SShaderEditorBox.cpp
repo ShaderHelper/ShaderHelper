@@ -28,14 +28,89 @@ using namespace FW;
 namespace SH
 {
 
-	const FLinearColor NormalLineNumberTextColor = { 0.3f,0.3f,0.3f,0.8f };
-	const FLinearColor HighlightLineNumberTextColor = { 0.7f,0.7f,0.7f,0.9f };
+const FLinearColor NormalLineNumberTextColor = { 0.3f,0.3f,0.3f,0.8f };
+const FLinearColor HighlightLineNumberTextColor = { 0.7f,0.7f,0.7f,0.9f };
 
-	const FLinearColor NormalLineTipColor = { 1.0f,1.0f,1.0f,0.0f };
-	const FLinearColor HighlightLineTipColor = { 1.0f,1.0f,1.0f,0.2f };
-	
-	const FString FoldMarkerText = TEXT("⇿");
-	const FString ErrorMarkerText = TEXT("✘");
+const FLinearColor NormalLineTipColor = { 1.0f,1.0f,1.0f,0.0f };
+const FLinearColor HighlightLineTipColor = { 1.0f,1.0f,1.0f,0.2f };
+
+const FString FoldMarkerText = TEXT("⇿");
+const FString ErrorMarkerText = TEXT("✘");
+
+    TokenBreakIterator::TokenBreakIterator(FShaderEditorMarshaller* InMarshaller)
+        : Marshaller(InMarshaller)
+    {
+        
+    }
+
+    void TokenBreakIterator::SetString(FString&& InString)
+    {
+        InternalString = MoveTemp(InString);
+        ResetToBeginning();
+    }
+
+    void TokenBreakIterator::SetStringRef(FStringView InString)
+    {
+        InternalString = InString;
+        ResetToBeginning();
+    }
+
+    int32 TokenBreakIterator::GetCurrentPosition() const
+    {
+        return CurrentPosition;
+    }
+
+    int32 TokenBreakIterator::ResetToBeginning()
+    {
+        return CurrentPosition = 0;
+    }
+
+    int32 TokenBreakIterator::ResetToEnd()
+    {
+        return CurrentPosition = InternalString.Len();
+    }
+
+    int32 TokenBreakIterator::MoveToPrevious()
+    {
+        return MoveToCandidateBefore(CurrentPosition);
+    }
+
+    int32 TokenBreakIterator::MoveToNext()
+    {
+        return MoveToCandidateAfter(CurrentPosition);
+    }
+
+    int32 TokenBreakIterator::MoveToCandidateBefore(const int32 InIndex)
+    {
+        TArray<HlslHighLightTokenizer::BraceGroup> _;
+        TArray<HlslHighLightTokenizer::TokenizedLine> TokenizedLines = Marshaller->Tokenizer->Tokenize(InternalString, _, true);
+        const HlslHighLightTokenizer::TokenizedLine& TokenLine = TokenizedLines[0];
+        for(const auto& Token : TokenLine.Tokens)
+        {
+            if(InIndex > Token.Range.BeginIndex && InIndex <= Token.Range.EndIndex)
+            {
+                CurrentPosition = Token.Range.BeginIndex;
+                break;
+            }
+        }
+        return CurrentPosition >= InIndex ? INDEX_NONE : CurrentPosition;
+    }
+
+    int32 TokenBreakIterator::MoveToCandidateAfter(const int32 InIndex)
+    {
+        TArray<HlslHighLightTokenizer::BraceGroup> _;
+        TArray<HlslHighLightTokenizer::TokenizedLine> TokenizedLines = Marshaller->Tokenizer->Tokenize(InternalString, _, true);
+        const HlslHighLightTokenizer::TokenizedLine& TokenLine = TokenizedLines[0];
+        for(const auto& Token : TokenLine.Tokens)
+        {
+            if(InIndex >= Token.Range.BeginIndex && InIndex < Token.Range.EndIndex)
+            {
+                CurrentPosition = Token.Range.EndIndex;
+                break;
+            }
+        }
+        return CurrentPosition <= InIndex ? INDEX_NONE : CurrentPosition;
+    }
 	
 	SShaderEditorBox::~SShaderEditorBox()
 	{
@@ -177,6 +252,9 @@ namespace SH
                                     .HScrollBar(ShaderMultiLineHScrollBar)
                                     .OnKeyCharHandler(this, &SShaderEditorBox::HandleKeyChar)
                                     .OnKeyDownHandler(this, &SShaderEditorBox::HandleKeyDown)
+                                    .CreateSlateTextLayout_Lambda([this](SWidget* InOwner, FTextBlockStyle InDefaultTextStyle){
+                                        return MakeShared<ShaderTextLayout>(InOwner, InDefaultTextStyle, ShaderMarshaller.Get());
+                                    })
                                     .OnIsTypedCharValid_Lambda([](const TCHAR InChar) { return true; })
                                     .OnCursorMoved_Lambda([this](const FTextLocation&){
                                         if(!bKeyChar) {

@@ -5,6 +5,7 @@
 #include "UI/Widgets/ShaderCodeEditor/ShaderCodeTokenizer.h"
 #include "Renderer/ShRenderer.h"
 #include "GpuApi/GpuShader.h"
+#include <Internationalization/IBreakIterator.h>
 
 namespace SH
 {
@@ -34,6 +35,40 @@ namespace SH
 		//Key: The line index of Left Brace in MultiLineEditableText
 		TMap<int32, HlslHighLightTokenizer::BraceGroup> FoldingBraceGroups;
 	};
+
+    class TokenBreakIterator : public IBreakIterator
+    {
+    public:
+        TokenBreakIterator(FShaderEditorMarshaller* InMarshaller);
+
+        virtual void SetString(FString&& InString) override;
+        virtual void SetStringRef(FStringView InString) override;
+
+        virtual int32 GetCurrentPosition() const override;
+
+        virtual int32 ResetToBeginning() override;
+        virtual int32 ResetToEnd() override;
+
+        virtual int32 MoveToPrevious() override;
+        virtual int32 MoveToNext() override;
+        virtual int32 MoveToCandidateBefore(const int32 InIndex) override;
+        virtual int32 MoveToCandidateAfter(const int32 InIndex) override;
+
+    private:
+        FString InternalString;
+        int32 CurrentPosition{};
+        FShaderEditorMarshaller* Marshaller;
+    };
+
+    class ShaderTextLayout : public FSlateTextLayout
+    {
+    public:
+        ShaderTextLayout(SWidget* InOwner, FTextBlockStyle InDefaultTextStyle, FShaderEditorMarshaller* Marshaller)
+            :FSlateTextLayout(InOwner, InDefaultTextStyle)
+        {
+            WordBreakIterator = MakeShared<TokenBreakIterator>(Marshaller);
+        }
+    };
 
 	class FShaderEditorEffectMarshaller : public FBaseTextLayoutMarshaller
 	{
