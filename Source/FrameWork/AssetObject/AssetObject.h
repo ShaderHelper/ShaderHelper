@@ -16,11 +16,12 @@ namespace FW
         void Destroy()
         {
             NumRefs = 0;
+            OnDestroy.ExecuteIfBound();
             delete this;
         }
 
 		virtual void Serialize(FArchive& Ar) override;
-        virtual void PostLoad() {}
+        virtual void PostLoad() override;
 		virtual void Save();
 		virtual void MarkDirty();
 		bool IsDirty();
@@ -34,6 +35,9 @@ namespace FW
         
         FString GetFileName() const;
         FString GetPath() const;
+        
+    public:
+        FSimpleDelegate OnDestroy;
 	};
 
     FRAMEWORK_API MetaType* GetAssetMetaType(const FString& InPath);

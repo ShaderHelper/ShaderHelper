@@ -23,12 +23,19 @@ namespace FW
 		{
 			Ar << GProjectVer;
 		}
-		void AddPendingAsset(AssetObject* InAsset) { PendingAssets.AddUnique(InAsset); }
-		void RemovePendingAsset(AssetObject* InAsset) { if(PendingAssets.Contains(InAsset)) PendingAssets.Remove(InAsset);}
+		void AddPendingAsset(AssetPtr<AssetObject> InAsset) {
+            PendingAssets.AddUnique(MoveTemp(InAsset));
+        }
+		void RemovePendingAsset(AssetObject* InAsset) {
+            if(PendingAssets.Contains(InAsset))
+            {
+                PendingAssets.Remove(InAsset);
+            }
+        }
 
 		bool IsPendingAsset(AssetObject* InAsset) const { return PendingAssets.Contains(InAsset); }
 		bool IsPendingAsset(const FString& InPath) {
-			return PendingAssets.ContainsByPredicate([InPath](const AssetObject* Element) {
+			return PendingAssets.ContainsByPredicate([InPath](const AssetPtr<AssetObject>& Element) {
 				return Element->GetPath() == InPath;
 			});
 		}
@@ -39,7 +46,7 @@ namespace FW
 		}
 
 	protected:
-		TArray<ObserverObjectPtr<AssetObject>> PendingAssets;
+		TArray<AssetPtr<AssetObject>> PendingAssets;
 		FString Path;
 	};
 

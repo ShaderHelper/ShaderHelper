@@ -23,10 +23,8 @@ namespace SH
         ~ShaderToyOuputNode();
         
 	public:
+        void InitPins() override;
 		void Serialize(FArchive& Ar) override;
-		TArray<FW::GraphPin*> GetPins() override;
-		bool Exec(FW::GraphExecContext& Context) override;
-
-		GpuTexturePin ResultPin{ FText::FromString("RT"), FW::PinDirection::Input };
+        FW::ExecRet Exec(FW::GraphExecContext& Context) override;
 	};
 }

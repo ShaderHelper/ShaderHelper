@@ -63,6 +63,7 @@ namespace FW
 		Arguments.Add(TEXT("/Zi"));
         Arguments.Add(TEXT("/Od"));
 #endif
+        Arguments.Add(TEXT("-no-warnings"));
 
 		for(const FString& IncludeDir : InShader->GetIncludeDirs())
 		{

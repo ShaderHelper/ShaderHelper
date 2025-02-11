@@ -12,9 +12,13 @@ usage "ShaderConductor"
         links
         {
             "ShaderConductor",
+            "dxcompiler"
         }
         includedirs
         {
             "./Include",
+        }
+        buildoptions {
+            "-fms-extensions", --dxc uuid requires it for clang
         }
 

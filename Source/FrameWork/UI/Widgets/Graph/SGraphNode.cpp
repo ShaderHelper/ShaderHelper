@@ -57,7 +57,7 @@ namespace FW
 			]
 		];
 
-		for (GraphPin* Pin : NodeData->GetPins())
+		for (GraphPin* Pin : NodeData->Pins)
 		{
 			auto PinIcon = SNew(SGraphPin, this).PinData(Pin);
 			Pins.Add(&*PinIcon);

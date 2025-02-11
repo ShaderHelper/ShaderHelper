@@ -1,0 +1,15 @@
+<svg width="24" height="24" xmlns="http://www.w3.org/2000/svg">
+ <title>Artboard-189</title>
+
+ <g>
+  <title>background</title>
+  <rect fill="none" id="canvas_background" height="771" width="1534" y="-1" x="-1"/>
+ </g>
+ <g>
+  <title>Layer 1</title>
+  <g data-name="Next" id="Next-2">
+   <path id="svg_1" fill="#ffffff" d="m6,17.9375a0.986,0.986 0 0 1 -0.424,-0.095a1,1 0 0 1 -0.576,-0.905l0,-10a1,1 0 0 1 1.641,-0.769l6,5a1,1 0 0 1 0,1.538l-6,5a1.007,1.007 0 0 1 -0.641,0.231z"/>
+   <path id="svg_2" fill="#ffffff" d="m18,18l-3,0a1,1 0 0 1 -1,-1l0,-10a1,1 0 0 1 1,-1l3,0a1,1 0 0 1 1,1l0,10a1,1 0 0 1 -1,1z"/>
+  </g>
+ </g>
+</svg>

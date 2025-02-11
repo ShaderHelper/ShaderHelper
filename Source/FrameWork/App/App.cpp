@@ -32,6 +32,7 @@ namespace FW {
 #endif
 
 		FCommandLine::Set(CommandLine);
+        FFileHelper::SaveStringToFile(CommandLine, *(PathHelper::SavedDir() / TEXT("Cmd.txt")));
 		
 		FPlatformOutputDevices::SetupOutputDevices();
 
@@ -128,21 +129,16 @@ namespace FW {
 	{
 		Init();
 
-		double CurrentRealTime = FPlatformTime::Seconds();
-		double LastRealTime = CurrentRealTime;
-		while (!IsEngineExitRequested()) {
+        while (!IsEngineExitRequested()) {
 #if PLATFORM_MAC
             //Ensure that NSObjects autoreleased every frame are immediately released.
             SCOPED_AUTORELEASE_POOL;
 #endif
-			BeginExitIfRequested();
-
-			CurrentRealTime = FPlatformTime::Seconds();
-			double NewDeltaTime = CurrentRealTime - LastRealTime;
-
-			LastRealTime = CurrentRealTime;
-			DeltaTime = NewDeltaTime;
-
+            BeginExitIfRequested();
+            
+            //Note: FPlatformTime::Seconds must be passed to double. see FApplePlatformTime
+            double LastRealTime = FPlatformTime::Seconds();
+            
 			bool bIdleMode = AreAllWindowsHidden();
 			if (!bIdleMode)
 			{
@@ -153,7 +149,7 @@ namespace FW {
 					FSlateApplication::Get().PumpMessages();
 					FSlateApplication::Get().Tick();
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
-                    FTicker::GetCoreTicker().Tick((float)DeltaTime);
+                    FTicker::GetCoreTicker().Tick(DeltaTime);
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
 					//if not change GFrameCounter, slate texture may not update.
 					GFrameCounter++;
@@ -164,6 +160,29 @@ PRAGMA_DISABLE_DEPRECATION_WARNINGS
 			{
 				FSlateApplication::Get().PumpMessages();
 			}
+            
+            double CurrentRealTime = FPlatformTime::Seconds();
+            float NewDeltaTime = CurrentRealTime - LastRealTime;
+            DeltaTime = NewDeltaTime;
+            
+            //Lock fps to reduce cpu usage
+            const float MaxDeltaTime = 1.0f / 60.0f;
+            if(NewDeltaTime < MaxDeltaTime)
+            {
+                const float WaitTime = MaxDeltaTime - NewDeltaTime;
+                double WaitEndTime = CurrentRealTime + WaitTime;
+                if (WaitTime > 0.004f)
+                {
+                    FPlatformProcess::SleepNoStats(WaitTime - 0.001f);
+                }
+                while (FPlatformTime::Seconds() < WaitEndTime)
+                {
+                    FPlatformProcess::SleepNoStats(0);
+                }
+                CurrentRealTime = FPlatformTime::Seconds();
+                DeltaTime = CurrentRealTime - LastRealTime;
+            }
+
 		}
 	}
 
@@ -188,11 +207,11 @@ PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		return bAllHidden;
 	}
 
-	void App::Update(double DeltaTime)
+	void App::Update(float DeltaTime)
 	{
 		FDirectoryWatcherModule& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>(TEXT("DirectoryWatcher"));
 		IDirectoryWatcher* DirectoryWatcher = DirectoryWatcherModule.Get();
-		DirectoryWatcher->Tick((float)DeltaTime);
+		DirectoryWatcher->Tick(DeltaTime);
         
         if(AppEditor)
         {

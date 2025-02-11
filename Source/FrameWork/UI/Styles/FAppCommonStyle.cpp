@@ -30,6 +30,11 @@ namespace FW
 		Style->Set("AssetBrowser.Folder", new IMAGE_BRUSH_SVG("folder", FVector2D(64.0, 64.0)));
 		Style->Set("ProjectLauncher.Background", new IMAGE_BRUSH("Launcher", FVector2D(560, 270)));
 		Style->Set("ProjectLauncher.Logo", new IMAGE_BRUSH("ShaderHelper", FVector2D(100, 30)));
+        
+        Style->Set("Timeline.LeftEnd", new IMAGE_BRUSH_SVG("LeftEnd", FVector2D(24.0, 24.0)));
+        Style->Set("Timeline.Pause", new IMAGE_BRUSH_SVG("Pause", FVector2D(24.0, 24.0)));
+        Style->Set("Timeline.Play", new IMAGE_BRUSH_SVG("Play", FVector2D(24.0, 24.0)));
+        Style->Set("Timeline.RightEnd", new IMAGE_BRUSH_SVG("RightEnd", FVector2D(24.0, 24.0)));
 
         Style->Set("Graph.Shadow", new BOX_BRUSH( "WindowBorder", 0.48f ) );
 		Style->Set("Graph.NodeShadow", new BOX_BRUSH("NodeShadow", FMargin(18.0f / 64.0f)));

@@ -12,12 +12,12 @@ namespace SH
 
 	void ShRenderer::Render()
 	{
-		for (auto RenderComp : RenderComps)
-		{
-			RenderComp->RenderBegin();
-			RenderComp->RenderInternal();
-			RenderComp->RenderEnd();
-		}
+        for (auto RenderComp : RenderComps)
+        {
+            RenderComp->RenderBegin();
+            RenderComp->RenderInternal();
+            RenderComp->RenderEnd();
+        }
 	}
 
 }

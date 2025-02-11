@@ -15,5 +15,8 @@ namespace FW {
         static FString SavedCaptureDir();
 		static FString ShaderDir();
 		static FString ErrorDir();
+        
+        //Support the project path with space
+        static bool ParseProjectPath(const FString& CommandLine, FString& OutPath);
 	};
 }

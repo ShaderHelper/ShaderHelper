@@ -2,6 +2,8 @@
 
 namespace SH
 {
+    TOptional<int32> IsMatchPunctuation(const TCHAR* InString, int32 Len, FString& OutMatchedPuncuation);
+
 	class HlslHighLightTokenizer
 	{
 	public:
@@ -46,6 +48,6 @@ namespace SH
 		};
 
 	public:
-		TArray<TokenizedLine> Tokenize(const FString& HlslCodeString, TArray<BraceGroup>& OutBraceGroups);
+		TArray<TokenizedLine> Tokenize(const FString& HlslCodeString, TArray<BraceGroup>& OutBraceGroups, bool IgnoreWhitespace = false);
 	};
 }

@@ -14,21 +14,25 @@ namespace FW
 		{
 			if (ManagedExts.Contains(FPaths::GetExtension(FileName)))
 			{
-				TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*FileName));
-				FGuid Guid;
-				*Ar << Guid;
-
+                FGuid Guid = ReadAssetGuidInDisk(FileName);
                 GuidToPath.Add(Guid, FileName);
 			}
 		
 		}
 	}
 
-	void AssetManager::UpdateGuidToPath(const FString& InPath)
-	{
+    FGuid AssetManager::ReadAssetGuidInDisk(const FString& InPath)
+    {
+        //ps: Guid must be first entry in the asset binary.
         TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*InPath));
         FGuid Guid;
         *Ar << Guid;
+        return Guid;
+    }
+
+	void AssetManager::UpdateGuidToPath(const FString& InPath)
+	{
+        FGuid Guid = ReadAssetGuidInDisk(InPath);
         GuidToPath.FindOrAdd(Guid) = InPath;
 	}
 

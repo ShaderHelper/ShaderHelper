@@ -97,7 +97,4 @@ namespace FW
     private:
         T* Reference;
     };
-    
-    template<typename T>
-    using ObserverObjectPtr = ObjectPtr<T, ObjectOwnerShip::Assign>;
 }

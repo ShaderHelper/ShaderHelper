@@ -10,6 +10,7 @@ namespace FW
             : _DisplayName(nullptr)
             , _Indent(false)
         {}
+            SLATE_ARGUMENT(TFunction<bool(const FString&)>, CanChangeToName)
 			SLATE_ARGUMENT(FString*, DisplayName)
 			SLATE_ARGUMENT(TSharedPtr<SWidget>, ValueWidget)
             SLATE_ARGUMENT(bool, Indent)

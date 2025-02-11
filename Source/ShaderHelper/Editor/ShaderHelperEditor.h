@@ -44,6 +44,7 @@ namespace SH
 		void OpenGraph(FW::AssetPtr<FW::Graph> InGraphData, TSharedPtr<FW::RenderComponent> InGraphRenderComp);
         void RefreshProperty();
         void ShowProperty(FW::ShObject* InObjectData);
+        void UpdateStShaderPath(const FString& InStShaderPath);
 
 	private:
 		TSharedRef<SDockTab> SpawnWindowTab(const FSpawnTabArgs& Args);
@@ -79,6 +80,8 @@ namespace SH
 
 		ShRenderer* Renderer;
 		TSharedPtr<FW::RenderComponent> GraphRenderComp;
+        
+        TMap<FW::AssetPtr<StShader>, TSharedPtr<SScrollBox>> StShaderPathBoxMap;
 	};
 
 }

@@ -3,9 +3,17 @@
 #include "MetalShader.h"
 #include "MetalMap.h"
 #include "MetalDevice.h"
+#include "MetalGpuRhiBackend.h"
 
 namespace FW
 {
+    MetalRenderPipelineState::MetalRenderPipelineState(MTLRenderPipelineStatePtr InPipelineState, MTLPrimitiveType InPrimitiveType)
+    : PipelineState(MoveTemp(InPipelineState))
+    , PrimitiveType(InPrimitiveType)
+    {
+        GDeferredReleaseOneFrame.Add(this);
+    }
+
 	TRefCountPtr<MetalRenderPipelineState> CreateMetalRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc)
     {
         MetalShader* Vs = static_cast<MetalShader*>(InPipelineStateDesc.Vs);

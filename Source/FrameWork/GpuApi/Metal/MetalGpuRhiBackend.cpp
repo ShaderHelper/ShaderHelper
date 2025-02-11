@@ -41,6 +41,7 @@ void MetalGpuRhiBackend::EndFrame()
 {
 	WaitGpu();
     ClearSubmitted();
+    GDeferredReleaseOneFrame.Empty();
 }
 
 TRefCountPtr<GpuTexture> MetalGpuRhiBackend::CreateTexture(const GpuTextureDesc &InTexDesc, GpuResourceState InitState)

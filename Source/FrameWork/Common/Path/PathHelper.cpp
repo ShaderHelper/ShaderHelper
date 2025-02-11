@@ -55,5 +55,24 @@ namespace FW {
 		return SavedDir() / TEXT("Error");
 	}
 
+    bool PathHelper::ParseProjectPath(const FString& CommandLine, FString& OutPath)
+    {
+        FString Key = TEXT("-Project=");
+        FString Ext = TEXT(".shprj");
+        int32 StartIndex = CommandLine.Find(Key);
+        if(StartIndex != INDEX_NONE)
+        {
+            StartIndex += Key.Len();
+            int32 EndIndex = CommandLine.Find(Ext, ESearchCase::CaseSensitive, ESearchDir::FromStart, StartIndex);
+            if(EndIndex != INDEX_NONE)
+            {
+                EndIndex += Ext.Len();
+                OutPath = CommandLine.Mid(StartIndex, EndIndex - StartIndex);
+                return true;
+            }
+        }
+        return false;
+    }
+
 }
 

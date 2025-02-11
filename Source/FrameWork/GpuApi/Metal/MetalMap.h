@@ -82,6 +82,7 @@ namespace FW
             RawPassDesc.colorAttachments[i].texture = (id<MTLTexture>)Rt->GetResource();
             RawPassDesc.colorAttachments[i].loadAction = MapLoadAction(RtInfo.LoadAction);
             RawPassDesc.colorAttachments[i].storeAction = MapStoreAction(RtInfo.StoreAction);
+            RawPassDesc.colorAttachments[i].clearColor = MTLClearColorMake(RtInfo.ClearColor.x, RtInfo.ClearColor.y, RtInfo.ClearColor.z, RtInfo.ClearColor.w);
         }
         
         if(PassRtNum <= 0)

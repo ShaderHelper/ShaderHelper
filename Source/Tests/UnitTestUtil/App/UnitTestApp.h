@@ -11,7 +11,7 @@ namespace UNITTEST_UTIL
 
 	public:
 		void Init() override;
-		void Update(double DeltaTime) override;
+		void Update(float DeltaTime) override;
 	};
 }
 

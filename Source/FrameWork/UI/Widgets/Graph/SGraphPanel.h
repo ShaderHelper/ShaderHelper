@@ -62,7 +62,7 @@ namespace FW
 		SGraphPin* GetOuputPinInLink(SGraphPin* InputPin) const;
 		TSharedPtr<SGraphNode> AddNodeFromData(GraphNode* InNodeData);
 		void AddLink(SGraphPin* Output, SGraphPin* Input);
-		void RemoveInputLink(SGraphPin* Input);
+		void RemoveLink(SGraphPin* Input);
 
 		//GraphCoord center is (0,0) 
 		Vector2D PanelCoordToGraphCoord(const Vector2D& InCoord) const;

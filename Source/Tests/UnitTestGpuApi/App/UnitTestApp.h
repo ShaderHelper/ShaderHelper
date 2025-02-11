@@ -12,7 +12,7 @@ namespace UNITTEST_GPUAPI
 
 	public:
 		void Init() override;
-		void Update(double DeltaTime) override;
+		void Update(float DeltaTime) override;
 		void Render() override;
 	};
 }

@@ -1,8 +1,10 @@
+#pragma once
 #include "GpuApi/GpuTexture.h"
 #include "Editor/PreviewViewPort.h"
 #include <Widgets/SViewport.h>
 #include "UI/Widgets/AssetBrowser/AssetViewItem/AssetViewAssetItem.h"
 #include "Editor/AssetEditor/AssetEditor.h"
+#include "PropertyItem.h"
 
 namespace FW
 {
@@ -14,6 +16,7 @@ namespace FW
             SLATE_ARGUMENT(ShObject*, Owner)
             SLATE_ARGUMENT(void* , AssetPtrRef);
             SLATE_ARGUMENT(MetaType* , AssetMetaType);
+            SLATE_EVENT(FSimpleDelegate, OnAssetChanged)
         SLATE_END_ARGS()
         
         void RefreshAssetView()
@@ -40,6 +43,8 @@ namespace FW
             Owner = InArgs._Owner;
             AssetPtrRef = InArgs._AssetPtrRef;
             AssetMetaType = InArgs._AssetMetaType;
+            OnAssetChanged = InArgs._OnAssetChanged;
+            
             Display = SNew(SBox).WidthOverride(40).HeightOverride(40);
             
             auto PreviewBox = SNew(SBorder)
@@ -166,7 +171,7 @@ namespace FW
                     {
                         AssetRef = Asset;
                         RefreshAssetView();
-                        Owner->GetOuterMost()->MarkDirty();
+                        OnAssetChanged.ExecuteIfBound();
                     }
   
                 }
@@ -182,6 +187,7 @@ namespace FW
         void* AssetPtrRef;
         MetaType* AssetMetaType;
         TSharedPtr<SBox> Display;
+        FSimpleDelegate OnAssetChanged;
     };
     
     class PropertyAssetItem : public PropertyItemBase
@@ -200,7 +206,10 @@ namespace FW
             auto ValueWidget = SNew(SPropertyAsset)
                 .Owner(Owner)
                 .AssetPtrRef(AssetPtrRef)
-                .AssetMetaType(AssetMetaType);
+                .AssetMetaType(AssetMetaType)
+                .OnAssetChanged_Lambda([this]{
+                    Owner->PostPropertyChanged(this);
+                });
             Item->AddWidget(MoveTemp(ValueWidget));
             return Row;
         }

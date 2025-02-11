@@ -12,11 +12,13 @@ namespace FW
 		static void OpenAsset(AssetObject* InAsset);
 
 	public:
+        virtual void OnRename(const FString& OldPath, const FString& NewPath);
+        virtual void OnMove(const FString& OldPath, const FString& NewPath) {}
         virtual void OnOpen(const FString& InAssetPath) {}
-		//OnDelete and OnAdd will be triggered one after the other if rename or move the asset.
+
         virtual void OnAdd(const FString& InAssetPath) {}
 		virtual void OnDelete(const FString& InAssetPath);
-		//
+
 		virtual void OnCreate(AssetObject* InAsset) {};
 	};
     

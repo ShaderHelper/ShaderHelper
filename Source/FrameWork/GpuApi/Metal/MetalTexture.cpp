@@ -9,6 +9,20 @@
 
 namespace FW
 {
+    MetalSampler::MetalSampler(MTLSamplerStatePtr InSampler)
+    : Sampler(MoveTemp(InSampler))
+    {
+        GDeferredReleaseOneFrame.Add(this);
+    }
+
+    MetalTexture::MetalTexture(MTLTexturePtr InTex, GpuTextureDesc InDesc, CVPixelBufferRef InSharedHandle)
+    : GpuTexture(MoveTemp(InDesc))
+    , Tex(MoveTemp(InTex))
+    , SharedHandle(InSharedHandle)
+    {
+        GDeferredReleaseOneFrame.Add(this);
+    }
+
     static void SetTextureUsage(GpuTextureUsage InUsage, MTL::TextureDescriptor* OutTexDesc)
     {
         MTLTextureUsage Usage = MTLTextureUsageUnknown;
@@ -62,19 +76,22 @@ namespace FW
 
     TRefCountPtr<MetalTexture> CreateMetalTexture2D(const GpuTextureDesc& InTexDesc)
     {
+        TRefCountPtr<MetalTexture> RetTexture;
         if(EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::Shared))
         {
-            return CreateSharedMetalTexture(InTexDesc);
+            RetTexture = CreateSharedMetalTexture(InTexDesc);
         }
-        
-        MTL::PixelFormat TexFormat = (MTL::PixelFormat)MapTextureFormat(InTexDesc.Format);
-        MTL::TextureDescriptor* TexDesc = MTL::TextureDescriptor::texture2DDescriptor(TexFormat, InTexDesc.Width, InTexDesc.Height, InTexDesc.NumMips > 1);
-        TexDesc->setTextureType(MTL::TextureType2D);
-        TexDesc->setStorageMode(MTL::StorageModePrivate);
-        SetTextureUsage(InTexDesc.Usage, TexDesc);
-        
-        MTLTexturePtr Tex = NS::TransferPtr(GDevice->newTexture(TexDesc));
-        TRefCountPtr<MetalTexture> RetTexture = new MetalTexture(MoveTemp(Tex), InTexDesc);
+        else
+        {
+            MTL::PixelFormat TexFormat = (MTL::PixelFormat)MapTextureFormat(InTexDesc.Format);
+            MTL::TextureDescriptor* TexDesc = MTL::TextureDescriptor::texture2DDescriptor(TexFormat, InTexDesc.Width, InTexDesc.Height, InTexDesc.NumMips > 1);
+            TexDesc->setTextureType(MTL::TextureType2D);
+            TexDesc->setStorageMode(MTL::StorageModePrivate);
+            SetTextureUsage(InTexDesc.Usage, TexDesc);
+            
+            MTLTexturePtr Tex = NS::TransferPtr(GDevice->newTexture(TexDesc));
+            RetTexture = new MetalTexture(MoveTemp(Tex), InTexDesc);
+        }
         
         if (!InTexDesc.InitialData.IsEmpty()) {
             const uint32 BytesImage = InTexDesc.InitialData.Num();

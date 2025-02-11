@@ -7,20 +7,9 @@ namespace FW
 
 	using RenderPassExecution = TFunction<void(GpuRenderPassRecorder*)>;
 
-	enum class RGPassFlag
+	struct RGRenderPass
 	{
-		Render,
-		Compute,
-	};
-
-	struct RGPass
-	{
-		FString Name;
-		RGPassFlag Flag;
-	};
-
-	struct RGRenderPass : RGPass
-	{
+        FString Name;
 		GpuRenderPassDesc Desc;
 		RenderPassExecution Execution;
 	};
@@ -36,7 +25,7 @@ namespace FW
 		void Execute();
 
 	private:
-		TArray<TUniquePtr<RGPass>> RGPasses;
+		TArray<RGRenderPass> RGRenderPasses;
 		GpuCmdRecorder* CmdRecorder;
 	};
 }

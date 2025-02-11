@@ -25,6 +25,9 @@ namespace SH
 		FW::AssetPtr<FW::Graph> Graph;
 		TMap<FW::AssetPtr<StShader>, TSharedPtr<class SDockTab>> OpenedStShaders;
 		TSharedPtr<FTabManager::FLayout> CodeTabLayout;
+        bool TimelineStop = true;
+        float TimelineCurTime = 0;
+        float TimelineMaxTime = 100;
 	};
 
 	using ShProjectManager = FW::ProjectManager<ShProject>;

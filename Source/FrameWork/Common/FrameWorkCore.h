@@ -12,6 +12,9 @@ namespace FW
     };
 
     template<typename T, ObjectOwnerShip> class ObjectPtr;
+
+    template<typename T>
+    using ObserverObjectPtr = ObjectPtr<T, ObjectOwnerShip::Assign>;
         
 	enum class FrameWorkVer
 	{
@@ -32,8 +35,10 @@ namespace FW
 		FGuid GetGuid() const { return Guid; }
 		//Use the serialization system from unreal engine
 		virtual void Serialize(FArchive& Ar);
+        virtual void PostLoad();
         //
         virtual TArray<TSharedRef<PropertyData>>* GetPropertyDatas();
+        virtual void PostPropertyChanged(PropertyData* InProperty);
     
         uint32 Add() const
         {
@@ -53,26 +58,31 @@ namespace FW
             return uint32(NumRefs);
         }
         
+        void SetOuter(ShObject* InOuter);
+        ShObject* GetOuter() const { return Outer; }
         AssetObject* GetOuterMost();
 
 	public:
 		FText ObjectName;
-        
-        //For all Shobject except AssetObject
-        //The OuterMost should be an AssetObject
-        ShObject* Outer;
 
 	protected:
 		FGuid Guid;
         TArray<TSharedRef<PropertyData>> PropertyDatas;
         mutable int32 NumRefs;
+
+    private:
+        //For all Shobject except AssetObject
+        //The OuterMost should be an AssetObject
+        ShObject* Outer;
+
+        TArray<ObserverObjectPtr<ShObject>> SubObjects;
 	};
 
     template<typename T>
-    ObjectPtr<T, ObjectOwnerShip::Retain> NewShObject(ShObject* InOuter = nullptr)
+    ObjectPtr<T, ObjectOwnerShip::Retain> NewShObject(ShObject* InOuter)
     {
         T* NewObj = new T;
-        NewObj->Outer = InOuter;
+        NewObj->SetOuter(InOuter);
         return NewObj;
     }
 
