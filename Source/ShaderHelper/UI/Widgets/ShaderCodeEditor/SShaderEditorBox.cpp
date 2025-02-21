@@ -1423,31 +1423,53 @@ const FString ErrorMarkerText = TEXT("✘");
 
 		for (int32 LineIndex = StartLineIndex; LineIndex <= EndLineIndex; LineIndex++)
 		{
-			FString LineText;
-			if (LineIndex == StartLineIndex)
+			FString SelectedText;
+            int32 TextStart{};
+            int32 TextEnd{};
+            if(LineIndex == StartLineIndex && LineIndex == EndLineIndex)
+            {
+                ShaderMarshaller->TextLayout->GetSelectionAsText(SelectedText, DisplayedTextRange);
+                TextStart = StartOffset;
+                TextEnd = EndOffset;
+            }
+			else if (LineIndex == StartLineIndex)
 			{
-				LineText = Lines[LineIndex].Text->Mid(StartOffset);
+                SelectedText = Lines[LineIndex].Text->Mid(StartOffset);
+                TextStart = StartOffset;
+                TextEnd = Lines[LineIndex].Text->Len();
 			}
 			else if(LineIndex == EndLineIndex)
 			{
-				LineText = Lines[LineIndex].Text->Mid(0, EndOffset + 1);
+                SelectedText = Lines[LineIndex].Text->Mid(0, EndOffset);
+                TextStart = 0;
+                TextEnd = EndOffset;
 			}
 			else
 			{
-				LineText = *Lines[LineIndex].Text;
+                SelectedText = *Lines[LineIndex].Text;
+                TextStart = 0;
+                TextEnd = Lines[LineIndex].Text->Len();
 			}
 
 			TOptional<int32> MarkerIndex = FindFoldMarker(LineIndex);
 			if (MarkerIndex)
 			{
 				const auto& Marker = DisplayedFoldMarkers[*MarkerIndex];
-				TextAfterUnfolding += LineText.Mid(0, Marker.Offset);
-				TextAfterUnfolding += Marker.GetTotalFoldedLineTexts();
-				TextAfterUnfolding += LineText.Mid(Marker.Offset + 1);
+                if(Marker.Offset >= TextStart && Marker.Offset < TextEnd)
+                {
+                    int32 OffsetForSelectedText = Marker.Offset - TextStart;
+                    TextAfterUnfolding += SelectedText.Mid(0, OffsetForSelectedText);
+                    TextAfterUnfolding += Marker.GetTotalFoldedLineTexts();
+                    TextAfterUnfolding += SelectedText.Mid(OffsetForSelectedText + 1);
+                }
+                else
+                {
+                    TextAfterUnfolding += *SelectedText;
+                }
 			}
 			else
 			{
-				TextAfterUnfolding += *LineText;
+				TextAfterUnfolding += *SelectedText;
 			}
 
 			if (LineIndex < EndLineIndex) {
@@ -1793,7 +1815,7 @@ const FString ErrorMarkerText = TEXT("✘");
 			TextLayout->AddLineHighlight(Highlight);
 		}
 
-		FTextSelection UnFoldingRange = FTextSelection{ {0, 0}, {LinesToAdd.Num() - 1, LinesToAdd[LinesToAdd.Num() - 1].Text->Len() - 1} };
+		FTextSelection UnFoldingRange = FTextSelection{ {0, 0}, {LinesToAdd.Num() - 1, LinesToAdd[LinesToAdd.Num() - 1].Text->Len()} };
 		FString TextAfterUnfolding = OwnerWidget->UnFoldText(MoveTemp(UnFoldingRange));
         if(OwnerWidget->CurrentEditorSource != SourceString)
         {
