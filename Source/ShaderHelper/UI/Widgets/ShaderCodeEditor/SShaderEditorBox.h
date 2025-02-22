@@ -6,6 +6,7 @@
 #include "Renderer/ShRenderer.h"
 #include "GpuApi/GpuShader.h"
 #include <Internationalization/IBreakIterator.h>
+#include <Widgets/SCanvas.h>
 
 namespace SH
 {
@@ -237,6 +238,7 @@ namespace SH
         
         FString CurToken;
         TArray<FW::ShaderCandidateInfo> CandidateInfos;
+		TSharedPtr<SCanvas> CodeCompletionCanvas;
         TSharedPtr<SListView<CandidateItemPtr>> CodeCompletionList;
         CandidateItemPtr CurSelectedCandidate;
         TArray<CandidateItemPtr> CandidateItems;

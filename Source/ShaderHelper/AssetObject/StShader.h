@@ -2,7 +2,7 @@
 #include "AssetObject/AssetObject.h"
 #include "RenderResource/UniformBuffer.h"
 #include "UI/Widgets/Property/PropertyData/PropertyData.h"
-
+#include "RenderResource/Shader/Shader.h"
 
 namespace SH
 {
@@ -50,7 +50,7 @@ namespace SH
         TSharedPtr<FW::PropertyCategory> BuiltInCategory;
         TSharedPtr<FW::PropertyCategory> CustomCategory;
         FW::UniformBufferBuilder CustomUniformBufferBuilder{FW::UniformBufferUsage::Persistant};
-        FW::GpuBindGroupLayoutBuilder CustomBindGroupLayoutBuilder{1};
+        FW::GpuBindGroupLayoutBuilder CustomBindGroupLayoutBuilder{ FW::BindingContext::PassSlot };
 	};
 
 }

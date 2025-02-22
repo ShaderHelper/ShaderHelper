@@ -15,7 +15,7 @@
 {
     FPlatformMisc::SetCrashHandler(nullptr);
     _runBlock(*_SavedCommandLine);
-    [NSApp terminate:self];
+	std::_Exit(0);
 }
 
 -(void)applicationDidFinishLaunching:(NSNotification *)notification

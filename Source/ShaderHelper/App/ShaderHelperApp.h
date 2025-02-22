@@ -10,7 +10,6 @@ namespace SH {
 	{
 	public:
 		ShaderHelperApp(const FW::Vector2D& InClientSize, const TCHAR* CommandLine);
-		~ShaderHelperApp();
 
 	public:
 		void Init() override;

@@ -12,7 +12,6 @@
 #include "ShaderCodeEditorLineHighlighter.h"
 #include "AssetObject/StShader.h"
 #include "UI/Widgets/Misc/CommonCommands.h"
-#include <Widgets/SCanvas.h>
 #include "magic_enum.hpp"
 
 //No exposed methods, and too lazy to modify the source code for UE.
@@ -132,6 +131,7 @@ const FString ErrorMarkerText = TEXT("✘");
 
 		FText InitialShaderText = FText::FromString(StShaderAsset->PixelShaderBody);
         CurrentEditorSource = StShaderAsset->PixelShaderBody;
+		CurrentShaderSource = CurrentEditorSource;
         
         ISenseEvent = FPlatformProcess::GetSynchEventFromPool();
         ISenseThread = MakeUnique<FThread>(TEXT("ISenseThread"), [this]{
@@ -272,21 +272,21 @@ const FString ErrorMarkerText = TEXT("✘");
                                 ]
                                 + SOverlay::Slot()
                                 [
-                                    SNew(SCanvas)
+									SAssignNew(CodeCompletionCanvas, SCanvas)
                                     + SCanvas::Slot()
                                     .Size_Lambda([this]{
-                                        float Height = CustomCursorHighlighter->LineHeight * CandidateItems.Num();
+                                        float Height = CustomCursorHighlighter->ScaledLineHeight * CandidateItems.Num();
                                         float HSize = FMath::Min(200, Height);
                                         return FVector2D{240, HSize};
                                     })
                                     .Position_Lambda([this]{
-                                        FVector2D TipPos = CustomCursorHighlighter->CursorPos;
-                                        TipPos.Y += CustomCursorHighlighter->LineHeight;
+                                        FVector2D TipPos = CustomCursorHighlighter->ScaledCursorPos;
+                                        TipPos.Y += CustomCursorHighlighter->ScaledLineHeight;
                                         FVector2D Area = ShaderMultiLineEditableText->GetTickSpaceGeometry().GetLocalSize();
-                                        float HSize = FMath::Min(200, CustomCursorHighlighter->LineHeight * CandidateItems.Num());
+                                        float HSize = FMath::Min(200, CustomCursorHighlighter->ScaledLineHeight * CandidateItems.Num());
                                         if(TipPos.Y + HSize > Area.Y)
                                         {
-                                            TipPos.Y -= CustomCursorHighlighter->LineHeight;
+                                            TipPos.Y -= CustomCursorHighlighter->ScaledLineHeight;
                                             TipPos.Y -= HSize;
                                         }
                                         return TipPos;
@@ -876,6 +876,7 @@ const FString ErrorMarkerText = TEXT("✘");
         
         if(CandidateItems.Num() > 0)
         {
+			CodeCompletionCanvas->SlatePrepass();
             CodeCompletionList->RequestListRefresh();
             CodeCompletionList->SetSelection(CandidateItems[0]);
         }
@@ -1714,7 +1715,8 @@ const FString ErrorMarkerText = TEXT("✘");
         LineTip->SetBorderBackgroundColor(TAttribute<FSlateColor>::CreateLambda([this, Item]{
             const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
             const int32 CurLineIndex = CursorLocation.GetLineIndex();
-            if(FCString::Atoi(*Item->ToString()) == GetLineNumber(CurLineIndex))
+			auto FocusedWidget = FSlateApplication::Get().GetUserFocusedWidget(0);
+            if(FocusedWidget == ShaderMultiLineEditableText && FCString::Atoi(*Item->ToString()) == GetLineNumber(CurLineIndex))
             {
                 double CurTime = FPlatformTime::Seconds();
                 float Speed = 2.0f;

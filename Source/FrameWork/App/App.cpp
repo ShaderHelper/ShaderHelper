@@ -61,35 +61,12 @@ namespace FW {
 		FSlateApplication::InitializeAsStandaloneApplication(GetStandardStandaloneRenderer(FW::BaseResourcePath::UE_StandaloneRenderShaderDir));
 	
 	}
-	
-	static void UE_ShutDown()
-    {
-		FCoreDelegates::OnPreExit.Broadcast();
-		FCoreDelegates::OnExit.Broadcast();
-		FSlateApplication::Shutdown();
-		FModuleManager::Get().UnloadModulesAtShutdown();
-		FTaskGraphInterface::Shutdown();
-
-		FPlatformApplicationMisc::TearDown();
-		FPlatformMisc::PlatformTearDown();
-
-		if (GLog)
-		{
-			GLog->TearDown();
-		}
-	}
 
 	App::App(const Vector2D& InClientSize, const TCHAR* InCommandLine)
 		: AppClientSize(InClientSize), CommandLine(InCommandLine)
 	{
 	
 	}
-
-	App::~App()
-	{
-		UE_ShutDown();
-	}
-
 
 	void App::Init()
 	{

@@ -3,9 +3,17 @@
 #include "Common/Path/PathHelper.h"
 
 THIRD_PARTY_INCLUDES_START
-#define BOOL RESOLVED_BOOL
-#include "dxcisense.h"
-#undef BOOL
+#if PLATFORM_WINDOWS
+#include "Windows/AllowWindowsPlatformTypes.h"
+	#include <windows.h>
+	#include <ole2.h>
+	#include "dxcisense.h"
+#include "Windows/HideWindowsPlatformTypes.h"
+#else
+	#define BOOL RESOLVED_BOOL
+	#include "dxcisense.h"
+	#undef BOOL
+#endif
 THIRD_PARTY_INCLUDES_END
 
 namespace FW

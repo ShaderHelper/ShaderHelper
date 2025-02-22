@@ -51,19 +51,21 @@ namespace FW
 	bool ValidateCreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc)
 	{
 		const GpuBindGroupLayoutDesc& LayoutDesc = InBindGroupDesc.Layout->GetDesc();
+		bool Valid = true;
 		for (const auto& [Slot, LayoutBindingEntry] : LayoutDesc.Layouts)
 		{
 			if (auto* ResourceBindingEntry = InBindGroupDesc.Resources.Find(Slot))
 			{
-				return ValidateBindGroupResource(Slot, *ResourceBindingEntry, LayoutBindingEntry.Type);
+				Valid &= ValidateBindGroupResource(Slot, *ResourceBindingEntry, LayoutBindingEntry.Type);
 			}
 			else
 			{
-				SH_LOG(LogRhiValidation, Error, TEXT("CreateBindGroup Error(Missing BindingSlot) - Not find the slot : (%d)"), Slot);
-				return false;
+				SH_LOG(LogRhiValidation, Error, TEXT("CreateBindGroup Error(Missing BindingSlot) - Not find the slot : (%d)  Type: (%s)"), 
+					Slot, ANSI_TO_TCHAR(magic_enum::enum_name(LayoutBindingEntry.Type).data()));
+				Valid = false;
 			}
 		}
-		return true;
+		return Valid;
 	}
 
     bool ValidateCreateBindGroupLayout(const GpuBindGroupLayoutDesc& InBindGroupLayoutDesc)
@@ -97,7 +99,6 @@ namespace FW
 		};
 		return ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout0, 0) && ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout1, 1)
 			&& ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout2, 2) && ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout3, 3);
-		return true;
 	}
 
 	bool ValidateCreateBuffer(uint32 ByteSize, GpuBufferUsage Usage, GpuResourceState InitState)
@@ -151,6 +152,17 @@ namespace FW
 		}
 
 		return true;
+	}
+
+	bool ValidateCreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
+	{
+		if (EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::RenderTarget) && EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::ShaderResource) 
+			&& InitState == GpuResourceState::Unknown)
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(The InitState must be specified) for current texture usage."));
+			return false;
+		}
+		return ValidateGpuResourceState(InitState);
 	}
 
 }

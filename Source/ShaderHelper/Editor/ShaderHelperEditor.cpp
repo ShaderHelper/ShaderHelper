@@ -145,8 +145,7 @@ namespace SH
 			}))
 			.ScreenPosition(UsedWindowPos)
 			.AutoCenter(AutoCenterRule)
-			.ClientSize(UsedWindowSize)
-			.AdjustInitialSizeAndPositionForDPIScale(false);
+			.ClientSize(UsedWindowSize);
 
 		TabManagerTab->AssignParentWidget(Window);
 
@@ -252,6 +251,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                         .ButtonStyle(&FAppCommonStyle::Get().GetWidgetStyle< FButtonStyle >("SuperSimpleButton"))
                         .Text(FText::FromString(FileName + TEXT("  ❯")))
                         .OnClicked_Lambda([RelativePathHierarchy, this]{
+							TabManager->TryInvokeTab(AssetTabId);
                             AssetBrowser->SetCurrentDisplyPath(TSingleton<ShProjectManager>::Get().ConvertRelativePathToFull(RelativePathHierarchy));
                             return FReply::Handled();
                         })
@@ -611,12 +611,12 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		TSharedRef<FJsonObject> RootJsonObject = MakeShared<FJsonObject>();
 
 		TSharedRef<FJsonObject> RootWindowSizeJsonObject = MakeShared<FJsonObject>();
-		Vector2D CurClientSize = Window->GetClientSizeInScreen();
+		Vector2D CurClientSize = Window->GetClientSizeInScreen() / Window->GetDPIScaleFactor();
 		RootWindowSizeJsonObject->SetNumberField(TEXT("Width"), CurClientSize.X);
 		RootWindowSizeJsonObject->SetNumberField(TEXT("Height"), CurClientSize.Y);
 
 		TSharedRef<FJsonObject> RootWindowPosJsonObject = MakeShared<FJsonObject>();
-		Vector2D CurPos = Window->GetPositionInScreen();
+		Vector2D CurPos = Window->GetPositionInScreen() / Window->GetDPIScaleFactor();
 		RootWindowPosJsonObject->SetNumberField(TEXT("X"), CurPos.X);
 		RootWindowPosJsonObject->SetNumberField(TEXT("Y"), CurPos.Y);
 

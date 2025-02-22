@@ -276,13 +276,19 @@ namespace SH
                PassOutput->GetValue()->GetHeight() != ShaderToyContext.iResolution.y)
             {
                 GpuTextureDesc Desc{ (uint32)ShaderToyContext.iResolution.x, (uint32)ShaderToyContext.iResolution.y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
-                TRefCountPtr<GpuTexture> PassOuputTex = GGpuRhi->CreateTexture(MoveTemp(Desc));
+                TRefCountPtr<GpuTexture> PassOuputTex = GGpuRhi->CreateTexture(MoveTemp(Desc), GpuResourceState::RenderTargetWrite);
                 Preview->SetViewPortRenderTexture(PassOuputTex);
                 PassOutput->SetValue(PassOuputTex);
             }
 
             GpuRenderPassDesc PassDesc;
             PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassOutput->GetValue(), RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
+
+			BindingContext Bindings;
+			Bindings.SetGlobalBindGroup(StShader::GetBuiltInBindGroup());
+			Bindings.SetGlobalBindGroupLayout(StShader::GetBuiltInBindLayout());
+			Bindings.SetPassBindGroup(CustomBindGroup);
+			Bindings.SetPassBindGroupLayout(CustomBindLayout);
 
             GpuRenderPipelineStateDesc PipelineDesc{
                 //Shader
@@ -291,16 +297,17 @@ namespace SH
                 //Targets
                 {
                     { PassOutput->GetValue()->GetFormat() }
-                },
-                //BindGroupLayout
-                { StShader::GetBuiltInBindLayout(), CustomBindLayout }
+                }
             };
+			//BindGroupLayout
+			Bindings.ApplyBindGroupLayout(PipelineDesc);
+
             TRefCountPtr<GpuPipelineState> PipelineState = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
 
-            ShaderToyContext.RG->AddRenderPass(ObjectName.ToString(), MoveTemp(PassDesc),
-                [this, PipelineState](GpuRenderPassRecorder* PassRecorder) {
-                    PassRecorder->SetRenderPipelineState(PipelineState);
-                    PassRecorder->SetBindGroups(StShader::GetBuiltInBindGroup(), CustomBindGroup, nullptr, nullptr);
+            ShaderToyContext.RG->AddRenderPass(ObjectName.ToString(), MoveTemp(PassDesc), MoveTemp(Bindings),
+                [PipelineState](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
+					Bindings.ApplyBindGroup(PassRecorder);
+                    PassRecorder->SetRenderPipelineState(PipelineState);;
                     PassRecorder->DrawPrimitive(0, 3, 0, 1);
                 }
             );

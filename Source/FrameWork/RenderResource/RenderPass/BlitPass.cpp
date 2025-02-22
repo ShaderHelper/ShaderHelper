@@ -12,10 +12,10 @@ namespace FW
 
 		static BlitShader PassShader;
 
-		BindingContext Binding;
+		BindingContext Bindings;
 		BlitShader::Parameters ShaderParameter{ PassInput.InputTex, PassInput.InputTexSampler };
-		Binding.SetShaderBindGroup(PassShader.GetBindGroup(ShaderParameter));
-		Binding.SetShaderBindGroupLayout(PassShader.GetBindGroupLayout());
+		Bindings.SetShaderBindGroup(PassShader.GetBindGroup(ShaderParameter));
+		Bindings.SetShaderBindGroupLayout(PassShader.GetBindGroupLayout());
 
 		GpuRenderPipelineStateDesc PipelineDesc{
 			PassShader.GetVertexShader(), 
@@ -24,13 +24,13 @@ namespace FW
 				{ PassInput.OutputRenderTarget->GetFormat() }
 			}
 		};
-		Binding.ApplyBindGroupLayout(PipelineDesc);
+		Bindings.ApplyBindGroupLayout(PipelineDesc);
 
 		TRefCountPtr<GpuPipelineState> Pipeline = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
 
-		Graph.AddRenderPass("BlitPass", MoveTemp(BlitPassDesc),
-			[Pipeline, Binding](GpuRenderPassRecorder* PassRecorder) {
-				Binding.ApplyBindGroup(PassRecorder);
+		Graph.AddRenderPass("BlitPass", MoveTemp(BlitPassDesc), MoveTemp(Bindings),
+			[Pipeline](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
+				Bindings.ApplyBindGroup(PassRecorder);
 				PassRecorder->SetRenderPipelineState(Pipeline);
 				PassRecorder->DrawPrimitive(0, 3, 0, 1);
 			}

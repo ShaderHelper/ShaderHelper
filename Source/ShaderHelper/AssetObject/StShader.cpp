@@ -69,8 +69,18 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 
     GpuBindGroup* StShader::GetBuiltInBindGroup()
     {
+		GpuTexture* TempiChannel = GpuResourceHelper::GetGlobalBlackTex();
+		static TRefCountPtr<GpuSampler> TempSampler = GGpuRhi->CreateSampler({});
         static TRefCountPtr<GpuBindGroup> BuiltInBindGroup = GpuBindGrouprBuilder{ GetBuiltInBindLayout() }
             .SetUniformBuffer("Uniform", GetBuiltInUb()->GetGpuResource())
+			.SetTexture("iChannel0", TempiChannel)
+			.SetSampler("iChannel0Sampler", TempSampler)
+			.SetTexture("iChannel1", TempiChannel)
+			.SetSampler("iChannel1Sampler", TempSampler)
+			.SetTexture("iChannel2", TempiChannel)
+			.SetSampler("iChannel2Sampler", TempSampler)
+			.SetTexture("iChannel3", TempiChannel)
+			.SetSampler("iChannel3Sampler", TempSampler)
             .Build();
         return BuiltInBindGroup;
     }
@@ -95,7 +105,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 
     GpuBindGroupLayoutBuilder& StShader::GetBuiltInBindLayoutBuilder()
     {
-        static GpuBindGroupLayoutBuilder BuiltInBindLayout{ 0 };
+        static GpuBindGroupLayoutBuilder BuiltInBindLayout{ BindingContext::GlobalSlot };
         static int Init = [&] {
             BuiltInBindLayout
                 .AddUniformBuffer("Uniform", GetBuiltInUbBuilder().GetLayoutDeclaration(), BindingShaderStage::Pixel)

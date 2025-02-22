@@ -9,6 +9,7 @@ void WinLaunch(TFunctionRef<void(const TCHAR*)> RunBlock, const TCHAR* CmdLine)
 		GIsGuarded = 1;
 		RunBlock(CmdLine);
 		GIsGuarded = 0;
+		std::_Exit(0);
 	}
 	__except (ReportCrash(GetExceptionInformation()))
 	{

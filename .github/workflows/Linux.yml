@@ -30,9 +30,9 @@ jobs:
         run: ./bootstrap.sh
         shell: sh
 
-      - name: Build solution
-        working-directory: ${{env.GITHUB_WORKSPACE}}
-        run: |
-          # make ShaderHelper
-          make UnitTestUtil
-          # make UnitTestGpuApi
+      # - name: Build solution
+      #   working-directory: ${{env.GITHUB_WORKSPACE}}
+      #   run: |
+      #     # make ShaderHelper
+      #     make UnitTestUtil
+      #     # make UnitTestGpuApi

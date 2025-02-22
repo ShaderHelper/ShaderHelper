@@ -14,11 +14,6 @@ namespace SH {
    
 	}
 
-	ShaderHelperApp::~ShaderHelperApp()
-	{
-
-	}
-
 	void ShaderHelperApp::Init()
 	{
 		App::Init();

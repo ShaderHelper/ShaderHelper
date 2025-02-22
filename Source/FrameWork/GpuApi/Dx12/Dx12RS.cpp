@@ -209,16 +209,14 @@ namespace FW
 		for (int Visibility = 0; Visibility <= D3D12_SHADER_VISIBILITY_MESH; Visibility++)
 		{
 			D3D12_SHADER_VISIBILITY DxVisibility = static_cast<D3D12_SHADER_VISIBILITY>(Visibility);
-			if (RootSig->GetCbvSrvUavTableToRootParameterIndex(DxVisibility, GroupSlot))
+			if (TOptional<uint32> RootParameterIndex = RootSig->GetCbvSrvUavTableRootParameterIndex(DxVisibility, GroupSlot))
 			{
-				uint32 RootParameterIndex = *RootSig->GetCbvSrvUavTableToRootParameterIndex(DxVisibility, GroupSlot);
-				CommandList->SetGraphicsRootDescriptorTable(RootParameterIndex, GetDescriptorTableStart_CbvSrvUav(DxVisibility));
+				CommandList->SetGraphicsRootDescriptorTable(*RootParameterIndex, GetDescriptorTableStart_CbvSrvUav(DxVisibility));
 			}
 
-			if (RootSig->GetSamplerTableToRootParameterIndex(DxVisibility, GroupSlot))
+			if (TOptional<uint32> RootParameterIndex = RootSig->GetSamplerTableRootParameterIndex(DxVisibility, GroupSlot))
 			{
-				uint32 RootParameterIndex = *RootSig->GetSamplerTableToRootParameterIndex(DxVisibility, GroupSlot);
-				CommandList->SetGraphicsRootDescriptorTable(RootParameterIndex, GetDescriptorTableStart_Sampler(DxVisibility));
+				CommandList->SetGraphicsRootDescriptorTable(*RootParameterIndex, GetDescriptorTableStart_Sampler(DxVisibility));
 			}
 		}
 

@@ -7,7 +7,7 @@ namespace FW {
 	{
 	public:
 		App(const Vector2D& InClientSize, const TCHAR* CommandLine);
-		virtual ~App();
+		virtual ~App() = default;
 
 	public:
 		void Run();

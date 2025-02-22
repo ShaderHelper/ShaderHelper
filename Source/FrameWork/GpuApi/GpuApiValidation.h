@@ -20,4 +20,5 @@ namespace FW
 	bool ValidateCreateBuffer(uint32 ByteSize, GpuBufferUsage Usage, GpuResourceState InitState);
 	bool ValidateBarrier(GpuTrackedResource* InResource, GpuResourceState NewState);
 	bool ValidateGpuResourceState(GpuResourceState InState);
+	bool ValidateCreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState);
 }

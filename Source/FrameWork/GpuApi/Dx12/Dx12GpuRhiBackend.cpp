@@ -175,6 +175,7 @@ void* Dx12GpuRhiBackend::MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapM
 			GpuResourceState LastState = InGpuTexture->State;
 			CmdRecorder->Barrier(InGpuTexture, GpuResourceState::CopySrc);
 			CmdRecorder->CopyTextureToBuffer(InGpuTexture, Texture->ReadBackBuffer);
+			//TODO: batch barriers on the api backend.
 			CmdRecorder->Barrier(InGpuTexture, LastState);
 		}
 		GDx12GpuRhi->EndRecording(CmdRecorder);
@@ -193,7 +194,7 @@ void Dx12GpuRhiBackend::UnMapGpuTexture(GpuTexture* InGpuTexture)
 		auto CmdRecorder = GDx12GpuRhi->BeginRecording();
 		{
 			GpuResourceState LastState = InGpuTexture->State;
-			CmdRecorder->Barrier(InGpuTexture, GpuResourceState::CopySrc);
+			CmdRecorder->Barrier(InGpuTexture, GpuResourceState::CopyDst);
 			CmdRecorder->CopyBufferToTexture(Texture->UploadBuffer, Texture);
 			CmdRecorder->Barrier(InGpuTexture, LastState);
 		}

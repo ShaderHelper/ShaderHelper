@@ -141,6 +141,7 @@ public:
 
 	TRefCountPtr<GpuTexture> CreateTexture(const GpuTextureDesc &InTexDesc, GpuResourceState InitState) override
 	{
+		check(ValidateCreateTexture(InTexDesc, InitState));
 		return RhiBackend->CreateTexture(InTexDesc, InitState);
 	}
 
