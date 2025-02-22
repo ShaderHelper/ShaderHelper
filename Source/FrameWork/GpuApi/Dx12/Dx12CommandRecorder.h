@@ -23,7 +23,7 @@ namespace FW
 		void SetVertexBuffer(Dx12Buffer* InBuffer);
 		void SetPipeline(Dx12RenderPso* InPso);
 		void SetRootSignature(Dx12RootSignature* InRootSignature);
-		void SetRenderTargets(TArray<Dx12Texture*> InRTs, TArray<TOptional<Vector4f>> InClearColorValues);
+		void SetRenderTargets(TArray<Dx12Texture*> InRTs, TArray<Vector4f> InClearColorValues);
 		void SetBindGroups(Dx12BindGroup* InGroup0, Dx12BindGroup* InGroup1, Dx12BindGroup* InGroup2, Dx12BindGroup* InGroup3);
 
 	public:
@@ -44,7 +44,7 @@ namespace FW
 		TOptional<D3D12_VIEWPORT> CurrentViewPort;
 		TOptional<D3D12_RECT> CurrentSissorRect;
 		TArray<Dx12Texture*> CurrentRenderTargets;
-		TArray<TOptional<Vector4f>> ClearColorValues;
+		TArray<Vector4f> ClearColorValues;
 
 		Dx12RootSignature* CurrentRootSignature;
 		Dx12BindGroup* CurrentBindGroup0;

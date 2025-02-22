@@ -10,6 +10,7 @@
 
 namespace FW
 {
+    TMap<FString, FString> RenamedOrMovedFolderMap;
 
 	SAssetBrowser::~SAssetBrowser()
 	{
@@ -119,7 +120,7 @@ namespace FW
 		FDirectoryWatcherModule& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>(TEXT("DirectoryWatcher"));
 		IDirectoryWatcher* DirectoryWatcher = DirectoryWatcherModule.Get();
 
-		DirectoryWatcher->RegisterDirectoryChangedCallback_Handle(FPaths::GetPath(ContentPathShowed),
+		DirectoryWatcher->RegisterDirectoryChangedCallback_Handle(ContentPathShowed,
 			IDirectoryWatcher::FDirectoryChanged::CreateRaw(this, &SAssetBrowser::OnFileChanged),
 			DirectoryWatcherHandle, IDirectoryWatcher::WatchOptions::IncludeDirectoryChanges);
 
@@ -202,33 +203,129 @@ namespace FW
 
 	void SAssetBrowser::OnFileChanged(const TArray<FFileChangeData>& InFileChanges)
 	{
+        //First try to detect move/rename operaton
+        TArray<FFileChangeData> SolvedChanges;
+        for (const FFileChangeData& FileChange : InFileChanges)
+        {
+            FString Extension = FPaths::GetExtension(FileChange.Filename);
+            //only valid in editor
+            //OnDelete and OnAdd will be triggered one after the other if rename or move an folder outside
+            if (Extension.IsEmpty())
+            {
+                if(FileChange.Action == FFileChangeData::FCA_Removed)
+                {
+                    if(auto* Ret = InFileChanges.FindByPredicate([=](const FFileChangeData& Change){
+                        if(auto* NewFolderName = RenamedOrMovedFolderMap.Find(FileChange.Filename); NewFolderName && Change.Action == FFileChangeData::FCA_Added)
+                        {
+                            return RenamedOrMovedFolderMap[FileChange.Filename] == Change.Filename;
+                        }
+                        return false;
+                    }))
+                    {
+                        FString OldFolderName = FileChange.Filename;
+                        FString NewFolderName = Ret->Filename;
+                        TArray<FString> OldFileNames = FindFilesUnderBrowserDirectory(OldFolderName);
+                  
+                        for (const FString& OldFileName : OldFileNames)
+                        {
+                            FString RelativeName = OldFileName;
+                            FPaths::MakePathRelativeTo(RelativeName, *(OldFolderName + TEXT("/")));
+                            FString NewFileName = FPaths::ConvertRelativePathToFull(NewFolderName, RelativeName);
+                            
+                            TSingleton<AssetManager>::Get().RemoveGuidToPath(OldFileName);
+                            TSingleton<AssetManager>::Get().UpdateGuidToPath(NewFileName);
+                            
+                            if(AssetOp* AssetOp_ = GetAssetOp(OldFileName))
+                            {
+                                if(FPaths::GetPath(OldFolderName) == FPaths::GetPath(NewFolderName))
+                                {
+                                    AssetOp_->OnRename(OldFileName, NewFileName);
+                                }
+                                else
+                                {
+                                    AssetOp_->OnMove(OldFileName, NewFileName);
+                                }
+                            }
+                        }
+                        
+                        SolvedChanges.Add(FileChange);
+                        SolvedChanges.Add(*Ret);
+                    }
+                }
+            }
+            else if(TSingleton<AssetManager>::Get().GetManageredExts().Contains(Extension))
+            {
+                if(FileChange.Action == FFileChangeData::FCA_Removed)
+                {
+                    if(auto* Ret = InFileChanges.FindByPredicate([=](const FFileChangeData& Change){
+                        if(Change.Action == FFileChangeData::FCA_Added)
+                        {
+                            FGuid RemovedAssetId = TSingleton<AssetManager>::Get().GetGuid(FileChange.Filename);
+                            FGuid AddedAssetId = TSingleton<AssetManager>::Get().ReadAssetGuidInDisk(Change.Filename);
+                            return RemovedAssetId == AddedAssetId;
+                        }
+                        return false;
+                    }))
+                    {
+                        TSingleton<AssetManager>::Get().RemoveGuidToPath(FileChange.Filename);
+                        TSingleton<AssetManager>::Get().UpdateGuidToPath(Ret->Filename);
+                        
+                        if(AssetOp* AssetOp_ = GetAssetOp(FileChange.Filename))
+                        {
+                            if(FPaths::GetPath(FileChange.Filename) == FPaths::GetPath(Ret->Filename))
+                            {
+                                AssetOp_->OnRename(FileChange.Filename, Ret->Filename);
+                            }
+                            else
+                            {
+                                AssetOp_->OnMove(FileChange.Filename, Ret->Filename);
+                            }
+                        }
+                        
+                        SolvedChanges.Add(FileChange);
+                        SolvedChanges.Add(*Ret);
+                    }
+                }
+            }
+        }
+        
+        auto AlreadySolvedEvent = [&](const FFileChangeData& InChange) {
+            return SolvedChanges.ContainsByPredicate([InChange]( const FFileChangeData& Element){
+                return Element.Filename == InChange.Filename && Element.Action == InChange.Action;
+            });
+        };
+        
 		for (const FFileChangeData& FileChange : InFileChanges)
 		{
 			FString Extension = FPaths::GetExtension(FileChange.Filename);
 			FString FullFileName = FPaths::ConvertRelativePathToFull(FileChange.Filename);
-			if (!FPaths::IsUnderDirectory(FullFileName, ContentPathShowed))
-			{
-				continue;
-			}
+//			if (!FPaths::IsUnderDirectory(FullFileName, ContentPathShowed))
+//			{
+//				continue;
+//			}
 
 			if (Extension.IsEmpty())
 			{
 				if (FileChange.Action == FFileChangeData::FCA_Added)
 				{
-                    TArray<FString> FileNames;
-                    IFileManager::Get().FindFilesRecursive(FileNames, *FullFileName, TEXT("*"), true, false);
-                    for (const FString& FileName : FileNames)
+                    if(!AlreadySolvedEvent(FileChange))
                     {
-                        if (TSingleton<AssetManager>::Get().GetManageredExts().Contains(FPaths::GetExtension(FileName)))
+                        TArray<FString> FileNames;
+                        IFileManager::Get().FindFilesRecursive(FileNames, *FullFileName, TEXT("*"), true, false);
+                        for (const FString& FileName : FileNames)
                         {
-                            TSingleton<AssetManager>::Get().UpdateGuidToPath(FileName);
-                            
-                            if(AssetOp* AssetOp_ = GetAssetOp(FileName))
+                            if (TSingleton<AssetManager>::Get().GetManageredExts().Contains(FPaths::GetExtension(FileName)))
                             {
-                                AssetOp_->OnAdd(FileName);
+                                TSingleton<AssetManager>::Get().UpdateGuidToPath(FileName);
+                                
+                                if(AssetOp* AssetOp_ = GetAssetOp(FileName))
+                                {
+                                    AssetOp_->OnAdd(FileName);
+                                }
                             }
                         }
                     }
+
                     
 					DirectoryTree->AddDirectory(FullFileName);
 					AssetView->AddFolder(FullFileName);
@@ -240,14 +337,17 @@ namespace FW
                     AssetView->RemoveFolder(FullFileName);
                     SetCurrentDisplyPath(FPaths::GetPath(FullFileName));
                     
-                    TArray<FString> FileNames = FindFilesUnderBrowserDirectory(FullFileName);
-                    for(const FString& FileName : FileNames)
+                    if(!AlreadySolvedEvent(FileChange))
                     {
-                        if(AssetOp* AssetOp_ = GetAssetOp(FileName))
+                        TArray<FString> FileNames = FindFilesUnderBrowserDirectory(FullFileName);
+                        for(const FString& FileName : FileNames)
                         {
-                            AssetOp_->OnDelete(FileName);
+                            if(AssetOp* AssetOp_ = GetAssetOp(FileName))
+                            {
+                                AssetOp_->OnDelete(FileName);
+                            }
+                            TSingleton<AssetManager>::Get().RemoveGuidToPath(FileName);
                         }
-                        TSingleton<AssetManager>::Get().RemoveGuidToPath(FileName);
                     }
                     
                     RemoveBrowserDirectory(FullFileName);
@@ -261,10 +361,10 @@ namespace FW
                 if (FileChange.Action == FFileChangeData::FCA_Added)
 #endif
                 {
-                    TSingleton<AssetManager>::Get().UpdateGuidToPath(FullFileName);
                     
-                    if(AssetOp* AssetOp_ = GetAssetOp(FullFileName))
+                    if(AssetOp* AssetOp_ = GetAssetOp(FullFileName); AssetOp_ && !AlreadySolvedEvent(FileChange))
                     {
+                        TSingleton<AssetManager>::Get().UpdateGuidToPath(FullFileName);
                         AssetOp_->OnAdd(FullFileName);
                     }
                     
@@ -277,12 +377,11 @@ namespace FW
 					AssetView->RemoveFile(FullFileName);
                     RemoveFile(FullFileName);
                 
-                    if(AssetOp* AssetOp_ = GetAssetOp(FullFileName))
+                    if(AssetOp* AssetOp_ = GetAssetOp(FullFileName); AssetOp_ && !AlreadySolvedEvent(FileChange))
                     {
                         AssetOp_->OnDelete(FullFileName);
+                        TSingleton<AssetManager>::Get().RemoveGuidToPath(FullFileName);
                     }
-                    
-                    TSingleton<AssetManager>::Get().RemoveGuidToPath(FullFileName);
 				}
 			}
 		}

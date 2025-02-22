@@ -1,0 +1,15 @@
+<svg width="32" height="32" xmlns="http://www.w3.org/2000/svg" xml:space="preserve" style="enable-background:new 0 0 32 32;" version="1.1">
+ <style type="text/css">.st0{clip-path:url(#SVGID_2_);}
+	.st1{clip-path:url(#SVGID_4_);}</style>
+
+ <g>
+  <title>background</title>
+  <rect fill="none" id="canvas_background" height="771" width="1534" y="-1" x="-1"/>
+ </g>
+ <g>
+  <title>Layer 1</title>
+  <g id="svg_1">
+   <path fill="#ffffff" id="svg_2" d="m23.33643,27l-14.67286,0c-2.02002,0 -3.66357,-1.64355 -3.66357,-3.66357l0,-14.67286c0,-2.02002 1.64355,-3.66357 3.66357,-3.66357l14.67286,0c2.02002,0 3.66357,1.64355 3.66357,3.66357l0,14.67286c0,2.02002 -1.64355,3.66357 -3.66357,3.66357z"/>
+  </g>
+ </g>
+</svg>

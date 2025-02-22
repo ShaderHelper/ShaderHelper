@@ -61,6 +61,12 @@ public:
 	//TODO
 };
 
+struct GpuBarrierInfo
+{
+	GpuTrackedResource* Resource;
+	GpuResourceState NewState;
+};
+
 //Recorder is designed as transient within one frame, can not reuse it
 class GpuCmdRecorder : public GpuComputeCmdRecorder
 {
@@ -69,6 +75,7 @@ public:
 	virtual void EndRenderPass(GpuRenderPassRecorder* InRenderPassRecorder) = 0;
 	virtual void BeginCaptureEvent(const FString& EventName) = 0;
 	virtual void EndCaptureEvent() = 0;
+	//virtual void Barriers(const TArray<GpuBarrierInfo>& BarrierInfos) = 0;
 	virtual void Barrier(GpuTrackedResource* InResource, GpuResourceState NewState) = 0;
 	virtual void CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture) = 0;
 	virtual void CopyTextureToBuffer(GpuTexture* InTexture, GpuBuffer* InBuffer) = 0;

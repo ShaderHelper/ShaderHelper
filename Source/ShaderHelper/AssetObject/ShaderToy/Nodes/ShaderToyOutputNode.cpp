@@ -2,6 +2,8 @@
 #include "ShaderToyOutputNode.h"
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
+#include "Renderer/ShaderToyRenderComp.h"
+#include "RenderResource/RenderPass/BlitPass.h"
 
 using namespace FW;
 
@@ -35,20 +37,33 @@ namespace SH
 
     }
 
+    void ShaderToyOuputNode::InitPins()
+    {
+        auto ResultPin = NewShObject<GpuTexturePin>(this);
+        ResultPin->ObjectName = FText::FromString("RT");
+        ResultPin->Direction = PinDirection::Input;
+        
+        Pins.Add(MoveTemp(ResultPin));
+    }
+
 	void ShaderToyOuputNode::Serialize(FArchive& Ar)
 	{
 		GraphNode::Serialize(Ar);
-
-		ResultPin.Serialize(Ar);
 	}
 
-	TArray<GraphPin*> ShaderToyOuputNode::GetPins()
+    ExecRet ShaderToyOuputNode::Exec(GraphExecContext& Context)
 	{
-		return { &ResultPin };
-	}
+        ShaderToyExecContext& ShaderToyContext = static_cast<ShaderToyExecContext&>(Context);
+        
+        auto ResultPin = static_cast<GpuTexturePin*>(GetPin("RT"));
+        
+        BlitPassInput Input;
+        Input.InputTex = ResultPin->GetValue();
+        Input.InputTexSampler = GGpuRhi->CreateSampler({ SamplerFilter::Bilinear});
+        Input.OutputRenderTarget = ShaderToyContext.FinalRT;
 
-	bool ShaderToyOuputNode::Exec(GraphExecContext& Context)
-	{
-        return true;
+        AddBlitPass(*ShaderToyContext.RG, MoveTemp(Input));
+        
+        return {};
 	}
 }

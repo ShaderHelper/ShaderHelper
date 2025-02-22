@@ -11,7 +11,6 @@ int main(int argc, char *argv[])
 			CommandLine
 		);
         FW::GApp->Run();
-        FW::GApp.Reset();
 	};
 	[MacLaunch launch:argc argv:argv runBlock:RunBlock];
     return 0;

@@ -45,8 +45,6 @@ namespace FW
 				}
 			}
 			check(NewAssetObject);
-            NewAssetObject->ObjectName = FText::FromString(FPaths::GetBaseFilename(InAssetPath));
-            
 			TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*InAssetPath));
             if(Ar)
             {
@@ -70,7 +68,12 @@ namespace FW
 		{
 			return Assets.Contains(Id) ? Assets[Id] : nullptr;
 		}
+        AssetObject* FindLoadedAsset(const FString& InPath)
+        {
+            return FindLoadedAsset(GetGuid(InPath));
+        }
 
+        FGuid ReadAssetGuidInDisk(const FString& InPath);
 		void UpdateGuidToPath(const FString& InPath);
         void RemoveGuidToPath(const FString& InPath);
 

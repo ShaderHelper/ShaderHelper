@@ -23,6 +23,8 @@ namespace FW
         AssetViewPersistentState AssetViewState;
     };
 
+    extern TMap<FString, FString> RenamedOrMovedFolderMap;
+
 	class FRAMEWORK_API SAssetBrowser : public SCompoundWidget
 	{
 	public:

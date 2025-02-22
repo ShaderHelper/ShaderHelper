@@ -11,11 +11,11 @@ namespace FW
 								.BaseClass<ShObject>()
 	)
 
-	REFLECTION_REGISTER(AddClass<GraphPin>()
+	REFLECTION_REGISTER(AddClass<GraphPin>("GraphPin")
 								.BaseClass<ShObject>()
 	)
 
-	REFLECTION_REGISTER(AddClass<Graph>()
+	REFLECTION_REGISTER(AddClass<Graph>("Graph")
 								.BaseClass<AssetObject>()
 	)
 
@@ -43,7 +43,7 @@ namespace FW
 				FString TypeName;
 				Ar << TypeName;
 				GraphNode* LoadedNodeData = static_cast<GraphNode*>(GetMetaType(TypeName)->Construct());
-                LoadedNodeData->Outer = this;
+                LoadedNodeData->SetOuter(this);
 				LoadedNodeData->Serialize(Ar);
 				NodeDatas.Emplace(LoadedNodeData);
 			}
@@ -57,7 +57,19 @@ namespace FW
 		return FAppStyle::Get().GetBrush("Icons.Blueprints");
 	}
 
-	void Graph::Exec(GraphExecContext& Context)
+    GraphPin* Graph::GetPin(const FGuid& Id)
+    {
+        for(auto Node : NodeDatas)
+        {
+            GraphPin* Pin = Node->GetPin(Id);
+            if(Pin) {
+                return Pin;
+            }
+        }
+        return nullptr;
+    }
+
+    ExecRet Graph::Exec(GraphExecContext& Context)
 	{
 		TArray<ObjectPtr<GraphNode>> ExecNodes = NodeDatas;
 
@@ -75,20 +87,24 @@ namespace FW
         if(AnyError)
         {
             SH_LOG(LogGraph, Error, TEXT("Cycle not allowed."));
-            return;
+            return {true, true};
         }
 
 		for (auto Node : ExecNodes)
 		{
-			Node->AnyError = !Node->Exec(Context);
+            ExecRet NodeRet = Node->Exec(Context);;
+            Node->AnyError = NodeRet.AnyError;
             if(Node->AnyError)
             {
                 AnyError = true;
-                return;
+                if(NodeRet.Terminate)
+                {
+                    return {true ,true};
+                }
             }
 		}
-        
-        AnyError = false;
+    
+        return {AnyError, false};
 	}
 
 	TSharedRef<SGraphNode> GraphNode::CreateNodeWidget(SGraphPanel* OwnerPanel)
@@ -100,6 +116,34 @@ namespace FW
 	{
 		ShObject::Serialize(Ar);
 		Ar << Position;
+        
+        int PinNum = Pins.Num();
+        Ar << PinNum;
+        if (Ar.IsSaving())
+        {
+            for (int Index = 0; Index < PinNum; Index++)
+            {
+                //Serialize polymorphic pointers
+                FString TypeName = GetRegisteredName(Pins[Index]->DynamicMetaType());
+                Ar << TypeName;
+                Pins[Index]->Serialize(Ar);
+            }
+        }
+        else
+        {
+            Pins.Reserve(PinNum);
+            for (int Index = 0; Index < PinNum; Index++)
+            {
+                FString TypeName;
+                Ar << TypeName;
+                GraphPin* LoadedPinData = static_cast<GraphPin*>(GetMetaType(TypeName)->Construct());
+                LoadedPinData->SetOuter(this);
+                LoadedPinData->Serialize(Ar);
+                Pins.Emplace(LoadedPinData);
+            }
+        }
+
+        
 		Ar << OutPinToInPin;
 	}
 
@@ -108,11 +152,42 @@ namespace FW
 		return FStyleColors::Title;
 	}
 
-	GraphPin::GraphPin(const FText& InName, PinDirection InDirection)
-		: Direction(InDirection)
-	{
-		ObjectName = InName;
-	}
+    GraphPin* GraphNode::GetPin(const FGuid& Id)
+    {
+        for(GraphPin* Pin : Pins)
+        {
+            if(Pin->GetGuid() == Id)
+                return Pin;
+        }
+        return nullptr;
+    }
+
+    GraphPin* GraphNode::GetPin(const FString& InName)
+    {
+        for(GraphPin* Pin : Pins)
+        {
+            if(Pin->ObjectName.ToString() == InName)
+                return Pin;
+        }
+        return nullptr;
+    }
+
+    TArray<GraphPin*> GraphPin::GetTargetPins()
+    {
+        GraphNode* Owner = static_cast<GraphNode*>(GetOuter());
+        Graph* OwnerGraph = static_cast<Graph*>(Owner->GetOuter());
+        
+        TArray<FGuid> TargetPinGuids;
+        Owner->OutPinToInPin.MultiFind(GetGuid(), TargetPinGuids);
+        
+        TArray<GraphPin*> TargetPins;
+        for(FGuid PinGuid :TargetPinGuids)
+        {
+            TargetPins.Add(OwnerGraph->GetPin(PinGuid));
+        }
+        
+        return TargetPins;
+    }
 
 	void GraphPin::Serialize(FArchive& Ar)
 	{

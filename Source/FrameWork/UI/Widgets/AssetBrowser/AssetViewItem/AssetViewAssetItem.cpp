@@ -135,17 +135,7 @@ namespace FW
                             }
                             else
                             {
-								if (GProject->IsPendingAsset(Path))
-								{
-									if (MessageDialog::Open(MessageDialog::OkCancel, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("OpPendingAssetTip")))
-									{
-										IFileManager::Get().Move(*NewFilePath, *Path);
-									}
-								}
-								else
-								{
-									IFileManager::Get().Move(*NewFilePath, *Path);
-								}
+                                IFileManager::Get().Move(*NewFilePath, *Path);
                             }
                         }
                     })

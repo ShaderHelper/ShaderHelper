@@ -20,7 +20,9 @@ namespace FW
 		GpuTexture* Texture;
 		RenderTargetLoadAction LoadAction = RenderTargetLoadAction::DontCare;
 		RenderTargetStoreAction StoreAction = RenderTargetStoreAction::DontCare;
-		TOptional<Vector4f> ClearColor;
+        
+        //only valid when the load action is clear.
+		Vector4f ClearColor = Texture->GetResourceDesc().ClearValues;
 	};
 
 	struct GpuRenderPassDesc

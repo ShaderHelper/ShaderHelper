@@ -12,6 +12,7 @@
 #include <DesktopPlatformModule.h>
 #include "Editor/AssetEditor/AssetEditor.h"
 #include "UI/Widgets/Log/SOutputLog.h"
+#include "UI/Widgets/Timeline/STimeline.h"
 
 STEAL_PRIVATE_MEMBER(FTabManager, TArray<TSharedRef<FTabManager::FArea>>, CollapsedDockAreas)
 
@@ -139,12 +140,12 @@ namespace SH
 		SAssignNew(Window, SWindow)
 			.Title(TAttribute<FText>::CreateLambda([this] { 
 				FString ProjectPath = CurProject->GetFilePath();
-				return FText::FromString(LOCALIZATION("ShaderHelper").ToString() + FString::Printf(TEXT(" [%s]"), *ProjectPath));
+                int Fps = FMath::RoundToInt(1 / GApp->GetDeltaTime());
+				return FText::FromString(LOCALIZATION("ShaderHelper").ToString() + FString::Printf(TEXT(" [%s] Fps:%d"), *ProjectPath, Fps));
 			}))
 			.ScreenPosition(UsedWindowPos)
 			.AutoCenter(AutoCenterRule)
-			.ClientSize(UsedWindowSize)
-			.AdjustInitialSizeAndPositionForDPIScale(false);
+			.ClientSize(UsedWindowSize);
 
 		TabManagerTab->AssignParentWidget(Window);
 
@@ -161,10 +162,16 @@ namespace SH
                 MenuBarWidget
 			]
 			+ SVerticalBox::Slot()
-			.FillHeight(1.0f)
+			.FillHeight(0.965f)
 			[
 				TabManager->RestoreFrom(UsedLayout, Window).ToSharedRef()
 			]
+            +SVerticalBox::Slot()
+            .FillHeight(0.035f)
+            [
+                SNew(STimeline).bStop(&CurProject->TimelineStop)
+                    .CurTime(&CurProject->TimelineCurTime).MaxTime(&CurProject->TimelineMaxTime)
+            ]
 		);
         TabManager->FindExistingLiveTab(CodeTabId)->GetParentDockTabStack()->SetCanDropToAttach(false);
         
@@ -244,6 +251,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                         .ButtonStyle(&FAppCommonStyle::Get().GetWidgetStyle< FButtonStyle >("SuperSimpleButton"))
                         .Text(FText::FromString(FileName + TEXT("  ❯")))
                         .OnClicked_Lambda([RelativePathHierarchy, this]{
+							TabManager->TryInvokeTab(AssetTabId);
                             AssetBrowser->SetCurrentDisplyPath(TSingleton<ShProjectManager>::Get().ConvertRelativePathToFull(RelativePathHierarchy));
                             return FReply::Handled();
                         })
@@ -253,13 +261,24 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
         }
         
-        return SNew(SScrollBox)
-            .Orientation(EOrientation::Orient_Horizontal)
-            .ScrollBarVisibility(EVisibility::Collapsed)
-            +SScrollBox::Slot()
-            [
-                PathContainer
-            ];
+        return PathContainer;
+    }
+
+    void ShaderHelperEditor::UpdateStShaderPath(const FString& InStShaderPath)
+    {
+        AssetObject* Asset = TSingleton<AssetManager>::Get().FindLoadedAsset(InStShaderPath);
+        if(Asset)
+        {
+            StShader* Shader = static_cast<StShader*>(Asset);
+            if(auto* PathBox = StShaderPathBoxMap.Find(Shader))
+            {
+                (*PathBox)->ClearChildren();
+                (*PathBox)->AddSlot()
+                [
+                    SpawnStShaderPath(Shader->GetPath())
+                ];
+            }
+        }
     }
 
     TSharedRef<SDockTab> ShaderHelperEditor::SpawnStShaderTab(const FSpawnTabArgs& Args)
@@ -269,6 +288,16 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
         auto LoadedStShader = TSingleton<AssetManager>::Get().LoadAssetByGuid<StShader>(StShaderGuid);
 
         ShaderEditor = SNew(SShaderEditorBox).StShaderAsset(LoadedStShader);
+        
+        auto PathBox = SNew(SScrollBox)
+            .Orientation(EOrientation::Orient_Horizontal)
+            .ScrollBarVisibility(EVisibility::Collapsed)
+            +SScrollBox::Slot()
+            [
+                SpawnStShaderPath(LoadedStShader->GetPath())
+            ];
+        StShaderPathBoxMap.Add(LoadedStShader, PathBox);
+        
         auto NewStShaderTab = SNew(SShaderTab)
             .TabRole(ETabRole::DocumentTab)
 			.Label_Lambda([this, LoadedStShader] {
@@ -279,8 +308,10 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 				}
 				return FText::FromString(LoadedStShader->GetFileName() + DirtyChar);
 			})
-            .OnTabClosed_Lambda([this, LoadedStShader, TabId, Args](TSharedRef<SDockTab> ClosedTab) {
-                CurProject->OpenedStShaders.Remove(*CurProject->OpenedStShaders.FindKey(ClosedTab));
+            .OnTabClosed_Lambda([this, TabId, Args](TSharedRef<SDockTab> ClosedTab) {
+                auto StShaderAsset = *CurProject->OpenedStShaders.FindKey(ClosedTab);
+                CurProject->OpenedStShaders.Remove(StShaderAsset);
+                StShaderPathBoxMap.Remove(StShaderAsset);
 				//Clear the PersistLayout when closing a StShader tab. we don't intend to restore it, so just destroy it.
 				auto DockTabStack = ClosedTab->GetParentDockTabStack();
 				DockTabStack->OnTabRemoved(Args.GetTabId());
@@ -292,7 +323,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                 +SVerticalBox::Slot()
                 .AutoHeight()
                 [
-                    SpawnStShaderPath(LoadedStShader->GetPath())
+                    PathBox
                 ]
                 +SVerticalBox::Slot()
                 [
@@ -505,6 +536,11 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 		GraphPanel->SetGraphData(InGraphData);
 		CurProject->Graph = InGraphData;
+        
+        if(!InGraphData)
+        {
+            ViewPort->Clear();
+        }
 	}
 
     void ShaderHelperEditor::RefreshProperty()
@@ -575,12 +611,12 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		TSharedRef<FJsonObject> RootJsonObject = MakeShared<FJsonObject>();
 
 		TSharedRef<FJsonObject> RootWindowSizeJsonObject = MakeShared<FJsonObject>();
-		Vector2D CurClientSize = Window->GetClientSizeInScreen();
+		Vector2D CurClientSize = Window->GetClientSizeInScreen() / Window->GetDPIScaleFactor();
 		RootWindowSizeJsonObject->SetNumberField(TEXT("Width"), CurClientSize.X);
 		RootWindowSizeJsonObject->SetNumberField(TEXT("Height"), CurClientSize.Y);
 
 		TSharedRef<FJsonObject> RootWindowPosJsonObject = MakeShared<FJsonObject>();
-		Vector2D CurPos = Window->GetPositionInScreen();
+		Vector2D CurPos = Window->GetPositionInScreen() / Window->GetDPIScaleFactor();
 		RootWindowPosJsonObject->SetNumberField(TEXT("X"), CurPos.X);
 		RootWindowPosJsonObject->SetNumberField(TEXT("Y"), CurPos.Y);
 

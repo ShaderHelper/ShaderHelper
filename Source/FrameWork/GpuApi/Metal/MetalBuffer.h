@@ -7,10 +7,7 @@ namespace FW
     class MetalBuffer : public GpuBuffer
     {
     public:
-        MetalBuffer(MTLBufferPtr InBuffer, GpuBufferUsage Usage)
-            : GpuBuffer(Usage)
-            , Buffer(MoveTemp(InBuffer))
-        {}
+        MetalBuffer(MTLBufferPtr InBuffer, GpuBufferUsage Usage);
         
     public:
         MTL::Buffer* GetResource() const { return Buffer.get(); }

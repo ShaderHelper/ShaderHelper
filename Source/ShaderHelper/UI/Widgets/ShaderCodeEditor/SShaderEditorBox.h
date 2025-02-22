@@ -5,6 +5,8 @@
 #include "UI/Widgets/ShaderCodeEditor/ShaderCodeTokenizer.h"
 #include "Renderer/ShRenderer.h"
 #include "GpuApi/GpuShader.h"
+#include <Internationalization/IBreakIterator.h>
+#include <Widgets/SCanvas.h>
 
 namespace SH
 {
@@ -34,6 +36,40 @@ namespace SH
 		//Key: The line index of Left Brace in MultiLineEditableText
 		TMap<int32, HlslHighLightTokenizer::BraceGroup> FoldingBraceGroups;
 	};
+
+    class TokenBreakIterator : public IBreakIterator
+    {
+    public:
+        TokenBreakIterator(FShaderEditorMarshaller* InMarshaller);
+
+        virtual void SetString(FString&& InString) override;
+        virtual void SetStringRef(FStringView InString) override;
+
+        virtual int32 GetCurrentPosition() const override;
+
+        virtual int32 ResetToBeginning() override;
+        virtual int32 ResetToEnd() override;
+
+        virtual int32 MoveToPrevious() override;
+        virtual int32 MoveToNext() override;
+        virtual int32 MoveToCandidateBefore(const int32 InIndex) override;
+        virtual int32 MoveToCandidateAfter(const int32 InIndex) override;
+
+    private:
+        FString InternalString;
+        int32 CurrentPosition{};
+        FShaderEditorMarshaller* Marshaller;
+    };
+
+    class ShaderTextLayout : public FSlateTextLayout
+    {
+    public:
+        ShaderTextLayout(SWidget* InOwner, FTextBlockStyle InDefaultTextStyle, FShaderEditorMarshaller* Marshaller)
+            :FSlateTextLayout(InOwner, InDefaultTextStyle)
+        {
+            WordBreakIterator = MakeShared<TokenBreakIterator>(Marshaller);
+        }
+    };
 
 	class FShaderEditorEffectMarshaller : public FBaseTextLayoutMarshaller
 	{
@@ -67,11 +103,23 @@ namespace SH
 	{
 	public:
 		using LineNumberItemPtr = TSharedPtr<FText>;
+        using CandidateItemPtr = TSharedPtr<FW::ShaderCandidateInfo>;
+        
         enum class EditState
         {
-            Normal,
+            Succeed,
             Compiling,
             Failed,
+        };
+        
+        struct ISenseTask
+        {
+            FString HlslSource;
+            
+            FString CursorToken;
+            uint32 Row = 0;
+            uint32 Col = 0;
+            bool IsMemberAccess = false;
         };
 
 		struct FoldMarker
@@ -79,7 +127,7 @@ namespace SH
 			int32 LineIndex;
 			int32 Offset;
 			TArray<FString> FoldedLineTexts;
-			//Note: ChildFoldMarker's line index and offset is invalid.
+			//Note: ChildFoldMarker's line index and offset may be invalid.
 			TArray<FoldMarker> ChildFoldMarkers;
 
 			FString GetTotalFoldedLineTexts() const;
@@ -98,11 +146,18 @@ namespace SH
 		void Construct(const FArguments& InArgs);
 
 		void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
-
 		void OnShaderTextChanged(const FString& InShaderSouce);
-		FReply OnTextKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent);
+        virtual bool SupportsKeyboardFocus() const override
+        {
+            return true;
+        }
+        virtual FReply OnFocusReceived(const FGeometry& MyGeometry, const FFocusEvent& InFocusEvent) override;
+        //If type a char, trigger KeyDown and then KeyChar.
+		FReply HandleKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent);
+        FReply HandleKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent);
 		TSharedRef<ITableRow> GenerateRowForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 		TSharedRef<ITableRow> GenerateLineTipForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
+        TSharedRef<ITableRow> GenerateCodeCompletionItem(CandidateItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 
         const FSlateFontInfo& GetFontInfo() const { return CodeFontInfo; }
         FText GetEditStateText() const;
@@ -115,10 +170,13 @@ namespace SH
         void Compile();
 
 		TOptional<int32> FindFoldMarker(int32 InIndex) const;
-		void MarkLineNumberDataDirty(bool IsDirty) { IsLineNumberDataDirty = IsDirty; }
 		
 		//Given a range for displayed text, then return the unfolding result.
-		FString UnFold(const FTextSelection& DisplayedTextRange);
+		FString UnFoldText(const FTextSelection& DisplayedTextRange);
+        
+        void UpdateLineNumberData();
+        void RefreshLineNumberToErrorInfo();
+        void RefreshCodeCompletionTip();
 
 	protected:
 		virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
@@ -131,9 +189,6 @@ namespace SH
 		void CutSelectedText();
 		bool CanCutSelectedText() const;
 
-		void UpdateLineNumberData();
-		void UpdateLineTipStyle(const double InCurrentTime);
-		void UpdateLineNumberHighlight();
 		void UpdateListViewScrollBar();
 		void UpdateEffectText();
 		void UpdateFoldingArrow();
@@ -144,20 +199,21 @@ namespace SH
 		FReply OnFold(int32 LineNumber);
 		void RemoveFoldMarker(int32 InIndex);
         
-        void RefreshLineNumberToErrorInfo();
+        void InsertCompletionText(const FString& InText);
 
 	public:
 		TArray<FoldMarker> DisplayedFoldMarkers;
-    
+        FString CurrentEditorSource;
+        
 	private:
 		FString CurrentShaderSource;
 
-		bool IsLineNumberDataDirty = false;
 		TArray<LineNumberItemPtr> LineNumberData;
 		TSharedPtr<FShaderEditorMarshaller> ShaderMarshaller;
         TSharedPtr<SMultiLineEditableText> ShaderMultiLineEditableText;
         TSharedPtr<SScrollBar> ShaderMultiLineVScrollBar;
         TSharedPtr<SScrollBar> ShaderMultiLineHScrollBar;
+        TSharedPtr<class CursorHightLighter> CustomCursorHighlighter;
         
 		TSharedPtr<FShaderEditorEffectMarshaller> EffectMarshller;
 		TSharedPtr<SMultiLineEditableText> EffectMultiLineEditableText;
@@ -172,6 +228,22 @@ namespace SH
 
 		FCurveSequence FoldingArrowAnim;
         
+        //CodeComplete and real-time diagnostic
+        TUniquePtr<FThread> ISenseThread;
+        TQueue<ISenseTask> ISenseQueue;
+        std::atomic<bool> bQuitISense{};
+        std::atomic<bool> bRefreshIsense{};
+        FEvent* ISenseEvent = nullptr;
         TArray<FW::ShaderErrorInfo> ErrorInfos;
+        
+        FString CurToken;
+        TArray<FW::ShaderCandidateInfo> CandidateInfos;
+		TSharedPtr<SCanvas> CodeCompletionCanvas;
+        TSharedPtr<SListView<CandidateItemPtr>> CodeCompletionList;
+        CandidateItemPtr CurSelectedCandidate;
+        TArray<CandidateItemPtr> CandidateItems;
+        bool bTryComplete = false;
+        bool bKeyChar = false;
+        //
 	};
 }

@@ -2,6 +2,7 @@
 #include "MetalDevice.h"
 #include "MetalArgumentBuffer.h"
 #include "MetalTexture.h"
+#include "MetalGpuRhiBackend.h"
 
 namespace FW
 {
@@ -88,6 +89,8 @@ namespace FW
     MetalBindGroup::MetalBindGroup(const GpuBindGroupDesc& InDesc)
         : GpuBindGroup(InDesc)
     {
+        GDeferredReleaseOneFrame.Add(this);
+        
         MetalBindGroupLayout* BindGroupLayout = static_cast<MetalBindGroupLayout*>(InDesc.Layout);
         MTL::ArgumentEncoder* VertexArgumentEncoder = BindGroupLayout->GetVertexArgumentEncoder();
         MTL::ArgumentEncoder* FragmentArgumentEncoder = BindGroupLayout->GetFragmentArgumentEncoder();

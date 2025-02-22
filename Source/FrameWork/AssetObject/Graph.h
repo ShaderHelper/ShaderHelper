@@ -9,23 +9,33 @@ namespace FW
 	struct GraphExecContext {
 	};
 
+    struct ExecRet
+    {
+        bool AnyError;
+        bool Terminate;
+    };
+
 	enum class PinDirection
 	{
 		Input,
 		Output
 	};
 
+    class GraphNode;
+
 	class FRAMEWORK_API GraphPin : public ShObject
 	{
 		REFLECTION_TYPE(GraphPin)
 	public:
 		GraphPin() = default;
-		GraphPin(const FText& InName, PinDirection InDirection);
 
 	public:
 		virtual void Serialize(FArchive& Ar) override;
 		virtual bool Accept(GraphPin* SourcePin) { return false; }
+        virtual void Refuse() {}
 		virtual FLinearColor GetPinColor() const { return FLinearColor::White; }
+        
+        TArray<GraphPin*> GetTargetPins();
 
 		PinDirection Direction = PinDirection::Output;
 	};
@@ -41,10 +51,13 @@ namespace FW
 		virtual TSharedPtr<SWidget> ExtraNodeWidget() { return {}; }
 		virtual void Serialize(FArchive& Ar) override;
 		virtual FSlateColor GetNodeColor() const;
-		virtual TArray<GraphPin*> GetPins() { return {}; }
-        virtual bool Exec(GraphExecContext& Context) { return true; }
+        virtual ExecRet Exec(GraphExecContext& Context) = 0;
+        virtual void InitPins() {}
+        GraphPin* GetPin(const FGuid& Id);
+        GraphPin* GetPin(const FString& InName);
 
 		Vector2D Position{0};
+        TArray<ObjectPtr<GraphPin>> Pins;
 		TMultiMap<FGuid, FGuid> OutPinToInPin;
         bool AnyError = false;
 	};
@@ -70,12 +83,13 @@ namespace FW
 		const TArray<ObjectPtr<GraphNode>>& GetNodes() const { return NodeDatas; }
 		void AddDep(GraphNode* Node1, GraphNode* Node2) { NodeDeps.Add(Node1->GetGuid(), Node2->GetGuid()); }
 		void RemoveDep(GraphNode* Node1, GraphNode* Node2) { NodeDeps.Remove(Node1->GetGuid(), Node2->GetGuid()); }
-
+            
+        GraphPin* GetPin(const FGuid& Id);
 	public:
 		void Serialize(FArchive& Ar) override;
 		const FSlateBrush* GetImage() const override;
 		virtual TArray<MetaType*> SupportNodes() const { return {}; }
-		virtual void Exec(GraphExecContext& Context);
+		virtual ExecRet Exec(GraphExecContext& Context);
     public:
         bool AnyError = false;
 	

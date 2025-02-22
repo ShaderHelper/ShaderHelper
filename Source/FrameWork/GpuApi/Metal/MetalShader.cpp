@@ -83,6 +83,7 @@ namespace FW
         MslTargetDesc.numOptions = UE_ARRAY_COUNT(SpvMslOptions);
         
         TArray<const char*> DxcArgs;
+        DxcArgs.Add("-no-warnings");
         DxcArgs.Add("-fspv-preserve-bindings"); //For bindgroup-argumentbuffer
         //TODO: Parse spv
         //DxcArgs.Add("-Od");

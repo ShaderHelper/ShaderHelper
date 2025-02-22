@@ -12,5 +12,5 @@ namespace FW
 		TRefCountPtr<GpuTexture> OutputRenderTarget;
 	};
 
-	void AddBlitPass(RenderGraph& Graph, const BlitPassInput& PassInput);
+	FRAMEWORK_API void AddBlitPass(RenderGraph& Graph, const BlitPassInput& PassInput);
 }

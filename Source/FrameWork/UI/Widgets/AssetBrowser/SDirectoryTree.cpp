@@ -8,6 +8,7 @@
 #include "ProjectManager/ProjectManager.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "App/App.h"
+#include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
 
 namespace FW
 {
@@ -90,18 +91,13 @@ namespace FW
         if(DragDropOp->IsOfType<AssetViewItemDragDropOp>())
         {
             FString DropFilePath = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Path;
-
-            bool CanDo = true;
-            if (GProject->IsPendingAsset(DropFilePath))
+            FString NewFilePath = DropTargetPath / FPaths::GetCleanFilename(DropFilePath);
+            if(FPaths::GetExtension(DropFilePath).IsEmpty())
             {
-                CanDo = MessageDialog::Open(MessageDialog::OkCancel, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("OpPendingAssetTip"));
+                RenamedOrMovedFolderMap.Add(DropFilePath, NewFilePath);
             }
-
-            if (CanDo)
-            {
-                FString NewFilePath = DropTargetPath / FPaths::GetCleanFilename(DropFilePath);
-                IFileManager::Get().Move(*NewFilePath, *DropFilePath);
-            }
+            
+            IFileManager::Get().Move(*NewFilePath, *DropFilePath);
         }
         return FReply::Handled();
     }

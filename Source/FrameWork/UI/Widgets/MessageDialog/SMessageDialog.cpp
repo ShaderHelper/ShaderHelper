@@ -138,8 +138,7 @@ namespace FW::MessageDialog
 			.SizingRule(ESizingRule::Autosized)
 			.AutoCenter(EAutoCenter::PreferredWorkArea)
 			.HasCloseButton(false)
-			.SupportsMinimize(false).SupportsMaximize(false)
-			.AdjustInitialSizeAndPositionForDPIScale(false);
+			.SupportsMinimize(false).SupportsMaximize(false);
 
 		TSharedRef<SMessageDialog> MessageDialog = SNew(SMessageDialog)
 			.ReturnResult(&Result)

@@ -9,9 +9,7 @@ namespace FW
     class MetalSampler : public GpuSampler
     {
     public:
-        MetalSampler(MTLSamplerStatePtr InSampler)
-            : Sampler(MoveTemp(InSampler))
-        {}
+        MetalSampler(MTLSamplerStatePtr InSampler);
         
         MTL::SamplerState* GetResource() const {
             return Sampler.get();
@@ -24,11 +22,8 @@ namespace FW
 	class MetalTexture : public GpuTexture
 	{
     public:
-        MetalTexture(MTLTexturePtr InTex, GpuTextureDesc InDesc, CVPixelBufferRef InSharedHandle = nullptr)
-            : GpuTexture(MoveTemp(InDesc))
-            , Tex(MoveTemp(InTex))
-            , SharedHandle(InSharedHandle)
-        {}
+        MetalTexture(MTLTexturePtr InTex, GpuTextureDesc InDesc, CVPixelBufferRef InSharedHandle = nullptr);
+        
         ~MetalTexture()
         {
             CVPixelBufferRelease(SharedHandle);

@@ -53,6 +53,10 @@ namespace SH
 		{
 			FTextLayout::FLineView NewLine = Line;
 			NewLine.Offset.X += OffsetX;
+            
+			float Scale = Inverse(AllottedGeometry.Scale);
+			ScaledLineHeight = Line.TextHeight * Scale;
+			ScaledCursorPos = NewLine.Offset * Scale;
 
 			if (CursorPos.IsZero()) {
 				CursorPos = NewLine.Offset;
@@ -83,7 +87,11 @@ namespace SH
 
 	protected:
 		using FCursorLineHighlighter::FCursorLineHighlighter;
-
+        
+    public:
 		mutable FVector2D CursorPos = FVector2D::Zero();
+
+		mutable float ScaledLineHeight = 0;
+		mutable FVector2D ScaledCursorPos = FVector2D::Zero();
 	};
 }

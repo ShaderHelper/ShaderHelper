@@ -33,6 +33,8 @@ namespace SH
 	void ShProject::Serialize(FArchive& Ar)
 	{
 		Project::Serialize(Ar);
+        
+        Ar << TimelineMaxTime;
 
 		//### AssetBrowserState ###
 		if (Ar.IsSaving())

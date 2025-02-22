@@ -2,7 +2,7 @@
 #include "AssetObject/AssetObject.h"
 #include "RenderResource/UniformBuffer.h"
 #include "UI/Widgets/Property/PropertyData/PropertyData.h"
-
+#include "RenderResource/Shader/Shader.h"
 
 namespace SH
 {
@@ -13,8 +13,11 @@ namespace SH
 		StShader();
 		~StShader();
         
+        static FW::UniformBuffer* GetBuiltInUb();
         static FW::UniformBufferBuilder& GetBuiltInUbBuilder();
-        static FW::GpuBindGroupLayoutBuilder& GetBuiltInBindingLayoutBuilder();
+        static FW::GpuBindGroupLayout* GetBuiltInBindLayout();
+        static FW::GpuBindGroup* GetBuiltInBindGroup();
+        static FW::GpuBindGroupLayoutBuilder& GetBuiltInBindLayoutBuilder();
 
 	public:
 		void Serialize(FArchive& Ar) override;
@@ -24,29 +27,30 @@ namespace SH
 
         FString GetBinding() const;
         FString GetTemplateWithBinding() const;
-		FString GetFullShader() const;
+		FString GetFullPs() const;
         
         TArray<TSharedRef<FW::PropertyData>>* GetPropertyDatas() override;
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromBinding();
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromUniform(const FW::UniformBufferBuilder& InBuilder, bool Enabled);
         
-        template<typename UniformType>
-        void AddUniform();
+        void AddUniform(FString TypeName);
         void RefreshBuilder();
         
     private:
         TSharedRef<SWidget> GetCategoryMenu();
+        bool HasBindingName(const FString& InName);
+        TSharedPtr<FW::PropertyData> CreateUniformPropertyData(const FString& InTypeName, const FString& UniformMemberName, bool Enabled);
         
 	public:
+        bool bCurPsCompilationSucceed;
 		FString PixelShaderBody;
         TRefCountPtr<FW::GpuShader> VertexShader, PixelShader;
+        FSimpleDelegate OnRefreshBuilder;
         
-        //Custom
-        FW::UniformBufferBuilder CustomUniformBufferBuilder{FW::UniformBufferUsage::Persistant};
-        FW::GpuBindGroupLayoutBuilder CustomBindGroupLayoutBuilder{1};
-        
+        TSharedPtr<FW::PropertyCategory> BuiltInCategory;
         TSharedPtr<FW::PropertyCategory> CustomCategory;
-        //
+        FW::UniformBufferBuilder CustomUniformBufferBuilder{FW::UniformBufferUsage::Persistant};
+        FW::GpuBindGroupLayoutBuilder CustomBindGroupLayoutBuilder{ FW::BindingContext::PassSlot };
 	};
 
 }

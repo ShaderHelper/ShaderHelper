@@ -106,12 +106,12 @@ namespace FW
 			return DynamicBufferToRootParameterIndex[InGroupSlot][InSlot];
 		}
 
-		TOptional<uint32> GetCbvSrvUavTableToRootParameterIndex(D3D12_SHADER_VISIBILITY Visibility, BindingGroupSlot InGroupSlot) const {
+		TOptional<uint32> GetCbvSrvUavTableRootParameterIndex(D3D12_SHADER_VISIBILITY Visibility, BindingGroupSlot InGroupSlot) const {
 			return CbvSrvUavTableToRootParameterIndex[InGroupSlot].Contains(Visibility) ?
 				CbvSrvUavTableToRootParameterIndex[InGroupSlot][Visibility] : TOptional<uint32>();
 		}
 
-		TOptional<uint32> GetSamplerTableToRootParameterIndex(D3D12_SHADER_VISIBILITY Visibility, BindingGroupSlot InGroupSlot) const {
+		TOptional<uint32> GetSamplerTableRootParameterIndex(D3D12_SHADER_VISIBILITY Visibility, BindingGroupSlot InGroupSlot) const {
 			return SamplerTableToRootParameterIndex[InGroupSlot].Contains(Visibility) ?
 				SamplerTableToRootParameterIndex[InGroupSlot][Visibility] : TOptional<uint32>();
 		}
