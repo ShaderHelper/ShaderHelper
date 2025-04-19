@@ -4,13 +4,16 @@
 
 void WinLaunch(TFunctionRef<void(const TCHAR*)> RunBlock, const TCHAR* CmdLine)
 {
+#if SH_SHIPPING
 	__try
+#endif
 	{
 		GIsGuarded = 1;
 		RunBlock(CmdLine);
 		GIsGuarded = 0;
-		std::_Exit(0);
+        FPlatformMisc::RequestExit(true);
 	}
+#if SH_SHIPPING
 	__except (ReportCrash(GetExceptionInformation()))
 	{
 		FPlatformMisc::MessageBoxExt(EAppMsgType::Ok, 
@@ -21,4 +24,5 @@ void WinLaunch(TFunctionRef<void(const TCHAR*)> RunBlock, const TCHAR* CmdLine)
 		}
 		FPlatformMisc::RequestExit(true);
 	}
+#endif
 }

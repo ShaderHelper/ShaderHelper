@@ -53,6 +53,8 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
     {
         AssetObject::PostLoad();
         
+        InitialPixelShaderBody = PixelShaderBody;
+        
         VertexShader = GGpuRhi->CreateShaderFromSource(ShaderType::VertexShader, DefaultVertexShader, GetFileName() + "Vs", TEXT("MainVS"));
         FString ErrorInfo;
         GGpuRhi->CrossCompileShader(VertexShader, ErrorInfo);

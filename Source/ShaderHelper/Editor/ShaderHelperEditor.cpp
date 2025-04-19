@@ -287,7 +287,8 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
         FName TabId = Args.GetTabId().TabType;
         auto LoadedStShader = TSingleton<AssetManager>::Get().LoadAssetByGuid<StShader>(StShaderGuid);
 
-        ShaderEditor = SNew(SShaderEditorBox).StShaderAsset(LoadedStShader);
+        auto ShaderEditor = SNew(SShaderEditorBox).StShaderAsset(LoadedStShader);
+        ShaderEditors.Add(LoadedStShader, ShaderEditor);
         
         auto PathBox = SNew(SScrollBox)
             .Orientation(EOrientation::Orient_Horizontal)
@@ -312,6 +313,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                 auto StShaderAsset = *CurProject->OpenedStShaders.FindKey(ClosedTab);
                 CurProject->OpenedStShaders.Remove(StShaderAsset);
                 StShaderPathBoxMap.Remove(StShaderAsset);
+                ShaderEditors.Remove(StShaderAsset);
 				//Clear the PersistLayout when closing a StShader tab. we don't intend to restore it, so just destroy it.
 				auto DockTabStack = ClosedTab->GetParentDockTabStack();
 				DockTabStack->OnTabRemoved(Args.GetTabId());
@@ -329,7 +331,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                 [
                     SNew(SBorder)
                     [
-                        ShaderEditor.ToSharedRef()
+                        ShaderEditor
                     ]
                 ]
             ];
@@ -344,13 +346,19 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                 }
             }
 		}));
-        NewStShaderTab->SetOnTabActivated(SDockTab::FOnTabActivatedCallback::CreateLambda([this, LoadedStShader](TSharedRef<SDockTab> InTab, ETabActivationCause) {
+        NewStShaderTab->SetOnTabActivated(SDockTab::FOnTabActivatedCallback::CreateLambda([this, LoadedStShader](TSharedRef<SDockTab> InTab, ETabActivationCause InCause) {
             if(!CodeTabMainArea) return;
             GetShObjectOp(LoadedStShader)->OnSelect(LoadedStShader);
             if(TSharedPtr<SDockingTabStack> TabStack = CodeTabManager->FindTabInLiveArea(FTabMatcher{InTab->GetLayoutIdentifier()}, CodeTabMainArea.ToSharedRef()))
             {
 				StShaderTabStackInsertPoint = TabStack;
             }
+            
+            if(InCause == ETabActivationCause::UserClickedOnTab)
+            {
+                ShaderEditors[LoadedStShader]->SetFocus();
+            }
+            
         }));
         CurProject->OpenedStShaders.Add(LoadedStShader, NewStShaderTab);
         return NewStShaderTab;
@@ -575,7 +583,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
         else
         {
             (*TabPtr)->ActivateInParent(ETabActivationCause::SetDirectly);
-            FSlateApplication::Get().SetAllUserFocus(*TabPtr);
+            ShaderEditors[InStShader]->SetFocus();
         }
     }
 

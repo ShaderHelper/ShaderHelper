@@ -7,11 +7,32 @@
 #include "GpuApi/GpuShader.h"
 #include <Internationalization/IBreakIterator.h>
 #include <Widgets/SCanvas.h>
+#include <Widgets/Text/SlateEditableTextLayout.h>
 
 namespace SH
 {
     class SShaderEditorBox;
     class StShader;
+
+    struct FoldMarker
+    {
+        //If the marker is visible top level, then the index is relative to 0;
+        //otherwise, relative to the parent index
+        int32 RelativeLineIndex;
+        int32 Offset;
+        TArray<FString> FoldedLineTexts;
+        
+        //Invisible
+        TArray<FoldMarker> ChildFoldMarkers;
+
+        FString GetTotalFoldedLineTexts() const;
+        int32 GetFoledLineCounts() const;
+    };
+
+    struct ShaderUndoState : SlateEditableTextTypes::FUndoState
+    {
+        TArray<FoldMarker> FoldMarkers;
+    };
 
 	class FShaderEditorMarshaller : public FBaseTextLayoutMarshaller
 	{
@@ -121,18 +142,6 @@ namespace SH
             uint32 Col = 0;
             bool IsMemberAccess = false;
         };
-
-		struct FoldMarker
-		{
-			int32 LineIndex;
-			int32 Offset;
-			TArray<FString> FoldedLineTexts;
-			//Note: ChildFoldMarker's line index and offset may be invalid.
-			TArray<FoldMarker> ChildFoldMarkers;
-
-			FString GetTotalFoldedLineTexts() const;
-			int32 GetFoledLineCounts() const;
-		};
         
     public:
 		SLATE_BEGIN_ARGS(SShaderEditorBox) 
@@ -147,11 +156,18 @@ namespace SH
 
 		void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 		void OnShaderTextChanged(const FString& InShaderSouce);
+        
         virtual bool SupportsKeyboardFocus() const override
         {
             return true;
         }
+        
+        virtual void OnFocusChanging(const FWeakWidgetPath& PreviousFocusPath, const FWidgetPath& NewWidgetPath, const FFocusEvent& InFocusEvent) override;
         virtual FReply OnFocusReceived(const FGeometry& MyGeometry, const FFocusEvent& InFocusEvent) override;
+        void SetFocus() {
+            FSlateApplication::Get().SetUserFocus(0, ShaderMultiLineEditableText);
+        }
+        
         //If type a char, trigger KeyDown and then KeyChar.
 		FReply HandleKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent);
         FReply HandleKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent);
@@ -185,13 +201,11 @@ namespace SH
         
 	private:
 		void CopySelectedText();
-		bool CanCopySelectedText() const;
 		void CutSelectedText();
-		bool CanCutSelectedText() const;
+        void PasteText();
 
 		void UpdateListViewScrollBar();
 		void UpdateEffectText();
-		void UpdateFoldingArrow();
 		void HandleAutoIndent();
         TSharedRef<SWidget> BuildInfoBar();
 		void GenerateInfoBarBox();
@@ -202,15 +216,19 @@ namespace SH
         void InsertCompletionText(const FString& InText);
 
 	public:
-		TArray<FoldMarker> DisplayedFoldMarkers;
+        FSlateEditableTextLayout* ShaderMultiLineEditableTextLayout;
+		TArray<FoldMarker> VisibleFoldMarkers;
+        //Contain fold markers.
         FString CurrentEditorSource;
         
 	private:
+        //The text after unfolding.
 		FString CurrentShaderSource;
-
+        
 		TArray<LineNumberItemPtr> LineNumberData;
 		TSharedPtr<FShaderEditorMarshaller> ShaderMarshaller;
         TSharedPtr<SMultiLineEditableText> ShaderMultiLineEditableText;
+        
         TSharedPtr<SScrollBar> ShaderMultiLineVScrollBar;
         TSharedPtr<SScrollBar> ShaderMultiLineHScrollBar;
         TSharedPtr<class CursorHightLighter> CustomCursorHighlighter;

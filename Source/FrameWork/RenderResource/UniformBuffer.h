@@ -148,8 +148,8 @@ namespace FW
 		UniformBufferBuilder(UniformBufferUsage InUsage)
 			: Usage(InUsage)
 		{
-			DeclarationHead = TEXT("cbuffer {0}\r\n{\r\n");
-			DeclarationEnd = TEXT("};\r\n");
+			DeclarationHead = TEXT("cbuffer {0}\n{\n");
+			DeclarationEnd = TEXT("};\n");
 		}
         
         friend FArchive& operator<<(FArchive& Ar, UniformBufferBuilder& UbBuilder)
@@ -219,7 +219,7 @@ namespace FW
 			{
 				while (SizeAfterAligning > SizeBeforeAligning)
 				{
-					UniformBufferMemberNames += FString::Printf(TEXT("float Padding_%d;\r\n"), SizeBeforeAligning);
+					UniformBufferMemberNames += FString::Printf(TEXT("float Padding_%d;\n"), SizeBeforeAligning);
 					SizeBeforeAligning += 4;
 				}
 				MetaData.UniformBufferSize = SizeAfterAligning + MemberSize;
@@ -232,7 +232,7 @@ namespace FW
             FString TypeName = ANSI_TO_TCHAR(UniformBufferMemberTypeString<T>::Value.data());
 			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize - MemberSize, MemberSize, TypeName});
 
-			UniformBufferMemberNames += FString::Printf(TEXT("%s %s;\r\n"), *TypeName, *MemberName);
+			UniformBufferMemberNames += FString::Printf(TEXT("%s %s;\n"), *TypeName, *MemberName);
 		}
 		
 	private:

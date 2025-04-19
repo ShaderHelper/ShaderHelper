@@ -383,28 +383,29 @@ namespace FW
 	{
 		Dx12Texture* Texture = static_cast<Dx12Texture*>(InTexture);
 		Dx12Buffer* Buffer = static_cast<Dx12Buffer*>(InBuffer);
-		D3D12_PLACED_SUBRESOURCE_FOOTPRINT Layout{};
-		D3D12_RESOURCE_DESC Desc = Texture->GetResource()->GetDesc();
+
+        D3D12_RESOURCE_DESC Desc = Texture->GetResource()->GetDesc();
+        D3D12_PLACED_SUBRESOURCE_FOOTPRINT Layout{};
 		GDevice->GetCopyableFootprints(&Desc, 0, 1, 0, &Layout, nullptr, nullptr, nullptr);
 
 		const CommonAllocationData& AllocationData = Buffer->GetAllocation().GetAllocationData().Get<CommonAllocationData>();
-		CD3DX12_TEXTURE_COPY_LOCATION DestLoc{ AllocationData.UnderlyResource, Layout };
-		CD3DX12_TEXTURE_COPY_LOCATION SrcLoc{ Texture->GetResource() };
+        CD3DX12_TEXTURE_COPY_LOCATION DestLoc{ Texture->GetResource() };
+        CD3DX12_TEXTURE_COPY_LOCATION SrcLoc{ AllocationData.UnderlyResource, Layout };
 		CmdList->CopyTextureRegion(&DestLoc, 0, 0, 0, &SrcLoc, nullptr);
 	}
 
 	void Dx12CmdRecorder::CopyTextureToBuffer(GpuTexture* InTexture, GpuBuffer* InBuffer)
 	{
-		Dx12Texture* Texture = static_cast<Dx12Texture*>(InTexture);
-		Dx12Buffer* Buffer = static_cast<Dx12Buffer*>(InBuffer);
-		CD3DX12_TEXTURE_COPY_LOCATION DestLoc{ Texture->GetResource() };
+        Dx12Texture* Texture = static_cast<Dx12Texture*>(InTexture);
+        Dx12Buffer* Buffer = static_cast<Dx12Buffer*>(InBuffer);
 
-		D3D12_PLACED_SUBRESOURCE_FOOTPRINT Layout{};
-		D3D12_RESOURCE_DESC Desc = Texture->GetResource()->GetDesc();
-		GDevice->GetCopyableFootprints(&Desc, 0, 1, 0, &Layout, nullptr, nullptr, nullptr);
+        D3D12_RESOURCE_DESC Desc = Texture->GetResource()->GetDesc();
+        D3D12_PLACED_SUBRESOURCE_FOOTPRINT Layout{};
+        GDevice->GetCopyableFootprints(&Desc, 0, 1, 0, &Layout, nullptr, nullptr, nullptr);
 
-		const CommonAllocationData& AllocationData = Buffer->GetAllocation().GetAllocationData().Get<CommonAllocationData>();
-		CD3DX12_TEXTURE_COPY_LOCATION SrcLoc{ AllocationData.UnderlyResource, Layout };
+        const CommonAllocationData& AllocationData = Buffer->GetAllocation().GetAllocationData().Get<CommonAllocationData>();
+        CD3DX12_TEXTURE_COPY_LOCATION DestLoc{ AllocationData.UnderlyResource, Layout };
+        CD3DX12_TEXTURE_COPY_LOCATION SrcLoc{ Texture->GetResource() };
 		CmdList->CopyTextureRegion(&DestLoc, 0, 0, 0, &SrcLoc, nullptr);
 	}
 

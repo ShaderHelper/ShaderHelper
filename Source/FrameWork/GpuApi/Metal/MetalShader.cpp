@@ -85,9 +85,6 @@ namespace FW
         TArray<const char*> DxcArgs;
         DxcArgs.Add("-no-warnings");
         DxcArgs.Add("-fspv-preserve-bindings"); //For bindgroup-argumentbuffer
-        //TODO: Parse spv
-        //DxcArgs.Add("-Od");
-        //DxcArgs.Add("-fspv-debug=line");
         
         SourceDesc.loadIncludeCallback = [InShader](const char* includeName) -> ShaderConductor::Blob {
             for(const FString& IncludeDir : InShader->GetIncludeDirs())

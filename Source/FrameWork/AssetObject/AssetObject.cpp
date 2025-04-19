@@ -42,9 +42,16 @@ namespace FW
 		GProject->RemovePendingAsset(this);
 	}
 
-	void AssetObject::MarkDirty()
+	void AssetObject::MarkDirty(bool IsDirty)
 	{
-		GProject->AddPendingAsset(this);
+        if(IsDirty)
+        {
+            GProject->AddPendingAsset(this);
+        }
+        else
+        {
+            GProject->RemovePendingAsset(this);
+        }
 	}
 
 	bool AssetObject::IsDirty()

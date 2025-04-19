@@ -59,7 +59,7 @@ namespace SH
 		TSharedPtr<FTabManager> TabManager;
         FDelegateHandle SaveLayoutTicker;
         TSharedPtr<FW::SAssetBrowser> AssetBrowser;
-		TSharedPtr<SShaderEditorBox> ShaderEditor;
+		TMap<FW::AssetPtr<StShader>, TSharedPtr<SShaderEditorBox>> ShaderEditors;
 
         TSharedPtr<SDockTab> CodeTab;
         TSharedPtr<FTabManager> CodeTabManager;

@@ -43,6 +43,7 @@ namespace SH
         
 	public:
         bool bCurPsCompilationSucceed;
+        FString InitialPixelShaderBody;
 		FString PixelShaderBody;
         TRefCountPtr<FW::GpuShader> VertexShader, PixelShader;
         FSimpleDelegate OnRefreshBuilder;

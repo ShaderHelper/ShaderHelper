@@ -23,7 +23,7 @@ namespace FW
 		virtual void Serialize(FArchive& Ar) override;
         virtual void PostLoad() override;
 		virtual void Save();
-		virtual void MarkDirty();
+		virtual void MarkDirty(bool IsDirty = true);
 		bool IsDirty();
 
 		virtual FString FileExtension() const = 0;
