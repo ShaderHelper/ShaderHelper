@@ -9,35 +9,42 @@ namespace FW
 	//To make sure that gpu resources do not ahead release when allow gpu lag several frames behind cpu.
 	class DeferredReleaseManager
 	{
-		using PendingResources = TArray<TRefCountPtr<GpuResource>>;
-	public:
-        DeferredReleaseManager() : LastCpuFrame(0), LastGpuFrame(0)
+		struct PendingResource
 		{
-			PendingQueue.push(PendingResources{});
+			TRefCountPtr<GpuResource> Resource;
+			uint64 WaitFrame;
+		};
+	public:
+		void AddResource(TRefCountPtr<GpuResource> InResource) 
+		{
+			Resources.Add(MoveTemp(InResource));
 		}
 
-		void AllocateOneFrame() {
-			if (CurCpuFrame > LastCpuFrame)
+		void ProcessResources() 
+		{
+			for (auto It = Resources.CreateIterator(); It; ++It)
 			{
-				check(CurCpuFrame == LastCpuFrame + 1);
-				PendingQueue.push(PendingResources{});
-				LastCpuFrame = CurCpuFrame;
+				if ((*It).GetRefCount() == 1)
+				{
+					PendingResources.Add({ *It, CurCpuFrame });
+					It.RemoveCurrent();
+				}
+			}
+
+			for (auto It = PendingResources.CreateIterator(); It; ++It)
+			{
+				if (CurGpuFrame >= It->WaitFrame)
+				{
+					It.RemoveCurrent();
+				}
 			}
 		}
-		void AddUncompletedResource(TRefCountPtr<GpuResource> InResource) {
-			PendingQueue.back().AddUnique(MoveTemp(InResource));
-		}
-		void ReleaseCompletedResources() {
-			check(LastGpuFrame <= CurGpuFrame);
-			uint64 GpuFrameIncrement = CurGpuFrame - LastGpuFrame;
-			while (GpuFrameIncrement--) {
-				PendingQueue.pop();
-			}
-			LastGpuFrame = CurGpuFrame;
-		}
+
 	private:
-		uint64 LastCpuFrame, LastGpuFrame;
-		std::queue<PendingResources> PendingQueue;
+		TArray<TRefCountPtr<GpuResource>> Resources;
+
+		//Resources no longer held by user
+		TArray<PendingResource> PendingResources;
 	};
 
 	inline DeferredReleaseManager* GDeferredReleaseManager = new DeferredReleaseManager;
@@ -50,7 +57,7 @@ namespace FW
 		{
 			static_assert(std::is_base_of_v<GpuResource, T>);
 			if (IsDeferred) {
-				GDeferredReleaseManager->AddUncompletedResource(static_cast<T*>(this));
+				GDeferredReleaseManager->AddResource(static_cast<T*>(this));
 			}
 		}
 		virtual ~Dx12DeferredDeleteObject() = default;

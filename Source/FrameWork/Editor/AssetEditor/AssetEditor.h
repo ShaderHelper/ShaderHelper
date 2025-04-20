@@ -19,6 +19,7 @@ namespace FW
         virtual void OnAdd(const FString& InAssetPath) {}
 		virtual void OnDelete(const FString& InAssetPath);
 
+		//For non-imported resources
 		virtual void OnCreate(AssetObject* InAsset) {};
 	};
     

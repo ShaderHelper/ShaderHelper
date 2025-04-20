@@ -900,7 +900,7 @@ const FString ErrorMarkerText = TEXT("✘");
         if (NewShaderSource != StShaderAsset->PixelShaderBody)
         {
             StShaderAsset->PixelShaderBody = NewShaderSource;
-            StShaderAsset->MarkDirty(NewShaderSource != StShaderAsset->InitialPixelShaderBody);
+            StShaderAsset->MarkDirty(NewShaderSource != StShaderAsset->SavedPixelShaderBody);
         }
         
         CurrentShaderSource = NewShaderSource;

@@ -40,7 +40,6 @@ void Dx12GpuRhiBackend::BeginFrame()
 {
 	uint32 FrameResourceIndex = GetCurFrameSourceIndex();
 	GTempUniformBufferAllocator[FrameResourceIndex]->Flush();
-	GDeferredReleaseManager->AllocateOneFrame();
 }
 
 void Dx12GpuRhiBackend::EndFrame()
@@ -58,7 +57,7 @@ void Dx12GpuRhiBackend::EndFrame()
 		CurGpuFrame = CurGpuFrame + 1;
 	}
 
-	GDeferredReleaseManager->ReleaseCompletedResources();
+	GDeferredReleaseManager->ProcessResources();
 }
 
 TRefCountPtr<GpuTexture> Dx12GpuRhiBackend::CreateTexture(const GpuTextureDesc &InTexDesc, GpuResourceState InitState)

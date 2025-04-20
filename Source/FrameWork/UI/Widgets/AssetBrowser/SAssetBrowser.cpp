@@ -361,12 +361,15 @@ namespace FW
                 if (FileChange.Action == FFileChangeData::FCA_Added)
 #endif
                 {
-                    
-                    if(AssetOp* AssetOp_ = GetAssetOp(FullFileName); AssetOp_ && !AlreadySolvedEvent(FileChange))
-                    {
-                        TSingleton<AssetManager>::Get().UpdateGuidToPath(FullFileName);
-                        AssetOp_->OnAdd(FullFileName);
-                    }
+              
+					if (!AlreadySolvedEvent(FileChange))
+					{
+						TSingleton<AssetManager>::Get().UpdateGuidToPath(FullFileName);
+						if (AssetOp* AssetOp_ = GetAssetOp(FullFileName))
+						{
+							AssetOp_->OnAdd(FullFileName);
+						}
+					}
                     
                     AssetView->AddFile(FullFileName);
                     AddFile(FullFileName);
@@ -377,11 +380,15 @@ namespace FW
 					AssetView->RemoveFile(FullFileName);
                     RemoveFile(FullFileName);
                 
-                    if(AssetOp* AssetOp_ = GetAssetOp(FullFileName); AssetOp_ && !AlreadySolvedEvent(FileChange))
-                    {
-                        AssetOp_->OnDelete(FullFileName);
-                        TSingleton<AssetManager>::Get().RemoveGuidToPath(FullFileName);
-                    }
+					if (!AlreadySolvedEvent(FileChange))
+					{
+						if (AssetOp* AssetOp_ = GetAssetOp(FullFileName))
+						{
+							AssetOp_->OnDelete(FullFileName);
+						}
+						TSingleton<AssetManager>::Get().RemoveGuidToPath(FullFileName);
+					}
+
 				}
 			}
 		}
