@@ -41,10 +41,10 @@ namespace FW
 		}
 
 	private:
-		TArray<TRefCountPtr<GpuResource>> Resources;
+		TSparseArray<TRefCountPtr<GpuResource>> Resources;
 
 		//Resources no longer held by user
-		TArray<PendingResource> PendingResources;
+		TSparseArray<PendingResource> PendingResources;
 	};
 
 	inline DeferredReleaseManager* GDeferredReleaseManager = new DeferredReleaseManager;

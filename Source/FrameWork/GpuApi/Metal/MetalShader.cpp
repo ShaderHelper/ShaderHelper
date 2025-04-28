@@ -64,8 +64,8 @@ namespace FW
         TArray<char> EntryPointAnsi{TCHAR_TO_ANSI(*InShader->GetEntryPoint()), InShader->GetEntryPoint().Len() + 1};
         SourceDesc.entryPoint = EntryPointAnsi.GetData();
         
-        TArray<char> SourceAnsi{TCHAR_TO_ANSI(*InShader->GetSourceText()), InShader->GetSourceText().Len() + 1};
-        SourceDesc.source = SourceAnsi.GetData();
+		auto SourceUTF8 = StringCast<UTF8CHAR>(*InShader->GetSourceText());
+        SourceDesc.source = (char*)SourceUTF8.Get();
         
         ShaderConductor::MacroDefine SpvMslOptions[] = {
             {"argument_buffers", "1"},
@@ -85,6 +85,9 @@ namespace FW
         TArray<const char*> DxcArgs;
         DxcArgs.Add("-no-warnings");
         DxcArgs.Add("-fspv-preserve-bindings"); //For bindgroup-argumentbuffer
+
+		DxcArgs.Add("-HV");
+		DxcArgs.Add("2021");
         
         SourceDesc.loadIncludeCallback = [InShader](const char* includeName) -> ShaderConductor::Blob {
             for(const FString& IncludeDir : InShader->GetIncludeDirs())

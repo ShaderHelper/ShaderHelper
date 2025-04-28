@@ -27,10 +27,8 @@ namespace FW
 		DxcCompiler();
 		bool Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo) const;
 
-	private:
 		TRefCountPtr<IDxcCompiler3> Compiler;
 		TRefCountPtr<IDxcUtils> CompierUitls;
-		TRefCountPtr<IDxcIncludeHandler> CompilerIncludeHandler;
 	};
 
 	inline DxcCompiler GShaderCompiler;
