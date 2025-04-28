@@ -16,8 +16,21 @@ THIRD_PARTY_INCLUDES_START
 #endif
 THIRD_PARTY_INCLUDES_END
 
+#include <Internationalization/Regex.h>
+
 namespace FW
 {
+	GpuShaderPreProcessor& GpuShaderPreProcessor::ReplaceTextToArray()
+	{
+		static const FRegexPattern Pattern(R"(TEXT("[*]"))");
+		FRegexMatcher Matcher(Pattern, ShaderText);
+		while (Matcher.FindNext())
+		{
+
+		}
+		return *this;
+	}
+
 
 	GpuShader::GpuShader(FString InFileName, ShaderType InType, const FString& ExtraDeclaration, FString InEntryPoint)
 		: GpuResource(GpuResourceType::Shader)
@@ -102,10 +115,15 @@ namespace FW
     {
         DxcCreateInstance(CLSID_DxcIntelliSense, IID_PPV_ARGS(Impl->ISense.GetInitReference()));
         Impl->ISense->CreateIndex(Impl->Index.GetInitReference());
-        Impl->ISense->CreateUnsavedFile("Temp.hlsl", TCHAR_TO_ANSI(HlslSource.GetData()), HlslSource.Len(), Impl->Unsaved.GetInitReference());
+		auto SourceText = StringCast<UTF8CHAR>(HlslSource.GetData());
+        Impl->ISense->CreateUnsavedFile("Temp.hlsl", (char*)SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR), Impl->Unsaved.GetInitReference());
         
+		TArray<const char*> DxcArgs;
+		DxcArgs.Add("-HV");
+		DxcArgs.Add("2021");
+
         DxcTranslationUnitFlags UnitFlag = DxcTranslationUnitFlags(DxcTranslationUnitFlags_UseCallerThread);
-        Impl->Index->ParseTranslationUnit("Temp.hlsl", nullptr, 0, AUX::GetAddrExt(Impl->Unsaved.GetReference()), 1, UnitFlag, Impl->TU.GetInitReference());
+        Impl->Index->ParseTranslationUnit("Temp.hlsl", DxcArgs.GetData(), DxcArgs.Num(), AUX::GetAddrExt(Impl->Unsaved.GetReference()), 1, UnitFlag, Impl->TU.GetInitReference());
     }
 
     TArray<ShaderErrorInfo> ISenseTU::GetDiagnostic()

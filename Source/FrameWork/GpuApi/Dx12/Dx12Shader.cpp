@@ -18,11 +18,81 @@ namespace FW
         return new Dx12Shader(InType, MoveTemp(InSourceText), MoveTemp(ShaderName), MoveTemp(InEntryPoint));
     }
 
+	class ShIncludeHandler final : public IDxcIncludeHandler
+	{
+	public:
+		ShIncludeHandler(TRefCountPtr<Dx12Shader> InShader) : Shader(MoveTemp(InShader)) {}
+
+	public:
+		HRESULT STDMETHODCALLTYPE QueryInterface(
+			/* [in] */ REFIID riid,
+			/* [iid_is][out] */ _COM_Outptr_ void __RPC_FAR* __RPC_FAR* ppvObject) override
+		{
+			if (IsEqualIID(riid, __uuidof(IDxcIncludeHandler)))
+			{
+				*ppvObject = dynamic_cast<IDxcIncludeHandler*>(this);
+				this->AddRef();
+				return S_OK;
+			}
+			else if (IsEqualIID(riid, __uuidof(IUnknown)))
+			{
+				*ppvObject = dynamic_cast<IUnknown*>(this);
+				this->AddRef();
+				return S_OK;
+			}
+			else
+			{
+				return E_NOINTERFACE;
+			}
+		}
+
+		ULONG STDMETHODCALLTYPE AddRef(void) override
+		{
+			++RefCount;
+			return RefCount;
+		}
+
+		ULONG STDMETHODCALLTYPE Release(void) override
+		{
+			--RefCount;
+			ULONG result = RefCount;
+			if (result == 0)
+			{
+				delete this;
+			}
+			return result;
+		}
+
+
+		HRESULT STDMETHODCALLTYPE LoadSource(
+			_In_z_ LPCWSTR pFilename,
+			_COM_Outptr_result_maybenull_ IDxcBlob** ppIncludeSource
+		) override
+		{
+			for (const FString& IncludeDir : Shader->GetIncludeDirs())
+			{
+				TArray<uint8> IncludeBlob;
+				FString IncludedFile = FPaths::Combine(IncludeDir, pFilename);
+				if (IFileManager::Get().FileExists(*IncludedFile))
+				{
+					FFileHelper::LoadFileToArray(IncludeBlob, *IncludedFile);
+					GShaderCompiler.CompierUitls->CreateBlob(IncludeBlob.GetData(), IncludeBlob.Num(), CP_UTF8,
+						reinterpret_cast<IDxcBlobEncoding**>(ppIncludeSource));
+					return S_OK;
+				}
+			}
+			return E_FAIL;
+		}
+
+	private:
+		TRefCountPtr<Dx12Shader> Shader;
+		std::atomic<ULONG> RefCount = 0;
+	};
+
 	DxcCompiler::DxcCompiler()
 	 {
 		 DxCheck(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(Compiler.GetInitReference())));
 		 DxCheck(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(CompierUitls.GetInitReference())));
-		 DxCheck(CompierUitls->CreateDefaultIncludeHandler(CompilerIncludeHandler.GetInitReference()));
 	 }
 
 	FString GetShaderProfile(ShaderType InType, GpuShaderModel InModel)
@@ -47,9 +117,8 @@ namespace FW
 	 {
 		TRefCountPtr<IDxcBlobEncoding> BlobEncoding;
 		TRefCountPtr<IDxcResult> CompileResult;
-		auto SourceText = StringCast<ANSICHAR>(*InShader->GetSourceText());
-		const ANSICHAR* SourceTextPtr = SourceText.Get();
-		DxCheck(CompierUitls->CreateBlobFromPinned(SourceTextPtr, FCStringAnsi::Strlen(SourceTextPtr), CP_UTF8, BlobEncoding.GetInitReference()));
+		auto SourceText = StringCast<UTF8CHAR>(*InShader->GetSourceText());
+		DxCheck(CompierUitls->CreateBlobFromPinned(SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR), CP_UTF8, BlobEncoding.GetInitReference()));
 
 		TArray<const TCHAR*> Arguments;
 		Arguments.Add(TEXT("/Qstrip_debug"));
@@ -64,6 +133,9 @@ namespace FW
         Arguments.Add(TEXT("/Od"));
 #endif
         Arguments.Add(TEXT("-no-warnings"));
+
+		Arguments.Add(TEXT("-HV"));
+		Arguments.Add(TEXT("2021"));
 
 		for(const FString& IncludeDir : InShader->GetIncludeDirs())
 		{
@@ -96,8 +168,9 @@ namespace FW
 			}
 		}
 
+		TRefCountPtr<IDxcIncludeHandler> IncludeHandler = new ShIncludeHandler(InShader);
 		bool IsApiSucceeded = SUCCEEDED(Compiler->Compile(&SourceBuffer,
-			Arguments.GetData(), Arguments.Num(), CompilerIncludeHandler,
+			Arguments.GetData(), Arguments.Num(), IncludeHandler,
 			IID_PPV_ARGS(CompileResult.GetInitReference()))
 		);
 
