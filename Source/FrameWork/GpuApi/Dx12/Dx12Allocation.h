@@ -4,11 +4,23 @@
 #include "GpuApi/GpuResource.h"
 namespace FW
 {
+	enum class AllocationPolicy
+	{
+		Committed,
+		SubAllocate,
+		Placed,
+	};
+
 	struct CommonAllocationData
 	{
 		TRefCountPtr<ID3D12Resource> UnderlyResource;
 		D3D12_GPU_VIRTUAL_ADDRESS ResourceBaseGpuAddr;
 		void* ResourceBaseCpuAddr;
+
+		ID3D12Resource* GetResource() const
+		{
+			return UnderlyResource;
+		}
 		
 		D3D12_GPU_VIRTUAL_ADDRESS GetGpuAddr() const
 		{
@@ -28,6 +40,13 @@ namespace FW
 		D3D12_GPU_VIRTUAL_ADDRESS ResourceBaseGpuAddr;
 		void* ResourceBaseCpuAddr;
 		uint64 Offset;
+
+		bool IsPlaced = false;
+
+		ID3D12Resource* GetResource() const
+		{
+			return UnderlyResource;
+		}
 
 		D3D12_GPU_VIRTUAL_ADDRESS GetGpuAddr() const
 		{
@@ -74,6 +93,13 @@ namespace FW
 		//Allow to update resource on demand with frame resource strategy.
 		mutable uint32 LastFrameBlockIndexWritten = 0;
 
+		bool IsPlaced = false;
+
+		ID3D12Resource* GetResource() const
+		{
+			return Section->UnderlyResource;
+		}
+
 		D3D12_GPU_VIRTUAL_ADDRESS GetGpuAddr() const
 		{
 			if (IsFrameSource) {
@@ -113,25 +139,38 @@ namespace FW
 		ResourceAllocation(const CommonAllocationData& InData)
 		{
 			AllocationData.Set<CommonAllocationData>(InData);
+			Policy = AllocationPolicy::Committed;
 		}
 
 		ResourceAllocation(const BumpAllocationData& InData)
 		{
 			AllocationData.Set<BumpAllocationData>(InData);
+			Policy = InData.IsPlaced ? AllocationPolicy::Placed : AllocationPolicy::SubAllocate;
 		}
 
 		ResourceAllocation(const BuddyAllocationData& InData)
 		{
 			AllocationData.Set<BuddyAllocationData>(InData);
+			Policy = InData.IsPlaced ? AllocationPolicy::Placed : AllocationPolicy::SubAllocate;
 		}
 
 	public:
 		void SetOwner(GpuResource* InOwner) { Owner = InOwner; }
 
+		AllocationPolicy GetPolicy() const { return Policy;  }
 		const AllocationDataVariant& GetAllocationData() const
 		{
 			return AllocationData;
 		}
+
+		ID3D12Resource* GetResource() const {
+			return Visit(
+				[](auto&& Arg)
+				{
+					return Arg.GetResource();
+				}, AllocationData);
+		}
+
 
 		D3D12_GPU_VIRTUAL_ADDRESS GetGpuAddr() const {
 			return Visit(
@@ -152,7 +191,7 @@ namespace FW
 	private:
 		GpuResource* Owner = nullptr;
 		AllocationDataVariant AllocationData;
-
+		AllocationPolicy Policy;
 	};
 
 	class BuddyAllocator
@@ -264,7 +303,7 @@ namespace FW
 	{
 	public:
 		CommonAllocationData Alloc(uint32 ByteSize, 
-			D3D12_HEAP_TYPE InHeapType, D3D12_RESOURCE_STATES InInitialState = D3D12_RESOURCE_STATE_COMMON);
+			D3D12_HEAP_TYPE InHeapType, const CD3DX12_RESOURCE_DESC& BufferDesc, D3D12_RESOURCE_STATES InInitialState);
 
 	};
 

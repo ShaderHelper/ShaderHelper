@@ -49,14 +49,14 @@ TRefCountPtr<GpuTexture> MetalGpuRhiBackend::CreateTexture(const GpuTextureDesc 
 	return AUX::StaticCastRefCountPtr<GpuTexture>(CreateMetalTexture2D(InTexDesc));
 }
 
-TRefCountPtr<GpuShader> MetalGpuRhiBackend::CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName, FString EntryPoint)
+TRefCountPtr<GpuShader> MetalGpuRhiBackend::CreateShaderFromSource(ShaderType InType, const FString& InSourceText, const FString& InShaderName, const FString& EntryPoint)
 {
-	return AUX::StaticCastRefCountPtr<GpuShader>(CreateMetalShader(InType, MoveTemp(InSourceText), MoveTemp(InShaderName), MoveTemp(EntryPoint)));
+	return AUX::StaticCastRefCountPtr<GpuShader>(CreateMetalShader(InType, InSourceText, InShaderName, EntryPoint));
 }
 
-TRefCountPtr<GpuShader> MetalGpuRhiBackend::CreateShaderFromFile(FString FileName, ShaderType InType, FString EntryPoint, FString ExtraDeclaration)
+TRefCountPtr<GpuShader> MetalGpuRhiBackend::CreateShaderFromFile(const FString& FileName, ShaderType InType, const FString& EntryPoint, const FString& ExtraDeclaration)
 {
-	return AUX::StaticCastRefCountPtr<GpuShader>(CreateMetalShader(MoveTemp(FileName), InType, MoveTemp(ExtraDeclaration), MoveTemp(EntryPoint)));
+	return AUX::StaticCastRefCountPtr<GpuShader>(CreateMetalShader(FileName, InType, ExtraDeclaration, EntryPoint));
 }
 
 TRefCountPtr<GpuBindGroup> MetalGpuRhiBackend::CreateBindGroup(const GpuBindGroupDesc &InBindGroupDesc)

@@ -161,7 +161,7 @@ namespace FW
 		TRefCountPtr<Dx12Buffer> UploadBuffer;
 		if (bHasInitialData) {
 			const uint32 UploadBufferSize = (uint32)GetRequiredIntermediateSize(RetTexture->GetResource(), 0, 1);
-			UploadBuffer = CreateDx12Buffer(D3D12_RESOURCE_STATE_COPY_SOURCE, UploadBufferSize, GpuBufferUsage::Dynamic);
+			UploadBuffer = CreateDx12Buffer(GpuResourceState::CopySrc, UploadBufferSize, GpuBufferUsage::Dynamic);
 
 			D3D12_SUBRESOURCE_DATA textureData = {};
 			textureData.pData = &InTexDesc.InitialData[0];

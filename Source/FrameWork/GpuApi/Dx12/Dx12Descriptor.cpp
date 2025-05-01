@@ -12,11 +12,11 @@ namespace FW
 
 	void InitDescriptorAllocator()
 	{
-		RtvAllocator = MakeUnique<CpuDescriptorAllocator>(2048, DescriptorType::Rtv);
-		Cpu_CbvSrvUavAllocator = MakeUnique<CpuDescriptorAllocator>(2048, DescriptorType::CbvSrvUav);
-		Gpu_CbvSrvUavAllocator = MakeUnique<GpuDescriptorAllocator>(2048, DescriptorType::CbvSrvUav);
-		Cpu_SamplerAllocator = MakeUnique<CpuDescriptorAllocator>(256, DescriptorType::Sampler);
-		Gpu_SamplerAllocator = MakeUnique<GpuDescriptorAllocator>(256, DescriptorType::Sampler);
+		RtvAllocator = MakeUnique<CpuDescriptorAllocator>(1024, DescriptorType::Rtv);
+		Cpu_CbvSrvUavAllocator = MakeUnique<CpuDescriptorAllocator>(1024, DescriptorType::CbvSrvUav);
+		Gpu_CbvSrvUavAllocator = MakeUnique<GpuDescriptorAllocator>(1024, DescriptorType::CbvSrvUav);
+		Cpu_SamplerAllocator = MakeUnique<CpuDescriptorAllocator>(128, DescriptorType::Sampler);
+		Gpu_SamplerAllocator = MakeUnique<GpuDescriptorAllocator>(128, DescriptorType::Sampler);
 	}
 
 	TUniquePtr<CpuDescriptor> AllocRtv()

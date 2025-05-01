@@ -7,7 +7,9 @@ namespace FW
 	class Dx12Shader : public GpuShader
 	{
 	public:
-        using GpuShader::GpuShader;
+		Dx12Shader(const FString& InFileName, ShaderType InType, const FString& ExtraDeclaration, const FString& InEntryPoint);
+		Dx12Shader(ShaderType InType, const FString& InSourceText, const FString& InShaderName, const FString& InEntryPoint);
+        
         
     public:
 		IDxcBlob* GetCompilationResult() const { return ByteCode; }
@@ -18,8 +20,8 @@ namespace FW
 		TRefCountPtr<IDxcBlob> ByteCode;
 	};
 
-	TRefCountPtr<Dx12Shader> CreateDx12Shader(FString FileName, ShaderType InType, FString ExtraDeclaration, FString EntryPoint);
-    TRefCountPtr<Dx12Shader> CreateDx12Shader(ShaderType InType, FString InSourceText, FString ShaderName, FString InEntryPoint);
+	TRefCountPtr<Dx12Shader> CreateDx12Shader(const FString& FileName, ShaderType InType, const FString& ExtraDeclaration, const FString& EntryPoint);
+    TRefCountPtr<Dx12Shader> CreateDx12Shader(ShaderType InType, const FString& InSourceText, const FString& ShaderName, const FString& InEntryPoint);
 
 	class DxcCompiler
 	{

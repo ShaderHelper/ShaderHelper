@@ -18,16 +18,14 @@ namespace FW
 		}
 	}
 
-	CommonAllocationData CommonBufferAllocator::Alloc(uint32 ByteSize, D3D12_HEAP_TYPE InHeapType, D3D12_RESOURCE_STATES InInitialState)
+	CommonAllocationData CommonBufferAllocator::Alloc(uint32 ByteSize, D3D12_HEAP_TYPE InHeapType, const CD3DX12_RESOURCE_DESC& BufferDesc, D3D12_RESOURCE_STATES InInitialState)
 	{
 		CommonAllocationData Data{};
 
 		CD3DX12_HEAP_PROPERTIES HeapType{ InHeapType };
-		D3D12_RESOURCE_STATES InitialState = InInitialState;
-		CD3DX12_RESOURCE_DESC BufferDesc = CD3DX12_RESOURCE_DESC::Buffer(ByteSize);
 
 		DxCheck(GDevice->CreateCommittedResource(&HeapType, D3D12_HEAP_FLAG_NONE,
-			&BufferDesc, InitialState, nullptr, IID_PPV_ARGS(Data.UnderlyResource.GetInitReference())));
+			&BufferDesc, InInitialState, nullptr, IID_PPV_ARGS(Data.UnderlyResource.GetInitReference())));
 
 		Data.ResourceBaseGpuAddr = Data.UnderlyResource->GetGPUVirtualAddress();
 		if (InHeapType == D3D12_HEAP_TYPE_UPLOAD || InHeapType == D3D12_HEAP_TYPE_READBACK)

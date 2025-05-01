@@ -26,7 +26,7 @@ workspace "ShaderHelper"
     } 
     targetname "%{prj.name}"
     language "C++"
-    cppdialect "C++17"
+    cppdialect "C++20"
     staticruntime "off"
     exceptionhandling "off"
 
@@ -35,6 +35,8 @@ workspace "ShaderHelper"
     symbols "On"
 
     startproject "ShaderHelper"
+	
+	includedirs { "Resource/Shaders"}
 
     filter "system:windows"
         architecture "x86_64"  
@@ -55,7 +57,8 @@ workspace "ShaderHelper"
             "/Zc:__cplusplus",
 			
 			--https://devblogs.microsoft.com/cppblog/improving-the-state-of-debug-performance-in-c/
-			"/permissive-", --implicitly contains "/Zc:hiddenFriend" "/Zc:strictStrings"
+			--msvc c++20 implicitly contains /permissive-
+			--"/permissive-", --implicitly contains "/Zc:hiddenFriend" "/Zc:strictStrings" 
         }
         linkoptions 
         { 

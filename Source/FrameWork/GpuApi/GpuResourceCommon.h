@@ -61,8 +61,11 @@ namespace FW
 		Dynamic = 1u << 1, // Cpu w, Gpu r
 		Staging = 1u << 2, // Cpu r, Gpu w
 
-		PersistentUniform = Dynamic | (1u << 3), // 1 or more frames
-		TemporaryUniform = Dynamic | (1u << 4),  // at most 1 frame.
+		//Persistent(1 or more frames) if not specified
+		Temporary = 1u << 3, // at most 1 frame.
+
+		Uniform = Dynamic | (1u << 4),
+		RWStorage = Static | (1u << 5),
 	};
 	ENUM_CLASS_FLAGS(GpuBufferUsage);
 

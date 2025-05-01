@@ -8,6 +8,25 @@ namespace FW
     template<typename T, typename = std::enable_if_t<std::is_base_of_v<AssetObject, T>>>
     using AssetPtr = ObjectPtr<T, ObjectOwnerShip::Retain>;
 
+	//Ensure the GuidToPath of AssetManager is always accessed with a normalized path.
+	// A/B/Rsource.xxx = A/B\\Resource.xxx
+	struct AssetPath
+	{
+		AssetPath() = default;
+		AssetPath(FString InPathStr) : PathStr(MoveTemp(InPathStr)) 
+		{
+			FPaths::NormalizeFilename(PathStr);
+		}
+
+		bool operator==(const AssetPath& Other) const
+		{
+			return PathStr == Other.PathStr;
+		}
+
+		operator FString() const { return PathStr; }
+		FString PathStr;
+	};
+
 	class FRAMEWORK_API AssetManager
 	{
 	public:
@@ -94,7 +113,7 @@ namespace FW
 		TArray<FString> GetManageredExts() const;
 
 	private:
-		TMap<FGuid, FString> GuidToPath;
+		TMap<FGuid, AssetPath> GuidToPath;
 		TMap<FGuid, AssetObject*> Assets; //Loaded asset
 		TMap<FGuid, TRefCountPtr<GpuTexture>> AssetThumbnailPool;
 	};

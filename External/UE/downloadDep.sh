@@ -13,7 +13,7 @@ echo "Downloading UE..."
     rm UE-Lib-Mac.zip*
 
     UE_Src_Dir="$CurrentPath/Src"
-    UE_Src_Url="https://gitlab.com/-/project/55718299/uploads/144c0bc8e5d41f321f9fcf0d1b75ac68/UE-Src.tar.gz"
+    UE_Src_Url="https://gitlab.com/-/project/55718299/uploads/0bf2ae8518d857c269a01256951bd7db/UE-Src.tar.gz"
     cd "$UE_Src_Dir" || exit 1
     curl -LO $UE_Src_Url || exit 1
     tar -zxf UE-Src.tar.gz || exit 1

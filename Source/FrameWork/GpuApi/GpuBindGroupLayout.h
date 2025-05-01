@@ -21,6 +21,7 @@ namespace FW
 		UniformBuffer,
 		Texture,
 		Sampler,
+		RWStorageBuffer,
 	};
 
 	struct LayoutBinding

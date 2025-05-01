@@ -89,7 +89,7 @@ namespace FW
         }
         
         template<typename OtherType, ObjectOwnerShip OtherOwnerShip>
-        bool operator==(const ObjectPtr<OtherType, OtherOwnerShip>& Other)
+        bool operator==(const ObjectPtr<OtherType, OtherOwnerShip>& Other) const
         {
             return Reference == Other.Reference;
         }

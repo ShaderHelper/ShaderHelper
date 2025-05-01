@@ -9,8 +9,8 @@ namespace SH
 {
 	struct ShaderToyExecContext : FW::GraphExecContext
 	{
-        float iTime;
-        FW::Vector2f iResolution;
+		float iTime{};
+		FW::Vector2f iResolution{};
 		FW::RenderGraph* RG = nullptr;
         TRefCountPtr<FW::GpuTexture> FinalRT;
 	};
