@@ -2,6 +2,7 @@
 
 #define JOIN_IMPL(A, B) A##B
 #define JOIN(A, B) JOIN_IMPL(A, B)
+#define EXPAND(...) __VA_ARGS__
 
 //Note that dont use the same slot in a shader even if declare a different type
 #define DECLARE_SHADER_TEXTURE(Type, Name, RegisterSlot) \

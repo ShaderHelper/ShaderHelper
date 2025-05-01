@@ -136,7 +136,10 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 
     FString StShader::GetBinding() const
     {
-        return GetBuiltInBindLayoutBuilder().GetCodegenDeclaration() + CustomBindGroupLayoutBuilder.GetCodegenDeclaration();
+		FString CommonHeader, PrintHeader;
+		FFileHelper::LoadFileToString(CommonHeader, *(PathHelper::ShaderDir() / "Common.hlsl"));
+		FFileHelper::LoadFileToString(PrintHeader, *(PathHelper::ShaderDir() / "Shared/Print.h"));
+        return CommonHeader + PrintHeader + GetBuiltInBindLayoutBuilder().GetCodegenDeclaration() + CustomBindGroupLayoutBuilder.GetCodegenDeclaration();
     }
 
     FString StShader::GetTemplateWithBinding() const
@@ -148,9 +151,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 
 	FString StShader::GetFullPs() const
 	{
-		FString Template;
-		FFileHelper::LoadFileToString(Template, *(PathHelper::ShaderDir() / "ShaderHelper/StShaderTemplate.hlsl"));
-        FString FullShader = GetBinding() + Template + PixelShaderBody;
+        FString FullShader = GetTemplateWithBinding() + PixelShaderBody;
 		return FullShader;
 	}
 

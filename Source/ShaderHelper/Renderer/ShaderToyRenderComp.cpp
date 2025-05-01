@@ -13,7 +13,6 @@ namespace SH
 		, ViewPort(InViewPort)
 	{
         ResizeHandle = ViewPort->OnViewportResize.AddRaw(this, &ShaderToyRenderComp::OnViewportResize);
-        OnViewportResize({ (float)ViewPort->GetSize().X, (float)ViewPort->GetSize().Y });
 	}
 
     ShaderToyRenderComp::~ShaderToyRenderComp()
@@ -24,17 +23,6 @@ namespace SH
 	void ShaderToyRenderComp::OnViewportResize(const Vector2f& InResolution)
 	{
 		Context.iResolution = InResolution;
-        
-        TArray<uint8> Datas;
-        Datas.SetNumZeroed(4 * (uint32)InResolution.x * (uint32)InResolution.y);
-        //Note: BGRA8_UNORM is default framebuffer format in ue standalone renderer framework.
-        GpuTextureDesc Desc{ (uint32)InResolution.x, (uint32)InResolution.y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared , Datas};
-        Context.FinalRT = GGpuRhi->CreateTexture(Desc);
-        GGpuRhi->SetResourceName("FinalRT", Context.FinalRT);
-        ViewPort->SetViewPortRenderTexture(Context.FinalRT);
-        
-        RenderBegin();
-        RenderInternal();
 	}
 
 	void ShaderToyRenderComp::RenderBegin()
@@ -45,7 +33,24 @@ namespace SH
 	void ShaderToyRenderComp::RenderInternal()
 	{
         if(!TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop)
-        {
+		{
+			if(!Context.FinalRT.IsValid() ||
+				Context.FinalRT->GetWidth() != (uint32)Context.iResolution.X || Context.FinalRT->GetHeight() != (uint32)Context.iResolution.Y )
+			{
+				TArray<uint8> Datas;
+				Datas.SetNumZeroed(4 * (uint32)Context.iResolution.x * (uint32)Context.iResolution.y);
+				//Note: BGRA8_UNORM is default framebuffer format in ue standalone renderer framework.
+				Context.FinalRT = GGpuRhi->CreateTexture({
+					.Width = (uint32)Context.iResolution.x,
+					.Height = (uint32)Context.iResolution.y,
+					.Format = GpuTextureFormat::B8G8R8A8_UNORM,
+					.Usage = GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared,
+					.InitialData = MoveTemp(Datas)
+				});
+				GGpuRhi->SetResourceName("FinalRT", Context.FinalRT);
+				ViewPort->SetViewPortRenderTexture(Context.FinalRT);
+			}
+		
             RenderGraph Graph;
             Context.RG = &Graph;
             {

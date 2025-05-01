@@ -83,7 +83,7 @@ namespace HLSL
         "reversebits", "round", "rsqrt", "saturate", "sign", "sin", "sincos", "sinh", "smoothstep", "sqrt", "step",
         "tan", "tanh", "tex1D", "tex1Dbias", "tex1Dgrad", "tex1Dlod", "tex1Dproj", "tex2D", "tex2Dbias",
         "tex2Dgrad", "tex2Dlod", "tex2Dproj", "tex3D", "tex3Dbias", "tex3Dgrad", "tex3Dlod", "tex3Dproj",
-        "texCUBE", "texCUBEbias", "texCUBEgrad", "texCUBElod", "texCUBEproj", "transpose", "trunc",
+        "texCUBE", "texCUBEbias", "texCUBEgrad", "texCUBElod", "texCUBEproj", "transpose", "trunc", "sizeof"
     };
 }
 
@@ -107,7 +107,7 @@ namespace FW
 		GpuShaderPreProcessor(FString InShaderText) : ShaderText(MoveTemp(InShaderText)) {}
 
 	public:
-		//hlsl does not support string literal
+		//hlsl does not currently support string literal
 		GpuShaderPreProcessor& ReplaceTextToArray();
 		FString Finalize() { return MoveTemp(ShaderText); }
 
@@ -119,10 +119,10 @@ namespace FW
     {
 	public:
         //From file
-		GpuShader(FString InFileName, ShaderType InType, const FString& ExtraDeclaration, FString InEntryPoint);
+		GpuShader(const FString& InFileName, ShaderType InType, const FString& ExtraDeclaration, const FString& InEntryPoint);
     
         //From source
-		GpuShader(ShaderType InType, FString InSourceText, FString InShaderName, FString InEntryPoint);
+		GpuShader(ShaderType InType, const FString& InSourceText, const FString& InShaderName, const FString& InEntryPoint);
         
         //Successfully got the bytecode result and no error occurred.
         virtual bool IsCompiled() const {
@@ -135,6 +135,7 @@ namespace FW
         const FString& GetShaderName() const { return ShaderName; }
         ShaderType GetShaderType() const {return Type;}
         const FString& GetSourceText() const { return SourceText; }
+		const FString& GetProcessedSourceText() const { return ProcessedSourceText; }
         const FString& GetEntryPoint() const { return EntryPoint; }
 		GpuShaderModel GetShaderModelVer() const;
 
@@ -142,12 +143,13 @@ namespace FW
 		void AddFlags(TArray<GpuShaderFlag> InFlags) { Flags.Append(MoveTemp(InFlags)); }
 		bool HasFlag(GpuShaderFlag InFlag) const { return Flags.Find(InFlag) != INDEX_NONE; }
         
-    private:
+    protected:
         ShaderType Type;
         FString ShaderName;
         FString EntryPoint;
         //Hlsl
         FString SourceText;
+		FString ProcessedSourceText;
         
         TOptional<FString> FileName;
         TArray<FString> IncludeDirs;

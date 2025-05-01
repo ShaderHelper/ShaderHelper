@@ -291,15 +291,12 @@ namespace SH
 			Bindings.SetPassBindGroupLayout(CustomBindLayout);
 
             GpuRenderPipelineStateDesc PipelineDesc{
-                //Shader
-                Shader->VertexShader,
-                Shader->PixelShader,
-                //Targets
-                {
-                    { PassOutput->GetValue()->GetFormat() }
+                .Vs = Shader->VertexShader,
+                .Ps = Shader->PixelShader,
+				.Targets = {
+                    { .TargetFormat = PassOutput->GetValue()->GetFormat() }
                 }
             };
-			//BindGroupLayout
 			Bindings.ApplyBindGroupLayout(PipelineDesc);
 
             TRefCountPtr<GpuPipelineState> PipelineState = GGpuRhi->CreateRenderPipelineState(PipelineDesc);

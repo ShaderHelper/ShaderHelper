@@ -135,8 +135,8 @@ namespace FW
 
 	enum class UniformBufferUsage : uint32
 	{
-		Persistant = (uint32)GpuBufferUsage::PersistentUniform,
-		Temp = (uint32)GpuBufferUsage::TemporaryUniform,
+		Persistant = GpuBufferUsage::Uniform,
+		Temp = GpuBufferUsage::Uniform | GpuBufferUsage::Temporary,
 	};
 	
 	//There is no declared struct for uniform buffer,

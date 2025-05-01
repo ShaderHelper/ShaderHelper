@@ -37,7 +37,7 @@ namespace FW
 			else
 			{
 				GpuBufferUsage BufferUsage = static_cast<GpuBuffer*>(GroupEntryResource)->GetUsage();
-				if (BufferUsage != GpuBufferUsage::PersistentUniform && BufferUsage != GpuBufferUsage::TemporaryUniform)
+				if (!EnumHasAllFlags(BufferUsage, GpuBufferUsage::Uniform))
 				{
 					SH_LOG(LogRhiValidation, Error, TEXT("CreateBindGroup Error(Mismatched GpuBufferUsage)"
 						" - Slot%d : (%s), Expected : (PersistentUniform or TemporaryUniform)"), Slot, ANSI_TO_TCHAR(magic_enum::enum_name(BufferUsage).data()));
@@ -118,7 +118,7 @@ namespace FW
 				return false;
 			}
 		}
-		else if (Usage == GpuBufferUsage::PersistentUniform || Usage == GpuBufferUsage::TemporaryUniform)
+		else if (EnumHasAllFlags(Usage, GpuBufferUsage::Uniform))
 		{
 			if (InitState != GpuResourceState::Unknown)
 			{
@@ -134,7 +134,7 @@ namespace FW
 		if (InResource->GetType() == GpuResourceType::Buffer)
 		{
 			GpuBuffer* Buffer = static_cast<GpuBuffer*>(InResource);
-			if (Buffer->GetUsage() == GpuBufferUsage::PersistentUniform || Buffer->GetUsage() == GpuBufferUsage::TemporaryUniform)
+			if (EnumHasAllFlags(Buffer->GetUsage(), GpuBufferUsage::Uniform))
 			{
 				SH_LOG(LogRhiValidation, Error, TEXT("Barrier Error(Can not change the uniform buffe's state)"));
 				return false;

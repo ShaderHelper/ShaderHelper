@@ -12,6 +12,7 @@ namespace FW
 		{
 		case BindingType::Texture:			return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 		case BindingType::Sampler:			return D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+		case BindingType::RWStorageBuffer:  return D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
 		default:
 			AUX::Unreachable();
 		}
@@ -38,7 +39,7 @@ namespace FW
 				Range.BaseShaderRegister = Slot;
 				Range.RegisterSpace = LayoutDesc.GroupNumber;
 
-				if (LayoutBindingEntry.Type == BindingType::Texture)
+				if (LayoutBindingEntry.Type == BindingType::Texture || LayoutBindingEntry.Type == BindingType::RWStorageBuffer)
 				{
 					DescriptorTableRanges_CbvSrvUav.FindOrAdd(BindingVisibility).Add(MoveTemp(Range));
 				}
@@ -127,7 +128,7 @@ namespace FW
 		TMap<D3D12_SHADER_VISIBILITY, TArray<D3D12_CPU_DESCRIPTOR_HANDLE>> SrcDescriptorRange_CbvSrvUav;
 		TMap<D3D12_SHADER_VISIBILITY, TArray<D3D12_CPU_DESCRIPTOR_HANDLE>> SrcDescriptorRange_Sampler;
 
-		auto SetBindingWithVisibility = [&](BindingSlot Slot, const ResourceBinding& ResourceBindingEntry, D3D12_SHADER_VISIBILITY BindingVisibility)
+		auto SetTableBindingVisibility = [&](BindingSlot Slot, const ResourceBinding& ResourceBindingEntry, D3D12_SHADER_VISIBILITY BindingVisibility)
 		{
 			GpuResource* BindingResource = ResourceBindingEntry.Resource;
 			if (BindingResource->GetType() == GpuResourceType::Sampler)
@@ -140,6 +141,14 @@ namespace FW
 				Dx12Texture* Texture = static_cast<Dx12Texture*>(BindingResource);
 				SrcDescriptorRange_CbvSrvUav.FindOrAdd(BindingVisibility).Add(Texture->SRV->GetHandle());
 			}
+			else if (BindingResource->GetType() == GpuResourceType::Buffer)
+			{
+				Dx12Buffer* Buffer = static_cast<Dx12Buffer*>(BindingResource);
+				if (EnumHasAllFlags(Buffer->GetUsage(), GpuBufferUsage::RWStorage))
+				{
+					SrcDescriptorRange_CbvSrvUav.FindOrAdd(BindingVisibility).Add(Buffer->UAV->GetHandle());
+				}
+			}
 		};
 
 		for (const auto& [Slot, ResourceBindingEntry] : InDesc.Resources)
@@ -150,25 +159,27 @@ namespace FW
 			if (BindingResource->GetType() == GpuResourceType::Buffer)
 			{
 				Dx12Buffer* Buffer = static_cast<Dx12Buffer*>(BindingResource);
-				DynamicBufferStorage.Add(Slot, Buffer);
+				if (EnumHasAllFlags(Buffer->GetUsage(), GpuBufferUsage::Uniform))
+				{
+					DynamicBufferStorage.Add(Slot, Buffer);
+					continue;
+				}
+			}
+
+			if (EnumHasAllFlags(RHIShaderStage, BindingShaderStage::All))
+			{
+				SetTableBindingVisibility(Slot, ResourceBindingEntry, D3D12_SHADER_VISIBILITY_ALL);
 			}
 			else
 			{
-				if (EnumHasAllFlags(RHIShaderStage, BindingShaderStage::All))
+				if (EnumHasAnyFlags(RHIShaderStage, BindingShaderStage::Vertex))
 				{
-					SetBindingWithVisibility(Slot, ResourceBindingEntry, D3D12_SHADER_VISIBILITY_ALL);
+					SetTableBindingVisibility(Slot, ResourceBindingEntry, D3D12_SHADER_VISIBILITY_VERTEX);
 				}
-				else
-				{
-					if (EnumHasAnyFlags(RHIShaderStage, BindingShaderStage::Vertex))
-					{
-						SetBindingWithVisibility(Slot, ResourceBindingEntry, D3D12_SHADER_VISIBILITY_VERTEX);
-					}
 
-					if (EnumHasAnyFlags(RHIShaderStage, BindingShaderStage::Pixel))
-					{
-						SetBindingWithVisibility(Slot, ResourceBindingEntry, D3D12_SHADER_VISIBILITY_PIXEL);
-					}
+				if (EnumHasAnyFlags(RHIShaderStage, BindingShaderStage::Pixel))
+				{
+					SetTableBindingVisibility(Slot, ResourceBindingEntry, D3D12_SHADER_VISIBILITY_PIXEL);
 				}
 			}
 		}

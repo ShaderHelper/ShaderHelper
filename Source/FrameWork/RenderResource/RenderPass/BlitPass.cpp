@@ -18,10 +18,10 @@ namespace FW
 		Bindings.SetShaderBindGroupLayout(PassShader.GetBindGroupLayout());
 
 		GpuRenderPipelineStateDesc PipelineDesc{
-			PassShader.GetVertexShader(), 
-			PassShader.GetPixelShader(),
-			{ 
-				{ PassInput.OutputRenderTarget->GetFormat() }
+			.Vs = PassShader.GetVertexShader(), 
+			.Ps = PassShader.GetPixelShader(),
+			.Targets = {
+				{ .TargetFormat = PassInput.OutputRenderTarget->GetFormat() }
 			}
 		};
 		Bindings.ApplyBindGroupLayout(PipelineDesc);

@@ -7,15 +7,30 @@
 
 namespace FW
 {
-
-	TRefCountPtr<Dx12Shader> CreateDx12Shader(FString FileName, ShaderType InType, FString ExtraDeclaration, FString EntryPoint)
+	Dx12Shader::Dx12Shader(const FString& InFileName, ShaderType InType, const FString& ExtraDeclaration, const FString& InEntryPoint)
+		: GpuShader(InFileName, InType, ExtraDeclaration, InEntryPoint)
 	{
-		return new Dx12Shader( MoveTemp(FileName), InType, MoveTemp(ExtraDeclaration), MoveTemp(EntryPoint));
+		ProcessedSourceText = GpuShaderPreProcessor{ SourceText }
+			.ReplaceTextToArray()
+			.Finalize();
 	}
 
-	TRefCountPtr<Dx12Shader> CreateDx12Shader(ShaderType InType, FString InSourceText, FString ShaderName, FString InEntryPoint)
+	Dx12Shader::Dx12Shader(ShaderType InType, const FString& InSourceText, const FString& InShaderName, const FString& InEntryPoint)
+		: GpuShader(InType, InSourceText, InShaderName, InEntryPoint)
+	{
+		ProcessedSourceText = GpuShaderPreProcessor{ SourceText }
+			.ReplaceTextToArray()
+			.Finalize();
+	}
+
+	TRefCountPtr<Dx12Shader> CreateDx12Shader(const FString& FileName, ShaderType InType, const FString& ExtraDeclaration, const FString& EntryPoint)
+	{
+		return new Dx12Shader(FileName, InType, ExtraDeclaration, EntryPoint);
+	}
+
+	TRefCountPtr<Dx12Shader> CreateDx12Shader(ShaderType InType, const FString& InSourceText, const FString& ShaderName, const FString& InEntryPoint)
     {
-        return new Dx12Shader(InType, MoveTemp(InSourceText), MoveTemp(ShaderName), MoveTemp(InEntryPoint));
+        return new Dx12Shader(InType, InSourceText, ShaderName, InEntryPoint);
     }
 
 	class ShIncludeHandler final : public IDxcIncludeHandler
@@ -71,12 +86,16 @@ namespace FW
 		{
 			for (const FString& IncludeDir : Shader->GetIncludeDirs())
 			{
-				TArray<uint8> IncludeBlob;
 				FString IncludedFile = FPaths::Combine(IncludeDir, pFilename);
 				if (IFileManager::Get().FileExists(*IncludedFile))
 				{
-					FFileHelper::LoadFileToArray(IncludeBlob, *IncludedFile);
-					GShaderCompiler.CompierUitls->CreateBlob(IncludeBlob.GetData(), IncludeBlob.Num(), CP_UTF8,
+					FString ShaderText;
+					FFileHelper::LoadFileToString(ShaderText, *IncludedFile);
+					ShaderText = GpuShaderPreProcessor{ ShaderText }
+						.ReplaceTextToArray()
+						.Finalize();
+					auto SourceText = StringCast<UTF8CHAR>(*ShaderText);
+					GShaderCompiler.CompierUitls->CreateBlob(SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR), CP_UTF8,
 						reinterpret_cast<IDxcBlobEncoding**>(ppIncludeSource));
 					return S_OK;
 				}
@@ -117,7 +136,7 @@ namespace FW
 	 {
 		TRefCountPtr<IDxcBlobEncoding> BlobEncoding;
 		TRefCountPtr<IDxcResult> CompileResult;
-		auto SourceText = StringCast<UTF8CHAR>(*InShader->GetSourceText());
+		auto SourceText = StringCast<UTF8CHAR>(*InShader->GetProcessedSourceText());
 		DxCheck(CompierUitls->CreateBlobFromPinned(SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR), CP_UTF8, BlobEncoding.GetInitReference()));
 
 		TArray<const TCHAR*> Arguments;
@@ -212,5 +231,4 @@ namespace FW
 		
 		return IsCompilationSucceeded;
 	 }
-
 }

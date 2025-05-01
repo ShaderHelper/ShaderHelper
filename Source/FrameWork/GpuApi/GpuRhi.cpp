@@ -151,12 +151,12 @@ public:
 		return RhiBackend->CreateBuffer(ByteSize, Usage, InitState);
 	}
 
-	TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, FString InSourceText, FString InShaderName, FString EntryPoint) override
+	TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, const FString& InSourceText, const FString& InShaderName, const FString& EntryPoint) override
 	{
 		return RhiBackend->CreateShaderFromSource(InType, InSourceText, InShaderName, EntryPoint);
 	}
 
-	TRefCountPtr<GpuShader> CreateShaderFromFile(FString FileName, ShaderType InType, FString EntryPoint, FString ExtraDeclaration) override
+	TRefCountPtr<GpuShader> CreateShaderFromFile(const FString& FileName, ShaderType InType, const FString& EntryPoint, const FString& ExtraDeclaration) override
 	{
 		return RhiBackend->CreateShaderFromFile(FileName, InType, EntryPoint, ExtraDeclaration);
 	}

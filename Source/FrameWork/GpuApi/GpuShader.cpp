@@ -16,43 +16,53 @@ THIRD_PARTY_INCLUDES_START
 #endif
 THIRD_PARTY_INCLUDES_END
 
-#include <Internationalization/Regex.h>
-
 namespace FW
 {
 	GpuShaderPreProcessor& GpuShaderPreProcessor::ReplaceTextToArray()
 	{
-		static const FRegexPattern Pattern(R"(TEXT("[*]"))");
-		FRegexMatcher Matcher(Pattern, ShaderText);
-		while (Matcher.FindNext())
+		int SearchIndex = 0;
+		do
 		{
-
-		}
+			SearchIndex = ShaderText.Find("TEXT(\"", ESearchCase::CaseSensitive, ESearchDir::FromStart, SearchIndex);
+			if (SearchIndex != INDEX_NONE)
+			{
+				int EndIndex = ShaderText.Find("\")", ESearchCase::CaseSensitive, ESearchDir::FromStart, SearchIndex);
+				FString TextInMacro = ShaderText.Mid(SearchIndex + 6, EndIndex - SearchIndex - 6);
+				ShaderText.RemoveAt(SearchIndex, EndIndex - SearchIndex + 2, false);
+				FString TextArr = "EXPAND(uint StrArr[] = {";
+				for(int i = 0; i < TextInMacro.Len(); i++)
+				{
+					TextArr += FString::Printf(TEXT("'%c',"), TextInMacro[i]);
+				}
+				TextArr += "'\\0'})";
+				ShaderText.InsertAt(SearchIndex, MoveTemp(TextArr));
+			}
+		} while(SearchIndex != INDEX_NONE);
 		return *this;
 	}
 
 
-	GpuShader::GpuShader(FString InFileName, ShaderType InType, const FString& ExtraDeclaration, FString InEntryPoint)
+	GpuShader::GpuShader(const FString& InFileName, ShaderType InType, const FString& ExtraDeclaration, const FString& InEntryPoint)
 		: GpuResource(GpuResourceType::Shader)
 		, Type(InType)
-		, FileName(MoveTemp(InFileName))
-		, EntryPoint(MoveTemp(InEntryPoint))
+		, FileName(InFileName)
+		, EntryPoint(InEntryPoint)
 	{
 		ShaderName = FPaths::GetBaseFilename(*FileName);
 		FString ShaderFileText;
 		FFileHelper::LoadFileToString(ShaderFileText, **FileName);
-		SourceText = ExtraDeclaration + MoveTemp(ShaderFileText);
+		SourceText = ExtraDeclaration + ShaderFileText;
 
 		IncludeDirs.Add(PathHelper::ShaderDir());
 		IncludeDirs.Add(FPaths::GetPath(*FileName));
 	}
 
-	GpuShader::GpuShader(ShaderType InType, FString InSourceText, FString InShaderName, FString InEntryPoint)
+	GpuShader::GpuShader(ShaderType InType, const FString& InSourceText, const FString& InShaderName, const FString& InEntryPoint)
 		: GpuResource(GpuResourceType::Shader)
 		, Type(InType)
-		, ShaderName(MoveTemp(InShaderName))
-		, EntryPoint(MoveTemp(InEntryPoint))
-		, SourceText(MoveTemp(InSourceText))
+		, ShaderName(InShaderName)
+		, EntryPoint(InEntryPoint)
+		, SourceText(InSourceText)
 	{
 
 	}

@@ -60,9 +60,10 @@ namespace UNITTEST_GPUAPI
 			.SetExistingBinding(0, TestTex)
 			.Build();
 
-		GpuRenderPipelineStateDesc PipelineDesc{};
-		PipelineDesc.Vs = Vs;
-		PipelineDesc.BindGroupLayout0 = BindGroupLayout;
+		GpuRenderPipelineStateDesc PipelineDesc{
+			.Vs = Vs,
+			.BindGroupLayout0 = BindGroupLayout
+		};
 
 		TRefCountPtr<GpuPipelineState> Pipeline = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
 
