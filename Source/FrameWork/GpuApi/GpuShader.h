@@ -108,7 +108,7 @@ namespace FW
 
 	public:
 		//hlsl does not currently support string literal
-		GpuShaderPreProcessor& ReplaceTextToArray();
+		GpuShaderPreProcessor& ReplacePrintStringLiteral();
 		FString Finalize() { return MoveTemp(ShaderText); }
 
 	private:

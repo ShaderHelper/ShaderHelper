@@ -57,10 +57,10 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         
         VertexShader = GGpuRhi->CreateShaderFromSource(ShaderType::VertexShader, DefaultVertexShader, GetFileName() + "Vs", TEXT("MainVS"));
         FString ErrorInfo;
-        GGpuRhi->CrossCompileShader(VertexShader, ErrorInfo);
+        GGpuRhi->CompileShader(VertexShader, ErrorInfo);
 
         PixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, GetFullPs(), GetFileName() + "Ps", TEXT("MainPS"));
-        bCurPsCompilationSucceed = GGpuRhi->CrossCompileShader(PixelShader, ErrorInfo);
+        bCurPsCompilationSucceed = GGpuRhi->CompileShader(PixelShader, ErrorInfo);
     }
 
     UniformBuffer* StShader::GetBuiltInUb()
@@ -158,7 +158,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
     void StShader::RefreshBuilder()
     {
         FW::UniformBufferBuilder NewCustomUniformBufferBuilder{FW::UniformBufferUsage::Persistant};
-        FW::GpuBindGroupLayoutBuilder NewCustomBindGroupLayoutBuilder{1};
+        FW::GpuBindGroupLayoutBuilder NewCustomBindGroupLayoutBuilder{ BindingContext::PassSlot };
         
         auto CustomUniformCategory = CustomCategory->GetData("Uniform");
         if(CustomUniformCategory)

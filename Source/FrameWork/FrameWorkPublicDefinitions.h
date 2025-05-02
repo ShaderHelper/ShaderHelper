@@ -9,8 +9,6 @@
 #pragma warning(disable:26450)
 #pragma warning(disable:26451)
 #pragma warning(disable:26495)
-
-#pragma warning(disable:4244)
 #endif
 
 #if defined(_WIN64)

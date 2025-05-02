@@ -77,4 +77,9 @@ namespace FW
         DxCheck(GDevice->CreateGraphicsPipelineState(&PsoDesc, IID_PPV_ARGS(Pso.GetInitReference())));
         return new Dx12RenderPso(MoveTemp(Pso), MapPrimitiveType(InPipelineStateDesc.Primitive));
     }
+
+	TRefCountPtr<Dx12ComputePso> CreateDx12ComputePso(const GpuComputePipelineStateDesc& InPipelineStateDesc)
+	{
+		return TRefCountPtr<Dx12ComputePso>();
+	}
 }

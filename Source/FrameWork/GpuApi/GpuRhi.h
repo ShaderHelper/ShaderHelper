@@ -32,7 +32,13 @@ struct GpuRhiConfig
 class GpuComputePassRecorder
 {
 public:
-	//TODO
+	GpuComputePassRecorder() = default;
+	virtual ~GpuComputePassRecorder() = default;
+
+public:
+	virtual void Dispatch(uint32 ThreadGroupCountX, uint32 ThreadGroupCountY, uint32 ThreadGroupCountZ) = 0;
+	virtual void SetComputePipelineState(GpuComputePipelineState* InPipelineState) = 0;
+	virtual void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) = 0;
 };
 
 class GpuRenderPassRecorder
@@ -43,7 +49,7 @@ public:
 
 public:
 	virtual void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount) = 0;
-	virtual void SetRenderPipelineState(GpuPipelineState* InPipelineState) = 0;
+	virtual void SetRenderPipelineState(GpuRenderPipelineState* InPipelineState) = 0;
 	virtual void SetVertexBuffer(GpuBuffer* InVertexBuffer) = 0;
 	// If omitted, it defaults to SetViewPort(GpuViewPortDesc{RenderTarget.Width, RenderTarget.Height}).
 	virtual void SetViewPort(const GpuViewPortDesc& InViewPortDesc) = 0;
@@ -58,7 +64,8 @@ public:
 	virtual ~GpuComputeCmdRecorder() = default;
 
 public:
-	//TODO
+	virtual GpuComputePassRecorder* BeginComputePass(const FString& PassName) = 0;
+	virtual void EndComputePass(GpuComputePassRecorder* InComputePassRecorder) = 0;
 };
 
 struct GpuBarrierInfo
@@ -105,12 +112,13 @@ public:
 	virtual TRefCountPtr<GpuShader> CreateShaderFromFile(const FString& FileName, ShaderType InType, const FString& EntryPoint, const FString& ExtraDeclaration = {}) = 0;
 	virtual TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc &InBindGroupDesc) = 0;
 	virtual TRefCountPtr<GpuBindGroupLayout> CreateBindGroupLayout(const GpuBindGroupLayoutDesc &InBindGroupLayoutDesc) = 0;
-	virtual TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const GpuRenderPipelineStateDesc &InPipelineStateDesc) = 0;
+	virtual TRefCountPtr<GpuRenderPipelineState> CreateRenderPipelineState(const GpuRenderPipelineStateDesc &InPipelineStateDesc) = 0;
+	virtual TRefCountPtr<GpuComputePipelineState> CreateComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc) = 0;
 	virtual TRefCountPtr<GpuSampler> CreateSampler(const GpuSamplerDesc &InSamplerDesc) = 0;
 
 	virtual void SetResourceName(const FString &Name, GpuResource *InResource) = 0;
 
-	virtual bool CrossCompileShader(GpuShader *InShader, FString &OutErrorInfo) = 0;
+	virtual bool CompileShader(GpuShader* InShader, FString& OutErrorInfo, const TArray<FString>& Definitions = {}) = 0;
 
 	// Need OutRowPitch to correctly read or write data, because the mapped buffer actually contains the *padded* texture data.
 	// RowPitch != Width x ElementByteSize

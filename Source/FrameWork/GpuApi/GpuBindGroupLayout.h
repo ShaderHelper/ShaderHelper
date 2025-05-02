@@ -12,7 +12,8 @@ namespace FW
 	{
 		Vertex = 1u << 0,
 		Pixel = 1u << 1,
-		All = Vertex | Pixel,
+		Compute = 1u << 2,
+		All = Vertex | Pixel | Compute,
 	};
     ENUM_CLASS_FLAGS(BindingShaderStage);
 

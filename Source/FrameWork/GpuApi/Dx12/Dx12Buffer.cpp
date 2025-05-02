@@ -4,8 +4,8 @@
 
 namespace FW
 {
-	Dx12Buffer::Dx12Buffer(GpuBufferUsage InUsage, ResourceAllocation InAllocation, bool IsDeferred)
-		: GpuBuffer(InUsage)
+	Dx12Buffer::Dx12Buffer(GpuBufferUsage InUsage, ResourceAllocation InAllocation, uint32 ByteSize, bool IsDeferred)
+		: GpuBuffer(InUsage, ByteSize)
 		, Dx12DeferredDeleteObject(IsDeferred)
 		, Allocation(MoveTemp(InAllocation))
 	{
@@ -25,12 +25,12 @@ namespace FW
 		if (EnumHasAnyFlags(Usage, GpuBufferUsage::Temporary))
 		{
 			BumpAllocationData AllocationData = GTempUniformBufferAllocator[GetCurFrameSourceIndex()]->Alloc(ByteSize);
-			return new Dx12Buffer{ Usage, AllocationData, IsDeferred };
+			return new Dx12Buffer{ Usage, AllocationData, ByteSize, IsDeferred };
 		}
 		else
 		{
 			BuddyAllocationData AllocationData = GPersistantUniformBufferAllocator->Alloc(ByteSize);
-			return new Dx12Buffer{ Usage, AllocationData, IsDeferred };
+			return new Dx12Buffer{ Usage, AllocationData, ByteSize, IsDeferred };
 		}
 	}
 
@@ -62,17 +62,17 @@ namespace FW
 		if (EnumHasAnyFlags(Usage, GpuBufferUsage::Dynamic))
 		{
 			CommonAllocationData AllocationData = GCommonBufferAllocator->Alloc(ByteSize, D3D12_HEAP_TYPE_UPLOAD, BufferDesc, InitState);
-			return new Dx12Buffer{ Usage, AllocationData, IsDeferred };
+			return new Dx12Buffer{ Usage, AllocationData, ByteSize, IsDeferred };
 		}
 		else if (EnumHasAnyFlags(Usage, GpuBufferUsage::Static))
 		{
 			CommonAllocationData AllocationData = GCommonBufferAllocator->Alloc(ByteSize, D3D12_HEAP_TYPE_DEFAULT, BufferDesc, InitState);
-			return new Dx12Buffer{ Usage, AllocationData, IsDeferred };
+			return new Dx12Buffer{ Usage, AllocationData, ByteSize, IsDeferred };
 		}
 		else if (EnumHasAnyFlags(Usage, GpuBufferUsage::Staging))
 		{
 			CommonAllocationData AllocationData = GCommonBufferAllocator->Alloc(ByteSize, D3D12_HEAP_TYPE_READBACK, BufferDesc, InitState);
-			return new Dx12Buffer{ Usage, AllocationData, IsDeferred };
+			return new Dx12Buffer{ Usage, AllocationData, ByteSize, IsDeferred };
 		}
 
 		checkf(false, TEXT("Invalid GpuBufferUsage"));

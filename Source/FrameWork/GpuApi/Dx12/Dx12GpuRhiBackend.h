@@ -22,10 +22,11 @@ public:
 	TRefCountPtr<GpuShader> CreateShaderFromFile(const FString& FileName, ShaderType InType, const FString& EntryPoint, const FString& ExtraDeclaration) override;
 	TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc &InBindGroupDesc) override;
 	TRefCountPtr<GpuBindGroupLayout> CreateBindGroupLayout(const GpuBindGroupLayoutDesc &InBindGroupLayoutDesc) override;
-	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc) override;
+	TRefCountPtr<GpuRenderPipelineState> CreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc) override;
+	TRefCountPtr<GpuComputePipelineState> CreateComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc) override;
 	TRefCountPtr<GpuSampler> CreateSampler(const GpuSamplerDesc &InSamplerDesc) override;
 	void SetResourceName(const FString& Name, GpuResource* InResource) override;
-	bool CrossCompileShader(GpuShader *InShader, FString &OutErrorInfo) override;
+	bool CompileShader(GpuShader *InShader, FString &OutErrorInfo, const TArray<FString>& Definitions) override;
 	void BeginGpuCapture(const FString &CaptureName) override;
 	void EndGpuCapture() override;
 	void *GetSharedHandle(GpuTexture *InGpuTexture) override;

@@ -25,29 +25,44 @@ namespace FW
 		BlendMask Mask = BlendMask::All;
     };
 
+	struct GpuComputePipelineStateDesc
+	{
+		GpuShader* Cs;
+
+		GpuBindGroupLayout* BindGroupLayout0 = nullptr;
+		GpuBindGroupLayout* BindGroupLayout1 = nullptr;
+		GpuBindGroupLayout* BindGroupLayout2 = nullptr;
+		GpuBindGroupLayout* BindGroupLayout3 = nullptr;
+	};
+
     struct GpuRenderPipelineStateDesc
     {
         GpuShader* Vs;
         GpuShader* Ps;
 		TArray<PipelineTargetDesc, TFixedAllocator<GpuResourceLimit::MaxRenderTargetNum>> Targets;
 
-		struct
-		{
-			GpuBindGroupLayout* BindGroupLayout0 = nullptr;
-			GpuBindGroupLayout* BindGroupLayout1 = nullptr;
-			GpuBindGroupLayout* BindGroupLayout2 = nullptr;
-			GpuBindGroupLayout* BindGroupLayout3 = nullptr;
-		};
+		GpuBindGroupLayout* BindGroupLayout0 = nullptr;
+		GpuBindGroupLayout* BindGroupLayout1 = nullptr;
+		GpuBindGroupLayout* BindGroupLayout2 = nullptr;
+		GpuBindGroupLayout* BindGroupLayout3 = nullptr;
 
 		RasterizerStateDesc RasterizerState{ RasterizerFillMode::Solid, RasterizerCullMode::None };
 		PrimitiveType Primitive = PrimitiveType::TriangleList;
     };
 
-    class GpuPipelineState : public GpuResource
+    class GpuRenderPipelineState : public GpuResource
     {
 	public:
-		GpuPipelineState() : GpuResource(GpuResourceType::PipelineState)
+		GpuRenderPipelineState() : GpuResource(GpuResourceType::RenderPipelineState)
 		{}
     };
+
+	class GpuComputePipelineState : public GpuResource
+	{
+	public:
+		GpuComputePipelineState() : GpuResource(GpuResourceType::ComputePipelineState)
+		{
+		}
+	};
 }
 

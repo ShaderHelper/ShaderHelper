@@ -103,8 +103,8 @@ namespace FW
         const bool bIsLeftMouseButtonDown = MouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton);
         if(bIsLeftMouseButtonDown)
         {
-            const float ValuesPerPixel = *MaxTime / MyGeometry.GetLocalSize().X;
-            *CurTime = ValuesPerPixel * MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()).X;
+            const float ValuesPerPixel = float(*MaxTime / MyGeometry.GetLocalSize().X);
+            *CurTime = float(ValuesPerPixel * MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()).X);
         }
         return FReply::Handled();
     }
@@ -122,7 +122,7 @@ namespace FW
         );
         
         //Draw scale.
-        const float PixelsPerValue = AllottedGeometry.GetLocalSize().X / *MaxTime;
+        const float PixelsPerValue = float(AllottedGeometry.GetLocalSize().X / *MaxTime);
         const float Spacing = *MaxTime / 50;
         const int MajorDivide = 5;
         
@@ -133,12 +133,12 @@ namespace FW
         for(int Offset = 0; Offset*Spacing < *MaxTime + 1e-3; Offset++)
         {
             float XPos = Offset * Spacing * PixelsPerValue;
-            float YOffset = AllottedGeometry.GetLocalSize().Y / 1.2f;
+            float YOffset = float(AllottedGeometry.GetLocalSize().Y / 1.2f);
             if(Offset % MajorDivide == 0)
             {
-                YOffset = AllottedGeometry.GetLocalSize().Y / 2;
+                YOffset = float(AllottedGeometry.GetLocalSize().Y / 2);
                 //Draw value
-                int Value = Offset * Spacing;
+                int Value = int(Offset * Spacing);
                 FString ValueString = FString::FromInt(Value);
                 const TSharedRef< FSlateFontMeasure > FontMeasureService = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
                 FVector2D TextSize = FontMeasureService->Measure(ValueString, Font);

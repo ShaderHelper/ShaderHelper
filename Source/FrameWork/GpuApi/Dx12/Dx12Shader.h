@@ -27,7 +27,7 @@ namespace FW
 	{
 	public:
 		DxcCompiler();
-		bool Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo) const;
+		bool Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo, const TArray<FString>& Definitions) const;
 
 		TRefCountPtr<IDxcCompiler3> Compiler;
 		TRefCountPtr<IDxcUtils> CompierUitls;

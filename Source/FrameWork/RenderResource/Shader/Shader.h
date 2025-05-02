@@ -4,12 +4,6 @@
 namespace FW
 {
 
-	class Shader
-	{
-	public:
-		virtual ~Shader() = default;
-	};
-
 	class BindingContext
 	{
 	public:
@@ -49,7 +43,19 @@ namespace FW
 			OutDesc.BindGroupLayout2 = ShaderBindGroupLayout;
 		}
 
+		void ApplyBindGroupLayout(GpuComputePipelineStateDesc& OutDesc)
+		{
+			OutDesc.BindGroupLayout0 = GlobalBindGroupLayout;
+			OutDesc.BindGroupLayout1 = PassBindGroupLayout;
+			OutDesc.BindGroupLayout2 = ShaderBindGroupLayout;
+		}
+
 		void ApplyBindGroup(GpuRenderPassRecorder* InPassRecorder) const
+		{
+			InPassRecorder->SetBindGroups(GlobalBindGroup, PassBindGroup, ShaderBindGroup, nullptr);
+		}
+
+		void ApplyBindGroup(GpuComputePassRecorder* InPassRecorder) const
 		{
 			InPassRecorder->SetBindGroups(GlobalBindGroup, PassBindGroup, ShaderBindGroup, nullptr);
 		}

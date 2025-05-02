@@ -27,10 +27,10 @@ namespace FW
 		);
 
 		FString ErrorInfo;
-		GGpuRhi->CrossCompileShader(Vs, ErrorInfo);
+		GGpuRhi->CompileShader(Vs, ErrorInfo);
 		check(ErrorInfo.IsEmpty());
 
-		GGpuRhi->CrossCompileShader(Ps, ErrorInfo);
+		GGpuRhi->CompileShader(Ps, ErrorInfo);
 		check(ErrorInfo.IsEmpty());
 	}
 
