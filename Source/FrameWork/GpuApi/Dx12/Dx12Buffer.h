@@ -11,7 +11,7 @@ namespace FW
 	class Dx12Buffer : public GpuBuffer, public Dx12DeferredDeleteObject<Dx12Buffer>
 	{
 	public:
-		Dx12Buffer(GpuBufferUsage InUsage, ResourceAllocation InAllocation, bool IsDeferred);
+		Dx12Buffer(GpuBufferUsage InUsage, ResourceAllocation InAllocation, uint32 ByteSize, bool IsDeferred);
 
 	public:
 		const ResourceAllocation& GetAllocation() const

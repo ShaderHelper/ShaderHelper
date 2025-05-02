@@ -16,42 +16,74 @@ namespace FW
 		Dx12StateCache();
 
 		void ApplyDrawState(ID3D12GraphicsCommandList* InCmdList);
-		//void ApplyComputeState();
+		void ApplyComputeState(ID3D12GraphicsCommandList* InCmdList);
 		void Clear();
 
 		void SetViewPort(D3D12_VIEWPORT InViewPort, D3D12_RECT InSissorRect);
 		void SetVertexBuffer(Dx12Buffer* InBuffer);
 		void SetPipeline(Dx12RenderPso* InPso);
-		void SetRootSignature(Dx12RootSignature* InRootSignature);
+		void SetPipeline(Dx12ComputePso* InPso);
+		void SetGraphicsRootSignature(Dx12RootSignature* InRootSignature);
+		void SetComputeRootSignature(Dx12RootSignature* InRootSignature);
 		void SetRenderTargets(TArray<Dx12Texture*> InRTs, TArray<Vector4f> InClearColorValues);
-		void SetBindGroups(Dx12BindGroup* InGroup0, Dx12BindGroup* InGroup1, Dx12BindGroup* InGroup2, Dx12BindGroup* InGroup3);
+		void SetGraphicsBindGroups(Dx12BindGroup* InGroup0, Dx12BindGroup* InGroup1, Dx12BindGroup* InGroup2, Dx12BindGroup* InGroup3);
+		void SetComputeBindGroups(Dx12BindGroup* InGroup0, Dx12BindGroup* InGroup1, Dx12BindGroup* InGroup2, Dx12BindGroup* InGroup3);
 
 	public:
-		bool IsRenderPipelineDirty : 1;
+		bool IsPipelineStateDirty : 1;
 		bool IsRenderTargetDirty : 1;
 		bool IsVertexBufferDirty : 1;
 		bool IsViewportDirty : 1;
-		bool IsRootSigDirty : 1;
 
-		bool IsBindGroup0Dirty : 1;
-		bool IsBindGroup1Dirty : 1;
-		bool IsBindGroup2Dirty : 1;
-		bool IsBindGroup3Dirty : 1;
+		bool IsGraphicsRootSigDirty : 1;
+		bool IsGraphicsBindGroup0Dirty : 1;
+		bool IsGraphicsBindGroup1Dirty : 1;
+		bool IsGraphicsBindGroup2Dirty : 1;
+		bool IsGraphicsBindGroup3Dirty : 1;
+
+		bool IsComputeRootSigDirty : 1;
+		bool IsComputeBindGroup0Dirty : 1;
+		bool IsComputeBindGroup1Dirty : 1;
+		bool IsComputeBindGroup2Dirty : 1;
+		bool IsComputeBindGroup3Dirty : 1;
 	
 	private:
-		Dx12RenderPso* CurrentPso;
-		Dx12Buffer* CurrentVertexBuffer;
+		TVariant<Dx12RenderPso*, Dx12ComputePso*> CurrentPso;
+		Dx12Buffer* CurrentVertexBuffer = nullptr;
 		TOptional<D3D12_VIEWPORT> CurrentViewPort;
 		TOptional<D3D12_RECT> CurrentSissorRect;
 		TArray<Dx12Texture*> CurrentRenderTargets;
 		TArray<Vector4f> ClearColorValues;
 
-		Dx12RootSignature* CurrentRootSignature;
-		Dx12BindGroup* CurrentBindGroup0;
-		Dx12BindGroup* CurrentBindGroup1;
-		Dx12BindGroup* CurrentBindGroup2;
-		Dx12BindGroup* CurrentBindGroup3;
+		Dx12RootSignature* CurrentGraphicsRootSignature = nullptr;
+		Dx12BindGroup* CurrentGraphicsBindGroup0 = nullptr;
+		Dx12BindGroup* CurrentGraphicsBindGroup1 = nullptr;
+		Dx12BindGroup* CurrentGraphicsBindGroup2 = nullptr;
+		Dx12BindGroup* CurrentGraphicsBindGroup3 = nullptr;
 
+		Dx12RootSignature* CurrentComputeRootSignature = nullptr;
+		Dx12BindGroup* CurrentComputeBindGroup0 = nullptr;
+		Dx12BindGroup* CurrentComputeBindGroup1 = nullptr;
+		Dx12BindGroup* CurrentComputeBindGroup2 = nullptr;
+		Dx12BindGroup* CurrentComputeBindGroup3 = nullptr;
+	};
+
+	class Dx12ComputePassRecorder : public GpuComputePassRecorder
+	{
+	public:
+		Dx12ComputePassRecorder(ID3D12GraphicsCommandList* InCmdList, Dx12StateCache& InStateCache)
+			: CmdList(InCmdList), StateCache(InStateCache)
+		{
+		}
+
+	public:
+		void Dispatch(uint32 ThreadGroupCountX, uint32 ThreadGroupCountY, uint32 ThreadGroupCountZ) override;
+		void SetComputePipelineState(GpuComputePipelineState* InPipelineState) override;
+		void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override;
+
+	private:
+		ID3D12GraphicsCommandList* CmdList;
+		Dx12StateCache& StateCache;
 	};
 
 	class Dx12RenderPassRecorder : public GpuRenderPassRecorder
@@ -63,7 +95,7 @@ namespace FW
 
 	public:
 		void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount) override;
-		void SetRenderPipelineState(GpuPipelineState* InPipelineState) override;
+		void SetRenderPipelineState(GpuRenderPipelineState* InPipelineState) override;
 		void SetVertexBuffer(GpuBuffer* InVertexBuffer) override;
 		void SetViewPort(const GpuViewPortDesc& InViewPortDesc) override;
 		void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override;
@@ -86,6 +118,8 @@ namespace FW
 		ID3D12GraphicsCommandList* GetCommandList() const { return CmdList; }
 
 	public:
+		GpuComputePassRecorder* BeginComputePass(const FString& PassName) override;
+		void EndComputePass(GpuComputePassRecorder* InComputePassRecorder) override;
 		GpuRenderPassRecorder* BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName) override;
 		void EndRenderPass(GpuRenderPassRecorder* InRenderPassRecorder) override;
 		void BeginCaptureEvent(const FString& EventName) override;
@@ -109,6 +143,7 @@ namespace FW
 		TRefCountPtr<ID3D12CommandAllocator> CommandAllocator;
 		Dx12StateCache StateCache;
 		TArray<TUniquePtr<Dx12RenderPassRecorder>> RequestedRenderPassRecorders;
+		TArray<TUniquePtr<Dx12ComputePassRecorder>> RequestedComputePassRecorders;
 		TRefCountPtr<ID3D12Fence> Fence;
 	};
 

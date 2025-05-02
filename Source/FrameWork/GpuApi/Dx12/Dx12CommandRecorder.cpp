@@ -5,23 +5,62 @@
 namespace FW
 {	
 	Dx12StateCache::Dx12StateCache()
-		: CurrentPso(nullptr)
-		, CurrentVertexBuffer(nullptr)
-		, CurrentRootSignature(nullptr)
-		, CurrentBindGroup0(nullptr)
-		, CurrentBindGroup1(nullptr)
-		, CurrentBindGroup2(nullptr)
-		, CurrentBindGroup3(nullptr)
-		, IsRenderPipelineDirty(false)
+		: IsPipelineStateDirty(false)
 		, IsRenderTargetDirty(false)
 		, IsVertexBufferDirty(false)
 		, IsViewportDirty(false)
-		, IsRootSigDirty(false)
-		, IsBindGroup0Dirty(false)
-		, IsBindGroup1Dirty(false)
-		, IsBindGroup2Dirty(false)
-		, IsBindGroup3Dirty(false)
+		, IsGraphicsRootSigDirty(false)
+		, IsGraphicsBindGroup0Dirty(false)
+		, IsGraphicsBindGroup1Dirty(false)
+		, IsGraphicsBindGroup2Dirty(false)
+		, IsGraphicsBindGroup3Dirty(false)
+		, IsComputeRootSigDirty(false)
+		, IsComputeBindGroup0Dirty(false)
+		, IsComputeBindGroup1Dirty(false)
+		, IsComputeBindGroup2Dirty(false)
+		, IsComputeBindGroup3Dirty(false)
 	{
+
+	}
+
+	void Dx12StateCache::ApplyComputeState(ID3D12GraphicsCommandList* InCmdList)
+	{
+		check(InCmdList);
+
+		if (IsPipelineStateDirty && CurrentPso.IsType<Dx12ComputePso*>())
+		{
+			Dx12ComputePso* CurComputePso = CurrentPso.Get<Dx12ComputePso*>();
+			check(CurComputePso);
+			InCmdList->SetPipelineState(CurComputePso->GetResource());
+			IsPipelineStateDirty = false;
+		}
+
+		if (IsComputeRootSigDirty)
+		{
+			check(CurrentComputeRootSignature);
+			InCmdList->SetComputeRootSignature(CurrentComputeRootSignature->GetResource());
+			IsComputeRootSigDirty = false;
+		}
+
+		if (CurrentComputeBindGroup0 && IsComputeBindGroup0Dirty) {
+			CurrentComputeBindGroup0->ApplyComputeBinding(InCmdList, CurrentComputeRootSignature);
+			IsComputeBindGroup0Dirty = false;
+		}
+
+		if (CurrentComputeBindGroup1 && IsComputeBindGroup1Dirty) {
+			CurrentComputeBindGroup1->ApplyComputeBinding(InCmdList, CurrentComputeRootSignature);
+			IsComputeBindGroup1Dirty = false;
+		}
+
+		if (CurrentComputeBindGroup2 && IsComputeBindGroup2Dirty) {
+			CurrentComputeBindGroup2->ApplyComputeBinding(InCmdList, CurrentComputeRootSignature);
+			IsComputeBindGroup2Dirty = false;
+		}
+
+		if (CurrentComputeBindGroup3 && IsComputeBindGroup3Dirty) {
+			CurrentComputeBindGroup3->ApplyComputeBinding(InCmdList, CurrentComputeRootSignature);
+			IsComputeBindGroup3Dirty = false;
+		}
 
 	}
 
@@ -67,39 +106,40 @@ namespace FW
 			IsVertexBufferDirty = false;
 		}
 
-		if (IsRenderPipelineDirty)
+		if (IsPipelineStateDirty && CurrentPso.IsType<Dx12RenderPso*>())
 		{
-			check(CurrentPso);
-			InCmdList->SetPipelineState(CurrentPso->GetResource());
-			InCmdList->IASetPrimitiveTopology(CurrentPso->GetPritimiveTopology());
-            IsRenderPipelineDirty = false;
+			Dx12RenderPso* CurRenderPso = CurrentPso.Get<Dx12RenderPso*>();
+			check(CurRenderPso);
+			InCmdList->SetPipelineState(CurRenderPso->GetResource());
+			InCmdList->IASetPrimitiveTopology(CurRenderPso->GetPritimiveTopology());
+			IsPipelineStateDirty = false;
 		}
 
-		if (IsRootSigDirty)
+		if (IsGraphicsRootSigDirty)
 		{
-			check(CurrentRootSignature);
-			InCmdList->SetGraphicsRootSignature(CurrentRootSignature->GetResource());
-			IsRootSigDirty = false;
+			check(CurrentGraphicsRootSignature);
+			InCmdList->SetGraphicsRootSignature(CurrentGraphicsRootSignature->GetResource());
+			IsGraphicsRootSigDirty = false;
 		}
 
-		if (CurrentBindGroup0 && IsBindGroup0Dirty) {
-			CurrentBindGroup0->ApplyDrawBinding(InCmdList, CurrentRootSignature);
-			IsBindGroup0Dirty = false;
+		if (CurrentGraphicsBindGroup0 && IsGraphicsBindGroup0Dirty) {
+			CurrentGraphicsBindGroup0->ApplyDrawBinding(InCmdList, CurrentGraphicsRootSignature);
+			IsGraphicsBindGroup0Dirty = false;
 		}
 
-		if (CurrentBindGroup1 && IsBindGroup1Dirty) {
-			CurrentBindGroup1->ApplyDrawBinding(InCmdList, CurrentRootSignature);
-			IsBindGroup1Dirty = false;
+		if (CurrentGraphicsBindGroup1 && IsGraphicsBindGroup1Dirty) {
+			CurrentGraphicsBindGroup1->ApplyDrawBinding(InCmdList, CurrentGraphicsRootSignature);
+			IsGraphicsBindGroup1Dirty = false;
 		}
 
-		if (CurrentBindGroup2 && IsBindGroup2Dirty) {
-			CurrentBindGroup2->ApplyDrawBinding(InCmdList, CurrentRootSignature);
-			IsBindGroup2Dirty = false;
+		if (CurrentGraphicsBindGroup2 && IsGraphicsBindGroup2Dirty) {
+			CurrentGraphicsBindGroup2->ApplyDrawBinding(InCmdList, CurrentGraphicsRootSignature);
+			IsGraphicsBindGroup2Dirty = false;
 		}
 
-		if (CurrentBindGroup3 && IsBindGroup3Dirty) {
-			CurrentBindGroup3->ApplyDrawBinding(InCmdList, CurrentRootSignature);
-			IsBindGroup3Dirty = false;
+		if (CurrentGraphicsBindGroup3 && IsGraphicsBindGroup3Dirty) {
+			CurrentGraphicsBindGroup3->ApplyDrawBinding(InCmdList, CurrentGraphicsRootSignature);
+			IsGraphicsBindGroup3Dirty = false;
 		}
 
 		if (IsRenderTargetDirty)
@@ -136,28 +176,43 @@ namespace FW
 
 	void Dx12StateCache::Clear()
 	{
-		CurrentPso = nullptr;
+		CurrentPso = {};
 		CurrentViewPort.Reset();
 		CurrentSissorRect.Reset();
-		CurrentRootSignature = nullptr;
-		CurrentBindGroup0 = nullptr;
-		CurrentBindGroup1 = nullptr;
-		CurrentBindGroup2 = nullptr;
-		CurrentBindGroup3 = nullptr;
+
+		CurrentGraphicsRootSignature = nullptr;
+		CurrentGraphicsBindGroup0 = nullptr;
+		CurrentGraphicsBindGroup1 = nullptr;
+		CurrentGraphicsBindGroup2 = nullptr;
+		CurrentGraphicsBindGroup3 = nullptr;
+
+		CurrentComputeRootSignature = nullptr;
+		CurrentComputeBindGroup0 = nullptr;
+		CurrentComputeBindGroup1 = nullptr;
+		CurrentComputeBindGroup2 = nullptr;
+		CurrentComputeBindGroup3 = nullptr;
 
 		CurrentRenderTargets.Empty();
 
 		ClearColorValues.Reset();
 
-        IsRenderPipelineDirty = false;
+		IsPipelineStateDirty = false;
 		IsRenderTargetDirty = false;
 		IsVertexBufferDirty = false;
 		IsViewportDirty = false;
-		IsRootSigDirty = false;
-		IsBindGroup0Dirty = false;
-		IsBindGroup1Dirty = false;
-		IsBindGroup2Dirty = false;
-		IsBindGroup3Dirty = false;
+
+		IsGraphicsRootSigDirty = false;
+		IsGraphicsBindGroup0Dirty = false;
+		IsGraphicsBindGroup1Dirty = false;
+		IsGraphicsBindGroup2Dirty = false;
+		IsGraphicsBindGroup3Dirty = false;
+
+		IsComputeRootSigDirty = false;
+		IsComputeBindGroup0Dirty = false;
+		IsComputeBindGroup1Dirty = false;
+		IsComputeBindGroup2Dirty = false;
+		IsComputeBindGroup3Dirty = false;
+
 	}
 
 	void Dx12StateCache::SetViewPort(D3D12_VIEWPORT InViewPort, D3D12_RECT InSissorRect)
@@ -181,19 +236,37 @@ namespace FW
 
 	void Dx12StateCache::SetPipeline(Dx12RenderPso* InPso)
 	{
-		if (CurrentPso != InPso)
+		if (CurrentPso.IsType<Dx12RenderPso*>() && CurrentPso.Get<Dx12RenderPso*>() != InPso)
 		{
-			CurrentPso = InPso;
-            IsRenderPipelineDirty = true;
+			CurrentPso.Set<Dx12RenderPso*>(InPso);
+			IsPipelineStateDirty = true;
 		}
 	}
 
-	void Dx12StateCache::SetRootSignature(Dx12RootSignature* InRootSignature)
+	void Dx12StateCache::SetPipeline(Dx12ComputePso* InPso)
 	{
-		if (CurrentRootSignature != InRootSignature)
+		if (CurrentPso.IsType<Dx12ComputePso*>() && CurrentPso.Get<Dx12ComputePso*>() != InPso)
 		{
-			CurrentRootSignature = InRootSignature;
-			IsRootSigDirty = true;
+			CurrentPso.Set<Dx12ComputePso*>(InPso);
+			IsPipelineStateDirty = true;
+		}
+	}
+
+	void Dx12StateCache::SetGraphicsRootSignature(Dx12RootSignature* InRootSignature)
+	{
+		if (CurrentGraphicsRootSignature != InRootSignature)
+		{
+			CurrentGraphicsRootSignature = InRootSignature;
+			IsGraphicsRootSigDirty = true;
+		}
+	}
+
+	void Dx12StateCache::SetComputeRootSignature(Dx12RootSignature* InRootSignature)
+	{
+		if (CurrentComputeRootSignature != InRootSignature)
+		{
+			CurrentComputeRootSignature = InRootSignature;
+			IsComputeRootSigDirty = true;
 		}
 	}
 
@@ -207,23 +280,43 @@ namespace FW
 		}
 	}
 
-	void Dx12StateCache::SetBindGroups(Dx12BindGroup* InGroup0, Dx12BindGroup* InGroup1, Dx12BindGroup* InGroup2, Dx12BindGroup* InGroup3)
+	void Dx12StateCache::SetGraphicsBindGroups(Dx12BindGroup* InGroup0, Dx12BindGroup* InGroup1, Dx12BindGroup* InGroup2, Dx12BindGroup* InGroup3)
 	{
-		if (InGroup0 != CurrentBindGroup0) {
-			CurrentBindGroup0 = InGroup0;
-			IsBindGroup0Dirty = true;
+		if (InGroup0 != CurrentGraphicsBindGroup0) {
+			CurrentGraphicsBindGroup0 = InGroup0;
+			IsGraphicsBindGroup0Dirty = true;
 		}
-		if (InGroup1 != CurrentBindGroup1) {
-			CurrentBindGroup1 = InGroup1;
-			IsBindGroup1Dirty = true;
+		if (InGroup1 != CurrentGraphicsBindGroup1) {
+			CurrentGraphicsBindGroup1 = InGroup1;
+			IsGraphicsBindGroup1Dirty = true;
 		}
-		if (InGroup2 != CurrentBindGroup2) {
-			CurrentBindGroup2 = InGroup2;
-			IsBindGroup2Dirty = true;
+		if (InGroup2 != CurrentGraphicsBindGroup2) {
+			CurrentGraphicsBindGroup2 = InGroup2;
+			IsGraphicsBindGroup2Dirty = true;
 		}
-		if (InGroup3 != CurrentBindGroup3) {
-			CurrentBindGroup3 = InGroup3;
-			IsBindGroup3Dirty = true;
+		if (InGroup3 != CurrentGraphicsBindGroup3) {
+			CurrentGraphicsBindGroup3 = InGroup3;
+			IsGraphicsBindGroup3Dirty = true;
+		}
+	}
+
+	void Dx12StateCache::SetComputeBindGroups(Dx12BindGroup* InGroup0, Dx12BindGroup* InGroup1, Dx12BindGroup* InGroup2, Dx12BindGroup* InGroup3)
+	{
+		if (InGroup0 != CurrentComputeBindGroup0) {
+			CurrentComputeBindGroup0 = InGroup0;
+			IsComputeBindGroup0Dirty = true;
+		}
+		if (InGroup1 != CurrentComputeBindGroup1) {
+			CurrentGraphicsBindGroup1 = InGroup1;
+			IsComputeBindGroup1Dirty = true;
+		}
+		if (InGroup2 != CurrentComputeBindGroup2) {
+			CurrentComputeBindGroup2 = InGroup2;
+			IsComputeBindGroup2Dirty = true;
+		}
+		if (InGroup3 != CurrentComputeBindGroup3) {
+			CurrentComputeBindGroup3 = InGroup3;
+			IsComputeBindGroup3Dirty = true;
 		}
 	}
 
@@ -279,7 +372,7 @@ namespace FW
 		CmdList->DrawInstanced(VertexCount, InstanceCount, StartVertexLocation, StartInstanceLocation);
 	}
 
-	void Dx12RenderPassRecorder::SetRenderPipelineState(GpuPipelineState* InPipelineState)
+	void Dx12RenderPassRecorder::SetRenderPipelineState(GpuRenderPipelineState* InPipelineState)
 	{
 		StateCache.SetPipeline(static_cast<Dx12RenderPso*>(InPipelineState));
 	}
@@ -317,8 +410,51 @@ namespace FW
 		Dx12BindGroup* Dx12BindGroup2 = static_cast<Dx12BindGroup*>(BindGroup2);
 		Dx12BindGroup* Dx12BindGroup3 = static_cast<Dx12BindGroup*>(BindGroup3);
 
-		StateCache.SetRootSignature(Dx12RootSignatureManager::GetRootSignature(RsDesc));
-		StateCache.SetBindGroups(Dx12BindGroup0, Dx12BindGroup1, Dx12BindGroup2, Dx12BindGroup3);
+		StateCache.SetGraphicsRootSignature(Dx12RootSignatureManager::GetRootSignature(RsDesc));
+		StateCache.SetGraphicsBindGroups(Dx12BindGroup0, Dx12BindGroup1, Dx12BindGroup2, Dx12BindGroup3);
+	}
+
+
+	void Dx12ComputePassRecorder::Dispatch(uint32 ThreadGroupCountX, uint32 ThreadGroupCountY, uint32 ThreadGroupCountZ)
+	{
+		StateCache.ApplyComputeState(CmdList);
+		CmdList->Dispatch(ThreadGroupCountX, ThreadGroupCountY, ThreadGroupCountZ);
+	}
+
+	void Dx12ComputePassRecorder::SetComputePipelineState(GpuComputePipelineState* InPipelineState)
+	{
+		StateCache.SetPipeline(static_cast<Dx12ComputePso*>(InPipelineState));
+	}
+
+	void Dx12ComputePassRecorder::SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)
+	{
+		RootSignatureDesc RsDesc{
+		BindGroup0 ? static_cast<Dx12BindGroupLayout*>(BindGroup0->GetLayout()) : nullptr,
+		BindGroup1 ? static_cast<Dx12BindGroupLayout*>(BindGroup1->GetLayout()) : nullptr,
+		BindGroup2 ? static_cast<Dx12BindGroupLayout*>(BindGroup2->GetLayout()) : nullptr,
+		BindGroup3 ? static_cast<Dx12BindGroupLayout*>(BindGroup3->GetLayout()) : nullptr
+		};
+
+		Dx12BindGroup* Dx12BindGroup0 = static_cast<Dx12BindGroup*>(BindGroup0);
+		Dx12BindGroup* Dx12BindGroup1 = static_cast<Dx12BindGroup*>(BindGroup1);
+		Dx12BindGroup* Dx12BindGroup2 = static_cast<Dx12BindGroup*>(BindGroup2);
+		Dx12BindGroup* Dx12BindGroup3 = static_cast<Dx12BindGroup*>(BindGroup3);
+
+		StateCache.SetComputeRootSignature(Dx12RootSignatureManager::GetRootSignature(RsDesc));
+		StateCache.SetComputeBindGroups(Dx12BindGroup0, Dx12BindGroup1, Dx12BindGroup2, Dx12BindGroup3);
+	}
+
+	GpuComputePassRecorder* Dx12CmdRecorder::BeginComputePass(const FString& PassName)
+	{
+		BeginCaptureEvent(PassName);
+		auto NewPassRecorder = MakeUnique<Dx12ComputePassRecorder>(CmdList, StateCache);
+		RequestedComputePassRecorders.Add(MoveTemp(NewPassRecorder));
+		return RequestedComputePassRecorders.Last().Get();
+	}
+
+	void Dx12CmdRecorder::EndComputePass(GpuComputePassRecorder* InComputePassRecorder)
+	{
+		EndCaptureEvent();
 	}
 
 	GpuRenderPassRecorder* Dx12CmdRecorder::BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName)

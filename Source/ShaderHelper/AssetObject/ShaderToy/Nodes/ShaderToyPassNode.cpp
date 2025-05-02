@@ -272,8 +272,8 @@ namespace SH
             ShaderToyExecContext& ShaderToyContext = static_cast<ShaderToyExecContext&>(Context);
 
             auto PassOutput = static_cast<GpuTexturePin*>(GetPin("RT"));
-            if(PassOutput->GetValue()->GetWidth() != ShaderToyContext.iResolution.x ||
-               PassOutput->GetValue()->GetHeight() != ShaderToyContext.iResolution.y)
+            if(PassOutput->GetValue()->GetWidth() != (uint32)ShaderToyContext.iResolution.x ||
+               PassOutput->GetValue()->GetHeight() != (uint32)ShaderToyContext.iResolution.y)
             {
                 GpuTextureDesc Desc{ (uint32)ShaderToyContext.iResolution.x, (uint32)ShaderToyContext.iResolution.y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
                 TRefCountPtr<GpuTexture> PassOuputTex = GGpuRhi->CreateTexture(MoveTemp(Desc), GpuResourceState::RenderTargetWrite);
@@ -299,7 +299,7 @@ namespace SH
             };
 			Bindings.ApplyBindGroupLayout(PipelineDesc);
 
-            TRefCountPtr<GpuPipelineState> PipelineState = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
+            TRefCountPtr<GpuRenderPipelineState> PipelineState = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
 
             ShaderToyContext.RG->AddRenderPass(ObjectName.ToString(), MoveTemp(PassDesc), MoveTemp(Bindings),
                 [PipelineState](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {

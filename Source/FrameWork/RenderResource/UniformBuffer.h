@@ -128,6 +128,7 @@ namespace FW
 	};
 
 	template<typename T> struct UniformBufferMemberTypeString;
+	template<> struct UniformBufferMemberTypeString<uint32> { static constexpr std::string_view Value = "uint"; };
 	template<> struct UniformBufferMemberTypeString<float> { static constexpr std::string_view Value = "float"; };
 	template<> struct UniformBufferMemberTypeString<Vector2f> { static constexpr std::string_view Value = "float2"; };
 	template<> struct UniformBufferMemberTypeString<Vector3f> { static constexpr std::string_view Value = "float3"; };
@@ -161,6 +162,12 @@ namespace FW
         }
 
 	public:
+		UniformBufferBuilder& AddUint(const FString& MemberName)
+		{
+			AddMember<uint32>(MemberName);
+			return *this;
+		}
+
 		UniformBufferBuilder& AddFloat(const FString& MemberName) 
 		{
 			AddMember<float>(MemberName);

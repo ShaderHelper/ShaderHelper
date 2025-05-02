@@ -34,7 +34,7 @@ namespace HLSL
 
 	struct Printer
 	{
-		static const uint MaxBufferSize = 500;
+		static const uint MaxBufferSize = 256;
 
 		uint ByteSize;
 		//PrintBuffer layout: [xxx{0}xxxx\0] [ArgNum TypeTag ArgValue ...]

@@ -276,14 +276,14 @@ const FString ErrorMarkerText = TEXT("✘");
                                     + SCanvas::Slot()
                                     .Size_Lambda([this]{
                                         float Height = CustomCursorHighlighter->ScaledLineHeight * CandidateItems.Num();
-                                        float HSize = FMath::Min(200, Height);
+                                        float HSize = FMath::Min(200.0f, Height);
                                         return FVector2D{240, HSize};
                                     })
                                     .Position_Lambda([this]{
                                         FVector2D TipPos = CustomCursorHighlighter->ScaledCursorPos;
                                         TipPos.Y += CustomCursorHighlighter->ScaledLineHeight;
                                         FVector2D Area = ShaderMultiLineEditableText->GetTickSpaceGeometry().GetLocalSize();
-                                        float HSize = FMath::Min(200, CustomCursorHighlighter->ScaledLineHeight * CandidateItems.Num());
+                                        float HSize = FMath::Min(200.0f, CustomCursorHighlighter->ScaledLineHeight * CandidateItems.Num());
                                         if(TipPos.Y + HSize > Area.Y)
                                         {
                                             TipPos.Y -= CustomCursorHighlighter->ScaledLineHeight;
@@ -881,7 +881,7 @@ const FString ErrorMarkerText = TEXT("✘");
         FString ShaderName = StShaderAsset->GetFileName() + "Ps";
         TRefCountPtr<GpuShader> CurPixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, MoveTemp(FinalShaderSource), ShaderName, TEXT("MainPS"));
         FString ErrorInfo;
-        if (GGpuRhi->CrossCompileShader(CurPixelShader, ErrorInfo))
+        if (GGpuRhi->CompileShader(CurPixelShader, ErrorInfo))
         {
             StShaderAsset->PixelShader = CurPixelShader;
             StShaderAsset->bCurPsCompilationSucceed = true;

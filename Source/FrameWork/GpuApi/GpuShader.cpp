@@ -16,28 +16,31 @@ THIRD_PARTY_INCLUDES_START
 #endif
 THIRD_PARTY_INCLUDES_END
 
+//ue regex is invalid if disable icu, so use the regex from std.
+#include <regex>
+#include <string>
+#include <format>
+
 namespace FW
 {
-	GpuShaderPreProcessor& GpuShaderPreProcessor::ReplaceTextToArray()
+	GpuShaderPreProcessor& GpuShaderPreProcessor::ReplacePrintStringLiteral()
 	{
 		int SearchIndex = 0;
-		do
+		std::string ShaderString{TCHAR_TO_UTF8(*ShaderText)};
+		std::regex Pattern{"Print *\\( *(\".*\")"};
+		std::smatch Match;
+		while (std::regex_search(ShaderString, Match, Pattern))
 		{
-			SearchIndex = ShaderText.Find("TEXT(\"", ESearchCase::CaseSensitive, ESearchDir::FromStart, SearchIndex);
-			if (SearchIndex != INDEX_NONE)
+			std::string PrintStringLiteral = Match[1];
+			std::string TextArr = "EXPAND(uint StrArr[] = {";
+			for (int i = 1; i < PrintStringLiteral.length() - 1; i++)
 			{
-				int EndIndex = ShaderText.Find("\")", ESearchCase::CaseSensitive, ESearchDir::FromStart, SearchIndex);
-				FString TextInMacro = ShaderText.Mid(SearchIndex + 6, EndIndex - SearchIndex - 6);
-				ShaderText.RemoveAt(SearchIndex, EndIndex - SearchIndex + 2, false);
-				FString TextArr = "EXPAND(uint StrArr[] = {";
-				for(int i = 0; i < TextInMacro.Len(); i++)
-				{
-					TextArr += FString::Printf(TEXT("'%c',"), TextInMacro[i]);
-				}
-				TextArr += "'\\0'})";
-				ShaderText.InsertAt(SearchIndex, MoveTemp(TextArr));
+				TextArr += std::format("'{}',", PrintStringLiteral[i]);
 			}
-		} while(SearchIndex != INDEX_NONE);
+			TextArr += "'\\0'})";
+			ShaderString.replace(Match.position(1), Match[1].length(), std::move(TextArr));
+		}
+		ShaderText = FString{UTF8_TO_TCHAR(ShaderString.data())};
 		return *this;
 	}
 

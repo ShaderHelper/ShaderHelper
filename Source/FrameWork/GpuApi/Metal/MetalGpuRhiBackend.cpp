@@ -146,7 +146,7 @@ void MetalGpuRhiBackend::UnMapGpuBuffer(GpuBuffer *InGpuBuffer)
 	// do nothing.
 }
 
-bool MetalGpuRhiBackend::CrossCompileShader(GpuShader *InShader, FString &OutErrorInfo)
+bool MetalGpuRhiBackend::CompileShader(GpuShader *InShader, FString &OutErrorInfo)
 {
 	return CompileShaderFromHlsl(static_cast<MetalShader *>(InShader), OutErrorInfo);
 }

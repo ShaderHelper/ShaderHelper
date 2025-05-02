@@ -49,7 +49,7 @@ namespace UNITTEST_GPUAPI
 		}
 	
 		FString ErrorInfo;
-		GGpuRhi->CrossCompileShader(Vs, ErrorInfo);
+		GGpuRhi->CompileShader(Vs, ErrorInfo);
 		check(ErrorInfo.IsEmpty());
 
 		TRefCountPtr<GpuBindGroupLayout> BindGroupLayout = GpuBindGroupLayoutBuilder{ 0 }
@@ -65,7 +65,7 @@ namespace UNITTEST_GPUAPI
 			.BindGroupLayout0 = BindGroupLayout
 		};
 
-		TRefCountPtr<GpuPipelineState> Pipeline = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
+		TRefCountPtr<GpuRenderPipelineState> Pipeline = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
 
 		auto CmdRecorder = GGpuRhi->BeginRecording();
 		{

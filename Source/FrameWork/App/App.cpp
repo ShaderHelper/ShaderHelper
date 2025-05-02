@@ -139,7 +139,7 @@ PRAGMA_DISABLE_DEPRECATION_WARNINGS
 			}
             
             double CurrentRealTime = FPlatformTime::Seconds();
-            float NewDeltaTime = CurrentRealTime - LastRealTime;
+            float NewDeltaTime = float(CurrentRealTime - LastRealTime);
             DeltaTime = NewDeltaTime;
             
             //Lock fps to reduce cpu usage
@@ -157,7 +157,7 @@ PRAGMA_DISABLE_DEPRECATION_WARNINGS
                     FPlatformProcess::SleepNoStats(0);
                 }
                 CurrentRealTime = FPlatformTime::Seconds();
-                DeltaTime = CurrentRealTime - LastRealTime;
+                DeltaTime = float(CurrentRealTime - LastRealTime);
             }
 
 		}

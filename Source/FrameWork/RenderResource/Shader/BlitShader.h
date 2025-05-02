@@ -4,7 +4,7 @@
 
 namespace FW
 {
-	class BlitShader : public Shader
+	class BlitShader
 	{
 	public:
 		struct Parameters

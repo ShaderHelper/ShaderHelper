@@ -60,7 +60,7 @@ namespace FW
 			BindingShaderStage RHIShaderStage = LayoutBindingEntry.Stage;
 			
 			//we dont just set it always to D3D12_SHADER_VISIBILITY_ALL, which might produce inconsistent result on different backend and have some performance impacts
-			if (EnumHasAllFlags(RHIShaderStage, BindingShaderStage::All))
+			if (EnumHasAllFlags(RHIShaderStage, BindingShaderStage::All) || EnumHasAnyFlags(RHIShaderStage, BindingShaderStage::Compute))
 			{
 				SetRootParameterInfo(Slot, LayoutBindingEntry, D3D12_SHADER_VISIBILITY_ALL);
 			}
@@ -75,6 +75,7 @@ namespace FW
 				{
 					SetRootParameterInfo(Slot, LayoutBindingEntry, D3D12_SHADER_VISIBILITY_PIXEL);
 				}
+
 			}
 		}
 
@@ -166,7 +167,7 @@ namespace FW
 				}
 			}
 
-			if (EnumHasAllFlags(RHIShaderStage, BindingShaderStage::All))
+			if (EnumHasAllFlags(RHIShaderStage, BindingShaderStage::All) || EnumHasAnyFlags(RHIShaderStage, BindingShaderStage::Compute))
 			{
 				SetTableBindingVisibility(Slot, ResourceBindingEntry, D3D12_SHADER_VISIBILITY_ALL);
 			}
@@ -232,6 +233,26 @@ namespace FW
 		}
 
     }
+
+	void Dx12BindGroup::ApplyComputeBinding(ID3D12GraphicsCommandList* CommandList, Dx12RootSignature* RootSig)
+	{
+		Dx12BindGroupLayout* Layout = static_cast<Dx12BindGroupLayout*>(GetLayout());
+		uint32 GroupSlot = Layout->GetGroupNumber();
+		for (const auto& [Slot, LayoutBindingEntry] : Layout->GetDesc().Layouts)
+		{
+			if (LayoutBindingEntry.Type == BindingType::UniformBuffer && EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Compute))
+			{
+				D3D12_GPU_VIRTUAL_ADDRESS GpuAddr = GetDynamicBufferGpuAddr(Slot);
+				uint32 RootParameterIndex = RootSig->GetDynamicBufferRootParameterIndex(Slot, GroupSlot);
+				CommandList->SetComputeRootConstantBufferView(RootParameterIndex, GpuAddr);
+			}
+		}
+
+		if (TOptional<uint32> RootParameterIndex = RootSig->GetCbvSrvUavTableRootParameterIndex(D3D12_SHADER_VISIBILITY_ALL, GroupSlot))
+		{
+			CommandList->SetComputeRootDescriptorTable(*RootParameterIndex, GetDescriptorTableStart_CbvSrvUav(D3D12_SHADER_VISIBILITY_ALL));
+		}
+	}
 
 	Dx12RootSignature::Dx12RootSignature(const RootSignatureDesc& InDesc)
 	{

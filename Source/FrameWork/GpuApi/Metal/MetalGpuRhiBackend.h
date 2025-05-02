@@ -24,7 +24,7 @@ public:
     TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc) override;
     TRefCountPtr<GpuSampler> CreateSampler(const GpuSamplerDesc &InSamplerDesc) override;
     void SetResourceName(const FString& Name, GpuResource* InResource) override;
-    bool CrossCompileShader(GpuShader *InShader, FString &OutErrorInfo) override;
+    bool CompileShader(GpuShader *InShader, FString &OutErrorInfo) override;
     void BeginGpuCapture(const FString &CaptureName) override;
     void EndGpuCapture() override;
     void *GetSharedHandle(GpuTexture *InGpuTexture) override;

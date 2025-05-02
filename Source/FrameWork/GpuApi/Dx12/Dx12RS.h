@@ -50,7 +50,7 @@ namespace FW
 		}
         
         void ApplyDrawBinding(ID3D12GraphicsCommandList* CommandList, class Dx12RootSignature* RootSig);
-		//void ApplyComputeBinding();
+		void ApplyComputeBinding(ID3D12GraphicsCommandList* CommandList, Dx12RootSignature* RootSig);
 
 	private:
 		TMap<D3D12_SHADER_VISIBILITY, TUniquePtr<GpuDescriptorRange>> DescriptorTableStorage_CbvSrvUav;

@@ -10,7 +10,7 @@ namespace FW
 		: GpuShader(InFileName, InType, ExtraDeclaration, InEntryPoint)
 	{
 		ProcessedSourceText = GpuShaderPreProcessor{ SourceText }
-			.ReplaceTextToArray()
+			.ReplacePrintStringLiteral()
 			.Finalize();
 	}
 
@@ -18,7 +18,7 @@ namespace FW
 		: GpuShader(InType, InSourceText, InShaderName, InEntryPoint)
 	{
 		ProcessedSourceText = GpuShaderPreProcessor{ SourceText }
-			.ReplaceTextToArray()
+			.ReplacePrintStringLiteral()
 			.Finalize();
 	}
 

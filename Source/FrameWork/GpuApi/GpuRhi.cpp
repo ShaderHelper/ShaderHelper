@@ -13,6 +13,35 @@
 namespace FW
 {
 
+class GpuComputePassRecorderValidation : public GpuComputePassRecorder
+{
+public:
+	GpuComputePassRecorderValidation(GpuComputePassRecorder* InRecorder) : PassRecorder(InRecorder) {}
+
+public:
+	void Dispatch(uint32 ThreadGroupCountX, uint32 ThreadGroupCountY, uint32 ThreadGroupCountZ) override
+	{
+		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));
+		PassRecorder->Dispatch(ThreadGroupCountX, ThreadGroupCountY, ThreadGroupCountZ);
+	}
+
+	void SetComputePipelineState(GpuComputePipelineState* InPipelineState) override
+	{
+		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));
+		PassRecorder->SetComputePipelineState(InPipelineState);
+	}
+
+	void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override
+	{
+		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));
+		check(ValidateSetBindGroups(BindGroup0, BindGroup1, BindGroup2, BindGroup3));
+		PassRecorder->SetBindGroups(BindGroup0, BindGroup1, BindGroup2, BindGroup3);
+	}
+
+	GpuComputePassRecorder* PassRecorder;
+	bool IsEnd{};
+};
+
 class GpuRenderPassRecorderValidation : public GpuRenderPassRecorder
 {
 public:
@@ -24,7 +53,7 @@ public:
 		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));
 		PassRecorder->DrawPrimitive(StartVertexLocation, VertexCount, StartInstanceLocation, InstanceCount);
 	}
-	void SetRenderPipelineState(GpuPipelineState* InPipelineState) override
+	void SetRenderPipelineState(GpuRenderPipelineState* InPipelineState) override
 	{
 		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));
 		PassRecorder->SetRenderPipelineState(InPipelineState);
@@ -58,13 +87,30 @@ public:
 	{}
 
 public:
+	GpuComputePassRecorder* BeginComputePass(const FString& PassName) override
+	{
+		check(State == CmdRecorderState::Begin);
+		auto PassRecorderValidation = MakeUnique<GpuComputePassRecorderValidation>(CmdRecorder->BeginComputePass(PassName));
+		RequestedComputePassRecorders.Add(MoveTemp(PassRecorderValidation));
+		return RequestedComputePassRecorders.Last().Get();
+	}
+
+	void EndComputePass(GpuComputePassRecorder* InComputePassRecorder) override
+	{
+		check(State == CmdRecorderState::Begin);
+		GpuComputePassRecorderValidation* PassRecorderValidation = static_cast<GpuComputePassRecorderValidation*>(InComputePassRecorder);
+		CmdRecorder->EndComputePass(PassRecorderValidation->PassRecorder);
+		PassRecorderValidation->IsEnd = true;
+	}
+
 	GpuRenderPassRecorder* BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName) override
 	{
 		check(State == CmdRecorderState::Begin);
 		auto PassRecorderValidation = MakeUnique<GpuRenderPassRecorderValidation>(CmdRecorder->BeginRenderPass(PassDesc, PassName));
-		RequestedPassRecorders.Add(MoveTemp(PassRecorderValidation));
-		return RequestedPassRecorders.Last().Get();
+		RequestedRenderPassRecorders.Add(MoveTemp(PassRecorderValidation));
+		return RequestedRenderPassRecorders.Last().Get();
 	}
+
 	void EndRenderPass(GpuRenderPassRecorder* InRenderPassRecorder) override
 	{
 		check(State == CmdRecorderState::Begin);
@@ -72,14 +118,17 @@ public:
 		CmdRecorder->EndRenderPass(PassRecorderValidation->PassRecorder);
 		PassRecorderValidation->IsEnd = true;
 	}
+
 	void BeginCaptureEvent(const FString& EventName) override
 	{
 		CmdRecorder->BeginCaptureEvent(EventName);
 	}
+
 	void EndCaptureEvent() override
 	{
 		CmdRecorder->EndCaptureEvent();
 	}
+
 	void Barrier(GpuTrackedResource* InResource, GpuResourceState NewState) override
 	{
 		check(State == CmdRecorderState::Begin);
@@ -104,7 +153,8 @@ public:
 	FString Name;
 	GpuCmdRecorder* CmdRecorder;
 	CmdRecorderState State;
-	TArray<TUniquePtr<GpuRenderPassRecorderValidation>> RequestedPassRecorders;
+	TArray<TUniquePtr<GpuRenderPassRecorderValidation>> RequestedRenderPassRecorders;
+	TArray<TUniquePtr<GpuComputePassRecorderValidation>> RequestedComputePassRecorders;
 };
 
 
@@ -173,10 +223,15 @@ public:
 		return RhiBackend->CreateBindGroupLayout(InBindGroupLayoutDesc);
 	}
 
-	TRefCountPtr<GpuPipelineState> CreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc) override
+	TRefCountPtr<GpuRenderPipelineState> CreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc) override
 	{
 		check(ValidateCreateRenderPipelineState(InPipelineStateDesc));
 		return RhiBackend->CreateRenderPipelineState(InPipelineStateDesc);
+	}
+
+	TRefCountPtr<GpuComputePipelineState> GpuRhi::CreateComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc)
+	{
+		return RhiBackend->CreateComputePipelineState(InPipelineStateDesc);
 	}
 
 	TRefCountPtr<GpuSampler> CreateSampler(const GpuSamplerDesc &InSamplerDesc) override
@@ -189,9 +244,9 @@ public:
 		RhiBackend->SetResourceName(Name, InResource);
 	}
 
-	bool CrossCompileShader(GpuShader *InShader, FString &OutErrorInfo) override
+	bool CompileShader(GpuShader *InShader, FString &OutErrorInfo, const TArray<FString>& Definitions) override
 	{
-		return RhiBackend->CrossCompileShader(InShader, OutErrorInfo);
+		return RhiBackend->CompileShader(InShader, OutErrorInfo, Definitions);
 	}
 
 	void BeginGpuCapture(const FString &CaptureName) override

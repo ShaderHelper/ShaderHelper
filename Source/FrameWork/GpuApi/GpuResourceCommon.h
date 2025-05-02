@@ -75,7 +75,8 @@ namespace FW
 		Texture,
 		BindGroup,
 		BindGroupLayout,
-		PipelineState,
+		RenderPipelineState,
+		ComputePipelineState,
 		Shader,
 		Sampler,
 	};
@@ -98,7 +99,8 @@ namespace FW
 	enum class ShaderType
 	{
 		VertexShader,
-		PixelShader
+		PixelShader,
+		ComputeShader
 	};
 
 	enum class RasterizerCullMode

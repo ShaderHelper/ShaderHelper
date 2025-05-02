@@ -11,7 +11,7 @@ namespace FW
 		: GpuShader(InFileName, InType, ExtraDeclaration, InEntryPoint)
 	{
 		ProcessedSourceText = GpuShaderPreProcessor{ SourceText }
-			.ReplaceTextToArray()
+			.ReplacePrintStringLiteral()
 			.Finalize();
 	}
 
@@ -19,7 +19,7 @@ namespace FW
 		: GpuShader(InType, InSourceText, InShaderName, InEntryPoint)
 	{
 		ProcessedSourceText = GpuShaderPreProcessor{ SourceText }
-			.ReplaceTextToArray()
+			.ReplacePrintStringLiteral()
 			.Finalize();
 	}
 
@@ -92,7 +92,7 @@ namespace FW
 					FString ShaderText;
 					FFileHelper::LoadFileToString(ShaderText, *IncludedFile);
 					ShaderText = GpuShaderPreProcessor{ ShaderText }
-						.ReplaceTextToArray()
+						.ReplacePrintStringLiteral()
 						.Finalize();
 					auto SourceText = StringCast<UTF8CHAR>(*ShaderText);
 					GShaderCompiler.CompierUitls->CreateBlob(SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR), CP_UTF8,
@@ -123,6 +123,9 @@ namespace FW
 		else if (InType == ShaderType::PixelShader) {
 			ProfileName += "ps";
 		}
+		else if (InType == ShaderType::ComputeShader) {
+			ProfileName += "cs";
+		}
 
 		ProfileName += "_";
 		ProfileName += FString::FromInt(InModel.Major);
@@ -132,7 +135,7 @@ namespace FW
 		return ProfileName;
 	}
 
-	 bool DxcCompiler::Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo) const
+	 bool DxcCompiler::Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo, const TArray<FString>& Definitions) const
 	 {
 		TRefCountPtr<IDxcBlobEncoding> BlobEncoding;
 		TRefCountPtr<IDxcResult> CompileResult;
@@ -173,6 +176,11 @@ namespace FW
 		};
         Arguments.Add(TEXT("-D"));
         Arguments.Add(TEXT("FINAL_HLSL"));
+		for (const auto& Definition : Definitions)
+		{
+			Arguments.Add(TEXT("-D"));
+			Arguments.Add(*Definition);
+		}
 		
 		DxcBuffer SourceBuffer = { 0 };
 		SourceBuffer.Ptr = BlobEncoding->GetBufferPointer();

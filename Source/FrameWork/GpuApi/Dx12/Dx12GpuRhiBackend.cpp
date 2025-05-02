@@ -85,9 +85,14 @@ TRefCountPtr<GpuBindGroupLayout> Dx12GpuRhiBackend::CreateBindGroupLayout(const 
 	return AUX::StaticCastRefCountPtr<GpuBindGroupLayout>(CreateDx12BindGroupLayout(InBindGroupLayoutDesc));
 }
 
-TRefCountPtr<GpuPipelineState> Dx12GpuRhiBackend::CreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc)
+TRefCountPtr<GpuRenderPipelineState> Dx12GpuRhiBackend::CreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc)
 {
-	return AUX::StaticCastRefCountPtr<GpuPipelineState>(CreateDx12RenderPso(InPipelineStateDesc));
+	return AUX::StaticCastRefCountPtr<GpuRenderPipelineState>(CreateDx12RenderPso(InPipelineStateDesc));
+}
+
+TRefCountPtr<GpuComputePipelineState> Dx12GpuRhiBackend::CreateComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc)
+{
+	return AUX::StaticCastRefCountPtr<GpuComputePipelineState>(CreateDx12ComputePso(InPipelineStateDesc));
 }
 
 TRefCountPtr<GpuBuffer> Dx12GpuRhiBackend::CreateBuffer(uint32 ByteSize, GpuBufferUsage Usage, GpuResourceState InitState)
@@ -117,9 +122,9 @@ void Dx12GpuRhiBackend::SetResourceName(const FString& Name, GpuResource* InReso
 	}
 }
 
-bool Dx12GpuRhiBackend::CrossCompileShader(GpuShader *InShader, FString &OutErrorInfo)
+bool Dx12GpuRhiBackend::CompileShader(GpuShader *InShader, FString &OutErrorInfo, const TArray<FString>& Definitions)
 {
-	return GShaderCompiler.Compile(static_cast<Dx12Shader *>(InShader), OutErrorInfo);
+	return GShaderCompiler.Compile(static_cast<Dx12Shader *>(InShader), OutErrorInfo, Definitions);
 }
 
 
