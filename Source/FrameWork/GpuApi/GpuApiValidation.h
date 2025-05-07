@@ -6,6 +6,8 @@ inline DEFINE_LOG_CATEGORY(LogRhiValidation);
 
 namespace FW
 {
+	struct GpuBarrierInfo;
+
 	enum class CmdRecorderState
 	{
 		Begin,
@@ -17,8 +19,8 @@ namespace FW
 	bool ValidateCreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc);
     bool ValidateCreateBindGroupLayout(const GpuBindGroupLayoutDesc& InBindGroupLayoutDesc);
 	bool ValidateCreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc);
-	bool ValidateCreateBuffer(uint32 ByteSize, GpuBufferUsage Usage, GpuResourceState InitState);
-	bool ValidateBarrier(GpuTrackedResource* InResource, GpuResourceState NewState);
+	bool ValidateCreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState);
+	bool ValidateBarriers(const TArray<GpuBarrierInfo>& BarrierInfos);
 	bool ValidateGpuResourceState(GpuResourceState InState);
 	bool ValidateCreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState);
 }

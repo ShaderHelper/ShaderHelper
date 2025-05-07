@@ -2,6 +2,8 @@
 #include "ShaderToyRenderComp.h"
 #include "GpuApi/GpuRhi.h"
 #include "ProjectManager/ShProjectManager.h"
+#include "GpuApi/GpuResourceHelper.h"
+#include "RenderResource/PrintBuffer.h"
 
 using namespace FW;
 
@@ -13,6 +15,7 @@ namespace SH
 		, ViewPort(InViewPort)
 	{
         ResizeHandle = ViewPort->OnViewportResize.AddRaw(this, &ShaderToyRenderComp::OnViewportResize);
+		Context.iResolution = { (float)ViewPort->GetSize().X, (float)ViewPort->GetSize().Y };
 	}
 
     ShaderToyRenderComp::~ShaderToyRenderComp()
@@ -65,6 +68,13 @@ namespace SH
                 }
             }
             Graph.Execute();
+
+			TArray<FString> ShaderPrintLogs = TSingleton<PrintBuffer>::Get().GetPrintStrings();
+			for (const FString& PrintLog : ShaderPrintLogs)
+			{
+				SH_LOG(LogShaderPrint, Display, TEXT("%s"), *PrintLog);
+			}
+			TSingleton<PrintBuffer>::Get().Clear();
         }
 	}
 

@@ -1,6 +1,7 @@
 #include "CommonHeader.h"
 #include "GpuApiValidation.h"
 #include "magic_enum.hpp"
+#include "GpuApi/GpuRhi.h"
 
 namespace FW
 {
@@ -101,53 +102,69 @@ namespace FW
 			&& ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout2, 2) && ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout3, 3);
 	}
 
-	bool ValidateCreateBuffer(uint32 ByteSize, GpuBufferUsage Usage, GpuResourceState InitState)
+	bool ValidateCreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState)
 	{
-        if(ByteSize <= 0)
+        if(InBufferDesc.ByteSize <= 0)
         {
             //[MTLDebugDevice newBufferWithLength:options:]:642: failed assertion `Buffer Validation Cannot create buffer of zero length`.
-            SH_LOG(LogRhiValidation, Error, TEXT("CreateBuffer Error(Incorrect buffer size:%d)"), ByteSize);
+            SH_LOG(LogRhiValidation, Error, TEXT("CreateBuffer Error(Incorrect buffer size:%d)"), InBufferDesc.ByteSize);
             return false;
         }
         
-		if (Usage == GpuBufferUsage::Staging || Usage == GpuBufferUsage::Static || Usage == GpuBufferUsage::Dynamic)
-		{
-			if (InitState == GpuResourceState::Unknown)
-			{
-				SH_LOG(LogRhiValidation, Error, TEXT("CreateBuffer Error(InitState can not be Unknown) for GpuBufferUsage(%s)"), ANSI_TO_TCHAR(magic_enum::enum_name(Usage).data()));
-				return false;
-			}
-		}
-		else if (EnumHasAllFlags(Usage, GpuBufferUsage::Uniform))
+		if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::Uniform))
 		{
 			if (InitState != GpuResourceState::Unknown)
 			{
-				SH_LOG(LogRhiValidation, Error, TEXT("CreateBuffer Error(InitState must be Unknown) for GpuBufferUsage(%s)"), ANSI_TO_TCHAR(magic_enum::enum_name(Usage).data()));
+				SH_LOG(LogRhiValidation, Error, TEXT("CreateBuffer Error(InitState must be Unknown) for GpuBufferUsage(%s)"), ANSI_TO_TCHAR(magic_enum::enum_name(InBufferDesc.Usage).data()));
+				return false;
+			}
+			else if (!InBufferDesc.InitialData.IsEmpty())
+			{
+				SH_LOG(LogRhiValidation, Error, TEXT("CreateBuffer Error(UniformBuffer can not have the InitialData)"));
+				return false;
+			}
+		}
+		else if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::RWStorage))
+		{
+			if (InBufferDesc.Stride == 0 || (InBufferDesc.ByteSize % InBufferDesc.Stride != 0))
+			{
+				SH_LOG(LogRhiValidation, Error, TEXT("CreateBuffer Error(Invalid Stride value) for GpuBufferUsage(%s)"), ANSI_TO_TCHAR(magic_enum::enum_name(InBufferDesc.Usage).data()));
 				return false;
 			}
 		}
 		return ValidateGpuResourceState(InitState);
 	}
 
-	bool ValidateBarrier(GpuTrackedResource* InResource, GpuResourceState NewState)
+	bool ValidateBarriers(const TArray<GpuBarrierInfo>& BarrierInfos)
 	{
-		if (InResource->GetType() == GpuResourceType::Buffer)
+		bool Valid = true;
+		for (const GpuBarrierInfo& BarrierInfo : BarrierInfos)
 		{
-			GpuBuffer* Buffer = static_cast<GpuBuffer*>(InResource);
-			if (EnumHasAllFlags(Buffer->GetUsage(), GpuBufferUsage::Uniform))
+			if (BarrierInfo.Resource->GetType() == GpuResourceType::Buffer)
 			{
-				SH_LOG(LogRhiValidation, Error, TEXT("Barrier Error(Can not change the uniform buffe's state)"));
-				return false;
+				GpuBuffer* Buffer = static_cast<GpuBuffer*>(BarrierInfo.Resource);
+				if (EnumHasAllFlags(Buffer->GetUsage(), GpuBufferUsage::Uniform))
+				{
+					SH_LOG(LogRhiValidation, Error, TEXT("Barrier Error(Can not change the uniform buffe's state)"));
+					Valid = false;
+				}
 			}
+			Valid &= ValidateGpuResourceState(BarrierInfo.NewState);
 		}
-		return ValidateGpuResourceState(NewState);
+		return Valid;
 	}
 
 	bool ValidateGpuResourceState(GpuResourceState InState)
 	{
 		if (EnumHasAnyFlags(InState, GpuResourceState::WriteMask) && EnumHasAnyFlags(InState, GpuResourceState::ReadMask))
 		{
-			SH_LOG(LogRhiValidation, Error, TEXT("GpuResourceState Error(Only a wirte state can be set)"));
+			SH_LOG(LogRhiValidation, Error, TEXT("GpuResourceState Error(The write state cannot be combined with the read state)"));
+			return false;
+		}
+
+		if (EnumHasAllFlags(InState, GpuResourceState::WriteMask) && FMath::CountBits(static_cast<uint32>(InState) > 1))
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("GpuResourceState Error(Only a write state can be set)"));
 			return false;
 		}
 

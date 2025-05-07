@@ -6,6 +6,7 @@
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "UI/Widgets/Property/PropertyData/PropertyItem.h"
+#include "RenderResource/PrintBuffer.h"
 
 using namespace FW;
 
@@ -74,6 +75,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 		GpuTexture* TempiChannel = GpuResourceHelper::GetGlobalBlackTex();
 		static TRefCountPtr<GpuSampler> TempSampler = GGpuRhi->CreateSampler({});
         static TRefCountPtr<GpuBindGroup> BuiltInBindGroup = GpuBindGrouprBuilder{ GetBuiltInBindLayout() }
+			.SetExistingBinding(0, TSingleton<PrintBuffer>::Get().GetResource())
             .SetUniformBuffer("Uniform", GetBuiltInUb()->GetGpuResource())
 			.SetTexture("iChannel0", TempiChannel)
 			.SetSampler("iChannel0Sampler", TempSampler)
@@ -110,6 +112,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         static GpuBindGroupLayoutBuilder BuiltInBindLayout{ BindingContext::GlobalSlot };
         static int Init = [&] {
             BuiltInBindLayout
+				.AddExistingBinding(0, BindingType::RWStorageBuffer, BindingShaderStage::Pixel)
                 .AddUniformBuffer("Uniform", GetBuiltInUbBuilder().GetLayoutDeclaration(), BindingShaderStage::Pixel)
                 .AddTexture("iChannel0", BindingShaderStage::Pixel)
                 .AddSampler("iChannel0Sampler", BindingShaderStage::Pixel)

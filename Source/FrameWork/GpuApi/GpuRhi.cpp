@@ -129,11 +129,11 @@ public:
 		CmdRecorder->EndCaptureEvent();
 	}
 
-	void Barrier(GpuTrackedResource* InResource, GpuResourceState NewState) override
+	void Barriers(const TArray<GpuBarrierInfo>& BarrierInfos) override
 	{
 		check(State == CmdRecorderState::Begin);
-		check(ValidateBarrier(InResource, NewState));
-		CmdRecorder->Barrier(InResource, NewState);
+		check(ValidateBarriers(BarrierInfos));
+		CmdRecorder->Barriers(BarrierInfos);
 	}
 
 	void CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture) override
@@ -148,6 +148,13 @@ public:
 		check(State == CmdRecorderState::Begin);
 		check(EnumHasAnyFlags(InBuffer->State, GpuResourceState::CopyDst) && EnumHasAnyFlags(InTexture->State, GpuResourceState::CopySrc));
 		CmdRecorder->CopyTextureToBuffer(InTexture, InBuffer);
+	}
+
+	void CopyBufferToBuffer(GpuBuffer* SrcBuffer, uint32 SrcOffset, GpuBuffer* DestBuffer, uint32 DestOffset, uint32 Size) override
+	{
+		check(State == CmdRecorderState::Begin);
+		check(EnumHasAnyFlags(DestBuffer->State, GpuResourceState::CopyDst) && EnumHasAnyFlags(SrcBuffer->State, GpuResourceState::CopySrc));
+		CmdRecorder->CopyBufferToBuffer(SrcBuffer, SrcOffset, DestBuffer, DestOffset, Size);
 	}
 
 	FString Name;
@@ -195,10 +202,10 @@ public:
 		return RhiBackend->CreateTexture(InTexDesc, InitState);
 	}
 
-	TRefCountPtr<GpuBuffer> CreateBuffer(uint32 ByteSize, GpuBufferUsage Usage, GpuResourceState InitState) override
+	TRefCountPtr<GpuBuffer> CreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState) override
 	{
-		check(ValidateCreateBuffer(ByteSize, Usage, InitState));
-		return RhiBackend->CreateBuffer(ByteSize, Usage, InitState);
+		check(ValidateCreateBuffer(InBufferDesc, InitState));
+		return RhiBackend->CreateBuffer(InBufferDesc);
 	}
 
 	TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, const FString& InSourceText, const FString& InShaderName, const FString& EntryPoint) override

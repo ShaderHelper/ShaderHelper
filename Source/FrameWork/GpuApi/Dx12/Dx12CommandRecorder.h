@@ -48,7 +48,8 @@ namespace FW
 		bool IsComputeBindGroup3Dirty : 1;
 	
 	private:
-		TVariant<Dx12RenderPso*, Dx12ComputePso*> CurrentPso;
+		Dx12RenderPso* RenderPso = nullptr;
+		Dx12ComputePso* ComputePso = nullptr;
 		Dx12Buffer* CurrentVertexBuffer = nullptr;
 		TOptional<D3D12_VIEWPORT> CurrentViewPort;
 		TOptional<D3D12_RECT> CurrentSissorRect;
@@ -124,9 +125,10 @@ namespace FW
 		void EndRenderPass(GpuRenderPassRecorder* InRenderPassRecorder) override;
 		void BeginCaptureEvent(const FString& EventName) override;
 		void EndCaptureEvent() override;
-		void Barrier(GpuTrackedResource* InResource, GpuResourceState NewState) override;
+		void Barriers(const TArray<GpuBarrierInfo>& BarrierInfos) override;
 		void CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture) override;
 		void CopyTextureToBuffer(GpuTexture* InTexture, GpuBuffer* InBuffer) override;
+		void CopyBufferToBuffer(GpuBuffer* SrcBuffer, uint32 SrcOffset, GpuBuffer* DestBuffer, uint32 DestOffset, uint32 Size) override;
 		void Reset();
 		void SetName(const FString& Name);
 		void BindDescriptorHeap();

@@ -60,9 +60,10 @@ void Dx12GpuRhiBackend::EndFrame()
 	GDeferredReleaseManager->ProcessResources();
 }
 
-TRefCountPtr<GpuTexture> Dx12GpuRhiBackend::CreateTexture(const GpuTextureDesc &InTexDesc, GpuResourceState InitState)
+TRefCountPtr<GpuTexture> Dx12GpuRhiBackend::CreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
 {
-	return AUX::StaticCastRefCountPtr<GpuTexture>(CreateDx12Texture2D(InTexDesc, InitState));
+	GpuResourceState ValidState = InitState == GpuResourceState::Unknown ? GetTextureState(InTexDesc.Usage) : InitState;
+	return AUX::StaticCastRefCountPtr<GpuTexture>(CreateDx12Texture2D(InTexDesc, ValidState));
 }
 
 TRefCountPtr<GpuShader> Dx12GpuRhiBackend::CreateShaderFromSource(ShaderType InType, const FString& InSourceText, const FString& InShaderName, const FString& EntryPoint)
@@ -95,9 +96,10 @@ TRefCountPtr<GpuComputePipelineState> Dx12GpuRhiBackend::CreateComputePipelineSt
 	return AUX::StaticCastRefCountPtr<GpuComputePipelineState>(CreateDx12ComputePso(InPipelineStateDesc));
 }
 
-TRefCountPtr<GpuBuffer> Dx12GpuRhiBackend::CreateBuffer(uint32 ByteSize, GpuBufferUsage Usage, GpuResourceState InitState)
+TRefCountPtr<GpuBuffer> Dx12GpuRhiBackend::CreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState)
 {
-	return AUX::StaticCastRefCountPtr<GpuBuffer>(CreateDx12Buffer(InitState, ByteSize, Usage));
+	GpuResourceState ValidState = InitState == GpuResourceState::Unknown ? GetBufferState(InBufferDesc.Usage) : InitState;
+	return AUX::StaticCastRefCountPtr<GpuBuffer>(CreateDx12Buffer(InBufferDesc, ValidState));
 }
 
 TRefCountPtr<GpuSampler> Dx12GpuRhiBackend::CreateSampler(const GpuSamplerDesc &InSamplerDesc)
@@ -114,10 +116,10 @@ void Dx12GpuRhiBackend::SetResourceName(const FString& Name, GpuResource* InReso
 	else if (InResource->GetType() == GpuResourceType::Buffer)
 	{
 		GpuBuffer* InBuffer = static_cast<GpuBuffer*>(InResource);
-		GpuBufferUsage BufferUsage = InBuffer->GetUsage();
-		if (BufferUsage == GpuBufferUsage::Static || BufferUsage == GpuBufferUsage::Dynamic || BufferUsage == GpuBufferUsage::Staging) {
-			Dx12Buffer* Buffer = static_cast<Dx12Buffer*>(InBuffer);
-			Buffer->GetAllocation().GetAllocationData().Get<CommonAllocationData>().UnderlyResource->SetName(*Name);
+		Dx12Buffer* Buffer = static_cast<Dx12Buffer*>(InBuffer);
+		if (Buffer->GetAllocation().GetPolicy() != AllocationPolicy::SubAllocate)
+		{
+			Buffer->GetAllocation().GetResource()->SetName(*Name);
 		}
 	}
 }
@@ -155,7 +157,7 @@ void* Dx12GpuRhiBackend::MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapM
 	if (InMapMode == GpuResourceMapMode::Write_Only) {
 		const uint32 BufferSize = (uint32)GetRequiredIntermediateSize(Texture->GetResource(), 0, 1);
 		if (!Texture->UploadBuffer) {
-			Texture->UploadBuffer = CreateDx12Buffer(GpuResourceState::CopySrc, BufferSize, GpuBufferUsage::Dynamic);
+			Texture->UploadBuffer = CreateDx12Buffer({ BufferSize, GpuBufferUsage::Upload }, GpuResourceState::CopySrc);
 		}
 		Data = Texture->UploadBuffer->GetAllocation().GetCpuAddr();
 		Texture->bIsMappingForWriting = true;
@@ -163,16 +165,19 @@ void* Dx12GpuRhiBackend::MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapM
 	else if (InMapMode == GpuResourceMapMode::Read_Only) {
 		const uint32 BufferSize = (uint32)GetRequiredIntermediateSize(Texture->GetResource(), 0, 1);
 		if (!Texture->ReadBackBuffer) {
-			Texture->ReadBackBuffer = CreateDx12Buffer(GpuResourceState::CopyDst, BufferSize, GpuBufferUsage::Staging);
+			Texture->ReadBackBuffer = CreateDx12Buffer({ BufferSize, GpuBufferUsage::ReadBack }, GpuResourceState::CopyDst);
 		}
 		Data = Texture->ReadBackBuffer->GetAllocation().GetCpuAddr();
 		auto CmdRecorder = GDx12GpuRhi->BeginRecording();
 		{
 			GpuResourceState LastState = InGpuTexture->State;
-			CmdRecorder->Barrier(InGpuTexture, GpuResourceState::CopySrc);
+			CmdRecorder->Barriers({
+				{ InGpuTexture, GpuResourceState::CopySrc } 
+			});
 			CmdRecorder->CopyTextureToBuffer(InGpuTexture, Texture->ReadBackBuffer);
-			//TODO: batch barriers on the api backend.
-			CmdRecorder->Barrier(InGpuTexture, LastState);
+			CmdRecorder->Barriers({
+				{ InGpuTexture, LastState } 
+			});
 		}
 		GDx12GpuRhi->EndRecording(CmdRecorder);
 		GDx12GpuRhi->Submit({ CmdRecorder });
@@ -190,9 +195,13 @@ void Dx12GpuRhiBackend::UnMapGpuTexture(GpuTexture* InGpuTexture)
 		auto CmdRecorder = GDx12GpuRhi->BeginRecording();
 		{
 			GpuResourceState LastState = InGpuTexture->State;
-			CmdRecorder->Barrier(InGpuTexture, GpuResourceState::CopyDst);
+			CmdRecorder->Barriers({
+				{InGpuTexture, GpuResourceState::CopyDst} 
+			});
 			CmdRecorder->CopyBufferToTexture(Texture->UploadBuffer, Texture);
-			CmdRecorder->Barrier(InGpuTexture, LastState);
+			CmdRecorder->Barriers({ 
+				{InGpuTexture, LastState} 
+			});
 		}
 		GDx12GpuRhi->EndRecording(CmdRecorder);
 		GDx12GpuRhi->Submit({ CmdRecorder });
@@ -207,11 +216,32 @@ void* Dx12GpuRhiBackend::MapGpuBuffer(GpuBuffer* InGpuBuffer, GpuResourceMapMode
 	Dx12Buffer* Buffer = static_cast<Dx12Buffer*>(InGpuBuffer);
 	void* Data = nullptr;
 
-	if (EnumHasAnyFlags(Usage, GpuBufferUsage::Dynamic)) {
-		check(InMapMode == GpuResourceMapMode::Write_Only);
+	if (EnumHasAnyFlags(Usage, GpuBufferUsage::Upload | GpuBufferUsage::ReadBack | GpuBufferUsage::Uniform)) 
+	{
 		Data = Buffer->GetAllocation().GetCpuAddr();
 	}
-	else {
+	else if(EnumHasAnyFlags(Usage, GpuBufferUsage::RWStorage))
+	{
+		if (InMapMode == GpuResourceMapMode::Read_Only)
+		{
+			TRefCountPtr<Dx12Buffer> ReadBackBuffer = CreateDx12Buffer({ Buffer->GetByteSize(), GpuBufferUsage::ReadBack}, GpuResourceState::CopyDst);
+			auto CmdRecorder = GDx12GpuRhi->BeginRecording();
+			{
+				GpuResourceState LastState = InGpuBuffer->State;
+				CmdRecorder->Barriers({
+					{ InGpuBuffer, GpuResourceState::CopySrc },
+				});
+				CmdRecorder->CopyBufferToBuffer(InGpuBuffer, 0, ReadBackBuffer, 0, Buffer->GetByteSize());
+				CmdRecorder->Barriers({
+					{ InGpuBuffer, LastState }
+				});
+			}
+			GDx12GpuRhi->EndRecording(CmdRecorder);
+			GDx12GpuRhi->Submit({ CmdRecorder });
+			GDx12GpuRhi->WaitGpu();
+
+			Data = ReadBackBuffer->GetAllocation().GetCpuAddr();
+		}
 	}
 
 	return Data;
@@ -219,7 +249,7 @@ void* Dx12GpuRhiBackend::MapGpuBuffer(GpuBuffer* InGpuBuffer, GpuResourceMapMode
 
 void Dx12GpuRhiBackend::UnMapGpuBuffer(GpuBuffer* InGpuBuffer)
 {
-	// do nothing.
+	
 }
 
 void Dx12GpuRhiBackend::BeginGpuCapture(const FString &CaptureName)

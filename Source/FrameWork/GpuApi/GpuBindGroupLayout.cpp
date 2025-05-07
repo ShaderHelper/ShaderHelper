@@ -12,10 +12,10 @@ namespace FW
 		LayoutDesc.GroupNumber = InGroupSlot;
 	}
 
-	GpuBindGroupLayoutBuilder& GpuBindGroupLayoutBuilder::AddExistingBinding(BindingSlot InSlot, BindingType ResourceType, BindingShaderStage InStage)
+	GpuBindGroupLayoutBuilder& GpuBindGroupLayoutBuilder::AddExistingBinding(BindingSlot InSlot, BindingType Type, BindingShaderStage InStage)
 	{
 		checkf(!LayoutDesc.Layouts.Contains(InSlot), *FString::Printf(TEXT("Slot:%d already existed."), InSlot));
-		LayoutDesc.Layouts.Add(InSlot, {ResourceType, InStage });
+		LayoutDesc.Layouts.Add(InSlot, { Type, InStage });
 		return *this;
 	}
 

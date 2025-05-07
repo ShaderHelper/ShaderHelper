@@ -101,39 +101,59 @@ AppendArgFunc(uint)
 AppendArgFunc(int)
 AppendArgFunc(float)
 
-#define SELECT_NUM(Arg1, Arg2, Arg3, RESULT, ...) RESULT
-#define GET_ARG_NUM(...) SELECT_NUM(__VA_ARGS__, 3, 2, 1)
+#define SELECT_NUM(Arg0, Arg1, Arg2, Arg3, RESULT, ...) RESULT
+#define GET_ARG_NUM(...) SELECT_NUM(0, ##__VA_ARGS__, 3, 2, 1, 0)
 
+#define GET_ARGS_SIZE_0() 0
 #define GET_ARGS_SIZE_1(Arg1) sizeof(Arg1)
 #define GET_ARGS_SIZE_2(Arg1, Arg2) sizeof(Arg1) + GET_ARGS_SIZE_1(Arg2)
 #define GET_ARGS_SIZE_3(Arg1, Arg2, Arg3) sizeof(Arg1) + GET_ARGS_SIZE_2(Arg2, Arg3)
 #define GET_ARGS_SIZE(...) JOIN(GET_ARGS_SIZE_, GET_ARG_NUM(__VA_ARGS__))(__VA_ARGS__)
 
-#define APPEND_ARGS_1(Arg1) Offset = AppendArg(Offset, Arg1)
-#define APPEND_ARGS_2(Arg1, Arg2) Offset = AppendArg(Offset, Arg1); APPEND_ARGS_1(Arg2)
-#define APPEND_ARGS_3(Arg1, Arg2, Arg3) Offset = AppendArg(Offset, Arg1); APPEND_ARGS_2(Arg2, Arg3)
+#define APPEND_ARGS_0()
+#define APPEND_ARGS_1(Arg1) ByteOffset = AppendArg(ByteOffset, Arg1)
+#define APPEND_ARGS_2(Arg1, Arg2) ByteOffset = AppendArg(ByteOffset, Arg1); APPEND_ARGS_1(Arg2)
+#define APPEND_ARGS_3(Arg1, Arg2, Arg3) ByteOffset = AppendArg(ByteOffset, Arg1); APPEND_ARGS_2(Arg2, Arg3)
 #define APPEND_ARGS(...) JOIN(APPEND_ARGS_, GET_ARG_NUM(__VA_ARGS__))(__VA_ARGS__)
 
 //Up to 3 args now.
 //Print("abc {0}", t);
-#define Print(StrArrDecl, ...)  do { \
-    StrArrDecl; \
-    uint CharNum = sizeof(StrArr) / sizeof(StrArr[0]);  \
-    uint ArgNum = GET_ARG_NUM(__VA_ARGS__);     \
-    uint ArgByteSize = 1 + ArgNum + GET_ARGS_SIZE(__VA_ARGS__);      \
-    uint Increment = CharNum + ArgByteSize;             \
-    if(Printer[0].ByteSize + Increment > Printer::MaxBufferSize * 4) \
-    { \
-        break; \
-    } \
-    uint Offset; \
-    InterlockedAdd(Printer[0].ByteSize, Increment, Offset);  \
-    for(int i = 0; i < CharNum; i++)         \
-    {   \
-        Offset = AppendChar(Offset, StrArr[i]); \
-    }   \
-    Offset = AppendChar(Offset, ArgNum);    \
-    APPEND_ARGS(__VA_ARGS__);  \
+#define Print(StrArrDecl, ...)  do {                                \
+    StrArrDecl;                                                     \
+    uint CharNum = sizeof(StrArr) / sizeof(StrArr[0]);              \
+    uint ArgNum = GET_ARG_NUM(__VA_ARGS__);                         \
+	uint ArgByteSize = 0;                                           \
+	if(ArgNum > 0)                                                  \
+	{                                                               \
+		ArgByteSize = 1 + ArgNum + GET_ARGS_SIZE(__VA_ARGS__);      \
+	}                                                               \
+    uint Increment = CharNum + ArgByteSize;                         \
+    uint OldByteSize = Printer[0].ByteSize;                         \
+	uint ByteOffset = 0xFFFFFFFF;                                   \
+    [allow_uav_condition]                                           \
+    while(OldByteSize + Increment <= Printer::MaxBufferSize * 4)    \
+    {                                                               \
+        uint CompareValue = OldByteSize;                            \
+        InterlockedCompareExchange(Printer[0].ByteSize,             \ 
+			CompareValue, OldByteSize + Increment, OldByteSize);    \
+        if(OldByteSize == CompareValue)                             \
+        {                                                           \
+			ByteOffset = OldByteSize;                               \
+            break;                                                  \
+        }                                                           \
+    }                                                               \
+	if (ByteOffset != 0xFFFFFFFF)                                   \
+	{                                                               \
+		for (uint i = 0; i < CharNum; i++)                          \
+		{                                                           \
+			ByteOffset = AppendChar(ByteOffset, StrArr[i]);         \
+		}                                                           \
+	}                                                               \
+	if (ArgNum > 0)                                                 \
+	{                                                               \
+		ByteOffset = AppendChar(ByteOffset, ArgNum);                \
+		APPEND_ARGS(__VA_ARGS__);                                   \
+	}                                                               \
 } while(0)
 
 #endif

@@ -11,9 +11,15 @@ namespace FW
 		{
 		case GpuResourceState::RenderTargetWrite:                return D3D12_RESOURCE_STATE_RENDER_TARGET;
 		case GpuResourceState::CopyDst:                          return D3D12_RESOURCE_STATE_COPY_DEST;
+		case GpuResourceState::UnorderedAccess:                  return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 		default:
 			check(!EnumHasAnyFlags(InResourceState, GpuResourceState::WriteMask));
 			D3D12_RESOURCE_STATES State{};
+
+			if (EnumHasAnyFlags(InResourceState, GpuResourceState::UniformBuffer))
+			{
+				State |= D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+			}
 			if (EnumHasAnyFlags(InResourceState, GpuResourceState::ShaderResourceRead))
 			{
 				State |= D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;

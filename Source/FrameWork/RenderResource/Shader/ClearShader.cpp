@@ -10,25 +10,26 @@ namespace FW
 		TArray<FString> Definitions;
 		if constexpr(InType == BindingType::RWStorageBuffer)
 		{
-			Definitions.Add("RESOURCE_TYPE==0");
+			Definitions.Add("RESOURCE_TYPE=0");
 		}
 
 		ClearUbBuilder.AddUint("Size");
-
-		Cs = GGpuRhi->CreateShaderFromFile(
-			PathHelper::ShaderDir() / "Clear.hlsl",
-			ShaderType::ComputeShader,
-			"ClearCS"
-		);
-
-		FString ErrorInfo;
-		GGpuRhi->CompileShader(Cs, ErrorInfo, Definitions);
-		check(ErrorInfo.IsEmpty());
 
 		BindGroupLayout = GpuBindGroupLayoutBuilder{ BindingContext::ShaderSlot }
 			.AddExistingBinding(0, InType, BindingShaderStage::Compute)
 			.AddUniformBuffer("ClearUb", ClearUbBuilder.GetLayoutDeclaration(), BindingShaderStage::Compute)
 			.Build();
+
+		Cs = GGpuRhi->CreateShaderFromFile(
+			PathHelper::ShaderDir() / "Clear.hlsl",
+			ShaderType::ComputeShader,
+			"ClearCS",
+			BindGroupLayout->GetCodegenDeclaration()
+		);
+
+		FString ErrorInfo;
+		GGpuRhi->CompileShader(Cs, ErrorInfo, Definitions);
+		check(ErrorInfo.IsEmpty());
 	}
 
 	template<BindingType InType>

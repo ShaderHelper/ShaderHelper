@@ -80,6 +80,18 @@ namespace FW
 
 	TRefCountPtr<Dx12ComputePso> CreateDx12ComputePso(const GpuComputePipelineStateDesc& InPipelineStateDesc)
 	{
-		return TRefCountPtr<Dx12ComputePso>();
+		Dx12Shader* Cs = static_cast<Dx12Shader*>(InPipelineStateDesc.Cs);
+		RootSignatureDesc RsDesc{
+			static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout0), static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout1),
+			static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout2), static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout3)
+		};
+
+		D3D12_COMPUTE_PIPELINE_STATE_DESC PsoDesc{};
+		PsoDesc.CS = { Cs->GetCompilationResult()->GetBufferPointer(), Cs->GetCompilationResult()->GetBufferSize() };
+		PsoDesc.pRootSignature = Dx12RootSignatureManager::GetRootSignature(RsDesc)->GetResource();
+
+		TRefCountPtr<ID3D12PipelineState> Pso;
+		DxCheck(GDevice->CreateComputePipelineState(&PsoDesc, IID_PPV_ARGS(Pso.GetInitReference())));
+		return new Dx12ComputePso(MoveTemp(Pso));
 	}
 }

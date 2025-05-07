@@ -27,11 +27,10 @@ namespace FW
 	{
 		check(InCmdList);
 
-		if (IsPipelineStateDirty && CurrentPso.IsType<Dx12ComputePso*>())
+		if (IsPipelineStateDirty)
 		{
-			Dx12ComputePso* CurComputePso = CurrentPso.Get<Dx12ComputePso*>();
-			check(CurComputePso);
-			InCmdList->SetPipelineState(CurComputePso->GetResource());
+			check(ComputePso);
+			InCmdList->SetPipelineState(ComputePso->GetResource());
 			IsPipelineStateDirty = false;
 		}
 
@@ -106,12 +105,11 @@ namespace FW
 			IsVertexBufferDirty = false;
 		}
 
-		if (IsPipelineStateDirty && CurrentPso.IsType<Dx12RenderPso*>())
+		if (IsPipelineStateDirty)
 		{
-			Dx12RenderPso* CurRenderPso = CurrentPso.Get<Dx12RenderPso*>();
-			check(CurRenderPso);
-			InCmdList->SetPipelineState(CurRenderPso->GetResource());
-			InCmdList->IASetPrimitiveTopology(CurRenderPso->GetPritimiveTopology());
+			check(RenderPso);
+			InCmdList->SetPipelineState(RenderPso->GetResource());
+			InCmdList->IASetPrimitiveTopology(RenderPso->GetPritimiveTopology());
 			IsPipelineStateDirty = false;
 		}
 
@@ -176,7 +174,8 @@ namespace FW
 
 	void Dx12StateCache::Clear()
 	{
-		CurrentPso = {};
+		RenderPso = nullptr;
+		ComputePso = nullptr;
 		CurrentViewPort.Reset();
 		CurrentSissorRect.Reset();
 
@@ -236,18 +235,20 @@ namespace FW
 
 	void Dx12StateCache::SetPipeline(Dx12RenderPso* InPso)
 	{
-		if (CurrentPso.IsType<Dx12RenderPso*>() && CurrentPso.Get<Dx12RenderPso*>() != InPso)
+		if (RenderPso != InPso)
 		{
-			CurrentPso.Set<Dx12RenderPso*>(InPso);
+			RenderPso = InPso;
+			ComputePso = nullptr;
 			IsPipelineStateDirty = true;
 		}
 	}
 
 	void Dx12StateCache::SetPipeline(Dx12ComputePso* InPso)
 	{
-		if (CurrentPso.IsType<Dx12ComputePso*>() && CurrentPso.Get<Dx12ComputePso*>() != InPso)
+		if (ComputePso != InPso)
 		{
-			CurrentPso.Set<Dx12ComputePso*>(InPso);
+			ComputePso = InPso;
+			RenderPso = nullptr;
 			IsPipelineStateDirty = true;
 		}
 	}
@@ -495,24 +496,44 @@ namespace FW
 #endif
 	}
 
-	void Dx12CmdRecorder::Barrier(GpuTrackedResource* InResource, GpuResourceState NewState)
+	void Dx12CmdRecorder::Barriers(const TArray<GpuBarrierInfo>& BarrierInfos)
 	{
-		check(InResource->State != GpuResourceState::Unknown);
-		D3D12_RESOURCE_STATES BeforeDx12State = MapResourceState(InResource->State);
-		D3D12_RESOURCE_STATES AfterDx12State = MapResourceState(NewState);
-		if (BeforeDx12State == AfterDx12State) {
-			return;
+		TArray<CD3DX12_RESOURCE_BARRIER> DxBarriers;
+		for (const GpuBarrierInfo& BarrierInfo : BarrierInfos)
+		{
+			check(BarrierInfo.Resource->State != GpuResourceState::Unknown);
+			D3D12_RESOURCE_STATES BeforeDx12State = MapResourceState(BarrierInfo.Resource->State);
+			D3D12_RESOURCE_STATES AfterDx12State = MapResourceState(BarrierInfo.NewState);
+			bool UAVBarrier = BarrierInfo.Resource->State == BarrierInfo.NewState && BarrierInfo.NewState == GpuResourceState::UnorderedAccess;
+			if (BeforeDx12State == AfterDx12State && !UAVBarrier) {
+				return;
+			}
+
+			CD3DX12_RESOURCE_BARRIER Barrier;
+			if (UAVBarrier)
+			{
+				Barrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
+			}
+			else
+			{
+				if (BarrierInfo.Resource->GetType() == GpuResourceType::Texture) {
+					Dx12Texture* DxTex = static_cast<Dx12Texture*>(BarrierInfo.Resource);
+					Barrier = CD3DX12_RESOURCE_BARRIER::Transition(DxTex->GetResource(), BeforeDx12State, AfterDx12State);
+				}
+				else if (BarrierInfo.Resource->GetType() == GpuResourceType::Buffer) {
+					Dx12Buffer* DxBuffer = static_cast<Dx12Buffer*>(BarrierInfo.Resource);
+					Barrier = CD3DX12_RESOURCE_BARRIER::Transition(DxBuffer->GetAllocation().GetResource(), BeforeDx12State, AfterDx12State);
+				}
+				else {
+					check(false);
+				}
+			}
+	
+			BarrierInfo.Resource->State = BarrierInfo.NewState;
+			DxBarriers.Add(MoveTemp(Barrier));
 		}
 
-		CD3DX12_RESOURCE_BARRIER Barrier;
-		if (InResource->GetType() == GpuResourceType::Texture) {
-			Barrier = CD3DX12_RESOURCE_BARRIER::Transition(static_cast<Dx12Texture*>(InResource)->GetResource(), BeforeDx12State, AfterDx12State);
-		}
-		else {
-			check(false);
-		}
-		InResource->State = NewState;
-		CmdList->ResourceBarrier(1, &Barrier);
+		CmdList->ResourceBarrier(DxBarriers.Num(), DxBarriers.GetData());
 	}
 
 	void Dx12CmdRecorder::CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture)
@@ -543,6 +564,14 @@ namespace FW
         CD3DX12_TEXTURE_COPY_LOCATION DestLoc{ AllocationData.UnderlyResource, Layout };
         CD3DX12_TEXTURE_COPY_LOCATION SrcLoc{ Texture->GetResource() };
 		CmdList->CopyTextureRegion(&DestLoc, 0, 0, 0, &SrcLoc, nullptr);
+	}
+
+	void Dx12CmdRecorder::CopyBufferToBuffer(GpuBuffer* SrcBuffer, uint32 SrcOffset, GpuBuffer* DestBuffer, uint32 DestOffset, uint32 Size)
+	{
+		//TODO:Is it necessary to support the sub-allocated constant buffer?
+		Dx12Buffer* SrcDxBuffer = static_cast<Dx12Buffer*>(SrcBuffer);
+		Dx12Buffer* DestDxBuffer = static_cast<Dx12Buffer*>(DestBuffer);
+		CmdList->CopyBufferRegion(DestDxBuffer->GetAllocation().GetResource(), DestOffset, SrcDxBuffer->GetAllocation().GetResource(), SrcOffset, Size);
 	}
 
 	void Dx12CmdRecorder::Reset()

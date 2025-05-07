@@ -906,9 +906,13 @@ const FString ErrorMarkerText = TEXT("✘");
         CurrentShaderSource = NewShaderSource;
         FString ShaderTemplateWithBinding = StShaderAsset->GetTemplateWithBinding();
         FString FinalShaderSource = ShaderTemplateWithBinding + CurrentShaderSource;
-        
-        ISenseTask Task{};
-        Task.HlslSource = MoveTemp(FinalShaderSource);
+
+		ISenseTask Task{};
+		{
+			//Need the text preprocessed by backend to ensure consistency
+			TRefCountPtr<GpuShader> CurPixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, MoveTemp(FinalShaderSource), {}, TEXT("MainPS"));
+			Task.HlslSource = CurPixelShader->GetProcessedSourceText();
+		}
         
         if(bTryComplete)
         {

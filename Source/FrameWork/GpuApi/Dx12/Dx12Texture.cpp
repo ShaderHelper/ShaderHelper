@@ -13,8 +13,8 @@ namespace FW
 		bool bSRV;
 	};
 
-	Dx12Texture::Dx12Texture(TRefCountPtr<ID3D12Resource> InResource, GpuTextureDesc InDesc, void* InSharedHandle)
-		: GpuTexture(MoveTemp(InDesc))
+	Dx12Texture::Dx12Texture(TRefCountPtr<ID3D12Resource> InResource, GpuResourceState InResourceState, GpuTextureDesc InDesc, void* InSharedHandle)
+		: GpuTexture(MoveTemp(InDesc), InResourceState)
 		, Resource(MoveTemp(InResource))
 		, SharedHandle(InSharedHandle)
 	{
@@ -58,7 +58,7 @@ namespace FW
 		}
 	}
 
-	static D3D12_RESOURCE_STATES GetInitialResourceState(const FlagSets& InFlags, GpuResourceState& OutState)
+	static D3D12_RESOURCE_STATES GetInitialResourceState(const FlagSets& InFlags)
 	{
 		bool bWritable = InFlags.bRTV;
 		bool bReadable = InFlags.bSRV;
@@ -67,7 +67,6 @@ namespace FW
 		if (bReadable)
 		{
 			if (InFlags.bSRV) {
-				OutState = GpuResourceState::ShaderResourceRead;
 				return D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
 			}
 
@@ -75,7 +74,6 @@ namespace FW
 		else
 		{
 			if (InFlags.bRTV) {
-				OutState = GpuResourceState::RenderTargetWrite;
 				return D3D12_RESOURCE_STATE_RENDER_TARGET;
 			}
 		}
@@ -128,7 +126,7 @@ namespace FW
 		CD3DX12_HEAP_PROPERTIES HeapType{ D3D12_HEAP_TYPE_DEFAULT };
 		D3D12_HEAP_FLAGS HeapFlag = Flags.bShared ? D3D12_HEAP_FLAG_SHARED : D3D12_HEAP_FLAG_NONE;
 
-		D3D12_RESOURCE_STATES FinalState = InitState == GpuResourceState::Unknown ? GetInitialResourceState(Flags, InitState) : MapResourceState(InitState);
+		D3D12_RESOURCE_STATES FinalState = MapResourceState(InitState);
 		D3D12_RESOURCE_STATES InitialState = bHasInitialData ? D3D12_RESOURCE_STATE_COPY_DEST : FinalState;
 
 		//Fast Clear Optimization
@@ -154,14 +152,19 @@ namespace FW
 			GDevice->CreateSharedHandle(TexResource, nullptr, GENERIC_ALL, nullptr, &SharedHandle);
 		}
 
-		TRefCountPtr<Dx12Texture> RetTexture = new Dx12Texture{ MoveTemp(TexResource), InTexDesc, SharedHandle };
-		RetTexture->State = bHasInitialData ? GpuResourceState::CopyDst : InitState;
+		TRefCountPtr<Dx12Texture> RetTexture = new Dx12Texture{ MoveTemp(TexResource), bHasInitialData ? GpuResourceState::CopyDst : InitState, 
+			InTexDesc, SharedHandle };
 		CreateTextureView(Flags, RetTexture);
 
 		TRefCountPtr<Dx12Buffer> UploadBuffer;
 		if (bHasInitialData) {
 			const uint32 UploadBufferSize = (uint32)GetRequiredIntermediateSize(RetTexture->GetResource(), 0, 1);
-			UploadBuffer = CreateDx12Buffer(GpuResourceState::CopySrc, UploadBufferSize, GpuBufferUsage::Dynamic);
+			UploadBuffer = CreateDx12Buffer({
+				.ByteSize = UploadBufferSize, 
+				.Usage = GpuBufferUsage::Upload
+				},
+				GpuResourceState::CopySrc
+			);
 
 			D3D12_SUBRESOURCE_DATA textureData = {};
 			textureData.pData = &InTexDesc.InitialData[0];
@@ -172,7 +175,9 @@ namespace FW
 			GpuCmdRecorder* CmdRecorder = GDx12GpuRhi->BeginRecording("InitTexture");
 			{
 				UpdateSubresources(static_cast<Dx12CmdRecorder*>(CmdRecorder)->GetCommandList(), RetTexture->GetResource(), AllocationData.UnderlyResource, 0, 0, 1, &textureData);
-				CmdRecorder->Barrier(RetTexture, InitState);
+				CmdRecorder->Barriers({
+					{RetTexture, InitState} 
+				});
 			}
 			GDx12GpuRhi->EndRecording(CmdRecorder);
 			GDx12GpuRhi->Submit({ CmdRecorder });

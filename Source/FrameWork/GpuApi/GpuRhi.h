@@ -82,10 +82,10 @@ public:
 	virtual void EndRenderPass(GpuRenderPassRecorder* InRenderPassRecorder) = 0;
 	virtual void BeginCaptureEvent(const FString& EventName) = 0;
 	virtual void EndCaptureEvent() = 0;
-	//virtual void Barriers(const TArray<GpuBarrierInfo>& BarrierInfos) = 0;
-	virtual void Barrier(GpuTrackedResource* InResource, GpuResourceState NewState) = 0;
+	virtual void Barriers(const TArray<GpuBarrierInfo>& BarrierInfos) = 0;
 	virtual void CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture) = 0;
 	virtual void CopyTextureToBuffer(GpuTexture* InTexture, GpuBuffer* InBuffer) = 0;
+	virtual void CopyBufferToBuffer(GpuBuffer* SrcBuffer, uint32 SrcOffset, GpuBuffer* DestBuffer, uint32 DestOffset, uint32 Size) = 0;
 };
 
 class FRAMEWORK_API GpuRhi
@@ -104,8 +104,9 @@ public:
 	virtual void BeginFrame() = 0;
 	virtual void EndFrame() = 0;
 
-	virtual TRefCountPtr<GpuTexture> CreateTexture(const GpuTextureDesc &InTexDesc, GpuResourceState InitState = GpuResourceState::Unknown) = 0;
-	virtual TRefCountPtr<GpuBuffer> CreateBuffer(uint32 ByteSize, GpuBufferUsage Usage, GpuResourceState InitState = GpuResourceState::Unknown) = 0;
+	//If the initial state is unknown, then the state be determined based on usage
+	virtual TRefCountPtr<GpuTexture> CreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState = GpuResourceState::Unknown) = 0;
+	virtual TRefCountPtr<GpuBuffer> CreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState = GpuResourceState::Unknown) = 0;
 
 	virtual TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, const FString& InSourceText, const FString& InShaderName, const FString& EntryPoint) = 0;
 	// The file directory will be considered as a include dir by default.

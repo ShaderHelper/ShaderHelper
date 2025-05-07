@@ -26,22 +26,37 @@ namespace FW
 		InOutPass.Bindings.EnumerateBinding([&](const ResourceBinding& ResourceBindingEntry, const LayoutBinding& LayoutBindingEntry) {
 			if (LayoutBindingEntry.Type == BindingType::Texture)
 			{
-				InOutPass.PassTexStates.Add(static_cast<GpuTexture*>(ResourceBindingEntry.Resource), GpuResourceState::ShaderResourceRead);
+				GpuTexture* Tex = static_cast<GpuTexture*>(ResourceBindingEntry.Resource);
+				InOutPass.PassTexStates.Add(Tex, GpuResourceState::ShaderResourceRead);
+			}
+			else if (LayoutBindingEntry.Type == BindingType::RWStorageBuffer)
+			{
+				GpuBuffer* Buffer = static_cast<GpuBuffer*>(ResourceBindingEntry.Resource);
+				InOutPass.PassBufferStates.Add(Buffer, GpuResourceState::UnorderedAccess);
 			}
 		});
 	}
 
 	void RenderGraph::CreatePassBarriers(const RGRenderPass& InPass)
 	{
+		TArray<GpuBarrierInfo> BarrierInfos;
 		for (auto [Tex, PassTexState] : InPass.PassTexStates)
 		{
 			GpuResourceState TexState = Tex->State;
 			if (TexState != PassTexState)
 			{
-				//TODO:Batch
-				CmdRecorder->Barrier(Tex, PassTexState);
+				BarrierInfos.Emplace(Tex, PassTexState);
 			}
 		}
+		for (auto [Buffer, PassBufferState] : InPass.PassBufferStates)
+		{
+			GpuResourceState BufferState = Buffer->State;
+			if (BufferState != PassBufferState)
+			{
+				BarrierInfos.Emplace(Buffer, PassBufferState);
+			}
+		}
+		CmdRecorder->Barriers(BarrierInfos);
 	}
 
 	void RenderGraph::ExecutePass(RGRenderPass& InPass)
