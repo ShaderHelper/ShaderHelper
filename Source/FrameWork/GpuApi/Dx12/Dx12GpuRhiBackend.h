@@ -17,7 +17,7 @@ public:
 	void BeginFrame() override;
 	void EndFrame() override;
 	TRefCountPtr<GpuTexture> CreateTexture(const GpuTextureDesc &InTexDesc, GpuResourceState InitState) override;
-	TRefCountPtr<GpuBuffer> CreateBuffer(uint32 ByteSize, GpuBufferUsage Usage, GpuResourceState InitState) override;
+	TRefCountPtr<GpuBuffer> CreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState) override;
 	TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, const FString& InSourceText, const FString& InShaderName, const FString& EntryPoint) override;
 	TRefCountPtr<GpuShader> CreateShaderFromFile(const FString& FileName, ShaderType InType, const FString& EntryPoint, const FString& ExtraDeclaration) override;
 	TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc &InBindGroupDesc) override;

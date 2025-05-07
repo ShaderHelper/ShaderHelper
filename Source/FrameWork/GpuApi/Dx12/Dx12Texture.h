@@ -20,7 +20,7 @@ namespace FW
 	class Dx12Texture : public GpuTexture, public Dx12DeferredDeleteObject<Dx12Texture>
 	{
 	public:
-		Dx12Texture(TRefCountPtr<ID3D12Resource> InResource, 
+		Dx12Texture(TRefCountPtr<ID3D12Resource> InResource, GpuResourceState InResourceState,
 			GpuTextureDesc InDesc, void* InSharedHandle = nullptr);
         
     public:

@@ -10,7 +10,7 @@ namespace FW
 		GpuTextureFormat Format;
 		GpuTextureUsage Usage = GpuTextureUsage::None;
  
-		TArray<uint8> InitialData{};
+		TArrayView<uint8> InitialData;
         Vector4f ClearValues{0,0,0,1};
 		uint32 Depth = 1;
 		uint32 NumMips = 1;
@@ -19,8 +19,8 @@ namespace FW
     class GpuTexture : public GpuTrackedResource
     {
     public:
-        GpuTexture(GpuTextureDesc InDesc)
-            : GpuTrackedResource(GpuResourceType::Texture)
+        GpuTexture(GpuTextureDesc InDesc, GpuResourceState InState)
+            : GpuTrackedResource(GpuResourceType::Texture, InState)
 			, TexDesc(MoveTemp(InDesc))
         {}
         

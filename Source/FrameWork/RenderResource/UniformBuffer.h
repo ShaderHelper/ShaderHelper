@@ -201,7 +201,7 @@ namespace FW
 		TUniquePtr<UniformBuffer> Build() {
             if(MetaData.UniformBufferSize > 0)
             {
-                TRefCountPtr<GpuBuffer> Buffer = GGpuRhi->CreateBuffer(MetaData.UniformBufferSize, (GpuBufferUsage)Usage);
+				TRefCountPtr<GpuBuffer> Buffer = GGpuRhi->CreateBuffer({ MetaData.UniformBufferSize, (GpuBufferUsage)Usage });
                 MetaData.UniformBufferDeclaration = GetLayoutDeclaration();
                 return MakeUnique<UniformBuffer>( MoveTemp(Buffer), MetaData);
             }

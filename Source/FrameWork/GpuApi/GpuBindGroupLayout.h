@@ -115,7 +115,7 @@ namespace FW
 	public:
 		GpuBindGroupLayoutBuilder(BindingGroupSlot InGroupSlot);
 		//!! If have bindings that are not from codegen, must first call this method for each binding, to make sure the bindings are compact.
-		GpuBindGroupLayoutBuilder& AddExistingBinding(BindingSlot InSlot, BindingType ResourceType, BindingShaderStage InStage = BindingShaderStage::All);
+		GpuBindGroupLayoutBuilder& AddExistingBinding(BindingSlot InSlot, BindingType Type, BindingShaderStage InStage = BindingShaderStage::All);
 
 		//Add the codegen bindings, then get the CodegenDeclaration that will be injected into a shader.
 		GpuBindGroupLayoutBuilder& AddUniformBuffer(const FString& BindingName, const FString& UniformBufferLayoutDeclaration, BindingShaderStage InStage = BindingShaderStage::All);

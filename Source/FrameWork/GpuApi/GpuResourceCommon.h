@@ -12,15 +12,17 @@ namespace FW
 	{
 		Unknown = 0,
 		//Read state
-		ShaderResourceRead = 1u << 0,
-		CopySrc = 1u << 1,
+		UniformBuffer = 1u << 0,
+		ShaderResourceRead = 1u << 1,
+		CopySrc = 1u << 2,
 
 		//Write State
-		RenderTargetWrite = 1u << 2,
-		CopyDst = 1u << 3,
+		RenderTargetWrite = 1u << 3,
+		CopyDst = 1u << 4,
+		UnorderedAccess = 1u << 5,
 
 		ReadMask = ShaderResourceRead | CopySrc,
-		WriteMask = RenderTargetWrite | CopyDst,
+		WriteMask = RenderTargetWrite | CopyDst | UnorderedAccess,
 	};
 	ENUM_CLASS_FLAGS(GpuResourceState);
 
@@ -57,15 +59,14 @@ namespace FW
 
 	enum class GpuBufferUsage : uint32
 	{
-		Static = 1u << 0,  // Gpu r/w
-		Dynamic = 1u << 1, // Cpu w, Gpu r
-		Staging = 1u << 2, // Cpu r, Gpu w
+		Upload = 1u << 0,
+		ReadBack = 1u << 1,
 
 		//Persistent(1 or more frames) if not specified
-		Temporary = 1u << 3, // at most 1 frame.
+		Temporary = 1u << 2, // at most 1 frame.
 
-		Uniform = Dynamic | (1u << 4),
-		RWStorage = Static | (1u << 5),
+		Uniform = 1u << 3,
+		RWStorage = 1u << 4,
 	};
 	ENUM_CLASS_FLAGS(GpuBufferUsage);
 
@@ -211,34 +212,14 @@ namespace FW
 	class GpuTrackedResource : public GpuResource
 	{
 	public:
-		using GpuResource::GpuResource;
-
-		GpuResourceState State{};
+		GpuTrackedResource(GpuResourceType InType, GpuResourceState InState);
+		GpuResourceState State;
 	};
 
-    inline uint32 GetTextureFormatByteSize(GpuTextureFormat InFormat)
-    {
-        switch (InFormat)
-        {
-		case GpuTextureFormat::R16_FLOAT:
-			return 2;
-        case GpuTextureFormat::R8G8B8A8_UNORM:
-        case GpuTextureFormat::B8G8R8A8_UNORM:
-		case GpuTextureFormat::B8G8R8A8_UNORM_SRGB:
-        case GpuTextureFormat::R10G10B10A2_UNORM:
-        case GpuTextureFormat::R11G11B10_FLOAT:
-        case GpuTextureFormat::R32_FLOAT:
-            return 4;
-        case GpuTextureFormat::R16G16B16A16_UNORM:
-        case GpuTextureFormat::R16G16B16A16_UINT:
-        case GpuTextureFormat::R16G16B16A16_FLOAT:
-            return 8;
-        case GpuTextureFormat::R32G32B32A32_UINT:
-        case GpuTextureFormat::R32G32B32A32_FLOAT:
-            return 16;
-        default:
-			AUX::Unreachable();
-        }
-    }
+	FRAMEWORK_API uint32 GetTextureFormatByteSize(GpuTextureFormat InFormat);
+
+	FRAMEWORK_API GpuResourceState GetBufferState(GpuBufferUsage Usage);
+
+	FRAMEWORK_API GpuResourceState GetTextureState(GpuTextureUsage Usage);
 }
 

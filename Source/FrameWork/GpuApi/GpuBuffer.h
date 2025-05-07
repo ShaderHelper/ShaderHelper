@@ -3,20 +3,28 @@
 
 namespace FW
 {
+	struct GpuBufferDesc
+	{
+		uint32 ByteSize;
+		GpuBufferUsage Usage;
+
+		//dx structured buffer have a stride limit of 2048 bytes.
+		uint32 Stride = 0;
+		TArrayView<uint8> InitialData;
+	};
+
 	class GpuBuffer : public GpuTrackedResource
 	{
 	public:
-		GpuBuffer(GpuBufferUsage InUsage, uint32 InByteSize) 
-			: GpuTrackedResource(GpuResourceType::Buffer)
-			, Usage(InUsage) 
-			, ByteSize(InByteSize)
+		GpuBuffer(GpuBufferDesc InDesc, GpuResourceState InState)
+			: GpuTrackedResource(GpuResourceType::Buffer, InState)
+			, Desc(MoveTemp(InDesc))
 		{}
 
-		GpuBufferUsage GetUsage() const { return Usage; }
-		uint32 GetByteSize() const { return ByteSize; }
+		GpuBufferUsage GetUsage() const { return Desc.Usage; }
+		uint32 GetByteSize() const { return Desc.ByteSize; }
 
 	private:
-		GpuBufferUsage Usage;
-		uint32 ByteSize;
+		GpuBufferDesc Desc;
 	};
 }
