@@ -19,14 +19,20 @@ namespace FW {
 	using Vector = VectorImpl<double>;
 	using Vector3f = VectorImpl<float>;
 	using Vector3d = VectorImpl<double>;
+	using Vector3i = VectorImpl<int>;
+	using Vector3u = VectorImpl<uint32>;
 
 	using Vector2D = Vector2Impl<double>;
 	using Vector2f = Vector2Impl<float>;
 	using Vector2d = Vector2Impl<double>;
+	using Vector2i = Vector2Impl<int>;
+	using Vector2u = Vector2Impl<uint32>;
 
 	using Vector4 = Vector4Impl<double>;
 	using Vector4f = Vector4Impl<float>;
 	using Vector4d = Vector4Impl<double>;
+	using Vector4i = Vector4Impl<int>;
+	using Vector4u = Vector4Impl<uint32>;
 
 	template<uint32 ElementNum, typename Base, template<typename>typename Target, uint32... Indexes>
 	struct Swizzle
@@ -502,7 +508,7 @@ namespace FW {
 		}
 
 		FString ToString() const {
-			return FString::Printf(TEXT("X=%3.3f Y=%3.3f"), X, Y);
+			return FString::Format(TEXT("X={0} Y={1}"), { X, Y });
 		}
 
 		const T* GetData() const {
@@ -723,7 +729,7 @@ namespace FW {
 		}
 
 		FString ToString() const {
-			return FString::Printf(TEXT("X=%3.3f Y=%3.3f Z=%3.3f"), X, Y, Z);
+			return FString::Format(TEXT("X={0} Y={1} Z={2}"), { X, Y, Z });
 		}
 
 		const T* GetData() const {
@@ -944,7 +950,7 @@ namespace FW {
 		}
 
 		FString ToString() const {
-			return FString::Printf(TEXT("X=%3.3f Y=%3.3f Z=%3.3f W=%3.3f"), X, Y, Z, W);
+			return FString::Format(TEXT("X={0} Y={1} Z={2} W={3}"), { X, Y, Z, W });
 		}
 
 		const T* GetData() const {

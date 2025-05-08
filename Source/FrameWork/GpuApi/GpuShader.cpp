@@ -33,9 +33,19 @@ namespace FW
 		{
 			std::string PrintStringLiteral = Match[1];
 			std::string TextArr = "EXPAND(uint StrArr[] = {";
-			for (int i = 1; i < PrintStringLiteral.length() - 1; i++)
+			int Num = PrintStringLiteral.length() - 1;
+			for (int i = 1; i < Num;)
 			{
-				TextArr += std::format("'{}',", PrintStringLiteral[i]);
+				if (i + 1 < Num && PrintStringLiteral[i] == '\\')
+				{
+					TextArr += std::format("'\\{}',", PrintStringLiteral[i + 1]);
+					i += 2;
+				}
+				else
+				{
+					TextArr += std::format("'{}',", PrintStringLiteral[i]);
+					i++;
+				}
 			}
 			TextArr += "'\\0'})";
 			ShaderString.replace(Match.position(1), Match[1].length(), std::move(TextArr));
@@ -135,7 +145,7 @@ namespace FW
 		DxcArgs.Add("-HV");
 		DxcArgs.Add("2021");
 
-        DxcTranslationUnitFlags UnitFlag = DxcTranslationUnitFlags(DxcTranslationUnitFlags_UseCallerThread);
+        DxcTranslationUnitFlags UnitFlag = DxcTranslationUnitFlags(DxcTranslationUnitFlags_UseCallerThread | DxcTranslationUnitFlags_DetailedPreprocessingRecord);
         Impl->Index->ParseTranslationUnit("Temp.hlsl", DxcArgs.GetData(), DxcArgs.Num(), AUX::GetAddrExt(Impl->Unsaved.GetReference()), 1, UnitFlag, Impl->TU.GetInitReference());
     }
 

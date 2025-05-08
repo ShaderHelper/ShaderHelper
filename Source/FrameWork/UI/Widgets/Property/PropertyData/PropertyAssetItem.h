@@ -98,7 +98,7 @@ namespace FW
                 ]
                 +SHorizontalBox::Slot()
                 .VAlign(VAlign_Center)
-                .AutoWidth()
+				.HAlign(HAlign_Center)
                 [
                     SNew(SVerticalBox)
                     +SVerticalBox::Slot()
@@ -106,7 +106,6 @@ namespace FW
                     .AutoHeight()
                     [
                         SNew(STextBlock)
-                        .TextStyle(&FAppCommonStyle::Get().GetWidgetStyle<FTextBlockStyle>("SmallMinorText"))
                         .Text_Lambda([this]{
                             if(auto& AssetRef = *(AssetPtr<AssetObject>*)AssetPtrRef)
                             {
@@ -119,7 +118,6 @@ namespace FW
                     .AutoHeight()
                     [
                         SNew(STextBlock)
-                        .TextStyle(&FAppCommonStyle::Get().GetWidgetStyle<FTextBlockStyle>("SmallMinorText"))
                         .Text_Lambda([this]{
                             return FText::FromString("(" + GetRegisteredName(AssetMetaType) + ")");
                         })

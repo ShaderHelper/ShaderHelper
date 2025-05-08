@@ -152,5 +152,83 @@ namespace FW
         Vector2f* ValueRef;
     };
 
+	class PropertyVector4fItem : public PropertyItemBase
+	{
+		MANUAL_RTTI_TYPE(PropertyVector4fItem, PropertyItemBase)
+	public:
+		PropertyVector4fItem(ShObject* InOwner, FString InName, Vector4f* InValueRef = nullptr)
+			: PropertyItemBase(InOwner, MoveTemp(InName))
+			, ValueRef(InValueRef)
+		{
+		}
+
+		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
+		{
+			auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
+			if (ValueRef)
+			{
+				auto ValueWidget = SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					[
+						SNew(SSpinBox<float>)
+							.MaxFractionalDigits(3)
+							.OnValueChanged_Lambda([this](float NewValue) {
+								if (ValueRef->x != NewValue)
+								{
+									ValueRef->x = NewValue;
+									Owner->PostPropertyChanged(this);
+								}
+							})
+							.Value_Lambda([this] { return ValueRef->x; })
+					]
+					+ SHorizontalBox::Slot()
+					[
+						SNew(SSpinBox<float>)
+							.MaxFractionalDigits(3)
+							.OnValueChanged_Lambda([this](float NewValue) {
+								if (ValueRef->y != NewValue)
+								{
+									ValueRef->y = NewValue;
+									Owner->PostPropertyChanged(this);
+								}
+							})
+							.Value_Lambda([this] { return ValueRef->y; })
+					]
+					+ SHorizontalBox::Slot()
+					[
+						SNew(SSpinBox<float>)
+							.MaxFractionalDigits(3)
+							.OnValueChanged_Lambda([this](float NewValue) {
+								if (ValueRef->z != NewValue)
+								{
+									ValueRef->z = NewValue;
+									Owner->PostPropertyChanged(this);
+								}
+							})
+							.Value_Lambda([this] { return ValueRef->z; })
+					]
+					+SHorizontalBox::Slot()
+					[
+						SNew(SSpinBox<float>)
+							.MaxFractionalDigits(3)
+							.OnValueChanged_Lambda([this](float NewValue) {
+								if (ValueRef->w != NewValue)
+								{
+									ValueRef->w = NewValue;
+									Owner->PostPropertyChanged(this);
+								}
+							})
+							.Value_Lambda([this] { return ValueRef->w; })
+					];
+				Item->AddWidget(MoveTemp(ValueWidget));
+			}
+
+			return Row;
+		}
+
+	private:
+		Vector4f* ValueRef;
+	};
+
 }
 

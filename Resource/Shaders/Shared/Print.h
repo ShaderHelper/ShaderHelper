@@ -122,11 +122,7 @@ AppendArgFunc(float)
     StrArrDecl;                                                     \
     uint CharNum = sizeof(StrArr) / sizeof(StrArr[0]);              \
     uint ArgNum = GET_ARG_NUM(__VA_ARGS__);                         \
-	uint ArgByteSize = 0;                                           \
-	if(ArgNum > 0)                                                  \
-	{                                                               \
-		ArgByteSize = 1 + ArgNum + GET_ARGS_SIZE(__VA_ARGS__);      \
-	}                                                               \
+	uint ArgByteSize = 1 + ArgNum + GET_ARGS_SIZE(__VA_ARGS__);     \
     uint Increment = CharNum + ArgByteSize;                         \
     uint OldByteSize = Printer[0].ByteSize;                         \
 	uint ByteOffset = 0xFFFFFFFF;                                   \
@@ -142,18 +138,22 @@ AppendArgFunc(float)
             break;                                                  \
         }                                                           \
     }                                                               \
-	if (ByteOffset != 0xFFFFFFFF)                                   \
+	if (ByteOffset == 0xFFFFFFFF)                                   \
 	{                                                               \
-		for (uint i = 0; i < CharNum; i++)                          \
-		{                                                           \
-			ByteOffset = AppendChar(ByteOffset, StrArr[i]);         \
-		}                                                           \
+		break;                                                      \
 	}                                                               \
-	if (ArgNum > 0)                                                 \
+	for (uint i = 0; i < CharNum; i++)                              \
 	{                                                               \
-		ByteOffset = AppendChar(ByteOffset, ArgNum);                \
-		APPEND_ARGS(__VA_ARGS__);                                   \
+		ByteOffset = AppendChar(ByteOffset, StrArr[i]);             \
 	}                                                               \
+	ByteOffset = AppendChar(ByteOffset, ArgNum);                    \
+	APPEND_ARGS(__VA_ARGS__);                                       \
 } while(0)
+
+static uint GAssertCondition = 1;
+void Assert(uint Condition) 
+{
+	GAssertCondition &= Condition;
+}
 
 #endif
