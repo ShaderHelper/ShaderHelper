@@ -144,8 +144,10 @@ namespace FW
 		TArray<const char*> DxcArgs;
 		DxcArgs.Add("-HV");
 		DxcArgs.Add("2021");
+		DxcArgs.Add("-D");
+		DxcArgs.Add("ENABLE_PRINT=0");
 
-        DxcTranslationUnitFlags UnitFlag = DxcTranslationUnitFlags(DxcTranslationUnitFlags_UseCallerThread | DxcTranslationUnitFlags_DetailedPreprocessingRecord);
+        DxcTranslationUnitFlags UnitFlag = DxcTranslationUnitFlags(DxcTranslationUnitFlags_UseCallerThread);
         Impl->Index->ParseTranslationUnit("Temp.hlsl", DxcArgs.GetData(), DxcArgs.Num(), AUX::GetAddrExt(Impl->Unsaved.GetReference()), 1, UnitFlag, Impl->TU.GetInitReference());
     }
 
