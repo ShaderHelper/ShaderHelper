@@ -1343,6 +1343,13 @@ const FString ErrorMarkerText = TEXT("✘");
 
             return FReply::Unhandled();
         }
+		else if (Character == '"')
+		{
+			Text->InsertTextAtCursor("\"\"");
+			const FTextLocation CursorLocation = Text->GetCursorLocation();
+			Text->GoTo(FTextLocation{CursorLocation.GetLineIndex(), CursorLocation.GetOffset() - 1});
+			return FReply::Handled();
+		}
         else if(FChar::IsIdentifier(Character) || Character == TEXT('.'))
         {
             bTryComplete = true;
@@ -1723,6 +1730,7 @@ const FString ErrorMarkerText = TEXT("✘");
         TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::Identifier, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText"));
         TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::Preprocess, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorPreprocessText"));
         TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::Comment, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorCommentText"));
+		TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::String, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorStringText"));
         TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::Other, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText"));
     }
 

@@ -17,6 +17,7 @@ namespace SH
 			Identifier,
 			Preprocess,
 			Comment,
+			String,
 			Other,
 		};
 

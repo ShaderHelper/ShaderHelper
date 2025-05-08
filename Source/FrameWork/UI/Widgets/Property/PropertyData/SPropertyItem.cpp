@@ -49,6 +49,7 @@ namespace FW
 			+ SHorizontalBox::Slot()
 			.VAlign(VAlign_Center)
 			.Padding(Indent, 0.0f, 0.0f, 0.0f)
+			.FillWidth(0.45f)
 			[
                 ItemTextBlock
             ];

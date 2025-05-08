@@ -99,9 +99,10 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
     {
         static UniformBufferBuilder BuiltInUbLayout{ UniformBufferUsage::Persistant };
         static int Init = [&] {
-            BuiltInUbLayout
-                .AddVector2f("iResolution")
-                .AddFloat("iTime");
+			BuiltInUbLayout
+				.AddVector2f("iResolution")
+				.AddFloat("iTime")
+				.AddVector4f("iMouse");
             return 0;
         }();
         return BuiltInUbLayout;
@@ -179,6 +180,10 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
                 {
                     NewCustomUniformBufferBuilder.AddVector2f(MemberName);
                 }
+				else if (UniformData->IsOfType<PropertyVector4fItem>())
+				{
+					NewCustomUniformBufferBuilder.AddVector4f(MemberName);
+				}
             }
             NewCustomBindGroupLayoutBuilder.AddUniformBuffer("Uniform", NewCustomUniformBufferBuilder.GetLayoutDeclaration(), BindingShaderStage::Pixel);
         }
@@ -243,6 +248,10 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         {
             NewUniformProperty = MakeShared<PropertyVector2fItem>(this, UniformMemberName);
         }
+		else if (InTypeName == "float4")
+		{
+			NewUniformProperty = MakeShared<PropertyVector4fItem>(this, UniformMemberName);
+		}
         else
         {
             check(false);
@@ -319,6 +328,12 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
             FSlateIcon(),
             FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, FString("float2")) }
         );
+		MenuBuilder.AddMenuEntry(
+			FText::FromString("float4"),
+			FText::GetEmpty(),
+			FSlateIcon(),
+			FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, FString("float4")) }
+		);
         return MenuBuilder.MakeWidget();
     }
 

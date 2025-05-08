@@ -104,6 +104,7 @@ namespace SH
 			Punctuation,
 			NumberPuncuation,
 			Keyword,
+			String,
 			Other,
 		};
 
@@ -121,6 +122,7 @@ namespace SH
 			case StateSet::Punctuation:                     return TokenType::Punctuation;
 			case StateSet::NumberPuncuation:                return TokenType::Punctuation;
 			case StateSet::Keyword:                         return TokenType::Keyword;
+			case StateSet::String:                          return TokenType::String;
 			case StateSet::Other:                           return TokenType::Other;
 			default:
 				return TokenType::Identifier;
@@ -174,6 +176,11 @@ namespace SH
 							else if (RemainingLen >= 2 && FCString::Strncmp(CurString, TEXT("/*"), 2) == 0) {
 								CurLineState = StateSet::LeftMultilineComment;
 								CurOffset += 2;
+							}
+							else if (CurChar == '"')
+							{
+								CurLineState = StateSet::String;
+								CurOffset += 1;
 							}
 							else if (TOptional<int32> PunctuationLen = IsMatchPunctuation(CurString, RemainingLen, MatchedPunctuation)) {
 
@@ -250,10 +257,18 @@ namespace SH
 						//Always regard other chars as valid tokens.
 						CurLineState = StateSet::End;
 						break;
+					case StateSet::String:
+						LastLineState = StateSet::String;
+						if (CurChar == '"' && HlslCodeString[CurOffset - 1] != '\\')
+						{
+							CurLineState = StateSet::End;
+						}
+						CurOffset += 1;
+						break;
 					case StateSet::Punctuation:
 						LastLineState = StateSet::Punctuation;
 						CurLineState = StateSet::End;
-						break;;
+						break;
 					case StateSet::End:
 						{
 							int32 TokenEnd = CurOffset;

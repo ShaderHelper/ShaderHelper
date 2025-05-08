@@ -123,6 +123,11 @@ namespace SH
                 auto Float2Porperty = MakeShared<PropertyUniformItem<Vector2f>>(this, MemberName, InUb->GetMember<Vector2f>(MemberName));
                 Property = Float2Porperty;
             }
+			else if (MemberInfo.TypeName == "float4")
+			{
+				auto Float4Porperty = MakeShared<PropertyUniformItem<Vector4f>>(this, MemberName, InUb->GetMember<Vector4f>(MemberName));
+				Property = Float4Porperty;
+			}
             else
             {
                 check(false);
