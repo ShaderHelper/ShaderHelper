@@ -116,6 +116,11 @@ AppendArgFunc(float)
 #define APPEND_ARGS_3(Arg1, Arg2, Arg3) ByteOffset = AppendArg(ByteOffset, Arg1); APPEND_ARGS_2(Arg2, Arg3)
 #define APPEND_ARGS(...) JOIN(APPEND_ARGS_, GET_ARG_NUM(__VA_ARGS__))(__VA_ARGS__)
 
+#ifndef ENABLE_PRINT
+	#define ENABLE_PRINT 1
+#endif
+
+#if ENABLE_PRINT == 1
 //Up to 3 args now.
 //Print("abc {0}", t);
 #define Print(StrArrDecl, ...)  do {                                \
@@ -149,11 +154,14 @@ AppendArgFunc(float)
 	ByteOffset = AppendChar(ByteOffset, ArgNum);                    \
 	APPEND_ARGS(__VA_ARGS__);                                       \
 } while(0)
+#else
+#define Print(StrArrDecl, ...)
+#endif
 
-static uint GAssertCondition = 1;
+static uint GAssertResult = 1;
 void Assert(uint Condition) 
 {
-	GAssertCondition &= Condition;
+	GAssertResult &= Condition;
 }
 
 #endif
