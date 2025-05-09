@@ -15,9 +15,13 @@ namespace SH
 const FString DefaultPixelShaderBody =
 R"(void mainImage(out float4 fragColor,in float2 fragCoord)
 {
-    float2 uv = fragCoord/iResolution.xy;
+    float2 uv = fragCoord / iResolution.xy;
+    
     float3 col = 0.5 + 0.5*cos(iTime + uv.xyx + float3(0,2,4));
-    fragColor = float4(col,1);
+    
+    fragColor = float4(uv,0,1);
+    
+    PrintAtMouse("fragColor:{0}", fragColor);
 })";
 
 const FString DefaultVertexShader =

@@ -34,7 +34,7 @@ namespace HLSL
 
 	struct Printer
 	{
-		static const uint MaxBufferSize = 256;
+		static const uint MaxBufferSize = 511;
 
 		uint ByteSize;
 		//PrintBuffer layout: [xxx{0}xxxx\0] [ArgNum TypeTag ArgValue ...]
@@ -158,10 +158,10 @@ AppendArgFunc(float)
 #define Print(StrArrDecl, ...)
 #endif
 
-static uint GAssertResult = 1;
+static uint GPrivate_AssertResult = 1;
 void Assert(uint Condition) 
 {
-	GAssertResult &= Condition;
+	GPrivate_AssertResult &= Condition;
 }
 
 #endif
