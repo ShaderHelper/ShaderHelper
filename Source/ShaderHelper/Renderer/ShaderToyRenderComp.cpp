@@ -15,19 +15,12 @@ namespace SH
 		, ViewPort(InViewPort)
 	{
         ResizeHandle = ViewPort->ViewportResize.AddRaw(this, &ShaderToyRenderComp::OnViewportResize);
-		MouseDownHandle = ViewPort->MouseDown.AddRaw(this, &ShaderToyRenderComp::OnMouseDown);
-		MouseUpHandle = ViewPort->MouseUp.AddRaw(this, &ShaderToyRenderComp::OnMouseUp);
-		MouseMoveHandle = ViewPort->MouseMove.AddRaw(this, &ShaderToyRenderComp::OnMouseMove);
-
 		Context.iResolution = { (float)ViewPort->GetSize().X, (float)ViewPort->GetSize().Y };
 	}
 
     ShaderToyRenderComp::~ShaderToyRenderComp()
     {
         ViewPort->ViewportResize.Remove(ResizeHandle);
-		ViewPort->MouseDown.Remove(MouseDownHandle);
-		ViewPort->MouseUp.Remove(MouseUpHandle);
-		ViewPort->MouseMove.Remove(MouseMoveHandle);
     }
 
 	void ShaderToyRenderComp::OnViewportResize(const Vector2f& InResolution)
@@ -35,32 +28,10 @@ namespace SH
 		Context.iResolution = InResolution;
 	}
 
-	void ShaderToyRenderComp::OnMouseDown(const FPointerEvent& MouseEvent)
-	{
-		Context.iMouse.xy = (Vector2f)MouseEvent.GetScreenSpacePosition();
-		Context.iMouse.zw = Context.iMouse.xy;
-	}
-
-	void ShaderToyRenderComp::OnMouseMove(const FPointerEvent& MouseEvent)
-	{
-		if (Context.iMouse.z > 0)
-		{
-			Context.iMouse.xy = (Vector2f)MouseEvent.GetScreenSpacePosition();
-			if (Context.iMouse.w > 0)
-			{
-				Context.iMouse.w = -Context.iMouse.w;
-			}
-		}
-	}
-
-	void ShaderToyRenderComp::OnMouseUp(const FPointerEvent& MouseEvent)
-	{
-		Context.iMouse.z = -Context.iMouse.z;
-	}
-
 	void ShaderToyRenderComp::RenderBegin()
 	{
 		Context.iTime = TSingleton<ShProjectManager>::Get().GetProject()->TimelineCurTime;
+		Context.iMouse = ViewPort->GetiMouse();
 	}
 
 	void ShaderToyRenderComp::RenderInternal()

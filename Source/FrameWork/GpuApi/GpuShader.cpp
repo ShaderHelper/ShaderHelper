@@ -25,31 +25,35 @@ namespace FW
 {
 	GpuShaderPreProcessor& GpuShaderPreProcessor::ReplacePrintStringLiteral()
 	{
-		int SearchIndex = 0;
 		std::string ShaderString{TCHAR_TO_UTF8(*ShaderText)};
-		std::regex Pattern{"Print *\\( *(\".*\")"};
 		std::smatch Match;
-		while (std::regex_search(ShaderString, Match, Pattern))
-		{
-			std::string PrintStringLiteral = Match[1];
-			std::string TextArr = "EXPAND(uint StrArr[] = {";
-			int Num = PrintStringLiteral.length() - 1;
-			for (int i = 1; i < Num;)
+
+		auto ReplaceMatch = [&](const std::regex& Pattern) {
+			while (std::regex_search(ShaderString, Match, Pattern))
 			{
-				if (i + 1 < Num && PrintStringLiteral[i] == '\\')
+				std::string PrintStringLiteral = Match[1];
+				std::string TextArr = "EXPAND(uint StrArr[] = {";
+				int Num = PrintStringLiteral.length() - 1;
+				for (int i = 1; i < Num;)
 				{
-					TextArr += std::format("'\\{}',", PrintStringLiteral[i + 1]);
-					i += 2;
+					if (i + 1 < Num && PrintStringLiteral[i] == '\\')
+					{
+						TextArr += std::format("'\\{}',", PrintStringLiteral[i + 1]);
+						i += 2;
+					}
+					else
+					{
+						TextArr += std::format("'{}',", PrintStringLiteral[i]);
+						i++;
+					}
 				}
-				else
-				{
-					TextArr += std::format("'{}',", PrintStringLiteral[i]);
-					i++;
-				}
+				TextArr += "'\\0'})";
+				ShaderString.replace(Match.position(1), Match[1].length(), std::move(TextArr));
 			}
-			TextArr += "'\\0'})";
-			ShaderString.replace(Match.position(1), Match[1].length(), std::move(TextArr));
-		}
+		};
+		ReplaceMatch(std::regex{"Print *\\( *(\".*\")"});
+		ReplaceMatch(std::regex{ "PrintAtMouse *\\( *(\".*\")" });
+
 		ShaderText = FString{UTF8_TO_TCHAR(ShaderString.data())};
 		return *this;
 	}

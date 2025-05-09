@@ -7,12 +7,26 @@ struct PIn
 
 void mainImage(out float4 fragColor, in float2 fragCoord);
 
+#if ENABLE_PRINT == 1
+#define PrintAtMouse(Str, ...) do {                                             \
+	if(iMouse.z > 0 && all(uint2(iMouse.xy) == uint2(GPrivate_fragCoord)))      \
+	{                                                                           \
+		Print(EXPAND(Str), ##__VA_ARGS__);                                      \
+	}                                                                           \
+} while(0)
+#else
+#define PrintAtMouse(Str, ...)
+#endif
+
+static float2 GPrivate_fragCoord;
+
 float4 MainPS(PIn Input) : SV_Target
 {
-	float2 fragCoord = float2(Input.Pos.x, iResolution.y - Input.Pos.y);
-	float4 fragColor = 1.0f;
+	float2 fragCoord = float2(Input.Pos.x, Input.Pos.y);
+	GPrivate_fragCoord = fragCoord;
+	float4 fragColor = 0.0f;
 	mainImage(fragColor, fragCoord);
-	if (GAssertResult != 1)
+	if (GPrivate_AssertResult != 1)
 	{
 		fragColor = float4(1,0,1,1);
 	}

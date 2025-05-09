@@ -21,7 +21,6 @@ namespace FW
 	{
 		TArray<FString> PrintStrings;
 		HLSL::Printer* Printer = (HLSL::Printer*)GGpuRhi->MapGpuBuffer(InternalBuffer, GpuResourceMapMode::Read_Only);
-		GGpuRhi->UnMapGpuBuffer(InternalBuffer);
 		uint32 ByteOffset = 4;
 		while (ByteOffset < Printer->ByteSize)
 		{
@@ -110,7 +109,7 @@ namespace FW
 			}
 			PrintStrings.Add(FString::Format(*PrintStr, Args));
 		}
-
+		GGpuRhi->UnMapGpuBuffer(InternalBuffer);
 		return PrintStrings;
 	}
 

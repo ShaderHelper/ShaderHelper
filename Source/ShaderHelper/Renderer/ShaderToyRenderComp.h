@@ -24,9 +24,6 @@ namespace SH
 
 	public:
 		void OnViewportResize(const FW::Vector2f& InResolution);
-		void OnMouseDown(const FPointerEvent& MouseEvent);
-		void OnMouseMove(const FPointerEvent& MouseEvent);
-		void OnMouseUp(const FPointerEvent& MouseEvent);
 
 		void RenderBegin();
 		void RenderInternal() override;
@@ -36,7 +33,5 @@ namespace SH
 		FW::PreviewViewPort* ViewPort;
 		ShaderToyExecContext Context;
         FDelegateHandle ResizeHandle;
-		FDelegateHandle MouseDownHandle, MouseUpHandle;
-		FDelegateHandle MouseMoveHandle;
 	};
 }

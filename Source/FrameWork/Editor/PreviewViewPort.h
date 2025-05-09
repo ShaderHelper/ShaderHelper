@@ -5,9 +5,9 @@
 namespace FW
 {
 	DECLARE_MULTICAST_DELEGATE_OneParam(OnViewportResizeDelegate, const Vector2f&)
-	DECLARE_MULTICAST_DELEGATE_OneParam(OnMouseDownDelegate, const FPointerEvent&)
-	DECLARE_MULTICAST_DELEGATE_OneParam(OnMouseUpDelegate, const FPointerEvent&)
-	DECLARE_MULTICAST_DELEGATE_OneParam(OnMouseMoveDelegate, const FPointerEvent&)
+	DECLARE_MULTICAST_DELEGATE_TwoParams(OnMouseDownDelegate, const FGeometry&, const FPointerEvent&)
+	DECLARE_MULTICAST_DELEGATE_TwoParams(OnMouseUpDelegate, const FGeometry&, const FPointerEvent&)
+	DECLARE_MULTICAST_DELEGATE_TwoParams(OnMouseMoveDelegate, const FGeometry&, const FPointerEvent&)
 
 	class FRAMEWORK_API PreviewViewPort : public ISlateViewport
 	{
@@ -37,31 +37,44 @@ namespace FW
         
         void Clear() { ViewPortRT.Reset(); }
 
+		Vector4f GetiMouse() const { return iMouse; }
+
 		FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
 		{
 			if (MouseDown.IsBound())
 			{
-				MouseDown.Broadcast(MouseEvent);
+				MouseDown.Broadcast(MyGeometry, MouseEvent);
 			}
-			return FReply::Unhandled();
+			iMouse.xy = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * MyGeometry.Scale);
+			iMouse.zw = iMouse.xy;
+			return FReply::Handled();
 		}
 
 		FReply OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
 		{
 			if (MouseUp.IsBound())
 			{
-				MouseUp.Broadcast(MouseEvent);
+				MouseUp.Broadcast(MyGeometry, MouseEvent);
 			}
-			return FReply::Unhandled();
+			iMouse.z = -iMouse.z;
+			return FReply::Handled();
 		}
 
 		FReply OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
 		{
 			if (MouseMove.IsBound())
 			{
-				MouseMove.Broadcast(MouseEvent);
+				MouseMove.Broadcast(MyGeometry, MouseEvent);
 			}
-			return FReply::Unhandled();
+			if (iMouse.z > 0)
+			{
+				iMouse.xy = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * MyGeometry.Scale);
+				if (iMouse.w > 0)
+				{
+					iMouse.w = -iMouse.w;
+				}
+			}
+			return FReply::Handled();
 		}
 
 	public:
@@ -74,5 +87,6 @@ namespace FW
 		TSharedPtr<FSlateUpdatableTexture> ViewPortRT;
 		int32 SizeX;
 		int32 SizeY;
+		Vector4f iMouse{};
 	};
 }
