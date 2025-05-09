@@ -3,7 +3,7 @@ CurrentPath="$(cd "$(dirname "$0")" && pwd)"
 
 echo "Downloading ShaderConductor..."
     ShaderConductor_Dir="$CurrentPath/Lib"
-    ShaderConductor_Url="https://gitlab.com/mxrhyx/shaderhelperdependency/uploads/a63d78d3904cdb31cffacc0a4acdcfd7/ShaderConductor-Mac.zip"
+    ShaderConductor_Url="https://gitee.com/mxr233/shader-helper-dependency/releases/download/v0.1/ShaderConductor-Mac.zip"
     cd "$ShaderConductor_Dir" || exit 1
     curl -LO $ShaderConductor_Url || exit 1
     tar -zxf ShaderConductor-Mac.zip || exit 1
