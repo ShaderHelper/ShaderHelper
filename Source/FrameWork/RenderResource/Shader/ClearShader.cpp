@@ -21,10 +21,10 @@ namespace FW
 			.Build();
 
 		Cs = GGpuRhi->CreateShaderFromFile(
-			PathHelper::ShaderDir() / "Clear.hlsl",
-			ShaderType::ComputeShader,
-			"ClearCS",
-			BindGroupLayout->GetCodegenDeclaration()
+			.FileName = PathHelper::ShaderDir() / "Clear.hlsl",
+			.Type = ShaderType::ComputeShader,
+			.EntryPoint = "ClearCS",
+			.ExtraDecl = BindGroupLayout->GetCodegenDeclaration()
 		);
 
 		FString ErrorInfo;
@@ -39,7 +39,7 @@ namespace FW
 		check(ResourceByteSize % 4 == 0);
 		ClearUb->GetMember<uint32>("Size") = ResourceByteSize / 4;
 
-		return GpuBindGrouprBuilder{ BindGroupLayout }
+		return GpuBindGroupBuilder{ BindGroupLayout }
 			.SetExistingBinding(0, InResource)
 			.SetUniformBuffer("ClearUb", ClearUb->GetGpuResource())
 			.Build();

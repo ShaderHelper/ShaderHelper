@@ -14,6 +14,12 @@ namespace FW
         GDeferredReleaseOneFrame.Add(this);
     }
 
+    MetalComputePipelineState::MetalComputePipelineState(MTLComputePipelineStatePtr InPipelineState)
+    : PipelineState(MoveTemp(InPipelineState))
+    {
+        GDeferredReleaseOneFrame.Add(this);
+    }
+
 	TRefCountPtr<MetalRenderPipelineState> CreateMetalRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc)
     {
         MetalShader* Vs = static_cast<MetalShader*>(InPipelineStateDesc.Vs);
@@ -51,5 +57,17 @@ namespace FW
         }
         
         return new MetalRenderPipelineState(MoveTemp(PipelineState), MapPrimitiveType(InPipelineStateDesc.Primitive));
+    }
+
+    TRefCountPtr<MetalComputePipelineState> CreateMetalComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc)
+    {
+        MetalShader* Cs = static_cast<MetalShader*>(InPipelineStateDesc.Cs);
+        NS::Error* err = nullptr;
+        MTLComputePipelineStatePtr PipelineState = GDevice->newComputePipelineState(Cs->GetCompilationResult(), &err);
+        if(!PipelineState)
+        {
+            SH_LOG(LogMetal, Fatal, TEXT("Failed to create compute pipeline: %s"), *NSStringToFString(err->localizedDescription()));
+        }
+        return new MetalComputePipelineState(MoveTemp(PipelineState));
     }
 }

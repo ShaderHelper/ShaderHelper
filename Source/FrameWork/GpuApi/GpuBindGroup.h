@@ -32,15 +32,15 @@ namespace FW
         GpuBindGroupDesc Desc;
 	};
 
-	class FRAMEWORK_API GpuBindGrouprBuilder
+	class FRAMEWORK_API GpuBindGroupBuilder
 	{
 	public:
-		GpuBindGrouprBuilder(GpuBindGroupLayout* InLayout);
+		GpuBindGroupBuilder(GpuBindGroupLayout* InLayout);
 
-		GpuBindGrouprBuilder& SetExistingBinding(BindingSlot InSlot, GpuResource* InResource);
-		GpuBindGrouprBuilder& SetUniformBuffer(const FString& BindingName, GpuResource* InResource);
-		GpuBindGrouprBuilder& SetTexture(const FString& BindingName, GpuResource* InResource);
-		GpuBindGrouprBuilder& SetSampler(const FString& BindingName, GpuResource* InResource);
+		GpuBindGroupBuilder& SetExistingBinding(BindingSlot InSlot, GpuResource* InResource);
+		GpuBindGroupBuilder& SetUniformBuffer(const FString& BindingName, GpuResource* InResource);
+		GpuBindGroupBuilder& SetTexture(const FString& BindingName, GpuResource* InResource);
+		GpuBindGroupBuilder& SetSampler(const FString& BindingName, GpuResource* InResource);
 
 		TRefCountPtr<GpuBindGroup> Build();
 

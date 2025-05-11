@@ -5,39 +5,39 @@
 namespace FW
 {
 
-	GpuBindGrouprBuilder::GpuBindGrouprBuilder(GpuBindGroupLayout* InLayout)
+	GpuBindGroupBuilder::GpuBindGroupBuilder(GpuBindGroupLayout* InLayout)
 	{
 		Desc.Layout = InLayout;
 	}
 
-	GpuBindGrouprBuilder& GpuBindGrouprBuilder::SetExistingBinding(BindingSlot InSlot, GpuResource* InResource)
+	GpuBindGroupBuilder& GpuBindGroupBuilder::SetExistingBinding(BindingSlot InSlot, GpuResource* InResource)
 	{
 		Desc.Resources.Add(InSlot, { InResource });
 		return *this;
 	}
 
-	GpuBindGrouprBuilder& GpuBindGrouprBuilder::SetUniformBuffer(const FString& BindingName, GpuResource* InResource)
+	GpuBindGroupBuilder& GpuBindGroupBuilder::SetUniformBuffer(const FString& BindingName, GpuResource* InResource)
 	{
 		BindingSlot Slot = Desc.Layout->GetDesc().CodegenBindingNameToSlot[BindingName];
 		Desc.Resources.Add(Slot, { InResource });
 		return *this;
 	}
 
-	GpuBindGrouprBuilder& GpuBindGrouprBuilder::SetTexture(const FString& BindingName, GpuResource* InResource)
+	GpuBindGroupBuilder& GpuBindGroupBuilder::SetTexture(const FString& BindingName, GpuResource* InResource)
 	{
 		BindingSlot Slot = Desc.Layout->GetDesc().CodegenBindingNameToSlot[BindingName];
 		Desc.Resources.Add(Slot, { InResource });
 		return *this;
 	}
 
-	GpuBindGrouprBuilder& GpuBindGrouprBuilder::SetSampler(const FString& BindingName, GpuResource* InResource)
+	GpuBindGroupBuilder& GpuBindGroupBuilder::SetSampler(const FString& BindingName, GpuResource* InResource)
 	{
 		BindingSlot Slot = Desc.Layout->GetDesc().CodegenBindingNameToSlot[BindingName];
 		Desc.Resources.Add(Slot, { InResource });
 		return *this;
 	}
 
-	TRefCountPtr<GpuBindGroup> GpuBindGrouprBuilder::Build()
+	TRefCountPtr<GpuBindGroup> GpuBindGroupBuilder::Build()
 	{
 		return GGpuRhi->CreateBindGroup(Desc);
 	}

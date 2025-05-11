@@ -1,5 +1,7 @@
 //@Binding@
 
+#include "Shared/Print.h"
+
 struct PIn
 {
 	float4 Pos : SV_Position;

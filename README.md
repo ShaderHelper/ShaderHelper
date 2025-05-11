@@ -7,18 +7,18 @@ This is a shader editor based on some special modules from UnrealEngine (Slate, 
 
 ## Build Instructions
 
-### Windows Requirements
+### Minimum Windows Requirements
 [![Windows](https://github.com/mxrhyx233/ShaderHelper/actions/workflows/Windows.yml/badge.svg)](https://github.com/mxrhyx233/ShaderHelper/actions/workflows/Windows.yml)
-* Windows 10 (64-bit)
+* Windows 10 64-bit version 1909
 * x86_64
 * Visual studio 2022
 
 First run `downloadDep.bat` to get external dependencies, then open the `.sln` file created after running `bootstrap.bat` and build the project.  
 
-### MacOS Requirements
+### Minimum MacOS Requirements
 [![MacOS](https://github.com/mxrhyx233/ShaderHelper/actions/workflows/MacOS.yml/badge.svg)](https://github.com/mxrhyx233/ShaderHelper/actions/workflows/MacOS.yml)
-* 10.15 system version at least
+* Sonoma 14.5
 * x86_64 or arm64
-* Xcode
+* Xcode 16
 
 First run `downloadDep.sh` to get external dependencies, then open the `.xcworkspace` file created after running `bootstrap.sh` and build the project.

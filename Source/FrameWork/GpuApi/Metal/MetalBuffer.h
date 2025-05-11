@@ -7,7 +7,7 @@ namespace FW
     class MetalBuffer : public GpuBuffer
     {
     public:
-        MetalBuffer(MTLBufferPtr InBuffer, GpuBufferUsage Usage);
+        MetalBuffer(MTLBufferPtr InBuffer, const GpuBufferDesc& InBufferDesc, GpuResourceState InResourceState);
         
     public:
         MTL::Buffer* GetResource() const { return Buffer.get(); }
@@ -21,5 +21,5 @@ namespace FW
         MTLBufferPtr Buffer;
     };
 
-    TRefCountPtr<MetalBuffer> CreateMetalBuffer(uint64 BufferSize, GpuBufferUsage Usage);
+    TRefCountPtr<MetalBuffer> CreateMetalBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InResourceState);
 }

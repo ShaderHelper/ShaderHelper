@@ -7,9 +7,9 @@ namespace FW
     class MetalShader : public GpuShader
     {
     public:
-		MetalShader(const FString& InFileName, ShaderType InType, const FString& ExtraDeclaration, const FString& InEntryPoint);
-		MetalShader(ShaderType InType, const FString& InSourceText, const FString& InShaderName, const FString& InEntryPoint);
-        
+        MetalShader(const GpuShaderFileDesc& Desc);
+        MetalShader(const GpuShaderSourceDesc& Desc);
+
     public:
         MTL::Function* GetCompilationResult() const { return ByteCodeFunc.get(); }
         const FString& GetMslText() const { return MslText; }
@@ -23,10 +23,8 @@ namespace FW
         FString MslText;
     };
     
-    TRefCountPtr<MetalShader> CreateMetalShader(const FString& FileName, ShaderType InType, const FString& ExtraDeclaration,
-		const FString& EntryPoint);
-    TRefCountPtr<MetalShader> CreateMetalShader(ShaderType InType, const FString& InSourceText, const FString& ShaderName,
-		const FString& InEntryPoint);
+    TRefCountPtr<MetalShader> CreateMetalShader(const GpuShaderFileDesc& FileDesc);
+    TRefCountPtr<MetalShader> CreateMetalShader(const GpuShaderSourceDesc& SourceDesc);
 
     bool CompileShader(TRefCountPtr<MetalShader> InShader, FString& OutErrorInfo);
     

@@ -2,8 +2,8 @@
 SETLOCAL ENABLEDELAYEDEXPANSION
 
 set VSWHERE_PATH="C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
-rem vs2019-vs2022
-set VSMIN=16.0
+rem vs2022
+set VSMIN=17.0
 set VSMAX=18.0
 
 set CURRENTDIR=%cd%
@@ -40,7 +40,7 @@ if not exist %VSWHERE_PATH% (
 		exit /b 0
 	)
 	
-	echo ERROR: Could not find vs2019 or vs2022, please make sure you installed it.
+	echo ERROR: Could not find vs2022, please make sure you installed it.
 )
 
 :GenerateVsProject

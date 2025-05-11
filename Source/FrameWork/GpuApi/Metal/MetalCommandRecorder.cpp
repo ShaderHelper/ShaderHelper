@@ -140,7 +140,7 @@ namespace FW
         CmdEncoder->drawPrimitives(StateCache.GetPrimitiveType(), StartVertexLocation, VertexCount, InstanceCount, StartInstanceLocation);
     }
     
-    void MtlRenderPassRecorder::SetRenderPipelineState(GpuPipelineState* InPipelineState)
+    void MtlRenderPassRecorder::SetRenderPipelineState(GpuRenderPipelineState* InPipelineState)
     {
         StateCache.SetPipeline(static_cast<MetalRenderPipelineState*>(InPipelineState));
     }
@@ -172,6 +172,36 @@ namespace FW
         );
     }
 
+    void MtlComputePassRecorder::Dispatch(uint32 ThreadGroupCountX, uint32 ThreadGroupCountY, uint32 ThreadGroupCountZ)
+    {
+        CmdEncoder->dispatch
+    }
+
+    void MtlComputePassRecorder::SetComputePipelineState(GpuComputePipelineState* InPipelineState)
+    {
+
+    }
+
+    void MtlComputePassRecorder::SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)
+    {
+
+    }
+
+    GpuComputePassRecorder* MtlCmdRecorder::BeginComputePass(const FString& PassName)
+    {
+        MTL::ComputeCommandEncoder* Encoder = CmdBuffer->computeCommandEncoder();
+        Encoder->setLabel(FStringToNSString(PassName));
+        auto PassRecorder = MakeUnique<MtlComputePassRecorder>(NS::RetainPtr(Encoder));
+        ComputePassRecorders.Add(MoveTemp(PassRecorder));
+        return ComputePassRecorders.Last().Get();
+    }
+
+    void MtlCmdRecorder::EndComputePass(GpuComputePassRecorder* InComputePassRecorder)
+    {
+        MtlComputePassRecorder* PassRecorder = static_cast<MtlComputePassRecorder*>(InComputePassRecorder);
+        PassRecorder->GetEncoder()->endEncoding();
+    }
+
     GpuRenderPassRecorder* MtlCmdRecorder::BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName)
     {
         MTLRenderPassDescriptorPtr RenderPassDesc = NS::RetainPtr((MTL::RenderPassDescriptor*)MapRenderPassDesc(PassDesc));
@@ -199,7 +229,7 @@ namespace FW
         
     }
 
-    void MtlCmdRecorder::Barrier(GpuTrackedResource* InResource, GpuResourceState NewState)
+    void MtlCmdRecorder::Barriers(const TArray<GpuBarrierInfo>& BarrierInfos)
     {
         InResource->State = NewState;
     }

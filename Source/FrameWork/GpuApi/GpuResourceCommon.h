@@ -67,6 +67,8 @@ namespace FW
 
 		Uniform = 1u << 3,
 		RWStorage = 1u << 4,
+
+		StaticMask = RWStorage, //Only Gpu r/w
 	};
 	ENUM_CLASS_FLAGS(GpuBufferUsage);
 

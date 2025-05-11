@@ -15,15 +15,15 @@ namespace FW
 							.Build();
 		
 		Vs = GGpuRhi->CreateShaderFromFile(
-			PathHelper::ShaderDir() / "Blit.hlsl", 
-			ShaderType::VertexShader,
-			TEXT("MainVS")
+			.FileName = PathHelper::ShaderDir() / "Blit.hlsl", 
+			.Type = ShaderType::VertexShader,
+			.EntryPoint = "MainVS"
 		);
 
 		Ps = GGpuRhi->CreateShaderFromFile(
-			PathHelper::ShaderDir() / "Blit.hlsl",
-			ShaderType::PixelShader,
-			TEXT("MainPS")
+			.FileName = PathHelper::ShaderDir() / "Blit.hlsl",
+			.Type = ShaderType::PixelShader,
+			.EntryPoint = "MainPS"
 		);
 
 		FString ErrorInfo;
@@ -36,7 +36,7 @@ namespace FW
 
 	TRefCountPtr<GpuBindGroup> BlitShader::GetBindGroup(const Parameters& InParameters) const
 	{
-		return GpuBindGrouprBuilder{ BindGroupLayout }
+		return GpuBindGroupBuilder{ BindGroupLayout }
 				.SetExistingBinding(0, InParameters.InputTex)
 				.SetExistingBinding(1, InParameters.InputTexSampler)
 				.Build();

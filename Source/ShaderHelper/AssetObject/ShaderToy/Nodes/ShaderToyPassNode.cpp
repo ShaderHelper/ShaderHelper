@@ -86,7 +86,7 @@ namespace SH
             
             CustomBindLayout = Shader->CustomBindGroupLayoutBuilder.Build();
             CustomUniformBuffer = Shader->CustomUniformBufferBuilder.Build();
-            auto CustomBindGroupBuilder = GpuBindGrouprBuilder{ CustomBindLayout };
+            auto CustomBindGroupBuilder = GpuBindGroupBuilder{ CustomBindLayout };
             if(CustomUniformBuffer.IsValid())
             {
                 CustomUniformBuffer->SetData(CustomUniformBufferData);
@@ -224,7 +224,7 @@ namespace SH
     void ShaderToyPassNode::RefreshProperty()
     {
         CustomBindLayout = Shader->CustomBindGroupLayoutBuilder.Build();
-        auto CustomBindGroupBuilder = GpuBindGrouprBuilder{ CustomBindLayout };
+        auto CustomBindGroupBuilder = GpuBindGroupBuilder{ CustomBindLayout };
         
         auto NewCustomUniformBuffer = Shader->CustomUniformBufferBuilder.Build();
         if(NewCustomUniformBuffer.IsValid())

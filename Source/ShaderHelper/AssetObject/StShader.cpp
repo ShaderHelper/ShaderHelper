@@ -60,11 +60,21 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
     {
         AssetObject::PostLoad();
         
-        VertexShader = GGpuRhi->CreateShaderFromSource(ShaderType::VertexShader, DefaultVertexShader, GetFileName() + "Vs", TEXT("MainVS"));
+        VertexShader = GGpuRhi->CreateShaderFromSource({
+            .Name = GetFileName() + "Vs", 
+            .Source = DefaultVertexShader, 
+            .Type = ShaderType::VertexShader, 
+            .EntryPoint = "MainVS"
+        });
         FString ErrorInfo;
         GGpuRhi->CompileShader(VertexShader, ErrorInfo);
 
-        PixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, GetFullPs(), GetFileName() + "Ps", TEXT("MainPS"));
+        PixelShader = GGpuRhi->CreateShaderFromSource({
+            .Name = GetFileName() + "Ps", 
+            .Source = GetFullPs(), 
+            .Type = ShaderType::PixelShader, 
+            .EntryPoint = "MainPS"
+        });
         bCurPsCompilationSucceed = GGpuRhi->CompileShader(PixelShader, ErrorInfo);
     }
 
@@ -78,7 +88,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
     {
 		GpuTexture* TempiChannel = GpuResourceHelper::GetGlobalBlackTex();
 		static TRefCountPtr<GpuSampler> TempSampler = GGpuRhi->CreateSampler({});
-        static TRefCountPtr<GpuBindGroup> BuiltInBindGroup = GpuBindGrouprBuilder{ GetBuiltInBindLayout() }
+        static TRefCountPtr<GpuBindGroup> BuiltInBindGroup = GpuBindGroupBuilder{ GetBuiltInBindLayout() }
 			.SetExistingBinding(0, TSingleton<PrintBuffer>::Get().GetResource())
             .SetUniformBuffer("Uniform", GetBuiltInUb()->GetGpuResource())
 			.SetTexture("iChannel0", TempiChannel)
@@ -144,10 +154,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 
     FString StShader::GetBinding() const
     {
-		FString CommonHeader, PrintHeader;
-		FFileHelper::LoadFileToString(CommonHeader, *(PathHelper::ShaderDir() / "Common.hlsl"));
-		FFileHelper::LoadFileToString(PrintHeader, *(PathHelper::ShaderDir() / "Shared/Print.h"));
-        return CommonHeader + PrintHeader + GetBuiltInBindLayoutBuilder().GetCodegenDeclaration() + CustomBindGroupLayoutBuilder.GetCodegenDeclaration();
+        return GetBuiltInBindLayoutBuilder().GetCodegenDeclaration() + CustomBindGroupLayoutBuilder.GetCodegenDeclaration();
     }
 
     FString StShader::GetTemplateWithBinding() const

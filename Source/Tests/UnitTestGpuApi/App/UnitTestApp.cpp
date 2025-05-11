@@ -40,9 +40,9 @@ namespace UNITTEST_GPUAPI
 		TRefCountPtr<GpuTexture> TestTex = GGpuRhi->CreateTexture(Desc);
 
 		TRefCountPtr<GpuShader> Vs = GGpuRhi->CreateShaderFromFile(
-			PathHelper::ShaderDir() / "Test/TestCast.hlsl",
-			ShaderType::VertexShader,
-			TEXT("MainVS")
+			.FileName = PathHelper::ShaderDir() / "Test/TestCast.hlsl",
+			.Type = ShaderType::VertexShader,
+			.EntryPoint = "MainVS"
 		);
 		if (GpuFeature::Support16bitType) {
 			Vs->AddFlag(GpuShaderFlag::Enable16bitType);
@@ -56,7 +56,7 @@ namespace UNITTEST_GPUAPI
 			.AddExistingBinding(0, BindingType::Texture, BindingShaderStage::Vertex)
 			.Build();
 
-		TRefCountPtr<GpuBindGroup> BindGroup = GpuBindGrouprBuilder{ BindGroupLayout }
+		TRefCountPtr<GpuBindGroup> BindGroup = GpuBindGroupBuilder{ BindGroupLayout }
 			.SetExistingBinding(0, TestTex)
 			.Build();
 
