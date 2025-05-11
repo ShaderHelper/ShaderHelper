@@ -39,11 +39,11 @@ namespace UNITTEST_GPUAPI
 		GpuTextureDesc Desc{ 1, 1, GpuTextureFormat::R16_FLOAT, GpuTextureUsage::ShaderResource , RawData };
 		TRefCountPtr<GpuTexture> TestTex = GGpuRhi->CreateTexture(Desc);
 
-		TRefCountPtr<GpuShader> Vs = GGpuRhi->CreateShaderFromFile(
+		TRefCountPtr<GpuShader> Vs = GGpuRhi->CreateShaderFromFile({
 			.FileName = PathHelper::ShaderDir() / "Test/TestCast.hlsl",
 			.Type = ShaderType::VertexShader,
 			.EntryPoint = "MainVS"
-		);
+		});
 		if (GpuFeature::Support16bitType) {
 			Vs->AddFlag(GpuShaderFlag::Enable16bitType);
 		}

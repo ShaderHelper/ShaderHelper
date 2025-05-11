@@ -135,12 +135,12 @@ namespace FW
         TRefCountPtr<IDxcTranslationUnit> TU;
     };
 
-    ISenseTU::ISenseTU(FStringView HlslSource)
+    ISenseTU::ISenseTU(TRefCountPtr<GpuShader> InShader)
         :Impl(MakePimpl<ISenseTUImpl>())
     {
         DxcCreateInstance(CLSID_DxcIntelliSense, IID_PPV_ARGS(Impl->ISense.GetInitReference()));
         Impl->ISense->CreateIndex(Impl->Index.GetInitReference());
-		auto SourceText = StringCast<UTF8CHAR>(HlslSource.GetData());
+		auto SourceText = StringCast<UTF8CHAR>(*InShader->GetProcessedSourceText());
         Impl->ISense->CreateUnsavedFile("Temp.hlsl", (char*)SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR), Impl->Unsaved.GetInitReference());
         
 		TArray<const char*> DxcArgs;
@@ -148,6 +148,11 @@ namespace FW
 		DxcArgs.Add("2021");
 		DxcArgs.Add("-D");
 		DxcArgs.Add("ENABLE_PRINT=0");
+		for (const FString& IncludeDir : InShader->GetIncludeDirs())
+		{
+			DxcArgs.Add("-I");
+			DxcArgs.Add(TCHAR_TO_ANSI(*IncludeDir));
+		}
 
         DxcTranslationUnitFlags UnitFlag = DxcTranslationUnitFlags(DxcTranslationUnitFlags_UseCallerThread);
         Impl->Index->ParseTranslationUnit("Temp.hlsl", DxcArgs.GetData(), DxcArgs.Num(), AUX::GetAddrExt(Impl->Unsaved.GetReference()), 1, UnitFlag, Impl->TU.GetInitReference());

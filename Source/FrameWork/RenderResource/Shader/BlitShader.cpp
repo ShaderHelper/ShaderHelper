@@ -14,17 +14,17 @@ namespace FW
 							.AddExistingBinding(1, BindingType::Sampler, BindingShaderStage::Pixel)
 							.Build();
 		
-		Vs = GGpuRhi->CreateShaderFromFile(
-			.FileName = PathHelper::ShaderDir() / "Blit.hlsl", 
+		Vs = GGpuRhi->CreateShaderFromFile({
+			.FileName = PathHelper::ShaderDir() / "Blit.hlsl",
 			.Type = ShaderType::VertexShader,
 			.EntryPoint = "MainVS"
-		);
+		});
 
-		Ps = GGpuRhi->CreateShaderFromFile(
+		Ps = GGpuRhi->CreateShaderFromFile({
 			.FileName = PathHelper::ShaderDir() / "Blit.hlsl",
 			.Type = ShaderType::PixelShader,
 			.EntryPoint = "MainPS"
-		);
+		});
 
 		FString ErrorInfo;
 		GGpuRhi->CompileShader(Vs, ErrorInfo);
