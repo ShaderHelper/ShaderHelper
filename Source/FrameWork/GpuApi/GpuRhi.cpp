@@ -208,14 +208,14 @@ public:
 		return RhiBackend->CreateBuffer(InBufferDesc);
 	}
 
-	TRefCountPtr<GpuShader> CreateShaderFromSource(ShaderType InType, const FString& InSourceText, const FString& InShaderName, const FString& EntryPoint) override
+	TRefCountPtr<GpuShader> CreateShaderFromSource(const GpuShaderSourceDesc& Desc) override
 	{
-		return RhiBackend->CreateShaderFromSource(InType, InSourceText, InShaderName, EntryPoint);
+		return RhiBackend->CreateShaderFromSource(Desc);
 	}
 
-	TRefCountPtr<GpuShader> CreateShaderFromFile(const FString& FileName, ShaderType InType, const FString& EntryPoint, const FString& ExtraDeclaration) override
+	TRefCountPtr<GpuShader> CreateShaderFromFile(const GpuShaderFileDesc& Desc) override
 	{
-		return RhiBackend->CreateShaderFromFile(FileName, InType, EntryPoint, ExtraDeclaration);
+		return RhiBackend->CreateShaderFromFile(Desc);
 	}
 
 	TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc &InBindGroupDesc) override

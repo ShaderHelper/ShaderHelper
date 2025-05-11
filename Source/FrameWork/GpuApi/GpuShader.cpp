@@ -1,6 +1,5 @@
 #include "CommonHeader.h"
 #include "GpuShader.h"
-#include "Common/Path/PathHelper.h"
 
 THIRD_PARTY_INCLUDES_START
 #if PLATFORM_WINDOWS
@@ -59,27 +58,26 @@ namespace FW
 	}
 
 
-	GpuShader::GpuShader(const FString& InFileName, ShaderType InType, const FString& ExtraDeclaration, const FString& InEntryPoint)
+	GpuShader::GpuShader(const GpuShaderFileDesc& FileDesc)
 		: GpuResource(GpuResourceType::Shader)
-		, Type(InType)
-		, FileName(InFileName)
-		, EntryPoint(InEntryPoint)
+		, Type(FileDesc.Type)
+		, EntryPoint(FileDesc.EntryPoint)
+        , FileName(FileDesc.FileName)
+        , IncludeDirs(FileDesc.IncludeDirs)
 	{
 		ShaderName = FPaths::GetBaseFilename(*FileName);
 		FString ShaderFileText;
 		FFileHelper::LoadFileToString(ShaderFileText, **FileName);
-		SourceText = ExtraDeclaration + ShaderFileText;
-
-		IncludeDirs.Add(PathHelper::ShaderDir());
-		IncludeDirs.Add(FPaths::GetPath(*FileName));
+		SourceText = FileDesc.ExtraDecl + ShaderFileText;
 	}
 
-	GpuShader::GpuShader(ShaderType InType, const FString& InSourceText, const FString& InShaderName, const FString& InEntryPoint)
+	GpuShader::GpuShader(const GpuShaderSourceDesc& SourceDesc)
 		: GpuResource(GpuResourceType::Shader)
-		, Type(InType)
-		, ShaderName(InShaderName)
-		, EntryPoint(InEntryPoint)
-		, SourceText(InSourceText)
+		, Type(SourceDesc.Type)
+		, ShaderName(SourceDesc.Name)
+		, EntryPoint(SourceDesc.EntryPoint)
+		, SourceText(SourceDesc.Source)
+        , IncludeDirs(SourceDesc.IncludeDirs)
 	{
 
 	}

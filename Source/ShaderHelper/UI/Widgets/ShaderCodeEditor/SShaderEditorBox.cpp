@@ -879,7 +879,12 @@ const FString ErrorMarkerText = TEXT("✘");
         FString FinalShaderSource = ShaderTemplateWithBinding + CurrentShaderSource;
         
         FString ShaderName = StShaderAsset->GetFileName() + "Ps";
-        TRefCountPtr<GpuShader> CurPixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, MoveTemp(FinalShaderSource), ShaderName, TEXT("MainPS"));
+        TRefCountPtr<GpuShader> CurPixelShader = GGpuRhi->CreateShaderFromSource({
+            .Name = ShaderName, 
+            .Source = MoveTemp(FinalShaderSource), 
+            .Type = ShaderType::PixelShader, 
+            .EntryPoint = "MainPS"
+        });
         FString ErrorInfo;
         if (GGpuRhi->CompileShader(CurPixelShader, ErrorInfo))
         {
@@ -910,7 +915,11 @@ const FString ErrorMarkerText = TEXT("✘");
 		ISenseTask Task{};
 		{
 			//Need the text preprocessed by backend to ensure consistency
-			TRefCountPtr<GpuShader> CurPixelShader = GGpuRhi->CreateShaderFromSource(ShaderType::PixelShader, MoveTemp(FinalShaderSource), {}, TEXT("MainPS"));
+			TRefCountPtr<GpuShader> CurPixelShader = GGpuRhi->CreateShaderFromSource({
+                .Source = MoveTemp(FinalShaderSource),
+                .Type = ShaderType::PixelShader, 
+                .EntryPoint = "MainPS"
+            });
 			Task.HlslSource = CurPixelShader->GetProcessedSourceText();
 		}
         

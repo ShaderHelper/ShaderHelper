@@ -4,7 +4,7 @@
 
 namespace FW
 {
-    class MetalRenderPipelineState : public GpuPipelineState
+    class MetalRenderPipelineState : public GpuRenderPipelineState
     {
     public:
         MetalRenderPipelineState(MTLRenderPipelineStatePtr InPipelineState, MTLPrimitiveType InPrimitiveType);
@@ -23,5 +23,15 @@ namespace FW
         MTLPrimitiveType PrimitiveType;
     };
 
+    class MetalComputePipelineState : public GpuComputePipelineState
+    {
+    public:
+        MetalComputePipelineState(MTLComputePipelineStatePtr InPipelineState);
+        
+    private:
+        MTLComputePipelineStatePtr PipelineState;
+    };
+
     TRefCountPtr<MetalRenderPipelineState> CreateMetalRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc);
+    TRefCountPtr<MetalComputePipelineState> CreateMetalComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc);
 }

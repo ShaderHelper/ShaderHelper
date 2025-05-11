@@ -1,7 +1,7 @@
 #pragma once
 #include "GpuResourceCommon.h"
 #include <Misc/FileHelper.h>
-
+#include "Common/Path/PathHelper.h"
 namespace HLSL
 {
     enum class CandidateKind
@@ -115,14 +115,37 @@ namespace FW
 		FString ShaderText;
 	};
 
+    struct GpuShaderFileDesc
+    {
+        FString FileName;
+        ShaderType Type;
+        FString EntryPoint;
+        FString ExtraDecl;
+        TArray<FString> IncludeDirs = { 
+            PathHelper::ShaderDir(), 
+            FPaths::GetPath(*FileName)
+        };
+    };
+
+    struct GpuShaderSourceDesc
+    {
+        FString Name;
+        FString Source;
+        ShaderType Type;
+        FString EntryPoint;
+        TArray<FString> IncludeDirs = { 
+            PathHelper::ShaderDir() 
+        };
+    };
+
     class GpuShader : public GpuResource
     {
 	public:
         //From file
-		GpuShader(const FString& InFileName, ShaderType InType, const FString& ExtraDeclaration, const FString& InEntryPoint);
+		GpuShader(const GpuShaderFileDesc& FileDesc);
     
         //From source
-		GpuShader(ShaderType InType, const FString& InSourceText, const FString& InShaderName, const FString& InEntryPoint);
+		GpuShader(const GpuShaderSourceDesc& SourceDesc);
         
         //Successfully got the bytecode result and no error occurred.
         virtual bool IsCompiled() const {

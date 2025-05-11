@@ -7,30 +7,30 @@
 
 namespace FW
 {
-	Dx12Shader::Dx12Shader(const FString& InFileName, ShaderType InType, const FString& ExtraDeclaration, const FString& InEntryPoint)
-		: GpuShader(InFileName, InType, ExtraDeclaration, InEntryPoint)
+	Dx12Shader::Dx12Shader(const GpuShaderFileDesc& Desc)
+		: GpuShader(Desc)
 	{
 		ProcessedSourceText = GpuShaderPreProcessor{ SourceText }
 			.ReplacePrintStringLiteral()
 			.Finalize();
 	}
 
-	Dx12Shader::Dx12Shader(ShaderType InType, const FString& InSourceText, const FString& InShaderName, const FString& InEntryPoint)
-		: GpuShader(InType, InSourceText, InShaderName, InEntryPoint)
+	Dx12Shader::Dx12Shader(const GpuShaderSourceDesc& Desc)
+		: GpuShader(Desc)
 	{
 		ProcessedSourceText = GpuShaderPreProcessor{ SourceText }
 			.ReplacePrintStringLiteral()
 			.Finalize();
 	}
 
-	TRefCountPtr<Dx12Shader> CreateDx12Shader(const FString& FileName, ShaderType InType, const FString& ExtraDeclaration, const FString& EntryPoint)
+	TRefCountPtr<Dx12Shader> CreateDx12Shader(const GpuShaderFileDesc& FileDesc)
 	{
-		return new Dx12Shader(FileName, InType, ExtraDeclaration, EntryPoint);
+		return new Dx12Shader(FileDesc);
 	}
 
-	TRefCountPtr<Dx12Shader> CreateDx12Shader(ShaderType InType, const FString& InSourceText, const FString& ShaderName, const FString& InEntryPoint)
+	TRefCountPtr<Dx12Shader> CreateDx12Shader(const GpuShaderSourceDesc& SourceDesc)
     {
-        return new Dx12Shader(InType, InSourceText, ShaderName, InEntryPoint);
+        return new Dx12Shader(SourceDesc);
     }
 
 	class ShIncludeHandler final : public IDxcIncludeHandler

@@ -6,30 +6,30 @@
 
 namespace FW
 {
-	MetalShader::MetalShader(const FString& InFileName, ShaderType InType, const FString& ExtraDeclaration, const FString& InEntryPoint)
-		: GpuShader(InFileName, InType, ExtraDeclaration, InEntryPoint)
+	MetalShader::MetalShader(const GpuShaderFileDesc& Desc)
+		: GpuShader(Desc)
 	{
 		ProcessedSourceText = GpuShaderPreProcessor{ SourceText }
 			.ReplacePrintStringLiteral()
 			.Finalize();
 	}
 
-	MetalShader::MetalShader(ShaderType InType, const FString& InSourceText, const FString& InShaderName, const FString& InEntryPoint)
-		: GpuShader(InType, InSourceText, InShaderName, InEntryPoint)
+	MetalShader::MetalShader(const GpuShaderSourceDesc& Desc)
+		: GpuShader(Desc)
 	{
 		ProcessedSourceText = GpuShaderPreProcessor{ SourceText }
 			.ReplacePrintStringLiteral()
 			.Finalize();
 	}
 
-    TRefCountPtr<MetalShader> CreateMetalShader(ShaderType InType, const FString& InSourceText, const FString& ShaderName, const FString& InEntryPoint)
+    TRefCountPtr<MetalShader> CreateMetalShader(const GpuShaderFileDesc& FileDesc)
     {
-        return new MetalShader(InType, InSourceText, ShaderName, InEntryPoint);
+        return new MetalShader(FileDesc);
     }
 
-    TRefCountPtr<MetalShader> CreateMetalShader(const FString& FileName, ShaderType InType, const FString& ExtraDeclaration, const FString& EntryPoint)
+    TRefCountPtr<MetalShader> CreateMetalShader(const GpuShaderSourceDesc& SourceDesc)
     {
-        return new MetalShader(FileName, InType, ExtraDeclaration, EntryPoint);
+        return new MetalShader(SourceDesc);
     }
 
     bool CompileShaderFromMSL(TRefCountPtr<MetalShader> InShader, FString& OutErrorInfo)
