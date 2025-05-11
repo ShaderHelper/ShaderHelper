@@ -47,6 +47,7 @@ namespace HLSL
 #endif
 
 #ifndef __cplusplus
+#include "Common.hlsl"
 
 DECLARE_GLOBAL_RW_BUFFER(RWStructuredBuffer<Printer>, Printer, 0)
 

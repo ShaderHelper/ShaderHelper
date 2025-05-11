@@ -139,9 +139,9 @@ const FString ErrorMarkerText = TEXT("✘");
             {
                 ISenseTask Task;
                 while(ISenseQueue.Dequeue(Task));
-                if(!Task.HlslSource.IsEmpty())
+                if(Task.Shader)
                 {
-                    ISenseTU TU{Task.HlslSource};
+                    ISenseTU TU{Task.Shader};
                     ErrorInfos = TU.GetDiagnostic();
                     
                     CandidateInfos.Reset();
@@ -913,15 +913,12 @@ const FString ErrorMarkerText = TEXT("✘");
         FString FinalShaderSource = ShaderTemplateWithBinding + CurrentShaderSource;
 
 		ISenseTask Task{};
-		{
-			//Need the text preprocessed by backend to ensure consistency
-			TRefCountPtr<GpuShader> CurPixelShader = GGpuRhi->CreateShaderFromSource({
-                .Source = MoveTemp(FinalShaderSource),
-                .Type = ShaderType::PixelShader, 
-                .EntryPoint = "MainPS"
-            });
-			Task.HlslSource = CurPixelShader->GetProcessedSourceText();
-		}
+		Task.Shader = GGpuRhi->CreateShaderFromSource({
+            .Source = MoveTemp(FinalShaderSource),
+            .Type = ShaderType::PixelShader, 
+            .EntryPoint = "MainPS"
+        });
+
         
         if(bTryComplete)
         {

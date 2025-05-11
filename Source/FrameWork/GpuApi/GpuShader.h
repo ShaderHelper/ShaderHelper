@@ -202,7 +202,7 @@ namespace FW
     class FRAMEWORK_API ISenseTU
     {
     public:
-        ISenseTU(FStringView HlslSource);
+        ISenseTU(TRefCountPtr<GpuShader> InShader);
         TArray<ShaderErrorInfo> GetDiagnostic();
         TArray<ShaderCandidateInfo> GetCodeComplete(uint32 Row, uint32 Col);
         

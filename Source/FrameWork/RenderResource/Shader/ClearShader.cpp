@@ -20,12 +20,12 @@ namespace FW
 			.AddUniformBuffer("ClearUb", ClearUbBuilder.GetLayoutDeclaration(), BindingShaderStage::Compute)
 			.Build();
 
-		Cs = GGpuRhi->CreateShaderFromFile(
+		Cs = GGpuRhi->CreateShaderFromFile({
 			.FileName = PathHelper::ShaderDir() / "Clear.hlsl",
 			.Type = ShaderType::ComputeShader,
 			.EntryPoint = "ClearCS",
 			.ExtraDecl = BindGroupLayout->GetCodegenDeclaration()
-		);
+		});
 
 		FString ErrorInfo;
 		GGpuRhi->CompileShader(Cs, ErrorInfo, Definitions);
