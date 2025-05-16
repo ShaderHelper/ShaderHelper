@@ -24,7 +24,7 @@ namespace FW
 			{
 				SpvId EntryPoint = SpvCode[WordOffset + 1];
 				SpvExecutionMode Mode = static_cast<SpvExecutionMode>(SpvCode[WordOffset + 2]);
-				ExtraOperands Operands = {&SpvCode[WordOffset + 3], InstLen - 3};
+				ExtraOperands Operands = {&SpvCode[WordOffset + 3], InstLen - 3u};
 				SpvExecutionModeOp DecodedInst = {EntryPoint, Mode, Operands};
 				DecodedInst.Accpet(Visitors);
 			}
