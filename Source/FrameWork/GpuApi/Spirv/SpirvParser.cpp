@@ -14,7 +14,7 @@ namespace FW
 
 	void ParseSpv(const TArray<uint32>& SpvCode, const TArray<SpvVisitor*>& Visitors, FString& OutErrorInfo)
 	{
-		uint32 WordOffset = 5;
+		int32 WordOffset = 5;
 		while(WordOffset < SpvCode.Num())
 		{
 			uint32 Inst = SpvCode[WordOffset];

@@ -15,10 +15,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macOS-latest, macos-13]
+        os: [macOS-latest]
     
     steps:
       - uses: actions/checkout@v3
+      
+	  - uses: maxim-lobanov/setup-xcode@v1
+		with:
+		  xcode-version: '16.1'
 
       - name: download dependency
         working-directory: ${{env.GITHUB_WORKSPACE}}

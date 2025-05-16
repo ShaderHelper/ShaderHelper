@@ -77,6 +77,8 @@ namespace FW
         
         ShaderConductor::Compiler::SourceDesc SourceDesc{};
         SourceDesc.stage = MapShaderCunductorStage(InShader->GetShaderType());
+		auto ShaderNameUTF8 = StringCast<UTF8CHAR>(*InShader->GetShaderName());
+		SourceDesc.fileName = (char*)ShaderNameUTF8.Get();
         
         //len + 1 for copying null terminator
         TArray<char> EntryPointAnsi{TCHAR_TO_ANSI(*InShader->GetEntryPoint()), InShader->GetEntryPoint().Len() + 1};
