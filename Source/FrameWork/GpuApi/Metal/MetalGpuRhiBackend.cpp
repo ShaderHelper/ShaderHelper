@@ -104,7 +104,7 @@ void *MetalGpuRhiBackend::MapGpuTexture(GpuTexture *InGpuTexture, GpuResourceMap
 		const uint32 BytesPerTexel = GetTextureFormatByteSize(InGpuTexture->GetFormat());
 		const uint64 UnpaddedSize = InGpuTexture->GetWidth() * InGpuTexture->GetHeight() * BytesPerTexel;
 		if (!Texture->ReadBackBuffer.IsValid()) {
-			Texture->ReadBackBuffer = CreateMetalBuffer(UnpaddedSize, GpuBufferUsage::Staging);
+			Texture->ReadBackBuffer = CreateMetalBuffer({(uint32)UnpaddedSize, GpuBufferUsage::ReadBack});
 		}
 
 		// Metal does not consider the alignment when copying back?
@@ -115,8 +115,8 @@ void *MetalGpuRhiBackend::MapGpuTexture(GpuTexture *InGpuTexture, GpuResourceMap
         }
         GMtlGpuRhi->EndRecording(CmdRecorder);
         GMtlGpuRhi->Submit({CmdRecorder});
-        
-        WaitGpu();
+		GMtlGpuRhi->WaitGpu();
+		
 		return Texture->ReadBackBuffer->GetContents();
 	} else {
 		// TODO
@@ -135,14 +135,27 @@ void *MetalGpuRhiBackend::MapGpuBuffer(GpuBuffer *InGpuBuffer, GpuResourceMapMod
 	GpuBufferUsage Usage = InGpuBuffer->GetUsage();
 	MetalBuffer *Buffer = static_cast<MetalBuffer *>(InGpuBuffer);
 	void *Data = nullptr;
-	if (InMapMode == GpuResourceMapMode::Write_Only) {
-		if (EnumHasAnyFlags(Usage, GpuBufferUsage::Static)) {
-
-		} else {
-			Data = Buffer->GetContents();
-		}
-	} else {
+	
+	if (EnumHasAnyFlags(Usage, GpuBufferUsage::DynamicMask))
+	{
+		Data = Buffer->GetContents();
 	}
+	else
+	{
+		if (InMapMode == GpuResourceMapMode::Read_Only)
+		{
+			TRefCountPtr<MetalBuffer> ReadBackBuffer = CreateMetalBuffer({Buffer->GetByteSize(), GpuBufferUsage::ReadBack});
+			auto CmdRecorder = GMtlGpuRhi->BeginRecording();
+			{
+				CmdRecorder->CopyBufferToBuffer(Buffer, 0, ReadBackBuffer, 0, Buffer->GetByteSize());
+			}
+			GMtlGpuRhi->EndRecording(CmdRecorder);
+			GMtlGpuRhi->Submit({CmdRecorder});
+			GMtlGpuRhi->WaitGpu();
+			Data = ReadBackBuffer->GetContents();
+		}
+	}
+
 	return Data;
 }
 

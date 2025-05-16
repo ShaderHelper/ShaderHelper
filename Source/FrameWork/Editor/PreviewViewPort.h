@@ -30,6 +30,8 @@ namespace FW
 		}
 
 		bool RequiresVsync() const override { return false; }
+		
+		void SetAssociatedWidget(TWeakPtr<SWidget> InWidget) { AssociatedWidget = MoveTemp(InWidget); }
 
 		void SetViewPortRenderTexture(GpuTexture* InGpuTex);
 	//	void UpdateViewPortRenderTexture(GpuTexture* InGpuTex);
@@ -47,6 +49,10 @@ namespace FW
 			}
 			iMouse.xy = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * MyGeometry.Scale);
 			iMouse.zw = iMouse.xy;
+			if(AssociatedWidget.IsValid())
+			{
+				return FReply::Handled().CaptureMouse(AssociatedWidget.Pin().ToSharedRef());
+			}
 			return FReply::Handled();
 		}
 
@@ -56,7 +62,14 @@ namespace FW
 			{
 				MouseUp.Broadcast(MyGeometry, MouseEvent);
 			}
-			iMouse.z = -iMouse.z;
+			if(iMouse.z > 0)
+			{
+				iMouse.z = -iMouse.z;
+			}
+			if(AssociatedWidget.IsValid())
+			{
+				return FReply::Handled().ReleaseMouseCapture();
+			}
 			return FReply::Handled();
 		}
 
@@ -84,6 +97,7 @@ namespace FW
 		OnMouseMoveDelegate MouseMove;
 
 	private:
+		TWeakPtr<SWidget> AssociatedWidget;
 		TSharedPtr<FSlateUpdatableTexture> ViewPortRT;
 		int32 SizeX;
 		int32 SizeY;

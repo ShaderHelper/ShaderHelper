@@ -53,16 +53,28 @@ namespace FW
     class GpuRenderPipelineState : public GpuResource
     {
 	public:
-		GpuRenderPipelineState() : GpuResource(GpuResourceType::RenderPipelineState)
+		GpuRenderPipelineState(GpuRenderPipelineStateDesc InDesc) 
+			: GpuResource(GpuResourceType::RenderPipelineState)
+			, Desc(MoveTemp(InDesc))
 		{}
+		const GpuRenderPipelineStateDesc& GetDesc() const { return Desc; }
+
+	private:
+		GpuRenderPipelineStateDesc Desc;
     };
 
 	class GpuComputePipelineState : public GpuResource
 	{
 	public:
-		GpuComputePipelineState() : GpuResource(GpuResourceType::ComputePipelineState)
+		GpuComputePipelineState(GpuComputePipelineStateDesc InDesc) 
+			: GpuResource(GpuResourceType::ComputePipelineState)
+			, Desc(MoveTemp(InDesc))
 		{
 		}
+		const GpuComputePipelineStateDesc& GetDesc() const { return Desc; }
+
+	private:
+		GpuComputePipelineStateDesc Desc;
 	};
 }
 

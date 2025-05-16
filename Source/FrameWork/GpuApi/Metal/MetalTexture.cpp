@@ -16,7 +16,7 @@ namespace FW
     }
 
     MetalTexture::MetalTexture(MTLTexturePtr InTex, GpuTextureDesc InDesc, CVPixelBufferRef InSharedHandle)
-    : GpuTexture(MoveTemp(InDesc))
+    : GpuTexture(MoveTemp(InDesc), GpuResourceState::Unknown)
     , Tex(MoveTemp(InTex))
     , SharedHandle(InSharedHandle)
     {
@@ -95,7 +95,7 @@ namespace FW
         
         if (!InTexDesc.InitialData.IsEmpty()) {
             const uint32 BytesImage = InTexDesc.InitialData.Num();
-            TRefCountPtr<MetalBuffer> UploadBuffer = CreateMetalBuffer(BytesImage, GpuBufferUsage::Dynamic);
+			TRefCountPtr<MetalBuffer> UploadBuffer = CreateMetalBuffer({BytesImage, GpuBufferUsage::Upload});
             uint8* BufferData = (uint8*)UploadBuffer->GetContents();
             FMemory::Memcpy(BufferData, InTexDesc.InitialData.GetData(), BytesImage);
             auto CmdRecorder = GMtlGpuRhi->BeginRecording("InitTexture");

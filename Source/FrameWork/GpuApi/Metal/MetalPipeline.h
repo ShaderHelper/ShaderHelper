@@ -7,7 +7,7 @@ namespace FW
     class MetalRenderPipelineState : public GpuRenderPipelineState
     {
     public:
-        MetalRenderPipelineState(MTLRenderPipelineStatePtr InPipelineState, MTLPrimitiveType InPrimitiveType);
+        MetalRenderPipelineState(GpuRenderPipelineStateDesc InDesc, MTLRenderPipelineStatePtr InPipelineState, MTLPrimitiveType InPrimitiveType);
         
     public:
         MTL::RenderPipelineState* GetResource() const {
@@ -26,8 +26,11 @@ namespace FW
     class MetalComputePipelineState : public GpuComputePipelineState
     {
     public:
-        MetalComputePipelineState(MTLComputePipelineStatePtr InPipelineState);
-        
+        MetalComputePipelineState(GpuComputePipelineStateDesc InDesc, MTLComputePipelineStatePtr InPipelineState);
+		MTL::ComputePipelineState* GetResource() const {
+			return PipelineState.get();
+		}
+		
     private:
         MTLComputePipelineStatePtr PipelineState;
     };

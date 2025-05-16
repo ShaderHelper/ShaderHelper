@@ -14,15 +14,42 @@ namespace FW
 
     TRefCountPtr<MetalBuffer> CreateMetalBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InResourceState)
     {
-        MTL::Buffer* Buffer = nullptr;
+		TRefCountPtr<MetalBuffer> Buffer;
         if(EnumHasAnyFlags(InBufferDesc.Usage, GpuBufferUsage::StaticMask))
         {
-            Buffer = GDevice->newBuffer(InBufferDesc.BufferSize, MTL::ResourceStorageModePrivate);
+			if(InBufferDesc.InitialData.Num() > 0)
+			{
+				TRefCountPtr<MetalBuffer> UploadBuffer = CreateMetalBuffer({
+					.ByteSize = InBufferDesc.ByteSize,
+					.Usage = GpuBufferUsage::Upload,
+					.InitialData = InBufferDesc.InitialData
+				});
+				Buffer = new MetalBuffer(NS::TransferPtr(GDevice->newBuffer(InBufferDesc.ByteSize, MTL::ResourceStorageModePrivate)), InBufferDesc, InResourceState);
+				auto CmdRecorder = GMtlGpuRhi->BeginRecording();
+				{
+					CmdRecorder->CopyBufferToBuffer(UploadBuffer, 0, Buffer, 0, UploadBuffer->GetByteSize());
+				}
+				GMtlGpuRhi->EndRecording(CmdRecorder);
+				GMtlGpuRhi->Submit({CmdRecorder});
+			}
+			else
+			{
+				Buffer = new MetalBuffer(NS::TransferPtr(GDevice->newBuffer(InBufferDesc.ByteSize, MTL::ResourceStorageModePrivate)), InBufferDesc, InResourceState);
+			}
+            
         }
         else
         {
-            Buffer = GDevice->newBuffer(InBufferDesc.BufferSize, MTL::ResourceStorageModeShared);
+			if(InBufferDesc.InitialData.Num() > 0)
+			{
+				Buffer = new MetalBuffer(NS::TransferPtr(GDevice->newBuffer(InBufferDesc.InitialData.GetData(), InBufferDesc.InitialData.Num(), MTL::ResourceStorageModeShared)), InBufferDesc, InResourceState);
+			}
+			else
+			{
+				Buffer = new MetalBuffer(NS::TransferPtr(GDevice->newBuffer(InBufferDesc.ByteSize, MTL::ResourceStorageModeShared)), InBufferDesc, InResourceState);
+			}
+            
         }
-        return new MetalBuffer(NS::TransferPtr(Buffer), InBufferDesc, InResourceState);
+        return Buffer;
     }
 }

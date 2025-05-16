@@ -18,7 +18,6 @@ THIRD_PARTY_INCLUDES_END
 //ue regex is invalid if disable icu, so use the regex from std.
 #include <regex>
 #include <string>
-#include <format>
 
 namespace FW
 {
@@ -30,24 +29,25 @@ namespace FW
 		auto ReplaceMatch = [&](const std::regex& Pattern) {
 			while (std::regex_search(ShaderString, Match, Pattern))
 			{
-				std::string PrintStringLiteral = Match[1];
-				std::string TextArr = "EXPAND(uint StrArr[] = {";
-				int Num = PrintStringLiteral.length() - 1;
+				FString PrintStringLiteral = UTF8_TO_TCHAR(std::string{Match[1]}.data());
+				FString TextArr = "EXPAND(uint StrArr[] = {";
+				int Num = (int)PrintStringLiteral.Len() - 1;
 				for (int i = 1; i < Num;)
 				{
 					if (i + 1 < Num && PrintStringLiteral[i] == '\\')
 					{
-						TextArr += std::format("'\\{}',", PrintStringLiteral[i + 1]);
+						//can not use std::format, std::to_chars needs a minimum deployment target of 13.4 on mac.
+						TextArr += FString::Printf(TEXT("'\\%c',"), PrintStringLiteral[i + 1]);
 						i += 2;
 					}
 					else
 					{
-						TextArr += std::format("'{}',", PrintStringLiteral[i]);
+						TextArr += FString::Printf(TEXT("'%c',"), PrintStringLiteral[i]);
 						i++;
 					}
 				}
 				TextArr += "'\\0'})";
-				ShaderString.replace(Match.position(1), Match[1].length(), std::move(TextArr));
+				ShaderString.replace(Match.position(1), Match[1].length(), TCHAR_TO_UTF8(*TextArr));
 			}
 		};
 		ReplaceMatch(std::regex{"Print *\\( *(\".*\")"});

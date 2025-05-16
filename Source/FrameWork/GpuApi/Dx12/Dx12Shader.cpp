@@ -159,12 +159,6 @@ namespace FW
 		Arguments.Add(TEXT("-HV"));
 		Arguments.Add(TEXT("2021"));
 
-		for(const FString& IncludeDir : InShader->GetIncludeDirs())
-		{
-			Arguments.Add(TEXT("-I"));
-			Arguments.Add(*IncludeDir);
-		}
-
 		ValidateGpuFeature(GpuFeature::Support16bitType, TEXT("Hardware does not support 16bitType, shader model <= 6.2"))
 		{
 			if (InShader->HasFlag(GpuShaderFlag::Enable16bitType))

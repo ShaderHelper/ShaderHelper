@@ -216,11 +216,11 @@ void* Dx12GpuRhiBackend::MapGpuBuffer(GpuBuffer* InGpuBuffer, GpuResourceMapMode
 	Dx12Buffer* Buffer = static_cast<Dx12Buffer*>(InGpuBuffer);
 	void* Data = nullptr;
 
-	if (EnumHasAnyFlags(Usage, GpuBufferUsage::Upload | GpuBufferUsage::ReadBack | GpuBufferUsage::Uniform)) 
+	if (EnumHasAnyFlags(Usage, GpuBufferUsage::DynamicMask))
 	{
 		Data = Buffer->GetAllocation().GetCpuAddr();
 	}
-	else if(EnumHasAnyFlags(Usage, GpuBufferUsage::RWStorage))
+	else
 	{
 		if (InMapMode == GpuResourceMapMode::Read_Only)
 		{

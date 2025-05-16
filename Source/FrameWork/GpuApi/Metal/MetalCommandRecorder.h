@@ -8,13 +8,11 @@
 
 namespace FW
 {
-
-    class MtlStateCache
+    class MtlRenderStateCache
     {
     public:
-        MtlStateCache(MTLRenderPassDescriptorPtr InRenderPassDesc);
+        MtlRenderStateCache(MTLRenderPassDescriptorPtr InRenderPassDesc);
         void ApplyDrawState(MTL::RenderCommandEncoder* RenderCommandEncoder);
-        void Clear();
         
         void SetPipeline(MetalRenderPipelineState* InPipelineState);
         void SetVertexBuffer(MetalBuffer* InBuffer);
@@ -49,6 +47,30 @@ namespace FW
         MTLRenderPassDescriptorPtr RenderPassDesc;
     };
 
+    class MtlComputeStateCache
+    {
+    public:
+        MtlComputeStateCache();
+        void ApplyComputeState(MTL::ComputeCommandEncoder* ComputeCommandEncoder);
+        void SetPipeline(MetalComputePipelineState* InPipelineState);
+        void SetBindGroups(MetalBindGroup* InGroup0, MetalBindGroup* InGroup1, MetalBindGroup* InGroup2, MetalBindGroup* InGroup3);
+        MetalComputePipelineState* GetPipeline() const { return CurrentComputePipelineState; }
+
+    public:
+        bool IsComputePipelineDirty : 1;
+        bool IsBindGroup0Dirty : 1;
+        bool IsBindGroup1Dirty : 1;
+        bool IsBindGroup2Dirty : 1;
+        bool IsBindGroup3Dirty : 1;
+
+    private:
+        MetalComputePipelineState* CurrentComputePipelineState;
+        MetalBindGroup* CurrentBindGroup0;
+        MetalBindGroup* CurrentBindGroup1;
+        MetalBindGroup* CurrentBindGroup2;
+        MetalBindGroup* CurrentBindGroup3;
+    };
+
     class MtlRenderPassRecorder : public GpuRenderPassRecorder
     {
     public:
@@ -68,7 +90,7 @@ namespace FW
         
     private:
         MTLRenderCommandEncoderPtr CmdEncoder;
-        MtlStateCache StateCache;
+        MtlRenderStateCache StateCache;
     };
 
 	class MtlComputePassRecorder: public GpuComputePassRecorder
@@ -77,6 +99,7 @@ namespace FW
 		MtlComputePassRecorder(MTLComputeCommandEncoderPtr InCmdEncoder)
             : CmdEncoder(MoveTemp(InCmdEncoder))
         {}
+		MTL::ComputeCommandEncoder* GetEncoder() const { return CmdEncoder.get(); }
 		
 	public:
 		void Dispatch(uint32 ThreadGroupCountX, uint32 ThreadGroupCountY, uint32 ThreadGroupCountZ) override;
@@ -85,6 +108,7 @@ namespace FW
 		
 	private:
 		MTLComputeCommandEncoderPtr CmdEncoder;
+        MtlComputeStateCache StateCache;
 	};
 
     class MtlCmdRecorder : public GpuCmdRecorder

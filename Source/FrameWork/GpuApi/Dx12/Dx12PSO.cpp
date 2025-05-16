@@ -75,7 +75,7 @@ namespace FW
 
         TRefCountPtr<ID3D12PipelineState> Pso;
         DxCheck(GDevice->CreateGraphicsPipelineState(&PsoDesc, IID_PPV_ARGS(Pso.GetInitReference())));
-        return new Dx12RenderPso(MoveTemp(Pso), MapPrimitiveType(InPipelineStateDesc.Primitive));
+        return new Dx12RenderPso(InPipelineStateDesc, MoveTemp(Pso), MapPrimitiveType(InPipelineStateDesc.Primitive));
     }
 
 	TRefCountPtr<Dx12ComputePso> CreateDx12ComputePso(const GpuComputePipelineStateDesc& InPipelineStateDesc)
@@ -92,6 +92,6 @@ namespace FW
 
 		TRefCountPtr<ID3D12PipelineState> Pso;
 		DxCheck(GDevice->CreateComputePipelineState(&PsoDesc, IID_PPV_ARGS(Pso.GetInitReference())));
-		return new Dx12ComputePso(MoveTemp(Pso));
+		return new Dx12ComputePso(InPipelineStateDesc, MoveTemp(Pso));
 	}
 }

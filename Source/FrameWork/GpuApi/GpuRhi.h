@@ -29,6 +29,7 @@ struct GpuRhiConfig
 	GpuRhiBackendType BackendType;
 };
 
+//Note: doesn't support state inheritance across pass
 class GpuComputePassRecorder
 {
 public:

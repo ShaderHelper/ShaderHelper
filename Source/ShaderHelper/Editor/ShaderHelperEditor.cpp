@@ -379,17 +379,19 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
             SpawnedTab->SetTabIcon(FAppCommonStyle::Get().GetBrush("Icons.Log"));
         }
 		else if (TabId == PreviewTabId) {
+			auto ViewportWidget = SNew(SViewport)
+				.ViewportInterface(ViewPort);
             SpawnedTab = SNew(SDockTab);
 			SpawnedTab->SetLabel(LOCALIZATION(PreviewTabId.ToString()));
 			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Visible"));
 			SpawnedTab->SetContent(
                 SNew(SBorder)
                 [
-                    SNew(SViewport)
-                    .ViewportInterface(ViewPort)
+					ViewportWidget
                 ]
 			
 			);
+			ViewPort->SetAssociatedWidget(ViewportWidget);
 		}
 		else if (TabId == PropretyTabId) {
             SpawnedTab = SNew(SDockTab);
