@@ -18,13 +18,13 @@ namespace FW
 		while(WordOffset < SpvCode.Num())
 		{
 			uint32 Inst = SpvCode[WordOffset];
-			uint32 InstLen = Inst >> 16;
+			int32 InstLen = int32(Inst >> 16);
 			SpvOp OpCode = static_cast<SpvOp>(Inst & 0xffff);
 			if(OpCode == SpvOp::ExecutionMode)
 			{
 				SpvId EntryPoint = SpvCode[WordOffset + 1];
 				SpvExecutionMode Mode = static_cast<SpvExecutionMode>(SpvCode[WordOffset + 2]);
-				ExtraOperands Operands = {&SpvCode[WordOffset + 3], InstLen - 3u};
+				ExtraOperands Operands = {&SpvCode[WordOffset + 3], InstLen - 3};
 				SpvExecutionModeOp DecodedInst = {EntryPoint, Mode, Operands};
 				DecodedInst.Accpet(Visitors);
 			}
