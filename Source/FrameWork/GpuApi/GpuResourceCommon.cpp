@@ -8,7 +8,9 @@ namespace FW
 		: GpuResource(InType)
 		, State(InState)
 	{
+		#if PLATFORM_WINDOWS
 		checkf(State != GpuResourceState::Unknown && ValidateGpuResourceState(State), TEXT("The backend can not automatically give a valid state, so explicitly specify it "));
+		#endif
 	}
 
 	uint32 GetTextureFormatByteSize(GpuTextureFormat InFormat)

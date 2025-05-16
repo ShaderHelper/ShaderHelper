@@ -29,13 +29,24 @@ namespace FW
     {
         TArray<MTLArgumentDescriptor*> VertexArgDescs;
         TArray<MTLArgumentDescriptor*> FragmentArgDescs;
-        for(const auto& [Slot, LayoutBindingEntry]  : Desc.Layouts)
+        TArray<MTLArgumentDescriptor*> ComputeArgDescs;
+
+        for(const auto& [Slot, LayoutBindingEntry] : Desc.Layouts)
         {
-            RenderStages.Add(Slot, MapShaderVisibility(LayoutBindingEntry.Stage));
+            if(LayoutBindingEntry.Stage != BindingShaderStage::Compute)
+            {
+                RenderStages.Add(Slot, MapShaderVisibility(LayoutBindingEntry.Stage));
+            }
             
             MTLArgumentDescriptor* ArgDesc = [MTLArgumentDescriptor argumentDescriptor];
             ArgDesc.index = Slot;
-            if(LayoutBindingEntry.Type == BindingType::UniformBuffer)
+            if(LayoutBindingEntry.Type == BindingType::RWStorageBuffer)
+            {
+                ArgDesc.dataType = MTLDataTypePointer;
+                ArgDesc.access = MTLArgumentAccessReadWrite;
+                ResourceUsages.Add(Slot, MTLResourceUsageWrite);
+            }
+            else if(LayoutBindingEntry.Type == BindingType::UniformBuffer)
             {
                 ArgDesc.dataType = MTLDataTypePointer;
                 ArgDesc.access = MTLArgumentAccessReadOnly;
@@ -68,6 +79,11 @@ namespace FW
             {
                 FragmentArgDescs.Add(ArgDesc);
             }
+
+            if(EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Compute))
+            {
+                ComputeArgDescs.Add(ArgDesc);
+            }
         }
         
         if(VertexArgDescs.Num() > 0)
@@ -84,6 +100,13 @@ namespace FW
             ));
         }
 
+        if(ComputeArgDescs.Num() > 0)
+        {
+            ComputeArgumentEncoder = NS::TransferPtr(GDevice->newArgumentEncoder(
+                (NS::Array*)[NSArray arrayWithObjects:ComputeArgDescs.GetData() count:ComputeArgDescs.Num()]
+            ));
+        }
+
     }
 
     MetalBindGroup::MetalBindGroup(const GpuBindGroupDesc& InDesc)
@@ -94,45 +117,54 @@ namespace FW
         MetalBindGroupLayout* BindGroupLayout = static_cast<MetalBindGroupLayout*>(InDesc.Layout);
         MTL::ArgumentEncoder* VertexArgumentEncoder = BindGroupLayout->GetVertexArgumentEncoder();
         MTL::ArgumentEncoder* FragmentArgumentEncoder = BindGroupLayout->GetFragmentArgumentEncoder();
-        
+        MTL::ArgumentEncoder* ComputeArgumentEncoder = BindGroupLayout->GetComputeArgumentEncoder();
+
         if(VertexArgumentEncoder != nullptr)
         {
-            VertexArgumentBuffer = CreateMetalBuffer(VertexArgumentEncoder->encodedLength(), GpuBufferUsage::Dynamic);
+			VertexArgumentBuffer = CreateMetalBuffer({(uint32)VertexArgumentEncoder->encodedLength(), GpuBufferUsage::Upload});
             VertexArgumentEncoder->setArgumentBuffer(VertexArgumentBuffer->GetResource(), 0);
         }
         
         if(FragmentArgumentEncoder != nullptr)
         {
-            FragmentArgumentBuffer = CreateMetalBuffer(FragmentArgumentEncoder->encodedLength(), GpuBufferUsage::Dynamic);
+			FragmentArgumentBuffer = CreateMetalBuffer({(uint32)FragmentArgumentEncoder->encodedLength(), GpuBufferUsage::Upload});
             FragmentArgumentEncoder->setArgumentBuffer(FragmentArgumentBuffer->GetResource(), 0);
         }
+
+        if(ComputeArgumentEncoder != nullptr)
+        {
+			ComputeArgumentBuffer = CreateMetalBuffer({(uint32)ComputeArgumentEncoder->encodedLength(), GpuBufferUsage::Upload});
+            ComputeArgumentEncoder->setArgumentBuffer(ComputeArgumentBuffer->GetResource(), 0);
+        }
         
+		auto Layouts = BindGroupLayout->GetDesc().Layouts;
         for(const auto& [Slot, ResourceBindingEntry] : InDesc.Resources)
         {
-            MTLRenderStages Stage = BindGroupLayout->GetRenderStages(Slot);
             if(ResourceBindingEntry.Resource->GetType() == GpuResourceType::Buffer)
             {
                 MetalBuffer* Buffer = static_cast<MetalBuffer*>(ResourceBindingEntry.Resource);
-                if(Stage & MTLRenderStageVertex)
+                if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Vertex))
                 {
                     VertexArgumentEncoder->setBuffer(Buffer->GetResource(), 0, Slot);
                 }
-                
-                if(Stage & MTLRenderStageFragment)
+                if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Pixel))
                 {
                     FragmentArgumentEncoder->setBuffer(Buffer->GetResource(), 0, Slot);
+                }
+                if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Compute))
+                {
+                    ComputeArgumentEncoder->setBuffer(Buffer->GetResource(), 0, Slot);
                 }
                 BindGroupResources.Add(Slot, Buffer->GetResource());
             }
             else if(ResourceBindingEntry.Resource->GetType() == GpuResourceType::Texture)
             {
                 MetalTexture* Tex = static_cast<MetalTexture*>(ResourceBindingEntry.Resource);
-                if(Stage & MTLRenderStageVertex)
+				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Vertex))
                 {
                     VertexArgumentEncoder->setTexture(Tex->GetResource(), Slot);
                 }
-                
-                if(Stage & MTLRenderStageFragment)
+				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Pixel))
                 {
                     FragmentArgumentEncoder->setTexture(Tex->GetResource(), Slot);
                 }
@@ -141,11 +173,11 @@ namespace FW
             else if(ResourceBindingEntry.Resource->GetType() == GpuResourceType::Sampler)
             {
                 MetalSampler* Sampler = static_cast<MetalSampler*>(ResourceBindingEntry.Resource);
-                if(Stage & MTLRenderStageVertex)
+				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Vertex))
                 {
                     VertexArgumentEncoder->setSamplerState(Sampler->GetResource(), Slot);
                 }
-                if(Stage & MTLRenderStageFragment)
+				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Pixel))
                 {
                     FragmentArgumentEncoder->setSamplerState(Sampler->GetResource(), Slot);
                 }
@@ -160,9 +192,13 @@ namespace FW
     void MetalBindGroup::Apply(MTL::RenderCommandEncoder* Encoder)
     {
         MetalBindGroupLayout* BindGroupLayout = static_cast<MetalBindGroupLayout*>(GetLayout());
+        auto Layouts = BindGroupLayout->GetDesc().Layouts;
         for(auto [Slot ,MtlResource] : BindGroupResources)
         {
-            Encoder->useResource(MtlResource, BindGroupLayout->GetResourceUsage(Slot), BindGroupLayout->GetRenderStages(Slot));
+            if(Layouts[Slot].Stage != BindingShaderStage::Compute)
+            {
+                Encoder->useResource(MtlResource, BindGroupLayout->GetResourceUsage(Slot), BindGroupLayout->GetRenderStages(Slot));
+            }
         }
         
         if(VertexArgumentBuffer)
@@ -175,6 +211,24 @@ namespace FW
             Encoder->setFragmentBuffer(FragmentArgumentBuffer->GetResource(), 0, BindGroupLayout->GetGroupNumber());
         }
         
+    }
+
+    void MetalBindGroup::Apply(MTL::ComputeCommandEncoder* Encoder)
+    {
+         MetalBindGroupLayout* BindGroupLayout = static_cast<MetalBindGroupLayout*>(GetLayout());
+        auto Layouts = BindGroupLayout->GetDesc().Layouts;
+        for(auto [Slot ,MtlResource] : BindGroupResources)
+        {
+            if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Compute))
+            {
+                Encoder->useResource(MtlResource, BindGroupLayout->GetResourceUsage(Slot));
+            }
+        }
+
+        if(ComputeArgumentBuffer)
+        {
+			Encoder->setBuffer(ComputeArgumentBuffer->GetResource(), 0, BindGroupLayout->GetGroupNumber());
+        }
     }
 
     TRefCountPtr<MetalBindGroupLayout> CreateMetalBindGroupLayout(const GpuBindGroupLayoutDesc& LayoutDesc)

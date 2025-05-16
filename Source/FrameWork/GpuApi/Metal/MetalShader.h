@@ -18,9 +18,13 @@ namespace FW
         void SetCompilationResult(MTLFunctionPtr InByteCodeFunc) { ByteCodeFunc = MoveTemp(InByteCodeFunc); }
         void SetMslText(FString InText) { MslText = MoveTemp(InText); }
         
+    public:
+        Vector3u ThreadGroupSize{};
+        
     private:
         MTLFunctionPtr ByteCodeFunc;
         FString MslText;
+
     };
     
     TRefCountPtr<MetalShader> CreateMetalShader(const GpuShaderFileDesc& FileDesc);

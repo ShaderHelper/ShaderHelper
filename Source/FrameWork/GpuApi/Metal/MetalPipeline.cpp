@@ -7,15 +7,17 @@
 
 namespace FW
 {
-    MetalRenderPipelineState::MetalRenderPipelineState(MTLRenderPipelineStatePtr InPipelineState, MTLPrimitiveType InPrimitiveType)
-    : PipelineState(MoveTemp(InPipelineState))
+    MetalRenderPipelineState::MetalRenderPipelineState(GpuRenderPipelineStateDesc InDesc, MTLRenderPipelineStatePtr InPipelineState, MTLPrimitiveType InPrimitiveType)
+    : GpuRenderPipelineState(MoveTemp(InDesc))
+    , PipelineState(MoveTemp(InPipelineState))
     , PrimitiveType(InPrimitiveType)
     {
         GDeferredReleaseOneFrame.Add(this);
     }
 
-    MetalComputePipelineState::MetalComputePipelineState(MTLComputePipelineStatePtr InPipelineState)
-    : PipelineState(MoveTemp(InPipelineState))
+    MetalComputePipelineState::MetalComputePipelineState(GpuComputePipelineStateDesc InDesc, MTLComputePipelineStatePtr InPipelineState)
+    : GpuComputePipelineState(MoveTemp(InDesc))
+    , PipelineState(MoveTemp(InPipelineState))
     {
         GDeferredReleaseOneFrame.Add(this);
     }
@@ -56,18 +58,18 @@ namespace FW
             //TDOO: fallback to default pipeline.
         }
         
-        return new MetalRenderPipelineState(MoveTemp(PipelineState), MapPrimitiveType(InPipelineStateDesc.Primitive));
+        return new MetalRenderPipelineState(InPipelineStateDesc, MoveTemp(PipelineState), MapPrimitiveType(InPipelineStateDesc.Primitive));
     }
 
     TRefCountPtr<MetalComputePipelineState> CreateMetalComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc)
     {
         MetalShader* Cs = static_cast<MetalShader*>(InPipelineStateDesc.Cs);
         NS::Error* err = nullptr;
-        MTLComputePipelineStatePtr PipelineState = GDevice->newComputePipelineState(Cs->GetCompilationResult(), &err);
+        MTLComputePipelineStatePtr PipelineState = NS::TransferPtr(GDevice->newComputePipelineState(Cs->GetCompilationResult(), &err));
         if(!PipelineState)
         {
             SH_LOG(LogMetal, Fatal, TEXT("Failed to create compute pipeline: %s"), *NSStringToFString(err->localizedDescription()));
         }
-        return new MetalComputePipelineState(MoveTemp(PipelineState));
+        return new MetalComputePipelineState(InPipelineStateDesc, MoveTemp(PipelineState));
     }
 }

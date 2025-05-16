@@ -45,5 +45,5 @@ namespace FW
 			.Build();
 	}
 
-	template ClearShader<BindingType::RWStorageBuffer>;
+	template class ClearShader<BindingType::RWStorageBuffer>;
 }

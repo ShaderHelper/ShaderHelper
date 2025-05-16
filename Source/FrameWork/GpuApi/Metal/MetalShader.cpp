@@ -3,6 +3,7 @@
 #include "MetalDevice.h"
 #include "ShaderConductor.hpp"
 #include "Common/Path/PathHelper.h"
+#include "GpuApi/Spirv/SpirvParser.h"
 
 namespace FW
 {
@@ -63,6 +64,7 @@ namespace FW
         {
         case ShaderType::VertexShader:         return ShaderConductor::ShaderStage::VertexShader;
         case ShaderType::PixelShader:          return ShaderConductor::ShaderStage::PixelShader;
+		case ShaderType::ComputeShader:        return ShaderConductor::ShaderStage::ComputeShader;
         default:
 			AUX::Unreachable();
         }
@@ -80,7 +82,7 @@ namespace FW
         TArray<char> EntryPointAnsi{TCHAR_TO_ANSI(*InShader->GetEntryPoint()), InShader->GetEntryPoint().Len() + 1};
         SourceDesc.entryPoint = EntryPointAnsi.GetData();
         
-		auto SourceUTF8 = StringCast<UTF8CHAR>(*InShader->GetSourceText());
+		auto SourceUTF8 = StringCast<UTF8CHAR>(*InShader->GetProcessedSourceText());
         SourceDesc.source = (char*)SourceUTF8.Get();
         
         ShaderConductor::MacroDefine SpvMslOptions[] = {
@@ -101,6 +103,9 @@ namespace FW
         TArray<const char*> DxcArgs;
         DxcArgs.Add("-no-warnings");
         DxcArgs.Add("-fspv-preserve-bindings"); //For bindgroup-argumentbuffer
+		//Storage buffers use the scalar layout instead of vector-relaxed 430
+		//to make it consistent with structuredbuffer, so that user side can unify the struct
+		DxcArgs.Add("-fvk-use-dx-layout");
 
 		DxcArgs.Add("-HV");
 		DxcArgs.Add("2021");
@@ -108,12 +113,16 @@ namespace FW
         SourceDesc.loadIncludeCallback = [InShader](const char* includeName) -> ShaderConductor::Blob {
             for(const FString& IncludeDir : InShader->GetIncludeDirs())
             {
-                TArray<uint8> IncludeBlob;
                 FString IncludedFile = FPaths::Combine(IncludeDir, includeName);
                 if(IFileManager::Get().FileExists(*IncludedFile))
                 {
-                    FFileHelper::LoadFileToArray(IncludeBlob, *IncludedFile);
-                    return ShaderConductor::Blob(IncludeBlob.GetData(), IncludeBlob.Num());
+                    FString ShaderText;
+					FFileHelper::LoadFileToString(ShaderText, *IncludedFile);
+					ShaderText = GpuShaderPreProcessor{ ShaderText }
+						.ReplacePrintStringLiteral()
+						.Finalize();
+					auto SourceText = StringCast<UTF8CHAR>(*ShaderText);
+                    return ShaderConductor::Blob(SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR));
                 }
             }
             return {};
@@ -137,14 +146,31 @@ namespace FW
         ShaderConductor::Compiler::TargetDesc TargetDescs[2] = {SpvTargetDesc, MslTargetDesc};
         ShaderConductor::Compiler::ResultDesc Results[2];
         ShaderConductor::Compiler::Compile(SourceDesc, SCOptions, TargetDescs, 2, Results);
-        if(Results[1].errorWarningMsg.Size() > 0)
+        if(Results[0].hasError)
+        {
+            FString ErrorInfo = static_cast<const char*>(Results[0].errorWarningMsg.Data());
+            SH_LOG(LogMetal, Error, TEXT("Hlsl compilation failed: %s"), *ErrorInfo);
+            OutErrorInfo = MoveTemp(ErrorInfo);
+            return false;
+        }
+        else if(Results[1].hasError)
         {
             FString ErrorInfo = static_cast<const char*>(Results[1].errorWarningMsg.Data());
             SH_LOG(LogMetal, Error, TEXT("Hlsl compilation failed: %s"), *ErrorInfo);
 			OutErrorInfo = MoveTemp(ErrorInfo);
             return false;
         }
-        
+        //Need the meta datas from spirv to abstract gpu api
+        //For example, metal's threadgroupsize is not specified in the shader 
+        //and needs to be specified directly by dispatchThreadgroups
+        FString ParserError;
+        TArray<uint32> SpvCode = {static_cast<const uint32*>(Results[0].target.Data()), Results[0].target.Size() / 4};
+        SpvMetaContext MetaContext;
+        SpvMetaVisitor MetaVisitor{MetaContext};
+        ParseSpv(SpvCode, {&MetaVisitor}, ParserError);
+        check(ParserError.IsEmpty());
+        InShader->ThreadGroupSize = MetaContext.ThreadGroupSize;
+
         FString MslSourceText = {(int32)Results[1].target.Size(), static_cast<const char*>(Results[1].target.Data())};
 #if DEBUG_SHADER
         ShaderConductor::Compiler::DisassembleDesc SpvasmDesc{ShaderConductor::ShadingLanguage::SpirV, static_cast<const uint8_t*>(Results[0].target.Data()), Results[0].target.Size()};
@@ -152,7 +178,7 @@ namespace FW
         FString SpvSourceText = {(int32)SpvasmResult.target.Size(), static_cast<const char*>(SpvasmResult.target.Data())};
         
         FString ShaderName = InShader->GetShaderName();
-        FFileHelper::SaveStringToFile(InShader->GetSourceText(), *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl"));
+        FFileHelper::SaveStringToFile(InShader->GetProcessedSourceText(), *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl"));
         FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".spvasm"));
         FFileHelper::SaveStringToFile(MslSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".metal"));
 #endif

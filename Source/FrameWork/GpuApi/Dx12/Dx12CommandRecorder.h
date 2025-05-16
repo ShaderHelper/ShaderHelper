@@ -10,6 +10,7 @@
 
 namespace FW
 {
+	//TODO More detailed states.
 	class Dx12StateCache
 	{
 	public:

@@ -69,6 +69,7 @@ namespace FW
 		RWStorage = 1u << 4,
 
 		StaticMask = RWStorage, //Only Gpu r/w
+		DynamicMask = Upload | ReadBack | Uniform, //Cpu can r/w
 	};
 	ENUM_CLASS_FLAGS(GpuBufferUsage);
 

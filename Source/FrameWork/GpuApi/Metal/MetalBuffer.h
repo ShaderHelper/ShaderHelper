@@ -21,5 +21,5 @@ namespace FW
         MTLBufferPtr Buffer;
     };
 
-    TRefCountPtr<MetalBuffer> CreateMetalBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InResourceState);
+    TRefCountPtr<MetalBuffer> CreateMetalBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InResourceState = GpuResourceState::Unknown);
 }

@@ -2,30 +2,42 @@
 #include "MetalCommandRecorder.h"
 #include "MetalMap.h"
 #include "MetalDevice.h"
+#include "MetalShader.h"
 
 namespace FW
 {
 
-    MtlStateCache::MtlStateCache(MTLRenderPassDescriptorPtr InRenderPassDesc)
-        : CurrentRenderPipelineState(nullptr)
-        , CurrentVertexBuffer(nullptr)
-        , CurrentBindGroup0(nullptr)
-        , CurrentBindGroup1(nullptr)
-        , CurrentBindGroup2(nullptr)
-        , CurrentBindGroup3(nullptr)
-        , IsRenderPipelineDirty(false)
+    MtlRenderStateCache::MtlRenderStateCache(MTLRenderPassDescriptorPtr InRenderPassDesc)
+        : IsRenderPipelineDirty(false)
         , IsViewportDirty(false)
         , IsVertexBufferDirty(false)
         , IsBindGroup0Dirty(false)
         , IsBindGroup1Dirty(false)
         , IsBindGroup2Dirty(false)
         , IsBindGroup3Dirty(false)
+        , CurrentRenderPipelineState(nullptr)
+        , CurrentVertexBuffer(nullptr)
+        , CurrentBindGroup0(nullptr)
+        , CurrentBindGroup1(nullptr)
+        , CurrentBindGroup2(nullptr)
+        , CurrentBindGroup3(nullptr)
         , RenderPassDesc(MoveTemp(InRenderPassDesc))
-    {
-        
-    }
+    {}
 
-    void MtlStateCache::SetPipeline(MetalRenderPipelineState* InPipelineState)
+    MtlComputeStateCache::MtlComputeStateCache()
+        : IsComputePipelineDirty(false)
+        , IsBindGroup0Dirty(false)
+        , IsBindGroup1Dirty(false)
+        , IsBindGroup2Dirty(false)
+        , IsBindGroup3Dirty(false)
+        , CurrentComputePipelineState(nullptr)
+        , CurrentBindGroup0(nullptr)
+        , CurrentBindGroup1(nullptr)
+        , CurrentBindGroup2(nullptr)
+        , CurrentBindGroup3(nullptr)
+    {}
+
+    void MtlRenderStateCache::SetPipeline(MetalRenderPipelineState* InPipelineState)
     {
         if (InPipelineState != CurrentRenderPipelineState)
         {
@@ -34,7 +46,7 @@ namespace FW
         }
     }
 
-    void MtlStateCache::SetVertexBuffer(MetalBuffer* InBuffer)
+    void MtlRenderStateCache::SetVertexBuffer(MetalBuffer* InBuffer)
     {
         if (CurrentVertexBuffer != InBuffer)
         {
@@ -43,7 +55,7 @@ namespace FW
         }
     }
 
-    void MtlStateCache::SetViewPort(MTL::Viewport InViewPort, MTL::ScissorRect InSissorRect)
+    void MtlRenderStateCache::SetViewPort(MTL::Viewport InViewPort, MTL::ScissorRect InSissorRect)
     {
         if (!CurrentViewPort || FMemory::Memcmp(&*CurrentViewPort , &InViewPort, sizeof(MTL::Viewport)))
         {
@@ -53,7 +65,7 @@ namespace FW
         }
     }
 
-    void MtlStateCache::SetBindGroups(MetalBindGroup* InGroup0, MetalBindGroup* InGroup1, MetalBindGroup* InGroup2, MetalBindGroup* InGroup3)
+    void MtlRenderStateCache::SetBindGroups(MetalBindGroup* InGroup0, MetalBindGroup* InGroup1, MetalBindGroup* InGroup2, MetalBindGroup* InGroup3)
     {
         if (InGroup0 != CurrentBindGroup0) {
             CurrentBindGroup0 = InGroup0;
@@ -73,7 +85,7 @@ namespace FW
         }
     }
 
-    void MtlStateCache::ApplyDrawState(MTL::RenderCommandEncoder* RenderCommandEncoder)
+    void MtlRenderStateCache::ApplyDrawState(MTL::RenderCommandEncoder* RenderCommandEncoder)
     {
         check(RenderCommandEncoder);
         if(!CurrentViewPort.IsSet())
@@ -133,6 +145,66 @@ namespace FW
 		}
     }
 
+    void MtlComputeStateCache::ApplyComputeState(MTL::ComputeCommandEncoder* ComputeCommandEncoder)
+    {
+        check(ComputeCommandEncoder);
+        if(IsComputePipelineDirty)
+        {
+            check(CurrentComputePipelineState);
+            ComputeCommandEncoder->setComputePipelineState(CurrentComputePipelineState->GetResource());
+            IsComputePipelineDirty = false;
+        }
+
+        if(CurrentBindGroup0 && IsBindGroup0Dirty) 
+		{ 
+			CurrentBindGroup0->Apply(ComputeCommandEncoder);
+            IsBindGroup0Dirty = false;
+		}
+        if(CurrentBindGroup1 && IsBindGroup1Dirty)
+		{ 
+			CurrentBindGroup1->Apply(ComputeCommandEncoder);
+            IsBindGroup1Dirty = false;
+		}
+		if(CurrentBindGroup2 && IsBindGroup2Dirty)
+		{ 
+			CurrentBindGroup2->Apply(ComputeCommandEncoder);
+            IsBindGroup2Dirty = false;
+		}
+        if(CurrentBindGroup3 && IsBindGroup3Dirty)
+		{ 
+			CurrentBindGroup3->Apply(ComputeCommandEncoder);
+            IsBindGroup3Dirty = false;
+		}
+    }
+
+    void MtlComputeStateCache::SetPipeline(MetalComputePipelineState* InPipelineState)
+    {
+        if (InPipelineState != CurrentComputePipelineState)
+        {
+            CurrentComputePipelineState = InPipelineState;
+            IsComputePipelineDirty = true;
+        }
+    }
+
+    void MtlComputeStateCache::SetBindGroups(MetalBindGroup* InGroup0, MetalBindGroup* InGroup1, MetalBindGroup* InGroup2, MetalBindGroup* InGroup3)
+    {
+        if (InGroup0 != CurrentBindGroup0) {
+            CurrentBindGroup0 = InGroup0;
+            IsBindGroup0Dirty = true;
+        }
+        if (InGroup1 != CurrentBindGroup1) {
+            CurrentBindGroup1 = InGroup1;
+            IsBindGroup1Dirty = true;
+        }
+        if (InGroup2 != CurrentBindGroup2) {
+            CurrentBindGroup2 = InGroup2;
+            IsBindGroup2Dirty = true;
+        }
+        if (InGroup3 != CurrentBindGroup3) {
+            CurrentBindGroup3 = InGroup3;
+            IsBindGroup3Dirty = true;;
+        }
+    }
                                        
    void MtlRenderPassRecorder::DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount)
     {
@@ -174,17 +246,26 @@ namespace FW
 
     void MtlComputePassRecorder::Dispatch(uint32 ThreadGroupCountX, uint32 ThreadGroupCountY, uint32 ThreadGroupCountZ)
     {
-        CmdEncoder->dispatch
+        StateCache.ApplyComputeState(CmdEncoder.get());
+        MetalComputePipelineState* Pipeline = StateCache.GetPipeline();
+        MetalShader* Cs = static_cast<MetalShader*>(Pipeline->GetDesc().Cs);
+        CmdEncoder->dispatchThreadgroups(MTL::Size{ThreadGroupCountX, ThreadGroupCountY, ThreadGroupCountZ},
+        MTL::Size{Cs->ThreadGroupSize.X, Cs->ThreadGroupSize.Y, Cs->ThreadGroupSize.Z});
     }
 
     void MtlComputePassRecorder::SetComputePipelineState(GpuComputePipelineState* InPipelineState)
     {
-
+        StateCache.SetPipeline(static_cast<MetalComputePipelineState*>(InPipelineState));
     }
 
     void MtlComputePassRecorder::SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)
     {
-
+        StateCache.SetBindGroups(
+            static_cast<MetalBindGroup *>(BindGroup0),
+            static_cast<MetalBindGroup *>(BindGroup1),
+            static_cast<MetalBindGroup *>(BindGroup2),
+            static_cast<MetalBindGroup *>(BindGroup3)
+        );
     }
 
     GpuComputePassRecorder* MtlCmdRecorder::BeginComputePass(const FString& PassName)
@@ -231,7 +312,7 @@ namespace FW
 
     void MtlCmdRecorder::Barriers(const TArray<GpuBarrierInfo>& BarrierInfos)
     {
-        InResource->State = NewState;
+        
     }
 
     void MtlCmdRecorder::CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture)
@@ -260,5 +341,14 @@ namespace FW
         const uint32 RowPitch = InTexture->GetWidth() * BytesPerTexel;
         BlitCommandEncoder->copyFromTexture(SrcMtlTexture->GetResource(), 0, 0, Origin, Size, DstMtlBuffer->GetResource(), 0, RowPitch, BytesImage);
         BlitCommandEncoder->endEncoding();
+    }
+
+    void MtlCmdRecorder::CopyBufferToBuffer(GpuBuffer* SrcBuffer, uint32 SrcOffset, GpuBuffer* DestBuffer, uint32 DestOffset, uint32 Size)
+    {
+		MetalBuffer* SrcMtlBuffer = static_cast<MetalBuffer*>(SrcBuffer);
+		MetalBuffer* DstMtlBuffer = static_cast<MetalBuffer*>(DestBuffer);
+		MTL::BlitCommandEncoder* BlitCommandEncoder = CmdBuffer->blitCommandEncoder();
+		BlitCommandEncoder->copyFromBuffer(SrcMtlBuffer->GetResource(), SrcOffset, DstMtlBuffer->GetResource(), DestOffset, Size);
+		BlitCommandEncoder->endEncoding();
     }
 }

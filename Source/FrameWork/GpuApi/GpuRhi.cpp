@@ -236,7 +236,7 @@ public:
 		return RhiBackend->CreateRenderPipelineState(InPipelineStateDesc);
 	}
 
-	TRefCountPtr<GpuComputePipelineState> GpuRhi::CreateComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc)
+	TRefCountPtr<GpuComputePipelineState> CreateComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc)
 	{
 		return RhiBackend->CreateComputePipelineState(InPipelineStateDesc);
 	}

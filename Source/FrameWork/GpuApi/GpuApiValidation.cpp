@@ -110,8 +110,13 @@ namespace FW
             SH_LOG(LogRhiValidation, Error, TEXT("CreateBuffer Error(Incorrect buffer size:%d)"), InBufferDesc.ByteSize);
             return false;
         }
-        
-		if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::Uniform))
+		
+        if(EnumHasAnyFlags(InBufferDesc.Usage, GpuBufferUsage::StaticMask) && EnumHasAnyFlags(InBufferDesc.Usage, GpuBufferUsage::DynamicMask))
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("CreateBuffer Error(Usage can only be either dynamic or static.)"));
+			return false;
+		}
+		else if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::Uniform))
 		{
 			if (InitState != GpuResourceState::Unknown)
 			{
