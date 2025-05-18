@@ -3,7 +3,6 @@
 #include "GpuApi/GpuRhi.h"
 #include "ProjectManager/ShProjectManager.h"
 #include "GpuApi/GpuResourceHelper.h"
-#include "RenderResource/PrintBuffer.h"
 
 using namespace FW;
 
@@ -70,13 +69,6 @@ namespace SH
                 }
             }
             Graph.Execute();
-
-			TArray<FString> ShaderPrintLogs = TSingleton<PrintBuffer>::Get().GetPrintStrings();
-			for (const FString& PrintLog : ShaderPrintLogs)
-			{
-				SH_LOG(LogShaderPrint, Display, TEXT("%s"), *PrintLog);
-			}
-			TSingleton<PrintBuffer>::Get().Clear();
         }
 	}
 

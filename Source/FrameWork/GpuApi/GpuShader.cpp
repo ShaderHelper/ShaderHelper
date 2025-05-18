@@ -52,6 +52,7 @@ namespace FW
 		};
 		ReplaceMatch(std::regex{"Print *\\( *(\".*\")"});
 		ReplaceMatch(std::regex{ "PrintAtMouse *\\( *(\".*\")" });
+        ReplaceMatch(std::regex{ "Assert *\\(.*(\".*\")" });
 
 		ShaderText = FString{UTF8_TO_TCHAR(ShaderString.data())};
 		return *this;
@@ -90,6 +91,22 @@ namespace FW
 			ShaderModel.Minor = 2;
 		}
 		return ShaderModel;
+	}
+
+	FString AdjustErrorLineNumber(const FString& ErrorInfo, int32 Delta)
+	{
+		std::string ErrorString{TCHAR_TO_UTF8(*ErrorInfo)};
+		std::regex Pattern{":([0-9]*):[0-9]*: error:"};
+		std::smatch Match;
+		std::size_t SearchPos = 0;
+		while (std::regex_search(ErrorString.cbegin() + SearchPos, ErrorString.cend(), Match, Pattern))
+		{
+			std::string RowStr = Match[1];
+			int32 RowNumber = std::stoi(RowStr) + Delta;
+			ErrorString.replace(SearchPos + Match.position(1), Match[1].length(), std::to_string(RowNumber));
+			SearchPos += Match.position() + Match.length();
+		}
+		return FString{UTF8_TO_TCHAR(ErrorString.data())};
 	}
 
     TArray<ShaderErrorInfo> ParseErrorInfoFromDxc(FStringView HlslErrorInfo)

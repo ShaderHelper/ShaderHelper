@@ -18,6 +18,14 @@ namespace FW
         })->DynamicMetaType();
     }
 
+	void AssetObject::Destroy()
+	{
+		GProject->RemovePendingAsset(this);
+		NumRefs = 0;
+		OnDestroy.ExecuteIfBound();
+		delete this;
+	}
+
     AssetObject::~AssetObject()
     {
         TSingleton<AssetManager>::Get().RemoveAsset(this);

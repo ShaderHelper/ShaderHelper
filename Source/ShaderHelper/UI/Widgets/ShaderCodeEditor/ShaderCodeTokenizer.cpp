@@ -387,7 +387,10 @@ namespace SH
 				}
 
 				//Process the last token of the line.
-				LastLineState = CurLineState;
+				if(CurLineState != StateSet::End)
+				{
+					LastLineState = CurLineState;
+				}
 				TokenizedLine.Tokens.Emplace(StateSetToTokenType(LastLineState), FTextRange{ TokenStart, LineRange.EndIndex });
 
 				TokenizedLines.Add(MoveTemp(TokenizedLine));

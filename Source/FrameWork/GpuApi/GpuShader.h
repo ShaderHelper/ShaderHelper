@@ -2,6 +2,10 @@
 #include "GpuResourceCommon.h"
 #include <Misc/FileHelper.h>
 #include "Common/Path/PathHelper.h"
+
+DECLARE_LOG_CATEGORY_EXTERN(LogShader, Log, All);
+inline DEFINE_LOG_CATEGORY(LogShader);
+
 namespace HLSL
 {
     enum class CandidateKind
@@ -197,6 +201,7 @@ namespace FW
         }
     };
 
+	FRAMEWORK_API FString AdjustErrorLineNumber(const FString& ErrorInfo, int32 Delta);
     FRAMEWORK_API TArray<ShaderCandidateInfo> DefaultCandidates();
 
     class FRAMEWORK_API ISenseTU

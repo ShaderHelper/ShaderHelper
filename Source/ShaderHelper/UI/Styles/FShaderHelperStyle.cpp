@@ -66,7 +66,7 @@ namespace SH {
 		FTextBlockStyle CodeEditorPreprocessTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
 			.SetColorAndOpacity(FLinearColor{0.35f, 0.35f, 0.35f, 1.0f});
 		FTextBlockStyle CodeEditorStringText = FTextBlockStyle{ CodeEditorNormalTextStyle }
-			.SetColorAndOpacity(FLinearColor{ 1.0f, 0.9f, 0.8f, 1.0f });
+			.SetColorAndOpacity(FLinearColor{ 1.0f, 0.8f, 0.66f, 1.0f });
 
 		Style->Set("CodeEditorNormalText", CodeEditorNormalTextStyle);
 		Style->Set("CodeEditorPunctuationText", CodeEditorPunctuationTextStyle);

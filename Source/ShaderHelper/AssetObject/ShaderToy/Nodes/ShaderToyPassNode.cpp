@@ -5,6 +5,7 @@
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/Property/PropertyData/PropertyUniformItem.h"
+#include "RenderResource/PrintBuffer.h"
 
 using namespace FW;
 
@@ -33,6 +34,15 @@ namespace SH
 	{
 		ObjectName = FText::FromString("ShaderPass");
         Preview = MakeShared<PreviewViewPort>();
+	}
+
+	ShaderToyPassNode::~ShaderToyPassNode()
+	{
+		if(Shader)
+		{
+			Shader->OnDestroy.Unbind();
+			Shader->OnRefreshBuilder.Unbind();
+		}
 	}
 
     void ShaderToyPassNode::InitPins()
@@ -313,6 +323,24 @@ namespace SH
                     PassRecorder->DrawPrimitive(0, 3, 0, 1);
                 }
             );
+			ShaderToyContext.RG->Execute();
+			
+			ShaderAssertInfo AssertInfo;
+			TArray<FString> ShaderPrintLogs = TSingleton<PrintBuffer>::Get().GetPrintStrings(AssertInfo);
+			TSingleton<PrintBuffer>::Get().Clear();
+			if(AssertInfo.AssertString.IsEmpty())
+			{
+				for (const FString& PrintLog : ShaderPrintLogs)
+				{
+					SH_LOG(LogShader, Display, TEXT("%s"), *PrintLog);
+				}
+			}
+			else
+			{
+				int AddedLineNum = Shader->GetAddedLineNum();
+				SH_LOG(LogShader, Error, TEXT("%s:%d:%s"), *ObjectName.ToString(), AssertInfo.LineNumber - AddedLineNum, *AssertInfo.AssertString);
+				return {true, true};
+			}
         }
         
         if(!Shader->bCurPsCompilationSucceed)

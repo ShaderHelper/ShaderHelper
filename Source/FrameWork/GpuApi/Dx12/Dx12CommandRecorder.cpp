@@ -321,6 +321,17 @@ namespace FW
 		}
 	}
 
+	void Dx12CmdRecorderPool::EndFrame()
+	{
+		for(auto& ActiveDx12CmdRecorder : ActiveDx12CmdRecorders)
+		{
+			if(!ActiveDx12CmdRecorder->IsSubmitted)
+			{
+				ActiveDx12CmdRecorder->IsUnsubmittedAtFrameEnd = true;
+			}
+		}
+	}
+
 	TSharedPtr<Dx12CmdRecorder> Dx12CmdRecorderPool::RetrieveFreeCmdRecorder()
 	{
 		for (auto It = ActiveDx12CmdRecorders.CreateIterator(); It; It++)
@@ -579,10 +590,11 @@ namespace FW
 		check(IsFree());
 		DxCheck(CommandAllocator->Reset());
 		DxCheck(CmdList->Reset(CommandAllocator, nullptr));
-		DxCheck(Fence->Signal(0));
+		DxCheck(Fence->Signal(NotSubmitted));
 		RequestedRenderPassRecorders.Empty();
 		StateCache.Clear();
 		BindDescriptorHeap();
+		IsUnsubmittedAtFrameEnd = false;
 	}
 
 	void Dx12CmdRecorder::SetName(const FString& Name)

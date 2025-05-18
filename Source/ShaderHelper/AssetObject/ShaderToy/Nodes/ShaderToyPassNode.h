@@ -22,6 +22,7 @@ namespace SH
 		REFLECTION_TYPE(ShaderToyPassNode)
 	public:
 		ShaderToyPassNode();
+		~ShaderToyPassNode();
 
 	public:
         void InitPins() override;

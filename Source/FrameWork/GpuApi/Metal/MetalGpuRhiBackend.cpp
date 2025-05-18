@@ -40,7 +40,7 @@ void MetalGpuRhiBackend::BeginFrame()
 void MetalGpuRhiBackend::EndFrame()
 {
 	WaitGpu();
-    ClearSubmitted();
+	GMtlCmdRecorderPool.Empty();
     GDeferredReleaseOneFrame.Empty();
 }
 
@@ -176,7 +176,6 @@ void MetalGpuRhiBackend::Submit(const TArray<GpuCmdRecorder*>& CmdRecorders)
         MtlCmdRecorder* MetalCmdRecorder = static_cast<MtlCmdRecorder*>(CmdRecorder);
         MTL::CommandBuffer* CmdBuffer = MetalCmdRecorder->GetCommandBuffer();
         CmdBuffer->commit();
-        MetalCmdRecorder->IsSubmitted = true;
     }
     LastSubmittedCmdRecorder = static_cast<MtlCmdRecorder*>(CmdRecorders.Last());
 }

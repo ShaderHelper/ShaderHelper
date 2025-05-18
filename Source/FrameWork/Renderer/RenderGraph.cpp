@@ -84,6 +84,10 @@ namespace FW
 		}
 		GGpuRhi->EndRecording(CmdRecorder);
 		GGpuRhi->Submit({CmdRecorder});
+		
+		//Allow multiple executions?
+		RGRenderPasses.Empty();
+		CmdRecorder = GGpuRhi->BeginRecording();
 	}
 
 }

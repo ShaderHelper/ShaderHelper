@@ -110,6 +110,13 @@ namespace FW
 	class Dx12CmdRecorder : public GpuCmdRecorder
 	{
 	public:
+		enum State
+		{
+			NotSubmitted,
+			Submitted,
+			Finished
+		};
+		
 		Dx12CmdRecorder(TRefCountPtr<ID3D12GraphicsCommandList> InCmdList, TRefCountPtr<ID3D12CommandAllocator> InCmdAllocator)
 			: CmdList(MoveTemp(InCmdList)), CommandAllocator(MoveTemp(InCmdAllocator))
 		{
@@ -134,12 +141,21 @@ namespace FW
 		void SetName(const FString& Name);
 		void BindDescriptorHeap();
 
-		void MarkFinished() { 
-			DxCheck(GGraphicsQueue->Signal(Fence, 1));
+		void MarkSubmitted() {
+			DxCheck(Fence->Signal(Submitted));
+			DxCheck(GGraphicsQueue->Signal(Fence, Finished));
+		}
+		bool IsSubmitted() {
+			return Fence->GetCompletedValue() == Submitted;
+		}
+		bool IsFinished() {
+			return Fence->GetCompletedValue() == Finished;
 		}
 		bool IsFree() {
-			return !!Fence->GetCompletedValue();
+			return IsFinished() || IsUnsubmittedAtFrameEnd;
 		}
+	public:
+		bool IsUnsubmittedAtFrameEnd = false;
 
 	private:
 		TRefCountPtr<ID3D12GraphicsCommandList> CmdList;
@@ -155,6 +171,7 @@ namespace FW
     public:
 		Dx12CmdRecorder* ObtainDxCmdRecorder(const FString& RecorderName = {});
 		TSharedPtr<Dx12CmdRecorder> RetrieveFreeCmdRecorder();
+		void EndFrame();
 
 	private:
 		TArray<TSharedPtr<Dx12CmdRecorder>> ActiveDx12CmdRecorders;
