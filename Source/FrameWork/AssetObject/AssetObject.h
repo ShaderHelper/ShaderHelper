@@ -13,12 +13,7 @@ namespace FW
         ~AssetObject();
         
         //The asset can be deleted outside
-        void Destroy()
-        {
-            NumRefs = 0;
-            OnDestroy.ExecuteIfBound();
-            delete this;
-        }
+		void Destroy();
 
 		virtual void Serialize(FArchive& Ar) override;
         virtual void PostLoad() override;

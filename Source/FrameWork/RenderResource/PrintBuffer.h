@@ -1,18 +1,21 @@
 #pragma once
 #include "GpuApi/GpuRhi.h"
 
-DECLARE_LOG_CATEGORY_EXTERN(LogShaderPrint, Log, All);
-inline DEFINE_LOG_CATEGORY(LogShaderPrint);
-
 namespace FW
 {
+	struct ShaderAssertInfo
+	{
+		FString AssertString;
+		int LineNumber;
+	};
+
 	class FRAMEWORK_API PrintBuffer
 	{
 	public:
 		PrintBuffer();
 
 	public:
-		TArray<FString> GetPrintStrings();
+		TArray<FString> GetPrintStrings(ShaderAssertInfo& OutAssertInfo);
 		void Clear();
 		GpuBuffer* GetResource() const { return InternalBuffer; }
 

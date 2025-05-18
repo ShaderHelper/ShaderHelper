@@ -151,14 +151,14 @@ namespace FW
         if(Results[0].hasError)
         {
             FString ErrorInfo = static_cast<const char*>(Results[0].errorWarningMsg.Data());
-            SH_LOG(LogMetal, Error, TEXT("Hlsl compilation failed: %s"), *ErrorInfo);
+            //SH_LOG(LogShader, Error, TEXT("Compilation failed: %s"), *ErrorInfo);
             OutErrorInfo = MoveTemp(ErrorInfo);
             return false;
         }
         else if(Results[1].hasError)
         {
             FString ErrorInfo = static_cast<const char*>(Results[1].errorWarningMsg.Data());
-            SH_LOG(LogMetal, Error, TEXT("Hlsl compilation failed: %s"), *ErrorInfo);
+            //SH_LOG(LogShader, Error, TEXT("Compilation failed: %s"), *ErrorInfo);
 			OutErrorInfo = MoveTemp(ErrorInfo);
             return false;
         }

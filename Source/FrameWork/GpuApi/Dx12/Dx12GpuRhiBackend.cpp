@@ -47,7 +47,8 @@ void Dx12GpuRhiBackend::EndFrame()
 	check(CurCpuFrame >= CurGpuFrame);
 	CurCpuFrame++;
 	DxCheck(GGraphicsQueue->Signal(CpuSyncGpuFence, CurCpuFrame));
-
+	GDx12CmdRecorderPool.EndFrame();
+	
 	CurGpuFrame = CpuSyncGpuFence->GetCompletedValue();
 	const uint64 CurLag = CurCpuFrame - CurGpuFrame;
 	if (CurLag > AllowableLag) {
@@ -146,7 +147,7 @@ void Dx12GpuRhiBackend::Submit(const TArray<GpuCmdRecorder*>& CmdRecorders)
 
 	for (auto CmdRecorder : CmdRecorders)
 	{
-		static_cast<Dx12CmdRecorder*>(CmdRecorder)->MarkFinished();
+		static_cast<Dx12CmdRecorder*>(CmdRecorder)->MarkSubmitted();
 	}
 }
 

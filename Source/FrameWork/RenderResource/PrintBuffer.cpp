@@ -17,14 +17,27 @@ namespace FW
 		});
 	}
 
-	TArray<FString> PrintBuffer::GetPrintStrings()
+	TArray<FString> PrintBuffer::GetPrintStrings(ShaderAssertInfo& OutAssertInfo)
 	{
 		TArray<FString> PrintStrings;
 		HLSL::Printer* Printer = (HLSL::Printer*)GGpuRhi->MapGpuBuffer(InternalBuffer, GpuResourceMapMode::Read_Only);
 		uint32 ByteOffset = 4;
 		while (ByteOffset < Printer->ByteSize)
 		{
+			uint8 AssertFlag = *((uint8*)Printer + ByteOffset);
+			ByteOffset += 1;
+			int LineNumber = *((uint8*)Printer + ByteOffset);
+			ByteOffset += 1;
 			FString PrintStr{ (char*)Printer + ByteOffset };
+			if(!AssertFlag) {
+				OutAssertInfo.AssertString = "Assert failed";
+				if(!PrintStr.IsEmpty())
+				{
+					OutAssertInfo.AssertString += ":" + PrintStr;
+				}
+				OutAssertInfo.LineNumber = LineNumber;
+				break;
+			}
 			ByteOffset += PrintStr.Len() + 1;
 			uint8 ArgNum = *((uint8*)Printer + ByteOffset);
 			ByteOffset += 1;

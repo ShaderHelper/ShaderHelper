@@ -16,7 +16,7 @@ const FString DefaultPixelShaderBody =
 R"(void mainImage(out float4 fragColor,in float2 fragCoord)
 {
     float2 uv = fragCoord / iResolution.xy;
-    
+	//Assert(uv.x > 0.9, "uv.x must be greater than 0.9");
     float3 col = 0.5 + 0.5*cos(iTime + uv.xyx + float3(0,2,4));
     
     fragColor = float4(uv,0,1);
@@ -61,7 +61,6 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         AssetObject::PostLoad();
         
         VertexShader = GGpuRhi->CreateShaderFromSource({
-            .Name = GetFileName() + "Vs", 
             .Source = DefaultVertexShader, 
             .Type = ShaderType::VertexShader, 
             .EntryPoint = "MainVS"
@@ -70,8 +69,8 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         GGpuRhi->CompileShader(VertexShader, ErrorInfo);
 
         PixelShader = GGpuRhi->CreateShaderFromSource({
-            .Name = GetFileName() + "Ps", 
-            .Source = GetFullPs(), 
+            .Name = GetFileName() + "." + FileExtension(),
+            .Source = GetFullPs(),
             .Type = ShaderType::PixelShader, 
             .EntryPoint = "MainPS"
         });
@@ -163,6 +162,13 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 		FFileHelper::LoadFileToString(Template, *(PathHelper::ShaderDir() / "ShaderHelper/StShaderTemplate.hlsl"));
         return GetBinding() + Template;
     }
+
+	int StShader::GetAddedLineNum() const
+	{
+		TArray<FString> AddedLines;
+		static int AddedLineNum = GetTemplateWithBinding().ParseIntoArrayLines(AddedLines, false) - 1;
+		return AddedLineNum;
+	}
 
 	FString StShader::GetFullPs() const
 	{

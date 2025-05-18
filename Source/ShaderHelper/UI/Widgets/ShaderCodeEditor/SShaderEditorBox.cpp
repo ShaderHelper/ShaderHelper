@@ -837,9 +837,7 @@ const FString ErrorMarkerText = TEXT("✘");
         EffectMarshller->LineNumberToErrorInfo.Reset();
         for (const ShaderErrorInfo& ErrorInfo : ErrorInfos)
         {
-            FString ShaderTemplateWithBinding = StShaderAsset->GetTemplateWithBinding();
-            TArray<FString> AddedLines;
-            int32 AddedLineNum = ShaderTemplateWithBinding.ParseIntoArrayLines(AddedLines, false) - 1;
+			int32 AddedLineNum = StShaderAsset->GetAddedLineNum();
             
             int32 ErrorInfoLineNumber = ErrorInfo.Row - AddedLineNum;
             if (!EffectMarshller->LineNumberToErrorInfo.Contains(ErrorInfoLineNumber))
@@ -877,8 +875,7 @@ const FString ErrorMarkerText = TEXT("✘");
     {
         FString ShaderTemplateWithBinding = StShaderAsset->GetTemplateWithBinding();
         FString FinalShaderSource = ShaderTemplateWithBinding + CurrentShaderSource;
-        
-        FString ShaderName = StShaderAsset->GetFileName() + "Ps";
+		FString ShaderName = StShaderAsset->GetFileName() + "." + StShaderAsset->FileExtension();
         TRefCountPtr<GpuShader> CurPixelShader = GGpuRhi->CreateShaderFromSource({
             .Name = ShaderName, 
             .Source = MoveTemp(FinalShaderSource), 
@@ -894,6 +891,9 @@ const FString ErrorMarkerText = TEXT("✘");
         }
         else
         {
+			int32 AddedLineNum = StShaderAsset->GetAddedLineNum();
+			ErrorInfo = AdjustErrorLineNumber(ErrorInfo, -AddedLineNum);
+			SH_LOG(LogShader, Error, TEXT("Compilation failed:\n%s"), *ErrorInfo);
             StShaderAsset->bCurPsCompilationSucceed = false;
             CurEditState = EditState::Failed;
         }
@@ -926,8 +926,7 @@ const FString ErrorMarkerText = TEXT("✘");
             const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
             const int32 CursorRow = CursorLocation.GetLineIndex();
             const int32 CursorCol = CursorLocation.GetOffset();
-            TArray<FString> AddedLines;
-            int32 AddedLineNum = ShaderTemplateWithBinding.ParseIntoArrayLines(AddedLines, false) - 1;
+			int32 AddedLineNum = StShaderAsset->GetAddedLineNum();
             
             FString CurLineText;
             ShaderMultiLineEditableText->GetTextLine(CursorRow, CurLineText);
@@ -1631,14 +1630,14 @@ const FString ErrorMarkerText = TEXT("✘");
             .OnClicked(this, &SShaderEditorBox::OnFold, LineNumber);
         
         FoldingArrow->SetPadding(FMargin{});
-        if(ShaderMarshaller->FoldingBraceGroups.Contains(LineIndex))
-        {
-            FoldingArrow->SetButtonStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FButtonStyle>("ArrowDownButton"));
-        }
-        else if(FindFoldMarker(LineIndex))
+        if(FindFoldMarker(LineIndex))
         {
             FoldingArrow->SetButtonStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FButtonStyle>("ArrowRightButton"));
         }
+		else
+		{
+			FoldingArrow->SetButtonStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FButtonStyle>("ArrowDownButton"));
+		}
         
         auto ItemErrorMarker = SNew(STextBlock)
         .Font(CodeFontInfo)

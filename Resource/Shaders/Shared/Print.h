@@ -37,8 +37,8 @@ namespace HLSL
 		static const uint MaxBufferSize = 511;
 
 		uint ByteSize;
-		//PrintBuffer layout: [xxx{0}xxxx\0] [ArgNum TypeTag ArgValue ...]
-		//Bytes:               ^CharNum        ^1     ^1      ^sizeof(ArgValue)
+		//PrintBuffer layout: AssertFlag Line [xxx{0}xxxx\0] [ArgNum TypeTag ArgValue ...]
+		//Bytes:              ^1         ^1    ^CharNum       ^1     ^1      ^sizeof(ArgValue)
 		uint PrintBuffer[MaxBufferSize];
 	};
 
@@ -124,45 +124,53 @@ AppendArgFunc(float)
 #if ENABLE_PRINT == 1
 //Up to 3 args now.
 //Print("abc {0}", t);
-#define Print(StrArrDecl, ...)  do {                                \
-    StrArrDecl;                                                     \
-    uint CharNum = sizeof(StrArr) / sizeof(StrArr[0]);              \
-    uint ArgNum = GET_ARG_NUM(__VA_ARGS__);                         \
-	uint ArgByteSize = 1 + ArgNum + GET_ARGS_SIZE(__VA_ARGS__);     \
-    uint Increment = CharNum + ArgByteSize;                         \
-    uint OldByteSize = Printer[0].ByteSize;                         \
-	uint ByteOffset = 0xFFFFFFFF;                                   \
-    [allow_uav_condition]                                           \
-    while(OldByteSize + Increment <= Printer::MaxBufferSize * 4)    \
-    {                                                               \
-        uint CompareValue = OldByteSize;                            \
-        InterlockedCompareExchange(Printer[0].ByteSize,             \ 
-			CompareValue, OldByteSize + Increment, OldByteSize);    \
-        if(OldByteSize == CompareValue)                             \
-        {                                                           \
-			ByteOffset = OldByteSize;                               \
-            break;                                                  \
-        }                                                           \
-    }                                                               \
-	if (ByteOffset == 0xFFFFFFFF)                                   \
-	{                                                               \
-		break;                                                      \
-	}                                                               \
-	for (uint i = 0; i < CharNum; i++)                              \
-	{                                                               \
-		ByteOffset = AppendChar(ByteOffset, StrArr[i]);             \
-	}                                                               \
-	ByteOffset = AppendChar(ByteOffset, ArgNum);                    \
-	APPEND_ARGS(__VA_ARGS__);                                       \
+#define Print(StrArrDecl, ...)  do {                                    \
+	uint StrArr[] = {'\0'};                                             \
+	{                                                                   \
+		StrArrDecl;                                                     \
+		uint CharNum = sizeof(StrArr) / sizeof(StrArr[0]);              \
+		uint ArgNum = GET_ARG_NUM(__VA_ARGS__);                         \
+		uint ArgByteSize = 1 + ArgNum + GET_ARGS_SIZE(__VA_ARGS__);     \
+		uint Increment = 2 + CharNum + ArgByteSize;                     \
+		uint OldByteSize = Printer[0].ByteSize;                         \
+		uint ByteOffset = 0xFFFFFFFF;                                   \
+		[allow_uav_condition]                                           \
+		while(OldByteSize + Increment <= Printer::MaxBufferSize * 4)    \
+		{                                                               \
+			uint CompareValue = OldByteSize;                            \
+			InterlockedCompareExchange(Printer[0].ByteSize,             \ 
+				CompareValue, OldByteSize + Increment, OldByteSize);    \
+			if(OldByteSize == CompareValue)                             \
+			{                                                           \
+				ByteOffset = OldByteSize;                               \
+				break;                                                  \
+			}                                                           \
+		}                                                               \
+		if (ByteOffset == 0xFFFFFFFF)                                   \
+		{                                                               \
+			break;                                                      \
+		}                                                               \
+		ByteOffset = AppendChar(ByteOffset, GPrivate_AssertResult);     \
+		ByteOffset = AppendChar(ByteOffset, __LINE__);                  \
+		for (uint i = 0; i < CharNum; i++)                              \
+		{                                                               \
+			ByteOffset = AppendChar(ByteOffset, StrArr[i]);             \
+		}                                                               \
+		ByteOffset = AppendChar(ByteOffset, ArgNum);                    \
+		APPEND_ARGS(__VA_ARGS__);                                       \
+	}                                                                   \
 } while(0)
 #else
 #define Print(StrArrDecl, ...)
 #endif
 
 static uint GPrivate_AssertResult = 1;
-void Assert(uint Condition) 
-{
-	GPrivate_AssertResult &= Condition;
-}
+#define Assert(Condition, ...) do {               \
+	GPrivate_AssertResult &= Condition;           \
+	if(GPrivate_AssertResult != 1)                \
+	{                                             \
+		Print(EXPAND(__VA_ARGS__));               \
+	}                                             \
+}while(0)
 
 #endif

@@ -131,9 +131,6 @@ namespace FW
         void CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture) override;
         void CopyTextureToBuffer(GpuTexture* InTexture, GpuBuffer* InBuffer) override;
 		void CopyBufferToBuffer(GpuBuffer* SrcBuffer, uint32 SrcOffset, GpuBuffer* DestBuffer, uint32 DestOffset, uint32 Size) override;
-		
-    public:
-        bool IsSubmitted{};
         
     private:
         MTLCommandBufferPtr CmdBuffer;
@@ -143,14 +140,5 @@ namespace FW
     
     inline MtlCmdRecorder* LastSubmittedCmdRecorder;
     inline TArray<TUniquePtr<MtlCmdRecorder>> GMtlCmdRecorderPool;
-    inline void ClearSubmitted()
-    {
-        for(auto It = GMtlCmdRecorderPool.CreateIterator(); It; It++)
-        {
-            if((*It)->IsSubmitted) {
-                It.RemoveCurrent();
-            }
-        }
-    }
- 
+
 }

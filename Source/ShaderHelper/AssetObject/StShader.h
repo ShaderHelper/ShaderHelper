@@ -27,6 +27,7 @@ namespace SH
 
         FString GetBinding() const;
         FString GetTemplateWithBinding() const;
+		int GetAddedLineNum() const;
 		FString GetFullPs() const;
         
         TArray<TSharedRef<FW::PropertyData>>* GetPropertyDatas() override;
