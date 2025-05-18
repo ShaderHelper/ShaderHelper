@@ -16,6 +16,7 @@ THIRD_PARTY_INCLUDES_START
 THIRD_PARTY_INCLUDES_END
 
 //ue regex is invalid if disable icu, so use the regex from std.
+//TODO RE2
 #include <regex>
 #include <string>
 
@@ -25,9 +26,9 @@ namespace FW
 	{
 		std::string ShaderString{TCHAR_TO_UTF8(*ShaderText)};
 		std::smatch Match;
-
 		auto ReplaceMatch = [&](const std::regex& Pattern) {
-			while (std::regex_search(ShaderString, Match, Pattern))
+			std::size_t SearchPos = 0;
+			while (std::regex_search(ShaderString.cbegin() + SearchPos, ShaderString.cend(), Match, Pattern))
 			{
 				FString PrintStringLiteral = UTF8_TO_TCHAR(std::string{Match[1]}.data());
 				FString TextArr = "EXPAND(uint StrArr[] = {";
@@ -47,12 +48,16 @@ namespace FW
 					}
 				}
 				TextArr += "'\\0'})";
-				ShaderString.replace(Match.position(1), Match[1].length(), TCHAR_TO_UTF8(*TextArr));
+				ShaderString.replace(SearchPos + Match.position(1), Match[1].length(), TCHAR_TO_UTF8(*TextArr));
+				SearchPos += Match.position() + TextArr.Len();
 			}
 		};
-		ReplaceMatch(std::regex{"Print *\\( *(\".*\")"});
-		ReplaceMatch(std::regex{ "PrintAtMouse *\\( *(\".*\")" });
-        ReplaceMatch(std::regex{ "Assert *\\(.*(\".*\")" });
+		static std::regex PrintRegex{"Print *\\( *(\".*\")"};
+		static std::regex PrintAtMouseRegex{"PrintAtMouse *\\( *(\".*\")"};
+		static std::regex AssertRegex{"Assert *\\(.*(\".*\")"};
+		ReplaceMatch(PrintRegex);
+		ReplaceMatch(PrintAtMouseRegex);
+        ReplaceMatch(AssertRegex);
 
 		ShaderText = FString{UTF8_TO_TCHAR(ShaderString.data())};
 		return *this;
@@ -102,9 +107,9 @@ namespace FW
 		while (std::regex_search(ErrorString.cbegin() + SearchPos, ErrorString.cend(), Match, Pattern))
 		{
 			std::string RowStr = Match[1];
-			int32 RowNumber = std::stoi(RowStr) + Delta;
-			ErrorString.replace(SearchPos + Match.position(1), Match[1].length(), std::to_string(RowNumber));
-			SearchPos += Match.position() + Match.length();
+			std::string RowNumber = std::to_string(std::stoi(RowStr) + Delta);
+			ErrorString.replace(SearchPos + Match.position(1), Match[1].length(), RowNumber);
+			SearchPos += Match.position() + RowNumber.length();
 		}
 		return FString{UTF8_TO_TCHAR(ErrorString.data())};
 	}

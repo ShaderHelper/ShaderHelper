@@ -1,8 +1,9 @@
 //Thanks to https://therealmjp.github.io/posts/hlsl-printf/
 
-//However the string literal trick was already fixed, 
+//However the string literal trick was already fixed, and CharToUint can not be used in spirv codegen.
 //so reference ue's approach by preprocessing shaders to generate uint arrays.
 //https://github.com/microsoft/DirectXShaderCompiler/pull/6920
+//https://godbolt.org/z/bnz9TPME8
 #pragma once
 
 #ifdef __cplusplus
