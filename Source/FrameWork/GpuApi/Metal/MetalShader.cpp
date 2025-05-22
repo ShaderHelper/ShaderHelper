@@ -104,6 +104,7 @@ namespace FW
         
         TArray<const char*> DxcArgs;
         DxcArgs.Add("-no-warnings");
+		DxcArgs.Add("-fspv-debug=vulkan-with-source");
         DxcArgs.Add("-fspv-preserve-bindings"); //For bindgroup-argumentbuffer
 		//Storage buffers use the scalar layout instead of vector-relaxed 430
 		//to make it consistent with structuredbuffer, so that user side can unify the struct

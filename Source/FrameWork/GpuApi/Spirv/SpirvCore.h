@@ -6,6 +6,8 @@ namespace FW
 
 	enum class SpvOp
 	{
+		String = 7,
+		ExtInst = 12,
 		ExecutionMode = 16,
 	};
 

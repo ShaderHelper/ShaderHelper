@@ -26,12 +26,13 @@ namespace SH
         TArray<FoldMarker> ChildFoldMarkers;
 
         FString GetTotalFoldedLineTexts() const;
-        int32 GetFoledLineCounts() const;
+        int32 GetFoldedLineCounts() const;
     };
 
     struct ShaderUndoState : SlateEditableTextTypes::FUndoState
     {
         TArray<FoldMarker> FoldMarkers;
+		TArray<int32> BreakPointLines;
     };
 
 	class FShaderEditorMarshaller : public FBaseTextLayoutMarshaller
@@ -198,6 +199,7 @@ namespace SH
 		virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 		virtual FReply OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 		virtual void OnMouseLeave(const FPointerEvent& MouseEvent) override;
+		void OnBeginEditTransaction();
         
 	private:
 		void CopySelectedText();
@@ -218,6 +220,7 @@ namespace SH
 	public:
         FSlateEditableTextLayout* ShaderMultiLineEditableTextLayout;
 		TArray<FoldMarker> VisibleFoldMarkers;
+		TArray<int32> BreakPointLines;
         //Contain fold markers.
         FString CurrentEditorSource;
         
@@ -238,12 +241,15 @@ namespace SH
         
 		TSharedPtr<SListView<LineNumberItemPtr>> LineNumberList;
 		TSharedPtr<SListView<LineNumberItemPtr>> LineTipList;
+		
+		FTextSelection SelectionBeforeEdit;
 
 		StShader* StShaderAsset;
         EditState CurEditState;
         FSlateFontInfo CodeFontInfo;
 		TSharedPtr<SHorizontalBox> InfoBarBox;
 
+		bool IsFoldEditTransaction{};
 		FCurveSequence FoldingArrowAnim;
         
         //CodeComplete and real-time diagnostic

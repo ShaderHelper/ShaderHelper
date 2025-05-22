@@ -1,5 +1,6 @@
 #pragma once
-#include "SpirvCommon.h"
+#include "SpirvCore.h"
+#include "SpirvExt.h"
 
 namespace FW
 {
@@ -9,15 +10,17 @@ namespace FW
 	{
 	public:
 		virtual void Visit(SpvInstruction*) {}
-		virtual void Visit(class SpvExecutionModeOp* Inst) {}
+		
+		virtual void Visit(class SpvOpExecutionMode* Inst) {}
+		virtual void Visit(class SpvOpString* Inst) {}
+		
+		virtual void Visit(class SpvDebugLine* ExtInst) {}
 	};
 
 	class SpvInstruction
 	{
 	public:
-		SpvInstruction(SpvOp InOpCode)
-			: OpCode(InOpCode)
-		{}
+		SpvInstruction() = default;
 		virtual ~SpvInstruction() = default;
 		
 	public:
@@ -26,16 +29,14 @@ namespace FW
 		virtual void Accpet(const TArray<SpvVisitor*>& Visitors) = 0;
 		
 	private:
-		SpvOp OpCode;
-		SpvId ResultId = 0;
-		Vector2u SrcLoc{};
+		std::optional<SpvId> ResultId;
+		std::optional<Vector2u> SrcLoc;
 	};
 
 	template<typename T>
 	class SpvInstructionBase : public SpvInstruction
 	{
 	public:
-		using SpvInstruction::SpvInstruction;
 		void Accpet(const TArray<SpvVisitor*>& Visitors) override
 		{
 			for(SpvVisitor* Visitor : Visitors)
@@ -47,13 +48,12 @@ namespace FW
 
 	using ExtraOperands = TArray<uint32, TInlineAllocator<4>>;
 
-	class SpvExecutionModeOp : public SpvInstructionBase<SpvExecutionModeOp>
+	class SpvOpExecutionMode : public SpvInstructionBase<SpvOpExecutionMode>
 	{
 	public:
-		SpvExecutionModeOp(SpvId InEntryPoint, SpvExecutionMode InMode,
+		SpvOpExecutionMode(SpvId InEntryPoint, SpvExecutionMode InMode,
 						   const ExtraOperands& InOperands)
-			: SpvInstructionBase(SpvOp::ExecutionMode)
-			, EntryPoint(InEntryPoint)
+			: EntryPoint(InEntryPoint)
 			, Mode(InMode)
 			, Operands(InOperands)
 		{}
@@ -65,5 +65,26 @@ namespace FW
 		SpvId EntryPoint;
 		SpvExecutionMode Mode;
 		ExtraOperands Operands;
+	};
+
+	class SpvOpString : public SpvInstructionBase<SpvOpString>
+	{
+	public:
+		SpvOpString()
+		{}
+	};
+
+	class SpvOpExtInst : public SpvInstructionBase<SpvOpExtInst>
+	{
+	public:
+		SpvOpExtInst()
+		{}
+	};
+
+	class SpvDebugLine : public SpvInstructionBase<SpvDebugLine>
+	{
+	public:
+		SpvDebugLine()
+		{}
 	};
 }

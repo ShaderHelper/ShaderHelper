@@ -13,6 +13,7 @@
 #include "Editor/AssetEditor/AssetEditor.h"
 #include "UI/Widgets/Log/SOutputLog.h"
 #include "UI/Widgets/Timeline/STimeline.h"
+#include "UI/Widgets/Misc/CommonCommands.h"
 
 STEAL_PRIVATE_MEMBER(FTabManager, TArray<TSharedRef<FTabManager::FArea>>, CollapsedDockAreas)
 
@@ -44,6 +45,18 @@ namespace SH
 		: Renderer(InRenderer)
 		, WindowSize(InWindowSize)
 	{
+		UICommandList = MakeShared<FUICommandList>();
+		UICommandList->MapAction(
+			CommonCommands::Get().StepInto,
+			FExecuteAction{},
+			FCanExecuteAction{}
+		);
+		UICommandList->MapAction(
+			CommonCommands::Get().StepOver,
+			FExecuteAction{},
+			FCanExecuteAction{}
+		);
+		
 		CurProject = TSingleton<ShProjectManager>::Get().GetProject();
 		ViewPort = MakeShared<PreviewViewPort>();
 	}
@@ -153,6 +166,9 @@ namespace SH
         
         auto MenuBarBuilder = CreateMenuBarBuilder();
         auto MenuBarWidget = MenuBarBuilder.MakeWidget();
+		
+		auto ToolBarBuilder = CreateToolBarBuilder();
+		auto ToolBarWidget = ToolBarBuilder.MakeWidget();
 
 		Window->SetContent(
 			SAssignNew(WindowContentBox, SVerticalBox)
@@ -161,7 +177,22 @@ namespace SH
 			[
                 MenuBarWidget
 			]
-			+ SVerticalBox::Slot()
+		    +SVerticalBox::Slot()
+		    .AutoHeight()
+			[
+				SNew(SBorder)
+				.Padding(FMargin{0, 0.5f, 0, 1.0f})
+				.BorderImage(FAppStyle::Get().GetBrush("Brushes.Panel"))
+				[
+					SNew(SBorder)
+					.BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
+					.Padding(4)
+					[
+						ToolBarWidget
+					]
+				]
+			]
+			+SVerticalBox::Slot()
 			.FillHeight(0.965f)
 			[
 				TabManager->RestoreFrom(UsedLayout, Window).ToSharedRef()
@@ -531,7 +562,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
         }
         
         TabManager->CloseAllAreas();
-        WindowContentBox->GetSlot(1).AttachWidget(TabManager->RestoreFrom(DefaultTabLayout.ToSharedRef(), Window).ToSharedRef());
+        WindowContentBox->GetSlot(2).AttachWidget(TabManager->RestoreFrom(DefaultTabLayout.ToSharedRef(), Window).ToSharedRef());
         TabManager->FindExistingLiveTab(CodeTabId)->GetParentDockTabStack()->SetCanDropToAttach(false);
 	}
 
@@ -641,6 +672,107 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		{
 			FFileHelper::SaveStringToFile(NewJsonContents, *WindowLayoutFileName);
 		}
+	}
+
+	FToolBarBuilder ShaderHelperEditor::CreateToolBarBuilder()
+	{
+		FToolBarBuilder ToolBarBuilder(TSharedPtr<FUICommandList>(), FMultiBoxCustomization::None, nullptr);
+		ToolBarBuilder.SetStyle(&FShaderHelperStyle::Get(), FName("Toolbar.ShaderHelper"));
+		ToolBarBuilder.AddToolBarButton(
+			FExecuteAction{},
+			NAME_None,
+			FText::GetEmpty(), FText::GetEmpty(),
+			FSlateIcon( FAppStyle::Get().GetStyleSetName(), "Icons.ArrowLeft"),
+			EUserInterfaceActionType::Button
+		);
+		ToolBarBuilder.AddToolBarButton(
+			FUIAction(
+				FExecuteAction(),
+				FCanExecuteAction::CreateLambda([] { return false; })
+			),
+			NAME_None,
+			FText::GetEmpty(), FText::GetEmpty(),
+			FSlateIcon( FAppStyle::Get().GetStyleSetName(), "Icons.ArrowRight"),
+			EUserInterfaceActionType::Button
+		);
+		FToolBarBuilder DebuggerToolBarBuilder(UICommandList, FMultiBoxCustomization::None, nullptr);
+		DebuggerToolBarBuilder.SetStyle(&FShaderHelperStyle::Get(), FName("Toolbar.ShaderHelper"));
+		DebuggerToolBarBuilder.AddToolBarButton(
+			FUIAction(
+				FExecuteAction(),
+				FCanExecuteAction::CreateLambda([] { return false; })
+			),
+			NAME_None,
+			FText::GetEmpty(), FText::GetEmpty(),
+			FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.Bug"),
+			EUserInterfaceActionType::Button
+		);
+		DebuggerToolBarBuilder.AddToolBarButton(
+			FUIAction(
+				FExecuteAction(),
+				FCanExecuteAction::CreateLambda([] { return false; })
+			),
+			NAME_None,
+			FText::GetEmpty(), FText::GetEmpty(),
+			FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.ArrowBoldRight"),
+			EUserInterfaceActionType::Button
+		);
+		DebuggerToolBarBuilder.AddToolBarButton(
+			FUIAction(
+				FExecuteAction(),
+				FCanExecuteAction::CreateLambda([] { return false; })
+			),
+			NAME_None,
+			FText::GetEmpty(), FText::GetEmpty(),
+			FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.StepOver"),
+			EUserInterfaceActionType::Button
+		);
+		DebuggerToolBarBuilder.AddToolBarButton(
+			FUIAction(
+				FExecuteAction(),
+				FCanExecuteAction::CreateLambda([] { return false; })
+			),
+			NAME_None,
+			FText::GetEmpty(), FText::GetEmpty(),
+			FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.StepInto"),
+			EUserInterfaceActionType::Button
+		);
+		DebuggerToolBarBuilder.AddToolBarButton(
+			FUIAction(
+				FExecuteAction(),
+				FCanExecuteAction::CreateLambda([] { return false; })
+			),
+			NAME_None,
+			FText::GetEmpty(), FText::GetEmpty(),
+			FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.StepBack"),
+			EUserInterfaceActionType::Button
+		);
+		DebuggerToolBarBuilder.AddToolBarButton(
+			FUIAction(
+				FExecuteAction(),
+				FCanExecuteAction::CreateLambda([] { return false; })
+			),
+			NAME_None,
+			FText::GetEmpty(), FText::GetEmpty(),
+			FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.StepOut"),
+			EUserInterfaceActionType::Button
+		);
+		ToolBarBuilder.AddToolBarWidget(
+			SNew(SBorder)
+			.BorderImage(FAppStyle::Get().GetBrush("Brushes.Black"))
+			.Padding(1)
+			[
+				DebuggerToolBarBuilder.MakeWidget()
+			]
+		);
+		ToolBarBuilder.AddToolBarButton(
+			FExecuteAction{},
+			NAME_None,
+			FText::GetEmpty(), FText::GetEmpty(),
+			FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.FullText"),
+			EUserInterfaceActionType::Button
+		);
+		return ToolBarBuilder;
 	}
 
     FMenuBarBuilder ShaderHelperEditor::CreateMenuBarBuilder()

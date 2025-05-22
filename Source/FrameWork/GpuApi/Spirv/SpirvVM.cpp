@@ -3,5 +3,8 @@
 
 namespace FW
 {
-
+	void SpvVmVisitor::Visit(SpvOpString* Inst)
+	{
+		
+	}
 }

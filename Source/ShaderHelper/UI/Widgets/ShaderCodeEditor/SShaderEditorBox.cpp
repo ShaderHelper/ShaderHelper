@@ -12,6 +12,7 @@
 #include "ShaderCodeEditorLineHighlighter.h"
 #include "AssetObject/StShader.h"
 #include "UI/Widgets/Misc/CommonCommands.h"
+#include "Editor/ShaderHelperEditor.h"
 #include "magic_enum.hpp"
 
 //No exposed methods, and too lazy to modify the source code for UE.
@@ -236,107 +237,101 @@ const FString ErrorMarkerText = TEXT("✘");
                         ]
 
                         + SHorizontalBox::Slot()
-                        .Padding(5, 0, 0, 0)
                         .FillWidth(1.0f)
                         [
-                            SNew(SOverlay)
-                            + SOverlay::Slot()
-                            [
-                                SNew(SOverlay)
-                                + SOverlay::Slot()
-                                [
-                                    SAssignNew(ShaderMultiLineEditableText, SMultiLineEditableText)
-                                    .Text(InitialShaderText)
-                                    .Marshaller(ShaderMarshaller)
-                                    .VScrollBar(ShaderMultiLineVScrollBar)
-                                    .HScrollBar(ShaderMultiLineHScrollBar)
-                                    .OnKeyCharHandler(this, &SShaderEditorBox::HandleKeyChar)
-                                    .OnKeyDownHandler(this, &SShaderEditorBox::HandleKeyDown)
-                                    .CreateSlateTextLayout_Lambda([this](SWidget* InOwner, FTextBlockStyle InDefaultTextStyle){
-                                        return MakeShared<ShaderTextLayout>(InOwner, InDefaultTextStyle, ShaderMarshaller.Get());
-                                    })
-                                    .OnIsTypedCharValid_Lambda([](const TCHAR InChar) { return true; })
-                                    .OnCursorMoved_Lambda([this](const FTextLocation&){
-                                        if(!bKeyChar) {
-                                            bTryComplete = false;
-                                        }
-                                        bKeyChar = false;
-                                    })
-                                ]
-                                + SOverlay::Slot()
-                                [
-                                    SAssignNew(EffectMultiLineEditableText, SMultiLineEditableText)
-                                    .IsReadOnly(true)
-                                    .Marshaller(EffectMarshller)
-                                    .Visibility(EVisibility::HitTestInvisible)
-                                ]
-                                + SOverlay::Slot()
-                                [
-                                    SAssignNew(CodeCompletionCanvas, SCanvas)
-                                    + SCanvas::Slot()
-                                    .Size_Lambda([this]{
-                                        float Height = CustomCursorHighlighter->ScaledLineHeight * CandidateItems.Num();
-                                        float HSize = FMath::Min(200.0f, Height);
-                                        return FVector2D{240, HSize};
-                                    })
-                                    .Position_Lambda([this]{
-                                        FVector2D TipPos = CustomCursorHighlighter->ScaledCursorPos;
-                                        TipPos.Y += CustomCursorHighlighter->ScaledLineHeight;
-                                        FVector2D Area = ShaderMultiLineEditableText->GetTickSpaceGeometry().GetLocalSize();
-                                        float HSize = FMath::Min(200.0f, CustomCursorHighlighter->ScaledLineHeight * CandidateItems.Num());
-                                        if(TipPos.Y + HSize > Area.Y)
-                                        {
-                                            TipPos.Y -= CustomCursorHighlighter->ScaledLineHeight;
-                                            TipPos.Y -= HSize;
-                                        }
-                                        return TipPos;
-                                    })
-                                    [
-                                        SNew(SBorder)
-                                        .Visibility_Lambda([this]{
-                                            return bTryComplete? EVisibility::Visible : EVisibility::Collapsed;
-                                        })
-                                        .BorderImage(FAppStyle::Get().GetBrush("Brushes.AccentGray"))
-                                        .Padding(1.0)
-                                        [
-                                            SNew(SHorizontalBox)
-                                            +SHorizontalBox::Slot()
-                                            [
-                                                SAssignNew(CodeCompletionList, SListView<CandidateItemPtr>)
-                                                .ListItemsSource(&CandidateItems)
-                                                .SelectionMode(ESelectionMode::Single)
-                                                .OnGenerateRow(this, &SShaderEditorBox::GenerateCodeCompletionItem)
-                                                .EnableAnimatedScrolling(true)
-                                                .ConsumeMouseWheel(EConsumeMouseWheel::Always)
-                                                .ExternalScrollbar(CustomScrollBar)
-                                                .OnSelectionChanged_Lambda([this](CandidateItemPtr SelectedItem, ESelectInfo::Type){
-                                                    CurSelectedCandidate = SelectedItem;
-                                                })
-                                                .OnMouseButtonClick_Lambda([this](CandidateItemPtr ClickedItem){
-                                                    InsertCompletionText(ClickedItem->Text);
-                                                    FSlateApplication::Get().SetUserFocus(0, ShaderMultiLineEditableText);
-                                                })
-                                            ]
-                                            +SHorizontalBox::Slot()
-                                            .AutoWidth()
-                                            [
-                                                CustomScrollBar
-                                            ]
-                                        ]
-                                    ]
-                                ]
-                            ]
-                            
-                            + SOverlay::Slot()
-                            [
-                                SAssignNew(LineTipList, SListView<LineNumberItemPtr>)
-                                .ListItemsSource(&LineNumberData)
-                                .SelectionMode(ESelectionMode::None)
-                                .OnGenerateRow(this, &SShaderEditorBox::GenerateLineTipForItem)
-                                .ScrollbarVisibility(EVisibility::Collapsed)
-                                .IsFocusable(false)
-                                .Visibility(EVisibility::HitTestInvisible)
-                            ]
+							SNew(SOverlay)
+							+ SOverlay::Slot()
+							[
+								SAssignNew(ShaderMultiLineEditableText, SMultiLineEditableText)
+								.Text(InitialShaderText)
+								.Marshaller(ShaderMarshaller)
+								.VScrollBar(ShaderMultiLineVScrollBar)
+								.HScrollBar(ShaderMultiLineHScrollBar)
+								.OnKeyCharHandler(this, &SShaderEditorBox::HandleKeyChar)
+								.OnKeyDownHandler(this, &SShaderEditorBox::HandleKeyDown)
+								.CreateSlateTextLayout_Lambda([this](SWidget* InOwner, FTextBlockStyle InDefaultTextStyle){
+									return MakeShared<ShaderTextLayout>(InOwner, InDefaultTextStyle, ShaderMarshaller.Get());
+								})
+								.OnIsTypedCharValid_Lambda([](const TCHAR InChar) { return true; })
+								.OnCursorMoved_Lambda([this](const FTextLocation& NewCursorLocation){
+									if(!bKeyChar) {
+										bTryComplete = false;
+									}
+									bKeyChar = false;
+								})
+							]
+							+ SOverlay::Slot()
+							[
+								SAssignNew(EffectMultiLineEditableText, SMultiLineEditableText)
+								.IsReadOnly(true)
+								.Marshaller(EffectMarshller)
+								.Visibility(EVisibility::HitTestInvisible)
+							]
+							+ SOverlay::Slot()
+							[
+								SAssignNew(LineTipList, SListView<LineNumberItemPtr>)
+								.ListItemsSource(&LineNumberData)
+								.SelectionMode(ESelectionMode::None)
+								.OnGenerateRow(this, &SShaderEditorBox::GenerateLineTipForItem)
+								.ScrollbarVisibility(EVisibility::Collapsed)
+								.IsFocusable(false)
+								.Visibility(EVisibility::HitTestInvisible)
+							]
+							+ SOverlay::Slot()
+							[
+								SAssignNew(CodeCompletionCanvas, SCanvas)
+								+ SCanvas::Slot()
+								.Size_Lambda([this]{
+									float Height = CustomCursorHighlighter->ScaledLineHeight * CandidateItems.Num();
+									float HSize = FMath::Min(200.0f, Height);
+									return FVector2D{240, HSize};
+								})
+								.Position_Lambda([this]{
+									FVector2D TipPos = CustomCursorHighlighter->ScaledCursorPos;
+									TipPos.Y += CustomCursorHighlighter->ScaledLineHeight;
+									FVector2D Area = ShaderMultiLineEditableText->GetTickSpaceGeometry().GetLocalSize();
+									float HSize = FMath::Min(200.0f, CustomCursorHighlighter->ScaledLineHeight * CandidateItems.Num());
+									if(TipPos.Y + HSize > Area.Y)
+									{
+										TipPos.Y -= CustomCursorHighlighter->ScaledLineHeight;
+										TipPos.Y -= HSize;
+									}
+									return TipPos;
+								})
+								[
+									SNew(SBorder)
+									.Visibility_Lambda([this]{
+										return bTryComplete? EVisibility::Visible : EVisibility::Collapsed;
+									})
+									.BorderImage(FAppStyle::Get().GetBrush("Brushes.AccentGray"))
+									.Padding(1.0)
+									[
+										SNew(SHorizontalBox)
+										+SHorizontalBox::Slot()
+										[
+											SAssignNew(CodeCompletionList, SListView<CandidateItemPtr>)
+											.ListItemsSource(&CandidateItems)
+											.SelectionMode(ESelectionMode::Single)
+											.OnGenerateRow(this, &SShaderEditorBox::GenerateCodeCompletionItem)
+											.EnableAnimatedScrolling(true)
+											.ConsumeMouseWheel(EConsumeMouseWheel::Always)
+											.ExternalScrollbar(CustomScrollBar)
+											.OnSelectionChanged_Lambda([this](CandidateItemPtr SelectedItem, ESelectInfo::Type){
+												CurSelectedCandidate = SelectedItem;
+											})
+											.OnMouseButtonClick_Lambda([this](CandidateItemPtr ClickedItem){
+												InsertCompletionText(ClickedItem->Text);
+												FSlateApplication::Get().SetUserFocus(0, ShaderMultiLineEditableText);
+											})
+										]
+										+SHorizontalBox::Slot()
+										.AutoWidth()
+										[
+											CustomScrollBar
+										]
+									]
+								]
+							]
                             
                         ]
                     ]
@@ -369,12 +364,14 @@ const FString ErrorMarkerText = TEXT("✘");
             auto UndoState = MakeUnique<ShaderUndoState>();
             ShaderMultiLineEditableTextLayout->InitUndoState(*UndoState);
             UndoState->FoldMarkers = VisibleFoldMarkers;
+			UndoState->BreakPointLines = BreakPointLines;
             return UndoState;
         };
 
         ShaderMultiLineEditableTextLayout->CopyOverride = [this] { CopySelectedText(); };
         ShaderMultiLineEditableTextLayout->CutOverride = [this] { CutSelectedText(); };
         ShaderMultiLineEditableTextLayout->PasteOverride = [this] { PasteText(); };
+		ShaderMultiLineEditableTextLayout->OnBeginEditTransaction = [this] { OnBeginEditTransaction(); };
         
         TSharedPtr<FUICommandList>& UICommandList = GetPrivate_FSlateEditableTextLayout_UICommandList(*ShaderEditableTextLayout);
         UICommandList->MapAction(
@@ -396,6 +393,11 @@ const FString ErrorMarkerText = TEXT("✘");
         
         CurEditState = StShaderAsset->bCurPsCompilationSucceed ? EditState::Succeed : EditState::Failed;
     }
+
+	void SShaderEditorBox::OnBeginEditTransaction()
+	{
+		SelectionBeforeEdit = ShaderMultiLineEditableText->GetSelection();
+	}
 
     FText SShaderEditorBox::GetEditStateText() const
     {
@@ -651,31 +653,55 @@ const FString ErrorMarkerText = TEXT("✘");
         return TotalFoldedLineTexts;
     }
 
-    int32 FoldMarker::GetFoledLineCounts() const
+    int32 FoldMarker::GetFoldedLineCounts() const
     {
         int32 FoledLineCount = FoldedLineTexts.Num() - 1;
         for (const FoldMarker& ChildMarker : ChildFoldMarkers)
         {
-            FoledLineCount += ChildMarker.GetFoledLineCounts();
+            FoledLineCount += ChildMarker.GetFoldedLineCounts();
         }
         return FoledLineCount;
     }
 
     void SShaderEditorBox::UpdateLineNumberData()
     {
+		int32 OldLineCount = LineNumberData.Num();
+		int32 StartLineNumber = GetLineNumber(SelectionBeforeEdit.GetBeginning().GetLineIndex());
+		int32 EndLineNumber = GetLineNumber(SelectionBeforeEdit.GetEnd().GetLineIndex());
+		
         LineNumberData.Reset();
         int32 CurTextLayoutLine = ShaderMarshaller->TextLayout->GetLineCount();
-        int32 FolendLineCount = 0;
+        int32 FoldedLineCount = 0;
         for (int32 LineIndex = 0; LineIndex < CurTextLayoutLine; LineIndex++)
         {
-            LineNumberItemPtr Data = MakeShared<FText>(FText::FromString(FString::FromInt(LineIndex + 1 + FolendLineCount)));
+            LineNumberItemPtr Data = MakeShared<FText>(FText::FromString(FString::FromInt(LineIndex + 1 + FoldedLineCount)));
             if (TOptional<int32> MarkerIndex = FindFoldMarker(LineIndex))
             {
                 const auto& Marker = VisibleFoldMarkers[*MarkerIndex];
-                FolendLineCount += Marker.GetFoledLineCounts();
+				FoldedLineCount += Marker.GetFoldedLineCounts();
             }
             LineNumberData.Add(MoveTemp(Data));
         }
+		
+		int32 DeltaLineCount = CurTextLayoutLine - OldLineCount;
+		bool IsRedoOrUndo = ShaderMultiLineEditableTextLayout && ShaderMultiLineEditableTextLayout->CurrentUndoLevel >= 0;
+		if(!IsFoldEditTransaction && !IsRedoOrUndo && DeltaLineCount != 0)
+		{
+			for(auto It = BreakPointLines.CreateIterator(); It; ++It)
+			{
+				if(StartLineNumber < *It)
+				{
+					if(EndLineNumber >= *It)
+					{
+						It.RemoveCurrent();
+					}
+					else
+					{
+						*It += DeltaLineCount;
+					}
+				}
+			}
+		}
 
         if(LineNumberList) {
             LineNumberList->RequestListRefresh();
@@ -873,6 +899,7 @@ const FString ErrorMarkerText = TEXT("✘");
 
     void SShaderEditorBox::Compile()
     {
+		//TODO Async and show "Compiling" state
         FString ShaderTemplateWithBinding = StShaderAsset->GetTemplateWithBinding();
         FString FinalShaderSource = ShaderTemplateWithBinding + CurrentShaderSource;
 		FString ShaderName = StShaderAsset->GetFileName() + "." + StShaderAsset->FileExtension();
@@ -1070,6 +1097,12 @@ const FString ErrorMarkerText = TEXT("✘");
     FReply SShaderEditorBox::HandleKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
     {
         const FKey Key = InKeyEvent.GetKey();
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		//Process tool bar commands.
+		if(ShEditor->GetUICommandList().IsValid())
+		{
+			ShEditor->GetUICommandList()->ProcessCommandBindings(InKeyEvent);
+		}
 
         if(bTryComplete && CandidateItems.Num())
         {
@@ -1160,7 +1193,7 @@ const FString ErrorMarkerText = TEXT("✘");
 
             return FReply::Unhandled();
         }
-        else if (Character == TEXT('\t'))
+        else if (Character == TEXT('\t') or Character == 0x19)
         {
             if(bTryComplete && CandidateItems.Num())
             {
@@ -1469,7 +1502,9 @@ const FString ErrorMarkerText = TEXT("✘");
         FSlateTextLayout* ShaderTextLayout = static_cast<FSlateTextLayout*>(ShaderMarshaller->TextLayout);
         TArray< FTextLayout::FLineModel >& Lines = const_cast<TArray<FTextLayout::FLineModel>&>(ShaderTextLayout->GetLineModels());
         
-        SMultiLineEditableText::FScopedEditableTextTransaction Transaction(ShaderMultiLineEditableText);
+		IsFoldEditTransaction = true;
+		ShaderMultiLineEditableTextLayout->BeginEditTransation();
+		
         TOptional<int32> MarkerIndex = FindFoldMarker(LineIndex);
         
         const FTextLocation& CurCursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
@@ -1585,7 +1620,10 @@ const FString ErrorMarkerText = TEXT("✘");
                 ShaderMultiLineEditableText->GoTo(NewCursorLocation);
             }
         }
-        
+		
+		ShaderMultiLineEditableTextLayout->EndEditTransaction();
+		IsFoldEditTransaction = false;
+		
         return FReply::Handled();
     }
 
@@ -1609,6 +1647,17 @@ const FString ErrorMarkerText = TEXT("✘");
             .Text(*Item)
             .Justification(ETextJustify::Right)
             .MinDesiredWidth(15.0f);
+		
+		LineNumberTextBlock->SetOnMouseButtonDown(FPointerEventHandler::CreateLambda([this, LineNumber](const FGeometry&, const FPointerEvent&){
+			if(BreakPointLines.Contains(LineNumber))
+			{
+				BreakPointLines.Remove(LineNumber);
+			}
+			else{
+				BreakPointLines.Add(LineNumber);
+			}
+			return FReply::Handled();
+		}));
 
         TSharedPtr<SButton> FoldingArrow = SNew(SButton)
             .ContentPadding(FMargin(0, 0))
@@ -1651,7 +1700,7 @@ const FString ErrorMarkerText = TEXT("✘");
             }
             else if (TOptional<int32> MarkerIndex = FindFoldMarker(LineIndex))
             {
-                int32 FoldedLineCounts = VisibleFoldMarkers[*MarkerIndex].GetFoledLineCounts();
+                int32 FoldedLineCounts = VisibleFoldMarkers[*MarkerIndex].GetFoldedLineCounts();
                 for (int32 i = CurLineNumber; i <= CurLineNumber + FoldedLineCounts + 1; i++)
                 {
                     if (EffectMarshller->LineNumberToErrorInfo.Contains(i))
@@ -1663,31 +1712,87 @@ const FString ErrorMarkerText = TEXT("✘");
             return EVisibility::Hidden;
         })
         .Text(FText::FromString(ErrorMarkerText));
+		
+		auto BreakPoint = SNew(SImage)
+		.Image(FAppStyle::Get().GetBrush("Icons.BulletPoint"))
+		.ColorAndOpacity(FLinearColor::Red)
+		.Visibility_Lambda([this, LineNumber, ItemErrorMarker]{
+			if(BreakPointLines.Contains(LineNumber) && ItemErrorMarker->GetVisibility() != EVisibility::Visible)
+			{
+				return EVisibility::HitTestInvisible;
+			}
+			return EVisibility::Hidden;
+		});
+		
+		auto LineNumberRow = SNew(STableRow<LineNumberItemPtr>, OwnerTable)
+			.Style(&FShaderHelperStyle::Get().GetWidgetStyle<FTableRowStyle>("LineNumberItemStyle"))
+			.Content()
+			[
+				SNew(SOverlay)
+				+SOverlay::Slot()
+				[
+					SNew(SHorizontalBox)
+					+SHorizontalBox::Slot()
+					.AutoWidth()
+					[
+						SNew(SOverlay)
+						+SOverlay::Slot()
+						[
+							BreakPoint
+						]
+						+SOverlay::Slot()
+						[
+							ItemErrorMarker
+						]
+					]
+					+ SHorizontalBox::Slot()
+					[
+						LineNumberTextBlock.ToSharedRef()
+					]
+					+ SHorizontalBox::Slot()
+					.Padding(5, 0, 0, 0)
+					.AutoWidth()
+					[
+						SNew(SScaleBox)
+						[
+							FoldingArrow.ToSharedRef()
+						]
+					]
+				]
+				+SOverlay::Slot()
+				.VAlign(VAlign_Top)
+				[
+					SNew(SBox)
+					.HeightOverride(1.0)
+					.Visibility_Lambda([this, LineNumber]{
+						if(BreakPointLines.Contains(LineNumber))
+						{
+							return EVisibility::HitTestInvisible;
+						}
+						return EVisibility::Collapsed;
+					})
+					[
+						SNew(SImage)
+						.Image(FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect2"))
+						.ColorAndOpacity(FLinearColor{1,0,0,0.7f})
+					]
+				]
+				+SOverlay::Slot()
+				[
+					SNew(SImage)
+					.Visibility_Lambda([this, LineNumber]{
+						if(BreakPointLines.Contains(LineNumber))
+						{
+							return EVisibility::HitTestInvisible;
+						}
+						return EVisibility::Collapsed;
+					})
+					.Image(FAppStyle::Get().GetBrush("WhiteBrush"))
+					.ColorAndOpacity(FLinearColor{1,0,0,0.11f})
+				]
+			];
         
-        return SNew(STableRow<LineNumberItemPtr>, OwnerTable)
-            .Style(&FShaderHelperStyle::Get().GetWidgetStyle<FTableRowStyle>("LineNumberItemStyle"))
-            .Content()
-            [
-                SNew(SHorizontalBox)
-                +SHorizontalBox::Slot()
-                .AutoWidth()
-                [
-                    ItemErrorMarker
-                ]
-                + SHorizontalBox::Slot()
-                .AutoWidth()
-                [
-                    LineNumberTextBlock.ToSharedRef()
-                ]
-                + SHorizontalBox::Slot()
-                .Padding(5, 0, 0, 0)
-                [
-                    SNew(SScaleBox)
-                    [
-                        FoldingArrow.ToSharedRef()
-                    ]
-                ]
-            ];
+		return LineNumberRow;
     }
 
     TSharedRef<ITableRow> SShaderEditorBox::GenerateLineTipForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
@@ -1696,20 +1801,56 @@ const FString ErrorMarkerText = TEXT("✘");
         TSharedPtr<STextBlock> DummyTextBlock = SNew(STextBlock)
             .Font(CodeFontInfo)
             .Visibility(EVisibility::Hidden);
-
+		int32 LineNumber = FCString::Atoi(*(*Item).ToString());
+		
         TSharedPtr<STableRow<LineNumberItemPtr>> LineTip = SNew(STableRow<LineNumberItemPtr>, OwnerTable)
             .Style(&FShaderHelperStyle::Get().GetWidgetStyle<FTableRowStyle>("LineTipItemStyle"))
             .Content()
             [
-                DummyTextBlock.ToSharedRef()
+				SNew(SOverlay)
+				+SOverlay::Slot()
+				[
+					DummyTextBlock.ToSharedRef()
+				]
+				+SOverlay::Slot()
+				.VAlign(VAlign_Top)
+				[
+					SNew(SBox)
+					.HeightOverride(1.0)
+					.Visibility_Lambda([this, LineNumber]{
+						if(BreakPointLines.Contains(LineNumber))
+						{
+							return EVisibility::HitTestInvisible;
+						}
+						return EVisibility::Collapsed;
+					})
+					[
+						SNew(SImage)
+						.Image(FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect2"))
+						.ColorAndOpacity(FLinearColor{1,0,0,0.7f})
+					]
+				]
+				+SOverlay::Slot()
+				[
+					SNew(SImage)
+					.Visibility_Lambda([this, LineNumber]{
+						if(BreakPointLines.Contains(LineNumber))
+						{
+							return EVisibility::HitTestInvisible;
+						}
+						return EVisibility::Collapsed;
+					})
+					.Image(FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect"))
+					.ColorAndOpacity(FLinearColor{1,0,0,0.7f})
+				]
             ];
 
     
-        LineTip->SetBorderBackgroundColor(TAttribute<FSlateColor>::CreateLambda([this, Item]{
+        LineTip->SetBorderBackgroundColor(TAttribute<FSlateColor>::CreateLambda([this, LineNumber]{
             const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
             const int32 CurLineIndex = CursorLocation.GetLineIndex();
             auto FocusedWidget = FSlateApplication::Get().GetUserFocusedWidget(0);
-            if(FocusedWidget == ShaderMultiLineEditableText && FCString::Atoi(*Item->ToString()) == GetLineNumber(CurLineIndex))
+            if(FocusedWidget == ShaderMultiLineEditableText && LineNumber == GetLineNumber(CurLineIndex) && !BreakPointLines.Contains(LineNumber))
             {
                 double CurTime = FPlatformTime::Seconds();
                 float Speed = 2.0f;
@@ -1758,6 +1899,7 @@ const FString ErrorMarkerText = TEXT("✘");
         {
             ShaderUndoState* UndoState = static_cast<ShaderUndoState*>(EditableTextLayout->UndoStates[EditableTextLayout->CurrentUndoLevel].Get());
             OwnerWidget->VisibleFoldMarkers = UndoState->FoldMarkers;
+			OwnerWidget->BreakPointLines = UndoState->BreakPointLines;
         }
         else
         {

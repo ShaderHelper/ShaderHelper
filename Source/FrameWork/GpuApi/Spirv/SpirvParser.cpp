@@ -3,7 +3,7 @@
 
 namespace FW
 {
-	void SpvMetaVisitor::Visit(SpvExecutionModeOp* Inst)
+	void SpvMetaVisitor::Visit(SpvOpExecutionMode* Inst)
 	{
 		if(Inst->GetMode() == SpvExecutionMode::LocalSize)
 		{
@@ -25,8 +25,16 @@ namespace FW
 				SpvId EntryPoint = SpvCode[WordOffset + 1];
 				SpvExecutionMode Mode = static_cast<SpvExecutionMode>(SpvCode[WordOffset + 2]);
 				ExtraOperands Operands = {&SpvCode[WordOffset + 3], InstLen - 3};
-				SpvExecutionModeOp DecodedInst = {EntryPoint, Mode, Operands};
+				SpvOpExecutionMode DecodedInst = {EntryPoint, Mode, Operands};
 				DecodedInst.Accpet(Visitors);
+			}
+			else if(OpCode == SpvOp::String)
+			{
+				
+			}
+			else if(OpCode == SpvOp::ExtInst)
+			{
+				
 			}
 			WordOffset += InstLen;
 		}
