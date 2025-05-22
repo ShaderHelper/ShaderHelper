@@ -21,10 +21,13 @@ namespace FW
 		{
 #define LOCTEXT_NAMESPACE "CommonCommands"
 			UI_COMMAND(Save, "", "", EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::S));
-
+			UI_COMMAND(StepInto, "", "", EUserInterfaceActionType::Button, FInputChord(EKeys::F11));
+			UI_COMMAND(StepOver, "", "", EUserInterfaceActionType::Button, FInputChord(EKeys::F10));
 #undef LOCTEXT_NAMESPACE
 		}
 
 		TSharedPtr<FUICommandInfo> Save;
+		TSharedPtr<FUICommandInfo> StepInto;
+		TSharedPtr<FUICommandInfo> StepOver;
 	};
 }

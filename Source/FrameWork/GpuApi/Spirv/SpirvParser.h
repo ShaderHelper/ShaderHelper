@@ -1,5 +1,4 @@
 #pragma once
-#include "SpirvCommon.h"
 #include "SpirvInstruction.h"
 
 namespace FW
@@ -16,7 +15,7 @@ namespace FW
 		{}
 		
 	public:
-		void Visit(SpvExecutionModeOp* Inst) override;
+		void Visit(SpvOpExecutionMode* Inst) override;
 	
 	private:
 		SpvMetaContext& Context;

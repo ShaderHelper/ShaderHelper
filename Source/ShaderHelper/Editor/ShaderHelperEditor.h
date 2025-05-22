@@ -31,6 +31,7 @@ namespace SH
         FTabManager* GetCodeTabManager() const { return CodeTabManager.Get(); }
 		TSharedPtr<SWindow> GetMainWindow() const override { return Window; }
 		FW::PreviewViewPort* GetViewPort() const { return ViewPort.Get(); }
+		TSharedPtr<FUICommandList> GetUICommandList() const { return UICommandList; }
         
     public:
 		void InitEditorUI();
@@ -50,10 +51,13 @@ namespace SH
 		TSharedRef<SDockTab> SpawnWindowTab(const FSpawnTabArgs& Args);
         TSharedRef<SDockTab> SpawnStShaderTab(const FSpawnTabArgs& Args);
         TSharedRef<SWidget> SpawnStShaderPath(const FString& InStShaderPath);
+		FToolBarBuilder CreateToolBarBuilder();
         FMenuBarBuilder CreateMenuBarBuilder();
 		void FillMenu(FMenuBuilder& MenuBuilder, FString MenuName);
 		
 	private:
+		TSharedPtr<FUICommandList> UICommandList;
+		
 		TSharedPtr<FTabManager::FLayout> DefaultTabLayout;
 		TSharedPtr<SDockTab> TabManagerTab;
 		TSharedPtr<FTabManager> TabManager;

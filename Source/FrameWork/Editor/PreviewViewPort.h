@@ -66,6 +66,10 @@ namespace FW
 			{
 				iMouse.z = -iMouse.z;
 			}
+			if(iMouse.w > 0)
+			{
+				iMouse.w = -iMouse.w;
+			}
 			if(AssociatedWidget.IsValid())
 			{
 				return FReply::Handled().ReleaseMouseCapture();

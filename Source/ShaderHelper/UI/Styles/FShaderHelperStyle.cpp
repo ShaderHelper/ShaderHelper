@@ -4,6 +4,8 @@
 #include <Styling/SlateStyleRegistry.h>
 #include <Styling/StyleColors.h>
 #include <Styling/SlateStyleMacros.h>
+#include <Styling/ToolBarStyle.h>
+#include "UI/Styles/FAppCommonStyle.h"
 
 #define RootToContentDir Style->RootToContentDir
 #define TTF_FONT( RelativePath, ... ) FSlateFontInfo(RootToContentDir( RelativePath, TEXT(".ttf") ), __VA_ARGS__ )
@@ -26,8 +28,23 @@ namespace SH {
 		TSharedRef<FSlateStyleSet> Style = MakeShared<FSlateStyleSet>("ShaderHelperStyle");
         Style->SetContentRoot(BaseResourcePath::Custom_SlateResourceDir);
         Style->Set("AssetBrowser.Shader", new IMAGE_BRUSH_SVG("Shader", FVector2D(64.0, 64.0)));
-        
+		Style->Set("Icons.StepInto", new IMAGE_BRUSH_SVG("StepInto", FVector2D(16.0, 16.0)));
+		Style->Set("Icons.StepOver", new IMAGE_BRUSH_SVG("StepOver", FVector2D(16.0, 16.0)));
+		Style->Set("Icons.Bug", new IMAGE_BRUSH("Bug", FVector2D(16.0, 16.0)));
+		Style->Set("Icons.StepBack", new IMAGE_BRUSH_SVG("StepBack", FVector2D(16.0, 16.0)));
+		Style->Set("Icons.StepOut", new IMAGE_BRUSH_SVG("StepOut", FVector2D(16.0, 16.0)));
+		Style->Set("Icons.ArrowBoldRight", new IMAGE_BRUSH_SVG("ArrowBoldRight", FVector2D(14.0, 14.0)));
+		Style->Set("LineTip.BreakPointEffect", new IMAGE_BRUSH("BreakPointEffect", FVector2D(10.0, 10.0)));
+		
 		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir);
+		FToolBarStyle ShToolbarStyle = FToolBarStyle::GetDefault();
+		ShToolbarStyle.SetButtonPadding(FMargin{4,0});
+		ShToolbarStyle.SetBackground(FSlateColorBrush(FStyleColors::Recessed));
+		ShToolbarStyle.SetButtonStyle(FAppCommonStyle::Get().GetWidgetStyle< FButtonStyle >("SuperSimpleButton"));
+		Style->Set("Toolbar.ShaderHelper", ShToolbarStyle);
+		
+		Style->Set("Icons.FullText", new IMAGE_BRUSH_SVG("Starship/Insights/MemTags_20", FVector2D(16.0, 16.0)));
+		Style->Set("LineTip.BreakPointEffect2", new IMAGE_BRUSH("Common/Window/WindowTitle_Flashing", FVector2D(16.0, 16.0), FLinearColor::White, ESlateBrushTileType::Horizontal));
 
 		FTableRowStyle LineNumberItemStyle;
 		LineNumberItemStyle.SetEvenRowBackgroundBrush(FSlateNoResource());
