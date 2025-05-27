@@ -34,7 +34,7 @@ namespace FW
 		check(ErrorInfo.IsEmpty());
 	}
 
-	TRefCountPtr<GpuBindGroup> BlitShader::GetBindGroup(const Parameters& InParameters) const
+	TRefCountPtr<GpuBindGroup> BlitShader::GetBindGroup(const Parameters& InParameters)
 	{
 		return GpuBindGroupBuilder{ BindGroupLayout }
 				.SetExistingBinding(0, InParameters.InputTex)

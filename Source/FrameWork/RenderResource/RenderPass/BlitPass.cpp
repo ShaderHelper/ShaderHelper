@@ -10,16 +10,16 @@ namespace FW
 		GpuRenderPassDesc BlitPassDesc;
 		BlitPassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassInput.OutputRenderTarget, RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
 
-		static BlitShader PassShader;
+		BlitShader* PassShader = GetShader<BlitShader>();
 
 		BindingContext Bindings;
 		BlitShader::Parameters ShaderParameter{ PassInput.InputTex, PassInput.InputTexSampler };
-		Bindings.SetShaderBindGroup(PassShader.GetBindGroup(ShaderParameter));
-		Bindings.SetShaderBindGroupLayout(PassShader.GetBindGroupLayout());
+		Bindings.SetShaderBindGroup(PassShader->GetBindGroup(ShaderParameter));
+		Bindings.SetShaderBindGroupLayout(PassShader->GetBindGroupLayout());
 
 		GpuRenderPipelineStateDesc PipelineDesc{
-			.Vs = PassShader.GetVertexShader(), 
-			.Ps = PassShader.GetPixelShader(),
+			.Vs = PassShader->GetVertexShader(),
+			.Ps = PassShader->GetPixelShader(),
 			.Targets = {
 				{ .TargetFormat = PassInput.OutputRenderTarget->GetFormat() }
 			}

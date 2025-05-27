@@ -16,7 +16,6 @@
 #include "magic_enum.hpp"
 
 //No exposed methods, and too lazy to modify the source code for UE.
-STEAL_PRIVATE_MEMBER(SScrollBar, TSharedPtr<SScrollBarTrack>, Track)
 STEAL_PRIVATE_MEMBER(SMultiLineEditableText, TUniquePtr<FSlateEditableTextLayout>, EditableTextLayout)
 STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, TSharedPtr<FUICommandList>, UICommandList)
 STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, TSharedPtr<SlateEditableTextTypes::FCursorLineHighlighter>, CursorLineHighlighter)
@@ -741,8 +740,7 @@ const FString ErrorMarkerText = TEXT("✘");
 
     void SShaderEditorBox::UpdateListViewScrollBar()
     {
-        TSharedPtr<SScrollBarTrack>& Track = GetPrivate_SScrollBar_Track(*ShaderMultiLineVScrollBar);
-        float VOffsetFraction = Track->DistanceFromTop();
+        float VOffsetFraction = ShaderMultiLineVScrollBar->DistanceFromTop();
         LineNumberList->SetScrollOffset(VOffsetFraction * LineNumberList->GetNumItemsBeingObserved());
         LineTipList->SetScrollOffset(VOffsetFraction * LineTipList->GetNumItemsBeingObserved());
     }
@@ -1750,7 +1748,7 @@ const FString ErrorMarkerText = TEXT("✘");
 						LineNumberTextBlock.ToSharedRef()
 					]
 					+ SHorizontalBox::Slot()
-					.Padding(5, 0, 0, 0)
+					.Padding(5, 0, 5, 0)
 					.AutoWidth()
 					[
 						SNew(SScaleBox)

@@ -4,6 +4,12 @@
 namespace FW
 {
 
+	template<typename ShaderType>
+	ShaderType* GetShader()
+	{
+		return &TSingleton<ShaderType>::Get();
+	}
+
 	class BindingContext
 	{
 	public:

@@ -21,10 +21,4 @@ namespace FW
 		UniformBufferBuilder ClearUbBuilder{ UniformBufferUsage::Temp };
 	};
 
-	template<BindingType InType>
-	ClearShader<InType>* GetClearShader()
-	{
-		static ClearShader<InType> Shader;
-		return &Shader;
-	}
 }

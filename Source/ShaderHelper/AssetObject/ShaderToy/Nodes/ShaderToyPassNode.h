@@ -4,6 +4,7 @@
 #include "AssetObject/StShader.h"
 #include "AssetManager/AssetManager.h"
 #include "Editor/PreviewViewPort.h"
+#include "AssetObject/DebuggableObject.h"
 
 namespace SH
 {
@@ -14,10 +15,11 @@ namespace SH
         ShaderToyPassNodeOp() = default;
         
         FW::MetaType* SupportType() override;
+		void OnCancelSelect(FW::ShObject* InObject) override;
         void OnSelect(FW::ShObject* InObject) override;
     };
 
-	class ShaderToyPassNode : public FW::GraphNode
+	class ShaderToyPassNode : public FW::GraphNode, public DebuggableObject
 	{
 		REFLECTION_TYPE(ShaderToyPassNode)
 	public:
@@ -36,6 +38,9 @@ namespace SH
         void PostPropertyChanged(FW::PropertyData* InProperty) override;
         TArray<TSharedRef<FW::PropertyData>>* GetPropertyDatas() override;
     
+		//ShDebuggableObject
+		TRefCountPtr<FW::GpuTexture> OnStartDebugging() override;
+		void OnEndDebuggging() override;
     private:
         void ClearBindingProperty();
         void RefreshProperty();

@@ -157,6 +157,9 @@ namespace UNITTEST_UTIL
 				Vector vec{ 1.233698,0,0 };
 				SH_LOG(LogTestUtil, Display, TEXT("==: (%d,%d)."), tmp.Equals(vec), tmp.Equals(vec, 1e-5));
 			}
+			
+			//check(vec1 <= vec2);
+			check(vec1 != vec2);
 		}
 
 		//Test Swizzle

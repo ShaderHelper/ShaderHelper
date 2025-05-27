@@ -19,7 +19,7 @@ namespace FW
 		GpuShader* GetPixelShader() const { return Ps; }
 
 		TRefCountPtr<GpuBindGroupLayout> GetBindGroupLayout() const { return BindGroupLayout; }
-		TRefCountPtr<GpuBindGroup> GetBindGroup(const Parameters& InParameters) const;
+		TRefCountPtr<GpuBindGroup> GetBindGroup(const Parameters& InParameters);
 
 	private:
 		TRefCountPtr<GpuShader> Vs;

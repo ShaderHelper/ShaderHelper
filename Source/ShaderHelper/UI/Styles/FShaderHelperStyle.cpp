@@ -33,6 +33,7 @@ namespace SH {
 		Style->Set("Icons.Bug", new IMAGE_BRUSH("Bug", FVector2D(16.0, 16.0)));
 		Style->Set("Icons.StepBack", new IMAGE_BRUSH_SVG("StepBack", FVector2D(16.0, 16.0)));
 		Style->Set("Icons.StepOut", new IMAGE_BRUSH_SVG("StepOut", FVector2D(16.0, 16.0)));
+		Style->Set("Icons.Pause", new IMAGE_BRUSH_SVG("Pause", FVector2D(16.0, 16.0), FLinearColor::Red));
 		Style->Set("Icons.ArrowBoldRight", new IMAGE_BRUSH_SVG("ArrowBoldRight", FVector2D(14.0, 14.0)));
 		Style->Set("LineTip.BreakPointEffect", new IMAGE_BRUSH("BreakPointEffect", FVector2D(10.0, 10.0)));
 		
@@ -122,10 +123,7 @@ namespace SH {
             .SetDraggedThumbImage(FSlateColorBrush(FStyleColors::Hover2))
             .SetHoveredThumbImage(FSlateColorBrush(FStyleColors::Hover2))
             .SetThickness(5.0f);
-        ;
-        {
-            Style->Set("CustomScrollbar", ScrollBar);
-        }
+		Style->Set("CustomScrollbar", ScrollBar);
         
 		return Style;
 	}

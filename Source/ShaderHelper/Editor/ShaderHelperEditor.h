@@ -12,8 +12,10 @@
 #include "Renderer/Renderer.h"
 #include "ProjectManager/ShProjectManager.h"
 #include "UI/Widgets/Property/PropertyView/SPropertyView.h"
+#include "UI/Widgets/SDebuggerViewport.h"
+#include "AssetObject/DebuggableObject.h"
 
-namespace SH 
+namespace SH
 {
 	class ShaderHelperEditor : public FW::Editor
 	{
@@ -46,6 +48,10 @@ namespace SH
         void RefreshProperty();
         void ShowProperty(FW::ShObject* InObjectData);
         void UpdateStShaderPath(const FString& InStShaderPath);
+		
+		void SetDebuggableObject(DebuggableObject* InObject) { CurDebuggableObject = InObject; }
+		void EndDebugging();
+		void StartDebugging();
 
 	private:
 		TSharedRef<SDockTab> SpawnWindowTab(const FSpawnTabArgs& Args);
@@ -86,6 +92,10 @@ namespace SH
 		TSharedPtr<FW::RenderComponent> GraphRenderComp;
         
         TMap<FW::AssetPtr<StShader>, TSharedPtr<SScrollBox>> StShaderPathBoxMap;
+		
+		TSharedPtr<SDebuggerViewport> DebuggerViewport;
+		DebuggableObject* CurDebuggableObject = nullptr;
+		bool IsDebugging{};
 	};
 
 }
