@@ -150,6 +150,8 @@ namespace FW
 			GraphData->RemoveNode(InNode->NodeData->GetGuid());
 			GraphData->AddNode(NodeData);
 
+			ShObjectOp* Op = GetShObjectOp(NodeData);
+			Op->OnSelect(NodeData);
 			SelectedNodes.Add(&*InNode);
 		}
 	}
@@ -200,7 +202,7 @@ namespace FW
 	{
 		if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
 		{
-			SelectedNodes.Empty();
+			ClearSelectedNode();
 			if (MarqueeStart)
 			{
 				Vector2D MarqueeUpperLeft = { FMath::Min((*MarqueeStart).x, MarqueeEnd.x), FMath::Min((*MarqueeStart).y, MarqueeEnd.y) };
@@ -380,8 +382,19 @@ namespace FW
 				FAppCommonStyle::Get().GetBrush("Graph.NodeShadow"),
 				ESlateDrawEffect::None
 			);
-            
-            if(CurNodeWidget->NodeData->AnyError)
+			
+			if(CurNodeWidget->NodeData->IsDebugging)
+			{
+				FSlateDrawElement::MakeBox(
+					OutDrawElements,
+					NodeLayer,
+					CurWidget.Geometry.ToInflatedPaintGeometry(FVector2D{ 2, 2}),
+					FAppCommonStyle::Get().GetBrush("Graph.NodeOutline"),
+					ESlateDrawEffect::None,
+					FLinearColor::Yellow
+				);
+			}
+            else if(CurNodeWidget->NodeData->AnyError)
             {
                 FSlateDrawElement::MakeBox(
                     OutDrawElements,
@@ -505,6 +518,16 @@ namespace FW
 		FSlateApplication::Get().DismissAllMenus();
 	}
 
+	void SGraphPanel::ClearSelectedNode()
+	{
+		for (auto It = SelectedNodes.CreateIterator(); It; It++)
+		{
+			ShObjectOp* Op = GetShObjectOp((*It)->NodeData);
+			Op->OnCancelSelect((*It)->NodeData);
+			It.RemoveCurrent();
+		}
+	}
+
 	void SGraphPanel::DeleteSelectedNodes()
 	{
 		for (auto Node : SelectedNodes)
@@ -537,6 +560,8 @@ namespace FW
 		check(RemoveIndex != -1);
 		Nodes.RemoveAt(RemoveIndex);
 
+		ShObjectOp* Op = GetShObjectOp(Node->NodeData);
+		Op->OnCancelSelect(Node->NodeData);
 		SelectedNodes.Remove(Node);
 
 		GraphData->MarkDirty();

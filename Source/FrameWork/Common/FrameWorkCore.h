@@ -94,6 +94,7 @@ namespace FW
 		virtual ~ShObjectOp() = default;
         
         virtual MetaType* SupportType() = 0;
+		virtual void OnCancelSelect(ShObject* InObject) {}
 		virtual void OnSelect(ShObject* InObject) {}
 	};
 

@@ -60,6 +60,7 @@ namespace FW
         TArray<ObjectPtr<GraphPin>> Pins;
 		TMultiMap<FGuid, FGuid> OutPinToInPin;
         bool AnyError = false;
+		bool IsDebugging = false;
 	};
 
 	class FRAMEWORK_API Graph : public AssetObject

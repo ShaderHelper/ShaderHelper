@@ -24,10 +24,19 @@ namespace SH
         return GetMetaType<ShaderToyPassNode>();
     }
 
+	void ShaderToyPassNodeOp::OnCancelSelect(ShObject* InObject)
+	{
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		if(!static_cast<ShaderToyPassNode*>(InObject)->IsDebugging) {
+			ShEditor->SetDebuggableObject(nullptr);
+		}
+	}
+
     void ShaderToyPassNodeOp::OnSelect(ShObject* InObject)
     {
         auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
         ShEditor->ShowProperty(InObject);
+		ShEditor->SetDebuggableObject(static_cast<ShaderToyPassNode*>(InObject));
     }
 
 	ShaderToyPassNode::ShaderToyPassNode()
@@ -43,6 +52,18 @@ namespace SH
 			Shader->OnDestroy.Unbind();
 			Shader->OnRefreshBuilder.Unbind();
 		}
+	}
+
+	TRefCountPtr<GpuTexture> ShaderToyPassNode::OnStartDebugging()
+	{
+		IsDebugging = true;
+		auto PassOutput = static_cast<GpuTexturePin*>(GetPin("RT"));
+		return PassOutput->GetValue();
+	}
+
+	void ShaderToyPassNode::OnEndDebuggging()
+	{
+		IsDebugging = false;
 	}
 
     void ShaderToyPassNode::InitPins()

@@ -30,7 +30,7 @@ namespace FW
 		void SetGraphData(Graph* InGraphData);
 		Graph* GetGraphData() const { return GraphData; }
 		void AddSelectedNode(TSharedRef<SGraphNode> InNode);
-		void ClearSelectedNode() { SelectedNodes.Empty(); }
+		void ClearSelectedNode();
 		bool IsSelectedNode(SGraphNode* InNode) const { return SelectedNodes.Contains(InNode); }
 		bool IsMultiSelect() const { return SelectedNodes.Num() > 1; }
 		Vector2D GetMousePos() const { return MousePos; }

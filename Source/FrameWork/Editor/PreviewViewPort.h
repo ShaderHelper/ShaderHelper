@@ -43,25 +43,17 @@ namespace FW
 
 		FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
 		{
-			if (MouseDown.IsBound())
-			{
-				MouseDown.Broadcast(MyGeometry, MouseEvent);
-			}
 			iMouse.xy = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * MyGeometry.Scale);
 			iMouse.zw = iMouse.xy;
 			if(AssociatedWidget.IsValid())
 			{
-				return FReply::Handled().CaptureMouse(AssociatedWidget.Pin().ToSharedRef());
+				return FReply::Unhandled().CaptureMouse(AssociatedWidget.Pin().ToSharedRef());
 			}
-			return FReply::Handled();
+			return FReply::Unhandled();
 		}
 
 		FReply OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
 		{
-			if (MouseUp.IsBound())
-			{
-				MouseUp.Broadcast(MyGeometry, MouseEvent);
-			}
 			if(iMouse.z > 0)
 			{
 				iMouse.z = -iMouse.z;
@@ -72,17 +64,13 @@ namespace FW
 			}
 			if(AssociatedWidget.IsValid())
 			{
-				return FReply::Handled().ReleaseMouseCapture();
+				return FReply::Unhandled().ReleaseMouseCapture();
 			}
-			return FReply::Handled();
+			return FReply::Unhandled();
 		}
 
 		FReply OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
 		{
-			if (MouseMove.IsBound())
-			{
-				MouseMove.Broadcast(MyGeometry, MouseEvent);
-			}
 			if (iMouse.z > 0)
 			{
 				iMouse.xy = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * MyGeometry.Scale);
@@ -91,14 +79,11 @@ namespace FW
 					iMouse.w = -iMouse.w;
 				}
 			}
-			return FReply::Handled();
+			return FReply::Unhandled();
 		}
 
 	public:
 		OnViewportResizeDelegate ViewportResize;
-		OnMouseDownDelegate MouseDown;
-		OnMouseUpDelegate MouseUp;
-		OnMouseMoveDelegate MouseMove;
 
 	private:
 		TWeakPtr<SWidget> AssociatedWidget;

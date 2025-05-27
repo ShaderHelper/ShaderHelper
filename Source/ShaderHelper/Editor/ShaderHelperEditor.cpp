@@ -16,6 +16,7 @@
 #include "UI/Widgets/Misc/CommonCommands.h"
 
 STEAL_PRIVATE_MEMBER(FTabManager, TArray<TSharedRef<FTabManager::FArea>>, CollapsedDockAreas)
+CALL_PRIVATE_FUNCTION(FSlateUser_LockCursor, FSlateUser, LockCursor,, void, const TSharedRef<SWidget>&)
 
 using namespace FW;
 
@@ -411,14 +412,29 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
         }
 		else if (TabId == PreviewTabId) {
 			auto ViewportWidget = SNew(SViewport)
-				.ViewportInterface(ViewPort);
+				.ViewportInterface(ViewPort)
+				.Visibility_Lambda([this]{
+					return IsDebugging ? EVisibility::Hidden : EVisibility::Visible;
+				});
+			SAssignNew(DebuggerViewport, SDebuggerViewport)
+				.Visibility_Lambda([this]{
+					return IsDebugging ? EVisibility::Visible : EVisibility::Hidden;
+				});
             SpawnedTab = SNew(SDockTab);
 			SpawnedTab->SetLabel(LOCALIZATION(PreviewTabId.ToString()));
 			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Visible"));
 			SpawnedTab->SetContent(
                 SNew(SBorder)
                 [
-					ViewportWidget
+					SNew(SOverlay)
+					+SOverlay::Slot()
+					[
+						ViewportWidget
+					]
+					+SOverlay::Slot()
+					[
+						DebuggerViewport.ToSharedRef()
+					]
                 ]
 			
 			);
@@ -547,9 +563,6 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 			}
 			
 		}
-		else {
-			ensure(false);
-		}
 		return SpawnedTab.ToSharedRef();
 	}
 
@@ -674,6 +687,28 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		}
 	}
 
+	void ShaderHelperEditor::EndDebugging()
+	{
+		IsDebugging = false;
+		CurDebuggableObject->OnEndDebuggging();
+	}
+
+	void ShaderHelperEditor::StartDebugging()
+	{
+		//Render once immediately for debugging
+		{
+			TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = false;
+			Renderer->Render();
+			TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = true;
+		}
+		
+		IsDebugging = true;
+		TRefCountPtr<GpuTexture> DebugTarget = CurDebuggableObject->OnStartDebugging();
+		DebuggerViewport->SetDebugTarget(MoveTemp(DebugTarget));
+		auto User0 = FSlateApplication::Get().GetUser(0);
+		CallPrivate_FSlateUser_LockCursor(*User0, DebuggerViewport.ToSharedRef());
+	}
+
 	FToolBarBuilder ShaderHelperEditor::CreateToolBarBuilder()
 	{
 		FToolBarBuilder ToolBarBuilder(TSharedPtr<FUICommandList>(), FMultiBoxCustomization::None, nullptr);
@@ -697,14 +732,31 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		);
 		FToolBarBuilder DebuggerToolBarBuilder(UICommandList, FMultiBoxCustomization::None, nullptr);
 		DebuggerToolBarBuilder.SetStyle(&FShaderHelperStyle::Get(), FName("Toolbar.ShaderHelper"));
+		
 		DebuggerToolBarBuilder.AddToolBarButton(
 			FUIAction(
-				FExecuteAction(),
-				FCanExecuteAction::CreateLambda([] { return false; })
+				FExecuteAction::CreateLambda([this]{
+					if(IsDebugging)
+					{
+						EndDebugging();
+					}
+					else
+					{
+						StartDebugging();
+					}
+				}),
+				FCanExecuteAction::CreateLambda([this] {
+					return CurDebuggableObject != nullptr;
+				})
 			),
 			NAME_None,
 			FText::GetEmpty(), FText::GetEmpty(),
-			FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.Bug"),
+			TAttribute<FSlateIcon>::CreateLambda([this] {
+				if(IsDebugging) {
+					return FSlateIcon(FShaderHelperStyle::Get().GetStyleSetName(), "Icons.Pause");
+				}
+				return FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.Bug");
+			}),
 			EUserInterfaceActionType::Button
 		);
 		DebuggerToolBarBuilder.AddToolBarButton(

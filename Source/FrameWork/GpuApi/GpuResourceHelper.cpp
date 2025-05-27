@@ -13,7 +13,7 @@ namespace FW::GpuResourceHelper
 	GpuTexture* GetGlobalBlackTex()
 	{
         TArray<uint8> RawData = {0,0,0,1};
-		GpuTextureDesc Desc{ 1, 1, GpuTextureFormat::R8G8B8A8_UNORM, GpuTextureUsage::ShaderResource , RawData};
+		GpuTextureDesc Desc{ 1, 1, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource , RawData};
 		static TRefCountPtr<GpuTexture> GlobalBlackTex = GGpuRhi->CreateTexture(MoveTemp(Desc));
 		return GlobalBlackTex;
 	}
@@ -30,7 +30,8 @@ namespace FW::GpuResourceHelper
 			uint32 BufferByteSize = Buffer->GetByteSize();
 			if (Buffer->GetUsage() == GpuBufferUsage::RWStorage)
 			{
-				auto* ClearShader = GetClearShader<BindingType::RWStorageBuffer>();
+				using ClearShaderType = ClearShader<BindingType::RWStorageBuffer>;
+				auto* ClearShader = GetShader<ClearShaderType>();
 				Cs = ClearShader->GetComputeShader();
 				BindGroupLayout = ClearShader->GetBindGroupLayout();
 				BindGroup = ClearShader->GetBindGroup(InResource, BufferByteSize);
