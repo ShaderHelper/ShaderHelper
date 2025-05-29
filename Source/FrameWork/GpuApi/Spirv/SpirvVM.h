@@ -1,11 +1,11 @@
 #pragma once
-#include "SpirvInstruction.h"
+#include "SpirvParser.h"
 
 namespace FW
 {
 	struct SpvVmContext
 	{
-		
+		SpvMetaContext MetaInfo;
 	};
 
 	class SpvVmVisitor : public SpvVisitor
@@ -15,7 +15,7 @@ namespace FW
 		{}
 		
 	public:
-		void Visit(SpvOpString* Inst) override;
+		void Visit(SpvDebugLine* Inst) override;
 
 	private:
 		SpvVmContext& Context;

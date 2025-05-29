@@ -11,6 +11,7 @@ namespace FW
 	public:
 		virtual void Visit(SpvInstruction*) {}
 		
+		virtual void Visit(class SpvOpConstant* Inst) {}
 		virtual void Visit(class SpvOpExecutionMode* Inst) {}
 		virtual void Visit(class SpvOpString* Inst) {}
 		
@@ -24,6 +25,7 @@ namespace FW
 		virtual ~SpvInstruction() = default;
 		
 	public:
+		std::optional<SpvId> GetId() const { return ResultId; }
 		void SetId(SpvId Id) { ResultId = Id; }
 		void SetSourceLocation(const Vector2u& InSrcLoc) { SrcLoc = InSrcLoc; }
 		virtual void Accpet(const TArray<SpvVisitor*>& Visitors) = 0;
@@ -67,11 +69,26 @@ namespace FW
 		ExtraOperands Operands;
 	};
 
+	class SpvOpConstant : public SpvInstructionBase<SpvOpConstant>
+	{
+	public:
+		SpvOpConstant() {}
+		
+	private:
+		
+	};
+
 	class SpvOpString : public SpvInstructionBase<SpvOpString>
 	{
 	public:
-		SpvOpString()
+		SpvOpString(const FString& InStr)
+		: Str(InStr)
 		{}
+		
+		const FString& GetStr() const { return Str; }
+		
+	private:
+		FString Str;
 	};
 
 	class SpvOpExtInst : public SpvInstructionBase<SpvOpExtInst>

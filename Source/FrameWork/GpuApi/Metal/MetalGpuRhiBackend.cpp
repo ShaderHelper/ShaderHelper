@@ -49,7 +49,7 @@ TRefCountPtr<GpuTexture> MetalGpuRhiBackend::CreateTexture(const GpuTextureDesc 
 	return AUX::StaticCastRefCountPtr<GpuTexture>(CreateMetalTexture2D(InTexDesc));
 }
 
-TRefCountPtr<GpuShader> MetalGpuRhiBackend::CreateShaderFromSource(const GpuShaderSourceDesc& Desc)
+TRefCountPtr<GpuShader> MetalGpuRhiBackend::CreateShaderFromSource(const GpuShaderSourceDesc& Desc) const
 {
 	return AUX::StaticCastRefCountPtr<GpuShader>(CreateMetalShader(Desc));
 }

@@ -24,42 +24,116 @@ namespace FW
 {
 	GpuShaderPreProcessor& GpuShaderPreProcessor::ReplacePrintStringLiteral()
 	{
-		std::string ShaderString{TCHAR_TO_UTF8(*ShaderText)};
-		std::smatch Match;
-		auto ReplaceMatch = [&](const std::regex& Pattern) {
-			std::size_t SearchPos = 0;
-			while (std::regex_search(ShaderString.cbegin() + SearchPos, ShaderString.cend(), Match, Pattern))
+//		std::string ShaderString{TCHAR_TO_UTF8(*ShaderText)};
+//		std::smatch Match;
+//		auto ReplaceMatch = [&](const std::regex& Pattern) {
+//			std::size_t SearchPos = 0;
+//			while (std::regex_search(ShaderString.cbegin() + SearchPos, ShaderString.cend(), Match, Pattern))
+//			{
+//				FString PrintStringLiteral = UTF8_TO_TCHAR(std::string{Match[1]}.data());
+//				FString TextArr = "EXPAND(uint StrArr[] = {";
+//				int Num = (int)PrintStringLiteral.Len() - 1;
+//				for (int i = 1; i < Num;)
+//				{
+//					if (i + 1 < Num && PrintStringLiteral[i] == '\\')
+//					{
+//						//can not use std::format, std::to_chars needs a minimum deployment target of 13.4 on mac.
+//						TextArr += FString::Printf(TEXT("'\\%c',"), PrintStringLiteral[i + 1]);
+//						i += 2;
+//					}
+//					else
+//					{
+//						TextArr += FString::Printf(TEXT("'%c',"), PrintStringLiteral[i]);
+//						i++;
+//					}
+//				}
+//				TextArr += "'\\0'})";
+//				ShaderString.replace(SearchPos + Match.position(1), Match[1].length(), TCHAR_TO_UTF8(*TextArr));
+//				SearchPos += Match.position() + TextArr.Len();
+//			}
+//		};
+//		static std::regex PrintRegex{"Print *\\( *(\".*\")"};
+//		static std::regex PrintAtMouseRegex{"PrintAtMouse *\\( *(\".*\")"};
+//		static std::regex AssertRegex{"Assert *\\(.*(\".*\")"};
+//		ReplaceMatch(PrintRegex);
+//		ReplaceMatch(PrintAtMouseRegex);
+//      ReplaceMatch(AssertRegex);
+//
+//		ShaderText = FString{UTF8_TO_TCHAR(ShaderString.data())};
+		FString NewShaderText;
+		const TCHAR* Src = *ShaderText;
+		int32 SrcLen = ShaderText.Len();
+		int32 i = 0;
+
+		auto TryReplace = [&](const TCHAR* Keyword) -> bool
+		{
+			int32 KeywordLen = FCString::Strlen(Keyword);
+			if (FCString::Strncmp(Src + i, Keyword, KeywordLen) == 0)
 			{
-				FString PrintStringLiteral = UTF8_TO_TCHAR(std::string{Match[1]}.data());
-				FString TextArr = "EXPAND(uint StrArr[] = {";
-				int Num = (int)PrintStringLiteral.Len() - 1;
-				for (int i = 1; i < Num;)
+				int32 j = i + KeywordLen;
+				while (j < SrcLen && FChar::IsWhitespace(Src[j])) ++j;
+				if (j < SrcLen && Src[j] == '(')
 				{
-					if (i + 1 < Num && PrintStringLiteral[i] == '\\')
+					++j;
+
+					while (j < SrcLen && FChar::IsWhitespace(Src[j])) ++j;
+					if (j < SrcLen && Src[j] == '"')
 					{
-						//can not use std::format, std::to_chars needs a minimum deployment target of 13.4 on mac.
-						TextArr += FString::Printf(TEXT("'\\%c',"), PrintStringLiteral[i + 1]);
-						i += 2;
-					}
-					else
-					{
-						TextArr += FString::Printf(TEXT("'%c',"), PrintStringLiteral[i]);
-						i++;
+						int32 StringStart = j;
+						++j;
+
+						while (j < SrcLen)
+						{
+							if (Src[j] == '"' && Src[j - 1] != '\\')
+								break;
+							++j;
+						}
+						if (j < SrcLen && Src[j] == '"')
+						{
+							int32 StringEnd = j;
+							NewShaderText.AppendChars(Src + i, StringStart - i);
+							// 生成EXPAND(uint StrArr[] = {...})
+							FString PrintStringLiteral = ShaderText.Mid(StringStart, StringEnd - StringStart + 1);
+							FString TextArr = TEXT("EXPAND(uint StrArr[] = {");
+							int Num = PrintStringLiteral.Len() - 1;
+							for (int k = 1; k < Num;)
+							{
+								if (k + 1 < Num && PrintStringLiteral[k] == '\\')
+								{
+									TextArr += FString::Printf(TEXT("'\\%c',"), PrintStringLiteral[k + 1]);
+									k += 2;
+								}
+								else
+								{
+									TextArr += FString::Printf(TEXT("'%c',"), PrintStringLiteral[k]);
+									k++;
+								}
+							}
+							TextArr += TEXT("'\\0'})");
+							NewShaderText += TextArr;
+							i = StringEnd + 1;
+							return true;
+						}
 					}
 				}
-				TextArr += "'\\0'})";
-				ShaderString.replace(SearchPos + Match.position(1), Match[1].length(), TCHAR_TO_UTF8(*TextArr));
-				SearchPos += Match.position() + TextArr.Len();
 			}
+			return false;
 		};
-		static std::regex PrintRegex{"Print *\\( *(\".*\")"};
-		static std::regex PrintAtMouseRegex{"PrintAtMouse *\\( *(\".*\")"};
-		static std::regex AssertRegex{"Assert *\\(.*(\".*\")"};
-		ReplaceMatch(PrintRegex);
-		ReplaceMatch(PrintAtMouseRegex);
-        ReplaceMatch(AssertRegex);
 
-		ShaderText = FString{UTF8_TO_TCHAR(ShaderString.data())};
+		while (i < SrcLen)
+		{
+			if (TryReplace(TEXT("PrintAtMouse")) ||
+				TryReplace(TEXT("Print")) ||
+				TryReplace(TEXT("Assert")))
+			{
+				continue;
+			}
+
+			NewShaderText.AppendChar(Src[i]);
+			++i;
+		}
+
+		ShaderText = MoveTemp(NewShaderText);
 		return *this;
 	}
 

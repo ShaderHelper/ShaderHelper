@@ -49,6 +49,7 @@ namespace SH
         void ShowProperty(FW::ShObject* InObjectData);
         void UpdateStShaderPath(const FString& InStShaderPath);
 		
+		DebuggableObject* GetDebuggaleObject() const { return CurDebuggableObject; }
 		void SetDebuggableObject(DebuggableObject* InObject) { CurDebuggableObject = InObject; }
 		void EndDebugging();
 		void StartDebugging();

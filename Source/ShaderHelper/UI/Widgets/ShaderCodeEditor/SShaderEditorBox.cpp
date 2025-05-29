@@ -14,12 +14,16 @@
 #include "UI/Widgets/Misc/CommonCommands.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "magic_enum.hpp"
+#include <Widgets/Text/SlateTextBlockLayout.h>
+#include <Framework/Text/SlateTextHighlightRunRenderer.h>
 
 //No exposed methods, and too lazy to modify the source code for UE.
 STEAL_PRIVATE_MEMBER(SMultiLineEditableText, TUniquePtr<FSlateEditableTextLayout>, EditableTextLayout)
 STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, TSharedPtr<FUICommandList>, UICommandList)
 STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, TSharedPtr<SlateEditableTextTypes::FCursorLineHighlighter>, CursorLineHighlighter)
 STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, SlateEditableTextTypes::FCursorInfo, CursorInfo)
+STEAL_PRIVATE_MEMBER(STextBlock, TUniquePtr< FSlateTextBlockLayout >, TextLayoutCache)
+STEAL_PRIVATE_MEMBER(FSlateTextBlockLayout, TSharedPtr<FSlateTextLayout>, TextLayout)
 CALL_PRIVATE_FUNCTION(SMultiLineEditableText_OnMouseWheel, SMultiLineEditableText, OnMouseWheel,, FReply, const FGeometry&, const FPointerEvent&)
 
 using namespace FW;
@@ -119,6 +123,29 @@ const FString ErrorMarkerText = TEXT("✘");
         FPlatformProcess::ReturnSynchEventToPool(ISenseEvent);
     }
 
+    static bool FuzzyMatch(const FString& Candidate, const FString& Token)
+    {
+        int32 SearchPos = 0;
+        for (int32 i = 0; i < Token.Len(); ++i)
+        {
+            TCHAR C = FChar::ToLower(Token[i]);
+            bool bFound = false;
+            while (SearchPos < Candidate.Len())
+            {
+                if (FChar::ToLower(Candidate[SearchPos]) == C)
+                {
+                    bFound = true;
+                    ++SearchPos;
+                    break;
+                }
+                ++SearchPos;
+            }
+            if (!bFound)
+                return false;
+        }
+        return true;
+    }
+
     void SShaderEditorBox::Construct(const FArguments& InArgs)
     {
         CodeFontInfo = FShaderHelperStyle::Get().GetFontStyle("CodeFont");
@@ -139,9 +166,10 @@ const FString ErrorMarkerText = TEXT("✘");
             {
                 ISenseTask Task;
                 while(ISenseQueue.Dequeue(Task));
-                if(Task.Shader)
+                if(Task.ShaderDesc)
                 {
-                    ISenseTU TU{Task.Shader};
+					TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(Task.ShaderDesc.value());
+                    ISenseTU TU{Shader};
                     ErrorInfos = TU.GetDiagnostic();
                     
                     CandidateInfos.Reset();
@@ -174,7 +202,7 @@ const FString ErrorMarkerText = TEXT("✘");
                             
                             if(Task.CursorToken != ".")
                             {
-                                if((*It).Text.Find(*Task.CursorToken) == INDEX_NONE)
+                                if(!FuzzyMatch((*It).Text, *Task.CursorToken))
                                 {
                                     It.RemoveCurrent();
                                 }
@@ -182,16 +210,21 @@ const FString ErrorMarkerText = TEXT("✘");
                         }
                         
                         CandidateInfos.Sort([&](const ShaderCandidateInfo& A, const ShaderCandidateInfo& B){
-                            int AIndex = A.Text.Find(*Task.CursorToken);
-                            int BIndex = B.Text.Find(*Task.CursorToken);
-                            if(AIndex != BIndex)
-                            {
-                                return AIndex < BIndex;
-                            }
-                            else if(A.Text.Len() != B.Text.Len())
-                            {
+                            auto Token = Task.CursorToken;
+                            bool AStarts = A.Text.StartsWith(Token, ESearchCase::CaseSensitive);
+                            bool BStarts = B.Text.StartsWith(Token, ESearchCase::CaseSensitive);
+                            if (AStarts != BStarts)
+                                return AStarts > BStarts;
+                            bool AStartsIC = A.Text.StartsWith(Token, ESearchCase::IgnoreCase);
+                            bool BStartsIC = B.Text.StartsWith(Token, ESearchCase::IgnoreCase);
+                            if (AStartsIC != BStartsIC)
+                                return AStartsIC > BStartsIC;
+                            int32 AIndex = A.Text.Find(Token, ESearchCase::IgnoreCase);
+                            int32 BIndex = B.Text.Find(Token, ESearchCase::IgnoreCase);
+                            if (AIndex != BIndex)
+                                return (AIndex >= 0 ? AIndex : MAX_int32) < (BIndex >= 0 ? BIndex : MAX_int32);
+                            if (A.Text.Len() != B.Text.Len())
                                 return A.Text.Len() < B.Text.Len();
-                            }
                             return A.Text.Compare(B.Text) < 0;
                         });
                     }
@@ -814,16 +847,40 @@ const FString ErrorMarkerText = TEXT("✘");
 
     TSharedRef<ITableRow> SShaderEditorBox::GenerateCodeCompletionItem(CandidateItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
     {
+		auto CandidateText = SNew(STextBlock).Font(CodeFontInfo)
+		.Text(FText::FromString(Item->Text))
+		.OverflowPolicy(ETextOverflowPolicy::Ellipsis);
+		
+		{
+			//STextBlock's built-in HighlightText only supports highlighting continuous substring
+			CandidateText->ComputeDesiredSize(1.0f);
+			TUniquePtr<FSlateTextBlockLayout>& TextLayoutCache = GetPrivate_STextBlock_TextLayoutCache(*CandidateText);
+			TSharedPtr<FSlateTextLayout>& TextLayout = GetPrivate_FSlateTextBlockLayout_TextLayout(*TextLayoutCache);
+			TArray<FTextRunRenderer> TextHighlights;
+			TSharedPtr<ISlateRunRenderer> TextHighlighter = FSlateTextHighlightRunRenderer::Create();
+			int32 TextLen = Item->Text.Len();
+            int32 TokenLen = CurToken.Len();
+            int32 TextPos = 0;
+            int32 TokenPos = 0;
+            while (TextPos < TextLen && TokenPos < TokenLen)
+            {
+                if (FChar::ToLower(Item->Text[TextPos]) == FChar::ToLower(CurToken[TokenPos]))
+                {
+                    TextHighlights.Add(FTextRunRenderer(0, FTextRange(TextPos, TextPos + 1), TextHighlighter.ToSharedRef()));
+                    ++TokenPos;
+                }
+                ++TextPos;
+            }
+			TextLayout->SetRunRenderers(TextHighlights);
+		}
+		
         return SNew(STableRow<CandidateItemPtr>, OwnerTable)
         [
             SNew(SHorizontalBox)
             +SHorizontalBox::Slot()
             .FillWidth(0.75f)
             [
-                SNew(STextBlock).Font(CodeFontInfo)
-                .Text(FText::FromString(Item->Text))
-                .HighlightText(FText::FromString(CurToken))
-                .OverflowPolicy(ETextOverflowPolicy::Ellipsis)
+				CandidateText
             ]
             +SHorizontalBox::Slot()
             .FillWidth(0.25f)
@@ -938,12 +995,11 @@ const FString ErrorMarkerText = TEXT("✘");
         FString FinalShaderSource = ShaderTemplateWithBinding + CurrentShaderSource;
 
 		ISenseTask Task{};
-		Task.Shader = GGpuRhi->CreateShaderFromSource({
+		Task.ShaderDesc = {
             .Source = MoveTemp(FinalShaderSource),
             .Type = ShaderType::PixelShader, 
             .EntryPoint = "MainPS"
-        });
-
+        };
         
         if(bTryComplete)
         {
@@ -1736,11 +1792,11 @@ const FString ErrorMarkerText = TEXT("✘");
 						SNew(SOverlay)
 						+SOverlay::Slot()
 						[
-							BreakPoint
+							ItemErrorMarker
 						]
 						+SOverlay::Slot()
 						[
-							ItemErrorMarker
+							BreakPoint
 						]
 					]
 					+ SHorizontalBox::Slot()
