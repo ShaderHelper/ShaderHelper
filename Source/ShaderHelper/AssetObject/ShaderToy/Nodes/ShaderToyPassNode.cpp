@@ -61,6 +61,11 @@ namespace SH
 		return PassOutput->GetValue();
 	}
 
+	void ShaderToyPassNode::OnFinalizePixel(const FW::Vector2u& PixelCoord)
+	{
+		
+	}
+
 	void ShaderToyPassNode::OnEndDebuggging()
 	{
 		IsDebugging = false;

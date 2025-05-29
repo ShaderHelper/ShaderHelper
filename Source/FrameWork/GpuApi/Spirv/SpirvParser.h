@@ -3,9 +3,11 @@
 
 namespace FW
 {
+	//Info before logical layout section 10
 	struct SpvMetaContext
 	{
 		Vector3u ThreadGroupSize{};
+		TMap<SpvId, FString> DebugStrs;
 	};
 
 	class SpvMetaVisitor : public SpvVisitor
@@ -16,6 +18,8 @@ namespace FW
 		
 	public:
 		void Visit(SpvOpExecutionMode* Inst) override;
+		void Visit(SpvOpString* Inst) override;
+		void Visit(SpvOpConstant* Inst) override;
 	
 	private:
 		SpvMetaContext& Context;

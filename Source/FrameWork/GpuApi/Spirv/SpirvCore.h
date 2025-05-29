@@ -9,6 +9,7 @@ namespace FW
 		String = 7,
 		ExtInst = 12,
 		ExecutionMode = 16,
+		Constant = 43,
 	};
 
 	enum class SpvExecutionMode

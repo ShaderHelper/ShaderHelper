@@ -109,7 +109,7 @@ public:
 	virtual TRefCountPtr<GpuTexture> CreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState = GpuResourceState::Unknown) = 0;
 	virtual TRefCountPtr<GpuBuffer> CreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState = GpuResourceState::Unknown) = 0;
 
-	virtual TRefCountPtr<GpuShader> CreateShaderFromSource(const GpuShaderSourceDesc& Desc) = 0;
+	virtual TRefCountPtr<GpuShader> CreateShaderFromSource(const GpuShaderSourceDesc& Desc) const = 0;
 	// The file directory will be considered as a include dir by default.
 	virtual TRefCountPtr<GpuShader> CreateShaderFromFile(const GpuShaderFileDesc& Desc) = 0;
 	virtual TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc &InBindGroupDesc) = 0;

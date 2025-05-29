@@ -136,7 +136,7 @@ namespace SH
         
         struct ISenseTask
         {
-            TRefCountPtr<FW::GpuShader> Shader;
+			std::optional<FW::GpuShaderSourceDesc> ShaderDesc;
             
             FString CursorToken;
             uint32 Row = 0;

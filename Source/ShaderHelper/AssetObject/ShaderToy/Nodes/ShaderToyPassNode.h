@@ -40,6 +40,7 @@ namespace SH
     
 		//ShDebuggableObject
 		TRefCountPtr<FW::GpuTexture> OnStartDebugging() override;
+		void OnFinalizePixel(const FW::Vector2u& PixelCoord) override;
 		void OnEndDebuggging() override;
     private:
         void ClearBindingProperty();

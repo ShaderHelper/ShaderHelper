@@ -12,6 +12,16 @@ namespace FW
 		}
 	}
 
+	void SpvMetaVisitor::Visit(SpvOpString* Inst)
+	{
+		Context.DebugStrs.Add(Inst->GetId().value(), Inst->GetStr());
+	}
+
+	void SpvMetaVisitor::Visit(SpvOpConstant* Inst)
+	{
+		
+	}
+
 	void ParseSpv(const TArray<uint32>& SpvCode, const TArray<SpvVisitor*>& Visitors, FString& OutErrorInfo)
 	{
 		int32 WordOffset = 5;
@@ -29,6 +39,15 @@ namespace FW
 				DecodedInst.Accpet(Visitors);
 			}
 			else if(OpCode == SpvOp::String)
+			{
+				SpvId ResultId = SpvCode[WordOffset + 1];
+				char* Str = (char*)&SpvCode[WordOffset + 2];
+				int32 StrWordLen = InstLen - 2;
+				SpvOpString DecodedInst = FString(StrWordLen * 4, Str);
+				DecodedInst.SetId(ResultId);
+				DecodedInst.Accpet(Visitors);
+			}
+			else if(OpCode == SpvOp::Constant)
 			{
 				
 			}

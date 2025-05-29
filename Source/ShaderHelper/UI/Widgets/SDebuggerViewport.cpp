@@ -150,15 +150,16 @@ namespace SH
 			return FReply::Unhandled();
 		}
 		
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		if(MouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
 		{
-			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 			ShEditor->EndDebugging();
 			return FReply::Handled().ReleaseMouseLock();
 		}
 		else if(MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
 		{
 			bFinalizePixel = true;
+			ShEditor->GetDebuggaleObject()->OnFinalizePixel(PixelCoord);
 			return FReply::Handled().ReleaseMouseLock();
 		}
 		return FReply::Handled();

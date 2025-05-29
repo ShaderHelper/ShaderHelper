@@ -208,7 +208,7 @@ public:
 		return RhiBackend->CreateBuffer(InBufferDesc);
 	}
 
-	TRefCountPtr<GpuShader> CreateShaderFromSource(const GpuShaderSourceDesc& Desc) override
+	TRefCountPtr<GpuShader> CreateShaderFromSource(const GpuShaderSourceDesc& Desc) const override
 	{
 		return RhiBackend->CreateShaderFromSource(Desc);
 	}

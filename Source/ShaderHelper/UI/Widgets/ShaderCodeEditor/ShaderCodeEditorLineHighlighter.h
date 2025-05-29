@@ -63,7 +63,7 @@ namespace SH
 			}
 
 			//not blinking
-			if (FVector2D::Distance(CursorPos, NewLine.Offset) > 0.05f)
+			if (FVector2D::Distance(CursorPos, NewLine.Offset) > 0.1f)
 			{
 				//Already ensure the cursorinfo do not pointer to a const object.
 				const_cast<SlateEditableTextTypes::FCursorInfo*>(CursorInfo)->UpdateLastCursorInteractionTime();
