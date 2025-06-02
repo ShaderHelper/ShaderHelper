@@ -98,13 +98,38 @@ namespace FW
         return FVector2D::Zero();
     }
 
+    FReply STimelineArea::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+    {
+        if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+        {
+			const float ValuesPerPixel = float(*MaxTime / MyGeometry.GetLocalSize().X);
+			float NewTime = float(ValuesPerPixel * MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()).X);
+            *CurTime = FMath::Clamp(NewTime, 0.0f, float(*MaxTime));
+            return FReply::Handled().CaptureMouse(SharedThis(this));
+        }
+        return FReply::Unhandled();
+    }
+
+    FReply STimelineArea::OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+    {
+        if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+        {
+            return FReply::Handled().ReleaseMouseCapture();
+        }
+        return FReply::Unhandled();
+    }
+
     FReply STimelineArea::OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
     {
-        const bool bIsLeftMouseButtonDown = MouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton);
-        if(bIsLeftMouseButtonDown)
+        if(HasMouseCapture())
         {
-            const float ValuesPerPixel = float(*MaxTime / MyGeometry.GetLocalSize().X);
-            *CurTime = float(ValuesPerPixel * MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()).X);
+             const bool bIsLeftMouseButtonDown = MouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton);
+            if(bIsLeftMouseButtonDown)
+            {
+                const float ValuesPerPixel = float(*MaxTime / MyGeometry.GetLocalSize().X);
+                float NewTime = float(ValuesPerPixel * MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()).X);
+                *CurTime = FMath::Clamp(NewTime, 0.0f, float(*MaxTime));
+            }
         }
         return FReply::Handled();
     }

@@ -10,12 +10,12 @@
 #include <HAL/PlatformApplicationMisc.h>
 #include <Framework/Text/TextLayout.h>
 #include "ShaderCodeEditorLineHighlighter.h"
-#include "AssetObject/StShader.h"
 #include "UI/Widgets/Misc/CommonCommands.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "magic_enum.hpp"
 #include <Widgets/Text/SlateTextBlockLayout.h>
 #include <Framework/Text/SlateTextHighlightRunRenderer.h>
+#include <Fonts/FontMeasure.h>
 
 //No exposed methods, and too lazy to modify the source code for UE.
 STEAL_PRIVATE_MEMBER(SMultiLineEditableText, TUniquePtr<FSlateEditableTextLayout>, EditableTextLayout)
@@ -149,15 +149,15 @@ const FString ErrorMarkerText = TEXT("✘");
     void SShaderEditorBox::Construct(const FArguments& InArgs)
     {
         CodeFontInfo = FShaderHelperStyle::Get().GetFontStyle("CodeFont");
-        StShaderAsset = InArgs._StShaderAsset;
+		ShaderAssetObj = InArgs._ShaderAssetObj;
         SAssignNew(ShaderMultiLineVScrollBar, SScrollBar).Orientation(EOrientation::Orient_Vertical);
         SAssignNew(ShaderMultiLineHScrollBar, SScrollBar).Orientation(EOrientation::Orient_Horizontal);
 
         ShaderMarshaller = MakeShared<FShaderEditorMarshaller>(this, MakeShared<HlslHighLightTokenizer>());
         EffectMarshller = MakeShared<FShaderEditorEffectMarshaller>(this);
 
-        FText InitialShaderText = FText::FromString(StShaderAsset->PixelShaderBody);
-        CurrentEditorSource = StShaderAsset->PixelShaderBody;
+        FText InitialShaderText = FText::FromString(ShaderAssetObj->EditorContent);
+        CurrentEditorSource = ShaderAssetObj->EditorContent;
         CurrentShaderSource = CurrentEditorSource;
         
         ISenseEvent = FPlatformProcess::GetSynchEventFromPool();
@@ -169,7 +169,7 @@ const FString ErrorMarkerText = TEXT("✘");
                 if(Task.ShaderDesc)
                 {
 					TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(Task.ShaderDesc.value());
-                    ISenseTU TU{Shader};
+                    ISenseTU TU{Shader->GetProcessedSourceText(), Shader->GetIncludeDirs()};
                     ErrorInfos = TU.GetDiagnostic();
                     
                     CandidateInfos.Reset();
@@ -409,7 +409,7 @@ const FString ErrorMarkerText = TEXT("✘");
         UICommandList->MapAction(
             CommonCommands::Get().Save,
             FExecuteAction::CreateLambda([this] {
-                StShaderAsset->Save();
+				ShaderAssetObj->Save();
                 Compile();
             })
         );
@@ -423,7 +423,7 @@ const FString ErrorMarkerText = TEXT("✘");
         CustomCursorHighlighter = CursorHightLighter::Create(&CursorInfo);
         CursorLineHighlighter = CustomCursorHighlighter;
         
-        CurEditState = StShaderAsset->bCurPsCompilationSucceed ? EditState::Succeed : EditState::Failed;
+        CurEditState = ShaderAssetObj->bCompilationSucceed ? EditState::Succeed : EditState::Failed;
     }
 
 	void SShaderEditorBox::OnBeginEditTransaction()
@@ -704,6 +704,7 @@ const FString ErrorMarkerText = TEXT("✘");
         LineNumberData.Reset();
         int32 CurTextLayoutLine = ShaderMarshaller->TextLayout->GetLineCount();
         int32 FoldedLineCount = 0;
+
         for (int32 LineIndex = 0; LineIndex < CurTextLayoutLine; LineIndex++)
         {
             LineNumberItemPtr Data = MakeShared<FText>(FText::FromString(FString::FromInt(LineIndex + 1 + FoldedLineCount)));
@@ -712,6 +713,9 @@ const FString ErrorMarkerText = TEXT("✘");
                 const auto& Marker = VisibleFoldMarkers[*MarkerIndex];
 				FoldedLineCount += Marker.GetFoldedLineCounts();
             }
+			
+			int32 LineNumber = FCString::Atoi(*(*Data).ToString());
+			MaxLineNumber = FMath::Max(MaxLineNumber, LineNumber);
             LineNumberData.Add(MoveTemp(Data));
         }
 		
@@ -918,9 +922,7 @@ const FString ErrorMarkerText = TEXT("✘");
         EffectMarshller->LineNumberToErrorInfo.Reset();
         for (const ShaderErrorInfo& ErrorInfo : ErrorInfos)
         {
-			int32 AddedLineNum = StShaderAsset->GetAddedLineNum();
-            
-            int32 ErrorInfoLineNumber = ErrorInfo.Row - AddedLineNum;
+            int32 ErrorInfoLineNumber = ErrorInfo.Row - ShaderAssetObj->GetExtraLineNum();
             if (!EffectMarshller->LineNumberToErrorInfo.Contains(ErrorInfoLineNumber))
             {
                 int32 LineIndex = GetLineIndex(ErrorInfoLineNumber);
@@ -955,28 +957,20 @@ const FString ErrorMarkerText = TEXT("✘");
     void SShaderEditorBox::Compile()
     {
 		//TODO Async and show "Compiling" state
-        FString ShaderTemplateWithBinding = StShaderAsset->GetTemplateWithBinding();
-        FString FinalShaderSource = ShaderTemplateWithBinding + CurrentShaderSource;
-		FString ShaderName = StShaderAsset->GetFileName() + "." + StShaderAsset->FileExtension();
-        TRefCountPtr<GpuShader> CurPixelShader = GGpuRhi->CreateShaderFromSource({
-            .Name = ShaderName, 
-            .Source = MoveTemp(FinalShaderSource), 
-            .Type = ShaderType::PixelShader, 
-            .EntryPoint = "MainPS"
-        });
+        TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(ShaderAssetObj->GetShaderDesc(CurrentShaderSource));
         FString ErrorInfo;
-        if (GGpuRhi->CompileShader(CurPixelShader, ErrorInfo))
+        if (GGpuRhi->CompileShader(Shader, ErrorInfo))
         {
-            StShaderAsset->PixelShader = CurPixelShader;
-            StShaderAsset->bCurPsCompilationSucceed = true;
+			ShaderAssetObj->Shader = Shader;
+			ShaderAssetObj->bCompilationSucceed = true;
             CurEditState = EditState::Succeed;
         }
         else
         {
-			int32 AddedLineNum = StShaderAsset->GetAddedLineNum();
+			int32 AddedLineNum = ShaderAssetObj->GetExtraLineNum();
 			ErrorInfo = AdjustErrorLineNumber(ErrorInfo, -AddedLineNum);
 			SH_LOG(LogShader, Error, TEXT("Compilation failed:\n%s"), *ErrorInfo);
-            StShaderAsset->bCurPsCompilationSucceed = false;
+			ShaderAssetObj->bCompilationSucceed = false;
             CurEditState = EditState::Failed;
         }
     }
@@ -984,22 +978,16 @@ const FString ErrorMarkerText = TEXT("✘");
     void SShaderEditorBox::OnShaderTextChanged(const FString& InShaderSouce)
     {
         FString NewShaderSource = InShaderSouce.Replace(TEXT("\r\n"), TEXT("\n"));
-        if (NewShaderSource != StShaderAsset->PixelShaderBody)
+        if (NewShaderSource != ShaderAssetObj->EditorContent)
         {
-            StShaderAsset->PixelShaderBody = NewShaderSource;
-            StShaderAsset->MarkDirty(NewShaderSource != StShaderAsset->SavedPixelShaderBody);
+			ShaderAssetObj->EditorContent = NewShaderSource;
+			ShaderAssetObj->MarkDirty(NewShaderSource != ShaderAssetObj->SavedEditorContent);
         }
         
         CurrentShaderSource = NewShaderSource;
-        FString ShaderTemplateWithBinding = StShaderAsset->GetTemplateWithBinding();
-        FString FinalShaderSource = ShaderTemplateWithBinding + CurrentShaderSource;
 
 		ISenseTask Task{};
-		Task.ShaderDesc = {
-            .Source = MoveTemp(FinalShaderSource),
-            .Type = ShaderType::PixelShader, 
-            .EntryPoint = "MainPS"
-        };
+		Task.ShaderDesc = ShaderAssetObj->GetShaderDesc(CurrentShaderSource);
         
         if(bTryComplete)
         {
@@ -1007,7 +995,7 @@ const FString ErrorMarkerText = TEXT("✘");
             const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
             const int32 CursorRow = CursorLocation.GetLineIndex();
             const int32 CursorCol = CursorLocation.GetOffset();
-			int32 AddedLineNum = StShaderAsset->GetAddedLineNum();
+			int32 AddedLineNum = ShaderAssetObj->GetExtraLineNum();
             
             FString CurLineText;
             ShaderMultiLineEditableText->GetTextLine(CursorRow, CurLineText);
@@ -1685,6 +1673,9 @@ const FString ErrorMarkerText = TEXT("✘");
     {
         int32 LineNumber = FCString::Atoi(*(*Item).ToString());
         const int32 LineIndex = GetLineIndex(LineNumber);
+		
+		float MinWidth = FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(TEXT("0"), CodeFontInfo).X;
+		MinWidth *= FString::FromInt(MaxLineNumber).Len();
         
         TSharedPtr<STextBlock> LineNumberTextBlock = SNew(STextBlock)
             .Font(CodeFontInfo)
@@ -1700,7 +1691,7 @@ const FString ErrorMarkerText = TEXT("✘");
             })
             .Text(*Item)
             .Justification(ETextJustify::Right)
-            .MinDesiredWidth(15.0f);
+            .MinDesiredWidth(MinWidth);
 		
 		LineNumberTextBlock->SetOnMouseButtonDown(FPointerEventHandler::CreateLambda([this, LineNumber](const FGeometry&, const FPointerEvent&){
 			if(BreakPointLines.Contains(LineNumber))
@@ -1937,6 +1928,7 @@ const FString ErrorMarkerText = TEXT("✘");
     void FShaderEditorMarshaller::SetText(const FString& SourceString, FTextLayout& TargetTextLayout)
     {
         TextLayout = &TargetTextLayout;
+		OwnerWidget->CurrentEditorSource = SourceString;
 
         TArray<HlslHighLightTokenizer::BraceGroup> BraceGroups;
         TArray<HlslHighLightTokenizer::TokenizedLine> TokenizedLines = Tokenizer->Tokenize(SourceString, BraceGroups);
@@ -2020,11 +2012,7 @@ const FString ErrorMarkerText = TEXT("✘");
 
         FTextSelection UnFoldingRange = FTextSelection{ {0, 0}, {LinesToAdd.Num() - 1, LinesToAdd[LinesToAdd.Num() - 1].Text->Len()} };
         FString TextAfterUnfolding = OwnerWidget->UnFoldText(MoveTemp(UnFoldingRange));
-        if(OwnerWidget->CurrentEditorSource != SourceString)
-        {
-            OwnerWidget->CurrentEditorSource = SourceString;
-            OwnerWidget->OnShaderTextChanged(TextAfterUnfolding);
-        }
+		OwnerWidget->OnShaderTextChanged(TextAfterUnfolding);
         OwnerWidget->UpdateLineNumberData();
     }
 

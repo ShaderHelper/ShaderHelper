@@ -236,12 +236,12 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		}));
 	}
 
-    TSharedRef<SWidget> ShaderHelperEditor::SpawnStShaderPath(const FString& InStShaderPath)
+    TSharedRef<SWidget> ShaderHelperEditor::SpawnShaderPath(const FString& InShaderPath)
     {
         auto PathContainer = SNew(SHorizontalBox);
-        FString StShaderRelativePath = TSingleton<ShProjectManager>::Get().GetRelativePathToProject(InStShaderPath);
+        FString ShaderRelativePath = TSingleton<ShProjectManager>::Get().GetRelativePathToProject(InShaderPath);
         TArray<FString> FileNames;
-        StShaderRelativePath.ParseIntoArray(FileNames, TEXT("/"));
+        ShaderRelativePath.ParseIntoArray(FileNames, TEXT("/"));
         FString RelativePathHierarchy;
         for(int32 i = 0; i < FileNames.Num(); i++)
         {
@@ -296,57 +296,57 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
         return PathContainer;
     }
 
-    void ShaderHelperEditor::UpdateStShaderPath(const FString& InStShaderPath)
+    void ShaderHelperEditor::UpdateShaderPath(const FString& InShaderPath)
     {
-        AssetObject* Asset = TSingleton<AssetManager>::Get().FindLoadedAsset(InStShaderPath);
+        AssetObject* Asset = TSingleton<AssetManager>::Get().FindLoadedAsset(InShaderPath);
         if(Asset)
         {
-            StShader* Shader = static_cast<StShader*>(Asset);
-            if(auto* PathBox = StShaderPathBoxMap.Find(Shader))
+            ShaderAsset* ShaderAssetObj = static_cast<ShaderAsset*>(Asset);
+            if(auto* PathBox = ShaderPathBoxMap.Find(ShaderAssetObj))
             {
                 (*PathBox)->ClearChildren();
                 (*PathBox)->AddSlot()
                 [
-                    SpawnStShaderPath(Shader->GetPath())
+                    SpawnShaderPath(ShaderAssetObj->GetPath())
                 ];
             }
         }
     }
 
-    TSharedRef<SDockTab> ShaderHelperEditor::SpawnStShaderTab(const FSpawnTabArgs& Args)
+    TSharedRef<SDockTab> ShaderHelperEditor::SpawnShaderTab(const FSpawnTabArgs& Args)
     {
-        FGuid StShaderGuid{Args.GetTabId().ToString()};
+        FGuid ShaderGuid{Args.GetTabId().ToString()};
         FName TabId = Args.GetTabId().TabType;
-        auto LoadedStShader = TSingleton<AssetManager>::Get().LoadAssetByGuid<StShader>(StShaderGuid);
+        auto LoadedShader = TSingleton<AssetManager>::Get().LoadAssetByGuid<ShaderAsset>(ShaderGuid);
 
-        auto ShaderEditor = SNew(SShaderEditorBox).StShaderAsset(LoadedStShader);
-        ShaderEditors.Add(LoadedStShader, ShaderEditor);
+        auto ShaderEditor = SNew(SShaderEditorBox).ShaderAssetObj(LoadedShader);
+        ShaderEditors.Add(LoadedShader, ShaderEditor);
         
         auto PathBox = SNew(SScrollBox)
             .Orientation(EOrientation::Orient_Horizontal)
             .ScrollBarVisibility(EVisibility::Collapsed)
             +SScrollBox::Slot()
             [
-                SpawnStShaderPath(LoadedStShader->GetPath())
+                SpawnShaderPath(LoadedShader->GetPath())
             ];
-        StShaderPathBoxMap.Add(LoadedStShader, PathBox);
+        ShaderPathBoxMap.Add(LoadedShader, PathBox);
         
-        auto NewStShaderTab = SNew(SShaderTab)
+        auto NewShaderTab = SNew(SShaderTab)
             .TabRole(ETabRole::DocumentTab)
-			.Label_Lambda([this, LoadedStShader] {
+			.Label_Lambda([this, LoadedShader] {
 				FString DirtyChar;
-				if (CurProject->IsPendingAsset(LoadedStShader))
+				if (CurProject->IsPendingAsset(LoadedShader))
 				{
 					DirtyChar = "*";
 				}
-				return FText::FromString(LoadedStShader->GetFileName() + DirtyChar);
+				return FText::FromString(LoadedShader->GetFileName() + DirtyChar);
 			})
             .OnTabClosed_Lambda([this, TabId, Args](TSharedRef<SDockTab> ClosedTab) {
-                auto StShaderAsset = *CurProject->OpenedStShaders.FindKey(ClosedTab);
-                CurProject->OpenedStShaders.Remove(StShaderAsset);
-                StShaderPathBoxMap.Remove(StShaderAsset);
-                ShaderEditors.Remove(StShaderAsset);
-				//Clear the PersistLayout when closing a StShader tab. we don't intend to restore it, so just destroy it.
+                auto ShaderAssetObj = *CurProject->OpenedShaders.FindKey(ClosedTab);
+                CurProject->OpenedShaders.Remove(ShaderAssetObj);
+                ShaderPathBoxMap.Remove(ShaderAssetObj);
+                ShaderEditors.Remove(ShaderAssetObj);
+				//Clear the PersistLayout when closing a Shader tab. we don't intend to restore it, so just destroy it.
 				auto DockTabStack = ClosedTab->GetParentDockTabStack();
 				DockTabStack->OnTabRemoved(Args.GetTabId());
 				TArray<TSharedRef<FTabManager::FArea>>& CollapsedDockAreas = GetPrivate_FTabManager_CollapsedDockAreas(*CodeTabManager);
@@ -368,32 +368,32 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                 ]
             ];
         
-        NewStShaderTab->SetTabIcon(LoadedStShader->GetImage());
-        NewStShaderTab->SetOnTabRelocated(FSimpleDelegate::CreateLambda([this, NewStShaderTab = TWeakPtr<SShaderTab>{NewStShaderTab}] {
-            if(NewStShaderTab.IsValid())
+        NewShaderTab->SetTabIcon(LoadedShader->GetImage());
+        NewShaderTab->SetOnTabRelocated(FSimpleDelegate::CreateLambda([this, NewShaderTab = TWeakPtr<SShaderTab>{NewShaderTab}] {
+            if(NewShaderTab.IsValid())
             {
-                if (TSharedPtr<SDockingTabStack> TabStack = CodeTabManager->FindTabInLiveArea(FTabMatcher{ NewStShaderTab.Pin()->GetLayoutIdentifier() }, CodeTabMainArea.ToSharedRef()))
+                if (TSharedPtr<SDockingTabStack> TabStack = CodeTabManager->FindTabInLiveArea(FTabMatcher{ NewShaderTab.Pin()->GetLayoutIdentifier() }, CodeTabMainArea.ToSharedRef()))
                 {
-                    StShaderTabStackInsertPoint = TabStack;
+                    ShaderTabStackInsertPoint = TabStack;
                 }
             }
 		}));
-        NewStShaderTab->SetOnTabActivated(SDockTab::FOnTabActivatedCallback::CreateLambda([this, LoadedStShader](TSharedRef<SDockTab> InTab, ETabActivationCause InCause) {
+        NewShaderTab->SetOnTabActivated(SDockTab::FOnTabActivatedCallback::CreateLambda([this, LoadedShader](TSharedRef<SDockTab> InTab, ETabActivationCause InCause) {
             if(!CodeTabMainArea) return;
-            GetShObjectOp(LoadedStShader)->OnSelect(LoadedStShader);
+            GetShObjectOp(LoadedShader)->OnSelect(LoadedShader);
             if(TSharedPtr<SDockingTabStack> TabStack = CodeTabManager->FindTabInLiveArea(FTabMatcher{InTab->GetLayoutIdentifier()}, CodeTabMainArea.ToSharedRef()))
             {
-				StShaderTabStackInsertPoint = TabStack;
+				ShaderTabStackInsertPoint = TabStack;
             }
             
             if(InCause == ETabActivationCause::UserClickedOnTab)
             {
-                ShaderEditors[LoadedStShader]->SetFocus();
+                ShaderEditors[LoadedShader]->SetFocus();
             }
             
         }));
-        CurProject->OpenedStShaders.Add(LoadedStShader, NewStShaderTab);
-        return NewStShaderTab;
+        CurProject->OpenedShaders.Add(LoadedShader, NewShaderTab);
+        return NewShaderTab;
     }
 
 	TSharedRef<SDockTab> ShaderHelperEditor::SpawnWindowTab(const FSpawnTabArgs& Args)
@@ -464,11 +464,11 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
             
             CodeTabManager = FGlobalTabmanager::Get()->NewTabManager(SpawnedTab.ToSharedRef());
             
-            for(const auto& [OpenedStShader, _] : CurProject->OpenedStShaders)
+            for(const auto& [OpenedShader, _] : CurProject->OpenedShaders)
             {
-                FName StShaderTabId{*OpenedStShader->GetGuid().ToString()};
+                FName ShaderTabId{*OpenedShader->GetGuid().ToString()};
 				CodeTabManager->RegisterTabSpawner(
-					StShaderTabId, FOnSpawnTab::CreateRaw(this, &ShaderHelperEditor::SpawnStShaderTab));
+					ShaderTabId, FOnSpawnTab::CreateRaw(this, &ShaderHelperEditor::SpawnShaderTab));
             }
  
             if(!CurProject->CodeTabLayout)
@@ -608,28 +608,28 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
         PropertyView->SetObjectData(InObjectData);
     }
 
-	void ShaderHelperEditor::OpenStShaderTab(AssetPtr<StShader> InStShader)
+	void ShaderHelperEditor::OpenShaderTab(AssetPtr<ShaderAsset> InShader)
     {
-        TSharedPtr<SDockTab>* TabPtr = CurProject->OpenedStShaders.Find(InStShader);
+        TSharedPtr<SDockTab>* TabPtr = CurProject->OpenedShaders.Find(InShader);
         if(TabPtr == nullptr || !*TabPtr)
         {
-            FName StShaderTabId{*InStShader->GetGuid().ToString()};
-            auto NewStShaderTab = SpawnStShaderTab({Window, StShaderTabId});
-            if(StShaderTabStackInsertPoint.IsValid() && StShaderTabStackInsertPoint.Pin()->GetAllChildTabs().IsValidIndex(0))
+            FName ShaderTabId{*InShader->GetGuid().ToString()};
+            auto NewShaderTab = SpawnShaderTab({Window, ShaderTabId});
+            if(ShaderTabStackInsertPoint.IsValid() && ShaderTabStackInsertPoint.Pin()->GetAllChildTabs().IsValidIndex(0))
             {
-                auto FirstTab = StShaderTabStackInsertPoint.Pin()->GetAllChildTabs()[0];
-                CodeTabManager->InsertNewDocumentTab(FirstTab->GetLayoutIdentifier().TabType, StShaderTabId, FTabManager::FLiveTabSearch{}, NewStShaderTab, true);
+                auto FirstTab = ShaderTabStackInsertPoint.Pin()->GetAllChildTabs()[0];
+                CodeTabManager->InsertNewDocumentTab(FirstTab->GetLayoutIdentifier().TabType, ShaderTabId, FTabManager::FLiveTabSearch{}, NewShaderTab, true);
             }
             else
             {
-                CodeTabManager->InsertNewDocumentTab(InitialInsertPointTabId, StShaderTabId, FTabManager::FRequireClosedTab{}, NewStShaderTab, true);
+                CodeTabManager->InsertNewDocumentTab(InitialInsertPointTabId, ShaderTabId, FTabManager::FRequireClosedTab{}, NewShaderTab, true);
             }
-            NewStShaderTab->ActivateInParent(ETabActivationCause::SetDirectly);
+            NewShaderTab->ActivateInParent(ETabActivationCause::SetDirectly);
         }
         else
         {
             (*TabPtr)->ActivateInParent(ETabActivationCause::SetDirectly);
-            ShaderEditors[InStShader]->SetFocus();
+            ShaderEditors[InShader]->SetFocus();
         }
     }
 

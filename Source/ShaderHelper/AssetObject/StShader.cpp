@@ -33,12 +33,12 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 
 
     REFLECTION_REGISTER(AddClass<StShader>("ShaderToy Shader")
-                                .BaseClass<AssetObject>()
+                                .BaseClass<ShaderAsset>()
 	)
 
 	StShader::StShader()
 	{
-        PixelShaderBody = DefaultPixelShaderBody;
+        EditorContent = DefaultPixelShaderBody;
 	}
 
 	StShader::~StShader()
@@ -48,11 +48,8 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 
 	void StShader::Serialize(FArchive& Ar)
 	{
-		AssetObject::Serialize(Ar);
-
-		Ar << PixelShaderBody;
-		SavedPixelShaderBody = PixelShaderBody;
-
+		ShaderAsset::Serialize(Ar);
+		
         Ar << CustomUniformBufferBuilder << CustomBindGroupLayoutBuilder;
 	}
 
@@ -60,22 +57,32 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
     {
         AssetObject::PostLoad();
         
-        VertexShader = GGpuRhi->CreateShaderFromSource({
-            .Source = DefaultVertexShader, 
-            .Type = ShaderType::VertexShader, 
-            .EntryPoint = "MainVS"
-        });
-        FString ErrorInfo;
-        GGpuRhi->CompileShader(VertexShader, ErrorInfo);
-
-        PixelShader = GGpuRhi->CreateShaderFromSource({
+        Shader = GGpuRhi->CreateShaderFromSource({
             .Name = GetFileName() + "." + FileExtension(),
-            .Source = GetFullPs(),
-            .Type = ShaderType::PixelShader, 
+            .Source = GetFullContent(),
+            .Type = ShaderType::PixelShader,
             .EntryPoint = "MainPS"
         });
-        bCurPsCompilationSucceed = GGpuRhi->CompileShader(PixelShader, ErrorInfo);
+		FString ErrorInfo;
+		bCompilationSucceed = GGpuRhi->CompileShader(Shader, ErrorInfo);
     }
+
+	GpuShader* StShader::GetVertexShader()
+	{
+		static TRefCountPtr<GpuShader> VertexShader;
+		static int Init = [&] {
+			VertexShader = GGpuRhi->CreateShaderFromSource({
+				.Source = DefaultVertexShader,
+				.Type = ShaderType::VertexShader,
+				.EntryPoint = "MainVS"
+			});
+			FString ErrorInfo;
+			GGpuRhi->CompileShader(VertexShader, ErrorInfo);
+			return 0;
+		}();
+		
+		return VertexShader;
+	}
 
     UniformBuffer* StShader::GetBuiltInUb()
     {
@@ -163,16 +170,29 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         return GetBinding() + Template;
     }
 
-	int StShader::GetAddedLineNum() const
+	int StShader::GetExtraLineNum() const
 	{
 		TArray<FString> AddedLines;
 		static int AddedLineNum = GetTemplateWithBinding().ParseIntoArrayLines(AddedLines, false) - 1;
 		return AddedLineNum;
 	}
 
-	FString StShader::GetFullPs() const
+	GpuShaderSourceDesc StShader::GetShaderDesc(const FString& InContent) const
 	{
-        FString FullShader = GetTemplateWithBinding() + PixelShaderBody;
+		FString FinalShaderSource = GetTemplateWithBinding() + InContent;
+		FString ShaderName = GetFileName() + "." + FileExtension();
+		auto Desc = GpuShaderSourceDesc{
+			.Name = ShaderName,
+			.Source = MoveTemp(FinalShaderSource),
+			.Type = ShaderType::PixelShader,
+			.EntryPoint = "MainPS"
+		};
+		return Desc;
+	}
+
+	FString StShader::GetFullContent() const
+	{
+        FString FullShader = GetTemplateWithBinding() + EditorContent;
 		return FullShader;
 	}
 

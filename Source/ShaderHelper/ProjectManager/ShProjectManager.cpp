@@ -70,8 +70,8 @@ namespace SH
 
 		Ar << Graph;
 		
-		int StShaderNum = OpenedStShaders.Num();
-		Ar << StShaderNum;
+		int ShaderNum = OpenedShaders.Num();
+		Ar << ShaderNum;
 
 		FString CodeTabLayoutContents;
 		TSharedPtr<FJsonObject> CodeTabLayoutJsonObject;
@@ -79,9 +79,9 @@ namespace SH
 		Ar << HasCodeTabLayout;
 		if (Ar.IsSaving())
 		{
-			for (auto& [OpenedStShader, _] : OpenedStShaders)
+			for (auto& [OpenedShader, _] : OpenedShaders)
 			{
-				Ar << OpenedStShader;
+				Ar << OpenedShader;
 			}
 
 			if (HasCodeTabLayout)
@@ -95,14 +95,14 @@ namespace SH
 		}
 		else
 		{
-			OpenedStShaders.Reserve(StShaderNum);
-			for (int i = 0; i < StShaderNum; i++)
+			OpenedShaders.Reserve(ShaderNum);
+			for (int i = 0; i < ShaderNum; i++)
 			{
-				AssetPtr<StShader> LoadedStShader;
-				Ar << LoadedStShader;
-				if (LoadedStShader)
+				AssetPtr<ShaderAsset> LoadedShader;
+				Ar << LoadedShader;
+				if (LoadedShader)
 				{
-					OpenedStShaders.Add(MoveTemp(LoadedStShader), nullptr);
+					OpenedShaders.Add(MoveTemp(LoadedShader), nullptr);
 				}
 				else
 				{

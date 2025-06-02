@@ -1,7 +1,7 @@
 #pragma once
 #include "ProjectManager/ProjectManager.h"
 #include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
-#include "AssetObject/StShader.h"
+#include "AssetObject/ShaderAsset.h"
 #include "AssetObject/Graph.h"
 
 namespace SH
@@ -23,7 +23,7 @@ namespace SH
 
 		FW::AssetBrowserPersistentState AssetBrowserState;
 		FW::AssetPtr<FW::Graph> Graph;
-		TMap<FW::AssetPtr<StShader>, TSharedPtr<class SDockTab>> OpenedStShaders;
+		TMap<FW::AssetPtr<ShaderAsset>, TSharedPtr<class SDockTab>> OpenedShaders;
 		TSharedPtr<FTabManager::FLayout> CodeTabLayout;
         bool TimelineStop = true;
         float TimelineCurTime = 0;

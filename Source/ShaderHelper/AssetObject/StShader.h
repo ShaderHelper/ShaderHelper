@@ -1,18 +1,20 @@
 #pragma once
-#include "AssetObject/AssetObject.h"
+#include "AssetObject/ShaderAsset.h"
 #include "RenderResource/UniformBuffer.h"
 #include "UI/Widgets/Property/PropertyData/PropertyData.h"
 #include "RenderResource/Shader/Shader.h"
 
 namespace SH
 {
-	class StShader : public FW::AssetObject
+	class StShader : public ShaderAsset
 	{
 		REFLECTION_TYPE(StShader)
 	public:
 		StShader();
 		~StShader();
         
+		FW::GpuShader* GetPixelShader() const { return Shader; }
+		static FW::GpuShader* GetVertexShader();
         static FW::UniformBuffer* GetBuiltInUb();
         static FW::UniformBufferBuilder& GetBuiltInUbBuilder();
         static FW::GpuBindGroupLayout* GetBuiltInBindLayout();
@@ -20,16 +22,21 @@ namespace SH
         static FW::GpuBindGroupLayoutBuilder& GetBuiltInBindLayoutBuilder();
 
 	public:
+		//AssetObject interface
 		void Serialize(FArchive& Ar) override;
         void PostLoad() override;
 		FString FileExtension() const override;
 		const FSlateBrush* GetImage() const override;
 
+		//ShaderAsset interface
+		FString GetFullContent() const override;
+		int32 GetExtraLineNum() const override;
+		FW::GpuShaderSourceDesc GetShaderDesc(const FString& InContent) const override;
+		
         FString GetBinding() const;
         FString GetTemplateWithBinding() const;
-		int GetAddedLineNum() const;
-		FString GetFullPs() const;
         
+		//ShObject interface
         TArray<TSharedRef<FW::PropertyData>>* GetPropertyDatas() override;
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromBinding();
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromUniform(const FW::UniformBufferBuilder& InBuilder, bool Enabled);
@@ -43,10 +50,6 @@ namespace SH
         TSharedPtr<FW::PropertyData> CreateUniformPropertyData(const FString& InTypeName, const FString& UniformMemberName, bool Enabled);
         
 	public:
-        bool bCurPsCompilationSucceed;
-        FString SavedPixelShaderBody;
-		FString PixelShaderBody;
-        TRefCountPtr<FW::GpuShader> VertexShader, PixelShader;
         FSimpleDelegate OnRefreshBuilder;
         
         TSharedPtr<FW::PropertyCategory> BuiltInCategory;

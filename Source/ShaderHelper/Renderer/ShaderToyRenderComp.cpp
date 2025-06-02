@@ -3,6 +3,7 @@
 #include "GpuApi/GpuRhi.h"
 #include "ProjectManager/ShProjectManager.h"
 #include "GpuApi/GpuResourceHelper.h"
+#include "AssetObject/StShader.h"
 
 using namespace FW;
 

@@ -8,6 +8,7 @@ namespace FW
 	{
 		Vector3u ThreadGroupSize{};
 		TMap<SpvId, FString> DebugStrs;
+		TMap<SpvId, SpvType*> Types;
 	};
 
 	class SpvMetaVisitor : public SpvVisitor
@@ -17,6 +18,8 @@ namespace FW
 		{}
 		
 	public:
+		void Visit(SpvOpTypeFloat* Inst) override;
+		
 		void Visit(SpvOpExecutionMode* Inst) override;
 		void Visit(SpvOpString* Inst) override;
 		void Visit(SpvOpConstant* Inst) override;

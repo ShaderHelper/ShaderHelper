@@ -5,9 +5,6 @@
 namespace FW
 {
 	DECLARE_MULTICAST_DELEGATE_OneParam(OnViewportResizeDelegate, const Vector2f&)
-	DECLARE_MULTICAST_DELEGATE_TwoParams(OnMouseDownDelegate, const FGeometry&, const FPointerEvent&)
-	DECLARE_MULTICAST_DELEGATE_TwoParams(OnMouseUpDelegate, const FGeometry&, const FPointerEvent&)
-	DECLARE_MULTICAST_DELEGATE_TwoParams(OnMouseMoveDelegate, const FGeometry&, const FPointerEvent&)
 
 	class FRAMEWORK_API PreviewViewPort : public ISlateViewport
 	{
