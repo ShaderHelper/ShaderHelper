@@ -4,13 +4,12 @@
 
 namespace FW
 {
-	class SpvInstruction;
-
 	class SpvVisitor
 	{
 	public:
-		virtual void Visit(SpvInstruction*) {}
+		virtual void Visit(class SpvInstruction*) {}
 		
+		virtual void Visit(class SpvOpTypeFloat* Inst) {}
 		virtual void Visit(class SpvOpConstant* Inst) {}
 		virtual void Visit(class SpvOpExecutionMode* Inst) {}
 		virtual void Visit(class SpvOpString* Inst) {}
@@ -67,6 +66,15 @@ namespace FW
 		SpvId EntryPoint;
 		SpvExecutionMode Mode;
 		ExtraOperands Operands;
+	};
+
+	class SpvOpTypeFloat : public SpvInstructionBase<SpvOpTypeFloat>
+	{
+	public:
+		SpvOpTypeFloat() {}
+		
+	private:
+		
 	};
 
 	class SpvOpConstant : public SpvInstructionBase<SpvOpConstant>

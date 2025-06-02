@@ -2,8 +2,6 @@
 
 namespace SH
 {
-    TOptional<int32> IsMatchPunctuation(const TCHAR* InString, int32 Len, FString& OutMatchedPuncuation);
-
 	class HlslHighLightTokenizer
 	{
 	public:

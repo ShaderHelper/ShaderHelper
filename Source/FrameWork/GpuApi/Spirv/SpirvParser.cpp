@@ -3,6 +3,12 @@
 
 namespace FW
 {
+
+	void SpvMetaVisitor::Visit(SpvOpTypeFloat* Inst)
+	{
+		
+	}
+
 	void SpvMetaVisitor::Visit(SpvOpExecutionMode* Inst)
 	{
 		if(Inst->GetMode() == SpvExecutionMode::LocalSize)
@@ -49,7 +55,7 @@ namespace FW
 			}
 			else if(OpCode == SpvOp::Constant)
 			{
-				
+				SpvOpConstant DecodedInst;
 			}
 			else if(OpCode == SpvOp::ExtInst)
 			{

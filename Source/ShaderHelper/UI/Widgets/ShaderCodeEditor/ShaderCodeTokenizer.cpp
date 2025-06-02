@@ -5,33 +5,14 @@
 using namespace FW;
 
 namespace SH
-{
-	static TOptional<int32> IsMatchBultinType(const TCHAR* InString, int32 Len)
-	{
-		TOptional<int32> Ret;
-		for (const char* Type : HLSL::BuiltinTypes)
-		{
-			int32 TypeLength = FCString::Strlen(ANSI_TO_TCHAR(Type));
-			if (Len >= TypeLength && FCString::Strncmp(InString, ANSI_TO_TCHAR(Type), TypeLength) == 0)
-			{
-				if (!Ret) { 
-					Ret = TypeLength; 
-				}
-				else {
-					Ret = FMath::Max(TypeLength, *Ret);
-				}
-			}
-		}
-		return Ret;
-	}
-	
+{	
 	TOptional<int32> IsMatchPunctuation(const TCHAR* InString, int32 Len, FString& OutMatchedPuncuation)
 	{
 		TOptional<int32> Ret;
-		for (const char* Punctuation : HLSL::Punctuations)
+		for (const TCHAR* Punctuation : HLSL::Punctuations)
 		{
-			int32 PunctuationLength = FCString::Strlen(ANSI_TO_TCHAR(Punctuation));
-			if (Len >= PunctuationLength && FCString::Strncmp(InString, ANSI_TO_TCHAR(Punctuation), PunctuationLength) == 0)
+			int32 PunctuationLength = FCString::Strlen(Punctuation);
+			if (Len >= PunctuationLength && FCString::Strncmp(InString, Punctuation, PunctuationLength) == 0)
 			{
 				if (!Ret) {
 					Ret = PunctuationLength;
@@ -40,44 +21,6 @@ namespace SH
 					Ret = FMath::Max(PunctuationLength, *Ret);
 				}
 				OutMatchedPuncuation = Punctuation;
-			}
-		}
-		return Ret;
-	}
-
-	static TOptional<int32> IsMatchKeyword(const TCHAR* InString, int32 Len)
-	{
-		TOptional<int32> Ret;
-		for (const char* Keyword : HLSL::KeyWords)
-		{
-			int32 KeywordLength = FCString::Strlen(ANSI_TO_TCHAR(Keyword));
-			if (Len >= KeywordLength && FCString::Strncmp(InString, ANSI_TO_TCHAR(Keyword), KeywordLength) == 0)
-			{
-				if (!Ret) {
-					Ret = KeywordLength;
-				}
-				else {
-					Ret = FMath::Max(KeywordLength, *Ret);
-				}
-			}
-		}
-		return Ret;
-	}
-
-	static TOptional<int32> IsMatchBultinFunc(const TCHAR* InString, int32 Len)
-	{
-		TOptional<int32> Ret;
-		for (const char* Func : HLSL::BuiltinFuncs)
-		{
-			int32 FuncLength = FCString::Strlen(ANSI_TO_TCHAR(Func));
-			if ( Len >= FuncLength && FCString::Strncmp(InString, ANSI_TO_TCHAR(Func), FuncLength) == 0)
-			{
-				if (!Ret) {
-					Ret = FuncLength;
-				}
-				else {
-					Ret = FMath::Max(FuncLength, *Ret);
-				}
 			}
 		}
 		return Ret;
@@ -95,33 +38,42 @@ namespace SH
 			End,
 			Id,
 			Number,
-			BuiltInType,
-			BuiltInFunc,
 			Macro,
 			Comment,
 			LeftMultilineComment,
 			RightMultilineComment,
 			Punctuation,
 			NumberPuncuation,
-			Keyword,
 			String,
 			Other,
 		};
 
-		auto StateSetToTokenType = [](StateSet InState) {
+		auto StateSetToTokenType = [](const FString& TokenStr, StateSet InState) {
 			switch (InState)
 			{
-			case StateSet::Id:                              return TokenType::Identifier;
+			case StateSet::Id:                              
+			{
+				if(HLSL::BuiltinTypes.Contains(TokenStr))
+				{
+					return TokenType::BuildtinType;
+				}
+				else if(HLSL::BuiltinFuncs.Contains(TokenStr))
+				{
+					return TokenType::BuildtinFunc;
+				}
+				else if(HLSL::KeyWords.Contains(TokenStr))
+				{
+					return TokenType::Keyword;
+				}
+				return TokenType::Identifier;
+			}
 			case StateSet::Number:                          return TokenType::Number;
-			case StateSet::BuiltInType:                     return TokenType::BuildtinType;
-			case StateSet::BuiltInFunc:                     return TokenType::BuildtinFunc;
 			case StateSet::Macro:                           return TokenType::Preprocess;
 			case StateSet::Comment:                         return TokenType::Comment;
 			case StateSet::LeftMultilineComment:            return TokenType::Comment;
 			case StateSet::RightMultilineComment:           return TokenType::Comment;
 			case StateSet::Punctuation:                     return TokenType::Punctuation;
 			case StateSet::NumberPuncuation:                return TokenType::Punctuation;
-			case StateSet::Keyword:                         return TokenType::Keyword;
 			case StateSet::String:                          return TokenType::String;
 			case StateSet::Other:                           return TokenType::Other;
 			default:
@@ -182,6 +134,33 @@ namespace SH
 								CurLineState = StateSet::String;
 								CurOffset += 1;
 							}
+							else if (FChar::IsDigit(CurChar)) {
+								CurLineState = StateSet::Number;
+								CurOffset += 1;
+							}
+							else if (FChar::IsUnderscore(CurChar) || FChar::IsAlpha(CurChar)) {
+								CurLineState = StateSet::Id;
+								CurOffset += 1;
+							}
+							else if (CurChar == '#') {
+								CurLineState = StateSet::Macro;
+								CurOffset += 1;
+							}
+							//Skip
+							else if(FChar::IsWhitespace(CurChar))
+							{
+								if(IgnoreWhitespace)
+								{
+									CurLineState = StateSet::Start;
+									CurOffset += 1;
+									TokenStart += 1;
+								}
+								else
+								{
+									CurLineState = StateSet::Other;
+									CurOffset += 1;
+								}
+							}
 							else if (TOptional<int32> PunctuationLen = IsMatchPunctuation(CurString, RemainingLen, MatchedPunctuation)) {
 
 								if (MatchedPunctuation == "{") {
@@ -215,37 +194,6 @@ namespace SH
 
 								CurOffset += *PunctuationLen;
 							}
-							else if (FChar::IsDigit(CurChar)) {
-								CurLineState = StateSet::Number;
-								CurOffset += 1;
-							}
-							else if (TOptional<int32> FuncLen = IsMatchBultinFunc(CurString, RemainingLen)) {
-								CurLineState = StateSet::BuiltInFunc;
-								CurOffset += *FuncLen;
-							}
-							else if (TOptional<int32> TypeLen = IsMatchBultinType(CurString, RemainingLen)) {
-								CurLineState = StateSet::BuiltInType;
-								CurOffset += *TypeLen;
-							}
-							else if (TOptional<int32> KeywordLen = IsMatchKeyword(CurString, RemainingLen)) {
-								CurLineState = StateSet::Keyword;
-								CurOffset += *KeywordLen;
-							}
-							else if (FChar::IsUnderscore(CurChar) || FChar::IsAlpha(CurChar)) {
-								CurLineState = StateSet::Id;
-								CurOffset += 1;
-							}
-							else if (CurChar == '#') {
-								CurLineState = StateSet::Macro;
-								CurOffset += 1;
-							}
-                            //Skip
-                            else if(IgnoreWhitespace && FChar::IsWhitespace(CurChar))
-                            {
-                                CurLineState = StateSet::Start;
-                                CurOffset += 1;
-                                TokenStart += 1;
-                            }
 							else {
 								CurLineState = StateSet::Other;
 								CurOffset += 1;
@@ -272,11 +220,10 @@ namespace SH
 					case StateSet::End:
 						{
 							int32 TokenEnd = CurOffset;
-
-							TokenType FinalTokenType = StateSetToTokenType(LastLineState);
 							FTextRange TokenRange{ TokenStart, TokenEnd };
-
 							FString TokenString = HlslCodeString.Mid(TokenRange.BeginIndex, TokenRange.Len());
+							TokenType FinalTokenType = StateSetToTokenType(TokenString, LastLineState);
+
 							if (TokenString != " ") {
 								LastTokenType = FinalTokenType;
 							}
@@ -310,36 +257,6 @@ namespace SH
 						LastLineState = StateSet::Number;
 						if (FChar::IsDigit(CurChar) || FChar::IsAlpha(CurChar) || CurChar == '.') {
 							CurLineState = StateSet::Number;
-							CurOffset += 1;
-						}
-						else {
-							CurLineState = StateSet::End;
-						}
-						break;
-					case StateSet::BuiltInType:
-						LastLineState = StateSet::BuiltInType;
-						if (FChar::IsIdentifier(CurChar)) {
-							CurLineState = StateSet::Id;
-							CurOffset += 1;
-						}
-						else {
-							CurLineState = StateSet::End;
-						}
-						break;
-					case StateSet::BuiltInFunc:
-						LastLineState = StateSet::BuiltInFunc;
-						if (FChar::IsIdentifier(CurChar)) {
-							CurLineState = StateSet::Id;
-							CurOffset += 1;
-						}
-						else {
-							CurLineState = StateSet::End;
-						}
-						break;
-					case StateSet::Keyword:
-						LastLineState = StateSet::Keyword;
-						if (FChar::IsIdentifier(CurChar)) {
-							CurLineState = StateSet::Id;
 							CurOffset += 1;
 						}
 						else {
@@ -391,7 +308,9 @@ namespace SH
 				{
 					LastLineState = CurLineState;
 				}
-				TokenizedLine.Tokens.Emplace(StateSetToTokenType(LastLineState), FTextRange{ TokenStart, LineRange.EndIndex });
+				FTextRange TokenRange{ TokenStart, LineRange.EndIndex };
+				FString TokenString = HlslCodeString.Mid(TokenRange.BeginIndex, TokenRange.Len());
+				TokenizedLine.Tokens.Emplace(StateSetToTokenType(TokenString, LastLineState), TokenRange);
 
 				TokenizedLines.Add(MoveTemp(TokenizedLine));
 			}

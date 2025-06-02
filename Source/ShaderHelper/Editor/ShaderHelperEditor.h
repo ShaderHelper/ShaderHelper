@@ -2,7 +2,7 @@
 #include <Widgets/SViewport.h>
 #include "Editor/Editor.h"
 #include "Editor/PreviewViewPort.h"
-#include "AssetObject/StShader.h"
+#include "AssetObject/ShaderAsset.h"
 #include "AssetObject/Graph.h"
 #include "AssetManager/AssetManager.h"
 #include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
@@ -42,12 +42,12 @@ namespace SH
 		WindowLayoutConfigInfo LoadWindowLayout(const FString& InWindowLayoutConfigFileName);
 		void SaveWindowLayout(const TSharedRef<FTabManager::FLayout>& InLayout);
         
-        void OpenStShaderTab(FW::AssetPtr<StShader> InStShader);
+        void OpenShaderTab(FW::AssetPtr<ShaderAsset> InShader);
 		
 		void OpenGraph(FW::AssetPtr<FW::Graph> InGraphData, TSharedPtr<FW::RenderComponent> InGraphRenderComp);
         void RefreshProperty();
         void ShowProperty(FW::ShObject* InObjectData);
-        void UpdateStShaderPath(const FString& InStShaderPath);
+        void UpdateShaderPath(const FString& InShaderPath);
 		
 		DebuggableObject* GetDebuggaleObject() const { return CurDebuggableObject; }
 		void SetDebuggableObject(DebuggableObject* InObject) { CurDebuggableObject = InObject; }
@@ -56,8 +56,8 @@ namespace SH
 
 	private:
 		TSharedRef<SDockTab> SpawnWindowTab(const FSpawnTabArgs& Args);
-        TSharedRef<SDockTab> SpawnStShaderTab(const FSpawnTabArgs& Args);
-        TSharedRef<SWidget> SpawnStShaderPath(const FString& InStShaderPath);
+        TSharedRef<SDockTab> SpawnShaderTab(const FSpawnTabArgs& Args);
+        TSharedRef<SWidget> SpawnShaderPath(const FString& InShaderPath);
 		FToolBarBuilder CreateToolBarBuilder();
         FMenuBarBuilder CreateMenuBarBuilder();
 		void FillMenu(FMenuBuilder& MenuBuilder, FString MenuName);
@@ -70,11 +70,11 @@ namespace SH
 		TSharedPtr<FTabManager> TabManager;
         FDelegateHandle SaveLayoutTicker;
         TSharedPtr<FW::SAssetBrowser> AssetBrowser;
-		TMap<FW::AssetPtr<StShader>, TSharedPtr<SShaderEditorBox>> ShaderEditors;
+		TMap<FW::AssetPtr<ShaderAsset>, TSharedPtr<SShaderEditorBox>> ShaderEditors;
 
         TSharedPtr<SDockTab> CodeTab;
         TSharedPtr<FTabManager> CodeTabManager;
-        TWeakPtr<class SDockingTabStack> StShaderTabStackInsertPoint;
+        TWeakPtr<class SDockingTabStack> ShaderTabStackInsertPoint;
         TSharedPtr<class SDockingArea> CodeTabMainArea;
         
 		TSharedPtr<SWindow> Window;
@@ -92,7 +92,7 @@ namespace SH
 		ShRenderer* Renderer;
 		TSharedPtr<FW::RenderComponent> GraphRenderComp;
         
-        TMap<FW::AssetPtr<StShader>, TSharedPtr<SScrollBox>> StShaderPathBoxMap;
+        TMap<FW::AssetPtr<ShaderAsset>, TSharedPtr<SScrollBox>> ShaderPathBoxMap;
 		
 		TSharedPtr<SDebuggerViewport> DebuggerViewport;
 		DebuggableObject* CurDebuggableObject = nullptr;

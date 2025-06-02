@@ -308,7 +308,7 @@ namespace SH
             return {true, true};
 		}
         
-        if(Shader->PixelShader->IsCompiled())
+        if(Shader->GetPixelShader()->IsCompiled())
         {
             ShaderToyExecContext& ShaderToyContext = static_cast<ShaderToyExecContext&>(Context);
 
@@ -332,8 +332,8 @@ namespace SH
 			Bindings.SetPassBindGroupLayout(CustomBindLayout);
 
             GpuRenderPipelineStateDesc PipelineDesc{
-                .Vs = Shader->VertexShader,
-                .Ps = Shader->PixelShader,
+                .Vs = Shader->GetVertexShader(),
+                .Ps = Shader->GetPixelShader(),
 				.Targets = {
                     { .TargetFormat = PassOutput->GetValue()->GetFormat() }
                 }
@@ -363,13 +363,13 @@ namespace SH
 			}
 			else
 			{
-				int AddedLineNum = Shader->GetAddedLineNum();
+				int AddedLineNum = Shader->GetExtraLineNum();
 				SH_LOG(LogShader, Error, TEXT("%s:%d:%s"), *ObjectName.ToString(), AssertInfo.LineNumber - AddedLineNum, *AssertInfo.AssertString);
 				return {true, true};
 			}
         }
         
-        if(!Shader->bCurPsCompilationSucceed)
+        if(!Shader->bCompilationSucceed)
         {
             return {true, false};
         }

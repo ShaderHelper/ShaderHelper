@@ -28,7 +28,7 @@ namespace SH
 	{
         AssetPtr<StShader> LoadedStShaderAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<StShader>(InAssetPath);
         auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-        ShEditor->OpenStShaderTab(MoveTemp(LoadedStShaderAsset));
+        ShEditor->OpenShaderTab(MoveTemp(LoadedStShaderAsset));
 	}
 
     void StShaderOp::OnRename(const FString& OldPath, const FString& NewPath)
@@ -40,7 +40,7 @@ namespace SH
     void StShaderOp::OnMove(const FString& OldPath, const FString& NewPath)
     {
         auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-        ShEditor->UpdateStShaderPath(NewPath);
+        ShEditor->UpdateShaderPath(NewPath);
     }
 
     void StShaderOp::OnAdd(const FString& InAssetPath)

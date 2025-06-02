@@ -182,7 +182,7 @@ namespace FW
 		{
 			CutLineStart = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
 			CutLineEnd = *CutLineStart;
-			return FReply::Handled().LockMouseToWidget(AsShared());
+			return FReply::Handled().CaptureMouse(AsShared()).LockMouseToWidget(AsShared());
 		}
 		return FReply::Unhandled();
 	}
@@ -546,6 +546,9 @@ namespace FW
 			}
 		}
 
+		ShObjectOp* Op = GetShObjectOp(Node->NodeData);
+		Op->OnCancelSelect(Node->NodeData);
+		
 		GraphData->RemoveNode(Node->NodeData->GetGuid());
 
 		int RemoveIndex = -1;
@@ -557,13 +560,11 @@ namespace FW
 				break;
 			}
 		}
+		
 		check(RemoveIndex != -1);
 		Nodes.RemoveAt(RemoveIndex);
-
-		ShObjectOp* Op = GetShObjectOp(Node->NodeData);
-		Op->OnCancelSelect(Node->NodeData);
+		
 		SelectedNodes.Remove(Node);
-
 		GraphData->MarkDirty();
 	}
 

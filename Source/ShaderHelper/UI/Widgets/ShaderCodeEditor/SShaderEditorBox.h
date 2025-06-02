@@ -8,11 +8,11 @@
 #include <Internationalization/IBreakIterator.h>
 #include <Widgets/SCanvas.h>
 #include <Widgets/Text/SlateEditableTextLayout.h>
+#include "AssetObject/ShaderAsset.h"
 
 namespace SH
 {
     class SShaderEditorBox;
-    class StShader;
 
     struct FoldMarker
     {
@@ -146,9 +146,9 @@ namespace SH
         
     public:
 		SLATE_BEGIN_ARGS(SShaderEditorBox) 
-			: _StShaderAsset(nullptr)
+			: _ShaderAssetObj(nullptr)
 		{}
-			SLATE_ARGUMENT(StShader*, StShaderAsset)
+			SLATE_ARGUMENT(ShaderAsset*, ShaderAssetObj)
 		SLATE_END_ARGS()
 
 		~SShaderEditorBox();
@@ -176,6 +176,7 @@ namespace SH
 		TSharedRef<ITableRow> GenerateLineTipForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
         TSharedRef<ITableRow> GenerateCodeCompletionItem(CandidateItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 
+		ShaderAsset* GetShaderAsset() const { return ShaderAssetObj; }
         const FSlateFontInfo& GetFontInfo() const { return CodeFontInfo; }
         FText GetEditStateText() const;
         FText GetFontSizeText() const;
@@ -183,6 +184,7 @@ namespace SH
         FSlateColor GetEditStateColor() const;
 		int32 GetLineNumber(int32 InLineIndex) const;
 		int32 GetLineIndex(int32 InLineNumber) const;
+		int32 GetCurMaxLineNumber() const;
 		int32 GetCurDisplayLineCount() const { return ShaderMarshaller->TextLayout->GetLineCount(); }
         void Compile();
 
@@ -221,13 +223,15 @@ namespace SH
         FSlateEditableTextLayout* ShaderMultiLineEditableTextLayout;
 		TArray<FoldMarker> VisibleFoldMarkers;
 		TArray<int32> BreakPointLines;
-        //Contain fold markers.
+        //The visible content in editor, and contains fold markers.
         FString CurrentEditorSource;
         
 	private:
-        //The text after unfolding.
+        //The text after unfolding, but that may not be the content compiled finally.
+		//The shader may contain extra declaration(eg. binding codegen)
 		FString CurrentShaderSource;
         
+		int32 MaxLineNumber{};
 		TArray<LineNumberItemPtr> LineNumberData;
 		TSharedPtr<FShaderEditorMarshaller> ShaderMarshaller;
         TSharedPtr<SMultiLineEditableText> ShaderMultiLineEditableText;
@@ -244,7 +248,7 @@ namespace SH
 		
 		FTextSelection SelectionBeforeEdit;
 
-		StShader* StShaderAsset;
+		ShaderAsset* ShaderAssetObj;
         EditState CurEditState;
         FSlateFontInfo CodeFontInfo;
 		TSharedPtr<SHorizontalBox> InfoBarBox;
