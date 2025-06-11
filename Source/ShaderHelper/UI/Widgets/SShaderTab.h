@@ -4,6 +4,11 @@ namespace SH {
     class SShaderTab : public SDockTab
     {
     public:
+		~SShaderTab()
+		{
+			
+		}
+		
         void Construct( const FArguments& InArgs )
         {
             SDockTab::Construct(InArgs);
@@ -18,12 +23,12 @@ namespace SH {
                     SNew(STextBlock)
                     .ColorAndOpacity(FLinearColor{0.5f,0.5f,0.5f,0.4f})
                     .Text(FText::FromString("|"))
-                    .Visibility(this, &SShaderTab::HandleEndMarkIsVisible)
+                    .Visibility(this, &SShaderTab::IsEndMarkVisible)
                 ]
             ];
         }
         
-        EVisibility HandleEndMarkIsVisible() const
+        EVisibility IsEndMarkVisible() const
         {
             return (IsHovered() || IsForeground()) ? EVisibility::Hidden : EVisibility::Visible;
         }

@@ -2,7 +2,7 @@
 
 namespace SH
 {
-	class HlslHighLightTokenizer
+	class HlslTokenizer
 	{
 	public:
 		enum class TokenType
@@ -21,32 +21,46 @@ namespace SH
 
 		struct Token
 		{
-			Token(TokenType InType, FTextRange InRange)
-				: Type(InType)
-				, Range(MoveTemp(InRange))
-			{}
-
 			TokenType Type;
-			FTextRange Range;
+			//relative to line start
+			int32 BeginOffset{};
+			int32 EndOffset{};
 		};
-
-		struct TokenizedLine
-		{
-			FTextRange LineRange;
-			TArray<Token> Tokens;
+		
+		enum class BraceType {
+			Open,
+			Close,
+		};
+		
+		struct Brace {
+			BraceType Type;
+			int32 Offset;
 		};
 
 		struct BraceGroup
 		{
-			struct BracePos {
-				int32 Row, Col;
-			};
-
-			BracePos LeftBracePos;
-			BracePos RightBracePos;
+			int32 OpenLineIndex{};
+			Brace OpenBrace;
+			
+			int32 CloseLineIndex{};
+			Brace CloseBrace;
+		};
+		
+		enum class LineContState
+		{
+			None,
+			MultilineComment,
 		};
 
+		struct TokenizedLine
+		{
+			TArray<Token> Tokens;
+			TArray<Brace> Braces;
+			LineContState State = LineContState::None;
+		};
+
+
 	public:
-		TArray<TokenizedLine> Tokenize(const FString& HlslCodeString, TArray<BraceGroup>& OutBraceGroups, bool IgnoreWhitespace = false);
+		TArray<TokenizedLine> Tokenize(const FString& HlslCodeString, bool IgnoreWhitespace = false, LineContState InLineContState = LineContState::None);
 	};
 }

@@ -37,7 +37,7 @@ namespace FW
 	public:
 		FOutputLogMarshaller(FOutputLogFilter* InFilter);
 
-		virtual void SetText(const FString& SourceString, FTextLayout& TargetTextLayout) override;
+		virtual void SetText(const FString& SourceString, FTextLayout& TargetTextLayout, TArray<FTextLayout::FLineModel>&& OldLineModels) override;
 		virtual void GetText(FString& TargetString, const FTextLayout& SourceTextLayout) override;
 
 		void AddMessage(FOutputLogMessage InMessage);

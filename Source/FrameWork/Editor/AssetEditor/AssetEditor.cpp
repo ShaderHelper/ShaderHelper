@@ -40,7 +40,7 @@ namespace FW
 
 	void AssetOp::OnDelete(const FString& InAssetPath)
 	{
-		TSingleton<AssetManager>::Get().ClearAsset(InAssetPath);
+		TSingleton<AssetManager>::Get().DestroyAsset(InAssetPath);
 	}
 
 }

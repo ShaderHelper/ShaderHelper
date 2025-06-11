@@ -71,11 +71,20 @@ namespace FW
 
 	void AssetManager::Clear()
 	{
+		for(auto [Id, Asset] : Assets)
+		{
+			if(Asset->GetRefCount() > 0)
+			{
+				Asset->Destroy();
+			}
+		}
+		Assets.Empty();
         GuidToPath.Empty();
 		AssetThumbnailPool.Empty();
+		
 	}
 
-	void AssetManager::ClearAsset(const FString& InAssetPath)
+	void AssetManager::DestroyAsset(const FString& InAssetPath)
 	{
 		if (AssetObject** Ptr = Assets.Find(GetGuid(InAssetPath)))
 		{

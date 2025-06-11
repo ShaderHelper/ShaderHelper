@@ -85,14 +85,13 @@ const FString ErrorMarkerText = TEXT("✘");
 
     int32 TokenBreakIterator::MoveToCandidateBefore(const int32 InIndex)
     {
-        TArray<HlslHighLightTokenizer::BraceGroup> _;
-        TArray<HlslHighLightTokenizer::TokenizedLine> TokenizedLines = Marshaller->Tokenizer->Tokenize(InternalString, _, true);
-        const HlslHighLightTokenizer::TokenizedLine& TokenLine = TokenizedLines[0];
+        TArray<HlslTokenizer::TokenizedLine> TokenizedLines = Marshaller->Tokenizer->Tokenize(InternalString);
+        const HlslTokenizer::TokenizedLine& TokenLine = TokenizedLines[0];
         for(const auto& Token : TokenLine.Tokens)
         {
-            if(InIndex > Token.Range.BeginIndex && InIndex <= Token.Range.EndIndex)
+            if(InIndex > Token.BeginOffset && InIndex <= Token.EndOffset)
             {
-                CurrentPosition = Token.Range.BeginIndex;
+                CurrentPosition = Token.BeginOffset;
                 break;
             }
         }
@@ -101,14 +100,13 @@ const FString ErrorMarkerText = TEXT("✘");
 
     int32 TokenBreakIterator::MoveToCandidateAfter(const int32 InIndex)
     {
-        TArray<HlslHighLightTokenizer::BraceGroup> _;
-        TArray<HlslHighLightTokenizer::TokenizedLine> TokenizedLines = Marshaller->Tokenizer->Tokenize(InternalString, _, true);
-        const HlslHighLightTokenizer::TokenizedLine& TokenLine = TokenizedLines[0];
+        TArray<HlslTokenizer::TokenizedLine> TokenizedLines = Marshaller->Tokenizer->Tokenize(InternalString);
+        const HlslTokenizer::TokenizedLine& TokenLine = TokenizedLines[0];
         for(const auto& Token : TokenLine.Tokens)
         {
-            if(InIndex >= Token.Range.BeginIndex && InIndex < Token.Range.EndIndex)
+            if(InIndex >= Token.BeginOffset && InIndex < Token.EndOffset)
             {
-                CurrentPosition = Token.Range.EndIndex;
+                CurrentPosition = Token.EndOffset;
                 break;
             }
         }
@@ -153,7 +151,7 @@ const FString ErrorMarkerText = TEXT("✘");
         SAssignNew(ShaderMultiLineVScrollBar, SScrollBar).Orientation(EOrientation::Orient_Vertical);
         SAssignNew(ShaderMultiLineHScrollBar, SScrollBar).Orientation(EOrientation::Orient_Horizontal);
 
-        ShaderMarshaller = MakeShared<FShaderEditorMarshaller>(this, MakeShared<HlslHighLightTokenizer>());
+        ShaderMarshaller = MakeShared<FShaderEditorMarshaller>(this, MakeShared<HlslTokenizer>());
         EffectMarshller = MakeShared<FShaderEditorEffectMarshaller>(this);
 
         FText InitialShaderText = FText::FromString(ShaderAssetObj->EditorContent);
@@ -276,6 +274,8 @@ const FString ErrorMarkerText = TEXT("✘");
 							[
 								SAssignNew(ShaderMultiLineEditableText, SMultiLineEditableText)
 								.Text(InitialShaderText)
+								.EnableUniformFont(true)
+								.Font(CodeFontInfo)
 								.Marshaller(ShaderMarshaller)
 								.VScrollBar(ShaderMultiLineVScrollBar)
 								.HScrollBar(ShaderMultiLineHScrollBar)
@@ -288,6 +288,7 @@ const FString ErrorMarkerText = TEXT("✘");
 								.OnCursorMoved_Lambda([this](const FTextLocation& NewCursorLocation){
 									if(!bKeyChar) {
 										bTryComplete = false;
+										bTryMergeUndoState = false;
 									}
 									bKeyChar = false;
 								})
@@ -296,6 +297,8 @@ const FString ErrorMarkerText = TEXT("✘");
 							[
 								SAssignNew(EffectMultiLineEditableText, SMultiLineEditableText)
 								.IsReadOnly(true)
+								.EnableUniformFont(true)
+								.Font(CodeFontInfo)
 								.Marshaller(EffectMarshller)
 								.Visibility(EVisibility::HitTestInvisible)
 							]
@@ -328,6 +331,10 @@ const FString ErrorMarkerText = TEXT("✘");
 										TipPos.Y -= CustomCursorHighlighter->ScaledLineHeight;
 										TipPos.Y -= HSize;
 									}
+									if(TipPos.X + 240 > Area.X)
+									{
+										TipPos.X -= 240;
+									}
 									return TipPos;
 								})
 								[
@@ -351,8 +358,9 @@ const FString ErrorMarkerText = TEXT("✘");
 											.OnSelectionChanged_Lambda([this](CandidateItemPtr SelectedItem, ESelectInfo::Type){
 												CurSelectedCandidate = SelectedItem;
 											})
+											.IsFocusable(false)
 											.OnMouseButtonClick_Lambda([this](CandidateItemPtr ClickedItem){
-												InsertCompletionText(ClickedItem->Text);
+												InsertCompletionText(ClickedItem);
 												FSlateApplication::Get().SetUserFocus(0, ShaderMultiLineEditableText);
 											})
 										]
@@ -404,6 +412,53 @@ const FString ErrorMarkerText = TEXT("✘");
         ShaderMultiLineEditableTextLayout->CutOverride = [this] { CutSelectedText(); };
         ShaderMultiLineEditableTextLayout->PasteOverride = [this] { PasteText(); };
 		ShaderMultiLineEditableTextLayout->OnBeginEditTransaction = [this] { OnBeginEditTransaction(); };
+		
+		ShaderMultiLineEditableTextLayout->TryPushUndoState = [this](SlateEditableTextTypes::FUndoState* InUndoState){
+			if(!ShaderMultiLineEditableTextLayout->UndoStates.IsEmpty() && bTryMergeUndoState)
+			{
+				//Merge some undo states
+				SlateEditableTextTypes::FUndoState* LastState = ShaderMultiLineEditableTextLayout->UndoStates.Last().Get();
+				if(LastState->Commands.Num() == 1 && InUndoState->Commands.Num() == 1)
+				{
+					TSharedPtr<SlateEditableTextTypes::FEditCommand> LastCmd = LastState->Commands[0];
+					TSharedPtr<SlateEditableTextTypes::FEditCommand> CurCmd = InUndoState->Commands[0];
+					if(LastCmd->GetType() == SlateEditableTextTypes::FEditCommand::Type::InsertAt
+					   && CurCmd->GetType() == SlateEditableTextTypes::FEditCommand::Type::InsertAt)
+					{
+						TSharedPtr<FInsertAtCmd> LastInsertCmd = StaticCastSharedPtr<FInsertAtCmd>(LastCmd);
+						TSharedPtr<FInsertAtCmd> CurInsertCmd = StaticCastSharedPtr<FInsertAtCmd>(CurCmd);
+						auto IsIdentifierStr = [](const FString& Str){
+                            for(auto C : Str)
+                                if(!FChar::IsIdentifier(C)) return false;
+                            return true;
+                        };
+                        auto IsWhitespaceStr = [](const FString& Str){
+                            for(auto C : Str)
+                                if(!FChar::IsWhitespace(C)) return false;
+                            return true;
+                        };
+
+                        const FString& LastText = LastInsertCmd->GetText();
+                        const FString& CurText = CurInsertCmd->GetText();
+
+                        bool bBothIdentifier = IsIdentifierStr(LastText) && IsIdentifierStr(CurText);
+                        bool bBothWhitespace = IsWhitespaceStr(LastText) && IsWhitespaceStr(CurText);
+
+                        if(LastInsertCmd->GetLocation().GetLineIndex() == CurInsertCmd->GetLocation().GetLineIndex()
+                        && LastInsertCmd->GetLocation().GetOffset() + LastInsertCmd->GetText().Len() == CurInsertCmd->GetLocation().GetOffset()
+                        && CurInsertCmd->GetText().Len() == 1
+                        && (bBothIdentifier || bBothWhitespace))
+                        {
+                            auto NewInsertCmd = MakeShared<FInsertAtCmd>(LastInsertCmd->GetLocation(), LastInsertCmd->GetText() + CurInsertCmd->GetText());
+                            LastState->Commands[0] = MoveTemp(NewInsertCmd);
+                            return false;
+                        }
+					}
+				}
+				
+			}
+			return true;
+		};
         
         TSharedPtr<FUICommandList>& UICommandList = GetPrivate_FSlateEditableTextLayout_UICommandList(*ShaderEditableTextLayout);
         UICommandList->MapAction(
@@ -437,6 +492,7 @@ const FString ErrorMarkerText = TEXT("✘");
         {
         case EditState::Compiling: return LOCALIZATION("COMPILING");
         case EditState::Failed:    return LOCALIZATION("FAILED");
+		case EditState::Editing:   return LOCALIZATION("Editing");
         default:                   return LOCALIZATION("SUCCEED");
         }
     }
@@ -452,6 +508,7 @@ const FString ErrorMarkerText = TEXT("✘");
         {
         case EditState::Compiling: return FLinearColor{1.0f, 0.5f, 0, 1.0f};
         case EditState::Failed:    return FLinearColor::Red;
+		case EditState::Editing:   return FLinearColor::Gray;
         default:                   return FLinearColor{0.6f, 1.0f , 0.1f, 1.0f};
         }
     }
@@ -470,10 +527,7 @@ const FString ErrorMarkerText = TEXT("✘");
 
     int32 SShaderEditorBox::GetLineIndex(int32 InLineNumber) const
     {
-        int32 LineIndex = LineNumberData.IndexOfByPredicate(
-            [InLineNumber](const LineNumberItemPtr& InItem)
-            { return FCString::Atoi(*InItem->ToString()) == InLineNumber; });
-        return LineIndex;
+        return LineNumberToIndexMap.Contains(InLineNumber) ? LineNumberToIndexMap[InLineNumber] : INDEX_NONE;
     }
 
     FText SShaderEditorBox::GetRowColText() const
@@ -504,13 +558,15 @@ const FString ErrorMarkerText = TEXT("✘");
                         {
                             CodeFontInfo.Size = i;
                             ShaderMarshaller->MakeDirty();
+							ShaderMultiLineEditableText->SetFont(CodeFontInfo);
                             ShaderMultiLineEditableText->Refresh();
                             EffectMarshller->MakeDirty();
+							EffectMultiLineEditableText->SetFont(CodeFontInfo);
                             EffectMultiLineEditableText->Refresh();
                         }),
                         FCanExecuteAction(),
                         FIsActionChecked::CreateLambda(
-                        [=]()
+                        [this, i]()
                         {
                             return CodeFontInfo.Size == i;
                         })),
@@ -540,6 +596,7 @@ const FString ErrorMarkerText = TEXT("✘");
             ];
 
         InfoBarBox->AddSlot()
+			.Padding(2,0,0,0)
             .AutoWidth()
             [
                 SNew(SBorder)
@@ -548,10 +605,11 @@ const FString ErrorMarkerText = TEXT("✘");
                 .VAlign(VAlign_Center)
                 [
                     SNew(STextBlock)
+					.Justification(ETextJustify::Center)
+					.MinDesiredWidth(80)
                     .Font(InforBarFontInfo)
                     .ColorAndOpacity(FLinearColor::Black)
                     .Text(this, &SShaderEditorBox::GetEditStateText)
-                    .Margin(FMargin{ 10, 0, 10, 0 })
                 ]
             ];
 
@@ -701,6 +759,7 @@ const FString ErrorMarkerText = TEXT("✘");
 		int32 StartLineNumber = GetLineNumber(SelectionBeforeEdit.GetBeginning().GetLineIndex());
 		int32 EndLineNumber = GetLineNumber(SelectionBeforeEdit.GetEnd().GetLineIndex());
 		
+        LineNumberToIndexMap.Reset();
         LineNumberData.Reset();
         int32 CurTextLayoutLine = ShaderMarshaller->TextLayout->GetLineCount();
         int32 FoldedLineCount = 0;
@@ -717,6 +776,7 @@ const FString ErrorMarkerText = TEXT("✘");
 			int32 LineNumber = FCString::Atoi(*(*Data).ToString());
 			MaxLineNumber = FMath::Max(MaxLineNumber, LineNumber);
             LineNumberData.Add(MoveTemp(Data));
+            LineNumberToIndexMap.Add(LineNumber, LineIndex);
         }
 		
 		int32 DeltaLineCount = CurTextLayoutLine - OldLineCount;
@@ -819,6 +879,7 @@ const FString ErrorMarkerText = TEXT("✘");
     void SShaderEditorBox::OnFocusChanging(const FWeakWidgetPath& PreviousFocusPath, const FWidgetPath& NewWidgetPath, const FFocusEvent& InFocusEvent)
     {
         bTryComplete = false;
+		bTryMergeUndoState = false;
     }
 
     FReply SShaderEditorBox::OnFocusReceived(const FGeometry& MyGeometry, const FFocusEvent& InFocusEvent)
@@ -826,8 +887,10 @@ const FString ErrorMarkerText = TEXT("✘");
         return FReply::Handled().SetUserFocus(ShaderMultiLineEditableText.ToSharedRef());
     }
 
-    void SShaderEditorBox::InsertCompletionText(const FString& InText)
+    void SShaderEditorBox::InsertCompletionText(CandidateItemPtr InItem)
     {
+		SMultiLineEditableText::FScopedEditableTextTransaction Transaction(ShaderMultiLineEditableText);
+		
         const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
         const int32 CursorRow = CursorLocation.GetLineIndex();
         const int32 CursorCol = CursorLocation.GetOffset();
@@ -844,9 +907,24 @@ const FString ErrorMarkerText = TEXT("✘");
         bTryComplete = false;
         FSlateTextLayout* ShaderTextLayout = static_cast<FSlateTextLayout*>(ShaderMarshaller->TextLayout);
         const FTextLocation NewCursorLocation(CursorRow, InsertCol);
+		
+		//TextLayout->RemoveAt does not handle the cursor, so manually call the goto function.
+		//However, directly call SelectText and DeleteSelectedText also can do it.
+		ShaderTextLayout->RemoveAt({CursorRow, InsertCol}, CurToken.Len());
         ShaderMultiLineEditableText->GoTo(NewCursorLocation);
-        ShaderTextLayout->RemoveAt({CursorRow, InsertCol}, CurToken.Len());
-        ShaderMultiLineEditableText->InsertTextAtCursor(InText);
+		
+		FString InsertedText = InItem->Text;
+		if(InItem->Kind == HLSL::CandidateKind::Func)
+		{
+			InsertedText += "()";
+			ShaderMultiLineEditableText->InsertTextAtCursor(MoveTemp(InsertedText));
+			const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
+			ShaderMultiLineEditableText->GoTo({CursorLocation.GetLineIndex(), CursorLocation.GetOffset() - 1});
+		}
+		else
+		{
+			ShaderMultiLineEditableText->InsertTextAtCursor(MoveTemp(InsertedText));
+		}
     }
 
     TSharedRef<ITableRow> SShaderEditorBox::GenerateCodeCompletionItem(CandidateItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
@@ -879,6 +957,8 @@ const FString ErrorMarkerText = TEXT("✘");
 		}
 		
         return SNew(STableRow<CandidateItemPtr>, OwnerTable)
+		.MouseButtonDownFocusWidget(ShaderMultiLineEditableText)
+		.DetectDrag(false)
         [
             SNew(SHorizontalBox)
             +SHorizontalBox::Slot()
@@ -977,6 +1057,7 @@ const FString ErrorMarkerText = TEXT("✘");
 
     void SShaderEditorBox::OnShaderTextChanged(const FString& InShaderSouce)
     {
+		CurEditState = EditState::Editing;
         FString NewShaderSource = InShaderSouce.Replace(TEXT("\r\n"), TEXT("\n"));
         if (NewShaderSource != ShaderAssetObj->EditorContent)
         {
@@ -1001,12 +1082,13 @@ const FString ErrorMarkerText = TEXT("✘");
             ShaderMultiLineEditableText->GetTextLine(CursorRow, CurLineText);
             FString CursorLeft = CurLineText.Mid(0, CursorCol);
             
-            TArray<HlslHighLightTokenizer::BraceGroup> _;
-            TArray<HlslHighLightTokenizer::TokenizedLine> TokenizedLines = ShaderMarshaller->Tokenizer->Tokenize(CursorLeft, _, true);
-            FString LeftToken = CursorLeft.Mid(TokenizedLines[0].Tokens.Last().Range.BeginIndex, TokenizedLines[0].Tokens.Last().Range.Len());
+            TArray<HlslTokenizer::TokenizedLine> TokenizedLines = ShaderMarshaller->Tokenizer->Tokenize(CursorLeft, true);
+			auto Token = TokenizedLines[0].Tokens.Last();
+            FString LeftToken = CursorLeft.Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
             if(TokenizedLines[0].Tokens.Num() > 1)
             {
-                FString LeftToken2 = CursorLeft.Mid(TokenizedLines[0].Tokens.Last(1).Range.BeginIndex, TokenizedLines[0].Tokens.Last(1).Range.Len());
+				Token = TokenizedLines[0].Tokens.Last(1);
+                FString LeftToken2 = CursorLeft.Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
                 if(LeftToken2 == ".")
                 {
                     Task.IsMemberAccess = true;
@@ -1170,10 +1252,21 @@ const FString ErrorMarkerText = TEXT("✘");
             }
             else if(Key == EKeys::Enter || Key == EKeys::Tab)
             {
+				//HandleKeyChar will handle it, no need to dispatch to SMultiLineEditableText::OnKeyDown
                 return FReply::Handled();
             }
         }
-            
+		else
+		{
+			if(Key == EKeys::Enter)
+			{
+				SMultiLineEditableText::FScopedEditableTextTransaction Transaction(ShaderMultiLineEditableText);
+				ShaderMultiLineEditableTextLayout->HandleCarriageReturn(InKeyEvent.IsRepeat());
+				// at this point, the text after the text cursor is already in a new line
+				HandleAutoIndent();
+				return FReply::Handled();
+			}
+		}
         // Let SMultiLineEditableText::OnKeyDown handle it.
         return FReply::Unhandled();
     }
@@ -1187,7 +1280,7 @@ const FString ErrorMarkerText = TEXT("✘");
             return FReply::Unhandled();
         }
         const TCHAR Character = InCharacterEvent.GetCharacter();
-        
+		bKeyChar = true;
         if (Character == TEXT('\b'))
         {
             if (!Text->AnyTextSelected())
@@ -1239,7 +1332,7 @@ const FString ErrorMarkerText = TEXT("✘");
         {
             if(bTryComplete && CandidateItems.Num())
             {
-                InsertCompletionText(CurSelectedCandidate->Text);
+                InsertCompletionText(CurSelectedCandidate);
             }
             else
             {
@@ -1324,21 +1417,13 @@ const FString ErrorMarkerText = TEXT("✘");
     
             return FReply::Handled();
         }
-        else if (Character == TEXT('\n') || Character == TEXT('\r'))
+		else if (Character == TEXT('\n') || Character == TEXT('\r'))
         {
             if(bTryComplete && CandidateItems.Num())
             {
-                InsertCompletionText(CurSelectedCandidate->Text);
+                InsertCompletionText(CurSelectedCandidate);
+                return FReply::Handled();
             }
-            else
-            {
-                SMultiLineEditableText::FScopedEditableTextTransaction Transaction(Text);
-                
-                // at this point, the text after the text cursor is already in a new line
-                HandleAutoIndent();
-            }
-
-            return FReply::Handled();
         }
         else if (IsOpenBrace(Character))
         {
@@ -1430,11 +1515,17 @@ const FString ErrorMarkerText = TEXT("✘");
 			Text->GoTo(FTextLocation{CursorLocation.GetLineIndex(), CursorLocation.GetOffset() - 1});
 			return FReply::Handled();
 		}
-        else if(FChar::IsIdentifier(Character) || Character == TEXT('.'))
+        
+		if(FChar::IsIdentifier(Character) || Character == TEXT('.'))
         {
             bTryComplete = true;
-            bKeyChar = true;
         }
+		
+		bTryMergeUndoState = false;
+		if(FChar::IsIdentifier(Character) || FChar::IsWhitespace(Character))
+		{
+			bTryMergeUndoState = true;
+		}
 
         // Let SMultiLineEditableText::OnKeyChar handle it.
         return FReply::Unhandled();
@@ -1553,10 +1644,10 @@ const FString ErrorMarkerText = TEXT("✘");
         if (!MarkerIndex)
         {
             auto BraceGroup = ShaderMarshaller->FoldingBraceGroups[LineIndex];
-            int32 FoldedBeginningRow = BraceGroup.LeftBracePos.Row;
-            int32 FoldedBeginningCol = BraceGroup.LeftBracePos.Col;
-            int32 FoldedEndRow = BraceGroup.RightBracePos.Row;
-            int32 FoldedEndCol = BraceGroup.RightBracePos.Col;
+            int32 FoldedBeginningRow = BraceGroup.OpenLineIndex;
+            int32 FoldedBeginningCol = BraceGroup.OpenBrace.Offset;
+            int32 FoldedEndRow = BraceGroup.CloseLineIndex;
+            int32 FoldedEndCol = BraceGroup.CloseBrace.Offset;
 
             FTextLayout::FLineModel& EndLine = Lines[FoldedEndRow];
             TArray<FString> FoldedTexts;
@@ -1908,39 +1999,147 @@ const FString ErrorMarkerText = TEXT("✘");
         return LineTip.ToSharedRef();
     }
 
-    FShaderEditorMarshaller::FShaderEditorMarshaller(SShaderEditorBox* InOwnerWidget, TSharedPtr<HlslHighLightTokenizer> InTokenizer)
+    FShaderEditorMarshaller::FShaderEditorMarshaller(SShaderEditorBox* InOwnerWidget, TSharedPtr<HlslTokenizer> InTokenizer)
         : OwnerWidget(InOwnerWidget)
         , TextLayout(nullptr)
         , Tokenizer(MoveTemp(InTokenizer))
     {
-        TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::Number, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNumberText"));
-        TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::Keyword, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorKeywordText"));
-        TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::Punctuation, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorPunctuationText"));
-        TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::BuildtinFunc, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuildtinFuncText"));
-        TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::BuildtinType, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuildtinTypeText"));
-        TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::Identifier, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText"));
-        TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::Preprocess, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorPreprocessText"));
-        TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::Comment, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorCommentText"));
-		TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::String, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorStringText"));
-        TokenStyleMap.Add(HlslHighLightTokenizer::TokenType::Other, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText"));
+        TokenStyleMap.Add(HlslTokenizer::TokenType::Number, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNumberText"));
+        TokenStyleMap.Add(HlslTokenizer::TokenType::Keyword, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorKeywordText"));
+        TokenStyleMap.Add(HlslTokenizer::TokenType::Punctuation, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorPunctuationText"));
+        TokenStyleMap.Add(HlslTokenizer::TokenType::BuildtinFunc, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuildtinFuncText"));
+        TokenStyleMap.Add(HlslTokenizer::TokenType::BuildtinType, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuildtinTypeText"));
+        TokenStyleMap.Add(HlslTokenizer::TokenType::Identifier, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText"));
+        TokenStyleMap.Add(HlslTokenizer::TokenType::Preprocess, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorPreprocessText"));
+        TokenStyleMap.Add(HlslTokenizer::TokenType::Comment, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorCommentText"));
+		TokenStyleMap.Add(HlslTokenizer::TokenType::String, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorStringText"));
+        TokenStyleMap.Add(HlslTokenizer::TokenType::Other, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText"));
     }
 
-    void FShaderEditorMarshaller::SetText(const FString& SourceString, FTextLayout& TargetTextLayout)
+    void FShaderEditorMarshaller::SetText(const FString& SourceString, FTextLayout& TargetTextLayout, TArray<FTextLayout::FLineModel>&& OldLineModels)
     {
         TextLayout = &TargetTextLayout;
 		OwnerWidget->CurrentEditorSource = SourceString;
+		auto& LineModels = TextLayout->GetLineModels();
+		FSlateEditableTextLayout* EditableTextLayout = OwnerWidget->ShaderMultiLineEditableTextLayout;
+		if(OldLineModels.Num() == 0)
+		{
+			TArray<HlslTokenizer::TokenizedLine> TokenizedLines = Tokenizer->Tokenize(SourceString);
+			
+			TArray<FTextRange> LineRanges;
+			FTextRange::CalculateLineRangesFromString(SourceString, LineRanges);
 
-        TArray<HlslHighLightTokenizer::BraceGroup> BraceGroups;
-        TArray<HlslHighLightTokenizer::TokenizedLine> TokenizedLines = Tokenizer->Tokenize(SourceString, BraceGroups);
+			TArray<FTextLayout::FNewLineData> LinesToAdd;
+			for (int32 LineIndex = 0; LineIndex < TokenizedLines.Num(); LineIndex++)
+			{
+				TSharedRef<FString> LineText = MakeShared<FString>(SourceString.Mid(LineRanges[LineIndex].BeginIndex, LineRanges[LineIndex].Len()));
+				
+				TArray<TSharedRef<IRun>> Runs;
+				TOptional<int32> MarkerIndex = OwnerWidget->FindFoldMarker(LineIndex);
+				for (const HlslTokenizer::Token& Token : TokenizedLines[LineIndex].Tokens)
+				{
+					FTextBlockStyle& RunTextStyle = TokenStyleMap[Token.Type];
+					RunTextStyle.SetFont(OwnerWidget->GetFontInfo());
+					FTextRange NewTokenRange{ Token.BeginOffset, Token.EndOffset };
+
+					if (MarkerIndex && LineText->Mid(NewTokenRange.BeginIndex, 1) == FoldMarkerText)
+					{
+						RunTextStyle.SetColorAndOpacity(FLinearColor::Gray);
+					}
+
+					Runs.Add(FSlateTextStyleRefRun::Create(FRunInfo(), LineText, RunTextStyle, MoveTemp(NewTokenRange)));
+				}
+
+				LinesToAdd.Emplace(MoveTemp(LineText), MoveTemp(Runs));
+			}
+
+			TextLayout->AddLines(MoveTemp(LinesToAdd));
+			
+			for(int i = 0; i < LineModels.Num(); i++)
+			{
+				LineModels[i].CustomData = MakeShared<HlslTokenizer::TokenizedLine>(MoveTemp(TokenizedLines[i]));
+			}
+			
+		}
+		else
+		{
+			//Incremental processing
+			LineModels = MoveTemp(OldLineModels);
+			bool bForce{};
+			for(int32 LineIndex = 0; LineIndex < LineModels.Num(); LineIndex++)
+			{
+				if(bForce || (LineModels[LineIndex].DirtyFlags & FTextLayout::ELineModelDirtyState::All))
+				{
+					TSharedRef<FString> LineText = LineModels[LineIndex].Text;
+					HlslTokenizer::LineContState LastLineContState = HlslTokenizer::LineContState::None;
+					HlslTokenizer::TokenizedLine* CurTokenizedLine = static_cast<HlslTokenizer::TokenizedLine*>(LineModels[LineIndex].CustomData.Get());
+					if(LineIndex > 0)
+					{
+						HlslTokenizer::TokenizedLine* LastTokenizedLine = static_cast<HlslTokenizer::TokenizedLine*>(LineModels[LineIndex - 1].CustomData.Get());
+						LastLineContState = LastTokenizedLine->State;
+					}
+					HlslTokenizer::TokenizedLine NewTokenizedLine = Tokenizer->Tokenize(*LineText, false, LastLineContState)[0];
+					bForce = CurTokenizedLine ? NewTokenizedLine.State != CurTokenizedLine->State : true;
+					
+					TArray<FTextLayout::FRunModel> RunModels;
+					TOptional<int32> MarkerIndex = OwnerWidget->FindFoldMarker(LineIndex);
+					for (const HlslTokenizer::Token& Token : NewTokenizedLine.Tokens)
+					{
+						FTextBlockStyle& RunTextStyle = TokenStyleMap[Token.Type];
+						RunTextStyle.SetFont(OwnerWidget->GetFontInfo());
+						FTextRange NewTokenRange{ Token.BeginOffset, Token.EndOffset };
+
+						if (MarkerIndex && LineText->Mid(NewTokenRange.BeginIndex, 1) == FoldMarkerText)
+						{
+							RunTextStyle.SetColorAndOpacity(FLinearColor::Gray);
+						}
+
+						TSharedRef<IRun> Run = FSlateTextStyleRefRun::Create(FRunInfo(), LineText, RunTextStyle, MoveTemp(NewTokenRange));
+						RunModels.Add(MoveTemp(Run));
+					}
+					
+					LineModels[LineIndex].Runs = RunModels;
+					LineModels[LineIndex].CustomData = MakeShared<HlslTokenizer::TokenizedLine>(MoveTemp(NewTokenizedLine));
+				}
+			}
+		
+		}
+
+        TArray<HlslTokenizer::BraceGroup> BraceGroups;
+		struct BraceStackData
+		{
+			int32 LineIndex{};
+			HlslTokenizer::Brace Brace;
+		};
+        TArray<BraceStackData> OpenBraceStack;
+        for(int32 LineIndex = 0; LineIndex < LineModels.Num(); LineIndex++)
+        {
+			HlslTokenizer::TokenizedLine* TokenizedLine = static_cast<HlslTokenizer::TokenizedLine*>(LineModels[LineIndex].CustomData.Get());
+            for(const HlslTokenizer::Brace& Brace : TokenizedLine->Braces)
+            {
+                if(Brace.Type == HlslTokenizer::BraceType::Open)
+                {
+                    OpenBraceStack.Emplace(LineIndex, Brace);
+                }
+				else
+				{
+					if(!OpenBraceStack.IsEmpty())
+					{
+						auto OpenBraceData = OpenBraceStack.Pop();
+						BraceGroups.Emplace(OpenBraceData.LineIndex, OpenBraceData.Brace, LineIndex, Brace);
+					}
+				}
+            }
+        }
 
         FoldingBraceGroups.Empty();
         for (const auto& BraceGroup : BraceGroups)
         {
-            if (BraceGroup.LeftBracePos.Row != BraceGroup.RightBracePos.Row && !FoldingBraceGroups.Contains(BraceGroup.LeftBracePos.Row)) {
-                FoldingBraceGroups.Add(BraceGroup.LeftBracePos.Row, BraceGroup);
+            if (BraceGroup.OpenLineIndex != BraceGroup.CloseLineIndex && !FoldingBraceGroups.Contains(BraceGroup.OpenLineIndex)) {
+                FoldingBraceGroups.Add(BraceGroup.OpenLineIndex, BraceGroup);
             }
         }
-        FSlateEditableTextLayout* EditableTextLayout = OwnerWidget->ShaderMultiLineEditableTextLayout;
+		
         if(EditableTextLayout && EditableTextLayout->CurrentUndoLevel >= 0)
         {
             ShaderUndoState* UndoState = static_cast<ShaderUndoState*>(EditableTextLayout->UndoStates[EditableTextLayout->CurrentUndoLevel].Get());
@@ -1950,9 +2149,9 @@ const FString ErrorMarkerText = TEXT("✘");
         else
         {
             TArray<FoldMarker> NewFoldMarkers;
-            for (int32 LineIndex = 0; LineIndex < TokenizedLines.Num(); LineIndex++)
+            for (int32 LineIndex = 0; LineIndex < LineModels.Num(); LineIndex++)
             {
-                TSharedRef<FString> LineText = MakeShared<FString>(SourceString.Mid(TokenizedLines[LineIndex].LineRange.BeginIndex, TokenizedLines[LineIndex].LineRange.Len()));
+				TSharedRef<FString> LineText = LineModels[LineIndex].Text;
                 int32 MarkerOffset = LineText->Find(FoldMarkerText);
                 if (MarkerOffset != INDEX_NONE)
                 {
@@ -1976,41 +2175,15 @@ const FString ErrorMarkerText = TEXT("✘");
             auto& Marker = OwnerWidget->VisibleFoldMarkers[i];
             Highlights.Emplace(Marker.RelativeLineIndex, FTextRange{ Marker.Offset, Marker.Offset + 1 }, -1, FoldMarkerHighLighter::Create());
         }
-        
-        TArray<FTextLayout::FNewLineData> LinesToAdd;
-        for (int32 LineIndex = 0; LineIndex < TokenizedLines.Num(); LineIndex++)
-        {
-            TSharedRef<FString> LineText = MakeShared<FString>(SourceString.Mid(TokenizedLines[LineIndex].LineRange.BeginIndex, TokenizedLines[LineIndex].LineRange.Len()));
-            
-            TArray<TSharedRef<IRun>> Runs;
-            int32 RunBeginIndexInAllString = TokenizedLines[LineIndex].LineRange.BeginIndex;
-            TOptional<int32> MarkerIndex = OwnerWidget->FindFoldMarker(LineIndex);
-            for (const HlslHighLightTokenizer::Token& Token : TokenizedLines[LineIndex].Tokens)
-            {
-                FTextBlockStyle RunTextStyle = TokenStyleMap[Token.Type];
-                RunTextStyle.SetFont(OwnerWidget->GetFontInfo());
-                FTextRange NewTokenRange{ Token.Range.BeginIndex - RunBeginIndexInAllString, Token.Range.EndIndex - RunBeginIndexInAllString };
-
-                if (MarkerIndex && LineText->Mid(NewTokenRange.BeginIndex, 1) == FoldMarkerText)
-                {
-                    RunTextStyle.SetColorAndOpacity(FLinearColor::Gray);
-                }
-
-                Runs.Add(FSlateTextRun::Create(FRunInfo(), LineText, MoveTemp(RunTextStyle), MoveTemp(NewTokenRange)));
-            }
-
-            LinesToAdd.Emplace(MoveTemp(LineText), MoveTemp(Runs));
-        }
-
-        TextLayout->AddLines(MoveTemp(LinesToAdd));
 
         //Update fold markers highlight.
+		TextLayout->ClearLineHighlights();
         for (const FTextLineHighlight& Highlight : Highlights)
         {
             TextLayout->AddLineHighlight(Highlight);
         }
 
-        FTextSelection UnFoldingRange = FTextSelection{ {0, 0}, {LinesToAdd.Num() - 1, LinesToAdd[LinesToAdd.Num() - 1].Text->Len()} };
+        FTextSelection UnFoldingRange = FTextSelection{ {0, 0}, {LineModels.Num() - 1, LineModels[LineModels.Num() - 1].Text->Len()} };
         FString TextAfterUnfolding = OwnerWidget->UnFoldText(MoveTemp(UnFoldingRange));
 		OwnerWidget->OnShaderTextChanged(TextAfterUnfolding);
         OwnerWidget->UpdateLineNumberData();
@@ -2021,7 +2194,7 @@ const FString ErrorMarkerText = TEXT("✘");
         SourceTextLayout.GetAsText(TargetString);
     }
 
-    void FShaderEditorEffectMarshaller::SetText(const FString& SourceString, FTextLayout& TargetTextLayout)
+    void FShaderEditorEffectMarshaller::SetText(const FString& SourceString, FTextLayout& TargetTextLayout, TArray<FTextLayout::FLineModel>&& OldLineModels)
     {
         TextLayout = &TargetTextLayout;
         SubmitEffectText();

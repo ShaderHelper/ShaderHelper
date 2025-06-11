@@ -219,17 +219,22 @@ PRAGMA_DISABLE_DEPRECATION_WARNINGS
         }), 2.0f);
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		Window->SetRequestDestroyWindowOverride(FRequestDestroyWindowOverride::CreateLambda([this](const TSharedRef<SWindow>& InWindow) {
+			if(CurProject->AnyPendingAsset())
+			{
+				auto Ret = MessageDialog::Open(MessageDialog::OkNoCancel, Window, LOCALIZATION("SaveAssetsTip"));
+				if(Ret == MessageDialog::MessageRet::Cancel)
+				{
+					return;
+				}
+				else if (Ret == MessageDialog::MessageRet::Ok)
+				{
+					CurProject->SavePendingAssets();
+				}
+			}
+			
 			TabManager->SavePersistentLayout();
             CurProject->CodeTabLayout = CodeTabManager->PersistLayout();
-			if (CurProject->AnyPendingAsset() && MessageDialog::Open(MessageDialog::OkCancel, Window, LOCALIZATION("SaveAssetTip")))
-			{
-				CurProject->SavePendingAssets();
-				CurProject->Save();
-			}
-			else
-			{
-				CurProject->Save();
-			}
+			CurProject->Save();
 			auto ShApp = static_cast<ShaderHelperApp*>(GApp.Get());
 			ShApp->Launcher.Reset();
 			FSlateApplication::Get().RequestDestroyWindow(InWindow);
@@ -316,7 +321,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
     TSharedRef<SDockTab> ShaderHelperEditor::SpawnShaderTab(const FSpawnTabArgs& Args)
     {
         FGuid ShaderGuid{Args.GetTabId().ToString()};
-        FName TabId = Args.GetTabId().TabType;
+		FTabId TabId = Args.GetTabId();
         auto LoadedShader = TSingleton<AssetManager>::Get().LoadAssetByGuid<ShaderAsset>(ShaderGuid);
 
         auto ShaderEditor = SNew(SShaderEditorBox).ShaderAssetObj(LoadedShader);
@@ -348,7 +353,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                 ShaderEditors.Remove(ShaderAssetObj);
 				//Clear the PersistLayout when closing a Shader tab. we don't intend to restore it, so just destroy it.
 				auto DockTabStack = ClosedTab->GetParentDockTabStack();
-				DockTabStack->OnTabRemoved(Args.GetTabId());
+				DockTabStack->OnTabRemoved(TabId);
 				TArray<TSharedRef<FTabManager::FArea>>& CollapsedDockAreas = GetPrivate_FTabManager_CollapsedDockAreas(*CodeTabManager);
 				CollapsedDockAreas.Empty();
             })
@@ -883,17 +888,22 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 									ShApp->AppEditor = MakeUnique<ShaderHelperEditor>(ShApp->GetClientSize(), static_cast<ShRenderer*>(ShApp->GetRenderer()));
 									static_cast<ShaderHelperEditor*>(ShApp->AppEditor.Get())->InitEditorUI();
 								});
-								ShApp->Launcher->SetBeforeLaunchFunc(FSimpleDelegate::CreateLambda([this] {
-									if (CurProject->AnyPendingAsset() && MessageDialog::Open(MessageDialog::OkCancel, Window, LOCALIZATION("SaveAssetTip")))
+								ShApp->Launcher->SetCanLaunchFunc([this] {
+									if(CurProject->AnyPendingAsset())
 									{
-										CurProject->SavePendingAssets();
-										CurProject->Save();
+										auto Ret = MessageDialog::Open(MessageDialog::OkNoCancel, Window, LOCALIZATION("SaveAssetsTip"));
+										if(Ret == MessageDialog::MessageRet::Cancel)
+										{
+											return false;
+										}
+										else if (Ret == MessageDialog::MessageRet::Ok)
+										{
+											CurProject->SavePendingAssets();
+										}
 									}
-									else
-									{
-										CurProject->Save();
-									}
-								}));
+									CurProject->Save();
+									return true;
+								});
 							})
 					));
 				MenuBuilder.AddMenuEntry(LOCALIZATION("SaveAll"), FText::GetEmpty(), FSlateIcon(),

@@ -104,7 +104,7 @@ namespace FW
 		bool IsValidAsset(const FString& InPath) const { return GuidToPath.FindKey(InPath) != nullptr; }
 
         void Clear();
-        void ClearAsset(const FString& InAssetPath);
+        void DestroyAsset(const FString& InAssetPath);
 
 		void AddAssetThumbnail(const FGuid& InGuid, TRefCountPtr<GpuTexture> InThumbnail);
 		GpuTexture* FindAssetThumbnail(const FGuid& InGuid) const;

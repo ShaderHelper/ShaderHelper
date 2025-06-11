@@ -331,7 +331,7 @@ namespace FW
         MakeDirty();
     }
 
-	void FOutputLogMarshaller::SetText(const FString& SourceString, FTextLayout& TargetTextLayout)
+	void FOutputLogMarshaller::SetText(const FString& SourceString, FTextLayout& TargetTextLayout, TArray<FTextLayout::FLineModel>&& OldLineModels)
 	{
 		TextLayout = &TargetTextLayout;
 		NextPendingMessageIndex = 0;

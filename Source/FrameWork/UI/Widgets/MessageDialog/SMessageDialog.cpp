@@ -11,7 +11,7 @@ namespace FW::MessageDialog
 			SLATE_ARGUMENT(SWindow*, ParentWindow)
 			SLATE_ARGUMENT(FText, Message)
 			SLATE_ARGUMENT(MessageType, MsgType)
-			SLATE_ARGUMENT(bool*, ReturnResult)
+			SLATE_ARGUMENT(MessageRet*, ReturnResult)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs);
@@ -19,7 +19,7 @@ namespace FW::MessageDialog
 	private:
 		MessageType MsgType;
 		SWindow* ParentWindow;
-		bool* ReturnResult;
+		MessageRet* ReturnResult;
 	};
 
 	void SMessageDialog::Construct(const FArguments& InArgs)
@@ -82,44 +82,49 @@ namespace FW::MessageDialog
 
 		];
 
-		if (MsgType == MessageType::Ok)
+		if (MsgType & MessageType::Ok)
 		{
 			ButtonBox->AddSlot()
 			.AutoWidth()
-			[
-				SNew(SButton)
-				.ButtonStyle(&FAppStyle::Get().GetWidgetStyle<FButtonStyle>("PrimaryButton"))
-				.Text(FText::FromString("Ok"))
-				.OnClicked_Lambda([this] {
-					*ReturnResult = true;
-					ParentWindow->RequestDestroyWindow();
-					return FReply::Handled();
-				})
-			];
-		}
-		else
-		{
-			ButtonBox->AddSlot()
-			.AutoWidth()
-			.Padding(FMargin{0,0,10,0})
 			[
 				SNew(SButton)
 				.ButtonStyle(&FAppStyle::Get().GetWidgetStyle<FButtonStyle>("PrimaryButton"))
 				.Text(LOCALIZATION("Ok"))
 				.OnClicked_Lambda([this] {
-					*ReturnResult = true;
+					*ReturnResult = MessageRet::Ok;
 					ParentWindow->RequestDestroyWindow();
 					return FReply::Handled();
 				})
 			];
-
+		}
+		
+		if(MsgType & MessageType::No)
+		{
 			ButtonBox->AddSlot()
 			.AutoWidth()
+			.Padding(FMargin{10,0,0,0})
+			[
+				SNew(SButton)
+				.Text(LOCALIZATION("No"))
+				.OnClicked_Lambda([this] {
+					*ReturnResult = MessageRet::No;
+					ParentWindow->RequestDestroyWindow();
+					return FReply::Handled();
+				})
+			];
+		}
+		
+		if(MsgType & MessageType::Cancel)
+		{
+		
+			ButtonBox->AddSlot()
+			.AutoWidth()
+			.Padding(FMargin{10,0,0,0})
 			[
 				SNew(SButton)
 				.Text(LOCALIZATION("Cancel"))
 				.OnClicked_Lambda([this] {
-					*ReturnResult = false;
+					*ReturnResult = MessageRet::Cancel;
 					ParentWindow->RequestDestroyWindow();
 					return FReply::Handled();
 				})
@@ -128,9 +133,9 @@ namespace FW::MessageDialog
 
 	}
 
-	bool Open(MessageType MsgType, TSharedPtr<SWindow> Parent, const TAttribute<FText>& InMessage)
+	MessageRet Open(MessageType MsgType, TSharedPtr<SWindow> Parent, const TAttribute<FText>& InMessage)
 	{
-		bool Result;
+		MessageRet Result;
 
 		TSharedRef<SWindow> ModalWindow = SNew(SWindow)
 			.bDragAnywhere(true)

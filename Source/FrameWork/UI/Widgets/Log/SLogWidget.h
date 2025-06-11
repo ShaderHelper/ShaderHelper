@@ -12,7 +12,7 @@ namespace FW
 		FLogWidgetMarshaller();
 		~FLogWidgetMarshaller();
 
-		virtual void SetText(const FString& SourceString, FTextLayout& TargetTextLayout) override;
+		virtual void SetText(const FString& SourceString, FTextLayout& TargetTextLayout, TArray<FTextLayout::FLineModel>&& OldLineModels) override;
 		virtual void GetText(FString& TargetString, const FTextLayout& SourceTextLayout) override;
 	private:
 		FTextLayout* TextLayout;

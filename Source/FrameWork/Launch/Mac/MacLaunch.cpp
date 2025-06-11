@@ -15,7 +15,7 @@
 {
     FPlatformMisc::SetCrashHandler(nullptr);
     _runBlock(*_SavedCommandLine);
-	std::_Exit(0);
+	FPlatformMisc::RequestExit(true);
 }
 
 -(void)applicationDidFinishLaunching:(NSNotification *)notification
@@ -25,15 +25,7 @@
 
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)Sender;
 {
-    if(!IsEngineExitRequested() || ([NSThread gameThread] && [NSThread gameThread] != [NSThread mainThread]))
-    {
-        RequestEngineExit(TEXT("applicationShouldTerminate"));
-        return NSTerminateLater;
-    }
-    else
-    {
-        return NSTerminateNow;
-    }
+	FPlatformMisc::RequestExit(true);
 }
 
 - (BOOL)application:(NSApplication *)sender openFile:(NSString *)filename
