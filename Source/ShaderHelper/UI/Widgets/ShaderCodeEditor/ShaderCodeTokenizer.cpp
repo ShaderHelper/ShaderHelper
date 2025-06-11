@@ -26,9 +26,10 @@ namespace SH
 		return Ret;
 	}
 
-	TArray<HlslHighLightTokenizer::TokenizedLine> HlslHighLightTokenizer::Tokenize(const FString& HlslCodeString, TArray<BraceGroup>& OutBraceGroups, bool IgnoreWhitespace)
+	TArray<HlslTokenizer::TokenizedLine> HlslTokenizer::Tokenize(const FString& HlslCodeString, bool IgnoreWhitespace, LineContState InLineContState)
 	{
-		TArray<HlslHighLightTokenizer::TokenizedLine> TokenizedLines;
+		TArray<TokenizedLine> TokenizedLines;
+		
 		TArray<FTextRange> LineRanges;
 		FTextRange::CalculateLineRangesFromString(HlslCodeString, LineRanges);
 
@@ -40,11 +41,12 @@ namespace SH
 			Number,
 			Macro,
 			Comment,
-			LeftMultilineComment,
-			RightMultilineComment,
+			MultilineComment,
+			MultilineCommentEnd,
 			Punctuation,
 			NumberPuncuation,
 			String,
+			Whitespace,
 			Other,
 		};
 
@@ -70,8 +72,8 @@ namespace SH
 			case StateSet::Number:                          return TokenType::Number;
 			case StateSet::Macro:                           return TokenType::Preprocess;
 			case StateSet::Comment:                         return TokenType::Comment;
-			case StateSet::LeftMultilineComment:            return TokenType::Comment;
-			case StateSet::RightMultilineComment:           return TokenType::Comment;
+			case StateSet::MultilineComment:                return TokenType::Comment;
+			case StateSet::MultilineCommentEnd:             return TokenType::Comment;
 			case StateSet::Punctuation:                     return TokenType::Punctuation;
 			case StateSet::NumberPuncuation:                return TokenType::Punctuation;
 			case StateSet::String:                          return TokenType::String;
@@ -81,29 +83,28 @@ namespace SH
 			}
 		};
 
-		TArray<BraceGroup::BracePos> LeftBraceStack;
 		int32 CurRow = -1;
 		int32 CurCol = 0;
 
-		StateSet LastLineState = StateSet::Start;
+		StateSet LastState = InLineContState == LineContState::MultilineComment ? StateSet::MultilineComment : StateSet::Start;
 
 		for (const FTextRange& LineRange : LineRanges)
 		{
 			CurRow++;
-			HlslHighLightTokenizer::TokenizedLine TokenizedLine;
-			TokenizedLine.LineRange = LineRange;
+			HlslTokenizer::TokenizedLine TokenizedLine;
 
 			//A empty line without any char.
 			if (LineRange.IsEmpty())
 			{
 				//Still need a token to correctly display
-				TokenizedLine.Tokens.Emplace(TokenType::Other, LineRange);
+				TokenizedLine.State = (LastState == StateSet::MultilineComment) ? LineContState::MultilineComment : LineContState::None;
+				TokenizedLine.Tokens.Emplace(TokenType::Other);
 				TokenizedLines.Add(MoveTemp(TokenizedLine));
 			}
 			else
 			{
 				//DFA
-				StateSet CurLineState = (LastLineState == StateSet::LeftMultilineComment) ? StateSet::LeftMultilineComment : StateSet::Start;
+				StateSet CurState = (LastState == StateSet::MultilineComment) ? StateSet::MultilineComment : StateSet::Start;
 				int32 CurOffset = LineRange.BeginIndex;
 				int32 TokenStart = CurOffset;
 				TOptional<TokenType> LastTokenType; //The token is not a white space;
@@ -115,188 +116,191 @@ namespace SH
 					int32 RemainingLen = HlslCodeString.Len() - CurOffset;
 					CurCol = CurOffset - LineRange.BeginIndex;
 
-					switch (CurLineState)
+					switch (CurState)
 					{
 					case StateSet::Start:
 						{
 							FString MatchedPunctuation;
-							LastLineState = StateSet::Start;
+							LastState = StateSet::Start;
 							if (RemainingLen >= 2 && FCString::Strncmp(CurString, TEXT("//"), 2) == 0) {
-								CurLineState = StateSet::Comment;
+								CurState = StateSet::Comment;
 								CurOffset += 2;
 							}
 							else if (RemainingLen >= 2 && FCString::Strncmp(CurString, TEXT("/*"), 2) == 0) {
-								CurLineState = StateSet::LeftMultilineComment;
+								CurState = StateSet::MultilineComment;
 								CurOffset += 2;
 							}
 							else if (CurChar == '"')
 							{
-								CurLineState = StateSet::String;
+								CurState = StateSet::String;
 								CurOffset += 1;
 							}
 							else if (FChar::IsDigit(CurChar)) {
-								CurLineState = StateSet::Number;
+								CurState = StateSet::Number;
 								CurOffset += 1;
 							}
 							else if (FChar::IsUnderscore(CurChar) || FChar::IsAlpha(CurChar)) {
-								CurLineState = StateSet::Id;
+								CurState = StateSet::Id;
 								CurOffset += 1;
 							}
 							else if (CurChar == '#') {
-								CurLineState = StateSet::Macro;
+								CurState = StateSet::Macro;
 								CurOffset += 1;
 							}
-							//Skip
 							else if(FChar::IsWhitespace(CurChar))
 							{
 								if(IgnoreWhitespace)
 								{
-									CurLineState = StateSet::Start;
-									CurOffset += 1;
+									CurState = StateSet::Start;
 									TokenStart += 1;
 								}
 								else
 								{
-									CurLineState = StateSet::Other;
-									CurOffset += 1;
+									CurState = StateSet::Whitespace;
 								}
+								CurOffset += 1;
 							}
 							else if (TOptional<int32> PunctuationLen = IsMatchPunctuation(CurString, RemainingLen, MatchedPunctuation)) {
 
 								if (MatchedPunctuation == "{") {
-									LeftBraceStack.Push({ CurRow, CurCol });
+									TokenizedLine.Braces.Add({BraceType::Open, CurCol });
 								}
 								else if (MatchedPunctuation == "}") {
-
-									if (!LeftBraceStack.IsEmpty())
-									{
-										auto LeftBracePos = LeftBraceStack.Pop();
-										BraceGroup Group{ LeftBracePos, {CurRow, CurCol}};
-										OutBraceGroups.Add(MoveTemp(Group));
-									}
-								
+									TokenizedLine.Braces.Add({BraceType::Close, CurCol });
 								}
 								
 								if (MatchedPunctuation == "+" || MatchedPunctuation == "-") {
 									if (LastTokenType && (LastTokenType == TokenType::Identifier || LastTokenType == TokenType::Number)) {
-										CurLineState = StateSet::Punctuation;
+										CurState = StateSet::Punctuation;
 									}
 									else {
-										CurLineState = StateSet::NumberPuncuation;
+										CurState = StateSet::NumberPuncuation;
 									}
 								}
 								else if (MatchedPunctuation == ".") {
-									CurLineState = StateSet::NumberPuncuation;
+									CurState = StateSet::NumberPuncuation;
 								}
 								else {
-									CurLineState = StateSet::Punctuation;
+									CurState = StateSet::Punctuation;
 								}
 
 								CurOffset += *PunctuationLen;
 							}
 							else {
-								CurLineState = StateSet::Other;
+								CurState = StateSet::Other;
 								CurOffset += 1;
 							}
 						}
 						break;
+					case StateSet::Whitespace:
+						LastState = StateSet::Whitespace;
+						if(FChar::IsWhitespace(CurChar))
+						{
+							CurState = StateSet::Whitespace;
+							CurOffset += 1;
+						}
+						else
+						{
+							CurState = StateSet::End;
+						}
+						break;
 					case StateSet::Other:
-						LastLineState = StateSet::Other;
+						LastState = StateSet::Other;
 						//Always regard other chars as valid tokens.
-						CurLineState = StateSet::End;
+						CurState = StateSet::End;
 						break;
 					case StateSet::String:
-						LastLineState = StateSet::String;
+						LastState = StateSet::String;
 						if (CurChar == '"' && HlslCodeString[CurOffset - 1] != '\\')
 						{
-							CurLineState = StateSet::End;
+							CurState = StateSet::End;
 						}
 						CurOffset += 1;
 						break;
 					case StateSet::Punctuation:
-						LastLineState = StateSet::Punctuation;
-						CurLineState = StateSet::End;
+						LastState = StateSet::Punctuation;
+						CurState = StateSet::End;
 						break;
 					case StateSet::End:
 						{
 							int32 TokenEnd = CurOffset;
 							FTextRange TokenRange{ TokenStart, TokenEnd };
 							FString TokenString = HlslCodeString.Mid(TokenRange.BeginIndex, TokenRange.Len());
-							TokenType FinalTokenType = StateSetToTokenType(TokenString, LastLineState);
+							TokenType FinalTokenType = StateSetToTokenType(TokenString, LastState);
 
 							if (TokenString != " ") {
 								LastTokenType = FinalTokenType;
 							}
 
-							TokenizedLine.Tokens.Emplace(FinalTokenType, MoveTemp(TokenRange));
-							CurLineState = StateSet::Start;
+							TokenizedLine.Tokens.Emplace(FinalTokenType, CurCol - TokenRange.Len(), CurCol);
+							CurState = StateSet::Start;
 							TokenStart = TokenEnd;
 						}
 						break;
 					case StateSet::Id:
-						LastLineState = StateSet::Id;
+						LastState = StateSet::Id;
 						if (FChar::IsIdentifier(CurChar)) {
-							CurLineState = StateSet::Id;
+							CurState = StateSet::Id;
 							CurOffset += 1;
 						}
 						else {
-							CurLineState = StateSet::End;
+							CurState = StateSet::End;
 						}
 						break;
 					case StateSet::NumberPuncuation:
-						LastLineState = StateSet::NumberPuncuation;
+						LastState = StateSet::NumberPuncuation;
 						if (FChar::IsDigit(CurChar) || CurChar == '.') {
-							CurLineState = StateSet::Number;
+							CurState = StateSet::Number;
 							CurOffset += 1;
 						}
 						else {
-							CurLineState = StateSet::End;
+							CurState = StateSet::End;
 						}
 						break;
 					case StateSet::Number:
-						LastLineState = StateSet::Number;
+						LastState = StateSet::Number;
 						if (FChar::IsDigit(CurChar) || FChar::IsAlpha(CurChar) || CurChar == '.') {
-							CurLineState = StateSet::Number;
+							CurState = StateSet::Number;
 							CurOffset += 1;
 						}
 						else {
-							CurLineState = StateSet::End;
+							CurState = StateSet::End;
 						}
 						break;
 					case StateSet::Macro:
-						LastLineState = StateSet::Macro;
+						LastState = StateSet::Macro;
 						if (CurOffset < LineRange.EndIndex) {
-							CurLineState = StateSet::Macro;
+							CurState = StateSet::Macro;
 							CurOffset += 1;
 						}
 						else {
-							CurLineState = StateSet::End;
+							CurState = StateSet::End;
 						}
 						break;
 					case StateSet::Comment:
-						LastLineState = StateSet::Comment;
+						LastState = StateSet::Comment;
 						if (CurOffset < LineRange.EndIndex) {
-							CurLineState = StateSet::Comment;
+							CurState = StateSet::Comment;
 							CurOffset += 1;
 						}
 						else {
-							CurLineState = StateSet::End;
+							CurState = StateSet::End;
 						}
 						break;
-					case StateSet::LeftMultilineComment:
-						LastLineState = StateSet::LeftMultilineComment;
+					case StateSet::MultilineComment:
+						LastState = StateSet::MultilineComment;
 						if (RemainingLen >= 2 && FCString::Strncmp(CurString, TEXT("*/"), 2) == 0) {
-							CurLineState = StateSet::RightMultilineComment;
+							CurState = StateSet::MultilineCommentEnd;
 							CurOffset += 2;
 						}
 						else {
-							CurLineState = StateSet::LeftMultilineComment;
+							CurState = StateSet::MultilineComment;
 							CurOffset += 1;
 						}
 						break;
-					case StateSet::RightMultilineComment:
-						LastLineState = StateSet::RightMultilineComment;
-						CurLineState = StateSet::End;
+					case StateSet::MultilineCommentEnd:
+						LastState = StateSet::MultilineCommentEnd;
+						CurState = StateSet::End;
 						break;
 					default:
 						AUX::Unreachable();
@@ -304,14 +308,15 @@ namespace SH
 				}
 
 				//Process the last token of the line.
-				if(CurLineState != StateSet::End)
+				if(CurState != StateSet::End)
 				{
-					LastLineState = CurLineState;
+					LastState = CurState;
 				}
 				FTextRange TokenRange{ TokenStart, LineRange.EndIndex };
 				FString TokenString = HlslCodeString.Mid(TokenRange.BeginIndex, TokenRange.Len());
-				TokenizedLine.Tokens.Emplace(StateSetToTokenType(TokenString, LastLineState), TokenRange);
-
+				
+				TokenizedLine.State = (LastState == StateSet::MultilineComment) ? LineContState::MultilineComment : LineContState::None;
+				TokenizedLine.Tokens.Emplace(StateSetToTokenType(TokenString, LastState), LineRange.Len() - TokenRange.Len(), LineRange.Len());
 				TokenizedLines.Add(MoveTemp(TokenizedLine));
 			}
 		}

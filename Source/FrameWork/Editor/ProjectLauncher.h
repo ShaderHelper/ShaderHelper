@@ -16,6 +16,8 @@ namespace FW
 		ProjectLauncher(TFunction<void()> InLaunchProjectFunc) : LaunchProjectFunc(MoveTemp(InLaunchProjectFunc))
 		{
 			AddProjectAssociation();
+			
+			CanLaunchFunc = []{ return true; };
 
 			constexpr float Space = 4.0f;
 			TSharedRef<SVerticalBox> LeftContent =
@@ -87,10 +89,12 @@ namespace FW
 							}
 							else
 							{
-								BeforeLaunchDelegate.ExecuteIfBound();
-								TSingleton<ProjectManager<T>>::Get().NewProject(ProjectName, ProjectDir);
-								LaunchProjectFunc();
-								Window->RequestDestroyWindow();
+								if(CanLaunchFunc())
+								{
+									TSingleton<ProjectManager<T>>::Get().NewProject(ProjectName, ProjectDir);
+									LaunchProjectFunc();
+									Window->RequestDestroyWindow();
+								}
 							}
 							return FReply::Handled();
 						})
@@ -137,10 +141,11 @@ namespace FW
 						[RecentProjcetButton = TWeakPtr<SIconButton>{ RecentProjcetButton }, RecentProjcetPath, InsertDummy, this] {
 							if (IFileManager::Get().FileExists(*RecentProjcetPath))
 							{
-								BeforeLaunchDelegate.ExecuteIfBound();
-								TSingleton<ProjectManager<T>>::Get().OpenProject(RecentProjcetPath);
-								LaunchProjectFunc();
-								Window->RequestDestroyWindow();
+								if(CanLaunchFunc()) {
+									TSingleton<ProjectManager<T>>::Get().OpenProject(RecentProjcetPath);
+									LaunchProjectFunc();
+									Window->RequestDestroyWindow();
+								}
 							}
 							else
 							{
@@ -180,11 +185,13 @@ namespace FW
 							{
 								if (OpenedFileNames.Num() > 0)
 								{
-									BeforeLaunchDelegate.ExecuteIfBound();
-									CacheOpenProjectDir = FPaths::GetPath(OpenedFileNames[0]);
-									TSingleton<ProjectManager<T>>::Get().OpenProject(FPaths::ConvertRelativePathToFull(OpenedFileNames[0]));
-									LaunchProjectFunc();
-									Window->RequestDestroyWindow();
+									if(CanLaunchFunc())
+									{
+										CacheOpenProjectDir = FPaths::GetPath(OpenedFileNames[0]);
+										TSingleton<ProjectManager<T>>::Get().OpenProject(FPaths::ConvertRelativePathToFull(OpenedFileNames[0]));
+										LaunchProjectFunc();
+										Window->RequestDestroyWindow();
+									}
 								}
 							}
 							return FReply::Handled();
@@ -264,13 +271,13 @@ namespace FW
 		}
 
 	public:
-		void SetBeforeLaunchFunc(FSimpleDelegate InBeforeLaunchDelegate)
+		void SetCanLaunchFunc(TFunction<bool()> InCanLaunchFunc)
 		{
-			BeforeLaunchDelegate = MoveTemp(InBeforeLaunchDelegate);
+			CanLaunchFunc = MoveTemp(InCanLaunchFunc);
 		}
 
 	private:
-		FSimpleDelegate BeforeLaunchDelegate;
+		TFunction<bool()> CanLaunchFunc;
 		TFunction<void()> LaunchProjectFunc;
 		TSharedPtr<SWindow> Window;
 		TSharedPtr<SVerticalBox> RightContent;

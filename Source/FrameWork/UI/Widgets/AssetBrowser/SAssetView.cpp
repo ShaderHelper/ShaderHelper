@@ -418,7 +418,8 @@ namespace FW
 			return;
 		}
 
-		if (MessageDialog::Open(MessageDialog::OkCancel, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("DeleteItemTip")))
+		auto Ret = MessageDialog::Open(MessageDialog::OkCancel, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("DeleteItemTip"));
+		if (Ret == MessageDialog::MessageRet::Ok)
 		{
 			if (SelectedItems[0]->IsOfType<AssetViewFolderItem>())
 			{

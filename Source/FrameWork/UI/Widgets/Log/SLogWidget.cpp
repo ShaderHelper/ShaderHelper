@@ -15,7 +15,7 @@ namespace FW
 
 	}
 
-	void FLogWidgetMarshaller::SetText(const FString& SourceString, FTextLayout& TargetTextLayout)
+	void FLogWidgetMarshaller::SetText(const FString& SourceString, FTextLayout& TargetTextLayout, TArray<FTextLayout::FLineModel>&& OldLineModels)
 	{
 		TextLayout = &TargetTextLayout;
 	}

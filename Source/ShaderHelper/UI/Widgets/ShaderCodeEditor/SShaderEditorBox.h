@@ -38,10 +38,10 @@ namespace SH
 	class FShaderEditorMarshaller : public FBaseTextLayoutMarshaller
 	{
 	public:
-		FShaderEditorMarshaller(SShaderEditorBox* InOwnerWidget, TSharedPtr<HlslHighLightTokenizer> InTokenizer);
+		FShaderEditorMarshaller(SShaderEditorBox* InOwnerWidget, TSharedPtr<HlslTokenizer> InTokenizer);
 		
 	public:
-		virtual void SetText(const FString& SourceString, FTextLayout& TargetTextLayout) override;
+		virtual void SetText(const FString& SourceString, FTextLayout& TargetTextLayout, TArray<FTextLayout::FLineModel>&& OldLineModels) override;
 		virtual void GetText(FString& TargetString, const FTextLayout& SourceTextLayout) override;
 
 		//ReTokenize when the text changed.
@@ -53,10 +53,11 @@ namespace SH
 	public:
         SShaderEditorBox* OwnerWidget;
 		FTextLayout* TextLayout;
-		TSharedPtr<HlslHighLightTokenizer> Tokenizer;
-		TMap<HlslHighLightTokenizer::TokenType, FTextBlockStyle> TokenStyleMap;
+		TSharedPtr<HlslTokenizer> Tokenizer;
+		TMap<HlslTokenizer::TokenType, FTextBlockStyle> TokenStyleMap;
 		//Key: The line index of Left Brace in MultiLineEditableText
-		TMap<int32, HlslHighLightTokenizer::BraceGroup> FoldingBraceGroups;
+		TMap<int32, HlslTokenizer::BraceGroup> FoldingBraceGroups;
+		int32 FontSize{};
 	};
 
     class TokenBreakIterator : public IBreakIterator
@@ -76,6 +77,8 @@ namespace SH
         virtual int32 MoveToNext() override;
         virtual int32 MoveToCandidateBefore(const int32 InIndex) override;
         virtual int32 MoveToCandidateAfter(const int32 InIndex) override;
+		
+		bool IngoreWhitespace() { return false; }
 
     private:
         FString InternalString;
@@ -102,7 +105,7 @@ namespace SH
 		{}
 
 	public:
-		virtual void SetText(const FString& SourceString, FTextLayout& TargetTextLayout) override;
+		virtual void SetText(const FString& SourceString, FTextLayout& TargetTextLayout, TArray<FTextLayout::FLineModel>&& OldLineModels) override;
 		virtual void GetText(FString& TargetString, const FTextLayout& SourceTextLayout) override;
 		
 		void SubmitEffectText();
@@ -130,6 +133,7 @@ namespace SH
         enum class EditState
         {
             Succeed,
+			Editing,
             Compiling,
             Failed,
         };
@@ -177,7 +181,7 @@ namespace SH
         TSharedRef<ITableRow> GenerateCodeCompletionItem(CandidateItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 
 		ShaderAsset* GetShaderAsset() const { return ShaderAssetObj; }
-        const FSlateFontInfo& GetFontInfo() const { return CodeFontInfo; }
+        FSlateFontInfo& GetFontInfo() { return CodeFontInfo; }
         FText GetEditStateText() const;
         FText GetFontSizeText() const;
         FText GetRowColText() const;
@@ -217,7 +221,7 @@ namespace SH
 		FReply OnFold(int32 LineNumber);
 		void RemoveFoldMarker(int32 InIndex);
         
-        void InsertCompletionText(const FString& InText);
+        void InsertCompletionText(CandidateItemPtr InItem);
 
 	public:
         FSlateEditableTextLayout* ShaderMultiLineEditableTextLayout;
@@ -231,6 +235,7 @@ namespace SH
 		//The shader may contain extra declaration(eg. binding codegen)
 		FString CurrentShaderSource;
         
+		TMap<int32, int32> LineNumberToIndexMap;
 		int32 MaxLineNumber{};
 		TArray<LineNumberItemPtr> LineNumberData;
 		TSharedPtr<FShaderEditorMarshaller> ShaderMarshaller;
@@ -273,5 +278,7 @@ namespace SH
         bool bTryComplete = false;
         bool bKeyChar = false;
         //
+		//TArray<>
+		bool bTryMergeUndoState = false;
 	};
 }

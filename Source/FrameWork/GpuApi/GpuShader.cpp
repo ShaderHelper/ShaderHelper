@@ -29,7 +29,7 @@ namespace HLSL
         "SV_InsideTessFactor", "SV_IsFrontFace", "SV_OutputControlPointID", "SV_POSITION", "SV_Position", "SV_RenderTargetArrayIndex",
         "SV_SampleIndex", "SV_TessFactor", "SV_ViewportArrayIndex", "SV_InstanceID", "SV_PrimitiveID", "SV_VertexID", "SV_TargetID",
         "SV_TARGET", "SV_Target", "SV_Target0", "SV_Target1", "SV_Target2", "SV_Target3", "SV_Target4", "SV_Target5", "SV_Target6", "SV_Target7",
-		"template", "typename"
+		"template", "typename", "sizeof",
     };
 
     TArray<FString> BuiltinTypes = {
@@ -80,7 +80,7 @@ namespace HLSL
         "reversebits", "round", "rsqrt", "saturate", "sign", "sin", "sincos", "sinh", "smoothstep", "sqrt", "step",
         "tan", "tanh", "tex1D", "tex1Dbias", "tex1Dgrad", "tex1Dlod", "tex1Dproj", "tex2D", "tex2Dbias",
         "tex2Dgrad", "tex2Dlod", "tex2Dproj", "tex3D", "tex3Dbias", "tex3Dgrad", "tex3Dlod", "tex3Dproj",
-        "texCUBE", "texCUBEbias", "texCUBEgrad", "texCUBElod", "texCUBEproj", "transpose", "trunc", "sizeof",
+        "texCUBE", "texCUBEbias", "texCUBEgrad", "texCUBElod", "texCUBEproj", "transpose", "trunc",
     };
 }
 
@@ -308,11 +308,13 @@ namespace FW
 		DxcArgs.Add("2021");
 		DxcArgs.Add("-D");
 		DxcArgs.Add("ENABLE_PRINT=0");
-		for (const FString& IncludeDir : IncludeDirs)
-		{
-			DxcArgs.Add("-I");
-			DxcArgs.Add(TCHAR_TO_ANSI(*IncludeDir));
-		}
+		TArray<FTCHARToUTF8> CharIncludeDirs;
+        for (const FString& IncludeDir : IncludeDirs)
+        {
+            DxcArgs.Add("-I");
+            CharIncludeDirs.Emplace(*IncludeDir);
+            DxcArgs.Add(CharIncludeDirs.Last().Get());
+        }
 
         DxcTranslationUnitFlags UnitFlag = DxcTranslationUnitFlags(DxcTranslationUnitFlags_UseCallerThread);
         Impl->Index->ParseTranslationUnit("Temp.hlsl", DxcArgs.GetData(), DxcArgs.Num(), AUX::GetAddrExt(Impl->Unsaved.GetReference()), 1, UnitFlag, Impl->TU.GetInitReference());
