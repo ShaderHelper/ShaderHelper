@@ -20,6 +20,30 @@ namespace HLSL
         Type
     };
 
+	enum class TokenType
+	{
+		//Tokenizer
+		Number,
+		Keyword,
+		Punctuation,
+		BuildtinFunc,
+		BuildtinType,
+		Identifier,
+		Preprocess,
+		Comment,
+		String,
+		
+		//Parser
+		Func,
+		Type,
+		Parm,
+		Var,
+		LocalVar,
+		
+		Other,
+		
+	};
+
     inline const TCHAR* Punctuations[] = {
         TEXT(":"), TEXT("+="), TEXT("++"), TEXT("+"), TEXT("--"), TEXT("-="), TEXT("-"), TEXT("("),
 		TEXT(")"), TEXT("["), TEXT("]"), TEXT("."), TEXT("->"), TEXT("!="), TEXT("!"),
@@ -147,15 +171,16 @@ namespace FW
 	FRAMEWORK_API FString AdjustErrorLineNumber(const FString& ErrorInfo, int32 Delta);
     FRAMEWORK_API TArray<ShaderCandidateInfo> DefaultCandidates();
 
-    class FRAMEWORK_API ISenseTU
+    class FRAMEWORK_API ShaderTU
     {
     public:
-		ISenseTU(FStringView HlslSource, const TArray<FString>& IncludeDirs = {});
+		ShaderTU(FStringView HlslSource, const TArray<FString>& IncludeDirs = {});
         TArray<ShaderErrorInfo> GetDiagnostic();
+		HLSL::TokenType GetTokenType(HLSL::TokenType InType, uint32 Row, uint32 Col);
         TArray<ShaderCandidateInfo> GetCodeComplete(uint32 Row, uint32 Col);
         
     private:
-        TPimplPtr<struct ISenseTUImpl> Impl;
+        TPimplPtr<struct ShaderTUImpl> Impl;
     };
 
 }

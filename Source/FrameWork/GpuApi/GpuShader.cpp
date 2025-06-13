@@ -29,7 +29,7 @@ namespace HLSL
         "SV_InsideTessFactor", "SV_IsFrontFace", "SV_OutputControlPointID", "SV_POSITION", "SV_Position", "SV_RenderTargetArrayIndex",
         "SV_SampleIndex", "SV_TessFactor", "SV_ViewportArrayIndex", "SV_InstanceID", "SV_PrimitiveID", "SV_VertexID", "SV_TargetID",
         "SV_TARGET", "SV_Target", "SV_Target0", "SV_Target1", "SV_Target2", "SV_Target3", "SV_Target4", "SV_Target5", "SV_Target6", "SV_Target7",
-		"template", "typename", "sizeof",
+		"template", "typename", "sizeof", "numthreads",
     };
 
     TArray<FString> BuiltinTypes = {
@@ -287,7 +287,7 @@ namespace FW
         return Ret;
     }
 
-    struct ISenseTUImpl
+    struct ShaderTUImpl
     {
         TRefCountPtr<IDxcIntelliSense> ISense;
         TRefCountPtr<IDxcIndex> Index;
@@ -295,8 +295,8 @@ namespace FW
         TRefCountPtr<IDxcTranslationUnit> TU;
     };
 
-    ISenseTU::ISenseTU(FStringView HlslSource, const TArray<FString>& IncludeDirs)
-        :Impl(MakePimpl<ISenseTUImpl>())
+	ShaderTU::ShaderTU(FStringView HlslSource, const TArray<FString>& IncludeDirs)
+        :Impl(MakePimpl<ShaderTUImpl>())
     {
         DxcCreateInstance(CLSID_DxcIntelliSense, IID_PPV_ARGS(Impl->ISense.GetInitReference()));
         Impl->ISense->CreateIndex(Impl->Index.GetInitReference());
@@ -306,8 +306,8 @@ namespace FW
 		TArray<const char*> DxcArgs;
 		DxcArgs.Add("-HV");
 		DxcArgs.Add("2021");
-		DxcArgs.Add("-D");
-		DxcArgs.Add("ENABLE_PRINT=0");
+		//DxcArgs.Add("-D");
+		//DxcArgs.Add("ENABLE_PRINT=0");
 		TArray<FTCHARToUTF8> CharIncludeDirs;
         for (const FString& IncludeDir : IncludeDirs)
         {
@@ -316,11 +316,11 @@ namespace FW
             DxcArgs.Add(CharIncludeDirs.Last().Get());
         }
 
-        DxcTranslationUnitFlags UnitFlag = DxcTranslationUnitFlags(DxcTranslationUnitFlags_UseCallerThread);
+        DxcTranslationUnitFlags UnitFlag = DxcTranslationUnitFlags(DxcTranslationUnitFlags_UseCallerThread | DxcTranslationUnitFlags_DetailedPreprocessingRecord);
         Impl->Index->ParseTranslationUnit("Temp.hlsl", DxcArgs.GetData(), DxcArgs.Num(), AUX::GetAddrExt(Impl->Unsaved.GetReference()), 1, UnitFlag, Impl->TU.GetInitReference());
     }
 
-    TArray<ShaderErrorInfo> ISenseTU::GetDiagnostic()
+    TArray<ShaderErrorInfo> ShaderTU::GetDiagnostic()
     {
         uint32 NumDiag{};
         Impl->TU->GetNumDiagnostics(&NumDiag);
@@ -381,7 +381,77 @@ namespace FW
         return Candidates;
     }
 
-    TArray<ShaderCandidateInfo> ISenseTU::GetCodeComplete(uint32 Row, uint32 Col)
+	HLSL::TokenType ShaderTU::GetTokenType(HLSL::TokenType InType, uint32 Row, uint32 Col)
+	{
+		TRefCountPtr<IDxcSourceLocation> SrcLoc;
+		TRefCountPtr<IDxcFile> DxcFile;
+		Impl->TU->GetFile("Temp.hlsl", DxcFile.GetInitReference());
+		Impl->TU->GetLocation(DxcFile, Row, Col, SrcLoc.GetInitReference());
+		
+		TRefCountPtr<IDxcCursor> DxcCursor;
+		DxcCursorKind CursorKind;
+		Impl->TU->GetCursorForLocation(SrcLoc, DxcCursor.GetInitReference());
+		DxcCursor->GetKind(&CursorKind);
+		
+		TRefCountPtr<IDxcCursor> DxcReferencedCursor;
+		DxcCursorKind ReferencedCursorKind;
+		DxcCursor->GetReferencedCursor(DxcReferencedCursor.GetInitReference());
+		DxcReferencedCursor->GetKind(&ReferencedCursorKind);
+		
+		TRefCountPtr<IDxcCursor> DxcReferencedCursorLexPar;
+		DxcCursorKind ReferencedCursorLexParKind;
+		DxcReferencedCursor->GetLexicalParent(DxcReferencedCursorLexPar.GetInitReference());
+		DxcReferencedCursorLexPar->GetKind(&ReferencedCursorLexParKind);
+		
+		BSTR CursorName;
+		BSTR ReferencedCursorName;
+		DxcCursor->GetDisplayName(&CursorName);
+		DxcReferencedCursor->GetDisplayName(&ReferencedCursorName);
+		LPSTR CursorSpelling;
+		LPSTR ReferencedCursorSpelling;
+		DxcCursor->GetSpelling(&CursorSpelling);
+		DxcCursor->GetSpelling(&ReferencedCursorSpelling);
+		
+		if(InType == HLSL::TokenType::Identifier)
+		{
+			if(ReferencedCursorKind == DxcCursor_FunctionDecl || ReferencedCursorKind == DxcCursor_CXXMethod)
+			{
+				return HLSL::TokenType::Func;
+			}
+			
+			if(ReferencedCursorKind == DxcCursor_ParmDecl)
+			{
+				return HLSL::TokenType::Parm;
+			}
+			
+			if(ReferencedCursorKind == DxcCursor_StructDecl)
+			{
+				return HLSL::TokenType::Type;
+			}
+			
+			if(ReferencedCursorKind == DxcCursor_VarDecl)
+			{
+				if(ReferencedCursorLexParKind == DxcCursor_FunctionDecl || ReferencedCursorLexParKind == DxcCursor_CXXMethod)
+				{
+					return HLSL::TokenType::LocalVar;
+				}
+				else
+				{
+					return HLSL::TokenType::Var;
+				}
+			}
+			
+			if(CursorKind == DxcCursor_MacroExpansion)
+			{
+				return HLSL::TokenType::Preprocess;
+			}
+		}
+
+		
+		return InType;
+	}
+
+    TArray<ShaderCandidateInfo> ShaderTU::GetCodeComplete(uint32 Row, uint32 Col)
     {
         TArray<ShaderCandidateInfo> Candidates;
         

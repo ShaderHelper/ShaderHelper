@@ -1,27 +1,14 @@
 #pragma once
+#include "GpuApi/GpuShader.h"
 
 namespace SH
 {
 	class HlslTokenizer
 	{
 	public:
-		enum class TokenType
-		{
-			Number,
-			Keyword,
-			Punctuation,
-			BuildtinFunc,
-			BuildtinType,
-			Identifier,
-			Preprocess,
-			Comment,
-			String,
-			Other,
-		};
-
 		struct Token
 		{
-			TokenType Type;
+			HLSL::TokenType Type;
 			//relative to line start
 			int32 BeginOffset{};
 			int32 EndOffset{};
