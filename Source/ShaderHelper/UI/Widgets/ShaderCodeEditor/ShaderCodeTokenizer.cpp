@@ -1,6 +1,5 @@
 #include "CommonHeader.h"
 #include "ShaderCodeTokenizer.h"
-#include "GpuApi/GpuShader.h"
 
 using namespace FW;
 
@@ -53,33 +52,32 @@ namespace SH
 		auto StateSetToTokenType = [](const FString& TokenStr, StateSet InState) {
 			switch (InState)
 			{
-			case StateSet::Id:                              
-			{
-				if(HLSL::BuiltinTypes.Contains(TokenStr))
+				case StateSet::Id:
 				{
-					return TokenType::BuildtinType;
+					if(HLSL::BuiltinTypes.Contains(TokenStr))
+					{
+						return HLSL::TokenType::BuildtinType;
+					}
+					else if(HLSL::BuiltinFuncs.Contains(TokenStr))
+					{
+						return HLSL::TokenType::BuildtinFunc;
+					}
+					else if(HLSL::KeyWords.Contains(TokenStr))
+					{
+						return HLSL::TokenType::Keyword;
+					}
+					return HLSL::TokenType::Identifier;
 				}
-				else if(HLSL::BuiltinFuncs.Contains(TokenStr))
-				{
-					return TokenType::BuildtinFunc;
-				}
-				else if(HLSL::KeyWords.Contains(TokenStr))
-				{
-					return TokenType::Keyword;
-				}
-				return TokenType::Identifier;
-			}
-			case StateSet::Number:                          return TokenType::Number;
-			case StateSet::Macro:                           return TokenType::Preprocess;
-			case StateSet::Comment:                         return TokenType::Comment;
-			case StateSet::MultilineComment:                return TokenType::Comment;
-			case StateSet::MultilineCommentEnd:             return TokenType::Comment;
-			case StateSet::Punctuation:                     return TokenType::Punctuation;
-			case StateSet::NumberPuncuation:                return TokenType::Punctuation;
-			case StateSet::String:                          return TokenType::String;
-			case StateSet::Other:                           return TokenType::Other;
-			default:
-				return TokenType::Identifier;
+				case StateSet::Number:                          return HLSL::TokenType::Number;
+				case StateSet::Macro:                           return HLSL::TokenType::Preprocess;
+				case StateSet::Comment:                         return HLSL::TokenType::Comment;
+				case StateSet::MultilineComment:                return HLSL::TokenType::Comment;
+				case StateSet::MultilineCommentEnd:             return HLSL::TokenType::Comment;
+				case StateSet::Punctuation:                     return HLSL::TokenType::Punctuation;
+				case StateSet::NumberPuncuation:                return HLSL::TokenType::Punctuation;
+				case StateSet::String:                          return HLSL::TokenType::String;
+				default:
+					return HLSL::TokenType::Other;
 			}
 		};
 
@@ -98,7 +96,7 @@ namespace SH
 			{
 				//Still need a token to correctly display
 				TokenizedLine.State = (LastState == StateSet::MultilineComment) ? LineContState::MultilineComment : LineContState::None;
-				TokenizedLine.Tokens.Emplace(TokenType::Other);
+				TokenizedLine.Tokens.Emplace(HLSL::TokenType::Other);
 				TokenizedLines.Add(MoveTemp(TokenizedLine));
 			}
 			else
@@ -107,7 +105,7 @@ namespace SH
 				StateSet CurState = (LastState == StateSet::MultilineComment) ? StateSet::MultilineComment : StateSet::Start;
 				int32 CurOffset = LineRange.BeginIndex;
 				int32 TokenStart = CurOffset;
-				TOptional<TokenType> LastTokenType; //The token is not a white space;
+				TOptional<HLSL::TokenType> LastTokenType; //The token is not a white space;
 
 				while (CurOffset < LineRange.EndIndex)
 				{
@@ -170,7 +168,7 @@ namespace SH
 								}
 								
 								if (MatchedPunctuation == "+" || MatchedPunctuation == "-") {
-									if (LastTokenType && (LastTokenType == TokenType::Identifier || LastTokenType == TokenType::Number)) {
+									if (LastTokenType && (LastTokenType == HLSL::TokenType::Identifier || LastTokenType == HLSL::TokenType::Number)) {
 										CurState = StateSet::Punctuation;
 									}
 									else {
@@ -226,7 +224,7 @@ namespace SH
 							int32 TokenEnd = CurOffset;
 							FTextRange TokenRange{ TokenStart, TokenEnd };
 							FString TokenString = HlslCodeString.Mid(TokenRange.BeginIndex, TokenRange.Len());
-							TokenType FinalTokenType = StateSetToTokenType(TokenString, LastState);
+							HLSL::TokenType FinalTokenType = StateSetToTokenType(TokenString, LastState);
 
 							if (TokenString != " ") {
 								LastTokenType = FinalTokenType;

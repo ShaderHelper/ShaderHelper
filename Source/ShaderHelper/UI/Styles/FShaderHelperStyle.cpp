@@ -69,8 +69,6 @@ namespace SH {
 			.SetFont(CodeFontInfo)
 			.SetColorAndOpacity(FLinearColor::White);
 		
-		FTextBlockStyle CodeEditorPunctuationTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
-			.SetColorAndOpacity(FLinearColor{1.0f, 0.65f, 0.0f, 1.0f});
 		FTextBlockStyle CodeEditorKeywordTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
 			.SetColorAndOpacity(FLinearColor{1.0f, 0.4f, 0.7f, 1.0f});
 		FTextBlockStyle CodeEditorNumberTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
@@ -83,18 +81,31 @@ namespace SH {
 			.SetColorAndOpacity(FLinearColor{ 0.1f, 0.55f, 1.0f, 1.0f });
 		FTextBlockStyle CodeEditorPreprocessTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
 			.SetColorAndOpacity(FLinearColor{0.35f, 0.35f, 0.35f, 1.0f});
-		FTextBlockStyle CodeEditorStringText = FTextBlockStyle{ CodeEditorNormalTextStyle }
+		FTextBlockStyle CodeEditorStringTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
 			.SetColorAndOpacity(FLinearColor{ 1.0f, 0.8f, 0.66f, 1.0f });
-
+		
+		FTextBlockStyle CodeEditorFuncTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
+			.SetColorAndOpacity(FLinearColor{ 1.0f, 0.93f, 0.54f, 1.0f });
+		FTextBlockStyle CodeEditorTypeTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
+			.SetColorAndOpacity(FLinearColor{ 0.0f, 0.81f, 0.81f, 1.0f });
+		FTextBlockStyle CodeEditorParmTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
+			.SetColorAndOpacity(FLinearColor{ 0.39f, 0.72f, 1.0f, 1.0f });
+		FTextBlockStyle CodeEditorVarTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
+			.SetColorAndOpacity(FLinearColor{ 0.93f, 0.51f, 0.38f, 1.0f });
+		
 		Style->Set("CodeEditorNormalText", CodeEditorNormalTextStyle);
-		Style->Set("CodeEditorPunctuationText", CodeEditorPunctuationTextStyle);
 		Style->Set("CodeEditorKeywordText", CodeEditorKeywordTextStyle);
 		Style->Set("CodeEditorNumberText", CodeEditorNumberTextStyle);
 		Style->Set("CodeEditorCommentText", CodeEditorCommentTextStyle);
 		Style->Set("CodeEditorBuildtinFuncText", CodeEditorBuildtinFuncTextStyle);
 		Style->Set("CodeEditorBuildtinTypeText", CodeEditorBuildtinTypeTextStyle);
 		Style->Set("CodeEditorPreprocessText", CodeEditorPreprocessTextStyle);
-		Style->Set("CodeEditorStringText", CodeEditorStringText);
+		Style->Set("CodeEditorStringText", CodeEditorStringTextStyle);
+		
+		Style->Set("CodeEditorFuncText", CodeEditorFuncTextStyle);
+		Style->Set("CodeEditorTypeText", CodeEditorTypeTextStyle);
+		Style->Set("CodeEditorParmText", CodeEditorParmTextStyle);
+		Style->Set("CodeEditorVarText", CodeEditorVarTextStyle);
 
 		FTextBlockStyle CodeEditorErrorInfoStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
 			.SetColorAndOpacity(FLinearColor::Red);

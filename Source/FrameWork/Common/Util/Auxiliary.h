@@ -370,6 +370,17 @@ namespace AUX
         }                                                                                                               \
     };
 
+#define STEAL_PRIVATE_TYPE(AliasType, ClassName, Type)                                                              \
+	namespace                                                                                                       \
+	{                                                                                                               \
+		decltype(auto) GetPrivate_##ClassName##_##Type();                                                           \
+		template <typename T> struct Hack_##ClassName##_##Type {                                                    \
+			friend decltype(auto) GetPrivate_##ClassName##_##Type() { return std::type_identity<T>{}; }             \
+		};                                                                                                          \
+		template struct Hack_##ClassName##_##Type<ClassName::Type>;                                                 \
+		using AliasType = decltype(GetPrivate_##ClassName##_##Type())::type;                                        \
+	};
+
 	template<typename T>
 	class InitListWrapper : FNoncopyable
 	{

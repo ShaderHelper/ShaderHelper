@@ -54,7 +54,6 @@ namespace SH
         SShaderEditorBox* OwnerWidget;
 		FTextLayout* TextLayout;
 		TSharedPtr<HlslTokenizer> Tokenizer;
-		TMap<HlslTokenizer::TokenType, FTextBlockStyle> TokenStyleMap;
 		//Key: The line index of Left Brace in MultiLineEditableText
 		TMap<int32, HlslTokenizer::BraceGroup> FoldingBraceGroups;
 		int32 FontSize{};
@@ -124,6 +123,22 @@ namespace SH
 		TMap<int32, ErrorEffectInfo> LineNumberToErrorInfo;
 	};
 
+	struct ISenseTask
+	{
+		std::optional<FW::GpuShaderSourceDesc> ShaderDesc;
+		
+		FString CursorToken;
+		uint32 Row = 0;
+		uint32 Col = 0;
+		bool IsMemberAccess = false;
+	};
+
+	struct SyntaxTask
+	{
+		std::optional<FW::GpuShaderSourceDesc> ShaderDesc;
+		TArray<TArray<HlslTokenizer::Token>> LineTokens;
+	};
+
 	class SShaderEditorBox : public SCompoundWidget
 	{
 	public:
@@ -137,17 +152,10 @@ namespace SH
             Compiling,
             Failed,
         };
-        
-        struct ISenseTask
-        {
-			std::optional<FW::GpuShaderSourceDesc> ShaderDesc;
-            
-            FString CursorToken;
-            uint32 Row = 0;
-            uint32 Col = 0;
-            bool IsMemberAccess = false;
-        };
-        
+		
+		static FTextBlockStyle& GetTokenStyle(HLSL::TokenType InType);
+		static FSlateFontInfo& GetCodeFontInfo();
+		
     public:
 		SLATE_BEGIN_ARGS(SShaderEditorBox) 
 			: _ShaderAssetObj(nullptr)
@@ -181,7 +189,6 @@ namespace SH
         TSharedRef<ITableRow> GenerateCodeCompletionItem(CandidateItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 
 		ShaderAsset* GetShaderAsset() const { return ShaderAssetObj; }
-        FSlateFontInfo& GetFontInfo() { return CodeFontInfo; }
         FText GetEditStateText() const;
         FText GetFontSizeText() const;
         FText GetRowColText() const;
@@ -200,6 +207,7 @@ namespace SH
         void UpdateLineNumberData();
         void RefreshLineNumberToErrorInfo();
         void RefreshCodeCompletionTip();
+		void RefreshSyntaxHighlight();
 
 	protected:
 		virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
@@ -229,6 +237,15 @@ namespace SH
 		TArray<int32> BreakPointLines;
         //The visible content in editor, and contains fold markers.
         FString CurrentEditorSource;
+		
+		//Syntax highlight
+		TArray<TMap<FTextRange, FTextBlockStyle*>> LineSyntaxHighlightMaps;
+		TUniquePtr<FThread> SyntaxThread;
+		TQueue<SyntaxTask> SyntaxQueue;
+		std::atomic<bool> bQuitISyntax{};
+		std::atomic<bool> bRefreshSyntax{};
+		FEvent* SyntaxEvent = nullptr;
+		//
         
 	private:
         //The text after unfolding, but that may not be the content compiled finally.
@@ -255,7 +272,6 @@ namespace SH
 
 		ShaderAsset* ShaderAssetObj;
         EditState CurEditState;
-        FSlateFontInfo CodeFontInfo;
 		TSharedPtr<SHorizontalBox> InfoBarBox;
 
 		bool IsFoldEditTransaction{};
@@ -278,7 +294,6 @@ namespace SH
         bool bTryComplete = false;
         bool bKeyChar = false;
         //
-		//TArray<>
 		bool bTryMergeUndoState = false;
 	};
 }

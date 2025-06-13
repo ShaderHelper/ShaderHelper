@@ -24,6 +24,7 @@ STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, TSharedPtr<SlateEditableTextTypes
 STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, SlateEditableTextTypes::FCursorInfo, CursorInfo)
 STEAL_PRIVATE_MEMBER(STextBlock, TUniquePtr< FSlateTextBlockLayout >, TextLayoutCache)
 STEAL_PRIVATE_MEMBER(FSlateTextBlockLayout, TSharedPtr<FSlateTextLayout>, TextLayout)
+STEAL_PRIVATE_MEMBER(FTextLayout, uint8, DirtyFlags)
 CALL_PRIVATE_FUNCTION(SMultiLineEditableText_OnMouseWheel, SMultiLineEditableText, OnMouseWheel,, FReply, const FGeometry&, const FPointerEvent&)
 
 using namespace FW;
@@ -119,6 +120,11 @@ const FString ErrorMarkerText = TEXT("✘");
         ISenseEvent->Trigger();
         ISenseThread->Join();
         FPlatformProcess::ReturnSynchEventToPool(ISenseEvent);
+		
+		bQuitISyntax = true;
+		SyntaxEvent->Trigger();
+		SyntaxThread->Join();
+		FPlatformProcess::ReturnSynchEventToPool(SyntaxEvent);
     }
 
     static bool FuzzyMatch(const FString& Candidate, const FString& Token)
@@ -144,9 +150,45 @@ const FString ErrorMarkerText = TEXT("✘");
         return true;
     }
 
+	FSlateFontInfo& SShaderEditorBox::GetCodeFontInfo()
+	{
+		static FSlateFontInfo CodeFontInfo = FShaderHelperStyle::Get().GetFontStyle("CodeFont");
+		return CodeFontInfo;
+	}
+
+	FTextBlockStyle& SShaderEditorBox::GetTokenStyle(HLSL::TokenType InType)
+	{
+		static TMap<HLSL::TokenType, FTextBlockStyle> TokenStyleMap {
+			{ HLSL::TokenType::Number, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNumberText") },
+			{ HLSL::TokenType::Keyword, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorKeywordText") },
+			{ HLSL::TokenType::Punctuation, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText") },
+			{ HLSL::TokenType::BuildtinFunc, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuildtinFuncText") },
+			{ HLSL::TokenType::BuildtinType, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuildtinTypeText") },
+			{ HLSL::TokenType::Identifier, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText") },
+			{ HLSL::TokenType::Preprocess, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorPreprocessText") },
+			{ HLSL::TokenType::Comment, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorCommentText") },
+			{ HLSL::TokenType::String, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorStringText") },
+			{ HLSL::TokenType::Other, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText") },
+			
+			{ HLSL::TokenType::Func, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorFuncText")},
+			{ HLSL::TokenType::Type, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorTypeText")},
+			{ HLSL::TokenType::Parm, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorParmText")},
+			{ HLSL::TokenType::Var, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorVarText")},
+			{ HLSL::TokenType::LocalVar, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText")},
+		};
+		auto& CodeFontInfo = GetCodeFontInfo();
+		for(auto& [_, Style] : TokenStyleMap)
+		{
+			if(Style.Font != CodeFontInfo)
+			{
+				Style.SetFont(CodeFontInfo);
+			}
+		}
+		return TokenStyleMap[InType];
+	}
+
     void SShaderEditorBox::Construct(const FArguments& InArgs)
     {
-        CodeFontInfo = FShaderHelperStyle::Get().GetFontStyle("CodeFont");
 		ShaderAssetObj = InArgs._ShaderAssetObj;
         SAssignNew(ShaderMultiLineVScrollBar, SScrollBar).Orientation(EOrientation::Orient_Vertical);
         SAssignNew(ShaderMultiLineHScrollBar, SScrollBar).Orientation(EOrientation::Orient_Horizontal);
@@ -167,7 +209,7 @@ const FString ErrorMarkerText = TEXT("✘");
                 if(Task.ShaderDesc)
                 {
 					TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(Task.ShaderDesc.value());
-                    ISenseTU TU{Shader->GetProcessedSourceText(), Shader->GetIncludeDirs()};
+					ShaderTU TU{Shader->GetProcessedSourceText(), Shader->GetIncludeDirs()};
                     ErrorInfos = TU.GetDiagnostic();
                     
                     CandidateInfos.Reset();
@@ -227,13 +269,58 @@ const FString ErrorMarkerText = TEXT("✘");
                         });
                     }
                     
-                    bRefreshIsense.store(true, std::memory_order_release);
+					if(ISenseQueue.IsEmpty())
+					{
+						bRefreshIsense.store(true, std::memory_order_release);
+					}
                 }
 
-                ISenseEvent->Wait();
-                FPlatformProcess::SleepNoStats(0.01f);
+				if(ISenseQueue.IsEmpty())
+				{
+					ISenseEvent->Wait();
+					FPlatformProcess::SleepNoStats(0.01f);
+				}
             }
         });
+		
+		SyntaxEvent = FPlatformProcess::GetSynchEventFromPool();
+		SyntaxThread = MakeUnique<FThread>(TEXT("SyntaxThread"), [this]{
+			while(!bQuitISyntax)
+			{
+				SyntaxTask Task;
+				while(SyntaxQueue.Dequeue(Task));
+				if(Task.ShaderDesc)
+				{
+					TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(Task.ShaderDesc.value());
+					ShaderTU TU{Shader->GetSourceText(), Shader->GetIncludeDirs()};
+					LineSyntaxHighlightMaps.Reset();
+					LineSyntaxHighlightMaps.SetNum(Task.LineTokens.Num());
+					int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
+					for(int LineIndex = 0; LineIndex < Task.LineTokens.Num(); LineIndex++)
+					{
+						for (const HlslTokenizer::Token& Token : Task.LineTokens[LineIndex])
+						{
+							HLSL::TokenType NewTokenType = TU.GetTokenType(Token.Type, ExtraLineNum + LineIndex + 1, Token.BeginOffset + 1);
+							if(NewTokenType != Token.Type)
+							{
+								LineSyntaxHighlightMaps[LineIndex].Add(FTextRange{Token.BeginOffset, Token.EndOffset},
+																	  &GetTokenStyle(NewTokenType));
+							}
+						}
+					}
+					
+					if(SyntaxQueue.IsEmpty())
+					{
+						bRefreshSyntax.store(true, std::memory_order_release);
+					}
+				}
+				
+				if(SyntaxQueue.IsEmpty())
+				{
+					SyntaxEvent->Wait();
+				}
+			}
+		});
         
         auto CustomScrollBar = SNew(SScrollBar).Padding(0)
             .Style(&FShaderHelperStyle::Get().GetWidgetStyle<FScrollBarStyle>("CustomScrollbar"));
@@ -275,7 +362,7 @@ const FString ErrorMarkerText = TEXT("✘");
 								SAssignNew(ShaderMultiLineEditableText, SMultiLineEditableText)
 								.Text(InitialShaderText)
 								.EnableUniformFont(true)
-								.Font(CodeFontInfo)
+								.Font(GetCodeFontInfo())
 								.Marshaller(ShaderMarshaller)
 								.VScrollBar(ShaderMultiLineVScrollBar)
 								.HScrollBar(ShaderMultiLineHScrollBar)
@@ -298,7 +385,7 @@ const FString ErrorMarkerText = TEXT("✘");
 								SAssignNew(EffectMultiLineEditableText, SMultiLineEditableText)
 								.IsReadOnly(true)
 								.EnableUniformFont(true)
-								.Font(CodeFontInfo)
+								.Font(GetCodeFontInfo())
 								.Marshaller(EffectMarshller)
 								.Visibility(EVisibility::HitTestInvisible)
 							]
@@ -556,6 +643,7 @@ const FString ErrorMarkerText = TEXT("✘");
                     FUIAction(FExecuteAction::CreateLambda(
                         [this, i]()
                         {
+							auto& CodeFontInfo = GetCodeFontInfo();
                             CodeFontInfo.Size = i;
                             ShaderMarshaller->MakeDirty();
 							ShaderMultiLineEditableText->SetFont(CodeFontInfo);
@@ -568,7 +656,7 @@ const FString ErrorMarkerText = TEXT("✘");
                         FIsActionChecked::CreateLambda(
                         [this, i]()
                         {
-                            return CodeFontInfo.Size == i;
+                            return GetCodeFontInfo().Size == i;
                         })),
                         NAME_None,
                         EUserInterfaceActionType::RadioButton);
@@ -861,6 +949,28 @@ const FString ErrorMarkerText = TEXT("✘");
         EffectTextLayout->SetVisibleRegion(EffectMultiLineGeometry.GetLocalSize(), ShaderScrollOffset * EffectTextLayout->GetScale());
     }
 
+	void SShaderEditorBox::RefreshSyntaxHighlight()
+	{
+		for(int LineIndex = 0; LineIndex < LineSyntaxHighlightMaps.Num(); LineIndex++)
+		{
+			auto& SyntaxHighlightMap = LineSyntaxHighlightMaps[LineIndex];
+			auto& LineModel =  ShaderMarshaller->TextLayout->GetLineModels()[LineIndex];
+			for(const auto& [TokenRange, Style] : SyntaxHighlightMap)
+			{
+				for(auto& RunModel : LineModel.Runs)
+				{
+					TSharedRef<IRun> Run = RunModel.GetRun();
+					if(Run->GetTextRange() == TokenRange)
+					{
+						RunModel = FTextLayout::FRunModel(FSlateTextStyleRefRun::Create(FRunInfo(), LineModel.Text, *Style, TokenRange));
+					}
+				}
+			}
+		}
+		
+		GetPrivate_FTextLayout_DirtyFlags(*ShaderMarshaller->TextLayout) |= (1 << 0);
+	}
+
     void SShaderEditorBox::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
     {
         SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
@@ -871,6 +981,12 @@ const FString ErrorMarkerText = TEXT("✘");
             RefreshCodeCompletionTip();
             bRefreshIsense.store(false, std::memory_order_relaxed);
         }
+		
+		if(bRefreshSyntax.load(std::memory_order_acquire))
+		{
+			RefreshSyntaxHighlight();
+			bRefreshSyntax.store(false, std::memory_order_relaxed);
+		}
         
         UpdateListViewScrollBar();
         UpdateEffectText();
@@ -929,7 +1045,7 @@ const FString ErrorMarkerText = TEXT("✘");
 
     TSharedRef<ITableRow> SShaderEditorBox::GenerateCodeCompletionItem(CandidateItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
     {
-		auto CandidateText = SNew(STextBlock).Font(CodeFontInfo)
+		auto CandidateText = SNew(STextBlock).Font(GetCodeFontInfo())
 		.Text(FText::FromString(Item->Text))
 		.OverflowPolicy(ETextOverflowPolicy::Ellipsis);
 		
@@ -1633,7 +1749,7 @@ const FString ErrorMarkerText = TEXT("✘");
     {
         int32 LineIndex = GetLineIndex(LineNumber);
         FSlateTextLayout* ShaderTextLayout = static_cast<FSlateTextLayout*>(ShaderMarshaller->TextLayout);
-        TArray< FTextLayout::FLineModel >& Lines = const_cast<TArray<FTextLayout::FLineModel>&>(ShaderTextLayout->GetLineModels());
+        TArray< FTextLayout::FLineModel >& Lines = ShaderTextLayout->GetLineModels();
         
 		IsFoldEditTransaction = true;
 		ShaderMultiLineEditableTextLayout->BeginEditTransation();
@@ -1765,6 +1881,7 @@ const FString ErrorMarkerText = TEXT("✘");
         int32 LineNumber = FCString::Atoi(*(*Item).ToString());
         const int32 LineIndex = GetLineIndex(LineNumber);
 		
+		auto& CodeFontInfo = GetCodeFontInfo();
 		float MinWidth = FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(TEXT("0"), CodeFontInfo).X;
 		MinWidth *= FString::FromInt(MaxLineNumber).Len();
         
@@ -1935,7 +2052,7 @@ const FString ErrorMarkerText = TEXT("✘");
     {
         //DummyTextBlock is used to keep the same layout as LineNumber and MultiLineEditableText.
         TSharedPtr<STextBlock> DummyTextBlock = SNew(STextBlock)
-            .Font(CodeFontInfo)
+            .Font(GetCodeFontInfo())
             .Visibility(EVisibility::Hidden);
 		int32 LineNumber = FCString::Atoi(*(*Item).ToString());
 		
@@ -2004,16 +2121,7 @@ const FString ErrorMarkerText = TEXT("✘");
         , TextLayout(nullptr)
         , Tokenizer(MoveTemp(InTokenizer))
     {
-        TokenStyleMap.Add(HlslTokenizer::TokenType::Number, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNumberText"));
-        TokenStyleMap.Add(HlslTokenizer::TokenType::Keyword, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorKeywordText"));
-        TokenStyleMap.Add(HlslTokenizer::TokenType::Punctuation, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorPunctuationText"));
-        TokenStyleMap.Add(HlslTokenizer::TokenType::BuildtinFunc, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuildtinFuncText"));
-        TokenStyleMap.Add(HlslTokenizer::TokenType::BuildtinType, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuildtinTypeText"));
-        TokenStyleMap.Add(HlslTokenizer::TokenType::Identifier, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText"));
-        TokenStyleMap.Add(HlslTokenizer::TokenType::Preprocess, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorPreprocessText"));
-        TokenStyleMap.Add(HlslTokenizer::TokenType::Comment, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorCommentText"));
-		TokenStyleMap.Add(HlslTokenizer::TokenType::String, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorStringText"));
-        TokenStyleMap.Add(HlslTokenizer::TokenType::Other, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText"));
+       
     }
 
     void FShaderEditorMarshaller::SetText(const FString& SourceString, FTextLayout& TargetTextLayout, TArray<FTextLayout::FLineModel>&& OldLineModels)
@@ -2038,8 +2146,7 @@ const FString ErrorMarkerText = TEXT("✘");
 				TOptional<int32> MarkerIndex = OwnerWidget->FindFoldMarker(LineIndex);
 				for (const HlslTokenizer::Token& Token : TokenizedLines[LineIndex].Tokens)
 				{
-					FTextBlockStyle& RunTextStyle = TokenStyleMap[Token.Type];
-					RunTextStyle.SetFont(OwnerWidget->GetFontInfo());
+					FTextBlockStyle& RunTextStyle = OwnerWidget->GetTokenStyle(Token.Type);
 					FTextRange NewTokenRange{ Token.BeginOffset, Token.EndOffset };
 
 					if (MarkerIndex && LineText->Mid(NewTokenRange.BeginIndex, 1) == FoldMarkerText)
@@ -2085,8 +2192,7 @@ const FString ErrorMarkerText = TEXT("✘");
 					TOptional<int32> MarkerIndex = OwnerWidget->FindFoldMarker(LineIndex);
 					for (const HlslTokenizer::Token& Token : NewTokenizedLine.Tokens)
 					{
-						FTextBlockStyle& RunTextStyle = TokenStyleMap[Token.Type];
-						RunTextStyle.SetFont(OwnerWidget->GetFontInfo());
+						FTextBlockStyle& RunTextStyle = OwnerWidget->GetTokenStyle(Token.Type);
 						FTextRange NewTokenRange{ Token.BeginOffset, Token.EndOffset };
 
 						if (MarkerIndex && LineText->Mid(NewTokenRange.BeginIndex, 1) == FoldMarkerText)
@@ -2104,6 +2210,20 @@ const FString ErrorMarkerText = TEXT("✘");
 			}
 		
 		}
+		
+		SyntaxTask Task;
+		Task.ShaderDesc = OwnerWidget->GetShaderAsset()->GetShaderDesc(SourceString);
+		Task.LineTokens.SetNum(LineModels.Num());
+		for(int32 LineIndex = 0; LineIndex < LineModels.Num(); LineIndex++)
+		{
+			HlslTokenizer::TokenizedLine* CurTokenizedLine = static_cast<HlslTokenizer::TokenizedLine*>(LineModels[LineIndex].CustomData.Get());
+			for (const HlslTokenizer::Token& Token : CurTokenizedLine->Tokens)
+			{
+				Task.LineTokens[LineIndex].Add(Token);
+			}
+		}
+		OwnerWidget->SyntaxQueue.Enqueue(MoveTemp(Task));
+		OwnerWidget->SyntaxEvent->Trigger();
 
         TArray<HlslTokenizer::BraceGroup> BraceGroups;
 		struct BraceStackData
@@ -2212,10 +2332,10 @@ const FString ErrorMarkerText = TEXT("✘");
         {
             TArray<TSharedRef<IRun>> Runs;
             FTextBlockStyle ErrorInfoStyle = FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorErrorInfoText");
-            ErrorInfoStyle.SetFont(OwnerWidget->GetFontInfo());
+            ErrorInfoStyle.SetFont(OwnerWidget->GetCodeFontInfo());
 
             FTextBlockStyle DummyInfoStyle = FTextBlockStyle{}
-                .SetFont(OwnerWidget->GetFontInfo())
+                .SetFont(OwnerWidget->GetCodeFontInfo())
                 .SetColorAndOpacity(FLinearColor{ 0, 0, 0, 0 });
 
             int32 CurLineNumber = OwnerWidget->GetLineNumber(LineIndex);
