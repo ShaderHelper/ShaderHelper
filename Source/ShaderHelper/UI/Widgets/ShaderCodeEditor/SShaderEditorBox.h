@@ -208,6 +208,8 @@ namespace SH
         void RefreshLineNumberToErrorInfo();
         void RefreshCodeCompletionTip();
 		void RefreshSyntaxHighlight();
+		
+		void StartDebugging(const FW::Vector2u& PixelCoord);
 
 	protected:
 		virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
@@ -220,7 +222,6 @@ namespace SH
 		void CutSelectedText();
         void PasteText();
 
-		void UpdateListViewScrollBar();
 		void UpdateEffectText();
 		void HandleAutoIndent();
         TSharedRef<SWidget> BuildInfoBar();
@@ -240,6 +241,7 @@ namespace SH
 		
 		//Syntax highlight
 		TArray<TMap<FTextRange, FTextBlockStyle*>> LineSyntaxHighlightMaps;
+		TArray<TMap<FTextRange, FTextBlockStyle*>> LineSyntaxHighlightMapsCopy;
 		TUniquePtr<FThread> SyntaxThread;
 		TQueue<SyntaxTask> SyntaxQueue;
 		std::atomic<bool> bQuitISyntax{};
@@ -295,5 +297,6 @@ namespace SH
         bool bKeyChar = false;
         //
 		bool bTryMergeUndoState = false;
+		bool bTryToggleCommentSelection = false;
 	};
 }

@@ -403,14 +403,14 @@ namespace FW
 		DxcReferencedCursor->GetLexicalParent(DxcReferencedCursorLexPar.GetInitReference());
 		DxcReferencedCursorLexPar->GetKind(&ReferencedCursorLexParKind);
 		
-		BSTR CursorName;
-		BSTR ReferencedCursorName;
-		DxcCursor->GetDisplayName(&CursorName);
-		DxcReferencedCursor->GetDisplayName(&ReferencedCursorName);
-		LPSTR CursorSpelling;
-		LPSTR ReferencedCursorSpelling;
-		DxcCursor->GetSpelling(&CursorSpelling);
-		DxcCursor->GetSpelling(&ReferencedCursorSpelling);
+//		BSTR CursorName;
+//		BSTR ReferencedCursorName;
+//		DxcCursor->GetDisplayName(&CursorName);
+//		DxcReferencedCursor->GetDisplayName(&ReferencedCursorName);
+//		LPSTR CursorSpelling;
+//		LPSTR ReferencedCursorSpelling;
+//		DxcCursor->GetSpelling(&CursorSpelling);
+//		DxcCursor->GetSpelling(&ReferencedCursorSpelling);
 		
 		if(InType == HLSL::TokenType::Identifier)
 		{

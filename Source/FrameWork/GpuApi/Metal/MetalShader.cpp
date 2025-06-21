@@ -166,12 +166,12 @@ namespace FW
         //Need the meta datas from spirv to abstract gpu api
         //For example, metal's threadgroupsize is not specified in the shader 
         //and needs to be specified directly by dispatchThreadgroups
-        FString ParserError;
         TArray<uint32> SpvCode = {static_cast<const uint32*>(Results[0].target.Data()), Results[0].target.Size() / 4};
         SpvMetaContext MetaContext;
         SpvMetaVisitor MetaVisitor{MetaContext};
-        ParseSpv(SpvCode, {&MetaVisitor}, ParserError);
-        check(ParserError.IsEmpty());
+		SpirvParser Parser;
+		Parser.Parse(SpvCode);
+		Parser.Accept(&MetaVisitor);
         InShader->ThreadGroupSize = MetaContext.ThreadGroupSize;
 
         FString MslSourceText = {(int32)Results[1].target.Size(), static_cast<const char*>(Results[1].target.Data())};

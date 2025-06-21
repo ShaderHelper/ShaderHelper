@@ -24,22 +24,14 @@ namespace SH
 {
 	static const FString WindowLayoutFileName = PathHelper::SavedDir() / TEXT("WindowLayout.json");
 
-	const FName PreviewTabId = "Preview";
-	const FName PropretyTabId = "Propety";
-
-	const FName CodeTabId = "Code";
-    const FName InitialInsertPointTabId = "CodeInsertPoint";
-
-    const FName AssetTabId = "Asset";
-	const FName GraphTabId = "Graph";
-    const FName LogTabId = "Log";
-
 	const TArray<FName> TabIds{
-		PreviewTabId, PropretyTabId, CodeTabId, AssetTabId, GraphTabId, LogTabId
+		PreviewTabId, PropretyTabId, CodeTabId, AssetTabId, GraphTabId, LogTabId,
+		VariableTabId, CallStackTabId
 	};
 
     const TArray<FName> WindowMenuTabIds{
-        PreviewTabId, PropretyTabId, AssetTabId, GraphTabId, LogTabId
+        PreviewTabId, PropretyTabId, AssetTabId, GraphTabId, LogTabId,
+		VariableTabId, CallStackTabId
     };
 
 	ShaderHelperEditor::ShaderHelperEditor(const Vector2f& InWindowSize, ShRenderer* InRenderer)
@@ -94,7 +86,7 @@ namespace SH
 				(
 					FTabManager::NewSplitter()
 					->SetOrientation(Orient_Vertical)
-					->SetSizeCoefficient(0.4f)
+					->SetSizeCoefficient(0.32f)
 					->Split
 					(
 						FTabManager::NewStack()
@@ -113,7 +105,7 @@ namespace SH
 				(
 					FTabManager::NewSplitter()
 					->SetOrientation(Orient_Vertical)
-					->SetSizeCoefficient(0.4f)
+					->SetSizeCoefficient(0.48f)
 					->Split
 					(
 						FTabManager::NewStack()
@@ -122,19 +114,32 @@ namespace SH
 					)
 					->Split
 					(
-						FTabManager::NewStack()
+						FTabManager::NewSplitter()
+						->SetOrientation(Orient_Horizontal)
 						->SetSizeCoefficient(0.3f)
-						->AddTab(AssetTabId, ETabState::OpenedTab)
-                        ->AddTab(LogTabId, ETabState::OpenedTab)
-                        ->SetForegroundTab(AssetTabId)
+						->Split
+						(
+							 FTabManager::NewStack()
+							 ->SetSizeCoefficient(0.5f)
+							 ->AddTab(CallStackTabId, ETabState::ClosedTab)
+							 ->AddTab(AssetTabId, ETabState::OpenedTab)
+							 ->AddTab(LogTabId, ETabState::OpenedTab)
+							 ->SetForegroundTab(AssetTabId)
+						)
+						->Split
+						(
+							 FTabManager::NewStack()
+							 ->SetSizeCoefficient(0.5f)
+							 ->AddTab(VariableTabId, ETabState::ClosedTab)
+						)
 					)
 				)
                 ->Split
-                 (
-                     FTabManager::NewStack()
-                     ->SetSizeCoefficient(0.15f)
-                     ->AddTab(PropretyTabId, ETabState::OpenedTab)
-                 )
+				(
+					 FTabManager::NewStack()
+					 ->SetSizeCoefficient(0.15f)
+					 ->AddTab(PropretyTabId, ETabState::OpenedTab)
+				)
 			);
 
 		FVector2D UsedWindowPos = FVector2D::ZeroVector;
@@ -415,6 +420,18 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
             ];
             SpawnedTab->SetTabIcon(FAppCommonStyle::Get().GetBrush("Icons.Log"));
         }
+		else if(TabId == VariableTabId)
+		{
+			SpawnedTab = SNew(SDockTab)
+				.Label(LOCALIZATION(VariableTabId.ToString()));
+			SpawnedTab->SetTabIcon(FShaderHelperStyle::Get().GetBrush("Icons.Variable"));
+		}
+		else if(TabId == CallStackTabId)
+		{
+			SpawnedTab = SNew(SDockTab)
+				.Label(LOCALIZATION(CallStackTabId.ToString()));
+			SpawnedTab->SetTabIcon(FShaderHelperStyle::Get().GetBrush("Icons.CallStack"));
+		}
 		else if (TabId == PreviewTabId) {
 			auto ViewportWidget = SNew(SViewport)
 				.ViewportInterface(ViewPort)
