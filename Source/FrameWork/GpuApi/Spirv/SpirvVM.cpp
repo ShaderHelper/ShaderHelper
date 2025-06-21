@@ -7,4 +7,9 @@ namespace FW
 	{
 		
 	}
+
+	void SpvVmVisitor::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts)
+	{
+		
+	}
 }

@@ -7,8 +7,16 @@ namespace FW
 	struct SpvMetaContext
 	{
 		Vector3u ThreadGroupSize{};
+		
+		SpvId EntryPoint;
 		TMap<SpvId, FString> DebugStrs;
-		TMap<SpvId, SpvType*> Types;
+		TMap<SpvId, TUniquePtr<SpvType>> Types;
+		TMap<SpvId, SpvObject> Constants;
+		TMap<SpvId, SpvVariable> GlobalVariables;
+		TMap<SpvId, TUniquePtr<SpvDecoration>> Decorations;		//GlobalVarId -> Decoration
+		TMap<SpvId, SpvTypeDesc> TypeDescs;
+		TMap<SpvId, SpvVariableDesc> VariableDescs;
+		TMap<SpvId, TUniquePtr<SpvLexicalScope>> LexicalScopes;
 	};
 
 	class SpvMetaVisitor : public SpvVisitor
@@ -18,15 +26,39 @@ namespace FW
 		{}
 		
 	public:
-		void Visit(SpvOpTypeFloat* Inst) override;
+		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts) override;
 		
+		void Visit(SpvOpTypeFloat* Inst) override;
+		void Visit(SpvOpTypeInt* Inst) override;
+		void Visit(SpvOpTypeVector* Inst) override;
+		void Visit(SpvOpTypeBool* Inst) override;
+		void Visit(SpvOpTypePointer* Inst) override;
+		void Visit(SpvOpTypeStruct* Inst) override;
+ 
+		void Visit(SpvOpDecorate* Inst) override;
 		void Visit(SpvOpExecutionMode* Inst) override;
 		void Visit(SpvOpString* Inst) override;
 		void Visit(SpvOpConstant* Inst) override;
-	
+		void Visit(SpvOpConstantTrue* Inst) override;
+		void Visit(SpvOpConstantFalse* Inst) override;
+		void Visit(SpvOpConstantComposite* Inst) override;
+		
+		void Visit(SpvDebugCompilationUnit* Inst) override;
+		void Visit(SpvDebugFunction* Inst) override;
+ 
 	private:
 		SpvMetaContext& Context;
 	};
 
-	void ParseSpv(const TArray<uint32>& SpvCode, const TArray<SpvVisitor*>& Visitors, FString& OutErrorInfo);
+	class SpirvParser
+	{
+	public:
+		void Parse(const TArray<uint32>& SpvCode);
+		void Accept(SpvVisitor* Visitor);
+		
+	protected:
+		TMap<SpvId, SpvExtSet> ExtSets;
+		TArray<TUniquePtr<SpvInstruction>> Insts;
+	};
+	
 }

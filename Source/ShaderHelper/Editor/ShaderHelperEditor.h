@@ -17,6 +17,20 @@
 
 namespace SH
 {
+
+	const FName PreviewTabId = "Preview";
+	const FName PropretyTabId = "Propety";
+
+	const FName CodeTabId = "Code";
+	const FName InitialInsertPointTabId = "CodeInsertPoint";
+
+	const FName AssetTabId = "Asset";
+	const FName GraphTabId = "Graph";
+	const FName LogTabId = "Log";
+
+	const FName CallStackTabId = "CallStack";
+	const FName VariableTabId = "Variable";
+
 	class ShaderHelperEditor : public FW::Editor
 	{
 	public:
@@ -31,6 +45,7 @@ namespace SH
 		~ShaderHelperEditor();
     public:
         FTabManager* GetCodeTabManager() const { return CodeTabManager.Get(); }
+		FTabManager* GetTabManager() const { return TabManager.Get(); }
 		TSharedPtr<SWindow> GetMainWindow() const override { return Window; }
 		FW::PreviewViewPort* GetViewPort() const { return ViewPort.Get(); }
 		TSharedPtr<FUICommandList> GetUICommandList() const { return UICommandList; }
@@ -53,6 +68,7 @@ namespace SH
 		void SetDebuggableObject(DebuggableObject* InObject) { CurDebuggableObject = InObject; }
 		void EndDebugging();
 		void StartDebugging();
+		SShaderEditorBox* GetShaderEditor(FW::AssetPtr<ShaderAsset> InShader) { return ShaderEditors[InShader].Get();}
 
 	private:
 		TSharedRef<SDockTab> SpawnWindowTab(const FSpawnTabArgs& Args);

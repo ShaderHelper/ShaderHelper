@@ -2,6 +2,13 @@
 
 namespace FW
 {
+
+	enum class SpvExtSet
+	{
+		GLSLstd450,
+		NonSemanticShaderDebugInfo100,
+	};
+
 	enum class SpvDebugInfo100
 	{
 		DebugInfoNone = 0,
@@ -61,4 +68,48 @@ namespace FW
 		Unsigned = 6,
 		UnsignedChar = 7,
 	};
+
+	struct SpvVariableDesc
+	{
+		
+	};
+
+	struct SpvTypeDesc
+	{
+		
+	};
+	
+	enum class ScopeKind
+	{
+		TU,
+		Function,
+		Block,
+	};
+
+	struct SpvLexicalScope
+	{
+		ScopeKind Kind;
+		SpvLexicalScope* Parent = nullptr;
+	};
+
+	struct SpvCompilationUnit : SpvLexicalScope
+	{
+		SpvCompilationUnit() : SpvLexicalScope{ScopeKind::TU}
+		{}
+	};
+
+	struct SpvFunctionDesc : SpvLexicalScope
+	{
+		SpvFunctionDesc(SpvLexicalScope* InParent, const FString& InName, const SpvTypeDesc* InTypeDesc, uint32 InLine)
+		: SpvLexicalScope{ScopeKind::Function, InParent}
+		, Name(InName)
+		, TypeDesc(InTypeDesc)
+		, LineNumber(InLine)
+		{}
+		
+		FString Name;
+		const SpvTypeDesc* TypeDesc;
+		uint32 LineNumber;
+	};
+
 }

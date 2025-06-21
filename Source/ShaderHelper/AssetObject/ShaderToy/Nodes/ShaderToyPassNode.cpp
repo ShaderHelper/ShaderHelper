@@ -6,6 +6,7 @@
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/Property/PropertyData/PropertyUniformItem.h"
 #include "RenderResource/PrintBuffer.h"
+#include "Editor/AssetEditor/AssetEditor.h"
 
 using namespace FW;
 
@@ -63,12 +64,30 @@ namespace SH
 
 	void ShaderToyPassNode::OnFinalizePixel(const FW::Vector2u& PixelCoord)
 	{
-		
+		AssetOp::OpenAsset(Shader);
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(Shader);
+		ShaderEditor->StartDebugging(PixelCoord);
+		FTabManager* EditorTabManager = ShEditor->GetTabManager();
+		EditorTabManager->TryInvokeTab(VariableTabId);
+		EditorTabManager->TryInvokeTab(CallStackTabId);
 	}
 
 	void ShaderToyPassNode::OnEndDebuggging()
 	{
 		IsDebugging = false;
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		FTabManager* EditorTabManager = ShEditor->GetTabManager();
+		auto VarTab = EditorTabManager->FindExistingLiveTab(VariableTabId);
+		auto CallStackTab = EditorTabManager->FindExistingLiveTab(CallStackTabId);
+		if (VarTab)
+		{
+			VarTab->RequestCloseTab();
+		}
+		if(CallStackTab)
+		{
+			CallStackTab->RequestCloseTab();
+		}
 	}
 
     void ShaderToyPassNode::InitPins()
