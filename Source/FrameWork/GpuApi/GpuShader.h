@@ -61,10 +61,13 @@ namespace HLSL
 
 namespace FW
 {
-	enum class GpuShaderFlag
+	enum class GpuShaderCompilerFlag : uint32
 	{
-		Enable16bitType,
+		None = 0,
+		Enable16bitType = 1u << 0,
+		GenSpvForDebugging = 1u << 1,
 	};
+	ENUM_CLASS_FLAGS(GpuShaderCompilerFlag);
 
 	struct GpuShaderModel
 	{
@@ -133,9 +136,9 @@ namespace FW
         const FString& GetEntryPoint() const { return EntryPoint; }
 		GpuShaderModel GetShaderModelVer() const;
 
-		void AddFlag(GpuShaderFlag InFlag) { Flags.Add(InFlag); }
-		void AddFlags(TArray<GpuShaderFlag> InFlags) { Flags.Append(MoveTemp(InFlags)); }
-		bool HasFlag(GpuShaderFlag InFlag) const { return Flags.Find(InFlag) != INDEX_NONE; }
+	public:
+		GpuShaderCompilerFlag CompilerFlag = GpuShaderCompilerFlag::None;
+		TArray<uint32> SpvCode;
         
     protected:
         ShaderType Type;
@@ -147,8 +150,6 @@ namespace FW
         
         TOptional<FString> FileName;
         TArray<FString> IncludeDirs;
-
-		TArray<GpuShaderFlag> Flags;
     };
 
 	struct ShaderErrorInfo

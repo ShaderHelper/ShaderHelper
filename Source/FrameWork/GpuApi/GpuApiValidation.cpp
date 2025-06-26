@@ -1,6 +1,5 @@
 #include "CommonHeader.h"
 #include "GpuApiValidation.h"
-#include "magic_enum.hpp"
 #include "GpuApi/GpuRhi.h"
 
 namespace FW

@@ -15,12 +15,25 @@ namespace FW
         TArray<MetaMemberData*> MetaMemDatas = GetProperties(InObject->DynamicMetaType());
         for(MetaMemberData* MetaMemData : MetaMemDatas)
         {
+			TSharedPtr<PropertyData> Item;
             if(MetaMemData->IsAssetRef())
             {
                 void* AssetPtrRef = MetaMemData->Get(InObject);
-                TSharedRef<PropertyData> Item = MakeShared<PropertyAssetItem>(InObject, MetaMemData->MemberName, MetaMemData->GetShObjectMetaType(), AssetPtrRef);
-                Datas.Add(MoveTemp(Item));
+				Item = MakeShared<PropertyAssetItem>(InObject, MetaMemData->MemberName, MetaMemData->GetShObjectMetaType(), AssetPtrRef);
             }
+			//IsEnum
+			else if(MetaMemData->GetEnumValueName)
+			{
+				void* EnumValue = MetaMemData->Get(InObject);
+				auto EnumValueName = MakeShared<FString>(MetaMemData->GetEnumValueName(InObject));
+				Item = MakeShared<PropertyEnumItem>(InObject, MetaMemData->MemberName, EnumValue, EnumValueName, MetaMemData->EnumEntries, [=](void* NewValue){
+					MetaMemData->Set(InObject, NewValue);
+				});
+			}
+			
+			if(Item) {
+				Datas.Add(Item.ToSharedRef());
+			}
         }
         
         return Datas;

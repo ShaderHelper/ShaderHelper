@@ -1,5 +1,6 @@
 #pragma once
 #include "Auxiliary.h"
+#include "magic_enum.hpp"
 
 namespace FW
 {
@@ -55,6 +56,9 @@ namespace FW
         
         bool bShObjectRef;
         MetaType*(*GetShObjectMetaType)();
+		
+		FString(*GetEnumValueName)(void*) = nullptr;
+		TMap<FString, TSharedPtr<void>> EnumEntries;
     };
 
 	struct MetaType
@@ -171,9 +175,19 @@ namespace FW
             MemberData.Get = [](void* Instance) -> void* {
                 return &((T*)Instance->*DataPtr);
             };
+			if constexpr(std::is_enum_v<MemberType>)
+			{
+				MemberData.GetEnumValueName = [](void* Instance) -> FString {
+					return magic_enum::enum_name((T*)Instance->*DataPtr).data();
+				};
+				for(const auto& [EntryValue, EntryStr] : magic_enum::enum_entries<MemberType>())
+				{
+					MemberData.EnumEntries.Add(EntryStr.data(), MakeShared<MemberType>(EntryValue));
+				}
+			}
             MemberData.InfoType = InfoType;
             MemberData.InfoData = InfoData;
-            if(is_object_ptr<RawType>::value)
+            if constexpr(is_object_ptr<RawType>::value)
             {
                 MemberData.bShObjectRef = true;
                 //the metatype of member may not be registered at the moment, so lazy get.

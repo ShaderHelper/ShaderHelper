@@ -8,7 +8,6 @@
 #include "./Metal/MetalGpuRhiBackend.h"
 #endif
 #include "GpuApiValidation.h"
-#include "magic_enum.hpp"
 
 namespace FW
 {
@@ -251,9 +250,9 @@ public:
 		RhiBackend->SetResourceName(Name, InResource);
 	}
 
-	bool CompileShader(GpuShader *InShader, FString &OutErrorInfo, const TArray<FString>& Definitions) override
+	bool CompileShader(GpuShader *InShader, FString &OutErrorInfo, const TArray<FString>& ExtraArgs) override
 	{
-		return RhiBackend->CompileShader(InShader, OutErrorInfo, Definitions);
+		return RhiBackend->CompileShader(InShader, OutErrorInfo, ExtraArgs);
 	}
 
 	void BeginGpuCapture(const FString &CaptureName) override

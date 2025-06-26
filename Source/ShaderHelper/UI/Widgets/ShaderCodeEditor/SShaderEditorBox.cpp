@@ -12,7 +12,6 @@
 #include "ShaderCodeEditorLineHighlighter.h"
 #include "UI/Widgets/Misc/CommonCommands.h"
 #include "Editor/ShaderHelperEditor.h"
-#include "magic_enum.hpp"
 #include <Widgets/Text/SlateTextBlockLayout.h>
 #include <Framework/Text/SlateTextHighlightRunRenderer.h>
 #include <Fonts/FontMeasure.h>
@@ -2511,8 +2510,53 @@ const FString ErrorMarkerText = TEXT("✘");
         TextLayout->AddLines(MoveTemp(LinesToAdd));
     }
 
-	void SShaderEditorBox::StartDebugging(const FW::Vector2u& PixelCoord)
+	void SShaderEditorBox::DebugPixel(const FW::Vector2u& PixelCoord, const TArray<TRefCountPtr<FW::GpuBindGroup>>& BindGroups)
 	{
+		int32 DebugIndex= 2 * (PixelCoord.y & 1) + (PixelCoord.x & 1);
 		
+		TArray<SpvVmBinding> Bindings;
+		for(const auto& BindGroup : BindGroups)
+		{
+			const auto& BindGroupDesc = BindGroup->GetDesc();
+			int32 SetNumber = BindGroupDesc.Layout->GetGroupNumber();
+			for(const auto& [Slot, ResourceBindingEntry] : BindGroupDesc.Resources)
+			{
+				const auto& LayoutBindingEntry = BindGroupDesc.Layout->GetDesc().Layouts[Slot];
+				Bindings.Add({
+					.DescriptorSet = SetNumber,
+					.Binding = Slot,
+					.Resource = ResourceBindingEntry.Resource
+				});
+			}
+		}
+		
+		std::array<PixelThreadState,4> Quad;
+		//TODO z,w
+		uint32 QuadLeftTopX = PixelCoord.x & ~1u;
+		uint32 QuadLeftTopY = PixelCoord.y & ~1u;
+		Quad[0].FragCoord = {QuadLeftTopX + 0.5f, QuadLeftTopY + 0.5f, 0.0f, 1.0f};
+		Quad[1].FragCoord = {QuadLeftTopX + 1.5f, QuadLeftTopY + 0.5f, 0.0f, 1.0f};
+		Quad[2].FragCoord = {QuadLeftTopX + 0.5f, QuadLeftTopY + 1.5f, 0.0f, 1.0f};
+		Quad[3].FragCoord = {QuadLeftTopX + 1.5f, QuadLeftTopY + 1.5f, 0.0f, 1.0f};
+		
+		SpvVmPixelContext VmContext{
+			.DebugIndex = DebugIndex,
+			.Bindings = MoveTemp(Bindings),
+			.Quad = MoveTemp(Quad)
+		};
+		
+		SpvMetaVisitor MetaVisitor{VmContext};
+		SpvVmPixelVisitor VmVisitor{VmContext};
+		
+		TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(ShaderAssetObj->GetShaderDesc(CurrentShaderSource));
+		Shader->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
+		FString ErrorInfo;
+		GGpuRhi->CompileShader(Shader, ErrorInfo);
+		check(ErrorInfo.IsEmpty());
+
+		SpirvParser Parser;
+		Parser.Parse(Shader->SpvCode);
+		Parser.Accept(&MetaVisitor);
+		Parser.Accept(&VmVisitor);
 	}
 }

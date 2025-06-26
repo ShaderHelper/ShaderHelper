@@ -15,6 +15,7 @@ namespace SH
     REFLECTION_REGISTER(AddClass<ShaderToyPassNode>("ShaderPass Node")
 		.BaseClass<GraphNode>()
         .Data<&ShaderToyPassNode::Shader, MetaInfo::Property>("Shader")
+		.Data<&ShaderToyPassNode::Format, MetaInfo::Property>("Format")
 	)
     REFLECTION_REGISTER(AddClass<ShaderToyPassNodeOp>()
         .BaseClass<ShObjectOp>()
@@ -41,6 +42,7 @@ namespace SH
     }
 
 	ShaderToyPassNode::ShaderToyPassNode()
+	: Format(ShaderToyFormat::B8G8R8A8_UNORM)
 	{
 		ObjectName = FText::FromString("ShaderPass");
         Preview = MakeShared<PreviewViewPort>();
@@ -67,7 +69,7 @@ namespace SH
 		AssetOp::OpenAsset(Shader);
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(Shader);
-		ShaderEditor->StartDebugging(PixelCoord);
+		ShaderEditor->DebugPixel(PixelCoord, {CustomBindGroup, StShader::GetBuiltInBindGroup()});
 		FTabManager* EditorTabManager = ShEditor->GetTabManager();
 		EditorTabManager->TryInvokeTab(VariableTabId);
 		EditorTabManager->TryInvokeTab(CallStackTabId);
@@ -335,7 +337,7 @@ namespace SH
             if(PassOutput->GetValue()->GetWidth() != (uint32)ShaderToyContext.iResolution.x ||
                PassOutput->GetValue()->GetHeight() != (uint32)ShaderToyContext.iResolution.y)
             {
-                GpuTextureDesc Desc{ (uint32)ShaderToyContext.iResolution.x, (uint32)ShaderToyContext.iResolution.y, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
+                GpuTextureDesc Desc{ (uint32)ShaderToyContext.iResolution.x, (uint32)ShaderToyContext.iResolution.y, (GpuTextureFormat)Format, GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
                 TRefCountPtr<GpuTexture> PassOuputTex = GGpuRhi->CreateTexture(MoveTemp(Desc), GpuResourceState::RenderTargetWrite);
                 Preview->SetViewPortRenderTexture(PassOuputTex);
                 PassOutput->SetValue(PassOuputTex);

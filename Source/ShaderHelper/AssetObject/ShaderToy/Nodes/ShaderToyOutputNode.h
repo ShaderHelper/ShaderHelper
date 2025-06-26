@@ -1,6 +1,7 @@
 #pragma once
 #include "AssetObject/Graph.h"
 #include "AssetObject/ShaderToy/Pins/ShaderToyPin.h"
+#include "AssetObject/ShaderToy/ShaderToy.h"
 
 namespace SH
 {
@@ -26,5 +27,7 @@ namespace SH
         void InitPins() override;
 		void Serialize(FArchive& Ar) override;
         FW::ExecRet Exec(FW::GraphExecContext& Context) override;
+		
+		ShaderToyFormat Format;
 	};
 }

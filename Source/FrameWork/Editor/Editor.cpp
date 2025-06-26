@@ -2,7 +2,6 @@
 #include "Editor.h"
 #include "UI/Styles/FAppCommonStyle.h"
 #include "Common/Path/PathHelper.h"
-#include "magic_enum.hpp"
 #include <Framework/Commands/GenericCommands.h>
 #include "UI/Widgets/Misc/CommonCommands.h"
 

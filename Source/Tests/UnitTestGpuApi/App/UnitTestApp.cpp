@@ -42,12 +42,11 @@ namespace UNITTEST_GPUAPI
 		TRefCountPtr<GpuShader> Vs = GGpuRhi->CreateShaderFromFile({
 			.FileName = PathHelper::ShaderDir() / "Test/TestCast.hlsl",
 			.Type = ShaderType::VertexShader,
-			.EntryPoint = "MainVS"
+			.EntryPoint = "MainVS",
 		});
 		if (GpuFeature::Support16bitType) {
-			Vs->AddFlag(GpuShaderFlag::Enable16bitType);
+			Vs->CompilerFlag |= GpuShaderCompilerFlag::Enable16bitType;
 		}
-	
 		FString ErrorInfo;
 		GGpuRhi->CompileShader(Vs, ErrorInfo);
 		check(ErrorInfo.IsEmpty());

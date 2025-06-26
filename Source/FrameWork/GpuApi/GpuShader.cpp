@@ -229,7 +229,7 @@ namespace FW
 	GpuShaderModel GpuShader::GetShaderModelVer() const
 	{
 		GpuShaderModel ShaderModel;
-		if (HasFlag(GpuShaderFlag::Enable16bitType))
+		if (EnumHasAnyFlags(CompilerFlag, GpuShaderCompilerFlag::Enable16bitType))
 		{
 			ShaderModel.Minor = 2;
 		}

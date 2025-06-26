@@ -135,7 +135,7 @@ namespace FW
 		return ProfileName;
 	}
 
-	 bool DxcCompiler::Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo, const TArray<FString>& Definitions) const
+	 bool DxcCompiler::Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo, const TArray<FString>& ExtraArgs) const
 	 {
 		TRefCountPtr<IDxcBlobEncoding> BlobEncoding;
 		TRefCountPtr<IDxcResult> CompileResult;
@@ -161,7 +161,7 @@ namespace FW
 
 		ValidateGpuFeature(GpuFeature::Support16bitType, TEXT("Hardware does not support 16bitType, shader model <= 6.2"))
 		{
-			if (InShader->HasFlag(GpuShaderFlag::Enable16bitType))
+			if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::Enable16bitType))
 			{
 				Arguments.Add(TEXT("-enable-16bit-types"));
 				Arguments.Add(TEXT("-D"));
@@ -170,10 +170,9 @@ namespace FW
 		};
         Arguments.Add(TEXT("-D"));
         Arguments.Add(TEXT("FINAL_HLSL"));
-		for (const auto& Definition : Definitions)
+		for (const FString& ExtraArg : ExtraArgs)
 		{
-			Arguments.Add(TEXT("-D"));
-			Arguments.Add(*Definition);
+			Arguments.Add(*ExtraArg);
 		}
 		
 		DxcBuffer SourceBuffer = { 0 };

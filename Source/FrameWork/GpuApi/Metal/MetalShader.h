@@ -29,9 +29,7 @@ namespace FW
     
     TRefCountPtr<MetalShader> CreateMetalShader(const GpuShaderFileDesc& FileDesc);
     TRefCountPtr<MetalShader> CreateMetalShader(const GpuShaderSourceDesc& SourceDesc);
-
-    bool CompileShader(TRefCountPtr<MetalShader> InShader, FString& OutErrorInfo);
     
-    bool CompileShaderFromHlsl(TRefCountPtr<MetalShader> InShader, FString& OutErrorInfo);
+    bool CompileShaderFromHlsl(TRefCountPtr<MetalShader> InShader, FString& OutErrorInfo, const TArray<FString>& ExtraArgs);
 }
 
