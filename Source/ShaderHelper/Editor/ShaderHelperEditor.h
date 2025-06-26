@@ -29,7 +29,7 @@ namespace SH
 	const FName LogTabId = "Log";
 
 	const FName CallStackTabId = "CallStack";
-	const FName VariableTabId = "Variable";
+	const FName VariableTabId = "Variables";
 
 	class ShaderHelperEditor : public FW::Editor
 	{

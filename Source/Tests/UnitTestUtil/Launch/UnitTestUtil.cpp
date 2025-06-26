@@ -1,5 +1,4 @@
 #include "CommonHeader.h"
-#include "magic_enum.hpp"
 DEFINE_LOG_CATEGORY_STATIC(LogTestUtil, Log, All);
 #include <chrono>
 

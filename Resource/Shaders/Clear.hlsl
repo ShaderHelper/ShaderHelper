@@ -1,6 +1,6 @@
 #include "Common.hlsl"
 
-#if RESOURCE_TYPE == 0
+#if RESOURCE_TYPE == 1
 DECLARE_SHADER_RW_BUFFER(RWStructuredBuffer<uint>, ClearResource, 0)
 #endif
 

@@ -164,9 +164,9 @@ void MetalGpuRhiBackend::UnMapGpuBuffer(GpuBuffer *InGpuBuffer)
 	// do nothing.
 }
 
-bool MetalGpuRhiBackend::CompileShader(GpuShader *InShader, FString &OutErrorInfo, const TArray<FString>& Definitions)
+bool MetalGpuRhiBackend::CompileShader(GpuShader *InShader, FString &OutErrorInfo, const TArray<FString>& ExtraArgs)
 {
-	return CompileShaderFromHlsl(static_cast<MetalShader *>(InShader), OutErrorInfo);
+	return CompileShaderFromHlsl(static_cast<MetalShader *>(InShader), OutErrorInfo, ExtraArgs);
 }
 
 void MetalGpuRhiBackend::Submit(const TArray<GpuCmdRecorder*>& CmdRecorders)

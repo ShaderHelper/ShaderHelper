@@ -5,7 +5,6 @@
 #include <Misc/FileHelper.h>
 #include "Common/Path/PathHelper.h"
 #include "UI/Styles/FShaderHelperStyle.h"
-#include "magic_enum.hpp"
 #include <Framework/Docking/SDockingTabStack.h>
 #include "UI/Widgets/SShaderTab.h"
 #include "UI/Widgets/Graph/SGraphPanel.h"

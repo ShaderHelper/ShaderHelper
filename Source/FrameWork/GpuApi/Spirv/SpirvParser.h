@@ -12,14 +12,16 @@ namespace FW
 		TMap<SpvId, FString> DebugStrs;
 		TMap<SpvId, TUniquePtr<SpvType>> Types;
 		TMap<SpvId, SpvObject> Constants;
+		TMap<SpvId, SpvPointer> GlobalPointers;
 		TMap<SpvId, SpvVariable> GlobalVariables;
-		TMap<SpvId, TUniquePtr<SpvDecoration>> Decorations;		//GlobalVarId -> Decoration
+		TMultiMap<SpvId, SpvDecoration> Decorations;		//GlobalVarId -> Decoration
 		TMap<SpvId, SpvTypeDesc> TypeDescs;
 		TMap<SpvId, SpvVariableDesc> VariableDescs;
+		TMap<SpvId, SpvVariableDesc*> GlobalVariableDescMap;   //GlobalVarId -> Desc
 		TMap<SpvId, TUniquePtr<SpvLexicalScope>> LexicalScopes;
 	};
 
-	class SpvMetaVisitor : public SpvVisitor
+	class FRAMEWORK_API SpvMetaVisitor : public SpvVisitor
 	{
 	public:
 		SpvMetaVisitor(SpvMetaContext& InContext) : Context(InContext)
@@ -28,6 +30,8 @@ namespace FW
 	public:
 		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts) override;
 		
+		void Visit(SpvOpVariable* Inst) override;
+		void Visit(SpvOpTypeVoid* Inst) override;
 		void Visit(SpvOpTypeFloat* Inst) override;
 		void Visit(SpvOpTypeInt* Inst) override;
 		void Visit(SpvOpTypeVector* Inst) override;
@@ -45,12 +49,14 @@ namespace FW
 		
 		void Visit(SpvDebugCompilationUnit* Inst) override;
 		void Visit(SpvDebugFunction* Inst) override;
+		void Visit(SpvDebugLocalVariable* Inst) override;
+		void Visit(SpvDebugGlobalVariable* Inst) override;
  
 	private:
 		SpvMetaContext& Context;
 	};
 
-	class SpirvParser
+	class FRAMEWORK_API SpirvParser
 	{
 	public:
 		void Parse(const TArray<uint32>& SpvCode);

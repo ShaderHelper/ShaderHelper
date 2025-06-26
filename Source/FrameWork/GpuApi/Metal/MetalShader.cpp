@@ -70,109 +70,126 @@ namespace FW
         }
     }
 
-    bool CompileShaderFromHlsl(TRefCountPtr<MetalShader> InShader, FString& OutErrorInfo)
-    {
-        TArray<ShaderConductor::MacroDefine> Defines;
-        Defines.Add({"FINAL_METAL"});
-        
-        ShaderConductor::Compiler::SourceDesc SourceDesc{};
-        SourceDesc.stage = MapShaderCunductorStage(InShader->GetShaderType());
+    bool CompileShaderFromHlsl(TRefCountPtr<MetalShader> InShader, FString& OutErrorInfo, const TArray<FString>& ExtraArgs)
+{
+		TArray<ShaderConductor::MacroDefine> Defines;
+		Defines.Add({"FINAL_METAL"});
+		
+		ShaderConductor::Compiler::SourceDesc SourceDesc{};
+		SourceDesc.stage = MapShaderCunductorStage(InShader->GetShaderType());
 		auto ShaderNameUTF8 = StringCast<UTF8CHAR>(*InShader->GetShaderName());
 		SourceDesc.fileName = (char*)ShaderNameUTF8.Get();
-        
-        //len + 1 for copying null terminator
-        TArray<char> EntryPointAnsi{TCHAR_TO_ANSI(*InShader->GetEntryPoint()), InShader->GetEntryPoint().Len() + 1};
-        SourceDesc.entryPoint = EntryPointAnsi.GetData();
-        
+		
+		//len + 1 for copying null terminator
+		TArray<char> EntryPointAnsi{TCHAR_TO_ANSI(*InShader->GetEntryPoint()), InShader->GetEntryPoint().Len() + 1};
+		SourceDesc.entryPoint = EntryPointAnsi.GetData();
+		
 		auto SourceUTF8 = StringCast<UTF8CHAR>(*InShader->GetProcessedSourceText());
-        SourceDesc.source = (char*)SourceUTF8.Get();
-        
-        ShaderConductor::MacroDefine SpvMslOptions[] = {
-            {"argument_buffers", "1"},
-            {"enable_decoration_binding", "1"},
-            {"force_active_argument_buffer_resources","1"}
-        };
-        
-        ShaderConductor::Compiler::TargetDesc SpvTargetDesc{};
-        SpvTargetDesc.language = ShaderConductor::ShadingLanguage::SpirV;
-        
-        ShaderConductor::Compiler::TargetDesc MslTargetDesc{};
-        MslTargetDesc.language = ShaderConductor::ShadingLanguage::Msl_macOS;
-        MslTargetDesc.version = "20200";
-        MslTargetDesc.options = SpvMslOptions;
-        MslTargetDesc.numOptions = UE_ARRAY_COUNT(SpvMslOptions);
-        
-        TArray<const char*> DxcArgs;
-        DxcArgs.Add("-no-warnings");
-		DxcArgs.Add("-fspv-debug=vulkan-with-source");
-        DxcArgs.Add("-fspv-preserve-bindings"); //For bindgroup-argumentbuffer
+		SourceDesc.source = (char*)SourceUTF8.Get();
+		
+		ShaderConductor::MacroDefine SpvMslOptions[] = {
+			{"argument_buffers", "1"},
+			{"enable_decoration_binding", "1"},
+			{"force_active_argument_buffer_resources","1"}
+		};
+		
+		ShaderConductor::Compiler::TargetDesc SpvTargetDesc{};
+		SpvTargetDesc.language = ShaderConductor::ShadingLanguage::SpirV;
+		
+		ShaderConductor::Compiler::TargetDesc MslTargetDesc{};
+		MslTargetDesc.language = ShaderConductor::ShadingLanguage::Msl_macOS;
+		MslTargetDesc.version = "20200";
+		MslTargetDesc.options = SpvMslOptions;
+		MslTargetDesc.numOptions = UE_ARRAY_COUNT(SpvMslOptions);
+		
+		TArray<const char*> DxcArgs;
+		DxcArgs.Add("-no-warnings");
+		DxcArgs.Add("-fspv-preserve-bindings"); //For bindgroup-argumentbuffer
 		//Storage buffers use the scalar layout instead of vector-relaxed 430
 		//to make it consistent with structuredbuffer, so that user side can unify the struct
 		DxcArgs.Add("-fvk-use-dx-layout");
-
+		
 		DxcArgs.Add("-HV");
 		DxcArgs.Add("2021");
-        
-        SourceDesc.loadIncludeCallback = [InShader](const char* includeName) -> ShaderConductor::Blob {
-            for(const FString& IncludeDir : InShader->GetIncludeDirs())
-            {
-                FString IncludedFile = FPaths::Combine(IncludeDir, includeName);
-                if(IFileManager::Get().FileExists(*IncludedFile))
-                {
-                    FString ShaderText;
+		
+		if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
+		{
+			DxcArgs.Add("/Od");
+			DxcArgs.Add("-fspv-debug=vulkan-with-source");
+		}
+		
+		TArray<std::string> ExtraAnsiArgs;
+		for (const FString& ExtraArg : ExtraArgs)
+		{
+			ExtraAnsiArgs.Add(TCHAR_TO_ANSI(*ExtraArg));
+			DxcArgs.Add(ExtraAnsiArgs.Last().data());
+		}
+		
+		SourceDesc.loadIncludeCallback = [InShader](const char* includeName) -> ShaderConductor::Blob {
+			for(const FString& IncludeDir : InShader->GetIncludeDirs())
+			{
+				FString IncludedFile = FPaths::Combine(IncludeDir, includeName);
+				if(IFileManager::Get().FileExists(*IncludedFile))
+				{
+					FString ShaderText;
 					FFileHelper::LoadFileToString(ShaderText, *IncludedFile);
 					ShaderText = GpuShaderPreProcessor{ ShaderText }
 						.ReplacePrintStringLiteral()
 						.Finalize();
 					auto SourceText = StringCast<UTF8CHAR>(*ShaderText);
-                    return ShaderConductor::Blob(SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR));
-                }
-            }
-            return {};
-        };
-        
-        ShaderConductor::Compiler::Options SCOptions;
-        SCOptions.DXCArgs = DxcArgs.GetData();
-        SCOptions.numDXCArgs = DxcArgs.Num();
+					return ShaderConductor::Blob(SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR));
+				}
+			}
+			return {};
+		};
+		
+		ShaderConductor::Compiler::Options SCOptions;
+		SCOptions.DXCArgs = DxcArgs.GetData();
+		SCOptions.numDXCArgs = DxcArgs.Num();
 		GpuShaderModel Sm = InShader->GetShaderModelVer();
 		SCOptions.shaderModel = {Sm.Major, Sm.Minor};
-
-		if (InShader->HasFlag(GpuShaderFlag::Enable16bitType))
+		
+		if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::Enable16bitType))
 		{
-            Defines.Add({"ENABLE_16BIT_TYPE"});
+			Defines.Add({"ENABLE_16BIT_TYPE"});
 			SCOptions.enable16bitTypes = true;
 		}
-        
-        SourceDesc.defines = Defines.GetData();
-        SourceDesc.numDefines = Defines.Num();
-        
-        ShaderConductor::Compiler::TargetDesc TargetDescs[2] = {SpvTargetDesc, MslTargetDesc};
-        ShaderConductor::Compiler::ResultDesc Results[2];
-        ShaderConductor::Compiler::Compile(SourceDesc, SCOptions, TargetDescs, 2, Results);
-        if(Results[0].hasError)
-        {
-            FString ErrorInfo = static_cast<const char*>(Results[0].errorWarningMsg.Data());
-            //SH_LOG(LogShader, Error, TEXT("Compilation failed: %s"), *ErrorInfo);
-            OutErrorInfo = MoveTemp(ErrorInfo);
-            return false;
-        }
-        else if(Results[1].hasError)
-        {
-            FString ErrorInfo = static_cast<const char*>(Results[1].errorWarningMsg.Data());
-            //SH_LOG(LogShader, Error, TEXT("Compilation failed: %s"), *ErrorInfo);
+		
+		SourceDesc.defines = Defines.GetData();
+		SourceDesc.numDefines = Defines.Num();
+		
+		ShaderConductor::Compiler::TargetDesc TargetDescs[2] = {SpvTargetDesc, MslTargetDesc};
+		ShaderConductor::Compiler::ResultDesc Results[2];
+		ShaderConductor::Compiler::Compile(SourceDesc, SCOptions, TargetDescs, 2, Results);
+		if(Results[0].hasError)
+		{
+			FString ErrorInfo = static_cast<const char*>(Results[0].errorWarningMsg.Data());
+			//SH_LOG(LogShader, Error, TEXT("Compilation failed: %s"), *ErrorInfo);
 			OutErrorInfo = MoveTemp(ErrorInfo);
-            return false;
-        }
-        //Need the meta datas from spirv to abstract gpu api
-        //For example, metal's threadgroupsize is not specified in the shader 
-        //and needs to be specified directly by dispatchThreadgroups
-        TArray<uint32> SpvCode = {static_cast<const uint32*>(Results[0].target.Data()), Results[0].target.Size() / 4};
-        SpvMetaContext MetaContext;
-        SpvMetaVisitor MetaVisitor{MetaContext};
+			return false;
+		}
+		else if(Results[1].hasError)
+		{
+			FString ErrorInfo = static_cast<const char*>(Results[1].errorWarningMsg.Data());
+			//SH_LOG(LogShader, Error, TEXT("Compilation failed: %s"), *ErrorInfo);
+			OutErrorInfo = MoveTemp(ErrorInfo);
+			return false;
+		}
+		//Need the meta datas from spirv to abstract gpu api
+		//For example, metal's threadgroupsize is not specified in the shader
+		//and needs to be specified directly by dispatchThreadgroups
+		TArray<uint32> SpvCode = {static_cast<const uint32*>(Results[0].target.Data()), Results[0].target.Size() / 4};
+		SpvMetaContext MetaContext;
+		SpvMetaVisitor MetaVisitor{MetaContext};
 		SpirvParser Parser;
 		Parser.Parse(SpvCode);
 		Parser.Accept(&MetaVisitor);
-        InShader->ThreadGroupSize = MetaContext.ThreadGroupSize;
+		InShader->ThreadGroupSize = MetaContext.ThreadGroupSize;
+		
+		if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
+		{
+			InShader->SpvCode = MoveTemp(SpvCode);
+		}
 
         FString MslSourceText = {(int32)Results[1].target.Size(), static_cast<const char*>(Results[1].target.Data())};
 #if DEBUG_SHADER

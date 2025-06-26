@@ -7,10 +7,11 @@ namespace FW
 	template<BindingType InType>
 	ClearShader<InType>::ClearShader()
 	{
-		TArray<FString> Definitions;
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
 		if constexpr(InType == BindingType::RWStorageBuffer)
 		{
-			Definitions.Add("RESOURCE_TYPE=0");
+			ExtraArgs.Add("RESOURCE_TYPE=1");
 		}
 
 		ClearUbBuilder.AddUint("Size");
@@ -28,7 +29,7 @@ namespace FW
 		});
 
 		FString ErrorInfo;
-		GGpuRhi->CompileShader(Cs, ErrorInfo, Definitions);
+		GGpuRhi->CompileShader(Cs, ErrorInfo, ExtraArgs);
 		check(ErrorInfo.IsEmpty());
 	}
 

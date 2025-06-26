@@ -66,6 +66,56 @@ namespace FW
         TFunction<void(const FString&)> OnDisplayNameChanged;
     };
 
+	class PropertyEnumItem : public PropertyItemBase
+	{
+		MANUAL_RTTI_TYPE(PropertyEnumItem, PropertyItemBase)
+	public:
+		PropertyEnumItem(ShObject* InOwner, const FString& InName, void* InValueRef, TSharedPtr<FString> InEnumValueName,
+						 const TMap<FString, TSharedPtr<void>>& InEnumEntries, const TFunction<void(void*)>& InSetter)
+		: PropertyItemBase(InOwner, InName)
+		, ValueRef(InValueRef)
+		, EnumValueName(InEnumValueName)
+		, EnumEntries(InEnumEntries)
+		, Setter(InSetter)
+		{
+			for(const auto& [EntryStr, _] : EnumEntries)
+			{
+				EnumItems.Add(MakeShared<FString>(EntryStr));
+			}
+		}
+		
+		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
+		{
+			auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
+			auto ValueWidget = SNew(SComboBox<TSharedPtr<FString>>)
+			.OptionsSource(&EnumItems)
+			.OnSelectionChanged_Lambda([this](TSharedPtr<FString> InItem, ESelectInfo::Type){
+				if(InItem)
+				{
+					EnumValueName = InItem;
+					Setter(EnumEntries[*EnumValueName].Get());
+				}
+			})
+			.OnGenerateWidget_Lambda([](TSharedPtr<FString> InItem){
+				return SNew(STextBlock).Text(FText::FromString(*InItem));
+			})
+			[
+				SNew(STextBlock).Text_Lambda([this] {
+					return FText::FromString(*EnumValueName);
+				})
+			];
+			Item->AddWidget(MoveTemp(ValueWidget));
+			return Row;
+		}
+		
+	private:
+		void* ValueRef;
+		TSharedPtr<FString> EnumValueName;
+		TMap<FString, TSharedPtr<void>> EnumEntries;
+		TFunction<void(void*)> Setter;
+		
+		TArray<TSharedPtr<FString>> EnumItems;
+	};
 
     class PropertyFloatItem : public PropertyItemBase
     {

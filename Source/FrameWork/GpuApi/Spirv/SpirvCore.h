@@ -1,4 +1,5 @@
 #pragma once
+#include "GpuApi/GpuResource.h"
 
 namespace FW
 {
@@ -6,6 +7,7 @@ namespace FW
 
 	enum class SpvTypeKind
 	{
+		Void,
 		Bool,
 		Float,
 		Uint,
@@ -35,6 +37,8 @@ namespace FW
 	enum class SpvDecorationKind
 	{
 		BuiltIn = 11,
+		Binding = 33,
+		DescriptorSet = 34,
 	};
 
 	enum class SpvBuiltIn
@@ -66,7 +70,8 @@ namespace FW
 		SpvType(SpvTypeKind InKind) : Kind(InKind) {}
 		virtual ~SpvType() = default;
 		
-		bool IsScalar() const { return Kind != SpvTypeKind::Vector; }
+		bool IsScalar() const { return Kind == SpvTypeKind::Bool || Kind == SpvTypeKind::Float
+			|| Kind == SpvTypeKind::Uint || Kind == SpvTypeKind::Int; }
 		
 	private:
 		SpvTypeKind Kind;
@@ -104,6 +109,12 @@ namespace FW
 		
 	private:
 		bool IsSigned;
+	};
+
+	class SpvVoidType : public SpvType
+	{
+	public:
+		SpvVoidType() : SpvType(SpvTypeKind::Void) {}
 	};
 
 	class SpvBoolType : public SpvScalarType
@@ -152,32 +163,58 @@ namespace FW
 	struct SpvObject
 	{
 		SpvType* Type = nullptr;
-		TArray<uint8> Value;
+		
+		struct External
+		{
+			GpuResource* Resource = nullptr;
+			TArray<uint8> Value;
+			
+			bool operator==(const External&) const = default;
+		};
+			
+		struct Internal
+		{
+			TArray<uint8> Value;
+			bool operator==(const Internal&) const = default;
+		};
+		
+		bool operator==(const SpvObject&) const = default;
+		
+		std::variant<External, Internal> Storage;
 	};
 
 	struct SpvVariable : SpvObject
 	{
 		bool Initialized{};
+		SpvStorageClass StorageClass;
+		
+		bool operator==(const SpvVariable&) const = default;
 	};
 
-	struct SpvFunction
+	struct SpvPointer
 	{
-		
+		SpvVariable* Pointee;
+		TArray<int32> Indexes;
 	};
 
 	struct SpvDecoration
 	{
 		SpvDecorationKind Kind;
-	};
-
-	struct SpvBuiltInDecoration : SpvDecoration
-	{
-		SpvBuiltInDecoration(SpvBuiltIn InBuiltIn)
-		: SpvDecoration{SpvDecorationKind::BuiltIn}
-		, BuiltIn(InBuiltIn)
-		{}
-		
-		SpvBuiltIn BuiltIn;
+		union
+		{
+			struct
+			{
+				SpvBuiltIn Attribute;
+			} BuiltIn;
+			struct
+			{
+				uint32 Number;
+			}Binding;
+			struct
+			{
+				uint32 Number;
+			}DescriptorSet;
+		};
 	};
 
 	enum class SpvOp
@@ -187,6 +224,7 @@ namespace FW
 		ExtInst = 12,
 		EntryPoint = 15,
 		ExecutionMode = 16,
+		TypeVoid = 19,
 		TypeBool = 20,
 		TypeInt = 21,
 		TypeFloat = 22,
@@ -198,6 +236,14 @@ namespace FW
 		Constant = 43,
 		ConstantComposite = 44,
 		Function = 54,
+		FunctionParameter = 55,
+		FunctionCall = 57,
+		Variable = 59,
+		Load = 61,
+		Store = 62,
+		AccessChain = 65,
 		Decorate = 71,
+		CompositeConstruct = 80,
+		Label = 248,
 	};
 }

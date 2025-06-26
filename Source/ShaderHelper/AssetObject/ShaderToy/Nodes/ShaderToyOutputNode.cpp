@@ -11,6 +11,7 @@ namespace SH
 {
     REFLECTION_REGISTER(AddClass<ShaderToyOuputNode>("Present Node")
 		.BaseClass<GraphNode>()
+		.Data<&ShaderToyOuputNode::Format, MetaInfo::Property>("Format")
 	)
     REFLECTION_REGISTER(AddClass<ShaderToyOuputNodeOp>()
         .BaseClass<ShObjectOp>()
@@ -28,6 +29,7 @@ namespace SH
     }
 
 	ShaderToyOuputNode::ShaderToyOuputNode()
+	: Format(ShaderToyFormat::B8G8R8A8_UNORM)
 	{
 		ObjectName = FText::FromString("Present");
 	}
@@ -56,6 +58,20 @@ namespace SH
         ShaderToyExecContext& ShaderToyContext = static_cast<ShaderToyExecContext&>(Context);
         
         auto ResultPin = static_cast<GpuTexturePin*>(GetPin("RT"));
+		
+		if(!ShaderToyContext.FinalRT.IsValid() ||
+		   ShaderToyContext.FinalRT->GetWidth() != (uint32)ShaderToyContext.iResolution.X || ShaderToyContext.FinalRT->GetHeight() != (uint32)ShaderToyContext.iResolution.Y )
+		{
+			ShaderToyContext.FinalRT = GGpuRhi->CreateTexture({
+				.Width = (uint32)ShaderToyContext.iResolution.x,
+				.Height = (uint32)ShaderToyContext.iResolution.y,
+				.Format = (GpuTextureFormat)Format,
+				.Usage = GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared,
+			});
+			GGpuRhi->SetResourceName("FinalRT", ShaderToyContext.FinalRT);
+			ShaderToyContext.ViewPort->SetViewPortRenderTexture(ShaderToyContext.FinalRT);
+		}
+	
         
         BlitPassInput Input;
         Input.InputTex = ResultPin->GetValue();

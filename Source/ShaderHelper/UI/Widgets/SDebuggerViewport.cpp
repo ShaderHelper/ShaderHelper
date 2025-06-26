@@ -31,36 +31,36 @@ namespace SH
 			.Padding(0, 0, 0, 2)
 			[
 				SNew(STextBlock).Text_Lambda([this]{
-					uint32 Value{};
+					float Value{};
 					if(DebuggerTex) {
 						uint32 DataIndex = PixelCoord.x + PixelCoord.y * DebuggerTex->GetWidth();
 						Value = TexDatas[DataIndex].z;
 					}
-					return FText::FromString(FString::Printf(TEXT("R Channel: %d"), Value));
+					return FText::FromString(FString::Printf(TEXT("R Channel: %f"), Value));
 				})
 			]
 			+SVerticalBox::Slot()
 			.Padding(0, 0, 0, 2)
 			[
 				SNew(STextBlock).Text_Lambda([this]{
-					uint32 Value{};
+					float Value{};
 					if(DebuggerTex) {
 						uint32 DataIndex = PixelCoord.x + PixelCoord.y * DebuggerTex->GetWidth();
 						Value = TexDatas[DataIndex].y;
 					}
-					return FText::FromString(FString::Printf(TEXT("G Channel: %d"), Value));
+					return FText::FromString(FString::Printf(TEXT("G Channel: %f"), Value));
 				})
 			]
 			+SVerticalBox::Slot()
 			.Padding(0, 0, 0, 2)
 			[
 				SNew(STextBlock).Text_Lambda([this]{
-					uint32 Value{};
+					float Value{};
 					if(DebuggerTex) {
 						uint32 DataIndex = PixelCoord.x + PixelCoord.y * DebuggerTex->GetWidth();
 						Value = TexDatas[DataIndex].x;
 					}
-					return FText::FromString(FString::Printf(TEXT("B Channel: %d"), Value));
+					return FText::FromString(FString::Printf(TEXT("B Channel: %f"), Value));
 				})
 			]
 		];
@@ -220,6 +220,7 @@ namespace SH
 
 	void SDebuggerViewport::SetDebugTarget(TRefCountPtr<GpuTexture> InTarget)
 	{
+		//TODO
 		check(InTarget->GetFormat() == GpuTextureFormat::B8G8R8A8_UNORM);
 
 		bFinalizePixel = false;
@@ -246,8 +247,12 @@ namespace SH
 			const uint8* SrcRow = PaddedData + y * PaddedRowPitch;
 			for (uint32 x = 0; x < Width; ++x)
 			{
-				const uint8* Pixel = SrcRow + x * 4;
-				TexDatas[y * Width + x] = Vector3u(Pixel[0], Pixel[1], Pixel[2]);
+				const uint8* Pixel = SrcRow + x * GetTextureFormatByteSize(InTarget->GetFormat());
+				if(InTarget->GetFormat() == GpuTextureFormat::B8G8R8A8_UNORM)
+				{
+					TexDatas[y * Width + x] = {Pixel[0] / 255.0f, Pixel[1] / 255.0f, Pixel[2] / 255.0f};
+				}
+				
 			}
 		}
 		GGpuRhi->UnMapGpuTexture(InTarget);

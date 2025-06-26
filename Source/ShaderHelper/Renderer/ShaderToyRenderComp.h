@@ -14,6 +14,7 @@ namespace SH
 		FW::Vector4f iMouse{};
 		FW::RenderGraph* RG = nullptr;
         TRefCountPtr<FW::GpuTexture> FinalRT;
+		FW::PreviewViewPort* ViewPort;
 	};
 
 	class ShaderToyRenderComp : public FW::RenderComponent
@@ -30,7 +31,6 @@ namespace SH
 
 	private:
 		ShaderToy* ShaderToyGraph;
-		FW::PreviewViewPort* ViewPort;
 		ShaderToyExecContext Context;
         FDelegateHandle ResizeHandle;
 	};

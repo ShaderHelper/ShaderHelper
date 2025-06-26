@@ -5,6 +5,7 @@
 #include "AssetManager/AssetManager.h"
 #include "Editor/PreviewViewPort.h"
 #include "AssetObject/DebuggableObject.h"
+#include "AssetObject/ShaderToy/ShaderToy.h"
 
 namespace SH
 {
@@ -50,6 +51,7 @@ namespace SH
         
     public:
         FW::AssetPtr<StShader> Shader;
+		ShaderToyFormat Format;
         
 	private:
 		TSharedPtr<FW::PreviewViewPort> Preview;

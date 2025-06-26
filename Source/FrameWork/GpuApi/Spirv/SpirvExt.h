@@ -79,37 +79,49 @@ namespace FW
 		
 	};
 	
-	enum class ScopeKind
+	enum class SpvScopeKind
 	{
 		TU,
 		Function,
 		Block,
 	};
 
-	struct SpvLexicalScope
+	class SpvLexicalScope
 	{
-		ScopeKind Kind;
-		SpvLexicalScope* Parent = nullptr;
+	public:
+		SpvLexicalScope(SpvScopeKind InKind, SpvLexicalScope* InParent)
+		: Kind(InKind), Parent(InParent)
+		{}
+		
+		SpvScopeKind Kind;
+		SpvLexicalScope* Parent;
+		
+		virtual int32 GetLineNumber() const {return 0;}
 	};
 
-	struct SpvCompilationUnit : SpvLexicalScope
+	class SpvCompilationUnit :  public SpvLexicalScope
 	{
-		SpvCompilationUnit() : SpvLexicalScope{ScopeKind::TU}
+	public:
+		SpvCompilationUnit() : SpvLexicalScope(SpvScopeKind::TU, nullptr)
 		{}
 	};
 
-	struct SpvFunctionDesc : SpvLexicalScope
+	class SpvFunctionDesc : public SpvLexicalScope
 	{
-		SpvFunctionDesc(SpvLexicalScope* InParent, const FString& InName, const SpvTypeDesc* InTypeDesc, uint32 InLine)
-		: SpvLexicalScope{ScopeKind::Function, InParent}
+	public:
+		SpvFunctionDesc(SpvLexicalScope* InParent, const FString& InName, const SpvTypeDesc* InTypeDesc, int32 InLine)
+		: SpvLexicalScope(SpvScopeKind::Function, InParent)
 		, Name(InName)
 		, TypeDesc(InTypeDesc)
 		, LineNumber(InLine)
 		{}
 		
+		int32 GetLineNumber() const override { return LineNumber; }
+		
+	private:
 		FString Name;
 		const SpvTypeDesc* TypeDesc;
-		uint32 LineNumber;
+		int32 LineNumber;
 	};
 
 }

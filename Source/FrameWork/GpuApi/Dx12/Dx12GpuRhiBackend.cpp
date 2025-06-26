@@ -125,9 +125,9 @@ void Dx12GpuRhiBackend::SetResourceName(const FString& Name, GpuResource* InReso
 	}
 }
 
-bool Dx12GpuRhiBackend::CompileShader(GpuShader *InShader, FString &OutErrorInfo, const TArray<FString>& Definitions)
+bool Dx12GpuRhiBackend::CompileShader(GpuShader *InShader, FString &OutErrorInfo, const TArray<FString>& ExtraArgs)
 {
-	return GShaderCompiler.Compile(static_cast<Dx12Shader *>(InShader), OutErrorInfo, Definitions);
+	return GShaderCompiler.Compile(static_cast<Dx12Shader *>(InShader), OutErrorInfo, ExtraArgs);
 }
 
 

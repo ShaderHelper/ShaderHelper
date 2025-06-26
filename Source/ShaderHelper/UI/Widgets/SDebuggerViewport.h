@@ -23,7 +23,7 @@ namespace SH
 		}
 		
 	private:
-		TArray<FW::Vector3u> TexDatas;
+		TArray<FW::Vector3f> TexDatas;
 		TRefCountPtr<FW::GpuTexture> RawTex;
 		TRefCountPtr<FW::GpuTexture> DebuggerTex;
 		TSharedPtr<FW::PreviewViewPort> ViewPort;

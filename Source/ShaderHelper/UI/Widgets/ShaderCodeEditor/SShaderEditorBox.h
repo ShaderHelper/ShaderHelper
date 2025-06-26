@@ -9,6 +9,9 @@
 #include <Widgets/SCanvas.h>
 #include <Widgets/Text/SlateEditableTextLayout.h>
 #include "AssetObject/ShaderAsset.h"
+#include "GpuApi/Spirv/SpirvParser.h"
+#include "GpuApi/Spirv/SpirvVM.h"
+#include "GpuApi/GpuBindGroup.h"
 
 namespace SH
 {
@@ -209,7 +212,7 @@ namespace SH
         void RefreshCodeCompletionTip();
 		void RefreshSyntaxHighlight();
 		
-		void StartDebugging(const FW::Vector2u& PixelCoord);
+		void DebugPixel(const FW::Vector2u& PixelCoord, const TArray<TRefCountPtr<FW::GpuBindGroup>>& BindGroups = {});
 
 	protected:
 		virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
