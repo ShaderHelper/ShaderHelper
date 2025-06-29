@@ -4,17 +4,17 @@
 
 namespace FW
 {
-	SpvVmPixelVisitor::SpvVmPixelVisitor(SpvVmPixelContext& InContext)
-	: Context(InContext)
-	{}
-
 	TArray<uint8> GetPointerValue(SpvPointer* InPointer, SpvVariableDesc* PointeeDesc)
 	{
 		check(InPointer);
 		check(InPointer->Indexes.IsEmpty() || PointeeDesc);
+		if(!InPointer->Pointee->Initialized)
+		{
+			return {};
+		}
 		
 		TArray<uint8> RetValue;
-		if(std::holds_alternative<SpvObject::External>(InPointer->Pointee->Storage))
+		if(InPointer->Pointee->IsExternal())
 		{
 			RetValue = std::get<SpvObject::External>(InPointer->Pointee->Storage).Value;
 		}
@@ -23,23 +23,41 @@ namespace FW
 			RetValue = std::get<SpvObject::Internal>(InPointer->Pointee->Storage).Value;
 		}
 		
-		if(InPointer->Indexes.IsEmpty())
+		SpvTypeDesc* BaseTypeDesc = PointeeDesc ? PointeeDesc->TypeDesc : nullptr;
+		int32 OffsetBytes = 0;
+		int32 ByteSize = RetValue.Num();
+		for(int32 Index : InPointer->Indexes)
 		{
-			return RetValue;
+			if(BaseTypeDesc->GetKind() == SpvTypeDescKind::Composite)
+			{
+				SpvCompositeTypeDesc* CompositeTypeDesc = static_cast<SpvCompositeTypeDesc*>(BaseTypeDesc);
+				SpvTypeDesc* IndexTypeDesc = CompositeTypeDesc->GetMemberTypeDescs()[Index];
+				if(IndexTypeDesc->GetKind() == SpvTypeDescKind::Member)
+				{
+					SpvMemberTypeDesc* MemberTypeDesc = static_cast<SpvMemberTypeDesc*>(IndexTypeDesc);
+					OffsetBytes += MemberTypeDesc->GetOffset();
+					ByteSize = MemberTypeDesc->GetSize() / 8;
+					BaseTypeDesc = MemberTypeDesc->GetTypeDesc();
+				}
+			}
+			else if(BaseTypeDesc->GetKind() == SpvTypeDescKind::Vector)
+			{
+				SpvVectorTypeDesc* VectorTypeDesc = static_cast<SpvVectorTypeDesc*>(BaseTypeDesc);
+				SpvBasicTypeDesc* BasicTypeDesc = VectorTypeDesc->GetBasicTypeDesc();
+				OffsetBytes += Index * BasicTypeDesc->GetSize() / 8;
+				ByteSize = BasicTypeDesc->GetSize();
+			}
 		}
-		else
-		{
-			
-		}
+		return {RetValue.GetData() + OffsetBytes, ByteSize};
 	}
 
-	void WritePointerValue(SpvPointer* InPointer, SpvVariableDesc* PointeeDesc, const TArray<uint8>& ValueToStore)
+	void WritePointerValue(SpvPointer* InPointer, SpvVariableDesc* PointeeDesc, const TArray<uint8>& ValueToStore, SpvVariableChange* OutVariableChange)
 	{
 		check(InPointer);
 		check(InPointer->Indexes.IsEmpty() || PointeeDesc);
 		
 		TArray<uint8>* ValueRef;
-		if(std::holds_alternative<SpvObject::External>(InPointer->Pointee->Storage))
+		if(InPointer->Pointee->IsExternal())
 		{
 			ValueRef = &std::get<SpvObject::External>(InPointer->Pointee->Storage).Value;
 		}
@@ -48,38 +66,84 @@ namespace FW
 			ValueRef = &std::get<SpvObject::Internal>(InPointer->Pointee->Storage).Value;
 		}
 		
-		if(!InPointer->Pointee->Initialized)
+		if(OutVariableChange)
 		{
-			
+			OutVariableChange->PreValue = *ValueRef;
+		}
+		
+		int32 OffsetBytes = 0;
+		int32 ByteSize = ValueRef->Num();
+		for(int32 Index : InPointer->Indexes)
+		{
+			SpvTypeDesc* BaseTypeDesc = PointeeDesc->TypeDesc;
+			if(BaseTypeDesc->GetKind() == SpvTypeDescKind::Composite)
+			{
+				SpvCompositeTypeDesc* CompositeTypeDesc = static_cast<SpvCompositeTypeDesc*>(BaseTypeDesc);
+				SpvTypeDesc* IndexTypeDesc = CompositeTypeDesc->GetMemberTypeDescs()[Index];
+				if(IndexTypeDesc->GetKind() == SpvTypeDescKind::Member)
+				{
+					SpvMemberTypeDesc* MemberTypeDesc = static_cast<SpvMemberTypeDesc*>(IndexTypeDesc);
+					OffsetBytes += MemberTypeDesc->GetOffset();
+					ByteSize = MemberTypeDesc->GetSize() / 8;
+					BaseTypeDesc = MemberTypeDesc->GetTypeDesc();
+				}
+			}
+			else if(BaseTypeDesc->GetKind() == SpvTypeDescKind::Vector)
+			{
+				SpvVectorTypeDesc* VectorTypeDesc = static_cast<SpvVectorTypeDesc*>(BaseTypeDesc);
+				SpvBasicTypeDesc* BasicTypeDesc = VectorTypeDesc->GetBasicTypeDesc();
+				OffsetBytes += Index * BasicTypeDesc->GetSize() / 8;
+				ByteSize = BasicTypeDesc->GetSize();
+			}
+		}
+		check(ByteSize == ValueToStore.Num());
+		FMemory::Memcpy(ValueRef->GetData() + OffsetBytes, ValueToStore.GetData(), ByteSize);
+		InPointer->Pointee->Initialized = true;
+		
+		if(OutVariableChange)
+		{
+			OutVariableChange->Range = {OffsetBytes, ByteSize};
+			OutVariableChange->NewValue = *ValueRef;
 		}
 	}
 
-	void SpvVmPixelVisitor::Visit(SpvDebugDeclare* Inst)
+	void SpvVmVisitor::Visit(SpvDebugDeclare* Inst)
 	{
-		PixelThreadState& ThreadState = Context.Quad[Context.CurActiveIndex];
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
 		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.Last();
 		
 		SpvVariableDesc* VarDesc = &Context.VariableDescs[Inst->GetVarDesc()];
-		ThreadState.RecordedInfo.AllVariableDescMap.FindOrAdd(Inst->GetVarId(), VarDesc);
-		CurStackFrame.VariableDescMap.Add(Inst->GetVarId(), VarDesc);
+		SpvPointer* Pointer = nullptr;
+		if(Context.GlobalPointers.Contains(Inst->GetPointer()))
+		{
+			Pointer = &Context.GlobalPointers[Inst->GetPointer()];
+		}
+		else
+		{
+			Pointer = &CurStackFrame.Pointers[Inst->GetPointer()];
+		}
+		Context.VariableDescMap.FindOrAdd(Pointer->Pointee->Id, VarDesc);
 	}
 
-	void SpvVmPixelVisitor::Visit(SpvDebugLine* Inst)
+	void SpvVmVisitor::Visit(SpvDebugLine* Inst)
 	{
-		PixelThreadState& ThreadState = Context.Quad[Context.CurActiveIndex];
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
 		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.Last();
 		
 		int32 OldLineNumber = CurStackFrame.CurLineNumber;
-		CurStackFrame.CurLineNumber = Inst->GetLineStart();
+		CurStackFrame.CurLineNumber = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLineStart()].Storage).Value.GetData();
 		if(OldLineNumber != CurStackFrame.CurLineNumber)
 		{
 			ThreadState.RecordedInfo.LineDebugStates.Emplace(CurStackFrame.CurLineNumber);
 		}
 	}
 
-	void SpvVmPixelVisitor::Visit(SpvDebugScope* Inst)
+	void SpvVmVisitor::Visit(SpvDebugScope* Inst)
 	{
-		PixelThreadState& ThreadState = Context.Quad[Context.CurActiveIndex];
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
 		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.Last();
 		
 		int32 OldLineNumber = CurStackFrame.CurLineNumber;
@@ -98,17 +162,19 @@ namespace FW
 		}
 	}
 
-	void SpvVmPixelVisitor::Visit(SpvOpFunctionParameter* Inst)
+	void SpvVmVisitor::Visit(SpvOpFunctionParameter* Inst)
 	{
-		PixelThreadState& ThreadState = Context.Quad[Context.CurActiveIndex];
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
 		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.Last();
 		
 		CurStackFrame.Pointers.Add(Inst->GetId().value(), *CurStackFrame.Arguments.Pop());
 	}
 
-	void SpvVmPixelVisitor::Visit(SpvOpFunctionCall* Inst)
+	void SpvVmVisitor::Visit(SpvOpFunctionCall* Inst)
 	{
-		PixelThreadState& ThreadState = Context.Quad[Context.CurActiveIndex];
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
 		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.Last();
 		
 		ThreadState.NextInstIndex = GetInstIndex(Inst->GetFunction());
@@ -126,50 +192,68 @@ namespace FW
 		SpvType* ReturnType = Context.Types[Inst->GetResultType()].Get();
 		if(ReturnType->GetKind() != SpvTypeKind::Void)
 		{
-			SpvObject ReturnObject{ReturnType};
+			SpvObject ReturnObject{Inst->GetId().value(), ReturnType};
 			CurStackFrame.IntermediateObjects.Add(Inst->GetId().value(), MoveTemp(ReturnObject));
 			NewFrame.ReturnObject = &CurStackFrame.IntermediateObjects[Inst->GetId().value()];
 		}
 		ThreadState.StackFrames.Add(MoveTemp(NewFrame));
 	}
 
-	void SpvVmPixelVisitor::Visit(SpvOpVariable* Inst)
+	void SpvVmVisitor::Visit(SpvOpVariable* Inst)
 	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvId ResultId = Inst->GetId().value();
+		
 		if(!Context.Types.Contains(Inst->GetResultType()))
 		{
 			return;
 		}
 		
-		PixelThreadState& ThreadState = Context.Quad[Context.CurActiveIndex];
 		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.Last();
 		
 		SpvStorageClass StorageClass = Inst->GetStorageClass();
 		SpvPointerType* PointerType = static_cast<SpvPointerType*>(Context.Types[Inst->GetResultType()].Get());
-		SpvVariable Var = {{PointerType->PointeeType}, false, StorageClass};
-		SpvPointer Pointer{&Var};
+		SpvVariable Var = {{ResultId, PointerType->PointeeType}, false, StorageClass};
+		if(StorageClass == SpvStorageClass::Uniform || StorageClass == SpvStorageClass::UniformConstant)
+		{
+			Var.Storage = SpvObject::External{};
+		}
+		else
+		{
+			TArray<uint8> Value;
+			Value.SetNumZeroed(GetTypeByteSize(PointerType->PointeeType));
+			Var.Storage = SpvObject::Internal{MoveTemp(Value)};
+		}
 		
-		ThreadState.RecordedInfo.AllVariables.FindOrAdd(Inst->GetId().value(), Var);
-		CurStackFrame.Variables.Add(Inst->GetId().value(), MoveTemp(Var));
-		CurStackFrame.Pointers.Add(Inst->GetId().value(), MoveTemp(Pointer));
+		ThreadState.RecordedInfo.AllVariables.FindOrAdd(ResultId, Var);
+		CurStackFrame.Variables.Add(ResultId, MoveTemp(Var));
+		
+		SpvPointer Pointer{ &CurStackFrame.Variables[ResultId] };
+		CurStackFrame.Pointers.Add(ResultId, MoveTemp(Pointer));
 	}
 
-	void SpvVmPixelVisitor::Visit(SpvOpLabel* Inst)
+	void SpvVmVisitor::Visit(SpvOpLabel* Inst)
 	{
-		PixelThreadState& ThreadState = Context.Quad[Context.CurActiveIndex];
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		
 		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.Last();
 		
 		CurStackFrame.PreBasicBlock = CurStackFrame.CurBasicBlock;
 		CurStackFrame.CurBasicBlock = Inst->GetId().value();
 	}
 
-	void SpvVmPixelVisitor::Visit(SpvOpLoad* Inst)
+	void SpvVmVisitor::Visit(SpvOpLoad* Inst)
 	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		
 		if(!Context.Types.Contains(Inst->GetResultType()))
 		{
 			return;
 		}
-		
-		PixelThreadState& ThreadState = Context.Quad[Context.CurActiveIndex];
+		;
 		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.Last();
 		
 		SpvPointer* Pointer = nullptr;
@@ -177,19 +261,18 @@ namespace FW
 		if(Context.GlobalPointers.Contains(Inst->GetPointer()))
 		{
 			Pointer = &Context.GlobalPointers[Inst->GetPointer()];
-			SpvId VarId = *Context.GlobalVariables.FindKey(*Pointer->Pointee);
-			PointeeDesc = Context.GlobalVariableDescMap.FindRef(VarId);
+			PointeeDesc = Context.VariableDescMap.FindRef(Pointer->Pointee->Id);
 		}
 		else
 		{
 			Pointer = &CurStackFrame.Pointers[Inst->GetPointer()];
-			SpvId VarId = *CurStackFrame.Variables.FindKey(*Pointer->Pointee);
-			PointeeDesc = CurStackFrame.VariableDescMap.FindRef(VarId);
+			PointeeDesc = Context.VariableDescMap.FindRef(Pointer->Pointee->Id);
 		}
+		
 		TArray<uint8> Value = GetPointerValue(Pointer, PointeeDesc);
 		if(Value.IsEmpty())
 		{
-			ThreadState.RecordedInfo.LineDebugStates.Last().UbError = "Reading the uninitialized variable:";
+			ThreadState.RecordedInfo.LineDebugStates.Last().UbError = FString::Printf(TEXT("Reading the uninitialized variable %s !"), *PointeeDesc->Name);
 			AnyError = true;
 			return;
 		}
@@ -201,9 +284,10 @@ namespace FW
 		CurStackFrame.IntermediateObjects.Add(Inst->GetId().value(), MoveTemp(Object));
 	}
 
-	void SpvVmPixelVisitor::Visit(SpvOpStore* Inst)
+	void SpvVmVisitor::Visit(SpvOpStore* Inst)
 	{
-		PixelThreadState& ThreadState = Context.Quad[Context.CurActiveIndex];
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
 		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.Last();
 		
 		if(!Context.GlobalPointers.Contains(Inst->GetPointer()) &&
@@ -228,23 +312,27 @@ namespace FW
 		if(Context.GlobalPointers.Contains(Inst->GetPointer()))
 		{
 			Pointer = &Context.GlobalPointers[Inst->GetPointer()];
-			SpvId VarId = *Context.GlobalVariables.FindKey(*Pointer->Pointee);
-			PointeeDesc = Context.GlobalVariableDescMap.FindRef(VarId);
 		}
 		else
 		{
 			Pointer = &CurStackFrame.Pointers[Inst->GetPointer()];
-			SpvId VarId = *CurStackFrame.Variables.FindKey(*Pointer->Pointee);
-			PointeeDesc = CurStackFrame.VariableDescMap.FindRef(VarId);
 		}
+		SpvId VarId = Pointer->Pointee->Id;
+		PointeeDesc = Context.VariableDescMap.FindRef(VarId);
 		const TArray<uint8>& ValueToStore = std::get<SpvObject::Internal>(ObjectToStore->Storage).Value;
-		WritePointerValue(Pointer, PointeeDesc, ValueToStore);
-		Pointer->Pointee->Initialized = true;
+		SpvDebugState& CurDebugState = ThreadState.RecordedInfo.LineDebugStates.Last();
+		
+		SpvVariableChange VariableChange;
+		VariableChange.VarId = VarId;
+		WritePointerValue(Pointer, PointeeDesc, ValueToStore, &VariableChange);
+		
+		CurDebugState.VarChanges.Add(MoveTemp(VariableChange));
 	}
 
-	void SpvVmPixelVisitor::Visit(SpvOpCompositeConstruct* Inst)
+	void SpvVmVisitor::Visit(SpvOpCompositeConstruct* Inst)
 	{
-		PixelThreadState& ThreadState = Context.Quad[Context.CurActiveIndex];
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
 		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.Last();
 		
 		SpvType* Type = Context.Types[Inst->GetResultType()].Get();
@@ -269,12 +357,13 @@ namespace FW
 		CurStackFrame.IntermediateObjects.Add(Inst->GetId().value(), MoveTemp(Object));
 	}
 
-	void SpvVmPixelVisitor::Visit(SpvOpAccessChain* Inst)
+	void SpvVmVisitor::Visit(SpvOpAccessChain* Inst)
 	{
-		PixelThreadState& ThreadState = Context.Quad[Context.CurActiveIndex];
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
 		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.Last();
 		SpvPointer* BasePointer = &CurStackFrame.Pointers[Inst->GetBasePointer()];
-		TArray<int32> Indexes;
+		TArray<int32> Indexes = BasePointer->Indexes;
 		for(SpvId IndexId : Inst->GetIndexes())
 		{
 			int32 IndexValue = *(int32*)std::get<SpvObject::Internal>(Context.Constants[IndexId].Storage).Value.GetData();
@@ -288,82 +377,25 @@ namespace FW
 		CurStackFrame.Pointers.Add(Inst->GetId().value(), MoveTemp(Pointer));
 	}
 
-	void SpvVmPixelVisitor::ParseQuad(int32 QuadIndex, int32 StopIndex)
+	void SpvVmVisitor::Visit(SpvOpIEqual* Inst)
 	{
-		Context.CurActiveIndex = QuadIndex;
-		PixelThreadState& CurPixelThread = Context.Quad[QuadIndex];
-		while(CurPixelThread.InstIndex < Insts->Num())
-		{
-			CurPixelThread.NextInstIndex = CurPixelThread.InstIndex + 1;
-			if(StopIndex == CurPixelThread.InstIndex)
-			{
-				break;
-			}
-			
-			(*Insts)[CurPixelThread.InstIndex]->Accpet(this);
-			if(AnyError)
-			{
-				break;
-			}
-			CurPixelThread.InstIndex = CurPixelThread.NextInstIndex;
-		}
+		
 	}
 
-	int32 SpvVmPixelVisitor::GetInstIndex(SpvId Inst) const
+	void SpvVmVisitor::Visit(SpvOpINotEqual* Inst)
+	{
+		
+	}
+
+	int32 SpvVmVisitor::GetInstIndex(SpvId Inst) const
 	{
 		return Insts->IndexOfByPredicate([this, Inst](const TUniquePtr<SpvInstruction>& InInst){
 			return InInst->GetId() ? InInst->GetId().value() == Inst : false;
 		});
 	}
 
-	void SpvVmPixelVisitor::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts)
+	void SpvVmVisitor::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts)
 	{
 		this->Insts = &Insts;
-		//Get entry point loc
-		int32 InstIndex = GetInstIndex(Context.EntryPoint);
-		
-		//Init global external variable
-		for(auto& [Id, Var] : Context.GlobalVariables)
-		{
-			int32 SetNumber = INDEX_NONE;
-			int32 BindingNumber = INDEX_NONE;
-			TArray<SpvDecoration> Decorations;
-			Context.Decorations.MultiFind(Id, Decorations);
-			for(const auto& Decoration : Decorations)
-			{
-				if(Decoration.Kind == SpvDecorationKind::DescriptorSet)
-				{
-					SetNumber = Decoration.DescriptorSet.Number;
-				}
-				else if(Decoration.Kind == SpvDecorationKind::Binding)
-				{
-					BindingNumber = Decoration.Binding.Number;
-				}
-			}
-			if(SetNumber != INDEX_NONE && BindingNumber != INDEX_NONE ;
-			   SpvVmBinding* VmBinding = Context.Bindings.FindByPredicate([&](const SpvVmBinding& InItem) { return InItem.Binding == BindingNumber && InItem.DescriptorSet == SetNumber; }))
-			{
-				auto& Storage = std::get<SpvObject::External>(Var.Storage);
-				Storage.Resource = VmBinding->Resource;
-				if(VmBinding->Resource->GetType() == GpuResourceType::Buffer)
-				{
-					GpuBuffer* Buffer = static_cast<GpuBuffer*>(VmBinding->Resource);
-					uint8* Data = (uint8*)GGpuRhi->MapGpuBuffer(Buffer, GpuResourceMapMode::Read_Only);
-					Storage.Value = {Data, Buffer->GetByteSize()};
-					GGpuRhi->UnMapGpuBuffer(Buffer);
-				}
-				Var.Initialized = true;
-			}
-		}
-		
-		for(int32 QuadIndex = 0; QuadIndex < 4; QuadIndex++)
-		{
-			Context.Quad[QuadIndex].InstIndex = InstIndex;
-			Context.Quad[QuadIndex].RecordedInfo.AllVariables.Append(Context.GlobalVariables);
-			Context.Quad[QuadIndex].RecordedInfo.AllVariableDescMap.Append(Context.GlobalVariableDescMap);
-			Context.Quad[QuadIndex].StackFrames.SetNum(1);
-		}
-		
-		ParseQuad(Context.DebugIndex);
 	}
 }

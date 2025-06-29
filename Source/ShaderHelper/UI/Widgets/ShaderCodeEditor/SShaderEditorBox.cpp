@@ -2321,21 +2321,26 @@ const FString ErrorMarkerText = TEXT("✘");
 					{
 						FTextBlockStyle* RunTextStyle = &OwnerWidget->GetTokenStyle(Token.Type);
 						FTextRange NewTokenRange{ Token.BeginOffset, Token.EndOffset };
-						//Compares old tokens to avoid lexical highlighting overriding syntax highlighting
-						if(CurTokenizedLine)
+						
+						if(!CurTokenizedLine)
 						{
-							if(auto* MatchedToken = CurTokenizedLine->Tokens.FindByPredicate([&](const HlslTokenizer::Token& Element){
-								FString TokenStr = LineText->Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
-								FString ElementStr = LineTextBeforeEditing.Mid(Element.BeginOffset, Element.EndOffset - Element.BeginOffset);
-								return Token.Type == HLSL::TokenType::Identifier && Token.Type == Element.Type && TokenStr == ElementStr;
-							}))
+							CurTokenizedLine = &NewTokenizedLine;
+						}
+						//Compares old tokens to avoid lexical highlighting overriding syntax highlighting
+						if(auto* MatchedToken = CurTokenizedLine->Tokens.FindByPredicate([&](const HlslTokenizer::Token& Element){
+							FString TokenStr = LineText->Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
+							FString ElementStr = LineTextBeforeEditing.Mid(Element.BeginOffset, Element.EndOffset - Element.BeginOffset);
+							return Token.Type == HLSL::TokenType::Identifier && Token.Type == Element.Type
+							&& (Token.BeginOffset == Element.BeginOffset || TokenStr == ElementStr);
+						}))
+						{
+							if(OwnerWidget->LineSyntaxHighlightMapsCopy.IsValidIndex(LineIndex))
 							{
-								if(OwnerWidget->LineSyntaxHighlightMapsCopy.IsValidIndex(LineIndex))
+								for(const auto& [Range, Style] : OwnerWidget->LineSyntaxHighlightMapsCopy[LineIndex])
 								{
-									FTextBlockStyle** Style = OwnerWidget->LineSyntaxHighlightMapsCopy[LineIndex].Find({MatchedToken->BeginOffset, MatchedToken->EndOffset});
-									if(Style)
+									if(Range.BeginIndex == MatchedToken->BeginOffset)
 									{
-										RunTextStyle = *Style;
+										RunTextStyle = Style;
 									}
 								}
 							}
@@ -2530,33 +2535,39 @@ const FString ErrorMarkerText = TEXT("✘");
 			}
 		}
 		
-		std::array<PixelThreadState,4> Quad;
+		std::array<SpvVmContext,4> Quad;
 		//TODO z,w
 		uint32 QuadLeftTopX = PixelCoord.x & ~1u;
 		uint32 QuadLeftTopY = PixelCoord.y & ~1u;
-		Quad[0].FragCoord = {QuadLeftTopX + 0.5f, QuadLeftTopY + 0.5f, 0.0f, 1.0f};
-		Quad[1].FragCoord = {QuadLeftTopX + 1.5f, QuadLeftTopY + 0.5f, 0.0f, 1.0f};
-		Quad[2].FragCoord = {QuadLeftTopX + 0.5f, QuadLeftTopY + 1.5f, 0.0f, 1.0f};
-		Quad[3].FragCoord = {QuadLeftTopX + 1.5f, QuadLeftTopY + 1.5f, 0.0f, 1.0f};
-		
-		SpvVmPixelContext VmContext{
-			.DebugIndex = DebugIndex,
-			.Bindings = MoveTemp(Bindings),
-			.Quad = MoveTemp(Quad)
-		};
-		
-		SpvMetaVisitor MetaVisitor{VmContext};
-		SpvVmPixelVisitor VmVisitor{VmContext};
+		Vector4f QuadFragCoord0 = {QuadLeftTopX + 0.5f, QuadLeftTopY + 0.5f, 0.0f, 1.0f};
+		Vector4f QuadFragCoord1 = {QuadLeftTopX + 1.5f, QuadLeftTopY + 0.5f, 0.0f, 1.0f};
+		Vector4f QuadFragCoord2 = {QuadLeftTopX + 0.5f, QuadLeftTopY + 1.5f, 0.0f, 1.0f};
+		Vector4f QuadFragCoord3 = {QuadLeftTopX + 1.5f, QuadLeftTopY + 1.5f, 0.0f, 1.0f};
+		Quad[0].ThreadState.BuiltInInput.Add(SpvBuiltIn::FragCoord, {(uint8*)&QuadFragCoord0, sizeof(Vector4f)});
+		Quad[1].ThreadState.BuiltInInput.Add(SpvBuiltIn::FragCoord, {(uint8*)&QuadFragCoord1, sizeof(Vector4f)});
+		Quad[2].ThreadState.BuiltInInput.Add(SpvBuiltIn::FragCoord, {(uint8*)&QuadFragCoord2, sizeof(Vector4f)});
+		Quad[3].ThreadState.BuiltInInput.Add(SpvBuiltIn::FragCoord, {(uint8*)&QuadFragCoord3, sizeof(Vector4f)});
 		
 		TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(ShaderAssetObj->GetShaderDesc(CurrentShaderSource));
 		Shader->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
 		FString ErrorInfo;
 		GGpuRhi->CompileShader(Shader, ErrorInfo);
 		check(ErrorInfo.IsEmpty());
-
+		
 		SpirvParser Parser;
 		Parser.Parse(Shader->SpvCode);
-		Parser.Accept(&MetaVisitor);
+		for(int32 QuadIndex = 0; QuadIndex < 4; QuadIndex++)
+		{
+			SpvMetaVisitor MetaVisitor{Quad[QuadIndex]};
+			Parser.Accept(&MetaVisitor);
+		}
+		
+		SpvVmPixelContext VmContext{
+			DebugIndex,
+			MoveTemp(Bindings),
+			MoveTemp(Quad)
+		};
+		SpvVmPixelVisitor VmVisitor{VmContext};
 		Parser.Accept(&VmVisitor);
 	}
 }

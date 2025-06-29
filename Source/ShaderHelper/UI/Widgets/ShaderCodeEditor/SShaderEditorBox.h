@@ -10,7 +10,7 @@
 #include <Widgets/Text/SlateEditableTextLayout.h>
 #include "AssetObject/ShaderAsset.h"
 #include "GpuApi/Spirv/SpirvParser.h"
-#include "GpuApi/Spirv/SpirvVM.h"
+#include "GpuApi/Spirv/SpirvPixelVM.h"
 #include "GpuApi/GpuBindGroup.h"
 
 namespace SH
