@@ -3,7 +3,20 @@
 
 namespace FW
 {
-	using SpvId = uint32;
+	class SpvId
+	{
+	public:
+		SpvId() : IdValue(0) {}
+		SpvId(uint32 InIdValue) : IdValue(InIdValue) {}
+		friend uint32 GetTypeHash(const SpvId& Key)
+		{
+			return ::GetTypeHash(Key.IdValue);
+		}
+		bool operator==(const SpvId&) const = default;
+		
+	private:
+		uint32 IdValue;
+	};
 
 	enum class SpvTypeKind
 	{
@@ -15,6 +28,7 @@ namespace FW
 		Vector,
 		Pointer,
 		Struct,
+		Array,
 	};
 
 	enum class SpvStorageClass
@@ -37,6 +51,7 @@ namespace FW
 	enum class SpvDecorationKind
 	{
 		BuiltIn = 11,
+		Location = 30,
 		Binding = 33,
 		DescriptorSet = 34,
 	};
@@ -160,25 +175,65 @@ namespace FW
 		TArray<SpvType*> MemberTypes;
 	};
 
+	class SpvArrayType : public SpvType
+	{
+	public:
+		SpvArrayType(SpvType* InElementType, uint32 InLength) : SpvType(SpvTypeKind::Array)
+		, ElementType(InElementType), Length(InLength)
+		{}
+	 
+		SpvType* ElementType;
+		uint32 Length;
+	};
+
+	inline uint32 GetTypeByteSize(SpvType* Type)
+	{
+		if(Type->IsScalar())
+		{
+			SpvScalarType* ScalarType = static_cast<SpvScalarType*>(Type);
+			return ScalarType->GetWidth() / 8;
+		}
+		else if(Type->GetKind() == SpvTypeKind::Vector)
+		{
+			SpvVectorType* VectorType = static_cast<SpvVectorType*>(Type);
+			return GetTypeByteSize(VectorType->ElementType) * VectorType->ElementCount;
+		}
+		else if(Type->GetKind() == SpvTypeKind::Array)
+		{
+			SpvArrayType* ArrayType = static_cast<SpvArrayType*>(Type);
+			return GetTypeByteSize(ArrayType->ElementType) * ArrayType->Length;
+		}
+		else if(Type->GetKind() == SpvTypeKind::Struct)
+		{
+			SpvStructType* StructType = static_cast<SpvStructType*>(Type);
+			uint32 MembersByteSize = 0;
+			for(SpvType* MemberType : StructType->MemberTypes)
+			{
+				MembersByteSize += GetTypeByteSize(MemberType);
+			}
+			return MembersByteSize;
+		}
+		
+		AUX::Unreachable();
+	}
+
 	struct SpvObject
 	{
+		SpvId Id{};
 		SpvType* Type = nullptr;
 		
 		struct External
 		{
 			GpuResource* Resource = nullptr;
 			TArray<uint8> Value;
-			
-			bool operator==(const External&) const = default;
 		};
 			
 		struct Internal
 		{
 			TArray<uint8> Value;
-			bool operator==(const Internal&) const = default;
 		};
 		
-		bool operator==(const SpvObject&) const = default;
+		bool IsExternal() const { return std::holds_alternative<SpvObject::External>(Storage); }
 		
 		std::variant<External, Internal> Storage;
 	};
@@ -187,8 +242,6 @@ namespace FW
 	{
 		bool Initialized{};
 		SpvStorageClass StorageClass;
-		
-		bool operator==(const SpvVariable&) const = default;
 	};
 
 	struct SpvPointer
@@ -213,6 +266,10 @@ namespace FW
 			struct
 			{
 				uint32 Number;
+			}Location;
+			struct
+			{
+				uint32 Number;
 			}DescriptorSet;
 		};
 	};
@@ -229,12 +286,14 @@ namespace FW
 		TypeInt = 21,
 		TypeFloat = 22,
 		TypeVector = 23,
+		TypeArray = 28,
 		TypeStruct = 30,
 		TypePointer = 32,
 		ConstantTrue = 41,
 		ConstantFalse = 42,
 		Constant = 43,
 		ConstantComposite = 44,
+		ConstantNull = 46,
 		Function = 54,
 		FunctionParameter = 55,
 		FunctionCall = 57,
@@ -244,6 +303,9 @@ namespace FW
 		AccessChain = 65,
 		Decorate = 71,
 		CompositeConstruct = 80,
+		IEqual = 170,
+		INotEqual = 171,
+		DPdx = 207,
 		Label = 248,
 	};
 }

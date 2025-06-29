@@ -15,9 +15,9 @@ namespace FW
 		TMap<SpvId, SpvPointer> GlobalPointers;
 		TMap<SpvId, SpvVariable> GlobalVariables;
 		TMultiMap<SpvId, SpvDecoration> Decorations;		//GlobalVarId -> Decoration
-		TMap<SpvId, SpvTypeDesc> TypeDescs;
+		TMap<SpvId, TUniquePtr<SpvTypeDesc>> TypeDescs;
 		TMap<SpvId, SpvVariableDesc> VariableDescs;
-		TMap<SpvId, SpvVariableDesc*> GlobalVariableDescMap;   //GlobalVarId -> Desc
+		TMap<SpvId, SpvVariableDesc*> VariableDescMap;   //VarId -> Desc
 		TMap<SpvId, TUniquePtr<SpvLexicalScope>> LexicalScopes;
 	};
 
@@ -38,7 +38,7 @@ namespace FW
 		void Visit(SpvOpTypeBool* Inst) override;
 		void Visit(SpvOpTypePointer* Inst) override;
 		void Visit(SpvOpTypeStruct* Inst) override;
- 
+		void Visit(SpvOpTypeArray* Inst) override;
 		void Visit(SpvOpDecorate* Inst) override;
 		void Visit(SpvOpExecutionMode* Inst) override;
 		void Visit(SpvOpString* Inst) override;
@@ -46,8 +46,16 @@ namespace FW
 		void Visit(SpvOpConstantTrue* Inst) override;
 		void Visit(SpvOpConstantFalse* Inst) override;
 		void Visit(SpvOpConstantComposite* Inst) override;
+		void Visit(SpvOpConstantNull* Inst) override;
 		
+		void Visit(SpvDebugTypeBasic* Inst) override;
+		void Visit(SpvDebugTypeVector* Inst) override;
+		void Visit(SpvDebugTypeComposite* Inst) override;
+		void Visit(SpvDebugTypeMember* Inst) override;
+		void Visit(SpvDebugTypeArray* Inst) override;
+		void Visit(SpvDebugTypeFunction* Inst) override;
 		void Visit(SpvDebugCompilationUnit* Inst) override;
+		void Visit(SpvDebugLexicalBlock* Inst) override;
 		void Visit(SpvDebugFunction* Inst) override;
 		void Visit(SpvDebugLocalVariable* Inst) override;
 		void Visit(SpvDebugGlobalVariable* Inst) override;

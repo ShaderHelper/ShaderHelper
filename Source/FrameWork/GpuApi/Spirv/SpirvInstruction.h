@@ -24,11 +24,13 @@ namespace FW
 		virtual void Visit(class SpvOpTypeVector* Inst) {}
 		virtual void Visit(class SpvOpTypePointer* Inst) {}
 		virtual void Visit(class SpvOpTypeStruct* Inst) {}
+		virtual void Visit(class SpvOpTypeArray* Inst) {}
 		
 		virtual void Visit(class SpvOpConstant* Inst) {}
 		virtual void Visit(class SpvOpConstantTrue* Inst) {}
 		virtual void Visit(class SpvOpConstantFalse* Inst) {}
 		virtual void Visit(class SpvOpConstantComposite* Inst) {}
+		virtual void Visit(class SpvOpConstantNull* Inst) {}
 		virtual void Visit(class SpvOpFunction* Inst) {}
 		virtual void Visit(class SpvOpFunctionParameter* Inst) {}
 		virtual void Visit(class SpvOpFunctionCall* Inst) {}
@@ -38,9 +40,19 @@ namespace FW
 		virtual void Visit(class SpvOpStore* Inst) {}
 		virtual void Visit(class SpvOpCompositeConstruct* Inst) {}
 		virtual void Visit(class SpvOpAccessChain* Inst) {}
+		virtual void Visit(class SpvOpIEqual* Inst) {}
+		virtual void Visit(class SpvOpINotEqual* Inst) {}
+		virtual void Visit(class SpvOpDPdx* Inst) {}
 		
 		//NonSemantic.Shader.DebugInfo.100
+		virtual void Visit(class SpvDebugTypeBasic* Inst) {}
+		virtual void Visit(class SpvDebugTypeVector* Inst) {}
+		virtual void Visit(class SpvDebugTypeComposite* Inst) {}
+		virtual void Visit(class SpvDebugTypeMember* Inst) {}
+		virtual void Visit(class SpvDebugTypeArray* Inst) {}
+		virtual void Visit(class SpvDebugTypeFunction* Inst) {}
 		virtual void Visit(class SpvDebugCompilationUnit* Inst) {}
+		virtual void Visit(class SpvDebugLexicalBlock* Inst) {}
 		virtual void Visit(class SpvDebugFunction* Inst) {}
 		virtual void Visit(class SpvDebugLine* Inst) {}
 		virtual void Visit(class SpvDebugScope* Inst) {}
@@ -229,6 +241,21 @@ namespace FW
 		TArray<SpvId> MemberTypes;
 	};
 
+	class SpvOpTypeArray : public SpvInstructionBase<SpvOpTypeArray>
+	{
+	public:
+		SpvOpTypeArray(SpvId InElementType, SpvId InLength) : SpvInstructionBase(SpvOp::TypeArray)
+		, ElementType(InElementType), Length(InLength)
+		{}
+		
+		SpvId GetElementType() const { return ElementType; }
+		SpvId GetLength() const { return Length; }
+		
+	private:
+		SpvId ElementType;
+		SpvId Length;
+	};
+
 	class SpvOpConstant : public SpvInstructionBase<SpvOpConstant>
 	{
 	public:
@@ -275,6 +302,17 @@ namespace FW
 	private:
 		SpvId ResultType;
 		TArray<SpvId> Constituents;
+	};
+
+	class SpvOpConstantNull : public SpvInstructionBase<SpvOpConstantNull>
+	{
+	public:
+		SpvOpConstantNull(SpvId InResultType) : SpvInstructionBase(SpvOp::ConstantNull)
+		, ResultType(InResultType)
+		{}
+		SpvId GetResultType() const { return ResultType; }
+	private:
+		SpvId ResultType;
 	};
 
 	class SpvOpString : public SpvInstructionBase<SpvOpString>
@@ -342,17 +380,20 @@ namespace FW
 	class SpvOpVariable : public SpvInstructionBase<SpvOpVariable>
 	{
 	public:
-		SpvOpVariable(SpvId InResultType, SpvStorageClass InStorageClass) : SpvInstructionBase(SpvOp::Variable)
+		SpvOpVariable(SpvId InResultType, SpvStorageClass InStorageClass, std::optional<SpvId> InInitializer) : SpvInstructionBase(SpvOp::Variable)
 		, ResultType(InResultType)
 		, StorageClass(InStorageClass)
+		, Initializer(InInitializer)
 		{}
 		
 		SpvId GetResultType() const { return ResultType; }
 		SpvStorageClass GetStorageClass() const { return StorageClass; }
+		std::optional<SpvId> GetInitializer() const { return Initializer; }
 		
 	private:
 		SpvId ResultType;
 		SpvStorageClass StorageClass;
+		std::optional<SpvId> Initializer;
 	};
 
 	class SpvOpLabel : public SpvInstructionBase<SpvOpLabel>
@@ -428,6 +469,127 @@ namespace FW
 		TArray<SpvId> Indexes;
 	};
 
+	class SpvOpIEqual : public SpvInstructionBase<SpvOpIEqual>
+	{
+	public:
+		SpvOpIEqual() : SpvInstructionBase(SpvOp::IEqual)
+		{}
+	private:
+	};
+
+	class SpvOpINotEqual : public SpvInstructionBase<SpvOpINotEqual>
+	{
+	public:
+		SpvOpINotEqual() : SpvInstructionBase(SpvOp::INotEqual)
+		{}
+	private:
+	};
+
+	class SpvOpDPdx : public SpvInstructionBase<SpvOpDPdx>
+	{
+	public:
+		SpvOpDPdx() : SpvInstructionBase(SpvOp::DPdx)
+		{}
+	private:
+	};
+
+	class SpvDebugTypeBasic : public SpvInstructionBase<SpvDebugTypeBasic>
+	{
+	public:
+		SpvDebugTypeBasic(SpvId InName, SpvId InSize, SpvDebugBasicTypeEncoding InEncoding) : SpvInstructionBase(SpvDebugInfo100::DebugTypeBasic)
+		, Name(InName), Size(InSize), Encoding(InEncoding)
+		{}
+		
+		SpvId GetName() const { return Name; }
+		SpvId GetSize() const { return Size; }
+		SpvDebugBasicTypeEncoding GetEncoding() const { return Encoding; }
+		
+	private:
+		SpvId Name;
+		SpvId Size;
+		SpvDebugBasicTypeEncoding Encoding;
+	};
+
+	class SpvDebugTypeVector : public SpvInstructionBase<SpvDebugTypeVector>
+	{
+	public:
+		SpvDebugTypeVector(SpvId InBasicType, SpvId InComponentCount) : SpvInstructionBase(SpvDebugInfo100::DebugTypeVector)
+		, BasicType(InBasicType), ComponentCount(InComponentCount)
+		{}
+		
+		SpvId GetBasicType() const { return BasicType; }
+		SpvId GetComponentCount() const { return ComponentCount; }
+		
+	private:
+		SpvId BasicType;
+		SpvId ComponentCount;
+	};
+
+	class SpvDebugTypeComposite : public SpvInstructionBase<SpvDebugTypeComposite>
+	{
+	public:
+		SpvDebugTypeComposite(SpvId InName, SpvId InSize, const TArray<SpvId>& InMembers) : SpvInstructionBase(SpvDebugInfo100::DebugTypeComposite)
+		, Name(InName), Size(InSize), Members(InMembers)
+		{}
+		
+		SpvId GetName() const { return Name; }
+		SpvId GetSize() const { return Size; }
+		const TArray<SpvId>& GetMembers() const { return Members; }
+		
+	private:
+		SpvId Name;
+		SpvId Size;
+		TArray<SpvId> Members;
+	};
+
+	class SpvDebugTypeMember : public SpvInstructionBase<SpvDebugTypeMember>
+	{
+	public:
+		SpvDebugTypeMember(SpvId InName, SpvId InType, SpvId InOffset, SpvId InSize) : SpvInstructionBase(SpvDebugInfo100::DebugTypeMember)
+		, Name(InName), Type(InType), Offset(InOffset), Size(InSize)
+		{}
+		
+		SpvId GetName() const { return Name; }
+		SpvId GetType() const { return Type; }
+		SpvId GetOffset() const { return Offset; }
+		SpvId GetSize() const { return Size; }
+		
+	private:
+		SpvId Name;
+		SpvId Type;
+		SpvId Offset;
+		SpvId Size;
+	};
+
+	class SpvDebugTypeArray: public SpvInstructionBase<SpvDebugTypeArray>
+	{
+	public:
+		SpvDebugTypeArray(SpvId InBaseType, const TArray<SpvId>& InComponentCounts) : SpvInstructionBase(SpvDebugInfo100::DebugTypeArray)
+		, BaseType(InBaseType), ComponentCounts(InComponentCounts)
+		{}
+		
+		SpvId GetBaseType() const { return BaseType; }
+		const TArray<SpvId>& GetComponentCounts() const { return ComponentCounts; }
+		
+	private:
+		SpvId BaseType;
+		TArray<SpvId> ComponentCounts;
+	};
+
+	class SpvDebugTypeFunction : public SpvInstructionBase<SpvDebugTypeFunction>
+	{
+	public:
+		SpvDebugTypeFunction(SpvId InReturnType, const TArray<SpvId>& InParmTypes) : SpvInstructionBase(SpvDebugInfo100::DebugTypeFunction)
+		, ReturnType(InReturnType), ParmTypes(InParmTypes)
+		{}
+		
+		SpvId GetReturnType() const { return ReturnType; }
+		const TArray<SpvId>& GetParmTypes() const { return ParmTypes; }
+		
+	private:
+		SpvId ReturnType;
+		TArray<SpvId> ParmTypes;
+	};
 
 	class SpvDebugCompilationUnit : public SpvInstructionBase<SpvDebugCompilationUnit>
 	{
@@ -435,10 +597,25 @@ namespace FW
 		SpvDebugCompilationUnit() : SpvInstructionBase(SpvDebugInfo100::DebugCompilationUnit) {}
 	};
 
+	class SpvDebugLexicalBlock : public SpvInstructionBase<SpvDebugLexicalBlock>
+	{
+	public:
+		SpvDebugLexicalBlock(SpvId InLine, SpvId InParent) : SpvInstructionBase(SpvDebugInfo100::DebugLexicalBlock)
+		, Line(InLine), Parent(InParent)
+		{}
+		
+		SpvId GetLineNumber() const { return Line; }
+		SpvId GetParentId() const { return Parent; }
+		
+	private:
+		SpvId Line;
+		SpvId Parent;
+	};
+
 	class SpvDebugFunction : public SpvInstructionBase<SpvDebugFunction>
 	{
 	public:
-		SpvDebugFunction(SpvId InName, SpvId InTypeDesc, int32 InLine, SpvId InParent)
+		SpvDebugFunction(SpvId InName, SpvId InTypeDesc, SpvId InLine, SpvId InParent)
 		: SpvInstructionBase(SpvDebugInfo100::DebugFunction)
 		, Name(InName), TypeDesc(InTypeDesc)
 		, Line(InLine), Parent(InParent)
@@ -446,13 +623,13 @@ namespace FW
 		
 		SpvId GetNameId() const { return Name; }
 		SpvId GetTypeDescId() const { return TypeDesc; }
-		int32 GetLineNumber() const { return Line; }
+		SpvId GetLineNumber() const { return Line; }
 		SpvId GetParentId() const { return Parent; }
 		
 	private:
 		SpvId Name;
 		SpvId TypeDesc;
-		int32 Line;
+		SpvId Line;
 		SpvId Parent;
 	};
 
@@ -485,23 +662,23 @@ namespace FW
 	class SpvDebugDeclare : public SpvInstructionBase<SpvDebugDeclare>
 	{
 	public:
-		SpvDebugDeclare(SpvId InVarDesc, SpvId InVarId) : SpvInstructionBase(SpvDebugInfo100::DebugDeclare)
+		SpvDebugDeclare(SpvId InVarDesc, SpvId InPointerId) : SpvInstructionBase(SpvDebugInfo100::DebugDeclare)
 		, VarDesc(InVarDesc)
-		, VarId(InVarId)
+		, PointerId(InPointerId)
 		{}
 		
 		SpvId GetVarDesc() const { return VarDesc; }
-		SpvId GetVarId() const { return VarId; }
+		SpvId GetPointer() const { return PointerId; }
 		
 	private:
 		SpvId VarDesc;
-		SpvId VarId;
+		SpvId PointerId;
 	};
 
 	class SpvDebugLocalVariable : public SpvInstructionBase<SpvDebugLocalVariable>
 	{
 	public:
-		SpvDebugLocalVariable(SpvId InName, SpvId InTypeDesc, int32 InLine, SpvId InParent)
+		SpvDebugLocalVariable(SpvId InName, SpvId InTypeDesc, SpvId InLine, SpvId InParent)
 		: SpvInstructionBase(SpvDebugInfo100::DebugLocalVariable)
 		, Name(InName), TypeDesc(InTypeDesc)
 		, Line(InLine), Parent(InParent)
@@ -509,34 +686,34 @@ namespace FW
 		
 		SpvId GetNameId() const { return Name; }
 		SpvId GetTypeDescId() const { return TypeDesc; }
-		int32 GetLineNumber() const { return Line; }
+		SpvId GetLineNumber() const { return Line; }
 		SpvId GetParentId() const { return Parent; }
 		
 	private:
 		SpvId Name;
 		SpvId TypeDesc;
-		int32 Line;
+		SpvId Line;
 		SpvId Parent;
 	};
 
 	class SpvDebugGlobalVariable : public SpvInstructionBase<SpvDebugGlobalVariable>
 	{
 	public:
-		SpvDebugGlobalVariable(SpvId InName, SpvId InTypeDesc, int32 InLine, SpvId InParent, SpvId InVar)
+		SpvDebugGlobalVariable(SpvId InName, SpvId InTypeDesc, SpvId InLine, SpvId InParent, SpvId InVar)
 		: SpvInstructionBase(SpvDebugInfo100::DebugGlobalVariable)
 		, Name(InName), TypeDesc(InTypeDesc), Line(InLine), Parent(InParent), Var(InVar)
 		{}
 		
 		SpvId GetNameId() const { return Name; }
 		SpvId GetTypeDescId() const { return TypeDesc; }
-		int32 GetLineNumber() const { return Line; }
+		SpvId GetLineNumber() const { return Line; }
 		SpvId GetParentId() const { return Parent; }
 		SpvId GetVarId() const { return Var; }
 		
 	private:
 		SpvId Name;
 		SpvId TypeDesc;
-		int32 Line;
+		SpvId Line;
 		SpvId Parent;
 		SpvId Var;
 	};

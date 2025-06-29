@@ -3,12 +3,16 @@
 
 namespace FW
 {
-	TArray<uint8> GetPointerValue(SpvPointer* InPointer, SpvVariableDesc* PointeeDesc);
-	void WritePointerValue(SpvPointer* InPointer, SpvVariableDesc* PointeeDesc, const TArray<uint8>& ValueToStore);
-
 	struct SpvVariableChange
 	{
-		
+		SpvId VarId;
+		TArray<uint8> PreValue;
+		TArray<uint8> NewValue;
+		struct DirtyRange
+		{
+			int32 OffsetBytes;
+			int32 ByteSize;
+		} Range ;
 	};
 
 	struct SpvLexicalScopeChange
@@ -19,7 +23,7 @@ namespace FW
 
 	struct SpvDebugState
 	{
-		uint32 LineNumber;
+		int32 LineNumber{};
 		SpvLexicalScopeChange ScopeChange;
 		TArray<SpvVariableChange> VarChanges;
 		FString UbError;
@@ -28,7 +32,6 @@ namespace FW
 	struct SpvRecordedInfo
 	{
 		TMap<SpvId, SpvVariable> AllVariables;
-		TMap<SpvId, SpvVariableDesc*> AllVariableDescMap;
 		TArray<SpvFunctionDesc*> CallStack;
 		SpvLexicalScope* Scope = nullptr;
 		
@@ -55,41 +58,34 @@ namespace FW
 		TMap<SpvId, SpvObject> IntermediateObjects;
 		TMap<SpvId, SpvPointer> Pointers;
 		TMap<SpvId, SpvVariable> Variables;
-		TMap<SpvId, SpvVariableDesc*> VariableDescMap;
 	};
 
-	struct ThreadState
+	struct SpvThreadState
 	{
 		int32 InstIndex;
 		int32 NextInstIndex;
 		TArray<SpvVmFrame> StackFrames;
 		
+		TMap<SpvBuiltIn, TArray<uint8>> BuiltInInput;
+		TMap<uint32, TArray<uint8>> LocationInput;
+		
 		//Finalized information for external use
 		SpvRecordedInfo RecordedInfo;
 	};
 
-	struct PixelThreadState : ThreadState
+	struct SpvVmContext : SpvMetaContext
 	{
-		Vector4f FragCoord;
+		SpvThreadState ThreadState;
 	};
 
-	struct SpvVmPixelContext : SpvMetaContext
-	{
-		int32 DebugIndex;
-		TArray<SpvVmBinding> Bindings;
-		std::array<PixelThreadState,4> Quad;
-		int32 CurActiveIndex;
-	};
-
-	class FRAMEWORK_API SpvVmPixelVisitor : public SpvVisitor
+	class FRAMEWORK_API SpvVmVisitor : public SpvVisitor
 	{
 	public:
-		SpvVmPixelVisitor(SpvVmPixelContext& InContext);
+		SpvVmVisitor() = default;
+		virtual SpvVmContext& GetActiveContext() = 0;
 		
 	public:
 		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts) override;
-		void ParseQuad(int32 QuadIndex, int32 StopIndex = INDEX_NONE);
-		
 		int32 GetInstIndex(SpvId Inst) const;
 		
 		void Visit(SpvDebugLine* Inst) override;
@@ -104,10 +100,14 @@ namespace FW
 		void Visit(SpvOpStore* Inst) override;
 		void Visit(SpvOpCompositeConstruct* Inst) override;
 		void Visit(SpvOpAccessChain* Inst) override;
+		void Visit(SpvOpIEqual* Inst) override;
+		void Visit(SpvOpINotEqual* Inst) override;
 
-	private:
+	protected:
 		bool AnyError{};
 		const TArray<TUniquePtr<SpvInstruction>>* Insts;
-		SpvVmPixelContext& Context;
 	};
+
+	TArray<uint8> GetPointerValue(SpvPointer* InPointer, SpvVariableDesc* PointeeDesc);
+	void WritePointerValue(SpvPointer* InPointer, SpvVariableDesc* PointeeDesc, const TArray<uint8>& ValueToStore, SpvVariableChange* OutVariableChange = nullptr);
 }

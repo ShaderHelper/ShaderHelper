@@ -839,7 +839,10 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 			]
 		);
 		ToolBarBuilder.AddToolBarButton(
-			FExecuteAction{},
+			FUIAction(
+				FExecuteAction(),
+				FCanExecuteAction::CreateLambda([] { return false; })
+			),
 			NAME_None,
 			FText::GetEmpty(), FText::GetEmpty(),
 			FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.FullText"),

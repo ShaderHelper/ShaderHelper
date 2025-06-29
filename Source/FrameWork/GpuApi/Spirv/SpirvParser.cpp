@@ -7,19 +7,38 @@ namespace FW
 	void SpvMetaVisitor::Visit(SpvOpVariable* Inst)
 	{
 		SpvStorageClass StorageClass = Inst->GetStorageClass();
-		if(StorageClass == SpvStorageClass::Uniform)
+		SpvId ResultId = Inst->GetId().value();
+		
+		if(!Context.Types.Contains(Inst->GetResultType()))
 		{
-			if(!Context.Types.Contains(Inst->GetResultType()))
-			{
-				return;
-			}
-			
-			SpvPointerType* PointerType = static_cast<SpvPointerType*>(Context.Types[Inst->GetResultType()].Get());
-			SpvVariable Var = {{PointerType->PointeeType}, false, StorageClass};
-			SpvPointer Pointer{&Var};
-			Context.GlobalVariables.Add(Inst->GetId().value(), MoveTemp(Var));
-			Context.GlobalPointers.Add(Inst->GetId().value(), MoveTemp(Pointer));
+			return;
 		}
+		
+		SpvPointerType* PointerType = static_cast<SpvPointerType*>(Context.Types[Inst->GetResultType()].Get());
+		SpvVariable Var = {{ResultId, PointerType->PointeeType}, false, StorageClass};
+		if(StorageClass == SpvStorageClass::Uniform || StorageClass == SpvStorageClass::UniformConstant)
+		{
+			//Cannot confirm the allocation size of external objects.
+			Var.Storage = SpvObject::External{};
+		}
+		else
+		{
+			TArray<uint8> Value;
+			Value.SetNumZeroed(GetTypeByteSize(PointerType->PointeeType));
+			Var.Storage = SpvObject::Internal{MoveTemp(Value)};
+		}
+		
+		if(Inst->GetInitializer().has_value())
+		{
+			SpvObject* Constant = &Context.Constants[Inst->GetInitializer().value()];
+			std::get<SpvObject::Internal>(Var.Storage).Value = std::get<SpvObject::Internal>(Constant->Storage).Value;
+			Var.Initialized = true;
+		}
+		
+		Context.GlobalVariables.Add(ResultId, MoveTemp(Var));
+		SpvPointer Pointer{ &Context.GlobalVariables[ResultId] };
+		Context.GlobalPointers.Add(ResultId, MoveTemp(Pointer));
+		
 	}
 
 	void SpvMetaVisitor::Visit(SpvOpTypeFloat* Inst)
@@ -72,6 +91,13 @@ namespace FW
 			MemberTypes.Add(Context.Types[MemberTypeId].Get());
 		}
 		Context.Types.Add(Inst->GetId().value(), MakeUnique<SpvStructType>(MemberTypes));
+	}
+
+	void SpvMetaVisitor::Visit(SpvOpTypeArray* Inst)
+	{
+		SpvType* ElementType = Context.Types[Inst->GetElementType()].Get();
+		uint32 Length = *(uint32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLength()].Storage).Value.GetData();
+		Context.Types.Add(Inst->GetId().value(), MakeUnique<SpvArrayType>(ElementType, Length));
 	}
 
 	void SpvMetaVisitor::Visit(SpvOpExecutionMode* Inst)
@@ -134,6 +160,7 @@ namespace FW
 
 	void SpvMetaVisitor::Visit(SpvOpConstantTrue* Inst)
 	{
+		SpvId ResultId = Inst->GetId().value();
 		if(!Context.Types.Contains(Inst->GetResultType()))
 		{
 			return;
@@ -141,20 +168,22 @@ namespace FW
 		
 		SpvType* RetType = Context.Types[Inst->GetResultType()].Get();
 		check(RetType->GetKind() == SpvTypeKind::Bool);
-		SpvObject Obj = {RetType,  SpvObject::Internal{Inst->GetValue()}};
-		Context.Constants.Add(Inst->GetId().value(), MoveTemp(Obj));
+		SpvObject Obj = {ResultId, RetType, SpvObject::Internal{Inst->GetValue()}};
+		Context.Constants.Add(ResultId, MoveTemp(Obj));
 	}
 
 	void SpvMetaVisitor::Visit(SpvOpConstantFalse* Inst)
 	{
+		SpvId ResultId = Inst->GetId().value();
 		SpvType* RetType = Context.Types[Inst->GetResultType()].Get();
 		check(RetType->GetKind() == SpvTypeKind::Bool);
-		SpvObject Obj = {RetType,  SpvObject::Internal{Inst->GetValue()}};
-		Context.Constants.Add(Inst->GetId().value(), MoveTemp(Obj));
+		SpvObject Obj = {ResultId, RetType, SpvObject::Internal{Inst->GetValue()}};
+		Context.Constants.Add(ResultId, MoveTemp(Obj));
 	}
 
 	void SpvMetaVisitor::Visit(SpvOpConstantComposite* Inst)
 	{
+		SpvId ResultId = Inst->GetId().value();
 		if(!Context.Types.Contains(Inst->GetResultType()))
 		{
 			return;
@@ -167,8 +196,100 @@ namespace FW
 			SpvObject& ConstituentObj = Context.Constants[ConstituentId];
 			CompositeValue.Append(std::get<SpvObject::Internal>(ConstituentObj.Storage).Value);
 		}
-		SpvObject Obj = {RetType, SpvObject::Internal{MoveTemp(CompositeValue)}};
+		SpvObject Obj = {ResultId, RetType, SpvObject::Internal{MoveTemp(CompositeValue)}};
+		Context.Constants.Add(ResultId, MoveTemp(Obj));
+	}
+
+	void SpvMetaVisitor::Visit(SpvOpConstantNull* Inst)
+	{
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		TArray<uint8> Value;
+		Value.SetNumZeroed(GetTypeByteSize(ResultType));
+		SpvObject Obj = {
+			.Type = ResultType,
+			.Storage = SpvObject::Internal{MoveTemp(Value)}
+		};
 		Context.Constants.Add(Inst->GetId().value(), MoveTemp(Obj));
+	}
+
+	void SpvMetaVisitor::Visit(SpvDebugTypeBasic* Inst)
+	{
+		int32 Size = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetSize()].Storage).Value.GetData();
+		auto BasicTypeDesc = MakeUnique<SpvBasicTypeDesc>(Context.DebugStrs[Inst->GetName()],
+														  Size,
+														  Inst->GetEncoding());
+		Context.TypeDescs.Add(Inst->GetId().value(), MoveTemp(BasicTypeDesc));
+	}
+
+	void SpvMetaVisitor::Visit(SpvDebugTypeVector* Inst)
+	{
+		int32 CompCount = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetComponentCount()].Storage).Value.GetData();
+		auto VectorTypeDesc = MakeUnique<SpvVectorTypeDesc>(static_cast<SpvBasicTypeDesc*>(Context.TypeDescs[Inst->GetBasicType()].Get()), CompCount);
+		Context.TypeDescs.Add(Inst->GetId().value(), MoveTemp(VectorTypeDesc));
+	}
+
+	void SpvMetaVisitor::Visit(SpvDebugTypeComposite* Inst)
+	{
+		TArray<SpvTypeDesc*> MemberTypeDescs;
+		for(SpvId MemberTypeDescId : Inst->GetMembers())
+		{
+			MemberTypeDescs.Add(Context.TypeDescs[MemberTypeDescId].Get());
+		}
+		//Skip opaque type
+		if(MemberTypeDescs.IsEmpty())
+		{
+			return;
+		}
+		
+		int32 Size = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetSize()].Storage).Value.GetData();
+		auto CompositeTypeDesc = MakeUnique<SpvCompositeTypeDesc>(Context.DebugStrs[Inst->GetName()],
+																  Size,
+																  MemberTypeDescs);
+		Context.TypeDescs.Add(Inst->GetId().value(), MoveTemp(CompositeTypeDesc));
+	}
+
+	void SpvMetaVisitor::Visit(SpvDebugTypeMember* Inst)
+	{
+		int32 Offset = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetOffset()].Storage).Value.GetData();
+		int32 Size = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetSize()].Storage).Value.GetData();
+		auto MemberTypeDesc = MakeUnique<SpvMemberTypeDesc>(Context.DebugStrs[Inst->GetName()],
+															Context.TypeDescs[Inst->GetType()].Get(),
+															Offset, Size);
+		Context.TypeDescs.Add(Inst->GetId().value(), MoveTemp(MemberTypeDesc));
+	}
+
+	void SpvMetaVisitor::Visit(SpvDebugTypeArray* Inst)
+	{
+		SpvTypeDesc* BaseTypeDesc = Context.TypeDescs[Inst->GetBaseType()].Get();
+		TArray<uint32> CompCounts;
+		for(SpvId CompCountId : Inst->GetComponentCounts())
+		{
+			CompCounts.Add(*(uint32*)std::get<SpvObject::Internal>(Context.Constants[CompCountId].Storage).Value.GetData());
+		}
+		auto ArrayTypeDesc = MakeUnique<SpvArrayTypeDesc>(BaseTypeDesc, CompCounts);
+		Context.TypeDescs.Add(Inst->GetId().value(), MoveTemp(ArrayTypeDesc));
+	}
+
+	void SpvMetaVisitor::Visit(SpvDebugTypeFunction* Inst)
+	{
+		TArray<SpvTypeDesc*> ParmTypeDescs;
+		for(SpvId ParmTypeDescId : Inst->GetParmTypes())
+		{
+			ParmTypeDescs.Add(Context.TypeDescs[ParmTypeDescId].Get());
+		}
+		
+		TUniquePtr<SpvTypeDesc> FuncTypeDesc;
+		if(auto TypeVoid = Context.Types.Find(Inst->GetReturnType()))
+		{
+			SpvVoidType* ReturnType = static_cast<SpvVoidType*>((*TypeVoid).Get());
+			FuncTypeDesc = MakeUnique<SpvFuncTypeDesc>(ReturnType, ParmTypeDescs);
+		}
+		else
+		{
+			SpvTypeDesc* ReturnTypeDesc = Context.TypeDescs[Inst->GetReturnType()].Get();
+			FuncTypeDesc = MakeUnique<SpvFuncTypeDesc>(ReturnTypeDesc, ParmTypeDescs);
+		}
+		Context.TypeDescs.Add(Inst->GetId().value(), MoveTemp(FuncTypeDesc));
 	}
 
 	void SpvMetaVisitor::Visit(SpvDebugCompilationUnit* Inst)
@@ -176,22 +297,43 @@ namespace FW
 		Context.LexicalScopes.Add(Inst->GetId().value(), MakeUnique<SpvCompilationUnit>());
 	}
 
+	void SpvMetaVisitor::Visit(SpvDebugLexicalBlock* Inst)
+	{
+		int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLineNumber()].Storage).Value.GetData();
+		SpvLexicalScope* ParentScope = Context.LexicalScopes[Inst->GetParentId()].Get();
+		Context.LexicalScopes.Add(Inst->GetId().value(), MakeUnique<SpvLexicalBlock>(Line, ParentScope));
+	}
+
 	void SpvMetaVisitor::Visit(SpvDebugFunction* Inst)
 	{
 		SpvLexicalScope* ParentScope = Context.LexicalScopes[Inst->GetParentId()].Get();
 		const FString& FuncName = Context.DebugStrs[Inst->GetNameId()];
-		const SpvTypeDesc& FuncTypeDesc = Context.TypeDescs[Inst->GetTypeDescId()];
-		Context.LexicalScopes.Add(Inst->GetId().value(), MakeUnique<SpvFunctionDesc>(ParentScope, FuncName, &FuncTypeDesc, Inst->GetLineNumber()));
+		SpvTypeDesc* FuncTypeDesc = Context.TypeDescs[Inst->GetTypeDescId()].Get();
+		int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLineNumber()].Storage).Value.GetData();
+		Context.LexicalScopes.Add(Inst->GetId().value(), MakeUnique<SpvFunctionDesc>(ParentScope, FuncName, FuncTypeDesc, Line));
 	}
 
 	void SpvMetaVisitor::Visit(SpvDebugLocalVariable* Inst)
 	{
-		
+		SpvVariableDesc VarDesc{
+			.Name = Context.DebugStrs[Inst->GetNameId()],
+			.TypeDesc = Context.TypeDescs[Inst->GetTypeDescId()].Get(),
+			.Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLineNumber()].Storage).Value.GetData(),
+			.Parent = Context.LexicalScopes[Inst->GetParentId()].Get()
+		};
+		Context.VariableDescs.Add(Inst->GetId().value(), MoveTemp(VarDesc));
 	}
 
 	void SpvMetaVisitor::Visit(SpvDebugGlobalVariable* Inst)
 	{
-		
+		SpvVariableDesc VarDesc{
+			.Name = Context.DebugStrs[Inst->GetNameId()],
+			.TypeDesc = Context.TypeDescs.Contains(Inst->GetTypeDescId()) ? Context.TypeDescs[Inst->GetTypeDescId()].Get() : nullptr,
+			.Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLineNumber()].Storage).Value.GetData(),
+			.Parent = Context.LexicalScopes[Inst->GetParentId()].Get()
+		};
+		Context.VariableDescs.Add(Inst->GetId().value(), MoveTemp(VarDesc));
+		Context.VariableDescMap.Add(Inst->GetVarId(), &Context.VariableDescs[Inst->GetId().value()]);
 	}
 
 	void SpvMetaVisitor::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts)
@@ -240,8 +382,7 @@ namespace FW
 			{
 				SpvId ResultId = SpvCode[WordOffset + 1];
 				char* Str = (char*)&SpvCode[WordOffset + 2];
-				int32 StrWordLen = InstWordLen - 3;
-				DecodedInst = MakeUnique<SpvOpString>(FString(StrWordLen * 4, Str));
+				DecodedInst = MakeUnique<SpvOpString>(FString(Str));
 				DecodedInst->SetId(ResultId);
 			}
 			else if(OpCode == SpvOp::Decorate)
@@ -302,12 +443,20 @@ namespace FW
 				DecodedInst = MakeUnique<SpvOpTypePointer>(StorageClass, PointeeType);
 				DecodedInst->SetId(ResultId);
 			}
+			else if(OpCode == SpvOp::TypeArray)
+			{
+				SpvId ResultId = SpvCode[WordOffset + 1];
+				SpvId ElementType =  SpvCode[WordOffset + 2];
+				SpvId Length =  SpvCode[WordOffset + 3];
+				DecodedInst = MakeUnique<SpvOpTypeArray>(ElementType, Length);
+				DecodedInst->SetId(ResultId);
+			}
 			else if(OpCode == SpvOp::Constant)
 			{
 				SpvId ResultType = SpvCode[WordOffset + 1];
 				SpvId ResultId = SpvCode[WordOffset + 2];
 				uint8* Value = (uint8*)&SpvCode[WordOffset + 3];
-				int32 ValueWordLen = InstWordLen - 4;
+				int32 ValueWordLen = InstWordLen - 3;
 				DecodedInst = MakeUnique<SpvOpConstant>(ResultType, TArray{Value, ValueWordLen * 4});
 				DecodedInst->SetId(ResultId);
 			}
@@ -332,6 +481,13 @@ namespace FW
 				int32 ConstituentsWordLen = InstWordLen - 3;
 				TArray<SpvId> Constituents = {(SpvId*)&SpvCode[WordOffset + 3], ConstituentsWordLen};
 				DecodedInst = MakeUnique<SpvOpConstantComposite>(ResultType, Constituents);
+				DecodedInst->SetId(ResultId);
+			}
+			else if(OpCode == SpvOp::ConstantNull)
+			{
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				DecodedInst = MakeUnique<SpvOpConstantNull>(ResultType);
 				DecodedInst->SetId(ResultId);
 			}
 			else if(OpCode == SpvOp::Function)
@@ -364,7 +520,12 @@ namespace FW
 				SpvId ResultType = SpvCode[WordOffset + 1];
 				SpvId ResultId = SpvCode[WordOffset + 2];
 				SpvStorageClass StorageClass = static_cast<SpvStorageClass>(SpvCode[WordOffset + 3]);
-				DecodedInst = MakeUnique<SpvOpVariable>(ResultType, StorageClass);
+				std::optional<SpvId> Initializer;
+				if(InstWordLen - 4 > 0)
+				{
+					Initializer = SpvCode[WordOffset + 4];
+				}
+				DecodedInst = MakeUnique<SpvOpVariable>(ResultType, StorageClass, Initializer);
 				DecodedInst->SetId(ResultId);
 			}
 			else if(OpCode == SpvOp::Label)
@@ -406,6 +567,18 @@ namespace FW
 				DecodedInst = MakeUnique<SpvOpAccessChain>(ResultType, BasePointer, Indexes);
 				DecodedInst->SetId(ResultId);
 			}
+			else if(OpCode == SpvOp::IEqual)
+			{
+				
+			}
+			else if(OpCode == SpvOp::INotEqual)
+			{
+				
+			}
+			else if(OpCode == SpvOp::DPdx)
+			{
+				
+			}
 			else if(OpCode == SpvOp::ExtInstImport)
 			{
 				SpvId ResultId = SpvCode[WordOffset + 1];
@@ -430,16 +603,72 @@ namespace FW
 				if(ExtSets[ExtSetId] == SpvExtSet::NonSemanticShaderDebugInfo100)
 				{
 					SpvDebugInfo100 ExtOp = static_cast<SpvDebugInfo100>(SpvCode[WordOffset + 4]);
-					if(ExtOp == SpvDebugInfo100::DebugCompilationUnit)
+					if(ExtOp == SpvDebugInfo100::DebugTypeBasic)
+					{
+						SpvId Name = SpvCode[WordOffset + 5];
+						SpvId Size = SpvCode[WordOffset + 6];
+						SpvDebugBasicTypeEncoding Encoding = static_cast<SpvDebugBasicTypeEncoding>(SpvCode[WordOffset + 7]);
+						DecodedInst = MakeUnique<SpvDebugTypeBasic>(Name, Size, Encoding);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvDebugInfo100::DebugTypeVector)
+					{
+						SpvId BasicType = SpvCode[WordOffset + 5];
+						SpvId ComponentCount = SpvCode[WordOffset + 6];
+						DecodedInst = MakeUnique<SpvDebugTypeVector>(BasicType, ComponentCount);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvDebugInfo100::DebugTypeComposite)
+					{
+						SpvId Name = SpvCode[WordOffset + 5];
+						SpvId Size = SpvCode[WordOffset + 12];
+						int32 MembersWordLen = InstWordLen - 14;
+						TArray<SpvId> Members = {(SpvId*)&SpvCode[WordOffset + 14], MembersWordLen};
+						DecodedInst = MakeUnique<SpvDebugTypeComposite>(Name, Size, Members);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvDebugInfo100::DebugTypeMember)
+					{
+						SpvId Name = SpvCode[WordOffset + 5];
+						SpvId Type = SpvCode[WordOffset + 6];
+						SpvId Offset = SpvCode[WordOffset + 10];
+						SpvId Size = SpvCode[WordOffset + 11];
+						DecodedInst = MakeUnique<SpvDebugTypeMember>(Name, Type, Offset, Size);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvDebugInfo100::DebugTypeArray)
+					{
+						SpvId BaseType = SpvCode[WordOffset + 5];
+						int32 ComponentCountsWordLen = InstWordLen - 6;
+						TArray<SpvId> ComponentCounts = {(SpvId*)&SpvCode[WordOffset + 6], ComponentCountsWordLen};
+						DecodedInst = MakeUnique<SpvDebugTypeArray>(BaseType, ComponentCounts);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvDebugInfo100::DebugTypeFunction)
+					{
+						SpvId ReturnType = SpvCode[WordOffset + 6];
+						int32 ParmTypesWordLen = InstWordLen - 7;
+						TArray<SpvId> ParmTypes = {(SpvId*)&SpvCode[WordOffset + 7], ParmTypesWordLen};
+						DecodedInst = MakeUnique<SpvDebugTypeFunction>(ReturnType, ParmTypes);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvDebugInfo100::DebugCompilationUnit)
 					{
 						DecodedInst = MakeUnique<SpvDebugCompilationUnit>();
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvDebugInfo100::DebugLexicalBlock)
+					{
+						SpvId Line = SpvCode[WordOffset + 6];
+						SpvId Parent = SpvCode[WordOffset + 8];
+						DecodedInst = MakeUnique<SpvDebugLexicalBlock>(Line, Parent);
 						DecodedInst->SetId(ResultId);
 					}
 					else if(ExtOp == SpvDebugInfo100::DebugFunction)
 					{
 						SpvId Name = SpvCode[WordOffset + 5];
 						SpvId TypeDesc = SpvCode[WordOffset + 6];
-						int32 Line = SpvCode[WordOffset + 8];
+						SpvId Line = SpvCode[WordOffset + 8];
 						SpvId Parent = SpvCode[WordOffset + 10];
 						DecodedInst = MakeUnique<SpvDebugFunction>(Name, TypeDesc, Line, Parent);
 						DecodedInst->SetId(ResultId);
@@ -454,7 +683,7 @@ namespace FW
 					{
 						SpvId Name = SpvCode[WordOffset + 5];
 						SpvId TypeDesc = SpvCode[WordOffset + 6];
-						uint32 Line = SpvCode[WordOffset + 8];
+						SpvId Line = SpvCode[WordOffset + 8];
 						SpvId Parent = SpvCode[WordOffset + 10];
 						SpvId Var = SpvCode[WordOffset + 12];
 						DecodedInst = MakeUnique<SpvDebugGlobalVariable>(Name, TypeDesc, Line, Parent, Var);
@@ -464,7 +693,7 @@ namespace FW
 					{
 						SpvId Name = SpvCode[WordOffset + 5];
 						SpvId TypeDesc = SpvCode[WordOffset + 6];
-						int32 Line = SpvCode[WordOffset + 8];
+						SpvId Line = SpvCode[WordOffset + 8];
 						SpvId Parent = SpvCode[WordOffset + 10];
 						DecodedInst = MakeUnique<SpvDebugLocalVariable>(Name, TypeDesc, Line, Parent);
 						DecodedInst->SetId(ResultId);
@@ -478,8 +707,8 @@ namespace FW
 					else if(ExtOp == SpvDebugInfo100::DebugDeclare)
 					{
 						SpvId VarDesc = SpvCode[WordOffset + 5];
-						SpvId VarId = SpvCode[WordOffset + 6];
-						DecodedInst = MakeUnique<SpvDebugDeclare>(VarDesc, VarId);
+						SpvId PointerId = SpvCode[WordOffset + 6];
+						DecodedInst = MakeUnique<SpvDebugDeclare>(VarDesc, PointerId);
 						DecodedInst->SetId(ResultId);
 					}
 				}

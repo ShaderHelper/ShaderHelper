@@ -57,7 +57,7 @@ namespace FW
 		DebugTypeMatrix = 108,
 	};
 
-	enum class SpvDebugBaseTypeEncoding
+	enum class SpvDebugBasicTypeEncoding
 	{
 		Unspecified = 0,
 		Address = 1,
@@ -69,14 +69,122 @@ namespace FW
 		UnsignedChar = 7,
 	};
 
-	struct SpvVariableDesc
+	enum class SpvTypeDescKind
 	{
-		
+		Basic,
+		Vector,
+		Composite,
+		Member,
+		Function,
+		Array,
 	};
 
-	struct SpvTypeDesc
+	class SpvTypeDesc
 	{
+	public:
+		SpvTypeDesc(SpvTypeDescKind InKind) : Kind(InKind){}
+		SpvTypeDescKind GetKind() const { return Kind; }
+	private:
+		SpvTypeDescKind Kind;
+	};
+
+	class SpvBasicTypeDesc : public SpvTypeDesc
+	{
+	public:
+		SpvBasicTypeDesc(const FString& InName, int32 InSize, SpvDebugBasicTypeEncoding InEncoding) : SpvTypeDesc(SpvTypeDescKind::Basic)
+		, Name(InName), Size(InSize), Encoding(InEncoding)
+		{}
 		
+		FString GetName() const { return Name; }
+		int32 GetSize() const { return Size; }
+		SpvDebugBasicTypeEncoding GetEncoding() const { return Encoding; }
+		
+	private:
+		FString Name;
+		int32 Size;
+		SpvDebugBasicTypeEncoding Encoding;
+	};
+
+	class SpvVectorTypeDesc : public SpvTypeDesc
+	{
+	public:
+		SpvVectorTypeDesc(SpvBasicTypeDesc* InBasicTypeDesc, int32 InCompCount) : SpvTypeDesc(SpvTypeDescKind::Vector)
+		, BasicTypeDesc(InBasicTypeDesc), CompCount(InCompCount)
+		{}
+		
+		SpvBasicTypeDesc* GetBasicTypeDesc() const { return BasicTypeDesc; }
+		int32 GetCompCount() const { return CompCount; }
+		
+	private:
+		SpvBasicTypeDesc* BasicTypeDesc;
+		int32 CompCount;
+	};
+
+	class SpvCompositeTypeDesc : public SpvTypeDesc
+	{
+	public:
+		SpvCompositeTypeDesc(const FString& InName, int32 InSize, const TArray<SpvTypeDesc*>& InMemberTypeDescs) : SpvTypeDesc(SpvTypeDescKind::Composite)
+		, Name(InName), Size(InSize), MemberTypeDescs(InMemberTypeDescs)
+		{}
+		
+		FString GetName() const { return Name; }
+		int32 GetSize() const { return Size; }
+		const TArray<SpvTypeDesc*>& GetMemberTypeDescs() const { return MemberTypeDescs; }
+		
+	private:
+		FString Name;
+		int32 Size;
+		TArray<SpvTypeDesc*> MemberTypeDescs;
+	};
+
+	class SpvMemberTypeDesc : public SpvTypeDesc
+	{
+	public:
+		SpvMemberTypeDesc(const FString& InName, SpvTypeDesc* InTypeDesc, int32 InOffset, int32 InSize) : SpvTypeDesc(SpvTypeDescKind::Member)
+		, Name(InName), TypeDesc(InTypeDesc), Offset(InOffset), Size(InSize)
+		{}
+		
+		FString GetName() const { return Name; }
+		SpvTypeDesc* GetTypeDesc() const { return TypeDesc; }
+		int32 GetOffset() const {return Offset; }
+		int32 GetSize() const { return Size; }
+		
+	private:
+		FString Name;
+		SpvTypeDesc* TypeDesc;
+		int32 Offset;
+		int32 Size;
+	};
+
+	class SpvFuncTypeDesc : public SpvTypeDesc
+	{
+	public:
+		SpvFuncTypeDesc(std::variant<SpvVoidType*, SpvTypeDesc*> InReturnType, const TArray<SpvTypeDesc*>& InParmTypes) : SpvTypeDesc(SpvTypeDescKind::Function)
+		, ReturnType(InReturnType)
+		, ParmTypes(InParmTypes)
+		{}
+		
+		std::variant<SpvVoidType*, SpvTypeDesc*> GetReturnType() const { return ReturnType; }
+		const TArray<SpvTypeDesc*>& GetParmTypes() const { return ParmTypes; }
+		
+	private:
+		std::variant<SpvVoidType*, SpvTypeDesc*> ReturnType;
+		TArray<SpvTypeDesc*> ParmTypes;
+	};
+
+	class SpvArrayTypeDesc : public SpvTypeDesc
+	{
+	public:
+		SpvArrayTypeDesc(SpvTypeDesc* InBaseTypeDesc, const TArray<uint32>& InCompCounts) : SpvTypeDesc(SpvTypeDescKind::Array)
+		, BaseTypeDesc(InBaseTypeDesc), CompCounts(InCompCounts)
+		{}
+		
+		SpvTypeDesc* GetBaseTypeDesc() const { return BaseTypeDesc; }
+		const TArray<uint32>& GetCompCounts() const { return CompCounts; }
+		
+	private:
+		SpvTypeDesc* BaseTypeDesc;
+		TArray<uint32> CompCounts;
 	};
 	
 	enum class SpvScopeKind
@@ -93,10 +201,13 @@ namespace FW
 		: Kind(InKind), Parent(InParent)
 		{}
 		
+		virtual int32 GetLineNumber() const {return 0;}
+		SpvScopeKind GetKind() const { return Kind; }
+		SpvLexicalScope* GetParent() const { return Parent; }
+		
+	private:
 		SpvScopeKind Kind;
 		SpvLexicalScope* Parent;
-		
-		virtual int32 GetLineNumber() const {return 0;}
 	};
 
 	class SpvCompilationUnit :  public SpvLexicalScope
@@ -106,10 +217,23 @@ namespace FW
 		{}
 	};
 
+	class SpvLexicalBlock : public SpvLexicalScope
+	{
+	public:
+		SpvLexicalBlock(int32 InLineNumber, SpvLexicalScope* InParent) : SpvLexicalScope(SpvScopeKind::Block, InParent)
+		, LineNumber(InLineNumber)
+		{}
+		
+		int32 GetLineNumber() const override { return LineNumber; }
+		
+	private:
+		int32 LineNumber;
+	};
+
 	class SpvFunctionDesc : public SpvLexicalScope
 	{
 	public:
-		SpvFunctionDesc(SpvLexicalScope* InParent, const FString& InName, const SpvTypeDesc* InTypeDesc, int32 InLine)
+		SpvFunctionDesc(SpvLexicalScope* InParent, const FString& InName, SpvTypeDesc* InTypeDesc, int32 InLine)
 		: SpvLexicalScope(SpvScopeKind::Function, InParent)
 		, Name(InName)
 		, TypeDesc(InTypeDesc)
@@ -117,11 +241,21 @@ namespace FW
 		{}
 		
 		int32 GetLineNumber() const override { return LineNumber; }
+		FString GetName() const { return Name; }
+		SpvTypeDesc* GetTypeDesc() const { return TypeDesc; }
 		
 	private:
 		FString Name;
-		const SpvTypeDesc* TypeDesc;
+		SpvTypeDesc* TypeDesc;
 		int32 LineNumber;
+	};
+
+	struct SpvVariableDesc
+	{
+		FString Name;
+		SpvTypeDesc* TypeDesc{};
+		int32 Line;
+		SpvLexicalScope* Parent{};
 	};
 
 }
