@@ -9,8 +9,8 @@ namespace FW
 		GpuBufferUsage Usage;
 
 		//dx structured buffer have a stride limit of 2048 bytes.
-		uint32 Stride = 0;
-		TArrayView<uint8> InitialData;
+		uint32 Stride;
+		TArrayView<const uint8> InitialData;
 	};
 
 	class GpuBuffer : public GpuTrackedResource

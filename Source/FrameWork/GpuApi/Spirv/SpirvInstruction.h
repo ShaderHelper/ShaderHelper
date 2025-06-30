@@ -39,10 +39,15 @@ namespace FW
 		virtual void Visit(class SpvOpLoad* Inst) {}
 		virtual void Visit(class SpvOpStore* Inst) {}
 		virtual void Visit(class SpvOpCompositeConstruct* Inst) {}
+		virtual void Visit(class SpvOpCompositeExtract* Inst) {}
 		virtual void Visit(class SpvOpAccessChain* Inst) {}
 		virtual void Visit(class SpvOpIEqual* Inst) {}
 		virtual void Visit(class SpvOpINotEqual* Inst) {}
 		virtual void Visit(class SpvOpDPdx* Inst) {}
+		virtual void Visit(class SpvOpFDiv* Inst) {}
+		virtual void Visit(class SpvOpBranchConditional* Inst) {}
+		virtual void Visit(class SpvOpReturn* Inst) {}
+		virtual void Visit(class SpvOpReturnValue* Inst) {}
 		
 		//NonSemantic.Shader.DebugInfo.100
 		virtual void Visit(class SpvDebugTypeBasic* Inst) {}
@@ -450,6 +455,23 @@ namespace FW
 		TArray<SpvId> Constituents;
 	};
 
+	class SpvOpCompositeExtract : public SpvInstructionBase<SpvOpCompositeExtract>
+	{
+	public:
+		SpvOpCompositeExtract(SpvId InResultType, SpvId InComposite, const TArray<uint32>& InIndexes) : SpvInstructionBase(SpvOp::CompositeExtract)
+		, ResultType(InResultType), Composite(InComposite), Indexes(InIndexes)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetComposite() const { return Composite; }
+		const TArray<uint32>& GetIndexes() const { return Indexes; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Composite;
+		TArray<uint32> Indexes;
+	};
+
 	class SpvOpAccessChain : public SpvInstructionBase<SpvOpAccessChain>
 	{
 	public:
@@ -469,6 +491,23 @@ namespace FW
 		TArray<SpvId> Indexes;
 	};
 
+	class SpvOpFDiv : public SpvInstructionBase<SpvOpFDiv>
+	{
+	public:
+		SpvOpFDiv(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::FDiv)
+		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetOperand1() const { return Operand1; }
+		SpvId GetOperand2() const { return Operand2; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Operand1;
+		SpvId Operand2;
+	};
+
 	class SpvOpIEqual : public SpvInstructionBase<SpvOpIEqual>
 	{
 	public:
@@ -480,9 +519,18 @@ namespace FW
 	class SpvOpINotEqual : public SpvInstructionBase<SpvOpINotEqual>
 	{
 	public:
-		SpvOpINotEqual() : SpvInstructionBase(SpvOp::INotEqual)
+		SpvOpINotEqual(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::INotEqual)
+		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
 		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetOperand1() const { return Operand1; }
+		SpvId GetOperand2() const { return Operand2; }
+		
 	private:
+		SpvId ResultType;
+		SpvId Operand1;
+		SpvId Operand2;
 	};
 
 	class SpvOpDPdx : public SpvInstructionBase<SpvOpDPdx>
@@ -491,6 +539,42 @@ namespace FW
 		SpvOpDPdx() : SpvInstructionBase(SpvOp::DPdx)
 		{}
 	private:
+	};
+
+	class SpvOpBranchConditional : public SpvInstructionBase<SpvOpBranchConditional>
+	{
+	public:
+		SpvOpBranchConditional(SpvId InCondition, SpvId InTrueLabel, SpvId InFalseLabel) : SpvInstructionBase(SpvOp::BranchConditional)
+		, Condition(InCondition), TrueLabel(InTrueLabel), FalseLabel(InFalseLabel)
+		{}
+		
+		SpvId GetCondition() const { return Condition; }
+		SpvId GetTrueLabel() const { return TrueLabel; }
+		SpvId GetFalseLabel() const { return FalseLabel; }
+		
+	private:
+		SpvId Condition;
+		SpvId TrueLabel;
+		SpvId FalseLabel;
+	};
+
+	class SpvOpReturn : public SpvInstructionBase<SpvOpReturn>
+	{
+	public:
+		SpvOpReturn() : SpvInstructionBase(SpvOp::Return) {}
+	};
+
+	class SpvOpReturnValue : public SpvInstructionBase<SpvOpReturnValue>
+	{
+	public:
+		SpvOpReturnValue(SpvId InValue) : SpvInstructionBase(SpvOp::ReturnValue)
+		, Value(InValue)
+		{}
+		
+		SpvId GetValue() const { return Value; }
+		
+	private:
+		SpvId Value;
 	};
 
 	class SpvDebugTypeBasic : public SpvInstructionBase<SpvDebugTypeBasic>

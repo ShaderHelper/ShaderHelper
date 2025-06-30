@@ -96,6 +96,7 @@ namespace FW
 		{}
 		
 		FString GetName() const { return Name; }
+		//Bit size
 		int32 GetSize() const { return Size; }
 		SpvDebugBasicTypeEncoding GetEncoding() const { return Encoding; }
 		

@@ -9,16 +9,16 @@ namespace FW
 		Vector3u ThreadGroupSize{};
 		
 		SpvId EntryPoint;
-		TMap<SpvId, FString> DebugStrs;
-		TMap<SpvId, TUniquePtr<SpvType>> Types;
-		TMap<SpvId, SpvObject> Constants;
-		TMap<SpvId, SpvPointer> GlobalPointers;
-		TMap<SpvId, SpvVariable> GlobalVariables;
+		std::unordered_map<SpvId, FString> DebugStrs;
+		std::unordered_map<SpvId, TUniquePtr<SpvType>> Types;
+		std::unordered_map<SpvId, SpvObject> Constants;
+		std::unordered_map<SpvId, SpvPointer> GlobalPointers;
+		std::unordered_map<SpvId, SpvVariable> GlobalVariables;
 		TMultiMap<SpvId, SpvDecoration> Decorations;		//GlobalVarId -> Decoration
-		TMap<SpvId, TUniquePtr<SpvTypeDesc>> TypeDescs;
-		TMap<SpvId, SpvVariableDesc> VariableDescs;
-		TMap<SpvId, SpvVariableDesc*> VariableDescMap;   //VarId -> Desc
-		TMap<SpvId, TUniquePtr<SpvLexicalScope>> LexicalScopes;
+		std::unordered_map<SpvId, TUniquePtr<SpvTypeDesc>> TypeDescs;
+		std::unordered_map<SpvId, SpvVariableDesc> VariableDescs;
+		std::unordered_map<SpvId, SpvVariableDesc*> VariableDescMap;   //VarId -> Desc
+		std::unordered_map<SpvId, TUniquePtr<SpvLexicalScope>> LexicalScopes;
 	};
 
 	class FRAMEWORK_API SpvMetaVisitor : public SpvVisitor
