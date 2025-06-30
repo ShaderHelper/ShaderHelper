@@ -6,16 +6,17 @@ namespace FW
 	class SpvId
 	{
 	public:
-		SpvId() : IdValue(0) {}
-		SpvId(uint32 InIdValue) : IdValue(InIdValue) {}
+		SpvId() : Value(0) {}
+		SpvId(uint32 InValue) : Value(InValue) {}
 		friend uint32 GetTypeHash(const SpvId& Key)
 		{
-			return ::GetTypeHash(Key.IdValue);
+			return ::GetTypeHash(Key.Value);
 		}
 		bool operator==(const SpvId&) const = default;
+		uint32 GetValue() const { return Value; }
 		
 	private:
-		uint32 IdValue;
+		uint32 Value;
 	};
 
 	enum class SpvTypeKind
@@ -23,8 +24,7 @@ namespace FW
 		Void,
 		Bool,
 		Float,
-		Uint,
-		Int,
+		Integer,
 		Vector,
 		Pointer,
 		Struct,
@@ -86,7 +86,7 @@ namespace FW
 		virtual ~SpvType() = default;
 		
 		bool IsScalar() const { return Kind == SpvTypeKind::Bool || Kind == SpvTypeKind::Float
-			|| Kind == SpvTypeKind::Uint || Kind == SpvTypeKind::Int; }
+			|| Kind == SpvTypeKind::Integer; }
 		
 	private:
 		SpvTypeKind Kind;
@@ -116,7 +116,7 @@ namespace FW
 	{
 	public:
 		SpvIntegerType(uint32 InWidth, bool InIsSigned)
-		: SpvScalarType(IsSigned ? SpvTypeKind::Int : SpvTypeKind::Uint, InWidth)
+		: SpvScalarType(SpvTypeKind::Integer, InWidth)
 		, IsSigned(InIsSigned)
 		{}
 		
@@ -184,6 +184,34 @@ namespace FW
 	 
 		SpvType* ElementType;
 		uint32 Length;
+	};
+
+	inline FString GetHlslTypeStr(SpvType* Type)
+	{
+		if(Type->GetKind() == SpvTypeKind::Float)
+		{
+			return "float";
+		}
+		else if(Type->GetKind() == SpvTypeKind::Bool)
+		{
+			return "bool";
+		}
+		else if(Type->GetKind() == SpvTypeKind::Integer)
+		{
+			SpvIntegerType* IntegerType = static_cast<SpvIntegerType*>(Type);
+			return IntegerType->IsSigend() ? "int" : "uint";
+		}
+		else if(Type->GetKind() == SpvTypeKind::Vector)
+		{
+			SpvVectorType* VectorType = static_cast<SpvVectorType*>(Type);
+			FString TypeStr = GetHlslTypeStr(VectorType->ElementType);
+			if(VectorType->ElementCount > 0)
+			{
+				TypeStr.AppendInt((int)VectorType->ElementCount);
+			}
+			return TypeStr;
+		}
+		AUX::Unreachable();
 	};
 
 	inline uint32 GetTypeByteSize(SpvType* Type)
@@ -303,9 +331,23 @@ namespace FW
 		AccessChain = 65,
 		Decorate = 71,
 		CompositeConstruct = 80,
+		CompositeExtract = 81,
+		FDiv = 136,
 		IEqual = 170,
 		INotEqual = 171,
 		DPdx = 207,
 		Label = 248,
+		BranchConditional = 250,
+		Return = 253,
+		ReturnValue = 254,
 	};
 }
+
+template<>
+struct std::hash<FW::SpvId> {
+	std::size_t operator()(const FW::SpvId& Id) const
+	{
+		return std::hash<uint32>{}(Id.GetValue());
+	}
+};
+

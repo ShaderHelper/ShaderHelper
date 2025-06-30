@@ -2543,10 +2543,10 @@ const FString ErrorMarkerText = TEXT("✘");
 		Vector4f QuadFragCoord1 = {QuadLeftTopX + 1.5f, QuadLeftTopY + 0.5f, 0.0f, 1.0f};
 		Vector4f QuadFragCoord2 = {QuadLeftTopX + 0.5f, QuadLeftTopY + 1.5f, 0.0f, 1.0f};
 		Vector4f QuadFragCoord3 = {QuadLeftTopX + 1.5f, QuadLeftTopY + 1.5f, 0.0f, 1.0f};
-		Quad[0].ThreadState.BuiltInInput.Add(SpvBuiltIn::FragCoord, {(uint8*)&QuadFragCoord0, sizeof(Vector4f)});
-		Quad[1].ThreadState.BuiltInInput.Add(SpvBuiltIn::FragCoord, {(uint8*)&QuadFragCoord1, sizeof(Vector4f)});
-		Quad[2].ThreadState.BuiltInInput.Add(SpvBuiltIn::FragCoord, {(uint8*)&QuadFragCoord2, sizeof(Vector4f)});
-		Quad[3].ThreadState.BuiltInInput.Add(SpvBuiltIn::FragCoord, {(uint8*)&QuadFragCoord3, sizeof(Vector4f)});
+		Quad[0].ThreadState.BuiltInInput.emplace(SpvBuiltIn::FragCoord, TArray{(uint8*)&QuadFragCoord0, sizeof(Vector4f)});
+		Quad[1].ThreadState.BuiltInInput.emplace(SpvBuiltIn::FragCoord, TArray{(uint8*)&QuadFragCoord1, sizeof(Vector4f)});
+		Quad[2].ThreadState.BuiltInInput.emplace(SpvBuiltIn::FragCoord, TArray{(uint8*)&QuadFragCoord2, sizeof(Vector4f)});
+		Quad[3].ThreadState.BuiltInInput.emplace(SpvBuiltIn::FragCoord, TArray{(uint8*)&QuadFragCoord3, sizeof(Vector4f)});
 		
 		TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(ShaderAssetObj->GetShaderDesc(CurrentShaderSource));
 		Shader->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;

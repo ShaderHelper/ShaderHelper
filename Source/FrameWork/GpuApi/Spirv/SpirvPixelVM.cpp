@@ -26,7 +26,7 @@ namespace FW
 		   }
 		   
 		   (*Insts)[CurPixelThread.InstIndex]->Accpet(this);
-		   if(AnyError)
+		   if(AnyError || CurPixelThread.StackFrames.IsEmpty())
 		   {
 			   break;
 		   }
@@ -92,20 +92,21 @@ namespace FW
 					}
 					Var.Initialized = true;
 				}
-				else if(BuiltIn && Context.ThreadState.BuiltInInput.Contains(BuiltIn.value()))
+				else if(BuiltIn && Context.ThreadState.BuiltInInput.contains(BuiltIn.value()))
 				{
 					std::get<SpvObject::Internal>(Var.Storage).Value = Context.ThreadState.BuiltInInput[BuiltIn.value()];
 					Var.Initialized = true;
 				}
-				else if(auto LocationValue = Context.ThreadState.LocationInput.Find(Location))
+				else if(auto Search = Context.ThreadState.LocationInput.find(Location) ; Search != Context.ThreadState.LocationInput.end())
 				{
-					std::get<SpvObject::Internal>(Var.Storage).Value = *LocationValue;;
+					auto LocationValue = Search->second;
+					std::get<SpvObject::Internal>(Var.Storage).Value = LocationValue;;
 					Var.Initialized = true;
 				}
 			}
 			
 			Context.ThreadState.InstIndex = InstIndex;
-			Context.ThreadState.RecordedInfo.AllVariables.Append(Context.GlobalVariables);
+			Context.ThreadState.RecordedInfo.AllVariables = Context.GlobalVariables;
 			Context.ThreadState.RecordedInfo.LineDebugStates.SetNum(1);
 			Context.ThreadState.StackFrames.SetNum(1);
 		}

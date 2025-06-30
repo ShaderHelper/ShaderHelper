@@ -1,5 +1,6 @@
 #pragma once
 #include "SpirvParser.h"
+#include <queue>
 
 namespace FW
 {
@@ -31,7 +32,7 @@ namespace FW
 
 	struct SpvRecordedInfo
 	{
-		TMap<SpvId, SpvVariable> AllVariables;
+		std::unordered_map<SpvId, SpvVariable> AllVariables;
 		TArray<SpvFunctionDesc*> CallStack;
 		SpvLexicalScope* Scope = nullptr;
 		
@@ -49,15 +50,15 @@ namespace FW
 	struct SpvVmFrame
 	{
 		int32 ReturnPointIndex{};
-		TArray<SpvPointer*> Arguments;
+		std::queue<SpvPointer*> Arguments;
 		SpvObject* ReturnObject = nullptr;
 		SpvId CurBasicBlock{};
 		SpvId PreBasicBlock{};
 		SpvLexicalScope* CurScope = nullptr;
 		int32 CurLineNumber{};
-		TMap<SpvId, SpvObject> IntermediateObjects;
-		TMap<SpvId, SpvPointer> Pointers;
-		TMap<SpvId, SpvVariable> Variables;
+		std::unordered_map<SpvId, SpvObject> IntermediateObjects;
+		std::unordered_map<SpvId, SpvPointer> Pointers;
+		std::unordered_map<SpvId, SpvVariable> Variables;
 	};
 
 	struct SpvThreadState
@@ -66,8 +67,8 @@ namespace FW
 		int32 NextInstIndex;
 		TArray<SpvVmFrame> StackFrames;
 		
-		TMap<SpvBuiltIn, TArray<uint8>> BuiltInInput;
-		TMap<uint32, TArray<uint8>> LocationInput;
+		std::unordered_map<SpvBuiltIn, TArray<uint8>> BuiltInInput;
+		std::unordered_map<uint32, TArray<uint8>> LocationInput;
 		
 		//Finalized information for external use
 		SpvRecordedInfo RecordedInfo;
@@ -87,7 +88,11 @@ namespace FW
 	public:
 		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts) override;
 		int32 GetInstIndex(SpvId Inst) const;
+		SpvPointer* GetPointer(SpvId PointerId);
+		SpvObject* GetObject(SpvId ObjectId);
+		TArray<uint8> ExecuteOp(const FString& Name, int32 ResultSize, const TArray<uint8>& InputData, const TArray<FString>& Args);
 		
+	public:
 		void Visit(SpvDebugLine* Inst) override;
 		void Visit(SpvDebugScope* Inst) override;
 		void Visit(SpvDebugDeclare* Inst) override;
@@ -99,9 +104,14 @@ namespace FW
 		void Visit(SpvOpLoad* Inst) override;
 		void Visit(SpvOpStore* Inst) override;
 		void Visit(SpvOpCompositeConstruct* Inst) override;
+		void Visit(SpvOpCompositeExtract* Inst) override;
 		void Visit(SpvOpAccessChain* Inst) override;
 		void Visit(SpvOpIEqual* Inst) override;
 		void Visit(SpvOpINotEqual* Inst) override;
+		void Visit(SpvOpFDiv* Inst) override;
+		void Visit(SpvOpBranchConditional* Inst) override;
+		void Visit(SpvOpReturn* Inst) override;
+		void Visit(SpvOpReturnValue* Inst) override;
 
 	protected:
 		bool AnyError{};
@@ -109,5 +119,6 @@ namespace FW
 	};
 
 	TArray<uint8> GetPointerValue(SpvPointer* InPointer, SpvVariableDesc* PointeeDesc);
+	TArray<uint8> GetObjectValue(SpvObject* InObject, const TArray<uint32> Indexes = {});
 	void WritePointerValue(SpvPointer* InPointer, SpvVariableDesc* PointeeDesc, const TArray<uint8>& ValueToStore, SpvVariableChange* OutVariableChange = nullptr);
 }
