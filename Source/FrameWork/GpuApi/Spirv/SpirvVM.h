@@ -24,18 +24,16 @@ namespace FW
 
 	struct SpvDebugState
 	{
-		int32 LineNumber{};
-		SpvLexicalScopeChange ScopeChange;
+		int32 Line{};
+		std::optional<SpvLexicalScopeChange> ScopeChange;
 		TArray<SpvVariableChange> VarChanges;
+		bool bFuncCall{};
 		FString UbError;
 	};
 
 	struct SpvRecordedInfo
 	{
 		std::unordered_map<SpvId, SpvVariable> AllVariables;
-		TArray<SpvFunctionDesc*> CallStack;
-		SpvLexicalScope* Scope = nullptr;
-		
 		TArray<SpvDebugState> LineDebugStates;
 	};
 
@@ -55,7 +53,7 @@ namespace FW
 		SpvId CurBasicBlock{};
 		SpvId PreBasicBlock{};
 		SpvLexicalScope* CurScope = nullptr;
-		int32 CurLineNumber{};
+		int32 CurLine{};
 		std::unordered_map<SpvId, SpvObject> IntermediateObjects;
 		std::unordered_map<SpvId, SpvPointer> Pointers;
 		std::unordered_map<SpvId, SpvVariable> Variables;

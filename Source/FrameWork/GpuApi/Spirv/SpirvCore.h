@@ -205,7 +205,7 @@ namespace FW
 		{
 			SpvVectorType* VectorType = static_cast<SpvVectorType*>(Type);
 			FString TypeStr = GetHlslTypeStr(VectorType->ElementType);
-			if(VectorType->ElementCount > 0)
+			if(VectorType->ElementCount > 1)
 			{
 				TypeStr.AppendInt((int)VectorType->ElementCount);
 			}

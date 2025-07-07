@@ -299,7 +299,7 @@ namespace FW
 
 	void SpvMetaVisitor::Visit(SpvDebugLexicalBlock* Inst)
 	{
-		int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLineNumber()].Storage).Value.GetData();
+		int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLine()].Storage).Value.GetData();
 		SpvLexicalScope* ParentScope = Context.LexicalScopes[Inst->GetParentId()].Get();
 		Context.LexicalScopes.emplace(Inst->GetId().value(), MakeUnique<SpvLexicalBlock>(Line, ParentScope));
 	}
@@ -308,8 +308,8 @@ namespace FW
 	{
 		SpvLexicalScope* ParentScope = Context.LexicalScopes[Inst->GetParentId()].Get();
 		const FString& FuncName = Context.DebugStrs[Inst->GetNameId()];
-		SpvTypeDesc* FuncTypeDesc = Context.TypeDescs[Inst->GetTypeDescId()].Get();
-		int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLineNumber()].Storage).Value.GetData();
+		SpvFuncTypeDesc* FuncTypeDesc = static_cast<SpvFuncTypeDesc*>(Context.TypeDescs[Inst->GetTypeDescId()].Get());
+		int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLine()].Storage).Value.GetData();
 		Context.LexicalScopes.emplace(Inst->GetId().value(), MakeUnique<SpvFunctionDesc>(ParentScope, FuncName, FuncTypeDesc, Line));
 	}
 
@@ -318,7 +318,7 @@ namespace FW
 		SpvVariableDesc VarDesc{
 			.Name = Context.DebugStrs[Inst->GetNameId()],
 			.TypeDesc = Context.TypeDescs[Inst->GetTypeDescId()].Get(),
-			.Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLineNumber()].Storage).Value.GetData(),
+			.Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLine()].Storage).Value.GetData(),
 			.Parent = Context.LexicalScopes[Inst->GetParentId()].Get()
 		};
 		Context.VariableDescs.emplace(Inst->GetId().value(), MoveTemp(VarDesc));
@@ -329,7 +329,7 @@ namespace FW
 		SpvVariableDesc VarDesc{
 			.Name = Context.DebugStrs[Inst->GetNameId()],
 			.TypeDesc = Context.TypeDescs.contains(Inst->GetTypeDescId()) ? Context.TypeDescs[Inst->GetTypeDescId()].Get() : nullptr,
-			.Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLineNumber()].Storage).Value.GetData(),
+			.Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLine()].Storage).Value.GetData(),
 			.Parent = Context.LexicalScopes[Inst->GetParentId()].Get()
 		};
 		Context.VariableDescs.emplace(Inst->GetId().value(), MoveTemp(VarDesc));
@@ -588,7 +588,12 @@ namespace FW
 			}
 			else if(OpCode == SpvOp::IEqual)
 			{
-				
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvId Operand1 = SpvCode[WordOffset + 3];
+				SpvId Operand2 = SpvCode[WordOffset + 4];
+				DecodedInst = MakeUnique<SpvOpIEqual>(ResultType, Operand1, Operand2);
+				DecodedInst->SetId(ResultId);
 			}
 			else if(OpCode == SpvOp::INotEqual)
 			{

@@ -511,9 +511,18 @@ namespace FW
 	class SpvOpIEqual : public SpvInstructionBase<SpvOpIEqual>
 	{
 	public:
-		SpvOpIEqual() : SpvInstructionBase(SpvOp::IEqual)
+		SpvOpIEqual(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::IEqual)
+		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
 		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetOperand1() const { return Operand1; }
+		SpvId GetOperand2() const { return Operand2; }
+		
 	private:
+		SpvId ResultType;
+		SpvId Operand1;
+		SpvId Operand2;
 	};
 
 	class SpvOpINotEqual : public SpvInstructionBase<SpvOpINotEqual>
@@ -688,7 +697,7 @@ namespace FW
 		, Line(InLine), Parent(InParent)
 		{}
 		
-		SpvId GetLineNumber() const { return Line; }
+		SpvId GetLine() const { return Line; }
 		SpvId GetParentId() const { return Parent; }
 		
 	private:
@@ -707,7 +716,7 @@ namespace FW
 		
 		SpvId GetNameId() const { return Name; }
 		SpvId GetTypeDescId() const { return TypeDesc; }
-		SpvId GetLineNumber() const { return Line; }
+		SpvId GetLine() const { return Line; }
 		SpvId GetParentId() const { return Parent; }
 		
 	private:
@@ -770,7 +779,7 @@ namespace FW
 		
 		SpvId GetNameId() const { return Name; }
 		SpvId GetTypeDescId() const { return TypeDesc; }
-		SpvId GetLineNumber() const { return Line; }
+		SpvId GetLine() const { return Line; }
 		SpvId GetParentId() const { return Parent; }
 		
 	private:
@@ -790,7 +799,7 @@ namespace FW
 		
 		SpvId GetNameId() const { return Name; }
 		SpvId GetTypeDescId() const { return TypeDesc; }
-		SpvId GetLineNumber() const { return Line; }
+		SpvId GetLine() const { return Line; }
 		SpvId GetParentId() const { return Parent; }
 		SpvId GetVarId() const { return Var; }
 		

@@ -48,6 +48,23 @@ namespace SH {
 		
 		Style->Set("Icons.FullText", new IMAGE_BRUSH_SVG("Starship/Insights/MemTags_20", FVector2D(16.0, 16.0)));
 		Style->Set("LineTip.BreakPointEffect2", new IMAGE_BRUSH("Common/Window/WindowTitle_Flashing", FVector2D(16.0, 16.0), FLinearColor::White, ESlateBrushTileType::Horizontal));
+		
+		const FHeaderRowStyle& CoreHeaderRowStyle = FAppStyle::Get().GetWidgetStyle<FHeaderRowStyle>("TableView.Header");
+		const FTableColumnHeaderStyle CoreTableColumnHeaderStyle = FAppStyle::Get().GetWidgetStyle<FTableColumnHeaderStyle>("TableView.Header.Column");
+		const FTableColumnHeaderStyle TableColumnHeaderStyle = FTableColumnHeaderStyle(CoreTableColumnHeaderStyle);
+		const FTableColumnHeaderStyle TableLastColumnHeaderStyle = FTableColumnHeaderStyle(TableColumnHeaderStyle);
+		
+		const FSplitterStyle TableHeaderSplitterStyle = FSplitterStyle()
+				.SetHandleNormalBrush(FSlateColorBrush(FStyleColors::Recessed))
+				.SetHandleHighlightBrush(FSlateColorBrush(FStyleColors::Recessed));
+		
+		Style->Set("TableView.DebuggerHeader", FHeaderRowStyle(CoreHeaderRowStyle)
+			.SetColumnStyle(TableColumnHeaderStyle)
+			.SetLastColumnStyle(TableLastColumnHeaderStyle)
+			.SetColumnSplitterStyle(TableHeaderSplitterStyle)
+		    .SetSplitterHandleSize(2.0f)
+			.SetHorizontalSeparatorThickness(2.0f)
+		);
 
 		FTableRowStyle LineNumberItemStyle;
 		LineNumberItemStyle.SetEvenRowBackgroundBrush(FSlateNoResource());

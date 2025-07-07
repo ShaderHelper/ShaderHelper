@@ -202,7 +202,7 @@ namespace FW
 		: Kind(InKind), Parent(InParent)
 		{}
 		
-		virtual int32 GetLineNumber() const {return 0;}
+		virtual int32 GetLine() const {return 0;}
 		SpvScopeKind GetKind() const { return Kind; }
 		SpvLexicalScope* GetParent() const { return Parent; }
 		
@@ -221,34 +221,108 @@ namespace FW
 	class SpvLexicalBlock : public SpvLexicalScope
 	{
 	public:
-		SpvLexicalBlock(int32 InLineNumber, SpvLexicalScope* InParent) : SpvLexicalScope(SpvScopeKind::Block, InParent)
-		, LineNumber(InLineNumber)
+		SpvLexicalBlock(int32 InLine, SpvLexicalScope* InParent) : SpvLexicalScope(SpvScopeKind::Block, InParent)
+		, Line(InLine)
 		{}
 		
-		int32 GetLineNumber() const override { return LineNumber; }
+		int32 GetLine() const override { return Line; }
 		
 	private:
-		int32 LineNumber;
+		int32 Line;
 	};
 
 	class SpvFunctionDesc : public SpvLexicalScope
 	{
 	public:
-		SpvFunctionDesc(SpvLexicalScope* InParent, const FString& InName, SpvTypeDesc* InTypeDesc, int32 InLine)
+		SpvFunctionDesc(SpvLexicalScope* InParent, const FString& InName, SpvFuncTypeDesc* InTypeDesc, int32 InLine)
 		: SpvLexicalScope(SpvScopeKind::Function, InParent)
 		, Name(InName)
 		, TypeDesc(InTypeDesc)
-		, LineNumber(InLine)
+		, Line(InLine)
 		{}
 		
-		int32 GetLineNumber() const override { return LineNumber; }
+		int32 GetLine() const override { return Line; }
 		FString GetName() const { return Name; }
-		SpvTypeDesc* GetTypeDesc() const { return TypeDesc; }
+		SpvFuncTypeDesc* GetFuncTypeDesc() const { return TypeDesc; }
 		
 	private:
 		FString Name;
-		SpvTypeDesc* TypeDesc;
-		int32 LineNumber;
+		SpvFuncTypeDesc* TypeDesc;
+		int32 Line;
+	};
+
+	inline SpvFunctionDesc* GetFunctionDesc(SpvLexicalScope* InScope)
+	{
+		if(!InScope || InScope->GetKind() == SpvScopeKind::TU)
+		{
+			return nullptr;
+		}
+		else if(InScope->GetKind() == SpvScopeKind::Function)
+		{
+			return static_cast<SpvFunctionDesc*>(InScope);
+		}
+		else
+		{
+			return GetFunctionDesc(InScope->GetParent());
+		}
+	};
+
+	inline FString GetTypeDescStr(SpvTypeDesc* TypeDesc)
+	{
+		if(TypeDesc->GetKind() == SpvTypeDescKind::Vector)
+		{
+			SpvVectorTypeDesc* VectorTypeDesc = static_cast<SpvVectorTypeDesc*>(TypeDesc);
+			if(VectorTypeDesc->GetCompCount() > 1)
+			{
+				return VectorTypeDesc->GetBasicTypeDesc()->GetName() + FString::FromInt(VectorTypeDesc->GetCompCount());
+			}
+			return VectorTypeDesc->GetBasicTypeDesc()->GetName();
+		}
+		else if(TypeDesc->GetKind() == SpvTypeDescKind::Basic)
+		{
+			SpvBasicTypeDesc* BasicTypeDesc = static_cast<SpvBasicTypeDesc*>(TypeDesc);
+			return BasicTypeDesc->GetName();
+		}
+		else if(TypeDesc->GetKind() == SpvTypeDescKind::Composite)
+		{
+			SpvCompositeTypeDesc* CompositeTypeDesc = static_cast<SpvCompositeTypeDesc*>(TypeDesc);
+			return CompositeTypeDesc->GetName();
+		}
+		AUX::Unreachable();
+	};
+
+	inline FString GetFunctionSig(SpvFunctionDesc* FuncDesc)
+	{
+		FString FuncName = FuncDesc->GetName();
+		SpvFuncTypeDesc* FuncTypeDesc = FuncDesc->GetFuncTypeDesc();
+		FString Signature;
+		auto ReturnType = FuncTypeDesc->GetReturnType();
+		if(std::holds_alternative<SpvVoidType*>(ReturnType))
+		{
+			Signature += "void";
+		}
+		else
+		{
+			Signature += GetTypeDescStr(std::get<SpvTypeDesc*>(ReturnType));
+		}
+		Signature += " ";
+		Signature += FuncName;
+		Signature += "(";
+		auto ParmTypes = FuncTypeDesc->GetParmTypes();
+		for(int i = 0; i < ParmTypes.Num(); i++)
+		{
+			if(i == ParmTypes.Num() - 1)
+			{
+				Signature += GetTypeDescStr(ParmTypes[i]);
+			}
+			else
+			{
+				Signature += GetTypeDescStr(ParmTypes[i]);
+				Signature += ", ";
+			}
+		}
+		Signature += ")";
+		return Signature;
 	};
 
 	struct SpvVariableDesc

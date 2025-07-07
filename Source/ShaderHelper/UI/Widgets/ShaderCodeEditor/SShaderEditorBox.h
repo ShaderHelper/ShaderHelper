@@ -213,6 +213,12 @@ namespace SH
 		void RefreshSyntaxHighlight();
 		
 		void DebugPixel(const FW::Vector2u& PixelCoord, const TArray<TRefCountPtr<FW::GpuBindGroup>>& BindGroups = {});
+		void ApplyDebugState(const FW::SpvDebugState& State, const FW::SpvDebugState* LastState, bool bReverse = false);
+		void ShowDebuggerResult();
+		void StepInto();
+		void StepOver();
+		void Continue();
+		void ClearDebugger();
 
 	protected:
 		virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
@@ -301,5 +307,16 @@ namespace SH
         //
 		bool bTryMergeUndoState = false;
 		bool bTryToggleCommentSelection = false;
+		
+		//Debugger
+		TArray<TPair<FW::SpvFunctionDesc*, int>> CallStack;
+		FW::SpvLexicalScope* Scope = nullptr;
+		TMultiMap<FW::SpvId, FW::SpvVariableChange::DirtyRange> DirtyVars;
+		int32 StopLineNumber{};
+		//ValidLine: Line that can trigger a breakpoint
+		std::optional<int32> CurValidLine;
+		FString UbError;
+		int32 CurDebugStateIndex{};
+		FW::SpvVmContext DebuggerContext;
 	};
 }

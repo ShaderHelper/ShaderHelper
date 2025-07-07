@@ -68,17 +68,27 @@ namespace SH
 	{
 		AssetOp::OpenAsset(Shader);
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(Shader);
-		ShaderEditor->DebugPixel(PixelCoord, {CustomBindGroup, StShader::GetBuiltInBindGroup()});
 		FTabManager* EditorTabManager = ShEditor->GetTabManager();
 		EditorTabManager->TryInvokeTab(VariableTabId);
 		EditorTabManager->TryInvokeTab(CallStackTabId);
+		SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(Shader);
+		ShaderEditor->DebugPixel(PixelCoord, {CustomBindGroup, StShader::GetBuiltInBindGroup()});
+	}
+
+	ShaderAsset* ShaderToyPassNode::GetShaderAsset() const
+	{
+		return Shader;
 	}
 
 	void ShaderToyPassNode::OnEndDebuggging()
 	{
 		IsDebugging = false;
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		if(SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(Shader))
+		{
+			ShaderEditor->ClearDebugger();
+		}
+		
 		FTabManager* EditorTabManager = ShEditor->GetTabManager();
 		auto VarTab = EditorTabManager->FindExistingLiveTab(VariableTabId);
 		auto CallStackTab = EditorTabManager->FindExistingLiveTab(CallStackTabId);

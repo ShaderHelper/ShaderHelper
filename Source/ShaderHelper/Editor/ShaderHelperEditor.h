@@ -12,7 +12,9 @@
 #include "Renderer/Renderer.h"
 #include "ProjectManager/ShProjectManager.h"
 #include "UI/Widgets/Property/PropertyView/SPropertyView.h"
-#include "UI/Widgets/SDebuggerViewport.h"
+#include "UI/Widgets/Debugger/SDebuggerViewport.h"
+#include "UI/Widgets/Debugger/SDebuggerVariableView.h"
+#include "UI/Widgets/Debugger/SDebuggerCallStackView.h"
 #include "AssetObject/DebuggableObject.h"
 
 namespace SH
@@ -49,6 +51,8 @@ namespace SH
 		TSharedPtr<SWindow> GetMainWindow() const override { return Window; }
 		FW::PreviewViewPort* GetViewPort() const { return ViewPort.Get(); }
 		TSharedPtr<FUICommandList> GetUICommandList() const { return UICommandList; }
+		SDebuggerVariableView* GetDebuggerVariableView() const { return DebuggerVariableView.Get(); }
+		SDebuggerCallStackView* GetDebuggerCallStackView() const { return DebuggerCallStackView.Get(); }
         
     public:
 		void InitEditorUI();
@@ -68,7 +72,13 @@ namespace SH
 		void SetDebuggableObject(DebuggableObject* InObject) { CurDebuggableObject = InObject; }
 		void EndDebugging();
 		void StartDebugging();
-		SShaderEditorBox* GetShaderEditor(FW::AssetPtr<ShaderAsset> InShader) { return ShaderEditors[InShader].Get();}
+		SShaderEditorBox* GetShaderEditor(FW::AssetPtr<ShaderAsset> InShader) {
+			if(!ShaderEditors.Contains(InShader))
+			{
+				return nullptr;
+			}
+			return ShaderEditors[InShader].Get();
+		}
 
 	private:
 		TSharedRef<SDockTab> SpawnWindowTab(const FSpawnTabArgs& Args);
@@ -110,6 +120,8 @@ namespace SH
         
         TMap<FW::AssetPtr<ShaderAsset>, TSharedPtr<SScrollBox>> ShaderPathBoxMap;
 		
+		TSharedPtr<SDebuggerVariableView> DebuggerVariableView;
+		TSharedPtr<SDebuggerCallStackView> DebuggerCallStackView;
 		TSharedPtr<SDebuggerViewport> DebuggerViewport;
 		DebuggableObject* CurDebuggableObject = nullptr;
 		bool IsDebugging{};
