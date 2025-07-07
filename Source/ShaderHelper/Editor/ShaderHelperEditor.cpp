@@ -340,7 +340,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
             ];
         ShaderPathBoxMap.Add(LoadedShader, PathBox);
         
-        auto NewShaderTab = SNew(SShaderTab)
+        TSharedRef<SShaderTab> NewShaderTab = SNew(SShaderTab)
             .TabRole(ETabRole::DocumentTab)
 			.Label_Lambda([this, LoadedShader] {
 				FString DirtyChar;
@@ -349,6 +349,25 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 					DirtyChar = "*";
 				}
 				return FText::FromString(LoadedShader->GetFileName() + DirtyChar);
+			})
+			.OnCanCloseTab_Lambda([this, TabId]{
+				if(CurDebuggableObject)
+				{
+					ShaderAsset* Shader = CurDebuggableObject->GetShaderAsset();
+					if(CurProject->OpenedShaders[Shader]->GetLayoutIdentifier() == TabId)
+					{
+						auto Ret = MessageDialog::Open(MessageDialog::OkCancel, Window, LOCALIZATION("TerminateDebuggerTip"));
+						if(Ret == MessageDialog::MessageRet::Ok)
+						{
+							EndDebugging();
+						}
+						else
+						{
+							return false;
+						}
+					}
+				}
+				return true;
 			})
             .OnTabClosed_Lambda([this, TabId, Args](TSharedRef<SDockTab> ClosedTab) {
                 auto ShaderAssetObj = *CurProject->OpenedShaders.FindKey(ClosedTab);
@@ -422,13 +441,19 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		else if(TabId == VariableTabId)
 		{
 			SpawnedTab = SNew(SDockTab)
-				.Label(LOCALIZATION(VariableTabId.ToString()));
+			.Label(LOCALIZATION(VariableTabId.ToString()))
+			[
+				SAssignNew(DebuggerVariableView, SDebuggerVariableView)
+			];
 			SpawnedTab->SetTabIcon(FShaderHelperStyle::Get().GetBrush("Icons.Variable"));
 		}
 		else if(TabId == CallStackTabId)
 		{
 			SpawnedTab = SNew(SDockTab)
-				.Label(LOCALIZATION(CallStackTabId.ToString()));
+			.Label(LOCALIZATION(CallStackTabId.ToString()))
+			[
+				SAssignNew(DebuggerCallStackView, SDebuggerCallStackView)
+			];
 			SpawnedTab->SetTabIcon(FShaderHelperStyle::Get().GetBrush("Icons.CallStack"));
 		}
 		else if (TabId == PreviewTabId) {
@@ -782,8 +807,11 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		);
 		DebuggerToolBarBuilder.AddToolBarButton(
 			FUIAction(
-				FExecuteAction(),
-				FCanExecuteAction::CreateLambda([] { return false; })
+				  FExecuteAction::CreateLambda([this]{
+					  SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
+					  ShaderEditor->Continue();
+				  }),
+				FCanExecuteAction::CreateLambda([this] { return IsDebugging; })
 			),
 			NAME_None,
 			FText::GetEmpty(), FText::GetEmpty(),

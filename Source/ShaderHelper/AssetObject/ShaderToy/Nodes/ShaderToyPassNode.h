@@ -43,6 +43,7 @@ namespace SH
 		TRefCountPtr<FW::GpuTexture> OnStartDebugging() override;
 		void OnFinalizePixel(const FW::Vector2u& PixelCoord) override;
 		void OnEndDebuggging() override;
+		ShaderAsset* GetShaderAsset() const;
     private:
         void ClearBindingProperty();
         void RefreshProperty();

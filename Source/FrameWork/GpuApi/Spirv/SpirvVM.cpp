@@ -157,11 +157,11 @@ namespace FW
 		SpvThreadState& ThreadState = Context.ThreadState;
 		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.Last();
 		
-		int32 OldLineNumber = CurStackFrame.CurLineNumber;
-		CurStackFrame.CurLineNumber = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLineStart()].Storage).Value.GetData();
-		if(OldLineNumber != CurStackFrame.CurLineNumber)
+		int32 OldLine = CurStackFrame.CurLine;
+		CurStackFrame.CurLine = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLineStart()].Storage).Value.GetData();
+		if(OldLine != CurStackFrame.CurLine)
 		{
-			ThreadState.RecordedInfo.LineDebugStates.Emplace(CurStackFrame.CurLineNumber);
+			ThreadState.RecordedInfo.LineDebugStates.Emplace(CurStackFrame.CurLine);
 		}
 	}
 
@@ -171,17 +171,17 @@ namespace FW
 		SpvThreadState& ThreadState = Context.ThreadState;
 		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.Last();
 		
-		int32 OldLineNumber = CurStackFrame.CurLineNumber;
+		int32 OldLine = CurStackFrame.CurLine;
 		SpvLexicalScope* OldScope = CurStackFrame.CurScope;
 		SpvLexicalScope* NewScope = Context.LexicalScopes[Inst->GetScope()].Get();
 		CurStackFrame.CurScope = NewScope;
-		CurStackFrame.CurLineNumber = NewScope->GetLineNumber();
+		CurStackFrame.CurLine = NewScope->GetLine();
 
-		if(OldLineNumber != CurStackFrame.CurLineNumber)
+		if(OldLine != CurStackFrame.CurLine)
 		{
 			SpvDebugState Debugstate {
-				.LineNumber = CurStackFrame.CurLineNumber,
-				.ScopeChange = {OldScope, NewScope}
+				.Line = CurStackFrame.CurLine,
+				.ScopeChange = SpvLexicalScopeChange{OldScope, NewScope}
 			};
 			ThreadState.RecordedInfo.LineDebugStates.Add(MoveTemp(Debugstate));
 		}
@@ -203,6 +203,8 @@ namespace FW
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
 		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.Last();
+		SpvDebugState& CurDebugState = ThreadState.RecordedInfo.LineDebugStates.Last();
+		CurDebugState.bFuncCall = true;
 		
 		ThreadState.NextInstIndex = GetInstIndex(Inst->GetFunction());
 		std::queue<SpvPointer*> Arguments;
@@ -438,25 +440,99 @@ namespace FW
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
-		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.Last();
 		
-		ThreadState.NextInstIndex = CurStackFrame.ReturnPointIndex;
+		ThreadState.NextInstIndex = ThreadState.StackFrames.Last().ReturnPointIndex;
+		SpvLexicalScope* OldScope = ThreadState.StackFrames.Last().CurScope;
 		ThreadState.StackFrames.Pop();
+	
+		if(!ThreadState.StackFrames.IsEmpty())
+		{
+			SpvVmFrame& CurStackFrame = ThreadState.StackFrames.Last();
+			SpvLexicalScope* NewScope = CurStackFrame.CurScope;
+			
+			SpvDebugState Debugstate {
+				.Line = CurStackFrame.CurLine,
+				.ScopeChange = SpvLexicalScopeChange{OldScope, NewScope}
+			};
+			ThreadState.RecordedInfo.LineDebugStates.Add(MoveTemp(Debugstate));
+		}
 	}
 
 	void SpvVmVisitor::Visit(SpvOpReturnValue* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
-		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.Last();
-		CurStackFrame.ReturnObject->Storage = GetObject(Inst->GetValue())->Storage;
-		ThreadState.NextInstIndex = CurStackFrame.ReturnPointIndex;
+		ThreadState.StackFrames.Last().ReturnObject->Storage = GetObject(Inst->GetValue())->Storage;
+		ThreadState.NextInstIndex = ThreadState.StackFrames.Last().ReturnPointIndex;
+		SpvLexicalScope* OldScope = ThreadState.StackFrames.Last().CurScope;
 		ThreadState.StackFrames.Pop();
+		
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.Last();
+		SpvLexicalScope* NewScope = CurStackFrame.CurScope;
+		
+		SpvDebugState Debugstate {
+			.Line = CurStackFrame.CurLine,
+			.ScopeChange = SpvLexicalScopeChange{OldScope, NewScope}
+		};
+		ThreadState.RecordedInfo.LineDebugStates.Add(MoveTemp(Debugstate));
 	}
 
 	void SpvVmVisitor::Visit(SpvOpIEqual* Inst)
 	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.Last();
 		
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvObject* Operand1 = GetObject(Inst->GetOperand1());
+		SpvObject* Operand2 = GetObject(Inst->GetOperand2());
+		TArray<uint8> OperandValue1 = GetObjectValue(Operand1);
+		TArray<uint8> OperandValue2 = GetObjectValue(Operand2);
+		SpvType* OperandType = Operand1->Type;
+		
+		TArray<uint8> ResultValue;
+		ResultValue.SetNumZeroed(GetTypeByteSize(ResultType));
+		
+		auto IntegerEqualComparison = [&](SpvIntegerType* IntegerType, int32 Index = 0){
+			check(IntegerType->GetWidth() == 32);
+			if(IntegerType->IsSigend())
+			{
+				int32 OperandTypedValue1 = *(int32*)OperandValue1.GetData();
+				int32 OperandTypedValue2 = *(int32*)OperandValue2.GetData();
+				*((uint32*)ResultValue.GetData() + Index) = OperandTypedValue1 == OperandTypedValue2;
+			}
+			else
+			{
+				uint32 OperandTypedValue1 = *(uint32*)OperandValue1.GetData();
+				uint32 OperandTypedValue2 = *(uint32*)OperandValue2.GetData();
+				*((uint32*)ResultValue.GetData() + Index) = OperandTypedValue1 == OperandTypedValue2;
+			}
+		};
+		
+		if(OperandType->GetKind() == SpvTypeKind::Vector)
+		{
+			SpvVectorType* VectorType = static_cast<SpvVectorType*>(OperandType);
+			check(VectorType->ElementType->GetKind() == SpvTypeKind::Integer);
+			for(int32 Index = 0; Index < VectorType->ElementCount; Index++)
+			{
+				SpvIntegerType* IntegerType = static_cast<SpvIntegerType*>(VectorType->ElementType);
+				IntegerEqualComparison(IntegerType, Index);
+			}
+		}
+		else
+		{
+			check(OperandType->GetKind() == SpvTypeKind::Integer);
+			SpvIntegerType* IntegerType = static_cast<SpvIntegerType*>(OperandType);
+			IntegerEqualComparison(IntegerType);
+		}
+		
+		SpvId ResultId = Inst->GetId().value();
+		SpvObject ResultObject{
+			.Id = ResultId,
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.emplace(ResultId, MoveTemp(ResultObject));
 	}
 
 	void SpvVmVisitor::Visit(SpvOpINotEqual* Inst)

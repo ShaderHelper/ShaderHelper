@@ -2082,11 +2082,20 @@ const FString ErrorMarkerText = TEXT("✘");
         })
         .Text(FText::FromString(ErrorMarkerText));
 		
-		auto BreakPoint = SNew(SImage)
-		.Image(FAppStyle::Get().GetBrush("Icons.BulletPoint"))
-		.ColorAndOpacity(FLinearColor::Red)
+		auto DebugLineMarker = SNew(SImage)
+		.Image_Lambda([this, LineNumber]{
+			if(StopLineNumber == LineNumber)
+			{
+				return FShaderHelperStyle::Get().GetBrush("Icons.ArrowBoldRight");
+			}
+			return FAppStyle::Get().GetBrush("Icons.BulletPoint");
+		})
+		.ColorAndOpacity_Lambda([this, LineNumber]{
+			return StopLineNumber == LineNumber ? FLinearColor::Green : FLinearColor::Red;
+		})
 		.Visibility_Lambda([this, LineNumber, ItemErrorMarker]{
-			if(BreakPointLines.Contains(LineNumber) && ItemErrorMarker->GetVisibility() != EVisibility::Visible)
+			if(ItemErrorMarker->GetVisibility() != EVisibility::Visible
+			   && (BreakPointLines.Contains(LineNumber) || StopLineNumber == LineNumber))
 			{
 				return EVisibility::HitTestInvisible;
 			}
@@ -2111,7 +2120,7 @@ const FString ErrorMarkerText = TEXT("✘");
 						]
 						+SOverlay::Slot()
 						[
-							BreakPoint
+							DebugLineMarker
 						]
 					]
 					+ SHorizontalBox::Slot()
@@ -2134,7 +2143,7 @@ const FString ErrorMarkerText = TEXT("✘");
 					SNew(SBox)
 					.HeightOverride(1.0)
 					.Visibility_Lambda([this, LineNumber]{
-						if(BreakPointLines.Contains(LineNumber))
+						if(BreakPointLines.Contains(LineNumber) || StopLineNumber == LineNumber)
 						{
 							return EVisibility::HitTestInvisible;
 						}
@@ -2143,21 +2152,25 @@ const FString ErrorMarkerText = TEXT("✘");
 					[
 						SNew(SImage)
 						.Image(FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect2"))
-						.ColorAndOpacity(FLinearColor{1,0,0,0.7f})
+						.ColorAndOpacity_Lambda([this, LineNumber]{
+							return StopLineNumber == LineNumber ? FLinearColor{0,1,0,0.7f} : FLinearColor{1,0,0,0.7f};
+						})
 					]
 				]
 				+SOverlay::Slot()
 				[
 					SNew(SImage)
 					.Visibility_Lambda([this, LineNumber]{
-						if(BreakPointLines.Contains(LineNumber))
+						if(BreakPointLines.Contains(LineNumber) || StopLineNumber == LineNumber)
 						{
 							return EVisibility::HitTestInvisible;
 						}
 						return EVisibility::Collapsed;
 					})
 					.Image(FAppStyle::Get().GetBrush("WhiteBrush"))
-					.ColorAndOpacity(FLinearColor{1,0,0,0.11f})
+					.ColorAndOpacity_Lambda([this, LineNumber]{
+						return StopLineNumber == LineNumber ? FLinearColor{0,1,0,0.06f} : FLinearColor{1,0,0,0.06f};
+					})
 				]
 			];
         
@@ -2187,7 +2200,7 @@ const FString ErrorMarkerText = TEXT("✘");
 					SNew(SBox)
 					.HeightOverride(1.0)
 					.Visibility_Lambda([this, LineNumber]{
-						if(BreakPointLines.Contains(LineNumber))
+						if(BreakPointLines.Contains(LineNumber) || StopLineNumber == LineNumber)
 						{
 							return EVisibility::HitTestInvisible;
 						}
@@ -2196,21 +2209,25 @@ const FString ErrorMarkerText = TEXT("✘");
 					[
 						SNew(SImage)
 						.Image(FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect2"))
-						.ColorAndOpacity(FLinearColor{1,0,0,0.7f})
+						.ColorAndOpacity_Lambda([this, LineNumber]{
+							return StopLineNumber == LineNumber ? FLinearColor{0,1,0,0.7f} : FLinearColor{1,0,0,0.7f};
+						})
 					]
 				]
 				+SOverlay::Slot()
 				[
 					SNew(SImage)
 					.Visibility_Lambda([this, LineNumber]{
-						if(BreakPointLines.Contains(LineNumber))
+						if(BreakPointLines.Contains(LineNumber) || StopLineNumber == LineNumber)
 						{
 							return EVisibility::HitTestInvisible;
 						}
 						return EVisibility::Collapsed;
 					})
 					.Image(FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect"))
-					.ColorAndOpacity(FLinearColor{1,0,0,0.7f})
+					.ColorAndOpacity_Lambda([this, LineNumber]{
+						return StopLineNumber == LineNumber ? FLinearColor{0,1,0,0.3f} : FLinearColor{1,0,0,0.3f};
+					})
 				]
             ];
 
@@ -2219,7 +2236,8 @@ const FString ErrorMarkerText = TEXT("✘");
             const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
             const int32 CurLineIndex = CursorLocation.GetLineIndex();
             auto FocusedWidget = FSlateApplication::Get().GetUserFocusedWidget(0);
-            if(FocusedWidget == ShaderMultiLineEditableText && LineNumber == GetLineNumber(CurLineIndex) && !BreakPointLines.Contains(LineNumber))
+            if(FocusedWidget == ShaderMultiLineEditableText && LineNumber == GetLineNumber(CurLineIndex)
+			   && !BreakPointLines.Contains(LineNumber) && StopLineNumber != LineNumber)
             {
                 double CurTime = FPlatformTime::Seconds();
                 float Speed = 2.0f;
@@ -2515,6 +2533,147 @@ const FString ErrorMarkerText = TEXT("✘");
         TextLayout->AddLines(MoveTemp(LinesToAdd));
     }
 
+	void SShaderEditorBox::StepInto()
+	{
+		
+	}
+
+	void SShaderEditorBox::StepOver()
+	{
+		
+	}
+
+	void SShaderEditorBox::ApplyDebugState(const FW::SpvDebugState& State, const FW::SpvDebugState* LastState, bool bReverse)
+	{
+		if(State.ScopeChange)
+		{
+			Scope = bReverse ? State.ScopeChange.value().PreScope : State.ScopeChange.value().NewScope;
+			SpvFunctionDesc* FuncDesc = GetFunctionDesc(Scope);
+			if(FuncDesc)
+			{
+				if(CallStack.Num() > 1 && CallStack.Last(1).Key == FuncDesc)
+				{
+					CallStack.Pop();
+				}
+				else if(CallStack.IsEmpty() || CallStack.Last().Key != FuncDesc)
+				{
+					CallStack.Add(TPair<SpvFunctionDesc*, int>(FuncDesc, LastState->Line));
+				}
+				CurValidLine.reset();
+			}
+		}
+		
+		for(const SpvVariableChange& VarChange : State.VarChanges)
+		{
+			auto& RecordedInfo = DebuggerContext.ThreadState.RecordedInfo;
+			SpvVariable& Var = RecordedInfo.AllVariables[VarChange.VarId];
+			if(!Var.IsExternal())
+			{
+				std::get<SpvObject::Internal>(Var.Storage).Value = bReverse ? VarChange.NewValue : VarChange.PreValue;
+			}
+			DirtyVars.Add(VarChange.VarId, VarChange.Range);
+		}
+	}
+
+	void SShaderEditorBox::ShowDebuggerResult()
+	{
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		SDebuggerCallStackView* DebuggerCallStackView = ShEditor->GetDebuggerCallStackView();
+		SDebuggerVariableView* DebuggerVariableView = ShEditor->GetDebuggerVariableView();
+		
+		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
+		TArray<CallStackDataPtr> CallStackDatas;
+		
+		SpvFunctionDesc* FuncDesc = CallStack.Last().Key;
+		FString Location = FString::Printf(TEXT("%s (Line %d)"), *ShaderAssetObj->GetFileName(), StopLineNumber);
+		CallStackDatas.Add(MakeShared<CallStackData>(GetFunctionSig(FuncDesc), MoveTemp(Location)));
+		for(int i = CallStack.Num() - 1; i > 0; i--)
+		{
+			SpvFunctionDesc* FuncDesc = CallStack[i-1].Key;
+			int JumpLineNumber = CallStack[i].Value - ExtraLineNum;
+			if(JumpLineNumber > 0)
+			{
+				FString Location = FString::Printf(TEXT("%s (Line %d)"), *ShaderAssetObj->GetFileName(), JumpLineNumber);
+				CallStackDatas.Add(MakeShared<CallStackData>(GetFunctionSig(FuncDesc), MoveTemp(Location)));
+			}
+		}
+		DebuggerCallStackView->SetCallStackDatas(CallStackDatas);
+		
+		const auto& RecordedInfo = DebuggerContext.ThreadState.RecordedInfo;
+	}
+
+	void SShaderEditorBox::Continue()
+	{
+		const auto& LineDebugStates = DebuggerContext.ThreadState.RecordedInfo.LineDebugStates;
+		while(CurDebugStateIndex < LineDebugStates.Num())
+		{
+			const SpvDebugState& DebugState = LineDebugStates[CurDebugStateIndex];
+			auto OldCallStack = CallStack;
+			std::optional<int32> NextValidLine;
+			if(CurDebugStateIndex + 1 < LineDebugStates.Num() &&
+			   (!LineDebugStates[CurDebugStateIndex + 1].VarChanges.IsEmpty() || LineDebugStates[CurDebugStateIndex + 1].bFuncCall))
+			{
+				NextValidLine = LineDebugStates[CurDebugStateIndex + 1].Line;
+			}
+			const SpvDebugState* LastState = nullptr;
+			if(CurDebugStateIndex > 0)
+			{
+				LastState = &LineDebugStates[CurDebugStateIndex - 1];
+			}
+			
+			UbError = DebugState.UbError;
+			if(!UbError.IsEmpty())
+			{
+				break;
+			}
+			
+			ApplyDebugState(DebugState, LastState);
+			CurDebugStateIndex++;
+			
+			int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
+			if(NextValidLine && OldCallStack == CallStack
+			   && !CallStack.IsEmpty()
+			   && BreakPointLines.ContainsByPredicate([&](int32 InEntry){
+				int32 RealLine = InEntry + ExtraLineNum;
+				bool bForward;
+				if(!CurValidLine)
+				{
+					int32 FuncLine = CallStack.Last().Key->GetLine();
+					bForward = (RealLine >= FuncLine) && (RealLine <= NextValidLine.value());
+				}
+				else
+				{
+					bForward = (RealLine > CurValidLine.value()) && (RealLine <= NextValidLine.value());
+				}
+				return bForward;
+			}))
+			{
+				CurValidLine = NextValidLine;
+				StopLineNumber = NextValidLine.value() - ExtraLineNum;
+				break;
+			}
+			
+			CurValidLine = NextValidLine;
+		}
+		
+		if(CurDebugStateIndex >= LineDebugStates.Num())
+		{
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			ShEditor->EndDebugging();
+		}
+		else
+		{
+			ShowDebuggerResult();
+		}
+	}
+
+	void SShaderEditorBox::ClearDebugger()
+	{
+		CurValidLine.reset();
+		CallStack.Empty();
+		StopLineNumber = 0;
+	}
+
 	void SShaderEditorBox::DebugPixel(const FW::Vector2u& PixelCoord, const TArray<TRefCountPtr<FW::GpuBindGroup>>& BindGroups)
 	{
 		int32 DebugIndex= 2 * (PixelCoord.y & 1) + (PixelCoord.x & 1);
@@ -2569,5 +2728,17 @@ const FString ErrorMarkerText = TEXT("✘");
 		};
 		SpvVmPixelVisitor VmVisitor{VmContext};
 		Parser.Accept(&VmVisitor);
+		
+		CurDebugStateIndex = 0;
+		DebuggerContext = MoveTemp(VmContext.Quad[DebugIndex]);
+		if(BreakPointLines.IsEmpty())
+		{
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			ShEditor->EndDebugging();
+		}
+		else
+		{
+			Continue();
+		}
 	}
 }
