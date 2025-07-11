@@ -16,16 +16,29 @@ namespace SH
 			SAssignNew(CallStackView, SListView<CallStackDataPtr>)
 			.ListItemsSource(&CallStackDatas)
 			.OnGenerateRow(this, &SDebuggerCallStackView::GenerateRowForItem)
+			.SelectionMode(ESelectionMode::Single)
+			.OnSelectionChanged_Lambda([this](CallStackDataPtr SelectedData, ESelectInfo::Type) {
+				if(SelectedData && ActiveData != SelectedData)
+				{
+					ActiveData = SelectedData;
+					if(OnSelectionChanged)
+					{
+						OnSelectionChanged(SelectedData->Name);
+					}
+				}
+			})
 			.HeaderRow
 			(
 				SNew(SHeaderRow)
 				.Style(&FShaderHelperStyle::Get().GetWidgetStyle<FHeaderRowStyle>("TableView.DebuggerHeader"))
 				+ SHeaderRow::Column(CallPointColId)
-				.FillWidth(0.25f)
+				.FillWidth(0.1f)
 				.DefaultLabel(LOCALIZATION(CallPointColId.ToString()))
 				+ SHeaderRow::Column(FuncNameColId)
+				.FillWidth(0.6f)
 				.DefaultLabel(LOCALIZATION(FuncNameColId.ToString()))
 				+ SHeaderRow::Column(LocationColId)
+				.FillWidth(0.3f)
 				.DefaultLabel(LOCALIZATION(LocationColId.ToString()))
 			)
 		];
@@ -70,6 +83,7 @@ namespace SH
 					   return EVisibility::Hidden;
 				   })
 				   .Image(FShaderHelperStyle::Get().GetBrush("Icons.ArrowBoldRight"))
+				   .ColorAndOpacity(FLinearColor::Green)
 		   );
 				
 		}

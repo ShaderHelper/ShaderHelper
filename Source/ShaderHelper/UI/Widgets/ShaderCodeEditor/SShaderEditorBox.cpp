@@ -2533,33 +2533,25 @@ const FString ErrorMarkerText = TEXT("✘");
         TextLayout->AddLines(MoveTemp(LinesToAdd));
     }
 
-	void SShaderEditorBox::StepInto()
+	void SShaderEditorBox::ApplyDebugState(const FW::SpvDebugState& State, bool bReverse)
 	{
+		if(State.bFuncCall)
+		{
+			if(Scope)
+			{
+				CallStack.Add(TPair<SpvLexicalScope*, int>(Scope, State.Line));
+				CurValidLine.reset();
+			}
+		}
 		
-	}
-
-	void SShaderEditorBox::StepOver()
-	{
-		
-	}
-
-	void SShaderEditorBox::ApplyDebugState(const FW::SpvDebugState& State, const FW::SpvDebugState* LastState, bool bReverse)
-	{
 		if(State.ScopeChange)
 		{
 			Scope = bReverse ? State.ScopeChange.value().PreScope : State.ScopeChange.value().NewScope;
-			SpvFunctionDesc* FuncDesc = GetFunctionDesc(Scope);
-			if(FuncDesc)
+			//Return func
+			if(!CallStack.IsEmpty() && State.bReturn)
 			{
-				if(CallStack.Num() > 1 && CallStack.Last(1).Key == FuncDesc)
-				{
-					CallStack.Pop();
-				}
-				else if(CallStack.IsEmpty() || CallStack.Last().Key != FuncDesc)
-				{
-					CallStack.Add(TPair<SpvFunctionDesc*, int>(FuncDesc, LastState->Line));
-				}
-				CurValidLine.reset();
+				auto Item = CallStack.Pop();
+				CurValidLine = Item.Value;
 			}
 		}
 		
@@ -2569,27 +2561,74 @@ const FString ErrorMarkerText = TEXT("✘");
 			SpvVariable& Var = RecordedInfo.AllVariables[VarChange.VarId];
 			if(!Var.IsExternal())
 			{
-				std::get<SpvObject::Internal>(Var.Storage).Value = bReverse ? VarChange.NewValue : VarChange.PreValue;
+				Var.Initialized = true;
+				std::get<SpvObject::Internal>(Var.Storage).Value = bReverse ? VarChange.PreValue : VarChange.NewValue;
 			}
 			DirtyVars.Add(VarChange.VarId, VarChange.Range);
 		}
 	}
 
-	void SShaderEditorBox::ShowDebuggerResult()
+	void SShaderEditorBox::ShowDeuggerVariable(SpvLexicalScope* InScope) const
+	{
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		SDebuggerVariableView* DebuggerVariableView = ShEditor->GetDebuggerVariableView();
+		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
+		
+		TArray<VariableNodePtr> VariableNodeDatas;
+		const auto& RecordedInfo = DebuggerContext.ThreadState.RecordedInfo;
+		const auto& DebugStates = RecordedInfo.DebugStates;
+		for(const auto& [VarId, VarDesc] : DebuggerContext.VariableDescMap)
+		{
+			if(RecordedInfo.AllVariables.contains(VarId))
+			{
+				const SpvVariable& Var = RecordedInfo.AllVariables.at(VarId);
+				if(!Var.IsExternal() && VarDesc
+				   && (VarDesc->Parent->Contains(InScope) || (DebugStates[CurDebugStateIndex].bReturn && InScope->Contains(VarDesc->Parent)))
+				   && VarDesc->Line < StopLineNumber + ExtraLineNum
+				   && VarDesc->Line > ExtraLineNum)
+				{
+					FString VarName = VarDesc->Name;
+					FString TypeName = GetTypeDescStr(VarDesc->TypeDesc);
+					FString ValueStr = "Uninitialized";
+					if(Var.Initialized)
+					{
+						const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var.Storage).Value;
+						ValueStr = GetValueStr(Value, VarDesc->TypeDesc);
+					}
+					auto Data = MakeShared<VariableNode>(VarName, ValueStr, TypeName);
+					TArray<SpvVariableChange::DirtyRange> Ranges;
+					DirtyVars.MultiFind(VarId, Ranges);
+					if(VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Composite)
+					{
+						
+					}
+					else if(!Ranges.IsEmpty())
+					{
+						Data->Dirty = true;
+					}
+					VariableNodeDatas.Add(MoveTemp(Data));
+				}
+			}
+			
+		}
+		
+		DebuggerVariableView->SetVariableNodeDatas(VariableNodeDatas);
+	}
+
+	void SShaderEditorBox::ShowDebuggerResult() const
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		SDebuggerCallStackView* DebuggerCallStackView = ShEditor->GetDebuggerCallStackView();
-		SDebuggerVariableView* DebuggerVariableView = ShEditor->GetDebuggerVariableView();
 		
 		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
 		TArray<CallStackDataPtr> CallStackDatas;
 		
-		SpvFunctionDesc* FuncDesc = CallStack.Last().Key;
-		FString Location = FString::Printf(TEXT("%s (Line %d)"), *ShaderAssetObj->GetFileName(), StopLineNumber);
+		SpvFunctionDesc* FuncDesc = GetFunctionDesc(Scope);
+		FString Location = FString::Printf(TEXT("%s (Line %d)"), *ShaderAssetObj->GetFileName(), CurValidLine.value() - ExtraLineNum);
 		CallStackDatas.Add(MakeShared<CallStackData>(GetFunctionSig(FuncDesc), MoveTemp(Location)));
-		for(int i = CallStack.Num() - 1; i > 0; i--)
+		for(int i = CallStack.Num() - 1; i >= 0; i--)
 		{
-			SpvFunctionDesc* FuncDesc = CallStack[i-1].Key;
+			SpvFunctionDesc* FuncDesc = GetFunctionDesc(CallStack[i].Key);
 			int JumpLineNumber = CallStack[i].Value - ExtraLineNum;
 			if(JumpLineNumber > 0)
 			{
@@ -2599,26 +2638,25 @@ const FString ErrorMarkerText = TEXT("✘");
 		}
 		DebuggerCallStackView->SetCallStackDatas(CallStackDatas);
 		
-		const auto& RecordedInfo = DebuggerContext.ThreadState.RecordedInfo;
+		ShowDeuggerVariable(Scope);
 	}
 
-	void SShaderEditorBox::Continue()
+	void SShaderEditorBox::Continue(StepMode Mode)
 	{
-		const auto& LineDebugStates = DebuggerContext.ThreadState.RecordedInfo.LineDebugStates;
-		while(CurDebugStateIndex < LineDebugStates.Num())
+		DirtyVars.Empty();
+		const auto& DebugStates = DebuggerContext.ThreadState.RecordedInfo.DebugStates;
+		auto CallStackAtStop = CallStack;
+		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
+		while(CurDebugStateIndex < DebugStates.Num())
 		{
-			const SpvDebugState& DebugState = LineDebugStates[CurDebugStateIndex];
-			auto OldCallStack = CallStack;
+			const SpvDebugState& DebugState = DebugStates[CurDebugStateIndex];
 			std::optional<int32> NextValidLine;
-			if(CurDebugStateIndex + 1 < LineDebugStates.Num() &&
-			   (!LineDebugStates[CurDebugStateIndex + 1].VarChanges.IsEmpty() || LineDebugStates[CurDebugStateIndex + 1].bFuncCall))
+			if(CurDebugStateIndex + 1 < DebugStates.Num() &&
+			   (!DebugStates[CurDebugStateIndex + 1].VarChanges.IsEmpty() || DebugStates[CurDebugStateIndex + 1].bReturn ||
+				DebugStates[CurDebugStateIndex + 1].bFuncCallAfterReturn ||
+				DebugStates[CurDebugStateIndex + 1].bFuncCall || DebugStates[CurDebugStateIndex + 1].bCondition))
 			{
-				NextValidLine = LineDebugStates[CurDebugStateIndex + 1].Line;
-			}
-			const SpvDebugState* LastState = nullptr;
-			if(CurDebugStateIndex > 0)
-			{
-				LastState = &LineDebugStates[CurDebugStateIndex - 1];
+				NextValidLine = DebugStates[CurDebugStateIndex + 1].Line;
 			}
 			
 			UbError = DebugState.UbError;
@@ -2627,36 +2665,43 @@ const FString ErrorMarkerText = TEXT("✘");
 				break;
 			}
 			
-			ApplyDebugState(DebugState, LastState);
+			ApplyDebugState(DebugState);
 			CurDebugStateIndex++;
 			
-			int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
-			if(NextValidLine && OldCallStack == CallStack
-			   && !CallStack.IsEmpty()
-			   && BreakPointLines.ContainsByPredicate([&](int32 InEntry){
-				int32 RealLine = InEntry + ExtraLineNum;
-				bool bForward;
-				if(!CurValidLine)
-				{
-					int32 FuncLine = CallStack.Last().Key->GetLine();
-					bForward = (RealLine >= FuncLine) && (RealLine <= NextValidLine.value());
-				}
-				else
-				{
-					bForward = (RealLine > CurValidLine.value()) && (RealLine <= NextValidLine.value());
-				}
-				return bForward;
-			}))
+			if(NextValidLine)
 			{
+				bool MatchBreakPoint = Scope && BreakPointLines.ContainsByPredicate([&](int32 InEntry){
+					 int32 BreakPointRealLine = InEntry + ExtraLineNum;
+					 bool bForward;
+					 if(!CurValidLine)
+					 {
+						 int32 FuncLine = GetFunctionDesc(Scope)->GetLine();
+						 bForward = (BreakPointRealLine >= FuncLine) && (BreakPointRealLine <= NextValidLine.value());
+					 }
+					 else
+					 {
+						 bForward = (BreakPointRealLine > CurValidLine.value()) && (BreakPointRealLine <= NextValidLine.value());
+					 }
+					 return bForward;
+				});
+				bool SameStack = CurValidLine != NextValidLine && CallStackAtStop.Num() == CallStack.Num();
+				bool ReturnStack = CallStackAtStop.Num() > CallStack.Num();
+				bool CrossStack = CallStackAtStop.Num() != CallStack.Num();
+				
+				bool StopStepOver = Mode == StepMode::StepOver && NextValidLine.value() - ExtraLineNum > 0 && (SameStack || ReturnStack);
+				bool StopStepInto = Mode == StepMode::StepInto && NextValidLine.value() - ExtraLineNum > 0 && (SameStack || CrossStack);
+				
 				CurValidLine = NextValidLine;
-				StopLineNumber = NextValidLine.value() - ExtraLineNum;
-				break;
+				if(MatchBreakPoint || StopStepOver || StopStepInto)
+				{
+					CallStackAtStop = CallStack;
+					StopLineNumber = NextValidLine.value() - ExtraLineNum;
+					break;
+				}
 			}
-			
-			CurValidLine = NextValidLine;
 		}
 		
-		if(CurDebugStateIndex >= LineDebugStates.Num())
+		if(CurDebugStateIndex >= DebugStates.Num())
 		{
 			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 			ShEditor->EndDebugging();
@@ -2671,6 +2716,9 @@ const FString ErrorMarkerText = TEXT("✘");
 	{
 		CurValidLine.reset();
 		CallStack.Empty();
+		Scope = nullptr;
+		UbError.Empty();
+		DirtyVars.Empty();
 		StopLineNumber = 0;
 	}
 
@@ -2731,13 +2779,34 @@ const FString ErrorMarkerText = TEXT("✘");
 		
 		CurDebugStateIndex = 0;
 		DebuggerContext = MoveTemp(VmContext.Quad[DebugIndex]);
+		
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		if(BreakPointLines.IsEmpty())
 		{
-			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 			ShEditor->EndDebugging();
 		}
 		else
 		{
+			SDebuggerCallStackView* DebuggerCallStackView = ShEditor->GetDebuggerCallStackView();
+			DebuggerCallStackView->OnSelectionChanged = [this](const FString& FuncName) {
+				int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
+				if(GetFunctionSig(GetFunctionDesc(Scope)) == FuncName)
+				{
+					StopLineNumber =  CurValidLine.value() - ExtraLineNum;
+					ShowDeuggerVariable(Scope);
+				}
+				else if(auto Call = CallStack.FindByPredicate([this, FuncName](const TPair<FW::SpvLexicalScope*, int>& InItem){
+					if(GetFunctionSig(GetFunctionDesc(InItem.Key)) == FuncName)
+					{
+						return true;
+					}
+					return false;
+				}))
+				{
+					StopLineNumber = Call->Value - ExtraLineNum;
+					ShowDeuggerVariable(Call->Key);
+				}
+			};
 			Continue();
 		}
 	}

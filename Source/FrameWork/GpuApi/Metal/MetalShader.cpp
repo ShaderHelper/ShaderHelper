@@ -119,6 +119,7 @@ namespace FW
 		}
 		
 		TArray<std::string> ExtraAnsiArgs;
+		ExtraAnsiArgs.Reserve(ExtraArgs.Num());
 		for (const FString& ExtraArg : ExtraArgs)
 		{
 			ExtraAnsiArgs.Add(TCHAR_TO_ANSI(*ExtraArg));
@@ -192,7 +193,7 @@ namespace FW
 		//Need the meta datas from spirv to abstract gpu api
 		//For example, metal's threadgroupsize is not specified in the shader
 		//and needs to be specified directly by dispatchThreadgroups
-		TArray<uint32> SpvCode = {static_cast<const uint32*>(Results[0].target.Data()), Results[0].target.Size() / 4};
+		TArray<uint32> SpvCode = {static_cast<const uint32*>(Results[0].target.Data()), (int)Results[0].target.Size() / 4};
 		SpvMetaContext MetaContext;
 		SpvMetaVisitor MetaVisitor{MetaContext};
 		SpirvParser Parser;

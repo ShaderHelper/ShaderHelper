@@ -27,14 +27,17 @@ namespace FW
 		int32 Line{};
 		std::optional<SpvLexicalScopeChange> ScopeChange;
 		TArray<SpvVariableChange> VarChanges;
-		bool bFuncCall{};
+		bool bFuncCall : 1 {};
+		bool bFuncCallAfterReturn : 1 {};
+		bool bReturn : 1 {};
+		bool bCondition : 1 {};
 		FString UbError;
 	};
 
 	struct SpvRecordedInfo
 	{
 		std::unordered_map<SpvId, SpvVariable> AllVariables;
-		TArray<SpvDebugState> LineDebugStates;
+		TArray<SpvDebugState> DebugStates;
 	};
 
 	struct SpvVmBinding
@@ -63,7 +66,9 @@ namespace FW
 	{
 		int32 InstIndex;
 		int32 NextInstIndex;
-		TArray<SpvVmFrame> StackFrames;
+		//Can not use TArray<SpvVmFrame>, TArray requires the trivially relocatable type.
+		//However, std::unordered_map may not be trivially relocatable.
+		std::vector<SpvVmFrame> StackFrames;
 		
 		std::unordered_map<SpvBuiltIn, TArray<uint8>> BuiltInInput;
 		std::unordered_map<uint32, TArray<uint8>> LocationInput;
@@ -88,12 +93,15 @@ namespace FW
 		int32 GetInstIndex(SpvId Inst) const;
 		SpvPointer* GetPointer(SpvId PointerId);
 		SpvObject* GetObject(SpvId ObjectId);
-		TArray<uint8> ExecuteOp(const FString& Name, int32 ResultSize, const TArray<uint8>& InputData, const TArray<FString>& Args);
+		TArray<uint8> ExecuteGpuOp(const FString& Name, int32 ResultSize, const TArray<uint8>& InputData, const TArray<FString>& Args);
 		
 	public:
 		void Visit(SpvDebugLine* Inst) override;
 		void Visit(SpvDebugScope* Inst) override;
 		void Visit(SpvDebugDeclare* Inst) override;
+		
+		void Visit(SpvSin* Inst) override;
+		void Visit(SpvCos* Inst) override;
 		
 		void Visit(SpvOpFunctionParameter* Inst) override;
 		void Visit(SpvOpFunctionCall* Inst) override;
@@ -106,7 +114,17 @@ namespace FW
 		void Visit(SpvOpAccessChain* Inst) override;
 		void Visit(SpvOpIEqual* Inst) override;
 		void Visit(SpvOpINotEqual* Inst) override;
+		void Visit(SpvOpSGreaterThan* Inst) override;
+		void Visit(SpvOpSLessThan* Inst) override;
+		void Visit(SpvOpFOrdLessThan* Inst) override;
+		void Visit(SpvOpFOrdGreaterThan* Inst) override;
+		void Visit(SpvOpConvertSToF* Inst) override;
+		void Visit(SpvOpIAdd* Inst) override;
+		void Visit(SpvOpFAdd* Inst) override;
+		void Visit(SpvOpISub* Inst) override;
+		void Visit(SpvOpFSub* Inst) override;
 		void Visit(SpvOpFDiv* Inst) override;
+		void Visit(SpvOpBranch* Inst) override;
 		void Visit(SpvOpBranchConditional* Inst) override;
 		void Visit(SpvOpReturn* Inst) override;
 		void Visit(SpvOpReturnValue* Inst) override;

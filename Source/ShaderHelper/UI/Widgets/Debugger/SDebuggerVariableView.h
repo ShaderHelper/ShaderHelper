@@ -7,6 +7,7 @@ namespace SH
 		FString VarName;
 		FString ValueStr;
 		FString TypeName;
+		bool Dirty{};
 		TArray<TSharedPtr<VariableNode>> Children;
 	};
 

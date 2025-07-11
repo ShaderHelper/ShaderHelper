@@ -21,6 +21,7 @@ namespace SH
 		TSharedRef<ITableRow> GenerateRowForItem(CallStackDataPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 		CallStackDataPtr GetActiveData() const { return ActiveData; }
 		
+		TFunction<void(const FString&)> OnSelectionChanged;
 	private:
 		TSharedPtr<SListView<CallStackDataPtr>> CallStackView;
 		TArray<CallStackDataPtr> CallStackDatas;

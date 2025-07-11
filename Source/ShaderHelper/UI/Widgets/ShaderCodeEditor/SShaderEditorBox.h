@@ -156,6 +156,13 @@ namespace SH
             Failed,
         };
 		
+		enum class StepMode
+		{
+			None,
+			StepOver,
+			StepInto,
+		};
+		
 		static FTextBlockStyle& GetTokenStyle(HLSL::TokenType InType);
 		static FSlateFontInfo& GetCodeFontInfo();
 		
@@ -213,11 +220,10 @@ namespace SH
 		void RefreshSyntaxHighlight();
 		
 		void DebugPixel(const FW::Vector2u& PixelCoord, const TArray<TRefCountPtr<FW::GpuBindGroup>>& BindGroups = {});
-		void ApplyDebugState(const FW::SpvDebugState& State, const FW::SpvDebugState* LastState, bool bReverse = false);
-		void ShowDebuggerResult();
-		void StepInto();
-		void StepOver();
-		void Continue();
+		void ApplyDebugState(const FW::SpvDebugState& State, bool bReverse = false);
+		void ShowDeuggerVariable(FW::SpvLexicalScope* InScope) const;
+		void ShowDebuggerResult() const;
+		void Continue(StepMode Mode = StepMode::None);
 		void ClearDebugger();
 
 	protected:
@@ -309,7 +315,7 @@ namespace SH
 		bool bTryToggleCommentSelection = false;
 		
 		//Debugger
-		TArray<TPair<FW::SpvFunctionDesc*, int>> CallStack;
+		TArray<TPair<FW::SpvLexicalScope*, int>> CallStack;
 		FW::SpvLexicalScope* Scope = nullptr;
 		TMultiMap<FW::SpvId, FW::SpvVariableChange::DirtyRange> DirtyVars;
 		int32 StopLineNumber{};

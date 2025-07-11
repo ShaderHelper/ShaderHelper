@@ -19,11 +19,15 @@ namespace SH
 			.HeaderRow
 			(
 				SNew(SHeaderRow)
+				.Style(&FShaderHelperStyle::Get().GetWidgetStyle<FHeaderRowStyle>("TableView.DebuggerHeader"))
 				+ SHeaderRow::Column(VariableColId)
+				.FillWidth(0.2f)
 				.DefaultLabel(LOCALIZATION(VariableColId.ToString()))
 				+ SHeaderRow::Column(ValueColId)
+				.FillWidth(0.6f)
 				.DefaultLabel(LOCALIZATION(ValueColId.ToString()))
 				+ SHeaderRow::Column(TypeColId)
+				.FillWidth(0.2f)
 				.DefaultLabel(LOCALIZATION(TypeColId.ToString()))
 			)
 		];
@@ -37,18 +41,32 @@ namespace SH
 
 	TSharedRef<SWidget> SVariableViewRow::GenerateWidgetForColumn(const FName& ColumnId)
 	{
+		auto InternalBorder = SNew(SBorder).BorderImage(FAppStyle::Get().GetBrush("Brushes.Panel")).Padding(0);
+		auto Border = SNew(SBorder).BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
+		[
+			InternalBorder
+		];
 		if(ColumnId == VariableColId)
 		{
-			return SNew(STextBlock).Text(FText::FromString(Data->VarName));
+			Border->SetPadding(FMargin{0, 0, 1, 2});
+			InternalBorder->SetContent(SNew(STextBlock).Text(FText::FromString(Data->VarName)));
 		}
 		else if(ColumnId == ValueColId)
 		{
-			return SNew(STextBlock).Text(FText::FromString(Data->ValueStr));
+			Border->SetPadding(FMargin{1, 0, 1, 2});
+			if(Data->Dirty)
+			{
+				InternalBorder->SetBorderImage(FAppStyle::Get().GetBrush("Brushes.White"));
+				InternalBorder->SetBorderBackgroundColor(FLinearColor{1,1,1,0.2});
+			}
+			InternalBorder->SetContent(SNew(STextBlock).Text(FText::FromString(Data->ValueStr)));
 		}
 		else
 		{
-			return SNew(STextBlock).Text(FText::FromString(Data->TypeName));
+			Border->SetPadding(FMargin{1, 0, 0, 2});
+			InternalBorder->SetContent(SNew(STextBlock).Text(FText::FromString(Data->TypeName)));
 		}
+		return Border;
 	}
 
 	void SDebuggerVariableView::SetVariableNodeDatas(const TArray<VariableNodePtr>& InDatas)
