@@ -21,6 +21,7 @@ namespace SH
 		FW::Vector2u GetPixelCoord() const {
 			return PixelCoord;
 		}
+		bool FinalizedPixel() const { return bFinalizePixel; }
 		
 	private:
 		TArray<FW::Vector3f> TexDatas;

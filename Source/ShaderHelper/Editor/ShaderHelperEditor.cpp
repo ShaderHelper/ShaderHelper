@@ -40,13 +40,19 @@ namespace SH
 		UICommandList = MakeShared<FUICommandList>();
 		UICommandList->MapAction(
 			CommonCommands::Get().StepInto,
-			FExecuteAction{},
-			FCanExecuteAction{}
+			FExecuteAction::CreateLambda([this]{
+			SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
+			ShaderEditor->Continue(SShaderEditorBox::StepMode::StepInto);
+			}),
+			FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); })
 		);
 		UICommandList->MapAction(
 			CommonCommands::Get().StepOver,
-			FExecuteAction{},
-			FCanExecuteAction{}
+			FExecuteAction::CreateLambda([this]{
+				SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
+				ShaderEditor->Continue(SShaderEditorBox::StepMode::StepOver);
+			}),
+			FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); })
 		);
 		
 		CurProject = TSingleton<ShProjectManager>::Get().GetProject();
@@ -119,7 +125,7 @@ namespace SH
 						->Split
 						(
 							 FTabManager::NewStack()
-							 ->SetSizeCoefficient(0.5f)
+							 ->SetSizeCoefficient(0.45f)
 							 ->AddTab(CallStackTabId, ETabState::ClosedTab)
 							 ->AddTab(AssetTabId, ETabState::OpenedTab)
 							 ->AddTab(LogTabId, ETabState::OpenedTab)
@@ -128,7 +134,7 @@ namespace SH
 						->Split
 						(
 							 FTabManager::NewStack()
-							 ->SetSizeCoefficient(0.5f)
+							 ->SetSizeCoefficient(0.55f)
 							 ->AddTab(VariableTabId, ETabState::ClosedTab)
 						)
 					)
@@ -811,7 +817,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 					  SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
 					  ShaderEditor->Continue();
 				  }),
-				FCanExecuteAction::CreateLambda([this] { return IsDebugging; })
+				FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); })
 			),
 			NAME_None,
 			FText::GetEmpty(), FText::GetEmpty(),
@@ -819,24 +825,16 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 			EUserInterfaceActionType::Button
 		);
 		DebuggerToolBarBuilder.AddToolBarButton(
-			FUIAction(
-				FExecuteAction(),
-				FCanExecuteAction::CreateLambda([] { return false; })
-			),
+			CommonCommands::Get().StepOver,
 			NAME_None,
 			FText::GetEmpty(), FText::GetEmpty(),
-			FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.StepOver"),
-			EUserInterfaceActionType::Button
+			FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.StepOver")
 		);
 		DebuggerToolBarBuilder.AddToolBarButton(
-			FUIAction(
-				FExecuteAction(),
-				FCanExecuteAction::CreateLambda([] { return false; })
-			),
+			CommonCommands::Get().StepInto,
 			NAME_None,
 			FText::GetEmpty(), FText::GetEmpty(),
-			FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.StepInto"),
-			EUserInterfaceActionType::Button
+			FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.StepInto")
 		);
 		DebuggerToolBarBuilder.AddToolBarButton(
 			FUIAction(

@@ -9,6 +9,9 @@ namespace FW
 		Vector3u ThreadGroupSize{};
 		
 		SpvId EntryPoint;
+		//Can not use Tmap, because its underlying impl relies on TArray,
+		//which may ivalidate references to existing elements upon insertion.
+		//Therefore, we replace it with std::unordered_map
 		std::unordered_map<SpvId, FString> DebugStrs;
 		std::unordered_map<SpvId, TUniquePtr<SpvType>> Types;
 		std::unordered_map<SpvId, SpvObject> Constants;

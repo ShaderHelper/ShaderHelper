@@ -26,7 +26,7 @@ namespace FW
 		   }
 		   
 		   (*Insts)[CurPixelThread.InstIndex]->Accpet(this);
-		   if(AnyError || CurPixelThread.StackFrames.IsEmpty())
+		   if(AnyError || CurPixelThread.StackFrames.empty())
 		   {
 			   break;
 		   }
@@ -87,7 +87,7 @@ namespace FW
 					{
 						GpuBuffer* Buffer = static_cast<GpuBuffer*>(VmBinding->Resource);
 						uint8* Data = (uint8*)GGpuRhi->MapGpuBuffer(Buffer, GpuResourceMapMode::Read_Only);
-						Storage.Value = {Data, Buffer->GetByteSize()};
+						Storage.Value = {Data, (int)Buffer->GetByteSize()};
 						GGpuRhi->UnMapGpuBuffer(Buffer);
 					}
 					Var.Initialized = true;
@@ -107,8 +107,8 @@ namespace FW
 			
 			Context.ThreadState.InstIndex = InstIndex;
 			Context.ThreadState.RecordedInfo.AllVariables = Context.GlobalVariables;
-			Context.ThreadState.RecordedInfo.LineDebugStates.SetNum(1);
-			Context.ThreadState.StackFrames.SetNum(1);
+			Context.ThreadState.RecordedInfo.DebugStates.SetNum(1);
+			Context.ThreadState.StackFrames.resize(1);
 		}
 
 		ParseQuad(PixelContext.DebugIndex);

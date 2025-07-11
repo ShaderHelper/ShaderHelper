@@ -43,8 +43,18 @@ namespace FW
 		virtual void Visit(class SpvOpAccessChain* Inst) {}
 		virtual void Visit(class SpvOpIEqual* Inst) {}
 		virtual void Visit(class SpvOpINotEqual* Inst) {}
+		virtual void Visit(class SpvOpSGreaterThan* Inst) {}
+		virtual void Visit(class SpvOpSLessThan* Inst) {}
+		virtual void Visit(class SpvOpFOrdLessThan* Inst) {}
+		virtual void Visit(class SpvOpFOrdGreaterThan* Inst) {}
 		virtual void Visit(class SpvOpDPdx* Inst) {}
+		virtual void Visit(class SpvOpConvertSToF* Inst) {}
+		virtual void Visit(class SpvOpIAdd* Inst) {}
+		virtual void Visit(class SpvOpFAdd* Inst) {}
+		virtual void Visit(class SpvOpISub* Inst) {}
+		virtual void Visit(class SpvOpFSub* Inst) {}
 		virtual void Visit(class SpvOpFDiv* Inst) {}
+		virtual void Visit(class SpvOpBranch* Inst) {}
 		virtual void Visit(class SpvOpBranchConditional* Inst) {}
 		virtual void Visit(class SpvOpReturn* Inst) {}
 		virtual void Visit(class SpvOpReturnValue* Inst) {}
@@ -66,9 +76,11 @@ namespace FW
 		virtual void Visit(class SpvDebugGlobalVariable* Inst) {}
 		
 		//GLSL.std.450
+		virtual void Visit(class SpvSin* Inst) {}
+		virtual void Visit(class SpvCos* Inst) {}
 	};
 
-	using SpvInstKind = std::variant<SpvOp, SpvDebugInfo100>;
+	using SpvInstKind = std::variant<SpvOp, SpvGLSLstd450, SpvDebugInfo100>;
 
 	class SpvInstruction
 	{
@@ -491,6 +503,89 @@ namespace FW
 		TArray<SpvId> Indexes;
 	};
 
+	class SpvOpConvertSToF : public SpvInstructionBase<SpvOpConvertSToF>
+	{
+	public:
+		SpvOpConvertSToF(SpvId InResultType, SpvId InSignedValue) : SpvInstructionBase(SpvOp::ConvertSToF)
+		, ResultType(InResultType), SignedValue(InSignedValue)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetSignedValue() const { return SignedValue; }
+		
+	private:
+		SpvId ResultType;
+		SpvId SignedValue;
+	};
+
+	class SpvOpIAdd : public SpvInstructionBase<SpvOpIAdd>
+	{
+	public:
+		SpvOpIAdd(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::IAdd)
+		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetOperand1() const { return Operand1; }
+		SpvId GetOperand2() const { return Operand2; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Operand1;
+		SpvId Operand2;
+	};
+
+	class SpvOpFAdd : public SpvInstructionBase<SpvOpFAdd>
+	{
+	public:
+		SpvOpFAdd(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::FAdd)
+		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetOperand1() const { return Operand1; }
+		SpvId GetOperand2() const { return Operand2; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Operand1;
+		SpvId Operand2;
+	};
+
+	class SpvOpISub : public SpvInstructionBase<SpvOpISub>
+	{
+	public:
+		SpvOpISub(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::ISub)
+		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetOperand1() const { return Operand1; }
+		SpvId GetOperand2() const { return Operand2; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Operand1;
+		SpvId Operand2;
+	};
+
+	class SpvOpFSub : public SpvInstructionBase<SpvOpFSub>
+	{
+	public:
+		SpvOpFSub(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::FSub)
+		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetOperand1() const { return Operand1; }
+		SpvId GetOperand2() const { return Operand2; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Operand1;
+		SpvId Operand2;
+	};
+
 	class SpvOpFDiv : public SpvInstructionBase<SpvOpFDiv>
 	{
 	public:
@@ -542,12 +637,93 @@ namespace FW
 		SpvId Operand2;
 	};
 
+	class SpvOpSGreaterThan : public SpvInstructionBase<SpvOpSGreaterThan>
+	{
+	public:
+		SpvOpSGreaterThan(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::SGreaterThan)
+		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetOperand1() const { return Operand1; }
+		SpvId GetOperand2() const { return Operand2; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Operand1;
+		SpvId Operand2;
+	};
+
+	class SpvOpSLessThan : public SpvInstructionBase<SpvOpSLessThan>
+	{
+	public:
+		SpvOpSLessThan(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::SLessThan)
+		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetOperand1() const { return Operand1; }
+		SpvId GetOperand2() const { return Operand2; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Operand1;
+		SpvId Operand2;
+	};
+
+	class SpvOpFOrdLessThan : public SpvInstructionBase<SpvOpFOrdLessThan>
+	{
+	public:
+		SpvOpFOrdLessThan(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::FOrdLessThan)
+		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetOperand1() const { return Operand1; }
+		SpvId GetOperand2() const { return Operand2; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Operand1;
+		SpvId Operand2;
+	};
+
+	class SpvOpFOrdGreaterThan : public SpvInstructionBase<SpvOpFOrdGreaterThan>
+	{
+	public:
+		SpvOpFOrdGreaterThan(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::FOrdGreaterThan)
+		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetOperand1() const { return Operand1; }
+		SpvId GetOperand2() const { return Operand2; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Operand1;
+		SpvId Operand2;
+	};
+
 	class SpvOpDPdx : public SpvInstructionBase<SpvOpDPdx>
 	{
 	public:
 		SpvOpDPdx() : SpvInstructionBase(SpvOp::DPdx)
 		{}
 	private:
+	};
+
+	class SpvOpBranch : public SpvInstructionBase<SpvOpBranch>
+	{
+	public:
+		SpvOpBranch(SpvId InTargetLabel) : SpvInstructionBase(SpvOp::Branch)
+		, TargetLabel(InTargetLabel)
+		{}
+		
+		SpvId GetTargetLabel() const { return TargetLabel; }
+		
+	private:
+		SpvId TargetLabel;
 	};
 
 	class SpvOpBranchConditional : public SpvInstructionBase<SpvOpBranchConditional>
@@ -589,18 +765,18 @@ namespace FW
 	class SpvDebugTypeBasic : public SpvInstructionBase<SpvDebugTypeBasic>
 	{
 	public:
-		SpvDebugTypeBasic(SpvId InName, SpvId InSize, SpvDebugBasicTypeEncoding InEncoding) : SpvInstructionBase(SpvDebugInfo100::DebugTypeBasic)
+		SpvDebugTypeBasic(SpvId InName, SpvId InSize, SpvId InEncoding) : SpvInstructionBase(SpvDebugInfo100::DebugTypeBasic)
 		, Name(InName), Size(InSize), Encoding(InEncoding)
 		{}
 		
 		SpvId GetName() const { return Name; }
 		SpvId GetSize() const { return Size; }
-		SpvDebugBasicTypeEncoding GetEncoding() const { return Encoding; }
+		SpvId GetEncoding() const { return Encoding; }
 		
 	private:
 		SpvId Name;
 		SpvId Size;
-		SpvDebugBasicTypeEncoding Encoding;
+		SpvId Encoding;
 	};
 
 	class SpvDebugTypeVector : public SpvInstructionBase<SpvDebugTypeVector>
@@ -809,5 +985,35 @@ namespace FW
 		SpvId Line;
 		SpvId Parent;
 		SpvId Var;
+	};
+
+	class SpvSin : public SpvInstructionBase<SpvSin>
+	{
+	public:
+		SpvSin(SpvId InResultType, SpvId InX) : SpvInstructionBase(SpvGLSLstd450::Sin)
+		, ResultType(InResultType), X(InX)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetX() const { return X; }
+		
+	private:
+		SpvId ResultType;
+		SpvId X;
+	};
+
+	class SpvCos : public SpvInstructionBase<SpvCos>
+	{
+	public:
+		SpvCos(SpvId InResultType, SpvId InX) : SpvInstructionBase(SpvGLSLstd450::Cos)
+		, ResultType(InResultType), X(InX)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetX() const { return X; }
+		
+	private:
+		SpvId ResultType;
+		SpvId X;
 	};
 }
