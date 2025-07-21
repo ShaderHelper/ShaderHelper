@@ -27,6 +27,7 @@ namespace FW
 		int32 Line{};
 		std::optional<SpvLexicalScopeChange> ScopeChange;
 		TArray<SpvVariableChange> VarChanges;
+		std::optional<SpvObject> ReturnObject;
 		bool bFuncCall : 1 {};
 		bool bFuncCallAfterReturn : 1 {};
 		bool bReturn : 1 {};
@@ -45,7 +46,7 @@ namespace FW
 		int32 DescriptorSet;
 		int32 Binding;
 		
-		GpuResource* Resource = nullptr;
+		TRefCountPtr<GpuResource> Resource;
 	};
 
 	struct SpvVmFrame
@@ -109,32 +110,39 @@ namespace FW
 		void Visit(SpvOpLabel* Inst) override;
 		void Visit(SpvOpLoad* Inst) override;
 		void Visit(SpvOpStore* Inst) override;
+		void Visit(SpvOpVectorShuffle* Inst) override;
 		void Visit(SpvOpCompositeConstruct* Inst) override;
 		void Visit(SpvOpCompositeExtract* Inst) override;
 		void Visit(SpvOpAccessChain* Inst) override;
+		void Visit(SpvOpVectorTimesScalar* Inst) override;
+		void Visit(SpvOpSelect* Inst) override;
 		void Visit(SpvOpIEqual* Inst) override;
 		void Visit(SpvOpINotEqual* Inst) override;
 		void Visit(SpvOpSGreaterThan* Inst) override;
 		void Visit(SpvOpSLessThan* Inst) override;
 		void Visit(SpvOpFOrdLessThan* Inst) override;
 		void Visit(SpvOpFOrdGreaterThan* Inst) override;
+		void Visit(SpvOpConvertFToS* Inst) override;
 		void Visit(SpvOpConvertSToF* Inst) override;
 		void Visit(SpvOpIAdd* Inst) override;
 		void Visit(SpvOpFAdd* Inst) override;
 		void Visit(SpvOpISub* Inst) override;
 		void Visit(SpvOpFSub* Inst) override;
+		void Visit(SpvOpIMul* Inst) override;
+		void Visit(SpvOpFMul* Inst) override;
 		void Visit(SpvOpFDiv* Inst) override;
+		void Visit(SpvOpBitwiseAnd* Inst) override;
 		void Visit(SpvOpBranch* Inst) override;
 		void Visit(SpvOpBranchConditional* Inst) override;
 		void Visit(SpvOpReturn* Inst) override;
 		void Visit(SpvOpReturnValue* Inst) override;
 
 	protected:
-		bool AnyError{};
+		bool bTerminate{};
 		const TArray<TUniquePtr<SpvInstruction>>* Insts;
 	};
 
-	TArray<uint8> GetPointerValue(SpvPointer* InPointer, SpvVariableDesc* PointeeDesc);
-	TArray<uint8> GetObjectValue(SpvObject* InObject, const TArray<uint32> Indexes = {});
+	TArray<uint8> GetPointerValue(SpvVmContext* InContext, SpvPointer* InPointer);
+	TArray<uint8> GetObjectValue(SpvObject* InObject, const TArray<uint32>& Indexes = {});
 	void WritePointerValue(SpvPointer* InPointer, SpvVariableDesc* PointeeDesc, const TArray<uint8>& ValueToStore, SpvVariableChange* OutVariableChange = nullptr);
 }

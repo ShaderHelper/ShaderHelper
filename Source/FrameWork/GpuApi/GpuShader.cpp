@@ -451,6 +451,58 @@ namespace FW
 		return InType;
 	}
 
+	TArray<ShaderFuncScope> ShaderTU::GetFuncScopes()
+	{
+		TRefCountPtr<IDxcFile> DxcFile;
+		Impl->TU->GetFile("Temp.hlsl", DxcFile.GetInitReference());
+		
+		TArray<ShaderFuncScope> Scopes;
+		TRefCountPtr<IDxcCursor> DxcRootCursor;
+		Impl->TU->GetCursor(DxcRootCursor.GetInitReference());
+		
+		unsigned int NumChildren = 0;
+		IDxcCursor** Children = nullptr;
+		DxcRootCursor->GetChildren(0, -1, &NumChildren, &Children);
+		for (unsigned int i = 0; i < NumChildren; ++i)
+		{
+			IDxcCursor* ChildCursor = Children[i];
+			DxcCursorKind Kind;
+			ChildCursor->GetKind(&Kind);
+			bool IsDefinition;
+			ChildCursor->IsDefinition(&IsDefinition);
+			if(IsDefinition && (Kind == DxcCursor_FunctionDecl || Kind == DxcCursor_CXXMethod))
+			{
+				TRefCountPtr<IDxcSourceRange> Extent;
+				ChildCursor->GetExtent(Extent.GetInitReference());
+
+				TRefCountPtr<IDxcSourceLocation> StartLoc, EndLoc;
+				Extent->GetStart(StartLoc.GetInitReference());
+				Extent->GetEnd(EndLoc.GetInitReference());
+
+				TRefCountPtr<IDxcFile> CursorFile;
+				unsigned StartLine, StartCol, EndLine, EndCol;
+				StartLoc->GetSpellingLocation(CursorFile.GetInitReference(), &StartLine, &StartCol, nullptr);
+				EndLoc->GetSpellingLocation(CursorFile.GetInitReference(), &EndLine, &EndCol, nullptr);
+				bool IsInMainFile;
+				CursorFile->IsEqualTo(DxcFile, &IsInMainFile);
+				if(IsInMainFile)
+				{
+					LPSTR CursorName;
+					ChildCursor->GetSpelling(&CursorName);
+					
+					Scopes.Emplace(ANSI_TO_TCHAR(CursorName), Vector2i{StartLine, StartCol}, Vector2i{EndLine, EndCol});
+					CoTaskMemFree(CursorName);
+				}
+			}
+			
+			ChildCursor->Release();
+		}
+		
+		CoTaskMemFree(Children);
+
+		return Scopes;
+	}
+
     TArray<ShaderCandidateInfo> ShaderTU::GetCodeComplete(uint32 Row, uint32 Col)
     {
         TArray<ShaderCandidateInfo> Candidates;

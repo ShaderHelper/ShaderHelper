@@ -15,6 +15,7 @@
 #include "UI/Widgets/Debugger/SDebuggerViewport.h"
 #include "UI/Widgets/Debugger/SDebuggerVariableView.h"
 #include "UI/Widgets/Debugger/SDebuggerCallStackView.h"
+#include "UI/Widgets/Debugger/SDebuggerWatchView.h"
 #include "AssetObject/DebuggableObject.h"
 
 namespace SH
@@ -31,7 +32,9 @@ namespace SH
 	const FName LogTabId = "Log";
 
 	const FName CallStackTabId = "CallStack";
-	const FName VariableTabId = "Variables";
+	const FName LocalTabId = "Local";
+	const FName GlobalTabId = "Global";
+	const FName WatchTabId = "Watch";
 
 	class ShaderHelperEditor : public FW::Editor
 	{
@@ -51,8 +54,12 @@ namespace SH
 		TSharedPtr<SWindow> GetMainWindow() const override { return Window; }
 		FW::PreviewViewPort* GetViewPort() const { return ViewPort.Get(); }
 		TSharedPtr<FUICommandList> GetUICommandList() const { return UICommandList; }
-		SDebuggerVariableView* GetDebuggerVariableView() const { return DebuggerVariableView.Get(); }
+		SDebuggerVariableView* GetDebuggerLocalVariableView() const { return DebuggerLocalVariableView.Get(); }
+		SDebuggerVariableView* GetDebuggerGlobalVariableView() const { return DebuggerGlobalVariableView.Get(); }
 		SDebuggerCallStackView* GetDebuggerCallStackView() const { return DebuggerCallStackView.Get(); }
+		SDebuggerWatchView* GetDebuggerWatchView() const { return DebuggerWatchView.Get(); }
+		void InvokeDebuggerTabs();
+		void CloseDebuggerTabs();
         
     public:
 		void InitEditorUI();
@@ -120,8 +127,10 @@ namespace SH
         
         TMap<FW::AssetPtr<ShaderAsset>, TSharedPtr<SScrollBox>> ShaderPathBoxMap;
 		
-		TSharedPtr<SDebuggerVariableView> DebuggerVariableView;
+		TSharedPtr<SDebuggerVariableView> DebuggerLocalVariableView;
+		TSharedPtr<SDebuggerVariableView> DebuggerGlobalVariableView;
 		TSharedPtr<SDebuggerCallStackView> DebuggerCallStackView;
+		TSharedPtr<SDebuggerWatchView> DebuggerWatchView;
 		TSharedPtr<SDebuggerViewport> DebuggerViewport;
 		DebuggableObject* CurDebuggableObject = nullptr;
 		bool IsDebugging{};

@@ -29,6 +29,7 @@ namespace FW
 		Pointer,
 		Struct,
 		Array,
+		RuntimeArray,
 	};
 
 	enum class SpvStorageClass
@@ -50,10 +51,12 @@ namespace FW
 
 	enum class SpvDecorationKind
 	{
+		ArrayStride = 6,
 		BuiltIn = 11,
 		Location = 30,
 		Binding = 33,
 		DescriptorSet = 34,
+		Offset = 35,
 	};
 
 	enum class SpvBuiltIn
@@ -81,68 +84,70 @@ namespace FW
 	{
 	public:
 		SpvTypeKind GetKind() const { return Kind; }
+		SpvId GetId() const { return Id; }
 		
-		SpvType(SpvTypeKind InKind) : Kind(InKind) {}
+		SpvType(SpvTypeKind InKind, SpvId InId) : Kind(InKind), Id(InId) {}
 		virtual ~SpvType() = default;
 		
 		bool IsScalar() const { return Kind == SpvTypeKind::Bool || Kind == SpvTypeKind::Float
 			|| Kind == SpvTypeKind::Integer; }
 		
-	private:
+	protected:
 		SpvTypeKind Kind;
+		SpvId Id;
 	};
 
 	class SpvScalarType : public SpvType
 	{
 	public:
-		SpvScalarType(SpvTypeKind InKind, uint32 InWidth)
-		: SpvType(InKind)
+		SpvScalarType(SpvId InId, SpvTypeKind InKind, uint32 InWidth)
+		: SpvType(InKind, InId)
 		, BitWidth(InWidth)
 		{}
 		
 		uint32 GetWidth() const { return BitWidth; }
 		
-	private:
+	protected:
 		uint32 BitWidth;
 	};
 
 	class SpvFloatType : public SpvScalarType
 	{
 	public:
-		SpvFloatType(uint32 InWidth) : SpvScalarType(SpvTypeKind::Float, InWidth) {}
+		SpvFloatType(SpvId InId, uint32 InWidth) : SpvScalarType(InId, SpvTypeKind::Float, InWidth) {}
 	};
 
 	class SpvIntegerType : public SpvScalarType
 	{
 	public:
-		SpvIntegerType(uint32 InWidth, bool InIsSigned)
-		: SpvScalarType(SpvTypeKind::Integer, InWidth)
+		SpvIntegerType(SpvId InId, uint32 InWidth, bool InIsSigned)
+		: SpvScalarType(InId, SpvTypeKind::Integer, InWidth)
 		, IsSigned(InIsSigned)
 		{}
 		
 		bool IsSigend() const { return IsSigned; }
 		
-	private:
+	protected:
 		bool IsSigned;
 	};
 
 	class SpvVoidType : public SpvType
 	{
 	public:
-		SpvVoidType() : SpvType(SpvTypeKind::Void) {}
+		SpvVoidType(SpvId InId) : SpvType(SpvTypeKind::Void, InId) {}
 	};
 
 	class SpvBoolType : public SpvScalarType
 	{
 	public:
-		SpvBoolType() : SpvScalarType(SpvTypeKind::Bool, 32) {}
+		SpvBoolType(SpvId InId) : SpvScalarType(InId, SpvTypeKind::Bool, 32) {}
 	};
 
 	class SpvVectorType : public SpvType
 	{
 	public:
-		SpvVectorType(SpvScalarType* InElementType, uint32 InElementCount)
-		: SpvType(SpvTypeKind::Vector)
+		SpvVectorType(SpvId InId, SpvScalarType* InElementType, uint32 InElementCount)
+		: SpvType(SpvTypeKind::Vector, InId)
 		, ElementType(InElementType)
 		, ElementCount(InElementCount)
 		{}
@@ -154,8 +159,8 @@ namespace FW
 	class SpvPointerType : public SpvType
 	{
 	public:
-		SpvPointerType(SpvStorageClass InStorageClass, SpvType* InPointeeType)
-		: SpvType(SpvTypeKind::Pointer)
+		SpvPointerType(SpvId InId, SpvStorageClass InStorageClass, SpvType* InPointeeType)
+		: SpvType(SpvTypeKind::Pointer, InId)
 		, StorageClass(InStorageClass)
 		, PointeeType(InPointeeType)
 		{}
@@ -167,8 +172,8 @@ namespace FW
 	class SpvStructType : public SpvType
 	{
 	public:
-		SpvStructType(const TArray<SpvType*>& InMemberTypes)
-		: SpvType(SpvTypeKind::Struct)
+		SpvStructType(SpvId InId, const TArray<SpvType*>& InMemberTypes)
+		: SpvType(SpvTypeKind::Struct, InId)
 		, MemberTypes(InMemberTypes)
 		{}
 
@@ -178,12 +183,22 @@ namespace FW
 	class SpvArrayType : public SpvType
 	{
 	public:
-		SpvArrayType(SpvType* InElementType, uint32 InLength) : SpvType(SpvTypeKind::Array)
+		SpvArrayType(SpvId InId, SpvType* InElementType, uint32 InLength) : SpvType(SpvTypeKind::Array, InId)
 		, ElementType(InElementType), Length(InLength)
 		{}
 	 
 		SpvType* ElementType;
 		uint32 Length;
+	};
+
+	class SpvRuntimeArrayType : public SpvType
+	{
+	public:
+		SpvRuntimeArrayType(SpvId InId, SpvType* InElementType) : SpvType(SpvTypeKind::RuntimeArray, InId)
+		, ElementType(InElementType)
+		{}
+		
+		SpvType* ElementType;
 	};
 
 	inline FString GetHlslTypeStr(SpvType* Type)
@@ -214,6 +229,8 @@ namespace FW
 		AUX::Unreachable();
 	};
 
+	//Only valid for the type of the internal object,
+	//because the type of the external object may have different memory alignment rules.
 	inline uint32 GetTypeByteSize(SpvType* Type)
 	{
 		if(Type->IsScalar())
@@ -290,15 +307,12 @@ namespace FW
 			struct
 			{
 				uint32 Number;
-			}Binding;
+			}Binding, Location, DescriptorSet, ArrayStride;
 			struct
 			{
-				uint32 Number;
-			}Location;
-			struct
-			{
-				uint32 Number;
-			}DescriptorSet;
+				uint32 MemberIndex;
+				uint32 ByteOffset;
+			}Offset;
 		};
 	};
 
@@ -315,6 +329,7 @@ namespace FW
 		TypeFloat = 22,
 		TypeVector = 23,
 		TypeArray = 28,
+		TypeRuntimeArray = 29,
 		TypeStruct = 30,
 		TypePointer = 32,
 		ConstantTrue = 41,
@@ -330,20 +345,28 @@ namespace FW
 		Store = 62,
 		AccessChain = 65,
 		Decorate = 71,
+		MemberDecorate = 72,
+		VectorShuffle = 79,
 		CompositeConstruct = 80,
 		CompositeExtract = 81,
+		ConvertFToS = 110,
 		ConvertSToF = 111,
 		IAdd = 128,
 		FAdd = 129,
 		ISub = 130,
 		FSub = 131,
+		IMul = 132,
+		FMul = 133,
 		FDiv = 136,
+		VectorTimesScalar = 142,
+		Select = 169,
 		IEqual = 170,
 		INotEqual = 171,
 		SGreaterThan = 173,
 		SLessThan = 177,
 		FOrdLessThan = 184,
 		FOrdGreaterThan = 186,
+		BitwiseAnd = 199,
 		DPdx = 207,
 		Label = 248,
 		Branch = 249,

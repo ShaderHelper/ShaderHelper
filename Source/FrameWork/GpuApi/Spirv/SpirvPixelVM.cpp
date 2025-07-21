@@ -26,7 +26,7 @@ namespace FW
 		   }
 		   
 		   (*Insts)[CurPixelThread.InstIndex]->Accpet(this);
-		   if(AnyError || CurPixelThread.StackFrames.empty())
+		   if(bTerminate || CurPixelThread.StackFrames.empty())
 		   {
 			   break;
 		   }
@@ -85,7 +85,7 @@ namespace FW
 					Storage.Resource = VmBinding->Resource;
 					if(VmBinding->Resource->GetType() == GpuResourceType::Buffer)
 					{
-						GpuBuffer* Buffer = static_cast<GpuBuffer*>(VmBinding->Resource);
+						GpuBuffer* Buffer = static_cast<GpuBuffer*>(VmBinding->Resource.GetReference());
 						uint8* Data = (uint8*)GGpuRhi->MapGpuBuffer(Buffer, GpuResourceMapMode::Read_Only);
 						Storage.Value = {Data, (int)Buffer->GetByteSize()};
 						GGpuRhi->UnMapGpuBuffer(Buffer);
