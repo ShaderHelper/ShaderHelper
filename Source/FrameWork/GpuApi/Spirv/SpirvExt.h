@@ -334,14 +334,16 @@ namespace FW
 	class SpvFunctionDesc : public SpvLexicalScope
 	{
 	public:
-		SpvFunctionDesc(SpvLexicalScope* InParent, const FString& InName, SpvFuncTypeDesc* InTypeDesc, int32 InLine)
+		SpvFunctionDesc(SpvLexicalScope* InParent, const FString& InName, SpvFuncTypeDesc* InTypeDesc, int32 InLine, int32 InScopeLine)
 		: SpvLexicalScope(SpvScopeKind::Function, InParent)
 		, Name(InName)
 		, TypeDesc(InTypeDesc)
 		, Line(InLine)
+		, ScopeLine(InScopeLine)
 		{}
 		
 		int32 GetLine() const override { return Line; }
+		int32 GetScopeLine() const { return ScopeLine; }
 		FString GetName() const { return Name; }
 		SpvFuncTypeDesc* GetFuncTypeDesc() const { return TypeDesc; }
 		
@@ -349,6 +351,7 @@ namespace FW
 		FString Name;
 		SpvFuncTypeDesc* TypeDesc;
 		int32 Line;
+		int32 ScopeLine;
 	};
 
 	inline SpvFunctionDesc* GetFunctionDesc(SpvLexicalScope* InScope)
@@ -431,6 +434,7 @@ namespace FW
 		SpvTypeDesc* TypeDesc{};
 		int32 Line;
 		SpvLexicalScope* Parent{};
+		bool bGlobal{};
 	};
 
 	inline FString GetValueStr(const TArray<uint8>& InValue, const SpvTypeDesc* TypeDesc)
@@ -451,11 +455,13 @@ namespace FW
 				}
 				else if(Encoding == SpvDebugBasicTypeEncoding::Signed)
 				{
-					
+					int Value = *(int*)(InValue.GetData() + BasicTypeSize * Index);
+					ValueStr += FString::Format(TEXT("{0}"), {Value});
 				}
 				else if(Encoding == SpvDebugBasicTypeEncoding::Unsigned)
 				{
-					
+					uint32 Value = *(uint32*)(InValue.GetData() + BasicTypeSize * Index);
+					ValueStr += FString::Format(TEXT("{0}"), {Value});
 				}
 				
 				if(Index != VectorTypeDesc->GetCompCount() - 1)
@@ -476,10 +482,13 @@ namespace FW
 			}
 			else if(Encoding == SpvDebugBasicTypeEncoding::Signed)
 			{
-				
+				int Value = *(int*)(InValue.GetData());
+				ValueStr += FString::Format(TEXT("{0}"), {Value});
 			}
 			else if(Encoding == SpvDebugBasicTypeEncoding::Unsigned)
 			{
+				uint32 Value = *(uint32*)(InValue.GetData());
+				ValueStr += FString::Format(TEXT("{0}"), {Value});
 			}
 		}
 		return ValueStr;

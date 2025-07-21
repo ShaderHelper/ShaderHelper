@@ -141,7 +141,9 @@ namespace SH
 		std::optional<FW::GpuShaderSourceDesc> ShaderDesc;
 		TArray<TArray<HlslTokenizer::Token>> LineTokens;
 	};
-
+	//LineNumber: the line number of the visible shader source in editor
+	//LineIndex: the index in SMultiLineEditableText
+	//Line: the line number in the full shader source
 	class SShaderEditorBox : public SCompoundWidget
 	{
 	public:
@@ -223,6 +225,7 @@ namespace SH
 		void ApplyDebugState(const FW::SpvDebugState& State, bool bReverse = false);
 		void ShowDeuggerVariable(FW::SpvLexicalScope* InScope) const;
 		void ShowDebuggerResult() const;
+		struct ExpressionNode EvaluateExpression(const FString& InExpression) const;
 		void Continue(StepMode Mode = StepMode::None);
 		void ClearDebugger();
 
@@ -262,6 +265,8 @@ namespace SH
 		std::atomic<bool> bQuitISyntax{};
 		std::atomic<bool> bRefreshSyntax{};
 		FEvent* SyntaxEvent = nullptr;
+		TArray<FW::ShaderFuncScope> FuncScopes;
+		TArray<FW::ShaderFuncScope> FuncScopesCopy;
 		//
         
 	private:
@@ -321,8 +326,11 @@ namespace SH
 		int32 StopLineNumber{};
 		//ValidLine: Line that can trigger a breakpoint
 		std::optional<int32> CurValidLine;
-		FString UbError;
+		FString DebuggerError;
 		int32 CurDebugStateIndex{};
-		FW::SpvVmContext DebuggerContext;
+		FW::SpvVmContext* DebuggerContext = nullptr;
+		std::optional<FW::SpvObject> CurReturnObject;
+		FW::SpvVariable* AssertResult = nullptr;
+		std::optional<FW::SpvVmPixelContext> VmPixelContext;
 	};
 }

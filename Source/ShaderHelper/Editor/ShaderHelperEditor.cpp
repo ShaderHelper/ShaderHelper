@@ -25,12 +25,12 @@ namespace SH
 
 	const TArray<FName> TabIds{
 		PreviewTabId, PropretyTabId, CodeTabId, AssetTabId, GraphTabId, LogTabId,
-		VariableTabId, CallStackTabId
+		LocalTabId, GlobalTabId, CallStackTabId, WatchTabId
 	};
 
     const TArray<FName> WindowMenuTabIds{
         PreviewTabId, PropretyTabId, AssetTabId, GraphTabId, LogTabId,
-		VariableTabId, CallStackTabId
+		LocalTabId, GlobalTabId, CallStackTabId, WatchTabId
     };
 
 	ShaderHelperEditor::ShaderHelperEditor(const Vector2f& InWindowSize, ShRenderer* InRenderer)
@@ -125,7 +125,7 @@ namespace SH
 						->Split
 						(
 							 FTabManager::NewStack()
-							 ->SetSizeCoefficient(0.45f)
+							 ->SetSizeCoefficient(0.5f)
 							 ->AddTab(CallStackTabId, ETabState::ClosedTab)
 							 ->AddTab(AssetTabId, ETabState::OpenedTab)
 							 ->AddTab(LogTabId, ETabState::OpenedTab)
@@ -134,8 +134,10 @@ namespace SH
 						->Split
 						(
 							 FTabManager::NewStack()
-							 ->SetSizeCoefficient(0.55f)
-							 ->AddTab(VariableTabId, ETabState::ClosedTab)
+							 ->SetSizeCoefficient(0.5f)
+							 ->AddTab(LocalTabId, ETabState::ClosedTab)
+							 ->AddTab(GlobalTabId, ETabState::ClosedTab)
+							 ->AddTab(WatchTabId, ETabState::ClosedTab)
 						)
 					)
 				)
@@ -328,6 +330,34 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
         }
     }
 
+	void ShaderHelperEditor::InvokeDebuggerTabs()
+	{
+		TabManager->TryInvokeTab(GlobalTabId);
+		TabManager->TryInvokeTab(WatchTabId);
+		TabManager->TryInvokeTab(LocalTabId);
+		TabManager->TryInvokeTab(CallStackTabId);
+	}
+
+	void ShaderHelperEditor::CloseDebuggerTabs()
+	{
+		if (auto LocalTab = TabManager->FindExistingLiveTab(LocalTabId))
+		{
+			LocalTab->RequestCloseTab();
+		}
+        if(auto GlobalTab = TabManager->FindExistingLiveTab(GlobalTabId))
+        {
+            GlobalTab->RequestCloseTab();
+        }
+		if(auto WatchTab = TabManager->FindExistingLiveTab(WatchTabId))
+		{
+			WatchTab->RequestCloseTab();
+		}
+		if(auto CallStackTab = TabManager->FindExistingLiveTab(CallStackTabId))
+		{
+			CallStackTab->RequestCloseTab();
+		}
+	}
+
     TSharedRef<SDockTab> ShaderHelperEditor::SpawnShaderTab(const FSpawnTabArgs& Args)
     {
         FGuid ShaderGuid{Args.GetTabId().ToString()};
@@ -357,7 +387,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 				return FText::FromString(LoadedShader->GetFileName() + DirtyChar);
 			})
 			.OnCanCloseTab_Lambda([this, TabId]{
-				if(CurDebuggableObject)
+				if(CurDebuggableObject && IsDebugging)
 				{
 					ShaderAsset* Shader = CurDebuggableObject->GetShaderAsset();
 					if(CurProject->OpenedShaders[Shader]->GetLayoutIdentifier() == TabId)
@@ -444,21 +474,59 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
             ];
             SpawnedTab->SetTabIcon(FAppCommonStyle::Get().GetBrush("Icons.Log"));
         }
-		else if(TabId == VariableTabId)
+		else if(TabId == LocalTabId)
 		{
+			if(!DebuggerLocalVariableView)
+			{
+				SAssignNew(DebuggerLocalVariableView, SDebuggerVariableView);
+			}
+
 			SpawnedTab = SNew(SDockTab)
-			.Label(LOCALIZATION(VariableTabId.ToString()))
+			.Label(LOCALIZATION(LocalTabId.ToString()))
 			[
-				SAssignNew(DebuggerVariableView, SDebuggerVariableView)
+				DebuggerLocalVariableView.ToSharedRef()
 			];
 			SpawnedTab->SetTabIcon(FShaderHelperStyle::Get().GetBrush("Icons.Variable"));
 		}
+		else if(TabId == GlobalTabId)
+		{
+			if(!DebuggerGlobalVariableView)
+			{
+				SAssignNew(DebuggerGlobalVariableView, SDebuggerVariableView);
+			}
+			
+			SpawnedTab = SNew(SDockTab)
+			.Label(LOCALIZATION(GlobalTabId.ToString()))
+			[
+				DebuggerGlobalVariableView.ToSharedRef()
+			];
+			SpawnedTab->SetTabIcon(FShaderHelperStyle::Get().GetBrush("Icons.Variable"));
+		}
+		else if(TabId == WatchTabId)
+		{
+			if(!DebuggerWatchView)
+			{
+				SAssignNew(DebuggerWatchView, SDebuggerWatchView);
+			}
+			
+			SpawnedTab = SNew(SDockTab)
+			.Label(LOCALIZATION(WatchTabId.ToString()))
+			[
+				DebuggerWatchView.ToSharedRef()
+			];
+			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Visible"));
+		}
 		else if(TabId == CallStackTabId)
 		{
+			if(!DebuggerCallStackView)
+			{
+				SAssignNew(DebuggerCallStackView, SDebuggerCallStackView);
+			}
+			
 			SpawnedTab = SNew(SDockTab)
 			.Label(LOCALIZATION(CallStackTabId.ToString()))
 			[
-				SAssignNew(DebuggerCallStackView, SDebuggerCallStackView)
+				DebuggerCallStackView.ToSharedRef()
 			];
 			SpawnedTab->SetTabIcon(FShaderHelperStyle::Get().GetBrush("Icons.CallStack"));
 		}

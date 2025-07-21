@@ -169,6 +169,13 @@ namespace FW
         }
     };
 
+	struct ShaderFuncScope
+	{
+		FString Name;
+		Vector2i Start;
+		Vector2i End;
+	};
+
 	FRAMEWORK_API FString AdjustErrorLineNumber(const FString& ErrorInfo, int32 Delta);
     FRAMEWORK_API TArray<ShaderCandidateInfo> DefaultCandidates();
 
@@ -179,6 +186,7 @@ namespace FW
         TArray<ShaderErrorInfo> GetDiagnostic();
 		HLSL::TokenType GetTokenType(HLSL::TokenType InType, uint32 Row, uint32 Col);
         TArray<ShaderCandidateInfo> GetCodeComplete(uint32 Row, uint32 Col);
+		TArray<ShaderFuncScope> GetFuncScopes();
         
     private:
         TPimplPtr<struct ShaderTUImpl> Impl;

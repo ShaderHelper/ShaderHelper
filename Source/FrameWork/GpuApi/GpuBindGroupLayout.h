@@ -22,6 +22,7 @@ namespace FW
 		UniformBuffer,
 		Texture,
 		Sampler,
+		StorageBuffer,
 		RWStorageBuffer,
 	};
 

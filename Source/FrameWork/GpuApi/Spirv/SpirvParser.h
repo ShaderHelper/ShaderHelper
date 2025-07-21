@@ -17,7 +17,7 @@ namespace FW
 		std::unordered_map<SpvId, SpvObject> Constants;
 		std::unordered_map<SpvId, SpvPointer> GlobalPointers;
 		std::unordered_map<SpvId, SpvVariable> GlobalVariables;
-		TMultiMap<SpvId, SpvDecoration> Decorations;		//GlobalVarId -> Decoration
+		TMultiMap<SpvId, SpvDecoration> Decorations;		//GlobalVarId/TypeId -> Decoration
 		std::unordered_map<SpvId, TUniquePtr<SpvTypeDesc>> TypeDescs;
 		std::unordered_map<SpvId, SpvVariableDesc> VariableDescs;
 		std::unordered_map<SpvId, SpvVariableDesc*> VariableDescMap;   //VarId -> Desc
@@ -42,7 +42,9 @@ namespace FW
 		void Visit(SpvOpTypePointer* Inst) override;
 		void Visit(SpvOpTypeStruct* Inst) override;
 		void Visit(SpvOpTypeArray* Inst) override;
+		void Visit(SpvOpTypeRuntimeArray* Inst) override;
 		void Visit(SpvOpDecorate* Inst) override;
+		void Visit(SpvOpMemberDecorate* Inst) override;
 		void Visit(SpvOpExecutionMode* Inst) override;
 		void Visit(SpvOpString* Inst) override;
 		void Visit(SpvOpConstant* Inst) override;

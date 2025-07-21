@@ -159,6 +159,11 @@ namespace FW
 		SourceDesc.defines = Defines.GetData();
 		SourceDesc.numDefines = Defines.Num();
 		
+		FString ShaderName = InShader->GetShaderName();
+#if DEBUG_SHADER
+		FFileHelper::SaveStringToFile(InShader->GetProcessedSourceText(), *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl"));
+#endif
+		
 		ShaderConductor::Compiler::TargetDesc TargetDescs[2] = {SpvTargetDesc, MslTargetDesc};
 		ShaderConductor::Compiler::ResultDesc Results[2];
 		ShaderConductor::Compiler::Compile(SourceDesc, SCOptions, TargetDescs, 2, Results);
@@ -182,9 +187,6 @@ namespace FW
 		ShaderConductor::Compiler::DisassembleDesc SpvasmDesc{ShaderConductor::ShadingLanguage::SpirV, static_cast<const uint8_t*>(Results[0].target.Data()), Results[0].target.Size()};
 		ShaderConductor::Compiler::ResultDesc SpvasmResult = ShaderConductor::Compiler::Disassemble(SpvasmDesc);
 		FString SpvSourceText = {(int32)SpvasmResult.target.Size(), static_cast<const char*>(SpvasmResult.target.Data())};
-		
-		FString ShaderName = InShader->GetShaderName();
-		FFileHelper::SaveStringToFile(InShader->GetProcessedSourceText(), *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl"));
 		FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".spvasm"));
 		FFileHelper::SaveStringToFile(MslSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".metal"));
 #endif

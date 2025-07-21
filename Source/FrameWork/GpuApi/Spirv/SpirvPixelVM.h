@@ -22,7 +22,7 @@ namespace FW
 		
 		void Visit(SpvOpDPdx* Inst) override;
 		
-	private:
+	protected:
 		SpvVmPixelContext& PixelContext;
 	};
 }

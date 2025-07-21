@@ -15,6 +15,7 @@
 #include <Widgets/Text/SlateTextBlockLayout.h>
 #include <Framework/Text/SlateTextHighlightRunRenderer.h>
 #include <Fonts/FontMeasure.h>
+#include "GpuApi/Spirv/SpirvExpressionVM.h"
 
 //No exposed methods, and too lazy to modify the source code for UE.
 STEAL_PRIVATE_MEMBER(SMultiLineEditableText, TUniquePtr<FSlateEditableTextLayout>, EditableTextLayout)
@@ -310,6 +311,8 @@ const FString ErrorMarkerText = TEXT("✘");
 							}
 						}
 					}
+					
+					FuncScopes = TU.GetFuncScopes();
 					
 					if(SyntaxQueue.IsEmpty())
 					{
@@ -982,6 +985,7 @@ const FString ErrorMarkerText = TEXT("✘");
 		if(bRefreshSyntax.load(std::memory_order_acquire))
 		{
 			RefreshSyntaxHighlight();
+			FuncScopesCopy = FuncScopes;
 			bRefreshSyntax.store(false, std::memory_order_relaxed);
 		}
         
@@ -2091,7 +2095,11 @@ const FString ErrorMarkerText = TEXT("✘");
 			return FAppStyle::Get().GetBrush("Icons.BulletPoint");
 		})
 		.ColorAndOpacity_Lambda([this, LineNumber]{
-			return StopLineNumber == LineNumber ? FLinearColor::Green : FLinearColor::Red;
+			if(StopLineNumber == LineNumber && DebuggerError.IsEmpty())
+			{
+				return FLinearColor::Green;
+			}
+			return FLinearColor::Red;
 		})
 		.Visibility_Lambda([this, LineNumber, ItemErrorMarker]{
 			if(ItemErrorMarker->GetVisibility() != EVisibility::Visible
@@ -2153,7 +2161,11 @@ const FString ErrorMarkerText = TEXT("✘");
 						SNew(SImage)
 						.Image(FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect2"))
 						.ColorAndOpacity_Lambda([this, LineNumber]{
-							return StopLineNumber == LineNumber ? FLinearColor{0,1,0,0.7f} : FLinearColor{1,0,0,0.7f};
+							if(StopLineNumber == LineNumber && DebuggerError.IsEmpty())
+							{
+								return FLinearColor{0,1,0,0.7f};
+							}
+							return FLinearColor{1,0,0,0.7f};
 						})
 					]
 				]
@@ -2169,7 +2181,11 @@ const FString ErrorMarkerText = TEXT("✘");
 					})
 					.Image(FAppStyle::Get().GetBrush("WhiteBrush"))
 					.ColorAndOpacity_Lambda([this, LineNumber]{
-						return StopLineNumber == LineNumber ? FLinearColor{0,1,0,0.06f} : FLinearColor{1,0,0,0.06f};
+						if(StopLineNumber == LineNumber && DebuggerError.IsEmpty())
+						{
+							return FLinearColor{0,1,0,0.06f};
+						}
+						return FLinearColor{1,0,0,0.06f};
 					})
 				]
 			];
@@ -2210,13 +2226,17 @@ const FString ErrorMarkerText = TEXT("✘");
 						SNew(SImage)
 						.Image(FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect2"))
 						.ColorAndOpacity_Lambda([this, LineNumber]{
-							return StopLineNumber == LineNumber ? FLinearColor{0,1,0,0.7f} : FLinearColor{1,0,0,0.7f};
+							if(StopLineNumber == LineNumber && DebuggerError.IsEmpty())
+							{
+								return FLinearColor{0,1,0,0.7f};
+							}
+							return FLinearColor{1,0,0,0.7f};
 						})
 					]
 				]
 				+SOverlay::Slot()
 				[
-					SNew(SImage)
+					SNew(SBorder)
 					.Visibility_Lambda([this, LineNumber]{
 						if(BreakPointLines.Contains(LineNumber) || StopLineNumber == LineNumber)
 						{
@@ -2224,10 +2244,30 @@ const FString ErrorMarkerText = TEXT("✘");
 						}
 						return EVisibility::Collapsed;
 					})
-					.Image(FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect"))
-					.ColorAndOpacity_Lambda([this, LineNumber]{
-						return StopLineNumber == LineNumber ? FLinearColor{0,1,0,0.3f} : FLinearColor{1,0,0,0.3f};
+					.BorderImage_Lambda([this, LineNumber]{
+						if(StopLineNumber == LineNumber && !DebuggerError.IsEmpty())
+						{
+							return FAppStyle::Get().GetBrush("WhiteBrush");
+						}
+						return FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect");
 					})
+					.BorderBackgroundColor_Lambda([this, LineNumber]{
+						if(StopLineNumber == LineNumber && DebuggerError.IsEmpty())
+						{
+							return FLinearColor{0,1,0,0.3f};
+						}
+						return FLinearColor{1,0,0,0.3f};
+					})
+					.Padding(0)
+					.HAlign(HAlign_Right)
+					.VAlign(VAlign_Center)
+					[
+						SNew(STextBlock)
+						.Font(GetCodeFontInfo())
+						.Visibility_Lambda([this, LineNumber] { return StopLineNumber == LineNumber && !DebuggerError.IsEmpty() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+						.Text_Lambda([this] { return FText::FromString(DebuggerError); })
+						.ColorAndOpacity(FLinearColor::Red)
+					]
 				]
             ];
 
@@ -2535,6 +2575,7 @@ const FString ErrorMarkerText = TEXT("✘");
 
 	void SShaderEditorBox::ApplyDebugState(const FW::SpvDebugState& State, bool bReverse)
 	{
+        CurReturnObject = State.ReturnObject;
 		if(State.bFuncCall)
 		{
 			if(Scope)
@@ -2557,7 +2598,7 @@ const FString ErrorMarkerText = TEXT("✘");
 		
 		for(const SpvVariableChange& VarChange : State.VarChanges)
 		{
-			auto& RecordedInfo = DebuggerContext.ThreadState.RecordedInfo;
+			auto& RecordedInfo = DebuggerContext->ThreadState.RecordedInfo;
 			SpvVariable& Var = RecordedInfo.AllVariables[VarChange.VarId];
 			if(!Var.IsExternal())
 			{
@@ -2571,48 +2612,211 @@ const FString ErrorMarkerText = TEXT("✘");
 	void SShaderEditorBox::ShowDeuggerVariable(SpvLexicalScope* InScope) const
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		SDebuggerVariableView* DebuggerVariableView = ShEditor->GetDebuggerVariableView();
+		SDebuggerVariableView* DebuggerLocalVariableView = ShEditor->GetDebuggerLocalVariableView();
+        SDebuggerVariableView* DebuggerGlobalVariableView = ShEditor->GetDebuggerGlobalVariableView();
 		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
 		
-		TArray<VariableNodePtr> VariableNodeDatas;
-		const auto& RecordedInfo = DebuggerContext.ThreadState.RecordedInfo;
+		TArray<VariableNodePtr> LocalVarNodeDatas;
+        TArray<VariableNodePtr> GlobalVarNodeDatas;
+		const auto& RecordedInfo = DebuggerContext->ThreadState.RecordedInfo;
 		const auto& DebugStates = RecordedInfo.DebugStates;
-		for(const auto& [VarId, VarDesc] : DebuggerContext.VariableDescMap)
+		
+		if(CurReturnObject && Scope == InScope)
+		{
+			SpvTypeDesc* ReturnTypeDesc = std::get<SpvTypeDesc*>(GetFunctionDesc(Scope)->GetFuncTypeDesc()->GetReturnType());
+			const TArray<uint8>& Value = std::get<SpvObject::Internal>(CurReturnObject.value().Storage).Value;
+			FString VarName = GetFunctionDesc(Scope)->GetName() + LOCALIZATION("ReturnTip").ToString();
+			FString TypeName = GetTypeDescStr(ReturnTypeDesc);
+			FString ValueStr = GetValueStr(Value, ReturnTypeDesc);
+			
+			auto Data = MakeShared<VariableNode>(VarName, ValueStr, TypeName);
+			LocalVarNodeDatas.Add(MoveTemp(Data));
+		}
+		
+		for(const auto& [VarId, VarDesc] : DebuggerContext->VariableDescMap)
 		{
 			if(RecordedInfo.AllVariables.contains(VarId))
 			{
 				const SpvVariable& Var = RecordedInfo.AllVariables.at(VarId);
-				if(!Var.IsExternal() && VarDesc
-				   && (VarDesc->Parent->Contains(InScope) || (DebugStates[CurDebugStateIndex].bReturn && InScope->Contains(VarDesc->Parent)))
-				   && VarDesc->Line < StopLineNumber + ExtraLineNum
-				   && VarDesc->Line > ExtraLineNum)
+				if(!Var.IsExternal() && VarDesc)
 				{
-					FString VarName = VarDesc->Name;
-					FString TypeName = GetTypeDescStr(VarDesc->TypeDesc);
-					FString ValueStr = "Uninitialized";
-					if(Var.Initialized)
+					bool VisibleScope = VarDesc->Parent->Contains(InScope) || (DebugStates[CurDebugStateIndex].bReturn && InScope->GetKind() == SpvScopeKind::Function && InScope == VarDesc->Parent->GetParent());
+					bool VisibleLine = VarDesc->Line < StopLineNumber + ExtraLineNum && VarDesc->Line > ExtraLineNum;
+					if(VisibleScope && VisibleLine)
 					{
-						const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var.Storage).Value;
-						ValueStr = GetValueStr(Value, VarDesc->TypeDesc);
+						FString VarName = VarDesc->Name;
+						FString TypeName = GetTypeDescStr(VarDesc->TypeDesc);
+						FString ValueStr = "Uninitialized";
+						if(Var.Initialized)
+						{
+							const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var.Storage).Value;
+							ValueStr = GetValueStr(Value, VarDesc->TypeDesc);
+						}
+						auto Data = MakeShared<VariableNode>(VarName, ValueStr, TypeName);
+						TArray<SpvVariableChange::DirtyRange> Ranges;
+						DirtyVars.MultiFind(VarId, Ranges);
+						if(VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Composite)
+						{
+							
+						}
+						else if(!Ranges.IsEmpty())
+						{
+							Data->Dirty = true;
+						}
+
+                        if(!VarDesc->bGlobal)
+                        {
+		                    LocalVarNodeDatas.Add(MoveTemp(Data));
+                        }
+                        else
+                        {
+                            GlobalVarNodeDatas.Add(MoveTemp(Data));
+                        }
 					}
-					auto Data = MakeShared<VariableNode>(VarName, ValueStr, TypeName);
-					TArray<SpvVariableChange::DirtyRange> Ranges;
-					DirtyVars.MultiFind(VarId, Ranges);
-					if(VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Composite)
-					{
-						
-					}
-					else if(!Ranges.IsEmpty())
-					{
-						Data->Dirty = true;
-					}
-					VariableNodeDatas.Add(MoveTemp(Data));
 				}
 			}
 			
 		}
 		
-		DebuggerVariableView->SetVariableNodeDatas(VariableNodeDatas);
+		DebuggerLocalVariableView->SetVariableNodeDatas(LocalVarNodeDatas);
+        DebuggerGlobalVariableView->SetVariableNodeDatas(GlobalVarNodeDatas);
+	}
+
+	ExpressionNode SShaderEditorBox::EvaluateExpression(const FString& InExpression) const
+	{
+		const auto& RecordedInfo = DebuggerContext->ThreadState.RecordedInfo;
+		const auto& DebugStates = RecordedInfo.DebugStates;
+		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
+	
+		FString ExpressionShader = ShaderAssetObj->GetShaderDesc(CurrentShaderSource).Source;
+        TArray<uint8> InputData;
+		
+		//Patch EntryPoint
+		FString EntryPoint = ShaderAssetObj->Shader->GetEntryPoint();
+		for(const ShaderFuncScope& FuncScope : FuncScopesCopy)
+		{
+			if(FuncScope.Name == EntryPoint)
+			{
+				TArray<FTextRange> LineRanges;
+				FTextRange::CalculateLineRangesFromString(ExpressionShader, LineRanges);
+				int32 StartPos = LineRanges[FuncScope.Start.x - 1].BeginIndex + FuncScope.Start.y - 1;
+				int32 EndPos = LineRanges[FuncScope.End.x - 1].BeginIndex + FuncScope.End.y - 1;
+				
+				ExpressionShader.RemoveAt(StartPos, EndPos - StartPos);
+				
+				//Append bindings
+				FString LocalVars;
+				FString VisibleLocalVarBindings = "struct __Expression_Vars_Set {";
+				for(const auto& [VarId, VarDesc] : DebuggerContext->VariableDescMap)
+				{
+					if(RecordedInfo.AllVariables.contains(VarId))
+					{
+						const SpvVariable& Var = RecordedInfo.AllVariables.at(VarId);
+						if(!Var.IsExternal() && VarDesc)
+						{
+							bool VisibleScope = VarDesc->Parent->Contains(Scope) || (DebugStates[CurDebugStateIndex].bReturn && Scope->GetKind() == SpvScopeKind::Function && Scope == VarDesc->Parent->GetParent());
+							bool VisibleLine = VarDesc->Line < StopLineNumber + ExtraLineNum && VarDesc->Line > ExtraLineNum;
+							if(VisibleScope && VisibleLine)
+							{
+								FString Declaration = GetTypeDescStr(VarDesc->TypeDesc) + " " + VarDesc->Name + ";";
+								LocalVars += GetTypeDescStr(VarDesc->TypeDesc) + " " + VarDesc->Name + "= __Expression_Vars[0]." + VarDesc->Name + ";\n";
+								VisibleLocalVarBindings += Declaration;
+
+                                const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var.Storage).Value;
+                                InputData.Append(Value);
+							}
+						}
+					}
+				}
+				VisibleLocalVarBindings += "};\n";
+				VisibleLocalVarBindings += "StructuredBuffer<__Expression_Vars_Set> __Expression_Vars : register(t114514);\n";
+				ExpressionShader.InsertAt(StartPos, MoveTemp(VisibleLocalVarBindings));
+				
+				//Append the EntryPoint
+				FString EntryPointFunc = FString::Printf(TEXT("\nvoid %s() {\n"), *EntryPoint);
+				EntryPointFunc += MoveTemp(LocalVars);
+				EntryPointFunc += FString::Printf(TEXT("__Expression_Output(%s);\n"), *InExpression);
+				EntryPointFunc += "}\n";
+				ExpressionShader += MoveTemp(EntryPointFunc);
+				break;
+			}
+		}
+		
+		static const FString OutputFunc =
+R"(template<typename T>
+void __Expression_Output(T __Expression_Result) {}
+)";
+		ExpressionShader = OutputFunc + ExpressionShader;
+		
+		auto ShaderDesc = GpuShaderSourceDesc{
+			.Name = "EvaluateExpression",
+			.Source = MoveTemp(ExpressionShader),
+			.Type = ShaderAssetObj->Shader->GetShaderType(),
+			.EntryPoint = EntryPoint
+		};
+		TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(ShaderDesc);
+		Shader->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add("ENABLE_PRINT=0");
+		
+		FString ErrorInfo;
+		GGpuRhi->CompileShader(Shader, ErrorInfo, ExtraArgs);
+		if(ErrorInfo.IsEmpty())
+		{
+            TRefCountPtr<GpuBuffer> LocalVarsInput = GGpuRhi->CreateBuffer({
+                .ByteSize = (uint32)InputData.Num(),
+                .Usage = GpuBufferUsage::Storage,
+                .Stride = (uint32)InputData.Num(),
+                .InitialData = InputData
+            });
+
+            SpirvParser Parser;
+		    Parser.Parse(Shader->SpvCode);
+            if(Shader->GetShaderType() == ShaderType::PixelShader)
+            {
+                std::array<SpvVmContext,4> Quad;
+                for(int i = 0; i < Quad.size(); i++)
+                {       
+                    Quad[i].ThreadState.BuiltInInput = VmPixelContext.value().Quad[i].ThreadState.BuiltInInput;
+                    Quad[i].ThreadState.LocationInput = VmPixelContext.value().Quad[i].ThreadState.LocationInput;
+					
+					SpvMetaVisitor MetaVisitor{Quad[i]};
+					Parser.Accept(&MetaVisitor);
+                }
+
+                TArray<SpvVmBinding> Bindings = VmPixelContext.value().Bindings;
+                Bindings.Add(SpvVmBinding{
+                    .DescriptorSet = 0,
+                    .Binding = 114514,
+                    .Resource = AUX::StaticCastRefCountPtr<GpuResource>(LocalVarsInput)
+                });
+
+                SpvVmPixelExprContext VmContext{
+                    SpvVmPixelContext{
+                        .DebugIndex = VmPixelContext.value().DebugIndex,
+                        .Bindings = MoveTemp(Bindings),
+                        .Quad = MoveTemp(Quad)
+                    }
+                };
+                SpvVmPixelExprVisitor VmVisitor{VmContext};
+		        Parser.Accept(&VmVisitor);
+	
+				if(!VmContext.HasSideEffect)
+				{
+					FString TypeName = GetTypeDescStr(VmContext.ResultTypeDesc);
+					FString ValueStr = GetValueStr(VmContext.ResultValue, VmContext.ResultTypeDesc);
+					return {.Expr = InExpression, .ValueStr = FText::FromString(ValueStr), .TypeName = FText::FromString(TypeName)};
+				}
+				else
+				{
+					return {.Expr = InExpression, .ValueStr = LOCALIZATION("SideEffectExpr")};
+				}
+            }
+		}
+
+		return {.Expr = InExpression, .ValueStr = LOCALIZATION("InvalidExpr")};
 	}
 
 	void SShaderEditorBox::ShowDebuggerResult() const
@@ -2639,12 +2843,18 @@ const FString ErrorMarkerText = TEXT("✘");
 		DebuggerCallStackView->SetCallStackDatas(CallStackDatas);
 		
 		ShowDeuggerVariable(Scope);
+		
+		SDebuggerWatchView* DebuggerWatchView = ShEditor->GetDebuggerWatchView();
+		DebuggerWatchView->OnWatch = [this](const FString& Expression) { return EvaluateExpression(Expression); };
+		DebuggerWatchView->Refresh();
 	}
 
 	void SShaderEditorBox::Continue(StepMode Mode)
 	{
 		DirtyVars.Empty();
-		const auto& DebugStates = DebuggerContext.ThreadState.RecordedInfo.DebugStates;
+		DebuggerError.Empty();
+		
+		const auto& DebugStates = DebuggerContext->ThreadState.RecordedInfo.DebugStates;
 		auto CallStackAtStop = CallStack;
 		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
 		while(CurDebugStateIndex < DebugStates.Num())
@@ -2657,16 +2867,42 @@ const FString ErrorMarkerText = TEXT("✘");
 				DebugStates[CurDebugStateIndex + 1].bFuncCall || DebugStates[CurDebugStateIndex + 1].bCondition))
 			{
 				NextValidLine = DebugStates[CurDebugStateIndex + 1].Line;
+            
+				//Stop at the ending line of the function lexcical scope
+                if(NextValidLine.value() == 0 && DebugStates[CurDebugStateIndex + 1].bReturn)
+                {
+					for(const ShaderFuncScope& FuncScope : FuncScopesCopy)
+					{
+						if(FuncScope.Name == GetFunctionDesc(Scope)->GetName())
+						{
+							NextValidLine = FuncScope.End.x;
+						}
+					}
+                }
 			}
 			
-			UbError = DebugState.UbError;
-			if(!UbError.IsEmpty())
+			if(!DebugState.UbError.IsEmpty())
 			{
+				DebuggerError = "Undefined behavior";
+				StopLineNumber = DebugState.Line - ExtraLineNum;
 				break;
 			}
 			
 			ApplyDebugState(DebugState);
 			CurDebugStateIndex++;
+			
+			if(AssertResult && AssertResult->Initialized)
+			{
+				TArray<uint8>& Value = std::get<SpvObject::Internal>(AssertResult->Storage).Value;
+				uint& TypedValue = *(uint*)Value.GetData();
+				if(TypedValue != 1)
+				{
+					DebuggerError = "Assert failed";
+					StopLineNumber = DebugState.Line - ExtraLineNum;
+					TypedValue = 1;
+					break;
+				}
+			}
 			
 			if(NextValidLine)
 			{
@@ -2716,10 +2952,14 @@ const FString ErrorMarkerText = TEXT("✘");
 	{
 		CurValidLine.reset();
 		CallStack.Empty();
+        DebuggerContext = nullptr;
 		Scope = nullptr;
-		UbError.Empty();
+        CurReturnObject.reset();
+		AssertResult = nullptr;
+		DebuggerError.Empty();
 		DirtyVars.Empty();
 		StopLineNumber = 0;
+        VmPixelContext.reset();
 	}
 
 	void SShaderEditorBox::DebugPixel(const FW::Vector2u& PixelCoord, const TArray<TRefCountPtr<FW::GpuBindGroup>>& BindGroups)
@@ -2757,8 +2997,13 @@ const FString ErrorMarkerText = TEXT("✘");
 		
 		TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(ShaderAssetObj->GetShaderDesc(CurrentShaderSource));
 		Shader->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add("ENABLE_PRINT=0");
+		
 		FString ErrorInfo;
-		GGpuRhi->CompileShader(Shader, ErrorInfo);
+		GGpuRhi->CompileShader(Shader, ErrorInfo, ExtraArgs);
 		check(ErrorInfo.IsEmpty());
 		
 		SpirvParser Parser;
@@ -2769,45 +3014,47 @@ const FString ErrorMarkerText = TEXT("✘");
 			Parser.Accept(&MetaVisitor);
 		}
 		
-		SpvVmPixelContext VmContext{
+		VmPixelContext = SpvVmPixelContext{
 			DebugIndex,
 			MoveTemp(Bindings),
 			MoveTemp(Quad)
 		};
-		SpvVmPixelVisitor VmVisitor{VmContext};
+		SpvVmPixelVisitor VmVisitor{VmPixelContext.value()};
 		Parser.Accept(&VmVisitor);
 		
 		CurDebugStateIndex = 0;
-		DebuggerContext = MoveTemp(VmContext.Quad[DebugIndex]);
+		DebuggerContext = &VmPixelContext.value().Quad[DebugIndex];
 		
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		if(BreakPointLines.IsEmpty())
-		{
-			ShEditor->EndDebugging();
-		}
-		else
-		{
-			SDebuggerCallStackView* DebuggerCallStackView = ShEditor->GetDebuggerCallStackView();
-			DebuggerCallStackView->OnSelectionChanged = [this](const FString& FuncName) {
-				int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
-				if(GetFunctionSig(GetFunctionDesc(Scope)) == FuncName)
+	
+		SDebuggerCallStackView* DebuggerCallStackView = ShEditor->GetDebuggerCallStackView();
+		DebuggerCallStackView->OnSelectionChanged = [this](const FString& FuncName) {
+			int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
+			if(GetFunctionSig(GetFunctionDesc(Scope)) == FuncName)
+			{
+				StopLineNumber =  CurValidLine.value() - ExtraLineNum;
+				ShowDeuggerVariable(Scope);
+			}
+			else if(auto Call = CallStack.FindByPredicate([this, FuncName](const TPair<FW::SpvLexicalScope*, int>& InItem){
+				if(GetFunctionSig(GetFunctionDesc(InItem.Key)) == FuncName)
 				{
-					StopLineNumber =  CurValidLine.value() - ExtraLineNum;
-					ShowDeuggerVariable(Scope);
+					return true;
 				}
-				else if(auto Call = CallStack.FindByPredicate([this, FuncName](const TPair<FW::SpvLexicalScope*, int>& InItem){
-					if(GetFunctionSig(GetFunctionDesc(InItem.Key)) == FuncName)
-					{
-						return true;
-					}
-					return false;
-				}))
-				{
-					StopLineNumber = Call->Value - ExtraLineNum;
-					ShowDeuggerVariable(Call->Key);
-				}
-			};
-			Continue();
+				return false;
+			}))
+			{
+				StopLineNumber = Call->Value - ExtraLineNum;
+				ShowDeuggerVariable(Call->Key);
+			}
+		};
+		for(const auto& [VarId, VarDesc] : DebuggerContext->VariableDescMap)
+		{
+			if(VarDesc && VarDesc->Name == "GPrivate_AssertResult")
+			{
+				AssertResult = &DebuggerContext->ThreadState.RecordedInfo.AllVariables.at(VarId);;
+			}
 		}
+		Continue();
+	
 	}
 }

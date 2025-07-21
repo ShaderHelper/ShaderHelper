@@ -83,7 +83,6 @@ namespace SH
 					   return EVisibility::Hidden;
 				   })
 				   .Image(FShaderHelperStyle::Get().GetBrush("Icons.ArrowBoldRight"))
-				   .ColorAndOpacity(FLinearColor::Green)
 		   );
 				
 		}
