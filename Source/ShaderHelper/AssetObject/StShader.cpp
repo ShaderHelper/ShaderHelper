@@ -173,7 +173,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 	int StShader::GetExtraLineNum() const
 	{
 		TArray<FString> AddedLines;
-		static int AddedLineNum = GetTemplateWithBinding().ParseIntoArrayLines(AddedLines, false) - 1;
+		int AddedLineNum = GetTemplateWithBinding().ParseIntoArrayLines(AddedLines, false) - 1;
 		return AddedLineNum;
 	}
 

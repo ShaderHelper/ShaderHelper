@@ -475,7 +475,12 @@ namespace FW
 		{
 			const SpvBasicTypeDesc* BasicTypeDesc = static_cast<const SpvBasicTypeDesc*>(TypeDesc);
 			SpvDebugBasicTypeEncoding Encoding = BasicTypeDesc->GetEncoding();
-			if(Encoding == SpvDebugBasicTypeEncoding::Float)
+			if(Encoding == SpvDebugBasicTypeEncoding::Boolean)
+			{
+				uint32 Value = *(uint32*)(InValue.GetData());
+				ValueStr += FString::Format(TEXT("{0}"), {Value});
+			}
+			else if(Encoding == SpvDebugBasicTypeEncoding::Float)
 			{
 				float Value = *(float*)(InValue.GetData());
 				ValueStr += FString::Format(TEXT("{0}"), {Value});

@@ -30,6 +30,11 @@ namespace HLSL
 		Print_float3,
 		Print_float4,
 
+		Print_bool,
+		Print_bool2,
+		Print_bool3,
+		Print_bool4,
+
 		Num,
 	};
 
@@ -61,8 +66,20 @@ uint AppendChar(uint Offset, uint Char)
 	return Offset + 1;
 }
 
-template<int N>
-uint AppendArg(uint Offset, TypeTag Tag, uint Arg[N])
+template<typename T>
+uint GetArgValue(T Arg)
+{
+	return asuint(Arg);
+}
+
+template<>
+uint GetArgValue(bool Arg)
+{
+	return Arg ? 1 : 0;
+}
+
+template<typename T, int N>
+uint AppendArg(uint Offset, TypeTag Tag, T Arg[N])
 {
 	uint NewOffset = AppendChar(Offset, Tag);
 
@@ -70,7 +87,8 @@ uint AppendArg(uint Offset, TypeTag Tag, uint Arg[N])
 	{
 		for (int j = 0; j < 4; j++)
 		{
-			uint Val = Arg[i] >> (j * 8);
+			uint ArgVal = GetArgValue(Arg[i]);
+			uint Val = ArgVal >> (j * 8);
 			NewOffset = AppendChar(NewOffset, Val);
 		}
 	}
@@ -80,28 +98,29 @@ uint AppendArg(uint Offset, TypeTag Tag, uint Arg[N])
 #define AppendArgFunc(Type)                 \
     uint AppendArg(uint Offset, Type Arg)                \
     {                                       \
-        uint Arr[] = { asuint(Arg) };         \
+        Type Arr[] = { Arg };         \
         return AppendArg(Offset, Print_##Type, Arr);         \
     }                                       \
     uint AppendArg(uint Offset, Type##2 Arg)                \
     {                                       \
-        uint Arr[] = { asuint(Arg.x), asuint(Arg.y) };    \
+        Type Arr[] = { Arg.x, Arg.y };    \
         return AppendArg(Offset, Print_##Type##2, Arr);                     \
     }                                       \
     uint AppendArg(uint Offset, Type##3 Arg)                \
     {                                       \
-        uint Arr[] = { asuint(Arg.x), asuint(Arg.y), asuint(Arg.z) }; \
+        Type Arr[] = { Arg.x, Arg.y, Arg.z }; \
         return AppendArg(Offset, Print_##Type##3, Arr);                                 \
     }                                       \
     uint AppendArg(uint Offset, Type##4 Arg)                \
     {                                       \
-        uint Arr[] = { asuint(Arg.x), asuint(Arg.y), asuint(Arg.z), asuint(Arg.w) };  \
+        Type Arr[] = { Arg.x, Arg.y, Arg.z, Arg.w };  \
         return AppendArg(Offset, Print_##Type##4, Arr);         \
     }
 
 AppendArgFunc(uint)
 AppendArgFunc(int)
 AppendArgFunc(float)
+AppendArgFunc(bool)
 
 #define SELECT_NUM(Arg0, Arg1, Arg2, Arg3, RESULT, ...) RESULT
 #define GET_ARG_NUM(...) SELECT_NUM(0, ##__VA_ARGS__, 3, 2, 1, 0)

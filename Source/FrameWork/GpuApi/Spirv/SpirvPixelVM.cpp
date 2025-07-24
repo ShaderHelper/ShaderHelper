@@ -34,9 +34,123 @@ namespace FW
 		}
 	}
 
+	bool SpvVmPixelVisitor::FlushQuad(int32 InstIndex)
+	{
+		//Wait for other threads to reach current instruction location
+		for(int32 QuadIndex = 0; QuadIndex < 4; QuadIndex++)
+		{
+			if(QuadIndex != PixelContext.DebugIndex)
+			{
+				SpvVmContext& OtherContext = PixelContext.Quad[QuadIndex];
+				SpvThreadState& OtherThreadState = OtherContext.ThreadState;
+				ParseQuad(QuadIndex, InstIndex);
+				if(OtherThreadState.InstIndex != InstIndex)
+				{
+					return false;
+				}
+				else
+				{
+					//Skip the instruction in other threads, and the results are processed by the debugindex thread.
+					OtherThreadState.NextInstIndex++;
+				}
+			}
+		}
+		PixelContext.CurActiveIndex = PixelContext.DebugIndex;
+		return true;
+	}
+
 	void SpvVmPixelVisitor::Visit(SpvOpDPdx* Inst)
 	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvId ResultId = Inst->GetId().value();
 		
+		if(!FlushQuad(ThreadState.InstIndex) && EnableUbsan)
+		{
+			ThreadState.RecordedInfo.DebugStates.Last().UbError = "Derivative instruction in non-uniform control flow!";
+			bTerminate = true;
+			return;
+		}
+		
+		int32 ResultTypeSize = GetTypeByteSize(ResultType);
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(ResultTypeSize * 4);
+
+		for(int32 QuadIndex = 0; QuadIndex < 4; QuadIndex++)
+		{
+			SpvVmContext& Context = PixelContext.Quad[QuadIndex];
+			SpvObject* P = GetObject(&Context, Inst->GetP());
+			Datas.Append(GetObjectValue(P));
+		}
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvOp::DPdx));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("DPdx", ResultTypeSize * 4, Datas, ExtraArgs);
+		
+		for(int32 QuadIndex = 0; QuadIndex < 4; QuadIndex++)
+		{
+			SpvVmFrame& StackFrame = PixelContext.Quad[QuadIndex].ThreadState.StackFrames.back();
+			TArray<uint8> QuadIndexResultValue = {ResultValue.GetData() + ResultTypeSize * QuadIndex, ResultTypeSize};
+			
+			SpvObject ResultObject{
+				.Id = ResultId,
+				.Type = ResultType,
+				.Storage = SpvObject::Internal{ MoveTemp(QuadIndexResultValue) }
+			};
+			StackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(ResultObject));
+		}
+	}
+
+	void SpvVmPixelVisitor::Visit(SpvOpDPdy* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvId ResultId = Inst->GetId().value();
+		
+		if(!FlushQuad(ThreadState.InstIndex) && EnableUbsan)
+		{
+			ThreadState.RecordedInfo.DebugStates.Last().UbError = "Derivative instruction in non-uniform control flow!";
+			bTerminate = true;
+			return;
+		}
+		
+		int32 ResultTypeSize = GetTypeByteSize(ResultType);
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(ResultTypeSize * 4);
+
+		for(int32 QuadIndex = 0; QuadIndex < 4; QuadIndex++)
+		{
+			SpvVmContext& Context = PixelContext.Quad[QuadIndex];
+			SpvObject* P = GetObject(&Context, Inst->GetP());
+			Datas.Append(GetObjectValue(P));
+		}
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvOp::DPdy));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("DPdy", ResultTypeSize * 4, Datas, ExtraArgs);
+		
+		for(int32 QuadIndex = 0; QuadIndex < 4; QuadIndex++)
+		{
+			SpvVmFrame& StackFrame = PixelContext.Quad[QuadIndex].ThreadState.StackFrames.back();
+			TArray<uint8> QuadIndexResultValue = {ResultValue.GetData() + ResultTypeSize * QuadIndex, ResultTypeSize};
+			
+			SpvObject ResultObject{
+				.Id = ResultId,
+				.Type = ResultType,
+				.Storage = SpvObject::Internal{ MoveTemp(QuadIndexResultValue) }
+			};
+			StackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(ResultObject));
+		}
 	}
 
 	void SpvVmPixelVisitor::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts)

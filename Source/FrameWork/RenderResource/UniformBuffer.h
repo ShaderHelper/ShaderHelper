@@ -149,7 +149,7 @@ namespace FW
 		UniformBufferBuilder(UniformBufferUsage InUsage)
 			: Usage(InUsage)
 		{
-			DeclarationHead = TEXT("cbuffer {0}\n{\n");
+			DeclarationHead = TEXT("cbuffer {0} {\n");
 			DeclarationEnd = TEXT("};\n");
 		}
         

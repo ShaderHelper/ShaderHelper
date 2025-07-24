@@ -2885,6 +2885,7 @@ void __Expression_Output(T __Expression_Result) {}
 			{
 				DebuggerError = "Undefined behavior";
 				StopLineNumber = DebugState.Line - ExtraLineNum;
+				SH_LOG(LogShader, Error, TEXT("%s"), *DebugState.UbError);
 				break;
 			}
 			
