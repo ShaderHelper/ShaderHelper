@@ -19,8 +19,10 @@ namespace FW
 	public:
 		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts) override;
 		void ParseQuad(int32 QuadIndex, int32 StopIndex = INDEX_NONE);
+		bool FlushQuad(int32 InstIndex);
 		
 		void Visit(SpvOpDPdx* Inst) override;
+		void Visit(SpvOpDPdy* Inst) override;
 		
 	protected:
 		SpvVmPixelContext& PixelContext;

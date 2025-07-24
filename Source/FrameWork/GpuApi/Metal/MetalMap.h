@@ -5,6 +5,10 @@
 
 namespace FW
 {
+	//Set Scissor Rect must be <= render pass width/height (metal validation)
+	//However, metal may preallocate the memory by propertyies renderTargetWidth/renderTargetHeight
+	//We keep the size as small as possible, and then expand it if it doesn't fit.
+	const Vector2i TargetlessPassRect = {2, 2};
 
     inline MTLColorWriteMask MapWriteMask(BlendMask InMask)
     {
@@ -88,8 +92,8 @@ namespace FW
         if(PassRtNum <= 0)
         {
             //targetless rasterization
-            RawPassDesc.renderTargetWidth = 1;
-            RawPassDesc.renderTargetHeight = 1;
+            RawPassDesc.renderTargetWidth = TargetlessPassRect.x;
+            RawPassDesc.renderTargetHeight = TargetlessPassRect.y;
             RawPassDesc.defaultRasterSampleCount = 1;
         }
         return [RawPassDesc autorelease];

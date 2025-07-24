@@ -26,4 +26,14 @@
 #define DECLARE_PASS_RW_BUFFER(Type, Name, RegisterSlot) \
 	Type Name : register(JOIN(u, RegisterSlot), space1);
 
+template<typename T, typename U>
+struct is_same
+{
+	static const bool value = false;
+};
+template<typename T, typename U>
+struct is_same<T, T>
+{
+	static const bool value = true;
+};
 

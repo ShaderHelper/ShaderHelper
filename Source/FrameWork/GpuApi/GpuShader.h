@@ -51,7 +51,7 @@ namespace HLSL
 		TEXT("/"), TEXT("%="), TEXT("%"), TEXT("<<="), TEXT("<<"), TEXT("<="),
 		TEXT("<"), TEXT(">>="), TEXT(">>"), TEXT(">="), TEXT(">"), TEXT("=="), TEXT("&&"),
 		TEXT("&"), TEXT("^="), TEXT("^"), TEXT("|="), TEXT("||"), TEXT("|"), TEXT("?"),
-		TEXT("="), TEXT(","), TEXT(";"), TEXT("{"), TEXT("}")
+		TEXT("="), TEXT(","), TEXT(";"), TEXT("{"), TEXT("}"), TEXT("//"), TEXT("/*"), TEXT("*/")
     };
 
     extern FRAMEWORK_API TArray<FString> BuiltinTypes;

@@ -105,7 +105,10 @@ namespace SH
 				StateSet CurState = (LastState == StateSet::MultilineComment) ? StateSet::MultilineComment : StateSet::Start;
 				int32 CurOffset = LineRange.BeginIndex;
 				int32 TokenStart = CurOffset;
-				TOptional<HLSL::TokenType> LastTokenType; //The token is not a white space;
+				TOptional<HLSL::TokenType> LastTokenType; //The last token which is not a white space;
+
+				bool bInComment = false;
+				bool bInMultilineComment = false;
 
 				while (CurOffset < LineRange.EndIndex)
 				{
@@ -120,13 +123,11 @@ namespace SH
 						{
 							FString MatchedPunctuation;
 							LastState = StateSet::Start;
-							if (RemainingLen >= 2 && FCString::Strncmp(CurString, TEXT("//"), 2) == 0) {
+							if (!bInComment && RemainingLen >= 2 && FCString::Strncmp(CurString, TEXT("//"), 2) == 0) {
 								CurState = StateSet::Comment;
-								CurOffset += 2;
 							}
-							else if (RemainingLen >= 2 && FCString::Strncmp(CurString, TEXT("/*"), 2) == 0) {
+							else if (!bInMultilineComment && RemainingLen >= 2 && FCString::Strncmp(CurString, TEXT("/*"), 2) == 0) {
 								CurState = StateSet::MultilineComment;
-								CurOffset += 2;
 							}
 							else if (CurChar == '"')
 							{
@@ -159,29 +160,35 @@ namespace SH
 								CurOffset += 1;
 							}
 							else if (TOptional<int32> PunctuationLen = IsMatchPunctuation(CurString, RemainingLen, MatchedPunctuation)) {
-
-								if (MatchedPunctuation == "{") {
-									TokenizedLine.Braces.Add({BraceType::Open, CurCol });
+								if(MatchedPunctuation == "*/")
+								{
+									CurState = StateSet::MultilineCommentEnd;
 								}
-								else if (MatchedPunctuation == "}") {
-									TokenizedLine.Braces.Add({BraceType::Close, CurCol });
-								}
-								
-								if (MatchedPunctuation == "+" || MatchedPunctuation == "-") {
-									if (LastTokenType && (LastTokenType == HLSL::TokenType::Identifier || LastTokenType == HLSL::TokenType::Number)) {
-										CurState = StateSet::Punctuation;
+								else
+								{
+									if (MatchedPunctuation == "{") {
+										TokenizedLine.Braces.Add({BraceType::Open, CurCol });
 									}
-									else {
+									else if (MatchedPunctuation == "}") {
+										TokenizedLine.Braces.Add({BraceType::Close, CurCol });
+									}
+									
+									if (MatchedPunctuation == "+" || MatchedPunctuation == "-") {
+										if (LastTokenType && (LastTokenType == HLSL::TokenType::Identifier || LastTokenType == HLSL::TokenType::Number)) {
+											CurState = StateSet::Punctuation;
+										}
+										else {
+											CurState = StateSet::NumberPuncuation;
+										}
+									}
+									else if (MatchedPunctuation == ".") {
 										CurState = StateSet::NumberPuncuation;
 									}
+									else {
+										CurState = StateSet::Punctuation;
+									}
 								}
-								else if (MatchedPunctuation == ".") {
-									CurState = StateSet::NumberPuncuation;
-								}
-								else {
-									CurState = StateSet::Punctuation;
-								}
-
+				
 								CurOffset += *PunctuationLen;
 							}
 							else {
@@ -224,6 +231,14 @@ namespace SH
 							int32 TokenEnd = CurOffset;
 							FTextRange TokenRange{ TokenStart, TokenEnd };
 							FString TokenString = HlslCodeString.Mid(TokenRange.BeginIndex, TokenRange.Len());
+							if(bInComment)
+							{
+								LastState = StateSet::Comment;
+							}
+							else if(bInMultilineComment)
+							{
+								LastState = StateSet::MultilineComment;
+							}
 							HLSL::TokenType FinalTokenType = StateSetToTokenType(TokenString, LastState);
 
 							if (TokenString != " ") {
@@ -277,27 +292,17 @@ namespace SH
 						break;
 					case StateSet::Comment:
 						LastState = StateSet::Comment;
-						if (CurOffset < LineRange.EndIndex) {
-							CurState = StateSet::Comment;
-							CurOffset += 1;
-						}
-						else {
-							CurState = StateSet::End;
-						}
+						bInComment = true;
+						CurState = StateSet::Start;
 						break;
 					case StateSet::MultilineComment:
 						LastState = StateSet::MultilineComment;
-						if (RemainingLen >= 2 && FCString::Strncmp(CurString, TEXT("*/"), 2) == 0) {
-							CurState = StateSet::MultilineCommentEnd;
-							CurOffset += 2;
-						}
-						else {
-							CurState = StateSet::MultilineComment;
-							CurOffset += 1;
-						}
+						bInMultilineComment = true;
+						CurState = StateSet::Start;
 						break;
 					case StateSet::MultilineCommentEnd:
 						LastState = StateSet::MultilineCommentEnd;
+						bInMultilineComment = false;
 						CurState = StateSet::End;
 						break;
 					default:
@@ -309,6 +314,18 @@ namespace SH
 				if(CurState != StateSet::End)
 				{
 					LastState = CurState;
+					if(LastState == StateSet::MultilineCommentEnd)
+					{
+						bInMultilineComment = false;
+					}
+				}
+				if(bInComment)
+				{
+					LastState = StateSet::Comment;
+				}
+				else if(bInMultilineComment)
+				{
+					LastState = StateSet::MultilineComment;
 				}
 				FTextRange TokenRange{ TokenStart, LineRange.EndIndex };
 				FString TokenString = HlslCodeString.Mid(TokenRange.BeginIndex, TokenRange.Len());

@@ -95,25 +95,25 @@ namespace FW
 					Args.Add(Arg.ToString());
 					ByteOffset += sizeof(Vector4i);
 				}
-				else if (Tag == HLSL::Print_uint)
+				else if (Tag == HLSL::Print_uint || Tag == HLSL::Print_bool)
 				{
 					uint32 Arg = *(uint32*)ArgValue;
 					Args.Add(Arg);
 					ByteOffset += sizeof(uint32);
 				}
-				else if (Tag == HLSL::Print_uint2)
+				else if (Tag == HLSL::Print_uint2 || Tag == HLSL::Print_bool2)
 				{
 					Vector2u Arg = *(Vector2u*)ArgValue;
 					Args.Add(Arg.ToString());
 					ByteOffset += sizeof(Vector2u);
 				}
-				else if (Tag == HLSL::Print_uint3)
+				else if (Tag == HLSL::Print_uint3 || Tag == HLSL::Print_bool3)
 				{
 					Vector3u Arg = *(Vector3u*)ArgValue;
 					Args.Add(Arg.ToString());
 					ByteOffset += sizeof(Vector3u);
 				}
-				else if (Tag == HLSL::Print_uint4)
+				else if (Tag == HLSL::Print_uint4 || Tag == HLSL::Print_bool4)
 				{
 					Vector4u Arg = *(Vector4u*)ArgValue;
 					Args.Add(Arg.ToString());

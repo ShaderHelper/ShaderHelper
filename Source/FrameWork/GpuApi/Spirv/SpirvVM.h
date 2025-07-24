@@ -93,7 +93,6 @@ namespace FW
 		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts) override;
 		int32 GetInstIndex(SpvId Inst) const;
 		SpvPointer* GetPointer(SpvId PointerId);
-		SpvObject* GetObject(SpvId ObjectId);
 		TArray<uint8> ExecuteGpuOp(const FString& Name, int32 ResultSize, const TArray<uint8>& InputData, const TArray<FString>& Args);
 		
 	public:
@@ -103,6 +102,7 @@ namespace FW
 		
 		void Visit(SpvSin* Inst) override;
 		void Visit(SpvCos* Inst) override;
+		void Visit(SpvPow* Inst) override;
 		
 		void Visit(SpvOpFunctionParameter* Inst) override;
 		void Visit(SpvOpFunctionCall* Inst) override;
@@ -115,6 +115,7 @@ namespace FW
 		void Visit(SpvOpCompositeExtract* Inst) override;
 		void Visit(SpvOpAccessChain* Inst) override;
 		void Visit(SpvOpVectorTimesScalar* Inst) override;
+		void Visit(SpvOpIsNan* Inst) override;
 		void Visit(SpvOpSelect* Inst) override;
 		void Visit(SpvOpIEqual* Inst) override;
 		void Visit(SpvOpINotEqual* Inst) override;
@@ -124,6 +125,7 @@ namespace FW
 		void Visit(SpvOpFOrdGreaterThan* Inst) override;
 		void Visit(SpvOpConvertFToS* Inst) override;
 		void Visit(SpvOpConvertSToF* Inst) override;
+		void Visit(SpvOpFNegate* Inst) override;
 		void Visit(SpvOpIAdd* Inst) override;
 		void Visit(SpvOpFAdd* Inst) override;
 		void Visit(SpvOpISub* Inst) override;
@@ -138,10 +140,14 @@ namespace FW
 		void Visit(SpvOpReturnValue* Inst) override;
 
 	protected:
+		//if there is an ub case, the debugger results may not match gpu
+		bool EnableUbsan = true;
+		
 		bool bTerminate{};
 		const TArray<TUniquePtr<SpvInstruction>>* Insts;
 	};
 
+	SpvObject* GetObject(SpvVmContext* InContext, SpvId ObjectId);
 	TArray<uint8> GetPointerValue(SpvVmContext* InContext, SpvPointer* InPointer);
 	TArray<uint8> GetObjectValue(SpvObject* InObject, const TArray<uint32>& Indexes = {});
 	void WritePointerValue(SpvPointer* InPointer, SpvVariableDesc* PointeeDesc, const TArray<uint8>& ValueToStore, SpvVariableChange* OutVariableChange = nullptr);

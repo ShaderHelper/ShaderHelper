@@ -45,6 +45,7 @@ namespace FW
 		virtual void Visit(class SpvOpCompositeExtract* Inst) {}
 		virtual void Visit(class SpvOpAccessChain* Inst) {}
 		virtual void Visit(class SpvOpVectorTimesScalar* Inst) {}
+		virtual void Visit(class SpvOpIsNan* Inst) {}
 		virtual void Visit(class SpvOpSelect* Inst) {}
 		virtual void Visit(class SpvOpIEqual* Inst) {}
 		virtual void Visit(class SpvOpINotEqual* Inst) {}
@@ -55,6 +56,7 @@ namespace FW
 		virtual void Visit(class SpvOpBitwiseAnd* Inst) {}
 		virtual void Visit(class SpvOpConvertFToS* Inst) {}
 		virtual void Visit(class SpvOpConvertSToF* Inst) {}
+		virtual void Visit(class SpvOpFNegate* Inst) {}
 		virtual void Visit(class SpvOpIAdd* Inst) {}
 		virtual void Visit(class SpvOpFAdd* Inst) {}
 		virtual void Visit(class SpvOpISub* Inst) {}
@@ -63,6 +65,7 @@ namespace FW
 		virtual void Visit(class SpvOpFMul* Inst) {}
 		virtual void Visit(class SpvOpFDiv* Inst) {}
 		virtual void Visit(class SpvOpDPdx* Inst) {}
+		virtual void Visit(class SpvOpDPdy* Inst) {}
 		virtual void Visit(class SpvOpBranch* Inst) {}
 		virtual void Visit(class SpvOpBranchConditional* Inst) {}
 		virtual void Visit(class SpvOpReturn* Inst) {}
@@ -87,6 +90,7 @@ namespace FW
 		//GLSL.std.450
 		virtual void Visit(class SpvSin* Inst) {}
 		virtual void Visit(class SpvCos* Inst) {}
+		virtual void Visit(class SpvPow* Inst) {}
 	};
 
 	using SpvInstKind = std::variant<SpvOp, SpvGLSLstd450, SpvDebugInfo100>;
@@ -597,6 +601,21 @@ namespace FW
 		SpvId SignedValue;
 	};
 
+	class SpvOpFNegate : public SpvInstructionBase<SpvOpFNegate>
+	{
+	public:
+		SpvOpFNegate(SpvId InResultType, SpvId InOperand) : SpvInstructionBase(SpvOp::FNegate)
+		, ResultType(InResultType), Operand(InOperand)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetOperand() const { return Operand; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Operand;
+	};
+
 	class SpvOpIAdd : public SpvInstructionBase<SpvOpIAdd>
 	{
 	public:
@@ -731,6 +750,21 @@ namespace FW
 		SpvId ResultType;
 		SpvId Vector;
 		SpvId Scalar;
+	};
+
+	class SpvOpIsNan : public SpvInstructionBase<SpvOpIsNan>
+	{
+	public:
+		SpvOpIsNan(SpvId InResultType, SpvId InX) : SpvInstructionBase(SpvOp::IsNan)
+		, ResultType(InResultType), X(InX)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetX() const { return X; }
+		
+	private:
+		SpvId ResultType;
+		SpvId X;
 	};
 
 	class SpvOpSelect : public SpvInstructionBase<SpvOpSelect>
@@ -875,6 +909,21 @@ namespace FW
 	{
 	public:
 		SpvOpDPdx(SpvId InResultType, SpvId InP) : SpvInstructionBase(SpvOp::DPdx)
+		, ResultType(InResultType), P(InP)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetP() const { return P; }
+		
+	private:
+		SpvId ResultType;
+		SpvId P;
+	};
+
+	class SpvOpDPdy : public SpvInstructionBase<SpvOpDPdy>
+	{
+	public:
+		SpvOpDPdy(SpvId InResultType, SpvId InP) : SpvInstructionBase(SpvOp::DPdy)
 		, ResultType(InResultType), P(InP)
 		{}
 		
@@ -1191,5 +1240,22 @@ namespace FW
 	private:
 		SpvId ResultType;
 		SpvId X;
+	};
+
+	class SpvPow : public SpvInstructionBase<SpvPow>
+	{
+	public:
+		SpvPow(SpvId InResultType, SpvId InX, SpvId InY) : SpvInstructionBase(SpvGLSLstd450::Pow)
+		, ResultType(InResultType), X(InX), Y(InY)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetX() const { return X; }
+		SpvId GetY() const { return Y; }
+		
+	private:
+		SpvId ResultType;
+		SpvId X;
+		SpvId Y;
 	};
 }
