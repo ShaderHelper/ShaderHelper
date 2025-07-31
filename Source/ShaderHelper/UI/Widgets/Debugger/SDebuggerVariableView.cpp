@@ -16,6 +16,9 @@ namespace SH
 			.TreeItemsSource(&VariableNodeDatas)
 			.OnGenerateRow(this, &SDebuggerVariableView::OnGenerateRow)
 			.OnGetChildren(this, &SDebuggerVariableView::OnGetChildren)
+			.OnExpansionChanged_Lambda([this](VariableNodePtr InData, bool bExpanded){
+				InData->Expanded = bExpanded;
+			})
 			.HeaderRow
 			(
 				SNew(SHeaderRow)
@@ -31,6 +34,24 @@ namespace SH
 				.DefaultLabel(LOCALIZATION(TypeColId.ToString()))
 			)
 		];
+		
+		RefreshExpansions();
+	}
+
+	void SDebuggerVariableView::RefreshExpansions()
+	{
+		auto ExpandRecursive = [this](auto&& Self, VariableNodePtr Node) -> void
+		{
+			VariableTreeView->SetItemExpansion(Node, Node->Expanded);
+			for (auto& Child : Node->Children)
+			{
+				Self(Self, Child);
+			}
+		};
+		for (auto& Node : VariableNodeDatas)
+		{
+			ExpandRecursive(ExpandRecursive, Node);
+		}
 	}
 
 	void SVariableViewRow::Construct(const FArguments& InArgs, VariableNodePtr InData, const TSharedRef<STableViewBase>& OwnerTableView)
@@ -49,7 +70,18 @@ namespace SH
 		if(ColumnId == VariableColId)
 		{
 			Border->SetPadding(FMargin{0, 0, 1, 2});
-			InternalBorder->SetContent(SNew(STextBlock).Text(FText::FromString(Data->VarName)));
+			InternalBorder->SetContent(
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				[
+					SNew(SExpanderArrow, SharedThis(this))
+				]
+				+ SHorizontalBox::Slot()
+				[
+				   SNew(STextBlock).Text(FText::FromString(Data->VarName))
+				]
+			);
 		}
 		else if(ColumnId == ValueColId)
 		{
@@ -71,7 +103,15 @@ namespace SH
 
 	void SDebuggerVariableView::SetVariableNodeDatas(const TArray<VariableNodePtr>& InDatas)
 	{
+		for(const auto& Data: VariableNodeDatas)
+		{
+			if(const VariableNodePtr* InData = InDatas.FindByPredicate([&](const VariableNodePtr& InItem){ return InItem->VarName == Data->VarName; }))
+			{
+				(*InData)->Expanded = Data->Expanded;
+			}
+		}
 		VariableNodeDatas = InDatas;
+		RefreshExpansions();
 		VariableTreeView->RequestTreeRefresh();
 	}
 

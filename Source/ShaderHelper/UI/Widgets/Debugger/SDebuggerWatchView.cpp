@@ -31,6 +31,9 @@ namespace SH
 			.SelectionMode(ESelectionMode::Single)
 			.OnGenerateRow(this, &SDebuggerWatchView::OnGenerateRow)
 			.OnGetChildren(this, &SDebuggerWatchView::OnGetChildren)
+			.OnExpansionChanged_Lambda([this](ExpressionNodePtr InData, bool bExpanded){
+				InData->Expanded = bExpanded;
+			})
 			.OnContextMenuOpening_Lambda([this]{
 				if(ExpressionTreeView->GetSelectedItems().Num() > 0)
 				{
@@ -99,7 +102,18 @@ namespace SH
 					}
 				}
 			});
-			InternalBorder->SetContent(ExprText);
+			InternalBorder->SetContent(
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				[
+					SNew(SExpanderArrow, SharedThis(this))
+				]
+				+ SHorizontalBox::Slot()
+				[
+					ExprText
+				]
+			);
 		}
 		else if(ColumnId == ValueColId)
 		{

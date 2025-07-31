@@ -127,8 +127,11 @@ namespace SH {
 		Style->Set("CodeEditorVarText", CodeEditorVarTextStyle);
 
 		FTextBlockStyle CodeEditorErrorInfoStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
-			.SetColorAndOpacity(FLinearColor::Red);
+			.SetColorAndOpacity(FStyleColors::Error);
 		Style->Set("CodeEditorErrorInfoText", CodeEditorErrorInfoStyle);
+		FTextBlockStyle CodeEditorWarnInfoStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
+			.SetColorAndOpacity(FStyleColors::Warning);
+		Style->Set("CodeEditorWarnInfoText", CodeEditorWarnInfoStyle);
 		
 		const FVector2D Icon14x14(14.0f, 14.0f);
 		
@@ -147,11 +150,15 @@ namespace SH {
 
 		Style->Set("Icons.World", new IMAGE_BRUSH_SVG("Starship/Common/world", FVector2D{16.0f,16.0f}));
         
+		FLinearColor HoverColor = FStyleColors::Hover.GetSpecifiedColor();
+		HoverColor.A = 0.5f;
+		FLinearColor Hover2Color = FStyleColors::Hover2.GetSpecifiedColor();
+		Hover2Color.A = 0.5f;
+		
         const FScrollBarStyle ScrollBar = FScrollBarStyle()
-            .SetVerticalBackgroundImage(FSlateColorBrush(FStyleColors::Recessed))
-            .SetNormalThumbImage(FSlateColorBrush(FStyleColors::Hover))
-            .SetDraggedThumbImage(FSlateColorBrush(FStyleColors::Hover2))
-            .SetHoveredThumbImage(FSlateColorBrush(FStyleColors::Hover2))
+            .SetNormalThumbImage(FSlateColorBrush(HoverColor))
+            .SetDraggedThumbImage(FSlateColorBrush(Hover2Color))
+            .SetHoveredThumbImage(FSlateColorBrush(Hover2Color))
             .SetThickness(5.0f);
 		Style->Set("CustomScrollbar", ScrollBar);
         

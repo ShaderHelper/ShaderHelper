@@ -47,8 +47,8 @@ namespace UNITTEST_GPUAPI
 		if (GpuFeature::Support16bitType) {
 			Vs->CompilerFlag |= GpuShaderCompilerFlag::Enable16bitType;
 		}
-		FString ErrorInfo;
-		GGpuRhi->CompileShader(Vs, ErrorInfo);
+		FString ErrorInfo, WarnInfo;
+		GGpuRhi->CompileShader(Vs, ErrorInfo, WarnInfo);
 		check(ErrorInfo.IsEmpty());
 
 		TRefCountPtr<GpuBindGroupLayout> BindGroupLayout = GpuBindGroupLayoutBuilder{ 0 }

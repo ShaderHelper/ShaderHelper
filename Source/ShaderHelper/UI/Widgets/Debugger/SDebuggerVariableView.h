@@ -9,6 +9,7 @@ namespace SH
 		FString TypeName;
 		bool Dirty{};
 		TArray<TSharedPtr<VariableNode>> Children;
+		bool Expanded{};
 	};
 
 	using VariableNodePtr = TSharedPtr<VariableNode>;
@@ -27,7 +28,9 @@ namespace SH
 		SLATE_BEGIN_ARGS(SDebuggerVariableView){}
 		SLATE_END_ARGS()
 		void Construct( const FArguments& InArgs );
+		
 	public:
+		void RefreshExpansions();
 		void SetVariableNodeDatas(const TArray<VariableNodePtr>& InDatas);
 		TSharedRef<ITableRow> OnGenerateRow(VariableNodePtr InTreeNode, const TSharedRef<STableViewBase>& OwnerTable);
 		void OnGetChildren(VariableNodePtr InTreeNode, TArray<VariableNodePtr>& OutChildren);

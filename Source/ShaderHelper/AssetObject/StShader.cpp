@@ -63,8 +63,8 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
             .Type = ShaderType::PixelShader,
             .EntryPoint = "MainPS"
         });
-		FString ErrorInfo;
-		bCompilationSucceed = GGpuRhi->CompileShader(Shader, ErrorInfo);
+		FString ErrorInfo, WarnInfo;
+		bCompilationSucceed = GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo);
     }
 
 	GpuShader* StShader::GetVertexShader()
@@ -76,8 +76,8 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 				.Type = ShaderType::VertexShader,
 				.EntryPoint = "MainVS"
 			});
-			FString ErrorInfo;
-			GGpuRhi->CompileShader(VertexShader, ErrorInfo);
+			FString ErrorInfo, WarnInfo;
+			GGpuRhi->CompileShader(VertexShader, ErrorInfo, WarnInfo);
 			return 0;
 		}();
 		

@@ -10,7 +10,6 @@
 #include "UI/Widgets/Graph/SGraphPanel.h"
 #include <DesktopPlatformModule.h>
 #include "Editor/AssetEditor/AssetEditor.h"
-#include "UI/Widgets/Log/SOutputLog.h"
 #include "UI/Widgets/Timeline/STimeline.h"
 #include "UI/Widgets/Misc/CommonCommands.h"
 
@@ -70,6 +69,40 @@ namespace SH
             FSlateApplication::Get().DestroyWindowImmediately(Window.ToSharedRef());
         }
 		
+	}
+
+	void ShaderHelperEditor::CreateInternalWidgets()
+	{
+		SAssignNew(OutputLog, SOutputLog);
+		
+		SAssignNew(ViewportWidget, SViewport)
+			.ViewportInterface(ViewPort)
+			.Visibility_Lambda([this]{
+				return IsDebugging ? EVisibility::Hidden : EVisibility::Visible;
+			});
+		SAssignNew(DebuggerViewport, SDebuggerViewport)
+			.Visibility_Lambda([this]{
+				return IsDebugging ? EVisibility::Visible : EVisibility::Hidden;
+			});
+		ViewPort->SetAssociatedWidget(ViewportWidget);
+		
+		SAssignNew(AssetBrowser, SAssetBrowser)
+		.ContentPathShowed(TSingleton<ShProjectManager>::Get().GetActiveContentDirectory())
+		.State(&CurProject->AssetBrowserState);
+		
+		SAssignNew(PropertyView, SPropertyView)
+			.ObjectData(CurPropertyObject);
+		
+		SAssignNew(GraphPanel, SGraphPanel);
+		if (CurProject->Graph)
+		{
+			AssetOp::OpenAsset(CurProject->Graph);
+		}
+		
+		SAssignNew(DebuggerLocalVariableView, SDebuggerVariableView);
+		SAssignNew(DebuggerGlobalVariableView, SDebuggerVariableView);
+		SAssignNew(DebuggerWatchView, SDebuggerWatchView);
+		SAssignNew(DebuggerCallStackView, SDebuggerCallStackView);
 	}
 
 	void ShaderHelperEditor::InitEditorUI()
@@ -173,6 +206,7 @@ namespace SH
 			.AutoCenter(AutoCenterRule)
 			.ClientSize(UsedWindowSize);
 
+		CreateInternalWidgets();
 		TabManagerTab->AssignParentWidget(Window);
 
 		FSlateApplication::Get().AddWindow(Window.ToSharedRef());
@@ -470,17 +504,12 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
             SpawnedTab = SNew(SDockTab)
             .Label(LOCALIZATION(LogTabId.ToString()))
             [
-                SNew(SOutputLog)
+				OutputLog.ToSharedRef()
             ];
             SpawnedTab->SetTabIcon(FAppCommonStyle::Get().GetBrush("Icons.Log"));
         }
 		else if(TabId == LocalTabId)
 		{
-			if(!DebuggerLocalVariableView)
-			{
-				SAssignNew(DebuggerLocalVariableView, SDebuggerVariableView);
-			}
-
 			SpawnedTab = SNew(SDockTab)
 			.Label(LOCALIZATION(LocalTabId.ToString()))
 			[
@@ -490,11 +519,6 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		}
 		else if(TabId == GlobalTabId)
 		{
-			if(!DebuggerGlobalVariableView)
-			{
-				SAssignNew(DebuggerGlobalVariableView, SDebuggerVariableView);
-			}
-			
 			SpawnedTab = SNew(SDockTab)
 			.Label(LOCALIZATION(GlobalTabId.ToString()))
 			[
@@ -504,11 +528,6 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		}
 		else if(TabId == WatchTabId)
 		{
-			if(!DebuggerWatchView)
-			{
-				SAssignNew(DebuggerWatchView, SDebuggerWatchView);
-			}
-			
 			SpawnedTab = SNew(SDockTab)
 			.Label(LOCALIZATION(WatchTabId.ToString()))
 			[
@@ -518,11 +537,6 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		}
 		else if(TabId == CallStackTabId)
 		{
-			if(!DebuggerCallStackView)
-			{
-				SAssignNew(DebuggerCallStackView, SDebuggerCallStackView);
-			}
-			
 			SpawnedTab = SNew(SDockTab)
 			.Label(LOCALIZATION(CallStackTabId.ToString()))
 			[
@@ -531,15 +545,6 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 			SpawnedTab->SetTabIcon(FShaderHelperStyle::Get().GetBrush("Icons.CallStack"));
 		}
 		else if (TabId == PreviewTabId) {
-			auto ViewportWidget = SNew(SViewport)
-				.ViewportInterface(ViewPort)
-				.Visibility_Lambda([this]{
-					return IsDebugging ? EVisibility::Hidden : EVisibility::Visible;
-				});
-			SAssignNew(DebuggerViewport, SDebuggerViewport)
-				.Visibility_Lambda([this]{
-					return IsDebugging ? EVisibility::Visible : EVisibility::Hidden;
-				});
             SpawnedTab = SNew(SDockTab);
 			SpawnedTab->SetLabel(LOCALIZATION(PreviewTabId.ToString()));
 			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Visible"));
@@ -549,7 +554,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 					SNew(SOverlay)
 					+SOverlay::Slot()
 					[
-						ViewportWidget
+						ViewportWidget.ToSharedRef()
 					]
 					+SOverlay::Slot()
 					[
@@ -558,7 +563,6 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                 ]
 			
 			);
-			ViewPort->SetAssociatedWidget(ViewportWidget);
 		}
 		else if (TabId == PropretyTabId) {
             SpawnedTab = SNew(SDockTab);
@@ -568,8 +572,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                 SNew(SBorder)
                 .Padding(FMargin{2,2,3,2})
                 [
-                    SAssignNew(PropertyView, SPropertyView)
-                    .ObjectData(CurPropertyObject)
+					PropertyView.ToSharedRef()
                 ]
 			);
 		}
@@ -635,11 +638,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
             SpawnedTab = SNew(SDockTab);
 			SpawnedTab->SetLabel(LOCALIZATION(AssetTabId.ToString()));
 			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Server"));
-			SpawnedTab->SetContent(
-				SAssignNew(AssetBrowser, SAssetBrowser)
-				.ContentPathShowed(TSingleton<ShProjectManager>::Get().GetActiveContentDirectory())
-                .State(&CurProject->AssetBrowserState)
-			);
+			SpawnedTab->SetContent(AssetBrowser.ToSharedRef());
 		}
 		else if (TabId == GraphTabId) {
 			SAssignNew(SpawnedTab, SDockTab)
@@ -657,7 +656,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
                     SNew(SOverlay)
                     +SOverlay::Slot()
                     [
-                        SAssignNew(GraphPanel, SGraphPanel)
+                        GraphPanel.ToSharedRef()
                     ]
                     +SOverlay::Slot()
                     .VAlign(VAlign_Top)
@@ -677,11 +676,6 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		
 			];
 			SpawnedTab->SetTabIcon(FAppStyle::Get().GetBrush("Icons.Blueprints"));
-			if (CurProject->Graph)
-			{
-				AssetOp::OpenAsset(CurProject->Graph);
-			}
-			
 		}
 		return SpawnedTab.ToSharedRef();
 	}
@@ -725,7 +719,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
     void ShaderHelperEditor::ShowProperty(ShObject* InObjectData)
     {
         CurPropertyObject = InObjectData;
-        PropertyView->SetObjectData(InObjectData);
+		PropertyView->SetObjectData(InObjectData);
     }
 
 	void ShaderHelperEditor::OpenShaderTab(AssetPtr<ShaderAsset> InShader)

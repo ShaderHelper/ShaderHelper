@@ -34,11 +34,11 @@ namespace SH
 			.ExtraDecl = BindGroupLayout->GetCodegenDeclaration()
 		});
 
-		FString ErrorInfo;
-		GGpuRhi->CompileShader(Vs, ErrorInfo);
+		FString ErrorInfo, WarnInfo;
+		GGpuRhi->CompileShader(Vs, ErrorInfo, WarnInfo);
 		check(ErrorInfo.IsEmpty());
 
-		GGpuRhi->CompileShader(Ps, ErrorInfo);
+		GGpuRhi->CompileShader(Ps, ErrorInfo, WarnInfo);
 		check(ErrorInfo.IsEmpty());
 	}
 

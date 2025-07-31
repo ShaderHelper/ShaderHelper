@@ -154,7 +154,7 @@ namespace FW
 		Arguments.Add(TEXT("/Zi"));
         Arguments.Add(TEXT("/Od"));
 #endif
-        Arguments.Add(TEXT("-no-warnings"));
+        //Arguments.Add(TEXT("-no-warnings"));
 
 		Arguments.Add(TEXT("-HV"));
 		Arguments.Add(TEXT("2021"));

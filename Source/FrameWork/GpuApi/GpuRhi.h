@@ -120,7 +120,7 @@ public:
 
 	virtual void SetResourceName(const FString &Name, GpuResource *InResource) = 0;
 
-	virtual bool CompileShader(GpuShader* InShader, FString& OutErrorInfo, const TArray<FString>& ExtraArgs = {}) = 0;
+	virtual bool CompileShader(GpuShader* InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs = {}) = 0;
 
 	// Need OutRowPitch to correctly read or write data, because the mapped buffer actually contains the *padded* texture data.
 	// RowPitch != Width x ElementByteSize

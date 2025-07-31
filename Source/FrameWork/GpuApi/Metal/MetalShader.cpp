@@ -70,7 +70,7 @@ namespace FW
         }
     }
 
-    bool CompileShaderFromHlsl(TRefCountPtr<MetalShader> InShader, FString& OutErrorInfo, const TArray<FString>& ExtraArgs)
+    bool CompileShaderFromHlsl(TRefCountPtr<MetalShader> InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs)
 {
 		TArray<ShaderConductor::MacroDefine> Defines;
 		Defines.Add({"FINAL_METAL"});
@@ -103,7 +103,7 @@ namespace FW
 		MslTargetDesc.numOptions = UE_ARRAY_COUNT(SpvMslOptions);
 		
 		TArray<const char*> DxcArgs;
-		DxcArgs.Add("-no-warnings");
+		//DxcArgs.Add("-no-warnings");
 		DxcArgs.Add("-fspv-preserve-bindings"); //For bindgroup-argumentbuffer
 		//Storage buffers use the scalar layout instead of vector-relaxed 430
 		//to make it consistent with structuredbuffer, so that user side can unify the struct
@@ -174,7 +174,12 @@ namespace FW
 			OutErrorInfo = MoveTemp(ErrorInfo);
 			return false;
 		}
-		else if(Results[1].hasError)
+		else
+		{
+			OutWarnInfo = static_cast<const char*>(Results[0].errorWarningMsg.Data());
+		}
+		
+		if(Results[1].hasError)
 		{
 			FString ErrorInfo = static_cast<const char*>(Results[1].errorWarningMsg.Data());
 			//SH_LOG(LogShader, Error, TEXT("Compilation failed: %s"), *ErrorInfo);

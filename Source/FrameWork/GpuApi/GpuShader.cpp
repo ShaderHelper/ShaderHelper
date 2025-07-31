@@ -236,39 +236,39 @@ namespace FW
 		return ShaderModel;
 	}
 
-	FString AdjustErrorLineNumber(const FString& ErrorInfo, int32 Delta)
+	FString AdjustDiagLineNumber(const FString& DiagInfo, int32 Delta)
 	{
-		std::string ErrorString{TCHAR_TO_UTF8(*ErrorInfo)};
-		std::regex Pattern{":([0-9]*):[0-9]*: error:"};
+		std::string DiagString{TCHAR_TO_UTF8(*DiagInfo)};
+		std::regex Pattern{":([0-9]+):[0-9]+: (?:error|warning):"};
 		std::smatch Match;
 		std::size_t SearchPos = 0;
-		while (std::regex_search(ErrorString.cbegin() + SearchPos, ErrorString.cend(), Match, Pattern))
+		while (std::regex_search(DiagString.cbegin() + SearchPos, DiagString.cend(), Match, Pattern))
 		{
 			std::string RowStr = Match[1];
 			std::string RowNumber = std::to_string(std::stoi(RowStr) + Delta);
-			ErrorString.replace(SearchPos + Match.position(1), Match[1].length(), RowNumber);
+			DiagString.replace(SearchPos + Match.position(1), Match[1].length(), RowNumber);
 			SearchPos += Match.position() + RowNumber.length();
 		}
-		return FString{UTF8_TO_TCHAR(ErrorString.data())};
+		return FString{UTF8_TO_TCHAR(DiagString.data())};
 	}
 
-    TArray<ShaderErrorInfo> ParseErrorInfoFromDxc(FStringView HlslErrorInfo)
+	TArray<ShaderDiagnosticInfo> ParseDiagnosticInfoFromDxc(FStringView HlslDiagnosticInfo)
     {
-        TArray<ShaderErrorInfo> Ret;
+        TArray<ShaderDiagnosticInfo> Ret;
 
-        int32 LineInfoFirstPos = HlslErrorInfo.Find(TEXT("hlsl:"));
+        int32 LineInfoFirstPos = HlslDiagnosticInfo.Find(TEXT("hlsl:"));
         while (LineInfoFirstPos != INDEX_NONE)
         {
-            ShaderErrorInfo ErrorInfo;
+			ShaderDiagnosticInfo DiagnosticInfo;
 
-            int32 LineInfoLastPos = HlslErrorInfo.Find(TEXT("\n"), LineInfoFirstPos);
-            FStringView LineStringView{ HlslErrorInfo.GetData() + LineInfoFirstPos, LineInfoLastPos - LineInfoFirstPos };
+            int32 LineInfoLastPos = HlslDiagnosticInfo.Find(TEXT("\n"), LineInfoFirstPos);
+            FStringView LineStringView{ HlslDiagnosticInfo.GetData() + LineInfoFirstPos, LineInfoLastPos - LineInfoFirstPos };
 
             int32 LineInfoFirstColonPos = 4;
             int32 Pos2 = LineStringView.Find(TEXT(":"), LineInfoFirstColonPos + 1);
-            ErrorInfo.Row = FCString::Atoi(LineStringView.SubStr(LineInfoFirstColonPos + 1, Pos2 - LineInfoFirstColonPos - 1).GetData());
+			DiagnosticInfo.Row = FCString::Atoi(LineStringView.SubStr(LineInfoFirstColonPos + 1, Pos2 - LineInfoFirstColonPos - 1).GetData());
             int32 Pos3 = LineStringView.Find(TEXT(":"), Pos2 + 1);
-            ErrorInfo.Col = FCString::Atoi(LineStringView.SubStr(Pos2 + 1, Pos3 - Pos2 - 1).GetData());
+			DiagnosticInfo.Col = FCString::Atoi(LineStringView.SubStr(Pos2 + 1, Pos3 - Pos2 - 1).GetData());
 
             int32 ErrorPos = LineStringView.Find(TEXT("error: "), Pos3);
             if (ErrorPos != INDEX_NONE)
@@ -277,11 +277,21 @@ namespace FW
                 if (ErrorInfoEnd == INDEX_NONE) {
                     ErrorInfoEnd = LineStringView.Len();
                 }
-                ErrorInfo.Info = LineStringView.SubStr(ErrorPos + 7, ErrorInfoEnd - ErrorPos - 7);
-                Ret.Add(MoveTemp(ErrorInfo));
+				DiagnosticInfo.Error = LineStringView.SubStr(ErrorPos + 7, ErrorInfoEnd - ErrorPos - 7);
+                Ret.Add(MoveTemp(DiagnosticInfo));
             }
+			else
+			{
+				int32 WarnPos = LineStringView.Find(TEXT("warning: "), Pos3);
+				int32 WarnInfoEnd = LineStringView.Find(TEXT("["), WarnPos + 9);
+				if (WarnInfoEnd == INDEX_NONE) {
+					WarnInfoEnd = LineStringView.Len();
+				}
+				DiagnosticInfo.Warn = LineStringView.SubStr(WarnPos + 9, WarnInfoEnd - WarnPos - 9);
+				Ret.Add(MoveTemp(DiagnosticInfo));
+			}
 
-            LineInfoFirstPos = HlslErrorInfo.Find(TEXT("hlsl:"), LineInfoLastPos);
+            LineInfoFirstPos = HlslDiagnosticInfo.Find(TEXT("hlsl:"), LineInfoLastPos);
         }
 
         return Ret;
@@ -320,7 +330,7 @@ namespace FW
         Impl->Index->ParseTranslationUnit("Temp.hlsl", DxcArgs.GetData(), DxcArgs.Num(), AUX::GetAddrExt(Impl->Unsaved.GetReference()), 1, UnitFlag, Impl->TU.GetInitReference());
     }
 
-    TArray<ShaderErrorInfo> ShaderTU::GetDiagnostic()
+    TArray<ShaderDiagnosticInfo> ShaderTU::GetDiagnostic()
     {
         uint32 NumDiag{};
         Impl->TU->GetNumDiagnostics(&NumDiag);
@@ -336,7 +346,7 @@ namespace FW
             Diags += "\n";
             CoTaskMemFree(DiagResult);
         }
-        return ParseErrorInfoFromDxc(Diags);
+        return ParseDiagnosticInfoFromDxc(Diags);
     }
 
     HLSL::CandidateKind MapCursorDecl(DxcCursorKind InDecl)

@@ -53,6 +53,8 @@ namespace FW
 		virtual void Visit(class SpvOpSLessThan* Inst) {}
 		virtual void Visit(class SpvOpFOrdLessThan* Inst) {}
 		virtual void Visit(class SpvOpFOrdGreaterThan* Inst) {}
+		virtual void Visit(class SpvOpBitwiseOr* Inst) {}
+		virtual void Visit(class SpvOpBitwiseXor* Inst) {}
 		virtual void Visit(class SpvOpBitwiseAnd* Inst) {}
 		virtual void Visit(class SpvOpConvertFToS* Inst) {}
 		virtual void Visit(class SpvOpConvertSToF* Inst) {}
@@ -63,6 +65,8 @@ namespace FW
 		virtual void Visit(class SpvOpFSub* Inst) {}
 		virtual void Visit(class SpvOpIMul* Inst) {}
 		virtual void Visit(class SpvOpFMul* Inst) {}
+		virtual void Visit(class SpvOpUDiv* Inst) {}
+		virtual void Visit(class SpvOpSDiv* Inst) {}
 		virtual void Visit(class SpvOpFDiv* Inst) {}
 		virtual void Visit(class SpvOpDPdx* Inst) {}
 		virtual void Visit(class SpvOpDPdy* Inst) {}
@@ -91,6 +95,8 @@ namespace FW
 		virtual void Visit(class SpvSin* Inst) {}
 		virtual void Visit(class SpvCos* Inst) {}
 		virtual void Visit(class SpvPow* Inst) {}
+		virtual void Visit(class SpvStep* Inst) {}
+		virtual void Visit(class SpvSmoothStep* Inst) {}
 	};
 
 	using SpvInstKind = std::variant<SpvOp, SpvGLSLstd450, SpvDebugInfo100>;
@@ -718,6 +724,40 @@ namespace FW
 		SpvId Operand2;
 	};
 
+	class SpvOpUDiv : public SpvInstructionBase<SpvOpUDiv>
+	{
+	public:
+		SpvOpUDiv(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::UDiv)
+		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetOperand1() const { return Operand1; }
+		SpvId GetOperand2() const { return Operand2; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Operand1;
+		SpvId Operand2;
+	};
+
+	class SpvOpSDiv : public SpvInstructionBase<SpvOpSDiv>
+	{
+	public:
+		SpvOpSDiv(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::SDiv)
+		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetOperand1() const { return Operand1; }
+		SpvId GetOperand2() const { return Operand2; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Operand1;
+		SpvId Operand2;
+	};
+
 	class SpvOpFDiv : public SpvInstructionBase<SpvOpFDiv>
 	{
 	public:
@@ -875,6 +915,40 @@ namespace FW
 	{
 	public:
 		SpvOpFOrdGreaterThan(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::FOrdGreaterThan)
+		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetOperand1() const { return Operand1; }
+		SpvId GetOperand2() const { return Operand2; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Operand1;
+		SpvId Operand2;
+	};
+
+	class SpvOpBitwiseOr : public SpvInstructionBase<SpvOpBitwiseOr>
+	{
+	public:
+		SpvOpBitwiseOr(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::BitwiseOr)
+		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetOperand1() const { return Operand1; }
+		SpvId GetOperand2() const { return Operand2; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Operand1;
+		SpvId Operand2;
+	};
+
+	class SpvOpBitwiseXor : public SpvInstructionBase<SpvOpBitwiseXor>
+	{
+	public:
+		SpvOpBitwiseXor(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::BitwiseXor)
 		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
 		{}
 		
@@ -1257,5 +1331,41 @@ namespace FW
 		SpvId ResultType;
 		SpvId X;
 		SpvId Y;
+	};
+
+	class SpvStep : public SpvInstructionBase<SpvStep>
+	{
+	public:
+		SpvStep(SpvId InResultType, SpvId InEdge, SpvId InX) : SpvInstructionBase(SpvGLSLstd450::Step)
+		, ResultType(InResultType), Edge(InEdge), X(InX)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetEdge() const { return Edge; }
+		SpvId GetX() const { return X; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Edge;
+		SpvId X;
+	};
+
+	class SpvSmoothStep : public SpvInstructionBase<SpvSmoothStep>
+	{
+	public:
+		SpvSmoothStep(SpvId InResultType, SpvId InEdge0, SpvId InEdge1, SpvId InX) : SpvInstructionBase(SpvGLSLstd450::SmoothStep)
+		, ResultType(InResultType), Edge0(InEdge0), Edge1(InEdge1), X(InX)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetEdge0() const { return Edge0; }
+		SpvId GetEdge1() const { return Edge1; }
+		SpvId GetX() const { return X; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Edge0;
+		SpvId Edge1;
+		SpvId X;
 	};
 }
