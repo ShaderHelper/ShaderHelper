@@ -15,6 +15,7 @@
 #include <Widgets/Text/SlateTextBlockLayout.h>
 #include <Framework/Text/SlateTextHighlightRunRenderer.h>
 #include <Fonts/FontMeasure.h>
+#include <Styling/StyleColors.h>
 #include "GpuApi/Spirv/SpirvExpressionVM.h"
 
 //No exposed methods, and too lazy to modify the source code for UE.
@@ -39,7 +40,6 @@ const FLinearColor NormalLineTipColor = { 1.0f,1.0f,1.0f,0.0f };
 const FLinearColor HighlightLineTipColor = { 1.0f,1.0f,1.0f,0.2f };
 
 const FString FoldMarkerText = TEXT("⇿");
-const FString ErrorMarkerText = TEXT("✘");
 
     TokenBreakIterator::TokenBreakIterator(FShaderEditorMarshaller* InMarshaller)
         : Marshaller(InMarshaller)
@@ -190,12 +190,14 @@ const FString ErrorMarkerText = TEXT("✘");
     void SShaderEditorBox::Construct(const FArguments& InArgs)
     {
 		ShaderAssetObj = InArgs._ShaderAssetObj;
-        SAssignNew(ShaderMultiLineVScrollBar, SScrollBar).Orientation(EOrientation::Orient_Vertical);
+        SAssignNew(ShaderMultiLineVScrollBar, SScrollBar).Orientation(EOrientation::Orient_Vertical).Padding(0)
+			.Style(&FShaderHelperStyle::Get().GetWidgetStyle<FScrollBarStyle>("CustomScrollbar")).Thickness(8.0f);
 		ShaderMultiLineVScrollBar->OnSetState = [this](float InOffsetFraction, float InThumbSizeFraction) {
-		   LineNumberList->SetScrollOffset(InOffsetFraction * LineNumberList->GetNumItemsBeingObserved());
-		   LineTipList->SetScrollOffset(InOffsetFraction * LineTipList->GetNumItemsBeingObserved());
+			LineNumberList->SetScrollOffset(InOffsetFraction * LineNumberList->GetNumItemsBeingObserved());
+			LineTipList->SetScrollOffset(InOffsetFraction * LineTipList->GetNumItemsBeingObserved());
 		};
-        SAssignNew(ShaderMultiLineHScrollBar, SScrollBar).Orientation(EOrientation::Orient_Horizontal);
+        SAssignNew(ShaderMultiLineHScrollBar, SScrollBar).Orientation(EOrientation::Orient_Horizontal).Padding(0)
+			.Style(&FShaderHelperStyle::Get().GetWidgetStyle<FScrollBarStyle>("CustomScrollbar")).Thickness(8.0f);
 
         ShaderMarshaller = MakeShared<FShaderEditorMarshaller>(this, MakeShared<HlslTokenizer>());
         EffectMarshller = MakeShared<FShaderEditorEffectMarshaller>(this);
@@ -214,8 +216,8 @@ const FString ErrorMarkerText = TEXT("✘");
                 {
 					TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(Task.ShaderDesc.value());
 					ShaderTU TU{Shader->GetProcessedSourceText(), Shader->GetIncludeDirs()};
-                    ErrorInfos = TU.GetDiagnostic();
-                    
+					DiagnosticInfos = TU.GetDiagnostic();
+					
                     CandidateInfos.Reset();
                     if(!Task.CursorToken.IsEmpty())
                     {
@@ -336,153 +338,147 @@ const FString ErrorMarkerText = TEXT("✘");
             .BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
             .Padding(0)
             [
-                SNew(SGridPanel)
-                .FillColumn(0, 1.0f)
-                .FillRow(0, 1.0f)
-                + SGridPanel::Slot(0, 0)
-                [
-                    SNew(SVerticalBox)
-                    + SVerticalBox::Slot()
-                    .FillHeight(1.0f)
-                    [
-                        SNew(SHorizontalBox)
-                        + SHorizontalBox::Slot()
-                        .AutoWidth()
-                        [
-                            SAssignNew(LineNumberList, SListView<LineNumberItemPtr>)
-                            .ListItemsSource(&LineNumberData)
-                            .SelectionMode(ESelectionMode::None)
-                            .OnGenerateRow(this, &SShaderEditorBox::GenerateRowForItem)
-                            .ScrollbarVisibility(EVisibility::Collapsed)
-                            .IsFocusable(false)
-                            .ConsumeMouseWheel(EConsumeMouseWheel::Never)
-                        ]
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot()
+				.FillHeight(1.0f)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					.AutoWidth()
+					[
+						SAssignNew(LineNumberList, SListView<LineNumberItemPtr>)
+						.ListItemsSource(&LineNumberData)
+						.SelectionMode(ESelectionMode::None)
+						.OnGenerateRow(this, &SShaderEditorBox::GenerateRowForItem)
+						.ScrollbarVisibility(EVisibility::Collapsed)
+						.IsSelfDisabled(true)
+						.IsFocusable(false)
+					]
 
-                        + SHorizontalBox::Slot()
-                        .FillWidth(1.0f)
-                        [
-							SNew(SOverlay)
-							+ SOverlay::Slot()
+					+ SHorizontalBox::Slot()
+					.FillWidth(1.0f)
+					[
+						SNew(SOverlay)
+						+ SOverlay::Slot()
+						[
+							SAssignNew(ShaderMultiLineEditableText, SMultiLineEditableText)
+							.Text(InitialShaderText)
+							.EnableUniformFont(true)
+							.Font(GetCodeFontInfo())
+							.Marshaller(ShaderMarshaller)
+							.VScrollBar(ShaderMultiLineVScrollBar)
+							.HScrollBar(ShaderMultiLineHScrollBar)
+							.OnKeyCharHandler(this, &SShaderEditorBox::HandleKeyChar)
+							.OnKeyDownHandler(this, &SShaderEditorBox::HandleKeyDown)
+							.CreateSlateTextLayout_Lambda([this](SWidget* InOwner, FTextBlockStyle InDefaultTextStyle){
+								return MakeShared<ShaderTextLayout>(InOwner, InDefaultTextStyle, ShaderMarshaller.Get());
+							})
+							.OnIsTypedCharValid_Lambda([](const TCHAR InChar) { return true; })
+							.OnCursorMoved_Lambda([this](const FTextLocation& NewCursorLocation){
+								if(!bKeyChar) {
+									bTryComplete = false;
+									bTryMergeUndoState = false;
+								}
+								bKeyChar = false;
+							})
+						]
+						+ SOverlay::Slot()
+						[
+							SAssignNew(EffectMultiLineEditableText, SMultiLineEditableText)
+							.IsReadOnly(true)
+							.Font(GetCodeFontInfo())
+							.Marshaller(EffectMarshller)
+							.Visibility(EVisibility::HitTestInvisible)
+						]
+						+ SOverlay::Slot()
+						[
+							SAssignNew(LineTipList, SListView<LineNumberItemPtr>)
+							.ListItemsSource(&LineNumberData)
+							.SelectionMode(ESelectionMode::None)
+							.OnGenerateRow(this, &SShaderEditorBox::GenerateLineTipForItem)
+							.ScrollbarVisibility(EVisibility::Collapsed)
+							.IsFocusable(false)
+							.Visibility(EVisibility::HitTestInvisible)
+						]
+						+ SOverlay::Slot()
+						.VAlign(VAlign_Bottom)
+						[
+							ShaderMultiLineHScrollBar.ToSharedRef()
+						]
+						+ SOverlay::Slot()
+						[
+							SAssignNew(CodeCompletionCanvas, SCanvas)
+							+ SCanvas::Slot()
+							.Size_Lambda([this]{
+								float Height = CustomCursorHighlighter->ScaledLineHeight * CandidateItems.Num();
+								float HSize = FMath::Min(200.0f, Height);
+								return FVector2D{240, HSize};
+							})
+							.Position_Lambda([this]{
+								FVector2D TipPos = CustomCursorHighlighter->ScaledCursorPos;
+								TipPos.Y += CustomCursorHighlighter->ScaledLineHeight;
+								FVector2D Area = ShaderMultiLineEditableText->GetTickSpaceGeometry().GetLocalSize();
+								float HSize = FMath::Min(200.0f, CustomCursorHighlighter->ScaledLineHeight * CandidateItems.Num());
+								if(TipPos.Y + HSize > Area.Y)
+								{
+									TipPos.Y -= CustomCursorHighlighter->ScaledLineHeight;
+									TipPos.Y -= HSize;
+								}
+								if(TipPos.X + 240 > Area.X)
+								{
+									TipPos.X -= 240;
+								}
+								return TipPos;
+							})
 							[
-								SAssignNew(ShaderMultiLineEditableText, SMultiLineEditableText)
-								.Text(InitialShaderText)
-								.EnableUniformFont(true)
-								.Font(GetCodeFontInfo())
-								.Marshaller(ShaderMarshaller)
-								.VScrollBar(ShaderMultiLineVScrollBar)
-								.HScrollBar(ShaderMultiLineHScrollBar)
-								.OnKeyCharHandler(this, &SShaderEditorBox::HandleKeyChar)
-								.OnKeyDownHandler(this, &SShaderEditorBox::HandleKeyDown)
-								.CreateSlateTextLayout_Lambda([this](SWidget* InOwner, FTextBlockStyle InDefaultTextStyle){
-									return MakeShared<ShaderTextLayout>(InOwner, InDefaultTextStyle, ShaderMarshaller.Get());
+								SNew(SBorder)
+								.Visibility_Lambda([this]{
+									return bTryComplete? EVisibility::Visible : EVisibility::Collapsed;
 								})
-								.OnIsTypedCharValid_Lambda([](const TCHAR InChar) { return true; })
-								.OnCursorMoved_Lambda([this](const FTextLocation& NewCursorLocation){
-									if(!bKeyChar) {
-										bTryComplete = false;
-										bTryMergeUndoState = false;
-									}
-									bKeyChar = false;
-								})
-							]
-							+ SOverlay::Slot()
-							[
-								SAssignNew(EffectMultiLineEditableText, SMultiLineEditableText)
-								.IsReadOnly(true)
-								.EnableUniformFont(true)
-								.Font(GetCodeFontInfo())
-								.Marshaller(EffectMarshller)
-								.Visibility(EVisibility::HitTestInvisible)
-							]
-							+ SOverlay::Slot()
-							[
-								SAssignNew(LineTipList, SListView<LineNumberItemPtr>)
-								.ListItemsSource(&LineNumberData)
-								.SelectionMode(ESelectionMode::None)
-								.OnGenerateRow(this, &SShaderEditorBox::GenerateLineTipForItem)
-								.ScrollbarVisibility(EVisibility::Collapsed)
-								.IsFocusable(false)
-								.Visibility(EVisibility::HitTestInvisible)
-							]
-							+ SOverlay::Slot()
-							[
-								SAssignNew(CodeCompletionCanvas, SCanvas)
-								+ SCanvas::Slot()
-								.Size_Lambda([this]{
-									float Height = CustomCursorHighlighter->ScaledLineHeight * CandidateItems.Num();
-									float HSize = FMath::Min(200.0f, Height);
-									return FVector2D{240, HSize};
-								})
-								.Position_Lambda([this]{
-									FVector2D TipPos = CustomCursorHighlighter->ScaledCursorPos;
-									TipPos.Y += CustomCursorHighlighter->ScaledLineHeight;
-									FVector2D Area = ShaderMultiLineEditableText->GetTickSpaceGeometry().GetLocalSize();
-									float HSize = FMath::Min(200.0f, CustomCursorHighlighter->ScaledLineHeight * CandidateItems.Num());
-									if(TipPos.Y + HSize > Area.Y)
-									{
-										TipPos.Y -= CustomCursorHighlighter->ScaledLineHeight;
-										TipPos.Y -= HSize;
-									}
-									if(TipPos.X + 240 > Area.X)
-									{
-										TipPos.X -= 240;
-									}
-									return TipPos;
-								})
+								.BorderBackgroundColor(FLinearColor{1,1,1,0.8f})
+								.Padding(1.0)
 								[
-									SNew(SBorder)
-									.Visibility_Lambda([this]{
-										return bTryComplete? EVisibility::Visible : EVisibility::Collapsed;
-									})
-									.BorderBackgroundColor(FLinearColor{1,1,1,0.8f})
-									.Padding(1.0)
+									SNew(SHorizontalBox)
+									+SHorizontalBox::Slot()
 									[
-										SNew(SHorizontalBox)
-										+SHorizontalBox::Slot()
-										[
-											SAssignNew(CodeCompletionList, SListView<CandidateItemPtr>)
-											.ListItemsSource(&CandidateItems)
-											.SelectionMode(ESelectionMode::Single)
-											.OnGenerateRow(this, &SShaderEditorBox::GenerateCodeCompletionItem)
-											.EnableAnimatedScrolling(true)
-											.ConsumeMouseWheel(EConsumeMouseWheel::Always)
-											.ExternalScrollbar(CustomScrollBar)
-											.OnSelectionChanged_Lambda([this](CandidateItemPtr SelectedItem, ESelectInfo::Type){
-												CurSelectedCandidate = SelectedItem;
-											})
-											.IsFocusable(false)
-											.OnMouseButtonClick_Lambda([this](CandidateItemPtr ClickedItem){
-												InsertCompletionText(ClickedItem);
-												FSlateApplication::Get().SetUserFocus(0, ShaderMultiLineEditableText);
-											})
-										]
-										+SHorizontalBox::Slot()
-										.AutoWidth()
-										[
-											CustomScrollBar
-										]
+										SAssignNew(CodeCompletionList, SListView<CandidateItemPtr>)
+										.ListItemsSource(&CandidateItems)
+										.SelectionMode(ESelectionMode::Single)
+										.OnGenerateRow(this, &SShaderEditorBox::GenerateCodeCompletionItem)
+										.EnableAnimatedScrolling(true)
+										.ConsumeMouseWheel(EConsumeMouseWheel::Always)
+										.ExternalScrollbar(CustomScrollBar)
+										.OnSelectionChanged_Lambda([this](CandidateItemPtr SelectedItem, ESelectInfo::Type){
+											CurSelectedCandidate = SelectedItem;
+										})
+										.IsFocusable(false)
+										.OnMouseButtonClick_Lambda([this](CandidateItemPtr ClickedItem){
+											InsertCompletionText(ClickedItem);
+											FSlateApplication::Get().SetUserFocus(0, ShaderMultiLineEditableText);
+										})
+									]
+									+SHorizontalBox::Slot()
+									.AutoWidth()
+									[
+										CustomScrollBar
 									]
 								]
 							]
-                            
-                        ]
-                    ]
-                    
-                    + SVerticalBox::Slot()
-                    .AutoHeight()
-                    [
-                        BuildInfoBar()
-                    ]
-            
-                ]
-                + SGridPanel::Slot(1, 0)
-                [
-                    ShaderMultiLineVScrollBar.ToSharedRef()
-                ]
-                + SGridPanel::Slot(0, 1)
-                [
-                    ShaderMultiLineHScrollBar.ToSharedRef()
-                ]
+						]
+						
+					]
+					+ SHorizontalBox::Slot()
+					.AutoWidth()
+					[
+						ShaderMultiLineVScrollBar.ToSharedRef()
+					]
+				]
+				
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				[
+					BuildInfoBar()
+				]
             ]
                 
         ];
@@ -904,7 +900,7 @@ const FString ErrorMarkerText = TEXT("✘");
 
     FReply SShaderEditorBox::OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
     {
-        return CallPrivate_SMultiLineEditableText_OnMouseWheel(*ShaderMultiLineEditableText, MyGeometry, MouseEvent);
+        return CallPrivate_SMultiLineEditableText_OnMouseWheel(*ShaderMultiLineEditableText, ShaderMultiLineEditableText->GetTickSpaceGeometry(), MouseEvent);
     }
 
     FReply SShaderEditorBox::OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
@@ -931,7 +927,7 @@ const FString ErrorMarkerText = TEXT("✘");
 
     void SShaderEditorBox::UpdateEffectText()
     {
-        //Sync the error text location when scrolling ShaderMultiLineEditableText.
+        //Sync the effect text location when scrolling ShaderMultiLineEditableText.
         static float LastXoffset;
         TUniquePtr<FSlateEditableTextLayout>& EffectEditableTextLayout = GetPrivate_SMultiLineEditableText_EditableTextLayout(*EffectMultiLineEditableText);
         TUniquePtr<FSlateEditableTextLayout>& ShaderEditableTextLayout = GetPrivate_SMultiLineEditableText_EditableTextLayout(*ShaderMultiLineEditableText);
@@ -973,11 +969,13 @@ const FString ErrorMarkerText = TEXT("✘");
 
     void SShaderEditorBox::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
     {
-        SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
+		//ShaderMultiLineEditableText updates its VScrollBar when it ticks, and we sync the LineNumberList/LineTipList according to its VScrollBar callback.
+		//Which leads to a delay of one frame in the drawing of the list, so here we tick it earlier.
+		ShaderMultiLineEditableTextLayout->Tick(ShaderMultiLineEditableText->GetTickSpaceGeometry(), InCurrentTime, InDeltaTime);
         
         if(bRefreshIsense.load(std::memory_order_acquire))
         {
-            RefreshLineNumberToErrorInfo();
+            RefreshLineNumberToDiagInfo();
             RefreshCodeCompletionTip();
             bRefreshIsense.store(false, std::memory_order_relaxed);
         }
@@ -1115,15 +1113,15 @@ const FString ErrorMarkerText = TEXT("✘");
 
     }
 
-    void SShaderEditorBox::RefreshLineNumberToErrorInfo()
+    void SShaderEditorBox::RefreshLineNumberToDiagInfo()
     {
-        EffectMarshller->LineNumberToErrorInfo.Reset();
-        for (const ShaderErrorInfo& ErrorInfo : ErrorInfos)
+        EffectMarshller->LineNumberToDiagInfo.Reset();
+        for (const ShaderDiagnosticInfo& DiagInfo : DiagnosticInfos)
         {
-            int32 ErrorInfoLineNumber = ErrorInfo.Row - ShaderAssetObj->GetExtraLineNum();
-            if (!EffectMarshller->LineNumberToErrorInfo.Contains(ErrorInfoLineNumber))
+            int32 DiagInfoLineNumber = DiagInfo.Row - ShaderAssetObj->GetExtraLineNum();
+            if (!EffectMarshller->LineNumberToDiagInfo.Contains(DiagInfoLineNumber))
             {
-                int32 LineIndex = GetLineIndex(ErrorInfoLineNumber);
+                int32 LineIndex = GetLineIndex(DiagInfoLineNumber);
                 FString LineText;
                 if (LineIndex != INDEX_NONE) {
                     ShaderMultiLineEditableText->GetTextLine(LineIndex, LineText);
@@ -1136,11 +1134,25 @@ const FString ErrorMarkerText = TEXT("✘");
                     DummyText += LineText[i];
                 }
 
-                FString DisplayInfo = DummyText + TEXT("  ") + ErrorInfo.Info;
+				FString DisplayInfo = DummyText + TEXT("  ");
+				if(!DiagInfo.Error.IsEmpty())
+				{
+					DisplayInfo += DiagInfo.Error;
+				}
+				else if(!DiagInfo.Warn.IsEmpty())
+				{
+					DisplayInfo += DiagInfo.Warn;
+				}
                 FTextRange DummyRange{ 0, DummyText.Len() };
-                FTextRange ErrorRange{ DummyText.Len(), DisplayInfo.Len() };
+                FTextRange InfoRange{ DummyText.Len(), DisplayInfo.Len() };
 
-                EffectMarshller->LineNumberToErrorInfo.Add(ErrorInfoLineNumber, { MoveTemp(DummyRange), MoveTemp(ErrorRange), MoveTemp(DisplayInfo) });
+				EffectMarshller->LineNumberToDiagInfo.Add(DiagInfoLineNumber, {
+					.IsError = !DiagInfo.Error.IsEmpty(),
+					.IsWarn = !DiagInfo.Warn.IsEmpty(),
+					.DummyRange = MoveTemp(DummyRange),
+					.InfoRange = MoveTemp(InfoRange),
+					.TotalInfo = MoveTemp(DisplayInfo)
+				});
             }
         }
         
@@ -1154,20 +1166,28 @@ const FString ErrorMarkerText = TEXT("✘");
 
     void SShaderEditorBox::Compile()
     {
+		int32 AddedLineNum = ShaderAssetObj->GetExtraLineNum();
+		
 		//TODO Async and show "Compiling" state
         TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(ShaderAssetObj->GetShaderDesc(CurrentShaderSource));
-        FString ErrorInfo;
-        if (GGpuRhi->CompileShader(Shader, ErrorInfo))
+		FString ErrorInfo, WarnInfo;
+        if (GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo))
         {
 			ShaderAssetObj->Shader = Shader;
 			ShaderAssetObj->bCompilationSucceed = true;
             CurEditState = EditState::Succeed;
+			
+			if(!WarnInfo.IsEmpty())
+			{
+				WarnInfo = AdjustDiagLineNumber(WarnInfo, -AddedLineNum);
+				SH_LOG(LogShader, Warning, TEXT("%s"), *WarnInfo);
+			}
         }
-        else
+		
+		if(!ErrorInfo.IsEmpty())
         {
-			int32 AddedLineNum = ShaderAssetObj->GetExtraLineNum();
-			ErrorInfo = AdjustErrorLineNumber(ErrorInfo, -AddedLineNum);
-			SH_LOG(LogShader, Error, TEXT("Compilation failed:\n%s"), *ErrorInfo);
+			ErrorInfo = AdjustDiagLineNumber(ErrorInfo, -AddedLineNum);
+			SH_LOG(LogShader, Error, TEXT("%s"), *ErrorInfo);
 			ShaderAssetObj->bCompilationSucceed = false;
             CurEditState = EditState::Failed;
         }
@@ -1988,6 +2008,10 @@ const FString ErrorMarkerText = TEXT("✘");
                 const FTextLocation NewCursorLocation(CurCursorLocation.GetLineIndex() + FoldedLineText.Num() - 1, CurCursorLocation.GetOffset());
                 ShaderMultiLineEditableText->GoTo(NewCursorLocation);
             }
+			else
+			{
+				ShaderMultiLineEditableText->GoTo(CurCursorLocation);
+			}
         }
 		
 		ShaderMultiLineEditableTextLayout->EndEditTransaction();
@@ -1995,6 +2019,51 @@ const FString ErrorMarkerText = TEXT("✘");
 		
         return FReply::Handled();
     }
+
+	bool SShaderEditorBox::IsErrorLine(int InLineNumber) const
+	{
+		const int32 LineIndex = GetLineIndex(InLineNumber);
+		std::optional<int> DiagLineNumber;
+		if(EffectMarshller->LineNumberToDiagInfo.Contains(InLineNumber))
+		{
+			DiagLineNumber = InLineNumber;
+		}
+		else if (TOptional<int32> MarkerIndex = FindFoldMarker(LineIndex))
+		{
+			int32 FoldedLineCounts = VisibleFoldMarkers[*MarkerIndex].GetFoldedLineCounts();
+			for (int32 i = InLineNumber; i <= InLineNumber + FoldedLineCounts + 1; i++)
+			{
+				if (EffectMarshller->LineNumberToDiagInfo.Contains(i))
+				{
+					DiagLineNumber = i;
+				}
+			}
+		}
+		return DiagLineNumber ? EffectMarshller->LineNumberToDiagInfo[DiagLineNumber.value()].IsError : false;
+		
+	}
+
+	bool SShaderEditorBox::IsWarningLine(int InLineNumber) const
+	{
+		const int32 LineIndex = GetLineIndex(InLineNumber);
+		std::optional<int> DiagLineNumber;
+		if(EffectMarshller->LineNumberToDiagInfo.Contains(InLineNumber))
+		{
+			DiagLineNumber = InLineNumber;
+		}
+		else if (TOptional<int32> MarkerIndex = FindFoldMarker(LineIndex))
+		{
+			int32 FoldedLineCounts = VisibleFoldMarkers[*MarkerIndex].GetFoldedLineCounts();
+			for (int32 i = InLineNumber; i <= InLineNumber + FoldedLineCounts + 1; i++)
+			{
+				if (EffectMarshller->LineNumberToDiagInfo.Contains(i))
+				{
+					DiagLineNumber = i;
+				}
+			}
+		}
+		return DiagLineNumber ? EffectMarshller->LineNumberToDiagInfo[DiagLineNumber.value()].IsWarn : false;
+	}
 
     TSharedRef<ITableRow> SShaderEditorBox::GenerateRowForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
     {
@@ -2060,50 +2129,41 @@ const FString ErrorMarkerText = TEXT("✘");
 		{
 			FoldingArrow->SetButtonStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FButtonStyle>("ArrowDownButton"));
 		}
-        
-        auto ItemErrorMarker = SNew(STextBlock)
-        .Font(CodeFontInfo)
-        .ColorAndOpacity(FLinearColor::Red)
-        .Visibility_Lambda([this, Item]{
-            const int32 CurLineNumber = FCString::Atoi(*Item->ToString());
-            const int32 LineIndex = GetLineIndex(CurLineNumber);
-            if(EffectMarshller->LineNumberToErrorInfo.Contains(CurLineNumber))
-            {
-                return EVisibility::Visible;
-            }
-            else if (TOptional<int32> MarkerIndex = FindFoldMarker(LineIndex))
-            {
-                int32 FoldedLineCounts = VisibleFoldMarkers[*MarkerIndex].GetFoldedLineCounts();
-                for (int32 i = CurLineNumber; i <= CurLineNumber + FoldedLineCounts + 1; i++)
-                {
-                    if (EffectMarshller->LineNumberToErrorInfo.Contains(i))
-                    {
-                        return EVisibility::Visible;
-                    }
-                }
-            }
-            return EVisibility::Hidden;
-        })
-        .Text(FText::FromString(ErrorMarkerText));
 		
-		auto DebugLineMarker = SNew(SImage)
-		.Image_Lambda([this, LineNumber]{
-			if(StopLineNumber == LineNumber)
+		auto LineMarker = SNew(SImage)
+		.DesiredSizeOverride(FVector2D{12.0, 12.0})
+		.Image_Lambda([=, this] {
+			if(IsWarningLine(LineNumber) || IsErrorLine(LineNumber))
+			{
+				return FAppStyle::Get().GetBrush("Icons.Warning");
+			}
+			else if(StopLineNumber == LineNumber)
 			{
 				return FShaderHelperStyle::Get().GetBrush("Icons.ArrowBoldRight");
 			}
 			return FAppStyle::Get().GetBrush("Icons.BulletPoint");
 		})
-		.ColorAndOpacity_Lambda([this, LineNumber]{
-			if(StopLineNumber == LineNumber && DebuggerError.IsEmpty())
+		.ColorAndOpacity_Lambda([=, this]() -> FSlateColor {
+			if(IsWarningLine(LineNumber))
+			{
+				return FStyleColors::Warning;
+			}
+			else if(IsErrorLine(LineNumber))
+			{
+				return FStyleColors::Error;
+			}
+			else if(StopLineNumber == LineNumber && DebuggerError.IsEmpty())
 			{
 				return FLinearColor::Green;
 			}
 			return FLinearColor::Red;
 		})
-		.Visibility_Lambda([this, LineNumber, ItemErrorMarker]{
-			if(ItemErrorMarker->GetVisibility() != EVisibility::Visible
-			   && (BreakPointLines.Contains(LineNumber) || StopLineNumber == LineNumber))
+		.Visibility_Lambda([=, this] {
+			if(IsErrorLine(LineNumber) || IsWarningLine(LineNumber))
+			{
+				return EVisibility::Visible;
+			}
+			else if(BreakPointLines.Contains(LineNumber) || StopLineNumber == LineNumber)
 			{
 				return EVisibility::HitTestInvisible;
 			}
@@ -2121,17 +2181,16 @@ const FString ErrorMarkerText = TEXT("✘");
 					+SHorizontalBox::Slot()
 					.AutoWidth()
 					[
-						SNew(SOverlay)
-						+SOverlay::Slot()
+						SNew(SBox)
+						.MinDesiredWidth(16.0f)
+						.VAlign(VAlign_Center)
+						.HAlign(HAlign_Center)
 						[
-							ItemErrorMarker
-						]
-						+SOverlay::Slot()
-						[
-							DebugLineMarker
+							LineMarker
 						]
 					]
 					+ SHorizontalBox::Slot()
+					.AutoWidth()
 					[
 						LineNumberTextBlock.ToSharedRef()
 					]
@@ -2507,7 +2566,6 @@ const FString ErrorMarkerText = TEXT("✘");
         }
 
         //Update fold markers highlight.
-		TextLayout->ClearLineHighlights();
         for (const FTextLineHighlight& Highlight : Highlights)
         {
             TextLayout->AddLineHighlight(Highlight);
@@ -2543,21 +2601,31 @@ const FString ErrorMarkerText = TEXT("✘");
             TArray<TSharedRef<IRun>> Runs;
             FTextBlockStyle ErrorInfoStyle = FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorErrorInfoText");
             ErrorInfoStyle.SetFont(OwnerWidget->GetCodeFontInfo());
-
+			FTextBlockStyle WarnInfoStyle = FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorWarnInfoText");
+			WarnInfoStyle.SetFont(OwnerWidget->GetCodeFontInfo());
+			
             FTextBlockStyle DummyInfoStyle = FTextBlockStyle{}
                 .SetFont(OwnerWidget->GetCodeFontInfo())
                 .SetColorAndOpacity(FLinearColor{ 0, 0, 0, 0 });
 
             int32 CurLineNumber = OwnerWidget->GetLineNumber(LineIndex);
-            if (LineNumberToErrorInfo.Contains(CurLineNumber))
+            if (LineNumberToDiagInfo.Contains(CurLineNumber))
             {
-                TSharedRef<FString> TotalInfo = MakeShared<FString>(LineNumberToErrorInfo[CurLineNumber].TotalInfo);
+                TSharedRef<FString> TotalInfo = MakeShared<FString>(LineNumberToDiagInfo[CurLineNumber].TotalInfo);
 
-                TSharedRef<IRun> DummyRun = FSlateTextRun::Create(FRunInfo(), TotalInfo, DummyInfoStyle, LineNumberToErrorInfo[CurLineNumber].DummyRange);
+                TSharedRef<IRun> DummyRun = FSlateTextRun::Create(FRunInfo(), TotalInfo, DummyInfoStyle, LineNumberToDiagInfo[CurLineNumber].DummyRange);
                 Runs.Add(MoveTemp(DummyRun));
 
-                TSharedRef<IRun> ErrorRun = FSlateTextRun::Create(FRunInfo(), TotalInfo, ErrorInfoStyle, LineNumberToErrorInfo[CurLineNumber].ErrorRange);
-                Runs.Add(MoveTemp(ErrorRun));
+				if(LineNumberToDiagInfo[CurLineNumber].IsError)
+				{
+					TSharedRef<IRun> ErrorRun = FSlateTextRun::Create(FRunInfo(), TotalInfo, ErrorInfoStyle, LineNumberToDiagInfo[CurLineNumber].InfoRange);
+					Runs.Add(MoveTemp(ErrorRun));
+				}
+				else if(LineNumberToDiagInfo[CurLineNumber].IsWarn)
+				{
+					TSharedRef<IRun> WarnRun = FSlateTextRun::Create(FRunInfo(), TotalInfo, WarnInfoStyle, LineNumberToDiagInfo[CurLineNumber].InfoRange);
+					Runs.Add(MoveTemp(WarnRun));
+				}
 
                 LinesToAdd.Emplace(MoveTemp(TotalInfo), MoveTemp(Runs));
             }
@@ -2603,10 +2671,103 @@ const FString ErrorMarkerText = TEXT("✘");
 			if(!Var.IsExternal())
 			{
 				Var.Initialized = true;
+				Var.InitializedRanges.Add({VarChange.Range.OffsetBytes, VarChange.Range.OffsetBytes + VarChange.Range.ByteSize});
 				std::get<SpvObject::Internal>(Var.Storage).Value = bReverse ? VarChange.PreValue : VarChange.NewValue;
 			}
 			DirtyVars.Add(VarChange.VarId, VarChange.Range);
 		}
+	}
+
+	TArray<VariableNodePtr> AppendVarChildNodes(SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, const TArray<SpvVariableChange::DirtyRange>& DirtyRanges, const TArray<uint8>& Value, int InOffset)
+	{
+		TArray<VariableNodePtr> Nodes;
+		if(TypeDesc->GetKind() == SpvTypeDescKind::Member)
+		{
+			SpvMemberTypeDesc* MemberTypeDesc = static_cast<SpvMemberTypeDesc*>(TypeDesc);
+			int32 MemberByteSize = MemberTypeDesc->GetSize() / 8;
+			TArrayView<const uint8> MemberValue = MakeArrayView(Value.GetData() + InOffset, MemberByteSize);
+			FString ValueStr = LOCALIZATION("Uninitialized").ToString();
+			for(const auto& Range : InitializedRanges)
+			{
+				if(InOffset >= Range.X && InOffset + MemberByteSize <= Range.Y)
+				{
+					ValueStr = GetValueStr(MemberValue, MemberTypeDesc->GetTypeDesc());
+					break;
+				}
+			}
+			auto Data = MakeShared<VariableNode>(MemberTypeDesc->GetName(), MoveTemp(ValueStr), GetTypeDescStr(MemberTypeDesc->GetTypeDesc()));
+			if(MemberTypeDesc->GetTypeDesc()->GetKind() == SpvTypeDescKind::Composite)
+			{
+				Data->Children = AppendVarChildNodes(MemberTypeDesc->GetTypeDesc(), InitializedRanges, DirtyRanges, Value, InOffset);
+			}
+			for(const auto& Range : DirtyRanges)
+			{
+				int32 RangeStart = Range.OffsetBytes;
+				int32 RangeEnd = Range.OffsetBytes + Range.ByteSize;
+				if((RangeStart >= InOffset && RangeStart < InOffset + MemberByteSize) ||
+				   (RangeEnd > InOffset && RangeEnd <= InOffset + MemberByteSize))
+				{
+					Data->Dirty = true;
+					break;
+				}
+			}
+			Nodes.Add(MoveTemp(Data));
+		}
+		else if(TypeDesc->GetKind() == SpvTypeDescKind::Composite)
+		{
+			SpvCompositeTypeDesc* CompositeTypeDesc = static_cast<SpvCompositeTypeDesc*>(TypeDesc);
+			int Offset = InOffset;
+			for(SpvTypeDesc* MemberTypeDesc : CompositeTypeDesc->GetMemberTypeDescs())
+			{
+				Nodes.Append(AppendVarChildNodes(MemberTypeDesc, InitializedRanges, DirtyRanges, Value, Offset));
+				if(MemberTypeDesc->GetKind() == SpvTypeDescKind::Member)
+				{
+					Offset += static_cast<SpvMemberTypeDesc*>(MemberTypeDesc)->GetSize() / 8;
+				}
+			}
+		}
+		else
+		{
+			
+		}
+		return Nodes;
+	}
+
+	TArray<ExpressionNodePtr> AppendExprChildNodes(SpvTypeDesc* TypeDesc, const TArray<uint8>& Value, int InOffset)
+	{
+		TArray<ExpressionNodePtr> Nodes;
+		if(TypeDesc->GetKind() == SpvTypeDescKind::Member)
+		{
+			SpvMemberTypeDesc* MemberTypeDesc = static_cast<SpvMemberTypeDesc*>(TypeDesc);
+			int32 MemberByteSize = MemberTypeDesc->GetSize() / 8;
+			TArrayView<const uint8> MemberValue = MakeArrayView(Value.GetData() + InOffset, MemberByteSize);
+			FString ValueStr = GetValueStr(MemberValue, MemberTypeDesc->GetTypeDesc());
+			FString TypeName = GetTypeDescStr(MemberTypeDesc->GetTypeDesc());
+			auto Data = MakeShared<ExpressionNode>(MemberTypeDesc->GetName(), FText::FromString(ValueStr), FText::FromString(TypeName));
+			if(MemberTypeDesc->GetTypeDesc()->GetKind() == SpvTypeDescKind::Composite)
+			{
+				Data->Children = AppendExprChildNodes(MemberTypeDesc->GetTypeDesc(), Value, InOffset);
+			}
+			Nodes.Add(MoveTemp(Data));
+		}
+		else if(TypeDesc->GetKind() == SpvTypeDescKind::Composite)
+		{
+			SpvCompositeTypeDesc* CompositeTypeDesc = static_cast<SpvCompositeTypeDesc*>(TypeDesc);
+			int Offset = InOffset;
+			for(SpvTypeDesc* MemberTypeDesc : CompositeTypeDesc->GetMemberTypeDescs())
+			{
+				Nodes.Append(AppendExprChildNodes(MemberTypeDesc, Value, Offset));
+				if(MemberTypeDesc->GetKind() == SpvTypeDescKind::Member)
+				{
+					Offset += static_cast<SpvMemberTypeDesc*>(MemberTypeDesc)->GetSize() / 8;
+				}
+			}
+		}
+		else
+		{
+			
+		}
+		return Nodes;
 	}
 
 	void SShaderEditorBox::ShowDeuggerVariable(SpvLexicalScope* InScope) const
@@ -2646,20 +2807,21 @@ const FString ErrorMarkerText = TEXT("✘");
 					{
 						FString VarName = VarDesc->Name;
 						FString TypeName = GetTypeDescStr(VarDesc->TypeDesc);
-						FString ValueStr = "Uninitialized";
+						FString ValueStr = LOCALIZATION("Uninitialized").ToString();
+						const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var.Storage).Value;
 						if(Var.Initialized)
 						{
-							const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var.Storage).Value;
 							ValueStr = GetValueStr(Value, VarDesc->TypeDesc);
 						}
 						auto Data = MakeShared<VariableNode>(VarName, ValueStr, TypeName);
 						TArray<SpvVariableChange::DirtyRange> Ranges;
 						DirtyVars.MultiFind(VarId, Ranges);
-						if(VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Composite)
+						if(VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Composite || VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Array)
 						{
-							
+							Data->Children = AppendVarChildNodes(VarDesc->TypeDesc, Var.InitializedRanges, Ranges, Value, 0);
 						}
-						else if(!Ranges.IsEmpty())
+						
+						if(!Ranges.IsEmpty())
 						{
 							Data->Dirty = true;
 						}
@@ -2730,14 +2892,13 @@ const FString ErrorMarkerText = TEXT("✘");
 				}
 				VisibleLocalVarBindings += "};\n";
 				VisibleLocalVarBindings += "StructuredBuffer<__Expression_Vars_Set> __Expression_Vars : register(t114514);\n";
-				ExpressionShader.InsertAt(StartPos, MoveTemp(VisibleLocalVarBindings));
 				
 				//Append the EntryPoint
 				FString EntryPointFunc = FString::Printf(TEXT("\nvoid %s() {\n"), *EntryPoint);
 				EntryPointFunc += MoveTemp(LocalVars);
 				EntryPointFunc += FString::Printf(TEXT("__Expression_Output(%s);\n"), *InExpression);
 				EntryPointFunc += "}\n";
-				ExpressionShader += MoveTemp(EntryPointFunc);
+				ExpressionShader += VisibleLocalVarBindings + EntryPointFunc;
 				break;
 			}
 		}
@@ -2761,8 +2922,8 @@ void __Expression_Output(T __Expression_Result) {}
 		ExtraArgs.Add("-D");
 		ExtraArgs.Add("ENABLE_PRINT=0");
 		
-		FString ErrorInfo;
-		GGpuRhi->CompileShader(Shader, ErrorInfo, ExtraArgs);
+		FString ErrorInfo, WarnInfo;
+		GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo, ExtraArgs);
 		if(ErrorInfo.IsEmpty())
 		{
             TRefCountPtr<GpuBuffer> LocalVarsInput = GGpuRhi->CreateBuffer({
@@ -2807,7 +2968,15 @@ void __Expression_Output(T __Expression_Result) {}
 				{
 					FString TypeName = GetTypeDescStr(VmContext.ResultTypeDesc);
 					FString ValueStr = GetValueStr(VmContext.ResultValue, VmContext.ResultTypeDesc);
-					return {.Expr = InExpression, .ValueStr = FText::FromString(ValueStr), .TypeName = FText::FromString(TypeName)};
+					
+					TArray<TSharedPtr<ExpressionNode>> Children;
+					if(VmContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Composite || VmContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Array)
+					{
+						Children = AppendExprChildNodes(VmContext.ResultTypeDesc, VmContext.ResultValue, 0);
+					}
+					
+					return {.Expr = InExpression, .ValueStr = FText::FromString(ValueStr),
+						.TypeName = FText::FromString(TypeName), .Children = MoveTemp(Children)};
 				}
 				else
 				{
@@ -3003,8 +3172,8 @@ void __Expression_Output(T __Expression_Result) {}
 		ExtraArgs.Add("-D");
 		ExtraArgs.Add("ENABLE_PRINT=0");
 		
-		FString ErrorInfo;
-		GGpuRhi->CompileShader(Shader, ErrorInfo, ExtraArgs);
+		FString ErrorInfo, WarnInfo;
+		GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo, ExtraArgs);
 		check(ErrorInfo.IsEmpty());
 		
 		SpirvParser Parser;

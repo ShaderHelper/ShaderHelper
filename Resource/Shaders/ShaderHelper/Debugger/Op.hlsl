@@ -7,6 +7,8 @@
 #define OpFSub 131
 #define OpIMul 132
 #define OpFMul 133
+#define OpUDiv 134
+#define OpSDiv 135
 #define OpFDiv 136
 #define OpVectorTimesScalar 142
 #define OpIsNan 156
@@ -17,16 +19,20 @@
 #define OpSLessThan 177
 #define OpFOrdLessThan 184
 #define OpFOrdGreaterThan 186
+#define OpBitwiseOr 197
+#define OpBitwiseXor 198
 #define OpBitwiseAnd 199
 #define OpDPdx 207
 #define OpDPdy 208
 #define Sin 13
 #define Cos 14
 #define Pow 26
+#define Step 48
+#define SmoothStep 49
 
-#if OpCode == OpFDiv || OpCode == OpIAdd || OpCode == OpFAdd || OpCode == OpISub ||     \
-OpCode == OpFSub || OpCode == OpIMul || OpCode == OpFMul || OpCode == OpBitwiseAnd ||   \
-OpCode == Pow
+#if OpCode == OpFDiv || OpCode == OpUDiv || OpCode == OpSDiv || OpCode == OpIAdd || OpCode == OpFAdd || OpCode == OpISub ||                 \
+OpCode == OpFSub || OpCode == OpIMul || OpCode == OpFMul || OpCode == OpBitwiseAnd || OpCode == OpBitwiseOr || OpCode == OpBitwiseXor ||    \
+OpCode == Pow || OpCode == Step
 struct Op
 {
     OpResultType Result;
@@ -39,6 +45,14 @@ struct Op
     OpResultType Result;
     OpOperandType Operand1;
     OpOperandType Operand2;
+};
+#elif OpCode == SmoothStep
+struct Op
+{
+    OpResultType Result;
+    OpResultType Operand1;
+    OpResultType Operand2;
+    OpResultType Operand3;
 };
 #elif OpCode == OpVectorTimesScalar
 struct Op
@@ -82,6 +96,10 @@ void MainCS()
 {
 #if OpCode == OpBitwiseAnd
     Input[0].Result = Input[0].Operand1 & Input[0].Operand2;
+#elif OpCode == OpBitwiseOr
+    Input[0].Result = Input[0].Operand1 | Input[0].Operand2;
+#elif OpCode == OpBitwiseXor
+    Input[0].Result = Input[0].Operand1 ^ Input[0].Operand
 #elif OpCode == OpSelect
     Input[0].Result = select(Input[0].Condition,Input[0].Object1,Input[0].Object2);
 #elif OpCode == OpIMul || OpCode == OpFMul || OpCode == OpVectorTimesScalar
@@ -104,7 +122,7 @@ void MainCS()
     Input[0].Result = Input[0].Operand1 + Input[0].Operand2;
 #elif OpCode == OpISub || OpCode == OpFSub
     Input[0].Result = Input[0].Operand1 - Input[0].Operand2;
-#elif OpCode == OpFDiv
+#elif OpCode == OpFDiv || OpCode == OpUDiv || OpCode == OpSDiv
     Input[0].Result = Input[0].Operand1 / Input[0].Operand2;
 #elif OpCode == Sin
     Input[0].Result = sin(Input[0].Operand);
@@ -112,6 +130,10 @@ void MainCS()
     Input[0].Result = cos(Input[0].Operand);
 #elif OpCode == Pow
     Input[0].Result = pow(Input[0].Operand1, Input[0].Operand2);
+#elif OpCode == Step
+    Input[0].Result = step(Input[0].Operand1, Input[0].Operand2);
+#elif OpCode == SmoothStep
+    Input[0].Result = smoothstep(Input[0].Operand1, Input[0].Operand2, Input[0].Operand3);
 #endif
 }
 

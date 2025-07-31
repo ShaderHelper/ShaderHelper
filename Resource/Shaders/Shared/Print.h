@@ -154,11 +154,10 @@ AppendArgFunc(bool)
 		uint Increment = 2 + CharNum + ArgByteSize;                     \
 		uint OldByteSize = Printer[0].ByteSize;                         \
 		uint ByteOffset = 0xFFFFFFFF;                                   \
-		[allow_uav_condition]                                           \
 		while(OldByteSize + Increment <= Printer::MaxBufferSize * 4)    \
 		{                                                               \
 			uint CompareValue = OldByteSize;                            \
-			InterlockedCompareExchange(Printer[0].ByteSize,             \ 
+			InterlockedCompareExchange(Printer[0].ByteSize,             \
 				CompareValue, OldByteSize + Increment, OldByteSize);    \
 			if(OldByteSize == CompareValue)                             \
 			{                                                           \

@@ -152,10 +152,11 @@ namespace FW
         TArray<FString> IncludeDirs;
     };
 
-	struct ShaderErrorInfo
+	struct ShaderDiagnosticInfo
 	{
 		int32 Row, Col;
-		FString Info;
+		FString Error;
+		FString Warn;
 	};
 
     struct ShaderCandidateInfo
@@ -176,14 +177,14 @@ namespace FW
 		Vector2i End;
 	};
 
-	FRAMEWORK_API FString AdjustErrorLineNumber(const FString& ErrorInfo, int32 Delta);
+	FRAMEWORK_API FString AdjustDiagLineNumber(const FString& ErrorInfo, int32 Delta);
     FRAMEWORK_API TArray<ShaderCandidateInfo> DefaultCandidates();
 
     class FRAMEWORK_API ShaderTU
     {
     public:
 		ShaderTU(FStringView HlslSource, const TArray<FString>& IncludeDirs = {});
-        TArray<ShaderErrorInfo> GetDiagnostic();
+		TArray<ShaderDiagnosticInfo> GetDiagnostic();
 		HLSL::TokenType GetTokenType(HLSL::TokenType InType, uint32 Row, uint32 Col);
         TArray<ShaderCandidateInfo> GetCodeComplete(uint32 Row, uint32 Col);
 		TArray<ShaderFuncScope> GetFuncScopes();

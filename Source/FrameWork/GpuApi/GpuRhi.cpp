@@ -250,9 +250,9 @@ public:
 		RhiBackend->SetResourceName(Name, InResource);
 	}
 
-	bool CompileShader(GpuShader *InShader, FString &OutErrorInfo, const TArray<FString>& ExtraArgs) override
+	bool CompileShader(GpuShader *InShader, FString &OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs) override
 	{
-		return RhiBackend->CompileShader(InShader, OutErrorInfo, ExtraArgs);
+		return RhiBackend->CompileShader(InShader, OutErrorInfo, OutWarnInfo, ExtraArgs);
 	}
 
 	void BeginGpuCapture(const FString &CaptureName) override

@@ -91,6 +91,7 @@ namespace FW
 		
 		bool IsScalar() const { return Kind == SpvTypeKind::Bool || Kind == SpvTypeKind::Float
 			|| Kind == SpvTypeKind::Integer; }
+		bool IsComposite() const { return Kind == SpvTypeKind::Vector || Kind == SpvTypeKind::Struct || Kind == SpvTypeKind::Array; }
 		
 	protected:
 		SpvTypeKind Kind;
@@ -287,6 +288,7 @@ namespace FW
 	{
 		bool Initialized{};
 		SpvStorageClass StorageClass;
+		TArray<Vector2i> InitializedRanges;
 	};
 
 	struct SpvPointer
@@ -370,6 +372,8 @@ namespace FW
 		SLessThan = 177,
 		FOrdLessThan = 184,
 		FOrdGreaterThan = 186,
+		BitwiseOr = 197,
+		BitwiseXor = 198,
 		BitwiseAnd = 199,
 		DPdx = 207,
 		DPdy = 208,

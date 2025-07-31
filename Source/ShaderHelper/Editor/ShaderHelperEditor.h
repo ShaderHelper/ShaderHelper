@@ -11,6 +11,7 @@
 #include "Renderer/RenderComponent.h"
 #include "Renderer/Renderer.h"
 #include "ProjectManager/ShProjectManager.h"
+#include "UI/Widgets/Log/SOutputLog.h"
 #include "UI/Widgets/Property/PropertyView/SPropertyView.h"
 #include "UI/Widgets/Debugger/SDebuggerViewport.h"
 #include "UI/Widgets/Debugger/SDebuggerVariableView.h"
@@ -93,6 +94,7 @@ namespace SH
         TSharedRef<SWidget> SpawnShaderPath(const FString& InShaderPath);
 		FToolBarBuilder CreateToolBarBuilder();
         FMenuBarBuilder CreateMenuBarBuilder();
+		void CreateInternalWidgets();
 		void FillMenu(FMenuBuilder& MenuBuilder, FString MenuName);
 		
 	private:
@@ -111,6 +113,7 @@ namespace SH
         TSharedPtr<class SDockingArea> CodeTabMainArea;
         
 		TSharedPtr<SWindow> Window;
+		TSharedPtr<SViewport> ViewportWidget;
 		TSharedPtr<FW::PreviewViewPort> ViewPort;
 		FVector2D WindowSize;
 
@@ -120,6 +123,7 @@ namespace SH
         
 		TSharedPtr<ShProject> CurProject;
 
+		TSharedPtr<FW::SOutputLog> OutputLog;
 		TSharedPtr<FW::SGraphPanel> GraphPanel;
 
 		ShRenderer* Renderer;

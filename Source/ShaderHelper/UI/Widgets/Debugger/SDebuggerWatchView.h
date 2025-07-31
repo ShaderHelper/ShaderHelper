@@ -9,6 +9,7 @@ namespace SH
 		FText TypeName;
 		bool Dirty{};
 		TArray<TSharedPtr<ExpressionNode>> Children;
+		bool Expanded{};
 	};
 
 	using ExpressionNodePtr = TSharedPtr<ExpressionNode>;

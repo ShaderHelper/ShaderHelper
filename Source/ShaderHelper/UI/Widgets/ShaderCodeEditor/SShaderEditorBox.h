@@ -113,17 +113,19 @@ namespace SH
 		void SubmitEffectText();
         
     public:
-        struct ErrorEffectInfo
+        struct DiagEffectInfo
         {
+			bool IsError{};
+			bool IsWarn{};
             FTextRange DummyRange;
-            FTextRange ErrorRange;
+            FTextRange InfoRange;
             FString TotalInfo;
         };
 		
 	public:
 		SShaderEditorBox* OwnerWidget;
 		FTextLayout* TextLayout;
-		TMap<int32, ErrorEffectInfo> LineNumberToErrorInfo;
+		TMap<int32, DiagEffectInfo> LineNumberToDiagInfo;
 	};
 
 	struct ISenseTask
@@ -199,6 +201,8 @@ namespace SH
 		TSharedRef<ITableRow> GenerateRowForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 		TSharedRef<ITableRow> GenerateLineTipForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
         TSharedRef<ITableRow> GenerateCodeCompletionItem(CandidateItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
+		bool IsErrorLine(int InLineNumber) const;
+		bool IsWarningLine(int InLineNumber) const;
 
 		ShaderAsset* GetShaderAsset() const { return ShaderAssetObj; }
         FText GetEditStateText() const;
@@ -217,7 +221,7 @@ namespace SH
 		FString UnFoldText(const FTextSelection& DisplayedTextRange);
         
         void UpdateLineNumberData();
-        void RefreshLineNumberToErrorInfo();
+        void RefreshLineNumberToDiagInfo();
         void RefreshCodeCompletionTip();
 		void RefreshSyntaxHighlight();
 		
@@ -305,7 +309,7 @@ namespace SH
         std::atomic<bool> bQuitISense{};
         std::atomic<bool> bRefreshIsense{};
         FEvent* ISenseEvent = nullptr;
-        TArray<FW::ShaderErrorInfo> ErrorInfos;
+        TArray<FW::ShaderDiagnosticInfo> DiagnosticInfos;
         
         FString CurToken;
         TArray<FW::ShaderCandidateInfo> CandidateInfos;

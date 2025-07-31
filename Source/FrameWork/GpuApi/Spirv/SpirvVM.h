@@ -103,6 +103,8 @@ namespace FW
 		void Visit(SpvSin* Inst) override;
 		void Visit(SpvCos* Inst) override;
 		void Visit(SpvPow* Inst) override;
+		void Visit(SpvStep* Inst) override;
+		void Visit(SpvSmoothStep* Inst) override;
 		
 		void Visit(SpvOpFunctionParameter* Inst) override;
 		void Visit(SpvOpFunctionCall* Inst) override;
@@ -132,7 +134,11 @@ namespace FW
 		void Visit(SpvOpFSub* Inst) override;
 		void Visit(SpvOpIMul* Inst) override;
 		void Visit(SpvOpFMul* Inst) override;
+		void Visit(SpvOpUDiv* Inst) override;
+		void Visit(SpvOpSDiv* Inst) override;
 		void Visit(SpvOpFDiv* Inst) override;
+		void Visit(SpvOpBitwiseOr* Inst) override;
+		void Visit(SpvOpBitwiseXor* Inst) override;
 		void Visit(SpvOpBitwiseAnd* Inst) override;
 		void Visit(SpvOpBranch* Inst) override;
 		void Visit(SpvOpBranchConditional* Inst) override;

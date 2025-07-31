@@ -437,7 +437,7 @@ namespace FW
 		bool bGlobal{};
 	};
 
-	inline FString GetValueStr(const TArray<uint8>& InValue, const SpvTypeDesc* TypeDesc)
+	inline FString GetValueStr(TArrayView<const uint8> InValue, const SpvTypeDesc* TypeDesc)
 	{
 		FString ValueStr;
 		if(TypeDesc->GetKind() == SpvTypeDescKind::Vector)
@@ -495,6 +495,30 @@ namespace FW
 				uint32 Value = *(uint32*)(InValue.GetData());
 				ValueStr += FString::Format(TEXT("{0}"), {Value});
 			}
+		}
+		else if(TypeDesc->GetKind() == SpvTypeDescKind::Composite)
+		{
+			const SpvCompositeTypeDesc* CompositeTypeDesc = static_cast<const SpvCompositeTypeDesc*>(TypeDesc);
+			ValueStr += "{";
+			const TArray<SpvTypeDesc*>& MemberTypeDescs = CompositeTypeDesc->GetMemberTypeDescs();
+			int Offset = 0;
+			for(int Index = 0; Index < MemberTypeDescs.Num(); Index++)
+			{
+				if(MemberTypeDescs[Index]->GetKind() == SpvTypeDescKind::Member)
+				{
+					SpvMemberTypeDesc* MemberTypeDesc = static_cast<SpvMemberTypeDesc*>(MemberTypeDescs[Index]);
+					ValueStr += MemberTypeDesc->GetName() + "=";
+					TArrayView<const uint8> MemberValue = MakeArrayView(InValue.GetData() + Offset, MemberTypeDesc->GetSize() / 8);
+					ValueStr += GetValueStr(MemberValue, MemberTypeDesc->GetTypeDesc());
+					Offset += MemberTypeDesc->GetSize() / 8;
+				}
+				
+				if(Index != MemberTypeDescs.Num() - 1)
+				{
+					ValueStr += ", ";
+				}
+			}
+			ValueStr += "}";
 		}
 		return ValueStr;
 	}

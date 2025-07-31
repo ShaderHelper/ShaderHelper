@@ -28,8 +28,8 @@ namespace FW
 			.ExtraDecl = BindGroupLayout->GetCodegenDeclaration()
 		});
 
-		FString ErrorInfo;
-		GGpuRhi->CompileShader(Cs, ErrorInfo, ExtraArgs);
+		FString ErrorInfo, WarnInfo;
+		GGpuRhi->CompileShader(Cs, ErrorInfo, WarnInfo, ExtraArgs);
 		check(ErrorInfo.IsEmpty());
 	}
 

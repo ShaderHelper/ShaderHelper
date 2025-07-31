@@ -198,11 +198,13 @@ namespace FW
 
 	void SpvMetaVisitor::Visit(SpvOpConstant* Inst)
 	{
+		SpvId ResultId = Inst->GetId().value();
 		SpvObject Obj = {
+			.Id = ResultId,
 			.Type = Context.Types[Inst->GetResultType()].Get(),
 			.Storage = SpvObject::Internal{Inst->GetValue()}
 		};
-		Context.Constants.emplace(Inst->GetId().value(), MoveTemp(Obj));
+		Context.Constants.emplace(ResultId, MoveTemp(Obj));
 	}
 
 	void SpvMetaVisitor::Visit(SpvOpConstantTrue* Inst)
@@ -249,14 +251,16 @@ namespace FW
 
 	void SpvMetaVisitor::Visit(SpvOpConstantNull* Inst)
 	{
+		SpvId ResultId = Inst->GetId().value();
 		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
 		TArray<uint8> Value;
 		Value.SetNumZeroed(GetTypeByteSize(ResultType));
 		SpvObject Obj = {
+			.Id = ResultId,
 			.Type = ResultType,
 			.Storage = SpvObject::Internal{MoveTemp(Value)}
 		};
-		Context.Constants.emplace(Inst->GetId().value(), MoveTemp(Obj));
+		Context.Constants.emplace(ResultId, MoveTemp(Obj));
 	}
 
 	void SpvMetaVisitor::Visit(SpvDebugTypeBasic* Inst)
@@ -735,11 +739,21 @@ namespace FW
 			}
 			else if(OpCode == SpvOp::UDiv)
 			{
-				
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvId Operand1 = SpvCode[WordOffset + 3];
+				SpvId Operand2 = SpvCode[WordOffset + 4];
+				DecodedInst = MakeUnique<SpvOpUDiv>(ResultType, Operand1, Operand2);
+				DecodedInst->SetId(ResultId);
 			}
 			else if(OpCode == SpvOp::SDiv)
 			{
-				
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvId Operand1 = SpvCode[WordOffset + 3];
+				SpvId Operand2 = SpvCode[WordOffset + 4];
+				DecodedInst = MakeUnique<SpvOpSDiv>(ResultType, Operand1, Operand2);
+				DecodedInst->SetId(ResultId);
 			}
 			else if(OpCode == SpvOp::FDiv)
 			{
@@ -829,6 +843,24 @@ namespace FW
 				SpvId Operand1 = SpvCode[WordOffset + 3];
 				SpvId Operand2 = SpvCode[WordOffset + 4];
 				DecodedInst = MakeUnique<SpvOpFOrdGreaterThan>(ResultType, Operand1, Operand2);
+				DecodedInst->SetId(ResultId);
+			}
+			else if(OpCode == SpvOp::BitwiseOr)
+			{
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvId Operand1 = SpvCode[WordOffset + 3];
+				SpvId Operand2 = SpvCode[WordOffset + 4];
+				DecodedInst = MakeUnique<SpvOpBitwiseOr>(ResultType, Operand1, Operand2);
+				DecodedInst->SetId(ResultId);
+			}
+			else if(OpCode == SpvOp::BitwiseXor)
+			{
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvId Operand1 = SpvCode[WordOffset + 3];
+				SpvId Operand2 = SpvCode[WordOffset + 4];
+				DecodedInst = MakeUnique<SpvOpBitwiseXor>(ResultType, Operand1, Operand2);
 				DecodedInst->SetId(ResultId);
 			}
 			else if(OpCode == SpvOp::BitwiseAnd)
@@ -1031,6 +1063,21 @@ namespace FW
 						SpvId X = SpvCode[WordOffset + 5];
 						SpvId Y = SpvCode[WordOffset + 6];
 						DecodedInst = MakeUnique<SpvPow>(ResultType, X, Y);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::Step)
+					{
+						SpvId Edge = SpvCode[WordOffset + 5];
+						SpvId X = SpvCode[WordOffset + 6];
+						DecodedInst = MakeUnique<SpvStep>(ResultType, Edge, X);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::SmoothStep)
+					{
+						SpvId Edge0 = SpvCode[WordOffset + 5];
+						SpvId Edge1 = SpvCode[WordOffset + 6];
+						SpvId X = SpvCode[WordOffset + 7];
+						DecodedInst = MakeUnique<SpvSmoothStep>(ResultType, Edge0, Edge1, X);
 						DecodedInst->SetId(ResultId);
 					}
 				}
