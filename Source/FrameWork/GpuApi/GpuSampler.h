@@ -5,7 +5,7 @@ namespace FW
 {
 	struct GpuSamplerDesc
 	{
-		SamplerFilter Filer = SamplerFilter::Point;
+		SamplerFilter Filter = SamplerFilter::Point;
 		SamplerAddressMode AddressU = SamplerAddressMode::Clamp;
 		SamplerAddressMode AddressV = SamplerAddressMode::Clamp;
 		SamplerAddressMode AddressW = SamplerAddressMode::Clamp;

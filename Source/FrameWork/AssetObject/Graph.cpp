@@ -19,6 +19,8 @@ namespace FW
 								.BaseClass<AssetObject>()
 	)
 
+	TMap<FString, TArray<MetaType*>> RegisteredNodes;
+
 	void Graph::Serialize(FArchive& Ar)
 	{
 		AssetObject::Serialize(Ar);

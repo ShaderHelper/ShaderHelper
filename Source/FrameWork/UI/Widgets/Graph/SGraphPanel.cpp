@@ -42,11 +42,22 @@ namespace FW
 		ZoomValue = 0;
 	}
 
-	TSharedPtr<SGraphNode> SGraphPanel::AddNodeFromData(GraphNode* InNodeData)
+	void SGraphPanel::AddNode(ObjectPtr<GraphNode> NewNodeData)
 	{
-		auto NodeWidget = InNodeData->CreateNodeWidget(this);
+		NewNodeData->InitPins();
+		NewNodeData->SetOuter(GraphData);
+		NewNodeData->Position = PanelCoordToGraphCoord(MousePos);
+		
+		ShObjectOp* Op = GetShObjectOp(NewNodeData);
+		Op->OnSelect(NewNodeData);
+
+		auto NodeWidget = NewNodeData->CreateNodeWidget(this);
 		Nodes.Add(NodeWidget);
-		return NodeWidget;
+		
+		ClearSelectedNode();
+		GraphData->AddNode(NewNodeData);
+		AddSelectedNode(NodeWidget);
+		GraphData->MarkDirty();
 	}
 
 	void SGraphPanel::AddLink(SGraphPin* Output, SGraphPin* Input)
@@ -120,7 +131,8 @@ namespace FW
 		{
 			for (auto& NodeData : GraphData->GetNodes())
 			{
-				AddNodeFromData(NodeData);
+				auto NodeWidget = NodeData->CreateNodeWidget(this);
+				Nodes.Add(NodeWidget);
 			}
 
 			for (auto& NodeData : GraphData->GetNodes())
@@ -130,11 +142,13 @@ namespace FW
 					AddLink(GetGraphPin(OutPinId), GetGraphPin(InPinId));
 				}
 			}
-
-			for (auto NodeMetaType : GraphData->SupportNodes())
+			if(auto* NodeMetaTypes = RegisteredNodes.Find(GetRegisteredName(GraphData->DynamicMetaType())))
 			{
-				FText NodeTitle = static_cast<GraphNode*>(NodeMetaType->GetDefaultObject())->ObjectName;
-				MenuNodeItems.Add(MakeShared<FText>(MoveTemp(NodeTitle)));
+				for (auto NodeMetaType : *NodeMetaTypes)
+				{
+					FText NodeTitle = static_cast<GraphNode*>(NodeMetaType->GetDefaultObject())->ObjectName;
+					MenuNodeItems.Add(MakeShared<FText>(MoveTemp(NodeTitle)));
+				}
 			}
 		}
 	}
@@ -313,8 +327,24 @@ namespace FW
 		return FReply::Handled();
 	}
 
+	void SGraphPanel::OnDragEnter(FGeometry const& MyGeometry, FDragDropEvent const& DragDropEvent)
+	{
+		if(GraphData)
+		{
+			TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
+			GraphData->OnDragEnter(DragDropOp);
+		}
+	}
+
+	void SGraphPanel::OnDragLeave(FDragDropEvent const& DragDropEvent)
+	{
+		TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
+		DragDropOp->SetCursorOverride(TOptional<EMouseCursor::Type>());
+	}
+
 	FReply SGraphPanel::OnDragOver(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)
 	{
+		MousePos = MyGeometry.AbsoluteToLocal(DragDropEvent.GetScreenSpacePosition());
 		TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
 		if (DragDropOp->IsOfType<GraphDragDropOp>())
 		{
@@ -327,6 +357,11 @@ namespace FW
 	FReply SGraphPanel::OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)
 	{
 		PreviewStart.Reset();
+		if(GraphData)
+		{
+			TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
+			GraphData->OnDrop(DragDropOp);
+		}
 		return FReply::Handled().ReleaseMouseLock();
 	}
 
@@ -501,19 +536,8 @@ namespace FW
 			return CurNode->ObjectName.EqualTo(*InSelectedItem);
 		});
 
-		GraphNode* NewNodeData = static_cast<GraphNode*>(DefaultNodeData->DynamicMetaType()->Construct());
-        NewNodeData->InitPins();
-        NewNodeData->SetOuter(GraphData);
-		NewNodeData->Position = PanelCoordToGraphCoord(MousePos);
-        
-        ShObjectOp* Op = GetShObjectOp(NewNodeData);
-        Op->OnSelect(NewNodeData);
-
-		auto NodeWidget = AddNodeFromData(NewNodeData);
-		ClearSelectedNode();
-		GraphData->AddNode(NewNodeData);
-		AddSelectedNode(NodeWidget.ToSharedRef());
-		GraphData->MarkDirty();
+		ObjectPtr<GraphNode> NewNodeData = static_cast<GraphNode*>(DefaultNodeData->DynamicMetaType()->Construct());
+		AddNode(NewNodeData);
 
 		FSlateApplication::Get().DismissAllMenus();
 	}

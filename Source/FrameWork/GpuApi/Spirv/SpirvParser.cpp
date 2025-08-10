@@ -9,11 +9,6 @@ namespace FW
 		SpvStorageClass StorageClass = Inst->GetStorageClass();
 		SpvId ResultId = Inst->GetId().value();
 		
-		if(!Context.Types.contains(Inst->GetResultType()))
-		{
-			return;
-		}
-		
 		SpvPointerType* PointerType = static_cast<SpvPointerType*>(Context.Types[Inst->GetResultType()].Get());
 		SpvVariable Var = {{ResultId, PointerType->PointeeType}, false, StorageClass};
 		if(StorageClass == SpvStorageClass::Uniform || StorageClass == SpvStorageClass::UniformConstant)
@@ -36,7 +31,10 @@ namespace FW
 		}
 		
 		Context.GlobalVariables.emplace(ResultId, MoveTemp(Var));
-		SpvPointer Pointer{ &Context.GlobalVariables[ResultId] };
+		SpvPointer Pointer{
+			.Id = ResultId,
+			.Pointee = &Context.GlobalVariables[ResultId]
+		};
 		Context.GlobalPointers.emplace(ResultId, MoveTemp(Pointer));
 		
 	}
@@ -75,11 +73,6 @@ namespace FW
 
 	void SpvMetaVisitor::Visit(SpvOpTypePointer* Inst)
 	{
-		if(!Context.Types.contains(Inst->GetPointeeType()))
-		{
-			return;
-		}
-		
 		SpvType* PointeeType = Context.Types[Inst->GetPointeeType()].Get();
 		SpvId ResultId = Inst->GetId().value();
 		Context.Types.emplace(ResultId, MakeUnique<SpvPointerType>(ResultId, Inst->GetStorageClass(), PointeeType));
@@ -90,14 +83,23 @@ namespace FW
 		TArray<SpvType*> MemberTypes;
 		for(SpvId MemberTypeId : Inst->GetMemberTypeIds())
 		{
-			if(!Context.Types.contains(MemberTypeId))
-			{
-				return;
-			}
 			MemberTypes.Add(Context.Types[MemberTypeId].Get());
 		}
 		SpvId ResultId = Inst->GetId().value();
 		Context.Types.emplace(ResultId, MakeUnique<SpvStructType>(ResultId, MemberTypes));
+	}
+
+	void SpvMetaVisitor::Visit(SpvOpTypeImage* Inst)
+	{
+		SpvId ResultId = Inst->GetId().value();
+		SpvType* SampledType = Context.Types[Inst->GetSampledType()].Get();
+		Context.Types.emplace(ResultId, MakeUnique<SpvImageType>(ResultId, SampledType, Inst->GetDim()));
+	}
+
+	void SpvMetaVisitor::Visit(SpvOpTypeSampler* Inst)
+	{
+		SpvId ResultId = Inst->GetId().value();
+		Context.Types.emplace(ResultId, MakeUnique<SpvSamplerType>(ResultId));
 	}
 
 	void SpvMetaVisitor::Visit(SpvOpTypeArray* Inst)
@@ -210,11 +212,7 @@ namespace FW
 	void SpvMetaVisitor::Visit(SpvOpConstantTrue* Inst)
 	{
 		SpvId ResultId = Inst->GetId().value();
-		if(!Context.Types.contains(Inst->GetResultType()))
-		{
-			return;
-		}
-		
+
 		SpvType* RetType = Context.Types[Inst->GetResultType()].Get();
 		check(RetType->GetKind() == SpvTypeKind::Bool);
 		SpvObject Obj = {ResultId, RetType, SpvObject::Internal{Inst->GetValue()}};
@@ -233,10 +231,6 @@ namespace FW
 	void SpvMetaVisitor::Visit(SpvOpConstantComposite* Inst)
 	{
 		SpvId ResultId = Inst->GetId().value();
-		if(!Context.Types.contains(Inst->GetResultType()))
-		{
-			return;
-		}
 		
 		SpvType* RetType = Context.Types[Inst->GetResultType()].Get();
 		TArray<uint8> CompositeValue;
@@ -507,6 +501,25 @@ namespace FW
 				DecodedInst = MakeUnique<SpvOpTypePointer>(StorageClass, PointeeType);
 				DecodedInst->SetId(ResultId);
 			}
+			else if(OpCode == SpvOp::TypeImage)
+			{
+				SpvId ResultId = SpvCode[WordOffset + 1];
+				SpvId SampledType = SpvCode[WordOffset + 2];
+				SpvDim Dim = static_cast<SpvDim>(SpvCode[WordOffset + 3]);
+				uint32 Depth = SpvCode[WordOffset + 4];
+				uint32 Arrayed = SpvCode[WordOffset + 5];
+				uint32 MS = SpvCode[WordOffset + 6];
+				uint32 Sampled = SpvCode[WordOffset + 7];
+				SpvImageFormat Format = static_cast<SpvImageFormat>(SpvCode[WordOffset + 8]);
+				DecodedInst = MakeUnique<SpvOpTypeImage>(SampledType, Dim, Depth, Arrayed, MS, Sampled, Format);
+				DecodedInst->SetId(ResultId);
+			}
+			else if(OpCode == SpvOp::TypeSampler)
+			{
+				SpvId ResultId = SpvCode[WordOffset + 1];
+				DecodedInst = MakeUnique<SpvOpTypeSampler>();
+				DecodedInst->SetId(ResultId);
+			}
 			else if(OpCode == SpvOp::TypeArray)
 			{
 				SpvId ResultId = SpvCode[WordOffset + 1];
@@ -659,6 +672,40 @@ namespace FW
 				DecodedInst = MakeUnique<SpvOpAccessChain>(ResultType, BasePointer, Indexes);
 				DecodedInst->SetId(ResultId);
 			}
+			else if(OpCode == SpvOp::SampledImage)
+			{
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvId Image = SpvCode[WordOffset + 3];
+				SpvId Sampler = SpvCode[WordOffset + 4];
+				DecodedInst = MakeUnique<SpvOpSampledImage>(ResultType, Image, Sampler);
+				DecodedInst->SetId(ResultId);
+			}
+			else if(OpCode == SpvOp::ImageSampleImplicitLod)
+			{
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvId SampledImage = SpvCode[WordOffset + 3];
+				SpvId Coordinate = SpvCode[WordOffset + 4];
+				std::optional<SpvImageOperands> ImageOperands;
+				TArray<SpvId> Operands;
+				int32 OperandsWordLen = InstWordLen - 6;
+				if(OperandsWordLen >= 0)
+				{
+					ImageOperands = static_cast<SpvImageOperands>(SpvCode[WordOffset + 5]);
+					Operands = {(SpvId*)&SpvCode[WordOffset + 6], OperandsWordLen};
+				}
+				DecodedInst = MakeUnique<SpvOpImageSampleImplicitLod>(ResultType, SampledImage, Coordinate, ImageOperands, Operands);
+				DecodedInst->SetId(ResultId);
+			}
+			else if(OpCode == SpvOp::ConvertFToU)
+			{
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvId FloatValue = SpvCode[WordOffset + 3];
+				DecodedInst = MakeUnique<SpvOpConvertFToU>(ResultType, FloatValue);
+				DecodedInst->SetId(ResultId);
+			}
 			else if(OpCode == SpvOp::ConvertFToS)
 			{
 				SpvId ResultType = SpvCode[WordOffset + 1];
@@ -673,6 +720,14 @@ namespace FW
 				SpvId ResultId = SpvCode[WordOffset + 2];
 				SpvId SignedValue = SpvCode[WordOffset + 3];
 				DecodedInst = MakeUnique<SpvOpConvertSToF>(ResultType, SignedValue);
+				DecodedInst->SetId(ResultId);
+			}
+			else if(OpCode == SpvOp::ConvertUToF)
+			{
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvId UnsignedValue = SpvCode[WordOffset + 3];
+				DecodedInst = MakeUnique<SpvOpConvertUToF>(ResultType, UnsignedValue);
 				DecodedInst->SetId(ResultId);
 			}
 			else if(OpCode == SpvOp::FNegate)
@@ -764,6 +819,33 @@ namespace FW
 				DecodedInst = MakeUnique<SpvOpFDiv>(ResultType, Operand1, Operand2);
 				DecodedInst->SetId(ResultId);
 			}
+			else if(OpCode == SpvOp::UMod)
+			{
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvId Operand1 = SpvCode[WordOffset + 3];
+				SpvId Operand2 = SpvCode[WordOffset + 4];
+				DecodedInst = MakeUnique<SpvOpUMod>(ResultType, Operand1, Operand2);
+				DecodedInst->SetId(ResultId);
+			}
+			else if(OpCode == SpvOp::SRem)
+			{
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvId Operand1 = SpvCode[WordOffset + 3];
+				SpvId Operand2 = SpvCode[WordOffset + 4];
+				DecodedInst = MakeUnique<SpvOpSRem>(ResultType, Operand1, Operand2);
+				DecodedInst->SetId(ResultId);
+			}
+			else if(OpCode == SpvOp::FRem)
+			{
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvId Operand1 = SpvCode[WordOffset + 3];
+				SpvId Operand2 = SpvCode[WordOffset + 4];
+				DecodedInst = MakeUnique<SpvOpFRem>(ResultType, Operand1, Operand2);
+				DecodedInst->SetId(ResultId);
+			}
 			else if(OpCode == SpvOp::VectorTimesScalar)
 			{
 				SpvId ResultType = SpvCode[WordOffset + 1];
@@ -773,12 +855,71 @@ namespace FW
 				DecodedInst = MakeUnique<SpvOpVectorTimesScalar>(ResultType, Vector, Scalar);
 				DecodedInst->SetId(ResultId);
 			}
+			else if(OpCode == SpvOp::Dot)
+			{
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvId Vector1 = SpvCode[WordOffset + 3];
+				SpvId Vector2 = SpvCode[WordOffset + 4];
+				DecodedInst = MakeUnique<SpvOpDot>(ResultType, Vector1, Vector2);
+				DecodedInst->SetId(ResultId);
+			}
+			else if(OpCode == SpvOp::Any)
+			{
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvId Vector = SpvCode[WordOffset + 3];
+				DecodedInst = MakeUnique<SpvOpAny>(ResultType, Vector);
+				DecodedInst->SetId(ResultId);
+			}
+			else if(OpCode == SpvOp::All)
+			{
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvId Vector = SpvCode[WordOffset + 3];
+				DecodedInst = MakeUnique<SpvOpAll>(ResultType, Vector);
+				DecodedInst->SetId(ResultId);
+			}
 			else if(OpCode == SpvOp::IsNan)
 			{
 				SpvId ResultType = SpvCode[WordOffset + 1];
 				SpvId ResultId = SpvCode[WordOffset + 2];
 				SpvId X = SpvCode[WordOffset + 3];
 				DecodedInst = MakeUnique<SpvOpIsNan>(ResultType, X);
+				DecodedInst->SetId(ResultId);
+			}
+			else if(OpCode == SpvOp::IsInf)
+			{
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvId X = SpvCode[WordOffset + 3];
+				DecodedInst = MakeUnique<SpvOpIsInf>(ResultType, X);
+				DecodedInst->SetId(ResultId);
+			}
+			else if(OpCode == SpvOp::LogicalOr)
+			{
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvId Operand1 = SpvCode[WordOffset + 3];
+				SpvId Operand2 = SpvCode[WordOffset + 4];
+				DecodedInst = MakeUnique<SpvOpLogicalOr>(ResultType, Operand1, Operand2);
+				DecodedInst->SetId(ResultId);
+			}
+			else if(OpCode == SpvOp::LogicalAnd)
+			{
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvId Operand1 = SpvCode[WordOffset + 3];
+				SpvId Operand2 = SpvCode[WordOffset + 4];
+				DecodedInst = MakeUnique<SpvOpLogicalAnd>(ResultType, Operand1, Operand2);
+				DecodedInst->SetId(ResultId);
+			}
+			else if(OpCode == SpvOp::LogicalNot)
+			{
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvId Operand = SpvCode[WordOffset + 3];
+				DecodedInst = MakeUnique<SpvOpLogicalNot>(ResultType, Operand);
 				DecodedInst->SetId(ResultId);
 			}
 			else if(OpCode == SpvOp::Select)
@@ -870,6 +1011,14 @@ namespace FW
 				SpvId Operand1 = SpvCode[WordOffset + 3];
 				SpvId Operand2 = SpvCode[WordOffset + 4];
 				DecodedInst = MakeUnique<SpvOpBitwiseAnd>(ResultType, Operand1, Operand2);
+				DecodedInst->SetId(ResultId);
+			}
+			else if(OpCode == SpvOp::Not)
+			{
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvId Operand = SpvCode[WordOffset + 3];
+				DecodedInst = MakeUnique<SpvOpNot>(ResultType, Operand);
 				DecodedInst->SetId(ResultId);
 			}
 			else if(OpCode == SpvOp::DPdx)
@@ -1046,7 +1195,43 @@ namespace FW
 				else if(ExtSets[ExtSetId] == SpvExtSet::GLSLstd450)
 				{
 					SpvGLSLstd450 ExtOp = static_cast<SpvGLSLstd450>(SpvCode[WordOffset + 4]);
-					if(ExtOp == SpvGLSLstd450::Sin)
+					if(ExtOp == SpvGLSLstd450::RoundEven)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						DecodedInst = MakeUnique<SpvRoundEven>(ResultType, X);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::FAbs)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						DecodedInst = MakeUnique<SpvFAbs>(ResultType, X);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::SAbs)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						DecodedInst = MakeUnique<SpvSAbs>(ResultType, X);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::Floor)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						DecodedInst = MakeUnique<SpvFloor>(ResultType, X);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::Ceil)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						DecodedInst = MakeUnique<SpvCeil>(ResultType, X);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::Fract)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						DecodedInst = MakeUnique<SpvFract>(ResultType, X);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::Sin)
 					{
 						SpvId X = SpvCode[WordOffset + 5];
 						DecodedInst = MakeUnique<SpvSin>(ResultType, X);
@@ -1058,11 +1243,113 @@ namespace FW
 						DecodedInst = MakeUnique<SpvCos>(ResultType, X);
 						DecodedInst->SetId(ResultId);
 					}
+					else if(ExtOp == SpvGLSLstd450::Tan)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						DecodedInst = MakeUnique<SpvTan>(ResultType, X);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::Asin)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						DecodedInst = MakeUnique<SpvAsin>(ResultType, X);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::Acos)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						DecodedInst = MakeUnique<SpvAcos>(ResultType, X);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::Atan)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						DecodedInst = MakeUnique<SpvAtan>(ResultType, X);
+						DecodedInst->SetId(ResultId);
+					}
 					else if(ExtOp == SpvGLSLstd450::Pow)
 					{
 						SpvId X = SpvCode[WordOffset + 5];
 						SpvId Y = SpvCode[WordOffset + 6];
 						DecodedInst = MakeUnique<SpvPow>(ResultType, X, Y);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::Exp)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						DecodedInst = MakeUnique<SpvExp>(ResultType, X);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::Log)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						DecodedInst = MakeUnique<SpvLog>(ResultType, X);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::Sqrt)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						DecodedInst = MakeUnique<SpvSqrt>(ResultType, X);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::UMin)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						SpvId Y = SpvCode[WordOffset + 6];
+						DecodedInst = MakeUnique<SpvUMin>(ResultType, X, Y);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::SMin)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						SpvId Y = SpvCode[WordOffset + 6];
+						DecodedInst = MakeUnique<SpvSMin>(ResultType, X, Y);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::UMax)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						SpvId Y = SpvCode[WordOffset + 6];
+						DecodedInst = MakeUnique<SpvUMax>(ResultType, X, Y);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::SMax)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						SpvId Y = SpvCode[WordOffset + 6];
+						DecodedInst = MakeUnique<SpvSMax>(ResultType, X, Y);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::FClamp)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						SpvId MinVal = SpvCode[WordOffset + 6];
+						SpvId MaxVal = SpvCode[WordOffset + 7];
+						DecodedInst = MakeUnique<SpvFClamp>(ResultType, X, MinVal, MaxVal);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::UClamp)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						SpvId MinVal = SpvCode[WordOffset + 6];
+						SpvId MaxVal = SpvCode[WordOffset + 7];
+						DecodedInst = MakeUnique<SpvUClamp>(ResultType, X, MinVal, MaxVal);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::SClamp)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						SpvId MinVal = SpvCode[WordOffset + 6];
+						SpvId MaxVal = SpvCode[WordOffset + 7];
+						DecodedInst = MakeUnique<SpvSClamp>(ResultType, X, MinVal, MaxVal);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::FMix)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						SpvId Y = SpvCode[WordOffset + 6];
+						SpvId A = SpvCode[WordOffset + 7];
+						DecodedInst = MakeUnique<SpvFMix>(ResultType, X, Y, A);
 						DecodedInst->SetId(ResultId);
 					}
 					else if(ExtOp == SpvGLSLstd450::Step)
@@ -1078,6 +1365,39 @@ namespace FW
 						SpvId Edge1 = SpvCode[WordOffset + 6];
 						SpvId X = SpvCode[WordOffset + 7];
 						DecodedInst = MakeUnique<SpvSmoothStep>(ResultType, Edge0, Edge1, X);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::Length)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						DecodedInst = MakeUnique<SpvLength>(ResultType, X);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::Distance)
+					{
+						SpvId P0 = SpvCode[WordOffset + 5];
+						SpvId P1 = SpvCode[WordOffset + 6];
+						DecodedInst = MakeUnique<SpvDistance>(ResultType, P0, P1);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::Normalize)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						DecodedInst = MakeUnique<SpvNormalize>(ResultType, X);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::NMin)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						SpvId Y = SpvCode[WordOffset + 6];
+						DecodedInst = MakeUnique<SpvNMin>(ResultType, X, Y);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvGLSLstd450::NMax)
+					{
+						SpvId X = SpvCode[WordOffset + 5];
+						SpvId Y = SpvCode[WordOffset + 6];
+						DecodedInst = MakeUnique<SpvNMax>(ResultType, X, Y);
 						DecodedInst->SetId(ResultId);
 					}
 				}

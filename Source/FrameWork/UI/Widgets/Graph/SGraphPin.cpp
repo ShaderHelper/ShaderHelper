@@ -13,7 +13,7 @@ namespace FW
 		OwnerPanel = InOwner->Owner;
 
 		auto PinIcon = SNew(SImage)
-			.ColorAndOpacity(PinData->GetPinColor())
+			.ColorAndOpacity_Lambda([this]{ return PinData->GetPinColor();})
 			.DesiredSizeOverride(FVector2D{ 16,16 })
 			.Image(FAppStyle::Get().GetBrush("Icons.BulletPoint"));
 		

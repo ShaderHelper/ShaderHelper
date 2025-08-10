@@ -89,8 +89,10 @@ namespace FW
 	public:
 		void Serialize(FArchive& Ar) override;
 		const FSlateBrush* GetImage() const override;
-		virtual TArray<MetaType*> SupportNodes() const { return {}; }
+		virtual void OnDragEnter(TSharedPtr<FDragDropOperation> DragDropOp) {}
+		virtual void OnDrop(TSharedPtr<FDragDropOperation> DragDropOp) {}
 		virtual ExecRet Exec(GraphExecContext& Context);
+		
     public:
         bool AnyError = false;
 	
@@ -99,4 +101,13 @@ namespace FW
 		TArray<ObjectPtr<GraphNode>> NodeDatas;
 		TMultiMap<FGuid, FGuid> NodeDeps;
 	};
+
+	FRAMEWORK_API extern TMap<FString, TArray<MetaType*>> RegisteredNodes;
+
+#define REGISTER_NODE_TO_GRAPH(NodeType, GraphName)	\
+static const int PREPROCESSOR_JOIN(NodeGlobalRegister_,__COUNTER__) = [] {  \
+	auto& Nodes = RegisteredNodes.FindOrAdd(GraphName);  \
+	Nodes.Add(GetMetaType<NodeType>());	\
+	return 0; }();
+
 }

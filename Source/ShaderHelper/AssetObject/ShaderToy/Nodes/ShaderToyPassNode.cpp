@@ -7,6 +7,7 @@
 #include "UI/Widgets/Property/PropertyData/PropertyUniformItem.h"
 #include "RenderResource/PrintBuffer.h"
 #include "Editor/AssetEditor/AssetEditor.h"
+#include "AssetObject/Pins/Pins.h"
 
 using namespace FW;
 
@@ -16,10 +17,20 @@ namespace SH
 		.BaseClass<GraphNode>()
         .Data<&ShaderToyPassNode::Shader, MetaInfo::Property>("Shader")
 		.Data<&ShaderToyPassNode::Format, MetaInfo::Property>("Format")
+		.Data<&ShaderToyPassNode::iChannelDesc0>("iChannel0")
+		.Data<&ShaderToyPassNode::iChannelDesc1>("iChannel1")
+		.Data<&ShaderToyPassNode::iChannelDesc2>("iChannel2")
+		.Data<&ShaderToyPassNode::iChannelDesc3>("iChannel3")
 	)
     REFLECTION_REGISTER(AddClass<ShaderToyPassNodeOp>()
         .BaseClass<ShObjectOp>()
     )
+	REFLECTION_REGISTER(AddClass<ShaderToyChannelDesc>()
+		.Data<&ShaderToyChannelDesc::Filter, MetaInfo::Property>("Filter Mode")
+		.Data<&ShaderToyChannelDesc::Wrap, MetaInfo::Property>("Wrap Mode")
+	)
+
+	REGISTER_NODE_TO_GRAPH(ShaderToyPassNode, "ShaderToy Graph")
 
     MetaType* ShaderToyPassNodeOp::SupportType()
     {
@@ -41,11 +52,43 @@ namespace SH
 		ShEditor->SetDebuggableObject(static_cast<ShaderToyPassNode*>(InObject));
     }
 
+	void ShaderToyPassNode::InitShader()
+	{
+		if(Shader)
+		{
+			Shader->OnDestroy = FSimpleDelegate::CreateRaw(this, &ShaderToyPassNode::ClearBindingProperty);
+			Shader->OnRefreshBuilder = FSimpleDelegate::CreateRaw(this, &ShaderToyPassNode::RefreshProperty);
+			
+			CustomBindLayout = Shader->CustomBindGroupLayoutBuilder.Build();
+			CustomUniformBuffer = Shader->CustomUniformBufferBuilder.Build();
+			
+			auto CustomBindGroupBuilder = GpuBindGroupBuilder{ CustomBindLayout };
+			if(CustomUniformBuffer.IsValid())
+			{
+				if(CustomUniformBufferData.IsEmpty())
+				{
+					CustomUniformBufferData.SetNumZeroed(CustomUniformBuffer->GetSize());
+				}
+				
+				CustomUniformBuffer->SetData(CustomUniformBufferData);
+				CustomBindGroupBuilder.SetUniformBuffer("CustomUniform", CustomUniformBuffer->GetGpuResource());
+			}
+			CustomBindGroup = CustomBindGroupBuilder.Build();
+		}
+	}
+
 	ShaderToyPassNode::ShaderToyPassNode()
 	: Format(ShaderToyFormat::B8G8R8A8_UNORM)
 	{
 		ObjectName = FText::FromString("ShaderPass");
-        Preview = MakeShared<PreviewViewPort>();
+	}
+
+	ShaderToyPassNode::ShaderToyPassNode(FW::AssetPtr<StShader> InShader)
+	: Shader(MoveTemp(InShader))
+	, Format(ShaderToyFormat::B8G8R8A8_UNORM)
+	{
+		ObjectName = FText::FromString(Shader->GetFileName());
+		InitShader();
 	}
 
 	ShaderToyPassNode::~ShaderToyPassNode()
@@ -55,6 +98,48 @@ namespace SH
 			Shader->OnDestroy.Unbind();
 			Shader->OnRefreshBuilder.Unbind();
 		}
+	}
+
+	FW::GpuBindGroup* ShaderToyPassNode::GetBuiltInBindGroup()
+	{
+		auto Builder  = GpuBindGroupBuilder{ StShader::GetBuiltInBindLayout() }
+			.SetExistingBinding(0, TSingleton<PrintBuffer>::Get().GetResource())
+			.SetUniformBuffer("BuiltInUniform", StShader::GetBuiltInUb()->GetGpuResource());
+		
+		GpuTexturePin* iChannel0 = static_cast<GpuTexturePin*>(GetPin("iChannel0"));
+		GpuTexturePin* iChannel1 = static_cast<GpuTexturePin*>(GetPin("iChannel1"));
+		GpuTexturePin* iChannel2 = static_cast<GpuTexturePin*>(GetPin("iChannel2"));
+		GpuTexturePin* iChannel3 = static_cast<GpuTexturePin*>(GetPin("iChannel3"));
+		
+		Builder.SetTexture("iChannel0", iChannel0->GetValue());
+		Builder.SetSampler("iChannel0Sampler", GGpuRhi->CreateSampler({
+			.Filter = (SamplerFilter)iChannelDesc0.Filter,
+			.AddressU = (SamplerAddressMode)iChannelDesc0.Wrap,
+			.AddressV = (SamplerAddressMode)iChannelDesc0.Wrap,
+			.AddressW = (SamplerAddressMode)iChannelDesc0.Wrap
+		}));
+		Builder.SetTexture("iChannel1", iChannel1->GetValue());
+		Builder.SetSampler("iChannel1Sampler", GGpuRhi->CreateSampler({
+			.Filter = (SamplerFilter)iChannelDesc1.Filter,
+			.AddressU = (SamplerAddressMode)iChannelDesc1.Wrap,
+			.AddressV = (SamplerAddressMode)iChannelDesc1.Wrap,
+			.AddressW = (SamplerAddressMode)iChannelDesc1.Wrap
+		}));
+		Builder.SetTexture("iChannel2", iChannel2->GetValue());
+		Builder.SetSampler("iChannel2Sampler",GGpuRhi->CreateSampler({
+			.Filter = (SamplerFilter)iChannelDesc2.Filter,
+			.AddressU = (SamplerAddressMode)iChannelDesc2.Wrap,
+			.AddressV = (SamplerAddressMode)iChannelDesc2.Wrap,
+			.AddressW = (SamplerAddressMode)iChannelDesc2.Wrap
+		}));
+		Builder.SetTexture("iChannel3", iChannel3->GetValue());
+		Builder.SetSampler("iChannel3Sampler",GGpuRhi->CreateSampler({
+			.Filter = (SamplerFilter)iChannelDesc3.Filter,
+			.AddressU = (SamplerAddressMode)iChannelDesc3.Wrap,
+			.AddressV = (SamplerAddressMode)iChannelDesc3.Wrap,
+			.AddressW = (SamplerAddressMode)iChannelDesc3.Wrap
+		}));
+		return Builder.Build();
 	}
 
 	TRefCountPtr<GpuTexture> ShaderToyPassNode::OnStartDebugging()
@@ -70,7 +155,7 @@ namespace SH
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
         ShEditor->InvokeDebuggerTabs();
 		SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(Shader);
-		ShaderEditor->DebugPixel(PixelCoord, {CustomBindGroup, StShader::GetBuiltInBindGroup()});
+		ShaderEditor->DebugPixel(PixelCoord, {CustomBindGroup, GetBuiltInBindGroup()});
 	}
 
 	ShaderAsset* ShaderToyPassNode::GetShaderAsset() const
@@ -92,16 +177,16 @@ namespace SH
 
     void ShaderToyPassNode::InitPins()
     {
-        auto Slot0 = NewShObject<ChannelPin>(this);
+        auto Slot0 = NewShObject<GpuTexturePin>(this);
         Slot0->ObjectName = FText::FromString("iChannel0");
         Slot0->Direction = PinDirection::Input;
-        auto Slot1 = NewShObject<ChannelPin>(this);
+        auto Slot1 = NewShObject<GpuTexturePin>(this);
         Slot1->ObjectName = FText::FromString("iChannel1");
         Slot1->Direction = PinDirection::Input;
-        auto Slot2 = NewShObject<ChannelPin>(this);
+        auto Slot2 = NewShObject<GpuTexturePin>(this);
         Slot2->ObjectName = FText::FromString("iChannel2");
         Slot2->Direction = PinDirection::Input;
-        auto Slot3 = NewShObject<ChannelPin>(this);
+        auto Slot3 = NewShObject<GpuTexturePin>(this);
         Slot3->ObjectName = FText::FromString("iChannel3");
         Slot3->Direction = PinDirection::Input;
         
@@ -116,40 +201,16 @@ namespace SH
 	{
 		GraphNode::Serialize(Ar);
 		
-        Ar << Shader;
-        
-        Ar << CustomUbSize;
-        if(CustomUbSize > 0)
-        {
-            if(Ar.IsLoading())
-            {
-                CustomUniformBufferData = (uint8*)FMemory::Malloc(CustomUbSize);
-            }
-            Ar.Serialize(CustomUniformBufferData, CustomUbSize);
-        }
-
+		Ar << Shader << Format;
+		Ar << CustomUniformBufferData;
+		Ar << iChannelDesc0 << iChannelDesc1 << iChannelDesc2 << iChannelDesc3;
 	}
 
     void ShaderToyPassNode::PostLoad()
     {
         GraphNode::PostLoad();
         
-        if(Shader)
-        {
-            Shader->OnDestroy = FSimpleDelegate::CreateRaw(this, &ShaderToyPassNode::ClearBindingProperty);
-            Shader->OnRefreshBuilder = FSimpleDelegate::CreateRaw(this, &ShaderToyPassNode::RefreshProperty);
-            
-            CustomBindLayout = Shader->CustomBindGroupLayoutBuilder.Build();
-            CustomUniformBuffer = Shader->CustomUniformBufferBuilder.Build();
-            auto CustomBindGroupBuilder = GpuBindGroupBuilder{ CustomBindLayout };
-            if(CustomUniformBuffer.IsValid())
-            {
-                CustomUniformBuffer->SetData(CustomUniformBufferData);
-                CustomUniformBufferData = (uint8*)CustomUniformBuffer->GetReadableData();
-                CustomBindGroupBuilder.SetUniformBuffer("Uniform", CustomUniformBuffer->GetGpuResource());
-            }
-            CustomBindGroup = CustomBindGroupBuilder.Build();
-        }
+		InitShader();
     }
 
 	TSharedPtr<SWidget> ShaderToyPassNode::ExtraNodeWidget()
@@ -178,6 +239,11 @@ namespace SH
                 auto Float2Porperty = MakeShared<PropertyUniformItem<Vector2f>>(this, MemberName, InUb->GetMember<Vector2f>(MemberName));
                 Property = Float2Porperty;
             }
+			else if(MemberInfo.TypeName == "float3")
+			{
+				auto Float3Porperty = MakeShared<PropertyUniformItem<Vector3f>>(this, MemberName, InUb->GetMember<Vector3f>(MemberName));
+				Property = Float3Porperty;
+			}
 			else if (MemberInfo.TypeName == "float4")
 			{
 				auto Float4Porperty = MakeShared<PropertyUniformItem<Vector4f>>(this, MemberName, InUb->GetMember<Vector4f>(MemberName));
@@ -213,18 +279,14 @@ namespace SH
             }
             auto SlotCategory = MakeShared<PropertyCategory>(this, "Slot");
             {
-                auto iChannel0Item = MakeShared<PropertyItemBase>(this, "iChannel0");
-                iChannel0Item->SetEnabled(false);
-                auto iChannel1Item = MakeShared<PropertyItemBase>(this, "iChannel1");
-                iChannel1Item->SetEnabled(false);
-                auto iChannel2Item = MakeShared<PropertyItemBase>(this, "iChannel2");
-                iChannel2Item->SetEnabled(false);
-                auto iChannel3Item = MakeShared<PropertyItemBase>(this, "iChannel3");
-                iChannel3Item->SetEnabled(false);
-                SlotCategory->AddChild(MoveTemp(iChannel0Item));
-                SlotCategory->AddChild(MoveTemp(iChannel1Item));
-                SlotCategory->AddChild(MoveTemp(iChannel2Item));
-                SlotCategory->AddChild(MoveTemp(iChannel3Item));
+				auto PropertyDatas0 = GeneratePropertyDatas(this, GetMetaType<ShaderToyPassNode>()->GetMetaMemberData("iChannel0"), this);
+				auto PropertyDatas1 = GeneratePropertyDatas(this, GetMetaType<ShaderToyPassNode>()->GetMetaMemberData("iChannel1"), this);
+				auto PropertyDatas2 = GeneratePropertyDatas(this, GetMetaType<ShaderToyPassNode>()->GetMetaMemberData("iChannel2"), this);
+				auto PropertyDatas3 = GeneratePropertyDatas(this, GetMetaType<ShaderToyPassNode>()->GetMetaMemberData("iChannel3"), this);
+                SlotCategory->AddChilds(MoveTemp(PropertyDatas0));
+				SlotCategory->AddChilds(MoveTemp(PropertyDatas1));
+				SlotCategory->AddChilds(MoveTemp(PropertyDatas2));
+				SlotCategory->AddChilds(MoveTemp(PropertyDatas3));
             }
             BuiltInCategory->AddChild(MoveTemp(SlotCategory));
         }
@@ -289,9 +351,8 @@ namespace SH
                 NewCustomUniformBuffer->CopySameMember(*CustomUniformBuffer);
             }
             CustomUniformBuffer = MoveTemp(NewCustomUniformBuffer);
-            CustomUniformBufferData = (uint8*)CustomUniformBuffer->GetReadableData();
-            CustomUbSize = CustomUniformBuffer->GetSize();
-            CustomBindGroupBuilder.SetUniformBuffer("Uniform", CustomUniformBuffer->GetGpuResource());
+			CustomUniformBufferData = {(uint8*)CustomUniformBuffer->GetReadableData(), (int)CustomUniformBuffer->GetSize()};
+            CustomBindGroupBuilder.SetUniformBuffer("CustomUniform", CustomUniformBuffer->GetGpuResource());
         }
         CustomBindGroup = CustomBindGroupBuilder.Build();
         
@@ -345,7 +406,7 @@ namespace SH
             PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassOutput->GetValue(), RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
 
 			BindingContext Bindings;
-			Bindings.SetGlobalBindGroup(StShader::GetBuiltInBindGroup());
+			Bindings.SetGlobalBindGroup(GetBuiltInBindGroup());
 			Bindings.SetGlobalBindGroupLayout(StShader::GetBuiltInBindLayout());
 			Bindings.SetPassBindGroup(CustomBindGroup);
 			Bindings.SetPassBindGroupLayout(CustomBindLayout);

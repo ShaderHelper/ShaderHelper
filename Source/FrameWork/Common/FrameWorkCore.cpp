@@ -8,32 +8,81 @@ namespace FW
 {
     REFLECTION_REGISTER(AddClass<ShObject>())
     REFLECTION_REGISTER(AddClass<ShObjectOp>())
-
-    TArray<TSharedRef<PropertyData>> GeneratePropertyDatas(ShObject* InObject)
-    {
-        TArray<TSharedRef<PropertyData>> Datas;
-        TArray<MetaMemberData*> MetaMemDatas = GetProperties(InObject->DynamicMetaType());
-        for(MetaMemberData* MetaMemData : MetaMemDatas)
-        {
-			TSharedPtr<PropertyData> Item;
-            if(MetaMemData->IsAssetRef())
-            {
-                void* AssetPtrRef = MetaMemData->Get(InObject);
-				Item = MakeShared<PropertyAssetItem>(InObject, MetaMemData->MemberName, MetaMemData->GetShObjectMetaType(), AssetPtrRef);
-            }
-			//IsEnum
-			else if(MetaMemData->GetEnumValueName)
+	
+	TArray<TSharedRef<PropertyData>> GeneratePropertyDatas(ShObject* InObject, const MetaMemberData* MetaMemData, void* Instance)
+	{
+		TArray<TSharedRef<PropertyData>> Datas;
+		
+		MetaType* MemberMetaType = MetaMemData->GetMetaType();
+		TSharedPtr<PropertyData> Item;
+		bool ReadOnly = EnumHasAnyFlags(MetaMemData->InfoType, MetaInfo::ReadOnly);
+		if(MetaMemData->IsAssetRef())
+		{
+			void* AssetPtrRef = MetaMemData->Get(Instance);
+			Item = MakeShared<PropertyAssetItem>(InObject, MetaMemData->MemberName, MemberMetaType, AssetPtrRef);
+		}
+		//IsEnum
+		else if(MetaMemData->GetEnumValueName)
+		{
+			auto EnumValueName = MakeShared<FString>(MetaMemData->GetEnumValueName(Instance));
+			Item = MakeShared<PropertyEnumItem>(InObject, MetaMemData->MemberName, EnumValueName, MetaMemData->EnumEntries, [=](void* NewValue){
+				MetaMemData->Set(Instance, NewValue);
+			});
+		}
+		else if(MetaMemData->IsType<int32>())
+		{
+			int* IntValue = (int*)MetaMemData->Get(Instance);
+			Item = MakeShared<PropertyScalarItem<int32>>(InObject, MetaMemData->MemberName, IntValue, ReadOnly);
+		}
+		else if(MetaMemData->IsType<uint32>())
+		{
+			uint32* UIntValue = (uint32*)MetaMemData->Get(Instance);
+			Item = MakeShared<PropertyScalarItem<uint32>>(InObject, MetaMemData->MemberName, UIntValue, ReadOnly);
+		}
+		else if(MetaMemData->IsType<float>())
+		{
+			float* FloatValue = (float*)MetaMemData->Get(Instance);
+			Item = MakeShared<PropertyScalarItem<float>>(InObject, MetaMemData->MemberName, FloatValue, ReadOnly);
+		}
+		else if(MetaMemData->IsType<double>())
+		{
+			double* DoubleValue = (double*)MetaMemData->Get(Instance);
+			Item = MakeShared<PropertyScalarItem<double>>(InObject, MetaMemData->MemberName, DoubleValue, ReadOnly);
+		}
+		//Struct/Class
+		else if(MemberMetaType && MemberMetaType->Datas.Num() > 0)
+		{
+			Item = MakeShared<PropertyCategory>(InObject, MetaMemData->MemberName, true);
+			void* CompositeInstance = MetaMemData->Get(Instance);
+			for(MetaMemberData* ProperyMember : GetProperties(MemberMetaType))
 			{
-				void* EnumValue = MetaMemData->Get(InObject);
-				auto EnumValueName = MakeShared<FString>(MetaMemData->GetEnumValueName(InObject));
-				Item = MakeShared<PropertyEnumItem>(InObject, MetaMemData->MemberName, EnumValue, EnumValueName, MetaMemData->EnumEntries, [=](void* NewValue){
-					MetaMemData->Set(InObject, NewValue);
-				});
+				if(MemberMetaType->IsDerivedFrom<ShObject>())
+				{
+					Item->AddChilds(GeneratePropertyDatas(static_cast<ShObject*>(CompositeInstance), ProperyMember, CompositeInstance));
+				}
+				else
+				{
+					Item->AddChilds(GeneratePropertyDatas(InObject, ProperyMember, CompositeInstance));
+				}
+				
 			}
 			
-			if(Item) {
-				Datas.Add(Item.ToSharedRef());
-			}
+		}
+		
+		if(Item) {
+			Datas.Add(Item.ToSharedRef());
+		}
+		
+		return Datas;
+	}
+
+    TArray<TSharedRef<PropertyData>> GeneratePropertyDatas(ShObject* InObject, MetaType* InMetaType)
+    {
+        TArray<TSharedRef<PropertyData>> Datas;
+        TArray<MetaMemberData*> MetaMemDatas = GetProperties(InMetaType);
+        for(MetaMemberData* MetaMemData : MetaMemDatas)
+        {
+			Datas.Append(GeneratePropertyDatas(InObject, MetaMemData, InObject));
         }
         
         return Datas;
@@ -111,7 +160,7 @@ namespace FW
     {
         if(PropertyDatas.IsEmpty())
         {
-            PropertyDatas = GeneratePropertyDatas(this);
+            PropertyDatas = GeneratePropertyDatas(this, this->DynamicMetaType());
         }
         return &PropertyDatas;
     }

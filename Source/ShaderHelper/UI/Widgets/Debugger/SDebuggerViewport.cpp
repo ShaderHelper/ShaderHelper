@@ -34,7 +34,7 @@ namespace SH
 					float Value{};
 					if(DebuggerTex) {
 						uint32 DataIndex = PixelCoord.x + PixelCoord.y * DebuggerTex->GetWidth();
-						Value = TexDatas[DataIndex].z;
+						Value = TexDatas[DataIndex].x;
 					}
 					return FText::FromString(FString::Printf(TEXT("R Channel: %f"), Value));
 				})
@@ -58,9 +58,21 @@ namespace SH
 					float Value{};
 					if(DebuggerTex) {
 						uint32 DataIndex = PixelCoord.x + PixelCoord.y * DebuggerTex->GetWidth();
-						Value = TexDatas[DataIndex].x;
+						Value = TexDatas[DataIndex].z;
 					}
 					return FText::FromString(FString::Printf(TEXT("B Channel: %f"), Value));
+				})
+			]
+			+SVerticalBox::Slot()
+			.Padding(0, 0, 0, 2)
+			[
+				SNew(STextBlock).Text_Lambda([this]{
+					float Value{};
+					if(DebuggerTex) {
+						uint32 DataIndex = PixelCoord.x + PixelCoord.y * DebuggerTex->GetWidth();
+						Value = TexDatas[DataIndex].w;
+					}
+					return FText::FromString(FString::Printf(TEXT("A Channel: %f"), Value));
 				})
 			]
 		];
@@ -250,7 +262,7 @@ namespace SH
 				const uint8* Pixel = SrcRow + x * GetTextureFormatByteSize(InTarget->GetFormat());
 				if(InTarget->GetFormat() == GpuTextureFormat::B8G8R8A8_UNORM)
 				{
-					TexDatas[y * Width + x] = {Pixel[0] / 255.0f, Pixel[1] / 255.0f, Pixel[2] / 255.0f};
+					TexDatas[y * Width + x] = {Pixel[2] / 255.0f, Pixel[1] / 255.0f, Pixel[0] / 255.0f, Pixel[3] / 255.0f};
 				}
 				
 			}

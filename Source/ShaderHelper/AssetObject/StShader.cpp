@@ -90,25 +90,6 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         return BuiltInUb.Get();
     }
 
-    GpuBindGroup* StShader::GetBuiltInBindGroup()
-    {
-		GpuTexture* TempiChannel = GpuResourceHelper::GetGlobalBlackTex();
-		static TRefCountPtr<GpuSampler> TempSampler = GGpuRhi->CreateSampler({});
-        static TRefCountPtr<GpuBindGroup> BuiltInBindGroup = GpuBindGroupBuilder{ GetBuiltInBindLayout() }
-			.SetExistingBinding(0, TSingleton<PrintBuffer>::Get().GetResource())
-            .SetUniformBuffer("Uniform", GetBuiltInUb()->GetGpuResource())
-			.SetTexture("iChannel0", TempiChannel)
-			.SetSampler("iChannel0Sampler", TempSampler)
-			.SetTexture("iChannel1", TempiChannel)
-			.SetSampler("iChannel1Sampler", TempSampler)
-			.SetTexture("iChannel2", TempiChannel)
-			.SetSampler("iChannel2Sampler", TempSampler)
-			.SetTexture("iChannel3", TempiChannel)
-			.SetSampler("iChannel3Sampler", TempSampler)
-            .Build();
-        return BuiltInBindGroup;
-    }
-
     GpuBindGroupLayout* StShader::GetBuiltInBindLayout()
     {
         static TRefCountPtr<GpuBindGroupLayout> BuiltInBindLayout = GetBuiltInBindLayoutBuilder().Build();
@@ -134,7 +115,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         static int Init = [&] {
             BuiltInBindLayout
 				.AddExistingBinding(0, BindingType::RWStorageBuffer, BindingShaderStage::Pixel)
-                .AddUniformBuffer("Uniform", GetBuiltInUbBuilder().GetLayoutDeclaration(), BindingShaderStage::Pixel)
+                .AddUniformBuffer("BuiltInUniform", GetBuiltInUbBuilder().GetLayoutDeclaration(), BindingShaderStage::Pixel)
                 .AddTexture("iChannel0", BindingShaderStage::Pixel)
                 .AddSampler("iChannel0Sampler", BindingShaderStage::Pixel)
                 .AddTexture("iChannel1", BindingShaderStage::Pixel)
@@ -201,7 +182,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         FW::UniformBufferBuilder NewCustomUniformBufferBuilder{FW::UniformBufferUsage::Persistant};
         FW::GpuBindGroupLayoutBuilder NewCustomBindGroupLayoutBuilder{ BindingContext::PassSlot };
         
-        auto CustomUniformCategory = CustomCategory->GetData("Uniform");
+        auto CustomUniformCategory = CustomCategory->GetData("CustomUniform");
         if(CustomUniformCategory)
         {
             TArray<TSharedRef<PropertyData>> UniformDatas;
@@ -209,7 +190,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
             for(auto UniformData : UniformDatas)
             {
                 FString MemberName = UniformData->GetDisplayName();
-                if(UniformData->IsOfType<PropertyFloatItem>())
+                if(UniformData->IsOfType<PropertyScalarItem<float>>())
                 {
                     NewCustomUniformBufferBuilder.AddFloat(MemberName);
                 }
@@ -217,12 +198,16 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
                 {
                     NewCustomUniformBufferBuilder.AddVector2f(MemberName);
                 }
+				else if(UniformData->IsOfType<PropertyVector3fItem>())
+				{
+					NewCustomUniformBufferBuilder.AddVector3f(MemberName);
+				}
 				else if (UniformData->IsOfType<PropertyVector4fItem>())
 				{
 					NewCustomUniformBufferBuilder.AddVector4f(MemberName);
 				}
             }
-            NewCustomBindGroupLayoutBuilder.AddUniformBuffer("Uniform", NewCustomUniformBufferBuilder.GetLayoutDeclaration(), BindingShaderStage::Pixel);
+            NewCustomBindGroupLayoutBuilder.AddUniformBuffer("CustomUniform", NewCustomUniformBufferBuilder.GetLayoutDeclaration(), BindingShaderStage::Pixel);
         }
         
         CustomUniformBufferBuilder = NewCustomUniformBufferBuilder;
@@ -235,7 +220,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
     {
         TArray<TSharedRef<PropertyData>> BindingDatas;
         
-        auto BuiltInUniformCategory = BuiltInCategory->GetData("Uniform");
+        auto BuiltInUniformCategory = BuiltInCategory->GetData("BuiltInUniform");
         BuiltInUniformCategory->GetChildren(BindingDatas);
         for(const auto& Data: BindingDatas)
         {
@@ -256,7 +241,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         
         if(CustomCategory)
         {
-            auto CustomUniformCategory = CustomCategory->GetData("Uniform");
+            auto CustomUniformCategory = CustomCategory->GetData("CustomUniform");
             CustomUniformCategory->GetChildren(BindingDatas);
             for(const auto& Data: BindingDatas)
             {
@@ -279,12 +264,16 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         TSharedPtr<PropertyItemBase> NewUniformProperty;
         if(InTypeName == "float")
         {
-            NewUniformProperty = MakeShared<PropertyFloatItem>(this, UniformMemberName);
+            NewUniformProperty = MakeShared<PropertyScalarItem<float>>(this, UniformMemberName);
         }
         else if(InTypeName == "float2")
         {
             NewUniformProperty = MakeShared<PropertyVector2fItem>(this, UniformMemberName);
         }
+		else if(InTypeName == "float3")
+		{
+			NewUniformProperty = MakeShared<PropertyVector3fItem>(this, UniformMemberName);
+		}
 		else if (InTypeName == "float4")
 		{
 			NewUniformProperty = MakeShared<PropertyVector4fItem>(this, UniformMemberName);
@@ -295,7 +284,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         }
         NewUniformProperty->SetEnabled(Enabled);
         NewUniformProperty->SetEmbedWidget(TypeInfoWidget);
-        NewUniformProperty->SetCanChangeToName([this](const FString& NewUniformMemberName){
+        NewUniformProperty->SetCanApplyName([this](const FString& NewUniformMemberName){
             if(!HasBindingName(NewUniformMemberName))
             {
                 return true;
@@ -327,10 +316,10 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
     
     void StShader::AddUniform(FString TypeName)
     {
-        auto CustomUniformCategory = CustomCategory->GetData("Uniform");
+        auto CustomUniformCategory = CustomCategory->GetData("CustomUniform");
         if (!CustomUniformCategory)
         {
-            CustomUniformCategory = MakeShared<PropertyCategory>(this, "Uniform");
+            CustomUniformCategory = MakeShared<PropertyCategory>(this, "CustomUniform");
             CustomCategory->AddChild(CustomUniformCategory.ToSharedRef());
         }
         
@@ -365,6 +354,12 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
             FSlateIcon(),
             FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, FString("float2")) }
         );
+		MenuBuilder.AddMenuEntry(
+			FText::FromString("float3"),
+			FText::GetEmpty(),
+			FSlateIcon(),
+			FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, FString("float3")) }
+		);
 		MenuBuilder.AddMenuEntry(
 			FText::FromString("float4"),
 			FText::GetEmpty(),

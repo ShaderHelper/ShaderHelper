@@ -1,6 +1,5 @@
 #pragma once
 #include "AssetObject/Graph.h"
-#include "AssetObject/ShaderToy/Pins/ShaderToyPin.h"
 #include "AssetObject/StShader.h"
 #include "AssetManager/AssetManager.h"
 #include "Editor/PreviewViewPort.h"
@@ -20,11 +19,36 @@ namespace SH
         void OnSelect(FW::ShObject* InObject) override;
     };
 
+	enum class ShaderToyFilterMode
+	{
+		Linear = (int)FW::SamplerFilter::Bilinear,
+		Nearest = (int)FW::SamplerFilter::Point
+	};
+
+	enum class ShaderToyWrapMode
+	{
+		Clamp = (int)FW::SamplerAddressMode::Clamp,
+		Repeat = (int)FW::SamplerAddressMode::Wrap
+	};
+
+	struct ShaderToyChannelDesc
+	{
+		ShaderToyFilterMode Filter = ShaderToyFilterMode::Linear;
+		ShaderToyWrapMode Wrap = ShaderToyWrapMode::Repeat;
+		friend FArchive& operator<<(FArchive& Ar, ShaderToyChannelDesc& ChannelDesc)
+		{
+			Ar << ChannelDesc.Filter;
+			Ar << ChannelDesc.Wrap;
+			return Ar;
+		}
+	};
+
 	class ShaderToyPassNode : public FW::GraphNode, public DebuggableObject
 	{
 		REFLECTION_TYPE(ShaderToyPassNode)
 	public:
 		ShaderToyPassNode();
+		ShaderToyPassNode(FW::AssetPtr<StShader> InShader);
 		~ShaderToyPassNode();
 
 	public:
@@ -44,7 +68,10 @@ namespace SH
 		void OnFinalizePixel(const FW::Vector2u& PixelCoord) override;
 		void OnEndDebuggging() override;
 		ShaderAsset* GetShaderAsset() const;
+		
     private:
+		FW::GpuBindGroup* GetBuiltInBindGroup();
+		void InitShader();
         void ClearBindingProperty();
         void RefreshProperty();
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromBinding();
@@ -53,12 +80,15 @@ namespace SH
     public:
         FW::AssetPtr<StShader> Shader;
 		ShaderToyFormat Format;
+		ShaderToyChannelDesc iChannelDesc0;
+		ShaderToyChannelDesc iChannelDesc1;
+		ShaderToyChannelDesc iChannelDesc2;
+		ShaderToyChannelDesc iChannelDesc3;
         
 	private:
-		TSharedPtr<FW::PreviewViewPort> Preview;
+		TSharedPtr<FW::PreviewViewPort> Preview = MakeShared<FW::PreviewViewPort>();
         //For Serialize
-        uint32 CustomUbSize = 0;
-        uint8* CustomUniformBufferData = nullptr;
+        TArray<uint8> CustomUniformBufferData;
         
         TUniquePtr<FW::UniformBuffer> CustomUniformBuffer;
         TRefCountPtr<FW::GpuBindGroupLayout> CustomBindLayout;

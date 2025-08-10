@@ -43,8 +43,8 @@ namespace FW
             }
         }
 
-        template<typename OtherType, ObjectOwnerShip OtherOwnerShip,
-            typename = decltype(ImplicitConv<T*>((OtherType*)nullptr))>
+        template<typename OtherType, ObjectOwnerShip OtherOwnerShip>
+		requires std::is_convertible_v<OtherType*, T*>
         ObjectPtr(const ObjectPtr<OtherType, OtherOwnerShip>& Copy) : Reference(Copy.Reference)
         {
             if (OwnerShip != ObjectOwnerShip::Assign)

@@ -27,8 +27,12 @@ namespace FW
 	class FRAMEWORK_API ShObject : FNoncopyable
 	{
 		REFLECTION_TYPE(ShObject)
-	public:
+		
+		template<typename T, typename... ArgTypes>
+		friend ObjectPtr<T, ObjectOwnerShip::Retain> NewShObject(ShObject* InOuter, ArgTypes&&... InArgs);
+	protected:
 		ShObject();
+	public:
 		virtual ~ShObject();
         
     public:
@@ -78,10 +82,10 @@ namespace FW
         TArray<ObserverObjectPtr<ShObject>> SubObjects;
 	};
 
-    template<typename T>
-    ObjectPtr<T, ObjectOwnerShip::Retain> NewShObject(ShObject* InOuter)
+    template<typename T, typename... ArgTypes>
+    ObjectPtr<T, ObjectOwnerShip::Retain> NewShObject(ShObject* InOuter, ArgTypes&&... InArgs)
     {
-        T* NewObj = new T;
+        T* NewObj = new T(std::forward<ArgTypes>(InArgs)...);
         NewObj->SetOuter(InOuter);
         return NewObj;
     }
@@ -101,4 +105,7 @@ namespace FW
     FRAMEWORK_API ShObjectOp* GetShObjectOp(ShObject* InObject);
 
     FRAMEWORK_API extern TArray<ShObject*> GlobalValidShObjects;
+
+	FRAMEWORK_API TArray<TSharedRef<PropertyData>> GeneratePropertyDatas(ShObject* InObject, const MetaMemberData* MetaMemData, void* Instance);
+	FRAMEWORK_API TArray<TSharedRef<PropertyData>> GeneratePropertyDatas(ShObject* InObject, MetaType* InMetaType);
 }

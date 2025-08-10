@@ -41,7 +41,7 @@ namespace FW
     MTLSamplerDescriptor* MapSamplerDesc(const GpuSamplerDesc& InSamplerDesc)
     {
         MTLSamplerDescriptor* SamplerDesc = [MTLSamplerDescriptor new];
-        switch(InSamplerDesc.Filer)
+        switch(InSamplerDesc.Filter)
         {
         case SamplerFilter::Point:
             SamplerDesc.minFilter = MTLSamplerMinMagFilterNearest;

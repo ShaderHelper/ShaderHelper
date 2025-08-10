@@ -4,6 +4,7 @@
 #include "Editor/ShaderHelperEditor.h"
 #include "Renderer/ShaderToyRenderComp.h"
 #include "RenderResource/RenderPass/BlitPass.h"
+#include "AssetObject/Pins/Pins.h"
 
 using namespace FW;
 
@@ -16,6 +17,8 @@ namespace SH
     REFLECTION_REGISTER(AddClass<ShaderToyOuputNodeOp>()
         .BaseClass<ShObjectOp>()
     )
+
+	REGISTER_NODE_TO_GRAPH(ShaderToyOuputNode, "ShaderToy Graph")
 
     MetaType* ShaderToyOuputNodeOp::SupportType()
     {

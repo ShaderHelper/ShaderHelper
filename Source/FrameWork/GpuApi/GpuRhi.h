@@ -105,7 +105,8 @@ public:
 	virtual void BeginFrame() = 0;
 	virtual void EndFrame() = 0;
 
-	//If the initial state is unknown, then the state be determined based on usage
+	//If the initial state is unknown, then the state be determined based on usage,
+	//but it may not be possible to infer the state from some composite usage e.g. GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget
 	virtual TRefCountPtr<GpuTexture> CreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState = GpuResourceState::Unknown) = 0;
 	virtual TRefCountPtr<GpuBuffer> CreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState = GpuResourceState::Unknown) = 0;
 

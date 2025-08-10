@@ -37,7 +37,7 @@ namespace FW
 
 	void Texture2D::PostLoad()
 	{
-		GpuTextureDesc Desc{ (uint32)Width, (uint32)Height, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource , RawData };
+		GpuTextureDesc Desc{ (uint32)Width, (uint32)Height, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource | GpuTextureUsage::Shared , RawData };
 		GpuData = GGpuRhi->CreateTexture(MoveTemp(Desc));
 	}
 

@@ -93,18 +93,44 @@ namespace FW
 		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts) override;
 		int32 GetInstIndex(SpvId Inst) const;
 		SpvPointer* GetPointer(SpvId PointerId);
-		TArray<uint8> ExecuteGpuOp(const FString& Name, int32 ResultSize, const TArray<uint8>& InputData, const TArray<FString>& Args);
+		TArray<uint8> ExecuteGpuOp(const FString& Name, int32 ResultSize, const TArray<uint8>& InputData, const TArray<FString>& Args, const TArray<GpuResource*>& InResources = {});
 		
 	public:
 		void Visit(SpvDebugLine* Inst) override;
 		void Visit(SpvDebugScope* Inst) override;
 		void Visit(SpvDebugDeclare* Inst) override;
 		
+		void Visit(SpvRoundEven* Inst) override;
+		void Visit(SpvFAbs* Inst) override;
+		void Visit(SpvSAbs* Inst) override;
+		void Visit(SpvFloor* Inst) override;
+		void Visit(SpvCeil* Inst) override;
+		void Visit(SpvFract* Inst) override;
 		void Visit(SpvSin* Inst) override;
 		void Visit(SpvCos* Inst) override;
+		void Visit(SpvTan* Inst) override;
+		void Visit(SpvAsin* Inst) override;
+		void Visit(SpvAcos* Inst) override;
+		void Visit(SpvAtan* Inst) override;
 		void Visit(SpvPow* Inst) override;
+		void Visit(SpvExp* Inst) override;
+		void Visit(SpvLog* Inst) override;
+		void Visit(SpvSqrt* Inst) override;
+		void Visit(SpvUMin* Inst) override;
+		void Visit(SpvSMin* Inst) override;
+		void Visit(SpvUMax* Inst) override;
+		void Visit(SpvSMax* Inst) override;
+		void Visit(SpvFClamp* Inst) override;
+		void Visit(SpvUClamp* Inst) override;
+		void Visit(SpvSClamp* Inst) override;
+		void Visit(SpvFMix* Inst) override;
 		void Visit(SpvStep* Inst) override;
 		void Visit(SpvSmoothStep* Inst) override;
+		void Visit(SpvLength* Inst) override;
+		void Visit(SpvDistance* Inst) override;
+		void Visit(SpvNormalize* Inst) override;
+		void Visit(SpvNMin* Inst) override;
+		void Visit(SpvNMax* Inst) override;
 		
 		void Visit(SpvOpFunctionParameter* Inst) override;
 		void Visit(SpvOpFunctionCall* Inst) override;
@@ -117,7 +143,14 @@ namespace FW
 		void Visit(SpvOpCompositeExtract* Inst) override;
 		void Visit(SpvOpAccessChain* Inst) override;
 		void Visit(SpvOpVectorTimesScalar* Inst) override;
+		void Visit(SpvOpDot* Inst) override;
+		void Visit(SpvOpAny* Inst) override;
+		void Visit(SpvOpAll* Inst) override;
 		void Visit(SpvOpIsNan* Inst) override;
+		void Visit(SpvOpIsInf* Inst) override;
+		void Visit(SpvOpLogicalOr* Inst) override;
+		void Visit(SpvOpLogicalAnd* Inst) override;
+		void Visit(SpvOpLogicalNot* Inst) override;
 		void Visit(SpvOpSelect* Inst) override;
 		void Visit(SpvOpIEqual* Inst) override;
 		void Visit(SpvOpINotEqual* Inst) override;
@@ -125,8 +158,10 @@ namespace FW
 		void Visit(SpvOpSLessThan* Inst) override;
 		void Visit(SpvOpFOrdLessThan* Inst) override;
 		void Visit(SpvOpFOrdGreaterThan* Inst) override;
+		void Visit(SpvOpConvertFToU* Inst) override;
 		void Visit(SpvOpConvertFToS* Inst) override;
 		void Visit(SpvOpConvertSToF* Inst) override;
+		void Visit(SpvOpConvertUToF* Inst) override;
 		void Visit(SpvOpFNegate* Inst) override;
 		void Visit(SpvOpIAdd* Inst) override;
 		void Visit(SpvOpFAdd* Inst) override;
@@ -137,13 +172,18 @@ namespace FW
 		void Visit(SpvOpUDiv* Inst) override;
 		void Visit(SpvOpSDiv* Inst) override;
 		void Visit(SpvOpFDiv* Inst) override;
+		void Visit(SpvOpUMod* Inst) override;
+		void Visit(SpvOpSRem* Inst) override;
+		void Visit(SpvOpFRem* Inst) override;
 		void Visit(SpvOpBitwiseOr* Inst) override;
 		void Visit(SpvOpBitwiseXor* Inst) override;
 		void Visit(SpvOpBitwiseAnd* Inst) override;
+		void Visit(SpvOpNot* Inst) override;
 		void Visit(SpvOpBranch* Inst) override;
 		void Visit(SpvOpBranchConditional* Inst) override;
 		void Visit(SpvOpReturn* Inst) override;
 		void Visit(SpvOpReturnValue* Inst) override;
+		void Visit(SpvOpSampledImage* Inst) override;
 
 	protected:
 		//if there is an ub case, the debugger results may not match gpu

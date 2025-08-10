@@ -19,6 +19,8 @@ namespace SH
 	public:
 		void Serialize(FArchive& Ar) override;
 		FString FileExtension() const override;
-		TArray<FW::MetaType*> SupportNodes() const override;
+		
+		void OnDragEnter(TSharedPtr<FDragDropOperation> DragDropOp) override;
+		void OnDrop(TSharedPtr<FDragDropOperation> DragDropOp) override;
 	};
 }

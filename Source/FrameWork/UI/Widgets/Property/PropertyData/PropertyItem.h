@@ -16,7 +16,7 @@ namespace FW
         using PropertyData::PropertyData;
         
         void SetEnabled(bool Enabled) { IsEnabled = Enabled; }
-        void SetCanChangeToName(const TFunction<bool(const FString&)>& CanChange) { CanChangeToName = CanChange; }
+        void SetCanApplyName(const TFunction<bool(const FString&)>& CanApply) { CanApplyName = CanApply; }
         void SetOnDisplayNameChanged(const TFunction<void(const FString&)>& DisplayNameChanged) { OnDisplayNameChanged = DisplayNameChanged; }
         void SetEmbedWidget(TSharedPtr<SWidget> InWidget) { EmbedWidget = MoveTemp(InWidget); }
         void SetOnDelete(const TFunction<void()>& OnDeleteFunc) { OnDelete = OnDeleteFunc;}
@@ -27,7 +27,7 @@ namespace FW
             Row->SetEnabled(IsEnabled);
                 
             SAssignNew(Item, SPropertyItem)
-                    .CanChangeToName(CanChangeToName)
+                    .CanApplyName(CanApplyName)
                     .DisplayName(&DisplayName)
                     .OnDisplayNameChanged(OnDisplayNameChanged)
                     .Indent(!!Parent);
@@ -38,21 +38,32 @@ namespace FW
             }
             
             Row->SetRowContent(
-                SNew(SHorizontalBox)
-                +SHorizontalBox::Slot()
-                [
-                    Item.ToSharedRef()
-                ]
-                +SHorizontalBox::Slot()
-                .AutoWidth()
-                [
-                    SNew(SIconButton).Icon(FAppStyle::Get().GetBrush("Icons.Delete"))
-                        .Visibility_Lambda([this]{ return OnDelete? EVisibility::Visible : EVisibility::Hidden; })
-                        .OnClicked_Lambda([this]{
-                            if(OnDelete) OnDelete();
-                            return FReply::Handled();
-                        })
-                ]
+				SNew(SBorder)
+				.Padding(FMargin{0,2,0,2})
+				.BorderImage_Lambda([this] {
+					if(Parent && Parent->IsOfType<PropertyCategory>() && static_cast<PropertyCategory*>(Parent)->IsComposite() )
+					{
+						return FAppCommonStyle::Get().GetBrush("PropertyView.CompositeItemColor");
+					}
+				   return FAppCommonStyle::Get().GetBrush("PropertyView.ItemColor");
+				})
+				[
+					SNew(SHorizontalBox)
+					+SHorizontalBox::Slot()
+					[
+						Item.ToSharedRef()
+					]
+					+SHorizontalBox::Slot()
+					.AutoWidth()
+					[
+						SNew(SIconButton).Icon(FAppStyle::Get().GetBrush("Icons.Delete"))
+							.Visibility_Lambda([this]{ return OnDelete? EVisibility::Visible : EVisibility::Hidden; })
+							.OnClicked_Lambda([this]{
+								if(OnDelete) OnDelete();
+								return FReply::Handled();
+							})
+					]
+				]
             );
             return Row;
         }
@@ -62,7 +73,7 @@ namespace FW
         TFunction<void()> OnDelete;
         TSharedPtr<SWidget> EmbedWidget;
         TSharedPtr<SPropertyItem> Item;
-        TFunction<bool(const FString&)> CanChangeToName;
+        TFunction<bool(const FString&)> CanApplyName;
         TFunction<void(const FString&)> OnDisplayNameChanged;
     };
 
@@ -70,10 +81,9 @@ namespace FW
 	{
 		MANUAL_RTTI_TYPE(PropertyEnumItem, PropertyItemBase)
 	public:
-		PropertyEnumItem(ShObject* InOwner, const FString& InName, void* InValueRef, TSharedPtr<FString> InEnumValueName,
+		PropertyEnumItem(ShObject* InOwner, const FString& InName, TSharedPtr<FString> InEnumValueName,
 						 const TMap<FString, TSharedPtr<void>>& InEnumEntries, const TFunction<void(void*)>& InSetter)
 		: PropertyItemBase(InOwner, InName)
-		, ValueRef(InValueRef)
 		, EnumValueName(InEnumValueName)
 		, EnumEntries(InEnumEntries)
 		, Setter(InSetter)
@@ -90,10 +100,11 @@ namespace FW
 			auto ValueWidget = SNew(SComboBox<TSharedPtr<FString>>)
 			.OptionsSource(&EnumItems)
 			.OnSelectionChanged_Lambda([this](TSharedPtr<FString> InItem, ESelectInfo::Type){
-				if(InItem)
+				if(*InItem != *EnumValueName)
 				{
 					EnumValueName = InItem;
 					Setter(EnumEntries[*EnumValueName].Get());
+					Owner->PostPropertyChanged(this);
 				}
 			})
 			.OnGenerateWidget_Lambda([](TSharedPtr<FString> InItem){
@@ -109,7 +120,6 @@ namespace FW
 		}
 		
 	private:
-		void* ValueRef;
 		TSharedPtr<FString> EnumValueName;
 		TMap<FString, TSharedPtr<void>> EnumEntries;
 		TFunction<void(void*)> Setter;
@@ -117,13 +127,15 @@ namespace FW
 		TArray<TSharedPtr<FString>> EnumItems;
 	};
 
-    class PropertyFloatItem : public PropertyItemBase
+	template<typename T>
+    class PropertyScalarItem : public PropertyItemBase
     {
-        MANUAL_RTTI_TYPE(PropertyFloatItem, PropertyItemBase)
+        MANUAL_RTTI_TYPE(PropertyScalarItem<T>, PropertyItemBase)
     public:
-        PropertyFloatItem(ShObject* InOwner, FString InName, float* InValueRef = nullptr)
+		PropertyScalarItem(ShObject* InOwner, FString InName, T* InValueRef = nullptr, bool InReadOnly = false)
             : PropertyItemBase(InOwner, MoveTemp(InName))
             , ValueRef(InValueRef)
+			, ReadOnly(InReadOnly)
         {}
         
         TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
@@ -131,9 +143,10 @@ namespace FW
             auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
             if(ValueRef)
             {
-                auto ValueWidget = SNew(SSpinBox<float>)
+                auto ValueWidget = SNew(SSpinBox<T>)
+					.IsEnabled(!ReadOnly)
                     .MaxFractionalDigits(3)
-                    .OnValueChanged_Lambda([this](float NewValue) {
+                    .OnValueChanged_Lambda([this](T NewValue) {
                         if(*ValueRef != NewValue)
                         {
                             *ValueRef = NewValue;
@@ -148,7 +161,8 @@ namespace FW
         }
 
     private:
-        float* ValueRef;
+        T* ValueRef;
+		bool ReadOnly;
     };
 
     class PropertyVector2fItem : public PropertyItemBase
@@ -201,6 +215,70 @@ namespace FW
     private:
         Vector2f* ValueRef;
     };
+
+	class PropertyVector3fItem : public PropertyItemBase
+	{
+		MANUAL_RTTI_TYPE(PropertyVector3fItem, PropertyItemBase)
+	public:
+		PropertyVector3fItem(ShObject* InOwner, FString InName, Vector3f* InValueRef = nullptr)
+			: PropertyItemBase(InOwner, MoveTemp(InName))
+			, ValueRef(InValueRef)
+		{}
+		
+		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
+		{
+			auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
+			if(ValueRef)
+			{
+				auto ValueWidget = SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					[
+						SNew(SSpinBox<float>)
+						.MaxFractionalDigits(3)
+						.OnValueChanged_Lambda([this](float NewValue) {
+							if(ValueRef->x != NewValue)
+							{
+								ValueRef->x = NewValue;
+								Owner->PostPropertyChanged(this);
+							}
+						})
+						.Value_Lambda([this] { return ValueRef->x; })
+					]
+					+ SHorizontalBox::Slot()
+					[
+						SNew(SSpinBox<float>)
+						.MaxFractionalDigits(3)
+						.OnValueChanged_Lambda([this](float NewValue) {
+							if(ValueRef->y != NewValue)
+							{
+								ValueRef->y = NewValue;
+								Owner->PostPropertyChanged(this);
+							}
+						})
+						.Value_Lambda([this] { return ValueRef->y; })
+					]
+					+ SHorizontalBox::Slot()
+					[
+						SNew(SSpinBox<float>)
+						.MaxFractionalDigits(3)
+						.OnValueChanged_Lambda([this](float NewValue) {
+							if(ValueRef->z != NewValue)
+							{
+								ValueRef->z = NewValue;
+								Owner->PostPropertyChanged(this);
+							}
+						})
+						.Value_Lambda([this] { return ValueRef->z; })
+					];
+				Item->AddWidget(MoveTemp(ValueWidget));
+			}
+
+			return Row;
+		}
+
+	private:
+		Vector3f* ValueRef;
+	};
 
 	class PropertyVector4fItem : public PropertyItemBase
 	{

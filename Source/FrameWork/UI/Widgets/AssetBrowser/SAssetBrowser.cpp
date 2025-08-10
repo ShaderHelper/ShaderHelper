@@ -88,16 +88,22 @@ namespace FW
 
     void SAssetBrowser::AddBrowserDirectory(const FString& DirName)
     {
-        AssetBrowserDirectory NewDirectory;
-        InitDirectory(NewDirectory, DirName);
-        AssetBrowserDirectory& ParDirectory = *FindBrowserDirectory(ContentDirectory, FPaths::GetPath(DirName));
-        ParDirectory.Directories.Add(MoveTemp(NewDirectory));
+        AssetBrowserDirectory* ParDirectory = FindBrowserDirectory(ContentDirectory, FPaths::GetPath(DirName));
+		if(ParDirectory)
+		{
+			AssetBrowserDirectory NewDirectory;
+			InitDirectory(NewDirectory, DirName);
+			ParDirectory->Directories.Add(MoveTemp(NewDirectory));
+		}
     }
 
     void SAssetBrowser::RemoveBrowserDirectory(const FString& DirName)
     {
-        AssetBrowserDirectory& ParDirectory = *FindBrowserDirectory(ContentDirectory, FPaths::GetPath(DirName));
-        ParDirectory.Directories.Remove(AssetBrowserDirectory{DirName});
+        AssetBrowserDirectory* ParDirectory = FindBrowserDirectory(ContentDirectory, FPaths::GetPath(DirName));
+		if(ParDirectory)
+		{
+			ParDirectory->Directories.Remove(AssetBrowserDirectory{DirName});
+		}
     }
 
     TArray<FString> SAssetBrowser::FindFilesUnderBrowserDirectory(const FString& DirName)

@@ -21,14 +21,16 @@ namespace FW
 
     enum class MetaInfo
     {
-        None,
-        Property, //will occur in the property panel.
+        None = 0,
+        Property = 1 << 0, //will automatically occur in the property panel.
+		ReadOnly = 1 << 1,
     };
+	ENUM_CLASS_FLAGS(MetaInfo);
 
     struct MetaMemberData
     {
         template<typename T>
-        bool IsType()
+        bool IsType() const
         {
             return TypeName == AUX::TypeName<T>;
         }
@@ -40,12 +42,12 @@ namespace FW
         }
         
         template<typename T>
-        T GetValue(void* Instance)
+        T GetValue(void* Instance) const
         {
             return *static_cast<T*>(Get(Instance));
         }
         
-        bool IsAssetRef();
+        bool IsAssetRef() const;
         
         FString MemberName;
         FString TypeName;
@@ -54,8 +56,8 @@ namespace FW
         MetaInfo InfoType;
         void* InfoData;
         
-        bool bShObjectRef;
-        MetaType*(*GetShObjectMetaType)();
+		//return nullptr for basic types
+		MetaType*(*GetMetaType)() = nullptr;
 		
 		FString(*GetEnumValueName)(void*) = nullptr;
 		TMap<FString, TSharedPtr<void>> EnumEntries;
@@ -86,6 +88,12 @@ namespace FW
 			}
 			return nullptr;
 		}
+		
+		template<typename T>
+		bool IsType()
+		{
+			return TypeName == AUX::TypeName<T>;
+		}
 
 		template<typename T>
 		bool IsDerivedFrom()
@@ -106,9 +114,16 @@ namespace FW
 			} 
 			return false;
 		}
-
+		
+		const MetaMemberData* GetMetaMemberData(const FString& InMemberName) const
+		{
+			return Datas.FindByPredicate([&](const MetaMemberData& InItem){
+				return InItem.MemberName == InMemberName;
+			});
+		}
+		
 		FString TypeName;
-		TOptional<FString> RegisteredName; //Portable
+		FString RegisteredName; //Portable
 		void*(*Constructor)();
 		MetaType*(*BaseMetaTypeGetter)();
 		void* DefaultObject;
@@ -122,6 +137,14 @@ namespace FW
             TEXT("Please ensure that have registered the type: %s."), *AUX::TypeName<T>);
         return GetTypeNameToMetaType()[GetGeneratedTypeName<T>()];
     }
+
+	template<typename T>
+	MetaType* TryGetMetaType()
+	{
+		FString TypeName =  GetGeneratedTypeName<T>();
+		const auto& MetaTypeMap = GetTypeNameToMetaType();
+		return MetaTypeMap.Contains(TypeName) ? MetaTypeMap[TypeName] : nullptr;
+	}
 
     inline MetaType* GetMetaType(const FString& InRegisteredName)
     {
@@ -189,11 +212,13 @@ namespace FW
             MemberData.InfoData = InfoData;
             if constexpr(is_object_ptr<RawType>::value)
             {
-                MemberData.bShObjectRef = true;
-                //the metatype of member may not be registered at the moment, so lazy get.
-                using ShObjectType = typename object_ptr_trait<RawType>::type;
-                MemberData.GetShObjectMetaType = [] { return GetMetaType<ShObjectType>(); };
+                //the metatype of member may not be registered at the moment, so lazy getting.
+				MemberData.GetMetaType = [] { return GetMetaType<typename object_ptr_trait<RawType>::type>(); };
             }
+			else
+			{
+				MemberData.GetMetaType = [] { return TryGetMetaType<RawType>(); };
+			}
  
             Meta->Datas.Add(MoveTemp(MemberData));
             return *this;
@@ -202,9 +227,9 @@ namespace FW
 		~MetaTypeBuilder()
 		{
 			GetTypeNameToMetaType().Add(Meta->TypeName, Meta);
-			if (Meta->RegisteredName)
+			if(!Meta->RegisteredName.IsEmpty())
 			{
-				GetRegisteredNameToMetaType().Add(*Meta->RegisteredName, Meta);
+				GetRegisteredNameToMetaType().Add(Meta->RegisteredName, Meta);
 			}
 		}
 
@@ -226,9 +251,7 @@ namespace FW
 
 	inline FString GetRegisteredName(MetaType* InMt)
 	{
-		const FString* Rel = GetRegisteredNameToMetaType().FindKey(InMt);
-		check(Rel);
-		return *Rel;
+		return InMt->RegisteredName;
 	}
 
 	template<typename To, typename From>
@@ -300,7 +323,7 @@ namespace FW
         TArray<MetaMemberData*> Datas;
         for(auto& Data : InMt->Datas)
         {
-            if(Data.InfoType == MetaInfo::Property)
+            if(EnumHasAnyFlags(Data.InfoType,MetaInfo::Property))
             {
                 Datas.Add(&Data);
             }
@@ -321,7 +344,6 @@ namespace FW
 	template<typename T> bool IsOfType() const { return IsOfTypeImpl(T::GetTypeId());} \
 	virtual bool IsOfTypeImpl(const FString& Type) const { return false; }
 
-//Don't support MANUAL_RTTI_TYPE(PropertyItem<T>, PropertyItemBase)
 #define MANUAL_RTTI_TYPE(TYPE, Base) \
     public: \
 	static const FString& GetTypeId() { static FString Type = TEXT(#TYPE); return Type; } \

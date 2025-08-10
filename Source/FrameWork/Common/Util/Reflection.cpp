@@ -17,14 +17,10 @@ namespace FW
 		return RegisteredNameToMetaType;
 	}
 
-    bool MetaMemberData::IsAssetRef()
+    bool MetaMemberData::IsAssetRef() const
     {
-        if(bShObjectRef)
-        {
-            MetaType* ShObjectMetaType = GetShObjectMetaType();
-            return ShObjectMetaType->IsDerivedFrom<AssetObject>();
-        }
-        return false;
+		MetaType* MemberMetaType = GetMetaType();
+		return MemberMetaType ? MemberMetaType->IsDerivedFrom<AssetObject>() : false;
     }
 
 }

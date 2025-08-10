@@ -18,7 +18,6 @@ namespace SH
         static FW::UniformBuffer* GetBuiltInUb();
         static FW::UniformBufferBuilder& GetBuiltInUbBuilder();
         static FW::GpuBindGroupLayout* GetBuiltInBindLayout();
-        static FW::GpuBindGroup* GetBuiltInBindGroup();
         static FW::GpuBindGroupLayoutBuilder& GetBuiltInBindLayoutBuilder();
 
 	public:
