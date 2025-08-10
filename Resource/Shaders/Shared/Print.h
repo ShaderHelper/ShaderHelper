@@ -184,12 +184,24 @@ AppendArgFunc(bool)
 #endif
 
 static uint GPrivate_AssertResult = 1;
-#define Assert(Condition, ...) do {               \
-	GPrivate_AssertResult &= Condition;           \
-	if(GPrivate_AssertResult != 1)                \
-	{                                             \
-		Print(EXPAND(__VA_ARGS__));               \
-	}                                             \
+
+//Assert(uv.x > 0.9);
+//Assert(uv.x > 0.9, "uv.x must be greater than 0.9");
+#define Assert(Condition, ...) do {                     \
+	GPrivate_AssertResult &= Condition;                 \
+	if(GPrivate_AssertResult != 1)                      \
+	{                                                   \
+		Print(EXPAND(__VA_ARGS__));                     \
+	}                                                   \
+}while(0)
+
+//AssertFormat(uv.x > 0.9, "uv.x {0} must be greater than 0.9", uv.x);
+#define AssertFormat(Condition, StrArrDecl, ...) do {   \
+	GPrivate_AssertResult &= Condition;                 \
+	if(GPrivate_AssertResult != 1)                      \
+	{                                                   \
+		Print(EXPAND(StrArrDecl), ##__VA_ARGS__);       \
+	}                                                   \
 }while(0)
 
 #endif

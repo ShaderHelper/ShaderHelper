@@ -11,7 +11,10 @@ namespace FW
 	void AssetOp::OpenAsset(AssetObject* InAsset)
 	{
 		AssetOp* Op = GetAssetOp(InAsset->DynamicMetaType());
-		Op->OnOpen(InAsset->GetPath());
+		if(Op)
+		{
+			Op->OnOpen(InAsset->GetPath());
+		}
 	}
 
     AssetOp* GetAssetOp(const FString& InAssetPath)

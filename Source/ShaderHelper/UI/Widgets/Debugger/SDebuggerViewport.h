@@ -24,7 +24,7 @@ namespace SH
 		bool FinalizedPixel() const { return bFinalizePixel; }
 		
 	private:
-		TArray<FW::Vector3f> TexDatas;
+		TArray<FW::Vector4f> TexDatas;
 		TRefCountPtr<FW::GpuTexture> RawTex;
 		TRefCountPtr<FW::GpuTexture> DebuggerTex;
 		TSharedPtr<FW::PreviewViewPort> ViewPort;

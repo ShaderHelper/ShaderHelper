@@ -59,6 +59,7 @@ namespace SH
 		SDebuggerVariableView* GetDebuggerGlobalVariableView() const { return DebuggerGlobalVariableView.Get(); }
 		SDebuggerCallStackView* GetDebuggerCallStackView() const { return DebuggerCallStackView.Get(); }
 		SDebuggerWatchView* GetDebuggerWatchView() const { return DebuggerWatchView.Get(); }
+		FW::SGraphPanel* GetGraphPanel() const { return GraphPanel.Get(); }
 		void InvokeDebuggerTabs();
 		void CloseDebuggerTabs();
         

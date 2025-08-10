@@ -2566,6 +2566,7 @@ const FString FoldMarkerText = TEXT("⇿");
         }
 
         //Update fold markers highlight.
+		TextLayout->ClearLineHighlights();
         for (const FTextLineHighlight& Highlight : Highlights)
         {
             TextLayout->AddLineHighlight(Highlight);

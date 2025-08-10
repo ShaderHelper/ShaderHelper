@@ -28,6 +28,8 @@ namespace FW
 		Vector,
 		Pointer,
 		Struct,
+		Image,
+		Sampler,
 		Array,
 		RuntimeArray,
 	};
@@ -80,6 +82,86 @@ namespace FW
 		LocalSize = 17,
 	};
 
+	enum class SpvDim
+	{
+		_1D = 0,
+		_2D = 1,
+		_3D = 2,
+		Cube = 3,
+		Rect = 4,
+		Buffer = 5,
+		SubpassData = 6,
+		TileImageDataEXT = 4173,
+	};
+
+	enum class SpvImageOperands : uint32
+	{
+		None = 0x0000,
+		Bias = 0x0001,
+		Lod = 0x0002,
+		Grad = 0x0004,
+		ConstOffset = 0x0008,
+		Offset = 0x0010,
+		ConstOffsets = 0x0020,
+		Sample = 0x0040,
+		MinLod = 0x0080,
+		MakeTexelAvailable = 0x0100,
+		MakeTexelVisible = 0x0200,
+		NonPrivateTexel = 0x0400,
+		VolatileTexel = 0x0800,
+		SignExtend = 0x1000,
+		ZeroExtend = 0x2000,
+		Nontemporal = 0x4000,
+		Offsets = 0x10000,
+	};
+	ENUM_CLASS_FLAGS(SpvImageOperands);
+
+	enum class SpvImageFormat
+	{
+		Unknown = 0,
+		Rgba32f = 1,
+		Rgba16f = 2,
+		R32f = 3,
+		Rgba8 = 4,
+		Rgba8Snorm = 5,
+		Rg32f = 6,
+		Rg16f = 7,
+		R11fG11fB10f = 8,
+		R16f = 9,
+		Rgba16 = 10,
+		Rgb10A2 = 11,
+		Rg16 = 12,
+		Rg8 = 13,
+		R16 = 14,
+		R8 = 15,
+		Rgba16Snorm = 16,
+		Rg16Snorm = 17,
+		Rg8Snorm = 18,
+		R16Snorm = 19,
+		R8Snorm = 20,
+		Rgba32i = 21,
+		Rgba16i = 22,
+		Rgba8i = 23,
+		R32i = 24,
+		Rg32i = 25,
+		Rg16i = 26,
+		Rg8i = 27,
+		R16i = 28,
+		R8i = 29,
+		Rgba32ui = 30,
+		Rgba16ui = 31,
+		Rgba8ui = 32,
+		R32ui = 33,
+		Rgb10a2ui = 34,
+		Rg32ui = 35,
+		Rg16ui = 36,
+		Rg8ui = 37,
+		R16ui = 38,
+		R8ui = 39,
+		R64ui = 40,
+		R64i = 41,
+	};
+
 	class SpvType
 	{
 	public:
@@ -130,6 +212,23 @@ namespace FW
 		
 	protected:
 		bool IsSigned;
+	};
+
+	class SpvImageType : public SpvType
+	{
+	public:
+		SpvImageType(SpvId InId, SpvType* InSampledType, SpvDim InDim) : SpvType(SpvTypeKind::Image, InId)
+		, SampledType(InSampledType), Dim(InDim)
+		{}
+		
+		SpvType* SampledType;
+		SpvDim Dim;
+	};
+
+	class SpvSamplerType : public SpvType
+	{
+	public:
+		SpvSamplerType(SpvId InId) : SpvType(SpvTypeKind::Sampler, InId) {}
 	};
 
 	class SpvVoidType : public SpvType
@@ -272,13 +371,19 @@ namespace FW
 		{
 			GpuResource* Resource = nullptr;
 			TArray<uint8> Value;
+			
+			bool IsOpaque() const { return Value.IsEmpty() && Resource; }
 		};
 			
 		struct Internal
 		{
 			TArray<uint8> Value;
+			TArray<GpuResource*> Resources;
+			
+			bool IsOpaque() const { return Value.IsEmpty() && !Resources.IsEmpty(); }
 		};
 		
+		bool IsOpaque() const { return std::visit([](auto&& Arg){ return Arg.IsOpaque(); }, Storage); }
 		bool IsExternal() const { return std::holds_alternative<SpvObject::External>(Storage); }
 		
 		std::variant<External, Internal> Storage;
@@ -293,6 +398,7 @@ namespace FW
 
 	struct SpvPointer
 	{
+		SpvId Id{};
 		SpvVariable* Pointee;
 		TArray<int32> Indexes;
 	};
@@ -330,6 +436,8 @@ namespace FW
 		TypeInt = 21,
 		TypeFloat = 22,
 		TypeVector = 23,
+		TypeImage = 25,
+		TypeSampler = 26,
 		TypeArray = 28,
 		TypeRuntimeArray = 29,
 		TypeStruct = 30,
@@ -351,8 +459,12 @@ namespace FW
 		VectorShuffle = 79,
 		CompositeConstruct = 80,
 		CompositeExtract = 81,
+		SampledImage = 86,
+		ImageSampleImplicitLod = 87,
+		ConvertFToU = 109,
 		ConvertFToS = 110,
 		ConvertSToF = 111,
+		ConvertUToF = 112,
 		FNegate = 127,
 		IAdd = 128,
 		FAdd = 129,
@@ -363,8 +475,18 @@ namespace FW
 		UDiv = 134,
 		SDiv = 135,
 		FDiv = 136,
+		UMod = 137,
+		SRem = 138,
+		FRem = 140,
 		VectorTimesScalar = 142,
+		Dot = 148,
+		Any = 154,
+		All = 155,
 		IsNan = 156,
+		IsInf = 157,
+		LogicalOr = 166,
+		LogicalAnd = 167,
+		LogicalNot = 168,
 		Select = 169,
 		IEqual = 170,
 		INotEqual = 171,
@@ -375,6 +497,7 @@ namespace FW
 		BitwiseOr = 197,
 		BitwiseXor = 198,
 		BitwiseAnd = 199,
+		Not = 200,
 		DPdx = 207,
 		DPdy = 208,
 		Label = 248,

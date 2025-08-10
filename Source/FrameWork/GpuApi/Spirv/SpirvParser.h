@@ -41,6 +41,8 @@ namespace FW
 		void Visit(SpvOpTypeBool* Inst) override;
 		void Visit(SpvOpTypePointer* Inst) override;
 		void Visit(SpvOpTypeStruct* Inst) override;
+		void Visit(SpvOpTypeImage* Inst) override;
+		void Visit(SpvOpTypeSampler* Inst) override;
 		void Visit(SpvOpTypeArray* Inst) override;
 		void Visit(SpvOpTypeRuntimeArray* Inst) override;
 		void Visit(SpvOpDecorate* Inst) override;

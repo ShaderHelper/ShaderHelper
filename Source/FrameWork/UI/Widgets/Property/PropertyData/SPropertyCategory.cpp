@@ -9,17 +9,17 @@ namespace FW
 	{
 		OwnerRowPtr = TableRow.Get();
 
-		const FSlateBrush* CategoryColor = nullptr;
+		const FSlateBrush* CategoryBrush = nullptr;
 		FSlateFontInfo CategoryTextFont;
 
 		if (InArgs._IsRootCategory)
 		{
-			CategoryColor = FAppCommonStyle::Get().GetBrush("PropertyView.CategoryColor");
+			CategoryBrush = InArgs._CategoryBrush ? InArgs._CategoryBrush : FAppCommonStyle::Get().GetBrush("PropertyView.CategoryColor");
 			CategoryTextFont = FAppStyle::Get().GetFontStyle("NormalFontBold");
 		}
 		else
 		{
-			CategoryColor = FAppCommonStyle::Get().GetBrush("PropertyView.ItemColor");
+			CategoryBrush = InArgs._CategoryBrush ? InArgs._CategoryBrush : FAppCommonStyle::Get().GetBrush("PropertyView.ItemColor");
 			CategoryTextFont = FAppStyle::Get().GetFontStyle("NormalFont");
 		}
 
@@ -69,7 +69,7 @@ namespace FW
 			.Padding(FMargin{0.0f, 3.0f, 0.0f, 0.0f})
 			[
 				SNew(SBorder)
-				.BorderImage(CategoryColor)
+				.BorderImage(CategoryBrush)
 				[
 					HBox
 				]

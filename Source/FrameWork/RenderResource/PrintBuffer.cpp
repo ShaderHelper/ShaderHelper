@@ -29,15 +29,7 @@ namespace FW
 			int LineNumber = *((uint8*)Printer + ByteOffset);
 			ByteOffset += 1;
 			FString PrintStr{ (char*)Printer + ByteOffset };
-			if(!AssertFlag) {
-				OutAssertInfo.AssertString = "Assert failed";
-				if(!PrintStr.IsEmpty())
-				{
-					OutAssertInfo.AssertString += ":" + PrintStr;
-				}
-				OutAssertInfo.LineNumber = LineNumber;
-				break;
-			}
+			
 			ByteOffset += PrintStr.Len() + 1;
 			uint8 ArgNum = *((uint8*)Printer + ByteOffset);
 			ByteOffset += 1;
@@ -120,6 +112,17 @@ namespace FW
 					ByteOffset += sizeof(Vector4u);
 				}
 			}
+			
+			if(!AssertFlag) {
+				OutAssertInfo.AssertString = "Assert failed";
+				if(!PrintStr.IsEmpty())
+				{
+					OutAssertInfo.AssertString += ":" + FString::Format(*PrintStr, Args);
+				}
+				OutAssertInfo.LineNumber = LineNumber;
+				break;
+			}
+			
 			PrintStrings.Add(FString::Format(*PrintStr, Args));
 		}
 		GGpuRhi->UnMapGpuBuffer(InternalBuffer);

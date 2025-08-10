@@ -123,7 +123,6 @@ namespace FW
 		int32 ResultTypeSize = GetTypeByteSize(ResultType);
 		TArray<uint8> Datas;
 		Datas.SetNumZeroed(ResultTypeSize * 4);
-
 		for(int32 QuadIndex = 0; QuadIndex < 4; QuadIndex++)
 		{
 			SpvVmContext& Context = PixelContext.Quad[QuadIndex];
@@ -138,7 +137,55 @@ namespace FW
 		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
 		
 		TArray<uint8> ResultValue = ExecuteGpuOp("DPdy", ResultTypeSize * 4, Datas, ExtraArgs);
+		for(int32 QuadIndex = 0; QuadIndex < 4; QuadIndex++)
+		{
+			SpvVmFrame& StackFrame = PixelContext.Quad[QuadIndex].ThreadState.StackFrames.back();
+			TArray<uint8> QuadIndexResultValue = {ResultValue.GetData() + ResultTypeSize * QuadIndex, ResultTypeSize};
+			
+			SpvObject ResultObject{
+				.Id = ResultId,
+				.Type = ResultType,
+				.Storage = SpvObject::Internal{ MoveTemp(QuadIndexResultValue) }
+			};
+			StackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(ResultObject));
+		}
+	}
+
+	void SpvVmPixelVisitor::Visit(SpvOpImageSampleImplicitLod* Inst)
+{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvId ResultId = Inst->GetId().value();
+		SpvObject* Coordinate = GetObject(&Context, Inst->GetCoordinate());
+		SpvObject* SampledImage = GetObject(&Context, Inst->GetSampledImage());
 		
+		if(!FlushQuad(ThreadState.InstIndex) && EnableUbsan)
+		{
+			ThreadState.RecordedInfo.DebugStates.Last().UbError = "Texture sampling with implicit derivative instruction in non-uniform control flow!";
+			bTerminate = true;
+			return;
+		}
+		
+		int32 ResultTypeSize = GetTypeByteSize(ResultType);
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(ResultTypeSize * 4);
+		for(int32 QuadIndex = 0; QuadIndex < 4; QuadIndex++)
+		{
+			SpvVmContext& Context = PixelContext.Quad[QuadIndex];
+			SpvObject* Coordinate = GetObject(&Context, Inst->GetCoordinate());
+			Datas.Append(GetObjectValue(Coordinate));
+		}
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvOp::ImageSampleImplicitLod));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpOperandType=%s"), *GetHlslTypeStr(Coordinate->Type)));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("OpImageSampleImplicitLod", ResultTypeSize * 4, Datas, ExtraArgs, std::get<SpvObject::Internal>(SampledImage->Storage).Resources);
 		for(int32 QuadIndex = 0; QuadIndex < 4; QuadIndex++)
 		{
 			SpvVmFrame& StackFrame = PixelContext.Quad[QuadIndex].ThreadState.StackFrames.back();

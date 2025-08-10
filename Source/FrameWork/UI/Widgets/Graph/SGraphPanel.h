@@ -25,7 +25,10 @@ namespace FW
 
 		SGraphPanel();
 		void Construct(const FArguments& InArgs);
+		
 	public:
+		void AddNode(ObjectPtr<GraphNode> NewNodeData);
+		
 		void Clear();
 		void SetGraphData(Graph* InGraphData);
 		Graph* GetGraphData() const { return GraphData; }
@@ -44,6 +47,8 @@ namespace FW
 		virtual FReply OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 		virtual FReply OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 		virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+		virtual void OnDragEnter(FGeometry const& MyGeometry, FDragDropEvent const& DragDropEvent) override;
+		void OnDragLeave(FDragDropEvent const& DragDropEvent) override;
 		virtual FReply OnDragOver(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent) override;
 		virtual FReply OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent) override;
 		virtual bool SupportsKeyboardFocus() const override { return true; }
@@ -60,7 +65,6 @@ namespace FW
 		
 		SGraphPin* GetGraphPin(FGuid PinId);
 		SGraphPin* GetOuputPinInLink(SGraphPin* InputPin) const;
-		TSharedPtr<SGraphNode> AddNodeFromData(GraphNode* InNodeData);
 		void AddLink(SGraphPin* Output, SGraphPin* Input);
 		void RemoveLink(SGraphPin* Input);
 

@@ -85,10 +85,11 @@ namespace FW
         void* GetReadableData() const { return ReadableBackBuffer; }
         void* GetWriteCombinedData() const { return WriteCombinedBuffer; }
         
-        void SetData(uint8* InData)
+        void SetData(const TArray<uint8>& InData)
         {
-            FMemory::Memcpy(ReadableBackBuffer, InData, MetaData.UniformBufferSize);
-            FMemory::Memcpy(WriteCombinedBuffer, InData, MetaData.UniformBufferSize);
+			check(InData.Num() == MetaData.UniformBufferSize);
+            FMemory::Memcpy(ReadableBackBuffer, InData.GetData(), MetaData.UniformBufferSize);
+            FMemory::Memcpy(WriteCombinedBuffer, InData.GetData(), MetaData.UniformBufferSize);
         }
         
         bool HasMember(const FString& MemberName)
@@ -226,7 +227,7 @@ namespace FW
 			{
 				while (SizeAfterAligning > SizeBeforeAligning)
 				{
-					UniformBufferMemberNames += FString::Printf(TEXT("float Padding_%d;\n"), SizeBeforeAligning);
+					UniformBufferMemberNames += FString::Printf(TEXT("float {0}_Padding_%d;\n"), SizeBeforeAligning);
 					SizeBeforeAligning += 4;
 				}
 				MetaData.UniformBufferSize = SizeAfterAligning + MemberSize;

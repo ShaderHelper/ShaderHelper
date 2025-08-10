@@ -200,7 +200,7 @@ namespace FW
 
 		bool ComparisonEnable = InSamplerDesc.Compare != CompareMode::Never;
 
-		switch (InSamplerDesc.Filer)
+		switch (InSamplerDesc.Filter)
 		{
 		case SamplerFilter::Point:			
 			DxSamplerDesc.Filter = ComparisonEnable ? D3D12_FILTER_COMPARISON_MIN_MAG_MIP_POINT : D3D12_FILTER_MIN_MAG_MIP_POINT;

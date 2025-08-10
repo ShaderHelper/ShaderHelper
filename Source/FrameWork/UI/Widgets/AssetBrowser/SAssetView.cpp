@@ -182,8 +182,8 @@ namespace FW
 										AssetOp_->OnCreate(NewAsset);
 									}
 
-									NewAsset->ObjectName = FText::FromString(FPaths::GetBaseFilename(SavedFileName));
 									TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFileName));
+									NewAsset->ObjectName = FText::FromString(FPaths::GetBaseFilename(SavedFileName));
 									NewAsset->Serialize(*Ar);
 								})),
 								NAME_None,
@@ -369,6 +369,7 @@ namespace FW
 				{
 					FString SavedFileName = CurViewDirectory / FPaths::GetBaseFilename(OpenedFileNames[0]) + "." + ImportedAssetObject->FileExtension();
 					TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFileName));
+					ImportedAssetObject->ObjectName = FText::FromString(FPaths::GetBaseFilename(SavedFileName));
 					ImportedAssetObject->Serialize(*Ar);
 				}
 				else

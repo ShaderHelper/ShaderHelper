@@ -12,7 +12,7 @@ namespace FW::GpuResourceHelper
 
 	GpuTexture* GetGlobalBlackTex()
 	{
-        TArray<uint8> RawData = {0,0,0,1};
+        TArray<uint8> RawData = {0,0,0,255};
 		GpuTextureDesc Desc{ 1, 1, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource , RawData};
 		static TRefCountPtr<GpuTexture> GlobalBlackTex = GGpuRhi->CreateTexture(MoveTemp(Desc));
 		return GlobalBlackTex;

@@ -15,6 +15,9 @@ namespace FW
 		void PostLoad() override;
 		FString FileExtension() const override;
 		GpuTexture* GetThumbnail() const override;
+		GpuTexture* GetGpuData() const { return GpuData; }
+		uint32 GetWidth() const { return Width; }
+		uint32 GetHeight() const { return Height; }
 
 	private:
         uint32 Width, Height;

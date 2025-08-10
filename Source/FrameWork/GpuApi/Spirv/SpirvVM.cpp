@@ -297,12 +297,6 @@ namespace FW
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
 		SpvId ResultId = Inst->GetId().value();
-		
-		if(!Context.Types.contains(Inst->GetResultType()))
-		{
-			return;
-		}
-		
 		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
 		
 		SpvStorageClass StorageClass = Inst->GetStorageClass();
@@ -322,7 +316,10 @@ namespace FW
 		ThreadState.RecordedInfo.AllVariables[ResultId] =  Var;
 		CurStackFrame.Variables.insert_or_assign(ResultId, MoveTemp(Var));
 		
-		SpvPointer Pointer{ &CurStackFrame.Variables[ResultId] };
+		SpvPointer Pointer{
+			.Id = ResultId,
+			.Pointee = &CurStackFrame.Variables[ResultId]
+		};
 		CurStackFrame.Pointers.insert_or_assign(ResultId, MoveTemp(Pointer));
 	}
 
@@ -341,33 +338,37 @@ namespace FW
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
-		
-		if(!Context.Types.contains(Inst->GetResultType()))
-		{
-			return;
-		}
-		;
 		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
 		
 		SpvPointer* Pointer = GetPointer(Inst->GetPointer());
 		SpvVariableDesc* PointeeDesc = Context.VariableDescMap[Pointer->Pointee->Id];
 		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
-		TArray<uint8> Value = GetPointerValue(&Context, Pointer);
-		if(Value.IsEmpty() && EnableUbsan)
+		
+		TArray<uint8> Value;
+		TArray<GpuResource*> Resources;
+		if(Pointer->Pointee->IsOpaque() && Pointer->Pointee->IsExternal())
 		{
-			ThreadState.RecordedInfo.DebugStates.Last().UbError = FString::Printf(TEXT("Reading the uninitialized memory of the variable: %s !"), *PointeeDesc->Name);
-			bTerminate = true;
-			return;
+			Resources.Add(std::get<SpvObject::External>(Pointer->Pointee->Storage).Resource);
 		}
-		//TODO: the result type size may not be equal to the value if it is an external object
-		//We may need to remap the value result with padding to the result type
-		check(GetTypeByteSize(ResultType) == Value.Num());
+		else
+		{
+			Value = GetPointerValue(&Context, Pointer);
+			if(Value.IsEmpty() && EnableUbsan)
+			{
+				ThreadState.RecordedInfo.DebugStates.Last().UbError = FString::Printf(TEXT("Reading the uninitialized memory of the variable: %s !"), *PointeeDesc->Name);
+				bTerminate = true;
+				return;
+			}
+			//TODO: the result type size may not be equal to the value if it is an external object
+			//We may need to remap the value result with padding to the result type
+			check(GetTypeByteSize(ResultType) == Value.Num());
+		}
 		
 		SpvId ResultId = Inst->GetId().value();
 		SpvObject Object = {
 			.Id = ResultId,
 			.Type = ResultType,
-			.Storage = SpvObject::Internal{ MoveTemp(Value) }
+			.Storage = SpvObject::Internal{ MoveTemp(Value), Resources }
 		};
 		CurStackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(Object));
 	}
@@ -479,6 +480,7 @@ namespace FW
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
 		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvId ResultId = Inst->GetId().value();
 		
 		SpvPointer* BasePointer = GetPointer(Inst->GetBasePointer());
 		TArray<int32> Indexes = BasePointer->Indexes;
@@ -489,10 +491,60 @@ namespace FW
 		}
 		
 		SpvPointer Pointer{
+			.Id = ResultId,
 			.Pointee = BasePointer->Pointee,
 			.Indexes = MoveTemp(Indexes)
 		};
-		CurStackFrame.Pointers.insert_or_assign(Inst->GetId().value(), MoveTemp(Pointer));
+		CurStackFrame.Pointers.insert_or_assign(ResultId, MoveTemp(Pointer));
+	}
+
+	void SpvVmVisitor::Visit(SpvOpConvertFToU* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvObject* FloatValueObject = GetObject(&Context, Inst->GetFloatValue());
+		const TArray<uint8>& FloatValue = GetObjectValue(FloatValueObject);
+
+		if(EnableUbsan)
+		{
+			int ElemCount = 1;
+			if (FloatValueObject->Type->GetKind() == SpvTypeKind::Vector)
+			{
+				ElemCount = static_cast<SpvVectorType*>(FloatValueObject->Type)->ElementCount;
+			}
+			for (int i = 0; i < ElemCount; ++i)
+			{
+				float f = *reinterpret_cast<const float*>(FloatValue.GetData() + i * 4);
+				if (f < 0.0f || uint64(f) > uint64(std::numeric_limits<uint32>::max()))
+				{
+					ThreadState.RecordedInfo.DebugStates.Last().UbError = FString::Printf(TEXT("Conversion(floating point to unsigned integer) is undefined for component %d: Result type is not wide enough to hold the converted value(%f)."), i, f);
+					bTerminate = true;
+					return;
+				}
+			}
+		}
+
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvOp::ConvertFToU));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpOperandType=%s"), *GetHlslTypeStr(FloatValueObject->Type)));
+		
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(FloatValue);
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("OpConvertFToU", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
 	void SpvVmVisitor::Visit(SpvOpConvertFToS* Inst)
@@ -502,6 +554,26 @@ namespace FW
 		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
 		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
 		SpvObject* FloatValueObject = GetObject(&Context, Inst->GetFloatValue());
+		const TArray<uint8>& FloatValue = GetObjectValue(FloatValueObject);
+		
+		if(EnableUbsan)
+		{
+			int ElemCount = 1;
+			if (FloatValueObject->Type->GetKind() == SpvTypeKind::Vector)
+			{
+				ElemCount = static_cast<SpvVectorType*>(FloatValueObject->Type)->ElementCount;
+			}
+			for (int i = 0; i < ElemCount; ++i)
+			{
+				float f = *reinterpret_cast<const float*>(FloatValue.GetData() + i * 4);
+				if(int64(f) < int64(std::numeric_limits<int32>::min()) || int64(f) > int64(std::numeric_limits<int32>::max()))
+				{
+					ThreadState.RecordedInfo.DebugStates.Last().UbError = FString::Printf(TEXT("Conversion(floating point to signed integer) is undefined for component %d: It's not wide enough to hold the converted value(%f)."), i, f);
+					bTerminate = true;
+					return;
+				}
+			}
+		}
 		
 		TArray<FString> ExtraArgs;
 		ExtraArgs.Add("-D");
@@ -513,7 +585,7 @@ namespace FW
 		
 		TArray<uint8> Datas;
 		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
-		Datas.Append(GetObjectValue(FloatValueObject));
+		Datas.Append(FloatValue);
 		
 		TArray<uint8> ResultValue = ExecuteGpuOp("OpConvertFToS", GetTypeByteSize(ResultType), Datas, ExtraArgs);
 		SpvObject ResultObject{
@@ -545,6 +617,35 @@ namespace FW
 		Datas.Append(GetObjectValue(SignedValueObject));
 		
 		TArray<uint8> ResultValue = ExecuteGpuOp("OpConvertSToF", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvOpConvertUToF* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvObject* UnsignedValueObject = GetObject(&Context, Inst->GetUnsignedValue());
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvOp::ConvertUToF));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpOperandType=%s"), *GetHlslTypeStr(UnsignedValueObject->Type)));
+		
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(UnsignedValueObject));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("OpConvertUToF", GetTypeByteSize(ResultType), Datas, ExtraArgs);
 		SpvObject ResultObject{
 			.Id = Inst->GetId().value(),
 			.Type = ResultType,
@@ -779,7 +880,7 @@ namespace FW
 				if (v == 0)
 				{
 					ThreadState.RecordedInfo.DebugStates.Last().UbError =
-						TEXT("Integer division by zero is undefined.");
+						FString::Printf(TEXT("For component %d: Integer division by zero is undefined."), i);
 					bTerminate = true;
 					return;
 				}
@@ -830,8 +931,7 @@ namespace FW
 				int32 v = *reinterpret_cast<const int32*>(Operand2Value.GetData() + i * 4);
 				if (v == 0)
 				{
-					ThreadState.RecordedInfo.DebugStates.Last().UbError =
-						TEXT("Integer division by zero is undefined.");
+					ThreadState.RecordedInfo.DebugStates.Last().UbError = FString::Printf(TEXT("For component %d: Integer division by zero is undefined."), i);
 					bTerminate = true;
 					return;
 				}
@@ -879,6 +979,163 @@ namespace FW
 		Datas.Append(GetObjectValue(Operand2));
 		
 		TArray<uint8> ResultValue = ExecuteGpuOp("OpFDiv", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvOpUMod* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvObject* Operand1 = GetObject(&Context, Inst->GetOperand1());
+		SpvObject* Operand2 = GetObject(&Context, Inst->GetOperand2());
+		const TArray<uint8>& Operand1Value = GetObjectValue(Operand1);
+		const TArray<uint8>& Operand2Value = GetObjectValue(Operand2);
+		
+		if(EnableUbsan)
+		{
+			int ElemCount = 1;
+			if (Operand2->Type->GetKind() == SpvTypeKind::Vector)
+			{
+				ElemCount = static_cast<SpvVectorType*>(Operand2->Type)->ElementCount;
+			}
+			for (int i = 0; i < ElemCount; ++i)
+			{
+				uint32 v2 = *reinterpret_cast<const uint32*>(Operand2Value.GetData() + i * 4);
+				if (v2 == 0)
+				{
+					ThreadState.RecordedInfo.DebugStates.Last().UbError = FString::Printf(TEXT("For component %d: The operation of an unsigned integer remainder by zero is undefined."), i);
+					bTerminate = true;
+					return;
+				}
+			}
+		}
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvOp::UMod));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(Operand1Value);
+		Datas.Append(Operand2Value);
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("OpUMod", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvOpSRem* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvObject* Operand1 = GetObject(&Context, Inst->GetOperand1());
+		SpvObject* Operand2 = GetObject(&Context, Inst->GetOperand2());
+		const TArray<uint8>& Operand1Value = GetObjectValue(Operand1);
+		const TArray<uint8>& Operand2Value = GetObjectValue(Operand2);
+		
+		if(EnableUbsan)
+		{
+			int ElemCount = 1;
+			if (Operand2->Type->GetKind() == SpvTypeKind::Vector)
+			{
+				ElemCount = static_cast<SpvVectorType*>(Operand2->Type)->ElementCount;
+			}
+			for (int i = 0; i < ElemCount; ++i)
+			{
+				int32 v1 = *reinterpret_cast<const int32*>(Operand1Value.GetData() + i * 4);
+				int32 v2 = *reinterpret_cast<const int32*>(Operand2Value.GetData() + i * 4);
+				if (v2 == 0)
+				{
+					ThreadState.RecordedInfo.DebugStates.Last().UbError = FString::Printf(TEXT("For component %d: The operation of a signed integer remainder by zero is undefined."), i);
+					bTerminate = true;
+					return;
+				}
+				else if(v2 == -1 && v1 == std::numeric_limits<int32>::min())
+				{
+					ThreadState.RecordedInfo.DebugStates.Last().UbError = FString::Printf(TEXT("For component %d: The remainder operation of causing signed overflow is undefined."), i);
+					bTerminate = true;
+					return;
+				}
+			}
+		}
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvOp::SRem));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(Operand1Value);
+		Datas.Append(Operand2Value);
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("OpSRem", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvOpFRem* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvObject* Operand1 = GetObject(&Context, Inst->GetOperand1());
+		SpvObject* Operand2 = GetObject(&Context, Inst->GetOperand2());
+		const TArray<uint8>& Operand1Value = GetObjectValue(Operand1);
+		const TArray<uint8>& Operand2Value = GetObjectValue(Operand2);
+		
+		if(EnableUbsan)
+		{
+			int ElemCount = 1;
+			if (Operand2->Type->GetKind() == SpvTypeKind::Vector)
+			{
+				ElemCount = static_cast<SpvVectorType*>(Operand2->Type)->ElementCount;
+			}
+			for (int i = 0; i < ElemCount; ++i)
+			{
+				float v2 = *reinterpret_cast<const float*>(Operand2Value.GetData() + i * 4);
+				if (v2 == 0)
+				{
+					ThreadState.RecordedInfo.DebugStates.Last().UbError = FString::Printf(TEXT("For component %d: The operation of a floating-point remainder by zero is undefined."), i);
+					bTerminate = true;
+					return;
+				}
+			}
+		}
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvOp::FRem));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(Operand1Value);
+		Datas.Append(Operand2Value);
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("OpFRem", GetTypeByteSize(ResultType), Datas, ExtraArgs);
 		SpvObject ResultObject{
 			.Id = Inst->GetId().value(),
 			.Type = ResultType,
@@ -966,6 +1223,33 @@ namespace FW
 		Datas.Append(GetObjectValue(Operand2));
 		
 		TArray<uint8> ResultValue = ExecuteGpuOp("OpBitwiseAnd", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvOpNot* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvOp::Not));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* Operand = GetObject(&Context, Inst->GetOperand());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(Operand));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("OpNot", GetTypeByteSize(ResultType), Datas, ExtraArgs);
 		SpvObject ResultObject{
 			.Id = Inst->GetId().value(),
 			.Type = ResultType,
@@ -1077,6 +1361,95 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(ResultObject));
 	}
 
+	void SpvVmVisitor::Visit(SpvOpDot* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvObject* Vector1 = GetObject(&Context, Inst->GetVector1());
+		SpvObject* Vector2 = GetObject(&Context, Inst->GetVector2());
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvOp::Dot));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpOperandType=%s"), *GetHlslTypeStr(Vector1->Type)));
+		
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(Vector1));
+		Datas.Append(GetObjectValue(Vector2));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("OpDot", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvOpAny* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvObject* Vector = GetObject(&Context, Inst->GetVector());
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvOp::Any));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpOperandType=%s"), *GetHlslTypeStr(Vector->Type)));
+		
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(Vector));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("OpAny", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvOpAll* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvObject* Vector = GetObject(&Context, Inst->GetVector());
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvOp::All));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpOperandType=%s"), *GetHlslTypeStr(Vector->Type)));
+		
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(Vector));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("OpAll", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
 	void SpvVmVisitor::Visit(SpvOpIsNan* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
@@ -1098,6 +1471,122 @@ namespace FW
 		Datas.Append(GetObjectValue(X));
 		
 		TArray<uint8> ResultValue = ExecuteGpuOp("OpIsNan", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvOpIsInf* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvOp::IsInf));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpOperandType=%s"), *GetHlslTypeStr(X->Type)));
+		
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("OpIsInf", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvOpLogicalOr* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvObject* Operand1 = GetObject(&Context, Inst->GetOperand1());
+		SpvObject* Operand2 = GetObject(&Context, Inst->GetOperand2());
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvOp::LogicalOr));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(Operand1));
+		Datas.Append(GetObjectValue(Operand2));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("OpLogicalOr", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvId ResultId = Inst->GetId().value();
+		SpvObject ResultObject{
+			.Id = ResultId,
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvOpLogicalAnd* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvObject* Operand1 = GetObject(&Context, Inst->GetOperand1());
+		SpvObject* Operand2 = GetObject(&Context, Inst->GetOperand2());
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvOp::LogicalAnd));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(Operand1));
+		Datas.Append(GetObjectValue(Operand2));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("OpLogicalAnd", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvId ResultId = Inst->GetId().value();
+		SpvObject ResultObject{
+			.Id = ResultId,
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvOpLogicalNot* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvOp::LogicalNot));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* Operand = GetObject(&Context, Inst->GetOperand());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(Operand));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("OpLogicalNot", GetTypeByteSize(ResultType), Datas, ExtraArgs);
 		SpvObject ResultObject{
 			.Id = Inst->GetId().value(),
 			.Type = ResultType,
@@ -1337,12 +1826,173 @@ namespace FW
 		ThreadState.RecordedInfo.DebugStates.Last().bCondition = true;
 	}
 
+	void SpvVmVisitor::Visit(SpvRoundEven* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::RoundEven));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("RoundEven", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvFAbs* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::FAbs));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("FAbs", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvSAbs* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::SAbs));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("SAbs", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvFloor* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::Floor));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("Floor", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvCeil* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::Ceil));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("Ceil", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvFract* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::Fract));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("Fract", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
 	void SpvVmVisitor::Visit(SpvSin* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
 		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
-		
 		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
 		
 		TArray<FString> ExtraArgs;
@@ -1393,6 +2043,115 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
+	void SpvVmVisitor::Visit(SpvTan* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::Tan));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("Tan", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvAsin* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::Asin));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("Asin", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvAcos* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::Acos));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("Acos", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvAtan* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::Atan));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("Atan", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
 	void SpvVmVisitor::Visit(SpvPow* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
@@ -1426,14 +2185,14 @@ namespace FW
 				if (x < 0.0f)
 				{
 					ThreadState.RecordedInfo.DebugStates.Last().UbError =
-						TEXT("pow(x, y): x < 0, result is undefined.");
+						FString::Printf(TEXT("pow: x(%f) < 0 for component %d, the result is undefined."), x, i);
 					bTerminate = true;
 					return;
 				}
 				if (x == 0.0f && y <= 0.0f)
 				{
 					ThreadState.RecordedInfo.DebugStates.Last().UbError =
-						TEXT("pow(x, y): x == 0 and y <= 0, result is undefined.");
+						FString::Printf(TEXT("pow: x(%f) == 0 and y(%f) <= 0 for component %d, the result is undefined."), x, y, i);
 					bTerminate = true;
 					return;
 				}
@@ -1446,6 +2205,402 @@ namespace FW
 		Datas.Append(YValue);
 		
 		TArray<uint8> ResultValue = ExecuteGpuOp("Pow", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvExp* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::Exp));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("Exp", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvLog* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::Log));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("Log", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvSqrt* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::Sqrt));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("Sqrt", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvUMin* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::UMin));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		SpvObject* Y = GetObject(&Context, Inst->GetY());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		Datas.Append(GetObjectValue(Y));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("UMin", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvSMin* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::SMin));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		SpvObject* Y = GetObject(&Context, Inst->GetY());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		Datas.Append(GetObjectValue(Y));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("SMin", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvUMax* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::UMax));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		SpvObject* Y = GetObject(&Context, Inst->GetY());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		Datas.Append(GetObjectValue(Y));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("UMax", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvSMax* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::SMax));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		SpvObject* Y = GetObject(&Context, Inst->GetY());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		Datas.Append(GetObjectValue(Y));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("SMax", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvFClamp* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		SpvObject* MinVal = GetObject(&Context, Inst->GetMinVal());
+		SpvObject* MaxVal = GetObject(&Context, Inst->GetMaxVal());
+		const TArray<uint8>& XValue = GetObjectValue(X);
+		const TArray<uint8>& MinValue = GetObjectValue(MinVal);
+		const TArray<uint8>& MaxValue = GetObjectValue(MaxVal);
+		
+		if(EnableUbsan)
+		{
+			int ElemCount = 1;
+			if (MinVal->Type->GetKind() == SpvTypeKind::Vector)
+			{
+				ElemCount = static_cast<SpvVectorType*>(MinVal->Type)->ElementCount;
+			}
+			for (int i = 0; i < ElemCount; ++i)
+			{
+				float Min = *reinterpret_cast<const float*>(MinValue.GetData() + i * 4);
+				float Max = *reinterpret_cast<const float*>(MaxValue.GetData() + i * 4);
+				if (Min > Max)
+				{
+					ThreadState.RecordedInfo.DebugStates.Last().UbError =
+						FString::Printf(TEXT("clamp: minVal(%f) > maxVal(%f) for component %d, the result is undefined."), Min, Max, i);
+					bTerminate = true;
+					return;
+				}
+			}
+		}
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::FClamp));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(XValue);
+		Datas.Append(MinValue);
+		Datas.Append(MaxValue);
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("FClamp", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvUClamp* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		SpvObject* MinVal = GetObject(&Context, Inst->GetMinVal());
+		SpvObject* MaxVal = GetObject(&Context, Inst->GetMaxVal());
+		const TArray<uint8>& XValue = GetObjectValue(X);
+		const TArray<uint8>& MinValue = GetObjectValue(MinVal);
+		const TArray<uint8>& MaxValue = GetObjectValue(MaxVal);
+		
+		if(EnableUbsan)
+		{
+			int ElemCount = 1;
+			if (MinVal->Type->GetKind() == SpvTypeKind::Vector)
+			{
+				ElemCount = static_cast<SpvVectorType*>(MinVal->Type)->ElementCount;
+			}
+			for (int i = 0; i < ElemCount; ++i)
+			{
+				uint32 Min = *reinterpret_cast<const uint32*>(MinValue.GetData() + i * 4);
+				uint32 Max = *reinterpret_cast<const uint32*>(MaxValue.GetData() + i * 4);
+				if (Min > Max)
+				{
+					ThreadState.RecordedInfo.DebugStates.Last().UbError =
+						FString::Printf(TEXT("clamp: minVal(%d) > maxVal(%d) for component %d, the result is undefined."), Min, Max, i);
+					bTerminate = true;
+					return;
+				}
+			}
+		}
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::UClamp));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(XValue);
+		Datas.Append(MinValue);
+		Datas.Append(MaxValue);
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("UClamp", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvSClamp* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		SpvObject* MinVal = GetObject(&Context, Inst->GetMinVal());
+		SpvObject* MaxVal = GetObject(&Context, Inst->GetMaxVal());
+		const TArray<uint8>& XValue = GetObjectValue(X);
+		const TArray<uint8>& MinValue = GetObjectValue(MinVal);
+		const TArray<uint8>& MaxValue = GetObjectValue(MaxVal);
+		
+		if(EnableUbsan)
+		{
+			int ElemCount = 1;
+			if (MinVal->Type->GetKind() == SpvTypeKind::Vector)
+			{
+				ElemCount = static_cast<SpvVectorType*>(MinVal->Type)->ElementCount;
+			}
+			for (int i = 0; i < ElemCount; ++i)
+			{
+				int32 Min = *reinterpret_cast<const int32*>(MinValue.GetData() + i * 4);
+				int32 Max = *reinterpret_cast<const int32*>(MaxValue.GetData() + i * 4);
+				if (Min > Max)
+				{
+					ThreadState.RecordedInfo.DebugStates.Last().UbError =
+						FString::Printf(TEXT("clamp: minVal(%d) > maxVal(%d) for component %d, the result is undefined."), Min, Max, i);
+					bTerminate = true;
+					return;
+				}
+			}
+		}
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::SClamp));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(XValue);
+		Datas.Append(MinValue);
+		Datas.Append(MaxValue);
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("SClamp", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvFMix* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::FMix));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		SpvObject* Y = GetObject(&Context, Inst->GetY());
+		SpvObject* A = GetObject(&Context, Inst->GetA());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		Datas.Append(GetObjectValue(Y));
+		Datas.Append(GetObjectValue(A));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("FMix", GetTypeByteSize(ResultType), Datas, ExtraArgs);
 		SpvObject ResultObject{
 			.Id = Inst->GetId().value(),
 			.Type = ResultType,
@@ -1517,7 +2672,7 @@ namespace FW
 				if (e0 >= e1)
 				{
 					ThreadState.RecordedInfo.DebugStates.Last().UbError =
-						TEXT("smoothstep: Edge0 >= Edge1, result is undefined.");
+						FString::Printf(TEXT("smoothstep: Edge0(%f) >= Edge1(%f) for component %d, the result is undefined."), e0, e1, i);
 					bTerminate = true;
 					return;
 				}
@@ -1537,6 +2692,190 @@ namespace FW
 			.Storage = SpvObject::Internal(ResultValue)
 		};
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvLength* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::Length));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpOperandType=%s"), *GetHlslTypeStr(X->Type)));
+		
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("Length", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvDistance* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvObject* P0 = GetObject(&Context, Inst->GetP0());
+		SpvObject* P1 = GetObject(&Context, Inst->GetP1());
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::Distance));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpOperandType=%s"), *GetHlslTypeStr(P0->Type)));
+		
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(P0));
+		Datas.Append(GetObjectValue(P1));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("Distance", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvNormalize* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		const TArray<uint8>& XValue = GetObjectValue(X);
+		
+		if(EnableUbsan)
+		{
+			TArray<uint8> ZeroArr;
+			ZeroArr.SetNumZeroed(XValue.Num());
+			if (FMemory::Memcmp(XValue.GetData(), ZeroArr.GetData(), XValue.Num()) == 0)
+			{
+			   ThreadState.RecordedInfo.DebugStates.Last().UbError =
+				   TEXT("normalize: normalizing a zero scalar or vector is undefined.");
+			   bTerminate = true;
+			   return;
+			}
+		}
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::Normalize));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(XValue);
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("Normalize", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvNMin* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::NMin));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		SpvObject* Y = GetObject(&Context, Inst->GetY());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		Datas.Append(GetObjectValue(Y));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("NMin", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvNMax* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::NMax));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		SpvObject* Y = GetObject(&Context, Inst->GetY());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		Datas.Append(GetObjectValue(Y));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("NMax", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvOpSampledImage* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvId ResultId = Inst->GetId().value();
+		
+		SpvObject* Image = GetObject(&Context, Inst->GetImage());
+		SpvObject* Sampler = GetObject(&Context, Inst->GetSampler());
+		TArray<GpuResource*> Resources;
+		Resources.Append(std::get<SpvObject::Internal>(Image->Storage).Resources);
+		Resources.Append(std::get<SpvObject::Internal>(Sampler->Storage).Resources);
+		
+		SpvObject ResultObject{
+			.Id = ResultId,
+			.Type = ResultType,
+			.Storage = SpvObject::Internal{.Resources = Resources}
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(ResultObject));
 	}
 
 	int32 SpvVmVisitor::GetInstIndex(SpvId Inst) const
@@ -1574,7 +2913,7 @@ namespace FW
 		}
 	}
 
-	TArray<uint8> SpvVmVisitor::ExecuteGpuOp(const FString& Name, int32 ResultSize, const TArray<uint8>& InputData, const TArray<FString>& Args)
+	TArray<uint8> SpvVmVisitor::ExecuteGpuOp(const FString& Name, int32 ResultSize, const TArray<uint8>& InputData, const TArray<FString>& Args, const TArray<GpuResource*>& InResources)
 	{
 		static TRefCountPtr<GpuShader> OpComputeShader = GGpuRhi->CreateShaderFromFile({
 					.FileName = PathHelper::ShaderDir() / "ShaderHelper/Debugger/Op.hlsl",
@@ -1591,9 +2930,6 @@ namespace FW
 					.Type = ShaderType::PixelShader,
 					.EntryPoint = "MainPS"
 		});
-		static TRefCountPtr<GpuBindGroupLayout> OpBindGroupLayout = GpuBindGroupLayoutBuilder{ 0 }
-			.AddExistingBinding(0, BindingType::RWStorageBuffer)
-			.Build();
 		
 		TRefCountPtr<GpuBuffer> Input = GGpuRhi->CreateBuffer({
 			.ByteSize = (uint32)InputData.Num(),
@@ -1602,13 +2938,34 @@ namespace FW
 			.InitialData = InputData
 		});
 		
-		TRefCountPtr<GpuBindGroup> OpBindGroup = GpuBindGroupBuilder{ OpBindGroupLayout }
-			.SetExistingBinding(0, Input)
-			.Build();
+		TRefCountPtr<GpuBindGroupLayout> OpBindGroupLayout;
+		TRefCountPtr<GpuBindGroup> OpBindGroup;
+		if(Name == "OpImageSampleImplicitLod")
+		{
+			OpBindGroupLayout = GpuBindGroupLayoutBuilder{ 0 }
+				.AddExistingBinding(0, BindingType::RWStorageBuffer)
+				.AddExistingBinding(1, BindingType::Texture)
+				.AddExistingBinding(2, BindingType::Sampler)
+				.Build();
+			OpBindGroup = GpuBindGroupBuilder{ OpBindGroupLayout }
+				.SetExistingBinding(0, Input)
+				.SetExistingBinding(1, InResources[0])
+				.SetExistingBinding(2, InResources[1])
+				.Build();
+		}
+		else
+		{
+			OpBindGroupLayout = GpuBindGroupLayoutBuilder{ 0 }
+				.AddExistingBinding(0, BindingType::RWStorageBuffer)
+				.Build();
+			OpBindGroup = GpuBindGroupBuilder{ OpBindGroupLayout }
+				.SetExistingBinding(0, Input)
+				.Build();
+		}
 		
 		auto CmdRecorder = GGpuRhi->BeginRecording();
 		
-		if(Name == "DPdx" || Name == "DPdy")
+		if(Name == "DPdx" || Name == "DPdy" || Name == "OpImageSampleImplicitLod")
 		{
 			FString ErrorInfo, WarnInfo;
 			GGpuRhi->CompileShader(OpVertexShader, ErrorInfo, WarnInfo, Args);

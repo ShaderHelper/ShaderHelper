@@ -57,7 +57,6 @@ namespace FW
 		UClamp = 44,
 		SClamp = 45,
 		FMix = 46,
-		IMix = 47,
 		Step = 48,
 		SmoothStep = 49,
 		Fma = 50,
@@ -458,7 +457,7 @@ namespace FW
 					int Value = *(int*)(InValue.GetData() + BasicTypeSize * Index);
 					ValueStr += FString::Format(TEXT("{0}"), {Value});
 				}
-				else if(Encoding == SpvDebugBasicTypeEncoding::Unsigned)
+				else if(Encoding == SpvDebugBasicTypeEncoding::Unsigned || Encoding == SpvDebugBasicTypeEncoding::Boolean)
 				{
 					uint32 Value = *(uint32*)(InValue.GetData() + BasicTypeSize * Index);
 					ValueStr += FString::Format(TEXT("{0}"), {Value});
@@ -475,12 +474,7 @@ namespace FW
 		{
 			const SpvBasicTypeDesc* BasicTypeDesc = static_cast<const SpvBasicTypeDesc*>(TypeDesc);
 			SpvDebugBasicTypeEncoding Encoding = BasicTypeDesc->GetEncoding();
-			if(Encoding == SpvDebugBasicTypeEncoding::Boolean)
-			{
-				uint32 Value = *(uint32*)(InValue.GetData());
-				ValueStr += FString::Format(TEXT("{0}"), {Value});
-			}
-			else if(Encoding == SpvDebugBasicTypeEncoding::Float)
+			if(Encoding == SpvDebugBasicTypeEncoding::Float)
 			{
 				float Value = *(float*)(InValue.GetData());
 				ValueStr += FString::Format(TEXT("{0}"), {Value});
@@ -490,7 +484,7 @@ namespace FW
 				int Value = *(int*)(InValue.GetData());
 				ValueStr += FString::Format(TEXT("{0}"), {Value});
 			}
-			else if(Encoding == SpvDebugBasicTypeEncoding::Unsigned)
+			else if(Encoding == SpvDebugBasicTypeEncoding::Unsigned || Encoding == SpvDebugBasicTypeEncoding::Boolean)
 			{
 				uint32 Value = *(uint32*)(InValue.GetData());
 				ValueStr += FString::Format(TEXT("{0}"), {Value});

@@ -75,7 +75,7 @@ namespace FW
 
 		Style->Set("PropertyView.CategoryColor", new FSlateColorBrush(FStyleColors::Panel));
 		Style->Set("PropertyView.ItemColor", new FSlateColorBrush(FStyleColors::Recessed));
-		//Style->Set("PropertyView.ItemHoverdColor", new FSlateColorBrush(FLinearColor{ 0.05f, 0.05f, 0.05f, 1.0f }));
+		Style->Set("PropertyView.CompositeItemColor", new FSlateColorBrush(FStyleColors::Dropdown));
 
 		const FTableRowStyle DirectoryTableRowStyle =
 			FTableRowStyle(FAppStyle::Get().GetWidgetStyle<FTableRowStyle>("SimpleTableView.Row"))

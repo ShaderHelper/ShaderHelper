@@ -26,9 +26,9 @@ namespace FW
             .OnTextCommitted_Lambda([this, InArgs](const FText& NewText, ETextCommit::Type) {
                 if (*DisplayName != NewText.ToString() && InArgs._OnDisplayNameChanged)
                 {
-                    if(InArgs._CanChangeToName)
+                    if(InArgs._CanApplyName)
                     {
-                        if(InArgs._CanChangeToName(NewText.ToString()))
+                        if(InArgs._CanApplyName(NewText.ToString()))
                         {
                             *DisplayName = NewText.ToString();
                             InArgs._OnDisplayNameChanged(NewText.ToString());
@@ -56,17 +56,7 @@ namespace FW
 
 		ChildSlot
 		[
-	
-            SNew(SBorder)
-            .Padding(FMargin{0,4,0,4})
-            .BorderImage_Lambda([this] {
-                return FAppCommonStyle::Get().GetBrush("PropertyView.ItemColor");
-            })
-            [
-                HBox.ToSharedRef()
-            ]
-
-			
+			HBox.ToSharedRef()
 		];
 	}
 

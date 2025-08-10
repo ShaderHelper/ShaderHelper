@@ -395,9 +395,9 @@ namespace AUX
 			typename = std::enable_if_t<!std::is_same_v<T, Arg0>>,
 			typename = std::enable_if_t<std::is_constructible_v<T, Args...>>
 		>
-		InitListWrapper(Args&&... InArg)
+		InitListWrapper(Args&&... InArgs)
 		{
-			new (&Value) T(std::forward<Args>(InArg)...);
+			new (&Value) T(std::forward<Args>(InArgs)...);
 		}
 
 		T Extract() const

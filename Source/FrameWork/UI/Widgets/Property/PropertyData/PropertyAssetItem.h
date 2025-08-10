@@ -27,9 +27,9 @@ namespace FW
                 GpuTexture* Thumbnail = AssetRef->GetThumbnail();
                 if(Thumbnail)
                 {
-                    auto ThumbnailViewport = MakeShared<PreviewViewPort>();
                     ThumbnailViewport->SetViewPortRenderTexture(Thumbnail);
-                    Display->SetContent(SNew(SViewport).ViewportInterface(ThumbnailViewport));
+                    Display->SetContent(SNew(SViewport).ViewportInterface(ThumbnailViewport)
+										.ViewportSize(Display->GetDesiredSize()));
                 }
                 else
                 {
@@ -186,6 +186,7 @@ namespace FW
         MetaType* AssetMetaType;
         TSharedPtr<SBox> Display;
         FSimpleDelegate OnAssetChanged;
+		TSharedPtr<PreviewViewPort> ThumbnailViewport = MakeShared<PreviewViewPort>();
     };
     
     class PropertyAssetItem : public PropertyItemBase

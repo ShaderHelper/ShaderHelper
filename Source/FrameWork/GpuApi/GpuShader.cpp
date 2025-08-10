@@ -80,7 +80,7 @@ namespace HLSL
         "reversebits", "round", "rsqrt", "saturate", "sign", "sin", "sincos", "sinh", "smoothstep", "sqrt", "step",
         "tan", "tanh", "tex1D", "tex1Dbias", "tex1Dgrad", "tex1Dlod", "tex1Dproj", "tex2D", "tex2Dbias",
         "tex2Dgrad", "tex2Dlod", "tex2Dproj", "tex3D", "tex3Dbias", "tex3Dgrad", "tex3Dlod", "tex3Dproj",
-        "texCUBE", "texCUBEbias", "texCUBEgrad", "texCUBElod", "texCUBEproj", "transpose", "trunc",
+        "texCUBE", "texCUBEbias", "texCUBEgrad", "texCUBElod", "texCUBEproj", "transpose", "trunc", "and", "or", "select"
     };
 }
 
@@ -139,46 +139,54 @@ namespace FW
 				if (j < SrcLen && Src[j] == '(')
 				{
 					++j;
-
-					while (j < SrcLen && FChar::IsWhitespace(Src[j])) ++j;
-					if (j < SrcLen && Src[j] == '"')
+					int32 ParenDepth = 1;
+					int32 StringStart = -1, StringEnd = -1;
+					while (j < SrcLen && ParenDepth > 0)
 					{
-						int32 StringStart = j;
-						++j;
-
-						while (j < SrcLen)
+						if (Src[j] == '(') ParenDepth++;
+						else if (Src[j] == ')') ParenDepth--;
+						else if (Src[j] == '"' && ParenDepth == 1 && StringStart == -1)
 						{
-							if (Src[j] == '"' && Src[j - 1] != '\\')
-								break;
+							StringStart = j;
 							++j;
-						}
-						if (j < SrcLen && Src[j] == '"')
-						{
-							int32 StringEnd = j;
-							NewShaderText.AppendChars(Src + i, StringStart - i);
-							//EXPAND(uint StrArr[] = {...})
-							FString PrintStringLiteral = ShaderText.Mid(StringStart, StringEnd - StringStart + 1);
-							FString TextArr = TEXT("EXPAND(uint StrArr[] = {");
-							int Num = PrintStringLiteral.Len() - 1;
-							for (int k = 1; k < Num;)
+							while (j < SrcLen)
 							{
-								if (k + 1 < Num && PrintStringLiteral[k] == '\\')
+								if (Src[j] == '"' && Src[j - 1] != '\\')
 								{
-									TextArr += FString::Printf(TEXT("'\\%c',"), PrintStringLiteral[k + 1]);
-									k += 2;
+									StringEnd = j;
+									break;
 								}
-								else
-								{
-									TextArr += FString::Printf(TEXT("'%c',"), PrintStringLiteral[k]);
-									k++;
-								}
+								++j;
 							}
-							TextArr += TEXT("'\\0'})");
-							NewShaderText += TextArr;
-							i = StringEnd + 1;
-							return true;
+							break;
 						}
+						++j;
 					}
+					if (StringStart != -1 && StringEnd != -1)
+					{
+						NewShaderText.AppendChars(Src + i, StringStart - i);
+						FString PrintStringLiteral = ShaderText.Mid(StringStart, StringEnd - StringStart + 1);
+						FString TextArr = TEXT("EXPAND(uint StrArr[] = {");
+						int Num = PrintStringLiteral.Len() - 1;
+						for (int k = 1; k < Num;)
+						{
+							if (k + 1 < Num && PrintStringLiteral[k] == '\\')
+							{
+								TextArr += FString::Printf(TEXT("'\\%c',"), PrintStringLiteral[k + 1]);
+								k += 2;
+							}
+							else
+							{
+								TextArr += FString::Printf(TEXT("'%c',"), PrintStringLiteral[k]);
+								k++;
+							}
+						}
+						TextArr += TEXT("'\\0'})");
+						NewShaderText += TextArr;
+						i = StringEnd + 1;
+						return true;
+					}
+					
 				}
 			}
 			return false;
@@ -188,7 +196,8 @@ namespace FW
 		{
 			if (TryReplace(TEXT("PrintAtMouse")) ||
 				TryReplace(TEXT("Print")) ||
-				TryReplace(TEXT("Assert")))
+				TryReplace(TEXT("Assert")) ||
+				TryReplace(TEXT("AssertFormat")) )
 			{
 				continue;
 			}
