@@ -331,7 +331,7 @@ namespace FW
 
 	//Only valid for the type of the internal object,
 	//because the type of the external object may have different memory alignment rules.
-	inline uint32 GetTypeByteSize(SpvType* Type)
+	inline int32 GetTypeByteSize(SpvType* Type)
 	{
 		if(Type->IsScalar())
 		{
@@ -351,7 +351,7 @@ namespace FW
 		else if(Type->GetKind() == SpvTypeKind::Struct)
 		{
 			SpvStructType* StructType = static_cast<SpvStructType*>(Type);
-			uint32 MembersByteSize = 0;
+			int32 MembersByteSize = 0;
 			for(SpvType* MemberType : StructType->MemberTypes)
 			{
 				MembersByteSize += GetTypeByteSize(MemberType);
@@ -391,9 +391,8 @@ namespace FW
 
 	struct SpvVariable : SpvObject
 	{
-		bool Initialized{};
 		SpvStorageClass StorageClass;
-		TArray<Vector2i> InitializedRanges;
+		TArray<Vector2i> InitializedRanges;//[Start,End]
 	};
 
 	struct SpvPointer
@@ -465,6 +464,7 @@ namespace FW
 		ConvertFToS = 110,
 		ConvertSToF = 111,
 		ConvertUToF = 112,
+		Bitcast = 124,
 		FNegate = 127,
 		IAdd = 128,
 		FAdd = 129,
@@ -494,12 +494,16 @@ namespace FW
 		SLessThan = 177,
 		FOrdLessThan = 184,
 		FOrdGreaterThan = 186,
+		ShiftRightLogical = 194,
+		ShiftRightArithmetic = 195,
+		ShiftLeftLogical = 196,
 		BitwiseOr = 197,
 		BitwiseXor = 198,
 		BitwiseAnd = 199,
 		Not = 200,
 		DPdx = 207,
 		DPdy = 208,
+		Fwidth = 209,
 		Label = 248,
 		Branch = 249,
 		BranchConditional = 250,

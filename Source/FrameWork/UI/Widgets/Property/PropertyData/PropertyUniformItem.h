@@ -19,6 +19,11 @@ namespace FW
         UniformBufferMemberWrapper<T> ValueRef;
     };
 
+	bool IsProperyUniformItem(PropertyData* InProprety)
+	{
+		return InProprety->IsOfType<PropertyUniformItem<float>>() || InProprety->IsOfType<PropertyUniformItem<Vector2f>>() || InProprety->IsOfType<PropertyUniformItem<Vector3f>>() || InProprety->IsOfType<PropertyUniformItem<Vector4f>>();
+	}
+
     template<>
     inline TSharedRef<ITableRow> PropertyUniformItem<float>::GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable)
     {
@@ -26,7 +31,7 @@ namespace FW
         auto ValueWidget = SNew(SSpinBox<float>)
             .MaxFractionalDigits(3)
             .OnValueChanged_Lambda([this](float NewValue) {
-                if(ValueRef != NewValue)
+                if(ValueRef != NewValue && Owner->CanChangeProperty(this))
                 {
                     ValueRef = NewValue;
                     Owner->PostPropertyChanged(this);
@@ -48,7 +53,7 @@ namespace FW
                 .MaxFractionalDigits(3)
                 .OnValueChanged_Lambda([this](float NewValue) {
                     Vector2f& Value = ValueRef;
-                    if(Value.x != NewValue)
+                    if(Value.x != NewValue && Owner->CanChangeProperty(this))
                     {
                         ValueRef = {NewValue, Value.y};
                         Owner->PostPropertyChanged(this);
@@ -62,7 +67,7 @@ namespace FW
                 .MaxFractionalDigits(3)
                 .OnValueChanged_Lambda([this](float NewValue) {
                     Vector2f& Value = ValueRef;
-                    if(Value.y != NewValue)
+                    if(Value.y != NewValue && Owner->CanChangeProperty(this))
                     {
                         ValueRef = {Value.x, NewValue};
                         Owner->PostPropertyChanged(this);
@@ -85,7 +90,7 @@ namespace FW
 				.MaxFractionalDigits(3)
 				.OnValueChanged_Lambda([this](float NewValue) {
 					Vector3f& Value = ValueRef;
-					if(Value.x != NewValue)
+					if(Value.x != NewValue && Owner->CanChangeProperty(this))
 					{
 						ValueRef = {NewValue, Value.y, Value.z};
 						Owner->PostPropertyChanged(this);
@@ -99,7 +104,7 @@ namespace FW
 				.MaxFractionalDigits(3)
 				.OnValueChanged_Lambda([this](float NewValue) {
 					Vector3f& Value = ValueRef;
-					if(Value.y != NewValue)
+					if(Value.y != NewValue && Owner->CanChangeProperty(this))
 					{
 						ValueRef = {Value.x, NewValue, Value.z};
 						Owner->PostPropertyChanged(this);
@@ -113,7 +118,7 @@ namespace FW
 				.MaxFractionalDigits(3)
 				.OnValueChanged_Lambda([this](float NewValue) {
 					Vector3f& Value = ValueRef;
-					if(Value.z != NewValue)
+					if(Value.z != NewValue && Owner->CanChangeProperty(this))
 					{
 						ValueRef = {Value.x, Value.y, NewValue};
 						Owner->PostPropertyChanged(this);
@@ -139,7 +144,7 @@ namespace FW
 							.MaxFractionalDigits(3)
 							.OnValueChanged_Lambda([this](float NewValue) {
 							Vector4f& Value = ValueRef;
-							if (Value.x != NewValue)
+							if (Value.x != NewValue && Owner->CanChangeProperty(this))
 							{
 								ValueRef = { NewValue, Value.y, Value.z, Value.w };
 								Owner->PostPropertyChanged(this);
@@ -153,7 +158,7 @@ namespace FW
 							.MaxFractionalDigits(3)
 							.OnValueChanged_Lambda([this](float NewValue) {
 							Vector4f& Value = ValueRef;
-							if (Value.y != NewValue)
+							if (Value.y != NewValue && Owner->CanChangeProperty(this))
 							{
 								ValueRef = { Value.x, NewValue, Value.z, Value.w };
 								Owner->PostPropertyChanged(this);
@@ -171,7 +176,7 @@ namespace FW
 						.MaxFractionalDigits(3)
 						.OnValueChanged_Lambda([this](float NewValue) {
 						Vector4f& Value = ValueRef;
-						if (Value.z != NewValue)
+						if (Value.z != NewValue && Owner->CanChangeProperty(this))
 						{
 							ValueRef = { Value.x, Value.y, NewValue, Value.w };
 							Owner->PostPropertyChanged(this);
@@ -185,7 +190,7 @@ namespace FW
 						.MaxFractionalDigits(3)
 						.OnValueChanged_Lambda([this](float NewValue) {
 						Vector4f& Value = ValueRef;
-						if (Value.w != NewValue)
+						if (Value.w != NewValue && Owner->CanChangeProperty(this))
 						{
 							ValueRef = { Value.x, Value.y, Value.z, NewValue };
 							Owner->PostPropertyChanged(this);

@@ -8,6 +8,7 @@
 #include "RenderResource/PrintBuffer.h"
 #include "Editor/AssetEditor/AssetEditor.h"
 #include "AssetObject/Pins/Pins.h"
+#include "UI/Widgets/Property/PropertyData/PropertyAssetItem.h"
 
 using namespace FW;
 
@@ -56,21 +57,19 @@ namespace SH
 	{
 		if(Shader)
 		{
-			Shader->OnDestroy = FSimpleDelegate::CreateRaw(this, &ShaderToyPassNode::ClearBindingProperty);
-			Shader->OnRefreshBuilder = FSimpleDelegate::CreateRaw(this, &ShaderToyPassNode::RefreshProperty);
-			
+			Shader->OnDestroy.AddRaw(this, &ShaderToyPassNode::ClearBindingProperty);
+			Shader->OnRefreshBuilder.AddRaw(this, &ShaderToyPassNode::RefreshProperty, true);
+		}
+	}
+
+	void ShaderToyPassNode::InitCustomBindGroup()
+	{
+		if(Shader)
+		{
 			CustomBindLayout = Shader->CustomBindGroupLayoutBuilder.Build();
-			CustomUniformBuffer = Shader->CustomUniformBufferBuilder.Build();
-			
 			auto CustomBindGroupBuilder = GpuBindGroupBuilder{ CustomBindLayout };
 			if(CustomUniformBuffer.IsValid())
 			{
-				if(CustomUniformBufferData.IsEmpty())
-				{
-					CustomUniformBufferData.SetNumZeroed(CustomUniformBuffer->GetSize());
-				}
-				
-				CustomUniformBuffer->SetData(CustomUniformBufferData);
 				CustomBindGroupBuilder.SetUniformBuffer("CustomUniform", CustomUniformBuffer->GetGpuResource());
 			}
 			CustomBindGroup = CustomBindGroupBuilder.Build();
@@ -89,14 +88,19 @@ namespace SH
 	{
 		ObjectName = FText::FromString(Shader->GetFileName());
 		InitShader();
+		if(Shader)
+		{
+			CustomUniformBuffer = Shader->CustomUniformBufferBuilder.Build();
+		}
+		InitCustomBindGroup();
 	}
 
 	ShaderToyPassNode::~ShaderToyPassNode()
 	{
 		if(Shader)
 		{
-			Shader->OnDestroy.Unbind();
-			Shader->OnRefreshBuilder.Unbind();
+			Shader->OnDestroy.RemoveAll(this);
+			Shader->OnRefreshBuilder.RemoveAll(this);
 		}
 	}
 
@@ -202,15 +206,60 @@ namespace SH
 		GraphNode::Serialize(Ar);
 		
 		Ar << Shader << Format;
-		Ar << CustomUniformBufferData;
+		
+		if(Shader)
+		{
+			if(Ar.IsLoading())
+			{
+				InitShader();
+				CustomUniformBuffer = Shader->CustomUniformBufferBuilder.Build();
+			}
+			
+			if(CustomUniformBuffer.IsValid() && Ar.IsSaving())
+			{
+				CustomUniformBufferData = {(uint8*)CustomUniformBuffer->GetReadableData(), (int)CustomUniformBuffer->GetSize()};
+			}
+			Ar << CustomUniformBufferData;
+			
+			if(Ar.IsSaving())
+			{
+				Ar << Shader->CustomUniformBufferBuilder;
+			}
+			else
+			{
+				FW::UniformBufferBuilder NodeCustomUniformBufferBuilder{FW::UniformBufferUsage::Persistant};
+				Ar << NodeCustomUniformBufferBuilder;
+				if(CustomUniformBuffer.IsValid() && !CustomUniformBufferData.IsEmpty())
+				{
+					//If the layout of the shader's uniform buffer does not match the node
+					if(NodeCustomUniformBufferBuilder.GetMetaData().UniformBufferDeclaration != Shader->CustomUniformBufferBuilder.GetMetaData().UniformBufferDeclaration)
+					{
+						auto NodeCustomUniformBuffer = NodeCustomUniformBufferBuilder.Build();
+						if(NodeCustomUniformBuffer.IsValid())
+						{
+							NodeCustomUniformBuffer->SetData(CustomUniformBufferData);
+							CustomUniformBuffer->CopySameMember(*NodeCustomUniformBuffer);
+						}
+					}
+					else
+					{
+						CustomUniformBuffer->SetData(CustomUniformBufferData);
+					}
+				}
+				else
+				{
+					CustomUniformBufferData.Empty();
+				}
+				InitCustomBindGroup();
+			}
+		}
+		
 		Ar << iChannelDesc0 << iChannelDesc1 << iChannelDesc2 << iChannelDesc3;
 	}
 
     void ShaderToyPassNode::PostLoad()
     {
         GraphNode::PostLoad();
-        
-		InitShader();
     }
 
 	TSharedPtr<SWidget> ShaderToyPassNode::ExtraNodeWidget()
@@ -311,17 +360,35 @@ namespace SH
         return {BuiltInCategory, CustomCategory};
     }
 
+	bool ShaderToyPassNode::CanChangeProperty(PropertyData* InProperty)
+	{
+		if(InProperty->GetDisplayName() == "Shader")
+		{
+			if(Shader)
+			{
+				Shader->OnDestroy.RemoveAll(this);
+				Shader->OnRefreshBuilder.RemoveAll(this);
+			}
+		}
+		return true;
+	}
+
     void ShaderToyPassNode::PostPropertyChanged(PropertyData* InProperty)
     {
-        ShObject::PostPropertyChanged(InProperty);
+		GraphNode::PostPropertyChanged(InProperty);
         
         //Shader asset changed.
-        if(InProperty->GetDisplayName() == "Shader")
+        if(InProperty->IsOfType<PropertyAssetItem>() && InProperty->GetDisplayName() == "Shader")
         {
-            Shader->OnDestroy = FSimpleDelegate::CreateRaw(this, &ShaderToyPassNode::ClearBindingProperty);
-            Shader->OnRefreshBuilder = FSimpleDelegate::CreateRaw(this, &ShaderToyPassNode::RefreshProperty);
-            RefreshProperty();
+            Shader->OnDestroy.AddRaw(this, &ShaderToyPassNode::ClearBindingProperty);
+            Shader->OnRefreshBuilder.AddRaw(this, &ShaderToyPassNode::RefreshProperty, true);
+            RefreshProperty(false);
         }
+		else if(IsProperyUniformItem(InProperty))
+		{
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			ShEditor->ForceRender();
+		}
     }
 
     void ShaderToyPassNode::ClearBindingProperty()
@@ -338,7 +405,7 @@ namespace SH
         ShEditor->RefreshProperty();
     }
 
-    void ShaderToyPassNode::RefreshProperty()
+    void ShaderToyPassNode::RefreshProperty(bool bCopyUniformBuffer)
     {
         CustomBindLayout = Shader->CustomBindGroupLayoutBuilder.Build();
         auto CustomBindGroupBuilder = GpuBindGroupBuilder{ CustomBindLayout };
@@ -346,12 +413,11 @@ namespace SH
         auto NewCustomUniformBuffer = Shader->CustomUniformBufferBuilder.Build();
         if(NewCustomUniformBuffer.IsValid())
         {
-            if(CustomUniformBuffer.IsValid())
+            if(CustomUniformBuffer.IsValid() && bCopyUniformBuffer)
             {
                 NewCustomUniformBuffer->CopySameMember(*CustomUniformBuffer);
             }
             CustomUniformBuffer = MoveTemp(NewCustomUniformBuffer);
-			CustomUniformBufferData = {(uint8*)CustomUniformBuffer->GetReadableData(), (int)CustomUniformBuffer->GetSize()};
             CustomBindGroupBuilder.SetUniformBuffer("CustomUniform", CustomUniformBuffer->GetGpuResource());
         }
         CustomBindGroup = CustomBindGroupBuilder.Build();

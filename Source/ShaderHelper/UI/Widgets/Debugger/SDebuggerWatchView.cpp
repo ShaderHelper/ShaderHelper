@@ -99,6 +99,7 @@ namespace SH
 					if(Owner->OnWatch && NewText.ToString() != Data->Expr)
 					{
 						*Data = Owner->OnWatch(NewText.ToString());
+						Owner->ExpressionTreeView->RequestTreeRefresh();
 					}
 				}
 			});
@@ -165,6 +166,7 @@ namespace SH
 				}
 			}
 		}
+		ExpressionTreeView->RequestTreeRefresh();
 	}
 
 	TSharedRef<ITableRow> SDebuggerWatchView::OnGenerateRow(ExpressionNodePtr InTreeNode, const TSharedRef<STableViewBase>& OwnerTable)

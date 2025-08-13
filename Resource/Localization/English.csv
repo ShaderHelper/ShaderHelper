@@ -48,6 +48,7 @@ ProjectLocation,Project Location:,
 RecentProjects,Recent Projects:,
 Project,Project,
 SaveAssetsTip,Save all changes before closing?,
+SaveAssetTip,This operation will discard your current changes! Do you want to save?
 Log,Log,
 Local,Local,
 Global,Global,

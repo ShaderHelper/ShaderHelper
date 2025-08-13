@@ -65,6 +65,7 @@ namespace FW
         
         T* operator->() const
         {
+			check(IsValid());
             return Reference;
         }
 

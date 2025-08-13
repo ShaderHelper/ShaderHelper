@@ -59,7 +59,7 @@ namespace SH
 		FSlateColor GetNodeColor() const override { return FLinearColor{ 0.27f, 0.13f, 0.0f }; }
         FW::ExecRet Exec(FW::GraphExecContext& Context) override;
 
-        
+		bool CanChangeProperty(FW::PropertyData* InProperty) override;
         void PostPropertyChanged(FW::PropertyData* InProperty) override;
         TArray<TSharedRef<FW::PropertyData>>* GetPropertyDatas() override;
     
@@ -72,8 +72,9 @@ namespace SH
     private:
 		FW::GpuBindGroup* GetBuiltInBindGroup();
 		void InitShader();
+		void InitCustomBindGroup();
         void ClearBindingProperty();
-        void RefreshProperty();
+        void RefreshProperty(bool bCopyUniformBuffer = true);
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromBinding();
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromUniform(FW::UniformBuffer* InUb, bool Enabled);
         

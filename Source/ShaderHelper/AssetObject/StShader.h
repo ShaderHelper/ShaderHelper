@@ -49,8 +49,6 @@ namespace SH
         TSharedPtr<FW::PropertyData> CreateUniformPropertyData(const FString& InTypeName, const FString& UniformMemberName, bool Enabled);
         
 	public:
-        FSimpleDelegate OnRefreshBuilder;
-        
         TSharedPtr<FW::PropertyCategory> BuiltInCategory;
         TSharedPtr<FW::PropertyCategory> CustomCategory;
         FW::UniformBufferBuilder CustomUniformBufferBuilder{FW::UniformBufferUsage::Persistant};

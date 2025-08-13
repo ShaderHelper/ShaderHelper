@@ -56,6 +56,7 @@ namespace SH
 		
 		CurProject = TSingleton<ShProjectManager>::Get().GetProject();
 		ViewPort = MakeShared<PreviewViewPort>();
+		ViewPort->OniMouseChangeHandler = [this](const Vector4f&) { ForceRender(); };
 	}
 
 	ShaderHelperEditor::~ShaderHelperEditor()
@@ -103,6 +104,16 @@ namespace SH
 		SAssignNew(DebuggerGlobalVariableView, SDebuggerVariableView);
 		SAssignNew(DebuggerWatchView, SDebuggerWatchView);
 		SAssignNew(DebuggerCallStackView, SDebuggerCallStackView);
+	}
+
+	void ShaderHelperEditor::ForceRender()
+	{
+		if(TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop == true)
+		{
+			TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = false;
+			Renderer->Render();
+			TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = true;
+		}
 	}
 
 	void ShaderHelperEditor::InitEditorUI()
@@ -249,6 +260,9 @@ namespace SH
             [
                 SNew(STimeline).bStop(&CurProject->TimelineStop)
                     .CurTime(&CurProject->TimelineCurTime).MaxTime(&CurProject->TimelineMaxTime)
+					.OnHandleMove([this](float){
+						ForceRender();
+					})
             ]
 		);
         TabManager->FindExistingLiveTab(CodeTabId)->GetParentDockTabStack()->SetCanDropToAttach(false);
@@ -695,6 +709,23 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 	void ShaderHelperEditor::OpenGraph(AssetPtr<Graph> InGraphData, TSharedPtr<RenderComponent> InGraphRenderComp)
 	{
+		if(CurProject->Graph->IsDirty())
+		{
+			auto Ret = MessageDialog::Open(MessageDialog::OkNoCancel, Window, LOCALIZATION("SaveAssetTip"));
+			if(Ret == MessageDialog::MessageRet::Cancel)
+			{
+				return;
+			}
+			else if (Ret == MessageDialog::MessageRet::Ok)
+			{
+				CurProject->Graph->Save();
+			}
+			else
+			{
+				CurProject->Graph->MarkDirty(false);
+			}
+		}
+		
 		Renderer->UnRegisterRenderComp(GraphRenderComp.Get());
 		GraphRenderComp = InGraphRenderComp;
 		if (GraphRenderComp)

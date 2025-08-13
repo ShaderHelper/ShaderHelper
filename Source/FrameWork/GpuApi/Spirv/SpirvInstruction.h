@@ -64,6 +64,9 @@ namespace FW
 		virtual void Visit(class SpvOpSLessThan* Inst) {}
 		virtual void Visit(class SpvOpFOrdLessThan* Inst) {}
 		virtual void Visit(class SpvOpFOrdGreaterThan* Inst) {}
+		virtual void Visit(class SpvOpShiftRightLogical* Inst) {}
+		virtual void Visit(class SpvOpShiftRightArithmetic* Inst) {}
+		virtual void Visit(class SpvOpShiftLeftLogical* Inst) {}
 		virtual void Visit(class SpvOpBitwiseOr* Inst) {}
 		virtual void Visit(class SpvOpBitwiseXor* Inst) {}
 		virtual void Visit(class SpvOpBitwiseAnd* Inst) {}
@@ -71,6 +74,7 @@ namespace FW
 		virtual void Visit(class SpvOpConvertFToS* Inst) {}
 		virtual void Visit(class SpvOpConvertSToF* Inst) {}
 		virtual void Visit(class SpvOpConvertUToF* Inst) {}
+		virtual void Visit(class SpvOpBitcast* Inst) {}
 		virtual void Visit(class SpvOpFNegate* Inst) {}
 		virtual void Visit(class SpvOpIAdd* Inst) {}
 		virtual void Visit(class SpvOpFAdd* Inst) {}
@@ -87,6 +91,7 @@ namespace FW
 		virtual void Visit(class SpvOpNot* Inst) {}
 		virtual void Visit(class SpvOpDPdx* Inst) {}
 		virtual void Visit(class SpvOpDPdy* Inst) {}
+		virtual void Visit(class SpvOpFwidth* Inst) {}
 		virtual void Visit(class SpvOpBranch* Inst) {}
 		virtual void Visit(class SpvOpBranchConditional* Inst) {}
 		virtual void Visit(class SpvOpReturn* Inst) {}
@@ -110,6 +115,7 @@ namespace FW
 		
 		//GLSL.std.450
 		virtual void Visit(class SpvRoundEven* Inst) {}
+		virtual void Visit(class SpvTrunc* Inst) {}
 		virtual void Visit(class SpvFAbs* Inst) {}
 		virtual void Visit(class SpvSAbs* Inst) {}
 		virtual void Visit(class SpvFloor* Inst) {}
@@ -124,7 +130,10 @@ namespace FW
 		virtual void Visit(class SpvPow* Inst) {}
 		virtual void Visit(class SpvExp* Inst) {}
 		virtual void Visit(class SpvLog* Inst) {}
+		virtual void Visit(class SpvExp2* Inst) {}
+		virtual void Visit(class SpvLog2* Inst) {}
 		virtual void Visit(class SpvSqrt* Inst) {}
+		virtual void Visit(class SpvInverseSqrt* Inst) {}
 		virtual void Visit(class SpvUMin* Inst) {}
 		virtual void Visit(class SpvSMin* Inst) {}
 		virtual void Visit(class SpvUMax* Inst) {}
@@ -137,7 +146,9 @@ namespace FW
 		virtual void Visit(class SpvSmoothStep* Inst) {}
 		virtual void Visit(class SpvLength* Inst) {}
 		virtual void Visit(class SpvDistance* Inst) {}
+		virtual void Visit(class SpvCross* Inst) {}
 		virtual void Visit(class SpvNormalize* Inst) {}
+		virtual void Visit(class SpvReflect* Inst) {}
 		virtual void Visit(class SpvNMin* Inst) {}
 		virtual void Visit(class SpvNMax* Inst) {}
 	};
@@ -750,6 +761,21 @@ namespace FW
 		   SpvId UnsignedValue;
 	   };
 
+	class SpvOpBitcast : public SpvInstructionBase<SpvOpBitcast>
+	{
+	public:
+		SpvOpBitcast(SpvId InResultType, SpvId InOperand) : SpvInstructionBase(SpvOp::Bitcast)
+		, ResultType(InResultType), Operand(InOperand)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetOperand() const { return Operand; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Operand;
+	};
+
 	class SpvOpFNegate : public SpvInstructionBase<SpvOpFNegate>
 	{
 	public:
@@ -1233,6 +1259,57 @@ namespace FW
 		SpvId Operand2;
 	};
 
+	class SpvOpShiftRightLogical : public SpvInstructionBase<SpvOpShiftRightLogical>
+	{
+	public:
+		SpvOpShiftRightLogical(SpvId InResultType, SpvId InBase, SpvId InShift) : SpvInstructionBase(SpvOp::ShiftRightLogical)
+		, ResultType(InResultType), Base(InBase), Shift(InShift)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetBase() const { return Base; }
+		SpvId GetShift() const { return Shift; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Base;
+		SpvId Shift;
+	};
+
+	class SpvOpShiftRightArithmetic : public SpvInstructionBase<SpvOpShiftRightArithmetic>
+	{
+	public:
+		SpvOpShiftRightArithmetic(SpvId InResultType, SpvId InBase, SpvId InShift) : SpvInstructionBase(SpvOp::ShiftRightArithmetic)
+		, ResultType(InResultType), Base(InBase), Shift(InShift)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetBase() const { return Base; }
+		SpvId GetShift() const { return Shift; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Base;
+		SpvId Shift;
+	};
+
+	class SpvOpShiftLeftLogical : public SpvInstructionBase<SpvOpShiftLeftLogical>
+	{
+	public:
+		SpvOpShiftLeftLogical(SpvId InResultType, SpvId InBase, SpvId InShift) : SpvInstructionBase(SpvOp::ShiftLeftLogical)
+		, ResultType(InResultType), Base(InBase), Shift(InShift)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetBase() const { return Base; }
+		SpvId GetShift() const { return Shift; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Base;
+		SpvId Shift;
+	};
+
 	class SpvOpBitwiseOr : public SpvInstructionBase<SpvOpBitwiseOr>
 	{
 	public:
@@ -1318,6 +1395,21 @@ namespace FW
 	{
 	public:
 		SpvOpDPdy(SpvId InResultType, SpvId InP) : SpvInstructionBase(SpvOp::DPdy)
+		, ResultType(InResultType), P(InP)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetP() const { return P; }
+		
+	private:
+		SpvId ResultType;
+		SpvId P;
+	};
+
+	class SpvOpFwidth : public SpvInstructionBase<SpvOpFwidth>
+	{
+	public:
+		SpvOpFwidth(SpvId InResultType, SpvId InP) : SpvInstructionBase(SpvOp::Fwidth)
 		, ResultType(InResultType), P(InP)
 		{}
 		
@@ -1621,6 +1713,21 @@ namespace FW
 		SpvId X;
 	};
 
+	class SpvTrunc : public SpvInstructionBase<SpvTrunc>
+	{
+	public:
+		SpvTrunc(SpvId InResultType, SpvId InX) : SpvInstructionBase(SpvGLSLstd450::Trunc)
+		, ResultType(InResultType), X(InX)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetX() const { return X; }
+		
+	private:
+		SpvId ResultType;
+		SpvId X;
+	};
+
 	class SpvFAbs : public SpvInstructionBase<SpvFAbs>
 	{
 	public:
@@ -1833,10 +1940,55 @@ namespace FW
 		SpvId X;
 	};
 
+	class SpvExp2 : public SpvInstructionBase<SpvExp2>
+	{
+	public:
+		SpvExp2(SpvId InResultType, SpvId InX) : SpvInstructionBase(SpvGLSLstd450::Exp2)
+		, ResultType(InResultType), X(InX)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetX() const { return X; }
+		
+	private:
+		SpvId ResultType;
+		SpvId X;
+	};
+
+	class SpvLog2 : public SpvInstructionBase<SpvLog2>
+	{
+	public:
+		SpvLog2(SpvId InResultType, SpvId InX) : SpvInstructionBase(SpvGLSLstd450::Log2)
+		, ResultType(InResultType), X(InX)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetX() const { return X; }
+		
+	private:
+		SpvId ResultType;
+		SpvId X;
+	};
+
 	class SpvSqrt : public SpvInstructionBase<SpvSqrt>
 	{
 	public:
 		SpvSqrt(SpvId InResultType, SpvId InX) : SpvInstructionBase(SpvGLSLstd450::Sqrt)
+		, ResultType(InResultType), X(InX)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetX() const { return X; }
+		
+	private:
+		SpvId ResultType;
+		SpvId X;
+	};
+
+	class SpvInverseSqrt : public SpvInstructionBase<SpvInverseSqrt>
+	{
+	public:
+		SpvInverseSqrt(SpvId InResultType, SpvId InX) : SpvInstructionBase(SpvGLSLstd450::InverseSqrt)
 		, ResultType(InResultType), X(InX)
 		{}
 		
@@ -2060,6 +2212,23 @@ namespace FW
 		SpvId P1;
 	};
 
+	class SpvCross : public SpvInstructionBase<SpvCross>
+	{
+	public:
+		SpvCross(SpvId InResultType, SpvId InX, SpvId InY) : SpvInstructionBase(SpvGLSLstd450::Cross)
+		, ResultType(InResultType), X(InX), Y(InY)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetX() const { return X; }
+		SpvId GetY() const { return Y; }
+		
+	private:
+		SpvId ResultType;
+		SpvId X;
+		SpvId Y;
+	};
+
 	class SpvNormalize : public SpvInstructionBase<SpvNormalize>
 	{
 	public:
@@ -2073,6 +2242,23 @@ namespace FW
 	private:
 		SpvId ResultType;
 		SpvId X;
+	};
+
+	class SpvReflect : public SpvInstructionBase<SpvReflect>
+	{
+	public:
+		SpvReflect(SpvId InResultType, SpvId InI, SpvId InN) : SpvInstructionBase(SpvGLSLstd450::Reflect)
+		, ResultType(InResultType), I(InI), N(InN)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetI() const { return I; }
+		SpvId GetN() const { return N; }
+		
+	private:
+		SpvId ResultType;
+		SpvId I;
+		SpvId N;
 	};
 
 	class SpvNMin : public SpvInstructionBase<SpvNMin>

@@ -24,6 +24,10 @@ namespace FW
                 return FText::FromString(*DisplayName);
             })
             .OnTextCommitted_Lambda([this, InArgs](const FText& NewText, ETextCommit::Type) {
+				if(NewText.ToString().IsEmpty())
+				{
+					return;
+				}
                 if (*DisplayName != NewText.ToString() && InArgs._OnDisplayNameChanged)
                 {
                     if(InArgs._CanApplyName)

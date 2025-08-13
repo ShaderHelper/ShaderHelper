@@ -7,28 +7,37 @@ namespace FW
 	TArray<uint8> GetObjectValue(SpvObject* InObject, const TArray<uint32>& Indexes)
 	{
 		check(InObject);
-		
+		check(!InObject->IsExternal());
 		const TArray<uint8>& ObjectValue = std::get<SpvObject::Internal>(InObject->Storage).Value;
 		int32 OffsetBytes = 0;
 		int32 ByteSize = ObjectValue.Num();
+		SpvType* CurType = InObject->Type;
 		for(uint32 Index : Indexes)
 		{
-			if(InObject->Type->GetKind() == SpvTypeKind::Vector)
+			if(CurType->GetKind() == SpvTypeKind::Vector)
 			{
-				SpvVectorType* VectorType = static_cast<SpvVectorType*>(InObject->Type);
+				SpvVectorType* VectorType = static_cast<SpvVectorType*>(CurType);
 				OffsetBytes += Index * GetTypeByteSize(VectorType->ElementType);
 				ByteSize = GetTypeByteSize(VectorType->ElementType);
 			}
-			else if(InObject->Type->GetKind() == SpvTypeKind::Struct)
+			else if(CurType->GetKind() == SpvTypeKind::Struct)
 			{
-				SpvStructType* StructType = static_cast<SpvStructType*>(InObject->Type);
-				int MemberIndex = 0;
-				for(; MemberIndex < Index; MemberIndex++)
-				{
-					SpvType* MemberType = StructType->MemberTypes[MemberIndex];
-					OffsetBytes += GetTypeByteSize(MemberType);
-				}
-				ByteSize = GetTypeByteSize(StructType->MemberTypes[MemberIndex]);
+				SpvStructType* StructType = static_cast<SpvStructType*>(CurType);
+				SpvType* MemberType = StructType->MemberTypes[Index];
+				OffsetBytes += GetTypeByteSize(MemberType);
+				ByteSize = GetTypeByteSize(StructType->MemberTypes[Index]);
+				CurType = MemberType;
+			}
+			else if(CurType->GetKind() == SpvTypeKind::Array)
+			{
+				SpvArrayType* ArrayType = static_cast<SpvArrayType*>(CurType);
+				OffsetBytes += Index * GetTypeByteSize(ArrayType->ElementType);
+				ByteSize = GetTypeByteSize(ArrayType->ElementType);
+				CurType = ArrayType->ElementType;
+			}
+			else
+			{
+				AUX::Unreachable();
 			}
 		}
 		
@@ -38,7 +47,7 @@ namespace FW
 	TArray<uint8> GetPointerValue(SpvVmContext* InContext, SpvPointer* InPointer)
 	{
 		SpvVariableDesc* PointeeDesc = InContext->VariableDescMap[InPointer->Pointee->Id];
-		if(!InPointer->Pointee->Initialized)
+		if(InPointer->Pointee->InitializedRanges.IsEmpty())
 		{
 			return {};
 		}
@@ -60,8 +69,9 @@ namespace FW
 			if(PointeeDesc && PointeeDesc->TypeDesc)
 			{
 				SpvTypeDesc* CurTypeDesc = PointeeDesc->TypeDesc;
-				for(int32 Index : InPointer->Indexes)
+				for(int32 Layer = 0; Layer < InPointer->Indexes.Num(); Layer++ )
 				{
+					int32 Index = InPointer->Indexes[Layer];
 					//External objects like uniform buffers may have different alignments and sizes,
 					//so can't extract them directly from OpType* but rely on SpvVariableDesc to do it
 					if(CurTypeDesc->GetKind() == SpvTypeDescKind::Composite)
@@ -83,17 +93,30 @@ namespace FW
 						OffsetBytes += Index * BasicTypeDesc->GetSize() / 8;
 						ByteSize = BasicTypeDesc->GetSize() / 8;
 					}
+					else if(CurTypeDesc->GetKind() == SpvTypeDescKind::Array)
+					{
+						SpvArrayTypeDesc* ArrayTypeDesc = static_cast<SpvArrayTypeDesc*>(CurTypeDesc);
+						int32 BaseTypeSize = GetTypeByteSize(ArrayTypeDesc->GetBaseTypeDesc());
+						int32 ElementNum = 1;
+						for(int32 i = Layer + 1; i < ArrayTypeDesc->GetCompCounts().Num(); i++)
+						{
+							ElementNum *= ArrayTypeDesc->GetCompCounts()[i];
+						}
+						int32 ElementTypeSize = BaseTypeSize * ElementNum;
+						OffsetBytes += Index * ElementTypeSize;
+						ByteSize = ElementTypeSize;
+					}
 					
-					bool Initialized = InPointer->Pointee->InitializedRanges.IsEmpty();
+					bool ValueInitialized = false;
 					for(const auto& Range : InPointer->Pointee->InitializedRanges)
 					{
 						if(OffsetBytes >= Range.X && OffsetBytes + ByteSize <= Range.Y)
 						{
-							Initialized = true;
+							ValueInitialized = true;
 							break;
 						}
 					}
-					if(!Initialized)
+					if(!ValueInitialized)
 					{
 						return {};
 					}
@@ -144,6 +167,10 @@ namespace FW
 							}
 						}
 					}
+					else
+					{
+						AUX::Unreachable();
+					}
 				}
 			}
 			
@@ -174,8 +201,9 @@ namespace FW
 		
 		int32 OffsetBytes = 0;
 		int32 ByteSize = ValueRef->Num();
-		for(int32 Index : InPointer->Indexes)
+		for(int32 Layer = 0; Layer < InPointer->Indexes.Num(); Layer++ )
 		{
+			int32 Index = InPointer->Indexes[Layer];
 			SpvTypeDesc* CurTypeDesc = PointeeDesc->TypeDesc;
 			if(CurTypeDesc->GetKind() == SpvTypeDescKind::Composite)
 			{
@@ -196,10 +224,22 @@ namespace FW
 				OffsetBytes += Index * BasicTypeDesc->GetSize() / 8;
 				ByteSize = BasicTypeDesc->GetSize() / 8;
 			}
+			else if(CurTypeDesc->GetKind() == SpvTypeDescKind::Array)
+			{
+				SpvArrayTypeDesc* ArrayTypeDesc = static_cast<SpvArrayTypeDesc*>(CurTypeDesc);
+				int32 BaseTypeSize = GetTypeByteSize(ArrayTypeDesc->GetBaseTypeDesc());
+				int32 ElementNum = 1;
+				for(int32 i = Layer + 1; i < ArrayTypeDesc->GetCompCounts().Num(); i++)
+				{
+					ElementNum *= ArrayTypeDesc->GetCompCounts()[i];
+				}
+				int32 ElementTypeSize = BaseTypeSize * ElementNum;
+				OffsetBytes += Index * ElementTypeSize;
+				ByteSize = ElementTypeSize;
+			}
 		}
 		check(ByteSize == ValueToStore.Num());
 		FMemory::Memcpy(ValueRef->GetData() + OffsetBytes, ValueToStore.GetData(), ByteSize);
-		InPointer->Pointee->Initialized = true;
 		InPointer->Pointee->InitializedRanges.AddUnique({OffsetBytes, OffsetBytes + ByteSize});
 		
 		if(OutVariableChange)
@@ -301,17 +341,11 @@ namespace FW
 		
 		SpvStorageClass StorageClass = Inst->GetStorageClass();
 		SpvPointerType* PointerType = static_cast<SpvPointerType*>(Context.Types[Inst->GetResultType()].Get());
-		SpvVariable Var = {{ResultId, PointerType->PointeeType}, false, StorageClass};
-		if(StorageClass == SpvStorageClass::Uniform || StorageClass == SpvStorageClass::UniformConstant)
-		{
-			Var.Storage = SpvObject::External{};
-		}
-		else
-		{
-			TArray<uint8> Value;
-			Value.SetNumZeroed(GetTypeByteSize(PointerType->PointeeType));
-			Var.Storage = SpvObject::Internal{MoveTemp(Value)};
-		}
+		SpvVariable Var = {{ResultId, PointerType->PointeeType}, StorageClass};
+
+		TArray<uint8> Value;
+		Value.SetNumZeroed(GetTypeByteSize(PointerType->PointeeType));
+		Var.Storage = SpvObject::Internal{MoveTemp(Value)};
 		
 		ThreadState.RecordedInfo.AllVariables[ResultId] =  Var;
 		CurStackFrame.Variables.insert_or_assign(ResultId, MoveTemp(Var));
@@ -646,6 +680,35 @@ namespace FW
 		Datas.Append(GetObjectValue(UnsignedValueObject));
 		
 		TArray<uint8> ResultValue = ExecuteGpuOp("OpConvertUToF", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvOpBitcast* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvObject* Operand = GetObject(&Context, Inst->GetOperand());
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvOp::Bitcast));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpOperandType=%s"), *GetHlslTypeStr(Operand->Type)));
+		
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(Operand));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("OpBitcast", GetTypeByteSize(ResultType), Datas, ExtraArgs);
 		SpvObject ResultObject{
 			.Id = Inst->GetId().value(),
 			.Type = ResultType,
@@ -1826,6 +1889,93 @@ namespace FW
 		ThreadState.RecordedInfo.DebugStates.Last().bCondition = true;
 	}
 
+	void SpvVmVisitor::Visit(SpvOpShiftRightLogical* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvObject* Base = GetObject(&Context, Inst->GetBase());
+		SpvObject* Shift = GetObject(&Context, Inst->GetShift());
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvOp::ShiftRightLogical));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(Base));
+		Datas.Append(GetObjectValue(Shift));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("OpShiftRightLogical", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvOpShiftRightArithmetic* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvObject* Base = GetObject(&Context, Inst->GetBase());
+		SpvObject* Shift = GetObject(&Context, Inst->GetShift());
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvOp::ShiftRightArithmetic));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(Base));
+		Datas.Append(GetObjectValue(Shift));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("OpShiftRightArithmetic", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvOpShiftLeftLogical* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvObject* Base = GetObject(&Context, Inst->GetBase());
+		SpvObject* Shift = GetObject(&Context, Inst->GetShift());
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvOp::ShiftLeftLogical));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(Base));
+		Datas.Append(GetObjectValue(Shift));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("OpShiftLeftLogical", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
 	void SpvVmVisitor::Visit(SpvRoundEven* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
@@ -1845,6 +1995,33 @@ namespace FW
 		Datas.Append(GetObjectValue(X));
 		
 		TArray<uint8> ResultValue = ExecuteGpuOp("RoundEven", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvTrunc* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::Trunc));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("Trunc", GetTypeByteSize(ResultType), Datas, ExtraArgs);
 		SpvObject ResultObject{
 			.Id = Inst->GetId().value(),
 			.Type = ResultType,
@@ -2267,6 +2444,60 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
+	void SpvVmVisitor::Visit(SpvExp2* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::Exp2));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("Exp2", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvLog2* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::Log2));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("Log2", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
 	void SpvVmVisitor::Visit(SpvSqrt* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
@@ -2286,6 +2517,33 @@ namespace FW
 		Datas.Append(GetObjectValue(X));
 		
 		TArray<uint8> ResultValue = ExecuteGpuOp("Sqrt", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvInverseSqrt* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::InverseSqrt));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("InverseSqrt", GetTypeByteSize(ResultType), Datas, ExtraArgs);
 		SpvObject ResultObject{
 			.Id = Inst->GetId().value(),
 			.Type = ResultType,
@@ -2756,6 +3014,35 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
+	void SpvVmVisitor::Visit(SpvCross* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::Cross));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* X = GetObject(&Context, Inst->GetX());
+		SpvObject* Y = GetObject(&Context, Inst->GetY());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(X));
+		Datas.Append(GetObjectValue(Y));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("Cross", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
 	void SpvVmVisitor::Visit(SpvNormalize* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
@@ -2790,6 +3077,35 @@ namespace FW
 		Datas.Append(XValue);
 		
 		TArray<uint8> ResultValue = ExecuteGpuOp("Normalize", GetTypeByteSize(ResultType), Datas, ExtraArgs);
+		SpvObject ResultObject{
+			.Id = Inst->GetId().value(),
+			.Type = ResultType,
+			.Storage = SpvObject::Internal(ResultValue)
+		};
+		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
+	}
+
+	void SpvVmVisitor::Visit(SpvReflect* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvGLSLstd450::Reflect));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		SpvObject* I = GetObject(&Context, Inst->GetI());
+		SpvObject* N = GetObject(&Context, Inst->GetN());
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(GetTypeByteSize(ResultType));
+		Datas.Append(GetObjectValue(I));
+		Datas.Append(GetObjectValue(N));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("Reflect", GetTypeByteSize(ResultType), Datas, ExtraArgs);
 		SpvObject ResultObject{
 			.Id = Inst->GetId().value(),
 			.Type = ResultType,
@@ -2965,7 +3281,7 @@ namespace FW
 		
 		auto CmdRecorder = GGpuRhi->BeginRecording();
 		
-		if(Name == "DPdx" || Name == "DPdy" || Name == "OpImageSampleImplicitLod")
+		if(Name == "DPdx" || Name == "DPdy" || Name == "OpFwidth" || Name == "OpImageSampleImplicitLod")
 		{
 			FString ErrorInfo, WarnInfo;
 			GGpuRhi->CompileShader(OpVertexShader, ErrorInfo, WarnInfo, Args);

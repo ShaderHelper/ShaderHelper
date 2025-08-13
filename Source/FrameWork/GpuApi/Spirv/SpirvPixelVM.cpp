@@ -51,7 +51,7 @@ namespace FW
 				else
 				{
 					//Skip the instruction in other threads, and the results are processed by the debugindex thread.
-					OtherThreadState.NextInstIndex++;
+					OtherThreadState.InstIndex++;
 				}
 			}
 		}
@@ -151,8 +151,53 @@ namespace FW
 		}
 	}
 
+	void SpvVmPixelVisitor::Visit(SpvOpFwidth* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+		SpvId ResultId = Inst->GetId().value();
+		
+		if(!FlushQuad(ThreadState.InstIndex) && EnableUbsan)
+		{
+			ThreadState.RecordedInfo.DebugStates.Last().UbError = "Derivative instruction in non-uniform control flow!";
+			bTerminate = true;
+			return;
+		}
+		
+		int32 ResultTypeSize = GetTypeByteSize(ResultType);
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(ResultTypeSize * 4);
+		for(int32 QuadIndex = 0; QuadIndex < 4; QuadIndex++)
+		{
+			SpvVmContext& Context = PixelContext.Quad[QuadIndex];
+			SpvObject* P = GetObject(&Context, Inst->GetP());
+			Datas.Append(GetObjectValue(P));
+		}
+		
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpCode=%d"), (int)SpvOp::Fwidth));
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add(FString::Printf(TEXT("OpResultType=%s"), *GetHlslTypeStr(ResultType)));
+		
+		TArray<uint8> ResultValue = ExecuteGpuOp("OpFwidth", ResultTypeSize * 4, Datas, ExtraArgs);
+		for(int32 QuadIndex = 0; QuadIndex < 4; QuadIndex++)
+		{
+			SpvVmFrame& StackFrame = PixelContext.Quad[QuadIndex].ThreadState.StackFrames.back();
+			TArray<uint8> QuadIndexResultValue = {ResultValue.GetData() + ResultTypeSize * QuadIndex, ResultTypeSize};
+			
+			SpvObject ResultObject{
+				.Id = ResultId,
+				.Type = ResultType,
+				.Storage = SpvObject::Internal{ MoveTemp(QuadIndexResultValue) }
+			};
+			StackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(ResultObject));
+		}
+	}
+
 	void SpvVmPixelVisitor::Visit(SpvOpImageSampleImplicitLod* Inst)
-{
+	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
 		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
@@ -250,19 +295,21 @@ namespace FW
 						uint8* Data = (uint8*)GGpuRhi->MapGpuBuffer(Buffer, GpuResourceMapMode::Read_Only);
 						Storage.Value = {Data, (int)Buffer->GetByteSize()};
 						GGpuRhi->UnMapGpuBuffer(Buffer);
+						Var.InitializedRanges.AddUnique({0, (int)Buffer->GetByteSize()});
 					}
-					Var.Initialized = true;
 				}
 				else if(BuiltIn && Context.ThreadState.BuiltInInput.contains(BuiltIn.value()))
 				{
-					std::get<SpvObject::Internal>(Var.Storage).Value = Context.ThreadState.BuiltInInput[BuiltIn.value()];
-					Var.Initialized = true;
+					TArray<uint8>& Value = std::get<SpvObject::Internal>(Var.Storage).Value;
+					Value = Context.ThreadState.BuiltInInput[BuiltIn.value()];
+					Var.InitializedRanges.AddUnique({0, Value.Num()});
 				}
 				else if(auto Search = Context.ThreadState.LocationInput.find(Location) ; Search != Context.ThreadState.LocationInput.end())
 				{
 					auto LocationValue = Search->second;
-					std::get<SpvObject::Internal>(Var.Storage).Value = LocationValue;;
-					Var.Initialized = true;
+					TArray<uint8>& Value = std::get<SpvObject::Internal>(Var.Storage).Value;
+					Value = LocationValue;;
+					Var.InitializedRanges.AddUnique({0, Value.Num()});
 				}
 			}
 			

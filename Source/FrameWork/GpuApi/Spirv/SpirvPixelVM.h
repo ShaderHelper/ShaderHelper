@@ -23,6 +23,7 @@ namespace FW
 		
 		void Visit(SpvOpDPdx* Inst) override;
 		void Visit(SpvOpDPdy* Inst) override;
+		void Visit(SpvOpFwidth* Inst) override;
 		void Visit(SpvOpImageSampleImplicitLod* Inst) override;
 		
 	protected:

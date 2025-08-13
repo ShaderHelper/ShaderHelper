@@ -13,7 +13,8 @@ namespace FW
     public:
         SLATE_BEGIN_ARGS(SPropertyAsset)
         {}
-            SLATE_ARGUMENT(ShObject*, Owner)
+            SLATE_ARGUMENT(PropertyData*, Owner)
+			SLATE_ARGUMENT(ShObject*, OuterObject)
             SLATE_ARGUMENT(void* , AssetPtrRef);
             SLATE_ARGUMENT(MetaType* , AssetMetaType);
             SLATE_EVENT(FSimpleDelegate, OnAssetChanged)
@@ -41,6 +42,7 @@ namespace FW
         void Construct(const FArguments& InArgs)
         {
             Owner = InArgs._Owner;
+			OuterObject = InArgs._OuterObject;
             AssetPtrRef = InArgs._AssetPtrRef;
             AssetMetaType = InArgs._AssetMetaType;
             OnAssetChanged = InArgs._OnAssetChanged;
@@ -165,7 +167,7 @@ namespace FW
                 {
                     auto Asset = TSingleton<AssetManager>::Get().LoadAssetByPath<AssetObject>(DropFilePath);
                     auto& AssetRef = *(AssetPtr<AssetObject>*)AssetPtrRef;
-                    if(AssetRef != Asset)
+                    if(AssetRef != Asset && OuterObject->CanChangeProperty(Owner))
                     {
                         AssetRef = Asset;
                         RefreshAssetView();
@@ -181,7 +183,8 @@ namespace FW
     private:
         bool bPreviewUnderMouse = false;
         bool bRecognizedDragDrop = false;
-        ShObject* Owner;
+        PropertyData* Owner;
+		ShObject* OuterObject;
         void* AssetPtrRef;
         MetaType* AssetMetaType;
         TSharedPtr<SBox> Display;
@@ -203,7 +206,8 @@ namespace FW
         {
             auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
             auto ValueWidget = SNew(SPropertyAsset)
-                .Owner(Owner)
+                .Owner(this)
+				.OuterObject(Owner)
                 .AssetPtrRef(AssetPtrRef)
                 .AssetMetaType(AssetMetaType)
                 .OnAssetChanged_Lambda([this]{

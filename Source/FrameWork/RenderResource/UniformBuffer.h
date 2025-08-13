@@ -57,6 +57,7 @@ namespace FW
 		{
             WriteCombinedBuffer = GGpuRhi->MapGpuBuffer(Buffer, GpuResourceMapMode::Write_Only);
             ReadableBackBuffer = FMemory::Malloc(MetaData.UniformBufferSize);
+			FMemory::Memset(WriteCombinedBuffer, 0, MetaData.UniformBufferSize);
             FMemory::Memset(ReadableBackBuffer, 0, MetaData.UniformBufferSize);
         }
         
@@ -105,17 +106,20 @@ namespace FW
                 if(HasMember(MemberName))
                 {
                     uint32 MemberSize = MetaData.Members[MemberName].Size;
-                    
-                    uint32 DstMemberOffset = MetaData.Members[MemberName].Offset;
-                    void* DstMemberWritableData = (uint8*)WriteCombinedBuffer + DstMemberOffset;
-                    void* DstMemberReadableData = (uint8*)ReadableBackBuffer + DstMemberOffset;
-                    
-                    uint32 SrcMemberOffset = SrcMetaData.Members[MemberName].Offset;
-                    void* SrcMemberWritableData = (uint8*)Src.GetWriteCombinedData() + SrcMemberOffset;
-                    void* SrcMemberReadableData = (uint8*)Src.GetReadableData() + SrcMemberOffset;
+					FString MemberTypeName = MetaData.Members[MemberName].TypeName;
+					if(MemberSize == MemberInfo.Size && MemberTypeName == MemberInfo.TypeName)
+					{
+						uint32 DstMemberOffset = MetaData.Members[MemberName].Offset;
+						void* DstMemberWritableData = (uint8*)WriteCombinedBuffer + DstMemberOffset;
+						void* DstMemberReadableData = (uint8*)ReadableBackBuffer + DstMemberOffset;
+						
+						uint32 SrcMemberOffset = SrcMetaData.Members[MemberName].Offset;
+						void* SrcMemberWritableData = (uint8*)Src.GetWriteCombinedData() + SrcMemberOffset;
+						void* SrcMemberReadableData = (uint8*)Src.GetReadableData() + SrcMemberOffset;
 
-                    FMemory::Memcpy(DstMemberWritableData, SrcMemberWritableData, MemberSize);
-                    FMemory::Memcpy(DstMemberReadableData, SrcMemberReadableData, MemberSize);
+						FMemory::Memcpy(DstMemberWritableData, SrcMemberWritableData, MemberSize);
+						FMemory::Memcpy(DstMemberReadableData, SrcMemberReadableData, MemberSize);
+					}
                 }
             }
         }

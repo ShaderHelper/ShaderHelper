@@ -42,6 +42,7 @@ namespace FW
         virtual void PostLoad();
         //
         virtual TArray<TSharedRef<PropertyData>>* GetPropertyDatas();
+		virtual bool CanChangeProperty(PropertyData* InProperty) { return true; };
         virtual void PostPropertyChanged(PropertyData* InProperty);
     
         uint32 Add() const

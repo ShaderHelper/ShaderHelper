@@ -32,7 +32,7 @@ namespace FW
         FString GetPath() const;
         
     public:
-        FSimpleDelegate OnDestroy;
+		FSimpleMulticastDelegate OnDestroy;
 	};
 
     FRAMEWORK_API MetaType* GetAssetMetaType(const FString& InPath);
