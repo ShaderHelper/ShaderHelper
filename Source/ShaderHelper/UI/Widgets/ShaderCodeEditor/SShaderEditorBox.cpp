@@ -116,6 +116,8 @@ const FString FoldMarkerText = TEXT("⇿");
     
     SShaderEditorBox::~SShaderEditorBox()
     {
+		ShaderAssetObj->OnRefreshBuilder.RemoveAll(this);
+		
         bQuitISense = true;
         ISenseEvent->Trigger();
         ISenseThread->Join();
@@ -190,6 +192,13 @@ const FString FoldMarkerText = TEXT("⇿");
     void SShaderEditorBox::Construct(const FArguments& InArgs)
     {
 		ShaderAssetObj = InArgs._ShaderAssetObj;
+		ShaderAssetObj->OnRefreshBuilder.AddLambda([this]{
+			ISenseTask Task{};
+			Task.ShaderDesc = ShaderAssetObj->GetShaderDesc(CurrentShaderSource);
+			ISenseQueue.Enqueue(MoveTemp(Task));
+			ISenseEvent->Trigger();
+		});
+		
         SAssignNew(ShaderMultiLineVScrollBar, SScrollBar).Orientation(EOrientation::Orient_Vertical).Padding(0)
 			.Style(&FShaderHelperStyle::Get().GetWidgetStyle<FScrollBarStyle>("CustomScrollbar")).Thickness(8.0f);
 		ShaderMultiLineVScrollBar->OnSetState = [this](float InOffsetFraction, float InThumbSizeFraction) {
@@ -2671,7 +2680,6 @@ const FString FoldMarkerText = TEXT("⇿");
 			SpvVariable& Var = RecordedInfo.AllVariables[VarChange.VarId];
 			if(!Var.IsExternal())
 			{
-				Var.Initialized = true;
 				Var.InitializedRanges.Add({VarChange.Range.OffsetBytes, VarChange.Range.OffsetBytes + VarChange.Range.ByteSize});
 				std::get<SpvObject::Internal>(Var.Storage).Value = bReverse ? VarChange.PreValue : VarChange.NewValue;
 			}
@@ -2679,34 +2687,27 @@ const FString FoldMarkerText = TEXT("⇿");
 		}
 	}
 
-	TArray<VariableNodePtr> AppendVarChildNodes(SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, const TArray<SpvVariableChange::DirtyRange>& DirtyRanges, const TArray<uint8>& Value, int InOffset)
+	TArray<VariableNodePtr> AppendVarChildNodes(SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, const TArray<SpvVariableChange::DirtyRange>& DirtyRanges, const TArray<uint8>& Value, int32 InOffset)
 	{
 		TArray<VariableNodePtr> Nodes;
+		int32 Offset = InOffset;
 		if(TypeDesc->GetKind() == SpvTypeDescKind::Member)
 		{
 			SpvMemberTypeDesc* MemberTypeDesc = static_cast<SpvMemberTypeDesc*>(TypeDesc);
-			int32 MemberByteSize = MemberTypeDesc->GetSize() / 8;
-			TArrayView<const uint8> MemberValue = MakeArrayView(Value.GetData() + InOffset, MemberByteSize);
-			FString ValueStr = LOCALIZATION("Uninitialized").ToString();
-			for(const auto& Range : InitializedRanges)
-			{
-				if(InOffset >= Range.X && InOffset + MemberByteSize <= Range.Y)
-				{
-					ValueStr = GetValueStr(MemberValue, MemberTypeDesc->GetTypeDesc());
-					break;
-				}
-			}
+			int32 MemberByteSize = GetTypeByteSize(MemberTypeDesc);
+			FString ValueStr = GetValueStr(Value, MemberTypeDesc->GetTypeDesc(), InitializedRanges, Offset);
 			auto Data = MakeShared<VariableNode>(MemberTypeDesc->GetName(), MoveTemp(ValueStr), GetTypeDescStr(MemberTypeDesc->GetTypeDesc()));
 			if(MemberTypeDesc->GetTypeDesc()->GetKind() == SpvTypeDescKind::Composite)
 			{
-				Data->Children = AppendVarChildNodes(MemberTypeDesc->GetTypeDesc(), InitializedRanges, DirtyRanges, Value, InOffset);
+				Data->Children = AppendVarChildNodes(MemberTypeDesc->GetTypeDesc(), InitializedRanges, DirtyRanges, Value, Offset);
 			}
 			for(const auto& Range : DirtyRanges)
 			{
 				int32 RangeStart = Range.OffsetBytes;
 				int32 RangeEnd = Range.OffsetBytes + Range.ByteSize;
 				if((RangeStart >= InOffset && RangeStart < InOffset + MemberByteSize) ||
-				   (RangeEnd > InOffset && RangeEnd <= InOffset + MemberByteSize))
+				   (RangeEnd > InOffset && RangeEnd <= InOffset + MemberByteSize) ||
+				   (RangeStart < InOffset && RangeEnd > InOffset + MemberByteSize))
 				{
 					Data->Dirty = true;
 					break;
@@ -2717,56 +2718,108 @@ const FString FoldMarkerText = TEXT("⇿");
 		else if(TypeDesc->GetKind() == SpvTypeDescKind::Composite)
 		{
 			SpvCompositeTypeDesc* CompositeTypeDesc = static_cast<SpvCompositeTypeDesc*>(TypeDesc);
-			int Offset = InOffset;
 			for(SpvTypeDesc* MemberTypeDesc : CompositeTypeDesc->GetMemberTypeDescs())
 			{
 				Nodes.Append(AppendVarChildNodes(MemberTypeDesc, InitializedRanges, DirtyRanges, Value, Offset));
 				if(MemberTypeDesc->GetKind() == SpvTypeDescKind::Member)
 				{
-					Offset += static_cast<SpvMemberTypeDesc*>(MemberTypeDesc)->GetSize() / 8;
+					Offset += GetTypeByteSize(MemberTypeDesc);
 				}
 			}
 		}
-		else
+		else if(TypeDesc->GetKind() == SpvTypeDescKind::Array)
 		{
+			SpvArrayTypeDesc* ArrayTypeDesc = static_cast<SpvArrayTypeDesc*>(TypeDesc);
+			SpvTypeDesc* BaseTypeDesc = ArrayTypeDesc->GetBaseTypeDesc();
+			int32 BaseTypeSize = GetTypeByteSize(BaseTypeDesc);
+			int32 CompCount = ArrayTypeDesc->GetCompCounts()[0];
+			SpvTypeDesc* ElementTypeDesc = BaseTypeDesc;
+			int32 ElementTypeSize = BaseTypeSize;
+			TUniquePtr<SpvArrayTypeDesc> SubArrayTypeDesc = ArrayTypeDesc->GetCompCounts().Num() > 1 ? MakeUnique<SpvArrayTypeDesc>(BaseTypeDesc, TArray{ArrayTypeDesc->GetCompCounts().GetData() + 1, ArrayTypeDesc->GetCompCounts().Num() -1 }) : nullptr;
+			if(SubArrayTypeDesc)
+			{
+				ElementTypeDesc = SubArrayTypeDesc.Get();
+				ElementTypeSize *= SubArrayTypeDesc->GetElementNum();
+			}
+			for(int32 Index = 0; Index < CompCount; Index++)
+			{
+				FString MemberName = FString::Printf(TEXT("[%d]"), Index);
+				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset);
+				auto Data = MakeShared<VariableNode>(MemberName, MoveTemp(ValueStr), GetTypeDescStr(ElementTypeDesc));
+				Data->Children = AppendVarChildNodes(ElementTypeDesc, InitializedRanges, DirtyRanges, Value, Offset);
+				for(const auto& Range : DirtyRanges)
+				{
+					int32 RangeStart = Range.OffsetBytes;
+					int32 RangeEnd = Range.OffsetBytes + Range.ByteSize;
+					if((RangeStart >= Offset && RangeStart < Offset + ElementTypeSize) ||
+					   (RangeEnd > Offset && RangeEnd <= Offset + ElementTypeSize) ||
+					   (RangeStart < Offset && RangeEnd > Offset + ElementTypeSize))
+					{
+						Data->Dirty = true;
+						break;
+					}
+				}
+				Nodes.Add(MoveTemp(Data));
+				Offset += ElementTypeSize;
+			}
 			
 		}
 		return Nodes;
 	}
 
-	TArray<ExpressionNodePtr> AppendExprChildNodes(SpvTypeDesc* TypeDesc, const TArray<uint8>& Value, int InOffset)
+	TArray<ExpressionNodePtr> AppendExprChildNodes(SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, const TArray<uint8>& Value, int32 InOffset)
 	{
 		TArray<ExpressionNodePtr> Nodes;
+		int32 Offset = InOffset;
 		if(TypeDesc->GetKind() == SpvTypeDescKind::Member)
 		{
 			SpvMemberTypeDesc* MemberTypeDesc = static_cast<SpvMemberTypeDesc*>(TypeDesc);
-			int32 MemberByteSize = MemberTypeDesc->GetSize() / 8;
-			TArrayView<const uint8> MemberValue = MakeArrayView(Value.GetData() + InOffset, MemberByteSize);
-			FString ValueStr = GetValueStr(MemberValue, MemberTypeDesc->GetTypeDesc());
+			int32 MemberByteSize = GetTypeByteSize(MemberTypeDesc);
+			FString ValueStr = GetValueStr(Value, MemberTypeDesc->GetTypeDesc(), InitializedRanges, Offset);
 			FString TypeName = GetTypeDescStr(MemberTypeDesc->GetTypeDesc());
 			auto Data = MakeShared<ExpressionNode>(MemberTypeDesc->GetName(), FText::FromString(ValueStr), FText::FromString(TypeName));
 			if(MemberTypeDesc->GetTypeDesc()->GetKind() == SpvTypeDescKind::Composite)
 			{
-				Data->Children = AppendExprChildNodes(MemberTypeDesc->GetTypeDesc(), Value, InOffset);
+				Data->Children = AppendExprChildNodes(MemberTypeDesc->GetTypeDesc(), InitializedRanges, Value, Offset);
 			}
 			Nodes.Add(MoveTemp(Data));
 		}
 		else if(TypeDesc->GetKind() == SpvTypeDescKind::Composite)
 		{
 			SpvCompositeTypeDesc* CompositeTypeDesc = static_cast<SpvCompositeTypeDesc*>(TypeDesc);
-			int Offset = InOffset;
 			for(SpvTypeDesc* MemberTypeDesc : CompositeTypeDesc->GetMemberTypeDescs())
 			{
-				Nodes.Append(AppendExprChildNodes(MemberTypeDesc, Value, Offset));
+				Nodes.Append(AppendExprChildNodes(MemberTypeDesc, InitializedRanges, Value, Offset));
 				if(MemberTypeDesc->GetKind() == SpvTypeDescKind::Member)
 				{
-					Offset += static_cast<SpvMemberTypeDesc*>(MemberTypeDesc)->GetSize() / 8;
+					Offset += GetTypeByteSize(MemberTypeDesc);
 				}
 			}
 		}
-		else
+		else if(TypeDesc->GetKind() == SpvTypeDescKind::Array)
 		{
-			
+			SpvArrayTypeDesc* ArrayTypeDesc = static_cast<SpvArrayTypeDesc*>(TypeDesc);
+			SpvTypeDesc* BaseTypeDesc = ArrayTypeDesc->GetBaseTypeDesc();
+			int32 BaseTypeSize = GetTypeByteSize(BaseTypeDesc);
+			int32 CompCount = ArrayTypeDesc->GetCompCounts()[0];
+			SpvTypeDesc* ElementTypeDesc = BaseTypeDesc;
+			int32 ElementTypeSize = BaseTypeSize;
+			TUniquePtr<SpvArrayTypeDesc> SubArrayTypeDesc = ArrayTypeDesc->GetCompCounts().Num() > 1 ? MakeUnique<SpvArrayTypeDesc>(BaseTypeDesc, TArray{ArrayTypeDesc->GetCompCounts().GetData() + 1, ArrayTypeDesc->GetCompCounts().Num() -1 }) : nullptr;
+			if(SubArrayTypeDesc)
+			{
+				ElementTypeDesc = SubArrayTypeDesc.Get();
+				ElementTypeSize *= SubArrayTypeDesc->GetElementNum();
+			}
+			for(int32 Index = 0; Index < CompCount; Index++)
+			{
+				FString MemberName = FString::Printf(TEXT("[%d]"), Index);
+				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset);
+				FString TypeName = GetTypeDescStr(ElementTypeDesc);
+				auto Data = MakeShared<ExpressionNode>(MemberName, FText::FromString(ValueStr), FText::FromString(TypeName));
+				Data->Children = AppendExprChildNodes(ElementTypeDesc, InitializedRanges, Value, Offset);
+				Nodes.Add(MoveTemp(Data));
+				Offset += ElementTypeSize;
+			}
 		}
 		return Nodes;
 	}
@@ -2789,18 +2842,30 @@ const FString FoldMarkerText = TEXT("⇿");
 			const TArray<uint8>& Value = std::get<SpvObject::Internal>(CurReturnObject.value().Storage).Value;
 			FString VarName = GetFunctionDesc(Scope)->GetName() + LOCALIZATION("ReturnTip").ToString();
 			FString TypeName = GetTypeDescStr(ReturnTypeDesc);
-			FString ValueStr = GetValueStr(Value, ReturnTypeDesc);
+			FString ValueStr = GetValueStr(Value, ReturnTypeDesc, TArray{Vector2i{0, Value.Num()}}, 0);
 			
 			auto Data = MakeShared<VariableNode>(VarName, ValueStr, TypeName);
 			LocalVarNodeDatas.Add(MoveTemp(Data));
 		}
 		
-		for(const auto& [VarId, VarDesc] : DebuggerContext->VariableDescMap)
+		std::vector<std::pair<SpvId, SpvVariableDesc*>> SortedVariableDescs;
+		for(const auto& Pair : DebuggerContext->VariableDescMap)
+		{
+			if(Pair.second)
+			{
+				SortedVariableDescs.push_back(Pair);
+			}
+		}
+		std::sort(SortedVariableDescs.begin(), SortedVariableDescs.end(), [](const auto& PairA, const auto& PairB){
+			return PairA.second->Line > PairB.second->Line;
+		});
+		
+		for(const auto& [VarId, VarDesc] : SortedVariableDescs)
 		{
 			if(RecordedInfo.AllVariables.contains(VarId))
 			{
 				const SpvVariable& Var = RecordedInfo.AllVariables.at(VarId);
-				if(!Var.IsExternal() && VarDesc)
+				if(!Var.IsExternal())
 				{
 					bool VisibleScope = VarDesc->Parent->Contains(InScope) || (DebugStates[CurDebugStateIndex].bReturn && InScope->GetKind() == SpvScopeKind::Function && InScope == VarDesc->Parent->GetParent());
 					bool VisibleLine = VarDesc->Line < StopLineNumber + ExtraLineNum && VarDesc->Line > ExtraLineNum;
@@ -2808,12 +2873,8 @@ const FString FoldMarkerText = TEXT("⇿");
 					{
 						FString VarName = VarDesc->Name;
 						FString TypeName = GetTypeDescStr(VarDesc->TypeDesc);
-						FString ValueStr = LOCALIZATION("Uninitialized").ToString();
 						const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var.Storage).Value;
-						if(Var.Initialized)
-						{
-							ValueStr = GetValueStr(Value, VarDesc->TypeDesc);
-						}
+						FString ValueStr = GetValueStr(Value, VarDesc->TypeDesc, Var.InitializedRanges, 0);
 						auto Data = MakeShared<VariableNode>(VarName, ValueStr, TypeName);
 						TArray<SpvVariableChange::DirtyRange> Ranges;
 						DirtyVars.MultiFind(VarId, Ranges);
@@ -2881,8 +2942,22 @@ const FString FoldMarkerText = TEXT("⇿");
 							bool VisibleLine = VarDesc->Line < StopLineNumber + ExtraLineNum && VarDesc->Line > ExtraLineNum;
 							if(VisibleScope && VisibleLine)
 							{
-								FString Declaration = GetTypeDescStr(VarDesc->TypeDesc) + " " + VarDesc->Name + ";";
-								LocalVars += GetTypeDescStr(VarDesc->TypeDesc) + " " + VarDesc->Name + "= __Expression_Vars[0]." + VarDesc->Name + ";\n";
+								FString Declaration;
+								if(VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Array)
+								{
+									SpvArrayTypeDesc* ArrayTypeDesc = static_cast<SpvArrayTypeDesc*>(VarDesc->TypeDesc);
+									FString BasicTypeStr = GetTypeDescStr(ArrayTypeDesc->GetBaseTypeDesc());
+									FString DimStr = GetTypeDescStr(VarDesc->TypeDesc);
+									DimStr.RemoveFromStart(BasicTypeStr);
+									Declaration = BasicTypeStr + " " + VarDesc->Name + DimStr + ";";
+									LocalVars += Declaration;
+									LocalVars += VarDesc->Name + "= __Expression_Vars[0]." + VarDesc->Name + ";\n";
+								}
+								else
+								{
+									Declaration = GetTypeDescStr(VarDesc->TypeDesc) + " " + VarDesc->Name + ";";
+									LocalVars += GetTypeDescStr(VarDesc->TypeDesc) + " " + VarDesc->Name + "= __Expression_Vars[0]." + VarDesc->Name + ";\n";
+								}
 								VisibleLocalVarBindings += Declaration;
 
                                 const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var.Storage).Value;
@@ -2968,12 +3043,14 @@ void __Expression_Output(T __Expression_Result) {}
 				if(!VmContext.HasSideEffect)
 				{
 					FString TypeName = GetTypeDescStr(VmContext.ResultTypeDesc);
-					FString ValueStr = GetValueStr(VmContext.ResultValue, VmContext.ResultTypeDesc);
+					TArray<Vector2i> ResultRange;
+					ResultRange.Add({0, VmContext.ResultValue.Num()});
+					FString ValueStr = GetValueStr(VmContext.ResultValue, VmContext.ResultTypeDesc, ResultRange, 0);
 					
 					TArray<TSharedPtr<ExpressionNode>> Children;
 					if(VmContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Composite || VmContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Array)
 					{
-						Children = AppendExprChildNodes(VmContext.ResultTypeDesc, VmContext.ResultValue, 0);
+						Children = AppendExprChildNodes(VmContext.ResultTypeDesc, ResultRange, VmContext.ResultValue, 0);
 					}
 					
 					return {.Expr = InExpression, .ValueStr = FText::FromString(ValueStr),
@@ -3062,7 +3139,7 @@ void __Expression_Output(T __Expression_Result) {}
 			ApplyDebugState(DebugState);
 			CurDebugStateIndex++;
 			
-			if(AssertResult && AssertResult->Initialized)
+			if(AssertResult)
 			{
 				TArray<uint8>& Value = std::get<SpvObject::Internal>(AssertResult->Storage).Value;
 				uint& TypedValue = *(uint*)Value.GetData();

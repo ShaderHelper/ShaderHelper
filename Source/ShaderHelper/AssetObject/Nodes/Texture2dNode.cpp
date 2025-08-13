@@ -36,13 +36,19 @@ namespace SH
 		ObjectName = FText::FromString("Texture2d");
 	}
 
+	Texture2dNode::~Texture2dNode()
+	{
+		if(Texture)
+		{
+			Texture->OnDestroy.RemoveAll(this);
+		}
+	}
+
 	Texture2dNode::Texture2dNode(FW::AssetPtr<FW::Texture2D> InTexture)
 	: Texture(MoveTemp(InTexture))
-	, Width(Texture->GetWidth())
-	, Height(Texture->GetHeight())
 	{
 		ObjectName = FText::FromString(Texture->GetFileName());
-		Preview->SetViewPortRenderTexture(Texture->GetGpuData());
+		InitTexture();
 	}
 
 	void Texture2dNode::InitPins()
@@ -65,12 +71,7 @@ namespace SH
 	{
 		GraphNode::PostLoad();
 		
-		if(Texture)
-		{
-			Preview->SetViewPortRenderTexture(Texture->GetGpuData());
-			Width = Texture->GetWidth();
-			Height = Texture->GetHeight();
-		}
+		InitTexture();
 	}
 
 	TSharedPtr<SWidget> Texture2dNode::ExtraNodeWidget()
@@ -81,6 +82,32 @@ namespace SH
 			];
 	}
 
+	void Texture2dNode::InitTexture()
+	{
+		if(Texture)
+		{
+			Texture->OnDestroy.AddRaw(this, &Texture2dNode::ClearProperty);
+			Preview->SetViewPortRenderTexture(Texture->GetGpuData());
+			Width = Texture->GetWidth();
+			Height = Texture->GetHeight();
+		}
+	}
+
+	void Texture2dNode::ClearProperty()
+	{
+		Width = Height = 0;
+		auto ResultPin = static_cast<GpuTexturePin*>(GetPin("RT"));
+		ResultPin->SetValue(nullptr);
+		Preview->Clear();
+		
+		PropertyDatas.Empty();
+		ShObject::GetPropertyDatas();
+		GetOuterMost()->MarkDirty();
+		
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->RefreshProperty();
+	}
+
 	void Texture2dNode::PostPropertyChanged(PropertyData* InProperty)
 	{
 		ShObject::PostPropertyChanged(InProperty);
@@ -88,16 +115,17 @@ namespace SH
 		//Texture asset changed.
 		if(InProperty->GetDisplayName() == "Texture")
 		{
-			Preview->SetViewPortRenderTexture(Texture->GetGpuData());
-			Width = Texture->GetWidth();
-			Height = Texture->GetHeight();
+			InitTexture();
 		}
 	}
 
 	ExecRet Texture2dNode::Exec(GraphExecContext& Context)
 	{
-		auto ResultPin = static_cast<GpuTexturePin*>(GetPin("RT"));
-		ResultPin->SetValue(Texture->GetGpuData());
+		if(Texture)
+		{
+			auto ResultPin = static_cast<GpuTexturePin*>(GetPin("RT"));
+			ResultPin->SetValue(Texture->GetGpuData());
+		}
 		return {};
 	}
 }

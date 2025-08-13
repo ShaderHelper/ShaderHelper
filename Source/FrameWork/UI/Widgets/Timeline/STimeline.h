@@ -10,6 +10,7 @@ namespace FW
             SLATE_ARGUMENT(bool*, bStop)
             SLATE_ARGUMENT(float*, CurTime)
             SLATE_ARGUMENT(float*, MaxTime)
+			SLATE_ARGUMENT(TFunction<void(float)>, OnHandleMove)
         SLATE_END_ARGS()
         void Construct(const FArguments& InArgs);
         virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
@@ -26,6 +27,7 @@ namespace FW
         {}
             SLATE_ARGUMENT(float*, CurTime)
             SLATE_ARGUMENT(float*, MaxTime)
+			SLATE_ARGUMENT(TFunction<void(float)>, OnHandleMove)
         SLATE_END_ARGS()
 
         void Construct(const FArguments& InArgs);
@@ -39,5 +41,6 @@ namespace FW
     private:
         float* CurTime = nullptr;
         float* MaxTime = nullptr;
+		TFunction<void(float)> OnHandleMove;
     };
 }

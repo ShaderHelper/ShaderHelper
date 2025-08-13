@@ -26,7 +26,7 @@ namespace FW
 	void SpvVmPixelExprVisitor::Visit(SpvOpStore* Inst)
 	{
 		SpvPointer* Pointer = GetPointer(Inst->GetPointer());
-		if(Pointer->Pointee->Initialized)
+		if(!Pointer->Pointee->InitializedRanges.IsEmpty())
 		{
 			PixelExprContext.HasSideEffect = true;
 		}

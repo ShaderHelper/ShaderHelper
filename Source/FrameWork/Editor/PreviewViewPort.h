@@ -42,6 +42,10 @@ namespace FW
 		{
 			iMouse.xy = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * MyGeometry.Scale);
 			iMouse.zw = iMouse.xy;
+			if(OniMouseChangeHandler)
+			{
+				OniMouseChangeHandler(iMouse);
+			}
 			if(AssociatedWidget.IsValid())
 			{
 				return FReply::Unhandled().CaptureMouse(AssociatedWidget.Pin().ToSharedRef());
@@ -75,12 +79,17 @@ namespace FW
 				{
 					iMouse.w = -iMouse.w;
 				}
+				if(OniMouseChangeHandler)
+				{
+					OniMouseChangeHandler(iMouse);
+				}
 			}
 			return FReply::Unhandled();
 		}
 
 	public:
 		OnViewportResizeDelegate ViewportResize;
+		TFunction<void(const Vector4f&)> OniMouseChangeHandler;
 
 	private:
 		TWeakPtr<SWidget> AssociatedWidget;

@@ -100,7 +100,7 @@ namespace FW
 			auto ValueWidget = SNew(SComboBox<TSharedPtr<FString>>)
 			.OptionsSource(&EnumItems)
 			.OnSelectionChanged_Lambda([this](TSharedPtr<FString> InItem, ESelectInfo::Type){
-				if(*InItem != *EnumValueName)
+				if(*InItem != *EnumValueName && Owner->CanChangeProperty(this))
 				{
 					EnumValueName = InItem;
 					Setter(EnumEntries[*EnumValueName].Get());
@@ -147,7 +147,7 @@ namespace FW
 					.IsEnabled(!ReadOnly)
                     .MaxFractionalDigits(3)
                     .OnValueChanged_Lambda([this](T NewValue) {
-                        if(*ValueRef != NewValue)
+                        if(*ValueRef != NewValue && Owner->CanChangeProperty(this))
                         {
                             *ValueRef = NewValue;
                             Owner->PostPropertyChanged(this);
@@ -185,7 +185,7 @@ namespace FW
                         SNew(SSpinBox<float>)
                         .MaxFractionalDigits(3)
                         .OnValueChanged_Lambda([this](float NewValue) {
-                            if(ValueRef->x != NewValue)
+                            if(ValueRef->x != NewValue && Owner->CanChangeProperty(this))
                             {
                                 ValueRef->x = NewValue;
                                 Owner->PostPropertyChanged(this);
@@ -198,7 +198,7 @@ namespace FW
                         SNew(SSpinBox<float>)
                         .MaxFractionalDigits(3)
                         .OnValueChanged_Lambda([this](float NewValue) {
-                            if(ValueRef->y != NewValue)
+                            if(ValueRef->y != NewValue && Owner->CanChangeProperty(this))
                             {
                                 ValueRef->y = NewValue;
                                 Owner->PostPropertyChanged(this);
@@ -236,7 +236,7 @@ namespace FW
 						SNew(SSpinBox<float>)
 						.MaxFractionalDigits(3)
 						.OnValueChanged_Lambda([this](float NewValue) {
-							if(ValueRef->x != NewValue)
+							if(ValueRef->x != NewValue && Owner->CanChangeProperty(this))
 							{
 								ValueRef->x = NewValue;
 								Owner->PostPropertyChanged(this);
@@ -249,7 +249,7 @@ namespace FW
 						SNew(SSpinBox<float>)
 						.MaxFractionalDigits(3)
 						.OnValueChanged_Lambda([this](float NewValue) {
-							if(ValueRef->y != NewValue)
+							if(ValueRef->y != NewValue && Owner->CanChangeProperty(this))
 							{
 								ValueRef->y = NewValue;
 								Owner->PostPropertyChanged(this);
@@ -262,7 +262,7 @@ namespace FW
 						SNew(SSpinBox<float>)
 						.MaxFractionalDigits(3)
 						.OnValueChanged_Lambda([this](float NewValue) {
-							if(ValueRef->z != NewValue)
+							if(ValueRef->z != NewValue && Owner->CanChangeProperty(this))
 							{
 								ValueRef->z = NewValue;
 								Owner->PostPropertyChanged(this);
@@ -301,7 +301,7 @@ namespace FW
 						SNew(SSpinBox<float>)
 							.MaxFractionalDigits(3)
 							.OnValueChanged_Lambda([this](float NewValue) {
-								if (ValueRef->x != NewValue)
+								if (ValueRef->x != NewValue && Owner->CanChangeProperty(this))
 								{
 									ValueRef->x = NewValue;
 									Owner->PostPropertyChanged(this);
@@ -314,7 +314,7 @@ namespace FW
 						SNew(SSpinBox<float>)
 							.MaxFractionalDigits(3)
 							.OnValueChanged_Lambda([this](float NewValue) {
-								if (ValueRef->y != NewValue)
+								if (ValueRef->y != NewValue && Owner->CanChangeProperty(this))
 								{
 									ValueRef->y = NewValue;
 									Owner->PostPropertyChanged(this);
@@ -327,7 +327,7 @@ namespace FW
 						SNew(SSpinBox<float>)
 							.MaxFractionalDigits(3)
 							.OnValueChanged_Lambda([this](float NewValue) {
-								if (ValueRef->z != NewValue)
+								if (ValueRef->z != NewValue && Owner->CanChangeProperty(this))
 								{
 									ValueRef->z = NewValue;
 									Owner->PostPropertyChanged(this);
@@ -340,7 +340,7 @@ namespace FW
 						SNew(SSpinBox<float>)
 							.MaxFractionalDigits(3)
 							.OnValueChanged_Lambda([this](float NewValue) {
-								if (ValueRef->w != NewValue)
+								if (ValueRef->w != NewValue && Owner->CanChangeProperty(this))
 								{
 									ValueRef->w = NewValue;
 									Owner->PostPropertyChanged(this);

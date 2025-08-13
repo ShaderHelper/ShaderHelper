@@ -261,16 +261,24 @@ namespace FW
 	class SpvArrayTypeDesc : public SpvTypeDesc
 	{
 	public:
-		SpvArrayTypeDesc(SpvTypeDesc* InBaseTypeDesc, const TArray<uint32>& InCompCounts) : SpvTypeDesc(SpvTypeDescKind::Array)
+		SpvArrayTypeDesc(SpvTypeDesc* InBaseTypeDesc, const TArray<int32>& InCompCounts) : SpvTypeDesc(SpvTypeDescKind::Array)
 		, BaseTypeDesc(InBaseTypeDesc), CompCounts(InCompCounts)
 		{}
 		
 		SpvTypeDesc* GetBaseTypeDesc() const { return BaseTypeDesc; }
-		const TArray<uint32>& GetCompCounts() const { return CompCounts; }
+		const TArray<int32>& GetCompCounts() const { return CompCounts; }
+		int32 GetElementNum() const {
+			int ElementNum = 1;
+			for(int32 CompCount : CompCounts)
+			{
+				ElementNum *= CompCount;
+			}
+			return ElementNum;
+		}
 		
 	private:
 		SpvTypeDesc* BaseTypeDesc;
-		TArray<uint32> CompCounts;
+		TArray<int32> CompCounts;
 	};
 	
 	enum class SpvScopeKind
@@ -390,6 +398,16 @@ namespace FW
 			SpvCompositeTypeDesc* CompositeTypeDesc = static_cast<SpvCompositeTypeDesc*>(TypeDesc);
 			return CompositeTypeDesc->GetName();
 		}
+		else if(TypeDesc->GetKind() == SpvTypeDescKind::Array)
+		{
+			SpvArrayTypeDesc* ArrayTypeDesc = static_cast<SpvArrayTypeDesc*>(TypeDesc);
+			FString TypeName = GetTypeDescStr(ArrayTypeDesc->GetBaseTypeDesc());
+			for(int32 CompCount : ArrayTypeDesc->GetCompCounts())
+			{
+				TypeName += FString::Printf(TEXT("[%d]"), CompCount);
+			}
+			return TypeName;
+		}
 		AUX::Unreachable();
 	};
 
@@ -436,33 +454,58 @@ namespace FW
 		bool bGlobal{};
 	};
 
-	inline FString GetValueStr(TArrayView<const uint8> InValue, const SpvTypeDesc* TypeDesc)
+	inline int32 GetTypeByteSize(const SpvTypeDesc* TypeDesc)
+	{
+		if(TypeDesc->GetKind() == SpvTypeDescKind::Basic)
+		{
+			return static_cast<const SpvBasicTypeDesc*>(TypeDesc)->GetSize() / 8;
+		}
+		else if(TypeDesc->GetKind() == SpvTypeDescKind::Vector)
+		{
+			const SpvVectorTypeDesc* VectorTypeDesc = static_cast<const SpvVectorTypeDesc*>(TypeDesc);
+			int32 BasicTypeSize = GetTypeByteSize(VectorTypeDesc->GetBasicTypeDesc());
+			return BasicTypeSize * VectorTypeDesc->GetCompCount();
+		}
+		else if(TypeDesc->GetKind() == SpvTypeDescKind::Composite)
+		{
+			const SpvCompositeTypeDesc* CompositeTypeDesc = static_cast<const SpvCompositeTypeDesc*>(TypeDesc);
+			const TArray<SpvTypeDesc*>& MemberTypeDescs = CompositeTypeDesc->GetMemberTypeDescs();
+			int32 CompositeTypeSize{};
+			for(int Index = 0; Index < MemberTypeDescs.Num(); Index++)
+			{
+				if(MemberTypeDescs[Index]->GetKind() == SpvTypeDescKind::Member)
+				{
+					SpvMemberTypeDesc* MemberTypeDesc = static_cast<SpvMemberTypeDesc*>(MemberTypeDescs[Index]);
+					CompositeTypeSize += GetTypeByteSize(MemberTypeDesc);
+				}
+			}
+			return CompositeTypeSize;
+		}
+		else if(TypeDesc->GetKind() == SpvTypeDescKind::Member)
+		{
+			return static_cast<const SpvMemberTypeDesc*>(TypeDesc)->GetSize() / 8;
+		}
+		else if(TypeDesc->GetKind() == SpvTypeDescKind::Array)
+		{
+			const SpvArrayTypeDesc* ArrayTypeDesc = static_cast<const SpvArrayTypeDesc*>(TypeDesc);
+			return GetTypeByteSize(ArrayTypeDesc->GetBaseTypeDesc()) * ArrayTypeDesc->GetElementNum();
+		}
+		AUX::Unreachable();
+	}
+
+	inline FString GetValueStr(TArrayView<const uint8> InValue, const SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, int32 InOffset)
 	{
 		FString ValueStr;
+		int32 Offset = InOffset;
 		if(TypeDesc->GetKind() == SpvTypeDescKind::Vector)
 		{
 			ValueStr += "{";
 			const SpvVectorTypeDesc* VectorTypeDesc = static_cast<const SpvVectorTypeDesc*>(TypeDesc);
-			int32 BasicTypeSize = VectorTypeDesc->GetBasicTypeDesc()->GetSize() / 8;
-			SpvDebugBasicTypeEncoding Encoding = VectorTypeDesc->GetBasicTypeDesc()->GetEncoding();
+			int32 BasicTypeSize = GetTypeByteSize(VectorTypeDesc->GetBasicTypeDesc());
 			for(int Index = 0; Index < VectorTypeDesc->GetCompCount(); Index++)
 			{
-				if(Encoding == SpvDebugBasicTypeEncoding::Float)
-				{
-					float Value = *(float*)(InValue.GetData() + BasicTypeSize * Index);
-					ValueStr += FString::Format(TEXT("{0}"), {Value});
-				}
-				else if(Encoding == SpvDebugBasicTypeEncoding::Signed)
-				{
-					int Value = *(int*)(InValue.GetData() + BasicTypeSize * Index);
-					ValueStr += FString::Format(TEXT("{0}"), {Value});
-				}
-				else if(Encoding == SpvDebugBasicTypeEncoding::Unsigned || Encoding == SpvDebugBasicTypeEncoding::Boolean)
-				{
-					uint32 Value = *(uint32*)(InValue.GetData() + BasicTypeSize * Index);
-					ValueStr += FString::Format(TEXT("{0}"), {Value});
-				}
-				
+				ValueStr += GetValueStr(InValue, VectorTypeDesc->GetBasicTypeDesc(), InitializedRanges, Offset);
+				Offset += BasicTypeSize;
 				if(Index != VectorTypeDesc->GetCompCount() - 1)
 				{
 					ValueStr += ", ";
@@ -474,37 +517,45 @@ namespace FW
 		{
 			const SpvBasicTypeDesc* BasicTypeDesc = static_cast<const SpvBasicTypeDesc*>(TypeDesc);
 			SpvDebugBasicTypeEncoding Encoding = BasicTypeDesc->GetEncoding();
-			if(Encoding == SpvDebugBasicTypeEncoding::Float)
+			FString BasicValueStr = LOCALIZATION("Uninitialized").ToString();
+			for(const auto& Range : InitializedRanges)
 			{
-				float Value = *(float*)(InValue.GetData());
-				ValueStr += FString::Format(TEXT("{0}"), {Value});
+				if(Offset >= Range.X && Offset + GetTypeByteSize(BasicTypeDesc) <= Range.Y)
+				{
+					if(Encoding == SpvDebugBasicTypeEncoding::Float)
+					{
+						float Value = *(float*)(InValue.GetData() + Offset);
+						BasicValueStr = FString::Format(TEXT("{0}"), {Value});
+					}
+					else if(Encoding == SpvDebugBasicTypeEncoding::Signed)
+					{
+						int Value = *(int*)(InValue.GetData() + Offset);
+						BasicValueStr = FString::Format(TEXT("{0}"), {Value});
+					}
+					else if(Encoding == SpvDebugBasicTypeEncoding::Unsigned || Encoding == SpvDebugBasicTypeEncoding::Boolean)
+					{
+						uint32 Value = *(uint32*)(InValue.GetData() + Offset);
+						BasicValueStr = FString::Format(TEXT("{0}"), {Value});
+					}
+					break;
+				}
 			}
-			else if(Encoding == SpvDebugBasicTypeEncoding::Signed)
-			{
-				int Value = *(int*)(InValue.GetData());
-				ValueStr += FString::Format(TEXT("{0}"), {Value});
-			}
-			else if(Encoding == SpvDebugBasicTypeEncoding::Unsigned || Encoding == SpvDebugBasicTypeEncoding::Boolean)
-			{
-				uint32 Value = *(uint32*)(InValue.GetData());
-				ValueStr += FString::Format(TEXT("{0}"), {Value});
-			}
+			ValueStr += BasicValueStr;
 		}
 		else if(TypeDesc->GetKind() == SpvTypeDescKind::Composite)
 		{
 			const SpvCompositeTypeDesc* CompositeTypeDesc = static_cast<const SpvCompositeTypeDesc*>(TypeDesc);
-			ValueStr += "{";
 			const TArray<SpvTypeDesc*>& MemberTypeDescs = CompositeTypeDesc->GetMemberTypeDescs();
-			int Offset = 0;
+			ValueStr += "{";
 			for(int Index = 0; Index < MemberTypeDescs.Num(); Index++)
 			{
 				if(MemberTypeDescs[Index]->GetKind() == SpvTypeDescKind::Member)
 				{
 					SpvMemberTypeDesc* MemberTypeDesc = static_cast<SpvMemberTypeDesc*>(MemberTypeDescs[Index]);
+					int32 MemberSize = GetTypeByteSize(MemberTypeDesc);
 					ValueStr += MemberTypeDesc->GetName() + "=";
-					TArrayView<const uint8> MemberValue = MakeArrayView(InValue.GetData() + Offset, MemberTypeDesc->GetSize() / 8);
-					ValueStr += GetValueStr(MemberValue, MemberTypeDesc->GetTypeDesc());
-					Offset += MemberTypeDesc->GetSize() / 8;
+					ValueStr += GetValueStr(InValue, MemberTypeDesc->GetTypeDesc(), InitializedRanges, Offset);
+					Offset += MemberSize;
 				}
 				
 				if(Index != MemberTypeDescs.Num() - 1)
@@ -513,6 +564,37 @@ namespace FW
 				}
 			}
 			ValueStr += "}";
+		}
+		else if(TypeDesc->GetKind() == SpvTypeDescKind::Array)
+		{
+			const SpvArrayTypeDesc* ArrayTypeDesc = static_cast<const SpvArrayTypeDesc*>(TypeDesc);
+			SpvTypeDesc* BaseTypeDesc = ArrayTypeDesc->GetBaseTypeDesc();
+			int32 BaseTypeSize = GetTypeByteSize(BaseTypeDesc);
+			int32 CompCount = ArrayTypeDesc->GetCompCounts()[0];
+			SpvTypeDesc* ElementTypeDesc = BaseTypeDesc;
+			int32 ElementTypeSize = BaseTypeSize;
+			TUniquePtr<SpvArrayTypeDesc> SubArrayTypeDesc = ArrayTypeDesc->GetCompCounts().Num() > 1 ? MakeUnique<SpvArrayTypeDesc>(BaseTypeDesc, TArray{ArrayTypeDesc->GetCompCounts().GetData() + 1, ArrayTypeDesc->GetCompCounts().Num() -1 }) : nullptr;
+			if(SubArrayTypeDesc)
+			{
+				ElementTypeDesc = SubArrayTypeDesc.Get();
+				ElementTypeSize *= SubArrayTypeDesc->GetElementNum();
+			}
+			ValueStr += "[";
+			for(int32 Index = 0; Index < CompCount; Index++)
+			{
+				ValueStr += GetValueStr(InValue, ElementTypeDesc, InitializedRanges, Offset);
+				Offset += ElementTypeSize;
+				
+				if(Index != CompCount - 1)
+				{
+					ValueStr += ", ";
+				}
+			}
+			ValueStr += "]";
+		}
+		else
+		{
+			AUX::Unreachable();
 		}
 		return ValueStr;
 	}

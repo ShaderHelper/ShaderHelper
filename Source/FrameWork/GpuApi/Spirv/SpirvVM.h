@@ -101,6 +101,7 @@ namespace FW
 		void Visit(SpvDebugDeclare* Inst) override;
 		
 		void Visit(SpvRoundEven* Inst) override;
+		void Visit(SpvTrunc* Inst) override;
 		void Visit(SpvFAbs* Inst) override;
 		void Visit(SpvSAbs* Inst) override;
 		void Visit(SpvFloor* Inst) override;
@@ -115,7 +116,10 @@ namespace FW
 		void Visit(SpvPow* Inst) override;
 		void Visit(SpvExp* Inst) override;
 		void Visit(SpvLog* Inst) override;
+		void Visit(SpvExp2* Inst) override;
+		void Visit(SpvLog2* Inst) override;
 		void Visit(SpvSqrt* Inst) override;
+		void Visit(SpvInverseSqrt* Inst) override;
 		void Visit(SpvUMin* Inst) override;
 		void Visit(SpvSMin* Inst) override;
 		void Visit(SpvUMax* Inst) override;
@@ -128,7 +132,9 @@ namespace FW
 		void Visit(SpvSmoothStep* Inst) override;
 		void Visit(SpvLength* Inst) override;
 		void Visit(SpvDistance* Inst) override;
+		void Visit(SpvCross* Inst) override;
 		void Visit(SpvNormalize* Inst) override;
+		void Visit(SpvReflect* Inst) override;
 		void Visit(SpvNMin* Inst) override;
 		void Visit(SpvNMax* Inst) override;
 		
@@ -158,10 +164,14 @@ namespace FW
 		void Visit(SpvOpSLessThan* Inst) override;
 		void Visit(SpvOpFOrdLessThan* Inst) override;
 		void Visit(SpvOpFOrdGreaterThan* Inst) override;
+		void Visit(SpvOpShiftRightLogical* Inst) override;
+		void Visit(SpvOpShiftRightArithmetic* Inst) override;
+		void Visit(SpvOpShiftLeftLogical* Inst) override;
 		void Visit(SpvOpConvertFToU* Inst) override;
 		void Visit(SpvOpConvertFToS* Inst) override;
 		void Visit(SpvOpConvertSToF* Inst) override;
 		void Visit(SpvOpConvertUToF* Inst) override;
+		void Visit(SpvOpBitcast* Inst) override;
 		void Visit(SpvOpFNegate* Inst) override;
 		void Visit(SpvOpIAdd* Inst) override;
 		void Visit(SpvOpFAdd* Inst) override;

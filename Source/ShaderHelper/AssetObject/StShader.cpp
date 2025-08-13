@@ -213,7 +213,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         CustomUniformBufferBuilder = NewCustomUniformBufferBuilder;
         CustomBindGroupLayoutBuilder = NewCustomBindGroupLayoutBuilder;
         
-        OnRefreshBuilder.ExecuteIfBound();
+        OnRefreshBuilder.Broadcast();
     }
 
     bool StShader::HasBindingName(const FString& InName)

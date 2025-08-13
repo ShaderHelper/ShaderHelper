@@ -21,9 +21,11 @@ namespace SH
 		REFLECTION_TYPE(Texture2dNode)
 	public:
 		Texture2dNode();
+		~Texture2dNode();
 		Texture2dNode(FW::AssetPtr<FW::Texture2D> InTexture);
 		
 	public:
+		void InitTexture();
 		void InitPins() override;
 		void Serialize(FArchive& Ar) override;
 		void PostLoad() override;
@@ -32,6 +34,9 @@ namespace SH
 		FW::ExecRet Exec(FW::GraphExecContext& Context) override;
 		
 		void PostPropertyChanged(FW::PropertyData* InProperty) override;
+		
+	private:
+		void ClearProperty();
 		
 	public:
 		FW::AssetPtr<FW::Texture2D> Texture;

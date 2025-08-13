@@ -50,6 +50,7 @@ namespace SH
 		ShaderHelperEditor(const FW::Vector2f& InWindowSize, ShRenderer* InRenderer);
 		~ShaderHelperEditor();
     public:
+		ShRenderer* GetRenderer() const { return Renderer;}
         FTabManager* GetCodeTabManager() const { return CodeTabManager.Get(); }
 		FTabManager* GetTabManager() const { return TabManager.Get(); }
 		TSharedPtr<SWindow> GetMainWindow() const override { return Window; }
@@ -69,7 +70,7 @@ namespace SH
 		void ResetWindowLayout();
 		WindowLayoutConfigInfo LoadWindowLayout(const FString& InWindowLayoutConfigFileName);
 		void SaveWindowLayout(const TSharedRef<FTabManager::FLayout>& InLayout);
-        
+		void ForceRender();
         void OpenShaderTab(FW::AssetPtr<ShaderAsset> InShader);
 		
 		void OpenGraph(FW::AssetPtr<FW::Graph> InGraphData, TSharedPtr<FW::RenderComponent> InGraphRenderComp);

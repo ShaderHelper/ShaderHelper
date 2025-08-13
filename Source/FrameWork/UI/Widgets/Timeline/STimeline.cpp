@@ -13,7 +13,7 @@ namespace FW
         bStop = InArgs._bStop;
         CurTime = InArgs._CurTime;
         MaxTime = InArgs._MaxTime;
-        
+		
         ChildSlot
         [
             SNew(SBorder)
@@ -69,6 +69,7 @@ namespace FW
                 .Padding(16.0f, 0, 16.0f ,0)
                 [
                     SNew(STimelineArea).CurTime(CurTime).MaxTime(MaxTime)
+					.OnHandleMove(InArgs._OnHandleMove)
                 ]
             ]
 
@@ -91,6 +92,7 @@ namespace FW
     {
         MaxTime = InArgs._MaxTime;
         CurTime = InArgs._CurTime;
+		OnHandleMove = InArgs._OnHandleMove;
     }
 
     FVector2D STimelineArea::ComputeDesiredSize(float) const
@@ -105,6 +107,10 @@ namespace FW
 			const float ValuesPerPixel = float(*MaxTime / MyGeometry.GetLocalSize().X);
 			float NewTime = float(ValuesPerPixel * MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()).X);
             *CurTime = FMath::Clamp(NewTime, 0.0f, float(*MaxTime));
+			if(OnHandleMove)
+			{
+				OnHandleMove(*CurTime);
+			}
             return FReply::Handled().CaptureMouse(SharedThis(this));
         }
         return FReply::Unhandled();
@@ -129,6 +135,10 @@ namespace FW
                 const float ValuesPerPixel = float(*MaxTime / MyGeometry.GetLocalSize().X);
                 float NewTime = float(ValuesPerPixel * MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()).X);
                 *CurTime = FMath::Clamp(NewTime, 0.0f, float(*MaxTime));
+				if(OnHandleMove)
+				{
+					OnHandleMove(*CurTime);
+				}
             }
         }
         return FReply::Handled();

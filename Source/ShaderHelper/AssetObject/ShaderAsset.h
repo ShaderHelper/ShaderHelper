@@ -24,6 +24,8 @@ namespace SH
 		FString SavedEditorContent;
 		TRefCountPtr<FW::GpuShader> Shader;
 		bool bCompilationSucceed{};
+		
+		FSimpleMulticastDelegate OnRefreshBuilder;
 	};
 
 }
