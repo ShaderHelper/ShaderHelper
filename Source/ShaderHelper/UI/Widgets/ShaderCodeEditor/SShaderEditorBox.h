@@ -215,6 +215,8 @@ namespace SH
 		int32 GetCurDisplayLineCount() const { return ShaderMarshaller->TextLayout->GetLineCount(); }
         void Compile();
 
+		//Scroll to the specified line, which will be displayed in the middle of the document if possible.
+		void ScrollTo(int32 InLineIndex);
 		TOptional<int32> FindFoldMarker(int32 InIndex) const;
 		
 		//Given a range for displayed text, then return the unfolding result.

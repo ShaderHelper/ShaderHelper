@@ -2727,6 +2727,33 @@ const FString FoldMarkerText = TEXT("⇿");
 				}
 			}
 		}
+		else if(TypeDesc->GetKind() == SpvTypeDescKind::Matrix)
+		{
+			SpvMatrixTypeDesc* MatrixTypeDesc = static_cast<SpvMatrixTypeDesc*>(TypeDesc);
+			SpvVectorTypeDesc* ElementTypeDesc = MatrixTypeDesc->GetVectorTypeDesc();
+			int32 VectorCount = MatrixTypeDesc->GetVectorCount();
+			int32 ElementTypeSize = GetTypeByteSize(ElementTypeDesc);
+			for(int32 Index = 0 ; Index < VectorCount; Index++)
+			{
+				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset);
+				FString MemberName = FString::Printf(TEXT("[%d]"), Index);
+				auto Data = MakeShared<VariableNode>(MemberName, MoveTemp(ValueStr), GetTypeDescStr(ElementTypeDesc));
+				for(const auto& Range : DirtyRanges)
+				{
+					int32 RangeStart = Range.OffsetBytes;
+					int32 RangeEnd = Range.OffsetBytes + Range.ByteSize;
+					if((RangeStart >= Offset && RangeStart < Offset + ElementTypeSize) ||
+					   (RangeEnd > Offset && RangeEnd <= Offset + ElementTypeSize) ||
+					   (RangeStart < Offset && RangeEnd > Offset + ElementTypeSize))
+					{
+						Data->Dirty = true;
+						break;
+					}
+				}
+				Offset += ElementTypeSize;
+				Nodes.Add(MoveTemp(Data));
+			}
+		}
 		else if(TypeDesc->GetKind() == SpvTypeDescKind::Array)
 		{
 			SpvArrayTypeDesc* ArrayTypeDesc = static_cast<SpvArrayTypeDesc*>(TypeDesc);
@@ -2762,7 +2789,6 @@ const FString FoldMarkerText = TEXT("⇿");
 				Nodes.Add(MoveTemp(Data));
 				Offset += ElementTypeSize;
 			}
-			
 		}
 		return Nodes;
 	}
@@ -2794,6 +2820,22 @@ const FString FoldMarkerText = TEXT("⇿");
 				{
 					Offset += GetTypeByteSize(MemberTypeDesc);
 				}
+			}
+		}
+		else if(TypeDesc->GetKind() == SpvTypeDescKind::Matrix)
+		{
+			SpvMatrixTypeDesc* MatrixTypeDesc = static_cast<SpvMatrixTypeDesc*>(TypeDesc);
+			SpvVectorTypeDesc* ElementTypeDesc = MatrixTypeDesc->GetVectorTypeDesc();
+			int32 VectorCount = MatrixTypeDesc->GetVectorCount();
+			int32 ElementTypeSize = GetTypeByteSize(ElementTypeDesc);
+			for(int32 Index = 0 ; Index < VectorCount; Index++)
+			{
+				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset);
+				FString MemberName = FString::Printf(TEXT("[%d]"), Index);
+				FString TypeName = GetTypeDescStr(ElementTypeDesc);
+				auto Data = MakeShared<ExpressionNode>(MemberName, FText::FromString(ValueStr), FText::FromString(TypeName));
+				Offset += ElementTypeSize;
+				Nodes.Add(MoveTemp(Data));
 			}
 		}
 		else if(TypeDesc->GetKind() == SpvTypeDescKind::Array)
@@ -2868,7 +2910,7 @@ const FString FoldMarkerText = TEXT("⇿");
 				if(!Var.IsExternal())
 				{
 					bool VisibleScope = VarDesc->Parent->Contains(InScope) || (DebugStates[CurDebugStateIndex].bReturn && InScope->GetKind() == SpvScopeKind::Function && InScope == VarDesc->Parent->GetParent());
-					bool VisibleLine = VarDesc->Line < StopLineNumber + ExtraLineNum && VarDesc->Line > ExtraLineNum;
+					bool VisibleLine = VarDesc->Line <= StopLineNumber + ExtraLineNum && VarDesc->Line > ExtraLineNum;
 					if(VisibleScope && VisibleLine)
 					{
 						FString VarName = VarDesc->Name;
@@ -2878,7 +2920,8 @@ const FString FoldMarkerText = TEXT("⇿");
 						auto Data = MakeShared<VariableNode>(VarName, ValueStr, TypeName);
 						TArray<SpvVariableChange::DirtyRange> Ranges;
 						DirtyVars.MultiFind(VarId, Ranges);
-						if(VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Composite || VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Array)
+						if(VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Composite || VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Array
+							|| VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Matrix)
 						{
 							Data->Children = AppendVarChildNodes(VarDesc->TypeDesc, Var.InitializedRanges, Ranges, Value, 0);
 						}
@@ -3048,7 +3091,8 @@ void __Expression_Output(T __Expression_Result) {}
 					FString ValueStr = GetValueStr(VmContext.ResultValue, VmContext.ResultTypeDesc, ResultRange, 0);
 					
 					TArray<TSharedPtr<ExpressionNode>> Children;
-					if(VmContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Composite || VmContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Array)
+					if(VmContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Composite || VmContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Array
+					   || VmContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Matrix)
 					{
 						Children = AppendExprChildNodes(VmContext.ResultTypeDesc, ResultRange, VmContext.ResultValue, 0);
 					}
@@ -3064,6 +3108,24 @@ void __Expression_Output(T __Expression_Result) {}
 		}
 
 		return {.Expr = InExpression, .ValueStr = LOCALIZATION("InvalidExpr")};
+	}
+
+	void SShaderEditorBox::ScrollTo(int32 InLineIndex)
+	{
+		int32 LineCount = ShaderMarshaller->TextLayout->GetLineCount();
+		int32 VisibleLineCount = ShaderMarshaller->TextLayout->GetVisibleLineCount();
+		int32 StartVisibleLineIndex = ShaderMarshaller->TextLayout->GetStartVisibleLineIndex();
+		int32 EndVisibleLineIndex = ShaderMarshaller->TextLayout->GetEndVisibleLineIndex();
+		if(InLineIndex <= StartVisibleLineIndex)
+		{
+			int32 TargetLineIndex = FMath::Clamp(InLineIndex - VisibleLineCount / 2, 0, LineCount - 1);
+			ShaderMultiLineEditableText->ScrollTo({TargetLineIndex, 0});
+		}
+		else if(InLineIndex >= EndVisibleLineIndex)
+		{
+			int32 TargetLineIndex = FMath::Clamp(InLineIndex + VisibleLineCount / 2, 0, LineCount - 1);
+			ShaderMultiLineEditableText->ScrollTo({TargetLineIndex, 0});
+		}
 	}
 
 	void SShaderEditorBox::ShowDebuggerResult() const
@@ -3193,6 +3255,7 @@ void __Expression_Output(T __Expression_Result) {}
 		else
 		{
 			ShowDebuggerResult();
+			ScrollTo(GetLineIndex(StopLineNumber));
 		}
 	}
 

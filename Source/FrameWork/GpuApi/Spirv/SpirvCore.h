@@ -26,6 +26,7 @@ namespace FW
 		Float,
 		Integer,
 		Vector,
+		Matrix,
 		Pointer,
 		Struct,
 		Image,
@@ -256,6 +257,19 @@ namespace FW
 		uint32 ElementCount;
 	};
 
+	class SpvMatrixType : public SpvType
+	{
+	public:
+		SpvMatrixType(SpvId InId, SpvVectorType* InElementType, uint32 InElementCount)
+		: SpvType(SpvTypeKind::Matrix, InId)
+		, ElementType(InElementType)
+		, ElementCount(InElementCount)
+		{}
+		
+		SpvVectorType* ElementType;
+		uint32 ElementCount;
+	};
+
 	class SpvPointerType : public SpvType
 	{
 	public:
@@ -326,6 +340,13 @@ namespace FW
 			}
 			return TypeStr;
 		}
+		else if(Type->GetKind() == SpvTypeKind::Matrix)
+		{
+			SpvMatrixType* MatrixType = static_cast<SpvMatrixType*>(Type);
+			SpvVectorType* ElementType = MatrixType->ElementType;
+			FString BasicTypeStr = GetHlslTypeStr(ElementType->ElementType);
+			return BasicTypeStr + FString::Printf(TEXT("%dx%d"), MatrixType->ElementCount, ElementType->ElementCount);
+		}
 		AUX::Unreachable();
 	};
 
@@ -358,7 +379,11 @@ namespace FW
 			}
 			return MembersByteSize;
 		}
-		
+		else if(Type->GetKind() == SpvTypeKind::Matrix)
+		{
+			SpvMatrixType* MatrixType = static_cast<SpvMatrixType*>(Type);
+			return MatrixType->ElementCount * GetTypeByteSize(MatrixType->ElementType);
+		}
 		AUX::Unreachable();
 	}
 
@@ -425,6 +450,7 @@ namespace FW
 
 	enum class SpvOp
 	{
+		Name = 5,
 		String = 7,
 		ExtInstImport = 11,
 		ExtInst = 12,
@@ -435,6 +461,7 @@ namespace FW
 		TypeInt = 21,
 		TypeFloat = 22,
 		TypeVector = 23,
+		TypeMatrix = 24,
 		TypeImage = 25,
 		TypeSampler = 26,
 		TypeArray = 28,
@@ -458,13 +485,18 @@ namespace FW
 		VectorShuffle = 79,
 		CompositeConstruct = 80,
 		CompositeExtract = 81,
+		Transpose = 84,
 		SampledImage = 86,
 		ImageSampleImplicitLod = 87,
+		ImageFetch = 95,
+		ImageQuerySizeLod = 103,
+		ImageQueryLevels = 106,
 		ConvertFToU = 109,
 		ConvertFToS = 110,
 		ConvertSToF = 111,
 		ConvertUToF = 112,
 		Bitcast = 124,
+		SNegate = 126,
 		FNegate = 127,
 		IAdd = 128,
 		FAdd = 129,
@@ -479,6 +511,10 @@ namespace FW
 		SRem = 138,
 		FRem = 140,
 		VectorTimesScalar = 142,
+		MatrixTimesScalar = 143,
+		VectorTimesMatrix = 144,
+		MatrixTimesVector = 145,
+		MatrixTimesMatrix = 146,
 		Dot = 148,
 		Any = 154,
 		All = 155,
@@ -490,10 +526,20 @@ namespace FW
 		Select = 169,
 		IEqual = 170,
 		INotEqual = 171,
+		UGreaterThan = 172,
 		SGreaterThan = 173,
+		UGreaterThanEqual = 174,
+		SGreaterThanEqual = 175,
+		ULessThan = 176,
 		SLessThan = 177,
+		ULessThanEqual = 178,
+		SLessThanEqual = 179,
+		FOrdEqual = 180,
+		FOrdNotEqual = 182,
 		FOrdLessThan = 184,
 		FOrdGreaterThan = 186,
+		FOrdLessThanEqual = 188,
+		FOrdGreaterThanEqual = 190,
 		ShiftRightLogical = 194,
 		ShiftRightArithmetic = 195,
 		ShiftLeftLogical = 196,
@@ -507,6 +553,7 @@ namespace FW
 		Label = 248,
 		Branch = 249,
 		BranchConditional = 250,
+		Switch = 251,
 		Return = 253,
 		ReturnValue = 254,
 	};

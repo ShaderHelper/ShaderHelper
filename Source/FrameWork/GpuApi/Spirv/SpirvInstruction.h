@@ -15,6 +15,7 @@ namespace FW
 		//Core
 		virtual void Visit(class SpvOpEntryPoint* Inst) {}
 		virtual void Visit(class SpvOpExecutionMode* Inst) {}
+		virtual void Visit(class SpvOpName* Inst) {}
 		virtual void Visit(class SpvOpString* Inst) {}
 		virtual void Visit(class SpvOpDecorate* Inst) {}
 		virtual void Visit(class SpvOpMemberDecorate* Inst) {}
@@ -23,6 +24,7 @@ namespace FW
 		virtual void Visit(class SpvOpTypeFloat* Inst) {}
 		virtual void Visit(class SpvOpTypeInt* Inst) {}
 		virtual void Visit(class SpvOpTypeVector* Inst) {}
+		virtual void Visit(class SpvOpTypeMatrix* Inst) {}
 		virtual void Visit(class SpvOpTypePointer* Inst) {}
 		virtual void Visit(class SpvOpTypeStruct* Inst) {}
 		virtual void Visit(class SpvOpTypeImage* Inst) {}
@@ -45,10 +47,18 @@ namespace FW
 		virtual void Visit(class SpvOpVectorShuffle* Inst) {}
 		virtual void Visit(class SpvOpCompositeConstruct* Inst) {}
 		virtual void Visit(class SpvOpCompositeExtract* Inst) {}
+		virtual void Visit(class SpvOpTranspose* Inst) {}
 		virtual void Visit(class SpvOpAccessChain* Inst) {}
 		virtual void Visit(class SpvOpSampledImage* Inst) {}
 		virtual void Visit(class SpvOpImageSampleImplicitLod* Inst) {}
+		virtual void Visit(class SpvOpImageFetch* Inst) {}
+		virtual void Visit(class SpvOpImageQuerySizeLod* Inst) {}
+		virtual void Visit(class SpvOpImageQueryLevels* Inst) {}
 		virtual void Visit(class SpvOpVectorTimesScalar* Inst) {}
+		virtual void Visit(class SpvOpMatrixTimesScalar* Inst) {}
+		virtual void Visit(class SpvOpVectorTimesMatrix* Inst) {}
+		virtual void Visit(class SpvOpMatrixTimesVector* Inst) {}
+		virtual void Visit(class SpvOpMatrixTimesMatrix* Inst) {}
 		virtual void Visit(class SpvOpDot* Inst) {}
 		virtual void Visit(class SpvOpAny* Inst) {}
 		virtual void Visit(class SpvOpAll* Inst) {}
@@ -60,10 +70,20 @@ namespace FW
 		virtual void Visit(class SpvOpSelect* Inst) {}
 		virtual void Visit(class SpvOpIEqual* Inst) {}
 		virtual void Visit(class SpvOpINotEqual* Inst) {}
+		virtual void Visit(class SpvOpUGreaterThan* Inst) {}
 		virtual void Visit(class SpvOpSGreaterThan* Inst) {}
+		virtual void Visit(class SpvOpUGreaterThanEqual* Inst) {}
+		virtual void Visit(class SpvOpSGreaterThanEqual* Inst) {}
+		virtual void Visit(class SpvOpULessThan* Inst) {}
 		virtual void Visit(class SpvOpSLessThan* Inst) {}
+		virtual void Visit(class SpvOpULessThanEqual* Inst) {}
+		virtual void Visit(class SpvOpSLessThanEqual* Inst) {}
+		virtual void Visit(class SpvOpFOrdEqual* Inst) {}
+		virtual void Visit(class SpvOpFOrdNotEqual* Inst) {}
 		virtual void Visit(class SpvOpFOrdLessThan* Inst) {}
 		virtual void Visit(class SpvOpFOrdGreaterThan* Inst) {}
+		virtual void Visit(class SpvOpFOrdLessThanEqual* Inst) {}
+		virtual void Visit(class SpvOpFOrdGreaterThanEqual* Inst) {}
 		virtual void Visit(class SpvOpShiftRightLogical* Inst) {}
 		virtual void Visit(class SpvOpShiftRightArithmetic* Inst) {}
 		virtual void Visit(class SpvOpShiftLeftLogical* Inst) {}
@@ -75,6 +95,7 @@ namespace FW
 		virtual void Visit(class SpvOpConvertSToF* Inst) {}
 		virtual void Visit(class SpvOpConvertUToF* Inst) {}
 		virtual void Visit(class SpvOpBitcast* Inst) {}
+		virtual void Visit(class SpvOpSNegate* Inst) {}
 		virtual void Visit(class SpvOpFNegate* Inst) {}
 		virtual void Visit(class SpvOpIAdd* Inst) {}
 		virtual void Visit(class SpvOpFAdd* Inst) {}
@@ -94,12 +115,14 @@ namespace FW
 		virtual void Visit(class SpvOpFwidth* Inst) {}
 		virtual void Visit(class SpvOpBranch* Inst) {}
 		virtual void Visit(class SpvOpBranchConditional* Inst) {}
+		virtual void Visit(class SpvOpSwitch* Inst) {}
 		virtual void Visit(class SpvOpReturn* Inst) {}
 		virtual void Visit(class SpvOpReturnValue* Inst) {}
 		
 		//NonSemantic.Shader.DebugInfo.100
 		virtual void Visit(class SpvDebugTypeBasic* Inst) {}
 		virtual void Visit(class SpvDebugTypeVector* Inst) {}
+		virtual void Visit(class SpvDebugTypeMatrix* Inst) {}
 		virtual void Visit(class SpvDebugTypeComposite* Inst) {}
 		virtual void Visit(class SpvDebugTypeMember* Inst) {}
 		virtual void Visit(class SpvDebugTypeArray* Inst) {}
@@ -118,6 +141,8 @@ namespace FW
 		virtual void Visit(class SpvTrunc* Inst) {}
 		virtual void Visit(class SpvFAbs* Inst) {}
 		virtual void Visit(class SpvSAbs* Inst) {}
+		virtual void Visit(class SpvFSign* Inst) {}
+		virtual void Visit(class SpvSSign* Inst) {}
 		virtual void Visit(class SpvFloor* Inst) {}
 		virtual void Visit(class SpvCeil* Inst) {}
 		virtual void Visit(class SpvFract* Inst) {}
@@ -134,6 +159,7 @@ namespace FW
 		virtual void Visit(class SpvLog2* Inst) {}
 		virtual void Visit(class SpvSqrt* Inst) {}
 		virtual void Visit(class SpvInverseSqrt* Inst) {}
+		virtual void Visit(class SpvDeterminant* Isnt) {}
 		virtual void Visit(class SpvUMin* Inst) {}
 		virtual void Visit(class SpvSMin* Inst) {}
 		virtual void Visit(class SpvUMax* Inst) {}
@@ -144,11 +170,14 @@ namespace FW
 		virtual void Visit(class SpvFMix* Inst) {}
 		virtual void Visit(class SpvStep* Inst) {}
 		virtual void Visit(class SpvSmoothStep* Inst) {}
+		virtual void Visit(class SpvPackHalf2x16* Inst) {}
+		virtual void Visit(class SpvUnpackHalf2x16* Inst) {}
 		virtual void Visit(class SpvLength* Inst) {}
 		virtual void Visit(class SpvDistance* Inst) {}
 		virtual void Visit(class SpvCross* Inst) {}
 		virtual void Visit(class SpvNormalize* Inst) {}
 		virtual void Visit(class SpvReflect* Inst) {}
+		virtual void Visit(class SpvRefract* Inst) {}
 		virtual void Visit(class SpvNMin* Inst) {}
 		virtual void Visit(class SpvNMax* Inst) {}
 	};
@@ -303,12 +332,29 @@ namespace FW
 		, ComponentCount(InComponentCount)
 		{}
 		
-		SpvId GetComponentTypeId() const { return ComponentType; }
+		SpvId GetComponentType() const { return ComponentType; }
 		uint32 GetComponentCount() const { return ComponentCount; }
 		
 	private:
 		SpvId ComponentType;
 		uint32 ComponentCount;
+	};
+
+	class SpvOpTypeMatrix: public SpvInstructionBase<SpvOpTypeMatrix>
+	{
+	public:
+		SpvOpTypeMatrix(SpvId InColumnType, uint32 InColumnCount)
+		: SpvInstructionBase(SpvOp::TypeMatrix)
+		, ColumnType(InColumnType)
+		, ColumnCount(InColumnCount)
+		{}
+		
+		SpvId GetColumnType() const { return ColumnType; }
+		uint32 GetColumnCount() const { return ColumnCount; }
+		
+	private:
+		SpvId ColumnType;
+		uint32 ColumnCount;
 	};
 
 	class SpvOpTypeVoid : public SpvInstructionBase<SpvOpTypeVoid>
@@ -471,6 +517,23 @@ namespace FW
 		SpvId GetResultType() const { return ResultType; }
 	private:
 		SpvId ResultType;
+	};
+
+	class SpvOpName : public SpvInstructionBase<SpvOpName>
+	{
+	public:
+		SpvOpName(SpvId InTarget, const FString& InName)
+		: SpvInstructionBase(SpvOp::Name)
+		, Target(InTarget)
+		, Name(InName)
+		{}
+		
+		SpvId GetTarget() const { return Target; }
+		const FString& GetName() const { return Name; }
+		
+	private:
+		SpvId Target;
+		FString Name;
 	};
 
 	class SpvOpString : public SpvInstructionBase<SpvOpString>
@@ -644,6 +707,21 @@ namespace FW
 		TArray<uint32> Indexes;
 	};
 
+	class SpvOpTranspose : public SpvInstructionBase<SpvOpTranspose>
+	{
+	public:
+		SpvOpTranspose(SpvId InResultType, SpvId InMatrix) : SpvInstructionBase(SpvOp::Transpose)
+		, ResultType(InResultType), Matrix(InMatrix)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetMatrix() const { return Matrix; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Matrix;
+	};
+
 	class SpvOpAccessChain : public SpvInstructionBase<SpvOpAccessChain>
 	{
 	public:
@@ -699,6 +777,59 @@ namespace FW
 		SpvId Coordinate;
 		std::optional<SpvImageOperands> ImageOperands;
 		TArray<SpvId> Operands;
+	};
+
+	class SpvOpImageFetch : public SpvInstructionBase<SpvOpImageFetch>
+	{
+	public:
+		SpvOpImageFetch(SpvId InResultType, SpvId InImage, SpvId InCoordinate, std::optional<SpvImageOperands> InImageOperands, const TArray<SpvId>& InOperands) : SpvInstructionBase(SpvOp::ImageFetch)
+		, ResultType(InResultType), Image(InImage), Coordinate(InCoordinate), ImageOperands(InImageOperands), Operands(InOperands)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetImage() const { return Image; }
+		SpvId GetCoordinate() const { return Coordinate; }
+		std::optional<SpvImageOperands> GetImageOperands() const { return ImageOperands; }
+		const TArray<SpvId>& GetOperands() const { return Operands; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Image;
+		SpvId Coordinate;
+		std::optional<SpvImageOperands> ImageOperands;
+		TArray<SpvId> Operands;
+	};
+
+	class SpvOpImageQuerySizeLod : public SpvInstructionBase<SpvOpImageQuerySizeLod>
+	{
+	public:
+		SpvOpImageQuerySizeLod(SpvId InResultType, SpvId InImage, SpvId InLod) : SpvInstructionBase(SpvOp::ImageQuerySizeLod)
+		, ResultType(InResultType), Image(InImage), Lod(InLod)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetImage() const { return Image; }
+		SpvId GetLod() const { return Lod; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Image;
+		SpvId Lod;
+	};
+
+	class SpvOpImageQueryLevels : public SpvInstructionBase<SpvOpImageQueryLevels>
+	{
+	public:
+		SpvOpImageQueryLevels(SpvId InResultType, SpvId InImage) : SpvInstructionBase(SpvOp::ImageQueryLevels)
+		, ResultType(InResultType), Image(InImage)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetImage() const { return Image; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Image;
 	};
 
 	class SpvOpConvertFToU : public SpvInstructionBase<SpvOpConvertFToU>
@@ -765,6 +896,21 @@ namespace FW
 	{
 	public:
 		SpvOpBitcast(SpvId InResultType, SpvId InOperand) : SpvInstructionBase(SpvOp::Bitcast)
+		, ResultType(InResultType), Operand(InOperand)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetOperand() const { return Operand; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Operand;
+	};
+
+	class SpvOpSNegate : public SpvInstructionBase<SpvOpSNegate>
+	{
+	public:
+		SpvOpSNegate(SpvId InResultType, SpvId InOperand) : SpvInstructionBase(SpvOp::SNegate)
 		, ResultType(InResultType), Operand(InOperand)
 		{}
 		
@@ -1012,6 +1158,74 @@ namespace FW
 		SpvId Scalar;
 	};
 
+	class SpvOpMatrixTimesScalar : public SpvInstructionBase<SpvOpMatrixTimesScalar>
+	{
+	public:
+		SpvOpMatrixTimesScalar(SpvId InResultType, SpvId InMatrix, SpvId InScalar) : SpvInstructionBase(SpvOp::MatrixTimesScalar)
+		, ResultType(InResultType), Matrix(InMatrix), Scalar(InScalar)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetMatrix() const { return Matrix; }
+		SpvId GetScalar() const { return Scalar; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Matrix;
+		SpvId Scalar;
+	};
+
+	class SpvOpVectorTimesMatrix : public SpvInstructionBase<SpvOpVectorTimesMatrix>
+	{
+	public:
+		SpvOpVectorTimesMatrix(SpvId InResultType, SpvId InVector, SpvId InMatrix) : SpvInstructionBase(SpvOp::VectorTimesMatrix)
+		, ResultType(InResultType), Vector(InVector), Matrix(InMatrix)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetVector() const { return Vector; }
+		SpvId GetMatrix() const { return Matrix; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Vector;
+		SpvId Matrix;
+	};
+
+	class SpvOpMatrixTimesVector : public SpvInstructionBase<SpvOpMatrixTimesVector>
+	{
+	public:
+		SpvOpMatrixTimesVector(SpvId InResultType, SpvId InMatrix, SpvId InVector) : SpvInstructionBase(SpvOp::MatrixTimesVector)
+		, ResultType(InResultType), Matrix(InMatrix), Vector(InVector)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetMatrix() const { return Matrix; }
+		SpvId GetVector() const { return Vector; }
+		
+	private:
+		SpvId ResultType;
+		SpvId Matrix;
+		SpvId Vector;
+	};
+
+	class SpvOpMatrixTimesMatrix : public SpvInstructionBase<SpvOpMatrixTimesMatrix>
+	{
+	public:
+		SpvOpMatrixTimesMatrix(SpvId InResultType, SpvId InLeftMatrix, SpvId InRightMatrix) : SpvInstructionBase(SpvOp::MatrixTimesMatrix)
+		, ResultType(InResultType), LeftMatrix(InLeftMatrix), RightMatrix(InRightMatrix)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetLeftMatrix() const { return LeftMatrix; }
+		SpvId GetRightMatrix() const { return RightMatrix; }
+		
+	private:
+		SpvId ResultType;
+		SpvId LeftMatrix;
+		SpvId RightMatrix;
+	};
+
 	class SpvOpDot : public SpvInstructionBase<SpvOpDot>
 	{
 	public:
@@ -1157,107 +1371,38 @@ namespace FW
 		SpvId Object2;
 	};
 
-	class SpvOpIEqual : public SpvInstructionBase<SpvOpIEqual>
-	{
-	public:
-		SpvOpIEqual(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::IEqual)
-		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
-		{}
-		
-		SpvId GetResultType() const { return ResultType; }
-		SpvId GetOperand1() const { return Operand1; }
-		SpvId GetOperand2() const { return Operand2; }
-		
-	private:
-		SpvId ResultType;
-		SpvId Operand1;
-		SpvId Operand2;
+#define DEFINE_COMPARISON(Name)                                                                                         \
+	class SpvOp##Name : public SpvInstructionBase<SpvOp##Name>                                                          \
+	{                                                                                                                   \
+	public:                                                                                                             \
+		SpvOp##Name(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::Name)           \
+		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)                                          \
+		{}                                                                                                              \
+		SpvId GetResultType() const { return ResultType; }                                                              \
+		SpvId GetOperand1() const { return Operand1; }                                                                  \
+		SpvId GetOperand2() const { return Operand2; }                                                                  \
+	private:                                                                                                            \
+		SpvId ResultType;                                                                                               \
+		SpvId Operand1;                                                                                                 \
+		SpvId Operand2;                                                                                                 \
 	};
 
-	class SpvOpINotEqual : public SpvInstructionBase<SpvOpINotEqual>
-	{
-	public:
-		SpvOpINotEqual(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::INotEqual)
-		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
-		{}
-		
-		SpvId GetResultType() const { return ResultType; }
-		SpvId GetOperand1() const { return Operand1; }
-		SpvId GetOperand2() const { return Operand2; }
-		
-	private:
-		SpvId ResultType;
-		SpvId Operand1;
-		SpvId Operand2;
-	};
-
-	class SpvOpSGreaterThan : public SpvInstructionBase<SpvOpSGreaterThan>
-	{
-	public:
-		SpvOpSGreaterThan(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::SGreaterThan)
-		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
-		{}
-		
-		SpvId GetResultType() const { return ResultType; }
-		SpvId GetOperand1() const { return Operand1; }
-		SpvId GetOperand2() const { return Operand2; }
-		
-	private:
-		SpvId ResultType;
-		SpvId Operand1;
-		SpvId Operand2;
-	};
-
-	class SpvOpSLessThan : public SpvInstructionBase<SpvOpSLessThan>
-	{
-	public:
-		SpvOpSLessThan(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::SLessThan)
-		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
-		{}
-		
-		SpvId GetResultType() const { return ResultType; }
-		SpvId GetOperand1() const { return Operand1; }
-		SpvId GetOperand2() const { return Operand2; }
-		
-	private:
-		SpvId ResultType;
-		SpvId Operand1;
-		SpvId Operand2;
-	};
-
-	class SpvOpFOrdLessThan : public SpvInstructionBase<SpvOpFOrdLessThan>
-	{
-	public:
-		SpvOpFOrdLessThan(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::FOrdLessThan)
-		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
-		{}
-		
-		SpvId GetResultType() const { return ResultType; }
-		SpvId GetOperand1() const { return Operand1; }
-		SpvId GetOperand2() const { return Operand2; }
-		
-	private:
-		SpvId ResultType;
-		SpvId Operand1;
-		SpvId Operand2;
-	};
-
-	class SpvOpFOrdGreaterThan : public SpvInstructionBase<SpvOpFOrdGreaterThan>
-	{
-	public:
-		SpvOpFOrdGreaterThan(SpvId InResultType, SpvId InOperand1, SpvId InOperand2) : SpvInstructionBase(SpvOp::FOrdGreaterThan)
-		, ResultType(InResultType), Operand1(InOperand1), Operand2(InOperand2)
-		{}
-		
-		SpvId GetResultType() const { return ResultType; }
-		SpvId GetOperand1() const { return Operand1; }
-		SpvId GetOperand2() const { return Operand2; }
-		
-	private:
-		SpvId ResultType;
-		SpvId Operand1;
-		SpvId Operand2;
-	};
+DEFINE_COMPARISON(IEqual)
+DEFINE_COMPARISON(INotEqual)
+DEFINE_COMPARISON(UGreaterThan)
+DEFINE_COMPARISON(SGreaterThan)
+DEFINE_COMPARISON(UGreaterThanEqual)
+DEFINE_COMPARISON(SGreaterThanEqual)
+DEFINE_COMPARISON(ULessThan)
+DEFINE_COMPARISON(SLessThan)
+DEFINE_COMPARISON(ULessThanEqual)
+DEFINE_COMPARISON(SLessThanEqual)
+DEFINE_COMPARISON(FOrdEqual)
+DEFINE_COMPARISON(FOrdNotEqual)
+DEFINE_COMPARISON(FOrdLessThan)
+DEFINE_COMPARISON(FOrdGreaterThan)
+DEFINE_COMPARISON(FOrdLessThanEqual)
+DEFINE_COMPARISON(FOrdGreaterThanEqual)
 
 	class SpvOpShiftRightLogical : public SpvInstructionBase<SpvOpShiftRightLogical>
 	{
@@ -1451,6 +1596,23 @@ namespace FW
 		SpvId FalseLabel;
 	};
 
+	class SpvOpSwitch : public SpvInstructionBase<SpvOpSwitch>
+	{
+	public:
+		SpvOpSwitch(SpvId InSelector, SpvId InDefault, const TArray<TPair<TArray<uint8>, SpvId>>& InTargets) : SpvInstructionBase(SpvOp::Switch)
+		, Selector(InSelector), Default(InDefault), Targets(InTargets)
+		{}
+		
+		SpvId GetSelector() const { return Selector; }
+		SpvId GetDefault() const { return Default; }
+		const TArray<TPair<TArray<uint8>, SpvId>>& GetTargets() const { return Targets; }
+		
+	private:
+		SpvId Selector;
+		SpvId Default;
+		TArray<TPair<TArray<uint8>, SpvId>> Targets;
+	};
+
 	class SpvOpReturn : public SpvInstructionBase<SpvOpReturn>
 	{
 	public:
@@ -1500,6 +1662,23 @@ namespace FW
 	private:
 		SpvId BasicType;
 		SpvId ComponentCount;
+	};
+
+	class SpvDebugTypeMatrix : public SpvInstructionBase<SpvDebugTypeMatrix>
+	{
+	public:
+		SpvDebugTypeMatrix(SpvId InVectorType, SpvId InVectorCount, SpvId InColumnMajor) : SpvInstructionBase(SpvDebugInfo100::DebugTypeMatrix)
+		, VectorType(InVectorType), VectorCount(InVectorCount), ColumnMajor(InColumnMajor)
+		{}
+		
+		SpvId GetVectorType() const { return VectorType; }
+		SpvId GetVectorCount() const { return VectorCount; }
+		SpvId GetColumnMajor() const { return ColumnMajor; }
+		
+	private:
+		SpvId VectorType;
+		SpvId VectorCount;
+		SpvId ColumnMajor;
 	};
 
 	class SpvDebugTypeComposite : public SpvInstructionBase<SpvDebugTypeComposite>
@@ -1758,6 +1937,36 @@ namespace FW
 		SpvId X;
 	};
 
+	class SpvFSign : public SpvInstructionBase<SpvFSign>
+	{
+	public:
+		SpvFSign(SpvId InResultType, SpvId InX) : SpvInstructionBase(SpvGLSLstd450::FSign)
+		, ResultType(InResultType), X(InX)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetX() const { return X; }
+		
+	private:
+		SpvId ResultType;
+		SpvId X;
+	};
+
+	class SpvSSign : public SpvInstructionBase<SpvSSign>
+	{
+	public:
+		SpvSSign(SpvId InResultType, SpvId InX) : SpvInstructionBase(SpvGLSLstd450::SSign)
+		, ResultType(InResultType), X(InX)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetX() const { return X; }
+		
+	private:
+		SpvId ResultType;
+		SpvId X;
+	};
+
 	class SpvFloor : public SpvInstructionBase<SpvFloor>
 	{
 	public:
@@ -2000,6 +2209,21 @@ namespace FW
 		SpvId X;
 	};
 
+	class SpvDeterminant : public SpvInstructionBase<SpvDeterminant>
+	{
+	public:
+		SpvDeterminant(SpvId InResultType, SpvId InX) : SpvInstructionBase(SpvGLSLstd450::Determinant)
+		, ResultType(InResultType), X(InX)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetX() const { return X; }
+		
+	private:
+		SpvId ResultType;
+		SpvId X;
+	};
+
 	class SpvUMin : public SpvInstructionBase<SpvUMin>
 	{
 	public:
@@ -2180,6 +2404,36 @@ namespace FW
 		SpvId X;
 	};
 
+	class SpvPackHalf2x16 : public SpvInstructionBase<SpvPackHalf2x16>
+	{
+	public:
+		SpvPackHalf2x16(SpvId InResultType, SpvId InV) : SpvInstructionBase(SpvGLSLstd450::PackHalf2x16)
+		, ResultType(InResultType), V(InV)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetV() const { return V; }
+		
+	private:
+		SpvId ResultType;
+		SpvId V;
+	};
+
+	class SpvUnpackHalf2x16 : public SpvInstructionBase<SpvUnpackHalf2x16>
+	{
+	public:
+		SpvUnpackHalf2x16(SpvId InResultType, SpvId InV) : SpvInstructionBase(SpvGLSLstd450::UnpackHalf2x16)
+		, ResultType(InResultType), V(InV)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetV() const { return V; }
+		
+	private:
+		SpvId ResultType;
+		SpvId V;
+	};
+
 	class SpvLength : public SpvInstructionBase<SpvLength>
 	{
 	public:
@@ -2259,6 +2513,25 @@ namespace FW
 		SpvId ResultType;
 		SpvId I;
 		SpvId N;
+	};
+
+	class SpvRefract : public SpvInstructionBase<SpvRefract>
+	{
+	public:
+		SpvRefract(SpvId InResultType, SpvId InI, SpvId InN, SpvId InEta) : SpvInstructionBase(SpvGLSLstd450::Refract)
+		, ResultType(InResultType), I(InI), N(InN), Eta(InEta)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetI() const { return I; }
+		SpvId GetN() const { return N; }
+		SpvId GetEta() const { return Eta; }
+		
+	private:
+		SpvId ResultType;
+		SpvId I;
+		SpvId N;
+		SpvId Eta;
 	};
 
 	class SpvNMin : public SpvInstructionBase<SpvNMin>

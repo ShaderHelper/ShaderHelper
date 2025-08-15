@@ -104,6 +104,8 @@ namespace FW
 		void Visit(SpvTrunc* Inst) override;
 		void Visit(SpvFAbs* Inst) override;
 		void Visit(SpvSAbs* Inst) override;
+		void Visit(SpvFSign* Inst) override;
+		void Visit(SpvSSign* Inst) override;
 		void Visit(SpvFloor* Inst) override;
 		void Visit(SpvCeil* Inst) override;
 		void Visit(SpvFract* Inst) override;
@@ -120,6 +122,7 @@ namespace FW
 		void Visit(SpvLog2* Inst) override;
 		void Visit(SpvSqrt* Inst) override;
 		void Visit(SpvInverseSqrt* Inst) override;
+		void Visit(SpvDeterminant* Inst) override;
 		void Visit(SpvUMin* Inst) override;
 		void Visit(SpvSMin* Inst) override;
 		void Visit(SpvUMax* Inst) override;
@@ -130,11 +133,14 @@ namespace FW
 		void Visit(SpvFMix* Inst) override;
 		void Visit(SpvStep* Inst) override;
 		void Visit(SpvSmoothStep* Inst) override;
+		void Visit(SpvPackHalf2x16* Inst) override;
+		void Visit(SpvUnpackHalf2x16* Inst) override;
 		void Visit(SpvLength* Inst) override;
 		void Visit(SpvDistance* Inst) override;
 		void Visit(SpvCross* Inst) override;
 		void Visit(SpvNormalize* Inst) override;
 		void Visit(SpvReflect* Inst) override;
+		void Visit(SpvRefract* Inst) override;
 		void Visit(SpvNMin* Inst) override;
 		void Visit(SpvNMax* Inst) override;
 		
@@ -147,8 +153,13 @@ namespace FW
 		void Visit(SpvOpVectorShuffle* Inst) override;
 		void Visit(SpvOpCompositeConstruct* Inst) override;
 		void Visit(SpvOpCompositeExtract* Inst) override;
+		void Visit(SpvOpTranspose* Inst) override;
 		void Visit(SpvOpAccessChain* Inst) override;
 		void Visit(SpvOpVectorTimesScalar* Inst) override;
+		void Visit(SpvOpMatrixTimesScalar* Inst) override;
+		void Visit(SpvOpVectorTimesMatrix* Inst) override;
+		void Visit(SpvOpMatrixTimesVector* Inst) override;
+		void Visit(SpvOpMatrixTimesMatrix* Inst) override;
 		void Visit(SpvOpDot* Inst) override;
 		void Visit(SpvOpAny* Inst) override;
 		void Visit(SpvOpAll* Inst) override;
@@ -160,10 +171,20 @@ namespace FW
 		void Visit(SpvOpSelect* Inst) override;
 		void Visit(SpvOpIEqual* Inst) override;
 		void Visit(SpvOpINotEqual* Inst) override;
+		void Visit(SpvOpUGreaterThan* Inst) override;
 		void Visit(SpvOpSGreaterThan* Inst) override;
+		void Visit(SpvOpUGreaterThanEqual* Inst) override;
+		void Visit(SpvOpSGreaterThanEqual* Inst) override;
+		void Visit(SpvOpULessThan* Inst) override;
 		void Visit(SpvOpSLessThan* Inst) override;
+		void Visit(SpvOpULessThanEqual* Inst) override;
+		void Visit(SpvOpSLessThanEqual* Inst) override;
+		void Visit(SpvOpFOrdEqual* Inst) override;
+		void Visit(SpvOpFOrdNotEqual* Inst) override;
 		void Visit(SpvOpFOrdLessThan* Inst) override;
 		void Visit(SpvOpFOrdGreaterThan* Inst) override;
+		void Visit(SpvOpFOrdLessThanEqual* Inst) override;
+		void Visit(SpvOpFOrdGreaterThanEqual* Inst) override;
 		void Visit(SpvOpShiftRightLogical* Inst) override;
 		void Visit(SpvOpShiftRightArithmetic* Inst) override;
 		void Visit(SpvOpShiftLeftLogical* Inst) override;
@@ -172,6 +193,7 @@ namespace FW
 		void Visit(SpvOpConvertSToF* Inst) override;
 		void Visit(SpvOpConvertUToF* Inst) override;
 		void Visit(SpvOpBitcast* Inst) override;
+		void Visit(SpvOpSNegate* Inst) override;
 		void Visit(SpvOpFNegate* Inst) override;
 		void Visit(SpvOpIAdd* Inst) override;
 		void Visit(SpvOpFAdd* Inst) override;
@@ -191,9 +213,13 @@ namespace FW
 		void Visit(SpvOpNot* Inst) override;
 		void Visit(SpvOpBranch* Inst) override;
 		void Visit(SpvOpBranchConditional* Inst) override;
+		void Visit(SpvOpSwitch* Inst) override;
 		void Visit(SpvOpReturn* Inst) override;
 		void Visit(SpvOpReturnValue* Inst) override;
 		void Visit(SpvOpSampledImage* Inst) override;
+		void Visit(SpvOpImageFetch* Inst) override;
+		void Visit(SpvOpImageQuerySizeLod* Inst) override;
+		void Visit(SpvOpImageQueryLevels* Inst) override;
 
 	protected:
 		//if there is an ub case, the debugger results may not match gpu

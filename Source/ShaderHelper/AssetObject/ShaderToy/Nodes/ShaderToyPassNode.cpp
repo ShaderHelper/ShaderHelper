@@ -504,7 +504,7 @@ namespace SH
 			{
 				for (const FString& PrintLog : ShaderPrintLogs)
 				{
-					SH_LOG(LogShader, Display, TEXT("%s"), *PrintLog);
+					SH_LOG(LogShader, Display, TEXT("%s:%s"), *ObjectName.ToString(), *PrintLog);
 				}
 			}
 			else

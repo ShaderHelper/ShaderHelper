@@ -157,6 +157,7 @@ namespace FW
 	{
 		Basic,
 		Vector,
+		Matrix,
 		Composite,
 		Member,
 		Function,
@@ -203,6 +204,21 @@ namespace FW
 	private:
 		SpvBasicTypeDesc* BasicTypeDesc;
 		int32 CompCount;
+	};
+
+	class SpvMatrixTypeDesc : public SpvTypeDesc
+	{
+	public:
+		SpvMatrixTypeDesc(SpvVectorTypeDesc* InVectorTypeDesc, int32 InVectorCount) : SpvTypeDesc(SpvTypeDescKind::Matrix)
+		, VectorTypeDesc(InVectorTypeDesc), VectorCount(InVectorCount)
+		{}
+		
+		SpvVectorTypeDesc* GetVectorTypeDesc() const { return VectorTypeDesc; }
+		int32 GetVectorCount() const { return VectorCount; }
+		
+	private:
+		SpvVectorTypeDesc* VectorTypeDesc;
+		int32 VectorCount;
 	};
 
 	class SpvCompositeTypeDesc : public SpvTypeDesc
@@ -408,6 +424,14 @@ namespace FW
 			}
 			return TypeName;
 		}
+		else if(TypeDesc->GetKind() == SpvTypeDescKind::Matrix)
+		{
+			SpvMatrixTypeDesc* MatrixTypeDesc = static_cast<SpvMatrixTypeDesc*>(TypeDesc);
+			int32 VectorCount = MatrixTypeDesc->GetVectorCount();
+			FString BasicTypeName = GetTypeDescStr(MatrixTypeDesc->GetVectorTypeDesc()->GetBasicTypeDesc());
+			FString TypeName = BasicTypeName + FString::Printf(TEXT("%dx%d"), VectorCount, MatrixTypeDesc->GetVectorTypeDesc()->GetCompCount());
+			return TypeName;
+		}
 		AUX::Unreachable();
 	};
 
@@ -586,6 +610,25 @@ namespace FW
 				Offset += ElementTypeSize;
 				
 				if(Index != CompCount - 1)
+				{
+					ValueStr += ", ";
+				}
+			}
+			ValueStr += "]";
+		}
+		else if(TypeDesc->GetKind() == SpvTypeDescKind::Matrix)
+		{
+			const SpvMatrixTypeDesc* MatrixTypeDesc = static_cast<const SpvMatrixTypeDesc*>(TypeDesc);
+			SpvVectorTypeDesc* ElementTypeDesc = MatrixTypeDesc->GetVectorTypeDesc();
+			int32 VectorCount = MatrixTypeDesc->GetVectorCount();
+			int32 ElementTypeSize = GetTypeByteSize(ElementTypeDesc);
+			ValueStr += "[";
+			for(int32 Index = 0 ; Index < VectorCount; Index++)
+			{
+				ValueStr += GetValueStr(InValue, ElementTypeDesc, InitializedRanges, Offset);
+				Offset += ElementTypeSize;
+				
+				if(Index != VectorCount - 1)
 				{
 					ValueStr += ", ";
 				}
