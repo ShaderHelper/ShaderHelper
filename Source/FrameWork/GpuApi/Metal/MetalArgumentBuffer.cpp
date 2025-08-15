@@ -168,6 +168,10 @@ namespace FW
                 {
                     FragmentArgumentEncoder->setTexture(Tex->GetResource(), Slot);
                 }
+				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Compute))
+				{
+					ComputeArgumentEncoder->setTexture(Tex->GetResource(), Slot);
+				}
                 BindGroupResources.Add(Slot, Tex->GetResource());
             }
             else if(ResourceBindingEntry.Resource->GetType() == GpuResourceType::Sampler)

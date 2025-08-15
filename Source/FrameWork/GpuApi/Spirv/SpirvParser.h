@@ -13,6 +13,7 @@ namespace FW
 		//which may ivalidate references to existing elements upon insertion.
 		//Therefore, we replace it with std::unordered_map
 		std::unordered_map<SpvId, FString> DebugStrs;
+		std::unordered_map<SpvId, FString> Names; //VarId/TypeId etc. -> Name
 		std::unordered_map<SpvId, TUniquePtr<SpvType>> Types;
 		std::unordered_map<SpvId, SpvObject> Constants;
 		std::unordered_map<SpvId, SpvPointer> GlobalPointers;
@@ -38,6 +39,7 @@ namespace FW
 		void Visit(SpvOpTypeFloat* Inst) override;
 		void Visit(SpvOpTypeInt* Inst) override;
 		void Visit(SpvOpTypeVector* Inst) override;
+		void Visit(SpvOpTypeMatrix* Inst) override;
 		void Visit(SpvOpTypeBool* Inst) override;
 		void Visit(SpvOpTypePointer* Inst) override;
 		void Visit(SpvOpTypeStruct* Inst) override;
@@ -48,6 +50,7 @@ namespace FW
 		void Visit(SpvOpDecorate* Inst) override;
 		void Visit(SpvOpMemberDecorate* Inst) override;
 		void Visit(SpvOpExecutionMode* Inst) override;
+		void Visit(SpvOpName* Inst) override;
 		void Visit(SpvOpString* Inst) override;
 		void Visit(SpvOpConstant* Inst) override;
 		void Visit(SpvOpConstantTrue* Inst) override;
@@ -57,6 +60,7 @@ namespace FW
 		
 		void Visit(SpvDebugTypeBasic* Inst) override;
 		void Visit(SpvDebugTypeVector* Inst) override;
+		void Visit(SpvDebugTypeMatrix* Inst) override;
 		void Visit(SpvDebugTypeComposite* Inst) override;
 		void Visit(SpvDebugTypeMember* Inst) override;
 		void Visit(SpvDebugTypeArray* Inst) override;

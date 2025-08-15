@@ -40,6 +40,7 @@ namespace FW
         NS::Error* err = nullptr;
         NS::SharedPtr<MTL::CompileOptions> CompOpt = NS::TransferPtr(MTL::CompileOptions::alloc()->init());
         CompOpt->setLanguageVersion(MTL::LanguageVersion2_2);
+		//CompOpt->setFastMathEnabled(false);
         
         MTLLibraryPtr ByteCodeLib = NS::TransferPtr(GDevice->newLibrary(FStringToNSString(InShader->GetMslText()), CompOpt.get(), &err));
         
@@ -111,6 +112,7 @@ namespace FW
 		
 		DxcArgs.Add("-HV");
 		DxcArgs.Add("2021");
+		//DxcArgs.Add("-Gis");
 		
 		if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
 		{

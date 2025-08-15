@@ -6,6 +6,10 @@
 //https://godbolt.org/z/bnz9TPME8
 #pragma once
 
+#ifndef ENABLE_PRINT
+	#define ENABLE_PRINT 1
+#endif
+
 #ifdef __cplusplus
 #include "TypeAlias.h"
 
@@ -136,10 +140,6 @@ AppendArgFunc(bool)
 #define APPEND_ARGS_2(Arg1, Arg2) ByteOffset = AppendArg(ByteOffset, Arg1); APPEND_ARGS_1(Arg2)
 #define APPEND_ARGS_3(Arg1, Arg2, Arg3) ByteOffset = AppendArg(ByteOffset, Arg1); APPEND_ARGS_2(Arg2, Arg3)
 #define APPEND_ARGS(...) JOIN(APPEND_ARGS_, GET_ARG_NUM(__VA_ARGS__))(__VA_ARGS__)
-
-#ifndef ENABLE_PRINT
-	#define ENABLE_PRINT 1
-#endif
 
 #if ENABLE_PRINT == 1
 //Up to 3 args now.
