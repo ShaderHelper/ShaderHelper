@@ -1,5 +1,6 @@
 #pragma once
 #include "GpuApi/GpuResource.h"
+#include <variant>
 
 namespace FW
 {

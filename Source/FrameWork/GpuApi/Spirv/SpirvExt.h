@@ -168,6 +168,8 @@ namespace FW
 	{
 	public:
 		SpvTypeDesc(SpvTypeDescKind InKind) : Kind(InKind){}
+		virtual ~SpvTypeDesc() = default;
+
 		SpvTypeDescKind GetKind() const { return Kind; }
 	private:
 		SpvTypeDescKind Kind;
@@ -310,6 +312,7 @@ namespace FW
 		SpvLexicalScope(SpvScopeKind InKind, SpvLexicalScope* InParent)
 		: Kind(InKind), Parent(InParent)
 		{}
+		virtual ~SpvLexicalScope() = default;
 		
 		virtual int32 GetLine() const {return 0;}
 		SpvScopeKind GetKind() const { return Kind; }

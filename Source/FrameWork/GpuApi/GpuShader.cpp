@@ -11,7 +11,6 @@ THIRD_PARTY_INCLUDES_START
 #else
 	#define BOOL RESOLVED_BOOL
 	#include "dxcisense.h"
-	#undef BOOL
 #endif
 THIRD_PARTY_INCLUDES_END
 
@@ -487,7 +486,7 @@ namespace FW
 			IDxcCursor* ChildCursor = Children[i];
 			DxcCursorKind Kind;
 			ChildCursor->GetKind(&Kind);
-			bool IsDefinition;
+			BOOL IsDefinition;
 			ChildCursor->IsDefinition(&IsDefinition);
 			if(IsDefinition && (Kind == DxcCursor_FunctionDecl || Kind == DxcCursor_CXXMethod))
 			{
@@ -502,14 +501,14 @@ namespace FW
 				unsigned StartLine, StartCol, EndLine, EndCol;
 				StartLoc->GetSpellingLocation(CursorFile.GetInitReference(), &StartLine, &StartCol, nullptr);
 				EndLoc->GetSpellingLocation(CursorFile.GetInitReference(), &EndLine, &EndCol, nullptr);
-				bool IsInMainFile;
+				BOOL IsInMainFile;
 				CursorFile->IsEqualTo(DxcFile, &IsInMainFile);
 				if(IsInMainFile)
 				{
 					LPSTR CursorName;
 					ChildCursor->GetSpelling(&CursorName);
 					
-					Scopes.Emplace(ANSI_TO_TCHAR(CursorName), Vector2i{StartLine, StartCol}, Vector2i{EndLine, EndCol});
+					Scopes.Emplace(ANSI_TO_TCHAR(CursorName), Vector2i(StartLine, StartCol), Vector2i(EndLine, EndCol));
 					CoTaskMemFree(CursorName);
 				}
 			}

@@ -504,7 +504,7 @@ namespace FW {
 		}
 
 		FString ToString() const {
-			return FString::Format(TEXT("X={0} Y={1}"), { X, Y });
+			return FString::Format(TEXT("{{0},{1}}"), { X, Y });
 		}
 
 		const T* GetData() const {
@@ -722,7 +722,7 @@ namespace FW {
 		}
 
 		FString ToString() const {
-			return FString::Format(TEXT("X={0} Y={1} Z={2}"), { X, Y, Z });
+			return FString::Format(TEXT("{{0},{1},{2}}"), { X, Y, Z });
 		}
 
 		const T* GetData() const {
@@ -940,7 +940,7 @@ namespace FW {
 		}
 
 		FString ToString() const {
-			return FString::Format(TEXT("X={0} Y={1} Z={2} W={3}"), { X, Y, Z, W });
+			return FString::Format(TEXT("{{0},{1},{2},{3}}"), { X, Y, Z, W });
 		}
 
 		const T* GetData() const {

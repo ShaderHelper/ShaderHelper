@@ -325,7 +325,7 @@ namespace FW
 	{
 		for(auto& ActiveDx12CmdRecorder : ActiveDx12CmdRecorders)
 		{
-			if(!ActiveDx12CmdRecorder->IsSubmitted)
+			if(!ActiveDx12CmdRecorder->IsSubmitted())
 			{
 				ActiveDx12CmdRecorder->IsUnsubmittedAtFrameEnd = true;
 			}
