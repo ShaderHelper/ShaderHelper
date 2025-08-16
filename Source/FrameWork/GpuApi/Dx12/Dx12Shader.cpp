@@ -135,7 +135,7 @@ namespace FW
 		return ProfileName;
 	}
 
-	 bool DxcCompiler::Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo, const TArray<FString>& ExtraArgs) const
+	 bool DxcCompiler::Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs) const
 	 {
 		TRefCountPtr<IDxcBlobEncoding> BlobEncoding;
 		TRefCountPtr<IDxcResult> CompileResult;
@@ -203,13 +203,20 @@ namespace FW
 			{
 				TRefCountPtr<IDxcBlobEncoding> BlobEncodingError;
 				CompileResult->GetErrorBuffer(BlobEncodingError.GetInitReference());
-				FString ErrorStr{ (int32)BlobEncodingError->GetBufferSize(), (ANSICHAR*)BlobEncodingError->GetBufferPointer() };
-				if (!ErrorStr.IsEmpty())
+				FString DiagnosticInfo{ (int32)BlobEncodingError->GetBufferSize(), (ANSICHAR*)BlobEncodingError->GetBufferPointer() };
+				HRESULT ResultStatus;
+				CompileResult->GetStatus(&ResultStatus);
+				if(FAILED(ResultStatus))
 				{
-					//SH_LOG(LogShader, Error, TEXT("Compilation failed: %s"), *ErrorStr);
-					OutErrorInfo = MoveTemp(ErrorStr);
+					//SH_LOG(LogShader, Error, TEXT("Compilation failed: %s"), *DiagnosticInfo);
+					OutErrorInfo = MoveTemp(DiagnosticInfo);
 					IsCompilationSucceeded = false;
 				}
+				else
+				{
+					OutWarnInfo = MoveTemp(DiagnosticInfo);
+				}
+			
 			}
 
 			if (IsCompilationSucceeded)

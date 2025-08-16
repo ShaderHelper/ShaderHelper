@@ -75,7 +75,7 @@ namespace FW
 		SpvMetaContext& Context;
 	};
 
-	class FRAMEWORK_API SpirvParser
+	class FRAMEWORK_API SpirvParser : FNoncopyable
 	{
 	public:
 		void Parse(const TArray<uint32>& SpvCode);
