@@ -28,7 +28,7 @@ namespace FW
 			CpuHandle.ptr = 0;
 		}
 
-		D3D12_CPU_DESCRIPTOR_HANDLE GetHandle() const
+		CD3DX12_CPU_DESCRIPTOR_HANDLE GetHandle() const
 		{
 			check(IsValid());
 			return CpuHandle;
@@ -48,6 +48,7 @@ namespace FW
 		ID3D12DescriptorHeap* GetDescriptorHeap() const {
 			return DescriptorHeap;
 		}
+		uint32 GetDescriptorSize() const { return DescriptorSize; }
 
 	private:
 		TRefCountPtr<ID3D12DescriptorHeap> DescriptorHeap;
@@ -55,37 +56,7 @@ namespace FW
 		TQueue<uint32> AllocateIndexs;
 	};
 
-	class GpuDescriptorAllocator;
-
-	class GpuDescriptorRange : public FNoncopyable
-	{
-	public:
-		GpuDescriptorRange(uint32 InDescriptorNum, uint32 InOffsetInHeap,
-			CD3DX12_CPU_DESCRIPTOR_HANDLE InCpuHandle, CD3DX12_GPU_DESCRIPTOR_HANDLE InGpuHandle,
-			GpuDescriptorAllocator* InAllocator);
-		~GpuDescriptorRange();
-
-		D3D12_CPU_DESCRIPTOR_HANDLE GetCpuHandle() const
-		{
-			return CpuHandle;
-		}
-
-		D3D12_GPU_DESCRIPTOR_HANDLE GetGpuHandle() const
-		{
-			return GpuHandle;
-		}
-
-		uint32 GetDescriptorNum() const { return DescriptorNum; }
-
-	private:
-		uint32 DescriptorNum;
-		uint32 OffsetInHeap;
-		CD3DX12_CPU_DESCRIPTOR_HANDLE CpuHandle;
-		CD3DX12_GPU_DESCRIPTOR_HANDLE GpuHandle;
-		GpuDescriptorAllocator* FromAllocator;
-	};
-
-
+	class GpuDescriptorRange;
 	class GpuDescriptorAllocator
 	{
 	public:
@@ -95,11 +66,44 @@ namespace FW
 		ID3D12DescriptorHeap* GetDescriptorHeap() const {
 			return DescriptorHeap;
 		}
+		uint32 GetDescriptorSize() const { return DescriptorSize; }
 
 	private:
 		BuddyAllocator InternalAllocator;
 		TRefCountPtr<ID3D12DescriptorHeap> DescriptorHeap;
 		uint32 DescriptorSize;
+	};
+
+	class GpuDescriptorRange : public FNoncopyable
+	{
+	public:
+		GpuDescriptorRange(uint32 InDescriptorNum, uint32 InOffsetInHeap,
+			CD3DX12_CPU_DESCRIPTOR_HANDLE InBaseCpuHandle, CD3DX12_GPU_DESCRIPTOR_HANDLE InBaseGpuHandle,
+			GpuDescriptorAllocator* InAllocator);
+		~GpuDescriptorRange();
+
+		CD3DX12_CPU_DESCRIPTOR_HANDLE GetCpuHandle(int Offset) const
+		{
+			CD3DX12_CPU_DESCRIPTOR_HANDLE Handle{ BaseCpuHandle };
+			Handle.Offset(Offset, FromAllocator->GetDescriptorSize());
+			return Handle;
+		}
+
+		CD3DX12_GPU_DESCRIPTOR_HANDLE GetGpuHandle(int Offset) const
+		{
+			CD3DX12_GPU_DESCRIPTOR_HANDLE Handle{ BaseGpuHandle };
+			Handle.Offset(Offset, FromAllocator->GetDescriptorSize());
+			return Handle;
+		}
+
+		uint32 GetDescriptorNum() const { return DescriptorNum; }
+
+	private:
+		uint32 DescriptorNum;
+		uint32 OffsetInHeap;
+		CD3DX12_CPU_DESCRIPTOR_HANDLE BaseCpuHandle;
+		CD3DX12_GPU_DESCRIPTOR_HANDLE BaseGpuHandle;
+		GpuDescriptorAllocator* FromAllocator;
 	};
 
 	extern TUniquePtr<CpuDescriptorAllocator> RtvAllocator;

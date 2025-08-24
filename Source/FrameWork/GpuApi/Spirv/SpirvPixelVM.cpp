@@ -245,6 +245,15 @@ namespace FW
 		}
 	}
 
+	void SpvVmPixelVisitor::Visit(SpvOpKill* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+
+		bTerminate = true;
+		ThreadState.RecordedInfo.DebugStates.Last().bKill = true;
+	}
+
 	void SpvVmPixelVisitor::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts)
 	{
 		SpvVmVisitor::Parse(Insts);
@@ -316,6 +325,7 @@ namespace FW
 			Context.ThreadState.InstIndex = InstIndex;
 			Context.ThreadState.RecordedInfo.AllVariables = Context.GlobalVariables;
 			Context.ThreadState.RecordedInfo.DebugStates.SetNum(1);
+			Context.ThreadState.StackFrames.reserve(100);
 			Context.ThreadState.StackFrames.resize(1);
 		}
 

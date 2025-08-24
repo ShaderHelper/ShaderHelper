@@ -13,6 +13,8 @@ namespace FW
 	public:
 		void Serialize(FArchive& Ar) override;
 		void PostLoad() override;
+		
+		void InitGpudata();
 		FString FileExtension() const override;
 		GpuTexture* GetThumbnail() const override;
 		GpuTexture* GetGpuData() const { return GpuData; }
@@ -21,7 +23,6 @@ namespace FW
 
 	private:
         uint32 Width, Height;
-		//BGRA8
 		TArray<uint8> RawData;
 		TRefCountPtr<GpuTexture> GpuData;
 	};

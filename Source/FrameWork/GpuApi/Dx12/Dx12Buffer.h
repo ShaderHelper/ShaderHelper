@@ -20,6 +20,7 @@ namespace FW
 		}
 
 	public:
+		TUniquePtr<CpuDescriptor> SRV;
 		TUniquePtr<CpuDescriptor> UAV;
         
     private:

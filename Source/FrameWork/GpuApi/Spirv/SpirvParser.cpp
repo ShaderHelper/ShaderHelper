@@ -381,6 +381,11 @@ namespace FW
 		Context.LexicalScopes.emplace(Inst->GetId().value(), MakeUnique<SpvFunctionDesc>(ParentScope, FuncName, FuncTypeDesc, Line, ScopeLine));
 	}
 
+	void SpvMetaVisitor::Visit(SpvDebugInlinedAt* Inst)
+	{
+
+	}
+
 	void SpvMetaVisitor::Visit(SpvDebugLocalVariable* Inst)
 	{
 		SpvVariableDesc VarDesc{
@@ -673,6 +678,21 @@ namespace FW
 					Initializer = SpvCode[WordOffset + 4];
 				}
 				DecodedInst = MakeUnique<SpvOpVariable>(ResultType, StorageClass, Initializer);
+				DecodedInst->SetId(ResultId);
+				break;
+			}
+			case SpvOp::Phi:
+			{
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				int32 OperandNum = (InstWordLen - 3) / 2;
+				TArray<TPair<SpvId, SpvId>> Operands;
+				for (int32 Index = 0; Index < OperandNum; Index++)
+				{
+					SpvId Variable = SpvCode[WordOffset + Index * 2 + 3];
+					SpvId parent = SpvCode[WordOffset + Index * 2 + 4];
+				}
+				DecodedInst = MakeUnique<SpvOpPhi>(ResultType, Operands);
 				DecodedInst->SetId(ResultId);
 				break;
 			}
@@ -1290,6 +1310,11 @@ namespace FW
 				DecodedInst = MakeUnique<SpvOpSwitch>(Selector, Default, Targets);
 				break;
 			}
+			case SpvOp::Kill:
+			{
+				DecodedInst = MakeUnique<SpvOpKill>();
+				break;
+			}	
 			case SpvOp::Return:
 			{
 				DecodedInst = MakeUnique<SpvOpReturn>();
@@ -1408,7 +1433,12 @@ namespace FW
 					else if(ExtOp == SpvDebugInfo100::DebugScope)
 					{
 						SpvId Scope = SpvCode[WordOffset + 5];
-						DecodedInst = MakeUnique<SpvDebugScope>(Scope);
+						std::optional<SpvId> Inlined;
+						if (InstWordLen - 6 > 0)
+						{
+							Inlined = SpvCode[WordOffset + 6];
+						}
+						DecodedInst = MakeUnique<SpvDebugScope>(Scope, Inlined);
 						DecodedInst->SetId(ResultId);
 					}
 					else if(ExtOp == SpvDebugInfo100::DebugGlobalVariable)
@@ -1421,6 +1451,18 @@ namespace FW
 						DecodedInst = MakeUnique<SpvDebugGlobalVariable>(Name, TypeDesc, Line, Parent, Var);
 						DecodedInst->SetId(ResultId);
 					}
+					else if(ExtOp == SpvDebugInfo100::DebugInlinedAt)
+					{
+						SpvId Line = SpvCode[WordOffset + 5];
+						SpvId Scope = SpvCode[WordOffset + 6];
+						std::optional<SpvId> Inlined;
+						if(InstWordLen - 7 > 0)
+						{
+							Inlined = SpvCode[WordOffset + 7];
+						}
+						DecodedInst = MakeUnique<SpvDebugInlinedAt>(Line, Scope, Inlined);
+						DecodedInst->SetId(ResultId);
+					}
 					else if(ExtOp == SpvDebugInfo100::DebugLocalVariable)
 					{
 						SpvId Name = SpvCode[WordOffset + 5];
@@ -1428,6 +1470,13 @@ namespace FW
 						SpvId Line = SpvCode[WordOffset + 8];
 						SpvId Parent = SpvCode[WordOffset + 10];
 						DecodedInst = MakeUnique<SpvDebugLocalVariable>(Name, TypeDesc, Line, Parent);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvDebugInfo100::DebugFunctionDefinition)
+					{
+						SpvId Function = SpvCode[WordOffset + 5];
+						SpvId Definition = SpvCode[WordOffset + 6];
+						DecodedInst = MakeUnique<SpvDebugFunctionDefinition>(Function, Definition);
 						DecodedInst->SetId(ResultId);
 					}
 					else if(ExtOp == SpvDebugInfo100::DebugLine)
@@ -1439,8 +1488,15 @@ namespace FW
 					else if(ExtOp == SpvDebugInfo100::DebugDeclare)
 					{
 						SpvId VarDesc = SpvCode[WordOffset + 5];
-						SpvId PointerId = SpvCode[WordOffset + 6];
-						DecodedInst = MakeUnique<SpvDebugDeclare>(VarDesc, PointerId);
+						SpvId Variable = SpvCode[WordOffset + 6];
+						DecodedInst = MakeUnique<SpvDebugDeclare>(VarDesc, Variable);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvDebugInfo100::DebugValue)
+					{
+						SpvId LocalVariable = SpvCode[WordOffset + 5];
+						SpvId Value = SpvCode[WordOffset + 6];
+						DecodedInst = MakeUnique<SpvDebugValue>(LocalVariable, Value);
 						DecodedInst->SetId(ResultId);
 					}
 				}

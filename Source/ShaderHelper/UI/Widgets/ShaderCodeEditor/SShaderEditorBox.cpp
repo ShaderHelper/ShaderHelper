@@ -11,11 +11,13 @@
 #include <Framework/Text/TextLayout.h>
 #include "ShaderCodeEditorLineHighlighter.h"
 #include "UI/Widgets/Misc/CommonCommands.h"
+#include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "Editor/ShaderHelperEditor.h"
 #include <Widgets/Text/SlateTextBlockLayout.h>
 #include <Framework/Text/SlateTextHighlightRunRenderer.h>
 #include <Fonts/FontMeasure.h>
 #include <Styling/StyleColors.h>
+#include "Editor/AssetEditor/AssetEditor.h"
 #include "GpuApi/Spirv/SpirvExpressionVM.h"
 
 //No exposed methods, and too lazy to modify the source code for UE.
@@ -116,7 +118,7 @@ const FString FoldMarkerText = TEXT("⇿");
     
     SShaderEditorBox::~SShaderEditorBox()
     {
-		ShaderAssetObj->OnRefreshBuilder.RemoveAll(this);
+		ShaderAssetObj->OnRefreshBuilder.Remove(RefreshBuilderHandle);
 		
         bQuitISense = true;
         ISenseEvent->Trigger();
@@ -192,7 +194,7 @@ const FString FoldMarkerText = TEXT("⇿");
     void SShaderEditorBox::Construct(const FArguments& InArgs)
     {
 		ShaderAssetObj = InArgs._ShaderAssetObj;
-		ShaderAssetObj->OnRefreshBuilder.AddLambda([this]{
+		RefreshBuilderHandle = ShaderAssetObj->OnRefreshBuilder.AddLambda([this]{
 			ISenseTask Task{};
 			Task.ShaderDesc = ShaderAssetObj->GetShaderDesc(CurrentShaderSource);
 			ISenseQueue.Enqueue(MoveTemp(Task));
@@ -322,9 +324,7 @@ const FString FoldMarkerText = TEXT("⇿");
 							}
 						}
 					}
-					
-					FuncScopes = TU.GetFuncScopes();
-					
+										
 					if(SyntaxQueue.IsEmpty())
 					{
 						bRefreshSyntax.store(true, std::memory_order_release);
@@ -992,7 +992,6 @@ const FString FoldMarkerText = TEXT("⇿");
 		if(bRefreshSyntax.load(std::memory_order_acquire))
 		{
 			RefreshSyntaxHighlight();
-			FuncScopesCopy = FuncScopes;
 			bRefreshSyntax.store(false, std::memory_order_relaxed);
 		}
         
@@ -1204,10 +1203,14 @@ const FString FoldMarkerText = TEXT("⇿");
 
     void SShaderEditorBox::OnShaderTextChanged(const FString& InShaderSouce)
     {
-		CurEditState = EditState::Editing;
         FString NewShaderSource = InShaderSouce.Replace(TEXT("\r\n"), TEXT("\n"));
         if (NewShaderSource != ShaderAssetObj->EditorContent)
         {
+			if(DebuggerContext)
+			{
+				bEditDuringDebugging = true;
+			}
+			CurEditState = EditState::Editing;
 			ShaderAssetObj->EditorContent = NewShaderSource;
 			ShaderAssetObj->MarkDirty(NewShaderSource != ShaderAssetObj->SavedEditorContent);
         }
@@ -1368,12 +1371,6 @@ const FString FoldMarkerText = TEXT("⇿");
     FReply SShaderEditorBox::HandleKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
     {
         const FKey Key = InKeyEvent.GetKey();
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		//Process tool bar commands.
-		if(ShEditor->GetUICommandList().IsValid())
-		{
-			ShEditor->GetUICommandList()->ProcessCommandBindings(InKeyEvent);
-		}
 		
 		const FTextSelection& Selection = ShaderMultiLineEditableText->GetSelection();
 		const int32 StartLineIndex = Selection.GetBeginning().GetLineIndex();
@@ -1577,7 +1574,7 @@ const FString FoldMarkerText = TEXT("⇿");
 
                     if (Line[Offset - 1] == FoldMarkerText[0])
                     {
-                        OnFold(GetLineNumber(CursorLocation.GetLineIndex()));
+                        UnFold(GetLineNumber(CursorLocation.GetLineIndex()));
                         return FReply::Handled();
                     }
 
@@ -1886,6 +1883,162 @@ const FString FoldMarkerText = TEXT("⇿");
         return TextAfterUnfolding;
     }
 
+	void SShaderEditorBox::UnFold(int32 LineNumber)
+	{
+		int32 LineIndex = GetLineIndex(LineNumber);
+		if(LineIndex == INDEX_NONE)
+		{
+			for(const FoldMarker& Marker : VisibleFoldMarkers)
+			{
+				int StartLineNumber = GetLineNumber(Marker.RelativeLineIndex);
+				int EndLineNumber = StartLineNumber + Marker.GetFoldedLineCounts();
+				if(LineNumber >= StartLineNumber && LineNumber <= EndLineNumber)
+				{
+					LineIndex = Marker.RelativeLineIndex;
+					break;
+				}
+			}
+		}
+
+		TOptional<int32> MarkerIndex = FindFoldMarker(LineIndex);
+		if(MarkerIndex)
+		{
+			IsFoldEditTransaction = true;
+			ShaderMultiLineEditableTextLayout->BeginEditTransation();
+
+			FSlateTextLayout* ShaderTextLayout = static_cast<FSlateTextLayout*>(ShaderMarshaller->TextLayout);
+			TArray< FTextLayout::FLineModel >& Lines = ShaderTextLayout->GetLineModels();
+			const FTextLocation& CurCursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
+
+			const FoldMarker* Marker = &VisibleFoldMarkers[*MarkerIndex];
+			TArray<FString> FoldedLineText = Marker->FoldedLineTexts;
+			FTextLayout::FLineModel& BeginLine = Lines[LineIndex];
+			int32 MarkerCol = BeginLine.Text->Find(FoldMarkerText);
+			FString TextAfterMarker = BeginLine.Text->Mid(MarkerCol + 1);
+			ShaderTextLayout->RemoveAt(FTextLocation{ LineIndex, MarkerCol }, BeginLine.Text->Len() - MarkerCol);
+			ShaderMultiLineEditableText->GoTo(FTextLocation{ LineIndex, MarkerCol });
+			FString FoldedText;
+			for (int32 i = 0; i < FoldedLineText.Num(); i++)
+			{
+				FoldedText += FoldedLineText[i];
+				if (i == FoldedLineText.Num() - 1)
+				{
+					FoldedText += TextAfterMarker;
+				}
+				else
+				{
+					FoldedText += "\n";
+				}
+			}
+			ShaderMultiLineEditableText->InsertTextAtCursor(MoveTemp(FoldedText));
+
+			for (int32 i = 0; i < Marker->ChildFoldMarkers.Num(); i++)
+			{
+				auto NewMarker = Marker->ChildFoldMarkers[i];
+				NewMarker.RelativeLineIndex += Marker->RelativeLineIndex;
+				VisibleFoldMarkers.Add(MoveTemp(NewMarker));
+			}
+
+			RemoveFoldMarker(LineIndex);
+			VisibleFoldMarkers.Sort([](const FoldMarker& A, const FoldMarker& B) { return A.RelativeLineIndex < B.RelativeLineIndex; });
+
+			if (CurCursorLocation.GetLineIndex() > LineIndex)
+			{
+				const FTextLocation NewCursorLocation(CurCursorLocation.GetLineIndex() + FoldedLineText.Num() - 1, CurCursorLocation.GetOffset());
+				ShaderMultiLineEditableText->GoTo(NewCursorLocation);
+			}
+			else
+			{
+				ShaderMultiLineEditableText->GoTo(CurCursorLocation);
+			}
+
+			ShaderMultiLineEditableTextLayout->EndEditTransaction();
+			IsFoldEditTransaction = false;
+
+			if(GetLineIndex(LineNumber) == INDEX_NONE)
+			{
+				UnFold(LineNumber);
+			}
+		}
+	}
+
+	void SShaderEditorBox::Fold(int32 LineNumber)
+	{
+		IsFoldEditTransaction = true;
+		ShaderMultiLineEditableTextLayout->BeginEditTransation();
+
+		int32 LineIndex = GetLineIndex(LineNumber);
+		FSlateTextLayout* ShaderTextLayout = static_cast<FSlateTextLayout*>(ShaderMarshaller->TextLayout);
+		TArray< FTextLayout::FLineModel >& Lines = ShaderTextLayout->GetLineModels();
+		const FTextLocation& CurCursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
+
+		auto BraceGroup = ShaderMarshaller->FoldingBraceGroups[LineIndex];
+		int32 FoldedBeginningRow = BraceGroup.OpenLineIndex;
+		int32 FoldedBeginningCol = BraceGroup.OpenBrace.Offset;
+		int32 FoldedEndRow = BraceGroup.CloseLineIndex;
+		int32 FoldedEndCol = BraceGroup.CloseBrace.Offset;
+
+		FTextLayout::FLineModel& EndLine = Lines[FoldedEndRow];
+		TArray<FString> FoldedTexts;
+
+		FString EndLineRemains;
+		if (EndLine.Text->Len() > FoldedEndCol)
+		{
+			EndLineRemains = EndLine.Text->Mid(FoldedEndCol);
+		}
+		FoldedTexts.Add(*EndLine.Text->Mid(0, EndLine.Text->Len() - EndLineRemains.Len()));
+		ShaderTextLayout->RemoveLine(FoldedEndRow);
+
+		for (int32 LineIndex = FoldedEndRow - 1; LineIndex > FoldedBeginningRow; LineIndex--)
+		{
+			FoldedTexts.Add(*Lines[LineIndex].Text);
+			ShaderTextLayout->RemoveLine(LineIndex);
+		}
+
+		FTextLayout::FLineModel& BeginLine = Lines[FoldedBeginningRow];
+		FoldedTexts.Add(*BeginLine.Text->Mid(FoldedBeginningCol + 1));
+		ShaderTextLayout->RemoveAt(FTextLocation(FoldedBeginningRow, FoldedBeginningCol + 1), BeginLine.Text->Len() - FoldedBeginningCol - 1);
+
+		for (int32 i = 0; i < FoldedTexts.Num() / 2; i++)
+		{
+			FoldedTexts.Swap(i, FoldedTexts.Num() - 1 - i);
+		}
+
+		//Join with the fold marker
+		FoldMarker Marker = { FoldedBeginningRow, BeginLine.Text->Len(), MoveTemp(FoldedTexts) };
+		ShaderTextLayout->InsertAt(FTextLocation{ FoldedBeginningRow, BeginLine.Text->Len() }, FoldMarkerText + EndLineRemains);
+		for (int32 LineIndex = FoldedBeginningRow + 1; LineIndex <= FoldedEndRow; LineIndex++)
+		{
+			if (TOptional<int32> MarkerIndex = FindFoldMarker(LineIndex))
+			{
+				FoldMarker& FoldedMarker = VisibleFoldMarkers[*MarkerIndex];
+				FoldMarker ChildMarker = FoldedMarker;
+				ChildMarker.RelativeLineIndex = FoldedMarker.RelativeLineIndex - Marker.RelativeLineIndex;
+
+				Marker.ChildFoldMarkers.Add(MoveTemp(ChildMarker));
+				RemoveFoldMarker(LineIndex);
+			}
+		}
+		VisibleFoldMarkers.Add(MoveTemp(Marker));
+		VisibleFoldMarkers.Sort([](const FoldMarker& A, const FoldMarker& B) { return A.RelativeLineIndex < B.RelativeLineIndex; });
+
+		//The cursor is within the fold now.
+		if (CurCursorLocation.GetLineIndex() >= FoldedBeginningRow && CurCursorLocation.GetLineIndex() <= FoldedEndRow)
+		{
+			const FTextLocation NewCursorLocation(FoldedBeginningRow, BeginLine.Text->Len());
+			ShaderMultiLineEditableText->GoTo(NewCursorLocation);
+		}
+		else if (CurCursorLocation.GetLineIndex() > FoldedEndRow)
+		{
+			int32 FoldedLineNum = FoldedEndRow - FoldedBeginningRow;
+			const FTextLocation NewCursorLocation(CurCursorLocation.GetLineIndex() - FoldedLineNum, CurCursorLocation.GetOffset());
+			ShaderMultiLineEditableText->GoTo(NewCursorLocation);
+		}
+
+		ShaderMultiLineEditableTextLayout->EndEditTransaction();
+		IsFoldEditTransaction = false;
+	}
+
     void SShaderEditorBox::RemoveFoldMarker(int32 InIndex)
     {
         for (int32 i = 0; i < VisibleFoldMarkers.Num(); i++)
@@ -1900,133 +2053,18 @@ const FString FoldMarkerText = TEXT("⇿");
 
     FReply SShaderEditorBox::OnFold(int32 LineNumber)
     {
-        int32 LineIndex = GetLineIndex(LineNumber);
-        FSlateTextLayout* ShaderTextLayout = static_cast<FSlateTextLayout*>(ShaderMarshaller->TextLayout);
-        TArray< FTextLayout::FLineModel >& Lines = ShaderTextLayout->GetLineModels();
-        
-		IsFoldEditTransaction = true;
-		ShaderMultiLineEditableTextLayout->BeginEditTransation();
-		
+        int32 LineIndex = GetLineIndex(LineNumber);	
         TOptional<int32> MarkerIndex = FindFoldMarker(LineIndex);
-        
-        const FTextLocation& CurCursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
+    
         if (!MarkerIndex)
         {
-            auto BraceGroup = ShaderMarshaller->FoldingBraceGroups[LineIndex];
-            int32 FoldedBeginningRow = BraceGroup.OpenLineIndex;
-            int32 FoldedBeginningCol = BraceGroup.OpenBrace.Offset;
-            int32 FoldedEndRow = BraceGroup.CloseLineIndex;
-            int32 FoldedEndCol = BraceGroup.CloseBrace.Offset;
-
-            FTextLayout::FLineModel& EndLine = Lines[FoldedEndRow];
-            TArray<FString> FoldedTexts;
-            
-            FString EndLineRemains;
-            if (EndLine.Text->Len() > FoldedEndCol)
-            {
-                EndLineRemains = EndLine.Text->Mid(FoldedEndCol);
-            }
-            FoldedTexts.Add(*EndLine.Text->Mid(0, EndLine.Text->Len() - EndLineRemains.Len()));
-            ShaderTextLayout->RemoveLine(FoldedEndRow);
-
-            for (int32 LineIndex = FoldedEndRow - 1; LineIndex > FoldedBeginningRow; LineIndex--)
-            {
-                FoldedTexts.Add(*Lines[LineIndex].Text);
-                ShaderTextLayout->RemoveLine(LineIndex);
-            }
-
-            FTextLayout::FLineModel& BeginLine = Lines[FoldedBeginningRow];
-            FoldedTexts.Add(*BeginLine.Text->Mid(FoldedBeginningCol + 1));
-            ShaderTextLayout->RemoveAt(FTextLocation(FoldedBeginningRow, FoldedBeginningCol + 1), BeginLine.Text->Len() - FoldedBeginningCol - 1);
-
-            for (int32 i = 0; i < FoldedTexts.Num() / 2; i++)
-            {
-                FoldedTexts.Swap(i, FoldedTexts.Num() - 1 - i);
-            }
-
-            //Join with the fold marker
-            FoldMarker Marker = { FoldedBeginningRow, BeginLine.Text->Len(), MoveTemp(FoldedTexts) };
-            ShaderTextLayout->InsertAt(FTextLocation{ FoldedBeginningRow, BeginLine.Text->Len() }, FoldMarkerText + EndLineRemains);
-            for (int32 LineIndex = FoldedBeginningRow + 1; LineIndex <= FoldedEndRow; LineIndex++)
-            {
-                if (TOptional<int32> MarkerIndex = FindFoldMarker(LineIndex))
-                {
-                    FoldMarker& FoldedMarker = VisibleFoldMarkers[*MarkerIndex];
-                    FoldMarker ChildMarker = FoldedMarker;
-                    ChildMarker.RelativeLineIndex = FoldedMarker.RelativeLineIndex - Marker.RelativeLineIndex;
-                    
-                    Marker.ChildFoldMarkers.Add(MoveTemp(ChildMarker));
-                    RemoveFoldMarker(LineIndex);
-                }
-            }
-            VisibleFoldMarkers.Add(MoveTemp(Marker));
-            VisibleFoldMarkers.Sort([](const FoldMarker& A, const FoldMarker& B) { return A.RelativeLineIndex < B.RelativeLineIndex; });
-            
-            //The cursor is within the fold now.
-            if (CurCursorLocation.GetLineIndex() >= FoldedBeginningRow && CurCursorLocation.GetLineIndex() <= FoldedEndRow)
-            {
-                const FTextLocation NewCursorLocation(FoldedBeginningRow, BeginLine.Text->Len());
-                ShaderMultiLineEditableText->GoTo(NewCursorLocation);
-            }
-            else if(CurCursorLocation.GetLineIndex() > FoldedEndRow)
-            {
-                int32 FoldedLineNum = FoldedEndRow - FoldedBeginningRow;
-                const FTextLocation NewCursorLocation(CurCursorLocation.GetLineIndex() - FoldedLineNum, CurCursorLocation.GetOffset());
-                ShaderMultiLineEditableText->GoTo(NewCursorLocation);
-            }
+			Fold(LineNumber);
         }
-        //UnFold
         else
         {
-            const FoldMarker* Marker = &VisibleFoldMarkers[*MarkerIndex];
-            TArray<FString> FoldedLineText = Marker->FoldedLineTexts;
-            FTextLayout::FLineModel& BeginLine = Lines[LineIndex];
-    
-            int32 MarkerCol = BeginLine.Text->Find(FoldMarkerText);
-
-            FString TextAfterMarker = BeginLine.Text->Mid(MarkerCol + 1);
-			ShaderTextLayout->RemoveAt(FTextLocation{ LineIndex, MarkerCol }, BeginLine.Text->Len() - MarkerCol);
-			ShaderMultiLineEditableText->GoTo(FTextLocation{ LineIndex, MarkerCol });
-			FString FoldedText;
-			for (int32 i = 0; i < FoldedLineText.Num(); i++)
-			{
-				FoldedText += FoldedLineText[i];
-				if(i == FoldedLineText.Num() - 1)
-				{
-					FoldedText += TextAfterMarker;
-				}
-				else
-				{
-					FoldedText += "\n";
-				}
-			}
-			ShaderMultiLineEditableText->InsertTextAtCursor(MoveTemp(FoldedText));
-
-            for (int32 i = 0; i < Marker->ChildFoldMarkers.Num(); i++)
-            {
-                auto NewMarker = Marker->ChildFoldMarkers[i];
-                NewMarker.RelativeLineIndex += Marker->RelativeLineIndex;
-                VisibleFoldMarkers.Add(MoveTemp(NewMarker));
-            }
-
-            RemoveFoldMarker(LineIndex);
-            VisibleFoldMarkers.Sort([](const FoldMarker& A, const FoldMarker& B) { return A.RelativeLineIndex < B.RelativeLineIndex; });
-            
-            if(CurCursorLocation.GetLineIndex() > LineIndex)
-            {
-                const FTextLocation NewCursorLocation(CurCursorLocation.GetLineIndex() + FoldedLineText.Num() - 1, CurCursorLocation.GetOffset());
-                ShaderMultiLineEditableText->GoTo(NewCursorLocation);
-            }
-			else
-			{
-				ShaderMultiLineEditableText->GoTo(CurCursorLocation);
-			}
+			UnFold(LineNumber);
         }
-		
-		ShaderMultiLineEditableTextLayout->EndEditTransaction();
-		IsFoldEditTransaction = false;
-		
-        return FReply::Handled();
+		return FReply::Handled();
     }
 
 	bool SShaderEditorBox::IsErrorLine(int InLineNumber) const
@@ -2080,7 +2118,7 @@ const FString FoldMarkerText = TEXT("⇿");
         const int32 LineIndex = GetLineIndex(LineNumber);
 		
 		auto& CodeFontInfo = GetCodeFontInfo();
-		float MinWidth = FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(TEXT("0"), CodeFontInfo).X;
+		float MinWidth = (float)FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(TEXT("0"), CodeFontInfo).X;
 		MinWidth *= FString::FromInt(MaxLineNumber).Len();
         
         TSharedPtr<STextBlock> LineNumberTextBlock = SNew(STextBlock)
@@ -2127,7 +2165,7 @@ const FString FoldMarkerText = TEXT("⇿");
                 return EVisibility::Hidden;
             })
             .IsFocusable(false)
-            .OnClicked(this, &SShaderEditorBox::OnFold, LineNumber);
+			.OnClicked(this, &SShaderEditorBox::OnFold, LineNumber);
         
         FoldingArrow->SetPadding(FMargin{});
         if(FindFoldMarker(LineIndex))
@@ -2960,14 +2998,14 @@ const FString FoldMarkerText = TEXT("⇿");
 		
 		//Patch EntryPoint
 		FString EntryPoint = ShaderAssetObj->Shader->GetEntryPoint();
-		for(const ShaderFuncScope& FuncScope : FuncScopesCopy)
+		for(const ShaderFunc& Func : Funcs)
 		{
-			if(FuncScope.Name == EntryPoint)
+			if(Func.Name == EntryPoint)
 			{
 				TArray<FTextRange> LineRanges;
 				FTextRange::CalculateLineRangesFromString(ExpressionShader, LineRanges);
-				int32 StartPos = LineRanges[FuncScope.Start.x - 1].BeginIndex + FuncScope.Start.y - 1;
-				int32 EndPos = LineRanges[FuncScope.End.x - 1].BeginIndex + FuncScope.End.y - 1;
+				int32 StartPos = LineRanges[Func.Start.x - 1].BeginIndex + Func.Start.y - 1;
+				int32 EndPos = LineRanges[Func.End.x - 1].BeginIndex + Func.End.y - 1;
 				
 				ExpressionShader.RemoveAt(StartPos, EndPos - StartPos);
 				
@@ -3137,8 +3175,8 @@ void __Expression_Output(T __Expression_Result) {}
 		TArray<CallStackDataPtr> CallStackDatas;
 		
 		SpvFunctionDesc* FuncDesc = GetFunctionDesc(Scope);
-		FString Location = FString::Printf(TEXT("%s (Line %d)"), *ShaderAssetObj->GetFileName(), CurValidLine.value() - ExtraLineNum);
-		CallStackDatas.Add(MakeShared<CallStackData>(GetFunctionSig(FuncDesc), MoveTemp(Location)));
+		FString Location = FString::Printf(TEXT("%s (Line %d)"), *ShaderAssetObj->GetFileName(), StopLineNumber);
+		CallStackDatas.Add(MakeShared<CallStackData>(GetFunctionSig(FuncDesc, Funcs), MoveTemp(Location)));
 		for(int i = CallStack.Num() - 1; i >= 0; i--)
 		{
 			SpvFunctionDesc* FuncDesc = GetFunctionDesc(CallStack[i].Key);
@@ -3146,7 +3184,7 @@ void __Expression_Output(T __Expression_Result) {}
 			if(JumpLineNumber > 0)
 			{
 				FString Location = FString::Printf(TEXT("%s (Line %d)"), *ShaderAssetObj->GetFileName(), JumpLineNumber);
-				CallStackDatas.Add(MakeShared<CallStackData>(GetFunctionSig(FuncDesc), MoveTemp(Location)));
+				CallStackDatas.Add(MakeShared<CallStackData>(GetFunctionSig(FuncDesc, Funcs), MoveTemp(Location)));
 			}
 		}
 		DebuggerCallStackView->SetCallStackDatas(CallStackDatas);
@@ -3160,6 +3198,20 @@ void __Expression_Output(T __Expression_Result) {}
 
 	void SShaderEditorBox::Continue(StepMode Mode)
 	{
+		AssetOp::OpenAsset(ShaderAssetObj);
+		if(bEditDuringDebugging)
+		{
+			auto Ret = MessageDialog::Open(MessageDialog::OkCancel, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("EditDuringDebugging"));
+			if(Ret == MessageDialog::MessageRet::Ok)
+			{
+				bEditDuringDebugging = false;
+			}
+			else
+			{
+				return;
+			}
+		}
+
 		DirtyVars.Empty();
 		DebuggerError.Empty();
 		
@@ -3170,24 +3222,15 @@ void __Expression_Output(T __Expression_Result) {}
 		{
 			const SpvDebugState& DebugState = DebugStates[CurDebugStateIndex];
 			std::optional<int32> NextValidLine;
-			if(CurDebugStateIndex + 1 < DebugStates.Num() &&
-			   (!DebugStates[CurDebugStateIndex + 1].VarChanges.IsEmpty() || DebugStates[CurDebugStateIndex + 1].bReturn ||
-				DebugStates[CurDebugStateIndex + 1].bFuncCallAfterReturn ||
-				DebugStates[CurDebugStateIndex + 1].bFuncCall || DebugStates[CurDebugStateIndex + 1].bCondition))
+			if(CurDebugStateIndex + 1 < DebugStates.Num() && 
+				((!DebugStates[CurDebugStateIndex + 1].VarChanges.IsEmpty() && !DebugStates[CurDebugStateIndex + 1].bParamChange)
+				|| DebugStates[CurDebugStateIndex + 1].bKill
+				|| DebugStates[CurDebugStateIndex + 1].bReturn 
+				|| DebugStates[CurDebugStateIndex + 1].bFuncCallAfterReturn 
+				|| DebugStates[CurDebugStateIndex + 1].bFuncCall 
+				|| DebugStates[CurDebugStateIndex + 1].bCondition))
 			{
 				NextValidLine = DebugStates[CurDebugStateIndex + 1].Line;
-            
-				//Stop at the ending line of the function lexcical scope
-                if(NextValidLine.value() == 0 && DebugStates[CurDebugStateIndex + 1].bReturn)
-                {
-					for(const ShaderFuncScope& FuncScope : FuncScopesCopy)
-					{
-						if(FuncScope.Name == GetFunctionDesc(Scope)->GetName())
-						{
-							NextValidLine = FuncScope.End.x;
-						}
-					}
-                }
 			}
 			
 			if(!DebugState.UbError.IsEmpty())
@@ -3204,7 +3247,7 @@ void __Expression_Output(T __Expression_Result) {}
 			if(AssertResult)
 			{
 				TArray<uint8>& Value = std::get<SpvObject::Internal>(AssertResult->Storage).Value;
-				uint& TypedValue = *(uint*)Value.GetData();
+				uint32& TypedValue = *(uint32*)Value.GetData();
 				if(TypedValue != 1)
 				{
 					DebuggerError = "Assert failed";
@@ -3217,16 +3260,16 @@ void __Expression_Output(T __Expression_Result) {}
 			if(NextValidLine)
 			{
 				bool MatchBreakPoint = Scope && BreakPointLines.ContainsByPredicate([&](int32 InEntry){
-					 int32 BreakPointRealLine = InEntry + ExtraLineNum;
+					 int32 BreakPointLine = InEntry + ExtraLineNum;
 					 bool bForward;
 					 if(!CurValidLine)
 					 {
 						 int32 FuncLine = GetFunctionDesc(Scope)->GetLine();
-						 bForward = (BreakPointRealLine >= FuncLine) && (BreakPointRealLine <= NextValidLine.value());
+						 bForward = (BreakPointLine >= FuncLine) && (BreakPointLine <= NextValidLine.value());
 					 }
 					 else
 					 {
-						 bForward = (BreakPointRealLine > CurValidLine.value()) && (BreakPointRealLine <= NextValidLine.value());
+						 bForward = (BreakPointLine > CurValidLine.value()) && (BreakPointLine <= NextValidLine.value());
 					 }
 					 return bForward;
 				});
@@ -3256,6 +3299,7 @@ void __Expression_Output(T __Expression_Result) {}
 		{
 			ShowDebuggerResult();
 			ScrollTo(GetLineIndex(StopLineNumber));
+			UnFold(StopLineNumber);
 		}
 	}
 
@@ -3271,10 +3315,30 @@ void __Expression_Output(T __Expression_Result) {}
 		DirtyVars.Empty();
 		StopLineNumber = 0;
         VmPixelContext.reset();
+		bEditDuringDebugging = false;
 	}
 
 	void SShaderEditorBox::DebugPixel(const FW::Vector2u& PixelCoord, const TArray<TRefCountPtr<FW::GpuBindGroup>>& BindGroups)
 	{
+		TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(ShaderAssetObj->GetShaderDesc(CurrentShaderSource));
+		Shader->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
+
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add("ENABLE_PRINT=0");
+
+		FString ErrorInfo, WarnInfo;
+		if (!GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo, ExtraArgs))
+		{
+			FString FailureInfo = LOCALIZATION("DebugFailure").ToString() + ":\n\n" + ErrorInfo;
+			MessageDialog::Open(MessageDialog::Ok, GApp->GetEditor()->GetMainWindow(), FText::FromString(FailureInfo));
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			ShEditor->EndDebugging();
+			return;
+		}
+
+		ShaderTU TU{ Shader->GetSourceText(), Shader->GetIncludeDirs() };
+		Funcs = TU.GetFuncs();
 		int32 DebugIndex= 2 * (PixelCoord.y & 1) + (PixelCoord.x & 1);
 		
 		TArray<SpvVmBinding> Bindings;
@@ -3305,17 +3369,10 @@ void __Expression_Output(T __Expression_Result) {}
 		Quad[1].ThreadState.BuiltInInput.emplace(SpvBuiltIn::FragCoord, TArray{(uint8*)&QuadFragCoord1, sizeof(Vector4f)});
 		Quad[2].ThreadState.BuiltInInput.emplace(SpvBuiltIn::FragCoord, TArray{(uint8*)&QuadFragCoord2, sizeof(Vector4f)});
 		Quad[3].ThreadState.BuiltInInput.emplace(SpvBuiltIn::FragCoord, TArray{(uint8*)&QuadFragCoord3, sizeof(Vector4f)});
-		
-		TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(ShaderAssetObj->GetShaderDesc(CurrentShaderSource));
-		Shader->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
-		
-		TArray<FString> ExtraArgs;
-		ExtraArgs.Add("-D");
-		ExtraArgs.Add("ENABLE_PRINT=0");
-		
-		FString ErrorInfo, WarnInfo;
-		GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo, ExtraArgs);
-		check(ErrorInfo.IsEmpty());
+		for (int i = 0; i < 4; i++)
+		{
+			Quad[i].EditorFuncInfo = Funcs;
+		}
 		
 		SpirvParser Parser;
 		Parser.Parse(Shader->SpvCode);
@@ -3341,13 +3398,13 @@ void __Expression_Output(T __Expression_Result) {}
 		SDebuggerCallStackView* DebuggerCallStackView = ShEditor->GetDebuggerCallStackView();
 		DebuggerCallStackView->OnSelectionChanged = [this](const FString& FuncName) {
 			int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
-			if(GetFunctionSig(GetFunctionDesc(Scope)) == FuncName)
+			if(GetFunctionSig(GetFunctionDesc(Scope), Funcs) == FuncName)
 			{
 				StopLineNumber =  CurValidLine.value() - ExtraLineNum;
 				ShowDeuggerVariable(Scope);
 			}
 			else if(auto Call = CallStack.FindByPredicate([this, FuncName](const TPair<FW::SpvLexicalScope*, int>& InItem){
-				if(GetFunctionSig(GetFunctionDesc(InItem.Key)) == FuncName)
+				if(GetFunctionSig(GetFunctionDesc(InItem.Key), Funcs) == FuncName)
 				{
 					return true;
 				}

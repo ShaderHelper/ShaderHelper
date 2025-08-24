@@ -43,10 +43,10 @@ project "FrameWork"
         pchsource "CommonHeader.cpp"
         
         private_uses {
-            "DXC", "AgilitySDK", "WinPixEventRuntime"
+            "ShaderConductor", "AgilitySDK", "WinPixEventRuntime"
         }
+        addToProjectHierarchy(shaderConductorHierarchy)
 		addToProjectHierarchy(AgilitySDKHierarchy)
-		addToProjectHierarchy(DXCHierarchy)
 		addToProjectHierarchy(WinPixEventRuntimeHierarchy)
 		
         links {

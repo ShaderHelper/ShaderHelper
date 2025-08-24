@@ -32,6 +32,7 @@ namespace SH
 		uint32 Zoom = 1;
 
 		FW::Vector2f MouseLoc{};
+		float DpiScale{};
 		FW::Vector2u PixelCoord{};
 		
 		bool bFinalizePixel{};

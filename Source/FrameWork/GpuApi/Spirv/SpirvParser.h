@@ -68,6 +68,7 @@ namespace FW
 		void Visit(SpvDebugCompilationUnit* Inst) override;
 		void Visit(SpvDebugLexicalBlock* Inst) override;
 		void Visit(SpvDebugFunction* Inst) override;
+		void Visit(SpvDebugInlinedAt* Inst) override;
 		void Visit(SpvDebugLocalVariable* Inst) override;
 		void Visit(SpvDebugGlobalVariable* Inst) override;
  

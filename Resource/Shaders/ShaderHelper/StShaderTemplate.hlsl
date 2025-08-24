@@ -26,7 +26,7 @@ float4 MainPS(PIn Input) : SV_Target
 {
 	float2 fragCoord = float2(Input.Pos.x, Input.Pos.y);
 	GPrivate_fragCoord = fragCoord;
-	float4 fragColor = 0.0f;
+	float4 fragColor;
 	mainImage(fragColor, fragCoord);
 	if (GPrivate_AssertResult != 1)
 	{

@@ -54,6 +54,15 @@ namespace FW
         return *GuidToPath.FindKey(InPath);
 	}
 
+	TOptional<FGuid> AssetManager::TryGetGuid(const FString& InPath) const
+	{
+		if (const FGuid* Id = GuidToPath.FindKey(InPath))
+		{
+			return *Id;
+		}
+		return TOptional<FGuid>();
+	}
+
 	void AssetManager::AddAssetThumbnail(const FGuid& InGuid, TRefCountPtr<GpuTexture> InThumbnail)
 	{
 		AssetThumbnailPool.Add(InGuid, InThumbnail);

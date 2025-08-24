@@ -7,7 +7,6 @@
 #include <Fonts/SlateFontInfo.h>
 #include <Misc/OutputDeviceConsole.h>
 #include <DirectoryWatcherModule.h>
-#include <IDirectoryWatcher.h>
 #include "GpuApi/GpuRhi.h"
 #include <HAL/ExceptionHandling.h>
 #include <HAL/PlatformOutputDevices.h>
@@ -74,12 +73,20 @@ namespace FW {
 
 		// Create Rhi backend.
 		GpuRhiConfig Config;
+#if SH_SHIPPING
+		Config.EnableValidationCheck = false;
+#else
 		Config.EnableValidationCheck = true;
+#endif
 		Config.BackendType = GpuRhiBackendType::Default;
 
 		if (FParse::Param(FCommandLine::Get(), TEXT("disableValidation"))) {
 			Config.EnableValidationCheck = false;
-	}
+		}
+		else if (FParse::Param(FCommandLine::Get(), TEXT("enableValidation"))) {
+			Config.EnableValidationCheck = true;
+		}
+
 		FString BackendName;
 		if (FParse::Value(FCommandLine::Get(), TEXT("backend="), BackendName)) {
 			if (BackendName.Equals(TEXT("Vulkan"))) {
@@ -100,7 +107,10 @@ namespace FW {
 		}
 		GpuRhi::InitGpuRhi(Config);
 		GGpuRhi->InitApiEnv();
-}
+
+		FDirectoryWatcherModule& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>(TEXT("DirectoryWatcher"));
+		DirectoryWatcher = DirectoryWatcherModule.Get();
+	}
 
 	void App::Run()
 	{
@@ -125,9 +135,7 @@ namespace FW {
 					Render();
 					FSlateApplication::Get().PumpMessages();
 					FSlateApplication::Get().Tick();
-PRAGMA_DISABLE_DEPRECATION_WARNINGS
                     FTicker::GetCoreTicker().Tick(DeltaTime);
-PRAGMA_DISABLE_DEPRECATION_WARNINGS
 					//if not change GFrameCounter, slate texture may not update.
 					GFrameCounter++;
 				}
@@ -186,10 +194,8 @@ PRAGMA_DISABLE_DEPRECATION_WARNINGS
 
 	void App::Update(float DeltaTime)
 	{
-		FDirectoryWatcherModule& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>(TEXT("DirectoryWatcher"));
-		IDirectoryWatcher* DirectoryWatcher = DirectoryWatcherModule.Get();
 		DirectoryWatcher->Tick(DeltaTime);
-        
+
         if(AppEditor)
         {
             AppEditor->Update(DeltaTime);

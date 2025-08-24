@@ -10,6 +10,18 @@ namespace FW::GpuResourceHelper
 		return GGpuRhi->CreateTexture(MoveTemp(Desc));
 	}
 
+	FRAMEWORK_API GpuSampler* GetSampler(const GpuSamplerDesc& InDesc)
+	{
+		static TArray<TRefCountPtr<GpuSampler>> GpuSamplerCache;
+		if (auto* ExistingSampler = GpuSamplerCache.FindByPredicate([&](auto&& Item) { return InDesc == Item->GetDesc();}))
+		{
+			return *ExistingSampler;
+		}
+		auto NewSampler = GGpuRhi->CreateSampler(InDesc);
+		GpuSamplerCache.Add(NewSampler);
+		return NewSampler;
+	}
+
 	GpuTexture* GetGlobalBlackTex()
 	{
         TArray<uint8> RawData = {0,0,0,255};

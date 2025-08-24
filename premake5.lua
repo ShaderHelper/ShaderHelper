@@ -1,7 +1,6 @@
 include "Premake/custom.lua"
 
 external_ue = "External/UE"
-external_dxcompiler = "External/DXC"
 external_agilitysdk = "External/AgilitySDK"
 external_pix = "External/WinPixEventRuntime"
 external_metalcpp = "External/metal-cpp"
@@ -136,7 +135,6 @@ workspace "ShaderHelper"
         targetsuffix "-%{cfg.buildcfg}"
 
 include(external_ue)
-include(external_dxcompiler)
 include(external_agilitysdk)
 include(external_pix)
 include(external_metalcpp)

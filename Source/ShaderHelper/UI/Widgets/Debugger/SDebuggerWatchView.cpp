@@ -1,8 +1,8 @@
 #include "CommonHeader.h"
 #include "SDebuggerWatchView.h"
 #include "UI/Styles/FShaderHelperStyle.h"
-#include <Widgets/Text/SInlineEditableTextBlock.h>
 #include <Framework/Commands/GenericCommands.h>
+#include "UI/Widgets/Misc/MiscWidget.h"
 
 namespace SH
 {
@@ -81,7 +81,7 @@ namespace SH
 		if(ColumnId == ExpColId)
 		{
 			Border->SetPadding(FMargin{0, 0, 1, 2});
-			auto ExprText = SNew(SInlineEditableTextBlock)
+			auto ExprText = SNew(FW::SShInlineEditableTextBlock)
 			.Text_Lambda([this]{ return FText::FromString(Data->Expr); })
 			.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
 				if(NewText.ToString().IsEmpty() && !Data->Expr.IsEmpty())
@@ -130,7 +130,7 @@ namespace SH
 			InternalBorder->SetBorderBackgroundColor(TAttribute<FSlateColor>::CreateLambda([this]{
 				if(Data->Dirty)
 				{
-					return FLinearColor{1,1,1,0.2};
+					return FLinearColor{1,1,1,0.2f};
 				}
 				return FLinearColor::White;
 			}));

@@ -89,7 +89,7 @@ namespace SH
 			if(Data->Dirty)
 			{
 				InternalBorder->SetBorderImage(FAppStyle::Get().GetBrush("Brushes.White"));
-				InternalBorder->SetBorderBackgroundColor(FLinearColor{1,1,1,0.2});
+				InternalBorder->SetBorderBackgroundColor(FLinearColor{1,1,1,0.2f});
 			}
 			InternalBorder->SetContent(SNew(STextBlock).Text(FText::FromString(Data->ValueStr)));
 		}

@@ -32,6 +32,8 @@ namespace FW
 		bool bFuncCallAfterReturn : 1 {};
 		bool bReturn : 1 {};
 		bool bCondition : 1 {};
+		bool bParamChange : 1 {};
+		bool bKill : 1{};
 		FString UbError;
 	};
 
@@ -49,10 +51,17 @@ namespace FW
 		TRefCountPtr<GpuResource> Resource;
 	};
 
+	struct SpvVmParameter
+	{
+		SpvPointer* Pointer{};
+		ParamSemaFlag Flag{};
+	};
+
 	struct SpvVmFrame
 	{
 		int32 ReturnPointIndex{};
-		std::queue<SpvPointer*> Arguments;
+		std::vector<SpvPointer*> Arguments;
+		std::vector<SpvVmParameter> Parameters;
 		SpvObject* ReturnObject = nullptr;
 		SpvId CurBasicBlock{};
 		SpvId PreBasicBlock{};
@@ -80,6 +89,9 @@ namespace FW
 
 	struct SpvVmContext : SpvMetaContext
 	{
+		//Can not obtain information from spirv to distinguish whether formal paramaters have special semantics such as out/inout，
+		//Therefore, obtain it from the editor
+		TArray<ShaderFunc> EditorFuncInfo;
 		SpvThreadState ThreadState;
 	};
 
@@ -99,6 +111,8 @@ namespace FW
 		void Visit(SpvDebugLine* Inst) override;
 		void Visit(SpvDebugScope* Inst) override;
 		void Visit(SpvDebugDeclare* Inst) override;
+		void Visit(SpvDebugValue* Inst) override;
+		void Visit(SpvDebugFunctionDefinition* Inst) override;
 		
 		void Visit(SpvRoundEven* Inst) override;
 		void Visit(SpvTrunc* Inst) override;
@@ -147,6 +161,7 @@ namespace FW
 		void Visit(SpvOpFunctionParameter* Inst) override;
 		void Visit(SpvOpFunctionCall* Inst) override;
 		void Visit(SpvOpVariable* Inst) override;
+		void Visit(SpvOpPhi* Inst) override;
 		void Visit(SpvOpLabel* Inst) override;
 		void Visit(SpvOpLoad* Inst) override;
 		void Visit(SpvOpStore* Inst) override;

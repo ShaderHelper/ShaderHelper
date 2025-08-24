@@ -1,6 +1,5 @@
 #include "CommonHeader.h"
 #include "Pins.h"
-#include "GpuApi/GpuResourceHelper.h"
 #include "GpuApi/GpuRhi.h"
 
 using namespace FW;

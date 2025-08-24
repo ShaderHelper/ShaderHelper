@@ -2,6 +2,8 @@
 #include "Common/Util/SwizzleVector.h"
 #include "Editor/Editor.h"
 #include "Renderer/Renderer.h"
+#include <IDirectoryWatcher.h>
+
 namespace FW {
 	class FRAMEWORK_API App : public FNoncopyable
 	{
@@ -12,26 +14,28 @@ namespace FW {
 	public:
 		void Run();
 		bool AreAllWindowsHidden() const;
-        
-        Editor* GetEditor() const { return AppEditor.Get(); }
-        Renderer* GetRenderer() const { return AppRenderer.Get(); }
+
+		Editor* GetEditor() const { return AppEditor.Get(); }
+		Renderer* GetRenderer() const { return AppRenderer.Get(); }
 		Vector2D GetClientSize() const { return AppClientSize; }
 		float GetDeltaTime() const { return DeltaTime; }
-		
+
 	protected:
 		virtual void Update(float DeltaTime);
 		virtual void Render();
 		virtual void Init();
-        
-    public:
-        TUniquePtr<Editor> AppEditor;
-        TUniquePtr<Renderer> AppRenderer;
+
+	public:
+		TUniquePtr<Editor> AppEditor;
+		TUniquePtr<Renderer> AppRenderer;
 
 	protected:
 		Vector2D AppClientSize;
 		FString CommandLine;
 		float DeltaTime = 0.01f;
 		double FixedDeltaTime = 1 / 30;
+
+		IDirectoryWatcher* DirectoryWatcher{};
 	};
 
     FRAMEWORK_API extern TUniquePtr<App> GApp;

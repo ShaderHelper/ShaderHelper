@@ -325,8 +325,9 @@ namespace FW
 	{
 		for(auto& ActiveDx12CmdRecorder : ActiveDx12CmdRecorders)
 		{
-			if(!ActiveDx12CmdRecorder->IsSubmitted())
+			if(ActiveDx12CmdRecorder->IsUnsubmitted())
 			{
+				ActiveDx12CmdRecorder->End();
 				ActiveDx12CmdRecorder->IsUnsubmittedAtFrameEnd = true;
 			}
 		}
@@ -595,6 +596,7 @@ namespace FW
 		StateCache.Clear();
 		BindDescriptorHeap();
 		IsUnsubmittedAtFrameEnd = false;
+		IsEnd = false;
 	}
 
 	void Dx12CmdRecorder::SetName(const FString& Name)

@@ -23,7 +23,7 @@ namespace FW
 		, Height(InHeight)
 		, RawData(InRawData)
 	{
-		
+		InitGpudata();
 	}
 
 	void Texture2D::Serialize(FArchive& Ar)
@@ -36,6 +36,11 @@ namespace FW
 	}
 
 	void Texture2D::PostLoad()
+	{
+		InitGpudata();
+	}
+
+	void Texture2D::InitGpudata()
 	{
 		GpuTextureDesc Desc{ (uint32)Width, (uint32)Height, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource | GpuTextureUsage::Shared , RawData };
 		GpuData = GGpuRhi->CreateTexture(MoveTemp(Desc));
@@ -62,7 +67,7 @@ namespace FW
 		{
 			BlitPassInput Input;
 			Input.InputTex = GpuData;
-			Input.InputTexSampler = GGpuRhi->CreateSampler({ SamplerFilter::Bilinear});
+			Input.InputTexSampler = GpuResourceHelper::GetSampler({.Filter = SamplerFilter::Bilinear});
 			Input.OutputRenderTarget = Thumbnail;
 
 			AddBlitPass(Graph, MoveTemp(Input));

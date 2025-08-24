@@ -28,7 +28,7 @@ cbuffer PerElementPSConstants
 	uint ShaderType;            //  4 bytes
     uint IgnoreTextureAlpha;    //	4 bytes
     uint DisableEffect;         //  4 bytes
-    uint IsSrgb;             //  4 bytes
+    uint DoGammaCorrect;             //  4 bytes
 };
 
 struct VertexOut
@@ -236,7 +236,7 @@ float4 Main( VertexOut InVertex ) : SV_Target
 		OutColor = GetSplineElementColor( InVertex );
 	}
 
-	if (IsSrgb)
+	if (DoGammaCorrect)
 	{
 		// gamma correct
 		OutColor.rgb = GammaCorrect(OutColor.rgb);

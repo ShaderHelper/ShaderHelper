@@ -17,7 +17,7 @@ namespace SH
 		auto InfoTip = SNew(SBorder)
 		.Padding(4)
 		.BorderImage(FAppStyle::Get().GetBrush("ToolTip.Background"))
-		.BorderBackgroundColor(FLinearColor{1,1,1,0.2})
+		.BorderBackgroundColor(FLinearColor{1,1,1,0.2f})
 		[
 			SNew(SVerticalBox)
 			+SVerticalBox::Slot()
@@ -94,16 +94,17 @@ namespace SH
 					return InfoTip->GetDesiredSize();
 				})
 				.Position_Lambda([this, InfoTip]{
-					FVector2D ViewportSize = FVector2D(ViewPort->GetSize().X, ViewPort->GetSize().Y);
-					FVector2D InfoTipSize = InfoTip->GetDesiredSize();
-					FVector2D MousePos(MouseLoc.x, MouseLoc.y);
+					FVector2D ViewportSize = FVector2D(ViewPort->GetSize().X, ViewPort->GetSize().Y) / DpiScale;
+					FVector2D InfoTipSize = InfoTip->GetCachedGeometry().GetLocalSize();
+					FVector2D MousePos = FVector2D{ MouseLoc.x, MouseLoc.y } / DpiScale;
 
-					FVector2D Pos = MousePos + FVector2D(8, 8);
+					FVector2D Offset = FVector2D(8, 8);
+					FVector2D Pos = MousePos + Offset;
 
 					if (Pos.X + InfoTipSize.X > ViewportSize.X)
-						Pos.X = MousePos.X - InfoTipSize.X - 8;
+						Pos.X = MousePos.X - InfoTipSize.X - Offset.X;
 					if (Pos.Y + InfoTipSize.Y > ViewportSize.Y)
-						Pos.Y = MousePos.Y - InfoTipSize.Y - 8;
+						Pos.Y = MousePos.Y - InfoTipSize.Y - Offset.Y;
 
 					return Pos;
 				})
@@ -122,12 +123,13 @@ namespace SH
 			return FReply::Unhandled();
 		}
 		
-		Vector2f CurMousePos = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * MyGeometry.Scale);
+		DpiScale = MyGeometry.Scale;
+		Vector2f CurMousePos = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * DpiScale);
 		if(MouseEvent.IsMouseButtonDown(EKeys::MiddleMouseButton))
 		{
 			Offset += (MouseLoc - CurMousePos);
-			float MaxWOffset = ViewPort->GetSize().X * (int(Zoom) - 1);
-			float MaxHOffset = ViewPort->GetSize().Y * (int(Zoom) - 1);
+			float MaxWOffset = (float)ViewPort->GetSize().X * (int(Zoom) - 1);
+			float MaxHOffset = (float)ViewPort->GetSize().Y * (int(Zoom) - 1);
 			Offset.x = FMath::Clamp(Offset.x, 0.0f, MaxWOffset);
 			Offset.y = FMath::Clamp(Offset.y, 0.0f, MaxHOffset);
 		}
@@ -144,12 +146,13 @@ namespace SH
 			return FReply::Unhandled();
 		}
 		
-		Vector2f CurMousePos = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * MyGeometry.Scale);
+		DpiScale = MyGeometry.Scale;
+		Vector2f CurMousePos = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * DpiScale);
 		Vector2f ContentPosBefore = (CurMousePos + Offset) / float(Zoom);
 		Zoom = FMath::Clamp(int32(float(Zoom) + MouseEvent.GetWheelDelta()), 1, 128);
 		Offset = ContentPosBefore * float(Zoom) - CurMousePos;
-		float MaxWOffset = ViewPort->GetSize().X * (int(Zoom) - 1);
-		float MaxHOffset = ViewPort->GetSize().Y * (int(Zoom) - 1);
+		float MaxWOffset = (float)ViewPort->GetSize().X * (int(Zoom) - 1);
+		float MaxHOffset = (float)ViewPort->GetSize().Y * (int(Zoom) - 1);
 		Offset.x = FMath::Clamp(Offset.x, 0.0f, MaxWOffset);
 		Offset.y = FMath::Clamp(Offset.y, 0.0f, MaxHOffset);
 		return FReply::Handled();

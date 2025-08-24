@@ -45,6 +45,10 @@ namespace FW
 		{
 			Result |= GpuResourceState::UnorderedAccess;
 		}
+		if (EnumHasAllFlags(Usage, GpuBufferUsage::Storage))
+		{
+			Result |= GpuResourceState::ShaderResourceRead;
+		}
 		if (EnumHasAllFlags(Usage, GpuBufferUsage::Uniform))
 		{
 			Result |= GpuResourceState::UniformBuffer;

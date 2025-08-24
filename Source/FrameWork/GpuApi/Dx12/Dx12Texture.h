@@ -10,7 +10,11 @@ namespace FW
 	class Dx12Sampler : public GpuSampler, public Dx12DeferredDeleteObject<Dx12Sampler>
 	{
 	public:
-		Dx12Sampler(TUniquePtr<CpuDescriptor> InHandle) : Handle(MoveTemp(InHandle)) {}
+		Dx12Sampler(TUniquePtr<CpuDescriptor> InHandle, const GpuSamplerDesc& InDesc) 
+			: GpuSampler(InDesc)
+			, Handle(MoveTemp(InHandle)) 
+
+		{}
 		CpuDescriptor* GetCpuDescriptor() const { return Handle.Get(); }
 	
 	private:

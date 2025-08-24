@@ -1,7 +1,6 @@
 #include "CommonHeader.h"
 #include "AssetViewFolderItem.h"
 #include "UI/Styles/FAppCommonStyle.h"
-#include <Widgets/Text/SInlineEditableTextBlock.h>
 #include <Styling/StyleColors.h>
 #include "UI/Widgets/Misc/CommonTableRow.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
@@ -11,6 +10,29 @@
 
 namespace FW
 {
+	AssetViewFolderItem::AssetViewFolderItem(const FString& InPath)
+		: AssetViewItem(InPath)
+	{
+		SAssignNew(FolderEditableTextBlock, SInlineEditableTextBlock)
+			.Font(FAppStyle::Get().GetFontStyle("SmallFont"))
+			.Text(FText::FromString(FPaths::GetBaseFilename(Path)))
+			.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
+			FString NewFolderPath = FPaths::GetPath(Path) / NewText.ToString();
+			if (NewFolderPath != Path)
+			{
+				if (IFileManager::Get().DirectoryExists(*NewFolderPath))
+				{
+					MessageDialog::Open(MessageDialog::Ok, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("AssetRenameFailure"));
+				}
+				else
+				{
+					RenamedOrMovedFolderMap.Add(Path, NewFolderPath);
+					IFileManager::Get().Move(*NewFolderPath, *Path);
+				}
+			}
+			})
+			.OverflowPolicy(ETextOverflowPolicy::Ellipsis);
+	}
 
     FReply AssetViewFolderItem::HandleOnDragDetected(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
     {
@@ -87,26 +109,8 @@ namespace FW
 				SNew(SBox)
 					.Padding(FMargin(2.0f, 0.0f, 2.0f, 0.0f))
 					[
-                    SAssignNew(FolderEditableTextBlock, SInlineEditableTextBlock)
-                    .Font(FAppStyle::Get().GetFontStyle("SmallFont"))
-                    .Text(FText::FromString(FPaths::GetBaseFilename(Path)))
-                    .OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
-                        FString NewFolderPath =  FPaths::GetPath(Path) / NewText.ToString();
-                        if(NewFolderPath != Path)
-                        {
-                            if(IFileManager::Get().DirectoryExists(*NewFolderPath))
-                            {
-                                MessageDialog::Open(MessageDialog::Ok, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("AssetRenameFailure"));
-                            }
-                            else
-                            {
-                                RenamedOrMovedFolderMap.Add(Path, NewFolderPath);
-                                IFileManager::Get().Move(*NewFolderPath, *Path);
-                            }
-                        }
-                    })
-                    .OverflowPolicy(ETextOverflowPolicy::Ellipsis)
-                ]
+						FolderEditableTextBlock.ToSharedRef()
+					]
 				
 			]
 		);

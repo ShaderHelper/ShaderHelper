@@ -59,4 +59,6 @@ namespace FW
 #include <Internationalization/StringTableRegistry.h>
 #define LOCALIZATION(Key) \
 	FText::FromStringTable(TEXT("Localization"), Key)
+
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	

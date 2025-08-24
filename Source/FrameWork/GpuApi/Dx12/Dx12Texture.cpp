@@ -49,7 +49,7 @@ namespace FW
 		}
 
 		if (EnumHasAnyFlags(InFlags, GpuTextureUsage::Shared)) {
-			OutResourceFlag |= D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS;
+			OutResourceFlag |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS;
 			OutFlags.bShared = true;
 		}
 
@@ -149,7 +149,7 @@ namespace FW
 		void* SharedHandle = nullptr;
 		if (Flags.bShared)
 		{
-			GDevice->CreateSharedHandle(TexResource, nullptr, GENERIC_ALL, nullptr, &SharedHandle);
+			DxCheck(GDevice->CreateSharedHandle(TexResource, nullptr, GENERIC_ALL, nullptr, &SharedHandle));
 		}
 
 		TRefCountPtr<Dx12Texture> RetTexture = new Dx12Texture{ MoveTemp(TexResource), bHasInitialData ? GpuResourceState::CopyDst : InitState, 
@@ -216,7 +216,7 @@ namespace FW
 		TUniquePtr<CpuDescriptor> SamplerDescriptor = AllocSampler();
 		GDevice->CreateSampler(&DxSamplerDesc, SamplerDescriptor->GetHandle());
 
-		return new Dx12Sampler(MoveTemp(SamplerDescriptor));
+		return new Dx12Sampler(MoveTemp(SamplerDescriptor), InSamplerDesc);
 	}
 
 }

@@ -9,7 +9,7 @@ namespace FW
     class MetalSampler : public GpuSampler
     {
     public:
-        MetalSampler(MTLSamplerStatePtr InSampler);
+        MetalSampler(MTLSamplerStatePtr InSampler, const GpuSamplerDesc& InDesc);
         
         MTL::SamplerState* GetResource() const {
             return Sampler.get();

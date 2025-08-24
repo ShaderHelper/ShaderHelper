@@ -18,6 +18,7 @@
 #include "UI/Widgets/Debugger/SDebuggerCallStackView.h"
 #include "UI/Widgets/Debugger/SDebuggerWatchView.h"
 #include "AssetObject/DebuggableObject.h"
+#include "UI/Widgets/Misc/SShWindow.h"
 
 namespace SH
 {
@@ -114,7 +115,7 @@ namespace SH
         TWeakPtr<class SDockingTabStack> ShaderTabStackInsertPoint;
         TSharedPtr<class SDockingArea> CodeTabMainArea;
         
-		TSharedPtr<SWindow> Window;
+		TSharedPtr<FW::SShWindow> Window;
 		TSharedPtr<SViewport> ViewportWidget;
 		TSharedPtr<FW::PreviewViewPort> ViewPort;
 		FVector2D WindowSize;

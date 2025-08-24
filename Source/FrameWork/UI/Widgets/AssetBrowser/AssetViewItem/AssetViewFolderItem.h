@@ -1,5 +1,6 @@
 #pragma once
 #include "AssetViewItem.h"
+#include <Widgets/Text/SInlineEditableTextBlock.h>
 
 namespace FW
 {
@@ -7,7 +8,7 @@ namespace FW
 	{
         MANUAL_RTTI_TYPE(AssetViewFolderItem, AssetViewItem)
 	public:
-		using AssetViewItem::AssetViewItem;
+		AssetViewFolderItem(const FString& InPath);
         
 		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override;
 		void EnterRenameState();
@@ -15,6 +16,6 @@ namespace FW
         FReply HandleOnDrop(const FDragDropEvent& DragDropEvent);
 
 	private:
-		TSharedPtr<class SInlineEditableTextBlock> FolderEditableTextBlock;
+		TSharedPtr<SInlineEditableTextBlock> FolderEditableTextBlock;
 	};
 }

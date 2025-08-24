@@ -13,12 +13,14 @@ namespace FW
 		SpvVmVisitor::Visit(Inst);
 		
 		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+
 		SpvVariableDesc* VarDesc = &Context.VariableDescs[Inst->GetVarDesc()];
-		SpvPointer* Pointer = GetPointer(Inst->GetPointer());
 		if(VarDesc->Name == "__Expression_Result")
 		{
 			PixelExprContext.ResultTypeDesc = VarDesc->TypeDesc;
-			PixelExprContext.ResultValue = GetPointerValue(&Context, Pointer);
+			PixelExprContext.ResultValue = GetPointerValue(&Context, CurStackFrame.Arguments[0]);
 			bTerminate = true;
 		}
 	}

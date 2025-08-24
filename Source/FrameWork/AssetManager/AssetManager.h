@@ -89,6 +89,10 @@ namespace FW
 		}
         AssetObject* FindLoadedAsset(const FString& InPath)
         {
+			if (!TryGetGuid(InPath))
+			{
+				return nullptr;
+			}
             return FindLoadedAsset(GetGuid(InPath));
         }
 
@@ -98,6 +102,7 @@ namespace FW
 
 		FString GetPath(const FGuid& InGuid) const;
 		FGuid GetGuid(const FString& InPath) const;
+		TOptional<FGuid> TryGetGuid(const FString& InPath) const;
 
 		//The asset may be deleted outside
 		bool IsValidAsset(const FGuid& Id) const { return GuidToPath.Contains(Id); }

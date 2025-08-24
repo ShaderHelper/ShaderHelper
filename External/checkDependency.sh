@@ -31,6 +31,6 @@ elif [ "$(uname)" = "Linux" ]; then
     Check "UE"
 else
     Check "AgilitySDK"
-    Check "DXC"
+    Check "ShaderConductor"
     Check "UE"
 fi
