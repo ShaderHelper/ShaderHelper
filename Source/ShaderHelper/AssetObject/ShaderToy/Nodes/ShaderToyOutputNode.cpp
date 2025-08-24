@@ -78,7 +78,7 @@ namespace SH
         
         BlitPassInput Input;
         Input.InputTex = ResultPin->GetValue();
-        Input.InputTexSampler = GGpuRhi->CreateSampler({ SamplerFilter::Bilinear});
+        Input.InputTexSampler = GpuResourceHelper::GetSampler({.Filter = SamplerFilter::Bilinear});
         Input.OutputRenderTarget = ShaderToyContext.FinalRT;
 
         AddBlitPass(*ShaderToyContext.RG, MoveTemp(Input));

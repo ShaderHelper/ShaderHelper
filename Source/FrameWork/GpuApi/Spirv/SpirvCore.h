@@ -411,16 +411,31 @@ namespace FW
 		
 		bool IsOpaque() const { return std::visit([](auto&& Arg){ return Arg.IsOpaque(); }, Storage); }
 		bool IsExternal() const { return std::holds_alternative<SpvObject::External>(Storage); }
+		int GetBufferSize() const { return std::visit([](auto&& Arg) { return Arg.Value.Num(); }, Storage); }
 		
 		std::variant<External, Internal> Storage;
 	};
 
+	//Named
 	struct SpvVariable : SpvObject
 	{
 		SpvStorageClass StorageClass;
 		TArray<Vector2i> InitializedRanges;//[Start,End]
+
+		bool IsCompletelyInitialized() const
+		{
+			int MinimumStart = std::numeric_limits<int>::max();
+			int MaximumEnd = std::numeric_limits<int>::min();
+			for(const auto& Range : InitializedRanges)
+			{
+				MinimumStart = FMath::Min(MinimumStart, Range.X);
+				MaximumEnd = FMath::Max(MaximumEnd, Range.Y);
+			}
+			return MinimumStart == 0 && MaximumEnd == GetBufferSize();
+		} 
 	};
 
+	//Logical
 	struct SpvPointer
 	{
 		SpvId Id{};
@@ -551,10 +566,12 @@ namespace FW
 		DPdx = 207,
 		DPdy = 208,
 		Fwidth = 209,
+		Phi = 245,
 		Label = 248,
 		Branch = 249,
 		BranchConditional = 250,
 		Switch = 251,
+		Kill = 252,
 		Return = 253,
 		ReturnValue = 254,
 	};

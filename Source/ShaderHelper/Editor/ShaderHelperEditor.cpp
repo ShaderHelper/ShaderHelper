@@ -14,7 +14,6 @@
 #include "UI/Widgets/Misc/CommonCommands.h"
 
 STEAL_PRIVATE_MEMBER(FTabManager, TArray<TSharedRef<FTabManager::FArea>>, CollapsedDockAreas)
-CALL_PRIVATE_FUNCTION(FSlateUser_LockCursor, FSlateUser, LockCursor,, void, const TSharedRef<SWidget>&)
 
 using namespace FW;
 
@@ -37,6 +36,14 @@ namespace SH
 		, WindowSize(InWindowSize)
 	{
 		UICommandList = MakeShared<FUICommandList>();
+		UICommandList->MapAction(
+			CommonCommands::Get().Continue,
+			FExecuteAction::CreateLambda([this] {
+				SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
+				ShaderEditor->Continue();
+				}),
+			FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); })
+		);
 		UICommandList->MapAction(
 			CommonCommands::Get().StepInto,
 			FExecuteAction::CreateLambda([this]{
@@ -62,9 +69,7 @@ namespace SH
 	ShaderHelperEditor::~ShaderHelperEditor()
 	{
 		Renderer->ClearRenderComp();
-		PRAGMA_DISABLE_DEPRECATION_WARNINGS
 		FTicker::GetCoreTicker().RemoveTicker(SaveLayoutTicker);
-		PRAGMA_ENABLE_DEPRECATION_WARNINGS
         if(FSlateApplication::IsInitialized())
         {
             FSlateApplication::Get().DestroyWindowImmediately(Window.ToSharedRef());
@@ -207,7 +212,7 @@ namespace SH
 			AutoCenterRule = EAutoCenter::None;
 		}
 
-		SAssignNew(Window, SWindow)
+		SAssignNew(Window, SShWindow)
 			.Title(TAttribute<FText>::CreateLambda([this] { 
 				FString ProjectPath = CurProject->GetFilePath();
                 int Fps = FMath::RoundToInt(1 / GApp->GetDeltaTime());
@@ -216,6 +221,14 @@ namespace SH
 			.ScreenPosition(UsedWindowPos)
 			.AutoCenter(AutoCenterRule)
 			.ClientSize(UsedWindowSize);
+		Window->SetKeyDownHandler(FOnKeyDown::CreateLambda([this](const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) {
+			//Process tool bar commands.
+			if (UICommandList.IsValid())
+			{
+				UICommandList->ProcessCommandBindings(InKeyEvent);
+			}
+			return FReply::Handled();
+		}));
 
 		CreateInternalWidgets();
 		TabManagerTab->AssignParentWidget(Window);
@@ -263,6 +276,7 @@ namespace SH
 					.OnHandleMove([this](float){
 						ForceRender();
 					})
+					.IsEnabled_Lambda([this] { return !IsDebugging; })
             ]
 		);
         TabManager->FindExistingLiveTab(CodeTabId)->GetParentDockTabStack()->SetCanDropToAttach(false);
@@ -270,14 +284,14 @@ namespace SH
         //Add native menu bar for the window on mac.
         TabManager->SetMenuMultiBox(MenuBarBuilder.GetMultiBox(), MenuBarWidget);
         TabManager->UpdateMainMenu(nullptr, true);
-PRAGMA_DISABLE_DEPRECATION_WARNINGS
+
         SaveLayoutTicker = FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this](float) {
             TabManager->SavePersistentLayout();
             CurProject->CodeTabLayout = CodeTabManager->PersistLayout();
 			CurProject->Save();
             return true;
         }), 2.0f);
-PRAGMA_ENABLE_DEPRECATION_WARNINGS
+
 		Window->SetRequestDestroyWindowOverride(FRequestDestroyWindowOverride::CreateLambda([this](const TSharedRef<SWindow>& InWindow) {
 			if(CurProject->AnyPendingAsset())
 			{
@@ -709,7 +723,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 	void ShaderHelperEditor::OpenGraph(AssetPtr<Graph> InGraphData, TSharedPtr<RenderComponent> InGraphRenderComp)
 	{
-		if(CurProject->Graph->IsDirty())
+		if(CurProject->Graph && CurProject->Graph->IsDirty())
 		{
 			auto Ret = MessageDialog::Open(MessageDialog::OkNoCancel, Window, LOCALIZATION("SaveAssetTip"));
 			if(Ret == MessageDialog::MessageRet::Cancel)
@@ -839,19 +853,15 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	}
 
 	void ShaderHelperEditor::StartDebugging()
-	{
-		//Render once immediately for debugging
-		{
-			TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = false;
-			Renderer->Render();
-			TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = true;
-		}
-		
-		IsDebugging = true;
+	{		
 		TRefCountPtr<GpuTexture> DebugTarget = CurDebuggableObject->OnStartDebugging();
-		DebuggerViewport->SetDebugTarget(MoveTemp(DebugTarget));
-		auto User0 = FSlateApplication::Get().GetUser(0);
-		CallPrivate_FSlateUser_LockCursor(*User0, DebuggerViewport.ToSharedRef());
+		if(DebugTarget)
+		{
+			IsDebugging = true;
+			DebuggerViewport->SetDebugTarget(MoveTemp(DebugTarget));
+			auto User0 = FSlateApplication::Get().GetUser(0);
+			User0->LockCursor(DebuggerViewport.ToSharedRef());
+		}
 	}
 
 	FToolBarBuilder ShaderHelperEditor::CreateToolBarBuilder()

@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "SPropertyItem.h"
 #include "UI/Styles/FAppCommonStyle.h"
-#include <Widgets/Text/SInlineEditableTextBlock.h>
+#include "UI/Widgets/Misc/MiscWidget.h"
 
 namespace FW
 {
@@ -17,8 +17,7 @@ namespace FW
 	void SPropertyItem::Construct(const FArguments& InArgs)
 	{
         DisplayName = InArgs._DisplayName;
-        auto ItemTextBlock = SNew(SInlineEditableTextBlock)
-            .IsSelected_Lambda([] {return true; })
+        auto ItemTextBlock = SNew(SShInlineEditableTextBlock)
             .IsReadOnly(!InArgs._OnDisplayNameChanged)
             .Text_Lambda([this] {
                 return FText::FromString(*DisplayName);

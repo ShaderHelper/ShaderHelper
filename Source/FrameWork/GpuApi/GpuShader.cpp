@@ -311,6 +311,136 @@ namespace FW
         TRefCountPtr<IDxcIndex> Index;
         TRefCountPtr<IDxcUnsavedFile> Unsaved;
         TRefCountPtr<IDxcTranslationUnit> TU;
+		TRefCountPtr<IDxcFile> DxcFile;
+		TRefCountPtr<IDxcCursor> DxcRootCursor;
+
+		TArray<ShaderFunc> Funcs;
+
+		void GetCursorRange(IDxcCursor* InCursor, Vector2i& OutStart, Vector2i& OutEnd)
+		{
+			TRefCountPtr<IDxcSourceRange> Extent;
+			InCursor->GetExtent(Extent.GetInitReference());
+
+			TRefCountPtr<IDxcSourceLocation> StartLoc, EndLoc;
+			Extent->GetStart(StartLoc.GetInitReference());
+			Extent->GetEnd(EndLoc.GetInitReference());
+
+			TRefCountPtr<IDxcFile> CursorFile;
+			unsigned StartLine, StartCol, EndLine, EndCol;
+			StartLoc->GetSpellingLocation(CursorFile.GetInitReference(), &StartLine, &StartCol, nullptr);
+			EndLoc->GetSpellingLocation(CursorFile.GetInitReference(), &EndLine, &EndCol, nullptr);
+			OutStart = Vector2i(StartLine, StartCol);
+			OutEnd = Vector2i(EndLine, EndCol);
+		}
+
+		bool IsMainFile(IDxcCursor* InCursor)
+		{
+			TRefCountPtr<IDxcSourceRange> Extent;
+			InCursor->GetExtent(Extent.GetInitReference());
+
+			TRefCountPtr<IDxcSourceLocation> StartLoc, EndLoc;
+			Extent->GetStart(StartLoc.GetInitReference());
+			Extent->GetEnd(EndLoc.GetInitReference());
+
+			TRefCountPtr<IDxcFile> CursorFile;
+			unsigned StartLine, StartCol, EndLine, EndCol;
+			StartLoc->GetSpellingLocation(CursorFile.GetInitReference(), &StartLine, &StartCol, nullptr);
+			EndLoc->GetSpellingLocation(CursorFile.GetInitReference(), &EndLine, &EndCol, nullptr);
+
+			BOOL IsInMainFile;
+			CursorFile->IsEqualTo(DxcFile, &IsInMainFile);
+
+			return IsInMainFile;
+		}
+
+		void TraversalAST(IDxcCursor* InCursor)
+		{
+			unsigned int NumChildren = 0;
+			IDxcCursor** Children = nullptr;
+			InCursor->GetChildren(0, -1, &NumChildren, &Children);
+			for (unsigned int i = 0; i < NumChildren; ++i)
+			{
+				IDxcCursor* ChildCursor = Children[i];
+				DxcCursorKind Kind;
+				ChildCursor->GetKind(&Kind);
+
+				TRefCountPtr<IDxcSourceRange> Extent;
+				ChildCursor->GetExtent(Extent.GetInitReference());
+				
+				if(IsMainFile(ChildCursor))
+				{
+					if (Kind == DxcCursor_FunctionDecl || Kind == DxcCursor_CXXMethod)
+					{
+						BOOL IsDefinition;
+						ChildCursor->IsDefinition(&IsDefinition);
+						if (IsDefinition)
+						{
+							LPSTR CursorName;
+							ChildCursor->GetSpelling(&CursorName);
+							Vector2i FuncStart, FuncEnd;
+							GetCursorRange(ChildCursor, FuncStart, FuncEnd);
+							Funcs.Emplace(ANSI_TO_TCHAR(CursorName), FuncStart, FuncEnd);
+							CoTaskMemFree(CursorName);
+						}
+					}
+					else if (Kind == DxcCursor_ParmDecl)
+					{
+						LPSTR ParmName;
+						ChildCursor->GetSpelling(&ParmName);
+
+						ParamSemaFlag Flag = ParamSemaFlag::None;
+						unsigned int TokenCount;
+						IDxcToken** Tokens;
+						TU->Tokenize(Extent, &Tokens, &TokenCount);
+						for (unsigned int j = 0; j < TokenCount; j++)
+						{
+							LPSTR TokenCStr;
+							Tokens[j]->GetSpelling(&TokenCStr);
+							FString TokenStr = TokenCStr;
+							CoTaskMemFree(TokenCStr);
+
+							if (TokenStr == "out")
+							{
+								Flag = ParamSemaFlag::Out;
+								break;
+							}
+							else if (TokenStr == "in")
+							{
+								Flag = ParamSemaFlag::In;
+								break;
+							}
+							else if (TokenStr == "inout")
+							{
+								Flag = ParamSemaFlag::Inout;
+								break;
+							}
+						}
+
+						TRefCountPtr<IDxcCursor> FuncCursor;
+						ChildCursor->GetSemanticParent(FuncCursor.GetInitReference());
+						LPSTR FuncName;
+						FuncCursor->GetSpelling(&FuncName);
+
+						Vector2i FuncStart, FuncEnd;
+						GetCursorRange(FuncCursor, FuncStart, FuncEnd);
+						ShaderFunc* Func = Funcs.FindByPredicate([&](const ShaderFunc& InItem) {
+							return InItem.Name == ANSI_TO_TCHAR(FuncName) && InItem.Start == FuncStart && InItem.End == FuncEnd;
+						});
+						if (Func)
+						{
+							Func->Params.Emplace(ANSI_TO_TCHAR(ParmName), Flag);
+						}
+
+						CoTaskMemFree(Tokens);
+						CoTaskMemFree(FuncName);
+						CoTaskMemFree(ParmName);
+					}
+				}
+				TraversalAST(ChildCursor);
+				ChildCursor->Release();
+			}
+			CoTaskMemFree(Children);
+		}
     };
 
 	ShaderTU::ShaderTU(FStringView HlslSource, const TArray<FString>& IncludeDirs)
@@ -322,10 +452,6 @@ namespace FW
         Impl->ISense->CreateUnsavedFile("Temp.hlsl", (char*)SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR), Impl->Unsaved.GetInitReference());
         
 		TArray<const char*> DxcArgs;
-		DxcArgs.Add("-HV");
-		DxcArgs.Add("2021");
-		//DxcArgs.Add("-D");
-		//DxcArgs.Add("ENABLE_PRINT=0");
 		TArray<FTCHARToUTF8> CharIncludeDirs;
         for (const FString& IncludeDir : IncludeDirs)
         {
@@ -336,6 +462,10 @@ namespace FW
 
         DxcTranslationUnitFlags UnitFlag = DxcTranslationUnitFlags(DxcTranslationUnitFlags_UseCallerThread | DxcTranslationUnitFlags_DetailedPreprocessingRecord);
         Impl->Index->ParseTranslationUnit("Temp.hlsl", DxcArgs.GetData(), DxcArgs.Num(), AUX::GetAddrExt(Impl->Unsaved.GetReference()), 1, UnitFlag, Impl->TU.GetInitReference());
+
+		Impl->TU->GetFile("Temp.hlsl", Impl->DxcFile.GetInitReference());
+		Impl->TU->GetCursor(Impl->DxcRootCursor.GetInitReference());
+		Impl->TraversalAST(Impl->DxcRootCursor);
     }
 
     TArray<ShaderDiagnosticInfo> ShaderTU::GetDiagnostic()
@@ -421,14 +551,14 @@ namespace FW
 		DxcReferencedCursor->GetLexicalParent(DxcReferencedCursorLexPar.GetInitReference());
 		DxcReferencedCursorLexPar->GetKind(&ReferencedCursorLexParKind);
 		
-		BSTR CursorName;
-		BSTR ReferencedCursorName;
-		DxcCursor->GetDisplayName(&CursorName);
-		DxcReferencedCursor->GetDisplayName(&ReferencedCursorName);
-		LPSTR CursorSpelling;
-		LPSTR ReferencedCursorSpelling;
-		DxcCursor->GetSpelling(&CursorSpelling);
-		DxcCursor->GetSpelling(&ReferencedCursorSpelling);
+		//BSTR CursorName;
+		//BSTR ReferencedCursorName;
+		//DxcCursor->GetDisplayName(&CursorName);
+		//DxcReferencedCursor->GetDisplayName(&ReferencedCursorName);
+		//LPSTR CursorSpelling;
+		//LPSTR ReferencedCursorSpelling;
+		//DxcCursor->GetSpelling(&CursorSpelling);
+		//DxcCursor->GetSpelling(&ReferencedCursorSpelling);
 		
 		if(InType == HLSL::TokenType::Identifier)
 		{
@@ -469,56 +599,9 @@ namespace FW
 		return InType;
 	}
 
-	TArray<ShaderFuncScope> ShaderTU::GetFuncScopes()
+	TArray<ShaderFunc> ShaderTU::GetFuncs()
 	{
-		TRefCountPtr<IDxcFile> DxcFile;
-		Impl->TU->GetFile("Temp.hlsl", DxcFile.GetInitReference());
-		
-		TArray<ShaderFuncScope> Scopes;
-		TRefCountPtr<IDxcCursor> DxcRootCursor;
-		Impl->TU->GetCursor(DxcRootCursor.GetInitReference());
-		
-		unsigned int NumChildren = 0;
-		IDxcCursor** Children = nullptr;
-		DxcRootCursor->GetChildren(0, -1, &NumChildren, &Children);
-		for (unsigned int i = 0; i < NumChildren; ++i)
-		{
-			IDxcCursor* ChildCursor = Children[i];
-			DxcCursorKind Kind;
-			ChildCursor->GetKind(&Kind);
-			BOOL IsDefinition;
-			ChildCursor->IsDefinition(&IsDefinition);
-			if(IsDefinition && (Kind == DxcCursor_FunctionDecl || Kind == DxcCursor_CXXMethod))
-			{
-				TRefCountPtr<IDxcSourceRange> Extent;
-				ChildCursor->GetExtent(Extent.GetInitReference());
-
-				TRefCountPtr<IDxcSourceLocation> StartLoc, EndLoc;
-				Extent->GetStart(StartLoc.GetInitReference());
-				Extent->GetEnd(EndLoc.GetInitReference());
-
-				TRefCountPtr<IDxcFile> CursorFile;
-				unsigned StartLine, StartCol, EndLine, EndCol;
-				StartLoc->GetSpellingLocation(CursorFile.GetInitReference(), &StartLine, &StartCol, nullptr);
-				EndLoc->GetSpellingLocation(CursorFile.GetInitReference(), &EndLine, &EndCol, nullptr);
-				BOOL IsInMainFile;
-				CursorFile->IsEqualTo(DxcFile, &IsInMainFile);
-				if(IsInMainFile)
-				{
-					LPSTR CursorName;
-					ChildCursor->GetSpelling(&CursorName);
-					
-					Scopes.Emplace(ANSI_TO_TCHAR(CursorName), Vector2i(StartLine, StartCol), Vector2i(EndLine, EndCol));
-					CoTaskMemFree(CursorName);
-				}
-			}
-			
-			ChildCursor->Release();
-		}
-		
-		CoTaskMemFree(Children);
-
-		return Scopes;
+		return Impl->Funcs;
 	}
 
     TArray<ShaderCandidateInfo> ShaderTU::GetCodeComplete(uint32 Row, uint32 Col)

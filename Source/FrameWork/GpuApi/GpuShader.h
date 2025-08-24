@@ -170,11 +170,26 @@ namespace FW
         }
     };
 
-	struct ShaderFuncScope
+	enum class ParamSemaFlag
+	{
+		None = 0,
+		In = 1,
+		Out = 2,
+		Inout = 3
+	};
+
+	struct ShaderParameter
+	{
+		FString Name;
+		ParamSemaFlag SemaFlag;
+	};
+
+	struct ShaderFunc
 	{
 		FString Name;
 		Vector2i Start;
 		Vector2i End;
+		TArray<ShaderParameter> Params;
 	};
 
 	FRAMEWORK_API FString AdjustDiagLineNumber(const FString& ErrorInfo, int32 Delta);
@@ -187,7 +202,7 @@ namespace FW
 		TArray<ShaderDiagnosticInfo> GetDiagnostic();
 		HLSL::TokenType GetTokenType(HLSL::TokenType InType, uint32 Row, uint32 Col);
         TArray<ShaderCandidateInfo> GetCodeComplete(uint32 Row, uint32 Col);
-		TArray<ShaderFuncScope> GetFuncScopes();
+		TArray<ShaderFunc> GetFuncs();
         
     private:
         TPimplPtr<struct ShaderTUImpl> Impl;

@@ -10,7 +10,9 @@ namespace FW
 	{
 		switch (InType)
 		{
-		case BindingType::Texture:			return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		case BindingType::Texture:
+		case BindingType::StorageBuffer:
+			return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 		case BindingType::Sampler:			return D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
 		case BindingType::RWStorageBuffer:  return D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
 		default:
@@ -21,7 +23,6 @@ namespace FW
 	Dx12BindGroupLayout::Dx12BindGroupLayout(const GpuBindGroupLayoutDesc& LayoutDesc)
 		: GpuBindGroupLayout(LayoutDesc)
 	{
-
 		auto SetRootParameterInfo = [&](BindingSlot Slot,const LayoutBinding& LayoutBindingEntry, D3D12_SHADER_VISIBILITY BindingVisibility)
 		{
 			//For the moment, all uniformbuffers in the layout are bound via root descriptor.
@@ -38,8 +39,9 @@ namespace FW
 				Range.NumDescriptors = 1;
 				Range.BaseShaderRegister = Slot;
 				Range.RegisterSpace = LayoutDesc.GroupNumber;
+				Range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-				if (LayoutBindingEntry.Type == BindingType::Texture || LayoutBindingEntry.Type == BindingType::RWStorageBuffer)
+				if (LayoutBindingEntry.Type == BindingType::Texture || LayoutBindingEntry.Type == BindingType::RWStorageBuffer || LayoutBindingEntry.Type == BindingType::StorageBuffer)
 				{
 					DescriptorTableRanges_CbvSrvUav.FindOrAdd(BindingVisibility).Add(MoveTemp(Range));
 				}
@@ -129,7 +131,7 @@ namespace FW
 		TMap<D3D12_SHADER_VISIBILITY, TArray<D3D12_CPU_DESCRIPTOR_HANDLE>> SrcDescriptorRange_CbvSrvUav;
 		TMap<D3D12_SHADER_VISIBILITY, TArray<D3D12_CPU_DESCRIPTOR_HANDLE>> SrcDescriptorRange_Sampler;
 
-		auto SetTableBindingVisibility = [&](BindingSlot Slot, const ResourceBinding& ResourceBindingEntry, D3D12_SHADER_VISIBILITY BindingVisibility)
+		auto SetBindingTable = [&](BindingSlot Slot, const ResourceBinding& ResourceBindingEntry, D3D12_SHADER_VISIBILITY BindingVisibility)
 		{
 			GpuResource* BindingResource = ResourceBindingEntry.Resource;
 			if (BindingResource->GetType() == GpuResourceType::Sampler)
@@ -148,6 +150,10 @@ namespace FW
 				if (EnumHasAllFlags(Buffer->GetUsage(), GpuBufferUsage::RWStorage))
 				{
 					SrcDescriptorRange_CbvSrvUav.FindOrAdd(BindingVisibility).Add(Buffer->UAV->GetHandle());
+				}
+				else if (EnumHasAllFlags(Buffer->GetUsage(), GpuBufferUsage::Storage))
+				{
+					SrcDescriptorRange_CbvSrvUav.FindOrAdd(BindingVisibility).Add(Buffer->SRV->GetHandle());
 				}
 			}
 		};
@@ -169,35 +175,41 @@ namespace FW
 
 			if (EnumHasAllFlags(RHIShaderStage, BindingShaderStage::All) || EnumHasAnyFlags(RHIShaderStage, BindingShaderStage::Compute))
 			{
-				SetTableBindingVisibility(Slot, ResourceBindingEntry, D3D12_SHADER_VISIBILITY_ALL);
+				SetBindingTable(Slot, ResourceBindingEntry, D3D12_SHADER_VISIBILITY_ALL);
 			}
 			else
 			{
 				if (EnumHasAnyFlags(RHIShaderStage, BindingShaderStage::Vertex))
 				{
-					SetTableBindingVisibility(Slot, ResourceBindingEntry, D3D12_SHADER_VISIBILITY_VERTEX);
+					SetBindingTable(Slot, ResourceBindingEntry, D3D12_SHADER_VISIBILITY_VERTEX);
 				}
 
 				if (EnumHasAnyFlags(RHIShaderStage, BindingShaderStage::Pixel))
 				{
-					SetTableBindingVisibility(Slot, ResourceBindingEntry, D3D12_SHADER_VISIBILITY_PIXEL);
+					SetBindingTable(Slot, ResourceBindingEntry, D3D12_SHADER_VISIBILITY_PIXEL);
 				}
 			}
 		}
 
 		for (const auto& [DxVisibility, SrcRange] : SrcDescriptorRange_CbvSrvUav)
 		{
-			uint32 NumDescriptors = SrcRange.Num();
+			int NumDescriptors = SrcRange.Num();
 			TUniquePtr<GpuDescriptorRange> GpuHeapRanges = AllocGpuCbvSrvUavRange(NumDescriptors);
-			GDevice->CopyDescriptorsSimple(NumDescriptors, GpuHeapRanges->GetCpuHandle(), *SrcRange.GetData(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			for (int Index = 0; Index < NumDescriptors; Index++)
+			{
+				GDevice->CopyDescriptorsSimple(NumDescriptors, GpuHeapRanges->GetCpuHandle(Index), SrcRange[Index], D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			}
 			DescriptorTableStorage_CbvSrvUav.Add(DxVisibility, MoveTemp(GpuHeapRanges));
 		}
 
 		for (const auto& [DxVisibility, SrcRange] : SrcDescriptorRange_Sampler)
 		{
-			uint32 NumDescriptors = SrcRange.Num();
+			int NumDescriptors = SrcRange.Num();
 			TUniquePtr<GpuDescriptorRange> GpuHeapRanges = AllocGpuSamplerRange(NumDescriptors);
-			GDevice->CopyDescriptorsSimple(NumDescriptors, GpuHeapRanges->GetCpuHandle(), *SrcRange.GetData(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+			for (int Index = 0; Index < NumDescriptors; Index++)
+			{
+				GDevice->CopyDescriptorsSimple(NumDescriptors, GpuHeapRanges->GetCpuHandle(Index), SrcRange[Index], D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+			}
 			DescriptorTableStorage_Sampler.Add(DxVisibility, MoveTemp(GpuHeapRanges));
 		}
 	
@@ -277,15 +289,15 @@ namespace FW
 				for (int Visibility = 0; Visibility <= D3D12_SHADER_VISIBILITY_MESH; Visibility++)
 				{
 					D3D12_SHADER_VISIBILITY DxVisibility = static_cast<D3D12_SHADER_VISIBILITY>(Visibility);
-					if (Layout->GetDescriptorTableRootParameter_CbvSrvUav(DxVisibility))
+					if (TOptional<CD3DX12_ROOT_PARAMETER> RootParameter = Layout->GetDescriptorTableRootParameter_CbvSrvUav(DxVisibility))
 					{
-						RootParameters.Add(*Layout->GetDescriptorTableRootParameter_CbvSrvUav(DxVisibility));
+						RootParameters.Add(*RootParameter);
 						CbvSrvUavTableToRootParameterIndex[CurGroupNumber].Add(DxVisibility, RootParameters.Num() - 1);
 					}
 
-					if (Layout->GetDescriptorTableRootParameter_Sampler(DxVisibility))
+					if (TOptional<CD3DX12_ROOT_PARAMETER> RootParameter = Layout->GetDescriptorTableRootParameter_Sampler(DxVisibility))
 					{
-						RootParameters.Add(*Layout->GetDescriptorTableRootParameter_Sampler(DxVisibility));
+						RootParameters.Add(*RootParameter);
 						SamplerTableToRootParameterIndex[CurGroupNumber].Add(DxVisibility, RootParameters.Num() - 1);
 					}
 				}

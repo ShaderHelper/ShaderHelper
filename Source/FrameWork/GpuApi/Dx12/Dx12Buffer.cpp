@@ -12,7 +12,21 @@ namespace FW
 	{
 		Allocation.SetOwner(this);
 
-		if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::RWStorage))
+		if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::Storage))
+		{
+			SRV = AllocCpuCbvSrvUav();
+			if (Allocation.GetPolicy() == AllocationPolicy::Placed || Allocation.GetPolicy() == AllocationPolicy::Committed)
+			{
+				D3D12_SHADER_RESOURCE_VIEW_DESC SrvDesc{};
+				SrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+				SrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+				SrvDesc.Buffer.NumElements = InBufferDesc.ByteSize / InBufferDesc.Stride;
+				SrvDesc.Buffer.StructureByteStride = InBufferDesc.Stride;
+				GDevice->CreateShaderResourceView(Allocation.GetResource(), &SrvDesc, SRV->GetHandle());
+			}
+
+		}
+		else if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::RWStorage))
 		{
 			UAV = AllocCpuCbvSrvUav();
 			if (Allocation.GetPolicy() == AllocationPolicy::Placed || Allocation.GetPolicy() == AllocationPolicy::Committed)
@@ -58,7 +72,12 @@ namespace FW
 		D3D12_RESOURCE_STATES InitDxState = MapResourceState(ResourceState);
 
 		TRefCountPtr<Dx12Buffer> RetBuffer;
-		if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::RWStorage))
+		if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::Storage))
+		{
+			CommonAllocationData AllocationData = GCommonBufferAllocator->Alloc(InBufferDesc.ByteSize, D3D12_HEAP_TYPE_DEFAULT, DxBufferDesc, InitDxState);
+			RetBuffer = new Dx12Buffer{ InBufferDesc, ResourceState, AllocationData, IsDeferred };
+		}
+		else if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::RWStorage))
 		{
 			DxBufferDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 			CommonAllocationData AllocationData = GCommonBufferAllocator->Alloc(InBufferDesc.ByteSize, D3D12_HEAP_TYPE_DEFAULT, DxBufferDesc, InitDxState);

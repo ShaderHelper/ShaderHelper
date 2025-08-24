@@ -70,7 +70,7 @@ namespace SH
 		ShaderAsset* GetShaderAsset() const;
 		
     private:
-		FW::GpuBindGroup* GetBuiltInBindGroup();
+		TRefCountPtr<FW::GpuBindGroup> GetBuiltInBindGroup();
 		void InitShader();
 		void InitCustomBindGroup();
         void ClearBindingProperty();

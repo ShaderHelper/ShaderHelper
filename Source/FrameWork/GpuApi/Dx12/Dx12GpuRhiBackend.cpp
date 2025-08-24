@@ -134,12 +134,10 @@ bool Dx12GpuRhiBackend::CompileShader(GpuShader *InShader, FString &OutErrorInfo
 void Dx12GpuRhiBackend::Submit(const TArray<GpuCmdRecorder*>& CmdRecorders)
 {
 	TArray<ID3D12CommandList*> CmdLists;
-	//The commandLists must be closed before executing them.
 	for (auto CmdRecorder : CmdRecorders)
 	{
 		Dx12CmdRecorder* DxCmdRecorder = static_cast<Dx12CmdRecorder*>(CmdRecorder);
 		ID3D12GraphicsCommandList* CmdList = DxCmdRecorder->GetCommandList();
-		DxCheck(CmdList->Close());
 		CmdLists.Add(CmdList);
 	}
 
@@ -288,7 +286,9 @@ GpuCmdRecorder* Dx12GpuRhiBackend::BeginRecording(const FString& RecorderName)
 
 void Dx12GpuRhiBackend::EndRecording(GpuCmdRecorder* InCmdRecorder)
 {
-
+	//The commandLists must be closed before executing them.
+	Dx12CmdRecorder* DxCmdRecorder = static_cast<Dx12CmdRecorder*>(InCmdRecorder);
+	DxCmdRecorder->End();
 }
 
 }

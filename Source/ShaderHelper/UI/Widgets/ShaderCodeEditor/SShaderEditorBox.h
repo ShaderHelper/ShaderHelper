@@ -211,7 +211,6 @@ namespace SH
         FSlateColor GetEditStateColor() const;
 		int32 GetLineNumber(int32 InLineIndex) const;
 		int32 GetLineIndex(int32 InLineNumber) const;
-		int32 GetCurMaxLineNumber() const;
 		int32 GetCurDisplayLineCount() const { return ShaderMarshaller->TextLayout->GetLineCount(); }
         void Compile();
 
@@ -221,6 +220,8 @@ namespace SH
 		
 		//Given a range for displayed text, then return the unfolding result.
 		FString UnFoldText(const FTextSelection& DisplayedTextRange);
+		void UnFold(int32 LineNumber);
+		void Fold(int32 LineNumber);
         
         void UpdateLineNumberData();
         void RefreshLineNumberToDiagInfo();
@@ -271,8 +272,6 @@ namespace SH
 		std::atomic<bool> bQuitISyntax{};
 		std::atomic<bool> bRefreshSyntax{};
 		FEvent* SyntaxEvent = nullptr;
-		TArray<FW::ShaderFuncScope> FuncScopes;
-		TArray<FW::ShaderFuncScope> FuncScopesCopy;
 		//
         
 	private:
@@ -299,6 +298,7 @@ namespace SH
 		FTextSelection SelectionBeforeEdit;
 
 		ShaderAsset* ShaderAssetObj;
+		FDelegateHandle RefreshBuilderHandle;
         EditState CurEditState;
 		TSharedPtr<SHorizontalBox> InfoBarBox;
 
@@ -326,6 +326,7 @@ namespace SH
 		bool bTryToggleCommentSelection = false;
 		
 		//Debugger
+		TArray<FW::ShaderFunc> Funcs;
 		TArray<TPair<FW::SpvLexicalScope*, int>> CallStack;
 		FW::SpvLexicalScope* Scope = nullptr;
 		TMultiMap<FW::SpvId, FW::SpvVariableChange::DirtyRange> DirtyVars;
@@ -338,5 +339,6 @@ namespace SH
 		std::optional<FW::SpvObject> CurReturnObject;
 		FW::SpvVariable* AssertResult = nullptr;
 		std::optional<FW::SpvVmPixelContext> VmPixelContext;
+		bool bEditDuringDebugging{};
 	};
 }

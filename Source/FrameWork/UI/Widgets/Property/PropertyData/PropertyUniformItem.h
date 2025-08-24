@@ -8,15 +8,17 @@ namespace FW
     class PropertyUniformItem : public PropertyItemBase
     {
     public:
-        PropertyUniformItem(ShObject* InOwner, FString InName, UniformBufferMemberWrapper<T> InValueRef)
+        PropertyUniformItem(ShObject* InOwner, FString InName, UniformBufferMemberWrapper<T> InValueRef, const TAttribute<bool>& InWritable = false)
             : PropertyItemBase(InOwner, MoveTemp(InName))
             , ValueRef(InValueRef)
+			, Writable(InWritable)
         {}
 
         TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override;
 
     private:
         UniformBufferMemberWrapper<T> ValueRef;
+		TAttribute<bool> Writable;
     };
 
 	bool IsProperyUniformItem(PropertyData* InProprety)
@@ -38,6 +40,7 @@ namespace FW
                 }
             })
             .Value_Lambda([this] { return ValueRef; });
+		ValueWidget->SetEnabled(Writable);
         Item->AddWidget(MoveTemp(ValueWidget));
         return Row;
     }
@@ -75,6 +78,7 @@ namespace FW
                 })
                 .Value_Lambda([this] { return ((Vector2f&)ValueRef).y; })
             ];
+		ValueWidget->SetEnabled(Writable);
         Item->AddWidget(MoveTemp(ValueWidget));
         return Row;
     }
@@ -126,6 +130,7 @@ namespace FW
 				})
 				.Value_Lambda([this] { return ((Vector3f&)ValueRef).z; })
 			];
+		ValueWidget->SetEnabled(Writable);
 		Item->AddWidget(MoveTemp(ValueWidget));
 		return Row;
 	}
@@ -199,6 +204,7 @@ namespace FW
 						.Value_Lambda([this] { return ((Vector4f&)ValueRef).w; })
 				]
 			];
+		ValueWidget->SetEnabled(Writable);
 		Item->AddWidget(MoveTemp(ValueWidget));
 		return Row;
 	}

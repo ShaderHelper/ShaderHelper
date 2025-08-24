@@ -42,11 +42,11 @@ namespace FW
 		}
 
 		D3D12_GPU_DESCRIPTOR_HANDLE GetDescriptorTableStart_CbvSrvUav(D3D12_SHADER_VISIBILITY Visibility) const {
-			return DescriptorTableStorage_CbvSrvUav[Visibility]->GetGpuHandle();
+			return DescriptorTableStorage_CbvSrvUav[Visibility]->GetGpuHandle(0);
 		}
 
 		D3D12_GPU_DESCRIPTOR_HANDLE GetDescriptorTableStart_Sampler(D3D12_SHADER_VISIBILITY Visibility) const {
-			return DescriptorTableStorage_Sampler[Visibility]->GetGpuHandle();
+			return DescriptorTableStorage_Sampler[Visibility]->GetGpuHandle(0);
 		}
         
         void ApplyDrawBinding(ID3D12GraphicsCommandList* CommandList, class Dx12RootSignature* RootSig);

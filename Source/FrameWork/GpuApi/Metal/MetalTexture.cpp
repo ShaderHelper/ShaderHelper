@@ -9,8 +9,9 @@
 
 namespace FW
 {
-    MetalSampler::MetalSampler(MTLSamplerStatePtr InSampler)
-    : Sampler(MoveTemp(InSampler))
+    MetalSampler::MetalSampler(MTLSamplerStatePtr InSampler, const GpuSamplerDesc& InDesc)
+    : GpuSampler(InDesc)
+	, Sampler(MoveTemp(InSampler))
     {
         GDeferredReleaseOneFrame.Add(this);
     }
@@ -71,7 +72,7 @@ namespace FW
     TRefCountPtr<MetalSampler> CreateMetalSampler(const GpuSamplerDesc& InSamplerDesc)
     {
         MTLSamplerStatePtr Sampler = NS::TransferPtr(GDevice->newSamplerState((MTL::SamplerDescriptor*)MapSamplerDesc(InSamplerDesc)));
-        return new MetalSampler(MoveTemp(Sampler));
+        return new MetalSampler(MoveTemp(Sampler), InSamplerDesc);
     }
 
     TRefCountPtr<MetalTexture> CreateMetalTexture2D(const GpuTextureDesc& InTexDesc)

@@ -438,8 +438,12 @@ namespace FW
 		AUX::Unreachable();
 	};
 
-	inline FString GetFunctionSig(SpvFunctionDesc* FuncDesc)
+	inline FString GetFunctionSig(SpvFunctionDesc* FuncDesc, const TArray<ShaderFunc>& Funcs)
 	{
+		const ShaderFunc* EditorFunc = Funcs.FindByPredicate([&](const ShaderFunc& InItem) {
+			return InItem.Name == FuncDesc->GetName() && InItem.Start.x == FuncDesc->GetLine();
+		});
+
 		FString FuncName = FuncDesc->GetName();
 		SpvFuncTypeDesc* FuncTypeDesc = FuncDesc->GetFuncTypeDesc();
 		FString Signature;
@@ -458,6 +462,28 @@ namespace FW
 		auto ParmTypes = FuncTypeDesc->GetParmTypes();
 		for(int i = 0; i < ParmTypes.Num(); i++)
 		{
+			FString SemaStr;
+			if (EditorFunc)
+			{
+				const ShaderParameter& EditorParameter = EditorFunc->Params[i];
+				if(EditorParameter.SemaFlag == ParamSemaFlag::In)
+				{
+					SemaStr = "in";
+				}
+				else if(EditorParameter.SemaFlag == ParamSemaFlag::Out)
+				{
+					SemaStr = "out";
+				}
+				else if (EditorParameter.SemaFlag == ParamSemaFlag::Inout)
+				{
+					SemaStr = "inout";
+				}
+			}
+			if (!SemaStr.IsEmpty())
+			{
+				Signature += SemaStr + " ";
+			}
+			
 			if(i == ParmTypes.Num() - 1)
 			{
 				Signature += GetTypeDescStr(ParmTypes[i]);

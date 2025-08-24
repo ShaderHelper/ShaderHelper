@@ -107,6 +107,7 @@ namespace SH
 				int32 TokenStart = CurOffset;
 				TOptional<HLSL::TokenType> LastTokenType; //The last token which is not a white space;
 
+				bool bInMacro = false;
 				bool bInComment = false;
 				bool bInMultilineComment = false;
 
@@ -231,7 +232,11 @@ namespace SH
 							int32 TokenEnd = CurOffset;
 							FTextRange TokenRange{ TokenStart, TokenEnd };
 							FString TokenString = HlslCodeString.Mid(TokenRange.BeginIndex, TokenRange.Len());
-							if(bInComment)
+							if (bInMacro)
+							{
+								LastState = StateSet::Macro;
+							}
+							else if(bInComment)
 							{
 								LastState = StateSet::Comment;
 							}
@@ -282,13 +287,8 @@ namespace SH
 						break;
 					case StateSet::Macro:
 						LastState = StateSet::Macro;
-						if (CurOffset < LineRange.EndIndex) {
-							CurState = StateSet::Macro;
-							CurOffset += 1;
-						}
-						else {
-							CurState = StateSet::End;
-						}
+						bInMacro = true;
+						CurState = StateSet::Start;
 						break;
 					case StateSet::Comment:
 						LastState = StateSet::Comment;
@@ -319,11 +319,15 @@ namespace SH
 						bInMultilineComment = false;
 					}
 				}
-				if(bInComment)
+				if (bInMacro)
+				{
+					LastState = StateSet::Macro;
+				}
+				else if (bInComment)
 				{
 					LastState = StateSet::Comment;
 				}
-				else if(bInMultilineComment)
+				else if (bInMultilineComment)
 				{
 					LastState = StateSet::MultilineComment;
 				}

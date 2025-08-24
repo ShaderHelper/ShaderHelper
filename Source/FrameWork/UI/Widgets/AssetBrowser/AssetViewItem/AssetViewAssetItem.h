@@ -10,6 +10,7 @@ namespace FW
         MANUAL_RTTI_TYPE(AssetViewAssetItem, AssetViewItem)
 	public:
 		AssetViewAssetItem(const FString& InPath);
+		AssetViewAssetItem(const FString& InPath, AssetObject* InAsset);
         
 		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override;
         void EnterRenameState();
@@ -18,7 +19,7 @@ namespace FW
         
 	private:
 		TSharedPtr<class SInlineEditableTextBlock> AssetEditableTextBlock;
-		TSharedPtr<PreviewViewPort> ThumbnailViewport;
+		TSharedPtr<PreviewViewPort> ThumbnailViewport = MakeShared<PreviewViewPort>();
 
 		GpuTexture* AssetThumbnail = nullptr;
 		const FSlateBrush* ImageBrush = nullptr;

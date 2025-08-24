@@ -104,7 +104,7 @@ namespace SH
 		}
 	}
 
-	FW::GpuBindGroup* ShaderToyPassNode::GetBuiltInBindGroup()
+	TRefCountPtr<FW::GpuBindGroup> ShaderToyPassNode::GetBuiltInBindGroup()
 	{
 		auto Builder  = GpuBindGroupBuilder{ StShader::GetBuiltInBindLayout() }
 			.SetExistingBinding(0, TSingleton<PrintBuffer>::Get().GetResource())
@@ -116,28 +116,28 @@ namespace SH
 		GpuTexturePin* iChannel3 = static_cast<GpuTexturePin*>(GetPin("iChannel3"));
 		
 		Builder.SetTexture("iChannel0", iChannel0->GetValue());
-		Builder.SetSampler("iChannel0Sampler", GGpuRhi->CreateSampler({
+		Builder.SetSampler("iChannel0Sampler", GpuResourceHelper::GetSampler({
 			.Filter = (SamplerFilter)iChannelDesc0.Filter,
 			.AddressU = (SamplerAddressMode)iChannelDesc0.Wrap,
 			.AddressV = (SamplerAddressMode)iChannelDesc0.Wrap,
 			.AddressW = (SamplerAddressMode)iChannelDesc0.Wrap
 		}));
 		Builder.SetTexture("iChannel1", iChannel1->GetValue());
-		Builder.SetSampler("iChannel1Sampler", GGpuRhi->CreateSampler({
+		Builder.SetSampler("iChannel1Sampler", GpuResourceHelper::GetSampler({
 			.Filter = (SamplerFilter)iChannelDesc1.Filter,
 			.AddressU = (SamplerAddressMode)iChannelDesc1.Wrap,
 			.AddressV = (SamplerAddressMode)iChannelDesc1.Wrap,
 			.AddressW = (SamplerAddressMode)iChannelDesc1.Wrap
 		}));
 		Builder.SetTexture("iChannel2", iChannel2->GetValue());
-		Builder.SetSampler("iChannel2Sampler",GGpuRhi->CreateSampler({
+		Builder.SetSampler("iChannel2Sampler", GpuResourceHelper::GetSampler({
 			.Filter = (SamplerFilter)iChannelDesc2.Filter,
 			.AddressU = (SamplerAddressMode)iChannelDesc2.Wrap,
 			.AddressV = (SamplerAddressMode)iChannelDesc2.Wrap,
 			.AddressW = (SamplerAddressMode)iChannelDesc2.Wrap
 		}));
 		Builder.SetTexture("iChannel3", iChannel3->GetValue());
-		Builder.SetSampler("iChannel3Sampler",GGpuRhi->CreateSampler({
+		Builder.SetSampler("iChannel3Sampler", GpuResourceHelper::GetSampler({
 			.Filter = (SamplerFilter)iChannelDesc3.Filter,
 			.AddressU = (SamplerAddressMode)iChannelDesc3.Wrap,
 			.AddressV = (SamplerAddressMode)iChannelDesc3.Wrap,
@@ -148,14 +148,30 @@ namespace SH
 
 	TRefCountPtr<GpuTexture> ShaderToyPassNode::OnStartDebugging()
 	{
-		IsDebugging = true;
-		auto PassOutput = static_cast<GpuTexturePin*>(GetPin("RT"));
-		return PassOutput->GetValue();
+		AssetOp::OpenAsset(Shader);
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(Shader);
+		ShaderEditor->Compile();
+		//Render once immediately for debugging
+		{
+			TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = false;
+			ShEditor->GetRenderer()->Render();
+			TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = true;
+		}
+		if (Shader->bCompilationSucceed)
+		{
+			IsDebugging = true;
+			auto PassOutput = static_cast<GpuTexturePin*>(GetPin("RT"));
+			return PassOutput->GetValue();
+		}
+		else
+		{
+			return {};
+		}
 	}
 
 	void ShaderToyPassNode::OnFinalizePixel(const FW::Vector2u& PixelCoord)
 	{
-		AssetOp::OpenAsset(Shader);
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
         ShEditor->InvokeDebuggerTabs();
 		SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(Shader);
@@ -278,24 +294,25 @@ namespace SH
         for(const auto& [MemberName, MemberInfo]: MetaData.Members)
         {
             TSharedPtr<PropertyItemBase> Property;
+			auto Writable = TAttribute<bool>::CreateLambda([this] { return !IsDebugging; });
             if(MemberInfo.TypeName == "float")
             {
-                auto FloatProperty = MakeShared<PropertyUniformItem<float>>(this, MemberName, InUb->GetMember<float>(MemberName));
+                auto FloatProperty = MakeShared<PropertyUniformItem<float>>(this, MemberName, InUb->GetMember<float>(MemberName), Writable);
                 Property = FloatProperty;
             }
             else if(MemberInfo.TypeName == "float2")
             {
-                auto Float2Porperty = MakeShared<PropertyUniformItem<Vector2f>>(this, MemberName, InUb->GetMember<Vector2f>(MemberName));
+                auto Float2Porperty = MakeShared<PropertyUniformItem<Vector2f>>(this, MemberName, InUb->GetMember<Vector2f>(MemberName), Writable);
                 Property = Float2Porperty;
             }
 			else if(MemberInfo.TypeName == "float3")
 			{
-				auto Float3Porperty = MakeShared<PropertyUniformItem<Vector3f>>(this, MemberName, InUb->GetMember<Vector3f>(MemberName));
+				auto Float3Porperty = MakeShared<PropertyUniformItem<Vector3f>>(this, MemberName, InUb->GetMember<Vector3f>(MemberName), Writable);
 				Property = Float3Porperty;
 			}
 			else if (MemberInfo.TypeName == "float4")
 			{
-				auto Float4Porperty = MakeShared<PropertyUniformItem<Vector4f>>(this, MemberName, InUb->GetMember<Vector4f>(MemberName));
+				auto Float4Porperty = MakeShared<PropertyUniformItem<Vector4f>>(this, MemberName, InUb->GetMember<Vector4f>(MemberName), Writable);
 				Property = Float4Porperty;
 			}
             else

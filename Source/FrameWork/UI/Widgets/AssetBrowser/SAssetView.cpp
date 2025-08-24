@@ -182,6 +182,19 @@ namespace FW
 										AssetOp_->OnCreate(NewAsset);
 									}
 
+									TSharedRef<AssetViewAssetItem> NewAssetItem = MakeShared<AssetViewAssetItem>(SavedFileName, NewAsset);
+									if (!AssetViewItems.ContainsByPredicate([&](const TSharedRef<AssetViewItem>& InItem) {
+										return InItem->GetPath() == SavedFileName;
+										}))
+									{
+										FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([=](float) {
+											NewAssetItem->EnterRenameState();
+											return false;
+										}));
+										AssetViewItems.Add(MoveTemp(NewAssetItem));
+										AssetTileView->RequestListRefresh();
+									}
+
 									TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFileName));
 									NewAsset->ObjectName = FText::FromString(FPaths::GetBaseFilename(SavedFileName));
 									NewAsset->Serialize(*Ar);
@@ -216,6 +229,22 @@ namespace FW
 					{
 						NewDirectoryPath = *(CurViewDirectory / FString::Format(TEXT("NewFolder {0}"), { Number++ }));
 					}
+
+					TSharedRef<AssetViewFolderItem> NewFolderItem = MakeShared<AssetViewFolderItem>(NewDirectoryPath);
+					if (!AssetViewItems.ContainsByPredicate([&](const TSharedRef<AssetViewItem>& InItem) {
+						return InItem->GetPath() == NewDirectoryPath;
+						}))
+					{
+						// Setting the focus directly here will not take effect.
+						// The widget related to this item will only be added to STileView at the next tick
+						FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([=](float) {
+							NewFolderItem->EnterRenameState();
+							return false;
+						}));
+						AssetViewItems.Add(MoveTemp(NewFolderItem));
+						AssetTileView->RequestListRefresh();
+					}
+
 					IFileManager::Get().MakeDirectory(*NewDirectoryPath);
 				})});
 		}
@@ -368,6 +397,19 @@ namespace FW
 				if (ImportedAssetObject)
 				{
 					FString SavedFileName = CurViewDirectory / FPaths::GetBaseFilename(OpenedFileNames[0]) + "." + ImportedAssetObject->FileExtension();
+					TSharedRef<AssetViewAssetItem> NewAssetItem = MakeShared<AssetViewAssetItem>(SavedFileName, ImportedAssetObject.Get());
+					if (!AssetViewItems.ContainsByPredicate([&](const TSharedRef<AssetViewItem>& InItem) {
+						return InItem->GetPath() == SavedFileName;
+						}))
+					{
+						FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([=](float) {
+							NewAssetItem->EnterRenameState();
+							return false;
+							}));
+						AssetViewItems.Add(MoveTemp(NewAssetItem));
+						AssetTileView->RequestListRefresh();
+					}
+
 					TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFileName));
 					ImportedAssetObject->ObjectName = FText::FromString(FPaths::GetBaseFilename(SavedFileName));
 					ImportedAssetObject->Serialize(*Ar);

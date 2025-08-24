@@ -1,13 +1,15 @@
 #pragma once
 
 #ifndef USE_PIX
-    #define USE_PIX GPU_API_CAPTURE
+//Pix or renderdoc may affect debug layer ouput, so disbale it by default
+    #define USE_PIX 0
 #endif
 
 #include <Windows/PreWindowsApi.h>
 THIRD_PARTY_INCLUDES_START
 #include "d3d12sdklayers.h"
 #include "dxcapi.h"
+#include "d3d12Shader.h"
 #include "d3d12.h"
 //Note that the header include order. Include Agility SDK headers before windows sdk headers.
 #include "d3dx12/d3dx12.h"

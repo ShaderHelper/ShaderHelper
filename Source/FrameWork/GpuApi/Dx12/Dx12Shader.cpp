@@ -3,7 +3,7 @@
 #include "Common/Path/PathHelper.h"
 #include <Misc/FileHelper.h>
 #include "GpuApi/GpuFeature.h"
-#pragma comment (lib, "dxcompiler.lib")
+#include "ShaderConductor.hpp"
 
 namespace FW
 {
@@ -95,7 +95,7 @@ namespace FW
 						.ReplacePrintStringLiteral()
 						.Finalize();
 					auto SourceText = StringCast<UTF8CHAR>(*ShaderText);
-					GShaderCompiler.CompierUitls->CreateBlob(SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR), CP_UTF8,
+					GShaderCompiler.CompilerUitls->CreateBlob(SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR), CP_UTF8,
 						reinterpret_cast<IDxcBlobEncoding**>(ppIncludeSource));
 					return S_OK;
 				}
@@ -111,7 +111,7 @@ namespace FW
 	DxcCompiler::DxcCompiler()
 	 {
 		 DxCheck(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(Compiler.GetInitReference())));
-		 DxCheck(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(CompierUitls.GetInitReference())));
+		 DxCheck(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(CompilerUitls.GetInitReference())));
 	 }
 
 	FString GetShaderProfile(ShaderType InType, GpuShaderModel InModel)
@@ -140,7 +140,7 @@ namespace FW
 		TRefCountPtr<IDxcBlobEncoding> BlobEncoding;
 		TRefCountPtr<IDxcResult> CompileResult;
 		auto SourceText = StringCast<UTF8CHAR>(*InShader->GetProcessedSourceText());
-		DxCheck(CompierUitls->CreateBlobFromPinned(SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR), CP_UTF8, BlobEncoding.GetInitReference()));
+		DxCheck(CompilerUitls->CreateBlobFromPinned(SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR), CP_UTF8, BlobEncoding.GetInitReference()));
 
 		TArray<const TCHAR*> Arguments;
 		Arguments.Add(TEXT("/Qstrip_debug"));
@@ -156,8 +156,14 @@ namespace FW
 #endif
         //Arguments.Add(TEXT("-no-warnings"));
 
-		Arguments.Add(TEXT("-HV"));
-		Arguments.Add(TEXT("2021"));
+		if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
+		{
+			Arguments.Add(TEXT("/Od"));
+			Arguments.Add(TEXT("-fcgl"));
+			Arguments.Add(TEXT("-spirv"));
+			Arguments.Add(TEXT("-fvk-use-dx-layout"));
+			Arguments.Add(TEXT("-fspv-debug=vulkan-with-source"));
+		}
 
 		ValidateGpuFeature(GpuFeature::Support16bitType, TEXT("Hardware does not support 16bitType, shader model <= 6.2"))
 		{
@@ -187,6 +193,10 @@ namespace FW
 				SourceBuffer.Encoding = Encoding;
 			}
 		}
+		FString ShaderName = InShader->GetShaderName();
+#if DEBUG_SHADER
+		FFileHelper::SaveStringToFile(InShader->GetProcessedSourceText(), *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl"));
+#endif
 
 		TRefCountPtr<IDxcIncludeHandler> IncludeHandler = new ShIncludeHandler(InShader);
 		bool IsApiSucceeded = SUCCEEDED(Compiler->Compile(&SourceBuffer,
@@ -223,17 +233,37 @@ namespace FW
 			{
 				TRefCountPtr<IDxcBlob> ShaderBlob;
 				DxCheck(CompileResult->GetResult(ShaderBlob.GetInitReference()));
-				InShader->SetCompilationResult(ShaderBlob);
+				if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
+				{
+					TArray<uint32> SpvCode = { (uint32*)ShaderBlob->GetBufferPointer(), (int)ShaderBlob->GetBufferSize() / 4 };
+					InShader->SpvCode = MoveTemp(SpvCode);
 #if DEBUG_SHADER
-				TRefCountPtr<IDxcBlob> PdbBlob;
-				TRefCountPtr<IDxcBlobUtf16> PdbNameBlob;
-				DxCheck(CompileResult->GetOutput(DXC_OUT_PDB, IID_PPV_ARGS(PdbBlob.GetInitReference()), PdbNameBlob.GetInitReference()));
-				const FString PdbName = PdbNameBlob->GetStringPointer();
-				const FString PdbFile = PathHelper::SavedShaderDir() / PdbName;
-				
-				TArray<uint8> BinaryData{ (uint8*)PdbBlob->GetBufferPointer(), (int32)PdbBlob->GetBufferSize() };
-				FFileHelper::SaveArrayToFile(BinaryData, *PdbFile);
+					ShaderConductor::Compiler::DisassembleDesc SpvDisassembleDesc{
+						.language = ShaderConductor::ShadingLanguage::SpirV,
+						.binary = (uint8*)ShaderBlob->GetBufferPointer(),
+						.binarySize = (uint32_t)ShaderBlob->GetBufferSize()
+					};
+					ShaderConductor::Compiler::ResultDesc SpvTextResultDesc = ShaderConductor::Compiler::Disassemble(SpvDisassembleDesc);
+					FString SpvSourceText = {(int32)SpvTextResultDesc.target.Size(), static_cast<const char*>(SpvTextResultDesc.target.Data()) };
+					FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".spvasm"));
 #endif
+				}
+				else
+				{
+					InShader->SetCompilationResult(ShaderBlob);
+#if DEBUG_SHADER
+					TRefCountPtr<IDxcBlob> PdbBlob;
+					TRefCountPtr<IDxcBlobUtf16> PdbNameBlob;
+					if (SUCCEEDED(CompileResult->GetOutput(DXC_OUT_PDB, IID_PPV_ARGS(PdbBlob.GetInitReference()), PdbNameBlob.GetInitReference())))
+					{
+						const FString PdbName = PdbNameBlob->GetStringPointer();
+						const FString PdbFile = PathHelper::SavedShaderDir() / "Pdb" / PdbName;
+
+						TArray<uint8> BinaryData{ (uint8*)PdbBlob->GetBufferPointer(), (int32)PdbBlob->GetBufferSize() };
+						FFileHelper::SaveArrayToFile(BinaryData, *PdbFile);
+					}
+#endif
+				}
 			}
 		}
 		

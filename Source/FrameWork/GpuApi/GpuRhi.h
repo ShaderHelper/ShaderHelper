@@ -129,6 +129,7 @@ public:
 	virtual void* MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapMode InMapMode, uint32& OutRowPitch) = 0;
 	virtual void UnMapGpuTexture(GpuTexture* InGpuTexture) = 0;
 
+	//The results of Map* interfaces are transient within one frame, which should not be used across multiple frames.
 	virtual void* MapGpuBuffer(GpuBuffer* InGpuBuffer, GpuResourceMapMode InMapMode) = 0;
 	virtual void UnMapGpuBuffer(GpuBuffer* InGpuBuffer) = 0;
 

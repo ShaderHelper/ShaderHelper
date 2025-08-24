@@ -28,36 +28,39 @@ namespace FW
     class UniformBufferMemberWrapper
     {
     public:
-        UniformBufferMemberWrapper(T* InReadableData, T* InWritableData)
-        : ReadableData(InReadableData), WritableData(InWritableData)
+        UniformBufferMemberWrapper(void* InReadableBackBuffer, GpuBuffer* InWriteCombinedBuffer, uint32 InOffset)
+        : ReadableBackBuffer(InReadableBackBuffer), WriteCombinedBuffer(InWriteCombinedBuffer), Offset(InOffset)
         {}
         
         void operator=(const T& InData)
         {
+			T* ReadableData = reinterpret_cast<T*>((uint8*)ReadableBackBuffer + Offset);
             *ReadableData = InData;
+
+			T* WritableData = reinterpret_cast<T*>((uint8*)GGpuRhi->MapGpuBuffer(WriteCombinedBuffer, GpuResourceMapMode::Write_Only) + Offset);
             *WritableData = InData;
         }
         
         operator T&()
         {
-            return *ReadableData;
+            return *reinterpret_cast<T*>((uint8*)ReadableBackBuffer + Offset);
         }
         
     private:
-        T* ReadableData;
-        T* WritableData;
+        void* ReadableBackBuffer;
+		GpuBuffer* WriteCombinedBuffer;
+		uint32 Offset;
     };
 
 	class UniformBuffer
 	{
 	public:
-		UniformBuffer(TRefCountPtr<GpuBuffer> InBuffer, UniformBufferMetaData InData)
-			: Buffer(MoveTemp(InBuffer))
+		UniformBuffer(TRefCountPtr<GpuBuffer> InWriteCombinedBuffer, UniformBufferMetaData InData)
+			: WriteCombinedBuffer(MoveTemp(InWriteCombinedBuffer))
 			, MetaData(MoveTemp(InData))
 		{
-            WriteCombinedBuffer = GGpuRhi->MapGpuBuffer(Buffer, GpuResourceMapMode::Write_Only);
             ReadableBackBuffer = FMemory::Malloc(MetaData.UniformBufferSize);
-			FMemory::Memset(WriteCombinedBuffer, 0, MetaData.UniformBufferSize);
+			FMemory::Memset(GetWriteCombinedData(), 0, MetaData.UniformBufferSize);
             FMemory::Memset(ReadableBackBuffer, 0, MetaData.UniformBufferSize);
         }
         
@@ -70,27 +73,27 @@ namespace FW
         UniformBufferMemberWrapper<T> GetMember(const FString& MemberName) {
 			checkf(MetaData.Members.Contains(MemberName), TEXT("The uniform buffer doesn't contain \"%s\" member."), *MemberName);
             uint32 MemberOffset = MetaData.Members[MemberName].Offset;
-            T* BufferWritableData = reinterpret_cast<T*>((uint8*)WriteCombinedBuffer + MemberOffset);
-            T* BufferReadableData = reinterpret_cast<T*>((uint8*)ReadableBackBuffer + MemberOffset);
-            return {BufferReadableData, BufferWritableData};
+            return {ReadableBackBuffer, WriteCombinedBuffer, MemberOffset };
 		}
 
 		FString GetDeclaration() const {
 			return MetaData.UniformBufferDeclaration;
 		}
 
-		GpuBuffer* GetGpuResource() const { return Buffer; }
+		GpuBuffer* GetGpuResource() const { return WriteCombinedBuffer; }
         const UniformBufferMetaData& GetMetaData() const { return MetaData; }
         uint32 GetSize() const { return MetaData.UniformBufferSize; }
         
         void* GetReadableData() const { return ReadableBackBuffer; }
-        void* GetWriteCombinedData() const { return WriteCombinedBuffer; }
+        void* GetWriteCombinedData() const { 
+			return (uint8*)GGpuRhi->MapGpuBuffer(WriteCombinedBuffer, GpuResourceMapMode::Write_Only);
+		}
         
         void SetData(const TArray<uint8>& InData)
         {
 			check(InData.Num() == MetaData.UniformBufferSize);
             FMemory::Memcpy(ReadableBackBuffer, InData.GetData(), MetaData.UniformBufferSize);
-            FMemory::Memcpy(WriteCombinedBuffer, InData.GetData(), MetaData.UniformBufferSize);
+            FMemory::Memcpy(GetWriteCombinedData(), InData.GetData(), MetaData.UniformBufferSize);
         }
         
         bool HasMember(const FString& MemberName)
@@ -110,8 +113,8 @@ namespace FW
 					if(MemberSize == MemberInfo.Size && MemberTypeName == MemberInfo.TypeName)
 					{
 						uint32 DstMemberOffset = MetaData.Members[MemberName].Offset;
-						void* DstMemberWritableData = (uint8*)WriteCombinedBuffer + DstMemberOffset;
-						void* DstMemberReadableData = (uint8*)ReadableBackBuffer + DstMemberOffset;
+						void* DstMemberWritableData = (uint8*)GetWriteCombinedData() + DstMemberOffset;
+						void* DstMemberReadableData = (uint8*)GetReadableData() + DstMemberOffset;
 						
 						uint32 SrcMemberOffset = SrcMetaData.Members[MemberName].Offset;
 						void* SrcMemberWritableData = (uint8*)Src.GetWriteCombinedData() + SrcMemberOffset;
@@ -125,8 +128,7 @@ namespace FW
         }
 
 	private:
-		TRefCountPtr<GpuBuffer> Buffer;
-        void* WriteCombinedBuffer;
+		TRefCountPtr<GpuBuffer> WriteCombinedBuffer;
         //Avoid directly reading write-combined memory
         void* ReadableBackBuffer;
 		UniformBufferMetaData MetaData;

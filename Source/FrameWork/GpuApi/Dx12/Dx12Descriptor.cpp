@@ -12,11 +12,11 @@ namespace FW
 
 	void InitDescriptorAllocator()
 	{
-		RtvAllocator = MakeUnique<CpuDescriptorAllocator>(1024, DescriptorType::Rtv);
-		Cpu_CbvSrvUavAllocator = MakeUnique<CpuDescriptorAllocator>(1024, DescriptorType::CbvSrvUav);
-		Gpu_CbvSrvUavAllocator = MakeUnique<GpuDescriptorAllocator>(1024, DescriptorType::CbvSrvUav);
+		RtvAllocator = MakeUnique<CpuDescriptorAllocator>(4096, DescriptorType::Rtv);
+		Cpu_CbvSrvUavAllocator = MakeUnique<CpuDescriptorAllocator>(4096, DescriptorType::CbvSrvUav);
+		Gpu_CbvSrvUavAllocator = MakeUnique<GpuDescriptorAllocator>(4096, DescriptorType::CbvSrvUav);
 		Cpu_SamplerAllocator = MakeUnique<CpuDescriptorAllocator>(128, DescriptorType::Sampler);
-		Gpu_SamplerAllocator = MakeUnique<GpuDescriptorAllocator>(128, DescriptorType::Sampler);
+		Gpu_SamplerAllocator = MakeUnique<GpuDescriptorAllocator>(2048, DescriptorType::Sampler);
 	}
 
 	TUniquePtr<CpuDescriptor> AllocRtv()
@@ -119,12 +119,12 @@ namespace FW
 	}
 
 	GpuDescriptorRange::GpuDescriptorRange(uint32 InDescriptorNum, uint32 InOffsetInHeap, 
-		CD3DX12_CPU_DESCRIPTOR_HANDLE InCpuHandle, CD3DX12_GPU_DESCRIPTOR_HANDLE InGpuHandle, 
+		CD3DX12_CPU_DESCRIPTOR_HANDLE InBaseCpuHandle, CD3DX12_GPU_DESCRIPTOR_HANDLE InBaseGpuHandle, 
 		GpuDescriptorAllocator* InAllocator)
 		: DescriptorNum(InDescriptorNum)
 		, OffsetInHeap(InOffsetInHeap)
-		, CpuHandle(InCpuHandle)
-		, GpuHandle(InGpuHandle)
+		, BaseCpuHandle(InBaseCpuHandle)
+		, BaseGpuHandle(InBaseGpuHandle)
 		, FromAllocator(InAllocator)
 	{
 

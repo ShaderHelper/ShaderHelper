@@ -41,6 +41,7 @@ namespace FW
 		virtual void Visit(class SpvOpFunctionParameter* Inst) {}
 		virtual void Visit(class SpvOpFunctionCall* Inst) {}
 		virtual void Visit(class SpvOpVariable* Inst) {}
+		virtual void Visit(class SpvOpPhi* Inst) {}
 		virtual void Visit(class SpvOpLabel* Inst) {}
 		virtual void Visit(class SpvOpLoad* Inst) {}
 		virtual void Visit(class SpvOpStore* Inst) {}
@@ -116,6 +117,7 @@ namespace FW
 		virtual void Visit(class SpvOpBranch* Inst) {}
 		virtual void Visit(class SpvOpBranchConditional* Inst) {}
 		virtual void Visit(class SpvOpSwitch* Inst) {}
+		virtual void Visit(class SpvOpKill* Inst) {}
 		virtual void Visit(class SpvOpReturn* Inst) {}
 		virtual void Visit(class SpvOpReturnValue* Inst) {}
 		
@@ -133,7 +135,10 @@ namespace FW
 		virtual void Visit(class SpvDebugLine* Inst) {}
 		virtual void Visit(class SpvDebugScope* Inst) {}
 		virtual void Visit(class SpvDebugDeclare* Inst) {}
+		virtual void Visit(class SpvDebugValue* Inst) {}
+		virtual void Visit(class SpvDebugInlinedAt* Inst) {}
 		virtual void Visit(class SpvDebugLocalVariable* Inst) {}
+		virtual void Visit(class SpvDebugFunctionDefinition* Inst) {}
 		virtual void Visit(class SpvDebugGlobalVariable* Inst) {}
 		
 		//GLSL.std.450
@@ -615,6 +620,21 @@ namespace FW
 		SpvId ResultType;
 		SpvStorageClass StorageClass;
 		std::optional<SpvId> Initializer;
+	};
+
+	class SpvOpPhi : public SpvInstructionBase<SpvOpPhi>
+	{
+	public:
+		SpvOpPhi(SpvId InResultType, const TArray<TPair<SpvId, SpvId>>& InOperands) : SpvInstructionBase(SpvOp::Phi)
+		, ResultType(InResultType), Operands(InOperands)
+		{}
+
+		SpvId GetResultType() const { return ResultType; }
+		const TArray<TPair<SpvId, SpvId>>& GetOperands() const { return Operands; }
+
+	private:
+		SpvId ResultType;
+		TArray<TPair<SpvId, SpvId>> Operands;
 	};
 
 	class SpvOpLabel : public SpvInstructionBase<SpvOpLabel>
@@ -1613,6 +1633,12 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 		TArray<TPair<TArray<uint8>, SpvId>> Targets;
 	};
 
+	class SpvOpKill : public SpvInstructionBase<SpvOpKill>
+	{
+	public:
+		SpvOpKill() : SpvInstructionBase(SpvOp::Kill) {}
+	};
+
 	class SpvOpReturn : public SpvInstructionBase<SpvOpReturn>
 	{
 	public:
@@ -1795,14 +1821,16 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 	class SpvDebugScope : public SpvInstructionBase<SpvDebugScope>
 	{
 	public:
-		SpvDebugScope(SpvId InScope) : SpvInstructionBase(SpvDebugInfo100::DebugScope)
-		, Scope(InScope)
+		SpvDebugScope(SpvId InScope, std::optional<SpvId> InInlined) : SpvInstructionBase(SpvDebugInfo100::DebugScope)
+		, Scope(InScope), Inlined(InInlined)
 		{}
 		
 		SpvId GetScope() const { return Scope; }
+		std::optional<SpvId> GetInlined() const { return Inlined; }
 		
 	private:
 		SpvId Scope;
+		std::optional<SpvId> Inlined;
 	};
 
 	class SpvDebugLine : public SpvInstructionBase<SpvDebugLine>
@@ -1821,17 +1849,49 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 	class SpvDebugDeclare : public SpvInstructionBase<SpvDebugDeclare>
 	{
 	public:
-		SpvDebugDeclare(SpvId InVarDesc, SpvId InPointerId) : SpvInstructionBase(SpvDebugInfo100::DebugDeclare)
+		SpvDebugDeclare(SpvId InVarDesc, SpvId InVariable) : SpvInstructionBase(SpvDebugInfo100::DebugDeclare)
 		, VarDesc(InVarDesc)
-		, PointerId(InPointerId)
+		, Variable(InVariable)
 		{}
 		
 		SpvId GetVarDesc() const { return VarDesc; }
-		SpvId GetPointer() const { return PointerId; }
+		SpvId GetVariable() const { return Variable; }
 		
 	private:
 		SpvId VarDesc;
-		SpvId PointerId;
+		SpvId Variable;
+	};
+
+	class SpvDebugValue : public SpvInstructionBase<SpvDebugValue>
+	{
+	public:
+		SpvDebugValue(SpvId InLocalVariable, SpvId InValue) : SpvInstructionBase(SpvDebugInfo100::DebugValue)
+		, LocalVariable(InLocalVariable), Value(InValue)
+		{}
+
+		SpvId GetLocalVariable() const { return LocalVariable; }
+		SpvId GetValue() const { return Value; }
+
+	private:
+		SpvId LocalVariable;
+		SpvId Value;
+	};
+
+	class SpvDebugInlinedAt : public SpvInstructionBase<SpvDebugInlinedAt>
+	{
+	public:
+		SpvDebugInlinedAt(SpvId InLine, SpvId InScope, std::optional<SpvId> InInlined) : SpvInstructionBase(SpvDebugInfo100::DebugInlinedAt)
+		, Line(InLine), Scope(InScope), Inlined(InInlined)
+		{}
+
+		SpvId GetLine() const { return Line; }
+		SpvId GetScope() const { return Scope; }
+		std::optional<SpvId> GetInlined() const { return Inlined; }
+
+	private:
+		SpvId Line;
+		SpvId Scope;
+		std::optional<SpvId> Inlined;
 	};
 
 	class SpvDebugLocalVariable : public SpvInstructionBase<SpvDebugLocalVariable>
@@ -1853,6 +1913,21 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 		SpvId TypeDesc;
 		SpvId Line;
 		SpvId Parent;
+	};
+
+	class SpvDebugFunctionDefinition : public SpvInstructionBase<SpvDebugFunctionDefinition>
+	{
+	public:
+		SpvDebugFunctionDefinition(SpvId InFunction, SpvId InDefinition) : SpvInstructionBase(SpvDebugInfo100::DebugFunctionDefinition)
+		, Function(InFunction), Definition(InDefinition)
+		{}
+
+		SpvId GetFunction() const { return Function; }
+		SpvId GetDefinition() const { return Definition; }
+
+	private:
+		SpvId Function;
+		SpvId Definition;
 	};
 
 	class SpvDebugGlobalVariable : public SpvInstructionBase<SpvDebugGlobalVariable>

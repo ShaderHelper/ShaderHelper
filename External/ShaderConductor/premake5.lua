@@ -3,22 +3,23 @@ shaderConductorHierarchy = {
 }
 
 usage "ShaderConductor"
+    includedirs
+    {
+        "./Include",
+    }
+    libdirs
+    {
+        path.getabsolute("./Lib"),
+    }
+    links
+    {
+        "ShaderConductor",
+        "dxcompiler"
+    }
     filter "system:macosx"
         prebuildcommands "{COPYFILE} %{wks.location}/External/ShaderConductor/Lib/*.dylib %{cfg.targetdir}"
-        libdirs
-        {
-            path.getabsolute("./Lib"),
-        }
-        links
-        {
-            "ShaderConductor",
-            "dxcompiler"
-        }
-        includedirs
-        {
-            "./Include",
-        }
         buildoptions {
             "-fms-extensions", --dxc uuid requires it for clang
         }
-
+    filter "system:windows"
+        prebuildcommands "{COPYFILE} \"%{wks.location}/External/ShaderConductor/Lib/*.dll\" %{cfg.targetdir}"

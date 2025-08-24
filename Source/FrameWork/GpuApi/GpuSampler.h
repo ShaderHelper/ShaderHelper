@@ -10,12 +10,24 @@ namespace FW
 		SamplerAddressMode AddressV = SamplerAddressMode::Clamp;
 		SamplerAddressMode AddressW = SamplerAddressMode::Clamp;
 		CompareMode Compare = CompareMode::Never;
+
+		bool operator==(const GpuSamplerDesc& Other) const
+		{
+			return Filter == Other.Filter && AddressU == Other.AddressU && AddressV == Other.AddressV && AddressW == Other.AddressW
+				&& Compare == Other.Compare;
+		}
 	};
 
 	class GpuSampler : public GpuResource
 	{
 	public:
-		GpuSampler() : GpuResource(GpuResourceType::Sampler)
+		GpuSampler(const GpuSamplerDesc& InDesc) : GpuResource(GpuResourceType::Sampler)
+		, Desc(InDesc)
 		{}
+
+		const GpuSamplerDesc& GetDesc() const { return Desc; }
+
+	private:
+		GpuSamplerDesc Desc;
 	};
 }

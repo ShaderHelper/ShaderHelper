@@ -141,12 +141,20 @@ namespace FW
 		void SetName(const FString& Name);
 		void BindDescriptorHeap();
 
+		void End() {
+			if (!IsEnd)
+			{
+				DxCheck(CmdList->Close());
+				IsEnd = true;
+			}
+		}
+
 		void MarkSubmitted() {
 			DxCheck(Fence->Signal(Submitted));
 			DxCheck(GGraphicsQueue->Signal(Fence, Finished));
 		}
-		bool IsSubmitted() {
-			return Fence->GetCompletedValue() == Submitted;
+		bool IsUnsubmitted() {
+			return Fence->GetCompletedValue() == NotSubmitted;
 		}
 		bool IsFinished() {
 			return Fence->GetCompletedValue() == Finished;
@@ -164,6 +172,7 @@ namespace FW
 		TArray<TUniquePtr<Dx12RenderPassRecorder>> RequestedRenderPassRecorders;
 		TArray<TUniquePtr<Dx12ComputePassRecorder>> RequestedComputePassRecorders;
 		TRefCountPtr<ID3D12Fence> Fence;
+		bool IsEnd = false;
 	};
 
 	class Dx12CmdRecorderPool

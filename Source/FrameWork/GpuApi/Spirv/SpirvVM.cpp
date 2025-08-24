@@ -281,9 +281,49 @@ namespace FW
 		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
 		
 		SpvVariableDesc* VarDesc = &Context.VariableDescs[Inst->GetVarDesc()];
-		SpvPointer* Pointer = GetPointer(Inst->GetPointer());
-		check(Pointer->Pointee);
-		Context.VariableDescMap[Pointer->Pointee->Id] = VarDesc;
+		Context.VariableDescMap[Inst->GetVariable()] = VarDesc;
+	}
+
+	void SpvVmVisitor::Visit(SpvDebugValue* Inst)
+	{
+
+	}
+
+	void SpvVmVisitor::Visit(SpvDebugFunctionDefinition* Inst)
+	{
+		SpvVmContext& Context = GetActiveContext();
+		SpvThreadState& ThreadState = Context.ThreadState;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+
+		if(!CurStackFrame.Parameters.empty())
+		{
+			SpvFunctionDesc* CurFuncDesc = static_cast<SpvFunctionDesc*>(Context.LexicalScopes[Inst->GetFunction()].Get());
+			ShaderFunc* EditorFunc = Context.EditorFuncInfo.FindByPredicate([&](const ShaderFunc& InItem) {
+				return InItem.Name == CurFuncDesc->GetName() && InItem.Start.x == CurFuncDesc->GetLine();
+			});
+			for(int i = 0; i < CurStackFrame.Parameters.size(); i++)
+			{
+				SpvVmParameter& Parameter = CurStackFrame.Parameters[i];
+				SpvPointer* Argument = CurStackFrame.Arguments[i];
+				FString ParameterName = Context.Names[Parameter.Pointer->Pointee->Id];
+				const ShaderParameter& EditorParameter = EditorFunc->Params[i];
+				Parameter.Flag = EditorParameter.SemaFlag;
+				if(EditorParameter.SemaFlag != ParamSemaFlag::Out)
+				{
+					SpvId VarId = Parameter.Pointer->Pointee->Id;
+					SpvVariableDesc* PointeeDesc = Context.VariableDescMap[VarId];
+					const TArray<uint8>& ValueToStore = GetPointerValue(&Context, Argument);
+					SpvDebugState& CurDebugState = ThreadState.RecordedInfo.DebugStates.Last();
+
+					SpvVariableChange VariableChange;
+					VariableChange.VarId = VarId;
+					WritePointerValue(Parameter.Pointer, PointeeDesc, ValueToStore, &VariableChange);
+
+					CurDebugState.VarChanges.Add(MoveTemp(VariableChange));
+					CurDebugState.bParamChange = true;
+				}
+			}
+		}
 	}
 
 	void SpvVmVisitor::Visit(SpvDebugLine* Inst)
@@ -321,10 +361,24 @@ namespace FW
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
 		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		SpvId ResultId = Inst->GetId().value();
 		
-		SpvPointer* Argument = CurStackFrame.Arguments.front();
-		CurStackFrame.Arguments.pop();
-		CurStackFrame.Pointers.emplace(Inst->GetId().value(), *Argument);
+		SpvPointerType* PointerType = static_cast<SpvPointerType*>(Context.Types[Inst->GetResultType()].Get());
+		SpvVariable Var = { {ResultId, PointerType->PointeeType}, SpvStorageClass::Function};
+
+		TArray<uint8> Value;
+		Value.SetNumZeroed(GetTypeByteSize(PointerType->PointeeType));
+		Var.Storage = SpvObject::Internal{ MoveTemp(Value) };
+
+		ThreadState.RecordedInfo.AllVariables[ResultId] = Var;
+		CurStackFrame.Variables.insert_or_assign(ResultId, MoveTemp(Var));
+		SpvPointer Pointer{
+			.Id = ResultId,
+			.Pointee = &CurStackFrame.Variables[ResultId]
+		};
+		CurStackFrame.Pointers.insert_or_assign(ResultId, MoveTemp(Pointer));
+		SpvVmParameter Parameter{ &CurStackFrame.Pointers.at(ResultId) };
+		CurStackFrame.Parameters.push_back(MoveTemp(Parameter));
 	}
 
 	void SpvVmVisitor::Visit(SpvOpFunctionCall* Inst)
@@ -336,10 +390,17 @@ namespace FW
 		CurDebugState.bFuncCall = true;
 		
 		ThreadState.NextInstIndex = GetInstIndex(Inst->GetFunction());
-		std::queue<SpvPointer*> Arguments;
+		std::vector<SpvPointer*> Arguments;
 		for(SpvId ArgumentId : Inst->GetArguments())
 		{
-			Arguments.push(&CurStackFrame.Pointers[ArgumentId]);
+			if(Context.GlobalPointers.contains(ArgumentId))
+			{
+				Arguments.push_back(&Context.GlobalPointers.at(ArgumentId));
+			}
+			else
+			{
+				Arguments.push_back(&CurStackFrame.Pointers.at(ArgumentId));
+			}
 		}
 	
 		SpvVmFrame NewFrame{
@@ -382,6 +443,11 @@ namespace FW
 		CurStackFrame.Pointers.insert_or_assign(ResultId, MoveTemp(Pointer));
 	}
 
+	void SpvVmVisitor::Visit(SpvOpPhi* Inst)
+	{
+
+	}
+
 	void SpvVmVisitor::Visit(SpvOpLabel* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
@@ -411,8 +477,8 @@ namespace FW
 		}
 		else
 		{
-			Value = GetPointerValue(&Context, Pointer);
-			if(Value.IsEmpty() && EnableUbsan)
+			TArray<uint8> VarValue = GetPointerValue(&Context, Pointer);
+			if(VarValue.IsEmpty() && EnableUbsan)
 			{
 				//The variable name cannot be obtained from the PointeeDesc because DebugDeclare appears before OpLoad in the following case:
 				//float a = a + 1;
@@ -422,7 +488,8 @@ namespace FW
 			}
 			//TODO: the result type size may not be equal to the value if it is an external object
 			//We may need to remap the value result with padding to the result type
-			check(GetTypeByteSize(ResultType) == Value.Num());
+			//check(GetTypeByteSize(ResultType) == Value.Num());
+			Value = { VarValue.GetData(), GetTypeByteSize(ResultType) };
 		}
 		
 		SpvId ResultId = Inst->GetId().value();
@@ -1452,22 +1519,50 @@ namespace FW
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
-		
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
 		ThreadState.NextInstIndex = ThreadState.StackFrames.back().ReturnPointIndex;
 		SpvLexicalScope* OldScope = ThreadState.StackFrames.back().CurScope;
-		int32 Line = ThreadState.StackFrames.back().CurLine;
+
+		FString UbError;
+		for (int i = 0; i < CurStackFrame.Arguments.size(); i++)
+		{
+			SpvPointer* Argument = CurStackFrame.Arguments[i];
+			const SpvVmParameter& Parameter = CurStackFrame.Parameters[i];
+			if(Parameter.Flag == ParamSemaFlag::Out && !Parameter.Pointer->Pointee->IsCompletelyInitialized())
+			{
+				FString ParameterName = Context.Names[Parameter.Pointer->Pointee->Id];
+				UbError = FString::Printf(TEXT("It's undefined behavior to not explicitly initialize the \"out\" parameter:%s inside the function."), *ParameterName);
+				break;
+			}
+
+			SpvId VarId = Argument->Pointee->Id;
+			SpvVariableDesc* PointeeDesc = Context.VariableDescMap[VarId];
+			const TArray<uint8>& ValueToStore = GetPointerValue(&Context, Parameter.Pointer);
+			SpvDebugState& CurDebugState = ThreadState.RecordedInfo.DebugStates.Last();
+
+			SpvVariableChange VariableChange;
+			VariableChange.VarId = VarId;
+			WritePointerValue(Argument, PointeeDesc, ValueToStore, &VariableChange);
+
+			CurDebugState.VarChanges.Add(MoveTemp(VariableChange));
+		} 
 		
 		ThreadState.StackFrames.pop_back();
-	
 		if(!ThreadState.StackFrames.empty())
 		{
-			SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
-			SpvLexicalScope* NewScope = CurStackFrame.CurScope;
+			SpvVmFrame& CallerStackFrame = ThreadState.StackFrames.back();
+			SpvLexicalScope* NewScope = CallerStackFrame.CurScope;
 			ThreadState.RecordedInfo.DebugStates.Last().ScopeChange = SpvLexicalScopeChange{OldScope, NewScope};
 			ThreadState.RecordedInfo.DebugStates.Last().bReturn = true;
+			if (!UbError.IsEmpty())
+			{
+				ThreadState.RecordedInfo.DebugStates.Last().UbError = MoveTemp(UbError);
+				bTerminate = true;
+				return;
+			}
 			
 			//Append a debugstate for stopping at the function call after return
-			ThreadState.RecordedInfo.DebugStates.Add(SpvDebugState{.Line = CurStackFrame.CurLine, .bFuncCallAfterReturn = true});
+			ThreadState.RecordedInfo.DebugStates.Add(SpvDebugState{.Line = CallerStackFrame.CurLine, .bFuncCallAfterReturn = true});
 		}
 	}
 
@@ -1475,23 +1570,63 @@ namespace FW
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
-		ThreadState.StackFrames.back().ReturnObject->Storage = GetObject(&Context, Inst->GetValue())->Storage;
-		ThreadState.NextInstIndex = ThreadState.StackFrames.back().ReturnPointIndex;
-		SpvLexicalScope* OldScope = ThreadState.StackFrames.back().CurScope;
-		int32 Line = ThreadState.StackFrames.back().CurLine;
-		SpvObject ReturnObject = *ThreadState.StackFrames.back().ReturnObject;
+		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
+		CurStackFrame.ReturnObject->Storage = GetObject(&Context, Inst->GetValue())->Storage;
+		ThreadState.NextInstIndex = CurStackFrame.ReturnPointIndex;
+		SpvLexicalScope* OldScope = CurStackFrame.CurScope;
+		SpvObject ReturnObject = *CurStackFrame.ReturnObject;
+
+		FString UbError;
+		for (int i = 0; i < CurStackFrame.Arguments.size(); i++)
+		{
+			SpvPointer* Argument = CurStackFrame.Arguments[i];
+			const SpvVmParameter& Parameter = CurStackFrame.Parameters[i];
+			if (Parameter.Flag == ParamSemaFlag::Out && !Parameter.Pointer->Pointee->IsCompletelyInitialized())
+			{
+				FString ParameterName = Context.Names[Parameter.Pointer->Pointee->Id];
+				UbError = FString::Printf(TEXT("It's undefined behavior to not explicitly initialize the \"out\" parameter:%s inside the function."), *ParameterName);
+				break;
+			}
+
+			SpvId VarId = Argument->Pointee->Id;
+			SpvVariableDesc* PointeeDesc = Context.VariableDescMap[VarId];
+			const TArray<uint8>& ValueToStore = GetPointerValue(&Context, Parameter.Pointer);
+			SpvDebugState& CurDebugState = ThreadState.RecordedInfo.DebugStates.Last();
+
+			SpvVariableChange VariableChange;
+			VariableChange.VarId = VarId;
+			WritePointerValue(Argument, PointeeDesc, ValueToStore, &VariableChange);
+
+			CurDebugState.VarChanges.Add(MoveTemp(VariableChange));
+		}
 		
 		ThreadState.StackFrames.pop_back();
-		
-		SpvVmFrame& CurStackFrame = ThreadState.StackFrames.back();
-		SpvLexicalScope* NewScope = CurStackFrame.CurScope;
-		ThreadState.RecordedInfo.DebugStates.Last().ReturnObject = MoveTemp(ReturnObject);
-		ThreadState.RecordedInfo.DebugStates.Last().bReturn = true;
-		// Split a debugstate for stopping at ending line of the function lexcical scope
-		// we can't get the ending line, so the line number will be determined by the editor.
-		ThreadState.RecordedInfo.DebugStates.Add(SpvDebugState{.ScopeChange = SpvLexicalScopeChange{OldScope, NewScope}, .bReturn = true});
+		if (!ThreadState.StackFrames.empty())
+		{
+			SpvVmFrame& CallerStackFrame = ThreadState.StackFrames.back();
+			SpvLexicalScope* NewScope = CallerStackFrame.CurScope;
+			ThreadState.RecordedInfo.DebugStates.Last().ReturnObject = MoveTemp(ReturnObject);
+			ThreadState.RecordedInfo.DebugStates.Last().bReturn = true;
+			// Split a debugstate for stopping at ending line of the function lexcical scope
+			// we can't get the ending line, so the line number will be determined by the editor.
+			ShaderFunc* Func = Context.EditorFuncInfo.FindByPredicate([&](auto&& Item) { 
+				SpvFunctionDesc* FuncDesc = GetFunctionDesc(OldScope);
+				return Item.Name == FuncDesc->GetName() && Item.Start.X == FuncDesc->GetLine();
+			});
+			ThreadState.RecordedInfo.DebugStates.Add(SpvDebugState{
+				.Line = Func->End.X,
+				.ScopeChange = SpvLexicalScopeChange{OldScope, NewScope}, 
+				.bReturn = true 
+			});
+			if (!UbError.IsEmpty())
+			{
+				ThreadState.RecordedInfo.DebugStates.Last().UbError = MoveTemp(UbError);
+				bTerminate = true;
+				return;
+			}
 
-		ThreadState.RecordedInfo.DebugStates.Add(SpvDebugState{.Line = CurStackFrame.CurLine, .bFuncCallAfterReturn = true});
+			ThreadState.RecordedInfo.DebugStates.Add(SpvDebugState{ .Line = CallerStackFrame.CurLine, .bFuncCallAfterReturn = true });
+		}
 	}
 
 	void SpvVmVisitor::Visit(SpvOpVectorTimesScalar* Inst)

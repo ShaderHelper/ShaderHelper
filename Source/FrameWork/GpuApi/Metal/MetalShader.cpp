@@ -102,6 +102,9 @@ namespace FW
 		MslTargetDesc.version = "20200";
 		MslTargetDesc.options = SpvMslOptions;
 		MslTargetDesc.numOptions = UE_ARRAY_COUNT(SpvMslOptions);
+
+		TArray<ShaderConductor::Compiler::TargetDesc> TargetDescs;
+		TArray<ShaderConductor::Compiler::ResultDesc> Results;
 		
 		TArray<const char*> DxcArgs;
 		//DxcArgs.Add("-no-warnings");
@@ -109,15 +112,21 @@ namespace FW
 		//Storage buffers use the scalar layout instead of vector-relaxed 430
 		//to make it consistent with structuredbuffer, so that user side can unify the struct
 		DxcArgs.Add("-fvk-use-dx-layout");
-		
-		DxcArgs.Add("-HV");
-		DxcArgs.Add("2021");
 		//DxcArgs.Add("-Gis");
 		
 		if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
 		{
 			DxcArgs.Add("/Od");
+			DxcArgs.Add("-fcgl");
 			DxcArgs.Add("-fspv-debug=vulkan-with-source");
+			TargetDescs.Add(SpvTargetDesc);
+			Results.SetNum(1);
+		}
+		else
+		{
+			TargetDescs.Add(SpvTargetDesc);
+			TargetDescs.Add(MslTargetDesc);
+			Results.SetNum(2);
 		}
 		
 		TArray<std::string> ExtraAnsiArgs;
@@ -166,9 +175,7 @@ namespace FW
 		FFileHelper::SaveStringToFile(InShader->GetProcessedSourceText(), *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl"));
 #endif
 		
-		ShaderConductor::Compiler::TargetDesc TargetDescs[2] = {SpvTargetDesc, MslTargetDesc};
-		ShaderConductor::Compiler::ResultDesc Results[2];
-		ShaderConductor::Compiler::Compile(SourceDesc, SCOptions, TargetDescs, 2, Results);
+		ShaderConductor::Compiler::Compile(SourceDesc, SCOptions, TargetDescs.GetData(), TargetDescs.Num(), Results.GetData());
 		if(Results[0].hasError)
 		{
 			FString ErrorInfo = static_cast<const char*>(Results[0].errorWarningMsg.Data());
@@ -181,49 +188,57 @@ namespace FW
 			OutWarnInfo = static_cast<const char*>(Results[0].errorWarningMsg.Data());
 		}
 		
-		if(Results[1].hasError)
-		{
-			FString ErrorInfo = static_cast<const char*>(Results[1].errorWarningMsg.Data());
-			//SH_LOG(LogShader, Error, TEXT("Compilation failed: %s"), *ErrorInfo);
-			OutErrorInfo = MoveTemp(ErrorInfo);
-			return false;
-		}
-		
-		FString MslSourceText = {(int32)Results[1].target.Size(), static_cast<const char*>(Results[1].target.Data())};
+
 #if DEBUG_SHADER
 		ShaderConductor::Compiler::DisassembleDesc SpvasmDesc{ShaderConductor::ShadingLanguage::SpirV, static_cast<const uint8_t*>(Results[0].target.Data()), Results[0].target.Size()};
 		ShaderConductor::Compiler::ResultDesc SpvasmResult = ShaderConductor::Compiler::Disassemble(SpvasmDesc);
 		FString SpvSourceText = {(int32)SpvasmResult.target.Size(), static_cast<const char*>(SpvasmResult.target.Data())};
 		FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".spvasm"));
-		FFileHelper::SaveStringToFile(MslSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".metal"));
 #endif
-		InShader->SetMslText(MoveTemp(MslSourceText));
-		
+
 		//Need the meta datas from spirv to abstract gpu api
 		//For example, metal's threadgroupsize is not specified in the shader
 		//and needs to be specified directly by dispatchThreadgroups
-		TArray<uint32> SpvCode = {static_cast<const uint32*>(Results[0].target.Data()), (int)Results[0].target.Size() / 4};
+		TArray<uint32> SpvCode = { static_cast<const uint32*>(Results[0].target.Data()), (int)Results[0].target.Size() / 4 };
 		SpvMetaContext MetaContext;
-		SpvMetaVisitor MetaVisitor{MetaContext};
+		SpvMetaVisitor MetaVisitor{ MetaContext };
 		SpirvParser Parser;
 		Parser.Parse(SpvCode);
 		Parser.Accept(&MetaVisitor);
 		InShader->ThreadGroupSize = MetaContext.ThreadGroupSize;
-		
+
 		if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
 		{
 			InShader->SpvCode = MoveTemp(SpvCode);
 		}
-        
-        FString MslErrorInfo;
-        bool IsSuccessfullyCompiledMsl = CompileShaderFromMSL(InShader, MslErrorInfo);
-        
-        if(!IsSuccessfullyCompiledMsl)
-        {
-            OutErrorInfo = MoveTemp(MslErrorInfo);
-            return false;
-        }
-        
+
+		if (Results.Num() > 1)
+		{
+			if (Results[1].hasError)
+			{
+				FString ErrorInfo = static_cast<const char*>(Results[1].errorWarningMsg.Data());
+				//SH_LOG(LogShader, Error, TEXT("Compilation failed: %s"), *ErrorInfo);
+				OutErrorInfo = MoveTemp(ErrorInfo);
+				return false;
+
+			}
+
+			FString MslSourceText = { (int32)Results[1].target.Size(), static_cast<const char*>(Results[1].target.Data()) };
+#if DEBUG_SHADER
+			FFileHelper::SaveStringToFile(MslSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".metal"));
+#endif
+			InShader->SetMslText(MoveTemp(MslSourceText));
+
+			FString MslErrorInfo;
+			bool IsSuccessfullyCompiledMsl = CompileShaderFromMSL(InShader, MslErrorInfo);
+
+			if (!IsSuccessfullyCompiledMsl)
+			{
+				OutErrorInfo = MoveTemp(MslErrorInfo);
+				return false;
+			}
+		}
+       
         return true;
 
     }

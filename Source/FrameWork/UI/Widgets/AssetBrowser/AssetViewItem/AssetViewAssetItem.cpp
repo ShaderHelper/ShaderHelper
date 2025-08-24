@@ -14,10 +14,16 @@ namespace FW
 	AssetViewAssetItem::AssetViewAssetItem(const FString& InPath)
 		: AssetViewItem(InPath)
 	{
-		ThumbnailViewport = MakeShared<PreviewViewPort>();
 		AssetPtr<AssetObject> Asset = TSingleton<AssetManager>::Get().LoadAssetByPath<AssetObject>(Path);
 		AssetThumbnail = Asset->GetThumbnail();
 		ImageBrush = Asset->GetImage();
+	}
+
+	AssetViewAssetItem::AssetViewAssetItem(const FString& InPath, AssetObject* InAsset)
+		: AssetViewItem(InPath)
+	{
+		AssetThumbnail = InAsset->GetThumbnail();
+		ImageBrush = InAsset->GetImage();
 	}
 
     FReply AssetViewAssetItem::HandleOnDragDetected(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
@@ -103,8 +109,7 @@ namespace FW
 				[
 					SNew(STextBlock).Text(FText::FromString("*"))
 					.Visibility_Lambda([this] {
-						FGuid Id = TSingleton<AssetManager>::Get().GetGuid(Path);
-						AssetObject* Asset = TSingleton<AssetManager>::Get().FindLoadedAsset(Id);
+						AssetObject* Asset = TSingleton<AssetManager>::Get().FindLoadedAsset(Path);
 
 						if (Asset && Asset->IsDirty()) {
 							return EVisibility::Visible;

@@ -25,6 +25,7 @@ namespace FW
 		void Visit(SpvOpDPdy* Inst) override;
 		void Visit(SpvOpFwidth* Inst) override;
 		void Visit(SpvOpImageSampleImplicitLod* Inst) override;
+		void Visit(SpvOpKill* Inst) override;
 		
 	protected:
 		SpvVmPixelContext& PixelContext;
