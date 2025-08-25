@@ -22,6 +22,10 @@ project "FrameWork"
     uses {
         "UE", "magic_enum"
     }
+
+    private_uses {
+        "ShaderConductor"
+    }
 	
 	addToProjectHierarchy(UeHierarchy)
     addToProjectHierarchy(magic_enumHierarchy)
@@ -43,7 +47,7 @@ project "FrameWork"
         pchsource "CommonHeader.cpp"
         
         private_uses {
-            "ShaderConductor", "AgilitySDK", "WinPixEventRuntime"
+            "AgilitySDK", "WinPixEventRuntime"
         }
         addToProjectHierarchy(shaderConductorHierarchy)
 		addToProjectHierarchy(AgilitySDKHierarchy)
@@ -55,7 +59,7 @@ project "FrameWork"
 
     filter "system:macosx"
         private_uses { 
-            "ShaderConductor", "metal-cpp"
+            "metal-cpp"
         }
         addToProjectHierarchy(shaderConductorHierarchy)
         addToProjectHierarchy(metalcppHierarchy)
