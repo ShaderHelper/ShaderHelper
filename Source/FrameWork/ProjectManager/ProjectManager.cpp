@@ -17,13 +17,13 @@ namespace FW
 	{
 #if PLATFORM_WINDOWS
 		HKEY hKey;
-		if (RegCreateKeyEx(HKEY_CLASSES_ROOT, TEXT(".shprj"), 0, NULL, 0, KEY_READ | KEY_WRITE, NULL, &hKey, NULL) == ERROR_SUCCESS)
+		if (RegCreateKeyEx(HKEY_CURRENT_USER, TEXT("Software\\Classes\\.shprj"), 0, NULL, 0, KEY_READ | KEY_WRITE, NULL, &hKey, NULL) == ERROR_SUCCESS)
 		{
 			FString value = "Sh project file";
 			RegSetValueEx(hKey, TEXT(""), 0, REG_SZ, (const BYTE*)*value, sizeof(TCHAR)*value.Len());
 			RegCloseKey(hKey);
 
-			if (RegCreateKeyEx(HKEY_CLASSES_ROOT, TEXT("Sh project file"), 0, NULL, 0, KEY_READ | KEY_WRITE, NULL, &hKey, NULL) == ERROR_SUCCESS)
+			if (RegCreateKeyEx(HKEY_CURRENT_USER, TEXT("Software\\Classes\\Sh project file"), 0, NULL, 0, KEY_READ | KEY_WRITE, NULL, &hKey, NULL) == ERROR_SUCCESS)
 			{
 				FString IconPath = FPlatformProcess::ExecutablePath();
 				RegSetKeyValueW(hKey, TEXT("DefaultIcon"), TEXT(""), REG_SZ, (const BYTE*)*IconPath, sizeof(TCHAR) * IconPath.Len());
@@ -31,12 +31,23 @@ namespace FW
 				if(RegCreateKeyEx(hKey, TEXT("shell\\open\\command"), 0, NULL, 0, KEY_READ | KEY_WRITE, NULL, &openCmdKey, NULL) == ERROR_SUCCESS)
 				{
 					FString OpenCommand = FPlatformProcess::ExecutablePath() + FString(" -Project=%1");
-					RegSetValueEx(openCmdKey, TEXT(""), 0, REG_SZ, (const BYTE*)*OpenCommand, sizeof(TCHAR) * OpenCommand.Len());
+
+					DWORD DataType;
+					DWORD DataLen;
+					RegQueryValueEx(openCmdKey, TEXT(""), 0, &DataType, 0, &DataLen);
+					TArray<uint8> Data;
+					Data.SetNum(DataLen);
+					RegQueryValueEx(openCmdKey, TEXT(""), 0, 0, Data.GetData(), &DataLen);
+					FString QueryValue = FString((int32)DataLen, (TCHAR*)Data.GetData());
+					if(FCStringWide::Strcmp(*QueryValue, *OpenCommand) != 0)
+					{
+						RegSetValueEx(openCmdKey, TEXT(""), 0, REG_SZ, (const BYTE*)*OpenCommand, sizeof(TCHAR) * OpenCommand.Len());
+						SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, NULL, NULL);
+					}
 					RegCloseKey(openCmdKey);
 				}
 
 				RegCloseKey(hKey);
-				SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, NULL, NULL);
 			}
 		}
 #elif PLATFORM_MAC
