@@ -16,6 +16,8 @@ void mainImage(out float4 fragColor, in float2 fragCoord);
 		Print(EXPAND(Str), ##__VA_ARGS__);                                      \
 	}                                                                           \
 } while(0)
+#elif EDITOR_ISENSE == 1
+#define PrintAtMouse(Str, ...) UNUSED_ARGS(__VA_ARGS__);
 #else
 #define PrintAtMouse(Str, ...)
 #endif

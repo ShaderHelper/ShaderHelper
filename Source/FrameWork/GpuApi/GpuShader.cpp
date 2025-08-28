@@ -325,10 +325,9 @@ namespace FW
 			Extent->GetStart(StartLoc.GetInitReference());
 			Extent->GetEnd(EndLoc.GetInitReference());
 
-			TRefCountPtr<IDxcFile> CursorFile;
 			unsigned StartLine, StartCol, EndLine, EndCol;
-			StartLoc->GetSpellingLocation(CursorFile.GetInitReference(), &StartLine, &StartCol, nullptr);
-			EndLoc->GetSpellingLocation(CursorFile.GetInitReference(), &EndLine, &EndCol, nullptr);
+			StartLoc->GetSpellingLocation(nullptr, &StartLine, &StartCol, nullptr);
+			EndLoc->GetSpellingLocation(nullptr, &EndLine, &EndCol, nullptr);
 			OutStart = Vector2i(StartLine, StartCol);
 			OutEnd = Vector2i(EndLine, EndCol);
 		}
@@ -431,6 +430,10 @@ namespace FW
 							Func->Params.Emplace(ANSI_TO_TCHAR(ParmName), Flag);
 						}
 
+						for (unsigned int j = 0; j < TokenCount; j++) 
+						{
+							Tokens[j]->Release();
+						}
 						CoTaskMemFree(Tokens);
 						CoTaskMemFree(FuncName);
 						CoTaskMemFree(ParmName);
@@ -452,6 +455,11 @@ namespace FW
         Impl->ISense->CreateUnsavedFile("Temp.hlsl", (char*)SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR), Impl->Unsaved.GetInitReference());
         
 		TArray<const char*> DxcArgs;
+		DxcArgs.Add("-D");
+		DxcArgs.Add("ENABLE_PRINT=0");
+		DxcArgs.Add("-D");
+		DxcArgs.Add("EDITOR_ISENSE=1");
+
 		TArray<FTCHARToUTF8> CharIncludeDirs;
         for (const FString& IncludeDir : IncludeDirs)
         {
@@ -532,9 +540,7 @@ namespace FW
 	HLSL::TokenType ShaderTU::GetTokenType(HLSL::TokenType InType, uint32 Row, uint32 Col)
 	{
 		TRefCountPtr<IDxcSourceLocation> SrcLoc;
-		TRefCountPtr<IDxcFile> DxcFile;
-		Impl->TU->GetFile("Temp.hlsl", DxcFile.GetInitReference());
-		Impl->TU->GetLocation(DxcFile, Row, Col, SrcLoc.GetInitReference());
+		Impl->TU->GetLocation(Impl->DxcFile, Row, Col, SrcLoc.GetInitReference());
 		
 		TRefCountPtr<IDxcCursor> DxcCursor;
 		DxcCursorKind CursorKind;
@@ -602,6 +608,36 @@ namespace FW
 	TArray<ShaderFunc> ShaderTU::GetFuncs()
 	{
 		return Impl->Funcs;
+	}
+
+	TArray<ShaderOccurrence> ShaderTU::GetOccurrences(uint32 Row, uint32 Col)
+	{
+		TArray<ShaderOccurrence> Occurrences;
+
+		TRefCountPtr<IDxcSourceLocation> SrcLoc;
+		Impl->TU->GetLocation(Impl->DxcFile, Row, Col, SrcLoc.GetInitReference());
+		TRefCountPtr<IDxcCursor> DxcCursor;
+		Impl->TU->GetCursorForLocation(SrcLoc, DxcCursor.GetInitReference());
+		uint32 ResultLen;
+		IDxcCursor** CursorOccurrences;
+		DxcCursor->FindReferencesInFile(Impl->DxcFile, 0, -1, &ResultLen, &CursorOccurrences);
+
+		for(uint32 i = 0; i < ResultLen; i++)
+		{
+			//TODO: multiple files
+			if(Impl->IsMainFile(CursorOccurrences[i]))
+			{
+				TRefCountPtr<IDxcSourceLocation> Loc;
+				CursorOccurrences[i]->GetLocation(Loc.GetInitReference());
+				uint32 Row, Col;
+				Loc->GetSpellingLocation(nullptr, &Row, &Col, nullptr);
+				Occurrences.Emplace(Row, Col);
+			}
+	
+			CursorOccurrences[i]->Release();
+		}
+		CoTaskMemFree(CursorOccurrences);
+		return Occurrences;
 	}
 
     TArray<ShaderCandidateInfo> ShaderTU::GetCodeComplete(uint32 Row, uint32 Col)

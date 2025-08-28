@@ -41,6 +41,37 @@ namespace SH
 		}
 	};
 
+	class OccurrenceHightLighter : public ISlateLineHighlighter
+	{
+	public:
+		static TSharedRef<OccurrenceHightLighter> Create()
+		{
+			return MakeShareable(new OccurrenceHightLighter());
+		}
+
+		virtual int32 OnPaint(const FPaintArgs& Args, const FTextLayout::FLineView& Line, const float OffsetX, const float Width, const FTextBlockStyle& DefaultStyle, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override
+		{
+			const FVector2D Location(Line.Offset.X + OffsetX, Line.Offset.Y);
+
+			FLinearColor BackgroundColorAndOpacity = FLinearColor{ 0.1f, 0.1f, 0.1f, 0.8f };
+			const float InverseScale = Inverse(AllottedGeometry.Scale);
+
+			FSlateDrawElement::MakeBox(
+				OutDrawElements,
+				++LayerId,
+				AllottedGeometry.ToPaintGeometry(TransformVector(InverseScale, FVector2D(Width, FMath::Max(Line.Size.Y, Line.TextHeight))), FSlateLayoutTransform(TransformPoint(InverseScale, Location))),
+				&DefaultStyle.HighlightShape,
+				bParentEnabled ? ESlateDrawEffect::None : ESlateDrawEffect::DisabledEffect,
+				BackgroundColorAndOpacity
+			);
+
+			return LayerId;
+		}
+
+	protected:
+		OccurrenceHightLighter() = default;
+	};
+
 	class CursorHightLighter : public SlateEditableTextTypes::FCursorLineHighlighter
 	{
 	public:
@@ -72,7 +103,7 @@ namespace SH
 			if (FVector2D::Distance(CursorPos, NewLine.Offset) < 20.0f)
 			{
 				float Speed = 20.0f;
-				//FSlateApplication::Get().GetDeltaTime() will get a strange value here, which may be connected with hook.
+				//FSlateApplication::Get().GetDeltaTime() will get a strange value here
 				CursorPos = FMath::LerpStable(CursorPos, NewLine.Offset, FW::GApp->GetDeltaTime() * Speed);
 			}
 			else

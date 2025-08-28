@@ -29,7 +29,6 @@ namespace HLSL
 		BuildtinFunc,
 		BuildtinType,
 		Identifier,
-		Preprocess,
 		Comment,
 		String,
 		
@@ -39,7 +38,8 @@ namespace HLSL
 		Parm,
 		Var,
 		LocalVar,
-		
+
+		Preprocess,
 		Other,
 		
 	};
@@ -154,7 +154,7 @@ namespace FW
 
 	struct ShaderDiagnosticInfo
 	{
-		int32 Row, Col;
+		uint32 Row, Col;
 		FString Error;
 		FString Warn;
 	};
@@ -192,17 +192,24 @@ namespace FW
 		TArray<ShaderParameter> Params;
 	};
 
+	struct ShaderOccurrence
+	{
+		uint32 Row, Col;
+	};
+
 	FRAMEWORK_API FString AdjustDiagLineNumber(const FString& ErrorInfo, int32 Delta);
     FRAMEWORK_API TArray<ShaderCandidateInfo> DefaultCandidates();
 
     class FRAMEWORK_API ShaderTU
     {
     public:
+		ShaderTU() = default;
 		ShaderTU(FStringView HlslSource, const TArray<FString>& IncludeDirs = {});
 		TArray<ShaderDiagnosticInfo> GetDiagnostic();
 		HLSL::TokenType GetTokenType(HLSL::TokenType InType, uint32 Row, uint32 Col);
         TArray<ShaderCandidateInfo> GetCodeComplete(uint32 Row, uint32 Col);
 		TArray<ShaderFunc> GetFuncs();
+		TArray<ShaderOccurrence> GetOccurrences(uint32 Row, uint32 Col);
         
     private:
         TPimplPtr<struct ShaderTUImpl> Impl;

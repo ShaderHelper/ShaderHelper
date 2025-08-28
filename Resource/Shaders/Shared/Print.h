@@ -141,6 +141,12 @@ AppendArgFunc(bool)
 #define APPEND_ARGS_3(Arg1, Arg2, Arg3) ByteOffset = AppendArg(ByteOffset, Arg1); APPEND_ARGS_2(Arg2, Arg3)
 #define APPEND_ARGS(...) JOIN(APPEND_ARGS_, GET_ARG_NUM(__VA_ARGS__))(__VA_ARGS__)
 
+#define UNUSED_ARGS_0()
+#define UNUSED_ARGS_1(Arg1) (void)Arg1
+#define UNUSED_ARGS_2(Arg1, Arg2) (void)Arg1; APPEND_ARGS_1(Arg2);
+#define UNUSED_ARGS_3(Arg1, Arg2, Arg3) (void)Arg1; APPEND_ARGS_2(Arg2, Arg3);
+#define UNUSED_ARGS(...) JOIN(UNUSED_ARGS_, GET_ARG_NUM(__VA_ARGS__))(__VA_ARGS__)
+
 #if ENABLE_PRINT == 1
 //Up to 3 args now.
 //Print("abc {0}", t);
@@ -179,8 +185,10 @@ AppendArgFunc(bool)
 		APPEND_ARGS(__VA_ARGS__);                                       \
 	}                                                                   \
 } while(0)
+#elif EDITOR_ISENSE == 1
+#define Print(Str, ...) UNUSED_ARGS(__VA_ARGS__);
 #else
-#define Print(StrArrDecl, ...)
+#define Print(Str, ...)
 #endif
 
 static uint GPrivate_AssertResult = 1;
