@@ -302,17 +302,18 @@ namespace FW
 		{
 			MemberTypeDescs.Add(Context.TypeDescs[MemberTypeDescId].Get());
 		}
-		//Skip opaque type
-		if(MemberTypeDescs.IsEmpty())
+		
+		//Skip opaque type, it's size may be unknown(DebugInfoNone)
+		if(Context.Constants.contains(Inst->GetSize()))
 		{
-			return;
+			int32 Size = *(int32*)std::get<SpvObject::Internal>(Context.Constants.at(Inst->GetSize()).Storage).Value.GetData();
+			auto CompositeTypeDesc = MakeUnique<SpvCompositeTypeDesc>(Context.DebugStrs[Inst->GetName()],
+																	  Size,
+																	  MemberTypeDescs);
+			Context.TypeDescs.emplace(Inst->GetId().value(), MoveTemp(CompositeTypeDesc));
 		}
 		
-		int32 Size = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetSize()].Storage).Value.GetData();
-		auto CompositeTypeDesc = MakeUnique<SpvCompositeTypeDesc>(Context.DebugStrs[Inst->GetName()],
-																  Size,
-																  MemberTypeDescs);
-		Context.TypeDescs.emplace(Inst->GetId().value(), MoveTemp(CompositeTypeDesc));
+		
 	}
 
 	void SpvMetaVisitor::Visit(SpvDebugTypeMember* Inst)
