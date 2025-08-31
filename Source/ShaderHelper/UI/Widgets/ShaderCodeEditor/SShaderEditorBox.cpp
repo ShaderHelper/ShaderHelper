@@ -3138,7 +3138,11 @@ void __Expression_Output(T __Expression_Result) {}
 	
 				if(!VmContext.HasSideEffect)
 				{
-					FString TypeName = GetTypeDescStr(VmContext.ResultTypeDesc);
+					FText TypeName = LOCALIZATION("InvalidExpr");
+					if(VmContext.ResultTypeDesc)
+					{
+						TypeName = FText::FromString(GetTypeDescStr(VmContext.ResultTypeDesc));
+					}
 					TArray<Vector2i> ResultRange;
 					ResultRange.Add({0, VmContext.ResultValue.Num()});
 					FString ValueStr = GetValueStr(VmContext.ResultValue, VmContext.ResultTypeDesc, ResultRange, 0);
@@ -3151,7 +3155,7 @@ void __Expression_Output(T __Expression_Result) {}
 					}
 					
 					return {.Expr = InExpression, .ValueStr = FText::FromString(ValueStr),
-						.TypeName = FText::FromString(TypeName), .Children = MoveTemp(Children)};
+						.TypeName = MoveTemp(TypeName), .Children = MoveTemp(Children)};
 				}
 				else
 				{

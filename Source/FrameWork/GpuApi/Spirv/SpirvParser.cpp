@@ -303,7 +303,7 @@ namespace FW
 			MemberTypeDescs.Add(Context.TypeDescs[MemberTypeDescId].Get());
 		}
 		
-		//Skip opaque type, it's size may be unknown(DebugInfoNone)
+		//The size may be unknown(DebugInfoNone)
 		if(Context.Constants.contains(Inst->GetSize()))
 		{
 			int32 Size = *(int32*)std::get<SpvObject::Internal>(Context.Constants.at(Inst->GetSize()).Storage).Value.GetData();

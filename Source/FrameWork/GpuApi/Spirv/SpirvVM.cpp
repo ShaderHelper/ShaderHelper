@@ -54,10 +54,6 @@ namespace FW
 	TArray<uint8> GetPointerValue(SpvVmContext* InContext, SpvPointer* InPointer)
 	{
 		SpvVariableDesc* PointeeDesc = InContext->VariableDescMap[InPointer->Pointee->Id];
-		if(InPointer->Pointee->InitializedRanges.IsEmpty())
-		{
-			return {};
-		}
 		
 		TArray<uint8> RetValue;
 		if(InPointer->Pointee->IsExternal())
@@ -477,8 +473,7 @@ namespace FW
 		}
 		else
 		{
-			TArray<uint8> VarValue = GetPointerValue(&Context, Pointer);
-			if(VarValue.IsEmpty() && EnableUbsan)
+			if(Pointer->Pointee->InitializedRanges.IsEmpty() & EnableUbsan)
 			{
 				//The variable name cannot be obtained from the PointeeDesc because DebugDeclare appears before OpLoad in the following case:
 				//float a = a + 1;
@@ -489,6 +484,7 @@ namespace FW
 			//TODO: the result type size may not be equal to the value if it is an external object
 			//We may need to remap the value result with padding to the result type
 			//check(GetTypeByteSize(ResultType) == Value.Num());
+			TArray<uint8> VarValue = GetPointerValue(&Context, Pointer);
 			Value = { VarValue.GetData(), GetTypeByteSize(ResultType) };
 		}
 		
