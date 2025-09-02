@@ -16,11 +16,15 @@ namespace FW {
 		virtual ~Editor();
 
 		static void SetLanguage(SupportedLanguage InLanguage);
-		static inline SupportedLanguage CurLanguage = SupportedLanguage::English;
-		static inline TUniquePtr<FConfigFile> EditorConfig = MakeUnique<FConfigFile>();
-        
+		static SupportedLanguage GetLanguage() { return CurLanguage; }
         virtual void Update(double DeltaTime) {}
 		virtual TSharedPtr<SWindow> GetMainWindow() const { return {}; }
+		static FConfigFile* GetEditorConfig() { return EditorConfig.Get(); }
+		static void SaveEditorConfig();
+
+	private:
+		static inline SupportedLanguage CurLanguage = SupportedLanguage::English;
+		static inline TUniquePtr<FConfigFile> EditorConfig = MakeUnique<FConfigFile>();
 	};
 }
 

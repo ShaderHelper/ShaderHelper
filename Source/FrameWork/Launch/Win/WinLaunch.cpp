@@ -2,7 +2,7 @@
 #include "WinLaunch.h"
 #include <HAL/ExceptionHandling.h>
 
-void WinLaunch(TFunctionRef<void(const TCHAR*)> RunBlock, const TCHAR* CmdLine)
+void WinLaunch(const TFunction<void(const TCHAR*)>& RunBlock, const TCHAR* CmdLine)
 {
 #if SH_SHIPPING
 	__try

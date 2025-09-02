@@ -7,6 +7,7 @@ namespace FW {
 		static FString WorkspaceDir();
 		// ShaderHelper/Resource
 		static FString ResourceDir();
+		static FString PluginDir();
 		static FString ExternalDir();
 		static FString SavedDir();
 		static FString SavedLogDir();

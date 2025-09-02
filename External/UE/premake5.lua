@@ -44,10 +44,6 @@ usage "UE"
             "{COPYFILE} \"%{wks.location}/External/UE/Lib/*.dll\" %{cfg.targetdir}",
 			"{COPYFILE} \"%{wks.location}/External/UE/Lib/*.pdb\" %{cfg.targetdir}"
         }
-        buildoptions {
-            "/GR-", --UE modules disable rtti
-			"/experimental:external", --before vs2019 16.10
-        }
     filter "system:macosx"
         links 
         {
@@ -63,7 +59,6 @@ usage "UE"
         }
         buildoptions { 
             "-x objective-c++",
-            "-fno-rtti", --UE modules disable rtti
         }
     filter "system:linux"
         libdirs
@@ -73,7 +68,4 @@ usage "UE"
         links
         {
             "UE",
-        }
-        buildoptions { 
-            "-fno-rtti", --UE modules disable rtti
         }

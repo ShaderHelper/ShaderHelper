@@ -72,7 +72,7 @@ namespace SH
 		FTicker::GetCoreTicker().RemoveTicker(SaveLayoutTicker);
         if(FSlateApplication::IsInitialized())
         {
-            FSlateApplication::Get().DestroyWindowImmediately(Window.ToSharedRef());
+            FSlateApplication::Get().DestroyWindowImmediately(MainWindow.ToSharedRef());
         }
 		
 	}
@@ -212,7 +212,7 @@ namespace SH
 			AutoCenterRule = EAutoCenter::None;
 		}
 
-		SAssignNew(Window, SShWindow)
+		SAssignNew(MainWindow, SShWindow)
 			.Title(TAttribute<FText>::CreateLambda([this] { 
 				FString ProjectPath = CurProject->GetFilePath();
                 int Fps = FMath::RoundToInt(1 / GApp->GetDeltaTime());
@@ -221,7 +221,7 @@ namespace SH
 			.ScreenPosition(UsedWindowPos)
 			.AutoCenter(AutoCenterRule)
 			.ClientSize(UsedWindowSize);
-		Window->SetKeyDownHandler(FOnKeyDown::CreateLambda([this](const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) {
+		MainWindow->SetKeyDownHandler(FOnKeyDown::CreateLambda([this](const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) {
 			//Process tool bar commands.
 			if (UICommandList.IsValid())
 			{
@@ -231,9 +231,9 @@ namespace SH
 		}));
 
 		CreateInternalWidgets();
-		TabManagerTab->AssignParentWidget(Window);
+		TabManagerTab->AssignParentWidget(MainWindow);
 
-		FSlateApplication::Get().AddWindow(Window.ToSharedRef());
+		FSlateApplication::Get().AddWindow(MainWindow.ToSharedRef());
         
         auto MenuBarBuilder = CreateMenuBarBuilder();
         auto MenuBarWidget = MenuBarBuilder.MakeWidget();
@@ -241,7 +241,7 @@ namespace SH
 		auto ToolBarBuilder = CreateToolBarBuilder();
 		auto ToolBarWidget = ToolBarBuilder.MakeWidget();
 
-		Window->SetContent(
+		MainWindow->SetContent(
 			SAssignNew(WindowContentBox, SVerticalBox)
 			+SVerticalBox::Slot()
 			.AutoHeight()
@@ -266,7 +266,7 @@ namespace SH
 			+SVerticalBox::Slot()
 			.FillHeight(0.965f)
 			[
-				TabManager->RestoreFrom(UsedLayout, Window).ToSharedRef()
+				TabManager->RestoreFrom(UsedLayout, MainWindow).ToSharedRef()
 			]
             +SVerticalBox::Slot()
             .FillHeight(0.035f)
@@ -292,10 +292,10 @@ namespace SH
             return true;
         }), 2.0f);
 
-		Window->SetRequestDestroyWindowOverride(FRequestDestroyWindowOverride::CreateLambda([this](const TSharedRef<SWindow>& InWindow) {
+		MainWindow->SetRequestDestroyWindowOverride(FRequestDestroyWindowOverride::CreateLambda([this](const TSharedRef<SWindow>& InWindow) {
 			if(CurProject->AnyPendingAsset())
 			{
-				auto Ret = MessageDialog::Open(MessageDialog::OkNoCancel, Window, LOCALIZATION("SaveAssetsTip"));
+				auto Ret = MessageDialog::Open(MessageDialog::OkNoCancel, MainWindow, LOCALIZATION("SaveAssetsTip"));
 				if(Ret == MessageDialog::MessageRet::Cancel)
 				{
 					return;
@@ -313,6 +313,8 @@ namespace SH
 			ShApp->Launcher.Reset();
 			FSlateApplication::Get().RequestDestroyWindow(InWindow);
 		}));
+
+		TSingleton<ShPluginManager>::Get().RegisterActivePlugins();
 	}
 
     TSharedRef<SWidget> ShaderHelperEditor::SpawnShaderPath(const FString& InShaderPath)
@@ -454,7 +456,7 @@ namespace SH
 					ShaderAsset* Shader = CurDebuggableObject->GetShaderAsset();
 					if(CurProject->OpenedShaders[Shader]->GetLayoutIdentifier() == TabId)
 					{
-						auto Ret = MessageDialog::Open(MessageDialog::OkCancel, Window, LOCALIZATION("TerminateDebuggerTip"));
+						auto Ret = MessageDialog::Open(MessageDialog::OkCancel, MainWindow, LOCALIZATION("TerminateDebuggerTip"));
 						if(Ret == MessageDialog::MessageRet::Ok)
 						{
 							EndDebugging();
@@ -717,7 +719,7 @@ namespace SH
         }
         
         TabManager->CloseAllAreas();
-        WindowContentBox->GetSlot(2).AttachWidget(TabManager->RestoreFrom(DefaultTabLayout.ToSharedRef(), Window).ToSharedRef());
+        WindowContentBox->GetSlot(2).AttachWidget(TabManager->RestoreFrom(DefaultTabLayout.ToSharedRef(), MainWindow).ToSharedRef());
         TabManager->FindExistingLiveTab(CodeTabId)->GetParentDockTabStack()->SetCanDropToAttach(false);
 	}
 
@@ -725,7 +727,7 @@ namespace SH
 	{
 		if(CurProject->Graph && CurProject->Graph->IsDirty())
 		{
-			auto Ret = MessageDialog::Open(MessageDialog::OkNoCancel, Window, LOCALIZATION("SaveAssetTip"));
+			auto Ret = MessageDialog::Open(MessageDialog::OkNoCancel, MainWindow, LOCALIZATION("SaveAssetTip"));
 			if(Ret == MessageDialog::MessageRet::Cancel)
 			{
 				return;
@@ -773,7 +775,7 @@ namespace SH
         if(TabPtr == nullptr || !*TabPtr)
         {
             FName ShaderTabId{*InShader->GetGuid().ToString()};
-            auto NewShaderTab = SpawnShaderTab({Window, ShaderTabId});
+            auto NewShaderTab = SpawnShaderTab({ MainWindow, ShaderTabId});
             if(ShaderTabStackInsertPoint.IsValid() && ShaderTabStackInsertPoint.Pin()->GetAllChildTabs().IsValidIndex(0))
             {
                 auto FirstTab = ShaderTabStackInsertPoint.Pin()->GetAllChildTabs()[0];
@@ -824,12 +826,12 @@ namespace SH
 		TSharedRef<FJsonObject> RootJsonObject = MakeShared<FJsonObject>();
 
 		TSharedRef<FJsonObject> RootWindowSizeJsonObject = MakeShared<FJsonObject>();
-		Vector2D CurClientSize = Window->GetClientSizeInScreen() / Window->GetDPIScaleFactor();
+		Vector2D CurClientSize = MainWindow->GetClientSizeInScreen() / MainWindow->GetDPIScaleFactor();
 		RootWindowSizeJsonObject->SetNumberField(TEXT("Width"), CurClientSize.X);
 		RootWindowSizeJsonObject->SetNumberField(TEXT("Height"), CurClientSize.Y);
 
 		TSharedRef<FJsonObject> RootWindowPosJsonObject = MakeShared<FJsonObject>();
-		Vector2D CurPos = Window->GetPositionInScreen() / Window->GetDPIScaleFactor();
+		Vector2D CurPos = MainWindow->GetPositionInScreen() / MainWindow->GetDPIScaleFactor();
 		RootWindowPosJsonObject->SetNumberField(TEXT("X"), CurPos.X);
 		RootWindowPosJsonObject->SetNumberField(TEXT("Y"), CurPos.Y);
 
@@ -989,14 +991,19 @@ namespace SH
 			FNewMenuDelegate::CreateRaw(this, &ShaderHelperEditor::FillMenu, FString("File"))
 		);
 		MenuBarBuilder.AddPullDownMenu(
-			LOCALIZATION("Config"),
+			LOCALIZATION("Edit"),
 			FText::GetEmpty(),
-			FNewMenuDelegate::CreateRaw(this, &ShaderHelperEditor::FillMenu, FString("Config"))
+			FNewMenuDelegate::CreateRaw(this, &ShaderHelperEditor::FillMenu, FString("Edit"))
 		);
 		MenuBarBuilder.AddPullDownMenu(
 			LOCALIZATION("Window"),
 			FText::GetEmpty(),
 			FNewMenuDelegate::CreateRaw(this, &ShaderHelperEditor::FillMenu, FString("Window"))
+		);
+		MenuBarBuilder.AddPullDownMenu(
+			LOCALIZATION("Help"),
+			FText::GetEmpty(),
+			FNewMenuDelegate::CreateRaw(this, &ShaderHelperEditor::FillMenu, FString("Help"))
 		);
         return MenuBarBuilder;
 	}
@@ -1039,7 +1046,7 @@ namespace SH
 								ShApp->Launcher->SetCanLaunchFunc([this] {
 									if(CurProject->AnyPendingAsset())
 									{
-										auto Ret = MessageDialog::Open(MessageDialog::OkNoCancel, Window, LOCALIZATION("SaveAssetsTip"));
+										auto Ret = MessageDialog::Open(MessageDialog::OkNoCancel, MainWindow, LOCALIZATION("SaveAssetsTip"));
 										if(Ret == MessageDialog::MessageRet::Cancel)
 										{
 											return false;
@@ -1065,7 +1072,7 @@ namespace SH
 			MenuBuilder.EndSection();
 			
 		}
-		else if (MenuName == "Config") {
+		else if (MenuName == "Edit") {
 			MenuBuilder.AddSubMenu(LOCALIZATION("Language"), FText::GetEmpty(), FNewMenuDelegate::CreateLambda(
 				[this](FMenuBuilder& MenuBuilder) {
 					for (int Index{}; Index != static_cast<int>(SupportedLanguage::Num); Index++)
@@ -1085,7 +1092,7 @@ namespace SH
 								FIsActionChecked::CreateLambda(
 									[Lang]()
 									{
-										return Editor::CurLanguage == Lang;
+										return Editor::GetLanguage() == Lang;
 									})
 							),
 							NAME_None,
@@ -1094,6 +1101,26 @@ namespace SH
 					}
 				}),
 				false, FSlateIcon(FShaderHelperStyle::Get().GetStyleSetName(), "Icons.World"));
+			MenuBuilder.AddMenuEntry(LOCALIZATION("Preferences"), FText::GetEmpty(), FSlateIcon(FAppStyle::Get().GetStyleSetName(), "Icons.Settings"),
+				FUIAction(
+					FExecuteAction::CreateLambda([this] {
+						if (!PreferenceWindow.IsValid())
+						{
+							auto NewWindow = SNew(SShWindow).Title_Lambda([this] {
+								return FText::FromString(LOCALIZATION("ShaderHelper").ToString() + "-" + LOCALIZATION("Preferences").ToString());
+							})
+							.ClientSize({600, 400})
+							[
+								SAssignNew(PreferenceView, SPreferenceView)
+							];
+							NewWindow->SetOnWindowClosed(FOnWindowClosed::CreateLambda([this](const TSharedRef<SWindow>& InWindow) {
+								PreferenceView->SavePersistentState();
+							}));
+							PreferenceWindow = NewWindow;
+							FSlateApplication::Get().AddWindowAsNativeChild(NewWindow, MainWindow.ToSharedRef());
+						}
+					}
+				)));
 		}
 		else if (MenuName == "Window") {
 			MenuBuilder.BeginSection("WindowTabControl", FText::FromString("Tab Control"));
@@ -1123,6 +1150,15 @@ namespace SH
 					));
 			}
 			MenuBuilder.EndSection();
+		}
+		else if (MenuName == "Help")
+		{
+			MenuBuilder.AddMenuEntry(LOCALIZATION("About"), FText::GetEmpty(), FSlateIcon(),
+				FUIAction(
+					FExecuteAction::CreateLambda([this] {
+
+						}
+					)));
 		}
 	}
 

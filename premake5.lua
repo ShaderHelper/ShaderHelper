@@ -6,6 +6,7 @@ external_pix = "External/WinPixEventRuntime"
 external_metalcpp = "External/metal-cpp"
 external_shaderConductor = "External/ShaderConductor"
 external_magicenum = "External/magic_enum"
+external_python = "External/Python"
 
 project_shaderHelper = "Source/ShaderHelper"
 project_frameWork = "Source/FrameWork"
@@ -24,10 +25,10 @@ workspace "ShaderHelper"
         "Shipping" --RelWithDebInfo
     } 
     targetname "%{prj.name}"
+    targetdir ("Binaries")
     language "C++"
     cppdialect "C++20"
     staticruntime "off"
-    exceptionhandling "off"
 
     objdir ("Intermediate/%{prj.name}")
 
@@ -41,7 +42,6 @@ workspace "ShaderHelper"
         architecture "x86_64"  
         systemversion "latest"
         runtime "Release"
-        targetdir ("Binaries/Win64")
         implibdir ("%{cfg.objdir}/%{cfg.buildcfg}")
 
         workspace_items
@@ -70,7 +70,6 @@ workspace "ShaderHelper"
 
     filter "system:macosx"
         architecture "universal"
-        targetdir ("Binaries/Mac")
         xcodebuildsettings { 
             ["MACOSX_DEPLOYMENT_TARGET"] = "10.15",
             --This must be set to YES on arm64 mac.
@@ -91,7 +90,6 @@ workspace "ShaderHelper"
 
     filter "system:linux"
         architecture "x86_64"
-        targetdir ("Binaries/Linux")
         runpathdirs {
             "%{cfg.targetdir}",
             "%{cfg.targetdir}/../../../ "
@@ -140,6 +138,7 @@ include(external_pix)
 include(external_metalcpp)
 include(external_shaderConductor)
 include(external_magicenum)
+include(external_python)
 
 include(project_shaderHelper)
 include(project_frameWork)

@@ -5,7 +5,7 @@ namespace FW {
 
 	FString PathHelper::WorkspaceDir()
 	{
-		FString RetDir = FString(FPlatformProcess::BaseDir()) + TEXT("../../");
+		FString RetDir = FString(FPlatformProcess::BaseDir()) + TEXT("../");
 		FPaths::CollapseRelativeDirectories(RetDir);
 		return RetDir;
 	}
@@ -13,6 +13,11 @@ namespace FW {
 	FString PathHelper::ResourceDir()
 	{
 		return WorkspaceDir() / TEXT("Resource");
+	}
+
+	FString PathHelper::PluginDir()
+	{
+		return WorkspaceDir() / TEXT("Plugins");
 	}
 
 	FString PathHelper::ExternalDir()
