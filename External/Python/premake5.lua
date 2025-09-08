@@ -1,5 +1,8 @@
 pythonHierarchy = {
-    ["External/Python/*"] = {"%{_WORKING_DIR}/External/Python/**"},
+    ["External/Python/*"] = {
+        "%{_WORKING_DIR}/External/Python/Include/**", 
+        "%{_WORKING_DIR}/External/Python/pybind11/**",
+    },
 }
 
 usage "Python"
@@ -19,6 +22,6 @@ usage "Python"
     filter "system:windows"
         prebuildcommands {
             "{COPYFILE} \"%{wks.location}/External/Python/python311.dll\" %{cfg.targetdir}",
-            "{COPY} \"%{wks.location}/External/Python/DLLs\" %{cfg.targetdir}/Python",
-            "{COPYFILE} \"%{wks.location}/External/Python/python311.zip\" %{cfg.targetdir}/Python",
+            "{COPY} \"%{wks.location}/External/Python/DLLs\" %{cfg.targetdir}/Python/DLLs",
+            "{COPY} \"%{wks.location}/External/Python/Lib\" %{cfg.targetdir}/Python/Lib",
         } 

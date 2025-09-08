@@ -12,6 +12,7 @@
 #include "Editor/AssetEditor/AssetEditor.h"
 #include "UI/Widgets/Timeline/STimeline.h"
 #include "UI/Widgets/Misc/CommonCommands.h"
+#include "PluginManager/ShPluginManager.h"
 
 STEAL_PRIVATE_MEMBER(FTabManager, TArray<TSharedRef<FTabManager::FArea>>, CollapsedDockAreas)
 
@@ -765,8 +766,11 @@ namespace SH
 
     void ShaderHelperEditor::ShowProperty(ShObject* InObjectData)
     {
-        CurPropertyObject = InObjectData;
-		PropertyView->SetObjectData(InObjectData);
+		if (!PropertyView->IsLocked())
+		{
+			CurPropertyObject = InObjectData;
+			PropertyView->SetObjectData(InObjectData);
+		}
     }
 
 	void ShaderHelperEditor::OpenShaderTab(AssetPtr<ShaderAsset> InShader)
@@ -1160,6 +1164,20 @@ namespace SH
 						}
 					)));
 		}
+
+
+		for (MenuEntryExt* Ext : MenuEntryExts)
+		{
+			if (Ext->TargetMenu == MenuName)
+			{
+				MenuBuilder.AddMenuEntry(FText::FromString(Ext->Label), FText::GetEmpty(), FSlateIcon(), 
+					FUIAction(
+						FExecuteAction::CreateLambda([Ext] { Ext->OnExecute();  }),
+						FCanExecuteAction::CreateLambda([Ext] { return Ext->CanExecute(); })
+					));
+			}
+		}
+
 	}
 
 }

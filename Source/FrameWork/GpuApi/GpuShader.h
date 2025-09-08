@@ -75,7 +75,7 @@ namespace FW
 		uint8 Minor = 0;
 	};
 
-	class GpuShaderPreProcessor
+	class FRAMEWORK_API GpuShaderPreProcessor
 	{
 	public:
 		GpuShaderPreProcessor(FString InShaderText) : ShaderText(MoveTemp(InShaderText)) {}
@@ -112,7 +112,7 @@ namespace FW
         };
     };
 
-    class GpuShader : public GpuResource
+    class FRAMEWORK_API GpuShader : public GpuResource
     {
 	public:
         //From file

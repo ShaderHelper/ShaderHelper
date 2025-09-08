@@ -10,39 +10,39 @@ using namespace FW;
 
 namespace SH
 {
-    REFLECTION_REGISTER(AddClass<ShaderToyOuputNode>("Present Node")
+    REFLECTION_REGISTER(AddClass<ShaderToyOutputNode>("Present Node")
 		.BaseClass<GraphNode>()
-		.Data<&ShaderToyOuputNode::Format, MetaInfo::Property>("Format")
+		.Data<&ShaderToyOutputNode::Format, MetaInfo::Property>("Format")
 	)
-    REFLECTION_REGISTER(AddClass<ShaderToyOuputNodeOp>()
+    REFLECTION_REGISTER(AddClass<ShaderToyOutputNodeOp>()
         .BaseClass<ShObjectOp>()
     )
 
-	REGISTER_NODE_TO_GRAPH(ShaderToyOuputNode, "ShaderToy Graph")
+	REGISTER_NODE_TO_GRAPH(ShaderToyOutputNode, "ShaderToy Graph")
 
-    MetaType* ShaderToyOuputNodeOp::SupportType()
+    MetaType* ShaderToyOutputNodeOp::SupportType()
     {
-        return GetMetaType<ShaderToyOuputNode>();
+        return GetMetaType<ShaderToyOutputNode>();
     }
 
-    void ShaderToyOuputNodeOp::OnSelect(ShObject* InObject)
+    void ShaderToyOutputNodeOp::OnSelect(ShObject* InObject)
     {
         auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
         ShEditor->ShowProperty(InObject);
     }
 
-	ShaderToyOuputNode::ShaderToyOuputNode()
+	ShaderToyOutputNode::ShaderToyOutputNode()
 	: Format(ShaderToyFormat::B8G8R8A8_UNORM)
 	{
 		ObjectName = FText::FromString("Present");
 	}
 
-    ShaderToyOuputNode::~ShaderToyOuputNode()
+    ShaderToyOutputNode::~ShaderToyOutputNode()
     {
 
     }
 
-    void ShaderToyOuputNode::InitPins()
+    void ShaderToyOutputNode::InitPins()
     {
         auto ResultPin = NewShObject<GpuTexturePin>(this);
         ResultPin->ObjectName = FText::FromString("RT");
@@ -51,12 +51,12 @@ namespace SH
         Pins.Add(MoveTemp(ResultPin));
     }
 
-	void ShaderToyOuputNode::Serialize(FArchive& Ar)
+	void ShaderToyOutputNode::Serialize(FArchive& Ar)
 	{
 		GraphNode::Serialize(Ar);
 	}
 
-    ExecRet ShaderToyOuputNode::Exec(GraphExecContext& Context)
+    ExecRet ShaderToyOutputNode::Exec(GraphExecContext& Context)
 	{
         ShaderToyExecContext& ShaderToyContext = static_cast<ShaderToyExecContext&>(Context);
         

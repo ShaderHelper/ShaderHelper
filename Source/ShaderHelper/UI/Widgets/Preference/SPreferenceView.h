@@ -3,9 +3,9 @@
 
 namespace SH
 {
-	struct PluginData : ShPlugin
+	struct PluginData
 	{
-		bool bFailed{};
+		FW::ShPlugin* Data;
 	};
 	using PluginDataPtr = TSharedPtr<PluginData>;
 	class SPluginView : public SCompoundWidget

@@ -69,6 +69,8 @@ namespace FW
             return Reference;
         }
 
+		T* Get() const { return Reference; }
+
         operator T*() const
         {
             return Reference;

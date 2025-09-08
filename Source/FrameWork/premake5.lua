@@ -20,15 +20,12 @@ project "FrameWork"
 	}
 
     uses {
-        "UE", "magic_enum"
-    }
-
-    private_uses {
-        "ShaderConductor"
+        "UE", "magic_enum", "Python","ShaderConductor"
     }
 	
 	addToProjectHierarchy(UeHierarchy)
     addToProjectHierarchy(magic_enumHierarchy)
+    addToProjectHierarchy(pythonHierarchy)
 
     filter {"files:**/External/UE/**"}
         flags {"ExcludeFromBuild"}

@@ -57,6 +57,7 @@ namespace SH
 		FTabManager* GetTabManager() const { return TabManager.Get(); }
 		TSharedPtr<SWindow> GetMainWindow() const override { return MainWindow; }
 		FW::PreviewViewPort* GetViewPort() const { return ViewPort.Get(); }
+		FW::ShObject* GetCurPropertyObject() const { return CurPropertyObject; }
 		TSharedPtr<FUICommandList> GetUICommandList() const { return UICommandList; }
 		SDebuggerVariableView* GetDebuggerLocalVariableView() const { return DebuggerLocalVariableView.Get(); }
 		SDebuggerVariableView* GetDebuggerGlobalVariableView() const { return DebuggerGlobalVariableView.Get(); }

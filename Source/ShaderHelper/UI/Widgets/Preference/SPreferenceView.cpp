@@ -1,7 +1,6 @@
 #include "CommonHeader.h"
 #include "SPreferenceView.h"
 #include <Styling/StyleColors.h>
-#include "PluginManager/ShPluginManager.h"
 #include "App/App.h"
 
 using namespace FW;
@@ -10,9 +9,9 @@ namespace SH
 {
 	void SPluginView::Construct(const FArguments& InArgs)
 	{
-		for(const auto& Plugin : TSingleton<ShPluginManager>::Get().GetPlugins())
+		for(auto& Plugin : TSingleton<ShPluginManager>::Get().GetPlugins())
 		{
-			auto Data = MakeShared<PluginData>(Plugin);
+			auto Data = MakeShared<PluginData>(&Plugin);
 			PluginDatas.Add(MoveTemp(Data));
 		}
 
@@ -29,9 +28,9 @@ namespace SH
 		TArray<FString> ActivePlugins;
 		for(const auto& PluginData : PluginDatas)
 		{
-			if(PluginData->bActive)
+			if(PluginData->Data->bActive)
 			{
-				ActivePlugins.Add(PluginData->Name);
+				ActivePlugins.Add(PluginData->Data->Name);
 			}
 		}
 		Editor::GetEditorConfig()->SetArray(TEXT("Common"), TEXT("ActivePlugins"), ActivePlugins);
@@ -40,11 +39,12 @@ namespace SH
 
 	TSharedRef<ITableRow> SPluginView::GenerateRowForItem(PluginDataPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
 	{
-		return SNew(STableRow<PluginDataPtr>, OwnerTable)
+		auto Row = SNew(STableRow<PluginDataPtr>, OwnerTable)
+			.Padding(FMargin{0,0,0,6})
 			[
 				SNew(SBorder)
 				.BorderImage_Lambda([Item] {
-					if(Item->bFailed) {
+					if(Item->Data->bFailed) {
 						return FAppStyle::Get().GetBrush("Brushes.Error");
 					}
 					return FAppStyle::Get().GetBrush("Brushes.AccentGray");
@@ -62,18 +62,18 @@ namespace SH
 						.Padding(0, 0, 8, 0)
 						.AutoWidth()
 						[
-							SNew(SCheckBox).IsChecked_Lambda([Item] { return Item->bActive ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
+							SNew(SCheckBox).IsChecked_Lambda([Item] { return Item->Data->bActive ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
 							.OnCheckStateChanged_Lambda([Item](ECheckBoxState InState) {
 								if(InState == ECheckBoxState::Checked) {
-									Item->bFailed = !TSingleton<ShPluginManager>::Get().RegisterPlugin(*Item);
-									if(!Item->bFailed)
+									TSingleton<ShPluginManager>::Get().RegisterPlugin(*Item->Data);
+									if(!Item->Data->bFailed)
 									{
-										Item->bActive = true;
+										Item->Data->bActive = true;
 									}
 								}
 								else {
-									TSingleton<ShPluginManager>::Get().UnregisterPlugin(*Item);
-									Item->bActive = false;
+									TSingleton<ShPluginManager>::Get().UnregisterPlugin(*Item->Data);
+									Item->Data->bActive = false;
 								}
 							})
 						]
@@ -81,8 +81,8 @@ namespace SH
 						.HAlign(HAlign_Left)
 						.VAlign(VAlign_Center)
 						[
-							SNew(STextBlock).OverflowPolicy(ETextOverflowPolicy::Ellipsis).Text(FText::FromString(Item->Name))
-							.IsEnabled_Lambda([Item] { return Item->bActive; })
+							SNew(STextBlock).OverflowPolicy(ETextOverflowPolicy::Ellipsis).Text(FText::FromString(Item->Data->Name))
+							.IsEnabled_Lambda([Item] { return Item->Data->bActive; })
 						]
 					]
 					.BodyContent()
@@ -116,28 +116,30 @@ namespace SH
 							+ SVerticalBox::Slot()
 							[
 								SNew(STextBlock).OverflowPolicy(ETextOverflowPolicy::Ellipsis)
-								.Text_Lambda([=] { return FText::FromString(Item->Desc); })
+								.Text_Lambda([=] { return FText::FromString(Item->Data->Desc); })
 							]
 							+ SVerticalBox::Slot()
 							[
 								SNew(STextBlock).OverflowPolicy(ETextOverflowPolicy::Ellipsis)
-								.Text_Lambda([=] { return FText::FromString(FString::FromInt(Item->Major) + "." + FString::FromInt(Item->Minor)); })
+								.Text_Lambda([=] { return FText::FromString(Item->Data->Version); })
 							]
 							+ SVerticalBox::Slot()
 							[
 								SNew(STextBlock).OverflowPolicy(ETextOverflowPolicy::Ellipsis)
-								.Text_Lambda([=] { return FText::FromString(Item->Author); })
+								.Text_Lambda([=] { return FText::FromString(Item->Data->Author); })
 							]
 							+ SVerticalBox::Slot()
 							[
 								SNew(STextBlock).OverflowPolicy(ETextOverflowPolicy::Ellipsis)
-									.Text_Lambda([=] { return FText::FromString(Item->Path); })
+									.Text_Lambda([=] { return FText::FromString(Item->Data->Path); })
 							]
 						]
 					]
 				]
 				
 			];
+		Row->SetBorderImage(FAppStyle::Get().GetBrush("Brushes.Panel"));
+		return Row;
 	}
 
 	void SKeymapView::Construct(const FArguments& InArgs)

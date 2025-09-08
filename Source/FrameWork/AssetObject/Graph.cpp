@@ -174,7 +174,7 @@ namespace FW
         return nullptr;
     }
 
-    TArray<GraphPin*> GraphPin::GetTargetPins()
+    TArray<GraphPin*> GraphPin::GetTargetPins() const
     {
         GraphNode* Owner = static_cast<GraphNode*>(GetOuter());
         Graph* OwnerGraph = static_cast<Graph*>(Owner->GetOuter());
@@ -191,9 +191,26 @@ namespace FW
         return TargetPins;
     }
 
+	GraphPin* GraphPin::GetSourcePin() const
+	{
+		GraphNode* Owner = static_cast<GraphNode*>(GetOuter());
+		Graph* OwnerGraph = static_cast<Graph*>(Owner->GetOuter());
+		return OwnerGraph->GetPin(SourcePin);
+	}
+
+	GraphNode* GraphPin::GetSourceNode() const
+	{
+		if(GraphPin* SrcPin = GetSourcePin())
+		{
+			return static_cast<GraphNode*>(SrcPin->GetOuter());
+		}
+		return nullptr;
+	}
+
 	void GraphPin::Serialize(FArchive& Ar)
 	{
 		ShObject::Serialize(Ar);
+		Ar << SourcePin;
 		Ar << Direction;
 	}
 

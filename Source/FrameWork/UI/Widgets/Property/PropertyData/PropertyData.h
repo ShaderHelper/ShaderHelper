@@ -108,6 +108,28 @@ namespace FW
 		bool bComposite;
 		TSharedPtr<SWidget> AddMenuWidget;
 	};
+
+	class PropertyCustomWidget : public PropertyData
+	{
+		MANUAL_RTTI_TYPE(PropertyCustomWidget, PropertyData)
+	public:
+		PropertyCustomWidget(TSharedRef<SWidget> InCustomWidget)
+		: PropertyData(nullptr, "")
+		, CustomWidget(InCustomWidget)
+		{
+			
+		}
+
+		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
+		{
+			auto Row = SNew(STableRow<TSharedRef<PropertyData>>, OwnerTable).Padding(FMargin{ 0,4,0,4 });
+			Row->SetExpanderArrowVisibility(EVisibility::Collapsed);
+			Row->SetContent(CustomWidget.ToSharedRef());
+			return Row;
+		}
+	private:
+		TSharedPtr<SWidget> CustomWidget;
+	};
 }
 
 

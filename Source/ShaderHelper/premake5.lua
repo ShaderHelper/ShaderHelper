@@ -7,7 +7,6 @@ project "ShaderHelper"
     location "%{_WORKING_DIR}/ProjectFiles"
 
     addToProjectHierarchy(ShaderHelperHierarchy)
-    addToProjectHierarchy(pythonHierarchy)
     
     includedirs
     {
@@ -15,7 +14,7 @@ project "ShaderHelper"
     }
 
     uses {
-		"FrameWork", "Python"
+		"FrameWork"
 	}
 
     addPrivateIncludeDir_ue("Slate")
