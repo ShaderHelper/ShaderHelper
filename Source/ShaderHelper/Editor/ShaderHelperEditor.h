@@ -17,6 +17,7 @@
 #include "UI/Widgets/Debugger/SDebuggerVariableView.h"
 #include "UI/Widgets/Debugger/SDebuggerCallStackView.h"
 #include "UI/Widgets/Debugger/SDebuggerWatchView.h"
+#include "UI/Widgets/Preference/SPreferenceView.h"
 #include "AssetObject/DebuggableObject.h"
 #include "UI/Widgets/Misc/SShWindow.h"
 
@@ -54,8 +55,9 @@ namespace SH
 		ShRenderer* GetRenderer() const { return Renderer;}
         FTabManager* GetCodeTabManager() const { return CodeTabManager.Get(); }
 		FTabManager* GetTabManager() const { return TabManager.Get(); }
-		TSharedPtr<SWindow> GetMainWindow() const override { return Window; }
+		TSharedPtr<SWindow> GetMainWindow() const override { return MainWindow; }
 		FW::PreviewViewPort* GetViewPort() const { return ViewPort.Get(); }
+		FW::ShObject* GetCurPropertyObject() const { return CurPropertyObject; }
 		TSharedPtr<FUICommandList> GetUICommandList() const { return UICommandList; }
 		SDebuggerVariableView* GetDebuggerLocalVariableView() const { return DebuggerLocalVariableView.Get(); }
 		SDebuggerVariableView* GetDebuggerGlobalVariableView() const { return DebuggerGlobalVariableView.Get(); }
@@ -115,7 +117,9 @@ namespace SH
         TWeakPtr<class SDockingTabStack> ShaderTabStackInsertPoint;
         TSharedPtr<class SDockingArea> CodeTabMainArea;
         
-		TSharedPtr<FW::SShWindow> Window;
+		TSharedPtr<FW::SShWindow> MainWindow;
+		TWeakPtr<FW::SShWindow> PreferenceWindow;
+		TSharedPtr<SPreferenceView> PreferenceView;
 		TSharedPtr<SViewport> ViewportWidget;
 		TSharedPtr<FW::PreviewViewPort> ViewPort;
 		FVector2D WindowSize;

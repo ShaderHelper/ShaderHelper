@@ -3,6 +3,7 @@
 #include "ProjectManager/ProjectManager.h"
 #include "UI/Widgets/Property/PropertyData/PropertyData.h"
 #include "UI/Widgets/Property/PropertyData/PropertyAssetItem.h"
+#include "PluginManager/PluginManager.h"
 
 namespace FW
 {
@@ -84,6 +85,15 @@ namespace FW
         {
 			Datas.Append(GeneratePropertyDatas(InObject, MetaMemData, InObject));
         }
+
+		for (PropertyExt* Ext : PropertyExts)
+		{
+			auto Widget = Ext->CreateWidget();
+			if(Ext->TargetType == InMetaType && Widget)
+			{
+				Datas.Add(MakeShared<PropertyCustomWidget>(Widget->GetSlateWidget()));
+			}
+		}
         
         return Datas;
     }
@@ -158,10 +168,7 @@ namespace FW
 
     TArray<TSharedRef<PropertyData>>* ShObject::GetPropertyDatas()
     {
-        if(PropertyDatas.IsEmpty())
-        {
-            PropertyDatas = GeneratePropertyDatas(this, this->DynamicMetaType());
-        }
+        PropertyDatas = GeneratePropertyDatas(this, this->DynamicMetaType());
         return &PropertyDatas;
     }
     

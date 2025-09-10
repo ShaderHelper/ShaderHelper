@@ -32,7 +32,7 @@ namespace SH {
 			Launcher = MakeShared<ProjectLauncher<ShProject>>([this] {
 				AppEditor = MakeUnique<ShaderHelperEditor>(AppClientSize, static_cast<ShRenderer*>(GetRenderer()));
 				static_cast<ShaderHelperEditor*>(AppEditor.Get())->InitEditorUI();
-				});
+			});
 		}
 	}
 

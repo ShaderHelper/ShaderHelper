@@ -72,4 +72,9 @@ namespace FW
 		EditorConfig->Write(BaseEditorConfig());
 	}
 
+	void Editor::SaveEditorConfig()
+	{
+		EditorConfig->Write(BaseEditorConfig());
+	}
+
 }

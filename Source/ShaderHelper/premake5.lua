@@ -7,14 +7,14 @@ project "ShaderHelper"
     location "%{_WORKING_DIR}/ProjectFiles"
 
     addToProjectHierarchy(ShaderHelperHierarchy)
-
+    
     includedirs
     {
         "./",
     }
 
     uses {
-		"FrameWork",
+		"FrameWork"
 	}
 
     addPrivateIncludeDir_ue("Slate")

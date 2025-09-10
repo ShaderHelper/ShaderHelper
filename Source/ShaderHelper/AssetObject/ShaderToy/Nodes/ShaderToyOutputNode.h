@@ -5,22 +5,22 @@
 namespace SH
 {
 
-    class ShaderToyOuputNodeOp : public FW::ShObjectOp
+    class ShaderToyOutputNodeOp : public FW::ShObjectOp
     {
-        REFLECTION_TYPE(ShaderToyOuputNodeOp)
+        REFLECTION_TYPE(ShaderToyOutputNodeOp)
     public:
-        ShaderToyOuputNodeOp() = default;
+        ShaderToyOutputNodeOp() = default;
         
         FW::MetaType* SupportType() override;
         void OnSelect(FW::ShObject* InObject) override;
     };
 
-	class ShaderToyOuputNode : public FW::GraphNode
+	class ShaderToyOutputNode : public FW::GraphNode
 	{
-		REFLECTION_TYPE(ShaderToyOuputNode)
+		REFLECTION_TYPE(ShaderToyOutputNode)
 	public:
-		ShaderToyOuputNode();
-        ~ShaderToyOuputNode();
+		ShaderToyOutputNode();
+        ~ShaderToyOutputNode();
         
 	public:
         void InitPins() override;

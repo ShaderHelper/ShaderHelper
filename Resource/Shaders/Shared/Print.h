@@ -10,6 +10,10 @@
 	#define ENABLE_PRINT 1
 #endif
 
+#ifndef ENABLE_ASSERT
+	#define ENABLE_ASSERT 1
+#endif
+
 #ifdef __cplusplus
 #include "TypeAlias.h"
 
@@ -193,6 +197,7 @@ AppendArgFunc(bool)
 
 static uint GPrivate_AssertResult = 1;
 
+#if ENABLE_ASSERT == 1
 //Assert(uv.x > 0.9);
 //Assert(uv.x > 0.9, "uv.x must be greater than 0.9");
 #define Assert(Condition, ...) do {                     \
@@ -211,5 +216,9 @@ static uint GPrivate_AssertResult = 1;
 		Print(EXPAND(StrArrDecl), ##__VA_ARGS__);       \
 	}                                                   \
 }while(0)
+#else
+#define Assert(...)
+#define AssertFormat(...)
+#endif
 
 #endif

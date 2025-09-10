@@ -36,6 +36,8 @@ namespace FW
 
 		}
 
+		bool IsLocked() const { return Locked; }
+
 		void TryExpandItemRecursively(TSharedRef<PropertyData> InItem)
 		{
             if(InItem->Expanded)

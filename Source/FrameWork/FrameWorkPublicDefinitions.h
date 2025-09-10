@@ -37,8 +37,7 @@ namespace FW
     extern FRAMEWORK_API TArray<FName> GProjectCategoryNames;
 }
 
-#define PER_MODULE_DEFINITION() \
-    PER_MODULE_BOILERPLATE
+#define PER_MODULE_DEFINITION() PER_MODULE_BOILERPLATE
 
 #define PER_APP_DEFINITION(AppName) \
     static const int AppNameSetter = [] { \

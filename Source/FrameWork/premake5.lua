@@ -20,15 +20,12 @@ project "FrameWork"
 	}
 
     uses {
-        "UE", "magic_enum"
-    }
-
-    private_uses {
-        "ShaderConductor"
+        "UE", "magic_enum", "Python","ShaderConductor"
     }
 	
 	addToProjectHierarchy(UeHierarchy)
     addToProjectHierarchy(magic_enumHierarchy)
+    addToProjectHierarchy(pythonHierarchy)
 
     filter {"files:**/External/UE/**"}
         flags {"ExcludeFromBuild"}
@@ -72,8 +69,6 @@ project "FrameWork"
             "QuartzCore.framework",
             "Foundation.framework",
         }
-    filter "system:linux"
-        rtti "Off"
 
 usage "FrameWork"
     --Note that "DLLIMPORT" macro is defined by UE module. (see MacPlatform.h, WindowsPlatform.h)

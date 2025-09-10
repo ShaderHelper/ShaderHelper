@@ -15,7 +15,7 @@ namespace SH
 	{
 		Context.ViewPort = InViewPort;
         ResizeHandle = Context.ViewPort->ViewportResize.AddRaw(this, &ShaderToyRenderComp::OnViewportResize);
-		Context.iResolution = { (float)Context.ViewPort->GetSize().X, (float)Context.ViewPort->GetSize().Y };
+		Context.iResolution = { (float)Context.ViewPort->GetSize().X, (float)Context.ViewPort->GetSize().Y, (float)Context.ViewPort->GetSize().Y / Context.ViewPort->GetSize().X };
 	}
 
     ShaderToyRenderComp::~ShaderToyRenderComp()
@@ -25,7 +25,7 @@ namespace SH
 
 	void ShaderToyRenderComp::OnViewportResize(const Vector2f& InResolution)
 	{
-		Context.iResolution = InResolution;
+		Context.iResolution = { InResolution.X, InResolution.Y, InResolution.Y / InResolution.X };
 	}
 
 	void ShaderToyRenderComp::RenderBegin()
@@ -42,7 +42,7 @@ namespace SH
             Context.RG = &Graph;
             {
                 //Update builtin uniformbuffer value.
-                StShader::GetBuiltInUb()->GetMember<Vector2f>("iResolution") = Context.iResolution;
+                StShader::GetBuiltInUb()->GetMember<Vector3f>("iResolution") = Context.iResolution;
                 StShader::GetBuiltInUb()->GetMember<float>("iTime") = Context.iTime;
 				StShader::GetBuiltInUb()->GetMember<Vector4f>("iMouse") = Context.iMouse;
                 

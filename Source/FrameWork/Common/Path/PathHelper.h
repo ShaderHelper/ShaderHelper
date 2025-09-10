@@ -5,8 +5,10 @@ namespace FW {
 	public:
 		// ShaderHelper/
 		static FString WorkspaceDir();
+		static FString BinariesDir();
 		// ShaderHelper/Resource
 		static FString ResourceDir();
+		static FString PluginDir();
 		static FString ExternalDir();
 		static FString SavedDir();
 		static FString SavedLogDir();
@@ -15,7 +17,8 @@ namespace FW {
         static FString SavedCaptureDir();
 		static FString ShaderDir();
 		static FString ErrorDir();
-        
+		
+		static FString RemoveTrailingSlash(const FString& InPath);
         //Support the project path with space
         static bool ParseProjectPath(const FString& CommandLine, FString& OutPath);
 	};

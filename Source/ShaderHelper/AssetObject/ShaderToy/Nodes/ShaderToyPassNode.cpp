@@ -9,6 +9,8 @@
 #include "Editor/AssetEditor/AssetEditor.h"
 #include "AssetObject/Pins/Pins.h"
 #include "UI/Widgets/Property/PropertyData/PropertyAssetItem.h"
+#include "ShaderConductor.hpp"
+#include <regex>
 
 using namespace FW;
 
@@ -16,7 +18,7 @@ namespace SH
 {
     REFLECTION_REGISTER(AddClass<ShaderToyPassNode>("ShaderPass Node")
 		.BaseClass<GraphNode>()
-        .Data<&ShaderToyPassNode::Shader, MetaInfo::Property>("Shader")
+        .Data<&ShaderToyPassNode::ShaderAssetObj, MetaInfo::Property>("Shader")
 		.Data<&ShaderToyPassNode::Format, MetaInfo::Property>("Format")
 		.Data<&ShaderToyPassNode::iChannelDesc0>("iChannel0")
 		.Data<&ShaderToyPassNode::iChannelDesc1>("iChannel1")
@@ -53,20 +55,20 @@ namespace SH
 		ShEditor->SetDebuggableObject(static_cast<ShaderToyPassNode*>(InObject));
     }
 
-	void ShaderToyPassNode::InitShader()
+	void ShaderToyPassNode::InitShaderAsset()
 	{
-		if(Shader)
+		if(ShaderAssetObj)
 		{
-			Shader->OnDestroy.AddRaw(this, &ShaderToyPassNode::ClearBindingProperty);
-			Shader->OnRefreshBuilder.AddRaw(this, &ShaderToyPassNode::RefreshProperty, true);
+			ShaderAssetObj->OnDestroy.AddRaw(this, &ShaderToyPassNode::ClearBindingProperty);
+			ShaderAssetObj->OnRefreshBuilder.AddRaw(this, &ShaderToyPassNode::RefreshProperty, true);
 		}
 	}
 
 	void ShaderToyPassNode::InitCustomBindGroup()
 	{
-		if(Shader)
+		if(ShaderAssetObj)
 		{
-			CustomBindLayout = Shader->CustomBindGroupLayoutBuilder.Build();
+			CustomBindLayout = ShaderAssetObj->CustomBindGroupLayoutBuilder.Build();
 			auto CustomBindGroupBuilder = GpuBindGroupBuilder{ CustomBindLayout };
 			if(CustomUniformBuffer.IsValid())
 			{
@@ -82,25 +84,25 @@ namespace SH
 		ObjectName = FText::FromString("ShaderPass");
 	}
 
-	ShaderToyPassNode::ShaderToyPassNode(FW::AssetPtr<StShader> InShader)
-	: Shader(MoveTemp(InShader))
+	ShaderToyPassNode::ShaderToyPassNode(FW::AssetPtr<StShader> InShaderAssetObj)
+	: ShaderAssetObj(MoveTemp(InShaderAssetObj))
 	, Format(ShaderToyFormat::B8G8R8A8_UNORM)
 	{
-		ObjectName = FText::FromString(Shader->GetFileName());
-		InitShader();
-		if(Shader)
+		ObjectName = FText::FromString(ShaderAssetObj->GetFileName());
+		InitShaderAsset();
+		if(ShaderAssetObj)
 		{
-			CustomUniformBuffer = Shader->CustomUniformBufferBuilder.Build();
+			CustomUniformBuffer = ShaderAssetObj->CustomUniformBufferBuilder.Build();
 		}
 		InitCustomBindGroup();
 	}
 
 	ShaderToyPassNode::~ShaderToyPassNode()
 	{
-		if(Shader)
+		if(ShaderAssetObj)
 		{
-			Shader->OnDestroy.RemoveAll(this);
-			Shader->OnRefreshBuilder.RemoveAll(this);
+			ShaderAssetObj->OnDestroy.RemoveAll(this);
+			ShaderAssetObj->OnRefreshBuilder.RemoveAll(this);
 		}
 	}
 
@@ -148,9 +150,9 @@ namespace SH
 
 	TRefCountPtr<GpuTexture> ShaderToyPassNode::OnStartDebugging()
 	{
-		AssetOp::OpenAsset(Shader);
+		AssetOp::OpenAsset(ShaderAssetObj);
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(Shader);
+		SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(ShaderAssetObj);
 		ShaderEditor->Compile();
 		//Render once immediately for debugging
 		{
@@ -158,7 +160,7 @@ namespace SH
 			ShEditor->GetRenderer()->Render();
 			TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = true;
 		}
-		if (Shader->bCompilationSucceed)
+		if (ShaderAssetObj->bCompilationSucceed)
 		{
 			IsDebugging = true;
 			auto PassOutput = static_cast<GpuTexturePin*>(GetPin("RT"));
@@ -174,20 +176,201 @@ namespace SH
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
         ShEditor->InvokeDebuggerTabs();
-		SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(Shader);
+		SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(ShaderAssetObj);
 		ShaderEditor->DebugPixel(PixelCoord, {CustomBindGroup, GetBuiltInBindGroup()});
 	}
 
 	ShaderAsset* ShaderToyPassNode::GetShaderAsset() const
 	{
-		return Shader;
+		return ShaderAssetObj;
+	}
+
+	std::string ShaderToyPassNode::GetShaderToyCode() const
+	{
+		TArray<const char*> DxcArgs;
+		DxcArgs.Add("/Od");
+		DxcArgs.Add("-D");
+		DxcArgs.Add("ENABLE_PRINT=0");
+		DxcArgs.Add("-D");
+		DxcArgs.Add("ENABLE_ASSERT=0");
+		ShaderConductor::Compiler::Options SCOptions;
+		SCOptions.DXCArgs = DxcArgs.GetData();
+		SCOptions.numDXCArgs = DxcArgs.Num();
+		GpuShaderModel Sm = ShaderAssetObj->Shader->GetShaderModelVer();
+		SCOptions.shaderModel = { Sm.Major, Sm.Minor };
+
+		ShaderConductor::Compiler::SourceDesc SourceDesc{};
+		TArray<char> EntryPointAnsi{ TCHAR_TO_ANSI(*ShaderAssetObj->Shader->GetEntryPoint()), ShaderAssetObj->Shader->GetEntryPoint().Len() + 1 };
+		SourceDesc.entryPoint = EntryPointAnsi.GetData();
+		SourceDesc.stage = ShaderConductor::ShaderStage::PixelShader;
+		auto SourceUTF8 = StringCast<UTF8CHAR>(*ShaderAssetObj->Shader->GetProcessedSourceText());
+		SourceDesc.source = (char*)SourceUTF8.Get();
+
+		SourceDesc.loadIncludeCallback = [this](const char* includeName) -> ShaderConductor::Blob {
+			for (const FString& IncludeDir : ShaderAssetObj->Shader->GetIncludeDirs())
+			{
+				FString IncludedFile = FPaths::Combine(IncludeDir, includeName);
+				if (IFileManager::Get().FileExists(*IncludedFile))
+				{
+					FString ShaderText;
+					FFileHelper::LoadFileToString(ShaderText, *IncludedFile);
+					ShaderText = GpuShaderPreProcessor{ ShaderText }
+						.ReplacePrintStringLiteral()
+						.Finalize();
+					auto SourceText = StringCast<UTF8CHAR>(*ShaderText);
+					return ShaderConductor::Blob(SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR));
+				}
+			}
+			return {};
+		};
+
+		ShaderConductor::Compiler::TargetDesc TargetDesc{
+			.language = ShaderConductor::ShadingLanguage::Glsl,
+			.version = "300"
+		};
+
+		auto Result = ShaderConductor::Compiler::Compile(SourceDesc, SCOptions, TargetDesc);
+		std::string Glsl = {(char*)Result.target.Data(), Result.target.Size() };
+		std::string ShaderToy;
+		//Extract the valid shader segment
+		std::regex StartPattern(R"(vec2\s+GPrivate_fragCoord\s*;)");
+		std::smatch StartMatch;
+		std::regex EndPattern(R"(void\s+mainImage\s*\([^}]*\})");
+		std::smatch EndMatch;
+		if (std::regex_search(Glsl, StartMatch, StartPattern) &&
+			std::regex_search(Glsl, EndMatch, EndPattern))
+		{
+			size_t StartPos = StartMatch.position() + StartMatch.length();
+			size_t EndPos = EndMatch.position() + EndMatch.length();
+			ShaderToy = Glsl.substr(StartPos, EndPos - StartPos);
+			//Remove ubo prefix name
+			ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(BuiltInUniform\.)"), "");
+			//Replace SPIRV-Cross texture sampler names with Shadertoy standard names
+			ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(SPIRV_Cross_CombinediChannel0iChannel0Sampler)"), "iChannel0");
+			ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(SPIRV_Cross_CombinediChannel1iChannel1Sampler)"), "iChannel1");
+			ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(SPIRV_Cross_CombinediChannel2iChannel2Sampler)"), "iChannel2");
+			ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(SPIRV_Cross_CombinediChannel3iChannel3Sampler)"), "iChannel3");
+		}
+		//Find non-uniform global variables in the segment
+		std::vector<std::string> GlobalVars;
+		std::istringstream iss(ShaderToy);
+		std::string line;
+		bool inFunction = false;
+		int braceLevel = 0;
+		while (std::getline(iss, line))
+		{
+			std::string trimmedLine = std::regex_replace(line, std::regex(R"(^\s+|\s+$)"), "");
+			if (trimmedLine.empty() ||
+				trimmedLine.starts_with("//") ||
+				trimmedLine.starts_with("/*") ||
+				trimmedLine.starts_with("#"))
+				continue;
+			for (char c : trimmedLine)
+			{
+				if (c == '{') braceLevel++;
+				else if (c == '}') braceLevel--;
+			}
+			if (trimmedLine.find('(') != std::string::npos && trimmedLine.find(')') != std::string::npos)
+			{
+				inFunction = true;
+			}
+			if (!inFunction && braceLevel == 0)
+			{
+				std::regex GlobalVarPattern(R"(^([a-zA-Z_]\w*)\s+([a-zA-Z_]\w*)\s*(?:=\s*[^;]+)?\s*;)");
+				std::smatch match;
+				if (std::regex_match(trimmedLine, match, GlobalVarPattern))
+				{
+					std::string typeName = match[1].str();
+					std::string varName = match[2].str();
+					if (typeName != "struct")
+					{
+						GlobalVars.push_back(varName);
+					}
+				}
+			}
+			if (braceLevel == 0)
+			{
+				inFunction = false;
+			}
+		}
+		//Extract the global variable Initializations from "void main()"
+		std::regex MainPattern(R"(void\s+main\s*\(\s*\)\s*\{([^}]*)\})");
+		std::smatch MainMatch;
+		if (std::regex_search(Glsl, MainMatch, MainPattern))
+		{
+			std::string MainBody = MainMatch[1].str();
+			std::map<std::string, std::string> GlobalInits;
+			for (const std::string& VarName : GlobalVars)
+			{
+				std::string InitPattern = VarName + R"(\s*=\s*([^;]+);)";
+				std::regex InitRegex(InitPattern);
+				std::smatch InitMatch;
+				if (std::regex_search(MainBody, InitMatch, InitRegex))
+				{
+					std::string InitValue = InitMatch[1].str();
+					GlobalInits[VarName] = InitValue;
+				}
+			}
+			for (const auto& [VarName, InitValue] : GlobalInits)
+			{
+				std::string DeclPattern = R"((\w+\s+))" + VarName + R"(\s*;)";
+				std::regex DeclRegex(DeclPattern);
+				std::string Replacement = "$1" + VarName + " = " + InitValue + ";";
+				ShaderToy = std::regex_replace(ShaderToy, DeclRegex, Replacement);
+			}
+		}
+		//Append custom uniform members
+		if(CustomUniformBuffer)
+		{
+			FString MemberDecl;
+			for(const auto& [MemberName, MemberInfo] : CustomUniformBuffer->GetMetaData().Members)
+			{
+				if(MemberInfo.TypeName == "float")
+				{
+					float Val = CustomUniformBuffer->GetMember<float>(MemberName);
+					MemberDecl += "const float " + MemberName + " = " + FString::Printf(TEXT("%f;"), Val);
+				}
+				else if(MemberInfo.TypeName == "float2")
+				{
+					Vector2f Val = CustomUniformBuffer->GetMember<Vector2f>(MemberName);
+					MemberDecl += "const vec2 " + MemberName + " = " + FString::Printf(TEXT("vec2(%f,%f);"), Val.x, Val.y);
+				}
+				else if(MemberInfo.TypeName == "float3")
+				{
+					Vector3f Val = CustomUniformBuffer->GetMember<Vector3f>(MemberName);
+					MemberDecl += "const vec3 " + MemberName + " = " + FString::Printf(TEXT("vec3(%f,%f,%f);"), Val.x, Val.y, Val.z);
+				}
+				else if(MemberInfo.TypeName == "float4")
+				{
+					Vector4f Val = CustomUniformBuffer->GetMember<Vector4f>(MemberName);
+					MemberDecl += "const vec4 " + MemberName + " = " + FString::Printf(TEXT("vec4(%f,%f,%f,%f);"), Val.x, Val.y, Val.z, Val.w);
+				}
+				else
+				{
+					AUX::Unreachable();
+				}
+				MemberDecl += "\n";
+			}
+			ShaderToy = TCHAR_TO_UTF8(*MemberDecl) + ShaderToy;
+		}
+		//Flip y
+		std::regex MainImagePattern(R"(void\s+mainImage\s*\([^,]*,\s*vec2\s+(\w+)\s*\))");
+		std::smatch MainImageMatch;
+		if (std::regex_search(ShaderToy, MainImageMatch, MainImagePattern))
+		{
+			std::string FragCoordParamName = MainImageMatch[1].str();
+			std::regex FunctionBodyPattern(R"((void\s+mainImage\s*\([^)]*\)\s*\{)(\s*))");
+			std::string Replacement = "$1$2" + FragCoordParamName + ".y = iResolution.y - " + FragCoordParamName + ".y;\n$2";
+			ShaderToy = std::regex_replace(ShaderToy, FunctionBodyPattern, Replacement);
+		}
+		return ShaderToy;
 	}
 
 	void ShaderToyPassNode::OnEndDebuggging()
 	{
 		IsDebugging = false;
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		if(SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(Shader))
+		if(SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(ShaderAssetObj))
 		{
 			ShaderEditor->ClearDebugger();
 		}
@@ -221,14 +404,14 @@ namespace SH
 	{
 		GraphNode::Serialize(Ar);
 		
-		Ar << Shader << Format;
+		Ar << ShaderAssetObj << Format;
 		
-		if(Shader)
+		if(ShaderAssetObj)
 		{
 			if(Ar.IsLoading())
 			{
-				InitShader();
-				CustomUniformBuffer = Shader->CustomUniformBufferBuilder.Build();
+				InitShaderAsset();
+				CustomUniformBuffer = ShaderAssetObj->CustomUniformBufferBuilder.Build();
 			}
 			
 			if(CustomUniformBuffer.IsValid() && Ar.IsSaving())
@@ -239,7 +422,7 @@ namespace SH
 			
 			if(Ar.IsSaving())
 			{
-				Ar << Shader->CustomUniformBufferBuilder;
+				Ar << ShaderAssetObj->CustomUniformBufferBuilder;
 			}
 			else
 			{
@@ -248,7 +431,7 @@ namespace SH
 				if(CustomUniformBuffer.IsValid() && !CustomUniformBufferData.IsEmpty())
 				{
 					//If the layout of the shader's uniform buffer does not match the node
-					if(NodeCustomUniformBufferBuilder.GetMetaData().UniformBufferDeclaration != Shader->CustomUniformBufferBuilder.GetMetaData().UniformBufferDeclaration)
+					if(NodeCustomUniformBufferBuilder.GetMetaData().UniformBufferDeclaration != ShaderAssetObj->CustomUniformBufferBuilder.GetMetaData().UniformBufferDeclaration)
 					{
 						auto NodeCustomUniformBuffer = NodeCustomUniformBufferBuilder.Build();
 						if(NodeCustomUniformBuffer.IsValid())
@@ -359,7 +542,7 @@ namespace SH
         
         auto CustomCategory = MakeShared<PropertyCategory>(this, "Custom");
         {
-            const GpuBindGroupLayoutDesc& CustomLayoutDesc = Shader->CustomBindGroupLayoutBuilder.GetLayoutDesc();
+            const GpuBindGroupLayoutDesc& CustomLayoutDesc = ShaderAssetObj->CustomBindGroupLayoutBuilder.GetLayoutDesc();
             for(const auto& [BindingName, Slot] : CustomLayoutDesc.CodegenBindingNameToSlot)
             {
                 if(CustomLayoutDesc.GetBindingType(Slot) == BindingType::UniformBuffer)
@@ -381,10 +564,10 @@ namespace SH
 	{
 		if(InProperty->GetDisplayName() == "Shader")
 		{
-			if(Shader)
+			if(ShaderAssetObj)
 			{
-				Shader->OnDestroy.RemoveAll(this);
-				Shader->OnRefreshBuilder.RemoveAll(this);
+				ShaderAssetObj->OnDestroy.RemoveAll(this);
+				ShaderAssetObj->OnRefreshBuilder.RemoveAll(this);
 			}
 		}
 		return true;
@@ -397,8 +580,8 @@ namespace SH
         //Shader asset changed.
         if(InProperty->IsOfType<PropertyAssetItem>() && InProperty->GetDisplayName() == "Shader")
         {
-            Shader->OnDestroy.AddRaw(this, &ShaderToyPassNode::ClearBindingProperty);
-            Shader->OnRefreshBuilder.AddRaw(this, &ShaderToyPassNode::RefreshProperty, true);
+			ShaderAssetObj->OnDestroy.AddRaw(this, &ShaderToyPassNode::ClearBindingProperty);
+			ShaderAssetObj->OnRefreshBuilder.AddRaw(this, &ShaderToyPassNode::RefreshProperty, true);
             RefreshProperty(false);
         }
 		else if(IsProperyUniformItem(InProperty))
@@ -424,10 +607,10 @@ namespace SH
 
     void ShaderToyPassNode::RefreshProperty(bool bCopyUniformBuffer)
     {
-        CustomBindLayout = Shader->CustomBindGroupLayoutBuilder.Build();
+        CustomBindLayout = ShaderAssetObj->CustomBindGroupLayoutBuilder.Build();
         auto CustomBindGroupBuilder = GpuBindGroupBuilder{ CustomBindLayout };
         
-        auto NewCustomUniformBuffer = Shader->CustomUniformBufferBuilder.Build();
+        auto NewCustomUniformBuffer = ShaderAssetObj->CustomUniformBufferBuilder.Build();
         if(NewCustomUniformBuffer.IsValid())
         {
             if(CustomUniformBuffer.IsValid() && bCopyUniformBuffer)
@@ -455,7 +638,7 @@ namespace SH
             ShObject::GetPropertyDatas();
             
             //Custom binding
-            if(Shader)
+            if(ShaderAssetObj)
             {
                 PropertyDatas.Append(PropertyDatasFromBinding());
             }
@@ -465,13 +648,13 @@ namespace SH
 
     ExecRet ShaderToyPassNode::Exec(GraphExecContext& Context)
 	{
-		if (!Shader.IsValid())
+		if (!ShaderAssetObj.IsValid())
 		{
             SH_LOG(LogGraph, Error, TEXT("Node:%s does not specify the corresponding stShader."), *ObjectName.ToString());
             return {true, true};
 		}
         
-        if(Shader->GetPixelShader()->IsCompiled())
+        if(ShaderAssetObj->GetPixelShader()->IsCompiled())
         {
             ShaderToyExecContext& ShaderToyContext = static_cast<ShaderToyExecContext&>(Context);
 
@@ -495,8 +678,8 @@ namespace SH
 			Bindings.SetPassBindGroupLayout(CustomBindLayout);
 
             GpuRenderPipelineStateDesc PipelineDesc{
-                .Vs = Shader->GetVertexShader(),
-                .Ps = Shader->GetPixelShader(),
+                .Vs = ShaderAssetObj->GetVertexShader(),
+                .Ps = ShaderAssetObj->GetPixelShader(),
 				.Targets = {
                     { .TargetFormat = PassOutput->GetValue()->GetFormat() }
                 }
@@ -526,13 +709,13 @@ namespace SH
 			}
 			else
 			{
-				int AddedLineNum = Shader->GetExtraLineNum();
+				int AddedLineNum = ShaderAssetObj->GetExtraLineNum();
 				SH_LOG(LogShader, Error, TEXT("%s:%d:%s"), *ObjectName.ToString(), AssertInfo.LineNumber - AddedLineNum, *AssertInfo.AssertString);
 				return {true, true};
 			}
         }
         
-        if(!Shader->bCompilationSucceed)
+        if(!ShaderAssetObj->bCompilationSucceed)
         {
             return {true, false};
         }

@@ -101,7 +101,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         static UniformBufferBuilder BuiltInUbLayout{ UniformBufferUsage::Persistant };
         static int Init = [&] {
 			BuiltInUbLayout
-				.AddVector2f("iResolution")
+				.AddVector3f("iResolution")
 				.AddFloat("iTime")
 				.AddVector4f("iMouse");
             return 0;

@@ -27,10 +27,12 @@ echo "Checking dependencies..."
 if [ "$(uname)" = "Darwin" ]; then
     Check "ShaderConductor"
     Check "UE"
+    Check "Python"
 elif [ "$(uname)" = "Linux" ]; then
     Check "UE"
 else
     Check "AgilitySDK"
     Check "ShaderConductor"
     Check "UE"
+    Check "Python"
 fi

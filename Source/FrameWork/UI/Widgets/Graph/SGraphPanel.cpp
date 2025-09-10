@@ -66,6 +66,7 @@ namespace FW
 		{
 			SGraphNode* OutputOwner = Output->Owner;
 			SGraphNode* InputOwner = Input->Owner;
+			Input->PinData->SourcePin = Output->PinData->GetGuid();
 			OutputOwner->NodeData->OutPinToInPin.AddUnique(Output->PinData->GetGuid(), Input->PinData->GetGuid());
 			OutputOwner->AddDep(InputOwner);
 			Links.AddUnique(Output, Input);
@@ -79,6 +80,7 @@ namespace FW
 			SGraphPin* Output = *Key;
 			Links.Remove(Output, Input);
 			Output->Owner->RemoveDep(Input->Owner);
+			Input->PinData->SourcePin.Invalidate();
 			auto Kkey = Output->Owner->NodeData->OutPinToInPin.FindKey(Input->PinData->GetGuid());
 			Output->Owner->NodeData->OutPinToInPin.Remove(*Kkey, Input->PinData->GetGuid());
             Input->PinData->Refuse();

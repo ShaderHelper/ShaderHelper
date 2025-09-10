@@ -31,12 +31,17 @@ namespace FW
 
 	public:
 		virtual void Serialize(FArchive& Ar) override;
+		//Called when connected as an input.
 		virtual bool Accept(GraphPin* SourcePin) { return false; }
         virtual void Refuse() {}
 		virtual FLinearColor GetPinColor() const { return FLinearColor::White; }
-        
-        TArray<GraphPin*> GetTargetPins();
-
+		//The pins connected to the output
+        TArray<GraphPin*> GetTargetPins() const;
+		//The output pin relied upon when this pin is an input
+		GraphPin* GetSourcePin() const;
+		GraphNode* GetSourceNode() const;
+		FGuid SourcePin;
+	
 		PinDirection Direction = PinDirection::Output;
 	};
 

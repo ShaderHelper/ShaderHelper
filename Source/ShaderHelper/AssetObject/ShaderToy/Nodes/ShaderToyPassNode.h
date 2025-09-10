@@ -68,10 +68,12 @@ namespace SH
 		void OnFinalizePixel(const FW::Vector2u& PixelCoord) override;
 		void OnEndDebuggging() override;
 		ShaderAsset* GetShaderAsset() const;
+
+		std::string GetShaderToyCode() const;
 		
     private:
 		TRefCountPtr<FW::GpuBindGroup> GetBuiltInBindGroup();
-		void InitShader();
+		void InitShaderAsset();
 		void InitCustomBindGroup();
         void ClearBindingProperty();
         void RefreshProperty(bool bCopyUniformBuffer = true);
@@ -79,7 +81,7 @@ namespace SH
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromUniform(FW::UniformBuffer* InUb, bool Enabled);
         
     public:
-        FW::AssetPtr<StShader> Shader;
+        FW::AssetPtr<StShader> ShaderAssetObj;
 		ShaderToyFormat Format;
 		ShaderToyChannelDesc iChannelDesc0;
 		ShaderToyChannelDesc iChannelDesc1;

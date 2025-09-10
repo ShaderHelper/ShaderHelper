@@ -163,7 +163,7 @@ namespace FW
         friend FArchive& operator<<(FArchive& Ar, UniformBufferBuilder& UbBuilder)
         {
             Ar << UbBuilder.Usage;
-            Ar << UbBuilder.DeclarationHead << UbBuilder.UniformBufferMemberNames << UbBuilder.DeclarationEnd;
+            Ar << UbBuilder.DeclarationHead << UbBuilder.UniformBufferBody << UbBuilder.DeclarationEnd;
             Ar << UbBuilder.MetaData.Members << UbBuilder.MetaData.UniformBufferDeclaration << UbBuilder.MetaData.UniformBufferSize;
             return Ar;
         }
@@ -201,7 +201,7 @@ namespace FW
 
 		FString GetLayoutDeclaration() const
 		{
-			return DeclarationHead + UniformBufferMemberNames + DeclarationEnd;
+			return DeclarationHead + UniformBufferBody + DeclarationEnd;
 		}
         const UniformBufferMetaData& GetMetaData() const { return MetaData; }
         
@@ -233,7 +233,7 @@ namespace FW
 			{
 				while (SizeAfterAligning > SizeBeforeAligning)
 				{
-					UniformBufferMemberNames += FString::Printf(TEXT("float {0}_Padding_%d;\n"), SizeBeforeAligning);
+					UniformBufferBody += FString::Printf(TEXT("float {0}_Padding_%d;\n"), SizeBeforeAligning);
 					SizeBeforeAligning += 4;
 				}
 				MetaData.UniformBufferSize = SizeAfterAligning + MemberSize;
@@ -246,13 +246,13 @@ namespace FW
             FString TypeName = ANSI_TO_TCHAR(UniformBufferMemberTypeString<T>::Value.data());
 			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize - MemberSize, MemberSize, TypeName});
 
-			UniformBufferMemberNames += FString::Printf(TEXT("%s %s;\n"), *TypeName, *MemberName);
+			UniformBufferBody += FString::Printf(TEXT("%s %s;\n"), *TypeName, *MemberName);
 		}
 		
 	private:
 		UniformBufferUsage Usage;
 		FString DeclarationHead, DeclarationEnd;
-		FString UniformBufferMemberNames;
+		FString UniformBufferBody;
 		UniformBufferMetaData MetaData;
 	};
 }
