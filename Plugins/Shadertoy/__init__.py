@@ -153,7 +153,6 @@ class ImportShaderToyMenuEntry(Sh.MenuEntryExt):
         return True
 
     def OnExecute(self):
-        print("233")
         pass
 
 def Register():
