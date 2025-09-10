@@ -6,7 +6,6 @@ call "%~dp0External/AgilitySDK/downloadDep.bat" || goto error
 call "%~dp0External/ShaderConductor/downloadDep.bat" || goto error
 call "%~dp0External/UE/downloadDep.bat" || goto error
 call "%~dp0External/Python/downloadDep.bat" || goto error
-call "%~dp0Plugins/downloadDep.bat" || goto error
 
 echo Script complete
 pause
