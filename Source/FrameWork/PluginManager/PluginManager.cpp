@@ -161,11 +161,11 @@ namespace FW
 
 	void InitPy()
 	{
-		FString PyHome = FPaths::GetPath(FPlatformProcess::ExecutablePath()) + FString("\\Python");
+		FString PyHome = PathHelper::BinariesDir() / "Python";
 
 		PyConfig config;
 		PyConfig_InitPythonConfig(&config);
-		PyConfig_SetString(&config, &config.home, *PyHome);
+		PyConfig_SetString(&config, &config.home, TCHAR_TO_WCHAR(*PyHome));
 		py::initialize_interpreter(&config, 0, nullptr, false);
 
 		py::exec(R"(

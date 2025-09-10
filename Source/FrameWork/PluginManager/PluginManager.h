@@ -7,15 +7,11 @@
 
 #pragma push_macro("check")
 #undef check
-THIRD_PARTY_INCLUDES_START
-__pragma(warning(disable: 4191))
-__pragma(warning(disable: 4686))
-#include "pybind11/embed.h"
-#include "pybind11/stl.h"
-#include "pybind11/functional.h"
-#include "pybind11/native_enum.h"
-#include "python.h"
-THIRD_PARTY_INCLUDES_END
+#include <pybind11/embed.h>
+#include <pybind11/stl.h>
+#include <pybind11/functional.h>
+#include <pybind11/native_enum.h>
+#include <python.h>
 #pragma pop_macro("check")
 
 FRAMEWORK_API DECLARE_LOG_CATEGORY_EXTERN(LogPy, Log, All);

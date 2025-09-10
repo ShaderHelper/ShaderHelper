@@ -27,16 +27,10 @@ def get_browser_path():
                 return path
         elif sys.platform.startswith('darwin'):
             chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-            safari_path = "/Applications/Safari.app/Contents/MacOS/Safari"
             if os.path.exists(chrome_path):
                 return chrome_path
-            elif os.path.exists(safari_path):
-                return safari_path
-            else:
-                return None
-            
+            return None        
     except Exception as e:
-        print("Could not find the default browser:", e)
         return None
         
 def init_shadertoy_pass(page, shadertoy_context, shadertoy_pass):
@@ -86,6 +80,7 @@ def open_shadertoy_with_playwright(shadertoy_context):
     global _playwright_context, _playwright_instance
     browser_path = get_browser_path()
     if not browser_path:
+        print("Could not find the browser, only support chromium based browser.")
         return
 
     try:
@@ -158,6 +153,7 @@ class ImportShaderToyMenuEntry(Sh.MenuEntryExt):
         return True
 
     def OnExecute(self):
+        print("233")
         pass
 
 def Register():

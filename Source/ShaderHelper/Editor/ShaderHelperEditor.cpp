@@ -281,11 +281,7 @@ namespace SH
             ]
 		);
         TabManager->FindExistingLiveTab(CodeTabId)->GetParentDockTabStack()->SetCanDropToAttach(false);
-        
-        //Add native menu bar for the window on mac.
-        TabManager->SetMenuMultiBox(MenuBarBuilder.GetMultiBox(), MenuBarWidget);
-        TabManager->UpdateMainMenu(nullptr, true);
-
+	
         SaveLayoutTicker = FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this](float) {
             TabManager->SavePersistentLayout();
             CurProject->CodeTabLayout = CodeTabManager->PersistLayout();
@@ -638,11 +634,6 @@ namespace SH
                     )
                  ) , Args.GetOwnerWindow();
             }
-            
-            auto MenuBarBuilder = CreateMenuBarBuilder();
-            auto MenuBarWidget = MenuBarBuilder.MakeWidget();
-            CodeTabManager->SetMenuMultiBox(MenuBarBuilder.GetMultiBox(), MenuBarWidget);
-            CodeTabManager->UpdateMainMenu(nullptr, true);
             
             SpawnedTab->SetContent(
                SNew(SOverlay)
@@ -1090,7 +1081,6 @@ namespace SH
 									[this, Lang]()
 									{
 										Editor::SetLanguage(Lang);
-                                        TabManager->UpdateMainMenu(nullptr, true);
 									}),
 								FCanExecuteAction(),
 								FIsActionChecked::CreateLambda(

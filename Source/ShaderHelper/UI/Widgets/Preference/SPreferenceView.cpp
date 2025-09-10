@@ -49,7 +49,7 @@ namespace SH
 					}
 					return FAppStyle::Get().GetBrush("Brushes.AccentGray");
 				})
-				.Padding(FMargin{0.8f,0.8f,0.9f,0.9f})
+				.Padding(FMargin{1.0f})
 				[
 					SNew(SExpandableArea)
 					.BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
