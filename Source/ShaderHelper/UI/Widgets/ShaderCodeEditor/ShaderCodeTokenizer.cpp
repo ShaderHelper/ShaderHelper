@@ -167,11 +167,22 @@ namespace SH
 								}
 								else
 								{
-									if (MatchedPunctuation == "{") {
-										TokenizedLine.Braces.Add({BraceType::Open, CurCol });
-									}
-									else if (MatchedPunctuation == "}") {
-										TokenizedLine.Braces.Add({BraceType::Close, CurCol });
+									if (!bInComment && !bInMultilineComment)
+									{
+										if (MatchedPunctuation == "{") {
+											TokenizedLine.Braces.Add({ SideType::Open, CurCol });
+										}
+										else if (MatchedPunctuation == "}") {
+											TokenizedLine.Braces.Add({ SideType::Close, CurCol });
+										}
+										else if (MatchedPunctuation == "(")
+										{
+											TokenizedLine.Parens.Add({ SideType::Open, CurCol });
+										}
+										else if (MatchedPunctuation == ")")
+										{
+											TokenizedLine.Parens.Add({ SideType::Close, CurCol });
+										}
 									}
 									
 									if (MatchedPunctuation == "+" || MatchedPunctuation == "-") {

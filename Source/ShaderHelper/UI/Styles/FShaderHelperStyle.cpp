@@ -161,6 +161,8 @@ namespace SH {
             .SetHoveredThumbImage(FSlateColorBrush(Hover2Color))
             .SetThickness(5.0f);
 		Style->Set("CustomScrollbar", ScrollBar);
+
+		Style->Set("ShaderEditor.Border", new BOX_BRUSH("Common/DebugBorder", 8.0f / 16.0f));
         
 		return Style;
 	}

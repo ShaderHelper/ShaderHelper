@@ -59,7 +59,8 @@ namespace SH
 		TSharedPtr<HlslTokenizer> Tokenizer;
 		TArray<HlslTokenizer::TokenizedLine> TokenizedLines;
 		//Key: The line index of Left Brace in MultiLineEditableText
-		TMap<int32, HlslTokenizer::BraceGroup> FoldingBraceGroups;
+		TMap<int32, HlslTokenizer::BracketGroup> FoldingBraceGroups;
+		TArray<HlslTokenizer::BracketGroup> BracketGroups;
 		int32 FontSize{};
 	};
 
@@ -219,6 +220,8 @@ namespace SH
         void RefreshLineNumberToDiagInfo();
         void RefreshCodeCompletionTip();
 		void RefreshSyntaxHighlight();
+		void RefreshOccurrenceHighlight();
+		void RefreshBracketHighlight();
 		
 		void DebugPixel(const FW::Vector2u& PixelCoord, const TArray<TRefCountPtr<FW::GpuBindGroup>>& BindGroups = {});
 		void ApplyDebugState(const FW::SpvDebugState& State, bool bReverse = false);
@@ -276,7 +279,8 @@ namespace SH
         TSharedPtr<SScrollBar> ShaderMultiLineHScrollBar;
 
 		TArray<FTextLineHighlight> OccurrenceHighlights;
-        TSharedPtr<class CursorHightLighter> CustomCursorHighlighter;
+		TOptional<FTextLineHighlight> OpenBracketHighlight, CloseBracketHighlight;
+        TSharedPtr<class CursorHighlighter> CustomCursorHighlighter;
         
 		TSharedPtr<FShaderEditorEffectMarshaller> EffectMarshller;
 		TSharedPtr<SMultiLineEditableText> EffectMultiLineEditableText;

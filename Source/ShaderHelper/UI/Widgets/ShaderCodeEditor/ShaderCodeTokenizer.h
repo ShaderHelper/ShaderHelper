@@ -14,23 +14,23 @@ namespace SH
 			int32 EndOffset{};
 		};
 		
-		enum class BraceType {
+		enum class SideType {
 			Open,
 			Close,
 		};
 		
-		struct Brace {
-			BraceType Type;
+		struct Bracket {
+			SideType Type;
 			int32 Offset;
 		};
 
-		struct BraceGroup
+		struct BracketGroup
 		{
 			int32 OpenLineIndex{};
-			Brace OpenBrace;
+			Bracket OpenBracket;
 			
 			int32 CloseLineIndex{};
-			Brace CloseBrace;
+			Bracket CloseBracket;
 		};
 		
 		enum class LineContState
@@ -42,7 +42,8 @@ namespace SH
 		struct TokenizedLine
 		{
 			TArray<Token> Tokens;
-			TArray<Brace> Braces;
+			TArray<Bracket> Braces;
+			TArray<Bracket> Parens;
 			LineContState State = LineContState::None;
 		};
 

@@ -461,7 +461,7 @@ const FString FoldMarkerText = TEXT("⇿");
         TSharedPtr<SlateEditableTextTypes::FCursorLineHighlighter>& CursorLineHighlighter = GetPrivate_FSlateEditableTextLayout_CursorLineHighlighter(*ShaderEditableTextLayout);
         SlateEditableTextTypes::FCursorInfo& CursorInfo = GetPrivate_FSlateEditableTextLayout_CursorInfo(*ShaderEditableTextLayout);
         
-        CustomCursorHighlighter = CursorHightLighter::Create(&CursorInfo);
+        CustomCursorHighlighter = CursorHighlighter::Create(&CursorInfo);
         CursorLineHighlighter = CustomCursorHighlighter;
         
         CurEditState = ShaderAssetObj->bCompilationSucceed ? EditState::Succeed : EditState::Failed;
@@ -880,6 +880,133 @@ const FString FoldMarkerText = TEXT("⇿");
 		GetPrivate_FTextLayout_DirtyFlags(*ShaderMarshaller->TextLayout) |= (1 << 0);
 	}
 
+	void SShaderEditorBox::RefreshOccurrenceHighlight()
+	{
+		int32 CursorLineIndex = ShaderMultiLineEditableText->GetCursorLocation().GetLineIndex();
+		int32 CursorOffset = ShaderMultiLineEditableText->GetCursorLocation().GetOffset();
+		if (ShaderMarshaller->TokenizedLines.IsValidIndex(CursorLineIndex))
+		{
+			int32 AddedLineNum = ShaderAssetObj->GetExtraLineNum();
+			TArray<ShaderOccurrence> Occurrences;
+			for (const HlslTokenizer::Token& Token : ShaderMarshaller->TokenizedLines[CursorLineIndex].Tokens)
+			{
+				if ((Token.Type == HLSL::TokenType::Identifier || Token.Type == HLSL::TokenType::BuildtinFunc)
+					&& CursorOffset >= Token.BeginOffset && CursorOffset <= Token.EndOffset)
+				{
+					Occurrences = TU.GetOccurrences(GetLineNumber(CursorLineIndex) + AddedLineNum, Token.BeginOffset + 1);
+					break;
+				}
+			}
+			for (const FTextLineHighlight& Highlight : OccurrenceHighlights)
+			{
+				if (ShaderMarshaller->TextLayout->GetLineModels().IsValidIndex(Highlight.LineIndex))
+				{
+					ShaderMarshaller->TextLayout->RemoveLineHighlight(Highlight);
+				}
+			}
+			OccurrenceHighlights.Empty();
+			for (const ShaderOccurrence& Occurrence : Occurrences)
+			{
+				int32 OccurrenceLineIndex = GetLineIndex(Occurrence.Row - AddedLineNum);
+				if (ShaderMarshaller->TokenizedLines.IsValidIndex(OccurrenceLineIndex))
+				{
+					for (const HlslTokenizer::Token& Token : ShaderMarshaller->TokenizedLines[OccurrenceLineIndex].Tokens)
+					{
+						if (Token.BeginOffset == Occurrence.Col - 1)
+						{
+							OccurrenceHighlights.Emplace(OccurrenceLineIndex, FTextRange{ Token.BeginOffset, Token.EndOffset }, -11, OccurrenceHighlighter::Create());
+							break;
+						}
+					}
+				}
+
+			}
+			for (const FTextLineHighlight& Highlight : OccurrenceHighlights)
+			{
+				ShaderMarshaller->TextLayout->AddLineHighlight(Highlight);
+			}
+		}
+	}
+
+	void SShaderEditorBox::RefreshBracketHighlight()
+	{
+		int32 CursorLineIndex = ShaderMultiLineEditableText->GetCursorLocation().GetLineIndex();
+		int32 CursorOffset = ShaderMultiLineEditableText->GetCursorLocation().GetOffset();
+		if (ShaderMarshaller->TokenizedLines.IsValidIndex(CursorLineIndex))
+		{
+			if (OpenBracketHighlight)
+			{
+				if (ShaderMarshaller->TextLayout->GetLineModels().IsValidIndex(OpenBracketHighlight.GetValue().LineIndex))
+				{
+					ShaderMarshaller->TextLayout->RemoveLineHighlight(OpenBracketHighlight.GetValue());
+				}
+			}
+			if (CloseBracketHighlight)
+			{
+				if (ShaderMarshaller->TextLayout->GetLineModels().IsValidIndex(CloseBracketHighlight.GetValue().LineIndex))
+				{
+					ShaderMarshaller->TextLayout->RemoveLineHighlight(CloseBracketHighlight.GetValue());
+				}
+			}
+			OpenBracketHighlight.Reset();
+			CloseBracketHighlight.Reset();
+			for (const auto& BracketGroup : ShaderMarshaller->BracketGroups)
+			{
+				bool HasMatchedBracketGroup{};
+				if (CursorLineIndex >= BracketGroup.OpenLineIndex && CursorLineIndex <= BracketGroup.CloseLineIndex)
+				{
+					if (BracketGroup.OpenLineIndex == BracketGroup.CloseLineIndex)
+					{
+						if (CursorOffset >= BracketGroup.OpenBracket.Offset && CursorOffset <= BracketGroup.CloseBracket.Offset + 1)
+						{
+							HasMatchedBracketGroup = true;
+						}
+					}
+					else
+					{
+						HasMatchedBracketGroup = true;
+					}
+				}
+
+				bool UpdateBracketHighlight{};
+				if (HasMatchedBracketGroup)
+				{
+					if (OpenBracketHighlight)
+					{
+						if (BracketGroup.OpenLineIndex > OpenBracketHighlight.GetValue().LineIndex)
+						{
+							UpdateBracketHighlight = true;
+						}
+						else if (BracketGroup.OpenLineIndex == OpenBracketHighlight.GetValue().LineIndex && BracketGroup.OpenBracket.Offset > OpenBracketHighlight.GetValue().Range.BeginIndex)
+						{
+							UpdateBracketHighlight = true;
+						}
+					}
+					else
+					{
+						UpdateBracketHighlight = true;
+					}
+				}
+
+				if (UpdateBracketHighlight)
+				{
+					OpenBracketHighlight = { BracketGroup.OpenLineIndex, FTextRange{ BracketGroup.OpenBracket.Offset, BracketGroup.OpenBracket.Offset + 1 }, -11, BracketHighlighter::Create() };
+					CloseBracketHighlight = { BracketGroup.CloseLineIndex, FTextRange{ BracketGroup.CloseBracket.Offset, BracketGroup.CloseBracket.Offset + 1 }, -11, BracketHighlighter::Create() };
+				}
+
+			}
+			if (OpenBracketHighlight)
+			{
+				ShaderMarshaller->TextLayout->AddLineHighlight(OpenBracketHighlight.GetValue());
+			}
+			if (CloseBracketHighlight)
+			{
+				ShaderMarshaller->TextLayout->AddLineHighlight(CloseBracketHighlight.GetValue());
+			}
+
+		}
+	}
+
     void SShaderEditorBox::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
     {
 		//ShaderMultiLineEditableText updates its VScrollBar when it ticks, and we sync the LineNumberList/LineTipList according to its VScrollBar callback.
@@ -905,55 +1032,8 @@ const FString FoldMarkerText = TEXT("⇿");
 		}
 		bKeyChar = false;
 
-		//Highlight occurrences
-		FString CurTextLine;
-		ShaderMultiLineEditableText->GetCurrentTextLine(CurTextLine);
-		int32 CursorLineIndex = InLocation.GetLineIndex();
-		if (ShaderMarshaller->TokenizedLines.IsValidIndex(CursorLineIndex))
-		{
-			int32 AddedLineNum = ShaderAssetObj->GetExtraLineNum();
-			TArray<ShaderOccurrence> Occurrences;
-			for (const HlslTokenizer::Token& Token : ShaderMarshaller->TokenizedLines[CursorLineIndex].Tokens)
-			{
-				if ((Token.Type == HLSL::TokenType::Identifier || Token.Type == HLSL::TokenType::BuildtinFunc)
-					&& InLocation.GetOffset() >= Token.BeginOffset && InLocation.GetOffset() <= Token.EndOffset)
-				{
-					Occurrences = TU.GetOccurrences(GetLineNumber(CursorLineIndex) + AddedLineNum, Token.BeginOffset + 1);
-					break;
-				}
-			}
-
-			for (const FTextLineHighlight& Highlight : OccurrenceHighlights)
-			{
-				if(ShaderMarshaller->TextLayout->GetLineModels().IsValidIndex(Highlight.LineIndex))
-				{
-					ShaderMarshaller->TextLayout->RemoveLineHighlight(Highlight);
-				}
-			}
-
-			OccurrenceHighlights.Empty();
-			for(const ShaderOccurrence& Occurrence : Occurrences)
-			{
-				int32 OccurrenceLineIndex = GetLineIndex(Occurrence.Row - AddedLineNum);
-				if(ShaderMarshaller->TokenizedLines.IsValidIndex(OccurrenceLineIndex))
-				{
-					for(const HlslTokenizer::Token& Token : ShaderMarshaller->TokenizedLines[OccurrenceLineIndex].Tokens)
-					{
-						if(Token.BeginOffset == Occurrence.Col - 1)
-						{
-							OccurrenceHighlights.Emplace(OccurrenceLineIndex, FTextRange{ Token.BeginOffset, Token.EndOffset}, -11, OccurrenceHightLighter::Create());
-							break;
-						}
-					}
-				}
-				
-			}
-			for (const FTextLineHighlight& Highlight : OccurrenceHighlights)
-			{
-				ShaderMarshaller->TextLayout->AddLineHighlight(Highlight);
-			}
-		}
-	
+		RefreshOccurrenceHighlight();
+		RefreshBracketHighlight();
 	}
 
 	void SShaderEditorBox::OnFocusChanging(const FWeakWidgetPath& PreviousFocusPath, const FWidgetPath& NewWidgetPath, const FFocusEvent& InFocusEvent)
@@ -1997,9 +2077,9 @@ const FString FoldMarkerText = TEXT("⇿");
 
 		auto BraceGroup = ShaderMarshaller->FoldingBraceGroups[LineIndex];
 		int32 FoldedBeginningRow = BraceGroup.OpenLineIndex;
-		int32 FoldedBeginningCol = BraceGroup.OpenBrace.Offset;
+		int32 FoldedBeginningCol = BraceGroup.OpenBracket.Offset;
 		int32 FoldedEndRow = BraceGroup.CloseLineIndex;
-		int32 FoldedEndCol = BraceGroup.CloseBrace.Offset;
+		int32 FoldedEndCol = BraceGroup.CloseBracket.Offset;
 
 		FTextLayout::FLineModel& EndLine = Lines[FoldedEndRow];
 		TArray<FString> FoldedTexts;
@@ -2045,6 +2125,9 @@ const FString FoldMarkerText = TEXT("⇿");
 		VisibleFoldMarkers.Add(MoveTemp(Marker));
 		VisibleFoldMarkers.Sort([](const FoldMarker& A, const FoldMarker& B) { return A.RelativeLineIndex < B.RelativeLineIndex; });
 
+		ShaderMultiLineEditableTextLayout->EndEditTransaction();
+		IsFoldEditTransaction = false;
+
 		//The cursor is within the fold now.
 		if (CurCursorLocation.GetLineIndex() >= FoldedBeginningRow && CurCursorLocation.GetLineIndex() <= FoldedEndRow)
 		{
@@ -2057,9 +2140,6 @@ const FString FoldMarkerText = TEXT("⇿");
 			const FTextLocation NewCursorLocation(CurCursorLocation.GetLineIndex() - FoldedLineNum, CurCursorLocation.GetOffset());
 			ShaderMultiLineEditableText->GoTo(NewCursorLocation);
 		}
-
-		ShaderMultiLineEditableTextLayout->EndEditTransaction();
-		IsFoldEditTransaction = false;
 	}
 
     void SShaderEditorBox::RemoveFoldMarker(int32 InIndex)
@@ -2556,19 +2636,19 @@ const FString FoldMarkerText = TEXT("⇿");
 			this->TokenizedLines.Add(*CurTokenizedLine);
 		}
 
-        TArray<HlslTokenizer::BraceGroup> BraceGroups;
-		struct BraceStackData
+		struct BracketStackData
 		{
 			int32 LineIndex{};
-			HlslTokenizer::Brace Brace;
+			HlslTokenizer::Bracket Bracket;
 		};
-        TArray<BraceStackData> OpenBraceStack;
+        TArray<HlslTokenizer::BracketGroup> BraceGroups, ParenGroups;
+		TArray<BracketStackData> OpenBraceStack, OpenParenStack;
         for(int32 LineIndex = 0; LineIndex < LineModels.Num(); LineIndex++)
         {
 			HlslTokenizer::TokenizedLine* TokenizedLine = static_cast<HlslTokenizer::TokenizedLine*>(LineModels[LineIndex].CustomData.Get());
-            for(const HlslTokenizer::Brace& Brace : TokenizedLine->Braces)
+            for(const HlslTokenizer::Bracket& Brace : TokenizedLine->Braces)
             {
-                if(Brace.Type == HlslTokenizer::BraceType::Open)
+                if(Brace.Type == HlslTokenizer::SideType::Open)
                 {
                     OpenBraceStack.Emplace(LineIndex, Brace);
                 }
@@ -2577,11 +2657,29 @@ const FString FoldMarkerText = TEXT("⇿");
 					if(!OpenBraceStack.IsEmpty())
 					{
 						auto OpenBraceData = OpenBraceStack.Pop();
-						BraceGroups.Emplace(OpenBraceData.LineIndex, OpenBraceData.Brace, LineIndex, Brace);
+						BraceGroups.Emplace(OpenBraceData.LineIndex, OpenBraceData.Bracket, LineIndex, Brace);
 					}
 				}
             }
+			for(const HlslTokenizer::Bracket& Paren : TokenizedLine->Parens)
+			{
+				if(Paren.Type == HlslTokenizer::SideType::Open)
+				{
+					OpenParenStack.Emplace(LineIndex, Paren);
+				}
+				else
+				{
+					if (!OpenParenStack.IsEmpty())
+					{
+						auto OpenParenData = OpenParenStack.Pop();
+						ParenGroups.Emplace(OpenParenData.LineIndex, OpenParenData.Bracket, LineIndex, Paren);
+					}
+				}
+			}
         }
+		BracketGroups.Empty();
+		BracketGroups.Append(BraceGroups);
+		BracketGroups.Append(ParenGroups);
 
         FoldingBraceGroups.Empty();
         for (const auto& BraceGroup : BraceGroups)
@@ -2624,7 +2722,7 @@ const FString FoldMarkerText = TEXT("⇿");
         for (int32 i = 0; i < OwnerWidget->VisibleFoldMarkers.Num(); i++)
         {
             auto& Marker = OwnerWidget->VisibleFoldMarkers[i];
-            Highlights.Emplace(Marker.RelativeLineIndex, FTextRange{ Marker.Offset, Marker.Offset + 1 }, -1, FoldMarkerHighLighter::Create());
+            Highlights.Emplace(Marker.RelativeLineIndex, FTextRange{ Marker.Offset, Marker.Offset + 1 }, -1, FoldMarkerHighlighter::Create());
         }
 
         //Update fold markers highlight.

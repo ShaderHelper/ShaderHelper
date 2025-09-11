@@ -4,12 +4,12 @@
 
 namespace SH
 {
-	class FoldMarkerHighLighter : public ISlateLineHighlighter
+	class FoldMarkerHighlighter : public ISlateLineHighlighter
 	{
 	public:
-		static TSharedRef<FoldMarkerHighLighter> Create()
+		static TSharedRef<FoldMarkerHighlighter> Create()
 		{
-			return MakeShareable(new FoldMarkerHighLighter());
+			return MakeShareable(new FoldMarkerHighlighter());
 		}
 
 		virtual int32 OnPaint(const FPaintArgs& Args, const FTextLayout::FLineView& Line, const float OffsetX, const float Width, const FTextBlockStyle& DefaultStyle, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override
@@ -36,17 +36,17 @@ namespace SH
 		}
 
 	protected:
-		FoldMarkerHighLighter()
+		FoldMarkerHighlighter()
 		{
 		}
 	};
 
-	class OccurrenceHightLighter : public ISlateLineHighlighter
+	class OccurrenceHighlighter : public ISlateLineHighlighter
 	{
 	public:
-		static TSharedRef<OccurrenceHightLighter> Create()
+		static TSharedRef<OccurrenceHighlighter> Create()
 		{
-			return MakeShareable(new OccurrenceHightLighter());
+			return MakeShareable(new OccurrenceHighlighter());
 		}
 
 		virtual int32 OnPaint(const FPaintArgs& Args, const FTextLayout::FLineView& Line, const float OffsetX, const float Width, const FTextBlockStyle& DefaultStyle, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override
@@ -69,15 +69,47 @@ namespace SH
 		}
 
 	protected:
-		OccurrenceHightLighter() = default;
+		OccurrenceHighlighter() = default;
 	};
 
-	class CursorHightLighter : public SlateEditableTextTypes::FCursorLineHighlighter
+	class BracketHighlighter : public ISlateLineHighlighter
 	{
 	public:
-		static TSharedRef<CursorHightLighter> Create(const SlateEditableTextTypes::FCursorInfo* InCursorInfo)
+		static TSharedRef<BracketHighlighter> Create()
 		{
-			return MakeShareable(new CursorHightLighter(InCursorInfo));
+			return MakeShareable(new BracketHighlighter());
+		}
+
+		virtual int32 OnPaint(const FPaintArgs& Args, const FTextLayout::FLineView& Line, const float OffsetX, const float Width, const FTextBlockStyle& DefaultStyle, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override
+		{
+			const FVector2D Location(Line.Offset.X + OffsetX, Line.Offset.Y);
+
+			FLinearColor BackgroundColorAndOpacity = FLinearColor{ 0.4f, 0.4f, 0.4f, 1.0f };
+			const float InverseScale = Inverse(AllottedGeometry.Scale);
+
+			FSlateDrawElement::MakeBox(
+				OutDrawElements,
+				++LayerId,
+				AllottedGeometry.ToPaintGeometry(TransformVector(InverseScale, FVector2D(Width, FMath::Max(Line.Size.Y, Line.TextHeight))), FSlateLayoutTransform(TransformPoint(InverseScale, Location))),
+				FShaderHelperStyle::Get().GetBrush(TEXT("ShaderEditor.Border")),
+				ESlateDrawEffect::None,
+				BackgroundColorAndOpacity
+			);
+
+			return LayerId;
+		}
+
+	protected:
+		BracketHighlighter() = default;
+	};
+
+
+	class CursorHighlighter : public SlateEditableTextTypes::FCursorLineHighlighter
+	{
+	public:
+		static TSharedRef<CursorHighlighter> Create(const SlateEditableTextTypes::FCursorInfo* InCursorInfo)
+		{
+			return MakeShareable(new CursorHighlighter(InCursorInfo));
 		}
 
 		virtual int32 OnPaint(const FPaintArgs& Args, const FTextLayout::FLineView& Line, const float OffsetX, const float Width, const FTextBlockStyle& DefaultStyle, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override
