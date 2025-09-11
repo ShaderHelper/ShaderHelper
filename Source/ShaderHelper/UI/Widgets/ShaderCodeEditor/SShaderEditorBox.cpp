@@ -962,6 +962,20 @@ const FString FoldMarkerText = TEXT("⇿");
 							HasMatchedBracketGroup = true;
 						}
 					}
+					else if (CursorLineIndex == BracketGroup.OpenLineIndex)
+					{
+						if (CursorOffset >= BracketGroup.OpenBracket.Offset)
+						{
+							HasMatchedBracketGroup = true;
+						}
+					}
+					else if (CursorLineIndex == BracketGroup.CloseLineIndex)
+					{
+						if (CursorOffset <= BracketGroup.CloseBracket.Offset + 1)
+						{
+							HasMatchedBracketGroup = true;
+						}
+					}
 					else
 					{
 						HasMatchedBracketGroup = true;
@@ -995,11 +1009,12 @@ const FString FoldMarkerText = TEXT("⇿");
 				}
 
 			}
-			if (OpenBracketHighlight)
+
+			if (OpenBracketHighlight && ShaderMarshaller->TextLayout->GetLineModels().IsValidIndex(OpenBracketHighlight.GetValue().LineIndex))
 			{
 				ShaderMarshaller->TextLayout->AddLineHighlight(OpenBracketHighlight.GetValue());
 			}
-			if (CloseBracketHighlight)
+			if (CloseBracketHighlight && ShaderMarshaller->TextLayout->GetLineModels().IsValidIndex(CloseBracketHighlight.GetValue().LineIndex))
 			{
 				ShaderMarshaller->TextLayout->AddLineHighlight(CloseBracketHighlight.GetValue());
 			}
@@ -1029,10 +1044,9 @@ const FString FoldMarkerText = TEXT("⇿");
 		if(!bKeyChar) {
 			bTryComplete = false;
 			bTryMergeUndoState = false;
+			RefreshOccurrenceHighlight();
 		}
 		bKeyChar = false;
-
-		RefreshOccurrenceHighlight();
 		RefreshBracketHighlight();
 	}
 
@@ -2125,9 +2139,6 @@ const FString FoldMarkerText = TEXT("⇿");
 		VisibleFoldMarkers.Add(MoveTemp(Marker));
 		VisibleFoldMarkers.Sort([](const FoldMarker& A, const FoldMarker& B) { return A.RelativeLineIndex < B.RelativeLineIndex; });
 
-		ShaderMultiLineEditableTextLayout->EndEditTransaction();
-		IsFoldEditTransaction = false;
-
 		//The cursor is within the fold now.
 		if (CurCursorLocation.GetLineIndex() >= FoldedBeginningRow && CurCursorLocation.GetLineIndex() <= FoldedEndRow)
 		{
@@ -2140,6 +2151,9 @@ const FString FoldMarkerText = TEXT("⇿");
 			const FTextLocation NewCursorLocation(CurCursorLocation.GetLineIndex() - FoldedLineNum, CurCursorLocation.GetOffset());
 			ShaderMultiLineEditableText->GoTo(NewCursorLocation);
 		}
+
+		ShaderMultiLineEditableTextLayout->EndEditTransaction();
+		IsFoldEditTransaction = false;
 	}
 
     void SShaderEditorBox::RemoveFoldMarker(int32 InIndex)
