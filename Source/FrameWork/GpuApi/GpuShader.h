@@ -197,19 +197,26 @@ namespace FW
 		uint32 Row, Col;
 	};
 
+	struct ShaderScope
+	{
+		Vector2i Start;
+		Vector2i End;
+	};
+
 	FRAMEWORK_API FString AdjustDiagLineNumber(const FString& ErrorInfo, int32 Delta);
     FRAMEWORK_API TArray<ShaderCandidateInfo> DefaultCandidates();
 
     class FRAMEWORK_API ShaderTU
     {
     public:
-		ShaderTU() = default;
+		ShaderTU();
 		ShaderTU(FStringView HlslSource, const TArray<FString>& IncludeDirs = {});
 		TArray<ShaderDiagnosticInfo> GetDiagnostic();
 		HLSL::TokenType GetTokenType(HLSL::TokenType InType, uint32 Row, uint32 Col);
         TArray<ShaderCandidateInfo> GetCodeComplete(uint32 Row, uint32 Col);
 		TArray<ShaderFunc> GetFuncs();
 		TArray<ShaderOccurrence> GetOccurrences(uint32 Row, uint32 Col);
+		TArray<ShaderScope> GetScopes();
         
     private:
         TPimplPtr<struct ShaderTUImpl> Impl;

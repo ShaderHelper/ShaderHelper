@@ -315,6 +315,7 @@ namespace FW
 		TRefCountPtr<IDxcCursor> DxcRootCursor;
 
 		TArray<ShaderFunc> Funcs;
+		TArray<ShaderScope> Scopes;
 
 		void GetCursorRange(IDxcCursor* InCursor, Vector2i& OutStart, Vector2i& OutEnd)
 		{
@@ -368,6 +369,34 @@ namespace FW
 				
 				if(IsMainFile(ChildCursor))
 				{
+					if (Kind == DxcCursor_StructDecl ||
+						Kind == DxcCursor_FunctionDecl ||
+						Kind == DxcCursor_CXXMethod ||
+						Kind == DxcCursor_IfStmt ||
+						Kind == DxcCursor_ForStmt ||
+						Kind == DxcCursor_WhileStmt ||
+						Kind == DxcCursor_DoStmt ||
+						Kind == DxcCursor_SwitchStmt || 
+						Kind == DxcCursor_CompoundStmt)
+					{
+						Vector2i ScopeStart, ScopeEnd;
+						GetCursorRange(ChildCursor, ScopeStart, ScopeEnd);
+						if (Kind == DxcCursor_CompoundStmt)
+						{
+							DxcCursorKind ParKind;
+							InCursor->GetKind(&ParKind);
+							if (ParKind == DxcCursor_CompoundStmt)
+							{
+								Scopes.Emplace(ScopeStart, ScopeEnd);
+							}
+						}
+						else
+						{
+							Scopes.Emplace(ScopeStart, ScopeEnd);
+						}
+						
+					}
+
 					if (Kind == DxcCursor_FunctionDecl || Kind == DxcCursor_CXXMethod)
 					{
 						BOOL IsDefinition;
@@ -445,6 +474,12 @@ namespace FW
 			CoTaskMemFree(Children);
 		}
     };
+
+	ShaderTU::ShaderTU()
+		:Impl(MakePimpl<ShaderTUImpl>())
+	{
+
+	}
 
 	ShaderTU::ShaderTU(FStringView HlslSource, const TArray<FString>& IncludeDirs)
         :Impl(MakePimpl<ShaderTUImpl>())
@@ -638,6 +673,11 @@ namespace FW
 		}
 		CoTaskMemFree(CursorOccurrences);
 		return Occurrences;
+	}
+
+	TArray<ShaderScope> ShaderTU::GetScopes()
+	{
+		return Impl->Scopes;
 	}
 
     TArray<ShaderCandidateInfo> ShaderTU::GetCodeComplete(uint32 Row, uint32 Col)

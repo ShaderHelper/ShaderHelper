@@ -130,10 +130,35 @@ namespace SH
 		TMap<int32, DiagEffectInfo> LineNumberToDiagInfo;
 	};
 
+	struct ISenseTask
+	{
+		std::optional<FW::GpuShaderSourceDesc> ShaderDesc;
+
+		FString CursorToken;
+		uint32 Row = 0;
+		uint32 Col = 0;
+		bool IsMemberAccess = false;
+	};
+
 	struct SyntaxTask
 	{
 		std::optional<FW::GpuShaderSourceDesc> ShaderDesc;
+		TArray<TArray<HlslTokenizer::Token>> LineTokens;
 	};
+
+	class SShaderMultiLineEditableText : public SMultiLineEditableText
+	{
+	public:
+		void Construct(const FArguments& InArgs, SShaderEditorBox* InOwner)
+		{
+			Owner = InOwner;
+			SMultiLineEditableText::Construct(InArgs);
+		}
+		virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
+	private:
+		SShaderEditorBox* Owner = nullptr;
+	};
+
 	//LineNumber: the line number of the visible shader source in editor
 	//LineIndex: the index in SMultiLineEditableText
 	//Line: the line number in the full shader source
@@ -168,6 +193,7 @@ namespace SH
 			SLATE_ARGUMENT(ShaderAsset*, ShaderAssetObj)
 		SLATE_END_ARGS()
 
+		SShaderEditorBox() = default;
 		~SShaderEditorBox();
 		
 		void Construct(const FArguments& InArgs);
@@ -205,7 +231,6 @@ namespace SH
 		int32 GetLineIndex(int32 InLineNumber) const;
 		int32 GetCurDisplayLineCount() const { return ShaderMarshaller->TextLayout->GetLineCount(); }
         void Compile();
-		void RefreshTU();
 
 		//Scroll to the specified line, which will be displayed in the middle of the document if possible.
 		void ScrollTo(int32 InLineIndex);
@@ -258,9 +283,17 @@ namespace SH
 		TArray<int32> BreakPointLines;
         //The visible content in editor, and contains fold markers.
         FString CurrentEditorSource;
-
+		const FSlateBrush* BackgroundLayerBrush{};
+		TSharedPtr<FShaderEditorMarshaller> ShaderMarshaller;
 		//Syntax highlight
+		FW::ShaderTU SyntaxTU;
 		TArray<TMap<FTextRange, FTextBlockStyle*>> LineSyntaxHighlightMaps;
+		TArray<TMap<FTextRange, FTextBlockStyle*>> LineSyntaxHighlightMapsCopy;
+		TUniquePtr<FThread> SyntaxThread;
+		TQueue<SyntaxTask> SyntaxQueue;
+		std::atomic<bool> bQuitISyntax{};
+		std::atomic<bool> bRefreshSyntax{};
+		FEvent* SyntaxEvent = nullptr;
 		//
 
         
@@ -272,8 +305,7 @@ namespace SH
 		TMap<int32, int32> LineNumberToIndexMap;
 		int32 MaxLineNumber{};
 		TArray<LineNumberItemPtr> LineNumberData;
-		TSharedPtr<FShaderEditorMarshaller> ShaderMarshaller;
-        TSharedPtr<SMultiLineEditableText> ShaderMultiLineEditableText;
+        TSharedPtr<SShaderMultiLineEditableText> ShaderMultiLineEditableText;
         
         TSharedPtr<SScrollBar> ShaderMultiLineVScrollBar;
         TSharedPtr<SScrollBar> ShaderMultiLineHScrollBar;
@@ -298,14 +330,14 @@ namespace SH
 		bool IsFoldEditTransaction{};
 		FCurveSequence FoldingArrowAnim;
         
-		FW::ShaderTU TU;
-		TUniquePtr<FThread> SyntaxThread;
-		TQueue<SyntaxTask> SyntaxQueue;
-		std::atomic<bool> bQuitISyntax{};
-		std::atomic<bool> bRefreshSyntax{};
-		FEvent* SyntaxEvent = nullptr;
-
         //CodeComplete and real-time diagnostic
+		FW::ShaderTU ISenseTU;
+		TUniquePtr<FThread> ISenseThread;
+		TQueue<ISenseTask> ISenseQueue;
+
+		std::atomic<bool> bQuitISense{};
+		std::atomic<bool> bRefreshIsense{};
+		FEvent* ISenseEvent = nullptr;
         TArray<FW::ShaderDiagnosticInfo> DiagnosticInfos;
         FString CurToken;
         TArray<FW::ShaderCandidateInfo> CandidateInfos;

@@ -119,6 +119,11 @@ const FString FoldMarkerText = TEXT("⇿");
     SShaderEditorBox::~SShaderEditorBox()
     {
 		ShaderAssetObj->OnRefreshBuilder.Remove(RefreshBuilderHandle);
+
+		bQuitISense = true;
+		ISenseEvent->Trigger();
+		ISenseThread->Join();
+		FPlatformProcess::ReturnSynchEventToPool(ISenseEvent);
 		
 		bQuitISyntax = true;
 		SyntaxEvent->Trigger();
@@ -186,11 +191,77 @@ const FString FoldMarkerText = TEXT("⇿");
 		return TokenStyleMap[InType];
 	}
 
+	int32 SShaderMultiLineEditableText::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
+	{
+		const float InverseScale = Inverse(AllottedGeometry.Scale);
+		const double OffsetX = 4;
+
+		TArray<ShaderScope> Scopes = Owner->SyntaxTU.GetScopes();
+		int32 ExtraLineNum = Owner->GetShaderAsset()->GetExtraLineNum();
+		//Draw guide lines
+		for (const auto& Scope : Scopes)
+		{
+			int32 StartLineIndex = Scope.Start.X - ExtraLineNum - 1;
+			int32 StartOffset = Scope.Start.Y - 1;
+			if (StartLineIndex >= 0)
+			{
+				int32 EndLineIndex = Scope.End.X - ExtraLineNum - 1;
+				TSharedPtr<ILayoutBlock> Block = Owner->ShaderMarshaller->TextLayout->GetBlockAt({ StartLineIndex, StartOffset });
+				if (Block)
+				{
+					FVector2D P0 = TransformPoint(InverseScale, Block->GetLocationOffset() + FVector2D{OffsetX, 2.0});
+					FVector2D P1 = TransformPoint(InverseScale, Block->GetLocationOffset() + FVector2D{OffsetX, Block->GetSize().Y * (EndLineIndex - StartLineIndex)});
+					FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), {P0, P1}, ESlateDrawEffect::None, FLinearColor{1,1,1,0.2f});
+				}
+			}
+		}
+
+		// Draw a background layer for every non-whitespace block
+		const auto& LineViews = Owner->ShaderMarshaller->TextLayout->GetLineViews();
+		for (int32 LineIndex = 0; LineIndex < LineViews.Num(); ++LineIndex)
+		{
+			const FTextLayout::FLineView& LineView = LineViews[LineIndex];
+			for (const TSharedRef< ILayoutBlock >& Block : LineView.Blocks)
+			{
+				const FTextRange BlockRange = Block->GetTextRange();
+				FString Text;
+				GetTextLine(LineView.ModelIndex, Text);
+
+				bool bIsOnlyWhitespace = true;
+				for (int32 Index = BlockRange.BeginIndex; Index < BlockRange.EndIndex; ++Index)
+				{
+					if (!FChar::IsWhitespace((*Text)[Index]))
+					{
+						bIsOnlyWhitespace = false;
+						break;
+					}
+				}
+				if (!bIsOnlyWhitespace && Owner->BackgroundLayerBrush)
+				{
+					FSlateDrawElement::MakeBox(
+						OutDrawElements,
+						LayerId,
+						AllottedGeometry.ToPaintGeometry(TransformVector(InverseScale, Block->GetSize()), FSlateLayoutTransform(TransformPoint(InverseScale, Block->GetLocationOffset()))),
+						FCoreStyle::Get().GetBrush("WhiteBrush"),
+						ESlateDrawEffect::None,
+						Owner->BackgroundLayerBrush->TintColor.GetSpecifiedColor()
+					);
+				}
+			}
+		}
+
+		LayerId = SMultiLineEditableText::OnPaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
+		return LayerId;
+	}
+
     void SShaderEditorBox::Construct(const FArguments& InArgs)
     {
 		ShaderAssetObj = InArgs._ShaderAssetObj;
 		RefreshBuilderHandle = ShaderAssetObj->OnRefreshBuilder.AddLambda([this]{
-			RefreshTU();
+			ISenseTask Task{};
+			Task.ShaderDesc = ShaderAssetObj->GetShaderDesc(CurrentShaderSource);
+			ISenseQueue.Enqueue(MoveTemp(Task));
+			ISenseEvent->Trigger();
 		});
 		
         SAssignNew(ShaderMultiLineVScrollBar, SScrollBar).Orientation(EOrientation::Orient_Vertical).Padding(0)
@@ -208,25 +279,125 @@ const FString FoldMarkerText = TEXT("⇿");
         FText InitialShaderText = FText::FromString(ShaderAssetObj->EditorContent);
         CurrentEditorSource = ShaderAssetObj->EditorContent;
         CurrentShaderSource = CurrentEditorSource;
+
+		//Due to code folding altering the editing text, separate IsenseThread and SyntaxThread.
+		ISenseEvent = FPlatformProcess::GetSynchEventFromPool();
+		ISenseThread = MakeUnique<FThread>(TEXT("ISenseThread"), [this] {
+			while (!bQuitISense)
+			{
+				ISenseTask Task;
+				while (ISenseQueue.Dequeue(Task));
+				if (Task.ShaderDesc)
+				{
+					TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(Task.ShaderDesc.value());
+					ShaderTU TU{ Shader->GetProcessedSourceText(), Shader->GetIncludeDirs() };
+					DiagnosticInfos = TU.GetDiagnostic();
+
+					CandidateInfos.Reset();
+					if (!Task.CursorToken.IsEmpty())
+					{
+						CandidateInfos = TU.GetCodeComplete(Task.Row, Task.Col);
+						if (Task.IsMemberAccess == false)
+						{
+							for (const auto& Candidate : DefaultCandidates())
+							{
+								CandidateInfos.AddUnique(Candidate);
+							}
+						}
+
+						for (auto It = CandidateInfos.CreateIterator(); It; ++It)
+						{
+							if (Task.IsMemberAccess)
+							{
+								if ((*It).Text.Find("operator") != INDEX_NONE)
+								{
+									It.RemoveCurrent();
+									continue;
+								}
+								else if ((*It).Kind == HLSL::CandidateKind::Type)
+								{
+									It.RemoveCurrent();
+									continue;
+								}
+							}
+
+							if (Task.CursorToken != ".")
+							{
+								if (!FuzzyMatch((*It).Text, *Task.CursorToken))
+								{
+									It.RemoveCurrent();
+								}
+							}
+						}
+
+						CandidateInfos.Sort([&](const ShaderCandidateInfo& A, const ShaderCandidateInfo& B) {
+							auto Token = Task.CursorToken;
+							bool AStarts = A.Text.StartsWith(Token, ESearchCase::CaseSensitive);
+							bool BStarts = B.Text.StartsWith(Token, ESearchCase::CaseSensitive);
+							if (AStarts != BStarts)
+								return AStarts > BStarts;
+							bool AStartsIC = A.Text.StartsWith(Token, ESearchCase::IgnoreCase);
+							bool BStartsIC = B.Text.StartsWith(Token, ESearchCase::IgnoreCase);
+							if (AStartsIC != BStartsIC)
+								return AStartsIC > BStartsIC;
+							int32 AIndex = A.Text.Find(Token, ESearchCase::IgnoreCase);
+							int32 BIndex = B.Text.Find(Token, ESearchCase::IgnoreCase);
+							if (AIndex != BIndex)
+								return (AIndex >= 0 ? AIndex : MAX_int32) < (BIndex >= 0 ? BIndex : MAX_int32);
+							if (A.Text.Len() != B.Text.Len())
+								return A.Text.Len() < B.Text.Len();
+							return A.Text.Compare(B.Text) < 0;
+						});
+					}
+					this->ISenseTU = MoveTemp(TU);
+
+					if (ISenseQueue.IsEmpty())
+					{
+						bRefreshIsense.store(true, std::memory_order_release);
+					}
+				}
+
+				if (ISenseQueue.IsEmpty())
+				{
+					ISenseEvent->Wait();
+				}
+			}
+		});
 		
 		SyntaxEvent = FPlatformProcess::GetSynchEventFromPool();
 		SyntaxThread = MakeUnique<FThread>(TEXT("SyntaxThread"), [this]{
 			while(!bQuitISyntax)
 			{
 				SyntaxTask Task;
-				while(SyntaxQueue.Dequeue(Task));
-				if(Task.ShaderDesc)
+				while (SyntaxQueue.Dequeue(Task));
+				if (Task.ShaderDesc)
 				{
 					TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(Task.ShaderDesc.value());
-					this->TU = ShaderTU{Shader->GetSourceText(), Shader->GetIncludeDirs()};
-										
-					if(SyntaxQueue.IsEmpty())
+					ShaderTU TU{ Shader->GetSourceText(), Shader->GetIncludeDirs() };
+					LineSyntaxHighlightMaps.Reset();
+					LineSyntaxHighlightMaps.SetNum(Task.LineTokens.Num());
+					int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
+					for (int LineIndex = 0; LineIndex < Task.LineTokens.Num(); LineIndex++)
+					{
+						for (const HlslTokenizer::Token& Token : Task.LineTokens[LineIndex])
+						{
+							HLSL::TokenType NewTokenType = TU.GetTokenType(Token.Type, ExtraLineNum + LineIndex + 1, Token.BeginOffset + 1);
+							if (NewTokenType != Token.Type)
+							{
+								LineSyntaxHighlightMaps[LineIndex].Add(FTextRange{ Token.BeginOffset, Token.EndOffset },
+									&GetTokenStyle(NewTokenType));
+							}
+						}
+					}
+					this->SyntaxTU = MoveTemp(TU);
+
+					if (SyntaxQueue.IsEmpty())
 					{
 						bRefreshSyntax.store(true, std::memory_order_release);
 					}
 				}
-				
-				if(SyntaxQueue.IsEmpty())
+
+				if (SyntaxQueue.IsEmpty())
 				{
 					SyntaxEvent->Wait();
 				}
@@ -235,11 +406,11 @@ const FString FoldMarkerText = TEXT("⇿");
         
         auto CustomScrollBar = SNew(SScrollBar).Padding(0)
             .Style(&FShaderHelperStyle::Get().GetWidgetStyle<FScrollBarStyle>("CustomScrollbar"));
-
+		BackgroundLayerBrush = FAppStyle::Get().GetBrush("Brushes.Recessed");
         ChildSlot
         [
             SNew(SBorder)
-            .BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
+            .BorderImage(BackgroundLayerBrush)
             .Padding(0)
             [
 				SNew(SVerticalBox)
@@ -265,7 +436,7 @@ const FString FoldMarkerText = TEXT("⇿");
 						SNew(SOverlay)
 						+ SOverlay::Slot()
 						[
-							SAssignNew(ShaderMultiLineEditableText, SMultiLineEditableText)
+							SAssignNew(ShaderMultiLineEditableText, SShaderMultiLineEditableText, this)
 							.Text(InitialShaderText)
 							.EnableUniformFont(true)
 							.Font(GetCodeFontInfo())
@@ -844,25 +1015,10 @@ const FString FoldMarkerText = TEXT("⇿");
 
 	void SShaderEditorBox::RefreshSyntaxHighlight()
 	{
-		LineSyntaxHighlightMaps.Reset();
-		LineSyntaxHighlightMaps.SetNum(ShaderMarshaller->TokenizedLines.Num());
-		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
-		for (int LineIndex = 0; LineIndex < ShaderMarshaller->TokenizedLines.Num(); LineIndex++)
+		LineSyntaxHighlightMapsCopy = LineSyntaxHighlightMaps;
+		for(int LineIndex = 0; LineIndex < LineSyntaxHighlightMapsCopy.Num(); LineIndex++)
 		{
-			for (const HlslTokenizer::Token& Token : ShaderMarshaller->TokenizedLines[LineIndex].Tokens)
-			{
-				HLSL::TokenType NewTokenType = TU.GetTokenType(Token.Type, ExtraLineNum + LineIndex + 1, Token.BeginOffset + 1);
-				if (NewTokenType != Token.Type)
-				{
-					LineSyntaxHighlightMaps[LineIndex].Add(FTextRange{ Token.BeginOffset, Token.EndOffset },
-						&GetTokenStyle(NewTokenType));
-				}
-			}
-		}
-
-		for(int LineIndex = 0; LineIndex < LineSyntaxHighlightMaps.Num(); LineIndex++)
-		{
-			auto& SyntaxHighlightMap = LineSyntaxHighlightMaps[LineIndex];
+			auto& SyntaxHighlightMap = LineSyntaxHighlightMapsCopy[LineIndex];
 			auto& LineModel =  ShaderMarshaller->TextLayout->GetLineModels()[LineIndex];
 			for(const auto& [TokenRange, Style] : SyntaxHighlightMap)
 			{
@@ -893,7 +1049,7 @@ const FString FoldMarkerText = TEXT("⇿");
 				if ((Token.Type == HLSL::TokenType::Identifier || Token.Type == HLSL::TokenType::BuildtinFunc)
 					&& CursorOffset >= Token.BeginOffset && CursorOffset <= Token.EndOffset)
 				{
-					Occurrences = TU.GetOccurrences(GetLineNumber(CursorLineIndex) + AddedLineNum, Token.BeginOffset + 1);
+					Occurrences = ISenseTU.GetOccurrences(GetLineNumber(CursorLineIndex) + AddedLineNum, Token.BeginOffset + 1);
 					break;
 				}
 			}
@@ -914,6 +1070,7 @@ const FString FoldMarkerText = TEXT("⇿");
 					{
 						if (Token.BeginOffset == Occurrence.Col - 1)
 						{
+							//why -11? see FSlateEditableTextLayout::UpdateCursorHighlight() 
 							OccurrenceHighlights.Emplace(OccurrenceLineIndex, FTextRange{ Token.BeginOffset, Token.EndOffset }, -11, OccurrenceHighlighter::Create());
 							break;
 						}
@@ -1028,14 +1185,19 @@ const FString FoldMarkerText = TEXT("⇿");
 		//Which leads to a delay of one frame in the drawing of the list, so here we tick it earlier.
 		ShaderMultiLineEditableTextLayout->Tick(ShaderMultiLineEditableText->GetTickSpaceGeometry(), InCurrentTime, InDeltaTime);
         
-		if(bRefreshSyntax.load(std::memory_order_acquire))
+		if (bRefreshIsense.load(std::memory_order_acquire))
 		{
-			RefreshSyntaxHighlight();
 			RefreshLineNumberToDiagInfo();
 			RefreshCodeCompletionTip();
+			bRefreshIsense.store(false, std::memory_order_relaxed);
+		}
+
+		if (bRefreshSyntax.load(std::memory_order_acquire))
+		{
+			RefreshSyntaxHighlight();
 			bRefreshSyntax.store(false, std::memory_order_relaxed);
 		}
-        
+
         UpdateEffectText();
     }
 
@@ -1154,128 +1316,28 @@ const FString FoldMarkerText = TEXT("⇿");
 
     void SShaderEditorBox::RefreshCodeCompletionTip()
     {
-		if(bTryComplete)
+		CandidateItems.Reset();
+		for (const auto& CandidateInfo : CandidateInfos)
 		{
-			//Note: CursorLocation starts from 0, but libclang 1
-			const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
-			const int32 CursorRow = CursorLocation.GetLineIndex();
-			const int32 CursorCol = CursorLocation.GetOffset();
-			int32 AddedLineNum = ShaderAssetObj->GetExtraLineNum();
-
-			bool IsMemberAccess = false;
-			uint32 Row{};
-			uint32 Col{};
-
-			FString CurLineText;
-			ShaderMultiLineEditableText->GetTextLine(CursorRow, CurLineText);
-			FString CursorLeft = CurLineText.Mid(0, CursorCol);
-
-			TArray<HlslTokenizer::TokenizedLine> TokenizedLines = ShaderMarshaller->Tokenizer->Tokenize(CursorLeft, true);
-			auto Token = TokenizedLines[0].Tokens.Last();
-			FString LeftToken = CursorLeft.Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
-			if (TokenizedLines[0].Tokens.Num() > 1)
+			CandidateItems.Add(MakeShared<ShaderCandidateInfo>(CandidateInfo));
+			if (CandidateItems.Num() >= 40)
 			{
-				Token = TokenizedLines[0].Tokens.Last(1);
-				FString LeftToken2 = CursorLeft.Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
-				if (LeftToken2 == ".")
-				{
-					IsMemberAccess = true;
-				}
-			}
-			this->CurToken = LeftToken;
-
-			Row = GetLineNumber(CursorRow) + AddedLineNum;
-			if (LeftToken == ".")
-			{
-				IsMemberAccess = true;
-				Col = CursorCol + 1;
-			}
-			else
-			{
-				Col = CursorCol + 1 - LeftToken.Len();
-			}
-
-			CandidateInfos.Reset();
-			if (!CurToken.IsEmpty())
-			{
-				CandidateInfos = TU.GetCodeComplete(Row, Col);
-				if (IsMemberAccess == false)
-				{
-					for (const auto& Candidate : DefaultCandidates())
-					{
-						CandidateInfos.AddUnique(Candidate);
-					}
-				}
-
-				for (auto It = CandidateInfos.CreateIterator(); It; ++It)
-				{
-					if (IsMemberAccess)
-					{
-						if ((*It).Text.Find("operator") != INDEX_NONE)
-						{
-							It.RemoveCurrent();
-							continue;
-						}
-						else if ((*It).Kind == HLSL::CandidateKind::Type)
-						{
-							It.RemoveCurrent();
-							continue;
-						}
-					}
-
-					if (CurToken != ".")
-					{
-						if (!FuzzyMatch((*It).Text, *CurToken))
-						{
-							It.RemoveCurrent();
-						}
-					}
-				}
-
-				CandidateInfos.Sort([&](const ShaderCandidateInfo& A, const ShaderCandidateInfo& B) {
-					auto Token = CurToken;
-					bool AStarts = A.Text.StartsWith(Token, ESearchCase::CaseSensitive);
-					bool BStarts = B.Text.StartsWith(Token, ESearchCase::CaseSensitive);
-					if (AStarts != BStarts)
-						return AStarts > BStarts;
-					bool AStartsIC = A.Text.StartsWith(Token, ESearchCase::IgnoreCase);
-					bool BStartsIC = B.Text.StartsWith(Token, ESearchCase::IgnoreCase);
-					if (AStartsIC != BStartsIC)
-						return AStartsIC > BStartsIC;
-					int32 AIndex = A.Text.Find(Token, ESearchCase::IgnoreCase);
-					int32 BIndex = B.Text.Find(Token, ESearchCase::IgnoreCase);
-					if (AIndex != BIndex)
-						return (AIndex >= 0 ? AIndex : MAX_int32) < (BIndex >= 0 ? BIndex : MAX_int32);
-					if (A.Text.Len() != B.Text.Len())
-						return A.Text.Len() < B.Text.Len();
-					return A.Text.Compare(B.Text) < 0;
-					});
-			}
-
-			CandidateItems.Reset();
-			for (const auto& CandidateInfo : CandidateInfos)
-			{
-				CandidateItems.Add(MakeShared<ShaderCandidateInfo>(CandidateInfo));
-				if (CandidateItems.Num() >= 40)
-				{
-					break;
-				}
-			}
-
-			if (CandidateItems.Num() > 0)
-			{
-				CodeCompletionCanvas->SlatePrepass();
-				CodeCompletionList->RequestListRefresh();
-				CodeCompletionList->SetSelection(CandidateItems[0]);
+				break;
 			}
 		}
-		
+
+		if (CandidateItems.Num() > 0)
+		{
+			CodeCompletionCanvas->SlatePrepass();
+			CodeCompletionList->RequestListRefresh();
+			CodeCompletionList->SetSelection(CandidateItems[0]);
+		}
     }
 
     void SShaderEditorBox::RefreshLineNumberToDiagInfo()
     {
         EffectMarshller->LineNumberToDiagInfo.Reset();
-        for (const ShaderDiagnosticInfo& DiagInfo : TU.GetDiagnostic())
+        for (const ShaderDiagnosticInfo& DiagInfo : DiagnosticInfos)
         {
             int32 DiagInfoLineNumber = (int32)DiagInfo.Row - ShaderAssetObj->GetExtraLineNum();
             if (!EffectMarshller->LineNumberToDiagInfo.Contains(DiagInfoLineNumber))
@@ -1352,16 +1414,6 @@ const FString FoldMarkerText = TEXT("⇿");
         }
     }
 
-	void SShaderEditorBox::RefreshTU()
-	{
-		SyntaxTask Task;
-		Task.ShaderDesc = ShaderAssetObj->GetShaderDesc(CurrentShaderSource);
-
-		bRefreshSyntax.store(false, std::memory_order_relaxed);
-		SyntaxQueue.Enqueue(MoveTemp(Task));
-		SyntaxEvent->Trigger();
-	}
-
     void SShaderEditorBox::OnShaderTextChanged(const FString& InShaderSouce)
     {
         FString NewShaderSource = InShaderSouce.Replace(TEXT("\r\n"), TEXT("\n"));
@@ -1377,7 +1429,51 @@ const FString FoldMarkerText = TEXT("⇿");
         }
         
         CurrentShaderSource = NewShaderSource;
-		RefreshTU();
+
+		ISenseTask Task{};
+		Task.ShaderDesc = ShaderAssetObj->GetShaderDesc(CurrentShaderSource);
+
+		if (bTryComplete)
+		{
+			//Note: The cursor has advanced here. CursorLocation starts from 0, but libclang 1
+			const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
+			const int32 CursorRow = CursorLocation.GetLineIndex();
+			const int32 CursorCol = CursorLocation.GetOffset();
+			int32 AddedLineNum = ShaderAssetObj->GetExtraLineNum();
+
+			FString CurLineText;
+			ShaderMultiLineEditableText->GetTextLine(CursorRow, CurLineText);
+			FString CursorLeft = CurLineText.Mid(0, CursorCol);
+
+			TArray<HlslTokenizer::TokenizedLine> TokenizedLines = ShaderMarshaller->Tokenizer->Tokenize(CursorLeft, true);
+			auto Token = TokenizedLines[0].Tokens.Last();
+			FString LeftToken = CursorLeft.Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
+			if (TokenizedLines[0].Tokens.Num() > 1)
+			{
+				Token = TokenizedLines[0].Tokens.Last(1);
+				FString LeftToken2 = CursorLeft.Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
+				if (LeftToken2 == ".")
+				{
+					Task.IsMemberAccess = true;
+				}
+			}
+			CurToken = LeftToken;
+
+			Task.Row = GetLineNumber(CursorRow) + AddedLineNum;
+			if (LeftToken == ".")
+			{
+				Task.IsMemberAccess = true;
+				Task.Col = CursorCol + 1;
+			}
+			else
+			{
+				Task.Col = CursorCol + 1 - LeftToken.Len();
+			}
+			Task.CursorToken = MoveTemp(LeftToken);
+		}
+
+		ISenseQueue.Enqueue(MoveTemp(Task));
+		ISenseEvent->Trigger();
     }
 
     static int32 GetNumSpacesAtStartOfLine(const FString& InLine)
@@ -2615,9 +2711,9 @@ const FString FoldMarkerText = TEXT("⇿");
 							&& (Token.BeginOffset == Element.BeginOffset || TokenStr == ElementStr);
 						}))
 						{
-							if(OwnerWidget->LineSyntaxHighlightMaps.IsValidIndex(LineIndex))
+							if(OwnerWidget->LineSyntaxHighlightMapsCopy.IsValidIndex(LineIndex))
 							{
-								for(const auto& [Range, Style] : OwnerWidget->LineSyntaxHighlightMaps[LineIndex])
+								for(const auto& [Range, Style] : OwnerWidget->LineSyntaxHighlightMapsCopy[LineIndex])
 								{
 									if(Range.BeginIndex == MatchedToken->BeginOffset)
 									{
@@ -2642,13 +2738,23 @@ const FString FoldMarkerText = TEXT("⇿");
 			}
 		
 		}
-		
+
 		this->TokenizedLines.Empty();
-		for(int32 LineIndex = 0; LineIndex < LineModels.Num(); LineIndex++)
+		SyntaxTask Task;
+		Task.ShaderDesc = OwnerWidget->GetShaderAsset()->GetShaderDesc(SourceString);
+		Task.LineTokens.SetNum(LineModels.Num());
+		for (int32 LineIndex = 0; LineIndex < LineModels.Num(); LineIndex++)
 		{
 			HlslTokenizer::TokenizedLine* CurTokenizedLine = static_cast<HlslTokenizer::TokenizedLine*>(LineModels[LineIndex].CustomData.Get());
 			this->TokenizedLines.Add(*CurTokenizedLine);
+			for (const HlslTokenizer::Token& Token : CurTokenizedLine->Tokens)
+			{
+				Task.LineTokens[LineIndex].Add(Token);
+			}
 		}
+		OwnerWidget->bRefreshSyntax.store(false, std::memory_order_relaxed);
+		OwnerWidget->SyntaxQueue.Enqueue(MoveTemp(Task));
+		OwnerWidget->SyntaxEvent->Trigger();
 
 		struct BracketStackData
 		{
@@ -2771,18 +2877,16 @@ const FString FoldMarkerText = TEXT("⇿");
     void FShaderEditorEffectMarshaller::SubmitEffectText()
     {
         TArray<FTextLayout::FNewLineData> LinesToAdd;
+		FTextBlockStyle ErrorInfoStyle = FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorErrorInfoText");
+		ErrorInfoStyle.SetFont(OwnerWidget->GetCodeFontInfo());
+		FTextBlockStyle WarnInfoStyle = FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorWarnInfoText");
+		WarnInfoStyle.SetFont(OwnerWidget->GetCodeFontInfo());
+		FTextBlockStyle DummyInfoStyle = FTextBlockStyle{}
+			.SetFont(OwnerWidget->GetCodeFontInfo())
+			.SetColorAndOpacity(FLinearColor{ 0, 0, 0, 0 });
         for (int32 LineIndex = 0; LineIndex < OwnerWidget->GetCurDisplayLineCount(); LineIndex++)
         {
             TArray<TSharedRef<IRun>> Runs;
-            FTextBlockStyle ErrorInfoStyle = FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorErrorInfoText");
-            ErrorInfoStyle.SetFont(OwnerWidget->GetCodeFontInfo());
-			FTextBlockStyle WarnInfoStyle = FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorWarnInfoText");
-			WarnInfoStyle.SetFont(OwnerWidget->GetCodeFontInfo());
-			
-            FTextBlockStyle DummyInfoStyle = FTextBlockStyle{}
-                .SetFont(OwnerWidget->GetCodeFontInfo())
-                .SetColorAndOpacity(FLinearColor{ 0, 0, 0, 0 });
-
             int32 CurLineNumber = OwnerWidget->GetLineNumber(LineIndex);
             if (LineNumberToDiagInfo.Contains(CurLineNumber))
             {

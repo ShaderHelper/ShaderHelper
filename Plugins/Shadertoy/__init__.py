@@ -27,9 +27,12 @@ def get_browser_path():
                 return path
         elif sys.platform.startswith('darwin'):
             chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+            edge_path = "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"
             if os.path.exists(chrome_path):
                 return chrome_path
-            return None        
+            elif os.path.exists(edge_path):
+                return edge_path
+            return None      
     except Exception as e:
         return None
         
