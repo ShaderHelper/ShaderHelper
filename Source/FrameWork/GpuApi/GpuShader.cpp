@@ -381,11 +381,18 @@ namespace FW
 					{
 						Vector2i ScopeStart, ScopeEnd;
 						GetCursorRange(ChildCursor, ScopeStart, ScopeEnd);
+						DxcCursorKind ParKind;
+						InCursor->GetKind(&ParKind);
 						if (Kind == DxcCursor_CompoundStmt)
 						{
-							DxcCursorKind ParKind;
-							InCursor->GetKind(&ParKind);
 							if (ParKind == DxcCursor_CompoundStmt)
+							{
+								Scopes.Emplace(ScopeStart, ScopeEnd);
+							}
+						}
+						else if(Kind == DxcCursor_IfStmt)
+						{
+							if (ParKind != DxcCursor_IfStmt)
 							{
 								Scopes.Emplace(ScopeStart, ScopeEnd);
 							}
