@@ -300,7 +300,10 @@ namespace FW
 		TArray<SpvTypeDesc*> MemberTypeDescs;
 		for(SpvId MemberTypeDescId : Inst->GetMembers())
 		{
-			MemberTypeDescs.Add(Context.TypeDescs[MemberTypeDescId].Get());
+			if (Context.TypeDescs.contains(MemberTypeDescId))
+			{
+				MemberTypeDescs.Add(Context.TypeDescs.at(MemberTypeDescId).Get());
+			}
 		}
 		
 		//The size may be unknown(DebugInfoNone)
@@ -343,7 +346,11 @@ namespace FW
 		TArray<SpvTypeDesc*> ParmTypeDescs;
 		for(SpvId ParmTypeDescId : Inst->GetParmTypes())
 		{
-			ParmTypeDescs.Add(Context.TypeDescs[ParmTypeDescId].Get());
+			if (Context.TypeDescs.contains(ParmTypeDescId))
+			{
+				ParmTypeDescs.Add(Context.TypeDescs.at(ParmTypeDescId).Get());
+			}
+
 		}
 		
 		TUniquePtr<SpvTypeDesc> FuncTypeDesc;

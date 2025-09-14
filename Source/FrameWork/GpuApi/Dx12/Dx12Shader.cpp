@@ -161,6 +161,7 @@ namespace FW
 			Arguments.Add(TEXT("/Od"));
 			Arguments.Add(TEXT("-fcgl"));
 			Arguments.Add(TEXT("-spirv"));
+			Arguments.Add(TEXT("-Vd"));
 			Arguments.Add(TEXT("-fvk-use-dx-layout"));
 			Arguments.Add(TEXT("-fspv-debug=vulkan-with-source"));
 		}

@@ -3183,6 +3183,11 @@ const FString FoldMarkerText = TEXT("⇿");
 					if(VisibleScope && VisibleLine)
 					{
 						FString VarName = VarDesc->Name;
+						//If there are variables with the same name, only the one in the most recent scope is shown.
+						if (LocalVarNodeDatas.ContainsByPredicate([&](const VariableNodePtr& InItem) { return InItem->VarName == VarName;}))
+						{
+							continue;
+						}
 						FString TypeName = GetTypeDescStr(VarDesc->TypeDesc);
 						const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var.Storage).Value;
 						FString ValueStr = GetValueStr(Value, VarDesc->TypeDesc, Var.InitializedRanges, 0);
@@ -3241,9 +3246,21 @@ const FString FoldMarkerText = TEXT("⇿");
 				ExpressionShader.RemoveAt(StartPos, EndPos - StartPos);
 				
 				//Append bindings
-				FString LocalVars;
+				std::vector<std::pair<SpvId, SpvVariableDesc*>> SortedVariableDescs;
+				for (const auto& Pair : DebuggerContext->VariableDescMap)
+				{
+					if (Pair.second)
+					{
+						SortedVariableDescs.push_back(Pair);
+					}
+				}
+				std::sort(SortedVariableDescs.begin(), SortedVariableDescs.end(), [](const auto& PairA, const auto& PairB) {
+					return PairA.second->Line > PairB.second->Line;
+				});
+				TArray<FString> LocalVars;
+				FString LocalVarInitializations;
 				FString VisibleLocalVarBindings = "struct __Expression_Vars_Set {";
-				for(const auto& [VarId, VarDesc] : DebuggerContext->VariableDescMap)
+				for(const auto& [VarId, VarDesc] : SortedVariableDescs)
 				{
 					if(RecordedInfo.AllVariables.contains(VarId))
 					{
@@ -3252,8 +3269,13 @@ const FString FoldMarkerText = TEXT("⇿");
 						{
 							bool VisibleScope = VarDesc->Parent->Contains(Scope) || (DebugStates[CurDebugStateIndex].bReturn && Scope->GetKind() == SpvScopeKind::Function && Scope == VarDesc->Parent->GetParent());
 							bool VisibleLine = VarDesc->Line < StopLineNumber + ExtraLineNum && VarDesc->Line > ExtraLineNum;
-							if(VisibleScope && VisibleLine)
+							if (VisibleScope && VisibleLine)
 							{
+								//If there are variables with the same name, only the one in the most recent scope is evaluated.
+								if (LocalVars.Contains(VarDesc->Name))
+								{
+									continue;
+								}
 								FString Declaration;
 								if(VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Array)
 								{
@@ -3262,16 +3284,16 @@ const FString FoldMarkerText = TEXT("⇿");
 									FString DimStr = GetTypeDescStr(VarDesc->TypeDesc);
 									DimStr.RemoveFromStart(BasicTypeStr);
 									Declaration = BasicTypeStr + " " + VarDesc->Name + DimStr + ";";
-									LocalVars += Declaration;
-									LocalVars += VarDesc->Name + "= __Expression_Vars[0]." + VarDesc->Name + ";\n";
+									LocalVarInitializations += Declaration;
+									LocalVarInitializations += VarDesc->Name + "= __Expression_Vars[0]." + VarDesc->Name + ";\n";
 								}
 								else
 								{
 									Declaration = GetTypeDescStr(VarDesc->TypeDesc) + " " + VarDesc->Name + ";";
-									LocalVars += GetTypeDescStr(VarDesc->TypeDesc) + " " + VarDesc->Name + "= __Expression_Vars[0]." + VarDesc->Name + ";\n";
+									LocalVarInitializations += GetTypeDescStr(VarDesc->TypeDesc) + " " + VarDesc->Name + "= __Expression_Vars[0]." + VarDesc->Name + ";\n";
 								}
 								VisibleLocalVarBindings += Declaration;
-
+								LocalVars.Add(VarDesc->Name);
                                 const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var.Storage).Value;
                                 InputData.Append(Value);
 							}
@@ -3283,7 +3305,7 @@ const FString FoldMarkerText = TEXT("⇿");
 				
 				//Append the EntryPoint
 				FString EntryPointFunc = FString::Printf(TEXT("\nvoid %s() {\n"), *EntryPoint);
-				EntryPointFunc += MoveTemp(LocalVars);
+				EntryPointFunc += MoveTemp(LocalVarInitializations);
 				EntryPointFunc += FString::Printf(TEXT("__Expression_Output(%s);\n"), *InExpression);
 				EntryPointFunc += "}\n";
 				ExpressionShader += VisibleLocalVarBindings + EntryPointFunc;

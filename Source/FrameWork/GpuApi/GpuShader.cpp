@@ -414,7 +414,25 @@ namespace FW
 							ChildCursor->GetSpelling(&CursorName);
 							Vector2i FuncStart, FuncEnd;
 							GetCursorRange(ChildCursor, FuncStart, FuncEnd);
-							Funcs.Emplace(ANSI_TO_TCHAR(CursorName), FuncStart, FuncEnd);
+
+							if (Kind == DxcCursor_CXXMethod)
+							{
+								LPSTR ParCursorName;
+								InCursor->GetSpelling(&ParCursorName);
+								ShaderFunc Func{
+									.Name = ANSI_TO_TCHAR(CursorName),
+									.FullName = FString(ANSI_TO_TCHAR(ParCursorName)) + "." + ANSI_TO_TCHAR(CursorName),
+									.Start = FuncStart,
+									.End = FuncEnd,
+									.Params = {ShaderParameter{"this"}}
+								};
+								Funcs.Add(MoveTemp(Func));
+							}
+							else
+							{
+								Funcs.Emplace(ANSI_TO_TCHAR(CursorName), ANSI_TO_TCHAR(CursorName), FuncStart, FuncEnd);
+							}
+							
 							CoTaskMemFree(CursorName);
 						}
 					}

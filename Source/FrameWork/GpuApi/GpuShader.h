@@ -187,6 +187,7 @@ namespace FW
 	struct ShaderFunc
 	{
 		FString Name;
+		FString FullName;
 		Vector2i Start;
 		Vector2i End;
 		TArray<ShaderParameter> Params;

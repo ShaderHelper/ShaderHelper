@@ -295,16 +295,15 @@ namespace FW
 		{
 			SpvFunctionDesc* CurFuncDesc = static_cast<SpvFunctionDesc*>(Context.LexicalScopes[Inst->GetFunction()].Get());
 			ShaderFunc* EditorFunc = Context.EditorFuncInfo.FindByPredicate([&](const ShaderFunc& InItem) {
-				return InItem.Name == CurFuncDesc->GetName() && InItem.Start.x == CurFuncDesc->GetLine();
+				return InItem.FullName == CurFuncDesc->GetName() && InItem.Start.x == CurFuncDesc->GetLine();
 			});
 			for(int i = 0; i < CurStackFrame.Parameters.size(); i++)
 			{
 				SpvVmParameter& Parameter = CurStackFrame.Parameters[i];
 				SpvPointer* Argument = CurStackFrame.Arguments[i];
 				FString ParameterName = Context.Names[Parameter.Pointer->Pointee->Id];
-				const ShaderParameter& EditorParameter = EditorFunc->Params[i];
-				Parameter.Flag = EditorParameter.SemaFlag;
-				if(EditorParameter.SemaFlag != ParamSemaFlag::Out)
+				Parameter.Flag = EditorFunc->Params[i].SemaFlag;
+				if(Parameter.Flag != ParamSemaFlag::Out)
 				{
 					SpvId VarId = Parameter.Pointer->Pointee->Id;
 					SpvVariableDesc* PointeeDesc = Context.VariableDescMap[VarId];

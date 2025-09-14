@@ -441,10 +441,11 @@ namespace FW
 	inline FString GetFunctionSig(SpvFunctionDesc* FuncDesc, const TArray<ShaderFunc>& Funcs)
 	{
 		const ShaderFunc* EditorFunc = Funcs.FindByPredicate([&](const ShaderFunc& InItem) {
-			return InItem.Name == FuncDesc->GetName() && InItem.Start.x == FuncDesc->GetLine();
+			return InItem.FullName == FuncDesc->GetName() && InItem.Start.x == FuncDesc->GetLine();
 		});
 
 		FString FuncName = FuncDesc->GetName();
+		FuncName = FuncName.Replace(TEXT("."), TEXT("::"));
 		SpvFuncTypeDesc* FuncTypeDesc = FuncDesc->GetFuncTypeDesc();
 		FString Signature;
 		auto ReturnType = FuncTypeDesc->GetReturnType();
@@ -466,6 +467,11 @@ namespace FW
 			if (EditorFunc)
 			{
 				const ShaderParameter& EditorParameter = EditorFunc->Params[i];
+				if (EditorParameter.Name == "this")
+				{
+					continue;
+				}
+
 				if(EditorParameter.SemaFlag == ParamSemaFlag::In)
 				{
 					SemaStr = "in";

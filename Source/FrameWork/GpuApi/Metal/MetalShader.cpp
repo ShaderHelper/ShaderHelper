@@ -118,6 +118,7 @@ namespace FW
 		{
 			DxcArgs.Add("/Od");
 			DxcArgs.Add("-fcgl");
+			DxcArgs.Add("-Vd");
 			DxcArgs.Add("-fspv-debug=vulkan-with-source");
 			TargetDescs.Add(SpvTargetDesc);
 			Results.SetNum(1);
