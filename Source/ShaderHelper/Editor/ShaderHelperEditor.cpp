@@ -717,7 +717,8 @@ namespace SH
 
 	void ShaderHelperEditor::OpenGraph(AssetPtr<Graph> InGraphData, TSharedPtr<RenderComponent> InGraphRenderComp)
 	{
-		if(CurProject->Graph && CurProject->Graph->IsDirty())
+		if(CurProject->Graph && CurProject->Graph->IsDirty() &&
+			InGraphData != nullptr && InGraphData != CurProject->Graph)
 		{
 			auto Ret = MessageDialog::Open(MessageDialog::OkNoCancel, MainWindow, LOCALIZATION("SaveAssetTip"));
 			if(Ret == MessageDialog::MessageRet::Cancel)

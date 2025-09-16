@@ -16,6 +16,8 @@ namespace FW
 		AssetPath(FString InPathStr) : PathStr(MoveTemp(InPathStr)) 
 		{
 			FPaths::NormalizeFilename(PathStr);
+			PathStr = FPaths::ConvertRelativePathToFull(PathStr);
+			FPaths::RemoveDuplicateSlashes(PathStr);
 		}
 
 		bool operator==(const AssetPath& Other) const

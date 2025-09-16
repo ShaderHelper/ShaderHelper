@@ -446,7 +446,9 @@ const FString FoldMarkerText = TEXT("⇿");
 							.OnKeyCharHandler(this, &SShaderEditorBox::HandleKeyChar)
 							.OnKeyDownHandler(this, &SShaderEditorBox::HandleKeyDown)
 							.CreateSlateTextLayout_Lambda([this](SWidget* InOwner, FTextBlockStyle InDefaultTextStyle){
-								return MakeShared<ShaderTextLayout>(InOwner, InDefaultTextStyle, ShaderMarshaller.Get());
+								auto TextLayout = MakeShared<ShaderTextLayout>(InOwner, InDefaultTextStyle, ShaderMarshaller.Get());
+								TextLayout->KeepMaxDrawWidth(true);
+								return TextLayout;
 							})
 							.OnIsTypedCharValid_Lambda([](const TCHAR InChar) { return true; })
 							.OnCursorMoved(this, &SShaderEditorBox::OnCursorMoved)
