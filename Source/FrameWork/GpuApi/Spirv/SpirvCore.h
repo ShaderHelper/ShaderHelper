@@ -55,8 +55,11 @@ namespace FW
 
 	enum class SpvDecorationKind
 	{
+		Block = 2,
+		BufferBlock = 3,
 		ArrayStride = 6,
 		BuiltIn = 11,
+		NonWritable = 24,
 		Location = 30,
 		Binding = 33,
 		DescriptorSet = 34,

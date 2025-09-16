@@ -4,6 +4,7 @@
 #include "Common/Path/PathHelper.h"
 #include "Containers/Array.h"
 #include "Containers/UnrealString.h"
+#include "GpuBindGroupLayout.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogShader, Log, All);
 inline DEFINE_LOG_CATEGORY(LogShader);
@@ -112,6 +113,14 @@ namespace FW
         };
     };
 
+	struct GpuShaderLayoutBinding
+	{
+		FString Name;
+		BindingSlot Slot;
+		BindingGroupSlot Group;
+		BindingType Type;
+	};
+
     class FRAMEWORK_API GpuShader : public GpuResource
     {
 	public:
@@ -135,6 +144,8 @@ namespace FW
 		const FString& GetProcessedSourceText() const { return ProcessedSourceText; }
         const FString& GetEntryPoint() const { return EntryPoint; }
 		GpuShaderModel GetShaderModelVer() const;
+
+		virtual TArray<GpuShaderLayoutBinding> GetLayout() const = 0;
 
 	public:
 		GpuShaderCompilerFlag CompilerFlag = GpuShaderCompilerFlag::None;

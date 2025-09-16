@@ -3,6 +3,7 @@
 #include "Dx12Map.h"
 #include "Dx12Device.h"
 #include "Dx12RS.h"
+#include "GpuApi/GpuApiValidation.h"
 
 namespace FW
 {
@@ -32,6 +33,15 @@ namespace FW
 
         Dx12Shader* Vs = static_cast<Dx12Shader*>(InPipelineStateDesc.Vs);
         Dx12Shader* Ps = static_cast<Dx12Shader*>(InPipelineStateDesc.Ps);
+
+		if (InPipelineStateDesc.CheckLayout)
+		{
+			CheckShaderLayoutBinding(InPipelineStateDesc, Vs->GetLayout());
+			if (Ps)
+			{
+				CheckShaderLayoutBinding(InPipelineStateDesc, Ps->GetLayout());
+			}
+		}
 
 		RootSignatureDesc RsDesc{
 			static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout0), static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout1),
@@ -81,6 +91,11 @@ namespace FW
 	TRefCountPtr<Dx12ComputePso> CreateDx12ComputePso(const GpuComputePipelineStateDesc& InPipelineStateDesc)
 	{
 		Dx12Shader* Cs = static_cast<Dx12Shader*>(InPipelineStateDesc.Cs);
+		if (InPipelineStateDesc.CheckLayout)
+		{
+			CheckShaderLayoutBinding(InPipelineStateDesc, Cs->GetLayout());
+		}
+
 		RootSignatureDesc RsDesc{
 			static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout0), static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout1),
 			static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout2), static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout3)

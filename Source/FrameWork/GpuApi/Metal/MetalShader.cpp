@@ -23,6 +23,78 @@ namespace FW
 			.Finalize();
 	}
 
+	TArray<GpuShaderLayoutBinding> MetalShader::GetLayout() const
+	{
+		TArray<GpuShaderLayoutBinding> ShaderLayoutBindings;
+		SpvMetaContext MetaContext;
+		SpvMetaVisitor MetaVisitor{ MetaContext };
+		SpirvParser Parser;
+		Parser.Parse(SpvCode);
+		Parser.Accept(&MetaVisitor);
+		TMap<SpvId, GpuShaderLayoutBinding> SpvReflectionBindings;
+		for (auto [Id, Decoration] : MetaContext.Decorations)
+		{
+			if (Decoration.Kind == SpvDecorationKind::DescriptorSet)
+			{
+				if (!SpvReflectionBindings.Contains(Id))
+				{
+					GpuShaderLayoutBinding ShaderLayoutBinding{};
+					ShaderLayoutBinding.Name = MetaContext.Names[Id];
+					ShaderLayoutBinding.Group = Decoration.DescriptorSet.Number;
+					SpvReflectionBindings.Add(Id, MoveTemp(ShaderLayoutBinding));
+				}
+			}
+			else if (Decoration.Kind == SpvDecorationKind::Binding)
+			{
+				SpvReflectionBindings[Id].Slot = Decoration.Binding.Number;
+			}
+		}
+		for (auto& [Id, ShaderLayoutBinding] : SpvReflectionBindings)
+		{
+			SpvType* Type = static_cast<SpvPointerType*>(MetaContext.GlobalVariables[Id].Type)->PointeeType;
+			if (Type->GetKind() == SpvTypeKind::Image)
+			{
+				ShaderLayoutBinding.Type = BindingType::Texture;
+			}
+			else if (Type->GetKind() == SpvTypeKind::Sampler)
+			{
+				ShaderLayoutBinding.Type = BindingType::Sampler;
+			}
+			else if (Type->GetKind() == SpvTypeKind::Struct)
+			{
+				TArray<SpvDecoration> TypeDecorations;
+				MetaContext.Decorations.MultiFind(Type->GetId(), TypeDecorations);
+				if (TypeDecorations.ContainsByPredicate([&](const SpvDecoration& InItem) {
+					return InItem.Kind == SpvDecorationKind::Block;
+				}))
+				{
+					ShaderLayoutBinding.Type = BindingType::UniformBuffer;
+				}
+				else if (TypeDecorations.ContainsByPredicate([&](const SpvDecoration& InItem) {
+					return InItem.Kind == SpvDecorationKind::BufferBlock;
+				}))
+				{
+					if (TypeDecorations.ContainsByPredicate([&](const SpvDecoration& InItem) {
+						return InItem.Kind == SpvDecorationKind::NonWritable;
+					}))
+					{
+						ShaderLayoutBinding.Type = BindingType::StorageBuffer;
+					}
+					else
+					{
+						ShaderLayoutBinding.Type = BindingType::RWStorageBuffer;
+					}
+				}
+			}
+			else
+			{
+				AUX::Unreachable();
+			}
+			ShaderLayoutBindings.Add(MoveTemp(ShaderLayoutBinding));
+		}
+		return ShaderLayoutBindings;
+	}
+
     TRefCountPtr<MetalShader> CreateMetalShader(const GpuShaderFileDesc& FileDesc)
     {
         return new MetalShader(FileDesc);
@@ -207,11 +279,7 @@ namespace FW
 		Parser.Parse(SpvCode);
 		Parser.Accept(&MetaVisitor);
 		InShader->ThreadGroupSize = MetaContext.ThreadGroupSize;
-
-		if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
-		{
-			InShader->SpvCode = MoveTemp(SpvCode);
-		}
+		InShader->SpvCode = MoveTemp(SpvCode);
 
 		if (Results.Num() > 1)
 		{

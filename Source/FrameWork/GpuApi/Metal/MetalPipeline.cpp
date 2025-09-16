@@ -4,6 +4,7 @@
 #include "MetalMap.h"
 #include "MetalDevice.h"
 #include "MetalGpuRhiBackend.h"
+#include "GpuApi/GpuApiValidation.h"
 
 namespace FW
 {
@@ -26,6 +27,15 @@ namespace FW
     {
         MetalShader* Vs = static_cast<MetalShader*>(InPipelineStateDesc.Vs);
         MetalShader* Ps = static_cast<MetalShader*>(InPipelineStateDesc.Ps);
+
+		if (InPipelineStateDesc.CheckLayout)
+		{
+			CheckShaderLayoutBinding(InPipelineStateDesc, Vs->GetLayout());
+			if (Ps)
+			{
+				CheckShaderLayoutBinding(InPipelineStateDesc, Ps->GetLayout());
+			}
+		}
         
         MTLRenderPipelineDescriptorPtr PipelineDesc = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
         PipelineDesc->setVertexFunction(Vs->GetCompilationResult());
@@ -64,6 +74,11 @@ namespace FW
     TRefCountPtr<MetalComputePipelineState> CreateMetalComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc)
     {
         MetalShader* Cs = static_cast<MetalShader*>(InPipelineStateDesc.Cs);
+		if (InPipelineStateDesc.CheckLayout)
+		{
+			CheckShaderLayoutBinding(InPipelineStateDesc, Cs->GetLayout());
+		}
+
         NS::Error* err = nullptr;
         MTLComputePipelineStatePtr PipelineState = NS::TransferPtr(GDevice->newComputePipelineState(Cs->GetCompilationResult(), &err));
         if(!PipelineState)

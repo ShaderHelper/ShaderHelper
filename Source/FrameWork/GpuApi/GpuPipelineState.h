@@ -27,6 +27,7 @@ namespace FW
 
 	struct GpuComputePipelineStateDesc
 	{
+		bool CheckLayout = false;
 		GpuShader* Cs;
 
 		GpuBindGroupLayout* BindGroupLayout0 = nullptr;
@@ -37,6 +38,7 @@ namespace FW
 
     struct GpuRenderPipelineStateDesc
     {
+		bool CheckLayout = false;
         GpuShader* Vs;
         GpuShader* Ps;
 		TArray<PipelineTargetDesc, TFixedAllocator<GpuResourceLimit::MaxRenderTargetNum>> Targets;

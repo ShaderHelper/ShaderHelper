@@ -23,6 +23,44 @@ namespace FW
 			.Finalize();
 	}
 
+	BindingType MapBindingType(D3D_SHADER_INPUT_TYPE Type)
+	{
+		switch (Type)
+		{
+		case D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER:            return BindingType::UniformBuffer;
+		case D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE:			return BindingType::Texture;
+		case D3D_SHADER_INPUT_TYPE::D3D_SIT_SAMPLER:			return BindingType::Sampler;
+		case D3D_SHADER_INPUT_TYPE::D3D_SIT_STRUCTURED:			return BindingType::StorageBuffer;
+		case D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWSTRUCTURED:	return BindingType::RWStorageBuffer;
+		default:
+			AUX::Unreachable();
+		}
+	}
+
+	TArray<GpuShaderLayoutBinding> Dx12Shader::GetLayout() const
+	{
+		check(ByteCode.IsValid());
+		TArray<GpuShaderLayoutBinding> ShaderLayoutBindings;
+		TRefCountPtr<ID3D12ShaderReflection> Reflection;
+		DxcBuffer DxilBuffer{.Ptr = ByteCode->GetBufferPointer(), .Size = ByteCode->GetBufferSize()};
+		GShaderCompiler.CompilerUitls->CreateReflection(&DxilBuffer, IID_PPV_ARGS(Reflection.GetInitReference()));
+		D3D12_SHADER_DESC ShaderDesc;
+		Reflection->GetDesc(&ShaderDesc);
+		for (uint32 Index = 0; Index < ShaderDesc.BoundResources; Index++)
+		{
+			D3D12_SHADER_INPUT_BIND_DESC BindDesc;
+			Reflection->GetResourceBindingDesc(Index, &BindDesc);
+			ShaderLayoutBindings.Add({
+				.Name = BindDesc.Name,
+				.Slot = (int)BindDesc.BindPoint,
+				.Group = (int)BindDesc.Space,
+				.Type = MapBindingType(BindDesc.Type)
+			});
+
+		}
+		return ShaderLayoutBindings;
+	}
+
 	TRefCountPtr<Dx12Shader> CreateDx12Shader(const GpuShaderFileDesc& FileDesc)
 	{
 		return new Dx12Shader(FileDesc);

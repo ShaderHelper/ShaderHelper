@@ -10,7 +10,7 @@ namespace FW
 		Dx12Shader(const GpuShaderFileDesc& Desc);
 		Dx12Shader(const GpuShaderSourceDesc& Desc);
         
-        
+		TArray<GpuShaderLayoutBinding> GetLayout() const override;
     public:
 		IDxcBlob* GetCompilationResult() const { return ByteCode; }
 		virtual bool IsCompiled() const override { return ByteCode.IsValid(); }

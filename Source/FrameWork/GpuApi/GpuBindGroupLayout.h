@@ -81,7 +81,7 @@ namespace FW
             return Layouts[InSlot].Type;
         }
         
-        bool HasBinding(const FString& BindingName) const
+        bool HasCodegenBinding(const FString& BindingName) const
         {
             return CodegenBindingNameToSlot.Contains(BindingName);
         }

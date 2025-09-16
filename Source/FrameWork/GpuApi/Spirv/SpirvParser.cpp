@@ -196,6 +196,13 @@ namespace FW
 			};
 			Context.Decorations.Add(Inst->GetTargetId(), MoveTemp(Decoration));
 		}
+		else
+		{
+			SpvDecoration Decoration{
+				.Kind = Inst->GetKind(),
+			};
+			Context.Decorations.Add(Inst->GetTargetId(), MoveTemp(Decoration));
+		}
 	}
 
 	void SpvMetaVisitor::Visit(SpvOpMemberDecorate* Inst)
@@ -207,6 +214,13 @@ namespace FW
 			SpvDecoration Decoration{
 				.Kind = SpvDecorationKind::Offset,
 				.Offset = {Inst->GetMember(), ByteOffset}
+			};
+			Context.Decorations.Add(Inst->GetStructureType(), MoveTemp(Decoration));
+		}
+		else
+		{
+			SpvDecoration Decoration{
+				.Kind = Inst->GetKind(),
 			};
 			Context.Decorations.Add(Inst->GetStructureType(), MoveTemp(Decoration));
 		}

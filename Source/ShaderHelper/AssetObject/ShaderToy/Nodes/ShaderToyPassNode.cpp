@@ -235,23 +235,34 @@ namespace SH
 		//Extract the valid shader segment
 		std::regex StartPattern(R"(vec2\s+GPrivate_fragCoord\s*;)");
 		std::smatch StartMatch;
-		std::regex EndPattern(R"(void\s+mainImage\s*\([^}]*\})");
-		std::smatch EndMatch;
+		std::regex MainImagePattern(R"(void\s+mainImage\s*\([^)]*vec2\s+(\w+)\s*\)[^}]*\})");
+		std::smatch MainImageMatch;
+		std::regex MainPattern(R"(void\s+main\s*\(\s*\)\s*\{([^}]*)\})");
+		std::smatch MainMatch;
 		if (std::regex_search(Glsl, StartMatch, StartPattern) &&
-			std::regex_search(Glsl, EndMatch, EndPattern))
+			std::regex_search(Glsl, MainImageMatch, MainImagePattern))
 		{
 			size_t StartPos = StartMatch.position() + StartMatch.length();
-			size_t EndPos = EndMatch.position() + EndMatch.length();
+			size_t EndPos = MainImageMatch.position() + MainImageMatch.length();
 			ShaderToy = Glsl.substr(StartPos, EndPos - StartPos);
-			//Remove ubo prefix name
-			ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(BuiltInUniform\.)"), "");
-			ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(CustomUniform\.)"), "");
-			//Replace SPIRV-Cross texture sampler names with Shadertoy standard names
-			ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(SPIRV_Cross_CombinediChannel0iChannel0Sampler)"), "iChannel0");
-			ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(SPIRV_Cross_CombinediChannel1iChannel1Sampler)"), "iChannel1");
-			ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(SPIRV_Cross_CombinediChannel2iChannel2Sampler)"), "iChannel2");
-			ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(SPIRV_Cross_CombinediChannel3iChannel3Sampler)"), "iChannel3");
 		}
+		//Due to legalization by dxc, the shader may eventually be optimized to contain only the main function.
+		else if (std::regex_search(Glsl, MainMatch, MainPattern))
+		{
+			std::string MainBody = MainMatch[1].str();
+        	std::string NewMain = "void mainImage( out vec4 fragColor, in vec2 fragCoord )\n{" + MainBody + "}";
+       		ShaderToy = NewMain;
+			ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(out_var_SV_Target)"), "fragColor");
+			ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(gl_FragCoord)"), "fragCoord");
+		}
+		//Remove ubo prefix name
+		ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(BuiltInUniform\.)"), "");
+		ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(CustomUniform\.)"), "");
+		//Replace SPIRV-Cross texture sampler names with Shadertoy standard names
+		ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(SPIRV_Cross_CombinediChannel0iChannel0Sampler)"), "iChannel0");
+		ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(SPIRV_Cross_CombinediChannel1iChannel1Sampler)"), "iChannel1");
+		ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(SPIRV_Cross_CombinediChannel2iChannel2Sampler)"), "iChannel2");
+		ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(SPIRV_Cross_CombinediChannel3iChannel3Sampler)"), "iChannel3");
 		//Find non-uniform global variables in the segment
 		std::vector<std::string> GlobalVars;
 		std::istringstream iss(ShaderToy);
@@ -295,8 +306,6 @@ namespace SH
 			}
 		}
 		//Extract the global variable Initializations from "void main()"
-		std::regex MainPattern(R"(void\s+main\s*\(\s*\)\s*\{([^}]*)\})");
-		std::smatch MainMatch;
 		if (std::regex_search(Glsl, MainMatch, MainPattern))
 		{
 			std::string MainBody = MainMatch[1].str();
@@ -354,9 +363,20 @@ namespace SH
 			}
 			ShaderToy = TCHAR_TO_UTF8(*MemberDecl) + ShaderToy;
 		}
+		//Extract struct
+		std::regex StructPInPattern(R"(struct\s+PIn\s*\{[^}]*\};)");
+		std::smatch PInMatch;
+		if (std::regex_search(Glsl, PInMatch, StructPInPattern))
+		{
+			size_t StructEnd = PInMatch.position() + PInMatch.length();
+			size_t LayoutPos = Glsl.find("layout(std140)", StructEnd);
+			if (LayoutPos != std::string::npos)
+			{
+				std::string BetweenContent = Glsl.substr(StructEnd, LayoutPos - StructEnd);
+				ShaderToy = BetweenContent + ShaderToy;
+			}
+		}
 		//Flip y
-		std::regex MainImagePattern(R"(void\s+mainImage\s*\([^,]*,\s*vec2\s+(\w+)\s*\))");
-		std::smatch MainImageMatch;
 		if (std::regex_search(ShaderToy, MainImageMatch, MainImagePattern))
 		{
 			std::string FragCoordParamName = MainImageMatch[1].str();
@@ -679,6 +699,7 @@ namespace SH
 			Bindings.SetPassBindGroupLayout(CustomBindLayout);
 
             GpuRenderPipelineStateDesc PipelineDesc{
+				.CheckLayout = true,
                 .Vs = ShaderAssetObj->GetVertexShader(),
                 .Ps = ShaderAssetObj->GetPixelShader(),
 				.Targets = {
@@ -687,17 +708,27 @@ namespace SH
             };
 			Bindings.ApplyBindGroupLayout(PipelineDesc);
 
-            TRefCountPtr<GpuRenderPipelineState> PipelineState = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
+			TRefCountPtr<GpuRenderPipelineState> PipelineState;
 
-            ShaderToyContext.RG->AddRenderPass(ObjectName.ToString(), MoveTemp(PassDesc), MoveTemp(Bindings),
-                [PipelineState](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
+			try
+			{
+				PipelineState = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
+			}
+			catch (const std::runtime_error& e)
+			{
+				SH_LOG(LogShader, Error, TEXT("Execution failed: can not declare resource bindings in stshader.\n%s"), ANSI_TO_TCHAR(e.what()));
+				return { true, true };
+			}
+
+			ShaderToyContext.RG->AddRenderPass(ObjectName.ToString(), MoveTemp(PassDesc), MoveTemp(Bindings),
+				[PipelineState](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
 					Bindings.ApplyBindGroup(PassRecorder);
-                    PassRecorder->SetRenderPipelineState(PipelineState);;
-                    PassRecorder->DrawPrimitive(0, 3, 0, 1);
-                }
-            );
+					PassRecorder->SetRenderPipelineState(PipelineState);;
+					PassRecorder->DrawPrimitive(0, 3, 0, 1);
+				}
+			);
 			ShaderToyContext.RG->Execute();
-			
+
 			ShaderAssertInfo AssertInfo;
 			TArray<FString> ShaderPrintLogs = TSingleton<PrintBuffer>::Get().GetPrintStrings(AssertInfo);
 			TSingleton<PrintBuffer>::Get().Clear();

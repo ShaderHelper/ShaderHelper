@@ -60,6 +60,7 @@ namespace UNITTEST_GPUAPI
 			.Build();
 
 		GpuRenderPipelineStateDesc PipelineDesc{
+			.CheckLayout = true,
 			.Vs = Vs,
 			.BindGroupLayout0 = BindGroupLayout
 		};

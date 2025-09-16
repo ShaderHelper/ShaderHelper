@@ -10,6 +10,7 @@ namespace FW
         MetalShader(const GpuShaderFileDesc& Desc);
         MetalShader(const GpuShaderSourceDesc& Desc);
 
+		TArray<GpuShaderLayoutBinding> GetLayout() const override;
     public:
         MTL::Function* GetCompilationResult() const { return ByteCodeFunc.get(); }
         const FString& GetMslText() const { return MslText; }
