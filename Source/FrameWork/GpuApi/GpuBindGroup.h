@@ -38,8 +38,6 @@ namespace FW
 		GpuBindGroupBuilder(GpuBindGroupLayout* InLayout);
 
 		GpuBindGroupBuilder& SetExistingBinding(BindingSlot InSlot, GpuResource* InResource);
-		GpuBindGroupBuilder& SetExistingBinding(FStringView InBindingName, GpuResource* InResource);
-
 		GpuBindGroupBuilder& SetUniformBuffer(const FString& BindingName, GpuResource* InResource);
 		GpuBindGroupBuilder& SetTexture(const FString& BindingName, GpuResource* InResource);
 		GpuBindGroupBuilder& SetSampler(const FString& BindingName, GpuResource* InResource);

@@ -51,7 +51,7 @@ namespace FW
 		}
 		for (auto& [Id, ShaderLayoutBinding] : SpvReflectionBindings)
 		{
-			SpvType* Type = static_cast<SpvPointerType*>(MetaContext.GlobalVariables[Id].Type)->PointeeType;
+			SpvType* Type = MetaContext.GlobalVariables[Id].Type;
 			if (Type->GetKind() == SpvTypeKind::Image)
 			{
 				ShaderLayoutBinding.Type = BindingType::Texture;
