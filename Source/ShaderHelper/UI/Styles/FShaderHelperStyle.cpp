@@ -38,17 +38,17 @@ namespace SH {
 		Style->Set("LineTip.BreakPointEffect", new IMAGE_BRUSH("BreakPointEffect", FVector2D(10.0, 10.0)));
 		Style->Set("Icons.CallStack", new IMAGE_BRUSH_SVG("CallStack", FVector2D(16.0, 16.0)));
 		Style->Set("Icons.Variable", new IMAGE_BRUSH_SVG("Variable", FVector2D(16.0, 16.0)));
-		
+		Style->Set("Icons.Uninitialized", new IMAGE_BRUSH_SVG("Watch", FVector2D(16.0, 16.0)));
+
 		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir);
 		FToolBarStyle ShToolbarStyle = FToolBarStyle::GetDefault();
 		ShToolbarStyle.SetButtonPadding(FMargin{4,0});
 		ShToolbarStyle.SetBackground(FSlateColorBrush(FStyleColors::Recessed));
 		ShToolbarStyle.SetButtonStyle(FAppCommonStyle::Get().GetWidgetStyle< FButtonStyle >("SuperSimpleButton"));
 		Style->Set("Toolbar.ShaderHelper", ShToolbarStyle);
-		
 		Style->Set("Icons.FullText", new IMAGE_BRUSH_SVG("Starship/Insights/MemTags_20", FVector2D(16.0, 16.0)));
 		Style->Set("LineTip.BreakPointEffect2", new IMAGE_BRUSH("Common/Window/WindowTitle_Flashing", FVector2D(16.0, 16.0), FLinearColor::White, ESlateBrushTileType::Horizontal));
-		
+
 		const FHeaderRowStyle& CoreHeaderRowStyle = FAppStyle::Get().GetWidgetStyle<FHeaderRowStyle>("TableView.Header");
 		const FTableColumnHeaderStyle CoreTableColumnHeaderStyle = FAppStyle::Get().GetWidgetStyle<FTableColumnHeaderStyle>("TableView.Header.Column");
 		const FTableColumnHeaderStyle TableColumnHeaderStyle = FTableColumnHeaderStyle(CoreTableColumnHeaderStyle);

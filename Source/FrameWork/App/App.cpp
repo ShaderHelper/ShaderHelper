@@ -127,6 +127,7 @@ namespace FW {
             double LastRealTime = FPlatformTime::Seconds();
             
 			bool bIdleMode = AreAllWindowsHidden();
+
 			if (!bIdleMode)
 			{
 				GGpuRhi->BeginFrame();

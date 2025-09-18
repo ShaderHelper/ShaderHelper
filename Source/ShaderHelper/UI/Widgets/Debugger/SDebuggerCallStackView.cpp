@@ -14,6 +14,7 @@ namespace SH
 		ChildSlot
 		[
 			SAssignNew(CallStackView, SListView<CallStackDataPtr>)
+			.AllowOverscroll(EAllowOverscroll::No)
 			.ListItemsSource(&CallStackDatas)
 			.OnGenerateRow(this, &SDebuggerCallStackView::GenerateRowForItem)
 			.SelectionMode(ESelectionMode::Single)

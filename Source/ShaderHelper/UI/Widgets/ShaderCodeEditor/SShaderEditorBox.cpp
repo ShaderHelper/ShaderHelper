@@ -536,7 +536,7 @@ const FString FoldMarkerText = TEXT("⇿");
 								]
 							]
 						]
-						
+
 					]
 					+ SHorizontalBox::Slot()
 					.AutoWidth()
@@ -1218,6 +1218,20 @@ const FString FoldMarkerText = TEXT("⇿");
     {
         bTryComplete = false;
 		bTryMergeUndoState = false;
+
+		bool bContainsSelf = false;
+		for (int32 i = 0; i < NewWidgetPath.Widgets.Num(); ++i)
+		{
+			if (NewWidgetPath.Widgets[i].Widget == AsShared())
+			{
+				bContainsSelf = true;
+				break;
+			}
+		}
+		if (!bContainsSelf)
+		{
+			ShaderMarshaller->TextLayout->ClearLineHighlights();
+		}
     }
 
     FReply SShaderEditorBox::OnFocusReceived(const FGeometry& MyGeometry, const FFocusEvent& InFocusEvent)
@@ -2937,6 +2951,7 @@ const FString FoldMarkerText = TEXT("⇿");
 		if(State.ScopeChange)
 		{
 			Scope = bReverse ? State.ScopeChange.value().PreScope : State.ScopeChange.value().NewScope;
+			CallStackScope = Scope;
 			//Return func
 			if(!CallStack.IsEmpty() && State.bReturn)
 			{
@@ -2958,16 +2973,16 @@ const FString FoldMarkerText = TEXT("⇿");
 		}
 	}
 
-	TArray<VariableNodePtr> AppendVarChildNodes(SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, const TArray<SpvVariableChange::DirtyRange>& DirtyRanges, const TArray<uint8>& Value, int32 InOffset)
+	TArray<ExpressionNodePtr> AppendVarChildNodes(SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, const TArray<SpvVariableChange::DirtyRange>& DirtyRanges, const TArray<uint8>& Value, int32 InOffset)
 	{
-		TArray<VariableNodePtr> Nodes;
+		TArray<ExpressionNodePtr> Nodes;
 		int32 Offset = InOffset;
 		if(TypeDesc->GetKind() == SpvTypeDescKind::Member)
 		{
 			SpvMemberTypeDesc* MemberTypeDesc = static_cast<SpvMemberTypeDesc*>(TypeDesc);
 			int32 MemberByteSize = GetTypeByteSize(MemberTypeDesc);
 			FString ValueStr = GetValueStr(Value, MemberTypeDesc->GetTypeDesc(), InitializedRanges, Offset);
-			auto Data = MakeShared<VariableNode>(MemberTypeDesc->GetName(), MoveTemp(ValueStr), GetTypeDescStr(MemberTypeDesc->GetTypeDesc()));
+			auto Data = MakeShared<ExpressionNode>(MemberTypeDesc->GetName(), MoveTemp(ValueStr), GetTypeDescStr(MemberTypeDesc->GetTypeDesc()));
 			if(MemberTypeDesc->GetTypeDesc()->GetKind() == SpvTypeDescKind::Composite)
 			{
 				Data->Children = AppendVarChildNodes(MemberTypeDesc->GetTypeDesc(), InitializedRanges, DirtyRanges, Value, Offset);
@@ -3008,7 +3023,7 @@ const FString FoldMarkerText = TEXT("⇿");
 			{
 				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset);
 				FString MemberName = FString::Printf(TEXT("[%d]"), Index);
-				auto Data = MakeShared<VariableNode>(MemberName, MoveTemp(ValueStr), GetTypeDescStr(ElementTypeDesc));
+				auto Data = MakeShared<ExpressionNode>(MemberName, MoveTemp(ValueStr), GetTypeDescStr(ElementTypeDesc));
 				for(const auto& Range : DirtyRanges)
 				{
 					int32 RangeStart = Range.OffsetBytes;
@@ -3043,7 +3058,7 @@ const FString FoldMarkerText = TEXT("⇿");
 			{
 				FString MemberName = FString::Printf(TEXT("[%d]"), Index);
 				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset);
-				auto Data = MakeShared<VariableNode>(MemberName, MoveTemp(ValueStr), GetTypeDescStr(ElementTypeDesc));
+				auto Data = MakeShared<ExpressionNode>(MemberName, MoveTemp(ValueStr), GetTypeDescStr(ElementTypeDesc));
 				Data->Children = AppendVarChildNodes(ElementTypeDesc, InitializedRanges, DirtyRanges, Value, Offset);
 				for(const auto& Range : DirtyRanges)
 				{
@@ -3074,7 +3089,7 @@ const FString FoldMarkerText = TEXT("⇿");
 			int32 MemberByteSize = GetTypeByteSize(MemberTypeDesc);
 			FString ValueStr = GetValueStr(Value, MemberTypeDesc->GetTypeDesc(), InitializedRanges, Offset);
 			FString TypeName = GetTypeDescStr(MemberTypeDesc->GetTypeDesc());
-			auto Data = MakeShared<ExpressionNode>(MemberTypeDesc->GetName(), FText::FromString(ValueStr), FText::FromString(TypeName));
+			auto Data = MakeShared<ExpressionNode>(MemberTypeDesc->GetName(), ValueStr, TypeName);
 			if(MemberTypeDesc->GetTypeDesc()->GetKind() == SpvTypeDescKind::Composite)
 			{
 				Data->Children = AppendExprChildNodes(MemberTypeDesc->GetTypeDesc(), InitializedRanges, Value, Offset);
@@ -3104,7 +3119,7 @@ const FString FoldMarkerText = TEXT("⇿");
 				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset);
 				FString MemberName = FString::Printf(TEXT("[%d]"), Index);
 				FString TypeName = GetTypeDescStr(ElementTypeDesc);
-				auto Data = MakeShared<ExpressionNode>(MemberName, FText::FromString(ValueStr), FText::FromString(TypeName));
+				auto Data = MakeShared<ExpressionNode>(MemberName, ValueStr, TypeName);
 				Offset += ElementTypeSize;
 				Nodes.Add(MoveTemp(Data));
 			}
@@ -3128,13 +3143,129 @@ const FString FoldMarkerText = TEXT("⇿");
 				FString MemberName = FString::Printf(TEXT("[%d]"), Index);
 				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset);
 				FString TypeName = GetTypeDescStr(ElementTypeDesc);
-				auto Data = MakeShared<ExpressionNode>(MemberName, FText::FromString(ValueStr), FText::FromString(TypeName));
+				auto Data = MakeShared<ExpressionNode>(MemberName, ValueStr, TypeName);
 				Data->Children = AppendExprChildNodes(ElementTypeDesc, InitializedRanges, Value, Offset);
 				Nodes.Add(MoveTemp(Data));
 				Offset += ElementTypeSize;
 			}
 		}
 		return Nodes;
+	}
+
+	void SShaderMultiLineEditableText::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
+	{
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		SDebuggerVariableView* VarView = ShEditor->GetDebuggerTipVariableView();
+		TSharedPtr<SWindow> DebuggerTipWindow = ShEditor->GetDebuggerTipWindow();
+
+		FVector2D ScreenSpaceCursorPos = FSlateApplication::Get().GetCursorPos();
+		FGeometry WindowGeometry = DebuggerTipWindow->GetWindowGeometryInScreen();
+		bool bMouseInTipWindow = WindowGeometry.IsUnderLocation(ScreenSpaceCursorPos);
+
+		static double LastCheckTime = 0.0;
+		const double CheckInterval = 0.4;
+
+		bool bShouldCheck = InCurrentTime - LastCheckTime >= CheckInterval;
+		bShouldCheck = bShouldCheck && !bMouseInTipWindow;
+
+		//Show the debug value when hovering over variables
+		if (bShouldCheck)
+		{
+			ExpressionNodePtr HoverExpr;
+			FTextLocation CurrentHoverLocation;
+			FString CurrentTokenName;
+			int32 CurrentTokenBeginOffset = -1;
+			int32 CurrentTokenEndOffset = -1;
+			if (AllottedGeometry.IsUnderLocation(ScreenSpaceCursorPos))
+			{
+				FVector2D LocalSpaceCursorPos = AllottedGeometry.AbsoluteToLocal(ScreenSpaceCursorPos);
+				CurrentHoverLocation = Owner->ShaderMarshaller->TextLayout->GetTextLocationAt(LocalSpaceCursorPos * AllottedGeometry.Scale);
+				if (Owner->DebuggerContext)
+				{
+					int32 ExtraLineNum = Owner->GetShaderAsset()->GetExtraLineNum();
+					const auto& RecordedInfo = Owner->DebuggerContext->ThreadState.RecordedInfo;
+					const auto& DebugStates = RecordedInfo.DebugStates;
+					const auto& TokenizedLine = Owner->ShaderMarshaller->TokenizedLines[CurrentHoverLocation.GetLineIndex()];
+					FString CurTextLine;
+					GetTextLine(CurrentHoverLocation.GetLineIndex(), CurTextLine);
+
+					FString CurrentTokenName;
+					for (const auto& Token : TokenizedLine.Tokens)
+					{
+						if (Token.Type == HLSL::TokenType::Identifier && CurrentHoverLocation.GetOffset() >= Token.BeginOffset && CurrentHoverLocation.GetOffset() <= Token.EndOffset)
+						{
+							
+							CurrentTokenName = CurTextLine.Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
+							CurrentTokenBeginOffset = Token.BeginOffset;
+							CurrentTokenEndOffset = Token.EndOffset;
+							break;
+						}
+					}
+
+					if (!CurrentTokenName.IsEmpty())
+					{
+						//Extract expression
+						int32 BeginOffset = CurrentTokenBeginOffset;
+						while (BeginOffset > 0)
+						{
+							TCHAR PrevChar = CurTextLine[BeginOffset - 1];
+							if (FChar::IsIdentifier(PrevChar) || PrevChar == TEXT('.') ||
+								PrevChar == TEXT('[') || PrevChar == TEXT(']'))
+							{
+								BeginOffset--;
+							}
+							else
+							{
+								break;
+							}
+						}
+						FString Expression = CurTextLine.Mid(BeginOffset, CurrentTokenEndOffset - BeginOffset);
+						ExpressionNode EvalResult = Owner->EvaluateExpression(Expression);
+						if (EvalResult.ValueStr != LOCALIZATION("InvalidExpr").ToString())
+						{
+							HoverExpr = MakeShared<ExpressionNode>(MoveTemp(EvalResult));
+						}
+					}
+
+				}
+			}
+
+			static int32 LastHoverLineIndex = -1;
+			static FString LastTokenName;
+			static int32 LastTokenBeginOffset = -1;
+			static int32 LastTokenEndOffset = -1;
+
+			bool bSameToken = (CurrentHoverLocation.GetLineIndex() == LastHoverLineIndex &&
+				CurrentTokenName == LastTokenName &&
+				CurrentTokenBeginOffset == LastTokenBeginOffset &&
+				CurrentTokenEndOffset == LastTokenEndOffset);
+
+			if (HoverExpr)
+			{
+				if (!bSameToken)
+				{
+					VarView->SetVariableNodeDatas({ HoverExpr });
+					DebuggerTipWindow->ShowWindow();
+					FVector2D BlockPos = Owner->ShaderMarshaller->TextLayout->GetLocationAt({ CurrentHoverLocation.GetLineIndex(), CurrentTokenBeginOffset }, true);
+					FVector2D BlockScreenPos = AllottedGeometry.LocalToAbsolute(BlockPos / AllottedGeometry.Scale);
+					DebuggerTipWindow->MoveWindowTo(BlockScreenPos);
+					LastHoverLineIndex = CurrentHoverLocation.GetLineIndex();
+					LastTokenName = CurrentTokenName;
+					LastTokenBeginOffset = CurrentTokenBeginOffset;
+					LastTokenEndOffset = CurrentTokenEndOffset;
+				}
+			}
+			else
+			{
+				VarView->SetVariableNodeDatas({});
+				LastHoverLineIndex = -1;
+				LastTokenName.Empty();
+				LastTokenBeginOffset = -1;
+				LastTokenEndOffset = -1;
+			}
+			LastCheckTime = InCurrentTime;
+		}
+
 	}
 
 	void SShaderEditorBox::ShowDeuggerVariable(SpvLexicalScope* InScope) const
@@ -3144,8 +3275,8 @@ const FString FoldMarkerText = TEXT("⇿");
         SDebuggerVariableView* DebuggerGlobalVariableView = ShEditor->GetDebuggerGlobalVariableView();
 		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
 		
-		TArray<VariableNodePtr> LocalVarNodeDatas;
-        TArray<VariableNodePtr> GlobalVarNodeDatas;
+		TArray<ExpressionNodePtr> LocalVarNodeDatas;
+        TArray<ExpressionNodePtr> GlobalVarNodeDatas;
 		const auto& RecordedInfo = DebuggerContext->ThreadState.RecordedInfo;
 		const auto& DebugStates = RecordedInfo.DebugStates;
 		
@@ -3157,21 +3288,9 @@ const FString FoldMarkerText = TEXT("⇿");
 			FString TypeName = GetTypeDescStr(ReturnTypeDesc);
 			FString ValueStr = GetValueStr(Value, ReturnTypeDesc, TArray{Vector2i{0, Value.Num()}}, 0);
 			
-			auto Data = MakeShared<VariableNode>(VarName, ValueStr, TypeName);
+			auto Data = MakeShared<ExpressionNode>(VarName, ValueStr, TypeName);
 			LocalVarNodeDatas.Add(MoveTemp(Data));
 		}
-		
-		std::vector<std::pair<SpvId, SpvVariableDesc*>> SortedVariableDescs;
-		for(const auto& Pair : DebuggerContext->VariableDescMap)
-		{
-			if(Pair.second)
-			{
-				SortedVariableDescs.push_back(Pair);
-			}
-		}
-		std::sort(SortedVariableDescs.begin(), SortedVariableDescs.end(), [](const auto& PairA, const auto& PairB){
-			return PairA.second->Line > PairB.second->Line;
-		});
 		
 		for(const auto& [VarId, VarDesc] : SortedVariableDescs)
 		{
@@ -3186,20 +3305,26 @@ const FString FoldMarkerText = TEXT("⇿");
 					{
 						FString VarName = VarDesc->Name;
 						//If there are variables with the same name, only the one in the most recent scope is shown.
-						if (LocalVarNodeDatas.ContainsByPredicate([&](const VariableNodePtr& InItem) { return InItem->VarName == VarName;}))
+						if (LocalVarNodeDatas.ContainsByPredicate([&](const ExpressionNodePtr& InItem) { return InItem->Expr == VarName;}))
 						{
 							continue;
 						}
 						FString TypeName = GetTypeDescStr(VarDesc->TypeDesc);
 						const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var.Storage).Value;
-						FString ValueStr = GetValueStr(Value, VarDesc->TypeDesc, Var.InitializedRanges, 0);
-						auto Data = MakeShared<VariableNode>(VarName, ValueStr, TypeName);
+				
+						TArray<Vector2i> InitializedRanges = { {0, Value.Num()} };
+						if (SDebuggerVariableView::bShowUninitialized)
+						{
+							InitializedRanges = Var.InitializedRanges;
+						}
+						FString ValueStr = GetValueStr(Value, VarDesc->TypeDesc, InitializedRanges, 0);
+						auto Data = MakeShared<ExpressionNode>(VarName, ValueStr, TypeName);
 						TArray<SpvVariableChange::DirtyRange> Ranges;
 						DirtyVars.MultiFind(VarId, Ranges);
 						if(VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Composite || VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Array
 							|| VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Matrix)
 						{
-							Data->Children = AppendVarChildNodes(VarDesc->TypeDesc, Var.InitializedRanges, Ranges, Value, 0);
+							Data->Children = AppendVarChildNodes(VarDesc->TypeDesc, InitializedRanges, Ranges, Value, 0);
 						}
 						
 						if(!Ranges.IsEmpty())
@@ -3248,17 +3373,6 @@ const FString FoldMarkerText = TEXT("⇿");
 				ExpressionShader.RemoveAt(StartPos, EndPos - StartPos);
 				
 				//Append bindings
-				std::vector<std::pair<SpvId, SpvVariableDesc*>> SortedVariableDescs;
-				for (const auto& Pair : DebuggerContext->VariableDescMap)
-				{
-					if (Pair.second)
-					{
-						SortedVariableDescs.push_back(Pair);
-					}
-				}
-				std::sort(SortedVariableDescs.begin(), SortedVariableDescs.end(), [](const auto& PairA, const auto& PairB) {
-					return PairA.second->Line > PairB.second->Line;
-				});
 				TArray<FString> LocalVars;
 				FString LocalVarInitializations;
 				FString VisibleLocalVarBindings = "struct __Expression_Vars_Set {";
@@ -3269,7 +3383,7 @@ const FString FoldMarkerText = TEXT("⇿");
 						const SpvVariable& Var = RecordedInfo.AllVariables.at(VarId);
 						if(!Var.IsExternal() && VarDesc)
 						{
-							bool VisibleScope = VarDesc->Parent->Contains(Scope) || (DebugStates[CurDebugStateIndex].bReturn && Scope->GetKind() == SpvScopeKind::Function && Scope == VarDesc->Parent->GetParent());
+							bool VisibleScope = VarDesc->Parent->Contains(CallStackScope) || (DebugStates[CurDebugStateIndex].bReturn && Scope->GetKind() == SpvScopeKind::Function && CallStackScope == VarDesc->Parent->GetParent());
 							bool VisibleLine = VarDesc->Line < StopLineNumber + ExtraLineNum && VarDesc->Line > ExtraLineNum;
 							if (VisibleScope && VisibleLine)
 							{
@@ -3382,29 +3496,31 @@ void __Expression_Output(T __Expression_Result) {}
 					if(VmContext.ResultTypeDesc)
 					{
 						TypeName = FText::FromString(GetTypeDescStr(VmContext.ResultTypeDesc));
+
+						TArray<Vector2i> ResultRange;
+						ResultRange.Add({ 0, VmContext.ResultValue.Num() });
+						FString ValueStr = GetValueStr(VmContext.ResultValue, VmContext.ResultTypeDesc, ResultRange, 0);
+
+						TArray<TSharedPtr<ExpressionNode>> Children;
+						if (VmContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Composite || VmContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Array
+							|| VmContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Matrix)
+						{
+							Children = AppendExprChildNodes(VmContext.ResultTypeDesc, ResultRange, VmContext.ResultValue, 0);
+						}
+
+						return { .Expr = InExpression, .ValueStr = ValueStr,
+							.TypeName = TypeName.ToString(), .Children = MoveTemp(Children)};
 					}
-					TArray<Vector2i> ResultRange;
-					ResultRange.Add({0, VmContext.ResultValue.Num()});
-					FString ValueStr = GetValueStr(VmContext.ResultValue, VmContext.ResultTypeDesc, ResultRange, 0);
 					
-					TArray<TSharedPtr<ExpressionNode>> Children;
-					if(VmContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Composite || VmContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Array
-					   || VmContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Matrix)
-					{
-						Children = AppendExprChildNodes(VmContext.ResultTypeDesc, ResultRange, VmContext.ResultValue, 0);
-					}
-					
-					return {.Expr = InExpression, .ValueStr = FText::FromString(ValueStr),
-						.TypeName = MoveTemp(TypeName), .Children = MoveTemp(Children)};
 				}
 				else
 				{
-					return {.Expr = InExpression, .ValueStr = LOCALIZATION("SideEffectExpr")};
+					return {.Expr = InExpression, .ValueStr = LOCALIZATION("SideEffectExpr").ToString()};
 				}
             }
 		}
 
-		return {.Expr = InExpression, .ValueStr = LOCALIZATION("InvalidExpr")};
+		return {.Expr = InExpression, .ValueStr = LOCALIZATION("InvalidExpr").ToString()};
 	}
 
 	void SShaderEditorBox::ScrollTo(int32 InLineIndex)
@@ -3473,6 +3589,9 @@ void __Expression_Output(T __Expression_Result) {}
 
 		DirtyVars.Empty();
 		DebuggerError.Empty();
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		TSharedPtr<SWindow> DebuggerTipWindow = ShEditor->GetDebuggerTipWindow();
+		DebuggerTipWindow->HideWindow();
 		
 		const auto& DebugStates = DebuggerContext->ThreadState.RecordedInfo.DebugStates;
 		auto CallStackAtStop = CallStack;
@@ -3568,6 +3687,7 @@ void __Expression_Output(T __Expression_Result) {}
 		CallStack.Empty();
         DebuggerContext = nullptr;
 		Scope = nullptr;
+		CallStackScope = nullptr;
         CurReturnObject.reset();
 		AssertResult = nullptr;
 		DebuggerError.Empty();
@@ -3575,6 +3695,15 @@ void __Expression_Output(T __Expression_Result) {}
 		StopLineNumber = 0;
         VmPixelContext.reset();
 		bEditDuringDebugging = false;
+		SortedVariableDescs.clear();
+
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		SDebuggerVariableView* DebuggerLocalVariableView = ShEditor->GetDebuggerLocalVariableView();
+		SDebuggerVariableView* DebuggerGlobalVariableView = ShEditor->GetDebuggerGlobalVariableView();
+		DebuggerLocalVariableView->SetVariableNodeDatas({});
+		DebuggerGlobalVariableView->SetVariableNodeDatas({});
+		DebuggerLocalVariableView->SetOnShowUninitialized(nullptr);
+		DebuggerGlobalVariableView->SetOnShowUninitialized(nullptr);
 	}
 
 	void SShaderEditorBox::DebugPixel(const FW::Vector2u& PixelCoord, const TArray<TRefCountPtr<FW::GpuBindGroup>>& BindGroups)
@@ -3653,14 +3782,21 @@ void __Expression_Output(T __Expression_Result) {}
 		DebuggerContext = &VmPixelContext.value().Quad[DebugIndex];
 		
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-	
 		SDebuggerCallStackView* DebuggerCallStackView = ShEditor->GetDebuggerCallStackView();
-		DebuggerCallStackView->OnSelectionChanged = [this](const FString& FuncName) {
+		SDebuggerWatchView* DebuggerWatchView = ShEditor->GetDebuggerWatchView();
+
+		SDebuggerVariableView* DebuggerLocalVariableView = ShEditor->GetDebuggerLocalVariableView();
+		SDebuggerVariableView* DebuggerGlobalVariableView = ShEditor->GetDebuggerGlobalVariableView();
+		DebuggerLocalVariableView->SetOnShowUninitialized([this](bool bShowUninitialized) { ShowDeuggerVariable(CallStackScope); });
+		DebuggerGlobalVariableView->SetOnShowUninitialized([this](bool bShowUninitialized) { ShowDeuggerVariable(CallStackScope); });
+
+		DebuggerCallStackView->OnSelectionChanged = [this, DebuggerWatchView](const FString& FuncName) {
 			int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
 			if(GetFunctionSig(GetFunctionDesc(Scope), Funcs) == FuncName)
 			{
 				StopLineNumber =  CurValidLine.value() - ExtraLineNum;
 				ShowDeuggerVariable(Scope);
+				CallStackScope = Scope;
 			}
 			else if(auto Call = CallStack.FindByPredicate([this, FuncName](const TPair<FW::SpvLexicalScope*, int>& InItem){
 				if(GetFunctionSig(GetFunctionDesc(InItem.Key), Funcs) == FuncName)
@@ -3672,15 +3808,25 @@ void __Expression_Output(T __Expression_Result) {}
 			{
 				StopLineNumber = Call->Value - ExtraLineNum;
 				ShowDeuggerVariable(Call->Key);
+				CallStackScope = Call->Key;
 			}
+			
+			DebuggerWatchView->Refresh();
 		};
 		for(const auto& [VarId, VarDesc] : DebuggerContext->VariableDescMap)
 		{
-			if(VarDesc && VarDesc->Name == "GPrivate_AssertResult")
+			if(VarDesc)
 			{
-				AssertResult = &DebuggerContext->ThreadState.RecordedInfo.AllVariables.at(VarId);;
+				SortedVariableDescs.emplace_back(VarId, VarDesc);
+				if (VarDesc->Name == "GPrivate_AssertResult")
+				{
+					AssertResult = &DebuggerContext->ThreadState.RecordedInfo.AllVariables.at(VarId);;
+				}
 			}
 		}
+		std::sort(SortedVariableDescs.begin(), SortedVariableDescs.end(), [](const auto& PairA, const auto& PairB) {
+			return PairA.second->Line > PairB.second->Line;
+		});
 		Continue();
 	
 	}

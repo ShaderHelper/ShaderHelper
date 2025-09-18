@@ -80,3 +80,4 @@ Desc,描述,
 Version,版本,
 Author,作者,
 Location,位置,
+ShowUninitialized,显示未初始化值

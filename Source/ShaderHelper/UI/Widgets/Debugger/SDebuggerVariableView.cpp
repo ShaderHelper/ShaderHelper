@@ -1,6 +1,10 @@
 #include "CommonHeader.h"
 #include "SDebuggerVariableView.h"
 #include "UI/Styles/FShaderHelperStyle.h"
+#include "Editor/ShaderHelperEditor.h"
+#include "UI/Widgets/Misc/MiscWidget.h"
+
+using namespace FW;
 
 namespace SH
 {
@@ -10,37 +14,152 @@ namespace SH
 
 	void SDebuggerVariableView::Construct( const FArguments& InArgs )
 	{
+		EVisibility HeaderRowVisibility = InArgs._HasHeaderRow ? EVisibility::Visible : EVisibility::Collapsed;
+
+		TSharedPtr<SHeaderRow> HeaderRow = SNew(SHeaderRow)
+			.Visibility(HeaderRowVisibility)
+			.Style(&FShaderHelperStyle::Get().GetWidgetStyle<FHeaderRowStyle>("TableView.DebuggerHeader"));
+		if (InArgs._AutoWidth)
+		{
+			HeaderRow->AddColumn(SHeaderRow::Column(VariableColId)
+				.ManualWidth_Lambda([this] {
+					float MaxWidth{};
+					for (ExpressionNodePtr Data : VariableNodeDatas)
+					{
+						auto Temp = SNew(STextBlock).Text(FText::FromString(Data->Expr));
+						float DpiScale = static_cast<ShaderHelperEditor*>(GApp->GetEditor())->GetDebuggerTipWindow()->GetDPIScaleFactor();
+						MaxWidth = FMath::Max(MaxWidth, (float)Temp->ComputeDesiredSize(DpiScale).X + 60);
+					}
+					return MaxWidth;
+				}));
+			HeaderRow->AddColumn(SHeaderRow::Column(ValueColId)
+				.ManualWidth_Lambda([this] {
+					float MaxWidth{};
+					for (ExpressionNodePtr Data : VariableNodeDatas)
+					{
+						auto Temp = SNew(STextBlock).Text(FText::FromString(Data->ValueStr));
+						float DpiScale = static_cast<ShaderHelperEditor*>(GApp->GetEditor())->GetDebuggerTipWindow()->GetDPIScaleFactor();
+						MaxWidth = FMath::Max(MaxWidth, (float)Temp->ComputeDesiredSize(DpiScale).X + 40);
+					}
+					return MaxWidth;
+				}));
+			HeaderRow->AddColumn(SHeaderRow::Column(TypeColId)
+				.ManualWidth_Lambda([this] {
+					float MaxWidth{};
+					for (ExpressionNodePtr Data : VariableNodeDatas)
+					{
+						auto Temp = SNew(STextBlock).Text(FText::FromString(Data->TypeName));
+						float DpiScale = static_cast<ShaderHelperEditor*>(GApp->GetEditor())->GetDebuggerTipWindow()->GetDPIScaleFactor();
+						MaxWidth = FMath::Max(MaxWidth, (float)Temp->ComputeDesiredSize(DpiScale).X + 40);
+					}
+					return MaxWidth;
+				}));
+		}
+		else
+		{
+			HeaderRow->AddColumn(SHeaderRow::Column(VariableColId)
+				.FillWidth(0.2f)
+				.DefaultLabel(LOCALIZATION(VariableColId.ToString())));
+			HeaderRow->AddColumn(SHeaderRow::Column(ValueColId)
+				.FillWidth(0.6f)
+				.HeaderContent()
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					.VAlign(VAlign_Center)
+					[
+						SNew(STextBlock).Text(LOCALIZATION(ValueColId.ToString()))
+					]
+					+ SHorizontalBox::Slot()
+					.Padding(0, 0, 4, 0)
+					.HAlign(HAlign_Right)
+					.VAlign(VAlign_Center)
+					[
+						SNew(SShToggleButton).Icon(FShaderHelperStyle::Get().GetBrush("Icons.Uninitialized"))
+						.ToolTipText(LOCALIZATION("ShowUninitialized"))
+						.IsChecked_Lambda([this] { return bShowUninitialized ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
+						.OnCheckStateChanged_Lambda([this](ECheckBoxState InState) {
+							bShowUninitialized = InState == ECheckBoxState::Checked ? true : false;
+							if (OnShowUninitialized)
+							{
+								OnShowUninitialized(bShowUninitialized);
+							}
+						})
+					]
+				]);
+			HeaderRow->AddColumn(SHeaderRow::Column(TypeColId)
+				.FillWidth(0.2f)
+				.DefaultLabel(LOCALIZATION(TypeColId.ToString())));
+		}
+
 		ChildSlot
 		[
-			SAssignNew(VariableTreeView, STreeView<VariableNodePtr>)
+			SAssignNew(VariableTreeView, STreeView<ExpressionNodePtr>)
+			.AllowOverscroll(EAllowOverscroll::No)
 			.TreeItemsSource(&VariableNodeDatas)
 			.OnGenerateRow(this, &SDebuggerVariableView::OnGenerateRow)
 			.OnGetChildren(this, &SDebuggerVariableView::OnGetChildren)
-			.OnExpansionChanged_Lambda([this](VariableNodePtr InData, bool bExpanded){
+			.OnExpansionChanged_Lambda([this](ExpressionNodePtr InData, bool bExpanded){
 				InData->Expanded = bExpanded;
 			})
 			.HeaderRow
 			(
-				SNew(SHeaderRow)
-				.Style(&FShaderHelperStyle::Get().GetWidgetStyle<FHeaderRowStyle>("TableView.DebuggerHeader"))
-				+ SHeaderRow::Column(VariableColId)
-				.FillWidth(0.2f)
-				.DefaultLabel(LOCALIZATION(VariableColId.ToString()))
-				+ SHeaderRow::Column(ValueColId)
-				.FillWidth(0.6f)
-				.DefaultLabel(LOCALIZATION(ValueColId.ToString()))
-				+ SHeaderRow::Column(TypeColId)
-				.FillWidth(0.2f)
-				.DefaultLabel(LOCALIZATION(TypeColId.ToString()))
+				HeaderRow.ToSharedRef()
 			)
 		];
-		
+	
 		RefreshExpansions();
+	}
+
+	void SDebuggerVariableView::SaveExpansionStates(const TArray<ExpressionNodePtr>& NodeDatas, TMap<FString, bool>& OutStates)
+	{
+		auto SaveRecursive = [&OutStates](auto&& Self, const TArray<ExpressionNodePtr>& Nodes, const FString& Prefix) -> void {
+			for (const auto& Node : Nodes)
+			{
+				if (Node.IsValid())
+				{
+					FString NodeKey = Prefix.IsEmpty() ? Node->Expr : (Prefix + TEXT(".") + Node->Expr);
+					OutStates.Add(NodeKey, Node->Expanded);
+
+					if (!Node->Children.IsEmpty())
+					{
+						Self(Self, Node->Children, NodeKey);
+					}
+				}
+			}
+			};
+
+		SaveRecursive(SaveRecursive, NodeDatas, TEXT(""));
+	}
+
+	void SDebuggerVariableView::RestoreExpansionStates(const TArray<ExpressionNodePtr>& NodeDatas, const TMap<FString, bool>& ExpansionStates)
+	{
+		auto RestoreRecursive = [&ExpansionStates](auto&& Self, const TArray<ExpressionNodePtr>& Nodes, const FString& Prefix) -> void {
+			for (const auto& Node : Nodes)
+			{
+				if (Node.IsValid())
+				{
+					FString NodeKey = Prefix.IsEmpty() ? Node->Expr : (Prefix + TEXT(".") + Node->Expr);
+
+					if (const bool* bExpanded = ExpansionStates.Find(NodeKey))
+					{
+						Node->Expanded = *bExpanded;
+					}
+
+					if (!Node->Children.IsEmpty())
+					{
+						Self(Self, Node->Children, NodeKey);
+					}
+				}
+			}
+			};
+
+		RestoreRecursive(RestoreRecursive, NodeDatas, TEXT(""));
 	}
 
 	void SDebuggerVariableView::RefreshExpansions()
 	{
-		auto ExpandRecursive = [this](auto&& Self, VariableNodePtr Node) -> void
+		auto ExpandRecursive = [this](auto&& Self, ExpressionNodePtr Node) -> void
 		{
 			VariableTreeView->SetItemExpansion(Node, Node->Expanded);
 			for (auto& Child : Node->Children)
@@ -54,10 +173,10 @@ namespace SH
 		}
 	}
 
-	void SVariableViewRow::Construct(const FArguments& InArgs, VariableNodePtr InData, const TSharedRef<STableViewBase>& OwnerTableView)
+	void SVariableViewRow::Construct(const FArguments& InArgs, ExpressionNodePtr InData, const TSharedRef<STableViewBase>& OwnerTableView)
 	{
 		Data = InData;
-		SMultiColumnTableRow<VariableNodePtr>::Construct(FSuperRowType::FArguments(), OwnerTableView);
+		SMultiColumnTableRow<ExpressionNodePtr>::Construct(FSuperRowType::FArguments(), OwnerTableView);
 	}
 
 	TSharedRef<SWidget> SVariableViewRow::GenerateWidgetForColumn(const FName& ColumnId)
@@ -79,7 +198,7 @@ namespace SH
 				]
 				+ SHorizontalBox::Slot()
 				[
-				   SNew(STextBlock).Text(FText::FromString(Data->VarName))
+				   SNew(STextBlock).Text(FText::FromString(Data->Expr))
 				]
 			);
 		}
@@ -101,27 +220,25 @@ namespace SH
 		return Border;
 	}
 
-	void SDebuggerVariableView::SetVariableNodeDatas(const TArray<VariableNodePtr>& InDatas)
+	void SDebuggerVariableView::SetVariableNodeDatas(const TArray<ExpressionNodePtr>& InDatas)
 	{
-		for(const auto& Data: VariableNodeDatas)
-		{
-			if(const VariableNodePtr* InData = InDatas.FindByPredicate([&](const VariableNodePtr& InItem){ return InItem->VarName == Data->VarName; }))
-			{
-				(*InData)->Expanded = Data->Expanded;
-			}
-		}
+		TMap<FString, bool> ExpansionStates;
+		SaveExpansionStates(VariableNodeDatas, ExpansionStates);
+
 		VariableNodeDatas = InDatas;
+
+		RestoreExpansionStates(VariableNodeDatas, ExpansionStates);
 		RefreshExpansions();
 		VariableTreeView->RequestTreeRefresh();
 	}
 
-	TSharedRef<ITableRow> SDebuggerVariableView::OnGenerateRow(VariableNodePtr InTreeNode, const TSharedRef<STableViewBase>& OwnerTable)
+	TSharedRef<ITableRow> SDebuggerVariableView::OnGenerateRow(ExpressionNodePtr InTreeNode, const TSharedRef<STableViewBase>& OwnerTable)
 	{
 		TSharedRef<SVariableViewRow> TableRow = SNew(SVariableViewRow, InTreeNode, OwnerTable);
 		return TableRow;
 	}
 
-	void SDebuggerVariableView::OnGetChildren(VariableNodePtr InTreeNode, TArray<VariableNodePtr>& OutChildren)
+	void SDebuggerVariableView::OnGetChildren(ExpressionNodePtr InTreeNode, TArray<ExpressionNodePtr>& OutChildren)
 	{
 		OutChildren = InTreeNode->Children;
 	}

@@ -27,6 +27,7 @@ namespace SH
 		ChildSlot
 		[
 			SAssignNew(ExpressionTreeView, STreeView<ExpressionNodePtr>)
+			.AllowOverscroll(EAllowOverscroll::No)
 			.TreeItemsSource(&ExpressionNodeDatas)
 			.SelectionMode(ESelectionMode::Single)
 			.OnGenerateRow(this, &SDebuggerWatchView::OnGenerateRow)
@@ -135,14 +136,14 @@ namespace SH
 				return FLinearColor::White;
 			}));
 			InternalBorder->SetContent(SNew(STextBlock).Text_Lambda([this] {
-				return Data->ValueStr;
+				return FText::FromString(Data->ValueStr);
 			}));
 		}
 		else
 		{
 			Border->SetPadding(FMargin{1, 0, 0, 2});
 			InternalBorder->SetContent(SNew(STextBlock).Text_Lambda([this] {
-				return Data->TypeName;
+				return FText::FromString(Data->TypeName);
 			}));
 		}
 		return Border;
@@ -155,7 +156,7 @@ namespace SH
 			if(OnWatch && !Data->Expr.IsEmpty())
 			{
 				ExpressionNode ExprResult = OnWatch(Data->Expr);
-				if(ExprResult.ValueStr.ToString() != Data->ValueStr.ToString())
+				if(ExprResult.ValueStr != Data->ValueStr)
 				{
 					*Data = ExprResult;
 					Data->Dirty = true;

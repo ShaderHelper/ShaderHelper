@@ -5,8 +5,8 @@ namespace SH
 	struct ExpressionNode
 	{
 		FString Expr;
-		FText ValueStr;
-		FText TypeName;
+		FString ValueStr;
+		FString TypeName;
 		bool Dirty{};
 		TArray<TSharedPtr<ExpressionNode>> Children;
 		bool Expanded{};

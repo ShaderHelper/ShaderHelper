@@ -110,6 +110,22 @@ namespace SH
 		SAssignNew(DebuggerGlobalVariableView, SDebuggerVariableView);
 		SAssignNew(DebuggerWatchView, SDebuggerWatchView);
 		SAssignNew(DebuggerCallStackView, SDebuggerCallStackView);
+		SAssignNew(DebuggerTipVariableView, SDebuggerVariableView)
+			.AutoWidth(true)
+			.HasHeaderRow(false);
+		DebuggerTipWindow = SNew(SWindow)
+			.Type(EWindowType::ToolTip)
+			.CreateTitleBar(false)
+			.IsTopmostWindow(true)
+			.SupportsMaximize(false)
+			.SupportsMinimize(false)
+			.IsPopupWindow(true)
+			.SizingRule(ESizingRule::Autosized)
+			.ActivationPolicy(EWindowActivationPolicy::Never)
+			[
+				DebuggerTipVariableView.ToSharedRef()					
+			];
+		FSlateApplication::Get().AddWindow(DebuggerTipWindow.ToSharedRef());
 	}
 
 	void ShaderHelperEditor::ForceRender()
@@ -221,8 +237,15 @@ namespace SH
 			}))
 			.ScreenPosition(UsedWindowPos)
 			.AutoCenter(AutoCenterRule)
+			.MinWidth(400)
+			.MinHeight(400)
 			.ClientSize(UsedWindowSize);
-		MainWindow->SetKeyDownHandler(FOnKeyDown::CreateLambda([this](const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) {
+
+		CreateInternalWidgets();
+		TabManagerTab->AssignParentWidget(MainWindow);
+
+		FSlateApplication::Get().AddWindow(MainWindow.ToSharedRef());
+		FSlateApplication::Get().SetUnhandledKeyDownEventHandler(FOnKeyEvent::CreateLambda([this](const FKeyEvent& InKeyEvent) {
 			//Process tool bar commands.
 			if (UICommandList.IsValid())
 			{
@@ -230,11 +253,6 @@ namespace SH
 			}
 			return FReply::Handled();
 		}));
-
-		CreateInternalWidgets();
-		TabManagerTab->AssignParentWidget(MainWindow);
-
-		FSlateApplication::Get().AddWindow(MainWindow.ToSharedRef());
         
         auto MenuBarBuilder = CreateMenuBarBuilder();
         auto MenuBarWidget = MenuBarBuilder.MakeWidget();
@@ -302,7 +320,11 @@ namespace SH
 					CurProject->SavePendingAssets();
 				}
 			}
-			
+			if (IsDebugging)
+			{
+				EndDebugging();
+			}
+		
 			TabManager->SavePersistentLayout();
             CurProject->CodeTabLayout = CodeTabManager->PersistLayout();
 			CurProject->Save();
@@ -786,7 +808,6 @@ namespace SH
         else
         {
             (*TabPtr)->ActivateInParent(ETabActivationCause::SetDirectly);
-            ShaderEditors[InShader]->SetFocus();
         }
     }
 

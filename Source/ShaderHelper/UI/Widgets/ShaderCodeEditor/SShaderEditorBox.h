@@ -154,6 +154,7 @@ namespace SH
 			Owner = InOwner;
 			SMultiLineEditableText::Construct(InArgs);
 		}
+		virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 		virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
 	private:
 		SShaderEditorBox* Owner = nullptr;
@@ -285,6 +286,7 @@ namespace SH
         FString CurrentEditorSource;
 		const FSlateBrush* BackgroundLayerBrush{};
 		TSharedPtr<FShaderEditorMarshaller> ShaderMarshaller;
+
 		//Syntax highlight
 		FW::ShaderTU SyntaxTU;
 		TArray<TMap<FTextRange, FTextBlockStyle*>> LineSyntaxHighlightMaps;
@@ -296,6 +298,24 @@ namespace SH
 		FEvent* SyntaxEvent = nullptr;
 		//
 
+		//Debugger
+		TArray<FW::ShaderFunc> Funcs;
+		TArray<TPair<FW::SpvLexicalScope*, int>> CallStack;
+		FW::SpvLexicalScope* Scope = nullptr;
+		FW::SpvLexicalScope* CallStackScope = nullptr;
+		TMultiMap<FW::SpvId, FW::SpvVariableChange::DirtyRange> DirtyVars;
+		int32 StopLineNumber{};
+		//ValidLine: Line that can trigger a breakpoint
+		std::optional<int32> CurValidLine;
+		FString DebuggerError;
+		int32 CurDebugStateIndex{};
+		FW::SpvVmContext* DebuggerContext = nullptr;
+		std::vector<std::pair<FW::SpvId, FW::SpvVariableDesc*>> SortedVariableDescs;
+		std::optional<FW::SpvObject> CurReturnObject;
+		FW::SpvVariable* AssertResult = nullptr;
+		std::optional<FW::SpvVmPixelContext> VmPixelContext;
+		bool bEditDuringDebugging{};
+		//
         
 	private:
         //The text after unfolding, but that may not be the content compiled finally.
@@ -351,20 +371,5 @@ namespace SH
 		bool bTryMergeUndoState = false;
 		bool bTryToggleCommentSelection = false;
 		
-		//Debugger
-		TArray<FW::ShaderFunc> Funcs;
-		TArray<TPair<FW::SpvLexicalScope*, int>> CallStack;
-		FW::SpvLexicalScope* Scope = nullptr;
-		TMultiMap<FW::SpvId, FW::SpvVariableChange::DirtyRange> DirtyVars;
-		int32 StopLineNumber{};
-		//ValidLine: Line that can trigger a breakpoint
-		std::optional<int32> CurValidLine;
-		FString DebuggerError;
-		int32 CurDebugStateIndex{};
-		FW::SpvVmContext* DebuggerContext = nullptr;
-		std::optional<FW::SpvObject> CurReturnObject;
-		FW::SpvVariable* AssertResult = nullptr;
-		std::optional<FW::SpvVmPixelContext> VmPixelContext;
-		bool bEditDuringDebugging{};
 	};
 }

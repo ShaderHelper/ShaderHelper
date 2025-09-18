@@ -246,6 +246,6 @@ namespace FW
 
 	SpvObject* GetObject(SpvVmContext* InContext, SpvId ObjectId);
 	TArray<uint8> GetPointerValue(SpvVmContext* InContext, SpvPointer* InPointer);
-	TArray<uint8> GetObjectValue(SpvObject* InObject, const TArray<uint32>& Indexes = {});
+	TArray<uint8> GetObjectValue(SpvObject* InObject, const TArray<uint32>& Indexes = {}, int32* OutOffset = nullptr);
 	void WritePointerValue(SpvPointer* InPointer, SpvVariableDesc* PointeeDesc, const TArray<uint8>& ValueToStore, SpvVariableChange* OutVariableChange = nullptr);
 }

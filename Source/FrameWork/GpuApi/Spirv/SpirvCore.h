@@ -388,7 +388,10 @@ namespace FW
 			SpvMatrixType* MatrixType = static_cast<SpvMatrixType*>(Type);
 			return MatrixType->ElementCount * GetTypeByteSize(MatrixType->ElementType);
 		}
-		AUX::Unreachable();
+		else
+		{
+			return 0;
+		}
 	}
 
 	struct SpvObject
@@ -443,7 +446,7 @@ namespace FW
 	{
 		SpvId Id{};
 		SpvVariable* Pointee;
-		TArray<int32> Indexes;
+		TArray<uint32> Indexes;
 	};
 
 	struct SpvDecoration

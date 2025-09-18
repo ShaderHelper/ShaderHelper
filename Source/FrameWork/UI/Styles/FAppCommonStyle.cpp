@@ -41,6 +41,7 @@ namespace FW
 		Style->Set("Graph.NodeTitleBackground", new FSlateRoundedBoxBrush(FStyleColors::White, FVector4(5.0, 5.0, 0, 0)));
 		Style->Set("Graph.NodeContentBackground", new FSlateRoundedBoxBrush(FStyleColors::Panel, FVector4(0, 0, 5.0, 5.0)));
 		Style->Set("Graph.NodeOutline", new FSlateRoundedBoxBrush(FStyleColors::White, 5.0f));
+		Style->Set("Effect.Toggle", new IMAGE_BRUSH("Toggle", FVector2D(16.0, 16.0)));
 
 		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir);
 		//StarshipCoreStyle is used as the app style.

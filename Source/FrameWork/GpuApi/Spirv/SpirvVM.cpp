@@ -4,7 +4,7 @@
 
 namespace FW
 {
-	TArray<uint8> GetObjectValue(SpvObject* InObject, const TArray<uint32>& Indexes)
+	TArray<uint8> GetObjectValue(SpvObject* InObject, const TArray<uint32>& Indexes, int32* OutOffset)
 	{
 		check(InObject);
 		check(!InObject->IsExternal());
@@ -23,9 +23,12 @@ namespace FW
 			else if(CurType->GetKind() == SpvTypeKind::Struct)
 			{
 				SpvStructType* StructType = static_cast<SpvStructType*>(CurType);
+				for (uint32 MemberIndex = 0; MemberIndex < Index; MemberIndex++)
+				{
+					OffsetBytes += GetTypeByteSize(StructType->MemberTypes[MemberIndex]);
+				}
 				SpvType* MemberType = StructType->MemberTypes[Index];
-				OffsetBytes += GetTypeByteSize(MemberType);
-				ByteSize = GetTypeByteSize(StructType->MemberTypes[Index]);
+				ByteSize = GetTypeByteSize(MemberType);
 				CurType = MemberType;
 			}
 			else if(CurType->GetKind() == SpvTypeKind::Array)
@@ -47,6 +50,11 @@ namespace FW
 				AUX::Unreachable();
 			}
 		}
+
+		if (OutOffset)
+		{
+			*OutOffset = OffsetBytes;
+		}
 		
 		return {ObjectValue.GetData() + OffsetBytes, ByteSize};
 	}
@@ -54,6 +62,10 @@ namespace FW
 	TArray<uint8> GetPointerValue(SpvVmContext* InContext, SpvPointer* InPointer)
 	{
 		SpvVariableDesc* PointeeDesc = InContext->VariableDescMap[InPointer->Pointee->Id];
+		if (InPointer->Pointee->InitializedRanges.IsEmpty())
+		{
+			return {};
+		}
 		
 		TArray<uint8> RetValue;
 		if(InPointer->Pointee->IsExternal())
@@ -67,21 +79,39 @@ namespace FW
 		
 		int32 OffsetBytes = 0;
 		int32 ByteSize = RetValue.Num();
-		if(!InPointer->Indexes.IsEmpty())
+
+		if (!InPointer->Pointee->IsExternal())
 		{
-			if(PointeeDesc && PointeeDesc->TypeDesc)
+			ByteSize = GetObjectValue(InPointer->Pointee, InPointer->Indexes, &OffsetBytes).Num();
+			bool ValueInitialized = false;
+			for (const auto& Range : InPointer->Pointee->InitializedRanges)
+			{
+				if (OffsetBytes >= Range.X && OffsetBytes + ByteSize <= Range.Y)
+				{
+					ValueInitialized = true;
+					break;
+				}
+			}
+			if (!ValueInitialized)
+			{
+				return {};
+			}
+		}
+		else
+		{
+			//External objects like uniform buffers may have different alignments and sizes,
+			//so can't extract them directly from OpType* but rely on SpvVariableDesc to do it
+			if (PointeeDesc && PointeeDesc->TypeDesc)
 			{
 				SpvTypeDesc* CurTypeDesc = PointeeDesc->TypeDesc;
-				for(int32 Layer = 0; Layer < InPointer->Indexes.Num(); Layer++ )
+				for (int32 Layer = 0; Layer < InPointer->Indexes.Num(); Layer++)
 				{
 					int32 Index = InPointer->Indexes[Layer];
-					//External objects like uniform buffers may have different alignments and sizes,
-					//so can't extract them directly from OpType* but rely on SpvVariableDesc to do it
-					if(CurTypeDesc->GetKind() == SpvTypeDescKind::Composite)
+					if (CurTypeDesc->GetKind() == SpvTypeDescKind::Composite)
 					{
 						SpvCompositeTypeDesc* CompositeTypeDesc = static_cast<SpvCompositeTypeDesc*>(CurTypeDesc);
 						SpvTypeDesc* IndexTypeDesc = CompositeTypeDesc->GetMemberTypeDescs()[Index];
-						if(IndexTypeDesc->GetKind() == SpvTypeDescKind::Member)
+						if (IndexTypeDesc->GetKind() == SpvTypeDescKind::Member)
 						{
 							SpvMemberTypeDesc* MemberTypeDesc = static_cast<SpvMemberTypeDesc*>(IndexTypeDesc);
 							OffsetBytes += MemberTypeDesc->GetOffset() / 8;
@@ -89,14 +119,14 @@ namespace FW
 							CurTypeDesc = MemberTypeDesc->GetTypeDesc();
 						}
 					}
-					else if(CurTypeDesc->GetKind() == SpvTypeDescKind::Vector)
+					else if (CurTypeDesc->GetKind() == SpvTypeDescKind::Vector)
 					{
 						SpvVectorTypeDesc* VectorTypeDesc = static_cast<SpvVectorTypeDesc*>(CurTypeDesc);
 						SpvBasicTypeDesc* BasicTypeDesc = VectorTypeDesc->GetBasicTypeDesc();
 						OffsetBytes += Index * BasicTypeDesc->GetSize() / 8;
 						ByteSize = BasicTypeDesc->GetSize() / 8;
 					}
-					else if(CurTypeDesc->GetKind() == SpvTypeDescKind::Matrix)
+					else if (CurTypeDesc->GetKind() == SpvTypeDescKind::Matrix)
 					{
 						SpvMatrixTypeDesc* MatrixTypeDesc = static_cast<SpvMatrixTypeDesc*>(CurTypeDesc);
 						SpvVectorTypeDesc* ElementTypeDesc = MatrixTypeDesc->GetVectorTypeDesc();
@@ -105,12 +135,12 @@ namespace FW
 						ByteSize = ElementTypeSize;
 						CurTypeDesc = ElementTypeDesc;
 					}
-					else if(CurTypeDesc->GetKind() == SpvTypeDescKind::Array)
+					else if (CurTypeDesc->GetKind() == SpvTypeDescKind::Array)
 					{
 						SpvArrayTypeDesc* ArrayTypeDesc = static_cast<SpvArrayTypeDesc*>(CurTypeDesc);
 						int32 BaseTypeSize = GetTypeByteSize(ArrayTypeDesc->GetBaseTypeDesc());
 						int32 ElementNum = 1;
-						for(int32 i = Layer + 1; i < ArrayTypeDesc->GetCompCounts().Num(); i++)
+						for (int32 i = Layer + 1; i < ArrayTypeDesc->GetCompCounts().Num(); i++)
 						{
 							ElementNum *= ArrayTypeDesc->GetCompCounts()[i];
 						}
@@ -118,43 +148,28 @@ namespace FW
 						OffsetBytes += Index * ElementTypeSize;
 						ByteSize = ElementTypeSize;
 					}
-					
-					bool ValueInitialized = false;
-					for(const auto& Range : InPointer->Pointee->InitializedRanges)
-					{
-						if(OffsetBytes >= Range.X && OffsetBytes + ByteSize <= Range.Y)
-						{
-							ValueInitialized = true;
-							break;
-						}
-					}
-					if(!ValueInitialized)
-					{
-						return {};
-					}
 				}
 			}
 			else
 			{
 				//In some cases like StructuredBuffer,
 				//it may not be able to get the value correctly according to SpvVariableDesc, try getting the value from SpvType
-				check(InPointer->Pointee->IsExternal());
 				SpvType* CurType = InPointer->Pointee->Type;
-				for(int32 Index : InPointer->Indexes)
+				for (int32 Index : InPointer->Indexes)
 				{
 					TArray<SpvDecoration> Decorations;
 					InContext->Decorations.MultiFind(CurType->GetId(), Decorations);
-					
-					if(CurType->GetKind() == SpvTypeKind::Struct)
+
+					if (CurType->GetKind() == SpvTypeKind::Struct)
 					{
 						SpvStructType* StructType = static_cast<SpvStructType*>(CurType);
-						const SpvDecoration* CurMemberIndexDecoration = Decorations.FindByPredicate([Index](const SpvDecoration& Item){
+						const SpvDecoration* CurMemberIndexDecoration = Decorations.FindByPredicate([Index](const SpvDecoration& Item) {
 							return Item.Kind == SpvDecorationKind::Offset && Item.Offset.MemberIndex == Index;
-						});
-						const SpvDecoration* NextMemberIndexDecoration = Decorations.FindByPredicate([Index](const SpvDecoration& Item){
+							});
+						const SpvDecoration* NextMemberIndexDecoration = Decorations.FindByPredicate([Index](const SpvDecoration& Item) {
 							return Item.Kind == SpvDecorationKind::Offset && Item.Offset.MemberIndex == Index + 1;
-						});
-						if(Index == StructType->MemberTypes.Num() - 1)
+							});
+						if (Index == StructType->MemberTypes.Num() - 1)
 						{
 							ByteSize = ByteSize - CurMemberIndexDecoration->Offset.ByteOffset;
 						}
@@ -165,12 +180,12 @@ namespace FW
 						OffsetBytes = CurMemberIndexDecoration->Offset.ByteOffset;
 						CurType = StructType->MemberTypes[Index];
 					}
-					else if(CurType->GetKind() == SpvTypeKind::RuntimeArray)
+					else if (CurType->GetKind() == SpvTypeKind::RuntimeArray)
 					{
 						SpvRuntimeArrayType* RuntimeArrayType = static_cast<SpvRuntimeArrayType*>(CurType);
-						for(const auto& Decoration : Decorations)
+						for (const auto& Decoration : Decorations)
 						{
-							if(Decoration.Kind == SpvDecorationKind::ArrayStride)
+							if (Decoration.Kind == SpvDecorationKind::ArrayStride)
 							{
 								OffsetBytes += Index * Decoration.ArrayStride.Number;
 								ByteSize = Decoration.ArrayStride.Number;
@@ -185,7 +200,6 @@ namespace FW
 					}
 				}
 			}
-			
 		}
 
 		return {RetValue.GetData() + OffsetBytes, ByteSize};
@@ -472,7 +486,9 @@ namespace FW
 		}
 		else
 		{
-			if(Pointer->Pointee->InitializedRanges.IsEmpty() & EnableUbsan)
+			int32 ResultSize = GetTypeByteSize(ResultType);
+			TArray<uint8> VarValue = GetPointerValue(&Context, Pointer);
+			if (ResultSize != 0 && VarValue.IsEmpty() && EnableUbsan)
 			{
 				//The variable name cannot be obtained from the PointeeDesc because DebugDeclare appears before OpLoad in the following case:
 				//float a = a + 1;
@@ -483,8 +499,7 @@ namespace FW
 			//TODO: the result type size may not be equal to the value if it is an external object
 			//We may need to remap the value result with padding to the result type
 			//check(GetTypeByteSize(ResultType) == Value.Num());
-			TArray<uint8> VarValue = GetPointerValue(&Context, Pointer);
-			Value = { VarValue.GetData(), GetTypeByteSize(ResultType) };
+			Value = { VarValue.GetData(), ResultSize };
 		}
 		
 		SpvId ResultId = Inst->GetId().value();
@@ -636,7 +651,7 @@ namespace FW
 		SpvId ResultId = Inst->GetId().value();
 		
 		SpvPointer* BasePointer = GetPointer(Inst->GetBasePointer());
-		TArray<int32> Indexes = BasePointer->Indexes;
+		TArray<uint32> Indexes = BasePointer->Indexes;
 		for(SpvId IndexId : Inst->GetIndexes())
 		{
 			int32 IndexValue = *(int32*)std::get<SpvObject::Internal>(Context.Constants[IndexId].Storage).Value.GetData();
