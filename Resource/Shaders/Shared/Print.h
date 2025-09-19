@@ -147,8 +147,8 @@ AppendArgFunc(bool)
 
 #define UNUSED_ARGS_0()
 #define UNUSED_ARGS_1(Arg1) (void)Arg1
-#define UNUSED_ARGS_2(Arg1, Arg2) (void)Arg1; APPEND_ARGS_1(Arg2);
-#define UNUSED_ARGS_3(Arg1, Arg2, Arg3) (void)Arg1; APPEND_ARGS_2(Arg2, Arg3);
+#define UNUSED_ARGS_2(Arg1, Arg2) (void)Arg1; UNUSED_ARGS_1(Arg2);
+#define UNUSED_ARGS_3(Arg1, Arg2, Arg3) (void)Arg1; UNUSED_ARGS_2(Arg2, Arg3);
 #define UNUSED_ARGS(...) JOIN(UNUSED_ARGS_, GET_ARG_NUM(__VA_ARGS__))(__VA_ARGS__)
 
 #if ENABLE_PRINT == 1

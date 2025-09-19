@@ -263,7 +263,7 @@ const FString FoldMarkerText = TEXT("⇿");
 			ISenseQueue.Enqueue(MoveTemp(Task));
 			ISenseEvent->Trigger();
 		});
-		
+
         SAssignNew(ShaderMultiLineVScrollBar, SScrollBar).Orientation(EOrientation::Orient_Vertical).Padding(0)
 			.Style(&FShaderHelperStyle::Get().GetWidgetStyle<FScrollBarStyle>("CustomScrollbar")).Thickness(8.0f);
 		ShaderMultiLineVScrollBar->OnSetState = [this](float InOffsetFraction, float InThumbSizeFraction) {
@@ -290,7 +290,7 @@ const FString FoldMarkerText = TEXT("⇿");
 				if (Task.ShaderDesc)
 				{
 					TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(Task.ShaderDesc.value());
-					ShaderTU TU{ Shader->GetProcessedSourceText(), Shader->GetIncludeDirs() };
+					ShaderTU TU{ Shader->GetSourceText(), Shader->GetIncludeDirs() };
 					DiagnosticInfos = TU.GetDiagnostic();
 
 					CandidateInfos.Reset();
@@ -1051,7 +1051,7 @@ const FString FoldMarkerText = TEXT("⇿");
 				if ((Token.Type == HLSL::TokenType::Identifier || Token.Type == HLSL::TokenType::BuildtinFunc)
 					&& CursorOffset >= Token.BeginOffset && CursorOffset <= Token.EndOffset)
 				{
-					Occurrences = ISenseTU.GetOccurrences(GetLineNumber(CursorLineIndex) + AddedLineNum, Token.BeginOffset + 1);
+					Occurrences = SyntaxTU.GetOccurrences(GetLineNumber(CursorLineIndex) + AddedLineNum, Token.BeginOffset + 1);
 					break;
 				}
 			}
@@ -3189,16 +3189,18 @@ const FString FoldMarkerText = TEXT("⇿");
 					FString CurTextLine;
 					GetTextLine(CurrentHoverLocation.GetLineIndex(), CurTextLine);
 
-					FString CurrentTokenName;
 					for (const auto& Token : TokenizedLine.Tokens)
 					{
-						if (Token.Type == HLSL::TokenType::Identifier && CurrentHoverLocation.GetOffset() >= Token.BeginOffset && CurrentHoverLocation.GetOffset() <= Token.EndOffset)
+						FString TokenName = CurTextLine.Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
+						if (CurrentHoverLocation.GetOffset() >= Token.BeginOffset && CurrentHoverLocation.GetOffset() <= Token.EndOffset)
 						{
-							
-							CurrentTokenName = CurTextLine.Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
-							CurrentTokenBeginOffset = Token.BeginOffset;
-							CurrentTokenEndOffset = Token.EndOffset;
-							break;
+							if (Token.Type == HLSL::TokenType::Identifier || TokenName == "]")
+							{
+								CurrentTokenName = MoveTemp(TokenName);
+								CurrentTokenBeginOffset = Token.BeginOffset;
+								CurrentTokenEndOffset = Token.EndOffset;
+								break;
+							}
 						}
 					}
 
