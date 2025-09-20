@@ -998,13 +998,17 @@ const FString FoldMarkerText = TEXT("⇿");
 
     void SShaderEditorBox::UpdateEffectText()
     {
-        //Sync the effect text location when scrolling ShaderMultiLineEditableText.
-        static float LastXoffset;
+		//Sync the effect text location when scrolling ShaderMultiLineEditableText.
         TUniquePtr<FSlateEditableTextLayout>& EffectEditableTextLayout = GetPrivate_SMultiLineEditableText_EditableTextLayout(*EffectMultiLineEditableText);
-        TUniquePtr<FSlateEditableTextLayout>& ShaderEditableTextLayout = GetPrivate_SMultiLineEditableText_EditableTextLayout(*ShaderMultiLineEditableText);
-        float XOffsetSizeBetweenLayout = FMath::Max(0.f, (float)EffectEditableTextLayout->GetSize().X - (float)ShaderEditableTextLayout->GetSize().X + LastXoffset);
-        ShaderMultiLineEditableText->SetMargin(FMargin{ 0, 0, XOffsetSizeBetweenLayout, 0 });
-        LastXoffset = XOffsetSizeBetweenLayout;
+		TUniquePtr<FSlateEditableTextLayout>& ShaderEditableTextLayout = GetPrivate_SMultiLineEditableText_EditableTextLayout(*ShaderMultiLineEditableText);
+
+		double EffectLayoutWidth = EffectEditableTextLayout->GetSize().X;
+		FMargin CurrentMargin = ShaderEditableTextLayout->GetMargin();
+		double ShaderLayoutWidth = ShaderEditableTextLayout->GetSize().X - CurrentMargin.Right;
+
+        double XOffsetSizeBetweenLayout = FMath::Max(0.f, EffectLayoutWidth - ShaderLayoutWidth);
+		//Ensure that ShaderMultiLineEditableText can accommodate the effect text.
+        ShaderMultiLineEditableText->SetMargin(FMargin{ 0, 0, (float)XOffsetSizeBetweenLayout + 50, 0 });
 
         const FGeometry& ShaderMultiLineGeometry = ShaderMultiLineEditableText->GetTickSpaceGeometry();
         const FGeometry& EffectMultiLineGeometry = EffectMultiLineEditableText->GetTickSpaceGeometry();
@@ -3189,6 +3193,7 @@ const FString FoldMarkerText = TEXT("⇿");
 					FString CurTextLine;
 					GetTextLine(CurrentHoverLocation.GetLineIndex(), CurTextLine);
 
+					bool bFollowedBySquareBracket{};
 					for (const auto& Token : TokenizedLine.Tokens)
 					{
 						FString TokenName = CurTextLine.Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
@@ -3199,6 +3204,10 @@ const FString FoldMarkerText = TEXT("⇿");
 								CurrentTokenName = MoveTemp(TokenName);
 								CurrentTokenBeginOffset = Token.BeginOffset;
 								CurrentTokenEndOffset = Token.EndOffset;
+								if (CurTextLine.Mid(Token.EndOffset, 1) == "]")
+								{
+									bFollowedBySquareBracket = true;
+								}
 								break;
 							}
 						}
@@ -3214,6 +3223,11 @@ const FString FoldMarkerText = TEXT("⇿");
 							if (FChar::IsIdentifier(PrevChar) || PrevChar == TEXT('.') ||
 								PrevChar == TEXT('[') || PrevChar == TEXT(']'))
 							{
+								//If hovering between [ and ]
+								if (bFollowedBySquareBracket && PrevChar == TEXT('['))
+								{
+									break;
+								}
 								BeginOffset--;
 							}
 							else

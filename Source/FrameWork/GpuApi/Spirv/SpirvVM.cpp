@@ -654,7 +654,8 @@ namespace FW
 		TArray<uint32> Indexes = BasePointer->Indexes;
 		for(SpvId IndexId : Inst->GetIndexes())
 		{
-			int32 IndexValue = *(int32*)std::get<SpvObject::Internal>(Context.Constants[IndexId].Storage).Value.GetData();
+			SpvObject* IndexObject = GetObject(&Context, IndexId);
+			int32 IndexValue = *(int32*)std::get<SpvObject::Internal>(IndexObject->Storage).Value.GetData();
 			Indexes.Add(IndexValue);
 		}
 		
