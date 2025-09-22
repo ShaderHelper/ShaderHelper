@@ -4,6 +4,7 @@
 
 namespace FW
 {
+	int GAssetVer;
 
 	void AssetManager::MountProject(const FString& InProjectContentDir)
 	{

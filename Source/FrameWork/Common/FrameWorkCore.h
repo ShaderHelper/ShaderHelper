@@ -15,14 +15,7 @@ namespace FW
 
     template<typename T>
     using ObserverObjectPtr = ObjectPtr<T, ObjectOwnerShip::Assign>;
-        
-	enum class FrameWorkVer
-	{
-		Initial,
-	};
-
-	inline FrameWorkVer GFrameWorkVer = FrameWorkVer::Initial;
-
+      
     //Note: All ShObject must be default constructible.
 	class FRAMEWORK_API ShObject : FNoncopyable
 	{
@@ -107,6 +100,6 @@ namespace FW
 
     FRAMEWORK_API extern TArray<ShObject*> GlobalValidShObjects;
 
-	FRAMEWORK_API TArray<TSharedRef<PropertyData>> GeneratePropertyDatas(ShObject* InObject, const MetaMemberData* MetaMemData, void* Instance);
+	FRAMEWORK_API TArray<TSharedRef<PropertyData>> GeneratePropertyDatas(ShObject* InObject, const MetaMemberData* MetaMemData, void* Instance, bool bForce = false);
 	FRAMEWORK_API TArray<TSharedRef<PropertyData>> GeneratePropertyDatas(ShObject* InObject, MetaType* InMetaType);
 }

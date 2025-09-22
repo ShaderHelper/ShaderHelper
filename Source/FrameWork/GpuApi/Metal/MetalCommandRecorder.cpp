@@ -10,6 +10,7 @@ namespace FW
     MtlRenderStateCache::MtlRenderStateCache(MTLRenderPassDescriptorPtr InRenderPassDesc)
         : IsRenderPipelineDirty(false)
         , IsViewportDirty(false)
+		, IsScissorRectDirty(false)
         , IsVertexBufferDirty(false)
         , IsBindGroup0Dirty(false)
         , IsBindGroup1Dirty(false)
@@ -55,17 +56,25 @@ namespace FW
         }
     }
 
-    void MtlRenderStateCache::SetViewPort(MTL::Viewport InViewPort, MTL::ScissorRect InSissorRect)
+    void MtlRenderStateCache::SetViewPort(MTL::Viewport InViewPort)
     {
         if (!CurrentViewPort || FMemory::Memcmp(&*CurrentViewPort , &InViewPort, sizeof(MTL::Viewport)))
         {
             CurrentViewPort = MoveTemp(InViewPort);
-            CurrentScissorRect = MoveTemp(InSissorRect);
             IsViewportDirty = true;
         }
     }
 
-    void MtlRenderStateCache::SetBindGroups(MetalBindGroup* InGroup0, MetalBindGroup* InGroup1, MetalBindGroup* InGroup2, MetalBindGroup* InGroup3)
+	void MtlRenderStateCache::SetScissorRect(MTL::ScissorRect InSissorRect)
+	{
+		if (!CurrentScissorRect || FMemory::Memcmp(&*CurrentScissorRect, &InSissorRect, sizeof(MTL::ScissorRect)))
+		{
+			CurrentScissorRect = MoveTemp(InSissorRect);
+			IsScissorRectDirty = true;
+		}
+	}
+
+	void MtlRenderStateCache::SetBindGroups(MetalBindGroup* InGroup0, MetalBindGroup* InGroup1, MetalBindGroup* InGroup2, MetalBindGroup* InGroup3)
     {
         if (InGroup0 != CurrentBindGroup0) {
             CurrentBindGroup0 = InGroup0;
@@ -100,11 +109,14 @@ namespace FW
                     0, 1.0
                 };
 
-                MTL::ScissorRect ScissorRect{ 0, 0, Rt->width(), Rt->height() };
-
-                SetViewPort(MoveTemp(Viewport), MoveTemp(ScissorRect));
+                SetViewPort(MoveTemp(Viewport));
             }
         }
+		if (!CurrentScissorRect.IsSet() && CurrentViewPort)
+		{
+			MTL::ScissorRect ScissorRect{ 0, 0, (uint32)(*CurrentViewPort).Width, (uint32)(*CurrentViewPort).Height };
+			SetScissorRect(MoveTemp(ScissorRect));
+		}
         
         if(IsRenderPipelineDirty)
         {
@@ -113,15 +125,16 @@ namespace FW
             IsRenderPipelineDirty = false;
         }
         
-        if(IsViewportDirty)
+        if(IsViewportDirty && CurrentViewPort)
         {
-			if (CurrentViewPort)
-			{
-                RenderCommandEncoder->setViewport(*CurrentViewPort);
-                RenderCommandEncoder->setScissorRect(*CurrentScissorRect);
-                IsViewportDirty = false;
-			}
+			RenderCommandEncoder->setViewport(*CurrentViewPort);
+			IsViewportDirty = false;
         }
+		if(IsScissorRectDirty && CurrentScissorRect)
+		{
+			RenderCommandEncoder->setScissorRect(*CurrentScissorRect);
+			IsScissorRectDirty = false;
+		}
         
         if(CurrentBindGroup0 && IsBindGroup0Dirty) 
 		{ 
@@ -230,9 +243,14 @@ namespace FW
             (double)InViewPortDesc.ZMin, (double)InViewPortDesc.ZMax
         };
 
-        MTL::ScissorRect ScissorRect { 0, 0, (uint32)InViewPortDesc.Width, (uint32)InViewPortDesc.Height };
-        StateCache.SetViewPort(MoveTemp(Viewport), MoveTemp(ScissorRect));
+        StateCache.SetViewPort(MoveTemp(Viewport));
     }
+
+	void MtlRenderPassRecorder::SetScissorRect(const GpuScissorRectDesc& InScissorRectDes)
+	{
+		MTL::ScissorRect ScissorRect{ InScissorRectDes.Left, InScissorRectDes.Top, InScissorRectDes.Right, InScissorRectDes.Bottom };
+		StateCache.SetScissorRect(MoveTemp(ScissorRect));
+	}
 
     void MtlRenderPassRecorder::SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)
     {

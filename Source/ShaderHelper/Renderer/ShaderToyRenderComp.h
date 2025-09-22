@@ -4,9 +4,16 @@
 #include "AssetObject/ShaderToy/ShaderToy.h"
 #include "RenderResource/UniformBuffer.h"
 #include "Renderer/RenderGraph.h"
+#include "RenderResource/RenderPass/BlitPass.h"
 
 namespace SH
 {
+	struct ShaderToyOutputDesc
+	{
+		FW::BlitPassInput Pass;
+		int32 Layer;
+	};
+
 	struct ShaderToyExecContext : FW::GraphExecContext
 	{
 		float iTime{};
@@ -15,6 +22,7 @@ namespace SH
 		FW::RenderGraph* RG = nullptr;
         TRefCountPtr<FW::GpuTexture> FinalRT;
 		FW::PreviewViewPort* ViewPort;
+		TArray<ShaderToyOutputDesc> Ontputs;
 	};
 
 	class ShaderToyRenderComp : public FW::RenderComponent

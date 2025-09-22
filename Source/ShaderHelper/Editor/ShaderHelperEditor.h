@@ -20,6 +20,7 @@
 #include "UI/Widgets/Preference/SPreferenceView.h"
 #include "AssetObject/DebuggableObject.h"
 #include "UI/Widgets/Misc/SShWindow.h"
+#include "UI/Widgets/SShViewport.h"
 
 namespace SH
 {
@@ -122,7 +123,7 @@ namespace SH
 		TSharedPtr<FW::SShWindow> MainWindow;
 		TWeakPtr<FW::SShWindow> PreferenceWindow;
 		TSharedPtr<SPreferenceView> PreferenceView;
-		TSharedPtr<SViewport> ViewportWidget;
+		TSharedPtr<SShViewport> ViewportWidget;
 		TSharedPtr<FW::PreviewViewPort> ViewPort;
 		FVector2D WindowSize;
 

@@ -10,13 +10,20 @@ namespace FW
     REFLECTION_REGISTER(AddClass<ShObject>())
     REFLECTION_REGISTER(AddClass<ShObjectOp>())
 	
-	TArray<TSharedRef<PropertyData>> GeneratePropertyDatas(ShObject* InObject, const MetaMemberData* MetaMemData, void* Instance)
+	TArray<TSharedRef<PropertyData>> GeneratePropertyDatas(ShObject* InObject, const MetaMemberData* MetaMemData, void* Instance, bool bForce)
 	{
+		if (!bForce && !EnumHasAnyFlags(MetaMemData->InfoType, MetaInfo::Property))
+		{
+			return {};
+		}
+
 		TArray<TSharedRef<PropertyData>> Datas;
 		
 		MetaType* MemberMetaType = MetaMemData->GetMetaType();
 		TSharedPtr<PropertyData> Item;
 		bool ReadOnly = EnumHasAnyFlags(MetaMemData->InfoType, MetaInfo::ReadOnly);
+
+		const MetaPropertyData& PropertyData = MetaMemData->PropertyData;
 		if(MetaMemData->IsAssetRef())
 		{
 			void* AssetPtrRef = MetaMemData->Get(Instance);
@@ -28,27 +35,63 @@ namespace FW
 			auto EnumValueName = MakeShared<FString>(MetaMemData->GetEnumValueName(Instance));
 			Item = MakeShared<PropertyEnumItem>(InObject, MetaMemData->MemberName, EnumValueName, MetaMemData->EnumEntries, [=](void* NewValue){
 				MetaMemData->Set(Instance, NewValue);
-			});
+			}, ReadOnly);
 		}
 		else if(MetaMemData->IsType<int32>())
 		{
-			int* IntValue = (int*)MetaMemData->Get(Instance);
-			Item = MakeShared<PropertyScalarItem<int32>>(InObject, MetaMemData->MemberName, IntValue, ReadOnly);
+			int32* IntValue = (int32*)MetaMemData->Get(Instance);
+			auto ScalarItem = MakeShared<PropertyScalarItem<int32>>(InObject, MetaMemData->MemberName, IntValue, ReadOnly);
+			if (PropertyData.Min)
+			{
+				ScalarItem->SetMinValue(std::any_cast<int32>(PropertyData.Min(InObject)));
+			}
+			if (PropertyData.Max)
+			{
+				ScalarItem->SetMaxValue(std::any_cast<int32>(PropertyData.Max(InObject)));
+			}
+			Item = MoveTemp(ScalarItem);
 		}
 		else if(MetaMemData->IsType<uint32>())
 		{
 			uint32* UIntValue = (uint32*)MetaMemData->Get(Instance);
-			Item = MakeShared<PropertyScalarItem<uint32>>(InObject, MetaMemData->MemberName, UIntValue, ReadOnly);
+			auto ScalarItem = MakeShared<PropertyScalarItem<uint32>>(InObject, MetaMemData->MemberName, UIntValue, ReadOnly);
+			if (PropertyData.Min)
+			{
+				ScalarItem->SetMinValue(std::any_cast<uint32>(PropertyData.Min(InObject)));
+			}
+			if (PropertyData.Max)
+			{
+				ScalarItem->SetMaxValue(std::any_cast<uint32>(PropertyData.Max(InObject)));
+			}
+			Item = MoveTemp(ScalarItem);
 		}
 		else if(MetaMemData->IsType<float>())
 		{
 			float* FloatValue = (float*)MetaMemData->Get(Instance);
-			Item = MakeShared<PropertyScalarItem<float>>(InObject, MetaMemData->MemberName, FloatValue, ReadOnly);
+			auto ScalarItem = MakeShared<PropertyScalarItem<float>>(InObject, MetaMemData->MemberName, FloatValue, ReadOnly);
+			if (PropertyData.Min)
+			{
+				ScalarItem->SetMinValue(std::any_cast<float>(PropertyData.Min(InObject)));
+			}
+			if (PropertyData.Max)
+			{
+				ScalarItem->SetMaxValue(std::any_cast<float>(PropertyData.Max(InObject)));
+			}
+			Item = MoveTemp(ScalarItem);
 		}
 		else if(MetaMemData->IsType<double>())
 		{
 			double* DoubleValue = (double*)MetaMemData->Get(Instance);
-			Item = MakeShared<PropertyScalarItem<double>>(InObject, MetaMemData->MemberName, DoubleValue, ReadOnly);
+			auto ScalarItem = MakeShared<PropertyScalarItem<double>>(InObject, MetaMemData->MemberName, DoubleValue, ReadOnly);
+			if (PropertyData.Min)
+			{
+				ScalarItem->SetMinValue(std::any_cast<double>(PropertyData.Min(InObject)));
+			}
+			if (PropertyData.Max)
+			{
+				ScalarItem->SetMaxValue(std::any_cast<double>(PropertyData.Max(InObject)));
+			}
+			Item = MoveTemp(ScalarItem);
 		}
 		//Struct/Class
 		else if(MemberMetaType && MemberMetaType->Datas.Num() > 0)
@@ -142,7 +185,6 @@ namespace FW
 	{
 		Ar << Guid;
 		Ar << ObjectName;
-		Ar << GFrameWorkVer << GProjectVer;
 	}
 
     void ShObject::PostLoad()

@@ -15,6 +15,14 @@ namespace FW
 		float TopLeftY = 0.0f;
 	};
 
+	struct GpuScissorRectDesc
+	{
+		uint32 Left;
+		uint32 Top;
+		uint32 Right;
+		uint32 Bottom;
+	};
+
 	struct GpuRenderTargetInfo
 	{
 		GpuTexture* Texture;

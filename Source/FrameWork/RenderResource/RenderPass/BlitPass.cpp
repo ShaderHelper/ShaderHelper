@@ -29,9 +29,13 @@ namespace FW
 		TRefCountPtr<GpuRenderPipelineState> Pipeline = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
 
 		Graph.AddRenderPass("BlitPass", MoveTemp(BlitPassDesc), MoveTemp(Bindings),
-			[Pipeline](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
+			[Pipeline, Scissor = PassInput.Scissor](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
 				Bindings.ApplyBindGroup(PassRecorder);
 				PassRecorder->SetRenderPipelineState(Pipeline);
+				if (Scissor)
+				{
+					PassRecorder->SetScissorRect(Scissor.GetValue());
+				}
 				PassRecorder->DrawPrimitive(0, 3, 0, 1);
 			}
 		);

@@ -10,6 +10,8 @@ namespace FW
 		TRefCountPtr<GpuSampler> InputTexSampler;
 
 		TRefCountPtr<GpuTexture> OutputRenderTarget;
+
+		TOptional<GpuScissorRectDesc> Scissor;
 	};
 
 	FRAMEWORK_API void AddBlitPass(RenderGraph& Graph, const BlitPassInput& PassInput);

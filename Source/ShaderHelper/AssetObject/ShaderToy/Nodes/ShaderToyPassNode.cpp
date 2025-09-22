@@ -364,17 +364,40 @@ namespace SH
 			ShaderToy = TCHAR_TO_UTF8(*MemberDecl) + ShaderToy;
 		}
 		//Extract struct
-		std::regex StructPInPattern(R"(struct\s+PIn\s*\{[^}]*\};)");
-		std::smatch PInMatch;
-		if (std::regex_search(Glsl, PInMatch, StructPInPattern))
+		std::string ExtractedStructs;
+		std::regex VersionPattern(R"(#version\s+\d+)");
+		std::smatch VersionMatch;
+		std::regex LayoutPattern(R"(layout\s*\(\s*std140\s*\))");
+		std::smatch LayoutMatch;
+		if (std::regex_search(Glsl, VersionMatch, VersionPattern) &&
+			std::regex_search(Glsl, LayoutMatch, LayoutPattern))
 		{
-			size_t StructEnd = PInMatch.position() + PInMatch.length();
-			size_t LayoutPos = Glsl.find("layout(std140)", StructEnd);
-			if (LayoutPos != std::string::npos)
+			size_t VersionEnd = VersionMatch.position() + VersionMatch.length();
+			size_t LayoutStart = LayoutMatch.position();
+
+			if (LayoutStart > VersionEnd)
 			{
-				std::string BetweenContent = Glsl.substr(StructEnd, LayoutPos - StructEnd);
-				ShaderToy = BetweenContent + ShaderToy;
+				std::string TargetSection = Glsl.substr(VersionEnd, LayoutStart - VersionEnd);
+
+				std::regex StructPattern(R"(struct\s+(\w+)\s*\{[^}]*\}\s*;)");
+				std::sregex_iterator StructBegin(TargetSection.begin(), TargetSection.end(), StructPattern);
+				std::sregex_iterator StructEnd;
+
+				for (std::sregex_iterator iter = StructBegin; iter != StructEnd; ++iter)
+				{
+					const std::smatch& match = *iter;
+					std::string StructName = match[1].str();
+
+					if (StructName != "Printer" && StructName != "PIn")
+					{
+						ExtractedStructs += match.str() + "\n";
+					}
+				}
 			}
+		}
+		if (!ExtractedStructs.empty())
+		{
+			ShaderToy = ExtractedStructs + "\n" + ShaderToy;
 		}
 		//Flip y
 		if (std::regex_search(ShaderToy, MainImageMatch, MainImagePattern))
@@ -549,10 +572,10 @@ namespace SH
             }
             auto SlotCategory = MakeShared<PropertyCategory>(this, "Slot");
             {
-				auto PropertyDatas0 = GeneratePropertyDatas(this, GetMetaType<ShaderToyPassNode>()->GetMetaMemberData("iChannel0"), this);
-				auto PropertyDatas1 = GeneratePropertyDatas(this, GetMetaType<ShaderToyPassNode>()->GetMetaMemberData("iChannel1"), this);
-				auto PropertyDatas2 = GeneratePropertyDatas(this, GetMetaType<ShaderToyPassNode>()->GetMetaMemberData("iChannel2"), this);
-				auto PropertyDatas3 = GeneratePropertyDatas(this, GetMetaType<ShaderToyPassNode>()->GetMetaMemberData("iChannel3"), this);
+				auto PropertyDatas0 = GeneratePropertyDatas(this, GetMetaType<ShaderToyPassNode>()->GetMetaMemberData("iChannel0"), this, true);
+				auto PropertyDatas1 = GeneratePropertyDatas(this, GetMetaType<ShaderToyPassNode>()->GetMetaMemberData("iChannel1"), this, true);
+				auto PropertyDatas2 = GeneratePropertyDatas(this, GetMetaType<ShaderToyPassNode>()->GetMetaMemberData("iChannel2"), this, true);
+				auto PropertyDatas3 = GeneratePropertyDatas(this, GetMetaType<ShaderToyPassNode>()->GetMetaMemberData("iChannel3"), this, true);
                 SlotCategory->AddChilds(MoveTemp(PropertyDatas0));
 				SlotCategory->AddChilds(MoveTemp(PropertyDatas1));
 				SlotCategory->AddChilds(MoveTemp(PropertyDatas2));

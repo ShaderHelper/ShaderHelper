@@ -16,7 +16,8 @@ namespace FW
         
         void SetPipeline(MetalRenderPipelineState* InPipelineState);
         void SetVertexBuffer(MetalBuffer* InBuffer);
-        void SetViewPort(MTL::Viewport InViewPort, MTL::ScissorRect InSissorRect);
+        void SetViewPort(MTL::Viewport InViewPort);
+		void SetScissorRect(MTL::ScissorRect InSissorRect);
         void SetBindGroups(MetalBindGroup* InGroup0, MetalBindGroup* InGroup1, MetalBindGroup* InGroup2, MetalBindGroup* InGroup3);
         MTL::PrimitiveType GetPrimitiveType() const {
             check(CurrentRenderPipelineState);
@@ -26,6 +27,7 @@ namespace FW
     public:
         bool IsRenderPipelineDirty : 1;
         bool IsViewportDirty : 1;
+		bool IsScissorRectDirty : 1;
         bool IsVertexBufferDirty : 1;
        
         bool IsBindGroup0Dirty : 1;
@@ -86,6 +88,7 @@ namespace FW
         void SetRenderPipelineState(GpuRenderPipelineState* InPipelineState) override;
         void SetVertexBuffer(GpuBuffer* InVertexBuffer) override;
         void SetViewPort(const GpuViewPortDesc& InViewPortDesc) override;
+		void SetScissorRect(const GpuScissorRectDesc& InScissorRectDes) override;
         void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override;
         
     private:

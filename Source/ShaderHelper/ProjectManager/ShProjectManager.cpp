@@ -6,9 +6,9 @@ using namespace FW;
 
 namespace SH
 {
-
 	ShProject::ShProject(FString InPath) : Project(MoveTemp(InPath))
 	{
+		GAssetVer = static_cast<int>(ShAssetVersion::Initial);
 		GProjectVer = static_cast<int>(ShProjectVersion::Initial);
 	}
 

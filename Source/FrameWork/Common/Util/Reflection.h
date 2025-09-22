@@ -1,6 +1,7 @@
 #pragma once
 #include "Auxiliary.h"
 #include "magic_enum.hpp"
+#include <any>
 
 namespace FW
 {
@@ -26,6 +27,35 @@ namespace FW
 		ReadOnly = 1 << 1,
     };
 	ENUM_CLASS_FLAGS(MetaInfo);
+
+	struct MetaProperty
+	{
+		MetaProperty() = default;
+
+		template<typename T>
+		MetaProperty(T&& InLambda)
+		{
+			using RawType = std::decay_t<T>;
+			using ParamTypeList = typename AUX::TraitRetAndParamTypeFromFuncType<AUX::TraitFuncTypeFromFunctor_T<RawType>>::ParamTypeList;
+			static_assert(std::tuple_size_v<ParamTypeList> == 1, "A parameter is needed to pass `this`.");
+			using ThisType = std::tuple_element_t<0, ParamTypeList>;
+			Call = [InLambda](const void* ClassObject) -> std::any {
+				return std::invoke(InLambda, static_cast<ThisType>(ClassObject));
+			};
+		}
+
+		std::any operator()(const void* ClassObject) const { return Call(ClassObject); }
+		explicit operator bool() const { return (bool)Call; }
+
+	private:
+		std::function<std::any(const void*)> Call;
+	};
+
+	struct MetaPropertyData
+	{
+		MetaProperty Min;
+		MetaProperty Max;
+	};
 
     struct MetaMemberData
     {
@@ -54,7 +84,7 @@ namespace FW
         void(*Set)(void*, void*);
         void*(*Get)(void*);
         MetaInfo InfoType;
-        void* InfoData;
+		MetaPropertyData PropertyData;
         
 		//return nullptr for basic types
 		MetaType*(*GetMetaType)() = nullptr;
@@ -185,7 +215,7 @@ namespace FW
 		}
         
         template<auto DataPtr, MetaInfo InfoType = MetaInfo::None>
-        MetaTypeBuilder& Data(const FString& InMemberName, void* InfoData = nullptr)
+		MetaTypeBuilder& Data(const FString& InMemberName, const MetaPropertyData& PropertyData = {})
         {
             using MemberType = typename AUX::TraitMemberTypeFromMemberPtr<decltype(DataPtr)>::Type;
             using RawType = std::decay_t<MemberType>;
@@ -209,7 +239,7 @@ namespace FW
 				}
 			}
             MemberData.InfoType = InfoType;
-            MemberData.InfoData = InfoData;
+            MemberData.PropertyData = PropertyData;
             if constexpr(is_object_ptr<RawType>::value)
             {
                 //the metatype of member may not be registered at the moment, so lazy getting.

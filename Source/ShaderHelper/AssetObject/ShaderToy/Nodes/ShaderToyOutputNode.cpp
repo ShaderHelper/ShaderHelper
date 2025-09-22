@@ -3,7 +3,6 @@
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "Renderer/ShaderToyRenderComp.h"
-#include "RenderResource/RenderPass/BlitPass.h"
 #include "AssetObject/Pins/Pins.h"
 
 using namespace FW;
@@ -12,7 +11,12 @@ namespace SH
 {
     REFLECTION_REGISTER(AddClass<ShaderToyOutputNode>("Present Node")
 		.BaseClass<GraphNode>()
-		.Data<&ShaderToyOutputNode::Format, MetaInfo::Property>("Format")
+		.Data<&ShaderToyOutputNode::Format, MetaInfo::Property | MetaInfo::ReadOnly>("Format")
+		.Data<&ShaderToyOutputNode::Layer, MetaInfo::Property>("Layer")
+		.Data<&ShaderToyOutputNode::AreaFraction, MetaInfo::Property>("AreaFraction", {
+			.Min = [](const ShaderToyOutputNode*) { return 0.0f; },
+			.Max = [](const ShaderToyOutputNode*) { return 1.0f; }
+		})
 	)
     REFLECTION_REGISTER(AddClass<ShaderToyOutputNodeOp>()
         .BaseClass<ShObjectOp>()
@@ -25,14 +29,32 @@ namespace SH
         return GetMetaType<ShaderToyOutputNode>();
     }
 
-    void ShaderToyOutputNodeOp::OnSelect(ShObject* InObject)
+	void ShaderToyOutputNodeOp::OnCancelSelect(ShObject* InObject)
+	{
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		TSharedPtr<SShViewport> ViewportWidget = StaticCastSharedPtr<SShViewport>(ShEditor->GetViewPort()->GetAssociatedWidget().Pin());
+		ViewportWidget->ResetSpliter();
+	}
+
+	void ShaderToyOutputNodeOp::OnSelect(ShObject* InObject)
     {
         auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
         ShEditor->ShowProperty(InObject);
+		ShEditor->ForceRender();
+
+		TSharedPtr<SShViewport> ViewportWidget = StaticCastSharedPtr<SShViewport>(ShEditor->GetViewPort()->GetAssociatedWidget().Pin());
+		ViewportWidget->SetSpliterFraction(TAttribute<float>::CreateLambda([InObject] {
+			return static_cast<ShaderToyOutputNode*>(InObject)->AreaFraction;
+		}));
+		ViewportWidget->SetOnSpliterChanged([InObject, ShEditor](float InFraction) {
+			static_cast<ShaderToyOutputNode*>(InObject)->AreaFraction = InFraction;
+			ShEditor->ForceRender();
+		});
     }
 
 	ShaderToyOutputNode::ShaderToyOutputNode()
 	: Format(ShaderToyFormat::B8G8R8A8_UNORM)
+	, Layer(0), AreaFraction(1.0f)
 	{
 		ObjectName = FText::FromString("Present");
 	}
@@ -54,35 +76,33 @@ namespace SH
 	void ShaderToyOutputNode::Serialize(FArchive& Ar)
 	{
 		GraphNode::Serialize(Ar);
+		Ar << Layer;
+		Ar << AreaFraction;
 	}
 
     ExecRet ShaderToyOutputNode::Exec(GraphExecContext& Context)
 	{
         ShaderToyExecContext& ShaderToyContext = static_cast<ShaderToyExecContext&>(Context);
         
-        auto ResultPin = static_cast<GpuTexturePin*>(GetPin("RT"));
-		
-		if(!ShaderToyContext.FinalRT.IsValid() ||
-		   ShaderToyContext.FinalRT->GetWidth() != (uint32)ShaderToyContext.iResolution.X || ShaderToyContext.FinalRT->GetHeight() != (uint32)ShaderToyContext.iResolution.Y )
-		{
-			ShaderToyContext.FinalRT = GGpuRhi->CreateTexture({
-				.Width = (uint32)ShaderToyContext.iResolution.x,
-				.Height = (uint32)ShaderToyContext.iResolution.y,
-				.Format = (GpuTextureFormat)Format,
-				.Usage = GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared,
-			});
-			GGpuRhi->SetResourceName("FinalRT", ShaderToyContext.FinalRT);
-			ShaderToyContext.ViewPort->SetViewPortRenderTexture(ShaderToyContext.FinalRT);
-		}
-	
+        auto ResultPin = static_cast<GpuTexturePin*>(GetPin("RT"));	
         
         BlitPassInput Input;
         Input.InputTex = ResultPin->GetValue();
         Input.InputTexSampler = GpuResourceHelper::GetSampler({.Filter = SamplerFilter::Bilinear});
         Input.OutputRenderTarget = ShaderToyContext.FinalRT;
+		Input.Scissor = GpuScissorRectDesc{0, 0, (uint32)(AreaFraction * ShaderToyContext.FinalRT->GetWidth()), ShaderToyContext.FinalRT->GetHeight()};
 
-        AddBlitPass(*ShaderToyContext.RG, MoveTemp(Input));
-        
+		ShaderToyContext.Ontputs.Emplace(MoveTemp(Input), Layer);
         return {};
+	}
+
+	void ShaderToyOutputNode::PostPropertyChanged(PropertyData* InProperty)
+	{
+		GraphNode::PostPropertyChanged(InProperty);
+		if (InProperty->GetDisplayName() == "AreaFraction" || InProperty->GetDisplayName() == "Layer")
+		{
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			ShEditor->ForceRender();
+		}
 	}
 }

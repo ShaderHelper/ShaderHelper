@@ -82,11 +82,12 @@ namespace FW
 		MANUAL_RTTI_TYPE(PropertyEnumItem, PropertyItemBase)
 	public:
 		PropertyEnumItem(ShObject* InOwner, const FString& InName, TSharedPtr<FString> InEnumValueName,
-						 const TMap<FString, TSharedPtr<void>>& InEnumEntries, const TFunction<void(void*)>& InSetter)
+						 const TMap<FString, TSharedPtr<void>>& InEnumEntries, const TFunction<void(void*)>& InSetter, bool InReadOnly = false)
 		: PropertyItemBase(InOwner, InName)
 		, EnumValueName(InEnumValueName)
 		, EnumEntries(InEnumEntries)
 		, Setter(InSetter)
+		, ReadOnly(InReadOnly)
 		{
 			for(const auto& [EntryStr, _] : EnumEntries)
 			{
@@ -98,6 +99,7 @@ namespace FW
 		{
 			auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
 			auto ValueWidget = SNew(SComboBox<TSharedPtr<FString>>)
+			.IsEnabled(!ReadOnly)
 			.OptionsSource(&EnumItems)
 			.OnSelectionChanged_Lambda([this](TSharedPtr<FString> InItem, ESelectInfo::Type){
 				if(*InItem != *EnumValueName && Owner->CanChangeProperty(this))
@@ -123,7 +125,7 @@ namespace FW
 		TSharedPtr<FString> EnumValueName;
 		TMap<FString, TSharedPtr<void>> EnumEntries;
 		TFunction<void(void*)> Setter;
-		
+		bool ReadOnly;
 		TArray<TSharedPtr<FString>> EnumItems;
 	};
 
@@ -137,6 +139,9 @@ namespace FW
             , ValueRef(InValueRef)
 			, ReadOnly(InReadOnly)
         {}
+
+		void SetMinValue(const T& InValue) { MinValue = InValue; }
+		void SetMaxValue(const T& InValue) { MaxValue = InValue; }
         
         TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
         {
@@ -145,6 +150,8 @@ namespace FW
             {
                 auto ValueWidget = SNew(SSpinBox<T>)
 					.IsEnabled(!ReadOnly)
+					.MinValue(MinValue)
+					.MaxValue(MaxValue)
                     .MaxFractionalDigits(3)
                     .OnValueChanged_Lambda([this](T NewValue) {
                         if(*ValueRef != NewValue && Owner->CanChangeProperty(this))
@@ -163,6 +170,7 @@ namespace FW
     private:
         T* ValueRef;
 		bool ReadOnly;
+		TOptional<T> MinValue, MaxValue;
     };
 
     class PropertyVector2fItem : public PropertyItemBase

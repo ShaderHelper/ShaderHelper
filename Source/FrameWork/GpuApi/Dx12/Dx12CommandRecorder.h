@@ -20,7 +20,8 @@ namespace FW
 		void ApplyComputeState(ID3D12GraphicsCommandList* InCmdList);
 		void Clear();
 
-		void SetViewPort(D3D12_VIEWPORT InViewPort, D3D12_RECT InSissorRect);
+		void SetViewPort(D3D12_VIEWPORT InViewPort);
+		void SetScissorRect(D3D12_RECT InScissorRect);
 		void SetVertexBuffer(Dx12Buffer* InBuffer);
 		void SetPipeline(Dx12RenderPso* InPso);
 		void SetPipeline(Dx12ComputePso* InPso);
@@ -35,6 +36,7 @@ namespace FW
 		bool IsRenderTargetDirty : 1;
 		bool IsVertexBufferDirty : 1;
 		bool IsViewportDirty : 1;
+		bool IsScissorRectDirty : 1;
 
 		bool IsGraphicsRootSigDirty : 1;
 		bool IsGraphicsBindGroup0Dirty : 1;
@@ -53,7 +55,7 @@ namespace FW
 		Dx12ComputePso* ComputePso = nullptr;
 		Dx12Buffer* CurrentVertexBuffer = nullptr;
 		TOptional<D3D12_VIEWPORT> CurrentViewPort;
-		TOptional<D3D12_RECT> CurrentSissorRect;
+		TOptional<D3D12_RECT> CurrentScissorRect;
 		TArray<Dx12Texture*> CurrentRenderTargets;
 		TArray<Vector4f> ClearColorValues;
 
@@ -100,6 +102,7 @@ namespace FW
 		void SetRenderPipelineState(GpuRenderPipelineState* InPipelineState) override;
 		void SetVertexBuffer(GpuBuffer* InVertexBuffer) override;
 		void SetViewPort(const GpuViewPortDesc& InViewPortDesc) override;
+		void SetScissorRect(const GpuScissorRectDesc& InScissorRectDes) override;
 		void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override;
 	
 	private:

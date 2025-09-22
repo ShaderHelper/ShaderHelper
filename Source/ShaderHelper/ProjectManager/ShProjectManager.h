@@ -11,6 +11,11 @@ namespace SH
 		Initial
 	};
 
+	enum class ShAssetVersion
+	{
+		Initial
+	};
+
 	class ShProject : public FW::Project
 	{
 	public:

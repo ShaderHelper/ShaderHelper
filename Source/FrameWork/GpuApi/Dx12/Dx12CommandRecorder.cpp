@@ -9,6 +9,7 @@ namespace FW
 		, IsRenderTargetDirty(false)
 		, IsVertexBufferDirty(false)
 		, IsViewportDirty(false)
+		, IsScissorRectDirty(false)
 		, IsGraphicsRootSigDirty(false)
 		, IsGraphicsBindGroup0Dirty(false)
 		, IsGraphicsBindGroup1Dirty(false)
@@ -78,21 +79,25 @@ namespace FW
 				DefaultViewPort.MaxDepth = 1;
 				DefaultViewPort.TopLeftX = 0;
 				DefaultViewPort.TopLeftY = 0;
-
-				D3D12_RECT DefaultScissorRect = CD3DX12_RECT(0, 0, (LONG)DefaultViewPort.Width, (LONG)DefaultViewPort.Height);
-
-				SetViewPort(MoveTemp(DefaultViewPort), MoveTemp(DefaultScissorRect));
+				SetViewPort(MoveTemp(DefaultViewPort));
 			}
 		}
-
-		if (IsViewportDirty)
+		if (!CurrentScissorRect.IsSet() && CurrentViewPort)
 		{
-			if (CurrentViewPort)
-			{
-				InCmdList->RSSetViewports(1, &*CurrentViewPort);
-				InCmdList->RSSetScissorRects(1, &*CurrentSissorRect);
-				IsViewportDirty = false;
-			}
+			D3D12_RECT DefaultScissorRect = CD3DX12_RECT(0, 0, (LONG)(*CurrentViewPort).Width, (LONG)(*CurrentViewPort).Height);
+			SetScissorRect(MoveTemp(DefaultScissorRect));
+		}
+
+		if (IsViewportDirty && CurrentViewPort)
+		{
+			InCmdList->RSSetViewports(1, &*CurrentViewPort);
+			IsViewportDirty = false;
+		}
+
+		if (IsScissorRectDirty && CurrentScissorRect)
+		{
+			InCmdList->RSSetScissorRects(1, &*CurrentScissorRect);
+			IsScissorRectDirty = false;
 		}
 
 		if (IsVertexBufferDirty)
@@ -177,7 +182,7 @@ namespace FW
 		RenderPso = nullptr;
 		ComputePso = nullptr;
 		CurrentViewPort.Reset();
-		CurrentSissorRect.Reset();
+		CurrentScissorRect.Reset();
 
 		CurrentGraphicsRootSignature = nullptr;
 		CurrentGraphicsBindGroup0 = nullptr;
@@ -199,6 +204,7 @@ namespace FW
 		IsRenderTargetDirty = false;
 		IsVertexBufferDirty = false;
 		IsViewportDirty = false;
+		IsScissorRectDirty = false;
 
 		IsGraphicsRootSigDirty = false;
 		IsGraphicsBindGroup0Dirty = false;
@@ -214,13 +220,21 @@ namespace FW
 
 	}
 
-	void Dx12StateCache::SetViewPort(D3D12_VIEWPORT InViewPort, D3D12_RECT InSissorRect)
+	void Dx12StateCache::SetViewPort(D3D12_VIEWPORT InViewPort)
 	{
 		if (!CurrentViewPort || FMemory::Memcmp(&*CurrentViewPort, &InViewPort, sizeof(D3D12_VIEWPORT)))
 		{
 			CurrentViewPort = MoveTemp(InViewPort);
-			CurrentSissorRect = MoveTemp(InSissorRect);
 			IsViewportDirty = true;
+		}
+	}
+
+	void Dx12StateCache::SetScissorRect(D3D12_RECT InScissorRect)
+	{
+		if (!CurrentScissorRect || FMemory::Memcmp(&*CurrentScissorRect, &InScissorRect, sizeof(D3D12_RECT)))
+		{
+			CurrentScissorRect = MoveTemp(InScissorRect);
+			IsScissorRectDirty = true;
 		}
 	}
 
@@ -405,8 +419,13 @@ namespace FW
 		ViewPort.TopLeftX = InViewPortDesc.TopLeftX;
 		ViewPort.TopLeftY = InViewPortDesc.TopLeftY;
 
-		D3D12_RECT ScissorRect = CD3DX12_RECT(0, 0, (LONG)InViewPortDesc.Width, (LONG)InViewPortDesc.Height);
-		StateCache.SetViewPort(MoveTemp(ViewPort), MoveTemp(ScissorRect));
+		StateCache.SetViewPort(MoveTemp(ViewPort));
+	}
+
+	void Dx12RenderPassRecorder::SetScissorRect(const GpuScissorRectDesc& InScissorRectDes)
+	{
+		D3D12_RECT ScissorRect = CD3DX12_RECT(InScissorRectDes.Left, InScissorRectDes.Top, InScissorRectDes.Right, InScissorRectDes.Bottom);
+		StateCache.SetScissorRect(MoveTemp(ScissorRect));
 	}
 
 	void Dx12RenderPassRecorder::SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)

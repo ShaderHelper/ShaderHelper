@@ -12,6 +12,7 @@ namespace SH
         ShaderToyOutputNodeOp() = default;
         
         FW::MetaType* SupportType() override;
+		void OnCancelSelect(FW::ShObject* InObject) override;
         void OnSelect(FW::ShObject* InObject) override;
     };
 
@@ -26,7 +27,10 @@ namespace SH
         void InitPins() override;
 		void Serialize(FArchive& Ar) override;
         FW::ExecRet Exec(FW::GraphExecContext& Context) override;
+		void PostPropertyChanged(FW::PropertyData* InProperty) override;
 		
 		ShaderToyFormat Format;
+		int32 Layer;
+		float AreaFraction;
 	};
 }

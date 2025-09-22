@@ -67,6 +67,11 @@ public:
 		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));
 		PassRecorder->SetViewPort(InViewPortDesc);
 	}
+	void SetScissorRect(const GpuScissorRectDesc& InScissorRectDes) override
+	{
+		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));
+		PassRecorder->SetScissorRect(InScissorRectDes);
+	}
 	void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override
 	{
 		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));

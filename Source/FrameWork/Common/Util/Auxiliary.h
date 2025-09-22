@@ -291,11 +291,15 @@ namespace AUX
     
 	template<typename T>
 	struct TraitMemberTypeFromMemberPtr;
-	template<typename FuncType, typename C>
-	struct TraitMemberTypeFromMemberPtr<FuncType C::*> { using Type = FuncType; };
+	template<typename MemberType, typename C>
+	struct TraitMemberTypeFromMemberPtr<MemberType C::*> { using Type = MemberType; };
 
 	template<typename Ret, typename... ParamType>
-	struct TraitRetAndParamTypeFromFuncTypeBase { using Type = std::tuple<Ret, ParamType...>; };
+	struct TraitRetAndParamTypeFromFuncTypeBase { 
+		using Type = std::tuple<Ret, ParamType...>;
+		using RetType = Ret;
+		using ParamTypeList = std::tuple<ParamType...>;
+	};
 	template<typename FuncType>
 	struct TraitRetAndParamTypeFromFuncType;
 	template<typename Ret, typename... ParamType>
@@ -304,13 +308,6 @@ namespace AUX
 	struct TraitRetAndParamTypeFromFuncType<Ret(ParamType...) const> : TraitRetAndParamTypeFromFuncTypeBase<Ret, ParamType...> {};
 	template<typename FuncType>
 	using TraitRetAndParamTypeFromFuncType_T = typename TraitRetAndParamTypeFromFuncType<FuncType>::Type;
-
-	template<typename RetAndParamTypeList>
-	struct TraitRetFromRetAndParamTypeList;
-	template<typename Ret, typename... ParamType>
-	struct TraitRetFromRetAndParamTypeList<std::tuple<Ret, ParamType...>> { using Type = Ret; };
-	template<typename RetAndParamTypeList>
-	using TraitRetFromRetAndParamTypeList_T = typename TraitRetFromRetAndParamTypeList<RetAndParamTypeList>::Type;
 
 	template<typename Func>
 	using TraitFuncTypeFromFunctor_T = typename TraitMemberTypeFromMemberPtr<decltype(&Func::operator())>::Type;
@@ -526,7 +523,7 @@ namespace AUX
 				//std::integral_constant: Lambda does not support non-type template parameter until c++20.
 				using FuncPtr = decltype(&Func::template operator()<ResultTypes..., std::integral_constant<VarType, Cur>>);
 				using RetAndParamTypeList = TraitRetAndParamTypeFromFuncType_T<typename TraitMemberTypeFromMemberPtr<FuncPtr>::Type>;
-				using Ret = TraitRetFromRetAndParamTypeList_T<RetAndParamTypeList>;
+				using Ret = std::tuple_element_t<0, RetAndParamTypeList>;
 				//Erasure param types to make the same return type.
 				RunTimeConvCallBase<Func, Ret>* CallPtr = new RunTimeConvCall<Func, RetAndParamTypeList>{ &Lamb };
 				return RunTimeConvCallRet<Func, Ret>{CallPtr};

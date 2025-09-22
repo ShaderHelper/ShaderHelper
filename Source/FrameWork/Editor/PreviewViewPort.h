@@ -29,6 +29,7 @@ namespace FW
 		bool RequiresVsync() const override { return false; }
 		
 		void SetAssociatedWidget(TWeakPtr<SWidget> InWidget) { AssociatedWidget = MoveTemp(InWidget); }
+		TWeakPtr<SWidget> GetAssociatedWidget() const { return AssociatedWidget; }
 
 		void SetViewPortRenderTexture(GpuTexture* InGpuTex);
 	//	void UpdateViewPortRenderTexture(GpuTexture* InGpuTex);

@@ -29,6 +29,8 @@ namespace FW
 		FString PathStr;
 	};
 
+	FRAMEWORK_API extern int GAssetVer;
+
 	class FRAMEWORK_API AssetManager
 	{
 	public:

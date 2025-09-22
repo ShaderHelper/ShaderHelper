@@ -82,7 +82,7 @@ namespace SH
 	{
 		SAssignNew(OutputLog, SOutputLog);
 		
-		SAssignNew(ViewportWidget, SViewport)
+		SAssignNew(ViewportWidget, SShViewport)
 			.ViewportInterface(ViewPort)
 			.Visibility_Lambda([this]{
 				return IsDebugging ? EVisibility::Hidden : EVisibility::Visible;
