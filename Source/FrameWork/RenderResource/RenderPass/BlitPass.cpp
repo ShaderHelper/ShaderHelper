@@ -8,7 +8,7 @@ namespace FW
 	void AddBlitPass(RenderGraph& Graph, const BlitPassInput& PassInput)
 	{
 		GpuRenderPassDesc BlitPassDesc;
-		BlitPassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassInput.OutputRenderTarget, RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
+		BlitPassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassInput.OutputRenderTarget, PassInput.LoadAction, RenderTargetStoreAction::Store });
 
 		BlitShader* PassShader = GetShader<BlitShader>();
 

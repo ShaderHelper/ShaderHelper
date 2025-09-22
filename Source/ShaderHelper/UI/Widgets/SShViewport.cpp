@@ -64,7 +64,10 @@ namespace SH
 			{
 				double NewFraction = (LocalMousePos.X - DragOffset) / MyGeometry.GetLocalSize().X;
 				NewFraction = FMath::Clamp(NewFraction, 0.0, 1.0);
-				OnSpliterChanged((float)NewFraction);
+				if (NewFraction != SpliterFraction.Get())
+				{
+					OnSpliterChanged((float)NewFraction);
+				}
 				return FReply::Handled();
 			}
 		}

@@ -27,7 +27,7 @@ namespace FW
 		void SetPipeline(Dx12ComputePso* InPso);
 		void SetGraphicsRootSignature(Dx12RootSignature* InRootSignature);
 		void SetComputeRootSignature(Dx12RootSignature* InRootSignature);
-		void SetRenderTargets(TArray<Dx12Texture*> InRTs, TArray<Vector4f> InClearColorValues);
+		void SetRenderTargets(TArray<Dx12Texture*> InRTs, TArray<Vector4f> InClearColorValues, TArray<RenderTargetLoadAction> InLoadActions);
 		void SetGraphicsBindGroups(Dx12BindGroup* InGroup0, Dx12BindGroup* InGroup1, Dx12BindGroup* InGroup2, Dx12BindGroup* InGroup3);
 		void SetComputeBindGroups(Dx12BindGroup* InGroup0, Dx12BindGroup* InGroup1, Dx12BindGroup* InGroup2, Dx12BindGroup* InGroup3);
 
@@ -58,6 +58,7 @@ namespace FW
 		TOptional<D3D12_RECT> CurrentScissorRect;
 		TArray<Dx12Texture*> CurrentRenderTargets;
 		TArray<Vector4f> ClearColorValues;
+		TArray<RenderTargetLoadAction> LoadActions;
 
 		Dx12RootSignature* CurrentGraphicsRootSignature = nullptr;
 		Dx12BindGroup* CurrentGraphicsBindGroup0 = nullptr;

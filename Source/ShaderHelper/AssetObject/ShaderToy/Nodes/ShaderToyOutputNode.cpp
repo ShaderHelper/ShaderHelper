@@ -49,6 +49,7 @@ namespace SH
 		ViewportWidget->SetOnSpliterChanged([InObject, ShEditor](float InFraction) {
 			static_cast<ShaderToyOutputNode*>(InObject)->AreaFraction = InFraction;
 			ShEditor->ForceRender();
+			InObject->GetOuterMost()->MarkDirty();
 		});
     }
 

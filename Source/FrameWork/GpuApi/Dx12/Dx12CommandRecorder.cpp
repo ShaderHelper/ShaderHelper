@@ -151,6 +151,7 @@ namespace FW
 			if (RenderTargetNum > 0)
 			{
 				check(ClearColorValues.Num() == RenderTargetNum);
+				check(LoadActions.Num() == RenderTargetNum)
 
 				TArray<D3D12_CPU_DESCRIPTOR_HANDLE> RenderTargetDescriptors;
 				RenderTargetDescriptors.SetNumUninitialized(RenderTargetNum);
@@ -161,13 +162,17 @@ namespace FW
 					check(RenderTarget);
 					check(RenderTarget->RTV->IsValid());
 
-					Vector4f OptimizedClearValue = RenderTarget->GetResourceDesc().ClearValues;
-                    Vector4f ClearColorValue = ClearColorValues[i];
-                    if (!ClearColorValue.Equals(OptimizedClearValue))
-                    {
-                        SH_LOG(LogDx12, Warning, TEXT("OptimizedClearValue(%s) != ClearColorValue(%s) that may result in invalid fast clear optimization."), *OptimizedClearValue.ToString(), *ClearColorValue.ToString());
-                    }
-                    InCmdList->ClearRenderTargetView(RenderTarget->RTV->GetHandle(), ClearColorValue.GetData(), 0, nullptr);
+					if (LoadActions[i] == RenderTargetLoadAction::Clear)
+					{
+						Vector4f OptimizedClearValue = RenderTarget->GetResourceDesc().ClearValues;
+						Vector4f ClearColorValue = ClearColorValues[i];
+						if (!ClearColorValue.Equals(OptimizedClearValue))
+						{
+							SH_LOG(LogDx12, Warning, TEXT("OptimizedClearValue(%s) != ClearColorValue(%s) that may result in invalid fast clear optimization."), *OptimizedClearValue.ToString(), *ClearColorValue.ToString());
+						}
+						InCmdList->ClearRenderTargetView(RenderTarget->RTV->GetHandle(), ClearColorValue.GetData(), 0, nullptr);
+					}
+			
 					RenderTargetDescriptors[i] = RenderTarget->RTV->GetHandle();
 				}
 
@@ -197,7 +202,7 @@ namespace FW
 		CurrentComputeBindGroup3 = nullptr;
 
 		CurrentRenderTargets.Empty();
-
+		LoadActions.Reset();
 		ClearColorValues.Reset();
 
 		IsPipelineStateDirty = false;
@@ -285,12 +290,13 @@ namespace FW
 		}
 	}
 
-	void Dx12StateCache::SetRenderTargets(TArray<Dx12Texture*> InRTs, TArray<Vector4f> InClearColorValues)
+	void Dx12StateCache::SetRenderTargets(TArray<Dx12Texture*> InRTs, TArray<Vector4f> InClearColorValues, TArray<RenderTargetLoadAction> InLoadActions)
 	{
-		if (InRTs != CurrentRenderTargets || InClearColorValues != ClearColorValues)
+		if (InRTs != CurrentRenderTargets || InClearColorValues != ClearColorValues || LoadActions != InLoadActions)
 		{
 			CurrentRenderTargets = MoveTemp(InRTs);
 			ClearColorValues = MoveTemp(InClearColorValues);
+			LoadActions = MoveTemp(InLoadActions);
 			IsRenderTargetDirty = true;
 		}
 	}
@@ -495,14 +501,16 @@ namespace FW
 
 		TArray<Dx12Texture*> RTs;
 		TArray<Vector4f> ClearColorValues;
+		TArray<RenderTargetLoadAction> LoadActions;
 
 		for (int32 i = 0; i < PassDesc.ColorRenderTargets.Num(); i++) {
 			Dx12Texture* Rt = static_cast<Dx12Texture*>(PassDesc.ColorRenderTargets[i].Texture);
 			RTs.Add(Rt);
 			ClearColorValues.Add(PassDesc.ColorRenderTargets[i].ClearColor);
+			LoadActions.Add(PassDesc.ColorRenderTargets[i].LoadAction);
 		}
 
-		StateCache.SetRenderTargets(MoveTemp(RTs), MoveTemp(ClearColorValues));
+		StateCache.SetRenderTargets(MoveTemp(RTs), MoveTemp(ClearColorValues), MoveTemp(LoadActions));
 		auto NewPassRecorder = MakeUnique<Dx12RenderPassRecorder>(CmdList, StateCache);
 		RequestedRenderPassRecorders.Add(MoveTemp(NewPassRecorder));
 		return RequestedRenderPassRecorders.Last().Get();

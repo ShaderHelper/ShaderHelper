@@ -63,9 +63,13 @@ namespace SH
                 ExecRet GraphRet = ShaderToyGraph->Exec(Context);
 
 				Context.Ontputs.Sort([](const ShaderToyOutputDesc& A, const ShaderToyOutputDesc& B) { return A.Layer < B.Layer; });
-				for (const ShaderToyOutputDesc& Output : Context.Ontputs)
+				for (int i = 0; i < Context.Ontputs.Num(); i++)
 				{
-					AddBlitPass(*Context.RG, Output.Pass);
+					if (i == 0)
+					{
+						Context.Ontputs[i].Pass.LoadAction = RenderTargetLoadAction::Clear;
+					}
+					AddBlitPass(*Context.RG, Context.Ontputs[i].Pass);
 				}
 
                 if(GraphRet.Terminate)
