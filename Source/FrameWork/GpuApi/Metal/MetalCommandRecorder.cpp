@@ -114,7 +114,7 @@ namespace FW
         }
 		if (!CurrentScissorRect.IsSet() && CurrentViewPort)
 		{
-			MTL::ScissorRect ScissorRect{ 0, 0, (uint32)(*CurrentViewPort).Width, (uint32)(*CurrentViewPort).Height };
+			MTL::ScissorRect ScissorRect{ 0, 0, (uint32)(*CurrentViewPort).width, (uint32)(*CurrentViewPort).height };
 			SetScissorRect(MoveTemp(ScissorRect));
 		}
         
