@@ -1,6 +1,8 @@
 #include "CommonHeader.h"
 #include "PluginManager.h"
 #include "AssetObject/Graph.h"
+#include "AssetObject/Texture2D.h"
+#include "AssetManager/AssetImporter/AssetImporter.h"
 
 DEFINE_LOG_CATEGORY(LogPy);
 class RedirectorStdout
@@ -43,6 +45,9 @@ std::vector<py::object> RegisteredPropertyExts;
 
 void RegisterPyFW(py::module_& m)
 {
+	py::class_<FW::PathHelper>(m, "PathHelper")
+		.def_property_readonly_static("ResourceDir", [](py::object) { return std::string(TCHAR_TO_UTF8(*FW::PathHelper::ResourceDir())); });
+
 	py::class_< FW::MenuEntryExt, FW::PyMenuEntryExt >(m, "MenuEntryExt")
 		.def(py::init<>())
 		.def("CanExecute", &FW::MenuEntryExt::CanExecute)
@@ -53,10 +58,13 @@ void RegisterPyFW(py::module_& m)
 
 	py::class_<FW::MetaType>(m, "MetaType");
 	py::class_<FW::ShObject>(m, "ShObject")
+		.def_property_readonly("Id", [](const FW::ShObject& Self) { return std::string(TCHAR_TO_UTF8(*Self.GetGuid().ToString())); })
 		.def_property_readonly("DynamicMetaType", &FW::ShObject::DynamicMetaType)
 		.def_property_readonly("Name", [](const FW::ShObject& Self) { return std::string(TCHAR_TO_UTF8(*Self.ObjectName.ToString())); });
 	py::class_<FW::AssetObject, FW::ShObject>(m, "AssetObject")
+		.def_property_readonly("FileName", [](const FW::AssetObject& Self) { return std::string(TCHAR_TO_UTF8(*Self.GetFileName())); })
 		.def_property_readonly("FileExtension", [](const FW::AssetObject& Self) { return std::string(TCHAR_TO_UTF8(*Self.FileExtension())); });
+	py::class_<FW::Texture2D, FW::AssetObject>(m, "Texture2D");
 	py::class_<FW::Graph, FW::AssetObject>(m, "Graph")
 		.def_property_readonly("Nodes", [](const FW::Graph& Self) {
 			std::vector<FW::GraphNode*> RetNodes;
@@ -151,6 +159,22 @@ void RegisterPyFW(py::module_& m)
 		.def_readwrite("VAlign", &FW::Button::VAlign);
 	py::class_<FW::Slot>(m_slate, "Slot");
 	py::class_<FW::HBox, FW::Widget, py::smart_holder>(m_slate, "HBox");
+
+	auto m_asset = m.def_submodule("Asset");
+	py::class_<FW::AssetImporter>(m_asset, "Importer")
+		.def("CreateAsset", [](FW::AssetImporter& Self, const std::string& InFilePath) { 
+			return Self.CreateAssetObject(InFilePath.c_str()).Release();
+		});
+	m_asset.def("SaveToFile", [](FW::AssetObject* InAsset, const std::string& FilePath) {
+			if (InAsset)
+			{
+				FString SavedFilePath = FilePath.c_str();
+				TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFilePath));
+				InAsset->ObjectName = FText::FromString(FPaths::GetBaseFilename(SavedFilePath));
+				InAsset->Serialize(*Ar);
+			}
+	});
+	m_asset.def("GetImporter", [](const std::string& InPath) { return FW::GetAssetImporter(InPath.c_str()); }, py::return_value_policy::reference);
 }
 
 

@@ -7,6 +7,7 @@ namespace FW
 	inline bool GDred;
 	inline bool GCanPIXCapture;
 	inline ID3D12Device* GDevice;
+	inline ID3D12CompatibilityDevice* GCompatDevice;
 	inline IDXGIFactory2* GDxgiFactory;
 	inline IDXGIAdapter1* Adapter;
 	inline ID3D12CommandQueue* GGraphicsQueue;

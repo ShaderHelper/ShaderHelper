@@ -11,6 +11,7 @@ namespace SH
 	REFLECTION_REGISTER(AddClass<Texture2dNode>("Texture2d Node")
 		.BaseClass<GraphNode>()
 		.Data<&Texture2dNode::Texture, MetaInfo::Property>("Texture")
+		.Data<&Texture2dNode::Format, MetaInfo::Property | MetaInfo::ReadOnly>("Format")
 		.Data<&Texture2dNode::Width, MetaInfo::Property | MetaInfo::ReadOnly>("Width")
 		.Data<&Texture2dNode::Height, MetaInfo::Property | MetaInfo::ReadOnly>("Height")
 	)
@@ -88,6 +89,7 @@ namespace SH
 		{
 			Texture->OnDestroy.AddRaw(this, &Texture2dNode::ClearProperty);
 			Preview->SetViewPortRenderTexture(Texture->GetGpuData());
+			Format = Texture->GetFormat();
 			Width = Texture->GetWidth();
 			Height = Texture->GetHeight();
 		}

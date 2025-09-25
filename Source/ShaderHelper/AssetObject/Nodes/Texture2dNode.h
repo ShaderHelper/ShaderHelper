@@ -40,6 +40,7 @@ namespace SH
 		
 	public:
 		FW::AssetPtr<FW::Texture2D> Texture;
+		FW::GpuTextureFormat Format;
 		uint32 Width{};
 		uint32 Height{};
 		

@@ -704,7 +704,8 @@ namespace SH
 
             auto PassOutput = static_cast<GpuTexturePin*>(GetPin("RT"));
             if(PassOutput->GetValue()->GetWidth() != (uint32)ShaderToyContext.iResolution.x ||
-               PassOutput->GetValue()->GetHeight() != (uint32)ShaderToyContext.iResolution.y)
+               PassOutput->GetValue()->GetHeight() != (uint32)ShaderToyContext.iResolution.y ||
+				PassOutput->GetValue()->GetFormat() != (GpuTextureFormat)Format)
             {
                 GpuTextureDesc Desc{ (uint32)ShaderToyContext.iResolution.x, (uint32)ShaderToyContext.iResolution.y, (GpuTextureFormat)Format, GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
                 TRefCountPtr<GpuTexture> PassOuputTex = GGpuRhi->CreateTexture(MoveTemp(Desc), GpuResourceState::RenderTargetWrite);

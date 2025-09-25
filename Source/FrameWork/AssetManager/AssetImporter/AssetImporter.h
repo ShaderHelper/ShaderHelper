@@ -15,4 +15,6 @@ namespace FW
         
         virtual MetaType* SupportAsset() = 0;
 	};
+
+	FRAMEWORK_API AssetImporter* GetAssetImporter(const FString& InPath);
 }

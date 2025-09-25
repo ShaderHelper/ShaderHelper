@@ -235,9 +235,6 @@ namespace SH
 
 	void SDebuggerViewport::SetDebugTarget(TRefCountPtr<GpuTexture> InTarget)
 	{
-		//TODO
-		check(InTarget->GetFormat() == GpuTextureFormat::B8G8R8A8_UNORM);
-
 		bFinalizePixel = false;
 		Zoom = 1;
 		Offset = 0.0f;
@@ -267,7 +264,10 @@ namespace SH
 				{
 					TexDatas[y * Width + x] = {Pixel[2] / 255.0f, Pixel[1] / 255.0f, Pixel[0] / 255.0f, Pixel[3] / 255.0f};
 				}
-				
+				else if (InTarget->GetFormat() == GpuTextureFormat::R32G32B32A32_FLOAT)
+				{
+					TexDatas[y * Width + x] = { *((float*)Pixel), *((float*)Pixel + 1), *((float*)Pixel + 2), *((float*)Pixel + 3) };
+				}
 			}
 		}
 		GGpuRhi->UnMapGpuTexture(InTarget);

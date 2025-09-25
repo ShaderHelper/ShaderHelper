@@ -43,7 +43,8 @@ def init_shadertoy_pass(page, shadertoy_context, shadertoy_pass):
         select_element.select_option(label=shadertoy_pass[0])
     page.locator("#passManager label", has_text=shadertoy_pass[0]).first.click()
     page.wait_for_selector('.CodeMirror')
-    pass_code = shadertoy_pass[1]['node'].GetShaderToyCode()
+    shadertoy_pass_node = shadertoy_pass[1]['node']
+    pass_code = shadertoy_pass_node.GetShaderToyCode()
     js = f"""
     (() => {{
         var cm = document.querySelector('.CodeMirror').CodeMirror;
@@ -53,32 +54,69 @@ def init_shadertoy_pass(page, shadertoy_context, shadertoy_pass):
     }})()
     """
     page.evaluate(js)
-    
-    channel_to_css = {
-        'iChannel0': '#texture0',
-        'iChannel1': '#texture1', 
-        'iChannel2': '#texture2',
-        'iChannel3': '#texture3'
-    }
+
     pass_name_to_css = {
         'Buffer A': '#miscAssetThumnail4',
         'Buffer B': '#miscAssetThumnail5',
         'Buffer C': '#miscAssetThumnail6',
         'Buffer D': '#miscAssetThumnail7',
     }
+    pagebutton_to_texture = {
+        '#pageButton0' : ['Abstract 1', 'Abstract 2', 'Abstract 3', 'Bayer', 'Blue Noise', 'Font 1', 'Gray Noise Medium', 'Gray Noise Small', 'Lichen'],
+        '#pageButton1' : ['London', 'Nyancat', 'Organic 1', 'Organic 2', 'Organic 3', 'Organic 4', 'Pebbles', 'RGBA Noise Medium', 'RGBA Noise Small'],
+        '#pageButton2' : ['Rock Tiles', 'Rusty Metal', 'Stars', 'Wood'],
+    }
+    # set channels
     for item_name, item_value in shadertoy_pass[1].items():
         if item_name == 'node' or item_value is None:
             continue
+        channel_index = ''.join(filter(str.isdigit, item_name))
+        texture_selector = f"#texture{channel_index}"
+        resource_set_successfully = False
         if isinstance(item_value, Sh.ShaderToyPassNode):
-            page.locator(channel_to_css[item_name]).click()
+            page.locator(texture_selector).click()
             node_pass_name = None
             for pass_name, pass_data in shadertoy_context.items():
                 if pass_data is not None and pass_data.get('node') == item_value:
                     node_pass_name = pass_name
                     break
+            page.locator("//a[@onclick=\"openTab('Misc')\"]").click()
             page.locator(pass_name_to_css[node_pass_name]).click()
             page.locator("#pickTextureHeader div").nth(1).click()
-   
+            resource_set_successfully = True
+        elif isinstance(item_value, Sh.Texture2dNode):
+            texture = item_value.Texture
+            if texture is not None:
+                is_shadertoy_texture = False
+                for pagebutton, texture_list in pagebutton_to_texture.items():
+                    if texture.FileName in texture_list:
+                        is_shadertoy_texture = True
+                        break
+                if is_shadertoy_texture:
+                    page.locator(texture_selector).click()
+                    page.locator("//a[@onclick=\"openTab('Textures')\"]").click()
+                    page.locator(pagebutton).click()
+                    span = page.locator('span.spanName', has_text=texture.FileName).first
+                    td = span.locator('xpath=ancestor::td[1]')
+                    img = td.locator('xpath=preceding-sibling::td[1]//img').first
+                    img_id = img.get_attribute("id")
+                    page.locator(f"#{img_id}").click()
+                    page.locator("#pickTextureHeader div").nth(1).click()
+                    resource_set_successfully = True
+        if resource_set_successfully:
+            # set sampling setting
+            sampling_button_selector = f"#mySamplingButton{channel_index}"
+            samplerfilter_selector = f"#mySamplerFilter{channel_index}"
+            samplerwrap_selector = f"#mySamplerWrap{channel_index}"
+            samplervflip_selector = f"#mySamplerVFlip{channel_index}"
+            page.locator(sampling_button_selector).click()
+            channel_desc = getattr(shadertoy_pass_node, f"iChannel{channel_index}")
+            page.locator(samplerfilter_selector).select_option(channel_desc.Filter.name.lower())
+            page.locator(samplerwrap_selector).select_option(channel_desc.Wrap.name.lower())
+            if isinstance(item_value, Sh.Texture2dNode):
+                page.locator(samplervflip_selector).uncheck()
+            page.locator(sampling_button_selector).click()
+
 def open_shadertoy_with_playwright(shadertoy_context):
     global _playwright_context, _playwright_instance
     browser_path = get_browser_path()
@@ -142,8 +180,6 @@ class ExportShaderToyProperty(Sh.PropertyExt):
                 for InputPin in node.InputPins:
                     shadertoy_context[node_pass][InputPin.Name] = InputPin.SourceNode
                     traverse_node_chain(InputPin.SourceNode)
-            elif isinstance(node, Sh.Texture2dNode):
-                pass  
 
         traverse_node_chain(Sh.Context.PropertyObject.InputPins[0].SourceNode)
         open_shadertoy_with_playwright(shadertoy_context)
@@ -153,18 +189,40 @@ class ImportShaderToyMenuEntry(Sh.MenuEntryExt):
     TargetMenu = "File"
 
     def CanExecute(self):
-        return True
+        return False
 
     def OnExecute(self):
         pass
 
+class ImportShaderToyResourcesMenuEntry(Sh.MenuEntryExt):
+    Label = "Import shadertoy.com resources"
+    TargetMenu = "Asset"
+
+    def CanExecute(self):
+        return True
+
+    def OnExecute(self):
+        shadertoy_resource_dir = os.path.join(Sh.PathHelper.ResourceDir, "ShaderToy")
+        for root, dirs, files in os.walk(shadertoy_resource_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                importer = Sh.Asset.GetImporter(file_path)
+                if importer:
+                    asset = importer.CreateAsset(file_path)
+                    asset_ext = asset.FileExtension
+                    file_without_ext, ext = os.path.splitext(file)
+                    saved_file_path = os.path.join(Sh.Context.CurAssetBrowserDir, f"{file_without_ext}.{asset_ext}")
+                    Sh.Asset.SaveToFile(asset, saved_file_path)
+
 def Register():
     Sh.RegisterExt(ImportShaderToyMenuEntry)
     Sh.RegisterExt(ExportShaderToyProperty)
+    Sh.RegisterExt(ImportShaderToyResourcesMenuEntry)
 
 def Unregister():
     Sh.UnregisterExt(ImportShaderToyMenuEntry)
     Sh.UnregisterExt(ExportShaderToyProperty)
+    Sh.UnregisterExt(ImportShaderToyResourcesMenuEntry)
 
 
 

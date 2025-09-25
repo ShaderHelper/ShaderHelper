@@ -40,6 +40,7 @@ namespace FW
 		void OnDirectoryTreeSelectionChanged(const FString& SelectedDirectory);
         
         void SetCurrentDisplyPath(const FString& DisplayDir);
+		FString GetCurrentDisplayPath() const;
         
     private:
         void InitDirectory(AssetBrowserDirectory& OutDirectory, const FString& Dir);

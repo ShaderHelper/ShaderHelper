@@ -17,6 +17,8 @@ namespace FW
 	{
 		switch (InFormat)
 		{
+		case GpuTextureFormat::R8_UNORM:
+			return 1;
 		case GpuTextureFormat::R16_FLOAT:
 			return 2;
 		case GpuTextureFormat::R8G8B8A8_UNORM:

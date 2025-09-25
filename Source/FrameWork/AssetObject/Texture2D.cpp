@@ -18,9 +18,10 @@ namespace FW
 
 	}
 
-	Texture2D::Texture2D(uint32 InWidth, uint32 InHeight, const TArray<uint8>& InRawData)
+	Texture2D::Texture2D(uint32 InWidth, uint32 InHeight, GpuTextureFormat InFormat, const TArray<uint8>& InRawData)
 		: Width(InWidth)
 		, Height(InHeight)
+		, Format(InFormat)
 		, RawData(InRawData)
 	{
 		InitGpudata();
@@ -29,7 +30,7 @@ namespace FW
 	void Texture2D::Serialize(FArchive& Ar)
 	{
 		AssetObject::Serialize(Ar);
-
+		Ar << Format;
 		Ar << Width;
 		Ar << Height;
 		Ar << RawData;
@@ -42,7 +43,7 @@ namespace FW
 
 	void Texture2D::InitGpudata()
 	{
-		GpuTextureDesc Desc{ (uint32)Width, (uint32)Height, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource | GpuTextureUsage::Shared , RawData };
+		GpuTextureDesc Desc{ (uint32)Width, (uint32)Height, Format, GpuTextureUsage::ShaderResource | GpuTextureUsage::Shared , RawData };
 		GpuData = GGpuRhi->CreateTexture(MoveTemp(Desc));
 	}
 
@@ -60,7 +61,7 @@ namespace FW
 			return Thumbnail;
 		}
 
-		GpuTextureDesc Desc{ Width / 2, Height / 2, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
+		GpuTextureDesc Desc{ Width / 2, Height / 2, Format, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
 		TRefCountPtr<GpuTexture> Thumbnail = GGpuRhi->CreateTexture(MoveTemp(Desc));
 
 		RenderGraph Graph;

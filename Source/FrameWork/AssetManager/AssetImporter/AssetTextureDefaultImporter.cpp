@@ -23,10 +23,17 @@ namespace FW
 		{
 			if (ImageWrpper.IsValid() && ImageWrpper->SetCompressed(CompressedData.GetData(), CompressedData.Num()))
 			{
+				ERGBFormat Format = ImageWrpper->GetFormat();
 				TArray<uint8> UnCompressedData;
-				if (ImageWrpper->GetRaw(ERGBFormat::BGRA, 8, UnCompressedData))
+				if (Format == ERGBFormat::Gray)
 				{
-					return MakeUnique<Texture2D>(ImageWrpper->GetWidth(), ImageWrpper->GetHeight(), UnCompressedData);
+					ImageWrpper->GetRaw(ERGBFormat::Gray, 8, UnCompressedData);
+					return MakeUnique<Texture2D>(ImageWrpper->GetWidth(), ImageWrpper->GetHeight(), GpuTextureFormat::R8_UNORM, UnCompressedData);
+				}
+				else
+				{
+					ImageWrpper->GetRaw(ERGBFormat::BGRA, 8, UnCompressedData);
+					return MakeUnique<Texture2D>(ImageWrpper->GetWidth(), ImageWrpper->GetHeight(), GpuTextureFormat::B8G8R8A8_UNORM, UnCompressedData);
 				}
 			}
 		}

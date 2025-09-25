@@ -67,6 +67,7 @@ namespace SH
 		TSharedPtr<SWindow> GetDebuggerTipWindow() const { return DebuggerTipWindow; }
 		SDebuggerVariableView* GetDebuggerTipVariableView() const { return DebuggerTipVariableView.Get(); }
 		FW::SGraphPanel* GetGraphPanel() const { return GraphPanel.Get(); }
+		FW::SAssetBrowser* GetAssetBrowser() const { return AssetBrowser.Get(); }
 		void InvokeDebuggerTabs();
 		void CloseDebuggerTabs();
         

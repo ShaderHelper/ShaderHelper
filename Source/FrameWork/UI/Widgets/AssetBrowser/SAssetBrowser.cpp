@@ -30,6 +30,11 @@ namespace FW
         DirectoryTree->SetSelection(DisplayDir);
     }
 
+	FString SAssetBrowser::GetCurrentDisplayPath() const
+	{
+		return AssetView->GetViewDirectory();
+	}
+
     void SAssetBrowser::InitDirectory(AssetBrowserDirectory& OutDirectory, const FString& Path)
     {
         OutDirectory.Path = Path;

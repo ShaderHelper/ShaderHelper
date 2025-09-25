@@ -27,9 +27,10 @@ namespace FW
 
 		void Construct(const FArguments& InArgs);
 		void SetNewViewDirectory(const FString& NewViewDirectory);
+		FString GetViewDirectory() const { return CurViewDirectory; }
 		void PopulateAssetView(const FString& ViewDirectory);
 		TSharedPtr<SWidget> CreateContextMenu();
-		TSharedPtr<SWidget> CreateItemContextMenu(TSharedRef<AssetViewItem> ViewItem);
+		TSharedPtr<SWidget> CreateItemContextMenu(const TArray<TSharedRef<AssetViewItem>>& ViewItems);
 		void AddFolder(const FString& InFolderName);
 		void RemoveFolder(const FString& InFolderName);
 		void AddFile(const FString& InFileName);
@@ -42,7 +43,9 @@ namespace FW
 			AssetTileView->RequestListRefresh();
 		}
 
-		FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
+		virtual FReply OnDragOver(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent) override;
+		virtual FReply OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent) override;
+		virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 	private:
 		void OnMouseButtonDoubleClick(TSharedRef<AssetViewItem> ViewItem);
 		void OnHandleDeleteAction();

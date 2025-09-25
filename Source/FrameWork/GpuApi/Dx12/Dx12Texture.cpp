@@ -134,8 +134,17 @@ namespace FW
 		CD3DX12_CLEAR_VALUE ClearValues{ MapTextureFormat(InTexDesc.Format), ClearColor };
 
 		TRefCountPtr<ID3D12Resource> TexResource;
+		void* SharedHandle = nullptr;
 
-		if(Flags.bRTV)
+		if (Flags.bShared)
+		{
+			D3D12_COMPATIBILITY_SHARED_FLAGS CompatFlags{};
+			D3D11_RESOURCE_FLAGS Flags = { .BindFlags = D3D11_BIND_SHADER_RESOURCE, .MiscFlags = D3D11_RESOURCE_MISC_SHARED | D3D11_RESOURCE_MISC_SHARED_NTHANDLE };
+			DxCheck(GCompatDevice->CreateSharedResource(&HeapType, HeapFlag, &TexDesc, InitialState,
+				&ClearValues, &Flags, CompatFlags, nullptr, nullptr, IID_PPV_ARGS(TexResource.GetInitReference())));
+			DxCheck(GDevice->CreateSharedHandle(TexResource, nullptr, GENERIC_ALL, nullptr, &SharedHandle));
+		}
+		else if(Flags.bRTV)
 		{ 
 			DxCheck(GDevice->CreateCommittedResource(&HeapType, HeapFlag,
 				&TexDesc, InitialState, &ClearValues, IID_PPV_ARGS(TexResource.GetInitReference())));
@@ -145,13 +154,7 @@ namespace FW
 			DxCheck(GDevice->CreateCommittedResource(&HeapType, HeapFlag,
 				&TexDesc, InitialState, nullptr, IID_PPV_ARGS(TexResource.GetInitReference())));
 		}
-
-		void* SharedHandle = nullptr;
-		if (Flags.bShared)
-		{
-			DxCheck(GDevice->CreateSharedHandle(TexResource, nullptr, GENERIC_ALL, nullptr, &SharedHandle));
-		}
-
+		
 		TRefCountPtr<Dx12Texture> RetTexture = new Dx12Texture{ MoveTemp(TexResource), bHasInitialData ? GpuResourceState::CopyDst : InitState, 
 			InTexDesc, SharedHandle };
 		CreateTextureView(Flags, RetTexture);

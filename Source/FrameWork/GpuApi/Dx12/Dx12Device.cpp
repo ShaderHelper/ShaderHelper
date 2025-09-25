@@ -130,6 +130,7 @@ namespace FW
 		SH_LOG(LogDx12, Display, TEXT("Adapter: %s"), Desc.Description);
 
 		DxCheck(D3D12CreateDevice(Adapter, D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&GDevice)));
+		DxCheck(GDevice->QueryInterface(&GCompatDevice));
 		GMaxShaderModel = GetMaxShaderModel(GDevice);
 		if (GMaxShaderModel >= D3D_SHADER_MODEL_6_2)
 		{

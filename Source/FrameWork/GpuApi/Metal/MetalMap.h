@@ -103,6 +103,7 @@ namespace FW
     {
         switch(InTextureFormat)
         {
+		case GpuTextureFormat::R8_UNORM:              return MTLPixelFormatR8Unorm;
         case GpuTextureFormat::R8G8B8A8_UNORM:        return MTLPixelFormatRGBA8Unorm;
         case GpuTextureFormat::B8G8R8A8_UNORM:        return MTLPixelFormatBGRA8Unorm;
         case GpuTextureFormat::R10G10B10A2_UNORM:     return MTLPixelFormatRGB10A2Unorm;

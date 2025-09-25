@@ -29,6 +29,7 @@ namespace FW
 	enum class GpuTextureFormat
 	{
 		//Unorm
+		R8_UNORM,
 		R8G8B8A8_UNORM,
 		B8G8R8A8_UNORM,
 		B8G8R8A8_UNORM_SRGB,
