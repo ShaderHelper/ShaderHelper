@@ -3,7 +3,7 @@
 
 namespace FW
 {
-	class Texture2D : public AssetObject
+	class FRAMEWORK_API Texture2D : public AssetObject
 	{
 		REFLECTION_TYPE(Texture2D)
 	public:

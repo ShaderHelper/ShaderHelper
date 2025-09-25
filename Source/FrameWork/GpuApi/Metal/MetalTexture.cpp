@@ -117,6 +117,8 @@ namespace FW
         switch(InFormat)
         {
         case MTLPixelFormatBGRA8Unorm:  return kCVPixelFormatType_32BGRA;
+		case MTLPixelFormatR8Unorm:		return kCVPixelFormatType_OneComponent8;
+		case MTLPixelFormatRGBA32Float: return kCVPixelFormatType_128RGBAFloat;
         default:
 			AUX::Unreachable();
         }
