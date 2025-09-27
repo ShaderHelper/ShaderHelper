@@ -259,10 +259,7 @@ namespace SH
 		ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(BuiltInUniform\.)"), "");
 		ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(CustomUniform\.)"), "");
 		//Replace SPIRV-Cross texture sampler names with Shadertoy standard names
-		ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(SPIRV_Cross_CombinediChannel0iChannel0Sampler)"), "iChannel0");
-		ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(SPIRV_Cross_CombinediChannel1iChannel1Sampler)"), "iChannel1");
-		ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(SPIRV_Cross_CombinediChannel2iChannel2Sampler)"), "iChannel2");
-		ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(SPIRV_Cross_CombinediChannel3iChannel3Sampler)"), "iChannel3");
+		ShaderToy = std::regex_replace(ShaderToy, std::regex(R"(SPIRV_Cross_Combined(iChannel\d+)\w+)"), "$1");
 		//Find non-uniform global variables in the segment
 		std::vector<std::string> GlobalVars;
 		std::istringstream iss(ShaderToy);

@@ -5,6 +5,12 @@
 namespace FW
 {
 	DECLARE_MULTICAST_DELEGATE_OneParam(OnViewportResizeDelegate, const Vector2f&)
+	DECLARE_MULTICAST_DELEGATE_OneParam(OnFocusLostDelegate, const FFocusEvent&)
+	DECLARE_MULTICAST_DELEGATE_TwoParams(OnMouseDownDelegate, const FGeometry&, const FPointerEvent&)
+	DECLARE_MULTICAST_DELEGATE_TwoParams(OnMouseUpDelegate, const FGeometry&, const FPointerEvent&)
+	DECLARE_MULTICAST_DELEGATE_TwoParams(OnMouseMoveDelegate, const FGeometry&, const FPointerEvent&)
+	DECLARE_MULTICAST_DELEGATE_TwoParams(OnKeyDownDelegate, const FGeometry&, const FKeyEvent&)
+	DECLARE_MULTICAST_DELEGATE_TwoParams(OnKeyUpDelegate, const FGeometry&, const FKeyEvent&)
 
 	class FRAMEWORK_API PreviewViewPort : public ISlateViewport
 	{
@@ -37,66 +43,87 @@ namespace FW
         
         void Clear() { ViewPortRT.Reset(); }
 
-		Vector4f GetiMouse() const { return iMouse; }
+		void OnFocusLost(const FFocusEvent& InFocusEvent) override 
+		{
+			if (FocusLostHandler.IsBound())
+			{
+				FocusLostHandler.Broadcast(InFocusEvent);
+			}
+		}
+
+		FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override
+		{
+			if (KeyDownHandler.IsBound())
+			{
+				KeyDownHandler.Broadcast(MyGeometry, InKeyEvent);
+				return FReply::Handled();
+			}
+			return FReply::Unhandled();
+		}
+
+		FReply OnKeyUp(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override
+		{
+			if (KeyUpHandler.IsBound())
+			{
+				KeyUpHandler.Broadcast(MyGeometry, InKeyEvent);
+				return FReply::Handled();
+			}
+			return FReply::Unhandled();
+		}
 
 		FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
 		{
-			iMouse.xy = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * MyGeometry.Scale);
-			iMouse.zw = iMouse.xy;
-			if(OniMouseChangeHandler)
+			FReply Reply = FReply::Unhandled();
+			if (MouseDownHandler.IsBound())
 			{
-				OniMouseChangeHandler(iMouse);
+				MouseDownHandler.Broadcast(MyGeometry, MouseEvent);
+				Reply = FReply::Handled();
 			}
 			if(AssociatedWidget.IsValid())
 			{
-				return FReply::Unhandled().CaptureMouse(AssociatedWidget.Pin().ToSharedRef());
+				Reply.CaptureMouse(AssociatedWidget.Pin().ToSharedRef());
 			}
-			return FReply::Unhandled();
+			return Reply;
 		}
 
 		FReply OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
 		{
-			if(iMouse.z > 0)
+			FReply Reply = FReply::Unhandled();
+			if (MouseUpHandler.IsBound())
 			{
-				iMouse.z = -iMouse.z;
-			}
-			if(iMouse.w > 0)
-			{
-				iMouse.w = -iMouse.w;
+				MouseUpHandler.Broadcast(MyGeometry, MouseEvent);
+				Reply = FReply::Handled();
 			}
 			if(AssociatedWidget.IsValid())
 			{
-				return FReply::Unhandled().ReleaseMouseCapture();
+				Reply.ReleaseMouseCapture();
 			}
-			return FReply::Unhandled();
+			return Reply;
 		}
 
 		FReply OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
 		{
-			if (iMouse.z > 0)
+			if (MouseMoveHandler.IsBound())
 			{
-				iMouse.xy = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * MyGeometry.Scale);
-				if (iMouse.w > 0)
-				{
-					iMouse.w = -iMouse.w;
-				}
-				if(OniMouseChangeHandler)
-				{
-					OniMouseChangeHandler(iMouse);
-				}
+				MouseMoveHandler.Broadcast(MyGeometry, MouseEvent);
+				return FReply::Handled();
 			}
 			return FReply::Unhandled();
 		}
 
 	public:
-		OnViewportResizeDelegate ViewportResize;
-		TFunction<void(const Vector4f&)> OniMouseChangeHandler;
+		OnViewportResizeDelegate ResizeHandler;
+		OnFocusLostDelegate FocusLostHandler;
+		OnKeyDownDelegate KeyDownHandler;
+		OnKeyUpDelegate KeyUpHandler;
+		OnMouseDownDelegate MouseDownHandler;
+		OnMouseUpDelegate MouseUpHandler;
+		OnMouseMoveDelegate MouseMoveHandler;
 
 	private:
 		TWeakPtr<SWidget> AssociatedWidget;
 		TSharedPtr<FSlateUpdatableTexture> ViewPortRT;
 		int32 SizeX;
 		int32 SizeY;
-		Vector4f iMouse{};
 	};
 }

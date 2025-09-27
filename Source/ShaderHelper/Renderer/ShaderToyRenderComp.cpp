@@ -4,34 +4,107 @@
 #include "ProjectManager/ShProjectManager.h"
 #include "GpuApi/GpuResourceHelper.h"
 #include "AssetObject/StShader.h"
+#include "App/App.h"
+#include "Editor/ShaderHelperEditor.h"
+#include "AssetObject/ShaderToy/Nodes/ShaderToyKeyboardNode.h"
 
 using namespace FW;
 
 namespace SH
 {
 
+	void ShaderToyRenderComp::RefreshKeyboard()
+	{
+		TArray<uint8> RawData;
+		RawData.SetNumZeroed(256 * 3);
+		for (uint32 PressedKey : PressedKeys)
+		{
+			RawData[PressedKey] = 255;
+		}
+		Context.Keyboard = GGpuRhi->CreateTexture({
+			.Width = 256, .Height = 3,
+			.Format = GpuTextureFormat::R8_UNORM,
+			.Usage = GpuTextureUsage::ShaderResource,
+			.InitialData = RawData
+		});
+		GGpuRhi->SetResourceName("Keyboard", Context.Keyboard);
+		for (auto Node : ShaderToyGraph->GetNodes())
+		{
+			if (Node->DynamicMetaType() == GetMetaType<ShaderToyKeyboardNode>())
+			{
+				Node->HasResponse = PressedKeys.Num() > 0;
+			}
+		}
+	}
+
 	ShaderToyRenderComp::ShaderToyRenderComp(ShaderToy* InShaderToyGraph, PreviewViewPort* InViewPort)
 		: ShaderToyGraph(InShaderToyGraph)
 	{
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		Context.ViewPort = InViewPort;
-        ResizeHandle = Context.ViewPort->ViewportResize.AddRaw(this, &ShaderToyRenderComp::OnViewportResize);
+		ResizeHandle = Context.ViewPort->ResizeHandler.AddLambda([this](const Vector2f& InResolution) {
+			Context.iResolution = { InResolution.X, InResolution.Y, InResolution.Y / InResolution.X };
+		});
+		FocusLostHandle = Context.ViewPort->FocusLostHandler.AddLambda([this](const FFocusEvent& InFocusEvent) {
+			PressedKeys.Reset();
+		});
+		KeyDownHandle = Context.ViewPort->KeyDownHandler.AddLambda([this, ShEditor](const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) {
+			if (!PressedKeys.Contains(InKeyEvent.GetKeyCode()))
+			{
+				PressedKeys.Add(InKeyEvent.GetKeyCode());
+				RefreshKeyboard();
+				ShEditor->ForceRender();
+			}
+		});
+		KeyUpHandle = Context.ViewPort->KeyUpHandler.AddLambda([this, ShEditor](const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) {
+			PressedKeys.Remove(InKeyEvent.GetKeyCode());
+			RefreshKeyboard();
+			ShEditor->ForceRender();
+		});
+		MouseDownHandle = Context.ViewPort->MouseDownHandler.AddLambda([this, ShEditor](const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) {
+			Context.iMouse.xy = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * MyGeometry.Scale);
+			Context.iMouse.zw = Context.iMouse.xy;
+			ShEditor->ForceRender();
+		});
+		MouseUpHandle = Context.ViewPort->MouseUpHandler.AddLambda([this](const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) {
+			if (Context.iMouse.z > 0)
+			{
+				Context.iMouse.z = -Context.iMouse.z;
+			}
+			if (Context.iMouse.w > 0)
+			{
+				Context.iMouse.w = -Context.iMouse.w;
+			}
+		});
+		MouseMoveHandle = Context.ViewPort->MouseMoveHandler.AddLambda([this, ShEditor](const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) {
+			if (Context.iMouse.z > 0)
+			{
+				Context.iMouse.xy = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * MyGeometry.Scale);
+				if (Context.iMouse.w > 0)
+				{
+					Context.iMouse.w = -Context.iMouse.w;
+				}
+				ShEditor->ForceRender();
+			}
+		});
+		RefreshKeyboard();
 		Context.iResolution = { (float)Context.ViewPort->GetSize().X, (float)Context.ViewPort->GetSize().Y, (float)Context.ViewPort->GetSize().Y / Context.ViewPort->GetSize().X };
 	}
 
     ShaderToyRenderComp::~ShaderToyRenderComp()
     {
-		Context.ViewPort->ViewportResize.Remove(ResizeHandle);
+		Context.ViewPort->ResizeHandler.Remove(ResizeHandle);
+		Context.ViewPort->FocusLostHandler.Remove(FocusLostHandle);
+		Context.ViewPort->KeyDownHandler.Remove(KeyDownHandle);
+		Context.ViewPort->KeyUpHandler.Remove(KeyUpHandle);
+		Context.ViewPort->MouseDownHandler.Remove(MouseDownHandle);
+		Context.ViewPort->MouseUpHandler.Remove(MouseUpHandle);
+		Context.ViewPort->MouseMoveHandler.Remove(MouseMoveHandle);
     }
-
-	void ShaderToyRenderComp::OnViewportResize(const Vector2f& InResolution)
-	{
-		Context.iResolution = { InResolution.X, InResolution.Y, InResolution.Y / InResolution.X };
-	}
 
 	void ShaderToyRenderComp::RenderBegin()
 	{
 		Context.iTime = TSingleton<ShProjectManager>::Get().GetProject()->TimelineCurTime;
-		Context.iMouse = Context.ViewPort->GetiMouse();
 		Context.Ontputs.Reset();
 	}
 

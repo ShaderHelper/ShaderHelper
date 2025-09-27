@@ -64,7 +64,6 @@ namespace SH
 		
 		CurProject = TSingleton<ShProjectManager>::Get().GetProject();
 		ViewPort = MakeShared<PreviewViewPort>();
-		ViewPort->OniMouseChangeHandler = [this](const Vector4f&) { ForceRender(); };
 	}
 
 	ShaderHelperEditor::~ShaderHelperEditor()

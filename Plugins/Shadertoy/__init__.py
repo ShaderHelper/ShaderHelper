@@ -103,6 +103,13 @@ def init_shadertoy_pass(page, shadertoy_context, shadertoy_pass):
                     page.locator(f"#{img_id}").click()
                     page.locator("#pickTextureHeader div").nth(1).click()
                     resource_set_successfully = True
+        elif isinstance(item_value, Sh.ShaderToyKeyboardNode):
+            page.locator(texture_selector).click()
+            page.locator("//a[@onclick=\"openTab('Misc')\"]").click()
+            page.locator("#miscAssetThumnail0").click()
+            page.locator("#pickTextureHeader div").nth(1).click()
+            resource_set_successfully = True
+
         if resource_set_successfully:
             # set sampling setting
             sampling_button_selector = f"#mySamplingButton{channel_index}"

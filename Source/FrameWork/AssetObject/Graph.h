@@ -65,6 +65,7 @@ namespace FW
         TArray<ObjectPtr<GraphPin>> Pins;
 		TMultiMap<FGuid, FGuid> OutPinToInPin;
         bool AnyError = false;
+		bool HasResponse = false;
 		bool IsDebugging = false;
 	};
 

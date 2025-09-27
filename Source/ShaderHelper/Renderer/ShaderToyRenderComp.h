@@ -21,6 +21,7 @@ namespace SH
 		FW::Vector4f iMouse{};
 		FW::RenderGraph* RG = nullptr;
         TRefCountPtr<FW::GpuTexture> FinalRT;
+		TRefCountPtr<FW::GpuTexture> Keyboard;
 		FW::PreviewViewPort* ViewPort;
 		TArray<ShaderToyOutputDesc> Ontputs;
 	};
@@ -32,14 +33,18 @@ namespace SH
         ~ShaderToyRenderComp();
 
 	public:
-		void OnViewportResize(const FW::Vector2f& InResolution);
-
 		void RenderBegin();
 		void RenderInternal() override;
+		void RefreshKeyboard();
 
 	private:
 		ShaderToy* ShaderToyGraph;
 		ShaderToyExecContext Context;
-        FDelegateHandle ResizeHandle;
+		TSet<uint32> PressedKeys;
+		FDelegateHandle ResizeHandle;
+		FDelegateHandle FocusLostHandle;
+		FDelegateHandle KeyDownHandle, KeyUpHandle;
+		FDelegateHandle MouseDownHandle, MouseUpHandle;
+		FDelegateHandle MouseMoveHandle;
 	};
 }

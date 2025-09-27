@@ -41,9 +41,9 @@ namespace FW
 		{
 			SizeX = DrawSize.X;
 			SizeY = DrawSize.Y;
-			if (ViewportResize.IsBound())
+			if (ResizeHandler.IsBound())
 			{
-				ViewportResize.Broadcast(Vector2f{ (float)SizeX, (float)SizeY });
+				ResizeHandler.Broadcast(Vector2f{ (float)SizeX, (float)SizeY });
 			}
 		}
 

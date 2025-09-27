@@ -4,6 +4,7 @@
 #include "AssetObject/Nodes/Texture2dNode.h"
 #include "AssetObject/ShaderToy/Nodes/ShaderToyPassNode.h"
 #include "AssetObject/ShaderToy/Nodes/ShaderToyOutputNode.h"
+#include "AssetObject/ShaderToy/Nodes/ShaderToyKeyboardNode.h"
 #include "AssetObject/Pins/Pins.h"
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
@@ -32,6 +33,8 @@ PYBIND11_EMBEDDED_MODULE(ShaderHelper, m)
 		.def_readonly("iChannel2", &SH::ShaderToyPassNode::iChannelDesc2)
 		.def_readonly("iChannel3", &SH::ShaderToyPassNode::iChannelDesc3);
 	py::class_<SH::ShaderToyOutputNode, FW::GraphNode>(m, "ShaderToyOutputNode")
+		.def(py::init<>());
+	py::class_<SH::ShaderToyKeyboardNode, FW::GraphNode>(m, "ShaderToyKeyboardNode")
 		.def(py::init<>());
 	py::class_<SH::Texture2dNode, FW::GraphNode>(m, "Texture2dNode")
 		.def(py::init<>())

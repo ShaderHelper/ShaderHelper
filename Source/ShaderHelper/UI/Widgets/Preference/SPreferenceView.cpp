@@ -229,10 +229,6 @@ namespace SH
 			{
 				return FAppStyle::Get().GetBrush("Brushes.Select");
 			}
-			else if (Self->IsHovered())
-			{
-				return FAppStyle::Get().GetBrush("Brushes.Hover");
-			}
 			return FAppStyle::Get().GetBrush("Brushes.Header");
 			}));
 		Preference->SetOnMouseButtonDown(FPointerEventHandler::CreateLambda([this, InView, Self = &*Preference](auto&&, auto&&) {

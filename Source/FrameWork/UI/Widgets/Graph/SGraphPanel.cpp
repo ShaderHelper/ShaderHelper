@@ -442,6 +442,19 @@ namespace FW
                     FLinearColor::Red
                 );
             }
+
+			if (CurNodeWidget->NodeData->HasResponse)
+			{
+				FSlateDrawElement::MakeBox(
+					OutDrawElements,
+					TopNodeLayer,
+					CurWidget.Geometry.ToPaintGeometry(),
+					FAppCommonStyle::Get().GetBrush("Graph.NodeOutline"),
+					ESlateDrawEffect::None,
+					FLinearColor{1.0f, 0.55f, 0.0f, 0.4f}
+				);
+			}
+
 			else if (SelectedNodes.Contains( &*CurNodeWidget))
 			{
 				FSlateDrawElement::MakeBox(
