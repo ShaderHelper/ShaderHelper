@@ -13,7 +13,7 @@ namespace FW
 			TRefCountPtr<GpuSampler> InputTexSampler;
 		};
 
-		BlitShader();
+		BlitShader(const std::set<FString>& VariantDefinitions = {});
 
 		GpuShader* GetVertexShader() const { return Vs; }
 		GpuShader* GetPixelShader() const { return Ps; }

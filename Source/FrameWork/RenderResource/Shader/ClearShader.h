@@ -8,7 +8,7 @@ namespace FW
 	class ClearShader
 	{
 	public:
-		ClearShader();
+		ClearShader(const std::set<FString>& VariantDefinitions = {});
 
 		GpuShader* GetComputeShader() const { return Cs; }
 

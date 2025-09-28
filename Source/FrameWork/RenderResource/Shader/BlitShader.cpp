@@ -7,8 +7,15 @@
 namespace FW
 {
 
-	BlitShader::BlitShader()
+	BlitShader::BlitShader(const std::set<FString>& VariantDefinitions)
 	{
+		TArray<FString> ExtraArgs;
+		for(const auto& D : VariantDefinitions)
+		{
+			ExtraArgs.Add("-D");
+			ExtraArgs.Add(D);
+		}
+
 		BindGroupLayout = GpuBindGroupLayoutBuilder{ BindingContext::ShaderSlot }
 							.AddExistingBinding(0, BindingType::Texture, BindingShaderStage::Pixel)
 							.AddExistingBinding(1, BindingType::Sampler, BindingShaderStage::Pixel)
@@ -27,10 +34,10 @@ namespace FW
 		});
 
 		FString ErrorInfo, WarnInfo;
-		GGpuRhi->CompileShader(Vs, ErrorInfo, WarnInfo);
+		GGpuRhi->CompileShader(Vs, ErrorInfo, WarnInfo, ExtraArgs);
 		check(ErrorInfo.IsEmpty());
 
-		GGpuRhi->CompileShader(Ps, ErrorInfo, WarnInfo);
+		GGpuRhi->CompileShader(Ps, ErrorInfo, WarnInfo, ExtraArgs);
 		check(ErrorInfo.IsEmpty());
 	}
 

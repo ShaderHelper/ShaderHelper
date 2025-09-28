@@ -31,12 +31,36 @@ namespace FW
 			, _IsChecked(ECheckBoxState::Unchecked)
 			{}
 			SLATE_ATTRIBUTE(const FSlateBrush*, Icon)
+			SLATE_ATTRIBUTE(FText, Text)
 			SLATE_EVENT(FOnCheckStateChanged, OnCheckStateChanged)
 			SLATE_ATTRIBUTE(ECheckBoxState, IsChecked)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs)
 		{
+			TSharedRef<SHorizontalBox> HBox = SNew(SHorizontalBox);
+			float Space = InArgs._Icon.IsSet() ? 6.0f : 0.0f;
+
+			if (InArgs._Icon.IsSet())
+			{
+				HBox->AddSlot()
+					.AutoWidth()
+					.VAlign(VAlign_Center)
+					[
+						SNew(SImage).Image(InArgs._Icon)
+					];
+			}
+
+			if (!InArgs._Text.Get().IsEmpty())
+			{
+				HBox->AddSlot()
+					.HAlign(HAlign_Center)
+					.Padding(Space, 0.0f, 0.f, 0.f)
+					[
+						SNew(STextBlock).Text(InArgs._Text.Get())
+					];
+			}
+
 			IsCheckboxChecked = InArgs._IsChecked;
 			OnCheckStateChanged = InArgs._OnCheckStateChanged;
 			ChildSlot
@@ -55,9 +79,9 @@ namespace FW
 					}
 					return FLinearColor::Transparent;
 				})
-				[
-					SNew(SImage).Image(InArgs._Icon)
-					.OnMouseButtonDown_Lambda([this](const FGeometry&, const FPointerEvent&) {
+				.OnMouseButtonDown_Lambda([this](const FGeometry&, const FPointerEvent& MouseEvent) {
+					if (MouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton))
+					{
 						if (IsCheckboxChecked.Get() == ECheckBoxState::Checked)
 						{
 							OnCheckStateChanged.ExecuteIfBound(ECheckBoxState::Unchecked);
@@ -67,7 +91,11 @@ namespace FW
 							OnCheckStateChanged.ExecuteIfBound(ECheckBoxState::Checked);
 						}
 						return FReply::Handled();
-					})
+					}
+					return FReply::Unhandled();
+				})
+				[
+					HBox
 				]
 			];
 		}

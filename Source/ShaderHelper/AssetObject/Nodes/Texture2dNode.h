@@ -16,6 +16,15 @@ namespace SH
 		void OnSelect(FW::ShObject* InObject) override;
 	};
 
+	enum class TextureChannelFilter
+	{
+		None,
+		R,
+		G,
+		B,
+		A
+	};
+
 	class Texture2dNode : public FW::GraphNode
 	{
 		REFLECTION_TYPE(Texture2dNode)
@@ -36,6 +45,7 @@ namespace SH
 		void PostPropertyChanged(FW::PropertyData* InProperty) override;
 		
 	private:
+		void RefershPreview();
 		void ClearProperty();
 		
 	public:
@@ -45,6 +55,7 @@ namespace SH
 		uint32 Height{};
 		
 	private:
+		TextureChannelFilter ChannelFilter = TextureChannelFilter::None;
 		TSharedPtr<FW::PreviewViewPort> Preview = MakeShared<FW::PreviewViewPort>();
 		
 	};

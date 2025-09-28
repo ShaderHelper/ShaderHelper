@@ -9,7 +9,7 @@ using namespace FW;
 namespace SH
 {
 
-	DebuggerGridShader::DebuggerGridShader()
+	DebuggerGridShader::DebuggerGridShader(const std::set<FString>& VariantDefinitions)
 	{
 		GridUbBuilder.AddVector2f("Offset")
 				 .AddUint("Zoom")

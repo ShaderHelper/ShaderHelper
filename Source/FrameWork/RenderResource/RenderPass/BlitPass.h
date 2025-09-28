@@ -6,11 +6,12 @@ namespace FW
 {
 	struct BlitPassInput
 	{
+		std::set<FString> VariantDefinitions;
 		TRefCountPtr<GpuTexture> InputTex;
 		TRefCountPtr<GpuSampler> InputTexSampler;
 
 		TRefCountPtr<GpuTexture> OutputRenderTarget;
-
+		
 		TOptional<GpuScissorRectDesc> Scissor;
 		RenderTargetLoadAction LoadAction = RenderTargetLoadAction::Load;
 	};

@@ -17,7 +17,7 @@ namespace SH
 			FW::Vector2f MouseLoc;
 		};
 
-		DebuggerGridShader();
+		DebuggerGridShader(const std::set<FString>& VariantDefinitions = {});
 
 		FW::GpuShader* GetVertexShader() const { return Vs; }
 		FW::GpuShader* GetPixelShader() const { return Ps; }

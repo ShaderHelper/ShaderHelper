@@ -5,13 +5,13 @@
 namespace FW
 {
 	template<BindingType InType>
-	ClearShader<InType>::ClearShader()
+	ClearShader<InType>::ClearShader(const std::set<FString>& VariantDefinitions)
 	{
 		TArray<FString> ExtraArgs;
 		ExtraArgs.Add("-D");
 		if constexpr(InType == BindingType::RWStorageBuffer)
 		{
-			ExtraArgs.Add("RESOURCE_TYPE=1");
+			ExtraArgs.Add("RESOURCE_STORAGE_BUFFER");
 		}
 
 		ClearUbBuilder.AddUint("Size");
