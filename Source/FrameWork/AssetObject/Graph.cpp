@@ -59,7 +59,7 @@ namespace FW
 		return FAppStyle::Get().GetBrush("Icons.Blueprints");
 	}
 
-    GraphPin* Graph::GetPin(const FGuid& Id)
+    GraphPin* Graph::GetPin(FGuid Id)
     {
         for(auto Node : NodeDatas)
         {
@@ -154,7 +154,7 @@ namespace FW
 		return FStyleColors::Title;
 	}
 
-    GraphPin* GraphNode::GetPin(const FGuid& Id)
+    GraphPin* GraphNode::GetPin(FGuid Id)
     {
         for(GraphPin* Pin : Pins)
         {

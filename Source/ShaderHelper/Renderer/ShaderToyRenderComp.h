@@ -24,6 +24,7 @@ namespace SH
 		TRefCountPtr<FW::GpuTexture> Keyboard;
 		FW::PreviewViewPort* ViewPort;
 		TArray<ShaderToyOutputDesc> Ontputs;
+		bool bTimelineJump{};
 	};
 
 	class ShaderToyRenderComp : public FW::RenderComponent
@@ -37,9 +38,10 @@ namespace SH
 		void RenderInternal() override;
 		void RefreshKeyboard();
 
+		ShaderToyExecContext Context;
+
 	private:
 		ShaderToy* ShaderToyGraph;
-		ShaderToyExecContext Context;
 		TSet<uint32> PressedKeys;
 		FDelegateHandle ResizeHandle;
 		FDelegateHandle FocusLostHandle;

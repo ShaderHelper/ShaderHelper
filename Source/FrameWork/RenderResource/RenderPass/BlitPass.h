@@ -13,7 +13,7 @@ namespace FW
 		TRefCountPtr<GpuTexture> OutputRenderTarget;
 		
 		TOptional<GpuScissorRectDesc> Scissor;
-		RenderTargetLoadAction LoadAction = RenderTargetLoadAction::Load;
+		RenderTargetLoadAction LoadAction = RenderTargetLoadAction::DontCare;
 	};
 
 	FRAMEWORK_API void AddBlitPass(RenderGraph& Graph, const BlitPassInput& PassInput);

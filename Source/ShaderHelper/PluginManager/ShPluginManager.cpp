@@ -5,6 +5,7 @@
 #include "AssetObject/ShaderToy/Nodes/ShaderToyPassNode.h"
 #include "AssetObject/ShaderToy/Nodes/ShaderToyOutputNode.h"
 #include "AssetObject/ShaderToy/Nodes/ShaderToyKeyboardNode.h"
+#include "AssetObject/ShaderToy/Nodes/ShaderToyPreviousFrameNode.h"
 #include "AssetObject/Pins/Pins.h"
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
@@ -36,6 +37,9 @@ PYBIND11_EMBEDDED_MODULE(ShaderHelper, m)
 		.def(py::init<>());
 	py::class_<SH::ShaderToyKeyboardNode, FW::GraphNode>(m, "ShaderToyKeyboardNode")
 		.def(py::init<>());
+	py::class_<SH::ShaderToyPreviousFrameNode, FW::GraphNode>(m, "ShaderToyPreviousFrameNode")
+		.def(py::init<>())
+		.def("GetPassNode", &SH::ShaderToyPreviousFrameNode::GetPassNode, py::return_value_policy::reference);
 	py::class_<SH::Texture2dNode, FW::GraphNode>(m, "Texture2dNode")
 		.def(py::init<>())
 		.def_property_readonly("Texture", [](const SH::Texture2dNode& Self) { return Self.Texture.Get(); });

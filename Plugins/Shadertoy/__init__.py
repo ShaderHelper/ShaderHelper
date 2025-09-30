@@ -39,9 +39,10 @@ def get_browser_path():
 def init_shadertoy_pass(page, shadertoy_context, shadertoy_pass):
     select_element = page.locator('select.tabAddSelect')
     options = select_element.locator('option').all_text_contents()
-    if shadertoy_pass[0] in options:
-        select_element.select_option(label=shadertoy_pass[0])
-    page.locator("#passManager label", has_text=shadertoy_pass[0]).first.click()
+    shadertoy_pass_name = shadertoy_pass[0]
+    if shadertoy_pass_name in options:
+        select_element.select_option(label=shadertoy_pass_name)
+    page.locator("#passManager label", has_text=shadertoy_pass_name).first.click()
     page.wait_for_selector('.CodeMirror')
     shadertoy_pass_node = shadertoy_pass[1]['node']
     pass_code = shadertoy_pass_node.GetShaderToyCode()
@@ -109,6 +110,13 @@ def init_shadertoy_pass(page, shadertoy_context, shadertoy_pass):
             page.locator("#miscAssetThumnail0").click()
             page.locator("#pickTextureHeader div").nth(1).click()
             resource_set_successfully = True
+        elif isinstance(item_value, Sh.ShaderToyPreviousFrameNode):
+            if shadertoy_pass_name != 'Image' and shadertoy_pass_node is item_value.GetPassNode():
+                page.locator(texture_selector).click()
+                page.locator("//a[@onclick=\"openTab('Misc')\"]").click()
+                page.locator(pass_name_to_css[shadertoy_pass_name]).click()
+                page.locator("#pickTextureHeader div").nth(1).click()
+                resource_set_successfully = True
 
         if resource_set_successfully:
             # set sampling setting
@@ -153,6 +161,9 @@ def open_shadertoy_with_playwright(shadertoy_context):
 
         page.locator("#passManager label", has_text='Image').first.click()
         page.locator("#compileButton").click()
+        page.locator("#myPauseButton").click()
+        page.locator("#myResetButton").click()
+        page.locator("#myPauseButton").click()
 
     except Exception as e:
         print(f"launch browser failed: {e}")

@@ -38,6 +38,7 @@ namespace FW
 
 	void Texture2D::PostLoad()
 	{
+		AssetObject::PostLoad();
 		InitGpudata();
 	}
 

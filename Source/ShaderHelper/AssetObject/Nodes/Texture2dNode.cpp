@@ -85,10 +85,10 @@ namespace SH
 				+ SVerticalBox::Slot()
 				.AutoHeight()
 				[
-					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot()
+					SNew(SBorder).BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
 					[
-						SNew(SBorder).BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot()
 						[
 							SNew(SShToggleButton).Text(FText::FromString("R"))
 							.IsChecked_Lambda([this] { return ChannelFilter == TextureChannelFilter::R ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
@@ -104,10 +104,7 @@ namespace SH
 								RefershPreview();
 							})
 						]
-					]
-					+ SHorizontalBox::Slot()
-					[
-						SNew(SBorder).BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
+						+ SHorizontalBox::Slot()
 						[
 							SNew(SShToggleButton).Text(FText::FromString("G"))
 							.IsChecked_Lambda([this] { return ChannelFilter == TextureChannelFilter::G ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
@@ -123,10 +120,7 @@ namespace SH
 								RefershPreview();
 							})
 						]
-					]
-					+ SHorizontalBox::Slot()
-					[
-						SNew(SBorder).BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
+						+ SHorizontalBox::Slot()
 						[
 							SNew(SShToggleButton).Text(FText::FromString("B"))
 							.IsChecked_Lambda([this] { return ChannelFilter == TextureChannelFilter::B ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
@@ -142,10 +136,7 @@ namespace SH
 								RefershPreview();
 							})
 						]
-					]
-					+ SHorizontalBox::Slot()
-					[
-						SNew(SBorder).BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
+						+ SHorizontalBox::Slot()
 						[
 							SNew(SShToggleButton).Text(FText::FromString("A"))
 							.IsChecked_Lambda([this] { return ChannelFilter == TextureChannelFilter::A ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
@@ -202,19 +193,23 @@ namespace SH
 
 	}
 
+	void Texture2dNode::RefreshProprety()
+	{
+		PropertyDatas.Empty();
+		ShObject::GetPropertyDatas();
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->RefreshProperty();
+	}
+
 	void Texture2dNode::ClearProperty()
 	{
-		Width = Height = 0;
+		Width = Height = 1;
+		Format = GpuTextureFormat::B8G8R8A8_UNORM;
 		auto ResultPin = static_cast<GpuTexturePin*>(GetPin("RT"));
 		ResultPin->SetValue(nullptr);
 		Preview->Clear();
-		
-		PropertyDatas.Empty();
-		ShObject::GetPropertyDatas();
 		GetOuterMost()->MarkDirty();
-		
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->RefreshProperty();
+		RefreshProprety();
 	}
 
 	void Texture2dNode::PostPropertyChanged(PropertyData* InProperty)
@@ -225,6 +220,7 @@ namespace SH
 		if(InProperty->GetDisplayName() == "Texture")
 		{
 			InitTexture();
+			RefreshProprety();
 		}
 	}
 

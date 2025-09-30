@@ -18,6 +18,7 @@ namespace FW
         bool* bStop = nullptr;
         float* CurTime = nullptr;
         float* MaxTime = nullptr;
+		TFunction<void(float)> OnHandleMove;
     };
 
     class FRAMEWORK_API STimelineArea : public SLeafWidget

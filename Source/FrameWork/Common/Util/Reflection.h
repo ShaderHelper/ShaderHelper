@@ -95,20 +95,9 @@ namespace FW
 
 	struct MetaType
 	{
-		void* GetDefaultObject()
-		{
-			if (!DefaultObject && Constructor)
-			{
-				DefaultObject = Constructor();
-			}
-			return DefaultObject;
-		}
+		FRAMEWORK_API void* GetDefaultObject();
 
-		void* Construct()
-		{
-			check(Constructor);
-			return Constructor();
-		}
+		FRAMEWORK_API void* Construct();
 
 		MetaType* GetBaseClass()
 		{
@@ -366,6 +355,7 @@ namespace FW
 
 #define REFLECTION_TYPE(Type)       \
     public:                         \
+		friend FW::MetaType;        \
         virtual FW::MetaType* DynamicMetaType() const {  return FW::GetMetaType<Type>(); }
     
 

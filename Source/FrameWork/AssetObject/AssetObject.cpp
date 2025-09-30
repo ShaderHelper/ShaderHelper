@@ -22,7 +22,6 @@ namespace FW
 	{
 		GProject->RemovePendingAsset(this);
 		NumRefs = 0;
-		OnDestroy.Broadcast();
 		delete this;
 	}
 

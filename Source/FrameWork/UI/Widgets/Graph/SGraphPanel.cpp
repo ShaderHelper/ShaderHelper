@@ -442,6 +442,16 @@ namespace FW
                     FLinearColor::Red
                 );
             }
+			else if (SelectedNodes.Contains(&*CurNodeWidget))
+			{
+				FSlateDrawElement::MakeBox(
+					OutDrawElements,
+					NodeLayer,
+					CurWidget.Geometry.ToInflatedPaintGeometry(FVector2D{ 2, 2 }),
+					FAppCommonStyle::Get().GetBrush("Graph.NodeOutline"),
+					ESlateDrawEffect::None
+				);
+			}
 
 			if (CurNodeWidget->NodeData->HasResponse)
 			{
@@ -455,16 +465,6 @@ namespace FW
 				);
 			}
 
-			else if (SelectedNodes.Contains( &*CurNodeWidget))
-			{
-				FSlateDrawElement::MakeBox(
-					OutDrawElements,
-					NodeLayer,
-					CurWidget.Geometry.ToInflatedPaintGeometry(FVector2D{ 2, 2}),
-					FAppCommonStyle::Get().GetBrush("Graph.NodeOutline"),
-					ESlateDrawEffect::None
-				);
-			}
 		}
 
 		if (PreviewStart)

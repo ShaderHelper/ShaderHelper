@@ -13,6 +13,7 @@
 #include "UI/Widgets/Timeline/STimeline.h"
 #include "UI/Widgets/Misc/CommonCommands.h"
 #include "PluginManager/ShPluginManager.h"
+#include "Renderer/ShaderToyRenderComp.h"
 
 STEAL_PRIVATE_MEMBER(FTabManager, TArray<TSharedRef<FTabManager::FArea>>, CollapsedDockAreas)
 
@@ -129,10 +130,11 @@ namespace SH
 
 	void ShaderHelperEditor::ForceRender()
 	{
-		if(TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop == true)
+		bool CacheTimelineStop = TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop;
+		TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = false;
+		Renderer->Render();
+		if(CacheTimelineStop == true)
 		{
-			TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = false;
-			Renderer->Render();
 			TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = true;
 		}
 	}
@@ -292,7 +294,16 @@ namespace SH
                 SNew(STimeline).bStop(&CurProject->TimelineStop)
                     .CurTime(&CurProject->TimelineCurTime).MaxTime(&CurProject->TimelineMaxTime)
 					.OnHandleMove([this](float){
-						ForceRender();
+						if (auto RenderComp = dynamic_cast<ShaderToyRenderComp*>(GraphRenderComp.Get()))
+						{
+							RenderComp->Context.bTimelineJump = true;
+							ForceRender();
+							RenderComp->Context.bTimelineJump = false;
+						}
+						else
+						{
+							ForceRender();
+						}
 					})
 					.IsEnabled_Lambda([this] { return !IsDebugging; })
             ]

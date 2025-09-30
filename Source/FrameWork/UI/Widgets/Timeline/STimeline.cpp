@@ -13,7 +13,8 @@ namespace FW
         bStop = InArgs._bStop;
         CurTime = InArgs._CurTime;
         MaxTime = InArgs._MaxTime;
-		
+		OnHandleMove = InArgs._OnHandleMove;
+
         ChildSlot
         [
             SNew(SBorder)
@@ -39,6 +40,7 @@ namespace FW
                     SNew(SIconButton).Icon(FAppCommonStyle::Get().GetBrush("Timeline.LeftEnd"))
                     .OnClicked_Lambda([this]{
                         *CurTime = 0;
+						OnHandleMove(*CurTime);
                         return FReply::Handled();
                     })
                 ]
@@ -62,6 +64,7 @@ namespace FW
                     SNew(SIconButton).Icon(FAppCommonStyle::Get().GetBrush("Timeline.RightEnd"))
                     .OnClicked_Lambda([this]{
                         *CurTime = *MaxTime;
+						OnHandleMove(*CurTime);
                         return FReply::Handled();
                     })
                 ]

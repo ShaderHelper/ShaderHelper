@@ -497,11 +497,6 @@ namespace SH
 		Ar << iChannelDesc0 << iChannelDesc1 << iChannelDesc2 << iChannelDesc3;
 	}
 
-    void ShaderToyPassNode::PostLoad()
-    {
-        GraphNode::PostLoad();
-    }
-
 	TSharedPtr<SWidget> ShaderToyPassNode::ExtraNodeWidget()
 	{
 		return SNew(SBox).Padding(4.0f)
@@ -691,7 +686,7 @@ namespace SH
 	{
 		if (!ShaderAssetObj.IsValid())
 		{
-            SH_LOG(LogGraph, Error, TEXT("Node:%s does not specify the corresponding stShader."), *ObjectName.ToString());
+            SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" does not specify the corresponding stShader."), *ObjectName.ToString());
             return {true, true};
 		}
         

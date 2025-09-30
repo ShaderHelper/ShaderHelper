@@ -58,7 +58,7 @@ namespace FW
 		virtual FSlateColor GetNodeColor() const;
         virtual ExecRet Exec(GraphExecContext& Context) = 0;
         virtual void InitPins() {}
-        GraphPin* GetPin(const FGuid& Id);
+        GraphPin* GetPin(FGuid Id);
         GraphPin* GetPin(const FString& InName);
 
 		Vector2D Position{0};
@@ -69,6 +69,9 @@ namespace FW
 		bool IsDebugging = false;
 	};
 
+	DECLARE_MULTICAST_DELEGATE_OneParam(OnAddNodeDelegate, ObjectPtr<GraphNode>)
+	DECLARE_MULTICAST_DELEGATE_OneParam(OnRemoveNodeDelegate, FGuid)
+
 	class FRAMEWORK_API Graph : public AssetObject
 	{
 		REFLECTION_TYPE(Graph)
@@ -76,22 +79,31 @@ namespace FW
 		Graph() = default;
 
 	public:
-		void AddNode(ObjectPtr<GraphNode> InNode) { NodeDatas.Add(MoveTemp(InNode)); }
+		void AddNode(ObjectPtr<GraphNode> InNode) { 
+			NodeDatas.Add(InNode);
+			AddNodeHandler.Broadcast(MoveTemp(InNode));
+		}
 		void RemoveNode(FGuid Id) {
 			NodeDatas.RemoveAll([Id](const ObjectPtr<GraphNode>& Element) {
 				return Element->GetGuid() == Id;
-				});
+			});
+			RemoveNodeHandler.Broadcast(Id);
 		}
         ObjectPtr<GraphNode> GetNode(FGuid Id) const {
-			return (*NodeDatas.FindByPredicate([Id](const ObjectPtr<GraphNode>& Element) {
+			auto* ResultPtr = NodeDatas.FindByPredicate([Id](const ObjectPtr<GraphNode>& Element) {
 				return Element->GetGuid() == Id;
-				}));
+			});
+			if (ResultPtr)
+			{
+				return *ResultPtr;
+			}
+			return nullptr;
 		}
 		const TArray<ObjectPtr<GraphNode>>& GetNodes() const { return NodeDatas; }
 		void AddDep(GraphNode* Node1, GraphNode* Node2) { NodeDeps.Add(Node1->GetGuid(), Node2->GetGuid()); }
 		void RemoveDep(GraphNode* Node1, GraphNode* Node2) { NodeDeps.Remove(Node1->GetGuid(), Node2->GetGuid()); }
             
-        GraphPin* GetPin(const FGuid& Id);
+        GraphPin* GetPin(FGuid Id);
 	public:
 		void Serialize(FArchive& Ar) override;
 		const FSlateBrush* GetImage() const override;
@@ -101,6 +113,8 @@ namespace FW
 		
     public:
         bool AnyError = false;
+		OnAddNodeDelegate AddNodeHandler;
+		OnRemoveNodeDelegate RemoveNodeHandler;
 	
 	protected:
 		//Keep layer order

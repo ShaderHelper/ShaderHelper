@@ -156,6 +156,7 @@ namespace FW
     {
         check(NumRefs == 0);
         GlobalValidShObjects.Remove(this);
+		OnDestroy.Broadcast();
     }
 
     void ShObject::SetOuter(ShObject* InOuter)
@@ -169,6 +170,11 @@ namespace FW
 
     AssetObject* ShObject::GetOuterMost()
     {
+		if (IsDefaultObject)
+		{
+			return nullptr;
+		}
+
         ShObject* Cur = this;
         ShObject* CurOuter = GetOuter();
         while(CurOuter)

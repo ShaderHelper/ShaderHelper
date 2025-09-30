@@ -23,4 +23,27 @@ namespace FW
 		return MemberMetaType ? MemberMetaType->IsDerivedFrom<AssetObject>() : false;
     }
 
+	void* MetaType::GetDefaultObject()
+	{
+		if (!DefaultObject && Constructor)
+		{
+			DefaultObject = Constructor();
+			if (IsDerivedFrom<ShObject>())
+			{
+				static_cast<ShObject*>(DefaultObject)->IsDefaultObject = true;
+			}
+		}
+		return DefaultObject;
+	}
+
+	void* MetaType::Construct()
+	{
+		check(Constructor);
+		void* NewObject = Constructor();
+		if (IsDerivedFrom<ShObject>())
+		{
+			static_cast<ShObject*>(NewObject)->Init();
+		}
+		return NewObject;
+	}
 }

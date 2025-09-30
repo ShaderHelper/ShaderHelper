@@ -142,6 +142,10 @@ namespace SH
 					{
 						Context.Ontputs[i].Pass.LoadAction = RenderTargetLoadAction::Clear;
 					}
+					else
+					{
+						Context.Ontputs[i].Pass.LoadAction = RenderTargetLoadAction::Load;
+					}
 					AddBlitPass(*Context.RG, Context.Ontputs[i].Pass);
 				}
 

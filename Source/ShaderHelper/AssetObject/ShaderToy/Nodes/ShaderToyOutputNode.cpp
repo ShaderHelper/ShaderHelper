@@ -89,7 +89,7 @@ namespace SH
         
         BlitPassInput Input;
         Input.InputTex = ResultPin->GetValue();
-        Input.InputTexSampler = GpuResourceHelper::GetSampler({.Filter = SamplerFilter::Bilinear});
+        Input.InputTexSampler = GpuResourceHelper::GetSampler({});
         Input.OutputRenderTarget = ShaderToyContext.FinalRT;
 		Input.Scissor = GpuScissorRectDesc{0, 0, (uint32)(AreaFraction * ShaderToyContext.FinalRT->GetWidth()), ShaderToyContext.FinalRT->GetHeight()};
 

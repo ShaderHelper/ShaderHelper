@@ -27,6 +27,8 @@ namespace FW
 		ShObject();
 	public:
 		virtual ~ShObject();
+		//Init will be called when a non-default object is created
+		virtual void Init() {}
         
     public:
 		FGuid GetGuid() const { return Guid; }
@@ -62,6 +64,7 @@ namespace FW
 
 	public:
 		FText ObjectName;
+		FSimpleMulticastDelegate OnDestroy;
 
 	protected:
 		FGuid Guid;
@@ -74,6 +77,7 @@ namespace FW
         ShObject* Outer;
 
         TArray<ObserverObjectPtr<ShObject>> SubObjects;
+		bool IsDefaultObject{};
 	};
 
     template<typename T, typename... ArgTypes>
@@ -81,6 +85,7 @@ namespace FW
     {
         T* NewObj = new T(std::forward<ArgTypes>(InArgs)...);
         NewObj->SetOuter(InOuter);
+		NewObj->Init();
         return NewObj;
     }
 
