@@ -1,6 +1,7 @@
 #pragma once
 #include "SDirectoryTree.h"
 #include "SAssetView.h"
+#include <Widgets/Input/SSearchBox.h>
 struct FFileChangeData;
 
 namespace FW
@@ -41,6 +42,7 @@ namespace FW
         
         void SetCurrentDisplyPath(const FString& DisplayDir);
 		FString GetCurrentDisplayPath() const;
+		SSearchBox* GetAssetSearchBox() const { return AssetSearchBox.Get(); }
         
     private:
         void InitDirectory(AssetBrowserDirectory& OutDirectory, const FString& Dir);
@@ -52,6 +54,7 @@ namespace FW
         TArray<FString> FindFilesUnderBrowserDirectory(const FString& DirName);
 
 	private:
+		TSharedPtr<SSearchBox> AssetSearchBox;
 		TSharedPtr<SDirectoryTree> DirectoryTree;
 		TSharedPtr<SAssetView> AssetView;
 		FDelegateHandle DirectoryWatcherHandle;

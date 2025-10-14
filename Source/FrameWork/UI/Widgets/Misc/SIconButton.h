@@ -5,7 +5,8 @@ namespace FW
 	class SIconButton : public SButton
 	{
 	public:
-		SLATE_BEGIN_ARGS(SIconButton) : _Icon(nullptr) {}
+		SLATE_BEGIN_ARGS(SIconButton) : _ButtonStyle(nullptr), _Icon(nullptr) {}
+			SLATE_STYLE_ARGUMENT(FButtonStyle, ButtonStyle)
             SLATE_ATTRIBUTE(const FSlateBrush*, Icon)
 			SLATE_ARGUMENT(TOptional<FVector2D>, IconSize)
 			SLATE_ARGUMENT(FText, Label)
@@ -33,7 +34,7 @@ namespace FW
 			{
 				HBox->AddSlot()
 					.VAlign(VAlign_Center)
-					.Padding(Space, 0.5f, 0.f, 0.f)
+					.Padding(Space, 0.f, 0.f, 0.f)
 					.AutoWidth()
 					[
 						SNew(STextBlock)
@@ -42,10 +43,15 @@ namespace FW
 							.Text(InArgs._Label)
 					];
 			}
+			const FButtonStyle* DefaultStyle = &FAppStyle::Get().GetWidgetStyle<FButtonStyle>("SimpleButton");
+			if (InArgs._ButtonStyle)
+			{
+				DefaultStyle = InArgs._ButtonStyle;
+			}
 
 			SButton::Construct(
 				SButton::FArguments()
-				.ButtonStyle(&FAppStyle::Get().GetWidgetStyle<FButtonStyle>("SimpleButton"))
+				.ButtonStyle(DefaultStyle)
 				.OnClicked(InArgs._OnClicked)
 				[
 					HBox

@@ -17,19 +17,25 @@ namespace FW
 			.Font(FAppStyle::Get().GetFontStyle("SmallFont"))
 			.Text(FText::FromString(FPaths::GetBaseFilename(Path)))
 			.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
-			FString NewFolderPath = FPaths::GetPath(Path) / NewText.ToString();
-			if (NewFolderPath != Path)
-			{
-				if (IFileManager::Get().DirectoryExists(*NewFolderPath))
+				FString NewFolderPath = FPaths::GetPath(Path) / NewText.ToString();
+				if (NewFolderPath != Path)
 				{
-					MessageDialog::Open(MessageDialog::Ok, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("AssetRenameFailure"));
+					if (IFileManager::Get().DirectoryExists(*NewFolderPath))
+					{
+						MessageDialog::Open(MessageDialog::Ok, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("AssetRenameFailure"));
+					}
+					else
+					{
+						RenamedOrMovedFolderMap.Add(Path, NewFolderPath);
+						IFileManager::Get().Move(*NewFolderPath, *Path);
+					}
 				}
-				else
+			})
+			.OnExitEditingMode_Lambda([this] { 
+				if (OnExitRenameState)
 				{
-					RenamedOrMovedFolderMap.Add(Path, NewFolderPath);
-					IFileManager::Get().Move(*NewFolderPath, *Path);
+					OnExitRenameState();
 				}
-			}
 			})
 			.OverflowPolicy(ETextOverflowPolicy::Ellipsis);
 	}

@@ -78,6 +78,18 @@ namespace SH {
 		
 		Style->Set("LineTipItemStyle", LineTipItemStyle);
 
+		FTableRowStyle KeybindingRowStyle;
+		KeybindingRowStyle.SetEvenRowBackgroundBrush(FSlateColorBrush(FStyleColors::Recessed));
+		KeybindingRowStyle.SetEvenRowBackgroundHoveredBrush(FSlateColorBrush(FStyleColors::Hover));
+		KeybindingRowStyle.SetOddRowBackgroundBrush(FSlateColorBrush(FStyleColors::Header));
+		KeybindingRowStyle.SetOddRowBackgroundHoveredBrush(FSlateColorBrush(FStyleColors::Hover));
+		KeybindingRowStyle.SetActiveBrush(FSlateColorBrush(FStyleColors::Select));
+		KeybindingRowStyle.SetActiveHoveredBrush(FSlateColorBrush(FStyleColors::Select));
+		KeybindingRowStyle.SetInactiveBrush(FSlateColorBrush(FStyleColors::SelectInactive));
+		KeybindingRowStyle.SetInactiveHoveredBrush(FSlateColorBrush(FStyleColors::SelectInactive));
+		KeybindingRowStyle.SetSelectorFocusedBrush(FSlateNoResource());
+		Style->Set("Keybinding.Row", KeybindingRowStyle);
+
         TSharedRef<FCompositeFont> CodeFont = MakeShared<FStandaloneCompositeFont>();
         CodeFont->DefaultTypeface.AppendFont(TEXT("Code"), BaseResourcePath::UE_SlateFontDir / TEXT("DroidSansMono.ttf"), EFontHinting::Default, EFontLoadingPolicy::LazyLoad);
         CodeFont->FallbackTypeface.Typeface.AppendFont(TEXT("Code"), BaseResourcePath::UE_SlateFontDir / TEXT("DroidSansFallback.ttf"), EFontHinting::Default, EFontLoadingPolicy::LazyLoad);

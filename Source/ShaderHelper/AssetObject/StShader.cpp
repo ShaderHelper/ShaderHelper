@@ -16,7 +16,7 @@ const FString DefaultPixelShaderBody =
 R"(void mainImage(out float4 fragColor,in float2 fragCoord)
 {
     float2 uv = fragCoord / iResolution.xy;
-	//Assert(uv.x > 0.9, "uv.x must be greater than 0.9");
+    // Assert(uv.x > 0.9, "uv.x must be greater than 0.9");
     float3 col = 0.5 + 0.5*cos(iTime + uv.xyx + float3(0,2,4));
     
     fragColor = float4(uv,0,1);

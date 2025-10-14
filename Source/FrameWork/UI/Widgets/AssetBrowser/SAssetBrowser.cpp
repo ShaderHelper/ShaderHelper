@@ -5,7 +5,6 @@
 #include <DirectoryWatcherModule.h>
 #include <IDirectoryWatcher.h>
 #include <Widgets/Input/SSlider.h>
-#include <Widgets/Input/SSearchBox.h>
 #include "Editor/AssetEditor/AssetEditor.h"
 
 namespace FW
@@ -135,7 +134,16 @@ namespace FW
 			IDirectoryWatcher::FDirectoryChanged::CreateRaw(this, &SAssetBrowser::OnFileChanged),
 			DirectoryWatcherHandle, IDirectoryWatcher::WatchOptions::IncludeDirectoryChanges);
 
-		SAssignNew(AssetView, SAssetView)
+		SAssignNew(AssetSearchBox, SSearchBox)
+			.HintText_Lambda([this] {
+				return FText::FromString(LOCALIZATION("Search").ToString() + " " + FPaths::GetBaseFilename(GetCurrentDisplayPath()));
+			})
+			.OnTextChanged_Lambda([this](const FText& InFilterText) {
+				AssetView->PopulateAssetView(GetCurrentDisplayPath(), InFilterText);
+			})
+			.DelayChangeNotificationsWhileTyping(true);
+
+		SAssignNew(AssetView, SAssetView, this)
             .State(&State->AssetViewState)
 			.ContentPathShowed(InArgs._ContentPathShowed)
 			.OnFolderOpen([this](const FString& FolderPath) {
@@ -161,7 +169,7 @@ namespace FW
 					SNew(SBox)
 					.WidthOverride(200)
 					[
-						SNew(SSearchBox)
+						AssetSearchBox.ToSharedRef()
 					]
 				
 				]
@@ -408,5 +416,6 @@ namespace FW
 	void SAssetBrowser::OnDirectoryTreeSelectionChanged(const FString& SelectedDirectory)
 	{
 		AssetView->SetNewViewDirectory(SelectedDirectory);
+		AssetSearchBox->SetText(FText::GetEmpty());
 	}
 }

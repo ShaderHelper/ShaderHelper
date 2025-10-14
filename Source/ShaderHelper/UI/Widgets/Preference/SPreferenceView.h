@@ -1,5 +1,6 @@
 #pragma once
 #include "PluginManager/ShPluginManager.h"
+#include "SKeybindingText.h"
 
 namespace SH
 {
@@ -22,6 +23,11 @@ namespace SH
 		TArray<PluginDataPtr> PluginDatas;
 	};
 
+	struct KeyData
+	{
+		TSharedPtr<FUICommandInfo> CommandInfo;
+	};
+	using KeyDataPtr = TSharedPtr<KeyData>;
 	class SKeymapView : public SCompoundWidget
 	{
 	public:
@@ -29,12 +35,29 @@ namespace SH
 		SLATE_END_ARGS()
 		void Construct(const FArguments& InArgs);
 		void SavePersistentState();
+		void GenerateKeyDatas(const FText& InFilterText = FText::GetEmpty());
+		TSharedRef<ITableRow> GenerateRowForItem(KeyDataPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
+	private:
+		TSharedPtr<SListView<KeyDataPtr>> KeyListView;
+		TArray<KeyDataPtr> KeyDatas;
 	};
-
-	class SThemeView : public SCompoundWidget
+	class SKeymapViewRow : public SMultiColumnTableRow<KeyDataPtr>
 	{
 	public:
-		SLATE_BEGIN_ARGS(SThemeView) {}
+		void Construct(const FArguments& InArgs, SKeymapView* InOwner, KeyDataPtr InData, const TSharedRef<STableViewBase>& OwnerTableView);
+		virtual TSharedRef<SWidget> GenerateWidgetForColumn(const FName& ColumnId) override;
+
+		TSharedPtr<SKeybindingText> KeybindingText;
+
+	private:
+		SKeymapView* Owner{};
+		KeyDataPtr Data;
+	};
+
+	class SAppearanceView : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SAppearanceView) {}
 		SLATE_END_ARGS()
 		void Construct(const FArguments& InArgs);
 		void SavePersistentState();
@@ -56,6 +79,6 @@ namespace SH
 
 		TSharedPtr<SPluginView> PluginView;
 		TSharedPtr<SKeymapView> KeymapView;
-		TSharedPtr<SThemeView>  ThemeView;
+		TSharedPtr<SAppearanceView> AppearanceView;
 	};
 }

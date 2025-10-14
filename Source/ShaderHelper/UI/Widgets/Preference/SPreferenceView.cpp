@@ -1,6 +1,10 @@
 #include "CommonHeader.h"
 #include "SPreferenceView.h"
 #include <Styling/StyleColors.h>
+#include <Widgets/Input/SSearchBox.h>
+#include "UI/Widgets/Misc/SIconButton.h"
+#include "UI/Styles/FShaderHelperStyle.h"
+#include "UI/Styles/FAppCommonStyle.h"
 #include "App/App.h"
 
 using namespace FW;
@@ -142,9 +146,114 @@ namespace SH
 		return Row;
 	}
 
+	const FName CommandColId = "Command";
+	const FName ShortCutColId = "ShortCut";
+	const FName CategoryColId = "Category";
+
+	void SKeymapView::GenerateKeyDatas(const FText& InFilterText)
+	{
+		KeyDatas.Reset();
+		TArray<TSharedPtr<FUICommandInfo>> Commands;
+		TArray<TSharedPtr<FUICommandInfo>> DebuggerViewCommands, GraphEditorCommandInfos, CodeEditorCommandInfos, AssetViewCommands;
+		FInputBindingManager::Get().GetCommandInfosFromContext("DebuggerViewCommands", DebuggerViewCommands);
+		FInputBindingManager::Get().GetCommandInfosFromContext("AssetViewCommands", AssetViewCommands);
+		FInputBindingManager::Get().GetCommandInfosFromContext("GraphEditorCommands", GraphEditorCommandInfos);
+		FInputBindingManager::Get().GetCommandInfosFromContext("CodeEditorCommands", CodeEditorCommandInfos);
+		Commands.Append(MoveTemp(CodeEditorCommandInfos));
+		Commands.Append(MoveTemp(AssetViewCommands));
+		Commands.Append(MoveTemp(GraphEditorCommandInfos));
+		Commands.Append(MoveTemp(DebuggerViewCommands));
+		for (const auto& Command : Commands)
+		{
+			if (!InFilterText.IsEmpty())
+			{
+				FText Label = Command->GetLabel();
+				FText Category = LOCALIZATION(Command->GetBindingContext().ToString());
+				FText Keybinding = Command->GetActiveChord(EMultipleKeyBindingIndex::Primary)->GetInputText(false);
+				if (Category.ToString().Contains(InFilterText.ToString()) ||
+					Keybinding.ToString().Contains(InFilterText.ToString()) ||
+					Label.ToString().Contains(InFilterText.ToString()))
+				{
+					KeyDatas.Add(MakeShared<KeyData>(Command));
+				}
+			}
+			else
+			{
+				KeyDatas.Add(MakeShared<KeyData>(Command));
+			}
+		}
+	}
+
 	void SKeymapView::Construct(const FArguments& InArgs)
 	{
-
+		GenerateKeyDatas();
+		ChildSlot
+		[
+			SNew(SVerticalBox)
+			+SVerticalBox::Slot()
+			.HAlign(HAlign_Right)
+			.AutoHeight()
+			[
+				SNew(SHorizontalBox)
+				+SHorizontalBox::Slot()
+				.Padding(0, 0, 4, 0)
+				[
+					SNew(SSearchBox).MinDesiredWidth(120)
+					.OnTextChanged_Lambda([this](const FText& InFilterText) {
+						GenerateKeyDatas(InFilterText);
+						KeyListView->RequestListRefresh();
+					})
+					.DelayChangeNotificationsWhileTyping(true)
+				]
+				+SHorizontalBox::Slot()
+				.AutoWidth()
+				[
+					SNew(SIconButton)
+					.ButtonStyle(&FAppStyle::Get().GetWidgetStyle< FButtonStyle >("Button"))
+					.Label(LOCALIZATION("Reset"))
+					.Icon(FAppStyle::Get().GetBrush("GenericCommands.Undo"))
+					.IconSize(FVector2D{12,12})
+					.OnClicked_Lambda([this] {
+						FInputBindingManager::Get().RemoveUserDefinedChords();
+						GConfig->Flush(false, GEditorKeyBindingsIni);
+						for (auto& KeyData : KeyDatas)
+						{
+							const auto& DefaultChord = KeyData->CommandInfo->GetDefaultChord(EMultipleKeyBindingIndex::Primary);
+							KeyData->CommandInfo->SetActiveChord(DefaultChord, EMultipleKeyBindingIndex::Primary);
+						}
+						return FReply::Handled();
+					})
+				]
+			]
+			+SVerticalBox::Slot()
+			.Padding(0, 4, 0, 0)
+			[
+				SAssignNew(KeyListView, SListView<KeyDataPtr>)
+				.ListItemsSource(&KeyDatas)
+				.OnGenerateRow(this, &SKeymapView::GenerateRowForItem)
+				.OnMouseButtonDoubleClick_Lambda([this](KeyDataPtr Item) {
+					auto Row = KeyListView->WidgetFromItem(Item);
+					if (Row)
+					{
+						StaticCastSharedPtr<SKeymapViewRow>(Row)->KeybindingText->EnterEditingMode();
+					}
+				})
+				.HeaderRow
+				(
+					SNew(SHeaderRow)
+					+ SHeaderRow::Column(CommandColId)
+					.FillWidth(0.4f)
+					.DefaultLabel(LOCALIZATION(CommandColId.ToString()))
+					+ SHeaderRow::Column(ShortCutColId)
+					.FillWidth(0.35f)
+					.DefaultLabel(LOCALIZATION(ShortCutColId.ToString()))
+					+ SHeaderRow::Column(CategoryColId)
+					.FillWidth(0.25f)
+					.DefaultLabel(LOCALIZATION(CategoryColId.ToString()))
+				)
+			]
+			
+		];
 	}
 
 	void SKeymapView::SavePersistentState()
@@ -152,12 +261,79 @@ namespace SH
 
 	}
 
-	void SThemeView::Construct(const FArguments& InArgs)
+	TSharedRef<ITableRow> SKeymapView::GenerateRowForItem(KeyDataPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
+	{
+		TSharedRef<SKeymapViewRow> TableRow = SNew(SKeymapViewRow, this, Item, OwnerTable)
+			.Style(&FShaderHelperStyle::Get().GetWidgetStyle<FTableRowStyle>("Keybinding.Row"));
+		if (Item->CommandInfo->GetActiveChord(EMultipleKeyBindingIndex::Primary)->Key.IsMouseButton())
+		{
+			TableRow->SetEnabled(false);
+		}
+		return TableRow;
+	}
+
+	void SKeymapViewRow::Construct(const FArguments& InArgs, SKeymapView* InOwner, KeyDataPtr InData, const TSharedRef<STableViewBase>& OwnerTableView)
+	{
+		Owner = InOwner;
+		Data = InData;
+		SMultiColumnTableRow<KeyDataPtr>::Construct(InArgs, OwnerTableView);
+	}
+
+	TSharedRef<SWidget> SKeymapViewRow::GenerateWidgetForColumn(const FName& ColumnId)
+	{
+		TSharedPtr<SWidget> Content;
+		if (ColumnId == CommandColId)
+		{
+			Content = SNew(STextBlock).Text(Data->CommandInfo->GetLabel());
+		}
+		else if(ColumnId == CategoryColId)
+		{
+			Content = SNew(STextBlock).Text(LOCALIZATION(Data->CommandInfo->GetBindingContext().ToString()));
+		}
+		else
+		{
+			Content = SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			[
+				SAssignNew(KeybindingText, SKeybindingText)
+					.Command(Data->CommandInfo)
+			]
+			+ SHorizontalBox::Slot()
+			.HAlign(HAlign_Right)
+			[
+				SNew(SIconButton).ButtonStyle(&FAppCommonStyle::Get().GetWidgetStyle< FButtonStyle >("SuperSimpleButton"))
+				.Icon(FAppStyle::Get().GetBrush("Icons.ArrowLeft"))
+				.Visibility_Lambda([this] {
+					if (*Data->CommandInfo->GetActiveChord(EMultipleKeyBindingIndex::Primary) != Data->CommandInfo->GetDefaultChord(EMultipleKeyBindingIndex::Primary))
+					{
+						return EVisibility::Visible;
+					}
+					return EVisibility::Hidden;
+				})
+				.OnClicked_Lambda([this] {
+					const auto& DefaultChord = Data->CommandInfo->GetDefaultChord(EMultipleKeyBindingIndex::Primary);
+					Data->CommandInfo->SetActiveChord(DefaultChord, EMultipleKeyBindingIndex::Primary);
+					FInputBindingManager::Get().SaveInputBindings();
+					GConfig->Flush(false, GEditorPerProjectIni);
+					return FReply::Handled();
+				})
+			];
+			 
+		}
+
+		return SNew(SBox).VAlign(VAlign_Center)
+		[
+			Content.ToSharedRef()
+		];
+	}
+
+	void SAppearanceView::Construct(const FArguments& InArgs)
 	{
 
 	}
 
-	void SThemeView::SavePersistentState()
+	void SAppearanceView::SavePersistentState()
 	{
 
 	}
@@ -166,10 +342,10 @@ namespace SH
 	{
 		SAssignNew(KeymapView, SKeymapView);
 		SAssignNew(PluginView, SPluginView);
-		SAssignNew(ThemeView, SThemeView);
+		SAssignNew(AppearanceView, SAppearanceView);
 
 		auto PluginPreference = CreatePreference(LOCALIZATION("Plugins"), PluginView.ToSharedRef());
-		auto ThemePreference = CreatePreference(LOCALIZATION("Theme"), ThemeView.ToSharedRef());
+		auto AppearancePreference = CreatePreference(LOCALIZATION("Appearance"), AppearanceView.ToSharedRef());
 		auto KeymapPreference = CreatePreference(LOCALIZATION("Keymap"), KeymapView.ToSharedRef());
 		CurPreference = &*PluginPreference;
 
@@ -193,7 +369,7 @@ namespace SH
 					.Padding(0, 0, 0, 1.5)
 					.AutoHeight()
 					[
-						ThemePreference
+						AppearancePreference
 					]
 					+ SVerticalBox::Slot()
 					.AutoHeight()
@@ -216,7 +392,7 @@ namespace SH
 	{
 		PluginView->SavePersistentState();
 		KeymapView->SavePersistentState();
-		ThemeView->SavePersistentState();
+		AppearanceView->SavePersistentState();
 	}
 
 	TSharedRef<SWidget> SPreferenceView::CreatePreference(const FText& InText, TSharedRef<SWidget> InView)
@@ -230,7 +406,7 @@ namespace SH
 				return FAppStyle::Get().GetBrush("Brushes.Select");
 			}
 			return FAppStyle::Get().GetBrush("Brushes.Header");
-			}));
+		}));
 		Preference->SetOnMouseButtonDown(FPointerEventHandler::CreateLambda([this, InView, Self = &*Preference](auto&&, auto&&) {
 			CurPreference = Self;
 			PreferenceBox->GetSlot(1).AttachWidget(InView);

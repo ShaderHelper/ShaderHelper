@@ -2,44 +2,26 @@
 #include "Editor.h"
 #include "UI/Styles/FAppCommonStyle.h"
 #include "Common/Path/PathHelper.h"
-#include <Framework/Commands/GenericCommands.h>
-#include "UI/Widgets/Misc/CommonCommands.h"
-
-STEAL_PRIVATE_MEMBER(FUICommandInfo, FText, Label)
-STEAL_PRIVATE_MEMBER(FUICommandInfo, FText, Description)
+#include "GraphEditorCommands.h"
+#include "AssetViewCommands.h"
 
 namespace FW 
 {
-	FString BaseEditorConfig()
+	FString EditorConfigPath()
 	{
-		return PathHelper::SavedConfigDir() / TEXT("BaseEditor.ini");
+		return PathHelper::SavedConfigDir() / TEXT("Editor.ini");
 	}
 
-	static void ResetGenericCommandsLabelAndTip()
+	FString EditorKeyBindingConfigPath()
 	{
-		//Hook, reset GenericCommand label for Localization
-		GetPrivate_FUICommandInfo_Label(*FGenericCommands::Get().Cut) = LOCALIZATION("Cut");
-		GetPrivate_FUICommandInfo_Label(*FGenericCommands::Get().Copy) = LOCALIZATION("Copy");
-		GetPrivate_FUICommandInfo_Label(*FGenericCommands::Get().Paste) = LOCALIZATION("Paste");
-		GetPrivate_FUICommandInfo_Label(*FGenericCommands::Get().Undo) = LOCALIZATION("Undo");
-		GetPrivate_FUICommandInfo_Label(*FGenericCommands::Get().Delete) = LOCALIZATION("Delete");
-		GetPrivate_FUICommandInfo_Label(*FGenericCommands::Get().Rename) = LOCALIZATION("Rename");
-		GetPrivate_FUICommandInfo_Label(*FGenericCommands::Get().SelectAll) = LOCALIZATION("SelectAll");
-
-		GetPrivate_FUICommandInfo_Description(*FGenericCommands::Get().Cut) = FText::GetEmpty();
-		GetPrivate_FUICommandInfo_Description(*FGenericCommands::Get().Copy) = FText::GetEmpty();
-		GetPrivate_FUICommandInfo_Description(*FGenericCommands::Get().Paste) = FText::GetEmpty();
-		GetPrivate_FUICommandInfo_Description(*FGenericCommands::Get().Undo) = FText::GetEmpty();
-		GetPrivate_FUICommandInfo_Description(*FGenericCommands::Get().Delete) = FText::GetEmpty();
-		GetPrivate_FUICommandInfo_Description(*FGenericCommands::Get().Rename) = FText::GetEmpty();
-		GetPrivate_FUICommandInfo_Description(*FGenericCommands::Get().SelectAll) = FText::GetEmpty();
+		return PathHelper::SavedConfigDir() / TEXT("EditorKeybinding.ini");
 	}
 
 	Editor::Editor()
 	{
-		if (IFileManager::Get().FileExists(*BaseEditorConfig()))
+		if (IFileManager::Get().FileExists(*EditorConfigPath()))
 		{
-			EditorConfig->Read(BaseEditorConfig());
+			EditorConfig->Read(EditorConfigPath());
 
 			FString Lang;
 			EditorConfig->GetString(TEXT("Common"), TEXT("Language"), Lang);
@@ -50,9 +32,9 @@ namespace FW
 		}
 
 		SetLanguage(CurLanguage);
-		ResetGenericCommandsLabelAndTip();
 
-		CommonCommands::Register();
+		GraphEditorCommands::Register();
+		AssetViewCommands::Register();
 	}
 
 	Editor::~Editor()
@@ -69,12 +51,12 @@ namespace FW
 		CurLanguage = InLanguage;
 
 		EditorConfig->SetString(TEXT("Common"), TEXT("Language"), ANSI_TO_TCHAR(magic_enum::enum_name(CurLanguage).data()));
-		EditorConfig->Write(BaseEditorConfig());
+		EditorConfig->Write(EditorConfigPath());
 	}
 
 	void Editor::SaveEditorConfig()
 	{
-		EditorConfig->Write(BaseEditorConfig());
+		EditorConfig->Write(EditorConfigPath());
 	}
 
 }

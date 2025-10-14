@@ -11,7 +11,8 @@
 #include <DesktopPlatformModule.h>
 #include "Editor/AssetEditor/AssetEditor.h"
 #include "UI/Widgets/Timeline/STimeline.h"
-#include "UI/Widgets/Misc/CommonCommands.h"
+#include "CodeEditorCommands.h"
+#include "DebuggerViewCommands.h"
 #include "PluginManager/ShPluginManager.h"
 #include "Renderer/ShaderToyRenderComp.h"
 
@@ -37,25 +38,42 @@ namespace SH
 		: Renderer(InRenderer)
 		, WindowSize(InWindowSize)
 	{
+		CodeEditorCommands::Register();
+		DebuggerViewCommands::Register();
+
 		UICommandList = MakeShared<FUICommandList>();
 		UICommandList->MapAction(
-			CommonCommands::Get().Continue,
+			CodeEditorCommands::Get().Debug,
+			FExecuteAction::CreateLambda([this] {
+				if (IsDebugging)
+				{
+					EndDebugging();
+				}
+				else
+				{
+					StartDebugging();
+				}
+			}),
+			FCanExecuteAction::CreateLambda([this] { return CurDebuggableObject != nullptr; })
+		);
+		UICommandList->MapAction(
+			CodeEditorCommands::Get().Continue,
 			FExecuteAction::CreateLambda([this] {
 				SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
 				ShaderEditor->Continue();
-				}),
-			FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); })
-		);
-		UICommandList->MapAction(
-			CommonCommands::Get().StepInto,
-			FExecuteAction::CreateLambda([this]{
-			SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
-			ShaderEditor->Continue(SShaderEditorBox::StepMode::StepInto);
 			}),
 			FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); })
 		);
 		UICommandList->MapAction(
-			CommonCommands::Get().StepOver,
+			CodeEditorCommands::Get().StepInto,
+			FExecuteAction::CreateLambda([this]{
+				SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
+				ShaderEditor->Continue(SShaderEditorBox::StepMode::StepInto);
+			}),
+			FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); })
+		);
+		UICommandList->MapAction(
+			CodeEditorCommands::Get().StepOver,
 			FExecuteAction::CreateLambda([this]{
 				SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
 				ShaderEditor->Continue(SShaderEditorBox::StepMode::StepOver);
@@ -248,10 +266,7 @@ namespace SH
 		FSlateApplication::Get().AddWindow(MainWindow.ToSharedRef());
 		FSlateApplication::Get().SetUnhandledKeyDownEventHandler(FOnKeyEvent::CreateLambda([this](const FKeyEvent& InKeyEvent) {
 			//Process tool bar commands.
-			if (UICommandList.IsValid())
-			{
-				UICommandList->ProcessCommandBindings(InKeyEvent);
-			}
+			UICommandList->ProcessCommandBindings(InKeyEvent);
 			return FReply::Handled();
 		}));
         
@@ -918,21 +933,7 @@ namespace SH
 		DebuggerToolBarBuilder.SetStyle(&FShaderHelperStyle::Get(), FName("Toolbar.ShaderHelper"));
 		
 		DebuggerToolBarBuilder.AddToolBarButton(
-			FUIAction(
-				FExecuteAction::CreateLambda([this]{
-					if(IsDebugging)
-					{
-						EndDebugging();
-					}
-					else
-					{
-						StartDebugging();
-					}
-				}),
-				FCanExecuteAction::CreateLambda([this] {
-					return CurDebuggableObject != nullptr;
-				})
-			),
+			CodeEditorCommands::Get().Debug,
 			NAME_None,
 			FText::GetEmpty(), FText::GetEmpty(),
 			TAttribute<FSlateIcon>::CreateLambda([this] {
@@ -940,30 +941,22 @@ namespace SH
 					return FSlateIcon(FShaderHelperStyle::Get().GetStyleSetName(), "Icons.Pause");
 				}
 				return FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.Bug");
-			}),
-			EUserInterfaceActionType::Button
+			})
 		);
 		DebuggerToolBarBuilder.AddToolBarButton(
-			FUIAction(
-				  FExecuteAction::CreateLambda([this]{
-					  SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
-					  ShaderEditor->Continue();
-				  }),
-				FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); })
-			),
+			CodeEditorCommands::Get().Continue,
 			NAME_None,
 			FText::GetEmpty(), FText::GetEmpty(),
-			FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.ArrowBoldRight"),
-			EUserInterfaceActionType::Button
+			FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.ArrowBoldRight")
 		);
 		DebuggerToolBarBuilder.AddToolBarButton(
-			CommonCommands::Get().StepOver,
+			CodeEditorCommands::Get().StepOver,
 			NAME_None,
 			FText::GetEmpty(), FText::GetEmpty(),
 			FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.StepOver")
 		);
 		DebuggerToolBarBuilder.AddToolBarButton(
-			CommonCommands::Get().StepInto,
+			CodeEditorCommands::Get().StepInto,
 			NAME_None,
 			FText::GetEmpty(), FText::GetEmpty(),
 			FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.StepInto")
@@ -1135,7 +1128,7 @@ namespace SH
 							auto NewWindow = SNew(SShWindow).Title_Lambda([this] {
 								return FText::FromString(LOCALIZATION("ShaderHelper").ToString() + "-" + LOCALIZATION("Preferences").ToString());
 							})
-							.ClientSize({600, 400})
+							.ClientSize({700, 500})
 							[
 								SAssignNew(PreferenceView, SPreferenceView)
 							];

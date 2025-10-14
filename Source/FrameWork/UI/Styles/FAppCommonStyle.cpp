@@ -86,6 +86,7 @@ namespace FW
 		const FTableRowStyle AssetViewTableRowStyle =
 			FTableRowStyle(FAppStyle::Get().GetWidgetStyle<FTableRowStyle>("TableView.Row"))
 			.SetEvenRowBackgroundHoveredBrush(FSlateNoResource())
+			.SetSelectorFocusedBrush(FSlateNoResource())
 			.SetOddRowBackgroundHoveredBrush(FSlateNoResource());
 		Style->Set("AssetView.Row", AssetViewTableRowStyle);
 

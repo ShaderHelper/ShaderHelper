@@ -54,6 +54,12 @@ namespace FW {
 		FPlatformMemory::Init();
 		FPlatformApplicationMisc::PostInit();
 
+		GEditorKeyBindingsIni = EditorKeyBindingConfigPath();
+		if (IFileManager::Get().FileExists(*GEditorKeyBindingsIni))
+		{
+			GConfig->LoadFile(GEditorKeyBindingsIni);
+		}
+
 		//This project uses slate as UI framework, so we need to initialize it.
 		SetSlateFontPath(FW::BaseResourcePath::UE_SlateFontDir);
 		FSlateApplication::SetCoreStylePath(FW::BaseResourcePath::UE_CoreStyleDir);

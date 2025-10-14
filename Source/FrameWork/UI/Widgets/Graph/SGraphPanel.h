@@ -56,6 +56,7 @@ namespace FW
 		void DrawConnection(const FPaintGeometry& PaintGeometry, FSlateWindowElementList& OutDrawElements, int32 Layer, PinDirection InStartDir, const Vector2D& Start, const Vector2D& End) const;
 		virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
 
+		void GenerateMenuNodeItems(const FText& InFilterText = FText::GetEmpty());
 		TSharedRef<SWidget> CreateContextMenu();
 		TSharedRef<ITableRow> GenerateNodeItems(TSharedPtr<FText> Item, const TSharedRef<STableViewBase>& OwnerTable);
 		void OnMenuItemSelected(TSharedPtr<FText> InSelectedItem, ESelectInfo::Type SelectInfo);
@@ -92,6 +93,7 @@ namespace FW
 		TArray<SGraphNode*> SelectedNodes;
 		TSharedPtr<FUICommandList> UICommandList;
 		TArray<TSharedPtr<FText>> MenuNodeItems;
+		TSharedPtr<SListView<TSharedPtr<FText>>> MenuNodeList;
 
 		//OutputPin to InputPin
 		TMultiMap<SGraphPin*, SGraphPin*> Links;

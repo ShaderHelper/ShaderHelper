@@ -9,6 +9,9 @@ namespace FW {
 		Num,
 	};
 
+	FRAMEWORK_API FString EditorConfigPath();
+	FRAMEWORK_API FString EditorKeyBindingConfigPath();
+
 	class FRAMEWORK_API Editor
 	{
 	public:

@@ -15,6 +15,7 @@ namespace FW
         FReply HandleOnDragDetected(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent);
         FReply HandleOnDrop(const FDragDropEvent& DragDropEvent);
 
+		TFunction<void()> OnExitRenameState;
 	private:
 		TSharedPtr<SInlineEditableTextBlock> FolderEditableTextBlock;
 	};

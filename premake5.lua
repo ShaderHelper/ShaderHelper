@@ -54,7 +54,7 @@ workspace "ShaderHelper"
         { 
             "/utf-8",
             "/Zc:__cplusplus",
-			
+			"/bigobj"
 			--https://devblogs.microsoft.com/cppblog/improving-the-state-of-debug-performance-in-c/
 			--msvc c++20 implicitly contains /permissive-
 			--"/permissive-", --implicitly contains "/Zc:hiddenFriend" "/Zc:strictStrings" 

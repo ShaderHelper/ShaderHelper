@@ -1,8 +1,8 @@
 #include "CommonHeader.h"
 #include "SDebuggerWatchView.h"
 #include "UI/Styles/FShaderHelperStyle.h"
-#include <Framework/Commands/GenericCommands.h>
 #include "UI/Widgets/Misc/MiscWidget.h"
+#include "Editor/DebuggerViewCommands.h"
 
 namespace SH
 {
@@ -16,7 +16,7 @@ namespace SH
 		
 		UICommandList = MakeShared<FUICommandList>();
 		UICommandList->MapAction(
-			FGenericCommands::Get().Delete,
+			DebuggerViewCommands::Get().Delete,
 			FExecuteAction::CreateLambda([this]{
 				ExpressionNodePtr SelectedItem = ExpressionTreeView->GetSelectedItems()[0];
 				ExpressionNodeDatas.Remove(SelectedItem);
@@ -42,7 +42,8 @@ namespace SH
 					if(!SelectedItem->Expr.IsEmpty())
 					{
 						FMenuBuilder MenuBuilder{ true, UICommandList };
-						MenuBuilder.AddMenuEntry(FGenericCommands::Get().Delete);
+						MenuBuilder.AddMenuEntry(DebuggerViewCommands::Get().Delete, NAME_None, {}, {},
+							FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "GenericCommands.Delete" });
 						return MenuBuilder.MakeWidget();
 					}
 				}

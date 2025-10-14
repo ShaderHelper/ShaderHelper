@@ -5,7 +5,7 @@
 #include "SGraphPanel.h"
 #include "UI/Styles/FAppCommonStyle.h"
 #include "UI/Widgets/Graph/SGraphPin.h"
-#include <Framework/Commands/GenericCommands.h>
+#include "Editor/GraphEditorCommands.h"
 
 namespace FW
 {
@@ -17,11 +17,11 @@ namespace FW
 
 		UICommandList = MakeShared<FUICommandList>();
 		UICommandList->MapAction(
-			FGenericCommands::Get().Delete,
+			GraphEditorCommands::Get().Delete,
 			FExecuteAction::CreateRaw(this, &SGraphNode::OnHandleDeleteAction)
 		);
 		UICommandList->MapAction(
-			FGenericCommands::Get().Rename,
+			GraphEditorCommands::Get().Rename,
 			FExecuteAction::CreateRaw(this, &SGraphNode::OnHandleRenameAction)
 		);
 
@@ -170,8 +170,10 @@ namespace FW
 		FMenuBuilder MenuBuilder{ true, UICommandList };
 		MenuBuilder.BeginSection("Control", FText::FromString("Control"));
 		{
-			MenuBuilder.AddMenuEntry(FGenericCommands::Get().Delete);
-			MenuBuilder.AddMenuEntry(FGenericCommands::Get().Rename);
+			MenuBuilder.AddMenuEntry(GraphEditorCommands::Get().Delete, NAME_None, {}, {}, 
+				FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "GenericCommands.Delete" });
+			MenuBuilder.AddMenuEntry(GraphEditorCommands::Get().Rename, NAME_None, {}, {},
+				FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "GenericCommands.Rename" });
 		}
 		MenuBuilder.EndSection();
 		return MenuBuilder.MakeWidget();

@@ -1,8 +1,7 @@
 #include "CommonHeader.h"
 #include "SGraphPanel.h"
-#include "UI/Styles/FAppCommonStyle.h"
 #include "AssetObject/Graph.h"
-#include "UI/Widgets/Misc/CommonCommands.h"
+#include "Editor/GraphEditorCommands.h"
 #include <Widgets/Input/SSearchBox.h>
 #include <Styling/StyleColors.h>
 #include "Common/Util/Math.h"
@@ -21,9 +20,16 @@ namespace FW
 	{
 		UICommandList = MakeShared<FUICommandList>();
 		UICommandList->MapAction(
-			CommonCommands::Get().Save,
+			GraphEditorCommands::Get().Save,
 			FExecuteAction::CreateLambda([this] {
 				GraphData->Save();
+			})
+		);
+		UICommandList->MapAction(
+			GraphEditorCommands::Get().CutLine,
+			FExecuteAction::CreateLambda([this] {
+				CutLineStart = MousePos;
+				CutLineEnd = *CutLineStart;
 			})
 		);
 
@@ -144,14 +150,6 @@ namespace FW
 					AddLink(GetGraphPin(OutPinId), GetGraphPin(InPinId));
 				}
 			}
-			if(auto* NodeMetaTypes = RegisteredNodes.Find(GetRegisteredName(GraphData->DynamicMetaType())))
-			{
-				for (auto NodeMetaType : *NodeMetaTypes)
-				{
-					FText NodeTitle = static_cast<GraphNode*>(NodeMetaType->GetDefaultObject())->ObjectName;
-					MenuNodeItems.Add(MakeShared<FText>(MoveTemp(NodeTitle)));
-				}
-			}
 		}
 	}
 
@@ -194,10 +192,8 @@ namespace FW
 
 	FReply SGraphPanel::OnPreviewMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 	{
-		if (MouseEvent.IsMouseButtonDown(EKeys::RightMouseButton) && MouseEvent.IsControlDown())
+		if (UICommandList->ProcessCommandBindings(MouseEvent))
 		{
-			CutLineStart = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
-			CutLineEnd = *CutLineStart;
 			return FReply::Handled().CaptureMouse(AsShared()).LockMouseToWidget(AsShared());
 		}
 		return FReply::Unhandled();
@@ -263,7 +259,7 @@ namespace FW
 					}
 				}
 				CutLineStart.Reset();
-				return FReply::Handled().ReleaseMouseLock();
+				return FReply::Handled().ReleaseMouseCapture().ReleaseMouseLock();
 			}
 			else if (GraphData)
 			{
@@ -369,7 +365,7 @@ namespace FW
 
 	FReply SGraphPanel::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
 	{
-		if (UICommandList.IsValid() && UICommandList->ProcessCommandBindings(InKeyEvent))
+		if (UICommandList->ProcessCommandBindings(InKeyEvent))
 		{
 			return FReply::Handled();
 		}
@@ -511,14 +507,42 @@ namespace FW
 		return MaxTopNodeLayer;
 	}
 
+	void SGraphPanel::GenerateMenuNodeItems(const FText& InFilterText)
+	{
+		MenuNodeItems.Empty();
+		if (auto* NodeMetaTypes = RegisteredNodes.Find(GetRegisteredName(GraphData->DynamicMetaType())))
+		{
+			for (auto NodeMetaType : *NodeMetaTypes)
+			{
+				FText NodeTitle = static_cast<GraphNode*>(NodeMetaType->GetDefaultObject())->ObjectName;
+				if (!InFilterText.IsEmpty())
+				{
+					if (NodeTitle.ToString().Contains(InFilterText.ToString()))
+					{
+						MenuNodeItems.Add(MakeShared<FText>(MoveTemp(NodeTitle)));
+					}
+				}
+				else
+				{
+					MenuNodeItems.Add(MakeShared<FText>(MoveTemp(NodeTitle)));
+				}
+			}
+		}
+	}
+
 	TSharedRef<SWidget> SGraphPanel::CreateContextMenu()
 	{
+		GenerateMenuNodeItems();
 		return SNew(SVerticalBox)
 			+ SVerticalBox::Slot()
 			.AutoHeight()
 			[
 				SNew(SSearchBox)
-					.DelayChangeNotificationsWhileTyping(false)
+				.OnTextChanged_Lambda([this](const FText& InFilterText) {
+					GenerateMenuNodeItems(InFilterText);
+					MenuNodeList->RequestListRefresh();
+				})
+				.DelayChangeNotificationsWhileTyping(false)
 			]
 			+ SVerticalBox::Slot()
 			[
@@ -526,7 +550,7 @@ namespace FW
 				.BorderImage(FAppCommonStyle::Get().GetBrush("WhiteBrush"))
 				.BorderBackgroundColor(FStyleColors::Dropdown)
 				[
-					SNew(SListView<TSharedPtr<FText>>)
+					SAssignNew(MenuNodeList, SListView<TSharedPtr<FText>>)
 						.ListItemsSource(&MenuNodeItems)
 						.OnSelectionChanged(this, &SGraphPanel::OnMenuItemSelected)
 						.SelectionMode(ESelectionMode::Single)

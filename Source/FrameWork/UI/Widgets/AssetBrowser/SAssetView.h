@@ -25,10 +25,10 @@ namespace FW
             SLATE_ARGUMENT(AssetViewPersistentState*, State)
 		SLATE_END_ARGS()
 
-		void Construct(const FArguments& InArgs);
+		void Construct(const FArguments& InArgs, SAssetBrowser* InBrowser);
 		void SetNewViewDirectory(const FString& NewViewDirectory);
 		FString GetViewDirectory() const { return CurViewDirectory; }
-		void PopulateAssetView(const FString& ViewDirectory);
+		void PopulateAssetView(const FString& ViewDirectory, const FText& InFilterText = FText::GetEmpty());
 		TSharedPtr<SWidget> CreateContextMenu();
 		TSharedPtr<SWidget> CreateItemContextMenu(const TArray<TSharedRef<AssetViewItem>>& ViewItems);
 		void AddFolder(const FString& InFolderName);
@@ -54,6 +54,7 @@ namespace FW
 		void OnHandleOpenAction(TSharedRef<AssetViewItem> ViewItem);
 
 	private:
+		SAssetBrowser* Browser;
 		TSharedPtr<STileView<TSharedRef<AssetViewItem>>> AssetTileView;
 		TArray<TSharedRef<AssetViewItem>> AssetViewItems;
 		FString CacheImportAssetPath;

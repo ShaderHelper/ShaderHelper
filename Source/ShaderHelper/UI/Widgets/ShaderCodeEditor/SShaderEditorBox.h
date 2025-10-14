@@ -241,6 +241,7 @@ namespace SH
 		FString UnFoldText(const FTextSelection& DisplayedTextRange);
 		void UnFold(int32 LineNumber);
 		void Fold(int32 LineNumber);
+		void ToggleComment();
         
         void UpdateLineNumberData();
         void RefreshLineNumberToDiagInfo();
@@ -326,6 +327,7 @@ namespace SH
 		int32 MaxLineNumber{};
 		TArray<LineNumberItemPtr> LineNumberData;
         TSharedPtr<SShaderMultiLineEditableText> ShaderMultiLineEditableText;
+		TSharedPtr<FUICommandList> UICommandList;
         
         TSharedPtr<SScrollBar> ShaderMultiLineVScrollBar;
         TSharedPtr<SScrollBar> ShaderMultiLineHScrollBar;
@@ -369,7 +371,6 @@ namespace SH
         bool bKeyChar = false;
         //
 		bool bTryMergeUndoState = false;
-		bool bTryToggleCommentSelection = false;
 		
 	};
 }

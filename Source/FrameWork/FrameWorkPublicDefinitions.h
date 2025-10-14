@@ -59,5 +59,18 @@ namespace FW
 #define LOCALIZATION(Key) \
 	FText::FromStringTable(TEXT("Localization"), Key)
 
+#define UI_COMMAND_SH( CommandId, InLabel, InDescription, CommandType, InDefaultChord, ... )                                                            \
+	FUICommandInfo::MakeCommandInfo(                                                                                                                    \
+		this->AsShared(),                                                                                                                      \
+		CommandId,                                                                                                                                      \
+		TEXT(#CommandId),                                                                                                                               \
+		InLabel,                                                                                                                                        \
+		InDescription,                                                                                                                                  \
+		FSlateIcon{},                                                                                                                                   \
+		CommandType,                                                                                                                                    \
+		InDefaultChord,                                                                                                                                 \
+		##__VA_ARGS__                                                                                                                                   \
+	)
+
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	

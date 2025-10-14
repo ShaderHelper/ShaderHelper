@@ -1,39 +1,39 @@
 #include "CommonHeader.h"
 #include "SAssetView.h"
+#include "SAssetBrowser.h"
 #include <DirectoryWatcherModule.h>
 #include <IDirectoryWatcher.h>
 #include <DesktopPlatformModule.h>
-#include "Common/Util/Reflection.h"
 #include "AssetManager/AssetImporter/AssetImporter.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "AssetManager/AssetManager.h"
 #include "UI/Widgets/AssetBrowser/AssetViewItem/AssetViewFolderItem.h"
 #include "UI/Widgets/AssetBrowser/AssetViewItem/AssetViewAssetItem.h"
 #include "UI/Styles/FAppCommonStyle.h"
-#include <Framework/Commands/GenericCommands.h>
 #include "Editor/AssetEditor/AssetEditor.h"
 #include "ProjectManager/ProjectManager.h"
-#include "UI/Widgets/Misc/CommonCommands.h"
+#include "Editor/AssetViewCommands.h"
 #include "App/App.h"
 #include "PluginManager/PluginManager.h"
 
 namespace FW
 {
 
-	void SAssetView::Construct(const FArguments& InArgs)
+	void SAssetView::Construct(const FArguments& InArgs, SAssetBrowser* InBrowser)
 	{
+		Browser = InBrowser;
 		UICommandList = MakeShared<FUICommandList>();
 		UICommandList->MapAction(
-			FGenericCommands::Get().Delete,
+			AssetViewCommands::Get().Delete,
 			FExecuteAction::CreateRaw(this, &SAssetView::OnHandleDeleteAction)
 		);
 		UICommandList->MapAction(
-			FGenericCommands::Get().Rename,
+			AssetViewCommands::Get().Rename,
 			FExecuteAction::CreateRaw(this, &SAssetView::OnHandleRenameAction),
 			FCanExecuteAction::CreateLambda([this] { return AssetTileView->GetSelectedItems().Num() == 1; })
 		);
 		UICommandList->MapAction(
-			CommonCommands::Get().Save,
+			AssetViewCommands::Get().Save,
 			FExecuteAction::CreateRaw(this, &SAssetView::OnHandleSaveAction)
 		);
 
@@ -110,7 +110,7 @@ namespace FW
         }
 	}
 
-	void SAssetView::PopulateAssetView(const FString& ViewDirectory)
+	void SAssetView::PopulateAssetView(const FString& ViewDirectory, const FText& InFilterText)
 	{
 		AssetViewItems.Reset();
 
@@ -121,11 +121,31 @@ namespace FW
             FString Ext = FPaths::GetExtension(FileOrFolderName);
 			if (Ext.IsEmpty())
 			{
-				AssetViewItems.Add(MakeShared<AssetViewFolderItem>(ViewDirectory / FileOrFolderName));
+				if (!InFilterText.IsEmpty())
+				{
+					if (FileOrFolderName.Contains(InFilterText.ToString()))
+					{
+						AssetViewItems.Add(MakeShared<AssetViewFolderItem>(ViewDirectory / FileOrFolderName));
+					}
+				}
+				else
+				{
+					AssetViewItems.Add(MakeShared<AssetViewFolderItem>(ViewDirectory / FileOrFolderName));
+				}
 			}
 			else if(TSingleton<AssetManager>::Get().GetManageredExts().Contains(Ext))
 			{
-				AssetViewItems.Add(MakeShared<AssetViewAssetItem>(ViewDirectory / FileOrFolderName));
+				if (!InFilterText.IsEmpty())
+				{
+					if (FileOrFolderName.Contains(InFilterText.ToString()))
+					{
+						AssetViewItems.Add(MakeShared<AssetViewAssetItem>(ViewDirectory / FileOrFolderName));
+					}
+				}
+				else
+				{
+					AssetViewItems.Add(MakeShared<AssetViewAssetItem>(ViewDirectory / FileOrFolderName));
+				}
 			}
 		}
 
@@ -235,12 +255,15 @@ namespace FW
 					TSharedRef<AssetViewFolderItem> NewFolderItem = MakeShared<AssetViewFolderItem>(NewDirectoryPath);
 					if (!AssetViewItems.ContainsByPredicate([&](const TSharedRef<AssetViewItem>& InItem) {
 						return InItem->GetPath() == NewDirectoryPath;
-						}))
+					}))
 					{
 						// Setting the focus directly here will not take effect.
 						// The widget related to this item will only be added to STileView at the next tick
-						FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([=](float) {
+						FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this, NewFolderItem](float) {
 							NewFolderItem->EnterRenameState();
+							NewFolderItem->OnExitRenameState = [this] {
+								Browser->GetAssetSearchBox()->SetText(FText::GetEmpty());
+							};
 							return false;
 						}));
 						AssetViewItems.Add(MoveTemp(NewFolderItem));
@@ -291,10 +314,13 @@ namespace FW
 					FExecuteAction::CreateRaw(this, &SAssetView::OnHandleOpenAction, ViewItems[0]),
 					FCanExecuteAction::CreateLambda([ViewItems] { return ViewItems.Num() == 1; })
 				}
-			);
-			MenuBuilder.AddMenuEntry(CommonCommands::Get().Save, NAME_None, LOCALIZATION("Save"));
-			MenuBuilder.AddMenuEntry(FGenericCommands::Get().Rename);
-			MenuBuilder.AddMenuEntry(FGenericCommands::Get().Delete);
+			); 
+			MenuBuilder.AddMenuEntry(AssetViewCommands::Get().Save, NAME_None, {}, {},
+				FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "Icons.Save" });
+			MenuBuilder.AddMenuEntry(AssetViewCommands::Get().Rename, NAME_None, {}, {},
+				FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "GenericCommands.Rename" });
+			MenuBuilder.AddMenuEntry(AssetViewCommands::Get().Delete, NAME_None, {}, {},
+				FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "GenericCommands.Delete" });
 		}
 		MenuBuilder.EndSection();
 		return MenuBuilder.MakeWidget();

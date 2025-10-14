@@ -10,7 +10,7 @@
 #include <HAL/PlatformApplicationMisc.h>
 #include <Framework/Text/TextLayout.h>
 #include "ShaderCodeEditorLineHighlighter.h"
-#include "UI/Widgets/Misc/CommonCommands.h"
+#include "Editor/CodeEditorCommands.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "Editor/ShaderHelperEditor.h"
 #include <Widgets/Text/SlateTextBlockLayout.h>
@@ -22,7 +22,6 @@
 
 //No exposed methods, and too lazy to modify the source code for UE.
 STEAL_PRIVATE_MEMBER(SMultiLineEditableText, TUniquePtr<FSlateEditableTextLayout>, EditableTextLayout)
-STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, TSharedPtr<FUICommandList>, UICommandList)
 STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, TSharedPtr<SlateEditableTextTypes::FCursorLineHighlighter>, CursorLineHighlighter)
 STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, SlateEditableTextTypes::FCursorInfo, CursorInfo)
 STEAL_PRIVATE_MEMBER(STextBlock, TUniquePtr< FSlateTextBlockLayout >, TextLayoutCache)
@@ -42,6 +41,23 @@ const FLinearColor NormalLineTipColor = { 1.0f,1.0f,1.0f,0.0f };
 const FLinearColor HighlightLineTipColor = { 1.0f,1.0f,1.0f,0.2f };
 
 const FString FoldMarkerText = TEXT("⇿");
+
+
+	static bool IsOpenBrace(const TCHAR& InCharacter)
+	{
+		return (InCharacter == TEXT('{') || InCharacter == TEXT('[') || InCharacter == TEXT('('));
+	}
+
+	static bool IsCloseBrace(const TCHAR& InCharacter)
+	{
+		return (InCharacter == TEXT('}') || InCharacter == TEXT(']') || InCharacter == TEXT(')'));
+	}
+
+	static TCHAR GetMatchedCloseBrace(const TCHAR& InCharacter)
+	{
+		return InCharacter == TEXT('{') ? TEXT('}') :
+			(InCharacter == TEXT('[') ? TEXT(']') : TEXT(')'));
+	}
 
     TokenBreakIterator::TokenBreakIterator(FShaderEditorMarshaller* InMarshaller)
         : Marshaller(InMarshaller)
@@ -452,6 +468,22 @@ const FString FoldMarkerText = TEXT("⇿");
 							})
 							.OnIsTypedCharValid_Lambda([](const TCHAR InChar) { return true; })
 							.OnCursorMoved(this, &SShaderEditorBox::OnCursorMoved)
+							.OnContextMenuOpening_Lambda([this] {
+								FMenuBuilder MenuBuilder(true, UICommandList);
+								{
+									MenuBuilder.BeginSection("EditText", FText::FromString("Edit Text"));
+									{
+										MenuBuilder.AddMenuEntry(CodeEditorCommands::Get().Cut, NAME_None, {}, {},
+											FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "GenericCommands.Cut" });
+										MenuBuilder.AddMenuEntry(CodeEditorCommands::Get().Copy, NAME_None, {}, {}, 
+											FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "GenericCommands.Copy" });
+										MenuBuilder.AddMenuEntry(CodeEditorCommands::Get().Paste, NAME_None, {}, {},
+											FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "GenericCommands.Paste" });
+									}
+									MenuBuilder.EndSection();
+								}
+								return MenuBuilder.MakeWidget();
+							})
 						]
 						+ SOverlay::Slot()
 						[
@@ -619,14 +651,179 @@ const FString FoldMarkerText = TEXT("⇿");
 			return true;
 		};
         
-        TSharedPtr<FUICommandList>& UICommandList = GetPrivate_FSlateEditableTextLayout_UICommandList(*ShaderEditableTextLayout);
+		UICommandList = MakeShared<FUICommandList>();
         UICommandList->MapAction(
-            CommonCommands::Get().Save,
+			CodeEditorCommands::Get().Save,
             FExecuteAction::CreateLambda([this] {
 				ShaderAssetObj->Save();
                 Compile();
             })
         );
+		UICommandList->MapAction(CodeEditorCommands::Get().Undo,
+			FExecuteAction::CreateLambda([this] { ShaderMultiLineEditableTextLayout->Undo(); }),
+			FCanExecuteAction::CreateLambda([this] { return ShaderMultiLineEditableTextLayout->CanExecuteUndo(); }),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(
+			CodeEditorCommands::Get().Redo,
+			FExecuteAction::CreateLambda([this] {
+				ShaderMultiLineEditableTextLayout->Redo();
+			}),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(CodeEditorCommands::Get().Cut,
+			FExecuteAction::CreateLambda([this] {ShaderMultiLineEditableTextLayout->CutSelectedTextToClipboard();}),
+			FCanExecuteAction::CreateLambda([this] { return ShaderMultiLineEditableTextLayout->CanExecuteCut(); }),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(CodeEditorCommands::Get().Paste,
+			FExecuteAction::CreateLambda([this] {ShaderMultiLineEditableTextLayout->PasteTextFromClipboard(); }),
+			FCanExecuteAction::CreateLambda([this] { return ShaderMultiLineEditableTextLayout->CanExecutePaste(); }),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(CodeEditorCommands::Get().Copy,
+			FExecuteAction::CreateLambda([this] {ShaderMultiLineEditableTextLayout->CopySelectedTextToClipboard(); }),
+			FCanExecuteAction::CreateLambda([this] { return ShaderMultiLineEditableTextLayout->CanExecuteCopy(); })
+		);
+		UICommandList->MapAction(CodeEditorCommands::Get().DeleteLeft,
+			FExecuteAction::CreateLambda([this] { 
+				SMultiLineEditableText::FScopedEditableTextTransaction TextTransaction(ShaderMultiLineEditableText);
+				if (!ShaderMultiLineEditableText->AnyTextSelected())
+				{
+					// if we are deleting a single open brace
+					// look for a matching close brace following it and delete the close brace as well
+					const FTextLocation& CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
+					const int Offset = CursorLocation.GetOffset();
+					FString Line;
+					ShaderMultiLineEditableText->GetTextLine(CursorLocation.GetLineIndex(), Line);
+
+					if (Line.IsValidIndex(Offset - 1))
+					{
+						if (IsOpenBrace(Line[Offset - 1]))
+						{
+							if (Line.IsValidIndex(Offset) && Line[Offset] == GetMatchedCloseBrace(Line[Offset - 1]))
+							{
+								ShaderMultiLineEditableText->SelectText(FTextLocation(CursorLocation, -1), FTextLocation(CursorLocation, 1));
+								ShaderMultiLineEditableText->DeleteSelectedText();
+								ShaderMultiLineEditableText->GoTo(FTextLocation(CursorLocation, -1));
+								return;
+							}
+						}
+
+						if (Line[Offset - 1] == FoldMarkerText[0])
+						{
+							UnFold(GetLineNumber(CursorLocation.GetLineIndex()));
+							return;
+						}
+
+					}
+
+				}
+				else
+				{
+					const FTextSelection& Selection = ShaderMultiLineEditableText->GetSelection();
+					int32 StartLineIndex = Selection.GetBeginning().GetLineIndex();
+					int32 EndLineIndex = Selection.GetEnd().GetLineIndex();
+					for (int32 LineIndex = StartLineIndex; LineIndex <= EndLineIndex; LineIndex++)
+					{
+						RemoveFoldMarker(LineIndex);
+					}
+				}
+				
+				ShaderMultiLineEditableTextLayout->HandleBackspace();
+			}),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(CodeEditorCommands::Get().DeleteRight,
+			FExecuteAction::CreateLambda([this]{
+				SMultiLineEditableText::FScopedEditableTextTransaction TextTransaction(ShaderMultiLineEditableText);
+				ShaderMultiLineEditableTextLayout->HandleDelete();
+			}),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(CodeEditorCommands::Get().SelectAll,
+			FExecuteAction::CreateLambda([this] {ShaderMultiLineEditableTextLayout->SelectAllText(); }),
+			FCanExecuteAction::CreateLambda([this] { return ShaderMultiLineEditableTextLayout->CanExecuteSelectAll(); })
+		);
+		UICommandList->MapAction(
+			CodeEditorCommands::Get().ToggleComment,
+			FExecuteAction::CreateRaw(this, &SShaderEditorBox::ToggleComment)
+		);
+		UICommandList->MapAction(
+			CodeEditorCommands::Get().GoToBeginningOfLine,
+			FExecuteAction::CreateLambda([this] { ShaderMultiLineEditableTextLayout->GoTo(ETextLocation::BeginningOfCodeLine); }),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(
+			CodeEditorCommands::Get().GoToEndOfLine,
+			FExecuteAction::CreateLambda([this] { ShaderMultiLineEditableTextLayout->GoTo(ETextLocation::EndOfLine); }),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(
+			CodeEditorCommands::Get().CursorSelectLeft,
+			FExecuteAction::CreateLambda([this] { 
+				ShaderMultiLineEditableTextLayout->MoveCursor(FMoveCursor::Cardinal(
+					ECursorMoveGranularity::Character,
+					FIntPoint(-1, 0),
+					ECursorAction::SelectText
+				)); 
+			}),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(
+			CodeEditorCommands::Get().CursorSelectRight,
+			FExecuteAction::CreateLambda([this] { ShaderMultiLineEditableTextLayout->MoveCursor(FMoveCursor::Cardinal(
+					ECursorMoveGranularity::Character,
+					FIntPoint(+1, 0),
+					ECursorAction::SelectText
+				)); 
+			}),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(
+			CodeEditorCommands::Get().CursorTokenSelectLeft,
+			FExecuteAction::CreateLambda([this] {
+				ShaderMultiLineEditableTextLayout->MoveCursor(FMoveCursor::Cardinal(
+					ECursorMoveGranularity::Word,
+					FIntPoint(-1, 0),
+					ECursorAction::SelectText
+				));
+			}),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(
+			CodeEditorCommands::Get().CursorTokenSelectRight,
+			FExecuteAction::CreateLambda([this] {
+				ShaderMultiLineEditableTextLayout->MoveCursor(FMoveCursor::Cardinal(
+					ECursorMoveGranularity::Word,
+					FIntPoint(+1, 0),
+					ECursorAction::SelectText
+				));
+			}),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(
+			CodeEditorCommands::Get().CursorTokenLeft,
+			FExecuteAction::CreateLambda([this] {
+				ShaderMultiLineEditableTextLayout->MoveCursor(FMoveCursor::Cardinal(
+					ECursorMoveGranularity::Word,
+					FIntPoint(-1, 0),
+					ECursorAction::MoveCursor
+				));
+			}),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(
+			CodeEditorCommands::Get().CursorTokenRight,
+			FExecuteAction::CreateLambda([this] {
+				ShaderMultiLineEditableTextLayout->MoveCursor(FMoveCursor::Cardinal(
+					ECursorMoveGranularity::Word,
+					FIntPoint(+1, 0),
+					ECursorAction::MoveCursor
+				));
+			}),
+			EUIActionRepeatMode::RepeatEnabled
+		);
 
         FoldingArrowAnim.AddCurve(0, 0.25f, ECurveEaseFunction::Linear);
 
@@ -639,6 +836,128 @@ const FString FoldMarkerText = TEXT("⇿");
         
         CurEditState = ShaderAssetObj->bCompilationSucceed ? EditState::Succeed : EditState::Failed;
     }
+
+	void SShaderEditorBox::ToggleComment()
+	{
+		const FTextLocation& CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
+		const FTextSelection& Selection = ShaderMultiLineEditableText->GetSelection();
+		const int32 StartLineIndex = Selection.GetBeginning().GetLineIndex();
+		const int32 EndLineIndex = Selection.GetEnd().GetLineIndex();
+		FTextLocation OldStart = Selection.GetBeginning();
+		FTextLocation OldEnd = Selection.GetEnd();
+
+		bool CancelComment = true;
+		for (int32 LineIndex = StartLineIndex; LineIndex <= EndLineIndex; ++LineIndex)
+		{
+			FString LineText;
+			ShaderMultiLineEditableText->GetTextLine(LineIndex, LineText);
+			int32 Col = 0;
+			while (Col < LineText.Len() && FChar::IsWhitespace(LineText[Col]))
+			{
+				++Col;
+			}
+
+			if (LineText.Mid(Col, 2) != TEXT("//"))
+			{
+				CancelComment = false;
+			}
+		}
+
+		SMultiLineEditableText::FScopedEditableTextTransaction Transaction(ShaderMultiLineEditableText);
+		if (!CancelComment)
+		{
+			int32 FinalInserCol = std::numeric_limits<int32>::max();
+			TMap<int32, bool> CanInsert;
+			for (int32 LineIndex = StartLineIndex; LineIndex <= EndLineIndex; ++LineIndex)
+			{
+				FString LineText;
+				ShaderMultiLineEditableText->GetTextLine(LineIndex, LineText);
+
+				CanInsert.Add(LineIndex, false);
+
+				int32 InsertCol = 0;
+				do
+				{
+					if (InsertCol >= LineText.Len())
+					{
+						break;
+					}
+					if (!FChar::IsWhitespace(LineText[InsertCol]))
+					{
+						CanInsert[LineIndex] = true;
+						break;
+					}
+					InsertCol++;
+				} while (InsertCol);
+
+				if (CanInsert[LineIndex]) {
+					FinalInserCol = FMath::Min(FinalInserCol, InsertCol);
+				}
+			}
+			FSlateTextLayout* ShaderTextLayout = static_cast<FSlateTextLayout*>(ShaderMarshaller->TextLayout);
+			if (FinalInserCol != std::numeric_limits<int32>::max())
+			{
+				for (int32 LineIndex = StartLineIndex; LineIndex <= EndLineIndex; ++LineIndex)
+				{
+					if (CanInsert[LineIndex])
+					{
+						ShaderTextLayout->InsertAt(FTextLocation{ LineIndex, FinalInserCol }, "// ");
+						if (OldStart.GetLineIndex() == LineIndex && OldStart.GetOffset() >= FinalInserCol)
+							OldStart = FTextLocation(LineIndex, OldStart.GetOffset() + 3);
+						if (OldEnd.GetLineIndex() == LineIndex && OldEnd.GetOffset() >= FinalInserCol)
+							OldEnd = FTextLocation(LineIndex, OldEnd.GetOffset() + 3);
+					}
+				}
+				bool bCursorAtEnd = (OldEnd == CursorLocation);
+				if (bCursorAtEnd)
+				{
+					ShaderMultiLineEditableText->SelectText(OldStart, OldEnd);
+				}
+				else
+				{
+					ShaderMultiLineEditableText->SelectText(OldEnd, OldStart);
+				}
+			}
+		}
+		else
+		{
+			for (int32 LineIndex = StartLineIndex; LineIndex <= EndLineIndex; ++LineIndex)
+			{
+				FString LineText;
+				ShaderMultiLineEditableText->GetTextLine(LineIndex, LineText);
+				int32 RemoveCol = 0;
+				while (RemoveCol < LineText.Len() && FChar::IsWhitespace(LineText[RemoveCol]))
+				{
+					++RemoveCol;
+				}
+
+				if (LineText.Mid(RemoveCol, 2) == TEXT("//"))
+				{
+					int32 RemoveLen = 2;
+					if (LineText.Len() > RemoveCol + 2 && LineText[RemoveCol + 2] == TEXT(' '))
+					{
+						++RemoveLen;
+					}
+					FSlateTextLayout* ShaderTextLayout = static_cast<FSlateTextLayout*>(ShaderMarshaller->TextLayout);
+					ShaderTextLayout->RemoveAt(FTextLocation{ LineIndex, RemoveCol }, RemoveLen);
+
+					if (OldStart.GetLineIndex() == LineIndex && OldStart.GetOffset() >= RemoveCol)
+						OldStart = FTextLocation(OldStart, -FMath::Min(RemoveLen, OldStart.GetOffset() - RemoveCol));
+					if (OldEnd.GetLineIndex() == LineIndex && OldEnd.GetOffset() >= RemoveCol)
+						OldEnd = FTextLocation(OldEnd, -FMath::Min(RemoveLen, OldEnd.GetOffset() - RemoveCol));
+				}
+				bool bCursorAtEnd = (OldEnd == CursorLocation);
+				if (bCursorAtEnd)
+				{
+					ShaderMultiLineEditableText->SelectText(OldStart, OldEnd);
+				}
+				else
+				{
+					ShaderMultiLineEditableText->SelectText(OldEnd, OldStart);
+				}
+			}
+		}
+	}
 
 	void SShaderEditorBox::OnBeginEditTransaction()
 	{
@@ -1512,22 +1831,6 @@ const FString FoldMarkerText = TEXT("⇿");
         return NumSpaces;
     }
 
-    static bool IsOpenBrace(const TCHAR& InCharacter)
-    {
-        return (InCharacter == TEXT('{') || InCharacter == TEXT('[') || InCharacter == TEXT('('));
-    }
-
-    static bool IsCloseBrace(const TCHAR& InCharacter)
-    {
-        return (InCharacter == TEXT('}') || InCharacter == TEXT(']') || InCharacter == TEXT(')'));
-    }
-
-    static TCHAR GetMatchedCloseBrace(const TCHAR& InCharacter)
-    {
-        return InCharacter == TEXT('{') ? TEXT('}') :
-            (InCharacter == TEXT('[') ? TEXT(']') : TEXT(')'));
-    }
-
     void SShaderEditorBox::HandleAutoIndent()
     {
         TSharedPtr<SMultiLineEditableText> Text = ShaderMultiLineEditableText;
@@ -1612,119 +1915,10 @@ const FString FoldMarkerText = TEXT("⇿");
 		const FTextLocation& CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
 		const int32 CursorLine = CursorLocation.GetLineIndex();
 		const int32 CursorOffset = CursorLocation.GetOffset();
-		
-		if(Key == EKeys::K && InKeyEvent.GetModifierKeys().IsControlDown())
-		{
-			bTryToggleCommentSelection = true;
-		}
-		else if(Key == EKeys::C && bTryToggleCommentSelection)
-		{
-			SMultiLineEditableText::FScopedEditableTextTransaction Transaction(ShaderMultiLineEditableText);
-			int32 FinalInserCol = std::numeric_limits<int32>::max();
-			TMap<int32, bool> CanInsert;
-			for(int32 LineIndex = StartLineIndex; LineIndex <= EndLineIndex; ++LineIndex)
-			{
-				FString LineText;
-				ShaderMultiLineEditableText->GetTextLine(LineIndex, LineText);
-				CanInsert.Add(LineIndex, false);
-				
-				int32 InsertCol = 0;
-				do
-				{
-					if(InsertCol >= LineText.Len())
-					{
-						break;
-					}
-					if(!FChar::IsWhitespace(LineText[InsertCol]))
-					{
-						CanInsert[LineIndex] = true;
-						break;
-					}
-					InsertCol++;
-				}while(InsertCol);
 
-				if(CanInsert[LineIndex]) {
-					FinalInserCol = FMath::Min(FinalInserCol, InsertCol);
-				}
-			}
-			FSlateTextLayout* ShaderTextLayout = static_cast<FSlateTextLayout*>(ShaderMarshaller->TextLayout);
-			if(FinalInserCol != std::numeric_limits<int32>::max())
-			{
-                FTextLocation OldStart = Selection.GetBeginning();
-                FTextLocation OldEnd = Selection.GetEnd();
-                bool bCursorAtEnd = (OldEnd == CursorLocation);
-
-				for(int32 LineIndex = StartLineIndex; LineIndex <= EndLineIndex; ++LineIndex)
-				{
-					if(CanInsert[LineIndex])
-					{
-						ShaderTextLayout->InsertAt(FTextLocation{ LineIndex, FinalInserCol }, "// ");
-                        if(OldStart.GetLineIndex() == LineIndex && OldStart.GetOffset() >= FinalInserCol)
-                            OldStart = FTextLocation(LineIndex, OldStart.GetOffset() + 3);
-                        if(OldEnd.GetLineIndex() == LineIndex && OldEnd.GetOffset() >= FinalInserCol)
-                            OldEnd = FTextLocation(LineIndex, OldEnd.GetOffset() + 3);
-					}
-				}
-                if(bCursorAtEnd)
-                {
-                    ShaderMultiLineEditableText->SelectText(OldStart, OldEnd);
-                }
-                else
-                {
-                    ShaderMultiLineEditableText->SelectText(OldEnd, OldStart);
-                }
-			}
-			bTryToggleCommentSelection = false;
-		}
-		else if(Key == EKeys::U && bTryToggleCommentSelection)
+		if (UICommandList->ProcessCommandBindings(InKeyEvent))
 		{
-			SMultiLineEditableText::FScopedEditableTextTransaction Transaction(ShaderMultiLineEditableText);
-			
-			FTextLocation OldStart = Selection.GetBeginning();
-			FTextLocation OldEnd = Selection.GetEnd();
-			bool bCursorAtEnd = (OldEnd == CursorLocation);
-			
-			for(int32 LineIndex = StartLineIndex; LineIndex <= EndLineIndex; ++LineIndex)
-			{
-				FString LineText;
-				ShaderMultiLineEditableText->GetTextLine(LineIndex, LineText);
-
-				int32 RemoveCol = 0;
-				while(RemoveCol < LineText.Len() && FChar::IsWhitespace(LineText[RemoveCol]))
-				{
-					++RemoveCol;
-				}
-
-				if(LineText.Mid(RemoveCol, 2) == TEXT("//"))
-				{
-					int32 RemoveLen = 2;
-					if(LineText.Len() > RemoveCol + 2 && LineText[RemoveCol + 2] == TEXT(' '))
-					{
-						++RemoveLen;
-					}
-					FSlateTextLayout* ShaderTextLayout = static_cast<FSlateTextLayout*>(ShaderMarshaller->TextLayout);
-					ShaderTextLayout->RemoveAt(FTextLocation{LineIndex, RemoveCol}, RemoveLen);
-					
-					if(OldStart.GetLineIndex() == LineIndex && OldStart.GetOffset() >= RemoveCol)
-						  OldStart = FTextLocation(OldStart, -FMath::Min(RemoveLen, OldStart.GetOffset() - RemoveCol));
-					if(OldEnd.GetLineIndex() == LineIndex && OldEnd.GetOffset() >= RemoveCol)
-						  OldEnd = FTextLocation(OldEnd, -FMath::Min(RemoveLen, OldEnd.GetOffset()  - RemoveCol));
-				}
-			}
-			if(bCursorAtEnd)
-			{
-				ShaderMultiLineEditableText->SelectText(OldStart, OldEnd);
-			}
-			else
-			{
-				ShaderMultiLineEditableText->SelectText(OldEnd, OldStart);
-			}
-			bTryToggleCommentSelection = false;
-			
-		}
-		else
-		{
-			bTryToggleCommentSelection = false;
+			return FReply::Handled();
 		}
 		
         if(bTryComplete && CandidateItems.Num())
@@ -1766,8 +1960,45 @@ const FString FoldMarkerText = TEXT("⇿");
 				return FReply::Handled();
 			}
 		}
-        // Let SMultiLineEditableText::OnKeyDown handle it.
-        return FReply::Unhandled();
+
+		if (Key == EKeys::Left)
+		{
+			ShaderMultiLineEditableTextLayout->MoveCursor(FMoveCursor::Cardinal(
+				ECursorMoveGranularity::Character,
+				FIntPoint(-1, 0),
+				ECursorAction::MoveCursor
+			));
+		}
+		else if (Key == EKeys::Right)
+		{
+			ShaderMultiLineEditableTextLayout->MoveCursor(FMoveCursor::Cardinal(
+				ECursorMoveGranularity::Character,
+				FIntPoint(+1, 0),
+				ECursorAction::MoveCursor
+			));
+		}
+		else if (Key == EKeys::Up)
+		{
+			ShaderMultiLineEditableTextLayout->MoveCursor(FMoveCursor::Cardinal(
+				ECursorMoveGranularity::Character,
+				// Move up
+				FIntPoint(0, -1),
+				// Shift selects text.	
+				InKeyEvent.IsShiftDown() ? ECursorAction::SelectText : ECursorAction::MoveCursor
+			));
+		}
+		else if (Key == EKeys::Down)
+		{
+			ShaderMultiLineEditableTextLayout->MoveCursor(FMoveCursor::Cardinal(
+				ECursorMoveGranularity::Character,
+				// Move down
+				FIntPoint(0, +1),
+				// Shift selects text.	
+				InKeyEvent.IsShiftDown() ? ECursorAction::SelectText : ECursorAction::MoveCursor
+			));
+		}
+
+		return FReply::Handled();
     }
 
     FReply SShaderEditorBox::HandleKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent)
@@ -1782,50 +2013,8 @@ const FString FoldMarkerText = TEXT("⇿");
 		bKeyChar = true;
         if (Character == TEXT('\b'))
         {
-            if (!Text->AnyTextSelected())
-            {
-                // if we are deleting a single open brace
-                // look for a matching close brace following it and delete the close brace as well
-                const FTextLocation& CursorLocation = Text->GetCursorLocation();
-                const int Offset = CursorLocation.GetOffset();
-                FString Line;
-                Text->GetTextLine(CursorLocation.GetLineIndex(), Line);
-
-                if (Line.IsValidIndex(Offset - 1))
-                {
-                    if (IsOpenBrace(Line[Offset - 1]))
-                    {
-                        if (Line.IsValidIndex(Offset) && Line[Offset] == GetMatchedCloseBrace(Line[Offset - 1]))
-                        {
-                            SMultiLineEditableText::FScopedEditableTextTransaction ScopedTransaction(Text);
-                            Text->SelectText(FTextLocation(CursorLocation, -1), FTextLocation(CursorLocation, 1));
-                            Text->DeleteSelectedText();
-                            Text->GoTo(FTextLocation(CursorLocation, -1));
-                            return FReply::Handled();
-                        }
-                    }
-
-                    if (Line[Offset - 1] == FoldMarkerText[0])
-                    {
-                        UnFold(GetLineNumber(CursorLocation.GetLineIndex()));
-                        return FReply::Handled();
-                    }
-
-                }
-                
-            }
-            else
-            {
-                const FTextSelection& Selection = Text->GetSelection();
-                int32 StartLineIndex = Selection.GetBeginning().GetLineIndex();
-                int32 EndLineIndex = Selection.GetEnd().GetLineIndex();
-                for (int32 LineIndex = StartLineIndex; LineIndex <= EndLineIndex; LineIndex++)
-                {
-                    RemoveFoldMarker(LineIndex);
-                }
-            }
-
-            return FReply::Unhandled();
+			//Ignore FSlateEditableTextLayout::HandleKeyChar backspace
+			return FReply::Handled();
         }
         else if (Character == TEXT('\t') or Character == 0x19)
         {
