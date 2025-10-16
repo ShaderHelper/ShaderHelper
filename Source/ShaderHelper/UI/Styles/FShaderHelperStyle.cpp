@@ -97,7 +97,6 @@ namespace SH {
         Style->Set("CodeFont", CodeFontInfo);
 
 		FTextBlockStyle CodeEditorNormalTextStyle = FTextBlockStyle{}
-			.SetFont(CodeFontInfo)
 			.SetColorAndOpacity(FLinearColor::White);
 		
 		FTextBlockStyle CodeEditorKeywordTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }

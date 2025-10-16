@@ -185,7 +185,12 @@ namespace SH
 		};
 		
 		static FTextBlockStyle& GetTokenStyle(HLSL::TokenType InType);
-		static FSlateFontInfo& GetCodeFontInfo();
+		static FString GetFontPath();
+		static int32 GetFontSize();
+		static bool CanMouseWheelZoom();
+		static FSlateFontInfo GetCodeFontInfo();
+		static constexpr int32 MinFontSize = 4;
+		void RefreshFont();
 		
     public:
 		SLATE_BEGIN_ARGS(SShaderEditorBox) 
@@ -225,7 +230,6 @@ namespace SH
 
 		ShaderAsset* GetShaderAsset() const { return ShaderAssetObj; }
         FText GetEditStateText() const;
-        FText GetFontSizeText() const;
         FText GetRowColText() const;
         FSlateColor GetEditStateColor() const;
 		int32 GetLineNumber(int32 InLineIndex) const;
@@ -272,7 +276,6 @@ namespace SH
 		void UpdateEffectText();
 		void HandleAutoIndent();
         TSharedRef<SWidget> BuildInfoBar();
-		void GenerateInfoBarBox();
 
 		FReply OnFold(int32 LineNumber);
 		void RemoveFoldMarker(int32 InIndex);

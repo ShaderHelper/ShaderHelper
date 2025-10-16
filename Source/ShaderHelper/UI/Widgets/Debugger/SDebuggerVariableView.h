@@ -3,14 +3,6 @@
 
 namespace SH
 {
-	class SVariableViewRow : public SMultiColumnTableRow<ExpressionNodePtr>
-	{
-	public:
-		void Construct(const FArguments& InArgs, ExpressionNodePtr InData, const TSharedRef<STableViewBase>& OwnerTableView);
-		virtual TSharedRef<SWidget> GenerateWidgetForColumn(const FName& ColumnId) override;
-		ExpressionNodePtr Data;
-	};
-
 	class SDebuggerVariableView : public SCompoundWidget
 	{
 	public:
@@ -20,6 +12,7 @@ namespace SH
 		{}
 			SLATE_ARGUMENT(bool, HasHeaderRow)
 			SLATE_ARGUMENT(bool, AutoWidth)
+			SLATE_ATTRIBUTE(FSlateFontInfo, Font)
 		SLATE_END_ARGS()
 		void Construct( const FArguments& InArgs );
 		
@@ -34,9 +27,19 @@ namespace SH
 		void OnGetChildren(ExpressionNodePtr InTreeNode, TArray<ExpressionNodePtr>& OutChildren);
 
 		static inline bool bShowUninitialized = false;
+		TAttribute<FSlateFontInfo> Font;
 	private:
 		TSharedPtr<STreeView<ExpressionNodePtr>> VariableTreeView;
 		TArray<ExpressionNodePtr> VariableNodeDatas;
 		TFunction<void(bool)> OnShowUninitialized;
+	};
+
+	class SVariableViewRow : public SMultiColumnTableRow<ExpressionNodePtr>
+	{
+	public:
+		void Construct(const FArguments& InArgs, SDebuggerVariableView* InOwner, ExpressionNodePtr InData, const TSharedRef<STableViewBase>& OwnerTableView);
+		virtual TSharedRef<SWidget> GenerateWidgetForColumn(const FName& ColumnId) override;
+		SDebuggerVariableView* Owner{};
+		ExpressionNodePtr Data;
 	};
 }

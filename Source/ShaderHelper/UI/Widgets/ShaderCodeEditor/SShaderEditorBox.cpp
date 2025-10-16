@@ -19,6 +19,7 @@
 #include <Styling/StyleColors.h>
 #include "Editor/AssetEditor/AssetEditor.h"
 #include "GpuApi/Spirv/SpirvExpressionVM.h"
+#include "Common/Path/BaseResourcePath.h"
 
 //No exposed methods, and too lazy to modify the source code for UE.
 STEAL_PRIVATE_MEMBER(SMultiLineEditableText, TUniquePtr<FSlateEditableTextLayout>, EditableTextLayout)
@@ -170,10 +171,50 @@ const FString FoldMarkerText = TEXT("⇿");
         return true;
     }
 
-	FSlateFontInfo& SShaderEditorBox::GetCodeFontInfo()
+	FString SShaderEditorBox::GetFontPath()
 	{
-		static FSlateFontInfo CodeFontInfo = FShaderHelperStyle::Get().GetFontStyle("CodeFont");
+		FString FontPath = BaseResourcePath::UE_SlateFontDir / TEXT("DroidSansMono.ttf");
+		Editor::GetEditorConfig()->GetString(TEXT("CodeEditor"), TEXT("Font"), FontPath);
+		return FontPath;
+	}
+
+	int32 SShaderEditorBox::GetFontSize()
+	{
+		int32 FontSize = 10;
+		Editor::GetEditorConfig()->GetInt(TEXT("CodeEditor"), TEXT("FontSize"), FontSize);
+		return FontSize;
+	}
+
+	bool SShaderEditorBox::CanMouseWheelZoom()
+	{
+		bool MouseWheelZoom = true;
+		Editor::GetEditorConfig()->GetBool(TEXT("CodeEditor"), TEXT("MouseWheelZoom"), MouseWheelZoom);
+		return MouseWheelZoom;
+	}
+
+	FSlateFontInfo SShaderEditorBox::GetCodeFontInfo()
+	{
+		TSharedRef<FCompositeFont> CodeFont = MakeShared<FStandaloneCompositeFont>();
+		FString FontPath = GetFontPath();
+		FString FontSize = FString::FromInt(GetFontSize());
+		Editor::GetEditorConfig()->GetString(TEXT("CodeEditor"), TEXT("Font"), FontPath);
+		Editor::GetEditorConfig()->GetString(TEXT("CodeEditor"), TEXT("FontSize"), FontSize);
+
+		CodeFont->DefaultTypeface.AppendFont(TEXT("Code"), FontPath, EFontHinting::Default, EFontLoadingPolicy::LazyLoad);
+		CodeFont->FallbackTypeface.Typeface.AppendFont(TEXT("Code"), BaseResourcePath::UE_SlateFontDir / TEXT("DroidSansFallback.ttf"), EFontHinting::Default, EFontLoadingPolicy::LazyLoad);
+		FSlateFontInfo CodeFontInfo = FSlateFontInfo(CodeFont, FCString::Atoi(*FontSize));
 		return CodeFontInfo;
+	}
+
+	void SShaderEditorBox::RefreshFont()
+	{
+		const auto& CodeFontInfo = GetCodeFontInfo();
+	
+		ShaderMultiLineEditableText->SetFont(CodeFontInfo);
+		ShaderMultiLineEditableText->Refresh();
+
+		EffectMultiLineEditableText->SetFont(CodeFontInfo);
+		EffectMultiLineEditableText->Refresh();
 	}
 
 	FTextBlockStyle& SShaderEditorBox::GetTokenStyle(HLSL::TokenType InType)
@@ -196,7 +237,7 @@ const FString FoldMarkerText = TEXT("⇿");
 			{ HLSL::TokenType::Var, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorVarText")},
 			{ HLSL::TokenType::LocalVar, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText")},
 		};
-		auto& CodeFontInfo = GetCodeFontInfo();
+		const auto& CodeFontInfo = GetCodeFontInfo();
 		for(auto& [_, Style] : TokenStyleMap)
 		{
 			if(Style.Font != CodeFontInfo)
@@ -513,9 +554,15 @@ const FString FoldMarkerText = TEXT("⇿");
 							SAssignNew(CodeCompletionCanvas, SCanvas)
 							+ SCanvas::Slot()
 							.Size_Lambda([this]{
-								float Height = CustomCursorHighlighter->ScaledLineHeight * CandidateItems.Num();
-								float HSize = FMath::Min(200.0f, Height);
-								return FVector2D{240, HSize};
+								const FSlateFontInfo Font = GetCodeFontInfo();
+								const auto Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
+								const float LineH = (float)Measure->Measure(TEXT("M"), Font).Y; 
+								const float ItemH = LineH + 2.0f;
+								const int32 Visible = FMath::Clamp(CandidateItems.Num(), 1, 10);
+								const float Height = ItemH * Visible;
+								const float CharW = (float)Measure->Measure(TEXT("M"), Font).X;
+								const float Width = CharW * 24 + 20.0f;
+								return FVector2D{ Width, Height };
 							})
 							.Position_Lambda([this]{
 								FVector2D TipPos = CustomCursorHighlighter->ScaledCursorPos;
@@ -975,11 +1022,6 @@ const FString FoldMarkerText = TEXT("⇿");
         }
     }
 
-    FText SShaderEditorBox::GetFontSizeText() const
-    {
-        return LOCALIZATION("FontSize");
-    }
-
     FSlateColor SShaderEditorBox::GetEditStateColor() const
     {
         switch(CurEditState)
@@ -1013,133 +1055,73 @@ const FString FoldMarkerText = TEXT("⇿");
         const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
         const int32 CursorRow = CursorLocation.GetLineIndex();
         const int32 CursorCol = CursorLocation.GetOffset() + 1;
-        return FText::FromString(FString::Printf(TEXT("%d:%d"), GetLineNumber(CursorRow), CursorCol));
-    }
-
-
-    void SShaderEditorBox::GenerateInfoBarBox()
-    {
-        FSlateFontInfo InforBarFontInfo = FShaderHelperStyle::Get().GetFontStyle("CodeFont");
-        auto BuildFontSizeMenu = [this]() {
-            const int32 MinFontSize = 9;
-            const int32 MaxFontSize = 14;
-
-            FMenuBuilder MenuBuilder{ true, TSharedPtr<FUICommandList>() };
-            for (int32 i = MinFontSize; i <= MaxFontSize; i++)
-            {
-                MenuBuilder.AddMenuEntry(
-                    FText::AsNumber(i),
-                    FText::GetEmpty(),
-                    FSlateIcon(),
-                    FUIAction(FExecuteAction::CreateLambda(
-                        [this, i]()
-                        {
-							auto& CodeFontInfo = GetCodeFontInfo();
-                            CodeFontInfo.Size = i;
-                            ShaderMarshaller->MakeDirty();
-							ShaderMultiLineEditableText->SetFont(CodeFontInfo);
-                            ShaderMultiLineEditableText->Refresh();
-                            EffectMarshller->MakeDirty();
-							EffectMultiLineEditableText->SetFont(CodeFontInfo);
-                            EffectMultiLineEditableText->Refresh();
-                        }),
-                        FCanExecuteAction(),
-                        FIsActionChecked::CreateLambda(
-                        [this, i]()
-                        {
-                            return GetCodeFontInfo().Size == i;
-                        })),
-                        NAME_None,
-                        EUserInterfaceActionType::RadioButton);
-            }
-
-            return MenuBuilder.MakeWidget();
-        };
-
-        InfoBarBox->ClearChildren();
-        
-        InfoBarBox->AddSlot()
-            .AutoWidth()
-            [
-                SNew(SButton)
-                .IsFocusable(false)
-                .OnClicked_Lambda([this]{
-                    Compile();
-                    return FReply::Handled();
-                })
-                [
-                    SNew(STextBlock)
-                    .Font(InforBarFontInfo)
-                    .Text(FText::FromString(TEXT("❖")))
-                ]
-            ];
-
-        InfoBarBox->AddSlot()
-			.Padding(2,0,0,0)
-            .AutoWidth()
-            [
-                SNew(SBorder)
-                .BorderImage(FAppStyle::Get().GetBrush("WhiteBrush"))
-                .BorderBackgroundColor(this, &SShaderEditorBox::GetEditStateColor)
-                .VAlign(VAlign_Center)
-                [
-                    SNew(STextBlock)
-					.Justification(ETextJustify::Center)
-					.MinDesiredWidth(80)
-                    .Font(InforBarFontInfo)
-                    .ColorAndOpacity(FLinearColor::Black)
-                    .Text(this, &SShaderEditorBox::GetEditStateText)
-                ]
-            ];
-
-        InfoBarBox->AddSlot()
-            .FillWidth(1.0f)
-            [
-                SNullWidget::NullWidget
-            ];
-
-        InfoBarBox->AddSlot()
-            .AutoWidth()
-            .HAlign(HAlign_Right)
-            [
-                SNew(SComboButton)
-                .ComboButtonStyle(&FAppStyle::Get().GetWidgetStyle<FComboButtonStyle>("SimpleComboButton"))
-                .HasDownArrow(false)
-                .ButtonContent()
-                [
-                    SNew(STextBlock)
-                    .Font(InforBarFontInfo)
-                    .Text(this, &SShaderEditorBox::GetFontSizeText)
-                ]
-                .MenuContent()
-                [
-                    BuildFontSizeMenu()
-                ]
-            ];
-
-        InfoBarBox->AddSlot()
-            .AutoWidth()
-            .HAlign(HAlign_Right)
-            [
-                SNew(SBorder)
-                .BorderImage(FAppStyle::Get().GetBrush("WhiteBrush"))
-                .BorderBackgroundColor(this, &SShaderEditorBox::GetEditStateColor)
-                .VAlign(VAlign_Center)
-                [
-                    SNew(STextBlock)
-                    .Font(InforBarFontInfo)
-                    .ColorAndOpacity(FLinearColor::Black)
-                    .Text(this, &SShaderEditorBox::GetRowColText)
-                    .Margin(FMargin{ 20, 0, 20, 0 })
-                ]
-            ];
+		FString Fmt = LOCALIZATION("Line").ToString() + ":{0} " + LOCALIZATION("Column").ToString() + ":{1}";
+		return FText::FromString(FString::Format(*Fmt, { GetLineNumber(CursorRow), CursorCol }));
     }
 
     TSharedRef<SWidget> SShaderEditorBox::BuildInfoBar()
     {
         SAssignNew(InfoBarBox, SHorizontalBox);
 
-        GenerateInfoBarBox();
+		InfoBarBox->ClearChildren();
+
+		FSlateFontInfo InforBarFontInfo = FShaderHelperStyle::Get().GetFontStyle("CodeFont");
+		InfoBarBox->AddSlot()
+			.AutoWidth()
+			[
+				SNew(SButton)
+				.IsFocusable(false)
+				.OnClicked_Lambda([this] {
+					Compile();
+					return FReply::Handled();
+				})
+				[
+					SNew(STextBlock)
+					.Font(InforBarFontInfo)
+					.Text(FText::FromString(TEXT("❖")))
+				]
+			];
+
+		InfoBarBox->AddSlot()
+			.Padding(2, 0, 0, 0)
+			.AutoWidth()
+			[
+				SNew(SBorder)
+				.BorderImage(FAppStyle::Get().GetBrush("WhiteBrush"))
+				.BorderBackgroundColor(this, &SShaderEditorBox::GetEditStateColor)
+				.VAlign(VAlign_Center)
+				[
+					SNew(STextBlock)
+						.Justification(ETextJustify::Center)
+						.MinDesiredWidth(80)
+						.Font(InforBarFontInfo)
+						.ColorAndOpacity(FLinearColor::Black)
+						.Text(this, &SShaderEditorBox::GetEditStateText)
+				]
+			];
+
+		InfoBarBox->AddSlot()
+			.FillWidth(1.0f)
+			[
+				SNullWidget::NullWidget
+			];
+
+		InfoBarBox->AddSlot()
+			.AutoWidth()
+			.HAlign(HAlign_Right)
+			[
+				SNew(SBorder)
+					.BorderImage(FAppStyle::Get().GetBrush("WhiteBrush"))
+					.BorderBackgroundColor(this, &SShaderEditorBox::GetEditStateColor)
+					.VAlign(VAlign_Center)
+					[
+						SNew(STextBlock)
+							.Font(InforBarFontInfo)
+							.ColorAndOpacity(FLinearColor::Black)
+							.Text(this, &SShaderEditorBox::GetRowColText)
+							.Margin(FMargin{ 8, 0, 8, 0 })
+					]
+			];
 
         TSharedRef<SWidget> InfoBar = SNew(SBorder)
         [
@@ -1290,6 +1272,17 @@ const FString FoldMarkerText = TEXT("⇿");
 
     FReply SShaderEditorBox::OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
     {
+		if (FSlateApplication::Get().GetModifierKeys().IsControlDown() && CanMouseWheelZoom())
+		{
+			int32 FontSize = (int32)(GetFontSize() + MouseEvent.GetWheelDelta());
+			Editor::GetEditorConfig()->SetInt64(TEXT("CodeEditor"), TEXT("FontSize"), FMath::Max(MinFontSize, FontSize));
+			Editor::SaveEditorConfig();
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			for (auto ShaderEditor : ShEditor->GetShaderEditors())
+			{
+				ShaderEditor->RefreshFont();
+			}
+		}
         return CallPrivate_SMultiLineEditableText_OnMouseWheel(*ShaderMultiLineEditableText, ShaderMultiLineEditableText->GetTickSpaceGeometry(), MouseEvent);
     }
 
@@ -1604,7 +1597,8 @@ const FString FoldMarkerText = TEXT("⇿");
 
     TSharedRef<ITableRow> SShaderEditorBox::GenerateCodeCompletionItem(CandidateItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
     {
-		auto CandidateText = SNew(STextBlock).Font(GetCodeFontInfo())
+		const auto& CodeFontInfo = GetCodeFontInfo();
+		auto CandidateText = SNew(STextBlock).Font(CodeFontInfo)
 		.Text(FText::FromString(Item->Text))
 		.OverflowPolicy(ETextOverflowPolicy::Ellipsis);
 		
@@ -1637,14 +1631,13 @@ const FString FoldMarkerText = TEXT("⇿");
         [
             SNew(SHorizontalBox)
             +SHorizontalBox::Slot()
-            .FillWidth(0.75f)
             [
 				CandidateText
             ]
             +SHorizontalBox::Slot()
-            .FillWidth(0.25f)
+            .AutoWidth()
             [
-                SNew(STextBlock)
+                SNew(STextBlock).Font(CodeFontInfo)
                 .Justification(ETextJustify::Right)
                 .Text(FText::FromString(FString{magic_enum::enum_name(Item->Kind).data()}))
             ]
@@ -2539,7 +2532,7 @@ const FString FoldMarkerText = TEXT("⇿");
         int32 LineNumber = FCString::Atoi(*(*Item).ToString());
         const int32 LineIndex = GetLineIndex(LineNumber);
 		
-		auto& CodeFontInfo = GetCodeFontInfo();
+		const auto& CodeFontInfo = GetCodeFontInfo();
 		float MinWidth = (float)FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(TEXT("0"), CodeFontInfo).X;
 		MinWidth *= FString::FromInt(MaxLineNumber).Len();
         
@@ -2600,7 +2593,6 @@ const FString FoldMarkerText = TEXT("⇿");
 		}
 		
 		auto LineMarker = SNew(SImage)
-		.DesiredSizeOverride(FVector2D{12.0, 12.0})
 		.Image_Lambda([=, this] {
 			if(IsWarningLine(LineNumber) || IsErrorLine(LineNumber))
 			{
@@ -2651,11 +2643,13 @@ const FString FoldMarkerText = TEXT("⇿");
 					.AutoWidth()
 					[
 						SNew(SBox)
-						.MinDesiredWidth(16.0f)
-						.VAlign(VAlign_Center)
-						.HAlign(HAlign_Center)
+						.WidthOverride_Lambda([this] { return GetFontSize() + 2; })
+						.HeightOverride_Lambda([this] { return GetFontSize() + 2; })
 						[
-							LineMarker
+							SNew(SScaleBox).Stretch(EStretch::ScaleToFit)
+							[
+								LineMarker
+							]
 						]
 					]
 					+ SHorizontalBox::Slot()
@@ -2667,9 +2661,14 @@ const FString FoldMarkerText = TEXT("⇿");
 					.Padding(5, 0, 5, 0)
 					.AutoWidth()
 					[
-						SNew(SScaleBox)
+						SNew(SBox)
+						.WidthOverride_Lambda([this] { return GetFontSize(); })
+						.HeightOverride_Lambda([this] { return GetFontSize(); })
 						[
-							FoldingArrow.ToSharedRef()
+							SNew(SScaleBox).Stretch(EStretch::ScaleToFit)
+							[
+								FoldingArrow.ToSharedRef()
+							]
 						]
 					]
 				]

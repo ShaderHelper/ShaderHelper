@@ -14,6 +14,7 @@ namespace SH
 
 	void SDebuggerVariableView::Construct( const FArguments& InArgs )
 	{
+		Font = InArgs._Font;
 		EVisibility HeaderRowVisibility = InArgs._HasHeaderRow ? EVisibility::Visible : EVisibility::Collapsed;
 
 		TSharedPtr<SHeaderRow> HeaderRow = SNew(SHeaderRow)
@@ -26,7 +27,8 @@ namespace SH
 					float MaxWidth{};
 					for (ExpressionNodePtr Data : VariableNodeDatas)
 					{
-						auto Temp = SNew(STextBlock).Text(FText::FromString(Data->Expr));
+						auto Temp = SNew(STextBlock).Text(FText::FromString(Data->Expr)).SimpleTextMode(true);
+						if (Font.IsSet()) { Temp->SetFont(Font.Get()); }
 						float DpiScale = static_cast<ShaderHelperEditor*>(GApp->GetEditor())->GetDebuggerTipWindow()->GetDPIScaleFactor();
 						MaxWidth = FMath::Max(MaxWidth, (float)Temp->ComputeDesiredSize(DpiScale).X + 60);
 					}
@@ -38,6 +40,7 @@ namespace SH
 					for (ExpressionNodePtr Data : VariableNodeDatas)
 					{
 						auto Temp = SNew(STextBlock).Text(FText::FromString(Data->ValueStr));
+						if (Font.IsSet()) { Temp->SetFont(Font.Get()); }
 						float DpiScale = static_cast<ShaderHelperEditor*>(GApp->GetEditor())->GetDebuggerTipWindow()->GetDPIScaleFactor();
 						MaxWidth = FMath::Max(MaxWidth, (float)Temp->ComputeDesiredSize(DpiScale).X + 40);
 					}
@@ -49,6 +52,7 @@ namespace SH
 					for (ExpressionNodePtr Data : VariableNodeDatas)
 					{
 						auto Temp = SNew(STextBlock).Text(FText::FromString(Data->TypeName));
+						if (Font.IsSet()) { Temp->SetFont(Font.Get()); }
 						float DpiScale = static_cast<ShaderHelperEditor*>(GApp->GetEditor())->GetDebuggerTipWindow()->GetDPIScaleFactor();
 						MaxWidth = FMath::Max(MaxWidth, (float)Temp->ComputeDesiredSize(DpiScale).X + 40);
 					}
@@ -173,15 +177,17 @@ namespace SH
 		}
 	}
 
-	void SVariableViewRow::Construct(const FArguments& InArgs, ExpressionNodePtr InData, const TSharedRef<STableViewBase>& OwnerTableView)
+	void SVariableViewRow::Construct(const FArguments& InArgs, SDebuggerVariableView* InOwner, ExpressionNodePtr InData, const TSharedRef<STableViewBase>& OwnerTableView)
 	{
+		Owner = InOwner;
 		Data = InData;
 		SMultiColumnTableRow<ExpressionNodePtr>::Construct(FSuperRowType::FArguments(), OwnerTableView);
 	}
 
 	TSharedRef<SWidget> SVariableViewRow::GenerateWidgetForColumn(const FName& ColumnId)
 	{
-		auto InternalBorder = SNew(SBorder).BorderImage(FAppStyle::Get().GetBrush("Brushes.Panel")).Padding(0);
+		auto InternalBorder = SNew(SBorder).BorderImage(FAppStyle::Get().GetBrush("Brushes.Panel")).Padding(0)
+			.VAlign(VAlign_Center);
 		auto Border = SNew(SBorder).BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
 		[
 			InternalBorder
@@ -198,7 +204,7 @@ namespace SH
 				]
 				+ SHorizontalBox::Slot()
 				[
-				   SNew(STextBlock).Text(FText::FromString(Data->Expr))
+				   SNew(STextBlock).Font(Owner->Font).Text(FText::FromString(Data->Expr))
 				]
 			);
 		}
@@ -210,12 +216,12 @@ namespace SH
 				InternalBorder->SetBorderImage(FAppStyle::Get().GetBrush("Brushes.White"));
 				InternalBorder->SetBorderBackgroundColor(FLinearColor{1,1,1,0.2f});
 			}
-			InternalBorder->SetContent(SNew(STextBlock).Text(FText::FromString(Data->ValueStr)));
+			InternalBorder->SetContent(SNew(STextBlock).Font(Owner->Font).Text(FText::FromString(Data->ValueStr)));
 		}
 		else
 		{
 			Border->SetPadding(FMargin{1, 0, 0, 2});
-			InternalBorder->SetContent(SNew(STextBlock).Text(FText::FromString(Data->TypeName)));
+			InternalBorder->SetContent(SNew(STextBlock).Font(Owner->Font).Text(FText::FromString(Data->TypeName)));
 		}
 		return Border;
 	}
@@ -234,7 +240,7 @@ namespace SH
 
 	TSharedRef<ITableRow> SDebuggerVariableView::OnGenerateRow(ExpressionNodePtr InTreeNode, const TSharedRef<STableViewBase>& OwnerTable)
 	{
-		TSharedRef<SVariableViewRow> TableRow = SNew(SVariableViewRow, InTreeNode, OwnerTable);
+		TSharedRef<SVariableViewRow> TableRow = SNew(SVariableViewRow, this, InTreeNode, OwnerTable);
 		return TableRow;
 	}
 

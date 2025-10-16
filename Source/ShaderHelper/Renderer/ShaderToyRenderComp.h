@@ -24,7 +24,7 @@ namespace SH
 		TRefCountPtr<FW::GpuTexture> Keyboard;
 		FW::PreviewViewPort* ViewPort;
 		TArray<ShaderToyOutputDesc> Ontputs;
-		bool bTimelineJump{};
+		bool bResetPreviousFrame{};
 	};
 
 	class ShaderToyRenderComp : public FW::RenderComponent

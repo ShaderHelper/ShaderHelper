@@ -146,8 +146,7 @@ namespace SH
 		}
 
 		BlitPassInput Input;
-		//Reset the previous frame's result when the user manually adjusts the timeline
-		if (ShaderToyContext.bTimelineJump)
+		if (ShaderToyContext.bResetPreviousFrame)
 		{
 			Input.InputTex = GpuResourceHelper::GetGlobalBlackTex();
 		}

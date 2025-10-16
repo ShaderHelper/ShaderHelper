@@ -89,6 +89,11 @@ namespace SH
 		void SetDebuggableObject(DebuggableObject* InObject) { CurDebuggableObject = InObject; }
 		void EndDebugging();
 		void StartDebugging();
+		TArray<TSharedPtr<SShaderEditorBox>> GetShaderEditors() const { 
+			TArray<TSharedPtr<SShaderEditorBox>> Ret;
+			ShaderEditors.GenerateValueArray(Ret);
+			return Ret;
+		}
 		SShaderEditorBox* GetShaderEditor(FW::AssetPtr<ShaderAsset> InShader) {
 			if(!ShaderEditors.Contains(InShader))
 			{

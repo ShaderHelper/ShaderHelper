@@ -34,7 +34,6 @@ namespace SH
 		SLATE_BEGIN_ARGS(SKeymapView) {}
 		SLATE_END_ARGS()
 		void Construct(const FArguments& InArgs);
-		void SavePersistentState();
 		void GenerateKeyDatas(const FText& InFilterText = FText::GetEmpty());
 		TSharedRef<ITableRow> GenerateRowForItem(KeyDataPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 	private:
@@ -60,7 +59,6 @@ namespace SH
 		SLATE_BEGIN_ARGS(SAppearanceView) {}
 		SLATE_END_ARGS()
 		void Construct(const FArguments& InArgs);
-		void SavePersistentState();
 	};
 
 	class SPreferenceView : public SCompoundWidget
@@ -69,7 +67,6 @@ namespace SH
 		SLATE_BEGIN_ARGS(SPreferenceView) {}
 		SLATE_END_ARGS()
 		void Construct(const FArguments& InArgs);
-		void SavePersistentState();
 	private:
 		TSharedRef<SWidget> CreatePreference(const FText& InText, TSharedRef<SWidget> InView);	
 

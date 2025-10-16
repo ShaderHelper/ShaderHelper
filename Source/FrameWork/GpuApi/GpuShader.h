@@ -14,7 +14,7 @@ namespace HLSL
     enum class CandidateKind
     {
         Unknown,
-        KeyWord,
+        Kword,
         Var,
         Func,
         Macro,

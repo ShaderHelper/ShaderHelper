@@ -129,6 +129,7 @@ namespace SH
 		SAssignNew(DebuggerWatchView, SDebuggerWatchView);
 		SAssignNew(DebuggerCallStackView, SDebuggerCallStackView);
 		SAssignNew(DebuggerTipVariableView, SDebuggerVariableView)
+			.Font_Lambda([] { return SShaderEditorBox::GetCodeFontInfo(); })
 			.AutoWidth(true)
 			.HasHeaderRow(false);
 		DebuggerTipWindow = SNew(SWindow)
@@ -311,9 +312,9 @@ namespace SH
 					.OnHandleMove([this](float){
 						if (auto RenderComp = dynamic_cast<ShaderToyRenderComp*>(GraphRenderComp.Get()))
 						{
-							RenderComp->Context.bTimelineJump = true;
+							RenderComp->Context.bResetPreviousFrame = true;
 							ForceRender();
-							RenderComp->Context.bTimelineJump = false;
+							RenderComp->Context.bResetPreviousFrame = false;
 						}
 						else
 						{
@@ -1132,9 +1133,6 @@ namespace SH
 							[
 								SAssignNew(PreferenceView, SPreferenceView)
 							];
-							NewWindow->SetOnWindowClosed(FOnWindowClosed::CreateLambda([this](const TSharedRef<SWindow>& InWindow) {
-								PreferenceView->SavePersistentState();
-							}));
 							PreferenceWindow = NewWindow;
 							FSlateApplication::Get().AddWindowAsNativeChild(NewWindow, MainWindow.ToSharedRef());
 						}

@@ -2,10 +2,14 @@
 #include "SPreferenceView.h"
 #include <Styling/StyleColors.h>
 #include <Widgets/Input/SSearchBox.h>
+#include <Widgets/Input/SSpinBox.h>
 #include "UI/Widgets/Misc/SIconButton.h"
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "UI/Styles/FAppCommonStyle.h"
 #include "App/App.h"
+#include "Editor/ShaderHelperEditor.h"
+#include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
+#include <DesktopPlatformModule.h>
 
 using namespace FW;
 
@@ -67,7 +71,7 @@ namespace SH
 						.AutoWidth()
 						[
 							SNew(SCheckBox).IsChecked_Lambda([Item] { return Item->Data->bActive ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
-							.OnCheckStateChanged_Lambda([Item](ECheckBoxState InState) {
+							.OnCheckStateChanged_Lambda([this, Item](ECheckBoxState InState) {
 								if(InState == ECheckBoxState::Checked) {
 									TSingleton<ShPluginManager>::Get().RegisterPlugin(*Item->Data);
 									if(!Item->Data->bFailed)
@@ -79,6 +83,7 @@ namespace SH
 									TSingleton<ShPluginManager>::Get().UnregisterPlugin(*Item->Data);
 									Item->Data->bActive = false;
 								}
+								SavePersistentState();
 							})
 						]
 						+ SHorizontalBox::Slot()
@@ -256,11 +261,6 @@ namespace SH
 		];
 	}
 
-	void SKeymapView::SavePersistentState()
-	{
-
-	}
-
 	TSharedRef<ITableRow> SKeymapView::GenerateRowForItem(KeyDataPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
 	{
 		TSharedRef<SKeymapViewRow> TableRow = SNew(SKeymapViewRow, this, Item, OwnerTable)
@@ -330,12 +330,125 @@ namespace SH
 
 	void SAppearanceView::Construct(const FArguments& InArgs)
 	{
+		auto CodeEditorGrid = SNew(SGridPanel).FillColumn(0, 0.4f).FillColumn(1, 0.5f).FillColumn(2, 0.1f);
+		auto AppendItem = [ItemNum = 0](auto& InGrid, const FText& InLabel, const FText& InToolTipText = FText::GetEmpty()) mutable -> SHorizontalBox::FScopedWidgetSlotArguments
+		{
+			InGrid->AddSlot(0, ItemNum)
+			.VAlign(VAlign_Center)
+			.HAlign(HAlign_Right)
+			[
+				SNew(STextBlock).Text(InLabel).ToolTipText(InToolTipText)
+			];
+			TSharedRef<SHorizontalBox> HBox = SNew(SHorizontalBox);
+			InGrid->AddSlot(1, ItemNum)
+			.Padding(12.f, 2.f, 0, 2.f)
+			[
+				HBox
+			];
+			InGrid->AddSlot(2, ItemNum);
+			ItemNum++;
+			return HBox->AddSlot();
+		};
+		auto AppendCodeEditorItem = AppendItem;
 
-	}
+		AppendCodeEditorItem(CodeEditorGrid, LOCALIZATION("MouseZoom"), LOCALIZATION("MouseZoomTip"))
+		[
+			SNew(SCheckBox).IsChecked_Lambda([] {
+				return SShaderEditorBox::CanMouseWheelZoom() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;;
+			})
+			.OnCheckStateChanged_Lambda([](ECheckBoxState InState) {
+				Editor::GetEditorConfig()->SetBool(TEXT("CodeEditor"), TEXT("MouseWheelZoom"), InState == ECheckBoxState::Checked);
+				Editor::SaveEditorConfig();
+			})
+		];
 
-	void SAppearanceView::SavePersistentState()
-	{
+		auto FontPathEditBox = SNew(SEditableTextBox).Text_Lambda([] {
+				return FText::FromString(SShaderEditorBox::GetFontPath());
+			})
+			.OverflowPolicy(ETextOverflowPolicy::Ellipsis)
+			.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
+				Editor::GetEditorConfig()->SetString(TEXT("CodeEditor"), TEXT("Font"), *NewText.ToString());
+				Editor::SaveEditorConfig();
+				auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+				for (auto ShaderEditor : ShEditor->GetShaderEditors())
+				{
+					ShaderEditor->RefreshFont();
+				}
+			});
+		FontPathEditBox->SetToolTipText(TAttribute<FText>::CreateLambda([Self = &*FontPathEditBox] { return Self->GetText(); }));
+		AppendCodeEditorItem(CodeEditorGrid, LOCALIZATION("Font"))
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot()
+			[
+				FontPathEditBox
+			]
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			[
+				SNew(SIconButton).Icon(FAppStyle::Get().GetBrush("Icons.Search"))
+				.OnClicked_Lambda([this] {
+					static FString CacheSelectDir = FPaths::GetPath(SShaderEditorBox::GetFontPath());
+					FString DialogType = "Font(*.ttf)|*.ttf";
+					IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+					TArray<FString> OpenedFileNames;
+					TSharedPtr<SWindow> ParentWindow = FSlateApplication::Get().FindWidgetWindow(AsShared());
+					void* ParentWindowHandle = (ParentWindow.IsValid() && ParentWindow->GetNativeWindow().IsValid()) ? ParentWindow->GetNativeWindow()->GetOSWindowHandle() : nullptr;
+					if (DesktopPlatform->OpenFileDialog(ParentWindowHandle, "Select Font", CacheSelectDir, "", MoveTemp(DialogType), EFileDialogFlags::None, OpenedFileNames))
+					{
+						if (OpenedFileNames.Num() > 0)
+						{
+							CacheSelectDir = FPaths::GetPath(OpenedFileNames[0]);
+							Editor::GetEditorConfig()->SetString(TEXT("CodeEditor"), TEXT("Font"), *FPaths::ConvertRelativePathToFull(OpenedFileNames[0]));
+							Editor::SaveEditorConfig();
+							auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+							for (auto ShaderEditor : ShEditor->GetShaderEditors())
+							{
+								ShaderEditor->RefreshFont();
+							}
+						}
+					}
+					return FReply::Handled();
+				})
+			]
+		];
 
+		AppendCodeEditorItem(CodeEditorGrid, LOCALIZATION("FontSize"))
+		.AutoWidth()
+		[
+			SNew(SSpinBox<int32>)
+			.MinValue(SShaderEditorBox::MinFontSize)
+			.OnValueChanged_Lambda([this](int32 NewValue) {
+				Editor::GetEditorConfig()->SetInt64(TEXT("CodeEditor"), TEXT("FontSize"), NewValue);
+				Editor::SaveEditorConfig();
+				auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+				for (auto ShaderEditor : ShEditor->GetShaderEditors())
+				{
+					ShaderEditor->RefreshFont();
+				}
+			})
+			.Value_Lambda([] { 
+				return SShaderEditorBox::GetFontSize();
+			})
+		];
+
+		ChildSlot
+		[
+			SNew(SVerticalBox)
+			+SVerticalBox::Slot()
+			.AutoHeight()
+			[
+				SNew(SExpandableArea)
+				.AreaTitle(LOCALIZATION("CodeEditor"))
+				.AreaTitleFont(FAppStyle::Get().GetFontStyle("NormalFont"))
+				.BodyBorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
+				.BodyContent()
+				[
+					CodeEditorGrid
+				]
+			]
+			
+		];
 	}
 
 	void SPreferenceView::Construct(const FArguments& InArgs)
@@ -358,23 +471,27 @@ namespace SH
 				+ SHorizontalBox::Slot()
 				.AutoWidth()
 				[
-					SNew(SVerticalBox)
-					+ SVerticalBox::Slot()
-					.Padding(0, 0, 0, 1.5)
-					.AutoHeight()
+					SNew(SBorder)
+					.BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
 					[
-						PluginPreference
-					]
-					+ SVerticalBox::Slot()
-					.Padding(0, 0, 0, 1.5)
-					.AutoHeight()
-					[
-						AppearancePreference
-					]
-					+ SVerticalBox::Slot()
-					.AutoHeight()
-					[
-						KeymapPreference
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot()
+						.Padding(0, 0, 0, 1.5)
+						.AutoHeight()
+						[
+							PluginPreference
+						]
+						+ SVerticalBox::Slot()
+						.Padding(0, 0, 0, 1.5)
+						.AutoHeight()
+						[
+							AppearancePreference
+						]
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						[
+							KeymapPreference
+						]
 					]
 				]
 				+SHorizontalBox::Slot()
@@ -386,13 +503,6 @@ namespace SH
 		];
 		
 
-	}
-
-	void SPreferenceView::SavePersistentState()
-	{
-		PluginView->SavePersistentState();
-		KeymapView->SavePersistentState();
-		AppearanceView->SavePersistentState();
 	}
 
 	TSharedRef<SWidget> SPreferenceView::CreatePreference(const FText& InText, TSharedRef<SWidget> InView)

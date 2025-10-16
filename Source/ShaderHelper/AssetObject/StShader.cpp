@@ -300,11 +300,11 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
             MarkDirty();
         });
         //Avoid self/cycle ref
-        NewUniformProperty->SetOnDelete([this, self = &*NewUniformProperty]{
-            self->Remove();
-            if(self->GetParent()->GetChildrenNum() <= 0)
+        NewUniformProperty->SetOnDelete([this, Self = &*NewUniformProperty]{
+			Self->Remove();
+            if(Self->GetParent()->GetChildrenNum() <= 0)
             {
-                self->GetParent()->Remove();
+				Self->GetParent()->Remove();
             }
             RefreshBuilder();
             MarkDirty();

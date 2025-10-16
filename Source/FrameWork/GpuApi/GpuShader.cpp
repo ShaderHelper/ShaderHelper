@@ -591,7 +591,7 @@ namespace FW
         }
         for (const FString& Keyword : HLSL::KeyWords)
         {
-            Candidates.AddUnique({HLSL::CandidateKind::KeyWord, Keyword});
+            Candidates.AddUnique({HLSL::CandidateKind::Kword, Keyword});
         }
         
         return Candidates;

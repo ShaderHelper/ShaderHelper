@@ -4,6 +4,10 @@
 #include "Common/Path/PathHelper.h"
 #include "GraphEditorCommands.h"
 #include "AssetViewCommands.h"
+#include <Framework/Commands/GenericCommands.h>
+
+STEAL_PRIVATE_MEMBER(FUICommandInfo, FText, Label)
+STEAL_PRIVATE_MEMBER(FUICommandInfo, FText, Description)
 
 namespace FW 
 {
@@ -16,6 +20,27 @@ namespace FW
 	{
 		return PathHelper::SavedConfigDir() / TEXT("EditorKeybinding.ini");
 	}
+
+	static void ResetGenericCommandsLabelAndTip()
+	{
+		//Hook, reset GenericCommand label for Localization
+		GetPrivate_FUICommandInfo_Label(*FGenericCommands::Get().Cut) = LOCALIZATION("Cut");
+		GetPrivate_FUICommandInfo_Label(*FGenericCommands::Get().Copy) = LOCALIZATION("Copy");
+		GetPrivate_FUICommandInfo_Label(*FGenericCommands::Get().Paste) = LOCALIZATION("Paste");
+		GetPrivate_FUICommandInfo_Label(*FGenericCommands::Get().Undo) = LOCALIZATION("Undo");
+		GetPrivate_FUICommandInfo_Label(*FGenericCommands::Get().Delete) = LOCALIZATION("Delete");
+		GetPrivate_FUICommandInfo_Label(*FGenericCommands::Get().Rename) = LOCALIZATION("Rename");
+		GetPrivate_FUICommandInfo_Label(*FGenericCommands::Get().SelectAll) = LOCALIZATION("SelectAll");
+
+		GetPrivate_FUICommandInfo_Description(*FGenericCommands::Get().Cut) = FText::GetEmpty();
+		GetPrivate_FUICommandInfo_Description(*FGenericCommands::Get().Copy) = FText::GetEmpty();
+		GetPrivate_FUICommandInfo_Description(*FGenericCommands::Get().Paste) = FText::GetEmpty();
+		GetPrivate_FUICommandInfo_Description(*FGenericCommands::Get().Undo) = FText::GetEmpty();
+		GetPrivate_FUICommandInfo_Description(*FGenericCommands::Get().Delete) = FText::GetEmpty();
+		GetPrivate_FUICommandInfo_Description(*FGenericCommands::Get().Rename) = FText::GetEmpty();
+		GetPrivate_FUICommandInfo_Description(*FGenericCommands::Get().SelectAll) = FText::GetEmpty();
+	}
+
 
 	Editor::Editor()
 	{
@@ -32,6 +57,7 @@ namespace FW
 		}
 
 		SetLanguage(CurLanguage);
+		ResetGenericCommandsLabelAndTip();
 
 		GraphEditorCommands::Register();
 		AssetViewCommands::Register();
