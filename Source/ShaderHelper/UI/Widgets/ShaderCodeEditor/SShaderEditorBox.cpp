@@ -28,7 +28,6 @@ STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, SlateEditableTextTypes::FCursorIn
 STEAL_PRIVATE_MEMBER(STextBlock, TUniquePtr< FSlateTextBlockLayout >, TextLayoutCache)
 STEAL_PRIVATE_MEMBER(FSlateTextBlockLayout, TSharedPtr<FSlateTextLayout>, TextLayout)
 STEAL_PRIVATE_MEMBER(FTextLayout, uint8, DirtyFlags)
-CALL_PRIVATE_FUNCTION(SMultiLineEditableText_OnMouseWheel, SMultiLineEditableText, OnMouseWheel,, FReply, const FGeometry&, const FPointerEvent&)
 
 using namespace FW;
 
@@ -42,7 +41,6 @@ const FLinearColor NormalLineTipColor = { 1.0f,1.0f,1.0f,0.0f };
 const FLinearColor HighlightLineTipColor = { 1.0f,1.0f,1.0f,0.2f };
 
 const FString FoldMarkerText = TEXT("⇿");
-
 
 	static bool IsOpenBrace(const TCHAR& InCharacter)
 	{
@@ -192,60 +190,70 @@ const FString FoldMarkerText = TEXT("⇿");
 		return MouseWheelZoom;
 	}
 
-	FSlateFontInfo SShaderEditorBox::GetCodeFontInfo()
+	FSlateFontInfo& SShaderEditorBox::GetCodeFontInfo()
 	{
-		TSharedRef<FCompositeFont> CodeFont = MakeShared<FStandaloneCompositeFont>();
-		FString FontPath = GetFontPath();
-		FString FontSize = FString::FromInt(GetFontSize());
-		Editor::GetEditorConfig()->GetString(TEXT("CodeEditor"), TEXT("Font"), FontPath);
-		Editor::GetEditorConfig()->GetString(TEXT("CodeEditor"), TEXT("FontSize"), FontSize);
-
-		CodeFont->DefaultTypeface.AppendFont(TEXT("Code"), FontPath, EFontHinting::Default, EFontLoadingPolicy::LazyLoad);
-		CodeFont->FallbackTypeface.Typeface.AppendFont(TEXT("Code"), BaseResourcePath::UE_SlateFontDir / TEXT("DroidSansFallback.ttf"), EFontHinting::Default, EFontLoadingPolicy::LazyLoad);
-		FSlateFontInfo CodeFontInfo = FSlateFontInfo(CodeFont, FCString::Atoi(*FontSize));
+		static FSlateFontInfo CodeFontInfo;
 		return CodeFontInfo;
 	}
 
 	void SShaderEditorBox::RefreshFont()
 	{
-		const auto& CodeFontInfo = GetCodeFontInfo();
-	
+		auto& CodeFontInfo = GetCodeFontInfo();
+		TSharedRef<FCompositeFont> CodeFont = MakeShared<FStandaloneCompositeFont>();
+		FString FontPath = GetFontPath();
+		int32 FontSize = GetFontSize();
+		Editor::GetEditorConfig()->GetString(TEXT("CodeEditor"), TEXT("Font"), FontPath);
+		Editor::GetEditorConfig()->GetInt(TEXT("CodeEditor"), TEXT("FontSize"), FontSize);
+
+		CodeFont->DefaultTypeface.AppendFont(TEXT("Code"), FontPath, EFontHinting::Default, EFontLoadingPolicy::LazyLoad);
+		CodeFont->FallbackTypeface.Typeface.AppendFont(TEXT("Code"), BaseResourcePath::UE_SlateFontDir / TEXT("DroidSansFallback.ttf"), EFontHinting::Default, EFontLoadingPolicy::LazyLoad);
+		CodeFontInfo = FSlateFontInfo(CodeFont, FontSize);
+
+		for (auto& [_, Style] : GetTokenStyleMap())
+		{
+			Style.SetFont(CodeFontInfo);
+		}
 		ShaderMultiLineEditableText->SetFont(CodeFontInfo);
-		ShaderMultiLineEditableText->Refresh();
+		//After marking Marshaller as dirty, calling refresh directly will rehandle the entire text, 
+		//which may cause stuttering. Therefore, we only update layout
+		ShaderMarshaller->ClearDirty();
+		int32 StartVisibleLineIndex = ShaderMarshaller->TextLayout->GetStartVisibleLineIndex();
+		double X = ShaderMultiLineEditableTextLayout->GetScrollOffset().X;
+		double Y = ShaderMarshaller->TextLayout->GetUniformLineHeight() * StartVisibleLineIndex / ShaderMarshaller->TextLayout->GetScale();
+		ShaderMultiLineEditableTextLayout->SetScrollOffset({ X,Y }, ShaderMultiLineEditableText->GetTickSpaceGeometry());
+		ShaderMarshaller->TextLayout->ResetMaxDrawWidth();
+		ShaderMarshaller->TextLayout->UpdateIfNeeded();
+		ShaderMultiLineEditableTextLayout->Tick(ShaderMultiLineEditableText->GetTickSpaceGeometry(), 0, 0);
 
 		EffectMultiLineEditableText->SetFont(CodeFontInfo);
 		EffectMultiLineEditableText->Refresh();
+
+		LineNumberList->RebuildList();
+		LineTipList->RebuildList();
+
 	}
 
-	FTextBlockStyle& SShaderEditorBox::GetTokenStyle(HLSL::TokenType InType)
+	TMap<HLSL::TokenType, FTextBlockStyle>& SShaderEditorBox::GetTokenStyleMap()
 	{
-		static TMap<HLSL::TokenType, FTextBlockStyle> TokenStyleMap {
-			{ HLSL::TokenType::Number, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNumberText") },
-			{ HLSL::TokenType::Keyword, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorKeywordText") },
-			{ HLSL::TokenType::Punctuation, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText") },
-			{ HLSL::TokenType::BuildtinFunc, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuildtinFuncText") },
-			{ HLSL::TokenType::BuildtinType, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuildtinTypeText") },
-			{ HLSL::TokenType::Identifier, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText") },
-			{ HLSL::TokenType::Preprocess, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorPreprocessText") },
-			{ HLSL::TokenType::Comment, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorCommentText") },
-			{ HLSL::TokenType::String, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorStringText") },
-			{ HLSL::TokenType::Other, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText") },
-			
-			{ HLSL::TokenType::Func, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorFuncText")},
-			{ HLSL::TokenType::Type, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorTypeText")},
-			{ HLSL::TokenType::Parm, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorParmText")},
-			{ HLSL::TokenType::Var, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorVarText")},
-			{ HLSL::TokenType::LocalVar, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText")},
+		static TMap<HLSL::TokenType, FTextBlockStyle> TokenStyleMap{
+				{ HLSL::TokenType::Number, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNumberText") },
+				{ HLSL::TokenType::Keyword, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorKeywordText") },
+				{ HLSL::TokenType::Punctuation, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText") },
+				{ HLSL::TokenType::BuildtinFunc, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuildtinFuncText") },
+				{ HLSL::TokenType::BuildtinType, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuildtinTypeText") },
+				{ HLSL::TokenType::Identifier, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText") },
+				{ HLSL::TokenType::Preprocess, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorPreprocessText") },
+				{ HLSL::TokenType::Comment, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorCommentText") },
+				{ HLSL::TokenType::String, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorStringText") },
+				{ HLSL::TokenType::Other, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText") },
+
+				{ HLSL::TokenType::Func, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorFuncText")},
+				{ HLSL::TokenType::Type, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorTypeText")},
+				{ HLSL::TokenType::Parm, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorParmText")},
+				{ HLSL::TokenType::Var, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorVarText")},
+				{ HLSL::TokenType::LocalVar, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText")},
 		};
-		const auto& CodeFontInfo = GetCodeFontInfo();
-		for(auto& [_, Style] : TokenStyleMap)
-		{
-			if(Style.Font != CodeFontInfo)
-			{
-				Style.SetFont(CodeFontInfo);
-			}
-		}
-		return TokenStyleMap[InType];
+		return TokenStyleMap;
 	}
 
 	int32 SShaderMultiLineEditableText::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
@@ -309,6 +317,19 @@ const FString FoldMarkerText = TEXT("⇿");
 
 		LayerId = SMultiLineEditableText::OnPaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
 		return LayerId;
+	}
+
+	FVector2D SShaderEditorBox::GetCodeCompletionCanvasSize() const
+	{
+		const FSlateFontInfo Font = GetCodeFontInfo();
+		const auto Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
+		const float LineH = (float)Measure->Measure(TEXT("M"), Font).Y;
+		const float ItemH = LineH + 2.0f;
+		const int32 Visible = FMath::Clamp(CandidateItems.Num(), 0, 10);
+		const float Height = ItemH * Visible;
+		const float CharW = (float)Measure->Measure(TEXT("M"), Font).X;
+		const float Width = CharW * 24 + 20.0f;
+		return FVector2D{ Width, Height };
 	}
 
     void SShaderEditorBox::Construct(const FArguments& InArgs)
@@ -441,8 +462,7 @@ const FString FoldMarkerText = TEXT("⇿");
 							HLSL::TokenType NewTokenType = TU.GetTokenType(Token.Type, ExtraLineNum + LineIndex + 1, Token.BeginOffset + 1);
 							if (NewTokenType != Token.Type)
 							{
-								LineSyntaxHighlightMaps[LineIndex].Add(FTextRange{ Token.BeginOffset, Token.EndOffset },
-									&GetTokenStyle(NewTokenType));
+								LineSyntaxHighlightMaps[LineIndex].Add(FTextRange{ Token.BeginOffset, Token.EndOffset }, NewTokenType);
 							}
 						}
 					}
@@ -553,30 +573,20 @@ const FString FoldMarkerText = TEXT("⇿");
 						[
 							SAssignNew(CodeCompletionCanvas, SCanvas)
 							+ SCanvas::Slot()
-							.Size_Lambda([this]{
-								const FSlateFontInfo Font = GetCodeFontInfo();
-								const auto Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
-								const float LineH = (float)Measure->Measure(TEXT("M"), Font).Y; 
-								const float ItemH = LineH + 2.0f;
-								const int32 Visible = FMath::Clamp(CandidateItems.Num(), 1, 10);
-								const float Height = ItemH * Visible;
-								const float CharW = (float)Measure->Measure(TEXT("M"), Font).X;
-								const float Width = CharW * 24 + 20.0f;
-								return FVector2D{ Width, Height };
-							})
+							.Size(this, &SShaderEditorBox::GetCodeCompletionCanvasSize)
 							.Position_Lambda([this]{
 								FVector2D TipPos = CustomCursorHighlighter->ScaledCursorPos;
 								TipPos.Y += CustomCursorHighlighter->ScaledLineHeight;
 								FVector2D Area = ShaderMultiLineEditableText->GetTickSpaceGeometry().GetLocalSize();
-								float HSize = FMath::Min(200.0f, CustomCursorHighlighter->ScaledLineHeight * CandidateItems.Num());
-								if(TipPos.Y + HSize > Area.Y)
+								FVector2D CanvasSize = GetCodeCompletionCanvasSize();
+								if(TipPos.Y + CanvasSize.Y > Area.Y)
 								{
 									TipPos.Y -= CustomCursorHighlighter->ScaledLineHeight;
-									TipPos.Y -= HSize;
+									TipPos.Y -= CanvasSize.Y;
 								}
-								if(TipPos.X + 240 > Area.X)
+								if(TipPos.X + CanvasSize.X > Area.X)
 								{
-									TipPos.X -= 240;
+									TipPos.X -= CanvasSize.X;
 								}
 								return TipPos;
 							})
@@ -646,11 +656,7 @@ const FString FoldMarkerText = TEXT("⇿");
             return UndoState;
         };
 
-        ShaderMultiLineEditableTextLayout->CopyOverride = [this] { CopySelectedText(); };
-        ShaderMultiLineEditableTextLayout->CutOverride = [this] { CutSelectedText(); };
-        ShaderMultiLineEditableTextLayout->PasteOverride = [this] { PasteText(); };
 		ShaderMultiLineEditableTextLayout->OnBeginEditTransaction = [this] { OnBeginEditTransaction(); };
-		
 		ShaderMultiLineEditableTextLayout->TryPushUndoState = [this](SlateEditableTextTypes::FUndoState* InUndoState){
 			if(!ShaderMultiLineEditableTextLayout->UndoStates.IsEmpty() && bTryMergeUndoState)
 			{
@@ -719,18 +725,17 @@ const FString FoldMarkerText = TEXT("⇿");
 			EUIActionRepeatMode::RepeatEnabled
 		);
 		UICommandList->MapAction(CodeEditorCommands::Get().Cut,
-			FExecuteAction::CreateLambda([this] {ShaderMultiLineEditableTextLayout->CutSelectedTextToClipboard();}),
-			FCanExecuteAction::CreateLambda([this] { return ShaderMultiLineEditableTextLayout->CanExecuteCut(); }),
+			FExecuteAction::CreateLambda([this] { CutText(); }),
+			FCanExecuteAction::CreateLambda([this] { return !ShaderMultiLineEditableText->IsTextReadOnly(); }),
 			EUIActionRepeatMode::RepeatEnabled
 		);
 		UICommandList->MapAction(CodeEditorCommands::Get().Paste,
-			FExecuteAction::CreateLambda([this] {ShaderMultiLineEditableTextLayout->PasteTextFromClipboard(); }),
+			FExecuteAction::CreateLambda([this] { PasteText(); }),
 			FCanExecuteAction::CreateLambda([this] { return ShaderMultiLineEditableTextLayout->CanExecutePaste(); }),
 			EUIActionRepeatMode::RepeatEnabled
 		);
 		UICommandList->MapAction(CodeEditorCommands::Get().Copy,
-			FExecuteAction::CreateLambda([this] {ShaderMultiLineEditableTextLayout->CopySelectedTextToClipboard(); }),
-			FCanExecuteAction::CreateLambda([this] { return ShaderMultiLineEditableTextLayout->CanExecuteCopy(); })
+			FExecuteAction::CreateLambda([this] { CopyText(); })
 		);
 		UICommandList->MapAction(CodeEditorCommands::Get().DeleteLeft,
 			FExecuteAction::CreateLambda([this] { 
@@ -828,6 +833,20 @@ const FString FoldMarkerText = TEXT("⇿");
 			EUIActionRepeatMode::RepeatEnabled
 		);
 		UICommandList->MapAction(
+			CodeEditorCommands::Get().CursorSelectLineStart,
+			FExecuteAction::CreateLambda([this] { 
+				ShaderMultiLineEditableTextLayout->JumpTo(ETextLocation::BeginningOfCodeLine, ECursorAction::SelectText);
+			}),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(
+			CodeEditorCommands::Get().CursorSelectLineEnd,
+			FExecuteAction::CreateLambda([this] {
+				ShaderMultiLineEditableTextLayout->JumpTo(ETextLocation::EndOfLine, ECursorAction::SelectText);
+			}),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(
 			CodeEditorCommands::Get().CursorTokenSelectLeft,
 			FExecuteAction::CreateLambda([this] {
 				ShaderMultiLineEditableTextLayout->MoveCursor(FMoveCursor::Cardinal(
@@ -882,6 +901,8 @@ const FString FoldMarkerText = TEXT("⇿");
         CursorLineHighlighter = CustomCursorHighlighter;
         
         CurEditState = ShaderAssetObj->bCompilationSucceed ? EditState::Succeed : EditState::Failed;
+
+		RefreshFont();
     }
 
 	void SShaderEditorBox::ToggleComment()
@@ -1142,40 +1163,57 @@ const FString FoldMarkerText = TEXT("⇿");
         ShaderMultiLineEditableText->Refresh();
     }
 
-    void SShaderEditorBox::CopySelectedText()
+    void SShaderEditorBox::CopyText()
     {
-        if (ShaderMultiLineEditableTextLayout->AnyTextSelected())
+        if (!ShaderMultiLineEditableTextLayout->AnyTextSelected())
         {
-            const FTextSelection Selection = ShaderMultiLineEditableTextLayout->GetSelection();
-            FString SelectedText = UnFoldText(Selection);
-
-            // Copy text to clipboard
-            FPlatformApplicationMisc::ClipboardCopy(*SelectedText);
+			int32 CursorLineIndex = ShaderMultiLineEditableTextLayout->GetCursorLocation().GetLineIndex();
+			FString LineText;
+			ShaderMultiLineEditableText->GetTextLine(CursorLineIndex, LineText);
+			FTextSelection Selection = { { CursorLineIndex, 0 }, {CursorLineIndex, LineText.Len()} };
+			FString UnFoldedText = UnFoldText(Selection);
+			FPlatformApplicationMisc::ClipboardCopy(*UnFoldedText);
         }
+		else
+		{
+			const FTextSelection Selection = ShaderMultiLineEditableTextLayout->GetSelection();
+			FString SelectedText = UnFoldText(Selection);
+			FPlatformApplicationMisc::ClipboardCopy(*SelectedText);
+		}
+		
     }
 
-    void SShaderEditorBox::CutSelectedText()
+    void SShaderEditorBox::CutText()
     {
-        if (ShaderMultiLineEditableTextLayout->AnyTextSelected())
+		SMultiLineEditableText::FScopedEditableTextTransaction TextTransaction(ShaderMultiLineEditableText);
+
+        if (!ShaderMultiLineEditableTextLayout->AnyTextSelected())
         {
-            SMultiLineEditableText::FScopedEditableTextTransaction TextTransaction(ShaderMultiLineEditableText);
-            const FTextSelection Selection = ShaderMultiLineEditableTextLayout->GetSelection();
-            FString SelectedText = UnFoldText(Selection);
-
-            int32 StartLineIndex = Selection.GetBeginning().GetLineIndex();
-            int32 EndLineIndex = Selection.GetEnd().GetLineIndex();
-            for (int32 LineIndex = StartLineIndex; LineIndex <= EndLineIndex; LineIndex++)
-            {
-                RemoveFoldMarker(LineIndex);
-            }
-            
-            // Copy text to clipboard
-            FPlatformApplicationMisc::ClipboardCopy(*SelectedText);
-
-            ShaderMultiLineEditableTextLayout->DeleteSelectedText();
-
-            ShaderMultiLineEditableTextLayout->UpdateCursorHighlight();
+			int32 CursorLineIndex = ShaderMultiLineEditableTextLayout->GetCursorLocation().GetLineIndex();
+			FString LineText;
+			ShaderMultiLineEditableText->GetTextLine(CursorLineIndex, LineText);
+			FTextLocation SelectionEnd{ CursorLineIndex, LineText.Len()};
+			if (ShaderMarshaller->TextLayout->GetLineModels().IsValidIndex(CursorLineIndex + 1))
+			{
+				SelectionEnd = { CursorLineIndex + 1, 0 };
+			}
+			
+			ShaderMultiLineEditableTextLayout->SelectText({ CursorLineIndex , 0}, SelectionEnd);
         }
+
+		const FTextSelection Selection = ShaderMultiLineEditableTextLayout->GetSelection();
+		FString SelectedText = UnFoldText(Selection);
+
+		int32 StartLineIndex = Selection.GetBeginning().GetLineIndex();
+		int32 EndLineIndex = Selection.GetEnd().GetLineIndex();
+		for (int32 LineIndex = StartLineIndex; LineIndex <= EndLineIndex; LineIndex++)
+		{
+			RemoveFoldMarker(LineIndex);
+		}
+
+		FPlatformApplicationMisc::ClipboardCopy(*SelectedText);
+		ShaderMultiLineEditableTextLayout->DeleteSelectedText();
+		ShaderMultiLineEditableTextLayout->UpdateCursorHighlight();
     }
 
     FString FoldMarker::GetTotalFoldedLineTexts() const
@@ -1272,18 +1310,7 @@ const FString FoldMarkerText = TEXT("⇿");
 
     FReply SShaderEditorBox::OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
     {
-		if (FSlateApplication::Get().GetModifierKeys().IsControlDown() && CanMouseWheelZoom())
-		{
-			int32 FontSize = (int32)(GetFontSize() + MouseEvent.GetWheelDelta());
-			Editor::GetEditorConfig()->SetInt64(TEXT("CodeEditor"), TEXT("FontSize"), FMath::Max(MinFontSize, FontSize));
-			Editor::SaveEditorConfig();
-			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-			for (auto ShaderEditor : ShEditor->GetShaderEditors())
-			{
-				ShaderEditor->RefreshFont();
-			}
-		}
-        return CallPrivate_SMultiLineEditableText_OnMouseWheel(*ShaderMultiLineEditableText, ShaderMultiLineEditableText->GetTickSpaceGeometry(), MouseEvent);
+        return ShaderMultiLineEditableText->OnMouseWheel(ShaderMultiLineEditableText->GetTickSpaceGeometry(), MouseEvent);
     }
 
     FReply SShaderEditorBox::OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
@@ -1338,14 +1365,14 @@ const FString FoldMarkerText = TEXT("⇿");
 		{
 			auto& SyntaxHighlightMap = LineSyntaxHighlightMapsCopy[LineIndex];
 			auto& LineModel =  ShaderMarshaller->TextLayout->GetLineModels()[LineIndex];
-			for(const auto& [TokenRange, Style] : SyntaxHighlightMap)
+			for(const auto& [TokenRange, TokenType] : SyntaxHighlightMap)
 			{
 				for(auto& RunModel : LineModel.Runs)
 				{
 					TSharedRef<IRun> Run = RunModel.GetRun();
 					if(Run->GetTextRange() == TokenRange)
 					{
-						RunModel = FTextLayout::FRunModel(FSlateTextStyleRefRun::Create(FRunInfo(), LineModel.Text, *Style, TokenRange));
+						RunModel = FTextLayout::FRunModel(FSlateTextStyleRefRun::Create(FRunInfo(), LineModel.Text, GetTokenStyleMap()[TokenType], TokenRange));
 					}
 				}
 			}
@@ -2852,7 +2879,7 @@ const FString FoldMarkerText = TEXT("⇿");
 				TOptional<int32> MarkerIndex = OwnerWidget->FindFoldMarker(LineIndex);
 				for (const HlslTokenizer::Token& Token : TokenizedLines[LineIndex].Tokens)
 				{
-					FTextBlockStyle& RunTextStyle = OwnerWidget->GetTokenStyle(Token.Type);
+					FTextBlockStyle& RunTextStyle = OwnerWidget->GetTokenStyleMap()[Token.Type];
 					FTextRange NewTokenRange{ Token.BeginOffset, Token.EndOffset };
 
 					if (MarkerIndex && LineText->Mid(NewTokenRange.BeginIndex, 1) == FoldMarkerText)
@@ -2904,7 +2931,7 @@ const FString FoldMarkerText = TEXT("⇿");
 					TOptional<int32> MarkerIndex = OwnerWidget->FindFoldMarker(LineIndex);
 					for (const HlslTokenizer::Token& Token : NewTokenizedLine.Tokens)
 					{
-						FTextBlockStyle* RunTextStyle = &OwnerWidget->GetTokenStyle(Token.Type);
+						FTextBlockStyle* RunTextStyle = &OwnerWidget->GetTokenStyleMap()[Token.Type];
 						FTextRange NewTokenRange{ Token.BeginOffset, Token.EndOffset };
 						
 						if(!CurTokenizedLine)
@@ -2921,11 +2948,11 @@ const FString FoldMarkerText = TEXT("⇿");
 						{
 							if(OwnerWidget->LineSyntaxHighlightMapsCopy.IsValidIndex(LineIndex))
 							{
-								for(const auto& [Range, Style] : OwnerWidget->LineSyntaxHighlightMapsCopy[LineIndex])
+								for(const auto& [TokenRange, TokenType] : OwnerWidget->LineSyntaxHighlightMapsCopy[LineIndex])
 								{
-									if(Range.BeginIndex == MatchedToken->BeginOffset)
+									if(TokenRange.BeginIndex == MatchedToken->BeginOffset)
 									{
-										RunTextStyle = Style;
+										RunTextStyle = &OwnerWidget->GetTokenStyleMap()[TokenType];
 									}
 								}
 							}
@@ -3470,6 +3497,23 @@ const FString FoldMarkerText = TEXT("⇿");
 			LastCheckTime = InCurrentTime;
 		}
 
+	}
+
+	FReply SShaderMultiLineEditableText::OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+	{
+		if (FSlateApplication::Get().GetModifierKeys().IsControlDown() && SShaderEditorBox::CanMouseWheelZoom())
+		{
+			int32 FontSize = (int32)(SShaderEditorBox::GetFontSize() + MouseEvent.GetWheelDelta());
+			Editor::GetEditorConfig()->SetInt64(TEXT("CodeEditor"), TEXT("FontSize"), FMath::Max(SShaderEditorBox::MinFontSize, FontSize));
+			Editor::SaveEditorConfig();
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			for (auto ShaderEditor : ShEditor->GetShaderEditors())
+			{
+				ShaderEditor->RefreshFont();
+			}
+			return FReply::Handled();
+		}
+		return SMultiLineEditableText::OnMouseWheel(MyGeometry, MouseEvent);
 	}
 
 	void SShaderEditorBox::ShowDeuggerVariable(SpvLexicalScope* InScope) const

@@ -155,6 +155,7 @@ namespace SH
 			SMultiLineEditableText::Construct(InArgs);
 		}
 		virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
+		virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 		virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
 	private:
 		SShaderEditorBox* Owner = nullptr;
@@ -184,11 +185,11 @@ namespace SH
 			StepInto,
 		};
 		
-		static FTextBlockStyle& GetTokenStyle(HLSL::TokenType InType);
+		static TMap<HLSL::TokenType, FTextBlockStyle>& GetTokenStyleMap();
 		static FString GetFontPath();
 		static int32 GetFontSize();
 		static bool CanMouseWheelZoom();
-		static FSlateFontInfo GetCodeFontInfo();
+		static FSlateFontInfo& GetCodeFontInfo();
 		static constexpr int32 MinFontSize = 4;
 		void RefreshFont();
 		
@@ -227,6 +228,7 @@ namespace SH
         TSharedRef<ITableRow> GenerateCodeCompletionItem(CandidateItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 		bool IsErrorLine(int InLineNumber) const;
 		bool IsWarningLine(int InLineNumber) const;
+		FVector2D GetCodeCompletionCanvasSize() const;
 
 		ShaderAsset* GetShaderAsset() const { return ShaderAssetObj; }
         FText GetEditStateText() const;
@@ -269,8 +271,8 @@ namespace SH
 		void OnBeginEditTransaction();
         
 	private:
-		void CopySelectedText();
-		void CutSelectedText();
+		void CopyText();
+		void CutText();
         void PasteText();
 
 		void UpdateEffectText();
@@ -283,6 +285,7 @@ namespace SH
         void InsertCompletionText(CandidateItemPtr InItem);
 
 	public:
+		TSharedPtr<SShaderMultiLineEditableText> ShaderMultiLineEditableText;
         FSlateEditableTextLayout* ShaderMultiLineEditableTextLayout;
 		TArray<FoldMarker> VisibleFoldMarkers;
 		TArray<int32> BreakPointLines;
@@ -293,8 +296,8 @@ namespace SH
 
 		//Syntax highlight
 		FW::ShaderTU SyntaxTU;
-		TArray<TMap<FTextRange, FTextBlockStyle*>> LineSyntaxHighlightMaps;
-		TArray<TMap<FTextRange, FTextBlockStyle*>> LineSyntaxHighlightMapsCopy;
+		TArray<TMap<FTextRange, HLSL::TokenType>> LineSyntaxHighlightMaps;
+		TArray<TMap<FTextRange, HLSL::TokenType>> LineSyntaxHighlightMapsCopy;
 		TUniquePtr<FThread> SyntaxThread;
 		TQueue<SyntaxTask> SyntaxQueue;
 		std::atomic<bool> bQuitISyntax{};
@@ -329,7 +332,6 @@ namespace SH
 		TMap<int32, int32> LineNumberToIndexMap;
 		int32 MaxLineNumber{};
 		TArray<LineNumberItemPtr> LineNumberData;
-        TSharedPtr<SShaderMultiLineEditableText> ShaderMultiLineEditableText;
 		TSharedPtr<FUICommandList> UICommandList;
         
         TSharedPtr<SScrollBar> ShaderMultiLineVScrollBar;

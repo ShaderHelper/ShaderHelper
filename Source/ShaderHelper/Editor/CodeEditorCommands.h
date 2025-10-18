@@ -38,6 +38,8 @@ namespace SH
 			UI_COMMAND_SH(GoToEndOfLine, LOCALIZATION("GoToEndOfLine"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EKeys::End));
 			UI_COMMAND_SH(CursorSelectLeft, LOCALIZATION("CursorSelectLeft"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Shift, EKeys::Left));
 			UI_COMMAND_SH(CursorSelectRight, LOCALIZATION("CursorSelectRight"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Shift, EKeys::Right));
+			UI_COMMAND_SH(CursorSelectLineStart, LOCALIZATION("CursorSelectLineStart"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Shift, EKeys::Home));
+			UI_COMMAND_SH(CursorSelectLineEnd, LOCALIZATION("CursorSelectLineEnd"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Shift, EKeys::End));
 			UI_COMMAND_SH(CursorTokenSelectLeft, LOCALIZATION("CursorTokenSelectLeft"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control | EModifierKey::Shift, EKeys::Left));
 			UI_COMMAND_SH(CursorTokenSelectRight, LOCALIZATION("CursorTokenSelectRight"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control | EModifierKey::Shift, EKeys::Right));
 			UI_COMMAND_SH(CursorTokenLeft, LOCALIZATION("CursorTokenLeft"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::Left));
@@ -64,6 +66,8 @@ namespace SH
 		TSharedPtr<FUICommandInfo> GoToEndOfLine;
 		TSharedPtr<FUICommandInfo> CursorSelectLeft;
 		TSharedPtr<FUICommandInfo> CursorSelectRight;
+		TSharedPtr<FUICommandInfo> CursorSelectLineStart;
+		TSharedPtr<FUICommandInfo> CursorSelectLineEnd;
 		TSharedPtr<FUICommandInfo> CursorTokenSelectLeft;
 		TSharedPtr<FUICommandInfo> CursorTokenSelectRight;
 		TSharedPtr<FUICommandInfo> CursorTokenLeft;
