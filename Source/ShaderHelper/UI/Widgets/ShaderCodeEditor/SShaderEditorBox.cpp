@@ -2423,16 +2423,6 @@ constexpr int PaddingLineNum = 22;
 			RemoveFoldMarker(LineIndex);
 			VisibleFoldMarkers.Sort([](const FoldMarker& A, const FoldMarker& B) { return A.RelativeLineIndex < B.RelativeLineIndex; });
 
-			if (CurCursorLocation.GetLineIndex() > LineIndex)
-			{
-				const FTextLocation NewCursorLocation(CurCursorLocation.GetLineIndex() + FoldedLineText.Num() - 1, CurCursorLocation.GetOffset());
-				ShaderMultiLineEditableText->GoTo(NewCursorLocation);
-			}
-			else
-			{
-				ShaderMultiLineEditableText->GoTo(CurCursorLocation);
-			}
-
 			ShaderMultiLineEditableTextLayout->EndEditTransaction();
 			IsFoldEditTransaction = false;
 
@@ -2503,18 +2493,8 @@ constexpr int PaddingLineNum = 22;
 		VisibleFoldMarkers.Add(MoveTemp(Marker));
 		VisibleFoldMarkers.Sort([](const FoldMarker& A, const FoldMarker& B) { return A.RelativeLineIndex < B.RelativeLineIndex; });
 
-		//The cursor is within the fold now.
-		if (CurCursorLocation.GetLineIndex() >= FoldedBeginningRow && CurCursorLocation.GetLineIndex() <= FoldedEndRow)
-		{
-			const FTextLocation NewCursorLocation(FoldedBeginningRow, BeginLine.Text->Len());
-			ShaderMultiLineEditableText->GoTo(NewCursorLocation);
-		}
-		else if (CurCursorLocation.GetLineIndex() > FoldedEndRow)
-		{
-			int32 FoldedLineNum = FoldedEndRow - FoldedBeginningRow;
-			const FTextLocation NewCursorLocation(CurCursorLocation.GetLineIndex() - FoldedLineNum, CurCursorLocation.GetOffset());
-			ShaderMultiLineEditableText->GoTo(NewCursorLocation);
-		}
+		const FTextLocation NewCursorLocation(FoldedBeginningRow, BeginLine.Text->Len());
+		ShaderMultiLineEditableText->GoTo(NewCursorLocation);
 
 		ShaderMultiLineEditableTextLayout->EndEditTransaction();
 		IsFoldEditTransaction = false;
@@ -3574,6 +3554,33 @@ constexpr int PaddingLineNum = 22;
 			return FReply::Handled();
 		}
 		return SMultiLineEditableText::OnMouseWheel(MyGeometry, MouseEvent);
+	}
+
+	FReply SShaderMultiLineEditableText::OnMouseButtonDoubleClick(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+	{
+		for (int32 i = 0; i < Owner->VisibleFoldMarkers.Num(); i++)
+		{
+			const TArray<FTextLayout::FLineModel>& Lines = Owner->ShaderMarshaller->TextLayout->GetLineModels();
+			int FoldMarkerLineIndex = Owner->VisibleFoldMarkers[i].RelativeLineIndex;
+			const auto& FoldMarkerLine = Lines[FoldMarkerLineIndex];
+			for (const auto& Highlight : FoldMarkerLine.LineHighlights)
+			{
+				if (auto Highlighter = dynamic_cast<FoldMarkerHighlighter*>(&*Highlight.Highlighter))
+				{
+					FVector2D LocalMousePos = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
+					const double Ext = 5.5;
+					if (LocalMousePos.X >= Highlighter->Location.X - Ext &&
+						LocalMousePos.X < Highlighter->Location.X + Highlighter->Size.X + Ext &&
+						LocalMousePos.Y >= Highlighter->Location.Y - Ext &&
+						LocalMousePos.Y < Highlighter->Location.Y + Highlighter->Size.Y + Ext)
+					{
+						Owner->UnFold(Owner->GetLineNumber(FoldMarkerLineIndex));
+						return FReply::Handled();
+					}
+				}
+			}
+		}
+		return SMultiLineEditableText::OnMouseButtonDoubleClick(MyGeometry, MouseEvent);
 	}
 
 	void SShaderEditorBox::ShowDeuggerVariable(SpvLexicalScope* InScope) const
