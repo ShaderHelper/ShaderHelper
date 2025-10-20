@@ -44,6 +44,10 @@ namespace SH
 			UI_COMMAND_SH(CursorTokenSelectRight, LOCALIZATION("CursorTokenSelectRight"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control | EModifierKey::Shift, EKeys::Right));
 			UI_COMMAND_SH(CursorTokenLeft, LOCALIZATION("CursorTokenLeft"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::Left));
 			UI_COMMAND_SH(CursorTokenRight, LOCALIZATION("CursorTokenRight"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::Right));
+			UI_COMMAND_SH(ScrollUp, LOCALIZATION("ScrollUp"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::Up));
+			UI_COMMAND_SH(ScrollDown, LOCALIZATION("ScrollDown"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::Down));
+			UI_COMMAND_SH(JumpTop, LOCALIZATION("JumpTop"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::Home));
+			UI_COMMAND_SH(JumpBottom, LOCALIZATION("JumpBottom"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::End));
 #undef LOCTEXT_NAMESPACE
 		}
 
@@ -72,5 +76,9 @@ namespace SH
 		TSharedPtr<FUICommandInfo> CursorTokenSelectRight;
 		TSharedPtr<FUICommandInfo> CursorTokenLeft;
 		TSharedPtr<FUICommandInfo> CursorTokenRight;
+		TSharedPtr<FUICommandInfo> ScrollUp;
+		TSharedPtr<FUICommandInfo> ScrollDown;
+		TSharedPtr<FUICommandInfo> JumpTop;
+		TSharedPtr<FUICommandInfo> JumpBottom;
 	};
 }

@@ -45,6 +45,7 @@ namespace SH
 			Punctuation,
 			NumberPuncuation,
 			String,
+			StringEnd,
 			Whitespace,
 			Other,
 		};
@@ -76,6 +77,7 @@ namespace SH
 				case StateSet::Punctuation:                     return HLSL::TokenType::Punctuation;
 				case StateSet::NumberPuncuation:                return HLSL::TokenType::Punctuation;
 				case StateSet::String:                          return HLSL::TokenType::String;
+				case StateSet::StringEnd:                       return HLSL::TokenType::String;
 				default:
 					return HLSL::TokenType::Other;
 			}
@@ -110,6 +112,7 @@ namespace SH
 				bool bInMacro = false;
 				bool bInComment = false;
 				bool bInMultilineComment = false;
+				bool bInString = false;
 
 				while (CurOffset < LineRange.EndIndex)
 				{
@@ -132,7 +135,14 @@ namespace SH
 							}
 							else if (CurChar == '"')
 							{
-								CurState = StateSet::String;
+								if (!bInString)
+								{
+									CurState = StateSet::String;
+								}
+								else
+								{
+									CurState = StateSet::StringEnd;
+								}
 								CurOffset += 1;
 							}
 							else if (FChar::IsDigit(CurChar)) {
@@ -167,7 +177,7 @@ namespace SH
 								}
 								else
 								{
-									if (!bInComment && !bInMultilineComment)
+									if (!bInComment && !bInMultilineComment && !bInString)
 									{
 										if (MatchedPunctuation == "{") {
 											TokenizedLine.Braces.Add({ SideType::Open, CurCol });
@@ -228,11 +238,13 @@ namespace SH
 						break;
 					case StateSet::String:
 						LastState = StateSet::String;
-						if (CurChar == '"' && HlslCodeString[CurOffset - 1] != '\\')
-						{
-							CurState = StateSet::End;
-						}
-						CurOffset += 1;
+						bInString = true;
+						CurState = StateSet::End;
+						break;
+					case StateSet::StringEnd:
+						LastState = StateSet::StringEnd;
+						bInString = false;
+						CurState = StateSet::End;
 						break;
 					case StateSet::Punctuation:
 						LastState = StateSet::Punctuation;
@@ -254,6 +266,10 @@ namespace SH
 							else if(bInMultilineComment)
 							{
 								LastState = StateSet::MultilineComment;
+							}
+							else if (bInString)
+							{
+								LastState = StateSet::String;
 							}
 							HLSL::TokenType FinalTokenType = StateSetToTokenType(TokenString, LastState);
 
@@ -341,6 +357,10 @@ namespace SH
 				else if (bInMultilineComment)
 				{
 					LastState = StateSet::MultilineComment;
+				}
+				else if (bInString)
+				{
+					LastState = StateSet::String;
 				}
 				FTextRange TokenRange{ TokenStart, LineRange.EndIndex };
 				FString TokenString = HlslCodeString.Mid(TokenRange.BeginIndex, TokenRange.Len());

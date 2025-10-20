@@ -42,6 +42,9 @@ const FLinearColor HighlightLineTipColor = { 1.0f,1.0f,1.0f,0.2f };
 
 const FString FoldMarkerText = TEXT("⇿");
 
+//Append dummy datas to LineNumberData for Padding
+constexpr int PaddingLineNum = 22;
+
 	static bool IsOpenBrace(const TCHAR& InCharacter)
 	{
 		return (InCharacter == TEXT('{') || InCharacter == TEXT('[') || InCharacter == TEXT('('));
@@ -103,7 +106,7 @@ const FString FoldMarkerText = TEXT("⇿");
 
     int32 TokenBreakIterator::MoveToCandidateBefore(const int32 InIndex)
     {
-        TArray<HlslTokenizer::TokenizedLine> TokenizedLines = Marshaller->Tokenizer->Tokenize(InternalString);
+        TArray<HlslTokenizer::TokenizedLine> TokenizedLines = Marshaller->Tokenizer->Tokenize(InternalString, true);
         const HlslTokenizer::TokenizedLine& TokenLine = TokenizedLines[0];
         for(const auto& Token : TokenLine.Tokens)
         {
@@ -118,7 +121,7 @@ const FString FoldMarkerText = TEXT("⇿");
 
     int32 TokenBreakIterator::MoveToCandidateAfter(const int32 InIndex)
     {
-        TArray<HlslTokenizer::TokenizedLine> TokenizedLines = Marshaller->Tokenizer->Tokenize(InternalString);
+        TArray<HlslTokenizer::TokenizedLine> TokenizedLines = Marshaller->Tokenizer->Tokenize(InternalString, true);
         const HlslTokenizer::TokenizedLine& TokenLine = TokenizedLines[0];
         for(const auto& Token : TokenLine.Tokens)
         {
@@ -890,6 +893,36 @@ const FString FoldMarkerText = TEXT("⇿");
 			}),
 			EUIActionRepeatMode::RepeatEnabled
 		);
+		UICommandList->MapAction(
+			CodeEditorCommands::Get().ScrollUp,
+			FExecuteAction::CreateLambda([this] {
+				float LineHeight = ShaderMarshaller->TextLayout->GetUniformLineHeight() / ShaderMarshaller->TextLayout->GetScale();
+				FVector2D Offset = ShaderMultiLineEditableTextLayout->GetScrollOffset();
+				ShaderMultiLineEditableTextLayout->SetScrollOffset({Offset.X, Offset.Y - LineHeight}, ShaderMultiLineEditableText->GetTickSpaceGeometry());
+			}),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(
+			CodeEditorCommands::Get().ScrollDown,
+			FExecuteAction::CreateLambda([this] {
+				float LineHeight = ShaderMarshaller->TextLayout->GetUniformLineHeight() / ShaderMarshaller->TextLayout->GetScale();
+				FVector2D Offset = ShaderMultiLineEditableTextLayout->GetScrollOffset();
+				ShaderMultiLineEditableTextLayout->SetScrollOffset({ Offset.X, Offset.Y + LineHeight }, ShaderMultiLineEditableText->GetTickSpaceGeometry());
+			}),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(
+			CodeEditorCommands::Get().JumpTop,
+			FExecuteAction::CreateLambda([this] {
+				ShaderMultiLineEditableText->GoTo(ETextLocation::BeginningOfDocument);
+			})
+		);
+		UICommandList->MapAction(
+			CodeEditorCommands::Get().JumpBottom,
+			FExecuteAction::CreateLambda([this] {
+				ShaderMultiLineEditableText->GoTo(ETextLocation::EndOfDocument);
+			})
+		);
 
         FoldingArrowAnim.AddCurve(0, 0.25f, ECurveEaseFunction::Linear);
 
@@ -1278,6 +1311,11 @@ const FString FoldMarkerText = TEXT("⇿");
             LineNumberData.Add(MoveTemp(Data));
             LineNumberToIndexMap.Add(LineNumber, LineIndex);
         }
+
+		for(int i = 0; i < PaddingLineNum; i++)
+		{
+			LineNumberData.Add(MakeShared<FText>(FText::FromString("-")));
+		}
 		
 		int32 DeltaLineCount = CurTextLayoutLine - OldLineCount;
 		bool IsRedoOrUndo = ShaderMultiLineEditableTextLayout && ShaderMultiLineEditableTextLayout->CurrentUndoLevel >= 0;
@@ -1347,7 +1385,8 @@ const FString FoldMarkerText = TEXT("⇿");
 
         double XOffsetSizeBetweenLayout = FMath::Max(0.f, EffectLayoutWidth - ShaderLayoutWidth);
 		//Ensure that ShaderMultiLineEditableText can accommodate the effect text.
-        ShaderMultiLineEditableText->SetMargin(FMargin{ 0, 0, (float)XOffsetSizeBetweenLayout + 50, 0 });
+		float LineHeight = ShaderMarshaller->TextLayout->GetUniformLineHeight() / ShaderMarshaller->TextLayout->GetScale();
+        ShaderMultiLineEditableText->SetMargin(FMargin{ 0, 0, (float)XOffsetSizeBetweenLayout + 50, LineHeight * PaddingLineNum });
 
         const FGeometry& ShaderMultiLineGeometry = ShaderMultiLineEditableText->GetTickSpaceGeometry();
         const FGeometry& EffectMultiLineGeometry = EffectMultiLineEditableText->GetTickSpaceGeometry();
@@ -2556,6 +2595,20 @@ const FString FoldMarkerText = TEXT("⇿");
 
     TSharedRef<ITableRow> SShaderEditorBox::GenerateRowForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
     {
+		float LineHeight = ShaderMarshaller->TextLayout->GetUniformLineHeight() / ShaderMarshaller->TextLayout->GetScale();
+		auto LineHeightBox = SNew(SBox).HeightOverride(LineHeight);
+		auto LineNumberRow = SNew(STableRow<LineNumberItemPtr>, OwnerTable)
+			.Style(&FShaderHelperStyle::Get().GetWidgetStyle<FTableRowStyle>("LineNumberItemStyle"))
+			.Content()
+			[
+				LineHeightBox
+			];
+
+		if (Item->ToString() == "-")
+		{
+			return LineNumberRow;
+		}
+
         int32 LineNumber = FCString::Atoi(*(*Item).ToString());
         const int32 LineIndex = GetLineIndex(LineNumber);
 		
@@ -2658,10 +2711,8 @@ const FString FoldMarkerText = TEXT("⇿");
 			return EVisibility::Hidden;
 		});
 		
-		auto LineNumberRow = SNew(STableRow<LineNumberItemPtr>, OwnerTable)
-			.Style(&FShaderHelperStyle::Get().GetWidgetStyle<FTableRowStyle>("LineNumberItemStyle"))
-			.Content()
-			[
+		
+		LineHeightBox->SetContent(
 				SNew(SOverlay)
 				+SOverlay::Slot()
 				[
@@ -2742,27 +2793,36 @@ const FString FoldMarkerText = TEXT("⇿");
 						return FLinearColor{1,0,0,0.06f};
 					})
 				]
-			];
+		);
         
 		return LineNumberRow;
     }
 
     TSharedRef<ITableRow> SShaderEditorBox::GenerateLineTipForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
     {
-        //DummyTextBlock is used to keep the same layout as LineNumber and MultiLineEditableText.
-        TSharedPtr<STextBlock> DummyTextBlock = SNew(STextBlock)
-            .Font(GetCodeFontInfo())
-            .Visibility(EVisibility::Hidden);
+		float LineHeight = ShaderMarshaller->TextLayout->GetUniformLineHeight() / ShaderMarshaller->TextLayout->GetScale();
+		auto LineHeightBox = SNew(SBox).HeightOverride(LineHeight);
+		auto LineTip = SNew(STableRow<LineNumberItemPtr>, OwnerTable)
+			.Style(&FShaderHelperStyle::Get().GetWidgetStyle<FTableRowStyle>("LineTipItemStyle"))
+			.Content()
+			[
+				LineHeightBox
+			];
+
+		//Dummy
+		if (Item->ToString() == "-")
+		{
+			return SNew(STableRow<LineNumberItemPtr>, OwnerTable).Style(&FShaderHelperStyle::Get().GetWidgetStyle<FTableRowStyle>("LineNumberItemStyle"))
+				.Content()[LineHeightBox];
+		}
+
 		int32 LineNumber = FCString::Atoi(*(*Item).ToString());
 		
-        TSharedPtr<STableRow<LineNumberItemPtr>> LineTip = SNew(STableRow<LineNumberItemPtr>, OwnerTable)
-            .Style(&FShaderHelperStyle::Get().GetWidgetStyle<FTableRowStyle>("LineTipItemStyle"))
-            .Content()
-            [
+		LineTip->SetContent(
 				SNew(SOverlay)
 				+SOverlay::Slot()
 				[
-					DummyTextBlock.ToSharedRef()
+					LineHeightBox
 				]
 				+SOverlay::Slot()
 				.VAlign(VAlign_Top)
@@ -2823,7 +2883,7 @@ const FString FoldMarkerText = TEXT("⇿");
 						.ColorAndOpacity(FLinearColor::Red)
 					]
 				]
-            ];
+        );
 
     
         LineTip->SetBorderBackgroundColor(TAttribute<FSlateColor>::CreateLambda([this, LineNumber]{
@@ -2841,7 +2901,7 @@ const FString FoldMarkerText = TEXT("⇿");
             return NormalLineTipColor;
         }));
         
-        return LineTip.ToSharedRef();
+        return LineTip;
     }
 
     FShaderEditorMarshaller::FShaderEditorMarshaller(SShaderEditorBox* InOwnerWidget, TSharedPtr<HlslTokenizer> InTokenizer)
