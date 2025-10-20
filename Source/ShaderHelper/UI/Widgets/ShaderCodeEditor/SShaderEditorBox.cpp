@@ -186,6 +186,13 @@ constexpr int PaddingLineNum = 22;
 		return FontSize;
 	}
 
+	int32 SShaderEditorBox::GetTabSize()
+	{
+		int32 TabSize = 4;
+		Editor::GetEditorConfig()->GetInt(TEXT("CodeEditor"), TEXT("TabSize"), TabSize);
+		return TabSize;
+	}
+
 	bool SShaderEditorBox::CanMouseWheelZoom()
 	{
 		bool MouseWheelZoom = true;
@@ -655,7 +662,7 @@ constexpr int PaddingLineNum = 22;
             auto UndoState = MakeUnique<ShaderUndoState>();
             ShaderMultiLineEditableTextLayout->InitUndoState(*UndoState);
             UndoState->FoldMarkers = VisibleFoldMarkers;
-			UndoState->BreakPointLines = BreakPointLines;
+			UndoState->BreakPointLineNumbers = BreakPointLineNumbers;
             return UndoState;
         };
 
@@ -923,6 +930,110 @@ constexpr int PaddingLineNum = 22;
 				ShaderMultiLineEditableText->GoTo(ETextLocation::EndOfDocument);
 			})
 		);
+		UICommandList->MapAction(
+			CodeEditorCommands::Get().MoveLineUp,
+			FExecuteAction::CreateLambda([this] {
+				const FTextSelection Selection = ShaderMultiLineEditableText->GetSelection();
+				const int32 StartLineIndex = Selection.GetBeginning().GetLineIndex();
+        		const int32 EndLineIndex = Selection.GetEnd().GetLineIndex();
+				auto& Lines = ShaderMarshaller->TextLayout->GetLineModels();
+				if (StartLineIndex <= 0)
+				{
+					return;
+				}
+
+				SMultiLineEditableText::FScopedEditableTextTransaction Transaction(ShaderMultiLineEditableText);
+
+				TArray<FTextLayout::FLineModel> MovedLines;
+				for (int32 Index = EndLineIndex; Index >= StartLineIndex; Index--)
+				{
+					MovedLines.Add(Lines[Index]);
+					ShaderMarshaller->TextLayout->RemoveLine(Index);
+				}
+				for (int32 Index = 0; Index < MovedLines.Num(); Index++)
+				{
+					FTextLayout::FTextOffsetLocations BeforeOffsetLocations;
+					ShaderMarshaller->TextLayout->GetTextOffsetLocations(BeforeOffsetLocations);
+					Lines.Insert(MovedLines[Index], StartLineIndex - 1);
+					//TextLayout does not provide an API to insert a single line. 
+					//To perform the insertion while preserving the UndoState, call OnAddLine() manually here.
+					ShaderMarshaller->TextLayout->OnAddLine(StartLineIndex - 1, *MovedLines[Index].Text, BeforeOffsetLocations);
+				}
+
+				TArray<int32> AffectedBreakPoints;
+				for (auto It = BreakPointLineNumbers.CreateIterator(); It; ++It)
+				{
+					int32 BreakPointLineIndex = GetLineIndex(*It);
+					if (BreakPointLineIndex == StartLineIndex - 1)
+					{
+						AffectedBreakPoints.Add(GetLineNumber(EndLineIndex));
+						It.RemoveCurrent();
+					}
+					else if (BreakPointLineIndex >= StartLineIndex && BreakPointLineIndex <= EndLineIndex)
+					{
+						AffectedBreakPoints.Add(GetLineNumber(BreakPointLineIndex - 1));
+						It.RemoveCurrent();
+					}
+				}
+				BreakPointLineNumbers.Append(AffectedBreakPoints);
+
+				const FTextLocation NewSelectionStart(StartLineIndex - 1, Selection.GetBeginning().GetOffset());
+				const FTextLocation NewSelectionEnd(EndLineIndex - 1, Selection.GetEnd().GetOffset());
+				ShaderMultiLineEditableText->SelectText(NewSelectionStart, NewSelectionEnd);
+			}),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(
+			CodeEditorCommands::Get().MoveLineDown,
+			FExecuteAction::CreateLambda([this] {
+				const FTextSelection Selection = ShaderMultiLineEditableText->GetSelection();
+				const int32 StartLineIndex = Selection.GetBeginning().GetLineIndex();
+        		const int32 EndLineIndex = Selection.GetEnd().GetLineIndex();
+				auto& Lines = ShaderMarshaller->TextLayout->GetLineModels();
+				if (EndLineIndex >= Lines.Num() - 1)
+				{
+					return;
+				}
+
+				SMultiLineEditableText::FScopedEditableTextTransaction Transaction(ShaderMultiLineEditableText);
+
+				TArray<FTextLayout::FLineModel> MovedLines;
+				for (int32 Index = EndLineIndex; Index >= StartLineIndex; Index--)
+				{
+					MovedLines.Add(Lines[Index]);
+					ShaderMarshaller->TextLayout->RemoveLine(Index);
+				}
+				for (int32 Index = 0; Index < MovedLines.Num(); Index++)
+				{
+					FTextLayout::FTextOffsetLocations BeforeOffsetLocations;
+					ShaderMarshaller->TextLayout->GetTextOffsetLocations(BeforeOffsetLocations);
+					Lines.Insert(MovedLines[Index], StartLineIndex + 1);
+					ShaderMarshaller->TextLayout->OnAddLine(StartLineIndex + 1, *MovedLines[Index].Text, BeforeOffsetLocations);
+				}
+
+				TArray<int32> AffectedBreakPoints;
+				for (auto It = BreakPointLineNumbers.CreateIterator(); It; ++It)
+				{
+					int32 BreakPointLineIndex = GetLineIndex(*It);
+					if (BreakPointLineIndex == EndLineIndex + 1)
+					{
+						AffectedBreakPoints.Add(GetLineNumber(StartLineIndex));
+						It.RemoveCurrent();
+					}
+					else if (BreakPointLineIndex >= StartLineIndex && BreakPointLineIndex <= EndLineIndex)
+					{
+						AffectedBreakPoints.Add(GetLineNumber(BreakPointLineIndex + 1));
+						It.RemoveCurrent();
+					}
+				}
+				BreakPointLineNumbers.Append(AffectedBreakPoints);
+
+				const FTextLocation NewSelectionStart(StartLineIndex + 1, Selection.GetBeginning().GetOffset());
+				const FTextLocation NewSelectionEnd(EndLineIndex + 1, Selection.GetEnd().GetOffset());
+				ShaderMultiLineEditableText->SelectText(NewSelectionStart, NewSelectionEnd);
+			}),
+			EUIActionRepeatMode::RepeatEnabled
+		);
 
         FoldingArrowAnim.AddCurve(0, 0.25f, ECurveEaseFunction::Linear);
 
@@ -1188,8 +1299,10 @@ constexpr int PaddingLineNum = 22;
     void SShaderEditorBox::PasteText()
     {
         FString PastedText;
-		//TODO:Tab character?
         FPlatformApplicationMisc::ClipboardPaste(PastedText);
+		FString TabSpace;
+		for (int i = 0; i < GetTabSize(); i++) { TabSpace += " "; }
+		PastedText = PastedText.Replace(TEXT("\t"), *TabSpace);
         ShaderMultiLineEditableText->InsertTextAtCursor(PastedText);
         
         ShaderMarshaller->MakeDirty();
@@ -1288,7 +1401,7 @@ constexpr int PaddingLineNum = 22;
 
     void SShaderEditorBox::UpdateLineNumberData()
     {
-		int32 OldLineCount = LineNumberData.Num();
+		int32 OldLineCount = LineNumberData.Num() - PaddingLineNum;
 		int32 StartLineNumber = GetLineNumber(SelectionBeforeEdit.GetBeginning().GetLineIndex());
 		int32 EndLineNumber = GetLineNumber(SelectionBeforeEdit.GetEnd().GetLineIndex());
 		
@@ -1321,9 +1434,9 @@ constexpr int PaddingLineNum = 22;
 		bool IsRedoOrUndo = ShaderMultiLineEditableTextLayout && ShaderMultiLineEditableTextLayout->CurrentUndoLevel >= 0;
 		if(!IsFoldEditTransaction && !IsRedoOrUndo && DeltaLineCount != 0)
 		{
-			for(auto It = BreakPointLines.CreateIterator(); It; ++It)
+			for(auto It = BreakPointLineNumbers.CreateIterator(); It; ++It)
 			{
-				if(StartLineNumber < *It)
+				if(StartLineNumber <= *It)
 				{
 					if(EndLineNumber >= *It)
 					{
@@ -2086,6 +2199,7 @@ constexpr int PaddingLineNum = 22;
                 SMultiLineEditableText::FScopedEditableTextTransaction Transaction(Text);
 
                 const FTextLocation CursorLocation = Text->GetCursorLocation();
+				const int32 TabSize = GetTabSize();
 
                 const bool bShouldIncreaseIndentation = InCharacterEvent.GetModifierKeys().IsShiftDown() ? false : true;
 
@@ -2114,18 +2228,18 @@ constexpr int PaddingLineNum = 22;
                         FString Line;
                         Text->GetTextLine(Index, Line);
                         const int32 NumSpaces = GetNumSpacesAtStartOfLine(Line);
-                        const int32 NumExtraSpaces = NumSpaces % 4;
+                        const int32 NumExtraSpaces = NumSpaces % TabSize;
 
-                        // Tab to nearest 4.
+                        // Tab to nearest TabSize.
                         int32 NumSpacesForIndentation;
                         if (bShouldIncreaseIndentation)
                         {
-                            NumSpacesForIndentation = NumExtraSpaces == 0 ? 4 : 4 - NumExtraSpaces;
+                            NumSpacesForIndentation = NumExtraSpaces == 0 ? TabSize : TabSize - NumExtraSpaces;
                             Text->InsertTextAtCursor(FString::ChrN(NumSpacesForIndentation, TEXT(' ')));
                         }
                         else
                         {
-                            NumSpacesForIndentation = NumExtraSpaces == 0 ? FMath::Min(4, NumSpaces) : NumExtraSpaces;
+                            NumSpacesForIndentation = NumExtraSpaces == 0 ? FMath::Min(TabSize, NumSpaces) : NumExtraSpaces;
                             Text->SelectText(LineStart, FTextLocation(LineStart, NumSpacesForIndentation));
                             Text->DeleteSelectedText();
                         }
@@ -2153,10 +2267,10 @@ constexpr int PaddingLineNum = 22;
 
                     const int32 Offset = CursorLocation.GetOffset();
 
-                    // Tab to nearest 4.
+                    // Tab to nearest TabSize.
                     if (ensure(bShouldIncreaseIndentation))
                     {
-                        const int32 NumSpacesForIndentation = 4 - Offset % 4;
+                        const int32 NumSpacesForIndentation = TabSize - Offset % TabSize;
                         Text->InsertTextAtCursor(FString::ChrN(NumSpacesForIndentation, TEXT(' ')));
                     }
                 }
@@ -2602,7 +2716,7 @@ constexpr int PaddingLineNum = 22;
                 const FTextSelection Selection = ShaderMultiLineEditableText->GetSelection();
                 const int32 BeginLineIndex = Selection.GetBeginning().GetLineIndex();
                 const int32 EndLineIndex = Selection.GetEnd().GetLineIndex();
-                if(LineIndex >= BeginLineIndex && LineIndex <= EndLineIndex)
+                if(LineIndex >= BeginLineIndex && LineIndex <= EndLineIndex && ShaderMultiLineEditableText->HasKeyboardFocus())
                 {
                     return HighlightLineNumberTextColor;
                 }
@@ -2613,12 +2727,12 @@ constexpr int PaddingLineNum = 22;
             .MinDesiredWidth(MinWidth);
 		
 		LineNumberTextBlock->SetOnMouseButtonDown(FPointerEventHandler::CreateLambda([this, LineNumber](const FGeometry&, const FPointerEvent&){
-			if(BreakPointLines.Contains(LineNumber))
+			if(BreakPointLineNumbers.Contains(LineNumber))
 			{
-				BreakPointLines.Remove(LineNumber);
+				BreakPointLineNumbers.Remove(LineNumber);
 			}
 			else{
-				BreakPointLines.Add(LineNumber);
+				BreakPointLineNumbers.Add(LineNumber);
 			}
 			return FReply::Handled();
 		}));
@@ -2684,7 +2798,7 @@ constexpr int PaddingLineNum = 22;
 			{
 				return EVisibility::Visible;
 			}
-			else if(BreakPointLines.Contains(LineNumber) || StopLineNumber == LineNumber)
+			else if(BreakPointLineNumbers.Contains(LineNumber) || StopLineNumber == LineNumber)
 			{
 				return EVisibility::HitTestInvisible;
 			}
@@ -2736,7 +2850,7 @@ constexpr int PaddingLineNum = 22;
 					SNew(SBox)
 					.HeightOverride(1.0)
 					.Visibility_Lambda([this, LineNumber]{
-						if(BreakPointLines.Contains(LineNumber) || StopLineNumber == LineNumber)
+						if(BreakPointLineNumbers.Contains(LineNumber) || StopLineNumber == LineNumber)
 						{
 							return EVisibility::HitTestInvisible;
 						}
@@ -2758,7 +2872,7 @@ constexpr int PaddingLineNum = 22;
 				[
 					SNew(SImage)
 					.Visibility_Lambda([this, LineNumber]{
-						if(BreakPointLines.Contains(LineNumber) || StopLineNumber == LineNumber)
+						if(BreakPointLineNumbers.Contains(LineNumber) || StopLineNumber == LineNumber)
 						{
 							return EVisibility::HitTestInvisible;
 						}
@@ -2810,7 +2924,7 @@ constexpr int PaddingLineNum = 22;
 					SNew(SBox)
 					.HeightOverride(1.0)
 					.Visibility_Lambda([this, LineNumber]{
-						if(BreakPointLines.Contains(LineNumber) || StopLineNumber == LineNumber)
+						if(BreakPointLineNumbers.Contains(LineNumber) || StopLineNumber == LineNumber)
 						{
 							return EVisibility::HitTestInvisible;
 						}
@@ -2832,7 +2946,7 @@ constexpr int PaddingLineNum = 22;
 				[
 					SNew(SBorder)
 					.Visibility_Lambda([this, LineNumber]{
-						if(BreakPointLines.Contains(LineNumber) || StopLineNumber == LineNumber)
+						if(BreakPointLineNumbers.Contains(LineNumber) || StopLineNumber == LineNumber)
 						{
 							return EVisibility::HitTestInvisible;
 						}
@@ -2871,7 +2985,7 @@ constexpr int PaddingLineNum = 22;
             const int32 CurLineIndex = CursorLocation.GetLineIndex();
             auto FocusedWidget = FSlateApplication::Get().GetUserFocusedWidget(0);
             if(FocusedWidget == ShaderMultiLineEditableText && LineNumber == GetLineNumber(CurLineIndex)
-			   && !BreakPointLines.Contains(LineNumber) && StopLineNumber != LineNumber)
+			   && !BreakPointLineNumbers.Contains(LineNumber) && StopLineNumber != LineNumber)
             {
                 double CurTime = FPlatformTime::Seconds();
                 float Speed = 2.0f;
@@ -3088,7 +3202,7 @@ constexpr int PaddingLineNum = 22;
         {
             ShaderUndoState* UndoState = static_cast<ShaderUndoState*>(EditableTextLayout->UndoStates[EditableTextLayout->CurrentUndoLevel].Get());
             OwnerWidget->VisibleFoldMarkers = UndoState->FoldMarkers;
-			OwnerWidget->BreakPointLines = UndoState->BreakPointLines;
+			OwnerWidget->BreakPointLineNumbers = UndoState->BreakPointLineNumbers;
         }
         else
         {
@@ -3952,7 +4066,7 @@ void __Expression_Output(T __Expression_Result) {}
 			
 			if(NextValidLine)
 			{
-				bool MatchBreakPoint = Scope && BreakPointLines.ContainsByPredicate([&](int32 InEntry){
+				bool MatchBreakPoint = Scope && BreakPointLineNumbers.ContainsByPredicate([&](int32 InEntry){
 					 int32 BreakPointLine = InEntry + ExtraLineNum;
 					 bool bForward;
 					 if(!CurValidLine)

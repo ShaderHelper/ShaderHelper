@@ -48,6 +48,8 @@ namespace SH
 			UI_COMMAND_SH(ScrollDown, LOCALIZATION("ScrollDown"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::Down));
 			UI_COMMAND_SH(JumpTop, LOCALIZATION("JumpTop"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::Home));
 			UI_COMMAND_SH(JumpBottom, LOCALIZATION("JumpBottom"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::End));
+			UI_COMMAND_SH(MoveLineUp, LOCALIZATION("MoveLineUp"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Alt, EKeys::Up));
+			UI_COMMAND_SH(MoveLineDown, LOCALIZATION("MoveLineDown"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Alt, EKeys::Down));
 #undef LOCTEXT_NAMESPACE
 		}
 
@@ -80,5 +82,7 @@ namespace SH
 		TSharedPtr<FUICommandInfo> ScrollDown;
 		TSharedPtr<FUICommandInfo> JumpTop;
 		TSharedPtr<FUICommandInfo> JumpBottom;
+		TSharedPtr<FUICommandInfo> MoveLineUp;
+		TSharedPtr<FUICommandInfo> MoveLineDown;
 	};
 }

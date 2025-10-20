@@ -35,7 +35,7 @@ namespace SH
     struct ShaderUndoState : SlateEditableTextTypes::FUndoState
     {
         TArray<FoldMarker> FoldMarkers;
-		TArray<int32> BreakPointLines;
+		TArray<int32> BreakPointLineNumbers;
     };
 
 	class FShaderEditorMarshaller : public FBaseTextLayoutMarshaller
@@ -189,6 +189,7 @@ namespace SH
 		static TMap<HLSL::TokenType, FTextBlockStyle>& GetTokenStyleMap();
 		static FString GetFontPath();
 		static int32 GetFontSize();
+		static int32 GetTabSize();
 		static bool CanMouseWheelZoom();
 		static FSlateFontInfo& GetCodeFontInfo();
 		static constexpr int32 MinFontSize = 4;
@@ -289,7 +290,7 @@ namespace SH
 		TSharedPtr<SShaderMultiLineEditableText> ShaderMultiLineEditableText;
         FSlateEditableTextLayout* ShaderMultiLineEditableTextLayout;
 		TArray<FoldMarker> VisibleFoldMarkers;
-		TArray<int32> BreakPointLines;
+		TArray<int32> BreakPointLineNumbers;
         //The visible content in editor, and contains fold markers.
         FString CurrentEditorSource;
 		const FSlateBrush* BackgroundLayerBrush{};
