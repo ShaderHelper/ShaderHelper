@@ -217,6 +217,7 @@ namespace SH
 				InternalBorder->SetBorderBackgroundColor(FLinearColor{1,1,1,0.2f});
 			}
 			InternalBorder->SetContent(SNew(STextBlock).Font(Owner->Font).Text(FText::FromString(Data->ValueStr)));
+			InternalBorder->SetToolTipText(FText::FromString(Data->ValueStr));
 		}
 		else
 		{

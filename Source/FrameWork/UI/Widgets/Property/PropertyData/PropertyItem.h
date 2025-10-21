@@ -152,7 +152,6 @@ namespace FW
 					.IsEnabled(!ReadOnly)
 					.MinValue(MinValue)
 					.MaxValue(MaxValue)
-                    .MaxFractionalDigits(3)
                     .OnValueChanged_Lambda([this](T NewValue) {
                         if(*ValueRef != NewValue && Owner->CanChangeProperty(this))
                         {
@@ -191,7 +190,6 @@ namespace FW
                     + SHorizontalBox::Slot()
                     [
                         SNew(SSpinBox<float>)
-                        .MaxFractionalDigits(3)
                         .OnValueChanged_Lambda([this](float NewValue) {
                             if(ValueRef->x != NewValue && Owner->CanChangeProperty(this))
                             {
@@ -204,7 +202,6 @@ namespace FW
                     + SHorizontalBox::Slot()
                     [
                         SNew(SSpinBox<float>)
-                        .MaxFractionalDigits(3)
                         .OnValueChanged_Lambda([this](float NewValue) {
                             if(ValueRef->y != NewValue && Owner->CanChangeProperty(this))
                             {
@@ -242,7 +239,6 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<float>)
-						.MaxFractionalDigits(3)
 						.OnValueChanged_Lambda([this](float NewValue) {
 							if(ValueRef->x != NewValue && Owner->CanChangeProperty(this))
 							{
@@ -255,7 +251,6 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<float>)
-						.MaxFractionalDigits(3)
 						.OnValueChanged_Lambda([this](float NewValue) {
 							if(ValueRef->y != NewValue && Owner->CanChangeProperty(this))
 							{
@@ -268,7 +263,6 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<float>)
-						.MaxFractionalDigits(3)
 						.OnValueChanged_Lambda([this](float NewValue) {
 							if(ValueRef->z != NewValue && Owner->CanChangeProperty(this))
 							{
@@ -307,7 +301,6 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<float>)
-							.MaxFractionalDigits(3)
 							.OnValueChanged_Lambda([this](float NewValue) {
 								if (ValueRef->x != NewValue && Owner->CanChangeProperty(this))
 								{
@@ -320,7 +313,6 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<float>)
-							.MaxFractionalDigits(3)
 							.OnValueChanged_Lambda([this](float NewValue) {
 								if (ValueRef->y != NewValue && Owner->CanChangeProperty(this))
 								{
@@ -333,7 +325,6 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<float>)
-							.MaxFractionalDigits(3)
 							.OnValueChanged_Lambda([this](float NewValue) {
 								if (ValueRef->z != NewValue && Owner->CanChangeProperty(this))
 								{
@@ -346,7 +337,6 @@ namespace FW
 					+SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<float>)
-							.MaxFractionalDigits(3)
 							.OnValueChanged_Lambda([this](float NewValue) {
 								if (ValueRef->w != NewValue && Owner->CanChangeProperty(this))
 								{

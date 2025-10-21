@@ -139,6 +139,7 @@ namespace SH
 			InternalBorder->SetContent(SNew(STextBlock).Text_Lambda([this] {
 				return FText::FromString(Data->ValueStr);
 			}));
+			InternalBorder->SetToolTipText(FText::FromString(Data->ValueStr));
 		}
 		else
 		{

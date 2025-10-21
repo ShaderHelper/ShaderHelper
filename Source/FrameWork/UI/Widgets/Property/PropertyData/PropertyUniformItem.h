@@ -31,7 +31,6 @@ namespace FW
     {
         auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
         auto ValueWidget = SNew(SSpinBox<float>)
-            .MaxFractionalDigits(3)
             .OnValueChanged_Lambda([this](float NewValue) {
                 if(ValueRef != NewValue && Owner->CanChangeProperty(this))
                 {
@@ -53,7 +52,6 @@ namespace FW
             + SHorizontalBox::Slot()
             [
                 SNew(SSpinBox<float>)
-                .MaxFractionalDigits(3)
                 .OnValueChanged_Lambda([this](float NewValue) {
                     Vector2f& Value = ValueRef;
                     if(Value.x != NewValue && Owner->CanChangeProperty(this))
@@ -67,7 +65,6 @@ namespace FW
             + SHorizontalBox::Slot()
             [
                 SNew(SSpinBox<float>)
-                .MaxFractionalDigits(3)
                 .OnValueChanged_Lambda([this](float NewValue) {
                     Vector2f& Value = ValueRef;
                     if(Value.y != NewValue && Owner->CanChangeProperty(this))
@@ -91,7 +88,6 @@ namespace FW
 			+ SHorizontalBox::Slot()
 			[
 				SNew(SSpinBox<float>)
-				.MaxFractionalDigits(3)
 				.OnValueChanged_Lambda([this](float NewValue) {
 					Vector3f& Value = ValueRef;
 					if(Value.x != NewValue && Owner->CanChangeProperty(this))
@@ -105,7 +101,6 @@ namespace FW
 			+ SHorizontalBox::Slot()
 			[
 				SNew(SSpinBox<float>)
-				.MaxFractionalDigits(3)
 				.OnValueChanged_Lambda([this](float NewValue) {
 					Vector3f& Value = ValueRef;
 					if(Value.y != NewValue && Owner->CanChangeProperty(this))
@@ -119,7 +114,6 @@ namespace FW
 			+ SHorizontalBox::Slot()
 			[
 				SNew(SSpinBox<float>)
-				.MaxFractionalDigits(3)
 				.OnValueChanged_Lambda([this](float NewValue) {
 					Vector3f& Value = ValueRef;
 					if(Value.z != NewValue && Owner->CanChangeProperty(this))
@@ -146,7 +140,6 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<float>)
-							.MaxFractionalDigits(3)
 							.OnValueChanged_Lambda([this](float NewValue) {
 							Vector4f& Value = ValueRef;
 							if (Value.x != NewValue && Owner->CanChangeProperty(this))
@@ -160,7 +153,6 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<float>)
-							.MaxFractionalDigits(3)
 							.OnValueChanged_Lambda([this](float NewValue) {
 							Vector4f& Value = ValueRef;
 							if (Value.y != NewValue && Owner->CanChangeProperty(this))
@@ -178,7 +170,6 @@ namespace FW
 				+SHorizontalBox::Slot()
 				[
 					SNew(SSpinBox<float>)
-						.MaxFractionalDigits(3)
 						.OnValueChanged_Lambda([this](float NewValue) {
 						Vector4f& Value = ValueRef;
 						if (Value.z != NewValue && Owner->CanChangeProperty(this))
@@ -192,7 +183,6 @@ namespace FW
 				+ SHorizontalBox::Slot()
 				[
 					SNew(SSpinBox<float>)
-						.MaxFractionalDigits(3)
 						.OnValueChanged_Lambda([this](float NewValue) {
 						Vector4f& Value = ValueRef;
 						if (Value.w != NewValue && Owner->CanChangeProperty(this))

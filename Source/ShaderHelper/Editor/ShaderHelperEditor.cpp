@@ -62,7 +62,8 @@ namespace SH
 				SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
 				ShaderEditor->Continue();
 			}),
-			FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); })
+			FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); }),
+			EUIActionRepeatMode::RepeatEnabled
 		);
 		UICommandList->MapAction(
 			CodeEditorCommands::Get().StepInto,
@@ -70,7 +71,8 @@ namespace SH
 				SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
 				ShaderEditor->Continue(SShaderEditorBox::StepMode::StepInto);
 			}),
-			FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); })
+			FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); }),
+			EUIActionRepeatMode::RepeatEnabled
 		);
 		UICommandList->MapAction(
 			CodeEditorCommands::Get().StepOver,
@@ -78,9 +80,10 @@ namespace SH
 				SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
 				ShaderEditor->Continue(SShaderEditorBox::StepMode::StepOver);
 			}),
-			FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); })
+			FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); }),
+			EUIActionRepeatMode::RepeatEnabled
 		);
-		
+
 		CurProject = TSingleton<ShProjectManager>::Get().GetProject();
 		ViewPort = MakeShared<PreviewViewPort>();
 	}

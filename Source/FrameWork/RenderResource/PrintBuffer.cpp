@@ -41,7 +41,7 @@ namespace FW
 				void* ArgValue = (uint8*)Printer + ByteOffset;
 				if (Tag == HLSL::Print_float)
 				{
-					float Arg = *(float*)ArgValue;
+					FString Arg = FString::Printf(TEXT("%.7g"), *(float*)ArgValue);
 					Args.Add(Arg);
 					ByteOffset += sizeof(float);
 				}

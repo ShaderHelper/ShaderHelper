@@ -1499,7 +1499,7 @@ constexpr int PaddingLineNum = 22;
         double XOffsetSizeBetweenLayout = FMath::Max(0.f, EffectLayoutWidth - ShaderLayoutWidth);
 		//Ensure that ShaderMultiLineEditableText can accommodate the effect text.
 		float LineHeight = ShaderMarshaller->TextLayout->GetUniformLineHeight() / ShaderMarshaller->TextLayout->GetScale();
-        ShaderMultiLineEditableText->SetMargin(FMargin{ 0, 0, (float)XOffsetSizeBetweenLayout + 50, LineHeight * PaddingLineNum });
+        ShaderMultiLineEditableText->SetMargin(FMargin{ 0, 0, (float)XOffsetSizeBetweenLayout + 100, LineHeight * PaddingLineNum });
 
         const FGeometry& ShaderMultiLineGeometry = ShaderMultiLineEditableText->GetTickSpaceGeometry();
         const FGeometry& EffectMultiLineGeometry = EffectMultiLineEditableText->GetTickSpaceGeometry();

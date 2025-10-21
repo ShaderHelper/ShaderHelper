@@ -504,7 +504,18 @@ namespace FW {
 		}
 
 		FString ToString() const {
-			return FString::Format(TEXT("{{0},{1}}"), { X, Y });
+			if constexpr (std::is_same_v<T, float>)
+			{
+				return FString::Printf(TEXT("{%.7g,%.7g}"), X, Y);
+			}
+			else if constexpr (std::is_same_v<T, double>)
+			{
+				return FString::Printf(TEXT("{%.16g,%.16g}"), X, Y );
+			}
+			else
+			{
+				return FString::Format(TEXT("{{0},{1}}"), { X, Y });
+			}
 		}
 
 		const T* GetData() const {
@@ -722,7 +733,18 @@ namespace FW {
 		}
 
 		FString ToString() const {
-			return FString::Format(TEXT("{{0},{1},{2}}"), { X, Y, Z });
+			if constexpr (std::is_same_v<T, float>)
+			{
+				return FString::Printf(TEXT("{%.7g,%.7g,%.7g}"), X, Y, Z);
+			}
+			else if constexpr (std::is_same_v<T, double>)
+			{
+				return FString::Printf(TEXT("{%.16g,%.16g,%.16g}"), X, Y, Z);
+			}
+			else
+			{
+				return FString::Format(TEXT("{{0},{1},{2}}"), { X, Y, Z });
+			}
 		}
 
 		const T* GetData() const {
@@ -940,7 +962,18 @@ namespace FW {
 		}
 
 		FString ToString() const {
-			return FString::Format(TEXT("{{0},{1},{2},{3}}"), { X, Y, Z, W });
+			if constexpr (std::is_same_v<T, float>)
+			{
+				return FString::Printf(TEXT("{%.7g,%.7g,%.7g,%.7g}"), X, Y, Z, W);
+			}
+			else if constexpr (std::is_same_v<T, double>)
+			{
+				return FString::Printf(TEXT("{%.16g,%.16g,%.16g,%.16g}"), X, Y, Z, W);
+			}
+			else
+			{
+				return FString::Format(TEXT("{{0},{1},{2},{3}}"), { X, Y, Z, W });
+			}
 		}
 
 		const T* GetData() const {

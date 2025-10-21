@@ -584,7 +584,7 @@ namespace FW
 					if(Encoding == SpvDebugBasicTypeEncoding::Float)
 					{
 						float Value = *(float*)(InValue.GetData() + Offset);
-						BasicValueStr = FString::Format(TEXT("{0}"), {Value});
+						BasicValueStr = FString::Printf(TEXT("%.7g"), Value);
 					}
 					else if(Encoding == SpvDebugBasicTypeEncoding::Signed)
 					{
