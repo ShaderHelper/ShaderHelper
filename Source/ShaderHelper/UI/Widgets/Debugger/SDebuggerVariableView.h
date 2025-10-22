@@ -17,8 +17,8 @@ namespace SH
 		void Construct( const FArguments& InArgs );
 		
 	public:
-		void SaveExpansionStates(const TArray<ExpressionNodePtr>& NodeDatas, TMap<FString, bool>& OutStates);
-		void RestoreExpansionStates(const TArray<ExpressionNodePtr>& NodeDatas, const TMap<FString, bool>& ExpansionStates);
+		void SavePersistantStates(const TArray<ExpressionNodePtr>& NodeDatas, TMap<FString, ExpressionNodePersistantState>& OutStates);
+		void RestorePersistantStates(const TArray<ExpressionNodePtr>& NodeDatas, const TMap<FString, ExpressionNodePersistantState>& PersistantStates);
 		void RefreshExpansions();
 		void SetOnShowUninitialized(const TFunction<void(bool)>& InHandler) { OnShowUninitialized = InHandler; }
 		void SetVariableNodeDatas(const TArray<ExpressionNodePtr>& InDatas);

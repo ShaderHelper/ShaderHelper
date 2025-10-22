@@ -20,6 +20,7 @@
 #include "Editor/AssetEditor/AssetEditor.h"
 #include "GpuApi/Spirv/SpirvExpressionVM.h"
 #include "Common/Path/BaseResourcePath.h"
+#include <regex>
 
 //No exposed methods, and too lazy to modify the source code for UE.
 STEAL_PRIVATE_MEMBER(SMultiLineEditableText, TUniquePtr<FSlateEditableTextLayout>, EditableTextLayout)
@@ -3528,11 +3529,10 @@ constexpr int PaddingLineNum = 22;
 	void SShaderMultiLineEditableText::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		SDebuggerVariableView* VarView = ShEditor->GetDebuggerTipVariableView();
-		TSharedPtr<SWindow> DebuggerTipWindow = ShEditor->GetDebuggerTipWindow();
+		TSharedPtr<SWindow> ShaderEditorTipWindow = ShEditor->GetShaderEditorTipWindow();
 
 		FVector2D ScreenSpaceCursorPos = FSlateApplication::Get().GetCursorPos();
-		FGeometry WindowGeometry = DebuggerTipWindow->GetWindowGeometryInScreen();
+		FGeometry WindowGeometry = ShaderEditorTipWindow->GetWindowGeometryInScreen();
 		bool bMouseInTipWindow = WindowGeometry.IsUnderLocation(ScreenSpaceCursorPos);
 
 		static double LastCheckTime = 0.0;
@@ -3541,9 +3541,7 @@ constexpr int PaddingLineNum = 22;
 		bool bShouldCheck = InCurrentTime - LastCheckTime >= CheckInterval;
 		bShouldCheck = bShouldCheck && !bMouseInTipWindow;
 
-		//Show the debug value when hovering over variables
-		if (bShouldCheck)
-		{
+		auto CheckDebuggerTip = [&] {
 			ExpressionNodePtr HoverExpr;
 			FTextLocation CurrentHoverLocation;
 			FString CurrentTokenName;
@@ -3556,8 +3554,6 @@ constexpr int PaddingLineNum = 22;
 				if (Owner->DebuggerContext)
 				{
 					int32 ExtraLineNum = Owner->GetShaderAsset()->GetExtraLineNum();
-					const auto& RecordedInfo = Owner->DebuggerContext->ThreadState.RecordedInfo;
-					const auto& DebugStates = RecordedInfo.DebugStates;
 					const auto& TokenizedLine = Owner->ShaderMarshaller->TokenizedLines[CurrentHoverLocation.GetLineIndex()];
 					FString CurTextLine;
 					GetTextLine(CurrentHoverLocation.GetLineIndex(), CurTextLine);
@@ -3629,11 +3625,18 @@ constexpr int PaddingLineNum = 22;
 			{
 				if (!bSameToken)
 				{
+					auto VarView = SNew(SDebuggerVariableView)
+						.Font_Lambda([] { return SShaderEditorBox::GetCodeFontInfo(); })
+						.AutoWidth(true)
+						.HasHeaderRow(false);
 					VarView->SetVariableNodeDatas({ HoverExpr });
-					DebuggerTipWindow->ShowWindow();
-					FVector2D BlockPos = Owner->ShaderMarshaller->TextLayout->GetLocationAt({ CurrentHoverLocation.GetLineIndex(), CurrentTokenBeginOffset }, true);
-					FVector2D BlockScreenPos = AllottedGeometry.LocalToAbsolute(BlockPos / AllottedGeometry.Scale);
-					DebuggerTipWindow->MoveWindowTo(BlockScreenPos);
+					ShaderEditorTipWindow->SetContent(VarView);
+					ShaderEditorTipWindow->SlatePrepass();
+					ShaderEditorTipWindow->Resize(ShaderEditorTipWindow->GetDesiredSize());
+					ShaderEditorTipWindow->ShowWindow();
+					FVector2D BlockPos = Owner->ShaderMarshaller->TextLayout->GetLocationAt({ CurrentHoverLocation.GetLineIndex(), CurrentTokenBeginOffset }, true) / AllottedGeometry.Scale;
+					FVector2D BlockScreenPos = AllottedGeometry.LocalToAbsolute(BlockPos);
+					ShaderEditorTipWindow->MoveWindowTo(BlockScreenPos);
 					LastHoverLineIndex = CurrentHoverLocation.GetLineIndex();
 					LastTokenName = CurrentTokenName;
 					LastTokenBeginOffset = CurrentTokenBeginOffset;
@@ -3642,11 +3645,90 @@ constexpr int PaddingLineNum = 22;
 			}
 			else
 			{
-				VarView->SetVariableNodeDatas({});
 				LastHoverLineIndex = -1;
 				LastTokenName.Empty();
 				LastTokenBeginOffset = -1;
 				LastTokenEndOffset = -1;
+			}
+			return HoverExpr.IsValid();
+		};
+
+		auto CheckColorBlockTip = [&] {
+			if (AllottedGeometry.IsUnderLocation(ScreenSpaceCursorPos))
+			{
+				FVector2D LocalSpaceCursorPos = AllottedGeometry.AbsoluteToLocal(ScreenSpaceCursorPos);
+				FTextLocation CurrentHoverLocation = Owner->ShaderMarshaller->TextLayout->GetTextLocationAt(LocalSpaceCursorPos * AllottedGeometry.Scale);
+
+				FString CurTextLine;
+				GetTextLine(CurrentHoverLocation.GetLineIndex(), CurTextLine);
+				std::string Str = TCHAR_TO_UTF8(*CurTextLine);
+				std::regex Pattern(
+					R"(float3\s*)"
+					R"((\()"
+					R"(\s*([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*,\s*)"
+					R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*,\s*)"
+					R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*)"
+					R"(\)))"
+				);
+				std::smatch Match;
+				static FTextLocation LastMatchedPos;
+				static std::string LastMatchedStr;
+				if (std::regex_search(Str, Match, Pattern) && Match.size() == 5)
+				{
+					if (CurrentHoverLocation.GetOffset() >= Match.position(1) &&
+						CurrentHoverLocation.GetOffset() < Match.position(1) + Match.length(0))
+					{
+						FTextLocation CurMatchedPos = { CurrentHoverLocation.GetLineIndex(), (int32)Match.position(1) };
+						std::string CurMatchedStr = Match[1].str();
+						if (LastMatchedPos != CurMatchedPos || LastMatchedStr != CurMatchedStr)
+						{
+							LastMatchedPos = CurMatchedPos;
+							LastMatchedStr = CurMatchedStr;
+							float X = std::stof(Match[2].str());
+							float Y = std::stof(Match[3].str());
+							float Z = std::stof(Match[4].str());
+							FVector2D BlockBeginPos = Owner->ShaderMarshaller->TextLayout->GetLocationAt(CurMatchedPos, true) / AllottedGeometry.Scale;
+							FVector2D BlockEndPos = Owner->ShaderMarshaller->TextLayout->GetLocationAt({ CurrentHoverLocation.GetLineIndex(), (int32)Match.position(1) + (int32)Match.length(1) }, true) / AllottedGeometry.Scale;
+							FVector2D BlockBeginScreenPos = AllottedGeometry.LocalToAbsolute(BlockBeginPos);
+							auto ColorBlock = SNew(SBox)
+								.WidthOverride(BlockEndPos.X - BlockBeginPos.X)
+								.HeightOverride(SShaderEditorBox::GetFontSize() + 4)
+								[
+									SNew(SBorder) 
+									[
+										SNew(SBorder).BorderImage(FAppStyle::Get().GetBrush("Brushes.White"))
+										.BorderBackgroundColor(FLinearColor{ X, Y, Z })
+									]
+								];
+							ShaderEditorTipWindow->SetContent(ColorBlock);
+							ShaderEditorTipWindow->SlatePrepass();
+							ShaderEditorTipWindow->Resize(ShaderEditorTipWindow->GetDesiredSize());
+							ShaderEditorTipWindow->ShowWindow();
+							ShaderEditorTipWindow->MoveWindowTo(BlockBeginScreenPos);
+						}
+						return true;
+					}
+					else
+					{
+						LastMatchedPos = {};
+						LastMatchedStr.clear();
+					}
+				}
+				else
+				{
+					LastMatchedPos = {};
+					LastMatchedStr.clear();
+				}
+			}
+			return false;
+		};
+
+		//Show the debug value when hovering over variables
+		if (bShouldCheck)
+		{
+			if (!CheckDebuggerTip() && !CheckColorBlockTip())
+			{
+				ShaderEditorTipWindow->HideWindow();
 			}
 			LastCheckTime = InCurrentTime;
 		}
@@ -4019,8 +4101,8 @@ void __Expression_Output(T __Expression_Result) {}
 		DirtyVars.Empty();
 		DebuggerError.Empty();
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		TSharedPtr<SWindow> DebuggerTipWindow = ShEditor->GetDebuggerTipWindow();
-		DebuggerTipWindow->HideWindow();
+		TSharedPtr<SWindow> ShaderEditorTipWindow = ShEditor->GetShaderEditorTipWindow();
+		ShaderEditorTipWindow->HideWindow();
 		
 		const auto& DebugStates = DebuggerContext->ThreadState.RecordedInfo.DebugStates;
 		auto CallStackAtStop = CallStack;

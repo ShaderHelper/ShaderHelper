@@ -131,11 +131,7 @@ namespace SH
 		SAssignNew(DebuggerGlobalVariableView, SDebuggerVariableView);
 		SAssignNew(DebuggerWatchView, SDebuggerWatchView);
 		SAssignNew(DebuggerCallStackView, SDebuggerCallStackView);
-		SAssignNew(DebuggerTipVariableView, SDebuggerVariableView)
-			.Font_Lambda([] { return SShaderEditorBox::GetCodeFontInfo(); })
-			.AutoWidth(true)
-			.HasHeaderRow(false);
-		DebuggerTipWindow = SNew(SWindow)
+		SAssignNew(ShaderEditorTipWindow, SWindow)
 			.Type(EWindowType::ToolTip)
 			.CreateTitleBar(false)
 			.IsTopmostWindow(true)
@@ -143,11 +139,8 @@ namespace SH
 			.SupportsMinimize(false)
 			.IsPopupWindow(true)
 			.SizingRule(ESizingRule::Autosized)
-			.ActivationPolicy(EWindowActivationPolicy::Never)
-			[
-				DebuggerTipVariableView.ToSharedRef()					
-			];
-		FSlateApplication::Get().AddWindow(DebuggerTipWindow.ToSharedRef());
+			.ActivationPolicy(EWindowActivationPolicy::Never);
+		FSlateApplication::Get().AddWindow(ShaderEditorTipWindow.ToSharedRef(), false);
 	}
 
 	void ShaderHelperEditor::ForceRender()

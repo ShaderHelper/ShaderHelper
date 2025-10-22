@@ -2,6 +2,11 @@
 
 namespace SH
 {
+	struct ExpressionNodePersistantState
+	{
+		bool Expanded{};
+	};
+
 	struct ExpressionNode
 	{
 		FString Expr;
@@ -9,10 +14,12 @@ namespace SH
 		FString TypeName;
 		bool Dirty{};
 		TArray<TSharedPtr<ExpressionNode>> Children;
-		bool Expanded{};
+		ExpressionNodePersistantState PersistantState;
 	};
 
 	using ExpressionNodePtr = TSharedPtr<ExpressionNode>;
+
+	inline bool DebuggerViewDisplayColorBlock;
 
 	class SDebuggerWatchView : public SCompoundWidget
 	{

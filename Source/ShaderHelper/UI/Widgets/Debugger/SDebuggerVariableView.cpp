@@ -3,6 +3,7 @@
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/Misc/MiscWidget.h"
+#include <regex>
 
 using namespace FW;
 
@@ -27,9 +28,9 @@ namespace SH
 					float MaxWidth{};
 					for (ExpressionNodePtr Data : VariableNodeDatas)
 					{
-						auto Temp = SNew(STextBlock).Text(FText::FromString(Data->Expr)).SimpleTextMode(true);
+						auto Temp = SNew(STextBlock).Text(FText::FromString(Data->Expr));
 						if (Font.IsSet()) { Temp->SetFont(Font.Get()); }
-						float DpiScale = static_cast<ShaderHelperEditor*>(GApp->GetEditor())->GetDebuggerTipWindow()->GetDPIScaleFactor();
+						float DpiScale = static_cast<ShaderHelperEditor*>(GApp->GetEditor())->GetShaderEditorTipWindow()->GetDPIScaleFactor();
 						MaxWidth = FMath::Max(MaxWidth, (float)Temp->ComputeDesiredSize(DpiScale).X + 60);
 					}
 					return MaxWidth;
@@ -41,7 +42,7 @@ namespace SH
 					{
 						auto Temp = SNew(STextBlock).Text(FText::FromString(Data->ValueStr));
 						if (Font.IsSet()) { Temp->SetFont(Font.Get()); }
-						float DpiScale = static_cast<ShaderHelperEditor*>(GApp->GetEditor())->GetDebuggerTipWindow()->GetDPIScaleFactor();
+						float DpiScale = static_cast<ShaderHelperEditor*>(GApp->GetEditor())->GetShaderEditorTipWindow()->GetDPIScaleFactor();
 						MaxWidth = FMath::Max(MaxWidth, (float)Temp->ComputeDesiredSize(DpiScale).X + 40);
 					}
 					return MaxWidth;
@@ -53,7 +54,7 @@ namespace SH
 					{
 						auto Temp = SNew(STextBlock).Text(FText::FromString(Data->TypeName));
 						if (Font.IsSet()) { Temp->SetFont(Font.Get()); }
-						float DpiScale = static_cast<ShaderHelperEditor*>(GApp->GetEditor())->GetDebuggerTipWindow()->GetDPIScaleFactor();
+						float DpiScale = static_cast<ShaderHelperEditor*>(GApp->GetEditor())->GetShaderEditorTipWindow()->GetDPIScaleFactor();
 						MaxWidth = FMath::Max(MaxWidth, (float)Temp->ComputeDesiredSize(DpiScale).X + 40);
 					}
 					return MaxWidth;
@@ -78,6 +79,20 @@ namespace SH
 					.Padding(0, 0, 4, 0)
 					.HAlign(HAlign_Right)
 					.VAlign(VAlign_Center)
+					.AutoWidth()
+					[
+						SNew(SShToggleButton).Icon(FAppStyle::Get().GetBrush("ColorPicker.Mode"))
+						.ToolTipText(LOCALIZATION("DisplayColorBlock"))
+						.IsChecked_Lambda([this] { return DebuggerViewDisplayColorBlock ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
+						.OnCheckStateChanged_Lambda([this](ECheckBoxState InState) {
+							DebuggerViewDisplayColorBlock = InState == ECheckBoxState::Checked ? true : false;
+						})
+					]
+					+ SHorizontalBox::Slot()
+					.Padding(0, 0, 4, 0)
+					.HAlign(HAlign_Right)
+					.VAlign(VAlign_Center)
+					.AutoWidth()
 					[
 						SNew(SShToggleButton).Icon(FShaderHelperStyle::Get().GetBrush("Icons.Uninitialized"))
 						.ToolTipText(LOCALIZATION("ShowUninitialized"))
@@ -104,7 +119,7 @@ namespace SH
 			.OnGenerateRow(this, &SDebuggerVariableView::OnGenerateRow)
 			.OnGetChildren(this, &SDebuggerVariableView::OnGetChildren)
 			.OnExpansionChanged_Lambda([this](ExpressionNodePtr InData, bool bExpanded){
-				InData->Expanded = bExpanded;
+				InData->PersistantState.Expanded = bExpanded;
 			})
 			.HeaderRow
 			(
@@ -115,7 +130,7 @@ namespace SH
 		RefreshExpansions();
 	}
 
-	void SDebuggerVariableView::SaveExpansionStates(const TArray<ExpressionNodePtr>& NodeDatas, TMap<FString, bool>& OutStates)
+	void SDebuggerVariableView::SavePersistantStates(const TArray<ExpressionNodePtr>& NodeDatas, TMap<FString, ExpressionNodePersistantState>& OutStates)
 	{
 		auto SaveRecursive = [&OutStates](auto&& Self, const TArray<ExpressionNodePtr>& Nodes, const FString& Prefix) -> void {
 			for (const auto& Node : Nodes)
@@ -123,7 +138,7 @@ namespace SH
 				if (Node.IsValid())
 				{
 					FString NodeKey = Prefix.IsEmpty() ? Node->Expr : (Prefix + TEXT(".") + Node->Expr);
-					OutStates.Add(NodeKey, Node->Expanded);
+					OutStates.Add(NodeKey, Node->PersistantState);
 
 					if (!Node->Children.IsEmpty())
 					{
@@ -136,18 +151,18 @@ namespace SH
 		SaveRecursive(SaveRecursive, NodeDatas, TEXT(""));
 	}
 
-	void SDebuggerVariableView::RestoreExpansionStates(const TArray<ExpressionNodePtr>& NodeDatas, const TMap<FString, bool>& ExpansionStates)
+	void SDebuggerVariableView::RestorePersistantStates(const TArray<ExpressionNodePtr>& NodeDatas, const TMap<FString, ExpressionNodePersistantState>& PersistantStates)
 	{
-		auto RestoreRecursive = [&ExpansionStates](auto&& Self, const TArray<ExpressionNodePtr>& Nodes, const FString& Prefix) -> void {
+		auto RestoreRecursive = [&PersistantStates](auto&& Self, const TArray<ExpressionNodePtr>& Nodes, const FString& Prefix) -> void {
 			for (const auto& Node : Nodes)
 			{
 				if (Node.IsValid())
 				{
 					FString NodeKey = Prefix.IsEmpty() ? Node->Expr : (Prefix + TEXT(".") + Node->Expr);
 
-					if (const bool* bExpanded = ExpansionStates.Find(NodeKey))
+					if (const ExpressionNodePersistantState* State = PersistantStates.Find(NodeKey))
 					{
-						Node->Expanded = *bExpanded;
+						Node->PersistantState = *State;
 					}
 
 					if (!Node->Children.IsEmpty())
@@ -165,7 +180,7 @@ namespace SH
 	{
 		auto ExpandRecursive = [this](auto&& Self, ExpressionNodePtr Node) -> void
 		{
-			VariableTreeView->SetItemExpansion(Node, Node->Expanded);
+			VariableTreeView->SetItemExpansion(Node, Node->PersistantState.Expanded);
 			for (auto& Child : Node->Children)
 			{
 				Self(Self, Child);
@@ -211,11 +226,34 @@ namespace SH
 		else if(ColumnId == ValueColId)
 		{
 			Border->SetPadding(FMargin{1, 0, 1, 2});
-			if(Data->Dirty)
-			{
-				InternalBorder->SetBorderImage(FAppStyle::Get().GetBrush("Brushes.White"));
-				InternalBorder->SetBorderBackgroundColor(FLinearColor{1,1,1,0.2f});
-			}
+			InternalBorder->SetBorderImage(FAppStyle::Get().GetBrush("Brushes.White"));
+			InternalBorder->SetBorderBackgroundColor(TAttribute<FSlateColor>::CreateLambda([this] {
+				if (DebuggerViewDisplayColorBlock && Data->TypeName == "float3")
+				{
+					std::string Str = TCHAR_TO_UTF8(*Data->ValueStr);
+					std::regex Pattern(
+						R"(\{\s*)"                                                   //{
+						R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*,\s*)"          // x,
+						R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*,\s*)"          // y,
+						R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*\})"            // z}
+					);
+					std::smatch Match;
+					if (std::regex_search(Str, Match, Pattern) && Match.size() == 4)
+					{
+						float X = std::stof(Match[1].str());
+						float Y = std::stof(Match[2].str());
+						float Z = std::stof(Match[3].str());
+						return FLinearColor{ X, Y, Z };
+					}
+				}
+				else if (Data->Dirty)
+				{
+					return FLinearColor{ 1,1,1,0.2f };
+				}
+				
+				return FAppStyle::Get().GetBrush("Brushes.Panel")->TintColor.GetSpecifiedColor();
+			}));
+
 			InternalBorder->SetContent(SNew(STextBlock).Font(Owner->Font).Text(FText::FromString(Data->ValueStr)));
 			InternalBorder->SetToolTipText(FText::FromString(Data->ValueStr));
 		}
@@ -229,12 +267,12 @@ namespace SH
 
 	void SDebuggerVariableView::SetVariableNodeDatas(const TArray<ExpressionNodePtr>& InDatas)
 	{
-		TMap<FString, bool> ExpansionStates;
-		SaveExpansionStates(VariableNodeDatas, ExpansionStates);
+		TMap<FString, ExpressionNodePersistantState> PersistantStates;
+		SavePersistantStates(VariableNodeDatas, PersistantStates);
 
 		VariableNodeDatas = InDatas;
 
-		RestoreExpansionStates(VariableNodeDatas, ExpansionStates);
+		RestorePersistantStates(VariableNodeDatas, PersistantStates);
 		RefreshExpansions();
 		VariableTreeView->RequestTreeRefresh();
 	}

@@ -3,6 +3,9 @@
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "UI/Widgets/Misc/MiscWidget.h"
 #include "Editor/DebuggerViewCommands.h"
+#include <regex>
+
+using namespace FW;
 
 namespace SH
 {
@@ -18,8 +21,13 @@ namespace SH
 		UICommandList->MapAction(
 			DebuggerViewCommands::Get().Delete,
 			FExecuteAction::CreateLambda([this]{
-				ExpressionNodePtr SelectedItem = ExpressionTreeView->GetSelectedItems()[0];
-				ExpressionNodeDatas.Remove(SelectedItem);
+				for (ExpressionNodePtr SelectedItem : ExpressionTreeView->GetSelectedItems())
+				{
+					if (!SelectedItem->Expr.IsEmpty())
+					{
+						ExpressionNodeDatas.Remove(SelectedItem);
+					}
+				}
 				ExpressionTreeView->RequestTreeRefresh();
 			})
 		);
@@ -29,23 +37,18 @@ namespace SH
 			SAssignNew(ExpressionTreeView, STreeView<ExpressionNodePtr>)
 			.AllowOverscroll(EAllowOverscroll::No)
 			.TreeItemsSource(&ExpressionNodeDatas)
-			.SelectionMode(ESelectionMode::Single)
 			.OnGenerateRow(this, &SDebuggerWatchView::OnGenerateRow)
 			.OnGetChildren(this, &SDebuggerWatchView::OnGetChildren)
 			.OnExpansionChanged_Lambda([this](ExpressionNodePtr InData, bool bExpanded){
-				InData->Expanded = bExpanded;
+				InData->PersistantState.Expanded = bExpanded;
 			})
 			.OnContextMenuOpening_Lambda([this]{
 				if(ExpressionTreeView->GetSelectedItems().Num() > 0)
 				{
-					ExpressionNodePtr SelectedItem = ExpressionTreeView->GetSelectedItems()[0];
-					if(!SelectedItem->Expr.IsEmpty())
-					{
-						FMenuBuilder MenuBuilder{ true, UICommandList };
-						MenuBuilder.AddMenuEntry(DebuggerViewCommands::Get().Delete, NAME_None, {}, {},
-							FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "GenericCommands.Delete" });
-						return MenuBuilder.MakeWidget();
-					}
+					FMenuBuilder MenuBuilder{ true, UICommandList };
+					MenuBuilder.AddMenuEntry(DebuggerViewCommands::Get().Delete, NAME_None, {}, {},
+						FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "GenericCommands.Delete" });
+					return MenuBuilder.MakeWidget();
 				}
 				return SNullWidget::NullWidget;
 			})
@@ -59,6 +62,28 @@ namespace SH
 				+ SHeaderRow::Column(ValueColId)
 				.FillWidth(0.6f)
 				.DefaultLabel(LOCALIZATION(ValueColId.ToString()))
+				.HeaderContent()
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					.VAlign(VAlign_Center)
+					[
+						SNew(STextBlock).Text(LOCALIZATION(ValueColId.ToString()))
+					]
+					+ SHorizontalBox::Slot()
+					.Padding(0, 0, 4, 0)
+					.HAlign(HAlign_Right)
+					.VAlign(VAlign_Center)
+					.AutoWidth()
+					[
+						SNew(SShToggleButton).Icon(FAppStyle::Get().GetBrush("ColorPicker.Mode"))
+						.ToolTipText(LOCALIZATION("DisplayColorBlock"))
+						.IsChecked_Lambda([this] { return DebuggerViewDisplayColorBlock ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
+						.OnCheckStateChanged_Lambda([this](ECheckBoxState InState) {
+							DebuggerViewDisplayColorBlock = InState == ECheckBoxState::Checked ? true : false;
+						})
+					]
+				]
 				+ SHeaderRow::Column(TypeColId)
 				.FillWidth(0.2f)
 				.DefaultLabel(LOCALIZATION(TypeColId.ToString()))
@@ -121,20 +146,32 @@ namespace SH
 		else if(ColumnId == ValueColId)
 		{
 			Border->SetPadding(FMargin{1, 0, 1, 2});
+			InternalBorder->SetBorderImage(FAppStyle::Get().GetBrush("Brushes.White"));
+			InternalBorder->SetBorderBackgroundColor(TAttribute<FSlateColor>::CreateLambda([this] {
+				if (DebuggerViewDisplayColorBlock && Data->TypeName == "float3")
+				{
+					std::string Str = TCHAR_TO_UTF8(*Data->ValueStr);
+					std::regex Pattern(
+						R"(\{\s*)"                                                   //{
+						R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*,\s*)"          // x,
+						R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*,\s*)"          // y,
+						R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*\})"            // z}
+					);
+					std::smatch Match;
+					if (std::regex_search(Str, Match, Pattern) && Match.size() == 4)
+					{
+						float X = std::stof(Match[1].str());
+						float Y = std::stof(Match[2].str());
+						float Z = std::stof(Match[3].str());
+						return FLinearColor{ X, Y, Z };
+					}
+				}
+				else if (Data->Dirty)
+				{
+					return FLinearColor{ 1,1,1,0.2f };
+				}
 
-			InternalBorder->SetBorderImage(TAttribute<const FSlateBrush*>::CreateLambda([this]{
-				if(Data->Dirty)
-				{
-					return FAppStyle::Get().GetBrush("Brushes.White");
-				}
-				return FAppStyle::Get().GetBrush("Brushes.Panel");
-			}));
-			InternalBorder->SetBorderBackgroundColor(TAttribute<FSlateColor>::CreateLambda([this]{
-				if(Data->Dirty)
-				{
-					return FLinearColor{1,1,1,0.2f};
-				}
-				return FLinearColor::White;
+				return FAppStyle::Get().GetBrush("Brushes.Panel")->TintColor.GetSpecifiedColor();
 			}));
 			InternalBorder->SetContent(SNew(STextBlock).Text_Lambda([this] {
 				return FText::FromString(Data->ValueStr);

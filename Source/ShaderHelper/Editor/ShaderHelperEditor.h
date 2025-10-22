@@ -64,8 +64,7 @@ namespace SH
 		SDebuggerVariableView* GetDebuggerGlobalVariableView() const { return DebuggerGlobalVariableView.Get(); }
 		SDebuggerCallStackView* GetDebuggerCallStackView() const { return DebuggerCallStackView.Get(); }
 		SDebuggerWatchView* GetDebuggerWatchView() const { return DebuggerWatchView.Get(); }
-		TSharedPtr<SWindow> GetDebuggerTipWindow() const { return DebuggerTipWindow; }
-		SDebuggerVariableView* GetDebuggerTipVariableView() const { return DebuggerTipVariableView.Get(); }
+		TSharedPtr<SWindow> GetShaderEditorTipWindow() const { return ShaderEditorTipWindow; }
 		FW::SGraphPanel* GetGraphPanel() const { return GraphPanel.Get(); }
 		FW::SAssetBrowser* GetAssetBrowser() const { return AssetBrowser.Get(); }
 		void InvokeDebuggerTabs();
@@ -152,8 +151,7 @@ namespace SH
 		TSharedPtr<SDebuggerCallStackView> DebuggerCallStackView;
 		TSharedPtr<SDebuggerWatchView> DebuggerWatchView;
 		TSharedPtr<SDebuggerViewport> DebuggerViewport;
-		TSharedPtr<SWindow> DebuggerTipWindow;
-		TSharedPtr<SDebuggerVariableView> DebuggerTipVariableView;
+		TSharedPtr<SWindow> ShaderEditorTipWindow;
 		DebuggableObject* CurDebuggableObject = nullptr;
 		bool IsDebugging{};
 	};
