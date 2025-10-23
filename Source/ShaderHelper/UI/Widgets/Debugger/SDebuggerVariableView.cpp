@@ -258,6 +258,10 @@ namespace SH
 					{
 						W = std::stof(Match[4].str());
 					}
+					X = FMath::Clamp(X, 0.0f, 1.0f);
+					Y = FMath::Clamp(Y, 0.0f, 1.0f);
+					Z = FMath::Clamp(Z, 0.0f, 1.0f);
+					W = FMath::Clamp(W, 0.0f, 1.0f);
 				}
 				InternalBorder->SetContent(
 					SNew(SOverlay)

@@ -3663,12 +3663,12 @@ constexpr int PaddingLineNum = 22;
 				GetTextLine(CurrentHoverLocation.GetLineIndex(), CurTextLine);
 				std::string Str = TCHAR_TO_UTF8(*CurTextLine);
 				std::regex Pattern(
-					R"(\(\s*)"                                                // (
-					R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*,\s*)"        // X
-					R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*,\s*)"        // Y
-					R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*)"            // z
-					R"((?:\s*,\s*([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?))?)"   // optional w
-					R"(\s*\))"                                                // )
+					R"(\(\s*)"                                                           // (
+					R"(([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?[fF]?)\s*,\s*)"         // X
+					R"(([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?[fF]?)\s*,\s*)"         // Y
+					R"(([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?[fF]?)\s*)"             // z
+					R"((?:\s*,\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?[fF]?))?)"    // optional w
+					R"(\s*\))"                                                           // )
 				);
 				std::smatch Match;
 				static FTextLocation LastMatchedPos;
@@ -3692,6 +3692,10 @@ constexpr int PaddingLineNum = 22;
 							{
 								W = std::stof(Match[4].str());
 							}
+							X = FMath::Clamp(X, 0.0f, 1.0f);
+							Y = FMath::Clamp(Y, 0.0f, 1.0f);
+							Z = FMath::Clamp(Z, 0.0f, 1.0f);
+							W = FMath::Clamp(W, 0.0f, 1.0f);
 							FVector2D BlockBeginPos = Owner->ShaderMarshaller->TextLayout->GetLocationAt(CurMatchedPos, true) / AllottedGeometry.Scale;
 							FVector2D BlockEndPos = Owner->ShaderMarshaller->TextLayout->GetLocationAt({ CurrentHoverLocation.GetLineIndex(), (int32)Match.position(0) + (int32)Match.length(0) }, true) / AllottedGeometry.Scale;
 							FVector2D BlockBeginScreenPos = AllottedGeometry.LocalToAbsolute(BlockBeginPos);
