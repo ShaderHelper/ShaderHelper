@@ -20,6 +20,7 @@
 #include "Editor/AssetEditor/AssetEditor.h"
 #include "GpuApi/Spirv/SpirvExpressionVM.h"
 #include "Common/Path/BaseResourcePath.h"
+#include <Widgets/Colors/SColorBlock.h>
 #include <regex>
 
 //No exposed methods, and too lazy to modify the source code for UE.
@@ -3533,7 +3534,7 @@ constexpr int PaddingLineNum = 22;
 
 		FVector2D ScreenSpaceCursorPos = FSlateApplication::Get().GetCursorPos();
 		FGeometry WindowGeometry = ShaderEditorTipWindow->GetWindowGeometryInScreen();
-		bool bMouseInTipWindow = WindowGeometry.IsUnderLocation(ScreenSpaceCursorPos);
+		bool bMouseInTipWindow = ShaderEditorTipWindow->IsVisible() && WindowGeometry.IsUnderLocation(ScreenSpaceCursorPos);
 
 		static double LastCheckTime = 0.0;
 		const double CheckInterval = 0.4;
@@ -3631,8 +3632,7 @@ constexpr int PaddingLineNum = 22;
 						.HasHeaderRow(false);
 					VarView->SetVariableNodeDatas({ HoverExpr });
 					ShaderEditorTipWindow->SetContent(VarView);
-					ShaderEditorTipWindow->SlatePrepass();
-					ShaderEditorTipWindow->Resize(ShaderEditorTipWindow->GetDesiredSize());
+					ShaderEditorTipWindow->Resize(FVector2D::ZeroVector);
 					ShaderEditorTipWindow->ShowWindow();
 					FVector2D BlockPos = Owner->ShaderMarshaller->TextLayout->GetLocationAt({ CurrentHoverLocation.GetLineIndex(), CurrentTokenBeginOffset }, true) / AllottedGeometry.Scale;
 					FVector2D BlockScreenPos = AllottedGeometry.LocalToAbsolute(BlockPos);
@@ -3663,46 +3663,56 @@ constexpr int PaddingLineNum = 22;
 				GetTextLine(CurrentHoverLocation.GetLineIndex(), CurTextLine);
 				std::string Str = TCHAR_TO_UTF8(*CurTextLine);
 				std::regex Pattern(
-					R"(float3\s*)"
-					R"((\()"
-					R"(\s*([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*,\s*)"
-					R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*,\s*)"
-					R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*)"
-					R"(\)))"
+					R"(\(\s*)"                                                // (
+					R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*,\s*)"        // X
+					R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*,\s*)"        // Y
+					R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*)"            // z
+					R"((?:\s*,\s*([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?))?)"   // optional w
+					R"(\s*\))"                                                // )
 				);
 				std::smatch Match;
 				static FTextLocation LastMatchedPos;
 				static std::string LastMatchedStr;
-				if (std::regex_search(Str, Match, Pattern) && Match.size() == 5)
+				if (std::regex_search(Str, Match, Pattern) && Match.size() >= 4)
 				{
-					if (CurrentHoverLocation.GetOffset() >= Match.position(1) &&
-						CurrentHoverLocation.GetOffset() < Match.position(1) + Match.length(0))
+					if (CurrentHoverLocation.GetOffset() >= Match.position(0) &&
+						CurrentHoverLocation.GetOffset() < Match.position(0) + Match.length(0))
 					{
-						FTextLocation CurMatchedPos = { CurrentHoverLocation.GetLineIndex(), (int32)Match.position(1) };
-						std::string CurMatchedStr = Match[1].str();
+						FTextLocation CurMatchedPos = { CurrentHoverLocation.GetLineIndex(), (int32)Match.position(0) };
+						std::string CurMatchedStr = Match[0].str();
 						if (LastMatchedPos != CurMatchedPos || LastMatchedStr != CurMatchedStr)
 						{
 							LastMatchedPos = CurMatchedPos;
 							LastMatchedStr = CurMatchedStr;
-							float X = std::stof(Match[2].str());
-							float Y = std::stof(Match[3].str());
-							float Z = std::stof(Match[4].str());
+							float X = std::stof(Match[1].str());
+							float Y = std::stof(Match[2].str());
+							float Z = std::stof(Match[3].str());
+							float W = 1.0f;
+							if (Match.size() > 4 && Match[4].matched && Match[4].length() > 0)
+							{
+								W = std::stof(Match[4].str());
+							}
 							FVector2D BlockBeginPos = Owner->ShaderMarshaller->TextLayout->GetLocationAt(CurMatchedPos, true) / AllottedGeometry.Scale;
-							FVector2D BlockEndPos = Owner->ShaderMarshaller->TextLayout->GetLocationAt({ CurrentHoverLocation.GetLineIndex(), (int32)Match.position(1) + (int32)Match.length(1) }, true) / AllottedGeometry.Scale;
+							FVector2D BlockEndPos = Owner->ShaderMarshaller->TextLayout->GetLocationAt({ CurrentHoverLocation.GetLineIndex(), (int32)Match.position(0) + (int32)Match.length(0) }, true) / AllottedGeometry.Scale;
 							FVector2D BlockBeginScreenPos = AllottedGeometry.LocalToAbsolute(BlockBeginPos);
 							auto ColorBlock = SNew(SBox)
 								.WidthOverride(BlockEndPos.X - BlockBeginPos.X)
 								.HeightOverride(SShaderEditorBox::GetFontSize() + 4)
 								[
-									SNew(SBorder) 
+									SNew(SBorder)
 									[
-										SNew(SBorder).BorderImage(FAppStyle::Get().GetBrush("Brushes.White"))
-										.BorderBackgroundColor(FLinearColor{ X, Y, Z })
+										SNew(SColorBlock)
+										.AlphaDisplayMode(EColorBlockAlphaDisplayMode::Separate)
+										.ShowBackgroundForAlpha(true)
+										.Color(FLinearColor{ X, Y, Z, W})
+										.UseSRGB(false) //TODO
+										.OnMouseButtonDown_Lambda([](const FGeometry&, const FPointerEvent& MouseEvent) {
+											return FReply::Handled();
+										})
 									]
 								];
 							ShaderEditorTipWindow->SetContent(ColorBlock);
-							ShaderEditorTipWindow->SlatePrepass();
-							ShaderEditorTipWindow->Resize(ShaderEditorTipWindow->GetDesiredSize());
+							ShaderEditorTipWindow->Resize(FVector2D::ZeroVector);
 							ShaderEditorTipWindow->ShowWindow();
 							ShaderEditorTipWindow->MoveWindowTo(BlockBeginScreenPos);
 						}

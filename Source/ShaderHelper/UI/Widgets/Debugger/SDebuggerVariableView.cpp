@@ -3,6 +3,7 @@
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/Misc/MiscWidget.h"
+#include <Widgets/Colors/SColorBlock.h>
 #include <regex>
 
 using namespace FW;
@@ -228,33 +229,58 @@ namespace SH
 			Border->SetPadding(FMargin{1, 0, 1, 2});
 			InternalBorder->SetBorderImage(FAppStyle::Get().GetBrush("Brushes.White"));
 			InternalBorder->SetBorderBackgroundColor(TAttribute<FSlateColor>::CreateLambda([this] {
-				if (DebuggerViewDisplayColorBlock && Data->TypeName == "float3")
-				{
-					std::string Str = TCHAR_TO_UTF8(*Data->ValueStr);
-					std::regex Pattern(
-						R"(\{\s*)"                                                   //{
-						R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*,\s*)"          // x,
-						R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*,\s*)"          // y,
-						R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*\})"            // z}
-					);
-					std::smatch Match;
-					if (std::regex_search(Str, Match, Pattern) && Match.size() == 4)
-					{
-						float X = std::stof(Match[1].str());
-						float Y = std::stof(Match[2].str());
-						float Z = std::stof(Match[3].str());
-						return FLinearColor{ X, Y, Z };
-					}
-				}
-				else if (Data->Dirty)
+				if (Data->Dirty)
 				{
 					return FLinearColor{ 1,1,1,0.2f };
 				}
-				
 				return FAppStyle::Get().GetBrush("Brushes.Panel")->TintColor.GetSpecifiedColor();
 			}));
 
-			InternalBorder->SetContent(SNew(STextBlock).Font(Owner->Font).Text(FText::FromString(Data->ValueStr)));
+			if (Data->TypeName == "float3" || Data->TypeName == "float4")
+			{
+				std::string Str = TCHAR_TO_UTF8(*Data->ValueStr);
+				std::regex Pattern(
+					R"(\{\s*)"                                                  // {
+					R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*,\s*)"          // x
+					R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*,\s*)"          // y
+					R"(([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?)\s*)"              // z
+					R"((?:\s*,\s*([+-]?\d+\.?\d*(?:[eE][+-]?\d+)?[fF]?))?)"     // optional w
+					R"(\})"                                                     // }
+				);
+				std::smatch Match;
+				float X = 1.0f, Y = 1.0f, Z = 1.0f, W = 1.0f;
+				if (std::regex_search(Str, Match, Pattern) && Match.size() >= 4)
+				{
+					X = std::stof(Match[1].str());
+					Y = std::stof(Match[2].str());
+					Z = std::stof(Match[3].str());
+					if (Match.size() > 4 && Match[4].matched && Match[4].length() > 0)
+					{
+						W = std::stof(Match[4].str());
+					}
+				}
+				InternalBorder->SetContent(
+					SNew(SOverlay)
+					+SOverlay::Slot()
+					[
+						SNew(SColorBlock)
+						.AlphaDisplayMode(EColorBlockAlphaDisplayMode::Separate)
+						.Visibility_Lambda([] { return DebuggerViewDisplayColorBlock ? EVisibility::Visible : EVisibility::Hidden; })
+						.ShowBackgroundForAlpha(true)
+						.Color(FLinearColor{ X, Y, Z, W })
+						.UseSRGB(false)
+					]
+					+SOverlay::Slot()
+					[
+						SNew(STextBlock).Font(Owner->Font).Text(FText::FromString(Data->ValueStr))
+					]
+				);
+			}
+			else
+			{
+				InternalBorder->SetContent(SNew(STextBlock).Font(Owner->Font).Text(FText::FromString(Data->ValueStr)));
+			}
+
 			InternalBorder->SetToolTipText(FText::FromString(Data->ValueStr));
 		}
 		else

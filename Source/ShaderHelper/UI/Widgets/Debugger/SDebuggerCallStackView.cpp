@@ -63,6 +63,7 @@ namespace SH
 		{
 			Border->SetPadding(FMargin{1, 0, 1, 2});
 			InternalBorder->SetContent(SNew(STextBlock).Text(FText::FromString(Data->Name)));
+			InternalBorder->SetToolTipText(FText::FromString(Data->Name));
 		}
 		else if(ColumnId == LocationColId)
 		{
