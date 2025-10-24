@@ -362,6 +362,17 @@ namespace SH
 			})
 		];
 
+		AppendCodeEditorItem(CodeEditorGrid, LOCALIZATION("ShowColorBlock"), LOCALIZATION("ShowColorBlockTip"))
+		[
+			SNew(SCheckBox).IsChecked_Lambda([] {
+				return SShaderEditorBox::CanShowColorBlock() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;;
+			})
+			.OnCheckStateChanged_Lambda([](ECheckBoxState InState) {
+				Editor::GetEditorConfig()->SetBool(TEXT("CodeEditor"), TEXT("ShowColorBlock"), InState == ECheckBoxState::Checked);
+				Editor::SaveEditorConfig();
+			})
+		];
+
 		auto FontPathEditBox = SNew(SEditableTextBox).Text_Lambda([] {
 				return FText::FromString(SShaderEditorBox::GetFontPath());
 			})

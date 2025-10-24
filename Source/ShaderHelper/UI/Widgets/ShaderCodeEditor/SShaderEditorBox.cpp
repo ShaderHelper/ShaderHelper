@@ -21,6 +21,7 @@
 #include "GpuApi/Spirv/SpirvExpressionVM.h"
 #include "Common/Path/BaseResourcePath.h"
 #include <Widgets/Colors/SColorBlock.h>
+#include "UI/Widgets/ColorPicker/SColorPicker.h"
 #include <regex>
 
 //No exposed methods, and too lazy to modify the source code for UE.
@@ -200,6 +201,13 @@ constexpr int PaddingLineNum = 22;
 		bool MouseWheelZoom = true;
 		Editor::GetEditorConfig()->GetBool(TEXT("CodeEditor"), TEXT("MouseWheelZoom"), MouseWheelZoom);
 		return MouseWheelZoom;
+	}
+
+	bool SShaderEditorBox::CanShowColorBlock()
+	{
+		bool ShowColorBlock = true;
+		Editor::GetEditorConfig()->GetBool(TEXT("CodeEditor"), TEXT("ShowColorBlock"), ShowColorBlock);
+		return ShowColorBlock;
 	}
 
 	FSlateFontInfo& SShaderEditorBox::GetCodeFontInfo()
@@ -958,7 +966,7 @@ constexpr int PaddingLineNum = 22;
 					ShaderMarshaller->TextLayout->GetTextOffsetLocations(BeforeOffsetLocations);
 					Lines.Insert(MovedLines[Index], StartLineIndex - 1);
 					//TextLayout does not provide an API to insert a single line. 
-					//To perform the insertion while preserving the UndoState, call OnAddLine() manually here.
+					//To perform the insertion while preserving edit commands for an undo state, call OnAddLine() manually here.
 					ShaderMarshaller->TextLayout->OnAddLine(StartLineIndex - 1, *MovedLines[Index].Text, BeforeOffsetLocations);
 				}
 
@@ -3654,6 +3662,11 @@ constexpr int PaddingLineNum = 22;
 		};
 
 		auto CheckColorBlockTip = [&] {
+			if (!SShaderEditorBox::CanShowColorBlock())
+			{
+				return false;
+			}
+
 			if (AllottedGeometry.IsUnderLocation(ScreenSpaceCursorPos))
 			{
 				FVector2D LocalSpaceCursorPos = AllottedGeometry.AbsoluteToLocal(ScreenSpaceCursorPos);
@@ -3688,7 +3701,8 @@ constexpr int PaddingLineNum = 22;
 							float Y = std::stof(Match[2].str());
 							float Z = std::stof(Match[3].str());
 							float W = 1.0f;
-							if (Match.size() > 4 && Match[4].matched && Match[4].length() > 0)
+							bool HasAlpha = Match.size() > 4 && Match[4].matched && Match[4].length() > 0;
+							if (HasAlpha)
 							{
 								W = std::stof(Match[4].str());
 							}
@@ -3710,7 +3724,51 @@ constexpr int PaddingLineNum = 22;
 										.ShowBackgroundForAlpha(true)
 										.Color(FLinearColor{ X, Y, Z, W})
 										.UseSRGB(false) //TODO
-										.OnMouseButtonDown_Lambda([](const FGeometry&, const FPointerEvent& MouseEvent) {
+										.OnMouseButtonDown_Lambda([=](const FGeometry&, const FPointerEvent& MouseEvent) {
+											ShaderEditorTipWindow->SetContent(
+												SNew(SColorPicker)
+												.TargetColorAttribute(FLinearColor{ X, Y, Z, W })
+												.ShowAlpha(HasAlpha)
+												.OnColorChanged_Lambda([CurrentHoverLocation, Pattern, this](const FLinearColor& InColor) {
+													//Modify LineModel directly instead of calling BeginTransaction/EndTransaction to avoid pushing an undo state.
+													auto& Lines = Owner->ShaderMarshaller->TextLayout->GetLineModels();
+													auto& ColorBlockLineModel = Lines[CurrentHoverLocation.GetLineIndex()];
+													FString& LineText = *ColorBlockLineModel.Text;
+													std::string Str = TCHAR_TO_UTF8(*LineText);
+													std::smatch Match;
+													if (std::regex_search(Str, Match, Pattern) && Match.size() >= 4)
+													{
+														bool HasAlpha = Match.size() > 4 && Match[4].matched && Match[4].length() > 0;
+														FString NewColorStr;
+														if (HasAlpha)
+															NewColorStr = FString::Printf(TEXT("(%.3f, %.3f, %.3f, %.3f)"), InColor.R, InColor.G, InColor.B, InColor.A);
+														else
+															NewColorStr = FString::Printf(TEXT("(%.3f, %.3f, %.3f)"), InColor.R, InColor.G, InColor.B);
+
+														int32 ReplacePos = (int32)Match.position(0);
+														int32 ReplaceLen = (int32)Match.length(0);
+														LineText = LineText.Left(ReplacePos) + NewColorStr + LineText.Mid(ReplacePos + ReplaceLen);
+														
+														ColorBlockLineModel.DirtyFlags |= FTextLayout::ELineModelDirtyState::All;
+														Owner->ShaderMarshaller->MakeDirty();
+														Owner->ShaderMultiLineEditableText->Refresh();
+													}
+												})
+												.OnDestroyed_Lambda([CurTextLine, CurrentHoverLocation, this] {
+													//Only manually push an an undo state here.
+													auto& Lines = Owner->ShaderMarshaller->TextLayout->GetLineModels();
+													auto& ColorBlockLineModel = Lines[CurrentHoverLocation.GetLineIndex()];
+													FString& LineText = *ColorBlockLineModel.Text;
+													if (CurTextLine != LineText)
+													{
+														auto NewUndoState = Owner->ShaderMultiLineEditableTextLayout->MakeUndoState();
+														NewUndoState->Commands.Add(MakeShared<FRemoveAtCmd>(FTextLocation{ CurrentHoverLocation.GetLineIndex(), 0 }, CurTextLine));
+														NewUndoState->Commands.Add(MakeShared<FInsertAtCmd>(FTextLocation{ CurrentHoverLocation.GetLineIndex(), 0 }, LineText));
+														Owner->ShaderMultiLineEditableTextLayout->PushUndoState(MoveTemp(NewUndoState));
+													}
+													
+												})
+											);
 											return FReply::Handled();
 										})
 									]
@@ -3742,6 +3800,7 @@ constexpr int PaddingLineNum = 22;
 		{
 			if (!CheckDebuggerTip() && !CheckColorBlockTip())
 			{
+				ShaderEditorTipWindow->SetContent(SNullWidget::NullWidget);
 				ShaderEditorTipWindow->HideWindow();
 			}
 			LastCheckTime = InCurrentTime;

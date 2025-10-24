@@ -191,6 +191,7 @@ namespace SH
 		static int32 GetFontSize();
 		static int32 GetTabSize();
 		static bool CanMouseWheelZoom();
+		static bool CanShowColorBlock();
 		static FSlateFontInfo& GetCodeFontInfo();
 		static constexpr int32 MinFontSize = 4;
 		void RefreshFont();

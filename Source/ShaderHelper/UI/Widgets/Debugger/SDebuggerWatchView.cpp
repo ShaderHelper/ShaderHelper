@@ -195,6 +195,7 @@ namespace SH
 						.UseSRGB(false)
 					]
 					+ SOverlay::Slot()
+					.VAlign(VAlign_Center)
 					[
 						SNew(STextBlock).Text(FText::FromString(Data->ValueStr))
 					]
