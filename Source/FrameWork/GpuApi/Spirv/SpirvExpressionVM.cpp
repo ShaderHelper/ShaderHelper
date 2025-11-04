@@ -8,7 +8,7 @@ namespace FW
 	, PixelExprContext(InPixelExprContext)
 	{}
 
-	void SpvVmPixelExprVisitor::Visit(SpvDebugDeclare* Inst)
+	void SpvVmPixelExprVisitor::Visit(const SpvDebugDeclare* Inst)
 	{
 		SpvVmVisitor::Visit(Inst);
 		
@@ -25,7 +25,7 @@ namespace FW
 		}
 	}
 
-	void SpvVmPixelExprVisitor::Visit(SpvOpStore* Inst)
+	void SpvVmPixelExprVisitor::Visit(const SpvOpStore* Inst)
 	{
 		SpvPointer* Pointer = GetPointer(Inst->GetPointer());
 		if(!Pointer->Pointee->InitializedRanges.IsEmpty())

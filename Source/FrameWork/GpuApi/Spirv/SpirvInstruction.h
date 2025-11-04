@@ -5,186 +5,186 @@
 namespace FW
 {
 	class SpvInstruction;
-	class SpvVisitor
+	class FRAMEWORK_API SpvVisitor
 	{
 	public:
-		virtual void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts) {}
-		
-		virtual void Visit(SpvInstruction*) {}
+		virtual ~SpvVisitor() = default;
+		virtual void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections) {}
+		virtual void Visit(const SpvInstruction*) {}
 		
 		//Core
-		virtual void Visit(class SpvOpEntryPoint* Inst) {}
-		virtual void Visit(class SpvOpExecutionMode* Inst) {}
-		virtual void Visit(class SpvOpName* Inst) {}
-		virtual void Visit(class SpvOpString* Inst) {}
-		virtual void Visit(class SpvOpDecorate* Inst) {}
-		virtual void Visit(class SpvOpMemberDecorate* Inst) {}
-		virtual void Visit(class SpvOpTypeVoid* Inst) {}
-		virtual void Visit(class SpvOpTypeBool* Inst) {}
-		virtual void Visit(class SpvOpTypeFloat* Inst) {}
-		virtual void Visit(class SpvOpTypeInt* Inst) {}
-		virtual void Visit(class SpvOpTypeVector* Inst) {}
-		virtual void Visit(class SpvOpTypeMatrix* Inst) {}
-		virtual void Visit(class SpvOpTypePointer* Inst) {}
-		virtual void Visit(class SpvOpTypeStruct* Inst) {}
-		virtual void Visit(class SpvOpTypeImage* Inst) {}
-		virtual void Visit(class SpvOpTypeSampler* Inst) {}
-		virtual void Visit(class SpvOpTypeArray* Inst) {}
-		virtual void Visit(class SpvOpTypeRuntimeArray* Inst) {}
+		virtual void Visit(const class SpvOpEntryPoint* Inst) {}
+		virtual void Visit(const class SpvOpExecutionMode* Inst) {}
+		virtual void Visit(const class SpvOpName* Inst) {}
+		virtual void Visit(const class SpvOpString* Inst) {}
+		virtual void Visit(const class SpvOpDecorate* Inst) {}
+		virtual void Visit(const class SpvOpMemberDecorate* Inst) {}
+		virtual void Visit(const class SpvOpTypeVoid* Inst) {}
+		virtual void Visit(const class SpvOpTypeBool* Inst) {}
+		virtual void Visit(const class SpvOpTypeFloat* Inst) {}
+		virtual void Visit(const class SpvOpTypeInt* Inst) {}
+		virtual void Visit(const class SpvOpTypeVector* Inst) {}
+		virtual void Visit(const class SpvOpTypeMatrix* Inst) {}
+		virtual void Visit(const class SpvOpTypePointer* Inst) {}
+		virtual void Visit(const class SpvOpTypeStruct* Inst) {}
+		virtual void Visit(const class SpvOpTypeImage* Inst) {}
+		virtual void Visit(const class SpvOpTypeSampler* Inst) {}
+		virtual void Visit(const class SpvOpTypeArray* Inst) {}
+		virtual void Visit(const class SpvOpTypeRuntimeArray* Inst) {}
 		
-		virtual void Visit(class SpvOpConstant* Inst) {}
-		virtual void Visit(class SpvOpConstantTrue* Inst) {}
-		virtual void Visit(class SpvOpConstantFalse* Inst) {}
-		virtual void Visit(class SpvOpConstantComposite* Inst) {}
-		virtual void Visit(class SpvOpConstantNull* Inst) {}
-		virtual void Visit(class SpvOpFunction* Inst) {}
-		virtual void Visit(class SpvOpFunctionParameter* Inst) {}
-		virtual void Visit(class SpvOpFunctionCall* Inst) {}
-		virtual void Visit(class SpvOpVariable* Inst) {}
-		virtual void Visit(class SpvOpPhi* Inst) {}
-		virtual void Visit(class SpvOpLabel* Inst) {}
-		virtual void Visit(class SpvOpLoad* Inst) {}
-		virtual void Visit(class SpvOpStore* Inst) {}
-		virtual void Visit(class SpvOpVectorShuffle* Inst) {}
-		virtual void Visit(class SpvOpCompositeConstruct* Inst) {}
-		virtual void Visit(class SpvOpCompositeExtract* Inst) {}
-		virtual void Visit(class SpvOpTranspose* Inst) {}
-		virtual void Visit(class SpvOpAccessChain* Inst) {}
-		virtual void Visit(class SpvOpSampledImage* Inst) {}
-		virtual void Visit(class SpvOpImageSampleImplicitLod* Inst) {}
-		virtual void Visit(class SpvOpImageFetch* Inst) {}
-		virtual void Visit(class SpvOpImageQuerySizeLod* Inst) {}
-		virtual void Visit(class SpvOpImageQueryLevels* Inst) {}
-		virtual void Visit(class SpvOpVectorTimesScalar* Inst) {}
-		virtual void Visit(class SpvOpMatrixTimesScalar* Inst) {}
-		virtual void Visit(class SpvOpVectorTimesMatrix* Inst) {}
-		virtual void Visit(class SpvOpMatrixTimesVector* Inst) {}
-		virtual void Visit(class SpvOpMatrixTimesMatrix* Inst) {}
-		virtual void Visit(class SpvOpDot* Inst) {}
-		virtual void Visit(class SpvOpAny* Inst) {}
-		virtual void Visit(class SpvOpAll* Inst) {}
-		virtual void Visit(class SpvOpIsNan* Inst) {}
-		virtual void Visit(class SpvOpIsInf* Inst) {}
-		virtual void Visit(class SpvOpLogicalOr* Inst) {}
-		virtual void Visit(class SpvOpLogicalAnd* Inst) {}
-		virtual void Visit(class SpvOpLogicalNot* Inst) {}
-		virtual void Visit(class SpvOpSelect* Inst) {}
-		virtual void Visit(class SpvOpIEqual* Inst) {}
-		virtual void Visit(class SpvOpINotEqual* Inst) {}
-		virtual void Visit(class SpvOpUGreaterThan* Inst) {}
-		virtual void Visit(class SpvOpSGreaterThan* Inst) {}
-		virtual void Visit(class SpvOpUGreaterThanEqual* Inst) {}
-		virtual void Visit(class SpvOpSGreaterThanEqual* Inst) {}
-		virtual void Visit(class SpvOpULessThan* Inst) {}
-		virtual void Visit(class SpvOpSLessThan* Inst) {}
-		virtual void Visit(class SpvOpULessThanEqual* Inst) {}
-		virtual void Visit(class SpvOpSLessThanEqual* Inst) {}
-		virtual void Visit(class SpvOpFOrdEqual* Inst) {}
-		virtual void Visit(class SpvOpFOrdNotEqual* Inst) {}
-		virtual void Visit(class SpvOpFOrdLessThan* Inst) {}
-		virtual void Visit(class SpvOpFOrdGreaterThan* Inst) {}
-		virtual void Visit(class SpvOpFOrdLessThanEqual* Inst) {}
-		virtual void Visit(class SpvOpFOrdGreaterThanEqual* Inst) {}
-		virtual void Visit(class SpvOpShiftRightLogical* Inst) {}
-		virtual void Visit(class SpvOpShiftRightArithmetic* Inst) {}
-		virtual void Visit(class SpvOpShiftLeftLogical* Inst) {}
-		virtual void Visit(class SpvOpBitwiseOr* Inst) {}
-		virtual void Visit(class SpvOpBitwiseXor* Inst) {}
-		virtual void Visit(class SpvOpBitwiseAnd* Inst) {}
-		virtual void Visit(class SpvOpConvertFToU* Inst) {}
-		virtual void Visit(class SpvOpConvertFToS* Inst) {}
-		virtual void Visit(class SpvOpConvertSToF* Inst) {}
-		virtual void Visit(class SpvOpConvertUToF* Inst) {}
-		virtual void Visit(class SpvOpBitcast* Inst) {}
-		virtual void Visit(class SpvOpSNegate* Inst) {}
-		virtual void Visit(class SpvOpFNegate* Inst) {}
-		virtual void Visit(class SpvOpIAdd* Inst) {}
-		virtual void Visit(class SpvOpFAdd* Inst) {}
-		virtual void Visit(class SpvOpISub* Inst) {}
-		virtual void Visit(class SpvOpFSub* Inst) {}
-		virtual void Visit(class SpvOpIMul* Inst) {}
-		virtual void Visit(class SpvOpFMul* Inst) {}
-		virtual void Visit(class SpvOpUDiv* Inst) {}
-		virtual void Visit(class SpvOpSDiv* Inst) {}
-		virtual void Visit(class SpvOpFDiv* Inst) {}
-		virtual void Visit(class SpvOpUMod* Inst) {}
-		virtual void Visit(class SpvOpSRem* Inst) {}
-		virtual void Visit(class SpvOpFRem* Inst) {}
-		virtual void Visit(class SpvOpNot* Inst) {}
-		virtual void Visit(class SpvOpDPdx* Inst) {}
-		virtual void Visit(class SpvOpDPdy* Inst) {}
-		virtual void Visit(class SpvOpFwidth* Inst) {}
-		virtual void Visit(class SpvOpBranch* Inst) {}
-		virtual void Visit(class SpvOpBranchConditional* Inst) {}
-		virtual void Visit(class SpvOpSwitch* Inst) {}
-		virtual void Visit(class SpvOpKill* Inst) {}
-		virtual void Visit(class SpvOpReturn* Inst) {}
-		virtual void Visit(class SpvOpReturnValue* Inst) {}
+		virtual void Visit(const class SpvOpConstant* Inst) {}
+		virtual void Visit(const class SpvOpConstantTrue* Inst) {}
+		virtual void Visit(const class SpvOpConstantFalse* Inst) {}
+		virtual void Visit(const class SpvOpConstantComposite* Inst) {}
+		virtual void Visit(const class SpvOpConstantNull* Inst) {}
+		virtual void Visit(const class SpvOpFunction* Inst) {}
+		virtual void Visit(const class SpvOpFunctionParameter* Inst) {}
+		virtual void Visit(const class SpvOpFunctionCall* Inst) {}
+		virtual void Visit(const class SpvOpVariable* Inst) {}
+		virtual void Visit(const class SpvOpPhi* Inst) {}
+		virtual void Visit(const class SpvOpLabel* Inst) {}
+		virtual void Visit(const class SpvOpLoad* Inst) {}
+		virtual void Visit(const class SpvOpStore* Inst) {}
+		virtual void Visit(const class SpvOpVectorShuffle* Inst) {}
+		virtual void Visit(const class SpvOpCompositeConstruct* Inst) {}
+		virtual void Visit(const class SpvOpCompositeExtract* Inst) {}
+		virtual void Visit(const class SpvOpTranspose* Inst) {}
+		virtual void Visit(const class SpvOpAccessChain* Inst) {}
+		virtual void Visit(const class SpvOpSampledImage* Inst) {}
+		virtual void Visit(const class SpvOpImageSampleImplicitLod* Inst) {}
+		virtual void Visit(const class SpvOpImageFetch* Inst) {}
+		virtual void Visit(const class SpvOpImageQuerySizeLod* Inst) {}
+		virtual void Visit(const class SpvOpImageQueryLevels* Inst) {}
+		virtual void Visit(const class SpvOpVectorTimesScalar* Inst) {}
+		virtual void Visit(const class SpvOpMatrixTimesScalar* Inst) {}
+		virtual void Visit(const class SpvOpVectorTimesMatrix* Inst) {}
+		virtual void Visit(const class SpvOpMatrixTimesVector* Inst) {}
+		virtual void Visit(const class SpvOpMatrixTimesMatrix* Inst) {}
+		virtual void Visit(const class SpvOpDot* Inst) {}
+		virtual void Visit(const class SpvOpAny* Inst) {}
+		virtual void Visit(const class SpvOpAll* Inst) {}
+		virtual void Visit(const class SpvOpIsNan* Inst) {}
+		virtual void Visit(const class SpvOpIsInf* Inst) {}
+		virtual void Visit(const class SpvOpLogicalOr* Inst) {}
+		virtual void Visit(const class SpvOpLogicalAnd* Inst) {}
+		virtual void Visit(const class SpvOpLogicalNot* Inst) {}
+		virtual void Visit(const class SpvOpSelect* Inst) {}
+		virtual void Visit(const class SpvOpIEqual* Inst) {}
+		virtual void Visit(const class SpvOpINotEqual* Inst) {}
+		virtual void Visit(const class SpvOpUGreaterThan* Inst) {}
+		virtual void Visit(const class SpvOpSGreaterThan* Inst) {}
+		virtual void Visit(const class SpvOpUGreaterThanEqual* Inst) {}
+		virtual void Visit(const class SpvOpSGreaterThanEqual* Inst) {}
+		virtual void Visit(const class SpvOpULessThan* Inst) {}
+		virtual void Visit(const class SpvOpSLessThan* Inst) {}
+		virtual void Visit(const class SpvOpULessThanEqual* Inst) {}
+		virtual void Visit(const class SpvOpSLessThanEqual* Inst) {}
+		virtual void Visit(const class SpvOpFOrdEqual* Inst) {}
+		virtual void Visit(const class SpvOpFOrdNotEqual* Inst) {}
+		virtual void Visit(const class SpvOpFOrdLessThan* Inst) {}
+		virtual void Visit(const class SpvOpFOrdGreaterThan* Inst) {}
+		virtual void Visit(const class SpvOpFOrdLessThanEqual* Inst) {}
+		virtual void Visit(const class SpvOpFOrdGreaterThanEqual* Inst) {}
+		virtual void Visit(const class SpvOpShiftRightLogical* Inst) {}
+		virtual void Visit(const class SpvOpShiftRightArithmetic* Inst) {}
+		virtual void Visit(const class SpvOpShiftLeftLogical* Inst) {}
+		virtual void Visit(const class SpvOpBitwiseOr* Inst) {}
+		virtual void Visit(const class SpvOpBitwiseXor* Inst) {}
+		virtual void Visit(const class SpvOpBitwiseAnd* Inst) {}
+		virtual void Visit(const class SpvOpConvertFToU* Inst) {}
+		virtual void Visit(const class SpvOpConvertFToS* Inst) {}
+		virtual void Visit(const class SpvOpConvertSToF* Inst) {}
+		virtual void Visit(const class SpvOpConvertUToF* Inst) {}
+		virtual void Visit(const class SpvOpBitcast* Inst) {}
+		virtual void Visit(const class SpvOpSNegate* Inst) {}
+		virtual void Visit(const class SpvOpFNegate* Inst) {}
+		virtual void Visit(const class SpvOpIAdd* Inst) {}
+		virtual void Visit(const class SpvOpFAdd* Inst) {}
+		virtual void Visit(const class SpvOpISub* Inst) {}
+		virtual void Visit(const class SpvOpFSub* Inst) {}
+		virtual void Visit(const class SpvOpIMul* Inst) {}
+		virtual void Visit(const class SpvOpFMul* Inst) {}
+		virtual void Visit(const class SpvOpUDiv* Inst) {}
+		virtual void Visit(const class SpvOpSDiv* Inst) {}
+		virtual void Visit(const class SpvOpFDiv* Inst) {}
+		virtual void Visit(const class SpvOpUMod* Inst) {}
+		virtual void Visit(const class SpvOpSRem* Inst) {}
+		virtual void Visit(const class SpvOpFRem* Inst) {}
+		virtual void Visit(const class SpvOpNot* Inst) {}
+		virtual void Visit(const class SpvOpDPdx* Inst) {}
+		virtual void Visit(const class SpvOpDPdy* Inst) {}
+		virtual void Visit(const class SpvOpFwidth* Inst) {}
+		virtual void Visit(const class SpvOpBranch* Inst) {}
+		virtual void Visit(const class SpvOpBranchConditional* Inst) {}
+		virtual void Visit(const class SpvOpSwitch* Inst) {}
+		virtual void Visit(const class SpvOpKill* Inst) {}
+		virtual void Visit(const class SpvOpReturn* Inst) {}
+		virtual void Visit(const class SpvOpReturnValue* Inst) {}
 		
 		//NonSemantic.Shader.DebugInfo.100
-		virtual void Visit(class SpvDebugTypeBasic* Inst) {}
-		virtual void Visit(class SpvDebugTypeVector* Inst) {}
-		virtual void Visit(class SpvDebugTypeMatrix* Inst) {}
-		virtual void Visit(class SpvDebugTypeComposite* Inst) {}
-		virtual void Visit(class SpvDebugTypeMember* Inst) {}
-		virtual void Visit(class SpvDebugTypeArray* Inst) {}
-		virtual void Visit(class SpvDebugTypeFunction* Inst) {}
-		virtual void Visit(class SpvDebugCompilationUnit* Inst) {}
-		virtual void Visit(class SpvDebugLexicalBlock* Inst) {}
-		virtual void Visit(class SpvDebugFunction* Inst) {}
-		virtual void Visit(class SpvDebugLine* Inst) {}
-		virtual void Visit(class SpvDebugScope* Inst) {}
-		virtual void Visit(class SpvDebugDeclare* Inst) {}
-		virtual void Visit(class SpvDebugValue* Inst) {}
-		virtual void Visit(class SpvDebugInlinedAt* Inst) {}
-		virtual void Visit(class SpvDebugLocalVariable* Inst) {}
-		virtual void Visit(class SpvDebugFunctionDefinition* Inst) {}
-		virtual void Visit(class SpvDebugGlobalVariable* Inst) {}
+		virtual void Visit(const class SpvDebugTypeBasic* Inst) {}
+		virtual void Visit(const class SpvDebugTypeVector* Inst) {}
+		virtual void Visit(const class SpvDebugTypeMatrix* Inst) {}
+		virtual void Visit(const class SpvDebugTypeComposite* Inst) {}
+		virtual void Visit(const class SpvDebugTypeMember* Inst) {}
+		virtual void Visit(const class SpvDebugTypeArray* Inst) {}
+		virtual void Visit(const class SpvDebugTypeFunction* Inst) {}
+		virtual void Visit(const class SpvDebugCompilationUnit* Inst) {}
+		virtual void Visit(const class SpvDebugLexicalBlock* Inst) {}
+		virtual void Visit(const class SpvDebugFunction* Inst) {}
+		virtual void Visit(const class SpvDebugLine* Inst) {}
+		virtual void Visit(const class SpvDebugScope* Inst) {}
+		virtual void Visit(const class SpvDebugDeclare* Inst) {}
+		virtual void Visit(const class SpvDebugValue* Inst) {}
+		virtual void Visit(const class SpvDebugInlinedAt* Inst) {}
+		virtual void Visit(const class SpvDebugLocalVariable* Inst) {}
+		virtual void Visit(const class SpvDebugFunctionDefinition* Inst) {}
+		virtual void Visit(const class SpvDebugGlobalVariable* Inst) {}
 		
 		//GLSL.std.450
-		virtual void Visit(class SpvRoundEven* Inst) {}
-		virtual void Visit(class SpvTrunc* Inst) {}
-		virtual void Visit(class SpvFAbs* Inst) {}
-		virtual void Visit(class SpvSAbs* Inst) {}
-		virtual void Visit(class SpvFSign* Inst) {}
-		virtual void Visit(class SpvSSign* Inst) {}
-		virtual void Visit(class SpvFloor* Inst) {}
-		virtual void Visit(class SpvCeil* Inst) {}
-		virtual void Visit(class SpvFract* Inst) {}
-		virtual void Visit(class SpvSin* Inst) {}
-		virtual void Visit(class SpvCos* Inst) {}
-		virtual void Visit(class SpvTan* Inst) {}
-		virtual void Visit(class SpvAsin* Inst) {}
-		virtual void Visit(class SpvAcos* Inst) {}
-		virtual void Visit(class SpvAtan* Inst) {}
-		virtual void Visit(class SpvPow* Inst) {}
-		virtual void Visit(class SpvExp* Inst) {}
-		virtual void Visit(class SpvLog* Inst) {}
-		virtual void Visit(class SpvExp2* Inst) {}
-		virtual void Visit(class SpvLog2* Inst) {}
-		virtual void Visit(class SpvSqrt* Inst) {}
-		virtual void Visit(class SpvInverseSqrt* Inst) {}
-		virtual void Visit(class SpvDeterminant* Isnt) {}
-		virtual void Visit(class SpvUMin* Inst) {}
-		virtual void Visit(class SpvSMin* Inst) {}
-		virtual void Visit(class SpvUMax* Inst) {}
-		virtual void Visit(class SpvSMax* Inst) {}
-		virtual void Visit(class SpvFClamp* Inst) {}
-		virtual void Visit(class SpvUClamp* Inst) {}
-		virtual void Visit(class SpvSClamp* Inst) {}
-		virtual void Visit(class SpvFMix* Inst) {}
-		virtual void Visit(class SpvStep* Inst) {}
-		virtual void Visit(class SpvSmoothStep* Inst) {}
-		virtual void Visit(class SpvPackHalf2x16* Inst) {}
-		virtual void Visit(class SpvUnpackHalf2x16* Inst) {}
-		virtual void Visit(class SpvLength* Inst) {}
-		virtual void Visit(class SpvDistance* Inst) {}
-		virtual void Visit(class SpvCross* Inst) {}
-		virtual void Visit(class SpvNormalize* Inst) {}
-		virtual void Visit(class SpvReflect* Inst) {}
-		virtual void Visit(class SpvRefract* Inst) {}
-		virtual void Visit(class SpvNMin* Inst) {}
-		virtual void Visit(class SpvNMax* Inst) {}
+		virtual void Visit(const class SpvRoundEven* Inst) {}
+		virtual void Visit(const class SpvTrunc* Inst) {}
+		virtual void Visit(const class SpvFAbs* Inst) {}
+		virtual void Visit(const class SpvSAbs* Inst) {}
+		virtual void Visit(const class SpvFSign* Inst) {}
+		virtual void Visit(const class SpvSSign* Inst) {}
+		virtual void Visit(const class SpvFloor* Inst) {}
+		virtual void Visit(const class SpvCeil* Inst) {}
+		virtual void Visit(const class SpvFract* Inst) {}
+		virtual void Visit(const class SpvSin* Inst) {}
+		virtual void Visit(const class SpvCos* Inst) {}
+		virtual void Visit(const class SpvTan* Inst) {}
+		virtual void Visit(const class SpvAsin* Inst) {}
+		virtual void Visit(const class SpvAcos* Inst) {}
+		virtual void Visit(const class SpvAtan* Inst) {}
+		virtual void Visit(const class SpvPow* Inst) {}
+		virtual void Visit(const class SpvExp* Inst) {}
+		virtual void Visit(const class SpvLog* Inst) {}
+		virtual void Visit(const class SpvExp2* Inst) {}
+		virtual void Visit(const class SpvLog2* Inst) {}
+		virtual void Visit(const class SpvSqrt* Inst) {}
+		virtual void Visit(const class SpvInverseSqrt* Inst) {}
+		virtual void Visit(const class SpvDeterminant* Isnt) {}
+		virtual void Visit(const class SpvUMin* Inst) {}
+		virtual void Visit(const class SpvSMin* Inst) {}
+		virtual void Visit(const class SpvUMax* Inst) {}
+		virtual void Visit(const class SpvSMax* Inst) {}
+		virtual void Visit(const class SpvFClamp* Inst) {}
+		virtual void Visit(const class SpvUClamp* Inst) {}
+		virtual void Visit(const class SpvSClamp* Inst) {}
+		virtual void Visit(const class SpvFMix* Inst) {}
+		virtual void Visit(const class SpvStep* Inst) {}
+		virtual void Visit(const class SpvSmoothStep* Inst) {}
+		virtual void Visit(const class SpvPackHalf2x16* Inst) {}
+		virtual void Visit(const class SpvUnpackHalf2x16* Inst) {}
+		virtual void Visit(const class SpvLength* Inst) {}
+		virtual void Visit(const class SpvDistance* Inst) {}
+		virtual void Visit(const class SpvCross* Inst) {}
+		virtual void Visit(const class SpvNormalize* Inst) {}
+		virtual void Visit(const class SpvReflect* Inst) {}
+		virtual void Visit(const class SpvRefract* Inst) {}
+		virtual void Visit(const class SpvNMin* Inst) {}
+		virtual void Visit(const class SpvNMax* Inst) {}
 	};
 
 	using SpvInstKind = std::variant<SpvOp, SpvGLSLstd450, SpvDebugInfo100>;
@@ -199,7 +199,8 @@ namespace FW
 		const SpvInstKind& GetKind() const { return Kind;}
 		std::optional<SpvId> GetId() const { return ResultId; }
 		void SetId(SpvId Id) { ResultId = Id; }
-		virtual void Accpet(SpvVisitor* Visitor) = 0;
+		virtual void Accept(SpvVisitor* Visitor) const = 0;
+		virtual TArray<uint32> ToBinary() const { check(false);  return {}; }
 		
 	private:
 		SpvInstKind Kind;
@@ -212,9 +213,9 @@ namespace FW
 	public:
 		using SpvInstruction::SpvInstruction;
 		
-		void Accpet(SpvVisitor* Visitor) override
+		void Accept(SpvVisitor* Visitor) const override
 		{
-			Visitor->Visit(static_cast<T*>(this));
+			Visitor->Visit(static_cast<const T*>(this));
 		}
 	};
 
@@ -268,6 +269,16 @@ namespace FW
 		SpvId GetTargetId() const { return Target; }
 		SpvDecorationKind GetKind() const { return DecorationKind; }
 		const TArray<uint8>& GetExtraOperands() const { return Operands; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(Target.GetValue());
+			Bin.Add((uint32)DecorationKind);
+			Bin.Append((uint32*)Operands.GetData(), Operands.Num() / 4);
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Decorate;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId Target;
@@ -290,6 +301,17 @@ namespace FW
 		uint32 GetMember() const { return Member; }
 		SpvDecorationKind GetKind() const { return DecorationKind; }
 		const TArray<uint8>& GetExtraOperands() const { return Operands; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(StructureType.GetValue());
+			Bin.Add(Member);
+			Bin.Add((uint32)DecorationKind);
+			Bin.Append((uint32*)Operands.GetData(), Operands.Num() / 4);
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::MemberDecorate;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId StructureType;
@@ -322,6 +344,16 @@ namespace FW
 		
 		uint32 GetWidth() const { return Width; }
 		uint32 GetSignedness() const { return Signedness; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Width);
+			Bin.Add(Signedness);
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::TypeInt;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		uint32 Width;
@@ -385,6 +417,16 @@ namespace FW
 		
 		SpvStorageClass GetStorageClass() const { return StorageClass; }
 		SpvId GetPointeeType() const { return PointeeType; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add((uint32)StorageClass);
+			Bin.Add(PointeeType.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::TypePointer;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvStorageClass StorageClass;
@@ -400,6 +442,15 @@ namespace FW
 		{}
 		
 		const TArray<SpvId>& GetMemberTypeIds() const { return MemberTypes; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(GetId().value().GetValue());
+			Bin.Append((uint32*)MemberTypes.GetData(), MemberTypes.Num());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::TypeStruct;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 	
 	private:
 		TArray<SpvId> MemberTypes;
@@ -460,6 +511,15 @@ namespace FW
 		{}
 		
 		SpvId GetElementType() const { return ElementType; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(ElementType.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::TypeRuntimeArray;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ElementType;
@@ -615,6 +675,20 @@ namespace FW
 		SpvId GetResultType() const { return ResultType; }
 		SpvStorageClass GetStorageClass() const { return StorageClass; }
 		std::optional<SpvId> GetInitializer() const { return Initializer; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add((uint32)StorageClass);
+			if (Initializer)
+			{
+				Bin.Add(Initializer.value().GetValue());
+			}
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Variable;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;

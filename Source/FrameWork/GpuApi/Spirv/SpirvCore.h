@@ -15,9 +15,33 @@ namespace FW
 		}
 		bool operator==(const SpvId&) const = default;
 		uint32 GetValue() const { return Value; }
+		bool IsValid() const { return Value != 0; }
 		
 	private:
 		uint32 Value;
+	};
+
+	struct SpvSection
+	{
+		int StartOffset, EndOffset;
+	};
+
+	enum class SpvSectionKind
+	{
+		Capability,
+		Extension,
+		ExtInstImport,
+		MemoryModel,
+		EntryPoint,
+		ExecutionMode,
+		DebugString,
+		DebugName,
+		Annotation,
+		Type,
+		Contant = Type,
+		GlobalVar = Type,
+		Function,
+		Num,
 	};
 
 	enum class SpvTypeKind
@@ -472,12 +496,17 @@ namespace FW
 
 	enum class SpvOp
 	{
+		Source = 3,
 		Name = 5,
+		MemberName = 6,
 		String = 7,
+		Extension = 10,
 		ExtInstImport = 11,
 		ExtInst = 12,
+		MemoryModel = 14,
 		EntryPoint = 15,
 		ExecutionMode = 16,
+		Capability = 17,
 		TypeVoid = 19,
 		TypeBool = 20,
 		TypeInt = 21,

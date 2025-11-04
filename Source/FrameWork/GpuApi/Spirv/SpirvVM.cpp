@@ -284,7 +284,7 @@ namespace FW
 		}
 	}
 
-	void SpvVmVisitor::Visit(SpvDebugDeclare* Inst)
+	void SpvVmVisitor::Visit(const SpvDebugDeclare* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -294,12 +294,12 @@ namespace FW
 		Context.VariableDescMap[Inst->GetVariable()] = VarDesc;
 	}
 
-	void SpvVmVisitor::Visit(SpvDebugValue* Inst)
+	void SpvVmVisitor::Visit(const SpvDebugValue* Inst)
 	{
 
 	}
 
-	void SpvVmVisitor::Visit(SpvDebugFunctionDefinition* Inst)
+	void SpvVmVisitor::Visit(const SpvDebugFunctionDefinition* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -335,7 +335,7 @@ namespace FW
 		}
 	}
 
-	void SpvVmVisitor::Visit(SpvDebugLine* Inst)
+	void SpvVmVisitor::Visit(const SpvDebugLine* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -346,7 +346,7 @@ namespace FW
 		ThreadState.RecordedInfo.DebugStates.Emplace(CurStackFrame.CurLine);
 	}
 
-	void SpvVmVisitor::Visit(SpvDebugScope* Inst)
+	void SpvVmVisitor::Visit(const SpvDebugScope* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -365,7 +365,7 @@ namespace FW
 		ThreadState.RecordedInfo.DebugStates.Add(MoveTemp(DebugState));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpFunctionParameter* Inst)
+	void SpvVmVisitor::Visit(const SpvOpFunctionParameter* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -390,7 +390,7 @@ namespace FW
 		CurStackFrame.Parameters.push_back(MoveTemp(Parameter));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpFunctionCall* Inst)
+	void SpvVmVisitor::Visit(const SpvOpFunctionCall* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -427,7 +427,7 @@ namespace FW
 		ThreadState.StackFrames.push_back(MoveTemp(NewFrame));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpVariable* Inst)
+	void SpvVmVisitor::Visit(const SpvOpVariable* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -452,12 +452,12 @@ namespace FW
 		CurStackFrame.Pointers.insert_or_assign(ResultId, MoveTemp(Pointer));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpPhi* Inst)
+	void SpvVmVisitor::Visit(const SpvOpPhi* Inst)
 	{
 
 	}
 
-	void SpvVmVisitor::Visit(SpvOpLabel* Inst)
+	void SpvVmVisitor::Visit(const SpvOpLabel* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -468,7 +468,7 @@ namespace FW
 		CurStackFrame.CurBasicBlock = Inst->GetId().value();
 	}
 
-	void SpvVmVisitor::Visit(SpvOpLoad* Inst)
+	void SpvVmVisitor::Visit(const SpvOpLoad* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -511,7 +511,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(Object));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpStore* Inst)
+	void SpvVmVisitor::Visit(const SpvOpStore* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -537,7 +537,7 @@ namespace FW
 		CurDebugState.VarChanges.Add(MoveTemp(VariableChange));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpVectorShuffle* Inst)
+	void SpvVmVisitor::Visit(const SpvOpVectorShuffle* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -573,7 +573,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(Object));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpCompositeConstruct* Inst)
+	void SpvVmVisitor::Visit(const SpvOpCompositeConstruct* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -595,7 +595,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(Object));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpCompositeExtract* Inst)
+	void SpvVmVisitor::Visit(const SpvOpCompositeExtract* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -613,7 +613,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(Object));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpTranspose* Inst)
+	void SpvVmVisitor::Visit(const SpvOpTranspose* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -643,7 +643,7 @@ namespace FW
 		
 	}
 
-	void SpvVmVisitor::Visit(SpvOpAccessChain* Inst)
+	void SpvVmVisitor::Visit(const SpvOpAccessChain* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -667,7 +667,7 @@ namespace FW
 		CurStackFrame.Pointers.insert_or_assign(ResultId, MoveTemp(Pointer));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpConvertFToU* Inst)
+	void SpvVmVisitor::Visit(const SpvOpConvertFToU* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -716,7 +716,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpConvertFToS* Inst)
+	void SpvVmVisitor::Visit(const SpvOpConvertFToS* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -765,7 +765,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpConvertSToF* Inst)
+	void SpvVmVisitor::Visit(const SpvOpConvertSToF* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -794,7 +794,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpConvertUToF* Inst)
+	void SpvVmVisitor::Visit(const SpvOpConvertUToF* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -823,7 +823,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpBitcast* Inst)
+	void SpvVmVisitor::Visit(const SpvOpBitcast* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -852,7 +852,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpSNegate* Inst)
+	void SpvVmVisitor::Visit(const SpvOpSNegate* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -879,7 +879,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpFNegate* Inst)
+	void SpvVmVisitor::Visit(const SpvOpFNegate* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -906,7 +906,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpIAdd* Inst)
+	void SpvVmVisitor::Visit(const SpvOpIAdd* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -935,7 +935,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpFAdd* Inst)
+	void SpvVmVisitor::Visit(const SpvOpFAdd* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -964,7 +964,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpISub* Inst)
+	void SpvVmVisitor::Visit(const SpvOpISub* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -993,7 +993,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpIMul* Inst)
+	void SpvVmVisitor::Visit(const SpvOpIMul* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1022,7 +1022,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpFMul* Inst)
+	void SpvVmVisitor::Visit(const SpvOpFMul* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1051,7 +1051,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpFSub* Inst)
+	void SpvVmVisitor::Visit(const SpvOpFSub* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1080,7 +1080,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpUDiv* Inst)
+	void SpvVmVisitor::Visit(const SpvOpUDiv* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1132,7 +1132,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpSDiv* Inst)
+	void SpvVmVisitor::Visit(const SpvOpSDiv* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1183,7 +1183,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpFDiv* Inst)
+	void SpvVmVisitor::Visit(const SpvOpFDiv* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1212,7 +1212,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpUMod* Inst)
+	void SpvVmVisitor::Visit(const SpvOpUMod* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1262,7 +1262,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpSRem* Inst)
+	void SpvVmVisitor::Visit(const SpvOpSRem* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1319,7 +1319,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpFRem* Inst)
+	void SpvVmVisitor::Visit(const SpvOpFRem* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1369,7 +1369,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpBitwiseOr* Inst)
+	void SpvVmVisitor::Visit(const SpvOpBitwiseOr* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1398,7 +1398,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpBitwiseXor* Inst)
+	void SpvVmVisitor::Visit(const SpvOpBitwiseXor* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1427,7 +1427,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpBitwiseAnd* Inst)
+	void SpvVmVisitor::Visit(const SpvOpBitwiseAnd* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1456,7 +1456,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpNot* Inst)
+	void SpvVmVisitor::Visit(const SpvOpNot* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1483,14 +1483,14 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpBranch* Inst)
+	void SpvVmVisitor::Visit(const SpvOpBranch* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
 		ThreadState.NextInstIndex = GetInstIndex(Inst->GetTargetLabel());
 	}
 
-	void SpvVmVisitor::Visit(SpvOpBranchConditional* Inst)
+	void SpvVmVisitor::Visit(const SpvOpBranchConditional* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1507,7 +1507,7 @@ namespace FW
 		ThreadState.RecordedInfo.DebugStates.Last().bCondition = true;
 	}
 
-	void SpvVmVisitor::Visit(SpvOpSwitch* Inst)
+	void SpvVmVisitor::Visit(const SpvOpSwitch* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1526,7 +1526,7 @@ namespace FW
 		ThreadState.NextInstIndex = GetInstIndex(Inst->GetDefault());
 	}
 
-	void SpvVmVisitor::Visit(SpvOpReturn* Inst)
+	void SpvVmVisitor::Visit(const SpvOpReturn* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1577,7 +1577,7 @@ namespace FW
 		}
 	}
 
-	void SpvVmVisitor::Visit(SpvOpReturnValue* Inst)
+	void SpvVmVisitor::Visit(const SpvOpReturnValue* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1640,7 +1640,7 @@ namespace FW
 		}
 	}
 
-	void SpvVmVisitor::Visit(SpvOpVectorTimesScalar* Inst)
+	void SpvVmVisitor::Visit(const SpvOpVectorTimesScalar* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1674,7 +1674,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpMatrixTimesScalar* Inst)
+	void SpvVmVisitor::Visit(const SpvOpMatrixTimesScalar* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1708,7 +1708,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpVectorTimesMatrix* Inst)
+	void SpvVmVisitor::Visit(const SpvOpVectorTimesMatrix* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1742,7 +1742,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpMatrixTimesVector* Inst)
+	void SpvVmVisitor::Visit(const SpvOpMatrixTimesVector* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1776,7 +1776,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpMatrixTimesMatrix* Inst)
+	void SpvVmVisitor::Visit(const SpvOpMatrixTimesMatrix* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1810,7 +1810,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpDot* Inst)
+	void SpvVmVisitor::Visit(const SpvOpDot* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1843,7 +1843,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpAny* Inst)
+	void SpvVmVisitor::Visit(const SpvOpAny* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1872,7 +1872,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpAll* Inst)
+	void SpvVmVisitor::Visit(const SpvOpAll* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1901,7 +1901,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpIsNan* Inst)
+	void SpvVmVisitor::Visit(const SpvOpIsNan* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1930,7 +1930,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpIsInf* Inst)
+	void SpvVmVisitor::Visit(const SpvOpIsInf* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1959,7 +1959,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpLogicalOr* Inst)
+	void SpvVmVisitor::Visit(const SpvOpLogicalOr* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -1989,7 +1989,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpLogicalAnd* Inst)
+	void SpvVmVisitor::Visit(const SpvOpLogicalAnd* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2019,7 +2019,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpLogicalNot* Inst)
+	void SpvVmVisitor::Visit(const SpvOpLogicalNot* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2046,7 +2046,7 @@ namespace FW
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpSelect* Inst)
+	void SpvVmVisitor::Visit(const SpvOpSelect* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2084,7 +2084,7 @@ namespace FW
 	}
 
 #define IMPL_COMPARISON(Name)		                                                                              \
-	void SpvVmVisitor::Visit(SpvOp##Name* Inst)                                                                   \
+	void SpvVmVisitor::Visit(const SpvOp##Name* Inst)                                                                   \
 	{                                                                                                             \
 		SpvVmContext& Context = GetActiveContext();                                                               \
 		SpvThreadState& ThreadState = Context.ThreadState;                                                        \
@@ -2135,7 +2135,7 @@ IMPL_COMPARISON(FOrdGreaterThan)
 IMPL_COMPARISON(FOrdLessThanEqual)
 IMPL_COMPARISON(FOrdGreaterThanEqual)
 
-	void SpvVmVisitor::Visit(SpvOpShiftRightLogical* Inst)
+	void SpvVmVisitor::Visit(const SpvOpShiftRightLogical* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2164,7 +2164,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpShiftRightArithmetic* Inst)
+	void SpvVmVisitor::Visit(const SpvOpShiftRightArithmetic* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2193,7 +2193,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpShiftLeftLogical* Inst)
+	void SpvVmVisitor::Visit(const SpvOpShiftLeftLogical* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2222,7 +2222,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvRoundEven* Inst)
+	void SpvVmVisitor::Visit(const SpvRoundEven* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2249,7 +2249,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvTrunc* Inst)
+	void SpvVmVisitor::Visit(const SpvTrunc* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2276,7 +2276,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvFAbs* Inst)
+	void SpvVmVisitor::Visit(const SpvFAbs* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2303,7 +2303,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvSAbs* Inst)
+	void SpvVmVisitor::Visit(const SpvSAbs* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2330,7 +2330,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvFSign* Inst)
+	void SpvVmVisitor::Visit(const SpvFSign* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2357,7 +2357,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvSSign* Inst)
+	void SpvVmVisitor::Visit(const SpvSSign* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2384,7 +2384,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvFloor* Inst)
+	void SpvVmVisitor::Visit(const SpvFloor* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2411,7 +2411,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvCeil* Inst)
+	void SpvVmVisitor::Visit(const SpvCeil* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2438,7 +2438,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvFract* Inst)
+	void SpvVmVisitor::Visit(const SpvFract* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2465,7 +2465,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvSin* Inst)
+	void SpvVmVisitor::Visit(const SpvSin* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2492,7 +2492,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvCos* Inst)
+	void SpvVmVisitor::Visit(const SpvCos* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2520,7 +2520,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvTan* Inst)
+	void SpvVmVisitor::Visit(const SpvTan* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2548,7 +2548,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvAsin* Inst)
+	void SpvVmVisitor::Visit(const SpvAsin* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2575,7 +2575,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvAcos* Inst)
+	void SpvVmVisitor::Visit(const SpvAcos* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2602,7 +2602,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvAtan* Inst)
+	void SpvVmVisitor::Visit(const SpvAtan* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2629,7 +2629,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvPow* Inst)
+	void SpvVmVisitor::Visit(const SpvPow* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2690,7 +2690,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvExp* Inst)
+	void SpvVmVisitor::Visit(const SpvExp* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2717,7 +2717,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvLog* Inst)
+	void SpvVmVisitor::Visit(const SpvLog* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2744,7 +2744,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvExp2* Inst)
+	void SpvVmVisitor::Visit(const SpvExp2* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2771,7 +2771,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvLog2* Inst)
+	void SpvVmVisitor::Visit(const SpvLog2* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2798,7 +2798,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvSqrt* Inst)
+	void SpvVmVisitor::Visit(const SpvSqrt* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2825,7 +2825,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvInverseSqrt* Inst)
+	void SpvVmVisitor::Visit(const SpvInverseSqrt* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2852,7 +2852,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvDeterminant* Inst)
+	void SpvVmVisitor::Visit(const SpvDeterminant* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2881,7 +2881,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvUMin* Inst)
+	void SpvVmVisitor::Visit(const SpvUMin* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2910,7 +2910,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvSMin* Inst)
+	void SpvVmVisitor::Visit(const SpvSMin* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2939,7 +2939,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvUMax* Inst)
+	void SpvVmVisitor::Visit(const SpvUMax* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2968,7 +2968,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvSMax* Inst)
+	void SpvVmVisitor::Visit(const SpvSMax* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -2997,7 +2997,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvFClamp* Inst)
+	void SpvVmVisitor::Visit(const SpvFClamp* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -3053,7 +3053,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvUClamp* Inst)
+	void SpvVmVisitor::Visit(const SpvUClamp* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -3109,7 +3109,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvSClamp* Inst)
+	void SpvVmVisitor::Visit(const SpvSClamp* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -3165,7 +3165,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvFMix* Inst)
+	void SpvVmVisitor::Visit(const SpvFMix* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -3196,7 +3196,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvStep* Inst)
+	void SpvVmVisitor::Visit(const SpvStep* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -3225,7 +3225,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvSmoothStep* Inst)
+	void SpvVmVisitor::Visit(const SpvSmoothStep* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -3281,7 +3281,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvPackHalf2x16* Inst)
+	void SpvVmVisitor::Visit(const SpvPackHalf2x16* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -3311,7 +3311,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvUnpackHalf2x16* Inst)
+	void SpvVmVisitor::Visit(const SpvUnpackHalf2x16* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -3341,7 +3341,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvLength* Inst)
+	void SpvVmVisitor::Visit(const SpvLength* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -3371,7 +3371,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvDistance* Inst)
+	void SpvVmVisitor::Visit(const SpvDistance* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -3405,7 +3405,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvCross* Inst)
+	void SpvVmVisitor::Visit(const SpvCross* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -3434,7 +3434,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvNormalize* Inst)
+	void SpvVmVisitor::Visit(const SpvNormalize* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -3476,7 +3476,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvReflect* Inst)
+	void SpvVmVisitor::Visit(const SpvReflect* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -3505,7 +3505,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvRefract* Inst)
+	void SpvVmVisitor::Visit(const SpvRefract* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -3542,7 +3542,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvNMin* Inst)
+	void SpvVmVisitor::Visit(const SpvNMin* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -3571,7 +3571,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvNMax* Inst)
+	void SpvVmVisitor::Visit(const SpvNMax* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -3600,7 +3600,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(Inst->GetId().value(), MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpSampledImage* Inst)
+	void SpvVmVisitor::Visit(const SpvOpSampledImage* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -3622,7 +3622,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpImageFetch* Inst)
+	void SpvVmVisitor::Visit(const SpvOpImageFetch* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -3668,7 +3668,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpImageQuerySizeLod* Inst)
+	void SpvVmVisitor::Visit(const SpvOpImageQuerySizeLod* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -3700,7 +3700,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		CurStackFrame.IntermediateObjects.insert_or_assign(ResultId, MoveTemp(ResultObject));
 	}
 
-	void SpvVmVisitor::Visit(SpvOpImageQueryLevels* Inst)
+	void SpvVmVisitor::Visit(const SpvOpImageQueryLevels* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -3880,8 +3880,70 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		return ResultValue;
 	}
 
-	void SpvVmVisitor::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts)
+	void SpvVmVisitor::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections)
 	{
 		this->Insts = &Insts;
+		SpvVmContext& Context = GetActiveContext();
+		Patcher.SetSpvContext(SpvCode, &Context);
+
+		//Patch debugger buffer
+		SpvId UIntType;
+		if (auto It = std::find_if(Context.Types.begin(), Context.Types.end(), [](const auto& Pair) {
+			SpvType* Type = Pair.second.Get();
+			return Type->GetKind() == SpvTypeKind::Integer
+				&& static_cast<SpvIntegerType*>(Type)->GetWidth() == 32
+				&& !static_cast<SpvIntegerType*>(Type)->IsSigend();
+			}); It != Context.Types.end())
+		{
+			UIntType = It->second->GetId();
+		}
+		else
+		{
+			UIntType = Patcher.NewId();
+			SpvOpTypeInt Op{ 32, 0 };
+			Op.SetId(UIntType);
+			Patcher.AddType(&Op);
+		}
+		SpvId RunTimeArrayType = Patcher.NewId();
+		{
+			SpvOpTypeRuntimeArray Op{ UIntType };
+			Op.SetId(RunTimeArrayType);
+			Patcher.AddType(&Op);
+		}
+		int ArrayStride = 4;
+		SpvOpDecorate ArrayStrideOp{ RunTimeArrayType, SpvDecorationKind::ArrayStride,{(uint8*)&ArrayStride, sizeof(int)} };
+		Patcher.AddAnnotation(&ArrayStrideOp);
+
+		SpvId DebuggerBufferType = Patcher.NewId();
+		{
+			SpvOpTypeStruct Op{ {RunTimeArrayType} };
+			Op.SetId(DebuggerBufferType);
+			Patcher.AddType(&Op);
+		}
+		int MemberOffset = 0;
+		SpvOpMemberDecorate MemberOffsetOp{ DebuggerBufferType, 0, SpvDecorationKind::Offset, {(uint8*)&MemberOffset, sizeof(int)} };
+		Patcher.AddAnnotation(&MemberOffsetOp);
+		SpvOpDecorate BufferBlockOp{ DebuggerBufferType, SpvDecorationKind::BufferBlock, {} };
+		Patcher.AddAnnotation(&BufferBlockOp);
+
+		SpvId DebuggerBufferPointerType = Patcher.NewId();
+		{
+			SpvOpTypePointer Op{SpvStorageClass::Uniform, DebuggerBufferType };
+			Op.SetId(DebuggerBufferPointerType);
+			Patcher.AddType(&Op);
+		}
+		DebuggerBuffer = Patcher.NewId();
+		{
+			SpvOpVariable Op{ DebuggerBufferPointerType, SpvStorageClass::Uniform, {} };
+			Op.SetId(DebuggerBuffer);
+			Patcher.AddGlobalVariable(&Op);
+		}
+		int SetNumber = 0;
+		SpvOpDecorate SetOp{ DebuggerBuffer, SpvDecorationKind::DescriptorSet, {(uint8*)&SetNumber, sizeof(int)}};
+		Patcher.AddAnnotation(&SetOp);
+
+		int BindingNumber = 0721;
+		SpvOpDecorate BindingOp{ DebuggerBuffer, SpvDecorationKind::Binding, {(uint8*)&BindingNumber, sizeof(int)} };
+		Patcher.AddAnnotation(&BindingOp);
 	}
 }

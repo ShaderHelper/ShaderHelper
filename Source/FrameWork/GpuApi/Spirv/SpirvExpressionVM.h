@@ -17,8 +17,8 @@ namespace FW
 		SpvVmPixelExprVisitor(SpvVmPixelExprContext& InPixelExprContext);
 		
 	public:
-		void Visit(SpvDebugDeclare* Inst) override;
-		void Visit(SpvOpStore* Inst) override;
+		void Visit(const SpvDebugDeclare* Inst) override;
+		void Visit(const SpvOpStore* Inst) override;
 		
 	protected:
 		SpvVmPixelExprContext& PixelExprContext;

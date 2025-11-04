@@ -4,7 +4,7 @@
 namespace FW
 {
 
-	void SpvMetaVisitor::Visit(SpvOpVariable* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpVariable* Inst)
 	{
 		SpvStorageClass StorageClass = Inst->GetStorageClass();
 		SpvId ResultId = Inst->GetId().value();
@@ -40,19 +40,19 @@ namespace FW
 		
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpTypeFloat* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpTypeFloat* Inst)
 	{
 		SpvId ResultId = Inst->GetId().value();
 		Context.Types.emplace(ResultId, MakeUnique<SpvFloatType>(ResultId, Inst->GetWidth()));
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpTypeInt* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpTypeInt* Inst)
 	{
 		SpvId ResultId = Inst->GetId().value();
 		Context.Types.emplace(ResultId, MakeUnique<SpvIntegerType>(ResultId, Inst->GetWidth(), !!Inst->GetSignedness()));
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpTypeVector* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpTypeVector* Inst)
 	{
 		SpvType* ElementType = Context.Types[Inst->GetComponentType()].Get();
 		check(ElementType->IsScalar());
@@ -60,7 +60,7 @@ namespace FW
 		Context.Types.emplace(ResultId, MakeUnique<SpvVectorType>(ResultId, static_cast<SpvScalarType*>(ElementType), Inst->GetComponentCount()));
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpTypeMatrix* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpTypeMatrix* Inst)
 	{
 		SpvType* ElementType = Context.Types[Inst->GetColumnType()].Get();
 		check(ElementType->GetKind() == SpvTypeKind::Vector);
@@ -68,26 +68,26 @@ namespace FW
 		Context.Types.emplace(ResultId, MakeUnique<SpvMatrixType>(ResultId, static_cast<SpvVectorType*>(ElementType), Inst->GetColumnCount()));
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpTypeVoid* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpTypeVoid* Inst)
 	{
 		SpvId ResultId = Inst->GetId().value();
 		Context.Types.emplace(ResultId, MakeUnique<SpvVoidType>(ResultId));
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpTypeBool* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpTypeBool* Inst)
 	{
 		SpvId ResultId = Inst->GetId().value();
 		Context.Types.emplace(ResultId, MakeUnique<SpvBoolType>(ResultId));
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpTypePointer* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpTypePointer* Inst)
 	{
 		SpvType* PointeeType = Context.Types[Inst->GetPointeeType()].Get();
 		SpvId ResultId = Inst->GetId().value();
 		Context.Types.emplace(ResultId, MakeUnique<SpvPointerType>(ResultId, Inst->GetStorageClass(), PointeeType));
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpTypeStruct* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpTypeStruct* Inst)
 	{
 		TArray<SpvType*> MemberTypes;
 		for(SpvId MemberTypeId : Inst->GetMemberTypeIds())
@@ -98,20 +98,20 @@ namespace FW
 		Context.Types.emplace(ResultId, MakeUnique<SpvStructType>(ResultId, MemberTypes));
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpTypeImage* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpTypeImage* Inst)
 	{
 		SpvId ResultId = Inst->GetId().value();
 		SpvType* SampledType = Context.Types[Inst->GetSampledType()].Get();
 		Context.Types.emplace(ResultId, MakeUnique<SpvImageType>(ResultId, SampledType, Inst->GetDim()));
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpTypeSampler* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpTypeSampler* Inst)
 	{
 		SpvId ResultId = Inst->GetId().value();
 		Context.Types.emplace(ResultId, MakeUnique<SpvSamplerType>(ResultId));
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpTypeArray* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpTypeArray* Inst)
 	{
 		SpvType* ElementType = Context.Types[Inst->GetElementType()].Get();
 		uint32 Length = *(uint32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLength()].Storage).Value.GetData();
@@ -119,14 +119,14 @@ namespace FW
 		Context.Types.emplace(ResultId, MakeUnique<SpvArrayType>(ResultId, ElementType, Length));
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpTypeRuntimeArray* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpTypeRuntimeArray* Inst)
 	{
 		SpvType* ElementType = Context.Types[Inst->GetElementType()].Get();
 		SpvId ResultId = Inst->GetId().value();
 		Context.Types.emplace(ResultId, MakeUnique<SpvRuntimeArrayType>(ResultId, ElementType));
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpExecutionMode* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpExecutionMode* Inst)
 	{
 		Context.EntryPoint = Inst->GetEntryPointId();
 		if(Inst->GetMode() == SpvExecutionMode::LocalSize)
@@ -138,17 +138,17 @@ namespace FW
 		}
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpName* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpName* Inst)
 	{
 		Context.Names.emplace(Inst->GetTarget(), Inst->GetName());
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpString* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpString* Inst)
 	{
 		Context.DebugStrs.emplace(Inst->GetId().value(), Inst->GetStr());
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpDecorate* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpDecorate* Inst)
 	{
 		const TArray<uint8>& ExtraOperands = Inst->GetExtraOperands();
 		if(Inst->GetKind() == SpvDecorationKind::BuiltIn)
@@ -205,7 +205,7 @@ namespace FW
 		}
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpMemberDecorate* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpMemberDecorate* Inst)
 	{
 		const TArray<uint8>& ExtraOperands = Inst->GetExtraOperands();
 		if(Inst->GetKind() == SpvDecorationKind::Offset)
@@ -226,7 +226,7 @@ namespace FW
 		}
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpConstant* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpConstant* Inst)
 	{
 		SpvId ResultId = Inst->GetId().value();
 		SpvObject Obj = {
@@ -237,7 +237,7 @@ namespace FW
 		Context.Constants.emplace(ResultId, MoveTemp(Obj));
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpConstantTrue* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpConstantTrue* Inst)
 	{
 		SpvId ResultId = Inst->GetId().value();
 
@@ -247,7 +247,7 @@ namespace FW
 		Context.Constants.emplace(ResultId, MoveTemp(Obj));
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpConstantFalse* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpConstantFalse* Inst)
 	{
 		SpvId ResultId = Inst->GetId().value();
 		SpvType* RetType = Context.Types[Inst->GetResultType()].Get();
@@ -256,7 +256,7 @@ namespace FW
 		Context.Constants.emplace(ResultId, MoveTemp(Obj));
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpConstantComposite* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpConstantComposite* Inst)
 	{
 		SpvId ResultId = Inst->GetId().value();
 		
@@ -271,7 +271,7 @@ namespace FW
 		Context.Constants.emplace(ResultId, MoveTemp(Obj));
 	}
 
-	void SpvMetaVisitor::Visit(SpvOpConstantNull* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpConstantNull* Inst)
 	{
 		SpvId ResultId = Inst->GetId().value();
 		SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
@@ -285,7 +285,7 @@ namespace FW
 		Context.Constants.emplace(ResultId, MoveTemp(Obj));
 	}
 
-	void SpvMetaVisitor::Visit(SpvDebugTypeBasic* Inst)
+	void SpvMetaVisitor::Visit(const SpvDebugTypeBasic* Inst)
 	{
 		int32 Size = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetSize()].Storage).Value.GetData();
 		SpvDebugBasicTypeEncoding Encoding = *(SpvDebugBasicTypeEncoding*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetEncoding()].Storage).Value.GetData();
@@ -295,21 +295,21 @@ namespace FW
 		Context.TypeDescs.emplace(Inst->GetId().value(), MoveTemp(BasicTypeDesc));
 	}
 
-	void SpvMetaVisitor::Visit(SpvDebugTypeVector* Inst)
+	void SpvMetaVisitor::Visit(const SpvDebugTypeVector* Inst)
 	{
 		int32 CompCount = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetComponentCount()].Storage).Value.GetData();
 		auto VectorTypeDesc = MakeUnique<SpvVectorTypeDesc>(static_cast<SpvBasicTypeDesc*>(Context.TypeDescs[Inst->GetBasicType()].Get()), CompCount);
 		Context.TypeDescs.emplace(Inst->GetId().value(), MoveTemp(VectorTypeDesc));
 	}
 
-	void SpvMetaVisitor::Visit(SpvDebugTypeMatrix* Inst)
+	void SpvMetaVisitor::Visit(const SpvDebugTypeMatrix* Inst)
 	{
 		int32 VectorCount = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetVectorCount()].Storage).Value.GetData();
 		auto MatrixTypeDesc = MakeUnique<SpvMatrixTypeDesc>(static_cast<SpvVectorTypeDesc*>(Context.TypeDescs[Inst->GetVectorType()].Get()), VectorCount);
 		Context.TypeDescs.emplace(Inst->GetId().value(), MoveTemp(MatrixTypeDesc));
 	}
 
-	void SpvMetaVisitor::Visit(SpvDebugTypeComposite* Inst)
+	void SpvMetaVisitor::Visit(const SpvDebugTypeComposite* Inst)
 	{
 		TArray<SpvTypeDesc*> MemberTypeDescs;
 		for(SpvId MemberTypeDescId : Inst->GetMembers())
@@ -333,7 +333,7 @@ namespace FW
 		
 	}
 
-	void SpvMetaVisitor::Visit(SpvDebugTypeMember* Inst)
+	void SpvMetaVisitor::Visit(const SpvDebugTypeMember* Inst)
 	{
 		int32 Offset = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetOffset()].Storage).Value.GetData();
 		int32 Size = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetSize()].Storage).Value.GetData();
@@ -343,7 +343,7 @@ namespace FW
 		Context.TypeDescs.emplace(Inst->GetId().value(), MoveTemp(MemberTypeDesc));
 	}
 
-	void SpvMetaVisitor::Visit(SpvDebugTypeArray* Inst)
+	void SpvMetaVisitor::Visit(const SpvDebugTypeArray* Inst)
 	{
 		SpvTypeDesc* BaseTypeDesc = Context.TypeDescs[Inst->GetBaseType()].Get();
 		TArray<int32> CompCounts;
@@ -355,7 +355,7 @@ namespace FW
 		Context.TypeDescs.emplace(Inst->GetId().value(), MoveTemp(ArrayTypeDesc));
 	}
 
-	void SpvMetaVisitor::Visit(SpvDebugTypeFunction* Inst)
+	void SpvMetaVisitor::Visit(const SpvDebugTypeFunction* Inst)
 	{
 		TArray<SpvTypeDesc*> ParmTypeDescs;
 		for(SpvId ParmTypeDescId : Inst->GetParmTypes())
@@ -381,19 +381,19 @@ namespace FW
 		Context.TypeDescs.emplace(Inst->GetId().value(), MoveTemp(FuncTypeDesc));
 	}
 
-	void SpvMetaVisitor::Visit(SpvDebugCompilationUnit* Inst)
+	void SpvMetaVisitor::Visit(const SpvDebugCompilationUnit* Inst)
 	{
 		Context.LexicalScopes.emplace(Inst->GetId().value(), MakeUnique<SpvCompilationUnit>());
 	}
 
-	void SpvMetaVisitor::Visit(SpvDebugLexicalBlock* Inst)
+	void SpvMetaVisitor::Visit(const SpvDebugLexicalBlock* Inst)
 	{
 		int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLine()].Storage).Value.GetData();
 		SpvLexicalScope* ParentScope = Context.LexicalScopes[Inst->GetParentId()].Get();
 		Context.LexicalScopes.emplace(Inst->GetId().value(), MakeUnique<SpvLexicalBlock>(Line, ParentScope));
 	}
 
-	void SpvMetaVisitor::Visit(SpvDebugFunction* Inst)
+	void SpvMetaVisitor::Visit(const SpvDebugFunction* Inst)
 	{
 		SpvLexicalScope* ParentScope = Context.LexicalScopes[Inst->GetParentId()].Get();
 		const FString& FuncName = Context.DebugStrs[Inst->GetNameId()];
@@ -403,12 +403,12 @@ namespace FW
 		Context.LexicalScopes.emplace(Inst->GetId().value(), MakeUnique<SpvFunctionDesc>(ParentScope, FuncName, FuncTypeDesc, Line, ScopeLine));
 	}
 
-	void SpvMetaVisitor::Visit(SpvDebugInlinedAt* Inst)
+	void SpvMetaVisitor::Visit(const SpvDebugInlinedAt* Inst)
 	{
 
 	}
 
-	void SpvMetaVisitor::Visit(SpvDebugLocalVariable* Inst)
+	void SpvMetaVisitor::Visit(const SpvDebugLocalVariable* Inst)
 	{
 		SpvVariableDesc VarDesc{
 			.Name = Context.DebugStrs[Inst->GetNameId()],
@@ -420,7 +420,7 @@ namespace FW
 		Context.VariableDescs.emplace(Inst->GetId().value(), MoveTemp(VarDesc));
 	}
 
-	void SpvMetaVisitor::Visit(SpvDebugGlobalVariable* Inst)
+	void SpvMetaVisitor::Visit(const SpvDebugGlobalVariable* Inst)
 	{
 		//PS: Interface variables don't have corresponding descs
 		SpvVariableDesc VarDesc{
@@ -434,8 +434,9 @@ namespace FW
 		Context.VariableDescMap.emplace(Inst->GetVarId(), &Context.VariableDescs[Inst->GetId().value()]);
 	}
 
-	void SpvMetaVisitor::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts)
+	void SpvMetaVisitor::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections)
 	{
+		Context.Sections = InSections;
 		for(const auto& Inst : Insts)
 		{
 			if(const SpvOp* OpKind = std::get_if<SpvOp>(&Inst->GetKind()) ;
@@ -444,17 +445,18 @@ namespace FW
 				break;
 			}
 			
-			Inst->Accpet(this);
+			Inst->Accept(this);
 		}
 	}
 
 	void SpirvParser::Accept(SpvVisitor* Visitor)
 	{
-		Visitor->Parse(Insts);
+		Visitor->Parse(Insts, SpvCode, Sections);
 	}
 
 	void SpirvParser::Parse(const TArray<uint32>& SpvCode)
 	{
+		this->SpvCode = SpvCode;
 		int32 WordOffset = 5;
 		while(WordOffset < SpvCode.Num())
 		{
@@ -462,6 +464,51 @@ namespace FW
 			int32 InstWordLen = int32(Inst >> 16);
 			SpvOp OpCode = static_cast<SpvOp>(Inst & 0xffff);
 			TUniquePtr<SpvInstruction> DecodedInst;
+			if (OpCode == SpvOp::Capability)
+			{
+				Sections.FindOrAdd(SpvSectionKind::Capability, { WordOffset });
+			}
+			else if (OpCode == SpvOp::Extension)
+			{
+				Sections.FindOrAdd(SpvSectionKind::Extension, { WordOffset });
+			}
+			else if (OpCode == SpvOp::ExtInstImport)
+			{
+				Sections.FindOrAdd(SpvSectionKind::ExtInstImport, {WordOffset});
+			}
+			else if (OpCode == SpvOp::MemoryModel)
+			{
+				Sections.FindOrAdd(SpvSectionKind::MemoryModel, { WordOffset });
+			}
+			else if (OpCode == SpvOp::EntryPoint)
+			{
+				Sections.FindOrAdd(SpvSectionKind::EntryPoint, { WordOffset });
+			}
+			else if (OpCode == SpvOp::ExecutionMode)
+			{
+				Sections.FindOrAdd(SpvSectionKind::ExecutionMode, { WordOffset });
+			}
+			else if (OpCode == SpvOp::String || OpCode == SpvOp::Source)
+			{
+				Sections.FindOrAdd(SpvSectionKind::DebugString, { WordOffset });
+			}
+			else if (OpCode == SpvOp::Name || OpCode == SpvOp::MemberName)
+			{
+				Sections.FindOrAdd(SpvSectionKind::DebugName, { WordOffset });
+			}
+			else if (OpCode == SpvOp::Decorate || OpCode == SpvOp::MemberDecorate)
+			{
+				Sections.FindOrAdd(SpvSectionKind::Annotation, { WordOffset });
+			}
+			else if (OpCode == SpvOp::Function)
+			{
+				Sections.FindOrAdd(SpvSectionKind::Function, { WordOffset, SpvCode.Num() });
+			}
+			else if(!Sections.Contains(SpvSectionKind::Function))
+			{
+				Sections.FindOrAdd(SpvSectionKind::Type, { WordOffset });
+			}
+
 			switch(OpCode)
 			{
 			case SpvOp::EntryPoint:
@@ -1817,6 +1864,15 @@ namespace FW
 				Insts.Add(MoveTemp(DecodedInst));
 			}
 			WordOffset += InstWordLen;
+		}
+
+		for (int i = (int)SpvSectionKind::Num - 1; i > 0; i--)
+		{
+			if (!Sections.Contains(SpvSectionKind(i-1)))
+			{
+				Sections.Add(SpvSectionKind(i - 1), { Sections[SpvSectionKind(i)].StartOffset });
+			}
+			Sections[SpvSectionKind(i - 1)].EndOffset = Sections[SpvSectionKind(i)].StartOffset;
 		}
 	}
 }

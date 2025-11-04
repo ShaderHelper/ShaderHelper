@@ -22,6 +22,7 @@
 #include "Common/Path/BaseResourcePath.h"
 #include <Widgets/Colors/SColorBlock.h>
 #include "UI/Widgets/ColorPicker/SColorPicker.h"
+#include "ShaderConductor.hpp"
 #include <regex>
 
 //No exposed methods, and too lazy to modify the source code for UE.
@@ -3724,7 +3725,7 @@ constexpr int PaddingLineNum = 22;
 										.ShowBackgroundForAlpha(true)
 										.Color(FLinearColor{ X, Y, Z, W})
 										.UseSRGB(false) //TODO
-										.OnMouseButtonDown_Lambda([=](const FGeometry&, const FPointerEvent& MouseEvent) {
+										.OnMouseButtonDown_Lambda([=, this](const FGeometry&, const FPointerEvent& MouseEvent) {
 											ShaderEditorTipWindow->SetContent(
 												SNew(SColorPicker)
 												.TargetColorAttribute(FLinearColor{ X, Y, Z, W })
@@ -4361,6 +4362,24 @@ void __Expression_Output(T __Expression_Result) {}
 		};
 		SpvVmPixelVisitor VmVisitor{VmPixelContext.value()};
 		Parser.Accept(&VmVisitor);
+
+		const TArray<uint32>& PatchedSpv = VmVisitor.GetPatcher().GetSpv();
+		auto EntryPoint = StringCast<UTF8CHAR>(*Shader->GetEntryPoint());
+		ShaderConductor::Compiler::TargetDesc HlslTargetDesc{};
+		HlslTargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
+		HlslTargetDesc.version = "60";
+		ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile({ PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, (char*)EntryPoint.Get(),
+			ShaderConductor::ShaderStage::PixelShader, HlslTargetDesc);
+#if !SH_SHIPPING
+		VmVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / Shader->GetShaderName() / Shader->GetShaderName() + "Patched.spvasm");
+		FString ShaderSourceText = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
+		if (ShaderResultDesc.hasError)
+		{
+			FString ErrorInfo = static_cast<const char*>(ShaderResultDesc.errorWarningMsg.Data());
+			ShaderSourceText = MoveTemp(ErrorInfo);
+		}
+		FFileHelper::SaveStringToFile(ShaderSourceText, *(PathHelper::SavedShaderDir() / Shader->GetShaderName() / Shader->GetShaderName() + "Patched.hlsl"));
+#endif
 		
 		CurDebugStateIndex = 0;
 		DebuggerContext = &VmPixelContext.value().Quad[DebugIndex];

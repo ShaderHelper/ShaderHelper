@@ -250,6 +250,7 @@ namespace ShaderConductor
         static ResultDesc Compile(const SourceDesc& source, const Options& options, const TargetDesc& target);
         static void Compile(const SourceDesc& source, const Options& options, const TargetDesc* targets, uint32_t numTargets,
                             ResultDesc* results);
+        static ResultDesc SpvCompile(const Blob& spvBinary, const char* entryPoint, ShaderStage stage, const TargetDesc& target);
         static ResultDesc Disassemble(const DisassembleDesc& source);
 
         // Currently only Dxil on Windows supports linking

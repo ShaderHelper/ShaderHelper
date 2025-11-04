@@ -25,7 +25,7 @@ namespace FW
 			   break;
 		   }
 		   
-		   (*Insts)[CurPixelThread.InstIndex]->Accpet(this);
+		   (*Insts)[CurPixelThread.InstIndex]->Accept(this);
 		   if(bTerminate || CurPixelThread.StackFrames.empty())
 		   {
 			   break;
@@ -59,7 +59,7 @@ namespace FW
 		return true;
 	}
 
-	void SpvVmPixelVisitor::Visit(SpvOpDPdx* Inst)
+	void SpvVmPixelVisitor::Visit(const SpvOpDPdx* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -106,7 +106,7 @@ namespace FW
 		}
 	}
 
-	void SpvVmPixelVisitor::Visit(SpvOpDPdy* Inst)
+	void SpvVmPixelVisitor::Visit(const SpvOpDPdy* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -151,7 +151,7 @@ namespace FW
 		}
 	}
 
-	void SpvVmPixelVisitor::Visit(SpvOpFwidth* Inst)
+	void SpvVmPixelVisitor::Visit(const SpvOpFwidth* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -196,7 +196,7 @@ namespace FW
 		}
 	}
 
-	void SpvVmPixelVisitor::Visit(SpvOpImageSampleImplicitLod* Inst)
+	void SpvVmPixelVisitor::Visit(const SpvOpImageSampleImplicitLod* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -245,7 +245,7 @@ namespace FW
 		}
 	}
 
-	void SpvVmPixelVisitor::Visit(SpvOpKill* Inst)
+	void SpvVmPixelVisitor::Visit(const SpvOpKill* Inst)
 	{
 		SpvVmContext& Context = GetActiveContext();
 		SpvThreadState& ThreadState = Context.ThreadState;
@@ -254,9 +254,9 @@ namespace FW
 		ThreadState.RecordedInfo.DebugStates.Last().bKill = true;
 	}
 
-	void SpvVmPixelVisitor::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts)
+	void SpvVmPixelVisitor::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections)
 	{
-		SpvVmVisitor::Parse(Insts);
+		SpvVmVisitor::Parse(Insts, SpvCode, InSections);
 		
 		for(int32 QuadIndex = 0; QuadIndex < 4; QuadIndex++)
 		{
