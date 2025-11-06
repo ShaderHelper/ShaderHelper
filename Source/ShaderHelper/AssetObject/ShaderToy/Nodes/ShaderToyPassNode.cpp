@@ -160,7 +160,7 @@ namespace SH
 			ShEditor->GetRenderer()->Render();
 			TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = true;
 		}
-		if (ShaderAssetObj->bCompilationSucceed)
+		if (!AnyError)
 		{
 			IsDebugging = true;
 			auto PassOutput = static_cast<GpuTexturePin*>(GetPin("RT"));

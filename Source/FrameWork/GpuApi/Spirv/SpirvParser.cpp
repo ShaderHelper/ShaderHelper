@@ -87,6 +87,18 @@ namespace FW
 		Context.Types.emplace(ResultId, MakeUnique<SpvPointerType>(ResultId, Inst->GetStorageClass(), PointeeType));
 	}
 
+	void SpvMetaVisitor::Visit(const SpvOpTypeFunction* Inst)
+	{
+		SpvType* ReturnType = Context.Types[Inst->GetReturnType()].Get();
+		SpvId ResultId = Inst->GetId().value();
+		TArray<SpvType*> ParameterTypes;
+		for (SpvId ParameterTypeId : Inst->GetParameterTypes())
+		{
+			ParameterTypes.Add(Context.Types[ParameterTypeId].Get());
+		}
+		Context.Types.emplace(ResultId, MakeUnique<SpvFunctionType>(ResultId, ReturnType, ParameterTypes));
+	}
+
 	void SpvMetaVisitor::Visit(const SpvOpTypeStruct* Inst)
 	{
 		TArray<SpvType*> MemberTypes;
@@ -626,6 +638,16 @@ namespace FW
 				DecodedInst->SetId(ResultId);
 				break;
 			}
+			case SpvOp::TypeFunction:
+			{
+				SpvId ResultId = SpvCode[WordOffset + 1];
+				SpvId ReturnType = SpvCode[WordOffset + 2];
+				int32 ParameterTypeWordLen = InstWordLen - 3;
+				TArray<SpvId> ParameterTypeIds = { (SpvId*)&SpvCode[WordOffset + 3], ParameterTypeWordLen };
+				DecodedInst = MakeUnique<SpvOpTypeFunction>(ReturnType, ParameterTypeIds);
+				DecodedInst->SetId(ResultId);
+				break;
+			}
 			case SpvOp::TypeImage:
 			{
 				SpvId ResultId = SpvCode[WordOffset + 1];
@@ -712,8 +734,9 @@ namespace FW
 			{
 				SpvId ResultType = SpvCode[WordOffset + 1];
 				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvFunctionControl FunctionControl = static_cast<SpvFunctionControl>(SpvCode[WordOffset + 3]);
 				SpvId FunctionTypeId = SpvCode[WordOffset + 4];
-				DecodedInst = MakeUnique<SpvOpFunction>(ResultType, FunctionTypeId);
+				DecodedInst = MakeUnique<SpvOpFunction>(ResultType, FunctionControl, FunctionTypeId);
 				DecodedInst->SetId(ResultId);
 				break;
 			}
@@ -1861,6 +1884,7 @@ namespace FW
 
 			if(DecodedInst)
 			{
+				DecodedInst->SetWordOffset(WordOffset);
 				Insts.Add(MoveTemp(DecodedInst));
 			}
 			WordOffset += InstWordLen;

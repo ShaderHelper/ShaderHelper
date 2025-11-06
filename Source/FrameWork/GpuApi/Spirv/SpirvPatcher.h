@@ -9,22 +9,32 @@ namespace FW
 	class FRAMEWORK_API SpvPatcher
 	{
 	public:
-		void SetSpvContext(const TArray<uint32>& InSpvCode, SpvMetaContext* InMetaContext);
+		void SetSpvContext(const TArray<TUniquePtr<SpvInstruction>>& InInsts, const TArray<uint32>& InSpvCode, SpvMetaContext* InMetaContext);
 		const TArray<uint32>& GetSpv() const { return SpvCode; }
 		void Dump(const FString& SavedFileName) const;
 		SpvId NewId() {
 			return SpvCode[3]++;
 		}
 
-		void AddAnnotation(const SpvInstruction* Inst);
-		void AddType(const SpvInstruction* Inst);
-		void AddConstant(const SpvInstruction* Inst);
-		void AddGlobalVariable(const SpvInstruction* Inst);
+		//The result ID is inferred internally
+		SpvId FindOrAddType(SpvInstruction& InInst);
+		template<typename T>
+		SpvId FindOrAddConstant(T InConstant);
+
+		void AddDebugName(SpvInstruction& InInst);
+		void AddAnnotation(SpvInstruction& InInst);
+		void AddGlobalVariable(SpvInstruction& InInst);
+		void AddFunction(TArray<std::reference_wrapper<SpvInstruction>>& Function);
+
+		void AddInstruction(int WordOffset, SpvInstruction& InInst);
 
 	private:
 		void UpdateSection(SpvSectionKind DirtySection, int WordSize);
+		void UpdateOriginInsts(int WordOffset, int WordSize);
 
 	private:
+		const TArray<TUniquePtr<SpvInstruction>>* OriginInsts;
+		TArray<TUniquePtr<SpvInstruction>> PatchedInsts;
 		TArray<uint32> SpvCode;
 		TUniquePtr<SpvMetaVisitor> MetaVisitor;
 	};

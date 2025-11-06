@@ -9,7 +9,7 @@ namespace FW
 	{
 		TArray<FString> ExtraArgs;
 		ExtraArgs.Add("-D");
-		if constexpr(InType == BindingType::RWStorageBuffer)
+		if constexpr(InType == BindingType::RWStructuredBuffer)
 		{
 			ExtraArgs.Add("RESOURCE_STORAGE_BUFFER");
 		}
@@ -46,5 +46,5 @@ namespace FW
 			.Build();
 	}
 
-	template class ClearShader<BindingType::RWStorageBuffer>;
+	template class ClearShader<BindingType::RWStructuredBuffer>;
 }

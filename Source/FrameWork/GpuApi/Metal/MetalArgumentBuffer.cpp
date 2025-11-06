@@ -40,13 +40,13 @@ namespace FW
             
             MTLArgumentDescriptor* ArgDesc = [MTLArgumentDescriptor argumentDescriptor];
             ArgDesc.index = Slot;
-            if(LayoutBindingEntry.Type == BindingType::RWStorageBuffer)
+            if(LayoutBindingEntry.Type == BindingType::RWStructuredBuffer || LayoutBindingEntry.Type == BindingType::RWRawBuffer)
             {
                 ArgDesc.dataType = MTLDataTypePointer;
                 ArgDesc.access = MTLArgumentAccessReadWrite;
                 ResourceUsages.Add(Slot, MTLResourceUsageWrite);
             }
-            else if(LayoutBindingEntry.Type == BindingType::UniformBuffer)
+            else if(LayoutBindingEntry.Type == BindingType::UniformBuffer || LayoutBindingEntry.Type == BindingType::StructuredBuffer || LayoutBindingEntry.Type == BindingType::RawBuffer)
             {
                 ArgDesc.dataType = MTLDataTypePointer;
                 ArgDesc.access = MTLArgumentAccessReadOnly;

@@ -114,7 +114,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         static GpuBindGroupLayoutBuilder BuiltInBindLayout{ BindingContext::GlobalSlot };
         static int Init = [&] {
             BuiltInBindLayout
-				.AddExistingBinding(0, BindingType::RWStorageBuffer, BindingShaderStage::Pixel)
+				.AddExistingBinding(0, BindingType::RWStructuredBuffer, BindingShaderStage::Pixel)
                 .AddUniformBuffer("BuiltInUniform", GetBuiltInUbBuilder().GetLayoutDeclaration(), BindingShaderStage::Pixel)
                 .AddTexture("iChannel0", BindingShaderStage::Pixel)
                 .AddSampler("iChannel0Sampler", BindingShaderStage::Pixel)

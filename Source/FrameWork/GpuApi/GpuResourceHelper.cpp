@@ -40,9 +40,9 @@ namespace FW::GpuResourceHelper
 		{
 			GpuBuffer* Buffer = static_cast<GpuBuffer*>(InResource);
 			uint32 BufferByteSize = Buffer->GetByteSize();
-			if (Buffer->GetUsage() == GpuBufferUsage::RWStorage)
+			if (Buffer->GetUsage() == GpuBufferUsage::RWStructured)
 			{
-				using ClearShaderType = ClearShader<BindingType::RWStorageBuffer>;
+				using ClearShaderType = ClearShader<BindingType::RWStructuredBuffer>;
 				auto* ClearShader = GetShader<ClearShaderType>();
 				Cs = ClearShader->GetComputeShader();
 				BindGroupLayout = ClearShader->GetBindGroupLayout();

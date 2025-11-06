@@ -3783,9 +3783,11 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		
 		TRefCountPtr<GpuBuffer> Input = GGpuRhi->CreateBuffer({
 			.ByteSize = (uint32)InputData.Num(),
-			.Usage = GpuBufferUsage::RWStorage,
-			.Stride = (uint32)InputData.Num(),
-			.InitialData = InputData
+			.Usage = GpuBufferUsage::RWStructured,
+			.InitialData = InputData,
+			.StructuredInit = {
+				.Stride = (uint32)InputData.Num()
+			}
 		});
 		
 		TRefCountPtr<GpuBindGroupLayout> OpBindGroupLayout;
@@ -3793,7 +3795,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		if(Name == "OpImageSampleImplicitLod")
 		{
 			OpBindGroupLayout = GpuBindGroupLayoutBuilder{ 0 }
-				.AddExistingBinding(0, BindingType::RWStorageBuffer)
+				.AddExistingBinding(0, BindingType::RWStructuredBuffer)
 				.AddExistingBinding(1, BindingType::Texture)
 				.AddExistingBinding(2, BindingType::Sampler)
 				.Build();
@@ -3806,7 +3808,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		else if(Name == "OpImageFetch" || Name == "OpImageQueryLevels" || Name == "OpImageQuerySizeLod")
 		{
 			OpBindGroupLayout = GpuBindGroupLayoutBuilder{ 0 }
-				.AddExistingBinding(0, BindingType::RWStorageBuffer)
+				.AddExistingBinding(0, BindingType::RWStructuredBuffer)
 				.AddExistingBinding(1, BindingType::Texture)
 				.Build();
 			OpBindGroup = GpuBindGroupBuilder{ OpBindGroupLayout }
@@ -3817,7 +3819,7 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 		else
 		{
 			OpBindGroupLayout = GpuBindGroupLayoutBuilder{ 0 }
-				.AddExistingBinding(0, BindingType::RWStorageBuffer)
+				.AddExistingBinding(0, BindingType::RWStructuredBuffer)
 				.Build();
 			OpBindGroup = GpuBindGroupBuilder{ OpBindGroupLayout }
 				.SetExistingBinding(0, Input)
@@ -3884,66 +3886,247 @@ IMPL_COMPARISON(FOrdGreaterThanEqual)
 	{
 		this->Insts = &Insts;
 		SpvVmContext& Context = GetActiveContext();
-		Patcher.SetSpvContext(SpvCode, &Context);
+		Patcher.SetSpvContext(Insts, SpvCode, &Context);
 
 		//Patch debugger buffer
-		SpvId UIntType;
-		if (auto It = std::find_if(Context.Types.begin(), Context.Types.end(), [](const auto& Pair) {
-			SpvType* Type = Pair.second.Get();
-			return Type->GetKind() == SpvTypeKind::Integer
-				&& static_cast<SpvIntegerType*>(Type)->GetWidth() == 32
-				&& !static_cast<SpvIntegerType*>(Type)->IsSigend();
-			}); It != Context.Types.end())
-		{
-			UIntType = It->second->GetId();
-		}
-		else
-		{
-			UIntType = Patcher.NewId();
-			SpvOpTypeInt Op{ 32, 0 };
-			Op.SetId(UIntType);
-			Patcher.AddType(&Op);
-		}
-		SpvId RunTimeArrayType = Patcher.NewId();
-		{
-			SpvOpTypeRuntimeArray Op{ UIntType };
-			Op.SetId(RunTimeArrayType);
-			Patcher.AddType(&Op);
-		}
+		SpvOpTypeInt UIntTypeOp{ 32, 0 };
+		SpvId UIntType = Patcher.FindOrAddType(UIntTypeOp);
+
+		SpvOpTypePointer UIntPointerPrivateTypeOp{ SpvStorageClass::Private, UIntType };
+		SpvId UIntPointerPrivateType = Patcher.FindOrAddType(UIntPointerPrivateTypeOp);
+
+		SpvOpTypePointer UIntPointerUniformTypeOp{ SpvStorageClass::Uniform, UIntType };
+		SpvId UIntPointerUniformType = Patcher.FindOrAddType(UIntPointerUniformTypeOp);
+
+		SpvOpTypeRuntimeArray RunTimeArrayTypeOp{ UIntType };
+		SpvId RunTimeArrayType = Patcher.FindOrAddType(RunTimeArrayTypeOp);
+
 		int ArrayStride = 4;
 		SpvOpDecorate ArrayStrideOp{ RunTimeArrayType, SpvDecorationKind::ArrayStride,{(uint8*)&ArrayStride, sizeof(int)} };
-		Patcher.AddAnnotation(&ArrayStrideOp);
+		Patcher.AddAnnotation(ArrayStrideOp);
 
-		SpvId DebuggerBufferType = Patcher.NewId();
-		{
-			SpvOpTypeStruct Op{ {RunTimeArrayType} };
-			Op.SetId(DebuggerBufferType);
-			Patcher.AddType(&Op);
-		}
+		SpvOpTypeStruct DebuggerBufferTypeOp{ {RunTimeArrayType} };
+		SpvId DebuggerBufferType = Patcher.FindOrAddType(DebuggerBufferTypeOp);
+
 		int MemberOffset = 0;
 		SpvOpMemberDecorate MemberOffsetOp{ DebuggerBufferType, 0, SpvDecorationKind::Offset, {(uint8*)&MemberOffset, sizeof(int)} };
-		Patcher.AddAnnotation(&MemberOffsetOp);
+		Patcher.AddAnnotation(MemberOffsetOp);
 		SpvOpDecorate BufferBlockOp{ DebuggerBufferType, SpvDecorationKind::BufferBlock, {} };
-		Patcher.AddAnnotation(&BufferBlockOp);
+		Patcher.AddAnnotation(BufferBlockOp);
 
-		SpvId DebuggerBufferPointerType = Patcher.NewId();
-		{
-			SpvOpTypePointer Op{SpvStorageClass::Uniform, DebuggerBufferType };
-			Op.SetId(DebuggerBufferPointerType);
-			Patcher.AddType(&Op);
-		}
+		SpvOpTypePointer DebuggerBufferPointerTypeOp{ SpvStorageClass::Uniform, DebuggerBufferType };
+		SpvId DebuggerBufferPointerType = Patcher.FindOrAddType(DebuggerBufferPointerTypeOp);
+
 		DebuggerBuffer = Patcher.NewId();
 		{
 			SpvOpVariable Op{ DebuggerBufferPointerType, SpvStorageClass::Uniform, {} };
 			Op.SetId(DebuggerBuffer);
-			Patcher.AddGlobalVariable(&Op);
+			Patcher.AddGlobalVariable(Op);
+
+			SpvOpName NameOp{ DebuggerBuffer, "__DebuggerBuffer"};
+			Patcher.AddDebugName(NameOp);
 		}
 		int SetNumber = 0;
 		SpvOpDecorate SetOp{ DebuggerBuffer, SpvDecorationKind::DescriptorSet, {(uint8*)&SetNumber, sizeof(int)}};
-		Patcher.AddAnnotation(&SetOp);
+		Patcher.AddAnnotation(SetOp);
 
 		int BindingNumber = 0721;
 		SpvOpDecorate BindingOp{ DebuggerBuffer, SpvDecorationKind::Binding, {(uint8*)&BindingNumber, sizeof(int)} };
-		Patcher.AddAnnotation(&BindingOp);
+		Patcher.AddAnnotation(BindingOp);
+
+		DebuggerStateType = Patcher.NewId();
+		{
+			SpvOpVariable Op{ UIntPointerPrivateType, SpvStorageClass::Private, {}};
+			Op.SetId(DebuggerStateType);
+			Patcher.AddGlobalVariable(Op);
+
+			SpvOpName NameOp{ DebuggerStateType, "__DebuggerStateType" };
+			Patcher.AddDebugName(NameOp);
+		}
+		DebuggerOffset = Patcher.NewId();
+		{
+			SpvOpVariable Op{ UIntPointerPrivateType, SpvStorageClass::Private, {} };
+			Op.SetId(DebuggerOffset);
+			Patcher.AddGlobalVariable(Op);
+
+			SpvOpName NameOp{ DebuggerOffset, "__DebuggerOffset" };
+			Patcher.AddDebugName(NameOp);
+		}
+		DebuggerLine = Patcher.NewId();
+		{
+			SpvOpVariable Op{ UIntPointerPrivateType, SpvStorageClass::Private, {} };
+			Op.SetId(DebuggerLine);
+			Patcher.AddGlobalVariable(Op);
+
+			SpvOpName NameOp{ DebuggerLine, "__DebuggerLine" };
+			Patcher.AddDebugName(NameOp);
+		}
+		DebuggerScopeId = Patcher.NewId();
+		{
+			SpvOpVariable Op{ UIntPointerPrivateType, SpvStorageClass::Private, {} };
+			Op.SetId(DebuggerScopeId);
+			Patcher.AddGlobalVariable(Op);
+
+			SpvOpName NameOp{ DebuggerScopeId, "__DebuggerScopeId" };
+			Patcher.AddDebugName(NameOp);
+		}
+		DebuggerVarId = Patcher.NewId();
+		{
+			SpvOpVariable Op{ UIntPointerPrivateType, SpvStorageClass::Private, {} };
+			Op.SetId(DebuggerVarId);
+			Patcher.AddGlobalVariable(Op);
+
+			SpvOpName NameOp{ DebuggerVarId, "__DebuggerVarId" };
+			Patcher.AddDebugName(NameOp);
+		}
+		DebuggerVarDirtyOffset = Patcher.NewId();
+		{
+			SpvOpVariable Op{ UIntPointerPrivateType, SpvStorageClass::Private, {} };
+			Op.SetId(DebuggerVarDirtyOffset);
+			Patcher.AddGlobalVariable(Op);
+
+			SpvOpName NameOp{ DebuggerVarDirtyOffset, "__DebuggerVarDirtyOffset" };
+			Patcher.AddDebugName(NameOp);
+		}
+		DebuggerVarDirtyByteSize = Patcher.NewId();
+		{
+			SpvOpVariable Op{ UIntPointerPrivateType, SpvStorageClass::Private, {} };
+			Op.SetId(DebuggerVarDirtyByteSize);
+			Patcher.AddGlobalVariable(Op);
+
+			SpvOpName NameOp{ DebuggerVarDirtyByteSize, "__DebuggerVarDirtyByteSize" };
+			Patcher.AddDebugName(NameOp);
+		}
+
+		//Patch AppendScope function
+		SpvOpTypeVoid VoidTypeOp;
+		SpvId VoidType = Patcher.FindOrAddType(VoidTypeOp);
+		AppendScopeFuncId = Patcher.NewId();
+		TArray<std::reference_wrapper<SpvInstruction>> AppendScopeFuncInsts;
+		{
+			SpvOpTypeFunction FuncTypeOp{ VoidType, {}};
+			SpvId FuncType = Patcher.FindOrAddType(FuncTypeOp);
+			SpvOpFunction FuncOp{ VoidType, SpvFunctionControl::None, FuncType };
+			FuncOp.SetId(AppendScopeFuncId);
+			AppendScopeFuncInsts.Add(FuncOp);
+
+			SpvOpLabel LabelOp;
+			LabelOp.SetId(Patcher.NewId());
+			AppendScopeFuncInsts.Add(LabelOp);
+
+			SpvId LoadedDebuggerOffset = Patcher.NewId();
+			{
+				SpvOpLoad LoadedDebuggerOffsetOp{ UIntType, DebuggerOffset };
+				LoadedDebuggerOffsetOp.SetId(LoadedDebuggerOffset);
+				AppendScopeFuncInsts.Add(LoadedDebuggerOffsetOp);
+
+				SpvId AlignedDebuggerOffset = Patcher.NewId();
+				SpvOpShiftRightLogical AlignedDebuggerOffsetOp{ UIntType, LoadedDebuggerOffset, Patcher.FindOrAddConstant(2u) };
+				AlignedDebuggerOffsetOp.SetId(AlignedDebuggerOffset);
+				AppendScopeFuncInsts.Add(AlignedDebuggerOffsetOp);
+
+				SpvId LoadedDebuggerStateType = Patcher.NewId();
+				SpvOpLoad LoadedDebuggerStateTypeOp{ UIntType, DebuggerStateType };
+				LoadedDebuggerStateTypeOp.SetId(LoadedDebuggerStateType);
+				AppendScopeFuncInsts.Add(LoadedDebuggerStateTypeOp);
+
+				SpvId DebuggerBufferStorage = Patcher.NewId();
+				SpvOpAccessChain DebuggerBufferStorageOp{ UIntPointerUniformType, DebuggerBuffer, {Patcher.FindOrAddConstant(0u), AlignedDebuggerOffset} };
+				DebuggerBufferStorageOp.SetId(DebuggerBufferStorage);
+				AppendScopeFuncInsts.Add(DebuggerBufferStorageOp);
+
+				SpvOpStore StoreStateOp{ DebuggerBufferStorage, LoadedDebuggerStateType };
+				AppendScopeFuncInsts.Add(StoreStateOp);
+			}
+
+			{
+				SpvId NewDebuggerOffset = Patcher.NewId();
+				SpvOpIAdd AddOp{ UIntType,  LoadedDebuggerOffset, Patcher.FindOrAddConstant(4u)};
+				AddOp.SetId(NewDebuggerOffset);
+				AppendScopeFuncInsts.Add(AddOp);
+
+				SpvOpStore StoreStateOp{ DebuggerOffset, NewDebuggerOffset };
+				AppendScopeFuncInsts.Add(StoreStateOp);
+			}
+
+			LoadedDebuggerOffset = Patcher.NewId();
+			{
+				SpvOpLoad LoadedDebuggerOffsetOp{ UIntType, DebuggerOffset };
+				LoadedDebuggerOffsetOp.SetId(LoadedDebuggerOffset);
+				AppendScopeFuncInsts.Add(LoadedDebuggerOffsetOp);
+
+				SpvId AlignedDebuggerOffset = Patcher.NewId();
+				SpvOpShiftRightLogical AlignedDebuggerOffsetOp{ UIntType, LoadedDebuggerOffset, Patcher.FindOrAddConstant(2u) };
+				AlignedDebuggerOffsetOp.SetId(AlignedDebuggerOffset);
+				AppendScopeFuncInsts.Add(AlignedDebuggerOffsetOp);
+
+				SpvId LoadedDebuggerLine = Patcher.NewId();
+				SpvOpLoad LoadedDebuggerLineOp{ UIntType, DebuggerLine };
+				LoadedDebuggerLineOp.SetId(LoadedDebuggerLine);
+				AppendScopeFuncInsts.Add(LoadedDebuggerLineOp);
+
+				SpvId DebuggerBufferStorage = Patcher.NewId();
+				SpvOpAccessChain DebuggerBufferStorageOp{ UIntPointerUniformType, DebuggerBuffer, {Patcher.FindOrAddConstant(0u), AlignedDebuggerOffset} };
+				DebuggerBufferStorageOp.SetId(DebuggerBufferStorage);
+				AppendScopeFuncInsts.Add(DebuggerBufferStorageOp);
+
+				SpvOpStore StoreStateOp{ DebuggerBufferStorage, LoadedDebuggerLine };
+				AppendScopeFuncInsts.Add(StoreStateOp);
+			}
+
+			{
+				SpvId NewDebuggerOffset = Patcher.NewId();
+				SpvOpIAdd AddOp{ UIntType,  LoadedDebuggerOffset, Patcher.FindOrAddConstant(4u) };
+				AddOp.SetId(NewDebuggerOffset);
+				AppendScopeFuncInsts.Add(AddOp);
+
+				SpvOpStore StoreStateOp{ DebuggerOffset, NewDebuggerOffset };
+				AppendScopeFuncInsts.Add(StoreStateOp);
+			}
+
+			LoadedDebuggerOffset = Patcher.NewId();
+			{
+				SpvOpLoad LoadedDebuggerOffsetOp{ UIntType, DebuggerOffset };
+				LoadedDebuggerOffsetOp.SetId(LoadedDebuggerOffset);
+				AppendScopeFuncInsts.Add(LoadedDebuggerOffsetOp);
+
+				SpvId AlignedDebuggerOffset = Patcher.NewId();
+				SpvOpShiftRightLogical AlignedDebuggerOffsetOp{ UIntType, LoadedDebuggerOffset, Patcher.FindOrAddConstant(2u) };
+				AlignedDebuggerOffsetOp.SetId(AlignedDebuggerOffset);
+				AppendScopeFuncInsts.Add(AlignedDebuggerOffsetOp);
+
+				SpvId LoadedDebuggerScopeId = Patcher.NewId();
+				SpvOpLoad LoadedDebuggerScopeIdOp{ UIntType, DebuggerScopeId };
+				LoadedDebuggerScopeIdOp.SetId(LoadedDebuggerScopeId);
+				AppendScopeFuncInsts.Add(LoadedDebuggerScopeIdOp);
+
+				SpvId DebuggerBufferStorage = Patcher.NewId();
+				SpvOpAccessChain DebuggerBufferStorageOp{ UIntPointerUniformType, DebuggerBuffer, {Patcher.FindOrAddConstant(0u), AlignedDebuggerOffset} };
+				DebuggerBufferStorageOp.SetId(DebuggerBufferStorage);
+				AppendScopeFuncInsts.Add(DebuggerBufferStorageOp);
+
+				SpvOpStore StoreStateOp{ DebuggerBufferStorage, LoadedDebuggerScopeId };
+				AppendScopeFuncInsts.Add(StoreStateOp);
+			}
+
+			{
+				SpvId NewDebuggerOffset = Patcher.NewId();
+				SpvOpIAdd AddOp{ UIntType,  LoadedDebuggerOffset, Patcher.FindOrAddConstant(4u) };
+				AddOp.SetId(NewDebuggerOffset);
+				AppendScopeFuncInsts.Add(AddOp);
+
+				SpvOpStore StoreStateOp{ DebuggerOffset, NewDebuggerOffset };
+				AppendScopeFuncInsts.Add(StoreStateOp);
+			}
+
+			SpvOpReturn ReturnOp{};
+			AppendScopeFuncInsts.Add(ReturnOp);
+			SpvOpFunctionEnd FuncEndOp{};
+			AppendScopeFuncInsts.Add(FuncEndOp);
+
+			SpvOpName NameOp{ AppendScopeFuncId, "__AppendScope" };
+			Patcher.AddDebugName(NameOp);
+		}
+		Patcher.AddFunction(AppendScopeFuncInsts);
 	}
 }

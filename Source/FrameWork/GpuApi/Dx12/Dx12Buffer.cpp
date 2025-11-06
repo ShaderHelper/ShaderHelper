@@ -12,7 +12,7 @@ namespace FW
 	{
 		Allocation.SetOwner(this);
 
-		if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::Storage))
+		if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::Structured))
 		{
 			SRV = AllocCpuCbvSrvUav();
 			if (Allocation.GetPolicy() == AllocationPolicy::Placed || Allocation.GetPolicy() == AllocationPolicy::Committed)
@@ -20,8 +20,8 @@ namespace FW
 				D3D12_SHADER_RESOURCE_VIEW_DESC SrvDesc{};
 				SrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 				SrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-				SrvDesc.Buffer.NumElements = InBufferDesc.ByteSize / InBufferDesc.Stride;
-				SrvDesc.Buffer.StructureByteStride = InBufferDesc.Stride;
+				SrvDesc.Buffer.NumElements = InBufferDesc.ByteSize / InBufferDesc.StructuredInit.Stride;
+				SrvDesc.Buffer.StructureByteStride = InBufferDesc.StructuredInit.Stride;
 				GDevice->CreateShaderResourceView(Allocation.GetResource(), &SrvDesc, SRV->GetHandle());
 			}
 
@@ -36,20 +36,20 @@ namespace FW
 				SrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 				SrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 				SrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
-				SrvDesc.Buffer.NumElements = InBufferDesc.ByteSize;
+				SrvDesc.Buffer.NumElements = InBufferDesc.ByteSize / 4;
 				GDevice->CreateShaderResourceView(Allocation.GetResource(), &SrvDesc, SRV->GetHandle());
 			}
 		}
 
-		if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::RWStorage))
+		if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::RWStructured))
 		{
 			UAV = AllocCpuCbvSrvUav();
 			if (Allocation.GetPolicy() == AllocationPolicy::Placed || Allocation.GetPolicy() == AllocationPolicy::Committed)
 			{
 				D3D12_UNORDERED_ACCESS_VIEW_DESC UavDesc{};
 				UavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-				UavDesc.Buffer.NumElements = InBufferDesc.ByteSize / InBufferDesc.Stride;
-				UavDesc.Buffer.StructureByteStride = InBufferDesc.Stride;
+				UavDesc.Buffer.NumElements = InBufferDesc.ByteSize / InBufferDesc.StructuredInit.Stride;
+				UavDesc.Buffer.StructureByteStride = InBufferDesc.StructuredInit.Stride;
 				GDevice->CreateUnorderedAccessView(Allocation.GetResource(), nullptr, &UavDesc, UAV->GetHandle());
 			}
 		}
@@ -62,7 +62,7 @@ namespace FW
 				UavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
 				UavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
 				UavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
-				UavDesc.Buffer.NumElements = InBufferDesc.ByteSize;
+				UavDesc.Buffer.NumElements = InBufferDesc.ByteSize / 4;
 				GDevice->CreateUnorderedAccessView(Allocation.GetResource(), nullptr, &UavDesc, UAV->GetHandle());
 			}
 		}
@@ -100,7 +100,7 @@ namespace FW
 		D3D12_RESOURCE_STATES InitDxState = MapResourceState(ResourceState);
 
 		TRefCountPtr<Dx12Buffer> RetBuffer;
-		if (EnumHasAnyFlags(InBufferDesc.Usage, GpuBufferUsage::RWStorage | GpuBufferUsage::RWRaw))
+		if (EnumHasAnyFlags(InBufferDesc.Usage, GpuBufferUsage::RWStructured | GpuBufferUsage::RWRaw))
 		{
 			DxBufferDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 		}

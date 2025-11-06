@@ -4039,9 +4039,11 @@ void __Expression_Output(T __Expression_Result) {}
 		{
             TRefCountPtr<GpuBuffer> LocalVarsInput = GGpuRhi->CreateBuffer({
                 .ByteSize = (uint32)InputData.Num(),
-                .Usage = GpuBufferUsage::Storage,
-                .Stride = (uint32)InputData.Num(),
-                .InitialData = InputData
+                .Usage = GpuBufferUsage::Structured,
+                .InitialData = InputData,
+				.StructuredInit = {
+					.Stride = (uint32)InputData.Num()
+				}
             });
 
             SpirvParser Parser;

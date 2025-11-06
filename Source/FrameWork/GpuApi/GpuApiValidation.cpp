@@ -128,9 +128,9 @@ namespace FW
 				return false;
 			}
 		}
-		else if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::RWStorage))
+		else if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::RWStructured))
 		{
-			if (InBufferDesc.Stride == 0 || (InBufferDesc.ByteSize % InBufferDesc.Stride != 0))
+			if (InBufferDesc.StructuredInit.Stride == 0 || (InBufferDesc.ByteSize % InBufferDesc.StructuredInit.Stride != 0))
 			{
 				SH_LOG(LogRhiValidation, Error, TEXT("CreateBuffer Error(Invalid Stride value) for GpuBufferUsage(%s)"), ANSI_TO_TCHAR(magic_enum::enum_name(InBufferDesc.Usage).data()));
 				return false;

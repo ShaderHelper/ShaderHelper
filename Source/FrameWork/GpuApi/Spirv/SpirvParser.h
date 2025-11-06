@@ -45,6 +45,7 @@ namespace FW
 		void Visit(const SpvOpTypeMatrix* Inst) override;
 		void Visit(const SpvOpTypeBool* Inst) override;
 		void Visit(const SpvOpTypePointer* Inst) override;
+		void Visit(const SpvOpTypeFunction* Inst) override;
 		void Visit(const SpvOpTypeStruct* Inst) override;
 		void Visit(const SpvOpTypeImage* Inst) override;
 		void Visit(const SpvOpTypeSampler* Inst) override;

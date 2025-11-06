@@ -11,9 +11,11 @@ namespace FW
 		Datas.SetNumZeroed(sizeof(HLSL::Printer));
 		InternalBuffer = GGpuRhi->CreateBuffer({
 			.ByteSize = sizeof(HLSL::Printer),
-			.Usage = GpuBufferUsage::RWStorage,
-			.Stride = sizeof(HLSL::Printer),
-			.InitialData = Datas
+			.Usage = GpuBufferUsage::RWStructured,
+			.InitialData = Datas,
+			.StructuredInit = {
+				.Stride = sizeof(HLSL::Printer)
+			}
 		});
 	}
 

@@ -245,6 +245,12 @@ namespace FW
 		bool bTerminate{};
 		const TArray<TUniquePtr<SpvInstruction>>* Insts;
 		SpvId DebuggerBuffer;
+		SpvId DebuggerStateType;
+		SpvId DebuggerOffset;
+		SpvId DebuggerLine;
+		SpvId DebuggerVarId, DebuggerVarDirtyOffset, DebuggerVarDirtyByteSize;
+		SpvId DebuggerScopeId;
+		SpvId AppendScopeFuncId;
 		SpvPatcher Patcher;
 	};
 

@@ -53,6 +53,7 @@ namespace FW
 		Vector,
 		Matrix,
 		Pointer,
+		Function,
 		Struct,
 		Image,
 		Sampler,
@@ -191,6 +192,22 @@ namespace FW
 		R64i = 41,
 	};
 
+	enum class SpvFunctionControl
+	{
+		None = 0,
+		Inline = 1,
+		DontInline = 2,
+		Pure = 4,
+		Const  = 8,
+	};
+
+	enum class SpvSelectionControl
+	{
+		None = 0,
+		Flatten = 1,
+		DontFlatten = 2,
+	};
+
 	class SpvType
 	{
 	public:
@@ -309,6 +326,19 @@ namespace FW
 		
 		SpvStorageClass StorageClass;
 		SpvType* PointeeType;
+	};
+
+	class SpvFunctionType : public SpvType
+	{
+	public:
+		SpvFunctionType(SpvId InId, SpvType* InReturnType, const TArray<SpvType*>& InParameterTypes)
+		: SpvType(SpvTypeKind::Function, InId)
+		, ReturnType(InReturnType)
+		, ParameterTypes(InParameterTypes)
+		{}
+
+		SpvType* ReturnType;
+		TArray<SpvType*> ParameterTypes;
 	};
 
 	class SpvStructType : public SpvType
@@ -519,6 +549,7 @@ namespace FW
 		TypeRuntimeArray = 29,
 		TypeStruct = 30,
 		TypePointer = 32,
+		TypeFunction = 33,
 		ConstantTrue = 41,
 		ConstantFalse = 42,
 		Constant = 43,
@@ -526,6 +557,7 @@ namespace FW
 		ConstantNull = 46,
 		Function = 54,
 		FunctionParameter = 55,
+		FunctionEnd = 56,
 		FunctionCall = 57,
 		Variable = 59,
 		Load = 61,
@@ -602,6 +634,7 @@ namespace FW
 		DPdy = 208,
 		Fwidth = 209,
 		Phi = 245,
+		SelectionMerge = 247,
 		Label = 248,
 		Branch = 249,
 		BranchConditional = 250,

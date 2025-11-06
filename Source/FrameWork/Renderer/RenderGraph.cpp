@@ -29,7 +29,7 @@ namespace FW
 				GpuTexture* Tex = static_cast<GpuTexture*>(ResourceBindingEntry.Resource);
 				InOutPass.PassTexStates.Add(Tex, GpuResourceState::ShaderResourceRead);
 			}
-			else if (LayoutBindingEntry.Type == BindingType::RWStorageBuffer)
+			else if (LayoutBindingEntry.Type == BindingType::RWStructuredBuffer || LayoutBindingEntry.Type == BindingType::RWRawBuffer)
 			{
 				GpuBuffer* Buffer = static_cast<GpuBuffer*>(ResourceBindingEntry.Resource);
 				InOutPass.PassBufferStates.Add(Buffer, GpuResourceState::UnorderedAccess);
