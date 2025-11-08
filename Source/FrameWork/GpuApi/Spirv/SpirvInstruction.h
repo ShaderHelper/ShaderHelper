@@ -203,6 +203,9 @@ namespace FW
 		void SetId(SpvId Id) { ResultId = Id; }
 		std::optional<int> GetWordOffset() const { return WordOffset; }
 		void SetWordOffset(uint32 InWordOffset) { WordOffset = InWordOffset; };
+		std::optional<int> GetWordLen() const { return WordLen; }
+		void SetWordLen(uint32 InWordLen) { WordLen = InWordLen; };
+
 		virtual TUniquePtr<SpvInstruction> Clone() const = 0;
 		virtual void Accept(SpvVisitor* Visitor) const = 0;
 		virtual TArray<uint32> ToBinary() const { check(false);  return {}; }
@@ -211,6 +214,7 @@ namespace FW
 		SpvInstKind Kind;
 		std::optional<SpvId> ResultId;
 		std::optional<int> WordOffset;
+		std::optional<int> WordLen;
 	};
 
 	template<typename T>
@@ -270,7 +274,7 @@ namespace FW
 	class SpvOpDecorate : public SpvInstructionBase<SpvOpDecorate>
 	{
 	public:
-		SpvOpDecorate(SpvId InTarget, SpvDecorationKind InDecorationKind, const TArray<uint8>& InOperands)
+		SpvOpDecorate(SpvId InTarget, SpvDecorationKind InDecorationKind, const TArray<uint8>& InOperands = {})
 		: SpvInstructionBase(SpvOp::Decorate)
 		, Target(InTarget)
 		, DecorationKind(InDecorationKind)
@@ -382,6 +386,16 @@ namespace FW
 		
 		SpvId GetComponentType() const { return ComponentType; }
 		uint32 GetComponentCount() const { return ComponentCount; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(ComponentType.GetValue());
+			Bin.Add(ComponentCount);
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::TypeVector;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ComponentType;
@@ -447,7 +461,7 @@ namespace FW
 	class SpvOpTypeFunction : public SpvInstructionBase<SpvOpTypeFunction>
 	{
 	public:
-		SpvOpTypeFunction(SpvId InReturnType, const TArray<SpvId>& InParameterTypes) : SpvInstructionBase(SpvOp::TypeFunction)
+		SpvOpTypeFunction(SpvId InReturnType, const TArray<SpvId>& InParameterTypes = {}) : SpvInstructionBase(SpvOp::TypeFunction)
 		, ReturnType(InReturnType)
 		, ParameterTypes(InParameterTypes)
 		{}
@@ -572,6 +586,16 @@ namespace FW
 		{}
 		SpvId GetResultType() const { return ResultType; }
 		const TArray<uint8>& GetValue() const { return Value; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Append((uint32*)Value.GetData(), Value.Num() / 4);
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Constant;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	protected:
 		SpvId ResultType;
@@ -604,6 +628,16 @@ namespace FW
 		{}
 		SpvId GetResultType() const { return ResultType; }
 		const TArray<SpvId>& GetConstituents() const { return Constituents; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Append((uint32*)Constituents.GetData(), Constituents.Num());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ConstantComposite;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -730,7 +764,7 @@ namespace FW
 	class SpvOpFunctionCall : public SpvInstructionBase<SpvOpFunctionCall>
 	{
 	public:
-		SpvOpFunctionCall(SpvId InResultType, SpvId InFunction, const TArray<SpvId>& InArguments) : SpvInstructionBase(SpvOp::FunctionCall)
+		SpvOpFunctionCall(SpvId InResultType, SpvId InFunction, const TArray<SpvId>& InArguments = {}) : SpvInstructionBase(SpvOp::FunctionCall)
 		, ResultType(InResultType)
 		, Function(InFunction)
 		, Arguments(InArguments)
@@ -760,7 +794,7 @@ namespace FW
 	class SpvOpVariable : public SpvInstructionBase<SpvOpVariable>
 	{
 	public:
-		SpvOpVariable(SpvId InResultType, SpvStorageClass InStorageClass, std::optional<SpvId> InInitializer) : SpvInstructionBase(SpvOp::Variable)
+		SpvOpVariable(SpvId InResultType, SpvStorageClass InStorageClass, std::optional<SpvId> InInitializer = {}) : SpvInstructionBase(SpvOp::Variable)
 		, ResultType(InResultType)
 		, StorageClass(InStorageClass)
 		, Initializer(InInitializer)
@@ -1973,6 +2007,14 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 		{}
 		
 		SpvId GetValue() const { return Value; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(Value.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ReturnValue;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId Value;

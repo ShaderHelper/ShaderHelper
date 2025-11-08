@@ -10,7 +10,7 @@
 #include <Widgets/Text/SlateEditableTextLayout.h>
 #include "AssetObject/ShaderAsset.h"
 #include "GpuApi/Spirv/SpirvParser.h"
-#include "GpuApi/Spirv/SpirvPixelVM.h"
+#include "GpuApi/Spirv/SpirvPixelDebugger.h"
 #include "GpuApi/GpuBindGroup.h"
 
 namespace SH
@@ -260,7 +260,7 @@ namespace SH
 		void RefreshBracketHighlight();
 		
 		void DebugPixel(const FW::Vector2u& PixelCoord, const TArray<TRefCountPtr<FW::GpuBindGroup>>& BindGroups = {});
-		void ApplyDebugState(const FW::SpvDebugState& State, bool bReverse = false);
+		void ApplyDebugState(const FW::SpvDebugState& State);
 		void ShowDeuggerVariable(FW::SpvLexicalScope* InScope) const;
 		void ShowDebuggerResult() const;
 		struct ExpressionNode EvaluateExpression(const FString& InExpression) const;
@@ -319,11 +319,12 @@ namespace SH
 		std::optional<int32> CurValidLine;
 		FString DebuggerError;
 		int32 CurDebugStateIndex{};
-		FW::SpvVmContext* DebuggerContext = nullptr;
+		FW::SpvDebuggerContext* DebuggerContext = nullptr;
 		std::vector<std::pair<FW::SpvId, FW::SpvVariableDesc*>> SortedVariableDescs;
 		std::optional<FW::SpvObject> CurReturnObject;
 		FW::SpvVariable* AssertResult = nullptr;
-		std::optional<FW::SpvVmPixelContext> VmPixelContext;
+		std::optional<FW::SpvPixelDebuggerContext> PixelDebuggerContext;
+		TArray<FW::SpvDebugState> DebugStates;
 		bool bEditDuringDebugging{};
 		//
         

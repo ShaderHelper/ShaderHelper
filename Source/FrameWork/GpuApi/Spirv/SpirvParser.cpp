@@ -171,6 +171,7 @@ namespace FW
 				.BuiltIn = {BuiltIn}
 			};
 			Context.Decorations.Add(Inst->GetTargetId(), MoveTemp(Decoration));
+			Context.BuiltIns.Add(BuiltIn, Inst->GetTargetId());
 		}
 		else if(Inst->GetKind() == SpvDecorationKind::Binding)
 		{
@@ -1885,6 +1886,7 @@ namespace FW
 			if(DecodedInst)
 			{
 				DecodedInst->SetWordOffset(WordOffset);
+				DecodedInst->SetWordLen(InstWordLen);
 				Insts.Add(MoveTemp(DecodedInst));
 			}
 			WordOffset += InstWordLen;

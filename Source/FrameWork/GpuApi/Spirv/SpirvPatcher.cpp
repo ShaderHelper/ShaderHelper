@@ -29,19 +29,19 @@ namespace FW
 		FFileHelper::SaveStringToFile(SpvSourceText, *SavedFileName);
 	}
 
-	void SpvPatcher::AddDebugName(SpvInstruction& InInst)
+	void SpvPatcher::AddDebugName(TUniquePtr<SpvInstruction> InInst)
 	{
 		SpvMetaContext& Context = MetaVisitor->GetContext();
-		AddInstruction(Context.Sections[SpvSectionKind::DebugName].EndOffset, InInst);
+		AddInstruction(Context.Sections[SpvSectionKind::DebugName].EndOffset, MoveTemp(InInst));
 	}
 
-	void SpvPatcher::AddAnnotation(SpvInstruction& InInst)
+	void SpvPatcher::AddAnnotation(TUniquePtr<SpvInstruction> InInst)
 	{
 		SpvMetaContext& Context = MetaVisitor->GetContext();
-		AddInstruction(Context.Sections[SpvSectionKind::Annotation].EndOffset, InInst);
+		AddInstruction(Context.Sections[SpvSectionKind::Annotation].EndOffset, MoveTemp(InInst));
 	}
 
-	SpvId SpvPatcher::FindOrAddType(SpvInstruction& InInst)
+	SpvId SpvPatcher::FindOrAddType(TUniquePtr<SpvInstruction> InInst)
 	{
 		SpvMetaContext& Context = MetaVisitor->GetContext();
 
@@ -101,14 +101,14 @@ namespace FW
 		SpvId ResultId;
 		for (auto& Inst : *OriginInsts)
 		{
-			if (HasType(Inst.Get(), &InInst))
+			if (HasType(Inst.Get(), InInst.Get()))
 			{
 				ResultId = Inst->GetId().value();
 			}
 		}
 		for (auto& Inst : PatchedInsts)
 		{
-			if (HasType(Inst.Get(), &InInst))
+			if (HasType(Inst.Get(), InInst.Get()))
 			{
 				ResultId = Inst->GetId().value();
 			}
@@ -117,9 +117,9 @@ namespace FW
 		if(!ResultId.IsValid())
 		{
 			ResultId = NewId();
-			InInst.SetId(ResultId);
+			InInst->SetId(ResultId);
 
-			AddInstruction(Context.Sections[SpvSectionKind::Type].EndOffset, InInst);
+			AddInstruction(Context.Sections[SpvSectionKind::Type].EndOffset, MoveTemp(InInst));
 		}
 
 		return ResultId;
@@ -129,18 +129,36 @@ namespace FW
 	SpvId SpvPatcher::FindOrAddConstant(T InConstant)
 	{
 		SpvId ConstantType;
+		TUniquePtr<SpvInstruction> ConstantInst;
 		if constexpr (std::is_same_v<T, uint32>)
 		{
-			SpvOpTypeInt UIntTypeOp{ 32, 0 };
-			ConstantType = FindOrAddType(UIntTypeOp);
+			ConstantType = FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
+			ConstantInst = MakeUnique<SpvOpConstant>(ConstantType, TArray<uint8>{(uint8*)&InConstant, sizeof(T)});
 		}
 		else if constexpr (std::is_same_v<T, int32>)
 		{
-			SpvOpTypeInt IntTypeOp{ 32, 1 };
-			ConstantType = FindOrAddType(IntTypeOp);
+			ConstantType = FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 1));
+			ConstantInst = MakeUnique<SpvOpConstant>(ConstantType, TArray<uint8>{(uint8*)&InConstant, sizeof(T)});
+		}
+		else if constexpr (std::is_same_v<T, Vector2u>)
+		{
+			SpvId BaseType = FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
+			ConstantType = FindOrAddType(MakeUnique<SpvOpTypeVector>(BaseType, 2));
+			ConstantInst = MakeUnique<SpvOpConstantComposite>(ConstantType, TArray<SpvId>{
+				FindOrAddConstant(InConstant.X),
+				FindOrAddConstant(InConstant.Y)
+			});
+		}
+		else if constexpr (std::is_same_v<T, Vector2i>)
+		{
+			SpvId BaseType = FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 1));
+			ConstantType = FindOrAddType(MakeUnique<SpvOpTypeVector>(BaseType, 2));
+			ConstantInst = MakeUnique<SpvOpConstantComposite>(ConstantType, TArray<SpvId>{
+				FindOrAddConstant(InConstant.X),
+				FindOrAddConstant(InConstant.Y)
+			});
 		}
 
-		SpvOpConstant InInst{ ConstantType, {(uint8*)&InConstant, sizeof(T)} };
 		SpvMetaContext& Context = MetaVisitor->GetContext();
 		auto HasConstant = [&](SpvInstruction* A, SpvInstruction* B) {
 			if (A->GetKind() == B->GetKind())
@@ -152,21 +170,27 @@ namespace FW
 					SpvOpConstant* ConstantB = static_cast<SpvOpConstant*>(B);
 					return ConstantA->GetResultType() == ConstantB->GetResultType() && ConstantA->GetValue() == ConstantB->GetValue();
 				}
+				else if (OpCode == SpvOp::ConstantComposite)
+				{
+					SpvOpConstantComposite* ConstantA = static_cast<SpvOpConstantComposite*>(A);
+					SpvOpConstantComposite* ConstantB = static_cast<SpvOpConstantComposite*>(B);
+					return ConstantA->GetResultType() == ConstantB->GetResultType() && ConstantA->GetConstituents() == ConstantB->GetConstituents();
+				}
 			}
 			return false;
-			};
+		};
 
 		SpvId ResultId;
 		for (auto& Inst : *OriginInsts)
 		{
-			if (HasConstant(Inst.Get(), &InInst))
+			if (HasConstant(Inst.Get(), ConstantInst.Get()))
 			{
 				ResultId = Inst->GetId().value();
 			}
 		}
 		for (auto& Inst : PatchedInsts)
 		{
-			if (HasConstant(Inst.Get(), &InInst))
+			if (HasConstant(Inst.Get(), ConstantInst.Get()))
 			{
 				ResultId = Inst->GetId().value();
 			}
@@ -175,36 +199,47 @@ namespace FW
 		if (!ResultId.IsValid())
 		{
 			ResultId = NewId();
-			InInst.SetId(ResultId);
-			AddInstruction(Context.Sections[SpvSectionKind::Contant].EndOffset, InInst);
+			ConstantInst->SetId(ResultId);
+			AddInstruction(Context.Sections[SpvSectionKind::Contant].EndOffset, MoveTemp(ConstantInst));
 		}
 		return ResultId;
 	}
 
 	template SpvId SpvPatcher::FindOrAddConstant<uint32>(uint32);
 	template SpvId SpvPatcher::FindOrAddConstant<int32>(int32);
+	template SpvId SpvPatcher::FindOrAddConstant<Vector2i>(Vector2i);
+	template SpvId SpvPatcher::FindOrAddConstant<Vector2u>(Vector2u);
 
-	void SpvPatcher::AddGlobalVariable(SpvInstruction& InInst)
+	void SpvPatcher::AddGlobalVariable(TUniquePtr<SpvInstruction> InInst)
 	{
 		SpvMetaContext& Context = MetaVisitor->GetContext();
-		AddInstruction(Context.Sections[SpvSectionKind::GlobalVar].EndOffset, InInst);
+		AddInstruction(Context.Sections[SpvSectionKind::GlobalVar].EndOffset, MoveTemp(InInst));
 	}
 
-	void SpvPatcher::AddFunction(TArray<std::reference_wrapper<SpvInstruction>>& Function)
+	void SpvPatcher::AddFunction(TArray<TUniquePtr<SpvInstruction>>&& Function)
 	{
 		SpvMetaContext& Context = MetaVisitor->GetContext();
 		for (auto& Inst : Function)
 		{
-			AddInstruction(Context.Sections[SpvSectionKind::Function].EndOffset, Inst);
+			AddInstruction(Context.Sections[SpvSectionKind::Function].EndOffset, MoveTemp(Inst));
 		}
 	}
 
-	void SpvPatcher::AddInstruction(int WordOffset, SpvInstruction& InInst)
+	void SpvPatcher::AddInstructions(int WordOffset, TArray<TUniquePtr<SpvInstruction>>&& InInsts)
+	{
+		for (int i = InInsts.Num() - 1; i >= 0; i--)
+		{
+			AddInstruction(WordOffset, MoveTemp(InInsts[i]));
+		}
+	}
+
+	void SpvPatcher::AddInstruction(int WordOffset, TUniquePtr<SpvInstruction> InInst)
 	{
 		SpvMetaContext& Context = MetaVisitor->GetContext();
-		TArray<uint32> InstBin = InInst.ToBinary();
+		TArray<uint32> InstBin = InInst->ToBinary();
 		SpvCode.Insert(InstBin, WordOffset);
-		InInst.SetWordOffset(WordOffset);
+		InInst->SetWordOffset(WordOffset);
+		InInst->SetWordLen(InstBin.Num());
 		SpvSectionKind TargetSection{};
 		for (int i = (int)SpvSectionKind::Capability; i < (int)SpvSectionKind::Num; i++)
 		{
@@ -218,9 +253,9 @@ namespace FW
 		UpdateOriginInsts(WordOffset, InstBin.Num());
 		if ((int)TargetSection <= (int)SpvSectionKind::Function)
 		{
-			InInst.Accept(MetaVisitor.Get());
+			InInst->Accept(MetaVisitor.Get());
 		}
-		PatchedInsts.Add(InInst.Clone());
+		PatchedInsts.Add(MoveTemp(InInst));
 	}
 
 	void SpvPatcher::UpdateSection(SpvSectionKind DirtySection, int WordSize)

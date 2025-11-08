@@ -17,16 +17,17 @@ namespace FW
 		}
 
 		//The result ID is inferred internally
-		SpvId FindOrAddType(SpvInstruction& InInst);
+		SpvId FindOrAddType(TUniquePtr<SpvInstruction> InInst);
 		template<typename T>
 		SpvId FindOrAddConstant(T InConstant);
 
-		void AddDebugName(SpvInstruction& InInst);
-		void AddAnnotation(SpvInstruction& InInst);
-		void AddGlobalVariable(SpvInstruction& InInst);
-		void AddFunction(TArray<std::reference_wrapper<SpvInstruction>>& Function);
+		void AddDebugName(TUniquePtr<SpvInstruction> InInst);
+		void AddAnnotation(TUniquePtr<SpvInstruction> InInst);
+		void AddGlobalVariable(TUniquePtr<SpvInstruction> InInst);
+		void AddFunction(TArray<TUniquePtr<SpvInstruction>>&& Function);
 
-		void AddInstruction(int WordOffset, SpvInstruction& InInst);
+		void AddInstructions(int WordOffset, TArray<TUniquePtr<SpvInstruction>>&& InInsts);
+		void AddInstruction(int WordOffset, TUniquePtr<SpvInstruction> InInst);
 
 	private:
 		void UpdateSection(SpvSectionKind DirtySection, int WordSize);

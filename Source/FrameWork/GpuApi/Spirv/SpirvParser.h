@@ -24,6 +24,7 @@ namespace FW
 		std::unordered_map<SpvId, SpvVariableDesc*> VariableDescMap;   //VarId -> Desc
 		std::unordered_map<SpvId, TUniquePtr<SpvLexicalScope>> LexicalScopes;
 
+		TMap<SpvBuiltIn, SpvId> BuiltIns;
 		TMap<SpvSectionKind, SpvSection> Sections;
 	};
 

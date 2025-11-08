@@ -18,7 +18,6 @@
 #include <Fonts/FontMeasure.h>
 #include <Styling/StyleColors.h>
 #include "Editor/AssetEditor/AssetEditor.h"
-#include "GpuApi/Spirv/SpirvExpressionVM.h"
 #include "Common/Path/BaseResourcePath.h"
 #include <Widgets/Colors/SColorBlock.h>
 #include "UI/Widgets/ColorPicker/SColorPicker.h"
@@ -3320,7 +3319,7 @@ constexpr int PaddingLineNum = 22;
         TextLayout->AddLines(MoveTemp(LinesToAdd));
     }
 
-	void SShaderEditorBox::ApplyDebugState(const FW::SpvDebugState& State, bool bReverse)
+	void SShaderEditorBox::ApplyDebugState(const FW::SpvDebugState& State)
 	{
         CurReturnObject = State.ReturnObject;
 		if(State.bFuncCall)
@@ -3334,7 +3333,7 @@ constexpr int PaddingLineNum = 22;
 		
 		if(State.ScopeChange)
 		{
-			Scope = bReverse ? State.ScopeChange.value().PreScope : State.ScopeChange.value().NewScope;
+			Scope = State.ScopeChange.value().NewScope;
 			CallStackScope = Scope;
 			//Return func
 			if(!CallStack.IsEmpty() && State.bReturn)
@@ -3346,12 +3345,11 @@ constexpr int PaddingLineNum = 22;
 		
 		for(const SpvVariableChange& VarChange : State.VarChanges)
 		{
-			auto& RecordedInfo = DebuggerContext->ThreadState.RecordedInfo;
-			SpvVariable& Var = RecordedInfo.AllVariables[VarChange.VarId];
-			if(!Var.IsExternal())
+			SpvVariable* Var = DebuggerContext->FindVar(VarChange.VarId);
+			if(!Var->IsExternal())
 			{
-				Var.InitializedRanges.Add({VarChange.Range.OffsetBytes, VarChange.Range.OffsetBytes + VarChange.Range.ByteSize});
-				std::get<SpvObject::Internal>(Var.Storage).Value = bReverse ? VarChange.PreValue : VarChange.NewValue;
+				Var->InitializedRanges.Add({VarChange.Range.OffsetBytes, VarChange.Range.OffsetBytes + VarChange.Range.ByteSize});
+				std::get<SpvObject::Internal>(Var->Storage).Value =  VarChange.NewValue;
 			}
 			DirtyVars.Add(VarChange.VarId, VarChange.Range);
 		}
@@ -3862,9 +3860,7 @@ constexpr int PaddingLineNum = 22;
 		
 		TArray<ExpressionNodePtr> LocalVarNodeDatas;
         TArray<ExpressionNodePtr> GlobalVarNodeDatas;
-		const auto& RecordedInfo = DebuggerContext->ThreadState.RecordedInfo;
-		const auto& DebugStates = RecordedInfo.DebugStates;
-		
+
 		if(CurReturnObject && Scope == InScope)
 		{
 			SpvTypeDesc* ReturnTypeDesc = std::get<SpvTypeDesc*>(GetFunctionDesc(Scope)->GetFuncTypeDesc()->GetReturnType());
@@ -3879,10 +3875,9 @@ constexpr int PaddingLineNum = 22;
 		
 		for(const auto& [VarId, VarDesc] : SortedVariableDescs)
 		{
-			if(RecordedInfo.AllVariables.contains(VarId))
+			if(SpvVariable* Var = DebuggerContext->FindVar(VarId))
 			{
-				const SpvVariable& Var = RecordedInfo.AllVariables.at(VarId);
-				if(!Var.IsExternal())
+				if(!Var->IsExternal())
 				{
 					bool VisibleScope = VarDesc->Parent->Contains(InScope) || (DebugStates[CurDebugStateIndex].bReturn && InScope->GetKind() == SpvScopeKind::Function && InScope == VarDesc->Parent->GetParent());
 					bool VisibleLine = VarDesc->Line <= StopLineNumber + ExtraLineNum && VarDesc->Line > ExtraLineNum;
@@ -3895,12 +3890,12 @@ constexpr int PaddingLineNum = 22;
 							continue;
 						}
 						FString TypeName = GetTypeDescStr(VarDesc->TypeDesc);
-						const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var.Storage).Value;
+						const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var->Storage).Value;
 				
 						TArray<Vector2i> InitializedRanges = { {0, Value.Num()} };
 						if (SDebuggerVariableView::bShowUninitialized)
 						{
-							InitializedRanges = Var.InitializedRanges;
+							InitializedRanges = Var->InitializedRanges;
 						}
 						FString ValueStr = GetValueStr(Value, VarDesc->TypeDesc, InitializedRanges, 0);
 						auto Data = MakeShared<ExpressionNode>(VarName, ValueStr, TypeName);
@@ -3937,8 +3932,6 @@ constexpr int PaddingLineNum = 22;
 
 	ExpressionNode SShaderEditorBox::EvaluateExpression(const FString& InExpression) const
 	{
-		const auto& RecordedInfo = DebuggerContext->ThreadState.RecordedInfo;
-		const auto& DebugStates = RecordedInfo.DebugStates;
 		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
 	
 		FString ExpressionShader = ShaderAssetObj->GetShaderDesc(CurrentShaderSource).Source;
@@ -3963,10 +3956,9 @@ constexpr int PaddingLineNum = 22;
 				FString VisibleLocalVarBindings = "struct __Expression_Vars_Set {";
 				for(const auto& [VarId, VarDesc] : SortedVariableDescs)
 				{
-					if(RecordedInfo.AllVariables.contains(VarId))
+					if(SpvVariable* Var = DebuggerContext->FindVar(VarId))
 					{
-						const SpvVariable& Var = RecordedInfo.AllVariables.at(VarId);
-						if(!Var.IsExternal() && VarDesc)
+						if(!Var->IsExternal() && VarDesc)
 						{
 							bool VisibleScope = VarDesc->Parent->Contains(CallStackScope) || (DebugStates[CurDebugStateIndex].bReturn && Scope->GetKind() == SpvScopeKind::Function && CallStackScope == VarDesc->Parent->GetParent());
 							bool VisibleLine = VarDesc->Line < StopLineNumber + ExtraLineNum && VarDesc->Line > ExtraLineNum;
@@ -3995,7 +3987,7 @@ constexpr int PaddingLineNum = 22;
 								}
 								VisibleLocalVarBindings += Declaration;
 								LocalVars.Add(VarDesc->Name);
-                                const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var.Storage).Value;
+                                const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var->Storage).Value;
                                 InputData.Append(Value);
 							}
 						}
@@ -4046,53 +4038,24 @@ void __Expression_Output(T __Expression_Result) {}
 				}
             });
 
-            SpirvParser Parser;
-		    Parser.Parse(Shader->SpvCode);
             if(Shader->GetShaderType() == ShaderType::PixelShader)
             {
-                std::array<SpvVmContext,4> Quad;
-                for(int i = 0; i < Quad.size(); i++)
-                {       
-                    Quad[i].ThreadState.BuiltInInput = VmPixelContext.value().Quad[i].ThreadState.BuiltInInput;
-                    Quad[i].ThreadState.LocationInput = VmPixelContext.value().Quad[i].ThreadState.LocationInput;
-					
-					SpvMetaVisitor MetaVisitor{Quad[i]};
-					Parser.Accept(&MetaVisitor);
-                }
-
-                TArray<SpvVmBinding> Bindings = VmPixelContext.value().Bindings;
-                Bindings.Add(SpvVmBinding{
-                    .DescriptorSet = 0,
-                    .Binding = 114514,
-                    .Resource = AUX::StaticCastRefCountPtr<GpuResource>(LocalVarsInput)
-                });
-
-                SpvVmPixelExprContext VmContext{
-                    SpvVmPixelContext{
-                        .DebugIndex = VmPixelContext.value().DebugIndex,
-                        .Bindings = MoveTemp(Bindings),
-                        .Quad = MoveTemp(Quad)
-                    }
-                };
-                SpvVmPixelExprVisitor VmVisitor{VmContext};
-		        Parser.Accept(&VmVisitor);
-	
-				if(!VmContext.HasSideEffect)
+				/*if(!ExprContext.HasSideEffect)
 				{
 					FText TypeName = LOCALIZATION("InvalidExpr");
-					if(VmContext.ResultTypeDesc)
+					if(ExprContext.ResultTypeDesc)
 					{
-						TypeName = FText::FromString(GetTypeDescStr(VmContext.ResultTypeDesc));
+						TypeName = FText::FromString(GetTypeDescStr(ExprContext.ResultTypeDesc));
 
 						TArray<Vector2i> ResultRange;
-						ResultRange.Add({ 0, VmContext.ResultValue.Num() });
-						FString ValueStr = GetValueStr(VmContext.ResultValue, VmContext.ResultTypeDesc, ResultRange, 0);
+						ResultRange.Add({ 0, ExprContext.ResultValue.Num() });
+						FString ValueStr = GetValueStr(ExprContext.ResultValue, ExprContext.ResultTypeDesc, ResultRange, 0);
 
 						TArray<TSharedPtr<ExpressionNode>> Children;
-						if (VmContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Composite || VmContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Array
-							|| VmContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Matrix)
+						if (ExprContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Composite || ExprContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Array
+							|| ExprContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Matrix)
 						{
-							Children = AppendExprChildNodes(VmContext.ResultTypeDesc, ResultRange, VmContext.ResultValue, 0);
+							Children = AppendExprChildNodes(ExprContext.ResultTypeDesc, ResultRange, ExprContext.ResultValue, 0);
 						}
 
 						return { .Expr = InExpression, .ValueStr = ValueStr,
@@ -4100,7 +4063,7 @@ void __Expression_Output(T __Expression_Result) {}
 					}
 					
 				}
-				else
+				else*/
 				{
 					return {.Expr = InExpression, .ValueStr = LOCALIZATION("SideEffectExpr").ToString()};
 				}
@@ -4180,7 +4143,6 @@ void __Expression_Output(T __Expression_Result) {}
 		TSharedPtr<SWindow> ShaderEditorTipWindow = ShEditor->GetShaderEditorTipWindow();
 		ShaderEditorTipWindow->HideWindow();
 		
-		const auto& DebugStates = DebuggerContext->ThreadState.RecordedInfo.DebugStates;
 		auto CallStackAtStop = CallStack;
 		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
 		while(CurDebugStateIndex < DebugStates.Num())
@@ -4280,7 +4242,8 @@ void __Expression_Output(T __Expression_Result) {}
 		DebuggerError.Empty();
 		DirtyVars.Empty();
 		StopLineNumber = 0;
-        VmPixelContext.reset();
+        PixelDebuggerContext.reset();
+		DebugStates.Reset();
 		bEditDuringDebugging = false;
 		SortedVariableDescs.clear();
 
@@ -4314,9 +4277,8 @@ void __Expression_Output(T __Expression_Result) {}
 
 		ShaderTU TU{ Shader->GetSourceText(), Shader->GetIncludeDirs() };
 		Funcs = TU.GetFuncs();
-		int32 DebugIndex= 2 * (PixelCoord.y & 1) + (PixelCoord.x & 1);
 		
-		TArray<SpvVmBinding> Bindings;
+		TArray<SpvBinding> Bindings;
 		for(const auto& BindGroup : BindGroups)
 		{
 			const auto& BindGroupDesc = BindGroup->GetDesc();
@@ -4331,41 +4293,19 @@ void __Expression_Output(T __Expression_Result) {}
 				});
 			}
 		}
-		
-		std::array<SpvVmContext,4> Quad;
-		//TODO z,w
-		uint32 QuadLeftTopX = PixelCoord.x & ~1u;
-		uint32 QuadLeftTopY = PixelCoord.y & ~1u;
-		Vector4f QuadFragCoord0 = {QuadLeftTopX + 0.5f, QuadLeftTopY + 0.5f, 0.0f, 1.0f};
-		Vector4f QuadFragCoord1 = {QuadLeftTopX + 1.5f, QuadLeftTopY + 0.5f, 0.0f, 1.0f};
-		Vector4f QuadFragCoord2 = {QuadLeftTopX + 0.5f, QuadLeftTopY + 1.5f, 0.0f, 1.0f};
-		Vector4f QuadFragCoord3 = {QuadLeftTopX + 1.5f, QuadLeftTopY + 1.5f, 0.0f, 1.0f};
-		Quad[0].ThreadState.BuiltInInput.emplace(SpvBuiltIn::FragCoord, TArray{(uint8*)&QuadFragCoord0, sizeof(Vector4f)});
-		Quad[1].ThreadState.BuiltInInput.emplace(SpvBuiltIn::FragCoord, TArray{(uint8*)&QuadFragCoord1, sizeof(Vector4f)});
-		Quad[2].ThreadState.BuiltInInput.emplace(SpvBuiltIn::FragCoord, TArray{(uint8*)&QuadFragCoord2, sizeof(Vector4f)});
-		Quad[3].ThreadState.BuiltInInput.emplace(SpvBuiltIn::FragCoord, TArray{(uint8*)&QuadFragCoord3, sizeof(Vector4f)});
-		for (int i = 0; i < 4; i++)
-		{
-			Quad[i].EditorFuncInfo = Funcs;
-		}
-		
+
 		SpirvParser Parser;
 		Parser.Parse(Shader->SpvCode);
-		for(int32 QuadIndex = 0; QuadIndex < 4; QuadIndex++)
-		{
-			SpvMetaVisitor MetaVisitor{Quad[QuadIndex]};
-			Parser.Accept(&MetaVisitor);
-		}
-		
-		VmPixelContext = SpvVmPixelContext{
-			DebugIndex,
-			MoveTemp(Bindings),
-			MoveTemp(Quad)
-		};
-		SpvVmPixelVisitor VmVisitor{VmPixelContext.value()};
-		Parser.Accept(&VmVisitor);
 
-		const TArray<uint32>& PatchedSpv = VmVisitor.GetPatcher().GetSpv();
+		PixelDebuggerContext = SpvPixelDebuggerContext{ PixelCoord, Bindings};
+
+		SpvMetaVisitor MetaVisitor{ PixelDebuggerContext.value()};
+		Parser.Accept(&MetaVisitor);
+		
+		SpvPixelDebuggerVisitor PixelDebuggerVisitor{ PixelDebuggerContext.value()};
+		Parser.Accept(&PixelDebuggerVisitor);
+
+		const TArray<uint32>& PatchedSpv = PixelDebuggerVisitor.GetPatcher().GetSpv();
 		auto EntryPoint = StringCast<UTF8CHAR>(*Shader->GetEntryPoint());
 		ShaderConductor::Compiler::TargetDesc HlslTargetDesc{};
 		HlslTargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
@@ -4373,7 +4313,7 @@ void __Expression_Output(T __Expression_Result) {}
 		ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile({ PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, (char*)EntryPoint.Get(),
 			ShaderConductor::ShaderStage::PixelShader, HlslTargetDesc);
 #if !SH_SHIPPING
-		VmVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / Shader->GetShaderName() / Shader->GetShaderName() + "Patched.spvasm");
+		PixelDebuggerVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / Shader->GetShaderName() / Shader->GetShaderName() + "Patched.spvasm");
 		FString ShaderSourceText = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
 		if (ShaderResultDesc.hasError)
 		{
@@ -4384,7 +4324,7 @@ void __Expression_Output(T __Expression_Result) {}
 #endif
 		
 		CurDebugStateIndex = 0;
-		DebuggerContext = &VmPixelContext.value().Quad[DebugIndex];
+		DebuggerContext = &PixelDebuggerContext.value();
 		
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		SDebuggerCallStackView* DebuggerCallStackView = ShEditor->GetDebuggerCallStackView();
@@ -4425,14 +4365,14 @@ void __Expression_Output(T __Expression_Result) {}
 				SortedVariableDescs.emplace_back(VarId, VarDesc);
 				if (VarDesc->Name == "GPrivate_AssertResult")
 				{
-					AssertResult = &DebuggerContext->ThreadState.RecordedInfo.AllVariables.at(VarId);;
+					AssertResult = DebuggerContext->FindVar(VarId);;
 				}
 			}
 		}
 		std::sort(SortedVariableDescs.begin(), SortedVariableDescs.end(), [](const auto& PairA, const auto& PairB) {
 			return PairA.second->Line > PairB.second->Line;
 		});
-		Continue();
+		//Continue();
 	
 	}
 }

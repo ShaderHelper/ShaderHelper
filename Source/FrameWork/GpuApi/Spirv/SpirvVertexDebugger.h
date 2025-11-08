@@ -1,5 +1,5 @@
 #pragma once
-#include "SpirvVM.h"
+#include "SpirvDebugger.h"
 
 namespace FW
 {
