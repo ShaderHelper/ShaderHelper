@@ -44,6 +44,8 @@ namespace FW
 
 		TRefCountPtr<GpuBindGroup> Build();
 
+		const GpuBindGroupDesc& GetDesc() const { return Desc; }
+
 	private:
 		GpuBindGroupDesc Desc;
 	};

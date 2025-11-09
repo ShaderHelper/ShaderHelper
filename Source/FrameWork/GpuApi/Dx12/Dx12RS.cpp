@@ -152,11 +152,11 @@ namespace FW
 			else if (BindingResource->GetType() == GpuResourceType::Buffer)
 			{
 				Dx12Buffer* Buffer = static_cast<Dx12Buffer*>(BindingResource);
-				if (EnumHasAllFlags(Buffer->GetUsage(), GpuBufferUsage::RWStructured))
+				if (EnumHasAnyFlags(Buffer->GetUsage(), GpuBufferUsage::RWStructured | GpuBufferUsage::RWRaw))
 				{
 					SrcDescriptorRange_CbvSrvUav.FindOrAdd(BindingVisibility).Add(Buffer->UAV->GetHandle());
 				}
-				else if (EnumHasAllFlags(Buffer->GetUsage(), GpuBufferUsage::Structured))
+				else if (EnumHasAnyFlags(Buffer->GetUsage(), GpuBufferUsage::Structured | GpuBufferUsage::Raw))
 				{
 					SrcDescriptorRange_CbvSrvUav.FindOrAdd(BindingVisibility).Add(Buffer->SRV->GetHandle());
 				}

@@ -69,12 +69,12 @@ namespace SH
 		if(ShaderAssetObj)
 		{
 			CustomBindLayout = ShaderAssetObj->CustomBindGroupLayoutBuilder.Build();
-			auto CustomBindGroupBuilder = GpuBindGroupBuilder{ CustomBindLayout };
+			CustomBindGroupBuilder = GpuBindGroupBuilder{ CustomBindLayout };
 			if(CustomUniformBuffer.IsValid())
 			{
-				CustomBindGroupBuilder.SetUniformBuffer("CustomUniform", CustomUniformBuffer->GetGpuResource());
+				(*CustomBindGroupBuilder).SetUniformBuffer("CustomUniform", CustomUniformBuffer->GetGpuResource());
 			}
-			CustomBindGroup = CustomBindGroupBuilder.Build();
+			CustomBindGroup = (*CustomBindGroupBuilder).Build();
 		}
 	}
 
@@ -106,17 +106,17 @@ namespace SH
 		}
 	}
 
-	TRefCountPtr<FW::GpuBindGroup> ShaderToyPassNode::GetBuiltInBindGroup()
+	GpuBindGroupBuilder ShaderToyPassNode::GetBuiltInBindGroupBuiler()
 	{
-		auto Builder  = GpuBindGroupBuilder{ StShader::GetBuiltInBindLayout() }
+		auto Builder = GpuBindGroupBuilder{ StShader::GetBuiltInBindLayout() }
 			.SetExistingBinding(0, TSingleton<PrintBuffer>::Get().GetResource())
 			.SetUniformBuffer("BuiltInUniform", StShader::GetBuiltInUb()->GetGpuResource());
-		
+
 		GpuTexturePin* iChannel0 = static_cast<GpuTexturePin*>(GetPin("iChannel0"));
 		GpuTexturePin* iChannel1 = static_cast<GpuTexturePin*>(GetPin("iChannel1"));
 		GpuTexturePin* iChannel2 = static_cast<GpuTexturePin*>(GetPin("iChannel2"));
 		GpuTexturePin* iChannel3 = static_cast<GpuTexturePin*>(GetPin("iChannel3"));
-		
+
 		Builder.SetTexture("iChannel0", iChannel0->GetValue());
 		Builder.SetSampler("iChannel0Sampler", GpuResourceHelper::GetSampler({
 			.Filter = (SamplerFilter)iChannelDesc0.Filter,
@@ -145,7 +145,12 @@ namespace SH
 			.AddressV = (SamplerAddressMode)iChannelDesc3.Wrap,
 			.AddressW = (SamplerAddressMode)iChannelDesc3.Wrap
 		}));
-		return Builder.Build();
+		return Builder;
+	}
+
+	TRefCountPtr<FW::GpuBindGroup> ShaderToyPassNode::GetBuiltInBindGroup()
+	{
+		return GetBuiltInBindGroupBuiler().Build();
 	}
 
 	TRefCountPtr<GpuTexture> ShaderToyPassNode::OnStartDebugging()
@@ -177,7 +182,23 @@ namespace SH
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
         ShEditor->InvokeDebuggerTabs();
 		SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(ShaderAssetObj);
-		ShaderEditor->DebugPixel(PixelCoord, {CustomBindGroup, GetBuiltInBindGroup()});
+		auto RT = static_cast<GpuTexturePin*>(GetPin("RT"))->GetValue();
+		ShaderEditor->DebugPixel({
+			.Coord = PixelCoord,
+			.ViewPortDesc = {(float)RT->GetWidth(), (float)RT->GetHeight()},
+			.GlobalBuilder = BindingBuilder{
+				.BingGroupBuilder = GetBuiltInBindGroupBuiler(),
+				.LayoutBuilder = StShader::GetBuiltInBindLayoutBuilder()
+			},
+			.PassBuilder = BindingBuilder{
+				.BingGroupBuilder = *CustomBindGroupBuilder,
+				.LayoutBuilder = ShaderAssetObj->CustomBindGroupLayoutBuilder,
+			},	
+			.PipelineDesc = PipelineDesc,
+			.DrawFunction = [](GpuRenderPassRecorder* PassRecorder) {
+				PassRecorder->DrawPrimitive(0, 3, 0, 1);
+			}
+		});
 	}
 
 	ShaderAsset* ShaderToyPassNode::GetShaderAsset() const
@@ -413,7 +434,7 @@ namespace SH
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		if(SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(ShaderAssetObj))
 		{
-			ShaderEditor->ClearDebugger();
+			ShaderEditor->ResetDebugger();
 		}
 		
         ShEditor->CloseDebuggerTabs();
@@ -548,7 +569,7 @@ namespace SH
     {
         auto BuiltInCategory = MakeShared<PropertyCategory>(this, "Built In");
         {
-            const GpuBindGroupLayoutDesc& BuiltInLayoutDesc = StShader::GetBuiltInBindLayoutBuilder().GetLayoutDesc();
+            const GpuBindGroupLayoutDesc& BuiltInLayoutDesc = StShader::GetBuiltInBindLayoutBuilder().GetDesc();
             for(const auto& [BindingName, Slot] : BuiltInLayoutDesc.CodegenBindingNameToSlot)
             {
                 if(BuiltInLayoutDesc.GetBindingType(Slot) == BindingType::UniformBuffer)
@@ -578,7 +599,7 @@ namespace SH
         
         auto CustomCategory = MakeShared<PropertyCategory>(this, "Custom");
         {
-            const GpuBindGroupLayoutDesc& CustomLayoutDesc = ShaderAssetObj->CustomBindGroupLayoutBuilder.GetLayoutDesc();
+            const GpuBindGroupLayoutDesc& CustomLayoutDesc = ShaderAssetObj->CustomBindGroupLayoutBuilder.GetDesc();
             for(const auto& [BindingName, Slot] : CustomLayoutDesc.CodegenBindingNameToSlot)
             {
                 if(CustomLayoutDesc.GetBindingType(Slot) == BindingType::UniformBuffer)
@@ -644,7 +665,7 @@ namespace SH
     void ShaderToyPassNode::RefreshProperty(bool bCopyUniformBuffer)
     {
         CustomBindLayout = ShaderAssetObj->CustomBindGroupLayoutBuilder.Build();
-        auto CustomBindGroupBuilder = GpuBindGroupBuilder{ CustomBindLayout };
+        CustomBindGroupBuilder = GpuBindGroupBuilder{ CustomBindLayout };
         
         auto NewCustomUniformBuffer = ShaderAssetObj->CustomUniformBufferBuilder.Build();
         if(NewCustomUniformBuffer.IsValid())
@@ -654,9 +675,9 @@ namespace SH
                 NewCustomUniformBuffer->CopySameMember(*CustomUniformBuffer);
             }
             CustomUniformBuffer = MoveTemp(NewCustomUniformBuffer);
-            CustomBindGroupBuilder.SetUniformBuffer("CustomUniform", CustomUniformBuffer->GetGpuResource());
+			(*CustomBindGroupBuilder).SetUniformBuffer("CustomUniform", CustomUniformBuffer->GetGpuResource());
         }
-        CustomBindGroup = CustomBindGroupBuilder.Build();
+        CustomBindGroup = (*CustomBindGroupBuilder).Build();
         
         PropertyDatas.Empty();
         GetPropertyDatas();
@@ -714,7 +735,7 @@ namespace SH
 			Bindings.SetPassBindGroup(CustomBindGroup);
 			Bindings.SetPassBindGroupLayout(CustomBindLayout);
 
-            GpuRenderPipelineStateDesc PipelineDesc{
+			PipelineDesc = GpuRenderPipelineStateDesc{
 				.CheckLayout = true,
                 .Vs = ShaderAssetObj->GetVertexShader(),
                 .Ps = ShaderAssetObj->GetPixelShader(),

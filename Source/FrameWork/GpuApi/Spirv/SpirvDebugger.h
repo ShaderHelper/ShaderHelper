@@ -23,6 +23,35 @@ namespace FW
 		SpvLexicalScope* NewScope{};
 	};
 
+	enum class SpvDebuggerStateType : uint32
+	{
+		None,
+		VarChange,
+		ScopeChange,
+		//Other
+		Condition,
+	};
+
+	struct SpvVarChangeState
+	{
+		int32 Line;
+		SpvId VarId;
+		int32 DirtyOffset;
+		int32 DirtyByteSize;
+		TArray<uint8> Value;
+	};
+
+	struct SpvScopeChangeState
+	{
+		int32 Line;
+		SpvId ScopeId;
+	};
+
+	struct SpvOtherState
+	{
+		int32 Line;
+	};
+
 	struct SpvDebugState
 	{
 		int32 Line{};
@@ -52,7 +81,6 @@ namespace FW
 
 		int32 InstIndex;
 
-		SpvLexicalScope* Scope = nullptr;
 		int32 Line{};
 
 		std::unordered_map<SpvId, SpvVariable> LocalVariables;
@@ -112,27 +140,14 @@ namespace FW
 		void Visit(const SpvOpLabel* Inst) override;
 		void Visit(const SpvOpLoad* Inst) override;
 		void Visit(const SpvOpStore* Inst) override;
-		void Visit(const SpvOpIEqual* Inst) override;
-		void Visit(const SpvOpINotEqual* Inst) override;
-		void Visit(const SpvOpUGreaterThan* Inst) override;
-		void Visit(const SpvOpSGreaterThan* Inst) override;
-		void Visit(const SpvOpUGreaterThanEqual* Inst) override;
-		void Visit(const SpvOpSGreaterThanEqual* Inst) override;
-		void Visit(const SpvOpULessThan* Inst) override;
-		void Visit(const SpvOpSLessThan* Inst) override;
-		void Visit(const SpvOpULessThanEqual* Inst) override;
-		void Visit(const SpvOpSLessThanEqual* Inst) override;
-		void Visit(const SpvOpFOrdEqual* Inst) override;
-		void Visit(const SpvOpFOrdNotEqual* Inst) override;
-		void Visit(const SpvOpFOrdLessThan* Inst) override;
-		void Visit(const SpvOpFOrdGreaterThan* Inst) override;
-		void Visit(const SpvOpFOrdLessThanEqual* Inst) override;
-		void Visit(const SpvOpFOrdGreaterThanEqual* Inst) override;
 
 		void Visit(const SpvOpBranch* Inst) override;
 		void Visit(const SpvOpBranchConditional* Inst) override;
 		void Visit(const SpvOpReturn* Inst) override;
 		void Visit(const SpvOpReturnValue* Inst) override;
+	protected:
+		void PatchDebuggerStateType(TArray<TUniquePtr<SpvInstruction>>& InstList);
+		void PatchDebuggerLine(TArray<TUniquePtr<SpvInstruction>>& InstList);
 
 	protected:
 		SpvDebuggerContext& Context;
@@ -146,7 +161,7 @@ namespace FW
 		SpvId DebuggerLine;
 		SpvId DebuggerVarId, DebuggerVarDirtyOffset, DebuggerVarDirtyByteSize;
 		SpvId DebuggerScopeId;
-		SpvId AppendScopeFuncId;
+		SpvId AppendScopeFuncId, AppendOtherFuncId;
 		SpvPatcher Patcher;
 	};
 

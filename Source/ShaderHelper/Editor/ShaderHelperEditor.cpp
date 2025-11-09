@@ -69,7 +69,7 @@ namespace SH
 			CodeEditorCommands::Get().StepInto,
 			FExecuteAction::CreateLambda([this]{
 				SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
-				ShaderEditor->Continue(SShaderEditorBox::StepMode::StepInto);
+				ShaderEditor->Continue(StepMode::StepInto);
 			}),
 			FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); }),
 			EUIActionRepeatMode::RepeatEnabled
@@ -78,7 +78,7 @@ namespace SH
 			CodeEditorCommands::Get().StepOver,
 			FExecuteAction::CreateLambda([this]{
 				SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
-				ShaderEditor->Continue(SShaderEditorBox::StepMode::StepOver);
+				ShaderEditor->Continue(StepMode::StepOver);
 			}),
 			FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); }),
 			EUIActionRepeatMode::RepeatEnabled

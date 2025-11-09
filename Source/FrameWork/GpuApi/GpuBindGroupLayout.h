@@ -127,7 +127,7 @@ namespace FW
 		GpuBindGroupLayoutBuilder& AddSampler(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
 
         const FString& GetCodegenDeclaration() const { return LayoutDesc.CodegenDeclaration; }
-        const GpuBindGroupLayoutDesc& GetLayoutDesc() const { return LayoutDesc; }
+        const GpuBindGroupLayoutDesc& GetDesc() const { return LayoutDesc; }
 		TRefCountPtr<GpuBindGroupLayout> Build();
         
         friend FArchive& operator<<(FArchive& Ar, GpuBindGroupLayoutBuilder& BindLayoutBuilder)

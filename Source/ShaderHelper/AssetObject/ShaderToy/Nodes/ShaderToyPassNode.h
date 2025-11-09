@@ -71,7 +71,9 @@ namespace SH
 		std::string GetShaderToyCode() const;
 		
     private:
+		FW::GpuBindGroupBuilder GetBuiltInBindGroupBuiler();
 		TRefCountPtr<FW::GpuBindGroup> GetBuiltInBindGroup();
+
 		void InitShaderAsset();
 		void InitCustomBindGroup();
         void ClearBindingProperty();
@@ -95,5 +97,9 @@ namespace SH
         TUniquePtr<FW::UniformBuffer> CustomUniformBuffer;
         TRefCountPtr<FW::GpuBindGroupLayout> CustomBindLayout;
         TRefCountPtr<FW::GpuBindGroup> CustomBindGroup;
+		std::optional<FW::GpuBindGroupBuilder> CustomBindGroupBuilder;
+
+		//Debugger
+		FW::GpuRenderPipelineStateDesc PipelineDesc;
 	};
 }

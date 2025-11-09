@@ -9,9 +9,7 @@
 #include <Widgets/SCanvas.h>
 #include <Widgets/Text/SlateEditableTextLayout.h>
 #include "AssetObject/ShaderAsset.h"
-#include "GpuApi/Spirv/SpirvParser.h"
-#include "GpuApi/Spirv/SpirvPixelDebugger.h"
-#include "GpuApi/GpuBindGroup.h"
+#include "Debugger/ShaderDebugger.h"
 
 namespace SH
 {
@@ -179,13 +177,6 @@ namespace SH
             Failed,
         };
 		
-		enum class StepMode
-		{
-			None,
-			StepOver,
-			StepInto,
-		};
-		
 		static TMap<HLSL::TokenType, FTextBlockStyle>& GetTokenStyleMap();
 		static FString GetFontPath();
 		static int32 GetFontSize();
@@ -203,7 +194,7 @@ namespace SH
 			SLATE_ARGUMENT(ShaderAsset*, ShaderAssetObj)
 		SLATE_END_ARGS()
 
-		SShaderEditorBox() = default;
+		SShaderEditorBox();
 		~SShaderEditorBox();
 		
 		void Construct(const FArguments& InArgs);
@@ -234,6 +225,8 @@ namespace SH
 		FVector2D GetCodeCompletionCanvasSize() const;
 
 		ShaderAsset* GetShaderAsset() const { return ShaderAssetObj; }
+		FString GetCurShaderSource() const { return CurrentShaderSource; }
+		TRefCountPtr<FW::GpuShader> CreateGpuShader();
         FText GetEditStateText() const;
         FText GetRowColText() const;
         FSlateColor GetEditStateColor() const;
@@ -259,13 +252,9 @@ namespace SH
 		void RefreshOccurrenceHighlight();
 		void RefreshBracketHighlight();
 		
-		void DebugPixel(const FW::Vector2u& PixelCoord, const TArray<TRefCountPtr<FW::GpuBindGroup>>& BindGroups = {});
-		void ApplyDebugState(const FW::SpvDebugState& State);
-		void ShowDeuggerVariable(FW::SpvLexicalScope* InScope) const;
-		void ShowDebuggerResult() const;
-		struct ExpressionNode EvaluateExpression(const FString& InExpression) const;
-		void Continue(StepMode Mode = StepMode::None);
-		void ClearDebugger();
+		void DebugPixel(const PixelState& InState);
+		void Continue(StepMode Mode = StepMode::Continue);
+		void ResetDebugger();
 
 	protected:
 		virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
@@ -289,7 +278,7 @@ namespace SH
 
 	public:
 		TSharedPtr<SShaderMultiLineEditableText> ShaderMultiLineEditableText;
-        FSlateEditableTextLayout* ShaderMultiLineEditableTextLayout;
+        FSlateEditableTextLayout* ShaderMultiLineEditableTextLayout = nullptr;
 		TArray<FoldMarker> VisibleFoldMarkers;
 		TArray<int32> BreakPointLineNumbers;
         //The visible content in editor, and contains fold markers.
@@ -297,7 +286,7 @@ namespace SH
 		const FSlateBrush* BackgroundLayerBrush{};
 		TSharedPtr<FShaderEditorMarshaller> ShaderMarshaller;
 
-		//Syntax highlight
+		//------------Syntax highlight-----------
 		FW::ShaderTU SyntaxTU;
 		TArray<TMap<FTextRange, HLSL::TokenType>> LineSyntaxHighlightMaps;
 		TArray<TMap<FTextRange, HLSL::TokenType>> LineSyntaxHighlightMapsCopy;
@@ -306,27 +295,12 @@ namespace SH
 		std::atomic<bool> bQuitISyntax{};
 		std::atomic<bool> bRefreshSyntax{};
 		FEvent* SyntaxEvent = nullptr;
-		//
+		//---------------------------------------
 
-		//Debugger
-		TArray<FW::ShaderFunc> Funcs;
-		TArray<TPair<FW::SpvLexicalScope*, int>> CallStack;
-		FW::SpvLexicalScope* Scope = nullptr;
-		FW::SpvLexicalScope* CallStackScope = nullptr;
-		TMultiMap<FW::SpvId, FW::SpvVariableChange::DirtyRange> DirtyVars;
-		int32 StopLineNumber{};
-		//ValidLine: Line that can trigger a breakpoint
-		std::optional<int32> CurValidLine;
-		FString DebuggerError;
-		int32 CurDebugStateIndex{};
-		FW::SpvDebuggerContext* DebuggerContext = nullptr;
-		std::vector<std::pair<FW::SpvId, FW::SpvVariableDesc*>> SortedVariableDescs;
-		std::optional<FW::SpvObject> CurReturnObject;
-		FW::SpvVariable* AssertResult = nullptr;
-		std::optional<FW::SpvPixelDebuggerContext> PixelDebuggerContext;
-		TArray<FW::SpvDebugState> DebugStates;
+		//----------------Debugger----------------
+		ShaderDebugger Debugger;
 		bool bEditDuringDebugging{};
-		//
+		//---------------------------------------
         
 	private:
         //The text after unfolding, but that may not be the content compiled finally.
@@ -361,7 +335,7 @@ namespace SH
 		bool IsFoldEditTransaction{};
 		FCurveSequence FoldingArrowAnim;
         
-        //CodeComplete and real-time diagnostic
+        //----------CodeComplete and real-time diagnostic----------
 		FW::ShaderTU ISenseTU;
 		TUniquePtr<FThread> ISenseThread;
 		TQueue<ISenseTask> ISenseQueue;
@@ -378,7 +352,7 @@ namespace SH
         TArray<CandidateItemPtr> CandidateItems;
         bool bTryComplete = false;
         bool bKeyChar = false;
-        //
+        //--------------------------------------------------------
 		bool bTryMergeUndoState = false;
 		
 	};
