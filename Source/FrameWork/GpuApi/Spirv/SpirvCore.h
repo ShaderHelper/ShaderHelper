@@ -480,6 +480,7 @@ namespace FW
 	struct SpvVariable : SpvObject
 	{
 		SpvStorageClass StorageClass;
+		SpvPointerType* PointerType;
 		TArray<Vector2i> InitializedRanges;//[Start,End]
 
 		bool IsCompletelyInitialized() const
@@ -499,8 +500,9 @@ namespace FW
 	struct SpvPointer
 	{
 		SpvId Id{};
-		SpvVariable* Pointee;
-		TArray<uint32> Indexes;
+		SpvVariable* Var;
+		TArray<SpvId> Indexes;
+		SpvPointerType* Type;
 	};
 
 	struct SpvDecoration

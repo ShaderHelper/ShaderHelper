@@ -3707,7 +3707,7 @@ constexpr int PaddingLineNum = 22;
 		}
 		catch (const std::runtime_error& e)
 		{
-			MessageDialog::Open(MessageDialog::Ok, GApp->GetEditor()->GetMainWindow(), FText::FromString(ANSI_TO_TCHAR(e.what())));
+			MessageDialog::Open(MessageDialog::Ok, GApp->GetEditor()->GetMainWindow(), FText::FromString(UTF8_TO_TCHAR(e.what())));
 			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 			ShEditor->EndDebugging();
 			return;

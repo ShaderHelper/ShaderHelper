@@ -9,7 +9,7 @@ using namespace FW;
 
 namespace SH
 {
-	TArray<ExpressionNodePtr> AppendVarChildNodes(SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, const TArray<SpvVariableChange::DirtyRange>& DirtyRanges, const TArray<uint8>& Value, int32 InOffset)
+	TArray<ExpressionNodePtr> AppendVarChildNodes(SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, const TArray<SpvVarDirtyRange>& DirtyRanges, const TArray<uint8>& Value, int32 InOffset)
 	{
 		TArray<ExpressionNodePtr> Nodes;
 		int32 Offset = InOffset;
@@ -218,39 +218,39 @@ namespace SH
 				{
 					if (SpvVariable* Var = DebuggerContext->FindVar(VarId))
 					{
-						if (!Var->IsExternal() && VarDesc)
-						{
-							bool VisibleScope = VarDesc->Parent->Contains(CallStackScope) || (DebugStates[CurDebugStateIndex].bReturn && Scope->GetKind() == SpvScopeKind::Function && CallStackScope == VarDesc->Parent->GetParent());
-							bool VisibleLine = VarDesc->Line < StopLineNumber + ExtraLineNum && VarDesc->Line > ExtraLineNum;
-							if (VisibleScope && VisibleLine)
-							{
-								//If there are variables with the same name, only the one in the most recent scope is evaluated.
-								if (LocalVars.Contains(VarDesc->Name))
-								{
-									continue;
-								}
-								FString Declaration;
-								if (VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Array)
-								{
-									SpvArrayTypeDesc* ArrayTypeDesc = static_cast<SpvArrayTypeDesc*>(VarDesc->TypeDesc);
-									FString BasicTypeStr = GetTypeDescStr(ArrayTypeDesc->GetBaseTypeDesc());
-									FString DimStr = GetTypeDescStr(VarDesc->TypeDesc);
-									DimStr.RemoveFromStart(BasicTypeStr);
-									Declaration = BasicTypeStr + " " + VarDesc->Name + DimStr + ";";
-									LocalVarInitializations += Declaration;
-									LocalVarInitializations += VarDesc->Name + "= __Expression_Vars[0]." + VarDesc->Name + ";\n";
-								}
-								else
-								{
-									Declaration = GetTypeDescStr(VarDesc->TypeDesc) + " " + VarDesc->Name + ";";
-									LocalVarInitializations += GetTypeDescStr(VarDesc->TypeDesc) + " " + VarDesc->Name + "= __Expression_Vars[0]." + VarDesc->Name + ";\n";
-								}
-								VisibleLocalVarBindings += Declaration;
-								LocalVars.Add(VarDesc->Name);
-								const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var->Storage).Value;
-								InputData.Append(Value);
-							}
-						}
+						//if (!Var->IsExternal() && VarDesc)
+						//{
+						//	bool VisibleScope = VarDesc->Parent->Contains(CallStackScope) || (DebugStates[CurDebugStateIndex].bReturn && Scope->GetKind() == SpvScopeKind::Function && CallStackScope == VarDesc->Parent->GetParent());
+						//	bool VisibleLine = VarDesc->Line < StopLineNumber + ExtraLineNum && VarDesc->Line > ExtraLineNum;
+						//	if (VisibleScope && VisibleLine)
+						//	{
+						//		//If there are variables with the same name, only the one in the most recent scope is evaluated.
+						//		if (LocalVars.Contains(VarDesc->Name))
+						//		{
+						//			continue;
+						//		}
+						//		FString Declaration;
+						//		if (VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Array)
+						//		{
+						//			SpvArrayTypeDesc* ArrayTypeDesc = static_cast<SpvArrayTypeDesc*>(VarDesc->TypeDesc);
+						//			FString BasicTypeStr = GetTypeDescStr(ArrayTypeDesc->GetBaseTypeDesc());
+						//			FString DimStr = GetTypeDescStr(VarDesc->TypeDesc);
+						//			DimStr.RemoveFromStart(BasicTypeStr);
+						//			Declaration = BasicTypeStr + " " + VarDesc->Name + DimStr + ";";
+						//			LocalVarInitializations += Declaration;
+						//			LocalVarInitializations += VarDesc->Name + "= __Expression_Vars[0]." + VarDesc->Name + ";\n";
+						//		}
+						//		else
+						//		{
+						//			Declaration = GetTypeDescStr(VarDesc->TypeDesc) + " " + VarDesc->Name + ";";
+						//			LocalVarInitializations += GetTypeDescStr(VarDesc->TypeDesc) + " " + VarDesc->Name + "= __Expression_Vars[0]." + VarDesc->Name + ";\n";
+						//		}
+						//		VisibleLocalVarBindings += Declaration;
+						//		LocalVars.Add(VarDesc->Name);
+						//		const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var->Storage).Value;
+						//		InputData.Append(Value);
+						//	}
+						//}
 					}
 				}
 				VisibleLocalVarBindings += "};\n";
@@ -373,7 +373,7 @@ void __Expression_Output(T __Expression_Result) {}
 		TArray<ExpressionNodePtr> LocalVarNodeDatas;
 		TArray<ExpressionNodePtr> GlobalVarNodeDatas;
 
-		if (CurReturnObject && Scope == InScope)
+		/*if (CurReturnObject && Scope == InScope)
 		{
 			SpvTypeDesc* ReturnTypeDesc = std::get<SpvTypeDesc*>(GetFunctionDesc(Scope)->GetFuncTypeDesc()->GetReturnType());
 			const TArray<uint8>& Value = std::get<SpvObject::Internal>(CurReturnObject.value().Storage).Value;
@@ -383,57 +383,57 @@ void __Expression_Output(T __Expression_Result) {}
 
 			auto Data = MakeShared<ExpressionNode>(VarName, ValueStr, TypeName);
 			LocalVarNodeDatas.Add(MoveTemp(Data));
-		}
+		}*/
 
 		for (const auto& [VarId, VarDesc] : SortedVariableDescs)
 		{
 			if (SpvVariable* Var = DebuggerContext->FindVar(VarId))
 			{
-				if (!Var->IsExternal())
-				{
-					bool VisibleScope = VarDesc->Parent->Contains(InScope) || (DebugStates[CurDebugStateIndex].bReturn && InScope->GetKind() == SpvScopeKind::Function && InScope == VarDesc->Parent->GetParent());
-					bool VisibleLine = VarDesc->Line <= StopLineNumber + ExtraLineNum && VarDesc->Line > ExtraLineNum;
-					if (VisibleScope && VisibleLine)
-					{
-						FString VarName = VarDesc->Name;
-						//If there are variables with the same name, only the one in the most recent scope is shown.
-						if (LocalVarNodeDatas.ContainsByPredicate([&](const ExpressionNodePtr& InItem) { return InItem->Expr == VarName; }))
-						{
-							continue;
-						}
-						FString TypeName = GetTypeDescStr(VarDesc->TypeDesc);
-						const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var->Storage).Value;
+				//if (!Var->IsExternal())
+				//{
+				//	bool VisibleScope = VarDesc->Parent->Contains(InScope) || (DebugStates[CurDebugStateIndex].bReturn && InScope->GetKind() == SpvScopeKind::Function && InScope == VarDesc->Parent->GetParent());
+				//	bool VisibleLine = VarDesc->Line <= StopLineNumber + ExtraLineNum && VarDesc->Line > ExtraLineNum;
+				//	if (VisibleScope && VisibleLine)
+				//	{
+				//		FString VarName = VarDesc->Name;
+				//		//If there are variables with the same name, only the one in the most recent scope is shown.
+				//		if (LocalVarNodeDatas.ContainsByPredicate([&](const ExpressionNodePtr& InItem) { return InItem->Expr == VarName; }))
+				//		{
+				//			continue;
+				//		}
+				//		FString TypeName = GetTypeDescStr(VarDesc->TypeDesc);
+				//		const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var->Storage).Value;
 
-						TArray<Vector2i> InitializedRanges = { {0, Value.Num()} };
-						if (SDebuggerVariableView::bShowUninitialized)
-						{
-							InitializedRanges = Var->InitializedRanges;
-						}
-						FString ValueStr = GetValueStr(Value, VarDesc->TypeDesc, InitializedRanges, 0);
-						auto Data = MakeShared<ExpressionNode>(VarName, ValueStr, TypeName);
-						TArray<SpvVariableChange::DirtyRange> Ranges;
-						DirtyVars.MultiFind(VarId, Ranges);
-						if (VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Composite || VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Array
-							|| VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Matrix)
-						{
-							Data->Children = AppendVarChildNodes(VarDesc->TypeDesc, InitializedRanges, Ranges, Value, 0);
-						}
+				//		TArray<Vector2i> InitializedRanges = { {0, Value.Num()} };
+				//		if (SDebuggerVariableView::bShowUninitialized)
+				//		{
+				//			InitializedRanges = Var->InitializedRanges;
+				//		}
+				//		FString ValueStr = GetValueStr(Value, VarDesc->TypeDesc, InitializedRanges, 0);
+				//		auto Data = MakeShared<ExpressionNode>(VarName, ValueStr, TypeName);
+				//		TArray<SpvVariableChange::DirtyRange> Ranges;
+				//		DirtyVars.MultiFind(VarId, Ranges);
+				//		if (VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Composite || VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Array
+				//			|| VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Matrix)
+				//		{
+				//			Data->Children = AppendVarChildNodes(VarDesc->TypeDesc, InitializedRanges, Ranges, Value, 0);
+				//		}
 
-						if (!Ranges.IsEmpty())
-						{
-							Data->Dirty = true;
-						}
+				//		if (!Ranges.IsEmpty())
+				//		{
+				//			Data->Dirty = true;
+				//		}
 
-						if (!VarDesc->bGlobal)
-						{
-							LocalVarNodeDatas.Add(MoveTemp(Data));
-						}
-						else
-						{
-							GlobalVarNodeDatas.Add(MoveTemp(Data));
-						}
-					}
-				}
+				//		if (!VarDesc->bGlobal)
+				//		{
+				//			LocalVarNodeDatas.Add(MoveTemp(Data));
+				//		}
+				//		else
+				//		{
+				//			GlobalVarNodeDatas.Add(MoveTemp(Data));
+				//		}
+				//	}
+				//}
 			}
 
 		}
@@ -456,24 +456,26 @@ void __Expression_Output(T __Expression_Result) {}
 		{
 			const SpvDebugState& DebugState = DebugStates[CurDebugStateIndex];
 			std::optional<int32> NextValidLine;
-			if (CurDebugStateIndex + 1 < DebugStates.Num() &&
-				((!DebugStates[CurDebugStateIndex + 1].VarChanges.IsEmpty() && !DebugStates[CurDebugStateIndex + 1].bParamChange)
-					|| DebugStates[CurDebugStateIndex + 1].bKill
-					|| DebugStates[CurDebugStateIndex + 1].bReturn
-					|| DebugStates[CurDebugStateIndex + 1].bFuncCallAfterReturn
-					|| DebugStates[CurDebugStateIndex + 1].bFuncCall
-					|| DebugStates[CurDebugStateIndex + 1].bCondition))
+			if (CurDebugStateIndex + 1 < DebugStates.Num())
 			{
-				NextValidLine = DebugStates[CurDebugStateIndex + 1].Line;
+				const SpvDebugState& NextDebugState = DebugStates[CurDebugStateIndex + 1];
+				if (std::holds_alternative<SpvDebugState_VarChange>(NextDebugState))
+				{
+					NextValidLine = std::get<SpvDebugState_VarChange>(NextDebugState).Line;
+				}
+				else if (std::holds_alternative<SpvDebugState_Tag>(NextDebugState))
+				{
+					NextValidLine = std::get<SpvDebugState_Tag>(NextDebugState).Line;
+				}
 			}
 
-			if (!DebugState.UbError.IsEmpty())
+			/*if (!DebugState.UbError.IsEmpty())
 			{
 				DebuggerError = "Undefined behavior";
 				StopLineNumber = DebugState.Line - ExtraLineNum;
 				SH_LOG(LogShader, Error, TEXT("%s"), *DebugState.UbError);
 				break;
-			}
+			}*/
 
 			ApplyDebugState(DebugState);
 			CurDebugStateIndex++;
@@ -532,39 +534,39 @@ void __Expression_Output(T __Expression_Result) {}
 	{
 	}
 
-	void ShaderDebugger::ApplyDebugState(const SpvDebugState& State)
+	void ShaderDebugger::ApplyDebugState(const SpvDebugState& InState)
 	{
-		CurReturnObject = State.ReturnObject;
-		if (State.bFuncCall)
+		if (std::holds_alternative<SpvDebugState_VarChange>(InState))
 		{
-			if (Scope)
+			const auto& State = std::get<SpvDebugState_VarChange>(InState);
+			SpvVariable* Var = DebuggerContext->FindVar(State.Change.VarId);
+			SpvVarDirtyRange DirtyRange = { State.Change.OffsetBytes, State.Change.NewDirtyValue.Num() };
+			if (!Var->IsExternal())
+			{
+				Var->InitializedRanges.Add({ State.Change.OffsetBytes, State.Change.NewDirtyValue.Num()});
+				//std::get<SpvObject::Internal>(Var->Storage).Value = State.Change.NewValue;
+			}
+			DirtyVars.Add(State.Change.VarId, MoveTemp(DirtyRange));
+		}
+		else if (std::holds_alternative<SpvDebugState_ScopeChange>(InState))
+		{
+			const auto& State = std::get<SpvDebugState_ScopeChange>(InState);
+			Scope = State.Change.NewScope;
+			CallStackScope = Scope;
+		}
+		else if (std::holds_alternative<SpvDebugState_Tag>(InState))
+		{
+			const auto& State = std::get<SpvDebugState_Tag>(InState);
+			if (State.bFuncCall && Scope)
 			{
 				CallStack.Add(TPair<SpvLexicalScope*, int>(Scope, State.Line));
 				CurValidLine.reset();
 			}
-		}
-
-		if (State.ScopeChange)
-		{
-			Scope = State.ScopeChange.value().NewScope;
-			CallStackScope = Scope;
-			//Return func
-			if (!CallStack.IsEmpty() && State.bReturn)
+			else if (State.bReturn && !CallStack.IsEmpty())
 			{
 				auto Item = CallStack.Pop();
 				CurValidLine = Item.Value;
 			}
-		}
-
-		for (const SpvVariableChange& VarChange : State.VarChanges)
-		{
-			SpvVariable* Var = DebuggerContext->FindVar(VarChange.VarId);
-			if (!Var->IsExternal())
-			{
-				Var->InitializedRanges.Add({ VarChange.Range.OffsetBytes, VarChange.Range.OffsetBytes + VarChange.Range.ByteSize });
-				std::get<SpvObject::Internal>(Var->Storage).Value = VarChange.NewValue;
-			}
-			DirtyVars.Add(VarChange.VarId, VarChange.Range);
 		}
 	}
 
@@ -581,7 +583,7 @@ void __Expression_Output(T __Expression_Result) {}
 		if (!GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo, ExtraArgs))
 		{
 			FString FailureInfo = LOCALIZATION("DebugFailure").ToString() + ":\n\n" + ErrorInfo;
-			throw std::runtime_error(TCHAR_TO_ANSI(*FailureInfo));
+			throw std::runtime_error(TCHAR_TO_UTF8(*FailureInfo));
 		}
 
 		ShaderTU TU{ Shader->GetSourceText(), Shader->GetIncludeDirs() };
@@ -681,17 +683,16 @@ void __Expression_Output(T __Expression_Result) {}
 		ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile({ PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, (char*)EntryPoint.Get(),
 			ShaderConductor::ShaderStage::PixelShader, HlslTargetDesc);
 		FString PatchedHlsl = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
-		if (ShaderResultDesc.hasError)
-		{
-			FString ErrorInfo = static_cast<const char*>(ShaderResultDesc.errorWarningMsg.Data());
-			PatchedHlsl = MoveTemp(ErrorInfo);
-			FString FailureInfo = LOCALIZATION("DebugFailure").ToString() + ":\n\n" + ErrorInfo;
-			throw std::runtime_error(TCHAR_TO_ANSI(*FailureInfo));
-		}
 #if !SH_SHIPPING
 		PixelDebuggerVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / Shader->GetShaderName() / Shader->GetShaderName() + "Patched.spvasm");
 		FFileHelper::SaveStringToFile(PatchedHlsl, *(PathHelper::SavedShaderDir() / Shader->GetShaderName() / Shader->GetShaderName() + "Patched.hlsl"));
 #endif
+		if (ShaderResultDesc.hasError)
+		{
+			FString ErrorInfo = static_cast<const char*>(ShaderResultDesc.errorWarningMsg.Data());
+			FString FailureInfo = LOCALIZATION("DebugFailure").ToString() + ":\n\n" + ErrorInfo;
+			throw std::runtime_error(TCHAR_TO_UTF8(*FailureInfo));
+		}
 
 		CurDebugStateIndex = 0;
 		DebuggerContext = &PixelDebuggerContext.value();
@@ -704,7 +705,7 @@ void __Expression_Output(T __Expression_Result) {}
 		if (!GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo))
 		{
 			FString FailureInfo = LOCALIZATION("DebugFailure").ToString() + ":\n\n" + ErrorInfo;
-			throw std::runtime_error(TCHAR_TO_ANSI(*FailureInfo));
+			throw std::runtime_error(TCHAR_TO_UTF8(*FailureInfo));
 		}
 
 		GpuRenderPipelineStateDesc PatchedPipelineDesc{
@@ -763,7 +764,6 @@ void __Expression_Output(T __Expression_Result) {}
 		DebuggerContext = nullptr;
 		Scope = nullptr;
 		CallStackScope = nullptr;
-		CurReturnObject.reset();
 		AssertResult = nullptr;
 		DebuggerError.Empty();
 		DirtyVars.Empty();
@@ -828,31 +828,72 @@ void __Expression_Output(T __Expression_Result) {}
 			{
 			case SpvDebuggerStateType::ScopeChange:
 			{
-				SpvScopeChangeState State = *(SpvScopeChangeState*)(DebuggerData + Offset);
+				SpvDebuggerState_ScopeChange State = *(SpvDebuggerState_ScopeChange*)(DebuggerData + Offset);
 				SpvLexicalScope* NewScopeState = PixelDebuggerContext.value().LexicalScopes[State.ScopeId].Get();
-				DebugStates.Add({
-					.Line = State.Line,
-					.ScopeChange = SpvLexicalScopeChange {
+				DebugStates.Add(SpvDebugState_ScopeChange{
+					{
 						.PreScope = ScopeState,
 						.NewScope = NewScopeState,
 					}
-					});
+				});
 				ScopeState = NewScopeState;
-				Offset += sizeof(SpvScopeChangeState);
+				Offset += sizeof(SpvDebuggerState_ScopeChange);
+				break;
 			}
-			break;
 			case SpvDebuggerStateType::Condition:
 			{
-				SpvOtherState State = *(SpvOtherState*)(DebuggerData + Offset);
-				DebugStates.Add({
+				SpvDebuggerState_Tag State = *(SpvDebuggerState_Tag*)(DebuggerData + Offset);
+				DebugStates.Add(SpvDebugState_Tag{
 					.Line = State.Line,
 					.bCondition = true,
-					});
-				Offset += sizeof(SpvOtherState);
+				});
+				Offset += sizeof(SpvDebuggerState_Tag);
+				break;
 			}
-			break;
+			case SpvDebuggerStateType::FuncCall:
+			{
+				SpvDebuggerState_Tag State = *(SpvDebuggerState_Tag*)(DebuggerData + Offset);
+				DebugStates.Add(SpvDebugState_Tag{
+					.Line = State.Line,
+					.bFuncCall = true,
+				});
+				Offset += sizeof(SpvDebuggerState_Tag);
+				break;
+			}
+			case SpvDebuggerStateType::FuncCallAfterReturn:
+			{
+				SpvDebuggerState_Tag State = *(SpvDebuggerState_Tag*)(DebuggerData + Offset);
+				DebugStates.Add(SpvDebugState_Tag{
+					.Line = State.Line,
+					.bFuncCallAfterReturn = true,
+				});
+				Offset += sizeof(SpvDebuggerState_Tag);
+				break;
+			}
+			case SpvDebuggerStateType::Return:
+			{
+				SpvDebuggerState_Tag State = *(SpvDebuggerState_Tag*)(DebuggerData + Offset);
+				DebugStates.Add(SpvDebugState_Tag{
+					.Line = State.Line,
+					.bReturn = true,
+				});
+				Offset += sizeof(SpvDebuggerState_Tag);
+				break;
+			}
+			case SpvDebuggerStateType::Kill:
+			{
+				SpvDebuggerState_Tag State = *(SpvDebuggerState_Tag*)(DebuggerData + Offset);
+				DebugStates.Add(SpvDebugState_Tag{
+					.Line = State.Line,
+					.bKill = true,
+				});
+				Offset += sizeof(SpvDebuggerState_Tag);
+				break;
+			}
 			default:
-				AUX::Unreachable();
+				FString ErrorInfo = FString::Printf(TEXT("Unknown debugger state type:%s"), ANSI_TO_TCHAR(magic_enum::enum_name(StateType).data()));
+				FString FailureInfo = LOCALIZATION("DebugFailure").ToString() + ":\n\n" + ErrorInfo;
+				throw std::runtime_error(TCHAR_TO_UTF8(*FailureInfo));
 			}
 			StateType = *(SpvDebuggerStateType*)(DebuggerData + Offset);
 		}

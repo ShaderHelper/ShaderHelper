@@ -548,6 +548,16 @@ namespace FW
 		
 		SpvId GetElementType() const { return ElementType; }
 		SpvId GetLength() const { return Length; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(ElementType.GetValue());
+			Bin.Add(Length.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::TypeArray;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ElementType;
@@ -1207,6 +1217,16 @@ namespace FW
 		
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetOperand() const { return Operand; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Operand.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Bitcast;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;

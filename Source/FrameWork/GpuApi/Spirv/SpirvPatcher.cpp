@@ -62,6 +62,12 @@ namespace FW
 					SpvOpTypeFloat* TypeB = static_cast<SpvOpTypeFloat*>(B);
 					return TypeA->GetWidth() == TypeB->GetWidth();
 				}
+				else if (OpCode == SpvOp::TypeArray)
+				{
+					SpvOpTypeArray* TypeA = static_cast<SpvOpTypeArray*>(A);
+					SpvOpTypeArray* TypeB = static_cast<SpvOpTypeArray*>(B);
+					return TypeA->GetElementType() == TypeB->GetElementType() && TypeA->GetLength() == TypeB->GetLength();
+				}
 				else if (OpCode == SpvOp::TypeMatrix)
 				{
 					SpvOpTypeMatrix* TypeA = static_cast<SpvOpTypeMatrix*>(A);

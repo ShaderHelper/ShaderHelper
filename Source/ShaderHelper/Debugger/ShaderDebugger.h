@@ -40,7 +40,7 @@ namespace SH
 		ShaderDebugger(SShaderEditorBox* InShaderEditor);
 
 	public:
-		void ApplyDebugState(const FW::SpvDebugState& State);
+		void ApplyDebugState(const FW::SpvDebugState& InState);
 		void ShowDebuggerResult() const;
 		void ShowDeuggerVariable(FW::SpvLexicalScope* InScope) const;
 		struct ExpressionNode EvaluateExpression(const FString& InExpression) const;
@@ -62,7 +62,7 @@ namespace SH
 		TArray<TPair<FW::SpvLexicalScope*, int>> CallStack;
 		FW::SpvLexicalScope* Scope = nullptr;
 		FW::SpvLexicalScope* CallStackScope = nullptr;
-		TMultiMap<FW::SpvId, FW::SpvVariableChange::DirtyRange> DirtyVars;
+		TMultiMap<FW::SpvId, FW::SpvVarDirtyRange> DirtyVars;
 		int32 StopLineNumber{};
 		//ValidLine: Line that can trigger a breakpoint
 		std::optional<int32> CurValidLine;
@@ -70,7 +70,6 @@ namespace SH
 		int32 CurDebugStateIndex{};
 		FW::SpvDebuggerContext* DebuggerContext = nullptr;
 		std::vector<std::pair<FW::SpvId, FW::SpvVariableDesc*>> SortedVariableDescs;
-		std::optional<FW::SpvObject> CurReturnObject;
 		FW::SpvVariable* AssertResult = nullptr;
 
 		std::optional<FW::SpvPixelDebuggerContext> PixelDebuggerContext;

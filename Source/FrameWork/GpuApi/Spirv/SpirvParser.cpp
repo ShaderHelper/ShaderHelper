@@ -10,7 +10,7 @@ namespace FW
 		SpvId ResultId = Inst->GetId().value();
 		
 		SpvPointerType* PointerType = static_cast<SpvPointerType*>(Context.Types[Inst->GetResultType()].Get());
-		SpvVariable Var = {{ResultId, PointerType->PointeeType}, StorageClass};
+		SpvVariable Var = {{ResultId, PointerType->PointeeType}, StorageClass, PointerType };
 		if(StorageClass == SpvStorageClass::Uniform || StorageClass == SpvStorageClass::UniformConstant)
 		{
 			//Cannot confirm the allocation size of external objects.
@@ -34,7 +34,8 @@ namespace FW
 		Context.GlobalVariables.emplace(ResultId, MoveTemp(Var));
 		SpvPointer Pointer{
 			.Id = ResultId,
-			.Pointee = &Context.GlobalVariables[ResultId]
+			.Var = &Context.GlobalVariables[ResultId],
+			.Type = PointerType,
 		};
 		Context.GlobalPointers.emplace(ResultId, MoveTemp(Pointer));
 		
@@ -396,24 +397,27 @@ namespace FW
 
 	void SpvMetaVisitor::Visit(const SpvDebugCompilationUnit* Inst)
 	{
-		Context.LexicalScopes.emplace(Inst->GetId().value(), MakeUnique<SpvCompilationUnit>());
+		SpvId ResultId = Inst->GetId().value();
+		Context.LexicalScopes.emplace(ResultId, MakeUnique<SpvCompilationUnit>(ResultId));
 	}
 
 	void SpvMetaVisitor::Visit(const SpvDebugLexicalBlock* Inst)
 	{
+		SpvId ResultId = Inst->GetId().value();
 		int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLine()].Storage).Value.GetData();
 		SpvLexicalScope* ParentScope = Context.LexicalScopes[Inst->GetParentId()].Get();
-		Context.LexicalScopes.emplace(Inst->GetId().value(), MakeUnique<SpvLexicalBlock>(Line, ParentScope));
+		Context.LexicalScopes.emplace(ResultId, MakeUnique<SpvLexicalBlock>(ResultId, Line, ParentScope));
 	}
 
 	void SpvMetaVisitor::Visit(const SpvDebugFunction* Inst)
 	{
+		SpvId ResultId = Inst->GetId().value();
 		SpvLexicalScope* ParentScope = Context.LexicalScopes[Inst->GetParentId()].Get();
 		const FString& FuncName = Context.DebugStrs[Inst->GetNameId()];
 		SpvFuncTypeDesc* FuncTypeDesc = static_cast<SpvFuncTypeDesc*>(Context.TypeDescs[Inst->GetTypeDescId()].Get());
 		int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLine()].Storage).Value.GetData();
 		int32 ScopeLine = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetScopeLine()].Storage).Value.GetData();
-		Context.LexicalScopes.emplace(Inst->GetId().value(), MakeUnique<SpvFunctionDesc>(ParentScope, FuncName, FuncTypeDesc, Line, ScopeLine));
+		Context.LexicalScopes.emplace(ResultId, MakeUnique<SpvFunctionDesc>(ResultId, ParentScope, FuncName, FuncTypeDesc, Line, ScopeLine));
 	}
 
 	void SpvMetaVisitor::Visit(const SpvDebugInlinedAt* Inst)
@@ -787,6 +791,13 @@ namespace FW
 				}
 				DecodedInst = MakeUnique<SpvOpPhi>(ResultType, Operands);
 				DecodedInst->SetId(ResultId);
+				break;
+			}
+			case SpvOp::SelectionMerge:
+			{
+				SpvId MergeBlock = SpvCode[WordOffset + 1];
+				SpvSelectionControl SelectionControl = static_cast<SpvSelectionControl>(SpvCode[WordOffset + 2]);
+				DecodedInst = MakeUnique<SpvOpSelectionMerge>(MergeBlock, SelectionControl);
 				break;
 			}
 			case SpvOp::Label:

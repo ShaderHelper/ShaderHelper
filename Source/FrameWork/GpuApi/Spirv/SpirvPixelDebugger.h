@@ -20,5 +20,6 @@ namespace FW
 
 	public:
 		void PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) override;
+		void Visit(const SpvOpKill* Inst) override;
 	};
 }
