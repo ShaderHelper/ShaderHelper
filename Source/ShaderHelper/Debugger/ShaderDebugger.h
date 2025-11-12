@@ -3,6 +3,9 @@
 #include "GpuApi/Spirv/SpirvPixelDebugger.h"
 #include "GpuApi/GpuRhi.h"
 
+DECLARE_LOG_CATEGORY_EXTERN(LogDebugger, Log, All);
+inline DEFINE_LOG_CATEGORY(LogDebugger);
+
 namespace SH
 {
 	class SShaderEditorBox;
@@ -13,11 +16,16 @@ namespace SH
 		FW::GpuBindGroupLayoutBuilder LayoutBuilder;
 	};
 
+	struct BindingState
+	{
+		std::optional<BindingBuilder> GlobalBuilder, PassBuilder, ShaderBuilder;
+	};
+
 	struct PixelState
 	{
 		FW::Vector2u Coord;
 		FW::GpuViewPortDesc ViewPortDesc;
-		std::optional<BindingBuilder> GlobalBuilder, PassBuilder, ShaderBuilder;
+		BindingState Builders;
 		FW::GpuRenderPipelineStateDesc PipelineDesc;
 		TFunction<void(FW::GpuRenderPassRecorder*)> DrawFunction;
 	};
@@ -45,8 +53,8 @@ namespace SH
 		void ShowDeuggerVariable(FW::SpvLexicalScope* InScope) const;
 		struct ExpressionNode EvaluateExpression(const FString& InExpression) const;
 		bool Continue(StepMode Mode);
-		void DebugPixel(const PixelState& InState);
-		void DebugCompute(const ComputeState& InState);
+		void DebugPixel(const BindingState& InBuilders, const PixelState& InState);
+		void DebugCompute(const BindingState& InBuilders, const ComputeState& InState);
 		void Reset();
 
 		FString GetDebuggerError() const { return DebuggerError; }
@@ -64,15 +72,18 @@ namespace SH
 		FW::SpvLexicalScope* CallStackScope = nullptr;
 		TMultiMap<FW::SpvId, FW::SpvVarDirtyRange> DirtyVars;
 		int32 StopLineNumber{};
+		TArray<uint8> ReturnValue;
 		//ValidLine: Line that can trigger a breakpoint
 		std::optional<int32> CurValidLine;
 		FString DebuggerError;
 		int32 CurDebugStateIndex{};
-		FW::SpvDebuggerContext* DebuggerContext = nullptr;
 		std::vector<std::pair<FW::SpvId, FW::SpvVariableDesc*>> SortedVariableDescs;
 		FW::SpvVariable* AssertResult = nullptr;
 
+		BindingState BindingBuilders;
+		FW::SpvDebuggerContext* DebuggerContext = nullptr;
 		std::optional<FW::SpvPixelDebuggerContext> PixelDebuggerContext;
+		std::optional<PixelState> PsState;
 
 		TArray<FW::SpvDebugState> DebugStates;
 	};

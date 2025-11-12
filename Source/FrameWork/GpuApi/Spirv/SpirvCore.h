@@ -464,14 +464,15 @@ namespace FW
 		struct Internal
 		{
 			TArray<uint8> Value;
-			TArray<GpuResource*> Resources;
-			
-			bool IsOpaque() const { return Value.IsEmpty() && !Resources.IsEmpty(); }
 		};
 		
-		bool IsOpaque() const { return std::visit([](auto&& Arg){ return Arg.IsOpaque(); }, Storage); }
 		bool IsExternal() const { return std::holds_alternative<SpvObject::External>(Storage); }
 		int GetBufferSize() const { return std::visit([](auto&& Arg) { return Arg.Value.Num(); }, Storage); }
+		TArray<uint8>& GetBuffer() { 
+			return std::visit([](auto&& Arg) -> auto& {
+				return Arg.Value;
+			}, Storage);
+		}
 		
 		std::variant<External, Internal> Storage;
 	};

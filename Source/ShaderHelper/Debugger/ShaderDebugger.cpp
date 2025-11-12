@@ -4,6 +4,7 @@
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "RenderResource/Shader/Shader.h"
+#include "GpuApi/Spirv/SpirvExprDebugger.h"
 
 using namespace FW;
 
@@ -25,8 +26,8 @@ namespace SH
 			}
 			for (const auto& Range : DirtyRanges)
 			{
-				int32 RangeStart = Range.OffsetBytes;
-				int32 RangeEnd = Range.OffsetBytes + Range.ByteSize;
+				int32 RangeStart = Range.ByteOffset;
+				int32 RangeEnd = Range.ByteOffset + Range.ByteSize;
 				if ((RangeStart >= InOffset && RangeStart < InOffset + MemberByteSize) ||
 					(RangeEnd > InOffset && RangeEnd <= InOffset + MemberByteSize) ||
 					(RangeStart < InOffset && RangeEnd > InOffset + MemberByteSize))
@@ -62,8 +63,8 @@ namespace SH
 				auto Data = MakeShared<ExpressionNode>(MemberName, MoveTemp(ValueStr), GetTypeDescStr(ElementTypeDesc));
 				for (const auto& Range : DirtyRanges)
 				{
-					int32 RangeStart = Range.OffsetBytes;
-					int32 RangeEnd = Range.OffsetBytes + Range.ByteSize;
+					int32 RangeStart = Range.ByteOffset;
+					int32 RangeEnd = Range.ByteOffset + Range.ByteSize;
 					if ((RangeStart >= Offset && RangeStart < Offset + ElementTypeSize) ||
 						(RangeEnd > Offset && RangeEnd <= Offset + ElementTypeSize) ||
 						(RangeStart < Offset && RangeEnd > Offset + ElementTypeSize))
@@ -98,8 +99,8 @@ namespace SH
 				Data->Children = AppendVarChildNodes(ElementTypeDesc, InitializedRanges, DirtyRanges, Value, Offset);
 				for (const auto& Range : DirtyRanges)
 				{
-					int32 RangeStart = Range.OffsetBytes;
-					int32 RangeEnd = Range.OffsetBytes + Range.ByteSize;
+					int32 RangeStart = Range.ByteOffset;
+					int32 RangeEnd = Range.ByteOffset + Range.ByteSize;
 					if ((RangeStart >= Offset && RangeStart < Offset + ElementTypeSize) ||
 						(RangeEnd > Offset && RangeEnd <= Offset + ElementTypeSize) ||
 						(RangeStart < Offset && RangeEnd > Offset + ElementTypeSize))
@@ -190,7 +191,6 @@ namespace SH
 
 	ExpressionNode ShaderDebugger::EvaluateExpression(const FString& InExpression) const
 	{
-		return{};
 		ShaderAsset* ShaderAssetObj = ShaderEditor->GetShaderAsset();
 		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
 
@@ -218,39 +218,38 @@ namespace SH
 				{
 					if (SpvVariable* Var = DebuggerContext->FindVar(VarId))
 					{
-						//if (!Var->IsExternal() && VarDesc)
-						//{
-						//	bool VisibleScope = VarDesc->Parent->Contains(CallStackScope) || (DebugStates[CurDebugStateIndex].bReturn && Scope->GetKind() == SpvScopeKind::Function && CallStackScope == VarDesc->Parent->GetParent());
-						//	bool VisibleLine = VarDesc->Line < StopLineNumber + ExtraLineNum && VarDesc->Line > ExtraLineNum;
-						//	if (VisibleScope && VisibleLine)
-						//	{
-						//		//If there are variables with the same name, only the one in the most recent scope is evaluated.
-						//		if (LocalVars.Contains(VarDesc->Name))
-						//		{
-						//			continue;
-						//		}
-						//		FString Declaration;
-						//		if (VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Array)
-						//		{
-						//			SpvArrayTypeDesc* ArrayTypeDesc = static_cast<SpvArrayTypeDesc*>(VarDesc->TypeDesc);
-						//			FString BasicTypeStr = GetTypeDescStr(ArrayTypeDesc->GetBaseTypeDesc());
-						//			FString DimStr = GetTypeDescStr(VarDesc->TypeDesc);
-						//			DimStr.RemoveFromStart(BasicTypeStr);
-						//			Declaration = BasicTypeStr + " " + VarDesc->Name + DimStr + ";";
-						//			LocalVarInitializations += Declaration;
-						//			LocalVarInitializations += VarDesc->Name + "= __Expression_Vars[0]." + VarDesc->Name + ";\n";
-						//		}
-						//		else
-						//		{
-						//			Declaration = GetTypeDescStr(VarDesc->TypeDesc) + " " + VarDesc->Name + ";";
-						//			LocalVarInitializations += GetTypeDescStr(VarDesc->TypeDesc) + " " + VarDesc->Name + "= __Expression_Vars[0]." + VarDesc->Name + ";\n";
-						//		}
-						//		VisibleLocalVarBindings += Declaration;
-						//		LocalVars.Add(VarDesc->Name);
-						//		const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var->Storage).Value;
-						//		InputData.Append(Value);
-						//	}
-						//}
+						if (!Var->IsExternal() && VarDesc)
+						{
+							bool VisibleScope = VarDesc->Parent->Contains(CallStackScope);
+							bool VisibleLine = VarDesc->Line < StopLineNumber + ExtraLineNum && VarDesc->Line > ExtraLineNum;
+							if (VisibleScope && VisibleLine)
+							{
+								if (LocalVars.Contains(VarDesc->Name))
+								{
+									continue;
+								}
+								FString Declaration;
+								if (VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Array)
+								{
+									SpvArrayTypeDesc* ArrayTypeDesc = static_cast<SpvArrayTypeDesc*>(VarDesc->TypeDesc);
+									FString BasicTypeStr = GetTypeDescStr(ArrayTypeDesc->GetBaseTypeDesc());
+									FString DimStr = GetTypeDescStr(VarDesc->TypeDesc);
+									DimStr.RemoveFromStart(BasicTypeStr);
+									Declaration = BasicTypeStr + " " + VarDesc->Name + DimStr + ";";
+									LocalVarInitializations += Declaration;
+									LocalVarInitializations += VarDesc->Name + "= __Expression_Vars[0]." + VarDesc->Name + ";\n";
+								}
+								else
+								{
+									Declaration = GetTypeDescStr(VarDesc->TypeDesc) + " " + VarDesc->Name + ";";
+									LocalVarInitializations += GetTypeDescStr(VarDesc->TypeDesc) + " " + VarDesc->Name + "= __Expression_Vars[0]." + VarDesc->Name + ";\n";
+								}
+								VisibleLocalVarBindings += Declaration;
+								LocalVars.Add(VarDesc->Name);
+								const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var->Storage).Value;
+								InputData.Append(Value);
+							}
+						}
 					}
 				}
 				VisibleLocalVarBindings += "};\n";
@@ -267,8 +266,13 @@ namespace SH
 		}
 
 		static const FString OutputFunc =
-			R"(template<typename T>
-void __Expression_Output(T __Expression_Result) {}
+			R"(
+RWByteAddressBuffer _DebuggerBuffer : register(u465, space0);
+template<typename T>
+void __Expression_Output(T __Expression_Result) 
+{
+	_DebuggerBuffer.Store(0, __Expression_Result);
+}
 )";
 		ExpressionShader = OutputFunc + ExpressionShader;
 
@@ -289,45 +293,109 @@ void __Expression_Output(T __Expression_Result) {}
 		GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo, ExtraArgs);
 		if (ErrorInfo.IsEmpty())
 		{
-			TRefCountPtr<GpuBuffer> LocalVarsInput = GGpuRhi->CreateBuffer({
-				.ByteSize = (uint32)InputData.Num(),
-				.Usage = GpuBufferUsage::Structured,
-				.InitialData = InputData,
-				.StructuredInit = {
-					.Stride = (uint32)InputData.Num()
-				}
+			SpvExprDebuggerContext ExprContext;
+			SpirvParser Parser;
+			Parser.Parse(Shader->SpvCode);
+			SpvMetaVisitor MetaVisitor{ ExprContext };
+			Parser.Accept(&MetaVisitor);
+			SpvExprDebuggerVisitor ExprVisitor{ ExprContext };
+			Parser.Accept(&ExprVisitor);
+
+			if (ExprContext.ResultTypeDesc)
+			{
+				FText TypeName = LOCALIZATION("InvalidExpr");
+				TypeName = FText::FromString(GetTypeDescStr(ExprContext.ResultTypeDesc));
+
+				BindingContext Bindings;
+				int32 ResultSize = GetTypeByteSize(ExprContext.ResultTypeDesc);
+				TArray<uint8> Datas;
+				Datas.SetNumZeroed(ResultSize);
+				TRefCountPtr<GpuBuffer> DebuggerBuffer = GGpuRhi->CreateBuffer({
+					.ByteSize = (uint32)ResultSize,
+					.Usage = GpuBufferUsage::RWRaw,
+					.InitialData = Datas,
 				});
 
-			if (Shader->GetShaderType() == ShaderType::PixelShader)
-			{
-				/*if(!ExprContext.HasSideEffect)
+				TRefCountPtr<GpuBuffer> LocalVarsInput = GGpuRhi->CreateBuffer({
+					.ByteSize = (uint32)InputData.Num(),
+					.Usage = GpuBufferUsage::Structured,
+					.InitialData = InputData,
+					.StructuredInit = {
+						.Stride = (uint32)InputData.Num()
+					}
+				});
+
+				GpuBindGroupDesc BindGroupDesc = (*BindingBuilders.GlobalBuilder).BingGroupBuilder.GetDesc();
+				GpuBindGroupLayoutDesc LayoutDesc = (*BindingBuilders.GlobalBuilder).LayoutBuilder.GetDesc();
+				BindGroupDesc.Resources.Add(0721, { DebuggerBuffer });
+				LayoutDesc.Layouts.Add(0721, { BindingType::RWRawBuffer });
+				BindGroupDesc.Resources.Add(114514, { LocalVarsInput });
+				LayoutDesc.Layouts.Add(114514, { BindingType::StructuredBuffer });
+				TRefCountPtr<GpuBindGroupLayout> PatchedBindGroupLayout = GGpuRhi->CreateBindGroupLayout(LayoutDesc);
+				BindGroupDesc.Layout = PatchedBindGroupLayout;
+				TRefCountPtr<GpuBindGroup> PacthedBindGroup = GGpuRhi->CreateBindGroup(BindGroupDesc);
+				Bindings.SetGlobalBindGroup(PacthedBindGroup);
+				Bindings.SetGlobalBindGroupLayout(PatchedBindGroupLayout);
+
+				if (BindingBuilders.PassBuilder)
 				{
-					FText TypeName = LOCALIZATION("InvalidExpr");
-					if(ExprContext.ResultTypeDesc)
+					Bindings.SetPassBindGroup(BindingBuilders.PassBuilder.value().BingGroupBuilder.Build());
+					Bindings.SetPassBindGroupLayout(BindingBuilders.PassBuilder.value().LayoutBuilder.Build());
+				}
+				if (BindingBuilders.ShaderBuilder)
+				{
+					Bindings.SetShaderBindGroup(BindingBuilders.ShaderBuilder.value().BingGroupBuilder.Build());
+					Bindings.SetShaderBindGroupLayout(BindingBuilders.ShaderBuilder.value().LayoutBuilder.Build());
+				}
+
+				if (Shader->GetShaderType() == ShaderType::PixelShader)
+				{
+					Shader->CompilerFlag = GpuShaderCompilerFlag::None;
+					if (GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo, ExtraArgs))
 					{
-						TypeName = FText::FromString(GetTypeDescStr(ExprContext.ResultTypeDesc));
+						GpuRenderPipelineStateDesc PatchedPipelineDesc{
+						.Vs = PsState.value().PipelineDesc.Vs,
+						.Ps = Shader,
+						.RasterizerState = PsState.value().PipelineDesc.RasterizerState,
+						.Primitive = PsState.value().PipelineDesc.Primitive
+						};
+						Bindings.ApplyBindGroupLayout(PatchedPipelineDesc);
+						TRefCountPtr<GpuRenderPipelineState> Pipeline = GGpuRhi->CreateRenderPipelineState(PatchedPipelineDesc);
+						auto CmdRecorder = GGpuRhi->BeginRecording();
+						{
+							auto PassRecorder = CmdRecorder->BeginRenderPass({}, TEXT("Debugger"));
+							{
+								PassRecorder->SetViewPort(PsState.value().ViewPortDesc);
+								PassRecorder->SetRenderPipelineState(Pipeline);
+								Bindings.ApplyBindGroup(PassRecorder);
+								PsState.value().DrawFunction(PassRecorder);
+							}
+							CmdRecorder->EndRenderPass(PassRecorder);
+						}
+						GGpuRhi->EndRecording(CmdRecorder);
+						GGpuRhi->Submit({ CmdRecorder });
+
+						uint8* DebuggerBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebuggerBuffer, GpuResourceMapMode::Read_Only);
+						TArray<uint8> ResultValue = { DebuggerBufferData, ResultSize };
+						GGpuRhi->UnMapGpuBuffer(DebuggerBuffer);
 
 						TArray<Vector2i> ResultRange;
-						ResultRange.Add({ 0, ExprContext.ResultValue.Num() });
-						FString ValueStr = GetValueStr(ExprContext.ResultValue, ExprContext.ResultTypeDesc, ResultRange, 0);
+						ResultRange.Add({ 0, ResultValue.Num() });
+						FString ValueStr = GetValueStr(ResultValue, ExprContext.ResultTypeDesc, ResultRange, 0);
 
 						TArray<TSharedPtr<ExpressionNode>> Children;
 						if (ExprContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Composite || ExprContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Array
 							|| ExprContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Matrix)
 						{
-							Children = AppendExprChildNodes(ExprContext.ResultTypeDesc, ResultRange, ExprContext.ResultValue, 0);
+							Children = AppendExprChildNodes(ExprContext.ResultTypeDesc, ResultRange, ResultValue, 0);
 						}
 
 						return { .Expr = InExpression, .ValueStr = ValueStr,
-							.TypeName = TypeName.ToString(), .Children = MoveTemp(Children)};
+							.TypeName = TypeName.ToString(), .Children = MoveTemp(Children) };
 					}
-
-				}
-				else*/
-				{
-					return { .Expr = InExpression, .ValueStr = LOCALIZATION("SideEffectExpr").ToString() };
 				}
 			}
+
 		}
 
 		return { .Expr = InExpression, .ValueStr = LOCALIZATION("InvalidExpr").ToString() };
@@ -356,11 +424,11 @@ void __Expression_Output(T __Expression_Result) {}
 		}
 		DebuggerCallStackView->SetCallStackDatas(CallStackDatas);
 
-		/*ShowDeuggerVariable(Scope);
+		ShowDeuggerVariable(Scope);
 
 		SDebuggerWatchView* DebuggerWatchView = ShEditor->GetDebuggerWatchView();
 		DebuggerWatchView->OnWatch = [this](const FString& Expression) { return EvaluateExpression(Expression); };
-		DebuggerWatchView->Refresh();*/
+		DebuggerWatchView->Refresh();
 	}
 
 	void ShaderDebugger::ShowDeuggerVariable(SpvLexicalScope* InScope) const
@@ -373,67 +441,66 @@ void __Expression_Output(T __Expression_Result) {}
 		TArray<ExpressionNodePtr> LocalVarNodeDatas;
 		TArray<ExpressionNodePtr> GlobalVarNodeDatas;
 
-		/*if (CurReturnObject && Scope == InScope)
+		if (!ReturnValue.IsEmpty())
 		{
 			SpvTypeDesc* ReturnTypeDesc = std::get<SpvTypeDesc*>(GetFunctionDesc(Scope)->GetFuncTypeDesc()->GetReturnType());
-			const TArray<uint8>& Value = std::get<SpvObject::Internal>(CurReturnObject.value().Storage).Value;
 			FString VarName = GetFunctionDesc(Scope)->GetName() + LOCALIZATION("ReturnTip").ToString();
 			FString TypeName = GetTypeDescStr(ReturnTypeDesc);
-			FString ValueStr = GetValueStr(Value, ReturnTypeDesc, TArray{ Vector2i{0, Value.Num()} }, 0);
+			FString ValueStr = GetValueStr(ReturnValue, ReturnTypeDesc, TArray{ Vector2i{0, ReturnValue.Num()} }, 0);
 
 			auto Data = MakeShared<ExpressionNode>(VarName, ValueStr, TypeName);
 			LocalVarNodeDatas.Add(MoveTemp(Data));
-		}*/
+		}
 
 		for (const auto& [VarId, VarDesc] : SortedVariableDescs)
 		{
 			if (SpvVariable* Var = DebuggerContext->FindVar(VarId))
 			{
-				//if (!Var->IsExternal())
-				//{
-				//	bool VisibleScope = VarDesc->Parent->Contains(InScope) || (DebugStates[CurDebugStateIndex].bReturn && InScope->GetKind() == SpvScopeKind::Function && InScope == VarDesc->Parent->GetParent());
-				//	bool VisibleLine = VarDesc->Line <= StopLineNumber + ExtraLineNum && VarDesc->Line > ExtraLineNum;
-				//	if (VisibleScope && VisibleLine)
-				//	{
-				//		FString VarName = VarDesc->Name;
-				//		//If there are variables with the same name, only the one in the most recent scope is shown.
-				//		if (LocalVarNodeDatas.ContainsByPredicate([&](const ExpressionNodePtr& InItem) { return InItem->Expr == VarName; }))
-				//		{
-				//			continue;
-				//		}
-				//		FString TypeName = GetTypeDescStr(VarDesc->TypeDesc);
-				//		const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var->Storage).Value;
+				if (!Var->IsExternal())
+				{
+					bool VisibleScope = VarDesc->Parent->Contains(InScope);
+					bool VisibleLine = VarDesc->Line <= StopLineNumber + ExtraLineNum && VarDesc->Line > ExtraLineNum;
+					if (VisibleScope && VisibleLine)
+					{
+						FString VarName = VarDesc->Name;
+						//If there are variables with the same name, only the one in the most recent scope is shown.
+						if (LocalVarNodeDatas.ContainsByPredicate([&](const ExpressionNodePtr& InItem) { return InItem->Expr == VarName; }))
+						{
+							continue;
+						}
+						FString TypeName = GetTypeDescStr(VarDesc->TypeDesc);
+						const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var->Storage).Value;
 
-				//		TArray<Vector2i> InitializedRanges = { {0, Value.Num()} };
-				//		if (SDebuggerVariableView::bShowUninitialized)
-				//		{
-				//			InitializedRanges = Var->InitializedRanges;
-				//		}
-				//		FString ValueStr = GetValueStr(Value, VarDesc->TypeDesc, InitializedRanges, 0);
-				//		auto Data = MakeShared<ExpressionNode>(VarName, ValueStr, TypeName);
-				//		TArray<SpvVariableChange::DirtyRange> Ranges;
-				//		DirtyVars.MultiFind(VarId, Ranges);
-				//		if (VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Composite || VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Array
-				//			|| VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Matrix)
-				//		{
-				//			Data->Children = AppendVarChildNodes(VarDesc->TypeDesc, InitializedRanges, Ranges, Value, 0);
-				//		}
+						TArray<Vector2i> InitializedRanges = { {0, Value.Num()} };
+						if (SDebuggerVariableView::bShowUninitialized)
+						{
+							InitializedRanges = Var->InitializedRanges;
+						}
+						FString ValueStr = GetValueStr(Value, VarDesc->TypeDesc, InitializedRanges, 0);
+						auto Data = MakeShared<ExpressionNode>(VarName, ValueStr, TypeName);
+						TArray<SpvVarDirtyRange> Ranges;
+						DirtyVars.MultiFind(VarId, Ranges);
+						if (VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Composite || VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Array
+							|| VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Matrix)
+						{
+							Data->Children = AppendVarChildNodes(VarDesc->TypeDesc, InitializedRanges, Ranges, Value, 0);
+						}
 
-				//		if (!Ranges.IsEmpty())
-				//		{
-				//			Data->Dirty = true;
-				//		}
+						if (!Ranges.IsEmpty())
+						{
+							Data->Dirty = true;
+						}
 
-				//		if (!VarDesc->bGlobal)
-				//		{
-				//			LocalVarNodeDatas.Add(MoveTemp(Data));
-				//		}
-				//		else
-				//		{
-				//			GlobalVarNodeDatas.Add(MoveTemp(Data));
-				//		}
-				//	}
-				//}
+						if (!VarDesc->bGlobal)
+						{
+							LocalVarNodeDatas.Add(MoveTemp(Data));
+						}
+						else
+						{
+							GlobalVarNodeDatas.Add(MoveTemp(Data));
+						}
+					}
+				}
 			}
 
 		}
@@ -480,18 +547,18 @@ void __Expression_Output(T __Expression_Result) {}
 			ApplyDebugState(DebugState);
 			CurDebugStateIndex++;
 
-		/*	if (AssertResult)
+			if (AssertResult && AssertResult->IsCompletelyInitialized())
 			{
-				TArray<uint8>& Value = std::get<SpvObject::Internal>(AssertResult->Storage).Value;
+				TArray<uint8>& Value = AssertResult->GetBuffer();
 				uint32& TypedValue = *(uint32*)Value.GetData();
 				if (TypedValue != 1)
 				{
 					DebuggerError = "Assert failed";
-					StopLineNumber = DebugState.Line - ExtraLineNum;
+					StopLineNumber = CurValidLine.value() - ExtraLineNum;
 					TypedValue = 1;
 					break;
 				}
-			}*/
+			}
 
 			if (NextValidLine)
 			{
@@ -540,13 +607,19 @@ void __Expression_Output(T __Expression_Result) {}
 		{
 			const auto& State = std::get<SpvDebugState_VarChange>(InState);
 			SpvVariable* Var = DebuggerContext->FindVar(State.Change.VarId);
-			SpvVarDirtyRange DirtyRange = { State.Change.OffsetBytes, State.Change.NewDirtyValue.Num() };
-			if (!Var->IsExternal())
-			{
-				Var->InitializedRanges.Add({ State.Change.OffsetBytes, State.Change.NewDirtyValue.Num()});
-				//std::get<SpvObject::Internal>(Var->Storage).Value = State.Change.NewValue;
-			}
+
+			void* Dest = &Var->GetBuffer()[State.Change.ByteOffset];
+			const void* Src = State.Change.NewDirtyValue.GetData();
+			FMemory::Memcpy(Dest, Src, State.Change.NewDirtyValue.Num());
+
+			SpvVarDirtyRange DirtyRange = { State.Change.ByteOffset, State.Change.NewDirtyValue.Num() };
+			Var->InitializedRanges.Add({ State.Change.ByteOffset, State.Change.NewDirtyValue.Num() });
 			DirtyVars.Add(State.Change.VarId, MoveTemp(DirtyRange));
+		}
+		else if (std::holds_alternative<SpvDebugState_ReturnValue>(InState))
+		{
+			const auto& State = std::get<SpvDebugState_ReturnValue>(InState);
+			ReturnValue = State.Value;
 		}
 		else if (std::holds_alternative<SpvDebugState_ScopeChange>(InState))
 		{
@@ -566,12 +639,15 @@ void __Expression_Output(T __Expression_Result) {}
 			{
 				auto Item = CallStack.Pop();
 				CurValidLine = Item.Value;
+				ReturnValue.Empty();
 			}
 		}
 	}
 
-	void ShaderDebugger::DebugPixel(const PixelState& InState)
+	void ShaderDebugger::DebugPixel(const BindingState& InBuilders, const PixelState& InState)
 	{
+		BindingBuilders = InBuilders;
+		PsState = InState;
 		TRefCountPtr<GpuShader> Shader = ShaderEditor->CreateGpuShader();
 		Shader->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
 
@@ -582,7 +658,8 @@ void __Expression_Output(T __Expression_Result) {}
 		FString ErrorInfo, WarnInfo;
 		if (!GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo, ExtraArgs))
 		{
-			FString FailureInfo = LOCALIZATION("DebugFailure").ToString() + ":\n\n" + ErrorInfo;
+			FString FailureInfo = LOCALIZATION("DebugFailure").ToString();
+			SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo, *ErrorInfo);
 			throw std::runtime_error(TCHAR_TO_UTF8(*FailureInfo));
 		}
 
@@ -591,7 +668,7 @@ void __Expression_Output(T __Expression_Result) {}
 
 		TArray<SpvBinding> Bindings;
 		BindingContext PatchedBindings;
-		uint32 BufferSize = 1024 * 1024 * 10;
+		uint32 BufferSize = 1024 * 1024 * 2;
 		TArray<uint8> Datas;
 		Datas.SetNumZeroed(BufferSize);
 		TRefCountPtr<GpuBuffer> DebuggerBuffer = GGpuRhi->CreateBuffer({
@@ -662,11 +739,11 @@ void __Expression_Output(T __Expression_Result) {}
 				PatchedBindings.SetShaderBindGroupLayout(PatchedBindGroupLayout);
 			}
 		};
-		SetupBinding(InState.GlobalBuilder);
-		SetupBinding(InState.PassBuilder);
-		SetupBinding(InState.ShaderBuilder);
+		SetupBinding(InBuilders.GlobalBuilder);
+		SetupBinding(InBuilders.PassBuilder);
+		SetupBinding(InBuilders.ShaderBuilder);
 
-		PixelDebuggerContext = SpvPixelDebuggerContext{ InState.Coord, Bindings };
+		PixelDebuggerContext = SpvPixelDebuggerContext{InState.Coord, Funcs, Bindings };
 
 		SpirvParser Parser;
 		Parser.Parse(Shader->SpvCode);
@@ -674,6 +751,9 @@ void __Expression_Output(T __Expression_Result) {}
 		Parser.Accept(&MetaVisitor);
 		SpvPixelDebuggerVisitor PixelDebuggerVisitor{ PixelDebuggerContext.value() };
 		Parser.Accept(&PixelDebuggerVisitor);
+#if !SH_SHIPPING
+		PixelDebuggerVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / Shader->GetShaderName() / Shader->GetShaderName() + "Patched.spvasm");
+#endif 
 
 		const TArray<uint32>& PatchedSpv = PixelDebuggerVisitor.GetPatcher().GetSpv();
 		auto EntryPoint = StringCast<UTF8CHAR>(*Shader->GetEntryPoint());
@@ -683,28 +763,26 @@ void __Expression_Output(T __Expression_Result) {}
 		ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile({ PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, (char*)EntryPoint.Get(),
 			ShaderConductor::ShaderStage::PixelShader, HlslTargetDesc);
 		FString PatchedHlsl = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
-#if !SH_SHIPPING
-		PixelDebuggerVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / Shader->GetShaderName() / Shader->GetShaderName() + "Patched.spvasm");
-		FFileHelper::SaveStringToFile(PatchedHlsl, *(PathHelper::SavedShaderDir() / Shader->GetShaderName() / Shader->GetShaderName() + "Patched.hlsl"));
-#endif
 		if (ShaderResultDesc.hasError)
 		{
 			FString ErrorInfo = static_cast<const char*>(ShaderResultDesc.errorWarningMsg.Data());
-			FString FailureInfo = LOCALIZATION("DebugFailure").ToString() + ":\n\n" + ErrorInfo;
+			FString FailureInfo = LOCALIZATION("DebugFailure").ToString();
+			SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo, *ErrorInfo);
 			throw std::runtime_error(TCHAR_TO_UTF8(*FailureInfo));
-		}
+		} 
 
 		CurDebugStateIndex = 0;
 		DebuggerContext = &PixelDebuggerContext.value();
 		TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
-			.Name = "PacthedShader",
+			.Name = PathHelper::SavedShaderDir() / Shader->GetShaderName() / Shader->GetShaderName() + "Patched",
 			.Source = MoveTemp(PatchedHlsl),
 			.Type = Shader->GetShaderType(),
 			.EntryPoint = "main"
 		});
 		if (!GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo))
 		{
-			FString FailureInfo = LOCALIZATION("DebugFailure").ToString() + ":\n\n" + ErrorInfo;
+			FString FailureInfo = LOCALIZATION("DebugFailure").ToString();
+			SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo, *ErrorInfo);
 			throw std::runtime_error(TCHAR_TO_UTF8(*FailureInfo));
 		}
 
@@ -752,7 +830,7 @@ void __Expression_Output(T __Expression_Result) {}
 		});
 	}
 
-	void ShaderDebugger::DebugCompute(const ComputeState& InState)
+	void ShaderDebugger::DebugCompute(const BindingState& InBuilders, const ComputeState& InState)
 	{
 
 	}
@@ -768,9 +846,12 @@ void __Expression_Output(T __Expression_Result) {}
 		DebuggerError.Empty();
 		DirtyVars.Empty();
 		StopLineNumber = 0;
+		ReturnValue.Empty();
 		PixelDebuggerContext.reset();
 		DebugStates.Reset();
 		SortedVariableDescs.clear();
+		PsState.reset();
+		BindingBuilders = {};
 
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		SDebuggerVariableView* DebuggerLocalVariableView = ShEditor->GetDebuggerLocalVariableView();
@@ -820,80 +901,123 @@ void __Expression_Output(T __Expression_Result) {}
 	{
 		int Offset = 0;
 		SpvDebuggerStateType StateType = *(SpvDebuggerStateType*)(DebuggerData + Offset);
-		SpvLexicalScope* ScopeState = nullptr;
+		SpvLexicalScope* PreScope = nullptr;
 		while (StateType != SpvDebuggerStateType::None)
 		{
 			Offset += sizeof(SpvDebuggerStateType);
 			switch (StateType)
 			{
+			case SpvDebuggerStateType::VarChange:
+			{
+				int32 Line = *(int32*)(DebuggerData + Offset);
+				Offset += 4;
+				SpvId VarId = *(SpvId*)(DebuggerData + Offset);
+				Offset += 4;
+				int32 IndexNum = *(int32*)(DebuggerData + Offset);
+				Offset += 4;
+				TArray<uint32> Indexes = { (uint32*)(DebuggerData + Offset), IndexNum};
+				Offset += IndexNum * 4;
+				int32 ValueSize = *(int32*)(DebuggerData + Offset);
+				Offset += 4;
+				TArray<uint8> DirtyValue = {DebuggerData + Offset, ValueSize};
+				Offset += DirtyValue.Num();
+
+				SpvVariable* DirtyVar = DebuggerContext->FindVar(VarId);
+				int32 ByteOffset = GetByteOffset(DirtyVar, Indexes);
+				TArray<uint8> PreDirtyValue = { &DirtyVar->GetBuffer()[ByteOffset], ValueSize};
+
+				auto NewDebugState = SpvDebugState_VarChange{
+					.Line = Line,
+					.Change = {
+						.VarId = VarId,
+						.PreDirtyValue = MoveTemp(PreDirtyValue),
+						.NewDirtyValue = MoveTemp(DirtyValue),
+						.ByteOffset = ByteOffset,
+					},
+				};
+				DebugStates.Add(MoveTemp(NewDebugState));
+				break;
+			}
 			case SpvDebuggerStateType::ScopeChange:
 			{
-				SpvDebuggerState_ScopeChange State = *(SpvDebuggerState_ScopeChange*)(DebuggerData + Offset);
-				SpvLexicalScope* NewScopeState = PixelDebuggerContext.value().LexicalScopes[State.ScopeId].Get();
+				SpvId ScopeId = *(SpvId*)(DebuggerData + Offset);
+				Offset += 4;
+				SpvLexicalScope* NewScope = PixelDebuggerContext.value().LexicalScopes[ScopeId].Get();
 				DebugStates.Add(SpvDebugState_ScopeChange{
 					{
-						.PreScope = ScopeState,
-						.NewScope = NewScopeState,
+						.PreScope = PreScope,
+						.NewScope = NewScope,
 					}
 				});
-				ScopeState = NewScopeState;
-				Offset += sizeof(SpvDebuggerState_ScopeChange);
+				PreScope = NewScope;
+				break;
+			}
+			case SpvDebuggerStateType::ReturnValue:
+			{
+				int32 Line = *(int32*)(DebuggerData + Offset);
+				Offset += 4;
+				int32 ValueSize = *(int32*)(DebuggerData + Offset);
+				Offset += 4;
+				TArray<uint8> ReturnValue = { DebuggerData + Offset, ValueSize };
+				Offset += ReturnValue.Num();
+				DebugStates.Add(SpvDebugState_ReturnValue{
+					.Line = Line,
+					.Value = MoveTemp(ReturnValue)
+				});
 				break;
 			}
 			case SpvDebuggerStateType::Condition:
 			{
-				SpvDebuggerState_Tag State = *(SpvDebuggerState_Tag*)(DebuggerData + Offset);
+				int32 Line = *(int32*)(DebuggerData + Offset);
+				Offset += 4;
 				DebugStates.Add(SpvDebugState_Tag{
-					.Line = State.Line,
+					.Line = Line,
 					.bCondition = true,
 				});
-				Offset += sizeof(SpvDebuggerState_Tag);
 				break;
 			}
 			case SpvDebuggerStateType::FuncCall:
 			{
-				SpvDebuggerState_Tag State = *(SpvDebuggerState_Tag*)(DebuggerData + Offset);
+				int32 Line = *(int32*)(DebuggerData + Offset);
+				Offset += 4;
 				DebugStates.Add(SpvDebugState_Tag{
-					.Line = State.Line,
+					.Line = Line,
 					.bFuncCall = true,
 				});
-				Offset += sizeof(SpvDebuggerState_Tag);
 				break;
 			}
 			case SpvDebuggerStateType::FuncCallAfterReturn:
 			{
-				SpvDebuggerState_Tag State = *(SpvDebuggerState_Tag*)(DebuggerData + Offset);
+				int32 Line = *(int32*)(DebuggerData + Offset);
+				Offset += 4;
 				DebugStates.Add(SpvDebugState_Tag{
-					.Line = State.Line,
+					.Line = Line,
 					.bFuncCallAfterReturn = true,
 				});
-				Offset += sizeof(SpvDebuggerState_Tag);
 				break;
 			}
 			case SpvDebuggerStateType::Return:
 			{
-				SpvDebuggerState_Tag State = *(SpvDebuggerState_Tag*)(DebuggerData + Offset);
+				int32 Line = *(int32*)(DebuggerData + Offset);
+				Offset += 4;
 				DebugStates.Add(SpvDebugState_Tag{
-					.Line = State.Line,
+					.Line = Line,
 					.bReturn = true,
 				});
-				Offset += sizeof(SpvDebuggerState_Tag);
 				break;
 			}
 			case SpvDebuggerStateType::Kill:
 			{
-				SpvDebuggerState_Tag State = *(SpvDebuggerState_Tag*)(DebuggerData + Offset);
+				int32 Line = *(int32*)(DebuggerData + Offset);
+				Offset += 4;
 				DebugStates.Add(SpvDebugState_Tag{
-					.Line = State.Line,
+					.Line = Line,
 					.bKill = true,
 				});
-				Offset += sizeof(SpvDebuggerState_Tag);
 				break;
 			}
 			default:
-				FString ErrorInfo = FString::Printf(TEXT("Unknown debugger state type:%s"), ANSI_TO_TCHAR(magic_enum::enum_name(StateType).data()));
-				FString FailureInfo = LOCALIZATION("DebugFailure").ToString() + ":\n\n" + ErrorInfo;
-				throw std::runtime_error(TCHAR_TO_UTF8(*FailureInfo));
+				AUX::Unreachable();
 			}
 			StateType = *(SpvDebuggerStateType*)(DebuggerData + Offset);
 		}

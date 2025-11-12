@@ -128,7 +128,7 @@ namespace FW
 
         const FString& GetCodegenDeclaration() const { return LayoutDesc.CodegenDeclaration; }
         const GpuBindGroupLayoutDesc& GetDesc() const { return LayoutDesc; }
-		TRefCountPtr<GpuBindGroupLayout> Build();
+		TRefCountPtr<GpuBindGroupLayout> Build() const;
         
         friend FArchive& operator<<(FArchive& Ar, GpuBindGroupLayoutBuilder& BindLayoutBuilder)
         {

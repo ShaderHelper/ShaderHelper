@@ -7,7 +7,7 @@ namespace FW
 {
 	struct SpvVarDirtyRange
 	{
-		int32 OffsetBytes;
+		int32 ByteOffset;
 		int32 ByteSize;
 	} ;
 	struct SpvVarChange
@@ -15,7 +15,7 @@ namespace FW
 		SpvId VarId;
 		TArray<uint8> PreDirtyValue;
 		TArray<uint8> NewDirtyValue;
-		int32 OffsetBytes;
+		int32 ByteOffset;
 	};
 
 	struct SpvScopeChange
@@ -24,12 +24,12 @@ namespace FW
 		SpvLexicalScope* NewScope{};
 	};
 
-	//For reading back from the debugger buffer.
 	enum class SpvDebuggerStateType : uint32
 	{
 		None,
 		VarChange,
 		ScopeChange,
+		ReturnValue,
 
 		Condition,
 		FuncCall,
@@ -37,33 +37,24 @@ namespace FW
 		Return,
 		Kill,
 	};
-	struct SpvDebuggerState_VarChange
-	{
-		int32 Line;
-		SpvId VarId;
-		uint32 IndexNum;
-		TArray<uint32> Indexes;
-		uint32 ValueSize;
-		TArray<uint8> Value;
-	};
-	struct SpvDebuggerState_ScopeChange
-	{
-		SpvId ScopeId;
-	};
-	struct SpvDebuggerState_Tag
-	{
-		int32 Line;
-	};
 
 	struct SpvDebugState_VarChange
 	{
 		int32 Line{};
 		SpvVarChange Change;
 	};
+
 	struct SpvDebugState_ScopeChange
 	{
 		SpvScopeChange Change;
 	};
+
+	struct SpvDebugState_ReturnValue
+	{
+		int32 Line{};
+		TArray<uint8> Value;
+	};
+
 	struct SpvDebugState_Tag
 	{
 		int32 Line{};
@@ -73,7 +64,8 @@ namespace FW
 		bool bCondition : 1 {};
 		bool bKill : 1{};
 	};
-	using SpvDebugState = std::variant<SpvDebugState_VarChange, SpvDebugState_ScopeChange, SpvDebugState_Tag>;
+
+	using SpvDebugState = std::variant<SpvDebugState_VarChange, SpvDebugState_ScopeChange, SpvDebugState_ReturnValue, SpvDebugState_Tag>;
 
 	struct SpvBinding
 	{
@@ -85,9 +77,14 @@ namespace FW
 
 	struct SpvDebuggerContext : SpvMetaContext
 	{
+		//Can not obtain information from spirv to distinguish whether formal paramaters have special semantics such as out/inout，
+		//Therefore, obtain it from the editor
+		TArray<ShaderFunc> EditorFuncInfo;
+
 		TArray<SpvBinding> Bindings;
 		std::unordered_map<SpvId, SpvPointer> LocalPointers;
 		std::unordered_map<SpvId, SpvVariable> LocalVariables;
+		std::unordered_map<SpvId, SpvVariable*> FuncParameters;
 
 		SpvVariable* FindVar(SpvId Id)
 		{
@@ -135,6 +132,7 @@ namespace FW
 		void Visit(const SpvDebugScope* Inst) override;
 		void Visit(const SpvDebugDeclare* Inst) override;
 		void Visit(const SpvDebugValue* Inst) override;
+		void Visit(const SpvDebugFunctionDefinition* Inst) override;
 
 		void Visit(const SpvPow* Inst) override;
 		void Visit(const SpvFClamp* Inst) override;
@@ -151,6 +149,7 @@ namespace FW
 		void Visit(const SpvOpSRem* Inst) override;
 		void Visit(const SpvOpFRem* Inst) override;
 
+		void Visit(const SpvOpFunction* Inst) override;
 		void Visit(const SpvOpFunctionCall* Inst) override;
 		void Visit(const SpvOpFunctionParameter* Inst) override;
 		void Visit(const SpvOpVariable* Inst) override;
@@ -159,6 +158,7 @@ namespace FW
 		void Visit(const SpvOpLoad* Inst) override;
 		void Visit(const SpvOpStore* Inst) override;
 		void Visit(const SpvOpAccessChain* Inst) override;
+		void Visit(const SpvOpSwitch* Inst) override;
 		void Visit(const SpvOpBranch* Inst) override;
 		void Visit(const SpvOpBranchConditional* Inst) override;
 		void Visit(const SpvOpReturn* Inst) override;
@@ -166,12 +166,15 @@ namespace FW
 	protected:
 		void PatchToDebugger(SpvId InValueId, SpvId InTypeId, TArray<TUniquePtr<SpvInstruction>>& InstList);
 		void PatchAppendVarFunc(SpvPointer* Pointer, uint32 IndexNum);
+		void PatchAppendValueFunc(SpvType* ValueType);
 
 	protected:
 		SpvDebuggerContext& Context;
 		int32 InstIndex;
-		SpvLexicalScope* CurScope;
-		int32 CurLine;
+		SpvLexicalScope* CurScope = nullptr;
+		int32 CurLine{};
+		TArray<SpvVariable*> CurFuncParams;
+		SpvType* CurReturnType;
 
 		bool EnableUbsan = true;
 		
@@ -190,7 +193,10 @@ namespace FW
 			}
 		};
 		TMap<VarFuncSerachKey, SpvId> AppendVarFuncIds;
+		TMap<SpvType*, SpvId> AppendValueFuncIds;
 		SpvPatcher Patcher;
 	};
+
+	FRAMEWORK_API int32 GetByteOffset(const SpvVariable* Var, const TArray<uint32>& Indexes);
 
 }

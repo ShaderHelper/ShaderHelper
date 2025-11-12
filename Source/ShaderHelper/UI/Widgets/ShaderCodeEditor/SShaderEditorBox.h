@@ -252,7 +252,7 @@ namespace SH
 		void RefreshOccurrenceHighlight();
 		void RefreshBracketHighlight();
 		
-		void DebugPixel(const PixelState& InState);
+		void DebugPixel(const BindingState& InBuilders, const PixelState& InState);
 		void Continue(StepMode Mode = StepMode::Continue);
 		void ResetDebugger();
 

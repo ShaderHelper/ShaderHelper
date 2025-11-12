@@ -817,6 +817,30 @@ constexpr int PaddingLineNum = 22;
 			}),
 			EUIActionRepeatMode::RepeatEnabled
 		);
+		UICommandList->MapAction(CodeEditorCommands::Get().DeleteTokenLeft,
+			FExecuteAction::CreateLambda([this] {
+				SMultiLineEditableText::FScopedEditableTextTransaction TextTransaction(ShaderMultiLineEditableText);
+				ShaderMultiLineEditableTextLayout->MoveCursor(FMoveCursor::Cardinal(
+					ECursorMoveGranularity::Word,
+					FIntPoint(-1, 0),
+					ECursorAction::SelectText
+				));
+				ShaderMultiLineEditableText->DeleteSelectedText();
+			}),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(CodeEditorCommands::Get().DeleteTokenRight,
+			FExecuteAction::CreateLambda([this] {
+				SMultiLineEditableText::FScopedEditableTextTransaction TextTransaction(ShaderMultiLineEditableText);
+				ShaderMultiLineEditableTextLayout->MoveCursor(FMoveCursor::Cardinal(
+					ECursorMoveGranularity::Word,
+					FIntPoint(+1, 0),
+					ECursorAction::SelectText
+				));
+				ShaderMultiLineEditableText->DeleteSelectedText();
+			}),
+			EUIActionRepeatMode::RepeatEnabled
+		);
 		UICommandList->MapAction(CodeEditorCommands::Get().SelectAll,
 			FExecuteAction::CreateLambda([this] {ShaderMultiLineEditableTextLayout->SelectAllText(); }),
 			FCanExecuteAction::CreateLambda([this] { return ShaderMultiLineEditableTextLayout->CanExecuteSelectAll(); })
@@ -3698,11 +3722,11 @@ constexpr int PaddingLineNum = 22;
 		Debugger.Reset();
 	}
 
-	void SShaderEditorBox::DebugPixel(const PixelState& InState)
+	void SShaderEditorBox::DebugPixel(const BindingState& InBuilders, const PixelState& InState)
 	{
 		try
 		{
-			Debugger.DebugPixel(InState);
+			Debugger.DebugPixel(InBuilders, InState);
 			Continue();
 		}
 		catch (const std::runtime_error& e)

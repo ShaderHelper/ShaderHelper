@@ -53,7 +53,7 @@ namespace FW
 		return *this;
 	}
 
-	TRefCountPtr<GpuBindGroupLayout> GpuBindGroupLayoutBuilder::Build()
+	TRefCountPtr<GpuBindGroupLayout> GpuBindGroupLayoutBuilder::Build() const
 	{
 		return GGpuRhi->CreateBindGroupLayout(LayoutDesc);
 	}

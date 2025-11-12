@@ -979,6 +979,16 @@ namespace FW
 		
 		SpvId GetResultType() const { return ResultType; }
 		const TArray<SpvId>& GetConstituents() const { return Constituents; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Append((uint32*)Constituents.GetData(), Constituents.Num());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::CompositeConstruct;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -995,6 +1005,17 @@ namespace FW
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetComposite() const { return Composite; }
 		const TArray<uint32>& GetIndexes() const { return Indexes; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Composite.GetValue());
+			Bin.Append(Indexes);
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::CompositeExtract;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -1710,6 +1731,18 @@ namespace FW
 		SpvId GetCondition() const { return Condition; }
 		SpvId GetObject1() const { return Object1; }
 		SpvId GetObject2() const { return Object2; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Condition.GetValue());
+			Bin.Add(Object1.GetValue());
+			Bin.Add(Object2.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Select;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;

@@ -101,5 +101,6 @@ namespace SH
 
 		//Debugger
 		FW::GpuRenderPipelineStateDesc PipelineDesc;
+		bool AssertError{};
 	};
 }

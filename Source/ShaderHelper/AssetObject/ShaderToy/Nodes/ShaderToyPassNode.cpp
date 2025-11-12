@@ -165,7 +165,7 @@ namespace SH
 			ShEditor->GetRenderer()->Render();
 			TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = true;
 		}
-		if (!AnyError)
+		if (!AnyError || AssertError)
 		{
 			IsDebugging = true;
 			auto PassOutput = static_cast<GpuTexturePin*>(GetPin("RT"));
@@ -183,9 +183,8 @@ namespace SH
         ShEditor->InvokeDebuggerTabs();
 		SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(ShaderAssetObj);
 		auto RT = static_cast<GpuTexturePin*>(GetPin("RT"))->GetValue();
-		ShaderEditor->DebugPixel({
-			.Coord = PixelCoord,
-			.ViewPortDesc = {(float)RT->GetWidth(), (float)RT->GetHeight()},
+		ShaderEditor->DebugPixel(
+		BindingState {
 			.GlobalBuilder = BindingBuilder{
 				.BingGroupBuilder = GetBuiltInBindGroupBuiler(),
 				.LayoutBuilder = StShader::GetBuiltInBindLayoutBuilder()
@@ -193,7 +192,11 @@ namespace SH
 			.PassBuilder = BindingBuilder{
 				.BingGroupBuilder = *CustomBindGroupBuilder,
 				.LayoutBuilder = ShaderAssetObj->CustomBindGroupLayoutBuilder,
-			},	
+			},
+		}, 
+		PixelState {
+			.Coord = PixelCoord,
+			.ViewPortDesc = {(float)RT->GetWidth(), (float)RT->GetHeight()},
 			.PipelineDesc = PipelineDesc,
 			.DrawFunction = [](GpuRenderPassRecorder* PassRecorder) {
 				PassRecorder->DrawPrimitive(0, 3, 0, 1);
@@ -780,6 +783,7 @@ namespace SH
 			{
 				int AddedLineNum = ShaderAssetObj->GetExtraLineNum();
 				SH_LOG(LogShader, Error, TEXT("%s:%d:%s"), *ObjectName.ToString(), AssertInfo.LineNumber - AddedLineNum, *AssertInfo.AssertString);
+				AssertError = true;
 				return {true, true};
 			}
         }
