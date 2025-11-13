@@ -4,8 +4,8 @@
 
 namespace FW
 {
-	SpvPixelDebuggerVisitor::SpvPixelDebuggerVisitor(SpvPixelDebuggerContext& InPixelContext)
-	: SpvDebuggerVisitor(InPixelContext)
+	SpvPixelDebuggerVisitor::SpvPixelDebuggerVisitor(SpvPixelDebuggerContext& InPixelContext, bool InEnableUbsan)
+	: SpvDebuggerVisitor(InPixelContext, InEnableUbsan)
 	{}
 
 	void SpvPixelDebuggerVisitor::PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList)

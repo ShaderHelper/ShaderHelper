@@ -46,6 +46,7 @@ namespace SH
 	{
 	public:
 		ShaderDebugger(SShaderEditorBox* InShaderEditor);
+		static bool EnableUbsan();
 
 	public:
 		void ApplyDebugState(const FW::SpvDebugState& InState);

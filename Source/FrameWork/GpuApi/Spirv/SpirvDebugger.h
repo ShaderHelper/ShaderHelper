@@ -117,7 +117,9 @@ namespace FW
 	{
 	public:
 		SpvDebuggerVisitor() = default;
-		SpvDebuggerVisitor(SpvDebuggerContext& InContext) : Context(InContext)
+		SpvDebuggerVisitor(SpvDebuggerContext& InContext, bool InEnableUbsan) 
+			: Context(InContext)
+			, EnableUbsan(InEnableUbsan)
 		{
 		}
 		
@@ -176,7 +178,7 @@ namespace FW
 		TArray<SpvVariable*> CurFuncParams;
 		SpvType* CurReturnType;
 
-		bool EnableUbsan = true;
+		bool EnableUbsan;
 		
 		const TArray<TUniquePtr<SpvInstruction>>* Insts;
 		SpvId DebuggerBuffer;

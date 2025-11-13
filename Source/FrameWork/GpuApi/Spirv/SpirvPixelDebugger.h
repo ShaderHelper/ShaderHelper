@@ -16,7 +16,7 @@ namespace FW
 	class FRAMEWORK_API SpvPixelDebuggerVisitor : public SpvDebuggerVisitor
 	{
 	public:
-		SpvPixelDebuggerVisitor(SpvPixelDebuggerContext& InPixelContext);
+		SpvPixelDebuggerVisitor(SpvPixelDebuggerContext& InPixelContext, bool InEnableUbsan);
 
 	public:
 		void PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) override;

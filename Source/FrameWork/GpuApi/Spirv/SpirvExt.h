@@ -527,6 +527,11 @@ namespace FW
 			int32 BasicTypeSize = GetTypeByteSize(VectorTypeDesc->GetBasicTypeDesc());
 			return BasicTypeSize * VectorTypeDesc->GetCompCount();
 		}
+		else if (TypeDesc->GetKind() == SpvTypeDescKind::Matrix)
+		{
+			const SpvMatrixTypeDesc* MatrixTypeDesc = static_cast<const SpvMatrixTypeDesc*>(TypeDesc);
+			return GetTypeByteSize(MatrixTypeDesc->GetVectorTypeDesc()) * MatrixTypeDesc->GetVectorCount();
+		}
 		else if(TypeDesc->GetKind() == SpvTypeDescKind::Composite)
 		{
 			const SpvCompositeTypeDesc* CompositeTypeDesc = static_cast<const SpvCompositeTypeDesc*>(TypeDesc);

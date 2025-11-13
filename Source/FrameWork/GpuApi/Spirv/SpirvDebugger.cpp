@@ -536,16 +536,7 @@ namespace FW
 		}
 
 		SpvId AppendVarFuncId = Patcher.NewId();
-		FString TypeName;
-		if (Context.Names.contains(PointeeType->GetId()))
-		{
-			TypeName = Context.Names[PointeeType->GetId()];
-		}
-		else
-		{
-			TypeName = GetHlslTypeStr(PointeeType);
-		}
-		FString FuncName = FString::Printf(TEXT("__AppendVar_%s_%d"), *TypeName, IndexNum);
+		FString FuncName = FString::Printf(TEXT("__AppendVar_%d_%d"), PointeeType->GetId().GetValue(), IndexNum);
 		Patcher.AddDebugName(MakeUnique<SpvOpName>(AppendVarFuncId, FuncName));
 		TArray<TUniquePtr<SpvInstruction>> AppendVarFuncInsts;
 		{
@@ -635,16 +626,7 @@ namespace FW
 		}
 
 		SpvId AppendValueFuncId = Patcher.NewId();
-		FString TypeName;
-		if (Context.Names.contains(ValueType->GetId()))
-		{
-			TypeName = Context.Names[ValueType->GetId()];
-		}
-		else
-		{
-			TypeName = GetHlslTypeStr(ValueType);
-		}
-		FString FuncName = FString::Printf(TEXT("__AppendValue_%s"), *TypeName);
+		FString FuncName = FString::Printf(TEXT("__AppendValue_%d"), ValueType->GetId().GetValue());
 		Patcher.AddDebugName(MakeUnique<SpvOpName>(AppendValueFuncId, FuncName));
 		TArray<TUniquePtr<SpvInstruction>> AppendValueFuncInsts;
 		{

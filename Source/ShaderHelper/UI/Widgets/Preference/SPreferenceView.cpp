@@ -462,15 +462,66 @@ namespace SH
 		];
 	}
 
+	void SDebugView::Construct(const FArguments& InArgs)
+	{
+		auto DebugGrid = SNew(SGridPanel).FillColumn(0, 0.4f).FillColumn(1, 0.5f).FillColumn(2, 0.1f);
+		auto AppendItem = [ItemNum = 0](auto& InGrid, const FText& InLabel, const FText& InToolTipText = FText::GetEmpty()) mutable -> SHorizontalBox::FScopedWidgetSlotArguments
+		{
+			InGrid->AddSlot(0, ItemNum)
+				.VAlign(VAlign_Center)
+				.HAlign(HAlign_Right)
+				[
+					SNew(STextBlock).Text(InLabel).ToolTipText(InToolTipText)
+				];
+			TSharedRef<SHorizontalBox> HBox = SNew(SHorizontalBox);
+			InGrid->AddSlot(1, ItemNum)
+				.Padding(12.f, 2.f, 0, 2.f)
+				[
+					HBox
+				];
+			InGrid->AddSlot(2, ItemNum);
+			ItemNum++;
+			return HBox->AddSlot();
+		};
+
+		AppendItem(DebugGrid, LOCALIZATION("EnableUbsan"), LOCALIZATION("EnableUbsanTip"))
+		[
+			SNew(SCheckBox).IsChecked_Lambda([] {
+				return ShaderDebugger::EnableUbsan() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;;
+			})
+			.OnCheckStateChanged_Lambda([](ECheckBoxState InState) {
+				Editor::GetEditorConfig()->SetBool(TEXT("Debugger"), TEXT("EnableUbsan"), InState == ECheckBoxState::Checked);
+				Editor::SaveEditorConfig();
+			})
+		];
+
+		ChildSlot
+		[
+			SNew(SVerticalBox)
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			[
+				SNew(SBorder)
+				.BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
+				[
+					DebugGrid
+				]
+			]
+	
+		];
+	}
+
 	void SPreferenceView::Construct(const FArguments& InArgs)
 	{
 		SAssignNew(KeymapView, SKeymapView);
 		SAssignNew(PluginView, SPluginView);
 		SAssignNew(AppearanceView, SAppearanceView);
+		SAssignNew(DebugView, SDebugView);
 
 		auto PluginPreference = CreatePreference(LOCALIZATION("Plugins"), PluginView.ToSharedRef());
 		auto AppearancePreference = CreatePreference(LOCALIZATION("Appearance"), AppearanceView.ToSharedRef());
 		auto KeymapPreference = CreatePreference(LOCALIZATION("Keymap"), KeymapView.ToSharedRef());
+		auto DebugPreference = CreatePreference(LOCALIZATION("Debug"), DebugView.ToSharedRef());
 		CurPreference = &*PluginPreference;
 
 		ChildSlot
@@ -499,9 +550,15 @@ namespace SH
 							AppearancePreference
 						]
 						+ SVerticalBox::Slot()
+						.Padding(0, 0, 0, 1.5)
 						.AutoHeight()
 						[
 							KeymapPreference
+						]
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						[
+							DebugPreference
 						]
 					]
 				]

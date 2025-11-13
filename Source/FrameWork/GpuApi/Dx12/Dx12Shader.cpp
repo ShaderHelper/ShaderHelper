@@ -194,6 +194,7 @@ namespace FW
 		Arguments.Add(TEXT("/Zi"));
         Arguments.Add(TEXT("/Od"));
 #endif
+		Arguments.Add(TEXT("-Zpr"));
         //Arguments.Add(TEXT("-no-warnings"));
 
 		if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
@@ -236,7 +237,10 @@ namespace FW
 		}
 		FString ShaderName = InShader->GetShaderName();
 #if DEBUG_SHADER
-		FFileHelper::SaveStringToFile(InShader->GetProcessedSourceText(), *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl"));
+		if (!ShaderName.IsEmpty())
+		{
+			FFileHelper::SaveStringToFile(InShader->GetProcessedSourceText(), *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl"));
+		}
 #endif
 
 		TRefCountPtr<IDxcIncludeHandler> IncludeHandler = new ShIncludeHandler(InShader);

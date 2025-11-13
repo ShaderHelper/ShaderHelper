@@ -267,7 +267,10 @@ namespace FW
 		
 		FString ShaderName = InShader->GetShaderName();
 #if DEBUG_SHADER
-		FFileHelper::SaveStringToFile(InShader->GetProcessedSourceText(), *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl"));
+		if (!ShaderName.IsEmpty())
+		{
+			FFileHelper::SaveStringToFile(InShader->GetProcessedSourceText(), *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl"));
+		}
 #endif
 		
 		ShaderConductor::Compiler::Compile(SourceDesc, SCOptions, TargetDescs.GetData(), TargetDescs.Num(), Results.GetData());

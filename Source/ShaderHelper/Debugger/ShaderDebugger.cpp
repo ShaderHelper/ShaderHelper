@@ -253,7 +253,7 @@ namespace SH
 					}
 				}
 				VisibleLocalVarBindings += "};\n";
-				VisibleLocalVarBindings += "StructuredBuffer<__Expression_Vars_Set> __Expression_Vars : register(t114514);\n";
+				VisibleLocalVarBindings += "StructuredBuffer<__Expression_Vars_Set> __Expression_Vars : register(t114514, space0);\n";
 
 				//Append the EntryPoint
 				FString EntryPointFunc = FString::Printf(TEXT("\nvoid %s() {\n"), *EntryPoint);
@@ -271,7 +271,7 @@ RWByteAddressBuffer _DebuggerBuffer : register(u465, space0);
 template<typename T>
 void __Expression_Output(T __Expression_Result) 
 {
-	_DebuggerBuffer.Store(0, __Expression_Result);
+	_DebuggerBuffer.Store<T>(0, __Expression_Result);
 }
 )";
 		ExpressionShader = OutputFunc + ExpressionShader;
@@ -601,6 +601,13 @@ void __Expression_Output(T __Expression_Result)
 	{
 	}
 
+	bool ShaderDebugger::EnableUbsan()
+	{
+		bool EnableUbsan = false;
+		Editor::GetEditorConfig()->GetBool(TEXT("Debugger"), TEXT("EnableUbsan"), EnableUbsan);
+		return EnableUbsan;
+	}
+
 	void ShaderDebugger::ApplyDebugState(const SpvDebugState& InState)
 	{
 		if (std::holds_alternative<SpvDebugState_VarChange>(InState))
@@ -749,7 +756,7 @@ void __Expression_Output(T __Expression_Result)
 		Parser.Parse(Shader->SpvCode);
 		SpvMetaVisitor MetaVisitor{ PixelDebuggerContext.value() };
 		Parser.Accept(&MetaVisitor);
-		SpvPixelDebuggerVisitor PixelDebuggerVisitor{ PixelDebuggerContext.value() };
+		SpvPixelDebuggerVisitor PixelDebuggerVisitor{ PixelDebuggerContext.value(), EnableUbsan()};
 		Parser.Accept(&PixelDebuggerVisitor);
 #if !SH_SHIPPING
 		PixelDebuggerVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / Shader->GetShaderName() / Shader->GetShaderName() + "Patched.spvasm");
@@ -763,6 +770,9 @@ void __Expression_Output(T __Expression_Result)
 		ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile({ PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, (char*)EntryPoint.Get(),
 			ShaderConductor::ShaderStage::PixelShader, HlslTargetDesc);
 		FString PatchedHlsl = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
+#if !SH_SHIPPING
+		FFileHelper::SaveStringToFile(PatchedHlsl, *(PathHelper::SavedShaderDir() / Shader->GetShaderName() / Shader->GetShaderName() + "Patched.hlsl"));
+#endif
 		if (ShaderResultDesc.hasError)
 		{
 			FString ErrorInfo = static_cast<const char*>(ShaderResultDesc.errorWarningMsg.Data());
@@ -774,7 +784,6 @@ void __Expression_Output(T __Expression_Result)
 		CurDebugStateIndex = 0;
 		DebuggerContext = &PixelDebuggerContext.value();
 		TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
-			.Name = PathHelper::SavedShaderDir() / Shader->GetShaderName() / Shader->GetShaderName() + "Patched",
 			.Source = MoveTemp(PatchedHlsl),
 			.Type = Shader->GetShaderType(),
 			.EntryPoint = "main"

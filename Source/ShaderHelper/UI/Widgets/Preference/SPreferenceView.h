@@ -61,6 +61,14 @@ namespace SH
 		void Construct(const FArguments& InArgs);
 	};
 
+	class SDebugView : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SDebugView) {}
+		SLATE_END_ARGS()
+		void Construct(const FArguments& InArgs);
+	};
+
 	class SPreferenceView : public SCompoundWidget
 	{
 	public:
@@ -77,5 +85,6 @@ namespace SH
 		TSharedPtr<SPluginView> PluginView;
 		TSharedPtr<SKeymapView> KeymapView;
 		TSharedPtr<SAppearanceView> AppearanceView;
+		TSharedPtr<SDebugView> DebugView;
 	};
 }
