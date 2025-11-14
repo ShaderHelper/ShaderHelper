@@ -7,7 +7,7 @@
 namespace FW
 {
 
-    MtlRenderStateCache::MtlRenderStateCache(MTLRenderPassDescriptorPtr InRenderPassDesc)
+    MtlRenderStateCache::MtlRenderStateCache(const FString& InName, MTLCommandBufferPtr InCmdBuffer, MTLRenderPassDescriptorPtr InRenderPassDesc)
         : IsRenderPipelineDirty(false)
         , IsViewportDirty(false)
 		, IsScissorRectDirty(false)
@@ -22,6 +22,8 @@ namespace FW
         , CurrentBindGroup1(nullptr)
         , CurrentBindGroup2(nullptr)
         , CurrentBindGroup3(nullptr)
+		, Name(InName)
+		, CmdBuffer(MoveTemp(InCmdBuffer))
         , RenderPassDesc(MoveTemp(InRenderPassDesc))
     {}
 
@@ -94,9 +96,8 @@ namespace FW
         }
     }
 
-    void MtlRenderStateCache::ApplyDrawState(MTL::RenderCommandEncoder* RenderCommandEncoder)
+    void MtlRenderStateCache::ApplyDrawState()
     {
-        check(RenderCommandEncoder);
         if(!CurrentViewPort.IsSet())
         {
             auto ColorAttachments = RenderPassDesc->colorAttachments();
@@ -116,6 +117,21 @@ namespace FW
 		{
 			MTL::ScissorRect ScissorRect{ 0, 0, (uint32)(*CurrentViewPort).width, (uint32)(*CurrentViewPort).height };
 			SetScissorRect(MoveTemp(ScissorRect));
+		}
+		
+		//Targetless, metal may preallocate the memory by propertyies renderTargetWidth/renderTargetHeight.
+		//we delay creating RenderCommandEncoder, so can set the most appropriate value.
+		if(!RenderCommandEncoder)
+		{
+			//Set Scissor Rect must be <= render pass width/height (metal validation)
+			if(RenderPassDesc->colorAttachments()->object(0)->texture() == nullptr && CurrentScissorRect)
+			{
+				RenderPassDesc->setRenderTargetWidth((*CurrentScissorRect).width);
+				RenderPassDesc->setRenderTargetHeight((*CurrentScissorRect).height);
+			}
+			
+			RenderCommandEncoder = NS::RetainPtr(CmdBuffer->renderCommandEncoder(RenderPassDesc.get()));
+			RenderCommandEncoder->setLabel(FStringToNSString(Name));
 		}
         
         if(IsRenderPipelineDirty)
@@ -138,22 +154,22 @@ namespace FW
         
         if(CurrentBindGroup0 && IsBindGroup0Dirty) 
 		{ 
-			CurrentBindGroup0->Apply(RenderCommandEncoder);
+			CurrentBindGroup0->Apply(RenderCommandEncoder.get());
             IsBindGroup0Dirty = false;
 		}
         if(CurrentBindGroup1 && IsBindGroup1Dirty)
 		{ 
-			CurrentBindGroup1->Apply(RenderCommandEncoder);
+			CurrentBindGroup1->Apply(RenderCommandEncoder.get());
             IsBindGroup1Dirty = false;
 		}
 		if(CurrentBindGroup2 && IsBindGroup2Dirty)
 		{ 
-			CurrentBindGroup2->Apply(RenderCommandEncoder);
+			CurrentBindGroup2->Apply(RenderCommandEncoder.get());
             IsBindGroup2Dirty = false;
 		}
         if(CurrentBindGroup3 && IsBindGroup3Dirty)
 		{ 
-			CurrentBindGroup3->Apply(RenderCommandEncoder);
+			CurrentBindGroup3->Apply(RenderCommandEncoder.get());
             IsBindGroup3Dirty = false;
 		}
     }
@@ -221,8 +237,8 @@ namespace FW
                                        
    void MtlRenderPassRecorder::DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount)
     {
-        StateCache.ApplyDrawState(CmdEncoder.get());
-        CmdEncoder->drawPrimitives(StateCache.GetPrimitiveType(), StartVertexLocation, VertexCount, InstanceCount, StartInstanceLocation);
+        StateCache.ApplyDrawState();
+		StateCache.GetEncoder()->drawPrimitives(StateCache.GetPrimitiveType(), StartVertexLocation, VertexCount, InstanceCount, StartInstanceLocation);
     }
     
     void MtlRenderPassRecorder::SetRenderPipelineState(GpuRenderPipelineState* InPipelineState)
@@ -261,6 +277,14 @@ namespace FW
             static_cast<MetalBindGroup *>(BindGroup3)
         );
     }
+
+	void MtlRenderPassRecorder::End()
+	{
+		if(auto* Encoder = StateCache.GetEncoder())
+		{
+			Encoder->endEncoding();
+		}
+	}
 
     void MtlComputePassRecorder::Dispatch(uint32 ThreadGroupCountX, uint32 ThreadGroupCountY, uint32 ThreadGroupCountZ)
     {
@@ -304,10 +328,7 @@ namespace FW
     GpuRenderPassRecorder* MtlCmdRecorder::BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName)
     {
         MTLRenderPassDescriptorPtr RenderPassDesc = NS::RetainPtr((MTL::RenderPassDescriptor*)MapRenderPassDesc(PassDesc));
-        MTL::RenderCommandEncoder* Encoder= CmdBuffer->renderCommandEncoder(RenderPassDesc.get());
-        Encoder->setLabel(FStringToNSString(PassName));
-        
-        auto PassRecorder = MakeUnique<MtlRenderPassRecorder>(NS::RetainPtr(Encoder), MoveTemp(RenderPassDesc));
+        auto PassRecorder = MakeUnique<MtlRenderPassRecorder>(PassName, CmdBuffer, MoveTemp(RenderPassDesc));
         RenderPassRecorders.Add(MoveTemp(PassRecorder));
         return RenderPassRecorders.Last().Get();
     }
@@ -315,7 +336,7 @@ namespace FW
     void MtlCmdRecorder::EndRenderPass(GpuRenderPassRecorder* InRenderPassRecorder)
     {
         MtlRenderPassRecorder* PassRecorder = static_cast<MtlRenderPassRecorder*>(InRenderPassRecorder);
-        PassRecorder->GetEncoder()->endEncoding();
+		PassRecorder->End();
     }
 
     void MtlCmdRecorder::BeginCaptureEvent(const FString& EventName)

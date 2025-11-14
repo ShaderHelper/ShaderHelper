@@ -786,7 +786,7 @@ void __Expression_Output(T __Expression_Result)
 		TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
 			.Source = MoveTemp(PatchedHlsl),
 			.Type = Shader->GetShaderType(),
-			.EntryPoint = "main"
+			.EntryPoint = Shader->GetEntryPoint()
 		});
 		if (!GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo))
 		{
