@@ -19,7 +19,9 @@ namespace FW
 		SpvPixelDebuggerVisitor(SpvPixelDebuggerContext& InPixelContext, bool InEnableUbsan);
 
 	public:
-		void PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) override;
 		void Visit(const SpvOpKill* Inst) override;
+
+	protected:
+		void PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) override;
 	};
 }

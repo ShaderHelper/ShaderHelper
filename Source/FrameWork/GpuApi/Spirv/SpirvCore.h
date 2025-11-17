@@ -410,26 +410,26 @@ namespace FW
 
 	//Only valid for the type of the internal object,
 	//because the type of the external object may have different memory alignment rules.
-	inline int32 GetTypeByteSize(SpvType* Type)
+	inline int32 GetTypeByteSize(const SpvType* Type)
 	{
 		if(Type->IsScalar())
 		{
-			SpvScalarType* ScalarType = static_cast<SpvScalarType*>(Type);
+			const SpvScalarType* ScalarType = static_cast<const SpvScalarType*>(Type);
 			return ScalarType->GetWidth() / 8;
 		}
 		else if(Type->GetKind() == SpvTypeKind::Vector)
 		{
-			SpvVectorType* VectorType = static_cast<SpvVectorType*>(Type);
+			const SpvVectorType* VectorType = static_cast<const SpvVectorType*>(Type);
 			return GetTypeByteSize(VectorType->ElementType) * VectorType->ElementCount;
 		}
 		else if(Type->GetKind() == SpvTypeKind::Array)
 		{
-			SpvArrayType* ArrayType = static_cast<SpvArrayType*>(Type);
+			const SpvArrayType* ArrayType = static_cast<const SpvArrayType*>(Type);
 			return GetTypeByteSize(ArrayType->ElementType) * ArrayType->Length;
 		}
 		else if(Type->GetKind() == SpvTypeKind::Struct)
 		{
-			SpvStructType* StructType = static_cast<SpvStructType*>(Type);
+			const SpvStructType* StructType = static_cast<const SpvStructType*>(Type);
 			int32 MembersByteSize = 0;
 			for(SpvType* MemberType : StructType->MemberTypes)
 			{
@@ -439,13 +439,10 @@ namespace FW
 		}
 		else if(Type->GetKind() == SpvTypeKind::Matrix)
 		{
-			SpvMatrixType* MatrixType = static_cast<SpvMatrixType*>(Type);
+			const SpvMatrixType* MatrixType = static_cast<const SpvMatrixType*>(Type);
 			return MatrixType->ElementCount * GetTypeByteSize(MatrixType->ElementType);
 		}
-		else
-		{
-			return 0;
-		}
+		AUX::Unreachable();
 	}
 
 	struct SpvObject

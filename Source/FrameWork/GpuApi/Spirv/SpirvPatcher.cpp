@@ -29,6 +29,103 @@ namespace FW
 		FFileHelper::SaveStringToFile(SpvSourceText, *SavedFileName);
 	}
 
+	SpvId SpvPatcher::FindOrAddTypeDesc(TUniquePtr<SpvInstruction> InInst)
+	{
+		SpvMetaContext& Context = MetaVisitor->GetContext();
+
+		auto HasTypeDesc = [&](SpvInstruction* A, SpvInstruction* B) {
+			if (A->GetKind() == B->GetKind())
+			{
+				SpvDebugInfo100 OpCode = std::get<SpvDebugInfo100>(A->GetKind());
+				if (OpCode == SpvDebugInfo100::DebugTypeBasic)
+				{
+					SpvDebugTypeBasic* TypeA = static_cast<SpvDebugTypeBasic*>(A);
+					SpvDebugTypeBasic* TypeB = static_cast<SpvDebugTypeBasic*>(B);
+					return TypeA->GetSize() == TypeB->GetSize() && TypeA->GetEncoding() == TypeB->GetEncoding();
+				}
+				else if (OpCode == SpvDebugInfo100::DebugTypeVector)
+				{
+					SpvDebugTypeVector* TypeA = static_cast<SpvDebugTypeVector*>(A);
+					SpvDebugTypeVector* TypeB = static_cast<SpvDebugTypeVector*>(B);
+					return TypeA->GetBasicType() == TypeB->GetBasicType() && TypeA->GetComponentCount() == TypeB->GetComponentCount();
+				}
+			}
+			return false;
+		};
+
+		SpvId ResultId;
+		for (auto& Inst : *OriginInsts)
+		{
+			if (HasTypeDesc(Inst.Get(), InInst.Get()))
+			{
+				ResultId = Inst->GetId().value();
+			}
+		}
+		for (auto& Inst : PatchedInsts)
+		{
+			if (HasTypeDesc(Inst.Get(), InInst.Get()))
+			{
+				ResultId = Inst->GetId().value();
+			}
+		}
+
+		if (!ResultId.IsValid())
+		{
+			ResultId = NewId();
+			InInst->SetId(ResultId);
+
+			AddInstruction(Context.Sections[SpvSectionKind::Type].EndOffset, MoveTemp(InInst));
+		}
+
+		return ResultId;
+	}
+
+	SpvId SpvPatcher::FindOrAddDebugStr(const FString& Str)
+	{
+		SpvMetaContext& Context = MetaVisitor->GetContext();
+		TUniquePtr<SpvInstruction> InInst = MakeUnique<SpvOpString>(Str);
+
+		auto HasStr = [&](SpvInstruction* A, SpvInstruction* B) {
+			if (A->GetKind() == B->GetKind())
+			{
+				SpvOp OpCode = std::get<SpvOp>(A->GetKind());
+				if (OpCode == SpvOp::String)
+				{
+					SpvOpString* TypeA = static_cast<SpvOpString*>(A);
+					SpvOpString* TypeB = static_cast<SpvOpString*>(B);
+					return TypeA->GetStr() == TypeB->GetStr();
+				}
+			}
+			return false;
+		};
+
+		SpvId ResultId;
+		for (auto& Inst : *OriginInsts)
+		{
+			if (HasStr(Inst.Get(), InInst.Get()))
+			{
+				ResultId = Inst->GetId().value();
+			}
+		}
+		for (auto& Inst : PatchedInsts)
+		{
+			if (HasStr(Inst.Get(), InInst.Get()))
+			{
+				ResultId = Inst->GetId().value();
+			}
+		}
+
+		if (!ResultId.IsValid())
+		{
+			ResultId = NewId();
+			InInst->SetId(ResultId);
+
+			AddInstruction(Context.Sections[SpvSectionKind::DebugString].EndOffset, MoveTemp(InInst));
+		}
+
+		return ResultId;
+	}
+
 	void SpvPatcher::AddDebugName(TUniquePtr<SpvInstruction> InInst)
 	{
 		SpvMetaContext& Context = MetaVisitor->GetContext();
@@ -256,7 +353,7 @@ namespace FW
 			}
 		}
 		UpdateSection(TargetSection, InstBin.Num());
-		UpdateOriginInsts(WordOffset, InstBin.Num());
+		UpdateInsts(WordOffset, InstBin.Num());
 		if ((int)TargetSection <= (int)SpvSectionKind::Function)
 		{
 			InInst->Accept(MetaVisitor.Get());
@@ -275,9 +372,17 @@ namespace FW
 		}
 	}
 
-	void SpvPatcher::UpdateOriginInsts(int WordOffset, int WordSize)
+	void SpvPatcher::UpdateInsts(int WordOffset, int WordSize)
 	{
 		for (auto& Inst : *OriginInsts)
+		{
+			int CurInstOffset = Inst->GetWordOffset().value();
+			if (CurInstOffset >= WordOffset)
+			{
+				Inst->SetWordOffset(CurInstOffset + WordSize);
+			}
+		}
+		for (auto& Inst : PatchedInsts)
 		{
 			int CurInstOffset = Inst->GetWordOffset().value();
 			if (CurInstOffset >= WordOffset)

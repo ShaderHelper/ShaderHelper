@@ -219,6 +219,7 @@ namespace SH
 					SNew(SExpanderArrow, SharedThis(this))
 				]
 				+ SHorizontalBox::Slot()
+				.VAlign(VAlign_Center)
 				[
 				   SNew(STextBlock).Font(Owner->Font).Text(FText::FromString(Data->Expr))
 				]

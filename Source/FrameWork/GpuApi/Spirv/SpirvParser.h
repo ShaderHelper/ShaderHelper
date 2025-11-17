@@ -24,8 +24,21 @@ namespace FW
 		std::unordered_map<SpvId, SpvVariableDesc*> VariableDescMap;   //VarId -> Desc
 		std::unordered_map<SpvId, TUniquePtr<SpvLexicalScope>> LexicalScopes;
 
+		SpvId GetTypeDescId(const SpvTypeDesc* InDesc)
+		{
+			for (const auto& [Id, Desc] : TypeDescs)
+			{
+				if (Desc.Get() == InDesc)
+				{
+					return Id;
+				}
+			}
+			return {};
+		}
+
 		TMap<SpvBuiltIn, SpvId> BuiltIns;
 		TMap<SpvSectionKind, SpvSection> Sections;
+		TMap<SpvId, SpvExtSet> ExtSets;
 	};
 
 	class FRAMEWORK_API SpvMetaVisitor : public SpvVisitor
@@ -36,7 +49,7 @@ namespace FW
 		SpvMetaContext& GetContext() { return Context; }
 		
 	public:
-		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections) override;
+		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections, const TMap<SpvId, SpvExtSet>& InExtSets) override;
 		
 		void Visit(const SpvOpVariable* Inst) override;
 		void Visit(const SpvOpTypeVoid* Inst) override;

@@ -11,6 +11,7 @@ namespace FW
 	public:
 		void SetSpvContext(const TArray<TUniquePtr<SpvInstruction>>& InInsts, const TArray<uint32>& InSpvCode, SpvMetaContext* InMetaContext);
 		const TArray<uint32>& GetSpv() const { return SpvCode; }
+		const TArray<TUniquePtr<SpvInstruction>>& GetPathcedInsts() const { return PatchedInsts; }
 		void Dump(const FString& SavedFileName) const;
 		SpvId NewId() {
 			return SpvCode[3]++;
@@ -20,6 +21,8 @@ namespace FW
 		SpvId FindOrAddType(TUniquePtr<SpvInstruction> InInst);
 		template<typename T>
 		SpvId FindOrAddConstant(T InConstant);
+		SpvId FindOrAddTypeDesc(TUniquePtr<SpvInstruction> InInst);
+		SpvId FindOrAddDebugStr(const FString& Str);
 
 		void AddDebugName(TUniquePtr<SpvInstruction> InInst);
 		void AddAnnotation(TUniquePtr<SpvInstruction> InInst);
@@ -31,7 +34,7 @@ namespace FW
 
 	private:
 		void UpdateSection(SpvSectionKind DirtySection, int WordSize);
-		void UpdateOriginInsts(int WordOffset, int WordSize);
+		void UpdateInsts(int WordOffset, int WordSize);
 
 	private:
 		const TArray<TUniquePtr<SpvInstruction>>* OriginInsts;

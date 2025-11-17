@@ -2,6 +2,7 @@
 #include "GpuApi/Spirv/SpirvParser.h"
 #include "GpuApi/Spirv/SpirvPixelDebugger.h"
 #include "GpuApi/GpuRhi.h"
+#include "RenderResource/Shader/Shader.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogDebugger, Log, All);
 inline DEFINE_LOG_CATEGORY(LogDebugger);
@@ -81,11 +82,14 @@ namespace SH
 		std::vector<std::pair<FW::SpvId, FW::SpvVariableDesc*>> SortedVariableDescs;
 		FW::SpvVariable* AssertResult = nullptr;
 
+		TArray<FW::SpvBinding> SpvBindings;
 		BindingState BindingBuilders;
+		FW::BindingContext PatchedBindings;
 		FW::SpvDebuggerContext* DebuggerContext = nullptr;
 		std::optional<FW::SpvPixelDebuggerContext> PixelDebuggerContext;
 		std::optional<PixelState> PsState;
-
+		TRefCountPtr<FW::GpuShader> DebugShader;
 		TArray<FW::SpvDebugState> DebugStates;
+		TRefCountPtr<FW::GpuBuffer> DebugBuffer;
 	};
 }

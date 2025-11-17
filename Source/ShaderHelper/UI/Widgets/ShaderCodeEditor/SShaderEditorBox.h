@@ -225,7 +225,6 @@ namespace SH
 		FVector2D GetCodeCompletionCanvasSize() const;
 
 		ShaderAsset* GetShaderAsset() const { return ShaderAssetObj; }
-		FString GetCurShaderSource() const { return CurrentShaderSource; }
 		TRefCountPtr<FW::GpuShader> CreateGpuShader();
         FText GetEditStateText() const;
         FText GetRowColText() const;

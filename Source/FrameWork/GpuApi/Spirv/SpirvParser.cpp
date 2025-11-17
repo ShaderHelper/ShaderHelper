@@ -451,9 +451,10 @@ namespace FW
 		Context.VariableDescMap.emplace(Inst->GetVarId(), &Context.VariableDescs[Inst->GetId().value()]);
 	}
 
-	void SpvMetaVisitor::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections)
+	void SpvMetaVisitor::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections, const TMap<SpvId, SpvExtSet>& InExtSets)
 	{
 		Context.Sections = InSections;
+		Context.ExtSets = InExtSets;
 		for(const auto& Inst : Insts)
 		{
 			if(const SpvOp* OpKind = std::get_if<SpvOp>(&Inst->GetKind()) ;
@@ -468,7 +469,7 @@ namespace FW
 
 	void SpirvParser::Accept(SpvVisitor* Visitor)
 	{
-		Visitor->Parse(Insts, SpvCode, Sections);
+		Visitor->Parse(Insts, SpvCode, Sections, ExtSets);
 	}
 
 	void SpirvParser::Parse(const TArray<uint32>& SpvCode)
@@ -1460,14 +1461,15 @@ namespace FW
 						SpvId Name = SpvCode[WordOffset + 5];
 						SpvId Size = SpvCode[WordOffset + 6];
 						SpvId Encoding = SpvCode[WordOffset + 7];
-						DecodedInst = MakeUnique<SpvDebugTypeBasic>(Name, Size, Encoding);
+						SpvId Flags = SpvCode[WordOffset + 8];
+						DecodedInst = MakeUnique<SpvDebugTypeBasic>(ResultType, ExtSetId, Name, Size, Encoding, Flags);
 						DecodedInst->SetId(ResultId);
 					}
 					else if(ExtOp == SpvDebugInfo100::DebugTypeVector)
 					{
 						SpvId BasicType = SpvCode[WordOffset + 5];
 						SpvId ComponentCount = SpvCode[WordOffset + 6];
-						DecodedInst = MakeUnique<SpvDebugTypeVector>(BasicType, ComponentCount);
+						DecodedInst = MakeUnique<SpvDebugTypeVector>(ResultType, ExtSetId, BasicType, ComponentCount);
 						DecodedInst->SetId(ResultId);
 					}
 					else if(ExtOp == SpvDebugInfo100::DebugTypeMatrix)

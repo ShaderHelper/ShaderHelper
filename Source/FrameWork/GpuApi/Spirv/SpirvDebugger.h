@@ -125,9 +125,8 @@ namespace FW
 		
 	public:
 		const SpvPatcher& GetPatcher() const { return Patcher; }
-		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections) override;
+		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections, const TMap<SpvId, SpvExtSet>& InExtSets) override;
 		int32 GetInstIndex(SpvId Inst) const;
-		virtual void PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) = 0;
 		
 	public:
 		void Visit(const SpvDebugLine* Inst) override;
@@ -165,7 +164,10 @@ namespace FW
 		void Visit(const SpvOpBranchConditional* Inst) override;
 		void Visit(const SpvOpReturn* Inst) override;
 		void Visit(const SpvOpReturnValue* Inst) override;
+
 	protected:
+		virtual void PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) = 0;
+		virtual void ParseInternal();
 		void PatchToDebugger(SpvId InValueId, SpvId InTypeId, TArray<TUniquePtr<SpvInstruction>>& InstList);
 		void PatchAppendVarFunc(SpvPointer* Pointer, uint32 IndexNum);
 		void PatchAppendValueFunc(SpvType* ValueType);

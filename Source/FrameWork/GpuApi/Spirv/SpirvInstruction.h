@@ -9,7 +9,7 @@ namespace FW
 	{
 	public:
 		virtual ~SpvVisitor() = default;
-		virtual void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections) {}
+		virtual void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections, const TMap<SpvId, SpvExtSet>& InExtSets) {}
 		virtual void Visit(const SpvInstruction*) {}
 		
 		//Core
@@ -701,6 +701,16 @@ namespace FW
 		{}
 		
 		const FString& GetStr() const { return Str; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(GetId().value().GetValue());
+			std::string Utf8Name(TCHAR_TO_UTF8(*Str));
+			Bin.Append((uint32*)Utf8Name.c_str(), (Utf8Name.size() + 1 + 3) / 4);
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::String;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		FString Str;
@@ -2076,31 +2086,64 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 	class SpvDebugTypeBasic : public SpvInstructionBase<SpvDebugTypeBasic>
 	{
 	public:
-		SpvDebugTypeBasic(SpvId InName, SpvId InSize, SpvId InEncoding) : SpvInstructionBase(SpvDebugInfo100::DebugTypeBasic)
-		, Name(InName), Size(InSize), Encoding(InEncoding)
+		SpvDebugTypeBasic(SpvId InResultType, SpvId InExtSet, SpvId InName, SpvId InSize, SpvId InEncoding, SpvId InFlags) : SpvInstructionBase(SpvDebugInfo100::DebugTypeBasic)
+		, ResultType(InResultType), ExtSet(InExtSet), Name(InName), Size(InSize), Encoding(InEncoding), Flags(InFlags)
 		{}
 		
 		SpvId GetName() const { return Name; }
 		SpvId GetSize() const { return Size; }
 		SpvId GetEncoding() const { return Encoding; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(ExtSet.GetValue());
+			Bin.Add((uint32)SpvDebugInfo100::DebugTypeBasic);
+			Bin.Add(Name.GetValue());
+			Bin.Add(Size.GetValue());
+			Bin.Add(Encoding.GetValue());
+			Bin.Add(Flags.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ExtInst;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
+		SpvId ResultType;
+		SpvId ExtSet;
 		SpvId Name;
 		SpvId Size;
 		SpvId Encoding;
+		SpvId Flags;
 	};
 
 	class SpvDebugTypeVector : public SpvInstructionBase<SpvDebugTypeVector>
 	{
 	public:
-		SpvDebugTypeVector(SpvId InBasicType, SpvId InComponentCount) : SpvInstructionBase(SpvDebugInfo100::DebugTypeVector)
-		, BasicType(InBasicType), ComponentCount(InComponentCount)
+		SpvDebugTypeVector(SpvId InResultType, SpvId InExtSet, SpvId InBasicType, SpvId InComponentCount) : SpvInstructionBase(SpvDebugInfo100::DebugTypeVector)
+		, ResultType(InResultType), ExtSet(InExtSet), BasicType(InBasicType), ComponentCount(InComponentCount)
 		{}
 		
 		SpvId GetBasicType() const { return BasicType; }
 		SpvId GetComponentCount() const { return ComponentCount; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(ExtSet.GetValue());
+			Bin.Add((uint32)SpvDebugInfo100::DebugTypeVector);
+			Bin.Add(BasicType.GetValue());
+			Bin.Add(ComponentCount.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ExtInst;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
+		SpvId ResultType;
+		SpvId ExtSet;
 		SpvId BasicType;
 		SpvId ComponentCount;
 	};

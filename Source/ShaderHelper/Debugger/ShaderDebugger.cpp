@@ -3,7 +3,6 @@
 #include "ShaderConductor.hpp"
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
-#include "RenderResource/Shader/Shader.h"
 #include "GpuApi/Spirv/SpirvExprDebugger.h"
 
 using namespace FW;
@@ -191,211 +190,104 @@ namespace SH
 
 	ExpressionNode ShaderDebugger::EvaluateExpression(const FString& InExpression) const
 	{
-		ShaderAsset* ShaderAssetObj = ShaderEditor->GetShaderAsset();
-		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
-
-		FString ExpressionShader = ShaderAssetObj->GetShaderDesc(ShaderEditor->GetCurShaderSource()).Source;
-		TArray<uint8> InputData;
-
-		//Patch EntryPoint
-		FString EntryPoint = ShaderAssetObj->Shader->GetEntryPoint();
-		for (const ShaderFunc& Func : Funcs)
-		{
-			if (Func.Name == EntryPoint)
-			{
-				TArray<FTextRange> LineRanges;
-				FTextRange::CalculateLineRangesFromString(ExpressionShader, LineRanges);
-				int32 StartPos = LineRanges[Func.Start.x - 1].BeginIndex + Func.Start.y - 1;
-				int32 EndPos = LineRanges[Func.End.x - 1].BeginIndex + Func.End.y - 1;
-
-				ExpressionShader.RemoveAt(StartPos, EndPos - StartPos);
-
-				//Append bindings
-				TArray<FString> LocalVars;
-				FString LocalVarInitializations;
-				FString VisibleLocalVarBindings = "struct __Expression_Vars_Set {";
-				for (const auto& [VarId, VarDesc] : SortedVariableDescs)
-				{
-					if (SpvVariable* Var = DebuggerContext->FindVar(VarId))
-					{
-						if (!Var->IsExternal() && VarDesc)
-						{
-							bool VisibleScope = VarDesc->Parent->Contains(CallStackScope);
-							bool VisibleLine = VarDesc->Line < StopLineNumber + ExtraLineNum && VarDesc->Line > ExtraLineNum;
-							if (VisibleScope && VisibleLine)
-							{
-								if (LocalVars.Contains(VarDesc->Name))
-								{
-									continue;
-								}
-								FString Declaration;
-								if (VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Array)
-								{
-									SpvArrayTypeDesc* ArrayTypeDesc = static_cast<SpvArrayTypeDesc*>(VarDesc->TypeDesc);
-									FString BasicTypeStr = GetTypeDescStr(ArrayTypeDesc->GetBaseTypeDesc());
-									FString DimStr = GetTypeDescStr(VarDesc->TypeDesc);
-									DimStr.RemoveFromStart(BasicTypeStr);
-									Declaration = BasicTypeStr + " " + VarDesc->Name + DimStr + ";";
-									LocalVarInitializations += Declaration;
-									LocalVarInitializations += VarDesc->Name + "= __Expression_Vars[0]." + VarDesc->Name + ";\n";
-								}
-								else
-								{
-									Declaration = GetTypeDescStr(VarDesc->TypeDesc) + " " + VarDesc->Name + ";";
-									LocalVarInitializations += GetTypeDescStr(VarDesc->TypeDesc) + " " + VarDesc->Name + "= __Expression_Vars[0]." + VarDesc->Name + ";\n";
-								}
-								VisibleLocalVarBindings += Declaration;
-								LocalVars.Add(VarDesc->Name);
-								const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var->Storage).Value;
-								InputData.Append(Value);
-							}
-						}
-					}
-				}
-				VisibleLocalVarBindings += "};\n";
-				VisibleLocalVarBindings += "StructuredBuffer<__Expression_Vars_Set> __Expression_Vars : register(t114514, space0);\n";
-
-				//Append the EntryPoint
-				FString EntryPointFunc = FString::Printf(TEXT("\nvoid %s() {\n"), *EntryPoint);
-				EntryPointFunc += MoveTemp(LocalVarInitializations);
-				EntryPointFunc += FString::Printf(TEXT("__Expression_Output(%s);\n"), *InExpression);
-				EntryPointFunc += "}\n";
-				ExpressionShader += VisibleLocalVarBindings + EntryPointFunc;
-				break;
-			}
-		}
-
-		static const FString OutputFunc =
-			R"(
-RWByteAddressBuffer _DebuggerBuffer : register(u465, space0);
-template<typename T>
-void __Expression_Output(T __Expression_Result) 
-{
-	_DebuggerBuffer.Store<T>(0, __Expression_Result);
-}
-)";
-		ExpressionShader = OutputFunc + ExpressionShader;
-
-		auto ShaderDesc = GpuShaderSourceDesc{
-			.Name = "EvaluateExpression",
-			.Source = MoveTemp(ExpressionShader),
-			.Type = ShaderAssetObj->Shader->GetShaderType(),
-			.EntryPoint = EntryPoint
-		};
-		TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(ShaderDesc);
-		Shader->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
-
 		TArray<FString> ExtraArgs;
 		ExtraArgs.Add("-D");
 		ExtraArgs.Add("ENABLE_PRINT=0");
-
+		ExtraArgs.Add("/Od");
 		FString ErrorInfo, WarnInfo;
-		GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo, ExtraArgs);
-		if (ErrorInfo.IsEmpty())
+
+		if (DebugShader->GetShaderType() == ShaderType::PixelShader)
 		{
-			SpvExprDebuggerContext ExprContext;
+			SpvPixelExprDebuggerContext ExprContext{ DebugStates[CurDebugStateIndex], CurDebugStateIndex,
+				PsState.value().Coord, Funcs, SpvBindings };
 			SpirvParser Parser;
-			Parser.Parse(Shader->SpvCode);
+			Parser.Parse(DebugShader->SpvCode);
 			SpvMetaVisitor MetaVisitor{ ExprContext };
 			Parser.Accept(&MetaVisitor);
-			SpvExprDebuggerVisitor ExprVisitor{ ExprContext };
+			SpvPixelExprDebuggerVisitor ExprVisitor{ ExprContext };
 			Parser.Accept(&ExprVisitor);
+			ExprVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "ExprPatched.spvasm");
+			
+			const TArray<uint32>& PatchedSpv = ExprVisitor.GetPatcher().GetSpv();
+			auto EntryPoint = StringCast<UTF8CHAR>(*DebugShader->GetEntryPoint());
+			ShaderConductor::Compiler::TargetDesc HlslTargetDesc{};
+			HlslTargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
+			HlslTargetDesc.version = "60";
+			ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile({.force_zero_initialized_variables = true}, { PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, (char*)EntryPoint.Get(),
+				ShaderConductor::ShaderStage::PixelShader, HlslTargetDesc);
+			FString PatchedHlsl = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
 
-			if (ExprContext.ResultTypeDesc)
+			if (!ShaderResultDesc.hasError)
 			{
-				FText TypeName = LOCALIZATION("InvalidExpr");
-				TypeName = FText::FromString(GetTypeDescStr(ExprContext.ResultTypeDesc));
+				FString Pattern = "_AppendExprDummy_()";
+				int32 ReplaceIndex = PatchedHlsl.Find(Pattern, ESearchCase::IgnoreCase, ESearchDir::FromEnd);
+				PatchedHlsl.RemoveAt(ReplaceIndex, Pattern.Len());
+				PatchedHlsl.InsertAt(ReplaceIndex, "_AppendExpr_(" + InExpression + ")");
+				int32 RemoveStartIndex = PatchedHlsl.Find("void _AppendExprDummy_()", ESearchCase::IgnoreCase, ESearchDir::FromEnd, ReplaceIndex);
+				int32 RemoveEndIndex = PatchedHlsl.Find("}", ESearchCase::IgnoreCase, ESearchDir::FromStart, RemoveStartIndex);
+				PatchedHlsl.RemoveAt(RemoveStartIndex, RemoveEndIndex - RemoveStartIndex + 1);
+				FFileHelper::SaveStringToFile(PatchedHlsl, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "ExprPatched.hlsl"));
 
-				BindingContext Bindings;
-				int32 ResultSize = GetTypeByteSize(ExprContext.ResultTypeDesc);
-				TArray<uint8> Datas;
-				Datas.SetNumZeroed(ResultSize);
-				TRefCountPtr<GpuBuffer> DebuggerBuffer = GGpuRhi->CreateBuffer({
-					.ByteSize = (uint32)ResultSize,
-					.Usage = GpuBufferUsage::RWRaw,
-					.InitialData = Datas,
+				TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
+					.Source = MoveTemp(PatchedHlsl),
+					.Type = DebugShader->GetShaderType(),
+					.EntryPoint = DebugShader->GetEntryPoint()
 				});
-
-				TRefCountPtr<GpuBuffer> LocalVarsInput = GGpuRhi->CreateBuffer({
-					.ByteSize = (uint32)InputData.Num(),
-					.Usage = GpuBufferUsage::Structured,
-					.InitialData = InputData,
-					.StructuredInit = {
-						.Stride = (uint32)InputData.Num()
-					}
-				});
-
-				GpuBindGroupDesc BindGroupDesc = (*BindingBuilders.GlobalBuilder).BingGroupBuilder.GetDesc();
-				GpuBindGroupLayoutDesc LayoutDesc = (*BindingBuilders.GlobalBuilder).LayoutBuilder.GetDesc();
-				BindGroupDesc.Resources.Add(0721, { DebuggerBuffer });
-				LayoutDesc.Layouts.Add(0721, { BindingType::RWRawBuffer });
-				BindGroupDesc.Resources.Add(114514, { LocalVarsInput });
-				LayoutDesc.Layouts.Add(114514, { BindingType::StructuredBuffer });
-				TRefCountPtr<GpuBindGroupLayout> PatchedBindGroupLayout = GGpuRhi->CreateBindGroupLayout(LayoutDesc);
-				BindGroupDesc.Layout = PatchedBindGroupLayout;
-				TRefCountPtr<GpuBindGroup> PacthedBindGroup = GGpuRhi->CreateBindGroup(BindGroupDesc);
-				Bindings.SetGlobalBindGroup(PacthedBindGroup);
-				Bindings.SetGlobalBindGroupLayout(PatchedBindGroupLayout);
-
-				if (BindingBuilders.PassBuilder)
+				if (GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
 				{
-					Bindings.SetPassBindGroup(BindingBuilders.PassBuilder.value().BingGroupBuilder.Build());
-					Bindings.SetPassBindGroupLayout(BindingBuilders.PassBuilder.value().LayoutBuilder.Build());
-				}
-				if (BindingBuilders.ShaderBuilder)
-				{
-					Bindings.SetShaderBindGroup(BindingBuilders.ShaderBuilder.value().BingGroupBuilder.Build());
-					Bindings.SetShaderBindGroupLayout(BindingBuilders.ShaderBuilder.value().LayoutBuilder.Build());
-				}
-
-				if (Shader->GetShaderType() == ShaderType::PixelShader)
-				{
-					Shader->CompilerFlag = GpuShaderCompilerFlag::None;
-					if (GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo, ExtraArgs))
-					{
-						GpuRenderPipelineStateDesc PatchedPipelineDesc{
+					GpuRenderPipelineStateDesc PatchedPipelineDesc{
 						.Vs = PsState.value().PipelineDesc.Vs,
-						.Ps = Shader,
+						.Ps = PatchedShader,
 						.RasterizerState = PsState.value().PipelineDesc.RasterizerState,
 						.Primitive = PsState.value().PipelineDesc.Primitive
-						};
-						Bindings.ApplyBindGroupLayout(PatchedPipelineDesc);
-						TRefCountPtr<GpuRenderPipelineState> Pipeline = GGpuRhi->CreateRenderPipelineState(PatchedPipelineDesc);
-						auto CmdRecorder = GGpuRhi->BeginRecording();
-						{
-							auto PassRecorder = CmdRecorder->BeginRenderPass({}, TEXT("Debugger"));
-							{
-								PassRecorder->SetViewPort(PsState.value().ViewPortDesc);
-								PassRecorder->SetRenderPipelineState(Pipeline);
-								Bindings.ApplyBindGroup(PassRecorder);
-								PsState.value().DrawFunction(PassRecorder);
-							}
-							CmdRecorder->EndRenderPass(PassRecorder);
-						}
-						GGpuRhi->EndRecording(CmdRecorder);
-						GGpuRhi->Submit({ CmdRecorder });
+					};
+					PatchedBindings.ApplyBindGroupLayout(PatchedPipelineDesc);
+					TRefCountPtr<GpuRenderPipelineState> Pipeline = GGpuRhi->CreateRenderPipelineState(PatchedPipelineDesc);
 
-						uint8* DebuggerBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebuggerBuffer, GpuResourceMapMode::Read_Only);
-						TArray<uint8> ResultValue = { DebuggerBufferData, ResultSize };
-						GGpuRhi->UnMapGpuBuffer(DebuggerBuffer);
+					auto CmdRecorder = GGpuRhi->BeginRecording();
+					{
+						auto PassRecorder = CmdRecorder->BeginRenderPass({}, TEXT("ExprDebugger"));
+						{
+							PassRecorder->SetViewPort(PsState.value().ViewPortDesc);
+							PassRecorder->SetRenderPipelineState(Pipeline);
+							PatchedBindings.ApplyBindGroup(PassRecorder);
+							PsState.value().DrawFunction(PassRecorder);
+						}
+						CmdRecorder->EndRenderPass(PassRecorder);
+					}
+					GGpuRhi->EndRecording(CmdRecorder);
+					GGpuRhi->Submit({ CmdRecorder });
+
+					uint8* DebugBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebugBuffer, GpuResourceMapMode::Read_Only);
+					SpvId TypeDescId = *(uint32*)(DebugBufferData);
+					int32 ResultSize = *(int32*)(DebugBufferData + 4);
+					TArray<uint8> ResultValue = { DebugBufferData + 8, ResultSize };
+					GGpuRhi->UnMapGpuBuffer(DebugBuffer);
+
+					SpvTypeDesc* ResultTypeDesc = ExprContext.TypeDescs[TypeDescId].Get();
+					if (ResultTypeDesc)
+					{
+						FText TypeName = LOCALIZATION("InvalidExpr");
+						TypeName = FText::FromString(GetTypeDescStr(ResultTypeDesc));
 
 						TArray<Vector2i> ResultRange;
 						ResultRange.Add({ 0, ResultValue.Num() });
-						FString ValueStr = GetValueStr(ResultValue, ExprContext.ResultTypeDesc, ResultRange, 0);
+						FString ValueStr = GetValueStr(ResultValue, ResultTypeDesc, ResultRange, 0);
 
 						TArray<TSharedPtr<ExpressionNode>> Children;
-						if (ExprContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Composite || ExprContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Array
-							|| ExprContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Matrix)
+						if (ResultTypeDesc->GetKind() == SpvTypeDescKind::Composite || ResultTypeDesc->GetKind() == SpvTypeDescKind::Array
+							|| ResultTypeDesc->GetKind() == SpvTypeDescKind::Matrix)
 						{
-							Children = AppendExprChildNodes(ExprContext.ResultTypeDesc, ResultRange, ResultValue, 0);
+							Children = AppendExprChildNodes(ResultTypeDesc, ResultRange, ResultValue, 0);
 						}
 
 						return { .Expr = InExpression, .ValueStr = ValueStr,
 							.TypeName = TypeName.ToString(), .Children = MoveTemp(Children) };
 					}
+		
 				}
 			}
-
+	
 		}
 
 		return { .Expr = InExpression, .ValueStr = LOCALIZATION("InvalidExpr").ToString() };
@@ -560,7 +452,7 @@ void __Expression_Output(T __Expression_Result)
 				}
 			}
 
-			if (NextValidLine)
+			if (NextValidLine && NextValidLine.value() != 0)
 			{
 				bool MatchBreakPoint = Scope && ShaderEditor->BreakPointLineNumbers.ContainsByPredicate([&](int32 InEntry) {
 					int32 BreakPointLine = InEntry + ExtraLineNum;
@@ -655,30 +547,29 @@ void __Expression_Output(T __Expression_Result)
 	{
 		BindingBuilders = InBuilders;
 		PsState = InState;
-		TRefCountPtr<GpuShader> Shader = ShaderEditor->CreateGpuShader();
-		Shader->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
+		DebugShader = ShaderEditor->CreateGpuShader();
+		DebugShader->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
 
 		TArray<FString> ExtraArgs;
 		ExtraArgs.Add("-D");
 		ExtraArgs.Add("ENABLE_PRINT=0");
+		ExtraArgs.Add("/Od");
 
 		FString ErrorInfo, WarnInfo;
-		if (!GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo, ExtraArgs))
+		if (!GGpuRhi->CompileShader(DebugShader, ErrorInfo, WarnInfo, ExtraArgs))
 		{
 			FString FailureInfo = LOCALIZATION("DebugFailure").ToString();
 			SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo, *ErrorInfo);
 			throw std::runtime_error(TCHAR_TO_UTF8(*FailureInfo));
 		}
 
-		ShaderTU TU{ Shader->GetSourceText(), Shader->GetIncludeDirs() };
+		ShaderTU TU{ DebugShader->GetSourceText(), DebugShader->GetIncludeDirs() };
 		Funcs = TU.GetFuncs();
 
-		TArray<SpvBinding> Bindings;
-		BindingContext PatchedBindings;
 		uint32 BufferSize = 1024 * 1024 * 2;
 		TArray<uint8> Datas;
 		Datas.SetNumZeroed(BufferSize);
-		TRefCountPtr<GpuBuffer> DebuggerBuffer = GGpuRhi->CreateBuffer({
+		DebugBuffer = GGpuRhi->CreateBuffer({
 			.ByteSize = BufferSize,
 			.Usage = GpuBufferUsage::RWRaw,
 			.InitialData = Datas,
@@ -694,7 +585,7 @@ void __Expression_Output(T __Expression_Result)
 			for (const auto& [Slot, ResourceBindingEntry] : BindGroupDesc.Resources)
 			{
 				const auto& LayoutBindingEntry = LayoutDesc.Layouts[Slot];
-				Bindings.Add({
+				SpvBindings.Add({
 					.DescriptorSet = SetNumber,
 					.Binding = Slot,
 					.Resource = ResourceBindingEntry.Resource
@@ -720,7 +611,7 @@ void __Expression_Output(T __Expression_Result)
 			if (SetNumber == BindingContext::GlobalSlot)
 			{
 				//Add the debugger buffer
-				BindGroupDesc.Resources.Add(0721, { DebuggerBuffer });
+				BindGroupDesc.Resources.Add(0721, { DebugBuffer });
 				LayoutDesc.Layouts.Add(0721, { BindingType::RWRawBuffer });
 
 				TRefCountPtr<GpuBindGroupLayout> PatchedBindGroupLayout = GGpuRhi->CreateBindGroupLayout(LayoutDesc);
@@ -750,29 +641,26 @@ void __Expression_Output(T __Expression_Result)
 		SetupBinding(InBuilders.PassBuilder);
 		SetupBinding(InBuilders.ShaderBuilder);
 
-		PixelDebuggerContext = SpvPixelDebuggerContext{InState.Coord, Funcs, Bindings };
+		PixelDebuggerContext = SpvPixelDebuggerContext{InState.Coord, Funcs, SpvBindings };
 
 		SpirvParser Parser;
-		Parser.Parse(Shader->SpvCode);
+		Parser.Parse(DebugShader->SpvCode);
 		SpvMetaVisitor MetaVisitor{ PixelDebuggerContext.value() };
 		Parser.Accept(&MetaVisitor);
 		SpvPixelDebuggerVisitor PixelDebuggerVisitor{ PixelDebuggerContext.value(), EnableUbsan()};
 		Parser.Accept(&PixelDebuggerVisitor);
-#if !SH_SHIPPING
-		PixelDebuggerVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / Shader->GetShaderName() / Shader->GetShaderName() + "Patched.spvasm");
-#endif 
+		PixelDebuggerVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Patched.spvasm");
 
 		const TArray<uint32>& PatchedSpv = PixelDebuggerVisitor.GetPatcher().GetSpv();
-		auto EntryPoint = StringCast<UTF8CHAR>(*Shader->GetEntryPoint());
+		auto EntryPoint = StringCast<UTF8CHAR>(*DebugShader->GetEntryPoint());
 		ShaderConductor::Compiler::TargetDesc HlslTargetDesc{};
 		HlslTargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
 		HlslTargetDesc.version = "60";
-		ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile({ PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, (char*)EntryPoint.Get(),
+		ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile({}, { PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, (char*)EntryPoint.Get(),
 			ShaderConductor::ShaderStage::PixelShader, HlslTargetDesc);
 		FString PatchedHlsl = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
-#if !SH_SHIPPING
-		FFileHelper::SaveStringToFile(PatchedHlsl, *(PathHelper::SavedShaderDir() / Shader->GetShaderName() / Shader->GetShaderName() + "Patched.hlsl"));
-#endif
+		FFileHelper::SaveStringToFile(PatchedHlsl, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Patched.hlsl"));
+
 		if (ShaderResultDesc.hasError)
 		{
 			FString ErrorInfo = static_cast<const char*>(ShaderResultDesc.errorWarningMsg.Data());
@@ -785,10 +673,10 @@ void __Expression_Output(T __Expression_Result)
 		DebuggerContext = &PixelDebuggerContext.value();
 		TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
 			.Source = MoveTemp(PatchedHlsl),
-			.Type = Shader->GetShaderType(),
-			.EntryPoint = Shader->GetEntryPoint()
+			.Type = DebugShader->GetShaderType(),
+			.EntryPoint = DebugShader->GetEntryPoint()
 		});
-		if (!GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo))
+		if (!GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
 		{
 			FString FailureInfo = LOCALIZATION("DebugFailure").ToString();
 			SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo, *ErrorInfo);
@@ -803,6 +691,7 @@ void __Expression_Output(T __Expression_Result)
 		};
 		PatchedBindings.ApplyBindGroupLayout(PatchedPipelineDesc);
 		TRefCountPtr<GpuRenderPipelineState> Pipeline = GGpuRhi->CreateRenderPipelineState(PatchedPipelineDesc);
+
 		auto CmdRecorder = GGpuRhi->BeginRecording();
 		{
 			auto PassRecorder = CmdRecorder->BeginRenderPass({}, TEXT("Debugger"));
@@ -817,9 +706,9 @@ void __Expression_Output(T __Expression_Result)
 		GGpuRhi->EndRecording(CmdRecorder);
 		GGpuRhi->Submit({ CmdRecorder });
 
-		uint8* DebuggerBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebuggerBuffer, GpuResourceMapMode::Read_Only);
-		GenDebugStates(DebuggerBufferData);
-		GGpuRhi->UnMapGpuBuffer(DebuggerBuffer);
+		uint8* DebugBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebugBuffer, GpuResourceMapMode::Read_Only);
+		GenDebugStates(DebugBufferData);
+		GGpuRhi->UnMapGpuBuffer(DebugBuffer);
 
 		InitDebuggerView();
 
@@ -860,7 +749,11 @@ void __Expression_Output(T __Expression_Result)
 		DebugStates.Reset();
 		SortedVariableDescs.clear();
 		PsState.reset();
+		SpvBindings.Empty();
 		BindingBuilders = {};
+		PatchedBindings = {};
+		DebugShader = nullptr;
+		DebugBuffer = nullptr;
 
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		SDebuggerVariableView* DebuggerLocalVariableView = ShEditor->GetDebuggerLocalVariableView();

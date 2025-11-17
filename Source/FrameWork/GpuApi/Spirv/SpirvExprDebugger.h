@@ -1,22 +1,36 @@
 #pragma once
-#include "SpirvParser.h"
+#include "SpirvPixelDebugger.h"
 
 namespace FW
 {
-	struct SpvExprDebuggerContext : SpvMetaContext
+	struct SpvPixelExprDebuggerContext : SpvPixelDebuggerContext
 	{
-		SpvTypeDesc* ResultTypeDesc{};
+		SpvPixelExprDebuggerContext(const SpvDebugState& InStopDebugState, int32 InStopDebugStateIndex, const Vector2u& InCoord, const TArray<ShaderFunc>& InEditorFuncInfo, const TArray<SpvBinding>& InBindings)
+		: SpvPixelDebuggerContext{ InCoord, InEditorFuncInfo, InBindings }
+		, StopDebugState(InStopDebugState), StopDebugStateIndex(InStopDebugStateIndex)
+		{}
+
+		SpvDebugState StopDebugState;
+		int32 StopDebugStateIndex;
 	};
 
-	class FRAMEWORK_API SpvExprDebuggerVisitor : public SpvVisitor
+	class FRAMEWORK_API SpvPixelExprDebuggerVisitor : public SpvPixelDebuggerVisitor
 	{
 	public:
-		SpvExprDebuggerVisitor(SpvExprDebuggerContext& InContext) : Context(InContext) {}
-	public:
-		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections) override;
-		void Visit(const SpvDebugDeclare* Inst) override;
+		SpvPixelExprDebuggerVisitor(SpvPixelExprDebuggerContext& InContext) : SpvPixelDebuggerVisitor(InContext, false) {}
+		void Visit(const SpvDebugDeclare* Inst);
 
 	protected:
-		SpvExprDebuggerContext& Context;
+		void ParseInternal() override;
+		void PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) override;
+		void PatchBaseTypeAppendExprFunc();
+		void PatchAppendExprFunc(const SpvType* Type, const SpvTypeDesc* TypeDesc);
+		void PatchAppendExprDummyFunc();
+
+	private:
+		TMap<const SpvType*, SpvId> AppendExprFuncIds;
+		SpvId DebugStateNum;
+		SpvId AppendExprDummyFuncId;
+		const SpvDebugLine* StopInst{};
 	};
 }

@@ -2183,6 +2183,7 @@ constexpr int PaddingLineNum = 22;
 				FIntPoint(-1, 0),
 				ECursorAction::MoveCursor
 			));
+			return FReply::Handled();
 		}
 		else if (Key == EKeys::Right)
 		{
@@ -2191,6 +2192,7 @@ constexpr int PaddingLineNum = 22;
 				FIntPoint(+1, 0),
 				ECursorAction::MoveCursor
 			));
+			return FReply::Handled();
 		}
 		else if (Key == EKeys::Up)
 		{
@@ -2201,6 +2203,7 @@ constexpr int PaddingLineNum = 22;
 				// Shift selects text.	
 				InKeyEvent.IsShiftDown() ? ECursorAction::SelectText : ECursorAction::MoveCursor
 			));
+			return FReply::Handled();
 		}
 		else if (Key == EKeys::Down)
 		{
@@ -2211,9 +2214,10 @@ constexpr int PaddingLineNum = 22;
 				// Shift selects text.	
 				InKeyEvent.IsShiftDown() ? ECursorAction::SelectText : ECursorAction::MoveCursor
 			));
+			return FReply::Handled();
 		}
 
-		return FReply::Handled();
+		return FReply::Unhandled();
     }
 
     FReply SShaderEditorBox::HandleKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent)

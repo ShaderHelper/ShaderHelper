@@ -53,14 +53,14 @@ namespace FW
 			ShaderBindGroupLayout = MoveTemp(InBindGroupLayout);
 		}
 
-		void ApplyBindGroupLayout(GpuRenderPipelineStateDesc& OutDesc)
+		void ApplyBindGroupLayout(GpuRenderPipelineStateDesc& OutDesc) const
 		{
 			OutDesc.BindGroupLayout0 = GlobalBindGroupLayout;
 			OutDesc.BindGroupLayout1 = PassBindGroupLayout;
 			OutDesc.BindGroupLayout2 = ShaderBindGroupLayout;
 		}
 
-		void ApplyBindGroupLayout(GpuComputePipelineStateDesc& OutDesc)
+		void ApplyBindGroupLayout(GpuComputePipelineStateDesc& OutDesc) const
 		{
 			OutDesc.BindGroupLayout0 = GlobalBindGroupLayout;
 			OutDesc.BindGroupLayout1 = PassBindGroupLayout;
