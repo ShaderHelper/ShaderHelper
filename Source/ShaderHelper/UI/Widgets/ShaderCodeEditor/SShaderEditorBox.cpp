@@ -3377,6 +3377,13 @@ constexpr int PaddingLineNum = 22;
 			FString CurrentTokenName;
 			int32 CurrentTokenBeginOffset = -1;
 			int32 CurrentTokenEndOffset = -1;
+
+			static ExpressionNodePtr LastHoverExpr;
+			static int32 LastHoverLineIndex = -1;
+			static FString LastTokenName;
+			static int32 LastTokenBeginOffset = -1;
+			static int32 LastTokenEndOffset = -1;
+
 			if (AllottedGeometry.IsUnderLocation(ScreenSpaceCursorPos))
 			{
 				FVector2D LocalSpaceCursorPos = AllottedGeometry.AbsoluteToLocal(ScreenSpaceCursorPos);
@@ -3430,21 +3437,25 @@ constexpr int PaddingLineNum = 22;
 								break;
 							}
 						}
+		
 						FString Expression = CurTextLine.Mid(BeginOffset, CurrentTokenEndOffset - BeginOffset);
-						ExpressionNode EvalResult = Owner->Debugger.EvaluateExpression(Expression);
-						if (EvalResult.ValueStr != LOCALIZATION("InvalidExpr").ToString())
+						if (LastHoverExpr && LastHoverExpr->Expr == Expression)
 						{
-							HoverExpr = MakeShared<ExpressionNode>(MoveTemp(EvalResult));
+							HoverExpr =  LastHoverExpr;
 						}
+						else
+						{
+							ExpressionNode EvalResult = Owner->Debugger.EvaluateExpression(Expression);
+							if (EvalResult.ValueStr != LOCALIZATION("InvalidExpr").ToString())
+							{
+								HoverExpr = MakeShared<ExpressionNode>(MoveTemp(EvalResult));
+							}
+						}
+
 					}
 
 				}
 			}
-
-			static int32 LastHoverLineIndex = -1;
-			static FString LastTokenName;
-			static int32 LastTokenBeginOffset = -1;
-			static int32 LastTokenEndOffset = -1;
 
 			bool bSameToken = (CurrentHoverLocation.GetLineIndex() == LastHoverLineIndex &&
 				CurrentTokenName == LastTokenName &&
@@ -3466,6 +3477,8 @@ constexpr int PaddingLineNum = 22;
 					FVector2D BlockPos = Owner->ShaderMarshaller->TextLayout->GetLocationAt({ CurrentHoverLocation.GetLineIndex(), CurrentTokenBeginOffset }, true) / AllottedGeometry.Scale;
 					FVector2D BlockScreenPos = AllottedGeometry.LocalToAbsolute(BlockPos);
 					ShaderEditorTipWindow->MoveWindowTo(BlockScreenPos);
+
+					LastHoverExpr = HoverExpr;
 					LastHoverLineIndex = CurrentHoverLocation.GetLineIndex();
 					LastTokenName = CurrentTokenName;
 					LastTokenBeginOffset = CurrentTokenBeginOffset;
@@ -3474,6 +3487,7 @@ constexpr int PaddingLineNum = 22;
 			}
 			else
 			{
+				LastHoverExpr.Reset();
 				LastHoverLineIndex = -1;
 				LastTokenName.Empty();
 				LastTokenBeginOffset = -1;

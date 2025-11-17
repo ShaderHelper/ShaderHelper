@@ -462,15 +462,22 @@ namespace SH
 
 			if (NextValidLine && NextValidLine.value())
 			{
-				bool MatchBreakPoint = ShaderEditor->BreakPointLineNumbers.ContainsByPredicate([&](int32 InEntry) {
+				bool MatchBreakPoint = Scope && ShaderEditor->BreakPointLineNumbers.ContainsByPredicate([&](int32 InEntry) {
 					int32 BreakPointLine = InEntry + ExtraLineNum;
 					int32 BreakPointValidLine = ValidLines[Algo::UpperBound(ValidLines, BreakPointLine - 1)];
 					for (const auto& [_, BB] : DebuggerContext->BBs)
 					{
-						if (BB.ValidLines.Contains(BreakPointValidLine) && BB.ValidLines.Contains(NextValidLine) &&
-							NextValidLine >= BreakPointValidLine)
+						if (BB.ValidLines.Contains(BreakPointValidLine) && BB.ValidLines.Contains(NextValidLine))
 						{
-							return true;
+							if (!CurValidLine)
+							{
+								int32 FuncLine = GetFunctionDesc(Scope)->GetLine();
+								return (BreakPointValidLine >= FuncLine) && (BreakPointValidLine <= NextValidLine.value());
+							}
+							else
+							{
+								return (BreakPointValidLine > CurValidLine.value()) && (BreakPointValidLine <= NextValidLine.value());
+							}
 						}
 					}
 					return false;
@@ -539,10 +546,12 @@ namespace SH
 			if (State.bFuncCall && Scope)
 			{
 				CallStack.Add(TPair<SpvLexicalScope*, int>(Scope, State.Line));
+				CurValidLine.reset();
 			}
 			else if (State.bReturn && !CallStack.IsEmpty())
 			{
 				auto Item = CallStack.Pop();
+				CurValidLine = Item.Value;
 				ReturnValue.Empty();
 			}
 		}

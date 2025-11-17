@@ -142,7 +142,7 @@ namespace FW
         {
             if(ResourceBindingEntry.Resource->GetType() == GpuResourceType::Buffer)
             {
-                MetalBuffer* Buffer = static_cast<MetalBuffer*>(ResourceBindingEntry.Resource);
+                MetalBuffer* Buffer = static_cast<MetalBuffer*>(ResourceBindingEntry.Resource.GetReference());
                 if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Vertex))
                 {
                     VertexArgumentEncoder->setBuffer(Buffer->GetResource(), 0, Slot);
@@ -159,7 +159,7 @@ namespace FW
             }
             else if(ResourceBindingEntry.Resource->GetType() == GpuResourceType::Texture)
             {
-                MetalTexture* Tex = static_cast<MetalTexture*>(ResourceBindingEntry.Resource);
+                MetalTexture* Tex = static_cast<MetalTexture*>(ResourceBindingEntry.Resource.GetReference());
 				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Vertex))
                 {
                     VertexArgumentEncoder->setTexture(Tex->GetResource(), Slot);
@@ -176,7 +176,7 @@ namespace FW
             }
             else if(ResourceBindingEntry.Resource->GetType() == GpuResourceType::Sampler)
             {
-                MetalSampler* Sampler = static_cast<MetalSampler*>(ResourceBindingEntry.Resource);
+                MetalSampler* Sampler = static_cast<MetalSampler*>(ResourceBindingEntry.Resource.GetReference());
 				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Vertex))
                 {
                     VertexArgumentEncoder->setSamplerState(Sampler->GetResource(), Slot);

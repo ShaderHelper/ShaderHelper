@@ -285,6 +285,14 @@ namespace FW
 			return;
 		}
 
+		//Avoid hlsl overload resolution ambiguity between float2x2 and float4
+		//TODO glsl
+		if (const SpvMatrixType* MatrixType = dynamic_cast<const SpvMatrixType*>(Type);
+			MatrixType && MatrixType->ElementCount == 2 && MatrixType->ElementType->ElementCount == 2)
+		{
+			return;
+		}
+
 		SpvPixelExprDebuggerContext& ExprContext = static_cast<SpvPixelExprDebuggerContext&>(Context);
 
 		SpvId AppendExprFuncId = Patcher.NewId();
