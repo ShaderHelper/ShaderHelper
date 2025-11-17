@@ -49,6 +49,15 @@ namespace FW::GpuResourceHelper
 				BindGroup = ClearShader->GetBindGroup(InResource, BufferByteSize);
 				ThreadGroupCountX = FMath::CeilToInt(float(BufferByteSize / 4) / 64);
 			}
+			else if (Buffer->GetUsage() == GpuBufferUsage::RWRaw)
+			{
+				using ClearShaderType = ClearShader<BindingType::RWRawBuffer>;
+				auto* ClearShader = GetShader<ClearShaderType>();
+				Cs = ClearShader->GetComputeShader();
+				BindGroupLayout = ClearShader->GetBindGroupLayout();
+				BindGroup = ClearShader->GetBindGroup(InResource, BufferByteSize);
+				ThreadGroupCountX = FMath::CeilToInt(float(BufferByteSize / 4) / 64);
+			}
 		}
 
 		check(Cs && BindGroupLayout && BindGroup);

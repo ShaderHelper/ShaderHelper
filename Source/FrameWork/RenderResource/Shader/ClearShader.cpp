@@ -11,7 +11,11 @@ namespace FW
 		ExtraArgs.Add("-D");
 		if constexpr(InType == BindingType::RWStructuredBuffer)
 		{
-			ExtraArgs.Add("RESOURCE_STORAGE_BUFFER");
+			ExtraArgs.Add("RESOURCE_STRUCTURED_BUFFER");
+		}
+		else if constexpr(InType == BindingType::RWRawBuffer)
+		{
+			ExtraArgs.Add("RESOURCE_RAW_BUFFER");
 		}
 
 		ClearUbBuilder.AddUint("Size");
@@ -47,4 +51,5 @@ namespace FW
 	}
 
 	template class ClearShader<BindingType::RWStructuredBuffer>;
+	template class ClearShader<BindingType::RWRawBuffer>;
 }

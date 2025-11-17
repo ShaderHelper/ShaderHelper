@@ -30,6 +30,13 @@ namespace FW
 			Patcher.AddGlobalVariable(MoveTemp(VarOp));
 			Patcher.AddDebugName(MakeUnique<SpvOpName>(DebugStateNum, "_DebugStateNum_"));
 		}
+		DoAppendExpr = Patcher.NewId();
+		{
+			auto VarOp = MakeUnique<SpvOpVariable>(UIntPointerPrivateType, SpvStorageClass::Private);
+			VarOp->SetId(DoAppendExpr);
+			Patcher.AddGlobalVariable(MoveTemp(VarOp));
+			Patcher.AddDebugName(MakeUnique<SpvOpName>(DoAppendExpr, "_DoAppendExpr_"));
+		}
 
 		SpvPixelDebuggerVisitor::ParseInternal();
 
@@ -49,14 +56,26 @@ namespace FW
 		{
 			if (SpvOpFunctionCall * FuncCall = dynamic_cast<SpvOpFunctionCall*>(Inst.Get()))
 			{
-				bool DoExprDummy = false;
 				if (std::holds_alternative<SpvDebugState_VarChange>(ExprContext.StopDebugState) && AppendVarFuncIds.FindKey(FuncCall->GetFunction()))
 				{
 					const auto& State = std::get<SpvDebugState_VarChange>(ExprContext.StopDebugState);
 					int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[FuncCall->GetArguments()[1]].Storage).Value.GetData();
 					if (State.Line == Line)
 					{
-						DoExprDummy = true;
+						TArray<TUniquePtr<SpvInstruction>> AppendExprDummyInsts;
+						{
+							SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
+
+							AppendExprDummyInsts.Add(MakeUnique<SpvOpStore>(DoAppendExpr, Patcher.FindOrAddConstant(1u)));
+
+							auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendExprDummyFuncId);
+							FuncCallOp->SetId(Patcher.NewId());
+							AppendExprDummyInsts.Add(MoveTemp(FuncCallOp));
+
+							AppendExprDummyInsts.Add(MakeUnique<SpvOpStore>(DoAppendExpr, Patcher.FindOrAddConstant(0u)));
+						}
+						Patcher.AddInstructions(AppendVarCallToStore[FuncCall]->GetWordOffset().value(), MoveTemp(AppendExprDummyInsts));
+						break;
 					}
 				}
 				else if (std::holds_alternative<SpvDebugState_Tag>(ExprContext.StopDebugState) && FuncCall->GetFunction() == AppendTagFuncId)
@@ -71,21 +90,21 @@ namespace FW
 						(StateType == SpvDebuggerStateType::Return && State.bReturn)) &&
 						State.Line == Line)
 					{
-						DoExprDummy = true;
-					}
-				}
+						TArray<TUniquePtr<SpvInstruction>> AppendExprDummyInsts;
+						{
+							SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
 
-				if (DoExprDummy)
-				{
-					TArray<TUniquePtr<SpvInstruction>> AppendExprDummyInsts;
-					{
-						SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
-						auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendExprDummyFuncId);
-						FuncCallOp->SetId(Patcher.NewId());
-						AppendExprDummyInsts.Add(MoveTemp(FuncCallOp));
+							AppendExprDummyInsts.Add(MakeUnique<SpvOpStore>(DoAppendExpr, Patcher.FindOrAddConstant(1u)));
+
+							auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendExprDummyFuncId);
+							FuncCallOp->SetId(Patcher.NewId());
+							AppendExprDummyInsts.Add(MoveTemp(FuncCallOp));
+
+							AppendExprDummyInsts.Add(MakeUnique<SpvOpStore>(DoAppendExpr, Patcher.FindOrAddConstant(0u)));
+						}
+						Patcher.AddInstructions(FuncCall->GetWordOffset().value(), MoveTemp(AppendExprDummyInsts));
+						break;
 					}
-					Patcher.AddInstructions(FuncCall->GetWordOffset().value(), MoveTemp(AppendExprDummyInsts));
-					break;
 				}
 			}
 		}
@@ -126,6 +145,30 @@ namespace FW
 		SpvPixelDebuggerVisitor::PatchActiveCondition(InstList);
 
 		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
+		SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
+
+		SpvId LoadedDoAppendExpr = Patcher.NewId();
+		auto LoadedDoAppendExprOp = MakeUnique<SpvOpLoad>(UIntType, DoAppendExpr);
+		LoadedDoAppendExprOp->SetId(LoadedDoAppendExpr);
+		InstList.Add(MoveTemp(LoadedDoAppendExprOp));
+
+		SpvId IEqual = Patcher.NewId();;
+		auto IEqualOp = MakeUnique<SpvOpIEqual>(BoolType, LoadedDoAppendExpr, Patcher.FindOrAddConstant(0u));
+		IEqualOp->SetId(IEqual);
+		InstList.Add(MoveTemp(IEqualOp));
+
+		auto TrueLabel = Patcher.NewId();
+		auto FalseLabel = Patcher.NewId();
+		InstList.Add(MakeUnique<SpvOpSelectionMerge>(TrueLabel, SpvSelectionControl::None));
+		InstList.Add(MakeUnique<SpvOpBranchConditional>(IEqual, TrueLabel, FalseLabel));
+		auto FalseLabelOp = MakeUnique<SpvOpLabel>();
+		FalseLabelOp->SetId(FalseLabel);
+		InstList.Add(MoveTemp(FalseLabelOp));
+		InstList.Add(MakeUnique<SpvOpReturn>());
+		auto TrueLabelOp = MakeUnique<SpvOpLabel>();
+		TrueLabelOp->SetId(TrueLabel);
+		InstList.Add(MoveTemp(TrueLabelOp));
+
 		SpvId LoadedDebugStateNum = Patcher.NewId();
 		auto LoadedDebugStateNumOp = MakeUnique<SpvOpLoad>(UIntType, DebugStateNum);
 		LoadedDebugStateNumOp->SetId(LoadedDebugStateNum);

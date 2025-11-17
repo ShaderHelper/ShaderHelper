@@ -30,6 +30,7 @@ namespace FW
 	private:
 		TMap<const SpvType*, SpvId> AppendExprFuncIds;
 		SpvId DebugStateNum;
+		SpvId DoAppendExpr;
 		SpvId AppendExprDummyFuncId;
 		const SpvDebugLine* StopInst{};
 	};

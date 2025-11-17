@@ -246,6 +246,7 @@ namespace SH
 
 					auto CmdRecorder = GGpuRhi->BeginRecording();
 					{
+						GpuResourceHelper::ClearRWResource(CmdRecorder, DebugBuffer);
 						auto PassRecorder = CmdRecorder->BeginRenderPass({}, TEXT("ExprDebugger"));
 						{
 							PassRecorder->SetViewPort(PsState.value().ViewPortDesc);
@@ -409,6 +410,12 @@ namespace SH
 		TSharedPtr<SWindow> ShaderEditorTipWindow = ShEditor->GetShaderEditorTipWindow();
 		ShaderEditorTipWindow->HideWindow();
 
+		TArray<int32> ValidLines;
+		for (const auto& [_, BB] : DebuggerContext->BBs)
+		{
+			ValidLines.Append(BB.ValidLines);
+		}
+		ValidLines.Sort();
 		auto CallStackAtStop = CallStack;
 		int32 ExtraLineNum = ShaderEditor->GetShaderAsset()->GetExtraLineNum();
 		while (CurDebugStateIndex < DebugStates.Num())
@@ -452,21 +459,20 @@ namespace SH
 				}
 			}
 
-			if (NextValidLine && NextValidLine.value() != 0)
+			if (NextValidLine && NextValidLine.value())
 			{
-				bool MatchBreakPoint = Scope && ShaderEditor->BreakPointLineNumbers.ContainsByPredicate([&](int32 InEntry) {
+				bool MatchBreakPoint = ShaderEditor->BreakPointLineNumbers.ContainsByPredicate([&](int32 InEntry) {
 					int32 BreakPointLine = InEntry + ExtraLineNum;
-					bool bForward;
-					if (!CurValidLine)
+					int32 BreakPointValidLine = ValidLines[Algo::UpperBound(ValidLines, BreakPointLine - 1)];
+					for (const auto& [_, BB] : DebuggerContext->BBs)
 					{
-						int32 FuncLine = GetFunctionDesc(Scope)->GetLine();
-						bForward = (BreakPointLine >= FuncLine) && (BreakPointLine <= NextValidLine.value());
+						if (BB.ValidLines.Contains(BreakPointValidLine) && BB.ValidLines.Contains(NextValidLine) &&
+							NextValidLine >= BreakPointValidLine)
+						{
+							return true;
+						}
 					}
-					else
-					{
-						bForward = (BreakPointLine > CurValidLine.value()) && (BreakPointLine <= NextValidLine.value());
-					}
-					return bForward;
+					return false;
 				});
 				bool SameStack = CurValidLine != NextValidLine && CallStackAtStop.Num() == CallStack.Num();
 				bool ReturnStack = CallStackAtStop.Num() > CallStack.Num();
@@ -532,12 +538,10 @@ namespace SH
 			if (State.bFuncCall && Scope)
 			{
 				CallStack.Add(TPair<SpvLexicalScope*, int>(Scope, State.Line));
-				CurValidLine.reset();
 			}
 			else if (State.bReturn && !CallStack.IsEmpty())
 			{
 				auto Item = CallStack.Pop();
-				CurValidLine = Item.Value;
 				ReturnValue.Empty();
 			}
 		}

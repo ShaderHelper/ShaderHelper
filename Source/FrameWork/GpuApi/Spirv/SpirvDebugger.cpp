@@ -125,25 +125,8 @@ namespace FW
 
 	void SpvDebuggerVisitor::Visit(const SpvOpFunctionCall* Inst)
 	{
-		SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
-		SpvId Line = Patcher.FindOrAddConstant((uint32)CurLine);
-		{
-			TArray<TUniquePtr<SpvInstruction>> AppendTagInsts;
-			SpvId StateType = Patcher.FindOrAddConstant((uint32)SpvDebuggerStateType::FuncCall);
-			auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendTagFuncId, TArray<SpvId>{ StateType, Line});
-			FuncCallOp->SetId(Patcher.NewId());
-			AppendTagInsts.Add(MoveTemp(FuncCallOp));
-			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(AppendTagInsts));
-		}
-
-		{
-			TArray<TUniquePtr<SpvInstruction>> AppendTagInsts;
-			SpvId StateType = Patcher.FindOrAddConstant((uint32)SpvDebuggerStateType::FuncCallAfterReturn);
-			auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendTagFuncId, TArray<SpvId>{ StateType, Line});
-			FuncCallOp->SetId(Patcher.NewId());
-			AppendTagInsts.Add(MoveTemp(FuncCallOp));
-			Patcher.AddInstructions(Inst->GetWordOffset().value() + Inst->GetWordLen().value(), MoveTemp(AppendTagInsts));
-		}
+		AppendTag(Inst->GetWordOffset().value(), SpvDebuggerStateType::FuncCall);
+		AppendTag(Inst->GetWordOffset().value() + Inst->GetWordLen().value(), SpvDebuggerStateType::FuncCallAfterReturn);
 
 		if(CurScope)
 		{
@@ -210,7 +193,9 @@ namespace FW
 
 	void SpvDebuggerVisitor::Visit(const SpvOpLabel* Inst)
 	{
-
+		SpvId ResultId = Inst->GetId().value();
+		Context.BBs.emplace(ResultId, SpvBasicBlock{});
+		CurBlock = &Context.BBs[ResultId];
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvOpLoad* Inst)
@@ -220,6 +205,11 @@ namespace FW
 
 	void SpvDebuggerVisitor::Visit(const SpvOpStore* Inst)
 	{
+		if (CurLine && CurBlock)
+		{
+			CurBlock->ValidLines.Add(CurLine);
+		}
+
 		SpvPointer* Pointer = Context.FindPointer(Inst->GetPointer());
 		SpvType* PointeeType = Pointer->Type->PointeeType;
 		uint32 IndexNum = Pointer->Indexes.Num();
@@ -260,6 +250,7 @@ namespace FW
 
 			auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendVarFuncId, Arguments);
 			FuncCallOp->SetId(Patcher.NewId());
+			AppendVarCallToStore.Add(FuncCallOp.Get(), Inst);
 			AppendVarInsts.Add(MoveTemp(FuncCallOp));
 		}
 		Patcher.AddInstructions(Inst->GetWordOffset().value() + Inst->GetWordLen().value(), MoveTemp(AppendVarInsts));
@@ -281,17 +272,8 @@ namespace FW
 
 	void SpvDebuggerVisitor::Visit(const SpvOpSwitch* Inst)
 	{
-		TArray<TUniquePtr<SpvInstruction>> AppendTagInsts;
-		{
-			SpvId StateType = Patcher.FindOrAddConstant((uint32)SpvDebuggerStateType::Condition);
-			SpvId Line = Patcher.FindOrAddConstant((uint32)CurLine);
-			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
-			auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendTagFuncId, TArray<SpvId>{ StateType, Line});
-			FuncCallOp->SetId(Patcher.NewId());
-			AppendTagInsts.Add(MoveTemp(FuncCallOp));
-		}
 		int OpMergeOffset = (*Insts)[InstIndex - 1]->GetWordOffset().value();
-		Patcher.AddInstructions(OpMergeOffset, MoveTemp(AppendTagInsts));
+		AppendTag(OpMergeOffset, SpvDebuggerStateType::Condition);
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvOpConvertFToU* Inst)
@@ -336,31 +318,13 @@ namespace FW
 
 	void SpvDebuggerVisitor::Visit(const SpvOpBranchConditional* Inst)
 	{
-		TArray<TUniquePtr<SpvInstruction>> AppendTagInsts;
-		{
-			SpvId StateType = Patcher.FindOrAddConstant((uint32)SpvDebuggerStateType::Condition);
-			SpvId Line = Patcher.FindOrAddConstant((uint32)CurLine);
-			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
-			auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendTagFuncId, TArray<SpvId>{ StateType, Line});
-			FuncCallOp->SetId(Patcher.NewId());
-			AppendTagInsts.Add(MoveTemp(FuncCallOp));
-		}
 		int OpMergeOffset = (*Insts)[InstIndex - 1]->GetWordOffset().value();
-		Patcher.AddInstructions(OpMergeOffset, MoveTemp(AppendTagInsts));
+		AppendTag(OpMergeOffset, SpvDebuggerStateType::Condition);
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvOpReturn* Inst)
 	{
-		TArray<TUniquePtr<SpvInstruction>> AppendTagInsts;
-		{
-			SpvId StateType = Patcher.FindOrAddConstant((uint32)SpvDebuggerStateType::Return);
-			SpvId Line = Patcher.FindOrAddConstant((uint32)CurLine);
-			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
-			auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendTagFuncId, TArray<SpvId>{ StateType, Line});
-			FuncCallOp->SetId(Patcher.NewId());
-			AppendTagInsts.Add(MoveTemp(FuncCallOp));
-		}
-		Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(AppendTagInsts));
+		AppendTag(Inst->GetWordOffset().value(), SpvDebuggerStateType::Return);
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvOpReturnValue* Inst)
@@ -378,16 +342,7 @@ namespace FW
 		}
 		Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(AppendValueInsts));
 
-		TArray<TUniquePtr<SpvInstruction>> AppendTagInsts;
-		{
-			SpvId StateType = Patcher.FindOrAddConstant((uint32)SpvDebuggerStateType::Return);
-			SpvId Line = Patcher.FindOrAddConstant((uint32)CurLine);
-			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
-			auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendTagFuncId, TArray<SpvId>{ StateType, Line});
-			FuncCallOp->SetId(Patcher.NewId());
-			AppendTagInsts.Add(MoveTemp(FuncCallOp));
-		}
-		Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(AppendTagInsts));
+		AppendTag(Inst->GetWordOffset().value(), SpvDebuggerStateType::Return);
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvPow* Inst)
@@ -684,6 +639,25 @@ namespace FW
 		}
 		Patcher.AddFunction(MoveTemp(AppendValueFuncInsts));
 		AppendValueFuncIds.Add(ValueType, AppendValueFuncId);
+	}
+
+	void SpvDebuggerVisitor::AppendTag(int32 Offset, SpvDebuggerStateType TagType)
+	{
+		if (CurLine && CurBlock)
+		{
+			CurBlock->ValidLines.Add(CurLine);
+		}
+
+		TArray<TUniquePtr<SpvInstruction>> AppendTagInsts;
+		{
+			SpvId StateType = Patcher.FindOrAddConstant((uint32)TagType);
+			SpvId Line = Patcher.FindOrAddConstant((uint32)CurLine);
+			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
+			auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendTagFuncId, TArray<SpvId>{ StateType, Line});
+			FuncCallOp->SetId(Patcher.NewId());
+			AppendTagInsts.Add(MoveTemp(FuncCallOp));
+		}
+		Patcher.AddInstructions(Offset, MoveTemp(AppendTagInsts));
 	}
 
 	void SpvDebuggerVisitor::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections, const TMap<SpvId, SpvExtSet>& InExtSets)

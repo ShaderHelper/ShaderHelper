@@ -75,6 +75,11 @@ namespace FW
 		TRefCountPtr<GpuResource> Resource;
 	};
 
+	struct SpvBasicBlock
+	{
+		TArray<int32> ValidLines;
+	};
+
 	struct SpvDebuggerContext : SpvMetaContext
 	{
 		//Can not obtain information from spirv to distinguish whether formal paramaters have special semantics such as out/inout，
@@ -85,6 +90,7 @@ namespace FW
 		std::unordered_map<SpvId, SpvPointer> LocalPointers;
 		std::unordered_map<SpvId, SpvVariable> LocalVariables;
 		std::unordered_map<SpvId, SpvVariable*> FuncParameters;
+		std::unordered_map<SpvId, SpvBasicBlock> BBs;
 
 		SpvVariable* FindVar(SpvId Id)
 		{
@@ -171,11 +177,13 @@ namespace FW
 		void PatchToDebugger(SpvId InValueId, SpvId InTypeId, TArray<TUniquePtr<SpvInstruction>>& InstList);
 		void PatchAppendVarFunc(SpvPointer* Pointer, uint32 IndexNum);
 		void PatchAppendValueFunc(SpvType* ValueType);
+		void AppendTag(int32 Offset, SpvDebuggerStateType TagType);
 
 	protected:
 		SpvDebuggerContext& Context;
 		int32 InstIndex;
 		SpvLexicalScope* CurScope = nullptr;
+		SpvBasicBlock* CurBlock = nullptr;
 		int32 CurLine{};
 		TArray<SpvVariable*> CurFuncParams;
 		SpvType* CurReturnType;
@@ -198,6 +206,7 @@ namespace FW
 		};
 		TMap<VarFuncSerachKey, SpvId> AppendVarFuncIds;
 		TMap<SpvType*, SpvId> AppendValueFuncIds;
+		TMap<const SpvOpFunctionCall*, const SpvOpStore*> AppendVarCallToStore;
 		SpvPatcher Patcher;
 	};
 
