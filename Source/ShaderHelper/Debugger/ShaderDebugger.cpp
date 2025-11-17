@@ -247,6 +247,7 @@ namespace SH
 					auto CmdRecorder = GGpuRhi->BeginRecording();
 					{
 						GpuResourceHelper::ClearRWResource(CmdRecorder, DebugBuffer);
+						CmdRecorder->Barriers({ GpuBarrierInfo{.Resource = DebugBuffer, .NewState = GpuResourceState::UnorderedAccess} });
 						auto PassRecorder = CmdRecorder->BeginRenderPass({}, TEXT("ExprDebugger"));
 						{
 							PassRecorder->SetViewPort(PsState.value().ViewPortDesc);
@@ -598,7 +599,7 @@ namespace SH
 				//Replace StructuredBuffer with ByteAddressBuffer
 				if (LayoutBindingEntry.Type == BindingType::RWStructuredBuffer)
 				{
-					uint32 BufferSize = static_cast<GpuBuffer*>(ResourceBindingEntry.Resource)->GetByteSize();
+					uint32 BufferSize = static_cast<GpuBuffer*>(ResourceBindingEntry.Resource.GetReference())->GetByteSize();
 					TArray<uint8> Datas;
 					Datas.SetNumZeroed(BufferSize);
 					TRefCountPtr<GpuBuffer> RawBuffer = GGpuRhi->CreateBuffer({
@@ -607,7 +608,7 @@ namespace SH
 						.InitialData = Datas,
 					});
 
-					BindGroupDesc.Resources[Slot] = { RawBuffer };
+					BindGroupDesc.Resources[Slot] = { AUX::StaticCastRefCountPtr<GpuResource>(RawBuffer) };
 					LayoutDesc.Layouts[Slot] = { BindingType::RWRawBuffer, LayoutBindingEntry.Stage };
 				}
 			}
@@ -615,7 +616,7 @@ namespace SH
 			if (SetNumber == BindingContext::GlobalSlot)
 			{
 				//Add the debugger buffer
-				BindGroupDesc.Resources.Add(0721, { DebugBuffer });
+				BindGroupDesc.Resources.Add(0721, { AUX::StaticCastRefCountPtr<GpuResource>(DebugBuffer) });
 				LayoutDesc.Layouts.Add(0721, { BindingType::RWRawBuffer });
 
 				TRefCountPtr<GpuBindGroupLayout> PatchedBindGroupLayout = GGpuRhi->CreateBindGroupLayout(LayoutDesc);

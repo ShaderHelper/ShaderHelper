@@ -26,12 +26,12 @@ namespace FW
 		InOutPass.Bindings.EnumerateBinding([&](const ResourceBinding& ResourceBindingEntry, const LayoutBinding& LayoutBindingEntry) {
 			if (LayoutBindingEntry.Type == BindingType::Texture)
 			{
-				GpuTexture* Tex = static_cast<GpuTexture*>(ResourceBindingEntry.Resource);
+				GpuTexture* Tex = static_cast<GpuTexture*>(ResourceBindingEntry.Resource.GetReference());
 				InOutPass.PassTexStates.Add(Tex, GpuResourceState::ShaderResourceRead);
 			}
 			else if (LayoutBindingEntry.Type == BindingType::RWStructuredBuffer || LayoutBindingEntry.Type == BindingType::RWRawBuffer)
 			{
-				GpuBuffer* Buffer = static_cast<GpuBuffer*>(ResourceBindingEntry.Resource);
+				GpuBuffer* Buffer = static_cast<GpuBuffer*>(ResourceBindingEntry.Resource.GetReference());
 				InOutPass.PassBufferStates.Add(Buffer, GpuResourceState::UnorderedAccess);
 			}
 		});

@@ -8,7 +8,7 @@ namespace FW
 {
 	struct ResourceBinding
 	{
-		GpuResource* Resource;
+		TRefCountPtr<GpuResource> Resource;
 	};
 
 	struct GpuBindGroupDesc
