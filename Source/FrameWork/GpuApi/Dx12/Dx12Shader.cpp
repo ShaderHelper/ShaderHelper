@@ -299,7 +299,8 @@ namespace FW
 #if DEBUG_SHADER
 					TRefCountPtr<IDxcBlob> PdbBlob;
 					TRefCountPtr<IDxcBlobUtf16> PdbNameBlob;
-					if (SUCCEEDED(CompileResult->GetOutput(DXC_OUT_PDB, IID_PPV_ARGS(PdbBlob.GetInitReference()), PdbNameBlob.GetInitReference())))
+					if (SUCCEEDED(CompileResult->GetOutput(DXC_OUT_PDB, IID_PPV_ARGS(PdbBlob.GetInitReference()), PdbNameBlob.GetInitReference()))
+						&& PdbNameBlob)
 					{
 						const FString PdbName = PdbNameBlob->GetStringPointer();
 						const FString PdbFile = PathHelper::SavedShaderDir() / "Pdb" / PdbName;

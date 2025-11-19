@@ -637,7 +637,7 @@ namespace FW
 			
 			if(ReferencedCursorKind == DxcCursor_VarDecl)
 			{
-				if(ReferencedCursorLexParKind == DxcCursor_FunctionDecl || ReferencedCursorLexParKind == DxcCursor_CXXMethod)
+				if(ReferencedCursorLexParKind == DxcCursor_FunctionDecl || ReferencedCursorLexParKind == DxcCursor_CXXMethod || ReferencedCursorLexParKind == DxcCursor_FunctionTemplate)
 				{
 					return HLSL::TokenType::LocalVar;
 				}

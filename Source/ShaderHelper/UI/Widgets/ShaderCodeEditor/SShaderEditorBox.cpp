@@ -1479,6 +1479,9 @@ constexpr int PaddingLineNum = 22;
 		{
 			for(auto It = BreakPointLineNumbers.CreateIterator(); It; ++It)
 			{
+				if (StartLineNumber == *It && EndLineNumber == *It)
+					continue;
+
 				if(StartLineNumber <= *It)
 				{
 					if(EndLineNumber >= *It)

@@ -113,6 +113,56 @@ namespace FW
 						break;
 					}
 				}
+				else if (std::holds_alternative<SpvDebugState_Pow>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
+				{
+					const auto& State = std::get<SpvDebugState_Pow>(ExprContext.StopDebugState);
+					int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[FuncCall->GetArguments()[1]].Storage).Value.GetData();
+					if (State.Line == Line)
+					{
+						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
+						break;
+					}
+				}
+				else if (std::holds_alternative<SpvDebugState_Clamp>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
+				{
+					const auto& State = std::get<SpvDebugState_Clamp>(ExprContext.StopDebugState);
+					int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[FuncCall->GetArguments()[1]].Storage).Value.GetData();
+					if (State.Line == Line)
+					{
+						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
+						break;
+					}
+				}
+				else if (std::holds_alternative<SpvDebugState_Div>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
+				{
+					const auto& State = std::get<SpvDebugState_Div>(ExprContext.StopDebugState);
+					int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[FuncCall->GetArguments()[1]].Storage).Value.GetData();
+					if (State.Line == Line)
+					{
+						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
+						break;
+					}
+				}
+				else if (std::holds_alternative<SpvDebugState_ConvertF>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
+				{
+					const auto& State = std::get<SpvDebugState_ConvertF>(ExprContext.StopDebugState);
+					int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[FuncCall->GetArguments()[1]].Storage).Value.GetData();
+					if (State.Line == Line)
+					{
+						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
+						break;
+					}
+				}
+				else if (std::holds_alternative<SpvDebugState_Remainder>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
+				{
+					const auto& State = std::get<SpvDebugState_Remainder>(ExprContext.StopDebugState);
+					int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[FuncCall->GetArguments()[1]].Storage).Value.GetData();
+					if (State.Line == Line)
+					{
+						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
+						break;
+					}
+				}
 			}
 		}
 	

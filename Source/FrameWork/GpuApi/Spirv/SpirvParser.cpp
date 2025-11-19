@@ -1453,6 +1453,7 @@ namespace FW
 				break;
 			}
 			case SpvOp::ExtInst:
+			case SpvOp::ExtInstWithForwardRefsKHR:
 			{
 				SpvId ResultType = SpvCode[WordOffset + 1];
 				SpvId ResultId = SpvCode[WordOffset + 2];

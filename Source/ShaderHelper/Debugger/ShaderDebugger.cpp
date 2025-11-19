@@ -192,6 +192,7 @@ namespace SH
 		TArray<FString> ExtraArgs;
 		ExtraArgs.Add("-D");
 		ExtraArgs.Add("ENABLE_PRINT=0");
+		ExtraArgs.Add("-ignore-validation-error");
 		FString ErrorInfo, WarnInfo;
 
 		if (DebugShader->GetShaderType() == ShaderType::PixelShader)
@@ -471,7 +472,7 @@ namespace SH
 							if (!CurValidLine)
 							{
 								int32 FuncLine = GetFunctionDesc(Scope)->GetLine();
-								return (BreakPointValidLine >= FuncLine) && (BreakPointValidLine <= NextValidLine.value());
+								return (BreakPointLine >= FuncLine) && (BreakPointLine <= NextValidLine.value());
 							}
 							else
 							{
@@ -601,6 +602,146 @@ namespace SH
 				SH_LOG(LogShader, Error, TEXT("normalize: normalizing a zero scalar or vector is undefined."));
 			}
 		}
+		else if (std::holds_alternative<SpvDebugState_Pow>(InState))
+		{
+			const auto& State = std::get<SpvDebugState_Pow>(InState);
+			SpvType* ResultType = DebuggerContext->Types[State.ResultType].Get();
+			if (ResultType->GetKind() == SpvTypeKind::Vector)
+			{
+				int ElemCount = static_cast<SpvVectorType*>(ResultType)->ElementCount;
+				for (int i = 0; i < ElemCount; i++)
+				{
+					float X = *(float*)(State.X.GetData() + i * 4);
+					float Y = *(float*)(State.Y.GetData() + i * 4);
+					if (X < 0.0f)
+					{
+						Error = "Undefined";
+						StopLineNumber = State.Line - ExtraLineNum;
+						FString UbError = FString::Printf(TEXT("pow: x(%f) < 0 for component %d, the result is undefined."), X, i);
+						SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+					}
+					else if (X == 0.0f && Y <= 0.0f)
+					{
+						Error = "Undefined";
+						StopLineNumber = State.Line - ExtraLineNum;
+						FString UbError = FString::Printf(TEXT("pow: x(%f) == 0 and y(%f) <= 0 for component %d, the result is undefined."), X, Y, i);
+						SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+					}
+				}
+			}
+			else
+			{
+				float X = *(float*)(State.X.GetData());
+				float Y = *(float*)(State.Y.GetData());
+				if (X < 0.0f)
+				{
+					Error = "Undefined";
+					StopLineNumber = State.Line - ExtraLineNum;
+					FString UbError = FString::Printf(TEXT("pow: x(%f) < 0, the result is undefined."), X);
+					SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+				}
+				else if (X == 0.0f && Y <= 0.0f)
+				{
+					Error = "Undefined";
+					StopLineNumber = State.Line - ExtraLineNum;
+					FString UbError = FString::Printf(TEXT("pow: x(%f) == 0 and y(%f) <= 0, the result is undefined."), X, Y);
+					SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+				}
+			}
+		}
+		else if (std::holds_alternative<SpvDebugState_Clamp>(InState))
+		{
+			const auto& State = std::get<SpvDebugState_Clamp>(InState);
+			SpvType* ResultType = DebuggerContext->Types[State.ResultType].Get();
+			if (ResultType->GetKind() == SpvTypeKind::Vector)
+			{
+				int ElemCount = static_cast<SpvVectorType*>(ResultType)->ElementCount;
+				for (int i = 0; i < ElemCount; i++)
+				{
+					if (ResultType->GetKind() == SpvTypeKind::Float)
+					{
+						float MinVal = *(float*)(State.MinVal.GetData() + i * 4);
+						float MaxVal = *(float*)(State.MaxVal.GetData() + i * 4);
+						if (MinVal > MaxVal)
+						{
+							Error = "Undefined";
+							StopLineNumber = State.Line - ExtraLineNum;
+							FString UbError = FString::Printf(TEXT("clamp: minVal(%f) > maxVal(%f) for component %d, the result is undefined."), MinVal, MaxVal, i);
+							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+						}
+					}
+					else if (ResultType->GetKind() == SpvTypeKind::Integer)
+					{
+						if (static_cast<SpvIntegerType*>(ResultType)->IsSigend())
+						{
+							int MinVal = *(int*)(State.MinVal.GetData() + i * 4);
+							int MaxVal = *(int*)(State.MaxVal.GetData() + i * 4);
+							if (MinVal > MaxVal)
+							{
+								Error = "Undefined";
+								StopLineNumber = State.Line - ExtraLineNum;
+								FString UbError = FString::Printf(TEXT("clamp: minVal(%d) > maxVal(%d) for component %d, the result is undefined."), MinVal, MaxVal, i);
+								SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+							}
+						}
+						else
+						{
+							uint32 MinVal = *(uint32*)(State.MinVal.GetData() + i * 4);
+							uint32 MaxVal = *(uint32*)(State.MaxVal.GetData() + i * 4);
+							if (MinVal > MaxVal)
+							{
+								Error = "Undefined";
+								StopLineNumber = State.Line - ExtraLineNum;
+								FString UbError = FString::Printf(TEXT("clamp: minVal(%d) > maxVal(%d) for component %d, the result is undefined."), MinVal, MaxVal, i);
+								SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+							}
+						}
+					}
+				}
+			}
+			else
+			{
+				if (ResultType->GetKind() == SpvTypeKind::Float)
+				{
+					float MinVal = *(float*)(State.MinVal.GetData());
+					float MaxVal = *(float*)(State.MaxVal.GetData());
+					if (MinVal > MaxVal)
+					{
+						Error = "Undefined";
+						StopLineNumber = State.Line - ExtraLineNum;
+						FString UbError = FString::Printf(TEXT("clamp: minVal(%f) > maxVal(%f), the result is undefined."), MinVal, MaxVal);
+						SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+					}
+				}
+				else if (ResultType->GetKind() == SpvTypeKind::Integer)
+				{
+					if (static_cast<SpvIntegerType*>(ResultType)->IsSigend())
+					{
+						int MinVal = *(int*)(State.MinVal.GetData());
+						int MaxVal = *(int*)(State.MaxVal.GetData());
+						if (MinVal > MaxVal)
+						{
+							Error = "Undefined";
+							StopLineNumber = State.Line - ExtraLineNum;
+							FString UbError = FString::Printf(TEXT("clamp: minVal(%d) > maxVal(%d), the result is undefined."), MinVal, MaxVal);
+							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+						}
+					}
+					else
+					{
+						uint32 MinVal = *(uint32*)(State.MinVal.GetData());
+						uint32 MaxVal = *(uint32*)(State.MaxVal.GetData());
+						if (MinVal > MaxVal)
+						{
+							Error = "Undefined";
+							StopLineNumber = State.Line - ExtraLineNum;
+							FString UbError = FString::Printf(TEXT("clamp: minVal(%d) > maxVal(%d), the result is undefined."), MinVal, MaxVal);
+							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+						}
+					}
+				}
+			}
+		}
 		else if (std::holds_alternative<SpvDebugState_SmoothStep>(InState))
 		{
 			const auto& State = std::get<SpvDebugState_SmoothStep>(InState);
@@ -634,6 +775,207 @@ namespace SH
 				}
 			}
 		}
+		else if (std::holds_alternative<SpvDebugState_Div>(InState))
+		{
+			const auto& State = std::get<SpvDebugState_Div>(InState);
+			SpvType* ResultType = DebuggerContext->Types[State.ResultType].Get();
+			if (ResultType->GetKind() == SpvTypeKind::Vector)
+			{
+				int ElemCount = static_cast<SpvVectorType*>(ResultType)->ElementCount;
+				for (int i = 0; i < ElemCount; i++)
+				{
+					if (static_cast<SpvIntegerType*>(ResultType)->IsSigend())
+					{
+						int Operand2 = *(int*)(State.Operand2.GetData() + i * 4);
+						if (Operand2 == 0)
+						{
+							Error = "Undefined";
+							StopLineNumber = State.Line - ExtraLineNum;
+							FString UbError = FString::Printf(TEXT("Integer division by zero is undefined for component %d."), i);
+							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+						}
+					}
+					else
+					{
+						uint32 Operand2 = *(uint32*)(State.Operand2.GetData() + i * 4);
+						if (Operand2 == 0)
+						{
+							Error = "Undefined";
+							StopLineNumber = State.Line - ExtraLineNum;
+							FString UbError = FString::Printf(TEXT("Integer division by zero is undefined for component %d."), i);
+							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+						}
+					}
+				}
+			}
+			else
+			{
+				TArray<uint8> ZeroBuffer;
+				ZeroBuffer.SetNumZeroed(State.Operand2.Num());
+				if (FMemory::Memcmp(State.Operand2.GetData(), ZeroBuffer.GetData(), ZeroBuffer.Num()) == 0)
+				{
+					Error = "Undefined";
+					StopLineNumber = State.Line - ExtraLineNum;
+					FString UbError = FString::Printf(TEXT("Integer division by zero is undefined."));
+					SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+				}
+			}
+		}
+		else if (std::holds_alternative<SpvDebugState_ConvertF>(InState))
+		{
+			const auto& State = std::get<SpvDebugState_ConvertF>(InState);
+			SpvType* ResultType = DebuggerContext->Types[State.ResultType].Get();
+			if (ResultType->GetKind() == SpvTypeKind::Vector)
+			{
+				int ElemCount = static_cast<SpvVectorType*>(ResultType)->ElementCount;
+				for (int i = 0; i < ElemCount; i++)
+				{
+					float f = *(float*)(State.FloatValue.GetData() + i * 4);
+					if (static_cast<SpvIntegerType*>(ResultType)->IsSigend())
+					{
+						if (int64(f) < int64(std::numeric_limits<int32>::min()) || int64(f) > int64(std::numeric_limits<int32>::max()))
+						{
+							Error = "Undefined";
+							StopLineNumber = State.Line - ExtraLineNum;
+							FString UbError = FString::Printf(TEXT("Conversion(float to int) is undefined for component %d: It's not wide enough to hold the converted value(%f)."), i, f);
+							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+						}
+					}
+					else
+					{
+						if (f < 0.0f || uint64(f) > uint64(std::numeric_limits<uint32>::max()))
+						{
+							Error = "Undefined";
+							StopLineNumber = State.Line - ExtraLineNum;
+							FString UbError = FString::Printf(TEXT("Conversion(float to uint) is undefined for component %d: It's not wide enough to hold the converted value(%f)."), i, f);
+							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+						}
+					}
+				}
+			}
+			else if(ResultType->GetKind() == SpvTypeKind::Integer)
+			{
+				float f = *(float*)(State.FloatValue.GetData());
+				if (static_cast<SpvIntegerType*>(ResultType)->IsSigend())
+				{
+					if (int64(f) < int64(std::numeric_limits<int32>::min()) || int64(f) > int64(std::numeric_limits<int32>::max()))
+					{
+						Error = "Undefined";
+						StopLineNumber = State.Line - ExtraLineNum;
+						FString UbError = FString::Printf(TEXT("Conversion(float to int) is undefined: It's not wide enough to hold the converted value(%f)."), f);
+						SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+					}
+				}
+				else
+				{
+					if (f < 0.0f || uint64(f) > uint64(std::numeric_limits<uint32>::max()))
+					{
+						Error = "Undefined";
+						StopLineNumber = State.Line - ExtraLineNum;
+						FString UbError = FString::Printf(TEXT("Conversion(float to uint) is undefined: It's not wide enough to hold the converted value(%f)."), f);
+						SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+					}
+				}
+				
+			}
+		}
+		else if (std::holds_alternative<SpvDebugState_Remainder>(InState))
+		{
+			const auto& State = std::get<SpvDebugState_Remainder>(InState);
+			SpvType* ResultType = DebuggerContext->Types[State.ResultType].Get();
+			if (ResultType->GetKind() == SpvTypeKind::Vector)
+			{
+				int ElemCount = static_cast<SpvVectorType*>(ResultType)->ElementCount;
+				for (int i = 0; i < ElemCount; i++)
+				{
+					if (ResultType->GetKind() == SpvTypeKind::Float)
+					{
+						float Operand2 = *(float*)(State.Operand2.GetData() + i * 4);
+						if (Operand2 == 0)
+						{
+							Error = "Undefined";
+							StopLineNumber = State.Line - ExtraLineNum;
+							FString UbError = FString::Printf(TEXT("float remainder by zero is undefined for component %d."), i);
+							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+						}
+					}
+					else if (static_cast<SpvIntegerType*>(ResultType)->IsSigend())
+					{
+						int32 Operand1 = *(int32*)(State.Operand1.GetData() + i * 4);
+						int32 Operand2 = *(int32*)(State.Operand2.GetData() + i * 4);
+						if (Operand2 == 0)
+						{
+							Error = "Undefined";
+							StopLineNumber = State.Line - ExtraLineNum;
+							FString UbError = FString::Printf(TEXT("int remainder by zero is undefined for component %d."), i);
+							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+						}
+						else if (Operand2 == -1 && Operand1 == std::numeric_limits<int32>::min())
+						{
+							Error = "Undefined";
+							StopLineNumber = State.Line - ExtraLineNum;
+							FString UbError = FString::Printf(TEXT("The remainder causing signed overflow is undefined for component %d."), i);
+							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+						}
+					}
+					else
+					{
+						uint32 Operand2 = *(uint32*)(State.Operand2.GetData() + i * 4);
+						if (Operand2 == 0)
+						{
+							Error = "Undefined";
+							StopLineNumber = State.Line - ExtraLineNum;
+							FString UbError = FString::Printf(TEXT("uint remainder by zero is undefined for component %d."), i);
+							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+						}
+					}
+				}
+			}
+			else
+			{
+				if (ResultType->GetKind() == SpvTypeKind::Float)
+				{
+					float Operand2 = *(float*)(State.Operand2.GetData());
+					if (Operand2 == 0)
+					{
+						Error = "Undefined";
+						StopLineNumber = State.Line - ExtraLineNum;
+						FString UbError = FString::Printf(TEXT("float remainder by zero is undefined."));
+						SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+					}
+				}
+				else if (static_cast<SpvIntegerType*>(ResultType)->IsSigend())
+				{
+					int32 Operand1 = *(int32*)(State.Operand1.GetData());
+					int32 Operand2 = *(int32*)(State.Operand2.GetData());
+					if (Operand2 == 0)
+					{
+						Error = "Undefined";
+						StopLineNumber = State.Line - ExtraLineNum;
+						FString UbError = FString::Printf(TEXT("int remainder by zero is undefined."));
+						SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+					}
+					else if (Operand2 == -1 && Operand1 == std::numeric_limits<int32>::min())
+					{
+						Error = "Undefined";
+						StopLineNumber = State.Line - ExtraLineNum;
+						FString UbError = FString::Printf(TEXT("The remainder causing signed overflow is undefined."));
+						SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+					}
+				}
+				else
+				{
+					uint32 Operand2 = *(uint32*)(State.Operand2.GetData());
+					if (Operand2 == 0)
+					{
+						Error = "Undefined";
+						StopLineNumber = State.Line - ExtraLineNum;
+						FString UbError = FString::Printf(TEXT("uint remainder by zero is undefined."));
+						SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+					}
+				}
+			}
+		}
 	}
 
 	void ShaderDebugger::DebugPixel(const BindingState& InBuilders, const PixelState& InState)
@@ -646,6 +988,7 @@ namespace SH
 		TArray<FString> ExtraArgs;
 		ExtraArgs.Add("-D");
 		ExtraArgs.Add("ENABLE_PRINT=0");
+		ExtraArgs.Add("-ignore-validation-error");
 
 		FString ErrorInfo, WarnInfo;
 		if (!GGpuRhi->CompileShader(DebugShader, ErrorInfo, WarnInfo, ExtraArgs))
@@ -982,6 +1325,77 @@ namespace SH
 					.ResultType = ResultType,
 					.Edge0 = MoveTemp(Edge0),
 					.Edge1 = MoveTemp(Edge1)
+				});
+				break;
+			}
+			case SpvDebuggerStateType::Pow:
+			{
+				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
+				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
+				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
+				TArray<uint8> Y = { DebuggerData + Offset, Size }; Offset += Y.Num();
+				DebugStates.Add(SpvDebugState_Pow{
+					.Line = Line,
+					.ResultType = ResultType,
+					.X = MoveTemp(X),
+					.Y = MoveTemp(Y)
+				});
+				break;
+			}
+			case SpvDebuggerStateType::Clamp:
+			{
+				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
+				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
+				TArray<uint8> MinVal = { DebuggerData + Offset, Size }; Offset += MinVal.Num();
+				TArray<uint8> MaxVal = { DebuggerData + Offset, Size }; Offset += MaxVal.Num();
+				DebugStates.Add(SpvDebugState_Clamp{
+					.Line = Line,
+					.ResultType = ResultType,
+					.MinVal = MoveTemp(MinVal),
+					.MaxVal = MoveTemp(MaxVal)
+				});
+				break;
+			}
+			case SpvDebuggerStateType::Div:
+			{
+				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
+				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
+				TArray<uint8> Operand2 = { DebuggerData + Offset, Size }; Offset += Operand2.Num();
+				DebugStates.Add(SpvDebugState_Div{
+					.Line = Line,
+					.ResultType = ResultType,
+					.Operand2 = MoveTemp(Operand2),
+				});
+				break;
+			}
+			case SpvDebuggerStateType::ConvertF:
+			{
+				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
+				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
+				TArray<uint8> FloatValue = { DebuggerData + Offset, Size }; Offset += FloatValue.Num();
+				DebugStates.Add(SpvDebugState_ConvertF{
+					.Line = Line,
+					.ResultType = ResultType,
+					.FloatValue = MoveTemp(FloatValue),
+				});
+				break;
+			}
+			case SpvDebuggerStateType::Remainder:
+			{
+				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
+				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
+				TArray<uint8> Operand1 = { DebuggerData + Offset, Size }; Offset += Operand1.Num();
+				TArray<uint8> Operand2 = { DebuggerData + Offset, Size }; Offset += Operand2.Num();
+				DebugStates.Add(SpvDebugState_Remainder{
+					.Line = Line,
+					.ResultType = ResultType,
+					.Operand1 = MoveTemp(Operand1),
+					.Operand2 = MoveTemp(Operand2)
 				});
 				break;
 			}

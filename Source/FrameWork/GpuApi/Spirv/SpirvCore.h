@@ -648,6 +648,7 @@ namespace FW
 		Kill = 252,
 		Return = 253,
 		ReturnValue = 254,
+		ExtInstWithForwardRefsKHR = 4433,
 	};
 }
 

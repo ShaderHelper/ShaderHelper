@@ -237,37 +237,69 @@ namespace FW
 
 	void SpvDebuggerVisitor::Visit(const SpvOpConvertFToU* Inst)
 	{
-		
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			SpvId FloatTypeId = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFloat>(32));
+			SpvType* FloatType = Context.Types[FloatTypeId].Get();
+			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, FloatType, { Inst->GetFloatValue() }, SpvDebuggerStateType::ConvertF);
+		}
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvOpConvertFToS* Inst)
 	{
-		
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			SpvId FloatTypeId = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFloat>(32));
+			SpvType* FloatType = Context.Types[FloatTypeId].Get();
+			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, FloatType, { Inst->GetFloatValue() }, SpvDebuggerStateType::ConvertF);
+		}
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvOpUDiv* Inst)
 	{
-		
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, ResultType, { Inst->GetOperand2() }, SpvDebuggerStateType::Div);
+		}
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvOpSDiv* Inst)
 	{
-		
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, ResultType, { Inst->GetOperand2() }, SpvDebuggerStateType::Div);
+		}
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvOpUMod* Inst)
 	{
-		
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, ResultType, { Inst->GetOperand1(), Inst->GetOperand2() }, SpvDebuggerStateType::Remainder);
+		}
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvOpSRem* Inst)
 	{
-		
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, ResultType, { Inst->GetOperand1(), Inst->GetOperand2() }, SpvDebuggerStateType::Remainder);
+		}
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvOpFRem* Inst)
 	{
-		
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, ResultType, { Inst->GetOperand1(), Inst->GetOperand2() }, SpvDebuggerStateType::Remainder);
+		}
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvOpBranch* Inst)
@@ -294,22 +326,38 @@ namespace FW
 
 	void SpvDebuggerVisitor::Visit(const SpvPow* Inst)
 	{
-		
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, ResultType, { Inst->GetX(), Inst->GetY() }, SpvDebuggerStateType::Pow);
+		}
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvFClamp* Inst)
 	{
-
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, ResultType,{ Inst->GetMinVal(), Inst->GetMaxVal()}, SpvDebuggerStateType::Clamp);
+		}
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvUClamp* Inst)
 	{
-		
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, ResultType, { Inst->GetMinVal(), Inst->GetMaxVal() }, SpvDebuggerStateType::Clamp);
+		}
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvSClamp* Inst)
 	{
-		
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, ResultType, { Inst->GetMinVal(), Inst->GetMaxVal() }, SpvDebuggerStateType::Clamp);
+		}
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvSmoothStep* Inst)
@@ -317,7 +365,7 @@ namespace FW
 		if (EnableUbsan)
 		{
 			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
-			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, { Inst->GetEdge0(), Inst->GetEdge1()}, SpvDebuggerStateType::SmoothStep);
+			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, ResultType, { Inst->GetEdge0(), Inst->GetEdge1()}, SpvDebuggerStateType::SmoothStep);
 		}
 	}
 
@@ -326,7 +374,7 @@ namespace FW
 		if (EnableUbsan)
 		{
 			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
-			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, { Inst->GetX() }, SpvDebuggerStateType::Normalize);
+			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, ResultType, { Inst->GetX() }, SpvDebuggerStateType::Normalize);
 		}
 
 	}
@@ -446,15 +494,15 @@ namespace FW
 
 	}
 
-	void SpvDebuggerVisitor::PatchAppendMathFunc(SpvType* ResultType, uint32 OperandNum)
+	void SpvDebuggerVisitor::PatchAppendMathFunc(SpvType* ResultType, SpvType* OperandType, uint32 OperandNum)
 	{
-		if (AppendMathFuncIds.Contains({ ResultType, OperandNum }))
+		if (AppendMathFuncIds.Contains({ ResultType, OperandType, OperandNum }))
 		{
 			return;
 		}
 
 		SpvId AppendMathFuncId = Patcher.NewId();
-		FString FuncName = FString::Printf(TEXT("_AppendMath_%d_%d_"), ResultType->GetId().GetValue(), OperandNum);
+		FString FuncName = FString::Printf(TEXT("_AppendMath_%d_%d_"), ResultType->GetId().GetValue(), OperandType->GetId().GetValue(), OperandNum);
 		Patcher.AddDebugName(MakeUnique<SpvOpName>(AppendMathFuncId, FuncName));
 		TArray<TUniquePtr<SpvInstruction>> AppendMathFuncInsts;
 		{
@@ -464,10 +512,9 @@ namespace FW
 			ParamterTypes.Add(UIntType);
 			ParamterTypes.Add(UIntType);
 			ParamterTypes.Add(UIntType);
-			//Assumes that result type and the type of all operands must be the same type
 			for (uint32 i = 0; i < OperandNum; i++)
 			{
-				ParamterTypes.Add(ResultType->GetId());
+				ParamterTypes.Add(OperandType->GetId());
 			}
 
 			SpvId FuncType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFunction>(VoidType, ParamterTypes));
@@ -497,7 +544,7 @@ namespace FW
 			for (uint32 i = 0; i < OperandNum; i++)
 			{
 				SpvId OperandParam = Patcher.NewId();
-				auto OperandParamOp = MakeUnique<SpvOpFunctionParameter>(ResultType->GetId());
+				auto OperandParamOp = MakeUnique<SpvOpFunctionParameter>(OperandType->GetId());
 				OperandParamOp->SetId(OperandParam);
 				AppendMathFuncInsts.Add(MoveTemp(OperandParamOp));
 				Patcher.AddDebugName(MakeUnique<SpvOpName>(OperandParam, FString::Printf(TEXT("_DebuggerOperand%d_"), i)));
@@ -514,14 +561,14 @@ namespace FW
 			PatchToDebugger(ResultTypeIdParam, UIntType, AppendMathFuncInsts);
 			for (uint32 i = 0; i < OperandNum; i++)
 			{
-				PatchToDebugger(OperandParams[i], ResultType->GetId(), AppendMathFuncInsts);
+				PatchToDebugger(OperandParams[i], OperandType->GetId(), AppendMathFuncInsts);
 			}
 
 			AppendMathFuncInsts.Add(MakeUnique<SpvOpReturn>());
 			AppendMathFuncInsts.Add(MakeUnique<SpvOpFunctionEnd>());
 		}
 		Patcher.AddFunction(MoveTemp(AppendMathFuncInsts));
-		AppendMathFuncIds.Add({ ResultType, OperandNum }, AppendMathFuncId);
+		AppendMathFuncIds.Add({ ResultType, OperandType, OperandNum }, AppendMathFuncId);
 	}
 
 	void SpvDebuggerVisitor::AppendScope(const TFunction<int32()>& OffsetEval)
@@ -729,10 +776,11 @@ namespace FW
 		Patcher.AddInstructions(OffsetEval(), MoveTemp(AppendValueInsts));
 	}
 
-	void SpvDebuggerVisitor::AppendMath(const TFunction<int32()>& OffsetEval, SpvType* ResultType, const TArray<SpvId>& Operands, SpvDebuggerStateType InStateType)
+	void SpvDebuggerVisitor::AppendMath(const TFunction<int32()>& OffsetEval, SpvType* ResultType, SpvType* OperandType, const TArray<SpvId>& Operands, SpvDebuggerStateType InStateType)
 	{
-		PatchAppendMathFunc(ResultType, Operands.Num());
-		SpvId AppendMathFuncId = AppendMathFuncIds[{ResultType, Operands.Num()}];
+		uint32 OperandNum = Operands.Num();
+		PatchAppendMathFunc(ResultType, OperandType, OperandNum);
+		SpvId AppendMathFuncId = AppendMathFuncIds[{ResultType, OperandType, OperandNum}];
 		TArray<TUniquePtr<SpvInstruction>> AppendMathInsts;
 		{
 			SpvId StateType = Patcher.FindOrAddConstant((uint32)InStateType);

@@ -59,16 +59,7 @@ namespace FW
 
 	void SpvPixelDebuggerVisitor::Visit(const SpvOpKill* Inst)
 	{
-		TArray<TUniquePtr<SpvInstruction>> AppendTagInsts;
-		{
-			SpvId StateType = Patcher.FindOrAddConstant((uint32)SpvDebuggerStateType::Kill);
-			SpvId Line = Patcher.FindOrAddConstant((uint32)CurLine);
-			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
-			auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendTagFuncId, TArray<SpvId>{ StateType, Line});
-			FuncCallOp->SetId(Patcher.NewId());
-			AppendTagInsts.Add(MoveTemp(FuncCallOp));
-		}
-		Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(AppendTagInsts));
+		AppendTag([&] {return Inst->GetWordOffset().value(); }, SpvDebuggerStateType::Kill);
 	}
 
 }

@@ -41,6 +41,11 @@ namespace FW
 		//UBSan
 		Normalize,
 		SmoothStep,
+		Pow,
+		Clamp,
+		Div,
+		ConvertF,
+		Remainder,
 	};
 
 	struct SpvDebugState_VarChange
@@ -75,6 +80,7 @@ namespace FW
 		bool bKill : 1{};
 	};
 
+
 	struct SpvDebugState_Normalize
 	{
 		int32 Line{};
@@ -88,9 +94,42 @@ namespace FW
 		TArray<uint8> Edge0;
 		TArray<uint8> Edge1;
 	};
+	struct SpvDebugState_Pow
+	{
+		int32 Line{};
+		SpvId ResultType;
+		TArray<uint8> X;
+		TArray<uint8> Y;
+	};
+	struct SpvDebugState_Clamp
+	{
+		int32 Line{};
+		SpvId ResultType;
+		TArray<uint8> MinVal;
+		TArray<uint8> MaxVal;
+	};
+	struct SpvDebugState_Div
+	{
+		int32 Line{};
+		SpvId ResultType;
+		TArray<uint8> Operand2;
+	};
+	struct SpvDebugState_ConvertF
+	{
+		int32 Line{};
+		SpvId ResultType;
+		TArray<uint8> FloatValue;
+	};
+	struct SpvDebugState_Remainder
+	{
+		int32 Line{};
+		SpvId ResultType;
+		TArray<uint8> Operand1;
+		TArray<uint8> Operand2;
+	};
 
 	using SpvDebugState = std::variant<SpvDebugState_VarChange, SpvDebugState_ScopeChange, SpvDebugState_ReturnValue, SpvDebugState_FuncCall, SpvDebugState_Tag,
-		SpvDebugState_Normalize, SpvDebugState_SmoothStep>;
+		SpvDebugState_Normalize, SpvDebugState_SmoothStep, SpvDebugState_Pow, SpvDebugState_Clamp, SpvDebugState_Div, SpvDebugState_ConvertF, SpvDebugState_Remainder>;
 
 	struct SpvBinding
 	{
@@ -222,11 +261,11 @@ namespace FW
 		void PatchToDebugger(SpvId InValueId, SpvId InTypeId, TArray<TUniquePtr<SpvInstruction>>& InstList);
 		void PatchAppendVarFunc(SpvPointer* Pointer, uint32 IndexNum);
 		void PatchAppendValueFunc(SpvType* ValueType);
-		void PatchAppendMathFunc(SpvType* ResultType, uint32 OperandNum);
+		void PatchAppendMathFunc(SpvType* ResultType, SpvType* OperandType, uint32 OperandNum);
 		void AppendScope(const TFunction<int32()>& OffsetEval);
 		void AppendTag(const TFunction<int32()>& OffsetEval, SpvDebuggerStateType InStateType);
 		void AppendValue(const TFunction<int32()>& OffsetEval, SpvType* ValueType, SpvId Value, SpvDebuggerStateType InStateType);
-		void AppendMath(const TFunction<int32()>& OffsetEval, SpvType* ResultType, const TArray<SpvId>& Operands, SpvDebuggerStateType InStateType);
+		void AppendMath(const TFunction<int32()>& OffsetEval, SpvType* ResultType, SpvType* OperandType, const TArray<SpvId>& Operands, SpvDebuggerStateType InStateType);
 
 	protected:
 		SpvDebuggerContext& Context;
@@ -245,7 +284,20 @@ namespace FW
 		SpvId AppendCallFuncId;
 		TMap<TPair<SpvType*, uint32>, SpvId> AppendVarFuncIds;
 		TMap<SpvType*, SpvId> AppendValueFuncIds;
-		TMap<TPair<SpvType*, uint32>, SpvId> AppendMathFuncIds;
+		struct MathFuncSearchKey
+		{
+			SpvType* ResultType{};
+			SpvType* OperandType{};
+			uint32 OperandNum{};
+			bool operator==(const MathFuncSearchKey& Other) const = default;
+			friend uint32 GetTypeHash(const MathFuncSearchKey& Key)
+			{
+				uint32 Hash = HashCombine(::GetTypeHash(Key.ResultType), ::GetTypeHash(Key.OperandType));
+				Hash = HashCombine(Hash, ::GetTypeHash(Key.OperandNum));
+				return Hash;
+			}
+		};
+		TMap<MathFuncSearchKey, SpvId> AppendMathFuncIds;
 		TMap<const SpvOpFunctionCall*, const SpvOpStore*> AppendVarCallToStore;
 		SpvPatcher Patcher;
 	};
