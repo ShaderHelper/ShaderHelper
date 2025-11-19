@@ -5,8 +5,8 @@ namespace FW
 {
 	struct SpvPixelDebuggerContext : SpvDebuggerContext
 	{
-		SpvPixelDebuggerContext(const Vector2u& InCoord, const TArray<ShaderFunc>& InEditorFuncInfo, const TArray<SpvBinding>& InBindings)
-		: SpvDebuggerContext{.EditorFuncInfo = InEditorFuncInfo, .Bindings = InBindings}
+		SpvPixelDebuggerContext(const Vector2u& InCoord, const TArray<SpvBinding>& InBindings)
+		: SpvDebuggerContext{.Bindings = InBindings}
 		, PixelCoord(InCoord)
 		{}
 

@@ -169,18 +169,10 @@ namespace FW
 						int Num = PrintStringLiteral.Len() - 1;
 						for (int k = 1; k < Num;)
 						{
-							if (k + 1 < Num && PrintStringLiteral[k] == '\\')
-							{
-								TextArr += FString::Printf(TEXT("'\\%c',"), PrintStringLiteral[k + 1]);
-								k += 2;
-							}
-							else
-							{
-								TextArr += FString::Printf(TEXT("'%c',"), PrintStringLiteral[k]);
-								k++;
-							}
+							TextArr += FString::Printf(TEXT("%d,"), PrintStringLiteral[k]);
+							k++;
 						}
-						TextArr += TEXT("'\\0'})");
+						TextArr += TEXT("0})");
 						NewShaderText += TextArr;
 						i = StringEnd + 1;
 						return true;

@@ -483,15 +483,21 @@ namespace FW
 
 		bool IsCompletelyInitialized() const
 		{
+			Vector2i Range = GetInitializedRange();
+			return Range.X == 0 && Range.Y == GetBufferSize();
+		}
+
+		Vector2i GetInitializedRange() const
+		{
 			int MinimumStart = std::numeric_limits<int>::max();
 			int MaximumEnd = std::numeric_limits<int>::min();
-			for(const auto& Range : InitializedRanges)
+			for (const auto& Range : InitializedRanges)
 			{
 				MinimumStart = FMath::Min(MinimumStart, Range.X);
 				MaximumEnd = FMath::Max(MaximumEnd, Range.Y);
 			}
-			return MinimumStart == 0 && MaximumEnd == GetBufferSize();
-		} 
+			return { MinimumStart, MaximumEnd };
+		}
 	};
 
 	//Logical

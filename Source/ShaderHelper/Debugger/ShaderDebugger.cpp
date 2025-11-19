@@ -2,7 +2,6 @@
 #include "ShaderDebugger.h"
 #include "ShaderConductor.hpp"
 #include "Editor/ShaderHelperEditor.h"
-#include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "GpuApi/Spirv/SpirvExprDebugger.h"
 
 using namespace FW;
@@ -193,18 +192,17 @@ namespace SH
 		TArray<FString> ExtraArgs;
 		ExtraArgs.Add("-D");
 		ExtraArgs.Add("ENABLE_PRINT=0");
-		ExtraArgs.Add("/Od");
 		FString ErrorInfo, WarnInfo;
 
 		if (DebugShader->GetShaderType() == ShaderType::PixelShader)
 		{
 			SpvPixelExprDebuggerContext ExprContext{ DebugStates[CurDebugStateIndex], CurDebugStateIndex,
-				PsState.value().Coord, Funcs, SpvBindings };
+				PsState.value().Coord, SpvBindings };
 			SpirvParser Parser;
 			Parser.Parse(DebugShader->SpvCode);
 			SpvMetaVisitor MetaVisitor{ ExprContext };
 			Parser.Accept(&MetaVisitor);
-			SpvPixelExprDebuggerVisitor ExprVisitor{ ExprContext };
+			SpvPixelExprDebuggerVisitor ExprVisitor{ ExprContext, EnableUbsan()};
 			Parser.Accept(&ExprVisitor);
 			ExprVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "ExprPatched.spvasm");
 			
@@ -269,8 +267,7 @@ namespace SH
 					SpvTypeDesc* ResultTypeDesc = ExprContext.TypeDescs[TypeDescId].Get();
 					if (ResultTypeDesc)
 					{
-						FText TypeName = LOCALIZATION("InvalidExpr");
-						TypeName = FText::FromString(GetTypeDescStr(ResultTypeDesc));
+						 FText TypeName = FText::FromString(GetTypeDescStr(ResultTypeDesc));
 
 						TArray<Vector2i> ResultRange;
 						ResultRange.Add({ 0, ResultValue.Num() });
@@ -305,15 +302,15 @@ namespace SH
 
 		SpvFunctionDesc* FuncDesc = GetFunctionDesc(Scope);
 		FString Location = FString::Printf(TEXT("%s (Line %d)"), *ShaderAssetObj->GetFileName(), StopLineNumber);
-		CallStackDatas.Add(MakeShared<CallStackData>(GetFunctionSig(FuncDesc, Funcs), MoveTemp(Location)));
+		CallStackDatas.Add(MakeShared<CallStackData>(GetFunctionSig(FuncDesc), MoveTemp(Location)));
 		for (int i = CallStack.Num() - 1; i >= 0; i--)
 		{
-			SpvFunctionDesc* FuncDesc = GetFunctionDesc(CallStack[i].Key);
-			int JumpLineNumber = CallStack[i].Value - ExtraLineNum;
+			SpvFunctionDesc* FuncDesc = GetFunctionDesc(CallStack[i].Scope);
+			int JumpLineNumber = CallStack[i].Line - ExtraLineNum;
 			if (JumpLineNumber > 0)
 			{
 				FString Location = FString::Printf(TEXT("%s (Line %d)"), *ShaderAssetObj->GetFileName(), JumpLineNumber);
-				CallStackDatas.Add(MakeShared<CallStackData>(GetFunctionSig(FuncDesc, Funcs), MoveTemp(Location)));
+				CallStackDatas.Add(MakeShared<CallStackData>(GetFunctionSig(FuncDesc), MoveTemp(Location)));
 			}
 		}
 		DebuggerCallStackView->SetCallStackDatas(CallStackDatas);
@@ -430,21 +427,23 @@ namespace SH
 				{
 					NextValidLine = std::get<SpvDebugState_VarChange>(NextDebugState).Line;
 				}
+				else if (std::holds_alternative<SpvDebugState_FuncCall>(NextDebugState))
+				{
+					NextValidLine = std::get<SpvDebugState_FuncCall>(NextDebugState).Line;
+				}
 				else if (std::holds_alternative<SpvDebugState_Tag>(NextDebugState))
 				{
 					NextValidLine = std::get<SpvDebugState_Tag>(NextDebugState).Line;
 				}
 			}
 
-			/*if (!DebugState.UbError.IsEmpty())
+			FString Error;
+			ApplyDebugState(DebugState, Error);
+			if (!Error.IsEmpty())
 			{
-				DebuggerError = "Undefined behavior";
-				StopLineNumber = DebugState.Line - ExtraLineNum;
-				SH_LOG(LogShader, Error, TEXT("%s"), *DebugState.UbError);
+				DebuggerError = MoveTemp(Error);
 				break;
-			}*/
-
-			ApplyDebugState(DebugState);
+			}
 			CurDebugStateIndex++;
 
 			if (AssertResult && AssertResult->IsCompletelyInitialized())
@@ -514,8 +513,9 @@ namespace SH
 		return EnableUbsan;
 	}
 
-	void ShaderDebugger::ApplyDebugState(const SpvDebugState& InState)
+	void ShaderDebugger::ApplyDebugState(const SpvDebugState& InState, FString& Error)
 	{
+		int32 ExtraLineNum = ShaderEditor->GetShaderAsset()->GetExtraLineNum();
 		if (std::holds_alternative<SpvDebugState_VarChange>(InState))
 		{
 			const auto& State = std::get<SpvDebugState_VarChange>(InState);
@@ -528,6 +528,24 @@ namespace SH
 			SpvVarDirtyRange DirtyRange = { State.Change.ByteOffset, State.Change.NewDirtyValue.Num() };
 			Var->InitializedRanges.Add({ State.Change.ByteOffset, State.Change.NewDirtyValue.Num() });
 			DirtyVars.Add(State.Change.VarId, MoveTemp(DirtyRange));
+
+			//Propagate changes made to the parameter back to the argument.
+			//This assumes that OpFunctionParameter's result type is always a pointer type
+			if (DebuggerContext->IsParameter(Var->Id) && !CallStack.IsEmpty())
+			{
+				const SpvFuncCall* SourceCall = CallStack.Last().Call;
+				const TArray<SpvId>& Parameters = DebuggerContext->Funcs.at(SourceCall->Callee).Parameters;
+				for (int i = 0; i < SourceCall->Arguments.Num(); i++)
+				{
+					if (Parameters[i] == Var->Id)
+					{
+						SpvVariable* ArgumentVar = DebuggerContext->FindVar(SourceCall->Arguments[i]);
+						ArgumentVar->Storage = Var->Storage;
+						ArgumentVar->InitializedRanges = Var->InitializedRanges;
+						break;
+					}
+				}
+			}
 		}
 		else if (std::holds_alternative<SpvDebugState_ReturnValue>(InState))
 		{
@@ -538,21 +556,82 @@ namespace SH
 		{
 			const auto& State = std::get<SpvDebugState_ScopeChange>(InState);
 			Scope = State.Change.NewScope;
-			CallStackScope = Scope;
+			ActiveCallStackScope = Scope;
+		}
+		else if (std::holds_alternative<SpvDebugState_FuncCall>(InState))
+		{
+			const auto& State = std::get<SpvDebugState_FuncCall>(InState);
+			const SpvFuncCall& Call = DebuggerContext->FuncCalls.at(State.CallId);
+			const TArray<SpvId>& Parameters = DebuggerContext->Funcs.at(Call.Callee).Parameters;
+			//Assign arguments to parameters.
+			for (int i = 0; i < Call.Arguments.Num(); i++)
+			{
+				SpvVariable* ArgumentVar = DebuggerContext->FindVar(Call.Arguments[i]);
+				SpvVariable* ParameterVar = DebuggerContext->FindVar(Parameters[i]);
+				ParameterVar->Storage = ArgumentVar->Storage;
+				ParameterVar->InitializedRanges = ArgumentVar->InitializedRanges;
+			}
+			if (Scope)
+			{
+				CallStack.Emplace(Scope, State.Line, &Call);
+				CurValidLine.reset();
+			}
 		}
 		else if (std::holds_alternative<SpvDebugState_Tag>(InState))
 		{
 			const auto& State = std::get<SpvDebugState_Tag>(InState);
-			if (State.bFuncCall && Scope)
-			{
-				CallStack.Add(TPair<SpvLexicalScope*, int>(Scope, State.Line));
-				CurValidLine.reset();
-			}
-			else if (State.bReturn && !CallStack.IsEmpty())
+			if (State.bReturn && !CallStack.IsEmpty())
 			{
 				auto Item = CallStack.Pop();
-				CurValidLine = Item.Value;
+				CurValidLine = Item.Line;
 				ReturnValue.Empty();
+			}
+		}
+		//UBSan
+		else if (std::holds_alternative<SpvDebugState_Normalize>(InState))
+		{
+			const auto& State = std::get<SpvDebugState_Normalize>(InState);
+			
+			TArray<uint8> ZeroBuffer;
+			ZeroBuffer.SetNumZeroed(State.X.Num());
+			if (FMemory::Memcmp(State.X.GetData(), ZeroBuffer.GetData(), ZeroBuffer.Num()) == 0)
+			{
+				Error = "Undefined";
+				StopLineNumber = State.Line - ExtraLineNum;
+				SH_LOG(LogShader, Error, TEXT("normalize: normalizing a zero scalar or vector is undefined."));
+			}
+		}
+		else if (std::holds_alternative<SpvDebugState_SmoothStep>(InState))
+		{
+			const auto& State = std::get<SpvDebugState_SmoothStep>(InState);
+			SpvType* ResultType = DebuggerContext->Types[State.ResultType].Get();
+			if (ResultType->GetKind() == SpvTypeKind::Vector)
+			{
+				int ElemCount = static_cast<SpvVectorType*>(ResultType)->ElementCount;
+				for (int i = 0; i < ElemCount; i++)
+				{
+					float e0 = *(float*)(State.Edge0.GetData() + i * 4);
+					float e1 = *(float*)(State.Edge1.GetData() + i * 4);
+					if (e0 >= e1)
+					{
+						Error = "Undefined";
+						StopLineNumber = State.Line - ExtraLineNum;
+						FString UbError = FString::Printf(TEXT("smoothstep: Edge0(%f) >= Edge1(%f) for component %d, the result is undefined."), e0, e1, i);
+						SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+					}
+				}
+			}
+			else
+			{
+				float e0 = *(float*)(State.Edge0.GetData());
+				float e1 = *(float*)(State.Edge1.GetData());
+				if (e0 >= e1)
+				{
+					Error = "Undefined";
+					StopLineNumber = State.Line - ExtraLineNum;
+					FString UbError = FString::Printf(TEXT("smoothstep: Edge0(%f) >= Edge1(%f), the result is undefined."), e0, e1);
+					SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+				}
 			}
 		}
 	}
@@ -567,7 +646,6 @@ namespace SH
 		TArray<FString> ExtraArgs;
 		ExtraArgs.Add("-D");
 		ExtraArgs.Add("ENABLE_PRINT=0");
-		ExtraArgs.Add("/Od");
 
 		FString ErrorInfo, WarnInfo;
 		if (!GGpuRhi->CompileShader(DebugShader, ErrorInfo, WarnInfo, ExtraArgs))
@@ -576,9 +654,6 @@ namespace SH
 			SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo, *ErrorInfo);
 			throw std::runtime_error(TCHAR_TO_UTF8(*FailureInfo));
 		}
-
-		ShaderTU TU{ DebugShader->GetSourceText(), DebugShader->GetIncludeDirs() };
-		Funcs = TU.GetFuncs();
 
 		uint32 BufferSize = 1024 * 1024 * 2;
 		TArray<uint8> Datas;
@@ -655,7 +730,7 @@ namespace SH
 		SetupBinding(InBuilders.PassBuilder);
 		SetupBinding(InBuilders.ShaderBuilder);
 
-		PixelDebuggerContext = SpvPixelDebuggerContext{InState.Coord, Funcs, SpvBindings };
+		PixelDebuggerContext = SpvPixelDebuggerContext{InState.Coord, SpvBindings };
 
 		SpirvParser Parser;
 		Parser.Parse(DebugShader->SpvCode);
@@ -753,7 +828,7 @@ namespace SH
 		CallStack.Empty();
 		DebuggerContext = nullptr;
 		Scope = nullptr;
-		CallStackScope = nullptr;
+		ActiveCallStackScope = nullptr;
 		AssertResult = nullptr;
 		DebuggerError.Empty();
 		DirtyVars.Empty();
@@ -786,28 +861,28 @@ namespace SH
 
 		SDebuggerVariableView* DebuggerLocalVariableView = ShEditor->GetDebuggerLocalVariableView();
 		SDebuggerVariableView* DebuggerGlobalVariableView = ShEditor->GetDebuggerGlobalVariableView();
-		DebuggerLocalVariableView->SetOnShowUninitialized([this](bool bShowUninitialized) { ShowDeuggerVariable(CallStackScope); });
-		DebuggerGlobalVariableView->SetOnShowUninitialized([this](bool bShowUninitialized) { ShowDeuggerVariable(CallStackScope); });
+		DebuggerLocalVariableView->SetOnShowUninitialized([this](bool bShowUninitialized) { ShowDeuggerVariable(ActiveCallStackScope); });
+		DebuggerGlobalVariableView->SetOnShowUninitialized([this](bool bShowUninitialized) { ShowDeuggerVariable(ActiveCallStackScope); });
 
 		DebuggerCallStackView->OnSelectionChanged = [this, DebuggerWatchView](const FString& FuncName) {
 			int32 ExtraLineNum = ShaderEditor->GetShaderAsset()->GetExtraLineNum();
-			if (GetFunctionSig(GetFunctionDesc(Scope), Funcs) == FuncName)
+			if (GetFunctionSig(GetFunctionDesc(Scope)) == FuncName)
 			{
 				StopLineNumber = CurValidLine.value() - ExtraLineNum;
 				ShowDeuggerVariable(Scope);
-				CallStackScope = Scope;
+				ActiveCallStackScope = Scope;
 			}
-			else if (auto Call = CallStack.FindByPredicate([this, FuncName](const TPair<FW::SpvLexicalScope*, int>& InItem) {
-				if (GetFunctionSig(GetFunctionDesc(InItem.Key), Funcs) == FuncName)
+			else if (auto CallPoint = CallStack.FindByPredicate([this, FuncName](const auto& InItem) {
+				if (GetFunctionSig(GetFunctionDesc(InItem.Scope)) == FuncName)
 				{
 					return true;
 				}
 				return false;
 			}))
 			{
-				StopLineNumber = Call->Value - ExtraLineNum;
-				ShowDeuggerVariable(Call->Key);
-				CallStackScope = Call->Key;
+				StopLineNumber = CallPoint->Line - ExtraLineNum;
+				ShowDeuggerVariable(CallPoint->Scope);
+				ActiveCallStackScope = CallPoint->Scope;
 			}
 			DebuggerWatchView->Refresh();
 		};
@@ -839,7 +914,7 @@ namespace SH
 				Offset += DirtyValue.Num();
 
 				SpvVariable* DirtyVar = DebuggerContext->FindVar(VarId);
-				int32 ByteOffset = GetByteOffset(DirtyVar, Indexes);
+				auto [_, ByteOffset] = GetAccess(DirtyVar, Indexes);
 				TArray<uint8> PreDirtyValue = { &DirtyVar->GetBuffer()[ByteOffset], ValueSize};
 
 				auto NewDebugState = SpvDebugState_VarChange{
@@ -882,6 +957,34 @@ namespace SH
 				});
 				break;
 			}
+			case SpvDebuggerStateType::Normalize:
+			{
+				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
+				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
+				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
+				DebugStates.Add(SpvDebugState_Normalize{
+					.Line = Line,
+					.ResultType = ResultType,
+					.X = MoveTemp(X)
+				});
+				break;
+			}
+			case SpvDebuggerStateType::SmoothStep:
+			{
+				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
+				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
+				TArray<uint8> Edge0 = { DebuggerData + Offset, Size }; Offset += Edge0.Num();
+				TArray<uint8> Edge1 = { DebuggerData + Offset, Size }; Offset += Edge1.Num();
+				DebugStates.Add(SpvDebugState_SmoothStep{
+					.Line = Line,
+					.ResultType = ResultType,
+					.Edge0 = MoveTemp(Edge0),
+					.Edge1 = MoveTemp(Edge1)
+				});
+				break;
+			}
 			case SpvDebuggerStateType::Condition:
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset);
@@ -894,11 +997,11 @@ namespace SH
 			}
 			case SpvDebuggerStateType::FuncCall:
 			{
-				int32 Line = *(int32*)(DebuggerData + Offset);
-				Offset += 4;
-				DebugStates.Add(SpvDebugState_Tag{
+				int32 Line = *(int32*)(DebuggerData + Offset);  Offset += 4;
+				SpvId CallId = *(SpvId*)(DebuggerData + Offset); Offset += 4;
+				DebugStates.Add(SpvDebugState_FuncCall{
 					.Line = Line,
-					.bFuncCall = true,
+					.CallId = CallId,
 				});
 				break;
 			}

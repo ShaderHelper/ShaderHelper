@@ -30,12 +30,17 @@ namespace FW
 		VarChange,
 		ScopeChange,
 		ReturnValue,
-
-		Condition,
 		FuncCall,
+
+		//Tag
+		Condition,
 		FuncCallAfterReturn,
 		Return,
 		Kill,
+
+		//UBSan
+		Normalize,
+		SmoothStep,
 	};
 
 	struct SpvDebugState_VarChange
@@ -55,17 +60,37 @@ namespace FW
 		TArray<uint8> Value;
 	};
 
+	struct SpvDebugState_FuncCall
+	{
+		int32 Line{};
+		SpvId CallId;
+	};
+
 	struct SpvDebugState_Tag
 	{
 		int32 Line{};
-		bool bFuncCall : 1 {};
 		bool bFuncCallAfterReturn : 1 {};
 		bool bReturn : 1 {};
 		bool bCondition : 1 {};
 		bool bKill : 1{};
 	};
 
-	using SpvDebugState = std::variant<SpvDebugState_VarChange, SpvDebugState_ScopeChange, SpvDebugState_ReturnValue, SpvDebugState_Tag>;
+	struct SpvDebugState_Normalize
+	{
+		int32 Line{};
+		SpvId ResultType;
+		TArray<uint8> X;
+	};
+	struct SpvDebugState_SmoothStep
+	{
+		int32 Line{};
+		SpvId ResultType;
+		TArray<uint8> Edge0;
+		TArray<uint8> Edge1;
+	};
+
+	using SpvDebugState = std::variant<SpvDebugState_VarChange, SpvDebugState_ScopeChange, SpvDebugState_ReturnValue, SpvDebugState_FuncCall, SpvDebugState_Tag,
+		SpvDebugState_Normalize, SpvDebugState_SmoothStep>;
 
 	struct SpvBinding
 	{
@@ -75,6 +100,18 @@ namespace FW
 		TRefCountPtr<GpuResource> Resource;
 	};
 
+	struct SpvFuncCall
+	{
+		SpvId Callee;
+		TArray<SpvId> Arguments;
+	};
+
+	struct SpvFunc
+	{
+		SpvId ReturnType;
+		TArray<SpvId> Parameters;
+	};
+
 	struct SpvBasicBlock
 	{
 		TArray<int32> ValidLines;
@@ -82,14 +119,11 @@ namespace FW
 
 	struct SpvDebuggerContext : SpvMetaContext
 	{
-		//Can not obtain information from spirv to distinguish whether formal paramaters have special semantics such as out/inout，
-		//Therefore, obtain it from the editor
-		TArray<ShaderFunc> EditorFuncInfo;
-
 		TArray<SpvBinding> Bindings;
 		std::unordered_map<SpvId, SpvPointer> LocalPointers;
 		std::unordered_map<SpvId, SpvVariable> LocalVariables;
-		std::unordered_map<SpvId, SpvVariable*> FuncParameters;
+		std::unordered_map<SpvId, SpvFuncCall> FuncCalls;
+		std::unordered_map<SpvId, SpvFunc> Funcs;
 		std::unordered_map<SpvId, SpvBasicBlock> BBs;
 
 		SpvVariable* FindVar(SpvId Id)
@@ -117,6 +151,18 @@ namespace FW
 			}
 			return nullptr;
 		}
+
+		bool IsParameter(SpvId Id)
+		{
+			for (const auto& [_, Func] : Funcs)
+			{
+				if (Func.Parameters.Contains(Id))
+				{
+					return true;
+				}
+			}
+			return false;
+		}
 	};
 
 	class FRAMEWORK_API SpvDebuggerVisitor : public SpvVisitor
@@ -139,7 +185,6 @@ namespace FW
 		void Visit(const SpvDebugScope* Inst) override;
 		void Visit(const SpvDebugDeclare* Inst) override;
 		void Visit(const SpvDebugValue* Inst) override;
-		void Visit(const SpvDebugFunctionDefinition* Inst) override;
 
 		void Visit(const SpvPow* Inst) override;
 		void Visit(const SpvFClamp* Inst) override;
@@ -177,7 +222,11 @@ namespace FW
 		void PatchToDebugger(SpvId InValueId, SpvId InTypeId, TArray<TUniquePtr<SpvInstruction>>& InstList);
 		void PatchAppendVarFunc(SpvPointer* Pointer, uint32 IndexNum);
 		void PatchAppendValueFunc(SpvType* ValueType);
-		void AppendTag(int32 Offset, SpvDebuggerStateType TagType);
+		void PatchAppendMathFunc(SpvType* ResultType, uint32 OperandNum);
+		void AppendScope(const TFunction<int32()>& OffsetEval);
+		void AppendTag(const TFunction<int32()>& OffsetEval, SpvDebuggerStateType InStateType);
+		void AppendValue(const TFunction<int32()>& OffsetEval, SpvType* ValueType, SpvId Value, SpvDebuggerStateType InStateType);
+		void AppendMath(const TFunction<int32()>& OffsetEval, SpvType* ResultType, const TArray<SpvId>& Operands, SpvDebuggerStateType InStateType);
 
 	protected:
 		SpvDebuggerContext& Context;
@@ -185,8 +234,7 @@ namespace FW
 		SpvLexicalScope* CurScope = nullptr;
 		SpvBasicBlock* CurBlock = nullptr;
 		int32 CurLine{};
-		TArray<SpvVariable*> CurFuncParams;
-		SpvType* CurReturnType;
+		SpvFunc* CurFunc{};
 
 		bool EnableUbsan;
 		
@@ -194,22 +242,14 @@ namespace FW
 		SpvId DebuggerBuffer;
 		SpvId DebuggerOffset;
 		SpvId AppendScopeFuncId, AppendTagFuncId;
-		struct VarFuncSerachKey
-		{
-			SpvType* Type;
-			uint32 IndexNum;
-			bool operator==(const VarFuncSerachKey& Other) const = default;
-			friend uint32 GetTypeHash(const VarFuncSerachKey& Key)
-			{
-				return HashCombine(::GetTypeHash(Key.Type), ::GetTypeHash(Key.IndexNum));
-			}
-		};
-		TMap<VarFuncSerachKey, SpvId> AppendVarFuncIds;
+		SpvId AppendCallFuncId;
+		TMap<TPair<SpvType*, uint32>, SpvId> AppendVarFuncIds;
 		TMap<SpvType*, SpvId> AppendValueFuncIds;
+		TMap<TPair<SpvType*, uint32>, SpvId> AppendMathFuncIds;
 		TMap<const SpvOpFunctionCall*, const SpvOpStore*> AppendVarCallToStore;
 		SpvPatcher Patcher;
 	};
 
-	FRAMEWORK_API int32 GetByteOffset(const SpvVariable* Var, const TArray<uint32>& Indexes);
+	FRAMEWORK_API std::tuple<SpvType*, int32> GetAccess(const SpvVariable* Var, const TArray<uint32>& Indexes);
 
 }

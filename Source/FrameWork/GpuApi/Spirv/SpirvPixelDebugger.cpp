@@ -1,6 +1,5 @@
 #include "CommonHeader.h"
 #include "SpirvPixelDebugger.h"
-#include "GpuApi/GpuRhi.h"
 
 namespace FW
 {

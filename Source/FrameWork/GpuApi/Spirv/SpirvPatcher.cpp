@@ -354,7 +354,7 @@ namespace FW
 		}
 		UpdateSection(TargetSection, InstBin.Num());
 		UpdateInsts(WordOffset, InstBin.Num());
-		if ((int)TargetSection <= (int)SpvSectionKind::Function)
+		if ((int)TargetSection < (int)SpvSectionKind::Function)
 		{
 			InInst->Accept(MetaVisitor.Get());
 		}

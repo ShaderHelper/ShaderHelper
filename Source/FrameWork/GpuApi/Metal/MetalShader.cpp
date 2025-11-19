@@ -207,6 +207,7 @@ namespace FW
 		//to make it consistent with structuredbuffer, so that user side can unify the struct
 		DxcArgs.Add("-fvk-use-dx-layout");
 		//DxcArgs.Add("-Gis");
+		DxcArgs.Add("/Od"); //TODO
 		
 		if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
 		{

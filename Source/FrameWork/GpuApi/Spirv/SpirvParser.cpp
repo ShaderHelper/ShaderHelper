@@ -20,6 +20,10 @@ namespace FW
 		{
 			TArray<uint8> Value;
 			Value.SetNumZeroed(GetTypeByteSize(PointerType->PointeeType));
+			if (StorageClass == SpvStorageClass::Input)
+			{
+				Var.InitializedRanges.Add({ 0, Value.Num() });
+			}
 			Var.Storage = SpvObject::Internal{MoveTemp(Value)};
 		}
 		

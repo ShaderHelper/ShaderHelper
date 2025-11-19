@@ -192,8 +192,8 @@ namespace FW
 		Arguments.Add(*ShaderProfile);
 #if DEBUG_SHADER
 		Arguments.Add(TEXT("/Zi"));
-        Arguments.Add(TEXT("/Od"));
 #endif
+		Arguments.Add(TEXT("/Od")); //TODO
 		Arguments.Add(TEXT("-Zpr"));
         //Arguments.Add(TEXT("-no-warnings"));
 

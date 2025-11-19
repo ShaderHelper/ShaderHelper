@@ -50,7 +50,7 @@ namespace SH
 		static bool EnableUbsan();
 
 	public:
-		void ApplyDebugState(const FW::SpvDebugState& InState);
+		void ApplyDebugState(const FW::SpvDebugState& InState, FString& Error);
 		void ShowDebuggerResult() const;
 		void ShowDeuggerVariable(FW::SpvLexicalScope* InScope) const;
 		struct ExpressionNode EvaluateExpression(const FString& InExpression) const;
@@ -68,10 +68,15 @@ namespace SH
 
 	private:
 		SShaderEditorBox* ShaderEditor;
-		TArray<FW::ShaderFunc> Funcs;
-		TArray<TPair<FW::SpvLexicalScope*, int>> CallStack;
+		struct FuncCallPoint
+		{
+			FW::SpvLexicalScope* Scope{};
+			int Line{};
+			const FW::SpvFuncCall* Call{};
+		};
+		TArray<FuncCallPoint> CallStack;
 		FW::SpvLexicalScope* Scope = nullptr;
-		FW::SpvLexicalScope* CallStackScope = nullptr;
+		FW::SpvLexicalScope* ActiveCallStackScope = nullptr;
 		TMultiMap<FW::SpvId, FW::SpvVarDirtyRange> DirtyVars;
 		int32 StopLineNumber{};
 		TArray<uint8> ReturnValue;

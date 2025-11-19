@@ -5,8 +5,8 @@ namespace FW
 {
 	struct SpvPixelExprDebuggerContext : SpvPixelDebuggerContext
 	{
-		SpvPixelExprDebuggerContext(const SpvDebugState& InStopDebugState, int32 InStopDebugStateIndex, const Vector2u& InCoord, const TArray<ShaderFunc>& InEditorFuncInfo, const TArray<SpvBinding>& InBindings)
-		: SpvPixelDebuggerContext{ InCoord, InEditorFuncInfo, InBindings }
+		SpvPixelExprDebuggerContext(const SpvDebugState& InStopDebugState, int32 InStopDebugStateIndex, const Vector2u& InCoord, const TArray<SpvBinding>& InBindings)
+		: SpvPixelDebuggerContext{ InCoord, InBindings }
 		, StopDebugState(InStopDebugState), StopDebugStateIndex(InStopDebugStateIndex)
 		{}
 
@@ -17,7 +17,7 @@ namespace FW
 	class FRAMEWORK_API SpvPixelExprDebuggerVisitor : public SpvPixelDebuggerVisitor
 	{
 	public:
-		SpvPixelExprDebuggerVisitor(SpvPixelExprDebuggerContext& InContext) : SpvPixelDebuggerVisitor(InContext, false) {}
+		SpvPixelExprDebuggerVisitor(SpvPixelExprDebuggerContext& InContext, bool InEnableUbsan) : SpvPixelDebuggerVisitor(InContext, InEnableUbsan) {}
 		void Visit(const SpvDebugDeclare* Inst);
 
 	protected:
@@ -26,6 +26,7 @@ namespace FW
 		void PatchBaseTypeAppendExprFunc();
 		void PatchAppendExprFunc(const SpvType* Type, const SpvTypeDesc* TypeDesc);
 		void PatchAppendExprDummyFunc();
+		void AppendExprDummy(const TFunction<int32()>& OffsetEval);
 
 	private:
 		TMap<const SpvType*, SpvId> AppendExprFuncIds;
