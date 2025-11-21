@@ -214,6 +214,13 @@ constexpr int PaddingLineNum = 22;
 		return ShowColorBlock;
 	}
 
+	bool SShaderEditorBox::CanRealTimeDiagnosis()
+	{
+		bool RealTimeDiagnosis = true;
+		Editor::GetEditorConfig()->GetBool(TEXT("CodeEditor"), TEXT("RealTimeDiagnosis"), RealTimeDiagnosis);
+		return RealTimeDiagnosis;
+	}
+
 	FSlateFontInfo& SShaderEditorBox::GetCodeFontInfo()
 	{
 		static FSlateFontInfo CodeFontInfo;
@@ -1505,6 +1512,13 @@ constexpr int PaddingLineNum = 22;
         }
     }
 
+	void SShaderEditorBox::ClearDiagInfoEffect()
+	{
+		EffectMarshller->LineNumberToDiagInfo.Reset();
+		EffectMarshller->MakeDirty();
+		EffectMultiLineEditableText->Refresh();
+	}
+
     FReply SShaderEditorBox::OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
     {
         return ShaderMultiLineEditableText->OnMouseWheel(ShaderMultiLineEditableText->GetTickSpaceGeometry(), MouseEvent);
@@ -1893,6 +1907,11 @@ constexpr int PaddingLineNum = 22;
 
     void SShaderEditorBox::RefreshLineNumberToDiagInfo()
     {
+		if (!CanRealTimeDiagnosis())
+		{
+			return;
+		}
+
         EffectMarshller->LineNumberToDiagInfo.Reset();
         for (const ShaderDiagnosticInfo& DiagInfo : DiagnosticInfos)
         {
@@ -1934,12 +1953,8 @@ constexpr int PaddingLineNum = 22;
             }
         }
         
-        if(EffectMultiLineEditableText && EffectMarshller)
-        {
-            EffectMarshller->MakeDirty();
-            EffectMultiLineEditableText->Refresh();
-        }
-
+		EffectMarshller->MakeDirty();
+		EffectMultiLineEditableText->Refresh();
     }
 
     void SShaderEditorBox::Compile()

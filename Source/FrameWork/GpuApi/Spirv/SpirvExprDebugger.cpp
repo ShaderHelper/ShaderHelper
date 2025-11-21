@@ -93,6 +93,16 @@ namespace FW
 					}
 				}
 				//Stopped due to UBSan.
+				else if (std::holds_alternative<SpvDebugState_Access>(ExprContext.StopDebugState) && AppendAccessFuncIds.FindKey(FuncCall->GetFunction()))
+				{
+					const auto& State = std::get<SpvDebugState_Access>(ExprContext.StopDebugState);
+					int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[FuncCall->GetArguments()[1]].Storage).Value.GetData();
+					if (State.Line == Line)
+					{
+						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
+						break;
+					}
+				}
 				else if (std::holds_alternative<SpvDebugState_Normalize>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
 				{
 					const auto& State = std::get<SpvDebugState_Normalize>(ExprContext.StopDebugState);

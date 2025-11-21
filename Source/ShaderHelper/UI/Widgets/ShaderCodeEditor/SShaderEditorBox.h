@@ -183,6 +183,7 @@ namespace SH
 		static int32 GetTabSize();
 		static bool CanMouseWheelZoom();
 		static bool CanShowColorBlock();
+		static bool CanRealTimeDiagnosis();
 		static FSlateFontInfo& GetCodeFontInfo();
 		static constexpr int32 MinFontSize = 4;
 		void RefreshFont();
@@ -245,6 +246,7 @@ namespace SH
 		void ToggleComment();
         
         void UpdateLineNumberData();
+		void ClearDiagInfoEffect();
         void RefreshLineNumberToDiagInfo();
         void RefreshCodeCompletionTip();
 		void RefreshSyntaxHighlight();

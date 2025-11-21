@@ -162,6 +162,7 @@ namespace FW
 		Member,
 		Function,
 		Array,
+		Template,
 	};
 
 	class SpvTypeDesc
@@ -276,6 +277,12 @@ namespace FW
 		TArray<SpvTypeDesc*> ParmTypes;
 	};
 
+	class SpvTemplateTypeDesc : public SpvTypeDesc
+	{
+	public:
+		SpvTemplateTypeDesc() : SpvTypeDesc(SpvTypeDescKind::Template) {}
+	};
+
 	class SpvArrayTypeDesc : public SpvTypeDesc
 	{
 	public:
@@ -375,6 +382,8 @@ namespace FW
 		FString GetName() const { return Name; }
 		SpvFuncTypeDesc* GetFuncTypeDesc() const { return TypeDesc; }
 		
+		SpvFunctionType* DefinitionType{};
+
 	private:
 		FString Name;
 		SpvFuncTypeDesc* TypeDesc;
@@ -437,7 +446,7 @@ namespace FW
 			FString TypeName = BasicTypeName + FString::Printf(TEXT("%dx%d"), VectorCount, MatrixTypeDesc->GetVectorTypeDesc()->GetCompCount());
 			return TypeName;
 		}
-		AUX::Unreachable();
+		return {};
 	};
 
 	inline FString GetFunctionSig(SpvFunctionDesc* FuncDesc)
@@ -458,16 +467,27 @@ namespace FW
 		Signature += " ";
 		Signature += FuncName;
 		Signature += "(";
-		auto ParmTypes = FuncTypeDesc->GetParmTypes();
-		for(int i = 0; i < ParmTypes.Num(); i++)
+		auto ParamTypeDescs = FuncTypeDesc->GetParmTypes();
+		auto ParamTypes = FuncDesc->DefinitionType->ParameterTypes;
+		for(int i = 0; i < ParamTypeDescs.Num(); i++)
 		{	
-			if(i == ParmTypes.Num() - 1)
+			SpvType* ParamType = ParamTypes[i];
+			if (ParamType->GetKind() == SpvTypeKind::Pointer)
 			{
-				Signature += GetTypeDescStr(ParmTypes[i]);
+				ParamType = static_cast<SpvPointerType*>(ParamType)->PointeeType;
+			}
+
+			if (ParamType->GetKind() == SpvTypeKind::Sampler || ParamType->GetKind() == SpvTypeKind::Image)
+			{
+				Signature += GetHlslTypeStr(ParamType);
 			}
 			else
 			{
-				Signature += GetTypeDescStr(ParmTypes[i]);
+				Signature += GetTypeDescStr(ParamTypeDescs[i]);
+			}
+
+			if (i != ParamTypeDescs.Num() - 1)
+			{
 				Signature += ", ";
 			}
 		}
@@ -645,10 +665,6 @@ namespace FW
 				}
 			}
 			ValueStr += "]";
-		}
-		else
-		{
-			AUX::Unreachable();
 		}
 		return ValueStr;
 	}

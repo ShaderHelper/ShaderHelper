@@ -373,6 +373,22 @@ namespace SH
 			})
 		];
 
+		AppendCodeEditorItem(CodeEditorGrid, LOCALIZATION("RealTimeDiagnosis"))
+		[
+			SNew(SCheckBox).IsChecked_Lambda([] {
+				return SShaderEditorBox::CanRealTimeDiagnosis() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;;
+			})
+			.OnCheckStateChanged_Lambda([](ECheckBoxState InState) {
+				Editor::GetEditorConfig()->SetBool(TEXT("CodeEditor"), TEXT("RealTimeDiagnosis"), InState == ECheckBoxState::Checked);
+				Editor::SaveEditorConfig();
+				auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+				for (auto ShaderEditor : ShEditor->GetShaderEditors())
+				{
+					ShaderEditor->ClearDiagInfoEffect();
+				}
+			})
+		];
+
 		auto FontPathEditBox = SNew(SEditableTextBox).Text_Lambda([] {
 				return FText::FromString(SShaderEditorBox::GetFontPath());
 			})

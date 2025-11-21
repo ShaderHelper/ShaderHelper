@@ -119,7 +119,7 @@ namespace FW
 	{
 		SpvId ResultId = Inst->GetId().value();
 		SpvType* SampledType = Context.Types[Inst->GetSampledType()].Get();
-		Context.Types.emplace(ResultId, MakeUnique<SpvImageType>(ResultId, SampledType, Inst->GetDim()));
+		Context.Types.emplace(ResultId, MakeUnique<SpvImageType>(ResultId, SampledType, Inst->GetDim(), Inst->GetSamlped()));
 	}
 
 	void SpvMetaVisitor::Visit(const SpvOpTypeSampler* Inst)
@@ -338,17 +338,14 @@ namespace FW
 			}
 		}
 		
+		int32 Size = 0;
 		//The size may be unknown(DebugInfoNone)
 		if(Context.Constants.contains(Inst->GetSize()))
 		{
-			int32 Size = *(int32*)std::get<SpvObject::Internal>(Context.Constants.at(Inst->GetSize()).Storage).Value.GetData();
-			auto CompositeTypeDesc = MakeUnique<SpvCompositeTypeDesc>(Context.DebugStrs[Inst->GetName()],
-																	  Size,
-																	  MemberTypeDescs);
-			Context.TypeDescs.emplace(Inst->GetId().value(), MoveTemp(CompositeTypeDesc));
+			Size = *(int32*)std::get<SpvObject::Internal>(Context.Constants.at(Inst->GetSize()).Storage).Value.GetData();
 		}
-		
-		
+		auto CompositeTypeDesc = MakeUnique<SpvCompositeTypeDesc>(Context.DebugStrs[Inst->GetName()],Size,MemberTypeDescs);
+		Context.TypeDescs.emplace(Inst->GetId().value(), MoveTemp(CompositeTypeDesc));
 	}
 
 	void SpvMetaVisitor::Visit(const SpvDebugTypeMember* Inst)
@@ -371,6 +368,11 @@ namespace FW
 		}
 		auto ArrayTypeDesc = MakeUnique<SpvArrayTypeDesc>(BaseTypeDesc, CompCounts);
 		Context.TypeDescs.emplace(Inst->GetId().value(), MoveTemp(ArrayTypeDesc));
+	}
+
+	void SpvMetaVisitor::Visit(const SpvDebugTypeTemplate* Inst)
+	{
+		Context.TypeDescs.emplace(Inst->GetId().value(), MakeUnique<SpvTemplateTypeDesc>());
 	}
 
 	void SpvMetaVisitor::Visit(const SpvDebugTypeFunction* Inst)
@@ -1550,6 +1552,13 @@ namespace FW
 							Inlined = SpvCode[WordOffset + 6];
 						}
 						DecodedInst = MakeUnique<SpvDebugScope>(Scope, Inlined);
+						DecodedInst->SetId(ResultId);
+					}
+					else if(ExtOp == SpvDebugInfo100::DebugTypeTemplate)
+					{
+						SpvId Target = SpvCode[WordOffset + 5];
+						TArray<SpvId> Parameters = { (SpvId*)&SpvCode[WordOffset + 6], InstWordLen - 6 };
+						DecodedInst = MakeUnique<SpvDebugTypeTemplate>(Target, Parameters);
 						DecodedInst->SetId(ResultId);
 					}
 					else if(ExtOp == SpvDebugInfo100::DebugGlobalVariable)

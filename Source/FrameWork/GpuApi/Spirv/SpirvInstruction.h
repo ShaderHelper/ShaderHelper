@@ -130,6 +130,7 @@ namespace FW
 		virtual void Visit(const class SpvDebugTypeComposite* Inst) {}
 		virtual void Visit(const class SpvDebugTypeMember* Inst) {}
 		virtual void Visit(const class SpvDebugTypeArray* Inst) {}
+		virtual void Visit(const class SpvDebugTypeTemplate* Inst) {}
 		virtual void Visit(const class SpvDebugTypeFunction* Inst) {}
 		virtual void Visit(const class SpvDebugCompilationUnit* Inst) {}
 		virtual void Visit(const class SpvDebugLexicalBlock* Inst) {}
@@ -2386,6 +2387,21 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 	private:
 		SpvId Function;
 		SpvId Definition;
+	};
+
+	class SpvDebugTypeTemplate : public SpvInstructionBase<SpvDebugTypeTemplate>
+	{
+	public:
+		SpvDebugTypeTemplate(SpvId InTarget, const TArray<SpvId>& InParameters) : SpvInstructionBase(SpvDebugInfo100::DebugTypeTemplate)
+		, Target(InTarget), Parameters(InParameters)
+		{}
+
+		SpvId GetTarget() const { return Target; }
+		const TArray<SpvId>& GetParameters() const { return Parameters; }
+
+	private:
+		SpvId Target;
+		TArray<SpvId> Parameters;
 	};
 
 	class SpvDebugGlobalVariable : public SpvInstructionBase<SpvDebugGlobalVariable>

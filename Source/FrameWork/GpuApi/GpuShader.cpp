@@ -28,7 +28,7 @@ namespace HLSL
         "SV_InsideTessFactor", "SV_IsFrontFace", "SV_OutputControlPointID", "SV_POSITION", "SV_Position", "SV_RenderTargetArrayIndex",
         "SV_SampleIndex", "SV_TessFactor", "SV_ViewportArrayIndex", "SV_InstanceID", "SV_PrimitiveID", "SV_VertexID", "SV_TargetID",
         "SV_TARGET", "SV_Target", "SV_Target0", "SV_Target1", "SV_Target2", "SV_Target3", "SV_Target4", "SV_Target5", "SV_Target6", "SV_Target7",
-		"template", "typename", "sizeof", "numthreads",
+		"template", "typename", "sizeof", "numthreads", "_Static_assert",
     };
 
     TArray<FString> BuiltinTypes = {

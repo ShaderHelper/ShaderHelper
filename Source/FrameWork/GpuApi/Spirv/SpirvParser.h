@@ -82,6 +82,7 @@ namespace FW
 		void Visit(const SpvDebugTypeComposite* Inst) override;
 		void Visit(const SpvDebugTypeMember* Inst) override;
 		void Visit(const SpvDebugTypeArray* Inst) override;
+		void Visit(const SpvDebugTypeTemplate* Inst) override;
 		void Visit(const SpvDebugTypeFunction* Inst) override;
 		void Visit(const SpvDebugCompilationUnit* Inst) override;
 		void Visit(const SpvDebugLexicalBlock* Inst) override;

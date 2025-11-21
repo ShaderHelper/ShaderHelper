@@ -266,7 +266,7 @@ namespace SH
 					GGpuRhi->UnMapGpuBuffer(DebugBuffer);
 
 					SpvTypeDesc* ResultTypeDesc = ExprContext.TypeDescs[TypeDescId].Get();
-					if (ResultTypeDesc)
+					if (ResultTypeDesc && !ResultValue.IsEmpty())
 					{
 						 FText TypeName = FText::FromString(GetTypeDescStr(ResultTypeDesc));
 
@@ -362,6 +362,10 @@ namespace SH
 						}
 						FString TypeName = GetTypeDescStr(VarDesc->TypeDesc);
 						const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var->Storage).Value;
+						if (Value.IsEmpty())
+						{
+							continue;
+						}
 
 						TArray<Vector2i> InitializedRanges = { {0, Value.Num()} };
 						if (SDebuggerVariableView::bShowUninitialized)
@@ -589,6 +593,24 @@ namespace SH
 			}
 		}
 		//UBSan
+		else if (std::holds_alternative<SpvDebugState_Access>(InState))
+		{
+			const auto& State = std::get<SpvDebugState_Access>(InState);
+			SpvVariable* Var = DebuggerContext->FindVar(State.VarId);
+			if (Var->GetBufferSize() > 0)
+			{
+				auto Range = Var->GetInitializedRange();
+				auto [Type, ByteOffset] = GetAccess(Var, State.Indexes);
+				int32 Size = GetTypeByteSize(Type);
+				if (ByteOffset < Range.X || ByteOffset + Size > Range.Y)
+				{
+					Error = "Undefined";
+					StopLineNumber = State.Line - ExtraLineNum;
+					SH_LOG(LogShader, Error, TEXT("Reading the unintialized memory of the variable: %s!"), *DebuggerContext->Names[Var->Id]);
+				}
+			}
+
+		}
 		else if (std::holds_alternative<SpvDebugState_Normalize>(InState))
 		{
 			const auto& State = std::get<SpvDebugState_Normalize>(InState);
@@ -617,15 +639,13 @@ namespace SH
 					{
 						Error = "Undefined";
 						StopLineNumber = State.Line - ExtraLineNum;
-						FString UbError = FString::Printf(TEXT("pow: x(%f) < 0 for component %d, the result is undefined."), X, i);
-						SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+						SH_LOG(LogShader, Error, TEXT("pow: x(%f) < 0 for component %d, the result is undefined."), X, i);
 					}
 					else if (X == 0.0f && Y <= 0.0f)
 					{
 						Error = "Undefined";
 						StopLineNumber = State.Line - ExtraLineNum;
-						FString UbError = FString::Printf(TEXT("pow: x(%f) == 0 and y(%f) <= 0 for component %d, the result is undefined."), X, Y, i);
-						SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+						SH_LOG(LogShader, Error, TEXT("pow: x(%f) == 0 and y(%f) <= 0 for component %d, the result is undefined."), X, Y, i);
 					}
 				}
 			}
@@ -637,15 +657,13 @@ namespace SH
 				{
 					Error = "Undefined";
 					StopLineNumber = State.Line - ExtraLineNum;
-					FString UbError = FString::Printf(TEXT("pow: x(%f) < 0, the result is undefined."), X);
-					SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+					SH_LOG(LogShader, Error, TEXT("pow: x(%f) < 0, the result is undefined."), X);
 				}
 				else if (X == 0.0f && Y <= 0.0f)
 				{
 					Error = "Undefined";
 					StopLineNumber = State.Line - ExtraLineNum;
-					FString UbError = FString::Printf(TEXT("pow: x(%f) == 0 and y(%f) <= 0, the result is undefined."), X, Y);
-					SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+					SH_LOG(LogShader, Error, TEXT("pow: x(%f) == 0 and y(%f) <= 0, the result is undefined."), X, Y);
 				}
 			}
 		}
@@ -666,8 +684,7 @@ namespace SH
 						{
 							Error = "Undefined";
 							StopLineNumber = State.Line - ExtraLineNum;
-							FString UbError = FString::Printf(TEXT("clamp: minVal(%f) > maxVal(%f) for component %d, the result is undefined."), MinVal, MaxVal, i);
-							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+							SH_LOG(LogShader, Error, TEXT("clamp: minVal(%f) > maxVal(%f) for component %d, the result is undefined."), MinVal, MaxVal, i);
 						}
 					}
 					else if (ResultType->GetKind() == SpvTypeKind::Integer)
@@ -680,8 +697,7 @@ namespace SH
 							{
 								Error = "Undefined";
 								StopLineNumber = State.Line - ExtraLineNum;
-								FString UbError = FString::Printf(TEXT("clamp: minVal(%d) > maxVal(%d) for component %d, the result is undefined."), MinVal, MaxVal, i);
-								SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+								SH_LOG(LogShader, Error, TEXT("clamp: minVal(%d) > maxVal(%d) for component %d, the result is undefined."), MinVal, MaxVal, i);
 							}
 						}
 						else
@@ -692,8 +708,7 @@ namespace SH
 							{
 								Error = "Undefined";
 								StopLineNumber = State.Line - ExtraLineNum;
-								FString UbError = FString::Printf(TEXT("clamp: minVal(%d) > maxVal(%d) for component %d, the result is undefined."), MinVal, MaxVal, i);
-								SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+								SH_LOG(LogShader, Error, TEXT("clamp: minVal(%d) > maxVal(%d) for component %d, the result is undefined."), MinVal, MaxVal, i);
 							}
 						}
 					}
@@ -709,8 +724,7 @@ namespace SH
 					{
 						Error = "Undefined";
 						StopLineNumber = State.Line - ExtraLineNum;
-						FString UbError = FString::Printf(TEXT("clamp: minVal(%f) > maxVal(%f), the result is undefined."), MinVal, MaxVal);
-						SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+						SH_LOG(LogShader, Error, TEXT("clamp: minVal(%f) > maxVal(%f), the result is undefined."), MinVal, MaxVal);
 					}
 				}
 				else if (ResultType->GetKind() == SpvTypeKind::Integer)
@@ -723,8 +737,7 @@ namespace SH
 						{
 							Error = "Undefined";
 							StopLineNumber = State.Line - ExtraLineNum;
-							FString UbError = FString::Printf(TEXT("clamp: minVal(%d) > maxVal(%d), the result is undefined."), MinVal, MaxVal);
-							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+							SH_LOG(LogShader, Error, TEXT("clamp: minVal(%d) > maxVal(%d), the result is undefined."), MinVal, MaxVal);
 						}
 					}
 					else
@@ -735,8 +748,7 @@ namespace SH
 						{
 							Error = "Undefined";
 							StopLineNumber = State.Line - ExtraLineNum;
-							FString UbError = FString::Printf(TEXT("clamp: minVal(%d) > maxVal(%d), the result is undefined."), MinVal, MaxVal);
-							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+							SH_LOG(LogShader, Error, TEXT("clamp: minVal(%d) > maxVal(%d), the result is undefined."), MinVal, MaxVal);
 						}
 					}
 				}
@@ -757,8 +769,7 @@ namespace SH
 					{
 						Error = "Undefined";
 						StopLineNumber = State.Line - ExtraLineNum;
-						FString UbError = FString::Printf(TEXT("smoothstep: Edge0(%f) >= Edge1(%f) for component %d, the result is undefined."), e0, e1, i);
-						SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+						SH_LOG(LogShader, Error, TEXT("smoothstep: Edge0(%f) >= Edge1(%f) for component %d, the result is undefined."), e0, e1, i);
 					}
 				}
 			}
@@ -770,8 +781,7 @@ namespace SH
 				{
 					Error = "Undefined";
 					StopLineNumber = State.Line - ExtraLineNum;
-					FString UbError = FString::Printf(TEXT("smoothstep: Edge0(%f) >= Edge1(%f), the result is undefined."), e0, e1);
-					SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+					SH_LOG(LogShader, Error, TEXT("smoothstep: Edge0(%f) >= Edge1(%f), the result is undefined."), e0, e1);
 				}
 			}
 		}
@@ -791,8 +801,7 @@ namespace SH
 						{
 							Error = "Undefined";
 							StopLineNumber = State.Line - ExtraLineNum;
-							FString UbError = FString::Printf(TEXT("Integer division by zero is undefined for component %d."), i);
-							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+							SH_LOG(LogShader, Error, TEXT("Integer division by zero is undefined for component %d."), i);
 						}
 					}
 					else
@@ -802,8 +811,7 @@ namespace SH
 						{
 							Error = "Undefined";
 							StopLineNumber = State.Line - ExtraLineNum;
-							FString UbError = FString::Printf(TEXT("Integer division by zero is undefined for component %d."), i);
-							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+							SH_LOG(LogShader, Error, TEXT("Integer division by zero is undefined for component %d."), i);
 						}
 					}
 				}
@@ -816,8 +824,7 @@ namespace SH
 				{
 					Error = "Undefined";
 					StopLineNumber = State.Line - ExtraLineNum;
-					FString UbError = FString::Printf(TEXT("Integer division by zero is undefined."));
-					SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+					SH_LOG(LogShader, Error, TEXT("Integer division by zero is undefined."));
 				}
 			}
 		}
@@ -837,8 +844,7 @@ namespace SH
 						{
 							Error = "Undefined";
 							StopLineNumber = State.Line - ExtraLineNum;
-							FString UbError = FString::Printf(TEXT("Conversion(float to int) is undefined for component %d: It's not wide enough to hold the converted value(%f)."), i, f);
-							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+							SH_LOG(LogShader, Error, TEXT("Conversion(float to int) is undefined for component %d: It's not wide enough to hold the converted value(%f)."), i, f);
 						}
 					}
 					else
@@ -847,8 +853,7 @@ namespace SH
 						{
 							Error = "Undefined";
 							StopLineNumber = State.Line - ExtraLineNum;
-							FString UbError = FString::Printf(TEXT("Conversion(float to uint) is undefined for component %d: It's not wide enough to hold the converted value(%f)."), i, f);
-							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+							SH_LOG(LogShader, Error, TEXT("Conversion(float to uint) is undefined for component %d: It's not wide enough to hold the converted value(%f)."), i, f);
 						}
 					}
 				}
@@ -862,8 +867,7 @@ namespace SH
 					{
 						Error = "Undefined";
 						StopLineNumber = State.Line - ExtraLineNum;
-						FString UbError = FString::Printf(TEXT("Conversion(float to int) is undefined: It's not wide enough to hold the converted value(%f)."), f);
-						SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+						SH_LOG(LogShader, Error, TEXT("Conversion(float to int) is undefined: It's not wide enough to hold the converted value(%f)."), f);
 					}
 				}
 				else
@@ -872,8 +876,7 @@ namespace SH
 					{
 						Error = "Undefined";
 						StopLineNumber = State.Line - ExtraLineNum;
-						FString UbError = FString::Printf(TEXT("Conversion(float to uint) is undefined: It's not wide enough to hold the converted value(%f)."), f);
-						SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+						SH_LOG(LogShader, Error, TEXT("Conversion(float to uint) is undefined: It's not wide enough to hold the converted value(%f)."), f);
 					}
 				}
 				
@@ -895,8 +898,7 @@ namespace SH
 						{
 							Error = "Undefined";
 							StopLineNumber = State.Line - ExtraLineNum;
-							FString UbError = FString::Printf(TEXT("float remainder by zero is undefined for component %d."), i);
-							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+							SH_LOG(LogShader, Error, TEXT("float remainder by zero is undefined for component %d."), i);
 						}
 					}
 					else if (static_cast<SpvIntegerType*>(ResultType)->IsSigend())
@@ -907,15 +909,13 @@ namespace SH
 						{
 							Error = "Undefined";
 							StopLineNumber = State.Line - ExtraLineNum;
-							FString UbError = FString::Printf(TEXT("int remainder by zero is undefined for component %d."), i);
-							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+							SH_LOG(LogShader, Error, TEXT("int remainder by zero is undefined for component %d."), i);
 						}
 						else if (Operand2 == -1 && Operand1 == std::numeric_limits<int32>::min())
 						{
 							Error = "Undefined";
 							StopLineNumber = State.Line - ExtraLineNum;
-							FString UbError = FString::Printf(TEXT("The remainder causing signed overflow is undefined for component %d."), i);
-							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+							SH_LOG(LogShader, Error, TEXT("The remainder causing signed overflow is undefined for component %d."), i);
 						}
 					}
 					else
@@ -925,8 +925,7 @@ namespace SH
 						{
 							Error = "Undefined";
 							StopLineNumber = State.Line - ExtraLineNum;
-							FString UbError = FString::Printf(TEXT("uint remainder by zero is undefined for component %d."), i);
-							SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+							SH_LOG(LogShader, Error, TEXT("uint remainder by zero is undefined for component %d."), i);
 						}
 					}
 				}
@@ -940,8 +939,7 @@ namespace SH
 					{
 						Error = "Undefined";
 						StopLineNumber = State.Line - ExtraLineNum;
-						FString UbError = FString::Printf(TEXT("float remainder by zero is undefined."));
-						SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+						SH_LOG(LogShader, Error, TEXT("float remainder by zero is undefined."));
 					}
 				}
 				else if (static_cast<SpvIntegerType*>(ResultType)->IsSigend())
@@ -952,15 +950,13 @@ namespace SH
 					{
 						Error = "Undefined";
 						StopLineNumber = State.Line - ExtraLineNum;
-						FString UbError = FString::Printf(TEXT("int remainder by zero is undefined."));
-						SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+						SH_LOG(LogShader, Error, TEXT("int remainder by zero is undefined."));
 					}
 					else if (Operand2 == -1 && Operand1 == std::numeric_limits<int32>::min())
 					{
 						Error = "Undefined";
 						StopLineNumber = State.Line - ExtraLineNum;
-						FString UbError = FString::Printf(TEXT("The remainder causing signed overflow is undefined."));
-						SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+						SH_LOG(LogShader, Error, TEXT("The remainder causing signed overflow is undefined."));
 					}
 				}
 				else
@@ -970,8 +966,7 @@ namespace SH
 					{
 						Error = "Undefined";
 						StopLineNumber = State.Line - ExtraLineNum;
-						FString UbError = FString::Printf(TEXT("uint remainder by zero is undefined."));
-						SH_LOG(LogShader, Error, TEXT("%s"), *UbError);
+						SH_LOG(LogShader, Error, TEXT("uint remainder by zero is undefined."));
 					}
 				}
 			}
@@ -1297,6 +1292,19 @@ namespace SH
 				DebugStates.Add(SpvDebugState_ReturnValue{
 					.Line = Line,
 					.Value = MoveTemp(ReturnValue)
+				});
+				break;
+			}
+			case SpvDebuggerStateType::Access:
+			{
+				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId VarId = *(SpvId*)(DebuggerData + Offset); Offset += 4;
+				int32 IndexNum = *(int32*)(DebuggerData + Offset); Offset += 4;
+				TArray<uint32> Indexes = { (uint32*)(DebuggerData + Offset), IndexNum }; Offset += IndexNum * 4;
+				DebugStates.Add(SpvDebugState_Access{
+					.Line = Line,
+					.VarId = VarId,
+					.Indexes = MoveTemp(Indexes)
 				});
 				break;
 			}

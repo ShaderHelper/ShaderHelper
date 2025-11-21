@@ -263,12 +263,13 @@ namespace FW
 	class SpvImageType : public SpvType
 	{
 	public:
-		SpvImageType(SpvId InId, SpvType* InSampledType, SpvDim InDim) : SpvType(SpvTypeKind::Image, InId)
-		, SampledType(InSampledType), Dim(InDim)
+		SpvImageType(SpvId InId, SpvType* InSampledType, SpvDim InDim, uint32 InSampled) : SpvType(SpvTypeKind::Image, InId)
+		, SampledType(InSampledType), Dim(InDim), Sampled(InSampled)
 		{}
 		
 		SpvType* SampledType;
 		SpvDim Dim;
+		uint32 Sampled;
 	};
 
 	class SpvSamplerType : public SpvType
@@ -405,6 +406,22 @@ namespace FW
 			FString BasicTypeStr = GetHlslTypeStr(ElementType->ElementType);
 			return BasicTypeStr + FString::Printf(TEXT("%dx%d"), MatrixType->ElementCount, ElementType->ElementCount);
 		}
+		else if (Type->GetKind() == SpvTypeKind::Image)
+		{
+			SpvImageType* ImageType = static_cast<SpvImageType*>(Type);
+			if (ImageType->Sampled == 2)
+			{
+				return "RWTexture2D";
+			}
+			else
+			{
+				return "Texture2D";
+			}
+		}
+		else if (Type->GetKind() == SpvTypeKind::Sampler)
+		{
+			return "SamplerState";
+		}
 		AUX::Unreachable();
 	};
 
@@ -442,7 +459,7 @@ namespace FW
 			const SpvMatrixType* MatrixType = static_cast<const SpvMatrixType*>(Type);
 			return MatrixType->ElementCount * GetTypeByteSize(MatrixType->ElementType);
 		}
-		AUX::Unreachable();
+		return 0;
 	}
 
 	struct SpvObject
