@@ -785,6 +785,18 @@ namespace FW
 				DecodedInst->SetId(ResultId);
 				break;
 			}
+			case SpvOp::AtomicIAdd:
+			{
+				SpvId ResultType = SpvCode[WordOffset + 1];
+				SpvId ResultId = SpvCode[WordOffset + 2];
+				SpvId Pointer = SpvCode[WordOffset + 3];
+				SpvId Memory = SpvCode[WordOffset + 4];
+				SpvId Semantics = SpvCode[WordOffset + 5];
+				SpvId Value = SpvCode[WordOffset + 6];
+				DecodedInst = MakeUnique<SpvOpAtomicIAdd>(ResultType, Pointer, Memory, Semantics, Value);
+				DecodedInst->SetId(ResultId);
+				break;
+			}
 			case SpvOp::Phi:
 			{
 				SpvId ResultType = SpvCode[WordOffset + 1];

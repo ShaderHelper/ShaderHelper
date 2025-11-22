@@ -63,10 +63,11 @@ namespace SH
         TArray<TSharedRef<FW::PropertyData>>* GetPropertyDatas() override;
     
 		//ShDebuggableObject
+		InvocationState GetInvocationState() override;
 		TRefCountPtr<FW::GpuTexture> OnStartDebugging() override;
 		void OnFinalizePixel(const FW::Vector2u& PixelCoord) override;
 		void OnEndDebuggging() override;
-		ShaderAsset* GetShaderAsset() const;
+		ShaderAsset* GetShaderAsset() const override;
 
 		std::string GetShaderToyCode() const;
 		

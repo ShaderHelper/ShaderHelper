@@ -78,6 +78,30 @@ namespace FW
 		StorageBuffer = 12,
 	};
 
+	enum class SpvMemoryScope
+	{
+		CrossDevice = 0,
+		Device = 1,
+		Workgroup = 2,
+		Subgroup = 3,
+		Invocation = 4,
+	};
+
+	enum class SpvMemorySemantics
+	{
+		None = 0,
+		Acquire = 0x0002,
+		Release = 0x0004,
+		AcquireRelease = 0x0008,
+		SequentiallyConsistent = 0x0010,
+		UniformMemory = 0x0040,
+		SubgroupMemory = 0x0080,
+		WorkgroupMemory = 0x0100,
+		CrossWorkgroupMemory = 0x0200,
+		AtomicCounterMemory = 0x0400,
+		ImageMemory = 0x0800,
+	};
+
 	enum class SpvDecorationKind
 	{
 		Block = 2,
@@ -656,6 +680,7 @@ namespace FW
 		DPdx = 207,
 		DPdy = 208,
 		Fwidth = 209,
+		AtomicIAdd = 234,
 		Phi = 245,
 		SelectionMerge = 247,
 		Label = 248,

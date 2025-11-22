@@ -332,7 +332,7 @@ namespace SH
 		MainWindow->SetRequestDestroyWindowOverride(FRequestDestroyWindowOverride::CreateLambda([this](const TSharedRef<SWindow>& InWindow) {
 			if(CurProject->AnyPendingAsset())
 			{
-				auto Ret = MessageDialog::Open(MessageDialog::OkNoCancel, MainWindow, LOCALIZATION("SaveAssetsTip"));
+				auto Ret = MessageDialog::Open(MessageDialog::OkNoCancel, MessageDialog::Shocked, MainWindow, LOCALIZATION("SaveAssetsTip"));
 				if(Ret == MessageDialog::MessageRet::Cancel)
 				{
 					return;
@@ -497,7 +497,7 @@ namespace SH
 					ShaderAsset* Shader = CurDebuggableObject->GetShaderAsset();
 					if(CurProject->OpenedShaders[Shader]->GetLayoutIdentifier() == TabId)
 					{
-						auto Ret = MessageDialog::Open(MessageDialog::OkCancel, MainWindow, LOCALIZATION("TerminateDebuggerTip"));
+						auto Ret = MessageDialog::Open(MessageDialog::OkCancel, MessageDialog::Shocked, MainWindow, LOCALIZATION("TerminateDebuggerTip"));
 						if(Ret == MessageDialog::MessageRet::Ok)
 						{
 							EndDebugging();
@@ -764,7 +764,7 @@ namespace SH
 		if(CurProject->Graph && CurProject->Graph->IsDirty() &&
 			InGraphData != nullptr && InGraphData != CurProject->Graph)
 		{
-			auto Ret = MessageDialog::Open(MessageDialog::OkNoCancel, MainWindow, LOCALIZATION("SaveAssetTip"));
+			auto Ret = MessageDialog::Open(MessageDialog::OkNoCancel, MessageDialog::Shocked, MainWindow, LOCALIZATION("SaveAssetTip"));
 			if(Ret == MessageDialog::MessageRet::Cancel)
 			{
 				return;
@@ -893,15 +893,19 @@ namespace SH
 		CurDebuggableObject->OnEndDebuggging();
 	}
 
-	void ShaderHelperEditor::StartDebugging()
+	void ShaderHelperEditor::StartDebugging(bool GlobalValidation)
 	{		
 		TRefCountPtr<GpuTexture> DebugTarget = CurDebuggableObject->OnStartDebugging();
 		if(DebugTarget)
 		{
 			IsDebugging = true;
-			DebuggerViewport->SetDebugTarget(MoveTemp(DebugTarget));
-			auto User0 = FSlateApplication::Get().GetUser(0);
-			User0->LockCursor(DebuggerViewport.ToSharedRef());
+			DebuggerViewport->SetDebugTarget(MoveTemp(DebugTarget), GlobalValidation);
+			if (!GlobalValidation)
+			{
+				auto User0 = FSlateApplication::Get().GetUser(0);
+				User0->LockCursor(DebuggerViewport.ToSharedRef());
+			}
+
 		}
 	}
 
@@ -988,6 +992,18 @@ namespace SH
 		);
 		ToolBarBuilder.AddToolBarButton(
 			FUIAction(
+				FExecuteAction::CreateLambda([this] {
+					StartDebugging(true);
+				}),
+				FCanExecuteAction::CreateLambda([this] { return !IsDebugging && CurDebuggableObject != nullptr; })
+			),
+			NAME_None,
+			FText::GetEmpty(), LOCALIZATION("Validation"),
+			FSlateIcon(FShaderHelperStyle::Get().GetStyleSetName(), "Icons.Validation"),
+			EUserInterfaceActionType::Button
+		);
+		ToolBarBuilder.AddToolBarButton(
+			FUIAction(
 				FExecuteAction(),
 				FCanExecuteAction::CreateLambda([] { return false; })
 			),
@@ -1063,7 +1079,7 @@ namespace SH
 								ShApp->Launcher->SetCanLaunchFunc([this] {
 									if(CurProject->AnyPendingAsset())
 									{
-										auto Ret = MessageDialog::Open(MessageDialog::OkNoCancel, MainWindow, LOCALIZATION("SaveAssetsTip"));
+										auto Ret = MessageDialog::Open(MessageDialog::OkNoCancel, MessageDialog::Shocked, MainWindow, LOCALIZATION("SaveAssetsTip"));
 										if(Ret == MessageDialog::MessageRet::Cancel)
 										{
 											return false;

@@ -217,9 +217,10 @@ namespace FW
 	{
 	public:
 		SpvDebuggerVisitor() = default;
-		SpvDebuggerVisitor(SpvDebuggerContext& InContext, bool InEnableUbsan) 
+		SpvDebuggerVisitor(SpvDebuggerContext& InContext, bool InEnableUbsan, bool InGlobalValidation) 
 			: Context(InContext)
 			, EnableUbsan(InEnableUbsan)
+			, GlobalValidation(InGlobalValidation)
 		{
 		}
 		
@@ -273,6 +274,7 @@ namespace FW
 		void PatchAppendVarFunc(SpvPointer* Pointer, uint32 IndexNum);
 		void PatchAppendValueFunc(SpvType* ValueType);
 		void PatchAppendMathFunc(SpvType* ResultType, SpvType* OperandType, uint32 OperandNum);
+		SpvOpFunctionCall* AppendVar(const TFunction<int32()>& OffsetEval, SpvPointer* Pointer);
 		void AppendScope(const TFunction<int32()>& OffsetEval);
 		void AppendAccess(const TFunction<int32()>& OffsetEval, SpvPointer* Pointer);
 		void AppendTag(const TFunction<int32()>& OffsetEval, SpvDebuggerStateType InStateType);
@@ -288,6 +290,7 @@ namespace FW
 		SpvFunc* CurFunc{};
 
 		bool EnableUbsan;
+		bool GlobalValidation;
 		
 		const TArray<TUniquePtr<SpvInstruction>>* Insts;
 		SpvId DebuggerBuffer;

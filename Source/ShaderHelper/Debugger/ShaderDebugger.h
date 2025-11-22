@@ -24,7 +24,6 @@ namespace SH
 
 	struct PixelState
 	{
-		FW::Vector2u Coord;
 		FW::GpuViewPortDesc ViewPortDesc;
 		BindingState Builders;
 		FW::GpuRenderPipelineStateDesc PipelineDesc;
@@ -35,6 +34,8 @@ namespace SH
 	{
 
 	};
+
+	using InvocationState = std::variant<PixelState, ComputeState>;
 
 	enum class StepMode
 	{
@@ -55,8 +56,12 @@ namespace SH
 		void ShowDeuggerVariable(FW::SpvLexicalScope* InScope) const;
 		struct ExpressionNode EvaluateExpression(const FString& InExpression) const;
 		bool Continue(StepMode Mode);
-		void DebugPixel(const BindingState& InBuilders, const PixelState& InState);
-		void DebugCompute(const BindingState& InBuilders, const ComputeState& InState);
+
+		void InvokePixel(bool GlobalValidation = false);
+		void DebugPixel(const FW::Vector2u& InPixelCoord, const InvocationState& InState);
+		std::optional<FW::Vector2u> ValidatePixel(const InvocationState& InState);
+
+		void DebugCompute(const InvocationState& InState);
 		void Reset();
 
 		FString GetDebuggerError() const { return DebuggerError; }
@@ -77,6 +82,7 @@ namespace SH
 		TArray<FuncCallPoint> CallStack;
 		FW::SpvLexicalScope* Scope = nullptr;
 		FW::SpvLexicalScope* ActiveCallStackScope = nullptr;
+		FW::SpvVariable* AssertResult = nullptr;
 		TMultiMap<FW::SpvId, FW::SpvVarDirtyRange> DirtyVars;
 		int32 StopLineNumber{};
 		TArray<uint8> ReturnValue;
@@ -85,16 +91,16 @@ namespace SH
 		FString DebuggerError;
 		int32 CurDebugStateIndex{};
 		std::vector<std::pair<FW::SpvId, FW::SpvVariableDesc*>> SortedVariableDescs;
-		FW::SpvVariable* AssertResult = nullptr;
 
 		TArray<FW::SpvBinding> SpvBindings;
-		BindingState BindingBuilders;
 		FW::BindingContext PatchedBindings;
-		FW::SpvDebuggerContext* DebuggerContext = nullptr;
-		std::optional<FW::SpvPixelDebuggerContext> PixelDebuggerContext;
-		std::optional<PixelState> PsState;
+		TUniquePtr<FW::SpvDebuggerContext> DebuggerContext;
+		InvocationState Invocation;
 		TRefCountPtr<FW::GpuShader> DebugShader;
 		TArray<FW::SpvDebugState> DebugStates;
 		TRefCountPtr<FW::GpuBuffer> DebugBuffer;
+		bool bEnableUbsan = false;
+
+		FW::Vector2u PixelCoord;
 	};
 }

@@ -22,7 +22,7 @@ namespace FW
 				{
 					if (IFileManager::Get().DirectoryExists(*NewFolderPath))
 					{
-						MessageDialog::Open(MessageDialog::Ok, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("AssetRenameFailure"));
+						MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("AssetRenameFailure"));
 					}
 					else
 					{

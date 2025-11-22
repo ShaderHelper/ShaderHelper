@@ -12,6 +12,13 @@ namespace FW::MessageDialog
 		OkNoCancel = Ok | No | Cancel,
 	};
 
+	enum MessageMood
+	{
+		Happy,
+		Sad,
+		Shocked,
+	};
+
 	enum class MessageRet
 	{
 		Ok,
@@ -19,6 +26,6 @@ namespace FW::MessageDialog
 		Cancel,
 	};
 
-	FRAMEWORK_API MessageRet Open(MessageType MsgType, TSharedPtr<SWindow> Parent, const TAttribute<FText>& InMessage);
+	FRAMEWORK_API MessageRet Open(MessageType MsgType, MessageMood Mood, TSharedPtr<SWindow> Parent, const TAttribute<FText>& InMessage);
 	
 }

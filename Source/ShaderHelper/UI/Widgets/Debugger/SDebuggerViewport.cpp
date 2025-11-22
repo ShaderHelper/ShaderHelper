@@ -5,6 +5,7 @@
 #include "Editor/ShaderHelperEditor.h"
 #include "App/App.h"
 #include "RenderResource/Shader/DebuggerGridShader.h"
+#include "UI/Widgets/MessageDialog/SMessageDialog.h"
 
 using namespace FW;
 
@@ -233,11 +234,12 @@ namespace SH
 		return SCompoundWidget::OnPaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
 	}
 
-	void SDebuggerViewport::SetDebugTarget(TRefCountPtr<GpuTexture> InTarget)
+	void SDebuggerViewport::SetDebugTarget(TRefCountPtr<GpuTexture> InTarget, bool GlobalValidation)
 	{
 		bFinalizePixel = false;
 		Zoom = 1;
 		Offset = 0.0f;
+		DpiScale = GetCachedGeometry().Scale;
 		
 		uint32 Width = InTarget->GetWidth();
 		uint32 Height = InTarget->GetHeight();
@@ -271,5 +273,29 @@ namespace SH
 			}
 		}
 		GGpuRhi->UnMapGpuTexture(InTarget);
+
+		if (GlobalValidation)
+		{
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			auto Invocation = ShEditor->GetDebuggaleObject()->GetInvocationState();
+			if (std::holds_alternative<PixelState>(Invocation))
+			{
+				SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(ShEditor->GetDebuggaleObject()->GetShaderAsset());
+				std::optional<Vector2u> ErrorCoord = ShaderEditor->ValidatePixel(Invocation);
+				if (ErrorCoord)
+				{
+					PixelCoord = ErrorCoord.value();
+					MouseLoc = PixelCoord * Zoom - Offset;
+					Draw();
+					bFinalizePixel = true;
+					ShEditor->GetDebuggaleObject()->OnFinalizePixel(PixelCoord);
+				}
+				else
+				{
+					MessageDialog::Open(MessageDialog::Ok, MessageDialog::Happy, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("ValidationTip"));
+					ShEditor->EndDebugging();
+				}
+			}
+		}
 	}
 }

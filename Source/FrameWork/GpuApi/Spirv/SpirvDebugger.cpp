@@ -83,6 +83,11 @@ namespace FW
 
 	void SpvDebuggerVisitor::Visit(const SpvOpFunctionCall* Inst)
 	{
+		if (GlobalValidation)
+		{
+			return;
+		}
+
 		if (CurLine && CurBlock)
 		{
 			CurBlock->ValidLines.AddUnique(CurLine);
@@ -174,59 +179,10 @@ namespace FW
 	void SpvDebuggerVisitor::Visit(const SpvOpStore* Inst)
 	{
 		SpvPointer* Pointer = Context.FindPointer(Inst->GetPointer());
-		SpvType* PointeeType = Pointer->Type->PointeeType;
-		if (PointeeType->GetKind() == SpvTypeKind::Image || PointeeType->GetKind() == SpvTypeKind::Sampler)
+		if (SpvOpFunctionCall* FuncCall = AppendVar([&] {return Inst->GetWordOffset().value() + Inst->GetWordLen().value(); }, Pointer))
 		{
-			return;
+			AppendVarCallToStore.Add(FuncCall, Inst);
 		}
-
-		if (CurLine && CurBlock)
-		{
-			CurBlock->ValidLines.AddUnique(CurLine);
-		}
-
-		uint32 IndexNum = Pointer->Indexes.Num();
-		PatchAppendVarFunc(Pointer, IndexNum);
-
-		SpvId AppendVarFuncId = AppendVarFuncIds[{PointeeType, IndexNum}];
-		TArray<TUniquePtr<SpvInstruction>> AppendVarInsts;
-		{
-			SpvId StateType = Patcher.FindOrAddConstant((uint32)SpvDebuggerStateType::VarChange);
-			SpvId Line = Patcher.FindOrAddConstant((uint32)CurLine);
-			SpvId VarId = Patcher.FindOrAddConstant(Pointer->Var->Id.GetValue());
-			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
-			TArray<SpvId> Arguments{ StateType, Line, VarId };
-			if (IndexNum > 0)
-			{
-				SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
-				SpvId ArrType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeArray>(UIntType, Patcher.FindOrAddConstant(IndexNum)));
-				SpvId IndexArr = Patcher.NewId();
-				TArray<SpvId> Constituents;
-				for (SpvId Index : Pointer->Indexes)
-				{
-					SpvId BitCastValue = Patcher.NewId();
-					auto BitCastOp = MakeUnique<SpvOpBitcast>(UIntType, Index);
-					BitCastOp->SetId(BitCastValue);
-					AppendVarInsts.Add(MoveTemp(BitCastOp));
-					Constituents.Add(BitCastValue);
-				}
-				auto IndexArrOp = MakeUnique<SpvOpCompositeConstruct>(ArrType, Constituents);
-				IndexArrOp->SetId(IndexArr);
-				AppendVarInsts.Add(MoveTemp(IndexArrOp));
-				Arguments.Add(IndexArr);
-			}
-			SpvId ParamValue = Patcher.NewId();
-			auto ParamValueOp = MakeUnique<SpvOpLoad>(PointeeType->GetId(), Pointer->Id);
-			ParamValueOp->SetId(ParamValue);
-			AppendVarInsts.Add(MoveTemp(ParamValueOp));
-			Arguments.Add(ParamValue);
-
-			auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendVarFuncId, Arguments);
-			FuncCallOp->SetId(Patcher.NewId());
-			AppendVarCallToStore.Add(FuncCallOp.Get(), Inst);
-			AppendVarInsts.Add(MoveTemp(FuncCallOp));
-		}
-		Patcher.AddInstructions(Inst->GetWordOffset().value() + Inst->GetWordLen().value(), MoveTemp(AppendVarInsts));
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvOpAccessChain* Inst)
@@ -665,8 +621,77 @@ namespace FW
 		AppendMathFuncIds.Add({ ResultType, OperandType, OperandNum }, AppendMathFuncId);
 	}
 
+	SpvOpFunctionCall* SpvDebuggerVisitor::AppendVar(const TFunction<int32()>& OffsetEval, SpvPointer* Pointer)
+	{
+		if (GlobalValidation)
+		{
+			return nullptr;
+		}
+
+		SpvType* PointeeType = Pointer->Type->PointeeType;
+		if (PointeeType->GetKind() == SpvTypeKind::Image || PointeeType->GetKind() == SpvTypeKind::Sampler)
+		{
+			return nullptr;
+		}
+
+		if (CurLine && CurBlock)
+		{
+			CurBlock->ValidLines.AddUnique(CurLine);
+		}
+
+		uint32 IndexNum = Pointer->Indexes.Num();
+		PatchAppendVarFunc(Pointer, IndexNum);
+
+		SpvId AppendVarFuncId = AppendVarFuncIds[{PointeeType, IndexNum}];
+		SpvOpFunctionCall* FuncCall{};
+		TArray<TUniquePtr<SpvInstruction>> AppendVarInsts;
+		{
+			SpvId StateType = Patcher.FindOrAddConstant((uint32)SpvDebuggerStateType::VarChange);
+			SpvId Line = Patcher.FindOrAddConstant((uint32)CurLine);
+			SpvId VarId = Patcher.FindOrAddConstant(Pointer->Var->Id.GetValue());
+			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
+			TArray<SpvId> Arguments{ StateType, Line, VarId };
+			if (IndexNum > 0)
+			{
+				SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
+				SpvId ArrType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeArray>(UIntType, Patcher.FindOrAddConstant(IndexNum)));
+				SpvId IndexArr = Patcher.NewId();
+				TArray<SpvId> Constituents;
+				for (SpvId Index : Pointer->Indexes)
+				{
+					SpvId BitCastValue = Patcher.NewId();
+					auto BitCastOp = MakeUnique<SpvOpBitcast>(UIntType, Index);
+					BitCastOp->SetId(BitCastValue);
+					AppendVarInsts.Add(MoveTemp(BitCastOp));
+					Constituents.Add(BitCastValue);
+				}
+				auto IndexArrOp = MakeUnique<SpvOpCompositeConstruct>(ArrType, Constituents);
+				IndexArrOp->SetId(IndexArr);
+				AppendVarInsts.Add(MoveTemp(IndexArrOp));
+				Arguments.Add(IndexArr);
+			}
+			SpvId ParamValue = Patcher.NewId();
+			auto ParamValueOp = MakeUnique<SpvOpLoad>(PointeeType->GetId(), Pointer->Id);
+			ParamValueOp->SetId(ParamValue);
+			AppendVarInsts.Add(MoveTemp(ParamValueOp));
+			Arguments.Add(ParamValue);
+
+			auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendVarFuncId, Arguments);
+			FuncCallOp->SetId(Patcher.NewId());
+			FuncCall = FuncCallOp.Get();
+			AppendVarInsts.Add(MoveTemp(FuncCallOp));
+		}
+		Patcher.AddInstructions(OffsetEval(), MoveTemp(AppendVarInsts));
+		return FuncCall;
+	}
+
 	void SpvDebuggerVisitor::AppendScope(const TFunction<int32()>& OffsetEval)
 	{
+		if (GlobalValidation)
+		{
+			return;
+		}
+
 		if (!CurScope)
 		{
 			return;
@@ -857,6 +882,11 @@ namespace FW
 
 	void SpvDebuggerVisitor::AppendTag(const TFunction<int32()>& OffsetEval, SpvDebuggerStateType InStateType)
 	{
+		if (GlobalValidation)
+		{
+			return;
+		}
+
 		if (CurLine && CurBlock)
 		{
 			CurBlock->ValidLines.AddUnique(CurLine);
@@ -876,6 +906,11 @@ namespace FW
 
 	void SpvDebuggerVisitor::AppendValue(const TFunction<int32()>& OffsetEval, SpvType* ValueType, SpvId Value, SpvDebuggerStateType InStateType)
 	{
+		if (GlobalValidation)
+		{
+			return;
+		}
+
 		PatchAppendValueFunc(ValueType);
 		SpvId AppendValueFuncId = AppendValueFuncIds[ValueType];
 		TArray<TUniquePtr<SpvInstruction>> AppendValueInsts;

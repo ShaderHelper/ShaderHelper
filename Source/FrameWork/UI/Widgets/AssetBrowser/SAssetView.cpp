@@ -447,7 +447,7 @@ namespace FW
 				}
 				else
 				{
-					MessageDialog::Open(MessageDialog::Ok, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("AssetImportFailure"));
+					MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("AssetImportFailure"));
 					break;
 				}
 			}
@@ -531,7 +531,7 @@ namespace FW
 			return;
 		}
 
-		auto Ret = MessageDialog::Open(MessageDialog::OkCancel, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("DeleteItemTip"));
+		auto Ret = MessageDialog::Open(MessageDialog::OkCancel, MessageDialog::Shocked, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("DeleteItemTip"));
 		if (Ret == MessageDialog::MessageRet::Ok)
 		{
 			for (const auto& Item : SelectedItems)

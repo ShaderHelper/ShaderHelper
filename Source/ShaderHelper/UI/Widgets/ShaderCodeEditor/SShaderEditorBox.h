@@ -253,7 +253,8 @@ namespace SH
 		void RefreshOccurrenceHighlight();
 		void RefreshBracketHighlight();
 		
-		void DebugPixel(const BindingState& InBuilders, const PixelState& InState);
+		std::optional<FW::Vector2u> ValidatePixel(const InvocationState& InState);
+		void DebugPixel(const FW::Vector2u& InPixelCoord, const InvocationState& InState);
 		void Continue(StepMode Mode = StepMode::Continue);
 		void ResetDebugger();
 

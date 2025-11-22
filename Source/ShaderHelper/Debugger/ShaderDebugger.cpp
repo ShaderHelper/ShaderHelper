@@ -197,13 +197,14 @@ namespace SH
 
 		if (DebugShader->GetShaderType() == ShaderType::PixelShader)
 		{
+			const auto& PsInvocation = std::get<PixelState>(Invocation);
 			SpvPixelExprDebuggerContext ExprContext{ DebugStates[CurDebugStateIndex], CurDebugStateIndex,
-				PsState.value().Coord, SpvBindings };
+				PixelCoord, SpvBindings };
 			SpirvParser Parser;
 			Parser.Parse(DebugShader->SpvCode);
 			SpvMetaVisitor MetaVisitor{ ExprContext };
 			Parser.Accept(&MetaVisitor);
-			SpvPixelExprDebuggerVisitor ExprVisitor{ ExprContext, EnableUbsan()};
+			SpvPixelExprDebuggerVisitor ExprVisitor{ ExprContext, bEnableUbsan };
 			Parser.Accept(&ExprVisitor);
 			ExprVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "ExprPatched.spvasm");
 			
@@ -235,10 +236,10 @@ namespace SH
 				if (GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
 				{
 					GpuRenderPipelineStateDesc PatchedPipelineDesc{
-						.Vs = PsState.value().PipelineDesc.Vs,
+						.Vs = PsInvocation.PipelineDesc.Vs,
 						.Ps = PatchedShader,
-						.RasterizerState = PsState.value().PipelineDesc.RasterizerState,
-						.Primitive = PsState.value().PipelineDesc.Primitive
+						.RasterizerState = PsInvocation.PipelineDesc.RasterizerState,
+						.Primitive = PsInvocation.PipelineDesc.Primitive
 					};
 					PatchedBindings.ApplyBindGroupLayout(PatchedPipelineDesc);
 					TRefCountPtr<GpuRenderPipelineState> Pipeline = GGpuRhi->CreateRenderPipelineState(PatchedPipelineDesc);
@@ -249,10 +250,10 @@ namespace SH
 						CmdRecorder->Barriers({ GpuBarrierInfo{.Resource = DebugBuffer, .NewState = GpuResourceState::UnorderedAccess} });
 						auto PassRecorder = CmdRecorder->BeginRenderPass({}, TEXT("ExprDebugger"));
 						{
-							PassRecorder->SetViewPort(PsState.value().ViewPortDesc);
+							PassRecorder->SetViewPort(PsInvocation.ViewPortDesc);
 							PassRecorder->SetRenderPipelineState(Pipeline);
 							PatchedBindings.ApplyBindGroup(PassRecorder);
-							PsState.value().DrawFunction(PassRecorder);
+							PsInvocation.DrawFunction(PassRecorder);
 						}
 						CmdRecorder->EndRenderPass(PassRecorder);
 					}
@@ -408,6 +409,11 @@ namespace SH
 	bool ShaderDebugger::Continue(StepMode Mode)
 	{
 		DirtyVars.Empty();
+		//Allow ignoring assert failures and proceeding.
+		if (DebuggerError == "Assert failed")
+		{
+			CurDebugStateIndex++;
+		}
 		DebuggerError.Empty();
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		TSharedPtr<SWindow> ShaderEditorTipWindow = ShEditor->GetShaderEditorTipWindow();
@@ -449,8 +455,6 @@ namespace SH
 				DebuggerError = MoveTemp(Error);
 				break;
 			}
-			CurDebugStateIndex++;
-
 			if (AssertResult && AssertResult->IsCompletelyInitialized())
 			{
 				TArray<uint8>& Value = AssertResult->GetBuffer();
@@ -463,6 +467,7 @@ namespace SH
 					break;
 				}
 			}
+			CurDebugStateIndex++;
 
 			if (NextValidLine && NextValidLine.value())
 			{
@@ -973,10 +978,10 @@ namespace SH
 		}
 	}
 
-	void ShaderDebugger::DebugPixel(const BindingState& InBuilders, const PixelState& InState)
+	void ShaderDebugger::InvokePixel(bool GlobalValidation)
 	{
-		BindingBuilders = InBuilders;
-		PsState = InState;
+		const auto& PsInvocation = std::get<PixelState>(Invocation);
+
 		DebugShader = ShaderEditor->CreateGpuShader();
 		DebugShader->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
 
@@ -993,7 +998,7 @@ namespace SH
 			throw std::runtime_error(TCHAR_TO_UTF8(*FailureInfo));
 		}
 
-		uint32 BufferSize = 1024 * 1024 * 2;
+		uint32 BufferSize = GlobalValidation ? 1024 : 1024 * 1024 * 2;
 		TArray<uint8> Datas;
 		Datas.SetNumZeroed(BufferSize);
 		DebugBuffer = GGpuRhi->CreateBuffer({
@@ -1002,79 +1007,79 @@ namespace SH
 			.InitialData = Datas,
 		});
 		auto SetupBinding = [&](const std::optional<BindingBuilder>& Builder)
-		{
-			if (!Builder.has_value())
-				return;
-
-			GpuBindGroupDesc BindGroupDesc = (*Builder).BingGroupBuilder.GetDesc();
-			GpuBindGroupLayoutDesc LayoutDesc = (*Builder).LayoutBuilder.GetDesc();
-			int32 SetNumber = BindGroupDesc.Layout->GetGroupNumber();
-			for (const auto& [Slot, ResourceBindingEntry] : BindGroupDesc.Resources)
 			{
-				const auto& LayoutBindingEntry = LayoutDesc.Layouts[Slot];
-				SpvBindings.Add({
-					.DescriptorSet = SetNumber,
-					.Binding = Slot,
-					.Resource = ResourceBindingEntry.Resource
-				});
-	
-				//Replace StructuredBuffer with ByteAddressBuffer
-				if (LayoutBindingEntry.Type == BindingType::RWStructuredBuffer)
+				if (!Builder.has_value())
+					return;
+
+				GpuBindGroupDesc BindGroupDesc = (*Builder).BingGroupBuilder.GetDesc();
+				GpuBindGroupLayoutDesc LayoutDesc = (*Builder).LayoutBuilder.GetDesc();
+				int32 SetNumber = BindGroupDesc.Layout->GetGroupNumber();
+				for (const auto& [Slot, ResourceBindingEntry] : BindGroupDesc.Resources)
 				{
-					uint32 BufferSize = static_cast<GpuBuffer*>(ResourceBindingEntry.Resource.GetReference())->GetByteSize();
-					TArray<uint8> Datas;
-					Datas.SetNumZeroed(BufferSize);
-					TRefCountPtr<GpuBuffer> RawBuffer = GGpuRhi->CreateBuffer({
-						.ByteSize = BufferSize,
-						.Usage = GpuBufferUsage::RWRaw,
-						.InitialData = Datas,
-					});
+					const auto& LayoutBindingEntry = LayoutDesc.Layouts[Slot];
+					SpvBindings.Add({
+						.DescriptorSet = SetNumber,
+						.Binding = Slot,
+						.Resource = ResourceBindingEntry.Resource
+						});
 
-					BindGroupDesc.Resources[Slot] = { AUX::StaticCastRefCountPtr<GpuResource>(RawBuffer) };
-					LayoutDesc.Layouts[Slot] = { BindingType::RWRawBuffer, LayoutBindingEntry.Stage };
+					//Replace StructuredBuffer with ByteAddressBuffer
+					if (LayoutBindingEntry.Type == BindingType::RWStructuredBuffer)
+					{
+						uint32 BufferSize = static_cast<GpuBuffer*>(ResourceBindingEntry.Resource.GetReference())->GetByteSize();
+						TArray<uint8> Datas;
+						Datas.SetNumZeroed(BufferSize);
+						TRefCountPtr<GpuBuffer> RawBuffer = GGpuRhi->CreateBuffer({
+							.ByteSize = BufferSize,
+							.Usage = GpuBufferUsage::RWRaw,
+							.InitialData = Datas,
+							});
+
+						BindGroupDesc.Resources[Slot] = { AUX::StaticCastRefCountPtr<GpuResource>(RawBuffer) };
+						LayoutDesc.Layouts[Slot] = { BindingType::RWRawBuffer, LayoutBindingEntry.Stage };
+					}
 				}
-			}
 
-			if (SetNumber == BindingContext::GlobalSlot)
-			{
-				//Add the debugger buffer
-				BindGroupDesc.Resources.Add(0721, { AUX::StaticCastRefCountPtr<GpuResource>(DebugBuffer) });
-				LayoutDesc.Layouts.Add(0721, { BindingType::RWRawBuffer });
+				if (SetNumber == BindingContext::GlobalSlot)
+				{
+					//Add the debugger buffer
+					BindGroupDesc.Resources.Add(0721, { AUX::StaticCastRefCountPtr<GpuResource>(DebugBuffer) });
+					LayoutDesc.Layouts.Add(0721, { BindingType::RWRawBuffer });
 
-				TRefCountPtr<GpuBindGroupLayout> PatchedBindGroupLayout = GGpuRhi->CreateBindGroupLayout(LayoutDesc);
-				BindGroupDesc.Layout = PatchedBindGroupLayout;
-				TRefCountPtr<GpuBindGroup> PacthedBindGroup = GGpuRhi->CreateBindGroup(BindGroupDesc);
-				PatchedBindings.SetGlobalBindGroup(PacthedBindGroup);
-				PatchedBindings.SetGlobalBindGroupLayout(PatchedBindGroupLayout);
-			}
-			else if (SetNumber == BindingContext::PassSlot)
-			{
-				TRefCountPtr<GpuBindGroupLayout> PatchedBindGroupLayout = GGpuRhi->CreateBindGroupLayout(LayoutDesc);
-				BindGroupDesc.Layout = PatchedBindGroupLayout;
-				TRefCountPtr<GpuBindGroup> PacthedBindGroup = GGpuRhi->CreateBindGroup(BindGroupDesc);
-				PatchedBindings.SetPassBindGroup(PacthedBindGroup);
-				PatchedBindings.SetPassBindGroupLayout(PatchedBindGroupLayout);
-			}
-			else if (SetNumber == BindingContext::ShaderSlot)
-			{
-				TRefCountPtr<GpuBindGroupLayout> PatchedBindGroupLayout = GGpuRhi->CreateBindGroupLayout(LayoutDesc);
-				BindGroupDesc.Layout = PatchedBindGroupLayout;
-				TRefCountPtr<GpuBindGroup> PacthedBindGroup = GGpuRhi->CreateBindGroup(BindGroupDesc);
-				PatchedBindings.SetShaderBindGroup(PacthedBindGroup);
-				PatchedBindings.SetShaderBindGroupLayout(PatchedBindGroupLayout);
-			}
-		};
-		SetupBinding(InBuilders.GlobalBuilder);
-		SetupBinding(InBuilders.PassBuilder);
-		SetupBinding(InBuilders.ShaderBuilder);
+					TRefCountPtr<GpuBindGroupLayout> PatchedBindGroupLayout = GGpuRhi->CreateBindGroupLayout(LayoutDesc);
+					BindGroupDesc.Layout = PatchedBindGroupLayout;
+					TRefCountPtr<GpuBindGroup> PacthedBindGroup = GGpuRhi->CreateBindGroup(BindGroupDesc);
+					PatchedBindings.SetGlobalBindGroup(PacthedBindGroup);
+					PatchedBindings.SetGlobalBindGroupLayout(PatchedBindGroupLayout);
+				}
+				else if (SetNumber == BindingContext::PassSlot)
+				{
+					TRefCountPtr<GpuBindGroupLayout> PatchedBindGroupLayout = GGpuRhi->CreateBindGroupLayout(LayoutDesc);
+					BindGroupDesc.Layout = PatchedBindGroupLayout;
+					TRefCountPtr<GpuBindGroup> PacthedBindGroup = GGpuRhi->CreateBindGroup(BindGroupDesc);
+					PatchedBindings.SetPassBindGroup(PacthedBindGroup);
+					PatchedBindings.SetPassBindGroupLayout(PatchedBindGroupLayout);
+				}
+				else if (SetNumber == BindingContext::ShaderSlot)
+				{
+					TRefCountPtr<GpuBindGroupLayout> PatchedBindGroupLayout = GGpuRhi->CreateBindGroupLayout(LayoutDesc);
+					BindGroupDesc.Layout = PatchedBindGroupLayout;
+					TRefCountPtr<GpuBindGroup> PacthedBindGroup = GGpuRhi->CreateBindGroup(BindGroupDesc);
+					PatchedBindings.SetShaderBindGroup(PacthedBindGroup);
+					PatchedBindings.SetShaderBindGroupLayout(PatchedBindGroupLayout);
+				}
+			};
+		SetupBinding(PsInvocation.Builders.GlobalBuilder);
+		SetupBinding(PsInvocation.Builders.PassBuilder);
+		SetupBinding(PsInvocation.Builders.ShaderBuilder);
 
-		PixelDebuggerContext = SpvPixelDebuggerContext{InState.Coord, SpvBindings };
+		auto PixelDebuggerContext = MakeUnique<SpvPixelDebuggerContext>(PixelCoord, SpvBindings);
 
 		SpirvParser Parser;
 		Parser.Parse(DebugShader->SpvCode);
-		SpvMetaVisitor MetaVisitor{ PixelDebuggerContext.value() };
+		SpvMetaVisitor MetaVisitor{ *PixelDebuggerContext };
 		Parser.Accept(&MetaVisitor);
-		SpvPixelDebuggerVisitor PixelDebuggerVisitor{ PixelDebuggerContext.value(), EnableUbsan()};
+		SpvPixelDebuggerVisitor PixelDebuggerVisitor{ *PixelDebuggerContext, bEnableUbsan, GlobalValidation };
 		Parser.Accept(&PixelDebuggerVisitor);
 		PixelDebuggerVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Patched.spvasm");
 
@@ -1094,15 +1099,15 @@ namespace SH
 			FString FailureInfo = LOCALIZATION("DebugFailure").ToString();
 			SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo, *ErrorInfo);
 			throw std::runtime_error(TCHAR_TO_UTF8(*FailureInfo));
-		} 
+		}
 
 		CurDebugStateIndex = 0;
-		DebuggerContext = &PixelDebuggerContext.value();
+		DebuggerContext = MoveTemp(PixelDebuggerContext);
 		TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
 			.Source = MoveTemp(PatchedHlsl),
 			.Type = DebugShader->GetShaderType(),
 			.EntryPoint = DebugShader->GetEntryPoint()
-		});
+			});
 		if (!GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
 		{
 			FString FailureInfo = LOCALIZATION("DebugFailure").ToString();
@@ -1111,28 +1116,38 @@ namespace SH
 		}
 
 		GpuRenderPipelineStateDesc PatchedPipelineDesc{
-			.Vs = InState.PipelineDesc.Vs,
+			.Vs = PsInvocation.PipelineDesc.Vs,
 			.Ps = PatchedShader,
-			.RasterizerState = InState.PipelineDesc.RasterizerState,
-			.Primitive = InState.PipelineDesc.Primitive
+			.RasterizerState = PsInvocation.PipelineDesc.RasterizerState,
+			.Primitive = PsInvocation.PipelineDesc.Primitive
 		};
 		PatchedBindings.ApplyBindGroupLayout(PatchedPipelineDesc);
 		TRefCountPtr<GpuRenderPipelineState> Pipeline = GGpuRhi->CreateRenderPipelineState(PatchedPipelineDesc);
 
 		auto CmdRecorder = GGpuRhi->BeginRecording();
 		{
+			GpuResourceHelper::ClearRWResource(CmdRecorder, DebugBuffer);
+			CmdRecorder->Barriers({ GpuBarrierInfo{.Resource = DebugBuffer, .NewState = GpuResourceState::UnorderedAccess} });
 			auto PassRecorder = CmdRecorder->BeginRenderPass({}, TEXT("Debugger"));
 			{
-				PassRecorder->SetViewPort(InState.ViewPortDesc);
+				PassRecorder->SetViewPort(PsInvocation.ViewPortDesc);
 				PassRecorder->SetRenderPipelineState(Pipeline);
 				PatchedBindings.ApplyBindGroup(PassRecorder);
-				InState.DrawFunction(PassRecorder);
+				PsInvocation.DrawFunction(PassRecorder);
 			}
 			CmdRecorder->EndRenderPass(PassRecorder);
 		}
 		GGpuRhi->EndRecording(CmdRecorder);
 		GGpuRhi->Submit({ CmdRecorder });
+	}
 
+	void ShaderDebugger::DebugPixel(const Vector2u& InPixelCoord, const InvocationState& InState)
+	{
+		PixelCoord = InPixelCoord;
+		Invocation = InState;
+		bEnableUbsan = EnableUbsan();
+		
+		InvokePixel();
 		uint8* DebugBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebugBuffer, GpuResourceMapMode::Read_Only);
 		GenDebugStates(DebugBufferData);
 		GGpuRhi->UnMapGpuBuffer(DebugBuffer);
@@ -1155,7 +1170,26 @@ namespace SH
 		});
 	}
 
-	void ShaderDebugger::DebugCompute(const BindingState& InBuilders, const ComputeState& InState)
+	std::optional<Vector2u> ShaderDebugger::ValidatePixel(const InvocationState& InState)
+	{
+		Invocation = InState;
+		bEnableUbsan = EnableUbsan();
+
+		InvokePixel(true);
+
+		std::optional<Vector2u> ErrorCoord;
+		uint8* DebugBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebugBuffer, GpuResourceMapMode::Read_Only);
+		uint32 Offset = *(uint32*)(DebugBufferData);
+		if (Offset > 0)
+		{
+			ErrorCoord = *(Vector2u*)(DebugBufferData + 4);
+		}
+		GGpuRhi->UnMapGpuBuffer(DebugBuffer);
+
+		return ErrorCoord;
+	}
+
+	void ShaderDebugger::DebugCompute(const InvocationState& InState)
 	{
 
 	}
@@ -1172,15 +1206,12 @@ namespace SH
 		DirtyVars.Empty();
 		StopLineNumber = 0;
 		ReturnValue.Empty();
-		PixelDebuggerContext.reset();
 		DebugStates.Reset();
 		SortedVariableDescs.clear();
-		PsState.reset();
 		SpvBindings.Empty();
-		BindingBuilders = {};
-		PatchedBindings = {};
 		DebugShader = nullptr;
 		DebugBuffer = nullptr;
+		bEnableUbsan = false;
 
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		SDebuggerVariableView* DebuggerLocalVariableView = ShEditor->GetDebuggerLocalVariableView();
@@ -1271,7 +1302,7 @@ namespace SH
 			{
 				SpvId ScopeId = *(SpvId*)(DebuggerData + Offset);
 				Offset += 4;
-				SpvLexicalScope* NewScope = PixelDebuggerContext.value().LexicalScopes[ScopeId].Get();
+				SpvLexicalScope* NewScope = DebuggerContext->LexicalScopes[ScopeId].Get();
 				DebugStates.Add(SpvDebugState_ScopeChange{
 					{
 						.PreScope = PreScope,

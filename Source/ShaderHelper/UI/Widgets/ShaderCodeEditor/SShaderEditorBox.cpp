@@ -3728,7 +3728,7 @@ constexpr int PaddingLineNum = 22;
 		AssetOp::OpenAsset(ShaderAssetObj);
 		if(bEditDuringDebugging)
 		{
-			auto Ret = MessageDialog::Open(MessageDialog::OkCancel, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("EditDuringDebugging"));
+			auto Ret = MessageDialog::Open(MessageDialog::OkCancel, MessageDialog::Shocked, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("EditDuringDebugging"));
 			if(Ret == MessageDialog::MessageRet::Ok)
 			{
 				bEditDuringDebugging = false;
@@ -3758,16 +3758,29 @@ constexpr int PaddingLineNum = 22;
 		Debugger.Reset();
 	}
 
-	void SShaderEditorBox::DebugPixel(const BindingState& InBuilders, const PixelState& InState)
+	std::optional<Vector2u> SShaderEditorBox::ValidatePixel(const InvocationState& InState)
 	{
 		try
 		{
-			Debugger.DebugPixel(InBuilders, InState);
+			return Debugger.ValidatePixel(InState);
+		}
+		catch (const std::runtime_error& e)
+		{
+			MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), FText::FromString(UTF8_TO_TCHAR(e.what())));
+			return {};
+		}
+	}
+
+	void SShaderEditorBox::DebugPixel(const Vector2u& InPixelCoord, const InvocationState& InState)
+	{
+		try
+		{
+			Debugger.DebugPixel(InPixelCoord, InState);
 			Continue();
 		}
 		catch (const std::runtime_error& e)
 		{
-			MessageDialog::Open(MessageDialog::Ok, GApp->GetEditor()->GetMainWindow(), FText::FromString(UTF8_TO_TCHAR(e.what())));
+			MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), FText::FromString(UTF8_TO_TCHAR(e.what())));
 			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 			ShEditor->EndDebugging();
 			return;

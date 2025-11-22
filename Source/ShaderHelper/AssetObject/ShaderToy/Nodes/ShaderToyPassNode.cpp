@@ -153,6 +153,29 @@ namespace SH
 		return GetBuiltInBindGroupBuiler().Build();
 	}
 
+	InvocationState ShaderToyPassNode::GetInvocationState()
+	{
+		auto RT = static_cast<GpuTexturePin*>(GetPin("RT"))->GetValue();
+		
+		return PixelState{
+			.ViewPortDesc = {(float)RT->GetWidth(), (float)RT->GetHeight()},
+			.Builders = BindingState{
+				.GlobalBuilder = BindingBuilder{
+					.BingGroupBuilder = GetBuiltInBindGroupBuiler(),
+					.LayoutBuilder = StShader::GetBuiltInBindLayoutBuilder()
+				},
+				.PassBuilder = BindingBuilder{
+					.BingGroupBuilder = *CustomBindGroupBuilder,
+					.LayoutBuilder = ShaderAssetObj->CustomBindGroupLayoutBuilder,
+				}
+			},
+			.PipelineDesc = PipelineDesc,
+			.DrawFunction = [](GpuRenderPassRecorder* PassRecorder) {
+				PassRecorder->DrawPrimitive(0, 3, 0, 1);
+			}
+		};
+	}
+
 	TRefCountPtr<GpuTexture> ShaderToyPassNode::OnStartDebugging()
 	{
 		AssetOp::OpenAsset(ShaderAssetObj);
@@ -182,26 +205,7 @@ namespace SH
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
         ShEditor->InvokeDebuggerTabs();
 		SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(ShaderAssetObj);
-		auto RT = static_cast<GpuTexturePin*>(GetPin("RT"))->GetValue();
-		ShaderEditor->DebugPixel(
-		BindingState {
-			.GlobalBuilder = BindingBuilder{
-				.BingGroupBuilder = GetBuiltInBindGroupBuiler(),
-				.LayoutBuilder = StShader::GetBuiltInBindLayoutBuilder()
-			},
-			.PassBuilder = BindingBuilder{
-				.BingGroupBuilder = *CustomBindGroupBuilder,
-				.LayoutBuilder = ShaderAssetObj->CustomBindGroupLayoutBuilder,
-			},
-		}, 
-		PixelState {
-			.Coord = PixelCoord,
-			.ViewPortDesc = {(float)RT->GetWidth(), (float)RT->GetHeight()},
-			.PipelineDesc = PipelineDesc,
-			.DrawFunction = [](GpuRenderPassRecorder* PassRecorder) {
-				PassRecorder->DrawPrimitive(0, 3, 0, 1);
-			}
-		});
+		ShaderEditor->DebugPixel(PixelCoord, GetInvocationState());
 	}
 
 	ShaderAsset* ShaderToyPassNode::GetShaderAsset() const

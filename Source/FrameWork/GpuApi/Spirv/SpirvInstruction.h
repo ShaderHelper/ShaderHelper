@@ -42,6 +42,7 @@ namespace FW
 		virtual void Visit(const class SpvOpFunctionParameter* Inst) {}
 		virtual void Visit(const class SpvOpFunctionCall* Inst) {}
 		virtual void Visit(const class SpvOpVariable* Inst) {}
+		virtual void Visit(const class SpvOpAtomicIAdd* Inst) {}
 		virtual void Visit(const class SpvOpPhi* Inst) {}
 		virtual void Visit(const class SpvOpSelectionMerge* Inst) {}
 		virtual void Visit(const class SpvOpLabel* Inst) {}
@@ -843,6 +844,42 @@ namespace FW
 		SpvId ResultType;
 		SpvStorageClass StorageClass;
 		std::optional<SpvId> Initializer;
+	};
+
+	class SpvOpAtomicIAdd : public SpvInstructionBase<SpvOpAtomicIAdd>
+	{
+	public:
+		SpvOpAtomicIAdd(SpvId InResultType, SpvId InPointer, SpvId InMemory, SpvId InSemantics, SpvId InValue)
+			: SpvInstructionBase(SpvOp::AtomicIAdd)
+			, ResultType(InResultType), Pointer(InPointer)
+			, Memory(InMemory), Semantics(InSemantics), Value(InValue)
+		{}
+
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetPointer() const { return Pointer; }
+		SpvId GetMemory() const { return Memory; }
+		SpvId GetSemantics() const { return Semantics; }
+		SpvId GetValue() const { return Value; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Pointer.GetValue());
+			Bin.Add(Memory.GetValue());
+			Bin.Add(Semantics.GetValue());
+			Bin.Add(Value.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::AtomicIAdd;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
+
+	private:
+		SpvId ResultType;
+		SpvId Pointer;
+		SpvId Memory;
+		SpvId Semantics;
+		SpvId Value;
 	};
 
 	class SpvOpPhi : public SpvInstructionBase<SpvOpPhi>
