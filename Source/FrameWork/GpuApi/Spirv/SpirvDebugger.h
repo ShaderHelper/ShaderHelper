@@ -53,6 +53,7 @@ namespace FW
 	{
 		int32 Line{};
 		SpvVarChange Change;
+		FString Error;
 	};
 
 	struct SpvDebugState_ScopeChange
@@ -86,7 +87,7 @@ namespace FW
 	{
 		int32 Line{};
 		SpvId VarId;
-		TArray<uint32> Indexes;
+		TArray<int32> Indexes;
 	};
 	struct SpvDebugState_Normalize
 	{
@@ -217,17 +218,15 @@ namespace FW
 	{
 	public:
 		SpvDebuggerVisitor() = default;
-		SpvDebuggerVisitor(SpvDebuggerContext& InContext, bool InEnableUbsan, bool InGlobalValidation) 
+		SpvDebuggerVisitor(SpvDebuggerContext& InContext, bool InEnableUbsan) 
 			: Context(InContext)
 			, EnableUbsan(InEnableUbsan)
-			, GlobalValidation(InGlobalValidation)
 		{
 		}
 		
 	public:
 		const SpvPatcher& GetPatcher() const { return Patcher; }
 		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections, const TMap<SpvId, SpvExtSet>& InExtSets) override;
-		int32 GetInstIndex(SpvId Inst) const;
 		
 	public:
 		void Visit(const SpvDebugLine* Inst) override;
@@ -267,13 +266,13 @@ namespace FW
 		void Visit(const SpvOpReturnValue* Inst) override;
 
 	protected:
-		virtual void PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) = 0;
+		virtual void PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) {}
 		virtual void ParseInternal();
 		void PatchToDebugger(SpvId InValueId, SpvId InTypeId, TArray<TUniquePtr<SpvInstruction>>& InstList);
-		void PatchAppendAccessFunc(uint32 IndexNum);
-		void PatchAppendVarFunc(SpvPointer* Pointer, uint32 IndexNum);
+		void PatchAppendAccessFunc(int32 IndexNum);
+		void PatchAppendVarFunc(SpvPointer* Pointer, int32 IndexNum);
 		void PatchAppendValueFunc(SpvType* ValueType);
-		void PatchAppendMathFunc(SpvType* ResultType, SpvType* OperandType, uint32 OperandNum);
+		void PatchAppendMathFunc(SpvType* ResultType, SpvType* OperandType, int32 OperandNum);
 		SpvOpFunctionCall* AppendVar(const TFunction<int32()>& OffsetEval, SpvPointer* Pointer);
 		void AppendScope(const TFunction<int32()>& OffsetEval);
 		void AppendAccess(const TFunction<int32()>& OffsetEval, SpvPointer* Pointer);
@@ -290,21 +289,20 @@ namespace FW
 		SpvFunc* CurFunc{};
 
 		bool EnableUbsan;
-		bool GlobalValidation;
 		
 		const TArray<TUniquePtr<SpvInstruction>>* Insts;
 		SpvId DebuggerBuffer;
 		SpvId DebuggerOffset;
 		SpvId AppendScopeFuncId, AppendTagFuncId;
 		SpvId AppendCallFuncId;
-		TMap<TPair<SpvType*, uint32>, SpvId> AppendVarFuncIds;
+		TMap<TPair<SpvType*, int32>, SpvId> AppendVarFuncIds;
 		TMap<SpvType*, SpvId> AppendValueFuncIds;
-		TMap<uint32, SpvId> AppendAccessFuncIds;
+		TMap<int32, SpvId> AppendAccessFuncIds;
 		struct MathFuncSearchKey
 		{
 			SpvType* ResultType{};
 			SpvType* OperandType{};
-			uint32 OperandNum{};
+			int32 OperandNum{};
 			bool operator==(const MathFuncSearchKey& Other) const = default;
 			friend uint32 GetTypeHash(const MathFuncSearchKey& Key)
 			{
@@ -318,6 +316,8 @@ namespace FW
 		SpvPatcher Patcher;
 	};
 
-	FRAMEWORK_API std::tuple<SpvType*, int32> GetAccess(const SpvVariable* Var, const TArray<uint32>& Indexes);
+	FRAMEWORK_API TValueOrError<std::tuple<SpvType*, int32>, FString> GetAccess(const SpvVariable* Var, const TArray<int32>& Indexes);
+	SpvId PatchDebuggerBuffer(SpvPatcher& Patcher);
+	int32 GetInstIndex(const TArray<TUniquePtr<SpvInstruction>>* Insts, SpvId Inst);
 
 }

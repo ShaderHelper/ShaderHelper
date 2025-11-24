@@ -1658,6 +1658,16 @@ namespace FW
 		
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetVector() const { return Vector; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Vector.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Any;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -1729,6 +1739,17 @@ namespace FW
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetOperand1() const { return Operand1; }
 		SpvId GetOperand2() const { return Operand2; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Operand1.GetValue());
+			Bin.Add(Operand2.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::LogicalOr;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -1746,6 +1767,17 @@ namespace FW
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetOperand1() const { return Operand1; }
 		SpvId GetOperand2() const { return Operand2; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Operand1.GetValue());
+			Bin.Add(Operand2.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::LogicalAnd;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -1762,6 +1794,16 @@ namespace FW
 		
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetOperand() const { return Operand; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Operand.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::LogicalNot;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;

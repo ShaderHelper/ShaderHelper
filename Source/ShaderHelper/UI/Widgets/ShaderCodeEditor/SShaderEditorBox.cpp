@@ -3760,15 +3760,7 @@ constexpr int PaddingLineNum = 22;
 
 	std::optional<Vector2u> SShaderEditorBox::ValidatePixel(const InvocationState& InState)
 	{
-		try
-		{
-			return Debugger.ValidatePixel(InState);
-		}
-		catch (const std::runtime_error& e)
-		{
-			MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), FText::FromString(UTF8_TO_TCHAR(e.what())));
-			return {};
-		}
+		return Debugger.ValidatePixel(InState);
 	}
 
 	void SShaderEditorBox::DebugPixel(const Vector2u& InPixelCoord, const InvocationState& InState)

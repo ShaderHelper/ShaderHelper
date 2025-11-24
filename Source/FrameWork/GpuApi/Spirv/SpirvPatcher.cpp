@@ -243,6 +243,11 @@ namespace FW
 			ConstantType = FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 1));
 			ConstantInst = MakeUnique<SpvOpConstant>(ConstantType, TArray<uint8>{(uint8*)&InConstant, sizeof(T)});
 		}
+		else if constexpr (std::is_same_v<T, float>)
+		{
+			ConstantType = FindOrAddType(MakeUnique<SpvOpTypeFloat>(32));
+			ConstantInst = MakeUnique<SpvOpConstant>(ConstantType, TArray<uint8>{(uint8*)&InConstant, sizeof(T)});
+		}
 		else if constexpr (std::is_same_v<T, Vector2u>)
 		{
 			SpvId BaseType = FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
@@ -310,6 +315,7 @@ namespace FW
 
 	template SpvId SpvPatcher::FindOrAddConstant<uint32>(uint32);
 	template SpvId SpvPatcher::FindOrAddConstant<int32>(int32);
+	template SpvId SpvPatcher::FindOrAddConstant<float>(float);
 	template SpvId SpvPatcher::FindOrAddConstant<Vector2i>(Vector2i);
 	template SpvId SpvPatcher::FindOrAddConstant<Vector2u>(Vector2u);
 

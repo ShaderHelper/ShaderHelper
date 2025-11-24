@@ -17,7 +17,7 @@ namespace FW
 	class FRAMEWORK_API SpvPixelExprDebuggerVisitor : public SpvPixelDebuggerVisitor
 	{
 	public:
-		SpvPixelExprDebuggerVisitor(SpvPixelExprDebuggerContext& InContext, bool InEnableUbsan) : SpvPixelDebuggerVisitor(InContext, InEnableUbsan, false) {}
+		SpvPixelExprDebuggerVisitor(SpvPixelExprDebuggerContext& InContext, bool InEnableUbsan) : SpvPixelDebuggerVisitor(InContext, InEnableUbsan) {}
 		void Visit(const SpvDebugDeclare* Inst);
 
 	protected:

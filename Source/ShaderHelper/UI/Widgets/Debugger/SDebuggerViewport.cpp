@@ -124,7 +124,6 @@ namespace SH
 			return FReply::Unhandled();
 		}
 		
-		DpiScale = MyGeometry.Scale;
 		Vector2f CurMousePos = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * DpiScale);
 		if(MouseEvent.IsMouseButtonDown(EKeys::MiddleMouseButton))
 		{
@@ -147,7 +146,6 @@ namespace SH
 			return FReply::Unhandled();
 		}
 		
-		DpiScale = MyGeometry.Scale;
 		Vector2f CurMousePos = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * DpiScale);
 		Vector2f ContentPosBefore = (CurMousePos + Offset) / float(Zoom);
 		Zoom = FMath::Clamp(int32(float(Zoom) + MouseEvent.GetWheelDelta()), 1, 128);
@@ -239,7 +237,7 @@ namespace SH
 		bFinalizePixel = false;
 		Zoom = 1;
 		Offset = 0.0f;
-		DpiScale = GetCachedGeometry().Scale;
+		DpiScale = FSlateApplication::Get().FindWidgetWindow(AsShared())->GetNativeWindow()->GetDPIScaleFactor();
 		
 		uint32 Width = InTarget->GetWidth();
 		uint32 Height = InTarget->GetHeight();
@@ -281,7 +279,18 @@ namespace SH
 			if (std::holds_alternative<PixelState>(Invocation))
 			{
 				SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(ShEditor->GetDebuggaleObject()->GetShaderAsset());
-				std::optional<Vector2u> ErrorCoord = ShaderEditor->ValidatePixel(Invocation);
+				std::optional<Vector2u> ErrorCoord;
+				try
+				{
+					ErrorCoord = ShaderEditor->ValidatePixel(Invocation);
+				}
+				catch (const std::runtime_error& e)
+				{
+					MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), FText::FromString(UTF8_TO_TCHAR(e.what())));
+					ShEditor->EndDebugging();
+					return;
+				}
+
 				if (ErrorCoord)
 				{
 					PixelCoord = ErrorCoord.value();

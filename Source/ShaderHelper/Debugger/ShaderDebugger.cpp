@@ -3,6 +3,7 @@
 #include "ShaderConductor.hpp"
 #include "Editor/ShaderHelperEditor.h"
 #include "GpuApi/Spirv/SpirvExprDebugger.h"
+#include "GpuApi/Spirv/SpirvValidator.h"
 
 using namespace FW;
 
@@ -529,6 +530,17 @@ namespace SH
 		if (std::holds_alternative<SpvDebugState_VarChange>(InState))
 		{
 			const auto& State = std::get<SpvDebugState_VarChange>(InState);
+			if (!State.Error.IsEmpty())
+			{
+				if (bEnableUbsan)
+				{
+					Error = "Undefined";
+					StopLineNumber = State.Line - ExtraLineNum;
+					SH_LOG(LogShader, Error, TEXT("%s"), *State.Error);
+				}
+				return;
+			}
+
 			SpvVariable* Var = DebuggerContext->FindVar(State.Change.VarId);
 
 			void* Dest = &Var->GetBuffer()[State.Change.ByteOffset];
@@ -605,14 +617,25 @@ namespace SH
 			if (Var->GetBufferSize() > 0)
 			{
 				auto Range = Var->GetInitializedRange();
-				auto [Type, ByteOffset] = GetAccess(Var, State.Indexes);
-				int32 Size = GetTypeByteSize(Type);
-				if (ByteOffset < Range.X || ByteOffset + Size > Range.Y)
+				auto AccessOrError = GetAccess(Var, State.Indexes);
+				if (AccessOrError.HasError())
 				{
 					Error = "Undefined";
 					StopLineNumber = State.Line - ExtraLineNum;
-					SH_LOG(LogShader, Error, TEXT("Reading the unintialized memory of the variable: %s!"), *DebuggerContext->Names[Var->Id]);
+					SH_LOG(LogShader, Error, TEXT("%s"), *AccessOrError.GetError());
 				}
+				else
+				{
+					auto [Type, ByteOffset] = AccessOrError.GetValue();
+					int32 Size = GetTypeByteSize(Type);
+					if (ByteOffset < Range.X || ByteOffset + Size > Range.Y)
+					{
+						Error = "Undefined";
+						StopLineNumber = State.Line - ExtraLineNum;
+						SH_LOG(LogShader, Error, TEXT("Reading the unintialized memory of the variable: %s!"), *DebuggerContext->Names[Var->Id]);
+					}
+				}
+	
 			}
 
 		}
@@ -1079,11 +1102,22 @@ namespace SH
 		Parser.Parse(DebugShader->SpvCode);
 		SpvMetaVisitor MetaVisitor{ *PixelDebuggerContext };
 		Parser.Accept(&MetaVisitor);
-		SpvPixelDebuggerVisitor PixelDebuggerVisitor{ *PixelDebuggerContext, bEnableUbsan, GlobalValidation };
-		Parser.Accept(&PixelDebuggerVisitor);
-		PixelDebuggerVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Patched.spvasm");
+		TArray<uint32> PatchedSpv;
+		if (GlobalValidation)
+		{
+			SpvValidator Validator{ *PixelDebuggerContext, bEnableUbsan, ShaderType::PixelShader };
+			Parser.Accept(&Validator);
+			Validator.GetPatcher().Dump(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Validation.spvasm");
+			PatchedSpv = Validator.GetPatcher().GetSpv();
+		}
+		else
+		{
+			SpvPixelDebuggerVisitor DebuggerVisitor{ *PixelDebuggerContext, bEnableUbsan };
+			Parser.Accept(&DebuggerVisitor);
+			DebuggerVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Patched.spvasm");
+			PatchedSpv = DebuggerVisitor.GetPatcher().GetSpv();
+		}
 
-		const TArray<uint32>& PatchedSpv = PixelDebuggerVisitor.GetPatcher().GetSpv();
 		auto EntryPoint = StringCast<UTF8CHAR>(*DebugShader->GetEntryPoint());
 		ShaderConductor::Compiler::TargetDesc HlslTargetDesc{};
 		HlslTargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
@@ -1091,7 +1125,14 @@ namespace SH
 		ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile({}, { PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, (char*)EntryPoint.Get(),
 			ShaderConductor::ShaderStage::PixelShader, HlslTargetDesc);
 		FString PatchedHlsl = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
-		FFileHelper::SaveStringToFile(PatchedHlsl, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Patched.hlsl"));
+		if (GlobalValidation)
+		{
+			FFileHelper::SaveStringToFile(PatchedHlsl, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Validation.hlsl"));
+		}
+		else
+		{
+			FFileHelper::SaveStringToFile(PatchedHlsl, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Patched.hlsl"));
+		}
 
 		if (ShaderResultDesc.hasError)
 		{
@@ -1275,7 +1316,7 @@ namespace SH
 				Offset += 4;
 				int32 IndexNum = *(int32*)(DebuggerData + Offset);
 				Offset += 4;
-				TArray<uint32> Indexes = { (uint32*)(DebuggerData + Offset), IndexNum};
+				TArray<int32> Indexes = { (int32*)(DebuggerData + Offset), IndexNum};
 				Offset += IndexNum * 4;
 				int32 ValueSize = *(int32*)(DebuggerData + Offset);
 				Offset += 4;
@@ -1283,19 +1324,32 @@ namespace SH
 				Offset += DirtyValue.Num();
 
 				SpvVariable* DirtyVar = DebuggerContext->FindVar(VarId);
-				auto [_, ByteOffset] = GetAccess(DirtyVar, Indexes);
-				TArray<uint8> PreDirtyValue = { &DirtyVar->GetBuffer()[ByteOffset], ValueSize};
+				auto AccessOrError = GetAccess(DirtyVar, Indexes);
+				if (!AccessOrError.HasError())
+				{
+					const auto& [_, ByteOffset] = AccessOrError.GetValue();
+					TArray<uint8> PreDirtyValue = { &DirtyVar->GetBuffer()[ByteOffset], ValueSize };
 
-				auto NewDebugState = SpvDebugState_VarChange{
-					.Line = Line,
-					.Change = {
-						.VarId = VarId,
-						.PreDirtyValue = MoveTemp(PreDirtyValue),
-						.NewDirtyValue = MoveTemp(DirtyValue),
-						.ByteOffset = ByteOffset,
-					},
-				};
-				DebugStates.Add(MoveTemp(NewDebugState));
+					auto NewDebugState = SpvDebugState_VarChange{
+						.Line = Line,
+						.Change = {
+							.VarId = VarId,
+							.PreDirtyValue = MoveTemp(PreDirtyValue),
+							.NewDirtyValue = MoveTemp(DirtyValue),
+							.ByteOffset = ByteOffset,
+						},
+					};
+					DebugStates.Add(MoveTemp(NewDebugState));
+				}
+				else
+				{
+					auto NewDebugState = SpvDebugState_VarChange{
+						.Line = Line,
+						.Error = AccessOrError.GetError()
+					};
+					DebugStates.Add(MoveTemp(NewDebugState));
+				}
+
 				break;
 			}
 			case SpvDebuggerStateType::ScopeChange:
@@ -1331,7 +1385,7 @@ namespace SH
 				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
 				SpvId VarId = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 IndexNum = *(int32*)(DebuggerData + Offset); Offset += 4;
-				TArray<uint32> Indexes = { (uint32*)(DebuggerData + Offset), IndexNum }; Offset += IndexNum * 4;
+				TArray<int32> Indexes = { (int32*)(DebuggerData + Offset), IndexNum }; Offset += IndexNum * 4;
 				DebugStates.Add(SpvDebugState_Access{
 					.Line = Line,
 					.VarId = VarId,
