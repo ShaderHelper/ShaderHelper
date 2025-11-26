@@ -228,7 +228,56 @@ namespace FW
 		return ResultId;
 	}
 
+	SpvId SpvPatcher::FindOrAddConstant(TUniquePtr<SpvInstruction> InInst)
+	{
+		SpvMetaContext& Context = MetaVisitor->GetContext();
+		auto HasConstant = [&](SpvInstruction* A, SpvInstruction* B) {
+			if (A->GetKind() == B->GetKind())
+			{
+				SpvOp OpCode = std::get<SpvOp>(A->GetKind());
+				if (OpCode == SpvOp::Constant)
+				{
+					SpvOpConstant* ConstantA = static_cast<SpvOpConstant*>(A);
+					SpvOpConstant* ConstantB = static_cast<SpvOpConstant*>(B);
+					return ConstantA->GetResultType() == ConstantB->GetResultType() && ConstantA->GetValue() == ConstantB->GetValue();
+				}
+				else if (OpCode == SpvOp::ConstantComposite)
+				{
+					SpvOpConstantComposite* ConstantA = static_cast<SpvOpConstantComposite*>(A);
+					SpvOpConstantComposite* ConstantB = static_cast<SpvOpConstantComposite*>(B);
+					return ConstantA->GetResultType() == ConstantB->GetResultType() && ConstantA->GetConstituents() == ConstantB->GetConstituents();
+				}
+			}
+			return false;
+			};
+
+		SpvId ResultId;
+		for (auto& Inst : *OriginInsts)
+		{
+			if (HasConstant(Inst.Get(), InInst.Get()))
+			{
+				ResultId = Inst->GetId().value();
+			}
+		}
+		for (auto& Inst : PatchedInsts)
+		{
+			if (HasConstant(Inst.Get(), InInst.Get()))
+			{
+				ResultId = Inst->GetId().value();
+			}
+		}
+
+		if (!ResultId.IsValid())
+		{
+			ResultId = NewId();
+			InInst->SetId(ResultId);
+			AddInstruction(Context.Sections[SpvSectionKind::Contant].EndOffset, MoveTemp(InInst));
+		}
+		return ResultId;
+	}
+
 	template<typename T>
+	requires requires { T{} + T{}; }
 	SpvId SpvPatcher::FindOrAddConstant(T InConstant)
 	{
 		SpvId ConstantType;
@@ -238,9 +287,19 @@ namespace FW
 			ConstantType = FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
 			ConstantInst = MakeUnique<SpvOpConstant>(ConstantType, TArray<uint8>{(uint8*)&InConstant, sizeof(T)});
 		}
+		else if constexpr (std::is_same_v<T, uint64>)
+		{
+			ConstantType = FindOrAddType(MakeUnique<SpvOpTypeInt>(64, 0));
+			ConstantInst = MakeUnique<SpvOpConstant>(ConstantType, TArray<uint8>{(uint8*)&InConstant, sizeof(T)});
+		}
 		else if constexpr (std::is_same_v<T, int32>)
 		{
 			ConstantType = FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 1));
+			ConstantInst = MakeUnique<SpvOpConstant>(ConstantType, TArray<uint8>{(uint8*)&InConstant, sizeof(T)});
+		}
+		else if constexpr (std::is_same_v<T, int64>)
+		{
+			ConstantType = FindOrAddType(MakeUnique<SpvOpTypeInt>(64, 1));
 			ConstantInst = MakeUnique<SpvOpConstant>(ConstantType, TArray<uint8>{(uint8*)&InConstant, sizeof(T)});
 		}
 		else if constexpr (std::is_same_v<T, float>)
@@ -267,54 +326,13 @@ namespace FW
 			});
 		}
 
-		SpvMetaContext& Context = MetaVisitor->GetContext();
-		auto HasConstant = [&](SpvInstruction* A, SpvInstruction* B) {
-			if (A->GetKind() == B->GetKind())
-			{
-				SpvOp OpCode = std::get<SpvOp>(A->GetKind());
-				if (OpCode == SpvOp::Constant)
-				{
-					SpvOpConstant* ConstantA = static_cast<SpvOpConstant*>(A);
-					SpvOpConstant* ConstantB = static_cast<SpvOpConstant*>(B);
-					return ConstantA->GetResultType() == ConstantB->GetResultType() && ConstantA->GetValue() == ConstantB->GetValue();
-				}
-				else if (OpCode == SpvOp::ConstantComposite)
-				{
-					SpvOpConstantComposite* ConstantA = static_cast<SpvOpConstantComposite*>(A);
-					SpvOpConstantComposite* ConstantB = static_cast<SpvOpConstantComposite*>(B);
-					return ConstantA->GetResultType() == ConstantB->GetResultType() && ConstantA->GetConstituents() == ConstantB->GetConstituents();
-				}
-			}
-			return false;
-		};
-
-		SpvId ResultId;
-		for (auto& Inst : *OriginInsts)
-		{
-			if (HasConstant(Inst.Get(), ConstantInst.Get()))
-			{
-				ResultId = Inst->GetId().value();
-			}
-		}
-		for (auto& Inst : PatchedInsts)
-		{
-			if (HasConstant(Inst.Get(), ConstantInst.Get()))
-			{
-				ResultId = Inst->GetId().value();
-			}
-		}
-
-		if (!ResultId.IsValid())
-		{
-			ResultId = NewId();
-			ConstantInst->SetId(ResultId);
-			AddInstruction(Context.Sections[SpvSectionKind::Contant].EndOffset, MoveTemp(ConstantInst));
-		}
-		return ResultId;
+		return FindOrAddConstant(MoveTemp(ConstantInst));
 	}
 
 	template SpvId SpvPatcher::FindOrAddConstant<uint32>(uint32);
+	template SpvId SpvPatcher::FindOrAddConstant<uint64>(uint64);
 	template SpvId SpvPatcher::FindOrAddConstant<int32>(int32);
+	template SpvId SpvPatcher::FindOrAddConstant<int64>(int64);
 	template SpvId SpvPatcher::FindOrAddConstant<float>(float);
 	template SpvId SpvPatcher::FindOrAddConstant<Vector2i>(Vector2i);
 	template SpvId SpvPatcher::FindOrAddConstant<Vector2u>(Vector2u);

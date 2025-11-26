@@ -411,6 +411,10 @@ namespace FW
 		else if(Type->GetKind() == SpvTypeKind::Integer)
 		{
 			SpvIntegerType* IntegerType = static_cast<SpvIntegerType*>(Type);
+			if (IntegerType->GetWidth() == 64)
+			{
+				return IntegerType->IsSigend() ? "int64_t" : "uint64_t";
+			}
 			return IntegerType->IsSigend() ? "int" : "uint";
 		}
 		else if(Type->GetKind() == SpvTypeKind::Vector)

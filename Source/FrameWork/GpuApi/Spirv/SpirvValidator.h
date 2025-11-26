@@ -16,11 +16,41 @@ namespace FW
 	public:
 		void Visit(const SpvPow* Inst) override;
 		void Visit(const SpvNormalize* Inst) override;
+		void Visit(const SpvFClamp* Inst) override;
+		void Visit(const SpvUClamp* Inst) override;
+		void Visit(const SpvSClamp* Inst) override;
+		void Visit(const SpvSmoothStep* Inst) override;
+		void Visit(const SpvOpConvertFToU* Inst) override;
+		void Visit(const SpvOpConvertFToS* Inst) override;
+		void Visit(const SpvOpUDiv* Inst) override;
+		void Visit(const SpvOpSDiv* Inst) override;
+		void Visit(const SpvOpUMod* Inst) override;
+		void Visit(const SpvOpSRem* Inst) override;
+		void Visit(const SpvOpFRem* Inst) override;
 
 	protected:
 		void PatchAppendErrorFunc();
 		void AppendError(TArray<TUniquePtr<SpvInstruction>>& InstList);
-		SpvId GetBoolTypeId(SpvType* Type);
+		void AppendAnyEqualZeroError(const TFunction<int32()>& OffsetEval, SpvId ResultTypeId, SpvId ValueId);
+		SpvId GetScalarOrVectorTypeId(SpvType* ResultType, SpvId ScalarTypeId);
+		template<typename T>
+		SpvId GetScalarOrVectorId(SpvType* ResultType, T ScalarValue)
+		{
+			SpvId ScalarId = Patcher.FindOrAddConstant(ScalarValue);
+			if (SpvVectorType* VecType = dynamic_cast<SpvVectorType*>(ResultType))
+			{
+				uint32 ElemCount = VecType->ElementCount;
+				SpvId VecTypeId = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(VecType->ElementType->GetId(), ElemCount));
+				TArray<SpvId> Constituents;
+				Constituents.Init(ScalarId, ElemCount);
+				return Patcher.FindOrAddConstant(MakeUnique<SpvOpConstantComposite>(VecTypeId, Constituents));
+			}
+			else
+			{
+				return ScalarId;
+			}
+			
+		}
 
 	private:
 		SpvMetaContext& Context;

@@ -3,17 +3,16 @@
 
 namespace FW
 {
-	SpvId SpvValidator::GetBoolTypeId(SpvType* Type)
+	SpvId SpvValidator::GetScalarOrVectorTypeId(SpvType* ResultType, SpvId ScalarTypeId)
 	{
-		SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
-		if (Type->IsScalar())
+		if (ResultType->IsScalar())
 		{
-			return BoolType;
+			return ScalarTypeId;
 		}
 		else
 		{
-			SpvVectorType* VectorType = static_cast<SpvVectorType*>(Type);
-			return Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(BoolType, VectorType->ElementCount));
+			SpvVectorType* VectorType = static_cast<SpvVectorType*>(ResultType);
+			return Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(ScalarTypeId, VectorType->ElementCount));
 		}
 	}
 
@@ -48,22 +47,23 @@ namespace FW
 		if (EnableUbsan)
 		{
 			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
-			SpvId BoolResultType = GetBoolTypeId(ResultType);
 			SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
+			SpvId BoolResultType = GetScalarOrVectorTypeId(ResultType, BoolType);
 			TArray<TUniquePtr<SpvInstruction>> PowValidationInsts;
 			{
+				SpvId Zero = GetScalarOrVectorId(ResultType, 0.0f);
 				SpvId FOrdLessThan = Patcher.NewId();
-				auto FOrdLessThanOp = MakeUnique<SpvOpFOrdLessThan>(BoolResultType, Inst->GetX(), Patcher.FindOrAddConstant(0.0f));
+				auto FOrdLessThanOp = MakeUnique<SpvOpFOrdLessThan>(BoolResultType, Inst->GetX(), Zero);
 				FOrdLessThanOp->SetId(FOrdLessThan);
 				PowValidationInsts.Add(MoveTemp(FOrdLessThanOp));
 
 				SpvId FOrdEqual = Patcher.NewId();
-				auto FOrdEqualOp = MakeUnique<SpvOpFOrdEqual>(BoolResultType, Inst->GetX(), Patcher.FindOrAddConstant(0.0f));
+				auto FOrdEqualOp = MakeUnique<SpvOpFOrdEqual>(BoolResultType, Inst->GetX(), Zero);
 				FOrdEqualOp->SetId(FOrdEqual);
 				PowValidationInsts.Add(MoveTemp(FOrdEqualOp));
 
 				SpvId FOrdLessThanEqual = Patcher.NewId();
-				auto FOrdLessThanEqualOp = MakeUnique<SpvOpFOrdLessThanEqual>(BoolResultType, Inst->GetY(), Patcher.FindOrAddConstant(0.0f));
+				auto FOrdLessThanEqualOp = MakeUnique<SpvOpFOrdLessThanEqual>(BoolResultType, Inst->GetY(), Zero);
 				FOrdLessThanEqualOp->SetId(FOrdLessThanEqual);
 				PowValidationInsts.Add(MoveTemp(FOrdLessThanEqualOp));
 
@@ -106,23 +106,12 @@ namespace FW
 		if (EnableUbsan)
 		{
 			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
-			SpvId BoolResultType = GetBoolTypeId(ResultType);
 			SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
+			SpvId BoolResultType = GetScalarOrVectorTypeId(ResultType, BoolType);
 			SpvId FloatType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFloat>(32));
 			TArray<TUniquePtr<SpvInstruction>> NormalizeValidationInsts;
 			{
-				SpvId Zero = Patcher.FindOrAddConstant(0.0f);
-				if (SpvVectorType* VecType = dynamic_cast<SpvVectorType*>(ResultType))
-				{
-					uint32 ElemCount = VecType->ElementCount;
-					SpvId FloatVecType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(FloatType, ElemCount));
-					TArray<SpvId> Constituents;
-					Constituents.Init(Zero, ElemCount);
-					Zero = Patcher.NewId();
-					auto ZeroVecOp = MakeUnique<SpvOpConstantComposite>(FloatVecType, Constituents);
-					ZeroVecOp->SetId(Zero);
-					NormalizeValidationInsts.Add(MoveTemp(ZeroVecOp));
-				}
+				SpvId Zero = GetScalarOrVectorId(ResultType, 0.0f);
 				SpvId IEqual = Patcher.NewId();;
 				auto IEqualOp = MakeUnique<SpvOpIEqual>(BoolResultType, Inst->GetX(), Zero);
 				IEqualOp->SetId(IEqual);
@@ -149,6 +138,356 @@ namespace FW
 				NormalizeValidationInsts.Add(MoveTemp(FalseLabelOp));
 			}
 			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(NormalizeValidationInsts));
+		}
+	}
+
+	void SpvValidator::Visit(const SpvFClamp* Inst)
+	{
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
+			SpvId BoolResultType = GetScalarOrVectorTypeId(ResultType, BoolType);
+			TArray<TUniquePtr<SpvInstruction>> ClampValidationInsts;
+			{
+				SpvId FOrdGreaterThan = Patcher.NewId();
+				auto FOrdGreaterThanOp = MakeUnique<SpvOpFOrdGreaterThan>(BoolResultType, Inst->GetMinVal(), Inst->GetMaxVal());
+				FOrdGreaterThanOp->SetId(FOrdGreaterThan);
+				ClampValidationInsts.Add(MoveTemp(FOrdGreaterThanOp));
+
+				SpvId Any = Patcher.NewId();
+				auto AnyOp = MakeUnique<SpvOpAny>(BoolType, FOrdGreaterThan);
+				AnyOp->SetId(Any);
+				ClampValidationInsts.Add(MoveTemp(AnyOp));
+
+				auto TrueLabel = Patcher.NewId();
+				auto FalseLabel = Patcher.NewId();
+				ClampValidationInsts.Add(MakeUnique<SpvOpSelectionMerge>(FalseLabel, SpvSelectionControl::None));
+				ClampValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Any, TrueLabel, FalseLabel));
+
+				auto TrueLabelOp = MakeUnique<SpvOpLabel>();
+				TrueLabelOp->SetId(TrueLabel);
+				ClampValidationInsts.Add(MoveTemp(TrueLabelOp));
+				AppendError(ClampValidationInsts);
+				ClampValidationInsts.Add(MakeUnique<SpvOpBranch>(FalseLabel));
+
+				auto FalseLabelOp = MakeUnique<SpvOpLabel>();
+				FalseLabelOp->SetId(FalseLabel);
+				ClampValidationInsts.Add(MoveTemp(FalseLabelOp));
+			}
+			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(ClampValidationInsts));
+		}
+	}
+
+	void SpvValidator::Visit(const SpvUClamp* Inst)
+	{
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
+			SpvId BoolResultType = GetScalarOrVectorTypeId(ResultType, BoolType);
+			TArray<TUniquePtr<SpvInstruction>> ClampValidationInsts;
+			{
+				SpvId UGreaterThan = Patcher.NewId();
+				auto UGreaterThanOp = MakeUnique<SpvOpUGreaterThan>(BoolResultType, Inst->GetMinVal(), Inst->GetMaxVal());
+				UGreaterThanOp->SetId(UGreaterThan);
+				ClampValidationInsts.Add(MoveTemp(UGreaterThanOp));
+
+				SpvId Any = Patcher.NewId();
+				auto AnyOp = MakeUnique<SpvOpAny>(BoolType, UGreaterThan);
+				AnyOp->SetId(Any);
+				ClampValidationInsts.Add(MoveTemp(AnyOp));
+
+				auto TrueLabel = Patcher.NewId();
+				auto FalseLabel = Patcher.NewId();
+				ClampValidationInsts.Add(MakeUnique<SpvOpSelectionMerge>(FalseLabel, SpvSelectionControl::None));
+				ClampValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Any, TrueLabel, FalseLabel));
+
+				auto TrueLabelOp = MakeUnique<SpvOpLabel>();
+				TrueLabelOp->SetId(TrueLabel);
+				ClampValidationInsts.Add(MoveTemp(TrueLabelOp));
+				AppendError(ClampValidationInsts);
+				ClampValidationInsts.Add(MakeUnique<SpvOpBranch>(FalseLabel));
+
+				auto FalseLabelOp = MakeUnique<SpvOpLabel>();
+				FalseLabelOp->SetId(FalseLabel);
+				ClampValidationInsts.Add(MoveTemp(FalseLabelOp));
+			}
+			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(ClampValidationInsts));
+		}
+	}
+
+	void SpvValidator::Visit(const SpvSClamp* Inst)
+	{
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
+			SpvId BoolResultType = GetScalarOrVectorTypeId(ResultType, BoolType);
+			TArray<TUniquePtr<SpvInstruction>> ClampValidationInsts;
+			{
+				SpvId SGreaterThan = Patcher.NewId();
+				auto SGreaterThanOp = MakeUnique<SpvOpSGreaterThan>(BoolResultType, Inst->GetMinVal(), Inst->GetMaxVal());
+				SGreaterThanOp->SetId(SGreaterThan);
+				ClampValidationInsts.Add(MoveTemp(SGreaterThanOp));
+
+				SpvId Any = Patcher.NewId();
+				auto AnyOp = MakeUnique<SpvOpAny>(BoolType, SGreaterThan);
+				AnyOp->SetId(Any);
+				ClampValidationInsts.Add(MoveTemp(AnyOp));
+
+				auto TrueLabel = Patcher.NewId();
+				auto FalseLabel = Patcher.NewId();
+				ClampValidationInsts.Add(MakeUnique<SpvOpSelectionMerge>(FalseLabel, SpvSelectionControl::None));
+				ClampValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Any, TrueLabel, FalseLabel));
+
+				auto TrueLabelOp = MakeUnique<SpvOpLabel>();
+				TrueLabelOp->SetId(TrueLabel);
+				ClampValidationInsts.Add(MoveTemp(TrueLabelOp));
+				AppendError(ClampValidationInsts);
+				ClampValidationInsts.Add(MakeUnique<SpvOpBranch>(FalseLabel));
+
+				auto FalseLabelOp = MakeUnique<SpvOpLabel>();
+				FalseLabelOp->SetId(FalseLabel);
+				ClampValidationInsts.Add(MoveTemp(FalseLabelOp));
+			}
+			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(ClampValidationInsts));
+		}
+	}
+
+	void SpvValidator::Visit(const SpvSmoothStep* Inst)
+	{
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
+			SpvId BoolResultType = GetScalarOrVectorTypeId(ResultType, BoolType);
+			TArray<TUniquePtr<SpvInstruction>> SmoothStepValidationInsts;
+			{
+				SpvId FOrdGreaterThanEqual = Patcher.NewId();
+				auto FOrdGreaterThanEqualOp = MakeUnique<SpvOpFOrdGreaterThanEqual>(BoolResultType, Inst->GetEdge0(), Inst->GetEdge1());
+				FOrdGreaterThanEqualOp->SetId(FOrdGreaterThanEqual);
+				SmoothStepValidationInsts.Add(MoveTemp(FOrdGreaterThanEqualOp));
+
+				SpvId Any = Patcher.NewId();
+				auto AnyOp = MakeUnique<SpvOpAny>(BoolType, FOrdGreaterThanEqual);
+				AnyOp->SetId(Any);
+				SmoothStepValidationInsts.Add(MoveTemp(AnyOp));
+
+				auto TrueLabel = Patcher.NewId();
+				auto FalseLabel = Patcher.NewId();
+				SmoothStepValidationInsts.Add(MakeUnique<SpvOpSelectionMerge>(FalseLabel, SpvSelectionControl::None));
+				SmoothStepValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Any, TrueLabel, FalseLabel));
+
+				auto TrueLabelOp = MakeUnique<SpvOpLabel>();
+				TrueLabelOp->SetId(TrueLabel);
+				SmoothStepValidationInsts.Add(MoveTemp(TrueLabelOp));
+				AppendError(SmoothStepValidationInsts);
+				SmoothStepValidationInsts.Add(MakeUnique<SpvOpBranch>(FalseLabel));
+
+				auto FalseLabelOp = MakeUnique<SpvOpLabel>();
+				FalseLabelOp->SetId(FalseLabel);
+				SmoothStepValidationInsts.Add(MoveTemp(FalseLabelOp));
+			}
+			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(SmoothStepValidationInsts));
+		}
+	}
+
+	void SpvValidator::Visit(const SpvOpConvertFToU* Inst)
+	{
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
+			SpvId BoolResultType = GetScalarOrVectorTypeId(ResultType, BoolType);
+			SpvId UInt64Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(64, 0));
+			SpvId UInt64ResultType = GetScalarOrVectorTypeId(ResultType, UInt64Type);
+			TArray<TUniquePtr<SpvInstruction>> ConvertFValidationInsts;
+			{
+				SpvId Zero = GetScalarOrVectorId(ResultType, 0.0f);
+				SpvId FOrdLessThan = Patcher.NewId();
+				auto FOrdLessThanOp = MakeUnique<SpvOpFOrdLessThan>(BoolResultType, Inst->GetFloatValue(), Zero);
+				FOrdLessThanOp->SetId(FOrdLessThan);
+				ConvertFValidationInsts.Add(MoveTemp(FOrdLessThanOp));
+
+				SpvId Maximum = GetScalarOrVectorId(ResultType, (uint64)std::numeric_limits<uint32>::max());
+
+				SpvId UInt64Value = Patcher.NewId();
+				auto UInt64ValueOp = MakeUnique<SpvOpConvertFToU>(UInt64ResultType, Inst->GetFloatValue());
+				UInt64ValueOp->SetId(UInt64Value);
+				ConvertFValidationInsts.Add(MoveTemp(UInt64ValueOp));
+
+				SpvId UGreaterThan = Patcher.NewId();;
+				auto UGreaterThanOp = MakeUnique<SpvOpUGreaterThan>(BoolResultType, UInt64Value, Maximum);
+				UGreaterThanOp->SetId(UGreaterThan);
+				ConvertFValidationInsts.Add(MoveTemp(UGreaterThanOp));
+
+				SpvId LogicalOr = Patcher.NewId();
+				auto LogicalOrOp = MakeUnique<SpvOpLogicalOr>(BoolResultType, FOrdLessThan, UGreaterThan);
+				LogicalOrOp->SetId(LogicalOr);
+				ConvertFValidationInsts.Add(MoveTemp(LogicalOrOp));
+
+				SpvId Any = Patcher.NewId();
+				auto AnyOp = MakeUnique<SpvOpAny>(BoolType, LogicalOr);
+				AnyOp->SetId(Any);
+				ConvertFValidationInsts.Add(MoveTemp(AnyOp));
+
+				auto TrueLabel = Patcher.NewId();
+				auto FalseLabel = Patcher.NewId();
+				ConvertFValidationInsts.Add(MakeUnique<SpvOpSelectionMerge>(FalseLabel, SpvSelectionControl::None));
+				ConvertFValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Any, TrueLabel, FalseLabel));
+
+				auto TrueLabelOp = MakeUnique<SpvOpLabel>();
+				TrueLabelOp->SetId(TrueLabel);
+				ConvertFValidationInsts.Add(MoveTemp(TrueLabelOp));
+				AppendError(ConvertFValidationInsts);
+				ConvertFValidationInsts.Add(MakeUnique<SpvOpBranch>(FalseLabel));
+
+				auto FalseLabelOp = MakeUnique<SpvOpLabel>();
+				FalseLabelOp->SetId(FalseLabel);
+				ConvertFValidationInsts.Add(MoveTemp(FalseLabelOp));
+			}
+			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(ConvertFValidationInsts));
+		}
+	}
+
+	void SpvValidator::Visit(const SpvOpConvertFToS* Inst)
+	{
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
+			SpvId BoolResultType = GetScalarOrVectorTypeId(ResultType, BoolType);
+			SpvId Int64Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(64, 1));
+			SpvId Int64ResultType = GetScalarOrVectorTypeId(ResultType, Int64Type);
+			TArray<TUniquePtr<SpvInstruction>> ConvertFValidationInsts;
+			{
+				SpvId Minimum = GetScalarOrVectorId(ResultType, (int64)std::numeric_limits<int32>::max());
+				SpvId Maximum = GetScalarOrVectorId(ResultType, (int64)std::numeric_limits<int32>::max());
+
+				SpvId Int64Value = Patcher.NewId();
+				auto Int64ValueOp = MakeUnique<SpvOpConvertFToU>(Int64ResultType, Inst->GetFloatValue());
+				Int64ValueOp->SetId(Int64Value);
+				ConvertFValidationInsts.Add(MoveTemp(Int64ValueOp));
+
+				SpvId SLessThan = Patcher.NewId();
+				auto SLessThanOp = MakeUnique<SpvOpSLessThan>(BoolResultType, Int64Value, Minimum);
+				SLessThanOp->SetId(SLessThan);
+				ConvertFValidationInsts.Add(MoveTemp(SLessThanOp));
+
+				SpvId SGreaterThan = Patcher.NewId();;
+				auto SGreaterThanOp = MakeUnique<SpvOpSGreaterThan>(BoolResultType, Int64Value, Maximum);
+				SGreaterThanOp->SetId(SGreaterThan);
+				ConvertFValidationInsts.Add(MoveTemp(SGreaterThanOp));
+
+				SpvId LogicalOr = Patcher.NewId();
+				auto LogicalOrOp = MakeUnique<SpvOpLogicalOr>(BoolResultType, SLessThan, SGreaterThan);
+				LogicalOrOp->SetId(LogicalOr);
+				ConvertFValidationInsts.Add(MoveTemp(LogicalOrOp));
+
+				SpvId Any = Patcher.NewId();
+				auto AnyOp = MakeUnique<SpvOpAny>(BoolType, LogicalOr);
+				AnyOp->SetId(Any);
+				ConvertFValidationInsts.Add(MoveTemp(AnyOp));
+
+				auto TrueLabel = Patcher.NewId();
+				auto FalseLabel = Patcher.NewId();
+				ConvertFValidationInsts.Add(MakeUnique<SpvOpSelectionMerge>(FalseLabel, SpvSelectionControl::None));
+				ConvertFValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Any, TrueLabel, FalseLabel));
+
+				auto TrueLabelOp = MakeUnique<SpvOpLabel>();
+				TrueLabelOp->SetId(TrueLabel);
+				ConvertFValidationInsts.Add(MoveTemp(TrueLabelOp));
+				AppendError(ConvertFValidationInsts);
+				ConvertFValidationInsts.Add(MakeUnique<SpvOpBranch>(FalseLabel));
+
+				auto FalseLabelOp = MakeUnique<SpvOpLabel>();
+				FalseLabelOp->SetId(FalseLabel);
+				ConvertFValidationInsts.Add(MoveTemp(FalseLabelOp));
+			}
+			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(ConvertFValidationInsts));
+		}
+	}
+
+	void SpvValidator::Visit(const SpvOpUDiv* Inst)
+	{
+		if (EnableUbsan)
+		{
+			AppendAnyEqualZeroError([&] { return Inst->GetWordOffset().value(); }, Inst->GetResultType(), Inst->GetOperand2());
+		}
+	}
+
+	void SpvValidator::Visit(const SpvOpSDiv* Inst)
+	{
+		if (EnableUbsan)
+		{
+			AppendAnyEqualZeroError([&] { return Inst->GetWordOffset().value(); }, Inst->GetResultType(), Inst->GetOperand2());
+		}
+	}
+
+	void SpvValidator::Visit(const SpvOpUMod* Inst)
+	{
+		if (EnableUbsan)
+		{
+			AppendAnyEqualZeroError([&] { return Inst->GetWordOffset().value(); }, Inst->GetResultType(), Inst->GetOperand2());
+		}
+	}
+
+	void SpvValidator::Visit(const SpvOpSRem* Inst)
+	{
+		if (EnableUbsan)
+		{
+			AppendAnyEqualZeroError([&] { return Inst->GetWordOffset().value(); }, Inst->GetResultType(), Inst->GetOperand2());
+
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
+			SpvId BoolResultType = GetScalarOrVectorTypeId(ResultType, BoolType);
+			TArray<TUniquePtr<SpvInstruction>> SRemValidationInsts;
+			{
+				SpvId IEqual1 = Patcher.NewId();
+				auto IEqual1Op = MakeUnique<SpvOpIEqual>(BoolResultType, Inst->GetOperand1(), GetScalarOrVectorId(ResultType, std::numeric_limits<int32>::min()));
+				IEqual1Op->SetId(IEqual1);
+				SRemValidationInsts.Add(MoveTemp(IEqual1Op));
+
+				SpvId IEqual2 = Patcher.NewId();
+				auto IEqual2Op = MakeUnique<SpvOpIEqual>(BoolResultType, Inst->GetOperand2(), GetScalarOrVectorId(ResultType, -1));
+				IEqual2Op->SetId(IEqual2);
+				SRemValidationInsts.Add(MoveTemp(IEqual2Op));
+
+				SpvId LogicalAnd = Patcher.NewId();
+				auto LogicalAndOp = MakeUnique<SpvOpLogicalAnd>(BoolResultType, IEqual1, IEqual2);
+				LogicalAndOp->SetId(LogicalAnd);
+				SRemValidationInsts.Add(MoveTemp(LogicalAndOp));
+
+				SpvId Any = Patcher.NewId();
+				auto AnyOp = MakeUnique<SpvOpAny>(BoolType, LogicalAnd);
+				AnyOp->SetId(Any);
+				SRemValidationInsts.Add(MoveTemp(AnyOp));
+
+				auto TrueLabel = Patcher.NewId();
+				auto FalseLabel = Patcher.NewId();
+				SRemValidationInsts.Add(MakeUnique<SpvOpSelectionMerge>(FalseLabel, SpvSelectionControl::None));
+				SRemValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Any, TrueLabel, FalseLabel));
+
+				auto TrueLabelOp = MakeUnique<SpvOpLabel>();
+				TrueLabelOp->SetId(TrueLabel);
+				SRemValidationInsts.Add(MoveTemp(TrueLabelOp));
+				AppendError(SRemValidationInsts);
+				SRemValidationInsts.Add(MakeUnique<SpvOpBranch>(FalseLabel));
+
+				auto FalseLabelOp = MakeUnique<SpvOpLabel>();
+				FalseLabelOp->SetId(FalseLabel);
+				SRemValidationInsts.Add(MoveTemp(FalseLabelOp));
+			}
+			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(SRemValidationInsts));
+		}
+	}
+
+	void SpvValidator::Visit(const SpvOpFRem* Inst)
+	{
+		if (EnableUbsan)
+		{
+			AppendAnyEqualZeroError([&] { return Inst->GetWordOffset().value(); }, Inst->GetResultType(), Inst->GetOperand2());
 		}
 	}
 
@@ -285,5 +624,67 @@ namespace FW
 		auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendErrorFuncId);
 		FuncCallOp->SetId(Patcher.NewId());
 		InstList.Add(MoveTemp(FuncCallOp));
+	}
+
+	void SpvValidator::AppendAnyEqualZeroError(const TFunction<int32()>& OffsetEval, SpvId ResultTypeId, SpvId ValueId)
+	{
+		SpvType* ResultType = Context.Types[ResultTypeId].Get();
+		SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
+		SpvId BoolResultType = GetScalarOrVectorTypeId(ResultType, BoolType);
+		TArray<TUniquePtr<SpvInstruction>> InstList;
+		{
+			SpvType* ScalarType;
+			if (SpvVectorType* VecType = dynamic_cast<SpvVectorType*>(ResultType))
+			{
+				ScalarType = VecType->ElementType;
+			}
+			else
+			{
+				ScalarType = ResultType;
+			}
+
+			SpvId Zero;
+			if (ScalarType->GetKind() == SpvTypeKind::Float)
+			{
+				Zero = GetScalarOrVectorId(ResultType, 0.0f);
+			}
+			else if (SpvIntegerType* IntegerType = dynamic_cast<SpvIntegerType*>(ScalarType))
+			{
+				if (IntegerType->IsSigend())
+				{
+					Zero = GetScalarOrVectorId(ResultType, 0);
+				}
+				else
+				{
+					Zero = GetScalarOrVectorId(ResultType, 0u);
+				}
+			}
+
+			SpvId IEqual = Patcher.NewId();;
+			auto IEqualOp = MakeUnique<SpvOpIEqual>(BoolResultType, ValueId, Zero);
+			IEqualOp->SetId(IEqual);
+			InstList.Add(MoveTemp(IEqualOp));
+
+			SpvId Any = Patcher.NewId();
+			auto AnyOp = MakeUnique<SpvOpAny>(BoolType, IEqual);
+			AnyOp->SetId(Any);
+			InstList.Add(MoveTemp(AnyOp));
+
+			auto TrueLabel = Patcher.NewId();
+			auto FalseLabel = Patcher.NewId();
+			InstList.Add(MakeUnique<SpvOpSelectionMerge>(FalseLabel, SpvSelectionControl::None));
+			InstList.Add(MakeUnique<SpvOpBranchConditional>(Any, TrueLabel, FalseLabel));
+
+			auto TrueLabelOp = MakeUnique<SpvOpLabel>();
+			TrueLabelOp->SetId(TrueLabel);
+			InstList.Add(MoveTemp(TrueLabelOp));
+			AppendError(InstList);
+			InstList.Add(MakeUnique<SpvOpBranch>(FalseLabel));
+
+			auto FalseLabelOp = MakeUnique<SpvOpLabel>();
+			FalseLabelOp->SetId(FalseLabel);
+			InstList.Add(MoveTemp(FalseLabelOp));
+		}
+		Patcher.AddInstructions(OffsetEval(), MoveTemp(InstList));
 	}
 }

@@ -20,7 +20,9 @@ namespace FW
 		//The result ID is inferred internally
 		SpvId FindOrAddType(TUniquePtr<SpvInstruction> InInst);
 		template<typename T>
+		requires requires { T{} + T{}; }
 		SpvId FindOrAddConstant(T InConstant);
+		SpvId FindOrAddConstant(TUniquePtr<SpvInstruction> InInst);
 		SpvId FindOrAddTypeDesc(TUniquePtr<SpvInstruction> InInst);
 		SpvId FindOrAddDebugStr(const FString& Str);
 
