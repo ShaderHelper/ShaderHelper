@@ -408,6 +408,7 @@ namespace FW
 	{
 		SpvType* Type = Context.Types.at(InTypeId).Get();
 		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
+		SpvId IntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 1));
 		if (InTypeId == UIntType)
 		{
 			SpvId LoadedDebuggerOffset = Patcher.NewId();
@@ -446,6 +447,33 @@ namespace FW
 					SelectOp->SetId(SelectValue);
 					InstList.Add(MoveTemp(SelectOp));
 					PatchToDebugger(SelectValue, UIntType, InstList);
+				}
+				else if(SpvIntegerType* IntegerType = dynamic_cast<SpvIntegerType*>(Type) ; IntegerType && IntegerType->GetWidth() == 64)
+				{
+					SpvId UInt2Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, 2));
+					SpvId UInt64Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(64, 0));
+					if (IntegerType->IsSigend())
+					{
+						SpvId UInt64Value = Patcher.NewId();
+						{
+							auto BitCastOp = MakeUnique<SpvOpBitcast>(UInt64Type, InValueId);
+							BitCastOp->SetId(UInt64Value);
+							InstList.Add(MoveTemp(BitCastOp));
+						}
+						SpvId BitCastValue = Patcher.NewId();
+						auto BitCastOp = MakeUnique<SpvOpBitcast>(UInt2Type, UInt64Value);
+						BitCastOp->SetId(BitCastValue);
+						InstList.Add(MoveTemp(BitCastOp));
+						PatchToDebugger(BitCastValue, UInt2Type, InstList);
+					}
+					else
+					{
+						SpvId BitCastValue = Patcher.NewId();
+						auto BitCastOp = MakeUnique<SpvOpBitcast>(UInt2Type, InValueId);
+						BitCastOp->SetId(BitCastValue);
+						InstList.Add(MoveTemp(BitCastOp));
+						PatchToDebugger(BitCastValue, UInt2Type, InstList);
+					}
 				}
 				else
 				{

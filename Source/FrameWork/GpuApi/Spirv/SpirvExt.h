@@ -584,13 +584,31 @@ namespace FW
 					}
 					else if(Encoding == SpvDebugBasicTypeEncoding::Signed)
 					{
-						int Value = *(int*)(InValue.GetData() + Offset);
-						BasicValueStr = FString::Format(TEXT("{0}"), {Value});
+						if (BasicTypeDesc->GetSize() == 64)
+						{
+							int64 Value = *(int64*)(InValue.GetData() + Offset);
+							BasicValueStr = FString::Format(TEXT("{0}"), { Value });
+						}
+						else
+						{
+							int Value = *(int*)(InValue.GetData() + Offset);
+							BasicValueStr = FString::Format(TEXT("{0}"), { Value });
+						}
+						
 					}
 					else if(Encoding == SpvDebugBasicTypeEncoding::Unsigned || Encoding == SpvDebugBasicTypeEncoding::Boolean)
 					{
-						uint32 Value = *(uint32*)(InValue.GetData() + Offset);
-						BasicValueStr = FString::Format(TEXT("{0}"), {Value});
+						if (BasicTypeDesc->GetSize() == 64)
+						{
+							uint64 Value = *(uint64*)(InValue.GetData() + Offset);
+							BasicValueStr = FString::Format(TEXT("{0}"), { Value });
+						}
+						else
+						{
+							uint32 Value = *(uint32*)(InValue.GetData() + Offset);
+							BasicValueStr = FString::Format(TEXT("{0}"), { Value });
+						}
+					
 					}
 					break;
 				}
