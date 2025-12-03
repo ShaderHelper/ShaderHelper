@@ -812,6 +812,14 @@ namespace FW
 				DecodedInst->SetId(ResultId);
 				break;
 			}
+			case SpvOp::LoopMerge:
+			{
+				SpvId MergeBlock = SpvCode[WordOffset + 1];
+				SpvId ContinueBlock = SpvCode[WordOffset + 2];
+				SpvLoopControl LoopControl = static_cast<SpvLoopControl>(SpvCode[WordOffset + 3]);
+				DecodedInst = MakeUnique<SpvOpLoopMerge>(MergeBlock, ContinueBlock, LoopControl);
+				break;
+			}
 			case SpvOp::SelectionMerge:
 			{
 				SpvId MergeBlock = SpvCode[WordOffset + 1];
@@ -1650,7 +1658,7 @@ namespace FW
 					else if(ExtOp == SpvGLSLstd450::FAbs)
 					{
 						SpvId X = SpvCode[WordOffset + 5];
-						DecodedInst = MakeUnique<SpvFAbs>(ResultType, X);
+						DecodedInst = MakeUnique<SpvFAbs>(ResultType, ExtSetId, X);
 						DecodedInst->SetId(ResultId);
 					}
 					else if(ExtOp == SpvGLSLstd450::SAbs)
@@ -1723,6 +1731,13 @@ namespace FW
 					{
 						SpvId X = SpvCode[WordOffset + 5];
 						DecodedInst = MakeUnique<SpvAtan>(ResultType, X);
+						DecodedInst->SetId(ResultId);
+					}
+					else if (ExtOp == SpvGLSLstd450::Atan2)
+					{
+						SpvId Y = SpvCode[WordOffset + 5];
+						SpvId X = SpvCode[WordOffset + 6];
+						DecodedInst = MakeUnique<SpvAtan2>(ResultType, Y, X);
 						DecodedInst->SetId(ResultId);
 					}
 					else if(ExtOp == SpvGLSLstd450::Pow)

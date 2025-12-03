@@ -44,6 +44,7 @@ namespace FW
 		virtual void Visit(const class SpvOpVariable* Inst) {}
 		virtual void Visit(const class SpvOpAtomicIAdd* Inst) {}
 		virtual void Visit(const class SpvOpPhi* Inst) {}
+		virtual void Visit(const class SpvOpLoopMerge* Inst) {}
 		virtual void Visit(const class SpvOpSelectionMerge* Inst) {}
 		virtual void Visit(const class SpvOpLabel* Inst) {}
 		virtual void Visit(const class SpvOpLoad* Inst) {}
@@ -161,6 +162,7 @@ namespace FW
 		virtual void Visit(const class SpvAsin* Inst) {}
 		virtual void Visit(const class SpvAcos* Inst) {}
 		virtual void Visit(const class SpvAtan* Inst) {}
+		virtual void Visit(const class SpvAtan2* Inst) {}
 		virtual void Visit(const class SpvPow* Inst) {}
 		virtual void Visit(const class SpvExp* Inst) {}
 		virtual void Visit(const class SpvLog* Inst) {}
@@ -895,6 +897,33 @@ namespace FW
 	private:
 		SpvId ResultType;
 		TArray<TPair<SpvId, SpvId>> Operands;
+	};
+
+	class SpvOpLoopMerge : public SpvInstructionBase<SpvOpLoopMerge>
+	{
+	public:
+		SpvOpLoopMerge(SpvId InMergeBlock, SpvId InContinueBlock, SpvLoopControl InLoopControl) : SpvInstructionBase(SpvOp::LoopMerge)
+		, MergeBlock(InMergeBlock), ContinueBlock(InContinueBlock), LoopControl(InLoopControl)
+		{}
+
+		SpvId GetMergeBlock() const { return MergeBlock; }
+		SpvId GetContinueBlock() const { return ContinueBlock; }
+		SpvLoopControl GetLoopControl() const { return LoopControl; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(MergeBlock.GetValue());
+			Bin.Add(ContinueBlock.GetValue());
+			Bin.Add((uint32)LoopControl);
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::LoopMerge;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
+
+	private:
+		SpvId MergeBlock;
+		SpvId ContinueBlock;
+		SpvLoopControl LoopControl;
 	};
 
 	class SpvOpSelectionMerge : public SpvInstructionBase<SpvOpSelectionMerge>
@@ -2538,15 +2567,28 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 	class SpvFAbs : public SpvInstructionBase<SpvFAbs>
 	{
 	public:
-		SpvFAbs(SpvId InResultType, SpvId InX) : SpvInstructionBase(SpvGLSLstd450::FAbs)
-		, ResultType(InResultType), X(InX)
+		SpvFAbs(SpvId InResultType, SpvId InExtSet, SpvId InX) : SpvInstructionBase(SpvGLSLstd450::FAbs)
+		, ResultType(InResultType), ExtSet(InExtSet), X(InX)
 		{}
 		
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetX() const { return X; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(ExtSet.GetValue());
+			Bin.Add((uint32)SpvGLSLstd450::FAbs);
+			Bin.Add(X.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ExtInst;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
+		SpvId ExtSet;
 		SpvId X;
 	};
 
@@ -2727,6 +2769,24 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 		
 	private:
 		SpvId ResultType;
+		SpvId X;
+	};
+
+	class SpvAtan2 : public SpvInstructionBase<SpvAtan2>
+	{
+	public:
+		SpvAtan2(SpvId InResultType, SpvId InY, SpvId InX) : SpvInstructionBase(SpvGLSLstd450::Atan2)
+			, ResultType(InResultType), Y(InY), X(InX)
+		{
+		}
+
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetY() const { return Y; }
+		SpvId GetX() const { return X; }
+
+	private:
+		SpvId ResultType;
+		SpvId Y;
 		SpvId X;
 	};
 

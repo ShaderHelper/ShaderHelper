@@ -509,7 +509,7 @@ namespace SH
 			}
 		}
 
-		return CurDebugStateIndex < DebugStates.Num();
+		return CurDebugStateIndex < DebugStates.Num() && StopLineNumber > 0;
 	}
 
 	ShaderDebugger::ShaderDebugger(SShaderEditorBox* InShaderEditor)
@@ -673,7 +673,7 @@ namespace SH
 					{
 						Error = "Undefined";
 						StopLineNumber = State.Line - ExtraLineNum;
-						SH_LOG(LogShader, Error, TEXT("pow: x(%f) == 0 and y(%f) <= 0 for component %d, the result is undefined."), X, Y, i);
+						SH_LOG(LogShader, Error, TEXT("pow: x = 0 and y(%f) <= 0 for component %d, the result is undefined."), Y, i);
 					}
 				}
 			}
@@ -691,7 +691,7 @@ namespace SH
 				{
 					Error = "Undefined";
 					StopLineNumber = State.Line - ExtraLineNum;
-					SH_LOG(LogShader, Error, TEXT("pow: x(%f) == 0 and y(%f) <= 0, the result is undefined."), X, Y);
+					SH_LOG(LogShader, Error, TEXT("pow: x = 0 and y(%f) <= 0, the result is undefined."), Y);
 				}
 			}
 		}
@@ -822,14 +822,24 @@ namespace SH
 				int ElemCount = static_cast<SpvVectorType*>(ResultType)->ElementCount;
 				for (int i = 0; i < ElemCount; i++)
 				{
-					if (static_cast<SpvIntegerType*>(ResultType)->IsSigend())
+					if (dynamic_cast<SpvFloatType*>(ResultType))
+					{
+						float Operand2 = *(float*)(State.Operand2.GetData() + i * 4);
+						if (Operand2 == 0)
+						{
+							Error = "Undefined";
+							StopLineNumber = State.Line - ExtraLineNum;
+							SH_LOG(LogShader, Error, TEXT("Division by zero is undefined for component %d."), i);
+						}
+					}
+					else if (static_cast<SpvIntegerType*>(ResultType)->IsSigend())
 					{
 						int Operand2 = *(int*)(State.Operand2.GetData() + i * 4);
 						if (Operand2 == 0)
 						{
 							Error = "Undefined";
 							StopLineNumber = State.Line - ExtraLineNum;
-							SH_LOG(LogShader, Error, TEXT("Integer division by zero is undefined for component %d."), i);
+							SH_LOG(LogShader, Error, TEXT("Division by zero is undefined for component %d."), i);
 						}
 					}
 					else
@@ -839,7 +849,7 @@ namespace SH
 						{
 							Error = "Undefined";
 							StopLineNumber = State.Line - ExtraLineNum;
-							SH_LOG(LogShader, Error, TEXT("Integer division by zero is undefined for component %d."), i);
+							SH_LOG(LogShader, Error, TEXT("Division by zero is undefined for component %d."), i);
 						}
 					}
 				}
@@ -852,7 +862,7 @@ namespace SH
 				{
 					Error = "Undefined";
 					StopLineNumber = State.Line - ExtraLineNum;
-					SH_LOG(LogShader, Error, TEXT("Integer division by zero is undefined."));
+					SH_LOG(LogShader, Error, TEXT("Division by zero is undefined."));
 				}
 			}
 		}
@@ -996,6 +1006,182 @@ namespace SH
 						StopLineNumber = State.Line - ExtraLineNum;
 						SH_LOG(LogShader, Error, TEXT("uint remainder by zero is undefined."));
 					}
+				}
+			}
+		}
+		else if (std::holds_alternative<SpvDebugState_Log>(InState))
+		{
+			const auto& State = std::get<SpvDebugState_Log>(InState);
+			SpvType* ResultType = DebuggerContext->Types[State.ResultType].Get();
+			if (ResultType->GetKind() == SpvTypeKind::Vector)
+			{
+				int ElemCount = static_cast<SpvVectorType*>(ResultType)->ElementCount;
+				for (int i = 0; i < ElemCount; i++)
+				{
+					float X = *(float*)(State.X.GetData() + i * 4);
+					if (X <= 0.0f)
+					{
+						Error = "Undefined";
+						StopLineNumber = State.Line - ExtraLineNum;
+						SH_LOG(LogShader, Error, TEXT("log: x(%f) <= 0 for component %d, may produce an indeterminate result."), X, i);
+					}
+				}
+			}
+			else
+			{
+				float X = *(float*)(State.X.GetData());
+				if (X <= 0.0f)
+				{
+					Error = "Undefined";
+					StopLineNumber = State.Line - ExtraLineNum;
+					SH_LOG(LogShader, Error, TEXT("log: x(%f) <= 0, may produce an indeterminate result."), X);
+				}
+			}
+		}
+		else if (std::holds_alternative<SpvDebugState_Asin>(InState))
+		{
+			const auto& State = std::get<SpvDebugState_Asin>(InState);
+			SpvType* ResultType = DebuggerContext->Types[State.ResultType].Get();
+			if (ResultType->GetKind() == SpvTypeKind::Vector)
+			{
+				int ElemCount = static_cast<SpvVectorType*>(ResultType)->ElementCount;
+				for (int i = 0; i < ElemCount; i++)
+				{
+					float X = *(float*)(State.X.GetData() + i * 4);
+					if (FMath::Abs(X) > 1.0f)
+					{
+						Error = "Undefined";
+						StopLineNumber = State.Line - ExtraLineNum;
+						SH_LOG(LogShader, Error, TEXT("Asin: abs x(%f) > 1 for component %d, may produce an indeterminate result."), X, i);
+					}
+				}
+			}
+			else
+			{
+				float X = *(float*)(State.X.GetData());
+				if (FMath::Abs(X) > 1.0f)
+				{
+					Error = "Undefined";
+					StopLineNumber = State.Line - ExtraLineNum;
+					SH_LOG(LogShader, Error, TEXT("Asin: abs x(%f) > 1, may produce an indeterminate result."), X);
+				}
+			}
+		}
+		else if (std::holds_alternative<SpvDebugState_Acos>(InState))
+		{
+			const auto& State = std::get<SpvDebugState_Acos>(InState);
+			SpvType* ResultType = DebuggerContext->Types[State.ResultType].Get();
+			if (ResultType->GetKind() == SpvTypeKind::Vector)
+			{
+				int ElemCount = static_cast<SpvVectorType*>(ResultType)->ElementCount;
+				for (int i = 0; i < ElemCount; i++)
+				{
+					float X = *(float*)(State.X.GetData() + i * 4);
+					if (FMath::Abs(X) > 1.0f)
+					{
+						Error = "Undefined";
+						StopLineNumber = State.Line - ExtraLineNum;
+						SH_LOG(LogShader, Error, TEXT("Acos: abs x(%f) > 1 for component %d, may produce an indeterminate result."), X, i);
+					}
+				}
+			}
+			else
+			{
+				float X = *(float*)(State.X.GetData());
+				if (FMath::Abs(X) > 1.0f)
+				{
+					Error = "Undefined";
+					StopLineNumber = State.Line - ExtraLineNum;
+					SH_LOG(LogShader, Error, TEXT("Acos: abs x(%f) > 1, may produce an indeterminate result."), X);
+				}
+			}
+		}
+		else if (std::holds_alternative<SpvDebugState_Sqrt>(InState))
+		{
+			const auto& State = std::get<SpvDebugState_Sqrt>(InState);
+			SpvType* ResultType = DebuggerContext->Types[State.ResultType].Get();
+			if (ResultType->GetKind() == SpvTypeKind::Vector)
+			{
+				int ElemCount = static_cast<SpvVectorType*>(ResultType)->ElementCount;
+				for (int i = 0; i < ElemCount; i++)
+				{
+					float X = *(float*)(State.X.GetData() + i * 4);
+					if (X < 0.0f)
+					{
+						Error = "Undefined";
+						StopLineNumber = State.Line - ExtraLineNum;
+						SH_LOG(LogShader, Error, TEXT("Sqrt: x(%f) < 0 for component %d, may produce an indeterminate result."), X, i);
+					}
+				}
+			}
+			else
+			{
+				float X = *(float*)(State.X.GetData());
+				if (X < 0.0f)
+				{
+					Error = "Undefined";
+					StopLineNumber = State.Line - ExtraLineNum;
+					SH_LOG(LogShader, Error, TEXT("Sqrt: x(%f) < 0, may produce an indeterminate result."), X);
+				}
+			}
+		}
+		else if (std::holds_alternative<SpvDebugState_InverseSqrt>(InState))
+		{
+			const auto& State = std::get<SpvDebugState_InverseSqrt>(InState);
+			SpvType* ResultType = DebuggerContext->Types[State.ResultType].Get();
+			if (ResultType->GetKind() == SpvTypeKind::Vector)
+			{
+				int ElemCount = static_cast<SpvVectorType*>(ResultType)->ElementCount;
+				for (int i = 0; i < ElemCount; i++)
+				{
+					float X = *(float*)(State.X.GetData() + i * 4);
+					if (X <= 0.0f)
+					{
+						Error = "Undefined";
+						StopLineNumber = State.Line - ExtraLineNum;
+						SH_LOG(LogShader, Error, TEXT("InverseSqrt: x(%f) <= 0 for component %d, may produce an indeterminate result."), X, i);
+					}
+				}
+			}
+			else
+			{
+				float X = *(float*)(State.X.GetData());
+				if (X <= 0.0f)
+				{
+					Error = "Undefined";
+					StopLineNumber = State.Line - ExtraLineNum;
+					SH_LOG(LogShader, Error, TEXT("InverseSqrt: x(%f) <= 0, may produce an indeterminate result."), X);
+				}
+			}
+		}
+		else if (std::holds_alternative<SpvDebugState_Atan2>(InState))
+		{
+			const auto& State = std::get<SpvDebugState_Atan2>(InState);
+			SpvType* ResultType = DebuggerContext->Types[State.ResultType].Get();
+			if (ResultType->GetKind() == SpvTypeKind::Vector)
+			{
+				int ElemCount = static_cast<SpvVectorType*>(ResultType)->ElementCount;
+				for (int i = 0; i < ElemCount; i++)
+				{
+					float Y = *(float*)(State.Y.GetData() + i * 4);
+					float X = *(float*)(State.X.GetData() + i * 4);
+					if (Y == 0.0f && X == 0.0f)
+					{
+						Error = "Undefined";
+						StopLineNumber = State.Line - ExtraLineNum;
+						SH_LOG(LogShader, Error, TEXT("Atan2: y = x = 0 for component %d, the result is undefined."), i);
+					}
+				}
+			}
+			else
+			{
+				float Y = *(float*)(State.Y.GetData());
+				float X = *(float*)(State.X.GetData());
+				if (Y == 0.0f && X == 0.0f)
+				{
+					Error = "Undefined";
+					StopLineNumber = State.Line - ExtraLineNum;
+					SH_LOG(LogShader, Error, TEXT("Atan2: y = x = 0, the result is undefined."));
 				}
 			}
 		}
@@ -1489,6 +1675,86 @@ namespace SH
 					.ResultType = ResultType,
 					.Operand1 = MoveTemp(Operand1),
 					.Operand2 = MoveTemp(Operand2)
+				});
+				break;
+			}
+			case SpvDebuggerStateType::Log:
+			{
+				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
+				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
+				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
+				DebugStates.Add(SpvDebugState_Log{
+					.Line = Line,
+					.ResultType = ResultType,
+					.X = MoveTemp(X)
+				});
+				break;
+			}
+			case SpvDebuggerStateType::Asin:
+			{
+				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
+				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
+				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
+				DebugStates.Add(SpvDebugState_Asin{
+					.Line = Line,
+					.ResultType = ResultType,
+					.X = MoveTemp(X)
+				});
+				break;
+			}
+			case SpvDebuggerStateType::Acos:
+			{
+				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
+				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
+				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
+				DebugStates.Add(SpvDebugState_Acos{
+					.Line = Line,
+					.ResultType = ResultType,
+					.X = MoveTemp(X)
+				});
+				break;
+			}
+			case SpvDebuggerStateType::Sqrt:
+			{
+				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
+				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
+				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
+				DebugStates.Add(SpvDebugState_Sqrt{
+					.Line = Line,
+					.ResultType = ResultType,
+					.X = MoveTemp(X)
+				});
+				break;
+			}
+			case SpvDebuggerStateType::InverseSqrt:
+			{
+				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
+				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
+				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
+				DebugStates.Add(SpvDebugState_InverseSqrt{
+					.Line = Line,
+					.ResultType = ResultType,
+					.X = MoveTemp(X)
+				});
+				break;
+			}
+			case SpvDebuggerStateType::Atan2:
+			{
+				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
+				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
+				TArray<uint8> Y = { DebuggerData + Offset, Size }; Offset += Y.Num();
+				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
+				DebugStates.Add(SpvDebugState_Atan2{
+					.Line = Line,
+					.ResultType = ResultType,
+					.Y = MoveTemp(Y),
+					.X = MoveTemp(X)
 				});
 				break;
 			}

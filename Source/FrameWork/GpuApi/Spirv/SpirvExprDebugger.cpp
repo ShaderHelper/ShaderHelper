@@ -97,7 +97,8 @@ namespace FW
 				{
 					const auto& State = std::get<SpvDebugState_Access>(ExprContext.StopDebugState);
 					int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[FuncCall->GetArguments()[1]].Storage).Value.GetData();
-					if (State.Line == Line)
+					SpvId VarId = *(SpvId*)std::get<SpvObject::Internal>(Context.Constants[FuncCall->GetArguments()[2]].Storage).Value.GetData();
+					if (State.Line == Line && State.VarId == VarId)
 					{
 						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
 						break;
@@ -166,6 +167,66 @@ namespace FW
 				else if (std::holds_alternative<SpvDebugState_Remainder>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
 				{
 					const auto& State = std::get<SpvDebugState_Remainder>(ExprContext.StopDebugState);
+					int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[FuncCall->GetArguments()[1]].Storage).Value.GetData();
+					if (State.Line == Line)
+					{
+						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
+						break;
+					}
+				}
+				else if (std::holds_alternative<SpvDebugState_Log>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
+				{
+					const auto& State = std::get<SpvDebugState_Log>(ExprContext.StopDebugState);
+					int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[FuncCall->GetArguments()[1]].Storage).Value.GetData();
+					if (State.Line == Line)
+					{
+						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
+						break;
+					}
+				}
+				else if (std::holds_alternative<SpvDebugState_Asin>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
+				{
+					const auto& State = std::get<SpvDebugState_Asin>(ExprContext.StopDebugState);
+					int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[FuncCall->GetArguments()[1]].Storage).Value.GetData();
+					if (State.Line == Line)
+					{
+						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
+						break;
+					}
+				}
+				else if (std::holds_alternative<SpvDebugState_Acos>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
+				{
+					const auto& State = std::get<SpvDebugState_Acos>(ExprContext.StopDebugState);
+					int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[FuncCall->GetArguments()[1]].Storage).Value.GetData();
+					if (State.Line == Line)
+					{
+						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
+						break;
+					}
+				}
+				else if (std::holds_alternative<SpvDebugState_Sqrt>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
+				{
+					const auto& State = std::get<SpvDebugState_Sqrt>(ExprContext.StopDebugState);
+					int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[FuncCall->GetArguments()[1]].Storage).Value.GetData();
+					if (State.Line == Line)
+					{
+						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
+						break;
+					}
+				}
+				else if (std::holds_alternative<SpvDebugState_InverseSqrt>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
+				{
+					const auto& State = std::get<SpvDebugState_InverseSqrt>(ExprContext.StopDebugState);
+					int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[FuncCall->GetArguments()[1]].Storage).Value.GetData();
+					if (State.Line == Line)
+					{
+						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
+						break;
+					}
+				}
+				else if (std::holds_alternative<SpvDebugState_Atan2>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
+				{
+					const auto& State = std::get<SpvDebugState_Atan2>(ExprContext.StopDebugState);
 					int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[FuncCall->GetArguments()[1]].Storage).Value.GetData();
 					if (State.Line == Line)
 					{

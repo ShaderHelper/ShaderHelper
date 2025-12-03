@@ -47,6 +47,12 @@ namespace FW
 		Div,
 		ConvertF,
 		Remainder,
+		Log,
+		Asin,
+		Acos,
+		Sqrt,
+		InverseSqrt,
+		Atan2,
 	};
 
 	struct SpvDebugState_VarChange
@@ -135,10 +141,47 @@ namespace FW
 		TArray<uint8> Operand1;
 		TArray<uint8> Operand2;
 	};
+	struct SpvDebugState_Log
+	{
+		int32 Line{};
+		SpvId ResultType;
+		TArray<uint8> X;
+	};
+	struct SpvDebugState_Asin
+	{
+		int32 Line{};
+		SpvId ResultType;
+		TArray<uint8> X;
+	};
+	struct SpvDebugState_Acos
+	{
+		int32 Line{};
+		SpvId ResultType;
+		TArray<uint8> X;
+	};
+	struct SpvDebugState_Sqrt
+	{
+		int32 Line{};
+		SpvId ResultType;
+		TArray<uint8> X;
+	};
+	struct SpvDebugState_InverseSqrt
+	{
+		int32 Line{};
+		SpvId ResultType;
+		TArray<uint8> X;
+	};
+	struct SpvDebugState_Atan2
+	{
+		int32 Line{};
+		SpvId ResultType;
+		TArray<uint8> Y;
+		TArray<uint8> X;
+	};
 
 	using SpvDebugState = std::variant<SpvDebugState_VarChange, SpvDebugState_ScopeChange, SpvDebugState_ReturnValue, SpvDebugState_FuncCall, SpvDebugState_Tag,
 		SpvDebugState_Access, SpvDebugState_Normalize, SpvDebugState_SmoothStep, SpvDebugState_Pow, SpvDebugState_Clamp, SpvDebugState_Div, SpvDebugState_ConvertF, 
-		SpvDebugState_Remainder>;
+		SpvDebugState_Remainder, SpvDebugState_Log, SpvDebugState_Asin, SpvDebugState_Acos, SpvDebugState_Sqrt, SpvDebugState_InverseSqrt, SpvDebugState_Atan2>;
 
 	struct SpvBinding
 	{
@@ -241,11 +284,19 @@ namespace FW
 		void Visit(const SpvSClamp* Inst) override;
 		void Visit(const SpvSmoothStep* Inst) override;
 		void Visit(const SpvNormalize* Inst) override;
+		void Visit(const SpvLog* Inst) override;
+		void Visit(const SpvLog2* Inst) override;
+		void Visit(const SpvAsin* Inst) override;
+		void Visit(const SpvAcos* Inst) override;
+		void Visit(const SpvSqrt* Inst) override;
+		void Visit(const SpvInverseSqrt* Inst) override;
+		void Visit(const SpvAtan2* Inst) override;
 		
 		void Visit(const SpvOpConvertFToU* Inst) override;
 		void Visit(const SpvOpConvertFToS* Inst) override;
 		void Visit(const SpvOpUDiv* Inst) override;
 		void Visit(const SpvOpSDiv* Inst) override;
+		void Visit(const SpvOpFDiv* Inst) override;
 		void Visit(const SpvOpUMod* Inst) override;
 		void Visit(const SpvOpSRem* Inst) override;
 		void Visit(const SpvOpFRem* Inst) override;

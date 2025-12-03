@@ -16,7 +16,7 @@ namespace FW
 				int32 Increment = Index * GetTypeByteSize(VectorType->ElementType);
 				if (Increment > GetTypeByteSize(VectorType) || Increment < 0)
 				{
-					return MakeError(FString::Printf(TEXT("Vector index %d is out of bounds"), Index));
+					return MakeError(FString::Printf(TEXT("Index %d is out of bounds"), Index));
 				}
 				Offset += Increment;
 				CurType = VectorType->ElementType;
@@ -37,7 +37,7 @@ namespace FW
 				int32 Increment = Index * GetTypeByteSize(ArrayType->ElementType);
 				if (Increment > GetTypeByteSize(ArrayType) || Increment < 0)
 				{
-					return MakeError(FString::Printf(TEXT("Array index %d is out of bounds"), Index));
+					return MakeError(FString::Printf(TEXT("Index %d is out of bounds"), Index));
 				}
 				Offset += Increment;
 				CurType = ArrayType->ElementType;
@@ -48,7 +48,7 @@ namespace FW
 				int32 Increment = Index * GetTypeByteSize(MatrixType->ElementType);
 				if (Increment > GetTypeByteSize(MatrixType) || Increment < 0)
 				{
-					return MakeError(FString::Printf(TEXT("Matrix index %d is out of bounds"), Index));
+					return MakeError(FString::Printf(TEXT("Index %d is out of bounds"), Index));
 				}
 				Offset += Increment;
 				CurType = MatrixType->ElementType;
@@ -300,6 +300,15 @@ namespace FW
 		}
 	}
 
+	void SpvDebuggerVisitor::Visit(const SpvOpFDiv* Inst)
+	{
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, ResultType, { Inst->GetOperand2() }, SpvDebuggerStateType::Div);
+		}
+	}
+
 	void SpvDebuggerVisitor::Visit(const SpvOpUMod* Inst)
 	{
 		if (EnableUbsan)
@@ -402,6 +411,69 @@ namespace FW
 			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, ResultType, { Inst->GetX() }, SpvDebuggerStateType::Normalize);
 		}
 
+	}
+
+	void SpvDebuggerVisitor::Visit(const SpvLog* Inst)
+	{
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, ResultType, { Inst->GetX() }, SpvDebuggerStateType::Log);
+		}
+	}
+
+	void SpvDebuggerVisitor::Visit(const SpvLog2* Inst)
+	{
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, ResultType, { Inst->GetX() }, SpvDebuggerStateType::Log);
+		}
+	}
+
+	void SpvDebuggerVisitor::Visit(const SpvAsin* Inst)
+	{
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, ResultType, { Inst->GetX() }, SpvDebuggerStateType::Asin);
+		}
+	}
+
+	void SpvDebuggerVisitor::Visit(const SpvAcos* Inst)
+	{
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, ResultType, { Inst->GetX() }, SpvDebuggerStateType::Acos);
+		}
+	}
+
+	void SpvDebuggerVisitor::Visit(const SpvSqrt* Inst)
+	{
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, ResultType, { Inst->GetX() }, SpvDebuggerStateType::Sqrt);
+		}
+	}
+
+	void SpvDebuggerVisitor::Visit(const SpvInverseSqrt* Inst)
+	{
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, ResultType, { Inst->GetX() }, SpvDebuggerStateType::InverseSqrt);
+		}
+	}
+
+	void SpvDebuggerVisitor::Visit(const SpvAtan2* Inst)
+	{
+		if (EnableUbsan)
+		{
+			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			AppendMath([&] { return Inst->GetWordOffset().value(); }, ResultType, ResultType, { Inst->GetY(), Inst->GetX() }, SpvDebuggerStateType::Atan2);
+		}
 	}
 
 	void SpvDebuggerVisitor::PatchToDebugger(SpvId InValueId, SpvId InTypeId, TArray<TUniquePtr<SpvInstruction>>& InstList)

@@ -1805,7 +1805,11 @@ constexpr int PaddingLineNum = 22;
         ShaderMultiLineEditableText->GetTextLine(CursorRow, CursorLineText);
         FString CursorLeftText = CursorLineText.Mid(0, CursorCol);
         int32 InsertCol = CursorLeftText.Find(*CurToken, ESearchCase::CaseSensitive, ESearchDir::FromEnd);
-        check(InsertCol != INDEX_NONE);
+		if (InsertCol == INDEX_NONE)
+		{
+			return;
+		}
+
         if(CurToken == ".")
         {
             InsertCol += 1;

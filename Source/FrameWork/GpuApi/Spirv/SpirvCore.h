@@ -102,6 +102,13 @@ namespace FW
 		ImageMemory = 0x0800,
 	};
 
+	enum class SpvLoopControl
+	{
+		None = 0,
+		Unroll = 0x0001,
+		DontUnroll = 0x0002,
+	};
+
 	enum class SpvDecorationKind
 	{
 		Block = 2,
@@ -686,6 +693,7 @@ namespace FW
 		Fwidth = 209,
 		AtomicIAdd = 234,
 		Phi = 245,
+		LoopMerge = 246,
 		SelectionMerge = 247,
 		Label = 248,
 		Branch = 249,
