@@ -22,8 +22,10 @@ namespace FW
 		UniformBuffer,
 		Texture,
 		Sampler,
-		StorageBuffer,
-		RWStorageBuffer,
+		StructuredBuffer,
+		RWStructuredBuffer,
+		RawBuffer,
+		RWRawBuffer,
 	};
 
 	struct LayoutBinding
@@ -125,8 +127,8 @@ namespace FW
 		GpuBindGroupLayoutBuilder& AddSampler(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
 
         const FString& GetCodegenDeclaration() const { return LayoutDesc.CodegenDeclaration; }
-        const GpuBindGroupLayoutDesc& GetLayoutDesc() const { return LayoutDesc; }
-		TRefCountPtr<GpuBindGroupLayout> Build();
+        const GpuBindGroupLayoutDesc& GetDesc() const { return LayoutDesc; }
+		TRefCountPtr<GpuBindGroupLayout> Build() const;
         
         friend FArchive& operator<<(FArchive& Ar, GpuBindGroupLayoutBuilder& BindLayoutBuilder)
         {

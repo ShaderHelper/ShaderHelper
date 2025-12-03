@@ -8,7 +8,7 @@ namespace FW
 {
 	struct ResourceBinding
 	{
-		GpuResource* Resource;
+		TRefCountPtr<GpuResource> Resource;
 	};
 
 	struct GpuBindGroupDesc
@@ -42,7 +42,9 @@ namespace FW
 		GpuBindGroupBuilder& SetTexture(const FString& BindingName, GpuResource* InResource);
 		GpuBindGroupBuilder& SetSampler(const FString& BindingName, GpuResource* InResource);
 
-		TRefCountPtr<GpuBindGroup> Build();
+		TRefCountPtr<GpuBindGroup> Build() const;
+
+		const GpuBindGroupDesc& GetDesc() const { return Desc; }
 
 	private:
 		GpuBindGroupDesc Desc;

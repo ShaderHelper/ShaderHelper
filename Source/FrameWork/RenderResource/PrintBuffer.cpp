@@ -11,9 +11,11 @@ namespace FW
 		Datas.SetNumZeroed(sizeof(HLSL::Printer));
 		InternalBuffer = GGpuRhi->CreateBuffer({
 			.ByteSize = sizeof(HLSL::Printer),
-			.Usage = GpuBufferUsage::RWStorage,
-			.Stride = sizeof(HLSL::Printer),
-			.InitialData = Datas
+			.Usage = GpuBufferUsage::RWStructured,
+			.InitialData = Datas,
+			.StructuredInit = {
+				.Stride = sizeof(HLSL::Printer)
+			}
 		});
 	}
 
@@ -41,7 +43,7 @@ namespace FW
 				void* ArgValue = (uint8*)Printer + ByteOffset;
 				if (Tag == HLSL::Print_float)
 				{
-					FString Arg = FString::Printf(TEXT("%.7g"), *(float*)ArgValue);
+					FString Arg = FString::Printf(TEXT("%.9g"), *(float*)ArgValue);
 					Args.Add(Arg);
 					ByteOffset += sizeof(float);
 				}

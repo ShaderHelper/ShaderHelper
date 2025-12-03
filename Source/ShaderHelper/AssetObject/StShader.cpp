@@ -114,7 +114,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         static GpuBindGroupLayoutBuilder BuiltInBindLayout{ BindingContext::GlobalSlot };
         static int Init = [&] {
             BuiltInBindLayout
-				.AddExistingBinding(0, BindingType::RWStorageBuffer, BindingShaderStage::Pixel)
+				.AddExistingBinding(0, BindingType::RWStructuredBuffer, BindingShaderStage::Pixel)
                 .AddUniformBuffer("BuiltInUniform", GetBuiltInUbBuilder().GetLayoutDeclaration(), BindingShaderStage::Pixel)
                 .AddTexture("iChannel0", BindingShaderStage::Pixel)
                 .AddSampler("iChannel0Sampler", BindingShaderStage::Pixel)
@@ -291,7 +291,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
             }
             else
             {
-                MessageDialog::Open(MessageDialog::Ok, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("DuplicateBindingName"));
+                MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("DuplicateBindingName"));
                 return false;
             }
         });
@@ -385,7 +385,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
     {
         BuiltInCategory = MakeShared<PropertyCategory>(this, "Built In");
         {
-            const GpuBindGroupLayoutDesc& BuiltInLayoutDesc = GetBuiltInBindLayoutBuilder().GetLayoutDesc();
+            const GpuBindGroupLayoutDesc& BuiltInLayoutDesc = GetBuiltInBindLayoutBuilder().GetDesc();
             for(const auto& [BindingName, Slot] : BuiltInLayoutDesc.CodegenBindingNameToSlot)
             {
                 if(BuiltInLayoutDesc.GetBindingType(Slot) == BindingType::UniformBuffer)
@@ -419,7 +419,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         
         CustomCategory = MakeShared<PropertyCategory>(this, "Custom");
         {
-            const GpuBindGroupLayoutDesc& CustomLayoutDesc = CustomBindGroupLayoutBuilder.GetLayoutDesc();
+            const GpuBindGroupLayoutDesc& CustomLayoutDesc = CustomBindGroupLayoutBuilder.GetDesc();
             for(const auto& [BindingName, Slot] : CustomLayoutDesc.CodegenBindingNameToSlot)
             {
                 if(CustomLayoutDesc.GetBindingType(Slot) == BindingType::UniformBuffer)

@@ -136,7 +136,7 @@ namespace FW
                         {
                             if(IFileManager::Get().FileExists(*NewFilePath))
                             {
-                                MessageDialog::Open(MessageDialog::Ok, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("AssetRenameFailure"));
+                                MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("AssetRenameFailure"));
                             }
                             else
                             {

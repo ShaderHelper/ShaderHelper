@@ -30,8 +30,10 @@ namespace FW
 		case D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER:            return BindingType::UniformBuffer;
 		case D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE:			return BindingType::Texture;
 		case D3D_SHADER_INPUT_TYPE::D3D_SIT_SAMPLER:			return BindingType::Sampler;
-		case D3D_SHADER_INPUT_TYPE::D3D_SIT_STRUCTURED:			return BindingType::StorageBuffer;
-		case D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWSTRUCTURED:	return BindingType::RWStorageBuffer;
+		case D3D_SHADER_INPUT_TYPE::D3D_SIT_STRUCTURED:			return BindingType::StructuredBuffer;
+		case D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWSTRUCTURED:	return BindingType::RWStructuredBuffer;
+		case D3D_SHADER_INPUT_TYPE::D3D_SIT_BYTEADDRESS:        return BindingType::RawBuffer;
+		case D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWBYTEADDRESS:  return BindingType::RWRawBuffer;
 		default:
 			AUX::Unreachable();
 		}
@@ -190,8 +192,9 @@ namespace FW
 		Arguments.Add(*ShaderProfile);
 #if DEBUG_SHADER
 		Arguments.Add(TEXT("/Zi"));
-        Arguments.Add(TEXT("/Od"));
 #endif
+		Arguments.Add(TEXT("/Od")); //TODO
+		Arguments.Add(TEXT("-Zpr"));
         //Arguments.Add(TEXT("-no-warnings"));
 
 		if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
@@ -202,6 +205,7 @@ namespace FW
 			Arguments.Add(TEXT("-Vd"));
 			Arguments.Add(TEXT("-fvk-use-dx-layout"));
 			Arguments.Add(TEXT("-fspv-debug=vulkan-with-source"));
+			//Arguments.Add(TEXT("-fspv-reflect"));
 		}
 
 		ValidateGpuFeature(GpuFeature::Support16bitType, TEXT("Hardware does not support 16bitType, shader model <= 6.2"))
@@ -234,7 +238,10 @@ namespace FW
 		}
 		FString ShaderName = InShader->GetShaderName();
 #if DEBUG_SHADER
-		FFileHelper::SaveStringToFile(InShader->GetProcessedSourceText(), *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl"));
+		if (!ShaderName.IsEmpty())
+		{
+			FFileHelper::SaveStringToFile(InShader->GetProcessedSourceText(), *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl"));
+		}
 #endif
 
 		TRefCountPtr<IDxcIncludeHandler> IncludeHandler = new ShIncludeHandler(InShader);
@@ -293,7 +300,8 @@ namespace FW
 #if DEBUG_SHADER
 					TRefCountPtr<IDxcBlob> PdbBlob;
 					TRefCountPtr<IDxcBlobUtf16> PdbNameBlob;
-					if (SUCCEEDED(CompileResult->GetOutput(DXC_OUT_PDB, IID_PPV_ARGS(PdbBlob.GetInitReference()), PdbNameBlob.GetInitReference())))
+					if (SUCCEEDED(CompileResult->GetOutput(DXC_OUT_PDB, IID_PPV_ARGS(PdbBlob.GetInitReference()), PdbNameBlob.GetInitReference()))
+						&& PdbNameBlob)
 					{
 						const FString PdbName = PdbNameBlob->GetStringPointer();
 						const FString PdbFile = PathHelper::SavedShaderDir() / "Pdb" / PdbName;

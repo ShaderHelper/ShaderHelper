@@ -185,6 +185,9 @@ namespace ShaderConductor
             int shiftAllSamplersBindings = 0;
             int shiftAllCBuffersBindings = 0;
             int shiftAllUABuffersBindings = 0;
+
+            //spv compile options
+            bool force_zero_initialized_variables = false;
         };
 
         struct TargetDesc
@@ -250,6 +253,7 @@ namespace ShaderConductor
         static ResultDesc Compile(const SourceDesc& source, const Options& options, const TargetDesc& target);
         static void Compile(const SourceDesc& source, const Options& options, const TargetDesc* targets, uint32_t numTargets,
                             ResultDesc* results);
+        static ResultDesc SpvCompile(const Options& options, const Blob& spvBinary, const char* entryPoint, ShaderStage stage, const TargetDesc& target);
         static ResultDesc Disassemble(const DisassembleDesc& source);
 
         // Currently only Dxil on Windows supports linking

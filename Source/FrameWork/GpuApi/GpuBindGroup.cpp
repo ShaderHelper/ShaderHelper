@@ -37,7 +37,7 @@ namespace FW
 		return *this;
 	}
 
-	TRefCountPtr<GpuBindGroup> GpuBindGroupBuilder::Build()
+	TRefCountPtr<GpuBindGroup> GpuBindGroupBuilder::Build() const
 	{
 		return GGpuRhi->CreateBindGroup(Desc);
 	}

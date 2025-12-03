@@ -67,10 +67,12 @@ namespace FW
 		Temporary = 1u << 2, // at most 1 frame.
 
 		Uniform = 1u << 3,
-		Storage = 1u << 4,
-		RWStorage = 1u << 5,
+		Structured = 1u << 4,
+		RWStructured = 1u << 5,
+		Raw = 1u << 6,
+		RWRaw = 1u << 7,
 
-		StaticMask = RWStorage | Storage, //Only Gpu r/w
+		StaticMask = RWStructured | Structured | Raw | RWRaw, //Only Gpu r/w
 		DynamicMask = Upload | ReadBack | Uniform, //Cpu can r/w
 	};
 	ENUM_CLASS_FLAGS(GpuBufferUsage);

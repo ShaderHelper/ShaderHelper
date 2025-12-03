@@ -15,9 +15,33 @@ namespace FW
 		}
 		bool operator==(const SpvId&) const = default;
 		uint32 GetValue() const { return Value; }
+		bool IsValid() const { return Value != 0; }
 		
 	private:
 		uint32 Value;
+	};
+
+	struct SpvSection
+	{
+		int StartOffset, EndOffset;
+	};
+
+	enum class SpvSectionKind
+	{
+		Capability,
+		Extension,
+		ExtInstImport,
+		MemoryModel,
+		EntryPoint,
+		ExecutionMode,
+		DebugString,
+		DebugName,
+		Annotation,
+		Type,
+		Contant = Type,
+		GlobalVar = Type,
+		Function,
+		Num,
 	};
 
 	enum class SpvTypeKind
@@ -29,6 +53,7 @@ namespace FW
 		Vector,
 		Matrix,
 		Pointer,
+		Function,
 		Struct,
 		Image,
 		Sampler,
@@ -51,6 +76,37 @@ namespace FW
 		AtomicCounter = 10,
 		Image = 11,
 		StorageBuffer = 12,
+	};
+
+	enum class SpvMemoryScope
+	{
+		CrossDevice = 0,
+		Device = 1,
+		Workgroup = 2,
+		Subgroup = 3,
+		Invocation = 4,
+	};
+
+	enum class SpvMemorySemantics
+	{
+		None = 0,
+		Acquire = 0x0002,
+		Release = 0x0004,
+		AcquireRelease = 0x0008,
+		SequentiallyConsistent = 0x0010,
+		UniformMemory = 0x0040,
+		SubgroupMemory = 0x0080,
+		WorkgroupMemory = 0x0100,
+		CrossWorkgroupMemory = 0x0200,
+		AtomicCounterMemory = 0x0400,
+		ImageMemory = 0x0800,
+	};
+
+	enum class SpvLoopControl
+	{
+		None = 0,
+		Unroll = 0x0001,
+		DontUnroll = 0x0002,
 	};
 
 	enum class SpvDecorationKind
@@ -167,6 +223,22 @@ namespace FW
 		R64i = 41,
 	};
 
+	enum class SpvFunctionControl
+	{
+		None = 0,
+		Inline = 1,
+		DontInline = 2,
+		Pure = 4,
+		Const  = 8,
+	};
+
+	enum class SpvSelectionControl
+	{
+		None = 0,
+		Flatten = 1,
+		DontFlatten = 2,
+	};
+
 	class SpvType
 	{
 	public:
@@ -222,12 +294,13 @@ namespace FW
 	class SpvImageType : public SpvType
 	{
 	public:
-		SpvImageType(SpvId InId, SpvType* InSampledType, SpvDim InDim) : SpvType(SpvTypeKind::Image, InId)
-		, SampledType(InSampledType), Dim(InDim)
+		SpvImageType(SpvId InId, SpvType* InSampledType, SpvDim InDim, uint32 InSampled) : SpvType(SpvTypeKind::Image, InId)
+		, SampledType(InSampledType), Dim(InDim), Sampled(InSampled)
 		{}
 		
 		SpvType* SampledType;
 		SpvDim Dim;
+		uint32 Sampled;
 	};
 
 	class SpvSamplerType : public SpvType
@@ -287,6 +360,19 @@ namespace FW
 		SpvType* PointeeType;
 	};
 
+	class SpvFunctionType : public SpvType
+	{
+	public:
+		SpvFunctionType(SpvId InId, SpvType* InReturnType, const TArray<SpvType*>& InParameterTypes)
+		: SpvType(SpvTypeKind::Function, InId)
+		, ReturnType(InReturnType)
+		, ParameterTypes(InParameterTypes)
+		{}
+
+		SpvType* ReturnType;
+		TArray<SpvType*> ParameterTypes;
+	};
+
 	class SpvStructType : public SpvType
 	{
 	public:
@@ -332,6 +418,10 @@ namespace FW
 		else if(Type->GetKind() == SpvTypeKind::Integer)
 		{
 			SpvIntegerType* IntegerType = static_cast<SpvIntegerType*>(Type);
+			if (IntegerType->GetWidth() == 64)
+			{
+				return IntegerType->IsSigend() ? "int64_t" : "uint64_t";
+			}
 			return IntegerType->IsSigend() ? "int" : "uint";
 		}
 		else if(Type->GetKind() == SpvTypeKind::Vector)
@@ -351,31 +441,47 @@ namespace FW
 			FString BasicTypeStr = GetHlslTypeStr(ElementType->ElementType);
 			return BasicTypeStr + FString::Printf(TEXT("%dx%d"), MatrixType->ElementCount, ElementType->ElementCount);
 		}
+		else if (Type->GetKind() == SpvTypeKind::Image)
+		{
+			SpvImageType* ImageType = static_cast<SpvImageType*>(Type);
+			if (ImageType->Sampled == 2)
+			{
+				return "RWTexture2D";
+			}
+			else
+			{
+				return "Texture2D";
+			}
+		}
+		else if (Type->GetKind() == SpvTypeKind::Sampler)
+		{
+			return "SamplerState";
+		}
 		AUX::Unreachable();
 	};
 
 	//Only valid for the type of the internal object,
 	//because the type of the external object may have different memory alignment rules.
-	inline int32 GetTypeByteSize(SpvType* Type)
+	inline int32 GetTypeByteSize(const SpvType* Type)
 	{
 		if(Type->IsScalar())
 		{
-			SpvScalarType* ScalarType = static_cast<SpvScalarType*>(Type);
+			const SpvScalarType* ScalarType = static_cast<const SpvScalarType*>(Type);
 			return ScalarType->GetWidth() / 8;
 		}
 		else if(Type->GetKind() == SpvTypeKind::Vector)
 		{
-			SpvVectorType* VectorType = static_cast<SpvVectorType*>(Type);
+			const SpvVectorType* VectorType = static_cast<const SpvVectorType*>(Type);
 			return GetTypeByteSize(VectorType->ElementType) * VectorType->ElementCount;
 		}
 		else if(Type->GetKind() == SpvTypeKind::Array)
 		{
-			SpvArrayType* ArrayType = static_cast<SpvArrayType*>(Type);
+			const SpvArrayType* ArrayType = static_cast<const SpvArrayType*>(Type);
 			return GetTypeByteSize(ArrayType->ElementType) * ArrayType->Length;
 		}
 		else if(Type->GetKind() == SpvTypeKind::Struct)
 		{
-			SpvStructType* StructType = static_cast<SpvStructType*>(Type);
+			const SpvStructType* StructType = static_cast<const SpvStructType*>(Type);
 			int32 MembersByteSize = 0;
 			for(SpvType* MemberType : StructType->MemberTypes)
 			{
@@ -385,13 +491,10 @@ namespace FW
 		}
 		else if(Type->GetKind() == SpvTypeKind::Matrix)
 		{
-			SpvMatrixType* MatrixType = static_cast<SpvMatrixType*>(Type);
+			const SpvMatrixType* MatrixType = static_cast<const SpvMatrixType*>(Type);
 			return MatrixType->ElementCount * GetTypeByteSize(MatrixType->ElementType);
 		}
-		else
-		{
-			return 0;
-		}
+		return 0;
 	}
 
 	struct SpvObject
@@ -410,14 +513,15 @@ namespace FW
 		struct Internal
 		{
 			TArray<uint8> Value;
-			TArray<GpuResource*> Resources;
-			
-			bool IsOpaque() const { return Value.IsEmpty() && !Resources.IsEmpty(); }
 		};
 		
-		bool IsOpaque() const { return std::visit([](auto&& Arg){ return Arg.IsOpaque(); }, Storage); }
 		bool IsExternal() const { return std::holds_alternative<SpvObject::External>(Storage); }
 		int GetBufferSize() const { return std::visit([](auto&& Arg) { return Arg.Value.Num(); }, Storage); }
+		TArray<uint8>& GetBuffer() { 
+			return std::visit([](auto&& Arg) -> auto& {
+				return Arg.Value;
+			}, Storage);
+		}
 		
 		std::variant<External, Internal> Storage;
 	};
@@ -426,27 +530,35 @@ namespace FW
 	struct SpvVariable : SpvObject
 	{
 		SpvStorageClass StorageClass;
+		SpvPointerType* PointerType;
 		TArray<Vector2i> InitializedRanges;//[Start,End]
 
 		bool IsCompletelyInitialized() const
 		{
+			Vector2i Range = GetInitializedRange();
+			return Range.X == 0 && Range.Y == GetBufferSize();
+		}
+
+		Vector2i GetInitializedRange() const
+		{
 			int MinimumStart = std::numeric_limits<int>::max();
 			int MaximumEnd = std::numeric_limits<int>::min();
-			for(const auto& Range : InitializedRanges)
+			for (const auto& Range : InitializedRanges)
 			{
 				MinimumStart = FMath::Min(MinimumStart, Range.X);
 				MaximumEnd = FMath::Max(MaximumEnd, Range.Y);
 			}
-			return MinimumStart == 0 && MaximumEnd == GetBufferSize();
-		} 
+			return { MinimumStart, MaximumEnd };
+		}
 	};
 
 	//Logical
 	struct SpvPointer
 	{
 		SpvId Id{};
-		SpvVariable* Pointee;
-		TArray<uint32> Indexes;
+		SpvVariable* Var;
+		TArray<SpvId> Indexes;
+		SpvPointerType* Type;
 	};
 
 	struct SpvDecoration
@@ -472,12 +584,17 @@ namespace FW
 
 	enum class SpvOp
 	{
+		Source = 3,
 		Name = 5,
+		MemberName = 6,
 		String = 7,
+		Extension = 10,
 		ExtInstImport = 11,
 		ExtInst = 12,
+		MemoryModel = 14,
 		EntryPoint = 15,
 		ExecutionMode = 16,
+		Capability = 17,
 		TypeVoid = 19,
 		TypeBool = 20,
 		TypeInt = 21,
@@ -490,6 +607,7 @@ namespace FW
 		TypeRuntimeArray = 29,
 		TypeStruct = 30,
 		TypePointer = 32,
+		TypeFunction = 33,
 		ConstantTrue = 41,
 		ConstantFalse = 42,
 		Constant = 43,
@@ -497,6 +615,7 @@ namespace FW
 		ConstantNull = 46,
 		Function = 54,
 		FunctionParameter = 55,
+		FunctionEnd = 56,
 		FunctionCall = 57,
 		Variable = 59,
 		Load = 61,
@@ -572,7 +691,10 @@ namespace FW
 		DPdx = 207,
 		DPdy = 208,
 		Fwidth = 209,
+		AtomicIAdd = 234,
 		Phi = 245,
+		LoopMerge = 246,
+		SelectionMerge = 247,
 		Label = 248,
 		Branch = 249,
 		BranchConditional = 250,
@@ -580,6 +702,7 @@ namespace FW
 		Kill = 252,
 		Return = 253,
 		ReturnValue = 254,
+		ExtInstWithForwardRefsKHR = 4433,
 	};
 }
 

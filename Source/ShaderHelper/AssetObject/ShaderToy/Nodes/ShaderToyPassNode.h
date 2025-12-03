@@ -63,15 +63,18 @@ namespace SH
         TArray<TSharedRef<FW::PropertyData>>* GetPropertyDatas() override;
     
 		//ShDebuggableObject
+		InvocationState GetInvocationState() override;
 		TRefCountPtr<FW::GpuTexture> OnStartDebugging() override;
 		void OnFinalizePixel(const FW::Vector2u& PixelCoord) override;
 		void OnEndDebuggging() override;
-		ShaderAsset* GetShaderAsset() const;
+		ShaderAsset* GetShaderAsset() const override;
 
 		std::string GetShaderToyCode() const;
 		
     private:
+		FW::GpuBindGroupBuilder GetBuiltInBindGroupBuiler();
 		TRefCountPtr<FW::GpuBindGroup> GetBuiltInBindGroup();
+
 		void InitShaderAsset();
 		void InitCustomBindGroup();
         void ClearBindingProperty();
@@ -95,5 +98,10 @@ namespace SH
         TUniquePtr<FW::UniformBuffer> CustomUniformBuffer;
         TRefCountPtr<FW::GpuBindGroupLayout> CustomBindLayout;
         TRefCountPtr<FW::GpuBindGroup> CustomBindGroup;
+		std::optional<FW::GpuBindGroupBuilder> CustomBindGroupBuilder;
+
+		//Debugger
+		FW::GpuRenderPipelineStateDesc PipelineDesc;
+		bool AssertError{};
 	};
 }

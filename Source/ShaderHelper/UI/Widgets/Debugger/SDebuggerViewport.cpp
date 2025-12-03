@@ -5,6 +5,7 @@
 #include "Editor/ShaderHelperEditor.h"
 #include "App/App.h"
 #include "RenderResource/Shader/DebuggerGridShader.h"
+#include "UI/Widgets/MessageDialog/SMessageDialog.h"
 
 using namespace FW;
 
@@ -123,7 +124,6 @@ namespace SH
 			return FReply::Unhandled();
 		}
 		
-		DpiScale = MyGeometry.Scale;
 		Vector2f CurMousePos = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * DpiScale);
 		if(MouseEvent.IsMouseButtonDown(EKeys::MiddleMouseButton))
 		{
@@ -146,7 +146,6 @@ namespace SH
 			return FReply::Unhandled();
 		}
 		
-		DpiScale = MyGeometry.Scale;
 		Vector2f CurMousePos = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * DpiScale);
 		Vector2f ContentPosBefore = (CurMousePos + Offset) / float(Zoom);
 		Zoom = FMath::Clamp(int32(float(Zoom) + MouseEvent.GetWheelDelta()), 1, 128);
@@ -233,11 +232,12 @@ namespace SH
 		return SCompoundWidget::OnPaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
 	}
 
-	void SDebuggerViewport::SetDebugTarget(TRefCountPtr<GpuTexture> InTarget)
+	void SDebuggerViewport::SetDebugTarget(TRefCountPtr<GpuTexture> InTarget, bool GlobalValidation)
 	{
 		bFinalizePixel = false;
 		Zoom = 1;
 		Offset = 0.0f;
+		DpiScale = FSlateApplication::Get().FindWidgetWindow(AsShared())->GetNativeWindow()->GetDPIScaleFactor();
 		
 		uint32 Width = InTarget->GetWidth();
 		uint32 Height = InTarget->GetHeight();
@@ -271,5 +271,40 @@ namespace SH
 			}
 		}
 		GGpuRhi->UnMapGpuTexture(InTarget);
+
+		if (GlobalValidation)
+		{
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			auto Invocation = ShEditor->GetDebuggaleObject()->GetInvocationState();
+			if (std::holds_alternative<PixelState>(Invocation))
+			{
+				SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(ShEditor->GetDebuggaleObject()->GetShaderAsset());
+				std::optional<Vector2u> ErrorCoord;
+				try
+				{
+					ErrorCoord = ShaderEditor->ValidatePixel(Invocation);
+				}
+				catch (const std::runtime_error& e)
+				{
+					MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), FText::FromString(UTF8_TO_TCHAR(e.what())));
+					ShEditor->EndDebugging();
+					return;
+				}
+
+				if (ErrorCoord)
+				{
+					PixelCoord = ErrorCoord.value();
+					MouseLoc = PixelCoord * Zoom - Offset;
+					Draw();
+					bFinalizePixel = true;
+					ShEditor->GetDebuggaleObject()->OnFinalizePixel(PixelCoord);
+				}
+				else
+				{
+					MessageDialog::Open(MessageDialog::Ok, MessageDialog::Happy, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("ValidationTip"));
+					ShEditor->EndDebugging();
+				}
+			}
+		}
 	}
 }

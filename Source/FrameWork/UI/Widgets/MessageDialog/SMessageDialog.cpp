@@ -11,6 +11,7 @@ namespace FW::MessageDialog
 			SLATE_ARGUMENT(SWindow*, ParentWindow)
 			SLATE_ARGUMENT(FText, Message)
 			SLATE_ARGUMENT(MessageType, MsgType)
+			SLATE_ARGUMENT(MessageMood, MsgMood)
 			SLATE_ARGUMENT(MessageRet*, ReturnResult)
 		SLATE_END_ARGS()
 
@@ -18,6 +19,7 @@ namespace FW::MessageDialog
 
 	private:
 		MessageType MsgType;
+		MessageMood MsgMood;
 		SWindow* ParentWindow;
 		MessageRet* ReturnResult;
 	};
@@ -25,6 +27,7 @@ namespace FW::MessageDialog
 	void SMessageDialog::Construct(const FArguments& InArgs)
 	{
 		MsgType = InArgs._MsgType;
+		MsgMood = InArgs._MsgMood;
 		ParentWindow = InArgs._ParentWindow;
 		ReturnResult = InArgs._ReturnResult;
 
@@ -46,13 +49,17 @@ namespace FW::MessageDialog
 					SNew(SImage)
 					.DesiredSizeOverride(FVector2D(64.f, 64.f))
 					.Image_Lambda([this] {
-						if (MsgType == MessageType::Ok)
+						if (MsgMood == MessageMood::Happy)
 						{	
-							return FAppCommonStyle::Get().GetBrush("MessageDialog.Boqi");
+							return FAppCommonStyle::Get().GetBrush("MessageDialog.Boqi3");
+						}
+						else if(MsgMood == MessageMood::Shocked)
+						{
+							return FAppCommonStyle::Get().GetBrush("MessageDialog.Boqi2");
 						}
 						else
 						{
-							return FAppCommonStyle::Get().GetBrush("MessageDialog.Boqi2");
+							return FAppCommonStyle::Get().GetBrush("MessageDialog.Boqi");
 						}
 					})
 				]
@@ -133,7 +140,7 @@ namespace FW::MessageDialog
 
 	}
 
-	MessageRet Open(MessageType MsgType, TSharedPtr<SWindow> Parent, const TAttribute<FText>& InMessage)
+	MessageRet Open(MessageType MsgType, MessageMood Mood, TSharedPtr<SWindow> Parent, const TAttribute<FText>& InMessage)
 	{
 		MessageRet Result;
 
@@ -148,6 +155,7 @@ namespace FW::MessageDialog
 		TSharedRef<SMessageDialog> MessageDialog = SNew(SMessageDialog)
 			.ReturnResult(&Result)
 			.MsgType(MsgType)
+			.MsgMood(Mood)
 			.ParentWindow(&*ModalWindow)
 			.Message(InMessage.Get());
 

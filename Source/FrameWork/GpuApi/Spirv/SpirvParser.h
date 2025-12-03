@@ -23,6 +23,22 @@ namespace FW
 		std::unordered_map<SpvId, SpvVariableDesc> VariableDescs;
 		std::unordered_map<SpvId, SpvVariableDesc*> VariableDescMap;   //VarId -> Desc
 		std::unordered_map<SpvId, TUniquePtr<SpvLexicalScope>> LexicalScopes;
+
+		SpvId GetTypeDescId(const SpvTypeDesc* InDesc)
+		{
+			for (const auto& [Id, Desc] : TypeDescs)
+			{
+				if (Desc.Get() == InDesc)
+				{
+					return Id;
+				}
+			}
+			return {};
+		}
+
+		TMap<SpvBuiltIn, SpvId> BuiltIns;
+		TMap<SpvSectionKind, SpvSection> Sections;
+		TMap<SpvId, SpvExtSet> ExtSets;
 	};
 
 	class FRAMEWORK_API SpvMetaVisitor : public SpvVisitor
@@ -30,47 +46,50 @@ namespace FW
 	public:
 		SpvMetaVisitor(SpvMetaContext& InContext) : Context(InContext)
 		{}
+		SpvMetaContext& GetContext() { return Context; }
 		
 	public:
-		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts) override;
+		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections, const TMap<SpvId, SpvExtSet>& InExtSets) override;
 		
-		void Visit(SpvOpVariable* Inst) override;
-		void Visit(SpvOpTypeVoid* Inst) override;
-		void Visit(SpvOpTypeFloat* Inst) override;
-		void Visit(SpvOpTypeInt* Inst) override;
-		void Visit(SpvOpTypeVector* Inst) override;
-		void Visit(SpvOpTypeMatrix* Inst) override;
-		void Visit(SpvOpTypeBool* Inst) override;
-		void Visit(SpvOpTypePointer* Inst) override;
-		void Visit(SpvOpTypeStruct* Inst) override;
-		void Visit(SpvOpTypeImage* Inst) override;
-		void Visit(SpvOpTypeSampler* Inst) override;
-		void Visit(SpvOpTypeArray* Inst) override;
-		void Visit(SpvOpTypeRuntimeArray* Inst) override;
-		void Visit(SpvOpDecorate* Inst) override;
-		void Visit(SpvOpMemberDecorate* Inst) override;
-		void Visit(SpvOpExecutionMode* Inst) override;
-		void Visit(SpvOpName* Inst) override;
-		void Visit(SpvOpString* Inst) override;
-		void Visit(SpvOpConstant* Inst) override;
-		void Visit(SpvOpConstantTrue* Inst) override;
-		void Visit(SpvOpConstantFalse* Inst) override;
-		void Visit(SpvOpConstantComposite* Inst) override;
-		void Visit(SpvOpConstantNull* Inst) override;
+		void Visit(const SpvOpVariable* Inst) override;
+		void Visit(const SpvOpTypeVoid* Inst) override;
+		void Visit(const SpvOpTypeFloat* Inst) override;
+		void Visit(const SpvOpTypeInt* Inst) override;
+		void Visit(const SpvOpTypeVector* Inst) override;
+		void Visit(const SpvOpTypeMatrix* Inst) override;
+		void Visit(const SpvOpTypeBool* Inst) override;
+		void Visit(const SpvOpTypePointer* Inst) override;
+		void Visit(const SpvOpTypeFunction* Inst) override;
+		void Visit(const SpvOpTypeStruct* Inst) override;
+		void Visit(const SpvOpTypeImage* Inst) override;
+		void Visit(const SpvOpTypeSampler* Inst) override;
+		void Visit(const SpvOpTypeArray* Inst) override;
+		void Visit(const SpvOpTypeRuntimeArray* Inst) override;
+		void Visit(const SpvOpDecorate* Inst) override;
+		void Visit(const SpvOpMemberDecorate* Inst) override;
+		void Visit(const SpvOpExecutionMode* Inst) override;
+		void Visit(const SpvOpName* Inst) override;
+		void Visit(const SpvOpString* Inst) override;
+		void Visit(const SpvOpConstant* Inst) override;
+		void Visit(const SpvOpConstantTrue* Inst) override;
+		void Visit(const SpvOpConstantFalse* Inst) override;
+		void Visit(const SpvOpConstantComposite* Inst) override;
+		void Visit(const SpvOpConstantNull* Inst) override;
 		
-		void Visit(SpvDebugTypeBasic* Inst) override;
-		void Visit(SpvDebugTypeVector* Inst) override;
-		void Visit(SpvDebugTypeMatrix* Inst) override;
-		void Visit(SpvDebugTypeComposite* Inst) override;
-		void Visit(SpvDebugTypeMember* Inst) override;
-		void Visit(SpvDebugTypeArray* Inst) override;
-		void Visit(SpvDebugTypeFunction* Inst) override;
-		void Visit(SpvDebugCompilationUnit* Inst) override;
-		void Visit(SpvDebugLexicalBlock* Inst) override;
-		void Visit(SpvDebugFunction* Inst) override;
-		void Visit(SpvDebugInlinedAt* Inst) override;
-		void Visit(SpvDebugLocalVariable* Inst) override;
-		void Visit(SpvDebugGlobalVariable* Inst) override;
+		void Visit(const SpvDebugTypeBasic* Inst) override;
+		void Visit(const SpvDebugTypeVector* Inst) override;
+		void Visit(const SpvDebugTypeMatrix* Inst) override;
+		void Visit(const SpvDebugTypeComposite* Inst) override;
+		void Visit(const SpvDebugTypeMember* Inst) override;
+		void Visit(const SpvDebugTypeArray* Inst) override;
+		void Visit(const SpvDebugTypeTemplate* Inst) override;
+		void Visit(const SpvDebugTypeFunction* Inst) override;
+		void Visit(const SpvDebugCompilationUnit* Inst) override;
+		void Visit(const SpvDebugLexicalBlock* Inst) override;
+		void Visit(const SpvDebugFunction* Inst) override;
+		void Visit(const SpvDebugInlinedAt* Inst) override;
+		void Visit(const SpvDebugLocalVariable* Inst) override;
+		void Visit(const SpvDebugGlobalVariable* Inst) override;
  
 	private:
 		SpvMetaContext& Context;
@@ -79,12 +98,14 @@ namespace FW
 	class FRAMEWORK_API SpirvParser : FNoncopyable
 	{
 	public:
-		void Parse(const TArray<uint32>& SpvCode);
+		void Parse(const TArray<uint32>& InSpvCode);
 		void Accept(SpvVisitor* Visitor);
 		
 	protected:
 		TMap<SpvId, SpvExtSet> ExtSets;
 		TArray<TUniquePtr<SpvInstruction>> Insts;
+		TArray<uint32> SpvCode;
+		TMap<SpvSectionKind, SpvSection> Sections;
 	};
 	
 }

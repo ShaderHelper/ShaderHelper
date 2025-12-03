@@ -162,6 +162,7 @@ namespace FW
 		Member,
 		Function,
 		Array,
+		Template,
 	};
 
 	class SpvTypeDesc
@@ -276,6 +277,12 @@ namespace FW
 		TArray<SpvTypeDesc*> ParmTypes;
 	};
 
+	class SpvTemplateTypeDesc : public SpvTypeDesc
+	{
+	public:
+		SpvTemplateTypeDesc() : SpvTypeDesc(SpvTypeDescKind::Template) {}
+	};
+
 	class SpvArrayTypeDesc : public SpvTypeDesc
 	{
 	public:
@@ -309,11 +316,12 @@ namespace FW
 	class SpvLexicalScope
 	{
 	public:
-		SpvLexicalScope(SpvScopeKind InKind, SpvLexicalScope* InParent)
-		: Kind(InKind), Parent(InParent)
+		SpvLexicalScope(SpvId InId, SpvScopeKind InKind, SpvLexicalScope* InParent)
+		: Id(InId), Kind(InKind), Parent(InParent)
 		{}
 		virtual ~SpvLexicalScope() = default;
 		
+		SpvId GetId() const { return Id; }
 		virtual int32 GetLine() const {return 0;}
 		SpvScopeKind GetKind() const { return Kind; }
 		SpvLexicalScope* GetParent() const { return Parent; }
@@ -333,6 +341,7 @@ namespace FW
 		}
 		
 	private:
+		SpvId Id;
 		SpvScopeKind Kind;
 		SpvLexicalScope* Parent;
 	};
@@ -340,14 +349,14 @@ namespace FW
 	class SpvCompilationUnit :  public SpvLexicalScope
 	{
 	public:
-		SpvCompilationUnit() : SpvLexicalScope(SpvScopeKind::TU, nullptr)
+		SpvCompilationUnit(SpvId InId) : SpvLexicalScope(InId, SpvScopeKind::TU, nullptr)
 		{}
 	};
 
 	class SpvLexicalBlock : public SpvLexicalScope
 	{
 	public:
-		SpvLexicalBlock(int32 InLine, SpvLexicalScope* InParent) : SpvLexicalScope(SpvScopeKind::Block, InParent)
+		SpvLexicalBlock(SpvId InId, int32 InLine, SpvLexicalScope* InParent) : SpvLexicalScope(InId, SpvScopeKind::Block, InParent)
 		, Line(InLine)
 		{}
 		
@@ -360,8 +369,8 @@ namespace FW
 	class SpvFunctionDesc : public SpvLexicalScope
 	{
 	public:
-		SpvFunctionDesc(SpvLexicalScope* InParent, const FString& InName, SpvFuncTypeDesc* InTypeDesc, int32 InLine, int32 InScopeLine)
-		: SpvLexicalScope(SpvScopeKind::Function, InParent)
+		SpvFunctionDesc(SpvId InId, SpvLexicalScope* InParent, const FString& InName, SpvFuncTypeDesc* InTypeDesc, int32 InLine, int32 InScopeLine)
+		: SpvLexicalScope(InId, SpvScopeKind::Function, InParent)
 		, Name(InName)
 		, TypeDesc(InTypeDesc)
 		, Line(InLine)
@@ -373,6 +382,8 @@ namespace FW
 		FString GetName() const { return Name; }
 		SpvFuncTypeDesc* GetFuncTypeDesc() const { return TypeDesc; }
 		
+		SpvFunctionType* DefinitionType{};
+
 	private:
 		FString Name;
 		SpvFuncTypeDesc* TypeDesc;
@@ -435,15 +446,11 @@ namespace FW
 			FString TypeName = BasicTypeName + FString::Printf(TEXT("%dx%d"), VectorCount, MatrixTypeDesc->GetVectorTypeDesc()->GetCompCount());
 			return TypeName;
 		}
-		AUX::Unreachable();
+		return {};
 	};
 
-	inline FString GetFunctionSig(SpvFunctionDesc* FuncDesc, const TArray<ShaderFunc>& Funcs)
+	inline FString GetFunctionSig(SpvFunctionDesc* FuncDesc)
 	{
-		const ShaderFunc* EditorFunc = Funcs.FindByPredicate([&](const ShaderFunc& InItem) {
-			return InItem.FullName == FuncDesc->GetName() && InItem.Start.x == FuncDesc->GetLine();
-		});
-
 		FString FuncName = FuncDesc->GetName();
 		FuncName = FuncName.Replace(TEXT("."), TEXT("::"));
 		SpvFuncTypeDesc* FuncTypeDesc = FuncDesc->GetFuncTypeDesc();
@@ -460,43 +467,27 @@ namespace FW
 		Signature += " ";
 		Signature += FuncName;
 		Signature += "(";
-		auto ParmTypes = FuncTypeDesc->GetParmTypes();
-		for(int i = 0; i < ParmTypes.Num(); i++)
-		{
-			FString SemaStr;
-			if (EditorFunc)
+		auto ParamTypeDescs = FuncTypeDesc->GetParmTypes();
+		auto ParamTypes = FuncDesc->DefinitionType->ParameterTypes;
+		for(int i = 0; i < ParamTypeDescs.Num(); i++)
+		{	
+			SpvType* ParamType = ParamTypes[i];
+			if (ParamType->GetKind() == SpvTypeKind::Pointer)
 			{
-				const ShaderParameter& EditorParameter = EditorFunc->Params[i];
-				if (EditorParameter.Name == "this")
-				{
-					continue;
-				}
+				ParamType = static_cast<SpvPointerType*>(ParamType)->PointeeType;
+			}
 
-				if(EditorParameter.SemaFlag == ParamSemaFlag::In)
-				{
-					SemaStr = "in";
-				}
-				else if(EditorParameter.SemaFlag == ParamSemaFlag::Out)
-				{
-					SemaStr = "out";
-				}
-				else if (EditorParameter.SemaFlag == ParamSemaFlag::Inout)
-				{
-					SemaStr = "inout";
-				}
-			}
-			if (!SemaStr.IsEmpty())
+			if (ParamType->GetKind() == SpvTypeKind::Sampler || ParamType->GetKind() == SpvTypeKind::Image)
 			{
-				Signature += SemaStr + " ";
-			}
-			
-			if(i == ParmTypes.Num() - 1)
-			{
-				Signature += GetTypeDescStr(ParmTypes[i]);
+				Signature += GetHlslTypeStr(ParamType);
 			}
 			else
 			{
-				Signature += GetTypeDescStr(ParmTypes[i]);
+				Signature += GetTypeDescStr(ParamTypeDescs[i]);
+			}
+
+			if (i != ParamTypeDescs.Num() - 1)
+			{
 				Signature += ", ";
 			}
 		}
@@ -524,6 +515,11 @@ namespace FW
 			const SpvVectorTypeDesc* VectorTypeDesc = static_cast<const SpvVectorTypeDesc*>(TypeDesc);
 			int32 BasicTypeSize = GetTypeByteSize(VectorTypeDesc->GetBasicTypeDesc());
 			return BasicTypeSize * VectorTypeDesc->GetCompCount();
+		}
+		else if (TypeDesc->GetKind() == SpvTypeDescKind::Matrix)
+		{
+			const SpvMatrixTypeDesc* MatrixTypeDesc = static_cast<const SpvMatrixTypeDesc*>(TypeDesc);
+			return GetTypeByteSize(MatrixTypeDesc->GetVectorTypeDesc()) * MatrixTypeDesc->GetVectorCount();
 		}
 		else if(TypeDesc->GetKind() == SpvTypeDescKind::Composite)
 		{
@@ -584,17 +580,35 @@ namespace FW
 					if(Encoding == SpvDebugBasicTypeEncoding::Float)
 					{
 						float Value = *(float*)(InValue.GetData() + Offset);
-						BasicValueStr = FString::Printf(TEXT("%.7g"), Value);
+						BasicValueStr = FString::Printf(TEXT("%.9g"), Value);
 					}
 					else if(Encoding == SpvDebugBasicTypeEncoding::Signed)
 					{
-						int Value = *(int*)(InValue.GetData() + Offset);
-						BasicValueStr = FString::Format(TEXT("{0}"), {Value});
+						if (BasicTypeDesc->GetSize() == 64)
+						{
+							int64 Value = *(int64*)(InValue.GetData() + Offset);
+							BasicValueStr = FString::Format(TEXT("{0}"), { Value });
+						}
+						else
+						{
+							int Value = *(int*)(InValue.GetData() + Offset);
+							BasicValueStr = FString::Format(TEXT("{0}"), { Value });
+						}
+						
 					}
 					else if(Encoding == SpvDebugBasicTypeEncoding::Unsigned || Encoding == SpvDebugBasicTypeEncoding::Boolean)
 					{
-						uint32 Value = *(uint32*)(InValue.GetData() + Offset);
-						BasicValueStr = FString::Format(TEXT("{0}"), {Value});
+						if (BasicTypeDesc->GetSize() == 64)
+						{
+							uint64 Value = *(uint64*)(InValue.GetData() + Offset);
+							BasicValueStr = FString::Format(TEXT("{0}"), { Value });
+						}
+						else
+						{
+							uint32 Value = *(uint32*)(InValue.GetData() + Offset);
+							BasicValueStr = FString::Format(TEXT("{0}"), { Value });
+						}
+					
 					}
 					break;
 				}
@@ -669,10 +683,6 @@ namespace FW
 				}
 			}
 			ValueStr += "]";
-		}
-		else
-		{
-			AUX::Unreachable();
 		}
 		return ValueStr;
 	}

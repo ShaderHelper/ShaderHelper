@@ -27,6 +27,8 @@ namespace SH
 			UI_COMMAND_SH(Redo, LOCALIZATION("Redo"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control | EModifierKey::Shift, EKeys::Z));
 			UI_COMMAND_SH(DeleteLeft, LOCALIZATION("DeleteLeft"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EKeys::BackSpace));
 			UI_COMMAND_SH(DeleteRight, LOCALIZATION("DeleteRight"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EKeys::Delete));
+			UI_COMMAND_SH(DeleteTokenLeft, LOCALIZATION("DeleteTokenLeft"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::BackSpace));
+			UI_COMMAND_SH(DeleteTokenRight, LOCALIZATION("DeleteTokenRight"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::Delete));
 			UI_COMMAND_SH(SelectAll, LOCALIZATION("SelectAll"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::A));
 			UI_COMMAND_SH(Save, LOCALIZATION("Save"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::S));
 			UI_COMMAND_SH(Debug, LOCALIZATION("Debug"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EKeys::F5));
@@ -60,6 +62,8 @@ namespace SH
 		TSharedPtr<FUICommandInfo> Redo;
 		TSharedPtr<FUICommandInfo> DeleteLeft;
 		TSharedPtr<FUICommandInfo> DeleteRight;
+		TSharedPtr<FUICommandInfo> DeleteTokenLeft;
+		TSharedPtr<FUICommandInfo> DeleteTokenRight;
 		TSharedPtr<FUICommandInfo> SelectAll;
 		TSharedPtr<FUICommandInfo> Save;
 

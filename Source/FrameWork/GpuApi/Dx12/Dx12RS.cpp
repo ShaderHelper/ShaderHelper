@@ -11,10 +11,13 @@ namespace FW
 		switch (InType)
 		{
 		case BindingType::Texture:
-		case BindingType::StorageBuffer:
+		case BindingType::StructuredBuffer:
+		case BindingType::RawBuffer:
 			return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 		case BindingType::Sampler:			return D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-		case BindingType::RWStorageBuffer:  return D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+		case BindingType::RWStructuredBuffer:
+		case BindingType::RWRawBuffer:
+			return D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
 		default:
 			AUX::Unreachable();
 		}
@@ -41,7 +44,9 @@ namespace FW
 				Range.RegisterSpace = LayoutDesc.GroupNumber;
 				Range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-				if (LayoutBindingEntry.Type == BindingType::Texture || LayoutBindingEntry.Type == BindingType::RWStorageBuffer || LayoutBindingEntry.Type == BindingType::StorageBuffer)
+				if (LayoutBindingEntry.Type == BindingType::Texture || 
+					LayoutBindingEntry.Type == BindingType::RWStructuredBuffer || LayoutBindingEntry.Type == BindingType::StructuredBuffer ||
+					LayoutBindingEntry.Type == BindingType::RWRawBuffer || LayoutBindingEntry.Type == BindingType::RawBuffer)
 				{
 					DescriptorTableRanges_CbvSrvUav.FindOrAdd(BindingVisibility).Add(MoveTemp(Range));
 				}
@@ -147,11 +152,11 @@ namespace FW
 			else if (BindingResource->GetType() == GpuResourceType::Buffer)
 			{
 				Dx12Buffer* Buffer = static_cast<Dx12Buffer*>(BindingResource);
-				if (EnumHasAllFlags(Buffer->GetUsage(), GpuBufferUsage::RWStorage))
+				if (EnumHasAnyFlags(Buffer->GetUsage(), GpuBufferUsage::RWStructured | GpuBufferUsage::RWRaw))
 				{
 					SrcDescriptorRange_CbvSrvUav.FindOrAdd(BindingVisibility).Add(Buffer->UAV->GetHandle());
 				}
-				else if (EnumHasAllFlags(Buffer->GetUsage(), GpuBufferUsage::Storage))
+				else if (EnumHasAnyFlags(Buffer->GetUsage(), GpuBufferUsage::Structured | GpuBufferUsage::Raw))
 				{
 					SrcDescriptorRange_CbvSrvUav.FindOrAdd(BindingVisibility).Add(Buffer->SRV->GetHandle());
 				}

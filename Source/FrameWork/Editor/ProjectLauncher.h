@@ -85,7 +85,7 @@ namespace FW
 							FString NewProjectPath = ProjectDir / ProjectName;
 							if (IFileManager::Get().DirectoryExists(*NewProjectPath))
 							{
-								MessageDialog::Open(MessageDialog::Ok, Window, FText::FromString("The project path already exists."));
+								MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, Window, FText::FromString("The project path already exists."));
 							}
 							else
 							{
@@ -149,7 +149,7 @@ namespace FW
 							}
 							else
 							{
-								MessageDialog::Open(MessageDialog::Ok, Window, FText::FromString("The project file does not exist."));
+								MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, Window, FText::FromString("The project file does not exist."));
 								TSingleton<ProjectManager<T>>::Get().RemoveFromProjMgmt(RecentProjcetPath);
 								InsertDummy(RightContent->NumSlots() - 1);
 								RightContent->RemoveSlot(RecentProjcetButton.Pin().ToSharedRef());

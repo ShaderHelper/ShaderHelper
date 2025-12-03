@@ -52,44 +52,66 @@ namespace FW
 		for (auto& [Id, ShaderLayoutBinding] : SpvReflectionBindings)
 		{
 			SpvType* Type = MetaContext.GlobalVariables[Id].Type;
+			std::optional<BindingType> ShaderBindingType;
 			if (Type->GetKind() == SpvTypeKind::Image)
 			{
-				ShaderLayoutBinding.Type = BindingType::Texture;
+				ShaderBindingType = BindingType::Texture;
 			}
 			else if (Type->GetKind() == SpvTypeKind::Sampler)
 			{
-				ShaderLayoutBinding.Type = BindingType::Sampler;
+				ShaderBindingType = BindingType::Sampler;
 			}
 			else if (Type->GetKind() == SpvTypeKind::Struct)
 			{
+				SpvStructType* StructType = static_cast<SpvStructType*>(Type);
 				TArray<SpvDecoration> TypeDecorations;
 				MetaContext.Decorations.MultiFind(Type->GetId(), TypeDecorations);
 				if (TypeDecorations.ContainsByPredicate([&](const SpvDecoration& InItem) {
 					return InItem.Kind == SpvDecorationKind::Block;
 				}))
 				{
-					ShaderLayoutBinding.Type = BindingType::UniformBuffer;
+					ShaderBindingType = BindingType::UniformBuffer;
 				}
-				else if (TypeDecorations.ContainsByPredicate([&](const SpvDecoration& InItem) {
-					return InItem.Kind == SpvDecorationKind::BufferBlock;
-				}))
+				else if(StructType->MemberTypes[0]->GetKind() == SpvTypeKind::RuntimeArray)
 				{
+					SpvRuntimeArrayType* RuntimeArrayType = static_cast<SpvRuntimeArrayType*>(StructType->MemberTypes[0]);
 					if (TypeDecorations.ContainsByPredicate([&](const SpvDecoration& InItem) {
-						return InItem.Kind == SpvDecorationKind::NonWritable;
+						return InItem.Kind == SpvDecorationKind::BufferBlock;
 					}))
 					{
-						ShaderLayoutBinding.Type = BindingType::StorageBuffer;
-					}
-					else
-					{
-						ShaderLayoutBinding.Type = BindingType::RWStorageBuffer;
+						if (TypeDecorations.ContainsByPredicate([&](const SpvDecoration& InItem) {
+							return InItem.Kind == SpvDecorationKind::NonWritable;
+							}))
+						{
+							if (RuntimeArrayType->ElementType->GetKind() == SpvTypeKind::Integer && 
+								static_cast<SpvIntegerType*>(RuntimeArrayType->ElementType)->IsSigend() == false &&
+								static_cast<SpvIntegerType*>(RuntimeArrayType->ElementType)->GetWidth() == 32)
+							{
+								ShaderBindingType = BindingType::RawBuffer;
+							}
+							else
+							{
+								ShaderBindingType = BindingType::StructuredBuffer;
+							}
+						}
+						else
+						{
+							if (RuntimeArrayType->ElementType->GetKind() == SpvTypeKind::Integer &&
+								static_cast<SpvIntegerType*>(RuntimeArrayType->ElementType)->IsSigend() == false &&
+								static_cast<SpvIntegerType*>(RuntimeArrayType->ElementType)->GetWidth() == 32)
+							{
+								ShaderBindingType = BindingType::RWRawBuffer;
+							}
+							else
+							{
+								ShaderBindingType = BindingType::RWStructuredBuffer;
+							}
+						}
 					}
 				}
 			}
-			else
-			{
-				AUX::Unreachable();
-			}
+			check(ShaderBindingType.has_value());
+			ShaderLayoutBinding.Type = ShaderBindingType.value();
 			ShaderLayoutBindings.Add(MoveTemp(ShaderLayoutBinding));
 		}
 		return ShaderLayoutBindings;
@@ -185,6 +207,7 @@ namespace FW
 		//to make it consistent with structuredbuffer, so that user side can unify the struct
 		DxcArgs.Add("-fvk-use-dx-layout");
 		//DxcArgs.Add("-Gis");
+		DxcArgs.Add("/Od"); //TODO
 		
 		if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
 		{
@@ -245,7 +268,10 @@ namespace FW
 		
 		FString ShaderName = InShader->GetShaderName();
 #if DEBUG_SHADER
-		FFileHelper::SaveStringToFile(InShader->GetProcessedSourceText(), *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl"));
+		if (!ShaderName.IsEmpty())
+		{
+			FFileHelper::SaveStringToFile(InShader->GetProcessedSourceText(), *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl"));
+		}
 #endif
 		
 		ShaderConductor::Compiler::Compile(SourceDesc, SCOptions, TargetDescs.GetData(), TargetDescs.Num(), Results.GetData());

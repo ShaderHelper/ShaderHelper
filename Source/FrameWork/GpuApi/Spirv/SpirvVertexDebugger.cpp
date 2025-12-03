@@ -1,5 +1,5 @@
 #include "CommonHeader.h"
-#include "SpirvVertexVM.h"
+#include "SpirvVertexDebugger.h"
 
 namespace FW
 {

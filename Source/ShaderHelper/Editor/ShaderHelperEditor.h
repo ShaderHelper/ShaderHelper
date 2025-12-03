@@ -87,7 +87,8 @@ namespace SH
 		DebuggableObject* GetDebuggaleObject() const { return CurDebuggableObject; }
 		void SetDebuggableObject(DebuggableObject* InObject) { CurDebuggableObject = InObject; }
 		void EndDebugging();
-		void StartDebugging();
+		//If globalvalidation is true, the validation error location will be automatically selected.
+		void StartDebugging(bool GlobalValidation = false);
 		TArray<TSharedPtr<SShaderEditorBox>> GetShaderEditors() const { 
 			TArray<TSharedPtr<SShaderEditorBox>> Ret;
 			ShaderEditors.GenerateValueArray(Ret);

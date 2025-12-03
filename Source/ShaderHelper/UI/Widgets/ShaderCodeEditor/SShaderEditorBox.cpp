@@ -18,7 +18,6 @@
 #include <Fonts/FontMeasure.h>
 #include <Styling/StyleColors.h>
 #include "Editor/AssetEditor/AssetEditor.h"
-#include "GpuApi/Spirv/SpirvExpressionVM.h"
 #include "Common/Path/BaseResourcePath.h"
 #include <Widgets/Colors/SColorBlock.h>
 #include "UI/Widgets/ColorPicker/SColorPicker.h"
@@ -137,7 +136,12 @@ constexpr int PaddingLineNum = 22;
         return CurrentPosition <= InIndex ? INDEX_NONE : CurrentPosition;
     }
     
-    SShaderEditorBox::~SShaderEditorBox()
+	SShaderEditorBox::SShaderEditorBox()
+	: Debugger(this)
+	{
+	}
+
+	SShaderEditorBox::~SShaderEditorBox()
     {
 		ShaderAssetObj->OnRefreshBuilder.Remove(RefreshBuilderHandle);
 
@@ -208,6 +212,13 @@ constexpr int PaddingLineNum = 22;
 		bool ShowColorBlock = true;
 		Editor::GetEditorConfig()->GetBool(TEXT("CodeEditor"), TEXT("ShowColorBlock"), ShowColorBlock);
 		return ShowColorBlock;
+	}
+
+	bool SShaderEditorBox::CanRealTimeDiagnosis()
+	{
+		bool RealTimeDiagnosis = true;
+		Editor::GetEditorConfig()->GetBool(TEXT("CodeEditor"), TEXT("RealTimeDiagnosis"), RealTimeDiagnosis);
+		return RealTimeDiagnosis;
 	}
 
 	FSlateFontInfo& SShaderEditorBox::GetCodeFontInfo()
@@ -813,6 +824,30 @@ constexpr int PaddingLineNum = 22;
 			}),
 			EUIActionRepeatMode::RepeatEnabled
 		);
+		UICommandList->MapAction(CodeEditorCommands::Get().DeleteTokenLeft,
+			FExecuteAction::CreateLambda([this] {
+				SMultiLineEditableText::FScopedEditableTextTransaction TextTransaction(ShaderMultiLineEditableText);
+				ShaderMultiLineEditableTextLayout->MoveCursor(FMoveCursor::Cardinal(
+					ECursorMoveGranularity::Word,
+					FIntPoint(-1, 0),
+					ECursorAction::SelectText
+				));
+				ShaderMultiLineEditableText->DeleteSelectedText();
+			}),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(CodeEditorCommands::Get().DeleteTokenRight,
+			FExecuteAction::CreateLambda([this] {
+				SMultiLineEditableText::FScopedEditableTextTransaction TextTransaction(ShaderMultiLineEditableText);
+				ShaderMultiLineEditableTextLayout->MoveCursor(FMoveCursor::Cardinal(
+					ECursorMoveGranularity::Word,
+					FIntPoint(+1, 0),
+					ECursorAction::SelectText
+				));
+				ShaderMultiLineEditableText->DeleteSelectedText();
+			}),
+			EUIActionRepeatMode::RepeatEnabled
+		);
 		UICommandList->MapAction(CodeEditorCommands::Get().SelectAll,
 			FExecuteAction::CreateLambda([this] {ShaderMultiLineEditableTextLayout->SelectAllText(); }),
 			FCanExecuteAction::CreateLambda([this] { return ShaderMultiLineEditableTextLayout->CanExecuteSelectAll(); })
@@ -1186,7 +1221,12 @@ constexpr int PaddingLineNum = 22;
 		SelectionBeforeEdit = ShaderMultiLineEditableText->GetSelection();
 	}
 
-    FText SShaderEditorBox::GetEditStateText() const
+	TRefCountPtr<GpuShader> SShaderEditorBox::CreateGpuShader()
+	{
+		return GGpuRhi->CreateShaderFromSource(ShaderAssetObj->GetShaderDesc(CurrentShaderSource));;
+	}
+
+	FText SShaderEditorBox::GetEditStateText() const
     {
         switch(CurEditState)
         {
@@ -1446,6 +1486,9 @@ constexpr int PaddingLineNum = 22;
 		{
 			for(auto It = BreakPointLineNumbers.CreateIterator(); It; ++It)
 			{
+				if (StartLineNumber == *It && EndLineNumber == *It)
+					continue;
+
 				if(StartLineNumber <= *It)
 				{
 					if(EndLineNumber >= *It)
@@ -1468,6 +1511,13 @@ constexpr int PaddingLineNum = 22;
             LineTipList->RequestListRefresh();
         }
     }
+
+	void SShaderEditorBox::ClearDiagInfoEffect()
+	{
+		EffectMarshller->LineNumberToDiagInfo.Reset();
+		EffectMarshller->MakeDirty();
+		EffectMultiLineEditableText->Refresh();
+	}
 
     FReply SShaderEditorBox::OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
     {
@@ -1755,7 +1805,11 @@ constexpr int PaddingLineNum = 22;
         ShaderMultiLineEditableText->GetTextLine(CursorRow, CursorLineText);
         FString CursorLeftText = CursorLineText.Mid(0, CursorCol);
         int32 InsertCol = CursorLeftText.Find(*CurToken, ESearchCase::CaseSensitive, ESearchDir::FromEnd);
-        check(InsertCol != INDEX_NONE);
+		if (InsertCol == INDEX_NONE)
+		{
+			return;
+		}
+
         if(CurToken == ".")
         {
             InsertCol += 1;
@@ -1857,6 +1911,11 @@ constexpr int PaddingLineNum = 22;
 
     void SShaderEditorBox::RefreshLineNumberToDiagInfo()
     {
+		if (!CanRealTimeDiagnosis())
+		{
+			return;
+		}
+
         EffectMarshller->LineNumberToDiagInfo.Reset();
         for (const ShaderDiagnosticInfo& DiagInfo : DiagnosticInfos)
         {
@@ -1898,12 +1957,8 @@ constexpr int PaddingLineNum = 22;
             }
         }
         
-        if(EffectMultiLineEditableText && EffectMarshller)
-        {
-            EffectMarshller->MakeDirty();
-            EffectMultiLineEditableText->Refresh();
-        }
-
+		EffectMarshller->MakeDirty();
+		EffectMultiLineEditableText->Refresh();
     }
 
     void SShaderEditorBox::Compile()
@@ -1911,7 +1966,7 @@ constexpr int PaddingLineNum = 22;
 		int32 AddedLineNum = ShaderAssetObj->GetExtraLineNum();
 		
 		//TODO Async and show "Compiling" state
-        TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(ShaderAssetObj->GetShaderDesc(CurrentShaderSource));
+		TRefCountPtr<GpuShader> Shader = CreateGpuShader();
 		FString ErrorInfo, WarnInfo;
         if (GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo))
         {
@@ -1940,7 +1995,7 @@ constexpr int PaddingLineNum = 22;
         FString NewShaderSource = InShaderSouce.Replace(TEXT("\r\n"), TEXT("\n"));
         if (NewShaderSource != ShaderAssetObj->EditorContent)
         {
-			if(DebuggerContext)
+			if(Debugger.IsValid())
 			{
 				bEditDuringDebugging = true;
 			}
@@ -2150,6 +2205,7 @@ constexpr int PaddingLineNum = 22;
 				FIntPoint(-1, 0),
 				ECursorAction::MoveCursor
 			));
+			return FReply::Handled();
 		}
 		else if (Key == EKeys::Right)
 		{
@@ -2158,6 +2214,7 @@ constexpr int PaddingLineNum = 22;
 				FIntPoint(+1, 0),
 				ECursorAction::MoveCursor
 			));
+			return FReply::Handled();
 		}
 		else if (Key == EKeys::Up)
 		{
@@ -2168,6 +2225,7 @@ constexpr int PaddingLineNum = 22;
 				// Shift selects text.	
 				InKeyEvent.IsShiftDown() ? ECursorAction::SelectText : ECursorAction::MoveCursor
 			));
+			return FReply::Handled();
 		}
 		else if (Key == EKeys::Down)
 		{
@@ -2178,9 +2236,10 @@ constexpr int PaddingLineNum = 22;
 				// Shift selects text.	
 				InKeyEvent.IsShiftDown() ? ECursorAction::SelectText : ECursorAction::MoveCursor
 			));
+			return FReply::Handled();
 		}
 
-		return FReply::Handled();
+		return FReply::Unhandled();
     }
 
     FReply SShaderEditorBox::HandleKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent)
@@ -2782,7 +2841,7 @@ constexpr int PaddingLineNum = 22;
 			{
 				return FAppStyle::Get().GetBrush("Icons.Warning");
 			}
-			else if(StopLineNumber == LineNumber)
+			else if(Debugger.GetStopLineNumber() == LineNumber)
 			{
 				return FShaderHelperStyle::Get().GetBrush("Icons.ArrowBoldRight");
 			}
@@ -2797,7 +2856,7 @@ constexpr int PaddingLineNum = 22;
 			{
 				return FStyleColors::Error;
 			}
-			else if(StopLineNumber == LineNumber && DebuggerError.IsEmpty())
+			else if(Debugger.GetStopLineNumber() == LineNumber && Debugger.GetDebuggerError().IsEmpty())
 			{
 				return FLinearColor::Green;
 			}
@@ -2808,7 +2867,7 @@ constexpr int PaddingLineNum = 22;
 			{
 				return EVisibility::Visible;
 			}
-			else if(BreakPointLineNumbers.Contains(LineNumber) || StopLineNumber == LineNumber)
+			else if(BreakPointLineNumbers.Contains(LineNumber) || Debugger.GetStopLineNumber() == LineNumber)
 			{
 				return EVisibility::HitTestInvisible;
 			}
@@ -2860,7 +2919,7 @@ constexpr int PaddingLineNum = 22;
 					SNew(SBox)
 					.HeightOverride(1.0)
 					.Visibility_Lambda([this, LineNumber]{
-						if(BreakPointLineNumbers.Contains(LineNumber) || StopLineNumber == LineNumber)
+						if(BreakPointLineNumbers.Contains(LineNumber) || Debugger.GetStopLineNumber() == LineNumber)
 						{
 							return EVisibility::HitTestInvisible;
 						}
@@ -2870,7 +2929,7 @@ constexpr int PaddingLineNum = 22;
 						SNew(SImage)
 						.Image(FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect2"))
 						.ColorAndOpacity_Lambda([this, LineNumber]{
-							if(StopLineNumber == LineNumber && DebuggerError.IsEmpty())
+							if(Debugger.GetStopLineNumber() == LineNumber && Debugger.GetDebuggerError().IsEmpty())
 							{
 								return FLinearColor{0,1,0,0.7f};
 							}
@@ -2882,7 +2941,7 @@ constexpr int PaddingLineNum = 22;
 				[
 					SNew(SImage)
 					.Visibility_Lambda([this, LineNumber]{
-						if(BreakPointLineNumbers.Contains(LineNumber) || StopLineNumber == LineNumber)
+						if(BreakPointLineNumbers.Contains(LineNumber) || Debugger.GetStopLineNumber() == LineNumber)
 						{
 							return EVisibility::HitTestInvisible;
 						}
@@ -2890,7 +2949,7 @@ constexpr int PaddingLineNum = 22;
 					})
 					.Image(FAppStyle::Get().GetBrush("WhiteBrush"))
 					.ColorAndOpacity_Lambda([this, LineNumber]{
-						if(StopLineNumber == LineNumber && DebuggerError.IsEmpty())
+						if(Debugger.GetStopLineNumber() == LineNumber && Debugger.GetDebuggerError().IsEmpty())
 						{
 							return FLinearColor{0,1,0,0.06f};
 						}
@@ -2934,7 +2993,7 @@ constexpr int PaddingLineNum = 22;
 					SNew(SBox)
 					.HeightOverride(1.0)
 					.Visibility_Lambda([this, LineNumber]{
-						if(BreakPointLineNumbers.Contains(LineNumber) || StopLineNumber == LineNumber)
+						if(BreakPointLineNumbers.Contains(LineNumber) || Debugger.GetStopLineNumber() == LineNumber)
 						{
 							return EVisibility::HitTestInvisible;
 						}
@@ -2944,7 +3003,7 @@ constexpr int PaddingLineNum = 22;
 						SNew(SImage)
 						.Image(FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect2"))
 						.ColorAndOpacity_Lambda([this, LineNumber]{
-							if(StopLineNumber == LineNumber && DebuggerError.IsEmpty())
+							if(Debugger.GetStopLineNumber() == LineNumber && Debugger.GetDebuggerError().IsEmpty())
 							{
 								return FLinearColor{0,1,0,0.7f};
 							}
@@ -2956,21 +3015,21 @@ constexpr int PaddingLineNum = 22;
 				[
 					SNew(SBorder)
 					.Visibility_Lambda([this, LineNumber]{
-						if(BreakPointLineNumbers.Contains(LineNumber) || StopLineNumber == LineNumber)
+						if(BreakPointLineNumbers.Contains(LineNumber) || Debugger.GetStopLineNumber() == LineNumber)
 						{
 							return EVisibility::HitTestInvisible;
 						}
 						return EVisibility::Collapsed;
 					})
 					.BorderImage_Lambda([this, LineNumber]{
-						if(StopLineNumber == LineNumber && !DebuggerError.IsEmpty())
+						if(Debugger.GetStopLineNumber() == LineNumber && !Debugger.GetDebuggerError().IsEmpty())
 						{
 							return FAppStyle::Get().GetBrush("WhiteBrush");
 						}
 						return FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect");
 					})
 					.BorderBackgroundColor_Lambda([this, LineNumber]{
-						if(StopLineNumber == LineNumber && DebuggerError.IsEmpty())
+						if(Debugger.GetStopLineNumber() == LineNumber && Debugger.GetDebuggerError().IsEmpty())
 						{
 							return FLinearColor{0,1,0,0.3f};
 						}
@@ -2982,8 +3041,8 @@ constexpr int PaddingLineNum = 22;
 					[
 						SNew(STextBlock)
 						.Font(GetCodeFontInfo())
-						.Visibility_Lambda([this, LineNumber] { return StopLineNumber == LineNumber && !DebuggerError.IsEmpty() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
-						.Text_Lambda([this] { return FText::FromString(DebuggerError); })
+						.Visibility_Lambda([this, LineNumber] { return Debugger.GetStopLineNumber() == LineNumber && !Debugger.GetDebuggerError().IsEmpty() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+						.Text_Lambda([this] { return FText::FromString(Debugger.GetDebuggerError()); })
 						.ColorAndOpacity(FLinearColor::Red)
 					]
 				]
@@ -2995,7 +3054,7 @@ constexpr int PaddingLineNum = 22;
             const int32 CurLineIndex = CursorLocation.GetLineIndex();
             auto FocusedWidget = FSlateApplication::Get().GetUserFocusedWidget(0);
             if(FocusedWidget == ShaderMultiLineEditableText && LineNumber == GetLineNumber(CurLineIndex)
-			   && !BreakPointLineNumbers.Contains(LineNumber) && StopLineNumber != LineNumber)
+			   && !BreakPointLineNumbers.Contains(LineNumber) && Debugger.GetStopLineNumber() != LineNumber)
             {
                 double CurTime = FPlatformTime::Seconds();
                 float Speed = 2.0f;
@@ -3319,222 +3378,6 @@ constexpr int PaddingLineNum = 22;
         TextLayout->AddLines(MoveTemp(LinesToAdd));
     }
 
-	void SShaderEditorBox::ApplyDebugState(const FW::SpvDebugState& State, bool bReverse)
-	{
-        CurReturnObject = State.ReturnObject;
-		if(State.bFuncCall)
-		{
-			if(Scope)
-			{
-				CallStack.Add(TPair<SpvLexicalScope*, int>(Scope, State.Line));
-				CurValidLine.reset();
-			}
-		}
-		
-		if(State.ScopeChange)
-		{
-			Scope = bReverse ? State.ScopeChange.value().PreScope : State.ScopeChange.value().NewScope;
-			CallStackScope = Scope;
-			//Return func
-			if(!CallStack.IsEmpty() && State.bReturn)
-			{
-				auto Item = CallStack.Pop();
-				CurValidLine = Item.Value;
-			}
-		}
-		
-		for(const SpvVariableChange& VarChange : State.VarChanges)
-		{
-			auto& RecordedInfo = DebuggerContext->ThreadState.RecordedInfo;
-			SpvVariable& Var = RecordedInfo.AllVariables[VarChange.VarId];
-			if(!Var.IsExternal())
-			{
-				Var.InitializedRanges.Add({VarChange.Range.OffsetBytes, VarChange.Range.OffsetBytes + VarChange.Range.ByteSize});
-				std::get<SpvObject::Internal>(Var.Storage).Value = bReverse ? VarChange.PreValue : VarChange.NewValue;
-			}
-			DirtyVars.Add(VarChange.VarId, VarChange.Range);
-		}
-	}
-
-	TArray<ExpressionNodePtr> AppendVarChildNodes(SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, const TArray<SpvVariableChange::DirtyRange>& DirtyRanges, const TArray<uint8>& Value, int32 InOffset)
-	{
-		TArray<ExpressionNodePtr> Nodes;
-		int32 Offset = InOffset;
-		if(TypeDesc->GetKind() == SpvTypeDescKind::Member)
-		{
-			SpvMemberTypeDesc* MemberTypeDesc = static_cast<SpvMemberTypeDesc*>(TypeDesc);
-			int32 MemberByteSize = GetTypeByteSize(MemberTypeDesc);
-			FString ValueStr = GetValueStr(Value, MemberTypeDesc->GetTypeDesc(), InitializedRanges, Offset);
-			auto Data = MakeShared<ExpressionNode>(MemberTypeDesc->GetName(), MoveTemp(ValueStr), GetTypeDescStr(MemberTypeDesc->GetTypeDesc()));
-			if(MemberTypeDesc->GetTypeDesc()->GetKind() == SpvTypeDescKind::Composite)
-			{
-				Data->Children = AppendVarChildNodes(MemberTypeDesc->GetTypeDesc(), InitializedRanges, DirtyRanges, Value, Offset);
-			}
-			for(const auto& Range : DirtyRanges)
-			{
-				int32 RangeStart = Range.OffsetBytes;
-				int32 RangeEnd = Range.OffsetBytes + Range.ByteSize;
-				if((RangeStart >= InOffset && RangeStart < InOffset + MemberByteSize) ||
-				   (RangeEnd > InOffset && RangeEnd <= InOffset + MemberByteSize) ||
-				   (RangeStart < InOffset && RangeEnd > InOffset + MemberByteSize))
-				{
-					Data->Dirty = true;
-					break;
-				}
-			}
-			Nodes.Add(MoveTemp(Data));
-		}
-		else if(TypeDesc->GetKind() == SpvTypeDescKind::Composite)
-		{
-			SpvCompositeTypeDesc* CompositeTypeDesc = static_cast<SpvCompositeTypeDesc*>(TypeDesc);
-			for(SpvTypeDesc* MemberTypeDesc : CompositeTypeDesc->GetMemberTypeDescs())
-			{
-				Nodes.Append(AppendVarChildNodes(MemberTypeDesc, InitializedRanges, DirtyRanges, Value, Offset));
-				if(MemberTypeDesc->GetKind() == SpvTypeDescKind::Member)
-				{
-					Offset += GetTypeByteSize(MemberTypeDesc);
-				}
-			}
-		}
-		else if(TypeDesc->GetKind() == SpvTypeDescKind::Matrix)
-		{
-			SpvMatrixTypeDesc* MatrixTypeDesc = static_cast<SpvMatrixTypeDesc*>(TypeDesc);
-			SpvVectorTypeDesc* ElementTypeDesc = MatrixTypeDesc->GetVectorTypeDesc();
-			int32 VectorCount = MatrixTypeDesc->GetVectorCount();
-			int32 ElementTypeSize = GetTypeByteSize(ElementTypeDesc);
-			for(int32 Index = 0 ; Index < VectorCount; Index++)
-			{
-				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset);
-				FString MemberName = FString::Printf(TEXT("[%d]"), Index);
-				auto Data = MakeShared<ExpressionNode>(MemberName, MoveTemp(ValueStr), GetTypeDescStr(ElementTypeDesc));
-				for(const auto& Range : DirtyRanges)
-				{
-					int32 RangeStart = Range.OffsetBytes;
-					int32 RangeEnd = Range.OffsetBytes + Range.ByteSize;
-					if((RangeStart >= Offset && RangeStart < Offset + ElementTypeSize) ||
-					   (RangeEnd > Offset && RangeEnd <= Offset + ElementTypeSize) ||
-					   (RangeStart < Offset && RangeEnd > Offset + ElementTypeSize))
-					{
-						Data->Dirty = true;
-						break;
-					}
-				}
-				Offset += ElementTypeSize;
-				Nodes.Add(MoveTemp(Data));
-			}
-		}
-		else if(TypeDesc->GetKind() == SpvTypeDescKind::Array)
-		{
-			SpvArrayTypeDesc* ArrayTypeDesc = static_cast<SpvArrayTypeDesc*>(TypeDesc);
-			SpvTypeDesc* BaseTypeDesc = ArrayTypeDesc->GetBaseTypeDesc();
-			int32 BaseTypeSize = GetTypeByteSize(BaseTypeDesc);
-			int32 CompCount = ArrayTypeDesc->GetCompCounts()[0];
-			SpvTypeDesc* ElementTypeDesc = BaseTypeDesc;
-			int32 ElementTypeSize = BaseTypeSize;
-			TUniquePtr<SpvArrayTypeDesc> SubArrayTypeDesc = ArrayTypeDesc->GetCompCounts().Num() > 1 ? MakeUnique<SpvArrayTypeDesc>(BaseTypeDesc, TArray{ArrayTypeDesc->GetCompCounts().GetData() + 1, ArrayTypeDesc->GetCompCounts().Num() -1 }) : nullptr;
-			if(SubArrayTypeDesc)
-			{
-				ElementTypeDesc = SubArrayTypeDesc.Get();
-				ElementTypeSize *= SubArrayTypeDesc->GetElementNum();
-			}
-			for(int32 Index = 0; Index < CompCount; Index++)
-			{
-				FString MemberName = FString::Printf(TEXT("[%d]"), Index);
-				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset);
-				auto Data = MakeShared<ExpressionNode>(MemberName, MoveTemp(ValueStr), GetTypeDescStr(ElementTypeDesc));
-				Data->Children = AppendVarChildNodes(ElementTypeDesc, InitializedRanges, DirtyRanges, Value, Offset);
-				for(const auto& Range : DirtyRanges)
-				{
-					int32 RangeStart = Range.OffsetBytes;
-					int32 RangeEnd = Range.OffsetBytes + Range.ByteSize;
-					if((RangeStart >= Offset && RangeStart < Offset + ElementTypeSize) ||
-					   (RangeEnd > Offset && RangeEnd <= Offset + ElementTypeSize) ||
-					   (RangeStart < Offset && RangeEnd > Offset + ElementTypeSize))
-					{
-						Data->Dirty = true;
-						break;
-					}
-				}
-				Nodes.Add(MoveTemp(Data));
-				Offset += ElementTypeSize;
-			}
-		}
-		return Nodes;
-	}
-
-	TArray<ExpressionNodePtr> AppendExprChildNodes(SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, const TArray<uint8>& Value, int32 InOffset)
-	{
-		TArray<ExpressionNodePtr> Nodes;
-		int32 Offset = InOffset;
-		if(TypeDesc->GetKind() == SpvTypeDescKind::Member)
-		{
-			SpvMemberTypeDesc* MemberTypeDesc = static_cast<SpvMemberTypeDesc*>(TypeDesc);
-			int32 MemberByteSize = GetTypeByteSize(MemberTypeDesc);
-			FString ValueStr = GetValueStr(Value, MemberTypeDesc->GetTypeDesc(), InitializedRanges, Offset);
-			FString TypeName = GetTypeDescStr(MemberTypeDesc->GetTypeDesc());
-			auto Data = MakeShared<ExpressionNode>(MemberTypeDesc->GetName(), ValueStr, TypeName);
-			if(MemberTypeDesc->GetTypeDesc()->GetKind() == SpvTypeDescKind::Composite)
-			{
-				Data->Children = AppendExprChildNodes(MemberTypeDesc->GetTypeDesc(), InitializedRanges, Value, Offset);
-			}
-			Nodes.Add(MoveTemp(Data));
-		}
-		else if(TypeDesc->GetKind() == SpvTypeDescKind::Composite)
-		{
-			SpvCompositeTypeDesc* CompositeTypeDesc = static_cast<SpvCompositeTypeDesc*>(TypeDesc);
-			for(SpvTypeDesc* MemberTypeDesc : CompositeTypeDesc->GetMemberTypeDescs())
-			{
-				Nodes.Append(AppendExprChildNodes(MemberTypeDesc, InitializedRanges, Value, Offset));
-				if(MemberTypeDesc->GetKind() == SpvTypeDescKind::Member)
-				{
-					Offset += GetTypeByteSize(MemberTypeDesc);
-				}
-			}
-		}
-		else if(TypeDesc->GetKind() == SpvTypeDescKind::Matrix)
-		{
-			SpvMatrixTypeDesc* MatrixTypeDesc = static_cast<SpvMatrixTypeDesc*>(TypeDesc);
-			SpvVectorTypeDesc* ElementTypeDesc = MatrixTypeDesc->GetVectorTypeDesc();
-			int32 VectorCount = MatrixTypeDesc->GetVectorCount();
-			int32 ElementTypeSize = GetTypeByteSize(ElementTypeDesc);
-			for(int32 Index = 0 ; Index < VectorCount; Index++)
-			{
-				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset);
-				FString MemberName = FString::Printf(TEXT("[%d]"), Index);
-				FString TypeName = GetTypeDescStr(ElementTypeDesc);
-				auto Data = MakeShared<ExpressionNode>(MemberName, ValueStr, TypeName);
-				Offset += ElementTypeSize;
-				Nodes.Add(MoveTemp(Data));
-			}
-		}
-		else if(TypeDesc->GetKind() == SpvTypeDescKind::Array)
-		{
-			SpvArrayTypeDesc* ArrayTypeDesc = static_cast<SpvArrayTypeDesc*>(TypeDesc);
-			SpvTypeDesc* BaseTypeDesc = ArrayTypeDesc->GetBaseTypeDesc();
-			int32 BaseTypeSize = GetTypeByteSize(BaseTypeDesc);
-			int32 CompCount = ArrayTypeDesc->GetCompCounts()[0];
-			SpvTypeDesc* ElementTypeDesc = BaseTypeDesc;
-			int32 ElementTypeSize = BaseTypeSize;
-			TUniquePtr<SpvArrayTypeDesc> SubArrayTypeDesc = ArrayTypeDesc->GetCompCounts().Num() > 1 ? MakeUnique<SpvArrayTypeDesc>(BaseTypeDesc, TArray{ArrayTypeDesc->GetCompCounts().GetData() + 1, ArrayTypeDesc->GetCompCounts().Num() -1 }) : nullptr;
-			if(SubArrayTypeDesc)
-			{
-				ElementTypeDesc = SubArrayTypeDesc.Get();
-				ElementTypeSize *= SubArrayTypeDesc->GetElementNum();
-			}
-			for(int32 Index = 0; Index < CompCount; Index++)
-			{
-				FString MemberName = FString::Printf(TEXT("[%d]"), Index);
-				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset);
-				FString TypeName = GetTypeDescStr(ElementTypeDesc);
-				auto Data = MakeShared<ExpressionNode>(MemberName, ValueStr, TypeName);
-				Data->Children = AppendExprChildNodes(ElementTypeDesc, InitializedRanges, Value, Offset);
-				Nodes.Add(MoveTemp(Data));
-				Offset += ElementTypeSize;
-			}
-		}
-		return Nodes;
-	}
-
 	void SShaderMultiLineEditableText::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
@@ -3556,11 +3399,18 @@ constexpr int PaddingLineNum = 22;
 			FString CurrentTokenName;
 			int32 CurrentTokenBeginOffset = -1;
 			int32 CurrentTokenEndOffset = -1;
+
+			static ExpressionNodePtr LastHoverExpr;
+			static int32 LastHoverLineIndex = -1;
+			static FString LastTokenName;
+			static int32 LastTokenBeginOffset = -1;
+			static int32 LastTokenEndOffset = -1;
+
 			if (AllottedGeometry.IsUnderLocation(ScreenSpaceCursorPos))
 			{
 				FVector2D LocalSpaceCursorPos = AllottedGeometry.AbsoluteToLocal(ScreenSpaceCursorPos);
 				CurrentHoverLocation = Owner->ShaderMarshaller->TextLayout->GetTextLocationAt(LocalSpaceCursorPos * AllottedGeometry.Scale);
-				if (Owner->DebuggerContext)
+				if (Owner->Debugger.IsValid())
 				{
 					int32 ExtraLineNum = Owner->GetShaderAsset()->GetExtraLineNum();
 					const auto& TokenizedLine = Owner->ShaderMarshaller->TokenizedLines[CurrentHoverLocation.GetLineIndex()];
@@ -3609,21 +3459,25 @@ constexpr int PaddingLineNum = 22;
 								break;
 							}
 						}
+		
 						FString Expression = CurTextLine.Mid(BeginOffset, CurrentTokenEndOffset - BeginOffset);
-						ExpressionNode EvalResult = Owner->EvaluateExpression(Expression);
-						if (EvalResult.ValueStr != LOCALIZATION("InvalidExpr").ToString())
+						if (LastHoverExpr && LastHoverExpr->Expr == Expression)
 						{
-							HoverExpr = MakeShared<ExpressionNode>(MoveTemp(EvalResult));
+							HoverExpr =  LastHoverExpr;
 						}
+						else
+						{
+							ExpressionNode EvalResult = Owner->Debugger.EvaluateExpression(Expression);
+							if (EvalResult.ValueStr != LOCALIZATION("InvalidExpr").ToString())
+							{
+								HoverExpr = MakeShared<ExpressionNode>(MoveTemp(EvalResult));
+							}
+						}
+
 					}
 
 				}
 			}
-
-			static int32 LastHoverLineIndex = -1;
-			static FString LastTokenName;
-			static int32 LastTokenBeginOffset = -1;
-			static int32 LastTokenEndOffset = -1;
 
 			bool bSameToken = (CurrentHoverLocation.GetLineIndex() == LastHoverLineIndex &&
 				CurrentTokenName == LastTokenName &&
@@ -3645,6 +3499,8 @@ constexpr int PaddingLineNum = 22;
 					FVector2D BlockPos = Owner->ShaderMarshaller->TextLayout->GetLocationAt({ CurrentHoverLocation.GetLineIndex(), CurrentTokenBeginOffset }, true) / AllottedGeometry.Scale;
 					FVector2D BlockScreenPos = AllottedGeometry.LocalToAbsolute(BlockPos);
 					ShaderEditorTipWindow->MoveWindowTo(BlockScreenPos);
+
+					LastHoverExpr = HoverExpr;
 					LastHoverLineIndex = CurrentHoverLocation.GetLineIndex();
 					LastTokenName = CurrentTokenName;
 					LastTokenBeginOffset = CurrentTokenBeginOffset;
@@ -3653,6 +3509,7 @@ constexpr int PaddingLineNum = 22;
 			}
 			else
 			{
+				LastHoverExpr.Reset();
 				LastHoverLineIndex = -1;
 				LastTokenName.Empty();
 				LastTokenBeginOffset = -1;
@@ -3724,7 +3581,7 @@ constexpr int PaddingLineNum = 22;
 										.ShowBackgroundForAlpha(true)
 										.Color(FLinearColor{ X, Y, Z, W})
 										.UseSRGB(false) //TODO
-										.OnMouseButtonDown_Lambda([=](const FGeometry&, const FPointerEvent& MouseEvent) {
+										.OnMouseButtonDown_Lambda([=, this](const FGeometry&, const FPointerEvent& MouseEvent) {
 											ShaderEditorTipWindow->SetContent(
 												SNew(SColorPicker)
 												.TargetColorAttribute(FLinearColor{ X, Y, Z, W })
@@ -3852,261 +3709,6 @@ constexpr int PaddingLineNum = 22;
 		return SMultiLineEditableText::OnMouseButtonDoubleClick(MyGeometry, MouseEvent);
 	}
 
-	void SShaderEditorBox::ShowDeuggerVariable(SpvLexicalScope* InScope) const
-	{
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		SDebuggerVariableView* DebuggerLocalVariableView = ShEditor->GetDebuggerLocalVariableView();
-        SDebuggerVariableView* DebuggerGlobalVariableView = ShEditor->GetDebuggerGlobalVariableView();
-		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
-		
-		TArray<ExpressionNodePtr> LocalVarNodeDatas;
-        TArray<ExpressionNodePtr> GlobalVarNodeDatas;
-		const auto& RecordedInfo = DebuggerContext->ThreadState.RecordedInfo;
-		const auto& DebugStates = RecordedInfo.DebugStates;
-		
-		if(CurReturnObject && Scope == InScope)
-		{
-			SpvTypeDesc* ReturnTypeDesc = std::get<SpvTypeDesc*>(GetFunctionDesc(Scope)->GetFuncTypeDesc()->GetReturnType());
-			const TArray<uint8>& Value = std::get<SpvObject::Internal>(CurReturnObject.value().Storage).Value;
-			FString VarName = GetFunctionDesc(Scope)->GetName() + LOCALIZATION("ReturnTip").ToString();
-			FString TypeName = GetTypeDescStr(ReturnTypeDesc);
-			FString ValueStr = GetValueStr(Value, ReturnTypeDesc, TArray{Vector2i{0, Value.Num()}}, 0);
-			
-			auto Data = MakeShared<ExpressionNode>(VarName, ValueStr, TypeName);
-			LocalVarNodeDatas.Add(MoveTemp(Data));
-		}
-		
-		for(const auto& [VarId, VarDesc] : SortedVariableDescs)
-		{
-			if(RecordedInfo.AllVariables.contains(VarId))
-			{
-				const SpvVariable& Var = RecordedInfo.AllVariables.at(VarId);
-				if(!Var.IsExternal())
-				{
-					bool VisibleScope = VarDesc->Parent->Contains(InScope) || (DebugStates[CurDebugStateIndex].bReturn && InScope->GetKind() == SpvScopeKind::Function && InScope == VarDesc->Parent->GetParent());
-					bool VisibleLine = VarDesc->Line <= StopLineNumber + ExtraLineNum && VarDesc->Line > ExtraLineNum;
-					if(VisibleScope && VisibleLine)
-					{
-						FString VarName = VarDesc->Name;
-						//If there are variables with the same name, only the one in the most recent scope is shown.
-						if (LocalVarNodeDatas.ContainsByPredicate([&](const ExpressionNodePtr& InItem) { return InItem->Expr == VarName;}))
-						{
-							continue;
-						}
-						FString TypeName = GetTypeDescStr(VarDesc->TypeDesc);
-						const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var.Storage).Value;
-				
-						TArray<Vector2i> InitializedRanges = { {0, Value.Num()} };
-						if (SDebuggerVariableView::bShowUninitialized)
-						{
-							InitializedRanges = Var.InitializedRanges;
-						}
-						FString ValueStr = GetValueStr(Value, VarDesc->TypeDesc, InitializedRanges, 0);
-						auto Data = MakeShared<ExpressionNode>(VarName, ValueStr, TypeName);
-						TArray<SpvVariableChange::DirtyRange> Ranges;
-						DirtyVars.MultiFind(VarId, Ranges);
-						if(VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Composite || VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Array
-							|| VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Matrix)
-						{
-							Data->Children = AppendVarChildNodes(VarDesc->TypeDesc, InitializedRanges, Ranges, Value, 0);
-						}
-						
-						if(!Ranges.IsEmpty())
-						{
-							Data->Dirty = true;
-						}
-
-                        if(!VarDesc->bGlobal)
-                        {
-		                    LocalVarNodeDatas.Add(MoveTemp(Data));
-                        }
-                        else
-                        {
-                            GlobalVarNodeDatas.Add(MoveTemp(Data));
-                        }
-					}
-				}
-			}
-			
-		}
-		
-		DebuggerLocalVariableView->SetVariableNodeDatas(LocalVarNodeDatas);
-        DebuggerGlobalVariableView->SetVariableNodeDatas(GlobalVarNodeDatas);
-	}
-
-	ExpressionNode SShaderEditorBox::EvaluateExpression(const FString& InExpression) const
-	{
-		const auto& RecordedInfo = DebuggerContext->ThreadState.RecordedInfo;
-		const auto& DebugStates = RecordedInfo.DebugStates;
-		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
-	
-		FString ExpressionShader = ShaderAssetObj->GetShaderDesc(CurrentShaderSource).Source;
-        TArray<uint8> InputData;
-		
-		//Patch EntryPoint
-		FString EntryPoint = ShaderAssetObj->Shader->GetEntryPoint();
-		for(const ShaderFunc& Func : Funcs)
-		{
-			if(Func.Name == EntryPoint)
-			{
-				TArray<FTextRange> LineRanges;
-				FTextRange::CalculateLineRangesFromString(ExpressionShader, LineRanges);
-				int32 StartPos = LineRanges[Func.Start.x - 1].BeginIndex + Func.Start.y - 1;
-				int32 EndPos = LineRanges[Func.End.x - 1].BeginIndex + Func.End.y - 1;
-				
-				ExpressionShader.RemoveAt(StartPos, EndPos - StartPos);
-				
-				//Append bindings
-				TArray<FString> LocalVars;
-				FString LocalVarInitializations;
-				FString VisibleLocalVarBindings = "struct __Expression_Vars_Set {";
-				for(const auto& [VarId, VarDesc] : SortedVariableDescs)
-				{
-					if(RecordedInfo.AllVariables.contains(VarId))
-					{
-						const SpvVariable& Var = RecordedInfo.AllVariables.at(VarId);
-						if(!Var.IsExternal() && VarDesc)
-						{
-							bool VisibleScope = VarDesc->Parent->Contains(CallStackScope) || (DebugStates[CurDebugStateIndex].bReturn && Scope->GetKind() == SpvScopeKind::Function && CallStackScope == VarDesc->Parent->GetParent());
-							bool VisibleLine = VarDesc->Line < StopLineNumber + ExtraLineNum && VarDesc->Line > ExtraLineNum;
-							if (VisibleScope && VisibleLine)
-							{
-								//If there are variables with the same name, only the one in the most recent scope is evaluated.
-								if (LocalVars.Contains(VarDesc->Name))
-								{
-									continue;
-								}
-								FString Declaration;
-								if(VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Array)
-								{
-									SpvArrayTypeDesc* ArrayTypeDesc = static_cast<SpvArrayTypeDesc*>(VarDesc->TypeDesc);
-									FString BasicTypeStr = GetTypeDescStr(ArrayTypeDesc->GetBaseTypeDesc());
-									FString DimStr = GetTypeDescStr(VarDesc->TypeDesc);
-									DimStr.RemoveFromStart(BasicTypeStr);
-									Declaration = BasicTypeStr + " " + VarDesc->Name + DimStr + ";";
-									LocalVarInitializations += Declaration;
-									LocalVarInitializations += VarDesc->Name + "= __Expression_Vars[0]." + VarDesc->Name + ";\n";
-								}
-								else
-								{
-									Declaration = GetTypeDescStr(VarDesc->TypeDesc) + " " + VarDesc->Name + ";";
-									LocalVarInitializations += GetTypeDescStr(VarDesc->TypeDesc) + " " + VarDesc->Name + "= __Expression_Vars[0]." + VarDesc->Name + ";\n";
-								}
-								VisibleLocalVarBindings += Declaration;
-								LocalVars.Add(VarDesc->Name);
-                                const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var.Storage).Value;
-                                InputData.Append(Value);
-							}
-						}
-					}
-				}
-				VisibleLocalVarBindings += "};\n";
-				VisibleLocalVarBindings += "StructuredBuffer<__Expression_Vars_Set> __Expression_Vars : register(t114514);\n";
-				
-				//Append the EntryPoint
-				FString EntryPointFunc = FString::Printf(TEXT("\nvoid %s() {\n"), *EntryPoint);
-				EntryPointFunc += MoveTemp(LocalVarInitializations);
-				EntryPointFunc += FString::Printf(TEXT("__Expression_Output(%s);\n"), *InExpression);
-				EntryPointFunc += "}\n";
-				ExpressionShader += VisibleLocalVarBindings + EntryPointFunc;
-				break;
-			}
-		}
-		
-		static const FString OutputFunc =
-R"(template<typename T>
-void __Expression_Output(T __Expression_Result) {}
-)";
-		ExpressionShader = OutputFunc + ExpressionShader;
-		
-		auto ShaderDesc = GpuShaderSourceDesc{
-			.Name = "EvaluateExpression",
-			.Source = MoveTemp(ExpressionShader),
-			.Type = ShaderAssetObj->Shader->GetShaderType(),
-			.EntryPoint = EntryPoint
-		};
-		TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(ShaderDesc);
-		Shader->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
-		
-		TArray<FString> ExtraArgs;
-		ExtraArgs.Add("-D");
-		ExtraArgs.Add("ENABLE_PRINT=0");
-		
-		FString ErrorInfo, WarnInfo;
-		GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo, ExtraArgs);
-		if(ErrorInfo.IsEmpty())
-		{
-            TRefCountPtr<GpuBuffer> LocalVarsInput = GGpuRhi->CreateBuffer({
-                .ByteSize = (uint32)InputData.Num(),
-                .Usage = GpuBufferUsage::Storage,
-                .Stride = (uint32)InputData.Num(),
-                .InitialData = InputData
-            });
-
-            SpirvParser Parser;
-		    Parser.Parse(Shader->SpvCode);
-            if(Shader->GetShaderType() == ShaderType::PixelShader)
-            {
-                std::array<SpvVmContext,4> Quad;
-                for(int i = 0; i < Quad.size(); i++)
-                {       
-                    Quad[i].ThreadState.BuiltInInput = VmPixelContext.value().Quad[i].ThreadState.BuiltInInput;
-                    Quad[i].ThreadState.LocationInput = VmPixelContext.value().Quad[i].ThreadState.LocationInput;
-					
-					SpvMetaVisitor MetaVisitor{Quad[i]};
-					Parser.Accept(&MetaVisitor);
-                }
-
-                TArray<SpvVmBinding> Bindings = VmPixelContext.value().Bindings;
-                Bindings.Add(SpvVmBinding{
-                    .DescriptorSet = 0,
-                    .Binding = 114514,
-                    .Resource = AUX::StaticCastRefCountPtr<GpuResource>(LocalVarsInput)
-                });
-
-                SpvVmPixelExprContext VmContext{
-                    SpvVmPixelContext{
-                        .DebugIndex = VmPixelContext.value().DebugIndex,
-                        .Bindings = MoveTemp(Bindings),
-                        .Quad = MoveTemp(Quad)
-                    }
-                };
-                SpvVmPixelExprVisitor VmVisitor{VmContext};
-		        Parser.Accept(&VmVisitor);
-	
-				if(!VmContext.HasSideEffect)
-				{
-					FText TypeName = LOCALIZATION("InvalidExpr");
-					if(VmContext.ResultTypeDesc)
-					{
-						TypeName = FText::FromString(GetTypeDescStr(VmContext.ResultTypeDesc));
-
-						TArray<Vector2i> ResultRange;
-						ResultRange.Add({ 0, VmContext.ResultValue.Num() });
-						FString ValueStr = GetValueStr(VmContext.ResultValue, VmContext.ResultTypeDesc, ResultRange, 0);
-
-						TArray<TSharedPtr<ExpressionNode>> Children;
-						if (VmContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Composite || VmContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Array
-							|| VmContext.ResultTypeDesc->GetKind() == SpvTypeDescKind::Matrix)
-						{
-							Children = AppendExprChildNodes(VmContext.ResultTypeDesc, ResultRange, VmContext.ResultValue, 0);
-						}
-
-						return { .Expr = InExpression, .ValueStr = ValueStr,
-							.TypeName = TypeName.ToString(), .Children = MoveTemp(Children)};
-					}
-					
-				}
-				else
-				{
-					return {.Expr = InExpression, .ValueStr = LOCALIZATION("SideEffectExpr").ToString()};
-				}
-            }
-		}
-
-		return {.Expr = InExpression, .ValueStr = LOCALIZATION("InvalidExpr").ToString()};
-	}
-
 	void SShaderEditorBox::ScrollTo(int32 InLineIndex)
 	{
 		int32 LineCount = ShaderMarshaller->TextLayout->GetLineCount();
@@ -4125,42 +3727,12 @@ void __Expression_Output(T __Expression_Result) {}
 		}
 	}
 
-	void SShaderEditorBox::ShowDebuggerResult() const
-	{
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		SDebuggerCallStackView* DebuggerCallStackView = ShEditor->GetDebuggerCallStackView();
-		
-		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
-		TArray<CallStackDataPtr> CallStackDatas;
-		
-		SpvFunctionDesc* FuncDesc = GetFunctionDesc(Scope);
-		FString Location = FString::Printf(TEXT("%s (Line %d)"), *ShaderAssetObj->GetFileName(), StopLineNumber);
-		CallStackDatas.Add(MakeShared<CallStackData>(GetFunctionSig(FuncDesc, Funcs), MoveTemp(Location)));
-		for(int i = CallStack.Num() - 1; i >= 0; i--)
-		{
-			SpvFunctionDesc* FuncDesc = GetFunctionDesc(CallStack[i].Key);
-			int JumpLineNumber = CallStack[i].Value - ExtraLineNum;
-			if(JumpLineNumber > 0)
-			{
-				FString Location = FString::Printf(TEXT("%s (Line %d)"), *ShaderAssetObj->GetFileName(), JumpLineNumber);
-				CallStackDatas.Add(MakeShared<CallStackData>(GetFunctionSig(FuncDesc, Funcs), MoveTemp(Location)));
-			}
-		}
-		DebuggerCallStackView->SetCallStackDatas(CallStackDatas);
-		
-		ShowDeuggerVariable(Scope);
-		
-		SDebuggerWatchView* DebuggerWatchView = ShEditor->GetDebuggerWatchView();
-		DebuggerWatchView->OnWatch = [this](const FString& Expression) { return EvaluateExpression(Expression); };
-		DebuggerWatchView->Refresh();
-	}
-
 	void SShaderEditorBox::Continue(StepMode Mode)
 	{
 		AssetOp::OpenAsset(ShaderAssetObj);
 		if(bEditDuringDebugging)
 		{
-			auto Ret = MessageDialog::Open(MessageDialog::OkCancel, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("EditDuringDebugging"));
+			auto Ret = MessageDialog::Open(MessageDialog::OkCancel, MessageDialog::Shocked, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("EditDuringDebugging"));
 			if(Ret == MessageDialog::MessageRet::Ok)
 			{
 				bEditDuringDebugging = false;
@@ -4170,248 +3742,44 @@ void __Expression_Output(T __Expression_Result) {}
 				return;
 			}
 		}
-
-		DirtyVars.Empty();
-		DebuggerError.Empty();
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		TSharedPtr<SWindow> ShaderEditorTipWindow = ShEditor->GetShaderEditorTipWindow();
-		ShaderEditorTipWindow->HideWindow();
 		
-		const auto& DebugStates = DebuggerContext->ThreadState.RecordedInfo.DebugStates;
-		auto CallStackAtStop = CallStack;
-		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
-		while(CurDebugStateIndex < DebugStates.Num())
+		if(Debugger.Continue(Mode))
 		{
-			const SpvDebugState& DebugState = DebugStates[CurDebugStateIndex];
-			std::optional<int32> NextValidLine;
-			if(CurDebugStateIndex + 1 < DebugStates.Num() && 
-				((!DebugStates[CurDebugStateIndex + 1].VarChanges.IsEmpty() && !DebugStates[CurDebugStateIndex + 1].bParamChange)
-				|| DebugStates[CurDebugStateIndex + 1].bKill
-				|| DebugStates[CurDebugStateIndex + 1].bReturn 
-				|| DebugStates[CurDebugStateIndex + 1].bFuncCallAfterReturn 
-				|| DebugStates[CurDebugStateIndex + 1].bFuncCall 
-				|| DebugStates[CurDebugStateIndex + 1].bCondition))
-			{
-				NextValidLine = DebugStates[CurDebugStateIndex + 1].Line;
-			}
-			
-			if(!DebugState.UbError.IsEmpty())
-			{
-				DebuggerError = "Undefined behavior";
-				StopLineNumber = DebugState.Line - ExtraLineNum;
-				SH_LOG(LogShader, Error, TEXT("%s"), *DebugState.UbError);
-				break;
-			}
-			
-			ApplyDebugState(DebugState);
-			CurDebugStateIndex++;
-			
-			if(AssertResult)
-			{
-				TArray<uint8>& Value = std::get<SpvObject::Internal>(AssertResult->Storage).Value;
-				uint32& TypedValue = *(uint32*)Value.GetData();
-				if(TypedValue != 1)
-				{
-					DebuggerError = "Assert failed";
-					StopLineNumber = DebugState.Line - ExtraLineNum;
-					TypedValue = 1;
-					break;
-				}
-			}
-			
-			if(NextValidLine)
-			{
-				bool MatchBreakPoint = Scope && BreakPointLineNumbers.ContainsByPredicate([&](int32 InEntry){
-					 int32 BreakPointLine = InEntry + ExtraLineNum;
-					 bool bForward;
-					 if(!CurValidLine)
-					 {
-						 int32 FuncLine = GetFunctionDesc(Scope)->GetLine();
-						 bForward = (BreakPointLine >= FuncLine) && (BreakPointLine <= NextValidLine.value());
-					 }
-					 else
-					 {
-						 bForward = (BreakPointLine > CurValidLine.value()) && (BreakPointLine <= NextValidLine.value());
-					 }
-					 return bForward;
-				});
-				bool SameStack = CurValidLine != NextValidLine && CallStackAtStop.Num() == CallStack.Num();
-				bool ReturnStack = CallStackAtStop.Num() > CallStack.Num();
-				bool CrossStack = CallStackAtStop.Num() != CallStack.Num();
-				
-				bool StopStepOver = Mode == StepMode::StepOver && NextValidLine.value() - ExtraLineNum > 0 && (SameStack || ReturnStack);
-				bool StopStepInto = Mode == StepMode::StepInto && NextValidLine.value() - ExtraLineNum > 0 && (SameStack || CrossStack);
-				
-				CurValidLine = NextValidLine;
-				if(MatchBreakPoint || StopStepOver || StopStepInto)
-				{
-					CallStackAtStop = CallStack;
-					StopLineNumber = NextValidLine.value() - ExtraLineNum;
-					break;
-				}
-			}
+			Debugger.ShowDebuggerResult();
+			ScrollTo(GetLineIndex(Debugger.GetStopLineNumber()));
+			UnFold(Debugger.GetStopLineNumber());
 		}
-		
-		if(CurDebugStateIndex >= DebugStates.Num())
+		else
 		{
 			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 			ShEditor->EndDebugging();
 		}
-		else
-		{
-			ShowDebuggerResult();
-			ScrollTo(GetLineIndex(StopLineNumber));
-			UnFold(StopLineNumber);
-		}
 	}
 
-	void SShaderEditorBox::ClearDebugger()
+	void SShaderEditorBox::ResetDebugger()
 	{
-		CurValidLine.reset();
-		CallStack.Empty();
-        DebuggerContext = nullptr;
-		Scope = nullptr;
-		CallStackScope = nullptr;
-        CurReturnObject.reset();
-		AssertResult = nullptr;
-		DebuggerError.Empty();
-		DirtyVars.Empty();
-		StopLineNumber = 0;
-        VmPixelContext.reset();
 		bEditDuringDebugging = false;
-		SortedVariableDescs.clear();
-
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		SDebuggerVariableView* DebuggerLocalVariableView = ShEditor->GetDebuggerLocalVariableView();
-		SDebuggerVariableView* DebuggerGlobalVariableView = ShEditor->GetDebuggerGlobalVariableView();
-		DebuggerLocalVariableView->SetVariableNodeDatas({});
-		DebuggerGlobalVariableView->SetVariableNodeDatas({});
-		DebuggerLocalVariableView->SetOnShowUninitialized(nullptr);
-		DebuggerGlobalVariableView->SetOnShowUninitialized(nullptr);
+		Debugger.Reset();
 	}
 
-	void SShaderEditorBox::DebugPixel(const FW::Vector2u& PixelCoord, const TArray<TRefCountPtr<FW::GpuBindGroup>>& BindGroups)
+	std::optional<Vector2u> SShaderEditorBox::ValidatePixel(const InvocationState& InState)
 	{
-		TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(ShaderAssetObj->GetShaderDesc(CurrentShaderSource));
-		Shader->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
+		return Debugger.ValidatePixel(InState);
+	}
 
-		TArray<FString> ExtraArgs;
-		ExtraArgs.Add("-D");
-		ExtraArgs.Add("ENABLE_PRINT=0");
-
-		FString ErrorInfo, WarnInfo;
-		if (!GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo, ExtraArgs))
+	void SShaderEditorBox::DebugPixel(const Vector2u& InPixelCoord, const InvocationState& InState)
+	{
+		try
 		{
-			FString FailureInfo = LOCALIZATION("DebugFailure").ToString() + ":\n\n" + ErrorInfo;
-			MessageDialog::Open(MessageDialog::Ok, GApp->GetEditor()->GetMainWindow(), FText::FromString(FailureInfo));
+			Debugger.DebugPixel(InPixelCoord, InState);
+			Continue();
+		}
+		catch (const std::runtime_error& e)
+		{
+			MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), FText::FromString(UTF8_TO_TCHAR(e.what())));
 			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 			ShEditor->EndDebugging();
 			return;
 		}
-
-		ShaderTU TU{ Shader->GetSourceText(), Shader->GetIncludeDirs() };
-		Funcs = TU.GetFuncs();
-		int32 DebugIndex= 2 * (PixelCoord.y & 1) + (PixelCoord.x & 1);
-		
-		TArray<SpvVmBinding> Bindings;
-		for(const auto& BindGroup : BindGroups)
-		{
-			const auto& BindGroupDesc = BindGroup->GetDesc();
-			int32 SetNumber = BindGroupDesc.Layout->GetGroupNumber();
-			for(const auto& [Slot, ResourceBindingEntry] : BindGroupDesc.Resources)
-			{
-				const auto& LayoutBindingEntry = BindGroupDesc.Layout->GetDesc().Layouts[Slot];
-				Bindings.Add({
-					.DescriptorSet = SetNumber,
-					.Binding = Slot,
-					.Resource = ResourceBindingEntry.Resource
-				});
-			}
-		}
-		
-		std::array<SpvVmContext,4> Quad;
-		//TODO z,w
-		uint32 QuadLeftTopX = PixelCoord.x & ~1u;
-		uint32 QuadLeftTopY = PixelCoord.y & ~1u;
-		Vector4f QuadFragCoord0 = {QuadLeftTopX + 0.5f, QuadLeftTopY + 0.5f, 0.0f, 1.0f};
-		Vector4f QuadFragCoord1 = {QuadLeftTopX + 1.5f, QuadLeftTopY + 0.5f, 0.0f, 1.0f};
-		Vector4f QuadFragCoord2 = {QuadLeftTopX + 0.5f, QuadLeftTopY + 1.5f, 0.0f, 1.0f};
-		Vector4f QuadFragCoord3 = {QuadLeftTopX + 1.5f, QuadLeftTopY + 1.5f, 0.0f, 1.0f};
-		Quad[0].ThreadState.BuiltInInput.emplace(SpvBuiltIn::FragCoord, TArray{(uint8*)&QuadFragCoord0, sizeof(Vector4f)});
-		Quad[1].ThreadState.BuiltInInput.emplace(SpvBuiltIn::FragCoord, TArray{(uint8*)&QuadFragCoord1, sizeof(Vector4f)});
-		Quad[2].ThreadState.BuiltInInput.emplace(SpvBuiltIn::FragCoord, TArray{(uint8*)&QuadFragCoord2, sizeof(Vector4f)});
-		Quad[3].ThreadState.BuiltInInput.emplace(SpvBuiltIn::FragCoord, TArray{(uint8*)&QuadFragCoord3, sizeof(Vector4f)});
-		for (int i = 0; i < 4; i++)
-		{
-			Quad[i].EditorFuncInfo = Funcs;
-		}
-		
-		SpirvParser Parser;
-		Parser.Parse(Shader->SpvCode);
-		for(int32 QuadIndex = 0; QuadIndex < 4; QuadIndex++)
-		{
-			SpvMetaVisitor MetaVisitor{Quad[QuadIndex]};
-			Parser.Accept(&MetaVisitor);
-		}
-		
-		VmPixelContext = SpvVmPixelContext{
-			DebugIndex,
-			MoveTemp(Bindings),
-			MoveTemp(Quad)
-		};
-		SpvVmPixelVisitor VmVisitor{VmPixelContext.value()};
-		Parser.Accept(&VmVisitor);
-		
-		CurDebugStateIndex = 0;
-		DebuggerContext = &VmPixelContext.value().Quad[DebugIndex];
-		
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		SDebuggerCallStackView* DebuggerCallStackView = ShEditor->GetDebuggerCallStackView();
-		SDebuggerWatchView* DebuggerWatchView = ShEditor->GetDebuggerWatchView();
-
-		SDebuggerVariableView* DebuggerLocalVariableView = ShEditor->GetDebuggerLocalVariableView();
-		SDebuggerVariableView* DebuggerGlobalVariableView = ShEditor->GetDebuggerGlobalVariableView();
-		DebuggerLocalVariableView->SetOnShowUninitialized([this](bool bShowUninitialized) { ShowDeuggerVariable(CallStackScope); });
-		DebuggerGlobalVariableView->SetOnShowUninitialized([this](bool bShowUninitialized) { ShowDeuggerVariable(CallStackScope); });
-
-		DebuggerCallStackView->OnSelectionChanged = [this, DebuggerWatchView](const FString& FuncName) {
-			int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
-			if(GetFunctionSig(GetFunctionDesc(Scope), Funcs) == FuncName)
-			{
-				StopLineNumber =  CurValidLine.value() - ExtraLineNum;
-				ShowDeuggerVariable(Scope);
-				CallStackScope = Scope;
-			}
-			else if(auto Call = CallStack.FindByPredicate([this, FuncName](const TPair<FW::SpvLexicalScope*, int>& InItem){
-				if(GetFunctionSig(GetFunctionDesc(InItem.Key), Funcs) == FuncName)
-				{
-					return true;
-				}
-				return false;
-			}))
-			{
-				StopLineNumber = Call->Value - ExtraLineNum;
-				ShowDeuggerVariable(Call->Key);
-				CallStackScope = Call->Key;
-			}
-			
-			DebuggerWatchView->Refresh();
-		};
-		for(const auto& [VarId, VarDesc] : DebuggerContext->VariableDescMap)
-		{
-			if(VarDesc)
-			{
-				SortedVariableDescs.emplace_back(VarId, VarDesc);
-				if (VarDesc->Name == "GPrivate_AssertResult")
-				{
-					AssertResult = &DebuggerContext->ThreadState.RecordedInfo.AllVariables.at(VarId);;
-				}
-			}
-		}
-		std::sort(SortedVariableDescs.begin(), SortedVariableDescs.end(), [](const auto& PairA, const auto& PairB) {
-			return PairA.second->Line > PairB.second->Line;
-		});
-		Continue();
-	
 	}
 }

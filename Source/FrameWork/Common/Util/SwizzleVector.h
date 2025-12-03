@@ -506,11 +506,11 @@ namespace FW {
 		FString ToString() const {
 			if constexpr (std::is_same_v<T, float>)
 			{
-				return FString::Printf(TEXT("{%.7g,%.7g}"), X, Y);
+				return FString::Printf(TEXT("{%.9g,%.9g}"), X, Y);
 			}
 			else if constexpr (std::is_same_v<T, double>)
 			{
-				return FString::Printf(TEXT("{%.16g,%.16g}"), X, Y );
+				return FString::Printf(TEXT("{%.17g,%.17g}"), X, Y );
 			}
 			else
 			{
@@ -735,11 +735,11 @@ namespace FW {
 		FString ToString() const {
 			if constexpr (std::is_same_v<T, float>)
 			{
-				return FString::Printf(TEXT("{%.7g,%.7g,%.7g}"), X, Y, Z);
+				return FString::Printf(TEXT("{%.9g,%.9g,%.9g}"), X, Y, Z);
 			}
 			else if constexpr (std::is_same_v<T, double>)
 			{
-				return FString::Printf(TEXT("{%.16g,%.16g,%.16g}"), X, Y, Z);
+				return FString::Printf(TEXT("{%.17g,%.17g,%.17g}"), X, Y, Z);
 			}
 			else
 			{
@@ -964,11 +964,11 @@ namespace FW {
 		FString ToString() const {
 			if constexpr (std::is_same_v<T, float>)
 			{
-				return FString::Printf(TEXT("{%.7g,%.7g,%.7g,%.7g}"), X, Y, Z, W);
+				return FString::Printf(TEXT("{%.9g,%.9g,%.9g,%.9g}"), X, Y, Z, W);
 			}
 			else if constexpr (std::is_same_v<T, double>)
 			{
-				return FString::Printf(TEXT("{%.16g,%.16g,%.16g,%.16g}"), X, Y, Z, W);
+				return FString::Printf(TEXT("{%.17g,%.17g,%.17g,%.17g}"), X, Y, Z, W);
 			}
 			else
 			{

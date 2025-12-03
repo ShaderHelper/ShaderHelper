@@ -5,186 +5,192 @@
 namespace FW
 {
 	class SpvInstruction;
-	class SpvVisitor
+	class FRAMEWORK_API SpvVisitor
 	{
 	public:
-		virtual void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts) {}
-		
-		virtual void Visit(SpvInstruction*) {}
+		virtual ~SpvVisitor() = default;
+		virtual void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections, const TMap<SpvId, SpvExtSet>& InExtSets) {}
+		virtual void Visit(const SpvInstruction*) {}
 		
 		//Core
-		virtual void Visit(class SpvOpEntryPoint* Inst) {}
-		virtual void Visit(class SpvOpExecutionMode* Inst) {}
-		virtual void Visit(class SpvOpName* Inst) {}
-		virtual void Visit(class SpvOpString* Inst) {}
-		virtual void Visit(class SpvOpDecorate* Inst) {}
-		virtual void Visit(class SpvOpMemberDecorate* Inst) {}
-		virtual void Visit(class SpvOpTypeVoid* Inst) {}
-		virtual void Visit(class SpvOpTypeBool* Inst) {}
-		virtual void Visit(class SpvOpTypeFloat* Inst) {}
-		virtual void Visit(class SpvOpTypeInt* Inst) {}
-		virtual void Visit(class SpvOpTypeVector* Inst) {}
-		virtual void Visit(class SpvOpTypeMatrix* Inst) {}
-		virtual void Visit(class SpvOpTypePointer* Inst) {}
-		virtual void Visit(class SpvOpTypeStruct* Inst) {}
-		virtual void Visit(class SpvOpTypeImage* Inst) {}
-		virtual void Visit(class SpvOpTypeSampler* Inst) {}
-		virtual void Visit(class SpvOpTypeArray* Inst) {}
-		virtual void Visit(class SpvOpTypeRuntimeArray* Inst) {}
+		virtual void Visit(const class SpvOpEntryPoint* Inst) {}
+		virtual void Visit(const class SpvOpExecutionMode* Inst) {}
+		virtual void Visit(const class SpvOpName* Inst) {}
+		virtual void Visit(const class SpvOpString* Inst) {}
+		virtual void Visit(const class SpvOpDecorate* Inst) {}
+		virtual void Visit(const class SpvOpMemberDecorate* Inst) {}
+		virtual void Visit(const class SpvOpTypeVoid* Inst) {}
+		virtual void Visit(const class SpvOpTypeBool* Inst) {}
+		virtual void Visit(const class SpvOpTypeFloat* Inst) {}
+		virtual void Visit(const class SpvOpTypeInt* Inst) {}
+		virtual void Visit(const class SpvOpTypeVector* Inst) {}
+		virtual void Visit(const class SpvOpTypeMatrix* Inst) {}
+		virtual void Visit(const class SpvOpTypePointer* Inst) {}
+		virtual void Visit(const class SpvOpTypeFunction* Inst) {}
+		virtual void Visit(const class SpvOpTypeStruct* Inst) {}
+		virtual void Visit(const class SpvOpTypeImage* Inst) {}
+		virtual void Visit(const class SpvOpTypeSampler* Inst) {}
+		virtual void Visit(const class SpvOpTypeArray* Inst) {}
+		virtual void Visit(const class SpvOpTypeRuntimeArray* Inst) {}
 		
-		virtual void Visit(class SpvOpConstant* Inst) {}
-		virtual void Visit(class SpvOpConstantTrue* Inst) {}
-		virtual void Visit(class SpvOpConstantFalse* Inst) {}
-		virtual void Visit(class SpvOpConstantComposite* Inst) {}
-		virtual void Visit(class SpvOpConstantNull* Inst) {}
-		virtual void Visit(class SpvOpFunction* Inst) {}
-		virtual void Visit(class SpvOpFunctionParameter* Inst) {}
-		virtual void Visit(class SpvOpFunctionCall* Inst) {}
-		virtual void Visit(class SpvOpVariable* Inst) {}
-		virtual void Visit(class SpvOpPhi* Inst) {}
-		virtual void Visit(class SpvOpLabel* Inst) {}
-		virtual void Visit(class SpvOpLoad* Inst) {}
-		virtual void Visit(class SpvOpStore* Inst) {}
-		virtual void Visit(class SpvOpVectorShuffle* Inst) {}
-		virtual void Visit(class SpvOpCompositeConstruct* Inst) {}
-		virtual void Visit(class SpvOpCompositeExtract* Inst) {}
-		virtual void Visit(class SpvOpTranspose* Inst) {}
-		virtual void Visit(class SpvOpAccessChain* Inst) {}
-		virtual void Visit(class SpvOpSampledImage* Inst) {}
-		virtual void Visit(class SpvOpImageSampleImplicitLod* Inst) {}
-		virtual void Visit(class SpvOpImageFetch* Inst) {}
-		virtual void Visit(class SpvOpImageQuerySizeLod* Inst) {}
-		virtual void Visit(class SpvOpImageQueryLevels* Inst) {}
-		virtual void Visit(class SpvOpVectorTimesScalar* Inst) {}
-		virtual void Visit(class SpvOpMatrixTimesScalar* Inst) {}
-		virtual void Visit(class SpvOpVectorTimesMatrix* Inst) {}
-		virtual void Visit(class SpvOpMatrixTimesVector* Inst) {}
-		virtual void Visit(class SpvOpMatrixTimesMatrix* Inst) {}
-		virtual void Visit(class SpvOpDot* Inst) {}
-		virtual void Visit(class SpvOpAny* Inst) {}
-		virtual void Visit(class SpvOpAll* Inst) {}
-		virtual void Visit(class SpvOpIsNan* Inst) {}
-		virtual void Visit(class SpvOpIsInf* Inst) {}
-		virtual void Visit(class SpvOpLogicalOr* Inst) {}
-		virtual void Visit(class SpvOpLogicalAnd* Inst) {}
-		virtual void Visit(class SpvOpLogicalNot* Inst) {}
-		virtual void Visit(class SpvOpSelect* Inst) {}
-		virtual void Visit(class SpvOpIEqual* Inst) {}
-		virtual void Visit(class SpvOpINotEqual* Inst) {}
-		virtual void Visit(class SpvOpUGreaterThan* Inst) {}
-		virtual void Visit(class SpvOpSGreaterThan* Inst) {}
-		virtual void Visit(class SpvOpUGreaterThanEqual* Inst) {}
-		virtual void Visit(class SpvOpSGreaterThanEqual* Inst) {}
-		virtual void Visit(class SpvOpULessThan* Inst) {}
-		virtual void Visit(class SpvOpSLessThan* Inst) {}
-		virtual void Visit(class SpvOpULessThanEqual* Inst) {}
-		virtual void Visit(class SpvOpSLessThanEqual* Inst) {}
-		virtual void Visit(class SpvOpFOrdEqual* Inst) {}
-		virtual void Visit(class SpvOpFOrdNotEqual* Inst) {}
-		virtual void Visit(class SpvOpFOrdLessThan* Inst) {}
-		virtual void Visit(class SpvOpFOrdGreaterThan* Inst) {}
-		virtual void Visit(class SpvOpFOrdLessThanEqual* Inst) {}
-		virtual void Visit(class SpvOpFOrdGreaterThanEqual* Inst) {}
-		virtual void Visit(class SpvOpShiftRightLogical* Inst) {}
-		virtual void Visit(class SpvOpShiftRightArithmetic* Inst) {}
-		virtual void Visit(class SpvOpShiftLeftLogical* Inst) {}
-		virtual void Visit(class SpvOpBitwiseOr* Inst) {}
-		virtual void Visit(class SpvOpBitwiseXor* Inst) {}
-		virtual void Visit(class SpvOpBitwiseAnd* Inst) {}
-		virtual void Visit(class SpvOpConvertFToU* Inst) {}
-		virtual void Visit(class SpvOpConvertFToS* Inst) {}
-		virtual void Visit(class SpvOpConvertSToF* Inst) {}
-		virtual void Visit(class SpvOpConvertUToF* Inst) {}
-		virtual void Visit(class SpvOpBitcast* Inst) {}
-		virtual void Visit(class SpvOpSNegate* Inst) {}
-		virtual void Visit(class SpvOpFNegate* Inst) {}
-		virtual void Visit(class SpvOpIAdd* Inst) {}
-		virtual void Visit(class SpvOpFAdd* Inst) {}
-		virtual void Visit(class SpvOpISub* Inst) {}
-		virtual void Visit(class SpvOpFSub* Inst) {}
-		virtual void Visit(class SpvOpIMul* Inst) {}
-		virtual void Visit(class SpvOpFMul* Inst) {}
-		virtual void Visit(class SpvOpUDiv* Inst) {}
-		virtual void Visit(class SpvOpSDiv* Inst) {}
-		virtual void Visit(class SpvOpFDiv* Inst) {}
-		virtual void Visit(class SpvOpUMod* Inst) {}
-		virtual void Visit(class SpvOpSRem* Inst) {}
-		virtual void Visit(class SpvOpFRem* Inst) {}
-		virtual void Visit(class SpvOpNot* Inst) {}
-		virtual void Visit(class SpvOpDPdx* Inst) {}
-		virtual void Visit(class SpvOpDPdy* Inst) {}
-		virtual void Visit(class SpvOpFwidth* Inst) {}
-		virtual void Visit(class SpvOpBranch* Inst) {}
-		virtual void Visit(class SpvOpBranchConditional* Inst) {}
-		virtual void Visit(class SpvOpSwitch* Inst) {}
-		virtual void Visit(class SpvOpKill* Inst) {}
-		virtual void Visit(class SpvOpReturn* Inst) {}
-		virtual void Visit(class SpvOpReturnValue* Inst) {}
+		virtual void Visit(const class SpvOpConstant* Inst) {}
+		virtual void Visit(const class SpvOpConstantTrue* Inst) {}
+		virtual void Visit(const class SpvOpConstantFalse* Inst) {}
+		virtual void Visit(const class SpvOpConstantComposite* Inst) {}
+		virtual void Visit(const class SpvOpConstantNull* Inst) {}
+		virtual void Visit(const class SpvOpFunction* Inst) {}
+		virtual void Visit(const class SpvOpFunctionParameter* Inst) {}
+		virtual void Visit(const class SpvOpFunctionCall* Inst) {}
+		virtual void Visit(const class SpvOpVariable* Inst) {}
+		virtual void Visit(const class SpvOpAtomicIAdd* Inst) {}
+		virtual void Visit(const class SpvOpPhi* Inst) {}
+		virtual void Visit(const class SpvOpLoopMerge* Inst) {}
+		virtual void Visit(const class SpvOpSelectionMerge* Inst) {}
+		virtual void Visit(const class SpvOpLabel* Inst) {}
+		virtual void Visit(const class SpvOpLoad* Inst) {}
+		virtual void Visit(const class SpvOpStore* Inst) {}
+		virtual void Visit(const class SpvOpVectorShuffle* Inst) {}
+		virtual void Visit(const class SpvOpCompositeConstruct* Inst) {}
+		virtual void Visit(const class SpvOpCompositeExtract* Inst) {}
+		virtual void Visit(const class SpvOpTranspose* Inst) {}
+		virtual void Visit(const class SpvOpAccessChain* Inst) {}
+		virtual void Visit(const class SpvOpSampledImage* Inst) {}
+		virtual void Visit(const class SpvOpImageSampleImplicitLod* Inst) {}
+		virtual void Visit(const class SpvOpImageFetch* Inst) {}
+		virtual void Visit(const class SpvOpImageQuerySizeLod* Inst) {}
+		virtual void Visit(const class SpvOpImageQueryLevels* Inst) {}
+		virtual void Visit(const class SpvOpVectorTimesScalar* Inst) {}
+		virtual void Visit(const class SpvOpMatrixTimesScalar* Inst) {}
+		virtual void Visit(const class SpvOpVectorTimesMatrix* Inst) {}
+		virtual void Visit(const class SpvOpMatrixTimesVector* Inst) {}
+		virtual void Visit(const class SpvOpMatrixTimesMatrix* Inst) {}
+		virtual void Visit(const class SpvOpDot* Inst) {}
+		virtual void Visit(const class SpvOpAny* Inst) {}
+		virtual void Visit(const class SpvOpAll* Inst) {}
+		virtual void Visit(const class SpvOpIsNan* Inst) {}
+		virtual void Visit(const class SpvOpIsInf* Inst) {}
+		virtual void Visit(const class SpvOpLogicalOr* Inst) {}
+		virtual void Visit(const class SpvOpLogicalAnd* Inst) {}
+		virtual void Visit(const class SpvOpLogicalNot* Inst) {}
+		virtual void Visit(const class SpvOpSelect* Inst) {}
+		virtual void Visit(const class SpvOpIEqual* Inst) {}
+		virtual void Visit(const class SpvOpINotEqual* Inst) {}
+		virtual void Visit(const class SpvOpUGreaterThan* Inst) {}
+		virtual void Visit(const class SpvOpSGreaterThan* Inst) {}
+		virtual void Visit(const class SpvOpUGreaterThanEqual* Inst) {}
+		virtual void Visit(const class SpvOpSGreaterThanEqual* Inst) {}
+		virtual void Visit(const class SpvOpULessThan* Inst) {}
+		virtual void Visit(const class SpvOpSLessThan* Inst) {}
+		virtual void Visit(const class SpvOpULessThanEqual* Inst) {}
+		virtual void Visit(const class SpvOpSLessThanEqual* Inst) {}
+		virtual void Visit(const class SpvOpFOrdEqual* Inst) {}
+		virtual void Visit(const class SpvOpFOrdNotEqual* Inst) {}
+		virtual void Visit(const class SpvOpFOrdLessThan* Inst) {}
+		virtual void Visit(const class SpvOpFOrdGreaterThan* Inst) {}
+		virtual void Visit(const class SpvOpFOrdLessThanEqual* Inst) {}
+		virtual void Visit(const class SpvOpFOrdGreaterThanEqual* Inst) {}
+		virtual void Visit(const class SpvOpShiftRightLogical* Inst) {}
+		virtual void Visit(const class SpvOpShiftRightArithmetic* Inst) {}
+		virtual void Visit(const class SpvOpShiftLeftLogical* Inst) {}
+		virtual void Visit(const class SpvOpBitwiseOr* Inst) {}
+		virtual void Visit(const class SpvOpBitwiseXor* Inst) {}
+		virtual void Visit(const class SpvOpBitwiseAnd* Inst) {}
+		virtual void Visit(const class SpvOpConvertFToU* Inst) {}
+		virtual void Visit(const class SpvOpConvertFToS* Inst) {}
+		virtual void Visit(const class SpvOpConvertSToF* Inst) {}
+		virtual void Visit(const class SpvOpConvertUToF* Inst) {}
+		virtual void Visit(const class SpvOpBitcast* Inst) {}
+		virtual void Visit(const class SpvOpSNegate* Inst) {}
+		virtual void Visit(const class SpvOpFNegate* Inst) {}
+		virtual void Visit(const class SpvOpIAdd* Inst) {}
+		virtual void Visit(const class SpvOpFAdd* Inst) {}
+		virtual void Visit(const class SpvOpISub* Inst) {}
+		virtual void Visit(const class SpvOpFSub* Inst) {}
+		virtual void Visit(const class SpvOpIMul* Inst) {}
+		virtual void Visit(const class SpvOpFMul* Inst) {}
+		virtual void Visit(const class SpvOpUDiv* Inst) {}
+		virtual void Visit(const class SpvOpSDiv* Inst) {}
+		virtual void Visit(const class SpvOpFDiv* Inst) {}
+		virtual void Visit(const class SpvOpUMod* Inst) {}
+		virtual void Visit(const class SpvOpSRem* Inst) {}
+		virtual void Visit(const class SpvOpFRem* Inst) {}
+		virtual void Visit(const class SpvOpNot* Inst) {}
+		virtual void Visit(const class SpvOpDPdx* Inst) {}
+		virtual void Visit(const class SpvOpDPdy* Inst) {}
+		virtual void Visit(const class SpvOpFwidth* Inst) {}
+		virtual void Visit(const class SpvOpBranch* Inst) {}
+		virtual void Visit(const class SpvOpBranchConditional* Inst) {}
+		virtual void Visit(const class SpvOpSwitch* Inst) {}
+		virtual void Visit(const class SpvOpKill* Inst) {}
+		virtual void Visit(const class SpvOpReturn* Inst) {}
+		virtual void Visit(const class SpvOpReturnValue* Inst) {}
 		
 		//NonSemantic.Shader.DebugInfo.100
-		virtual void Visit(class SpvDebugTypeBasic* Inst) {}
-		virtual void Visit(class SpvDebugTypeVector* Inst) {}
-		virtual void Visit(class SpvDebugTypeMatrix* Inst) {}
-		virtual void Visit(class SpvDebugTypeComposite* Inst) {}
-		virtual void Visit(class SpvDebugTypeMember* Inst) {}
-		virtual void Visit(class SpvDebugTypeArray* Inst) {}
-		virtual void Visit(class SpvDebugTypeFunction* Inst) {}
-		virtual void Visit(class SpvDebugCompilationUnit* Inst) {}
-		virtual void Visit(class SpvDebugLexicalBlock* Inst) {}
-		virtual void Visit(class SpvDebugFunction* Inst) {}
-		virtual void Visit(class SpvDebugLine* Inst) {}
-		virtual void Visit(class SpvDebugScope* Inst) {}
-		virtual void Visit(class SpvDebugDeclare* Inst) {}
-		virtual void Visit(class SpvDebugValue* Inst) {}
-		virtual void Visit(class SpvDebugInlinedAt* Inst) {}
-		virtual void Visit(class SpvDebugLocalVariable* Inst) {}
-		virtual void Visit(class SpvDebugFunctionDefinition* Inst) {}
-		virtual void Visit(class SpvDebugGlobalVariable* Inst) {}
+		virtual void Visit(const class SpvDebugTypeBasic* Inst) {}
+		virtual void Visit(const class SpvDebugTypeVector* Inst) {}
+		virtual void Visit(const class SpvDebugTypeMatrix* Inst) {}
+		virtual void Visit(const class SpvDebugTypeComposite* Inst) {}
+		virtual void Visit(const class SpvDebugTypeMember* Inst) {}
+		virtual void Visit(const class SpvDebugTypeArray* Inst) {}
+		virtual void Visit(const class SpvDebugTypeTemplate* Inst) {}
+		virtual void Visit(const class SpvDebugTypeFunction* Inst) {}
+		virtual void Visit(const class SpvDebugCompilationUnit* Inst) {}
+		virtual void Visit(const class SpvDebugLexicalBlock* Inst) {}
+		virtual void Visit(const class SpvDebugFunction* Inst) {}
+		virtual void Visit(const class SpvDebugLine* Inst) {}
+		virtual void Visit(const class SpvDebugScope* Inst) {}
+		virtual void Visit(const class SpvDebugDeclare* Inst) {}
+		virtual void Visit(const class SpvDebugValue* Inst) {}
+		virtual void Visit(const class SpvDebugInlinedAt* Inst) {}
+		virtual void Visit(const class SpvDebugLocalVariable* Inst) {}
+		virtual void Visit(const class SpvDebugFunctionDefinition* Inst) {}
+		virtual void Visit(const class SpvDebugGlobalVariable* Inst) {}
 		
 		//GLSL.std.450
-		virtual void Visit(class SpvRoundEven* Inst) {}
-		virtual void Visit(class SpvTrunc* Inst) {}
-		virtual void Visit(class SpvFAbs* Inst) {}
-		virtual void Visit(class SpvSAbs* Inst) {}
-		virtual void Visit(class SpvFSign* Inst) {}
-		virtual void Visit(class SpvSSign* Inst) {}
-		virtual void Visit(class SpvFloor* Inst) {}
-		virtual void Visit(class SpvCeil* Inst) {}
-		virtual void Visit(class SpvFract* Inst) {}
-		virtual void Visit(class SpvSin* Inst) {}
-		virtual void Visit(class SpvCos* Inst) {}
-		virtual void Visit(class SpvTan* Inst) {}
-		virtual void Visit(class SpvAsin* Inst) {}
-		virtual void Visit(class SpvAcos* Inst) {}
-		virtual void Visit(class SpvAtan* Inst) {}
-		virtual void Visit(class SpvPow* Inst) {}
-		virtual void Visit(class SpvExp* Inst) {}
-		virtual void Visit(class SpvLog* Inst) {}
-		virtual void Visit(class SpvExp2* Inst) {}
-		virtual void Visit(class SpvLog2* Inst) {}
-		virtual void Visit(class SpvSqrt* Inst) {}
-		virtual void Visit(class SpvInverseSqrt* Inst) {}
-		virtual void Visit(class SpvDeterminant* Isnt) {}
-		virtual void Visit(class SpvUMin* Inst) {}
-		virtual void Visit(class SpvSMin* Inst) {}
-		virtual void Visit(class SpvUMax* Inst) {}
-		virtual void Visit(class SpvSMax* Inst) {}
-		virtual void Visit(class SpvFClamp* Inst) {}
-		virtual void Visit(class SpvUClamp* Inst) {}
-		virtual void Visit(class SpvSClamp* Inst) {}
-		virtual void Visit(class SpvFMix* Inst) {}
-		virtual void Visit(class SpvStep* Inst) {}
-		virtual void Visit(class SpvSmoothStep* Inst) {}
-		virtual void Visit(class SpvPackHalf2x16* Inst) {}
-		virtual void Visit(class SpvUnpackHalf2x16* Inst) {}
-		virtual void Visit(class SpvLength* Inst) {}
-		virtual void Visit(class SpvDistance* Inst) {}
-		virtual void Visit(class SpvCross* Inst) {}
-		virtual void Visit(class SpvNormalize* Inst) {}
-		virtual void Visit(class SpvReflect* Inst) {}
-		virtual void Visit(class SpvRefract* Inst) {}
-		virtual void Visit(class SpvNMin* Inst) {}
-		virtual void Visit(class SpvNMax* Inst) {}
+		virtual void Visit(const class SpvRoundEven* Inst) {}
+		virtual void Visit(const class SpvTrunc* Inst) {}
+		virtual void Visit(const class SpvFAbs* Inst) {}
+		virtual void Visit(const class SpvSAbs* Inst) {}
+		virtual void Visit(const class SpvFSign* Inst) {}
+		virtual void Visit(const class SpvSSign* Inst) {}
+		virtual void Visit(const class SpvFloor* Inst) {}
+		virtual void Visit(const class SpvCeil* Inst) {}
+		virtual void Visit(const class SpvFract* Inst) {}
+		virtual void Visit(const class SpvSin* Inst) {}
+		virtual void Visit(const class SpvCos* Inst) {}
+		virtual void Visit(const class SpvTan* Inst) {}
+		virtual void Visit(const class SpvAsin* Inst) {}
+		virtual void Visit(const class SpvAcos* Inst) {}
+		virtual void Visit(const class SpvAtan* Inst) {}
+		virtual void Visit(const class SpvAtan2* Inst) {}
+		virtual void Visit(const class SpvPow* Inst) {}
+		virtual void Visit(const class SpvExp* Inst) {}
+		virtual void Visit(const class SpvLog* Inst) {}
+		virtual void Visit(const class SpvExp2* Inst) {}
+		virtual void Visit(const class SpvLog2* Inst) {}
+		virtual void Visit(const class SpvSqrt* Inst) {}
+		virtual void Visit(const class SpvInverseSqrt* Inst) {}
+		virtual void Visit(const class SpvDeterminant* Isnt) {}
+		virtual void Visit(const class SpvUMin* Inst) {}
+		virtual void Visit(const class SpvSMin* Inst) {}
+		virtual void Visit(const class SpvUMax* Inst) {}
+		virtual void Visit(const class SpvSMax* Inst) {}
+		virtual void Visit(const class SpvFClamp* Inst) {}
+		virtual void Visit(const class SpvUClamp* Inst) {}
+		virtual void Visit(const class SpvSClamp* Inst) {}
+		virtual void Visit(const class SpvFMix* Inst) {}
+		virtual void Visit(const class SpvStep* Inst) {}
+		virtual void Visit(const class SpvSmoothStep* Inst) {}
+		virtual void Visit(const class SpvPackHalf2x16* Inst) {}
+		virtual void Visit(const class SpvUnpackHalf2x16* Inst) {}
+		virtual void Visit(const class SpvLength* Inst) {}
+		virtual void Visit(const class SpvDistance* Inst) {}
+		virtual void Visit(const class SpvCross* Inst) {}
+		virtual void Visit(const class SpvNormalize* Inst) {}
+		virtual void Visit(const class SpvReflect* Inst) {}
+		virtual void Visit(const class SpvRefract* Inst) {}
+		virtual void Visit(const class SpvNMin* Inst) {}
+		virtual void Visit(const class SpvNMax* Inst) {}
 	};
 
 	using SpvInstKind = std::variant<SpvOp, SpvGLSLstd450, SpvDebugInfo100>;
@@ -199,11 +205,20 @@ namespace FW
 		const SpvInstKind& GetKind() const { return Kind;}
 		std::optional<SpvId> GetId() const { return ResultId; }
 		void SetId(SpvId Id) { ResultId = Id; }
-		virtual void Accpet(SpvVisitor* Visitor) = 0;
+		std::optional<int> GetWordOffset() const { return WordOffset; }
+		void SetWordOffset(uint32 InWordOffset) { WordOffset = InWordOffset; };
+		std::optional<int> GetWordLen() const { return WordLen; }
+		void SetWordLen(uint32 InWordLen) { WordLen = InWordLen; };
+
+		virtual TUniquePtr<SpvInstruction> Clone() const = 0;
+		virtual void Accept(SpvVisitor* Visitor) const = 0;
+		virtual TArray<uint32> ToBinary() const { check(false);  return {}; }
 		
 	private:
 		SpvInstKind Kind;
 		std::optional<SpvId> ResultId;
+		std::optional<int> WordOffset;
+		std::optional<int> WordLen;
 	};
 
 	template<typename T>
@@ -211,10 +226,15 @@ namespace FW
 	{
 	public:
 		using SpvInstruction::SpvInstruction;
-		
-		void Accpet(SpvVisitor* Visitor) override
+
+		TUniquePtr<SpvInstruction> Clone() const override
 		{
-			Visitor->Visit(static_cast<T*>(this));
+			return MakeUnique<T>(static_cast<const T&>(*this));
+		}
+		
+		void Accept(SpvVisitor* Visitor) const override
+		{
+			Visitor->Visit(static_cast<const T*>(this));
 		}
 	};
 
@@ -258,7 +278,7 @@ namespace FW
 	class SpvOpDecorate : public SpvInstructionBase<SpvOpDecorate>
 	{
 	public:
-		SpvOpDecorate(SpvId InTarget, SpvDecorationKind InDecorationKind, const TArray<uint8>& InOperands)
+		SpvOpDecorate(SpvId InTarget, SpvDecorationKind InDecorationKind, const TArray<uint8>& InOperands = {})
 		: SpvInstructionBase(SpvOp::Decorate)
 		, Target(InTarget)
 		, DecorationKind(InDecorationKind)
@@ -268,6 +288,16 @@ namespace FW
 		SpvId GetTargetId() const { return Target; }
 		SpvDecorationKind GetKind() const { return DecorationKind; }
 		const TArray<uint8>& GetExtraOperands() const { return Operands; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(Target.GetValue());
+			Bin.Add((uint32)DecorationKind);
+			Bin.Append((uint32*)Operands.GetData(), Operands.Num() / 4);
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Decorate;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId Target;
@@ -290,6 +320,17 @@ namespace FW
 		uint32 GetMember() const { return Member; }
 		SpvDecorationKind GetKind() const { return DecorationKind; }
 		const TArray<uint8>& GetExtraOperands() const { return Operands; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(StructureType.GetValue());
+			Bin.Add(Member);
+			Bin.Add((uint32)DecorationKind);
+			Bin.Append((uint32*)Operands.GetData(), Operands.Num() / 4);
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::MemberDecorate;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId StructureType;
@@ -322,6 +363,16 @@ namespace FW
 		
 		uint32 GetWidth() const { return Width; }
 		uint32 GetSignedness() const { return Signedness; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Width);
+			Bin.Add(Signedness);
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::TypeInt;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		uint32 Width;
@@ -339,6 +390,16 @@ namespace FW
 		
 		SpvId GetComponentType() const { return ComponentType; }
 		uint32 GetComponentCount() const { return ComponentCount; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(ComponentType.GetValue());
+			Bin.Add(ComponentCount);
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::TypeVector;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ComponentType;
@@ -385,10 +446,46 @@ namespace FW
 		
 		SpvStorageClass GetStorageClass() const { return StorageClass; }
 		SpvId GetPointeeType() const { return PointeeType; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add((uint32)StorageClass);
+			Bin.Add(PointeeType.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::TypePointer;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvStorageClass StorageClass;
 		SpvId PointeeType;
+	};
+
+	class SpvOpTypeFunction : public SpvInstructionBase<SpvOpTypeFunction>
+	{
+	public:
+		SpvOpTypeFunction(SpvId InReturnType, const TArray<SpvId>& InParameterTypes = {}) : SpvInstructionBase(SpvOp::TypeFunction)
+		, ReturnType(InReturnType)
+		, ParameterTypes(InParameterTypes)
+		{}
+
+		SpvId GetReturnType() const { return ReturnType; }
+		const TArray<SpvId>& GetParameterTypes() const { return ParameterTypes; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(ReturnType.GetValue());
+			Bin.Append((uint32*)ParameterTypes.GetData(), ParameterTypes.Num());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::TypeFunction;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
+
+	private:
+		SpvId ReturnType;
+		TArray<SpvId> ParameterTypes;
 	};
 
 	class SpvOpTypeStruct : public SpvInstructionBase<SpvOpTypeStruct>
@@ -400,6 +497,15 @@ namespace FW
 		{}
 		
 		const TArray<SpvId>& GetMemberTypeIds() const { return MemberTypes; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(GetId().value().GetValue());
+			Bin.Append((uint32*)MemberTypes.GetData(), MemberTypes.Num());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::TypeStruct;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 	
 	private:
 		TArray<SpvId> MemberTypes;
@@ -446,6 +552,16 @@ namespace FW
 		
 		SpvId GetElementType() const { return ElementType; }
 		SpvId GetLength() const { return Length; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(ElementType.GetValue());
+			Bin.Add(Length.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::TypeArray;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ElementType;
@@ -460,6 +576,15 @@ namespace FW
 		{}
 		
 		SpvId GetElementType() const { return ElementType; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(ElementType.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::TypeRuntimeArray;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ElementType;
@@ -475,6 +600,16 @@ namespace FW
 		{}
 		SpvId GetResultType() const { return ResultType; }
 		const TArray<uint8>& GetValue() const { return Value; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Append((uint32*)Value.GetData(), Value.Num() / 4);
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Constant;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	protected:
 		SpvId ResultType;
@@ -507,6 +642,16 @@ namespace FW
 		{}
 		SpvId GetResultType() const { return ResultType; }
 		const TArray<SpvId>& GetConstituents() const { return Constituents; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Append((uint32*)Constituents.GetData(), Constituents.Num());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ConstantComposite;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -535,6 +680,16 @@ namespace FW
 		
 		SpvId GetTarget() const { return Target; }
 		const FString& GetName() const { return Name; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(Target.GetValue());
+			std::string Utf8Name(TCHAR_TO_UTF8(*Name));
+			Bin.Append((uint32*)Utf8Name.c_str(), (Utf8Name.size() + 1 + 3) / 4);
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Name;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId Target;
@@ -550,6 +705,16 @@ namespace FW
 		{}
 		
 		const FString& GetStr() const { return Str; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(GetId().value().GetValue());
+			std::string Utf8Name(TCHAR_TO_UTF8(*Str));
+			Bin.Append((uint32*)Utf8Name.c_str(), (Utf8Name.size() + 1 + 3) / 4);
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::String;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		FString Str;
@@ -558,16 +723,30 @@ namespace FW
 	class SpvOpFunction : public SpvInstructionBase<SpvOpFunction>
 	{
 	public:
-		SpvOpFunction(SpvId InResultType, SpvId InFunctionType) : SpvInstructionBase(SpvOp::Function)
+		SpvOpFunction(SpvId InResultType, SpvFunctionControl InFunctionControl, SpvId InFunctionType) : SpvInstructionBase(SpvOp::Function)
 		, ResultType(InResultType)
+		, FunctionControl(InFunctionControl)
 		, FunctionType(InFunctionType)
 		{}
 		
 		SpvId GetResultType() const { return ResultType; }
+		SpvFunctionControl GetFunctionControl() const { return FunctionControl; }
 		SpvId GetFunctionType() const { return FunctionType; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add((uint32)FunctionControl);
+			Bin.Add(FunctionType.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Function;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
+		SpvFunctionControl FunctionControl;
 		SpvId FunctionType;
 	};
 
@@ -579,15 +758,37 @@ namespace FW
 		{}
 		
 		SpvId GetResultType() const { return ResultType; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::FunctionParameter;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
 	};
 
+	class SpvOpFunctionEnd : public SpvInstructionBase<SpvOpFunctionEnd>
+	{
+	public:
+		SpvOpFunctionEnd() : SpvInstructionBase(SpvOp::FunctionEnd) {}
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::FunctionEnd;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
+	};
+
 	class SpvOpFunctionCall : public SpvInstructionBase<SpvOpFunctionCall>
 	{
 	public:
-		SpvOpFunctionCall(SpvId InResultType, SpvId InFunction, const TArray<SpvId>& InArguments) : SpvInstructionBase(SpvOp::FunctionCall)
+		SpvOpFunctionCall(SpvId InResultType, SpvId InFunction, const TArray<SpvId>& InArguments = {}) : SpvInstructionBase(SpvOp::FunctionCall)
 		, ResultType(InResultType)
 		, Function(InFunction)
 		, Arguments(InArguments)
@@ -596,6 +797,17 @@ namespace FW
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetFunction() const { return Function; }
 		const TArray<SpvId>& GetArguments() const { return Arguments; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Function.GetValue());
+			Bin.Append((uint32*)Arguments.GetData(), Arguments.Num());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::FunctionCall;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -606,7 +818,7 @@ namespace FW
 	class SpvOpVariable : public SpvInstructionBase<SpvOpVariable>
 	{
 	public:
-		SpvOpVariable(SpvId InResultType, SpvStorageClass InStorageClass, std::optional<SpvId> InInitializer) : SpvInstructionBase(SpvOp::Variable)
+		SpvOpVariable(SpvId InResultType, SpvStorageClass InStorageClass, std::optional<SpvId> InInitializer = {}) : SpvInstructionBase(SpvOp::Variable)
 		, ResultType(InResultType)
 		, StorageClass(InStorageClass)
 		, Initializer(InInitializer)
@@ -615,11 +827,61 @@ namespace FW
 		SpvId GetResultType() const { return ResultType; }
 		SpvStorageClass GetStorageClass() const { return StorageClass; }
 		std::optional<SpvId> GetInitializer() const { return Initializer; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add((uint32)StorageClass);
+			if (Initializer)
+			{
+				Bin.Add(Initializer.value().GetValue());
+			}
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Variable;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
 		SpvStorageClass StorageClass;
 		std::optional<SpvId> Initializer;
+	};
+
+	class SpvOpAtomicIAdd : public SpvInstructionBase<SpvOpAtomicIAdd>
+	{
+	public:
+		SpvOpAtomicIAdd(SpvId InResultType, SpvId InPointer, SpvId InMemory, SpvId InSemantics, SpvId InValue)
+			: SpvInstructionBase(SpvOp::AtomicIAdd)
+			, ResultType(InResultType), Pointer(InPointer)
+			, Memory(InMemory), Semantics(InSemantics), Value(InValue)
+		{}
+
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetPointer() const { return Pointer; }
+		SpvId GetMemory() const { return Memory; }
+		SpvId GetSemantics() const { return Semantics; }
+		SpvId GetValue() const { return Value; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Pointer.GetValue());
+			Bin.Add(Memory.GetValue());
+			Bin.Add(Semantics.GetValue());
+			Bin.Add(Value.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::AtomicIAdd;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
+
+	private:
+		SpvId ResultType;
+		SpvId Pointer;
+		SpvId Memory;
+		SpvId Semantics;
+		SpvId Value;
 	};
 
 	class SpvOpPhi : public SpvInstructionBase<SpvOpPhi>
@@ -637,10 +899,69 @@ namespace FW
 		TArray<TPair<SpvId, SpvId>> Operands;
 	};
 
+	class SpvOpLoopMerge : public SpvInstructionBase<SpvOpLoopMerge>
+	{
+	public:
+		SpvOpLoopMerge(SpvId InMergeBlock, SpvId InContinueBlock, SpvLoopControl InLoopControl) : SpvInstructionBase(SpvOp::LoopMerge)
+		, MergeBlock(InMergeBlock), ContinueBlock(InContinueBlock), LoopControl(InLoopControl)
+		{}
+
+		SpvId GetMergeBlock() const { return MergeBlock; }
+		SpvId GetContinueBlock() const { return ContinueBlock; }
+		SpvLoopControl GetLoopControl() const { return LoopControl; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(MergeBlock.GetValue());
+			Bin.Add(ContinueBlock.GetValue());
+			Bin.Add((uint32)LoopControl);
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::LoopMerge;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
+
+	private:
+		SpvId MergeBlock;
+		SpvId ContinueBlock;
+		SpvLoopControl LoopControl;
+	};
+
+	class SpvOpSelectionMerge : public SpvInstructionBase<SpvOpSelectionMerge>
+	{
+	public:
+		SpvOpSelectionMerge(SpvId InMergeBlock, SpvSelectionControl InSelectionControl) : SpvInstructionBase(SpvOp::SelectionMerge)
+		, MergeBlock(InMergeBlock), SelectionControl(InSelectionControl)
+		{}
+
+		SpvId GetMergeBlock() const { return MergeBlock; }
+		SpvSelectionControl GetSelectionControl() const { return SelectionControl; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(MergeBlock.GetValue());
+			Bin.Add((uint32)SelectionControl);
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::SelectionMerge;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
+
+	private:
+		SpvId MergeBlock;
+		SpvSelectionControl SelectionControl;
+	};
+
 	class SpvOpLabel : public SpvInstructionBase<SpvOpLabel>
 	{
 	public:
 		SpvOpLabel() : SpvInstructionBase(SpvOp::Label) {}
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(GetId().value().GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Label;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 	};
 
 	class SpvOpLoad : public SpvInstructionBase<SpvOpLoad>
@@ -653,6 +974,16 @@ namespace FW
 		
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetPointer() const { return Pointer; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Pointer.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Load;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -669,6 +1000,15 @@ namespace FW
 		
 		SpvId GetPointer() const { return Pointer; }
 		SpvId GetObject() const { return Object; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(Pointer.GetValue());
+			Bin.Add(Object.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Store;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId Pointer;
@@ -686,6 +1026,18 @@ namespace FW
 		SpvId GetVector1() const { return Vector1; }
 		SpvId GetVector2() const { return Vector2; }
 		const TArray<uint32>& GetComponents() const { return Components; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Vector1.GetValue());
+			Bin.Add(Vector2.GetValue());
+			Bin.Append(Components);
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::VectorShuffle;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -704,6 +1056,16 @@ namespace FW
 		
 		SpvId GetResultType() const { return ResultType; }
 		const TArray<SpvId>& GetConstituents() const { return Constituents; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Append((uint32*)Constituents.GetData(), Constituents.Num());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::CompositeConstruct;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -720,6 +1082,17 @@ namespace FW
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetComposite() const { return Composite; }
 		const TArray<uint32>& GetIndexes() const { return Indexes; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Composite.GetValue());
+			Bin.Append(Indexes);
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::CompositeExtract;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -754,6 +1127,17 @@ namespace FW
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetBasePointer() const { return BasePointer; }
 		const TArray<SpvId>& GetIndexes() const { return Indexes; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(BasePointer.GetValue());
+			Bin.Append((uint32*)Indexes.GetData(), Indexes.Num());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::AccessChain;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -861,6 +1245,16 @@ namespace FW
 		
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetFloatValue() const { return FloatValue; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(FloatValue.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ConvertFToU;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -921,6 +1315,16 @@ namespace FW
 		
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetOperand() const { return Operand; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Operand.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Bitcast;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -967,6 +1371,17 @@ namespace FW
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetOperand1() const { return Operand1; }
 		SpvId GetOperand2() const { return Operand2; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Operand1.GetValue());
+			Bin.Add(Operand2.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::IAdd;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -1272,6 +1687,16 @@ namespace FW
 		
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetVector() const { return Vector; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Vector.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Any;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -1287,6 +1712,16 @@ namespace FW
 		
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetVector() const { return Vector; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Vector.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::All;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -1333,6 +1768,17 @@ namespace FW
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetOperand1() const { return Operand1; }
 		SpvId GetOperand2() const { return Operand2; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Operand1.GetValue());
+			Bin.Add(Operand2.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::LogicalOr;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -1350,6 +1796,17 @@ namespace FW
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetOperand1() const { return Operand1; }
 		SpvId GetOperand2() const { return Operand2; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Operand1.GetValue());
+			Bin.Add(Operand2.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::LogicalAnd;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -1366,6 +1823,16 @@ namespace FW
 		
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetOperand() const { return Operand; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Operand.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::LogicalNot;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -1383,6 +1850,18 @@ namespace FW
 		SpvId GetCondition() const { return Condition; }
 		SpvId GetObject1() const { return Object1; }
 		SpvId GetObject2() const { return Object2; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Condition.GetValue());
+			Bin.Add(Object1.GetValue());
+			Bin.Add(Object2.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Select;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -1401,6 +1880,17 @@ namespace FW
 		SpvId GetResultType() const { return ResultType; }                                                              \
 		SpvId GetOperand1() const { return Operand1; }                                                                  \
 		SpvId GetOperand2() const { return Operand2; }                                                                  \
+		TArray<uint32> ToBinary() const override                                                                        \
+		{                                                                                                               \
+			TArray<uint32> Bin;                                                                                         \
+			Bin.Add(ResultType.GetValue());                                                                             \
+			Bin.Add(GetId().value().GetValue());                                                                        \
+			Bin.Add(Operand1.GetValue());                                                                               \
+			Bin.Add(Operand2.GetValue());                                                                               \
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Name;                                              \
+			Bin.Insert(Header, 0);                                                                                      \
+			return Bin;                                                                                                 \
+		}                                                                                                               \
 	private:                                                                                                            \
 		SpvId ResultType;                                                                                               \
 		SpvId Operand1;                                                                                                 \
@@ -1434,6 +1924,17 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetBase() const { return Base; }
 		SpvId GetShift() const { return Shift; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Base.GetValue());
+			Bin.Add(Shift.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ShiftRightLogical;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -1594,6 +2095,14 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 		{}
 		
 		SpvId GetTargetLabel() const { return TargetLabel; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(TargetLabel.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Branch;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId TargetLabel;
@@ -1609,6 +2118,16 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 		SpvId GetCondition() const { return Condition; }
 		SpvId GetTrueLabel() const { return TrueLabel; }
 		SpvId GetFalseLabel() const { return FalseLabel; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(Condition.GetValue());
+			Bin.Add(TrueLabel.GetValue());
+			Bin.Add(FalseLabel.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::BranchConditional;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId Condition;
@@ -1643,6 +2162,13 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 	{
 	public:
 		SpvOpReturn() : SpvInstructionBase(SpvOp::Return) {}
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Return;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 	};
 
 	class SpvOpReturnValue : public SpvInstructionBase<SpvOpReturnValue>
@@ -1653,6 +2179,14 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 		{}
 		
 		SpvId GetValue() const { return Value; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(Value.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ReturnValue;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId Value;
@@ -1661,31 +2195,64 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 	class SpvDebugTypeBasic : public SpvInstructionBase<SpvDebugTypeBasic>
 	{
 	public:
-		SpvDebugTypeBasic(SpvId InName, SpvId InSize, SpvId InEncoding) : SpvInstructionBase(SpvDebugInfo100::DebugTypeBasic)
-		, Name(InName), Size(InSize), Encoding(InEncoding)
+		SpvDebugTypeBasic(SpvId InResultType, SpvId InExtSet, SpvId InName, SpvId InSize, SpvId InEncoding, SpvId InFlags) : SpvInstructionBase(SpvDebugInfo100::DebugTypeBasic)
+		, ResultType(InResultType), ExtSet(InExtSet), Name(InName), Size(InSize), Encoding(InEncoding), Flags(InFlags)
 		{}
 		
 		SpvId GetName() const { return Name; }
 		SpvId GetSize() const { return Size; }
 		SpvId GetEncoding() const { return Encoding; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(ExtSet.GetValue());
+			Bin.Add((uint32)SpvDebugInfo100::DebugTypeBasic);
+			Bin.Add(Name.GetValue());
+			Bin.Add(Size.GetValue());
+			Bin.Add(Encoding.GetValue());
+			Bin.Add(Flags.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ExtInst;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
+		SpvId ResultType;
+		SpvId ExtSet;
 		SpvId Name;
 		SpvId Size;
 		SpvId Encoding;
+		SpvId Flags;
 	};
 
 	class SpvDebugTypeVector : public SpvInstructionBase<SpvDebugTypeVector>
 	{
 	public:
-		SpvDebugTypeVector(SpvId InBasicType, SpvId InComponentCount) : SpvInstructionBase(SpvDebugInfo100::DebugTypeVector)
-		, BasicType(InBasicType), ComponentCount(InComponentCount)
+		SpvDebugTypeVector(SpvId InResultType, SpvId InExtSet, SpvId InBasicType, SpvId InComponentCount) : SpvInstructionBase(SpvDebugInfo100::DebugTypeVector)
+		, ResultType(InResultType), ExtSet(InExtSet), BasicType(InBasicType), ComponentCount(InComponentCount)
 		{}
 		
 		SpvId GetBasicType() const { return BasicType; }
 		SpvId GetComponentCount() const { return ComponentCount; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(ExtSet.GetValue());
+			Bin.Add((uint32)SpvDebugInfo100::DebugTypeVector);
+			Bin.Add(BasicType.GetValue());
+			Bin.Add(ComponentCount.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ExtInst;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
+		SpvId ResultType;
+		SpvId ExtSet;
 		SpvId BasicType;
 		SpvId ComponentCount;
 	};
@@ -1930,6 +2497,21 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 		SpvId Definition;
 	};
 
+	class SpvDebugTypeTemplate : public SpvInstructionBase<SpvDebugTypeTemplate>
+	{
+	public:
+		SpvDebugTypeTemplate(SpvId InTarget, const TArray<SpvId>& InParameters) : SpvInstructionBase(SpvDebugInfo100::DebugTypeTemplate)
+		, Target(InTarget), Parameters(InParameters)
+		{}
+
+		SpvId GetTarget() const { return Target; }
+		const TArray<SpvId>& GetParameters() const { return Parameters; }
+
+	private:
+		SpvId Target;
+		TArray<SpvId> Parameters;
+	};
+
 	class SpvDebugGlobalVariable : public SpvInstructionBase<SpvDebugGlobalVariable>
 	{
 	public:
@@ -1985,15 +2567,28 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 	class SpvFAbs : public SpvInstructionBase<SpvFAbs>
 	{
 	public:
-		SpvFAbs(SpvId InResultType, SpvId InX) : SpvInstructionBase(SpvGLSLstd450::FAbs)
-		, ResultType(InResultType), X(InX)
+		SpvFAbs(SpvId InResultType, SpvId InExtSet, SpvId InX) : SpvInstructionBase(SpvGLSLstd450::FAbs)
+		, ResultType(InResultType), ExtSet(InExtSet), X(InX)
 		{}
 		
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetX() const { return X; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(ExtSet.GetValue());
+			Bin.Add((uint32)SpvGLSLstd450::FAbs);
+			Bin.Add(X.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ExtInst;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
+		SpvId ExtSet;
 		SpvId X;
 	};
 
@@ -2174,6 +2769,24 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 		
 	private:
 		SpvId ResultType;
+		SpvId X;
+	};
+
+	class SpvAtan2 : public SpvInstructionBase<SpvAtan2>
+	{
+	public:
+		SpvAtan2(SpvId InResultType, SpvId InY, SpvId InX) : SpvInstructionBase(SpvGLSLstd450::Atan2)
+			, ResultType(InResultType), Y(InY), X(InX)
+		{
+		}
+
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetY() const { return Y; }
+		SpvId GetX() const { return X; }
+
+	private:
+		SpvId ResultType;
+		SpvId Y;
 		SpvId X;
 	};
 

@@ -47,6 +47,7 @@ namespace SH {
 		ShToolbarStyle.SetButtonStyle(FAppCommonStyle::Get().GetWidgetStyle< FButtonStyle >("SuperSimpleButton"));
 		Style->Set("Toolbar.ShaderHelper", ShToolbarStyle);
 		Style->Set("Icons.FullText", new IMAGE_BRUSH_SVG("Starship/Insights/MemTags_20", FVector2D(16.0, 16.0)));
+		Style->Set("Icons.Validation", new IMAGE_BRUSH_SVG("Starship/Insights/Tasks_20", FVector2D(16.0, 16.0)));
 		Style->Set("LineTip.BreakPointEffect2", new IMAGE_BRUSH("Common/Window/WindowTitle_Flashing", FVector2D(16.0, 16.0), FLinearColor::White, ESlateBrushTileType::Horizontal));
 
 		const FHeaderRowStyle& CoreHeaderRowStyle = FAppStyle::Get().GetWidgetStyle<FHeaderRowStyle>("TableView.Header");
