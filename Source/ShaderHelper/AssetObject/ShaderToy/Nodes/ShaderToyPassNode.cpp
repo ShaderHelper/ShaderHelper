@@ -1,7 +1,6 @@
 #include "CommonHeader.h"
 #include "ShaderToyPassNode.h"
 #include "Renderer/ShaderToyRenderComp.h"
-#include <Widgets/SViewport.h>
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/Property/PropertyData/PropertyUniformItem.h"
@@ -10,6 +9,9 @@
 #include "AssetObject/Pins/Pins.h"
 #include "UI/Widgets/Property/PropertyData/PropertyAssetItem.h"
 #include "ShaderConductor.hpp"
+#include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
+
+#include <Widgets/SViewport.h>
 #include <regex>
 
 using namespace FW;

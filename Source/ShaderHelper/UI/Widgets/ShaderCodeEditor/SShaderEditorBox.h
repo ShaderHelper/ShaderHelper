@@ -1,15 +1,17 @@
 #pragma once
-#include <Framework/Text/BaseTextLayoutMarshaller.h>
-#include <Widgets/Views/SListView.h>
-#include <Widgets/Text/SMultiLineEditableText.h>
 #include "UI/Widgets/ShaderCodeEditor/ShaderCodeTokenizer.h"
 #include "Renderer/ShRenderer.h"
 #include "GpuApi/GpuShader.h"
+#include "AssetObject/ShaderAsset.h"
+#include "Debugger/ShaderDebugger.h"
+#include "SCodeSearchWidget.h"
+
+#include <Framework/Text/BaseTextLayoutMarshaller.h>
+#include <Widgets/Views/SListView.h>
+#include <Widgets/Text/SMultiLineEditableText.h>
 #include <Internationalization/IBreakIterator.h>
 #include <Widgets/SCanvas.h>
 #include <Widgets/Text/SlateEditableTextLayout.h>
-#include "AssetObject/ShaderAsset.h"
-#include "Debugger/ShaderDebugger.h"
 
 namespace SH
 {
@@ -233,6 +235,7 @@ namespace SH
 		int32 GetLineNumber(int32 InLineIndex) const;
 		int32 GetLineIndex(int32 InLineNumber) const;
 		int32 GetCurDisplayLineCount() const { return ShaderMarshaller->TextLayout->GetLineCount(); }
+		FTextSelection GetWord(const FTextLocation& InTextLocation) const;
         void Compile();
 
 		//Scroll to the specified line, which will be displayed in the middle of the document if possible.
@@ -333,6 +336,7 @@ namespace SH
 		FDelegateHandle RefreshBuilderHandle;
         EditState CurEditState;
 		TSharedPtr<SHorizontalBox> InfoBarBox;
+		TSharedPtr<SCodeSearchWidget> CodeSearchWidget;
 
 		bool IsFoldEditTransaction{};
 		FCurveSequence FoldingArrowAnim;

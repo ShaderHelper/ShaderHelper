@@ -1,12 +1,10 @@
 #pragma once
-#include <Widgets/SViewport.h>
 #include "Editor/Editor.h"
 #include "Editor/PreviewViewPort.h"
 #include "AssetObject/ShaderAsset.h"
 #include "AssetObject/Graph.h"
 #include "AssetManager/AssetManager.h"
 #include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
-#include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 #include "UI/Widgets/Graph/SGraphPanel.h"
 #include "Renderer/RenderComponent.h"
 #include "Renderer/Renderer.h"
@@ -22,8 +20,12 @@
 #include "UI/Widgets/Misc/SShWindow.h"
 #include "UI/Widgets/SShViewport.h"
 
+#include <Widgets/SViewport.h>
+
 namespace SH
 {
+	class SShaderEditorBox;
+	class ShRenderer;
 
 	const FName PreviewTabId = "Preview";
 	const FName PropretyTabId = "Propety";

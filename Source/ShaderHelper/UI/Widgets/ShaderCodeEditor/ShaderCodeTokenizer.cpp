@@ -25,30 +25,12 @@ namespace SH
 		return Ret;
 	}
 
-	TArray<HlslTokenizer::TokenizedLine> HlslTokenizer::Tokenize(const FString& HlslCodeString, bool IgnoreWhitespace, LineContState InLineContState)
+	TArray<HlslTokenizer::TokenizedLine> HlslTokenizer::Tokenize(const FString& HlslCodeString, bool IgnoreWhitespace, StateSet InLastState)
 	{
 		TArray<TokenizedLine> TokenizedLines;
 		
 		TArray<FTextRange> LineRanges;
 		FTextRange::CalculateLineRangesFromString(HlslCodeString, LineRanges);
-
-		enum class StateSet
-		{
-			Start,
-			End,
-			Id,
-			Number,
-			Macro,
-			Comment,
-			MultilineComment,
-			MultilineCommentEnd,
-			Punctuation,
-			NumberPuncuation,
-			String,
-			StringEnd,
-			Whitespace,
-			Other,
-		};
 
 		auto StateSetToTokenType = [](const FString& TokenStr, StateSet InState) {
 			switch (InState)
@@ -85,11 +67,12 @@ namespace SH
 
 		int32 CurRow = -1;
 		int32 CurCol = 0;
+		StateSet LastState = InLastState;
+		bool bLineContinuation{};
 
-		StateSet LastState = InLineContState == LineContState::MultilineComment ? StateSet::MultilineComment : StateSet::Start;
-
-		for (const FTextRange& LineRange : LineRanges)
+		for (int32 Index = 0; Index < LineRanges.Num(); Index++)
 		{
+			const FTextRange& LineRange = LineRanges[Index];
 			CurRow++;
 			HlslTokenizer::TokenizedLine TokenizedLine;
 
@@ -97,14 +80,28 @@ namespace SH
 			if (LineRange.IsEmpty())
 			{
 				//Still need a token to correctly display
-				TokenizedLine.State = (LastState == StateSet::MultilineComment) ? LineContState::MultilineComment : LineContState::None;
+				TokenizedLine.State = StateSet::Start;
 				TokenizedLine.Tokens.Emplace(HLSL::TokenType::Other);
 				TokenizedLines.Add(MoveTemp(TokenizedLine));
 			}
 			else
 			{
 				//DFA
-				StateSet CurState = (LastState == StateSet::MultilineComment) ? StateSet::MultilineComment : StateSet::Start;
+				StateSet CurState;
+				if (Index == 0)
+				{
+					CurState = LastState;
+				}
+				else
+				{
+					CurState = StateSet::Start;
+					if (bLineContinuation || LastState == StateSet::MultilineComment)
+					{
+						CurState = LastState;
+						bLineContinuation = false;
+					}
+				}
+				
 				int32 CurOffset = LineRange.BeginIndex;
 				int32 TokenStart = CurOffset;
 				TOptional<HLSL::TokenType> LastTokenType; //The last token which is not a white space;
@@ -118,7 +115,7 @@ namespace SH
 				{
 					const TCHAR* CurString = &HlslCodeString[CurOffset];
 					const TCHAR CurChar = HlslCodeString[CurOffset];
-					int32 RemainingLen = HlslCodeString.Len() - CurOffset;
+					int32 RemainingLen = HlslCodeString.Len() - CurOffset; 
 					CurCol = CurOffset - LineRange.BeginIndex;
 
 					switch (CurState)
@@ -127,7 +124,12 @@ namespace SH
 						{
 							FString MatchedPunctuation;
 							LastState = StateSet::Start;
-							if (!bInComment && RemainingLen >= 2 && FCString::Strncmp(CurString, TEXT("//"), 2) == 0) {
+							if (!bInComment && !bInMultilineComment && CurChar == TEXT('\\') && CurOffset == LineRange.EndIndex - 1)
+							{
+								bLineContinuation = true;
+								CurOffset += 1;
+							}
+							else if (!bInComment && RemainingLen >= 2 && FCString::Strncmp(CurString, TEXT("//"), 2) == 0) {
 								CurState = StateSet::Comment;
 							}
 							else if (!bInMultilineComment && RemainingLen >= 2 && FCString::Strncmp(CurString, TEXT("/*"), 2) == 0) {
@@ -365,7 +367,15 @@ namespace SH
 				FTextRange TokenRange{ TokenStart, LineRange.EndIndex };
 				FString TokenString = HlslCodeString.Mid(TokenRange.BeginIndex, TokenRange.Len());
 				
-				TokenizedLine.State = (LastState == StateSet::MultilineComment) ? LineContState::MultilineComment : LineContState::None;
+				if (bLineContinuation || LastState == StateSet::MultilineComment)
+				{
+					TokenizedLine.State = LastState;
+				}
+				else
+				{
+					TokenizedLine.State = StateSet::Start;
+				}
+				
 				TokenizedLine.Tokens.Emplace(StateSetToTokenType(TokenString, LastState), LineRange.Len() - TokenRange.Len(), LineRange.Len());
 				TokenizedLines.Add(MoveTemp(TokenizedLine));
 			}

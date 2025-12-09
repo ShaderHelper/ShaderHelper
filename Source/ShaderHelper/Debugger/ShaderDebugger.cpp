@@ -4,6 +4,7 @@
 #include "Editor/ShaderHelperEditor.h"
 #include "GpuApi/Spirv/SpirvExprDebugger.h"
 #include "GpuApi/Spirv/SpirvValidator.h"
+#include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 
 using namespace FW;
 
@@ -1202,9 +1203,7 @@ namespace SH
 		FString ErrorInfo, WarnInfo;
 		if (!GGpuRhi->CompileShader(DebugShader, ErrorInfo, WarnInfo, ExtraArgs))
 		{
-			FString FailureInfo = LOCALIZATION("DebugFailure").ToString();
-			SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo, *ErrorInfo);
-			throw std::runtime_error(TCHAR_TO_UTF8(*FailureInfo));
+			throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
 		}
 
 		uint32 BufferSize = GlobalValidation ? 1024 : 1024 * 1024 * 2;
@@ -1323,9 +1322,7 @@ namespace SH
 		if (ShaderResultDesc.hasError)
 		{
 			FString ErrorInfo = static_cast<const char*>(ShaderResultDesc.errorWarningMsg.Data());
-			FString FailureInfo = LOCALIZATION("DebugFailure").ToString();
-			SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo, *ErrorInfo);
-			throw std::runtime_error(TCHAR_TO_UTF8(*FailureInfo));
+			throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
 		}
 
 		CurDebugStateIndex = 0;
@@ -1337,12 +1334,11 @@ namespace SH
 			});
 		if (!GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
 		{
-			FString FailureInfo = LOCALIZATION("DebugFailure").ToString();
-			SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo, *ErrorInfo);
-			throw std::runtime_error(TCHAR_TO_UTF8(*FailureInfo));
+			throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
 		}
 
 		GpuRenderPipelineStateDesc PatchedPipelineDesc{
+			.CheckLayout = true,
 			.Vs = PsInvocation.PipelineDesc.Vs,
 			.Ps = PatchedShader,
 			.RasterizerState = PsInvocation.PipelineDesc.RasterizerState,

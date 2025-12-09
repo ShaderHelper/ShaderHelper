@@ -32,11 +32,23 @@ namespace SH
 			int32 CloseLineIndex{};
 			Bracket CloseBracket;
 		};
-		
-		enum class LineContState
+
+		enum class StateSet
 		{
-			None,
+			Start,
+			End,
+			Id,
+			Number,
+			Macro,
+			Comment,
 			MultilineComment,
+			MultilineCommentEnd,
+			Punctuation,
+			NumberPuncuation,
+			String,
+			StringEnd,
+			Whitespace,
+			Other,
 		};
 
 		struct TokenizedLine
@@ -44,11 +56,10 @@ namespace SH
 			TArray<Token> Tokens;
 			TArray<Bracket> Braces;
 			TArray<Bracket> Parens;
-			LineContState State = LineContState::None;
+			StateSet State = StateSet::Start;
 		};
 
-
 	public:
-		TArray<TokenizedLine> Tokenize(const FString& HlslCodeString, bool IgnoreWhitespace = false, LineContState InLineContState = LineContState::None);
+		TArray<TokenizedLine> Tokenize(const FString& HlslCodeString, bool IgnoreWhitespace = false, StateSet InLastState = StateSet::Start);
 	};
 }

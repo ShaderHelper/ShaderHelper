@@ -1,6 +1,7 @@
 #pragma once
-#include <Widgets/Input/SMultiLineEditableTextBox.h>
 #include "SLogWidget.h"
+
+#include <Widgets/Input/SMultiLineEditableTextBox.h>
 namespace FW 
 {
 	/**

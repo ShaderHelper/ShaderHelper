@@ -1,11 +1,13 @@
 #include "CommonHeader.h"
 #include "SDebuggerViewport.h"
-#include <Widgets/SViewport.h>
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "App/App.h"
 #include "RenderResource/Shader/DebuggerGridShader.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
+#include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
+
+#include <Widgets/SViewport.h>
 
 using namespace FW;
 

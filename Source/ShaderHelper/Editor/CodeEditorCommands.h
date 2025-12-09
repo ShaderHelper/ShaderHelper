@@ -31,6 +31,9 @@ namespace SH
 			UI_COMMAND_SH(DeleteTokenRight, LOCALIZATION("DeleteTokenRight"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::Delete));
 			UI_COMMAND_SH(SelectAll, LOCALIZATION("SelectAll"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::A));
 			UI_COMMAND_SH(Save, LOCALIZATION("Save"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::S));
+			UI_COMMAND_SH(Search, LOCALIZATION("Search"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::F));
+			UI_COMMAND_SH(Replace, LOCALIZATION("Replace"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::H));
+
 			UI_COMMAND_SH(Debug, LOCALIZATION("Debug"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EKeys::F5));
 			UI_COMMAND_SH(Continue, LOCALIZATION("Continue"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EKeys::F9));
 			UI_COMMAND_SH(StepInto, LOCALIZATION("StepInto"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EKeys::F11));
@@ -66,6 +69,8 @@ namespace SH
 		TSharedPtr<FUICommandInfo> DeleteTokenRight;
 		TSharedPtr<FUICommandInfo> SelectAll;
 		TSharedPtr<FUICommandInfo> Save;
+		TSharedPtr<FUICommandInfo> Search;
+		TSharedPtr<FUICommandInfo> Replace;
 
 		TSharedPtr<FUICommandInfo> Debug;
 		TSharedPtr<FUICommandInfo> Continue;

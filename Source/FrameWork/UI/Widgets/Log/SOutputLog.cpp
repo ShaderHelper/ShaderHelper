@@ -1,9 +1,10 @@
 #include "CommonHeader.h"
 #include "SOutputLog.h"
 #include "UI/Styles/FAppCommonStyle.h"
+#include "UI/Widgets/Misc/SIconButton.h"
+
 #include <Misc/OutputDeviceHelper.h>
 #include <Framework/Text/SlateTextRun.h>
-#include "UI/Widgets/Misc/SIconButton.h"
 
 namespace FW 
 {

@@ -102,12 +102,17 @@ namespace FW
 			.SetNormal(IMAGE_BRUSH_SVG("Starship/Common/close-small", FVector2D(30.0, 30.0), FLinearColor{0.7f,0.7f,0.7f}))
 			.SetPressed(IMAGE_BRUSH_SVG("Starship/Common/close-small", FVector2D(30.0, 30.0), FLinearColor{ 0.7f,0.7f,0.7f }))
 			.SetHovered(IMAGE_BRUSH_SVG("Starship/Common/close-small", FVector2D(30.0, 30.0)));
+		Style->Set("Icons.Close", new IMAGE_BRUSH_SVG("Starship/Common/close", FVector2D(16.0, 16.0)));
 		Style->Set("CloseButton", CloseButton);
         
-        FButtonStyle SuperSimpleButton = FButtonStyle(FAppStyle::Get().GetWidgetStyle<FButtonStyle>("SimpleButton"))
-            .SetPressed(FSlateNoResource())
+		FButtonStyle SimpleButton = FButtonStyle(FAppStyle::Get().GetWidgetStyle<FButtonStyle>("SimpleButton"));
+		SimpleButton.SetNormalPadding(0);
+		SimpleButton.SetPressedPadding(0);
+		Style->Set("SimpleButtonNoPaddding", SimpleButton);
+
+		SimpleButton.SetPressed(FSlateNoResource())
             .SetHovered(FSlateNoResource());
-        Style->Set("SuperSimpleButton", SuperSimpleButton);
+        Style->Set("SuperSimpleButton", SimpleButton);
 		
 		Style->Set("Graph.Selector", new BORDER_BRUSH("Common/Selector", FMargin(6.0f / 32.0f)));
         

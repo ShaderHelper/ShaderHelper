@@ -1,26 +1,28 @@
 #include "CommonHeader.h"
 #include "SShaderEditorBox.h"
 #include "UI/Styles/FShaderHelperStyle.h"
-#include <Widgets/Text/SlateEditableTextLayout.h>
-#include <Widgets/Layout/SScrollBarTrack.h>
-#include <Framework/Text/SlateTextRun.h>
 #include "GpuApi/GpuRhi.h"
-#include <Widgets/Layout/SScaleBox.h>
-#include <Framework/Commands/GenericCommands.h>
-#include <HAL/PlatformApplicationMisc.h>
-#include <Framework/Text/TextLayout.h>
 #include "ShaderCodeEditorLineHighlighter.h"
 #include "Editor/CodeEditorCommands.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "Editor/ShaderHelperEditor.h"
+#include "Editor/AssetEditor/AssetEditor.h"
+#include "Common/Path/BaseResourcePath.h"
+#include "UI/Widgets/ColorPicker/SColorPicker.h"
+
+#include <Widgets/Text/SlateEditableTextLayout.h>
+#include <Widgets/Layout/SScrollBarTrack.h>
+#include <Framework/Text/SlateTextRun.h>
+#include <Widgets/Layout/SScaleBox.h>
+#include <Framework/Commands/GenericCommands.h>
+#include <HAL/PlatformApplicationMisc.h>
+#include <Framework/Text/TextLayout.h>
 #include <Widgets/Text/SlateTextBlockLayout.h>
 #include <Framework/Text/SlateTextHighlightRunRenderer.h>
 #include <Fonts/FontMeasure.h>
 #include <Styling/StyleColors.h>
-#include "Editor/AssetEditor/AssetEditor.h"
-#include "Common/Path/BaseResourcePath.h"
 #include <Widgets/Colors/SColorBlock.h>
-#include "UI/Widgets/ColorPicker/SColorPicker.h"
+
 #include <regex>
 
 //No exposed methods, and too lazy to modify the source code for UE.
@@ -373,6 +375,8 @@ constexpr int PaddingLineNum = 22;
 			ISenseEvent->Trigger();
 		});
 
+		UICommandList = MakeShared<FUICommandList>();
+
         SAssignNew(ShaderMultiLineVScrollBar, SScrollBar).Orientation(EOrientation::Orient_Vertical).Padding(0)
 			.Style(&FShaderHelperStyle::Get().GetWidgetStyle<FScrollBarStyle>("CustomScrollbar")).Thickness(8.0f);
 		ShaderMultiLineVScrollBar->OnSetState = [this](float InOffsetFraction, float InThumbSizeFraction) {
@@ -515,6 +519,7 @@ constexpr int PaddingLineNum = 22;
         auto CustomScrollBar = SNew(SScrollBar).Padding(0)
             .Style(&FShaderHelperStyle::Get().GetWidgetStyle<FScrollBarStyle>("CustomScrollbar"));
 		BackgroundLayerBrush = FAppStyle::Get().GetBrush("Brushes.Recessed");
+
         ChildSlot
         [
             SNew(SBorder)
@@ -546,6 +551,7 @@ constexpr int PaddingLineNum = 22;
 						[
 							SAssignNew(ShaderMultiLineEditableText, SShaderMultiLineEditableText, this)
 							.Text(InitialShaderText)
+							.TextStyle(&FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorDefaultText"))
 							.EnableUniformFont(true)
 							.Font(GetCodeFontInfo())
 							.Marshaller(ShaderMarshaller)
@@ -656,7 +662,75 @@ constexpr int PaddingLineNum = 22;
 								]
 							]
 						]
+						+ SOverlay::Slot()
+						.VAlign(VAlign_Top)
+						.HAlign(HAlign_Right)
+						[
+							SAssignNew(CodeSearchWidget, SCodeSearchWidget)
+							.Visibility(EVisibility::Collapsed)
+							.UICommandList(UICommandList)
+							.OnTextChanged_Lambda([this](const FText& InTextToSearch) {
+								ShaderMultiLineEditableText->GoTo(ShaderMultiLineEditableText->GetSelection().GetBeginning());
+								ShaderMultiLineEditableText->SetSearchText(InTextToSearch);
+								ScrollTo(ShaderMultiLineEditableText->GetSelection().GetBeginning().GetLineIndex());
+							})
+							.OnReplaced_Lambda([this](const FText& InTextToReplace, bool ReplaceAll) {
+								FText CurSearchText = CodeSearchWidget->GetSearchText();
+								if (!ReplaceAll)
+								{
+									int32 CurSearchIndex = ShaderMultiLineEditableTextLayout->CurrentSearchResultIndex;
+									if (const FTextLocation* Loc = ShaderMultiLineEditableTextLayout->SearchResultToIndexMap.FindKey(CurSearchIndex))
+									{
+										FTextLocation StartLoc = *Loc;
+										FTextLocation EndLoc = FTextLocation(StartLoc, CurSearchText.ToString().Len());
+										ShaderMultiLineEditableText->SelectText(StartLoc, EndLoc);
+										ShaderMultiLineEditableText->InsertTextAtCursor(InTextToReplace.ToString());
+										ShaderMultiLineEditableText->Refresh();
+										ShaderMultiLineEditableText->AdvanceSearch();
+										ScrollTo(ShaderMultiLineEditableText->GetSelection().GetBeginning().GetLineIndex());
+									}
+								}
+								else
+								{
+									SMultiLineEditableText::FScopedEditableTextTransaction TextTransaction(ShaderMultiLineEditableText);
+									while (ShaderMultiLineEditableText->GetNumSearchResults() > 0)
+									{
+										const FTextLocation* Loc = ShaderMultiLineEditableTextLayout->SearchResultToIndexMap.FindKey(1);
+										FTextLocation StartLoc = *Loc;
+										FTextLocation EndLoc = FTextLocation(StartLoc, CurSearchText.ToString().Len());
+										ShaderMultiLineEditableText->SelectText(StartLoc, EndLoc);
+										ShaderMultiLineEditableText->InsertTextAtCursor(InTextToReplace.ToString());
+									}
+								}
+							})
+							.OnClosed_Lambda([this] {
+								ShaderMultiLineEditableText->SetSearchText({});
+								FSlateApplication::Get().SetUserFocus(0, ShaderMultiLineEditableText);
+							})
+							.OnMatchCaseChanged_Lambda([this](bool MatchCase) {
+								ShaderMultiLineEditableTextLayout->SearchCase = MatchCase ? ESearchCase::CaseSensitive : ESearchCase::IgnoreCase;
+								ShaderMultiLineEditableText->GoTo(ShaderMultiLineEditableText->GetSelection().GetBeginning());
+								ShaderMultiLineEditableText->SetSearchText(CodeSearchWidget->GetSearchText());
+								ScrollTo(ShaderMultiLineEditableText->GetSelection().GetBeginning().GetLineIndex());
+							})
+							.OnMatchWholeChanged_Lambda([this](bool MatchWhole) {
+								ShaderMultiLineEditableTextLayout->MatchWhole = MatchWhole;
+								ShaderMultiLineEditableText->GoTo(ShaderMultiLineEditableText->GetSelection().GetBeginning());
+								ShaderMultiLineEditableText->SetSearchText(CodeSearchWidget->GetSearchText());
+								ScrollTo(ShaderMultiLineEditableText->GetSelection().GetBeginning().GetLineIndex());
+							})
+							.SearchResultData_Lambda([this]() {
+								SSearchBox::FSearchResultData Result{};
+								Result.CurrentSearchResultIndex = ShaderMultiLineEditableText->GetSearchResultIndex();
+								Result.NumSearchResults = ShaderMultiLineEditableText->GetNumSearchResults();
 
+								return Result;
+							})
+							.OnResultNavigationButtonClicked_Lambda([this](SSearchBox::SearchDirection InDirection) {
+								ShaderMultiLineEditableText->AdvanceSearch(InDirection == SSearchBox::SearchDirection::Previous);
+								ScrollTo(ShaderMultiLineEditableText->GetSelection().GetBeginning().GetLineIndex());
+							})
+						]
 					]
 					+ SHorizontalBox::Slot()
 					.AutoWidth()
@@ -735,7 +809,6 @@ constexpr int PaddingLineNum = 22;
 			return true;
 		};
         
-		UICommandList = MakeShared<FUICommandList>();
         UICommandList->MapAction(
 			CodeEditorCommands::Get().Save,
             FExecuteAction::CreateLambda([this] {
@@ -767,6 +840,32 @@ constexpr int PaddingLineNum = 22;
 		);
 		UICommandList->MapAction(CodeEditorCommands::Get().Copy,
 			FExecuteAction::CreateLambda([this] { CopyText(); })
+		);
+		UICommandList->MapAction(CodeEditorCommands::Get().Search,
+			FExecuteAction::CreateLambda([this] { 
+				CodeSearchWidget->SetVisibility(EVisibility::Visible); 
+				FText SearchText;
+				if (!ShaderMultiLineEditableText->AnyTextSelected())
+				{
+					FTextSelection WordSelection = GetWord(ShaderMultiLineEditableText->GetCursorLocation());
+					ShaderMultiLineEditableText->SelectText(WordSelection.GetBeginning(), WordSelection.GetEnd());
+				}
+				SearchText = ShaderMultiLineEditableText->GetSelectedText();
+				CodeSearchWidget->TriggerSearch(SearchText, false);
+			})
+		);
+		UICommandList->MapAction(CodeEditorCommands::Get().Replace,
+			FExecuteAction::CreateLambda([this] {  
+				FText SearchText;
+				CodeSearchWidget->SetVisibility(EVisibility::Visible);
+				if (!ShaderMultiLineEditableText->AnyTextSelected())
+				{
+					FTextSelection WordSelection = GetWord(ShaderMultiLineEditableText->GetCursorLocation());
+					ShaderMultiLineEditableText->SelectText(WordSelection.GetBeginning(), WordSelection.GetEnd());
+				}
+				SearchText = ShaderMultiLineEditableText->GetSelectedText();
+				CodeSearchWidget->TriggerSearch(SearchText, true);
+			})
 		);
 		UICommandList->MapAction(CodeEditorCommands::Get().DeleteLeft,
 			FExecuteAction::CreateLambda([this] { 
@@ -1961,7 +2060,39 @@ constexpr int PaddingLineNum = 22;
 		EffectMultiLineEditableText->Refresh();
     }
 
-    void SShaderEditorBox::Compile()
+	FTextSelection SShaderEditorBox::GetWord(const FTextLocation& InTextLocation) const
+	{
+		int32 LineIndex = InTextLocation.GetLineIndex();
+		FString LineStr;
+		ShaderMultiLineEditableText->GetTextLine(LineIndex, LineStr);
+		int32 Offset = InTextLocation.GetOffset();
+
+		if (LineStr.IsEmpty() || InTextLocation.GetOffset() >= LineStr.Len())
+		{
+			return { InTextLocation, InTextLocation };
+		}
+
+		if (!FChar::IsIdentifier(LineStr[Offset]))
+		{
+			return { InTextLocation, InTextLocation };
+		}
+    
+		int32 WordStart = Offset;
+		while (WordStart > 0 && FChar::IsIdentifier(LineStr[WordStart - 1]))
+		{
+			WordStart--;
+		}
+    
+		int32 WordEnd = Offset;
+		while (WordEnd < LineStr.Len() && FChar::IsIdentifier(LineStr[WordEnd]))
+		{
+			WordEnd++;
+		}
+   
+		return { FTextLocation(LineIndex, WordStart), FTextLocation(LineIndex, WordEnd)};
+	}
+
+	void SShaderEditorBox::Compile()
     {
 		int32 AddedLineNum = ShaderAssetObj->GetExtraLineNum();
 		
@@ -2785,7 +2916,7 @@ constexpr int PaddingLineNum = 22;
                 const FTextSelection Selection = ShaderMultiLineEditableText->GetSelection();
                 const int32 BeginLineIndex = Selection.GetBeginning().GetLineIndex();
                 const int32 EndLineIndex = Selection.GetEnd().GetLineIndex();
-                if(LineIndex >= BeginLineIndex && LineIndex <= EndLineIndex && ShaderMultiLineEditableText->HasKeyboardFocus())
+                if(LineIndex >= BeginLineIndex && LineIndex <= EndLineIndex)
                 {
                     return HighlightLineNumberTextColor;
                 }
@@ -3140,7 +3271,7 @@ constexpr int PaddingLineNum = 22;
 					{
 						LineTextBeforeEditing = EditorSourceBeforeEditing.Mid(LineRangesBeforeEditing[LineIndex].BeginIndex, LineRangesBeforeEditing[LineIndex].Len());
 					}
-					HlslTokenizer::LineContState LastLineContState = HlslTokenizer::LineContState::None;
+					HlslTokenizer::StateSet LastLineContState = HlslTokenizer::StateSet::Start;
 					HlslTokenizer::TokenizedLine* CurTokenizedLine = static_cast<HlslTokenizer::TokenizedLine*>(LineModels[LineIndex].CustomData.Get());
 					if(LineIndex > 0)
 					{
@@ -3533,12 +3664,12 @@ constexpr int PaddingLineNum = 22;
 				GetTextLine(CurrentHoverLocation.GetLineIndex(), CurTextLine);
 				std::string Str = TCHAR_TO_UTF8(*CurTextLine);
 				std::regex Pattern(
-					R"(\(\s*)"                                                           // (
+					R"([\(\{}]\s*)"                                                      // ( or {
 					R"(([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?[fF]?)\s*,\s*)"         // X
 					R"(([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?[fF]?)\s*,\s*)"         // Y
 					R"(([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?[fF]?)\s*)"             // z
 					R"((?:\s*,\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?[fF]?))?)"    // optional w
-					R"(\s*\))"                                                           // )
+					R"(\s*[\)\}])"                                                       // ) or }
 				);
 				std::smatch Match;
 				static FTextLocation LastMatchedPos;
@@ -3596,11 +3727,15 @@ constexpr int PaddingLineNum = 22;
 													if (std::regex_search(Str, Match, Pattern) && Match.size() >= 4)
 													{
 														bool HasAlpha = Match.size() > 4 && Match[4].matched && Match[4].length() > 0;
+														
+														FString OpenBrace = FString::Chr(Match[0].str()[0]);
+                                                        FString CloseBrace = FString::Chr(Match[0].str().back());
+
 														FString NewColorStr;
 														if (HasAlpha)
-															NewColorStr = FString::Printf(TEXT("(%.3f, %.3f, %.3f, %.3f)"), InColor.R, InColor.G, InColor.B, InColor.A);
+															NewColorStr = FString::Printf(TEXT("%s%.3f, %.3f, %.3f, %.3f%s"), *OpenBrace, InColor.R, InColor.G, InColor.B, InColor.A, *CloseBrace);
 														else
-															NewColorStr = FString::Printf(TEXT("(%.3f, %.3f, %.3f)"), InColor.R, InColor.G, InColor.B);
+															NewColorStr = FString::Printf(TEXT("%s%.3f, %.3f, %.3f%s"), *OpenBrace, InColor.R, InColor.G, InColor.B, *CloseBrace);
 
 														int32 ReplacePos = (int32)Match.position(0);
 														int32 ReplaceLen = (int32)Match.length(0);
@@ -3715,12 +3850,13 @@ constexpr int PaddingLineNum = 22;
 		int32 VisibleLineCount = ShaderMarshaller->TextLayout->GetVisibleLineCount();
 		int32 StartVisibleLineIndex = ShaderMarshaller->TextLayout->GetStartVisibleLineIndex();
 		int32 EndVisibleLineIndex = ShaderMarshaller->TextLayout->GetEndVisibleLineIndex();
-		if(InLineIndex <= StartVisibleLineIndex)
+		int32 Offset = VisibleLineCount / 5;
+		if(InLineIndex <= StartVisibleLineIndex + Offset)
 		{
 			int32 TargetLineIndex = FMath::Clamp(InLineIndex - VisibleLineCount / 2, 0, LineCount - 1);
 			ShaderMultiLineEditableText->ScrollTo({TargetLineIndex, 0});
 		}
-		else if(InLineIndex >= EndVisibleLineIndex)
+		else if(InLineIndex >= EndVisibleLineIndex - Offset)
 		{
 			int32 TargetLineIndex = FMath::Clamp(InLineIndex + VisibleLineCount / 2, 0, LineCount - 1);
 			ShaderMultiLineEditableText->ScrollTo({TargetLineIndex, 0});
@@ -3776,7 +3912,9 @@ constexpr int PaddingLineNum = 22;
 		}
 		catch (const std::runtime_error& e)
 		{
-			MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), FText::FromString(UTF8_TO_TCHAR(e.what())));
+			FString FailureInfo = LOCALIZATION("DebugFailure").ToString();
+			SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo, UTF8_TO_TCHAR(e.what()));
+			MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("DebugFailure"));
 			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 			ShEditor->EndDebugging();
 			return;

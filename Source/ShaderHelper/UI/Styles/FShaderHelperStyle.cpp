@@ -39,6 +39,10 @@ namespace SH {
 		Style->Set("Icons.CallStack", new IMAGE_BRUSH_SVG("CallStack", FVector2D(16.0, 16.0)));
 		Style->Set("Icons.Variable", new IMAGE_BRUSH_SVG("Variable", FVector2D(16.0, 16.0)));
 		Style->Set("Icons.Uninitialized", new IMAGE_BRUSH_SVG("Watch", FVector2D(16.0, 16.0)));
+		Style->Set("Icons.MatchCase", new IMAGE_BRUSH("MatchCase", FVector2D{ 16.0f,16.0f }));
+		Style->Set("Icons.MatchWhole", new IMAGE_BRUSH("MatchWhole", FVector2D{ 16.0f,16.0f }));
+		Style->Set("Icons.Replace", new IMAGE_BRUSH_SVG("Replace", FVector2D{ 16.0f,16.0f }));
+		Style->Set("Icons.ReplaceAll", new IMAGE_BRUSH_SVG("ReplaceAll", FVector2D{ 16.0f,16.0f }));
 
 		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir);
 		FToolBarStyle ShToolbarStyle = FToolBarStyle::GetDefault();
@@ -96,6 +100,10 @@ namespace SH {
         CodeFont->FallbackTypeface.Typeface.AppendFont(TEXT("Code"), BaseResourcePath::UE_SlateFontDir / TEXT("DroidSansFallback.ttf"), EFontHinting::Default, EFontLoadingPolicy::LazyLoad);
         FSlateFontInfo CodeFontInfo = FSlateFontInfo(CodeFont, 10);
         Style->Set("CodeFont", CodeFontInfo);
+
+		FTextBlockStyle CodeEditorDefaultTextStyle = FAppStyle::Get().GetWidgetStyle<FTextBlockStyle>("NormalText");
+		CodeEditorDefaultTextStyle.SetHighlightColor(FLinearColor{ 1.0f, 0.53f, 0.0f, .5f });
+		Style->Set("CodeEditorDefaultText", CodeEditorDefaultTextStyle);
 
 		FTextBlockStyle CodeEditorNormalTextStyle = FTextBlockStyle{}
 			.SetColorAndOpacity(FLinearColor::White);

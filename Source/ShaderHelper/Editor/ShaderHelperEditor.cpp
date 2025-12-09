@@ -1,20 +1,22 @@
 #include "CommonHeader.h"
 #include "ShaderHelperEditor.h"
 #include "App/ShaderHelperApp.h"
-#include <Serialization/JsonSerializer.h>
-#include <Misc/FileHelper.h>
 #include "Common/Path/PathHelper.h"
 #include "UI/Styles/FShaderHelperStyle.h"
-#include <Framework/Docking/SDockingTabStack.h>
 #include "UI/Widgets/SShaderTab.h"
 #include "UI/Widgets/Graph/SGraphPanel.h"
-#include <DesktopPlatformModule.h>
 #include "Editor/AssetEditor/AssetEditor.h"
 #include "UI/Widgets/Timeline/STimeline.h"
 #include "CodeEditorCommands.h"
 #include "DebuggerViewCommands.h"
 #include "PluginManager/ShPluginManager.h"
 #include "Renderer/ShaderToyRenderComp.h"
+#include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
+
+#include <Serialization/JsonSerializer.h>
+#include <Misc/FileHelper.h>
+#include <Framework/Docking/SDockingTabStack.h>
+#include <DesktopPlatformModule.h>
 
 STEAL_PRIVATE_MEMBER(FTabManager, TArray<TSharedRef<FTabManager::FArea>>, CollapsedDockAreas)
 
