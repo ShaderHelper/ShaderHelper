@@ -19,13 +19,12 @@ namespace SH
 	public:
 		void SetCallStackDatas(const TArray<CallStackDataPtr>& InDatas);
 		TSharedRef<ITableRow> GenerateRowForItem(CallStackDataPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
-		CallStackDataPtr GetActiveData() const { return ActiveData; }
 		
+		CallStackDataPtr ActiveData;
 		TFunction<void(const FString&)> OnSelectionChanged;
 	private:
 		TSharedPtr<SListView<CallStackDataPtr>> CallStackView;
 		TArray<CallStackDataPtr> CallStackDatas;
-		CallStackDataPtr ActiveData;
 	};
 
 	class SCallStackViewRow : public SMultiColumnTableRow<CallStackDataPtr>

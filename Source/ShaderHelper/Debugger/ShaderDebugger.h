@@ -52,7 +52,7 @@ namespace SH
 
 	public:
 		void ApplyDebugState(const FW::SpvDebugState& InState, FString& Error);
-		void ShowDebuggerResult() const;
+		void ShowDebuggerResult();
 		void ShowDeuggerVariable(FW::SpvLexicalScope* InScope) const;
 		struct ExpressionNode EvaluateExpression(const FString& InExpression) const;
 		bool Continue(StepMode Mode);
@@ -77,11 +77,12 @@ namespace SH
 		{
 			FW::SpvLexicalScope* Scope{};
 			int Line{};
+			int DebugStateIndex{};
 			const FW::SpvFuncCall* Call{};
 		};
 		TArray<FuncCallPoint> CallStack;
 		FW::SpvLexicalScope* Scope = nullptr;
-		FW::SpvLexicalScope* ActiveCallStackScope = nullptr;
+		std::optional<FuncCallPoint> ActiveCallPoint;
 		FW::SpvVariable* AssertResult = nullptr;
 		TMultiMap<FW::SpvId, FW::SpvVarDirtyRange> DirtyVars;
 		int32 StopLineNumber{};

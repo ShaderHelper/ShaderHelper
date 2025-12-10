@@ -200,7 +200,12 @@ namespace SH
 		if (DebugShader->GetShaderType() == ShaderType::PixelShader)
 		{
 			const auto& PsInvocation = std::get<PixelState>(Invocation);
-			SpvPixelExprDebuggerContext ExprContext{ DebugStates[CurDebugStateIndex], CurDebugStateIndex,
+			int32 DebugStateIndex = CurDebugStateIndex;
+			if (ActiveCallPoint)
+			{
+				DebugStateIndex = ActiveCallPoint.value().DebugStateIndex;
+			}
+			SpvPixelExprDebuggerContext ExprContext{ DebugStates[DebugStateIndex], DebugStateIndex,
 				PixelCoord, SpvBindings };
 			SpirvParser Parser;
 			Parser.Parse(DebugShader->SpvCode);
@@ -296,7 +301,7 @@ namespace SH
 		return { .Expr = InExpression, .ValueStr = LOCALIZATION("InvalidExpr").ToString() };
 	}
 
-	void ShaderDebugger::ShowDebuggerResult() const
+	void ShaderDebugger::ShowDebuggerResult()
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		SDebuggerCallStackView* DebuggerCallStackView = ShEditor->GetDebuggerCallStackView();
@@ -318,6 +323,8 @@ namespace SH
 			}
 		}
 		DebuggerCallStackView->SetCallStackDatas(CallStackDatas);
+		DebuggerCallStackView->ActiveData = CallStackDatas[0];
+		ActiveCallPoint.reset();
 
 		ShowDeuggerVariable(Scope);
 
@@ -359,7 +366,7 @@ namespace SH
 					{
 						FString VarName = VarDesc->Name;
 						//If there are variables with the same name, only the one in the most recent scope is shown.
-						if (LocalVarNodeDatas.ContainsByPredicate([&](const ExpressionNodePtr& InItem) { return InItem->Expr == VarName; }))
+						if (LocalVarNodeDatas.ContainsByPredicate([&](const ExpressionNodePtr& InItem) { return InItem->Expr.Equals(VarName); }))
 						{
 							continue;
 						}
@@ -579,7 +586,6 @@ namespace SH
 		{
 			const auto& State = std::get<SpvDebugState_ScopeChange>(InState);
 			Scope = State.Change.NewScope;
-			ActiveCallStackScope = Scope;
 		}
 		else if (std::holds_alternative<SpvDebugState_FuncCall>(InState))
 		{
@@ -596,7 +602,7 @@ namespace SH
 			}
 			if (Scope)
 			{
-				CallStack.Emplace(Scope, State.Line, &Call);
+				CallStack.Emplace(Scope, State.Line, CurDebugStateIndex, &Call);
 				CurValidLine.reset();
 			}
 		}
@@ -1423,7 +1429,7 @@ namespace SH
 		CallStack.Empty();
 		DebuggerContext = nullptr;
 		Scope = nullptr;
-		ActiveCallStackScope = nullptr;
+		ActiveCallPoint.reset();
 		AssertResult = nullptr;
 		DebuggerError.Empty();
 		DirtyVars.Empty();
@@ -1453,8 +1459,26 @@ namespace SH
 
 		SDebuggerVariableView* DebuggerLocalVariableView = ShEditor->GetDebuggerLocalVariableView();
 		SDebuggerVariableView* DebuggerGlobalVariableView = ShEditor->GetDebuggerGlobalVariableView();
-		DebuggerLocalVariableView->SetOnShowUninitialized([this](bool bShowUninitialized) { ShowDeuggerVariable(ActiveCallStackScope); });
-		DebuggerGlobalVariableView->SetOnShowUninitialized([this](bool bShowUninitialized) { ShowDeuggerVariable(ActiveCallStackScope); });
+		DebuggerLocalVariableView->SetOnShowUninitialized([this](bool bShowUninitialized) { 
+			if (ActiveCallPoint)
+			{
+				ShowDeuggerVariable(ActiveCallPoint.value().Scope);
+			}
+			else
+			{
+				ShowDeuggerVariable(Scope);
+			}
+		});
+		DebuggerGlobalVariableView->SetOnShowUninitialized([this](bool bShowUninitialized) { 
+			if (ActiveCallPoint)
+			{
+				ShowDeuggerVariable(ActiveCallPoint.value().Scope);
+			}
+			else
+			{
+				ShowDeuggerVariable(Scope);
+			}
+		});
 
 		DebuggerCallStackView->OnSelectionChanged = [this, DebuggerWatchView](const FString& FuncName) {
 			int32 ExtraLineNum = ShaderEditor->GetShaderAsset()->GetExtraLineNum();
@@ -1462,7 +1486,7 @@ namespace SH
 			{
 				StopLineNumber = CurValidLine.value() - ExtraLineNum;
 				ShowDeuggerVariable(Scope);
-				ActiveCallStackScope = Scope;
+				ActiveCallPoint.reset();
 			}
 			else if (auto CallPoint = CallStack.FindByPredicate([this, FuncName](const auto& InItem) {
 				if (GetFunctionSig(GetFunctionDesc(InItem.Scope)) == FuncName)
@@ -1474,7 +1498,7 @@ namespace SH
 			{
 				StopLineNumber = CallPoint->Line - ExtraLineNum;
 				ShowDeuggerVariable(CallPoint->Scope);
-				ActiveCallStackScope = CallPoint->Scope;
+				ActiveCallPoint = *CallPoint;
 			}
 			DebuggerWatchView->Refresh();
 		};

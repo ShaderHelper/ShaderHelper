@@ -78,7 +78,7 @@ namespace SH
 			InternalBorder->SetContent(
 				   SNew(SImage)
 				   .Visibility_Lambda([this]{
-					   if(Owner->GetActiveData() == Data)
+					   if(Owner->ActiveData == Data)
 					   {
 						   return EVisibility::Visible;
 					   }
@@ -94,10 +94,6 @@ namespace SH
 	void SDebuggerCallStackView::SetCallStackDatas(const TArray<CallStackDataPtr>& InDatas)
 	{
 		CallStackDatas = InDatas;
-		if(!CallStackDatas.IsEmpty())
-		{
-			ActiveData = CallStackDatas[0];
-		}
 		CallStackView->RequestListRefresh();
 	}
 	
