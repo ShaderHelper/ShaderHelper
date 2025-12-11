@@ -136,4 +136,6 @@ Desc,Description,
 Version,Version,
 Author,Author,
 Location,Location,
-ShowUninitialized,Show uninitialized value
+ShowUninitialized,Show uninitialized value,
+GoForward,Go Forward,
+GoBack,Go Back,

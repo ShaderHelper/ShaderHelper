@@ -85,6 +85,30 @@ namespace SH
 			FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); }),
 			EUIActionRepeatMode::RepeatEnabled
 		);
+		UICommandList->MapAction(
+			CodeEditorCommands::Get().GoBack,
+			FExecuteAction::CreateLambda([this] {
+				NavigationIndex--;
+				const auto& [Id, Location] = NavigationHistory[NavigationIndex];
+				auto LoadedShaderAsset = TSingleton<AssetManager>::Get().LoadAssetByGuid<ShaderAsset>(Id);
+				OpenShaderTab(MoveTemp(LoadedShaderAsset));
+				GetShaderEditor(LoadedShaderAsset)->ShaderMultiLineEditableText->GoTo(Location);
+			}),
+			FCanExecuteAction::CreateLambda([this] { return NavigationIndex > 0; }),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(
+			CodeEditorCommands::Get().GoForward,
+			FExecuteAction::CreateLambda([this] {
+				NavigationIndex++;
+				const auto& [Id, Location] = NavigationHistory[NavigationIndex];
+				auto LoadedShaderAsset = TSingleton<AssetManager>::Get().LoadAssetByGuid<ShaderAsset>(Id);
+				OpenShaderTab(MoveTemp(LoadedShaderAsset));
+				GetShaderEditor(LoadedShaderAsset)->ShaderMultiLineEditableText->GoTo(Location);
+			}),
+			FCanExecuteAction::CreateLambda([this] { return NavigationIndex < NavigationHistory.Num() - 1; }),
+			EUIActionRepeatMode::RepeatEnabled
+		);
 
 		CurProject = TSingleton<ShProjectManager>::Get().GetProject();
 		ViewPort = MakeShared<PreviewViewPort>();
@@ -437,6 +461,28 @@ namespace SH
         }
     }
 
+	void ShaderHelperEditor::AddNavigationInfo(const FGuid& Id, const FTextLocation& InLocation)
+	{
+		if (NavigationHistory.Num() > 0)
+		{			
+			if (NavigationHistory[NavigationIndex].Key == Id && 
+				(NavigationHistory[NavigationIndex].Value == InLocation || FMath::Abs(NavigationHistory[NavigationIndex].Value.GetLineIndex() - InLocation.GetLineIndex()) < 10))
+			{
+				return;
+			}
+		}
+
+		NavigationIndex++;
+		NavigationHistory.SetNum(NavigationIndex);
+		NavigationHistory.Emplace(Id, InLocation);
+
+		if (NavigationHistory.Num() > MaxNavigation)
+		{
+			NavigationHistory.RemoveAt(0);
+			NavigationIndex--;
+		}
+	}
+
 	void ShaderHelperEditor::InvokeDebuggerTabs()
 	{
 		TabManager->TryInvokeTab(GlobalTabId);
@@ -560,6 +606,8 @@ namespace SH
             if(InCause == ETabActivationCause::UserClickedOnTab)
             {
                 ShaderEditors[LoadedShader]->SetFocus();
+				auto ShaderEditor = GetShaderEditor(static_cast<ShaderAsset*>(LoadedShader));
+				AddNavigationInfo(LoadedShader->GetGuid(), ShaderEditor->ShaderMultiLineEditableText->GetCursorLocation());
             }
             
         }));
@@ -833,6 +881,7 @@ namespace SH
         {
             (*TabPtr)->ActivateInParent(ETabActivationCause::SetDirectly);
         }
+		GetShaderEditor(InShader)->SetFocus();
     }
 
 	ShaderHelperEditor::WindowLayoutConfigInfo ShaderHelperEditor::LoadWindowLayout(const FString& InWindowLayoutConfigFileName)
@@ -913,24 +962,19 @@ namespace SH
 
 	FToolBarBuilder ShaderHelperEditor::CreateToolBarBuilder()
 	{
-		FToolBarBuilder ToolBarBuilder(TSharedPtr<FUICommandList>(), FMultiBoxCustomization::None, nullptr);
+		FToolBarBuilder ToolBarBuilder(UICommandList, FMultiBoxCustomization::None, nullptr);
 		ToolBarBuilder.SetStyle(&FShaderHelperStyle::Get(), FName("Toolbar.ShaderHelper"));
 		ToolBarBuilder.AddToolBarButton(
-			FExecuteAction{},
+			CodeEditorCommands::Get().GoBack,
 			NAME_None,
-			FText::GetEmpty(), FText::GetEmpty(),
-			FSlateIcon( FAppStyle::Get().GetStyleSetName(), "Icons.ArrowLeft"),
-			EUserInterfaceActionType::Button
+			FText::GetEmpty(), LOCALIZATION("GoBack"),
+			FSlateIcon(FAppStyle::Get().GetStyleSetName(), "Icons.ArrowLeft")
 		);
 		ToolBarBuilder.AddToolBarButton(
-			FUIAction(
-				FExecuteAction(),
-				FCanExecuteAction::CreateLambda([] { return false; })
-			),
+			CodeEditorCommands::Get().GoForward,
 			NAME_None,
-			FText::GetEmpty(), FText::GetEmpty(),
-			FSlateIcon( FAppStyle::Get().GetStyleSetName(), "Icons.ArrowRight"),
-			EUserInterfaceActionType::Button
+			FText::GetEmpty(), LOCALIZATION("GoForward"),
+			FSlateIcon(FAppStyle::Get().GetStyleSetName(), "Icons.ArrowRight")
 		);
 		FToolBarBuilder DebuggerToolBarBuilder(UICommandList, FMultiBoxCustomization::None, nullptr);
 		DebuggerToolBarBuilder.SetStyle(&FShaderHelperStyle::Get(), FName("Toolbar.ShaderHelper"));
@@ -938,7 +982,7 @@ namespace SH
 		DebuggerToolBarBuilder.AddToolBarButton(
 			CodeEditorCommands::Get().Debug,
 			NAME_None,
-			FText::GetEmpty(), FText::GetEmpty(),
+			FText::GetEmpty(), LOCALIZATION("Debug"),
 			TAttribute<FSlateIcon>::CreateLambda([this] {
 				if(IsDebugging) {
 					return FSlateIcon(FShaderHelperStyle::Get().GetStyleSetName(), "Icons.Pause");
@@ -949,19 +993,19 @@ namespace SH
 		DebuggerToolBarBuilder.AddToolBarButton(
 			CodeEditorCommands::Get().Continue,
 			NAME_None,
-			FText::GetEmpty(), FText::GetEmpty(),
+			FText::GetEmpty(), LOCALIZATION("Continue"),
 			FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.ArrowBoldRight")
 		);
 		DebuggerToolBarBuilder.AddToolBarButton(
 			CodeEditorCommands::Get().StepOver,
 			NAME_None,
-			FText::GetEmpty(), FText::GetEmpty(),
+			FText::GetEmpty(), LOCALIZATION("StepOver"),
 			FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.StepOver")
 		);
 		DebuggerToolBarBuilder.AddToolBarButton(
 			CodeEditorCommands::Get().StepInto,
 			NAME_None,
-			FText::GetEmpty(), FText::GetEmpty(),
+			FText::GetEmpty(), LOCALIZATION("StepInto"),
 			FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.StepInto")
 		);
 		DebuggerToolBarBuilder.AddToolBarButton(

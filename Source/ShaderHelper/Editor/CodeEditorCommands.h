@@ -33,6 +33,8 @@ namespace SH
 			UI_COMMAND_SH(Save, LOCALIZATION("Save"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::S));
 			UI_COMMAND_SH(Search, LOCALIZATION("Search"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::F));
 			UI_COMMAND_SH(Replace, LOCALIZATION("Replace"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::H));
+			UI_COMMAND_SH(GoForward, LOCALIZATION("GoForward"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Alt, EKeys::Right));
+			UI_COMMAND_SH(GoBack, LOCALIZATION("GoBack"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Alt, EKeys::Left));
 
 			UI_COMMAND_SH(Debug, LOCALIZATION("Debug"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EKeys::F5));
 			UI_COMMAND_SH(Continue, LOCALIZATION("Continue"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EKeys::F9));
@@ -71,6 +73,8 @@ namespace SH
 		TSharedPtr<FUICommandInfo> Save;
 		TSharedPtr<FUICommandInfo> Search;
 		TSharedPtr<FUICommandInfo> Replace;
+		TSharedPtr<FUICommandInfo> GoForward;
+		TSharedPtr<FUICommandInfo> GoBack;
 
 		TSharedPtr<FUICommandInfo> Debug;
 		TSharedPtr<FUICommandInfo> Continue;

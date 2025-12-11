@@ -28,6 +28,7 @@ namespace SH
 	{
         AssetPtr<StShader> LoadedStShaderAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<StShader>(InAssetPath);
         auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->AddNavigationInfo(LoadedStShaderAsset->GetGuid(), {});
         ShEditor->OpenShaderTab(MoveTemp(LoadedStShaderAsset));
 	}
 

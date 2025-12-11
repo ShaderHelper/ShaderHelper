@@ -85,6 +85,8 @@ namespace SH
         void RefreshProperty();
         void ShowProperty(FW::ShObject* InObjectData);
         void UpdateShaderPath(const FString& InShaderPath);
+
+		void AddNavigationInfo(const FGuid& Id, const FTextLocation& InLocation);
 		
 		DebuggableObject* GetDebuggaleObject() const { return CurDebuggableObject; }
 		void SetDebuggableObject(DebuggableObject* InObject) { CurDebuggableObject = InObject; }
@@ -157,6 +159,10 @@ namespace SH
 		TSharedPtr<SWindow> ShaderEditorTipWindow;
 		DebuggableObject* CurDebuggableObject = nullptr;
 		bool IsDebugging{};
+
+		static constexpr int MaxNavigation = 233;
+		int32 NavigationIndex = INDEX_NONE;
+		TArray<TPair<FGuid, FTextLocation>> NavigationHistory;
 	};
 
 }

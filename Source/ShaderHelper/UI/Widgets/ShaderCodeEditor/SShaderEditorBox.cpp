@@ -1866,6 +1866,9 @@ constexpr int PaddingLineNum = 22;
 		}
 		bKeyChar = false;
 		RefreshBracketHighlight();
+
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->AddNavigationInfo(ShaderAssetObj->GetGuid(), InLocation);
 	}
 
 	void SShaderEditorBox::OnFocusChanging(const FWeakWidgetPath& PreviousFocusPath, const FWidgetPath& NewWidgetPath, const FFocusEvent& InFocusEvent)
@@ -2289,6 +2292,12 @@ constexpr int PaddingLineNum = 22;
 			return FReply::Handled();
 		}
 		
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		if (ShEditor->GetUICommandList()->ProcessCommandBindings(InKeyEvent))
+		{
+			return FReply::Handled();
+		}
+		
         if(bTryComplete && CandidateItems.Num())
         {
             if(Key == EKeys::Up)
@@ -2311,11 +2320,6 @@ constexpr int PaddingLineNum = 22;
                 CodeCompletionList->RequestScrollIntoView(TargetItem);
                 return FReply::Handled();
             }
-            else if(Key == EKeys::Enter || Key == EKeys::Tab)
-            {
-				//HandleKeyChar will handle it, no need to dispatch to SMultiLineEditableText::OnKeyDown
-                return FReply::Handled();
-            }
         }
 		else
 		{
@@ -2325,7 +2329,6 @@ constexpr int PaddingLineNum = 22;
 				ShaderMultiLineEditableTextLayout->HandleCarriageReturn(InKeyEvent.IsRepeat());
 				// at this point, the text after the text cursor is already in a new line
 				HandleAutoIndent();
-				return FReply::Handled();
 			}
 		}
 
@@ -2336,7 +2339,6 @@ constexpr int PaddingLineNum = 22;
 				FIntPoint(-1, 0),
 				ECursorAction::MoveCursor
 			));
-			return FReply::Handled();
 		}
 		else if (Key == EKeys::Right)
 		{
@@ -2345,7 +2347,6 @@ constexpr int PaddingLineNum = 22;
 				FIntPoint(+1, 0),
 				ECursorAction::MoveCursor
 			));
-			return FReply::Handled();
 		}
 		else if (Key == EKeys::Up)
 		{
@@ -2356,7 +2357,6 @@ constexpr int PaddingLineNum = 22;
 				// Shift selects text.	
 				InKeyEvent.IsShiftDown() ? ECursorAction::SelectText : ECursorAction::MoveCursor
 			));
-			return FReply::Handled();
 		}
 		else if (Key == EKeys::Down)
 		{
@@ -2367,10 +2367,9 @@ constexpr int PaddingLineNum = 22;
 				// Shift selects text.	
 				InKeyEvent.IsShiftDown() ? ECursorAction::SelectText : ECursorAction::MoveCursor
 			));
-			return FReply::Handled();
 		}
 
-		return FReply::Unhandled();
+		return FReply::Handled();
     }
 
     FReply SShaderEditorBox::HandleKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent)
