@@ -311,7 +311,6 @@ namespace SH
 			[
 				SNew(SBorder)
 				.Padding(FMargin{0, 0.5f, 0, 1.0f})
-				.BorderImage(FAppStyle::Get().GetBrush("Brushes.Panel"))
 				[
 					SNew(SBorder)
 					.BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
@@ -468,6 +467,7 @@ namespace SH
 			if (NavigationHistory[NavigationIndex].Key == Id && 
 				(NavigationHistory[NavigationIndex].Value == InLocation || FMath::Abs(NavigationHistory[NavigationIndex].Value.GetLineIndex() - InLocation.GetLineIndex()) < 10))
 			{
+				NavigationHistory[NavigationIndex] = {Id, InLocation};
 				return;
 			}
 		}

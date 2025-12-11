@@ -216,6 +216,13 @@ constexpr int PaddingLineNum = 22;
 		return ShowColorBlock;
 	}
 
+	bool SShaderEditorBox::CanShowGuideLine()
+	{
+		bool ShowGuideLine = true;
+		Editor::GetEditorConfig()->GetBool(TEXT("CodeEditor"), TEXT("ShowGuideLine"), ShowGuideLine);
+		return ShowGuideLine;
+	}
+
 	bool SShaderEditorBox::CanRealTimeDiagnosis()
 	{
 		bool RealTimeDiagnosis = true;
@@ -294,60 +301,63 @@ constexpr int PaddingLineNum = 22;
 		const float InverseScale = Inverse(AllottedGeometry.Scale);
 		const double OffsetX = 4;
 
-		TArray<ShaderScope> Scopes = Owner->SyntaxTU.GetScopes();
-		int32 ExtraLineNum = Owner->GetShaderAsset()->GetExtraLineNum();
-		//Draw guide lines
-		for (const auto& Scope : Scopes)
+		if (Owner->CanShowGuideLine())
 		{
-			int32 StartLineIndex = Scope.Start.X - ExtraLineNum - 1;
-			int32 StartOffset = Scope.Start.Y - 1;
-			if (StartLineIndex >= 0)
+			TArray<ShaderScope> Scopes = Owner->SyntaxTU.GetScopes();
+			int32 ExtraLineNum = Owner->GetShaderAsset()->GetExtraLineNum();
+			//Draw guide lines
+			for (const auto& Scope : Scopes)
 			{
-				int32 EndLineIndex = Scope.End.X - ExtraLineNum - 1;
-				TSharedPtr<ILayoutBlock> Block = Owner->ShaderMarshaller->TextLayout->GetBlockAt({ StartLineIndex, StartOffset });
-				if (Block)
+				int32 StartLineIndex = Scope.Start.X - ExtraLineNum - 1;
+				int32 StartOffset = Scope.Start.Y - 1;
+				if (StartLineIndex >= 0)
 				{
-					FVector2D P0 = TransformPoint(InverseScale, Block->GetLocationOffset() + FVector2D{OffsetX, 2.0});
-					FVector2D P1 = TransformPoint(InverseScale, Block->GetLocationOffset() + FVector2D{OffsetX, Block->GetSize().Y * (EndLineIndex - StartLineIndex)});
-					FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), {P0, P1}, ESlateDrawEffect::None, FLinearColor{1,1,1,0.2f});
-				}
-			}
-		}
-
-		// Draw a background layer for every non-whitespace block
-		const auto& LineViews = Owner->ShaderMarshaller->TextLayout->GetLineViews();
-		for (int32 LineIndex = 0; LineIndex < LineViews.Num(); ++LineIndex)
-		{
-			const FTextLayout::FLineView& LineView = LineViews[LineIndex];
-			for (const TSharedRef< ILayoutBlock >& Block : LineView.Blocks)
-			{
-				const FTextRange BlockRange = Block->GetTextRange();
-				FString Text;
-				GetTextLine(LineView.ModelIndex, Text);
-
-				bool bIsOnlyWhitespace = true;
-				for (int32 Index = BlockRange.BeginIndex; Index < BlockRange.EndIndex; ++Index)
-				{
-					if (!FChar::IsWhitespace((*Text)[Index]))
+					int32 EndLineIndex = Scope.End.X - ExtraLineNum - 1;
+					TSharedPtr<ILayoutBlock> Block = Owner->ShaderMarshaller->TextLayout->GetBlockAt({ StartLineIndex, StartOffset });
+					if (Block)
 					{
-						bIsOnlyWhitespace = false;
-						break;
+						FVector2D P0 = TransformPoint(InverseScale, Block->GetLocationOffset() + FVector2D{ OffsetX, 2.0 });
+						FVector2D P1 = TransformPoint(InverseScale, Block->GetLocationOffset() + FVector2D{ OffsetX, Block->GetSize().Y * (EndLineIndex - StartLineIndex) });
+						FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), { P0, P1 }, ESlateDrawEffect::None, FLinearColor{ 1,1,1,0.2f });
 					}
 				}
-				if (!bIsOnlyWhitespace && Owner->BackgroundLayerBrush)
+			}
+
+			// Draw a background layer for every non-whitespace block
+			const auto& LineViews = Owner->ShaderMarshaller->TextLayout->GetLineViews();
+			for (int32 LineIndex = 0; LineIndex < LineViews.Num(); ++LineIndex)
+			{
+				const FTextLayout::FLineView& LineView = LineViews[LineIndex];
+				for (const TSharedRef< ILayoutBlock >& Block : LineView.Blocks)
 				{
-					FSlateDrawElement::MakeBox(
-						OutDrawElements,
-						LayerId,
-						AllottedGeometry.ToPaintGeometry(TransformVector(InverseScale, Block->GetSize()), FSlateLayoutTransform(TransformPoint(InverseScale, Block->GetLocationOffset()))),
-						FCoreStyle::Get().GetBrush("WhiteBrush"),
-						ESlateDrawEffect::None,
-						Owner->BackgroundLayerBrush->TintColor.GetSpecifiedColor()
-					);
+					const FTextRange BlockRange = Block->GetTextRange();
+					FString Text;
+					GetTextLine(LineView.ModelIndex, Text);
+
+					bool bIsOnlyWhitespace = true;
+					for (int32 Index = BlockRange.BeginIndex; Index < BlockRange.EndIndex; ++Index)
+					{
+						if (!FChar::IsWhitespace((*Text)[Index]))
+						{
+							bIsOnlyWhitespace = false;
+							break;
+						}
+					}
+					if (!bIsOnlyWhitespace && Owner->BackgroundLayerBrush)
+					{
+						FSlateDrawElement::MakeBox(
+							OutDrawElements,
+							LayerId,
+							AllottedGeometry.ToPaintGeometry(TransformVector(InverseScale, Block->GetSize()), FSlateLayoutTransform(TransformPoint(InverseScale, Block->GetLocationOffset()))),
+							FCoreStyle::Get().GetBrush("WhiteBrush"),
+							ESlateDrawEffect::None,
+							Owner->BackgroundLayerBrush->TintColor.GetSpecifiedColor()
+						);
+					}
 				}
 			}
 		}
-
+		
 		LayerId = SMultiLineEditableText::OnPaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
 		return LayerId;
 	}
