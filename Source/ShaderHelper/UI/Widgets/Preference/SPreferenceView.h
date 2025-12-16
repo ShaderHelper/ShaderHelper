@@ -59,6 +59,13 @@ namespace SH
 		SLATE_BEGIN_ARGS(SAppearanceView) {}
 		SLATE_END_ARGS()
 		void Construct(const FArguments& InArgs);
+
+	private:
+		TArray<TSharedPtr<FGuid>> Themes;
+		TSharedPtr<SEditableTextBox> NameBox;
+		TArray<EStyleColor> Palette;
+		TArray<EStyleColor> SyntaxPalette;
+		bool IsNaming{};
 	};
 
 	class SDebugView : public SCompoundWidget

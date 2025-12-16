@@ -38,12 +38,6 @@ using namespace FW;
 namespace SH
 {
 
-const FLinearColor NormalLineNumberTextColor = { 0.3f,0.3f,0.3f,0.8f };
-const FLinearColor HighlightLineNumberTextColor = { 0.7f,0.7f,0.7f,0.9f };
-
-const FLinearColor NormalLineTipColor = { 1.0f,1.0f,1.0f,0.0f };
-const FLinearColor HighlightLineTipColor = { 1.0f,1.0f,1.0f,0.2f };
-
 const FString FoldMarkerText = TEXT("⇿");
 
 //Append dummy datas to LineNumberData for Padding
@@ -278,9 +272,9 @@ constexpr int PaddingLineNum = 22;
 		static TMap<HLSL::TokenType, FTextBlockStyle> TokenStyleMap{
 				{ HLSL::TokenType::Number, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNumberText") },
 				{ HLSL::TokenType::Keyword, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorKeywordText") },
-				{ HLSL::TokenType::Punctuation, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText") },
-				{ HLSL::TokenType::BuildtinFunc, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuildtinFuncText") },
-				{ HLSL::TokenType::BuildtinType, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuildtinTypeText") },
+				{ HLSL::TokenType::Punctuation, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorPunctuationText") },
+				{ HLSL::TokenType::BuildtinFunc, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuiltinFuncText") },
+				{ HLSL::TokenType::BuildtinType, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuiltinTypeText") },
 				{ HLSL::TokenType::Identifier, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText") },
 				{ HLSL::TokenType::Preprocess, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorPreprocessText") },
 				{ HLSL::TokenType::Comment, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorCommentText") },
@@ -318,7 +312,8 @@ constexpr int PaddingLineNum = 22;
 					{
 						FVector2D P0 = TransformPoint(InverseScale, Block->GetLocationOffset() + FVector2D{ OffsetX, 2.0 });
 						FVector2D P1 = TransformPoint(InverseScale, Block->GetLocationOffset() + FVector2D{ OffsetX, Block->GetSize().Y * (EndLineIndex - StartLineIndex) });
-						FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), { P0, P1 }, ESlateDrawEffect::None, FLinearColor{ 1,1,1,0.2f });
+						FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), { P0, P1 }, 
+							ESlateDrawEffect::None, FStyleColors::Foreground.GetSpecifiedColor().CopyWithNewOpacity(0.4f));
 					}
 				}
 			}
@@ -2927,9 +2922,9 @@ constexpr int PaddingLineNum = 22;
                 const int32 EndLineIndex = Selection.GetEnd().GetLineIndex();
                 if(LineIndex >= BeginLineIndex && LineIndex <= EndLineIndex)
                 {
-                    return HighlightLineNumberTextColor;
+                    return FStyleColors::Foreground.GetSpecifiedColor();
                 }
-                return NormalLineNumberTextColor;
+                return FStyleColors::Foreground.GetSpecifiedColor().CopyWithNewOpacity(0.5f);
             })
             .Text(*Item)
             .Justification(ETextJustify::Right)
@@ -2951,9 +2946,9 @@ constexpr int PaddingLineNum = 22;
             .ButtonColorAndOpacity_Lambda([this, LineIndex] {
                 if(ShaderMarshaller->FoldingBraceGroups.Contains(LineIndex))
                 {
-                    return FLinearColor{1, 1, 1, FoldingArrowAnim.GetLerp()};
+                    return FStyleColors::Foreground.GetSpecifiedColor().CopyWithNewOpacity(FoldingArrowAnim.GetLerp());
                 }
-                return FLinearColor::White;
+                return FStyleColors::Foreground.GetSpecifiedColor();
             })
             .Visibility_Lambda([this, LineIndex]{
                 if(ShaderMarshaller->FoldingBraceGroups.Contains(LineIndex) || FindFoldMarker(LineIndex))
@@ -3198,10 +3193,10 @@ constexpr int PaddingLineNum = 22;
             {
                 double CurTime = FPlatformTime::Seconds();
                 float Speed = 2.0f;
-                double AnimatedOpacity = (HighlightLineTipColor.A - 0.1f) * FMath::Pow(FMath::Abs(FMath::Sin(CurTime * Speed)),1.8) + 0.1f;
-                return FLinearColor{ HighlightLineTipColor.R, HighlightLineTipColor.G, HighlightLineTipColor.B, (float)AnimatedOpacity };
+                double AnimatedOpacity = 0.1 * FMath::Pow(FMath::Abs(FMath::Sin(CurTime * Speed)),1.8) + 0.1;
+				return FStyleColors::Foreground.GetSpecifiedColor().CopyWithNewOpacity((float)AnimatedOpacity);
             }
-            return NormalLineTipColor;
+            return FLinearColor::Transparent;
         }));
         
         return LineTip;
@@ -3533,6 +3528,7 @@ constexpr int PaddingLineNum = 22;
 		bool bShouldCheck = InCurrentTime - LastCheckTime >= CheckInterval;
 		bShouldCheck = bShouldCheck && !bMouseInTipWindow;
 
+		//Show the debug value when hovering over variables
 		auto CheckDebuggerTip = [&] {
 			ExpressionNodePtr HoverExpr;
 			FTextLocation CurrentHoverLocation;
@@ -3796,7 +3792,6 @@ constexpr int PaddingLineNum = 22;
 			return false;
 		};
 
-		//Show the debug value when hovering over variables
 		if (bShouldCheck)
 		{
 			if (!CheckDebuggerTip() && !CheckColorBlockTip())

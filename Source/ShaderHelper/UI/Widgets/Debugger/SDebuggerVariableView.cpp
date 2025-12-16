@@ -3,6 +3,8 @@
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/Misc/MiscWidget.h"
+
+#include <Styling/StyleColors.h>
 #include <Widgets/Colors/SColorBlock.h>
 #include <regex>
 
@@ -82,7 +84,7 @@ namespace SH
 					.VAlign(VAlign_Center)
 					.AutoWidth()
 					[
-						SNew(SShToggleButton).Icon(FAppStyle::Get().GetBrush("ColorPicker.Mode"))
+						SNew(SShToggleButton).Icon(FAppStyle::Get().GetBrush("ColorPicker.Mode")).IconColorAndOpacity(FLinearColor::White)
 						.ToolTipText(LOCALIZATION("DisplayColorBlock"))
 						.IsChecked_Lambda([this] { return DebuggerViewDisplayColorBlock ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
 						.OnCheckStateChanged_Lambda([this](ECheckBoxState InState) {
@@ -232,9 +234,9 @@ namespace SH
 			InternalBorder->SetBorderBackgroundColor(TAttribute<FSlateColor>::CreateLambda([this] {
 				if (Data->Dirty)
 				{
-					return FLinearColor{ 1,1,1,0.2f };
+					return FStyleColors::AccentRed.GetSpecifiedColor().CopyWithNewOpacity(0.4f);
 				}
-				return FAppStyle::Get().GetBrush("Brushes.Panel")->TintColor.GetSpecifiedColor();
+				return FStyleColors::Panel.GetSpecifiedColor();
 			}));
 
 			if (Data->TypeName == "float3" || Data->TypeName == "float4")

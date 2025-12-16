@@ -2,6 +2,8 @@
 #include "SDebuggerCallStackView.h"
 #include "UI/Styles/FShaderHelperStyle.h"
 
+#include <Styling/StyleColors.h>
+
 namespace SH
 {
 
@@ -77,6 +79,7 @@ namespace SH
 			InternalBorder->SetHAlign(HAlign_Center);
 			InternalBorder->SetContent(
 				   SNew(SImage)
+				   .ColorAndOpacity(FStyleColors::Foreground)
 				   .Visibility_Lambda([this]{
 					   if(Owner->ActiveData == Data)
 					   {

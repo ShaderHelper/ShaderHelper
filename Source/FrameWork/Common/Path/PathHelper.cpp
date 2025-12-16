@@ -20,6 +20,11 @@ namespace FW {
 		return WorkspaceDir() / TEXT("Resource");
 	}
 
+	FString PathHelper::ThemeDir()
+	{
+		return ResourceDir()/ TEXT("Theme");
+	}
+
 	FString PathHelper::PluginDir()
 	{
 		return WorkspaceDir() / TEXT("Plugins");

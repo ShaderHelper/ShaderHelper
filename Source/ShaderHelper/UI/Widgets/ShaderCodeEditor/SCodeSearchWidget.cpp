@@ -1,7 +1,6 @@
 #include "CommonHeader.h"
 #include "SCodeSearchWidget.h"
 #include "UI/Styles/FShaderHelperStyle.h"
-#include "UI/Widgets/Misc/SIconButton.h"
 #include "UI/Widgets/Misc/MiscWidget.h"
 #include "Editor/CodeEditorCommands.h"
 

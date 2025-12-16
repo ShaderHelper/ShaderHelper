@@ -59,6 +59,7 @@ namespace SH
         FTabManager* GetCodeTabManager() const { return CodeTabManager.Get(); }
 		FTabManager* GetTabManager() const { return TabManager.Get(); }
 		TSharedPtr<SWindow> GetMainWindow() const override { return MainWindow; }
+		TWeakPtr<SWindow> GetPreferenceWindow() const { return PreferenceWindow; }
 		FW::PreviewViewPort* GetViewPort() const { return ViewPort.Get(); }
 		FW::ShObject* GetCurPropertyObject() const { return CurPropertyObject; }
 		TSharedPtr<FUICommandList> GetUICommandList() const { return UICommandList; }

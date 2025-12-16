@@ -8,6 +8,7 @@ namespace FW {
 		static FString BinariesDir();
 		// ShaderHelper/Resource
 		static FString ResourceDir();
+		static FString ThemeDir();
 		static FString PluginDir();
 		static FString ExternalDir();
 		static FString SavedDir();

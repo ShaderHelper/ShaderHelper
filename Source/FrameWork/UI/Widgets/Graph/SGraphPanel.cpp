@@ -377,7 +377,8 @@ namespace FW
 		double Offset = FMath::Abs(End.x - Start.x) / 2;
 		double StartOffset = InStartDir == PinDirection::Output ? Offset : -Offset;
 		double EndOffset = -StartOffset;
-		FSlateDrawElement::MakeCubicBezierSpline(OutDrawElements, Layer, PaintGeometry, Start, { Start.x + StartOffset, Start.y }, {End.x + EndOffset, End.y}, End, 2.0f);
+		FSlateDrawElement::MakeCubicBezierSpline(OutDrawElements, Layer, PaintGeometry, Start, { Start.x + StartOffset, Start.y }, {End.x + EndOffset, End.y}, End, 2.0f, 
+			ESlateDrawEffect::None, FStyleColors::Foreground.GetSpecifiedColor());
 	}
 
 	int32 SGraphPanel::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
@@ -445,7 +446,8 @@ namespace FW
 					NodeLayer,
 					CurWidget.Geometry.ToInflatedPaintGeometry(FVector2D{ 2, 2 }),
 					FAppCommonStyle::Get().GetBrush("Graph.NodeOutline"),
-					ESlateDrawEffect::None
+					ESlateDrawEffect::None,
+					FStyleColors::Select.GetSpecifiedColor()
 				);
 			}
 

@@ -5,6 +5,7 @@
 #include <Widgets/Input/SSpinBox.h>
 #include <Widgets/Input/SSlider.h>
 #include <Widgets/Input/SSegmentedControl.h>
+#include <Widgets/Input/SEditableTextBox.h>
 #include <Widgets/Layout/SWidgetSwitcher.h>
 #include <Widgets/Colors/SColorBlock.h>
 
@@ -150,6 +151,26 @@ namespace FW
 						[ SNew(SSpinBox<float>).MinValue(0.f).MaxValue(1.f).Delta(0.01f).MaxFractionalDigits(3)
 							.Value_Lambda([this]{ return CurrentColor.A; })
 							.OnValueChanged_Lambda([this](float V){ HandleAlphaChanged(V); }) ]
+					]
+					+ SVerticalBox::Slot().AutoHeight()
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+						[
+							SNew(STextBlock).Text(FText::FromString(TEXT("Hex")))
+						]
+						+ SHorizontalBox::Slot().Padding(6, 0, 0, 0)
+						[
+							SNew(SEditableTextBox)
+							.Text_Lambda([this] {
+								return FText::FromString(CurrentColor.ToFColor(true).ToHex());
+							})
+							.OnTextCommitted_Lambda([this](const FText& Text, ETextCommit::Type CommitType) {
+								FColor NewColor = FColor::FromHex(Text.ToString());
+								CurrentColor = FLinearColor(NewColor);
+								if (OnColorChanged.IsBound()) OnColorChanged.Execute(CurrentColor);
+							})
+						]
 					]
 					+ SVerticalBox::Slot()
 					.VAlign(VAlign_Center)

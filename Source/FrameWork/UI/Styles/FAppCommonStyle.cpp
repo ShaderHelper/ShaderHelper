@@ -79,13 +79,14 @@ namespace FW
 		Style->Set("PropertyView.ItemColor", new FSlateColorBrush(FStyleColors::Recessed));
 		Style->Set("PropertyView.CompositeItemColor", new FSlateColorBrush(FStyleColors::Dropdown));
 
-		const FTableRowStyle DirectoryTableRowStyle =
-			FTableRowStyle(FAppStyle::Get().GetWidgetStyle<FTableRowStyle>("SimpleTableView.Row"))
-			.SetSelectedTextColor(FStyleColors::Foreground);
+		FTableRowStyle DirectoryTableRowStyle =
+			FTableRowStyle(FAppStyle::Get().GetWidgetStyle<FTableRowStyle>("SimpleTableView.Row"));
+		DirectoryTableRowStyle.SetSelectedTextColor(FStyleColors::White);
 		Style->Set("DirectoryTreeView.Row", DirectoryTableRowStyle);
 
 		const FTableRowStyle AssetViewTableRowStyle =
 			FTableRowStyle(FAppStyle::Get().GetWidgetStyle<FTableRowStyle>("TableView.Row"))
+			.SetSelectedTextColor(FStyleColors::White)
 			.SetEvenRowBackgroundHoveredBrush(FSlateNoResource())
 			.SetSelectorFocusedBrush(FSlateNoResource())
 			.SetOddRowBackgroundHoveredBrush(FSlateNoResource());
@@ -118,7 +119,7 @@ namespace FW
         
         FTextBlockStyle MinorText = FTextBlockStyle{}
             .SetFont(TTF_FONT(TEXT("Fonts/DroidSansMono"), 8))
-            .SetColorAndOpacity(FLinearColor{0.4f,0.4f,0.4f,1.0f});
+            .SetColorAndOpacity(FStyleColors::Foreground);
         FTextBlockStyle SmallMinorText = FTextBlockStyle{MinorText}
             .SetFontSize(7);
         Style->Set("MinorText", MinorText);

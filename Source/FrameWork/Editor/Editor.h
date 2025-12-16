@@ -1,4 +1,5 @@
 #pragma once
+#include <Styling/StyleColors.h>
 
 namespace FW {
 
@@ -20,6 +21,11 @@ namespace FW {
 
 		static void SetLanguage(SupportedLanguage InLanguage);
 		static SupportedLanguage GetLanguage() { return CurLanguage; }
+		static void SetTheme(const FGuid& InId);
+		static const FStyleTheme& GetTheme(const FGuid& InId);
+		static const FStyleTheme& GetDefaultTheme() { return GetTheme(DefaultThemeId); };
+		static FStyleTheme& GetMutableCurrentTheme();
+
         virtual void Update(double DeltaTime) {}
 		virtual TSharedPtr<SWindow> GetMainWindow() const { return {}; }
 		static FConfigFile* GetEditorConfig() { return EditorConfig.Get(); }
@@ -27,6 +33,7 @@ namespace FW {
 
 	private:
 		static inline SupportedLanguage CurLanguage = SupportedLanguage::English;
+		static inline FGuid DefaultThemeId = FGuid(0x13438026, 0x5FBB4A9C, 0xA00A1DC9, 0x770217B8);
 		static inline TUniquePtr<FConfigFile> EditorConfig = MakeUnique<FConfigFile>();
 	};
 }

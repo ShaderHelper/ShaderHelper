@@ -36,7 +36,6 @@ namespace FW::MessageDialog
 		ChildSlot
 		[
 			SNew(SBorder)
-			.BorderImage(FAppStyle::Get().GetBrush("Brushes.Title"))
 			.Padding(16.f)
 			[
 		
@@ -74,7 +73,6 @@ namespace FW::MessageDialog
 						SNew(STextBlock)
 						.Text(InArgs._Message)
 						.WrapTextAt(250.0f)
-						.ColorAndOpacity(FLinearColor::White)
 					]
 
 					+ SVerticalBox::Slot()

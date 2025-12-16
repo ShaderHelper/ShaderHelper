@@ -1,15 +1,19 @@
 #include "CommonHeader.h"
 #include "SPreferenceView.h"
-#include <Styling/StyleColors.h>
-#include <Widgets/Input/SSearchBox.h>
-#include <Widgets/Input/SSpinBox.h>
-#include "UI/Widgets/Misc/SIconButton.h"
+#include "UI/Widgets/Misc/MiscWidget.h"
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "UI/Styles/FAppCommonStyle.h"
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
+#include "UI/Widgets/Misc/MiscWidget.h"
+
+#include <Styling/StyleColors.h>
+#include <Widgets/Input/SSearchBox.h>
+#include <Widgets/Input/SSpinBox.h>
 #include <DesktopPlatformModule.h>
+
+CALL_PRIVATE_FUNCTION(USlateThemeManager_LoadThemeColors, USlateThemeManager, LoadThemeColors, , void, FStyleTheme&)
 
 using namespace FW;
 
@@ -330,8 +334,43 @@ namespace SH
 
 	void SAppearanceView::Construct(const FArguments& InArgs)
 	{
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		auto PreferenceWindow = ShEditor->GetPreferenceWindow().Pin().ToSharedRef();
+
+		auto UserInterfaceGrid = SNew(SGridPanel).FillColumn(0, 0.4f).FillColumn(1, 0.5f).FillColumn(2, 0.1f);
 		auto CodeEditorGrid = SNew(SGridPanel).FillColumn(0, 0.4f).FillColumn(1, 0.5f).FillColumn(2, 0.1f);
-		auto AppendItem = [ItemNum = 0](auto& InGrid, const FText& InLabel, const FText& InToolTipText = FText::GetEmpty()) mutable -> SHorizontalBox::FScopedWidgetSlotArguments
+
+		Palette.Add(EStyleColor::Foreground);
+		Palette.Add(EStyleColor::ForegroundHover);
+		Palette.Add(EStyleColor::Border);
+		Palette.Add(EStyleColor::Background);
+		Palette.Add(EStyleColor::Panel);
+		Palette.Add(EStyleColor::Recessed);
+		Palette.Add(EStyleColor::Input);
+		Palette.Add(EStyleColor::Secondary);
+		Palette.Add(EStyleColor::Dropdown);
+		Palette.Add(EStyleColor::Hover);
+		Palette.Add(EStyleColor::Primary);
+		Palette.Add(EStyleColor::Select);
+		Palette.Add(EStyleColor::SelectHover);
+		Palette.Add(EStyleColor::Header);
+		Palette.Add(EStyleColor::Title);
+
+		SyntaxPalette.Add(EStyleColor::User1);
+		SyntaxPalette.Add(EStyleColor::User2);
+		SyntaxPalette.Add(EStyleColor::User3);
+		SyntaxPalette.Add(EStyleColor::User4);
+		SyntaxPalette.Add(EStyleColor::User5);
+		SyntaxPalette.Add(EStyleColor::User6);
+		SyntaxPalette.Add(EStyleColor::User7);
+		SyntaxPalette.Add(EStyleColor::User8);
+		SyntaxPalette.Add(EStyleColor::User9);
+		SyntaxPalette.Add(EStyleColor::User10);
+		SyntaxPalette.Add(EStyleColor::User11);
+		SyntaxPalette.Add(EStyleColor::User12);
+		SyntaxPalette.Add(EStyleColor::User13);
+
+		auto AppendItem = [&, ItemNum = 0](auto& InGrid, const FText& InLabel, const FText& InToolTipText = FText::GetEmpty()) mutable -> SHorizontalBox::FScopedWidgetSlotArguments
 		{
 			InGrid->AddSlot(0, ItemNum)
 			.VAlign(VAlign_Center)
@@ -349,7 +388,21 @@ namespace SH
 			ItemNum++;
 			return HBox->AddSlot();
 		};
+		auto AppendUserInterfaceItem = AppendItem;
 		auto AppendCodeEditorItem = AppendItem;
+		
+		for (const auto& StyleColor : Palette)
+		{
+			AppendUserInterfaceItem(UserInterfaceGrid, USlateThemeManager::Get().GetColorDisplayName(StyleColor))
+			[
+				SNew(SShColorBlockPicker, PreferenceWindow)
+				.Color_Lambda([&] { return USlateThemeManager::Get().GetColor(StyleColor); })
+				.OnColorChanged_Lambda([&](const FLinearColor& InColor) {
+					FLinearColor& Color = const_cast<FLinearColor&>(USlateThemeManager::Get().GetColor(StyleColor));
+					Color = InColor;
+				})
+			];
+		}
 
 		AppendCodeEditorItem(CodeEditorGrid, LOCALIZATION("MouseZoom"), LOCALIZATION("MouseZoomTip"))
 		[
@@ -470,22 +523,171 @@ namespace SH
 			})
 		];
 
+		for (const auto& StyleColor : SyntaxPalette)
+		{
+			AppendCodeEditorItem(CodeEditorGrid, USlateThemeManager::Get().GetColorDisplayName(StyleColor))
+			[
+				SNew(SShColorBlockPicker, PreferenceWindow)
+				.Color_Lambda([&] { return USlateThemeManager::Get().GetColor(StyleColor); })
+				.OnColorChanged_Lambda([&](const FLinearColor& InColor) {
+					FLinearColor& Color = const_cast<FLinearColor&>(USlateThemeManager::Get().GetColor(StyleColor));
+					Color = InColor;
+				})
+			];
+		}
+
+		for (const auto& Theme : USlateThemeManager::Get().GetThemes())
+		{
+			Themes.Add(MakeShared<FGuid>(Theme.Id));
+		}
+
 		ChildSlot
 		[
-			SNew(SVerticalBox)
-			+SVerticalBox::Slot()
-			.AutoHeight()
+			SNew(SScrollBox)
+			+ SScrollBox::Slot()
 			[
-				SNew(SExpandableArea)
-				.AreaTitle(LOCALIZATION("CodeEditor"))
-				.AreaTitleFont(FAppStyle::Get().GetFontStyle("NormalFont"))
-				.BodyBorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
-				.BodyContent()
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().Padding(0,0,0,8)
+				.AutoHeight()
 				[
-					CodeEditorGrid
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					[
+						SNew(SComboBox<TSharedPtr<FGuid>>)
+						.Visibility_Lambda([this] { return IsNaming ? EVisibility::Collapsed : EVisibility::Visible; })
+						.OptionsSource(&Themes)
+						.OnSelectionChanged_Lambda([this](TSharedPtr<FGuid> InItem, ESelectInfo::Type) {
+							Editor::SetTheme(*InItem);
+						})
+						.OnGenerateWidget_Lambda([this](TSharedPtr<FGuid> InItem) {
+							FText ThemeName = Editor::GetTheme(*InItem).DisplayName;
+							if (*InItem == Editor::GetDefaultTheme())
+							{
+								ThemeName = FText::FromString(ThemeName.ToString() + " (" + LOCALIZATION("Default").ToString() + ")");
+							}
+							return SNew(STextBlock).Text(ThemeName);
+						})
+						[
+							SNew(STextBlock).Text_Lambda([this] {
+								FText ThemeName = Editor::GetMutableCurrentTheme().DisplayName;
+								if (Editor::GetMutableCurrentTheme() == Editor::GetDefaultTheme())
+								{
+									return FText::FromString(ThemeName.ToString() + " (" + LOCALIZATION("Default").ToString() + ")");
+								}
+								return ThemeName;
+							})
+						]
+					]
+					+ SHorizontalBox::Slot()
+					[
+						SAssignNew(NameBox, SEditableTextBox)
+						.SelectAllTextWhenFocused(true)
+						.Visibility_Lambda([this] { return IsNaming ? EVisibility::Visible : EVisibility::Collapsed; })
+						.OnTextCommitted_Lambda([this](const FText& InText, ETextCommit::Type) {
+							USlateThemeManager::Get().SetCurrentThemeDisplayName(InText);
+							FString ThemeName = Editor::GetMutableCurrentTheme().DisplayName.ToString();
+							USlateThemeManager::Get().SaveCurrentThemeAs(PathHelper::ThemeDir() / ThemeName + ".json");
+							IsNaming = false;
+						})
+					]
+					+ SHorizontalBox::Slot().AutoWidth()
+					[
+						SNew(SBox).WidthOverride(25)
+						[
+							SNew(SIconButton).ButtonStyle(&FAppStyle::Get().GetWidgetStyle< FButtonStyle >("Button"))
+							.Icon(FAppStyle::Get().GetBrush("Icons.Plus"))
+							.IconSize(FVector2D{ 10,10 })
+							.OnClicked_Lambda([this] {
+								FGuid NewThemeId = USlateThemeManager::Get().DuplicateActiveTheme();
+								Themes.Add(MakeShared<FGuid>(NewThemeId));
+								Editor::SetTheme(NewThemeId);
+								IsNaming = true;
+								NameBox->SetText(Editor::GetMutableCurrentTheme().DisplayName);
+								FSlateApplication::Get().SetKeyboardFocus(NameBox);
+								return FReply::Handled();
+							})
+						]
+					
+					]
+					+ SHorizontalBox::Slot().AutoWidth()
+					[
+						SNew(SBox).WidthOverride(25)
+						[
+							SNew(SIconButton).ButtonStyle(&FAppStyle::Get().GetWidgetStyle< FButtonStyle >("Button"))
+							.IsEnabled_Lambda([] {
+								return Editor::GetMutableCurrentTheme() != Editor::GetDefaultTheme();
+							})
+							.Icon(FAppStyle::Get().GetBrush("Icons.Minus"))
+							.IconSize(FVector2D{ 10,10 })
+							.OnClicked_Lambda([this] {
+								FStyleTheme& CurTheme = Editor::GetMutableCurrentTheme();
+								Themes.RemoveAll([&](const auto& InItem) { return *InItem == CurTheme.Id; });
+								IFileManager::Get().Delete(*CurTheme.Filename);
+								USlateThemeManager::Get().RemoveTheme(CurTheme.Id);
+								USlateThemeManager::Get().ApplyTheme(Editor::GetDefaultTheme().Id);
+								IsNaming = false;
+								return FReply::Handled();
+							})
+						]
+
+					]
+					+ SHorizontalBox::Slot().AutoWidth().Padding(8, 0, 0, 0)
+					[
+						SNew(SIconButton).ButtonStyle(&FAppStyle::Get().GetWidgetStyle< FButtonStyle >("Button"))
+						.Label(LOCALIZATION("Reset"))
+						.Icon(FAppStyle::Get().GetBrush("GenericCommands.Undo"))
+						.IconSize(FVector2D{ 12,12 })
+						.OnClicked_Lambda([this] {
+							for (auto StyleColor : Palette)
+							{
+								USlateThemeManager::Get().ResetActiveColorToDefault(StyleColor);
+							}
+							for (auto StyleColor : SyntaxPalette)
+							{
+								USlateThemeManager::Get().ResetActiveColorToDefault(StyleColor);
+							}
+							return FReply::Handled();
+						})
+					]
+					+ SHorizontalBox::Slot().AutoWidth().Padding(4,0,0,0)
+					[
+						SNew(SIconButton).ButtonStyle(&FAppStyle::Get().GetWidgetStyle< FButtonStyle >("Button"))
+						.Label(LOCALIZATION("Save"))
+						.Icon(FAppStyle::Get().GetBrush("Icons.Save"))
+						.IconSize(FVector2D{ 12,12 })
+						.OnClicked_Lambda([this] {
+							FString ThemeName = Editor::GetMutableCurrentTheme().DisplayName.ToString();
+							USlateThemeManager::Get().SaveCurrentThemeAs(PathHelper::ThemeDir() / ThemeName + ".json");
+							CallPrivate_USlateThemeManager_LoadThemeColors(USlateThemeManager::Get(), Editor::GetMutableCurrentTheme());
+							return FReply::Handled();
+						})
+					]
+				]
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				[
+					SNew(SExpandableArea)
+					.AreaTitle(LOCALIZATION("UserInterface"))
+					.AreaTitleFont(FAppStyle::Get().GetFontStyle("NormalFont"))
+					.BodyBorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
+					.BodyContent()
+					[
+						UserInterfaceGrid
+					]
+				]
+				+SVerticalBox::Slot()
+				.AutoHeight()
+				[
+					SNew(SExpandableArea)
+					.AreaTitle(LOCALIZATION("CodeEditor"))
+					.AreaTitleFont(FAppStyle::Get().GetFontStyle("NormalFont"))
+					.BodyBorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
+					.BodyContent()
+					[
+						CodeEditorGrid
+					]
 				]
 			]
-			
 		];
 	}
 
@@ -602,15 +804,18 @@ namespace SH
 
 	TSharedRef<SWidget> SPreferenceView::CreatePreference(const FText& InText, TSharedRef<SWidget> InView)
 	{
-		TSharedPtr<SBorder> Preference = SNew(SBorder).Padding(FMargin{ 4.0f, 2.0f }).HAlign(HAlign_Left).VAlign(VAlign_Center).DesiredSizeScale(FVector2D{ 2.5, 1.2 })[
-			SNew(STextBlock).Text(InText)
-		];
+		TSharedPtr<SBorder> Preference = SNew(SBorder).Padding(FMargin{ 4.0f, 2.0f }).HAlign(HAlign_Left).VAlign(VAlign_Center).DesiredSizeScale(FVector2D{ 2.5, 1.2 });
+		auto TextBlock = SNew(STextBlock).Text(InText).ColorAndOpacity_Lambda([this, Self = &*Preference] {
+			if (CurPreference == Self) { return FStyleColors::White; }
+			return FStyleColors::Foreground;
+		});
+		Preference->SetContent(TextBlock);
 		Preference->SetBorderImage(TAttribute<const FSlateBrush*>::CreateLambda([this, Self = &*Preference] {
 			if (CurPreference == Self)
 			{
 				return FAppStyle::Get().GetBrush("Brushes.Select");
 			}
-			return FAppStyle::Get().GetBrush("Brushes.Header");
+			return FAppStyle::Get().GetBrush("Brushes.Secondary");
 		}));
 		Preference->SetOnMouseButtonDown(FPointerEventHandler::CreateLambda([this, InView, Self = &*Preference](auto&&, auto&&) {
 			CurPreference = Self;

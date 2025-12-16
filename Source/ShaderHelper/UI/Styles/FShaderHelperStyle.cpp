@@ -25,6 +25,36 @@ namespace SH {
 
 	TSharedRef<ISlateStyle> FShaderHelperStyle::Create()
 	{
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::Foreground, LOCALIZATION("Foreground"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::ForegroundHover, LOCALIZATION("ForegroundHover"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::Border, LOCALIZATION("Border"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::Background, LOCALIZATION("Background"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::Header, LOCALIZATION("Header"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::Panel, LOCALIZATION("Panel"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::Input, LOCALIZATION("Input"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::Recessed, LOCALIZATION("Recessed"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::Secondary, LOCALIZATION("Secondary"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::Dropdown, LOCALIZATION("Dropdown"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::SelectHover, LOCALIZATION("SelectHover"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::Hover, LOCALIZATION("Hover"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::Primary, LOCALIZATION("Primary"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::Select, LOCALIZATION("Select"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::Title, LOCALIZATION("Title"));
+
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User1, LOCALIZATION("Keyword"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User2, LOCALIZATION("Number"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User3, LOCALIZATION("Comment"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User4, LOCALIZATION("BuiltinFunc"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User5, LOCALIZATION("BuiltinType"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User6, LOCALIZATION("Preprocess"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User7, LOCALIZATION("String"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User8, LOCALIZATION("Parameter"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User9, LOCALIZATION("Function"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User10, LOCALIZATION("Type"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User11, LOCALIZATION("GlobalVar"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User12, LOCALIZATION("Other"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User13, LOCALIZATION("Punctuation"));
+
 		TSharedRef<FSlateStyleSet> Style = MakeShared<FSlateStyleSet>("ShaderHelperStyle");
         Style->SetContentRoot(BaseResourcePath::Custom_SlateResourceDir);
         Style->Set("AssetBrowser.Shader", new IMAGE_BRUSH_SVG("Shader", FVector2D(64.0, 64.0)));
@@ -103,43 +133,46 @@ namespace SH {
 
 		FTextBlockStyle CodeEditorDefaultTextStyle = FAppStyle::Get().GetWidgetStyle<FTextBlockStyle>("NormalText");
 		CodeEditorDefaultTextStyle.SetHighlightColor(FLinearColor{ 1.0f, 0.53f, 0.0f, .5f });
+		CodeEditorDefaultTextStyle.SetSelectedBackgroundColor(FStyleColors::Select);
 		Style->Set("CodeEditorDefaultText", CodeEditorDefaultTextStyle);
 
 		FTextBlockStyle CodeEditorNormalTextStyle = FTextBlockStyle{}
-			.SetColorAndOpacity(FLinearColor::White);
+			.SetColorAndOpacity(EStyleColor::User12);
 		
 		FTextBlockStyle CodeEditorKeywordTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
-			.SetColorAndOpacity(FLinearColor{1.0f, 0.4f, 0.7f, 1.0f});
+			.SetColorAndOpacity(EStyleColor::User1);
 		FTextBlockStyle CodeEditorNumberTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
-			.SetColorAndOpacity(FLinearColor{ 0.5f, 1.0f, 0.66f, 1.0f });
+			.SetColorAndOpacity(EStyleColor::User2);
 		FTextBlockStyle CodeEditorCommentTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
-			.SetColorAndOpacity(FLinearColor{0.2f, 0.9f, 0.2f, 1.0f});
-		FTextBlockStyle CodeEditorBuildtinFuncTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
-			.SetColorAndOpacity(FLinearColor{0.58f, 0.43f, 0.82f,1.0f});
-		FTextBlockStyle CodeEditorBuildtinTypeTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
-			.SetColorAndOpacity(FLinearColor{ 0.1f, 0.55f, 1.0f, 1.0f });
+			.SetColorAndOpacity(EStyleColor::User3);
+		FTextBlockStyle CodeEditorBuiltinFuncTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
+			.SetColorAndOpacity(EStyleColor::User4);
+		FTextBlockStyle CodeEditorBuiltinTypeTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
+			.SetColorAndOpacity(EStyleColor::User5);
 		FTextBlockStyle CodeEditorPreprocessTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
-			.SetColorAndOpacity(FLinearColor{0.35f, 0.35f, 0.35f, 1.0f});
+			.SetColorAndOpacity(EStyleColor::User6);
 		FTextBlockStyle CodeEditorStringTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
-			.SetColorAndOpacity(FLinearColor{ 1.0f, 0.8f, 0.66f, 1.0f });
-		
-		FTextBlockStyle CodeEditorFuncTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
-			.SetColorAndOpacity(FLinearColor{ 1.0f, 0.93f, 0.54f, 1.0f });
-		FTextBlockStyle CodeEditorTypeTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
-			.SetColorAndOpacity(FLinearColor{ 0.0f, 0.81f, 0.81f, 1.0f });
+			.SetColorAndOpacity(EStyleColor::User7);
 		FTextBlockStyle CodeEditorParmTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
-			.SetColorAndOpacity(FLinearColor{ 0.39f, 0.72f, 1.0f, 1.0f });
+			.SetColorAndOpacity(EStyleColor::User8);
+		FTextBlockStyle CodeEditorFuncTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
+			.SetColorAndOpacity(EStyleColor::User9);
+		FTextBlockStyle CodeEditorTypeTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
+			.SetColorAndOpacity(EStyleColor::User10);
 		FTextBlockStyle CodeEditorVarTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
-			.SetColorAndOpacity(FLinearColor{ 0.93f, 0.51f, 0.38f, 1.0f });
+			.SetColorAndOpacity(EStyleColor::User11);
+		FTextBlockStyle CodeEditorPunctuationTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
+			.SetColorAndOpacity(EStyleColor::User13);
 		
 		Style->Set("CodeEditorNormalText", CodeEditorNormalTextStyle);
 		Style->Set("CodeEditorKeywordText", CodeEditorKeywordTextStyle);
 		Style->Set("CodeEditorNumberText", CodeEditorNumberTextStyle);
 		Style->Set("CodeEditorCommentText", CodeEditorCommentTextStyle);
-		Style->Set("CodeEditorBuildtinFuncText", CodeEditorBuildtinFuncTextStyle);
-		Style->Set("CodeEditorBuildtinTypeText", CodeEditorBuildtinTypeTextStyle);
+		Style->Set("CodeEditorBuiltinFuncText", CodeEditorBuiltinFuncTextStyle);
+		Style->Set("CodeEditorBuiltinTypeText", CodeEditorBuiltinTypeTextStyle);
 		Style->Set("CodeEditorPreprocessText", CodeEditorPreprocessTextStyle);
 		Style->Set("CodeEditorStringText", CodeEditorStringTextStyle);
+		Style->Set("CodeEditorPunctuationText", CodeEditorPunctuationTextStyle);
 		
 		Style->Set("CodeEditorFuncText", CodeEditorFuncTextStyle);
 		Style->Set("CodeEditorTypeText", CodeEditorTypeTextStyle);

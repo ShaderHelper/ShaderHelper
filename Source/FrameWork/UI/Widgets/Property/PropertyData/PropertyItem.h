@@ -1,10 +1,10 @@
 #pragma once
 #include "SPropertyItem.h"
 #include "UI/Styles/FAppCommonStyle.h"
-#include <Widgets/Input/SSpinBox.h>
-#include "UI/Widgets/Misc/SIconButton.h"
+#include "UI/Widgets/Misc/MiscWidget.h"
 #include "AssetManager/AssetManager.h"
 
+#include <Widgets/Input/SSpinBox.h>
 
 namespace FW
 {

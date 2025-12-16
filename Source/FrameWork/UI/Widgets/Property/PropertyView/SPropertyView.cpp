@@ -1,6 +1,6 @@
 #include "CommonHeader.h"
 #include "SPropertyView.h"
-#include "UI/Widgets/Misc/SIconButton.h"
+#include "UI/Widgets/Misc/MiscWidget.h"
 
 namespace FW
 {

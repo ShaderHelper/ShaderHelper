@@ -399,7 +399,6 @@ namespace SH
                 .AutoWidth()
                 .VAlign(VAlign_Center)
                 .HAlign(HAlign_Center)
-                .Padding(2.0f, 0.0f, 0.0f, 0.0f)
                 [
                     SNew(STextBlock)
                     .Text(FText::FromString(FileName))
@@ -412,14 +411,16 @@ namespace SH
                 .AutoWidth()
                 .VAlign(VAlign_Center)
                 .HAlign(HAlign_Center)
-                .Padding(2.0f, 0.0f, 0.0f, 0.0f)
+                .Padding(4.0f, 0.0f, 4.0f, 0.0f)
                 [
                     SNew(SHorizontalBox)
                     +SHorizontalBox::Slot()
                     .AutoWidth()
-                    .Padding(2.0f)
+					.Padding(0.0f, 0.0f, 4.0f, 0.0f)
+					.VAlign(VAlign_Center)
                     [
                         SNew(SImage)
+						.ColorAndOpacity(FStyleColors::Foreground)
                         .DesiredSizeOverride(FVector2D{12.0f, 12.0f})
                         .Image(FAppStyle::Get().GetBrush("Icons.FolderClosed"))
                     ]
@@ -530,6 +531,7 @@ namespace SH
         ShaderPathBoxMap.Add(LoadedShader, PathBox);
         
         TSharedRef<SShaderTab> NewShaderTab = SNew(SShaderTab)
+			.IconColor(FLinearColor::White)
             .TabRole(ETabRole::DocumentTab)
 			.Label_Lambda([this, LoadedShader] {
 				FString DirtyChar;
@@ -781,9 +783,7 @@ namespace SH
                     [
                         SNew(STextBlock)
                         .Visibility(EVisibility::HitTestInvisible)
-                        .ColorAndOpacity(FLinearColor::White)
                         .Font(FShaderHelperStyle::Get().GetFontStyle("CodeFont"))
-                        .ShadowOffset(FVector2D{2,2})
                         .Text_Lambda([this] {
                             return CurProject->Graph ? FText::FromString("> " + CurProject->Graph->GetFileName() + "." + CurProject->Graph->FileExtension()) : FText{};
                         })
@@ -1030,7 +1030,7 @@ namespace SH
 		);
 		ToolBarBuilder.AddToolBarWidget(
 			SNew(SBorder)
-			.BorderImage(FAppStyle::Get().GetBrush("Brushes.Black"))
+			.BorderImage(FAppStyle::Get().GetBrush("Brushes.Border"))
 			.Padding(1)
 			[
 				DebuggerToolBarBuilder.MakeWidget()
@@ -1187,12 +1187,10 @@ namespace SH
 							auto NewWindow = SNew(SShWindow).Title_Lambda([this] {
 								return FText::FromString(LOCALIZATION("ShaderHelper").ToString() + "-" + LOCALIZATION("Preferences").ToString());
 							})
-							.ClientSize({700, 500})
-							[
-								SAssignNew(PreferenceView, SPreferenceView)
-							];
+							.ClientSize({ 700, 500 });
 							PreferenceWindow = NewWindow;
 							FSlateApplication::Get().AddWindowAsNativeChild(NewWindow, MainWindow.ToSharedRef());
+							NewWindow->SetContent(SAssignNew(PreferenceView, SPreferenceView));
 						}
 					}
 				)));

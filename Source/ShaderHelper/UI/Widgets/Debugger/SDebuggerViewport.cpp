@@ -26,14 +26,14 @@ namespace SH
 			+SVerticalBox::Slot()
 			.Padding(0, 0, 0, 8)
 			[
-				SNew(STextBlock).Text_Lambda([this]{
+				SNew(STextBlock).ColorAndOpacity(FLinearColor::White).Text_Lambda([this]{
 					return FText::FromString(FString::Printf(TEXT("Pixel Coord: %d %d"), PixelCoord.x, PixelCoord.y));
 				})
 			]
 			+SVerticalBox::Slot()
 			.Padding(0, 0, 0, 2)
 			[
-				SNew(STextBlock).Text_Lambda([this]{
+				SNew(STextBlock).ColorAndOpacity(FLinearColor::White).Text_Lambda([this]{
 					float Value{};
 					if(DebuggerTex) {
 						uint32 DataIndex = PixelCoord.x + PixelCoord.y * DebuggerTex->GetWidth();
@@ -45,7 +45,7 @@ namespace SH
 			+SVerticalBox::Slot()
 			.Padding(0, 0, 0, 2)
 			[
-				SNew(STextBlock).Text_Lambda([this]{
+				SNew(STextBlock).ColorAndOpacity(FLinearColor::White).Text_Lambda([this]{
 					float Value{};
 					if(DebuggerTex) {
 						uint32 DataIndex = PixelCoord.x + PixelCoord.y * DebuggerTex->GetWidth();
@@ -57,7 +57,7 @@ namespace SH
 			+SVerticalBox::Slot()
 			.Padding(0, 0, 0, 2)
 			[
-				SNew(STextBlock).Text_Lambda([this]{
+				SNew(STextBlock).ColorAndOpacity(FLinearColor::White).Text_Lambda([this]{
 					float Value{};
 					if(DebuggerTex) {
 						uint32 DataIndex = PixelCoord.x + PixelCoord.y * DebuggerTex->GetWidth();
@@ -69,7 +69,7 @@ namespace SH
 			+SVerticalBox::Slot()
 			.Padding(0, 0, 0, 2)
 			[
-				SNew(STextBlock).Text_Lambda([this]{
+				SNew(STextBlock).ColorAndOpacity(FLinearColor::White).Text_Lambda([this]{
 					float Value{};
 					if(DebuggerTex) {
 						uint32 DataIndex = PixelCoord.x + PixelCoord.y * DebuggerTex->GetWidth();

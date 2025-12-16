@@ -104,12 +104,10 @@ namespace FW
 
 	TSharedRef<ITableRow> SDirectoryTree::OnGenerateRow(TSharedRef<DirectoryData> InTreeNode, const TSharedRef<STableViewBase>& OwnerTable)
 	{
-		FSlateColor DirectoryTextColor = FLinearColor{ 0.8f,0.8f,0.8f };
 		FSlateFontInfo DirectoryTextFont = FAppStyle::Get().GetFontStyle("SmallFont");
 
 		if (InTreeNode->IsRootDirectory)
 		{
-			DirectoryTextColor = FLinearColor::White;
 			DirectoryTextFont = FAppStyle::Get().GetFontStyle("SmallFontBold");
 		}
         
@@ -145,6 +143,7 @@ namespace FW
             .VAlign(VAlign_Center)
             [
                 SNew(SImage)
+				.ColorAndOpacity(FStyleColors::Foreground)
                 .DesiredSizeOverride(FVector2D(10.0f, 10.0f))
                 .Image_Lambda([this, InTreeNode]() {
                         if (DirectoryTree->IsItemExpanded(InTreeNode))
@@ -164,7 +163,6 @@ namespace FW
                 SNew(STextBlock)
                 .Text(FText::FromString(FPaths::GetBaseFilename(InTreeNode->DirectoryPath)))
                 .Font(MoveTemp(DirectoryTextFont))
-                .ColorAndOpacity(DirectoryTextColor)
             ]
         );
 

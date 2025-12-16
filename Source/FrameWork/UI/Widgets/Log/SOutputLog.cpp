@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "SOutputLog.h"
 #include "UI/Styles/FAppCommonStyle.h"
-#include "UI/Widgets/Misc/SIconButton.h"
+#include "UI/Widgets/Misc/MiscWidget.h"
 
 #include <Misc/OutputDeviceHelper.h>
 #include <Framework/Text/SlateTextRun.h>

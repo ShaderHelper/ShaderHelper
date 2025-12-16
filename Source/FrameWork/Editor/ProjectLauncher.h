@@ -1,11 +1,12 @@
 #pragma once
-#include "UI/Widgets/Misc/SIconButton.h"
+#include "UI/Widgets/Misc/MiscWidget.h"
 #include "UI/Styles/FAppCommonStyle.h"
 #include "Common/Path/PathHelper.h"
-#include <DesktopPlatformModule.h>
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "ProjectManager/ProjectManager.h"
 #include "Editor.h"
+
+#include <DesktopPlatformModule.h>
 
 namespace FW
 {
@@ -121,7 +122,6 @@ namespace FW
 							.Visibility(EVisibility::Hidden)
 							.Icon(FAppStyle::Get().GetBrush("AppIcon.Small"))
 							.IconSize(FVector2D{ 16,16 })
-
 					];
 			};
 
@@ -135,7 +135,8 @@ namespace FW
 						.Label(FText::FromString(FPaths::GetCleanFilename(RecentProjcetPath)))
 						.ToolTipText(FText::FromString(RecentProjcetPath))
 						.Icon(FAppStyle::Get().GetBrush("AppIcon.Small"))
-						.IconSize(FVector2D{ 16,16 });
+						.IconSize(FVector2D{ 16,16 })
+						.IconColorAndOpacity(FStyleColors::White);
 
 					RecentProjcetButton->SetOnClicked(FOnClicked::CreateLambda(
 						[RecentProjcetButton = TWeakPtr<SIconButton>{ RecentProjcetButton }, RecentProjcetPath, InsertDummy, this] {

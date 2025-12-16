@@ -1,10 +1,11 @@
 #include "CommonHeader.h"
 #include "STimeline.h"
-#include "UI/Widgets/Misc/SIconButton.h"
+#include "UI/Widgets/Misc/MiscWidget.h"
 #include "UI/Styles/FAppCommonStyle.h"
+#include "App/App.h"
+
 #include <Widgets/Input/SNumericEntryBox.h>
 #include <Fonts/FontMeasure.h>
-#include "App/App.h"
 
 namespace FW
 {
@@ -187,7 +188,9 @@ namespace FW
                     LayerId,
                     AllottedGeometry.ToPaintGeometry(TextOffset, TextSize),
                     ValueString,
-                    Font
+                    Font,
+					ESlateDrawEffect::None,
+					FStyleColors::Foreground.GetColor(InWidgetStyle)
                 );
             }
             LinePoints[0] = FVector2D{XPos, YOffset};
@@ -197,7 +200,9 @@ namespace FW
                 OutDrawElements,
                 LayerId,
                 AllottedGeometry.ToPaintGeometry(),
-                LinePoints
+                LinePoints,
+				ESlateDrawEffect::None,
+				FStyleColors::Foreground.GetColor(InWidgetStyle)
             );
         }
         

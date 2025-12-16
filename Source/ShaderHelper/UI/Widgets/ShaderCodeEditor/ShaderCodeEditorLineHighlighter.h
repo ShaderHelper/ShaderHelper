@@ -57,7 +57,7 @@ namespace SH
 		{
 			const FVector2D Location(Line.Offset.X + OffsetX, Line.Offset.Y);
 
-			FLinearColor BackgroundColorAndOpacity = FLinearColor{ 0.1f, 0.1f, 0.1f, 0.8f };
+			FLinearColor BackgroundColorAndOpacity = FLinearColor{ 0.3f, 0.3f, 0.3f, 0.6f };
 			const float InverseScale = Inverse(AllottedGeometry.Scale);
 
 			FSlateDrawElement::MakeBox(

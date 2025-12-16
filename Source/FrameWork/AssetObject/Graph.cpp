@@ -151,7 +151,7 @@ namespace FW
 
 	FSlateColor GraphNode::GetNodeColor() const
 	{
-		return FStyleColors::Title;
+		return FStyleColors::Header;
 	}
 
     GraphPin* GraphNode::GetPin(FGuid Id)
