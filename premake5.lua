@@ -7,6 +7,7 @@ external_metalcpp = "External/metal-cpp"
 external_shaderConductor = "External/ShaderConductor"
 external_magicenum = "External/magic_enum"
 external_python = "External/Python"
+external_shaderc = "External/shaderc"
 
 project_shaderHelper = "Source/ShaderHelper"
 project_frameWork = "Source/FrameWork"
@@ -139,6 +140,7 @@ include(external_metalcpp)
 include(external_shaderConductor)
 include(external_magicenum)
 include(external_python)
+include(external_shaderc)
 
 include(project_shaderHelper)
 include(project_frameWork)

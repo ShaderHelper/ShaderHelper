@@ -361,6 +361,7 @@ namespace SH
         bool bKeyChar = false;
         //--------------------------------------------------------
 		bool bTryMergeUndoState = false;
-		
+		//If shortcut key is handled in OnKeyDown, prevent its character from leaking to OnKeyChar
+		bool bShortcutHandled = false;
 	};
 }

@@ -124,7 +124,7 @@ namespace SH
 						{
 							FString MatchedPunctuation;
 							LastState = StateSet::Start;
-							if (!bInComment && !bInMultilineComment && CurChar == TEXT('\\') && CurOffset == LineRange.EndIndex - 1)
+							if (CurChar == TEXT('\\') && CurOffset == LineRange.EndIndex - 1)
 							{
 								bLineContinuation = true;
 								CurOffset += 1;

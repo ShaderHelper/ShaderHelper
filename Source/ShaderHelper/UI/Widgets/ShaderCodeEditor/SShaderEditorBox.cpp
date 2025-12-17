@@ -2282,6 +2282,7 @@ constexpr int PaddingLineNum = 22;
 
     FReply SShaderEditorBox::HandleKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
     {
+		bShortcutHandled = false;
         const FKey Key = InKeyEvent.GetKey();
 		
 		const FTextSelection& Selection = ShaderMultiLineEditableText->GetSelection();
@@ -2294,12 +2295,14 @@ constexpr int PaddingLineNum = 22;
 
 		if (UICommandList->ProcessCommandBindings(InKeyEvent))
 		{
+			bShortcutHandled = true;
 			return FReply::Handled();
 		}
 		
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		if (ShEditor->GetUICommandList()->ProcessCommandBindings(InKeyEvent))
 		{
+			bShortcutHandled = true;
 			return FReply::Handled();
 		}
 		
@@ -2380,6 +2383,10 @@ constexpr int PaddingLineNum = 22;
     FReply SShaderEditorBox::HandleKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent)
     {
         TSharedPtr<SMultiLineEditableText> Text = ShaderMultiLineEditableText;
+		if (bShortcutHandled)
+		{
+			return FReply::Handled();
+		}
             
         if (Text->IsTextReadOnly())
         {
