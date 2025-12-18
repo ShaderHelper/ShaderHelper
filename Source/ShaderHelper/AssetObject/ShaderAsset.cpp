@@ -19,6 +19,5 @@ namespace SH
 		AssetObject::Serialize(Ar);
 		
 		Ar << EditorContent;
-		SavedEditorContent = EditorContent;
 	}
 }

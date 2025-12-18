@@ -21,7 +21,6 @@ namespace SH
 	public:
 		//Only visible content in editor
 		FString EditorContent;
-		FString SavedEditorContent;
 		TRefCountPtr<FW::GpuShader> Shader;
 		bool bCompilationSucceed{};
 		

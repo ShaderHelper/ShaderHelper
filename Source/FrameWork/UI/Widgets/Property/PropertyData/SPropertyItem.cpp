@@ -20,27 +20,27 @@ namespace FW
 		auto ItemTextBlock = SNew(SShInlineEditableTextBlock)
 			.IsReadOnly(!InArgs._OnDisplayNameChanged)
 			.Text_Lambda([this] {
-			return FText::FromString(*DisplayName);
-				})
+				return *DisplayName;
+			})
 			.OnTextCommitted_Lambda([this, InArgs](const FText& NewText, ETextCommit::Type) {
 			if (NewText.ToString().IsEmpty())
 			{
 				return;
 			}
-			if (*DisplayName != NewText.ToString() && InArgs._OnDisplayNameChanged)
+			if (!DisplayName->EqualTo(NewText) && InArgs._OnDisplayNameChanged)
 			{
 				if (InArgs._CanApplyName)
 				{
-					if (InArgs._CanApplyName(NewText.ToString()))
+					if (InArgs._CanApplyName(NewText))
 					{
-						*DisplayName = NewText.ToString();
-						InArgs._OnDisplayNameChanged(NewText.ToString());
+						*DisplayName = NewText;
+						InArgs._OnDisplayNameChanged(NewText);
 					}
 				}
 				else
 				{
-					*DisplayName = NewText.ToString();
-					InArgs._OnDisplayNameChanged(NewText.ToString());
+					*DisplayName = NewText;
+					InArgs._OnDisplayNameChanged(NewText);
 				}
 			}
 				})

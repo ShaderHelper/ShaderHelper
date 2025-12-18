@@ -217,6 +217,10 @@ namespace SH
         void SetFocus() {
             FSlateApplication::Get().SetUserFocus(0, ShaderMultiLineEditableText);
         }
+		void SetText(const FText& Text) { 
+			ShaderMarshaller->TextLayout->GetLineModels().Reset();
+			ShaderMultiLineEditableText->SetText(Text); 
+		};
         
         //If type a char, trigger KeyDown and then KeyChar.
 		FReply HandleKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent);

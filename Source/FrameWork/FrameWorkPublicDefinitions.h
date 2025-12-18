@@ -59,6 +59,28 @@ namespace FW
 #define LOCALIZATION(Key) \
 	FText::FromStringTable(TEXT("Localization"), Key)
 
+//Call this method to serialize FText instead of  Ar << FText
+inline void ShSerializeText(FArchive& Ar, FText& Value)
+{
+	bool IsFromStringTable = Value.IsFromStringTable();
+	Ar << IsFromStringTable;
+	if (IsFromStringTable)
+	{
+		FName TableId;
+		FString Key;
+		FTextInspector::GetTableIdAndKey(Value, TableId, Key);
+		Ar << TableId << Key;
+		if (Ar.IsLoading())
+		{
+			Value = FText::FromStringTable(TableId, Key);
+		}
+	}
+	else
+	{
+		Ar << Value;
+	}
+}
+
 #define UI_COMMAND_SH( CommandId, InLabel, InDescription, CommandType, InDefaultChord, ... )                                                            \
 	FUICommandInfo::MakeCommandInfo(                                                                                                                    \
 		this->AsShared(),                                                                                                                      \

@@ -540,6 +540,7 @@ namespace FW
 			.AutoHeight()
 			[
 				SNew(SSearchBox)
+				.HintText(LOCALIZATION("Search"))
 				.OnTextChanged_Lambda([this](const FText& InFilterText) {
 					GenerateMenuNodeItems(InFilterText);
 					MenuNodeList->RequestListRefresh();

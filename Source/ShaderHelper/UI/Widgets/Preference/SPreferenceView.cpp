@@ -208,6 +208,7 @@ namespace SH
 				.Padding(0, 0, 4, 0)
 				[
 					SNew(SSearchBox).MinDesiredWidth(120)
+					.HintText(LOCALIZATION("Search"))
 					.OnTextChanged_Lambda([this](const FText& InFilterText) {
 						GenerateKeyDatas(InFilterText);
 						KeyListView->RequestListRefresh();

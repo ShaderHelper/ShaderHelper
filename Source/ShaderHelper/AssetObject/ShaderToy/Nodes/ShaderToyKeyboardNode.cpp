@@ -11,9 +11,9 @@ namespace SH
 {
 	REFLECTION_REGISTER(AddClass<ShaderToyKeyboardNode>("Keyboard Node")
 		.BaseClass<GraphNode>()
-		.Data<&ShaderToyKeyboardNode::Format, MetaInfo::Property | MetaInfo::ReadOnly>("Format")
-		.Data<&ShaderToyKeyboardNode::Width, MetaInfo::Property | MetaInfo::ReadOnly>("Width")
-		.Data<&ShaderToyKeyboardNode::Height, MetaInfo::Property | MetaInfo::ReadOnly>("Height")
+		.Data<&ShaderToyKeyboardNode::Format, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("Format"))
+		.Data<&ShaderToyKeyboardNode::Width, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("Width"))
+		.Data<&ShaderToyKeyboardNode::Height, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("Height"))
 	)
 	REFLECTION_REGISTER(AddClass<ShaderToyKeyboardNodeOp>()
 		.BaseClass<ShObjectOp>()
@@ -34,7 +34,7 @@ namespace SH
 	ShaderToyKeyboardNode::ShaderToyKeyboardNode()
 	: Format(GpuTextureFormat::R8_UNORM), Width(256), Height(3)
 	{
-		ObjectName = FText::FromString("Keyboard");
+		ObjectName = LOCALIZATION("Keyboard");
 	}
 
 	ShaderToyKeyboardNode::~ShaderToyKeyboardNode()

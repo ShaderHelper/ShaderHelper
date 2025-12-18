@@ -62,6 +62,12 @@ namespace HLSL
 
 namespace FW
 {
+	enum class GpuShaderLanguage
+	{
+		HLSL,
+		GLSL
+	};
+
 	enum class GpuShaderCompilerFlag : uint32
 	{
 		None = 0,
@@ -96,6 +102,7 @@ namespace FW
         ShaderType Type;
         FString EntryPoint;
         FString ExtraDecl;
+		GpuShaderLanguage Language = GpuShaderLanguage::HLSL;
         TArray<FString> IncludeDirs = { 
             PathHelper::ShaderDir(), 
             FPaths::GetPath(*FileName)
@@ -108,6 +115,7 @@ namespace FW
         FString Source;
         ShaderType Type;
         FString EntryPoint;
+		GpuShaderLanguage Language = GpuShaderLanguage::HLSL;
         TArray<FString> IncludeDirs = { 
             PathHelper::ShaderDir() 
         };
@@ -143,6 +151,7 @@ namespace FW
         const FString& GetSourceText() const { return SourceText; }
 		const FString& GetProcessedSourceText() const { return ProcessedSourceText; }
         const FString& GetEntryPoint() const { return EntryPoint; }
+		GpuShaderLanguage GetShaderLanguage() const { return ShaderLanguage; }
 		GpuShaderModel GetShaderModelVer() const;
 
 		virtual TArray<GpuShaderLayoutBinding> GetLayout() const = 0;
@@ -155,7 +164,7 @@ namespace FW
         ShaderType Type;
         FString ShaderName;
         FString EntryPoint;
-        //Hlsl
+		GpuShaderLanguage ShaderLanguage;
         FString SourceText;
 		FString ProcessedSourceText;
         

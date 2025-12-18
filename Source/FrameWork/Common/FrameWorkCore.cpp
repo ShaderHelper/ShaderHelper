@@ -190,7 +190,7 @@ namespace FW
 	void ShObject::Serialize(FArchive& Ar)
 	{
 		Ar << Guid;
-		Ar << ObjectName;
+		ShSerializeText(Ar, ObjectName);
 	}
 
     void ShObject::PostLoad()

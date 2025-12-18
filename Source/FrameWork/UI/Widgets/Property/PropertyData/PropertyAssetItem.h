@@ -196,7 +196,7 @@ namespace FW
     {
         MANUAL_RTTI_TYPE(PropertyAssetItem, PropertyItemBase)
     public:
-        PropertyAssetItem(ShObject* InOwner, FString InName, MetaType* InAssetMetaType, void* InAssetPtrRef)
+        PropertyAssetItem(ShObject* InOwner, FText InName, MetaType* InAssetMetaType, void* InAssetPtrRef)
             : PropertyItemBase(InOwner, MoveTemp(InName))
             , AssetMetaType(InAssetMetaType)
             , AssetPtrRef(InAssetPtrRef)

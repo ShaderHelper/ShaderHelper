@@ -8,7 +8,8 @@ namespace FW
 	{
         MANUAL_RTTI_BASE_TYPE()
 	public:
-		PropertyData(ShObject* InOwner, FString InName)
+		PropertyData(ShObject* InOwner, const FString& InName) : PropertyData(InOwner, FText::FromString(InName)) {}
+		PropertyData(ShObject* InOwner, FText InName)
             : Owner(InOwner)
             , DisplayName(MoveTemp(InName))
 		{}
@@ -18,7 +19,7 @@ namespace FW
 		virtual TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) = 0;
 		void GetChildren(TArray<TSharedRef<PropertyData>>& OutChildren) const { OutChildren = Children; };
 		int32 GetChildrenNum() const { return Children.Num(); }
-		FString GetDisplayName() const { return DisplayName; }
+		FText GetDisplayName() const { return DisplayName; }
 
 		PropertyData* GetParent() const { return Parent; }
 
@@ -49,11 +50,12 @@ namespace FW
             });
 		}
         
-        TSharedPtr<PropertyData> GetData(const FString& InName) const
+		TSharedPtr<PropertyData> GetData(const FString& InName) const { return GetData(FText::FromString(InName)); }
+        TSharedPtr<PropertyData> GetData(const FText& InName) const
         {
             for(auto Child : Children)
             {
-                if(Child->GetDisplayName() == InName)
+                if(Child->GetDisplayName().EqualTo(InName))
                 {
                     return Child;
                 }
@@ -65,7 +67,7 @@ namespace FW
 
 	protected:
         ShObject* Owner;
-		FString DisplayName;
+		FText DisplayName;
 		PropertyData* Parent = nullptr;
 		TArray<TSharedRef<PropertyData>> Children;
 	};
@@ -74,7 +76,8 @@ namespace FW
 	{
         MANUAL_RTTI_TYPE(PropertyCategory, PropertyData)
 	public:
-		PropertyCategory(ShObject* InOwner, FString InName, bool IsComposite = false)
+		PropertyCategory(ShObject* InOwner, const FString& InName, bool IsComposite = false) : PropertyCategory(InOwner, FText::FromString(InName), IsComposite) {}
+		PropertyCategory(ShObject* InOwner, FText InName, bool IsComposite = false)
 		: PropertyData(InOwner, MoveTemp(InName))
 		, bComposite(IsComposite)
 		{
@@ -114,7 +117,7 @@ namespace FW
 		MANUAL_RTTI_TYPE(PropertyCustomWidget, PropertyData)
 	public:
 		PropertyCustomWidget(TSharedRef<SWidget> InCustomWidget)
-		: PropertyData(nullptr, "")
+		: PropertyData(nullptr, FText::GetEmpty())
 		, CustomWidget(InCustomWidget)
 		{
 			

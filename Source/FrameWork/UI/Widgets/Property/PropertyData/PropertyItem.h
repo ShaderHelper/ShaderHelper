@@ -16,8 +16,8 @@ namespace FW
         using PropertyData::PropertyData;
         
         void SetEnabled(bool Enabled) { IsEnabled = Enabled; }
-        void SetCanApplyName(const TFunction<bool(const FString&)>& CanApply) { CanApplyName = CanApply; }
-        void SetOnDisplayNameChanged(const TFunction<void(const FString&)>& DisplayNameChanged) { OnDisplayNameChanged = DisplayNameChanged; }
+        void SetCanApplyName(const TFunction<bool(const FText&)>& CanApply) { CanApplyName = CanApply; }
+        void SetOnDisplayNameChanged(const TFunction<void(const FText&)>& DisplayNameChanged) { OnDisplayNameChanged = DisplayNameChanged; }
         void SetEmbedWidget(TSharedPtr<SWidget> InWidget) { EmbedWidget = MoveTemp(InWidget); }
         void SetOnDelete(const TFunction<void()>& OnDeleteFunc) { OnDelete = OnDeleteFunc;}
         
@@ -73,15 +73,15 @@ namespace FW
         TFunction<void()> OnDelete;
         TSharedPtr<SWidget> EmbedWidget;
         TSharedPtr<SPropertyItem> Item;
-        TFunction<bool(const FString&)> CanApplyName;
-        TFunction<void(const FString&)> OnDisplayNameChanged;
+        TFunction<bool(const FText&)> CanApplyName;
+        TFunction<void(const FText&)> OnDisplayNameChanged;
     };
 
 	class PropertyEnumItem : public PropertyItemBase
 	{
 		MANUAL_RTTI_TYPE(PropertyEnumItem, PropertyItemBase)
 	public:
-		PropertyEnumItem(ShObject* InOwner, const FString& InName, TSharedPtr<FString> InEnumValueName,
+		PropertyEnumItem(ShObject* InOwner, const FText& InName, TSharedPtr<FString> InEnumValueName,
 						 const TMap<FString, TSharedPtr<void>>& InEnumEntries, const TFunction<void(void*)>& InSetter, bool InReadOnly = false)
 		: PropertyItemBase(InOwner, InName)
 		, EnumValueName(InEnumValueName)
@@ -98,15 +98,22 @@ namespace FW
 		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
 		{
 			auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
-			auto ValueWidget = SNew(SComboBox<TSharedPtr<FString>>)
+			SAssignNew(ValueWidget, SComboBox<TSharedPtr<FString>>)
 			.IsEnabled(!ReadOnly)
 			.OptionsSource(&EnumItems)
 			.OnSelectionChanged_Lambda([this](TSharedPtr<FString> InItem, ESelectInfo::Type){
-				if(*InItem != *EnumValueName && Owner->CanChangeProperty(this))
+				if(InItem && *InItem != *EnumValueName)
 				{
-					EnumValueName = InItem;
-					Setter(EnumEntries[*EnumValueName].Get());
-					Owner->PostPropertyChanged(this);
+					if (Owner->CanChangeProperty(this))
+					{
+						EnumValueName = InItem;
+						Setter(EnumEntries[*EnumValueName].Get());
+						Owner->PostPropertyChanged(this);
+					}
+					else
+					{
+						ValueWidget->SetSelectedItem(EnumValueName);
+					}
 				}
 			})
 			.OnGenerateWidget_Lambda([](TSharedPtr<FString> InItem){
@@ -117,11 +124,14 @@ namespace FW
 					return FText::FromString(*EnumValueName);
 				})
 			];
-			Item->AddWidget(MoveTemp(ValueWidget));
+			Item->AddWidget(ValueWidget);
 			return Row;
 		}
+
+		void* GetEnum() const { return EnumEntries[*EnumValueName].Get(); }
 		
 	private:
+		TSharedPtr<SComboBox<TSharedPtr<FString>> > ValueWidget;
 		TSharedPtr<FString> EnumValueName;
 		TMap<FString, TSharedPtr<void>> EnumEntries;
 		TFunction<void(void*)> Setter;
@@ -134,7 +144,10 @@ namespace FW
     {
         MANUAL_RTTI_TYPE(PropertyScalarItem<T>, PropertyItemBase)
     public:
-		PropertyScalarItem(ShObject* InOwner, FString InName, T* InValueRef = nullptr, bool InReadOnly = false)
+		PropertyScalarItem(ShObject* InOwner, const FString& InName, T* InValueRef = nullptr, bool InReadOnly = false) 
+			: PropertyScalarItem(InOwner, FText::FromString(InName), InValueRef, InReadOnly)
+		{}
+		PropertyScalarItem(ShObject* InOwner, FText InName, T* InValueRef = nullptr, bool InReadOnly = false)
             : PropertyItemBase(InOwner, MoveTemp(InName))
             , ValueRef(InValueRef)
 			, ReadOnly(InReadOnly)
@@ -176,7 +189,10 @@ namespace FW
     {
         MANUAL_RTTI_TYPE(PropertyVector2fItem, PropertyItemBase)
     public:
-        PropertyVector2fItem(ShObject* InOwner, FString InName, Vector2f* InValueRef = nullptr)
+		PropertyVector2fItem(ShObject* InOwner, const FString& InName, Vector2f* InValueRef = nullptr)
+			: PropertyVector2fItem(InOwner, FText::FromString(InName), InValueRef)
+		{}
+        PropertyVector2fItem(ShObject* InOwner, FText InName, Vector2f* InValueRef = nullptr)
             : PropertyItemBase(InOwner, MoveTemp(InName))
             , ValueRef(InValueRef)
         {}
@@ -225,7 +241,10 @@ namespace FW
 	{
 		MANUAL_RTTI_TYPE(PropertyVector3fItem, PropertyItemBase)
 	public:
-		PropertyVector3fItem(ShObject* InOwner, FString InName, Vector3f* InValueRef = nullptr)
+		PropertyVector3fItem(ShObject* InOwner, const FString& InName, Vector3f* InValueRef = nullptr)
+			: PropertyVector3fItem(InOwner, FText::FromString(InName), InValueRef)
+		{}
+		PropertyVector3fItem(ShObject* InOwner, FText InName, Vector3f* InValueRef = nullptr)
 			: PropertyItemBase(InOwner, MoveTemp(InName))
 			, ValueRef(InValueRef)
 		{}
@@ -286,7 +305,10 @@ namespace FW
 	{
 		MANUAL_RTTI_TYPE(PropertyVector4fItem, PropertyItemBase)
 	public:
-		PropertyVector4fItem(ShObject* InOwner, FString InName, Vector4f* InValueRef = nullptr)
+		PropertyVector4fItem(ShObject* InOwner, const FString& InName, Vector4f* InValueRef = nullptr)
+			: PropertyVector4fItem(InOwner, FText::FromString(InName), InValueRef)
+		{}
+		PropertyVector4fItem(ShObject* InOwner, FText InName, Vector4f* InValueRef = nullptr)
 			: PropertyItemBase(InOwner, MoveTemp(InName))
 			, ValueRef(InValueRef)
 		{

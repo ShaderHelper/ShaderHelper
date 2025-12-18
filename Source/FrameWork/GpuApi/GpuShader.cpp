@@ -206,6 +206,7 @@ namespace FW
 		: GpuResource(GpuResourceType::Shader)
 		, Type(FileDesc.Type)
 		, EntryPoint(FileDesc.EntryPoint)
+		, ShaderLanguage(FileDesc.Language)
         , FileName(FileDesc.FileName)
         , IncludeDirs(FileDesc.IncludeDirs)
 	{
@@ -220,6 +221,7 @@ namespace FW
 		, Type(SourceDesc.Type)
 		, ShaderName(SourceDesc.Name)
 		, EntryPoint(SourceDesc.EntryPoint)
+		, ShaderLanguage(SourceDesc.Language)
 		, SourceText(SourceDesc.Source)
         , IncludeDirs(SourceDesc.IncludeDirs)
 	{

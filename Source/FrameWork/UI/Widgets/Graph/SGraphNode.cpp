@@ -43,6 +43,7 @@ namespace FW
 					.Text_Lambda([this] { return NodeData->ObjectName; })
 					.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
 						NodeData->ObjectName = NewText;
+						NodeData->GetOuterMost()->MarkDirty();
 					})
 				]
 			]

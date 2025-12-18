@@ -8,7 +8,7 @@ namespace FW
 		SLATE_BEGIN_ARGS(SPropertyCatergory)
 		: _CategoryBrush(nullptr)
 		{}
-			SLATE_ARGUMENT(FString, DisplayName)
+			SLATE_ARGUMENT(FText, DisplayName)
 			SLATE_ARGUMENT(TSharedPtr<SWidget>, AddMenuWidget)
 			SLATE_ARGUMENT(bool, IsRootCategory)
 			SLATE_ARGUMENT( const FSlateBrush*, CategoryBrush )

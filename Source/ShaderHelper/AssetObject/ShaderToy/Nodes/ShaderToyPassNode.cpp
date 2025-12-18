@@ -20,8 +20,8 @@ namespace SH
 {
     REFLECTION_REGISTER(AddClass<ShaderToyPassNode>("ShaderPass Node")
 		.BaseClass<GraphNode>()
-        .Data<&ShaderToyPassNode::ShaderAssetObj, MetaInfo::Property>("Shader")
-		.Data<&ShaderToyPassNode::Format, MetaInfo::Property>("Format")
+        .Data<&ShaderToyPassNode::ShaderAssetObj, MetaInfo::Property>(LOCALIZATION("Shader"))
+		.Data<&ShaderToyPassNode::Format, MetaInfo::Property>(LOCALIZATION("Format"))
 		.Data<&ShaderToyPassNode::iChannelDesc0>("iChannel0")
 		.Data<&ShaderToyPassNode::iChannelDesc1>("iChannel1")
 		.Data<&ShaderToyPassNode::iChannelDesc2>("iChannel2")
@@ -31,8 +31,8 @@ namespace SH
         .BaseClass<ShObjectOp>()
     )
 	REFLECTION_REGISTER(AddClass<ShaderToyChannelDesc>()
-		.Data<&ShaderToyChannelDesc::Filter, MetaInfo::Property>("Filter Mode")
-		.Data<&ShaderToyChannelDesc::Wrap, MetaInfo::Property>("Wrap Mode")
+		.Data<&ShaderToyChannelDesc::Filter, MetaInfo::Property>(LOCALIZATION("FilterMode"))
+		.Data<&ShaderToyChannelDesc::Wrap, MetaInfo::Property>(LOCALIZATION("WrapMode"))
 	)
 
 	REGISTER_NODE_TO_GRAPH(ShaderToyPassNode, "ShaderToy Graph")
@@ -576,7 +576,7 @@ namespace SH
 
     TArray<TSharedRef<PropertyData>> ShaderToyPassNode::PropertyDatasFromBinding()
     {
-        auto BuiltInCategory = MakeShared<PropertyCategory>(this, "Built In");
+        auto BuiltInCategory = MakeShared<PropertyCategory>(this, LOCALIZATION("Builtin"));
         {
             const GpuBindGroupLayoutDesc& BuiltInLayoutDesc = StShader::GetBuiltInBindLayoutBuilder().GetDesc();
             for(const auto& [BindingName, Slot] : BuiltInLayoutDesc.CodegenBindingNameToSlot)
@@ -606,7 +606,7 @@ namespace SH
             BuiltInCategory->AddChild(MoveTemp(SlotCategory));
         }
         
-        auto CustomCategory = MakeShared<PropertyCategory>(this, "Custom");
+        auto CustomCategory = MakeShared<PropertyCategory>(this, LOCALIZATION("Custom"));
         {
             const GpuBindGroupLayoutDesc& CustomLayoutDesc = ShaderAssetObj->CustomBindGroupLayoutBuilder.GetDesc();
             for(const auto& [BindingName, Slot] : CustomLayoutDesc.CodegenBindingNameToSlot)
@@ -628,7 +628,7 @@ namespace SH
 
 	bool ShaderToyPassNode::CanChangeProperty(PropertyData* InProperty)
 	{
-		if(InProperty->GetDisplayName() == "Shader")
+		if(InProperty->GetDisplayName().EqualTo(LOCALIZATION("Shader")))
 		{
 			if(ShaderAssetObj)
 			{
@@ -644,7 +644,7 @@ namespace SH
 		GraphNode::PostPropertyChanged(InProperty);
         
         //Shader asset changed.
-        if(InProperty->IsOfType<PropertyAssetItem>() && InProperty->GetDisplayName() == "Shader")
+        if(InProperty->IsOfType<PropertyAssetItem>() && InProperty->GetDisplayName().EqualTo(LOCALIZATION("Shader")))
         {
 			ShaderAssetObj->OnDestroy.AddRaw(this, &ShaderToyPassNode::ClearBindingProperty);
 			ShaderAssetObj->OnRefreshBuilder.AddRaw(this, &ShaderToyPassNode::RefreshProperty, true);

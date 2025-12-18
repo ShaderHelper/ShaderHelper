@@ -31,7 +31,7 @@ namespace SH
 
 	ShaderToyPreviousFrameNode::ShaderToyPreviousFrameNode()
 	{
-		ObjectName = FText::FromString("Previous Frame");
+		ObjectName = LOCALIZATION("PreviousFrame");
 	}
 
 	ShaderToyPreviousFrameNode::~ShaderToyPreviousFrameNode()

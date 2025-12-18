@@ -13,10 +13,10 @@ namespace SH
 {
 	REFLECTION_REGISTER(AddClass<Texture2dNode>("Texture2d Node")
 		.BaseClass<GraphNode>()
-		.Data<&Texture2dNode::Texture, MetaInfo::Property>("Texture")
-		.Data<&Texture2dNode::Format, MetaInfo::Property | MetaInfo::ReadOnly>("Format")
-		.Data<&Texture2dNode::Width, MetaInfo::Property | MetaInfo::ReadOnly>("Width")
-		.Data<&Texture2dNode::Height, MetaInfo::Property | MetaInfo::ReadOnly>("Height")
+		.Data<&Texture2dNode::Texture, MetaInfo::Property>(LOCALIZATION("Texture"))
+		.Data<&Texture2dNode::Format, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("Format"))
+		.Data<&Texture2dNode::Width, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("Width"))
+		.Data<&Texture2dNode::Height, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("Height"))
 	)
 	REFLECTION_REGISTER(AddClass<Texture2dNodeOp>()
 		.BaseClass<ShObjectOp>()
@@ -37,7 +37,7 @@ namespace SH
 
 	Texture2dNode::Texture2dNode()
 	{
-		ObjectName = FText::FromString("Texture2d");
+		ObjectName = LOCALIZATION("Texture2d");
 	}
 
 	Texture2dNode::~Texture2dNode()
@@ -217,7 +217,7 @@ namespace SH
 		ShObject::PostPropertyChanged(InProperty);
 		
 		//Texture asset changed.
-		if(InProperty->GetDisplayName() == "Texture")
+		if(InProperty->GetDisplayName().EqualTo(LOCALIZATION("Texture")))
 		{
 			InitTexture();
 			RefreshProprety();

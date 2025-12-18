@@ -2140,7 +2140,7 @@ constexpr int PaddingLineNum = 22;
 			}
 			CurEditState = EditState::Editing;
 			ShaderAssetObj->EditorContent = NewShaderSource;
-			ShaderAssetObj->MarkDirty(NewShaderSource != ShaderAssetObj->SavedEditorContent);
+			ShaderAssetObj->MarkDirty();
         }
         
         CurrentShaderSource = NewShaderSource;

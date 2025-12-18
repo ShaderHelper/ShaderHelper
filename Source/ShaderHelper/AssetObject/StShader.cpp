@@ -6,6 +6,7 @@
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "UI/Widgets/Property/PropertyData/PropertyItem.h"
+#include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 #include "RenderResource/PrintBuffer.h"
 
 using namespace FW;
@@ -24,6 +25,18 @@ R"(void mainImage(out float4 fragColor,in float2 fragCoord)
     PrintAtMouse("fragColor:{0}", fragColor);
 })";
 
+const FString DefaultGLSLPixelShaderBody =
+R"(void mainImage(out vec4 fragColor,in vec2 fragCoord)
+{
+    vec2 uv = fragCoord / iResolution.xy;
+    // Assert(uv.x > 0.9, "uv.x must be greater than 0.9");
+    vec3 col = 0.5 + 0.5*cos(iTime + uv.xyx + vec3(0,2,4));
+    
+    fragColor = vec4(uv,0,1);
+    
+    PrintAtMouse("fragColor:{0}", fragColor);
+})";
+
 const FString DefaultVertexShader =
 R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 {
@@ -31,12 +44,13 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
     Pos = float4(lerp(float2(-1, 1), float2(1, -1), uv), 0, 1);
 })";
 
-
     REFLECTION_REGISTER(AddClass<StShader>("ShaderToy Shader")
-                                .BaseClass<ShaderAsset>()
+                            .BaseClass<ShaderAsset>()
+							.Data<&StShader::Language, MetaInfo::Property>(LOCALIZATION("Language"))
 	)
 
 	StShader::StShader()
+		: Language(GpuShaderLanguage::HLSL)
 	{
         EditorContent = DefaultPixelShaderBody;
 	}
@@ -49,7 +63,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 	void StShader::Serialize(FArchive& Ar)
 	{
 		ShaderAsset::Serialize(Ar);
-		
+		Ar << Language;
         Ar << CustomUniformBufferBuilder << CustomBindGroupLayoutBuilder;
 	}
 
@@ -189,7 +203,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
             CustomUniformCategory->GetChildren(UniformDatas);
             for(auto UniformData : UniformDatas)
             {
-                FString MemberName = UniformData->GetDisplayName();
+                FString MemberName = UniformData->GetDisplayName().ToString();
                 if(UniformData->IsOfType<PropertyScalarItem<float>>())
                 {
                     NewCustomUniformBufferBuilder.AddFloat(MemberName);
@@ -224,7 +238,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         BuiltInUniformCategory->GetChildren(BindingDatas);
         for(const auto& Data: BindingDatas)
         {
-            if(Data->GetDisplayName() == InName)
+            if(Data->GetDisplayName().ToString() == InName)
             {
                 return true;
             }
@@ -233,7 +247,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         BuiltInSlotCategory->GetChildren(BindingDatas);
         for(const auto& Data: BindingDatas)
         {
-            if(Data->GetDisplayName() == InName)
+            if(Data->GetDisplayName().ToString() == InName)
             {
                 return true;
             }
@@ -245,7 +259,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
             CustomUniformCategory->GetChildren(BindingDatas);
             for(const auto& Data: BindingDatas)
             {
-                if(Data->GetDisplayName() == InName)
+                if(Data->GetDisplayName().ToString() == InName)
                 {
                     return true;
                 }
@@ -284,8 +298,8 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         }
         NewUniformProperty->SetEnabled(Enabled);
         NewUniformProperty->SetEmbedWidget(TypeInfoWidget);
-        NewUniformProperty->SetCanApplyName([this](const FString& NewUniformMemberName){
-            if(!HasBindingName(NewUniformMemberName))
+        NewUniformProperty->SetCanApplyName([this](const FText& NewUniformMemberName){
+            if(!HasBindingName(NewUniformMemberName.ToString()))
             {
                 return true;
             }
@@ -295,7 +309,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
                 return false;
             }
         });
-        NewUniformProperty->SetOnDisplayNameChanged([this](const FString&){
+        NewUniformProperty->SetOnDisplayNameChanged([this](const FText&){
             RefreshBuilder();
             MarkDirty();
         });
@@ -383,7 +397,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 
     TArray<TSharedRef<PropertyData>> StShader::PropertyDatasFromBinding()
     {
-        BuiltInCategory = MakeShared<PropertyCategory>(this, "Built In");
+        BuiltInCategory = MakeShared<PropertyCategory>(this, LOCALIZATION("Builtin"));
         {
             const GpuBindGroupLayoutDesc& BuiltInLayoutDesc = GetBuiltInBindLayoutBuilder().GetDesc();
             for(const auto& [BindingName, Slot] : BuiltInLayoutDesc.CodegenBindingNameToSlot)
@@ -417,7 +431,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
             BuiltInCategory->AddChild(MoveTemp(SlotCategory));
         }
         
-        CustomCategory = MakeShared<PropertyCategory>(this, "Custom");
+        CustomCategory = MakeShared<PropertyCategory>(this, LOCALIZATION("Custom"));
         {
             const GpuBindGroupLayoutDesc& CustomLayoutDesc = CustomBindGroupLayoutBuilder.GetDesc();
             for(const auto& [BindingName, Slot] : CustomLayoutDesc.CodegenBindingNameToSlot)
@@ -438,13 +452,45 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         return {BuiltInCategory.ToSharedRef(), CustomCategory.ToSharedRef()};
     }
 
-    TArray<TSharedRef<PropertyData>>* StShader::GetPropertyDatas()
+	bool StShader::CanChangeProperty(FW::PropertyData* InProperty)
+	{
+		if (InProperty->IsOfType<PropertyEnumItem>() && InProperty->GetDisplayName().EqualTo(LOCALIZATION("Language")))
+		{
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			auto Ret = MessageDialog::Open(MessageDialog::OkCancel, MessageDialog::Shocked, ShEditor->GetMainWindow(), LOCALIZATION("ShaderLanguageTip"));
+			if (Ret == MessageDialog::MessageRet::Cancel)
+			{
+				return false;
+			}
+		}
+		return true;
+	
+	}
+	void StShader::PostPropertyChanged(FW::PropertyData* InProperty)
+	{
+		if (InProperty->IsOfType<PropertyEnumItem>() && InProperty->GetDisplayName().EqualTo(LOCALIZATION("Language")))
+		{
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			GpuShaderLanguage NewLanguage = *static_cast<GpuShaderLanguage*>(static_cast<PropertyEnumItem*>(InProperty)->GetEnum());
+			if (NewLanguage == GpuShaderLanguage::HLSL)
+			{
+				ShEditor->GetShaderEditor(this)->SetText(FText::FromString(DefaultPixelShaderBody));
+			}
+			else if(NewLanguage == GpuShaderLanguage::GLSL)
+			{
+				ShEditor->GetShaderEditor(this)->SetText(FText::FromString(DefaultGLSLPixelShaderBody));
+			}
+		}
+	}
+
+	TArray<TSharedRef<PropertyData>>* StShader::GetPropertyDatas()
     {
-        if(PropertyDatas.IsEmpty())
-        {
-            PropertyDatas = PropertyDatasFromBinding();
-        }
-        return &PropertyDatas;
+		if (PropertyDatas.IsEmpty())
+		{
+			ShObject::GetPropertyDatas();
+			PropertyDatas.Append(PropertyDatasFromBinding());
+		}
+		return &PropertyDatas;
     }
 
 }
