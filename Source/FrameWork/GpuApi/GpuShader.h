@@ -11,29 +11,53 @@ inline DEFINE_LOG_CATEGORY(LogShader);
 
 namespace HLSL
 {
-    enum class CandidateKind
-    {
-        Unknown,
-        Kword,
-        Var,
-        Func,
-        Macro,
-        Type
-    };
+    extern FRAMEWORK_API TArray<FString> BuiltinTypes;
+    extern FRAMEWORK_API TArray<FString> KeyWords;
+    extern FRAMEWORK_API TArray<FString> BuiltinFuncs;
+}
 
-	enum class TokenType
+namespace GLSL
+{
+	extern FRAMEWORK_API TArray<FString> BuiltinTypes;
+	extern FRAMEWORK_API TArray<FString> KeyWords;
+	extern FRAMEWORK_API TArray<FString> BuiltinFuncs;
+}
+
+namespace FW
+{
+	inline const TCHAR* Punctuations[] = {
+		TEXT(":"), TEXT("+="), TEXT("++"), TEXT("+"), TEXT("--"), TEXT("-="), TEXT("-"), TEXT("("),
+		TEXT(")"), TEXT("["), TEXT("]"), TEXT("."), TEXT("->"), TEXT("!="), TEXT("!"),
+		TEXT("&="), TEXT("~"), TEXT("&"), TEXT("*="), TEXT("*"), TEXT("->"), TEXT("/="),
+		TEXT("/"), TEXT("%="), TEXT("%"), TEXT("<<="), TEXT("<<"), TEXT("<="),
+		TEXT("<"), TEXT(">>="), TEXT(">>"), TEXT(">="), TEXT(">"), TEXT("=="), TEXT("&&"),
+		TEXT("&"), TEXT("^="), TEXT("^"), TEXT("|="), TEXT("||"), TEXT("|"), TEXT("?"),
+		TEXT("="), TEXT(","), TEXT(";"), TEXT("{"), TEXT("}"), TEXT("//"), TEXT("/*"), TEXT("*/")
+	};
+
+	enum class ShaderCandidateKind
+	{
+		Unknown,
+		Kword,
+		Var,
+		Func,
+		Macro,
+		Type
+	};
+
+	enum class ShaderTokenType
 	{
 		//Tokenizer
 		Number,
-		Keyword,
 		Punctuation,
-		BuildtinFunc,
-		BuildtinType,
 		Identifier,
 		Comment,
 		String,
-		
+
 		//Parser
+		Keyword,
+		BuildtinFunc,
+		BuildtinType,
 		Func,
 		Type,
 		Parm,
@@ -42,26 +66,9 @@ namespace HLSL
 
 		Preprocess,
 		Other,
-		
+
 	};
 
-    inline const TCHAR* Punctuations[] = {
-        TEXT(":"), TEXT("+="), TEXT("++"), TEXT("+"), TEXT("--"), TEXT("-="), TEXT("-"), TEXT("("),
-		TEXT(")"), TEXT("["), TEXT("]"), TEXT("."), TEXT("->"), TEXT("!="), TEXT("!"),
-		TEXT("&="), TEXT("~"), TEXT("&"), TEXT("*="), TEXT("*"), TEXT("->"), TEXT("/="),
-		TEXT("/"), TEXT("%="), TEXT("%"), TEXT("<<="), TEXT("<<"), TEXT("<="),
-		TEXT("<"), TEXT(">>="), TEXT(">>"), TEXT(">="), TEXT(">"), TEXT("=="), TEXT("&&"),
-		TEXT("&"), TEXT("^="), TEXT("^"), TEXT("|="), TEXT("||"), TEXT("|"), TEXT("?"),
-		TEXT("="), TEXT(","), TEXT(";"), TEXT("{"), TEXT("}"), TEXT("//"), TEXT("/*"), TEXT("*/")
-    };
-
-    extern FRAMEWORK_API TArray<FString> BuiltinTypes;
-    extern FRAMEWORK_API TArray<FString> KeyWords;
-    extern FRAMEWORK_API TArray<FString> BuiltinFuncs;
-}
-
-namespace FW
-{
 	enum class GpuShaderLanguage
 	{
 		HLSL,
@@ -181,7 +188,7 @@ namespace FW
 
     struct ShaderCandidateInfo
     {
-        HLSL::CandidateKind Kind;
+        ShaderCandidateKind Kind;
         FString Text;
         
         bool operator==(const ShaderCandidateInfo& Other) const
@@ -225,22 +232,31 @@ namespace FW
 	};
 
 	FRAMEWORK_API FString AdjustDiagLineNumber(const FString& ErrorInfo, int32 Delta);
-    FRAMEWORK_API TArray<ShaderCandidateInfo> DefaultCandidates();
+    FRAMEWORK_API TArray<ShaderCandidateInfo> DefaultCandidates(GpuShaderLanguage Language);
 
     class FRAMEWORK_API ShaderTU
     {
+	protected:
+		ShaderTU(const FString& InShaderSource);
+
     public:
-		ShaderTU();
-		ShaderTU(FStringView HlslSource, const TArray<FString>& IncludeDirs = {});
-		TArray<ShaderDiagnosticInfo> GetDiagnostic();
-		HLSL::TokenType GetTokenType(HLSL::TokenType InType, uint32 Row, uint32 Col);
-        TArray<ShaderCandidateInfo> GetCodeComplete(uint32 Row, uint32 Col);
-		TArray<ShaderFunc> GetFuncs();
-		TArray<ShaderOccurrence> GetOccurrences(uint32 Row, uint32 Col);
-		TArray<ShaderScope> GetScopes();
+		static TUniquePtr<ShaderTU> Create(const FString& InShaderSource, GpuShaderLanguage Language, const TArray<FString>& IncludeDirs = {});
+		virtual ~ShaderTU() = default;
+
+		virtual TArray<ShaderDiagnosticInfo> GetDiagnostic() = 0;
+		virtual ShaderTokenType GetTokenType(ShaderTokenType InType, uint32 Row, uint32 Col, uint32 Size) = 0;
+		virtual TArray<ShaderCandidateInfo> GetCodeComplete(uint32 Row, uint32 Col) = 0;
+		virtual TArray<ShaderOccurrence> GetOccurrences(uint32 Row, uint32 Col) = 0;
+
+		const TArray<ShaderFunc>& GetFuncs() const { return Funcs; };
+		const TArray<ShaderScope>& GetScopes() const { return Scopes; };
+		FString GetStr(uint32 Row, uint32 Col, uint32 Size) const { return ShaderSource.Mid(LineRanges[Row - 1].BeginIndex + Col - 1, Size); }
         
-    private:
-        TPimplPtr<struct ShaderTUImpl> Impl;
+    protected:
+		FString ShaderSource;
+		TArray<FTextRange> LineRanges;
+		TArray<ShaderFunc> Funcs;
+		TArray<ShaderScope> Scopes;
     };
 
 }

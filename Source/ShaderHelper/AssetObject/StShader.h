@@ -14,7 +14,7 @@ namespace SH
 		~StShader();
         
 		FW::GpuShader* GetPixelShader() const { return Shader; }
-		static FW::GpuShader* GetVertexShader();
+		FW::GpuShader* GetVertexShader();
         static FW::UniformBuffer* GetBuiltInUb();
         static FW::UniformBufferBuilder& GetBuiltInUbBuilder();
         static FW::GpuBindGroupLayout* GetBuiltInBindLayout();

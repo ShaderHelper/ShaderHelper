@@ -1,9 +1,11 @@
 #include "CommonHeader.h"
 #include "Dx12Shader.h"
 #include "Common/Path/PathHelper.h"
-#include <Misc/FileHelper.h>
 #include "GpuApi/GpuFeature.h"
 #include "ShaderConductor.hpp"
+#include "shaderc/shaderc.hpp"
+
+#include <Misc/FileHelper.h>
 
 namespace FW
 {
@@ -177,9 +179,19 @@ namespace FW
 
 	 bool DxcCompiler::Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs) const
 	 {
+		 FString HlslSource;
+		 if (InShader->GetShaderLanguage() == GpuShaderLanguage::GLSL)
+		 {
+
+		 }
+		 else
+		 {
+			 HlslSource = InShader->GetProcessedSourceText();
+		 }
+
 		TRefCountPtr<IDxcBlobEncoding> BlobEncoding;
 		TRefCountPtr<IDxcResult> CompileResult;
-		auto SourceText = StringCast<UTF8CHAR>(*InShader->GetProcessedSourceText());
+		auto SourceText = StringCast<UTF8CHAR>(*HlslSource);
 		DxCheck(CompilerUitls->CreateBlobFromPinned(SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR), CP_UTF8, BlobEncoding.GetInitReference()));
 
 		TArray<const TCHAR*> Arguments;
@@ -240,7 +252,7 @@ namespace FW
 #if DEBUG_SHADER
 		if (!ShaderName.IsEmpty())
 		{
-			FFileHelper::SaveStringToFile(InShader->GetProcessedSourceText(), *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl"));
+			FFileHelper::SaveStringToFile(HlslSource, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl"));
 		}
 #endif
 

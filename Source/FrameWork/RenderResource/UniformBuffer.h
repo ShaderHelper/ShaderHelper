@@ -1,5 +1,6 @@
 #pragma once
 #include "GpuApi/GpuRhi.h"
+#include "GpuApi/GpuShader.h"
 #include <string_view>
 
 namespace FW
@@ -8,11 +9,17 @@ namespace FW
 	{
 		uint32 Offset;
         uint32 Size;
-        FString TypeName;
+        FString HlslTypeName;
+        FString GlslTypeName;
+        
+        FString GetTypeName(GpuShaderLanguage Language = GpuShaderLanguage::HLSL) const
+        {
+            return Language == GpuShaderLanguage::GLSL ? GlslTypeName : HlslTypeName;
+        }
         
         friend FArchive& operator<<(FArchive& Ar, UniformBufferMemberInfo& Info)
         {
-            Ar << Info.Offset << Info.Size << Info.TypeName;
+            Ar << Info.Offset << Info.Size << Info.HlslTypeName << Info.GlslTypeName;
             return Ar;
         }
 	};
@@ -20,8 +27,14 @@ namespace FW
 	struct UniformBufferMetaData
 	{
 		TMap<FString, UniformBufferMemberInfo> Members;
-		FString UniformBufferDeclaration;
+		FString HlslDeclaration;
+		FString GlslDeclaration;
 		uint32 UniformBufferSize = 0;
+		
+		FString GetDeclaration(GpuShaderLanguage Language = GpuShaderLanguage::HLSL) const
+		{
+			return Language == GpuShaderLanguage::GLSL ? GlslDeclaration : HlslDeclaration;
+		}
 	};
 
     template<typename T>
@@ -76,8 +89,8 @@ namespace FW
             return {ReadableBackBuffer, WriteCombinedBuffer, MemberOffset };
 		}
 
-		FString GetDeclaration() const {
-			return MetaData.UniformBufferDeclaration;
+		FString GetDeclaration(GpuShaderLanguage Language = GpuShaderLanguage::HLSL) const {
+			return MetaData.GetDeclaration(Language);
 		}
 
 		GpuBuffer* GetGpuResource() const { return WriteCombinedBuffer; }
@@ -109,8 +122,8 @@ namespace FW
                 if(HasMember(MemberName))
                 {
                     uint32 MemberSize = MetaData.Members[MemberName].Size;
-					FString MemberTypeName = MetaData.Members[MemberName].TypeName;
-					if(MemberSize == MemberInfo.Size && MemberTypeName == MemberInfo.TypeName)
+					FString MemberHlslTypeName = MetaData.Members[MemberName].HlslTypeName;
+					if(MemberSize == MemberInfo.Size && MemberHlslTypeName == MemberInfo.HlslTypeName)
 					{
 						uint32 DstMemberOffset = MetaData.Members[MemberName].Offset;
 						void* DstMemberWritableData = (uint8*)GetWriteCombinedData() + DstMemberOffset;
@@ -135,11 +148,11 @@ namespace FW
 	};
 
 	template<typename T> struct UniformBufferMemberTypeString;
-	template<> struct UniformBufferMemberTypeString<uint32> { static constexpr std::string_view Value = "uint"; };
-	template<> struct UniformBufferMemberTypeString<float> { static constexpr std::string_view Value = "float"; };
-	template<> struct UniformBufferMemberTypeString<Vector2f> { static constexpr std::string_view Value = "float2"; };
-	template<> struct UniformBufferMemberTypeString<Vector3f> { static constexpr std::string_view Value = "float3"; };
-	template<> struct UniformBufferMemberTypeString<Vector4f> { static constexpr std::string_view Value = "float4"; };
+	template<> struct UniformBufferMemberTypeString<uint32> { static constexpr std::string_view Value = "uint"; static constexpr std::string_view GlslValue = "uint"; };
+	template<> struct UniformBufferMemberTypeString<float> { static constexpr std::string_view Value = "float"; static constexpr std::string_view GlslValue = "float"; };
+	template<> struct UniformBufferMemberTypeString<Vector2f> { static constexpr std::string_view Value = "float2"; static constexpr std::string_view GlslValue = "vec2"; };
+	template<> struct UniformBufferMemberTypeString<Vector3f> { static constexpr std::string_view Value = "float3"; static constexpr std::string_view GlslValue = "vec3"; };
+	template<> struct UniformBufferMemberTypeString<Vector4f> { static constexpr std::string_view Value = "float4"; static constexpr std::string_view GlslValue = "vec4"; };
 
 	enum class UniformBufferUsage : uint32
 	{
@@ -156,15 +169,19 @@ namespace FW
 		UniformBufferBuilder(UniformBufferUsage InUsage)
 			: Usage(InUsage)
 		{
-			DeclarationHead = TEXT("cbuffer {0} {\n");
-			DeclarationEnd = TEXT("};\n");
+			HlslDeclarationHead = TEXT("cbuffer {0} : register(b{1}, space{2}) {\n");
+			HlslDeclarationEnd = TEXT("};\n");
+
+			GlslDeclarationHead = TEXT("layout(std140, binding = {1}, set = {2}) {0} {\n");
+			GlslDeclarationEnd = TEXT("};\n");
 		}
         
         friend FArchive& operator<<(FArchive& Ar, UniformBufferBuilder& UbBuilder)
         {
             Ar << UbBuilder.Usage;
-            Ar << UbBuilder.DeclarationHead << UbBuilder.UniformBufferBody << UbBuilder.DeclarationEnd;
-            Ar << UbBuilder.MetaData.Members << UbBuilder.MetaData.UniformBufferDeclaration << UbBuilder.MetaData.UniformBufferSize;
+            Ar << UbBuilder.HlslDeclarationHead << UbBuilder.HlslUniformBufferBody << UbBuilder.HlslDeclarationEnd;
+            Ar << UbBuilder.GlslDeclarationHead << UbBuilder.GlslUniformBufferBody << UbBuilder.GlslDeclarationEnd;
+            Ar << UbBuilder.MetaData.Members << UbBuilder.MetaData.HlslDeclaration << UbBuilder.MetaData.GlslDeclaration << UbBuilder.MetaData.UniformBufferSize;
             return Ar;
         }
 
@@ -199,9 +216,13 @@ namespace FW
 			return *this;
 		}
 
-		FString GetLayoutDeclaration() const
+		FString GetLayoutDeclaration(GpuShaderLanguage Language = GpuShaderLanguage::HLSL) const
 		{
-			return DeclarationHead + UniformBufferBody + DeclarationEnd;
+			if (Language == GpuShaderLanguage::GLSL)
+			{
+				return GlslDeclarationHead + GlslUniformBufferBody + GlslDeclarationEnd;
+			}
+			return HlslDeclarationHead + HlslUniformBufferBody + HlslDeclarationEnd;
 		}
         const UniformBufferMetaData& GetMetaData() const { return MetaData; }
         
@@ -209,7 +230,8 @@ namespace FW
             if(MetaData.UniformBufferSize > 0)
             {
 				TRefCountPtr<GpuBuffer> Buffer = GGpuRhi->CreateBuffer({ MetaData.UniformBufferSize, (GpuBufferUsage)Usage });
-                MetaData.UniformBufferDeclaration = GetLayoutDeclaration();
+                MetaData.HlslDeclaration = GetLayoutDeclaration(GpuShaderLanguage::HLSL);
+                MetaData.GlslDeclaration = GetLayoutDeclaration(GpuShaderLanguage::GLSL);
                 return MakeUnique<UniformBuffer>( MoveTemp(Buffer), MetaData);
             }
             return {};
@@ -233,7 +255,8 @@ namespace FW
 			{
 				while (SizeAfterAligning > SizeBeforeAligning)
 				{
-					UniformBufferBody += FString::Printf(TEXT("float {0}_Padding_%d;\n"), SizeBeforeAligning);
+					HlslUniformBufferBody += FString::Printf(TEXT("float {0}_Padding_%d;\n"), SizeBeforeAligning);
+					GlslUniformBufferBody += FString::Printf(TEXT("float {0}_Padding_%d;\n"), SizeBeforeAligning);
 					SizeBeforeAligning += 4;
 				}
 				MetaData.UniformBufferSize = SizeAfterAligning + MemberSize;
@@ -243,16 +266,20 @@ namespace FW
 				MetaData.UniformBufferSize += MemberSize;
 			}
 
-            FString TypeName = ANSI_TO_TCHAR(UniformBufferMemberTypeString<T>::Value.data());
-			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize - MemberSize, MemberSize, TypeName});
+            FString HlslTypeName = ANSI_TO_TCHAR(UniformBufferMemberTypeString<T>::Value.data());
+            FString GlslTypeName = ANSI_TO_TCHAR(UniformBufferMemberTypeString<T>::GlslValue.data());
+			MetaData.Members.Add(MemberName, { MetaData.UniformBufferSize - MemberSize, MemberSize, HlslTypeName, GlslTypeName });
 
-			UniformBufferBody += FString::Printf(TEXT("%s %s;\n"), *TypeName, *MemberName);
+			HlslUniformBufferBody += FString::Printf(TEXT("%s %s;\n"), *HlslTypeName, *MemberName);
+			GlslUniformBufferBody += FString::Printf(TEXT("%s %s;\n"), *GlslTypeName, *MemberName);
 		}
 		
 	private:
 		UniformBufferUsage Usage;
-		FString DeclarationHead, DeclarationEnd;
-		FString UniformBufferBody;
+		FString HlslDeclarationHead, HlslDeclarationEnd;
+		FString GlslDeclarationHead, GlslDeclarationEnd;
+		FString HlslUniformBufferBody;
+		FString GlslUniformBufferBody;
 		UniformBufferMetaData MetaData;
 	};
 }

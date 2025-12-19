@@ -22,14 +22,14 @@ namespace FW
 
 		BindGroupLayout = GpuBindGroupLayoutBuilder{ BindingContext::ShaderSlot }
 			.AddExistingBinding(0, InType, BindingShaderStage::Compute)
-			.AddUniformBuffer("ClearUb", ClearUbBuilder.GetLayoutDeclaration(), BindingShaderStage::Compute)
+			.AddUniformBuffer("ClearUb", ClearUbBuilder, BindingShaderStage::Compute)
 			.Build();
 
 		Cs = GGpuRhi->CreateShaderFromFile({
 			.FileName = PathHelper::ShaderDir() / "Clear.hlsl",
 			.Type = ShaderType::ComputeShader,
 			.EntryPoint = "ClearCS",
-			.ExtraDecl = BindGroupLayout->GetCodegenDeclaration()
+			.ExtraDecl = BindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL)
 		});
 
 		FString ErrorInfo, WarnInfo;

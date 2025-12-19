@@ -79,7 +79,7 @@ namespace SH
 			InternalBorder->SetHAlign(HAlign_Center);
 			InternalBorder->SetContent(
 				   SNew(SImage)
-				   .ColorAndOpacity(FStyleColors::Foreground)
+				   .ColorAndOpacity(FLinearColor::Green)
 				   .Visibility_Lambda([this]{
 					   if(Owner->ActiveData == Data)
 					   {

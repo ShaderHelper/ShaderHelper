@@ -454,6 +454,17 @@ namespace SH
 			})
 		];
 
+		AppendCodeEditorItem(CodeEditorGrid, LOCALIZATION("HighlightCursorLine"))
+		[
+			SNew(SCheckBox).IsChecked_Lambda([] {
+				return SShaderEditorBox::CanHighlightCursorLine() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;;
+			})
+			.OnCheckStateChanged_Lambda([](ECheckBoxState InState) {
+				Editor::GetEditorConfig()->SetBool(TEXT("CodeEditor"), TEXT("HighlightCursorLine"), InState == ECheckBoxState::Checked);
+				Editor::SaveEditorConfig();
+			})
+		];
+
 		auto FontPathEditBox = SNew(SEditableTextBox).Text_Lambda([] {
 				return FText::FromString(SShaderEditorBox::GetFontPath());
 			})

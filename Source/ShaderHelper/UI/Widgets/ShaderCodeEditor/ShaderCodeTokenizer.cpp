@@ -8,7 +8,7 @@ namespace SH
 	TOptional<int32> IsMatchPunctuation(const TCHAR* InString, int32 Len, FString& OutMatchedPuncuation)
 	{
 		TOptional<int32> Ret;
-		for (const TCHAR* Punctuation : HLSL::Punctuations)
+		for (const TCHAR* Punctuation : Punctuations)
 		{
 			int32 PunctuationLength = FCString::Strlen(Punctuation);
 			if (Len >= PunctuationLength && FCString::Strncmp(InString, Punctuation, PunctuationLength) == 0)
@@ -25,43 +25,28 @@ namespace SH
 		return Ret;
 	}
 
-	TArray<HlslTokenizer::TokenizedLine> HlslTokenizer::Tokenize(const FString& HlslCodeString, bool IgnoreWhitespace, StateSet InLastState)
+	TArray<ShaderTokenizer::TokenizedLine> ShaderTokenizer::Tokenize(const FString& CodeString, bool IgnoreWhitespace, StateSet InLastState)
 	{
 		TArray<TokenizedLine> TokenizedLines;
 		
 		TArray<FTextRange> LineRanges;
-		FTextRange::CalculateLineRangesFromString(HlslCodeString, LineRanges);
+		FTextRange::CalculateLineRangesFromString(CodeString, LineRanges);
 
 		auto StateSetToTokenType = [](const FString& TokenStr, StateSet InState) {
 			switch (InState)
 			{
-				case StateSet::Id:
-				{
-					if(HLSL::BuiltinTypes.Contains(TokenStr))
-					{
-						return HLSL::TokenType::BuildtinType;
-					}
-					else if(HLSL::BuiltinFuncs.Contains(TokenStr))
-					{
-						return HLSL::TokenType::BuildtinFunc;
-					}
-					else if(HLSL::KeyWords.Contains(TokenStr))
-					{
-						return HLSL::TokenType::Keyword;
-					}
-					return HLSL::TokenType::Identifier;
-				}
-				case StateSet::Number:                          return HLSL::TokenType::Number;
-				case StateSet::Macro:                           return HLSL::TokenType::Preprocess;
-				case StateSet::Comment:                         return HLSL::TokenType::Comment;
-				case StateSet::MultilineComment:                return HLSL::TokenType::Comment;
-				case StateSet::MultilineCommentEnd:             return HLSL::TokenType::Comment;
-				case StateSet::Punctuation:                     return HLSL::TokenType::Punctuation;
-				case StateSet::NumberPuncuation:                return HLSL::TokenType::Punctuation;
-				case StateSet::String:                          return HLSL::TokenType::String;
-				case StateSet::StringEnd:                       return HLSL::TokenType::String;
+				case StateSet::Id:                              return ShaderTokenType::Identifier;
+				case StateSet::Number:                          return ShaderTokenType::Number;
+				case StateSet::Macro:                           return ShaderTokenType::Preprocess;
+				case StateSet::Comment:                         return ShaderTokenType::Comment;
+				case StateSet::MultilineComment:                return ShaderTokenType::Comment;
+				case StateSet::MultilineCommentEnd:             return ShaderTokenType::Comment;
+				case StateSet::Punctuation:                     return ShaderTokenType::Punctuation;
+				case StateSet::NumberPuncuation:                return ShaderTokenType::Punctuation;
+				case StateSet::String:                          return ShaderTokenType::String;
+				case StateSet::StringEnd:                       return ShaderTokenType::String;
 				default:
-					return HLSL::TokenType::Other;
+					return ShaderTokenType::Other;
 			}
 		};
 
@@ -74,14 +59,14 @@ namespace SH
 		{
 			const FTextRange& LineRange = LineRanges[Index];
 			CurRow++;
-			HlslTokenizer::TokenizedLine TokenizedLine;
+			ShaderTokenizer::TokenizedLine TokenizedLine;
 
 			//A empty line without any char.
 			if (LineRange.IsEmpty())
 			{
 				//Still need a token to correctly display
 				TokenizedLine.State = StateSet::Start;
-				TokenizedLine.Tokens.Emplace(HLSL::TokenType::Other);
+				TokenizedLine.Tokens.Emplace(ShaderTokenType::Other);
 				TokenizedLines.Add(MoveTemp(TokenizedLine));
 			}
 			else
@@ -104,7 +89,7 @@ namespace SH
 				
 				int32 CurOffset = LineRange.BeginIndex;
 				int32 TokenStart = CurOffset;
-				TOptional<HLSL::TokenType> LastTokenType; //The last token which is not a white space;
+				TOptional<ShaderTokenType> LastTokenType; //The last token which is not a white space;
 
 				bool bInMacro = false;
 				bool bInComment = false;
@@ -113,9 +98,9 @@ namespace SH
 
 				while (CurOffset < LineRange.EndIndex)
 				{
-					const TCHAR* CurString = &HlslCodeString[CurOffset];
-					const TCHAR CurChar = HlslCodeString[CurOffset];
-					int32 RemainingLen = HlslCodeString.Len() - CurOffset; 
+					const TCHAR* CurString = &CodeString[CurOffset];
+					const TCHAR CurChar = CodeString[CurOffset];
+					int32 RemainingLen = CodeString.Len() - CurOffset; 
 					CurCol = CurOffset - LineRange.BeginIndex;
 
 					switch (CurState)
@@ -198,7 +183,7 @@ namespace SH
 									}
 									
 									if (MatchedPunctuation == "+" || MatchedPunctuation == "-") {
-										if (LastTokenType && (LastTokenType == HLSL::TokenType::Identifier || LastTokenType == HLSL::TokenType::Number)) {
+										if (LastTokenType && (LastTokenType == ShaderTokenType::Identifier || LastTokenType == ShaderTokenType::Number)) {
 											CurState = StateSet::Punctuation;
 										}
 										else {
@@ -256,7 +241,7 @@ namespace SH
 						{
 							int32 TokenEnd = CurOffset;
 							FTextRange TokenRange{ TokenStart, TokenEnd };
-							FString TokenString = HlslCodeString.Mid(TokenRange.BeginIndex, TokenRange.Len());
+							FString TokenString = CodeString.Mid(TokenRange.BeginIndex, TokenRange.Len());
 							if (bInMacro)
 							{
 								LastState = StateSet::Macro;
@@ -273,7 +258,7 @@ namespace SH
 							{
 								LastState = StateSet::String;
 							}
-							HLSL::TokenType FinalTokenType = StateSetToTokenType(TokenString, LastState);
+							ShaderTokenType FinalTokenType = StateSetToTokenType(TokenString, LastState);
 
 							if (TokenString != " ") {
 								LastTokenType = FinalTokenType;
@@ -365,7 +350,7 @@ namespace SH
 					LastState = StateSet::String;
 				}
 				FTextRange TokenRange{ TokenStart, LineRange.EndIndex };
-				FString TokenString = HlslCodeString.Mid(TokenRange.BeginIndex, TokenRange.Len());
+				FString TokenString = CodeString.Mid(TokenRange.BeginIndex, TokenRange.Len());
 				
 				if (bLineContinuation || LastState == StateSet::MultilineComment)
 				{

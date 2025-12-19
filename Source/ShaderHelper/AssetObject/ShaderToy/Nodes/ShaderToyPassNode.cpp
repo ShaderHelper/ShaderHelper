@@ -362,22 +362,22 @@ namespace SH
 			FString MemberDecl;
 			for(const auto& [MemberName, MemberInfo] : CustomUniformBuffer->GetMetaData().Members)
 			{
-				if(MemberInfo.TypeName == "float")
+				if(MemberInfo.HlslTypeName == "float")
 				{
 					float Val = CustomUniformBuffer->GetMember<float>(MemberName);
 					MemberDecl += "const float " + MemberName + " = " + FString::Printf(TEXT("%f;"), Val);
 				}
-				else if(MemberInfo.TypeName == "float2")
+				else if(MemberInfo.HlslTypeName == "float2")
 				{
 					Vector2f Val = CustomUniformBuffer->GetMember<Vector2f>(MemberName);
 					MemberDecl += "const vec2 " + MemberName + " = " + FString::Printf(TEXT("vec2(%f,%f);"), Val.x, Val.y);
 				}
-				else if(MemberInfo.TypeName == "float3")
+				else if(MemberInfo.HlslTypeName == "float3")
 				{
 					Vector3f Val = CustomUniformBuffer->GetMember<Vector3f>(MemberName);
 					MemberDecl += "const vec3 " + MemberName + " = " + FString::Printf(TEXT("vec3(%f,%f,%f);"), Val.x, Val.y, Val.z);
 				}
-				else if(MemberInfo.TypeName == "float4")
+				else if(MemberInfo.HlslTypeName == "float4")
 				{
 					Vector4f Val = CustomUniformBuffer->GetMember<Vector4f>(MemberName);
 					MemberDecl += "const vec4 " + MemberName + " = " + FString::Printf(TEXT("vec4(%f,%f,%f,%f);"), Val.x, Val.y, Val.z, Val.w);
@@ -502,7 +502,7 @@ namespace SH
 				if(CustomUniformBuffer.IsValid() && !CustomUniformBufferData.IsEmpty())
 				{
 					//If the layout of the shader's uniform buffer does not match the node
-					if(NodeCustomUniformBufferBuilder.GetMetaData().UniformBufferDeclaration != ShaderAssetObj->CustomUniformBufferBuilder.GetMetaData().UniformBufferDeclaration)
+					if(NodeCustomUniformBufferBuilder.GetMetaData().HlslDeclaration != ShaderAssetObj->CustomUniformBufferBuilder.GetMetaData().HlslDeclaration)
 					{
 						auto NodeCustomUniformBuffer = NodeCustomUniformBufferBuilder.Build();
 						if(NodeCustomUniformBuffer.IsValid())
@@ -544,22 +544,22 @@ namespace SH
         {
             TSharedPtr<PropertyItemBase> Property;
 			auto Writable = TAttribute<bool>::CreateLambda([this] { return !IsDebugging; });
-            if(MemberInfo.TypeName == "float")
+            if(MemberInfo.HlslTypeName == "float")
             {
                 auto FloatProperty = MakeShared<PropertyUniformItem<float>>(this, MemberName, InUb->GetMember<float>(MemberName), Writable);
                 Property = FloatProperty;
             }
-            else if(MemberInfo.TypeName == "float2")
+            else if(MemberInfo.HlslTypeName == "float2")
             {
                 auto Float2Porperty = MakeShared<PropertyUniformItem<Vector2f>>(this, MemberName, InUb->GetMember<Vector2f>(MemberName), Writable);
                 Property = Float2Porperty;
             }
-			else if(MemberInfo.TypeName == "float3")
+			else if(MemberInfo.HlslTypeName == "float3")
 			{
 				auto Float3Porperty = MakeShared<PropertyUniformItem<Vector3f>>(this, MemberName, InUb->GetMember<Vector3f>(MemberName), Writable);
 				Property = Float3Porperty;
 			}
-			else if (MemberInfo.TypeName == "float4")
+			else if (MemberInfo.HlslTypeName == "float4")
 			{
 				auto Float4Porperty = MakeShared<PropertyUniformItem<Vector4f>>(this, MemberName, InUb->GetMember<Vector4f>(MemberName), Writable);
 				Property = Float4Porperty;

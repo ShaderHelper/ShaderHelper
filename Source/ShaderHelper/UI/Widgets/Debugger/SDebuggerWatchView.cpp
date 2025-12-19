@@ -77,7 +77,7 @@ namespace SH
 					.VAlign(VAlign_Center)
 					.AutoWidth()
 					[
-						SNew(SShToggleButton).Icon(FAppStyle::Get().GetBrush("ColorPicker.Mode"))
+						SNew(SShToggleButton).Icon(FAppStyle::Get().GetBrush("ColorPicker.Mode")).IconColorAndOpacity(FLinearColor::White)
 						.ToolTipText(LOCALIZATION("DisplayColorBlock"))
 						.IsChecked_Lambda([this] { return DebuggerViewDisplayColorBlock ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
 						.OnCheckStateChanged_Lambda([this](ECheckBoxState InState) {

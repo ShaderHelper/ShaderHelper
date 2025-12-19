@@ -117,11 +117,11 @@ namespace FW
 				}
 			})
 			.OnGenerateWidget_Lambda([](TSharedPtr<FString> InItem){
-				return SNew(STextBlock).Text(FText::FromString(*InItem));
+				return SNew(STextBlock).Text(LOCALIZATION(*InItem));
 			})
 			[
 				SNew(STextBlock).Text_Lambda([this] {
-					return FText::FromString(*EnumValueName);
+					return LOCALIZATION(*EnumValueName);
 				})
 			];
 			Item->AddWidget(ValueWidget);

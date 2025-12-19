@@ -175,6 +175,11 @@ namespace SH
 
 	void Texture2dNode::RefershPreview()
 	{
+		if (!Texture)
+		{
+			return;
+		}
+
 		GpuTextureDesc Desc{ Width, Height, Format, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
 		TRefCountPtr<GpuTexture> PreviewTex = GGpuRhi->CreateTexture(MoveTemp(Desc));
 

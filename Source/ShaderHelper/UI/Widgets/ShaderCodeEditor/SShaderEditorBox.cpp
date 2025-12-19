@@ -104,8 +104,8 @@ constexpr int PaddingLineNum = 22;
 
     int32 TokenBreakIterator::MoveToCandidateBefore(const int32 InIndex)
     {
-        TArray<HlslTokenizer::TokenizedLine> TokenizedLines = Marshaller->Tokenizer->Tokenize(InternalString, true);
-        const HlslTokenizer::TokenizedLine& TokenLine = TokenizedLines[0];
+        TArray<ShaderTokenizer::TokenizedLine> TokenizedLines = Marshaller->Tokenizer->Tokenize(InternalString, true);
+        const ShaderTokenizer::TokenizedLine& TokenLine = TokenizedLines[0];
         for(const auto& Token : TokenLine.Tokens)
         {
             if(InIndex > Token.BeginOffset && InIndex <= Token.EndOffset)
@@ -119,8 +119,8 @@ constexpr int PaddingLineNum = 22;
 
     int32 TokenBreakIterator::MoveToCandidateAfter(const int32 InIndex)
     {
-        TArray<HlslTokenizer::TokenizedLine> TokenizedLines = Marshaller->Tokenizer->Tokenize(InternalString, true);
-        const HlslTokenizer::TokenizedLine& TokenLine = TokenizedLines[0];
+        TArray<ShaderTokenizer::TokenizedLine> TokenizedLines = Marshaller->Tokenizer->Tokenize(InternalString, true);
+        const ShaderTokenizer::TokenizedLine& TokenLine = TokenizedLines[0];
         for(const auto& Token : TokenLine.Tokens)
         {
             if(InIndex >= Token.BeginOffset && InIndex < Token.EndOffset)
@@ -224,6 +224,13 @@ constexpr int PaddingLineNum = 22;
 		return RealTimeDiagnosis;
 	}
 
+	bool SShaderEditorBox::CanHighlightCursorLine()
+	{
+		bool HighlightCursorLine = true;
+		Editor::GetEditorConfig()->GetBool(TEXT("CodeEditor"), TEXT("HighlightCursorLine"), HighlightCursorLine);
+		return HighlightCursorLine;
+	}
+
 	FSlateFontInfo& SShaderEditorBox::GetCodeFontInfo()
 	{
 		static FSlateFontInfo CodeFontInfo;
@@ -267,25 +274,25 @@ constexpr int PaddingLineNum = 22;
 
 	}
 
-	TMap<HLSL::TokenType, FTextBlockStyle>& SShaderEditorBox::GetTokenStyleMap()
+	TMap<ShaderTokenType, FTextBlockStyle>& SShaderEditorBox::GetTokenStyleMap()
 	{
-		static TMap<HLSL::TokenType, FTextBlockStyle> TokenStyleMap{
-				{ HLSL::TokenType::Number, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNumberText") },
-				{ HLSL::TokenType::Keyword, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorKeywordText") },
-				{ HLSL::TokenType::Punctuation, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorPunctuationText") },
-				{ HLSL::TokenType::BuildtinFunc, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuiltinFuncText") },
-				{ HLSL::TokenType::BuildtinType, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuiltinTypeText") },
-				{ HLSL::TokenType::Identifier, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText") },
-				{ HLSL::TokenType::Preprocess, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorPreprocessText") },
-				{ HLSL::TokenType::Comment, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorCommentText") },
-				{ HLSL::TokenType::String, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorStringText") },
-				{ HLSL::TokenType::Other, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText") },
+		static TMap<ShaderTokenType, FTextBlockStyle> TokenStyleMap{
+				{ ShaderTokenType::Number, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNumberText") },
+				{ ShaderTokenType::Keyword, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorKeywordText") },
+				{ ShaderTokenType::Punctuation, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorPunctuationText") },
+				{ ShaderTokenType::BuildtinFunc, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuiltinFuncText") },
+				{ ShaderTokenType::BuildtinType, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuiltinTypeText") },
+				{ ShaderTokenType::Identifier, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText") },
+				{ ShaderTokenType::Preprocess, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorPreprocessText") },
+				{ ShaderTokenType::Comment, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorCommentText") },
+				{ ShaderTokenType::String, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorStringText") },
+				{ ShaderTokenType::Other, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText") },
 
-				{ HLSL::TokenType::Func, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorFuncText")},
-				{ HLSL::TokenType::Type, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorTypeText")},
-				{ HLSL::TokenType::Parm, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorParmText")},
-				{ HLSL::TokenType::Var, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorVarText")},
-				{ HLSL::TokenType::LocalVar, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText")},
+				{ ShaderTokenType::Func, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorFuncText")},
+				{ ShaderTokenType::Type, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorTypeText")},
+				{ ShaderTokenType::Parm, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorParmText")},
+				{ ShaderTokenType::Var, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorVarText")},
+				{ ShaderTokenType::LocalVar, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText")},
 		};
 		return TokenStyleMap;
 	}
@@ -295,9 +302,9 @@ constexpr int PaddingLineNum = 22;
 		const float InverseScale = Inverse(AllottedGeometry.Scale);
 		const double OffsetX = 4;
 
-		if (Owner->CanShowGuideLine())
+		if (Owner->CanShowGuideLine() && Owner->SyntaxTU.IsValid())
 		{
-			TArray<ShaderScope> Scopes = Owner->SyntaxTU.GetScopes();
+			TArray<ShaderScope> Scopes = Owner->SyntaxTU->GetScopes();
 			int32 ExtraLineNum = Owner->GetShaderAsset()->GetExtraLineNum();
 			//Draw guide lines
 			for (const auto& Scope : Scopes)
@@ -391,7 +398,7 @@ constexpr int PaddingLineNum = 22;
         SAssignNew(ShaderMultiLineHScrollBar, SScrollBar).Orientation(EOrientation::Orient_Horizontal).Padding(0)
 			.Style(&FShaderHelperStyle::Get().GetWidgetStyle<FScrollBarStyle>("CustomScrollbar")).Thickness(8.0f);
 
-        ShaderMarshaller = MakeShared<FShaderEditorMarshaller>(this, MakeShared<HlslTokenizer>());
+        ShaderMarshaller = MakeShared<FShaderEditorMarshaller>(this, MakeShared<ShaderTokenizer>());
         EffectMarshller = MakeShared<FShaderEditorEffectMarshaller>(this);
 
         FText InitialShaderText = FText::FromString(ShaderAssetObj->EditorContent);
@@ -408,16 +415,16 @@ constexpr int PaddingLineNum = 22;
 				if (Task.ShaderDesc)
 				{
 					TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(Task.ShaderDesc.value());
-					ShaderTU TU{ Shader->GetSourceText(), Shader->GetIncludeDirs() };
-					DiagnosticInfos = TU.GetDiagnostic();
+					auto TU = ShaderTU::Create( Shader->GetSourceText(), Shader->GetShaderLanguage(), Shader->GetIncludeDirs());
+					DiagnosticInfos = TU->GetDiagnostic();
 
 					CandidateInfos.Reset();
 					if (!Task.CursorToken.IsEmpty())
 					{
-						CandidateInfos = TU.GetCodeComplete(Task.Row, Task.Col);
+						CandidateInfos = TU->GetCodeComplete(Task.Row, Task.Col);
 						if (Task.IsMemberAccess == false)
 						{
-							for (const auto& Candidate : DefaultCandidates())
+							for (const auto& Candidate : DefaultCandidates(Shader->GetShaderLanguage()))
 							{
 								CandidateInfos.AddUnique(Candidate);
 							}
@@ -432,7 +439,7 @@ constexpr int PaddingLineNum = 22;
 									It.RemoveCurrent();
 									continue;
 								}
-								else if ((*It).Kind == HLSL::CandidateKind::Type)
+								else if ((*It).Kind == ShaderCandidateKind::Type)
 								{
 									It.RemoveCurrent();
 									continue;
@@ -491,15 +498,15 @@ constexpr int PaddingLineNum = 22;
 				if (Task.ShaderDesc)
 				{
 					TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(Task.ShaderDesc.value());
-					ShaderTU TU{ Shader->GetSourceText(), Shader->GetIncludeDirs() };
+					auto TU = ShaderTU::Create( Shader->GetSourceText(), Shader->GetShaderLanguage(), Shader->GetIncludeDirs());
 					LineSyntaxHighlightMaps.Reset();
 					LineSyntaxHighlightMaps.SetNum(Task.LineTokens.Num());
 					int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
 					for (int LineIndex = 0; LineIndex < Task.LineTokens.Num(); LineIndex++)
 					{
-						for (const HlslTokenizer::Token& Token : Task.LineTokens[LineIndex])
+						for (const ShaderTokenizer::Token& Token : Task.LineTokens[LineIndex])
 						{
-							HLSL::TokenType NewTokenType = TU.GetTokenType(Token.Type, ExtraLineNum + LineIndex + 1, Token.BeginOffset + 1);
+							ShaderTokenType NewTokenType = TU->GetTokenType(Token.Type, ExtraLineNum + LineIndex + 1, Token.BeginOffset + 1, Token.EndOffset - Token.BeginOffset);
 							if (NewTokenType != Token.Type)
 							{
 								LineSyntaxHighlightMaps[LineIndex].Add(FTextRange{ Token.BeginOffset, Token.EndOffset }, NewTokenType);
@@ -1705,12 +1712,12 @@ constexpr int PaddingLineNum = 22;
 		{
 			int32 AddedLineNum = ShaderAssetObj->GetExtraLineNum();
 			TArray<ShaderOccurrence> Occurrences;
-			for (const HlslTokenizer::Token& Token : ShaderMarshaller->TokenizedLines[CursorLineIndex].Tokens)
+			for (const ShaderTokenizer::Token& Token : ShaderMarshaller->TokenizedLines[CursorLineIndex].Tokens)
 			{
-				if ((Token.Type == HLSL::TokenType::Identifier || Token.Type == HLSL::TokenType::BuildtinFunc)
+				if ((Token.Type == ShaderTokenType::Identifier || Token.Type == ShaderTokenType::BuildtinFunc)
 					&& CursorOffset >= Token.BeginOffset && CursorOffset <= Token.EndOffset)
 				{
-					Occurrences = SyntaxTU.GetOccurrences(GetLineNumber(CursorLineIndex) + AddedLineNum, Token.BeginOffset + 1);
+					Occurrences = SyntaxTU->GetOccurrences(GetLineNumber(CursorLineIndex) + AddedLineNum, Token.BeginOffset + 1);
 					break;
 				}
 			}
@@ -1727,7 +1734,7 @@ constexpr int PaddingLineNum = 22;
 				int32 OccurrenceLineIndex = GetLineIndex(Occurrence.Row - AddedLineNum);
 				if (ShaderMarshaller->TokenizedLines.IsValidIndex(OccurrenceLineIndex))
 				{
-					for (const HlslTokenizer::Token& Token : ShaderMarshaller->TokenizedLines[OccurrenceLineIndex].Tokens)
+					for (const ShaderTokenizer::Token& Token : ShaderMarshaller->TokenizedLines[OccurrenceLineIndex].Tokens)
 					{
 						if (Token.BeginOffset == Occurrence.Col - 1)
 						{
@@ -1932,7 +1939,7 @@ constexpr int PaddingLineNum = 22;
         ShaderMultiLineEditableText->GoTo(NewCursorLocation);
 		
 		FString InsertedText = InItem->Text;
-		if(InItem->Kind == HLSL::CandidateKind::Func)
+		if(InItem->Kind == ShaderCandidateKind::Func)
 		{
 			InsertedText += "()";
 			ShaderMultiLineEditableText->InsertTextAtCursor(MoveTemp(InsertedText));
@@ -2160,7 +2167,7 @@ constexpr int PaddingLineNum = 22;
 			ShaderMultiLineEditableText->GetTextLine(CursorRow, CurLineText);
 			FString CursorLeft = CurLineText.Mid(0, CursorCol);
 
-			TArray<HlslTokenizer::TokenizedLine> TokenizedLines = ShaderMarshaller->Tokenizer->Tokenize(CursorLeft, true);
+			TArray<ShaderTokenizer::TokenizedLine> TokenizedLines = ShaderMarshaller->Tokenizer->Tokenize(CursorLeft, true);
 			auto Token = TokenizedLines[0].Tokens.Last();
 			FString LeftToken = CursorLeft.Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
 			if (TokenizedLines[0].Tokens.Num() > 1)
@@ -3195,12 +3202,12 @@ constexpr int PaddingLineNum = 22;
             const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
             const int32 CurLineIndex = CursorLocation.GetLineIndex();
             auto FocusedWidget = FSlateApplication::Get().GetUserFocusedWidget(0);
-            if(FocusedWidget == ShaderMultiLineEditableText && LineNumber == GetLineNumber(CurLineIndex)
+            if(CanHighlightCursorLine() && FocusedWidget == ShaderMultiLineEditableText && LineNumber == GetLineNumber(CurLineIndex)
 			   && !BreakPointLineNumbers.Contains(LineNumber) && Debugger.GetStopLineNumber() != LineNumber)
             {
                 double CurTime = FPlatformTime::Seconds();
-                float Speed = 2.0f;
-                double AnimatedOpacity = 0.1 * FMath::Pow(FMath::Abs(FMath::Sin(CurTime * Speed)),1.8) + 0.1;
+                float Speed = 1.8f;
+                double AnimatedOpacity = 0.08 * FMath::Pow(FMath::Abs(FMath::Sin(CurTime * Speed)),1.8) + 0.1;
 				return FStyleColors::Foreground.GetSpecifiedColor().CopyWithNewOpacity((float)AnimatedOpacity);
             }
             return FLinearColor::Transparent;
@@ -3209,7 +3216,7 @@ constexpr int PaddingLineNum = 22;
         return LineTip;
     }
 
-    FShaderEditorMarshaller::FShaderEditorMarshaller(SShaderEditorBox* InOwnerWidget, TSharedPtr<HlslTokenizer> InTokenizer)
+    FShaderEditorMarshaller::FShaderEditorMarshaller(SShaderEditorBox* InOwnerWidget, TSharedPtr<ShaderTokenizer> InTokenizer)
         : OwnerWidget(InOwnerWidget)
         , TextLayout(nullptr)
         , Tokenizer(MoveTemp(InTokenizer))
@@ -3220,17 +3227,13 @@ constexpr int PaddingLineNum = 22;
     void FShaderEditorMarshaller::SetText(const FString& SourceString, FTextLayout& TargetTextLayout, TArray<FTextLayout::FLineModel>&& OldLineModels)
     {
         TextLayout = &TargetTextLayout;
-		
-		FString EditorSourceBeforeEditing = OwnerWidget->CurrentEditorSource;
-		TArray<FTextRange> LineRangesBeforeEditing;
-		FTextRange::CalculateLineRangesFromString(EditorSourceBeforeEditing, LineRangesBeforeEditing);
-		
+				
 		OwnerWidget->CurrentEditorSource = SourceString;
 		auto& LineModels = TextLayout->GetLineModels();
 		FSlateEditableTextLayout* EditableTextLayout = OwnerWidget->ShaderMultiLineEditableTextLayout;
 		if(OldLineModels.Num() == 0)
 		{
-			TArray<HlslTokenizer::TokenizedLine> TokenizedLines = Tokenizer->Tokenize(SourceString);
+			TArray<ShaderTokenizer::TokenizedLine> TokenizedLines = Tokenizer->Tokenize(SourceString);
 			
 			TArray<FTextRange> LineRanges;
 			FTextRange::CalculateLineRangesFromString(SourceString, LineRanges);
@@ -3242,7 +3245,7 @@ constexpr int PaddingLineNum = 22;
 				
 				TArray<TSharedRef<IRun>> Runs;
 				TOptional<int32> MarkerIndex = OwnerWidget->FindFoldMarker(LineIndex);
-				for (const HlslTokenizer::Token& Token : TokenizedLines[LineIndex].Tokens)
+				for (const ShaderTokenizer::Token& Token : TokenizedLines[LineIndex].Tokens)
 				{
 					FTextBlockStyle& RunTextStyle = OwnerWidget->GetTokenStyleMap()[Token.Type];
 					FTextRange NewTokenRange{ Token.BeginOffset, Token.EndOffset };
@@ -3262,13 +3265,17 @@ constexpr int PaddingLineNum = 22;
 			
 			for(int i = 0; i < LineModels.Num(); i++)
 			{
-				LineModels[i].CustomData = MakeShared<HlslTokenizer::TokenizedLine>(MoveTemp(TokenizedLines[i]));
+				LineModels[i].CustomData = MakeShared<ShaderTokenizer::TokenizedLine>(MoveTemp(TokenizedLines[i]));
 			}
 			
 		}
+		//Incremental processing
 		else
 		{
-			//Incremental processing
+			FString EditorSourceBeforeEditing = OwnerWidget->CurrentEditorSource;
+			TArray<FTextRange> LineRangesBeforeEditing;
+			FTextRange::CalculateLineRangesFromString(EditorSourceBeforeEditing, LineRangesBeforeEditing);
+
 			//OldLineModels already were handled by internal frameworks here
 			LineModels = MoveTemp(OldLineModels);
 			bool bForce{};
@@ -3282,19 +3289,19 @@ constexpr int PaddingLineNum = 22;
 					{
 						LineTextBeforeEditing = EditorSourceBeforeEditing.Mid(LineRangesBeforeEditing[LineIndex].BeginIndex, LineRangesBeforeEditing[LineIndex].Len());
 					}
-					HlslTokenizer::StateSet LastLineContState = HlslTokenizer::StateSet::Start;
-					HlslTokenizer::TokenizedLine* CurTokenizedLine = static_cast<HlslTokenizer::TokenizedLine*>(LineModels[LineIndex].CustomData.Get());
+					ShaderTokenizer::StateSet LastLineContState = ShaderTokenizer::StateSet::Start;
+					ShaderTokenizer::TokenizedLine* CurTokenizedLine = static_cast<ShaderTokenizer::TokenizedLine*>(LineModels[LineIndex].CustomData.Get());
 					if(LineIndex > 0)
 					{
-						HlslTokenizer::TokenizedLine* LastTokenizedLine = static_cast<HlslTokenizer::TokenizedLine*>(LineModels[LineIndex - 1].CustomData.Get());
+						ShaderTokenizer::TokenizedLine* LastTokenizedLine = static_cast<ShaderTokenizer::TokenizedLine*>(LineModels[LineIndex - 1].CustomData.Get());
 						LastLineContState = LastTokenizedLine->State;
 					}
-					HlslTokenizer::TokenizedLine NewTokenizedLine = Tokenizer->Tokenize(*LineText, false, LastLineContState)[0];
+					ShaderTokenizer::TokenizedLine NewTokenizedLine = Tokenizer->Tokenize(*LineText, false, LastLineContState)[0];
 					bForce = CurTokenizedLine ? NewTokenizedLine.State != CurTokenizedLine->State : true;
 					
 					TArray<FTextLayout::FRunModel> RunModels;
 					TOptional<int32> MarkerIndex = OwnerWidget->FindFoldMarker(LineIndex);
-					for (const HlslTokenizer::Token& Token : NewTokenizedLine.Tokens)
+					for (const ShaderTokenizer::Token& Token : NewTokenizedLine.Tokens)
 					{
 						FTextBlockStyle* RunTextStyle = &OwnerWidget->GetTokenStyleMap()[Token.Type];
 						FTextRange NewTokenRange{ Token.BeginOffset, Token.EndOffset };
@@ -3304,10 +3311,10 @@ constexpr int PaddingLineNum = 22;
 							CurTokenizedLine = &NewTokenizedLine;
 						}
 						//Compares old tokens to avoid lexical highlighting overriding syntax highlighting
-						if(auto* MatchedToken = CurTokenizedLine->Tokens.FindByPredicate([&](const HlslTokenizer::Token& Element){
+						if(auto* MatchedToken = CurTokenizedLine->Tokens.FindByPredicate([&](const ShaderTokenizer::Token& Element){
 							FString TokenStr = LineText->Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
 							FString ElementStr = LineTextBeforeEditing.Mid(Element.BeginOffset, Element.EndOffset - Element.BeginOffset);
-							return Token.Type == HLSL::TokenType::Identifier && Token.Type == Element.Type
+							return Token.Type == ShaderTokenType::Identifier && Token.Type == Element.Type
 							&& (Token.BeginOffset == Element.BeginOffset || TokenStr == ElementStr);
 						}))
 						{
@@ -3333,7 +3340,7 @@ constexpr int PaddingLineNum = 22;
 					}
 					
 					LineModels[LineIndex].Runs = RunModels;
-					LineModels[LineIndex].CustomData = MakeShared<HlslTokenizer::TokenizedLine>(MoveTemp(NewTokenizedLine));
+					LineModels[LineIndex].CustomData = MakeShared<ShaderTokenizer::TokenizedLine>(MoveTemp(NewTokenizedLine));
 				}
 			}
 		
@@ -3345,9 +3352,9 @@ constexpr int PaddingLineNum = 22;
 		Task.LineTokens.SetNum(LineModels.Num());
 		for (int32 LineIndex = 0; LineIndex < LineModels.Num(); LineIndex++)
 		{
-			HlslTokenizer::TokenizedLine* CurTokenizedLine = static_cast<HlslTokenizer::TokenizedLine*>(LineModels[LineIndex].CustomData.Get());
+			ShaderTokenizer::TokenizedLine* CurTokenizedLine = static_cast<ShaderTokenizer::TokenizedLine*>(LineModels[LineIndex].CustomData.Get());
 			this->TokenizedLines.Add(*CurTokenizedLine);
-			for (const HlslTokenizer::Token& Token : CurTokenizedLine->Tokens)
+			for (const ShaderTokenizer::Token& Token : CurTokenizedLine->Tokens)
 			{
 				Task.LineTokens[LineIndex].Add(Token);
 			}
@@ -3359,16 +3366,16 @@ constexpr int PaddingLineNum = 22;
 		struct BracketStackData
 		{
 			int32 LineIndex{};
-			HlslTokenizer::Bracket Bracket;
+			ShaderTokenizer::Bracket Bracket;
 		};
-        TArray<HlslTokenizer::BracketGroup> BraceGroups, ParenGroups;
+        TArray<ShaderTokenizer::BracketGroup> BraceGroups, ParenGroups;
 		TArray<BracketStackData> OpenBraceStack, OpenParenStack;
         for(int32 LineIndex = 0; LineIndex < LineModels.Num(); LineIndex++)
         {
-			HlslTokenizer::TokenizedLine* TokenizedLine = static_cast<HlslTokenizer::TokenizedLine*>(LineModels[LineIndex].CustomData.Get());
-            for(const HlslTokenizer::Bracket& Brace : TokenizedLine->Braces)
+			ShaderTokenizer::TokenizedLine* TokenizedLine = static_cast<ShaderTokenizer::TokenizedLine*>(LineModels[LineIndex].CustomData.Get());
+            for(const ShaderTokenizer::Bracket& Brace : TokenizedLine->Braces)
             {
-                if(Brace.Type == HlslTokenizer::SideType::Open)
+                if(Brace.Type == ShaderTokenizer::SideType::Open)
                 {
                     OpenBraceStack.Emplace(LineIndex, Brace);
                 }
@@ -3381,9 +3388,9 @@ constexpr int PaddingLineNum = 22;
 					}
 				}
             }
-			for(const HlslTokenizer::Bracket& Paren : TokenizedLine->Parens)
+			for(const ShaderTokenizer::Bracket& Paren : TokenizedLine->Parens)
 			{
-				if(Paren.Type == HlslTokenizer::SideType::Open)
+				if(Paren.Type == ShaderTokenizer::SideType::Open)
 				{
 					OpenParenStack.Emplace(LineIndex, Paren);
 				}
@@ -3566,7 +3573,7 @@ constexpr int PaddingLineNum = 22;
 						FString TokenName = CurTextLine.Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
 						if (CurrentHoverLocation.GetOffset() >= Token.BeginOffset && CurrentHoverLocation.GetOffset() <= Token.EndOffset)
 						{
-							if (Token.Type == HLSL::TokenType::Identifier || TokenName == "]")
+							if (Token.Type == ShaderTokenType::Identifier || TokenName == "]")
 							{
 								CurrentTokenName = MoveTemp(TokenName);
 								CurrentTokenBeginOffset = Token.BeginOffset;

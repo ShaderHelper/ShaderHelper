@@ -75,7 +75,8 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
             .Name = GetFileName() + "." + FileExtension(),
             .Source = GetFullContent(),
             .Type = ShaderType::PixelShader,
-            .EntryPoint = "MainPS"
+            .EntryPoint = "MainPS",
+			.Language = Language
         });
 		FString ErrorInfo, WarnInfo;
 		bCompilationSucceed = GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo);
@@ -129,7 +130,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         static int Init = [&] {
             BuiltInBindLayout
 				.AddExistingBinding(0, BindingType::RWStructuredBuffer, BindingShaderStage::Pixel)
-                .AddUniformBuffer("BuiltInUniform", GetBuiltInUbBuilder().GetLayoutDeclaration(), BindingShaderStage::Pixel)
+                .AddUniformBuffer("BuiltInUniform", GetBuiltInUbBuilder(), BindingShaderStage::Pixel)
                 .AddTexture("iChannel0", BindingShaderStage::Pixel)
                 .AddSampler("iChannel0Sampler", BindingShaderStage::Pixel)
                 .AddTexture("iChannel1", BindingShaderStage::Pixel)
@@ -155,13 +156,20 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 
     FString StShader::GetBinding() const
     {
-        return GetBuiltInBindLayoutBuilder().GetCodegenDeclaration() + CustomBindGroupLayoutBuilder.GetCodegenDeclaration();
+        return GetBuiltInBindLayoutBuilder().GetCodegenDeclaration(Language) + CustomBindGroupLayoutBuilder.GetCodegenDeclaration(Language);
     }
 
     FString StShader::GetTemplateWithBinding() const
     {
 		FString Template;
-		FFileHelper::LoadFileToString(Template, *(PathHelper::ShaderDir() / "ShaderHelper/StShaderTemplate.hlsl"));
+		if (Language == GpuShaderLanguage::HLSL)
+		{
+			FFileHelper::LoadFileToString(Template, *(PathHelper::ShaderDir() / "ShaderHelper/StShaderTemplate.hlsl"));
+		}
+		else
+		{
+			FFileHelper::LoadFileToString(Template, *(PathHelper::ShaderDir() / "ShaderHelper/StShaderTemplate.glsl"));
+		}
         return GetBinding() + Template;
     }
 
@@ -180,7 +188,8 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 			.Name = ShaderName,
 			.Source = MoveTemp(FinalShaderSource),
 			.Type = ShaderType::PixelShader,
-			.EntryPoint = "MainPS"
+			.EntryPoint = "MainPS",
+			.Language = Language
 		};
 		return Desc;
 	}
@@ -221,7 +230,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 					NewCustomUniformBufferBuilder.AddVector4f(MemberName);
 				}
             }
-            NewCustomBindGroupLayoutBuilder.AddUniformBuffer("CustomUniform", NewCustomUniformBufferBuilder.GetLayoutDeclaration(), BindingShaderStage::Pixel);
+            NewCustomBindGroupLayoutBuilder.AddUniformBuffer("CustomUniform", NewCustomUniformBufferBuilder, BindingShaderStage::Pixel);
         }
         
         CustomUniformBufferBuilder = NewCustomUniformBufferBuilder;
@@ -389,7 +398,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         const UniformBufferMetaData& MetaData = InBuilder.GetMetaData();
         for(const auto& [MemberName, MemberInfo]: MetaData.Members)
         {
-            auto Property = CreateUniformPropertyData(MemberInfo.TypeName, MemberName, Enabled);
+            auto Property = CreateUniformPropertyData(MemberInfo.GetTypeName(Language), MemberName, Enabled);
             Datas.Add(Property.ToSharedRef());
         }
         return Datas;
@@ -474,10 +483,12 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 			GpuShaderLanguage NewLanguage = *static_cast<GpuShaderLanguage*>(static_cast<PropertyEnumItem*>(InProperty)->GetEnum());
 			if (NewLanguage == GpuShaderLanguage::HLSL)
 			{
+				ShEditor->OpenShaderTab(this);
 				ShEditor->GetShaderEditor(this)->SetText(FText::FromString(DefaultPixelShaderBody));
 			}
 			else if(NewLanguage == GpuShaderLanguage::GLSL)
 			{
+				ShEditor->OpenShaderTab(this);
 				ShEditor->GetShaderEditor(this)->SetText(FText::FromString(DefaultGLSLPixelShaderBody));
 			}
 		}
