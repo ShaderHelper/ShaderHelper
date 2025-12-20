@@ -1,9 +1,6 @@
 #include "CommonHeader.h"
 #include "SAssetView.h"
 #include "SAssetBrowser.h"
-#include <DirectoryWatcherModule.h>
-#include <IDirectoryWatcher.h>
-#include <DesktopPlatformModule.h>
 #include "AssetManager/AssetImporter/AssetImporter.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "AssetManager/AssetManager.h"
@@ -15,6 +12,10 @@
 #include "Editor/AssetViewCommands.h"
 #include "App/App.h"
 #include "PluginManager/PluginManager.h"
+
+#include <DirectoryWatcherModule.h>
+#include <IDirectoryWatcher.h>
+#include <DesktopPlatformModule.h>
 
 namespace FW
 {
@@ -119,18 +120,19 @@ namespace FW
 		for (const FString& FileOrFolderName : FileOrFolderNames)
 		{
             FString Ext = FPaths::GetExtension(FileOrFolderName);
+			FString Path = ViewDirectory / FileOrFolderName;
 			if (Ext.IsEmpty())
 			{
 				if (!InFilterText.IsEmpty())
 				{
 					if (FileOrFolderName.Contains(InFilterText.ToString()))
 					{
-						AssetViewItems.Add(MakeShared<AssetViewFolderItem>(ViewDirectory / FileOrFolderName));
+						AssetViewItems.Add(MakeShared<AssetViewFolderItem>(AssetTileView.Get(), Path));
 					}
 				}
 				else
 				{
-					AssetViewItems.Add(MakeShared<AssetViewFolderItem>(ViewDirectory / FileOrFolderName));
+					AssetViewItems.Add(MakeShared<AssetViewFolderItem>(AssetTileView.Get(), Path));
 				}
 			}
 			else if(TSingleton<AssetManager>::Get().GetManageredExts().Contains(Ext))
@@ -139,12 +141,16 @@ namespace FW
 				{
 					if (FileOrFolderName.Contains(InFilterText.ToString()))
 					{
-						AssetViewItems.Add(MakeShared<AssetViewAssetItem>(ViewDirectory / FileOrFolderName));
+						auto Item = MakeShared<AssetViewAssetItem>(AssetTileView.Get(), Path);
+						SetAssetIcon(Item);
+						AssetViewItems.Add(Item);
 					}
 				}
 				else
 				{
-					AssetViewItems.Add(MakeShared<AssetViewAssetItem>(ViewDirectory / FileOrFolderName));
+					auto Item = MakeShared<AssetViewAssetItem>(AssetTileView.Get(), Path);
+					SetAssetIcon(Item);
+					AssetViewItems.Add(Item);
 				}
 			}
 		}
@@ -204,7 +210,16 @@ namespace FW
 										AssetOp_->OnCreate(NewAsset);
 									}
 
-									TSharedRef<AssetViewAssetItem> NewAssetItem = MakeShared<AssetViewAssetItem>(SavedFileName, NewAsset);
+									TSharedRef<AssetViewAssetItem> NewAssetItem = MakeShared<AssetViewAssetItem>(AssetTileView.Get(), SavedFileName);
+									if (auto* Thumbnail = NewAsset->GetThumbnail())
+									{
+										NewAssetItem->SetAssetThumbnail(Thumbnail);
+									}
+									else
+									{
+										NewAssetItem->SetAssetImage(NewAsset->GetImage());
+									}
+									
 									if (!AssetViewItems.ContainsByPredicate([&](const TSharedRef<AssetViewItem>& InItem) {
 										return InItem->GetPath() == SavedFileName;
 										}))
@@ -252,11 +267,11 @@ namespace FW
 						NewDirectoryPath = *(CurViewDirectory / FString::Format(TEXT("NewFolder {0}"), { Number++ }));
 					}
 
-					TSharedRef<AssetViewFolderItem> NewFolderItem = MakeShared<AssetViewFolderItem>(NewDirectoryPath);
 					if (!AssetViewItems.ContainsByPredicate([&](const TSharedRef<AssetViewItem>& InItem) {
 						return InItem->GetPath() == NewDirectoryPath;
 					}))
 					{
+						TSharedRef<AssetViewFolderItem> NewFolderItem = MakeShared<AssetViewFolderItem>(AssetTileView.Get(), NewDirectoryPath);
 						// Setting the focus directly here will not take effect.
 						// The widget related to this item will only be added to STileView at the next tick
 						FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this, NewFolderItem](float) {
@@ -333,11 +348,11 @@ namespace FW
 			return;
 		}
 
-		TSharedRef<AssetViewFolderItem> NewFolderItem = MakeShared<AssetViewFolderItem>(InFolderName);
         if(!AssetViewItems.ContainsByPredicate([&](const TSharedRef<AssetViewItem>& InItem){
             return InItem->GetPath() == InFolderName;
         }))
         {
+			TSharedRef<AssetViewFolderItem> NewFolderItem = MakeShared<AssetViewFolderItem>(AssetTileView.Get(), InFolderName);
             AssetViewItems.Add(MoveTemp(NewFolderItem));
             SortViewItems();
             AssetTileView->RequestListRefresh();
@@ -373,11 +388,12 @@ namespace FW
 			return;
 		}
 
-		TSharedRef<AssetViewAssetItem> NewAssetItem = MakeShared<AssetViewAssetItem>(InFileName);
         if(!AssetViewItems.ContainsByPredicate([&](const TSharedRef<AssetViewItem>& InItem){
             return InItem->GetPath() == InFileName;
         }))
         {
+			TSharedRef<AssetViewAssetItem> NewAssetItem = MakeShared<AssetViewAssetItem>(AssetTileView.Get(), InFileName);
+			SetAssetIcon(NewAssetItem);
             AssetViewItems.Add(MoveTemp(NewAssetItem));
             SortViewItems();
             AssetTileView->RequestListRefresh();
@@ -611,6 +627,31 @@ namespace FW
             }
             
         }
+	}
+
+	void SAssetView::SetAssetIcon(TSharedRef<AssetViewAssetItem> ViewItem)
+	{
+		TOptional<FGuid> Id = TSingleton<AssetManager>::Get().TryGetGuid(ViewItem->GetPath());
+		if (Id; auto* Thumbnail = TSingleton<AssetManager>::Get().FindAssetThumbnail(*Id))
+		{
+			ViewItem->SetAssetThumbnail(Thumbnail);
+		}
+		else
+		{
+			TSingleton<AssetManager>::Get().AsyncLoadAssetByPath<AssetObject>(ViewItem->GetPath(), [WeakItem = TWeakPtr<AssetViewAssetItem>{ ViewItem }](AssetPtr<AssetObject> Asset) {
+				if (WeakItem.IsValid())
+				{
+					if (auto* Thumbnail = Asset->GetThumbnail())
+					{
+						WeakItem.Pin()->SetAssetThumbnail(Thumbnail);
+					}
+					else
+					{
+						WeakItem.Pin()->SetAssetImage(Asset->GetImage());
+					}
+				}
+			});
+		}
 	}
 
 }

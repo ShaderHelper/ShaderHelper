@@ -1,17 +1,18 @@
 #include "CommonHeader.h"
 #include "AssetViewFolderItem.h"
 #include "UI/Styles/FAppCommonStyle.h"
-#include <Styling/StyleColors.h>
 #include "UI/Widgets/Misc/CommonTableRow.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "ProjectManager/ProjectManager.h"
 #include "App/App.h"
 #include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
 
+#include <Styling/StyleColors.h>
+
 namespace FW
 {
-	AssetViewFolderItem::AssetViewFolderItem(const FString& InPath)
-		: AssetViewItem(InPath)
+	AssetViewFolderItem::AssetViewFolderItem(STileView<TSharedRef<AssetViewItem>>* InOwner, const FString& InPath)
+		: AssetViewItem(InOwner, InPath)
 	{
 		SAssignNew(FolderEditableTextBlock, SInlineEditableTextBlock)
 			.Font(FAppStyle::Get().GetFontStyle("SmallFont"))
@@ -42,7 +43,12 @@ namespace FW
 
     FReply AssetViewFolderItem::HandleOnDragDetected(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
     {
-        return FReply::Handled().BeginDragDrop(AssetViewItemDragDropOp::New(Path));
+		TArray<FString> SelectedPaths;
+		for (const auto& Item : Owner->GetSelectedItems())
+		{
+			SelectedPaths.Add(Item->GetPath());
+		}
+        return FReply::Handled().BeginDragDrop(AssetViewItemDragDropOp::New(SelectedPaths));
     }
 
     FReply AssetViewFolderItem::HandleOnDrop(const FDragDropEvent& DragDropEvent)
@@ -50,14 +56,18 @@ namespace FW
         TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
         if(DragDropOp->IsOfType<AssetViewItemDragDropOp>())
         {
-            FString DropFilePath = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Path;
-            FString NewFilePath = Path / FPaths::GetCleanFilename(DropFilePath);
-            if(FPaths::GetExtension(DropFilePath).IsEmpty())
-            {
-                RenamedOrMovedFolderMap.Add(DropFilePath, NewFilePath);
-            }
-            
-            IFileManager::Get().Move(*NewFilePath, *DropFilePath);
+			TArray<FString> DropFilePaths = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Paths;
+			for (const auto& DropFilePath : DropFilePaths)
+			{
+				FString NewFilePath = Path / FPaths::GetCleanFilename(DropFilePath);
+				if (FPaths::GetExtension(DropFilePath).IsEmpty())
+				{
+					RenamedOrMovedFolderMap.Add(DropFilePath, NewFilePath);
+				}
+
+				IFileManager::Get().Move(*NewFilePath, *DropFilePath);
+			}
+
         }
         return FReply::Handled();
     }
@@ -74,11 +84,14 @@ namespace FW
             {
                 if(Operation->IsOfType<AssetViewItemDragDropOp>())
                 {
-                    FString DropFilePath = StaticCastSharedPtr<AssetViewItemDragDropOp>(Operation)->Path;
-                    if(DropFilePath == Path)
-                    {
-                        return false;
-                    }
+                    TArray<FString> DropFilePaths = StaticCastSharedPtr<AssetViewItemDragDropOp>(Operation)->Paths;
+					for (const auto& DropFilePath : DropFilePaths)
+					{
+						if (DropFilePath == Path)
+						{
+							return false;
+						}
+					}
                     return true;
                 }
             }

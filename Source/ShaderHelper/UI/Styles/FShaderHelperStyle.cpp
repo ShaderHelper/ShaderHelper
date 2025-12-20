@@ -1,11 +1,12 @@
 #include "CommonHeader.h"
 #include "FShaderHelperStyle.h"
 #include "Common/Path/BaseResourcePath.h"
+#include "UI/Styles/FAppCommonStyle.h"
+
 #include <Styling/SlateStyleRegistry.h>
 #include <Styling/StyleColors.h>
 #include <Styling/SlateStyleMacros.h>
 #include <Styling/ToolBarStyle.h>
-#include "UI/Styles/FAppCommonStyle.h"
 
 #define RootToContentDir Style->RootToContentDir
 #define TTF_FONT( RelativePath, ... ) FSlateFontInfo(RootToContentDir( RelativePath, TEXT(".ttf") ), __VA_ARGS__ )

@@ -1,6 +1,7 @@
 #pragma once
 #include "SDirectoryTree.h"
 #include "SAssetView.h"
+
 #include <Widgets/Input/SSearchBox.h>
 struct FFileChangeData;
 

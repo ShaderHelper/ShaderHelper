@@ -1,16 +1,18 @@
 #include "CommonHeader.h"
 #include "App.h"
+#include "Common/Path/BaseResourcePath.h"
+#include "GpuApi/GpuRhi.h"
+
 #include <HAL/PlatformOutputDevices.h>
 #include <HAL/PlatformApplicationMisc.h>
 #include <StandaloneRenderer.h>
-#include "Common/Path/BaseResourcePath.h"
 #include <Fonts/SlateFontInfo.h>
 #include <Misc/OutputDeviceConsole.h>
 #include <DirectoryWatcherModule.h>
-#include "GpuApi/GpuRhi.h"
 #include <HAL/ExceptionHandling.h>
 #include <HAL/PlatformOutputDevices.h>
 #include <Misc/OutputDeviceFile.h>
+#include <Misc/QueuedThreadPoolWrapper.h>
 
 namespace FW {
 	TUniquePtr<App> GApp;
@@ -36,6 +38,8 @@ namespace FW {
 		FPlatformOutputDevices::SetupOutputDevices();
 
 		FTaskGraphInterface::Startup(FPlatformMisc::NumberOfCores());
+		FTaskGraphInterface::Get().AttachToThread(ENamedThreads::GameThread);
+		GThreadPool = new FQueuedLowLevelThreadPool();
 		
 		//Some interfaces with uobject in slate module depend on the CoreUobject module.
 		FModuleManager::Get().LoadModule(TEXT("CoreUObject"));
@@ -142,6 +146,7 @@ namespace FW {
 					Render();
 					FSlateApplication::Get().PumpMessages();
 					FSlateApplication::Get().Tick();
+					FTaskGraphInterface::Get().ProcessThreadUntilIdle(ENamedThreads::GameThread);
                     FTicker::GetCoreTicker().Tick(DeltaTime);
 					//if not change GFrameCounter, slate texture may not update.
 					GFrameCounter++;

@@ -27,10 +27,7 @@ namespace FW
             PendingAssets.AddUnique(MoveTemp(InAsset));
         }
 		void RemovePendingAsset(AssetObject* InAsset) {
-            if(PendingAssets.Contains(InAsset))
-            {
-                PendingAssets.Remove(InAsset);
-            }
+			PendingAssets.Remove(InAsset);
         }
 
 		bool IsPendingAsset(AssetObject* InAsset) const { return PendingAssets.Contains(InAsset); }

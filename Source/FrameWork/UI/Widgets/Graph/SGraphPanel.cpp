@@ -2,10 +2,10 @@
 #include "SGraphPanel.h"
 #include "AssetObject/Graph.h"
 #include "Editor/GraphEditorCommands.h"
-#include <Widgets/Input/SSearchBox.h>
-#include <Styling/StyleColors.h>
 #include "Common/Util/Math.h"
 
+#include <Widgets/Input/SSearchBox.h>
+#include <Styling/StyleColors.h>
 namespace FW
 {
 

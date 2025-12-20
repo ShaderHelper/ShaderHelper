@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "ProjectManager.h"
+
 #if PLATFORM_WINDOWS
 #include <Windows/AllowWindowsPlatformTypes.h>
 	#include <shlobj_core.h>

@@ -177,12 +177,29 @@ namespace FW
 		return ProfileName;
 	}
 
+	shaderc_shader_kind MapShadercKind(ShaderType InType)
+	{
+		switch (InType)
+		{
+		case ShaderType::VertexShader:   return shaderc_shader_kind::shaderc_vertex_shader;
+		case ShaderType::PixelShader:    return shaderc_shader_kind::shaderc_fragment_shader;
+		case ShaderType::ComputeShader:  return shaderc_shader_kind::shaderc_compute_shader;
+		default:
+			AUX::Unreachable();
+		}
+	}
+
 	 bool DxcCompiler::Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs) const
 	 {
+		 FString ShaderName = InShader->GetShaderName();
 		 FString HlslSource;
 		 if (InShader->GetShaderLanguage() == GpuShaderLanguage::GLSL)
 		 {
-
+			 static shaderc::Compiler GlslCompiler;
+			 shaderc::CompileOptions Options;
+			 auto Result = GlslCompiler.CompileGlslToSpv(TCHAR_TO_UTF8(*InShader->GetProcessedSourceText()), 
+				 MapShadercKind(InShader->GetShaderType()), TCHAR_TO_UTF8(*ShaderName), 
+				 TCHAR_TO_UTF8(*InShader->GetEntryPoint()), Options);
 		 }
 		 else
 		 {
@@ -248,7 +265,7 @@ namespace FW
 				SourceBuffer.Encoding = Encoding;
 			}
 		}
-		FString ShaderName = InShader->GetShaderName();
+
 #if DEBUG_SHADER
 		if (!ShaderName.IsEmpty())
 		{

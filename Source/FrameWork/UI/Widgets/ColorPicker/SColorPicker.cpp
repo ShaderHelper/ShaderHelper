@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "SColorPicker.h"
+
 #include <Widgets/Colors/SColorWheel.h>
 #include <Widgets/Colors/SSimpleGradient.h>
 #include <Widgets/Input/SSpinBox.h>

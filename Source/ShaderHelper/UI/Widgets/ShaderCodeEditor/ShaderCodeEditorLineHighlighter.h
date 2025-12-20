@@ -1,6 +1,7 @@
 #pragma once
-#include <Widgets/Text/SlateEditableTextTypes.h>
 #include "App/App.h"
+
+#include <Widgets/Text/SlateEditableTextTypes.h>
 
 namespace SH
 {

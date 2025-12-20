@@ -1,6 +1,10 @@
 #pragma once
 #include "AssetObject/AssetObject.h"
 
+#include <HAL/PlatformFileManager.h>
+#include <Async/AsyncFileHandle.h>
+#include <Async/Async.h>
+
 namespace FW
 {
 	class GpuTexture;
@@ -51,40 +55,96 @@ namespace FW
 				return { static_cast<T*>(Assets[Guid]) };
 			}
 
-			AssetObject* NewAssetObject = nullptr;
-			FString AssetExt = FPaths::GetExtension(InAssetPath);
-			TArray<MetaType*> MetaTypes = GetMetaTypes<T>();
-			for (auto MetaTypePtr : MetaTypes)
-			{
-				void* DefaultObject = MetaTypePtr->GetDefaultObject();
-				if (DefaultObject)
-				{
-					T* RelDefaultObject = static_cast<T*>(DefaultObject);
-					if (RelDefaultObject->FileExtension().Contains(AssetExt))
-					{
-						NewAssetObject = static_cast<AssetObject*>(MetaTypePtr->Construct());
-						break;
-					}
-				}
-			}
+			AssetObject* NewAssetObject = ConstructAssetObject<T>(InAssetPath);
 			check(NewAssetObject);
+
 			TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*InAssetPath));
-            if(Ar)
-            {
-                NewAssetObject->Serialize(*Ar);
-                NewAssetObject->PostLoad();
-                Assets.Add(Guid, NewAssetObject);
-                return { static_cast<T*>(NewAssetObject) };
-            }
-            
-            //Failed to load the asset
-            return nullptr;
+			NewAssetObject->Serialize(*Ar);
+			NewAssetObject->PostLoad();
+			Assets.Add(Guid, NewAssetObject);
+			return { static_cast<T*>(NewAssetObject) };
+		}
+
+		//Only can be called from the main/game thread.
+		template<typename T>
+		void AsyncLoadAssetByPath(const FString& InAssetPath, const TFunction<void(AssetPtr<T>)>& CallBack)
+		{
+			static_assert(std::is_base_of_v<AssetObject, T>);
+
+			if (!IsValidAsset(InAssetPath))
+			{
+				CallBack(nullptr);
+				return;
+			}
+
+			FGuid Guid = GetGuid(InAssetPath);
+			if (Assets.Contains(Guid))
+			{
+				CallBack(static_cast<T*>(Assets[Guid]));
+				return;
+			}
+
+			if (PendingLoads.Contains(Guid))
+			{
+				PendingLoads[Guid].Add([CallBack](AssetObject* Obj) {
+					CallBack(static_cast<T*>(Obj));
+				});
+				return;
+			}
+
+			PendingLoads.Add(Guid, { [CallBack](AssetObject* Obj) {
+				CallBack(static_cast<T*>(Obj));
+			} });
+
+			AssetObject* NewAssetObject = ConstructAssetObject<T>(InAssetPath);
+			check(NewAssetObject);
+
+			IAsyncReadFileHandle* AsyncHandle{ FPlatformFileManager::Get().GetPlatformFile().OpenAsyncRead(*InAssetPath) };
+			TUniquePtr<IAsyncReadRequest> SizeRequest{ AsyncHandle->SizeRequest() };
+			SizeRequest->WaitCompletion();
+			int64 FileSize = SizeRequest->GetSizeResults();
+			FAsyncFileCallBack ReadCompleteCallBack = [=, this](bool bWasCancelled, IAsyncReadRequest* Request) {
+				uint8* RawData = Request->GetReadResults();
+				AsyncTask(ENamedThreads::GameThread, [=] {
+					ON_SCOPE_EXIT
+					{
+						delete Request;
+						delete AsyncHandle;
+					};
+
+					if (!RawData)
+					{
+						NotifyPendingLoads(Guid, nullptr);
+						return;
+					}
+
+					FBufferReader Ar(RawData, FileSize, true);
+					NewAssetObject->Serialize(Ar);
+					NewAssetObject->PostLoad();
+					Assets.Add(Guid, NewAssetObject);
+					NotifyPendingLoads(Guid, NewAssetObject);
+				});
+			};
+			AsyncHandle->ReadRequest(0, FileSize, AIOP_Normal, &ReadCompleteCallBack);
 		}
 
 		template<typename T>
 		AssetPtr<T> LoadAssetByGuid(const FGuid& InGuid)
 		{
 			return IsValidAsset(InGuid) ? LoadAssetByPath<T>(GetPath(InGuid)) : nullptr;
+		}
+
+		template<typename T>
+		void AsyncLoadAssetByGuid(const FGuid& InGuid, const TFunction<void(AssetPtr<T>)>& CallBack)
+		{
+			if (IsValidAsset(InGuid))
+			{
+				AsyncLoadAssetByPath(GetPath(InGuid), CallBack);
+			}
+			else
+			{
+				CallBack(nullptr);
+			}
 		}
 
 		AssetObject* FindLoadedAsset(const FGuid& Id)
@@ -122,9 +182,45 @@ namespace FW
 		TArray<FString> GetManageredExts() const;
 
 	private:
+		template<typename T>
+		AssetObject* ConstructAssetObject(const FString& InAssetPath)
+		{
+			AssetObject* NewAssetObject = nullptr;
+			FString AssetExt = FPaths::GetExtension(InAssetPath);
+			TArray<MetaType*> MetaTypes = GetMetaTypes<T>();
+			for (auto MetaTypePtr : MetaTypes)
+			{
+				void* DefaultObject = MetaTypePtr->GetDefaultObject();
+				if (DefaultObject)
+				{
+					T* RelDefaultObject = static_cast<T*>(DefaultObject);
+					if (RelDefaultObject->FileExtension().Contains(AssetExt))
+					{
+						NewAssetObject = static_cast<AssetObject*>(MetaTypePtr->Construct());
+						break;
+					}
+				}
+			}
+			return NewAssetObject;
+		}
+
+		void NotifyPendingLoads(const FGuid& Guid, AssetObject* Result)
+		{
+			if (auto* Callbacks = PendingLoads.Find(Guid))
+			{
+				for (auto& Cb : *Callbacks)
+				{
+					Cb(Result);
+				}
+				PendingLoads.Remove(Guid);
+			}
+		}
+
+	private:
 		TMap<FGuid, AssetPath> GuidToPath;
 		TMap<FGuid, AssetObject*> Assets; //Loaded asset
 		TMap<FGuid, TRefCountPtr<GpuTexture>> AssetThumbnailPool;
+		TMap<FGuid, TArray<TFunction<void(AssetObject*)>>> PendingLoads;
 	};
 
     template<typename T>

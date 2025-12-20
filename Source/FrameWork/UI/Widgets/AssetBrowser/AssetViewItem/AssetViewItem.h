@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Widgets/Views/STileView.h>
+
 namespace FW
 {
     
@@ -8,18 +10,18 @@ namespace FW
     public:
         DRAG_DROP_OPERATOR_TYPE(AssetViewItemDragDropOp, FDragDropOperation)
         
-        static TSharedRef<AssetViewItemDragDropOp> New(const FString& InPath)
+        static TSharedRef<AssetViewItemDragDropOp> New(const TArray<FString>& InPaths)
         {
-            TSharedRef<AssetViewItemDragDropOp> Operation = MakeShareable(new AssetViewItemDragDropOp(InPath));
+            TSharedRef<AssetViewItemDragDropOp> Operation = MakeShareable(new AssetViewItemDragDropOp(InPaths));
             Operation->MouseCursor = EMouseCursor::GrabHandClosed;
             Operation->Construct();
             return Operation;
         }
         
-        FString Path;
+        TArray<FString> Paths;
     protected:
-        AssetViewItemDragDropOp(const FString& InPath)
-            : Path(InPath)
+        AssetViewItemDragDropOp(const TArray<FString>& InPaths)
+            : Paths(InPaths)
         {}
     };
     
@@ -27,12 +29,13 @@ namespace FW
 	{
         MANUAL_RTTI_BASE_TYPE()
 	public:
-		AssetViewItem(const FString& InPath) : Path(InPath) {}
+		AssetViewItem(STileView<TSharedRef<AssetViewItem>>* InOwner, const FString& InPath) : Owner(InOwner), Path(InPath) {}
 		virtual ~AssetViewItem() = default;
 		virtual TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) = 0;
 		FString GetPath() const { return Path; }
 
 	protected:
+		STileView<TSharedRef<AssetViewItem>>* Owner;
 		FString Path;
 	};
 }

@@ -41,6 +41,8 @@ namespace FW
     {
         FGuid Guid = TSingleton<AssetManager>::Get().GetGuid(InPath);
         GuidToPath.Remove(Guid);
+
+		AssetThumbnailPool.Remove(Guid);
     }
 
 	FString AssetManager::GetPath(const FGuid& InGuid) const

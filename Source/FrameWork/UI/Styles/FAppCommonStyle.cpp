@@ -1,8 +1,9 @@
 #include "CommonHeader.h"
 #include "FAppCommonStyle.h"
+#include "Common/Path/BaseResourcePath.h"
+
 #include <Styling/SlateStyleRegistry.h>
 #include <Styling/StyleColors.h>
-#include "Common/Path/BaseResourcePath.h"
 #include <Styling/SlateStyleMacros.h>
 #include <Styling/StarshipCoreStyle.h>
 
