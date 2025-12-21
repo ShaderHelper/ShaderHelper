@@ -37,9 +37,17 @@ namespace FW {
 		
 		FPlatformOutputDevices::SetupOutputDevices();
 
-		FTaskGraphInterface::Startup(FPlatformMisc::NumberOfCores());
+		FTaskGraphInterface::Startup(FPlatformMisc::NumberOfIOWorkerThreadsToSpawn());
 		FTaskGraphInterface::Get().AttachToThread(ENamedThreads::GameThread);
-		GThreadPool = new FQueuedLowLevelThreadPool();
+		if(FPlatformProcess::SupportsMultithreading())
+		{
+			GThreadPool = new FQueuedLowLevelThreadPool();
+			
+			GIOThreadPool = FQueuedThreadPool::Allocate();
+			int32 NumThreadsInThreadPool = FPlatformMisc::NumberOfIOWorkerThreadsToSpawn();
+			verify(GIOThreadPool->Create(NumThreadsInThreadPool, 96 * 1024, TPri_AboveNormal, TEXT("IOThreadPool")));
+		}
+		
 		
 		//Some interfaces with uobject in slate module depend on the CoreUobject module.
 		FModuleManager::Get().LoadModule(TEXT("CoreUObject"));
