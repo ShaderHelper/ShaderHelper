@@ -260,7 +260,6 @@ namespace FW
 	class FRAMEWORK_API SpvDebuggerVisitor : public SpvVisitor
 	{
 	public:
-		SpvDebuggerVisitor() = default;
 		SpvDebuggerVisitor(SpvDebuggerContext& InContext, bool InEnableUbsan) 
 			: Context(InContext)
 			, EnableUbsan(InEnableUbsan)

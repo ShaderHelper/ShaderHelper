@@ -59,7 +59,7 @@ namespace SH
 					if(Item->Data->bFailed) {
 						return FAppStyle::Get().GetBrush("Brushes.Error");
 					}
-					return FAppStyle::Get().GetBrush("Brushes.AccentGray");
+					return FAppStyle::Get().GetBrush("Brushes.Border");
 				})
 				.Padding(FMargin{1.0f})
 				[

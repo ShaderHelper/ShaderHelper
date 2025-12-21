@@ -58,7 +58,7 @@ namespace FW
                 {
                     return FAppStyle::Get().GetBrush("Brushes.Hover");
                 }
-                return FAppStyle::Get().GetBrush("Brushes.Panel");
+                return FAppStyle::Get().GetBrush("Brushes.Border");
             })
             .OnMouseMove_Lambda([this](const FGeometry&, const FPointerEvent&){
                 bPreviewUnderMouse = true;

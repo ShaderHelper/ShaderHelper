@@ -45,8 +45,8 @@ namespace SH
 					return;
 				}
 			}
+			DragDropOp->SetCursorOverride(EMouseCursor::SlashedCircle);
 		}
-		DragDropOp->SetCursorOverride(EMouseCursor::SlashedCircle);
 	}
 
 	void ShaderToy::OnDrop(TSharedPtr<FDragDropOperation> DragDropOp)

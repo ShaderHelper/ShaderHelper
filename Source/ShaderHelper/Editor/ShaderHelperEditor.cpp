@@ -1192,6 +1192,10 @@ namespace SH
 							FSlateApplication::Get().AddWindowAsNativeChild(NewWindow, MainWindow.ToSharedRef());
 							NewWindow->SetContent(SAssignNew(PreferenceView, SPreferenceView));
 						}
+						else
+						{
+							PreferenceWindow.Pin()->BringToFront();
+						}
 					}
 				)));
 		}

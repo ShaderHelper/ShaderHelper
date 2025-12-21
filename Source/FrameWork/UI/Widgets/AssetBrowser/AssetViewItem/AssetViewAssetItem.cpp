@@ -42,9 +42,9 @@ namespace FW
 			SNew(SOverlay)
 			+SOverlay::Slot()
 			[
-				SNew(SImage).Image(ImageBrush)
+				SNew(SImage).Image_Lambda([this] { return ImageBrush; })
 				.Visibility_Lambda([this] {
-					return AssetThumbnail ? EVisibility::Collapsed : EVisibility::Visible;
+					return ImageBrush ? EVisibility::Visible : EVisibility::Collapsed;
 				})
 			]
 			+SOverlay::Slot()

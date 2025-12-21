@@ -105,7 +105,7 @@ namespace FW
 			int64 FileSize = SizeRequest->GetSizeResults();
 			FAsyncFileCallBack ReadCompleteCallBack = [=, this](bool bWasCancelled, IAsyncReadRequest* Request) {
 				uint8* RawData = Request->GetReadResults();
-				AsyncTask(ENamedThreads::GameThread, [=] {
+				AsyncTask(ENamedThreads::GameThread, [=, this] {
 					ON_SCOPE_EXIT
 					{
 						delete Request;
