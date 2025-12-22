@@ -200,15 +200,8 @@ namespace FW
 
 	void SGraphNode::AddDep(SGraphNode* InNode)
 	{
-		if (OutDegreeDeps.Contains(InNode))
-		{
-			OutDegreeDeps[InNode]++;
-		}
-		else
-		{
-			OutDegreeDeps.Add(InNode);
-			Owner->GetGraphData()->AddDep( InNode->NodeData, this->NodeData);
-		}
+		OutDegreeDeps.FindOrAdd(InNode)++;
+		Owner->GetGraphData()->AddDep(InNode->NodeData, this->NodeData);
 	}
 
 	void SGraphNode::RemoveDep(SGraphNode* InNode)

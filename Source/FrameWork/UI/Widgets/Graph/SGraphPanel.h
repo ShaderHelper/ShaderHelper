@@ -201,7 +201,7 @@ namespace FW
 		SGraphPin* GetGraphPin(FGuid PinId);
 		SGraphPin* GetOuputPin(SGraphPin* InputPin) const;
 		void AddLink(SGraphPin* Output, SGraphPin* Input);
-		void RemoveLink(SGraphPin* Input);
+		void RemoveLink(SGraphPin* Output, SGraphPin* Input);
 
 		//GraphCoord center is (0,0) 
 		Vector2D PanelCoordToGraphCoord(const Vector2D& InCoord) const;

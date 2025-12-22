@@ -30,9 +30,9 @@ namespace FW
 			FExecuteAction::CreateLambda([this] {
 				if (!UndoStack.IsEmpty()) {
 					auto State = UndoStack.Pop();
-					for (const auto& Command : State.Commands)
+					for (int Index = State.Commands.Num() - 1; Index >= 0; Index--)
 					{
-						Command->Undo();
+						State.Commands[Index]->Undo();
 					}
 					RedoStack.Add(State);
 				}
@@ -125,18 +125,14 @@ namespace FW
 		}
 	}
 
-	void SGraphPanel::RemoveLink(SGraphPin* Input)
+	void SGraphPanel::RemoveLink(SGraphPin* Output, SGraphPin* Input)
 	{
-		if (auto Key = Links.FindKey(Input))
-		{
-			SGraphPin* Output = *Key;
-			Links.Remove(Output, Input);
-			Output->Owner->RemoveDep(Input->Owner);
-			Input->PinData->SourcePin.Invalidate();
-			auto Kkey = Output->Owner->NodeData->OutPinToInPin.FindKey(Input->PinData->GetGuid());
-			Output->Owner->NodeData->OutPinToInPin.Remove(*Kkey, Input->PinData->GetGuid());
-            Input->PinData->Refuse();
-		}
+		Links.Remove(Output, Input);
+		Output->Owner->RemoveDep(Input->Owner);
+		Input->PinData->SourcePin.Invalidate();
+		auto Kkey = Output->Owner->NodeData->OutPinToInPin.FindKey(Input->PinData->GetGuid());
+		Output->Owner->NodeData->OutPinToInPin.Remove(*Kkey, Input->PinData->GetGuid());
+		Input->PinData->Refuse();
 	}
 
 	Vector2D SGraphPanel::PanelCoordToGraphCoord(const Vector2D& InCoord) const
@@ -641,22 +637,23 @@ namespace FW
 
 	void SGraphPanel::DeleteSelectedNodes()
 	{
-		for (auto Node : SelectedNodes)
+		for (int Index = SelectedNodes.Num() -1; Index >= 0; Index--)
 		{
+			SGraphNode* Node = SelectedNodes[Index];
+			for (auto [OuputPin, InputPin] : Links)
+			{
+				if (OuputPin->Owner == Node || InputPin->Owner == Node)
+				{
+					DoCommand(MakeShared<RemoveLinkCommand>(this, OuputPin->PinData, InputPin->PinData));
+				}
+			}
+
 			DoCommand(MakeShared<RemoveNodeCommand>(this, Node->NodeData));
 		}
 	}
 
 	void SGraphPanel::DeleteNode(SGraphNode* Node)
 	{
-		for (auto [OuputPin, InputPin] : Links)
-		{
-			if (OuputPin->Owner == Node || InputPin->Owner == Node)
-			{
-				DoCommand(MakeShared<RemoveLinkCommand>(this, OuputPin->PinData, InputPin->PinData));
-			}
-		}
-
 		ShObjectOp* Op = GetShObjectOp(Node->NodeData);
 		Op->OnCancelSelect(Node->NodeData);
 		
@@ -736,15 +733,17 @@ namespace FW
 
 	void AddLinkCommand::Undo()
 	{
+		SGraphPin* OutputPin = GraphPanel->GetGraphPin(Output->GetGuid());
 		SGraphPin* InputPin = GraphPanel->GetGraphPin(Input->GetGuid());
-		GraphPanel->RemoveLink(InputPin);
+		GraphPanel->RemoveLink(OutputPin, InputPin);
 		GraphPanel->GetGraphData()->MarkDirty();
 	}
 
 	void RemoveLinkCommand::Do()
 	{
+		SGraphPin* OutputPin = GraphPanel->GetGraphPin(Output->GetGuid());
 		SGraphPin* InputPin = GraphPanel->GetGraphPin(Input->GetGuid());
-		GraphPanel->RemoveLink(InputPin);
+		GraphPanel->RemoveLink(OutputPin, InputPin);
 		GraphPanel->GetGraphData()->MarkDirty();
 	}
 
