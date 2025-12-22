@@ -83,6 +83,7 @@ namespace SH
 	{
 		return	SNew(SVerticalBox)
 				+ SVerticalBox::Slot()
+				.Padding(4, 0, 4, 0)
 				.AutoHeight()
 				[
 					SNew(SBorder).BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))

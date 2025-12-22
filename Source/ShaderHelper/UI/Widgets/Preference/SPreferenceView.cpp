@@ -353,6 +353,7 @@ namespace SH
 		Palette.Add(EStyleColor::Hover);
 		Palette.Add(EStyleColor::Primary);
 		Palette.Add(EStyleColor::Select);
+		Palette.Add(EStyleColor::SelectInactive);
 		Palette.Add(EStyleColor::SelectHover);
 		Palette.Add(EStyleColor::Header);
 		Palette.Add(EStyleColor::Title);

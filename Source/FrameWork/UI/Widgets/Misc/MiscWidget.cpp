@@ -148,7 +148,8 @@ namespace FW
 						.SupportsMaximize(false)
 						.SupportsMinimize(false)
 						.IsPopupWindow(true)
-						.SizingRule(ESizingRule::Autosized)
+						.SizingRule(ESizingRule::FixedSize)
+						.ClientSize(FVector2D(350.f, 160.f))
 						.ActivationPolicy(EWindowActivationPolicy::Never)
 						[
 							SNew(SColorPicker)

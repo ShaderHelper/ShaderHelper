@@ -15,16 +15,6 @@ namespace FW
 		NodeData = InArgs._NodeData;
 		Owner = InOwnerPanel;
 
-		UICommandList = MakeShared<FUICommandList>();
-		UICommandList->MapAction(
-			GraphEditorCommands::Get().Delete,
-			FExecuteAction::CreateRaw(this, &SGraphNode::OnHandleDeleteAction)
-		);
-		UICommandList->MapAction(
-			GraphEditorCommands::Get().Rename,
-			FExecuteAction::CreateRaw(this, &SGraphNode::OnHandleRenameAction)
-		);
-
 		TSharedRef<SVerticalBox> PinContainer = SNew(SVerticalBox);
 
 		ChildSlot
@@ -42,8 +32,8 @@ namespace FW
                     .IsSelected_Lambda([] {return false; })
 					.Text_Lambda([this] { return NodeData->ObjectName; })
 					.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
-						NodeData->ObjectName = NewText;
-						NodeData->GetOuterMost()->MarkDirty();
+						SGraphPanel::ScopedTransaction Transaction{ Owner };
+						Owner->DoCommand(MakeShared<RenameNodeCommand>(Owner, NodeData, NodeData->ObjectName, NewText));
 					})
 				]
 			]
@@ -134,12 +124,24 @@ namespace FW
 		{
 			if (!Owner->IsSelectedNode(this))
 			{
-				Owner->ClearSelectedNode();
+				if (!MouseEvent.IsShiftDown())
+				{
+					Owner->ClearSelectedNode();
+				}
+				
 				Owner->AddSelectedNode(SharedThis(this));
 			}
 			MousePos = MouseEvent.GetScreenSpacePosition();
             ShObjectOp* Op = GetShObjectOp(NodeData);
             Op->OnSelect(NodeData);
+
+			if (MouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton))
+			{
+				for (auto Node : Owner->SelectedNodes)
+				{
+					Owner->MovingNodes.Emplace( Node->NodeData, Node->NodeData->Position );
+				}
+			}
 			return FReply::Handled();
 		}
 		return FReply::Unhandled();
@@ -158,9 +160,20 @@ namespace FW
 			FVector2D Offset = MouseEvent.GetScreenSpacePosition() - MousePos;
 			if (Owner->IsMultiSelect() && Offset.Equals(FVector2D::Zero(), 0.01))
 			{
-				Owner->ClearSelectedNode();
+				if (!MouseEvent.IsShiftDown())
+				{
+					Owner->ClearSelectedNode();
+				}
+				
 				Owner->AddSelectedNode(SharedThis(this));
 			}
+
+			SGraphPanel::ScopedTransaction Transaction{ Owner };
+			for (auto [NodeData, OldPos] : Owner->MovingNodes)
+			{
+				Owner->DoCommand(MakeShared<MoveNodeCommand>(Owner, NodeData, OldPos, NodeData->Position));
+			}
+			Owner->MovingNodes.Empty();
 			return FReply::Handled();
 		}
 		return FReply::Unhandled();
@@ -168,7 +181,7 @@ namespace FW
 
 	TSharedRef<SWidget> SGraphNode::CreateContextMenu()
 	{
-		FMenuBuilder MenuBuilder{ true, UICommandList };
+		FMenuBuilder MenuBuilder{ true, Owner->UICommandList };
 		MenuBuilder.BeginSection("Control", FText::FromString("Control"));
 		{
 			MenuBuilder.AddMenuEntry(GraphEditorCommands::Get().Delete, NAME_None, {}, {}, 
@@ -180,23 +193,9 @@ namespace FW
 		return MenuBuilder.MakeWidget();
 	}
 
-	void SGraphNode::OnHandleDeleteAction()
-	{
-		Owner->DeleteSelectedNodes();
-	}
-
-	void SGraphNode::OnHandleRenameAction()
+	void SGraphNode::HandleRenameAction()
 	{
 		NodeTitleEditText->EnterEditingMode();
-	}
-
-	FReply SGraphNode::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
-	{
-		if (UICommandList.IsValid() && UICommandList->ProcessCommandBindings(InKeyEvent))
-		{
-			return FReply::Handled();
-		}
-		return FReply::Unhandled();
 	}
 
 	void SGraphNode::AddDep(SGraphNode* InNode)

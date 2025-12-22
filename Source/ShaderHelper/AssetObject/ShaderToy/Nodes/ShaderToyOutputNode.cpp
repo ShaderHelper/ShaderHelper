@@ -71,7 +71,7 @@ namespace SH
         ResultPin->ObjectName = FText::FromString("RT");
         ResultPin->Direction = PinDirection::Input;
         
-        Pins.Add(MoveTemp(ResultPin));
+		Pins = { MoveTemp(ResultPin) };
     }
 
 	void ShaderToyOutputNode::Serialize(FArchive& Ar)

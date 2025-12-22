@@ -40,6 +40,7 @@ namespace SH {
 		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::Hover, LOCALIZATION("Hover"));
 		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::Primary, LOCALIZATION("Primary"));
 		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::Select, LOCALIZATION("Select"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::SelectInactive, LOCALIZATION("SelectInactive"));
 		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::Title, LOCALIZATION("Title"));
 
 		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User1, LOCALIZATION("Keyword"));
@@ -204,15 +205,10 @@ namespace SH {
 
 		Style->Set("Icons.World", new IMAGE_BRUSH_SVG("Starship/Common/world", FVector2D{16.0f,16.0f}));
         
-		FLinearColor HoverColor = FStyleColors::Hover.GetSpecifiedColor();
-		HoverColor.A = 0.5f;
-		FLinearColor Hover2Color = FStyleColors::Hover2.GetSpecifiedColor();
-		Hover2Color.A = 0.5f;
-		
         const FScrollBarStyle ScrollBar = FScrollBarStyle()
-            .SetNormalThumbImage(FSlateColorBrush(HoverColor))
-            .SetDraggedThumbImage(FSlateColorBrush(Hover2Color))
-            .SetHoveredThumbImage(FSlateColorBrush(Hover2Color))
+            .SetNormalThumbImage(FSlateColorBrush(FStyleColors::Secondary))
+            .SetDraggedThumbImage(FSlateColorBrush(FStyleColors::Hover))
+            .SetHoveredThumbImage(FSlateColorBrush(FStyleColors::Hover))
             .SetThickness(5.0f);
 		Style->Set("CustomScrollbar", ScrollBar);
 

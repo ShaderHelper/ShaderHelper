@@ -5,7 +5,6 @@
 #include "AssetObject/Graph.h"
 #include "AssetManager/AssetManager.h"
 #include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
-#include "UI/Widgets/Graph/SGraphPanel.h"
 #include "Renderer/RenderComponent.h"
 #include "Renderer/Renderer.h"
 #include "ProjectManager/ShProjectManager.h"
@@ -21,6 +20,11 @@
 #include "UI/Widgets/SShViewport.h"
 
 #include <Widgets/SViewport.h>
+
+namespace FW
+{
+	class SGraphPanel;
+}
 
 namespace SH
 {

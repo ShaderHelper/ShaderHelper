@@ -26,10 +26,54 @@ namespace FW
 			})
 		);
 		UICommandList->MapAction(
+			GraphEditorCommands::Get().Undo,
+			FExecuteAction::CreateLambda([this] {
+				if (!UndoStack.IsEmpty()) {
+					auto State = UndoStack.Pop();
+					for (const auto& Command : State.Commands)
+					{
+						Command->Undo();
+					}
+					RedoStack.Add(State);
+				}
+			}),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(
+			GraphEditorCommands::Get().Redo,
+			FExecuteAction::CreateLambda([this] {
+				if (!RedoStack.IsEmpty()) {
+					auto State = RedoStack.Pop();
+					for (const auto& Command : State.Commands)
+					{
+						Command->Do();
+					}
+					UndoStack.Add(State);
+				}
+			}),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(
 			GraphEditorCommands::Get().CutLine,
 			FExecuteAction::CreateLambda([this] {
 				CutLineStart = MousePos;
 				CutLineEnd = *CutLineStart;
+			})
+		);
+		UICommandList->MapAction(
+			GraphEditorCommands::Get().Delete,
+			FExecuteAction::CreateLambda([this] {
+				ScopedTransaction Transaction(this);
+				DeleteSelectedNodes();
+			})
+		);
+		UICommandList->MapAction(
+			GraphEditorCommands::Get().Rename,
+			FExecuteAction::CreateLambda([this] {
+				if (SelectedNodes.Num() > 0)
+				{
+					SelectedNodes.Last()->HandleRenameAction();
+				}
 			})
 		);
 
@@ -46,24 +90,26 @@ namespace FW
 		ViewOffset = 0;
 		MousePos = 0;
 		ZoomValue = 0;
+		CurrentTransaction.reset();
+		UndoStack.Empty();
+		RedoStack.Empty();
+		MovingNodes.Empty();
 	}
 
-	void SGraphPanel::AddNode(ObjectPtr<GraphNode> NewNodeData)
+	void SGraphPanel::AddNode(ObjectPtr<GraphNode> NewNodeData, const Vector2D& Pos)
 	{
-		NewNodeData->InitPins();
 		NewNodeData->SetOuter(GraphData);
-		NewNodeData->Position = PanelCoordToGraphCoord(MousePos);
-		
+		NewNodeData->Position = Pos; 
+
 		ShObjectOp* Op = GetShObjectOp(NewNodeData);
 		Op->OnSelect(NewNodeData);
 
 		auto NodeWidget = NewNodeData->CreateNodeWidget(this);
 		Nodes.Add(NodeWidget);
-		
+
 		ClearSelectedNode();
 		GraphData->AddNode(NewNodeData);
 		AddSelectedNode(NodeWidget);
-		GraphData->MarkDirty();
 	}
 
 	void SGraphPanel::AddLink(SGraphPin* Output, SGraphPin* Input)
@@ -121,7 +167,7 @@ namespace FW
 		return nullptr;
 	}
 
-	SGraphPin* SGraphPanel::GetOuputPinInLink(SGraphPin* InputPin) const
+	SGraphPin* SGraphPanel::GetOuputPin(SGraphPin* InputPin) const
 	{
 		auto KeyPtr = Links.FindKey(InputPin);
 		if (KeyPtr)
@@ -253,9 +299,8 @@ namespace FW
 
 					if (LineBezierIntersection(*CutLineStart, CutLineEnd, C0, C1, C2, C3))
 					{
-                        RemoveLink(InputPin);
-						
-						GraphData->MarkDirty();
+						ScopedTransaction Transaction(this);
+						DoCommand(MakeShared<RemoveLinkCommand>(this, OuputPin->PinData, InputPin->PinData));
 					}
 				}
 				CutLineStart.Reset();
@@ -299,10 +344,6 @@ namespace FW
 				{
 					Node->NodeData->Position += Offset;
 				}
-                if(FMath::Abs(DeltaPos.x) > 0.8 || FMath::Abs(DeltaPos.y) > 0.8)
-                {
-                    GraphData->MarkDirty();
-                }
 			}
 			return FReply::Handled();
 		}
@@ -358,7 +399,7 @@ namespace FW
 		if(GraphData)
 		{
 			TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
-			GraphData->OnDrop(DragDropOp);
+			GraphData->OnDrop(DragDropOp, PanelCoordToGraphCoord(MousePos));
 		}
 		return FReply::Handled().ReleaseMouseLock();
 	}
@@ -447,7 +488,7 @@ namespace FW
 					CurWidget.Geometry.ToInflatedPaintGeometry(FVector2D{ 2, 2 }),
 					FAppCommonStyle::Get().GetBrush("Graph.NodeOutline"),
 					ESlateDrawEffect::None,
-					FStyleColors::Select.GetSpecifiedColor()
+					HasKeyboardFocus() ? FStyleColors::Select.GetSpecifiedColor() : FStyleColors::SelectInactive.GetSpecifiedColor()
 				);
 			}
 
@@ -490,7 +531,9 @@ namespace FW
 				OutDrawElements,
 				MaxTopNodeLayer,
 				AllottedGeometry.ToPaintGeometry(MarqueeSize, FSlateLayoutTransform(UpperLeft)),
-				FAppCommonStyle::Get().GetBrush("Graph.Selector")
+				FAppCommonStyle::Get().GetBrush("Graph.Selector"),
+				ESlateDrawEffect::None,
+				FStyleColors::Foreground.GetSpecifiedColor()
 			);
 		}
         
@@ -578,8 +621,10 @@ namespace FW
 			return CurNode->ObjectName.EqualTo(*InSelectedItem);
 		});
 
+		ScopedTransaction Transaction(this);
 		ObjectPtr<GraphNode> NewNodeData = static_cast<GraphNode*>(DefaultNodeData->DynamicMetaType()->Construct());
-		AddNode(NewNodeData);
+		NewNodeData->InitPins();
+		DoCommand(MakeShared<AddNodeCommand>(this, NewNodeData, PanelCoordToGraphCoord(MousePos)));
 
 		FSlateApplication::Get().DismissAllMenus();
 	}
@@ -598,7 +643,7 @@ namespace FW
 	{
 		for (auto Node : SelectedNodes)
 		{
-			DeleteNode(Node);
+			DoCommand(MakeShared<RemoveNodeCommand>(this, Node->NodeData));
 		}
 	}
 
@@ -608,7 +653,7 @@ namespace FW
 		{
 			if (OuputPin->Owner == Node || InputPin->Owner == Node)
 			{
-                RemoveLink(InputPin);
+				DoCommand(MakeShared<RemoveLinkCommand>(this, OuputPin->PinData, InputPin->PinData));
 			}
 		}
 
@@ -631,9 +676,105 @@ namespace FW
 		Nodes.RemoveAt(RemoveIndex);
 		
 		SelectedNodes.Remove(Node);
-		GraphData->MarkDirty();
 	}
 
+	SGraphNode* SGraphPanel::GetNode(GraphNode* NodeData)
+	{
+		for (int i = 0; i < Nodes.Num(); i++)
+		{
+			if (Nodes[i]->NodeData == NodeData)
+			{
+				return &*Nodes[i];
+			}
+		}
+		return nullptr;
+	}
+
+	void RenameNodeCommand::Do()
+	{
+		NodeData->ObjectName = NewName;
+		GraphPanel->GetGraphData()->MarkDirty();
+	}
+
+	void RenameNodeCommand::Undo()
+	{
+		NodeData->ObjectName = OldName;
+		GraphPanel->GetGraphData()->MarkDirty();
+	}
+
+	void AddNodeCommand::Do()
+	{
+		GraphPanel->AddNode(NodeData, Pos);
+		GraphPanel->GetGraphData()->MarkDirty();
+	}
+
+	void AddNodeCommand::Undo()
+	{
+		GraphPanel->DeleteNode(GraphPanel->GetNode(NodeData));
+		GraphPanel->GetGraphData()->MarkDirty();
+	}
+
+	void RemoveNodeCommand::Do()
+	{
+		GraphPanel->DeleteNode(GraphPanel->GetNode(NodeData));
+		GraphPanel->GetGraphData()->MarkDirty();
+	}
+
+	void RemoveNodeCommand::Undo()
+	{
+		GraphPanel->AddNode(NodeData, NodeData->Position);
+		GraphPanel->GetGraphData()->MarkDirty();
+	}
+
+	void AddLinkCommand::Do()
+	{
+		SGraphPin* OutputPin = GraphPanel->GetGraphPin(Output->GetGuid());
+		SGraphPin* InputPin = GraphPanel->GetGraphPin(Input->GetGuid());
+		GraphPanel->AddLink(OutputPin, InputPin);
+		GraphPanel->GetGraphData()->MarkDirty();
+	}
+
+	void AddLinkCommand::Undo()
+	{
+		SGraphPin* InputPin = GraphPanel->GetGraphPin(Input->GetGuid());
+		GraphPanel->RemoveLink(InputPin);
+		GraphPanel->GetGraphData()->MarkDirty();
+	}
+
+	void RemoveLinkCommand::Do()
+	{
+		SGraphPin* InputPin = GraphPanel->GetGraphPin(Input->GetGuid());
+		GraphPanel->RemoveLink(InputPin);
+		GraphPanel->GetGraphData()->MarkDirty();
+	}
+
+	void RemoveLinkCommand::Undo()
+	{
+		SGraphPin* OutputPin = GraphPanel->GetGraphPin(Output->GetGuid());
+		SGraphPin* InputPin = GraphPanel->GetGraphPin(Input->GetGuid());
+		GraphPanel->AddLink(OutputPin, InputPin);
+		GraphPanel->GetGraphData()->MarkDirty();
+	}
+
+	void MoveNodeCommand::Do()
+	{
+		NodeData->Position = NewPos;
+		Vector2D DeltaPos = NewPos - OldPos;
+		if (FMath::Abs(DeltaPos.x) > 0.8 || FMath::Abs(DeltaPos.y) > 0.8)
+		{
+			GraphPanel->GetGraphData()->MarkDirty();
+		}
+	}
+
+	void MoveNodeCommand::Undo()
+	{
+		NodeData->Position = OldPos;
+		Vector2D DeltaPos = NewPos - OldPos;
+		if (FMath::Abs(DeltaPos.x) > 0.8 || FMath::Abs(DeltaPos.y) > 0.8)
+		{
+			GraphPanel->GetGraphData()->MarkDirty();
+		}
+	}
 
 }
 

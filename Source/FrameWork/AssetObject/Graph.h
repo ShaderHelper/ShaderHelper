@@ -108,7 +108,7 @@ namespace FW
 		void Serialize(FArchive& Ar) override;
 		const FSlateBrush* GetImage() const override;
 		virtual void OnDragEnter(TSharedPtr<FDragDropOperation> DragDropOp) {}
-		virtual void OnDrop(TSharedPtr<FDragDropOperation> DragDropOp) {}
+		virtual void OnDrop(TSharedPtr<FDragDropOperation> DragDropOp, const Vector2D& Pos) {}
 		virtual ExecRet Exec(GraphExecContext& Context);
 		
     public:

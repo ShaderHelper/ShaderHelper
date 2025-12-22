@@ -55,14 +55,14 @@ namespace FW
 				return { static_cast<T*>(Assets[Guid]) };
 			}
 
-			AssetObject* NewAssetObject = ConstructAssetObject<T>(InAssetPath);
-			check(NewAssetObject);
+			AssetPtr<T> NewAssetObject = ConstructAssetObject<T>(InAssetPath);
+			check(NewAssetObject.IsValid());
 
 			TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*InAssetPath));
 			NewAssetObject->Serialize(*Ar);
 			NewAssetObject->PostLoad();
 			Assets.Add(Guid, NewAssetObject);
-			return { static_cast<T*>(NewAssetObject) };
+			return NewAssetObject;
 		}
 
 		//Only can be called from the main/game thread.
@@ -96,9 +96,6 @@ namespace FW
 				CallBack(static_cast<T*>(Obj));
 			} });
 
-			AssetObject* NewAssetObject = ConstructAssetObject<T>(InAssetPath);
-			check(NewAssetObject);
-
 			IAsyncReadFileHandle* AsyncHandle{ FPlatformFileManager::Get().GetPlatformFile().OpenAsyncRead(*InAssetPath) };
 			TUniquePtr<IAsyncReadRequest> SizeRequest{ AsyncHandle->SizeRequest() };
 			SizeRequest->WaitCompletion();
@@ -119,6 +116,8 @@ namespace FW
 					}
 
 					FBufferReader Ar(RawData, FileSize, true);
+					AssetPtr<T> NewAssetObject = ConstructAssetObject<T>(InAssetPath);
+					check(NewAssetObject.IsValid());
 					NewAssetObject->Serialize(Ar);
 					NewAssetObject->PostLoad();
 					Assets.Add(Guid, NewAssetObject);
@@ -183,7 +182,7 @@ namespace FW
 
 	private:
 		template<typename T>
-		AssetObject* ConstructAssetObject(const FString& InAssetPath)
+		AssetPtr<T> ConstructAssetObject(const FString& InAssetPath)
 		{
 			AssetObject* NewAssetObject = nullptr;
 			FString AssetExt = FPaths::GetExtension(InAssetPath);
@@ -201,7 +200,7 @@ namespace FW
 					}
 				}
 			}
-			return NewAssetObject;
+			return static_cast<T*>(NewAssetObject);
 		}
 
 		void NotifyPendingLoads(const FGuid& Guid, AssetObject* Result)

@@ -48,7 +48,7 @@ namespace SH
 		OutputPin->ObjectName = FText::FromString("RT");
 		OutputPin->Direction = PinDirection::Output;
 
-		Pins.Add(MoveTemp(OutputPin));
+		Pins = { MoveTemp(OutputPin) };
 	}
 
 	void ShaderToyKeyboardNode::Serialize(FArchive& Ar)

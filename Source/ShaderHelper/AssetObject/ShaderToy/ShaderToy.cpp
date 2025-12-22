@@ -49,7 +49,7 @@ namespace SH
 		}
 	}
 
-	void ShaderToy::OnDrop(TSharedPtr<FDragDropOperation> DragDropOp)
+	void ShaderToy::OnDrop(TSharedPtr<FDragDropOperation> DragDropOp, const Vector2D& Pos)
 	{
 		if(DragDropOp->IsOfType<AssetViewItemDragDropOp>())
 		{
@@ -62,14 +62,22 @@ namespace SH
 				if (DropAssetMetaType->IsType<Texture2D>())
 				{
 					AssetPtr<Texture2D> TexAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<Texture2D>(DropFilePath);
+
+					SGraphPanel::ScopedTransaction Transcation(GraphPanel);
 					auto NewTexNode = NewShObject<Texture2dNode>(this, MoveTemp(TexAsset));
-					GraphPanel->AddNode(MoveTemp(NewTexNode));
+					NewTexNode->InitPins();
+					GraphPanel->DoCommand(MakeShared<AddNodeCommand>(GraphPanel, NewTexNode, Pos));
+					GraphPanel->SetFocus();
 				}
 				else if (DropAssetMetaType->IsType<StShader>())
 				{
 					AssetPtr<StShader> ShaderAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<StShader>(DropFilePath);
+
+					SGraphPanel::ScopedTransaction Transcation(GraphPanel);
 					auto NewPassNode = NewShObject<ShaderToyPassNode>(this, MoveTemp(ShaderAsset));
-					GraphPanel->AddNode(MoveTemp(NewPassNode));
+					NewPassNode->InitPins();
+					GraphPanel->DoCommand(MakeShared<AddNodeCommand>(GraphPanel, NewPassNode, Pos));
+					GraphPanel->SetFocus();
 				}
 			}
 			
