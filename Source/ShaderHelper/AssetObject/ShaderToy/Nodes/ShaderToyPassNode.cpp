@@ -11,7 +11,6 @@
 #include "ShaderConductor.hpp"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 
-#include <Widgets/SViewport.h>
 #include <regex>
 
 using namespace FW;
@@ -244,7 +243,7 @@ namespace SH
 				{
 					FString ShaderText;
 					FFileHelper::LoadFileToString(ShaderText, *IncludedFile);
-					ShaderText = GpuShaderPreProcessor{ ShaderText }
+					ShaderText = GpuShaderPreProcessor{ ShaderText, ShaderAssetObj->Shader->GetShaderLanguage()}
 						.ReplacePrintStringLiteral()
 						.Finalize();
 					auto SourceText = StringCast<UTF8CHAR>(*ShaderText);

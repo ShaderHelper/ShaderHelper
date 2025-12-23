@@ -62,7 +62,7 @@ namespace FW
 		const int32 LogFontSize =  9;
 		const FTextBlockStyle NormalLogText = FTextBlockStyle(NormalText)
 			.SetFont(TTF_FONT(TEXT("Fonts/DroidSansMono"), LogFontSize))
-			.SetColorAndOpacity(FStyleColors::White)
+			.SetColorAndOpacity(FStyleColors::Foreground)
 			.SetSelectedBackgroundColor(FStyleColors::Select)
 			.SetHighlightColor(FStyleColors::Highlight);
 

@@ -49,8 +49,13 @@ namespace FW
 //
 //		ShaderText = FString{UTF8_TO_TCHAR(ShaderString.data())};
 		FString NewShaderText;
-		const TCHAR* Src = *ShaderText;
-		int32 SrcLen = ShaderText.Len();
+		const bool bIsGLSL = (Language == GpuShaderLanguage::GLSL);
+
+		// Operate directly on internal ShaderText buffer.
+		FString& TargetShaderText = ShaderText;
+
+		const TCHAR* Src = *TargetShaderText;
+		int32 SrcLen = TargetShaderText.Len();
 		int32 i = 0;
 
 		auto TryReplace = [&](const TCHAR* Keyword) -> bool
@@ -62,6 +67,7 @@ namespace FW
 				while (j < SrcLen && FChar::IsWhitespace(Src[j])) ++j;
 				if (j < SrcLen && Src[j] == '(')
 				{
+					const int32 CallOpen = j;
 					++j;
 					int32 ParenDepth = 1;
 					int32 StringStart = -1, StringEnd = -1;
@@ -88,18 +94,147 @@ namespace FW
 					}
 					if (StringStart != -1 && StringEnd != -1)
 					{
-						NewShaderText.AppendChars(Src + i, StringStart - i);
-						FString PrintStringLiteral = ShaderText.Mid(StringStart, StringEnd - StringStart + 1);
-						FString TextArr = TEXT("EXPAND(uint StrArr[] = {");
-						int Num = PrintStringLiteral.Len() - 1;
-						for (int k = 1; k < Num;)
+						// Find the end of the entire function call to preserve arguments after the string
+						int32 CallEnd = StringEnd + 1;
+						int32 Depth = 1; // already inside outer call paren
+						bool bInString = false;
+						while (CallEnd < SrcLen && Depth > 0)
 						{
-							TextArr += FString::Printf(TEXT("%d,"), PrintStringLiteral[k]);
-							k++;
+							TCHAR C = Src[CallEnd];
+							if (C == '"' && (CallEnd == 0 || Src[CallEnd - 1] != '\\'))
+							{
+								bInString = !bInString;
+							}
+							else if (!bInString)
+							{
+								if (C == '(') Depth++;
+								else if (C == ')')
+								{
+									Depth--;
+									if (Depth == 0)
+									{
+										break;
+									}
+								}
+							}
+							++CallEnd;
 						}
-						TextArr += TEXT("0})");
+
+						// For GLSL we also need to adjust the function/macro name to Print0/1/2/3, Assert0/1/2/3, etc.
+						if (bIsGLSL)
+						{
+							// Count additional arguments after the string literal within this call
+							int32 AdditionalArgs = 0;
+							int32 kPos = StringEnd + 1;
+							int32 ArgDepth = 1; // already inside outer call paren
+							bool bArgInString = false;
+							while (kPos < CallEnd && ArgDepth > 0)
+							{
+								TCHAR C = Src[kPos];
+								if (C == '"' && (kPos == 0 || Src[kPos - 1] != '\\'))
+								{
+									bArgInString = !bArgInString;
+								}
+								else if (!bArgInString)
+								{
+									if (C == '(') ArgDepth++;
+									else if (C == ')')
+									{
+										ArgDepth--;
+										if (ArgDepth == 0)
+										{
+											break;
+										}
+									}
+									else if (C == ',' && ArgDepth == 1)
+									{
+										++AdditionalArgs;
+									}
+								}
+								++kPos;
+							}
+
+							const bool bIsPrint = FCString::Strcmp(Keyword, TEXT("Print")) == 0;
+							const bool bIsPrintAtMouse = FCString::Strcmp(Keyword, TEXT("PrintAtMouse")) == 0;
+							const bool bIsAssert = FCString::Strcmp(Keyword, TEXT("Assert")) == 0;
+
+							FString NewName;
+							if (bIsPrint)
+							{
+								// Print("...", a,b,c) -> PrintN("...", a,b,c) where N = number of value args
+								int32 N = FMath::Clamp(AdditionalArgs, 0, 3);
+								NewName = FString::Printf(TEXT("Print%d"), N);
+							}
+							else if (bIsPrintAtMouse)
+							{
+								// PrintAtMouse("...", a,b,c) -> PrintAtMouse0 / PrintAtMouse1 / PrintAtMouse2 / PrintAtMouse3
+								int32 N = FMath::Clamp(AdditionalArgs, 0, 3);
+								NewName = FString::Printf(TEXT("PrintAtMouse%d"), N);
+							}
+							else if (bIsAssert)
+							{
+								// Assert(Cond, "text", v1, v2, v3) -> AssertN(Cond, "text", v1, v2, v3)
+								// AdditionalArgs here is number of value args after the string
+								int32 N = FMath::Clamp(AdditionalArgs, 0, 3);
+								NewName = FString::Printf(TEXT("Assert%d"), N);
+							}
+
+							if (!NewName.IsEmpty())
+							{
+								// Up to this point NewShaderText already has Src[0..i-1]
+								const int32 NameEnd = i + KeywordLen;
+								NewShaderText += NewName;
+								// Append everything between original name and the start of the string literal
+								NewShaderText.AppendChars(Src + NameEnd, StringStart - NameEnd);
+							}
+							else
+							{
+								// Fallback: keep original text if we did not recognize the keyword
+								NewShaderText.AppendChars(Src + i, StringStart - i);
+							}
+						}
+						else
+						{
+							// HLSL path: keep original keyword, only replace the string literal
+							NewShaderText.AppendChars(Src + i, StringStart - i);
+						}
+
+						FString PrintStringLiteral = TargetShaderText.Mid(StringStart, StringEnd - StringStart + 1);
+
+						FString TextArr;
+						if (bIsGLSL)
+						{
+							// GLSL: uint StrArr[] = uint[](102u, 114u, ... , 0u)
+							TextArr = TEXT("EXPAND(uint StrArr[] = uint[](");
+							int Num = PrintStringLiteral.Len() - 1;
+							for (int k = 1; k < Num;)
+							{
+								TextArr += FString::Printf(TEXT("%du,"), (uint8)PrintStringLiteral[k]);
+								k++;
+							}
+							TextArr += TEXT("0u))");
+						}
+						else
+						{
+							// HLSL: uint StrArr[] = {102,114,...,0}
+							TextArr = TEXT("EXPAND(uint StrArr[] = {");
+							int Num = PrintStringLiteral.Len() - 1;
+							for (int k = 1; k < Num;)
+							{
+								TextArr += FString::Printf(TEXT("%d,"), (uint8)PrintStringLiteral[k]);
+								k++;
+							}
+							TextArr += TEXT("0})");
+						}
 						NewShaderText += TextArr;
-						i = StringEnd + 1;
+						
+						// Preserve all arguments after the string literal
+						if (StringEnd + 1 < CallEnd)
+						{
+							NewShaderText.AppendChars(Src + StringEnd + 1, CallEnd - (StringEnd + 1));
+						}
+						
+						i = CallEnd;
 						return true;
 					}
 					
@@ -122,7 +257,7 @@ namespace FW
 			++i;
 		}
 
-		ShaderText = MoveTemp(NewShaderText);
+		TargetShaderText = MoveTemp(NewShaderText);
 		return *this;
 	}
 
@@ -139,6 +274,7 @@ namespace FW
 		FString ShaderFileText;
 		FFileHelper::LoadFileToString(ShaderFileText, **FileName);
 		SourceText = FileDesc.ExtraDecl + ShaderFileText;
+		ProcessedSourceText = SourceText;
 	}
 
 	GpuShader::GpuShader(const GpuShaderSourceDesc& SourceDesc)
@@ -148,6 +284,7 @@ namespace FW
 		, EntryPoint(SourceDesc.EntryPoint)
 		, ShaderLanguage(SourceDesc.Language)
 		, SourceText(SourceDesc.Source)
+		, ProcessedSourceText(SourceDesc.Source)
         , IncludeDirs(SourceDesc.IncludeDirs)
 	{
 

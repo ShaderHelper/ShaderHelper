@@ -65,14 +65,19 @@ namespace HLSL
 #ifndef __cplusplus
 #include "Common.hlsl"
 
-DECLARE_GLOBAL_RW_BUFFER(RWStructuredBuffer<Printer>, Printer, 0)
+DECLARE_GLOBAL_RW_BUFFER(RWByteAddressBuffer, Printer, 0)
 
-//1byte
+// Layout in RWByteAddressBuffer Printer:
+// [0, 4)   : ByteSize (uint)
+// [4, ...) : PrintBuffer bytes (Printer::MaxBufferSize * 4 bytes)
+// 1 byte append
 uint AppendChar(uint Offset, uint Char)
 {
-	uint Shift = (Offset % 4) * 8;
+	uint Shift       = (Offset % 4) * 8;
 	uint BufferIndex = Offset / 4;
-	InterlockedOr(Printer[0].PrintBuffer[BufferIndex], (Char & 0xFF) << Shift);
+	uint ByteAddress = 4 + BufferIndex * 4;
+	uint Original;
+	Printer.InterlockedOr(ByteAddress, (Char & 0xFF) << Shift, Original);
 	return Offset + 1;
 }
 
@@ -164,12 +169,12 @@ AppendArgFunc(bool)
 		uint ArgNum = GET_ARG_NUM(__VA_ARGS__);                         \
 		uint ArgByteSize = 1 + ArgNum + GET_ARGS_SIZE(__VA_ARGS__);     \
 		uint Increment = 2 + CharNum + ArgByteSize;                     \
-		uint OldByteSize = Printer[0].ByteSize;                         \
+		uint OldByteSize = Printer.Load(0);                             \
 		uint ByteOffset = 0xFFFFFFFF;                                   \
 		while(OldByteSize + Increment <= Printer::MaxBufferSize * 4)    \
 		{                                                               \
 			uint CompareValue = OldByteSize;                            \
-			InterlockedCompareExchange(Printer[0].ByteSize,             \
+			Printer.InterlockedCompareExchange(0,                       \
 				CompareValue, OldByteSize + Increment, OldByteSize);    \
 			if(OldByteSize == CompareValue)                             \
 			{                                                           \

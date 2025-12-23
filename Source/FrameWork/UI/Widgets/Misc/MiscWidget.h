@@ -66,6 +66,7 @@ namespace FW
 			{}
 			SLATE_ATTRIBUTE(const FSlateBrush*, Icon)
 			SLATE_ATTRIBUTE(FSlateColor, IconColorAndOpacity)
+			SLATE_ATTRIBUTE(FSlateColor, ToggleColorAndOpacity)
 			SLATE_ATTRIBUTE(FText, Text)
 			SLATE_EVENT(FOnCheckStateChanged, OnCheckStateChanged)
 			SLATE_ATTRIBUTE(ECheckBoxState, IsChecked)
@@ -73,7 +74,9 @@ namespace FW
 
 		void Construct(const FArguments& InArgs);
 
+	private:
 		TAttribute<ECheckBoxState> IsCheckboxChecked;
+		TAttribute<FSlateColor> ToggleColorAndOpacity;
 		FOnCheckStateChanged OnCheckStateChanged;
 	};
 

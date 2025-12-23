@@ -172,7 +172,7 @@ namespace FW
 			HlslDeclarationHead = TEXT("cbuffer {0} : register(b{1}, space{2}) {\n");
 			HlslDeclarationEnd = TEXT("};\n");
 
-			GlslDeclarationHead = TEXT("layout(std140, binding = {1}, set = {2}) {0} {\n");
+			GlslDeclarationHead = TEXT("layout(std140, binding = {1}, set = {2}) uniform {0} {\n");
 			GlslDeclarationEnd = TEXT("};\n");
 		}
         

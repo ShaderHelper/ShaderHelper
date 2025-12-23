@@ -129,7 +129,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         static GpuBindGroupLayoutBuilder BuiltInBindLayout{ BindingContext::GlobalSlot };
         static int Init = [&] {
             BuiltInBindLayout
-				.AddExistingBinding(0, BindingType::RWStructuredBuffer, BindingShaderStage::Pixel)
+				.AddExistingBinding(0, BindingType::RWRawBuffer, BindingShaderStage::Pixel)
                 .AddUniformBuffer("BuiltInUniform", GetBuiltInUbBuilder(), BindingShaderStage::Pixel)
                 .AddTexture("iChannel0", BindingShaderStage::Pixel)
                 .AddSampler("iChannel0Sampler", BindingShaderStage::Pixel)
@@ -161,16 +161,17 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 
     FString StShader::GetTemplateWithBinding() const
     {
-		FString Template;
+		FString Template, Header;
 		if (Language == GpuShaderLanguage::HLSL)
 		{
 			FFileHelper::LoadFileToString(Template, *(PathHelper::ShaderDir() / "ShaderHelper/StShaderTemplate.hlsl"));
 		}
 		else
 		{
+			Header = "#version 450\n";
 			FFileHelper::LoadFileToString(Template, *(PathHelper::ShaderDir() / "ShaderHelper/StShaderTemplate.glsl"));
 		}
-        return GetBinding() + Template;
+        return Header + GetBinding() + Template;
     }
 
 	int StShader::GetExtraLineNum() const
@@ -289,15 +290,15 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         {
             NewUniformProperty = MakeShared<PropertyScalarItem<float>>(this, UniformMemberName);
         }
-        else if(InTypeName == "float2")
+        else if(InTypeName == "float2" || InTypeName == "vec2")
         {
             NewUniformProperty = MakeShared<PropertyVector2fItem>(this, UniformMemberName);
         }
-		else if(InTypeName == "float3")
+		else if(InTypeName == "float3" || InTypeName == "vec3")
 		{
 			NewUniformProperty = MakeShared<PropertyVector3fItem>(this, UniformMemberName);
 		}
-		else if (InTypeName == "float4")
+		else if (InTypeName == "float4" || InTypeName == "vec4")
 		{
 			NewUniformProperty = MakeShared<PropertyVector4fItem>(this, UniformMemberName);
 		}

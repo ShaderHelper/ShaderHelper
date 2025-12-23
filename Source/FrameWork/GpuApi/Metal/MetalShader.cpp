@@ -10,7 +10,7 @@ namespace FW
 	MetalShader::MetalShader(const GpuShaderFileDesc& Desc)
 		: GpuShader(Desc)
 	{
-		ProcessedSourceText = GpuShaderPreProcessor{ SourceText }
+		ProcessedSourceText = GpuShaderPreProcessor{ SourceText, ShaderLanguage }
 			.ReplacePrintStringLiteral()
 			.Finalize();
 	}
@@ -18,7 +18,7 @@ namespace FW
 	MetalShader::MetalShader(const GpuShaderSourceDesc& Desc)
 		: GpuShader(Desc)
 	{
-		ProcessedSourceText = GpuShaderPreProcessor{ SourceText }
+		ProcessedSourceText = GpuShaderPreProcessor{ SourceText, ShaderLanguage }
 			.ReplacePrintStringLiteral()
 			.Finalize();
 	}
@@ -151,18 +151,6 @@ namespace FW
         }
         InShader->SetCompilationResult(MoveTemp(ByteCodeFunc));
         return true;
-    }
-
-    static ShaderConductor::ShaderStage MapShaderCunductorStage(ShaderType InType)
-    {
-        switch(InType)
-        {
-        case ShaderType::VertexShader:         return ShaderConductor::ShaderStage::VertexShader;
-        case ShaderType::PixelShader:          return ShaderConductor::ShaderStage::PixelShader;
-		case ShaderType::ComputeShader:        return ShaderConductor::ShaderStage::ComputeShader;
-        default:
-			AUX::Unreachable();
-        }
     }
 
     bool CompileShaderFromHlsl(TRefCountPtr<MetalShader> InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs)

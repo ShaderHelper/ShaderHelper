@@ -5,6 +5,7 @@
 #include "Containers/Array.h"
 #include "Containers/UnrealString.h"
 #include "GpuBindGroupLayout.h"
+#include "ShaderConductor.hpp"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogShader, Log, All);
 inline DEFINE_LOG_CATEGORY(LogShader);
@@ -25,6 +26,19 @@ namespace GLSL
 
 namespace FW
 {
+
+	inline ShaderConductor::ShaderStage MapShaderCunductorStage(ShaderType InType)
+	{
+		switch (InType)
+		{
+		case ShaderType::VertexShader:         return ShaderConductor::ShaderStage::VertexShader;
+		case ShaderType::PixelShader:          return ShaderConductor::ShaderStage::PixelShader;
+		case ShaderType::ComputeShader:        return ShaderConductor::ShaderStage::ComputeShader;
+		default:
+			AUX::Unreachable();
+		}
+	}
+
 	inline const TCHAR* Punctuations[] = {
 		TEXT(":"), TEXT("+="), TEXT("++"), TEXT("+"), TEXT("--"), TEXT("-="), TEXT("-"), TEXT("("),
 		TEXT(")"), TEXT("["), TEXT("]"), TEXT("."), TEXT("->"), TEXT("!="), TEXT("!"),
@@ -92,7 +106,8 @@ namespace FW
 	class FRAMEWORK_API GpuShaderPreProcessor
 	{
 	public:
-		GpuShaderPreProcessor(FString InShaderText) : ShaderText(MoveTemp(InShaderText)) {}
+		GpuShaderPreProcessor(FString InShaderText, GpuShaderLanguage InLanguage) : ShaderText(MoveTemp(InShaderText)), Language(InLanguage)
+		{}
 
 	public:
 		//hlsl does not currently support string literal
@@ -101,6 +116,7 @@ namespace FW
 
 	private:
 		FString ShaderText;
+		GpuShaderLanguage Language;
 	};
 
     struct GpuShaderFileDesc
@@ -121,7 +137,7 @@ namespace FW
         FString Name;
         FString Source;
         ShaderType Type;
-        FString EntryPoint;
+		FString EntryPoint; //For HLSL compilation; For GLSL, always "main"
 		GpuShaderLanguage Language = GpuShaderLanguage::HLSL;
         TArray<FString> IncludeDirs = { 
             PathHelper::ShaderDir() 
@@ -138,6 +154,7 @@ namespace FW
 
     class FRAMEWORK_API GpuShader : public GpuResource
     {
+		friend GpuShaderPreProcessor;
 	public:
         //From file
 		GpuShader(const GpuShaderFileDesc& FileDesc);

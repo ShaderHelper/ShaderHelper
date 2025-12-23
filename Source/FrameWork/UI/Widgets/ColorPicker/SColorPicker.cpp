@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "SColorPicker.h"
+#include "UI/Widgets/Misc/MiscWidget.h"
 
 #include <Widgets/Colors/SColorWheel.h>
 #include <Widgets/Colors/SSimpleGradient.h>
@@ -22,14 +23,15 @@ namespace FW
 		OnColorChanged = InArgs._OnColorChanged;
 		OnDestroyed = InArgs._OnDestroyed;
 		bShowAlpha = InArgs._ShowAlpha;
+		bPreviewSrgb = InArgs._PreviewSrgb;
 
 		CurrentColor = InArgs._TargetColorAttribute.IsSet() ? InArgs._TargetColorAttribute.Get() : FLinearColor::White;
 
 		ChildSlot
 		[
 			SNew(SBox)
-			.WidthOverride(350.f)
-			.HeightOverride(160.f)
+			.WidthOverride(330.f)
+			.HeightOverride(170.f)
 			[
 				SNew(SBorder)
 				.Padding(8.0f)
@@ -178,13 +180,32 @@ namespace FW
 							]
 						]
 						+ SVerticalBox::Slot()
+						.Padding(0, 2, 0, 0)
 						.VAlign(VAlign_Center)
 						[
-							SNew(SColorBlock)
-							.AlphaDisplayMode(EColorBlockAlphaDisplayMode::Separate)
-							.ShowBackgroundForAlpha(true)
-							.Color_Lambda([this] { return CurrentColor; })
-							.UseSRGB(false)
+							SNew(SBox).HeightOverride(18)
+							[
+								SNew(SHorizontalBox)
+								+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+								[
+									SNew(SShToggleButton).Text_Lambda([this] { return bPreviewSrgb ? FText::FromString("SRGB") : FText::FromString("RGB"); })
+									.ToggleColorAndOpacity_Lambda([this] {
+										return CurrentColor;
+									})
+									.IsChecked_Lambda([this] { return bPreviewSrgb ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
+									.OnCheckStateChanged_Lambda([this](ECheckBoxState InState) {
+										bPreviewSrgb = InState == ECheckBoxState::Checked;
+									})
+								]
+								+ SHorizontalBox::Slot()
+								[
+									SNew(SColorBlock)
+										.AlphaDisplayMode(EColorBlockAlphaDisplayMode::Separate)
+										.ShowBackgroundForAlpha(true)
+										.Color_Lambda([this] { return CurrentColor; })
+										.UseSRGB_Lambda([this] { return bPreviewSrgb; })
+								]
+							]
 						]
 					]
 				]

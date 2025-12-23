@@ -484,7 +484,7 @@ namespace FW
 					CurWidget.Geometry.ToInflatedPaintGeometry(FVector2D{ 2, 2 }),
 					FAppCommonStyle::Get().GetBrush("Graph.NodeOutline"),
 					ESlateDrawEffect::None,
-					HasKeyboardFocus() ? FStyleColors::Select.GetSpecifiedColor() : FStyleColors::SelectInactive.GetSpecifiedColor()
+					HasKeyboardFocus() || HasFocusedDescendants() ? FStyleColors::Select.GetSpecifiedColor() : FStyleColors::SelectInactive.GetSpecifiedColor()
 				);
 			}
 

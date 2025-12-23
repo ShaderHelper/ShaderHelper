@@ -219,7 +219,7 @@ namespace SH
 			auto EntryPoint = StringCast<UTF8CHAR>(*DebugShader->GetEntryPoint());
 			ShaderConductor::Compiler::TargetDesc HlslTargetDesc{};
 			HlslTargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
-			HlslTargetDesc.version = "60";
+			HlslTargetDesc.version = "66";
 			ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile({.force_zero_initialized_variables = true}, { PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, (char*)EntryPoint.Get(),
 				ShaderConductor::ShaderStage::PixelShader, HlslTargetDesc);
 			FString PatchedHlsl = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };

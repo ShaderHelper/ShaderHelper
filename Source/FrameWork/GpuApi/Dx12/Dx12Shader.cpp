@@ -6,13 +6,13 @@
 #include "shaderc/shaderc.hpp"
 
 #include <Misc/FileHelper.h>
-
+#include <stdexcept>
 namespace FW
 {
 	Dx12Shader::Dx12Shader(const GpuShaderFileDesc& Desc)
 		: GpuShader(Desc)
 	{
-		ProcessedSourceText = GpuShaderPreProcessor{ SourceText }
+		ProcessedSourceText = GpuShaderPreProcessor{ SourceText, ShaderLanguage }
 			.ReplacePrintStringLiteral()
 			.Finalize();
 	}
@@ -20,7 +20,7 @@ namespace FW
 	Dx12Shader::Dx12Shader(const GpuShaderSourceDesc& Desc)
 		: GpuShader(Desc)
 	{
-		ProcessedSourceText = GpuShaderPreProcessor{ SourceText }
+		ProcessedSourceText = GpuShaderPreProcessor{ SourceText, ShaderLanguage }
 			.ReplacePrintStringLiteral()
 			.Finalize();
 	}
@@ -133,7 +133,7 @@ namespace FW
 				{
 					FString ShaderText;
 					FFileHelper::LoadFileToString(ShaderText, *IncludedFile);
-					ShaderText = GpuShaderPreProcessor{ ShaderText }
+					ShaderText = GpuShaderPreProcessor{ ShaderText, Shader->GetShaderLanguage()}
 						.ReplacePrintStringLiteral()
 						.Finalize();
 					auto SourceText = StringCast<UTF8CHAR>(*ShaderText);
@@ -148,6 +148,57 @@ namespace FW
 	private:
 		TRefCountPtr<Dx12Shader> Shader;
 		std::atomic<ULONG> RefCount = 0;
+	};
+
+	class ShadercIncludeHandler : public shaderc::CompileOptions::IncluderInterface
+	{
+		struct IncludeData {
+			std::string Source;
+			std::string Content;
+		};
+	public:
+		ShadercIncludeHandler(TRefCountPtr<Dx12Shader> InShader) : Shader(MoveTemp(InShader)) {}
+		shaderc_include_result* GetInclude(
+			const char* requested_source,
+			shaderc_include_type type,
+			const char* requesting_source,
+			size_t include_depth) override
+		{
+			auto data = new IncludeData;
+			shaderc_include_result* Result = new shaderc_include_result;
+			Result->user_data = data;
+			for (const FString& IncludeDir : Shader->GetIncludeDirs())
+			{
+				FString IncludedFile = FPaths::Combine(IncludeDir, ANSI_TO_TCHAR(requested_source));
+				if (IFileManager::Get().FileExists(*IncludedFile))
+				{
+					FString ShaderText;
+					FFileHelper::LoadFileToString(ShaderText, *IncludedFile);
+					ShaderText = GpuShaderPreProcessor{ ShaderText, Shader->GetShaderLanguage() }
+						.ReplacePrintStringLiteral()
+						.Finalize();
+					data->Source = requested_source;
+					data->Content = { TCHAR_TO_UTF8(*ShaderText) };
+					break;
+				}
+			}
+
+			Result->source_name = data->Source.c_str();
+			Result->source_name_length = data->Source.size();
+			Result->content = data->Content.c_str();
+			Result->content_length = data->Content.size();
+
+			return Result;
+		}
+
+		void ReleaseInclude(shaderc_include_result* data) override
+		{
+			delete static_cast<IncludeData*>(data->user_data);
+			delete data;
+		}
+
+	private:
+		TRefCountPtr<Dx12Shader> Shader;
 	};
 
 	DxcCompiler::DxcCompiler()
@@ -192,19 +243,56 @@ namespace FW
 	 bool DxcCompiler::Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs) const
 	 {
 		 FString ShaderName = InShader->GetShaderName();
-		 FString HlslSource;
+		 FString HlslSource, EntryPoint;
 		 if (InShader->GetShaderLanguage() == GpuShaderLanguage::GLSL)
 		 {
+#if DEBUG_SHADER
+			 if (!ShaderName.IsEmpty())
+			 {
+				 FFileHelper::SaveStringToFile(InShader->GetProcessedSourceText(), *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".glsl"));
+			 }
+#endif
 			 static shaderc::Compiler GlslCompiler;
 			 shaderc::CompileOptions Options;
+			 Options.SetIncluder(std::make_unique<ShadercIncludeHandler>(InShader));
 			 auto Result = GlslCompiler.CompileGlslToSpv(TCHAR_TO_UTF8(*InShader->GetProcessedSourceText()), 
-				 MapShadercKind(InShader->GetShaderType()), TCHAR_TO_UTF8(*ShaderName), 
-				 TCHAR_TO_UTF8(*InShader->GetEntryPoint()), Options);
+				 MapShadercKind(InShader->GetShaderType()), TCHAR_TO_UTF8(*ShaderName), Options);
+
+			 if(Result.GetCompilationStatus() != shaderc_compilation_status_success)
+			 {
+				 OutErrorInfo = UTF8_TO_TCHAR(Result.GetErrorMessage().c_str());
+				 return false;
+			 }
+
+			 std::vector<uint32> Spv = { Result.cbegin(), Result.cend()};
+			 ShaderConductor::Compiler::TargetDesc HlslTargetDesc{};
+			 HlslTargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
+			 HlslTargetDesc.version = "66";
+			 try
+			 {
+				 ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile({}, { Spv.data(), (uint32)Spv.size() * 4 }, "main",
+					 MapShaderCunductorStage(InShader->GetShaderType()), HlslTargetDesc);
+				 HlslSource = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
+				 EntryPoint = "main";
+			 }
+			 catch (const std::runtime_error& e)
+			 {
+				 OutErrorInfo =  ANSI_TO_TCHAR(e.what());
+				 return false;
+			 }
 		 }
 		 else
 		 {
 			 HlslSource = InShader->GetProcessedSourceText();
+			 EntryPoint = InShader->GetEntryPoint();
 		 }
+
+#if DEBUG_SHADER
+		 if (!ShaderName.IsEmpty())
+		 {
+			 FFileHelper::SaveStringToFile(HlslSource, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl"));
+		 }
+#endif
 
 		TRefCountPtr<IDxcBlobEncoding> BlobEncoding;
 		TRefCountPtr<IDxcResult> CompileResult;
@@ -214,7 +302,7 @@ namespace FW
 		TArray<const TCHAR*> Arguments;
 		Arguments.Add(TEXT("/Qstrip_debug"));
 		Arguments.Add(TEXT("/E"));
-		Arguments.Add(*InShader->GetEntryPoint());
+		Arguments.Add(*EntryPoint);
 
 		FString ShaderProfile = GetShaderProfile(InShader->GetShaderType(), InShader->GetShaderModelVer());
 		Arguments.Add(TEXT("/T"));
@@ -265,13 +353,6 @@ namespace FW
 				SourceBuffer.Encoding = Encoding;
 			}
 		}
-
-#if DEBUG_SHADER
-		if (!ShaderName.IsEmpty())
-		{
-			FFileHelper::SaveStringToFile(HlslSource, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl"));
-		}
-#endif
 
 		TRefCountPtr<IDxcIncludeHandler> IncludeHandler = new ShIncludeHandler(InShader);
 		bool IsApiSucceeded = SUCCEEDED(Compiler->Compile(&SourceBuffer,
