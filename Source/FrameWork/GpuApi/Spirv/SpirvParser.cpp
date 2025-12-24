@@ -512,7 +512,7 @@ namespace FW
 			{
 				Sections.FindOrAdd(SpvSectionKind::ExecutionMode, { WordOffset });
 			}
-			else if (OpCode == SpvOp::String || OpCode == SpvOp::Source)
+			else if (OpCode == SpvOp::String || OpCode == SpvOp::Source || OpCode == SpvOp::SourceExtension)
 			{
 				Sections.FindOrAdd(SpvSectionKind::DebugString, { WordOffset });
 			}

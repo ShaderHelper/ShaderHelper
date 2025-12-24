@@ -300,22 +300,6 @@ namespace FW
 		return ShaderModel;
 	}
 
-	FString AdjustDiagLineNumber(const FString& DiagInfo, int32 Delta)
-	{
-		std::string DiagString{TCHAR_TO_UTF8(*DiagInfo)};
-		std::regex Pattern{":([0-9]+):[0-9]+: (?:error|warning):"};
-		std::smatch Match;
-		std::size_t SearchPos = 0;
-		while (std::regex_search(DiagString.cbegin() + SearchPos, DiagString.cend(), Match, Pattern))
-		{
-			std::string RowStr = Match[1];
-			std::string RowNumber = std::to_string(std::stoi(RowStr) + Delta);
-			DiagString.replace(SearchPos + Match.position(1), Match[1].length(), RowNumber);
-			SearchPos += Match.position() + RowNumber.length();
-		}
-		return FString{UTF8_TO_TCHAR(DiagString.data())};
-	}
-
 	FRAMEWORK_API TArray<ShaderCandidateInfo> DefaultCandidates(GpuShaderLanguage Language)
 	{
 		TArray<ShaderCandidateInfo> Candidates;

@@ -248,7 +248,6 @@ namespace FW
 		Vector2i End;
 	};
 
-	FRAMEWORK_API FString AdjustDiagLineNumber(const FString& ErrorInfo, int32 Delta);
     FRAMEWORK_API TArray<ShaderCandidateInfo> DefaultCandidates(GpuShaderLanguage Language);
 
     class FRAMEWORK_API ShaderTU

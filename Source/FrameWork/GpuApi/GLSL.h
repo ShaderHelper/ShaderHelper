@@ -137,7 +137,24 @@ namespace FW
 
 		ShaderTokenType GetTokenType(ShaderTokenType InType, uint32 Row, uint32 Col, uint32 Size) override
 		{
-			return {};
+			if (InType == ShaderTokenType::Identifier)
+			{
+				FString TokenStr = GetStr(Row, Col, Size);
+				if (GLSL::BuiltinTypes.Contains(TokenStr))
+				{
+					return ShaderTokenType::BuildtinType;
+				}
+				else if (GLSL::BuiltinFuncs.Contains(TokenStr))
+				{
+					return ShaderTokenType::BuildtinFunc;
+				}
+				else if (GLSL::KeyWords.Contains(TokenStr))
+				{
+					return ShaderTokenType::Keyword;
+				}
+			}
+
+			return InType;
 		}
 
 		TArray<ShaderCandidateInfo> GetCodeComplete(uint32 Row, uint32 Col) override

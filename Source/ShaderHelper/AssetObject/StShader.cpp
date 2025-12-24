@@ -279,26 +279,25 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         return false;
     }
 
-    TSharedPtr<PropertyData> StShader::CreateUniformPropertyData(const FString& InTypeName, const FString& UniformMemberName, bool Enabled)
+    TSharedPtr<PropertyData> StShader::CreateUniformPropertyData(const TAttribute<FText>& InTypeName, const FString& UniformMemberName, bool Enabled)
     {
         auto TypeInfoWidget = SNew(STextBlock).TextStyle(&FAppCommonStyle::Get().GetWidgetStyle<FTextBlockStyle>("MinorText"));
-        FText TypeInfo = FText::FromString(InTypeName);
-        TypeInfoWidget->SetText(TypeInfo);
+        TypeInfoWidget->SetText(InTypeName);
         
         TSharedPtr<PropertyItemBase> NewUniformProperty;
-        if(InTypeName == "float")
+        if(InTypeName.Get().ToString() == "float")
         {
             NewUniformProperty = MakeShared<PropertyScalarItem<float>>(this, UniformMemberName);
         }
-        else if(InTypeName == "float2" || InTypeName == "vec2")
+        else if(InTypeName.Get().ToString() == "float2" || InTypeName.Get().ToString() == "vec2")
         {
             NewUniformProperty = MakeShared<PropertyVector2fItem>(this, UniformMemberName);
         }
-		else if(InTypeName == "float3" || InTypeName == "vec3")
+		else if(InTypeName.Get().ToString() == "float3" || InTypeName.Get().ToString() == "vec3")
 		{
 			NewUniformProperty = MakeShared<PropertyVector3fItem>(this, UniformMemberName);
 		}
-		else if (InTypeName == "float4" || InTypeName == "vec4")
+		else if (InTypeName.Get().ToString() == "float4" || InTypeName.Get().ToString() == "vec4")
 		{
 			NewUniformProperty = MakeShared<PropertyVector4fItem>(this, UniformMemberName);
 		}
@@ -338,7 +337,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         return NewUniformProperty;
     }
     
-    void StShader::AddUniform(FString TypeName)
+    void StShader::AddUniform(TAttribute<FText> TypeName)
     {
         auto CustomUniformCategory = CustomCategory->GetData("CustomUniform");
         if (!CustomUniformCategory)
@@ -366,29 +365,33 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
     TSharedRef<SWidget> StShader::GetCategoryMenu()
     {
         FMenuBuilder MenuBuilder{ true, TSharedPtr<FUICommandList>() };
+		auto Float = TAttribute<FText>::Create([] { return FText::FromString("float"); });
         MenuBuilder.AddMenuEntry(
-            FText::FromString("float"),
+			Float,
             FText::GetEmpty(),
             FSlateIcon(),
-            FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, FString("float")) }
+            FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, Float) }
         );
+		auto Float2 = TAttribute<FText>::Create([this] { return Language == GpuShaderLanguage::HLSL ? FText::FromString("float2") : FText::FromString("vec2"); });
         MenuBuilder.AddMenuEntry(
-            FText::FromString("float2"),
+			Float2,
             FText::GetEmpty(),
             FSlateIcon(),
-            FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, FString("float2")) }
+            FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, Float2) }
         );
+		auto Float3 = TAttribute<FText>::Create([this] { return Language == GpuShaderLanguage::HLSL ? FText::FromString("float3") : FText::FromString("vec3"); });
 		MenuBuilder.AddMenuEntry(
-			FText::FromString("float3"),
+			Float3,
 			FText::GetEmpty(),
 			FSlateIcon(),
-			FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, FString("float3")) }
+			FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, Float3) }
 		);
+		auto Float4 = TAttribute<FText>::Create([this] { return Language == GpuShaderLanguage::HLSL ? FText::FromString("float4") : FText::FromString("vec4"); });
 		MenuBuilder.AddMenuEntry(
-			FText::FromString("float4"),
+			Float4,
 			FText::GetEmpty(),
 			FSlateIcon(),
-			FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, FString("float4")) }
+			FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, Float4) }
 		);
         return MenuBuilder.MakeWidget();
     }
@@ -399,7 +402,10 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         const UniformBufferMetaData& MetaData = InBuilder.GetMetaData();
         for(const auto& [MemberName, MemberInfo]: MetaData.Members)
         {
-            auto Property = CreateUniformPropertyData(MemberInfo.GetTypeName(Language), MemberName, Enabled);
+			auto TypeName = TAttribute<FText>::Create([MemberInfo, this] {
+				return FText::FromString(MemberInfo.GetTypeName(Language));
+			});
+            auto Property = CreateUniformPropertyData(TypeName, MemberName, Enabled);
             Datas.Add(Property.ToSharedRef());
         }
         return Datas;

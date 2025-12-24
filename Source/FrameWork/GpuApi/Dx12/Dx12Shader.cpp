@@ -254,6 +254,48 @@ namespace FW
 #endif
 			 static shaderc::Compiler GlslCompiler;
 			 shaderc::CompileOptions Options;
+			 for (int32 i = 0; i < ExtraArgs.Num(); ++i)
+			 {
+				 // Parse -D macro definitions: -D is a separate arg, macro definition is the next arg
+				 if (ExtraArgs[i] == TEXT("-D") && i + 1 < ExtraArgs.Num())
+				 {
+					 FString MacroDef = ExtraArgs[i + 1];
+					 ++i; // Skip the macro definition arg in next iteration
+					 
+					 int32 EqualsPos = MacroDef.Find(TEXT("="));
+					 if (EqualsPos != INDEX_NONE)
+					 {
+						 // NAME=VALUE format
+						 FString MacroName = MacroDef.Left(EqualsPos);
+						 FString MacroValue = MacroDef.Mid(EqualsPos + 1);
+						 
+						 if (!MacroName.IsEmpty())
+						 {
+							 auto NameUTF8 = StringCast<UTF8CHAR>(*MacroName);
+							 auto ValueUTF8 = StringCast<UTF8CHAR>(*MacroValue);
+							 Options.AddMacroDefinition(
+								 (const char*)NameUTF8.Get(), NameUTF8.Length(),
+								 (const char*)ValueUTF8.Get(), ValueUTF8.Length());
+						 }
+					 }
+					 else
+					 {
+						 // NAME format (valueless macro)
+						 if (!MacroDef.IsEmpty())
+						 {
+							 auto NameUTF8 = StringCast<UTF8CHAR>(*MacroDef);
+							 Options.AddMacroDefinition(
+								 (const char*)NameUTF8.Get(), NameUTF8.Length(),
+								 nullptr, 0u);
+						 }
+					 }
+				 }
+			 }
+			 if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
+			 {
+				 Options.SetOptimizationLevel(shaderc_optimization_level_zero);
+				 Options.SetNonSemanticShaderDebugSource();
+			 }
 			 Options.SetIncluder(std::make_unique<ShadercIncludeHandler>(InShader));
 			 auto Result = GlslCompiler.CompileGlslToSpv(TCHAR_TO_UTF8(*InShader->GetProcessedSourceText()), 
 				 MapShadercKind(InShader->GetShaderType()), TCHAR_TO_UTF8(*ShaderName), Options);
@@ -264,7 +306,30 @@ namespace FW
 				 return false;
 			 }
 
-			 std::vector<uint32> Spv = { Result.cbegin(), Result.cend()};
+			 std::vector<uint32> Spv = { Result.cbegin(), Result.cend() };
+
+			 if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
+			 {
+				 TArray<uint32> SpvCode = { Spv.data(), (int)Spv.size() };
+#if DEBUG_SHADER
+				 ShaderConductor::Compiler::DisassembleDesc SpvDisassembleDesc{
+					 .language = ShaderConductor::ShadingLanguage::SpirV,
+					 .binary = (uint8*)SpvCode.GetData(),
+					 .binarySize = (uint32_t)SpvCode.Num() * 4,
+				 };
+				 ShaderConductor::Compiler::ResultDesc SpvTextResultDesc = ShaderConductor::Compiler::Disassemble(SpvDisassembleDesc);
+				 FString SpvSourceText = { (int32)SpvTextResultDesc.target.Size(), static_cast<const char*>(SpvTextResultDesc.target.Data()) };
+				 if (SpvTextResultDesc.hasError)
+				 {
+					 FString ErrorInfo = static_cast<const char*>(SpvTextResultDesc.errorWarningMsg.Data());
+					 SpvSourceText = MoveTemp(ErrorInfo);
+				 }
+				 FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".spvasm"));
+#endif
+				 InShader->SpvCode = MoveTemp(SpvCode);
+				 return true;
+			 }
+
 			 ShaderConductor::Compiler::TargetDesc HlslTargetDesc{};
 			 HlslTargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
 			 HlslTargetDesc.version = "66";
@@ -300,6 +365,7 @@ namespace FW
 		DxCheck(CompilerUitls->CreateBlobFromPinned(SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR), CP_UTF8, BlobEncoding.GetInitReference()));
 
 		TArray<const TCHAR*> Arguments;
+		Arguments.Add(*ShaderName);
 		Arguments.Add(TEXT("/Qstrip_debug"));
 		Arguments.Add(TEXT("/E"));
 		Arguments.Add(*EntryPoint);
@@ -401,6 +467,11 @@ namespace FW
 					};
 					ShaderConductor::Compiler::ResultDesc SpvTextResultDesc = ShaderConductor::Compiler::Disassemble(SpvDisassembleDesc);
 					FString SpvSourceText = {(int32)SpvTextResultDesc.target.Size(), static_cast<const char*>(SpvTextResultDesc.target.Data()) };
+					if (SpvTextResultDesc.hasError)
+					{
+						FString ErrorInfo = static_cast<const char*>(SpvTextResultDesc.errorWarningMsg.Data());
+						SpvSourceText = MoveTemp(ErrorInfo);
+					}
 					FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".spvasm"));
 #endif
 				}

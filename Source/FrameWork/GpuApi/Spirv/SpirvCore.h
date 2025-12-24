@@ -585,6 +585,7 @@ namespace FW
 	enum class SpvOp
 	{
 		Source = 3,
+		SourceExtension = 4,
 		Name = 5,
 		MemberName = 6,
 		String = 7,

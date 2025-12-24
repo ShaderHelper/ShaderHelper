@@ -1244,7 +1244,6 @@ namespace FW
 		}
 		Patcher.AddFunction(MoveTemp(AppendCallFuncInsts));
 
-
 		while (InstIndex < (*Insts).Num())
 		{
 			(*Insts)[InstIndex]->Accept(this);

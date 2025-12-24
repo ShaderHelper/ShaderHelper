@@ -319,6 +319,9 @@ SHADERC_EXPORT void shaderc_compile_options_set_source_language(
 SHADERC_EXPORT void shaderc_compile_options_set_generate_debug_info(
     shaderc_compile_options_t options);
 
+SHADERC_EXPORT void shaderc_compile_options_set_nonsemantic_shader_debug_source(
+    shaderc_compile_options_t options);
+
 // Sets the compiler optimization level to the given level. Only the last one
 // takes effect if multiple calls of this function exist.
 SHADERC_EXPORT void shaderc_compile_options_set_optimization_level(

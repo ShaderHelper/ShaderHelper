@@ -216,29 +216,51 @@ namespace SH
 			ExprVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "ExprPatched.spvasm");
 			
 			const TArray<uint32>& PatchedSpv = ExprVisitor.GetPatcher().GetSpv();
-			auto EntryPoint = StringCast<UTF8CHAR>(*DebugShader->GetEntryPoint());
-			ShaderConductor::Compiler::TargetDesc HlslTargetDesc{};
-			HlslTargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
-			HlslTargetDesc.version = "66";
-			ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile({.force_zero_initialized_variables = true}, { PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, (char*)EntryPoint.Get(),
-				ShaderConductor::ShaderStage::PixelShader, HlslTargetDesc);
-			FString PatchedHlsl = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
+			
+			ShaderConductor::Compiler::TargetDesc TargetDesc{};
+			FString FileExtension;
+			FString EntryPointStr;
+			if (DebugShader->GetShaderLanguage() == GpuShaderLanguage::HLSL)
+			{
+				TargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
+				TargetDesc.version = "66";
+				FileExtension = TEXT(".hlsl");
+				EntryPointStr = DebugShader->GetEntryPoint();
+			}
+			else
+			{
+				TargetDesc.language = ShaderConductor::ShadingLanguage::Glsl;
+				TargetDesc.version = "450";
+				FileExtension = TEXT(".glsl");
+				EntryPointStr = TEXT("main");
+			}
+			
+			auto EntryPoint = StringCast<UTF8CHAR>(*EntryPointStr);
+			ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile(
+				{.force_zero_initialized_variables = true}, 
+				{ PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, 
+				(const char*)EntryPoint.Get(),
+				ShaderConductor::ShaderStage::PixelShader, TargetDesc);
+			FString PatchedSource = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
 
 			if (!ShaderResultDesc.hasError)
 			{
 				FString Pattern = "_AppendExprDummy_()";
-				int32 ReplaceIndex = PatchedHlsl.Find(Pattern, ESearchCase::IgnoreCase, ESearchDir::FromEnd);
-				PatchedHlsl.RemoveAt(ReplaceIndex, Pattern.Len());
-				PatchedHlsl.InsertAt(ReplaceIndex, "_AppendExpr_(" + InExpression + ")");
-				int32 RemoveStartIndex = PatchedHlsl.Find("void _AppendExprDummy_()", ESearchCase::IgnoreCase, ESearchDir::FromEnd, ReplaceIndex);
-				int32 RemoveEndIndex = PatchedHlsl.Find("}", ESearchCase::IgnoreCase, ESearchDir::FromStart, RemoveStartIndex);
-				PatchedHlsl.RemoveAt(RemoveStartIndex, RemoveEndIndex - RemoveStartIndex + 1);
-				FFileHelper::SaveStringToFile(PatchedHlsl, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "ExprPatched.hlsl"));
+				int32 ReplaceIndex = PatchedSource.Find(Pattern, ESearchCase::IgnoreCase, ESearchDir::FromEnd);
+				PatchedSource.RemoveAt(ReplaceIndex, Pattern.Len());
+				PatchedSource.InsertAt(ReplaceIndex, "_AppendExpr_(" + InExpression + ")");
+				int32 RemoveStartIndex = PatchedSource.Find("void _AppendExprDummy_()", ESearchCase::IgnoreCase, ESearchDir::FromEnd, ReplaceIndex);
+				int32 RemoveEndIndex = PatchedSource.Find("}", ESearchCase::IgnoreCase, ESearchDir::FromStart, RemoveStartIndex);
+				PatchedSource.RemoveAt(RemoveStartIndex, RemoveEndIndex - RemoveStartIndex + 1);
+				
+				FString FileName = DebugShader->GetShaderName() + TEXT("ExprPatched") + FileExtension;
+				FFileHelper::SaveStringToFile(PatchedSource, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / FileName));
 
 				TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
-					.Source = MoveTemp(PatchedHlsl),
+					.Source = MoveTemp(PatchedSource),
 					.Type = DebugShader->GetShaderType(),
-					.EntryPoint = DebugShader->GetEntryPoint()
+					.EntryPoint = EntryPointStr,
+					.Language = DebugShader->GetShaderLanguage()
 				});
 				if (GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
 				{
@@ -1309,22 +1331,34 @@ namespace SH
 			PatchedSpv = DebuggerVisitor.GetPatcher().GetSpv();
 		}
 
-		auto EntryPoint = StringCast<UTF8CHAR>(*DebugShader->GetEntryPoint());
-		ShaderConductor::Compiler::TargetDesc HlslTargetDesc{};
-		HlslTargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
-		HlslTargetDesc.version = "60";
-		ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile({}, { PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, (char*)EntryPoint.Get(),
-			ShaderConductor::ShaderStage::PixelShader, HlslTargetDesc);
-		FString PatchedHlsl = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
-		if (GlobalValidation)
+		ShaderConductor::Compiler::TargetDesc TargetDesc{};
+		FString FileExtension;
+		FString EntryPointStr;
+		if (DebugShader->GetShaderLanguage() == GpuShaderLanguage::HLSL)
 		{
-			FFileHelper::SaveStringToFile(PatchedHlsl, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Validation.hlsl"));
+			TargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
+			TargetDesc.version = "66";
+			FileExtension = TEXT(".hlsl");
+			EntryPointStr = DebugShader->GetEntryPoint();
 		}
 		else
 		{
-			FFileHelper::SaveStringToFile(PatchedHlsl, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Patched.hlsl"));
+			TargetDesc.language = ShaderConductor::ShadingLanguage::Glsl;
+			TargetDesc.version = "450";
+			FileExtension = TEXT(".glsl");
+			EntryPointStr = TEXT("main"); // GLSL entry point must be "main"
 		}
+		
+		auto EntryPoint = StringCast<UTF8CHAR>(*EntryPointStr);
+		ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile(
+			{}, { PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, (const char*)EntryPoint.Get(),
+			ShaderConductor::ShaderStage::PixelShader, TargetDesc);
+		
+		FString PatchedSource = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
 
+		FString FileName = DebugShader->GetShaderName() + (GlobalValidation ? TEXT("Validation") : TEXT("Patched")) + FileExtension;
+		FFileHelper::SaveStringToFile(PatchedSource, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / FileName));
+		
 		if (ShaderResultDesc.hasError)
 		{
 			FString ErrorInfo = static_cast<const char*>(ShaderResultDesc.errorWarningMsg.Data());
@@ -1334,10 +1368,11 @@ namespace SH
 		CurDebugStateIndex = 0;
 		DebuggerContext = MoveTemp(PixelDebuggerContext);
 		TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
-			.Source = MoveTemp(PatchedHlsl),
+			.Source = MoveTemp(PatchedSource),
 			.Type = DebugShader->GetShaderType(),
-			.EntryPoint = DebugShader->GetEntryPoint()
-			});
+			.EntryPoint = EntryPointStr,
+			.Language = DebugShader->GetShaderLanguage(),
+		});
 		if (!GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
 		{
 			throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));

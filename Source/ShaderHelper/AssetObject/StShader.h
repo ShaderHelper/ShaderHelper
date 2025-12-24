@@ -42,13 +42,13 @@ namespace SH
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromBinding();
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromUniform(const FW::UniformBufferBuilder& InBuilder, bool Enabled);
         
-        void AddUniform(FString TypeName);
+        void AddUniform(TAttribute<FText> TypeName);
         void RefreshBuilder();
         
     private:
         TSharedRef<SWidget> GetCategoryMenu();
         bool HasBindingName(const FString& InName);
-        TSharedPtr<FW::PropertyData> CreateUniformPropertyData(const FString& InTypeName, const FString& UniformMemberName, bool Enabled);
+        TSharedPtr<FW::PropertyData> CreateUniformPropertyData(const TAttribute<FText>& InTypeName, const FString& UniformMemberName, bool Enabled);
         
 	public:
 		FW::GpuShaderLanguage Language;
