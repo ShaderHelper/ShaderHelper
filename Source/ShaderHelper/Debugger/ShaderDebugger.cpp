@@ -10,7 +10,7 @@ using namespace FW;
 
 namespace SH
 {
-	TArray<ExpressionNodePtr> AppendVarChildNodes(SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, const TArray<SpvVarDirtyRange>& DirtyRanges, const TArray<uint8>& Value, int32 InOffset)
+	TArray<ExpressionNodePtr> AppendVarChildNodes(GpuShaderLanguage Lang, SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, const TArray<SpvVarDirtyRange>& DirtyRanges, const TArray<uint8>& Value, int32 InOffset)
 	{
 		TArray<ExpressionNodePtr> Nodes;
 		int32 Offset = InOffset;
@@ -18,11 +18,11 @@ namespace SH
 		{
 			SpvMemberTypeDesc* MemberTypeDesc = static_cast<SpvMemberTypeDesc*>(TypeDesc);
 			int32 MemberByteSize = GetTypeByteSize(MemberTypeDesc);
-			FString ValueStr = GetValueStr(Value, MemberTypeDesc->GetTypeDesc(), InitializedRanges, Offset);
-			auto Data = MakeShared<ExpressionNode>(MemberTypeDesc->GetName(), MoveTemp(ValueStr), GetTypeDescStr(MemberTypeDesc->GetTypeDesc()));
+			FString ValueStr = GetValueStr(Value, MemberTypeDesc->GetTypeDesc(), InitializedRanges, Offset, DebuggerViewHex);
+			auto Data = MakeShared<ExpressionNode>(MemberTypeDesc->GetName(), MoveTemp(ValueStr), GetTypeDescStr(MemberTypeDesc->GetTypeDesc(), Lang));
 			if (MemberTypeDesc->GetTypeDesc()->GetKind() == SpvTypeDescKind::Composite)
 			{
-				Data->Children = AppendVarChildNodes(MemberTypeDesc->GetTypeDesc(), InitializedRanges, DirtyRanges, Value, Offset);
+				Data->Children = AppendVarChildNodes(Lang, MemberTypeDesc->GetTypeDesc(), InitializedRanges, DirtyRanges, Value, Offset);
 			}
 			for (const auto& Range : DirtyRanges)
 			{
@@ -43,7 +43,7 @@ namespace SH
 			SpvCompositeTypeDesc* CompositeTypeDesc = static_cast<SpvCompositeTypeDesc*>(TypeDesc);
 			for (SpvTypeDesc* MemberTypeDesc : CompositeTypeDesc->GetMemberTypeDescs())
 			{
-				Nodes.Append(AppendVarChildNodes(MemberTypeDesc, InitializedRanges, DirtyRanges, Value, Offset));
+				Nodes.Append(AppendVarChildNodes(Lang, MemberTypeDesc, InitializedRanges, DirtyRanges, Value, Offset));
 				if (MemberTypeDesc->GetKind() == SpvTypeDescKind::Member)
 				{
 					Offset += GetTypeByteSize(MemberTypeDesc);
@@ -58,9 +58,9 @@ namespace SH
 			int32 ElementTypeSize = GetTypeByteSize(ElementTypeDesc);
 			for (int32 Index = 0; Index < VectorCount; Index++)
 			{
-				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset);
+				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset, DebuggerViewHex);
 				FString MemberName = FString::Printf(TEXT("[%d]"), Index);
-				auto Data = MakeShared<ExpressionNode>(MemberName, MoveTemp(ValueStr), GetTypeDescStr(ElementTypeDesc));
+				auto Data = MakeShared<ExpressionNode>(MemberName, MoveTemp(ValueStr), GetTypeDescStr(ElementTypeDesc, Lang));
 				for (const auto& Range : DirtyRanges)
 				{
 					int32 RangeStart = Range.ByteOffset;
@@ -94,9 +94,9 @@ namespace SH
 			for (int32 Index = 0; Index < CompCount; Index++)
 			{
 				FString MemberName = FString::Printf(TEXT("[%d]"), Index);
-				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset);
-				auto Data = MakeShared<ExpressionNode>(MemberName, MoveTemp(ValueStr), GetTypeDescStr(ElementTypeDesc));
-				Data->Children = AppendVarChildNodes(ElementTypeDesc, InitializedRanges, DirtyRanges, Value, Offset);
+				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset, DebuggerViewHex);
+				auto Data = MakeShared<ExpressionNode>(MemberName, MoveTemp(ValueStr), GetTypeDescStr(ElementTypeDesc, Lang));
+				Data->Children = AppendVarChildNodes(Lang, ElementTypeDesc, InitializedRanges, DirtyRanges, Value, Offset);
 				for (const auto& Range : DirtyRanges)
 				{
 					int32 RangeStart = Range.ByteOffset;
@@ -116,7 +116,7 @@ namespace SH
 		return Nodes;
 	}
 
-	TArray<ExpressionNodePtr> AppendExprChildNodes(SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, const TArray<uint8>& Value, int32 InOffset)
+	TArray<ExpressionNodePtr> AppendExprChildNodes(GpuShaderLanguage Lang, SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, const TArray<uint8>& Value, int32 InOffset)
 	{
 		TArray<ExpressionNodePtr> Nodes;
 		int32 Offset = InOffset;
@@ -124,12 +124,12 @@ namespace SH
 		{
 			SpvMemberTypeDesc* MemberTypeDesc = static_cast<SpvMemberTypeDesc*>(TypeDesc);
 			int32 MemberByteSize = GetTypeByteSize(MemberTypeDesc);
-			FString ValueStr = GetValueStr(Value, MemberTypeDesc->GetTypeDesc(), InitializedRanges, Offset);
-			FString TypeName = GetTypeDescStr(MemberTypeDesc->GetTypeDesc());
+			FString ValueStr = GetValueStr(Value, MemberTypeDesc->GetTypeDesc(), InitializedRanges, Offset, DebuggerViewHex);
+			FString TypeName = GetTypeDescStr(MemberTypeDesc->GetTypeDesc(), Lang);
 			auto Data = MakeShared<ExpressionNode>(MemberTypeDesc->GetName(), ValueStr, TypeName);
 			if (MemberTypeDesc->GetTypeDesc()->GetKind() == SpvTypeDescKind::Composite)
 			{
-				Data->Children = AppendExprChildNodes(MemberTypeDesc->GetTypeDesc(), InitializedRanges, Value, Offset);
+				Data->Children = AppendExprChildNodes(Lang, MemberTypeDesc->GetTypeDesc(), InitializedRanges, Value, Offset);
 			}
 			Nodes.Add(MoveTemp(Data));
 		}
@@ -138,7 +138,7 @@ namespace SH
 			SpvCompositeTypeDesc* CompositeTypeDesc = static_cast<SpvCompositeTypeDesc*>(TypeDesc);
 			for (SpvTypeDesc* MemberTypeDesc : CompositeTypeDesc->GetMemberTypeDescs())
 			{
-				Nodes.Append(AppendExprChildNodes(MemberTypeDesc, InitializedRanges, Value, Offset));
+				Nodes.Append(AppendExprChildNodes(Lang, MemberTypeDesc, InitializedRanges, Value, Offset));
 				if (MemberTypeDesc->GetKind() == SpvTypeDescKind::Member)
 				{
 					Offset += GetTypeByteSize(MemberTypeDesc);
@@ -153,9 +153,9 @@ namespace SH
 			int32 ElementTypeSize = GetTypeByteSize(ElementTypeDesc);
 			for (int32 Index = 0; Index < VectorCount; Index++)
 			{
-				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset);
+				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset, DebuggerViewHex);
 				FString MemberName = FString::Printf(TEXT("[%d]"), Index);
-				FString TypeName = GetTypeDescStr(ElementTypeDesc);
+				FString TypeName = GetTypeDescStr(ElementTypeDesc, Lang);
 				auto Data = MakeShared<ExpressionNode>(MemberName, ValueStr, TypeName);
 				Offset += ElementTypeSize;
 				Nodes.Add(MoveTemp(Data));
@@ -178,10 +178,10 @@ namespace SH
 			for (int32 Index = 0; Index < CompCount; Index++)
 			{
 				FString MemberName = FString::Printf(TEXT("[%d]"), Index);
-				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset);
-				FString TypeName = GetTypeDescStr(ElementTypeDesc);
+				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset, DebuggerViewHex);
+				FString TypeName = GetTypeDescStr(ElementTypeDesc, Lang);
 				auto Data = MakeShared<ExpressionNode>(MemberName, ValueStr, TypeName);
-				Data->Children = AppendExprChildNodes(ElementTypeDesc, InitializedRanges, Value, Offset);
+				Data->Children = AppendExprChildNodes(Lang, ElementTypeDesc, InitializedRanges, Value, Offset);
 				Nodes.Add(MoveTemp(Data));
 				Offset += ElementTypeSize;
 			}
@@ -196,6 +196,7 @@ namespace SH
 		ExtraArgs.Add("ENABLE_PRINT=0");
 		ExtraArgs.Add("-ignore-validation-error");
 		FString ErrorInfo, WarnInfo;
+		GpuShaderLanguage Lang = DebugShader->GetShaderLanguage();
 
 		if (DebugShader->GetShaderType() == ShaderType::PixelShader)
 		{
@@ -218,9 +219,11 @@ namespace SH
 			const TArray<uint32>& PatchedSpv = ExprVisitor.GetPatcher().GetSpv();
 			
 			ShaderConductor::Compiler::TargetDesc TargetDesc{};
+			ShaderConductor::Compiler::Options Options{};
+			Options.force_zero_initialized_variables = true;
 			FString FileExtension;
 			FString EntryPointStr;
-			if (DebugShader->GetShaderLanguage() == GpuShaderLanguage::HLSL)
+			if (Lang == GpuShaderLanguage::HLSL)
 			{
 				TargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
 				TargetDesc.version = "66";
@@ -229,6 +232,7 @@ namespace SH
 			}
 			else
 			{
+				Options.vulkanSemantics = true;
 				TargetDesc.language = ShaderConductor::ShadingLanguage::Glsl;
 				TargetDesc.version = "450";
 				FileExtension = TEXT(".glsl");
@@ -237,7 +241,7 @@ namespace SH
 			
 			auto EntryPoint = StringCast<UTF8CHAR>(*EntryPointStr);
 			ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile(
-				{.force_zero_initialized_variables = true}, 
+				Options,
 				{ PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, 
 				(const char*)EntryPoint.Get(),
 				ShaderConductor::ShaderStage::PixelShader, TargetDesc);
@@ -260,7 +264,7 @@ namespace SH
 					.Source = MoveTemp(PatchedSource),
 					.Type = DebugShader->GetShaderType(),
 					.EntryPoint = EntryPointStr,
-					.Language = DebugShader->GetShaderLanguage()
+					.Language = Lang
 				});
 				if (GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
 				{
@@ -298,17 +302,17 @@ namespace SH
 					SpvTypeDesc* ResultTypeDesc = ExprContext.TypeDescs[TypeDescId].Get();
 					if (ResultTypeDesc && !ResultValue.IsEmpty())
 					{
-						 FText TypeName = FText::FromString(GetTypeDescStr(ResultTypeDesc));
+						 FText TypeName = FText::FromString(GetTypeDescStr(ResultTypeDesc, Lang));
 
 						TArray<Vector2i> ResultRange;
 						ResultRange.Add({ 0, ResultValue.Num() });
-						FString ValueStr = GetValueStr(ResultValue, ResultTypeDesc, ResultRange, 0);
+						FString ValueStr = GetValueStr(ResultValue, ResultTypeDesc, ResultRange, 0, DebuggerViewHex);
 
 						TArray<TSharedPtr<ExpressionNode>> Children;
 						if (ResultTypeDesc->GetKind() == SpvTypeDescKind::Composite || ResultTypeDesc->GetKind() == SpvTypeDescKind::Array
 							|| ResultTypeDesc->GetKind() == SpvTypeDescKind::Matrix)
 						{
-							Children = AppendExprChildNodes(ResultTypeDesc, ResultRange, ResultValue, 0);
+							Children = AppendExprChildNodes(Lang, ResultTypeDesc, ResultRange, ResultValue, 0);
 						}
 
 						return { .Expr = InExpression, .ValueStr = ValueStr,
@@ -331,9 +335,10 @@ namespace SH
 		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
 		TArray<CallStackDataPtr> CallStackDatas;
 
+		GpuShaderLanguage Lang = DebugShader->GetShaderLanguage();
 		SpvFunctionDesc* FuncDesc = GetFunctionDesc(Scope);
 		FString Location = FString::Printf(TEXT("%s (Line %d)"), *ShaderAssetObj->GetFileName(), StopLineNumber);
-		CallStackDatas.Add(MakeShared<CallStackData>(GetFunctionSig(FuncDesc), MoveTemp(Location)));
+		CallStackDatas.Add(MakeShared<CallStackData>(GetFunctionSig(FuncDesc, Lang), MoveTemp(Location)));
 		for (int i = CallStack.Num() - 1; i >= 0; i--)
 		{
 			SpvFunctionDesc* FuncDesc = GetFunctionDesc(CallStack[i].Scope);
@@ -341,7 +346,7 @@ namespace SH
 			if (JumpLineNumber > 0)
 			{
 				FString Location = FString::Printf(TEXT("%s (Line %d)"), *ShaderAssetObj->GetFileName(), JumpLineNumber);
-				CallStackDatas.Add(MakeShared<CallStackData>(GetFunctionSig(FuncDesc), MoveTemp(Location)));
+				CallStackDatas.Add(MakeShared<CallStackData>(GetFunctionSig(FuncDesc, Lang), MoveTemp(Location)));
 			}
 		}
 		DebuggerCallStackView->SetCallStackDatas(CallStackDatas);
@@ -364,13 +369,13 @@ namespace SH
 
 		TArray<ExpressionNodePtr> LocalVarNodeDatas;
 		TArray<ExpressionNodePtr> GlobalVarNodeDatas;
-
+		GpuShaderLanguage Lang = DebugShader->GetShaderLanguage();
 		if (!ReturnValue.IsEmpty())
 		{
 			SpvTypeDesc* ReturnTypeDesc = std::get<SpvTypeDesc*>(GetFunctionDesc(Scope)->GetFuncTypeDesc()->GetReturnType());
 			FString VarName = GetFunctionDesc(Scope)->GetName() + LOCALIZATION("ReturnTip").ToString();
-			FString TypeName = GetTypeDescStr(ReturnTypeDesc);
-			FString ValueStr = GetValueStr(ReturnValue, ReturnTypeDesc, TArray{ Vector2i{0, ReturnValue.Num()} }, 0);
+			FString TypeName = GetTypeDescStr(ReturnTypeDesc, Lang);
+			FString ValueStr = GetValueStr(ReturnValue, ReturnTypeDesc, TArray{ Vector2i{0, ReturnValue.Num()} }, 0, DebuggerViewHex);
 
 			auto Data = MakeShared<ExpressionNode>(VarName, ValueStr, TypeName);
 			LocalVarNodeDatas.Add(MoveTemp(Data));
@@ -392,7 +397,7 @@ namespace SH
 						{
 							continue;
 						}
-						FString TypeName = GetTypeDescStr(VarDesc->TypeDesc);
+						FString TypeName = GetTypeDescStr(VarDesc->TypeDesc, DebugShader->GetShaderLanguage());
 						const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var->Storage).Value;
 						if (Value.IsEmpty())
 						{
@@ -404,14 +409,14 @@ namespace SH
 						{
 							InitializedRanges = Var->InitializedRanges;
 						}
-						FString ValueStr = GetValueStr(Value, VarDesc->TypeDesc, InitializedRanges, 0);
+						FString ValueStr = GetValueStr(Value, VarDesc->TypeDesc, InitializedRanges, 0, DebuggerViewHex);
 						auto Data = MakeShared<ExpressionNode>(VarName, ValueStr, TypeName);
 						TArray<SpvVarDirtyRange> Ranges;
 						DirtyVars.MultiFind(VarId, Ranges);
 						if (VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Composite || VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Array
 							|| VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Matrix)
 						{
-							Data->Children = AppendVarChildNodes(VarDesc->TypeDesc, InitializedRanges, Ranges, Value, 0);
+							Data->Children = AppendVarChildNodes(Lang, VarDesc->TypeDesc, InitializedRanges, Ranges, Value, 0);
 						}
 
 						if (!Ranges.IsEmpty())
@@ -1332,6 +1337,7 @@ namespace SH
 		}
 
 		ShaderConductor::Compiler::TargetDesc TargetDesc{};
+		ShaderConductor::Compiler::Options Options{};
 		FString FileExtension;
 		FString EntryPointStr;
 		if (DebugShader->GetShaderLanguage() == GpuShaderLanguage::HLSL)
@@ -1343,6 +1349,7 @@ namespace SH
 		}
 		else
 		{
+			Options.vulkanSemantics = true;
 			TargetDesc.language = ShaderConductor::ShadingLanguage::Glsl;
 			TargetDesc.version = "450";
 			FileExtension = TEXT(".glsl");
@@ -1351,7 +1358,7 @@ namespace SH
 		
 		auto EntryPoint = StringCast<UTF8CHAR>(*EntryPointStr);
 		ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile(
-			{}, { PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, (const char*)EntryPoint.Get(),
+			Options, { PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, (const char*)EntryPoint.Get(),
 			ShaderConductor::ShaderStage::PixelShader, TargetDesc);
 		
 		FString PatchedSource = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
@@ -1368,6 +1375,7 @@ namespace SH
 		CurDebugStateIndex = 0;
 		DebuggerContext = MoveTemp(PixelDebuggerContext);
 		TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
+			.Name = DebugShader->GetShaderName() + (GlobalValidation ? TEXT("Validation") : TEXT("Patched")),
 			.Source = MoveTemp(PatchedSource),
 			.Type = DebugShader->GetShaderType(),
 			.EntryPoint = EntryPointStr,
@@ -1480,10 +1488,11 @@ namespace SH
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		SDebuggerVariableView* DebuggerLocalVariableView = ShEditor->GetDebuggerLocalVariableView();
 		SDebuggerVariableView* DebuggerGlobalVariableView = ShEditor->GetDebuggerGlobalVariableView();
+		SDebuggerWatchView* DebuggerWatchView = ShEditor->GetDebuggerWatchView();
 		DebuggerLocalVariableView->SetVariableNodeDatas({});
 		DebuggerGlobalVariableView->SetVariableNodeDatas({});
-		DebuggerLocalVariableView->SetOnShowUninitialized(nullptr);
-		DebuggerGlobalVariableView->SetOnShowUninitialized(nullptr);
+		DebuggerLocalVariableView->SetOnShowChanged(nullptr);
+		DebuggerGlobalVariableView->SetOnShowChanged(nullptr);
 	}
 
 	void ShaderDebugger::InitDebuggerView()
@@ -1494,7 +1503,7 @@ namespace SH
 
 		SDebuggerVariableView* DebuggerLocalVariableView = ShEditor->GetDebuggerLocalVariableView();
 		SDebuggerVariableView* DebuggerGlobalVariableView = ShEditor->GetDebuggerGlobalVariableView();
-		DebuggerLocalVariableView->SetOnShowUninitialized([this](bool bShowUninitialized) { 
+		DebuggerLocalVariableView->SetOnShowChanged([this] { 
 			if (ActiveCallPoint)
 			{
 				ShowDeuggerVariable(ActiveCallPoint.value().Scope);
@@ -1504,7 +1513,7 @@ namespace SH
 				ShowDeuggerVariable(Scope);
 			}
 		});
-		DebuggerGlobalVariableView->SetOnShowUninitialized([this](bool bShowUninitialized) { 
+		DebuggerGlobalVariableView->SetOnShowChanged([this] {
 			if (ActiveCallPoint)
 			{
 				ShowDeuggerVariable(ActiveCallPoint.value().Scope);
@@ -1517,14 +1526,14 @@ namespace SH
 
 		DebuggerCallStackView->OnSelectionChanged = [this, DebuggerWatchView](const FString& FuncName) {
 			int32 ExtraLineNum = ShaderEditor->GetShaderAsset()->GetExtraLineNum();
-			if (GetFunctionSig(GetFunctionDesc(Scope)) == FuncName)
+			if (GetFunctionSig(GetFunctionDesc(Scope), DebugShader->GetShaderLanguage()) == FuncName)
 			{
 				StopLineNumber = CurValidLine.value() - ExtraLineNum;
 				ShowDeuggerVariable(Scope);
 				ActiveCallPoint.reset();
 			}
 			else if (auto CallPoint = CallStack.FindByPredicate([this, FuncName](const auto& InItem) {
-				if (GetFunctionSig(GetFunctionDesc(InItem.Scope)) == FuncName)
+				if (GetFunctionSig(GetFunctionDesc(InItem.Scope), DebugShader->GetShaderLanguage()) == FuncName)
 				{
 					return true;
 				}

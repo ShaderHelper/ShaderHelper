@@ -1244,6 +1244,11 @@ namespace FW
 				Add4Op->SetId(OriginalValuePlus4);
 				AppendErrorFuncInsts.Add(MoveTemp(Add4Op));
 
+				SpvId OriginalValuePlus8 = Patcher.NewId();
+				auto Add8Op = MakeUnique<SpvOpIAdd>(UIntType, OriginalValue, Patcher.FindOrAddConstant(8u));
+				Add8Op->SetId(OriginalValuePlus8);
+				AppendErrorFuncInsts.Add(MoveTemp(Add8Op));
+
 				SpvId OriginalValuePlus12 = Patcher.NewId();
 				auto Add12Op = MakeUnique<SpvOpIAdd>(UIntType, OriginalValue, Patcher.FindOrAddConstant(12u));
 				Add12Op->SetId(OriginalValuePlus12);
@@ -1269,15 +1274,25 @@ namespace FW
 				AppendErrorFuncInsts.Add(MoveTemp(FalseLabelOp));
 
 				{
-					SpvId AlignedOffset = Patcher.NewId();
-					auto AlignedOffsetOp = MakeUnique<SpvOpShiftRightLogical>(UIntType, OriginalValuePlus4, Patcher.FindOrAddConstant(2u));
-					AlignedOffsetOp->SetId(AlignedOffset);
-					AppendErrorFuncInsts.Add(MoveTemp(AlignedOffsetOp));
+					SpvId AlignedOffsetX = Patcher.NewId();
+					auto AlignedOffsetXOp = MakeUnique<SpvOpShiftRightLogical>(UIntType, OriginalValuePlus4, Patcher.FindOrAddConstant(2u));
+					AlignedOffsetXOp->SetId(AlignedOffsetX);
+					AppendErrorFuncInsts.Add(MoveTemp(AlignedOffsetXOp));
 
-					SpvId DebuggerBufferStorage = Patcher.NewId();
-					auto DebuggerBufferStorageOp = MakeUnique<SpvOpAccessChain>(UIntPointerUniformType, DebuggerBuffer, TArray<SpvId>{Zero, AlignedOffset});
-					DebuggerBufferStorageOp->SetId(DebuggerBufferStorage);
-					AppendErrorFuncInsts.Add(MoveTemp(DebuggerBufferStorageOp));
+					SpvId AlignedOffsetY = Patcher.NewId();
+					auto AlignedOffsetYOp = MakeUnique<SpvOpShiftRightLogical>(UIntType, OriginalValuePlus8, Patcher.FindOrAddConstant(2u));
+					AlignedOffsetYOp->SetId(AlignedOffsetY);
+					AppendErrorFuncInsts.Add(MoveTemp(AlignedOffsetYOp));
+
+					SpvId DebuggerBufferStorageX = Patcher.NewId();
+					auto DebuggerBufferStorageXOp = MakeUnique<SpvOpAccessChain>(UIntPointerUniformType, DebuggerBuffer, TArray<SpvId>{Zero, AlignedOffsetX});
+					DebuggerBufferStorageXOp->SetId(DebuggerBufferStorageX);
+					AppendErrorFuncInsts.Add(MoveTemp(DebuggerBufferStorageXOp));
+
+					SpvId DebuggerBufferStorageY = Patcher.NewId();
+					auto DebuggerBufferStorageYOp = MakeUnique<SpvOpAccessChain>(UIntPointerUniformType, DebuggerBuffer, TArray<SpvId>{Zero, AlignedOffsetY});
+					DebuggerBufferStorageYOp->SetId(DebuggerBufferStorageY);
+					AppendErrorFuncInsts.Add(MoveTemp(DebuggerBufferStorageYOp));
 
 					SpvId LoadedFragCoord = Patcher.NewId();
 					auto LoadedFragCoordOp = MakeUnique<SpvOpLoad>(Float4Type, Context.BuiltIns[SpvBuiltIn::FragCoord]);
@@ -1294,7 +1309,18 @@ namespace FW
 					UIntFragCoordXYOp->SetId(UIntFragCoordXY);
 					AppendErrorFuncInsts.Add(MoveTemp(UIntFragCoordXYOp));
 
-					AppendErrorFuncInsts.Add(MakeUnique<SpvOpStore>(DebuggerBufferStorage, UIntFragCoordXY));
+					SpvId UIntFragCoordX = Patcher.NewId();
+					auto ExtractXOp = MakeUnique<SpvOpCompositeExtract>(UIntType, UIntFragCoordXY, TArray<uint32>{0});
+					ExtractXOp->SetId(UIntFragCoordX);
+					AppendErrorFuncInsts.Add(MoveTemp(ExtractXOp));
+
+					SpvId UIntFragCoordY= Patcher.NewId();
+					auto ExtractYOp = MakeUnique<SpvOpCompositeExtract>(UIntType, UIntFragCoordXY, TArray<uint32>{1});
+					ExtractYOp->SetId(UIntFragCoordY);
+					AppendErrorFuncInsts.Add(MoveTemp(ExtractYOp));
+
+					AppendErrorFuncInsts.Add(MakeUnique<SpvOpStore>(DebuggerBufferStorageX, UIntFragCoordX));
+					AppendErrorFuncInsts.Add(MakeUnique<SpvOpStore>(DebuggerBufferStorageY, UIntFragCoordY));
 				}
 			}
 

@@ -84,6 +84,22 @@ namespace SH
 					.VAlign(VAlign_Center)
 					.AutoWidth()
 					[
+						SNew(SShToggleButton).Text(FText::FromString("HEX"))
+						.IsChecked_Lambda([this] { return DebuggerViewHex ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
+						.OnCheckStateChanged_Lambda([this](ECheckBoxState InState) {
+							DebuggerViewHex = InState == ECheckBoxState::Checked ? true : false;
+							if (OnShowChanged)
+							{
+								OnShowChanged();
+							}
+						})
+					]
+					+ SHorizontalBox::Slot()
+					.Padding(0, 0, 4, 0)
+					.HAlign(HAlign_Right)
+					.VAlign(VAlign_Center)
+					.AutoWidth()
+					[
 						SNew(SShToggleButton).Icon(FAppStyle::Get().GetBrush("ColorPicker.Mode")).IconColorAndOpacity(FLinearColor::White)
 						.ToolTipText(LOCALIZATION("DisplayColorBlock"))
 						.IsChecked_Lambda([this] { return DebuggerViewDisplayColorBlock ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
@@ -102,9 +118,9 @@ namespace SH
 						.IsChecked_Lambda([this] { return bShowUninitialized ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
 						.OnCheckStateChanged_Lambda([this](ECheckBoxState InState) {
 							bShowUninitialized = InState == ECheckBoxState::Checked ? true : false;
-							if (OnShowUninitialized)
+							if (OnShowChanged)
 							{
-								OnShowUninitialized(bShowUninitialized);
+								OnShowChanged();
 							}
 						})
 					]
@@ -230,14 +246,10 @@ namespace SH
 		else if(ColumnId == ValueColId)
 		{
 			Border->SetPadding(FMargin{1, 0, 1, 2});
-			InternalBorder->SetBorderImage(FAppStyle::Get().GetBrush("Brushes.White"));
-			InternalBorder->SetBorderBackgroundColor(TAttribute<FSlateColor>::CreateLambda([this] {
-				if (Data->Dirty)
-				{
-					return FStyleColors::AccentRed.GetSpecifiedColor().CopyWithNewOpacity(0.4f);
-				}
-				return FStyleColors::Panel.GetSpecifiedColor();
-			}));
+			auto Text = SNew(STextBlock).Font(Owner->Font).Text(FText::FromString(Data->ValueStr))
+				.ColorAndOpacity_Lambda([this] {
+					return Data->Dirty ? FStyleColors::AccentRed : FStyleColors::Foreground;
+				});
 
 			if (Data->TypeName == "float3" || Data->TypeName == "float4")
 			{
@@ -280,13 +292,13 @@ namespace SH
 					+SOverlay::Slot()
 					.VAlign(VAlign_Center)
 					[
-						SNew(STextBlock).Font(Owner->Font).Text(FText::FromString(Data->ValueStr))
+						Text
 					]
 				);
 			}
 			else
 			{
-				InternalBorder->SetContent(SNew(STextBlock).Font(Owner->Font).Text(FText::FromString(Data->ValueStr)));
+				InternalBorder->SetContent(Text);
 			}
 
 			InternalBorder->SetToolTipText(FText::FromString(Data->ValueStr));

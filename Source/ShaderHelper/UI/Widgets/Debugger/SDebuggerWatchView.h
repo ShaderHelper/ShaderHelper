@@ -20,6 +20,7 @@ namespace SH
 	using ExpressionNodePtr = TSharedPtr<ExpressionNode>;
 
 	inline bool DebuggerViewDisplayColorBlock;
+	inline bool DebuggerViewHex;
 
 	class SDebuggerWatchView : public SCompoundWidget
 	{

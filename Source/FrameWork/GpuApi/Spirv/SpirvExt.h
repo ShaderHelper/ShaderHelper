@@ -407,14 +407,30 @@ namespace FW
 		}
 	};
 
-	inline FString GetTypeDescStr(SpvTypeDesc* TypeDesc)
+	inline FString GetTypeDescStr(SpvTypeDesc* TypeDesc, GpuShaderLanguage Language)
 	{
 		if(TypeDesc->GetKind() == SpvTypeDescKind::Vector)
 		{
 			SpvVectorTypeDesc* VectorTypeDesc = static_cast<SpvVectorTypeDesc*>(TypeDesc);
 			if(VectorTypeDesc->GetCompCount() > 1)
 			{
-				return VectorTypeDesc->GetBasicTypeDesc()->GetName() + FString::FromInt(VectorTypeDesc->GetCompCount());
+				if (Language == GpuShaderLanguage::GLSL)
+				{
+					switch (VectorTypeDesc->GetBasicTypeDesc()->GetEncoding())
+					{
+					case SpvDebugBasicTypeEncoding::Float:       return "vec" + FString::FromInt(VectorTypeDesc->GetCompCount());
+					case SpvDebugBasicTypeEncoding::Boolean:     return "bvec" + FString::FromInt(VectorTypeDesc->GetCompCount());
+					case SpvDebugBasicTypeEncoding::Signed:      return "ivec" + FString::FromInt(VectorTypeDesc->GetCompCount());
+					case SpvDebugBasicTypeEncoding::Unsigned:    return "uvec" + FString::FromInt(VectorTypeDesc->GetCompCount());
+					default:
+						AUX::Unreachable();
+					}
+				}
+				else
+				{
+					return VectorTypeDesc->GetBasicTypeDesc()->GetName() + FString::FromInt(VectorTypeDesc->GetCompCount());
+				}
+				
 			}
 			return VectorTypeDesc->GetBasicTypeDesc()->GetName();
 		}
@@ -431,7 +447,7 @@ namespace FW
 		else if(TypeDesc->GetKind() == SpvTypeDescKind::Array)
 		{
 			SpvArrayTypeDesc* ArrayTypeDesc = static_cast<SpvArrayTypeDesc*>(TypeDesc);
-			FString TypeName = GetTypeDescStr(ArrayTypeDesc->GetBaseTypeDesc());
+			FString TypeName = GetTypeDescStr(ArrayTypeDesc->GetBaseTypeDesc(), Language);
 			for(int32 CompCount : ArrayTypeDesc->GetCompCounts())
 			{
 				TypeName += FString::Printf(TEXT("[%d]"), CompCount);
@@ -442,14 +458,22 @@ namespace FW
 		{
 			SpvMatrixTypeDesc* MatrixTypeDesc = static_cast<SpvMatrixTypeDesc*>(TypeDesc);
 			int32 VectorCount = MatrixTypeDesc->GetVectorCount();
-			FString BasicTypeName = GetTypeDescStr(MatrixTypeDesc->GetVectorTypeDesc()->GetBasicTypeDesc());
+			FString BasicTypeName;
+			if (Language == GpuShaderLanguage::GLSL)
+			{
+				BasicTypeName = "mat";
+			}
+			else
+			{
+				BasicTypeName = GetTypeDescStr(MatrixTypeDesc->GetVectorTypeDesc()->GetBasicTypeDesc(), Language);
+			}
 			FString TypeName = BasicTypeName + FString::Printf(TEXT("%dx%d"), VectorCount, MatrixTypeDesc->GetVectorTypeDesc()->GetCompCount());
 			return TypeName;
 		}
 		return {};
 	};
 
-	inline FString GetFunctionSig(SpvFunctionDesc* FuncDesc)
+	inline FString GetFunctionSig(SpvFunctionDesc* FuncDesc, GpuShaderLanguage Lanuage)
 	{
 		FString FuncName = FuncDesc->GetName();
 		FuncName = FuncName.Replace(TEXT("."), TEXT("::"));
@@ -462,7 +486,7 @@ namespace FW
 		}
 		else
 		{
-			Signature += GetTypeDescStr(std::get<SpvTypeDesc*>(ReturnType));
+			Signature += GetTypeDescStr(std::get<SpvTypeDesc*>(ReturnType), Lanuage);
 		}
 		Signature += " ";
 		Signature += FuncName;
@@ -479,11 +503,18 @@ namespace FW
 
 			if (ParamType->GetKind() == SpvTypeKind::Sampler || ParamType->GetKind() == SpvTypeKind::Image)
 			{
-				Signature += GetHlslTypeStr(ParamType);
+				if (Lanuage == GpuShaderLanguage::HLSL)
+				{
+					Signature += GetHlslTypeStr(ParamType);
+				}
+				else
+				{
+					Signature += GetGlslTypeStr(ParamType);
+				}
 			}
 			else
 			{
-				Signature += GetTypeDescStr(ParamTypeDescs[i]);
+				Signature += GetTypeDescStr(ParamTypeDescs[i], Lanuage);
 			}
 
 			if (i != ParamTypeDescs.Num() - 1)
@@ -548,7 +579,7 @@ namespace FW
 		AUX::Unreachable();
 	}
 
-	inline FString GetValueStr(TArrayView<const uint8> InValue, const SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, int32 InOffset)
+	inline FString GetValueStr(TArrayView<const uint8> InValue, const SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, int32 InOffset, bool bShowHex)
 	{
 		FString ValueStr;
 		int32 Offset = InOffset;
@@ -559,7 +590,7 @@ namespace FW
 			int32 BasicTypeSize = GetTypeByteSize(VectorTypeDesc->GetBasicTypeDesc());
 			for(int Index = 0; Index < VectorTypeDesc->GetCompCount(); Index++)
 			{
-				ValueStr += GetValueStr(InValue, VectorTypeDesc->GetBasicTypeDesc(), InitializedRanges, Offset);
+				ValueStr += GetValueStr(InValue, VectorTypeDesc->GetBasicTypeDesc(), InitializedRanges, Offset, bShowHex);
 				Offset += BasicTypeSize;
 				if(Index != VectorTypeDesc->GetCompCount() - 1)
 				{
@@ -577,7 +608,20 @@ namespace FW
 			{
 				if(Offset >= Range.X && Offset + GetTypeByteSize(BasicTypeDesc) <= Range.Y)
 				{
-					if(Encoding == SpvDebugBasicTypeEncoding::Float)
+					if(bShowHex)
+					{
+						if (BasicTypeDesc->GetSize() == 64)
+						{
+							uint64 Value = *(uint64*)(InValue.GetData() + Offset);
+							BasicValueStr = FString::Printf(TEXT("0x%016llX"), Value);
+						}
+						else
+						{
+							uint32 Value = *(uint32*)(InValue.GetData() + Offset);
+							BasicValueStr = FString::Printf(TEXT("0x%08X"), Value);
+						}
+					}
+					else if(Encoding == SpvDebugBasicTypeEncoding::Float)
 					{
 						float Value = *(float*)(InValue.GetData() + Offset);
 						BasicValueStr = FString::Printf(TEXT("%.9g"), Value);
@@ -627,7 +671,7 @@ namespace FW
 					SpvMemberTypeDesc* MemberTypeDesc = static_cast<SpvMemberTypeDesc*>(MemberTypeDescs[Index]);
 					int32 MemberSize = GetTypeByteSize(MemberTypeDesc);
 					ValueStr += MemberTypeDesc->GetName() + "=";
-					ValueStr += GetValueStr(InValue, MemberTypeDesc->GetTypeDesc(), InitializedRanges, Offset);
+					ValueStr += GetValueStr(InValue, MemberTypeDesc->GetTypeDesc(), InitializedRanges, Offset, bShowHex);
 					Offset += MemberSize;
 				}
 				
@@ -655,7 +699,7 @@ namespace FW
 			ValueStr += "[";
 			for(int32 Index = 0; Index < CompCount; Index++)
 			{
-				ValueStr += GetValueStr(InValue, ElementTypeDesc, InitializedRanges, Offset);
+				ValueStr += GetValueStr(InValue, ElementTypeDesc, InitializedRanges, Offset, bShowHex);
 				Offset += ElementTypeSize;
 				
 				if(Index != CompCount - 1)
@@ -674,7 +718,7 @@ namespace FW
 			ValueStr += "[";
 			for(int32 Index = 0 ; Index < VectorCount; Index++)
 			{
-				ValueStr += GetValueStr(InValue, ElementTypeDesc, InitializedRanges, Offset);
+				ValueStr += GetValueStr(InValue, ElementTypeDesc, InitializedRanges, Offset, bShowHex);
 				Offset += ElementTypeSize;
 				
 				if(Index != VectorCount - 1)

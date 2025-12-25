@@ -43,6 +43,11 @@ vec2 GPrivate_fragCoord;
 #define PrintAtMouse3(StrArrDecl, Arg1, Arg2, Arg3)
 #endif
 
+#define iChannel0 sampler2D(iChannel0_texture, iChannel0_sampler)
+#define iChannel1 sampler2D(iChannel1_texture, iChannel1_sampler)
+#define iChannel2 sampler2D(iChannel2_texture, iChannel2_sampler)
+#define iChannel3 sampler2D(iChannel3_texture, iChannel3_sampler)
+
 void main()
 {
 	vec2 fragCoord = gl_FragCoord.xy;

@@ -288,7 +288,9 @@ namespace SH
 				}
 				catch (const std::runtime_error& e)
 				{
-					MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), FText::FromString(UTF8_TO_TCHAR(e.what())));
+					FText FailureInfo = LOCALIZATION("DebugFailure");
+					SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo.ToString(), UTF8_TO_TCHAR(e.what()));
+					MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), FailureInfo);
 					ShEditor->EndDebugging();
 					return;
 				}

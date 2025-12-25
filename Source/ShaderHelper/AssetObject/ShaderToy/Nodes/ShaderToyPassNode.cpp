@@ -118,29 +118,29 @@ namespace SH
 		GpuTexturePin* iChannel2 = static_cast<GpuTexturePin*>(GetPin("iChannel2"));
 		GpuTexturePin* iChannel3 = static_cast<GpuTexturePin*>(GetPin("iChannel3"));
 
-		Builder.SetTexture("iChannel0", iChannel0->GetValue());
-		Builder.SetSampler("iChannel0Sampler", GpuResourceHelper::GetSampler({
+		Builder.SetTexture("iChannel0_texture", iChannel0->GetValue());
+		Builder.SetSampler("iChannel0_sampler", GpuResourceHelper::GetSampler({
 			.Filter = (SamplerFilter)iChannelDesc0.Filter,
 			.AddressU = (SamplerAddressMode)iChannelDesc0.Wrap,
 			.AddressV = (SamplerAddressMode)iChannelDesc0.Wrap,
 			.AddressW = (SamplerAddressMode)iChannelDesc0.Wrap
 		}));
-		Builder.SetTexture("iChannel1", iChannel1->GetValue());
-		Builder.SetSampler("iChannel1Sampler", GpuResourceHelper::GetSampler({
+		Builder.SetTexture("iChannel1_texture", iChannel1->GetValue());
+		Builder.SetSampler("iChannel1_sampler", GpuResourceHelper::GetSampler({
 			.Filter = (SamplerFilter)iChannelDesc1.Filter,
 			.AddressU = (SamplerAddressMode)iChannelDesc1.Wrap,
 			.AddressV = (SamplerAddressMode)iChannelDesc1.Wrap,
 			.AddressW = (SamplerAddressMode)iChannelDesc1.Wrap
 		}));
-		Builder.SetTexture("iChannel2", iChannel2->GetValue());
-		Builder.SetSampler("iChannel2Sampler", GpuResourceHelper::GetSampler({
+		Builder.SetTexture("iChannel2_texture", iChannel2->GetValue());
+		Builder.SetSampler("iChannel2_sampler", GpuResourceHelper::GetSampler({
 			.Filter = (SamplerFilter)iChannelDesc2.Filter,
 			.AddressU = (SamplerAddressMode)iChannelDesc2.Wrap,
 			.AddressV = (SamplerAddressMode)iChannelDesc2.Wrap,
 			.AddressW = (SamplerAddressMode)iChannelDesc2.Wrap
 		}));
-		Builder.SetTexture("iChannel3", iChannel3->GetValue());
-		Builder.SetSampler("iChannel3Sampler", GpuResourceHelper::GetSampler({
+		Builder.SetTexture("iChannel3_texture", iChannel3->GetValue());
+		Builder.SetSampler("iChannel3_sampler", GpuResourceHelper::GetSampler({
 			.Filter = (SamplerFilter)iChannelDesc3.Filter,
 			.AddressU = (SamplerAddressMode)iChannelDesc3.Wrap,
 			.AddressV = (SamplerAddressMode)iChannelDesc3.Wrap,

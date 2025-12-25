@@ -147,15 +147,10 @@ namespace SH
 		else if(ColumnId == ValueColId)
 		{
 			Border->SetPadding(FMargin{1, 0, 1, 2});
-			InternalBorder->SetBorderImage(FAppStyle::Get().GetBrush("Brushes.White"));
-			InternalBorder->SetBorderBackgroundColor(TAttribute<FSlateColor>::CreateLambda([this] {
-				if (Data->Dirty)
-				{
-					return FLinearColor{ 1,1,1,0.2f };
-				}
-				return FAppStyle::Get().GetBrush("Brushes.Panel")->TintColor.GetSpecifiedColor();
-			}));
-
+			auto Text = SNew(STextBlock).Text(FText::FromString(Data->ValueStr))
+				.ColorAndOpacity_Lambda([this] {
+					return Data->Dirty ? FStyleColors::AccentRed : FStyleColors::Foreground;
+				});
 			if (Data->TypeName == "float3" || Data->TypeName == "float4")
 			{
 				std::string Str = TCHAR_TO_UTF8(*Data->ValueStr);
@@ -197,13 +192,13 @@ namespace SH
 					+ SOverlay::Slot()
 					.VAlign(VAlign_Center)
 					[
-						SNew(STextBlock).Text(FText::FromString(Data->ValueStr))
+						Text
 					]
 				);
 			}
 			else
 			{
-				InternalBorder->SetContent(SNew(STextBlock).Text(FText::FromString(Data->ValueStr)));
+				InternalBorder->SetContent(Text);
 			}
 
 			InternalBorder->SetToolTipText(FText::FromString(Data->ValueStr));

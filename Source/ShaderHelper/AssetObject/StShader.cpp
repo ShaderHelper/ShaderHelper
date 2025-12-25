@@ -131,14 +131,14 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
             BuiltInBindLayout
 				.AddExistingBinding(0, BindingType::RWRawBuffer, BindingShaderStage::Pixel)
                 .AddUniformBuffer("BuiltInUniform", GetBuiltInUbBuilder(), BindingShaderStage::Pixel)
-                .AddTexture("iChannel0", BindingShaderStage::Pixel)
-                .AddSampler("iChannel0Sampler", BindingShaderStage::Pixel)
-                .AddTexture("iChannel1", BindingShaderStage::Pixel)
-                .AddSampler("iChannel1Sampler", BindingShaderStage::Pixel)
-                .AddTexture("iChannel2", BindingShaderStage::Pixel)
-                .AddSampler("iChannel2Sampler", BindingShaderStage::Pixel)
-                .AddTexture("iChannel3", BindingShaderStage::Pixel)
-                .AddSampler("iChannel3Sampler", BindingShaderStage::Pixel);
+                .AddTexture("iChannel0_texture", BindingShaderStage::Pixel)
+                .AddSampler("iChannel0_sampler", BindingShaderStage::Pixel)
+                .AddTexture("iChannel1_texture", BindingShaderStage::Pixel)
+                .AddSampler("iChannel1_sampler", BindingShaderStage::Pixel)
+                .AddTexture("iChannel2_texture", BindingShaderStage::Pixel)
+                .AddSampler("iChannel2_sampler", BindingShaderStage::Pixel)
+                .AddTexture("iChannel3_texture", BindingShaderStage::Pixel)
+                .AddSampler("iChannel3_sampler", BindingShaderStage::Pixel);
             return 0;
         }();
         return BuiltInBindLayout;

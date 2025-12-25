@@ -3946,9 +3946,9 @@ constexpr int PaddingLineNum = 22;
 		}
 		catch (const std::runtime_error& e)
 		{
-			FString FailureInfo = LOCALIZATION("DebugFailure").ToString();
-			SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo, UTF8_TO_TCHAR(e.what()));
-			MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("DebugFailure"));
+			FText FailureInfo = LOCALIZATION("DebugFailure");
+			SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo.ToString(), UTF8_TO_TCHAR(e.what()));
+			MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), FailureInfo);
 			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 			ShEditor->EndDebugging();
 			return;

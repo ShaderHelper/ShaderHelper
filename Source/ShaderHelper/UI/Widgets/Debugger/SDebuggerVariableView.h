@@ -20,7 +20,7 @@ namespace SH
 		void SavePersistantStates(const TArray<ExpressionNodePtr>& NodeDatas, TMap<FString, ExpressionNodePersistantState>& OutStates);
 		void RestorePersistantStates(const TArray<ExpressionNodePtr>& NodeDatas, const TMap<FString, ExpressionNodePersistantState>& PersistantStates);
 		void RefreshExpansions();
-		void SetOnShowUninitialized(const TFunction<void(bool)>& InHandler) { OnShowUninitialized = InHandler; }
+		void SetOnShowChanged(const TFunction<void()>& InHandler) { OnShowChanged = InHandler; }
 		void SetVariableNodeDatas(const TArray<ExpressionNodePtr>& InDatas);
 		const TArray<ExpressionNodePtr>& GetVariableNodeDatas() const { return VariableNodeDatas; }
 		TSharedRef<ITableRow> OnGenerateRow(ExpressionNodePtr InTreeNode, const TSharedRef<STableViewBase>& OwnerTable);
@@ -31,7 +31,7 @@ namespace SH
 	private:
 		TSharedPtr<STreeView<ExpressionNodePtr>> VariableTreeView;
 		TArray<ExpressionNodePtr> VariableNodeDatas;
-		TFunction<void(bool)> OnShowUninitialized;
+		TFunction<void()> OnShowChanged;
 	};
 
 	class SVariableViewRow : public SMultiColumnTableRow<ExpressionNodePtr>
