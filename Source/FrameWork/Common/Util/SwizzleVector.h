@@ -502,6 +502,10 @@ namespace FW {
 		operator UE_Vector<U>() const {
 			return UE_Vector<U>((U)X, (U)Y);
 		}
+		friend uint32 GetTypeHash(const Vector2Impl& Key)
+		{
+			return FCrc::MemCrc32(Key.Data, sizeof Key.Data);
+		}
 
 		FString ToString() const {
 			if constexpr (std::is_same_v<T, float>)
@@ -731,6 +735,10 @@ namespace FW {
 		operator UE_Vector<U>() const {
             return UE_Vector<U>((U)X, (U)Y, (U)Z);
 		}
+		friend uint32 GetTypeHash(const VectorImpl& Key)
+		{
+			return FCrc::MemCrc32(Key.Data, sizeof Key.Data);
+		}
 
 		FString ToString() const {
 			if constexpr (std::is_same_v<T, float>)
@@ -959,6 +967,10 @@ namespace FW {
         template<typename U>
 		operator UE_Vector<U>() const {
 			return UE_Vector<U>((U)X, (U)Y, (U)Z, (U)W);
+		}
+		friend uint32 GetTypeHash(const Vector4Impl& Key)
+		{
+			return FCrc::MemCrc32(Key.Data, sizeof Key.Data);
 		}
 
 		FString ToString() const {

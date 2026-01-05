@@ -1,4 +1,6 @@
 
+#include "GpuShader.h"
+
 THIRD_PARTY_INCLUDES_START
 #if PLATFORM_WINDOWS
 #include "Windows/AllowWindowsPlatformTypes.h"
@@ -14,28 +16,91 @@ THIRD_PARTY_INCLUDES_END
 
 namespace HLSL
 {
-	TArray<FString> KeyWords = {
+	// ===================== KeyWords =====================
+	// Common keywords (all shader types)
+	TArray<FString> KeyWordsCommon = {
 		"register", "packoffset", "static", "const", "out", "in", "inout", "extern", "inline", "precise",
-		"break", "continue", "discard", "do", "for", "if", "struct", "typedef",
+		"break", "continue", "do", "for", "if", "struct", "typedef",
 		"else", "switch", "while", "case", "default", "return", "true", "false",
-		// Storage and interpolation modifiers
-		"groupshared", "globallycoherent", "linear", "nointerpolation", "centroid", "noperspective", "sample",
 		// Matrix layout
 		"row_major", "column_major",
 		// Compiler hints
 		"unroll", "loop", "flatten", "branch", "forcecase", "call",
-		// Geometry shader primitives
-		"point", "line", "triangle", "lineadj", "triangleadj",
-		// Semantics
-		"SV_Coverage", "SV_Depth", "SV_DispatchThreadID", "SV_DomainLocation", "SV_GroupID", "SV_GroupIndex", "SV_GroupThreadID", "SV_GSInstanceID",
-		"SV_InsideTessFactor", "SV_IsFrontFace", "SV_OutputControlPointID", "SV_POSITION", "SV_Position", "SV_RenderTargetArrayIndex",
-		"SV_SampleIndex", "SV_TessFactor", "SV_ViewportArrayIndex", "SV_InstanceID", "SV_PrimitiveID", "SV_VertexID", "SV_TargetID",
-		"SV_TARGET", "SV_Target", "SV_Target0", "SV_Target1", "SV_Target2", "SV_Target3", "SV_Target4", "SV_Target5", "SV_Target6", "SV_Target7",
-		"SV_StencilRef", "SV_Barycentrics", "SV_ShadingRate",
-		"template", "typename", "sizeof", "numthreads", "_Static_assert",
+		// Misc
+		"template", "typename", "sizeof", "_Static_assert",
+		// Common semantics
+		"SV_POSITION", "SV_Position",
 	};
 
-	TArray<FString> BuiltinTypes = {
+	// Vertex Shader keywords
+	TArray<FString> KeyWordsVS = {
+		// Semantics
+		"SV_VertexID", "SV_InstanceID",
+	};
+
+	// Pixel Shader keywords
+	TArray<FString> KeyWordsPS = {
+		"discard",
+		// Interpolation modifiers
+		"linear", "nointerpolation", "centroid", "noperspective", "sample",
+		// Semantics
+		"SV_Coverage", "SV_Depth", "SV_IsFrontFace", "SV_SampleIndex",
+		"SV_TARGET", "SV_Target", "SV_Target0", "SV_Target1", "SV_Target2", "SV_Target3", "SV_Target4", "SV_Target5", "SV_Target6", "SV_Target7",
+		"SV_StencilRef", "SV_Barycentrics", "SV_ShadingRate", "SV_PrimitiveID",
+	};
+
+	// Geometry Shader keywords
+	TArray<FString> KeyWordsGS = {
+		// Primitive types
+		"point", "line", "triangle", "lineadj", "triangleadj",
+		// Semantics
+		"SV_GSInstanceID", "SV_PrimitiveID", "SV_RenderTargetArrayIndex", "SV_ViewportArrayIndex", "SV_InstanceID",
+	};
+
+	// Hull Shader keywords (Tessellation Control)
+	TArray<FString> KeyWordsHS = {
+		// Semantics
+		"SV_OutputControlPointID", "SV_TessFactor", "SV_InsideTessFactor", "SV_PrimitiveID",
+	};
+
+	// Domain Shader keywords (Tessellation Evaluation)
+	TArray<FString> KeyWordsDS = {
+		// Semantics
+		"SV_DomainLocation", "SV_TessFactor", "SV_InsideTessFactor",
+	};
+
+	// Compute Shader keywords
+	TArray<FString> KeyWordsCS = {
+		// Storage modifiers
+		"groupshared", "globallycoherent",
+		// Attributes
+		"numthreads",
+		// Semantics
+		"SV_DispatchThreadID", "SV_GroupID", "SV_GroupIndex", "SV_GroupThreadID",
+	};
+
+	
+	TArray<FString> GetKeyWords(FW::ShaderType Stage) {
+		TArray<FString> Result;
+		Result.Append(KeyWordsCommon);
+		if (Stage == FW::ShaderType::VertexShader)
+		{
+			Result.Append(KeyWordsVS);
+		}
+		else if (Stage == FW::ShaderType::PixelShader)
+		{
+			Result.Append(KeyWordsPS);
+		}
+		else if (Stage == FW::ShaderType::ComputeShader)
+		{
+			Result.Append(KeyWordsCS);
+		}
+		return Result;
+	};
+
+	// ===================== BuiltinTypes =====================
+	// Common types (all shader types)
+	TArray<FString> BuiltinTypesCommon = {
 		"bool", "bool1", "bool2", "bool3", "bool4", "bool1x1", "bool1x2", "bool1x3", "bool1x4",
 		"bool2x1", "bool2x2", "bool2x3", "bool2x4", "bool3x1", "bool3x2", "bool3x3", "bool3x4",
 		"bool4x1", "bool4x2", "bool4x3", "bool4x4",
@@ -58,8 +123,7 @@ namespace HLSL
 		"double2x1", "double2x2", "double2x3", "double2x4", "double3x1", "double3x2", "double3x3", "double3x4",
 		"double4x1", "double4x2", "double4x3", "double4x4",
 		"snorm", "unorm", "string", "void", "cbuffer",
-		"Buffer", "AppendStructuredBuffer", "ByteAddressBuffer", "ConsumeStructuredBuffer", "StructuredBuffer", "ConstantBuffer",
-		"RWBuffer", "RWByteAddressBuffer", "RWStructuredBuffer", "RWTexture1D", "RWTexture1DArray", "RWTexture2D", "RWTexture2DArray", "RWTexture3D",
+		"Buffer", "ByteAddressBuffer", "StructuredBuffer", "ConstantBuffer",
 		"sampler", "sampler1D", "sampler2D", "sampler3D", "samplerCUBE", "SamplerComparisonState", "SamplerState",
 		"texture", "Texture1D", "Texture1DArray", "Texture2D", "Texture2DArray", "Texture2DMS", "Texture2DMSArray", "Texture3D", "TextureCube", "TextureCubeArray",
 		// Min precision types
@@ -71,31 +135,74 @@ namespace HLSL
 		"float16_t", "float16_t2", "float16_t3", "float16_t4",
 		"int16_t", "int16_t2", "int16_t3", "int16_t4",
 		"uint16_t", "uint16_t2", "uint16_t3", "uint16_t4",
-		// Geometry/Tessellation shader types
-		"TriangleStream", "PointStream", "LineStream", "InputPatch", "OutputPatch",
 	};
 
-	TArray<FString> BuiltinFuncs = {
-		"abs", "acos", "all", "AllMemoryBarrier", "AllMemoryBarrierWithGroupSync", "any", "asdouble",
-		"asfloat", "asin", "asint", "asuint", "atan", "atan2", "ceil", "clamp", "clip", "cos", "cosh", "countbits",
-		"cross", "D3DCOLORtoUBYTE4", "ddx", "ddx_coarse", "ddx_fine", "ddy", "ddy_coarse", "ddy_fine",
-		"degrees", "determinant", "DeviceMemoryBarrier", "DeviceMemoryBarrierWithGroupSync",
-		"distance", "dot", "dst", "EvaluateAttributeAtCentroid", "EvaluateAttributeAtSample",
-		"EvaluateAttributeSnapped", "exp", "exp2", "f16tof32", "f32tof16", "faceforward", "firstbithigh",
-		"firstbitlow", "floor", "fmod", "frac", "frexp", "fwidth", "GetRenderTargetSampleCount",
-		"GetRenderTargetSamplePosition", "GroupMemoryBarrier", "GroupMemoryBarrierWithGroupSync",
-		"InterlockedAdd", "InterlockedAnd", "InterlockedCompareExchange", "InterlockedCompareStore",
-		"InterlockedExchange", "InterlockedMax", "InterlockedMin", "InterlockedOr", "InterlockedXor",
+	// Pixel Shader types (also available in CS with UAV)
+	TArray<FString> BuiltinTypesPS = {
+		"RWBuffer", "RWByteAddressBuffer", "RWStructuredBuffer",
+		"RWTexture1D", "RWTexture1DArray", "RWTexture2D", "RWTexture2DArray", "RWTexture3D",
+	};
+
+	// Geometry Shader types
+	TArray<FString> BuiltinTypesGS = {
+		"TriangleStream", "PointStream", "LineStream",
+	};
+
+	// Tessellation Shader types (Hull/Domain)
+	TArray<FString> BuiltinTypesHSDS = {
+		"InputPatch", "OutputPatch",
+	};
+
+	// Compute Shader types
+	TArray<FString> BuiltinTypesCS = {
+		"RWBuffer", "RWByteAddressBuffer", "RWStructuredBuffer",
+		"RWTexture1D", "RWTexture1DArray", "RWTexture2D", "RWTexture2DArray", "RWTexture3D",
+		"AppendStructuredBuffer", "ConsumeStructuredBuffer",
+	};
+
+	TArray<FString> GetBuiltinTypes(FW::ShaderType Stage) {
+		TArray<FString> Result;
+		Result.Append(BuiltinTypesCommon);
+		if (Stage == FW::ShaderType::PixelShader)
+		{
+			Result.Append(BuiltinTypesPS);
+		}
+		else if (Stage == FW::ShaderType::ComputeShader)
+		{
+			Result.Append(BuiltinTypesCS);
+		}
+		return Result;
+	};
+
+	// ===================== BuiltinFuncs =====================
+	// Common functions (all shader types)
+	TArray<FString> BuiltinFuncsCommon = {
+		"abs", "acos", "all", "any", "asdouble",
+		"asfloat", "asin", "asint", "asuint", "atan", "atan2", "ceil", "clamp", "cos", "cosh", "countbits",
+		"cross", "D3DCOLORtoUBYTE4",
+		"degrees", "determinant",
+		"distance", "dot", "dst", "exp", "exp2", "f16tof32", "f32tof16", "faceforward", "firstbithigh",
+		"firstbitlow", "floor", "fmod", "frac", "frexp",
 		"isfinite", "isinf", "isnan", "ldexp", "length", "lerp", "lit", "log", "log10", "log2", "mad", "max", "min", "modf", "mul",
-		"noise", "normalize", "pow", "Process2DQuadTessFactorsAvg", "Process2DQuadTessFactorsMax",
-		"Process2DQuadTessFactorsMin", "ProcessIsolineTessFactors", "ProcessQuadTessFactorsAvg",
-		"ProcessQuadTessFactorsMax", "ProcessQuadTessFactorsMin", "ProcessTriTessFactorsAvg",
-		"ProcessTriTessFactorsMax", "ProcessTriTessFactorsMin", "radians", "rcp", "reflect", "refract",
+		"noise", "normalize", "pow", "radians", "rcp", "reflect", "refract",
 		"reversebits", "round", "rsqrt", "saturate", "sign", "sin", "sincos", "sinh", "smoothstep", "sqrt", "step",
 		"tan", "tanh", "tex1D", "tex1Dbias", "tex1Dgrad", "tex1Dlod", "tex1Dproj", "tex2D", "tex2Dbias",
 		"tex2Dgrad", "tex2Dlod", "tex2Dproj", "tex3D", "tex3Dbias", "tex3Dgrad", "tex3Dlod", "tex3Dproj",
 		"texCUBE", "texCUBEbias", "texCUBEgrad", "texCUBElod", "texCUBEproj", "transpose", "trunc", "and", "or", "select",
-		// Wave intrinsics (SM6.0+)
+		// Misc
+		"NonUniformResourceIndex", "CheckAccessFullyMapped",
+	};
+
+	// Pixel Shader functions
+	TArray<FString> BuiltinFuncsPS = {
+		"clip",
+		// Derivative functions
+		"ddx", "ddx_coarse", "ddx_fine", "ddy", "ddy_coarse", "ddy_fine", "fwidth",
+		// Attribute evaluation
+		"EvaluateAttributeAtCentroid", "EvaluateAttributeAtSample", "EvaluateAttributeSnapped",
+		"GetRenderTargetSampleCount", "GetRenderTargetSamplePosition",
+		"GetAttributeAtVertex",
+		// Wave intrinsics (SM6.0+, also available in CS)
 		"WaveGetLaneCount", "WaveGetLaneIndex", "WaveIsFirstLane",
 		"WaveActiveAnyTrue", "WaveActiveAllTrue", "WaveActiveBallot",
 		"WaveReadLaneFirst", "WaveReadLaneAt", "WaveActiveAllEqual",
@@ -103,8 +210,46 @@ namespace HLSL
 		"WaveActiveBitAnd", "WaveActiveBitOr", "WaveActiveBitXor",
 		"WavePrefixCountBits", "WavePrefixSum", "WavePrefixProduct",
 		"QuadReadLaneAt", "QuadReadAcrossDiagonal", "QuadReadAcrossX", "QuadReadAcrossY",
-		// Misc
-		"NonUniformResourceIndex", "CheckAccessFullyMapped", "GetAttributeAtVertex"
+	};
+
+	// Hull Shader functions (Tessellation)
+	TArray<FString> BuiltinFuncsHS = {
+		"Process2DQuadTessFactorsAvg", "Process2DQuadTessFactorsMax", "Process2DQuadTessFactorsMin",
+		"ProcessIsolineTessFactors",
+		"ProcessQuadTessFactorsAvg", "ProcessQuadTessFactorsMax", "ProcessQuadTessFactorsMin",
+		"ProcessTriTessFactorsAvg", "ProcessTriTessFactorsMax", "ProcessTriTessFactorsMin",
+	};
+
+	// Compute Shader functions
+	TArray<FString> BuiltinFuncsCS = {
+		// Memory barriers
+		"AllMemoryBarrier", "AllMemoryBarrierWithGroupSync",
+		"DeviceMemoryBarrier", "DeviceMemoryBarrierWithGroupSync",
+		"GroupMemoryBarrier", "GroupMemoryBarrierWithGroupSync",
+		// Interlocked operations
+		"InterlockedAdd", "InterlockedAnd", "InterlockedCompareExchange", "InterlockedCompareStore",
+		"InterlockedExchange", "InterlockedMax", "InterlockedMin", "InterlockedOr", "InterlockedXor",
+		// Wave intrinsics (SM6.0+)
+		"WaveGetLaneCount", "WaveGetLaneIndex", "WaveIsFirstLane",
+		"WaveActiveAnyTrue", "WaveActiveAllTrue", "WaveActiveBallot",
+		"WaveReadLaneFirst", "WaveReadLaneAt", "WaveActiveAllEqual",
+		"WaveActiveCountBits", "WaveActiveSum", "WaveActiveProduct", "WaveActiveMin", "WaveActiveMax",
+		"WaveActiveBitAnd", "WaveActiveBitOr", "WaveActiveBitXor",
+		"WavePrefixCountBits", "WavePrefixSum", "WavePrefixProduct",
+	};
+
+	TArray<FString> GetBuiltinFuncs(FW::ShaderType Stage) {
+		TArray<FString> Result;
+		Result.Append(BuiltinFuncsCommon);
+		if (Stage == FW::ShaderType::PixelShader)
+		{
+			Result.Append(BuiltinFuncsPS);
+		}
+		else if (Stage == FW::ShaderType::ComputeShader)
+		{
+			Result.Append(BuiltinFuncsCS);
+		}
+		return Result;
 	};
 }
 
@@ -182,12 +327,13 @@ namespace FW
 	class FRAMEWORK_API HlslTU : public ShaderTU
 	{
 	public:
-		HlslTU(const FString& InShaderSource, const TArray<FString>& IncludeDirs)
-			: ShaderTU(InShaderSource)
+		HlslTU(TRefCountPtr<GpuShader> InShader)
+			: ShaderTU(InShader->GetSourceText())
+			, Stage(InShader->GetShaderType())
 		{
 			DxcCreateInstance(CLSID_DxcIntelliSense, IID_PPV_ARGS(ISense.GetInitReference()));
 			ISense->CreateIndex(Index.GetInitReference());
-			auto SourceText = StringCast<UTF8CHAR>(*InShaderSource);
+			auto SourceText = StringCast<UTF8CHAR>(*ShaderSource);
 			ISense->CreateUnsavedFile("Temp.hlsl", (char*)SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR), Unsaved.GetInitReference());
 
 			TArray<const char*> DxcArgs;
@@ -197,7 +343,7 @@ namespace FW
 			DxcArgs.Add("EDITOR_ISENSE=1");
 
 			TArray<FTCHARToUTF8> CharIncludeDirs;
-			for (const FString& IncludeDir : IncludeDirs)
+			for (const FString& IncludeDir : InShader->GetIncludeDirs())
 			{
 				DxcArgs.Add("-I");
 				CharIncludeDirs.Emplace(*IncludeDir);
@@ -292,7 +438,7 @@ namespace FW
 
 					if (ReferencedCursorKind == DxcCursor_ParmDecl)
 					{
-						return ShaderTokenType::Parm;
+						return ShaderTokenType::Param;
 					}
 
 					if (ReferencedCursorKind == DxcCursor_FunctionDecl || ReferencedCursorKind == DxcCursor_CXXMethod)
@@ -301,23 +447,23 @@ namespace FW
 					}
 				}
 
-				if (TypeSpelling == TokenStr && !NullReferencedExtent)
+				if (TypeSpelling == TokenStr)
 				{
-					if (ReferencedCursorKind == DxcCursor_StructDecl)
+					if (ReferencedCursorKind == DxcCursor_StructDecl || CursorKind == DxcCursor_InitListExpr)
 					{
 						return ShaderTokenType::Type;
 					}
 				}
 
-				if (HLSL::BuiltinTypes.Contains(TokenStr))
+				if (HLSL::GetBuiltinTypes(Stage).Contains(TokenStr))
 				{
 					return ShaderTokenType::BuildtinType;
 				}
-				else if (HLSL::BuiltinFuncs.Contains(TokenStr))
+				else if (HLSL::GetBuiltinFuncs(Stage).Contains(TokenStr))
 				{
 					return ShaderTokenType::BuildtinFunc;
 				}
-				else if (HLSL::KeyWords.Contains(TokenStr))
+				else if (HLSL::GetKeyWords(Stage).Contains(TokenStr))
 				{
 					return ShaderTokenType::Keyword;
 				}
@@ -389,16 +535,16 @@ namespace FW
 
 		TArray<ShaderOccurrence> GetOccurrences(uint32 Row, uint32 Col) override
 		{
-			TArray<ShaderOccurrence> Occurrences;
-
 			TRefCountPtr<IDxcSourceLocation> SrcLoc;
 			TU->GetLocation(DxcFile, Row, Col, SrcLoc.GetInitReference());
 			TRefCountPtr<IDxcCursor> DxcCursor;
 			TU->GetCursorForLocation(SrcLoc, DxcCursor.GetInitReference());
+			TRefCountPtr<IDxcCursor> DefDxcCursor;
+			DxcCursor->GetDefinitionCursor(DefDxcCursor.GetInitReference());
 			uint32 ResultLen;
 			IDxcCursor** CursorOccurrences;
-			DxcCursor->FindReferencesInFile(DxcFile, 0, -1, &ResultLen, &CursorOccurrences);
-
+			DefDxcCursor->FindReferencesInFile(DxcFile, 0, -1, &ResultLen, &CursorOccurrences);
+			TArray<ShaderOccurrence> Occurrences;
 			for (uint32 i = 0; i < ResultLen; i++)
 			{
 				//TODO: multiple files
@@ -470,7 +616,9 @@ namespace FW
 
 				if (IsMainFile(ChildCursor))
 				{
-					if (Kind == DxcCursor_StructDecl ||
+					if (Kind == DxcCursor_StructDecl || 
+						Kind == DxcCursor_FunctionTemplate ||
+						Kind == DxcCursor_UnexposedDecl ||
 						Kind == DxcCursor_FunctionDecl ||
 						Kind == DxcCursor_CXXMethod ||
 						Kind == DxcCursor_IfStmt ||
@@ -488,19 +636,19 @@ namespace FW
 						{
 							if (ParKind == DxcCursor_CompoundStmt)
 							{
-								Scopes.Emplace(ScopeStart, ScopeEnd);
+								GuideLineScopes.Emplace(ScopeStart, ScopeEnd);
 							}
 						}
 						else if (Kind == DxcCursor_IfStmt)
 						{
 							if (ParKind != DxcCursor_IfStmt)
 							{
-								Scopes.Emplace(ScopeStart, ScopeEnd);
+								GuideLineScopes.Emplace(ScopeStart, ScopeEnd);
 							}
 						}
 						else
 						{
-							Scopes.Emplace(ScopeStart, ScopeEnd);
+							GuideLineScopes.Emplace(ScopeStart, ScopeEnd);
 						}
 
 					}
@@ -539,8 +687,8 @@ namespace FW
 					}
 					else if (Kind == DxcCursor_ParmDecl)
 					{
-						LPSTR ParmName;
-						ChildCursor->GetSpelling(&ParmName);
+						LPSTR ParamName;
+						ChildCursor->GetSpelling(&ParamName);
 
 						ParamSemaFlag Flag = ParamSemaFlag::None;
 						unsigned int TokenCount;
@@ -582,7 +730,7 @@ namespace FW
 							});
 						if (Func)
 						{
-							Func->Params.Emplace(ANSI_TO_TCHAR(ParmName), Flag);
+							Func->Params.Emplace(ANSI_TO_TCHAR(ParamName), Flag);
 						}
 
 						for (unsigned int j = 0; j < TokenCount; j++)
@@ -591,7 +739,7 @@ namespace FW
 						}
 						CoTaskMemFree(Tokens);
 						CoTaskMemFree(FuncName);
-						CoTaskMemFree(ParmName);
+						CoTaskMemFree(ParamName);
 					}
 				}
 				TraversalAST(ChildCursor);
@@ -607,5 +755,6 @@ namespace FW
 		TRefCountPtr<IDxcTranslationUnit> TU;
 		TRefCountPtr<IDxcFile> DxcFile;
 		TRefCountPtr<IDxcCursor> DxcRootCursor;
+		ShaderType Stage;
 	};
 }

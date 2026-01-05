@@ -1,10 +1,12 @@
 #ifndef ENABLE_PRINT
-	#define ENABLE_PRINT 1
+    #define ENABLE_PRINT 1
 #endif
 
 #ifndef ENABLE_ASSERT
-	#define ENABLE_ASSERT 1
+    #define ENABLE_ASSERT 1
 #endif
+
+#extension GL_EXT_debug_printf : enable
 
 const uint PRINT_MAX_U32 = 511u;
 const uint PRINT_MAX_BYTES = PRINT_MAX_U32 * 4u;
@@ -185,39 +187,63 @@ uint GPrivate_AssertResult = 1u;
         ByteOffset = AppendArg(ByteOffset, Arg3); \
     } \
 }
+#elif EDITOR_ISENSE == 1    
+#define Print0(StrArrDecl) StrArrDecl;
+#define Print1(StrArrDecl, Arg1) StrArrDecl;Arg1;
+#define Print2(StrArrDecl, Arg1, Arg2) StrArrDecl;Arg1;Arg2;
+#define Print3(StrArrDecl, Arg1, Arg2, Arg3) StrArrDecl;Arg1;Arg2;Arg3;
+#else
+#define Print0(StrArrDecl)
+#define Print1(StrArrDecl, Arg1)
+#define Print2(StrArrDecl, Arg1, Arg2)
+#define Print3(StrArrDecl, Arg1, Arg2, Arg3)
 #endif
 
 #if ENABLE_ASSERT == 1
-#define Assert0(Cond, StrArrDecl) { \
+#define Assert0(Cond) { \
+    GPrivate_AssertResult &= (Cond) ? 1u : 0u; \
+    if (GPrivate_AssertResult != 1u) { \
+        Print0(EXPAND(uint StrArr[] = uint[](0u))); \
+    } \
+}
+
+#define Assert1(Cond, StrArrDecl) { \
     GPrivate_AssertResult &= (Cond) ? 1u : 0u; \
     if (GPrivate_AssertResult != 1u) { \
         Print0(StrArrDecl); \
     } \
 }
 
-#define Assert1(Cond, StrArrDecl, Arg1) { \
+#define AssertFormat1(Cond, StrArrDecl, Arg1) { \
     GPrivate_AssertResult &= (Cond) ? 1u : 0u; \
     if (GPrivate_AssertResult != 1u) { \
         Print1(StrArrDecl, Arg1); \
     } \
 }
 
-#define Assert2(Cond, StrArrDecl, Arg1, Arg2) { \
+#define AssertFormat2(Cond, StrArrDecl, Arg1, Arg2) { \
     GPrivate_AssertResult &= (Cond) ? 1u : 0u; \
     if (GPrivate_AssertResult != 1u) { \
         Print2(StrArrDecl, Arg1, Arg2); \
     } \
 }
 
-#define Assert3(Cond, StrArrDecl, Arg1, Arg2, Arg3) { \
+#define AssertFormat3(Cond, StrArrDecl, Arg1, Arg2, Arg3) { \
     GPrivate_AssertResult &= (Cond) ? 1u : 0u; \
     if (GPrivate_AssertResult != 1u) { \
         Print3(StrArrDecl, Arg1, Arg2, Arg3); \
     } \
 }
-#else
-#define Assert0(...)
-#define Assert1(...)
-#define Assert2(...)
-#define Assert3(...)
+#elif EDITOR_ISENSE == 1
+#define Assert0(Cond) Cond;
+#define Assert1(Cond, StrArrDecl) Cond;StrArrDecl;
+#define AssertFormat1(Cond, StrArrDecl, Arg1) Cond;StrArrDecl;Arg1;
+#define AssertFormat2(Cond, StrArrDecl, Arg1, Arg2) Cond;StrArrDecl;Arg1;Arg2;
+#define AssertFormat3(Cond, StrArrDecl, Arg1, Arg2, Arg3) Cond;StrArrDecl;Arg1;Arg2;Arg3;
+#else    
+#define Assert0(Cond)
+#define Assert1(Cond, StrArrDecl)
+#define AssertFormat1(Cond, StrArrDecl, Arg1)
+#define AssertFormat2(Cond, StrArrDecl, Arg1, Arg2)
+#define AssertFormat3(Cond, StrArrDecl, Arg1, Arg2, Arg3)
 #endif

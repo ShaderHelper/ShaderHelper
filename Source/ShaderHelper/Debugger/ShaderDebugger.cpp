@@ -212,7 +212,7 @@ namespace SH
 			Parser.Parse(DebugShader->SpvCode);
 			SpvMetaVisitor MetaVisitor{ ExprContext };
 			Parser.Accept(&MetaVisitor);
-			SpvPixelExprDebuggerVisitor ExprVisitor{ ExprContext, bEnableUbsan };
+			SpvPixelExprDebuggerVisitor ExprVisitor{ ExprContext, Lang, bEnableUbsan };
 			Parser.Accept(&ExprVisitor);
 			ExprVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "ExprPatched.spvasm");
 			
@@ -516,6 +516,10 @@ namespace SH
 						{
 							if (!CurValidLine)
 							{
+								if (!GetFunctionDesc(Scope))
+								{
+									continue;
+								}
 								int32 FuncLine = GetFunctionDesc(Scope)->GetLine();
 								return (BreakPointLine >= FuncLine) && (BreakPointLine <= NextValidLine.value());
 							}
@@ -1227,6 +1231,7 @@ namespace SH
 
 		DebugShader = ShaderEditor->CreateGpuShader();
 		DebugShader->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
+		GpuShaderLanguage Lang = DebugShader->GetShaderLanguage();
 
 		TArray<FString> ExtraArgs;
 		ExtraArgs.Add("-D");
@@ -1316,31 +1321,11 @@ namespace SH
 
 		auto PixelDebuggerContext = MakeUnique<SpvPixelDebuggerContext>(PixelCoord, SpvBindings);
 
-		SpirvParser Parser;
-		Parser.Parse(DebugShader->SpvCode);
-		SpvMetaVisitor MetaVisitor{ *PixelDebuggerContext };
-		Parser.Accept(&MetaVisitor);
-		TArray<uint32> PatchedSpv;
-		if (GlobalValidation)
-		{
-			SpvValidator Validator{ *PixelDebuggerContext, bEnableUbsan, ShaderType::PixelShader };
-			Parser.Accept(&Validator);
-			Validator.GetPatcher().Dump(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Validation.spvasm");
-			PatchedSpv = Validator.GetPatcher().GetSpv();
-		}
-		else
-		{
-			SpvPixelDebuggerVisitor DebuggerVisitor{ *PixelDebuggerContext, bEnableUbsan };
-			Parser.Accept(&DebuggerVisitor);
-			DebuggerVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Patched.spvasm");
-			PatchedSpv = DebuggerVisitor.GetPatcher().GetSpv();
-		}
-
 		ShaderConductor::Compiler::TargetDesc TargetDesc{};
 		ShaderConductor::Compiler::Options Options{};
 		FString FileExtension;
 		FString EntryPointStr;
-		if (DebugShader->GetShaderLanguage() == GpuShaderLanguage::HLSL)
+		if (Lang == GpuShaderLanguage::HLSL)
 		{
 			TargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
 			TargetDesc.version = "66";
@@ -1355,31 +1340,64 @@ namespace SH
 			FileExtension = TEXT(".glsl");
 			EntryPointStr = TEXT("main"); // GLSL entry point must be "main"
 		}
+
+		SpirvParser Parser;
+		Parser.Parse(DebugShader->SpvCode);
+		SpvMetaVisitor MetaVisitor{ *PixelDebuggerContext };
+		Parser.Accept(&MetaVisitor);
+		TArray<uint32> PatchedSpv;
+		if (GlobalValidation)
+		{
+			SpvValidator Validator{ *PixelDebuggerContext, bEnableUbsan, ShaderType::PixelShader };
+			Parser.Accept(&Validator);
+			Validator.GetPatcher().Dump(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Validation" + FileExtension + ".spvasm");
+			PatchedSpv = Validator.GetPatcher().GetSpv();
+		}
+		else
+		{
+			SpvPixelDebuggerVisitor DebuggerVisitor{ *PixelDebuggerContext, Lang, bEnableUbsan };
+			Parser.Accept(&DebuggerVisitor);
+			DebuggerVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Patched" + FileExtension + ".spvasm");
+			PatchedSpv = DebuggerVisitor.GetPatcher().GetSpv();
+		}
 		
 		auto EntryPoint = StringCast<UTF8CHAR>(*EntryPointStr);
-		ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile(
-			Options, { PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, (const char*)EntryPoint.Get(),
-			ShaderConductor::ShaderStage::PixelShader, TargetDesc);
-		
-		FString PatchedSource = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
-
-		FString FileName = DebugShader->GetShaderName() + (GlobalValidation ? TEXT("Validation") : TEXT("Patched")) + FileExtension;
-		FFileHelper::SaveStringToFile(PatchedSource, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / FileName));
-		
-		if (ShaderResultDesc.hasError)
+		FString PatchedSource;
+		ON_SCOPE_EXIT
 		{
-			FString ErrorInfo = static_cast<const char*>(ShaderResultDesc.errorWarningMsg.Data());
+			FString FileName = DebugShader->GetShaderName() + (GlobalValidation ? TEXT("Validation") : TEXT("Patched")) + FileExtension;
+			FFileHelper::SaveStringToFile(PatchedSource, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / FileName));
+		};
+
+		try
+		{
+			ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile(
+				Options, { PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, (const char*)EntryPoint.Get(),
+				ShaderConductor::ShaderStage::PixelShader, TargetDesc);
+
+			if (ShaderResultDesc.hasError)
+			{
+				FString ErrorInfo = "[PatchedSourceError] " + FString(static_cast<const char*>(ShaderResultDesc.errorWarningMsg.Data()));
+				PatchedSource = ErrorInfo;
+				throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
+			}
+
+			PatchedSource = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
+		}
+		catch(const std::runtime_error& e)
+		{
+			FString ErrorInfo = "[PatchedSourceError] " + FString(UTF8_TO_TCHAR(e.what()));
+			PatchedSource = ErrorInfo;
 			throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
 		}
-
+		
 		CurDebugStateIndex = 0;
 		DebuggerContext = MoveTemp(PixelDebuggerContext);
 		TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
-			.Name = DebugShader->GetShaderName() + (GlobalValidation ? TEXT("Validation") : TEXT("Patched")),
-			.Source = MoveTemp(PatchedSource),
+			.Source = PatchedSource,
 			.Type = DebugShader->GetShaderType(),
 			.EntryPoint = EntryPointStr,
-			.Language = DebugShader->GetShaderLanguage(),
+			.Language = Lang,
 		});
 		if (!GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
 		{

@@ -108,7 +108,8 @@ namespace FW
 	{
 		VertexShader,
 		PixelShader,
-		ComputeShader
+		ComputeShader,
+		Num
 	};
 
 	enum class RasterizerCullMode

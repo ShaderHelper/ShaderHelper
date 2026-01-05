@@ -36,6 +36,11 @@ vec2 GPrivate_fragCoord;
         Print3(StrArrDecl, Arg1, Arg2, Arg3);                                            \
     }                                                                                    \
 } while(false)
+#elif EDITOR_ISENSE == 1
+#define PrintAtMouse0(StrArrDecl) StrArrDecl;
+#define PrintAtMouse1(StrArrDecl, Arg1) StrArrDecl;Arg1;
+#define PrintAtMouse2(StrArrDecl, Arg1, Arg2) StrArrDecl;Arg1;Arg2;
+#define PrintAtMouse3(StrArrDecl, Arg1, Arg2, Arg3) StrArrDecl;Arg1;Arg2;Arg3;
 #else
 #define PrintAtMouse0(StrArrDecl)
 #define PrintAtMouse1(StrArrDecl, Arg1)
@@ -50,15 +55,15 @@ vec2 GPrivate_fragCoord;
 
 void main()
 {
-	vec2 fragCoord = gl_FragCoord.xy;
-	GPrivate_fragCoord = fragCoord;
-	vec4 fragColor;
-	mainImage(fragColor, fragCoord);
-	if (GPrivate_AssertResult != 1)
-	{
-		fragColor = vec4(1,0,1,1);
-	}
-	outColor = fragColor;
+    vec2 fragCoord = gl_FragCoord.xy;
+    GPrivate_fragCoord = fragCoord;
+    vec4 fragColor;
+    mainImage(fragColor, fragCoord);
+    if (GPrivate_AssertResult != 1)
+    {
+        fragColor = vec4(1,0,1,1);
+    }
+    outColor = fragColor;
 }
 
 //@mainImage@

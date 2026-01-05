@@ -13,7 +13,7 @@ usage "shaderc"
     }
     links
     {
-        "shaderc_shared",
+        "shaderc_shared", "glslang"
     }
     filter "system:macosx"
         prebuildcommands "{COPYFILE} %{wks.location}/External/shaderc/Lib/*.dylib %{cfg.targetdir}"

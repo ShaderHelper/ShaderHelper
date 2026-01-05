@@ -10,7 +10,7 @@
 
 namespace FW
 {
-	GpuShaderPreProcessor& GpuShaderPreProcessor::ReplacePrintStringLiteral()
+	GpuShaderPreProcessor& GpuShaderPreProcessor::ReplacePrintStringLiteral(bool bGlslOnlyRenamePrintFuncs)
 	{
 //		std::string ShaderString{TCHAR_TO_UTF8(*ShaderText)};
 //		std::smatch Match;
@@ -50,6 +50,7 @@ namespace FW
 //		ShaderText = FString{UTF8_TO_TCHAR(ShaderString.data())};
 		FString NewShaderText;
 		const bool bIsGLSL = (Language == GpuShaderLanguage::GLSL);
+		const bool bGlslRenameOnly = (bIsGLSL && bGlslOnlyRenamePrintFuncs);
 
 		// Operate directly on internal ShaderText buffer.
 		FString& TargetShaderText = ShaderText;
@@ -92,6 +93,28 @@ namespace FW
 						}
 						++j;
 					}
+					// Handle Assert(Cond) without string literal - convert to Assert0
+					if (StringStart == -1 && FCString::Strcmp(Keyword, TEXT("Assert")) == 0)
+					{
+						// Find the end of the call
+						int32 CallEnd = CallOpen + 1;
+						int32 Depth = 1;
+						while (CallEnd < SrcLen && Depth > 0)
+						{
+							if (Src[CallEnd] == '(') Depth++;
+							else if (Src[CallEnd] == ')') Depth--;
+							++CallEnd;
+						}
+
+						if (bIsGLSL)
+						{
+							NewShaderText += TEXT("Assert0");
+							NewShaderText.AppendChars(Src + i + FCString::Strlen(Keyword), CallEnd - (i + FCString::Strlen(Keyword)));
+							i = CallEnd;
+							return true;
+						}
+					}
+
 					if (StringStart != -1 && StringEnd != -1)
 					{
 						// Find the end of the entire function call to preserve arguments after the string
@@ -157,6 +180,7 @@ namespace FW
 							const bool bIsPrint = FCString::Strcmp(Keyword, TEXT("Print")) == 0;
 							const bool bIsPrintAtMouse = FCString::Strcmp(Keyword, TEXT("PrintAtMouse")) == 0;
 							const bool bIsAssert = FCString::Strcmp(Keyword, TEXT("Assert")) == 0;
+							const bool bIsAssertFormat = FCString::Strcmp(Keyword, TEXT("AssertFormat")) == 0;
 
 							FString NewName;
 							if (bIsPrint)
@@ -173,10 +197,16 @@ namespace FW
 							}
 							else if (bIsAssert)
 							{
-								// Assert(Cond, "text", v1, v2, v3) -> AssertN(Cond, "text", v1, v2, v3)
-								// AdditionalArgs here is number of value args after the string
-								int32 N = FMath::Clamp(AdditionalArgs, 0, 3);
-								NewName = FString::Printf(TEXT("Assert%d"), N);
+								// Assert(Cond, "msg") -> Assert1(Cond, StrArr)
+								// AdditionalArgs should be 0 for Assert with message
+								NewName = TEXT("Assert1");
+							}
+							else if (bIsAssertFormat)
+							{
+								// AssertFormat(Cond, "msg", v1, v2, v3) -> AssertFormatN(Cond, StrArr, v1, v2, v3)
+								// AdditionalArgs is number of value args after the string
+								int32 N = FMath::Clamp(AdditionalArgs, 1, 3);
+								NewName = FString::Printf(TEXT("AssertFormat%d"), N);
 							}
 
 							if (!NewName.IsEmpty())
@@ -184,11 +214,28 @@ namespace FW
 								// Up to this point NewShaderText already has Src[0..i-1]
 								const int32 NameEnd = i + KeywordLen;
 								NewShaderText += NewName;
+
+								if (bGlslRenameOnly)
+								{
+									// Keep the original call text (including the string literal), only replace the function name.
+									NewShaderText.AppendChars(Src + NameEnd, CallEnd - NameEnd);
+									i = CallEnd;
+									return true;
+								}
+
 								// Append everything between original name and the start of the string literal
 								NewShaderText.AppendChars(Src + NameEnd, StringStart - NameEnd);
 							}
 							else
 							{
+								if (bGlslRenameOnly)
+								{
+									// Keep original text entirely (including the string literal).
+									NewShaderText.AppendChars(Src + i, CallEnd - i);
+									i = CallEnd;
+									return true;
+								}
+
 								// Fallback: keep original text if we did not recognize the keyword
 								NewShaderText.AppendChars(Src + i, StringStart - i);
 							}
@@ -300,36 +347,36 @@ namespace FW
 		return ShaderModel;
 	}
 
-	FRAMEWORK_API TArray<ShaderCandidateInfo> DefaultCandidates(GpuShaderLanguage Language)
+	FRAMEWORK_API TArray<ShaderCandidateInfo> DefaultCandidates(GpuShaderLanguage Language, ShaderType Type)
 	{
 		TArray<ShaderCandidateInfo> Candidates;
 
 		if (Language == GpuShaderLanguage::HLSL)
 		{
-			for (const FString& Type : HLSL::BuiltinTypes)
+			for (const FString& Type : HLSL::GetBuiltinTypes(Type))
 			{
 				Candidates.AddUnique({ ShaderCandidateKind::Type, Type });
 			}
-			for (const FString& Func : HLSL::BuiltinFuncs)
+			for (const FString& Func : HLSL::GetBuiltinFuncs(Type))
 			{
 				Candidates.AddUnique({ ShaderCandidateKind::Func, Func });
 			}
-			for (const FString& Keyword : HLSL::KeyWords)
+			for (const FString& Keyword : HLSL::GetKeyWords(Type))
 			{
 				Candidates.AddUnique({ ShaderCandidateKind::Kword, Keyword });
 			}
 		}
 		else
 		{
-			for (const FString& Type : GLSL::BuiltinTypes)
+			for (const FString& Type : GLSL::GetBuiltinTypes(Type))
 			{
 				Candidates.AddUnique({ ShaderCandidateKind::Type, Type });
 			}
-			for (const FString& Func : GLSL::BuiltinFuncs)
+			for (const FString& Func : GLSL::GetBuiltinFuncs(Type))
 			{
 				Candidates.AddUnique({ ShaderCandidateKind::Func, Func });
 			}
-			for (const FString& Keyword : GLSL::KeyWords)
+			for (const FString& Keyword : GLSL::GetKeyWords(Type))
 			{
 				Candidates.AddUnique({ ShaderCandidateKind::Kword, Keyword });
 			}
@@ -344,15 +391,15 @@ namespace FW
 		FTextRange::CalculateLineRangesFromString(ShaderSource, LineRanges);
     }
 
-	TUniquePtr<ShaderTU> ShaderTU::Create(const FString& InShaderSource, GpuShaderLanguage Language, const TArray<FString>& IncludeDirs)
+	TUniquePtr<ShaderTU> ShaderTU::Create(TRefCountPtr<GpuShader> InShader)
 	{
-		if(Language == GpuShaderLanguage::HLSL)
+		if(InShader->GetShaderLanguage() == GpuShaderLanguage::HLSL)
 		{
-			return MakeUnique<HlslTU>(InShaderSource, IncludeDirs);
+			return MakeUnique<HlslTU>(InShader);
 		}
 		else
 		{
-			return MakeUnique<GlslTU>(InShaderSource, IncludeDirs);
+			return MakeUnique<GlslTU>(InShader);
 		}
 	}
 

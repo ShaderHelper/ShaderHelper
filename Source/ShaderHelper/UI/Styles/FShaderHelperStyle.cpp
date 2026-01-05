@@ -155,7 +155,7 @@ namespace SH {
 			.SetColorAndOpacity(EStyleColor::User6);
 		FTextBlockStyle CodeEditorStringTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
 			.SetColorAndOpacity(EStyleColor::User7);
-		FTextBlockStyle CodeEditorParmTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
+		FTextBlockStyle CodeEditorParamTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
 			.SetColorAndOpacity(EStyleColor::User8);
 		FTextBlockStyle CodeEditorFuncTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
 			.SetColorAndOpacity(EStyleColor::User9);
@@ -178,7 +178,7 @@ namespace SH {
 		
 		Style->Set("CodeEditorFuncText", CodeEditorFuncTextStyle);
 		Style->Set("CodeEditorTypeText", CodeEditorTypeTextStyle);
-		Style->Set("CodeEditorParmText", CodeEditorParmTextStyle);
+		Style->Set("CodeEditorParamText", CodeEditorParamTextStyle);
 		Style->Set("CodeEditorVarText", CodeEditorVarTextStyle);
 
 		FTextBlockStyle CodeEditorErrorInfoStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }

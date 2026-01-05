@@ -260,8 +260,9 @@ namespace FW
 	class FRAMEWORK_API SpvDebuggerVisitor : public SpvVisitor
 	{
 	public:
-		SpvDebuggerVisitor(SpvDebuggerContext& InContext, bool InEnableUbsan) 
+		SpvDebuggerVisitor(SpvDebuggerContext& InContext, GpuShaderLanguage InLanguage, bool InEnableUbsan)
 			: Context(InContext)
+			, Language(InLanguage)
 			, EnableUbsan(InEnableUbsan)
 		{
 		}
@@ -332,6 +333,7 @@ namespace FW
 
 	protected:
 		SpvDebuggerContext& Context;
+		GpuShaderLanguage Language;
 		int32 InstIndex;
 		SpvLexicalScope* CurScope = nullptr;
 		SpvBasicBlock* CurBlock = nullptr;

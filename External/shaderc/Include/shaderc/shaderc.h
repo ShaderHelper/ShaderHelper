@@ -515,6 +515,7 @@ SHADERC_EXPORT void shaderc_compile_options_set_nan_clamp(
 // An opaque handle to the results of a call to any shaderc_compile_into_*()
 // function.
 typedef struct shaderc_compilation_result* shaderc_compilation_result_t;
+typedef struct shaderc_parsed_shader* shaderc_parsed_shader_t;
 
 // Takes a GLSL source string and the associated shader kind, input file
 // name, compiles it according to the given additional_options. If the shader
@@ -558,6 +559,17 @@ SHADERC_EXPORT shaderc_compilation_result_t shaderc_compile_into_preprocessed_te
     const char* input_file_name, const char* entry_point_name,
     const shaderc_compile_options_t additional_options);
 
+// Parses the given source into a glslang::TShader using the same configuration
+// rules as shaderc_compile_into_spv, but stops after successful parse.
+//
+// The returned object owns the parsed shader and must be released by calling
+// shaderc_parsed_shader_release().
+SHADERC_EXPORT shaderc_parsed_shader_t shaderc_parse_into_glslang_shader(
+    const shaderc_compiler_t compiler, const char* source_text,
+    size_t source_text_size, shaderc_shader_kind shader_kind,
+    const char* input_file_name, const char* entry_point_name,
+    const shaderc_compile_options_t additional_options);
+
 // Takes an assembly string of the format defined in the SPIRV-Tools project
 // (https://github.com/KhronosGroup/SPIRV-Tools/blob/master/syntax.md),
 // assembles it into SPIR-V binary and a shaderc_compilation_result will be
@@ -578,6 +590,10 @@ SHADERC_EXPORT shaderc_compilation_result_t shaderc_assemble_into_spv(
 // Releases the resources held by the result object. It is invalid to use the
 // result object for any further operations.
 SHADERC_EXPORT void shaderc_result_release(shaderc_compilation_result_t result);
+
+// Releases the resources held by the parsed shader object. It is invalid to use
+// the object for any further operations.
+SHADERC_EXPORT void shaderc_parsed_shader_release(shaderc_parsed_shader_t parsed);
 
 // Returns the number of bytes of the compilation output data in a result
 // object.
@@ -607,6 +623,32 @@ SHADERC_EXPORT const char* shaderc_result_get_bytes(const shaderc_compilation_re
 // during the compilation.
 SHADERC_EXPORT const char* shaderc_result_get_error_message(
     const shaderc_compilation_result_t result);
+
+// Returns the compilation status for a parsed shader object.
+SHADERC_EXPORT shaderc_compilation_status
+shaderc_parsed_shader_get_compilation_status(const shaderc_parsed_shader_t);
+
+// Returns a null-terminated string that contains any error messages generated
+// during parsing.
+SHADERC_EXPORT const char* shaderc_parsed_shader_get_error_message(
+    const shaderc_parsed_shader_t parsed);
+
+// Returns the number of warnings generated during parsing.
+SHADERC_EXPORT size_t shaderc_parsed_shader_get_num_warnings(
+    const shaderc_parsed_shader_t parsed);
+
+// Returns the number of errors generated during parsing.
+SHADERC_EXPORT size_t shaderc_parsed_shader_get_num_errors(
+    const shaderc_parsed_shader_t parsed);
+
+// Returns an opaque pointer to the parsed glslang::TShader, or NULL if parsing
+// failed. The returned pointer is owned by |parsed| and remains valid until
+// shaderc_parsed_shader_release(parsed) is called.
+//
+// C++ callers can cast it back to glslang::TShader* (see
+// shaderc/glslang_shader.hpp).
+SHADERC_EXPORT void* shaderc_parsed_shader_get_tshader(
+    shaderc_parsed_shader_t parsed);
 
 // Provides the version & revision of the SPIR-V which will be produced
 SHADERC_EXPORT void shaderc_get_spv_version(unsigned int* version, unsigned int* revision);

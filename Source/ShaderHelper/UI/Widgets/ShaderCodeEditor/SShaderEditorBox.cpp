@@ -290,7 +290,7 @@ constexpr int PaddingLineNum = 22;
 
 				{ ShaderTokenType::Func, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorFuncText")},
 				{ ShaderTokenType::Type, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorTypeText")},
-				{ ShaderTokenType::Parm, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorParmText")},
+				{ ShaderTokenType::Param, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorParamText")},
 				{ ShaderTokenType::Var, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorVarText")},
 				{ ShaderTokenType::LocalVar, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText")},
 		};
@@ -304,10 +304,10 @@ constexpr int PaddingLineNum = 22;
 
 		if (Owner->CanShowGuideLine() && Owner->SyntaxTU.IsValid())
 		{
-			TArray<ShaderScope> Scopes = Owner->SyntaxTU->GetScopes();
+			TArray<ShaderScope> GuideLineScopes = Owner->SyntaxTU->GetGuideLineScopes();
 			int32 ExtraLineNum = Owner->GetShaderAsset()->GetExtraLineNum();
 			//Draw guide lines
-			for (const auto& Scope : Scopes)
+			for (const auto& Scope : GuideLineScopes)
 			{
 				int32 StartLineIndex = Scope.Start.X - ExtraLineNum - 1;
 				int32 StartOffset = Scope.Start.Y - 1;
@@ -315,7 +315,7 @@ constexpr int PaddingLineNum = 22;
 				{
 					int32 EndLineIndex = Scope.End.X - ExtraLineNum - 1;
 					TSharedPtr<ILayoutBlock> Block = Owner->ShaderMarshaller->TextLayout->GetBlockAt({ StartLineIndex, StartOffset });
-					if (Block)
+					if (Block && StartLineIndex < EndLineIndex)
 					{
 						FVector2D P0 = TransformPoint(InverseScale, Block->GetLocationOffset() + FVector2D{ OffsetX, 2.0 });
 						FVector2D P1 = TransformPoint(InverseScale, Block->GetLocationOffset() + FVector2D{ OffsetX, Block->GetSize().Y * (EndLineIndex - StartLineIndex) });
@@ -415,7 +415,7 @@ constexpr int PaddingLineNum = 22;
 				if (Task.ShaderDesc)
 				{
 					TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(Task.ShaderDesc.value());
-					auto TU = ShaderTU::Create( Shader->GetSourceText(), Shader->GetShaderLanguage(), Shader->GetIncludeDirs());
+					auto TU = ShaderTU::Create( Shader);
 					DiagnosticInfos = TU->GetDiagnostic();
 
 					CandidateInfos.Reset();
@@ -424,7 +424,7 @@ constexpr int PaddingLineNum = 22;
 						CandidateInfos = TU->GetCodeComplete(Task.Row, Task.Col);
 						if (Task.IsMemberAccess == false)
 						{
-							for (const auto& Candidate : DefaultCandidates(Shader->GetShaderLanguage()))
+							for (const auto& Candidate : DefaultCandidates(Shader->GetShaderLanguage(), Shader->GetShaderType()))
 							{
 								CandidateInfos.AddUnique(Candidate);
 							}
@@ -498,7 +498,7 @@ constexpr int PaddingLineNum = 22;
 				if (Task.ShaderDesc)
 				{
 					TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(Task.ShaderDesc.value());
-					auto TU = ShaderTU::Create( Shader->GetSourceText(), Shader->GetShaderLanguage(), Shader->GetIncludeDirs());
+					auto TU = ShaderTU::Create(Shader);
 					LineSyntaxHighlightMaps.Reset();
 					LineSyntaxHighlightMaps.SetNum(Task.LineTokens.Num());
 					int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
@@ -1714,8 +1714,7 @@ constexpr int PaddingLineNum = 22;
 			TArray<ShaderOccurrence> Occurrences;
 			for (const ShaderTokenizer::Token& Token : ShaderMarshaller->TokenizedLines[CursorLineIndex].Tokens)
 			{
-				if ((Token.Type == ShaderTokenType::Identifier || Token.Type == ShaderTokenType::BuildtinFunc)
-					&& CursorOffset >= Token.BeginOffset && CursorOffset <= Token.EndOffset)
+				if (CursorOffset >= Token.BeginOffset && CursorOffset <= Token.EndOffset)
 				{
 					Occurrences = SyntaxTU->GetOccurrences(GetLineNumber(CursorLineIndex) + AddedLineNum, Token.BeginOffset + 1);
 					break;

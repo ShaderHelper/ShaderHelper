@@ -74,7 +74,7 @@ namespace FW
 		BuildtinType,
 		Func,
 		Type,
-		Parm,
+		Param,
 		Var,
 		LocalVar,
 
@@ -111,7 +111,10 @@ namespace FW
 
 	public:
 		//hlsl does not currently support string literal
-		GpuShaderPreProcessor& ReplacePrintStringLiteral();
+		// For GLSL:
+		// - default (false): replace string literal into `EXPAND(uint StrArr[] = uint[](...))` and rename Print/PrintAtMouse/Assert to Print%d...
+		// - true: only rename Print/PrintAtMouse/Assert to Print%d..., keep the original string literal (do NOT generate uint StrArr array)
+		GpuShaderPreProcessor& ReplacePrintStringLiteral(bool bGlslOnlyRenamePrintFuncs = false);
 		FString Finalize() { return MoveTemp(ShaderText); }
 
 	private:
@@ -248,7 +251,7 @@ namespace FW
 		Vector2i End;
 	};
 
-    FRAMEWORK_API TArray<ShaderCandidateInfo> DefaultCandidates(GpuShaderLanguage Language);
+    FRAMEWORK_API TArray<ShaderCandidateInfo> DefaultCandidates(GpuShaderLanguage Language, ShaderType Type);
 
     class FRAMEWORK_API ShaderTU
     {
@@ -256,7 +259,7 @@ namespace FW
 		ShaderTU(const FString& InShaderSource);
 
     public:
-		static TUniquePtr<ShaderTU> Create(const FString& InShaderSource, GpuShaderLanguage Language, const TArray<FString>& IncludeDirs = {});
+		static TUniquePtr<ShaderTU> Create(TRefCountPtr<GpuShader> InShader);
 		virtual ~ShaderTU() = default;
 
 		virtual TArray<ShaderDiagnosticInfo> GetDiagnostic() = 0;
@@ -265,14 +268,14 @@ namespace FW
 		virtual TArray<ShaderOccurrence> GetOccurrences(uint32 Row, uint32 Col) = 0;
 
 		const TArray<ShaderFunc>& GetFuncs() const { return Funcs; };
-		const TArray<ShaderScope>& GetScopes() const { return Scopes; };
+		const TArray<ShaderScope>& GetGuideLineScopes() const { return GuideLineScopes; };
 		FString GetStr(uint32 Row, uint32 Col, uint32 Size) const { return ShaderSource.Mid(LineRanges[Row - 1].BeginIndex + Col - 1, Size); }
         
     protected:
 		FString ShaderSource;
 		TArray<FTextRange> LineRanges;
 		TArray<ShaderFunc> Funcs;
-		TArray<ShaderScope> Scopes;
+		TArray<ShaderScope> GuideLineScopes;
     };
 
 }

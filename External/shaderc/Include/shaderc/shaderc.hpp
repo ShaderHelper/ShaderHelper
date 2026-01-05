@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "shaderc.h"
+#include "glslang_shader.hpp"
 
 namespace shaderc {
 // A CompilationResult contains the compiler output, compilation status,
@@ -437,6 +438,20 @@ class Compiler {
         compiler_, source_text, source_text_size, shader_kind, input_file_name,
         entry_point_name, options.options_);
     return SpvCompilationResult(compilation_result);
+  }
+
+  // Parses the given source using the same configuration rules as compilation,
+  // but stops after glslang parsing succeeds.
+  //
+  // Returns a shaderc::ParsedGlslangShader RAII wrapper which will
+  // automatically release resources. Use GetTShader() to access the underlying
+  // glslang::TShader*.
+  ParsedGlslangShader ParseGlslToGlslangShader(
+      const std::string& source_text, shaderc_shader_kind shader_kind,
+      const char* input_file_name, const CompileOptions& options) const {
+    return ParsedGlslangShader(shaderc_parse_into_glslang_shader(
+        compiler_, source_text.data(), source_text.size(), shader_kind,
+        input_file_name, "main", options.options_));
   }
 
   // Compiles the given source shader and returns a SPIR-V binary module

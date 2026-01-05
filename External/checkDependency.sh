@@ -35,4 +35,5 @@ else
     Check "ShaderConductor"
     Check "UE"
     Check "Python"
+	Check "shaderc"
 fi

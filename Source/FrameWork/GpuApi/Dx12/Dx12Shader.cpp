@@ -3,7 +3,7 @@
 #include "Common/Path/PathHelper.h"
 #include "GpuApi/GpuFeature.h"
 #include "ShaderConductor.hpp"
-#include "shaderc/shaderc.hpp"
+#include "GpuApi/GLSL.h"
 
 #include <Misc/FileHelper.h>
 #include <stdexcept>
@@ -150,57 +150,6 @@ namespace FW
 		std::atomic<ULONG> RefCount = 0;
 	};
 
-	class ShadercIncludeHandler : public shaderc::CompileOptions::IncluderInterface
-	{
-		struct IncludeData {
-			std::string Source;
-			std::string Content;
-		};
-	public:
-		ShadercIncludeHandler(TRefCountPtr<Dx12Shader> InShader) : Shader(MoveTemp(InShader)) {}
-		shaderc_include_result* GetInclude(
-			const char* requested_source,
-			shaderc_include_type type,
-			const char* requesting_source,
-			size_t include_depth) override
-		{
-			auto data = new IncludeData;
-			shaderc_include_result* Result = new shaderc_include_result;
-			Result->user_data = data;
-			for (const FString& IncludeDir : Shader->GetIncludeDirs())
-			{
-				FString IncludedFile = FPaths::Combine(IncludeDir, ANSI_TO_TCHAR(requested_source));
-				if (IFileManager::Get().FileExists(*IncludedFile))
-				{
-					FString ShaderText;
-					FFileHelper::LoadFileToString(ShaderText, *IncludedFile);
-					ShaderText = GpuShaderPreProcessor{ ShaderText, Shader->GetShaderLanguage() }
-						.ReplacePrintStringLiteral()
-						.Finalize();
-					data->Source = requested_source;
-					data->Content = { TCHAR_TO_UTF8(*ShaderText) };
-					break;
-				}
-			}
-
-			Result->source_name = data->Source.c_str();
-			Result->source_name_length = data->Source.size();
-			Result->content = data->Content.c_str();
-			Result->content_length = data->Content.size();
-
-			return Result;
-		}
-
-		void ReleaseInclude(shaderc_include_result* data) override
-		{
-			delete static_cast<IncludeData*>(data->user_data);
-			delete data;
-		}
-
-	private:
-		TRefCountPtr<Dx12Shader> Shader;
-	};
-
 	DxcCompiler::DxcCompiler()
 	 {
 		 DxCheck(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(Compiler.GetInitReference())));
@@ -228,18 +177,6 @@ namespace FW
 		return ProfileName;
 	}
 
-	shaderc_shader_kind MapShadercKind(ShaderType InType)
-	{
-		switch (InType)
-		{
-		case ShaderType::VertexShader:   return shaderc_shader_kind::shaderc_vertex_shader;
-		case ShaderType::PixelShader:    return shaderc_shader_kind::shaderc_fragment_shader;
-		case ShaderType::ComputeShader:  return shaderc_shader_kind::shaderc_compute_shader;
-		default:
-			AUX::Unreachable();
-		}
-	}
-
 	 bool DxcCompiler::Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs) const
 	 {
 		 FString ShaderName = InShader->GetShaderName();
@@ -252,53 +189,7 @@ namespace FW
 				 FFileHelper::SaveStringToFile(InShader->GetProcessedSourceText(), *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".glsl"));
 			 }
 #endif
-			 static shaderc::Compiler GlslCompiler;
-			 shaderc::CompileOptions Options;
-			 for (int32 i = 0; i < ExtraArgs.Num(); ++i)
-			 {
-				 // Parse -D macro definitions: -D is a separate arg, macro definition is the next arg
-				 if (ExtraArgs[i] == TEXT("-D") && i + 1 < ExtraArgs.Num())
-				 {
-					 FString MacroDef = ExtraArgs[i + 1];
-					 ++i; // Skip the macro definition arg in next iteration
-					 
-					 int32 EqualsPos = MacroDef.Find(TEXT("="));
-					 if (EqualsPos != INDEX_NONE)
-					 {
-						 // NAME=VALUE format
-						 FString MacroName = MacroDef.Left(EqualsPos);
-						 FString MacroValue = MacroDef.Mid(EqualsPos + 1);
-						 
-						 if (!MacroName.IsEmpty())
-						 {
-							 auto NameUTF8 = StringCast<UTF8CHAR>(*MacroName);
-							 auto ValueUTF8 = StringCast<UTF8CHAR>(*MacroValue);
-							 Options.AddMacroDefinition(
-								 (const char*)NameUTF8.Get(), NameUTF8.Length(),
-								 (const char*)ValueUTF8.Get(), ValueUTF8.Length());
-						 }
-					 }
-					 else
-					 {
-						 // NAME format (valueless macro)
-						 if (!MacroDef.IsEmpty())
-						 {
-							 auto NameUTF8 = StringCast<UTF8CHAR>(*MacroDef);
-							 Options.AddMacroDefinition(
-								 (const char*)NameUTF8.Get(), NameUTF8.Length(),
-								 nullptr, 0u);
-						 }
-					 }
-				 }
-			 }
-			 if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
-			 {
-				 Options.SetOptimizationLevel(shaderc_optimization_level_zero);
-				 Options.SetNonSemanticShaderDebugSource();
-			 }
-			 Options.SetIncluder(std::make_unique<ShadercIncludeHandler>(InShader));
-			 auto Result = GlslCompiler.CompileGlslToSpv(TCHAR_TO_UTF8(*InShader->GetProcessedSourceText()), 
-				 MapShadercKind(InShader->GetShaderType()), TCHAR_TO_UTF8(*ShaderName), Options);
+			 auto Result = CompileGlsl(InShader.GetReference(), ExtraArgs);
 
 			 if(Result.GetCompilationStatus() != shaderc_compilation_status_success)
 			 {
@@ -324,7 +215,7 @@ namespace FW
 					 FString ErrorInfo = static_cast<const char*>(SpvTextResultDesc.errorWarningMsg.Data());
 					 SpvSourceText = MoveTemp(ErrorInfo);
 				 }
-				 FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".spvasm"));
+				 FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".glsl" + ".spvasm"));
 #endif
 				 InShader->SpvCode = MoveTemp(SpvCode);
 				 return true;
@@ -472,7 +363,7 @@ namespace FW
 						FString ErrorInfo = static_cast<const char*>(SpvTextResultDesc.errorWarningMsg.Data());
 						SpvSourceText = MoveTemp(ErrorInfo);
 					}
-					FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".spvasm"));
+					FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl" + ".spvasm"));
 #endif
 				}
 				else
