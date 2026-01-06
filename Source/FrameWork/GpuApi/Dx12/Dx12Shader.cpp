@@ -180,7 +180,8 @@ namespace FW
 	 bool DxcCompiler::Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs) const
 	 {
 		 FString ShaderName = InShader->GetShaderName();
-		 FString HlslSource, EntryPoint;
+		 FString HlslSource;
+		 FString EntryPoint = InShader->GetEntryPoint();
 		 if (InShader->GetShaderLanguage() == GpuShaderLanguage::GLSL)
 		 {
 #if DEBUG_SHADER
@@ -229,7 +230,6 @@ namespace FW
 				 ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile({}, { Spv.data(), (uint32)Spv.size() * 4 }, "main",
 					 MapShaderCunductorStage(InShader->GetShaderType()), HlslTargetDesc);
 				 HlslSource = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
-				 EntryPoint = "main";
 			 }
 			 catch (const std::runtime_error& e)
 			 {
@@ -240,7 +240,6 @@ namespace FW
 		 else
 		 {
 			 HlslSource = InShader->GetProcessedSourceText();
-			 EntryPoint = InShader->GetEntryPoint();
 		 }
 
 #if DEBUG_SHADER

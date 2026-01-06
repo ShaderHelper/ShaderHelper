@@ -177,7 +177,9 @@ namespace FW
         ShaderType GetShaderType() const {return Type;}
         const FString& GetSourceText() const { return SourceText; }
 		const FString& GetProcessedSourceText() const { return ProcessedSourceText; }
-        const FString& GetEntryPoint() const { return EntryPoint; }
+		FString GetEntryPoint() const {
+			return ShaderLanguage == GpuShaderLanguage::HLSL ? EntryPoint : "main";
+		}
 		GpuShaderLanguage GetShaderLanguage() const { return ShaderLanguage; }
 		GpuShaderModel GetShaderModelVer() const;
 

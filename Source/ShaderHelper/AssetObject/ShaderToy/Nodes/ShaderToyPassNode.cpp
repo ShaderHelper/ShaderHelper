@@ -12,6 +12,7 @@
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 
 #include <regex>
+#include <vector>
 
 using namespace FW;
 
@@ -214,8 +215,102 @@ namespace SH
 		return ShaderAssetObj;
 	}
 
+	namespace
+	{
+		// Helper function to remove macro calls with arbitrary nested parentheses
+		void RemoveMacroCalls(std::string& Code, const std::string& MacroName)
+		{
+			std::string Pattern = R"(\b)" + MacroName + R"(\s*\()";
+			std::regex MacroRegex(Pattern);
+			
+			// Collect all matches first (from end to start to avoid position shifts)
+			std::vector<std::pair<size_t, size_t>> Matches;
+			std::sregex_iterator Iter(Code.begin(), Code.end(), MacroRegex);
+			std::sregex_iterator End;
+			
+			for (; Iter != End; ++Iter)
+			{
+				const std::smatch& Match = *Iter;
+				size_t MatchStart = Match.position();
+				size_t MatchEnd = MatchStart + Match.length();
+				
+				// Find matching closing parenthesis (skip parentheses inside string literals)
+				int ParenDepth = 1;
+				bool InString = false;
+				bool EscapeNext = false;
+				size_t Pos = MatchEnd;
+				while (Pos < Code.size() && ParenDepth > 0)
+				{
+					char Ch = Code[Pos];
+					
+					if (EscapeNext)
+					{
+						// This character is escaped, skip special processing
+						EscapeNext = false;
+					}
+					else if (Ch == '\\' && InString)
+					{
+						// Next character will be escaped
+						EscapeNext = true;
+					}
+					else if (Ch == '"')
+					{
+						// Toggle string state on double quote (if not escaped)
+						InString = !InString;
+					}
+					else if (!InString)
+					{
+						// Only count parentheses when not inside a string
+						if (Ch == '(')
+							ParenDepth++;
+						else if (Ch == ')')
+							ParenDepth--;
+					}
+					Pos++;
+				}
+				
+				// Skip whitespace and trailing semicolon if present
+				while (Pos < Code.size() && (Code[Pos] == ' ' || Code[Pos] == '\t' || Code[Pos] == '\n' || Code[Pos] == '\r'))
+					Pos++;
+				if (Pos < Code.size() && Code[Pos] == ';')
+					Pos++;
+				
+				Matches.emplace_back(MatchStart, Pos);
+			}
+			
+			// Remove matches from end to start
+			for (auto It = Matches.rbegin(); It != Matches.rend(); ++It)
+			{
+				Code.erase(It->first, It->second - It->first);
+			}
+		}
+	}
+
 	std::string ShaderToyPassNode::GetShaderToyCode() const
 	{
+		if(ShaderAssetObj->Shader->GetShaderLanguage() == GpuShaderLanguage::GLSL)
+		{
+			std::string ShaderToy = TCHAR_TO_UTF8(*ShaderAssetObj->EditorContent);
+			
+			// Remove Print/PrintAtMouse/Assert/AssertFormat macro calls
+			RemoveMacroCalls(ShaderToy, "Print");
+			RemoveMacroCalls(ShaderToy, "PrintAtMouse");
+			RemoveMacroCalls(ShaderToy, "Assert");
+			RemoveMacroCalls(ShaderToy, "AssertFormat");
+			
+			//Flip y
+			std::regex MainImagePattern(R"(void\s+mainImage\s*\([^)]*vec2\s+(\w+)\s*\)[^}]*\})");
+			std::smatch MainImageMatch;
+			if (std::regex_search(ShaderToy, MainImageMatch, MainImagePattern))
+			{
+				std::string FragCoordParamName = MainImageMatch[1].str();
+				std::regex FunctionBodyPattern(R"((void\s+mainImage\s*\([^)]*\)\s*\{)(\s*))");
+				std::string Replacement = "$1$2" + FragCoordParamName + ".y = iResolution.y - " + FragCoordParamName + ".y;\n$2";
+				ShaderToy = std::regex_replace(ShaderToy, FunctionBodyPattern, Replacement);
+			}
+			return ShaderToy;
+		}
+		
 		TArray<const char*> DxcArgs;
 		DxcArgs.Add("/Od");
 		DxcArgs.Add("-D");

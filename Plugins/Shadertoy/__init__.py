@@ -150,6 +150,11 @@ def open_shadertoy_with_playwright(shadertoy_context):
             user_data_dir,
             executable_path=browser_path,
             headless=False,
+            args=[
+                '--disable-blink-features=AutomationControlled',
+                '--no-sandbox',
+                '--disable-dev-shm-usage',
+            ],
         )
         
         page = _playwright_context.pages[0]

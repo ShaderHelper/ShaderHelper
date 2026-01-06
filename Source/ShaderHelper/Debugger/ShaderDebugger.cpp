@@ -222,13 +222,12 @@ namespace SH
 			ShaderConductor::Compiler::Options Options{};
 			Options.force_zero_initialized_variables = true;
 			FString FileExtension;
-			FString EntryPointStr;
+			FString EntryPoint = DebugShader->GetEntryPoint();
 			if (Lang == GpuShaderLanguage::HLSL)
 			{
 				TargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
 				TargetDesc.version = "66";
 				FileExtension = TEXT(".hlsl");
-				EntryPointStr = DebugShader->GetEntryPoint();
 			}
 			else
 			{
@@ -236,14 +235,13 @@ namespace SH
 				TargetDesc.language = ShaderConductor::ShadingLanguage::Glsl;
 				TargetDesc.version = "450";
 				FileExtension = TEXT(".glsl");
-				EntryPointStr = TEXT("main");
 			}
 			
-			auto EntryPoint = StringCast<UTF8CHAR>(*EntryPointStr);
+			auto EntryPointUTF8 = StringCast<UTF8CHAR>(*EntryPoint);
 			ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile(
 				Options,
 				{ PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, 
-				(const char*)EntryPoint.Get(),
+				(const char*)EntryPointUTF8.Get(),
 				ShaderConductor::ShaderStage::PixelShader, TargetDesc);
 			FString PatchedSource = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
 
@@ -263,7 +261,7 @@ namespace SH
 				TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
 					.Source = MoveTemp(PatchedSource),
 					.Type = DebugShader->GetShaderType(),
-					.EntryPoint = EntryPointStr,
+					.EntryPoint = EntryPoint,
 					.Language = Lang
 				});
 				if (GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
@@ -1324,13 +1322,12 @@ namespace SH
 		ShaderConductor::Compiler::TargetDesc TargetDesc{};
 		ShaderConductor::Compiler::Options Options{};
 		FString FileExtension;
-		FString EntryPointStr;
+		FString EntryPoint = DebugShader->GetEntryPoint();
 		if (Lang == GpuShaderLanguage::HLSL)
 		{
 			TargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
 			TargetDesc.version = "66";
 			FileExtension = TEXT(".hlsl");
-			EntryPointStr = DebugShader->GetEntryPoint();
 		}
 		else
 		{
@@ -1338,7 +1335,6 @@ namespace SH
 			TargetDesc.language = ShaderConductor::ShadingLanguage::Glsl;
 			TargetDesc.version = "450";
 			FileExtension = TEXT(".glsl");
-			EntryPointStr = TEXT("main"); // GLSL entry point must be "main"
 		}
 
 		SpirvParser Parser;
@@ -1361,7 +1357,7 @@ namespace SH
 			PatchedSpv = DebuggerVisitor.GetPatcher().GetSpv();
 		}
 		
-		auto EntryPoint = StringCast<UTF8CHAR>(*EntryPointStr);
+		auto EntryPointUTF8 = StringCast<UTF8CHAR>(*EntryPoint);
 		FString PatchedSource;
 		ON_SCOPE_EXIT
 		{
@@ -1372,12 +1368,12 @@ namespace SH
 		try
 		{
 			ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile(
-				Options, { PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, (const char*)EntryPoint.Get(),
+				Options, { PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, (const char*)EntryPointUTF8.Get(),
 				ShaderConductor::ShaderStage::PixelShader, TargetDesc);
 
 			if (ShaderResultDesc.hasError)
 			{
-				FString ErrorInfo = "[PatchedSourceError] " + FString(static_cast<const char*>(ShaderResultDesc.errorWarningMsg.Data()));
+				FString ErrorInfo = "[SpvCrossError] " + FString(static_cast<const char*>(ShaderResultDesc.errorWarningMsg.Data()));
 				PatchedSource = ErrorInfo;
 				throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
 			}
@@ -1386,7 +1382,7 @@ namespace SH
 		}
 		catch(const std::runtime_error& e)
 		{
-			FString ErrorInfo = "[PatchedSourceError] " + FString(UTF8_TO_TCHAR(e.what()));
+			FString ErrorInfo = "[SpvCrossError] " + FString(UTF8_TO_TCHAR(e.what()));
 			PatchedSource = ErrorInfo;
 			throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
 		}
@@ -1396,7 +1392,7 @@ namespace SH
 		TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
 			.Source = PatchedSource,
 			.Type = DebugShader->GetShaderType(),
-			.EntryPoint = EntryPointStr,
+			.EntryPoint = EntryPoint,
 			.Language = Lang,
 		});
 		if (!GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))

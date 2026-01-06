@@ -22,6 +22,7 @@ case "$OS_TYPE" in
         sh "$CurrentPath/External/ShaderConductor/downloadDep.sh" || Error
         sh "$CurrentPath/External/UE/downloadDep.sh" || Error
         sh "$CurrentPath/External/Python/downloadDep.sh" || Error
+        sh "$CurrentPath/External/shaderc/downloadDep.sh" || Error
         ;;
     *)
         Error

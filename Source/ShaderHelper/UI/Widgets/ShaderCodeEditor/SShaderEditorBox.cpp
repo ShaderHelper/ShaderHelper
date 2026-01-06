@@ -2141,14 +2141,17 @@ constexpr int PaddingLineNum = 22;
 				SH_LOG(LogShader, Warning, TEXT("%s"), *WarnInfo);
 			}
         }
-		
-		if(!ErrorInfo.IsEmpty())
-        {
-			ErrorInfo = AdjustDiagLineNumber(ErrorInfo, -AddedLineNum);
-			SH_LOG(LogShader, Error, TEXT("%s"), *ErrorInfo);
+		else
+		{
 			ShaderAssetObj->bCompilationSucceed = false;
-            CurEditState = EditState::Failed;
-        }
+			CurEditState = EditState::Failed;
+			
+			if(!ErrorInfo.IsEmpty())
+			{
+				ErrorInfo = AdjustDiagLineNumber(ErrorInfo, -AddedLineNum);
+				SH_LOG(LogShader, Error, TEXT("%s"), *ErrorInfo);
+			}
+		}
     }
 
     void SShaderEditorBox::OnShaderTextChanged(const FString& InShaderSouce)
