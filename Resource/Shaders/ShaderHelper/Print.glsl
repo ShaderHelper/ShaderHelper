@@ -12,15 +12,14 @@ const uint PRINT_MAX_U32 = 511u;
 const uint PRINT_MAX_BYTES = PRINT_MAX_U32 * 4u;
 
 layout(std430, binding = 0) buffer PrinterBuffer {
-    uint ByteSize;
-    uint PrintBuffer[PRINT_MAX_U32];
+    uint Data[];
 } Printer;
 
 uint AppendChar(uint Offset, uint Char)
 {
     uint Shift = (Offset % 4u) * 8u;
     uint BufferIndex = Offset / 4u;
-    atomicOr(Printer.PrintBuffer[BufferIndex], (Char & 0xFFu) << Shift);
+    atomicOr(Printer.Data[1u + BufferIndex], (Char & 0xFFu) << Shift);
     return Offset + 1u;
 }
 
@@ -107,10 +106,10 @@ uint GPrivate_AssertResult = 1u;
     StrArrDecl; \
     uint CharNum = uint(StrArr.length()); \
     uint Increment = 2u + CharNum + 1u; \
-    uint OldByteSize = Printer.ByteSize; \
+    uint OldByteSize = Printer.Data[0]; \
     uint ByteOffset = uint(-1); \
     while (OldByteSize + Increment <= PRINT_MAX_BYTES) { \
-        uint Prev = atomicCompSwap(Printer.ByteSize, OldByteSize, OldByteSize + Increment); \
+        uint Prev = atomicCompSwap(Printer.Data[0], OldByteSize, OldByteSize + Increment); \
         if (Prev == OldByteSize) { ByteOffset = OldByteSize; break; } \
         OldByteSize = Prev; \
     } \
@@ -127,10 +126,10 @@ uint GPrivate_AssertResult = 1u;
     uint CharNum = uint(StrArr.length()); \
     uint ArgByteSize = 1u + GetArgSize(Arg1); \
     uint Increment = 2u + CharNum + ArgByteSize; \
-    uint OldByteSize = Printer.ByteSize; \
+    uint OldByteSize = Printer.Data[0]; \
     uint ByteOffset = uint(-1); \
     while (OldByteSize + Increment <= PRINT_MAX_BYTES) { \
-        uint Prev = atomicCompSwap(Printer.ByteSize, OldByteSize, OldByteSize + Increment); \
+        uint Prev = atomicCompSwap(Printer.Data[0], OldByteSize, OldByteSize + Increment); \
         if (Prev == OldByteSize) { ByteOffset = OldByteSize; break; } \
         OldByteSize = Prev; \
     } \
@@ -148,10 +147,10 @@ uint GPrivate_AssertResult = 1u;
     uint CharNum = uint(StrArr.length()); \
     uint ArgByteSize = 1u + GetArgSize(Arg1) + GetArgSize(Arg2); \
     uint Increment = 2u + CharNum + ArgByteSize; \
-    uint OldByteSize = Printer.ByteSize; \
+    uint OldByteSize = Printer.Data[0]; \
     uint ByteOffset = uint(-1); \
     while (OldByteSize + Increment <= PRINT_MAX_BYTES) { \
-        uint Prev = atomicCompSwap(Printer.ByteSize, OldByteSize, OldByteSize + Increment); \
+        uint Prev = atomicCompSwap(Printer.Data[0], OldByteSize, OldByteSize + Increment); \
         if (Prev == OldByteSize) { ByteOffset = OldByteSize; break; } \
         OldByteSize = Prev; \
     } \
@@ -170,10 +169,10 @@ uint GPrivate_AssertResult = 1u;
     uint CharNum = uint(StrArr.length()); \
     uint ArgByteSize = 1u + GetArgSize(Arg1) + GetArgSize(Arg2) + GetArgSize(Arg3); \
     uint Increment = 2u + CharNum + ArgByteSize; \
-    uint OldByteSize = Printer.ByteSize; \
+    uint OldByteSize = Printer.Data[0]; \
     uint ByteOffset = uint(-1); \
     while (OldByteSize + Increment <= PRINT_MAX_BYTES) { \
-        uint Prev = atomicCompSwap(Printer.ByteSize, OldByteSize, OldByteSize + Increment); \
+        uint Prev = atomicCompSwap(Printer.Data[0], OldByteSize, OldByteSize + Increment); \
         if (Prev == OldByteSize) { ByteOffset = OldByteSize; break; } \
         OldByteSize = Prev; \
     } \
