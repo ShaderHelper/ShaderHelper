@@ -189,7 +189,10 @@ namespace FW
 				FString ErrorInfo = static_cast<const char*>(SpvTextResultDesc.errorWarningMsg.Data());
 				SpvSourceText = MoveTemp(ErrorInfo);
 			}
-			FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".glsl" + ".spvasm"));
+			if (!ShaderName.IsEmpty())
+			{
+				FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".glsl" + ".spvasm"));
+			}
 #endif
 		}
 		else
@@ -295,7 +298,10 @@ namespace FW
 			ShaderConductor::Compiler::DisassembleDesc SpvasmDesc{ShaderConductor::ShadingLanguage::SpirV, static_cast<const uint8_t*>(SpvResult.target.Data()), SpvResult.target.Size()};
 			ShaderConductor::Compiler::ResultDesc SpvasmResult = ShaderConductor::Compiler::Disassemble(SpvasmDesc);
 			FString SpvSourceText = {(int32)SpvasmResult.target.Size(), static_cast<const char*>(SpvasmResult.target.Data())};
-			FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl" + ".spvasm"));
+			if (!ShaderName.IsEmpty())
+			{
+				FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl" + ".spvasm"));
+			}
 #endif
 			SpvCode = { static_cast<const uint32*>(SpvResult.target.Data()), (int)SpvResult.target.Size() / 4 };
 		}
@@ -353,7 +359,10 @@ namespace FW
 
 		FString MslSourceText = { (int32)MslResult.target.Size(), static_cast<const char*>(MslResult.target.Data()) };
 #if DEBUG_SHADER
-		FFileHelper::SaveStringToFile(MslSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".metal"));
+		if (!ShaderName.IsEmpty())
+		{
+			FFileHelper::SaveStringToFile(MslSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".metal"));
+		}
 #endif
 		InShader->SetMslText(MoveTemp(MslSourceText));
 

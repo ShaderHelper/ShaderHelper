@@ -1321,6 +1321,7 @@ namespace SH
 
 		ShaderConductor::Compiler::TargetDesc TargetDesc{};
 		ShaderConductor::Compiler::Options Options{};
+		Options.force_zero_initialized_variables = true;
 		FString FileExtension;
 		FString EntryPoint = DebugShader->GetEntryPoint();
 		if (Lang == GpuShaderLanguage::HLSL)
@@ -1390,6 +1391,7 @@ namespace SH
 		CurDebugStateIndex = 0;
 		DebuggerContext = MoveTemp(PixelDebuggerContext);
 		TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
+			.Name = DebugShader->GetShaderName(),
 			.Source = PatchedSource,
 			.Type = DebugShader->GetShaderType(),
 			.EntryPoint = EntryPoint,

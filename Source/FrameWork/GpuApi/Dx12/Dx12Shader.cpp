@@ -216,7 +216,10 @@ namespace FW
 					 FString ErrorInfo = static_cast<const char*>(SpvTextResultDesc.errorWarningMsg.Data());
 					 SpvSourceText = MoveTemp(ErrorInfo);
 				 }
-				 FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".glsl" + ".spvasm"));
+				 if (!ShaderName.IsEmpty())
+				 {
+					 FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".glsl" + ".spvasm"));
+				 }
 #endif
 				 InShader->SpvCode = MoveTemp(SpvCode);
 				 return true;
@@ -362,7 +365,11 @@ namespace FW
 						FString ErrorInfo = static_cast<const char*>(SpvTextResultDesc.errorWarningMsg.Data());
 						SpvSourceText = MoveTemp(ErrorInfo);
 					}
-					FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl" + ".spvasm"));
+					
+					if (!ShaderName.IsEmpty())
+					{
+						FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl" + ".spvasm"));
+					}
 #endif
 				}
 				else
