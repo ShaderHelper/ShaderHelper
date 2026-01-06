@@ -15,17 +15,13 @@ namespace FW
 		virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 		virtual FReply OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 		TSharedRef<SWidget> CreateContextMenu();
-		void OnHandleDeleteAction();
-		void OnHandleRenameAction();
-		virtual bool SupportsKeyboardFocus() const override { return true; }
-		FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
+		void HandleRenameAction();
 		void AddDep(SGraphNode* InNode);
 		void RemoveDep(SGraphNode* InNode);
 
 	public:
 		class GraphNode* NodeData;
 		SGraphPanel* Owner;
-		TSharedPtr<FUICommandList> UICommandList;
 		TArray<class SGraphPin*> Pins;
 
 	private:

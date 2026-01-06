@@ -343,7 +343,14 @@ namespace FW
 
 	void SpvDebuggerVisitor::Visit(const SpvOpBranchConditional* Inst)
 	{
-		AppendTag([&] { return (*Insts)[InstIndex - 1]->GetWordOffset().value(); }, SpvDebuggerStateType::Condition);
+		if (Language == GpuShaderLanguage::HLSL)
+		{
+			AppendTag([&] { return (*Insts)[InstIndex - 1]->GetWordOffset().value(); }, SpvDebuggerStateType::Condition);
+		}
+		else
+		{
+			AppendTag([&] { return Inst->GetWordOffset().value(); }, SpvDebuggerStateType::Condition);
+		}
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvOpReturn* Inst)
@@ -1243,7 +1250,6 @@ namespace FW
 			AppendCallFuncInsts.Add(MakeUnique<SpvOpFunctionEnd>());
 		}
 		Patcher.AddFunction(MoveTemp(AppendCallFuncInsts));
-
 
 		while (InstIndex < (*Insts).Num())
 		{

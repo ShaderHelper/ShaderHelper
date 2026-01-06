@@ -1,34 +1,29 @@
 #include "CommonHeader.h"
 #include "AssetViewAssetItem.h"
 #include "UI/Styles/FAppCommonStyle.h"
-#include <Widgets/Text/SInlineEditableTextBlock.h>
-#include <Widgets/SViewport.h>
 #include "AssetManager/AssetManager.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "ProjectManager/ProjectManager.h"
 #include "App/App.h"
 
+#include <Widgets/Text/SInlineEditableTextBlock.h>
+#include <Widgets/SViewport.h>
+
 namespace FW
 {
-
-	AssetViewAssetItem::AssetViewAssetItem(const FString& InPath)
-		: AssetViewItem(InPath)
+	AssetViewAssetItem::AssetViewAssetItem(STileView<TSharedRef<AssetViewItem>>* InOwner, const FString& InPath)
+		: AssetViewItem(InOwner, InPath)
 	{
-		AssetPtr<AssetObject> Asset = TSingleton<AssetManager>::Get().LoadAssetByPath<AssetObject>(Path);
-		AssetThumbnail = Asset->GetThumbnail();
-		ImageBrush = Asset->GetImage();
-	}
-
-	AssetViewAssetItem::AssetViewAssetItem(const FString& InPath, AssetObject* InAsset)
-		: AssetViewItem(InPath)
-	{
-		AssetThumbnail = InAsset->GetThumbnail();
-		ImageBrush = InAsset->GetImage();
 	}
 
     FReply AssetViewAssetItem::HandleOnDragDetected(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
     {
-        return FReply::Handled().BeginDragDrop(AssetViewItemDragDropOp::New(Path));
+		TArray<FString> SelectedPaths;
+		for (const auto& Item : Owner->GetSelectedItems())
+		{
+			SelectedPaths.Add(Item->GetPath());
+		}
+        return FReply::Handled().BeginDragDrop(AssetViewItemDragDropOp::New(SelectedPaths));
     }
 
 	TSharedRef<ITableRow> AssetViewAssetItem::GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable)
@@ -43,17 +38,23 @@ namespace FW
         .BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
         .Padding(FMargin(5.0f, 4.0f, 5.0f, 6.0f));
 
-		if (AssetThumbnail)
-		{
-            PreviewBox->SetHAlign(HAlign_Center);
-            PreviewBox->SetVAlign(VAlign_Center);
-            
-			ThumbnailViewport->SetViewPortRenderTexture(AssetThumbnail);
-			Display =
+		Display =
+			SNew(SOverlay)
+			+SOverlay::Slot()
+			[
+				SNew(SImage).Image_Lambda([this] { return ImageBrush; })
+				.Visibility_Lambda([this] {
+					return ImageBrush ? EVisibility::Visible : EVisibility::Collapsed;
+				})
+			]
+			+SOverlay::Slot()
+			[
 				SNew(SViewport)
+				.Visibility_Lambda([this] {
+					return AssetThumbnail ? EVisibility::Visible : EVisibility::Collapsed;
+				})
 				.ViewportInterface(ThumbnailViewport)
-				.ViewportSize(TAttribute<FVector2D>::CreateLambda(
-					[this] { 
+				.ViewportSize_Lambda([this] { 
 						float PreviewBoxWidth = (float)PreviewBox->GetCachedGeometry().GetLocalSize().X;
 						float PreviewBoxHeight = (float)PreviewBox->GetCachedGeometry().GetLocalSize().Y;
 						float ThumbnailWidth = (float)AssetThumbnail->GetWidth();
@@ -61,15 +62,8 @@ namespace FW
 						 
 						float ScaleFactor = FMath::Clamp(ThumbnailWidth > ThumbnailHeight ? PreviewBoxWidth / ThumbnailWidth : PreviewBoxHeight / ThumbnailHeight, 0 , 1);
 						return FVector2D(ThumbnailWidth, ThumbnailHeight) * ScaleFactor;
-					}
-				));
-	
-		}
-		else
-		{
-			Display = SNew(SImage)
-				.Image(ImageBrush);
-		}
+				})
+			];
         
         PreviewBox->SetContent(
            SNew(SOverlay)

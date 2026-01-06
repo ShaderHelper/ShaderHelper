@@ -2,6 +2,7 @@
 #include "Graph.h"
 #include "UI/Widgets/Graph/SGraphNode.h"
 #include "UI/Widgets/Graph/SGraphPanel.h"
+
 #include <Styling/StyleColors.h>
 #include <Algo/TopologicalSort.h>
 

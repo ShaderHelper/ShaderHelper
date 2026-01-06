@@ -6,6 +6,7 @@
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "UI/Widgets/Property/PropertyData/PropertyItem.h"
+#include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 #include "RenderResource/PrintBuffer.h"
 
 using namespace FW;
@@ -24,6 +25,18 @@ R"(void mainImage(out float4 fragColor,in float2 fragCoord)
     PrintAtMouse("fragColor:{0}", fragColor);
 })";
 
+const FString DefaultGLSLPixelShaderBody =
+R"(void mainImage(out vec4 fragColor,in vec2 fragCoord)
+{
+    vec2 uv = fragCoord / iResolution.xy;
+    // Assert(uv.x > 0.9, "uv.x must be greater than 0.9");
+    vec3 col = 0.5 + 0.5*cos(iTime + uv.xyx + vec3(0,2,4));
+    
+    fragColor = vec4(uv,0,1);
+    
+    PrintAtMouse("fragColor:{0}", fragColor);
+})";
+
 const FString DefaultVertexShader =
 R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 {
@@ -31,12 +44,13 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
     Pos = float4(lerp(float2(-1, 1), float2(1, -1), uv), 0, 1);
 })";
 
-
     REFLECTION_REGISTER(AddClass<StShader>("ShaderToy Shader")
-                                .BaseClass<ShaderAsset>()
+                            .BaseClass<ShaderAsset>()
+							.Data<&StShader::Language, MetaInfo::Property>(LOCALIZATION("Language"))
 	)
 
 	StShader::StShader()
+		: Language(GpuShaderLanguage::HLSL)
 	{
         EditorContent = DefaultPixelShaderBody;
 	}
@@ -49,7 +63,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 	void StShader::Serialize(FArchive& Ar)
 	{
 		ShaderAsset::Serialize(Ar);
-		
+		Ar << Language;
         Ar << CustomUniformBufferBuilder << CustomBindGroupLayoutBuilder;
 	}
 
@@ -61,7 +75,8 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
             .Name = GetFileName() + "." + FileExtension(),
             .Source = GetFullContent(),
             .Type = ShaderType::PixelShader,
-            .EntryPoint = "MainPS"
+            .EntryPoint = "MainPS",
+			.Language = Language
         });
 		FString ErrorInfo, WarnInfo;
 		bCompilationSucceed = GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo);
@@ -114,16 +129,16 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         static GpuBindGroupLayoutBuilder BuiltInBindLayout{ BindingContext::GlobalSlot };
         static int Init = [&] {
             BuiltInBindLayout
-				.AddExistingBinding(0, BindingType::RWStructuredBuffer, BindingShaderStage::Pixel)
-                .AddUniformBuffer("BuiltInUniform", GetBuiltInUbBuilder().GetLayoutDeclaration(), BindingShaderStage::Pixel)
-                .AddTexture("iChannel0", BindingShaderStage::Pixel)
-                .AddSampler("iChannel0Sampler", BindingShaderStage::Pixel)
-                .AddTexture("iChannel1", BindingShaderStage::Pixel)
-                .AddSampler("iChannel1Sampler", BindingShaderStage::Pixel)
-                .AddTexture("iChannel2", BindingShaderStage::Pixel)
-                .AddSampler("iChannel2Sampler", BindingShaderStage::Pixel)
-                .AddTexture("iChannel3", BindingShaderStage::Pixel)
-                .AddSampler("iChannel3Sampler", BindingShaderStage::Pixel);
+				.AddExistingBinding(0, BindingType::RWRawBuffer, BindingShaderStage::Pixel)
+                .AddUniformBuffer("BuiltInUniform", GetBuiltInUbBuilder(), BindingShaderStage::Pixel)
+                .AddTexture("iChannel0_texture", BindingShaderStage::Pixel)
+                .AddSampler("iChannel0_sampler", BindingShaderStage::Pixel)
+                .AddTexture("iChannel1_texture", BindingShaderStage::Pixel)
+                .AddSampler("iChannel1_sampler", BindingShaderStage::Pixel)
+                .AddTexture("iChannel2_texture", BindingShaderStage::Pixel)
+                .AddSampler("iChannel2_sampler", BindingShaderStage::Pixel)
+                .AddTexture("iChannel3_texture", BindingShaderStage::Pixel)
+                .AddSampler("iChannel3_sampler", BindingShaderStage::Pixel);
             return 0;
         }();
         return BuiltInBindLayout;
@@ -141,14 +156,22 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 
     FString StShader::GetBinding() const
     {
-        return GetBuiltInBindLayoutBuilder().GetCodegenDeclaration() + CustomBindGroupLayoutBuilder.GetCodegenDeclaration();
+        return GetBuiltInBindLayoutBuilder().GetCodegenDeclaration(Language) + CustomBindGroupLayoutBuilder.GetCodegenDeclaration(Language);
     }
 
     FString StShader::GetTemplateWithBinding() const
     {
-		FString Template;
-		FFileHelper::LoadFileToString(Template, *(PathHelper::ShaderDir() / "ShaderHelper/StShaderTemplate.hlsl"));
-        return GetBinding() + Template;
+		FString Template, Header;
+		if (Language == GpuShaderLanguage::HLSL)
+		{
+			FFileHelper::LoadFileToString(Template, *(PathHelper::ShaderDir() / "ShaderHelper/StShaderTemplate.hlsl"));
+		}
+		else
+		{
+			Header = "#version 450\n";
+			FFileHelper::LoadFileToString(Template, *(PathHelper::ShaderDir() / "ShaderHelper/StShaderTemplate.glsl"));
+		}
+        return Header + GetBinding() + Template;
     }
 
 	int StShader::GetExtraLineNum() const
@@ -166,7 +189,8 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 			.Name = ShaderName,
 			.Source = MoveTemp(FinalShaderSource),
 			.Type = ShaderType::PixelShader,
-			.EntryPoint = "MainPS"
+			.EntryPoint = "MainPS",
+			.Language = Language
 		};
 		return Desc;
 	}
@@ -189,7 +213,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
             CustomUniformCategory->GetChildren(UniformDatas);
             for(auto UniformData : UniformDatas)
             {
-                FString MemberName = UniformData->GetDisplayName();
+                FString MemberName = UniformData->GetDisplayName().ToString();
                 if(UniformData->IsOfType<PropertyScalarItem<float>>())
                 {
                     NewCustomUniformBufferBuilder.AddFloat(MemberName);
@@ -207,7 +231,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 					NewCustomUniformBufferBuilder.AddVector4f(MemberName);
 				}
             }
-            NewCustomBindGroupLayoutBuilder.AddUniformBuffer("CustomUniform", NewCustomUniformBufferBuilder.GetLayoutDeclaration(), BindingShaderStage::Pixel);
+            NewCustomBindGroupLayoutBuilder.AddUniformBuffer("CustomUniform", NewCustomUniformBufferBuilder, BindingShaderStage::Pixel);
         }
         
         CustomUniformBufferBuilder = NewCustomUniformBufferBuilder;
@@ -224,7 +248,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         BuiltInUniformCategory->GetChildren(BindingDatas);
         for(const auto& Data: BindingDatas)
         {
-            if(Data->GetDisplayName() == InName)
+            if(Data->GetDisplayName().ToString() == InName)
             {
                 return true;
             }
@@ -233,7 +257,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         BuiltInSlotCategory->GetChildren(BindingDatas);
         for(const auto& Data: BindingDatas)
         {
-            if(Data->GetDisplayName() == InName)
+            if(Data->GetDisplayName().ToString() == InName)
             {
                 return true;
             }
@@ -245,7 +269,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
             CustomUniformCategory->GetChildren(BindingDatas);
             for(const auto& Data: BindingDatas)
             {
-                if(Data->GetDisplayName() == InName)
+                if(Data->GetDisplayName().ToString() == InName)
                 {
                     return true;
                 }
@@ -255,26 +279,25 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         return false;
     }
 
-    TSharedPtr<PropertyData> StShader::CreateUniformPropertyData(const FString& InTypeName, const FString& UniformMemberName, bool Enabled)
+    TSharedPtr<PropertyData> StShader::CreateUniformPropertyData(const TAttribute<FText>& InTypeName, const FString& UniformMemberName, bool Enabled)
     {
         auto TypeInfoWidget = SNew(STextBlock).TextStyle(&FAppCommonStyle::Get().GetWidgetStyle<FTextBlockStyle>("MinorText"));
-        FText TypeInfo = FText::FromString(InTypeName);
-        TypeInfoWidget->SetText(TypeInfo);
+        TypeInfoWidget->SetText(InTypeName);
         
         TSharedPtr<PropertyItemBase> NewUniformProperty;
-        if(InTypeName == "float")
+        if(InTypeName.Get().ToString() == "float")
         {
             NewUniformProperty = MakeShared<PropertyScalarItem<float>>(this, UniformMemberName);
         }
-        else if(InTypeName == "float2")
+        else if(InTypeName.Get().ToString() == "float2" || InTypeName.Get().ToString() == "vec2")
         {
             NewUniformProperty = MakeShared<PropertyVector2fItem>(this, UniformMemberName);
         }
-		else if(InTypeName == "float3")
+		else if(InTypeName.Get().ToString() == "float3" || InTypeName.Get().ToString() == "vec3")
 		{
 			NewUniformProperty = MakeShared<PropertyVector3fItem>(this, UniformMemberName);
 		}
-		else if (InTypeName == "float4")
+		else if (InTypeName.Get().ToString() == "float4" || InTypeName.Get().ToString() == "vec4")
 		{
 			NewUniformProperty = MakeShared<PropertyVector4fItem>(this, UniformMemberName);
 		}
@@ -284,8 +307,8 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         }
         NewUniformProperty->SetEnabled(Enabled);
         NewUniformProperty->SetEmbedWidget(TypeInfoWidget);
-        NewUniformProperty->SetCanApplyName([this](const FString& NewUniformMemberName){
-            if(!HasBindingName(NewUniformMemberName))
+        NewUniformProperty->SetCanApplyName([this](const FText& NewUniformMemberName){
+            if(!HasBindingName(NewUniformMemberName.ToString()))
             {
                 return true;
             }
@@ -295,7 +318,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
                 return false;
             }
         });
-        NewUniformProperty->SetOnDisplayNameChanged([this](const FString&){
+        NewUniformProperty->SetOnDisplayNameChanged([this](const FText&){
             RefreshBuilder();
             MarkDirty();
         });
@@ -314,7 +337,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         return NewUniformProperty;
     }
     
-    void StShader::AddUniform(FString TypeName)
+    void StShader::AddUniform(TAttribute<FText> TypeName)
     {
         auto CustomUniformCategory = CustomCategory->GetData("CustomUniform");
         if (!CustomUniformCategory)
@@ -342,29 +365,33 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
     TSharedRef<SWidget> StShader::GetCategoryMenu()
     {
         FMenuBuilder MenuBuilder{ true, TSharedPtr<FUICommandList>() };
+		auto Float = TAttribute<FText>::Create([] { return FText::FromString("float"); });
         MenuBuilder.AddMenuEntry(
-            FText::FromString("float"),
+			Float,
             FText::GetEmpty(),
             FSlateIcon(),
-            FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, FString("float")) }
+            FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, Float) }
         );
+		auto Float2 = TAttribute<FText>::Create([this] { return Language == GpuShaderLanguage::HLSL ? FText::FromString("float2") : FText::FromString("vec2"); });
         MenuBuilder.AddMenuEntry(
-            FText::FromString("float2"),
+			Float2,
             FText::GetEmpty(),
             FSlateIcon(),
-            FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, FString("float2")) }
+            FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, Float2) }
         );
+		auto Float3 = TAttribute<FText>::Create([this] { return Language == GpuShaderLanguage::HLSL ? FText::FromString("float3") : FText::FromString("vec3"); });
 		MenuBuilder.AddMenuEntry(
-			FText::FromString("float3"),
+			Float3,
 			FText::GetEmpty(),
 			FSlateIcon(),
-			FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, FString("float3")) }
+			FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, Float3) }
 		);
+		auto Float4 = TAttribute<FText>::Create([this] { return Language == GpuShaderLanguage::HLSL ? FText::FromString("float4") : FText::FromString("vec4"); });
 		MenuBuilder.AddMenuEntry(
-			FText::FromString("float4"),
+			Float4,
 			FText::GetEmpty(),
 			FSlateIcon(),
-			FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, FString("float4")) }
+			FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, Float4) }
 		);
         return MenuBuilder.MakeWidget();
     }
@@ -375,7 +402,10 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         const UniformBufferMetaData& MetaData = InBuilder.GetMetaData();
         for(const auto& [MemberName, MemberInfo]: MetaData.Members)
         {
-            auto Property = CreateUniformPropertyData(MemberInfo.TypeName, MemberName, Enabled);
+			auto TypeName = TAttribute<FText>::Create([MemberInfo, this] {
+				return FText::FromString(MemberInfo.GetTypeName(Language));
+			});
+            auto Property = CreateUniformPropertyData(TypeName, MemberName, Enabled);
             Datas.Add(Property.ToSharedRef());
         }
         return Datas;
@@ -383,7 +413,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 
     TArray<TSharedRef<PropertyData>> StShader::PropertyDatasFromBinding()
     {
-        BuiltInCategory = MakeShared<PropertyCategory>(this, "Built In");
+        BuiltInCategory = MakeShared<PropertyCategory>(this, LOCALIZATION("Builtin"));
         {
             const GpuBindGroupLayoutDesc& BuiltInLayoutDesc = GetBuiltInBindLayoutBuilder().GetDesc();
             for(const auto& [BindingName, Slot] : BuiltInLayoutDesc.CodegenBindingNameToSlot)
@@ -417,7 +447,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
             BuiltInCategory->AddChild(MoveTemp(SlotCategory));
         }
         
-        CustomCategory = MakeShared<PropertyCategory>(this, "Custom");
+        CustomCategory = MakeShared<PropertyCategory>(this, LOCALIZATION("Custom"));
         {
             const GpuBindGroupLayoutDesc& CustomLayoutDesc = CustomBindGroupLayoutBuilder.GetDesc();
             for(const auto& [BindingName, Slot] : CustomLayoutDesc.CodegenBindingNameToSlot)
@@ -438,13 +468,47 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         return {BuiltInCategory.ToSharedRef(), CustomCategory.ToSharedRef()};
     }
 
-    TArray<TSharedRef<PropertyData>>* StShader::GetPropertyDatas()
+	bool StShader::CanChangeProperty(FW::PropertyData* InProperty)
+	{
+		if (InProperty->IsOfType<PropertyEnumItem>() && InProperty->GetDisplayName().EqualTo(LOCALIZATION("Language")))
+		{
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			auto Ret = MessageDialog::Open(MessageDialog::OkCancel, MessageDialog::Shocked, ShEditor->GetMainWindow(), LOCALIZATION("ShaderLanguageTip"));
+			if (Ret == MessageDialog::MessageRet::Cancel)
+			{
+				return false;
+			}
+		}
+		return true;
+	
+	}
+	void StShader::PostPropertyChanged(FW::PropertyData* InProperty)
+	{
+		if (InProperty->IsOfType<PropertyEnumItem>() && InProperty->GetDisplayName().EqualTo(LOCALIZATION("Language")))
+		{
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			GpuShaderLanguage NewLanguage = *static_cast<GpuShaderLanguage*>(static_cast<PropertyEnumItem*>(InProperty)->GetEnum());
+			if (NewLanguage == GpuShaderLanguage::HLSL)
+			{
+				ShEditor->OpenShaderTab(this);
+				ShEditor->GetShaderEditor(this)->SetText(FText::FromString(DefaultPixelShaderBody));
+			}
+			else if(NewLanguage == GpuShaderLanguage::GLSL)
+			{
+				ShEditor->OpenShaderTab(this);
+				ShEditor->GetShaderEditor(this)->SetText(FText::FromString(DefaultGLSLPixelShaderBody));
+			}
+		}
+	}
+
+	TArray<TSharedRef<PropertyData>>* StShader::GetPropertyDatas()
     {
-        if(PropertyDatas.IsEmpty())
-        {
-            PropertyDatas = PropertyDatasFromBinding();
-        }
-        return &PropertyDatas;
+		if (PropertyDatas.IsEmpty())
+		{
+			ShObject::GetPropertyDatas();
+			PropertyDatas.Append(PropertyDatasFromBinding());
+		}
+		return &PropertyDatas;
     }
 
 }

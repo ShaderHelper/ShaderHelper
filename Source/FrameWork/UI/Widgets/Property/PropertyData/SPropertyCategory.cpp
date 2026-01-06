@@ -36,7 +36,7 @@ namespace FW
 			.Padding(4.0f, 0.0f, 0.0f, 0.0f)
 			[
 				SNew(STextBlock)
-				.Text(FText::FromString(InArgs._DisplayName))
+				.Text(InArgs._DisplayName)
 				.Font(MoveTemp(CategoryTextFont))
 			];
 

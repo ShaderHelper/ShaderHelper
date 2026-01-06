@@ -26,11 +26,13 @@
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)Sender;
 {
 	FPlatformMisc::RequestExit(true);
+    return NSTerminateNow;
 }
 
 - (BOOL)application:(NSApplication *)sender openFile:(NSString *)filename
 {
     self.SavedCommandLine += TEXT(" -Project=") + FString(filename);
+	return true;
 }
 @end
 

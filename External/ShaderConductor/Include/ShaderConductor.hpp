@@ -26,8 +26,6 @@
 #ifndef SHADER_CONDUCTOR_HPP
 #define SHADER_CONDUCTOR_HPP
 
-#pragma once
-
 #include <functional>
 
 #if defined(__clang__)
@@ -174,6 +172,7 @@ namespace ShaderConductor
             bool enableDebugInfo = false;                // Embed debug info into the binary
             bool disableOptimizations = false;           // Force to turn off optimizations. Ignore optimizationLevel below.
             bool inheritCombinedSamplerBindings = false; // If textures and samplers are combined, inherit the binding of the texture
+            bool vulkanSemantics = false; 
 
             int optimizationLevel = 3; // 0 to 3, no optimization to most optimization
             ShaderModel shaderModel = {6, 0};

@@ -31,7 +31,7 @@ namespace SH
 
 	ShaderToyPreviousFrameNode::ShaderToyPreviousFrameNode()
 	{
-		ObjectName = FText::FromString("Previous Frame");
+		ObjectName = LOCALIZATION("PreviousFrame");
 	}
 
 	ShaderToyPreviousFrameNode::~ShaderToyPreviousFrameNode()
@@ -63,7 +63,7 @@ namespace SH
 		OutputPin->ObjectName = FText::FromString("RT");
 		OutputPin->Direction = PinDirection::Output;
 
-		Pins.Add(MoveTemp(OutputPin));
+		Pins = { MoveTemp(OutputPin) };
 	}
 
 	void ShaderToyPreviousFrameNode::Serialize(FArchive& Ar)

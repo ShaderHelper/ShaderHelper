@@ -10,11 +10,11 @@ namespace FW
             : _DisplayName(nullptr)
             , _Indent(false)
         {}
-            SLATE_ARGUMENT(TFunction<bool(const FString&)>, CanApplyName)
-			SLATE_ARGUMENT(FString*, DisplayName)
+            SLATE_ARGUMENT(TFunction<bool(const FText&)>, CanApplyName)
+			SLATE_ARGUMENT(FText*, DisplayName)
 			SLATE_ARGUMENT(TSharedPtr<SWidget>, ValueWidget)
             SLATE_ARGUMENT(bool, Indent)
-			SLATE_ARGUMENT(TFunction<void(const FString&)>, OnDisplayNameChanged)
+			SLATE_ARGUMENT(TFunction<void(const FText&)>, OnDisplayNameChanged)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs);
@@ -22,7 +22,7 @@ namespace FW
         void AddWidget(TSharedPtr<SWidget> InWidget);
         
 	private:
-        FString* DisplayName;
+		FText* DisplayName;
         TSharedPtr<SHorizontalBox> HBox;
 	};
 }

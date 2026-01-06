@@ -1,11 +1,12 @@
 #include "CommonHeader.h"
 #include "AssetTextureDefaultImporter.h"
 #include "Common/Util/Reflection.h"
+#include "AssetObject/Texture2D.h"
+
 #include <IImageWrapperModule.h>
 #include <IImageWrapper.h>
 #include <ImageWrapperHelper.h>
 #include <Misc/FileHelper.h>
-#include "AssetObject/Texture2D.h"
 
 namespace FW
 {

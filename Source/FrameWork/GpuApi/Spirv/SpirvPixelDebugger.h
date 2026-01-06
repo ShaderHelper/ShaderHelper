@@ -16,7 +16,7 @@ namespace FW
 	class FRAMEWORK_API SpvPixelDebuggerVisitor : public SpvDebuggerVisitor
 	{
 	public:
-		SpvPixelDebuggerVisitor(SpvPixelDebuggerContext& InPixelContext, bool InEnableUbsan);
+		SpvPixelDebuggerVisitor(SpvPixelDebuggerContext& InPixelContext, GpuShaderLanguage InLanguage, bool InEnableUbsan);
 
 	public:
 		void Visit(const SpvOpKill* Inst) override;

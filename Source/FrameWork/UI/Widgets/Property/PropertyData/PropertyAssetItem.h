@@ -1,11 +1,11 @@
 #pragma once
 #include "GpuApi/GpuTexture.h"
 #include "Editor/PreviewViewPort.h"
-#include <Widgets/SViewport.h>
 #include "UI/Widgets/AssetBrowser/AssetViewItem/AssetViewAssetItem.h"
 #include "Editor/AssetEditor/AssetEditor.h"
 #include "PropertyItem.h"
 
+#include <Widgets/SViewport.h>
 namespace FW
 {
     class SPropertyAsset : public SCompoundWidget
@@ -58,7 +58,7 @@ namespace FW
                 {
                     return FAppStyle::Get().GetBrush("Brushes.Hover");
                 }
-                return FAppStyle::Get().GetBrush("Brushes.Panel");
+                return FAppStyle::Get().GetBrush("Brushes.Border");
             })
             .OnMouseMove_Lambda([this](const FGeometry&, const FPointerEvent&){
                 bPreviewUnderMouse = true;
@@ -133,17 +133,21 @@ namespace FW
             TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
             if(DragDropOp->IsOfType<AssetViewItemDragDropOp>())
             {
-                FString DropFilePath = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Path;
-                MetaType* DropAssetMetaType = GetAssetMetaType(DropFilePath);
-                if(DropAssetMetaType == AssetMetaType)
-                {
-                    bRecognizedDragDrop = true;
-                    DragDropOp->SetCursorOverride(EMouseCursor::GrabHand);
-                }
-                else
-                {
-                    DragDropOp->SetCursorOverride(EMouseCursor::SlashedCircle);
-                }
+                TArray<FString> DropFilePaths = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Paths;
+				if (DropFilePaths.Num() == 1)
+				{
+					MetaType* DropAssetMetaType = GetAssetMetaType(DropFilePaths[0]);
+					if (DropAssetMetaType == AssetMetaType)
+					{
+						bRecognizedDragDrop = true;
+						DragDropOp->SetCursorOverride(EMouseCursor::GrabHand);
+					}
+					else
+					{
+						DragDropOp->SetCursorOverride(EMouseCursor::SlashedCircle);
+					}
+				}
+               
             }
    
         }
@@ -161,20 +165,24 @@ namespace FW
             TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
             if(DragDropOp->IsOfType<AssetViewItemDragDropOp>())
             {
-                FString DropFilePath = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Path;
-                MetaType* DropAssetMetaType = GetAssetMetaType(DropFilePath);
-                if(DropAssetMetaType == AssetMetaType)
-                {
-                    auto Asset = TSingleton<AssetManager>::Get().LoadAssetByPath<AssetObject>(DropFilePath);
-                    auto& AssetRef = *(AssetPtr<AssetObject>*)AssetPtrRef;
-                    if(AssetRef != Asset && OuterObject->CanChangeProperty(Owner))
-                    {
-                        AssetRef = Asset;
-                        RefreshAssetView();
-                        OnAssetChanged.ExecuteIfBound();
-                    }
-  
-                }
+				TArray<FString> DropFilePaths = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Paths;
+				if (DropFilePaths.Num() == 1)
+				{
+					MetaType* DropAssetMetaType = GetAssetMetaType(DropFilePaths[0]);
+					if (DropAssetMetaType == AssetMetaType)
+					{
+						auto Asset = TSingleton<AssetManager>::Get().LoadAssetByPath<AssetObject>(DropFilePaths[0]);
+						auto& AssetRef = *(AssetPtr<AssetObject>*)AssetPtrRef;
+						if (AssetRef != Asset && OuterObject->CanChangeProperty(Owner))
+						{
+							AssetRef = Asset;
+							RefreshAssetView();
+							OnAssetChanged.ExecuteIfBound();
+						}
+
+					}
+				}
+               
             }
             return FReply::Handled();
         }
@@ -196,7 +204,7 @@ namespace FW
     {
         MANUAL_RTTI_TYPE(PropertyAssetItem, PropertyItemBase)
     public:
-        PropertyAssetItem(ShObject* InOwner, FString InName, MetaType* InAssetMetaType, void* InAssetPtrRef)
+        PropertyAssetItem(ShObject* InOwner, FText InName, MetaType* InAssetMetaType, void* InAssetPtrRef)
             : PropertyItemBase(InOwner, MoveTemp(InName))
             , AssetMetaType(InAssetMetaType)
             , AssetPtrRef(InAssetPtrRef)

@@ -3,8 +3,8 @@
 
 namespace FW
 {
-	SpvPixelDebuggerVisitor::SpvPixelDebuggerVisitor(SpvPixelDebuggerContext& InPixelContext, bool InEnableUbsan)
-	: SpvDebuggerVisitor(InPixelContext, InEnableUbsan)
+	SpvPixelDebuggerVisitor::SpvPixelDebuggerVisitor(SpvPixelDebuggerContext& InPixelContext, GpuShaderLanguage InLanguage, bool InEnableUbsan)
+	: SpvDebuggerVisitor(InPixelContext, InLanguage, InEnableUbsan)
 	{}
 
 	void SpvPixelDebuggerVisitor::PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList)

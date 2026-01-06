@@ -5,6 +5,8 @@
 
 namespace FW
 {
+	class SGraphPanel;
+
 	class GraphDragDropOp : public FDragDropOperation
 	{
 	public:
@@ -15,19 +17,150 @@ namespace FW
 		SGraphPin* StartPin;
 	};
 
+	class FRAMEWORK_API GraphCommand {
+	public:
+		GraphCommand(SGraphPanel* InGraphPanel) : GraphPanel(InGraphPanel) {}
+		virtual ~GraphCommand() = default;
+		virtual void Do() {}
+		virtual void Undo() {}
+	protected:
+		SGraphPanel* GraphPanel;
+	};
+
+	struct GraphState
+	{
+		TArray<TSharedPtr<GraphCommand>> Commands;
+	};
+
+	class FRAMEWORK_API RenameNodeCommand : public GraphCommand {
+	public:
+		RenameNodeCommand(SGraphPanel* InGraphPanel, ObjectPtr<GraphNode> InNodeData, const FText& InOldName, const FText& InNewName)
+			: GraphCommand(InGraphPanel)
+			, NodeData(InNodeData), OldName(InOldName), NewName(InNewName)
+		{}
+		void Do() override;
+		void Undo() override;
+	private:
+		ObjectPtr<GraphNode> NodeData;
+		FText OldName, NewName;
+	};
+
+	class FRAMEWORK_API MoveNodeCommand : public GraphCommand {
+	public:
+		MoveNodeCommand(SGraphPanel* InGraphPanel, ObjectPtr<GraphNode> InNodeData, const Vector2D& InOldPos, const Vector2D& InNewPos)
+			: GraphCommand(InGraphPanel)
+			, NodeData(InNodeData), OldPos(InOldPos), NewPos(InNewPos)
+		{}
+		void Do() override;
+		void Undo() override;
+	private:
+		ObjectPtr<GraphNode> NodeData;
+		Vector2D OldPos, NewPos;
+	};
+
+	class FRAMEWORK_API AddNodeCommand : public GraphCommand {
+	public:
+		AddNodeCommand(SGraphPanel* InGraphPanel, ObjectPtr<GraphNode> InNodeData, const Vector2D& InPos)
+			: GraphCommand(InGraphPanel)
+			, NodeData(InNodeData), Pos(InPos)
+		{}
+		void Do() override;
+		void Undo() override;
+
+	private:
+		ObjectPtr<GraphNode> NodeData;
+		Vector2D Pos;
+	};
+
+	class FRAMEWORK_API RemoveNodeCommand : public GraphCommand {
+	public:
+		RemoveNodeCommand(SGraphPanel* InGraphPanel, ObjectPtr<GraphNode> InNodeData)
+			: GraphCommand(InGraphPanel)
+			, NodeData(InNodeData)
+		{}
+		void Do() override;
+		void Undo() override;
+	private:
+		ObjectPtr<GraphNode> NodeData;
+	};
+
+	class FRAMEWORK_API AddLinkCommand : public GraphCommand {
+	public:
+		AddLinkCommand(SGraphPanel* InGraphPanel, GraphPin* Output, GraphPin* Input)
+			: GraphCommand(InGraphPanel)
+			, Output(Output), Input(Input)
+		{}
+		void Do() override;
+		void Undo() override;
+
+	private:
+		GraphPin* Output;
+		GraphPin* Input;
+	};
+
+	class FRAMEWORK_API RemoveLinkCommand : public GraphCommand {
+	public:
+		RemoveLinkCommand(SGraphPanel* InGraphPanel, GraphPin* Output, GraphPin* Input)
+			: GraphCommand(InGraphPanel)
+			, Output(Output), Input(Input)
+		{}
+		void Do() override;
+		void Undo() override;
+
+	private:
+		GraphPin* Output;
+		GraphPin* Input;
+	};
+
 	class FRAMEWORK_API SGraphPanel : public SPanel
 	{
+		friend SGraphNode;
 	public:
 		SLATE_BEGIN_ARGS(SGraphPanel) : _GraphData(nullptr)
 			{}
 			SLATE_ARGUMENT(class Graph*, GraphData)
 		SLATE_END_ARGS()
 
+		struct Transaction
+		{
+			TArray<TSharedPtr<GraphCommand>> Commands;
+		};
+		struct ScopedTransaction
+		{
+			ScopedTransaction(SGraphPanel* InGraphPanel) : GraphPanel(InGraphPanel)
+			{
+				if (!GraphPanel->CurrentTransaction)
+				{
+					GraphPanel->CurrentTransaction = Transaction{};
+				}
+			}
+			~ScopedTransaction()
+			{
+				if (GraphPanel->CurrentTransaction.value().Commands.Num() > 0)
+				{
+					GraphPanel->UndoStack.Emplace(GraphPanel->CurrentTransaction.value().Commands);
+					GraphPanel->RedoStack.Empty();
+				}
+				GraphPanel->CurrentTransaction.reset();
+			}
+
+			SGraphPanel* GraphPanel;
+		};
+
 		SGraphPanel();
 		void Construct(const FArguments& InArgs);
 		
 	public:
-		void AddNode(ObjectPtr<GraphNode> NewNodeData);
+		void DoCommand(TSharedPtr<GraphCommand> Command) {
+			if (CurrentTransaction)
+			{
+				CurrentTransaction.value().Commands.Add(Command);
+			}
+			Command->Do();
+		}
+
+		void SetFocus() { FSlateApplication::Get().SetKeyboardFocus(AsShared(), EFocusCause::SetDirectly); }
+		void AddNode(ObjectPtr<GraphNode> NewNodeData, const Vector2D& Pos);
 		
 		void Clear();
 		void SetGraphData(Graph* InGraphData);
@@ -63,11 +196,12 @@ namespace FW
 
 		void DeleteSelectedNodes();
 		void DeleteNode(SGraphNode* Node);
+		SGraphNode* GetNode(GraphNode* NodeData);
 		
 		SGraphPin* GetGraphPin(FGuid PinId);
-		SGraphPin* GetOuputPinInLink(SGraphPin* InputPin) const;
+		SGraphPin* GetOuputPin(SGraphPin* InputPin) const;
 		void AddLink(SGraphPin* Output, SGraphPin* Input);
-		void RemoveLink(SGraphPin* Input);
+		void RemoveLink(SGraphPin* Output, SGraphPin* Input);
 
 		//GraphCoord center is (0,0) 
 		Vector2D PanelCoordToGraphCoord(const Vector2D& InCoord) const;
@@ -92,6 +226,12 @@ namespace FW
 		float ZoomValue;
 		TArray<SGraphNode*> SelectedNodes;
 		TSharedPtr<FUICommandList> UICommandList;
+
+		std::optional<Transaction> CurrentTransaction;
+		TArray<GraphState> UndoStack;
+		TArray<GraphState> RedoStack;
+		TArray<TPair<GraphNode*, Vector2D>> MovingNodes;
+
 		TArray<TSharedPtr<FText>> MenuNodeItems;
 		TSharedPtr<SListView<TSharedPtr<FText>>> MenuNodeList;
 

@@ -2,10 +2,11 @@
 #include "SAssetBrowser.h"
 #include "SAssetView.h"
 #include "AssetManager/AssetManager.h"
+#include "Editor/AssetEditor/AssetEditor.h"
+
 #include <DirectoryWatcherModule.h>
 #include <IDirectoryWatcher.h>
 #include <Widgets/Input/SSlider.h>
-#include "Editor/AssetEditor/AssetEditor.h"
 
 namespace FW
 {

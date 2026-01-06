@@ -11,8 +11,8 @@
 #include "ShaderConductor.hpp"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 
-#include <Widgets/SViewport.h>
 #include <regex>
+#include <vector>
 
 using namespace FW;
 
@@ -20,8 +20,8 @@ namespace SH
 {
     REFLECTION_REGISTER(AddClass<ShaderToyPassNode>("ShaderPass Node")
 		.BaseClass<GraphNode>()
-        .Data<&ShaderToyPassNode::ShaderAssetObj, MetaInfo::Property>("Shader")
-		.Data<&ShaderToyPassNode::Format, MetaInfo::Property>("Format")
+        .Data<&ShaderToyPassNode::ShaderAssetObj, MetaInfo::Property>(LOCALIZATION("Shader"))
+		.Data<&ShaderToyPassNode::Format, MetaInfo::Property>(LOCALIZATION("Format"))
 		.Data<&ShaderToyPassNode::iChannelDesc0>("iChannel0")
 		.Data<&ShaderToyPassNode::iChannelDesc1>("iChannel1")
 		.Data<&ShaderToyPassNode::iChannelDesc2>("iChannel2")
@@ -31,8 +31,8 @@ namespace SH
         .BaseClass<ShObjectOp>()
     )
 	REFLECTION_REGISTER(AddClass<ShaderToyChannelDesc>()
-		.Data<&ShaderToyChannelDesc::Filter, MetaInfo::Property>("Filter Mode")
-		.Data<&ShaderToyChannelDesc::Wrap, MetaInfo::Property>("Wrap Mode")
+		.Data<&ShaderToyChannelDesc::Filter, MetaInfo::Property>(LOCALIZATION("FilterMode"))
+		.Data<&ShaderToyChannelDesc::Wrap, MetaInfo::Property>(LOCALIZATION("WrapMode"))
 	)
 
 	REGISTER_NODE_TO_GRAPH(ShaderToyPassNode, "ShaderToy Graph")
@@ -119,29 +119,29 @@ namespace SH
 		GpuTexturePin* iChannel2 = static_cast<GpuTexturePin*>(GetPin("iChannel2"));
 		GpuTexturePin* iChannel3 = static_cast<GpuTexturePin*>(GetPin("iChannel3"));
 
-		Builder.SetTexture("iChannel0", iChannel0->GetValue());
-		Builder.SetSampler("iChannel0Sampler", GpuResourceHelper::GetSampler({
+		Builder.SetTexture("iChannel0_texture", iChannel0->GetValue());
+		Builder.SetSampler("iChannel0_sampler", GpuResourceHelper::GetSampler({
 			.Filter = (SamplerFilter)iChannelDesc0.Filter,
 			.AddressU = (SamplerAddressMode)iChannelDesc0.Wrap,
 			.AddressV = (SamplerAddressMode)iChannelDesc0.Wrap,
 			.AddressW = (SamplerAddressMode)iChannelDesc0.Wrap
 		}));
-		Builder.SetTexture("iChannel1", iChannel1->GetValue());
-		Builder.SetSampler("iChannel1Sampler", GpuResourceHelper::GetSampler({
+		Builder.SetTexture("iChannel1_texture", iChannel1->GetValue());
+		Builder.SetSampler("iChannel1_sampler", GpuResourceHelper::GetSampler({
 			.Filter = (SamplerFilter)iChannelDesc1.Filter,
 			.AddressU = (SamplerAddressMode)iChannelDesc1.Wrap,
 			.AddressV = (SamplerAddressMode)iChannelDesc1.Wrap,
 			.AddressW = (SamplerAddressMode)iChannelDesc1.Wrap
 		}));
-		Builder.SetTexture("iChannel2", iChannel2->GetValue());
-		Builder.SetSampler("iChannel2Sampler", GpuResourceHelper::GetSampler({
+		Builder.SetTexture("iChannel2_texture", iChannel2->GetValue());
+		Builder.SetSampler("iChannel2_sampler", GpuResourceHelper::GetSampler({
 			.Filter = (SamplerFilter)iChannelDesc2.Filter,
 			.AddressU = (SamplerAddressMode)iChannelDesc2.Wrap,
 			.AddressV = (SamplerAddressMode)iChannelDesc2.Wrap,
 			.AddressW = (SamplerAddressMode)iChannelDesc2.Wrap
 		}));
-		Builder.SetTexture("iChannel3", iChannel3->GetValue());
-		Builder.SetSampler("iChannel3Sampler", GpuResourceHelper::GetSampler({
+		Builder.SetTexture("iChannel3_texture", iChannel3->GetValue());
+		Builder.SetSampler("iChannel3_sampler", GpuResourceHelper::GetSampler({
 			.Filter = (SamplerFilter)iChannelDesc3.Filter,
 			.AddressU = (SamplerAddressMode)iChannelDesc3.Wrap,
 			.AddressV = (SamplerAddressMode)iChannelDesc3.Wrap,
@@ -215,8 +215,102 @@ namespace SH
 		return ShaderAssetObj;
 	}
 
+	namespace
+	{
+		// Helper function to remove macro calls with arbitrary nested parentheses
+		void RemoveMacroCalls(std::string& Code, const std::string& MacroName)
+		{
+			std::string Pattern = R"(\b)" + MacroName + R"(\s*\()";
+			std::regex MacroRegex(Pattern);
+			
+			// Collect all matches first (from end to start to avoid position shifts)
+			std::vector<std::pair<size_t, size_t>> Matches;
+			std::sregex_iterator Iter(Code.begin(), Code.end(), MacroRegex);
+			std::sregex_iterator End;
+			
+			for (; Iter != End; ++Iter)
+			{
+				const std::smatch& Match = *Iter;
+				size_t MatchStart = Match.position();
+				size_t MatchEnd = MatchStart + Match.length();
+				
+				// Find matching closing parenthesis (skip parentheses inside string literals)
+				int ParenDepth = 1;
+				bool InString = false;
+				bool EscapeNext = false;
+				size_t Pos = MatchEnd;
+				while (Pos < Code.size() && ParenDepth > 0)
+				{
+					char Ch = Code[Pos];
+					
+					if (EscapeNext)
+					{
+						// This character is escaped, skip special processing
+						EscapeNext = false;
+					}
+					else if (Ch == '\\' && InString)
+					{
+						// Next character will be escaped
+						EscapeNext = true;
+					}
+					else if (Ch == '"')
+					{
+						// Toggle string state on double quote (if not escaped)
+						InString = !InString;
+					}
+					else if (!InString)
+					{
+						// Only count parentheses when not inside a string
+						if (Ch == '(')
+							ParenDepth++;
+						else if (Ch == ')')
+							ParenDepth--;
+					}
+					Pos++;
+				}
+				
+				// Skip whitespace and trailing semicolon if present
+				while (Pos < Code.size() && (Code[Pos] == ' ' || Code[Pos] == '\t' || Code[Pos] == '\n' || Code[Pos] == '\r'))
+					Pos++;
+				if (Pos < Code.size() && Code[Pos] == ';')
+					Pos++;
+				
+				Matches.emplace_back(MatchStart, Pos);
+			}
+			
+			// Remove matches from end to start
+			for (auto It = Matches.rbegin(); It != Matches.rend(); ++It)
+			{
+				Code.erase(It->first, It->second - It->first);
+			}
+		}
+	}
+
 	std::string ShaderToyPassNode::GetShaderToyCode() const
 	{
+		if(ShaderAssetObj->Shader->GetShaderLanguage() == GpuShaderLanguage::GLSL)
+		{
+			std::string ShaderToy = TCHAR_TO_UTF8(*ShaderAssetObj->EditorContent);
+			
+			// Remove Print/PrintAtMouse/Assert/AssertFormat macro calls
+			RemoveMacroCalls(ShaderToy, "Print");
+			RemoveMacroCalls(ShaderToy, "PrintAtMouse");
+			RemoveMacroCalls(ShaderToy, "Assert");
+			RemoveMacroCalls(ShaderToy, "AssertFormat");
+			
+			//Flip y
+			std::regex MainImagePattern(R"(void\s+mainImage\s*\([^)]*vec2\s+(\w+)\s*\)[^}]*\})");
+			std::smatch MainImageMatch;
+			if (std::regex_search(ShaderToy, MainImageMatch, MainImagePattern))
+			{
+				std::string FragCoordParamName = MainImageMatch[1].str();
+				std::regex FunctionBodyPattern(R"((void\s+mainImage\s*\([^)]*\)\s*\{)(\s*))");
+				std::string Replacement = "$1$2" + FragCoordParamName + ".y = iResolution.y - " + FragCoordParamName + ".y;\n$2";
+				ShaderToy = std::regex_replace(ShaderToy, FunctionBodyPattern, Replacement);
+			}
+			return ShaderToy;
+		}
+		
 		TArray<const char*> DxcArgs;
 		DxcArgs.Add("/Od");
 		DxcArgs.Add("-D");
@@ -244,7 +338,7 @@ namespace SH
 				{
 					FString ShaderText;
 					FFileHelper::LoadFileToString(ShaderText, *IncludedFile);
-					ShaderText = GpuShaderPreProcessor{ ShaderText }
+					ShaderText = GpuShaderPreProcessor{ ShaderText, ShaderAssetObj->Shader->GetShaderLanguage()}
 						.ReplacePrintStringLiteral()
 						.Finalize();
 					auto SourceText = StringCast<UTF8CHAR>(*ShaderText);
@@ -362,22 +456,22 @@ namespace SH
 			FString MemberDecl;
 			for(const auto& [MemberName, MemberInfo] : CustomUniformBuffer->GetMetaData().Members)
 			{
-				if(MemberInfo.TypeName == "float")
+				if(MemberInfo.HlslTypeName == "float")
 				{
 					float Val = CustomUniformBuffer->GetMember<float>(MemberName);
 					MemberDecl += "const float " + MemberName + " = " + FString::Printf(TEXT("%f;"), Val);
 				}
-				else if(MemberInfo.TypeName == "float2")
+				else if(MemberInfo.HlslTypeName == "float2")
 				{
 					Vector2f Val = CustomUniformBuffer->GetMember<Vector2f>(MemberName);
 					MemberDecl += "const vec2 " + MemberName + " = " + FString::Printf(TEXT("vec2(%f,%f);"), Val.x, Val.y);
 				}
-				else if(MemberInfo.TypeName == "float3")
+				else if(MemberInfo.HlslTypeName == "float3")
 				{
 					Vector3f Val = CustomUniformBuffer->GetMember<Vector3f>(MemberName);
 					MemberDecl += "const vec3 " + MemberName + " = " + FString::Printf(TEXT("vec3(%f,%f,%f);"), Val.x, Val.y, Val.z);
 				}
-				else if(MemberInfo.TypeName == "float4")
+				else if(MemberInfo.HlslTypeName == "float4")
 				{
 					Vector4f Val = CustomUniformBuffer->GetMember<Vector4f>(MemberName);
 					MemberDecl += "const vec4 " + MemberName + " = " + FString::Printf(TEXT("vec4(%f,%f,%f,%f);"), Val.x, Val.y, Val.z, Val.w);
@@ -502,7 +596,7 @@ namespace SH
 				if(CustomUniformBuffer.IsValid() && !CustomUniformBufferData.IsEmpty())
 				{
 					//If the layout of the shader's uniform buffer does not match the node
-					if(NodeCustomUniformBufferBuilder.GetMetaData().UniformBufferDeclaration != ShaderAssetObj->CustomUniformBufferBuilder.GetMetaData().UniformBufferDeclaration)
+					if(NodeCustomUniformBufferBuilder.GetMetaData().HlslDeclaration != ShaderAssetObj->CustomUniformBufferBuilder.GetMetaData().HlslDeclaration)
 					{
 						auto NodeCustomUniformBuffer = NodeCustomUniformBufferBuilder.Build();
 						if(NodeCustomUniformBuffer.IsValid())
@@ -544,22 +638,22 @@ namespace SH
         {
             TSharedPtr<PropertyItemBase> Property;
 			auto Writable = TAttribute<bool>::CreateLambda([this] { return !IsDebugging; });
-            if(MemberInfo.TypeName == "float")
+            if(MemberInfo.HlslTypeName == "float")
             {
                 auto FloatProperty = MakeShared<PropertyUniformItem<float>>(this, MemberName, InUb->GetMember<float>(MemberName), Writable);
                 Property = FloatProperty;
             }
-            else if(MemberInfo.TypeName == "float2")
+            else if(MemberInfo.HlslTypeName == "float2")
             {
                 auto Float2Porperty = MakeShared<PropertyUniformItem<Vector2f>>(this, MemberName, InUb->GetMember<Vector2f>(MemberName), Writable);
                 Property = Float2Porperty;
             }
-			else if(MemberInfo.TypeName == "float3")
+			else if(MemberInfo.HlslTypeName == "float3")
 			{
 				auto Float3Porperty = MakeShared<PropertyUniformItem<Vector3f>>(this, MemberName, InUb->GetMember<Vector3f>(MemberName), Writable);
 				Property = Float3Porperty;
 			}
-			else if (MemberInfo.TypeName == "float4")
+			else if (MemberInfo.HlslTypeName == "float4")
 			{
 				auto Float4Porperty = MakeShared<PropertyUniformItem<Vector4f>>(this, MemberName, InUb->GetMember<Vector4f>(MemberName), Writable);
 				Property = Float4Porperty;
@@ -576,7 +670,7 @@ namespace SH
 
     TArray<TSharedRef<PropertyData>> ShaderToyPassNode::PropertyDatasFromBinding()
     {
-        auto BuiltInCategory = MakeShared<PropertyCategory>(this, "Built In");
+        auto BuiltInCategory = MakeShared<PropertyCategory>(this, LOCALIZATION("Builtin"));
         {
             const GpuBindGroupLayoutDesc& BuiltInLayoutDesc = StShader::GetBuiltInBindLayoutBuilder().GetDesc();
             for(const auto& [BindingName, Slot] : BuiltInLayoutDesc.CodegenBindingNameToSlot)
@@ -606,7 +700,7 @@ namespace SH
             BuiltInCategory->AddChild(MoveTemp(SlotCategory));
         }
         
-        auto CustomCategory = MakeShared<PropertyCategory>(this, "Custom");
+        auto CustomCategory = MakeShared<PropertyCategory>(this, LOCALIZATION("Custom"));
         {
             const GpuBindGroupLayoutDesc& CustomLayoutDesc = ShaderAssetObj->CustomBindGroupLayoutBuilder.GetDesc();
             for(const auto& [BindingName, Slot] : CustomLayoutDesc.CodegenBindingNameToSlot)
@@ -628,7 +722,7 @@ namespace SH
 
 	bool ShaderToyPassNode::CanChangeProperty(PropertyData* InProperty)
 	{
-		if(InProperty->GetDisplayName() == "Shader")
+		if(InProperty->GetDisplayName().EqualTo(LOCALIZATION("Shader")))
 		{
 			if(ShaderAssetObj)
 			{
@@ -644,7 +738,7 @@ namespace SH
 		GraphNode::PostPropertyChanged(InProperty);
         
         //Shader asset changed.
-        if(InProperty->IsOfType<PropertyAssetItem>() && InProperty->GetDisplayName() == "Shader")
+        if(InProperty->IsOfType<PropertyAssetItem>() && InProperty->GetDisplayName().EqualTo(LOCALIZATION("Shader")))
         {
 			ShaderAssetObj->OnDestroy.AddRaw(this, &ShaderToyPassNode::ClearBindingProperty);
 			ShaderAssetObj->OnRefreshBuilder.AddRaw(this, &ShaderToyPassNode::RefreshProperty, true);

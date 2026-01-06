@@ -1,5 +1,6 @@
 #pragma once
 #include "AssetViewItem/AssetViewItem.h"
+
 #include <Widgets/Views/STileView.h>
 
 namespace FW
@@ -52,6 +53,7 @@ namespace FW
 		void OnHandleRenameAction();
 		void OnHandleSaveAction();
 		void OnHandleOpenAction(TSharedRef<AssetViewItem> ViewItem);
+		void SetAssetIcon(TSharedRef<class AssetViewAssetItem> ViewItem);
 
 	private:
 		SAssetBrowser* Browser;

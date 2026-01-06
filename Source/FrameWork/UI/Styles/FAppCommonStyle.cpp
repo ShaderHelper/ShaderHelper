@@ -1,8 +1,9 @@
 #include "CommonHeader.h"
 #include "FAppCommonStyle.h"
+#include "Common/Path/BaseResourcePath.h"
+
 #include <Styling/SlateStyleRegistry.h>
 #include <Styling/StyleColors.h>
-#include "Common/Path/BaseResourcePath.h"
 #include <Styling/SlateStyleMacros.h>
 #include <Styling/StarshipCoreStyle.h>
 
@@ -61,7 +62,7 @@ namespace FW
 		const int32 LogFontSize =  9;
 		const FTextBlockStyle NormalLogText = FTextBlockStyle(NormalText)
 			.SetFont(TTF_FONT(TEXT("Fonts/DroidSansMono"), LogFontSize))
-			.SetColorAndOpacity(FStyleColors::White)
+			.SetColorAndOpacity(FStyleColors::Foreground)
 			.SetSelectedBackgroundColor(FStyleColors::Select)
 			.SetHighlightColor(FStyleColors::Highlight);
 
@@ -77,7 +78,7 @@ namespace FW
 
 		Style->Set("PropertyView.CategoryColor", new FSlateColorBrush(FStyleColors::Panel));
 		Style->Set("PropertyView.ItemColor", new FSlateColorBrush(FStyleColors::Recessed));
-		Style->Set("PropertyView.CompositeItemColor", new FSlateColorBrush(FStyleColors::Dropdown));
+		Style->Set("PropertyView.CompositeItemColor", new FSlateColorBrush(FStyleColors::Secondary));
 
 		FTableRowStyle DirectoryTableRowStyle =
 			FTableRowStyle(FAppStyle::Get().GetWidgetStyle<FTableRowStyle>("SimpleTableView.Row"));

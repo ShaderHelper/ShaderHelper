@@ -28,6 +28,7 @@ if [ "$(uname)" = "Darwin" ]; then
     Check "ShaderConductor"
     Check "UE"
     Check "Python"
+    Check "shaderc"
 elif [ "$(uname)" = "Linux" ]; then
     Check "UE"
 else
@@ -35,4 +36,5 @@ else
     Check "ShaderConductor"
     Check "UE"
     Check "Python"
+	Check "shaderc"
 fi

@@ -1,6 +1,7 @@
 #include "CommonHeader.h"
 #include "GpuBindGroupLayout.h"
 #include "GpuRhi.h"
+#include "RenderResource/UniformBuffer.h"
 
 namespace FW
 {
@@ -19,16 +20,12 @@ namespace FW
 		return *this;
 	}
 
-	GpuBindGroupLayoutBuilder& GpuBindGroupLayoutBuilder::AddUniformBuffer(const FString& BindingName, const FString& UniformBufferLayoutDeclaration, BindingShaderStage InStage)
+	GpuBindGroupLayoutBuilder& GpuBindGroupLayoutBuilder::AddUniformBuffer(const FString& BindingName, const UniformBufferBuilder& UbBuilder, BindingShaderStage InStage)
 	{
-
-		FString FinalUniformBufferDeclaration = FString::Format(*UniformBufferLayoutDeclaration, { BindingName });
-		int32 InsertIndex = FinalUniformBufferDeclaration.Find(TEXT("{"));
-		check(InsertIndex != INDEX_NONE);
 		while (LayoutDesc.Layouts.Contains(AutoSlot)) { AutoSlot++; };
-		FinalUniformBufferDeclaration.InsertAt(InsertIndex - 1, FString::Printf(TEXT(": register(b%d, space%d)\n"), AutoSlot, LayoutDesc.GroupNumber));
 
-		LayoutDesc.CodegenDeclaration += MoveTemp(FinalUniformBufferDeclaration);
+		LayoutDesc.HlslCodegenDeclaration += FString::Format(*UbBuilder.GetLayoutDeclaration(GpuShaderLanguage::HLSL), {BindingName, AutoSlot, LayoutDesc.GroupNumber});
+		LayoutDesc.GlslCodegenDeclaration += FString::Format(*UbBuilder.GetLayoutDeclaration(GpuShaderLanguage::GLSL), { BindingName, AutoSlot, LayoutDesc.GroupNumber });
 		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, AutoSlot);
 		LayoutDesc.Layouts.Add(AutoSlot++, {BindingType::UniformBuffer, InStage });
 
@@ -38,7 +35,8 @@ namespace FW
 	GpuBindGroupLayoutBuilder& GpuBindGroupLayoutBuilder::AddTexture(const FString& BindingName, BindingShaderStage InStage)
 	{
 		while (LayoutDesc.Layouts.Contains(AutoSlot)) { AutoSlot++; };
-		LayoutDesc.CodegenDeclaration += FString::Printf(TEXT("Texture2D %s : register(t%d, space%d);\n"), *BindingName, AutoSlot, LayoutDesc.GroupNumber);
+		LayoutDesc.HlslCodegenDeclaration += FString::Printf(TEXT("Texture2D %s : register(t%d, space%d);\n"), *BindingName, AutoSlot, LayoutDesc.GroupNumber);
+		LayoutDesc.GlslCodegenDeclaration += FString::Printf(TEXT("layout(binding = %d, set = %d) uniform texture2D %s;\n"), AutoSlot, LayoutDesc.GroupNumber,*BindingName);
 		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, AutoSlot);
 		LayoutDesc.Layouts.Add(AutoSlot++, {BindingType::Texture, InStage });
 		return *this;
@@ -47,7 +45,8 @@ namespace FW
 	GpuBindGroupLayoutBuilder& GpuBindGroupLayoutBuilder::AddSampler(const FString& BindingName, BindingShaderStage InStage)
 	{
 		while (LayoutDesc.Layouts.Contains(AutoSlot)) { AutoSlot++; };
-		LayoutDesc.CodegenDeclaration += FString::Printf(TEXT("SamplerState %s : register(s%d, space%d);\n"), *BindingName, AutoSlot, LayoutDesc.GroupNumber);
+		LayoutDesc.HlslCodegenDeclaration += FString::Printf(TEXT("SamplerState %s : register(s%d, space%d);\n"), *BindingName, AutoSlot, LayoutDesc.GroupNumber);
+		LayoutDesc.GlslCodegenDeclaration += FString::Printf(TEXT("layout(binding = %d, set = %d) uniform sampler %s;\n"), AutoSlot, LayoutDesc.GroupNumber, *BindingName);
 		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, AutoSlot);
 		LayoutDesc.Layouts.Add(AutoSlot++, {BindingType::Sampler, InStage });
 		return *this;
@@ -56,6 +55,16 @@ namespace FW
 	TRefCountPtr<GpuBindGroupLayout> GpuBindGroupLayoutBuilder::Build() const
 	{
 		return GGpuRhi->CreateBindGroupLayout(LayoutDesc);
+	}
+
+	const FString& GpuBindGroupLayout::GetCodegenDeclaration(GpuShaderLanguage Language) const
+	{
+		return Language == GpuShaderLanguage::HLSL ? Desc.HlslCodegenDeclaration : Desc.GlslCodegenDeclaration;
+	}
+
+	const FString& GpuBindGroupLayoutBuilder::GetCodegenDeclaration(GpuShaderLanguage Language) const
+	{
+		return Language == GpuShaderLanguage::HLSL ? LayoutDesc.HlslCodegenDeclaration : LayoutDesc.GlslCodegenDeclaration;
 	}
 
 }

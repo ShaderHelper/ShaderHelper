@@ -1,6 +1,7 @@
 #pragma once
-#include <Framework/Commands/Commands.h>
 #include "UI/Styles/FAppCommonStyle.h"
+
+#include <Framework/Commands/Commands.h>
 
 namespace FW
 {
@@ -23,6 +24,8 @@ namespace FW
 			UI_COMMAND_SH(Delete, LOCALIZATION("Delete"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EKeys::Delete));
 			UI_COMMAND_SH(Rename, LOCALIZATION("Rename"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EKeys::F2));
 			UI_COMMAND_SH(Save, LOCALIZATION("Save"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::S));
+			UI_COMMAND_SH(Undo, LOCALIZATION("Undo"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::Z));
+			UI_COMMAND_SH(Redo, LOCALIZATION("Redo"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control | EModifierKey::Shift, EKeys::Z));
 			UI_COMMAND_SH(CutLine, LOCALIZATION("CutLine"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::RightMouseButton));
 #undef LOCTEXT_NAMESPACE
 		}
@@ -30,6 +33,8 @@ namespace FW
 		TSharedPtr<FUICommandInfo> Delete;
 		TSharedPtr<FUICommandInfo> Rename;
 		TSharedPtr<FUICommandInfo> Save;
+		TSharedPtr<FUICommandInfo> Undo;
+		TSharedPtr<FUICommandInfo> Redo;
 		TSharedPtr<FUICommandInfo> CutLine;
 	};
 }

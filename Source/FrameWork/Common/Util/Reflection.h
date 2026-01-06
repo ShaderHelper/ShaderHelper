@@ -79,7 +79,7 @@ namespace FW
         
         bool IsAssetRef() const;
         
-        FString MemberName;
+		FText MemberName;
         FString TypeName;
         void(*Set)(void*, void*);
         void*(*Get)(void*);
@@ -134,10 +134,11 @@ namespace FW
 			return false;
 		}
 		
-		const MetaMemberData* GetMetaMemberData(const FString& InMemberName) const
+		const MetaMemberData* GetMetaMemberData(const FString& InMemberName) const { return GetMetaMemberData(FText::FromString(InMemberName)); }
+		const MetaMemberData* GetMetaMemberData(const FText& InMemberName) const
 		{
 			return Datas.FindByPredicate([&](const MetaMemberData& InItem){
-				return InItem.MemberName == InMemberName;
+				return InItem.MemberName.EqualTo(InMemberName);
 			});
 		}
 		
@@ -202,9 +203,15 @@ namespace FW
 			};
 			return *this;
 		}
+
+		template<auto DataPtr, MetaInfo InfoType = MetaInfo::None>
+		MetaTypeBuilder& Data(const FString& InMemberName, const MetaPropertyData& PropertyData = {})
+		{
+			return Data<DataPtr, InfoType>(FText::FromString(InMemberName), PropertyData);
+		}
         
         template<auto DataPtr, MetaInfo InfoType = MetaInfo::None>
-		MetaTypeBuilder& Data(const FString& InMemberName, const MetaPropertyData& PropertyData = {})
+		MetaTypeBuilder& Data(const FText& InMemberName, const MetaPropertyData& PropertyData = {})
         {
             using MemberType = typename AUX::TraitMemberTypeFromMemberPtr<decltype(DataPtr)>::Type;
             using RawType = std::decay_t<MemberType>;

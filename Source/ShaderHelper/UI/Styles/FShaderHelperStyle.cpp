@@ -1,11 +1,12 @@
 #include "CommonHeader.h"
 #include "FShaderHelperStyle.h"
 #include "Common/Path/BaseResourcePath.h"
+#include "UI/Styles/FAppCommonStyle.h"
+
 #include <Styling/SlateStyleRegistry.h>
 #include <Styling/StyleColors.h>
 #include <Styling/SlateStyleMacros.h>
 #include <Styling/ToolBarStyle.h>
-#include "UI/Styles/FAppCommonStyle.h"
 
 #define RootToContentDir Style->RootToContentDir
 #define TTF_FONT( RelativePath, ... ) FSlateFontInfo(RootToContentDir( RelativePath, TEXT(".ttf") ), __VA_ARGS__ )
@@ -39,6 +40,7 @@ namespace SH {
 		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::Hover, LOCALIZATION("Hover"));
 		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::Primary, LOCALIZATION("Primary"));
 		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::Select, LOCALIZATION("Select"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::SelectInactive, LOCALIZATION("SelectInactive"));
 		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::Title, LOCALIZATION("Title"));
 
 		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User1, LOCALIZATION("Keyword"));
@@ -60,7 +62,7 @@ namespace SH {
         Style->Set("AssetBrowser.Shader", new IMAGE_BRUSH_SVG("Shader", FVector2D(64.0, 64.0)));
 		Style->Set("Icons.StepInto", new IMAGE_BRUSH_SVG("StepInto", FVector2D(16.0, 16.0)));
 		Style->Set("Icons.StepOver", new IMAGE_BRUSH_SVG("StepOver", FVector2D(16.0, 16.0)));
-		Style->Set("Icons.Bug", new IMAGE_BRUSH("Bug", FVector2D(16.0, 16.0)));
+		Style->Set("Icons.Bug", new IMAGE_BRUSH("Bug", FVector2D(16.0, 16.0), FLinearColor::Green));
 		Style->Set("Icons.StepBack", new IMAGE_BRUSH_SVG("StepBack", FVector2D(16.0, 16.0)));
 		Style->Set("Icons.StepOut", new IMAGE_BRUSH_SVG("StepOut", FVector2D(16.0, 16.0)));
 		Style->Set("Icons.Pause", new IMAGE_BRUSH_SVG("Pause", FVector2D(16.0, 16.0), FLinearColor::Red));
@@ -153,7 +155,7 @@ namespace SH {
 			.SetColorAndOpacity(EStyleColor::User6);
 		FTextBlockStyle CodeEditorStringTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
 			.SetColorAndOpacity(EStyleColor::User7);
-		FTextBlockStyle CodeEditorParmTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
+		FTextBlockStyle CodeEditorParamTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
 			.SetColorAndOpacity(EStyleColor::User8);
 		FTextBlockStyle CodeEditorFuncTextStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
 			.SetColorAndOpacity(EStyleColor::User9);
@@ -176,7 +178,7 @@ namespace SH {
 		
 		Style->Set("CodeEditorFuncText", CodeEditorFuncTextStyle);
 		Style->Set("CodeEditorTypeText", CodeEditorTypeTextStyle);
-		Style->Set("CodeEditorParmText", CodeEditorParmTextStyle);
+		Style->Set("CodeEditorParamText", CodeEditorParamTextStyle);
 		Style->Set("CodeEditorVarText", CodeEditorVarTextStyle);
 
 		FTextBlockStyle CodeEditorErrorInfoStyle = FTextBlockStyle{ CodeEditorNormalTextStyle }
@@ -203,15 +205,10 @@ namespace SH {
 
 		Style->Set("Icons.World", new IMAGE_BRUSH_SVG("Starship/Common/world", FVector2D{16.0f,16.0f}));
         
-		FLinearColor HoverColor = FStyleColors::Hover.GetSpecifiedColor();
-		HoverColor.A = 0.5f;
-		FLinearColor Hover2Color = FStyleColors::Hover2.GetSpecifiedColor();
-		Hover2Color.A = 0.5f;
-		
         const FScrollBarStyle ScrollBar = FScrollBarStyle()
-            .SetNormalThumbImage(FSlateColorBrush(HoverColor))
-            .SetDraggedThumbImage(FSlateColorBrush(Hover2Color))
-            .SetHoveredThumbImage(FSlateColorBrush(Hover2Color))
+            .SetNormalThumbImage(FSlateColorBrush(FStyleColors::Secondary))
+            .SetDraggedThumbImage(FSlateColorBrush(FStyleColors::Hover))
+            .SetHoveredThumbImage(FSlateColorBrush(FStyleColors::Hover))
             .SetThickness(5.0f);
 		Style->Set("CustomScrollbar", ScrollBar);
 

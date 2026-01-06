@@ -8,6 +8,7 @@ namespace FW
 {
 	void SShToggleButton::Construct(const FArguments& InArgs)
 	{
+		ToggleColorAndOpacity = InArgs._ToggleColorAndOpacity;
 		TSharedRef<SHorizontalBox> HBox = SNew(SHorizontalBox);
 		float Space = InArgs._Icon.IsSet() ? 6.0f : 0.0f;
 
@@ -27,8 +28,23 @@ namespace FW
 				.HAlign(HAlign_Center)
 				.Padding(Space, 0.0f, 0.f, 0.f)
 				[
-					SNew(STextBlock).Text(InArgs._Text.Get())
+					SNew(STextBlock).Text(InArgs._Text)
 				];
+		}
+
+		if (!ToggleColorAndOpacity.IsBound())
+		{
+			ToggleColorAndOpacity = TAttribute<FSlateColor>::CreateLambda([this] {
+				if (IsCheckboxChecked.Get() == ECheckBoxState::Checked)
+				{
+					return FStyleColors::Select.GetSpecifiedColor();
+				}
+				else if (IsHovered())
+				{
+					return FStyleColors::Hover.GetSpecifiedColor();
+				}
+				return FLinearColor::Transparent;
+			});
 		}
 
 		IsCheckboxChecked = InArgs._IsChecked;
@@ -38,34 +54,28 @@ namespace FW
 				SNew(SBorder)
 					.Padding(4)
 					.BorderImage(FAppCommonStyle::Get().GetBrush("Effect.Toggle"))
-					.BorderBackgroundColor_Lambda([this] {
-					if (IsCheckboxChecked.Get() == ECheckBoxState::Checked)
-					{
-						return FLinearColor{ 0.1f,0.5f,0.9f,1.0f };
-					}
-					else if (IsHovered())
-					{
-						return FLinearColor{ 0.5f,0.5f,0.5f,1.0f };
-					}
-					return FLinearColor::Transparent;
-						})
+					.BorderBackgroundColor(ToggleColorAndOpacity)
 					.OnMouseButtonDown_Lambda([this](const FGeometry&, const FPointerEvent& MouseEvent) {
 					if (MouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton))
-					{
-						if (IsCheckboxChecked.Get() == ECheckBoxState::Checked)
 						{
-							OnCheckStateChanged.ExecuteIfBound(ECheckBoxState::Unchecked);
+							if (IsCheckboxChecked.Get() == ECheckBoxState::Checked)
+							{
+								OnCheckStateChanged.ExecuteIfBound(ECheckBoxState::Unchecked);
+							}
+							else
+							{
+								OnCheckStateChanged.ExecuteIfBound(ECheckBoxState::Checked);
+							}
+							return FReply::Handled();
 						}
-						else
-						{
-							OnCheckStateChanged.ExecuteIfBound(ECheckBoxState::Checked);
-						}
-						return FReply::Handled();
-					}
-					return FReply::Unhandled();
-						})
+						return FReply::Unhandled();
+					})
 					[
-						HBox
+						SNew(SScaleBox)
+						[
+							HBox
+						]
+						
 					]
 			];
 	}
@@ -142,20 +152,21 @@ namespace FW
 				if (!PickerWindow)
 				{
 					SAssignNew(PickerWindow, SWindow)
-						.Type(EWindowType::ToolTip)
-						.CreateTitleBar(false)
-						.IsTopmostWindow(true)
-						.SupportsMaximize(false)
-						.SupportsMinimize(false)
-						.IsPopupWindow(true)
-						.SizingRule(ESizingRule::Autosized)
-						.ActivationPolicy(EWindowActivationPolicy::Never)
-						[
-							SNew(SColorPicker)
-								.TargetColorAttribute(Color)
-								.ShowAlpha(InArgs._ShowAlpha)
-								.OnColorChanged(OnColorChanged)
-						];
+					.Type(EWindowType::ToolTip)
+					.CreateTitleBar(false)
+					.IsTopmostWindow(true)
+					.SupportsMaximize(false)
+					.SupportsMinimize(false)
+					.IsPopupWindow(true)
+					.SizingRule(ESizingRule::Autosized)
+					.ActivationPolicy(EWindowActivationPolicy::Never)
+					[
+						SNew(SColorPicker)
+						.TargetColorAttribute(Color)
+						.ShowAlpha(InArgs._ShowAlpha)
+						.OnColorChanged(OnColorChanged)
+						.PreviewSrgb(true)
+					];
 					FSlateApplication::Get().AddWindowAsNativeChild(PickerWindow.ToSharedRef(), ParentWindow.Pin().ToSharedRef());
 					FVector2D WindowPos = GetTickSpaceGeometry().GetAbsolutePosition();
 					WindowPos.Y += GetTickSpaceGeometry().GetAbsoluteSize().Y;

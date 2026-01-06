@@ -685,7 +685,7 @@ namespace FW
 			TArray<uint32> Bin;
 			Bin.Add(Target.GetValue());
 			std::string Utf8Name(TCHAR_TO_UTF8(*Name));
-			Bin.Append((uint32*)Utf8Name.c_str(), (Utf8Name.size() + 1 + 3) / 4);
+			Bin.Append((uint32*)Utf8Name.c_str(), ((int)Utf8Name.size() + 1 + 3) / 4);
 			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Name;
 			Bin.Insert(Header, 0);
 			return Bin;
@@ -710,7 +710,7 @@ namespace FW
 			TArray<uint32> Bin;
 			Bin.Add(GetId().value().GetValue());
 			std::string Utf8Name(TCHAR_TO_UTF8(*Str));
-			Bin.Append((uint32*)Utf8Name.c_str(), (Utf8Name.size() + 1 + 3) / 4);
+			Bin.Append((uint32*)Utf8Name.c_str(), ((int)Utf8Name.size() + 1 + 3) / 4);
 			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::String;
 			Bin.Insert(Header, 0);
 			return Bin;

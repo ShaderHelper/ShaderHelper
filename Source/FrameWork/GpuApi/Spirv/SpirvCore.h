@@ -460,6 +460,27 @@ namespace FW
 		AUX::Unreachable();
 	};
 
+	inline FString GetGlslTypeStr(SpvType* Type)
+	{
+		if (Type->GetKind() == SpvTypeKind::Image)
+		{
+			SpvImageType* ImageType = static_cast<SpvImageType*>(Type);
+			if (ImageType->Sampled == 2)
+			{
+				return "image2D";
+			}
+			else
+			{
+				return "texture2D";
+			}
+		}
+		else if (Type->GetKind() == SpvTypeKind::Sampler)
+		{
+			return "sampler";
+		}
+		AUX::Unreachable();
+	}
+
 	//Only valid for the type of the internal object,
 	//because the type of the external object may have different memory alignment rules.
 	inline int32 GetTypeByteSize(const SpvType* Type)
@@ -585,6 +606,7 @@ namespace FW
 	enum class SpvOp
 	{
 		Source = 3,
+		SourceExtension = 4,
 		Name = 5,
 		MemberName = 6,
 		String = 7,

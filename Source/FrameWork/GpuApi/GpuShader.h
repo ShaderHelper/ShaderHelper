@@ -5,63 +5,90 @@
 #include "Containers/Array.h"
 #include "Containers/UnrealString.h"
 #include "GpuBindGroupLayout.h"
+#include "ShaderConductor.hpp"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogShader, Log, All);
 inline DEFINE_LOG_CATEGORY(LogShader);
 
 namespace HLSL
 {
-    enum class CandidateKind
-    {
-        Unknown,
-        Kword,
-        Var,
-        Func,
-        Macro,
-        Type
-    };
+    extern FRAMEWORK_API TArray<FString> BuiltinTypes;
+    extern FRAMEWORK_API TArray<FString> KeyWords;
+    extern FRAMEWORK_API TArray<FString> BuiltinFuncs;
+}
 
-	enum class TokenType
+namespace GLSL
+{
+	extern FRAMEWORK_API TArray<FString> BuiltinTypes;
+	extern FRAMEWORK_API TArray<FString> KeyWords;
+	extern FRAMEWORK_API TArray<FString> BuiltinFuncs;
+}
+
+namespace FW
+{
+
+	inline ShaderConductor::ShaderStage MapShaderCunductorStage(ShaderType InType)
 	{
-		//Tokenizer
-		Number,
-		Keyword,
-		Punctuation,
-		BuildtinFunc,
-		BuildtinType,
-		Identifier,
-		Comment,
-		String,
-		
-		//Parser
-		Func,
-		Type,
-		Parm,
-		Var,
-		LocalVar,
+		switch (InType)
+		{
+		case ShaderType::VertexShader:         return ShaderConductor::ShaderStage::VertexShader;
+		case ShaderType::PixelShader:          return ShaderConductor::ShaderStage::PixelShader;
+		case ShaderType::ComputeShader:        return ShaderConductor::ShaderStage::ComputeShader;
+		default:
+			AUX::Unreachable();
+		}
+	}
 
-		Preprocess,
-		Other,
-		
-	};
-
-    inline const TCHAR* Punctuations[] = {
-        TEXT(":"), TEXT("+="), TEXT("++"), TEXT("+"), TEXT("--"), TEXT("-="), TEXT("-"), TEXT("("),
+	inline const TCHAR* Punctuations[] = {
+		TEXT(":"), TEXT("+="), TEXT("++"), TEXT("+"), TEXT("--"), TEXT("-="), TEXT("-"), TEXT("("),
 		TEXT(")"), TEXT("["), TEXT("]"), TEXT("."), TEXT("->"), TEXT("!="), TEXT("!"),
 		TEXT("&="), TEXT("~"), TEXT("&"), TEXT("*="), TEXT("*"), TEXT("->"), TEXT("/="),
 		TEXT("/"), TEXT("%="), TEXT("%"), TEXT("<<="), TEXT("<<"), TEXT("<="),
 		TEXT("<"), TEXT(">>="), TEXT(">>"), TEXT(">="), TEXT(">"), TEXT("=="), TEXT("&&"),
 		TEXT("&"), TEXT("^="), TEXT("^"), TEXT("|="), TEXT("||"), TEXT("|"), TEXT("?"),
 		TEXT("="), TEXT(","), TEXT(";"), TEXT("{"), TEXT("}"), TEXT("//"), TEXT("/*"), TEXT("*/")
-    };
+	};
 
-    extern FRAMEWORK_API TArray<FString> BuiltinTypes;
-    extern FRAMEWORK_API TArray<FString> KeyWords;
-    extern FRAMEWORK_API TArray<FString> BuiltinFuncs;
-}
+	enum class ShaderCandidateKind
+	{
+		Unknown,
+		Kword,
+		Var,
+		Func,
+		Macro,
+		Type
+	};
 
-namespace FW
-{
+	enum class ShaderTokenType
+	{
+		//Tokenizer
+		Number,
+		Punctuation,
+		Identifier,
+		Comment,
+		String,
+
+		//Parser
+		Keyword,
+		BuildtinFunc,
+		BuildtinType,
+		Func,
+		Type,
+		Param,
+		Var,
+		LocalVar,
+
+		Preprocess,
+		Other,
+
+	};
+
+	enum class GpuShaderLanguage
+	{
+		HLSL,
+		GLSL
+	};
+
 	enum class GpuShaderCompilerFlag : uint32
 	{
 		None = 0,
@@ -79,15 +106,20 @@ namespace FW
 	class FRAMEWORK_API GpuShaderPreProcessor
 	{
 	public:
-		GpuShaderPreProcessor(FString InShaderText) : ShaderText(MoveTemp(InShaderText)) {}
+		GpuShaderPreProcessor(FString InShaderText, GpuShaderLanguage InLanguage) : ShaderText(MoveTemp(InShaderText)), Language(InLanguage)
+		{}
 
 	public:
 		//hlsl does not currently support string literal
-		GpuShaderPreProcessor& ReplacePrintStringLiteral();
+		// For GLSL:
+		// - default (false): replace string literal into `EXPAND(uint StrArr[] = uint[](...))` and rename Print/PrintAtMouse/Assert to Print%d...
+		// - true: only rename Print/PrintAtMouse/Assert to Print%d..., keep the original string literal (do NOT generate uint StrArr array)
+		GpuShaderPreProcessor& ReplacePrintStringLiteral(bool bGlslOnlyRenamePrintFuncs = false);
 		FString Finalize() { return MoveTemp(ShaderText); }
 
 	private:
 		FString ShaderText;
+		GpuShaderLanguage Language;
 	};
 
     struct GpuShaderFileDesc
@@ -96,6 +128,7 @@ namespace FW
         ShaderType Type;
         FString EntryPoint;
         FString ExtraDecl;
+		GpuShaderLanguage Language = GpuShaderLanguage::HLSL;
         TArray<FString> IncludeDirs = { 
             PathHelper::ShaderDir(), 
             FPaths::GetPath(*FileName)
@@ -107,7 +140,8 @@ namespace FW
         FString Name;
         FString Source;
         ShaderType Type;
-        FString EntryPoint;
+		FString EntryPoint; //For HLSL compilation; For GLSL, always "main"
+		GpuShaderLanguage Language = GpuShaderLanguage::HLSL;
         TArray<FString> IncludeDirs = { 
             PathHelper::ShaderDir() 
         };
@@ -123,6 +157,7 @@ namespace FW
 
     class FRAMEWORK_API GpuShader : public GpuResource
     {
+		friend GpuShaderPreProcessor;
 	public:
         //From file
 		GpuShader(const GpuShaderFileDesc& FileDesc);
@@ -142,7 +177,10 @@ namespace FW
         ShaderType GetShaderType() const {return Type;}
         const FString& GetSourceText() const { return SourceText; }
 		const FString& GetProcessedSourceText() const { return ProcessedSourceText; }
-        const FString& GetEntryPoint() const { return EntryPoint; }
+		FString GetEntryPoint() const {
+			return ShaderLanguage == GpuShaderLanguage::HLSL ? EntryPoint : "main";
+		}
+		GpuShaderLanguage GetShaderLanguage() const { return ShaderLanguage; }
 		GpuShaderModel GetShaderModelVer() const;
 
 		virtual TArray<GpuShaderLayoutBinding> GetLayout() const = 0;
@@ -155,7 +193,7 @@ namespace FW
         ShaderType Type;
         FString ShaderName;
         FString EntryPoint;
-        //Hlsl
+		GpuShaderLanguage ShaderLanguage;
         FString SourceText;
 		FString ProcessedSourceText;
         
@@ -172,7 +210,7 @@ namespace FW
 
     struct ShaderCandidateInfo
     {
-        HLSL::CandidateKind Kind;
+        ShaderCandidateKind Kind;
         FString Text;
         
         bool operator==(const ShaderCandidateInfo& Other) const
@@ -215,23 +253,31 @@ namespace FW
 		Vector2i End;
 	};
 
-	FRAMEWORK_API FString AdjustDiagLineNumber(const FString& ErrorInfo, int32 Delta);
-    FRAMEWORK_API TArray<ShaderCandidateInfo> DefaultCandidates();
+    FRAMEWORK_API TArray<ShaderCandidateInfo> DefaultCandidates(GpuShaderLanguage Language, ShaderType Type);
 
     class FRAMEWORK_API ShaderTU
     {
+	protected:
+		ShaderTU(const FString& InShaderSource);
+
     public:
-		ShaderTU();
-		ShaderTU(FStringView HlslSource, const TArray<FString>& IncludeDirs = {});
-		TArray<ShaderDiagnosticInfo> GetDiagnostic();
-		HLSL::TokenType GetTokenType(HLSL::TokenType InType, uint32 Row, uint32 Col);
-        TArray<ShaderCandidateInfo> GetCodeComplete(uint32 Row, uint32 Col);
-		TArray<ShaderFunc> GetFuncs();
-		TArray<ShaderOccurrence> GetOccurrences(uint32 Row, uint32 Col);
-		TArray<ShaderScope> GetScopes();
+		static TUniquePtr<ShaderTU> Create(TRefCountPtr<GpuShader> InShader);
+		virtual ~ShaderTU() = default;
+
+		virtual TArray<ShaderDiagnosticInfo> GetDiagnostic() = 0;
+		virtual ShaderTokenType GetTokenType(ShaderTokenType InType, uint32 Row, uint32 Col, uint32 Size) = 0;
+		virtual TArray<ShaderCandidateInfo> GetCodeComplete(uint32 Row, uint32 Col) = 0;
+		virtual TArray<ShaderOccurrence> GetOccurrences(uint32 Row, uint32 Col) = 0;
+
+		const TArray<ShaderFunc>& GetFuncs() const { return Funcs; };
+		const TArray<ShaderScope>& GetGuideLineScopes() const { return GuideLineScopes; };
+		FString GetStr(uint32 Row, uint32 Col, uint32 Size) const { return ShaderSource.Mid(LineRanges[Row - 1].BeginIndex + Col - 1, Size); }
         
-    private:
-        TPimplPtr<struct ShaderTUImpl> Impl;
+    protected:
+		FString ShaderSource;
+		TArray<FTextRange> LineRanges;
+		TArray<ShaderFunc> Funcs;
+		TArray<ShaderScope> GuideLineScopes;
     };
 
 }

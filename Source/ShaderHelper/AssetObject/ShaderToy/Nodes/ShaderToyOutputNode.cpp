@@ -11,9 +11,9 @@ namespace SH
 {
     REFLECTION_REGISTER(AddClass<ShaderToyOutputNode>("Present Node")
 		.BaseClass<GraphNode>()
-		.Data<&ShaderToyOutputNode::Format, MetaInfo::Property | MetaInfo::ReadOnly>("Format")
-		.Data<&ShaderToyOutputNode::Layer, MetaInfo::Property>("Layer")
-		.Data<&ShaderToyOutputNode::AreaFraction, MetaInfo::Property>("AreaFraction", {
+		.Data<&ShaderToyOutputNode::Format, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("Format"))
+		.Data<&ShaderToyOutputNode::Layer, MetaInfo::Property>(LOCALIZATION("Layer"))
+		.Data<&ShaderToyOutputNode::AreaFraction, MetaInfo::Property>(LOCALIZATION("AreaFraction"), {
 			.Min = [](const ShaderToyOutputNode*) { return 0.0f; },
 			.Max = [](const ShaderToyOutputNode*) { return 1.0f; }
 		})
@@ -57,7 +57,7 @@ namespace SH
 	: Format(ShaderToyFormat::B8G8R8A8_UNORM)
 	, Layer(0), AreaFraction(1.0f)
 	{
-		ObjectName = FText::FromString("Present");
+		ObjectName = LOCALIZATION("Present");
 	}
 
     ShaderToyOutputNode::~ShaderToyOutputNode()
@@ -71,7 +71,7 @@ namespace SH
         ResultPin->ObjectName = FText::FromString("RT");
         ResultPin->Direction = PinDirection::Input;
         
-        Pins.Add(MoveTemp(ResultPin));
+		Pins = { MoveTemp(ResultPin) };
     }
 
 	void ShaderToyOutputNode::Serialize(FArchive& Ar)
@@ -100,7 +100,7 @@ namespace SH
 	void ShaderToyOutputNode::PostPropertyChanged(PropertyData* InProperty)
 	{
 		GraphNode::PostPropertyChanged(InProperty);
-		if (InProperty->GetDisplayName() == "AreaFraction" || InProperty->GetDisplayName() == "Layer")
+		if (InProperty->GetDisplayName().EqualTo(LOCALIZATION("AreaFraction")) || InProperty->GetDisplayName().EqualTo(LOCALIZATION("Layer")))
 		{
 			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 			ShEditor->ForceRender();

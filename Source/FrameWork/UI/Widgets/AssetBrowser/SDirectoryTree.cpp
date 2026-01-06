@@ -1,14 +1,15 @@
 #include "CommonHeader.h"
 #include "SDirectoryTree.h"
-#include <DesktopPlatformModule.h>
 #include "UI/Styles/FAppCommonStyle.h"
-#include <Styling/StyleColors.h>
 #include "UI/Widgets/Misc/CommonTableRow.h"
 #include "AssetViewItem/AssetViewItem.h"
 #include "ProjectManager/ProjectManager.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "App/App.h"
 #include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
+
+#include <DesktopPlatformModule.h>
+#include <Styling/StyleColors.h>
 
 namespace FW
 {
@@ -90,14 +91,18 @@ namespace FW
         TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
         if(DragDropOp->IsOfType<AssetViewItemDragDropOp>())
         {
-            FString DropFilePath = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Path;
-            FString NewFilePath = DropTargetPath / FPaths::GetCleanFilename(DropFilePath);
-            if(FPaths::GetExtension(DropFilePath).IsEmpty())
-            {
-                RenamedOrMovedFolderMap.Add(DropFilePath, NewFilePath);
-            }
-            
-            IFileManager::Get().Move(*NewFilePath, *DropFilePath);
+			TArray<FString> DropFilePaths = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Paths;
+			for (const auto& DropFilePath : DropFilePaths)
+			{
+				FString NewFilePath = DropTargetPath / FPaths::GetCleanFilename(DropFilePath);
+				if (FPaths::GetExtension(DropFilePath).IsEmpty())
+				{
+					RenamedOrMovedFolderMap.Add(DropFilePath, NewFilePath);
+				}
+
+				IFileManager::Get().Move(*NewFilePath, *DropFilePath);
+			}
+
         }
         return FReply::Handled();
     }
@@ -120,15 +125,19 @@ namespace FW
             {
                 if(Operation->IsOfType<AssetViewItemDragDropOp>())
                 {
-                    FString DropFilePath = StaticCastSharedPtr<AssetViewItemDragDropOp>(Operation)->Path;
-                    if(FPaths::GetExtension(DropFilePath).IsEmpty() && FPaths::IsUnderDirectory(InTreeNode->DirectoryPath, DropFilePath))
-                    {
-                        return false;
-                    }
-                    else if(FPaths::GetPath(DropFilePath) == InTreeNode->DirectoryPath)
-                    {
-                        return false;
-                    }
+					TArray<FString> DropFilePaths = StaticCastSharedPtr<AssetViewItemDragDropOp>(Operation)->Paths;
+					for (const auto& DropFilePath : DropFilePaths)
+					{
+						if (FPaths::GetExtension(DropFilePath).IsEmpty() && FPaths::IsUnderDirectory(InTreeNode->DirectoryPath, DropFilePath))
+						{
+							return false;
+						}
+						else if (FPaths::GetPath(DropFilePath) == InTreeNode->DirectoryPath)
+						{
+							return false;
+						}
+					}
+
                     return true;
                 }
             }

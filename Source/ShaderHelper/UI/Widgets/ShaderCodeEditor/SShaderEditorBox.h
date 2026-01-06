@@ -41,7 +41,7 @@ namespace SH
 	class FShaderEditorMarshaller : public FBaseTextLayoutMarshaller
 	{
 	public:
-		FShaderEditorMarshaller(SShaderEditorBox* InOwnerWidget, TSharedPtr<HlslTokenizer> InTokenizer);
+		FShaderEditorMarshaller(SShaderEditorBox* InOwnerWidget, TSharedPtr<ShaderTokenizer> InTokenizer);
 		
 	public:
 		virtual void SetText(const FString& SourceString, FTextLayout& TargetTextLayout, TArray<FTextLayout::FLineModel>&& OldLineModels) override;
@@ -56,11 +56,11 @@ namespace SH
 	public:
         SShaderEditorBox* OwnerWidget;
 		FTextLayout* TextLayout;
-		TSharedPtr<HlslTokenizer> Tokenizer;
-		TArray<HlslTokenizer::TokenizedLine> TokenizedLines;
+		TSharedPtr<ShaderTokenizer> Tokenizer;
+		TArray<ShaderTokenizer::TokenizedLine> TokenizedLines;
 		//Key: The line index of Left Brace in MultiLineEditableText
-		TMap<int32, HlslTokenizer::BracketGroup> FoldingBraceGroups;
-		TArray<HlslTokenizer::BracketGroup> BracketGroups;
+		TMap<int32, ShaderTokenizer::BracketGroup> FoldingBraceGroups;
+		TArray<ShaderTokenizer::BracketGroup> BracketGroups;
 		int32 FontSize{};
 	};
 
@@ -143,7 +143,7 @@ namespace SH
 	struct SyntaxTask
 	{
 		std::optional<FW::GpuShaderSourceDesc> ShaderDesc;
-		TArray<TArray<HlslTokenizer::Token>> LineTokens;
+		TArray<TArray<ShaderTokenizer::Token>> LineTokens;
 	};
 
 	class SShaderMultiLineEditableText : public SMultiLineEditableText
@@ -179,7 +179,7 @@ namespace SH
             Failed,
         };
 		
-		static TMap<HLSL::TokenType, FTextBlockStyle>& GetTokenStyleMap();
+		static TMap<FW::ShaderTokenType, FTextBlockStyle>& GetTokenStyleMap();
 		static FString GetFontPath();
 		static int32 GetFontSize();
 		static int32 GetTabSize();
@@ -187,6 +187,7 @@ namespace SH
 		static bool CanShowColorBlock();
 		static bool CanShowGuideLine();
 		static bool CanRealTimeDiagnosis();
+		static bool CanHighlightCursorLine();
 		static FSlateFontInfo& GetCodeFontInfo();
 		static constexpr int32 MinFontSize = 4;
 		void RefreshFont();
@@ -217,6 +218,10 @@ namespace SH
         void SetFocus() {
             FSlateApplication::Get().SetUserFocus(0, ShaderMultiLineEditableText);
         }
+		void SetText(const FText& Text) { 
+			ShaderMarshaller->TextLayout->GetLineModels().Reset();
+			ShaderMultiLineEditableText->SetText(Text); 
+		};
         
         //If type a char, trigger KeyDown and then KeyChar.
 		FReply HandleKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent);
@@ -293,9 +298,9 @@ namespace SH
 		TSharedPtr<FShaderEditorMarshaller> ShaderMarshaller;
 
 		//------------Syntax highlight-----------
-		FW::ShaderTU SyntaxTU;
-		TArray<TMap<FTextRange, HLSL::TokenType>> LineSyntaxHighlightMaps;
-		TArray<TMap<FTextRange, HLSL::TokenType>> LineSyntaxHighlightMapsCopy;
+		TUniquePtr<FW::ShaderTU> SyntaxTU;
+		TArray<TMap<FTextRange, FW::ShaderTokenType>> LineSyntaxHighlightMaps;
+		TArray<TMap<FTextRange, FW::ShaderTokenType>> LineSyntaxHighlightMapsCopy;
 		TUniquePtr<FThread> SyntaxThread;
 		TQueue<SyntaxTask> SyntaxQueue;
 		std::atomic<bool> bQuitISyntax{};
@@ -343,7 +348,7 @@ namespace SH
 		FCurveSequence FoldingArrowAnim;
         
         //----------CodeComplete and real-time diagnostic----------
-		FW::ShaderTU ISenseTU;
+		TUniquePtr<FW::ShaderTU> ISenseTU;
 		TUniquePtr<FThread> ISenseThread;
 		TQueue<ISenseTask> ISenseQueue;
 
@@ -361,6 +366,7 @@ namespace SH
         bool bKeyChar = false;
         //--------------------------------------------------------
 		bool bTryMergeUndoState = false;
-		
+		//If shortcut key is handled in OnKeyDown, prevent its character from leaking to OnKeyChar
+		bool bShortcutHandled = false;
 	};
 }

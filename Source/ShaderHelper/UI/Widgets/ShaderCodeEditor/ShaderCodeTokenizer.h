@@ -3,12 +3,12 @@
 
 namespace SH
 {
-	class HlslTokenizer
+	class ShaderTokenizer
 	{
 	public:
 		struct Token
 		{
-			HLSL::TokenType Type;
+			FW::ShaderTokenType Type;
 			//relative to line start
 			int32 BeginOffset{};
 			int32 EndOffset{};
@@ -60,6 +60,6 @@ namespace SH
 		};
 
 	public:
-		TArray<TokenizedLine> Tokenize(const FString& HlslCodeString, bool IgnoreWhitespace = false, StateSet InLastState = StateSet::Start);
+		TArray<TokenizedLine> Tokenize(const FString& CodeString, bool IgnoreWhitespace = false, StateSet InLastState = StateSet::Start);
 	};
 }

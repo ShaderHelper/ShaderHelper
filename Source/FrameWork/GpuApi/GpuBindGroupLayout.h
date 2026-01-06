@@ -4,6 +4,8 @@
 
 namespace FW
 {
+	enum class GpuShaderLanguage;
+	class UniformBufferBuilder;
 
 	using BindingGroupSlot = int32;
 	using BindingSlot = int32;
@@ -73,7 +75,7 @@ namespace FW
         {
             Ar << BindLayoutDesc.GroupNumber;
             Ar << BindLayoutDesc.Layouts;
-            Ar << BindLayoutDesc.CodegenDeclaration;
+            Ar << BindLayoutDesc.HlslCodegenDeclaration << BindLayoutDesc.GlslCodegenDeclaration;
             Ar << BindLayoutDesc.CodegenBindingNameToSlot;
             return Ar;
         }
@@ -91,11 +93,11 @@ namespace FW
 		BindingGroupSlot GroupNumber;
 		TSortedMap<BindingSlot, LayoutBinding> Layouts;
 
-		FString CodegenDeclaration;
+		FString HlslCodegenDeclaration, GlslCodegenDeclaration;
 		TMap<FString, BindingSlot> CodegenBindingNameToSlot;
 	};
 
-	class GpuBindGroupLayout : public GpuResource
+	class FRAMEWORK_API GpuBindGroupLayout : public GpuResource
 	{
 	public:
 		GpuBindGroupLayout(const GpuBindGroupLayoutDesc& InDesc)
@@ -107,7 +109,7 @@ namespace FW
 			return Desc;
 		}
 		BindingGroupSlot GetGroupNumber() const { return Desc.GroupNumber; }
-		const FString& GetCodegenDeclaration() const { return Desc.CodegenDeclaration; }
+		const FString& GetCodegenDeclaration(GpuShaderLanguage Language) const;
 
 	protected:
 		GpuBindGroupLayoutDesc Desc;
@@ -121,12 +123,12 @@ namespace FW
 		GpuBindGroupLayoutBuilder& AddExistingBinding(BindingSlot InSlot, BindingType Type, BindingShaderStage InStage = BindingShaderStage::All);
 
 		//Add the codegen bindings, then get the CodegenDeclaration that will be injected into a shader.
-		GpuBindGroupLayoutBuilder& AddUniformBuffer(const FString& BindingName, const FString& UniformBufferLayoutDeclaration, BindingShaderStage InStage = BindingShaderStage::All);
+		GpuBindGroupLayoutBuilder& AddUniformBuffer(const FString& BindingName, const UniformBufferBuilder& UbBuilder, BindingShaderStage InStage = BindingShaderStage::All);
 		GpuBindGroupLayoutBuilder& AddTexture(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
 		//TODO StaticSampler ? It will be embed into BingGroupLayout, vulkan has the same concept, but metal might not have.
 		GpuBindGroupLayoutBuilder& AddSampler(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
 
-        const FString& GetCodegenDeclaration() const { return LayoutDesc.CodegenDeclaration; }
+		const FString& GetCodegenDeclaration(GpuShaderLanguage Language) const;
         const GpuBindGroupLayoutDesc& GetDesc() const { return LayoutDesc; }
 		TRefCountPtr<GpuBindGroupLayout> Build() const;
         

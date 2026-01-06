@@ -13,7 +13,7 @@ namespace FW
 	)
 
 	Texture2D::Texture2D()
-		: Width(0), Height(0)
+		: Width(0), Height(0), Format(GpuTextureFormat::B8G8R8A8_UNORM)
 	{
 
 	}

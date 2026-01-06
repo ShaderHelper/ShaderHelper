@@ -13,10 +13,10 @@ namespace FW
 		OwnerPanel = InOwner->Owner;
 
 		auto PinIcon = SNew(SImage)
-			.ColorAndOpacity_Lambda([this]{ return PinData->GetPinColor();})
+			.ColorAndOpacity_Lambda([this] { return PinData->GetPinColor(); })
 			.DesiredSizeOverride(FVector2D{ 16,16 })
 			.Image(FAppStyle::Get().GetBrush("Icons.BulletPoint"));
-		
+
 		ChildSlot
 			[
 				PinIcon
@@ -47,17 +47,22 @@ namespace FW
 			SGraphPin* EndPin = this;
 			if (PinData->Direction != StartPin->PinData->Direction && StartPin->Owner != Owner)
 			{
+				SGraphPanel::ScopedTransaction Transaction{ OwnerPanel };
 				if (PinData->Direction == PinDirection::Output)
 				{
-					OwnerPanel->RemoveLink(StartPin);
-					OwnerPanel->AddLink(EndPin, StartPin);
-                    OwnerPanel->GetGraphData()->MarkDirty();
+					if (auto OutputPin = OwnerPanel->GetOuputPin(StartPin))
+					{
+						OwnerPanel->DoCommand(MakeShared<RemoveLinkCommand>(OwnerPanel, OutputPin->PinData, StartPin->PinData));
+					}
+					OwnerPanel->DoCommand(MakeShared<AddLinkCommand>(OwnerPanel, EndPin->PinData, StartPin->PinData));
 				}
 				else
 				{
-					OwnerPanel->RemoveLink(EndPin);
-					OwnerPanel->AddLink(StartPin, EndPin);
-                    OwnerPanel->GetGraphData()->MarkDirty();
+					if (auto OutputPin = OwnerPanel->GetOuputPin(EndPin))
+					{
+						OwnerPanel->DoCommand(MakeShared<RemoveLinkCommand>(OwnerPanel, OutputPin->PinData, EndPin->PinData));
+					}
+					OwnerPanel->DoCommand(MakeShared<AddLinkCommand>(OwnerPanel, StartPin->PinData, EndPin->PinData));
 				}
 				OwnerPanel->PreviewStart.Reset();
 				return FReply::Handled().ReleaseMouseLock();
@@ -70,14 +75,15 @@ namespace FW
 	{
         if (MouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton))
         {
-            if (PinData->Direction == PinDirection::Input && OwnerPanel->GetOuputPinInLink(this))
+            if (PinData->Direction == PinDirection::Input && OwnerPanel->GetOuputPin(this))
             {
-                SGraphPin* OutputPin = OwnerPanel->GetOuputPinInLink(this);
+                SGraphPin* OutputPin = OwnerPanel->GetOuputPin(this);
                 OwnerPanel->PreviewStartDir = OutputPin->PinData->Direction;
                 OwnerPanel->PreviewStart = OwnerPanel->GetTickSpaceGeometry().AbsoluteToLocal(OutputPin->GetTickSpaceGeometry().GetAbsolutePositionAtCoordinates(FVector2D(0.5f, 0.5f)));
                 OwnerPanel->PreviewEnd = OwnerPanel->GetTickSpaceGeometry().AbsoluteToLocal(MyGeometry.GetAbsolutePositionAtCoordinates(FVector2D(0.5f, 0.5f)));
-                OwnerPanel->RemoveLink(this);
-                OwnerPanel->GetGraphData()->MarkDirty();
+
+				SGraphPanel::ScopedTransaction Transaction{ OwnerPanel };
+				OwnerPanel->DoCommand(MakeShared<RemoveLinkCommand>(OwnerPanel, OutputPin->PinData, PinData));
                 
                 return FReply::Handled().BeginDragDrop(MakeShared<GraphDragDropOp>(OutputPin));
             }

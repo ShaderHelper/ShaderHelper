@@ -1,6 +1,7 @@
 #pragma once
-#include <Framework/Commands/Commands.h>
 #include "UI/Styles/FShaderHelperStyle.h"
+
+#include <Framework/Commands/Commands.h>
 
 namespace SH
 {

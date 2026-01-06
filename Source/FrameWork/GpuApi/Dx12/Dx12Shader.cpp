@@ -1,16 +1,18 @@
 #include "CommonHeader.h"
 #include "Dx12Shader.h"
 #include "Common/Path/PathHelper.h"
-#include <Misc/FileHelper.h>
 #include "GpuApi/GpuFeature.h"
 #include "ShaderConductor.hpp"
+#include "GpuApi/GLSL.h"
 
+#include <Misc/FileHelper.h>
+#include <stdexcept>
 namespace FW
 {
 	Dx12Shader::Dx12Shader(const GpuShaderFileDesc& Desc)
 		: GpuShader(Desc)
 	{
-		ProcessedSourceText = GpuShaderPreProcessor{ SourceText }
+		ProcessedSourceText = GpuShaderPreProcessor{ SourceText, ShaderLanguage }
 			.ReplacePrintStringLiteral()
 			.Finalize();
 	}
@@ -18,7 +20,7 @@ namespace FW
 	Dx12Shader::Dx12Shader(const GpuShaderSourceDesc& Desc)
 		: GpuShader(Desc)
 	{
-		ProcessedSourceText = GpuShaderPreProcessor{ SourceText }
+		ProcessedSourceText = GpuShaderPreProcessor{ SourceText, ShaderLanguage }
 			.ReplacePrintStringLiteral()
 			.Finalize();
 	}
@@ -131,7 +133,7 @@ namespace FW
 				{
 					FString ShaderText;
 					FFileHelper::LoadFileToString(ShaderText, *IncludedFile);
-					ShaderText = GpuShaderPreProcessor{ ShaderText }
+					ShaderText = GpuShaderPreProcessor{ ShaderText, Shader->GetShaderLanguage()}
 						.ReplacePrintStringLiteral()
 						.Finalize();
 					auto SourceText = StringCast<UTF8CHAR>(*ShaderText);
@@ -177,15 +179,86 @@ namespace FW
 
 	 bool DxcCompiler::Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs) const
 	 {
+		 FString ShaderName = InShader->GetShaderName();
+		 FString HlslSource;
+		 FString EntryPoint = InShader->GetEntryPoint();
+		 if (InShader->GetShaderLanguage() == GpuShaderLanguage::GLSL)
+		 {
+#if DEBUG_SHADER
+			 if (!ShaderName.IsEmpty())
+			 {
+				 FFileHelper::SaveStringToFile(InShader->GetProcessedSourceText(), *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".glsl"));
+			 }
+#endif
+			 auto Result = CompileGlsl(InShader.GetReference(), ExtraArgs);
+
+			 if(Result.GetCompilationStatus() != shaderc_compilation_status_success)
+			 {
+				 OutErrorInfo = UTF8_TO_TCHAR(Result.GetErrorMessage().c_str());
+				 return false;
+			 }
+
+			 std::vector<uint32> Spv = { Result.cbegin(), Result.cend() };
+
+			 if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
+			 {
+				 TArray<uint32> SpvCode = { Spv.data(), (int)Spv.size() };
+#if DEBUG_SHADER
+				 ShaderConductor::Compiler::DisassembleDesc SpvDisassembleDesc{
+					 .language = ShaderConductor::ShadingLanguage::SpirV,
+					 .binary = (uint8*)SpvCode.GetData(),
+					 .binarySize = (uint32_t)SpvCode.Num() * 4,
+				 };
+				 ShaderConductor::Compiler::ResultDesc SpvTextResultDesc = ShaderConductor::Compiler::Disassemble(SpvDisassembleDesc);
+				 FString SpvSourceText = { (int32)SpvTextResultDesc.target.Size(), static_cast<const char*>(SpvTextResultDesc.target.Data()) };
+				 if (SpvTextResultDesc.hasError)
+				 {
+					 FString ErrorInfo = static_cast<const char*>(SpvTextResultDesc.errorWarningMsg.Data());
+					 SpvSourceText = MoveTemp(ErrorInfo);
+				 }
+				 FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".glsl" + ".spvasm"));
+#endif
+				 InShader->SpvCode = MoveTemp(SpvCode);
+				 return true;
+			 }
+
+			 ShaderConductor::Compiler::TargetDesc HlslTargetDesc{};
+			 HlslTargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
+			 HlslTargetDesc.version = "66";
+			 try
+			 {
+				 ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile({}, { Spv.data(), (uint32)Spv.size() * 4 }, "main",
+					 MapShaderCunductorStage(InShader->GetShaderType()), HlslTargetDesc);
+				 HlslSource = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
+			 }
+			 catch (const std::runtime_error& e)
+			 {
+				 OutErrorInfo =  ANSI_TO_TCHAR(e.what());
+				 return false;
+			 }
+		 }
+		 else
+		 {
+			 HlslSource = InShader->GetProcessedSourceText();
+		 }
+
+#if DEBUG_SHADER
+		 if (!ShaderName.IsEmpty())
+		 {
+			 FFileHelper::SaveStringToFile(HlslSource, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl"));
+		 }
+#endif
+
 		TRefCountPtr<IDxcBlobEncoding> BlobEncoding;
 		TRefCountPtr<IDxcResult> CompileResult;
-		auto SourceText = StringCast<UTF8CHAR>(*InShader->GetProcessedSourceText());
+		auto SourceText = StringCast<UTF8CHAR>(*HlslSource);
 		DxCheck(CompilerUitls->CreateBlobFromPinned(SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR), CP_UTF8, BlobEncoding.GetInitReference()));
 
 		TArray<const TCHAR*> Arguments;
+		Arguments.Add(*ShaderName);
 		Arguments.Add(TEXT("/Qstrip_debug"));
 		Arguments.Add(TEXT("/E"));
-		Arguments.Add(*InShader->GetEntryPoint());
+		Arguments.Add(*EntryPoint);
 
 		FString ShaderProfile = GetShaderProfile(InShader->GetShaderType(), InShader->GetShaderModelVer());
 		Arguments.Add(TEXT("/T"));
@@ -236,13 +309,6 @@ namespace FW
 				SourceBuffer.Encoding = Encoding;
 			}
 		}
-		FString ShaderName = InShader->GetShaderName();
-#if DEBUG_SHADER
-		if (!ShaderName.IsEmpty())
-		{
-			FFileHelper::SaveStringToFile(InShader->GetProcessedSourceText(), *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl"));
-		}
-#endif
 
 		TRefCountPtr<IDxcIncludeHandler> IncludeHandler = new ShIncludeHandler(InShader);
 		bool IsApiSucceeded = SUCCEEDED(Compiler->Compile(&SourceBuffer,
@@ -291,7 +357,12 @@ namespace FW
 					};
 					ShaderConductor::Compiler::ResultDesc SpvTextResultDesc = ShaderConductor::Compiler::Disassemble(SpvDisassembleDesc);
 					FString SpvSourceText = {(int32)SpvTextResultDesc.target.Size(), static_cast<const char*>(SpvTextResultDesc.target.Data()) };
-					FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".spvasm"));
+					if (SpvTextResultDesc.hasError)
+					{
+						FString ErrorInfo = static_cast<const char*>(SpvTextResultDesc.errorWarningMsg.Data());
+						SpvSourceText = MoveTemp(ErrorInfo);
+					}
+					FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".hlsl" + ".spvasm"));
 #endif
 				}
 				else

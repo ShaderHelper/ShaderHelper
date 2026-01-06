@@ -49,7 +49,7 @@ namespace SH
 			PressedKeys.Reset();
 		});
 		KeyDownHandle = Context.ViewPort->KeyDownHandler.AddLambda([this, ShEditor](const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) {
-			if (!PressedKeys.Contains(InKeyEvent.GetKeyCode()))
+			if (!PressedKeys.Contains(InKeyEvent.GetKeyCode()) && InKeyEvent.GetKeyCode() < 256 * 3)
 			{
 				PressedKeys.Add(InKeyEvent.GetKeyCode());
 				RefreshKeyboard();

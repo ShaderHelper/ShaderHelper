@@ -9,11 +9,11 @@
 #pragma once
 
 #ifndef ENABLE_PRINT
-	#define ENABLE_PRINT 1
+    #define ENABLE_PRINT 1
 #endif
 
 #ifndef ENABLE_ASSERT
-	#define ENABLE_ASSERT 1
+    #define ENABLE_ASSERT 1
 #endif
 
 #ifdef __cplusplus
@@ -23,40 +23,40 @@ namespace HLSL
 {
 #endif
 
-	enum TypeTag
-	{
-		Print_uint,
-		Print_uint2,
-		Print_uint3,
-		Print_uint4,
+    enum TypeTag
+    {
+        Print_uint,
+        Print_uint2,
+        Print_uint3,
+        Print_uint4,
 
-		Print_int,
-		Print_int2,
-		Print_int3,
-		Print_int4,
+        Print_int,
+        Print_int2,
+        Print_int3,
+        Print_int4,
 
-		Print_float,
-		Print_float2,
-		Print_float3,
-		Print_float4,
+        Print_float,
+        Print_float2,
+        Print_float3,
+        Print_float4,
 
-		Print_bool,
-		Print_bool2,
-		Print_bool3,
-		Print_bool4,
+        Print_bool,
+        Print_bool2,
+        Print_bool3,
+        Print_bool4,
 
-		Num,
-	};
+        Num,
+    };
 
-	struct Printer
-	{
-		static const uint MaxBufferSize = 511;
+    struct Printer
+    {
+        static const uint MaxBufferSize = 511;
 
-		uint ByteSize;
-		//PrintBuffer layout: AssertFlag Line [xxx{0}xxxx\0] [ArgNum TypeTag ArgValue ...]
-		//Bytes:              ^1         ^1    ^CharNum       ^1     ^1      ^sizeof(ArgValue)
-		uint PrintBuffer[MaxBufferSize];
-	};
+        uint ByteSize;
+        //PrintBuffer layout: AssertFlag Line [xxx{0}xxxx\0] [ArgNum TypeTag ArgValue ...]
+        //Bytes:              ^1         ^1    ^CharNum       ^1     ^1      ^sizeof(ArgValue)
+        uint PrintBuffer[MaxBufferSize];
+    };
 
 #ifdef __cplusplus
 }
@@ -65,44 +65,49 @@ namespace HLSL
 #ifndef __cplusplus
 #include "Common.hlsl"
 
-DECLARE_GLOBAL_RW_BUFFER(RWStructuredBuffer<Printer>, Printer, 0)
+DECLARE_GLOBAL_RW_BUFFER(RWByteAddressBuffer, Printer, 0)
 
-//1byte
+// Layout in RWByteAddressBuffer Printer:
+// [0, 4)   : ByteSize (uint)
+// [4, ...) : PrintBuffer bytes (Printer::MaxBufferSize * 4 bytes)
+// 1 byte append
 uint AppendChar(uint Offset, uint Char)
 {
-	uint Shift = (Offset % 4) * 8;
-	uint BufferIndex = Offset / 4;
-	InterlockedOr(Printer[0].PrintBuffer[BufferIndex], (Char & 0xFF) << Shift);
-	return Offset + 1;
+    uint Shift       = (Offset % 4) * 8;
+    uint BufferIndex = Offset / 4;
+    uint ByteAddress = 4 + BufferIndex * 4;
+    uint Original;
+    Printer.InterlockedOr(ByteAddress, (Char & 0xFF) << Shift, Original);
+    return Offset + 1;
 }
 
 template<typename T>
 uint GetArgValue(T Arg)
 {
-	return asuint(Arg);
+    return asuint(Arg);
 }
 
 template<>
 uint GetArgValue(bool Arg)
 {
-	return Arg ? 1 : 0;
+    return Arg ? 1 : 0;
 }
 
 template<typename T, int N>
 uint AppendArg(uint Offset, TypeTag Tag, T Arg[N])
 {
-	uint NewOffset = AppendChar(Offset, Tag);
+    uint NewOffset = AppendChar(Offset, Tag);
 
-	for (int i = 0; i < N; i++)
-	{
-		for (int j = 0; j < 4; j++)
-		{
-			uint ArgVal = GetArgValue(Arg[i]);
-			uint Val = ArgVal >> (j * 8);
-			NewOffset = AppendChar(NewOffset, Val);
-		}
-	}
-	return NewOffset;
+    for (int i = 0; i < N; i++)
+    {
+        for (int j = 0; j < 4; j++)
+        {
+            uint ArgVal = GetArgValue(Arg[i]);
+            uint Val = ArgVal >> (j * 8);
+            NewOffset = AppendChar(NewOffset, Val);
+        }
+    }
+    return NewOffset;
 }
 
 #define AppendArgFunc(Type)                 \
@@ -157,39 +162,39 @@ AppendArgFunc(bool)
 //Up to 3 args now.
 //Print("abc {0}", t);
 #define Print(StrArrDecl, ...)  do {                                    \
-	uint StrArr[] = {0};                                                \
-	{                                                                   \
-		StrArrDecl;                                                     \
-		uint CharNum = sizeof(StrArr) / sizeof(StrArr[0]);              \
-		uint ArgNum = GET_ARG_NUM(__VA_ARGS__);                         \
-		uint ArgByteSize = 1 + ArgNum + GET_ARGS_SIZE(__VA_ARGS__);     \
-		uint Increment = 2 + CharNum + ArgByteSize;                     \
-		uint OldByteSize = Printer[0].ByteSize;                         \
-		uint ByteOffset = 0xFFFFFFFF;                                   \
-		while(OldByteSize + Increment <= Printer::MaxBufferSize * 4)    \
-		{                                                               \
-			uint CompareValue = OldByteSize;                            \
-			InterlockedCompareExchange(Printer[0].ByteSize,             \
-				CompareValue, OldByteSize + Increment, OldByteSize);    \
-			if(OldByteSize == CompareValue)                             \
-			{                                                           \
-				ByteOffset = OldByteSize;                               \
-				break;                                                  \
-			}                                                           \
-		}                                                               \
-		if (ByteOffset == 0xFFFFFFFF)                                   \
-		{                                                               \
-			break;                                                      \
-		}                                                               \
-		ByteOffset = AppendChar(ByteOffset, GPrivate_AssertResult);     \
-		ByteOffset = AppendChar(ByteOffset, __LINE__);                  \
-		for (uint i = 0; i < CharNum; i++)                              \
-		{                                                               \
-			ByteOffset = AppendChar(ByteOffset, StrArr[i]);             \
-		}                                                               \
-		ByteOffset = AppendChar(ByteOffset, ArgNum);                    \
-		APPEND_ARGS(__VA_ARGS__);                                       \
-	}                                                                   \
+    uint StrArr[] = {0};                                                \
+    {                                                                   \
+        StrArrDecl;                                                     \
+        uint CharNum = sizeof(StrArr) / sizeof(StrArr[0]);              \
+        uint ArgNum = GET_ARG_NUM(__VA_ARGS__);                         \
+        uint ArgByteSize = 1 + ArgNum + GET_ARGS_SIZE(__VA_ARGS__);     \
+        uint Increment = 2 + CharNum + ArgByteSize;                     \
+        uint OldByteSize = Printer.Load(0);                             \
+        uint ByteOffset = 0xFFFFFFFF;                                   \
+        while(OldByteSize + Increment <= Printer::MaxBufferSize * 4)    \
+        {                                                               \
+            uint CompareValue = OldByteSize;                            \
+            Printer.InterlockedCompareExchange(0,                       \
+                CompareValue, OldByteSize + Increment, OldByteSize);    \
+            if(OldByteSize == CompareValue)                             \
+            {                                                           \
+                ByteOffset = OldByteSize;                               \
+                break;                                                  \
+            }                                                           \
+        }                                                               \
+        if (ByteOffset == 0xFFFFFFFF)                                   \
+        {                                                               \
+            break;                                                      \
+        }                                                               \
+        ByteOffset = AppendChar(ByteOffset, GPrivate_AssertResult);     \
+        ByteOffset = AppendChar(ByteOffset, __LINE__);                  \
+        for (uint i = 0; i < CharNum; i++)                              \
+        {                                                               \
+            ByteOffset = AppendChar(ByteOffset, StrArr[i]);             \
+        }                                                               \
+        ByteOffset = AppendChar(ByteOffset, ArgNum);                    \
+        APPEND_ARGS(__VA_ARGS__);                                       \
+    }                                                                   \
 } while(0)
 #elif EDITOR_ISENSE == 1
 #define Print(Str, ...) UNUSED_ARGS(__VA_ARGS__);
@@ -203,20 +208,20 @@ static uint GPrivate_AssertResult = 1;
 //Assert(uv.x > 0.9);
 //Assert(uv.x > 0.9, "uv.x must be greater than 0.9");
 #define Assert(Condition, ...) do {                     \
-	GPrivate_AssertResult &= Condition;                 \
-	if(GPrivate_AssertResult != 1)                      \
-	{                                                   \
-		Print(EXPAND(__VA_ARGS__));                     \
-	}                                                   \
+    GPrivate_AssertResult &= Condition;                 \
+    if(GPrivate_AssertResult != 1)                      \
+    {                                                   \
+        Print(EXPAND(__VA_ARGS__));                     \
+    }                                                   \
 }while(0)
 
 //AssertFormat(uv.x > 0.9, "uv.x {0} must be greater than 0.9", uv.x);
 #define AssertFormat(Condition, StrArrDecl, ...) do {   \
-	GPrivate_AssertResult &= Condition;                 \
-	if(GPrivate_AssertResult != 1)                      \
-	{                                                   \
-		Print(EXPAND(StrArrDecl), ##__VA_ARGS__);       \
-	}                                                   \
+    GPrivate_AssertResult &= Condition;                 \
+    if(GPrivate_AssertResult != 1)                      \
+    {                                                   \
+        Print(EXPAND(StrArrDecl), ##__VA_ARGS__);       \
+    }                                                   \
 }while(0)
 #else
 #define Assert(...)

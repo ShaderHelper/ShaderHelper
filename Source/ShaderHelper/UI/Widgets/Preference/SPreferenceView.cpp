@@ -59,7 +59,7 @@ namespace SH
 					if(Item->Data->bFailed) {
 						return FAppStyle::Get().GetBrush("Brushes.Error");
 					}
-					return FAppStyle::Get().GetBrush("Brushes.AccentGray");
+					return FAppStyle::Get().GetBrush("Brushes.Border");
 				})
 				.Padding(FMargin{1.0f})
 				[
@@ -208,6 +208,7 @@ namespace SH
 				.Padding(0, 0, 4, 0)
 				[
 					SNew(SSearchBox).MinDesiredWidth(120)
+					.HintText(LOCALIZATION("Search"))
 					.OnTextChanged_Lambda([this](const FText& InFilterText) {
 						GenerateKeyDatas(InFilterText);
 						KeyListView->RequestListRefresh();
@@ -352,6 +353,7 @@ namespace SH
 		Palette.Add(EStyleColor::Hover);
 		Palette.Add(EStyleColor::Primary);
 		Palette.Add(EStyleColor::Select);
+		Palette.Add(EStyleColor::SelectInactive);
 		Palette.Add(EStyleColor::SelectHover);
 		Palette.Add(EStyleColor::Header);
 		Palette.Add(EStyleColor::Title);
@@ -449,6 +451,17 @@ namespace SH
 			})
 			.OnCheckStateChanged_Lambda([](ECheckBoxState InState) {
 				Editor::GetEditorConfig()->SetBool(TEXT("CodeEditor"), TEXT("ShowGuideLine"), InState == ECheckBoxState::Checked);
+				Editor::SaveEditorConfig();
+			})
+		];
+
+		AppendCodeEditorItem(CodeEditorGrid, LOCALIZATION("HighlightCursorLine"))
+		[
+			SNew(SCheckBox).IsChecked_Lambda([] {
+				return SShaderEditorBox::CanHighlightCursorLine() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;;
+			})
+			.OnCheckStateChanged_Lambda([](ECheckBoxState InState) {
+				Editor::GetEditorConfig()->SetBool(TEXT("CodeEditor"), TEXT("HighlightCursorLine"), InState == ECheckBoxState::Checked);
 				Editor::SaveEditorConfig();
 			})
 		];
