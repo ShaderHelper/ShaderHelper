@@ -3,6 +3,7 @@
 #include "GpuShader.h"
 #include "Common/Path/PathHelper.h"
 #include "magic_enum.hpp"
+#include <Serialization/JsonSerializer.h>
 
 THIRD_PARTY_INCLUDES_START
 #pragma push_macro("check")
@@ -16,201 +17,122 @@ THIRD_PARTY_INCLUDES_END
 
 namespace GLSL
 {
-	// ===================== KeyWords =====================
-	// Common keywords (all shader types)
-	inline TArray<FString> KeyWordsCommon = {
-		// Control flow
-		"struct", "if", "else", "switch", "case", "default", "break", "return", "for", "while", "do", "continue",
-		// Qualifiers
-		"const", "in", "out", "inout", "uniform", "buffer",
-		"layout", "location", "binding", "set", "push_constant",
-		"highp", "mediump", "lowp", "precision",
-		"invariant", "precise",
-		// Misc
-		"true", "false",
+	struct ShaderBuiltinItem
+	{
+		FString Label;
+		TArray<FString> Stages;
+		FString Desc;
 	};
 
-	// Vertex Shader keywords
-	inline TArray<FString> KeyWordsVS = {
-		// Built-in variables
-		"gl_Position", "gl_PointSize", "gl_ClipDistance", "gl_CullDistance",
-		"gl_VertexIndex", "gl_InstanceIndex", "gl_VertexID", "gl_InstanceID",
+	struct ShaderBuiltinData
+	{
+		TArray<ShaderBuiltinItem> Keywords;
+		TArray<ShaderBuiltinItem> Types;
+		TArray<ShaderBuiltinItem> Functions;
+		bool bLoaded = false;
 	};
 
-	// Pixel/Fragment Shader keywords
-	inline TArray<FString> KeyWordsPS = {
-		"discard",
-		// Interpolation modifiers
-		"flat", "noperspective", "smooth", "centroid", "sample",
-		// Layout qualifier
-		"input_attachment_index",
-		// Built-in variables
-		"gl_FragCoord", "gl_FrontFacing", "gl_PointCoord", "gl_SampleID", "gl_SamplePosition", "gl_SampleMaskIn", "gl_SampleMask",
-		"gl_FragDepth", "gl_HelperInvocation",
-		"gl_PrimitiveID", "gl_Layer", "gl_ViewportIndex",
-	};
+	inline ShaderBuiltinData& GetBuiltinData()
+	{
+		static ShaderBuiltinData Data;
+		if (!Data.bLoaded)
+		{
+			FString JsonPath = FW::PathHelper::ShaderDir() / TEXT("GLSL.json");
+			FString JsonContent;
+			if (FFileHelper::LoadFileToString(JsonContent, *JsonPath))
+			{
+				TSharedPtr<FJsonObject> JsonObject;
+				TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(JsonContent);
+				if (FJsonSerializer::Deserialize(Reader, JsonObject) && JsonObject.IsValid())
+				{
+					auto ParseItems = [](const TSharedPtr<FJsonObject>& Obj, const FString& FieldName, TArray<ShaderBuiltinItem>& OutItems) {
+						const TArray<TSharedPtr<FJsonValue>>* ItemsArray;
+						if (Obj->TryGetArrayField(FieldName, ItemsArray))
+						{
+							for (const auto& ItemValue : *ItemsArray)
+							{
+								const TSharedPtr<FJsonObject>* ItemObj;
+								if (ItemValue->TryGetObject(ItemObj))
+								{
+									ShaderBuiltinItem Item;
+									(*ItemObj)->TryGetStringField(TEXT("label"), Item.Label);
+									(*ItemObj)->TryGetStringField(TEXT("desc"), Item.Desc);
+									const TArray<TSharedPtr<FJsonValue>>* StagesArray;
+									if ((*ItemObj)->TryGetArrayField(TEXT("stages"), StagesArray))
+									{
+										for (const auto& StageValue : *StagesArray)
+										{
+											FString Stage;
+											if (StageValue->TryGetString(Stage))
+											{
+												Item.Stages.Add(Stage);
+											}
+										}
+									}
+									OutItems.Add(MoveTemp(Item));
+								}
+							}
+						}
+					};
 
-	// Compute Shader keywords
-	inline TArray<FString> KeyWordsCS = {
-		// Storage qualifiers
-		"shared", "coherent", "volatile", "restrict", "readonly", "writeonly",
-		// Built-in variables
-		"gl_WorkGroupSize", "gl_WorkGroupID", "gl_LocalInvocationID", "gl_GlobalInvocationID", "gl_LocalInvocationIndex", "gl_NumWorkGroups",
-	};
+					ParseItems(JsonObject, TEXT("Keywords"), Data.Keywords);
+					ParseItems(JsonObject, TEXT("Types"), Data.Types);
+					ParseItems(JsonObject, TEXT("Functions"), Data.Functions);
+					Data.bLoaded = true;
+				}
+			}
+		}
+		return Data;
+	}
+
+	inline bool IsStageMatch(const TArray<FString>& ItemStages, FW::ShaderType Stage)
+	{
+		FString StageStr;
+		switch (Stage)
+		{
+		case FW::ShaderType::VertexShader:  StageStr = TEXT("VS"); break;
+		case FW::ShaderType::PixelShader:   StageStr = TEXT("PS"); break;
+		case FW::ShaderType::ComputeShader: StageStr = TEXT("CS"); break;
+		default: return false;
+		}
+		return ItemStages.Contains(StageStr);
+	}
 
 	inline TArray<FString> GetKeyWords(FW::ShaderType Stage) {
 		TArray<FString> Result;
-		Result.Append(KeyWordsCommon);
-		if (Stage == FW::ShaderType::VertexShader)
+		const ShaderBuiltinData& Data = GetBuiltinData();
+		for (const auto& Item : Data.Keywords)
 		{
-			Result.Append(KeyWordsVS);
-		}
-		else if (Stage == FW::ShaderType::PixelShader)
-		{
-			Result.Append(KeyWordsPS);
-		}
-		else if (Stage == FW::ShaderType::ComputeShader)
-		{
-			Result.Append(KeyWordsCS);
+			if (IsStageMatch(Item.Stages, Stage))
+			{
+				Result.Add(Item.Label);
+			}
 		}
 		return Result;
-	};
-
-	// ===================== BuiltinTypes =====================
-	// Common types (all shader types)
-	inline TArray<FString> BuiltinTypesCommon = {
-		// Scalars
-		"void", "bool", "int", "uint", "float", "double",
-		// Vectors
-		"vec2", "vec3", "vec4", "bvec2", "bvec3", "bvec4",
-		"ivec2", "ivec3", "ivec4", "uvec2", "uvec3", "uvec4",
-		"dvec2", "dvec3", "dvec4",
-		// Matrices
-		"mat2", "mat3", "mat4", "mat2x2", "mat2x3", "mat2x4", "mat3x2", "mat3x3", "mat3x4", "mat4x2", "mat4x3", "mat4x4",
-		"dmat2", "dmat3", "dmat4", "dmat2x2", "dmat2x3", "dmat2x4", "dmat3x2", "dmat3x3", "dmat3x4", "dmat4x2", "dmat4x3", "dmat4x4",
-		// Samplers
-		"sampler", "samplerShadow",
-		"sampler1D", "sampler2D", "sampler3D", "samplerCube", "sampler2DRect", "samplerBuffer",
-		"sampler1DArray", "sampler2DArray", "samplerCubeArray", "sampler2DMS", "sampler2DMSArray",
-		"sampler1DShadow", "sampler2DShadow", "samplerCubeShadow", "sampler2DRectShadow",
-		"sampler1DArrayShadow", "sampler2DArrayShadow", "samplerCubeArrayShadow",
-		"isampler1D", "isampler2D", "isampler3D", "isamplerCube", "isampler2DRect", "isamplerBuffer",
-		"isampler1DArray", "isampler2DArray", "isamplerCubeArray", "isampler2DMS", "isampler2DMSArray",
-		"usampler1D", "usampler2D", "usampler3D", "usamplerCube", "usampler2DRect", "usamplerBuffer",
-		"usampler1DArray", "usampler2DArray", "usamplerCubeArray", "usampler2DMS", "usampler2DMSArray",
-		// Textures (Vulkan)
-		"texture1D", "texture2D", "texture3D", "textureCube", "texture2DRect", "textureBuffer",
-		"texture1DArray", "texture2DArray", "textureCubeArray", "texture2DMS", "texture2DMSArray",
-		"itexture1D", "itexture2D", "itexture3D", "itextureCube", "itexture2DRect", "itextureBuffer",
-		"itexture1DArray", "itexture2DArray", "itextureCubeArray", "itexture2DMS", "itexture2DMSArray",
-		"utexture1D", "utexture2D", "utexture3D", "utextureCube", "utexture2DRect", "utextureBuffer",
-		"utexture1DArray", "utexture2DArray", "utextureCubeArray", "utexture2DMS", "utexture2DMSArray",
-	};
-
-	// Pixel/Fragment Shader types
-	inline TArray<FString> BuiltinTypesPS = {
-		// Subpass input (Vulkan)
-		"subpassInput", "subpassInputMS", "isubpassInput", "isubpassInputMS", "usubpassInput", "usubpassInputMS",
-	};
-
-	// Compute Shader types
-	inline TArray<FString> BuiltinTypesCS = {
-		// Images
-		"image1D", "image2D", "image3D", "imageCube", "image2DRect", "imageBuffer",
-		"image1DArray", "image2DArray", "imageCubeArray", "image2DMS", "image2DMSArray",
-		"iimage1D", "iimage2D", "iimage3D", "iimageCube", "iimage2DRect", "iimageBuffer",
-		"iimage1DArray", "iimage2DArray", "iimageCubeArray", "iimage2DMS", "iimage2DMSArray",
-		"uimage1D", "uimage2D", "uimage3D", "uimageCube", "uimage2DRect", "uimageBuffer",
-		"uimage1DArray", "uimage2DArray", "uimageCubeArray", "uimage2DMS", "uimage2DMSArray",
-		// Atomic counters
-		"atomic_uint",
 	};
 
 	inline TArray<FString> GetBuiltinTypes(FW::ShaderType Stage) {
 		TArray<FString> Result;
-		Result.Append(BuiltinTypesCommon);
-		if (Stage == FW::ShaderType::PixelShader)
+		const ShaderBuiltinData& Data = GetBuiltinData();
+		for (const auto& Item : Data.Types)
 		{
-			Result.Append(BuiltinTypesPS);
-		}
-		else if (Stage == FW::ShaderType::ComputeShader)
-		{
-			Result.Append(BuiltinTypesCS);
+			if (IsStageMatch(Item.Stages, Stage))
+			{
+				Result.Add(Item.Label);
+			}
 		}
 		return Result;
 	};
 
-	// ===================== BuiltinFuncs =====================
-	// Common functions (all shader types)
-	inline TArray<FString> BuiltinFuncsCommon = {
-		// Angle and Trigonometry
-		"radians", "degrees", "sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "asinh", "acosh", "atanh",
-		// Exponential
-		"pow", "exp", "log", "exp2", "log2", "sqrt", "inversesqrt",
-		// Common
-		"abs", "sign", "floor", "trunc", "round", "roundEven", "ceil", "fract", "mod", "modf",
-		"min", "max", "clamp", "mix", "step", "smoothstep", "isnan", "isinf", "fma",
-		"floatBitsToInt", "floatBitsToUint", "intBitsToFloat", "uintBitsToFloat",
-		"frexp", "ldexp",
-		// Packing and Unpacking
-		"packUnorm2x16", "packSnorm2x16", "packUnorm4x8", "packSnorm4x8",
-		"unpackUnorm2x16", "unpackSnorm2x16", "unpackUnorm4x8", "unpackSnorm4x8",
-		"packHalf2x16", "unpackHalf2x16", "packDouble2x32", "unpackDouble2x32",
-		// Geometric
-		"length", "distance", "dot", "cross", "normalize", "faceforward", "reflect", "refract",
-		// Matrix
-		"matrixCompMult", "outerProduct", "transpose", "determinant", "inverse",
-		// Vector Relational
-		"lessThan", "lessThanEqual", "greaterThan", "greaterThanEqual", "equal", "notEqual", "any", "all", "not",
-		// Integer
-		"uaddCarry", "usubBorrow", "umulExtended", "imulExtended",
-		"bitfieldExtract", "bitfieldInsert", "bitfieldReverse", "bitCount", "findLSB", "findMSB",
-		// Texture
-		"textureSize", "textureQueryLod", "textureQueryLevels", "textureSamples",
-		"texture", "textureProj", "textureLod", "textureOffset", "texelFetch", "texelFetchOffset",
-		"textureProjOffset", "textureLodOffset", "textureProjLod", "textureProjLodOffset",
-		"textureGrad", "textureGradOffset", "textureProjGrad", "textureProjGradOffset",
-		"textureGather", "textureGatherOffset", "textureGatherOffsets",
-		// Noise (deprecated but still valid)
-		"noise1", "noise2", "noise3", "noise4",
-	};
-
-	// Pixel/Fragment Shader functions
-	inline TArray<FString> BuiltinFuncsPS = {
-		// Derivative
-		"dFdx", "dFdy", "dFdxFine", "dFdyFine", "dFdxCoarse", "dFdyCoarse", "fwidth", "fwidthFine", "fwidthCoarse",
-		// Interpolation
-		"interpolateAtCentroid", "interpolateAtSample", "interpolateAtOffset",
-		// Subpass Input (Vulkan)
-		"subpassLoad",
-	};
-
-	// Compute Shader functions
-	inline TArray<FString> BuiltinFuncsCS = {
-		// Image
-		"imageSize", "imageSamples", "imageLoad", "imageStore",
-		"imageAtomicAdd", "imageAtomicMin", "imageAtomicMax", "imageAtomicAnd", "imageAtomicOr", "imageAtomicXor",
-		"imageAtomicExchange", "imageAtomicCompSwap",
-		// Atomic Counter
-		"atomicCounterIncrement", "atomicCounterDecrement", "atomicCounter",
-		"atomicCounterAdd", "atomicCounterSubtract", "atomicCounterMin", "atomicCounterMax",
-		"atomicCounterAnd", "atomicCounterOr", "atomicCounterXor", "atomicCounterExchange", "atomicCounterCompSwap",
-		// Atomic Memory
-		"atomicAdd", "atomicMin", "atomicMax", "atomicAnd", "atomicOr", "atomicXor", "atomicExchange", "atomicCompSwap",
-		// Shader Invocation Control
-		"barrier", "memoryBarrier", "memoryBarrierAtomicCounter", "memoryBarrierBuffer", "memoryBarrierImage", "memoryBarrierShared", "groupMemoryBarrier",
-	};
-
 	inline TArray<FString> GetBuiltinFuncs(FW::ShaderType Stage) {
 		TArray<FString> Result;
-		Result.Append(BuiltinFuncsCommon);
-		if (Stage == FW::ShaderType::PixelShader)
+		const ShaderBuiltinData& Data = GetBuiltinData();
+		for (const auto& Item : Data.Functions)
 		{
-			Result.Append(BuiltinFuncsPS);
-		}
-		else if (Stage == FW::ShaderType::ComputeShader)
-		{
-			Result.Append(BuiltinFuncsCS);
+			if (IsStageMatch(Item.Stages, Stage))
+			{
+				Result.Add(Item.Label);
+			}
 		}
 		return Result;
 	};
@@ -1072,6 +994,11 @@ namespace FW
 		{
 			FString Msg = UTF8_TO_TCHAR(ParsedShader.GetErrorMessage().c_str());
 			return ParseDiagnosticInfoFromGlslang(Msg);
+		}
+
+		ShaderSymbol GetSymbolInfo(uint32 Row, uint32 Col) override
+		{
+			return {};
 		}
 
 		ShaderTokenType GetTokenType(ShaderTokenType InType, uint32 Row, uint32 Col, uint32 Size) override

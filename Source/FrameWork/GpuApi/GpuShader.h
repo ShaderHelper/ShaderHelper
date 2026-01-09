@@ -10,20 +10,6 @@
 DECLARE_LOG_CATEGORY_EXTERN(LogShader, Log, All);
 inline DEFINE_LOG_CATEGORY(LogShader);
 
-namespace HLSL
-{
-    extern FRAMEWORK_API TArray<FString> BuiltinTypes;
-    extern FRAMEWORK_API TArray<FString> KeyWords;
-    extern FRAMEWORK_API TArray<FString> BuiltinFuncs;
-}
-
-namespace GLSL
-{
-	extern FRAMEWORK_API TArray<FString> BuiltinTypes;
-	extern FRAMEWORK_API TArray<FString> KeyWords;
-	extern FRAMEWORK_API TArray<FString> BuiltinFuncs;
-}
-
 namespace FW
 {
 
@@ -61,6 +47,7 @@ namespace FW
 
 	enum class ShaderTokenType
 	{
+		Unknown,
 		//Tokenizer
 		Number,
 		Punctuation,
@@ -79,8 +66,7 @@ namespace FW
 		LocalVar,
 
 		Preprocess,
-		Other,
-
+		Macro = Preprocess,
 	};
 
 	enum class GpuShaderLanguage
@@ -230,6 +216,7 @@ namespace FW
 	struct ShaderParameter
 	{
 		FString Name;
+		FString Desc;
 		ParamSemaFlag SemaFlag;
 	};
 
@@ -253,6 +240,23 @@ namespace FW
 		Vector2i End;
 	};
 
+	struct ShaderSymbol
+	{
+		ShaderTokenType Type;
+		TArray<TPair<FString, ShaderTokenType>> Tokens;
+		FString File;
+		uint32 Row;
+		FString Desc;
+		FString Url;
+
+		struct FuncOverload
+		{
+			TArray<TPair<FString, ShaderTokenType>> Tokens;
+			TArray<ShaderParameter> Params;
+		};
+		TArray<FuncOverload> Overloads;
+	};
+
     FRAMEWORK_API TArray<ShaderCandidateInfo> DefaultCandidates(GpuShaderLanguage Language, ShaderType Type);
 
     class FRAMEWORK_API ShaderTU
@@ -268,6 +272,7 @@ namespace FW
 		virtual ShaderTokenType GetTokenType(ShaderTokenType InType, uint32 Row, uint32 Col, uint32 Size) = 0;
 		virtual TArray<ShaderCandidateInfo> GetCodeComplete(uint32 Row, uint32 Col) = 0;
 		virtual TArray<ShaderOccurrence> GetOccurrences(uint32 Row, uint32 Col) = 0;
+		virtual ShaderSymbol GetSymbolInfo(uint32 Row, uint32 Col) = 0;
 
 		const TArray<ShaderFunc>& GetFuncs() const { return Funcs; };
 		const TArray<ShaderScope>& GetGuideLineScopes() const { return GuideLineScopes; };

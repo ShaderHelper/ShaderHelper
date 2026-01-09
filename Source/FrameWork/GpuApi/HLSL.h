@@ -1,5 +1,8 @@
+#pragma once
 
 #include "GpuShader.h"
+#include "Common/Path/PathHelper.h"
+#include <Serialization/JsonSerializer.h>
 
 THIRD_PARTY_INCLUDES_START
 #if PLATFORM_WINDOWS
@@ -16,240 +19,208 @@ THIRD_PARTY_INCLUDES_END
 
 namespace HLSL
 {
-	// ===================== KeyWords =====================
-	// Common keywords (all shader types)
-	TArray<FString> KeyWordsCommon = {
-		"register", "packoffset", "static", "const", "out", "in", "inout", "extern", "inline", "precise",
-		"break", "continue", "do", "for", "if", "struct", "typedef",
-		"else", "switch", "while", "case", "default", "return", "true", "false",
-		// Matrix layout
-		"row_major", "column_major",
-		// Compiler hints
-		"unroll", "loop", "flatten", "branch", "forcecase", "call",
-		// Misc
-		"template", "typename", "sizeof", "_Static_assert",
-		// Common semantics
-		"SV_POSITION", "SV_Position",
+	struct ShaderBuiltinParameter
+	{
+		FString Type;
+		FString Name;
+		FString Desc;
+		FString IO;
 	};
 
-	// Vertex Shader keywords
-	TArray<FString> KeyWordsVS = {
-		// Semantics
-		"SV_VertexID", "SV_InstanceID",
+	struct ShaderBuiltinSignature
+	{
+		FString ReturnType;
+		TArray<ShaderBuiltinParameter> Parameters;
 	};
 
-	// Pixel Shader keywords
-	TArray<FString> KeyWordsPS = {
-		"discard",
-		// Interpolation modifiers
-		"linear", "nointerpolation", "centroid", "noperspective", "sample",
-		// Semantics
-		"SV_Coverage", "SV_Depth", "SV_IsFrontFace", "SV_SampleIndex",
-		"SV_TARGET", "SV_Target", "SV_Target0", "SV_Target1", "SV_Target2", "SV_Target3", "SV_Target4", "SV_Target5", "SV_Target6", "SV_Target7",
-		"SV_StencilRef", "SV_Barycentrics", "SV_ShadingRate", "SV_PrimitiveID",
+	struct ShaderBuiltinItem
+	{
+		FString Label;
+		TArray<FString> Stages;
+		FString Desc;
+		TArray<ShaderBuiltinSignature> Signatures;
+		FString Url;
 	};
 
-	// Geometry Shader keywords
-	TArray<FString> KeyWordsGS = {
-		// Primitive types
-		"point", "line", "triangle", "lineadj", "triangleadj",
-		// Semantics
-		"SV_GSInstanceID", "SV_PrimitiveID", "SV_RenderTargetArrayIndex", "SV_ViewportArrayIndex", "SV_InstanceID",
+	struct ShaderBuiltinData
+	{
+		TArray<ShaderBuiltinItem> Keywords;
+		TArray<ShaderBuiltinItem> Types;
+		TArray<ShaderBuiltinItem> Functions;
+		bool bLoaded = false;
 	};
 
-	// Hull Shader keywords (Tessellation Control)
-	TArray<FString> KeyWordsHS = {
-		// Semantics
-		"SV_OutputControlPointID", "SV_TessFactor", "SV_InsideTessFactor", "SV_PrimitiveID",
-	};
+	inline ShaderBuiltinData& GetBuiltinData()
+	{
+		static ShaderBuiltinData Data;
+		if (!Data.bLoaded)
+		{
+			FString JsonPath = FW::PathHelper::ShaderDir() / TEXT("HLSL.json");
+			FString JsonContent;
+			if (FFileHelper::LoadFileToString(JsonContent, *JsonPath))
+			{
+				TSharedPtr<FJsonObject> JsonObject;
+				TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(JsonContent);
+				if (FJsonSerializer::Deserialize(Reader, JsonObject) && JsonObject.IsValid())
+				{
+					auto ParseItems = [](const TSharedPtr<FJsonObject>& Obj, const FString& FieldName, TArray<ShaderBuiltinItem>& OutItems) {
+						const TArray<TSharedPtr<FJsonValue>>* ItemsArray;
+						if (Obj->TryGetArrayField(FieldName, ItemsArray))
+						{
+							for (const auto& ItemValue : *ItemsArray)
+							{
+								const TSharedPtr<FJsonObject>* ItemObj;
+								if (ItemValue->TryGetObject(ItemObj))
+								{
+									ShaderBuiltinItem Item;
+									(*ItemObj)->TryGetStringField(TEXT("label"), Item.Label);
+									(*ItemObj)->TryGetStringField(TEXT("desc"), Item.Desc);
+									(*ItemObj)->TryGetStringField(TEXT("url"), Item.Url);
+									const TArray<TSharedPtr<FJsonValue>>* StagesArray;
+									if ((*ItemObj)->TryGetArrayField(TEXT("stages"), StagesArray))
+									{
+										for (const auto& StageValue : *StagesArray)
+										{
+											FString Stage;
+											if (StageValue->TryGetString(Stage))
+											{
+												Item.Stages.Add(Stage);
+											}
+										}
+									}
+									const TArray<TSharedPtr<FJsonValue>>* SignaturesArray;
+									if ((*ItemObj)->TryGetArrayField(TEXT("signatures"), SignaturesArray))
+									{
+										for (const auto& SigValue : *SignaturesArray)
+										{
+											const TSharedPtr<FJsonObject>* SigObj;
+											if (SigValue->TryGetObject(SigObj))
+											{
+												ShaderBuiltinSignature Sig;
+												(*SigObj)->TryGetStringField(TEXT("returnType"), Sig.ReturnType);
+												const TArray<TSharedPtr<FJsonValue>>* ParamsArray;
+												if ((*SigObj)->TryGetArrayField(TEXT("parameters"), ParamsArray))
+												{
+													for (const auto& ParamValue : *ParamsArray)
+													{
+														const TSharedPtr<FJsonObject>* ParamObj;
+														if (ParamValue->TryGetObject(ParamObj))
+														{
+															ShaderBuiltinParameter Param;
+															(*ParamObj)->TryGetStringField(TEXT("type"), Param.Type);
+															(*ParamObj)->TryGetStringField(TEXT("name"), Param.Name);
+															(*ParamObj)->TryGetStringField(TEXT("desc"), Param.Desc);
+															(*ParamObj)->TryGetStringField(TEXT("io"), Param.IO);
+															Sig.Parameters.Add(MoveTemp(Param));
+														}
+													}
+												}
+												Item.Signatures.Add(MoveTemp(Sig));
+											}
+										}
+									}
+									OutItems.Add(MoveTemp(Item));
+								}
+							}
+						}
+					};
 
-	// Domain Shader keywords (Tessellation Evaluation)
-	TArray<FString> KeyWordsDS = {
-		// Semantics
-		"SV_DomainLocation", "SV_TessFactor", "SV_InsideTessFactor",
-	};
+					ParseItems(JsonObject, TEXT("Keywords"), Data.Keywords);
+					ParseItems(JsonObject, TEXT("Types"), Data.Types);
+					ParseItems(JsonObject, TEXT("Functions"), Data.Functions);
+					Data.bLoaded = true;
+				}
+			}
+		}
+		return Data;
+	}
 
-	// Compute Shader keywords
-	TArray<FString> KeyWordsCS = {
-		// Storage modifiers
-		"groupshared", "globallycoherent",
-		// Attributes
-		"numthreads",
-		// Semantics
-		"SV_DispatchThreadID", "SV_GroupID", "SV_GroupIndex", "SV_GroupThreadID",
-	};
-
+	inline bool IsStageMatch(const TArray<FString>& ItemStages, FW::ShaderType Stage)
+	{
+		FString StageStr;
+		switch (Stage)
+		{
+		case FW::ShaderType::VertexShader:  StageStr = TEXT("VS"); break;
+		case FW::ShaderType::PixelShader:   StageStr = TEXT("PS"); break;
+		case FW::ShaderType::ComputeShader: StageStr = TEXT("CS"); break;
+		default: return false;
+		}
+		return ItemStages.Contains(StageStr);
+	}
 	
-	TArray<FString> GetKeyWords(FW::ShaderType Stage) {
+	inline TArray<FString> GetKeyWords(FW::ShaderType Stage) {
 		TArray<FString> Result;
-		Result.Append(KeyWordsCommon);
-		if (Stage == FW::ShaderType::VertexShader)
+		const ShaderBuiltinData& Data = GetBuiltinData();
+		for (const auto& Item : Data.Keywords)
 		{
-			Result.Append(KeyWordsVS);
-		}
-		else if (Stage == FW::ShaderType::PixelShader)
-		{
-			Result.Append(KeyWordsPS);
-		}
-		else if (Stage == FW::ShaderType::ComputeShader)
-		{
-			Result.Append(KeyWordsCS);
+			if (IsStageMatch(Item.Stages, Stage))
+			{
+				Result.Add(Item.Label);
+			}
 		}
 		return Result;
 	};
 
-	// ===================== BuiltinTypes =====================
-	// Common types (all shader types)
-	TArray<FString> BuiltinTypesCommon = {
-		"bool", "bool1", "bool2", "bool3", "bool4", "bool1x1", "bool1x2", "bool1x3", "bool1x4",
-		"bool2x1", "bool2x2", "bool2x3", "bool2x4", "bool3x1", "bool3x2", "bool3x3", "bool3x4",
-		"bool4x1", "bool4x2", "bool4x3", "bool4x4",
-		"int", "int1", "int2", "int3", "int4", "int1x1", "int1x2", "int1x3", "int1x4",
-		"int2x1", "int2x2", "int2x3", "int2x4", "int3x1", "int3x2", "int3x3", "int3x4",
-		"int4x1", "int4x2", "int4x3", "int4x4", "int64_t",
-		"uint", "uint1", "uint2", "uint3", "uint4", "uint1x1", "uint1x2", "uint1x3", "uint1x4",
-		"uint2x1", "uint2x2", "uint2x3", "uint2x4", "uint3x1", "uint3x2", "uint3x3", "uint3x4",
-		"uint4x1", "uint4x2", "uint4x3", "uint4x4", "uint64_t",
-		"dword", "dword1", "dword2", "dword3", "dword4", "dword1x1", "dword1x2", "dword1x3", "dword1x4",
-		"dword2x1", "dword2x2", "dword2x3", "dword2x4", "dword3x1", "dword3x2", "dword3x3", "dword3x4",
-		"dword4x1", "dword4x2", "dword4x3", "dword4x4",
-		"half", "half1", "half2", "half3", "half4", "half1x1", "half1x2", "half1x3", "half1x4",
-		"half2x1", "half2x2", "half2x3", "half2x4", "half3x1", "half3x2", "half3x3", "half3x4",
-		"half4x1", "half4x2", "half4x3", "half4x4",
-		"float", "float1", "float2", "float3", "float4", "float1x1", "float1x2", "float1x3", "float1x4",
-		"float2x1", "float2x2", "float2x3", "float2x4", "float3x1", "float3x2", "float3x3", "float3x4",
-		"float4x1", "float4x2", "float4x3", "float4x4",
-		"double", "double1", "double2", "double3", "double4", "double1x1", "double1x2", "double1x3", "double1x4",
-		"double2x1", "double2x2", "double2x3", "double2x4", "double3x1", "double3x2", "double3x3", "double3x4",
-		"double4x1", "double4x2", "double4x3", "double4x4",
-		"snorm", "unorm", "string", "void", "cbuffer",
-		"Buffer", "ByteAddressBuffer", "StructuredBuffer", "ConstantBuffer",
-		"sampler", "sampler1D", "sampler2D", "sampler3D", "samplerCUBE", "SamplerComparisonState", "SamplerState",
-		"texture", "Texture1D", "Texture1DArray", "Texture2D", "Texture2DArray", "Texture2DMS", "Texture2DMSArray", "Texture3D", "TextureCube", "TextureCubeArray",
-		// Min precision types
-		"min16float", "min16float1", "min16float2", "min16float3", "min16float4",
-		"min16int", "min16int1", "min16int2", "min16int3", "min16int4",
-		"min16uint", "min16uint1", "min16uint2", "min16uint3", "min16uint4",
-		"min10float", "min10float1", "min10float2", "min10float3", "min10float4",
-		// 16-bit types (SM6.2+)
-		"float16_t", "float16_t2", "float16_t3", "float16_t4",
-		"int16_t", "int16_t2", "int16_t3", "int16_t4",
-		"uint16_t", "uint16_t2", "uint16_t3", "uint16_t4",
-	};
-
-	// Pixel Shader types (also available in CS with UAV)
-	TArray<FString> BuiltinTypesPS = {
-		"RWBuffer", "RWByteAddressBuffer", "RWStructuredBuffer",
-		"RWTexture1D", "RWTexture1DArray", "RWTexture2D", "RWTexture2DArray", "RWTexture3D",
-	};
-
-	// Geometry Shader types
-	TArray<FString> BuiltinTypesGS = {
-		"TriangleStream", "PointStream", "LineStream",
-	};
-
-	// Tessellation Shader types (Hull/Domain)
-	TArray<FString> BuiltinTypesHSDS = {
-		"InputPatch", "OutputPatch",
-	};
-
-	// Compute Shader types
-	TArray<FString> BuiltinTypesCS = {
-		"RWBuffer", "RWByteAddressBuffer", "RWStructuredBuffer",
-		"RWTexture1D", "RWTexture1DArray", "RWTexture2D", "RWTexture2DArray", "RWTexture3D",
-		"AppendStructuredBuffer", "ConsumeStructuredBuffer",
-	};
-
-	TArray<FString> GetBuiltinTypes(FW::ShaderType Stage) {
+	inline TArray<FString> GetBuiltinTypes(FW::ShaderType Stage) {
 		TArray<FString> Result;
-		Result.Append(BuiltinTypesCommon);
-		if (Stage == FW::ShaderType::PixelShader)
+		const ShaderBuiltinData& Data = GetBuiltinData();
+		for (const auto& Item : Data.Types)
 		{
-			Result.Append(BuiltinTypesPS);
-		}
-		else if (Stage == FW::ShaderType::ComputeShader)
-		{
-			Result.Append(BuiltinTypesCS);
+			if (IsStageMatch(Item.Stages, Stage))
+			{
+				Result.Add(Item.Label);
+			}
 		}
 		return Result;
 	};
 
-	// ===================== BuiltinFuncs =====================
-	// Common functions (all shader types)
-	TArray<FString> BuiltinFuncsCommon = {
-		"abs", "acos", "all", "any", "asdouble",
-		"asfloat", "asin", "asint", "asuint", "atan", "atan2", "ceil", "clamp", "cos", "cosh", "countbits",
-		"cross", "D3DCOLORtoUBYTE4",
-		"degrees", "determinant",
-		"distance", "dot", "dst", "exp", "exp2", "f16tof32", "f32tof16", "faceforward", "firstbithigh",
-		"firstbitlow", "floor", "fmod", "frac", "frexp",
-		"isfinite", "isinf", "isnan", "ldexp", "length", "lerp", "lit", "log", "log10", "log2", "mad", "max", "min", "modf", "mul",
-		"noise", "normalize", "pow", "radians", "rcp", "reflect", "refract",
-		"reversebits", "round", "rsqrt", "saturate", "sign", "sin", "sincos", "sinh", "smoothstep", "sqrt", "step",
-		"tan", "tanh", "tex1D", "tex1Dbias", "tex1Dgrad", "tex1Dlod", "tex1Dproj", "tex2D", "tex2Dbias",
-		"tex2Dgrad", "tex2Dlod", "tex2Dproj", "tex3D", "tex3Dbias", "tex3Dgrad", "tex3Dlod", "tex3Dproj",
-		"texCUBE", "texCUBEbias", "texCUBEgrad", "texCUBElod", "texCUBEproj", "transpose", "trunc", "and", "or", "select",
-		// Misc
-		"NonUniformResourceIndex", "CheckAccessFullyMapped",
-	};
-
-	// Pixel Shader functions
-	TArray<FString> BuiltinFuncsPS = {
-		"clip",
-		// Derivative functions
-		"ddx", "ddx_coarse", "ddx_fine", "ddy", "ddy_coarse", "ddy_fine", "fwidth",
-		// Attribute evaluation
-		"EvaluateAttributeAtCentroid", "EvaluateAttributeAtSample", "EvaluateAttributeSnapped",
-		"GetRenderTargetSampleCount", "GetRenderTargetSamplePosition",
-		"GetAttributeAtVertex",
-		// Wave intrinsics (SM6.0+, also available in CS)
-		"WaveGetLaneCount", "WaveGetLaneIndex", "WaveIsFirstLane",
-		"WaveActiveAnyTrue", "WaveActiveAllTrue", "WaveActiveBallot",
-		"WaveReadLaneFirst", "WaveReadLaneAt", "WaveActiveAllEqual",
-		"WaveActiveCountBits", "WaveActiveSum", "WaveActiveProduct", "WaveActiveMin", "WaveActiveMax",
-		"WaveActiveBitAnd", "WaveActiveBitOr", "WaveActiveBitXor",
-		"WavePrefixCountBits", "WavePrefixSum", "WavePrefixProduct",
-		"QuadReadLaneAt", "QuadReadAcrossDiagonal", "QuadReadAcrossX", "QuadReadAcrossY",
-	};
-
-	// Hull Shader functions (Tessellation)
-	TArray<FString> BuiltinFuncsHS = {
-		"Process2DQuadTessFactorsAvg", "Process2DQuadTessFactorsMax", "Process2DQuadTessFactorsMin",
-		"ProcessIsolineTessFactors",
-		"ProcessQuadTessFactorsAvg", "ProcessQuadTessFactorsMax", "ProcessQuadTessFactorsMin",
-		"ProcessTriTessFactorsAvg", "ProcessTriTessFactorsMax", "ProcessTriTessFactorsMin",
-	};
-
-	// Compute Shader functions
-	TArray<FString> BuiltinFuncsCS = {
-		// Memory barriers
-		"AllMemoryBarrier", "AllMemoryBarrierWithGroupSync",
-		"DeviceMemoryBarrier", "DeviceMemoryBarrierWithGroupSync",
-		"GroupMemoryBarrier", "GroupMemoryBarrierWithGroupSync",
-		// Interlocked operations
-		"InterlockedAdd", "InterlockedAnd", "InterlockedCompareExchange", "InterlockedCompareStore",
-		"InterlockedExchange", "InterlockedMax", "InterlockedMin", "InterlockedOr", "InterlockedXor",
-		// Wave intrinsics (SM6.0+)
-		"WaveGetLaneCount", "WaveGetLaneIndex", "WaveIsFirstLane",
-		"WaveActiveAnyTrue", "WaveActiveAllTrue", "WaveActiveBallot",
-		"WaveReadLaneFirst", "WaveReadLaneAt", "WaveActiveAllEqual",
-		"WaveActiveCountBits", "WaveActiveSum", "WaveActiveProduct", "WaveActiveMin", "WaveActiveMax",
-		"WaveActiveBitAnd", "WaveActiveBitOr", "WaveActiveBitXor",
-		"WavePrefixCountBits", "WavePrefixSum", "WavePrefixProduct",
-	};
-
-	TArray<FString> GetBuiltinFuncs(FW::ShaderType Stage) {
+	inline TArray<FString> GetBuiltinFuncs(FW::ShaderType Stage) {
 		TArray<FString> Result;
-		Result.Append(BuiltinFuncsCommon);
-		if (Stage == FW::ShaderType::PixelShader)
+		const ShaderBuiltinData& Data = GetBuiltinData();
+		for (const auto& Item : Data.Functions)
 		{
-			Result.Append(BuiltinFuncsPS);
-		}
-		else if (Stage == FW::ShaderType::ComputeShader)
-		{
-			Result.Append(BuiltinFuncsCS);
+			if (IsStageMatch(Item.Stages, Stage))
+			{
+				Result.Add(Item.Label);
+			}
 		}
 		return Result;
+	};
+
+	inline const ShaderBuiltinItem* FindBuiltinFunc(const FString& FuncName, FW::ShaderType Stage) {
+		const ShaderBuiltinData& Data = GetBuiltinData();
+		for (const auto& Item : Data.Functions)
+		{
+			if (Item.Label == FuncName && IsStageMatch(Item.Stages, Stage))
+			{
+				return &Item;
+			}
+		}
+		return nullptr;
+	};
+
+	inline const ShaderBuiltinItem* FindBuiltinType(const FString& TypeName, FW::ShaderType Stage) {
+		const ShaderBuiltinData& Data = GetBuiltinData();
+		for (const auto& Item : Data.Types)
+		{
+			if (Item.Label == TypeName && IsStageMatch(Item.Stages, Stage))
+			{
+				return &Item;
+			}
+		}
+		return nullptr;
+	};
+
+	inline const ShaderBuiltinItem* FindKeyword(const FString& Keyword, FW::ShaderType Stage) {
+		const ShaderBuiltinData& Data = GetBuiltinData();
+		for (const auto& Item : Data.Keywords)
+		{
+			if (Item.Label == Keyword && IsStageMatch(Item.Stages, Stage))
+			{
+				return &Item;
+			}
+		}
+		return nullptr;
 	};
 }
 
@@ -375,6 +346,354 @@ namespace FW
 				CoTaskMemFree(DiagResult);
 			}
 			return ParseDiagnosticInfoFromDxc(Diags);
+		}
+
+		ShaderSymbol GetSymbolInfo(uint32 Row, uint32 Col) override
+		{
+			ShaderSymbol Symbol{};
+
+			TRefCountPtr<IDxcSourceLocation> SrcLoc;
+			TU->GetLocation(DxcFile, Row, Col, SrcLoc.GetInitReference());
+			TRefCountPtr<IDxcCursor> DxcCursor;
+			TU->GetCursorForLocation(SrcLoc, DxcCursor.GetInitReference());
+
+			LPSTR CursorSpellingPtr;
+			DxcCursor->GetSpelling(&CursorSpellingPtr);
+			FString CursorSpelling = CursorSpellingPtr;
+			CoTaskMemFree(CursorSpellingPtr);
+
+			DxcCursorKind CursorKind;
+			DxcCursor->GetKind(&CursorKind);
+
+			// Check for builtin functions first
+			if (const HLSL::ShaderBuiltinItem* BuiltinFunc = HLSL::FindBuiltinFunc(CursorSpelling, Stage))
+			{
+				Symbol.Type = ShaderTokenType::BuildtinFunc;
+				Symbol.Desc = BuiltinFunc->Desc;
+				Symbol.Url = BuiltinFunc->Url;
+
+				// Simplify DXC template type names to HLSL short form
+				// e.g. "vector<float, 3> (vector<float, 3>)" -> "float3"
+				auto SimplifyTypeName = [](const FString& TypeName) {
+					FString Result = TypeName;
+					int32 ParenPos = Result.Find(TEXT(" ("));
+					if (ParenPos != INDEX_NONE) Result = Result.Left(ParenPos);
+
+					if (Result.StartsWith(TEXT("vector<")))
+					{
+						int32 CommaPos = Result.Find(TEXT(","), ESearchCase::IgnoreCase, ESearchDir::FromStart, 7);
+						int32 EndPos = Result.Find(TEXT(">"), ESearchCase::IgnoreCase, ESearchDir::FromStart, 7);
+						if (CommaPos != INDEX_NONE && EndPos != INDEX_NONE)
+							Result = Result.Mid(7, CommaPos - 7).TrimStartAndEnd() + Result.Mid(CommaPos + 1, EndPos - CommaPos - 1).TrimStartAndEnd();
+					}
+					else if (Result.StartsWith(TEXT("matrix<")))
+					{
+						int32 Comma1 = Result.Find(TEXT(","), ESearchCase::IgnoreCase, ESearchDir::FromStart, 7);
+						int32 Comma2 = Result.Find(TEXT(","), ESearchCase::IgnoreCase, ESearchDir::FromStart, Comma1 + 1);
+						int32 EndPos = Result.Find(TEXT(">"), ESearchCase::IgnoreCase, ESearchDir::FromStart, 7);
+						if (Comma1 != INDEX_NONE && Comma2 != INDEX_NONE && EndPos != INDEX_NONE)
+							Result = Result.Mid(7, Comma1 - 7).TrimStartAndEnd() + Result.Mid(Comma1 + 1, Comma2 - Comma1 - 1).TrimStartAndEnd() + TEXT("x") + Result.Mid(Comma2 + 1, EndPos - Comma2 - 1).TrimStartAndEnd();
+					}
+					return Result;
+				};
+
+				// Get return type from DXC cursor type (the type of a function call expression is its return type)
+				TRefCountPtr<IDxcType> CursorType;
+				DxcCursor->GetCursorType(CursorType.GetInitReference());
+				LPSTR ReturnTypeNamePtr;
+				CursorType->GetSpelling(&ReturnTypeNamePtr);
+				FString ReturnTypeName = SimplifyTypeName(ReturnTypeNamePtr);
+				CoTaskMemFree(ReturnTypeNamePtr);
+
+				// Build Symbol.Tokens entirely from DXC
+				Symbol.Tokens.Add({ ReturnTypeName, ShaderTokenType::BuildtinType });
+				Symbol.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+				Symbol.Tokens.Add({ CursorSpelling, ShaderTokenType::BuildtinFunc });
+				Symbol.Tokens.Add({ TEXT("("), ShaderTokenType::Punctuation });
+
+				// Get referenced function cursor to obtain parameter information
+				TRefCountPtr<IDxcCursor> RefCursor;
+				DxcCursor->GetReferencedCursor(RefCursor.GetInitReference());
+				BOOL NullRefCursor;
+				RefCursor->IsNull(&NullRefCursor);
+				if (!NullRefCursor)
+				{
+					int NumArgs;
+					RefCursor->GetNumArguments(&NumArgs);
+					for (int i = 0; i < NumArgs; i++)
+					{
+						if (i > 0) Symbol.Tokens.Add({ TEXT(", "), ShaderTokenType::Punctuation });
+						TRefCountPtr<IDxcCursor> ArgCursor;
+						RefCursor->GetArgumentAt(i, ArgCursor.GetInitReference());
+
+						TRefCountPtr<IDxcType> ArgType;
+						ArgCursor->GetCursorType(ArgType.GetInitReference());
+						LPSTR ArgTypeNamePtr;
+						ArgType->GetSpelling(&ArgTypeNamePtr);
+						FString ArgTypeName = SimplifyTypeName(ArgTypeNamePtr);
+						CoTaskMemFree(ArgTypeNamePtr);
+
+						LPSTR ArgNamePtr;
+						ArgCursor->GetSpelling(&ArgNamePtr);
+						FString ArgName = ArgNamePtr;
+						CoTaskMemFree(ArgNamePtr);
+
+						Symbol.Tokens.Add({ ArgTypeName, ShaderTokenType::BuildtinType });
+						if (!ArgName.IsEmpty())
+						{
+							Symbol.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+							Symbol.Tokens.Add({ ArgName, ShaderTokenType::Param });
+						}
+					}
+				}
+				Symbol.Tokens.Add({ TEXT(")"), ShaderTokenType::Punctuation });
+
+				// Build overloads from JSON for reference display
+				for (const auto& Sig : BuiltinFunc->Signatures)
+				{
+					ShaderSymbol::FuncOverload Overload;
+					Overload.Tokens.Add({ Sig.ReturnType, ShaderTokenType::BuildtinType });
+					Overload.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+					Overload.Tokens.Add({ BuiltinFunc->Label, ShaderTokenType::BuildtinFunc });
+					Overload.Tokens.Add({ TEXT("("), ShaderTokenType::Punctuation });
+					for (int32 j = 0; j < Sig.Parameters.Num(); j++)
+					{
+						const auto& Param = Sig.Parameters[j];
+						if (j > 0) Overload.Tokens.Add({ TEXT(", "), ShaderTokenType::Punctuation });
+
+						ParamSemaFlag SemaFlag = ParamSemaFlag::None;
+						if (Param.IO == TEXT("in")) SemaFlag = ParamSemaFlag::In;
+						else if (Param.IO == TEXT("out")) SemaFlag = ParamSemaFlag::Out;
+						else if (Param.IO == TEXT("inout")) SemaFlag = ParamSemaFlag::Inout;
+
+						if (SemaFlag != ParamSemaFlag::None)
+						{
+							Overload.Tokens.Add({ Param.IO, ShaderTokenType::Keyword });
+							Overload.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+						}
+						Overload.Tokens.Add({ Param.Type, ShaderTokenType::BuildtinType });
+						Overload.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+						Overload.Tokens.Add({ Param.Name, ShaderTokenType::Param });
+						Overload.Params.Add({ Param.Name, Param.Desc, SemaFlag });
+					}
+					Overload.Tokens.Add({ TEXT(")"), ShaderTokenType::Punctuation });
+					Symbol.Overloads.Add(MoveTemp(Overload));
+				}
+
+				return Symbol;
+			}
+
+			// Check for builtin types
+			if (const HLSL::ShaderBuiltinItem* BuiltinType = HLSL::FindBuiltinType(CursorSpelling, Stage))
+			{
+				Symbol.Type = ShaderTokenType::BuildtinType;
+				Symbol.Tokens.Add({ CursorSpelling, ShaderTokenType::BuildtinType });
+				Symbol.Desc = BuiltinType->Desc;
+				Symbol.Url = BuiltinType->Url;
+				return Symbol;
+			}
+
+			// Check for keywords
+			if (const HLSL::ShaderBuiltinItem* Keyword = HLSL::FindKeyword(CursorSpelling, Stage))
+			{
+				Symbol.Type = ShaderTokenType::Keyword;
+				Symbol.Tokens.Add({ CursorSpelling, ShaderTokenType::Keyword });
+				Symbol.Desc = Keyword->Desc;
+				Symbol.Url = Keyword->Url;
+				return Symbol;
+			}
+
+			// Get definition cursor for user-defined symbols
+			TRefCountPtr<IDxcCursor> DefDxcCursor;
+			DxcCursor->GetDefinitionCursor(DefDxcCursor.GetInitReference());
+			BOOL NullDefDxcCursor;
+			DefDxcCursor->IsNull(&NullDefDxcCursor);
+
+			if (!NullDefDxcCursor)
+			{
+				DxcCursorKind DefCursorKind;
+				DefDxcCursor->GetKind(&DefCursorKind);
+
+				// Variable or parameter
+				if (DefCursorKind == DxcCursor_VarDecl || DefCursorKind == DxcCursor_ParmDecl)
+				{
+					LPSTR DefCursorNamePtr;
+					DefDxcCursor->GetSpelling(&DefCursorNamePtr);
+					FString DefName = DefCursorNamePtr;
+					CoTaskMemFree(DefCursorNamePtr);
+
+					TRefCountPtr<IDxcType> DefCursorType;
+					DefDxcCursor->GetCursorType(DefCursorType.GetInitReference());
+					LPSTR DefTypeNamePtr;
+					DefCursorType->GetSpelling(&DefTypeNamePtr);
+					FString DefTypeName = DefTypeNamePtr;
+					CoTaskMemFree(DefTypeNamePtr);
+
+					// Determine if it's a local variable or parameter
+					TRefCountPtr<IDxcCursor> ParentCursor;
+					DefDxcCursor->GetLexicalParent(ParentCursor.GetInitReference());
+					DxcCursorKind ParentKind;
+					ParentCursor->GetKind(&ParentKind);
+
+					if (DefCursorKind == DxcCursor_ParmDecl)
+					{
+						Symbol.Type = ShaderTokenType::Param;
+					}
+					else if (ParentKind == DxcCursor_FunctionDecl || ParentKind == DxcCursor_CXXMethod || ParentKind == DxcCursor_FunctionTemplate)
+					{
+						Symbol.Type = ShaderTokenType::LocalVar;
+					}
+					else
+					{
+						Symbol.Type = ShaderTokenType::Var;
+					}
+
+					ShaderTokenType DefTypeTokenType = HLSL::FindBuiltinType(DefTypeName, Stage) ? ShaderTokenType::BuildtinType : ShaderTokenType::Type;
+					Symbol.Tokens.Add({ DefTypeName, DefTypeTokenType });
+					Symbol.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+					Symbol.Tokens.Add({ DefName, Symbol.Type });
+					GetCursorLocation(DefDxcCursor, Symbol.File, Symbol.Row);
+					return Symbol;
+				}
+
+				// User-defined function
+				if (DefCursorKind == DxcCursor_FunctionDecl || DefCursorKind == DxcCursor_CXXMethod)
+				{
+					Symbol.Type = ShaderTokenType::Func;
+
+					LPSTR FuncNamePtr;
+					DefDxcCursor->GetSpelling(&FuncNamePtr);
+					FString FuncName = FuncNamePtr;
+					CoTaskMemFree(FuncNamePtr);
+
+					// Helper lambda to build tokens for a function cursor
+					auto BuildFuncTokens = [this](IDxcCursor* InFuncCursor, TArray<TPair<FString, ShaderTokenType>>& OutTokens) {
+						LPSTR NamePtr;
+						InFuncCursor->GetSpelling(&NamePtr);
+						FString Name = NamePtr;
+						CoTaskMemFree(NamePtr);
+
+						TRefCountPtr<IDxcType> Type;
+						InFuncCursor->GetCursorType(Type.GetInitReference());
+						LPSTR TypeSpellingPtr;
+						Type->GetSpelling(&TypeSpellingPtr);
+						FString TypeSpelling = TypeSpellingPtr;
+						CoTaskMemFree(TypeSpellingPtr);
+
+						int32 ParenPos = TypeSpelling.Find(TEXT("("));
+						FString ReturnType = ParenPos != INDEX_NONE ? TypeSpelling.Left(ParenPos).TrimEnd() : TypeSpelling;
+
+						ShaderTokenType ReturnTokenType = HLSL::FindBuiltinType(ReturnType, Stage) ? ShaderTokenType::BuildtinType : ShaderTokenType::Type;
+						OutTokens.Add({ ReturnType, ReturnTokenType });
+						OutTokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+						OutTokens.Add({ Name, ShaderTokenType::Func });
+						OutTokens.Add({ TEXT("("), ShaderTokenType::Punctuation });
+
+						int NumArgs;
+						InFuncCursor->GetNumArguments(&NumArgs);
+						for (int i = 0; i < NumArgs; i++)
+						{
+							if (i > 0) OutTokens.Add({ TEXT(", "), ShaderTokenType::Punctuation });
+							TRefCountPtr<IDxcCursor> ArgCursor;
+							InFuncCursor->GetArgumentAt(i, ArgCursor.GetInitReference());
+
+							TRefCountPtr<IDxcType> ArgType;
+							ArgCursor->GetCursorType(ArgType.GetInitReference());
+							LPSTR ArgTypeNamePtr;
+							ArgType->GetSpelling(&ArgTypeNamePtr);
+							FString ArgTypeName = ArgTypeNamePtr;
+							CoTaskMemFree(ArgTypeNamePtr);
+
+							LPSTR ArgNamePtr;
+							ArgCursor->GetSpelling(&ArgNamePtr);
+							FString ArgName = ArgNamePtr;
+							CoTaskMemFree(ArgNamePtr);
+
+							ShaderTokenType ArgTokenType = HLSL::FindBuiltinType(ArgTypeName, Stage) ? ShaderTokenType::BuildtinType : ShaderTokenType::Type;
+							OutTokens.Add({ ArgTypeName, ArgTokenType });
+							if (!ArgName.IsEmpty())
+							{
+								OutTokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+								OutTokens.Add({ ArgName, ShaderTokenType::Param });
+							}
+						}
+						OutTokens.Add({ TEXT(")"), ShaderTokenType::Punctuation });
+					};
+
+					// Build Symbol.Tokens for current definition
+					BuildFuncTokens(DefDxcCursor, Symbol.Tokens);
+					GetCursorLocation(DefDxcCursor, Symbol.File, Symbol.Row);
+
+					// Find overloads with the same name
+					for (const ShaderFunc& Func : Funcs)
+					{
+						if (Func.Name == FuncName)
+						{
+							TRefCountPtr<IDxcSourceLocation> FuncLoc;
+							TU->GetLocation(DxcFile, Func.Start.X, Func.Start.Y, FuncLoc.GetInitReference());
+							TRefCountPtr<IDxcCursor> FuncCursor;
+							TU->GetCursorForLocation(FuncLoc, FuncCursor.GetInitReference());
+
+							ShaderSymbol::FuncOverload Overload;
+							BuildFuncTokens(FuncCursor, Overload.Tokens);
+
+							// Add parameter info
+							for (const ShaderParameter& Param : Func.Params)
+							{
+								Overload.Params.Add({ Param.Name, Param.Desc, Param.SemaFlag });
+							}
+
+							Symbol.Overloads.Add(MoveTemp(Overload));
+						}
+					}
+
+					return Symbol;
+				}
+
+				// Struct/type definition
+				if (DefCursorKind == DxcCursor_StructDecl || DefCursorKind == DxcCursor_TypedefDecl)
+				{
+					Symbol.Type = ShaderTokenType::Type;
+
+					LPSTR TypeNamePtr;
+					DefDxcCursor->GetSpelling(&TypeNamePtr);
+					FString TypeName = TypeNamePtr;
+					CoTaskMemFree(TypeNamePtr);
+
+					Symbol.Tokens.Add({ TEXT("struct"), ShaderTokenType::Keyword });
+					Symbol.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+					Symbol.Tokens.Add({ TypeName, ShaderTokenType::Type });
+					GetCursorLocation(DefDxcCursor, Symbol.File, Symbol.Row);
+					return Symbol;
+				}
+			}
+
+			// Macro
+			if (CursorKind == DxcCursor_MacroExpansion || CursorKind == DxcCursor_MacroDefinition)
+			{
+				Symbol.Type = ShaderTokenType::Macro;
+				Symbol.Tokens.Add({ CursorSpelling, ShaderTokenType::Macro });
+
+				TRefCountPtr<IDxcCursor> MacroDefCursor;
+				if (CursorKind == DxcCursor_MacroExpansion)
+				{
+					DxcCursor->GetReferencedCursor(MacroDefCursor.GetInitReference());
+				}
+				else
+				{
+					MacroDefCursor = DxcCursor;
+				}
+
+				BOOL NullMacroDef;
+				MacroDefCursor->IsNull(&NullMacroDef);
+				if (!NullMacroDef)
+				{
+					GetCursorLocation(MacroDefCursor, Symbol.File, Symbol.Row);
+				}
+				return Symbol;
+			}
+
+			return Symbol;
 		}
 
 		ShaderTokenType GetTokenType(ShaderTokenType InType, uint32 Row, uint32 Col, uint32 Size) override
@@ -564,6 +883,21 @@ namespace FW
 		}
 
 	private:
+		void GetCursorLocation(IDxcCursor* InCursor, FString& OutFile, uint32& OutRow)
+		{
+			TRefCountPtr<IDxcSourceLocation> Loc;
+			InCursor->GetLocation(Loc.GetInitReference());
+			TRefCountPtr<IDxcFile> File;
+			Loc->GetSpellingLocation(File.GetInitReference(), &OutRow, nullptr, nullptr);
+			if (File)
+			{
+				LPSTR FileNamePtr;
+				File->GetName(&FileNamePtr);
+				OutFile = FileNamePtr;
+				CoTaskMemFree(FileNamePtr);
+			}
+		}
+
 		void GetCursorRange(IDxcCursor* InCursor, Vector2i& OutStart, Vector2i& OutEnd)
 		{
 			TRefCountPtr<IDxcSourceRange> Extent;
@@ -730,7 +1064,7 @@ namespace FW
 							});
 						if (Func)
 						{
-							Func->Params.Emplace(ANSI_TO_TCHAR(ParamName), Flag);
+							Func->Params.Emplace(ANSI_TO_TCHAR(ParamName), "", Flag);
 						}
 
 						for (unsigned int j = 0; j < TokenCount; j++)

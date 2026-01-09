@@ -46,7 +46,7 @@ namespace SH
 				case StateSet::String:                          return ShaderTokenType::String;
 				case StateSet::StringEnd:                       return ShaderTokenType::String;
 				default:
-					return ShaderTokenType::Other;
+					return ShaderTokenType::Unknown;
 			}
 		};
 
@@ -66,7 +66,7 @@ namespace SH
 			{
 				//Still need a token to correctly display
 				TokenizedLine.State = StateSet::Start;
-				TokenizedLine.Tokens.Emplace(ShaderTokenType::Other);
+				TokenizedLine.Tokens.Emplace(ShaderTokenType::Unknown);
 				TokenizedLines.Add(MoveTemp(TokenizedLine));
 			}
 			else

@@ -286,7 +286,7 @@ constexpr int PaddingLineNum = 22;
 				{ ShaderTokenType::Preprocess, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorPreprocessText") },
 				{ ShaderTokenType::Comment, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorCommentText") },
 				{ ShaderTokenType::String, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorStringText") },
-				{ ShaderTokenType::Other, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText") },
+				{ ShaderTokenType::Unknown, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText") },
 
 				{ ShaderTokenType::Func, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorFuncText")},
 				{ ShaderTokenType::Type, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorTypeText")},
@@ -3824,9 +3824,20 @@ constexpr int PaddingLineNum = 22;
 			return false;
 		};
 
+		auto CheckQuickInfo = [&] {
+			if (AllottedGeometry.IsUnderLocation(ScreenSpaceCursorPos) && !Owner->Debugger.IsValid())
+			{
+				FVector2D LocalSpaceCursorPos = AllottedGeometry.AbsoluteToLocal(ScreenSpaceCursorPos);
+				FTextLocation CurrentHoverLocation = Owner->ShaderMarshaller->TextLayout->GetTextLocationAt(LocalSpaceCursorPos * AllottedGeometry.Scale);
+				int32 ExtraLineNum = Owner->GetShaderAsset()->GetExtraLineNum();
+				Owner->SyntaxTU->GetSymbolInfo(CurrentHoverLocation.GetLineIndex() + ExtraLineNum + 1, CurrentHoverLocation.GetOffset() + 1);
+			}
+			return false;
+		};
+
 		if (bShouldCheck)
 		{
-			if (!CheckDebuggerTip() && !CheckColorBlockTip())
+			if (!CheckDebuggerTip() && !CheckColorBlockTip() && !CheckQuickInfo())
 			{
 				ShaderEditorTipWindow->SetContent(SNullWidget::NullWidget);
 				ShaderEditorTipWindow->HideWindow();
