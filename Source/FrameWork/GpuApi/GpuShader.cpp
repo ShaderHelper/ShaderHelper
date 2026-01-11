@@ -317,9 +317,9 @@ namespace FW
         , FileName(FileDesc.FileName)
         , IncludeDirs(FileDesc.IncludeDirs)
 	{
-		ShaderName = FPaths::GetBaseFilename(*FileName);
+		ShaderName = FPaths::GetBaseFilename(FileName);
 		FString ShaderFileText;
-		FFileHelper::LoadFileToString(ShaderFileText, **FileName);
+		FFileHelper::LoadFileToString(ShaderFileText, *FileName);
 		SourceText = FileDesc.ExtraDecl + ShaderFileText;
 		ProcessedSourceText = SourceText;
 	}
@@ -385,8 +385,8 @@ namespace FW
 		return Candidates;
 	}
 
-	ShaderTU::ShaderTU(const FString& InShaderSource)
-        :ShaderSource(InShaderSource)
+	ShaderTU::ShaderTU(const FString& InShaderSource, const FString& InShaderName)
+        :ShaderSource(InShaderSource), ShaderName(InShaderName)
     {
 		FTextRange::CalculateLineRangesFromString(ShaderSource, LineRanges);
     }

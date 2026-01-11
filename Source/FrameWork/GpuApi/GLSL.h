@@ -136,6 +136,42 @@ namespace GLSL
 		}
 		return Result;
 	};
+
+	inline const ShaderBuiltinItem* FindBuiltinFunc(const FString& FuncName, FW::ShaderType Stage) {
+		const ShaderBuiltinData& Data = GetBuiltinData();
+		for (const auto& Item : Data.Functions)
+		{
+			if (Item.Label == FuncName && IsStageMatch(Item.Stages, Stage))
+			{
+				return &Item;
+			}
+		}
+		return nullptr;
+	};
+
+	inline const ShaderBuiltinItem* FindBuiltinType(const FString& TypeName, FW::ShaderType Stage) {
+		const ShaderBuiltinData& Data = GetBuiltinData();
+		for (const auto& Item : Data.Types)
+		{
+			if (Item.Label == TypeName && IsStageMatch(Item.Stages, Stage))
+			{
+				return &Item;
+			}
+		}
+		return nullptr;
+	};
+
+	inline const ShaderBuiltinItem* FindKeyword(const FString& Keyword, FW::ShaderType Stage) {
+		const ShaderBuiltinData& Data = GetBuiltinData();
+		for (const auto& Item : Data.Keywords)
+		{
+			if (Item.Label == Keyword && IsStageMatch(Item.Stages, Stage))
+			{
+				return &Item;
+			}
+		}
+		return nullptr;
+	};
 }
 
 
@@ -915,7 +951,7 @@ namespace FW
 	{
 	public:
 		GlslTU(TRefCountPtr<GpuShader> InShader)
-			: ShaderTU(InShader->GetSourceText())
+			: ShaderTU(InShader->GetSourceText(), InShader->GetShaderName())
 			, Context(Funcs, GuideLineScopes)
 			, Stage(InShader->GetShaderType())
 		{
@@ -932,7 +968,8 @@ namespace FW
 			FString SourceText = GpuShaderPreProcessor{ ShaderSource, GpuShaderLanguage::GLSL }
 				.ReplacePrintStringLiteral(true)
 				.Finalize();
-			ParsedShader = GlslCompiler.ParseGlslToGlslangShader(TCHAR_TO_UTF8(*SourceText), MapShadercKind(InShader->GetShaderType()), "Temp.glsl", Options);
+			auto ShaderNameUTF8 = StringCast<UTF8CHAR>(*ShaderName);
+			ParsedShader = GlslCompiler.ParseGlslToGlslangShader(TCHAR_TO_UTF8(*SourceText), MapShadercKind(InShader->GetShaderType()), (char*)ShaderNameUTF8.Get(), Options);
 
 			if (ParsedShader.IsValid() && ParsedShader.GetTShader() && ParsedShader.GetTShader()->getIntermediate())
 			{
@@ -1008,7 +1045,7 @@ namespace FW
 				FString TokenStr = GetStr(Row, Col, Size);
 				for (const auto& [Def, Ref] : Context.SymbolRefs)
 				{
-					if (Ref.File == "Temp.glsl" && Row == (uint32)Ref.Location.X && Col >= (uint32)Ref.Location.Y && Col <= (uint32)Ref.Location.Y + Ref.Name.Len())
+					if (Ref.File == ShaderName && Row == (uint32)Ref.Location.X && Col >= (uint32)Ref.Location.Y && Col <= (uint32)Ref.Location.Y + Ref.Name.Len())
 					{
 						return Def.Kind;
 					}
@@ -1016,11 +1053,11 @@ namespace FW
 
 				if (GLSL::GetBuiltinTypes(Stage).Contains(TokenStr))
 				{
-					return ShaderTokenType::BuildtinType;
+					return ShaderTokenType::BuiltinType;
 				}
 				else if (GLSL::GetBuiltinFuncs(Stage).Contains(TokenStr))
 				{
-					return ShaderTokenType::BuildtinFunc;
+					return ShaderTokenType::BuiltinFunc;
 				}
 				else if (GLSL::GetKeyWords(Stage).Contains(TokenStr))
 				{
@@ -1177,7 +1214,7 @@ namespace FW
 			TArray<ShaderOccurrence> Occurrences;
 			for (const auto& [Def, Ref] : Context.SymbolRefs)
 			{
-				if (Ref.File == "Temp.glsl" && Row == (uint32)Ref.Location.X && Col >= (uint32)Ref.Location.Y && Col <= (uint32)Ref.Location.Y + Ref.Name.Len())
+				if (Ref.File == ShaderName && Row == (uint32)Ref.Location.X && Col >= (uint32)Ref.Location.Y && Col <= (uint32)Ref.Location.Y + Ref.Name.Len())
 				{
 					TArray<GlslSymbolRef> Refs;
 					Context.SymbolRefs.MultiFind(Def, Refs);

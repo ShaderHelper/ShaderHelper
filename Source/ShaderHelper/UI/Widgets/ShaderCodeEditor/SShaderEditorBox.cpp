@@ -9,6 +9,7 @@
 #include "Editor/AssetEditor/AssetEditor.h"
 #include "Common/Path/BaseResourcePath.h"
 #include "UI/Widgets/ColorPicker/SColorPicker.h"
+#include "UI/Widgets/Misc/MiscWidget.h"
 
 #include <Widgets/Text/SlateEditableTextLayout.h>
 #include <Widgets/Layout/SScrollBarTrack.h>
@@ -22,6 +23,7 @@
 #include <Fonts/FontMeasure.h>
 #include <Styling/StyleColors.h>
 #include <Widgets/Colors/SColorBlock.h>
+#include <Widgets/Text/SRichTextBlock.h>
 
 #include <regex>
 
@@ -217,6 +219,13 @@ constexpr int PaddingLineNum = 22;
 		return ShowGuideLine;
 	}
 
+	bool SShaderEditorBox::CanShowQuickInfo()
+	{
+		bool ShowQuickInfo = true;
+		Editor::GetEditorConfig()->GetBool(TEXT("CodeEditor"), TEXT("ShowQuickInfo"), ShowQuickInfo);
+		return ShowQuickInfo;
+	}
+
 	bool SShaderEditorBox::CanRealTimeDiagnosis()
 	{
 		bool RealTimeDiagnosis = true;
@@ -274,26 +283,36 @@ constexpr int PaddingLineNum = 22;
 
 	}
 
+	const TCHAR* GetTokenStyleName(ShaderTokenType Type)
+	{
+		switch (Type)
+		{
+		case ShaderTokenType::Keyword:     return TEXT("CodeEditorKeywordText");
+		case ShaderTokenType::BuiltinFunc: return TEXT("CodeEditorBuiltinFuncText");
+		case ShaderTokenType::BuiltinType: return TEXT("CodeEditorBuiltinTypeText");
+		case ShaderTokenType::Func:        return TEXT("CodeEditorFuncText");
+		case ShaderTokenType::Type:        return TEXT("CodeEditorTypeText");
+		case ShaderTokenType::Param:       return TEXT("CodeEditorParamText");
+		case ShaderTokenType::Var:         return TEXT("CodeEditorVarText");
+		case ShaderTokenType::Punctuation: return TEXT("CodeEditorPunctuationText");
+		case ShaderTokenType::Preprocess:  return TEXT("CodeEditorPreprocessText");
+		case ShaderTokenType::Number:      return TEXT("CodeEditorNumberText");
+		case ShaderTokenType::Comment:     return TEXT("CodeEditorCommentText");
+		case ShaderTokenType::String:      return TEXT("CodeEditorStringText");
+		default:                           return TEXT("CodeEditorNormalText");
+		}
+	}
+
 	TMap<ShaderTokenType, FTextBlockStyle>& SShaderEditorBox::GetTokenStyleMap()
 	{
-		static TMap<ShaderTokenType, FTextBlockStyle> TokenStyleMap{
-				{ ShaderTokenType::Number, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNumberText") },
-				{ ShaderTokenType::Keyword, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorKeywordText") },
-				{ ShaderTokenType::Punctuation, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorPunctuationText") },
-				{ ShaderTokenType::BuildtinFunc, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuiltinFuncText") },
-				{ ShaderTokenType::BuildtinType, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorBuiltinTypeText") },
-				{ ShaderTokenType::Identifier, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText") },
-				{ ShaderTokenType::Preprocess, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorPreprocessText") },
-				{ ShaderTokenType::Comment, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorCommentText") },
-				{ ShaderTokenType::String, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorStringText") },
-				{ ShaderTokenType::Unknown, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText") },
-
-				{ ShaderTokenType::Func, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorFuncText")},
-				{ ShaderTokenType::Type, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorTypeText")},
-				{ ShaderTokenType::Param, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorParamText")},
-				{ ShaderTokenType::Var, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorVarText")},
-				{ ShaderTokenType::LocalVar, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>("CodeEditorNormalText")},
-		};
+		static TMap<ShaderTokenType, FTextBlockStyle> TokenStyleMap = []() {
+			TMap<ShaderTokenType, FTextBlockStyle> Map;
+			for (ShaderTokenType Type : magic_enum::enum_values<ShaderTokenType>())
+			{
+				Map.Add(Type, FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>(GetTokenStyleName(Type)));
+			}
+			return Map;
+		}();
 		return TokenStyleMap;
 	}
 
@@ -1880,6 +1899,10 @@ constexpr int PaddingLineNum = 22;
 
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		ShEditor->AddNavigationInfo(ShaderAssetObj->GetGuid(), InLocation);
+
+		TSharedPtr<SWindow> ShaderEditorTipWindow = ShEditor->GetShaderEditorTipWindow();
+		ShaderEditorTipWindow->SetContent(SNullWidget::NullWidget);
+		ShaderEditorTipWindow->HideWindow();
 	}
 
 	void SShaderEditorBox::OnFocusChanging(const FWeakWidgetPath& PreviousFocusPath, const FWidgetPath& NewWidgetPath, const FFocusEvent& InFocusEvent)
@@ -3825,12 +3848,265 @@ constexpr int PaddingLineNum = 22;
 		};
 
 		auto CheckQuickInfo = [&] {
+			if (!SShaderEditorBox::CanShowQuickInfo())
+			{
+				return false;
+			}
+
 			if (AllottedGeometry.IsUnderLocation(ScreenSpaceCursorPos) && !Owner->Debugger.IsValid())
 			{
 				FVector2D LocalSpaceCursorPos = AllottedGeometry.AbsoluteToLocal(ScreenSpaceCursorPos);
 				FTextLocation CurrentHoverLocation = Owner->ShaderMarshaller->TextLayout->GetTextLocationAt(LocalSpaceCursorPos * AllottedGeometry.Scale);
 				int32 ExtraLineNum = Owner->GetShaderAsset()->GetExtraLineNum();
-				Owner->SyntaxTU->GetSymbolInfo(CurrentHoverLocation.GetLineIndex() + ExtraLineNum + 1, CurrentHoverLocation.GetOffset() + 1);
+				const auto& TokenizedLine = Owner->ShaderMarshaller->TokenizedLines[CurrentHoverLocation.GetLineIndex()];
+				int32 TokenOffset{};
+
+				static int32 LastHoverLineIndex = -1;
+				static int32 LastTokenOffset = -1;
+
+				for (const auto& Token : TokenizedLine.Tokens)
+				{
+					if (Token.Type == ShaderTokenType::Identifier && CurrentHoverLocation.GetOffset() >= Token.BeginOffset && CurrentHoverLocation.GetOffset() <= Token.EndOffset)
+					{
+						TokenOffset = Token.BeginOffset;
+						break;
+					}
+				}
+
+				bool bSameToken = (CurrentHoverLocation.GetLineIndex() == LastHoverLineIndex &&
+					TokenOffset == LastTokenOffset);
+
+				auto Symbol = Owner->SyntaxTU->GetSymbolInfo(CurrentHoverLocation.GetLineIndex() + ExtraLineNum + 1, TokenOffset + 1);
+				if (Symbol.Tokens.Num() > 0)
+				{
+					if (!bSameToken)
+					{
+						static int32 CurrentOverloadIndex;
+						static TArray<ShaderSymbol::FuncOverload> Overloads;
+						Overloads = Symbol.Overloads;
+						CurrentOverloadIndex = 0;
+
+						auto TokensBox = SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							[
+								SNew(STextBlock)
+									.Text(FText::FromString(TEXT("(") + LOCALIZATION(magic_enum::enum_name(Symbol.Type).data()).ToString() + TEXT(") ")))
+							];
+						for (const auto& Token : Symbol.Tokens)
+						{
+							TokensBox->AddSlot().AutoWidth()
+							[
+								SNew(STextBlock)
+									.Text(FText::FromString(Token.Key))
+									.TextStyle(&SShaderEditorBox::GetTokenStyleMap()[Token.Value])
+							];
+						}
+
+						auto Box = SNew(SVerticalBox)
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							[
+								TokensBox
+							];
+
+						if (Overloads.Num() > 0 || !Symbol.Desc.IsEmpty())
+						{
+							Box->AddSlot().AutoHeight()[SNew(SSeparator).Thickness(1.0f).ColorAndOpacity(FStyleColors::Border)];
+
+							// Overloads navigation
+							if (Overloads.Num() > 0)
+							{
+								auto OverloadTokensBox = SNew(SHorizontalBox);
+								auto ParamsBox = SNew(SVerticalBox);
+
+								auto BuildOverloadTokens = [](TSharedRef<SHorizontalBox> InBox, const TArray<TPair<FString, ShaderTokenType>>& Tokens) {
+									InBox->ClearChildren();
+									for (const auto& Token : Tokens)
+									{
+										InBox->AddSlot().AutoWidth()
+										[
+											SNew(STextBlock)
+												.Text(FText::FromString(Token.Key))
+												.TextStyle(&SShaderEditorBox::GetTokenStyleMap()[Token.Value])
+										];
+									}
+								};
+
+								auto BuildParamsBox = [](TSharedRef<SVerticalBox> InBox, const TArray<ShaderParameter>& Params) {
+									InBox->ClearChildren();
+									for (const auto& Param : Params)
+									{
+										auto ParamRow = SNew(SHorizontalBox);
+										
+										// Bullet point
+										ParamRow->AddSlot().AutoWidth()
+										[
+											SNew(STextBlock).Text(FText::FromString(TEXT("\u2022 ")))
+										];
+
+										// SemaFlag (in/out/inout)
+										if (Param.SemaFlag != ParamSemaFlag::None)
+										{
+											FString SemaStr;
+											switch (Param.SemaFlag)
+											{
+											case ParamSemaFlag::In:    SemaStr = TEXT("in"); break;
+											case ParamSemaFlag::Out:   SemaStr = TEXT("out"); break;
+											case ParamSemaFlag::Inout: SemaStr = TEXT("inout"); break;
+											default: break;
+											}
+											ParamRow->AddSlot().AutoWidth()
+											[
+												SNew(STextBlock)
+													.Text(FText::FromString(SemaStr + TEXT(" ")))
+													.TextStyle(&SShaderEditorBox::GetTokenStyleMap()[ShaderTokenType::Keyword])
+											];
+										}
+
+										// Parameter name (bold)
+										ParamRow->AddSlot().AutoWidth()
+										[
+											SNew(STextBlock)
+												.Text(FText::FromString(Param.Name))
+												.Font(FCoreStyle::GetDefaultFontStyle("Bold", SShaderEditorBox::GetFontSize()))
+										];
+
+										// Description
+										if (!Param.Desc.IsEmpty())
+										{
+											ParamRow->AddSlot().AutoWidth()
+											[
+												SNew(STextBlock)
+													.Text(FText::FromString(TEXT(" \u2014 ") + Param.Desc))
+											];
+										}
+
+										InBox->AddSlot().AutoHeight()[ParamRow];
+									}
+								};
+
+								BuildOverloadTokens(OverloadTokensBox, Overloads[CurrentOverloadIndex].Tokens);
+								BuildParamsBox(ParamsBox, Overloads[CurrentOverloadIndex].Params);
+
+								Box->AddSlot().AutoHeight()
+								[
+									SNew(SHorizontalBox)
+										+ SHorizontalBox::Slot()
+										.AutoWidth()
+										.VAlign(VAlign_Center)
+										[
+											SNew(SIconButton).Icon(FAppStyle::Get().GetBrush("Icons.ChevronUp")).IconSize(FVector2D{ 12,12 })
+												.OnClicked_Lambda([OverloadTokensBox, ParamsBox, BuildOverloadTokens, BuildParamsBox]() {
+													if (Overloads.Num() > 0)
+													{
+														CurrentOverloadIndex = (CurrentOverloadIndex - 1 + Overloads.Num()) % Overloads.Num();
+														BuildOverloadTokens(OverloadTokensBox, Overloads[CurrentOverloadIndex].Tokens);
+														BuildParamsBox(ParamsBox, Overloads[CurrentOverloadIndex].Params);
+													}
+													return FReply::Handled();
+												})
+										]
+										+ SHorizontalBox::Slot()
+										.AutoWidth()
+										.VAlign(VAlign_Center)
+										.Padding(2, 0, 2, 0)
+										[
+											SNew(STextBlock)
+												.Text_Lambda([]() {
+													return FText::FromString(FString::Printf(TEXT("%d/%d"), CurrentOverloadIndex + 1, Overloads.Num()));
+												})
+										]
+										+ SHorizontalBox::Slot()
+										.AutoWidth()
+										.VAlign(VAlign_Center)
+										[
+											SNew(SIconButton).Icon(FAppStyle::Get().GetBrush("Icons.ChevronDown")).IconSize(FVector2D{ 12,12 })
+												.OnClicked_Lambda([OverloadTokensBox, ParamsBox, BuildOverloadTokens, BuildParamsBox]() {
+													if (Overloads.Num() > 0)
+													{
+														CurrentOverloadIndex = (CurrentOverloadIndex + 1) % Overloads.Num();
+														BuildOverloadTokens(OverloadTokensBox, Overloads[CurrentOverloadIndex].Tokens);
+														BuildParamsBox(ParamsBox, Overloads[CurrentOverloadIndex].Params);
+													}
+													return FReply::Handled();
+												})
+										]
+										+ SHorizontalBox::Slot()
+										.AutoWidth()
+										.VAlign(VAlign_Center)
+										.Padding(4, 0, 0, 0)
+										[
+											OverloadTokensBox
+										]
+								];
+
+								Box->AddSlot().AutoHeight()[ParamsBox];
+							}
+
+							if (!Symbol.Desc.IsEmpty())
+							{
+								Box->AddSlot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(Symbol.Desc))];
+							}
+						}
+
+						int SymbolLineNumber = Symbol.Row - ExtraLineNum;
+						if (SymbolLineNumber > 0 || !Symbol.Url.IsEmpty())
+						{
+							Box->AddSlot().AutoHeight()[SNew(SSeparator).Thickness(1.0f).ColorAndOpacity(FStyleColors::Border)];
+							
+							auto LocationBox = SNew(SHorizontalBox);
+							FString LocationText = "Defined at: ";
+
+							if (!Symbol.File.IsEmpty() && SymbolLineNumber > 0)
+							{
+								LocationText += Symbol.File.IsEmpty()
+									? FString::Printf(TEXT("Line %d"), Symbol.Row)
+									: FString::Printf(TEXT("%s:%d"), *Symbol.File, SymbolLineNumber);
+							}
+
+							LocationBox->AddSlot().AutoWidth().VAlign(VAlign_Center)
+							[
+								SNew(STextBlock).Text(FText::FromString(LocationText))
+							];
+
+							if (!Symbol.Url.IsEmpty())
+							{
+								LocationBox->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(4, 0, 0, 0)
+								[
+									SNew(SIconButton)
+										.Icon(FShaderHelperStyle::Get().GetBrush("Icons.World"))
+										.IconSize(FVector2D{ 12, 12 })
+										.OnClicked_Lambda([Url = Symbol.Url]() {
+											FPlatformProcess::LaunchURL(*Url, nullptr, nullptr);
+											return FReply::Handled();
+										})
+								];
+							}
+							Box->AddSlot().AutoHeight()[LocationBox];
+						}
+						
+						auto DocView = SNew(SBorder)
+							[
+								Box
+							];
+						ShaderEditorTipWindow->SetContent(DocView);
+						ShaderEditorTipWindow->Resize(FVector2D::ZeroVector);
+						ShaderEditorTipWindow->ShowWindow();
+						FVector2D BlockPos = Owner->ShaderMarshaller->TextLayout->GetLocationAt({ CurrentHoverLocation.GetLineIndex(), TokenOffset }, true) / AllottedGeometry.Scale;
+						FVector2D BlockScreenPos = AllottedGeometry.LocalToAbsolute(BlockPos);
+						ShaderEditorTipWindow->MoveWindowTo(BlockScreenPos);
+
+						LastHoverLineIndex = CurrentHoverLocation.GetLineIndex();
+						LastTokenOffset = TokenOffset;
+					}
+					return true;
+				}
+				else
+				{
+					LastHoverLineIndex = 0;
+					LastTokenOffset = 0;
+				}
 			}
 			return false;
 		};

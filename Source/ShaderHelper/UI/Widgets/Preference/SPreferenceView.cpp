@@ -455,6 +455,17 @@ namespace SH
 			})
 		];
 
+		AppendCodeEditorItem(CodeEditorGrid, LOCALIZATION("QuickInfo"))
+		[
+			SNew(SCheckBox).IsChecked_Lambda([] {
+				return SShaderEditorBox::CanShowQuickInfo() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;;
+			})
+			.OnCheckStateChanged_Lambda([](ECheckBoxState InState) {
+				Editor::GetEditorConfig()->SetBool(TEXT("CodeEditor"), TEXT("ShowQuickInfo"), InState == ECheckBoxState::Checked);
+				Editor::SaveEditorConfig();
+			})
+		];
+
 		AppendCodeEditorItem(CodeEditorGrid, LOCALIZATION("HighlightCursorLine"))
 		[
 			SNew(SCheckBox).IsChecked_Lambda([] {

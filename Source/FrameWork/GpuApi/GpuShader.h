@@ -57,8 +57,8 @@ namespace FW
 
 		//Parser
 		Keyword,
-		BuildtinFunc,
-		BuildtinType,
+		BuiltinFunc,
+		BuiltinType,
 		Func,
 		Type,
 		Param,
@@ -66,7 +66,6 @@ namespace FW
 		LocalVar,
 
 		Preprocess,
-		Macro = Preprocess,
 	};
 
 	enum class GpuShaderLanguage
@@ -156,7 +155,7 @@ namespace FW
             return false;
         }
         
-        TOptional<FString> GetFileName() const { return FileName; }
+		const FString& GetFileName() const { return FileName; }
         const TArray<FString>& GetIncludeDirs() const { return IncludeDirs; }
         
         const FString& GetShaderName() const { return ShaderName; }
@@ -183,7 +182,7 @@ namespace FW
         FString SourceText;
 		FString ProcessedSourceText;
         
-        TOptional<FString> FileName;
+        FString FileName;
         TArray<FString> IncludeDirs;
     };
 
@@ -262,7 +261,7 @@ namespace FW
     class FRAMEWORK_API ShaderTU
     {
 	protected:
-		ShaderTU(const FString& InShaderSource);
+		ShaderTU(const FString& InShaderSource, const FString& InShaderName);
 
     public:
 		static TUniquePtr<ShaderTU> Create(TRefCountPtr<GpuShader> InShader);
@@ -280,6 +279,7 @@ namespace FW
         
     protected:
 		FString ShaderSource;
+		FString ShaderName;
 		TArray<FTextRange> LineRanges;
 		TArray<ShaderFunc> Funcs;
 		TArray<ShaderScope> GuideLineScopes;

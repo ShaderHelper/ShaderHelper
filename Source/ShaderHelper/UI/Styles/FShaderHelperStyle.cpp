@@ -53,7 +53,7 @@ namespace SH {
 		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User8, LOCALIZATION("Parameter"));
 		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User9, LOCALIZATION("Function"));
 		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User10, LOCALIZATION("Type"));
-		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User11, LOCALIZATION("GlobalVar"));
+		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User11, LOCALIZATION("NonLocalVar"));
 		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User12, LOCALIZATION("Other"));
 		USlateThemeManager::Get().SetColorDisplayName(EStyleColor::User13, LOCALIZATION("Punctuation"));
 
@@ -84,6 +84,7 @@ namespace SH {
 		Style->Set("Toolbar.ShaderHelper", ShToolbarStyle);
 		Style->Set("Icons.FullText", new IMAGE_BRUSH_SVG("Starship/Insights/MemTags_20", FVector2D(16.0, 16.0)));
 		Style->Set("Icons.Validation", new IMAGE_BRUSH_SVG("Starship/Insights/Tasks_20", FVector2D(16.0, 16.0)));
+		Style->Set("Icons.World", new IMAGE_BRUSH_SVG("Starship/Common/World", FVector2D(16.0, 16.0)));
 		Style->Set("LineTip.BreakPointEffect2", new IMAGE_BRUSH("Common/Window/WindowTitle_Flashing", FVector2D(16.0, 16.0), FLinearColor::White, ESlateBrushTileType::Horizontal));
 
 		const FHeaderRowStyle& CoreHeaderRowStyle = FAppStyle::Get().GetWidgetStyle<FHeaderRowStyle>("TableView.Header");

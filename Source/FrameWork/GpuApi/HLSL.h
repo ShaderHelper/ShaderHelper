@@ -299,13 +299,14 @@ namespace FW
 	{
 	public:
 		HlslTU(TRefCountPtr<GpuShader> InShader)
-			: ShaderTU(InShader->GetSourceText())
+			: ShaderTU(InShader->GetSourceText(), InShader->GetShaderName())
 			, Stage(InShader->GetShaderType())
 		{
 			DxcCreateInstance(CLSID_DxcIntelliSense, IID_PPV_ARGS(ISense.GetInitReference()));
 			ISense->CreateIndex(Index.GetInitReference());
 			auto SourceText = StringCast<UTF8CHAR>(*ShaderSource);
-			ISense->CreateUnsavedFile("Temp.hlsl", (char*)SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR), Unsaved.GetInitReference());
+			auto ShaderNameUTF8 = StringCast<UTF8CHAR>(*ShaderName);
+			ISense->CreateUnsavedFile((char*)ShaderNameUTF8.Get(), (char*)SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR), Unsaved.GetInitReference());
 
 			TArray<const char*> DxcArgs;
 			DxcArgs.Add("-D");
@@ -322,9 +323,9 @@ namespace FW
 			}
 
 			DxcTranslationUnitFlags UnitFlag = DxcTranslationUnitFlags(DxcTranslationUnitFlags_UseCallerThread | DxcTranslationUnitFlags_DetailedPreprocessingRecord);
-			Index->ParseTranslationUnit("Temp.hlsl", DxcArgs.GetData(), DxcArgs.Num(), AUX::GetAddrExt(Unsaved.GetReference()), 1, UnitFlag, TU.GetInitReference());
+			Index->ParseTranslationUnit((char*)ShaderNameUTF8.Get(), DxcArgs.GetData(), DxcArgs.Num(), AUX::GetAddrExt(Unsaved.GetReference()), 1, UnitFlag, TU.GetInitReference());
 
-			TU->GetFile("Temp.hlsl", DxcFile.GetInitReference());
+			TU->GetFile((char*)ShaderNameUTF8.Get(), DxcFile.GetInitReference());
 			TU->GetCursor(DxcRootCursor.GetInitReference());
 			TraversalAST(DxcRootCursor);
 		}
@@ -365,10 +366,41 @@ namespace FW
 			DxcCursorKind CursorKind;
 			DxcCursor->GetKind(&CursorKind);
 
+			// Tokenize type name, splitting keyword modifiers from core type
+			auto TokenizeTypeName = [this](const FString& TypeName, TArray<TPair<FString, ShaderTokenType>>& OutTokens) {
+				FString Remaining = TypeName.TrimStartAndEnd();
+
+				// Extract keyword prefixes (e.g. const, static, uniform, etc.)
+				while (!Remaining.IsEmpty())
+				{
+					int32 SpacePos = Remaining.Find(TEXT(" "));
+					if (SpacePos == INDEX_NONE) break;
+
+					FString FirstWord = Remaining.Left(SpacePos);
+					if (HLSL::FindKeyword(FirstWord, Stage))
+					{
+						OutTokens.Add({ FirstWord, ShaderTokenType::Keyword });
+						OutTokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+						Remaining = Remaining.Mid(SpacePos + 1).TrimStart();
+					}
+					else
+					{
+						break;
+					}
+				}
+
+				// Add the core type name
+				if (!Remaining.IsEmpty())
+				{
+					ShaderTokenType TypeTokenType = HLSL::FindBuiltinType(Remaining, Stage) ? ShaderTokenType::BuiltinType : ShaderTokenType::Type;
+					OutTokens.Add({ Remaining, TypeTokenType });
+				}
+			};
+
 			// Check for builtin functions first
 			if (const HLSL::ShaderBuiltinItem* BuiltinFunc = HLSL::FindBuiltinFunc(CursorSpelling, Stage))
 			{
-				Symbol.Type = ShaderTokenType::BuildtinFunc;
+				Symbol.Type = ShaderTokenType::BuiltinFunc;
 				Symbol.Desc = BuiltinFunc->Desc;
 				Symbol.Url = BuiltinFunc->Url;
 
@@ -406,9 +438,9 @@ namespace FW
 				CoTaskMemFree(ReturnTypeNamePtr);
 
 				// Build Symbol.Tokens entirely from DXC
-				Symbol.Tokens.Add({ ReturnTypeName, ShaderTokenType::BuildtinType });
+				TokenizeTypeName(ReturnTypeName, Symbol.Tokens);
 				Symbol.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
-				Symbol.Tokens.Add({ CursorSpelling, ShaderTokenType::BuildtinFunc });
+				Symbol.Tokens.Add({ CursorSpelling, ShaderTokenType::BuiltinFunc });
 				Symbol.Tokens.Add({ TEXT("("), ShaderTokenType::Punctuation });
 
 				// Get referenced function cursor to obtain parameter information
@@ -438,7 +470,7 @@ namespace FW
 						FString ArgName = ArgNamePtr;
 						CoTaskMemFree(ArgNamePtr);
 
-						Symbol.Tokens.Add({ ArgTypeName, ShaderTokenType::BuildtinType });
+						TokenizeTypeName(ArgTypeName, Symbol.Tokens);
 						if (!ArgName.IsEmpty())
 						{
 							Symbol.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
@@ -452,9 +484,9 @@ namespace FW
 				for (const auto& Sig : BuiltinFunc->Signatures)
 				{
 					ShaderSymbol::FuncOverload Overload;
-					Overload.Tokens.Add({ Sig.ReturnType, ShaderTokenType::BuildtinType });
+					Overload.Tokens.Add({ Sig.ReturnType, ShaderTokenType::BuiltinType });
 					Overload.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
-					Overload.Tokens.Add({ BuiltinFunc->Label, ShaderTokenType::BuildtinFunc });
+					Overload.Tokens.Add({ BuiltinFunc->Label, ShaderTokenType::BuiltinFunc });
 					Overload.Tokens.Add({ TEXT("("), ShaderTokenType::Punctuation });
 					for (int32 j = 0; j < Sig.Parameters.Num(); j++)
 					{
@@ -471,7 +503,7 @@ namespace FW
 							Overload.Tokens.Add({ Param.IO, ShaderTokenType::Keyword });
 							Overload.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
 						}
-						Overload.Tokens.Add({ Param.Type, ShaderTokenType::BuildtinType });
+						Overload.Tokens.Add({ Param.Type, ShaderTokenType::BuiltinType });
 						Overload.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
 						Overload.Tokens.Add({ Param.Name, ShaderTokenType::Param });
 						Overload.Params.Add({ Param.Name, Param.Desc, SemaFlag });
@@ -486,8 +518,8 @@ namespace FW
 			// Check for builtin types
 			if (const HLSL::ShaderBuiltinItem* BuiltinType = HLSL::FindBuiltinType(CursorSpelling, Stage))
 			{
-				Symbol.Type = ShaderTokenType::BuildtinType;
-				Symbol.Tokens.Add({ CursorSpelling, ShaderTokenType::BuildtinType });
+				Symbol.Type = ShaderTokenType::BuiltinType;
+				Symbol.Tokens.Add({ CursorSpelling, ShaderTokenType::BuiltinType });
 				Symbol.Desc = BuiltinType->Desc;
 				Symbol.Url = BuiltinType->Url;
 				return Symbol;
@@ -548,8 +580,7 @@ namespace FW
 						Symbol.Type = ShaderTokenType::Var;
 					}
 
-					ShaderTokenType DefTypeTokenType = HLSL::FindBuiltinType(DefTypeName, Stage) ? ShaderTokenType::BuildtinType : ShaderTokenType::Type;
-					Symbol.Tokens.Add({ DefTypeName, DefTypeTokenType });
+					TokenizeTypeName(DefTypeName, Symbol.Tokens);
 					Symbol.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
 					Symbol.Tokens.Add({ DefName, Symbol.Type });
 					GetCursorLocation(DefDxcCursor, Symbol.File, Symbol.Row);
@@ -567,7 +598,7 @@ namespace FW
 					CoTaskMemFree(FuncNamePtr);
 
 					// Helper lambda to build tokens for a function cursor
-					auto BuildFuncTokens = [this](IDxcCursor* InFuncCursor, TArray<TPair<FString, ShaderTokenType>>& OutTokens) {
+					auto BuildFuncTokens = [&TokenizeTypeName](IDxcCursor* InFuncCursor, TArray<TPair<FString, ShaderTokenType>>& OutTokens) {
 						LPSTR NamePtr;
 						InFuncCursor->GetSpelling(&NamePtr);
 						FString Name = NamePtr;
@@ -583,8 +614,7 @@ namespace FW
 						int32 ParenPos = TypeSpelling.Find(TEXT("("));
 						FString ReturnType = ParenPos != INDEX_NONE ? TypeSpelling.Left(ParenPos).TrimEnd() : TypeSpelling;
 
-						ShaderTokenType ReturnTokenType = HLSL::FindBuiltinType(ReturnType, Stage) ? ShaderTokenType::BuildtinType : ShaderTokenType::Type;
-						OutTokens.Add({ ReturnType, ReturnTokenType });
+						TokenizeTypeName(ReturnType, OutTokens);
 						OutTokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
 						OutTokens.Add({ Name, ShaderTokenType::Func });
 						OutTokens.Add({ TEXT("("), ShaderTokenType::Punctuation });
@@ -609,8 +639,7 @@ namespace FW
 							FString ArgName = ArgNamePtr;
 							CoTaskMemFree(ArgNamePtr);
 
-							ShaderTokenType ArgTokenType = HLSL::FindBuiltinType(ArgTypeName, Stage) ? ShaderTokenType::BuildtinType : ShaderTokenType::Type;
-							OutTokens.Add({ ArgTypeName, ArgTokenType });
+							TokenizeTypeName(ArgTypeName, OutTokens);
 							if (!ArgName.IsEmpty())
 							{
 								OutTokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
@@ -671,8 +700,8 @@ namespace FW
 			// Macro
 			if (CursorKind == DxcCursor_MacroExpansion || CursorKind == DxcCursor_MacroDefinition)
 			{
-				Symbol.Type = ShaderTokenType::Macro;
-				Symbol.Tokens.Add({ CursorSpelling, ShaderTokenType::Macro });
+				Symbol.Type = ShaderTokenType::Preprocess;
+				Symbol.Tokens.Add({ CursorSpelling, ShaderTokenType::Preprocess });
 
 				TRefCountPtr<IDxcCursor> MacroDefCursor;
 				if (CursorKind == DxcCursor_MacroExpansion)
@@ -776,11 +805,11 @@ namespace FW
 
 				if (HLSL::GetBuiltinTypes(Stage).Contains(TokenStr))
 				{
-					return ShaderTokenType::BuildtinType;
+					return ShaderTokenType::BuiltinType;
 				}
 				else if (HLSL::GetBuiltinFuncs(Stage).Contains(TokenStr))
 				{
-					return ShaderTokenType::BuildtinFunc;
+					return ShaderTokenType::BuiltinFunc;
 				}
 				else if (HLSL::GetKeyWords(Stage).Contains(TokenStr))
 				{
@@ -804,7 +833,8 @@ namespace FW
 
 			TRefCountPtr<IDxcCodeCompleteResults> CodeCompleteResults;
 			uint32 NumResult{};
-			TU->CodeCompleteAt("Temp.hlsl", Row, Col, AUX::GetAddrExt(Unsaved.GetReference()), 1, DxcCodeCompleteFlags_IncludeMacros, CodeCompleteResults.GetInitReference());
+			auto ShaderNameUTF8 = StringCast<UTF8CHAR>(*ShaderName);
+			TU->CodeCompleteAt((char*)ShaderNameUTF8.Get(), Row, Col, AUX::GetAddrExt(Unsaved.GetReference()), 1, DxcCodeCompleteFlags_IncludeMacros, CodeCompleteResults.GetInitReference());
 			CodeCompleteResults->GetNumResults(&NumResult);
 			for (uint32 i = 0; i < NumResult; i++)
 			{

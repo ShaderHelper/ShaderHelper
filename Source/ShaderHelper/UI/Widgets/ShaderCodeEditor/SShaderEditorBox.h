@@ -186,6 +186,7 @@ namespace SH
 		static bool CanMouseWheelZoom();
 		static bool CanShowColorBlock();
 		static bool CanShowGuideLine();
+		static bool CanShowQuickInfo();
 		static bool CanRealTimeDiagnosis();
 		static bool CanHighlightCursorLine();
 		static FSlateFontInfo& GetCodeFontInfo();
