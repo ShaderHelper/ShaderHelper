@@ -227,11 +227,11 @@ namespace HLSL
 namespace FW
 {
 
-	TArray<ShaderDiagnosticInfo> ParseDiagnosticInfoFromDxc(FStringView HlslDiagnosticInfo)
+	TArray<ShaderDiagnosticInfo> ParseDiagnosticInfoFromDxc(const FString& ShaderName, FStringView HlslDiagnosticInfo)
 	{
 		TArray<ShaderDiagnosticInfo> Ret;
 
-		int32 LineInfoFirstPos = HlslDiagnosticInfo.Find(TEXT("hlsl:"));
+		int32 LineInfoFirstPos = HlslDiagnosticInfo.Find(ShaderName + ":");
 		while (LineInfoFirstPos != INDEX_NONE)
 		{
 			ShaderDiagnosticInfo DiagnosticInfo;
@@ -239,7 +239,7 @@ namespace FW
 			int32 LineInfoLastPos = HlslDiagnosticInfo.Find(TEXT("\n"), LineInfoFirstPos);
 			FStringView LineStringView{ HlslDiagnosticInfo.GetData() + LineInfoFirstPos, LineInfoLastPos - LineInfoFirstPos };
 
-			int32 LineInfoFirstColonPos = 4;
+			int32 LineInfoFirstColonPos = ShaderName.Len();
 			int32 Pos2 = LineStringView.Find(TEXT(":"), LineInfoFirstColonPos + 1);
 			DiagnosticInfo.Row = FCString::Atoi(LineStringView.SubStr(LineInfoFirstColonPos + 1, Pos2 - LineInfoFirstColonPos - 1).GetData());
 			int32 Pos3 = LineStringView.Find(TEXT(":"), Pos2 + 1);
@@ -266,7 +266,7 @@ namespace FW
 				Ret.Add(MoveTemp(DiagnosticInfo));
 			}
 
-			LineInfoFirstPos = HlslDiagnosticInfo.Find(TEXT("hlsl:"), LineInfoLastPos);
+			LineInfoFirstPos = HlslDiagnosticInfo.Find(ShaderName + ":", LineInfoLastPos);
 		}
 
 		return Ret;
@@ -346,22 +346,23 @@ namespace FW
 				Diags += "\n";
 				CoTaskMemFree(DiagResult);
 			}
-			return ParseDiagnosticInfoFromDxc(Diags);
+			return ParseDiagnosticInfoFromDxc(ShaderName, Diags);
 		}
 
-		ShaderSymbol GetSymbolInfo(uint32 Row, uint32 Col) override
+		ShaderSymbol GetSymbolInfo(uint32 Row, uint32 Col, uint32 Size) override
 		{
+			FString TokenStr = GetStr(Row, Col, Size);
+			if (TokenStr.IsEmpty())
+			{
+				return {};
+			}
+
 			ShaderSymbol Symbol{};
 
 			TRefCountPtr<IDxcSourceLocation> SrcLoc;
 			TU->GetLocation(DxcFile, Row, Col, SrcLoc.GetInitReference());
 			TRefCountPtr<IDxcCursor> DxcCursor;
 			TU->GetCursorForLocation(SrcLoc, DxcCursor.GetInitReference());
-
-			LPSTR CursorSpellingPtr;
-			DxcCursor->GetSpelling(&CursorSpellingPtr);
-			FString CursorSpelling = CursorSpellingPtr;
-			CoTaskMemFree(CursorSpellingPtr);
 
 			DxcCursorKind CursorKind;
 			DxcCursor->GetKind(&CursorKind);
@@ -398,7 +399,7 @@ namespace FW
 			};
 
 			// Check for builtin functions first
-			if (const HLSL::ShaderBuiltinItem* BuiltinFunc = HLSL::FindBuiltinFunc(CursorSpelling, Stage))
+			if (const HLSL::ShaderBuiltinItem* BuiltinFunc = HLSL::FindBuiltinFunc(TokenStr, Stage))
 			{
 				Symbol.Type = ShaderTokenType::BuiltinFunc;
 				Symbol.Desc = BuiltinFunc->Desc;
@@ -440,7 +441,7 @@ namespace FW
 				// Build Symbol.Tokens entirely from DXC
 				TokenizeTypeName(ReturnTypeName, Symbol.Tokens);
 				Symbol.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
-				Symbol.Tokens.Add({ CursorSpelling, ShaderTokenType::BuiltinFunc });
+				Symbol.Tokens.Add({ TokenStr, ShaderTokenType::BuiltinFunc });
 				Symbol.Tokens.Add({ TEXT("("), ShaderTokenType::Punctuation });
 
 				// Get referenced function cursor to obtain parameter information
@@ -516,20 +517,22 @@ namespace FW
 			}
 
 			// Check for builtin types
-			if (const HLSL::ShaderBuiltinItem* BuiltinType = HLSL::FindBuiltinType(CursorSpelling, Stage))
+			if (const HLSL::ShaderBuiltinItem* BuiltinType = HLSL::FindBuiltinType(TokenStr, Stage))
 			{
+				if (BuiltinType->Desc.IsEmpty()) return {};
 				Symbol.Type = ShaderTokenType::BuiltinType;
-				Symbol.Tokens.Add({ CursorSpelling, ShaderTokenType::BuiltinType });
+				Symbol.Tokens.Add({ TokenStr, ShaderTokenType::BuiltinType });
 				Symbol.Desc = BuiltinType->Desc;
 				Symbol.Url = BuiltinType->Url;
 				return Symbol;
 			}
 
 			// Check for keywords
-			if (const HLSL::ShaderBuiltinItem* Keyword = HLSL::FindKeyword(CursorSpelling, Stage))
+			if (const HLSL::ShaderBuiltinItem* Keyword = HLSL::FindKeyword(TokenStr, Stage))
 			{
+				if (Keyword->Desc.IsEmpty()) return {};
 				Symbol.Type = ShaderTokenType::Keyword;
-				Symbol.Tokens.Add({ CursorSpelling, ShaderTokenType::Keyword });
+				Symbol.Tokens.Add({ TokenStr, ShaderTokenType::Keyword });
 				Symbol.Desc = Keyword->Desc;
 				Symbol.Url = Keyword->Url;
 				return Symbol;
@@ -701,7 +704,7 @@ namespace FW
 			if (CursorKind == DxcCursor_MacroExpansion || CursorKind == DxcCursor_MacroDefinition)
 			{
 				Symbol.Type = ShaderTokenType::Preprocess;
-				Symbol.Tokens.Add({ CursorSpelling, ShaderTokenType::Preprocess });
+				Symbol.Tokens.Add({ TokenStr, ShaderTokenType::Preprocess });
 
 				TRefCountPtr<IDxcCursor> MacroDefCursor;
 				if (CursorKind == DxcCursor_MacroExpansion)
@@ -888,11 +891,9 @@ namespace FW
 			TU->GetLocation(DxcFile, Row, Col, SrcLoc.GetInitReference());
 			TRefCountPtr<IDxcCursor> DxcCursor;
 			TU->GetCursorForLocation(SrcLoc, DxcCursor.GetInitReference());
-			TRefCountPtr<IDxcCursor> DefDxcCursor;
-			DxcCursor->GetDefinitionCursor(DefDxcCursor.GetInitReference());
 			uint32 ResultLen;
 			IDxcCursor** CursorOccurrences;
-			DefDxcCursor->FindReferencesInFile(DxcFile, 0, -1, &ResultLen, &CursorOccurrences);
+			DxcCursor->FindReferencesInFile(DxcFile, 0, -1, &ResultLen, &CursorOccurrences);
 			TArray<ShaderOccurrence> Occurrences;
 			for (uint32 i = 0; i < ResultLen; i++)
 			{

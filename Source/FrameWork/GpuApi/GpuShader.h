@@ -271,11 +271,17 @@ namespace FW
 		virtual ShaderTokenType GetTokenType(ShaderTokenType InType, uint32 Row, uint32 Col, uint32 Size) = 0;
 		virtual TArray<ShaderCandidateInfo> GetCodeComplete(uint32 Row, uint32 Col) = 0;
 		virtual TArray<ShaderOccurrence> GetOccurrences(uint32 Row, uint32 Col) = 0;
-		virtual ShaderSymbol GetSymbolInfo(uint32 Row, uint32 Col) = 0;
+		virtual ShaderSymbol GetSymbolInfo(uint32 Row, uint32 Col, uint32 Size) = 0;
 
 		const TArray<ShaderFunc>& GetFuncs() const { return Funcs; };
 		const TArray<ShaderScope>& GetGuideLineScopes() const { return GuideLineScopes; };
-		FString GetStr(uint32 Row, uint32 Col, uint32 Size) const { return ShaderSource.Mid(LineRanges[Row - 1].BeginIndex + Col - 1, Size); }
+		FString GetStr(uint32 Row, uint32 Col, uint32 Size) const { 
+			if ((int32)Row > LineRanges.Num() || (int32)Col > LineRanges[Row -1].Len())
+			{
+				return "";
+			}
+			return ShaderSource.Mid(LineRanges[Row - 1].BeginIndex + Col - 1, Size);
+		}
         
     protected:
 		FString ShaderSource;

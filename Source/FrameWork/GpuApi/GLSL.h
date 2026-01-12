@@ -17,11 +17,27 @@ THIRD_PARTY_INCLUDES_END
 
 namespace GLSL
 {
+	struct ShaderBuiltinParameter
+	{
+		FString Type;
+		FString Name;
+		FString Desc;
+		FString IO;
+	};
+
+	struct ShaderBuiltinSignature
+	{
+		FString ReturnType;
+		TArray<ShaderBuiltinParameter> Parameters;
+	};
+
 	struct ShaderBuiltinItem
 	{
 		FString Label;
 		TArray<FString> Stages;
 		FString Desc;
+		TArray<ShaderBuiltinSignature> Signatures;
+		FString Url;
 	};
 
 	struct ShaderBuiltinData
@@ -57,6 +73,7 @@ namespace GLSL
 									ShaderBuiltinItem Item;
 									(*ItemObj)->TryGetStringField(TEXT("label"), Item.Label);
 									(*ItemObj)->TryGetStringField(TEXT("desc"), Item.Desc);
+									(*ItemObj)->TryGetStringField(TEXT("url"), Item.Url);
 									const TArray<TSharedPtr<FJsonValue>>* StagesArray;
 									if ((*ItemObj)->TryGetArrayField(TEXT("stages"), StagesArray))
 									{
@@ -69,11 +86,42 @@ namespace GLSL
 											}
 										}
 									}
+									const TArray<TSharedPtr<FJsonValue>>* SignaturesArray;
+									if ((*ItemObj)->TryGetArrayField(TEXT("signatures"), SignaturesArray))
+									{
+										for (const auto& SigValue : *SignaturesArray)
+										{
+											const TSharedPtr<FJsonObject>* SigObj;
+											if (SigValue->TryGetObject(SigObj))
+											{
+												ShaderBuiltinSignature Sig;
+												(*SigObj)->TryGetStringField(TEXT("returnType"), Sig.ReturnType);
+												const TArray<TSharedPtr<FJsonValue>>* ParamsArray;
+												if ((*SigObj)->TryGetArrayField(TEXT("parameters"), ParamsArray))
+												{
+													for (const auto& ParamValue : *ParamsArray)
+													{
+														const TSharedPtr<FJsonObject>* ParamObj;
+														if (ParamValue->TryGetObject(ParamObj))
+														{
+															ShaderBuiltinParameter Param;
+															(*ParamObj)->TryGetStringField(TEXT("type"), Param.Type);
+															(*ParamObj)->TryGetStringField(TEXT("name"), Param.Name);
+															(*ParamObj)->TryGetStringField(TEXT("desc"), Param.Desc);
+															(*ParamObj)->TryGetStringField(TEXT("io"), Param.IO);
+															Sig.Parameters.Add(MoveTemp(Param));
+														}
+													}
+												}
+												Item.Signatures.Add(MoveTemp(Sig));
+											}
+										}
+									}
 									OutItems.Add(MoveTemp(Item));
 								}
 							}
 						}
-					};
+						};
 
 					ParseItems(JsonObject, TEXT("Keywords"), Data.Keywords);
 					ParseItems(JsonObject, TEXT("Types"), Data.Types);
@@ -177,10 +225,10 @@ namespace GLSL
 
 namespace FW
 {
-	inline TArray<ShaderDiagnosticInfo> ParseDiagnosticInfoFromGlslang(FStringView GlslDiagnosticInfo)
+	inline TArray<ShaderDiagnosticInfo> ParseDiagnosticInfoFromGlslang(const FString& ShaderName, FStringView GlslDiagnosticInfo)
 	{
 		TArray<ShaderDiagnosticInfo> Ret;
-		int32 LineInfoFirstPos = GlslDiagnosticInfo.Find(TEXT("glsl:"));
+		int32 LineInfoFirstPos = GlslDiagnosticInfo.Find(ShaderName + ":");
 		while (LineInfoFirstPos != INDEX_NONE)
 		{
 			ShaderDiagnosticInfo DiagnosticInfo;
@@ -188,7 +236,7 @@ namespace FW
 			int32 LineInfoLastPos = GlslDiagnosticInfo.Find(TEXT("\n"), LineInfoFirstPos);
 			FStringView LineStringView{ GlslDiagnosticInfo.GetData() + LineInfoFirstPos, LineInfoLastPos - LineInfoFirstPos };
 
-			int32 LineInfoFirstColonPos = 4;
+			int32 LineInfoFirstColonPos = ShaderName.Len();
 			int32 Pos2 = LineStringView.Find(TEXT(":"), LineInfoFirstColonPos + 1);
 			DiagnosticInfo.Row = FCString::Atoi(LineStringView.SubStr(LineInfoFirstColonPos + 1, Pos2 - LineInfoFirstColonPos - 1).GetData());
 
@@ -207,7 +255,7 @@ namespace FW
 				Ret.Add(MoveTemp(DiagnosticInfo));
 			}
 
-			LineInfoFirstPos = GlslDiagnosticInfo.Find(TEXT("glsl:"), LineInfoLastPos);
+			LineInfoFirstPos = GlslDiagnosticInfo.Find(ShaderName + ":", LineInfoLastPos);
 		}
 		return Ret;
 	}
@@ -399,7 +447,7 @@ namespace FW
 			}
 			else
 			{
-				Type = UTF8_TO_TCHAR(Node->getType().getCompleteString().c_str());
+				Type = UTF8_TO_TCHAR(Node->getType().getCompleteString(true).c_str());
 			}
 			const FString LocName = Loc.name ? UTF8_TO_TCHAR(Loc.getFilenameStr()) : TEXT("<main>");
 			AppendDumpLine(FString::Printf(TEXT("%s[Constant] %u:%u file=%s type=%s"),
@@ -479,7 +527,7 @@ namespace FW
 			}
 			else
 			{
-				Type = UTF8_TO_TCHAR(Node->getType().getCompleteString().c_str());
+				Type = UTF8_TO_TCHAR(Node->getType().getCompleteString(true).c_str());
 			}
 			const auto OpName = magic_enum::enum_name(Node->getOp());
 			const FString OpStr = OpName.empty() ? FString::FromInt(int32(Node->getOp())) : ANSI_TO_TCHAR(std::string(OpName).c_str());
@@ -523,10 +571,11 @@ namespace FW
 		FString TypeName;
 		bool bIsStruct = false;
 
-		bool operator==(const GlslSymbol& Other) const { return File == Other.File && Location == Other.Location; };
+		bool operator==(const GlslSymbol& Other) const { return Id == Other.Id && File == Other.File && Location == Other.Location; };
 		friend uint32 GetTypeHash(const GlslSymbol& Key)
 		{
-			uint32 Hash = ::GetTypeHash(Key.File);
+			uint32 Hash = ::GetTypeHash(Key.Id);
+			Hash = HashCombine(Hash, GetTypeHash(Key.File));
 			Hash = HashCombine(Hash, GetTypeHash(Key.Location));
 			return Hash;
 		}
@@ -562,6 +611,122 @@ namespace FW
 	{
 		return Name == "PrintAtMouse" || Name == "Print" || Name == "Assert" || Name == "AssertFormat";
 	}
+
+	inline FString GetTypeName(const glslang::TType& type) {
+		FString TypeName;
+		if (type.isStruct()) {
+			TypeName = UTF8_TO_TCHAR(type.getTypeName().c_str());
+		}
+		else if (type.isVector() || type.isMatrix() || type.isArray()) {
+			TypeName = UTF8_TO_TCHAR(type.getCompleteString(true, false, false, true).c_str());
+		}
+		else
+		{
+			TypeName = UTF8_TO_TCHAR(type.getBasicTypeString().c_str());
+		}
+
+		FString Qualifier;
+		switch (type.getQualifier().storage) {
+		case glslang::EvqConst:          Qualifier = "const";          break;
+		case glslang::EvqVaryingIn:      Qualifier = "in";             break;
+		case glslang::EvqVaryingOut:     Qualifier = "out";            break;
+		case glslang::EvqUniform:        Qualifier = "uniform";        break;
+		case glslang::EvqBuffer:         Qualifier = "buffer";         break;
+		case glslang::EvqShared:         Qualifier = "shared";         break;
+		case glslang::EvqIn:             Qualifier = "in";             break;
+		case glslang::EvqOut:            Qualifier = "out";            break;
+		case glslang::EvqInOut:          Qualifier = "inout";          break;
+		default: break;
+		}
+
+		return Qualifier + " " + TypeName.TrimStartAndEnd();
+	}
+
+	inline TMap<glslang::TOperator, FString> BuiltInOps = {
+		{glslang::EOpRadians,          "radians"},
+		{glslang::EOpDegrees,          "degrees"},
+		{glslang::EOpSin,              "sin"},
+		{glslang::EOpCos,              "cos"},
+		{glslang::EOpTan,              "tan"},
+		{glslang::EOpAsin,             "asin"},
+		{glslang::EOpAcos,             "acos"},
+		{glslang::EOpAtan,             "atan"},
+		{glslang::EOpAtan,             "atan"},
+		{glslang::EOpPow,              "pow"},
+		{glslang::EOpExp,              "exp"},
+		{glslang::EOpLog,              "log"},
+		{glslang::EOpExp2,             "exp2"},
+		{glslang::EOpLog2,             "log2"},
+		{glslang::EOpSqrt,             "sqrt"},
+		{glslang::EOpInverseSqrt,      "inversesqrt"},
+		{glslang::EOpAbs,              "abs"},
+		{glslang::EOpSign,             "sign"},
+		{glslang::EOpFloor,            "floor"},
+		{glslang::EOpCeil,             "ceil"},
+		{glslang::EOpFract,            "fract"},
+		{glslang::EOpMod,              "mod"},
+		{glslang::EOpMin,              "min"},
+		{glslang::EOpMax,              "max"},
+		{glslang::EOpClamp,            "clamp"},
+		{glslang::EOpMix,              "mix"},
+		{glslang::EOpStep,             "step"},
+		{glslang::EOpSmoothStep,       "smoothstep"},
+		{glslang::EOpNormalize,        "normalize"},
+		{glslang::EOpFaceForward,      "faceforward"},
+		{glslang::EOpReflect,          "reflect"},
+		{glslang::EOpRefract,          "refract"},
+		{glslang::EOpLength,           "length"},
+		{glslang::EOpDistance,         "distance"},
+		{glslang::EOpDot,              "dot"},
+		{glslang::EOpCross,            "cross"},
+		{glslang::EOpLessThan,         "lessThan"},
+		{glslang::EOpLessThanEqual,    "lessThanEqual"},
+		{glslang::EOpGreaterThan,      "greaterThan"},
+		{glslang::EOpGreaterThanEqual, "greaterThanEqual"},
+		{glslang::EOpVectorEqual,      "equal"},
+		{glslang::EOpVectorNotEqual,   "notEqual"},
+		{glslang::EOpAny,              "any"},
+		{glslang::EOpAll,              "all"},
+		{glslang::EOpVectorLogicalNot, "not"},
+		{glslang::EOpSinh,             "sinh"},
+		{glslang::EOpCosh,             "cosh"},
+		{glslang::EOpTanh,             "tanh"},
+		{glslang::EOpAsinh,            "asinh"},
+		{glslang::EOpAcosh,            "acosh"},
+		{glslang::EOpAtanh,            "atanh"},
+		{glslang::EOpAbs,              "abs"},
+		{glslang::EOpSign,             "sign"},
+		{glslang::EOpTrunc,            "trunc"},
+		{glslang::EOpRound,            "round"},
+		{glslang::EOpRoundEven,        "roundEven"},
+		{glslang::EOpModf,             "modf"},
+		{glslang::EOpMin,              "min"},
+		{glslang::EOpMax,              "max"},
+		{glslang::EOpClamp,            "clamp"},
+		{glslang::EOpMix,              "mix"},
+		{glslang::EOpIsInf,            "isinf"},
+		{glslang::EOpIsNan,            "isnan"},
+		{glslang::EOpLessThan,         "lessThan"},
+		{glslang::EOpLessThanEqual,    "lessThanEqual"},
+		{glslang::EOpGreaterThan,      "greaterThan"},
+		{glslang::EOpGreaterThanEqual, "greaterThanEqual"},
+		{glslang::EOpVectorEqual,      "equal"},
+		{glslang::EOpVectorNotEqual,   "notEqual"},
+		{glslang::EOpAtomicAdd,        "atomicAdd"},
+		{glslang::EOpAtomicMin,        "atomicMin"},
+		{glslang::EOpAtomicMax,        "atomicMax"},
+		{glslang::EOpAtomicAnd,        "atomicAnd"},
+		{glslang::EOpAtomicOr,         "atomicOr"},
+		{glslang::EOpAtomicXor,        "atomicXor"},
+		{glslang::EOpAtomicExchange,   "atomicExchange"},
+		{glslang::EOpAtomicCompSwap,   "atomicCompSwap"},
+		{glslang::EOpMix,              "mix"},
+		{glslang::EOpMix,              "mix"},
+
+		{glslang::EOpDPdx,             "dFdx"},
+		{glslang::EOpDPdy,             "dFdy"},
+		{glslang::EOpFwidth,           "fwidth"},
+	};
 
 	class GlslVisitor : public glslang::TIntermTraverser
 	{
@@ -604,7 +769,7 @@ namespace FW
 		{
 			if (Node->getType().isStruct())
 			{
-				FString TypeName = UTF8_TO_TCHAR(Node->getType().getTypeName().c_str());
+				FString TypeName = GetTypeName(Node->getType());
 				auto TypeLoc = Node->getType().loc;
 				if (auto* Def = Context.SymbolTable.FindByPredicate([&, this](auto&& Item) { return Item.Id == TypeName; }))
 				{
@@ -620,60 +785,23 @@ namespace FW
 		void visitSymbol(glslang::TIntermSymbol* Node) override
 		{
 			FString NodeName = UTF8_TO_TCHAR(Node->getName().c_str());
-			if (getParentNode()->getAsAggregate() && getParentNode()->getAsAggregate()->getOp() == glslang::EOpParameters)
+			if (auto* Def = Context.SymbolTable.FindByPredicate([&, this](auto&& Item) { return Item.Id == LexToString(Node->getId()); }))
 			{
-				bool bIsStruct = Node->getType().isStruct();
-				FString TypeName = bIsStruct ? UTF8_TO_TCHAR(Node->getType().getTypeName().c_str()) : FString();
-
-				Context.SymbolTable.AddUnique({
-					.Id = LexToString(Node->getId()),
-					.Kind = ShaderTokenType::Param,
-					.Name = NodeName,
-					.File = Node->getLoc().getFilenameStr(),
-					.Location = {Node->getLoc().line, Node->getLoc().column},
-					.Scope = ScopeStack.Top(),
-					.TypeName = TypeName,
-					.bIsStruct = bIsStruct
-				});
-				Context.SymbolRefs.AddUnique(Context.SymbolTable.Last(), GlslSymbolRef{
-					.Name = NodeName,
-					.File = Node->getLoc().getFilenameStr(),
-					.Location = {Node->getLoc().line, Node->getLoc().column}
-				});
-
-				if (bIsStruct)
+				bool FromMacro = Node->getLoc().flags & glslang::TSourceLoc::FromMacroExpansion;
+				Vector2i Location = { Node->getLoc().line, Node->getLoc().column };
+				if (FromMacro)
 				{
-					auto TypeLoc = Node->getType().loc;
-					if (auto* Def = Context.SymbolTable.FindByPredicate([&, this](auto&& Item) { return Item.Id == TypeName; }))
+					const auto& Exp = Context.MacroExpansions[Node->getLoc().macroExpansionId];
+					if (IsPrintMacro(Exp.name))
 					{
-						Context.SymbolRefs.AddUnique(*Def, GlslSymbolRef{
-							.Name = TypeName,
-							.File = TypeLoc.getFilenameStr(),
-							.Location = {TypeLoc.line, TypeLoc.column}
-						});
+						Location.y -= 1;
 					}
 				}
-			}
-			else
-			{
-				if (auto* Def = Context.SymbolTable.FindByPredicate([&, this](auto&& Item) { return Item.Id == LexToString(Node->getId()); }))
-				{
-					bool FromMacro = Node->getLoc().flags & glslang::TSourceLoc::FromMacroExpansion;
-					Vector2i Location = { Node->getLoc().line, Node->getLoc().column };
-					if (FromMacro)
-					{
-						const auto& Exp = Context.MacroExpansions[Node->getLoc().macroExpansionId];
-						if (IsPrintMacro(Exp.name))
-						{
-							Location.y -= 1;
-						}
-					}
-					Context.SymbolRefs.AddUnique(*Def, GlslSymbolRef{
-						.Name = NodeName,
-						.File = Node->getLoc().getFilenameStr(),
-						.Location = Location
-					});
-				}
+				Context.SymbolRefs.AddUnique(*Def, GlslSymbolRef{
+					.Name = NodeName,
+					.File = Node->getLoc().getFilenameStr(),
+					.Location = Location
+				});
 			}
 		}
 
@@ -689,7 +817,7 @@ namespace FW
 				{
 					FString MemberName = UTF8_TO_TCHAR(Member.type->getFieldName().c_str());
 					bool bMemberIsStruct = Member.type->isStruct();
-					FString MemberTypeName = bMemberIsStruct ? UTF8_TO_TCHAR(Member.type->getTypeName().c_str()) : FString();
+					FString MemberTypeName = GetTypeName(*Member.type);
 
 					Context.SymbolTable.AddUnique({
 						.Id = MemberName,
@@ -711,7 +839,7 @@ namespace FW
 			else
 			{
 				bool bIsStruct = DeclSymbol->getType().isStruct();
-				FString TypeName = bIsStruct ? UTF8_TO_TCHAR(DeclSymbol->getType().getTypeName().c_str()) : FString();
+				FString TypeName = GetTypeName(DeclSymbol->getType());
 
 				Context.SymbolTable.AddUnique({
 					.Id = LexToString(DeclSymbol->getId()),
@@ -799,6 +927,7 @@ namespace FW
 		bool visitUnary(glslang::TVisit Visit, glslang::TIntermUnary* Node) override
 		{
 			if (Visit == glslang::EvPostVisit) return true;
+
 			if (Node->getOp() == glslang::EOpDeclare)
 			{
 				const glslang::TIntermSymbol* Symbol = Node->getOperand()->getAsSymbolNode();
@@ -846,6 +975,10 @@ namespace FW
 					return false;
 				}
 			}
+			else
+			{
+				HandleBuiltInFunction(Node);
+			}
 			return true;
 		}
 
@@ -874,14 +1007,89 @@ namespace FW
 				ShaderScope FuncScope = { StartLoc, EndLoc };
 				Context.GuideLineScopes.Emplace(FuncScope);
 
+				FString ParamsTypeName;
+				TArray<ShaderParameter> Params;
+				const glslang::TIntermSequence& ParamsSequence = Node->getSequence()[0]->getAsAggregate()->getSequence();
+				for (int i = 0; i < ParamsSequence.size(); i++)
+				{
+					const TIntermNode* Child = ParamsSequence[i];
+					if (const glslang::TIntermSymbol* ParamSymbol = Child->getAsSymbolNode())
+					{
+						FString NodeName = UTF8_TO_TCHAR(ParamSymbol->getName().c_str());
+						bool bIsStruct = ParamSymbol->getType().isStruct();
+
+						FString TypeName = GetTypeName(ParamSymbol->getType());
+						ParamsTypeName += TypeName;
+						if (i < ParamsSequence.size() - 1)
+						{
+							ParamsTypeName += ",";
+						}
+
+						// Extract ParamSemaFlag from TypeName
+						ParamSemaFlag SemaFlag = ParamSemaFlag::None;
+						FString TrimmedTypeName = TypeName.TrimStartAndEnd();
+						if (TrimmedTypeName.StartsWith(TEXT("inout ")))
+						{
+							SemaFlag = ParamSemaFlag::Inout;
+						}
+						else if (TrimmedTypeName.StartsWith(TEXT("out ")))
+						{
+							SemaFlag = ParamSemaFlag::Out;
+						}
+						else if (TrimmedTypeName.StartsWith(TEXT("in ")))
+						{
+							SemaFlag = ParamSemaFlag::In;
+						}
+
+						Params.Add({.Name = NodeName, .SemaFlag = SemaFlag});
+
+						//Append symbol if the parameter name exists
+						if (!NodeName.IsEmpty())
+						{
+							Context.SymbolTable.AddUnique({
+								.Id = LexToString(ParamSymbol->getId()),
+								.Kind = ShaderTokenType::Param,
+								.Name = NodeName,
+								.File = ParamSymbol->getLoc().getFilenameStr(),
+								.Location = {ParamSymbol->getLoc().line, ParamSymbol->getLoc().column},
+								.Scope = ScopeStack.Top(),
+								.TypeName = TypeName,
+								.bIsStruct = bIsStruct
+							});
+							Context.SymbolRefs.AddUnique(Context.SymbolTable.Last(), GlslSymbolRef{
+								.Name = NodeName,
+								.File = ParamSymbol->getLoc().getFilenameStr(),
+								.Location = {ParamSymbol->getLoc().line, ParamSymbol->getLoc().column}
+							});
+						}
+
+						if (bIsStruct)
+						{
+							auto TypeLoc = ParamSymbol->getType().loc;
+							if (auto* Def = Context.SymbolTable.FindByPredicate([&, this](auto&& Item) { return Item.Id == TypeName; }))
+							{
+								Context.SymbolRefs.AddUnique(*Def, GlslSymbolRef{
+									.Name = TypeName,
+									.File = TypeLoc.getFilenameStr(),
+									.Location = {TypeLoc.line, TypeLoc.column}
+								});
+							}
+						}
+					}
+				}
+
+				FString ReturnTypeName = GetTypeName(Node->getType());
+				FString FuncTypeName = ReturnTypeName + "(" + ParamsTypeName + ")";
+
 				FString Name = UTF8_TO_TCHAR(Node->getName().c_str());
 				FString FuncName, _;
-				Name.Split(TEXT("("), &FuncName , &_);
+				Name.Split(TEXT("("), &FuncName, &_);
 				Context.Funcs.Add(ShaderFunc{
-					.Name = FuncName, 
+					.Name = FuncName,
 					.FullName = Name,
 					.Start = StartLoc,
-					.End = EndLoc
+					.End = EndLoc,
+					.Params = Params
 				});
 				Context.SymbolTable.AddUnique({
 					.Id = Name,
@@ -890,6 +1098,7 @@ namespace FW
 					.File = Node->getLoc().getFilenameStr(),
 					.Location = {Node->getLoc().line, Node->getLoc().column},
 					.Scope = ScopeStack.Top(),
+					.TypeName = FuncTypeName
 				});
 				Context.SymbolRefs.AddUnique(Context.SymbolTable.Last(), GlslSymbolRef{
 					.Name = FuncName,
@@ -897,6 +1106,11 @@ namespace FW
 					.Location = {Node->getLoc().line, Node->getLoc().column}
 				});
 				ScopeStack.Push(FuncScope);
+			}
+			else if (Op == glslang::EOpParameters)
+			{
+				// Skip processing to avoid duplicate traversal (already processed in EOpFunction)
+				return false;
 			}
 			else if (Op == glslang::EOpFunctionCall)
 			{
@@ -942,6 +1156,34 @@ namespace FW
 			return true;
 		}
 
+		void HandleBuiltInFunction(glslang::TIntermUnary* Node)
+		{
+			if (BuiltInOps.Contains(Node->getOp()))
+			{
+				FString FuncName = BuiltInOps[Node->getOp()];
+				FString ReturnTypeName = GetTypeName(Node->getType());
+				FString ParamTypeName = GetTypeName(Node->getOperand()->getType());
+				FString FuncTypeName = ReturnTypeName + "(" + ParamTypeName + ")";
+				FString FullFuncName = ReturnTypeName + " " + FuncName + "(" + ParamTypeName + ")";
+
+				Context.SymbolTable.AddUnique({
+					.Id = FullFuncName,
+					.Kind = ShaderTokenType::BuiltinFunc,
+					.Name = FuncName,
+					.TypeName = FuncTypeName
+				});
+
+				if (auto* Def = Context.SymbolTable.FindByPredicate([&, this](auto&& Item) { return Item.Id == FullFuncName; }))
+				{
+					Context.SymbolRefs.AddUnique(*Def, GlslSymbolRef{
+						.Name = FuncName,
+						.File = Node->getLoc().getFilenameStr(),
+						.Location = {Node->getLoc().line, Node->getLoc().column}
+					});
+				}
+			}
+		}
+
 	private:
 		GlslContext& Context;
 		TArray<ShaderScope> ScopeStack;
@@ -955,7 +1197,7 @@ namespace FW
 			, Context(Funcs, GuideLineScopes)
 			, Stage(InShader->GetShaderType())
 		{
-			shaderc::Compiler GlslCompiler; 
+			shaderc::Compiler GlslCompiler;
 			shaderc::CompileOptions Options;
 			Options.AddMacroDefinition("EDITOR_ISENSE", "1");
 			Options.AddMacroDefinition("ENABLE_PRINT", "0");
@@ -1030,12 +1272,352 @@ namespace FW
 		TArray<ShaderDiagnosticInfo> GetDiagnostic() override
 		{
 			FString Msg = UTF8_TO_TCHAR(ParsedShader.GetErrorMessage().c_str());
-			return ParseDiagnosticInfoFromGlslang(Msg);
+			return ParseDiagnosticInfoFromGlslang(ShaderName, Msg);
 		}
 
-		ShaderSymbol GetSymbolInfo(uint32 Row, uint32 Col) override
+		ShaderSymbol GetSymbolInfo(uint32 Row, uint32 Col, uint32 Size) override
 		{
-			return {};
+			FString TokenStr = GetStr(Row, Col, Size);
+			if (TokenStr.IsEmpty())
+			{
+				return {};
+			}
+
+			// Tokenize type name, splitting keyword modifiers from core type
+			auto TokenizeTypeName = [this](const FString& TypeName, TArray<TPair<FString, ShaderTokenType>>& OutTokens) {
+				FString Remaining = TypeName.TrimStartAndEnd();
+
+				// Extract keyword prefixes (e.g. const, in, out, uniform, etc.)
+				while (!Remaining.IsEmpty())
+				{
+					int32 SpacePos = Remaining.Find(TEXT(" "));
+					if (SpacePos == INDEX_NONE) break;
+
+					FString FirstWord = Remaining.Left(SpacePos);
+					if (GLSL::FindKeyword(FirstWord, Stage))
+					{
+						OutTokens.Add({ FirstWord, ShaderTokenType::Keyword });
+						OutTokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+						Remaining = Remaining.Mid(SpacePos + 1).TrimStart();
+					}
+					else
+					{
+						break;
+					}
+				}
+
+				// Add the core type name
+				if (!Remaining.IsEmpty())
+				{
+					ShaderTokenType TypeTokenType = GLSL::FindBuiltinType(Remaining, Stage) ? ShaderTokenType::BuiltinType : ShaderTokenType::Type;
+					OutTokens.Add({ Remaining, TypeTokenType });
+				}
+			};
+
+			ShaderSymbol Symbol{};
+			for (const auto& [Def, Ref] : Context.SymbolRefs)
+			{
+				if (Ref.File == ShaderName && Row == (uint32)Ref.Location.X && Col >= (uint32)Ref.Location.Y && Col <= (uint32)Ref.Location.Y + Ref.Name.Len())
+				{
+					if (const GLSL::ShaderBuiltinItem* BuiltinFunc = GLSL::FindBuiltinFunc(TokenStr, Stage))
+					{
+						Symbol.Type = ShaderTokenType::BuiltinFunc;
+						Symbol.Desc = BuiltinFunc->Desc;
+						Symbol.Url = BuiltinFunc->Url;
+
+						// Parse TypeName format: ReturnType(ParamType1,ParamType2)
+						if (!Def.TypeName.IsEmpty())
+						{
+							FString TypeName = Def.TypeName;
+							int32 ParenPos = TypeName.Find(TEXT("("));
+							if (ParenPos != INDEX_NONE)
+							{
+								// Extract return type
+								FString ReturnType = TypeName.Left(ParenPos).TrimStartAndEnd();
+								TokenizeTypeName(ReturnType, Symbol.Tokens);
+								Symbol.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+								Symbol.Tokens.Add({ TokenStr, ShaderTokenType::BuiltinFunc });
+								Symbol.Tokens.Add({ TEXT("("), ShaderTokenType::Punctuation });
+
+								// Extract parameter types
+								FString ParamsStr = TypeName.Mid(ParenPos + 1);
+								if (ParamsStr.EndsWith(TEXT(")")))
+								{
+									ParamsStr = ParamsStr.Left(ParamsStr.Len() - 1);
+								}
+								ParamsStr.TrimStartAndEndInline();
+
+								if (!ParamsStr.IsEmpty())
+								{
+									TArray<FString> ParamTypes;
+									ParamsStr.ParseIntoArray(ParamTypes, TEXT(","), true);
+									
+									// Try to find matching signature from BuiltinFunc to get parameter names
+									const GLSL::ShaderBuiltinSignature* MatchedSig = nullptr;
+									for (const auto& Sig : BuiltinFunc->Signatures)
+									{
+										if (Sig.Parameters.Num() == ParamTypes.Num())
+										{
+											MatchedSig = &Sig;
+											break; // Use first matching signature
+										}
+									}
+									
+									for (int32 i = 0; i < ParamTypes.Num(); i++)
+									{
+										if (i > 0) Symbol.Tokens.Add({ TEXT(", "), ShaderTokenType::Punctuation });
+										FString ParamType = ParamTypes[i].TrimStartAndEnd();
+										TokenizeTypeName(ParamType, Symbol.Tokens);
+										
+										// Append parameter name if available from signature
+										if (MatchedSig && MatchedSig->Parameters.IsValidIndex(i))
+										{
+											const auto& Param = MatchedSig->Parameters[i];
+											if (!Param.Name.IsEmpty())
+											{
+												Symbol.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+												Symbol.Tokens.Add({ Param.Name, ShaderTokenType::Param });
+											}
+										}
+									}
+								}
+								Symbol.Tokens.Add({ TEXT(")"), ShaderTokenType::Punctuation });
+							}
+							else
+							{
+								// No parameters, just return type
+								TokenizeTypeName(TypeName, Symbol.Tokens);
+								Symbol.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+								Symbol.Tokens.Add({ TokenStr, ShaderTokenType::BuiltinFunc });
+								Symbol.Tokens.Add({ TEXT("()"), ShaderTokenType::Punctuation });
+							}
+
+							// Build overloads from JSON for reference display
+							for (const auto& Sig : BuiltinFunc->Signatures)
+							{
+								ShaderSymbol::FuncOverload Overload;
+								TokenizeTypeName(Sig.ReturnType, Overload.Tokens);
+								Overload.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+								Overload.Tokens.Add({ BuiltinFunc->Label, ShaderTokenType::BuiltinFunc });
+								Overload.Tokens.Add({ TEXT("("), ShaderTokenType::Punctuation });
+								for (int32 j = 0; j < Sig.Parameters.Num(); j++)
+								{
+									const auto& Param = Sig.Parameters[j];
+									if (j > 0) Overload.Tokens.Add({ TEXT(", "), ShaderTokenType::Punctuation });
+
+									TokenizeTypeName(Param.Type, Overload.Tokens);
+									if (!Param.Name.IsEmpty())
+									{
+										Overload.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+										Overload.Tokens.Add({ Param.Name, ShaderTokenType::Param });
+									}
+
+									ParamSemaFlag SemaFlag = ParamSemaFlag::None;
+									if (Param.IO == TEXT("in")) SemaFlag = ParamSemaFlag::In;
+									else if (Param.IO == TEXT("out")) SemaFlag = ParamSemaFlag::Out;
+									else if (Param.IO == TEXT("inout")) SemaFlag = ParamSemaFlag::Inout;
+
+									Overload.Params.Add({ Param.Name, Param.Desc, SemaFlag });
+								}
+								Overload.Tokens.Add({ TEXT(")"), ShaderTokenType::Punctuation });
+								Symbol.Overloads.Add(MoveTemp(Overload));
+							}
+						}
+						return Symbol;
+					}
+
+					if (Def.Kind == ShaderTokenType::Var || Def.Kind == ShaderTokenType::LocalVar || Def.Kind == ShaderTokenType::Param)
+					{
+						Symbol.Type = Def.Kind;
+						Symbol.File = Def.File;
+						Symbol.Row = Def.Location.X;
+						TokenizeTypeName(Def.TypeName, Symbol.Tokens);
+						Symbol.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+						Symbol.Tokens.Add({ Def.Name, Def.Kind });
+						return Symbol;
+					}
+
+					if (Def.Kind == ShaderTokenType::Func)
+					{
+						Symbol.Type = ShaderTokenType::Func;
+						Symbol.File = Def.File;
+						Symbol.Row = Def.Location.X;
+
+						// Helper lambda to build function tokens
+						auto BuildFuncTokens = [&TokenizeTypeName](const FString& FuncTypeName, const FString& FuncName, const TArray<FString>& ParamNames, TArray<TPair<FString, ShaderTokenType>>& OutTokens) {
+							int32 ParenPos = FuncTypeName.Find(TEXT("("));
+							if (ParenPos != INDEX_NONE)
+							{
+								// Extract return type
+								FString ReturnType = FuncTypeName.Left(ParenPos).TrimStartAndEnd();
+								TokenizeTypeName(ReturnType, OutTokens);
+								OutTokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+								OutTokens.Add({ FuncName, ShaderTokenType::Func });
+								OutTokens.Add({ TEXT("("), ShaderTokenType::Punctuation });
+
+								// Extract parameter types
+								FString ParamsStr = FuncTypeName.Mid(ParenPos + 1);
+								if (ParamsStr.EndsWith(TEXT(")")))
+								{
+									ParamsStr = ParamsStr.Left(ParamsStr.Len() - 1);
+								}
+								ParamsStr.TrimStartAndEndInline();
+
+								if (!ParamsStr.IsEmpty())
+								{
+									TArray<FString> ParamTypes;
+									ParamsStr.ParseIntoArray(ParamTypes, TEXT(","), true);
+									for (int32 i = 0; i < ParamTypes.Num(); i++)
+									{
+										if (i > 0) OutTokens.Add({ TEXT(", "), ShaderTokenType::Punctuation });
+										FString ParamType = ParamTypes[i].TrimStartAndEnd();
+										TokenizeTypeName(ParamType, OutTokens);
+										
+										// Append parameter name if available
+										if (ParamNames.IsValidIndex(i) && !ParamNames[i].IsEmpty())
+										{
+											OutTokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+											OutTokens.Add({ ParamNames[i], ShaderTokenType::Param });
+										}
+									}
+								}
+								OutTokens.Add({ TEXT(")"), ShaderTokenType::Punctuation });
+							}
+							else
+							{
+								// No parameters
+								TokenizeTypeName(FuncTypeName, OutTokens);
+								OutTokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+								OutTokens.Add({ FuncName, ShaderTokenType::Func });
+								OutTokens.Add({ TEXT("()"), ShaderTokenType::Punctuation });
+							}
+						};
+
+						// Find parameters for current definition from Funcs
+						TArray<FString> DefParamNames;
+						const ShaderFunc* DefFunc = Funcs.FindByPredicate([&](const ShaderFunc& Func) {
+							return Func.FullName == Def.Id;
+						});
+						if (DefFunc)
+						{
+							for (const ShaderParameter& Param : DefFunc->Params)
+							{
+								DefParamNames.Add(Param.Name);
+							}
+						}
+
+						// Build Symbol.Tokens for current definition
+						BuildFuncTokens(Def.TypeName, Def.Name, DefParamNames, Symbol.Tokens);
+
+						// Find overloads with the same name
+						for (const ShaderFunc& Func : Funcs)
+						{
+							if (Func.Name == Def.Name)
+							{
+								// Find the function symbol to get its TypeName
+								const GlslSymbol* FuncSymbol = Context.SymbolTable.FindByPredicate([&](const GlslSymbol& Sym) {
+									return Sym.Kind == ShaderTokenType::Func && Sym.Name == Func.Name && Sym.Id == Func.FullName;
+								});
+
+								if (FuncSymbol)
+								{
+									ShaderSymbol::FuncOverload Overload;
+									
+									// Extract parameter names from Func.Params
+									TArray<FString> OverloadParamNames;
+									for (const ShaderParameter& Param : Func.Params)
+									{
+										OverloadParamNames.Add(Param.Name);
+										Overload.Params.Add({ Param.Name, Param.Desc, Param.SemaFlag });
+									}
+									
+									BuildFuncTokens(FuncSymbol->TypeName, Func.Name, OverloadParamNames, Overload.Tokens);
+
+									Symbol.Overloads.Add(MoveTemp(Overload));
+								}
+							}
+						}
+
+						return Symbol;
+					}
+
+					if (Def.Kind == ShaderTokenType::Type)
+					{
+						Symbol.Type = Def.Kind;
+						Symbol.File = Def.File;
+						Symbol.Row = Def.Location.X;
+						Symbol.Tokens.Add({ TEXT("struct"), ShaderTokenType::Keyword });
+						Symbol.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+						Symbol.Tokens.Add({ Def.Name, ShaderTokenType::Type });
+						return Symbol;
+					}
+				}
+			}
+
+			if (const GLSL::ShaderBuiltinItem* BuiltinFunc = GLSL::FindBuiltinFunc(TokenStr, Stage))
+			{
+				Symbol.Type = ShaderTokenType::BuiltinFunc;
+				Symbol.Desc = BuiltinFunc->Desc;
+				Symbol.Url = BuiltinFunc->Url;
+
+				Symbol.Tokens.Add({ TokenStr, ShaderTokenType::BuiltinFunc });
+				Symbol.Tokens.Add({ TEXT("()"), ShaderTokenType::Punctuation });
+
+				// Build overloads from JSON for reference display
+				for (const auto& Sig : BuiltinFunc->Signatures)
+				{
+					ShaderSymbol::FuncOverload Overload;
+					TokenizeTypeName(Sig.ReturnType, Overload.Tokens);
+					Overload.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+					Overload.Tokens.Add({ BuiltinFunc->Label, ShaderTokenType::BuiltinFunc });
+					Overload.Tokens.Add({ TEXT("("), ShaderTokenType::Punctuation });
+					for (int32 j = 0; j < Sig.Parameters.Num(); j++)
+					{
+						const auto& Param = Sig.Parameters[j];
+						if (j > 0) Overload.Tokens.Add({ TEXT(", "), ShaderTokenType::Punctuation });
+
+						TokenizeTypeName(Param.Type, Overload.Tokens);
+						if (!Param.Name.IsEmpty())
+						{
+							Overload.Tokens.Add({ TEXT(" "), ShaderTokenType::Unknown });
+							Overload.Tokens.Add({ Param.Name, ShaderTokenType::Param });
+						}
+
+						ParamSemaFlag SemaFlag = ParamSemaFlag::None;
+						if (Param.IO == TEXT("in")) SemaFlag = ParamSemaFlag::In;
+						else if (Param.IO == TEXT("out")) SemaFlag = ParamSemaFlag::Out;
+						else if (Param.IO == TEXT("inout")) SemaFlag = ParamSemaFlag::Inout;
+
+						Overload.Params.Add({ Param.Name, Param.Desc, SemaFlag });
+					}
+					Overload.Tokens.Add({ TEXT(")"), ShaderTokenType::Punctuation });
+					Symbol.Overloads.Add(MoveTemp(Overload));
+				}
+
+				return Symbol;
+			}
+
+			if (const GLSL::ShaderBuiltinItem* BuiltinType = GLSL::FindBuiltinType(TokenStr, Stage))
+			{
+				if (BuiltinType->Desc.IsEmpty()) return {};
+				Symbol.Type = ShaderTokenType::BuiltinType;
+				Symbol.Tokens.Add({ TokenStr, ShaderTokenType::BuiltinType });
+				Symbol.Desc = BuiltinType->Desc;
+				Symbol.Url = BuiltinType->Url;
+				return Symbol;
+			}
+
+			if (const GLSL::ShaderBuiltinItem* Keyword = GLSL::FindKeyword(TokenStr, Stage))
+			{
+				if (Keyword->Desc.IsEmpty()) return {};
+				Symbol.Type = ShaderTokenType::Keyword;
+				Symbol.Tokens.Add({ TokenStr, ShaderTokenType::Keyword });
+				Symbol.Desc = Keyword->Desc;
+				Symbol.Url = Keyword->Url;
+				return Symbol;
+			}
+
+			return Symbol;
 		}
 
 		ShaderTokenType GetTokenType(ShaderTokenType InType, uint32 Row, uint32 Col, uint32 Size) override

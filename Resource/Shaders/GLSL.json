@@ -6,8 +6,7 @@
                 "VS",
                 "PS",
                 "CS"
-            ],
-            "desc": "Structure definition"
+            ]
         },
         {
             "label": "if",
@@ -15,8 +14,7 @@
                 "VS",
                 "PS",
                 "CS"
-            ],
-            "desc": "Conditional statement"
+            ]
         },
         {
             "label": "else",
@@ -24,8 +22,7 @@
                 "VS",
                 "PS",
                 "CS"
-            ],
-            "desc": "Else branch of conditional"
+            ]
         },
         {
             "label": "switch",
@@ -33,8 +30,7 @@
                 "VS",
                 "PS",
                 "CS"
-            ],
-            "desc": "Switch statement"
+            ]
         },
         {
             "label": "case",
@@ -42,8 +38,7 @@
                 "VS",
                 "PS",
                 "CS"
-            ],
-            "desc": "Case label in switch"
+            ]
         },
         {
             "label": "default",
@@ -51,8 +46,7 @@
                 "VS",
                 "PS",
                 "CS"
-            ],
-            "desc": "Default case in switch"
+            ]
         },
         {
             "label": "break",
@@ -60,8 +54,7 @@
                 "VS",
                 "PS",
                 "CS"
-            ],
-            "desc": "Exits a loop or switch"
+            ]
         },
         {
             "label": "return",
@@ -69,8 +62,7 @@
                 "VS",
                 "PS",
                 "CS"
-            ],
-            "desc": "Returns from a function"
+            ]
         },
         {
             "label": "for",
@@ -78,8 +70,7 @@
                 "VS",
                 "PS",
                 "CS"
-            ],
-            "desc": "For loop statement"
+            ]
         },
         {
             "label": "while",
@@ -87,8 +78,7 @@
                 "VS",
                 "PS",
                 "CS"
-            ],
-            "desc": "While loop statement"
+            ]
         },
         {
             "label": "do",
@@ -96,8 +86,7 @@
                 "VS",
                 "PS",
                 "CS"
-            ],
-            "desc": "Do-while loop statement"
+            ]
         },
         {
             "label": "continue",
@@ -105,8 +94,7 @@
                 "VS",
                 "PS",
                 "CS"
-            ],
-            "desc": "Skips to the next loop iteration"
+            ]
         },
         {
             "label": "const",
@@ -114,8 +102,7 @@
                 "VS",
                 "PS",
                 "CS"
-            ],
-            "desc": "Declares a constant variable"
+            ]
         },
         {
             "label": "in",
@@ -123,8 +110,7 @@
                 "VS",
                 "PS",
                 "CS"
-            ],
-            "desc": "Input variable qualifier"
+            ]
         },
         {
             "label": "out",
@@ -132,8 +118,7 @@
                 "VS",
                 "PS",
                 "CS"
-            ],
-            "desc": "Output variable qualifier"
+            ]
         },
         {
             "label": "inout",
@@ -141,8 +126,7 @@
                 "VS",
                 "PS",
                 "CS"
-            ],
-            "desc": "Input/output variable qualifier"
+            ]
         },
         {
             "label": "uniform",
@@ -150,8 +134,7 @@
                 "VS",
                 "PS",
                 "CS"
-            ],
-            "desc": "Uniform variable qualifier"
+            ]
         },
         {
             "label": "buffer",
@@ -168,8 +151,7 @@
                 "VS",
                 "PS",
                 "CS"
-            ],
-            "desc": "Layout qualifier"
+            ]
         },
         {
             "label": "location",
@@ -177,8 +159,7 @@
                 "VS",
                 "PS",
                 "CS"
-            ],
-            "desc": "Location layout qualifier"
+            ]
         },
         {
             "label": "binding",
@@ -267,8 +248,7 @@
                 "VS",
                 "PS",
                 "CS"
-            ],
-            "desc": "Boolean true literal"
+            ]
         },
         {
             "label": "false",
@@ -276,8 +256,7 @@
                 "VS",
                 "PS",
                 "CS"
-            ],
-            "desc": "Boolean false literal"
+            ]
         },
         {
             "label": "gl_Position",

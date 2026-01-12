@@ -299,7 +299,8 @@ namespace SH
 		TSharedPtr<FShaderEditorMarshaller> ShaderMarshaller;
 
 		//------------Syntax highlight-----------
-		TUniquePtr<FW::ShaderTU> SyntaxTU;
+		TSharedPtr<FW::ShaderTU> SyntaxTU;
+		TSharedPtr<FW::ShaderTU> SyntaxTUCopy;
 		TArray<TMap<FTextRange, FW::ShaderTokenType>> LineSyntaxHighlightMaps;
 		TArray<TMap<FTextRange, FW::ShaderTokenType>> LineSyntaxHighlightMapsCopy;
 		TUniquePtr<FThread> SyntaxThread;
@@ -349,7 +350,6 @@ namespace SH
 		FCurveSequence FoldingArrowAnim;
         
         //----------CodeComplete and real-time diagnostic----------
-		TUniquePtr<FW::ShaderTU> ISenseTU;
 		TUniquePtr<FThread> ISenseThread;
 		TQueue<ISenseTask> ISenseQueue;
 

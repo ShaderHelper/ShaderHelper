@@ -321,9 +321,9 @@ constexpr int PaddingLineNum = 22;
 		const float InverseScale = Inverse(AllottedGeometry.Scale);
 		const double OffsetX = 4;
 
-		if (Owner->CanShowGuideLine() && Owner->SyntaxTU.IsValid())
+		if (Owner->CanShowGuideLine() && Owner->SyntaxTUCopy.IsValid())
 		{
-			TArray<ShaderScope> GuideLineScopes = Owner->SyntaxTU->GetGuideLineScopes();
+			TArray<ShaderScope> GuideLineScopes = Owner->SyntaxTUCopy->GetGuideLineScopes();
 			int32 ExtraLineNum = Owner->GetShaderAsset()->GetExtraLineNum();
 			//Draw guide lines
 			for (const auto& Scope : GuideLineScopes)
@@ -493,7 +493,6 @@ constexpr int PaddingLineNum = 22;
 							return A.Text.Compare(B.Text) < 0;
 						});
 					}
-					this->ISenseTU = MoveTemp(TU);
 
 					if (ISenseQueue.IsEmpty())
 					{
@@ -532,7 +531,7 @@ constexpr int PaddingLineNum = 22;
 							}
 						}
 					}
-					this->SyntaxTU = MoveTemp(TU);
+					this->SyntaxTU = MakeShareable(TU.Release());
 
 					if (SyntaxQueue.IsEmpty())
 					{
@@ -1702,7 +1701,6 @@ constexpr int PaddingLineNum = 22;
 
 	void SShaderEditorBox::RefreshSyntaxHighlight()
 	{
-		LineSyntaxHighlightMapsCopy = LineSyntaxHighlightMaps;
 		for(int LineIndex = 0; LineIndex < LineSyntaxHighlightMapsCopy.Num(); LineIndex++)
 		{
 			auto& SyntaxHighlightMap = LineSyntaxHighlightMapsCopy[LineIndex];
@@ -1735,7 +1733,7 @@ constexpr int PaddingLineNum = 22;
 			{
 				if (CursorOffset >= Token.BeginOffset && CursorOffset <= Token.EndOffset)
 				{
-					Occurrences = SyntaxTU->GetOccurrences(GetLineNumber(CursorLineIndex) + AddedLineNum, Token.BeginOffset + 1);
+					Occurrences = SyntaxTUCopy->GetOccurrences(GetLineNumber(CursorLineIndex) + AddedLineNum, Token.BeginOffset + 1);
 					break;
 				}
 			}
@@ -1880,6 +1878,9 @@ constexpr int PaddingLineNum = 22;
 
 		if (bRefreshSyntax.load(std::memory_order_acquire))
 		{
+			SyntaxTUCopy = SyntaxTU;
+			LineSyntaxHighlightMapsCopy = LineSyntaxHighlightMaps;
+
 			RefreshSyntaxHighlight();
 			bRefreshSyntax.store(false, std::memory_order_relaxed);
 		}
@@ -3268,7 +3269,7 @@ constexpr int PaddingLineNum = 22;
     void FShaderEditorMarshaller::SetText(const FString& SourceString, FTextLayout& TargetTextLayout, TArray<FTextLayout::FLineModel>&& OldLineModels)
     {
         TextLayout = &TargetTextLayout;
-				
+		FString EditorSourceBeforeEditing = OwnerWidget->CurrentEditorSource;
 		OwnerWidget->CurrentEditorSource = SourceString;
 		auto& LineModels = TextLayout->GetLineModels();
 		FSlateEditableTextLayout* EditableTextLayout = OwnerWidget->ShaderMultiLineEditableTextLayout;
@@ -3313,7 +3314,6 @@ constexpr int PaddingLineNum = 22;
 		//Incremental processing
 		else
 		{
-			FString EditorSourceBeforeEditing = OwnerWidget->CurrentEditorSource;
 			TArray<FTextRange> LineRangesBeforeEditing;
 			FTextRange::CalculateLineRangesFromString(EditorSourceBeforeEditing, LineRangesBeforeEditing);
 
@@ -3346,27 +3346,21 @@ constexpr int PaddingLineNum = 22;
 					{
 						FTextBlockStyle* RunTextStyle = &OwnerWidget->GetTokenStyleMap()[Token.Type];
 						FTextRange NewTokenRange{ Token.BeginOffset, Token.EndOffset };
-						
+						FString TokenStr = LineText->Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
+
 						if(!CurTokenizedLine)
 						{
 							CurTokenizedLine = &NewTokenizedLine;
 						}
 						//Compares old tokens to avoid lexical highlighting overriding syntax highlighting
-						if(auto* MatchedToken = CurTokenizedLine->Tokens.FindByPredicate([&](const ShaderTokenizer::Token& Element){
-							FString TokenStr = LineText->Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
-							FString ElementStr = LineTextBeforeEditing.Mid(Element.BeginOffset, Element.EndOffset - Element.BeginOffset);
-							return Token.Type == ShaderTokenType::Identifier && Token.Type == Element.Type
-							&& (Token.BeginOffset == Element.BeginOffset || TokenStr == ElementStr);
-						}))
+						if (OwnerWidget->LineSyntaxHighlightMapsCopy.IsValidIndex(LineIndex))
 						{
-							if(OwnerWidget->LineSyntaxHighlightMapsCopy.IsValidIndex(LineIndex))
+							for (const auto& [TokenRange, TokenType] : OwnerWidget->LineSyntaxHighlightMapsCopy[LineIndex])
 							{
-								for(const auto& [TokenRange, TokenType] : OwnerWidget->LineSyntaxHighlightMapsCopy[LineIndex])
+								FString OldTokenStr = LineTextBeforeEditing.Mid(TokenRange.BeginIndex, TokenRange.Len());
+								if (TokenStr == OldTokenStr)
 								{
-									if(TokenRange.BeginIndex == MatchedToken->BeginOffset)
-									{
-										RunTextStyle = &OwnerWidget->GetTokenStyleMap()[TokenType];
-									}
+									RunTextStyle = &OwnerWidget->GetTokenStyleMap()[TokenType];
 								}
 							}
 						}
@@ -3581,7 +3575,7 @@ constexpr int PaddingLineNum = 22;
 		const double CheckInterval = 0.4;
 
 		bool bShouldCheck = InCurrentTime - LastCheckTime >= CheckInterval;
-		bShouldCheck = bShouldCheck && !bMouseInTipWindow;
+		bShouldCheck = bShouldCheck && !bMouseInTipWindow && FSlateApplication::Get().GetActiveTopLevelRegularWindow() == ShEditor->GetMainWindow();
 
 		//Show the debug value when hovering over variables
 		auto CheckDebuggerTip = [&] {
@@ -3860,15 +3854,17 @@ constexpr int PaddingLineNum = 22;
 				int32 ExtraLineNum = Owner->GetShaderAsset()->GetExtraLineNum();
 				const auto& TokenizedLine = Owner->ShaderMarshaller->TokenizedLines[CurrentHoverLocation.GetLineIndex()];
 				int32 TokenOffset{};
+				int32 TokenEndOffset{};
 
 				static int32 LastHoverLineIndex = -1;
 				static int32 LastTokenOffset = -1;
-
+			
 				for (const auto& Token : TokenizedLine.Tokens)
 				{
 					if (Token.Type == ShaderTokenType::Identifier && CurrentHoverLocation.GetOffset() >= Token.BeginOffset && CurrentHoverLocation.GetOffset() <= Token.EndOffset)
 					{
 						TokenOffset = Token.BeginOffset;
+						TokenEndOffset = Token.EndOffset;
 						break;
 					}
 				}
@@ -3876,7 +3872,7 @@ constexpr int PaddingLineNum = 22;
 				bool bSameToken = (CurrentHoverLocation.GetLineIndex() == LastHoverLineIndex &&
 					TokenOffset == LastTokenOffset);
 
-				auto Symbol = Owner->SyntaxTU->GetSymbolInfo(CurrentHoverLocation.GetLineIndex() + ExtraLineNum + 1, TokenOffset + 1);
+				auto Symbol = Owner->SyntaxTUCopy->GetSymbolInfo(CurrentHoverLocation.GetLineIndex() + ExtraLineNum + 1, TokenOffset + 1, TokenEndOffset - TokenOffset);
 				if (Symbol.Tokens.Num() > 0)
 				{
 					if (!bSameToken)
@@ -3892,6 +3888,7 @@ constexpr int PaddingLineNum = 22;
 							[
 								SNew(STextBlock)
 									.Text(FText::FromString(TEXT("(") + LOCALIZATION(magic_enum::enum_name(Symbol.Type).data()).ToString() + TEXT(") ")))
+									.Font(FCoreStyle::GetDefaultFontStyle("Bold", SShaderEditorBox::GetFontSize()))
 							];
 						for (const auto& Token : Symbol.Tokens)
 						{
@@ -4046,7 +4043,7 @@ constexpr int PaddingLineNum = 22;
 
 							if (!Symbol.Desc.IsEmpty())
 							{
-								Box->AddSlot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(Symbol.Desc))];
+								Box->AddSlot().AutoHeight().Padding(0, 4, 0, 0)[SNew(STextBlock).Text(FText::FromString(Symbol.Desc))];
 							}
 						}
 

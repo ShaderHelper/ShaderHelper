@@ -33,8 +33,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Marks variable as static"
+            ]
         },
         {
             "label": "const",
@@ -45,8 +44,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Declares a read-only variable"
+            ]
         },
         {
             "label": "out",
@@ -57,8 +55,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Output parameter modifier"
+            ]
         },
         {
             "label": "in",
@@ -69,8 +66,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Input parameter modifier"
+            ]
         },
         {
             "label": "inout",
@@ -81,8 +77,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Input/output parameter modifier"
+            ]
         },
         {
             "label": "extern",
@@ -93,8 +88,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "External linkage modifier"
+            ]
         },
         {
             "label": "inline",
@@ -105,8 +99,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Inline function hint"
+            ]
         },
         {
             "label": "precise",
@@ -129,8 +122,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Exits a loop"
+            ]
         },
         {
             "label": "continue",
@@ -141,8 +133,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Skips to the next loop iteration"
+            ]
         },
         {
             "label": "do",
@@ -153,8 +144,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Do-while loop statement"
+            ]
         },
         {
             "label": "for",
@@ -165,8 +155,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "For loop statement"
+            ]
         },
         {
             "label": "if",
@@ -177,8 +166,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Conditional statement"
+            ]
         },
         {
             "label": "struct",
@@ -189,8 +177,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Structure definition"
+            ]
         },
         {
             "label": "typedef",
@@ -201,8 +188,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Type alias definition"
+            ]
         },
         {
             "label": "else",
@@ -213,8 +199,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Else branch of conditional"
+            ]
         },
         {
             "label": "switch",
@@ -225,8 +210,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Switch statement"
+            ]
         },
         {
             "label": "while",
@@ -237,8 +221,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "While loop statement"
+            ]
         },
         {
             "label": "case",
@@ -249,8 +232,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Case label in switch"
+            ]
         },
         {
             "label": "default",
@@ -261,8 +243,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Default case in switch"
+            ]
         },
         {
             "label": "return",
@@ -273,8 +254,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Returns from a function"
+            ]
         },
         {
             "label": "true",
@@ -285,8 +265,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Boolean true literal"
+            ]
         },
         {
             "label": "false",
@@ -297,8 +276,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Boolean false literal"
+            ]
         },
         {
             "label": "row_major",
@@ -405,8 +383,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Template declaration"
+            ]
         },
         {
             "label": "typename",
@@ -417,8 +394,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Template type parameter"
+            ]
         },
         {
             "label": "sizeof",
@@ -429,8 +405,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Returns size of a type"
+            ]
         },
         {
             "label": "_Static_assert",
@@ -441,8 +416,7 @@
                 "GS",
                 "HS",
                 "DS"
-            ],
-            "desc": "Compile-time assertion"
+            ]
         },
         {
             "label": "SV_POSITION",
