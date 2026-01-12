@@ -1551,6 +1551,15 @@ namespace FW
 						Symbol.Tokens.Add({ Def.Name, ShaderTokenType::Type });
 						return Symbol;
 					}
+
+					if (Def.Kind == ShaderTokenType::Preprocess)
+					{
+						Symbol.Type = Def.Kind;
+						Symbol.File = Def.File;
+						Symbol.Row = Def.Location.X;
+						Symbol.Tokens.Add({ TokenStr, ShaderTokenType::Preprocess });
+						return Symbol;
+					}
 				}
 			}
 

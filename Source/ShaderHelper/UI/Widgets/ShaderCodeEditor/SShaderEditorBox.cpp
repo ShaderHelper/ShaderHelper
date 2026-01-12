@@ -3358,7 +3358,7 @@ constexpr int PaddingLineNum = 22;
 							for (const auto& [TokenRange, TokenType] : OwnerWidget->LineSyntaxHighlightMapsCopy[LineIndex])
 							{
 								FString OldTokenStr = LineTextBeforeEditing.Mid(TokenRange.BeginIndex, TokenRange.Len());
-								if (TokenStr == OldTokenStr)
+								if (Token.Type == ShaderTokenType::Identifier && TokenStr == OldTokenStr)
 								{
 									RunTextStyle = &OwnerWidget->GetTokenStyleMap()[TokenType];
 								}
