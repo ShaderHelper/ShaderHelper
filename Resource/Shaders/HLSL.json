@@ -1,6 +1,17 @@
 {
     "Keywords": [
         {
+            "label": "operator",
+            "stages": [
+                "VS",
+                "PS",
+                "CS",
+                "GS",
+                "HS",
+                "DS"
+            ]
+        },
+        {
             "label": "register",
             "stages": [
                 "VS",

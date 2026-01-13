@@ -106,10 +106,14 @@ namespace SH
 		[
 			InternalBorder
 		];
+		bool ManualRefresh = !Data->IsVarIdentifier && Data->Dirty;
 		if(ColumnId == ExpColId)
 		{
 			Border->SetPadding(FMargin{0, 0, 1, 2});
 			auto ExprText = SNew(FW::SShInlineEditableTextBlock)
+			.ColorAndOpacity_Lambda([ManualRefresh] {
+				return ManualRefresh ? FStyleColors::Foreground.GetSpecifiedColor().CopyWithNewOpacity(0.5f) : FStyleColors::Foreground;
+			})
 			.Text_Lambda([this]{ return FText::FromString(Data->Expr); })
 			.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
 				if(NewText.ToString().IsEmpty() && !Data->Expr.IsEmpty())
@@ -131,16 +135,29 @@ namespace SH
 					}
 				}
 			});
+			InternalBorder->SetToolTipText(FText::FromString(Data->Expr));
 			InternalBorder->SetContent(
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot()
 				.AutoWidth()
 				[
-					SNew(SExpanderArrow, SharedThis(this))
+					SNew(SExpanderArrow, SharedThis(this)).Visibility_Lambda([ManualRefresh] { return ManualRefresh ? EVisibility::Visible : EVisibility::Hidden; })
 				]
 				+ SHorizontalBox::Slot()
 				[
 					ExprText
+				]
+				+ SHorizontalBox::Slot()
+				.HAlign(HAlign_Right)
+				.AutoWidth()
+				[
+					SNew(SIconButton).Visibility_Lambda([ManualRefresh] { return ManualRefresh ? EVisibility::Visible : EVisibility::Hidden; })
+					.Icon(FAppStyle::Get().GetBrush("Icons.refresh")).IconSize(FVector2D{12,12})
+					.OnClicked_Lambda([this] {
+						*Data = Owner->OnWatch(Data->Expr);
+						Owner->ExpressionTreeView->RebuildList();
+						return FReply::Handled();
+					})
 				]
 			);
 		}
@@ -148,8 +165,12 @@ namespace SH
 		{
 			Border->SetPadding(FMargin{1, 0, 1, 2});
 			auto Text = SNew(STextBlock).Text(FText::FromString(Data->ValueStr))
-				.ColorAndOpacity_Lambda([this] {
-					return Data->Dirty ? FStyleColors::AccentRed : FStyleColors::Foreground;
+				.ColorAndOpacity_Lambda([this, ManualRefresh] {
+					if (ManualRefresh)
+					{
+						return FStyleColors::Foreground.GetSpecifiedColor().CopyWithNewOpacity(0.5f);
+					}
+					return Data->Dirty ? FStyleColors::AccentRed.GetSpecifiedColor() : FStyleColors::Foreground.GetSpecifiedColor();
 				});
 			if (Data->TypeName == "float3" || Data->TypeName == "float4")
 			{
@@ -206,7 +227,12 @@ namespace SH
 		else
 		{
 			Border->SetPadding(FMargin{1, 0, 0, 2});
-			InternalBorder->SetContent(SNew(STextBlock).Text(FText::FromString(Data->TypeName)));
+			InternalBorder->SetToolTipText(FText::FromString(Data->TypeName));
+			InternalBorder->SetContent(SNew(STextBlock)
+				.ColorAndOpacity_Lambda([ManualRefresh] {
+					return ManualRefresh ? FStyleColors::Foreground.GetSpecifiedColor().CopyWithNewOpacity(0.5f) : FStyleColors::Foreground;
+				})
+				.Text(FText::FromString(Data->TypeName)));
 		}
 		return Border;
 	}
@@ -217,16 +243,24 @@ namespace SH
 		{
 			if(OnWatch && !Data->Expr.IsEmpty())
 			{
-				ExpressionNode ExprResult = OnWatch(Data->Expr);
-				if(ExprResult.ValueStr != Data->ValueStr)
+				if (Data->IsVarIdentifier)
 				{
-					*Data = ExprResult;
-					Data->Dirty = true;
+					ExpressionNode ExprResult = OnWatch(Data->Expr);
+					if (ExprResult.ValueStr != Data->ValueStr)
+					{
+						*Data = ExprResult;
+						Data->Dirty = true;
+					}
+					else
+					{
+						Data->Dirty = false;
+					}
 				}
 				else
 				{
-					Data->Dirty = false;
+					Data->Dirty = true;
 				}
+				
 			}
 		}
 		ExpressionTreeView->RebuildList();

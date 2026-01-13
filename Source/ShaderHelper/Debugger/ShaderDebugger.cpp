@@ -10,126 +10,42 @@ using namespace FW;
 
 namespace SH
 {
-	TArray<ExpressionNodePtr> AppendVarChildNodes(GpuShaderLanguage Lang, SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, const TArray<SpvVarDirtyRange>& DirtyRanges, const TArray<uint8>& Value, int32 InOffset)
+	TArray<ExpressionNodePtr> AppendChildNodes(GpuShaderLanguage Lang, SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, const TArray<SpvVarDirtyRange>& DirtyRanges, const TArray<uint8>& Value, int32 InOffset)
 	{
 		TArray<ExpressionNodePtr> Nodes;
 		int32 Offset = InOffset;
-		if (TypeDesc->GetKind() == SpvTypeDescKind::Member)
-		{
-			SpvMemberTypeDesc* MemberTypeDesc = static_cast<SpvMemberTypeDesc*>(TypeDesc);
-			int32 MemberByteSize = GetTypeByteSize(MemberTypeDesc);
-			FString ValueStr = GetValueStr(Value, MemberTypeDesc->GetTypeDesc(), InitializedRanges, Offset, DebuggerViewHex);
-			auto Data = MakeShared<ExpressionNode>(MemberTypeDesc->GetName(), MoveTemp(ValueStr), GetTypeDescStr(MemberTypeDesc->GetTypeDesc(), Lang));
-			if (MemberTypeDesc->GetTypeDesc()->GetKind() == SpvTypeDescKind::Composite)
-			{
-				Data->Children = AppendVarChildNodes(Lang, MemberTypeDesc->GetTypeDesc(), InitializedRanges, DirtyRanges, Value, Offset);
-			}
+		
+		// Helper lambda to check if a range is dirty
+		auto CheckDirty = [&DirtyRanges](int32 ByteOffset, int32 ByteSize) -> bool {
+			if (DirtyRanges.IsEmpty()) return false;
 			for (const auto& Range : DirtyRanges)
 			{
-				int32 RangeStart = Range.ByteOffset;
-				int32 RangeEnd = Range.ByteOffset + Range.ByteSize;
-				if ((RangeStart >= InOffset && RangeStart < InOffset + MemberByteSize) ||
-					(RangeEnd > InOffset && RangeEnd <= InOffset + MemberByteSize) ||
-					(RangeStart < InOffset && RangeEnd > InOffset + MemberByteSize))
+				int32 RangeStartOffset = Range.ByteOffset;
+				int32 RangeEndOffset = Range.ByteOffset + Range.ByteSize;
+				if ((RangeStartOffset >= ByteOffset && RangeStartOffset < ByteOffset + ByteSize) ||
+					(RangeEndOffset > ByteOffset && RangeEndOffset <= ByteOffset + ByteSize) ||
+					(RangeStartOffset < ByteOffset && RangeEndOffset > ByteOffset + ByteSize))
 				{
-					Data->Dirty = true;
-					break;
+					return true;
 				}
 			}
-			Nodes.Add(MoveTemp(Data));
-		}
-		else if (TypeDesc->GetKind() == SpvTypeDescKind::Composite)
-		{
-			SpvCompositeTypeDesc* CompositeTypeDesc = static_cast<SpvCompositeTypeDesc*>(TypeDesc);
-			for (SpvTypeDesc* MemberTypeDesc : CompositeTypeDesc->GetMemberTypeDescs())
-			{
-				Nodes.Append(AppendVarChildNodes(Lang, MemberTypeDesc, InitializedRanges, DirtyRanges, Value, Offset));
-				if (MemberTypeDesc->GetKind() == SpvTypeDescKind::Member)
-				{
-					Offset += GetTypeByteSize(MemberTypeDesc);
-				}
-			}
-		}
-		else if (TypeDesc->GetKind() == SpvTypeDescKind::Matrix)
-		{
-			SpvMatrixTypeDesc* MatrixTypeDesc = static_cast<SpvMatrixTypeDesc*>(TypeDesc);
-			SpvVectorTypeDesc* ElementTypeDesc = MatrixTypeDesc->GetVectorTypeDesc();
-			int32 VectorCount = MatrixTypeDesc->GetVectorCount();
-			int32 ElementTypeSize = GetTypeByteSize(ElementTypeDesc);
-			for (int32 Index = 0; Index < VectorCount; Index++)
-			{
-				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset, DebuggerViewHex);
-				FString MemberName = FString::Printf(TEXT("[%d]"), Index);
-				auto Data = MakeShared<ExpressionNode>(MemberName, MoveTemp(ValueStr), GetTypeDescStr(ElementTypeDesc, Lang));
-				for (const auto& Range : DirtyRanges)
-				{
-					int32 RangeStart = Range.ByteOffset;
-					int32 RangeEnd = Range.ByteOffset + Range.ByteSize;
-					if ((RangeStart >= Offset && RangeStart < Offset + ElementTypeSize) ||
-						(RangeEnd > Offset && RangeEnd <= Offset + ElementTypeSize) ||
-						(RangeStart < Offset && RangeEnd > Offset + ElementTypeSize))
-					{
-						Data->Dirty = true;
-						break;
-					}
-				}
-				Offset += ElementTypeSize;
-				Nodes.Add(MoveTemp(Data));
-			}
-		}
-		else if (TypeDesc->GetKind() == SpvTypeDescKind::Array)
-		{
-			SpvArrayTypeDesc* ArrayTypeDesc = static_cast<SpvArrayTypeDesc*>(TypeDesc);
-			SpvTypeDesc* BaseTypeDesc = ArrayTypeDesc->GetBaseTypeDesc();
-			int32 BaseTypeSize = GetTypeByteSize(BaseTypeDesc);
-			int32 CompCount = ArrayTypeDesc->GetCompCounts()[0];
-			SpvTypeDesc* ElementTypeDesc = BaseTypeDesc;
-			int32 ElementTypeSize = BaseTypeSize;
-			TUniquePtr<SpvArrayTypeDesc> SubArrayTypeDesc = ArrayTypeDesc->GetCompCounts().Num() > 1 ? MakeUnique<SpvArrayTypeDesc>(BaseTypeDesc, TArray{ ArrayTypeDesc->GetCompCounts().GetData() + 1, ArrayTypeDesc->GetCompCounts().Num() - 1 }) : nullptr;
-			if (SubArrayTypeDesc)
-			{
-				ElementTypeDesc = SubArrayTypeDesc.Get();
-				ElementTypeSize *= SubArrayTypeDesc->GetElementNum();
-			}
-			for (int32 Index = 0; Index < CompCount; Index++)
-			{
-				FString MemberName = FString::Printf(TEXT("[%d]"), Index);
-				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset, DebuggerViewHex);
-				auto Data = MakeShared<ExpressionNode>(MemberName, MoveTemp(ValueStr), GetTypeDescStr(ElementTypeDesc, Lang));
-				Data->Children = AppendVarChildNodes(Lang, ElementTypeDesc, InitializedRanges, DirtyRanges, Value, Offset);
-				for (const auto& Range : DirtyRanges)
-				{
-					int32 RangeStart = Range.ByteOffset;
-					int32 RangeEnd = Range.ByteOffset + Range.ByteSize;
-					if ((RangeStart >= Offset && RangeStart < Offset + ElementTypeSize) ||
-						(RangeEnd > Offset && RangeEnd <= Offset + ElementTypeSize) ||
-						(RangeStart < Offset && RangeEnd > Offset + ElementTypeSize))
-					{
-						Data->Dirty = true;
-						break;
-					}
-				}
-				Nodes.Add(MoveTemp(Data));
-				Offset += ElementTypeSize;
-			}
-		}
-		return Nodes;
-	}
+			return false;
+		};
 
-	TArray<ExpressionNodePtr> AppendExprChildNodes(GpuShaderLanguage Lang, SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, const TArray<uint8>& Value, int32 InOffset)
-	{
-		TArray<ExpressionNodePtr> Nodes;
-		int32 Offset = InOffset;
 		if (TypeDesc->GetKind() == SpvTypeDescKind::Member)
 		{
 			SpvMemberTypeDesc* MemberTypeDesc = static_cast<SpvMemberTypeDesc*>(TypeDesc);
 			int32 MemberByteSize = GetTypeByteSize(MemberTypeDesc);
 			FString ValueStr = GetValueStr(Value, MemberTypeDesc->GetTypeDesc(), InitializedRanges, Offset, DebuggerViewHex);
 			FString TypeName = GetTypeDescStr(MemberTypeDesc->GetTypeDesc(), Lang);
-			auto Data = MakeShared<ExpressionNode>(MemberTypeDesc->GetName(), ValueStr, TypeName);
+			auto Data = MakeShared<ExpressionNode>(MemberTypeDesc->GetName(), MoveTemp(ValueStr), TypeName);
 			if (MemberTypeDesc->GetTypeDesc()->GetKind() == SpvTypeDescKind::Composite)
 			{
-				Data->Children = AppendExprChildNodes(Lang, MemberTypeDesc->GetTypeDesc(), InitializedRanges, Value, Offset);
+				Data->Children = AppendChildNodes(Lang, MemberTypeDesc->GetTypeDesc(), InitializedRanges, DirtyRanges, Value, Offset);
+			}
+			if (CheckDirty(InOffset, MemberByteSize))
+			{
+				Data->Dirty = true;
 			}
 			Nodes.Add(MoveTemp(Data));
 		}
@@ -138,7 +54,7 @@ namespace SH
 			SpvCompositeTypeDesc* CompositeTypeDesc = static_cast<SpvCompositeTypeDesc*>(TypeDesc);
 			for (SpvTypeDesc* MemberTypeDesc : CompositeTypeDesc->GetMemberTypeDescs())
 			{
-				Nodes.Append(AppendExprChildNodes(Lang, MemberTypeDesc, InitializedRanges, Value, Offset));
+				Nodes.Append(AppendChildNodes(Lang, MemberTypeDesc, InitializedRanges, DirtyRanges, Value, Offset));
 				if (MemberTypeDesc->GetKind() == SpvTypeDescKind::Member)
 				{
 					Offset += GetTypeByteSize(MemberTypeDesc);
@@ -156,7 +72,11 @@ namespace SH
 				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset, DebuggerViewHex);
 				FString MemberName = FString::Printf(TEXT("[%d]"), Index);
 				FString TypeName = GetTypeDescStr(ElementTypeDesc, Lang);
-				auto Data = MakeShared<ExpressionNode>(MemberName, ValueStr, TypeName);
+				auto Data = MakeShared<ExpressionNode>(MemberName, MoveTemp(ValueStr), TypeName);
+				if (CheckDirty(Offset, ElementTypeSize))
+				{
+					Data->Dirty = true;
+				}
 				Offset += ElementTypeSize;
 				Nodes.Add(MoveTemp(Data));
 			}
@@ -180,8 +100,12 @@ namespace SH
 				FString MemberName = FString::Printf(TEXT("[%d]"), Index);
 				FString ValueStr = GetValueStr(Value, ElementTypeDesc, InitializedRanges, Offset, DebuggerViewHex);
 				FString TypeName = GetTypeDescStr(ElementTypeDesc, Lang);
-				auto Data = MakeShared<ExpressionNode>(MemberName, ValueStr, TypeName);
-				Data->Children = AppendExprChildNodes(Lang, ElementTypeDesc, InitializedRanges, Value, Offset);
+				auto Data = MakeShared<ExpressionNode>(MemberName, MoveTemp(ValueStr), TypeName);
+				Data->Children = AppendChildNodes(Lang, ElementTypeDesc, InitializedRanges, DirtyRanges, Value, Offset);
+				if (CheckDirty(Offset, ElementTypeSize))
+				{
+					Data->Dirty = true;
+				}
 				Nodes.Add(MoveTemp(Data));
 				Offset += ElementTypeSize;
 			}
@@ -191,6 +115,72 @@ namespace SH
 
 	ExpressionNode ShaderDebugger::EvaluateExpression(const FString& InExpression) const
 	{
+		// Check if expression is a simple variable identifier
+		FString TrimmedExpr = InExpression.TrimStartAndEnd();
+		if (!TrimmedExpr.IsEmpty() && DebuggerContext)
+		{
+			bool bIsSimpleIdentifier = true;
+			for (int32 i = 0; i < TrimmedExpr.Len(); i++)
+			{
+				TCHAR Ch = TrimmedExpr[i];
+				if (!FChar::IsIdentifier(Ch))
+				{
+					bIsSimpleIdentifier = false;
+					break;
+				}
+			}
+
+			if (bIsSimpleIdentifier)
+			{
+				// Try to find variable by name from SortedVariableDescs
+				for (const auto& [VarId, VarDesc] : SortedVariableDescs)
+				{
+					if (VarDesc->Name == TrimmedExpr)
+					{
+						if (SpvVariable* Var = DebuggerContext->FindVar(VarId))
+						{
+							if (!Var->IsExternal())
+							{
+								// Check if variable is visible in current scope
+								bool VisibleScope = VarDesc->Parent->Contains(Scope);
+								if (ActiveCallPoint)
+								{
+									VisibleScope = VarDesc->Parent->Contains(ActiveCallPoint.value().Scope);
+								}
+								if (VisibleScope)
+								{
+									FString TypeName = GetTypeDescStr(VarDesc->TypeDesc, DebugShader->GetShaderLanguage());
+									const TArray<uint8>& Value = std::get<SpvObject::Internal>(Var->Storage).Value;
+									if (!Value.IsEmpty())
+									{
+										TArray<Vector2i> InitializedRanges = { {0, Value.Num()} };
+										FString ValueStr = GetValueStr(Value, VarDesc->TypeDesc, InitializedRanges, 0, DebuggerViewHex);
+
+										TArray<SpvVarDirtyRange> Ranges;
+										DirtyVars.MultiFind(VarId, Ranges);
+
+										TArray<ExpressionNodePtr> Children;
+										if (VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Composite || 
+											VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Array ||
+											VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Matrix)
+										{
+											Children = AppendChildNodes(DebugShader->GetShaderLanguage(), VarDesc->TypeDesc, InitializedRanges, Ranges, Value, 0);
+										}
+
+										return { .Expr = TrimmedExpr, .ValueStr = ValueStr, .TypeName = TypeName,
+											.Dirty = !Ranges.IsEmpty(), .IsVarIdentifier = true,
+											.Children = MoveTemp(Children) };
+									}
+								}
+							}
+						}
+					}
+				}
+
+				return { .Expr = InExpression, .ValueStr = LOCALIZATION("InvalidExpr").ToString(), .IsVarIdentifier = true };
+			}
+		}
+
 		TArray<FString> ExtraArgs;
 		ExtraArgs.Add("-D");
 		ExtraArgs.Add("ENABLE_PRINT=0");
@@ -310,7 +300,7 @@ namespace SH
 						if (ResultTypeDesc->GetKind() == SpvTypeDescKind::Composite || ResultTypeDesc->GetKind() == SpvTypeDescKind::Array
 							|| ResultTypeDesc->GetKind() == SpvTypeDescKind::Matrix)
 						{
-							Children = AppendExprChildNodes(Lang, ResultTypeDesc, ResultRange, ResultValue, 0);
+							Children = AppendChildNodes(Lang, ResultTypeDesc, ResultRange, {}, ResultValue, 0);
 						}
 
 						return { .Expr = InExpression, .ValueStr = ValueStr,
@@ -408,18 +398,13 @@ namespace SH
 							InitializedRanges = Var->InitializedRanges;
 						}
 						FString ValueStr = GetValueStr(Value, VarDesc->TypeDesc, InitializedRanges, 0, DebuggerViewHex);
-						auto Data = MakeShared<ExpressionNode>(VarName, ValueStr, TypeName);
 						TArray<SpvVarDirtyRange> Ranges;
 						DirtyVars.MultiFind(VarId, Ranges);
+						auto Data = MakeShared<ExpressionNode>(VarName, ValueStr, TypeName, !Ranges.IsEmpty(), true);
 						if (VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Composite || VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Array
 							|| VarDesc->TypeDesc->GetKind() == SpvTypeDescKind::Matrix)
 						{
-							Data->Children = AppendVarChildNodes(Lang, VarDesc->TypeDesc, InitializedRanges, Ranges, Value, 0);
-						}
-
-						if (!Ranges.IsEmpty())
-						{
-							Data->Dirty = true;
+							Data->Children = AppendChildNodes(Lang, VarDesc->TypeDesc, InitializedRanges, Ranges, Value, 0);
 						}
 
 						if (!VarDesc->bGlobal)

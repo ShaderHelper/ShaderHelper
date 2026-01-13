@@ -792,7 +792,7 @@ namespace FW
 						return ShaderTokenType::Param;
 					}
 
-					if (ReferencedCursorKind == DxcCursor_FunctionDecl || ReferencedCursorKind == DxcCursor_CXXMethod)
+					if (ReferencedCursorKind == DxcCursor_FunctionDecl || ReferencedCursorKind == DxcCursor_CXXMethod || ReferencedCursorKind == DxcCursor_FunctionTemplate)
 					{
 						return ShaderTokenType::Func;
 					}

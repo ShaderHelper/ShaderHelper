@@ -13,6 +13,7 @@ namespace SH
 		FString ValueStr;
 		FString TypeName;
 		bool Dirty{};
+		bool IsVarIdentifier{};
 		TArray<TSharedPtr<ExpressionNode>> Children;
 		ExpressionNodePersistantState PersistantState;
 	};

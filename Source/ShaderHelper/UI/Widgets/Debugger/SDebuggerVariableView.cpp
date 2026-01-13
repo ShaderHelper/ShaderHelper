@@ -229,6 +229,7 @@ namespace SH
 		if(ColumnId == VariableColId)
 		{
 			Border->SetPadding(FMargin{0, 0, 1, 2});
+			InternalBorder->SetToolTipText(FText::FromString(Data->Expr));
 			InternalBorder->SetContent(
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot()
@@ -306,6 +307,7 @@ namespace SH
 		else
 		{
 			Border->SetPadding(FMargin{1, 0, 0, 2});
+			InternalBorder->SetToolTipText(FText::FromString(Data->TypeName));
 			InternalBorder->SetContent(SNew(STextBlock).Font(Owner->Font).Text(FText::FromString(Data->TypeName)));
 		}
 		return Border;
