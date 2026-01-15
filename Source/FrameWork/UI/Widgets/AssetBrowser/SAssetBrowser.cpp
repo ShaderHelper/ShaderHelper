@@ -147,6 +147,7 @@ namespace FW
 		SAssignNew(AssetView, SAssetView, this)
             .State(&State->AssetViewState)
 			.ContentPathShowed(InArgs._ContentPathShowed)
+			.BuiltInDir(InArgs._BuiltInDir)
 			.OnFolderOpen([this](const FString& FolderPath) {
 				DirectoryTree->SetExpansion(FPaths::GetPath(FolderPath));
 				DirectoryTree->SetSelection(FolderPath);
@@ -155,6 +156,7 @@ namespace FW
 		SAssignNew(DirectoryTree, SDirectoryTree)
             .State(&State->DirectoryTreeState)
 			.ContentPathShowed(InArgs._ContentPathShowed)
+			.BuiltInDir(InArgs._BuiltInDir)
 			.OnSelectedDirectoryChanged_Raw(this, &SAssetBrowser::OnDirectoryTreeSelectionChanged);
 
 		ChildSlot

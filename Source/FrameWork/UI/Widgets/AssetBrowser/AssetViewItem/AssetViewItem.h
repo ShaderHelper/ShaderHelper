@@ -1,10 +1,9 @@
 #pragma once
 
-#include <Widgets/Views/STileView.h>
-
 namespace FW
 {
-    
+	class SAssetView;
+
     class AssetViewItemDragDropOp : public FDragDropOperation
     {
     public:
@@ -29,13 +28,13 @@ namespace FW
 	{
         MANUAL_RTTI_BASE_TYPE()
 	public:
-		AssetViewItem(STileView<TSharedRef<AssetViewItem>>* InOwner, const FString& InPath) : Owner(InOwner), Path(InPath) {}
+		AssetViewItem(SAssetView* InOwner, const FString& InPath) : Owner(InOwner), Path(InPath) {}
 		virtual ~AssetViewItem() = default;
 		virtual TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) = 0;
 		FString GetPath() const { return Path; }
 
 	protected:
-		STileView<TSharedRef<AssetViewItem>>* Owner;
+		SAssetView* Owner;
 		FString Path;
 	};
 }

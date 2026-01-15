@@ -2,7 +2,6 @@
 #include "AssetViewItem.h"
 
 #include <Widgets/Text/SInlineEditableTextBlock.h>
-#include <Widgets/Views/STileView.h>
 
 namespace FW
 {
@@ -10,7 +9,7 @@ namespace FW
 	{
         MANUAL_RTTI_TYPE(AssetViewFolderItem, AssetViewItem)
 	public:
-		AssetViewFolderItem(STileView<TSharedRef<AssetViewItem>>* InOwner, const FString& InPath);
+		AssetViewFolderItem(SAssetView* InOwner, const FString& InPath);
         
 		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override;
 		void EnterRenameState();
@@ -20,7 +19,6 @@ namespace FW
 		TFunction<void()> OnExitRenameState;
 
 	private:
-		STileView<TSharedRef<AssetViewItem>>* Owner;
 		TSharedPtr<SInlineEditableTextBlock> FolderEditableTextBlock;
 	};
 }

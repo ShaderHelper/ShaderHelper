@@ -17,6 +17,15 @@ namespace FW
 		}
 	}
 
+	void AssetOp::NavigateAsset(AssetObject* InAsset)
+	{
+		AssetOp* Op = GetAssetOp(InAsset->DynamicMetaType());
+		if (Op)
+		{
+			Op->OnNavigate(InAsset->GetPath());
+		}
+	}
+
     AssetOp* GetAssetOp(const FString& InAssetPath)
     {
         return GetDefaultObject<AssetOp>([&](AssetOp* CurAssetOp){

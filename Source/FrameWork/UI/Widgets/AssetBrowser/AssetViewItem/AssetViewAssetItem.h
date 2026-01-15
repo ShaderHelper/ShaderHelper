@@ -9,7 +9,7 @@ namespace FW
 	{
         MANUAL_RTTI_TYPE(AssetViewAssetItem, AssetViewItem)
 	public:
-		AssetViewAssetItem(STileView<TSharedRef<AssetViewItem>>* InOwner, const FString& InPath);
+		AssetViewAssetItem(SAssetView* InOwner, const FString& InPath);
         
 		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override;
         void EnterRenameState();

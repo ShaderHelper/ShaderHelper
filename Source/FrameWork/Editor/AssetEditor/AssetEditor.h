@@ -10,6 +10,7 @@ namespace FW
 		AssetOp() = default;
 		//Manually trigger OnOpen
 		static void OpenAsset(AssetObject* InAsset);
+		static void NavigateAsset(AssetObject* InAsset);
 
 	public:
         virtual void OnRename(const FString& OldPath, const FString& NewPath);
@@ -18,6 +19,8 @@ namespace FW
 
         virtual void OnAdd(const FString& InAssetPath) {}
 		virtual void OnDelete(const FString& InAssetPath);
+
+		virtual void OnNavigate(const FString& InAssetPath) {};
 
 		//For non-imported resources
 		virtual void OnCreate(AssetObject* InAsset) {};

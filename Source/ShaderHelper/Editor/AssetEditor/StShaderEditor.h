@@ -1,9 +1,9 @@
 #pragma once
-#include "Editor/AssetEditor/AssetEditor.h"
+#include "ShAssetEditor.h"
 
 namespace SH
 {
-	class StShaderOp : public FW::AssetOp
+	class StShaderOp : public ShAssetOp
 	{
 		REFLECTION_TYPE(StShaderOp)
 	public:

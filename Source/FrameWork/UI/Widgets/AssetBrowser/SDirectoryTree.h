@@ -24,6 +24,7 @@ namespace FW
 		SLATE_BEGIN_ARGS(SDirectoryTree) : _State(nullptr)
         {}
 			SLATE_ARGUMENT(FString, ContentPathShowed)
+			SLATE_ARGUMENT(FString, BuiltInDir)
             SLATE_ARGUMENT(DirectoryTreePersistentState*, State)
             SLATE_EVENT(SelectedDirectoryChangedDelegate, OnSelectedDirectoryChanged)
 		SLATE_END_ARGS()
@@ -47,7 +48,7 @@ namespace FW
 	private:
 		TArray<TSharedRef<DirectoryData>> DirectoryDatas;
 		TSharedPtr<STreeView<TSharedRef<DirectoryData>>> DirectoryTree;
-		FString ContentPathShowed;
+		FString ContentPathShowed, BuiltInDir;
         SelectedDirectoryChangedDelegate OnSelectedDirectoryChanged;
         DirectoryTreePersistentState* State;
 	};

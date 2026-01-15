@@ -67,6 +67,7 @@ namespace FW
             .OnMouseDoubleClick_Lambda([this](const FGeometry&, const FPointerEvent&){
                 if(auto& AssetRef = *(AssetPtr<AssetObject>*)AssetPtrRef)
                 {
+					AssetOp::NavigateAsset(AssetRef);
                     AssetOp::OpenAsset(AssetRef);
                 }
                 return FReply::Handled();

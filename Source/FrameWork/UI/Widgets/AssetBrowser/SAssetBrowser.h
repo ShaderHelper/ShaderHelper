@@ -32,6 +32,7 @@ namespace FW
 	public:
 		SLATE_BEGIN_ARGS(SAssetBrowser) {}
 			SLATE_ARGUMENT(FString, ContentPathShowed)
+			SLATE_ARGUMENT(FString, BuiltInDir)
             SLATE_ARGUMENT(AssetBrowserPersistentState*, State)
 		SLATE_END_ARGS()
 
@@ -44,6 +45,7 @@ namespace FW
         void SetCurrentDisplyPath(const FString& DisplayDir);
 		FString GetCurrentDisplayPath() const;
 		SSearchBox* GetAssetSearchBox() const { return AssetSearchBox.Get(); }
+		SAssetView* GetAssetView() const { return AssetView.Get(); }
         
     private:
         void InitDirectory(AssetBrowserDirectory& OutDirectory, const FString& Dir);

@@ -43,7 +43,7 @@ PYBIND11_EMBEDDED_MODULE(ShRedirector, m)
 std::vector<py::object> RegisteredMenuEntryExts;
 std::vector<py::object> RegisteredPropertyExts;
 
-void RegisterPyFW(py::module_& m)
+void RegisterPyFW(py::module_& m, py::module_& m_slate)
 {
 	py::class_<FW::PathHelper>(m, "PathHelper")
 		.def_property_readonly_static("ResourceDir", [](py::object) { return std::string(TCHAR_TO_UTF8(*FW::PathHelper::ResourceDir())); });
@@ -134,7 +134,6 @@ void RegisterPyFW(py::module_& m)
 		}
 	});
 
-	auto m_slate = m.def_submodule("Slate");
 	py::native_enum<EHorizontalAlignment>(m_slate, "EHorizontalAlignment", "enum.Enum")
 		.value("HAlign_Fill", EHorizontalAlignment::HAlign_Fill)
 		.value("HAlign_Center", EHorizontalAlignment::HAlign_Center)
@@ -149,16 +148,72 @@ void RegisterPyFW(py::module_& m)
 		.value("VAlign_Bottom", EVerticalAlignment::VAlign_Bottom)
 		.export_values()
 		.finalize();
+	m_slate.def("AddWindow", [](FW::Window* Window, FW::Window* Parent) {
+			if (Parent)
+			{
+				FSlateApplication::Get().AddWindowAsNativeChild(StaticCastSharedRef<SWindow>(Window->GetSlateWidget()),
+					StaticCastSharedRef<SWindow>(Parent->GetSlateWidget()), true);
+			}
+			else
+			{
+				FSlateApplication::Get().AddWindow(StaticCastSharedRef<SWindow>(Window->GetSlateWidget()), true);
+			}
+	});
+	m_slate.def("DestroyWindow", [](FW::Window* Window) {
+		StaticCastSharedRef<SWindow>(Window->GetSlateWidget())->RequestDestroyWindow();
+	});
+	
+	py::class_<FLinearColor>(m, "LinearColor")
+		.def(py::init<float, float, float, float >())
+		.def_readwrite("R", &FLinearColor::R)
+		.def_readwrite("G", &FLinearColor::G)
+		.def_readwrite("B", &FLinearColor::B)
+		.def_readwrite("A", &FLinearColor::A);
+	py::class_<FW::Vector2D>(m, "Vector2D")
+		.def(py::init<double, double>())
+		.def_readwrite("X", &FW::Vector2D::X)
+		.def_readwrite("Y", &FW::Vector2D::Y);
+	py::class_<FMargin>(m, "Margin")
+		.def(py::init<float, float, float, float > ())
+		.def_readwrite("Left", &FMargin::Left)
+		.def_readwrite("Top", &FMargin::Top)
+		.def_readwrite("Right", &FMargin::Right)
+		.def_readwrite("Bottom", &FMargin::Bottom);
 
 	py::class_<FW::Widget, py::smart_holder>(m_slate, "Widget");
+	py::class_<FW::Window, FW::Widget, py::smart_holder>(m_slate, "Window")
+		.def(py::init<>())
+		.def(py::init<std::string>())
+		.def_readwrite("Content", &FW::Window::Content)
+		.def_readwrite("Size", &FW::Window::Size);
+	py::class_<FW::TextBlock, FW::Widget, py::smart_holder>(m_slate, "TextBlock")
+		.def(py::init<>())
+		.def(py::init<std::string>())
+		.def_readwrite("ColorAndOpacity", &FW::TextBlock::ColorAndOpacity)
+		.def_readwrite("Text", &FW::TextBlock::Text);
+	py::class_<FW::EditableTextBox, FW::Widget, py::smart_holder>(m_slate, "EditableTextBox")
+		.def(py::init<>())
+		.def("GetText", &FW::EditableTextBox::GetText);
 	py::class_<FW::Button, FW::Widget, py::smart_holder>(m_slate, "Button")
 		.def(py::init<>())
+		.def(py::init<std::string>())
 		.def_readwrite("Text", &FW::Button::Text)
 		.def_readwrite("OnClicked", &FW::Button::OnClicked)
 		.def_readwrite("HAlign", &FW::Button::HAlign)
 		.def_readwrite("VAlign", &FW::Button::VAlign);
-	py::class_<FW::Slot>(m_slate, "Slot");
-	py::class_<FW::HBox, FW::Widget, py::smart_holder>(m_slate, "HBox");
+	py::class_<FW::Slot>(m_slate, "Slot")
+		.def("Padding", &FW::Slot::Padding, py::return_value_policy::reference)
+		.def("VAlign", &FW::Slot::VAlign, py::return_value_policy::reference)
+		.def("HAlign", &FW::Slot::HAlign, py::return_value_policy::reference)
+		.def("AutoWidth", &FW::Slot::AutoWidth, py::return_value_policy::reference)
+		.def("AutoHeight", &FW::Slot::AutoHeight, py::return_value_policy::reference)
+		.def_readwrite("Content", &FW::Slot::Content);
+	py::class_<FW::VBox, FW::Widget, py::smart_holder>(m_slate, "VBox")
+		.def(py::init<>())
+		.def("AddSlot", &FW::VBox::AddSlot, py::return_value_policy::reference);
+	py::class_<FW::HBox, FW::Widget, py::smart_holder>(m_slate, "HBox")
+		.def(py::init<>())
+		.def("AddSlot", &FW::HBox::AddSlot, py::return_value_policy::reference);
 
 	auto m_asset = m.def_submodule("Asset");
 	py::class_<FW::AssetImporter>(m_asset, "Importer")

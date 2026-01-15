@@ -11,11 +11,14 @@
 
 namespace FW
 {
-	AssetViewFolderItem::AssetViewFolderItem(STileView<TSharedRef<AssetViewItem>>* InOwner, const FString& InPath)
+	AssetViewFolderItem::AssetViewFolderItem(SAssetView* InOwner, const FString& InPath)
 		: AssetViewItem(InOwner, InPath)
 	{
 		SAssignNew(FolderEditableTextBlock, SInlineEditableTextBlock)
 			.Font(FAppStyle::Get().GetFontStyle("SmallFont"))
+			.IsEnabled_Lambda([this] {
+				return !FPaths::IsUnderDirectory(GetPath(), Owner->GetBuiltInDir());
+			})
 			.Text(FText::FromString(FPaths::GetBaseFilename(Path)))
 			.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
 				FString NewFolderPath = FPaths::GetPath(Path) / NewText.ToString();
@@ -53,6 +56,11 @@ namespace FW
 
     FReply AssetViewFolderItem::HandleOnDrop(const FDragDropEvent& DragDropEvent)
     {
+		if (FPaths::IsUnderDirectory(GetPath(), Owner->GetBuiltInDir()))
+		{
+			return FReply::Handled();
+		}
+
         TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
         if(DragDropOp->IsOfType<AssetViewItemDragDropOp>())
         {

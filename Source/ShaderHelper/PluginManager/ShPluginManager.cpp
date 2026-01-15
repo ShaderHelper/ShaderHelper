@@ -12,7 +12,9 @@
 
 PYBIND11_EMBEDDED_MODULE(ShaderHelper, m)
 {
-	RegisterPyFW(m);
+	auto m_slate = m.def_submodule("Slate");
+	RegisterPyFW(m, m_slate);
+
 	py::class_<SH::ShaderToy, FW::Graph>(m, "ShaderToy")
 		.def(py::init<>());;
 	py::native_enum<SH::ShaderToyFilterMode>(m, "ShaderToyFilterMode", "enum.Enum")
@@ -51,6 +53,7 @@ PYBIND11_EMBEDDED_MODULE(ShaderHelper, m)
 			auto ShEditor = static_cast<SH::ShaderHelperEditor*>(FW::GApp->GetEditor());
 			return std::string(TCHAR_TO_UTF8(*ShEditor->GetAssetBrowser()->GetCurrentDisplayPath()));
 		})
+		.def_property_readonly_static("MainWindow", [](py::object) { return SH::ShPluginContext::GetMainWindow(); }, py::return_value_policy::take_ownership)
 		.def_property_readonly_static("Graph", [](py::object) { return SH::ShPluginContext::GetGraph(); })
 		.def_property_readonly_static("PropertyObject", [](py::object) { return SH::ShPluginContext::GetPropertyObject(); });
 
@@ -67,6 +70,13 @@ namespace SH
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(FW::GApp->GetEditor());
 		return ShEditor->GetCurPropertyObject();
+	}
+
+	std::unique_ptr<FW::Window> ShPluginContext::GetMainWindow()
+	{
+		auto ShEditor = static_cast<SH::ShaderHelperEditor*>(FW::GApp->GetEditor());
+		auto Window = std::make_unique<FW::Window>(ShEditor->GetMainWindow());
+		return Window;
 	}
 }
 

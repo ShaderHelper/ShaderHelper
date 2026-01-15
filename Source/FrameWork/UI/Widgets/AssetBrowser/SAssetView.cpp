@@ -39,6 +39,7 @@ namespace FW
 		);
 
 		ContentPathShowed = InArgs._ContentPathShowed;
+		BuiltInDir = InArgs._BuiltInDir;
         OnFolderOpen = InArgs._OnFolderOpen;
         State = InArgs._State;
 
@@ -127,12 +128,12 @@ namespace FW
 				{
 					if (FileOrFolderName.Contains(InFilterText.ToString()))
 					{
-						AssetViewItems.Add(MakeShared<AssetViewFolderItem>(AssetTileView.Get(), Path));
+						AssetViewItems.Add(MakeShared<AssetViewFolderItem>(this, Path));
 					}
 				}
 				else
 				{
-					AssetViewItems.Add(MakeShared<AssetViewFolderItem>(AssetTileView.Get(), Path));
+					AssetViewItems.Add(MakeShared<AssetViewFolderItem>(this, Path));
 				}
 			}
 			else if(TSingleton<AssetManager>::Get().GetManageredExts().Contains(Ext))
@@ -141,14 +142,14 @@ namespace FW
 				{
 					if (FileOrFolderName.Contains(InFilterText.ToString()))
 					{
-						auto Item = MakeShared<AssetViewAssetItem>(AssetTileView.Get(), Path);
+						auto Item = MakeShared<AssetViewAssetItem>(this, Path);
 						SetAssetIcon(Item);
 						AssetViewItems.Add(Item);
 					}
 				}
 				else
 				{
-					auto Item = MakeShared<AssetViewAssetItem>(AssetTileView.Get(), Path);
+					auto Item = MakeShared<AssetViewAssetItem>(this, Path);
 					SetAssetIcon(Item);
 					AssetViewItems.Add(Item);
 				}
@@ -166,6 +167,11 @@ namespace FW
 
 	TSharedPtr<SWidget> SAssetView::CreateContextMenu()
 	{
+		if (FPaths::IsUnderDirectory(CurViewDirectory,BuiltInDir))
+		{
+			return SNullWidget::NullWidget;
+		}
+
 		TArray<TSharedRef<AssetViewItem>> SelectedItems = AssetTileView->GetSelectedItems();
 		if (SelectedItems.Num() > 0)
 		{
@@ -210,7 +216,7 @@ namespace FW
 										AssetOp_->OnCreate(NewAsset);
 									}
 
-									TSharedRef<AssetViewAssetItem> NewAssetItem = MakeShared<AssetViewAssetItem>(AssetTileView.Get(), SavedFileName);
+									TSharedRef<AssetViewAssetItem> NewAssetItem = MakeShared<AssetViewAssetItem>(this, SavedFileName);
 									if (auto* Thumbnail = NewAsset->GetThumbnail())
 									{
 										NewAssetItem->SetAssetThumbnail(Thumbnail);
@@ -271,7 +277,7 @@ namespace FW
 						return InItem->GetPath() == NewDirectoryPath;
 					}))
 					{
-						TSharedRef<AssetViewFolderItem> NewFolderItem = MakeShared<AssetViewFolderItem>(AssetTileView.Get(), NewDirectoryPath);
+						TSharedRef<AssetViewFolderItem> NewFolderItem = MakeShared<AssetViewFolderItem>(this, NewDirectoryPath);
 						// Setting the focus directly here will not take effect.
 						// The widget related to this item will only be added to STileView at the next tick
 						FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this, NewFolderItem](float) {
@@ -352,7 +358,7 @@ namespace FW
             return InItem->GetPath() == InFolderName;
         }))
         {
-			TSharedRef<AssetViewFolderItem> NewFolderItem = MakeShared<AssetViewFolderItem>(AssetTileView.Get(), InFolderName);
+			TSharedRef<AssetViewFolderItem> NewFolderItem = MakeShared<AssetViewFolderItem>(this, InFolderName);
             AssetViewItems.Add(MoveTemp(NewFolderItem));
             SortViewItems();
             AssetTileView->RequestListRefresh();
@@ -392,7 +398,7 @@ namespace FW
             return InItem->GetPath() == InFileName;
         }))
         {
-			TSharedRef<AssetViewAssetItem> NewAssetItem = MakeShared<AssetViewAssetItem>(AssetTileView.Get(), InFileName);
+			TSharedRef<AssetViewAssetItem> NewAssetItem = MakeShared<AssetViewAssetItem>(this, InFileName);
 			SetAssetIcon(NewAssetItem);
             AssetViewItems.Add(MoveTemp(NewAssetItem));
             SortViewItems();
@@ -547,6 +553,11 @@ namespace FW
 			return;
 		}
 
+		if (FPaths::IsUnderDirectory(SelectedItems[0]->GetPath(), BuiltInDir))
+		{
+			return;
+		}
+
 		auto Ret = MessageDialog::Open(MessageDialog::OkCancel, MessageDialog::Shocked, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("DeleteItemTip"));
 		if (Ret == MessageDialog::MessageRet::Ok)
 		{
@@ -574,6 +585,11 @@ namespace FW
 			return;
 		}
 
+		if (FPaths::IsUnderDirectory(SelectedItems[0]->GetPath(), BuiltInDir))
+		{
+			return;
+		}
+
 		if (SelectedItems[0]->IsOfType<AssetViewFolderItem>())
 		{
 			TSharedRef<AssetViewFolderItem> SelectedFolderItem = StaticCastSharedRef<AssetViewFolderItem>(SelectedItems[0]);
@@ -590,6 +606,11 @@ namespace FW
 	{
 		TArray<TSharedRef<AssetViewItem>> SelectedItems = AssetTileView->GetSelectedItems();
 		if (SelectedItems.IsEmpty())
+		{
+			return;
+		}
+
+		if (FPaths::IsUnderDirectory(SelectedItems[0]->GetPath(), BuiltInDir))
 		{
 			return;
 		}
@@ -627,6 +648,19 @@ namespace FW
             }
             
         }
+	}
+
+	void SAssetView::SetSelectedItem(const FString& InItem)
+	{
+		for (auto Item : AssetViewItems)
+		{
+			if (InItem == Item->GetPath())
+			{
+				AssetTileView->ClearSelection();
+				AssetTileView->SetSelection(Item);
+				break;
+			}
+		}
 	}
 
 	void SAssetView::SetAssetIcon(TSharedRef<AssetViewAssetItem> ViewItem)

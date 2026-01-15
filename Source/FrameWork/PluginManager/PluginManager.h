@@ -17,10 +17,15 @@
 FRAMEWORK_API DECLARE_LOG_CATEGORY_EXTERN(LogPy, Log, All);
 namespace py = pybind11;
 
-FRAMEWORK_API void RegisterPyFW(py::module_& m);
+FRAMEWORK_API void RegisterPyFW(py::module_& m, py::module_& m_slate);
 
 namespace FW
 {
+	inline void PrintPyTraceback(const py::error_already_set& e)
+	{
+		py::module::import("traceback").attr("print_exception")(e.type(), e.value() ? e.value() : py::none(), e.trace() ? e.trace() : py::none());
+	}
+
 	struct ShPlugin
 	{
 		FString Name;
@@ -59,16 +64,92 @@ namespace FW
 	class Widget
 	{
 	public:
+		Widget() = default;
+		Widget(TSharedPtr<SWidget> InSlateWidget) : SlateWidget(InSlateWidget) {}
 		virtual ~Widget() = default;
-		virtual TSharedRef<SWidget> GetSlateWidget() = 0;
+		TSharedRef<SWidget> GetSlateWidget() {
+			if (!SlateWidget)
+			{
+				SlateWidget = GetDefaultSlateWidget();
+			}
+			return SlateWidget.ToSharedRef();
+		}
+		virtual TSharedRef<SWidget> GetDefaultSlateWidget() = 0;
+
+	protected:
+		TSharedPtr<SWidget> SlateWidget;
+	};
+
+	class Window : public Widget
+	{
+	public:
+		using Widget::Widget;
+		Window(std::string InTitle) : Title(std::move(InTitle)) {}
+		virtual TSharedRef<SWidget> GetDefaultSlateWidget() override {
+			auto SlateWindow = SNew(SWindow).SupportsMinimize(false).SupportsMaximize(false).IsTopmostWindow(true)
+				.ClientSize(Size).Title(FText::FromString(FString(Title.c_str()))).SizingRule(ESizingRule::FixedSize);
+			if (Content)
+			{
+				SlateWindow->SetContent(Content->GetSlateWidget());
+			}
+			return SlateWindow;
+		}
+
+		Vector2D Size{ 10, 10 };
+		std::string Title;
+		std::unique_ptr<Widget> Content;
+	};
+
+	class TextBlock : public Widget
+	{
+	public:
+		using Widget::Widget;
+		TextBlock(std::string InText) : Text(std::move(InText)) {}
+		virtual TSharedRef<SWidget> GetDefaultSlateWidget() override {
+			return SNew(STextBlock).Text_Lambda([this] {
+				return FText::FromString(FString(Text.c_str()));
+			}).ColorAndOpacity(ColorAndOpacity);
+		}
+
+		FLinearColor ColorAndOpacity = FStyleColors::Foreground.GetSpecifiedColor();
+		std::string Text;
+	};
+
+	class EditableTextBox : public Widget
+	{
+	public:
+		using Widget::Widget;
+		virtual TSharedRef<SWidget> GetDefaultSlateWidget() override {
+			return SNew(SEditableTextBox);
+		}
+
+		std::string GetText() const
+		{
+			return TCHAR_TO_UTF8(*StaticCastSharedPtr<SEditableTextBox>(SlateWidget)->GetText().ToString());
+		}
 	};
 	
 	class Button : public Widget
 	{
 	public:
-		virtual TSharedRef<SWidget> GetSlateWidget() override { 
+		using Widget::Widget;
+		Button(std::string InText) : Text(std::move(InText)) {}
+		virtual TSharedRef<SWidget> GetDefaultSlateWidget() override {
 			return SNew(SButton).Text(FText::FromString(FString(Text.c_str()))).HAlign(HAlign).VAlign(VAlign)
-				.OnClicked_Lambda([OnClicked = std::move(OnClicked)] { OnClicked(); return FReply::Handled(); });
+				.OnClicked_Lambda([OnClicked = std::move(OnClicked)] { 
+					if (OnClicked)
+					{
+						try
+						{
+							OnClicked();
+						}
+						catch (py::error_already_set& e)
+						{
+							PrintPyTraceback(e);
+						}
+					}
+					return FReply::Handled(); 
+				});
 		}
 
 		std::string Text;
@@ -80,21 +161,69 @@ namespace FW
 	class Slot
 	{
 	public:
-		bool AutoWidth{};
-		std::unique_ptr<Widget> Content;
-		EHorizontalAlignment HAlign = HAlign_Fill;
+		Slot& AutoWidth() { this->bAutoWidth = true; return *this; }
+		Slot& AutoHeight() { this->bAutoHeight = true; return *this; }
+		Slot& HAlign(EHorizontalAlignment InAlign) { this->mHAlign = InAlign; return *this; }
+		Slot& VAlign(EVerticalAlignment InAlign) { this->mVAlign = InAlign; return *this; }
+		Slot& Padding(float Left, float Top, float Right, float Bottom) { mPadding = FMargin{Left, Top, Right, Bottom}; return *this; }
+
+	public:
+		bool bAutoWidth{};
+		bool bAutoHeight{};
+		FMargin mPadding;
+		std::shared_ptr<Widget> Content;
+		EHorizontalAlignment mHAlign = HAlign_Fill;
+		EVerticalAlignment mVAlign = VAlign_Fill;
+	};
+
+	class VBox : public Widget
+	{
+	public:
+		using Widget::Widget;
+		virtual TSharedRef<SWidget> GetDefaultSlateWidget() override {
+			auto Box = SNew(SVerticalBox);
+			for (const auto& Slot : Slots)
+			{
+				auto SlateSlot = Box->AddSlot();
+				SlateSlot.HAlign(Slot->mHAlign);
+				SlateSlot.VAlign(Slot->mVAlign);
+				SlateSlot.Padding(Slot->mPadding);
+				if (Slot->bAutoHeight)
+				{
+					SlateSlot.AutoHeight();
+				}
+				if (Slot->Content)
+				{
+					SlateSlot.AttachWidget(Slot->Content->GetSlateWidget());
+				}
+			}
+			return Box;
+		}
+
+		Slot* AddSlot(std::unique_ptr<Widget> Content)
+		{
+			auto Item = std::make_unique<Slot>();
+			Item->Content = std::move(Content);
+			Slots.push_back(std::move(Item));
+			return Slots.back().get();
+		}
+
+		std::vector<std::unique_ptr<Slot>> Slots;
 	};
 
 	class HBox : public Widget
 	{
 	public:
-		virtual TSharedRef<SWidget> GetSlateWidget() override {
+		using Widget::Widget;
+		virtual TSharedRef<SWidget> GetDefaultSlateWidget() override {
 			auto Box = SNew(SHorizontalBox);
 			for(const auto& Slot : Slots)
 			{
 				auto SlateSlot = Box->AddSlot();
-				SlateSlot.HAlign(Slot->HAlign);
-				if (Slot->AutoWidth)
+				SlateSlot.HAlign(Slot->mHAlign);
+				SlateSlot.VAlign(Slot->mVAlign);
+				SlateSlot.Padding(Slot->mPadding);
+				if (Slot->bAutoWidth)
 				{
 					SlateSlot.AutoWidth();
 				}
@@ -106,9 +235,11 @@ namespace FW
 			return Box;
 		}
 
-		Slot* AddSlot()
+		Slot* AddSlot(std::shared_ptr<Widget> Content)
 		{
-			Slots.push_back(std::make_unique<Slot>());
+			auto Item = std::make_unique<Slot>();
+			Item->Content = std::move(Content);
+			Slots.push_back(std::move(Item));
 			return Slots.back().get();
 		}
 
@@ -137,11 +268,6 @@ namespace FW
 	inline bool IsBaseOf(py::type BaseType, py::type DerivedType)
 	{
 		return py::bool_(py::module_::import("builtins").attr("issubclass")(DerivedType, BaseType));
-	}
-
-	inline void PrintPyTraceback(const py::error_already_set& e)
-	{
-		py::module::import("traceback").attr("print_exception")(e.type(), e.value() ? e.value() : py::none(), e.trace() ? e.trace() : py::none());
 	}
 
 	template<typename ContextType>

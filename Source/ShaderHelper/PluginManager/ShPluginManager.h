@@ -9,6 +9,7 @@ namespace SH
 	public:
 		static FW::Graph* GetGraph();
 		static FW::ShObject* GetPropertyObject();
+		static std::unique_ptr<FW::Window> GetMainWindow();
 	};
 
 	using ShPluginManager = FW::PluginManager<ShPluginContext>;

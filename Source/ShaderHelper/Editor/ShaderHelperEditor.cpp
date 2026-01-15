@@ -12,6 +12,7 @@
 #include "PluginManager/ShPluginManager.h"
 #include "Renderer/ShaderToyRenderComp.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
+#include "AssetManager/AssetImporter/AssetImporter.h"
 
 #include <Serialization/JsonSerializer.h>
 #include <Misc/FileHelper.h>
@@ -139,9 +140,44 @@ namespace SH
 				return IsDebugging ? EVisibility::Visible : EVisibility::Hidden;
 			});
 		ViewPort->SetAssociatedWidget(ViewportWidget);
+
+		FString BuiltInDir = PathHelper::SavedDir() / "Builtin";
+		FString BuiltInShaderToyDir = BuiltInDir / "ShaderToy";
+		if (!IFileManager::Get().DirectoryExists(*BuiltInShaderToyDir))
+		{
+			IFileManager::Get().MakeDirectory(*BuiltInShaderToyDir, true);
+
+			FString ShaderToyResourceDir = PathHelper::ResourceDir() / TEXT("ShaderToy");
+			if (IFileManager::Get().DirectoryExists(*ShaderToyResourceDir))
+			{
+				TArray<FString> FileNames;
+				IFileManager::Get().FindFilesRecursive(FileNames, *ShaderToyResourceDir, TEXT("*"), true, false);
+
+				for (const FString& FilePath : FileNames)
+				{
+					AssetImporter* Importer = GetAssetImporter(FilePath);
+					if (Importer)
+					{
+						TUniquePtr<AssetObject> Asset = Importer->CreateAssetObject(FilePath);
+						if (Asset)
+						{
+							FString AssetExt = Asset->FileExtension();
+							FString FileWithoutExt = FPaths::GetBaseFilename(FilePath);
+							FString SavedFilePath = BuiltInShaderToyDir / (FileWithoutExt + TEXT(".") + AssetExt);
+
+							TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFilePath));
+							Asset->ObjectName = FText::FromString(FPaths::GetBaseFilename(SavedFilePath));
+							Asset->Serialize(*Ar);
+						}
+					}
+				}
+			}
+		}
+		TSingleton<AssetManager>::Get().MountProject(BuiltInDir);
 		
 		SAssignNew(AssetBrowser, SAssetBrowser)
 		.ContentPathShowed(TSingleton<ShProjectManager>::Get().GetActiveContentDirectory())
+		.BuiltInDir(BuiltInDir)
 		.State(&CurProject->AssetBrowserState);
 		
 		SAssignNew(PropertyView, SPropertyView)

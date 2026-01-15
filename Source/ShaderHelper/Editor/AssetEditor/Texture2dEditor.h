@@ -1,9 +1,9 @@
 #pragma once
-#include "Editor/AssetEditor/AssetEditor.h"
+#include "ShAssetEditor.h"
 
 namespace SH
 {
-	class Texture2dOp : public FW::AssetOp
+	class Texture2dOp : public ShAssetOp
 	{
 		REFLECTION_TYPE(Texture2dOp)
 	public:

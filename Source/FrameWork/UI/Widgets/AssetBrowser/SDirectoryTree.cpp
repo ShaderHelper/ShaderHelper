@@ -16,6 +16,7 @@ namespace FW
 	void SDirectoryTree::Construct(const FArguments& InArgs)
 	{
 		ContentPathShowed = InArgs._ContentPathShowed;
+		BuiltInDir = InArgs._BuiltInDir;
         State = InArgs._State;
 		OnSelectedDirectoryChanged = InArgs._OnSelectedDirectoryChanged;
 
@@ -50,6 +51,14 @@ namespace FW
 		if (State->CurSelectedDirectory.IsEmpty())
 		{
             State->CurSelectedDirectory = ContentPathShowed;
+		}
+
+		if (!BuiltInDir.IsEmpty())
+		{
+			auto RootDirectoryData = MakeShared<DirectoryData>();
+			RootDirectoryData->IsRootDirectory = true;
+			DirectoryDatas.Add(RootDirectoryData);
+			PopulateDirectoryData(RootDirectoryData, BuiltInDir);
 		}
 		
 		auto RootDirectoryData = MakeShared<DirectoryData>();
@@ -120,7 +129,12 @@ namespace FW
             .Style(&FAppCommonStyle::Get().GetWidgetStyle<FTableRowStyle>("DirectoryTreeView.Row"))
             .OnDrop_Raw(this, &SDirectoryTree::HandleOnDrop, InTreeNode->DirectoryPath);
         
-        Row->SetDragFilter([InTreeNode](const TSharedPtr<FDragDropOperation>& Operation){
+        Row->SetDragFilter([this, InTreeNode](const TSharedPtr<FDragDropOperation>& Operation){
+			if (FPaths::IsUnderDirectory(InTreeNode->DirectoryPath, BuiltInDir))
+			{
+				return false;
+			}
+
             if(Operation.IsValid())
             {
                 if(Operation->IsOfType<AssetViewItemDragDropOp>())
@@ -170,6 +184,9 @@ namespace FW
             .VAlign(VAlign_Center)
             [
                 SNew(STextBlock)
+				.ColorAndOpacity_Lambda([this, InTreeNode] {
+					return FPaths::IsUnderDirectory(InTreeNode->DirectoryPath,BuiltInDir) ? FStyleColors::Foreground.GetSpecifiedColor().CopyWithNewOpacity(0.5f) : FStyleColors::Foreground;
+				})
                 .Text(FText::FromString(FPaths::GetBaseFilename(InTreeNode->DirectoryPath)))
                 .Font(MoveTemp(DirectoryTextFont))
             ]

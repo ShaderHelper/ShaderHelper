@@ -22,6 +22,7 @@ namespace FW
         SLATE_BEGIN_ARGS(SAssetView) : _State(nullptr)
         {}
 			SLATE_ARGUMENT(FString, ContentPathShowed)
+			SLATE_ARGUMENT(FString, BuiltInDir)
 			SLATE_ARGUMENT(TFunction<void(const FString&)>, OnFolderOpen)
             SLATE_ARGUMENT(AssetViewPersistentState*, State)
 		SLATE_END_ARGS()
@@ -44,6 +45,13 @@ namespace FW
 			AssetTileView->RequestListRefresh();
 		}
 
+		const FString& GetBuiltInDir() const { return BuiltInDir; }
+		auto GetSelectedItems() const
+		{
+			return AssetTileView->GetSelectedItems();
+		}
+		void SetSelectedItem(const FString& InItem);
+
 		virtual FReply OnDragOver(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent) override;
 		virtual FReply OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent) override;
 		virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
@@ -63,7 +71,7 @@ namespace FW
 		FString CurViewDirectory;
 		TFunction<void(const FString&)> OnFolderOpen;
 		TSharedPtr<FUICommandList> UICommandList;
-		FString ContentPathShowed;
+		FString ContentPathShowed, BuiltInDir;
 
         AssetViewPersistentState* State;
 	};

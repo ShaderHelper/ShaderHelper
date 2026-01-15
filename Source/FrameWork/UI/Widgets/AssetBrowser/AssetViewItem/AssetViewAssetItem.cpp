@@ -5,13 +5,14 @@
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "ProjectManager/ProjectManager.h"
 #include "App/App.h"
+#include "UI/Widgets/AssetBrowser/SAssetView.h"
 
 #include <Widgets/Text/SInlineEditableTextBlock.h>
 #include <Widgets/SViewport.h>
 
 namespace FW
 {
-	AssetViewAssetItem::AssetViewAssetItem(STileView<TSharedRef<AssetViewItem>>* InOwner, const FString& InPath)
+	AssetViewAssetItem::AssetViewAssetItem(SAssetView* InOwner, const FString& InPath)
 		: AssetViewItem(InOwner, InPath)
 	{
 	}
@@ -122,6 +123,9 @@ namespace FW
                 [
                     SAssignNew(AssetEditableTextBlock, SInlineEditableTextBlock)
                     .Font(FAppStyle::Get().GetFontStyle("SmallFont"))
+					.IsEnabled_Lambda([this] {
+						return !FPaths::IsUnderDirectory(GetPath(), Owner->GetBuiltInDir());
+					})
                     .Text(FText::FromString(FPaths::GetBaseFilename(Path)))
                     .OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
                         FString NewFilePath = FPaths::GetPath(Path) / NewText.ToString() + "."
