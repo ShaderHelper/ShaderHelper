@@ -65,7 +65,6 @@ namespace SH
 
 					SGraphPanel::ScopedTransaction Transcation(GraphPanel);
 					auto NewTexNode = NewShObject<Texture2dNode>(this, MoveTemp(TexAsset));
-					NewTexNode->InitPins();
 					GraphPanel->DoCommand(MakeShared<AddNodeCommand>(GraphPanel, NewTexNode, Pos));
 					GraphPanel->SetFocus();
 				}
@@ -75,7 +74,6 @@ namespace SH
 
 					SGraphPanel::ScopedTransaction Transcation(GraphPanel);
 					auto NewPassNode = NewShObject<ShaderToyPassNode>(this, MoveTemp(ShaderAsset));
-					NewPassNode->InitPins();
 					GraphPanel->DoCommand(MakeShared<AddNodeCommand>(GraphPanel, NewPassNode, Pos));
 					GraphPanel->SetFocus();
 				}

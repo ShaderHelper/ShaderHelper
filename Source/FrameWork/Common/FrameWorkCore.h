@@ -23,13 +23,15 @@ namespace FW
 		
 		template<typename T, typename... ArgTypes>
 		friend ObjectPtr<T, ObjectOwnerShip::Retain> NewShObject(ShObject* InOuter, ArgTypes&&... InArgs);
+		template<typename T>
+		friend ObjectPtr<T, ObjectOwnerShip::Retain> NewShObject(MetaType* InMetaType, ShObject* InOuter);
 	protected:
 		ShObject();
-	public:
 		virtual ~ShObject();
-		//Init will be called when a non-default object is created
+		void Destroy();
+		//Init only be called when a non-default object is created by NewShObject
 		virtual void Init() {}
-        
+
     public:
 		FGuid GetGuid() const { return Guid; }
 		//Use the serialization system from unreal engine
@@ -40,16 +42,16 @@ namespace FW
 		virtual bool CanChangeProperty(PropertyData* InProperty) { return true; };
         virtual void PostPropertyChanged(PropertyData* InProperty);
     
-        uint32 Add() const
+        uint32 Add()
         {
             return uint32(++NumRefs);
         }
-        uint32 Release() const
+        uint32 Release()
         {
             uint32 Refs = uint32(--NumRefs);
             if(Refs == 0)
             {
-                delete this;
+				Destroy();
             }
             return Refs;
         }
@@ -69,7 +71,7 @@ namespace FW
 	protected:
 		FGuid Guid;
         TArray<TSharedRef<PropertyData>> PropertyDatas;
-        mutable int32 NumRefs;
+        int32 NumRefs;
 
     private:
         //For all Shobject except AssetObject
@@ -88,6 +90,15 @@ namespace FW
 		NewObj->Init();
         return NewObj;
     }
+
+	template<typename T>
+	ObjectPtr<T, ObjectOwnerShip::Retain> NewShObject(MetaType* InMetaType, ShObject* InOuter)
+	{
+		T* NewObj = static_cast<T*>(InMetaType->Construct());
+		NewObj->SetOuter(InOuter);
+		NewObj->Init();
+		return NewObj;
+	}
 
 	class FRAMEWORK_API ShObjectOp
 	{

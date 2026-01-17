@@ -50,9 +50,10 @@ namespace SH
 		ShaderToyPassNode();
 		ShaderToyPassNode(FW::AssetPtr<StShader> InShader);
 		~ShaderToyPassNode();
+		void Init() override;
 
 	public:
-        void InitPins() override;
+        void InitPins();
 		void Serialize(FArchive& Ar) override;
 		TSharedPtr<SWidget> ExtraNodeWidget() override;
 		FSlateColor GetNodeColor() const override { return FLinearColor{ 0.27f, 0.13f, 0.0f }; }

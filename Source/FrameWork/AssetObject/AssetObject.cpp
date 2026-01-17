@@ -21,8 +21,7 @@ namespace FW
 	void AssetObject::Destroy()
 	{
 		GProject->RemovePendingAsset(this);
-		NumRefs = 0;
-		delete this;
+		ShObject::Destroy();
 	}
 
     AssetObject::~AssetObject()

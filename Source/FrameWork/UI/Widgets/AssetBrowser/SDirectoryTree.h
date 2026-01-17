@@ -34,7 +34,7 @@ namespace FW
 		void OnGetChildren(TSharedRef<DirectoryData> InTreeNode, TArray<TSharedRef<DirectoryData>>& OutChildren);
 		void PopulateDirectoryData(TSharedRef<DirectoryData> InDirectoryData, const FString& DirectoryPath);
 
-		TSharedPtr<DirectoryData> FindTreeItemFromTree(const FString& TargetDirPath, TSharedRef<DirectoryData> StartTreeItem);
+		TSharedPtr<DirectoryData> FindTreeItemFromTree(const FString& TargetDirPath);
 		void AddDirectory(const FString& DirectoryPath);
 		void RemoveDirectory(const FString& DirectoryPath);
 

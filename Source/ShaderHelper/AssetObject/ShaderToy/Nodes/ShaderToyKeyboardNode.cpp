@@ -25,6 +25,12 @@ namespace SH
 		return GetMetaType<ShaderToyKeyboardNode>();
 	}
 
+	void ShaderToyKeyboardNodeOp::OnCancelSelect(FW::ShObject* InObject)
+	{
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->RefreshProperty(true);
+	}
+
 	void ShaderToyKeyboardNodeOp::OnSelect(ShObject* InObject)
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
@@ -40,6 +46,11 @@ namespace SH
 	ShaderToyKeyboardNode::~ShaderToyKeyboardNode()
 	{
 
+	}
+
+	void ShaderToyKeyboardNode::Init()
+	{
+		InitPins();
 	}
 
 	void ShaderToyKeyboardNode::InitPins()

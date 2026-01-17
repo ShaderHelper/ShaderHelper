@@ -45,8 +45,7 @@ namespace FW
 			{
 				FString TypeName;
 				Ar << TypeName;
-				GraphNode* LoadedNodeData = static_cast<GraphNode*>(GetMetaType(TypeName)->Construct());
-                LoadedNodeData->SetOuter(this);
+				auto LoadedNodeData = NewShObject<GraphNode>(GetMetaType(TypeName), this);
 				LoadedNodeData->Serialize(Ar);
 				NodeDatas.Emplace(LoadedNodeData);
 			}
@@ -134,13 +133,12 @@ namespace FW
         }
         else
         {
-            Pins.Reserve(PinNum);
+			Pins = {};
             for (int Index = 0; Index < PinNum; Index++)
             {
                 FString TypeName;
                 Ar << TypeName;
-                GraphPin* LoadedPinData = static_cast<GraphPin*>(GetMetaType(TypeName)->Construct());
-                LoadedPinData->SetOuter(this);
+                auto LoadedPinData = NewShObject<GraphPin>(GetMetaType(TypeName), this);
                 LoadedPinData->Serialize(Ar);
                 Pins.Emplace(LoadedPinData);
             }

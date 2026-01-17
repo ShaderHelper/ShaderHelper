@@ -141,8 +141,7 @@ namespace SH
 			});
 		ViewPort->SetAssociatedWidget(ViewportWidget);
 
-		FString BuiltInDir = PathHelper::SavedDir() / "Builtin";
-		FString BuiltInShaderToyDir = BuiltInDir / "ShaderToy";
+		FString BuiltInShaderToyDir = PathHelper::BuiltinDir() / "ShaderToy";
 		if (!IFileManager::Get().DirectoryExists(*BuiltInShaderToyDir))
 		{
 			IFileManager::Get().MakeDirectory(*BuiltInShaderToyDir, true);
@@ -173,11 +172,11 @@ namespace SH
 				}
 			}
 		}
-		TSingleton<AssetManager>::Get().MountProject(BuiltInDir);
+		TSingleton<AssetManager>::Get().MountProject(PathHelper::BuiltinDir());
 		
 		SAssignNew(AssetBrowser, SAssetBrowser)
 		.ContentPathShowed(TSingleton<ShProjectManager>::Get().GetActiveContentDirectory())
-		.BuiltInDir(BuiltInDir)
+		.BuiltInDir(PathHelper::BuiltinDir())
 		.State(&CurProject->AssetBrowserState);
 		
 		SAssignNew(PropertyView, SPropertyView)
@@ -635,7 +634,10 @@ namespace SH
 		}));
         NewShaderTab->SetOnTabActivated(SDockTab::FOnTabActivatedCallback::CreateLambda([this, LoadedShader](TSharedRef<SDockTab> InTab, ETabActivationCause InCause) {
             if(!CodeTabMainArea) return;
-            GetShObjectOp(LoadedShader)->OnSelect(LoadedShader);
+			if (ShObjectOp* Op = GetShObjectOp(LoadedShader))
+			{
+				Op->OnSelect(LoadedShader);
+			}
             if(TSharedPtr<SDockingTabStack> TabStack = CodeTabManager->FindTabInLiveArea(FTabMatcher{InTab->GetLayoutIdentifier()}, CodeTabMainArea.ToSharedRef()))
             {
 				ShaderTabStackInsertPoint = TabStack;
@@ -881,9 +883,9 @@ namespace SH
         }
 	}
 
-    void ShaderHelperEditor::RefreshProperty()
+    void ShaderHelperEditor::RefreshProperty(bool bClear)
     {
-        PropertyView->Refresh();
+        PropertyView->Refresh(bClear);
     }
 
     void ShaderHelperEditor::ShowProperty(ShObject* InObjectData)

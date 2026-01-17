@@ -57,7 +57,6 @@ namespace FW
 		virtual void Serialize(FArchive& Ar) override;
 		virtual FSlateColor GetNodeColor() const;
         virtual ExecRet Exec(GraphExecContext& Context) = 0;
-        virtual void InitPins() {}
         GraphPin* GetPin(FGuid Id);
         GraphPin* GetPin(const FString& InName);
 
@@ -99,6 +98,15 @@ namespace FW
 			}
 			return nullptr;
 		}
+
+		void AddLink(GraphPin* Output, GraphPin* Input)
+		{
+			GraphNode* OutputNode = static_cast<GraphNode*>(Output->GetOuter());
+			GraphNode* InputNode = static_cast<GraphNode*>(Input->GetOuter());
+			OutputNode->OutPinToInPin.AddUnique(Output->GetGuid(), Input->GetGuid());
+			AddDep(OutputNode, InputNode);
+		}
+
 		const TArray<ObjectPtr<GraphNode>>& GetNodes() const { return NodeDatas; }
 		void AddDep(GraphNode* Node1, GraphNode* Node2) { NodeDeps.Add(Node1->GetGuid(), Node2->GetGuid()); }
 		void RemoveDep(GraphNode* Node1, GraphNode* Node2) { NodeDeps.Remove(Node1->GetGuid(), Node2->GetGuid()); }

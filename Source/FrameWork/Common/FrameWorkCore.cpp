@@ -156,8 +156,18 @@ namespace FW
     {
         check(NumRefs == 0);
         GlobalValidShObjects.Remove(this);
-		OnDestroy.Broadcast();
     }
+
+	void ShObject::Destroy()
+	{
+		if (ShObjectOp* Op = GetShObjectOp(this))
+		{
+			Op->OnCancelSelect(this);
+		}
+		OnDestroy.Broadcast();
+		NumRefs = 0;
+		delete this;
+	}
 
     void ShObject::SetOuter(ShObject* InOuter)
     {

@@ -34,7 +34,6 @@ namespace SH
 	void ShaderToyOp::OnCreate(AssetObject* InAsset)
 	{
         auto OutputNode = NewShObject<ShaderToyOutputNode>(InAsset);
-        OutputNode->InitPins();
 		static_cast<ShaderToy*>(InAsset)->AddNode(MoveTemp(OutputNode));
 	}
 

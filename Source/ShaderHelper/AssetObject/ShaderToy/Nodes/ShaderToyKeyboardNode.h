@@ -12,6 +12,7 @@ namespace SH
 		ShaderToyKeyboardNodeOp() = default;
         
         FW::MetaType* SupportType() override;
+		void OnCancelSelect(FW::ShObject* InObject) override;
 		void OnSelect(FW::ShObject* InObject) override;
     };
 
@@ -21,9 +22,10 @@ namespace SH
 	public:
 		ShaderToyKeyboardNode();
         ~ShaderToyKeyboardNode();
+		void Init() override;
         
 	public:
-        void InitPins() override;
+        void InitPins();
 		void Serialize(FArchive& Ar) override;
 		FSlateColor GetNodeColor() const override { return FLinearColor{ 0.2f, 0.2f, 0.4f }; }
         FW::ExecRet Exec(FW::GraphExecContext& Context) override;

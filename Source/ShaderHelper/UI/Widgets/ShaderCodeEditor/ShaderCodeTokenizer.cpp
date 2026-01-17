@@ -114,7 +114,7 @@ namespace SH
 								bLineContinuation = true;
 								CurOffset += 1;
 							}
-							else if (!bInComment && RemainingLen >= 2 && FCString::Strncmp(CurString, TEXT("//"), 2) == 0) {
+							else if (!bInComment && !bInMultilineComment && RemainingLen >= 2 && FCString::Strncmp(CurString, TEXT("//"), 2) == 0) {
 								CurState = StateSet::Comment;
 							}
 							else if (!bInMultilineComment && RemainingLen >= 2 && FCString::Strncmp(CurString, TEXT("/*"), 2) == 0) {

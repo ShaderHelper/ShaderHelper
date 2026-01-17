@@ -23,6 +23,12 @@ namespace SH
 		return GetMetaType<ShaderToyPreviousFrameNode>();
 	}
 
+	void ShaderToyPreviousFrameNodeOp::OnCancelSelect(FW::ShObject* InObject)
+	{
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->RefreshProperty(true);
+	}
+
 	void ShaderToyPreviousFrameNodeOp::OnSelect(ShObject* InObject)
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
@@ -41,7 +47,7 @@ namespace SH
 
 	void ShaderToyPreviousFrameNode::Init()
 	{
-		
+		InitPins();
 	}
 
 	void ShaderToyPreviousFrameNode::UpdatePassNodes()

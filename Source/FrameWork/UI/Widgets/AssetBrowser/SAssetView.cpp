@@ -196,7 +196,7 @@ namespace FW
                     {
                         if(!IsImportedAsset(MetaTypePtr) && MetaTypePtr->Constructor)
                         {
-							AssetObject* NewAsset = static_cast<AssetObject*>(MetaTypePtr->Construct());
+							auto NewAsset = NewShObject<AssetObject>(MetaTypePtr, nullptr);
 							MenuBuilder.AddMenuEntry(
 								LOCALIZATION(NewAsset->FileExtension()),
 								FText::GetEmpty(),

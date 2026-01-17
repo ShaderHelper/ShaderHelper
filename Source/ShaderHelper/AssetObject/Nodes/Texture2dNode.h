@@ -13,6 +13,7 @@ namespace SH
 		Texture2dNodeOp() = default;
 		
 		FW::MetaType* SupportType() override;
+		void OnCancelSelect(FW::ShObject* InObject) override;
 		void OnSelect(FW::ShObject* InObject) override;
 	};
 
@@ -32,10 +33,11 @@ namespace SH
 		Texture2dNode();
 		~Texture2dNode();
 		Texture2dNode(FW::AssetPtr<FW::Texture2D> InTexture);
+		void Init() override;
 		
 	public:
 		void InitTexture();
-		void InitPins() override;
+		void InitPins();
 		void Serialize(FArchive& Ar) override;
 		void PostLoad() override;
 		FSlateColor GetNodeColor() const override { return FLinearColor{ 0.05f, 0.19f, 0.0f }; }

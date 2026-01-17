@@ -12,6 +12,7 @@ namespace SH
 		ShaderToyPreviousFrameNodeOp() = default;
 
 		FW::MetaType* SupportType() override;
+		void OnCancelSelect(FW::ShObject* InObject) override;
 		void OnSelect(FW::ShObject* InObject) override;
 	};
 
@@ -24,7 +25,7 @@ namespace SH
 		void Init() override;
 
 	public:
-		void InitPins() override;
+		void InitPins();
 		void Serialize(FArchive& Ar) override;
 		void PostLoad() override;
 		TSharedPtr<SWidget> ExtraNodeWidget() override;

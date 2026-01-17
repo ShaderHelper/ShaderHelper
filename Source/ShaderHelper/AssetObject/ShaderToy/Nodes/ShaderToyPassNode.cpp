@@ -45,6 +45,7 @@ namespace SH
 	void ShaderToyPassNodeOp::OnCancelSelect(ShObject* InObject)
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->RefreshProperty(true);
 		if(!static_cast<ShaderToyPassNode*>(InObject)->IsDebugging) {
 			ShEditor->SetDebuggableObject(nullptr);
 		}
@@ -90,7 +91,7 @@ namespace SH
 	: ShaderAssetObj(MoveTemp(InShaderAssetObj))
 	, Format(ShaderToyFormat::B8G8R8A8_UNORM)
 	{
-		ObjectName = FText::FromString(ShaderAssetObj->GetFileName());
+		ObjectName = ShaderAssetObj->ObjectName;
 		InitShaderAsset();
 		if(ShaderAssetObj)
 		{
@@ -106,6 +107,11 @@ namespace SH
 			ShaderAssetObj->OnDestroy.RemoveAll(this);
 			ShaderAssetObj->OnRefreshBuilder.RemoveAll(this);
 		}
+	}
+
+	void ShaderToyPassNode::Init()
+	{
+		InitPins();
 	}
 
 	GpuBindGroupBuilder ShaderToyPassNode::GetBuiltInBindGroupBuiler()

@@ -40,10 +40,6 @@ namespace FW
 	{
 		check(Constructor);
 		void* NewObject = Constructor();
-		if (IsDerivedFrom<ShObject>())
-		{
-			static_cast<ShObject*>(NewObject)->Init();
-		}
 		return NewObject;
 	}
 }

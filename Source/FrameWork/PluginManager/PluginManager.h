@@ -17,6 +17,15 @@
 FRAMEWORK_API DECLARE_LOG_CATEGORY_EXTERN(LogPy, Log, All);
 namespace py = pybind11;
 
+PYBIND11_DECLARE_HOLDER_TYPE(T, FW::ObjectPtr<T>, true)
+namespace PYBIND11_NAMESPACE {
+	namespace detail {
+		template <typename T>
+		struct holder_helper<FW::ObjectPtr<T>> {
+			static const T* get(const FW::ObjectPtr<T>& p) { return p.Get(); }
+		};
+	}
+}
 FRAMEWORK_API void RegisterPyFW(py::module_& m, py::module_& m_slate);
 
 namespace FW

@@ -60,6 +60,11 @@ namespace FW {
         return SavedDir() / TEXT("Capture");
     }
 
+	FString PathHelper::BuiltinDir()
+	{
+		return SavedDir()/ TEXT("Builtin");
+	}
+
 	FString PathHelper::ShaderDir()
 	{
 		return ResourceDir() / TEXT("Shaders");

@@ -132,8 +132,10 @@ namespace FW
 				Owner->AddSelectedNode(SharedThis(this));
 			}
 			MousePos = MouseEvent.GetScreenSpacePosition();
-            ShObjectOp* Op = GetShObjectOp(NodeData);
-            Op->OnSelect(NodeData);
+			if (ShObjectOp* Op = GetShObjectOp(NodeData))
+			{
+				Op->OnSelect(NodeData);
+			}
 
 			if (MouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton))
 			{
@@ -200,17 +202,12 @@ namespace FW
 
 	void SGraphNode::AddDep(SGraphNode* InNode)
 	{
-		OutDegreeDeps.FindOrAdd(InNode)++;
 		Owner->GetGraphData()->AddDep(InNode->NodeData, this->NodeData);
 	}
 
 	void SGraphNode::RemoveDep(SGraphNode* InNode)
 	{
-		if (--OutDegreeDeps[InNode] <= 0)
-		{
-			OutDegreeDeps.Remove(InNode);
-			Owner->GetGraphData()->RemoveDep(InNode->NodeData, this->NodeData);
-		}
+		Owner->GetGraphData()->RemoveDep(InNode->NodeData, this->NodeData);
 	}
 
 }

@@ -2,7 +2,10 @@
 #include "PluginManager.h"
 #include "AssetObject/Graph.h"
 #include "AssetObject/Texture2D.h"
+#include "AssetManager/AssetManager.h"
 #include "AssetManager/AssetImporter/AssetImporter.h"
+#include "Editor/AssetEditor/AssetEditor.h"
+#include "GpuApi/GpuShader.h"
 
 DEFINE_LOG_CATEGORY(LogPy);
 class RedirectorStdout
@@ -46,6 +49,7 @@ std::vector<py::object> RegisteredPropertyExts;
 void RegisterPyFW(py::module_& m, py::module_& m_slate)
 {
 	py::class_<FW::PathHelper>(m, "PathHelper")
+		.def_property_readonly_static("BuiltinDir", [](py::object) { return std::string(TCHAR_TO_UTF8(*FW::PathHelper::BuiltinDir())); })
 		.def_property_readonly_static("ResourceDir", [](py::object) { return std::string(TCHAR_TO_UTF8(*FW::PathHelper::ResourceDir())); });
 
 	py::class_< FW::MenuEntryExt, FW::PyMenuEntryExt >(m, "MenuEntryExt")
@@ -57,15 +61,17 @@ void RegisterPyFW(py::module_& m, py::module_& m_slate)
 		.def("CreateWidget", &FW::PropertyExt::CreateWidget);
 
 	py::class_<FW::MetaType>(m, "MetaType");
-	py::class_<FW::ShObject>(m, "ShObject")
+	py::class_<FW::ShObject, FW::ObjectPtr<FW::ShObject>>(m, "ShObject")
 		.def_property_readonly("Id", [](const FW::ShObject& Self) { return std::string(TCHAR_TO_UTF8(*Self.GetGuid().ToString())); })
 		.def_property_readonly("DynamicMetaType", &FW::ShObject::DynamicMetaType)
 		.def_property_readonly("Name", [](const FW::ShObject& Self) { return std::string(TCHAR_TO_UTF8(*Self.ObjectName.ToString())); });
-	py::class_<FW::AssetObject, FW::ShObject>(m, "AssetObject")
+	py::class_<FW::AssetObject, FW::ShObject, FW::ObjectPtr<FW::AssetObject>>(m, "AssetObject")
 		.def_property_readonly("FileName", [](const FW::AssetObject& Self) { return std::string(TCHAR_TO_UTF8(*Self.GetFileName())); })
 		.def_property_readonly("FileExtension", [](const FW::AssetObject& Self) { return std::string(TCHAR_TO_UTF8(*Self.FileExtension())); });
-	py::class_<FW::Texture2D, FW::AssetObject>(m, "Texture2D");
-	py::class_<FW::Graph, FW::AssetObject>(m, "Graph")
+	py::class_<FW::Texture2D, FW::AssetObject, FW::ObjectPtr<FW::Texture2D>>(m, "Texture2D");
+	py::class_<FW::Graph, FW::AssetObject, FW::ObjectPtr<FW::Graph>>(m, "Graph")
+		.def("AddNode", &FW::Graph::AddNode)
+		.def("AddLink", &FW::Graph::AddLink)
 		.def_property_readonly("Nodes", [](const FW::Graph& Self) {
 			std::vector<FW::GraphNode*> RetNodes;
 			for (const auto& Node : Self.GetNodes())
@@ -74,7 +80,8 @@ void RegisterPyFW(py::module_& m, py::module_& m_slate)
 			}
 			return RetNodes;
 		});
-	py::class_<FW::GraphNode, FW::ShObject>(m, "GraphNode")
+	py::class_<FW::GraphNode, FW::ShObject, FW::ObjectPtr<FW::GraphNode>>(m, "GraphNode")
+		.def("GetPin", [](FW::GraphNode& Self, const std::string& InName) { return Self.GetPin(UTF8_TO_TCHAR(InName.c_str())); })
 		.def_property_readonly("InputPins", [](const FW::GraphNode& Self) {
 			std::vector<FW::GraphPin*> RetPins;
 			for (const auto& Pin : Self.Pins)
@@ -86,7 +93,7 @@ void RegisterPyFW(py::module_& m, py::module_& m_slate)
 			}
 			return RetPins;
 		});
-	py::class_<FW::GraphPin, FW::ShObject>(m, "GraphPin")
+	py::class_<FW::GraphPin, FW::ShObject, FW::ObjectPtr<FW::GraphPin>>(m, "GraphPin")
 		.def_property_readonly("SourceNode", [](const FW::GraphPin& Self) { return Self.GetSourceNode(); });
 
 	m.def("RegisterExt", [](py::object ClassType) {
@@ -133,7 +140,11 @@ void RegisterPyFW(py::module_& m, py::module_& m_slate)
 			}
 		}
 	});
-
+	py::native_enum<FW::GpuShaderLanguage>(m, "GpuShaderLanguage", "enum.Enum")
+		.value("HLSL", FW::GpuShaderLanguage::HLSL)
+		.value("GLSL", FW::GpuShaderLanguage::GLSL)
+		.export_values()
+		.finalize();
 	py::native_enum<EHorizontalAlignment>(m_slate, "EHorizontalAlignment", "enum.Enum")
 		.value("HAlign_Fill", EHorizontalAlignment::HAlign_Fill)
 		.value("HAlign_Center", EHorizontalAlignment::HAlign_Center)
@@ -230,6 +241,23 @@ void RegisterPyFW(py::module_& m, py::module_& m_slate)
 			}
 	});
 	m_asset.def("GetImporter", [](const std::string& InPath) { return FW::GetAssetImporter(InPath.c_str()); }, py::return_value_policy::reference);
+	m_asset.def("CreateAsset", [](const std::string& InName, py::object ClassType) {
+		FW::ObjectPtr<FW::AssetObject> NewAsset = nullptr;
+		if (FW::IsBaseOf(py::type::of<FW::AssetObject>(), ClassType))
+		{
+			FW::MetaType* MetaType = ClassType().attr("DynamicMetaType").cast<FW::MetaType*>();
+			NewAsset = NewShObject<FW::AssetObject>(MetaType, nullptr);
+			NewAsset->ObjectName = FText::FromString(UTF8_TO_TCHAR(InName.c_str()));
+			if (FW::AssetOp* AssetOp = FW::GetAssetOp(MetaType))
+			{
+				AssetOp->OnCreate(NewAsset);
+			}
+		}
+		return NewAsset;
+	});
+	m_asset.def("LoadAsset", [](const std::string& InPath) {
+		return FW::TSingleton<FW::AssetManager>::Get().LoadAssetByPath<FW::AssetObject>(UTF8_TO_TCHAR(InPath.c_str()));
+	});
 }
 
 

@@ -32,6 +32,7 @@ namespace SH
 	void ShaderToyOutputNodeOp::OnCancelSelect(ShObject* InObject)
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->RefreshProperty(true);
 		TSharedPtr<SShViewport> ViewportWidget = StaticCastSharedPtr<SShViewport>(ShEditor->GetViewPort()->GetAssociatedWidget().Pin());
 		ViewportWidget->ResetSpliter();
 	}
@@ -64,6 +65,11 @@ namespace SH
     {
 
     }
+
+	void SH::ShaderToyOutputNode::Init()
+	{
+		InitPins();
+	}
 
     void ShaderToyOutputNode::InitPins()
     {

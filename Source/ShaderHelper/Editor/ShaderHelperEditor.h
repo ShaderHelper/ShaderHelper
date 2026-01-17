@@ -87,7 +87,7 @@ namespace SH
         void OpenShaderTab(FW::AssetPtr<ShaderAsset> InShader);
 		
 		void OpenGraph(FW::AssetPtr<FW::Graph> InGraphData, TSharedPtr<FW::RenderComponent> InGraphRenderComp);
-        void RefreshProperty();
+        void RefreshProperty(bool bClear = false);
         void ShowProperty(FW::ShObject* InObjectData);
         void UpdateShaderPath(const FString& InShaderPath);
 

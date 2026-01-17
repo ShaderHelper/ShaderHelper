@@ -201,21 +201,34 @@ namespace FW
 		OutChildren = InTreeNode->Children;
 	}
 
-	TSharedPtr<DirectoryData> SDirectoryTree::FindTreeItemFromTree(const FString& TargetDirPath, TSharedRef<DirectoryData> StartTreeItem)
+	namespace
 	{
-		if (TargetDirPath == StartTreeItem->DirectoryPath)
+		TSharedPtr<DirectoryData> FindRecursive(const TSharedRef<DirectoryData>& TreeNode, const FString& TargetPath)
 		{
-			return StartTreeItem;
-		}
-		else
-		{
-			for (const auto& Child : StartTreeItem->Children)
+			if (TargetPath == TreeNode->DirectoryPath)
 			{
-				TSharedPtr<DirectoryData> Result =  FindTreeItemFromTree(TargetDirPath, Child);
-				if (Result)
+				return TreeNode;
+			}
+			
+			for (const auto& Child : TreeNode->Children)
+			{
+				if (TSharedPtr<DirectoryData> Result = FindRecursive(Child, TargetPath))
 				{
 					return Result;
 				}
+			}
+			
+			return nullptr;
+		}
+	}
+
+	TSharedPtr<DirectoryData> SDirectoryTree::FindTreeItemFromTree(const FString& TargetDirPath)
+	{
+		for (const auto& RootItem : DirectoryDatas)
+		{
+			if (TSharedPtr<DirectoryData> Result = FindRecursive(RootItem, TargetDirPath))
+			{
+				return Result;
 			}
 		}
 
@@ -225,7 +238,7 @@ namespace FW
 	void SDirectoryTree::AddDirectory(const FString& DirectoryPath)
 	{
 		FString ParentDirectoryPath = FPaths::GetPath(DirectoryPath);
-		if (TSharedPtr<DirectoryData> ParentDirTreeItem = FindTreeItemFromTree(ParentDirectoryPath, DirectoryDatas[0]))
+		if (TSharedPtr<DirectoryData> ParentDirTreeItem = FindTreeItemFromTree(ParentDirectoryPath))
 		{
 			TSharedRef<DirectoryData> NewDirTreeItem = MakeShared<DirectoryData>();
 			PopulateDirectoryData(NewDirTreeItem, DirectoryPath);
@@ -251,7 +264,7 @@ namespace FW
         }
         
 		FString ParentDirectoryPath = FPaths::GetPath(DirectoryPath);
-		if (TSharedPtr<DirectoryData> ParentDirTreeItem = FindTreeItemFromTree(ParentDirectoryPath, DirectoryDatas[0]))
+		if (TSharedPtr<DirectoryData> ParentDirTreeItem = FindTreeItemFromTree(ParentDirectoryPath))
 		{
 			for (auto It = ParentDirTreeItem->Children.CreateIterator(); It; It++)
 			{
@@ -278,7 +291,7 @@ namespace FW
 
 	void SDirectoryTree::SetSelection(const FString& SelectedDirectory)
 	{
-		if (TSharedPtr<DirectoryData> Data = FindTreeItemFromTree(SelectedDirectory, DirectoryDatas[0]))
+		if (TSharedPtr<DirectoryData> Data = FindTreeItemFromTree(SelectedDirectory))
 		{
 			DirectoryTree->SetSelection(Data.ToSharedRef());
 		}
@@ -286,7 +299,7 @@ namespace FW
 
 	void SDirectoryTree::SetExpansion(const FString& ExpandedDirectory)
 	{
-		if (TSharedPtr<DirectoryData> Data = FindTreeItemFromTree(ExpandedDirectory, DirectoryDatas[0]))
+		if (TSharedPtr<DirectoryData> Data = FindTreeItemFromTree(ExpandedDirectory))
 		{
 			DirectoryTree->SetItemExpansion(Data.ToSharedRef(), true);
 		}
@@ -294,7 +307,7 @@ namespace FW
 
     void SDirectoryTree::SetExpansionRecursive(const FString& ExpandedDirectory)
     {
-        if (TSharedPtr<DirectoryData> Data = FindTreeItemFromTree(ExpandedDirectory, DirectoryDatas[0]))
+        if (TSharedPtr<DirectoryData> Data = FindTreeItemFromTree(ExpandedDirectory))
         {
             DirectoryTree->SetItemExpansion(Data.ToSharedRef(), true);
             SetExpansionRecursive(FPaths::GetPath(ExpandedDirectory));
@@ -303,7 +316,7 @@ namespace FW
 
 	void SDirectoryTree::SortSubDirectory(const FString& ParentDirectory)
 	{
-		if (TSharedPtr<DirectoryData> ParentDirTreeItem = FindTreeItemFromTree(ParentDirectory, DirectoryDatas[0]))
+		if (TSharedPtr<DirectoryData> ParentDirTreeItem = FindTreeItemFromTree(ParentDirectory))
 		{
 			ParentDirTreeItem->Children.Sort([](const TSharedRef<DirectoryData>& A, const TSharedRef<DirectoryData>& B) {
 				return A->DirectoryPath < B->DirectoryPath;

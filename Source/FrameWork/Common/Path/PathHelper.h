@@ -16,6 +16,7 @@ namespace FW {
 		static FString SavedShaderDir();
 		static FString SavedConfigDir();
         static FString SavedCaptureDir();
+		static FString BuiltinDir();
 		static FString ShaderDir();
 		static FString ErrorDir();
 		

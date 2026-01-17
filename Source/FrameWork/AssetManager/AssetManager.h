@@ -184,7 +184,7 @@ namespace FW
 		template<typename T>
 		AssetPtr<T> ConstructAssetObject(const FString& InAssetPath)
 		{
-			AssetObject* NewAssetObject = nullptr;
+			AssetPtr<T> NewAssetObject = nullptr;
 			FString AssetExt = FPaths::GetExtension(InAssetPath);
 			TArray<MetaType*> MetaTypes = GetMetaTypes<T>();
 			for (auto MetaTypePtr : MetaTypes)
@@ -195,12 +195,12 @@ namespace FW
 					T* RelDefaultObject = static_cast<T*>(DefaultObject);
 					if (RelDefaultObject->FileExtension().Contains(AssetExt))
 					{
-						NewAssetObject = static_cast<AssetObject*>(MetaTypePtr->Construct());
+						NewAssetObject = NewShObject<T>(MetaTypePtr, nullptr);
 						break;
 					}
 				}
 			}
-			return static_cast<T*>(NewAssetObject);
+			return NewAssetObject;
 		}
 
 		void NotifyPendingLoads(const FGuid& Guid, AssetObject* Result)

@@ -29,6 +29,12 @@ namespace SH
 		return GetMetaType<Texture2dNode>();
 	}
 
+	void Texture2dNodeOp::OnCancelSelect(FW::ShObject* InObject)
+	{
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->RefreshProperty(true);
+	}
+
 	void Texture2dNodeOp::OnSelect(ShObject* InObject)
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
@@ -53,6 +59,11 @@ namespace SH
 	{
 		ObjectName = FText::FromString(Texture->GetFileName());
 		InitTexture();
+	}
+
+	void Texture2dNode::Init()
+	{
+		InitPins();
 	}
 
 	void Texture2dNode::InitPins()

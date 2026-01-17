@@ -22,9 +22,10 @@ namespace SH
 	public:
 		ShaderToyOutputNode();
         ~ShaderToyOutputNode();
+		void Init() override;
         
 	public:
-        void InitPins() override;
+        void InitPins();
 		void Serialize(FArchive& Ar) override;
         FW::ExecRet Exec(FW::GraphExecContext& Context) override;
 		void PostPropertyChanged(FW::PropertyData* InProperty) override;

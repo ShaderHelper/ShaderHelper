@@ -23,15 +23,23 @@ namespace FW
         
         TArray<TSharedRef<PropertyData>> GetLinearizedItems(TSharedRef<PropertyData> InItem) const;
 
-		void Refresh()
+		void Refresh(bool bClear = false)
 		{
             if(PropertyTree)
             {
+				if (bClear)
+				{
+					ObjectData = nullptr;
+					PropertyDatas->Empty();
+				}
+				else
+				{
+					for (const auto& Data : *PropertyDatas)
+					{
+						TryExpandItemRecursively(Data);
+					}
+				}
                 PropertyTree->RequestTreeRefresh();
-                for(const auto& Data : *PropertyDatas)
-                {
-                    TryExpandItemRecursively(Data);
-                }
             }
 
 		}

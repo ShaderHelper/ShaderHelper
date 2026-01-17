@@ -101,8 +101,10 @@ namespace FW
 		NewNodeData->SetOuter(GraphData);
 		NewNodeData->Position = Pos; 
 
-		ShObjectOp* Op = GetShObjectOp(NewNodeData);
-		Op->OnSelect(NewNodeData);
+		if (ShObjectOp* Op = GetShObjectOp(NewNodeData))
+		{
+			Op->OnSelect(NewNodeData);
+		}
 
 		auto NodeWidget = NewNodeData->CreateNodeWidget(this);
 		Nodes.Add(NodeWidget);
@@ -119,8 +121,7 @@ namespace FW
 			SGraphNode* OutputOwner = Output->Owner;
 			SGraphNode* InputOwner = Input->Owner;
 			Input->PinData->SourcePin = Output->PinData->GetGuid();
-			OutputOwner->NodeData->OutPinToInPin.AddUnique(Output->PinData->GetGuid(), Input->PinData->GetGuid());
-			OutputOwner->AddDep(InputOwner);
+			GraphData->AddLink(Output->PinData, Input->PinData);
 			Links.AddUnique(Output, Input);
 		}
 	}
@@ -206,8 +207,10 @@ namespace FW
 			GraphData->RemoveNode(InNode->NodeData->GetGuid());
 			GraphData->AddNode(NodeData);
 
-			ShObjectOp* Op = GetShObjectOp(NodeData);
-			Op->OnSelect(NodeData);
+			if (ShObjectOp* Op = GetShObjectOp(NodeData))
+			{
+				Op->OnSelect(NodeData);
+			}
 			SelectedNodes.Add(&*InNode);
 		}
 	}
@@ -618,8 +621,7 @@ namespace FW
 		});
 
 		ScopedTransaction Transaction(this);
-		ObjectPtr<GraphNode> NewNodeData = static_cast<GraphNode*>(DefaultNodeData->DynamicMetaType()->Construct());
-		NewNodeData->InitPins();
+		ObjectPtr<GraphNode> NewNodeData = NewShObject<GraphNode>(DefaultNodeData->DynamicMetaType(), GetGraphData());
 		DoCommand(MakeShared<AddNodeCommand>(this, NewNodeData, PanelCoordToGraphCoord(MousePos)));
 
 		FSlateApplication::Get().DismissAllMenus();
@@ -629,8 +631,10 @@ namespace FW
 	{
 		for (auto It = SelectedNodes.CreateIterator(); It; It++)
 		{
-			ShObjectOp* Op = GetShObjectOp((*It)->NodeData);
-			Op->OnCancelSelect((*It)->NodeData);
+			if (ShObjectOp* Op = GetShObjectOp((*It)->NodeData))
+			{
+				Op->OnCancelSelect((*It)->NodeData);
+			}
 			It.RemoveCurrent();
 		}
 	}
@@ -654,8 +658,10 @@ namespace FW
 
 	void SGraphPanel::DeleteNode(SGraphNode* Node)
 	{
-		ShObjectOp* Op = GetShObjectOp(Node->NodeData);
-		Op->OnCancelSelect(Node->NodeData);
+		if (ShObjectOp* Op = GetShObjectOp(Node->NodeData))
+		{
+			Op->OnCancelSelect(Node->NodeData);
+		}
 		
 		GraphData->RemoveNode(Node->NodeData->GetGuid());
 

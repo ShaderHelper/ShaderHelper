@@ -25,7 +25,6 @@ namespace FW
 		TArray<class SGraphPin*> Pins;
 
 	private:
-		TMap<SGraphNode*, int> OutDegreeDeps;
 		FVector2D MousePos;
 		TSharedPtr<SInlineEditableTextBlock> NodeTitleEditText;
 	};
