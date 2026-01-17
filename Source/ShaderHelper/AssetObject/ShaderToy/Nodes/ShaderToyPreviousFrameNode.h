@@ -21,6 +21,7 @@ namespace SH
 		REFLECTION_TYPE(ShaderToyPreviousFrameNode)
 	public:
 		ShaderToyPreviousFrameNode();
+		ShaderToyPreviousFrameNode(ShaderToyPassNode* InPassNode);
 		~ShaderToyPreviousFrameNode();
 		void Init() override;
 

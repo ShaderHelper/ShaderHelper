@@ -274,7 +274,9 @@ def create_shadertoy_assets(shadertoy_id, shadertoy_info):
                                 id_to_node[input_id] = texture_node
                                 shadertoy_graph.AddNode(texture_node)
                     elif input_data['type'] == 'keyboard':
-                        pass
+                        keyboard_node = Sh.ShaderToyKeyboardNode(shadertoy_graph)
+                        id_to_node[input_id] = keyboard_node
+                        shadertoy_graph.AddNode(keyboard_node)
 
                     channel_index = input_data['channel']
                     sampler = input_data['sampler']
@@ -311,7 +313,13 @@ def create_shadertoy_assets(shadertoy_id, shadertoy_info):
                     if input_id in id_to_node:
                         input_node = id_to_node[input_id]
                         channel_index = input_data['channel']
-                        shadertoy_graph.AddLink(input_node.GetPin('RT'), pass_node.GetPin(f"iChannel{channel_index}"))
+                        # self-dependency
+                        if input_node == pass_node:
+                            preframe_node = Sh.ShaderToyPreviousFrameNode(shadertoy_graph, pass_node)
+                            shadertoy_graph.AddNode(preframe_node)
+                            shadertoy_graph.AddLink(preframe_node.GetPin('RT'), pass_node.GetPin(f"iChannel{channel_index}"))
+                        else:
+                            shadertoy_graph.AddLink(input_node.GetPin('RT'), pass_node.GetPin(f"iChannel{channel_index}"))
                
 
         saved_file_path = os.path.join(target_dir, f"{shadertoy_name}.{shadertoy_graph.FileExtension}")

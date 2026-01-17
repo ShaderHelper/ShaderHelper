@@ -53,6 +53,7 @@ PYBIND11_EMBEDDED_MODULE(ShaderHelper, m)
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::ShaderToyKeyboardNode>(Outer); }), py::arg("Outer") = nullptr);
 	py::class_<SH::ShaderToyPreviousFrameNode, FW::GraphNode, FW::ObjectPtr<SH::ShaderToyPreviousFrameNode>>(m, "ShaderToyPreviousFrameNode")
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::ShaderToyPreviousFrameNode>(Outer); }), py::arg("Outer") = nullptr)
+		.def(py::init([](FW::ShObject* Outer, SH::ShaderToyPassNode* InPassNode) { return NewShObject<SH::ShaderToyPreviousFrameNode>(Outer, InPassNode); }))
 		.def("GetPassNode", &SH::ShaderToyPreviousFrameNode::GetPassNode, py::return_value_policy::reference);
 	py::class_<SH::Texture2dNode, FW::GraphNode, FW::ObjectPtr<SH::Texture2dNode>>(m, "Texture2dNode")
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::Texture2dNode>(Outer); }), py::arg("Outer") = nullptr)

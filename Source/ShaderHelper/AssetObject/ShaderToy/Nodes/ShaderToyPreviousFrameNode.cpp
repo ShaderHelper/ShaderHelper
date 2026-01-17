@@ -40,6 +40,12 @@ namespace SH
 		ObjectName = LOCALIZATION("PreviousFrame");
 	}
 
+	ShaderToyPreviousFrameNode::ShaderToyPreviousFrameNode(ShaderToyPassNode* InPassNode)
+	{
+		ObjectName = LOCALIZATION("PreviousFrame");
+		PassNode = InPassNode->GetGuid();
+	}
+
 	ShaderToyPreviousFrameNode::~ShaderToyPreviousFrameNode()
 	{
 

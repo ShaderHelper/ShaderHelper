@@ -81,7 +81,10 @@ namespace FW
 			TArray<ObjectPtr<GraphNode>> DepNodes;
 			for (FGuid Id : DepIds)
 			{
-				DepNodes.Add(GetNode(Id));
+				if (GraphNode* Node = GetNode(Id))
+				{
+					DepNodes.Add(Node);
+				}
 			}
 			return DepNodes;
 		});
