@@ -80,6 +80,7 @@ namespace SH
 		void InitCustomBindGroup();
         void ClearBindingProperty();
         void RefreshProperty(bool bCopyUniformBuffer = true);
+		void UpdateBuiltinUniformBuffer(struct ShaderToyExecContext& Context);
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromBinding();
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromUniform(FW::UniformBuffer* InUb, bool Enabled);
         
@@ -94,8 +95,10 @@ namespace SH
 	private:
 		TSharedPtr<FW::PreviewViewPort> Preview = MakeShared<FW::PreviewViewPort>();
         //For Serialize
+		TArray<uint8> BuiltinUniformBufferData;
         TArray<uint8> CustomUniformBufferData;
         
+		TUniquePtr<FW::UniformBuffer> BuiltinUniformBuffer;
         TUniquePtr<FW::UniformBuffer> CustomUniformBuffer;
         TRefCountPtr<FW::GpuBindGroupLayout> CustomBindLayout;
         TRefCountPtr<FW::GpuBindGroup> CustomBindGroup;

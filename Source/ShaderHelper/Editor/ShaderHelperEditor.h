@@ -168,6 +168,9 @@ namespace SH
 		static constexpr int MaxNavigation = 233;
 		int32 NavigationIndex = INDEX_NONE;
 		TArray<TPair<FGuid, FTextLocation>> NavigationHistory;
+		
+		double LastForceRenderTime = 0.0;
+		static constexpr double ForceRenderThrottleInterval = 1.0 / 60.0;
 	};
 
 }

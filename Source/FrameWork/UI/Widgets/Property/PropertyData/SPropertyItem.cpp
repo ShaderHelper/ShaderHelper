@@ -19,6 +19,7 @@ namespace FW
         DisplayName = InArgs._DisplayName;
 		auto ItemTextBlock = SNew(SShInlineEditableTextBlock)
 			.IsReadOnly(!InArgs._OnDisplayNameChanged)
+			.OverflowPolicy(ETextOverflowPolicy::Ellipsis)
 			.Text_Lambda([this] {
 				return *DisplayName;
 			})

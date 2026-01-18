@@ -48,7 +48,7 @@ namespace FW
 			})
 		];
 
-		if (State->CurSelectedDirectory.IsEmpty())
+		if (State->CurSelectedDirectory.IsEmpty() || !IFileManager::Get().DirectoryExists(*State->CurSelectedDirectory))
 		{
             State->CurSelectedDirectory = ContentPathShowed;
 		}

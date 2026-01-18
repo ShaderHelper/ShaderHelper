@@ -33,5 +33,6 @@ namespace SH
 		ShaderToyFormat Format;
 		int32 Layer;
 		float AreaFraction;
+		bool FlipY;
 	};
 }

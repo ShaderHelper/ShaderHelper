@@ -2,6 +2,7 @@
 #include "GpuApi/GpuRhi.h"
 #include "GpuApi/GpuShader.h"
 #include <string_view>
+#include <type_traits>
 
 namespace FW
 {
@@ -65,6 +66,64 @@ namespace FW
 		uint32 Offset;
     };
 
+    // 数组类型的特化
+    template<typename T, size_t N>
+    class UniformBufferMemberWrapper<T[N]>
+    {
+    public:
+        UniformBufferMemberWrapper(void* InReadableBackBuffer, GpuBuffer* InWriteCombinedBuffer, uint32 InOffset)
+        : ReadableBackBuffer(InReadableBackBuffer), WriteCombinedBuffer(InWriteCombinedBuffer), BaseOffset(InOffset)
+        {
+            ElementSize = sizeof(T);
+            ElementAlignedSize = Align(ElementSize, 16);
+        }
+        
+        T& operator[](size_t Index)
+        {
+            checkf(Index < N, TEXT("Array index %zu out of bounds [0, %zu)"), Index, N);
+            uint32 ElementOffset = BaseOffset + static_cast<uint32>(Index) * ElementAlignedSize;
+            return *reinterpret_cast<T*>((uint8*)ReadableBackBuffer + ElementOffset);
+        }
+        
+        void operator=(const T(&InData)[N])
+        {
+            void* WritableData = GGpuRhi->MapGpuBuffer(WriteCombinedBuffer, GpuResourceMapMode::Write_Only);
+            
+            for (size_t i = 0; i < N; ++i)
+            {
+                uint32 ElementOffset = BaseOffset + static_cast<uint32>(i) * ElementAlignedSize;
+                T* ReadableData = reinterpret_cast<T*>((uint8*)ReadableBackBuffer + ElementOffset);
+                T* WritableElement = reinterpret_cast<T*>((uint8*)WritableData + ElementOffset);
+                *ReadableData = InData[i];
+                *WritableElement = InData[i];
+            }
+        }
+
+        void operator=(const TArray<T>& InData)
+        {
+            checkf(InData.Num() == N, TEXT("Array size mismatch: expected %zu, got %d"), N, InData.Num());
+            void* WritableData = GGpuRhi->MapGpuBuffer(WriteCombinedBuffer, GpuResourceMapMode::Write_Only);
+            
+            for (size_t i = 0; i < N; ++i)
+            {
+                uint32 ElementOffset = BaseOffset + static_cast<uint32>(i) * ElementAlignedSize;
+                T* ReadableData = reinterpret_cast<T*>((uint8*)ReadableBackBuffer + ElementOffset);
+                T* WritableElement = reinterpret_cast<T*>((uint8*)WritableData + ElementOffset);
+                *ReadableData = InData[i];
+                *WritableElement = InData[i];
+            }
+        }
+        
+        static constexpr size_t GetCount() { return N; }
+        
+    private:
+        void* ReadableBackBuffer;
+        GpuBuffer* WriteCombinedBuffer;
+        uint32 BaseOffset;
+        uint32 ElementSize;
+        uint32 ElementAlignedSize;
+    };
+
 	class UniformBuffer
 	{
 	public:
@@ -86,6 +145,23 @@ namespace FW
         UniformBufferMemberWrapper<T> GetMember(const FString& MemberName) {
 			checkf(MetaData.Members.Contains(MemberName), TEXT("The uniform buffer doesn't contain \"%s\" member."), *MemberName);
             uint32 MemberOffset = MetaData.Members[MemberName].Offset;
+            
+            if constexpr (std::is_array_v<T>)
+            {
+                const UniformBufferMemberInfo& MemberInfo = MetaData.Members[MemberName];
+                FString TypeName = MemberInfo.HlslTypeName;
+                int32 ArrayStartIndex = TypeName.Find(TEXT("["));
+                checkf(ArrayStartIndex != INDEX_NONE, TEXT("Member \"%s\" is not an array type."), *MemberName);
+                
+                int32 ArrayEndIndex = TypeName.Find(TEXT("]"), ESearchCase::CaseSensitive, ESearchDir::FromStart, ArrayStartIndex);
+                checkf(ArrayEndIndex != INDEX_NONE, TEXT("Invalid array type format for member \"%s\"."), *MemberName);
+                
+                FString ArraySizeStr = TypeName.Mid(ArrayStartIndex + 1, ArrayEndIndex - ArrayStartIndex - 1);
+                uint32 ArrayCount = FCString::Atoi(*ArraySizeStr);
+                constexpr size_t ExpectedArraySize = std::extent_v<T>;
+                checkf(ArrayCount == ExpectedArraySize, TEXT("Array size mismatch for member \"%s\": expected %zu, got %d"), *MemberName, ExpectedArraySize, ArrayCount);
+            }
+            
             return {ReadableBackBuffer, WriteCombinedBuffer, MemberOffset };
 		}
 
@@ -148,6 +224,7 @@ namespace FW
 	};
 
 	template<typename T> struct UniformBufferMemberTypeString;
+	template<> struct UniformBufferMemberTypeString<int32> { static constexpr std::string_view Value = "int"; static constexpr std::string_view GlslValue = "int"; };
 	template<> struct UniformBufferMemberTypeString<uint32> { static constexpr std::string_view Value = "uint"; static constexpr std::string_view GlslValue = "uint"; };
 	template<> struct UniformBufferMemberTypeString<float> { static constexpr std::string_view Value = "float"; static constexpr std::string_view GlslValue = "float"; };
 	template<> struct UniformBufferMemberTypeString<Vector2f> { static constexpr std::string_view Value = "float2"; static constexpr std::string_view GlslValue = "vec2"; };
@@ -192,6 +269,12 @@ namespace FW
 			return *this;
 		}
 
+		UniformBufferBuilder& AddInt(const FString& MemberName)
+		{
+			AddMember<int32>(MemberName);
+			return *this;
+		}
+
 		UniformBufferBuilder& AddFloat(const FString& MemberName) 
 		{
 			AddMember<float>(MemberName);
@@ -213,6 +296,12 @@ namespace FW
 		UniformBufferBuilder& AddVector4f(const FString& MemberName)
 		{
 			AddMember<Vector4f>(MemberName);
+			return *this;
+		}
+
+		UniformBufferBuilder& AddVector3fArray(const FString& MemberName, uint32 ArrayCount)
+		{
+			AddArrayMember<Vector3f>(MemberName, ArrayCount);
 			return *this;
 		}
 
@@ -272,6 +361,45 @@ namespace FW
 
 			HlslUniformBufferBody += FString::Printf(TEXT("%s %s;\n"), *HlslTypeName, *MemberName);
 			GlslUniformBufferBody += FString::Printf(TEXT("%s %s;\n"), *GlslTypeName, *MemberName);
+		}
+
+		template<typename T>
+		void AddArrayMember(const FString& MemberName, uint32 ArrayCount)
+		{
+            checkf(!HasMember(MemberName), TEXT("UniformBuffer can not have the same member name:%s."), *MemberName);
+			checkf(ArrayCount > 0, TEXT("Array count must be greater than 0."));
+
+			uint32 ElementSize = sizeof(T);
+			uint32 ElementAlignedSize = Align(ElementSize, 16);
+			uint32 ArraySize = ArrayCount * ElementAlignedSize;
+			
+			uint32 SizeBeforeAligning = MetaData.UniformBufferSize;
+			uint32 SizeAfterAligning = Align(MetaData.UniformBufferSize, 16);
+			uint32 RemainingSize = SizeAfterAligning - SizeBeforeAligning;
+			if (RemainingSize < ElementSize)
+			{
+				while (SizeAfterAligning > SizeBeforeAligning)
+				{
+					HlslUniformBufferBody += FString::Printf(TEXT("float {0}_Padding_%d;\n"), SizeBeforeAligning);
+					GlslUniformBufferBody += FString::Printf(TEXT("float {0}_Padding_%d;\n"), SizeBeforeAligning);
+					SizeBeforeAligning += 4;
+				}
+				MetaData.UniformBufferSize = SizeAfterAligning + ArraySize;
+			}
+			else
+			{
+				MetaData.UniformBufferSize = SizeAfterAligning + ArraySize;
+			}
+
+            FString HlslElementTypeName = ANSI_TO_TCHAR(UniformBufferMemberTypeString<T>::Value.data());
+            FString GlslElementTypeName = ANSI_TO_TCHAR(UniformBufferMemberTypeString<T>::GlslValue.data());
+			FString HlslTypeName = FString::Printf(TEXT("%s[%d]"), *HlslElementTypeName, ArrayCount);
+			FString GlslTypeName = FString::Printf(TEXT("%s[%d]"), *GlslElementTypeName, ArrayCount);
+			uint32 ArrayOffset = MetaData.UniformBufferSize - ArraySize;
+			MetaData.Members.Add(MemberName, { ArrayOffset, ArraySize, HlslTypeName, GlslTypeName });
+
+			HlslUniformBufferBody += FString::Printf(TEXT("%s %s[%d];\n"), *HlslElementTypeName, *MemberName, ArrayCount);
+			GlslUniformBufferBody += FString::Printf(TEXT("%s %s[%d];\n"), *GlslElementTypeName, *MemberName, ArrayCount);
 		}
 		
 	private:

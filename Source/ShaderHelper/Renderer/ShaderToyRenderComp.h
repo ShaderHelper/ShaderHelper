@@ -17,6 +17,7 @@ namespace SH
 	struct ShaderToyExecContext : FW::GraphExecContext
 	{
 		float iTime{};
+		int FrameCount = 0;
 		FW::Vector3f iResolution{};
 		FW::Vector4f iMouse{};
 		FW::RenderGraph* RG = nullptr;

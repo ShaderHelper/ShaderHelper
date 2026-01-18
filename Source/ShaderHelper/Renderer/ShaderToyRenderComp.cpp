@@ -106,6 +106,11 @@ namespace SH
 	{
 		Context.iTime = TSingleton<ShProjectManager>::Get().GetProject()->TimelineCurTime;
 		Context.Ontputs.Reset();
+		Context.FrameCount++;
+		if (Context.bResetPreviousFrame)
+		{
+			Context.FrameCount = 0;
+		}
 	}
 
 	void ShaderToyRenderComp::RenderInternal()
@@ -115,10 +120,6 @@ namespace SH
             RenderGraph Graph;
             Context.RG = &Graph;
             {
-                //Update builtin uniformbuffer value.
-                StShader::GetBuiltInUb()->GetMember<Vector3f>("iResolution") = Context.iResolution;
-                StShader::GetBuiltInUb()->GetMember<float>("iTime") = Context.iTime;
-				StShader::GetBuiltInUb()->GetMember<Vector4f>("iMouse") = Context.iMouse;
 
 				if (!Context.FinalRT.IsValid() ||
 					Context.FinalRT->GetWidth() != (uint32)Context.iResolution.X || Context.FinalRT->GetHeight() != (uint32)Context.iResolution.Y)

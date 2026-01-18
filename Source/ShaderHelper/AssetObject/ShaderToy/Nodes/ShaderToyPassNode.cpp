@@ -92,12 +92,6 @@ namespace SH
 	, Format(ShaderToyFormat::B8G8R8A8_UNORM)
 	{
 		ObjectName = ShaderAssetObj->ObjectName;
-		InitShaderAsset();
-		if(ShaderAssetObj)
-		{
-			CustomUniformBuffer = ShaderAssetObj->CustomUniformBufferBuilder.Build();
-		}
-		InitCustomBindGroup();
 	}
 
 	ShaderToyPassNode::~ShaderToyPassNode()
@@ -112,13 +106,20 @@ namespace SH
 	void ShaderToyPassNode::Init()
 	{
 		InitPins();
+		InitShaderAsset();
+		BuiltinUniformBuffer = StShader::GetBuiltInUbBuilder().Build();
+		if (ShaderAssetObj)
+		{
+			CustomUniformBuffer = ShaderAssetObj->CustomUniformBufferBuilder.Build();
+		}
+		InitCustomBindGroup();
 	}
 
 	GpuBindGroupBuilder ShaderToyPassNode::GetBuiltInBindGroupBuiler()
 	{
 		auto Builder = GpuBindGroupBuilder{ StShader::GetBuiltInBindLayout() }
 			.SetExistingBinding(0, TSingleton<PrintBuffer>::Get().GetResource())
-			.SetUniformBuffer("BuiltInUniform", StShader::GetBuiltInUb()->GetGpuResource());
+			.SetUniformBuffer("BuiltInUniform", BuiltinUniformBuffer->GetGpuResource());
 
 		GpuTexturePin* iChannel0 = static_cast<GpuTexturePin*>(GetPin("iChannel0"));
 		GpuTexturePin* iChannel1 = static_cast<GpuTexturePin*>(GetPin("iChannel1"));
@@ -576,7 +577,18 @@ namespace SH
 		GraphNode::Serialize(Ar);
 		
 		Ar << ShaderAssetObj << Format;
-		
+		Ar << iChannelDesc0 << iChannelDesc1 << iChannelDesc2 << iChannelDesc3;
+
+		if (Ar.IsSaving())
+		{
+			BuiltinUniformBufferData = { (uint8*)BuiltinUniformBuffer->GetReadableData(), (int)BuiltinUniformBuffer->GetSize() };
+		}
+		Ar << BuiltinUniformBufferData;
+		if (Ar.IsLoading())
+		{
+			BuiltinUniformBuffer->SetData(BuiltinUniformBufferData);
+		}
+
 		if(ShaderAssetObj)
 		{
 			if(Ar.IsLoading())
@@ -623,8 +635,7 @@ namespace SH
 				InitCustomBindGroup();
 			}
 		}
-		
-		Ar << iChannelDesc0 << iChannelDesc1 << iChannelDesc2 << iChannelDesc3;
+	
 	}
 
 	TSharedPtr<SWidget> ShaderToyPassNode::ExtraNodeWidget()
@@ -646,27 +657,27 @@ namespace SH
 			auto Writable = TAttribute<bool>::CreateLambda([this] { return !IsDebugging; });
             if(MemberInfo.HlslTypeName == "float")
             {
-                auto FloatProperty = MakeShared<PropertyUniformItem<float>>(this, MemberName, InUb->GetMember<float>(MemberName), Writable);
-                Property = FloatProperty;
+				Property = MakeShared<PropertyUniformItem<float>>(this, MemberName, InUb->GetMember<float>(MemberName), Writable);
             }
+			else if (MemberInfo.HlslTypeName == "int")
+			{
+				Property = MakeShared<PropertyUniformItem<int32>>(this, MemberName, InUb->GetMember<int32>(MemberName), Writable);
+			}
             else if(MemberInfo.HlslTypeName == "float2")
             {
-                auto Float2Porperty = MakeShared<PropertyUniformItem<Vector2f>>(this, MemberName, InUb->GetMember<Vector2f>(MemberName), Writable);
-                Property = Float2Porperty;
+				Property = MakeShared<PropertyUniformItem<Vector2f>>(this, MemberName, InUb->GetMember<Vector2f>(MemberName), Writable);
             }
 			else if(MemberInfo.HlslTypeName == "float3")
 			{
-				auto Float3Porperty = MakeShared<PropertyUniformItem<Vector3f>>(this, MemberName, InUb->GetMember<Vector3f>(MemberName), Writable);
-				Property = Float3Porperty;
+				Property = MakeShared<PropertyUniformItem<Vector3f>>(this, MemberName, InUb->GetMember<Vector3f>(MemberName), Writable);
 			}
 			else if (MemberInfo.HlslTypeName == "float4")
 			{
-				auto Float4Porperty = MakeShared<PropertyUniformItem<Vector4f>>(this, MemberName, InUb->GetMember<Vector4f>(MemberName), Writable);
-				Property = Float4Porperty;
+				Property = MakeShared<PropertyUniformItem<Vector4f>>(this, MemberName, InUb->GetMember<Vector4f>(MemberName), Writable);
 			}
             else
             {
-                check(false);
+				Property = MakeShared<PropertyItemBase>(this, MemberName);
             }
             Property->SetEnabled(Enabled);
             Datas.Add(Property.ToSharedRef());
@@ -684,7 +695,7 @@ namespace SH
                 if(BuiltInLayoutDesc.GetBindingType(Slot) == BindingType::UniformBuffer)
                 {
                     auto UniformCategory = MakeShared<PropertyCategory>(this, BindingName);
-                    auto PropertyDataUniforms = PropertyDatasFromUniform(StShader::GetBuiltInUb(), false);
+                    auto PropertyDataUniforms = PropertyDatasFromUniform(BuiltinUniformBuffer.Get(), false);
                     for(auto Data : PropertyDataUniforms)
                     {
                         UniformCategory->AddChild(Data);
@@ -796,6 +807,30 @@ namespace SH
         ShEditor->RefreshProperty();
     }
 
+	void ShaderToyPassNode::UpdateBuiltinUniformBuffer(ShaderToyExecContext& Context)
+	{
+		BuiltinUniformBuffer->GetMember<Vector3f>("iResolution") = Context.iResolution;
+		BuiltinUniformBuffer->GetMember<float>("iTime") = Context.iTime;
+		BuiltinUniformBuffer->GetMember<int32>("iFrame") = Context.FrameCount;
+		BuiltinUniformBuffer->GetMember<Vector4f>("iMouse") = Context.iMouse;
+
+		auto iChannelResolution = BuiltinUniformBuffer->GetMember<Vector3f[4]>("iChannelResolution");
+		for (int i = 0; i < 4; i++)
+		{
+			FString ChannelName = FString::Printf(TEXT("iChannel%d"), i);
+			GpuTexturePin* iChannel = static_cast<GpuTexturePin*>(GetPin(ChannelName));
+			if (iChannel->HasLink())
+			{
+				iChannelResolution[i] = Vector3f{ (float)iChannel->GetValue()->GetWidth(), (float)iChannel->GetValue()->GetHeight(), 1 };
+			}
+			else
+			{
+				iChannelResolution[i] = Vector3f{ 0 };
+			}
+		}
+
+	}
+
     TArray<TSharedRef<PropertyData>>* ShaderToyPassNode::GetPropertyDatas()
     {
         if(PropertyDatas.IsEmpty())
@@ -823,6 +858,7 @@ namespace SH
         if(ShaderAssetObj->GetPixelShader()->IsCompiled())
         {
             ShaderToyExecContext& ShaderToyContext = static_cast<ShaderToyExecContext&>(Context);
+			UpdateBuiltinUniformBuffer(ShaderToyContext);
 
             auto PassOutput = static_cast<GpuTexturePin*>(GetPin("RT"));
             if(PassOutput->GetValue()->GetWidth() != (uint32)ShaderToyContext.iResolution.x ||

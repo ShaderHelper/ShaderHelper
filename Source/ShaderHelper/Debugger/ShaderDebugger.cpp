@@ -1532,6 +1532,7 @@ namespace SH
 				StopLineNumber = CurValidLine.value() - ExtraLineNum;
 				ShowDeuggerVariable(Scope);
 				ActiveCallPoint.reset();
+				ShaderEditor->ScrollTo(ShaderEditor->GetLineIndex(StopLineNumber));
 			}
 			else if (auto CallPoint = CallStack.FindByPredicate([this, FuncName](const auto& InItem) {
 				if (GetFunctionSig(GetFunctionDesc(InItem.Scope), DebugShader->GetShaderLanguage()) == FuncName)
@@ -1544,6 +1545,7 @@ namespace SH
 				StopLineNumber = CallPoint->Line - ExtraLineNum;
 				ShowDeuggerVariable(CallPoint->Scope);
 				ActiveCallPoint = *CallPoint;
+				ShaderEditor->ScrollTo(ShaderEditor->GetLineIndex(StopLineNumber));
 			}
 			DebuggerWatchView->Refresh();
 		};

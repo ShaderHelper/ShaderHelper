@@ -99,12 +99,6 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 		return VertexShader;
 	}
 
-    UniformBuffer* StShader::GetBuiltInUb()
-    {
-        static TUniquePtr<UniformBuffer> BuiltInUb = GetBuiltInUbBuilder().Build();
-        return BuiltInUb.Get();
-    }
-
     GpuBindGroupLayout* StShader::GetBuiltInBindLayout()
     {
         static TRefCountPtr<GpuBindGroupLayout> BuiltInBindLayout = GetBuiltInBindLayoutBuilder().Build();
@@ -118,6 +112,8 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 			BuiltInUbLayout
 				.AddVector3f("iResolution")
 				.AddFloat("iTime")
+				.AddInt("iFrame")
+				.AddVector3fArray("iChannelResolution", 4)
 				.AddVector4f("iMouse");
             return 0;
         }();
@@ -289,6 +285,10 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         {
             NewUniformProperty = MakeShared<PropertyScalarItem<float>>(this, UniformMemberName);
         }
+		else if (InTypeName.Get().ToString() == "int")
+		{
+			NewUniformProperty = MakeShared<PropertyScalarItem<int32>>(this, UniformMemberName);
+		}
         else if(InTypeName.Get().ToString() == "float2" || InTypeName.Get().ToString() == "vec2")
         {
             NewUniformProperty = MakeShared<PropertyVector2fItem>(this, UniformMemberName);
@@ -303,7 +303,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 		}
         else
         {
-            check(false);
+			NewUniformProperty = MakeShared<PropertyItemBase>(this, UniformMemberName);
         }
         NewUniformProperty->SetEnabled(Enabled);
         NewUniformProperty->SetEmbedWidget(TypeInfoWidget);
@@ -393,6 +393,13 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 			FSlateIcon(),
 			FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, Float4) }
 		);
+	/*	TAttribute<FText> Array = FText::FromString("Array");
+		MenuBuilder.AddMenuEntry(
+			Array,
+			FText::GetEmpty(),
+			FSlateIcon(),
+			FUIAction{ FExecuteAction::CreateRaw(this, &StShader::AddUniform, Array) }
+		);*/
         return MenuBuilder.MakeWidget();
     }
 

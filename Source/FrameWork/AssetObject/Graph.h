@@ -34,6 +34,7 @@ namespace FW
 		//Called when connected as an input.
 		virtual bool Accept(GraphPin* SourcePin) { return false; }
         virtual void Refuse() {}
+		bool HasLink() const;
 		virtual FLinearColor GetPinColor() const { return FLinearColor::White; }
 		//The pins connected to the output
         TArray<GraphPin*> GetTargetPins() const;

@@ -206,6 +206,13 @@ namespace SH
 
 	void ShaderHelperEditor::ForceRender()
 	{
+		double CurrentTime = FPlatformTime::Seconds();
+		if (CurrentTime - LastForceRenderTime < ForceRenderThrottleInterval)
+		{
+			return;
+		}
+		LastForceRenderTime = CurrentTime;
+		
 		bool CacheTimelineStop = TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop;
 		TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = false;
 		Renderer->Render();

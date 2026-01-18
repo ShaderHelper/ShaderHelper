@@ -43,7 +43,7 @@ namespace FW
 		for (auto [Tex, PassTexState] : InPass.PassTexStates)
 		{
 			GpuResourceState TexState = Tex->State;
-			if (TexState != PassTexState)
+			if (TexState != PassTexState || TexState == GpuResourceState::UnorderedAccess)
 			{
 				BarrierInfos.Emplace(Tex, PassTexState);
 			}
@@ -51,7 +51,7 @@ namespace FW
 		for (auto [Buffer, PassBufferState] : InPass.PassBufferStates)
 		{
 			GpuResourceState BufferState = Buffer->State;
-			if (BufferState != PassBufferState)
+			if (BufferState != PassBufferState || BufferState == GpuResourceState::UnorderedAccess)
 			{
 				BarrierInfos.Emplace(Buffer, PassBufferState);
 			}

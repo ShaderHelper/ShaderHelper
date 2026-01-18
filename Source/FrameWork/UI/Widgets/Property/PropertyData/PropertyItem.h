@@ -161,18 +161,35 @@ namespace FW
             auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
             if(ValueRef)
             {
-                auto ValueWidget = SNew(SSpinBox<T>)
+				TSharedPtr<SWidget> ValueWidget;
+				if constexpr (std::is_same_v<T, bool>)
+				{
+					ValueWidget = SNew(SCheckBox).IsChecked_Lambda([this] {
+						return *ValueRef ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;;
+					})
+					.OnCheckStateChanged_Lambda([this](ECheckBoxState InState) {
+						if (Owner->CanChangeProperty(this))
+						{
+							*ValueRef = InState == ECheckBoxState::Checked;
+							Owner->PostPropertyChanged(this);
+						}
+					});
+				}
+				else
+				{
+					ValueWidget = SNew(SSpinBox<T>)
 					.IsEnabled(!ReadOnly)
 					.MinValue(MinValue)
 					.MaxValue(MaxValue)
-                    .OnValueChanged_Lambda([this](T NewValue) {
-                        if(*ValueRef != NewValue && Owner->CanChangeProperty(this))
-                        {
-                            *ValueRef = NewValue;
-                            Owner->PostPropertyChanged(this);
-                        }
-                    })
-                    .Value_Lambda([this] { return *ValueRef; });
+					.OnValueChanged_Lambda([this](T NewValue) {
+						if (*ValueRef != NewValue && Owner->CanChangeProperty(this))
+						{
+							*ValueRef = NewValue;
+							Owner->PostPropertyChanged(this);
+						}
+					})
+					.Value_Lambda([this] { return *ValueRef; });
+				}
                 Item->AddWidget(MoveTemp(ValueWidget));
             }
             

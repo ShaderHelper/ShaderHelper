@@ -20,7 +20,11 @@ DECLARE_SHADER_SAMPLER(SamplerState, InputTexSampler, 1)
 
 float4 MainPS(VsOutput Input) : SV_Target
 {
-	float4 color = InputTex.Sample(InputTexSampler, Input.UV);
+	float2 UV = Input.UV;
+#if FLIP_Y
+	UV.y = 1 - UV.y;	
+#endif
+	float4 color = InputTex.Sample(InputTexSampler, UV);
 #if CHANNEL_FILTER_R
 	return float4(color.r, 0, 0, 1);
 #elif CHANNEL_FILTER_G

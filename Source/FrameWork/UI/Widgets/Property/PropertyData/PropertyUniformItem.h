@@ -23,7 +23,9 @@ namespace FW
 
 	bool IsProperyUniformItem(PropertyData* InProprety)
 	{
-		return InProprety->IsOfType<PropertyUniformItem<float>>() || InProprety->IsOfType<PropertyUniformItem<Vector2f>>() || InProprety->IsOfType<PropertyUniformItem<Vector3f>>() || InProprety->IsOfType<PropertyUniformItem<Vector4f>>();
+		return InProprety->IsOfType<PropertyUniformItem<float>>() || InProprety->IsOfType<PropertyUniformItem<int32>>()
+			|| InProprety->IsOfType<PropertyUniformItem<Vector2f>>() 
+			|| InProprety->IsOfType<PropertyUniformItem<Vector3f>>() || InProprety->IsOfType<PropertyUniformItem<Vector4f>>();
 	}
 
     template<>
@@ -43,6 +45,24 @@ namespace FW
         Item->AddWidget(MoveTemp(ValueWidget));
         return Row;
     }
+
+	template<>
+	inline TSharedRef<ITableRow> PropertyUniformItem<int32>::GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable)
+	{
+		auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
+		auto ValueWidget = SNew(SSpinBox<int32>)
+			.OnValueChanged_Lambda([this](int32 NewValue) {
+				if (ValueRef != NewValue && Owner->CanChangeProperty(this))
+				{
+					ValueRef = NewValue;
+					Owner->PostPropertyChanged(this);
+				}
+			})
+			.Value_Lambda([this] { return ValueRef; });
+		ValueWidget->SetEnabled(Writable);
+		Item->AddWidget(MoveTemp(ValueWidget));
+		return Row;
+	}
 
     template<>
     inline TSharedRef<ITableRow> PropertyUniformItem<Vector2f>::GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable)

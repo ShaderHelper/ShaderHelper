@@ -3608,21 +3608,21 @@ constexpr int PaddingLineNum = 22;
 					FString CurTextLine;
 					GetTextLine(CurrentHoverLocation.GetLineIndex(), CurTextLine);
 
-					bool bFollowedBySquareBracket{};
+					//bool bFollowedBySquareBracket{};
 					for (const auto& Token : TokenizedLine.Tokens)
 					{
 						FString TokenName = CurTextLine.Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
 						if (CurrentHoverLocation.GetOffset() >= Token.BeginOffset && CurrentHoverLocation.GetOffset() <= Token.EndOffset)
 						{
-							if (Token.Type == ShaderTokenType::Identifier || TokenName == "]")
+							if (Token.Type == ShaderTokenType::Identifier /*|| TokenName == "]"*/)
 							{
 								CurrentTokenName = MoveTemp(TokenName);
 								CurrentTokenBeginOffset = Token.BeginOffset;
 								CurrentTokenEndOffset = Token.EndOffset;
-								if (CurTextLine.Mid(Token.EndOffset, 1) == "]")
+								/*if (CurTextLine.Mid(Token.EndOffset, 1) == "]")
 								{
 									bFollowedBySquareBracket = true;
-								}
+								}*/
 								break;
 							}
 						}
@@ -3632,24 +3632,24 @@ constexpr int PaddingLineNum = 22;
 					{
 						//Extract expression
 						int32 BeginOffset = CurrentTokenBeginOffset;
-						while (BeginOffset > 0)
-						{
-							TCHAR PrevChar = CurTextLine[BeginOffset - 1];
-							if (FChar::IsIdentifier(PrevChar) || PrevChar == TEXT('.') ||
-								PrevChar == TEXT('[') || PrevChar == TEXT(']'))
-							{
-								//If hovering between [ and ]
-								if (bFollowedBySquareBracket && PrevChar == TEXT('['))
-								{
-									break;
-								}
-								BeginOffset--;
-							}
-							else
-							{
-								break;
-							}
-						}
+						//while (BeginOffset > 0)
+						//{
+						//	TCHAR PrevChar = CurTextLine[BeginOffset - 1];
+						//	if (FChar::IsIdentifier(PrevChar) || PrevChar == TEXT('.') ||
+						//		PrevChar == TEXT('[') || PrevChar == TEXT(']'))
+						//	{
+						//		//If hovering between [ and ]
+						//		if (bFollowedBySquareBracket && PrevChar == TEXT('['))
+						//		{
+						//			break;
+						//		}
+						//		BeginOffset--;
+						//	}
+						//	else
+						//	{
+						//		break;
+						//	}
+						//}
 		
 						FString Expression = CurTextLine.Mid(BeginOffset, CurrentTokenEndOffset - BeginOffset);
 						if (LastHoverExpr && LastHoverExpr->Expr == Expression)

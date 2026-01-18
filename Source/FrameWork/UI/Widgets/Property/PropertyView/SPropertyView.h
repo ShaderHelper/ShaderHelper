@@ -30,7 +30,7 @@ namespace FW
 				if (bClear)
 				{
 					ObjectData = nullptr;
-					PropertyDatas->Empty();
+					PropertyDatas = nullptr;
 				}
 				else
 				{

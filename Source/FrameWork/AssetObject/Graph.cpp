@@ -176,6 +176,11 @@ namespace FW
         return nullptr;
     }
 
+	bool GraphPin::HasLink() const
+	{
+		return GetSourceNode() != nullptr || !GetTargetPins().IsEmpty();
+	}
+
     TArray<GraphPin*> GraphPin::GetTargetPins() const
     {
         GraphNode* Owner = static_cast<GraphNode*>(GetOuter());

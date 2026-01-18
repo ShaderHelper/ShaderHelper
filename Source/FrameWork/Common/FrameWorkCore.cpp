@@ -37,6 +37,11 @@ namespace FW
 				MetaMemData->Set(Instance, NewValue);
 			}, ReadOnly);
 		}
+		else if (MetaMemData->IsType<bool>())
+		{
+			bool* BoolValue = (bool*)MetaMemData->Get(Instance);
+			Item = MakeShared<PropertyScalarItem<bool>>(InObject, MetaMemData->MemberName, BoolValue, ReadOnly);
+		}
 		else if(MetaMemData->IsType<int32>())
 		{
 			int32* IntValue = (int32*)MetaMemData->Get(Instance);
