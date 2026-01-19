@@ -24,6 +24,8 @@
 #include <Styling/StyleColors.h>
 #include <Widgets/Colors/SColorBlock.h>
 #include <Widgets/Text/SRichTextBlock.h>
+#include <Framework/Notifications/NotificationManager.h>
+#include <Widgets/Notifications/SNotificationList.h>
 
 #include <regex>
 
@@ -4234,19 +4236,38 @@ constexpr int PaddingLineNum = 22;
 
 	void SShaderEditorBox::DebugPixel(const Vector2u& InPixelCoord, const InvocationState& InState)
 	{
-		try
-		{
-			Debugger.DebugPixel(InPixelCoord, InState);
-			Continue();
-		}
-		catch (const std::runtime_error& e)
-		{
-			FText FailureInfo = LOCALIZATION("DebugFailure");
-			SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo.ToString(), UTF8_TO_TCHAR(e.what()));
-			MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), FailureInfo);
-			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-			ShEditor->EndDebugging();
-			return;
-		}
+		GApp->EnableBusyBlocker();
+		FNotificationInfo Info(FText::FromString("Debugger starting..."));
+		Info.Image = FAppStyle::Get().GetBrush("NoBrush");
+		Info.bFireAndForget = false;
+		Info.FadeInDuration = 0.0f;
+		Info.FadeOutDuration = 0.0f;
+		auto Notification = FSlateNotificationManager::Get().AddNotification(Info);
+		Notification->SetCompletionState(SNotificationItem::CS_Pending);
+		Async(EAsyncExecution::Thread, [=, this]() {
+			try
+			{
+				Debugger.DebugPixel(InPixelCoord, InState);
+			}
+			catch (const std::runtime_error& e)
+			{
+				AsyncTask(ENamedThreads::GameThread, [=, this] {
+					Notification->Fadeout();
+					GApp->DisableBusyBlocker();
+					FText FailureInfo = LOCALIZATION("DebugFailure");
+					SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo.ToString(), UTF8_TO_TCHAR(e.what()));
+					MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), FailureInfo);
+					auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+					ShEditor->EndDebugging();
+				});
+				return;
+			}
+
+			AsyncTask(ENamedThreads::GameThread, [=, this] {
+				Notification->Fadeout();
+				GApp->DisableBusyBlocker();
+				Continue();
+			});
+		});
 	}
 }

@@ -8,6 +8,8 @@
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 
 #include <Widgets/SViewport.h>
+#include <Framework/Notifications/NotificationManager.h>
+#include <Widgets/Notifications/SNotificationList.h>
 
 using namespace FW;
 
@@ -21,6 +23,9 @@ namespace SH
 		.Padding(4)
 		.BorderImage(FAppStyle::Get().GetBrush("ToolTip.Background"))
 		.BorderBackgroundColor(FLinearColor{1,1,1,0.2f})
+		.Visibility_Lambda([this]{
+			return (PixelCoord.x >=0 && PixelCoord.y >=0 && DebuggerTex) ? EVisibility::Visible : EVisibility::Collapsed;
+		})
 		[
 			SNew(SVerticalBox)
 			+SVerticalBox::Slot()
@@ -35,10 +40,8 @@ namespace SH
 			[
 				SNew(STextBlock).ColorAndOpacity(FLinearColor::White).Text_Lambda([this]{
 					float Value{};
-					if(DebuggerTex) {
-						uint32 DataIndex = PixelCoord.x + PixelCoord.y * DebuggerTex->GetWidth();
-						Value = TexDatas[DataIndex].x;
-					}
+					uint32 DataIndex = PixelCoord.x + PixelCoord.y * DebuggerTex->GetWidth();
+					Value = TexDatas[DataIndex].x;
 					return FText::FromString(FString::Printf(TEXT("R Channel: %f"), Value));
 				})
 			]
@@ -47,10 +50,8 @@ namespace SH
 			[
 				SNew(STextBlock).ColorAndOpacity(FLinearColor::White).Text_Lambda([this]{
 					float Value{};
-					if(DebuggerTex) {
-						uint32 DataIndex = PixelCoord.x + PixelCoord.y * DebuggerTex->GetWidth();
-						Value = TexDatas[DataIndex].y;
-					}
+					uint32 DataIndex = PixelCoord.x + PixelCoord.y * DebuggerTex->GetWidth();
+					Value = TexDatas[DataIndex].y;
 					return FText::FromString(FString::Printf(TEXT("G Channel: %f"), Value));
 				})
 			]
@@ -59,10 +60,8 @@ namespace SH
 			[
 				SNew(STextBlock).ColorAndOpacity(FLinearColor::White).Text_Lambda([this]{
 					float Value{};
-					if(DebuggerTex) {
-						uint32 DataIndex = PixelCoord.x + PixelCoord.y * DebuggerTex->GetWidth();
-						Value = TexDatas[DataIndex].z;
-					}
+					uint32 DataIndex = PixelCoord.x + PixelCoord.y * DebuggerTex->GetWidth();
+					Value = TexDatas[DataIndex].z;
 					return FText::FromString(FString::Printf(TEXT("B Channel: %f"), Value));
 				})
 			]
@@ -71,10 +70,8 @@ namespace SH
 			[
 				SNew(STextBlock).ColorAndOpacity(FLinearColor::White).Text_Lambda([this]{
 					float Value{};
-					if(DebuggerTex) {
-						uint32 DataIndex = PixelCoord.x + PixelCoord.y * DebuggerTex->GetWidth();
-						Value = TexDatas[DataIndex].w;
-					}
+					uint32 DataIndex = PixelCoord.x + PixelCoord.y * DebuggerTex->GetWidth();
+					Value = TexDatas[DataIndex].w;
 					return FText::FromString(FString::Printf(TEXT("A Channel: %f"), Value));
 				})
 			]
@@ -136,8 +133,8 @@ namespace SH
 			Offset.y = FMath::Clamp(Offset.y, 0.0f, MaxHOffset);
 		}
 		MouseLoc = CurMousePos;
-		PixelCoord.x = uint32(MouseLoc.x + Offset.x) / Zoom;
-		PixelCoord.y = uint32(MouseLoc.y + Offset.y) / Zoom;
+		PixelCoord.x = int32(MouseLoc.x + Offset.x) / Zoom;
+		PixelCoord.y = int32(MouseLoc.y + Offset.y) / Zoom;
 		return FReply::Handled();
 	}
 
@@ -183,7 +180,7 @@ namespace SH
 
 	void SDebuggerViewport::Draw() const
 	{
-		if(!DebuggerTex || bFinalizePixel)
+		if(!DebuggerTex || bFinalizePixel || IsValidating || PixelCoord.x < 0 || PixelCoord.y < 0)
 		{
 			return;
 		}
@@ -280,34 +277,58 @@ namespace SH
 			auto Invocation = ShEditor->GetDebuggaleObject()->GetInvocationState();
 			if (std::holds_alternative<PixelState>(Invocation))
 			{
+				IsValidating = true;
 				SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(ShEditor->GetDebuggaleObject()->GetShaderAsset());
-				std::optional<Vector2u> ErrorCoord;
-				try
-				{
-					ErrorCoord = ShaderEditor->ValidatePixel(Invocation);
-				}
-				catch (const std::runtime_error& e)
-				{
-					FText FailureInfo = LOCALIZATION("DebugFailure");
-					SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo.ToString(), UTF8_TO_TCHAR(e.what()));
-					MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), FailureInfo);
-					ShEditor->EndDebugging();
-					return;
-				}
+				PixelCoord = { -1 };
+				GApp->EnableBusyBlocker();
+				FNotificationInfo Info(FText::FromString("Validator starting..."));
+				Info.Image = FAppStyle::Get().GetBrush("NoBrush");
+				Info.bFireAndForget = false;
+				Info.FadeInDuration = 0.0f;
+				Info.FadeOutDuration = 0.0f;
+				auto Notification = FSlateNotificationManager::Get().AddNotification(Info);
+				Notification->SetCompletionState(SNotificationItem::CS_Pending);
+				Async(EAsyncExecution::Thread, [=, this]() {
+					std::optional<Vector2u> ErrorCoord;
+					try
+					{
+						ErrorCoord = ShaderEditor->ValidatePixel(Invocation);
+					}
+					catch (const std::runtime_error& e)
+					{
+						AsyncTask(ENamedThreads::GameThread, [=, this] {
+							IsValidating = false;
+							Notification->Fadeout();
+							GApp->DisableBusyBlocker();
+							FText FailureInfo = LOCALIZATION("DebugFailure");
+							SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo.ToString(), UTF8_TO_TCHAR(e.what()));
+							MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), FailureInfo);
+							ShEditor->EndDebugging();
+						});
+						return;
+					}
 
-				if (ErrorCoord)
-				{
-					PixelCoord = ErrorCoord.value();
-					MouseLoc = PixelCoord * Zoom - Offset;
-					Draw();
-					bFinalizePixel = true;
-					ShEditor->GetDebuggaleObject()->OnFinalizePixel(PixelCoord);
-				}
-				else
-				{
-					MessageDialog::Open(MessageDialog::Ok, MessageDialog::Happy, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("ValidationTip"));
-					ShEditor->EndDebugging();
-				}
+					AsyncTask(ENamedThreads::GameThread, [=, this] {
+						IsValidating = false;
+						Notification->Fadeout();
+						GApp->DisableBusyBlocker();
+						if (ErrorCoord)
+						{
+							PixelCoord = ErrorCoord.value();
+							MouseLoc = PixelCoord * Zoom - Offset;
+							Draw();
+							bFinalizePixel = true;
+							ShEditor->GetDebuggaleObject()->OnFinalizePixel(PixelCoord);
+						}
+						else
+						{
+							MessageDialog::Open(MessageDialog::Ok, MessageDialog::Happy, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("ValidationTip"));
+							ShEditor->EndDebugging();
+						}
+					});
+					
+				});
+
 			}
 		}
 	}

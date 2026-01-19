@@ -1499,6 +1499,7 @@ namespace SH
 	void ShaderDebugger::InitDebuggerView()
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->InvokeDebuggerTabs();
 		SDebuggerCallStackView* DebuggerCallStackView = ShEditor->GetDebuggerCallStackView();
 		SDebuggerWatchView* DebuggerWatchView = ShEditor->GetDebuggerWatchView();
 

@@ -18,7 +18,7 @@ namespace SH
 		void SetDebugTarget(TRefCountPtr<FW::GpuTexture> InTarget, bool GlobalValidation);
 		void Draw() const;
 		
-		FW::Vector2u GetPixelCoord() const {
+		FW::Vector2i GetPixelCoord() const {
 			return PixelCoord;
 		}
 		bool FinalizedPixel() const { return bFinalizePixel; }
@@ -33,8 +33,9 @@ namespace SH
 
 		FW::Vector2f MouseLoc{};
 		float DpiScale{};
-		FW::Vector2u PixelCoord{};
+		FW::Vector2i PixelCoord{-1};
 		
 		bool bFinalizePixel{};
+		bool IsValidating{};
 	};
 }

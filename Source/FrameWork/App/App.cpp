@@ -145,8 +145,13 @@ namespace FW {
             double LastRealTime = FPlatformTime::Seconds();
             
 			bool bIdleMode = AreAllWindowsHidden();
-
-			if (!bIdleMode)
+			if (BusyBlocker.IsValid())
+			{
+				FSlateApplication::Get().PumpMessages();
+				FSlateApplication::Get().Tick();
+				FTaskGraphInterface::Get().ProcessThreadUntilIdle(ENamedThreads::GameThread);
+			}
+			else if (!bIdleMode)
 			{
 				GGpuRhi->BeginFrame();
 				{
@@ -210,6 +215,19 @@ namespace FW {
 		}
 
 		return bAllHidden;
+	}
+
+	void App::EnableBusyBlocker()
+	{
+		BusyBlocker = MakeShared<BusyInputBlocker>();
+		FSlateApplication::Get().RegisterInputPreProcessor(BusyBlocker);
+	}
+
+	void App::DisableBusyBlocker()
+	{
+		FSlateApplication::Get().UnregisterInputPreProcessor(BusyBlocker);
+		BusyBlocker.Reset();
+		
 	}
 
 	void App::Update(float DeltaTime)

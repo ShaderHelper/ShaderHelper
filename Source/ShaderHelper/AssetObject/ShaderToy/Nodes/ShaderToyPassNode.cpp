@@ -212,7 +212,6 @@ namespace SH
 	void ShaderToyPassNode::OnFinalizePixel(const FW::Vector2u& PixelCoord)
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-        ShEditor->InvokeDebuggerTabs();
 		SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(ShaderAssetObj);
 		ShaderEditor->DebugPixel(PixelCoord, GetInvocationState());
 	}

@@ -66,7 +66,6 @@ namespace FW
 		uint32 Offset;
     };
 
-    // 数组类型的特化
     template<typename T, size_t N>
     class UniformBufferMemberWrapper<T[N]>
     {
