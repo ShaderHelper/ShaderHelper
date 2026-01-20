@@ -325,7 +325,7 @@ namespace SH
 
 		GpuShaderLanguage Lang = DebugShader->GetShaderLanguage();
 		SpvFunctionDesc* FuncDesc = GetFunctionDesc(Scope);
-		FString Location = FString::Printf(TEXT("%s (Line %d)"), *ShaderAssetObj->GetFileName(), StopLineNumber);
+		FString Location = FString::Printf(TEXT("%s (Line %d)"), *ShaderAssetObj->Shader->GetShaderName(), StopLineNumber);
 		CallStackDatas.Add(MakeShared<CallStackData>(GetFunctionSig(FuncDesc, Lang), MoveTemp(Location)));
 		for (int i = CallStack.Num() - 1; i >= 0; i--)
 		{
@@ -333,11 +333,11 @@ namespace SH
 			int JumpLineNumber = CallStack[i].Line - ExtraLineNum;
 			if (JumpLineNumber > 0)
 			{
-				FString Location = FString::Printf(TEXT("%s (Line %d)"), *ShaderAssetObj->GetFileName(), JumpLineNumber);
+				FString Location = FString::Printf(TEXT("%s (Line %d)"), *ShaderAssetObj->Shader->GetShaderName(), JumpLineNumber);
 				CallStackDatas.Add(MakeShared<CallStackData>(GetFunctionSig(FuncDesc, Lang), MoveTemp(Location)));
 			}
 		}
-		DebuggerCallStackView->SetCallStackDatas(CallStackDatas);
+		DebuggerCallStackView->SetCallStackDatas(CallStackDatas, DebuggerError);
 		DebuggerCallStackView->ActiveData = CallStackDatas[0];
 		ActiveCallPoint.reset();
 
@@ -429,11 +429,11 @@ namespace SH
 	{
 		DirtyVars.Empty();
 		//Allow ignoring assert failures and proceeding.
-		if (DebuggerError == "Assert failed")
+		if (DebuggerError.Key == "Assert failed")
 		{
 			CurDebugStateIndex++;
 		}
-		DebuggerError.Empty();
+		DebuggerError = {};
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		TSharedPtr<SWindow> ShaderEditorTipWindow = ShEditor->GetShaderEditorTipWindow();
 		ShaderEditorTipWindow->HideWindow();
@@ -471,7 +471,7 @@ namespace SH
 			ApplyDebugState(DebugState, Error);
 			if (!Error.IsEmpty())
 			{
-				DebuggerError = MoveTemp(Error);
+				DebuggerError = { MoveTemp(Error), StopLineNumber };
 				break;
 			}
 			if (AssertResult && AssertResult->IsCompletelyInitialized())
@@ -480,8 +480,8 @@ namespace SH
 				uint32& TypedValue = *(uint32*)Value.GetData();
 				if (TypedValue != 1)
 				{
-					DebuggerError = "Assert failed";
 					StopLineNumber = CurValidLine.value() - ExtraLineNum;
+					DebuggerError = { "Assert failed", StopLineNumber };
 					TypedValue = 1;
 					break;
 				}
@@ -1475,7 +1475,7 @@ namespace SH
 		Scope = nullptr;
 		ActiveCallPoint.reset();
 		AssertResult = nullptr;
-		DebuggerError.Empty();
+		DebuggerError = {};
 		DirtyVars.Empty();
 		StopLineNumber = 0;
 		ReturnValue.Empty();
@@ -1533,7 +1533,7 @@ namespace SH
 				StopLineNumber = CurValidLine.value() - ExtraLineNum;
 				ShowDeuggerVariable(Scope);
 				ActiveCallPoint.reset();
-				ShaderEditor->ScrollTo(ShaderEditor->GetLineIndex(StopLineNumber));
+				ShaderEditor->JumpTo(ShaderEditor->GetLineIndex(StopLineNumber));
 			}
 			else if (auto CallPoint = CallStack.FindByPredicate([this, FuncName](const auto& InItem) {
 				if (GetFunctionSig(GetFunctionDesc(InItem.Scope), DebugShader->GetShaderLanguage()) == FuncName)
@@ -1546,7 +1546,7 @@ namespace SH
 				StopLineNumber = CallPoint->Line - ExtraLineNum;
 				ShowDeuggerVariable(CallPoint->Scope);
 				ActiveCallPoint = *CallPoint;
-				ShaderEditor->ScrollTo(ShaderEditor->GetLineIndex(StopLineNumber));
+				ShaderEditor->JumpTo(ShaderEditor->GetLineIndex(StopLineNumber));
 			}
 			DebuggerWatchView->Refresh();
 		};

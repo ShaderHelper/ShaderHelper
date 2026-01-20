@@ -349,15 +349,20 @@ namespace FW
 				LogicalOrOp->SetId(LogicalOr);
 				PowValidationInsts.Add(MoveTemp(LogicalOrOp));
 
-				SpvId Any = Patcher.NewId();
-				auto AnyOp = MakeUnique<SpvOpAny>(BoolType, LogicalOr);
-				AnyOp->SetId(Any);
-				PowValidationInsts.Add(MoveTemp(AnyOp));
+				SpvId Condition = LogicalOr;
+				if (!ResultType->IsScalar())
+				{
+					SpvId Any = Patcher.NewId();
+					auto AnyOp = MakeUnique<SpvOpAny>(BoolType, LogicalOr);
+					AnyOp->SetId(Any);
+					PowValidationInsts.Add(MoveTemp(AnyOp));
+					Condition = Any;
+				}
 
 				auto TrueLabel = Patcher.NewId();
 				auto FalseLabel = Patcher.NewId();
 				PowValidationInsts.Add(MakeUnique<SpvOpSelectionMerge>(FalseLabel, SpvSelectionControl::None));
-				PowValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Any, TrueLabel, FalseLabel));
+				PowValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Condition, TrueLabel, FalseLabel));
 
 				auto TrueLabelOp = MakeUnique<SpvOpLabel>();
 				TrueLabelOp->SetId(TrueLabel);
@@ -389,15 +394,20 @@ namespace FW
 				IEqualOp->SetId(IEqual);
 				NormalizeValidationInsts.Add(MoveTemp(IEqualOp));
 
-				SpvId All = Patcher.NewId();
-				auto AllOp = MakeUnique<SpvOpAll>(BoolType, IEqual);
-				AllOp->SetId(All);
-				NormalizeValidationInsts.Add(MoveTemp(AllOp));
+				SpvId Condition = IEqual;
+				if (!ResultType->IsScalar())
+				{
+					SpvId All = Patcher.NewId();
+					auto AllOp = MakeUnique<SpvOpAll>(BoolType, IEqual);
+					AllOp->SetId(All);
+					NormalizeValidationInsts.Add(MoveTemp(AllOp));
+					Condition = All;
+				}
 
 				auto TrueLabel = Patcher.NewId();
 				auto FalseLabel = Patcher.NewId();
 				NormalizeValidationInsts.Add(MakeUnique<SpvOpSelectionMerge>(FalseLabel, SpvSelectionControl::None));
-				NormalizeValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(All, TrueLabel, FalseLabel));
+				NormalizeValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Condition, TrueLabel, FalseLabel));
 
 				auto TrueLabelOp = MakeUnique<SpvOpLabel>();
 				TrueLabelOp->SetId(TrueLabel);
@@ -453,15 +463,20 @@ namespace FW
 				FOrdGreaterThanOp->SetId(FOrdGreaterThan);
 				AsinValidationInsts.Add(MoveTemp(FOrdGreaterThanOp));
 
-				SpvId Any = Patcher.NewId();
-				auto AnyOp = MakeUnique<SpvOpAny>(BoolType, FOrdGreaterThan);
-				AnyOp->SetId(Any);
-				AsinValidationInsts.Add(MoveTemp(AnyOp));
+				SpvId Condition = FOrdGreaterThan;
+				if (!ResultType->IsScalar())
+				{
+					SpvId Any = Patcher.NewId();
+					auto AnyOp = MakeUnique<SpvOpAny>(BoolType, FOrdGreaterThan);
+					AnyOp->SetId(Any);
+					AsinValidationInsts.Add(MoveTemp(AnyOp));
+					Condition = Any;
+				}
 
 				auto TrueLabel = Patcher.NewId();
 				auto FalseLabel = Patcher.NewId();
 				AsinValidationInsts.Add(MakeUnique<SpvOpSelectionMerge>(FalseLabel, SpvSelectionControl::None));
-				AsinValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Any, TrueLabel, FalseLabel));
+				AsinValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Condition, TrueLabel, FalseLabel));
 
 				auto TrueLabelOp = MakeUnique<SpvOpLabel>();
 				TrueLabelOp->SetId(TrueLabel);
@@ -501,15 +516,20 @@ namespace FW
 				FOrdGreaterThanOp->SetId(FOrdGreaterThan);
 				AcosValidationInsts.Add(MoveTemp(FOrdGreaterThanOp));
 
-				SpvId Any = Patcher.NewId();
-				auto AnyOp = MakeUnique<SpvOpAny>(BoolType, FOrdGreaterThan);
-				AnyOp->SetId(Any);
-				AcosValidationInsts.Add(MoveTemp(AnyOp));
+				SpvId Condition = FOrdGreaterThan;
+				if (!ResultType->IsScalar())
+				{
+					SpvId Any = Patcher.NewId();
+					auto AnyOp = MakeUnique<SpvOpAny>(BoolType, FOrdGreaterThan);
+					AnyOp->SetId(Any);
+					AcosValidationInsts.Add(MoveTemp(AnyOp));
+					Condition = Any;
+				}
 
 				auto TrueLabel = Patcher.NewId();
 				auto FalseLabel = Patcher.NewId();
 				AcosValidationInsts.Add(MakeUnique<SpvOpSelectionMerge>(FalseLabel, SpvSelectionControl::None));
-				AcosValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Any, TrueLabel, FalseLabel));
+				AcosValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Condition, TrueLabel, FalseLabel));
 
 				auto TrueLabelOp = MakeUnique<SpvOpLabel>();
 				TrueLabelOp->SetId(TrueLabel);
@@ -569,15 +589,20 @@ namespace FW
 				LogicalAndOp->SetId(LogicalAnd);
 				Atan2ValidationInsts.Add(MoveTemp(LogicalAndOp));
 
-				SpvId Any = Patcher.NewId();
-				auto AnyOp = MakeUnique<SpvOpAny>(BoolType, LogicalAnd);
-				AnyOp->SetId(Any);
-				Atan2ValidationInsts.Add(MoveTemp(AnyOp));
+				SpvId Condition = LogicalAnd;
+				if (!ResultType->IsScalar())
+				{
+					SpvId Any = Patcher.NewId();
+					auto AnyOp = MakeUnique<SpvOpAny>(BoolType, LogicalAnd);
+					AnyOp->SetId(Any);
+					Atan2ValidationInsts.Add(MoveTemp(AnyOp));
+					Condition = Any;
+				}
 
 				auto TrueLabel = Patcher.NewId();
 				auto FalseLabel = Patcher.NewId();
 				Atan2ValidationInsts.Add(MakeUnique<SpvOpSelectionMerge>(FalseLabel, SpvSelectionControl::None));
-				Atan2ValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Any, TrueLabel, FalseLabel));
+				Atan2ValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Condition, TrueLabel, FalseLabel));
 
 				auto TrueLabelOp = MakeUnique<SpvOpLabel>();
 				TrueLabelOp->SetId(TrueLabel);
@@ -607,15 +632,20 @@ namespace FW
 				FOrdGreaterThanOp->SetId(FOrdGreaterThan);
 				ClampValidationInsts.Add(MoveTemp(FOrdGreaterThanOp));
 
-				SpvId Any = Patcher.NewId();
-				auto AnyOp = MakeUnique<SpvOpAny>(BoolType, FOrdGreaterThan);
-				AnyOp->SetId(Any);
-				ClampValidationInsts.Add(MoveTemp(AnyOp));
+				SpvId Condition = FOrdGreaterThan;
+				if (!ResultType->IsScalar())
+				{
+					SpvId Any = Patcher.NewId();
+					auto AnyOp = MakeUnique<SpvOpAny>(BoolType, FOrdGreaterThan);
+					AnyOp->SetId(Any);
+					ClampValidationInsts.Add(MoveTemp(AnyOp));
+					Condition = Any;
+				}
 
 				auto TrueLabel = Patcher.NewId();
 				auto FalseLabel = Patcher.NewId();
 				ClampValidationInsts.Add(MakeUnique<SpvOpSelectionMerge>(FalseLabel, SpvSelectionControl::None));
-				ClampValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Any, TrueLabel, FalseLabel));
+				ClampValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Condition, TrueLabel, FalseLabel));
 
 				auto TrueLabelOp = MakeUnique<SpvOpLabel>();
 				TrueLabelOp->SetId(TrueLabel);
@@ -645,15 +675,20 @@ namespace FW
 				UGreaterThanOp->SetId(UGreaterThan);
 				ClampValidationInsts.Add(MoveTemp(UGreaterThanOp));
 
-				SpvId Any = Patcher.NewId();
-				auto AnyOp = MakeUnique<SpvOpAny>(BoolType, UGreaterThan);
-				AnyOp->SetId(Any);
-				ClampValidationInsts.Add(MoveTemp(AnyOp));
+				SpvId Condition = UGreaterThan;
+				if (!ResultType->IsScalar())
+				{
+					SpvId Any = Patcher.NewId();
+					auto AnyOp = MakeUnique<SpvOpAny>(BoolType, UGreaterThan);
+					AnyOp->SetId(Any);
+					ClampValidationInsts.Add(MoveTemp(AnyOp));
+					Condition = Any;
+				}
 
 				auto TrueLabel = Patcher.NewId();
 				auto FalseLabel = Patcher.NewId();
 				ClampValidationInsts.Add(MakeUnique<SpvOpSelectionMerge>(FalseLabel, SpvSelectionControl::None));
-				ClampValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Any, TrueLabel, FalseLabel));
+				ClampValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Condition, TrueLabel, FalseLabel));
 
 				auto TrueLabelOp = MakeUnique<SpvOpLabel>();
 				TrueLabelOp->SetId(TrueLabel);
@@ -683,15 +718,20 @@ namespace FW
 				SGreaterThanOp->SetId(SGreaterThan);
 				ClampValidationInsts.Add(MoveTemp(SGreaterThanOp));
 
-				SpvId Any = Patcher.NewId();
-				auto AnyOp = MakeUnique<SpvOpAny>(BoolType, SGreaterThan);
-				AnyOp->SetId(Any);
-				ClampValidationInsts.Add(MoveTemp(AnyOp));
+				SpvId Condition = SGreaterThan;
+				if (!ResultType->IsScalar())
+				{
+					SpvId Any = Patcher.NewId();
+					auto AnyOp = MakeUnique<SpvOpAny>(BoolType, SGreaterThan);
+					AnyOp->SetId(Any);
+					ClampValidationInsts.Add(MoveTemp(AnyOp));
+					Condition = Any;
+				}
 
 				auto TrueLabel = Patcher.NewId();
 				auto FalseLabel = Patcher.NewId();
 				ClampValidationInsts.Add(MakeUnique<SpvOpSelectionMerge>(FalseLabel, SpvSelectionControl::None));
-				ClampValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Any, TrueLabel, FalseLabel));
+				ClampValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Condition, TrueLabel, FalseLabel));
 
 				auto TrueLabelOp = MakeUnique<SpvOpLabel>();
 				TrueLabelOp->SetId(TrueLabel);
@@ -721,15 +761,20 @@ namespace FW
 				FOrdGreaterThanEqualOp->SetId(FOrdGreaterThanEqual);
 				SmoothStepValidationInsts.Add(MoveTemp(FOrdGreaterThanEqualOp));
 
-				SpvId Any = Patcher.NewId();
-				auto AnyOp = MakeUnique<SpvOpAny>(BoolType, FOrdGreaterThanEqual);
-				AnyOp->SetId(Any);
-				SmoothStepValidationInsts.Add(MoveTemp(AnyOp));
+				SpvId Condition = FOrdGreaterThanEqual;
+				if (!ResultType->IsScalar())
+				{
+					SpvId Any = Patcher.NewId();
+					auto AnyOp = MakeUnique<SpvOpAny>(BoolType, FOrdGreaterThanEqual);
+					AnyOp->SetId(Any);
+					SmoothStepValidationInsts.Add(MoveTemp(AnyOp));
+					Condition = Any;
+				}
 
 				auto TrueLabel = Patcher.NewId();
 				auto FalseLabel = Patcher.NewId();
 				SmoothStepValidationInsts.Add(MakeUnique<SpvOpSelectionMerge>(FalseLabel, SpvSelectionControl::None));
-				SmoothStepValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Any, TrueLabel, FalseLabel));
+				SmoothStepValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Condition, TrueLabel, FalseLabel));
 
 				auto TrueLabelOp = MakeUnique<SpvOpLabel>();
 				TrueLabelOp->SetId(TrueLabel);
@@ -779,15 +824,20 @@ namespace FW
 				LogicalOrOp->SetId(LogicalOr);
 				ConvertFValidationInsts.Add(MoveTemp(LogicalOrOp));
 
-				SpvId Any = Patcher.NewId();
-				auto AnyOp = MakeUnique<SpvOpAny>(BoolType, LogicalOr);
-				AnyOp->SetId(Any);
-				ConvertFValidationInsts.Add(MoveTemp(AnyOp));
+				SpvId Condition = LogicalOr;
+				if (!ResultType->IsScalar())
+				{
+					SpvId Any = Patcher.NewId();
+					auto AnyOp = MakeUnique<SpvOpAny>(BoolType, LogicalOr);
+					AnyOp->SetId(Any);
+					ConvertFValidationInsts.Add(MoveTemp(AnyOp));
+					Condition = Any;
+				}
 
 				auto TrueLabel = Patcher.NewId();
 				auto FalseLabel = Patcher.NewId();
 				ConvertFValidationInsts.Add(MakeUnique<SpvOpSelectionMerge>(FalseLabel, SpvSelectionControl::None));
-				ConvertFValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Any, TrueLabel, FalseLabel));
+				ConvertFValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Condition, TrueLabel, FalseLabel));
 
 				auto TrueLabelOp = MakeUnique<SpvOpLabel>();
 				TrueLabelOp->SetId(TrueLabel);
@@ -837,15 +887,20 @@ namespace FW
 				LogicalOrOp->SetId(LogicalOr);
 				ConvertFValidationInsts.Add(MoveTemp(LogicalOrOp));
 
-				SpvId Any = Patcher.NewId();
-				auto AnyOp = MakeUnique<SpvOpAny>(BoolType, LogicalOr);
-				AnyOp->SetId(Any);
-				ConvertFValidationInsts.Add(MoveTemp(AnyOp));
+				SpvId Condition = LogicalOr;
+				if (!ResultType->IsScalar())
+				{
+					SpvId Any = Patcher.NewId();
+					auto AnyOp = MakeUnique<SpvOpAny>(BoolType, LogicalOr);
+					AnyOp->SetId(Any);
+					ConvertFValidationInsts.Add(MoveTemp(AnyOp));
+					Condition = Any;
+				}
 
 				auto TrueLabel = Patcher.NewId();
 				auto FalseLabel = Patcher.NewId();
 				ConvertFValidationInsts.Add(MakeUnique<SpvOpSelectionMerge>(FalseLabel, SpvSelectionControl::None));
-				ConvertFValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Any, TrueLabel, FalseLabel));
+				ConvertFValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Condition, TrueLabel, FalseLabel));
 
 				auto TrueLabelOp = MakeUnique<SpvOpLabel>();
 				TrueLabelOp->SetId(TrueLabel);
@@ -919,15 +974,20 @@ namespace FW
 				LogicalAndOp->SetId(LogicalAnd);
 				SRemValidationInsts.Add(MoveTemp(LogicalAndOp));
 
-				SpvId Any = Patcher.NewId();
-				auto AnyOp = MakeUnique<SpvOpAny>(BoolType, LogicalAnd);
-				AnyOp->SetId(Any);
-				SRemValidationInsts.Add(MoveTemp(AnyOp));
+				SpvId Condition = LogicalAnd;
+				if (!ResultType->IsScalar())
+				{
+					SpvId Any = Patcher.NewId();
+					auto AnyOp = MakeUnique<SpvOpAny>(BoolType, LogicalAnd);
+					AnyOp->SetId(Any);
+					SRemValidationInsts.Add(MoveTemp(AnyOp));
+					Condition = Any;
+				}
 
 				auto TrueLabel = Patcher.NewId();
 				auto FalseLabel = Patcher.NewId();
 				SRemValidationInsts.Add(MakeUnique<SpvOpSelectionMerge>(FalseLabel, SpvSelectionControl::None));
-				SRemValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Any, TrueLabel, FalseLabel));
+				SRemValidationInsts.Add(MakeUnique<SpvOpBranchConditional>(Condition, TrueLabel, FalseLabel));
 
 				auto TrueLabelOp = MakeUnique<SpvOpLabel>();
 				TrueLabelOp->SetId(TrueLabel);
@@ -1703,15 +1763,20 @@ namespace FW
 				AUX::Unreachable();
 			}
 
-			SpvId Any = Patcher.NewId();
-			auto AnyOp = MakeUnique<SpvOpAny>(BoolType, ComparisonId);
-			AnyOp->SetId(Any);
-			InstList.Add(MoveTemp(AnyOp));
+			SpvId Condition = ComparisonId;
+			if (!ResultType->IsScalar())
+			{
+				SpvId Any = Patcher.NewId();
+				auto AnyOp = MakeUnique<SpvOpAny>(BoolType, ComparisonId);
+				AnyOp->SetId(Any);
+				InstList.Add(MoveTemp(AnyOp));
+				Condition = Any;
+			}
 
 			auto TrueLabel = Patcher.NewId();
 			auto FalseLabel = Patcher.NewId();
 			InstList.Add(MakeUnique<SpvOpSelectionMerge>(FalseLabel, SpvSelectionControl::None));
-			InstList.Add(MakeUnique<SpvOpBranchConditional>(Any, TrueLabel, FalseLabel));
+			InstList.Add(MakeUnique<SpvOpBranchConditional>(Condition, TrueLabel, FalseLabel));
 
 			auto TrueLabelOp = MakeUnique<SpvOpLabel>();
 			TrueLabelOp->SetId(TrueLabel);

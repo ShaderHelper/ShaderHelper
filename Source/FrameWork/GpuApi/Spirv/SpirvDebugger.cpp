@@ -865,8 +865,16 @@ namespace FW
 			SpvId Line = Patcher.FindOrAddConstant((uint32)CurLine);
 			SpvId VarId = Patcher.FindOrAddConstant(Pointer->Var->Id.GetValue());
 			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
+			SpvId IntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 1));
 			TArray<SpvId> Arguments = { StateType, Line, VarId };
-			Arguments.Append(Pointer->Indexes);
+			for (SpvId Index : Pointer->Indexes)
+			{
+				SpvId BitCastIndex = Patcher.NewId();
+				auto BitCastOp = MakeUnique<SpvOpBitcast>(IntType, Index);
+				BitCastOp->SetId(BitCastIndex);
+				AppendAccessInsts.Add(MoveTemp(BitCastOp));
+				Arguments.Add(BitCastIndex);
+			}
 			auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendAccessFuncId, Arguments);
 			FuncCallOp->SetId(Patcher.NewId());
 			AppendAccessInsts.Add(MoveTemp(FuncCallOp));

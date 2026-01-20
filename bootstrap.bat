@@ -2,9 +2,9 @@
 SETLOCAL ENABLEDELAYEDEXPANSION
 
 set VSWHERE_PATH="C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
-rem vs2022
+
 set VSMIN=17.0
-set VSMAX=18.0
+set VSMAX=30.0
 
 set CURRENTDIR=%cd%
 cd /D %CURRENTDIR%
@@ -30,22 +30,21 @@ if not exist %VSWHERE_PATH% (
 	set VsWhereCmdLine="!VSWHERE_PATH! -nologo -latest -version [%VSMIN%,%VSMAX%) -property catalog.productLineVersion"
 	
 	for /f "usebackq delims=" %%i in (`!VsWhereCmdLine!`) do (
-		echo Successfully find the latest visual studio : %%i
+		echo Successfully find the eligible visual studio
 		echo.
 		
-		set VsVersion=vs%%i
+		set VsVersion=vs2022
 		call :GenerateVsProject
 
 		pause
 		exit /b 0
 	)
 	
-	echo ERROR: Could not find vs2022, please make sure you installed it.
+	echo ERROR: Could not find vs2022 or later, please make sure you installed it.
 )
 
 :GenerateVsProject
 echo Premake5: Processing...
-echo "%VsVersion%"
 call %PREMAK5_PATH% %VsVersion% || goto error
 echo.	
 echo Premake5 complete

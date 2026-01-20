@@ -42,6 +42,7 @@ namespace SH
 			UI_COMMAND_SH(StepInto, LOCALIZATION("StepInto"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EKeys::F11));
 			UI_COMMAND_SH(StepOver, LOCALIZATION("StepOver"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EKeys::F10));
 			UI_COMMAND_SH(ToggleComment, LOCALIZATION("ToggleComment"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::Slash));
+			UI_COMMAND_SH(GoToDefinition, LOCALIZATION("GoToDefinition"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EKeys::F12));
 			UI_COMMAND_SH(GoToBeginningOfLine, LOCALIZATION("GoToBeginningOfLine"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EKeys::Home));
 			UI_COMMAND_SH(GoToEndOfLine, LOCALIZATION("GoToEndOfLine"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EKeys::End));
 			UI_COMMAND_SH(CursorSelectLeft, LOCALIZATION("CursorSelectLeft"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Shift, EKeys::Left));
@@ -82,6 +83,7 @@ namespace SH
 		TSharedPtr<FUICommandInfo> StepInto;
 		TSharedPtr<FUICommandInfo> StepOver;
 		TSharedPtr<FUICommandInfo> ToggleComment;
+		TSharedPtr<FUICommandInfo> GoToDefinition;
 		TSharedPtr<FUICommandInfo> GoToBeginningOfLine;
 		TSharedPtr<FUICommandInfo> GoToEndOfLine;
 		TSharedPtr<FUICommandInfo> CursorSelectLeft;

@@ -93,7 +93,7 @@ namespace SH
 				const auto& [Id, Location] = NavigationHistory[NavigationIndex];
 				auto LoadedShaderAsset = TSingleton<AssetManager>::Get().LoadAssetByGuid<ShaderAsset>(Id);
 				OpenShaderTab(MoveTemp(LoadedShaderAsset));
-				GetShaderEditor(LoadedShaderAsset)->ShaderMultiLineEditableText->GoTo(Location);
+				GetShaderEditor(LoadedShaderAsset)->JumpTo(Location);
 			}),
 			FCanExecuteAction::CreateLambda([this] { return NavigationIndex > 0; }),
 			EUIActionRepeatMode::RepeatEnabled
@@ -105,7 +105,7 @@ namespace SH
 				const auto& [Id, Location] = NavigationHistory[NavigationIndex];
 				auto LoadedShaderAsset = TSingleton<AssetManager>::Get().LoadAssetByGuid<ShaderAsset>(Id);
 				OpenShaderTab(MoveTemp(LoadedShaderAsset));
-				GetShaderEditor(LoadedShaderAsset)->ShaderMultiLineEditableText->GoTo(Location);
+				GetShaderEditor(LoadedShaderAsset)->JumpTo(Location);
 			}),
 			FCanExecuteAction::CreateLambda([this] { return NavigationIndex < NavigationHistory.Num() - 1; }),
 			EUIActionRepeatMode::RepeatEnabled

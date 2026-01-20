@@ -156,6 +156,7 @@ namespace SH
 		}
 		virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 		virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+		virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 		virtual FReply OnMouseButtonDoubleClick(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 		virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
 	private:
@@ -245,8 +246,9 @@ namespace SH
 		FTextSelection GetWord(const FTextLocation& InTextLocation) const;
         void Compile();
 
-		//Scroll to the specified line, which will be displayed in the middle of the document if possible.
-		void ScrollTo(int32 InLineIndex);
+		//Jump to the specified line, which will be displayed in the middle of the document if possible.
+		void JumpTo(const FTextLocation& InLocation);
+		void ScrollTo(const FTextLocation& InLocation);
 		TOptional<int32> FindFoldMarker(int32 InIndex) const;
 		
 		//Given a range for displayed text, then return the unfolding result.
@@ -254,6 +256,7 @@ namespace SH
 		void UnFold(int32 LineNumber);
 		void Fold(int32 LineNumber);
 		void ToggleComment();
+		void GoToDefinitionAt(const FTextLocation& Location);
         
         void UpdateLineNumberData();
 		void ClearDiagInfoEffect();

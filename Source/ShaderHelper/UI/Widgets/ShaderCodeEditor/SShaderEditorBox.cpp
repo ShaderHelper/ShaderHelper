@@ -33,6 +33,7 @@
 STEAL_PRIVATE_MEMBER(SMultiLineEditableText, TUniquePtr<FSlateEditableTextLayout>, EditableTextLayout)
 STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, TSharedPtr<SlateEditableTextTypes::FCursorLineHighlighter>, CursorLineHighlighter)
 STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, SlateEditableTextTypes::FCursorInfo, CursorInfo)
+STEAL_PRIVATE_MEMBER(FSlateEditableTextLayout, TOptional<SlateEditableTextTypes::FScrollInfo>, PositionToScrollIntoView)
 STEAL_PRIVATE_MEMBER(STextBlock, TUniquePtr< FSlateTextBlockLayout >, TextLayoutCache)
 STEAL_PRIVATE_MEMBER(FSlateTextBlockLayout, TSharedPtr<FSlateTextLayout>, TextLayout)
 STEAL_PRIVATE_MEMBER(FTextLayout, uint8, DirtyFlags)
@@ -988,6 +989,12 @@ constexpr int PaddingLineNum = 22;
 			FExecuteAction::CreateRaw(this, &SShaderEditorBox::ToggleComment)
 		);
 		UICommandList->MapAction(
+			CodeEditorCommands::Get().GoToDefinition,
+			FExecuteAction::CreateLambda([this] { 
+				GoToDefinitionAt(ShaderMultiLineEditableText->GetCursorLocation());
+			})
+		);
+		UICommandList->MapAction(
 			CodeEditorCommands::Get().GoToBeginningOfLine,
 			FExecuteAction::CreateLambda([this] { ShaderMultiLineEditableTextLayout->GoTo(ETextLocation::BeginningOfCodeLine); }),
 			EUIActionRepeatMode::RepeatEnabled
@@ -1543,6 +1550,37 @@ constexpr int PaddingLineNum = 22;
 		ShaderMultiLineEditableTextLayout->UpdateCursorHighlight();
     }
 
+	void SShaderEditorBox::GoToDefinitionAt(const FTextLocation& Location)
+	{
+		if (!ShaderMarshaller->TokenizedLines.IsValidIndex(Location.GetLineIndex()))
+		{
+			return;
+		}
+		const auto& TokenizedLine = ShaderMarshaller->TokenizedLines[Location.GetLineIndex()];
+		int32 TokenOffset{};
+		int32 TokenEndOffset{};
+		for (const auto& Token : TokenizedLine.Tokens)
+		{
+			if (Token.Type == ShaderTokenType::Identifier && Location.GetOffset() >= Token.BeginOffset && Location.GetOffset() <= Token.EndOffset)
+			{
+				TokenOffset = Token.BeginOffset;
+				TokenEndOffset = Token.EndOffset;
+				break;
+			}
+		}
+		if (SyntaxTUCopy.IsValid())
+		{
+			int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
+			auto Symbol = SyntaxTUCopy->GetSymbolInfo(Location.GetLineIndex() + ExtraLineNum + 1, TokenOffset + 1, TokenEndOffset - TokenOffset);
+			int SymbolLineNumber = Symbol.Row - ExtraLineNum;
+			//TODO: Handle include files
+			if (SymbolLineNumber > 0 && Symbol.File == ShaderAssetObj->Shader->GetShaderName())
+			{
+				JumpTo(GetLineIndex(SymbolLineNumber));
+			}
+		}
+	}
+
     FString FoldMarker::GetTotalFoldedLineTexts() const
     {
         FString TotalFoldedLineTexts;
@@ -1733,7 +1771,7 @@ constexpr int PaddingLineNum = 22;
 			TArray<ShaderOccurrence> Occurrences;
 			for (const ShaderTokenizer::Token& Token : ShaderMarshaller->TokenizedLines[CursorLineIndex].Tokens)
 			{
-				if (CursorOffset >= Token.BeginOffset && CursorOffset <= Token.EndOffset)
+				if (CursorOffset >= Token.BeginOffset && CursorOffset <= Token.EndOffset && Token.Type == ShaderTokenType::Identifier)
 				{
 					Occurrences = SyntaxTUCopy->GetOccurrences(GetLineNumber(CursorLineIndex) + AddedLineNum, Token.BeginOffset + 1);
 					break;
@@ -3049,11 +3087,15 @@ constexpr int PaddingLineNum = 22;
 			{
 				return FStyleColors::Error;
 			}
-			else if(Debugger.GetStopLineNumber() == LineNumber && Debugger.GetDebuggerError().IsEmpty())
+			else if (!Debugger.GetDebuggerError().Key.IsEmpty() && Debugger.GetDebuggerError().Value == LineNumber)
+			{
+				return FStyleColors::Error;
+			}
+			else if(Debugger.GetStopLineNumber() == LineNumber)
 			{
 				return FLinearColor::Green;
 			}
-			return FLinearColor::Red;
+			return FStyleColors::Error;
 		})
 		.Visibility_Lambda([=, this] {
 			if(IsErrorLine(LineNumber) || IsWarningLine(LineNumber))
@@ -3122,11 +3164,15 @@ constexpr int PaddingLineNum = 22;
 						SNew(SImage)
 						.Image(FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect2"))
 						.ColorAndOpacity_Lambda([this, LineNumber]{
-							if(Debugger.GetStopLineNumber() == LineNumber && Debugger.GetDebuggerError().IsEmpty())
+							if (!Debugger.GetDebuggerError().Key.IsEmpty() && Debugger.GetDebuggerError().Value == LineNumber)
+							{
+								return FLinearColor{ 1,0,0,0.7f };
+							}
+							else if(Debugger.GetStopLineNumber() == LineNumber)
 							{
 								return FLinearColor{0,1,0,0.7f};
 							}
-							return FLinearColor{1,0,0,0.7f};
+							return FLinearColor{ 1,0,0,0.7f };
 						})
 					]
 				]
@@ -3142,7 +3188,11 @@ constexpr int PaddingLineNum = 22;
 					})
 					.Image(FAppStyle::Get().GetBrush("WhiteBrush"))
 					.ColorAndOpacity_Lambda([this, LineNumber]{
-						if(Debugger.GetStopLineNumber() == LineNumber && Debugger.GetDebuggerError().IsEmpty())
+						if (!Debugger.GetDebuggerError().Key.IsEmpty() && Debugger.GetDebuggerError().Value == LineNumber)
+						{
+							return FLinearColor{ 1,0,0,0.06f };
+						}
+						else if(Debugger.GetStopLineNumber() == LineNumber)
 						{
 							return FLinearColor{0,1,0,0.06f};
 						}
@@ -3196,7 +3246,11 @@ constexpr int PaddingLineNum = 22;
 						SNew(SImage)
 						.Image(FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect2"))
 						.ColorAndOpacity_Lambda([this, LineNumber]{
-							if(Debugger.GetStopLineNumber() == LineNumber && Debugger.GetDebuggerError().IsEmpty())
+							if (!Debugger.GetDebuggerError().Key.IsEmpty() && Debugger.GetDebuggerError().Value == LineNumber)
+							{
+								return FLinearColor{ 1,0,0,0.7f };
+							}
+							else if(Debugger.GetStopLineNumber() == LineNumber)
 							{
 								return FLinearColor{0,1,0,0.7f};
 							}
@@ -3215,14 +3269,18 @@ constexpr int PaddingLineNum = 22;
 						return EVisibility::Collapsed;
 					})
 					.BorderImage_Lambda([this, LineNumber]{
-						if(Debugger.GetStopLineNumber() == LineNumber && !Debugger.GetDebuggerError().IsEmpty())
+						if (!Debugger.GetDebuggerError().Key.IsEmpty() && Debugger.GetDebuggerError().Value == LineNumber)
 						{
 							return FAppStyle::Get().GetBrush("WhiteBrush");
 						}
 						return FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect");
 					})
 					.BorderBackgroundColor_Lambda([this, LineNumber]{
-						if(Debugger.GetStopLineNumber() == LineNumber && Debugger.GetDebuggerError().IsEmpty())
+						if (!Debugger.GetDebuggerError().Key.IsEmpty() && Debugger.GetDebuggerError().Value == LineNumber)
+						{
+							return FLinearColor{ 1,0,0,0.3f };
+						}
+						else if(Debugger.GetStopLineNumber() == LineNumber)
 						{
 							return FLinearColor{0,1,0,0.3f};
 						}
@@ -3234,8 +3292,12 @@ constexpr int PaddingLineNum = 22;
 					[
 						SNew(STextBlock)
 						.Font(GetCodeFontInfo())
-						.Visibility_Lambda([this, LineNumber] { return Debugger.GetStopLineNumber() == LineNumber && !Debugger.GetDebuggerError().IsEmpty() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
-						.Text_Lambda([this] { return FText::FromString(Debugger.GetDebuggerError()); })
+						.Visibility_Lambda([this, LineNumber] { 
+							return !Debugger.GetDebuggerError().Key.IsEmpty() && Debugger.GetDebuggerError().Value == LineNumber ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+						})
+						.Text_Lambda([this] { 
+							return FText::FromString(Debugger.GetDebuggerError().Key); 
+						})
 						.ColorAndOpacity(FLinearColor::Red)
 					]
 				]
@@ -4148,6 +4210,18 @@ constexpr int PaddingLineNum = 22;
 		return SMultiLineEditableText::OnMouseWheel(MyGeometry, MouseEvent);
 	}
 
+	FReply SShaderMultiLineEditableText::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+	{
+		if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && MouseEvent.IsControlDown())
+		{
+			FVector2D LocalMousePos = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
+			FTextLocation ClickLocation = Owner->ShaderMarshaller->TextLayout->GetTextLocationAt(LocalMousePos * MyGeometry.Scale);
+			Owner->GoToDefinitionAt(ClickLocation);
+			return FReply::Handled();
+		}
+		return SMultiLineEditableText::OnMouseButtonDown(MyGeometry, MouseEvent);
+	}
+
 	FReply SShaderMultiLineEditableText::OnMouseButtonDoubleClick(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 	{
 		for (int32 i = 0; i < Owner->VisibleFoldMarkers.Num(); i++)
@@ -4175,22 +4249,51 @@ constexpr int PaddingLineNum = 22;
 		return SMultiLineEditableText::OnMouseButtonDoubleClick(MyGeometry, MouseEvent);
 	}
 
-	void SShaderEditorBox::ScrollTo(int32 InLineIndex)
+	void SShaderEditorBox::JumpTo(const FTextLocation& InLocation)
+	{
+		int32 LineCount = ShaderMarshaller->TextLayout->GetLineCount();
+		int32 InLineIndex = InLocation.GetLineIndex();
+
+		double LineHeight = ShaderMarshaller->TextLayout->GetUniformLineHeight() / ShaderMarshaller->TextLayout->GetScale();
+		double ViewHeight = ShaderMultiLineEditableText->GetTickSpaceGeometry().GetLocalSize().Y;
+		int32 VisibleLineCount = static_cast<int32>(ViewHeight / LineHeight);
+		int32 StartVisibleLineIndex = ShaderMarshaller->TextLayout->GetStartVisibleLineIndex();
+		int32 EndVisibleLineIndex = ShaderMarshaller->TextLayout->GetEndVisibleLineIndex();
+		int32 Offset = VisibleLineCount / 5;
+
+		if (InLineIndex <= StartVisibleLineIndex + Offset || InLineIndex >= EndVisibleLineIndex - Offset)
+		{
+			double TargetScrollY = LineHeight * FMath::Max(0, InLineIndex - VisibleLineCount / 2);
+
+			FVector2D CurrentOffset = ShaderMultiLineEditableTextLayout->GetScrollOffset();
+			ShaderMultiLineEditableTextLayout->SetScrollOffset(
+				FVector2D(CurrentOffset.X, TargetScrollY),
+				ShaderMultiLineEditableText->GetTickSpaceGeometry()
+			);
+		}
+		ShaderMultiLineEditableText->GoTo(InLocation);
+
+		// Move the cursor without scrolling
+		GetPrivate_FSlateEditableTextLayout_PositionToScrollIntoView(*ShaderMultiLineEditableTextLayout).Reset();
+	}
+
+	void SShaderEditorBox::ScrollTo(const FTextLocation& InLocation)
 	{
 		int32 LineCount = ShaderMarshaller->TextLayout->GetLineCount();
 		int32 VisibleLineCount = ShaderMarshaller->TextLayout->GetVisibleLineCount();
 		int32 StartVisibleLineIndex = ShaderMarshaller->TextLayout->GetStartVisibleLineIndex();
 		int32 EndVisibleLineIndex = ShaderMarshaller->TextLayout->GetEndVisibleLineIndex();
 		int32 Offset = VisibleLineCount / 5;
-		if(InLineIndex <= StartVisibleLineIndex + Offset)
+		int32 InLineIndex = InLocation.GetLineIndex();
+		if (InLineIndex <= StartVisibleLineIndex + Offset)
 		{
 			int32 TargetLineIndex = FMath::Clamp(InLineIndex - VisibleLineCount / 2, 0, LineCount - 1);
-			ShaderMultiLineEditableText->ScrollTo({TargetLineIndex, 0});
+			ShaderMultiLineEditableText->ScrollTo({ TargetLineIndex, 0 });
 		}
-		else if(InLineIndex >= EndVisibleLineIndex - Offset)
+		else if (InLineIndex >= EndVisibleLineIndex - Offset)
 		{
 			int32 TargetLineIndex = FMath::Clamp(InLineIndex + VisibleLineCount / 2, 0, LineCount - 1);
-			ShaderMultiLineEditableText->ScrollTo({TargetLineIndex, 0});
+			ShaderMultiLineEditableText->ScrollTo({ TargetLineIndex, 0 });
 		}
 	}
 
@@ -4213,7 +4316,7 @@ constexpr int PaddingLineNum = 22;
 		if(Debugger.Continue(Mode))
 		{
 			Debugger.ShowDebuggerResult();
-			ScrollTo(GetLineIndex(Debugger.GetStopLineNumber()));
+			JumpTo(GetLineIndex(Debugger.GetStopLineNumber()));
 			UnFold(Debugger.GetStopLineNumber());
 		}
 		else
@@ -4237,7 +4340,7 @@ constexpr int PaddingLineNum = 22;
 	void SShaderEditorBox::DebugPixel(const Vector2u& InPixelCoord, const InvocationState& InState)
 	{
 		GApp->EnableBusyBlocker();
-		FNotificationInfo Info(FText::FromString("Debugger starting..."));
+		FNotificationInfo Info(LOCALIZATION("StartDebuggerTip"));
 		Info.Image = FAppStyle::Get().GetBrush("NoBrush");
 		Info.bFireAndForget = false;
 		Info.FadeInDuration = 0.0f;

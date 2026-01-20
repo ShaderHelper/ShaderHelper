@@ -64,7 +64,7 @@ namespace SH
 		void DebugCompute(const InvocationState& InState);
 		void Reset();
 
-		FString GetDebuggerError() const { return DebuggerError; }
+		TPair<FString, int> GetDebuggerError() const { return DebuggerError; }
 		int32 GetStopLineNumber() const { return StopLineNumber; }
 		bool IsValid() const { return DebuggerContext != nullptr; }
 	private:
@@ -89,7 +89,7 @@ namespace SH
 		TArray<uint8> ReturnValue;
 		//ValidLine: Line that can trigger a breakpoint
 		std::optional<int32> CurValidLine;
-		FString DebuggerError;
+		TPair<FString, int> DebuggerError;
 		int32 CurDebugStateIndex{};
 		std::vector<std::pair<FW::SpvId, FW::SpvVariableDesc*>> SortedVariableDescs;
 

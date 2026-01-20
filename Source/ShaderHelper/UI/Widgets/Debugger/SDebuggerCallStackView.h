@@ -17,11 +17,13 @@ namespace SH
 		SLATE_END_ARGS()
 		void Construct( const FArguments& InArgs );
 	public:
-		void SetCallStackDatas(const TArray<CallStackDataPtr>& InDatas);
+		void SetCallStackDatas(const TArray<CallStackDataPtr>& InDatas, const TPair<FString, int>& InDebuggerError);
 		TSharedRef<ITableRow> GenerateRowForItem(CallStackDataPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 		
 		CallStackDataPtr ActiveData;
 		TFunction<void(const FString&)> OnSelectionChanged;
+		TPair<FString, int> DebuggerError;
+
 	private:
 		TSharedPtr<SListView<CallStackDataPtr>> CallStackView;
 		TArray<CallStackDataPtr> CallStackDatas;

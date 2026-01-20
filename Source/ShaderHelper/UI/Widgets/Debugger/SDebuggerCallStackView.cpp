@@ -71,6 +71,7 @@ namespace SH
 		{
 			Border->SetPadding(FMargin{1, 0, 0, 2});
 			InternalBorder->SetContent(SNew(STextBlock).Text(FText::FromString(Data->Location)));
+			InternalBorder->SetToolTipText(FText::FromString(Data->Location));
 		}
 		else
 		{
@@ -94,8 +95,9 @@ namespace SH
 		return Border;
 	}
 
-	void SDebuggerCallStackView::SetCallStackDatas(const TArray<CallStackDataPtr>& InDatas)
+	void SDebuggerCallStackView::SetCallStackDatas(const TArray<CallStackDataPtr>& InDatas, const TPair<FString, int>& InDebuggerError)
 	{
+		DebuggerError = InDebuggerError;
 		CallStackDatas = InDatas;
 		CallStackView->RequestListRefresh();
 	}

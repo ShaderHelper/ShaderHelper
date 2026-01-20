@@ -118,7 +118,7 @@ namespace SH
 
 	FReply SDebuggerViewport::OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 	{
-		if(bFinalizePixel)
+		if(bFinalizePixel || IsValidating)
 		{
 			return FReply::Unhandled();
 		}
@@ -140,7 +140,7 @@ namespace SH
 
 	FReply SDebuggerViewport::OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 	{
-		if(bFinalizePixel)
+		if(bFinalizePixel || IsValidating)
 		{
 			return FReply::Unhandled();
 		}
@@ -158,7 +158,7 @@ namespace SH
 
 	FReply SDebuggerViewport::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 	{
-		if(bFinalizePixel)
+		if(bFinalizePixel || IsValidating)
 		{
 			return FReply::Unhandled();
 		}
@@ -281,7 +281,7 @@ namespace SH
 				SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(ShEditor->GetDebuggaleObject()->GetShaderAsset());
 				PixelCoord = { -1 };
 				GApp->EnableBusyBlocker();
-				FNotificationInfo Info(FText::FromString("Validator starting..."));
+				FNotificationInfo Info(LOCALIZATION("StartValidatorTip"));
 				Info.Image = FAppStyle::Get().GetBrush("NoBrush");
 				Info.bFireAndForget = false;
 				Info.FadeInDuration = 0.0f;
