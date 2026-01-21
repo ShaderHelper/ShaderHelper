@@ -726,8 +726,22 @@ public:
         MacroLocation call;      // macro call site (macro identifier)
         bool functionLike = false;
     };
+
+    // ------------------------------------------------------------
+    // Inactive regions (for LSP semantic tokens / dimming)
+    //
+    // Represents line ranges that are skipped due to preprocessor conditionals
+    // (e.g., #if 0 ... #endif, or failed #ifdef conditions).
+    //
+    struct InactiveRegion {
+        int startLine = 0;       // 1-based start line (first inactive line)
+        int endLine = 0;         // 1-based end line (last inactive line, inclusive)
+        std::string file;        // optional filename (can be empty)
+    };
+
     const std::vector<MacroDefinition>& getMacroDefinitions() const { return macroDefinitions; }
     const std::vector<MacroExpansion>& getMacroExpansions() const { return macroExpansions; }
+    const std::vector<InactiveRegion>& getInactiveRegions() const { return inactiveRegions; }
 
 protected:
     TPoolAllocator* pool;
@@ -764,6 +778,9 @@ protected:
     // Macro expansion trace captured during parse().
     std::vector<MacroDefinition> macroDefinitions;
     std::vector<MacroExpansion> macroExpansions;
+
+    // Inactive regions captured during parse().
+    std::vector<InactiveRegion> inactiveRegions;
 
     friend class TProgram;
 

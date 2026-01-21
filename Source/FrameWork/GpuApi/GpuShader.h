@@ -272,6 +272,7 @@ namespace FW
 		virtual TArray<ShaderCandidateInfo> GetCodeComplete(uint32 Row, uint32 Col) = 0;
 		virtual TArray<ShaderOccurrence> GetOccurrences(uint32 Row, uint32 Col) = 0;
 		virtual ShaderSymbol GetSymbolInfo(uint32 Row, uint32 Col, uint32 Size) = 0;
+		virtual TArray<Vector2u> GetInactiveRegions() = 0;
 
 		const TArray<ShaderFunc>& GetFuncs() const { return Funcs; };
 		const TArray<ShaderScope>& GetGuideLineScopes() const { return GuideLineScopes; };

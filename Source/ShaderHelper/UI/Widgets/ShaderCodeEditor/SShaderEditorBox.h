@@ -301,6 +301,9 @@ namespace SH
 		const FSlateBrush* BackgroundLayerBrush{};
 		TSharedPtr<FShaderEditorMarshaller> ShaderMarshaller;
 
+		TSharedPtr<FShaderEditorEffectMarshaller> EffectMarshller;
+		TSharedPtr<SMultiLineEditableText> EffectMultiLineEditableText;
+
 		//------------Syntax highlight-----------
 		TSharedPtr<FW::ShaderTU> SyntaxTU;
 		TSharedPtr<FW::ShaderTU> SyntaxTUCopy;
@@ -334,9 +337,6 @@ namespace SH
 		TArray<FTextLineHighlight> OccurrenceHighlights;
 		TOptional<FTextLineHighlight> OpenBracketHighlight, CloseBracketHighlight;
         TSharedPtr<class CursorHighlighter> CustomCursorHighlighter;
-        
-		TSharedPtr<FShaderEditorEffectMarshaller> EffectMarshller;
-		TSharedPtr<SMultiLineEditableText> EffectMultiLineEditableText;
         
 		TSharedPtr<SListView<LineNumberItemPtr>> LineNumberList;
 		TSharedPtr<SListView<LineNumberItemPtr>> LineTipList;

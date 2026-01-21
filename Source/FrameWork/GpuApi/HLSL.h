@@ -328,6 +328,30 @@ namespace FW
 			TU->GetFile((char*)ShaderNameUTF8.Get(), DxcFile.GetInitReference());
 			TU->GetCursor(DxcRootCursor.GetInitReference());
 			TraversalAST(DxcRootCursor);
+
+			//Inactive regions
+			unsigned RangeCount = 0;
+			IDxcSourceRange** Ranges = nullptr;
+			TU->GetSkippedRanges(DxcFile, &RangeCount, &Ranges);
+			for (unsigned i = 0; i < RangeCount; i++)
+			{
+				TRefCountPtr<IDxcSourceLocation> StartLoc, EndLoc;
+				Ranges[i]->GetStart(StartLoc.GetInitReference());
+				Ranges[i]->GetEnd(EndLoc.GetInitReference());
+
+				unsigned StartLine, EndLine;
+				StartLoc->GetSpellingLocation(nullptr, &StartLine, nullptr, nullptr);
+				EndLoc->GetSpellingLocation(nullptr, &EndLine, nullptr, nullptr);
+
+				SkippedLines.Add({ StartLine+1, EndLine-1 });
+				Ranges[i]->Release();
+			}
+			CoTaskMemFree(Ranges);
+		}
+
+		TArray<Vector2u> GetInactiveRegions() override
+		{
+			return SkippedLines;
 		}
 
 		TArray<ShaderDiagnosticInfo> GetDiagnostic() override
@@ -1121,5 +1145,6 @@ namespace FW
 		TRefCountPtr<IDxcFile> DxcFile;
 		TRefCountPtr<IDxcCursor> DxcRootCursor;
 		ShaderType Stage;
+		TArray<Vector2u> SkippedLines;
 	};
 }

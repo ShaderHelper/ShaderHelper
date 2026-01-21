@@ -1269,6 +1269,19 @@ namespace FW
 			}
 		}
 
+		TArray<Vector2u> GetInactiveRegions() override
+		{
+			TArray<Vector2u> InactiveRegions;
+			for (const auto& InactiveRegion : ParsedShader.GetTShader()->getInactiveRegions())
+			{
+				if (ShaderName == UTF8_TO_TCHAR(InactiveRegion.file.c_str()))
+				{
+					InactiveRegions.Emplace(InactiveRegion.startLine+1, InactiveRegion.endLine-1);
+				}
+			}
+			return InactiveRegions;
+		}
+
 		TArray<ShaderDiagnosticInfo> GetDiagnostic() override
 		{
 			FString Msg = UTF8_TO_TCHAR(ParsedShader.GetErrorMessage().c_str());

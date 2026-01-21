@@ -528,10 +528,7 @@ constexpr int PaddingLineNum = 22;
 						for (const ShaderTokenizer::Token& Token : Task.LineTokens[LineIndex])
 						{
 							ShaderTokenType NewTokenType = TU->GetTokenType(Token.Type, ExtraLineNum + LineIndex + 1, Token.BeginOffset + 1, Token.EndOffset - Token.BeginOffset);
-							if (NewTokenType != Token.Type)
-							{
-								LineSyntaxHighlightMaps[LineIndex].Add(FTextRange{ Token.BeginOffset, Token.EndOffset }, NewTokenType);
-							}
+							LineSyntaxHighlightMaps[LineIndex].Add(FTextRange{ Token.BeginOffset, Token.EndOffset }, NewTokenType);
 						}
 					}
 					this->SyntaxTU = MakeShareable(TU.Release());
@@ -1741,18 +1738,55 @@ constexpr int PaddingLineNum = 22;
 
 	void SShaderEditorBox::RefreshSyntaxHighlight()
 	{
+		TArray<Vector2u> InactiveLineRange = SyntaxTUCopy->GetInactiveRegions();
+		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
+		
+		auto IsLineInactive = [&InactiveLineRange, ExtraLineNum](int32 LineIndex) -> bool {
+			int32 LineNumber = LineIndex + 1 + ExtraLineNum;
+			for (const Vector2u& Range : InactiveLineRange)
+			{
+				if (LineNumber >= (int32)Range.x && LineNumber <= (int32)Range.y)
+				{
+					return true;
+				}
+			}
+			return false;
+		};
+		
 		for(int LineIndex = 0; LineIndex < LineSyntaxHighlightMapsCopy.Num(); LineIndex++)
 		{
 			auto& SyntaxHighlightMap = LineSyntaxHighlightMapsCopy[LineIndex];
 			auto& LineModel =  ShaderMarshaller->TextLayout->GetLineModels()[LineIndex];
-			for(const auto& [TokenRange, TokenType] : SyntaxHighlightMap)
+			
+			bool bIsInactive = IsLineInactive(LineIndex);
+			
+			if (bIsInactive)
 			{
-				for(auto& RunModel : LineModel.Runs)
+				for (const auto& [TokenRange, TokenType] : SyntaxHighlightMap)
 				{
-					TSharedRef<IRun> Run = RunModel.GetRun();
-					if(Run->GetTextRange() == TokenRange)
+					for (auto& RunModel : LineModel.Runs)
 					{
-						RunModel = FTextLayout::FRunModel(FSlateTextStyleRefRun::Create(FRunInfo(), LineModel.Text, GetTokenStyleMap()[TokenType], TokenRange));
+						TSharedRef<IRun> Run = RunModel.GetRun();
+						if (Run->GetTextRange() == TokenRange)
+						{
+							FTextBlockStyle DimmedStyle = GetTokenStyleMap()[TokenType];
+							DimmedStyle.SetColorAndOpacity(DimmedStyle.ColorAndOpacity.GetSpecifiedColor().CopyWithNewOpacity(0.4f));
+							RunModel = FTextLayout::FRunModel(FSlateTextRun::Create(FRunInfo(), LineModel.Text, DimmedStyle, TokenRange));
+						}
+					}
+				}
+			}
+			else
+			{
+				for(const auto& [TokenRange, TokenType] : SyntaxHighlightMap)
+				{
+					for(auto& RunModel : LineModel.Runs)
+					{
+						TSharedRef<IRun> Run = RunModel.GetRun();
+						if(Run->GetTextRange() == TokenRange)
+						{
+							RunModel = FTextLayout::FRunModel(FSlateTextStyleRefRun::Create(FRunInfo(), LineModel.Text, GetTokenStyleMap()[TokenType], TokenRange));
+						}
 					}
 				}
 			}
@@ -2100,16 +2134,9 @@ constexpr int PaddingLineNum = 22;
             if (!EffectMarshller->LineNumberToDiagInfo.Contains(DiagInfoLineNumber))
             {
                 int32 LineIndex = GetLineIndex(DiagInfoLineNumber);
-                FString LineText;
-                if (LineIndex != INDEX_NONE) {
-                    ShaderMultiLineEditableText->GetTextLine(LineIndex, LineText);
-                }
-
                 FString DummyText;
-                int32 LineTextNum = LineText.Len();
-                for (int32 i = 0; i < LineTextNum; i++)
-                {
-                    DummyText += LineText[i];
+                if (LineIndex != INDEX_NONE) {
+                    ShaderMultiLineEditableText->GetTextLine(LineIndex, DummyText);
                 }
 
 				FString DisplayInfo = DummyText + TEXT("  ");
@@ -3562,6 +3589,29 @@ constexpr int PaddingLineNum = 22;
         FString TextAfterUnfolding = OwnerWidget->UnFoldText(MoveTemp(UnFoldingRange));
 		OwnerWidget->OnShaderTextChanged(TextAfterUnfolding);
         OwnerWidget->UpdateLineNumberData();
+
+		//To prevent old diag info from obscuring the code.
+		if (OwnerWidget->EffectMultiLineEditableText)
+		{
+			for (auto& [LineNumber, Info] : OwnerWidget->EffectMarshller->LineNumberToDiagInfo)
+			{
+				if (int32 LineIndex = OwnerWidget->GetLineIndex(LineNumber); LineIndex != INDEX_NONE)
+				{
+					int32 CodeLineLen = LineModels[LineIndex].Text->Len();
+					FString DiagInfo = Info.TotalInfo.Mid(Info.InfoRange.BeginIndex);
+					Info.DummyRange = { 0,  CodeLineLen };
+					FString NewDisplayInfo = *LineModels[LineIndex].Text + DiagInfo;
+					Info.InfoRange = { CodeLineLen, NewDisplayInfo.Len() };
+					Info.TotalInfo = MoveTemp(NewDisplayInfo);
+				}
+				else
+				{
+					OwnerWidget->EffectMarshller->LineNumberToDiagInfo.Remove(LineNumber);
+				}
+			}
+			OwnerWidget->EffectMarshller->MakeDirty();
+			OwnerWidget->EffectMultiLineEditableText->Refresh();
+		}
     }
 
     void FShaderEditorMarshaller::GetText(FString& TargetString, const FTextLayout& SourceTextLayout)

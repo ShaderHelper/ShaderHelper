@@ -219,8 +219,18 @@ public:
         bool functionLike = false;
     };
 
+    // Inactive region data (for LSP semantic tokens / inactive regions).
+    // Represents a range of lines that are skipped due to preprocessor conditionals
+    // (e.g., #if 0 ... #endif, or failed #ifdef conditions).
+    struct TInactiveRegion {
+        int startLine = 0;     // 1-based start line (first inactive line)
+        int endLine = 0;       // 1-based end line (last inactive line, inclusive)
+        TString fileName;      // optional filename
+    };
+
     const TVector<TMacroDefinition>& getMacroDefinitions() const { return macroDefinitions; }
     const TVector<TMacroExpansion>&  getMacroExpansions()  const { return macroExpansions; }
+    const TVector<TInactiveRegion>&  getInactiveRegions()  const { return inactiveRegions; }
 
     class tInput {
     public:
@@ -387,6 +397,7 @@ protected:
     // Tooling-facing macro trace
     TVector<TMacroDefinition> macroDefinitions;
     TVector<TMacroExpansion>  macroExpansions;
+    TVector<TInactiveRegion>  inactiveRegions;
     // Get the next token from *stack* of input sources, popping input sources
     // that are out of tokens, down until an input source is found that has a token.
     // Return EndOfInput when there are no more tokens to be found by doing this.
