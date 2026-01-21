@@ -266,6 +266,10 @@ constexpr int PaddingLineNum = 22;
 		{
 			Style.SetFont(CodeFontInfo);
 		}
+		for (auto& [_, Style] : GetDimTokenStyleMap())
+		{
+			Style.SetFont(CodeFontInfo);
+		}
 		ShaderMultiLineEditableText->SetFont(CodeFontInfo);
 		//After marking Marshaller as dirty, calling refresh directly will rehandle the entire text, 
 		//which may cause stuttering. Therefore, we only update layout
@@ -317,6 +321,21 @@ constexpr int PaddingLineNum = 22;
 			return Map;
 		}();
 		return TokenStyleMap;
+	}
+
+	TMap<ShaderTokenType, FTextBlockStyle>& SShaderEditorBox::GetDimTokenStyleMap()
+	{
+		static TMap<ShaderTokenType, FTextBlockStyle> DimTokenStyleMap = []() {
+			TMap<ShaderTokenType, FTextBlockStyle> Map;
+			for (ShaderTokenType Type : magic_enum::enum_values<ShaderTokenType>())
+			{
+				FTextBlockStyle Style = FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>(GetTokenStyleName(Type));
+				Style.SetColorAndOpacity(Style.ColorAndOpacity.GetSpecifiedColor().CopyWithNewOpacity(0.4f));
+				Map.Add(Type, MoveTemp(Style));
+			}
+			return Map;
+		}();
+		return DimTokenStyleMap;
 	}
 
 	int32 SShaderMultiLineEditableText::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
@@ -423,9 +442,13 @@ constexpr int PaddingLineNum = 22;
         ShaderMarshaller = MakeShared<FShaderEditorMarshaller>(this, MakeShared<ShaderTokenizer>());
         EffectMarshller = MakeShared<FShaderEditorEffectMarshaller>(this);
 
-        FText InitialShaderText = FText::FromString(ShaderAssetObj->EditorContent);
         CurrentEditorSource = ShaderAssetObj->EditorContent;
         CurrentShaderSource = CurrentEditorSource;
+
+		FString TabSpace;
+		for (int i = 0; i < GetTabSize(); i++) { TabSpace += " "; }
+		CurrentEditorSource = CurrentEditorSource.Replace(TEXT("\t"), *TabSpace);
+		FText InitialShaderText = FText::FromString(CurrentEditorSource);
 
 		//Due to code folding altering the editing text, separate IsenseThread and SyntaxThread.
 		ISenseEvent = FPlatformProcess::GetSynchEventFromPool();
@@ -1760,36 +1783,18 @@ constexpr int PaddingLineNum = 22;
 			
 			bool bIsInactive = IsLineInactive(LineIndex);
 			
-			if (bIsInactive)
+			for (const auto& [TokenRange, TokenType] : SyntaxHighlightMap)
 			{
-				for (const auto& [TokenRange, TokenType] : SyntaxHighlightMap)
+				for (auto& RunModel : LineModel.Runs)
 				{
-					for (auto& RunModel : LineModel.Runs)
+					TSharedRef<IRun> Run = RunModel.GetRun();
+					if (Run->GetTextRange() == TokenRange)
 					{
-						TSharedRef<IRun> Run = RunModel.GetRun();
-						if (Run->GetTextRange() == TokenRange)
-						{
-							FTextBlockStyle DimmedStyle = GetTokenStyleMap()[TokenType];
-							DimmedStyle.SetColorAndOpacity(DimmedStyle.ColorAndOpacity.GetSpecifiedColor().CopyWithNewOpacity(0.4f));
-							RunModel = FTextLayout::FRunModel(FSlateTextRun::Create(FRunInfo(), LineModel.Text, DimmedStyle, TokenRange));
-						}
+						RunModel = FTextLayout::FRunModel(FSlateTextStyleRefRun::Create(FRunInfo(), LineModel.Text, bIsInactive ? GetDimTokenStyleMap()[TokenType] : GetTokenStyleMap()[TokenType], TokenRange));
 					}
 				}
 			}
-			else
-			{
-				for(const auto& [TokenRange, TokenType] : SyntaxHighlightMap)
-				{
-					for(auto& RunModel : LineModel.Runs)
-					{
-						TSharedRef<IRun> Run = RunModel.GetRun();
-						if(Run->GetTextRange() == TokenRange)
-						{
-							RunModel = FTextLayout::FRunModel(FSlateTextStyleRefRun::Create(FRunInfo(), LineModel.Text, GetTokenStyleMap()[TokenType], TokenRange));
-						}
-					}
-				}
-			}
+
 		}
 		
 		GetPrivate_FTextLayout_DirtyFlags(*ShaderMarshaller->TextLayout) |= (1 << 0);
@@ -3435,7 +3440,6 @@ constexpr int PaddingLineNum = 22;
 					TOptional<int32> MarkerIndex = OwnerWidget->FindFoldMarker(LineIndex);
 					for (const ShaderTokenizer::Token& Token : NewTokenizedLine.Tokens)
 					{
-						FTextBlockStyle* RunTextStyle = &OwnerWidget->GetTokenStyleMap()[Token.Type];
 						FTextRange NewTokenRange{ Token.BeginOffset, Token.EndOffset };
 						FString TokenStr = LineText->Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
 
@@ -3443,6 +3447,24 @@ constexpr int PaddingLineNum = 22;
 						{
 							CurTokenizedLine = &NewTokenizedLine;
 						}
+						
+						//Check if line is in inactive region
+						bool bIsInactive = false;
+						if (OwnerWidget->SyntaxTUCopy.IsValid())
+						{
+							TArray<Vector2u> InactiveLineRange = OwnerWidget->SyntaxTUCopy->GetInactiveRegions();
+							int32 ExtraLineNum = OwnerWidget->GetShaderAsset()->GetExtraLineNum();
+							int32 LineNumber = LineIndex + 1 + ExtraLineNum;
+							for (const Vector2u& Range : InactiveLineRange)
+							{
+								if (LineNumber >= (int32)Range.x && LineNumber <= (int32)Range.y)
+								{
+									bIsInactive = true;
+									break;
+								}
+							}
+						}
+						FTextBlockStyle* RunTextStyle = bIsInactive ? &OwnerWidget->GetDimTokenStyleMap()[Token.Type] : &OwnerWidget->GetTokenStyleMap()[Token.Type];
 						//Compares old tokens to avoid lexical highlighting overriding syntax highlighting
 						if (OwnerWidget->LineSyntaxHighlightMapsCopy.IsValidIndex(LineIndex))
 						{
@@ -3451,16 +3473,11 @@ constexpr int PaddingLineNum = 22;
 								FString OldTokenStr = LineTextBeforeEditing.Mid(TokenRange.BeginIndex, TokenRange.Len());
 								if (Token.Type == ShaderTokenType::Identifier && TokenStr == OldTokenStr)
 								{
-									RunTextStyle = &OwnerWidget->GetTokenStyleMap()[TokenType];
+									RunTextStyle = bIsInactive ? &OwnerWidget->GetDimTokenStyleMap()[TokenType] : &OwnerWidget->GetTokenStyleMap()[TokenType];
 								}
 							}
 						}
-
-						if (MarkerIndex && LineText->Mid(NewTokenRange.BeginIndex, 1) == FoldMarkerText)
-						{
-							RunTextStyle->SetColorAndOpacity(FLinearColor::Gray);
-						}
-
+						
 						TSharedRef<IRun> Run = FSlateTextStyleRefRun::Create(FRunInfo(), LineText, *RunTextStyle, MoveTemp(NewTokenRange));
 						RunModels.Add(MoveTemp(Run));
 					}

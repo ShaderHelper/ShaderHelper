@@ -547,6 +547,20 @@ namespace SH
 			})
 		];
 
+		AppendCodeEditorItem(CodeEditorGrid, LOCALIZATION("TabSize"))
+		.AutoWidth()
+		[
+			SNew(SSpinBox<int32>)
+			.MinValue(1).MaxValue(16)
+			.OnValueChanged_Lambda([this](int32 NewValue) {
+				Editor::GetEditorConfig()->SetInt64(TEXT("CodeEditor"), TEXT("TabSize"), NewValue);
+				Editor::SaveEditorConfig();
+			})
+			.Value_Lambda([] {
+				return SShaderEditorBox::GetTabSize();
+			})
+		];
+
 		for (const auto& StyleColor : SyntaxPalette)
 		{
 			AppendCodeEditorItem(CodeEditorGrid, USlateThemeManager::Get().GetColorDisplayName(StyleColor))
