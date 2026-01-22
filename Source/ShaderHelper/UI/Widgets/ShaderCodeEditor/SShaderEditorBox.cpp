@@ -251,6 +251,10 @@ constexpr int PaddingLineNum = 22;
 
 	void SShaderEditorBox::RefreshFont()
 	{
+		// Save the current visible line index before changing font
+		int32 StartVisibleLineIndex = ShaderMarshaller->TextLayout->GetStartVisibleLineIndex();
+		double X = ShaderMultiLineEditableTextLayout->GetScrollOffset().X;
+
 		auto& CodeFontInfo = GetCodeFontInfo();
 		TSharedRef<FCompositeFont> CodeFont = MakeShared<FStandaloneCompositeFont>();
 		FString FontPath = GetFontPath();
@@ -274,12 +278,11 @@ constexpr int PaddingLineNum = 22;
 		//After marking Marshaller as dirty, calling refresh directly will rehandle the entire text, 
 		//which may cause stuttering. Therefore, we only update layout
 		ShaderMarshaller->ClearDirty();
-		int32 StartVisibleLineIndex = ShaderMarshaller->TextLayout->GetStartVisibleLineIndex();
-		double X = ShaderMultiLineEditableTextLayout->GetScrollOffset().X;
-		double Y = ShaderMarshaller->TextLayout->GetUniformLineHeight() * StartVisibleLineIndex / ShaderMarshaller->TextLayout->GetScale();
-		ShaderMultiLineEditableTextLayout->SetScrollOffset({ X,Y }, ShaderMultiLineEditableText->GetTickSpaceGeometry());
 		ShaderMarshaller->TextLayout->ResetMaxDrawWidth();
 		ShaderMarshaller->TextLayout->UpdateIfNeeded();
+		// Calculate Y offset using the new line height but the saved line index
+		double Y = ShaderMarshaller->TextLayout->GetUniformLineHeight() * StartVisibleLineIndex / ShaderMarshaller->TextLayout->GetScale();
+		ShaderMultiLineEditableTextLayout->SetScrollOffset({ X,Y }, ShaderMultiLineEditableText->GetTickSpaceGeometry());
 		ShaderMultiLineEditableTextLayout->Tick(ShaderMultiLineEditableText->GetTickSpaceGeometry(), 0, 0);
 
 		EffectMultiLineEditableText->SetFont(CodeFontInfo);
@@ -323,18 +326,32 @@ constexpr int PaddingLineNum = 22;
 		return TokenStyleMap;
 	}
 
+	static TMap<ShaderTokenType, FTextBlockStyle> DimTokenStyleMap;
+
+	void SShaderEditorBox::RefreshDimTokenStyleMap()
+	{
+		for (ShaderTokenType Type : magic_enum::enum_values<ShaderTokenType>())
+		{
+			FTextBlockStyle Style = FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>(GetTokenStyleName(Type));
+			FLinearColor BaseColor = Style.ColorAndOpacity.GetSpecifiedColor();
+			if (FTextBlockStyle* ExistingStyle = DimTokenStyleMap.Find(Type))
+			{
+				ExistingStyle->SetColorAndOpacity(BaseColor.CopyWithNewOpacity(0.4f));
+			}
+			else
+			{
+				Style.SetColorAndOpacity(BaseColor.CopyWithNewOpacity(0.4f));
+				DimTokenStyleMap.Add(Type, MoveTemp(Style));
+			}
+		}
+	}
+
 	TMap<ShaderTokenType, FTextBlockStyle>& SShaderEditorBox::GetDimTokenStyleMap()
 	{
-		static TMap<ShaderTokenType, FTextBlockStyle> DimTokenStyleMap = []() {
-			TMap<ShaderTokenType, FTextBlockStyle> Map;
-			for (ShaderTokenType Type : magic_enum::enum_values<ShaderTokenType>())
-			{
-				FTextBlockStyle Style = FShaderHelperStyle::Get().GetWidgetStyle<FTextBlockStyle>(GetTokenStyleName(Type));
-				Style.SetColorAndOpacity(Style.ColorAndOpacity.GetSpecifiedColor().CopyWithNewOpacity(0.4f));
-				Map.Add(Type, MoveTemp(Style));
-			}
-			return Map;
-		}();
+		if (DimTokenStyleMap.IsEmpty())
+		{
+			RefreshDimTokenStyleMap();
+		}
 		return DimTokenStyleMap;
 	}
 
@@ -1764,16 +1781,18 @@ constexpr int PaddingLineNum = 22;
 		TArray<Vector2u> InactiveLineRange = SyntaxTUCopy->GetInactiveRegions();
 		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
 		
-		auto IsLineInactive = [&InactiveLineRange, ExtraLineNum](int32 LineIndex) -> bool {
+		// Returns the index of the inactive region the line is in, or INDEX_NONE if not inactive
+		auto GetInactiveRegionIndex = [&InactiveLineRange, ExtraLineNum](int32 LineIndex) -> int32 {
 			int32 LineNumber = LineIndex + 1 + ExtraLineNum;
-			for (const Vector2u& Range : InactiveLineRange)
+			for (int32 i = 0; i < InactiveLineRange.Num(); i++)
 			{
+				const Vector2u& Range = InactiveLineRange[i];
 				if (LineNumber >= (int32)Range.x && LineNumber <= (int32)Range.y)
 				{
-					return true;
+					return i;
 				}
 			}
-			return false;
+			return INDEX_NONE;
 		};
 		
 		for(int LineIndex = 0; LineIndex < LineSyntaxHighlightMapsCopy.Num(); LineIndex++)
@@ -1781,7 +1800,7 @@ constexpr int PaddingLineNum = 22;
 			auto& SyntaxHighlightMap = LineSyntaxHighlightMapsCopy[LineIndex];
 			auto& LineModel =  ShaderMarshaller->TextLayout->GetLineModels()[LineIndex];
 			
-			bool bIsInactive = IsLineInactive(LineIndex);
+			bool bIsInactive = GetInactiveRegionIndex(LineIndex) != INDEX_NONE;
 			
 			for (const auto& [TokenRange, TokenType] : SyntaxHighlightMap)
 			{
@@ -1795,6 +1814,86 @@ constexpr int PaddingLineNum = 22;
 				}
 			}
 
+		}
+		
+		//Build BracketGroups and FoldingBraceGroups, skipping brackets where one side is in a different inactive region than the other
+		{
+			auto& LineModels = ShaderMarshaller->TextLayout->GetLineModels();
+			
+			struct BracketStackData
+			{
+				int32 LineIndex{};
+				int32 InactiveRegionIndex{};  // INDEX_NONE if not in inactive region
+				ShaderTokenizer::Bracket Bracket;
+			};
+			TArray<ShaderTokenizer::BracketGroup> BraceGroups, ParenGroups;
+			TArray<BracketStackData> OpenBraceStack, OpenParenStack;
+			
+			for (int32 LineIndex = 0; LineIndex < LineModels.Num(); LineIndex++)
+			{
+				ShaderTokenizer::TokenizedLine* TokenizedLine = static_cast<ShaderTokenizer::TokenizedLine*>(LineModels[LineIndex].CustomData.Get());
+				if (!TokenizedLine)
+				{
+					continue;
+				}
+				
+				int32 CurrentInactiveRegionIndex = GetInactiveRegionIndex(LineIndex);
+				
+				for (const ShaderTokenizer::Bracket& Brace : TokenizedLine->Braces)
+				{
+					if (Brace.Type == ShaderTokenizer::SideType::Open)
+					{
+						OpenBraceStack.Emplace(LineIndex, CurrentInactiveRegionIndex, Brace);
+					}
+					else
+					{
+						if (!OpenBraceStack.IsEmpty())
+						{
+							auto OpenBraceData = OpenBraceStack.Pop();
+							// Skip if not in the same inactive region (both must be in same region or both not inactive)
+							if (OpenBraceData.InactiveRegionIndex != CurrentInactiveRegionIndex)
+							{
+								continue;
+							}
+							BraceGroups.Emplace(OpenBraceData.LineIndex, OpenBraceData.Bracket, LineIndex, Brace);
+						}
+					}
+				}
+				
+				for (const ShaderTokenizer::Bracket& Paren : TokenizedLine->Parens)
+				{
+					if (Paren.Type == ShaderTokenizer::SideType::Open)
+					{
+						OpenParenStack.Emplace(LineIndex, CurrentInactiveRegionIndex, Paren);
+					}
+					else
+					{
+						if (!OpenParenStack.IsEmpty())
+						{
+							auto OpenParenData = OpenParenStack.Pop();
+							// Skip if not in the same inactive region (both must be in same region or both not inactive)
+							if (OpenParenData.InactiveRegionIndex != CurrentInactiveRegionIndex)
+							{
+								continue;
+							}
+							ParenGroups.Emplace(OpenParenData.LineIndex, OpenParenData.Bracket, LineIndex, Paren);
+						}
+					}
+				}
+			}
+			
+			ShaderMarshaller->BracketGroups.Empty();
+			ShaderMarshaller->BracketGroups.Append(BraceGroups);
+			ShaderMarshaller->BracketGroups.Append(ParenGroups);
+			
+			ShaderMarshaller->FoldingBraceGroups.Empty();
+			for (const auto& BraceGroup : BraceGroups)
+			{
+				if (BraceGroup.OpenLineIndex != BraceGroup.CloseLineIndex && !ShaderMarshaller->FoldingBraceGroups.Contains(BraceGroup.OpenLineIndex))
+				{
+					ShaderMarshaller->FoldingBraceGroups.Add(BraceGroup.OpenLineIndex, BraceGroup);
+				}
+			}
 		}
 		
 		GetPrivate_FTextLayout_DirtyFlags(*ShaderMarshaller->TextLayout) |= (1 << 0);
@@ -3505,59 +3604,6 @@ constexpr int PaddingLineNum = 22;
 		OwnerWidget->bRefreshSyntax.store(false, std::memory_order_relaxed);
 		OwnerWidget->SyntaxQueue.Enqueue(MoveTemp(Task));
 		OwnerWidget->SyntaxEvent->Trigger();
-
-		struct BracketStackData
-		{
-			int32 LineIndex{};
-			ShaderTokenizer::Bracket Bracket;
-		};
-        TArray<ShaderTokenizer::BracketGroup> BraceGroups, ParenGroups;
-		TArray<BracketStackData> OpenBraceStack, OpenParenStack;
-        for(int32 LineIndex = 0; LineIndex < LineModels.Num(); LineIndex++)
-        {
-			ShaderTokenizer::TokenizedLine* TokenizedLine = static_cast<ShaderTokenizer::TokenizedLine*>(LineModels[LineIndex].CustomData.Get());
-            for(const ShaderTokenizer::Bracket& Brace : TokenizedLine->Braces)
-            {
-                if(Brace.Type == ShaderTokenizer::SideType::Open)
-                {
-                    OpenBraceStack.Emplace(LineIndex, Brace);
-                }
-				else
-				{
-					if(!OpenBraceStack.IsEmpty())
-					{
-						auto OpenBraceData = OpenBraceStack.Pop();
-						BraceGroups.Emplace(OpenBraceData.LineIndex, OpenBraceData.Bracket, LineIndex, Brace);
-					}
-				}
-            }
-			for(const ShaderTokenizer::Bracket& Paren : TokenizedLine->Parens)
-			{
-				if(Paren.Type == ShaderTokenizer::SideType::Open)
-				{
-					OpenParenStack.Emplace(LineIndex, Paren);
-				}
-				else
-				{
-					if (!OpenParenStack.IsEmpty())
-					{
-						auto OpenParenData = OpenParenStack.Pop();
-						ParenGroups.Emplace(OpenParenData.LineIndex, OpenParenData.Bracket, LineIndex, Paren);
-					}
-				}
-			}
-        }
-		BracketGroups.Empty();
-		BracketGroups.Append(BraceGroups);
-		BracketGroups.Append(ParenGroups);
-
-        FoldingBraceGroups.Empty();
-        for (const auto& BraceGroup : BraceGroups)
-        {
-            if (BraceGroup.OpenLineIndex != BraceGroup.CloseLineIndex && !FoldingBraceGroups.Contains(BraceGroup.OpenLineIndex)) {
-                FoldingBraceGroups.Add(BraceGroup.OpenLineIndex, BraceGroup);
-            }
-        }
 		
         if(EditableTextLayout && EditableTextLayout->CurrentUndoLevel >= 0)
         {

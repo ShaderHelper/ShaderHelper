@@ -343,9 +343,10 @@ namespace FW
 
 	void SpvDebuggerVisitor::Visit(const SpvOpBranchConditional* Inst)
 	{
-		if (Language == GpuShaderLanguage::HLSL)
+		SpvInstruction* PrevInst = (*Insts)[InstIndex - 1].Get();
+		if (dynamic_cast<SpvOpLoopMerge*>(PrevInst) || dynamic_cast<SpvOpSelectionMerge*>(PrevInst))
 		{
-			AppendTag([&] { return (*Insts)[InstIndex - 1]->GetWordOffset().value(); }, SpvDebuggerStateType::Condition);
+			AppendTag([&] { return PrevInst->GetWordOffset().value(); }, SpvDebuggerStateType::Condition);
 		}
 		else
 		{
@@ -638,7 +639,7 @@ namespace FW
 			ParamterTypes.Add(UIntType);
 			ParamterTypes.Add(UIntType);
 			ParamterTypes.Add(UIntType);
-			if (IndexNum > 0)
+			for (int32 i = 0; i < IndexNum; i++)
 			{
 				ParamterTypes.Add(IntType);
 			}
@@ -685,10 +686,10 @@ namespace FW
 			PatchToDebugger(StateTypeParam, UIntType, AppendAccessFuncInsts);
 			PatchToDebugger(LineParam, UIntType, AppendAccessFuncInsts);
 			PatchToDebugger(VarIdParam, UIntType, AppendAccessFuncInsts);
-			PatchToDebugger(Patcher.FindOrAddConstant(IndexNum), UIntType, AppendAccessFuncInsts);
+			PatchToDebugger(Patcher.FindOrAddConstant((uint32)IndexNum), UIntType, AppendAccessFuncInsts);
 			for (int32 i = 0; i < IndexNum; i++)
 			{
-				PatchToDebugger(IndexParams[i], UIntType, AppendAccessFuncInsts);
+				PatchToDebugger(IndexParams[i], IntType, AppendAccessFuncInsts);
 			}
 
 			AppendAccessFuncInsts.Add(MakeUnique<SpvOpReturn>());
@@ -960,7 +961,7 @@ namespace FW
 			PatchToDebugger(StateTypeParam, UIntType, AppendVarFuncInsts);
 			PatchToDebugger(LineParam, UIntType, AppendVarFuncInsts);
 			PatchToDebugger(VarIdParam, UIntType, AppendVarFuncInsts);
-			PatchToDebugger(Patcher.FindOrAddConstant(IndexNum), UIntType, AppendVarFuncInsts);
+			PatchToDebugger(Patcher.FindOrAddConstant((uint32)IndexNum), UIntType, AppendVarFuncInsts);
 			if (IndexNum > 0)
 			{
 				PatchToDebugger(IndexArrParam, ArrType, AppendVarFuncInsts);
@@ -1222,7 +1223,7 @@ namespace FW
 		Patcher.AddDebugName(MakeUnique<SpvOpName>(AppendCallFuncId, "_AppendCall_"));
 		TArray<TUniquePtr<SpvInstruction>> AppendCallFuncInsts;
 		{
-			SpvId FuncType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFunction>(VoidType, TArray<SpvId>{ UIntType, UIntType }));
+			SpvId FuncType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFunction>(VoidType, TArray<SpvId>{ UIntType, UIntType, UIntType }));
 			auto FuncOp = MakeUnique<SpvOpFunction>(VoidType, SpvFunctionControl::None, FuncType);
 			FuncOp->SetId(AppendCallFuncId);
 			AppendCallFuncInsts.Add(MoveTemp(FuncOp));

@@ -182,6 +182,7 @@ namespace SH
 		
 		static TMap<FW::ShaderTokenType, FTextBlockStyle>& GetTokenStyleMap();
 		static TMap<FW::ShaderTokenType, FTextBlockStyle>& GetDimTokenStyleMap();
+		static void RefreshDimTokenStyleMap();
 		static FString GetFontPath();
 		static int32 GetFontSize();
 		static int32 GetTabSize();

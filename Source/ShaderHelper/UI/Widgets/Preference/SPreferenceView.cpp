@@ -570,6 +570,7 @@ namespace SH
 				.OnColorChanged_Lambda([&](const FLinearColor& InColor) {
 					FLinearColor& Color = const_cast<FLinearColor&>(USlateThemeManager::Get().GetColor(StyleColor));
 					Color = InColor;
+					SShaderEditorBox::RefreshDimTokenStyleMap();
 				})
 			];
 		}
@@ -596,6 +597,7 @@ namespace SH
 						.OptionsSource(&Themes)
 						.OnSelectionChanged_Lambda([this](TSharedPtr<FGuid> InItem, ESelectInfo::Type) {
 							Editor::SetTheme(*InItem);
+							SShaderEditorBox::RefreshDimTokenStyleMap();
 						})
 						.OnGenerateWidget_Lambda([this](TSharedPtr<FGuid> InItem) {
 							FText ThemeName = Editor::GetTheme(*InItem).DisplayName;
@@ -663,6 +665,7 @@ namespace SH
 								IFileManager::Get().Delete(*CurTheme.Filename);
 								USlateThemeManager::Get().RemoveTheme(CurTheme.Id);
 								USlateThemeManager::Get().ApplyTheme(Editor::GetDefaultTheme().Id);
+								SShaderEditorBox::RefreshDimTokenStyleMap();
 								IsNaming = false;
 								return FReply::Handled();
 							})
@@ -684,6 +687,7 @@ namespace SH
 							{
 								USlateThemeManager::Get().ResetActiveColorToDefault(StyleColor);
 							}
+							SShaderEditorBox::RefreshDimTokenStyleMap();
 							return FReply::Handled();
 						})
 					]
