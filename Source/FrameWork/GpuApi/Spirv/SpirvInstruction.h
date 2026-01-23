@@ -137,6 +137,7 @@ namespace FW
 		virtual void Visit(const class SpvDebugCompilationUnit* Inst) {}
 		virtual void Visit(const class SpvDebugLexicalBlock* Inst) {}
 		virtual void Visit(const class SpvDebugFunction* Inst) {}
+		virtual void Visit(const class SpvDebugSource* Inst) {}
 		virtual void Visit(const class SpvDebugLine* Inst) {}
 		virtual void Visit(const class SpvDebugScope* Inst) {}
 		virtual void Visit(const class SpvDebugDeclare* Inst) {}
@@ -2400,16 +2401,31 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 		std::optional<SpvId> Inlined;
 	};
 
+	class SpvDebugSource : public SpvInstructionBase<SpvDebugSource>
+	{
+	public:
+		SpvDebugSource(SpvId InFile) : SpvInstructionBase(SpvDebugInfo100::DebugSource)
+		, File(InFile)
+		{}
+		
+		SpvId GetFile() const { return File; }
+		
+	private:
+		SpvId File;
+	};
+
 	class SpvDebugLine : public SpvInstructionBase<SpvDebugLine>
 	{
 	public:
-		SpvDebugLine(SpvId InLineStart) : SpvInstructionBase(SpvDebugInfo100::DebugLine)
-		, LineStart(InLineStart)
+		SpvDebugLine(SpvId InSource, SpvId InLineStart) : SpvInstructionBase(SpvDebugInfo100::DebugLine)
+		, Source(InSource), LineStart(InLineStart)
 		{}
 		
+		SpvId GetSource() const { return Source; }
 		SpvId GetLineStart() const { return LineStart; }
 		
 	private:
+		SpvId Source;
 		SpvId LineStart;
 	};
 

@@ -25,8 +25,8 @@ namespace FW
 		{
 			uint8 AssertFlag = *((uint8*)Printer + ByteOffset);
 			ByteOffset += 1;
-			int LineNumber = *((uint8*)Printer + ByteOffset);
-			ByteOffset += 1;
+			int LineNumber = *((uint16*)((uint8*)Printer + ByteOffset));
+			ByteOffset += 2;
 			FString PrintStr{ (char*)Printer + ByteOffset };
 			
 			ByteOffset += PrintStr.Len() + 1;

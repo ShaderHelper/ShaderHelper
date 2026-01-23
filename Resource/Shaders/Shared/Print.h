@@ -51,10 +51,11 @@ namespace HLSL
     struct Printer
     {
         static const uint MaxBufferSize = 511;
+        static const uint MaxBufferByteSize = MaxBufferSize * 4;
 
         uint ByteSize;
-        //PrintBuffer layout: AssertFlag Line [xxx{0}xxxx\0] [ArgNum TypeTag ArgValue ...]
-        //Bytes:              ^1         ^1    ^CharNum       ^1     ^1      ^sizeof(ArgValue)
+        //PrintBuffer layout: AssertFlag Line   [xxx{0}xxxx\0] [ArgNum TypeTag ArgValue ...]
+        //Bytes:              ^1         ^2     ^CharNum       ^1     ^1      ^sizeof(ArgValue)
         uint PrintBuffer[MaxBufferSize];
     };
 
@@ -168,10 +169,10 @@ AppendArgFunc(bool)
         uint CharNum = sizeof(StrArr) / sizeof(StrArr[0]);              \
         uint ArgNum = GET_ARG_NUM(__VA_ARGS__);                         \
         uint ArgByteSize = 1 + ArgNum + GET_ARGS_SIZE(__VA_ARGS__);     \
-        uint Increment = 2 + CharNum + ArgByteSize;                     \
+        uint Increment = 3 + CharNum + ArgByteSize;                     \
         uint OldByteSize = Printer.Load(0);                             \
-        uint ByteOffset = 0xFFFFFFFF;                                   \
-        while(OldByteSize + Increment <= Printer::MaxBufferSize * 4)    \
+        uint ByteOffset = Printer::MaxBufferByteSize;                   \
+        while(OldByteSize + Increment <= Printer::MaxBufferByteSize)    \
         {                                                               \
             uint CompareValue = OldByteSize;                            \
             Printer.InterlockedCompareExchange(0,                       \
@@ -182,12 +183,13 @@ AppendArgFunc(bool)
                 break;                                                  \
             }                                                           \
         }                                                               \
-        if (ByteOffset == 0xFFFFFFFF)                                   \
+        if (ByteOffset >= Printer::MaxBufferByteSize)                   \
         {                                                               \
             break;                                                      \
         }                                                               \
         ByteOffset = AppendChar(ByteOffset, GPrivate_AssertResult);     \
-        ByteOffset = AppendChar(ByteOffset, __LINE__);                  \
+        ByteOffset = AppendChar(ByteOffset, __LINE__ & 0xFF);           \
+        ByteOffset = AppendChar(ByteOffset, (__LINE__ >> 8) & 0xFF);    \
         for (uint i = 0; i < CharNum; i++)                              \
         {                                                               \
             ByteOffset = AppendChar(ByteOffset, StrArr[i]);             \

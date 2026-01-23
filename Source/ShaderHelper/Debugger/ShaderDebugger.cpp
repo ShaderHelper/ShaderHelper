@@ -1582,6 +1582,8 @@ namespace SH
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset);
 				Offset += 4;
+				SpvId Source = *(SpvId*)(DebuggerData + Offset);
+				Offset += 4;
 				SpvId VarId = *(SpvId*)(DebuggerData + Offset);
 				Offset += 4;
 				int32 IndexNum = *(int32*)(DebuggerData + Offset);
@@ -1602,6 +1604,7 @@ namespace SH
 
 					auto NewDebugState = SpvDebugState_VarChange{
 						.Line = Line,
+						.Source = Source,
 						.Change = {
 							.VarId = VarId,
 							.PreDirtyValue = MoveTemp(PreDirtyValue),
@@ -1615,6 +1618,7 @@ namespace SH
 				{
 					auto NewDebugState = SpvDebugState_VarChange{
 						.Line = Line,
+						.Source = Source,
 						.Error = AccessOrError.GetError()
 					};
 					DebugStates.Add(MoveTemp(NewDebugState));
@@ -1640,12 +1644,15 @@ namespace SH
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset);
 				Offset += 4;
+				SpvId Source = *(SpvId*)(DebuggerData + Offset);
+				Offset += 4;
 				int32 ValueSize = *(int32*)(DebuggerData + Offset);
 				Offset += 4;
 				TArray<uint8> ReturnValue = { DebuggerData + Offset, ValueSize };
 				Offset += ReturnValue.Num();
 				DebugStates.Add(SpvDebugState_ReturnValue{
 					.Line = Line,
+					.Source = Source,
 					.Value = MoveTemp(ReturnValue)
 				});
 				break;
@@ -1653,11 +1660,13 @@ namespace SH
 			case SpvDebuggerStateType::Access:
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId VarId = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 IndexNum = *(int32*)(DebuggerData + Offset); Offset += 4;
 				TArray<int32> Indexes = { (int32*)(DebuggerData + Offset), IndexNum }; Offset += IndexNum * 4;
 				DebugStates.Add(SpvDebugState_Access{
 					.Line = Line,
+					.Source = Source,
 					.VarId = VarId,
 					.Indexes = MoveTemp(Indexes)
 				});
@@ -1666,11 +1675,13 @@ namespace SH
 			case SpvDebuggerStateType::Normalize:
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
 				DebugStates.Add(SpvDebugState_Normalize{
 					.Line = Line,
+					.Source = Source,
 					.ResultType = ResultType,
 					.X = MoveTemp(X)
 				});
@@ -1679,12 +1690,14 @@ namespace SH
 			case SpvDebuggerStateType::SmoothStep:
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> Edge0 = { DebuggerData + Offset, Size }; Offset += Edge0.Num();
 				TArray<uint8> Edge1 = { DebuggerData + Offset, Size }; Offset += Edge1.Num();
 				DebugStates.Add(SpvDebugState_SmoothStep{
 					.Line = Line,
+					.Source = Source,
 					.ResultType = ResultType,
 					.Edge0 = MoveTemp(Edge0),
 					.Edge1 = MoveTemp(Edge1)
@@ -1694,12 +1707,14 @@ namespace SH
 			case SpvDebuggerStateType::Pow:
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
 				TArray<uint8> Y = { DebuggerData + Offset, Size }; Offset += Y.Num();
 				DebugStates.Add(SpvDebugState_Pow{
 					.Line = Line,
+					.Source = Source,
 					.ResultType = ResultType,
 					.X = MoveTemp(X),
 					.Y = MoveTemp(Y)
@@ -1709,12 +1724,14 @@ namespace SH
 			case SpvDebuggerStateType::Clamp:
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> MinVal = { DebuggerData + Offset, Size }; Offset += MinVal.Num();
 				TArray<uint8> MaxVal = { DebuggerData + Offset, Size }; Offset += MaxVal.Num();
 				DebugStates.Add(SpvDebugState_Clamp{
 					.Line = Line,
+					.Source = Source,
 					.ResultType = ResultType,
 					.MinVal = MoveTemp(MinVal),
 					.MaxVal = MoveTemp(MaxVal)
@@ -1724,11 +1741,13 @@ namespace SH
 			case SpvDebuggerStateType::Div:
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> Operand2 = { DebuggerData + Offset, Size }; Offset += Operand2.Num();
 				DebugStates.Add(SpvDebugState_Div{
 					.Line = Line,
+					.Source = Source,
 					.ResultType = ResultType,
 					.Operand2 = MoveTemp(Operand2),
 				});
@@ -1737,11 +1756,13 @@ namespace SH
 			case SpvDebuggerStateType::ConvertF:
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> FloatValue = { DebuggerData + Offset, Size }; Offset += FloatValue.Num();
 				DebugStates.Add(SpvDebugState_ConvertF{
 					.Line = Line,
+					.Source = Source,
 					.ResultType = ResultType,
 					.FloatValue = MoveTemp(FloatValue),
 				});
@@ -1750,12 +1771,14 @@ namespace SH
 			case SpvDebuggerStateType::Remainder:
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> Operand1 = { DebuggerData + Offset, Size }; Offset += Operand1.Num();
 				TArray<uint8> Operand2 = { DebuggerData + Offset, Size }; Offset += Operand2.Num();
 				DebugStates.Add(SpvDebugState_Remainder{
 					.Line = Line,
+					.Source = Source,
 					.ResultType = ResultType,
 					.Operand1 = MoveTemp(Operand1),
 					.Operand2 = MoveTemp(Operand2)
@@ -1765,11 +1788,13 @@ namespace SH
 			case SpvDebuggerStateType::Log:
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
 				DebugStates.Add(SpvDebugState_Log{
 					.Line = Line,
+					.Source = Source,
 					.ResultType = ResultType,
 					.X = MoveTemp(X)
 				});
@@ -1778,11 +1803,13 @@ namespace SH
 			case SpvDebuggerStateType::Asin:
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
 				DebugStates.Add(SpvDebugState_Asin{
 					.Line = Line,
+					.Source = Source,
 					.ResultType = ResultType,
 					.X = MoveTemp(X)
 				});
@@ -1791,11 +1818,13 @@ namespace SH
 			case SpvDebuggerStateType::Acos:
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
 				DebugStates.Add(SpvDebugState_Acos{
 					.Line = Line,
+					.Source = Source,
 					.ResultType = ResultType,
 					.X = MoveTemp(X)
 				});
@@ -1804,11 +1833,13 @@ namespace SH
 			case SpvDebuggerStateType::Sqrt:
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
 				DebugStates.Add(SpvDebugState_Sqrt{
 					.Line = Line,
+					.Source = Source,
 					.ResultType = ResultType,
 					.X = MoveTemp(X)
 				});
@@ -1817,11 +1848,13 @@ namespace SH
 			case SpvDebuggerStateType::InverseSqrt:
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
 				DebugStates.Add(SpvDebugState_InverseSqrt{
 					.Line = Line,
+					.Source = Source,
 					.ResultType = ResultType,
 					.X = MoveTemp(X)
 				});
@@ -1830,12 +1863,14 @@ namespace SH
 			case SpvDebuggerStateType::Atan2:
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
+				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> Y = { DebuggerData + Offset, Size }; Offset += Y.Num();
 				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
 				DebugStates.Add(SpvDebugState_Atan2{
 					.Line = Line,
+					.Source = Source,
 					.ResultType = ResultType,
 					.Y = MoveTemp(Y),
 					.X = MoveTemp(X)
@@ -1846,8 +1881,11 @@ namespace SH
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset);
 				Offset += 4;
+				SpvId Source = *(SpvId*)(DebuggerData + Offset);
+				Offset += 4;
 				DebugStates.Add(SpvDebugState_Tag{
 					.Line = Line,
+					.Source = Source,
 					.bCondition = true,
 				});
 				break;
@@ -1855,9 +1893,11 @@ namespace SH
 			case SpvDebuggerStateType::FuncCall:
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset);  Offset += 4;
+				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId CallId = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				DebugStates.Add(SpvDebugState_FuncCall{
 					.Line = Line,
+					.Source = Source,
 					.CallId = CallId,
 				});
 				break;
@@ -1866,8 +1906,11 @@ namespace SH
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset);
 				Offset += 4;
+				SpvId Source = *(SpvId*)(DebuggerData + Offset);
+				Offset += 4;
 				DebugStates.Add(SpvDebugState_Tag{
 					.Line = Line,
+					.Source = Source,
 					.bFuncCallAfterReturn = true,
 				});
 				break;
@@ -1876,8 +1919,11 @@ namespace SH
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset);
 				Offset += 4;
+				SpvId Source = *(SpvId*)(DebuggerData + Offset);
+				Offset += 4;
 				DebugStates.Add(SpvDebugState_Tag{
 					.Line = Line,
+					.Source = Source,
 					.bReturn = true,
 				});
 				break;
@@ -1886,8 +1932,11 @@ namespace SH
 			{
 				int32 Line = *(int32*)(DebuggerData + Offset);
 				Offset += 4;
+				SpvId Source = *(SpvId*)(DebuggerData + Offset);
+				Offset += 4;
 				DebugStates.Add(SpvDebugState_Tag{
 					.Line = Line,
+					.Source = Source,
 					.bKill = true,
 				});
 				break;

@@ -407,6 +407,12 @@ namespace FW
 		Context.LexicalScopes.emplace(ResultId, MakeUnique<SpvCompilationUnit>(ResultId));
 	}
 
+	void SpvMetaVisitor::Visit(const SpvDebugSource* Inst)
+	{
+		SpvId ResultId = Inst->GetId().value();
+		Context.DebugSources.emplace(ResultId, Inst->GetFile());
+	}
+
 	void SpvMetaVisitor::Visit(const SpvDebugLexicalBlock* Inst)
 	{
 		SpvId ResultId = Inst->GetId().value();
@@ -1619,10 +1625,17 @@ namespace FW
 						DecodedInst = MakeUnique<SpvDebugFunctionDefinition>(Function, Definition);
 						DecodedInst->SetId(ResultId);
 					}
+					else if(ExtOp == SpvDebugInfo100::DebugSource)
+					{
+						SpvId File = SpvCode[WordOffset + 5];
+						DecodedInst = MakeUnique<SpvDebugSource>(File);
+						DecodedInst->SetId(ResultId);
+					}
 					else if(ExtOp == SpvDebugInfo100::DebugLine)
 					{
+						SpvId Source = SpvCode[WordOffset + 5];
 						SpvId LineStart = SpvCode[WordOffset + 6];
-						DecodedInst = MakeUnique<SpvDebugLine>(LineStart);
+						DecodedInst = MakeUnique<SpvDebugLine>(Source, LineStart);
 						DecodedInst->SetId(ResultId);
 					}
 					else if(ExtOp == SpvDebugInfo100::DebugDeclare)

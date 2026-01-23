@@ -13,6 +13,7 @@ namespace FW
 		//which may ivalidate references to existing elements upon insertion.
 		//Therefore, we replace it with std::unordered_map
 		std::unordered_map<SpvId, FString> DebugStrs;
+		std::unordered_map<SpvId, SpvId> DebugSources; //DebugSourceId -> FileOpStringId
 		std::unordered_map<SpvId, FString> Names; //VarId/TypeId etc. -> Name
 		std::unordered_map<SpvId, TUniquePtr<SpvType>> Types;
 		std::unordered_map<SpvId, SpvObject> Constants;
@@ -31,6 +32,20 @@ namespace FW
 				if (Desc.Get() == InDesc)
 				{
 					return Id;
+				}
+			}
+			return {};
+		}
+
+		FString GetSourceFileName(SpvId DebugSourceId) const
+		{
+			auto SourceIt = DebugSources.find(DebugSourceId);
+			if (SourceIt != DebugSources.end())
+			{
+				auto StrIt = DebugStrs.find(SourceIt->second);
+				if (StrIt != DebugStrs.end())
+				{
+					return StrIt->second;
 				}
 			}
 			return {};
@@ -85,6 +100,7 @@ namespace FW
 		void Visit(const SpvDebugTypeTemplate* Inst) override;
 		void Visit(const SpvDebugTypeFunction* Inst) override;
 		void Visit(const SpvDebugCompilationUnit* Inst) override;
+		void Visit(const SpvDebugSource* Inst) override;
 		void Visit(const SpvDebugLexicalBlock* Inst) override;
 		void Visit(const SpvDebugFunction* Inst) override;
 		void Visit(const SpvDebugInlinedAt* Inst) override;

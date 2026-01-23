@@ -58,6 +58,7 @@ namespace FW
 	struct SpvDebugState_VarChange
 	{
 		int32 Line{};
+		SpvId Source{};
 		SpvVarChange Change;
 		FString Error;
 	};
@@ -70,18 +71,21 @@ namespace FW
 	struct SpvDebugState_ReturnValue
 	{
 		int32 Line{};
+		SpvId Source{};
 		TArray<uint8> Value;
 	};
 
 	struct SpvDebugState_FuncCall
 	{
 		int32 Line{};
+		SpvId Source{};
 		SpvId CallId;
 	};
 
 	struct SpvDebugState_Tag
 	{
 		int32 Line{};
+		SpvId Source{};
 		bool bFuncCallAfterReturn : 1 {};
 		bool bReturn : 1 {};
 		bool bCondition : 1 {};
@@ -92,18 +96,21 @@ namespace FW
 	struct SpvDebugState_Access
 	{
 		int32 Line{};
+		SpvId Source{};
 		SpvId VarId;
 		TArray<int32> Indexes;
 	};
 	struct SpvDebugState_Normalize
 	{
 		int32 Line{};
+		SpvId Source{};
 		SpvId ResultType;
 		TArray<uint8> X;
 	};
 	struct SpvDebugState_SmoothStep
 	{
 		int32 Line{};
+		SpvId Source{};
 		SpvId ResultType;
 		TArray<uint8> Edge0;
 		TArray<uint8> Edge1;
@@ -111,6 +118,7 @@ namespace FW
 	struct SpvDebugState_Pow
 	{
 		int32 Line{};
+		SpvId Source{};
 		SpvId ResultType;
 		TArray<uint8> X;
 		TArray<uint8> Y;
@@ -118,6 +126,7 @@ namespace FW
 	struct SpvDebugState_Clamp
 	{
 		int32 Line{};
+		SpvId Source{};
 		SpvId ResultType;
 		TArray<uint8> MinVal;
 		TArray<uint8> MaxVal;
@@ -125,18 +134,21 @@ namespace FW
 	struct SpvDebugState_Div
 	{
 		int32 Line{};
+		SpvId Source{};
 		SpvId ResultType;
 		TArray<uint8> Operand2;
 	};
 	struct SpvDebugState_ConvertF
 	{
 		int32 Line{};
+		SpvId Source{};
 		SpvId ResultType;
 		TArray<uint8> FloatValue;
 	};
 	struct SpvDebugState_Remainder
 	{
 		int32 Line{};
+		SpvId Source{};
 		SpvId ResultType;
 		TArray<uint8> Operand1;
 		TArray<uint8> Operand2;
@@ -144,36 +156,42 @@ namespace FW
 	struct SpvDebugState_Log
 	{
 		int32 Line{};
+		SpvId Source{};
 		SpvId ResultType;
 		TArray<uint8> X;
 	};
 	struct SpvDebugState_Asin
 	{
 		int32 Line{};
+		SpvId Source{};
 		SpvId ResultType;
 		TArray<uint8> X;
 	};
 	struct SpvDebugState_Acos
 	{
 		int32 Line{};
+		SpvId Source{};
 		SpvId ResultType;
 		TArray<uint8> X;
 	};
 	struct SpvDebugState_Sqrt
 	{
 		int32 Line{};
+		SpvId Source{};
 		SpvId ResultType;
 		TArray<uint8> X;
 	};
 	struct SpvDebugState_InverseSqrt
 	{
 		int32 Line{};
+		SpvId Source{};
 		SpvId ResultType;
 		TArray<uint8> X;
 	};
 	struct SpvDebugState_Atan2
 	{
 		int32 Line{};
+		SpvId Source{};
 		SpvId ResultType;
 		TArray<uint8> Y;
 		TArray<uint8> X;
@@ -338,6 +356,7 @@ namespace FW
 		SpvLexicalScope* CurScope = nullptr;
 		SpvBasicBlock* CurBlock = nullptr;
 		int32 CurLine{};
+		SpvId CurSource{};
 		SpvFunc* CurFunc{};
 
 		bool EnableUbsan;
