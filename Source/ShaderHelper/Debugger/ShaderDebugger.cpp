@@ -8,6 +8,8 @@
 
 using namespace FW;
 
+#define SPIRV_CROSS_DEBUGGER 1
+
 namespace SH
 {
 	TArray<ExpressionNodePtr> AppendChildNodes(GpuShaderLanguage Lang, SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, const TArray<SpvVarDirtyRange>& DirtyRanges, const TArray<uint8>& Value, int32 InOffset)
@@ -1219,7 +1221,9 @@ namespace SH
 		TArray<FString> ExtraArgs;
 		ExtraArgs.Add("-D");
 		ExtraArgs.Add("ENABLE_PRINT=0");
+#if SPIRV_CROSS_DEBUGGER
 		ExtraArgs.Add("-ignore-validation-error");
+#endif
 
 		FString ErrorInfo, WarnInfo;
 		if (!GGpuRhi->CompileShader(DebugShader, ErrorInfo, WarnInfo, ExtraArgs))
@@ -1304,22 +1308,27 @@ namespace SH
 
 		auto PixelDebuggerContext = MakeUnique<SpvPixelDebuggerContext>(PixelCoord, SpvBindings);
 
+#if SPIRV_CROSS_DEBUGGER
 		ShaderConductor::Compiler::TargetDesc TargetDesc{};
 		ShaderConductor::Compiler::Options Options{};
 		Options.force_zero_initialized_variables = true;
+#endif
 		FString FileExtension;
-		FString EntryPoint = DebugShader->GetEntryPoint();
 		if (Lang == GpuShaderLanguage::HLSL)
 		{
+#if SPIRV_CROSS_DEBUGGER
 			TargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
 			TargetDesc.version = "66";
+#endif
 			FileExtension = TEXT(".hlsl");
 		}
 		else
 		{
+#if SPIRV_CROSS_DEBUGGER
 			Options.vulkanSemantics = true;
 			TargetDesc.language = ShaderConductor::ShadingLanguage::Glsl;
 			TargetDesc.version = "450";
+#endif
 			FileExtension = TEXT(".glsl");
 		}
 
@@ -1343,6 +1352,8 @@ namespace SH
 			PatchedSpv = DebuggerVisitor.GetPatcher().GetSpv();
 		}
 		
+#if SPIRV_CROSS_DEBUGGER
+		FString EntryPoint = DebugShader->GetEntryPoint();
 		auto EntryPointUTF8 = StringCast<UTF8CHAR>(*EntryPoint);
 		FString PatchedSource;
 		ON_SCOPE_EXIT
@@ -1372,9 +1383,11 @@ namespace SH
 			PatchedSource = ErrorInfo;
 			throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
 		}
+#endif
 		
 		CurDebugStateIndex = 0;
 		DebuggerContext = MoveTemp(PixelDebuggerContext);
+#if SPIRV_CROSS_DEBUGGER
 		TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
 			.Name = DebugShader->GetShaderName(),
 			.Source = PatchedSource,
@@ -1386,11 +1399,24 @@ namespace SH
 		{
 			throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
 		}
+#else
+		DebugShader->SpvCode = MoveTemp(PatchedSpv);
+		DebugShader->CompilerFlag = GpuShaderCompilerFlag::CompileFromSpriv;
+		if (!GGpuRhi->CompileShader(DebugShader, ErrorInfo, WarnInfo, ExtraArgs))
+		{
+			throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
+		}
+#endif
+		
 
 		GpuRenderPipelineStateDesc PatchedPipelineDesc{
 			.CheckLayout = true,
 			.Vs = PsInvocation.PipelineDesc.Vs,
+#if SPIRV_CROSS_DEBUGGER
 			.Ps = PatchedShader,
+#else
+			.Ps = DebugShader,
+#endif
 			.RasterizerState = PsInvocation.PipelineDesc.RasterizerState,
 			.Primitive = PsInvocation.PipelineDesc.Primitive
 		};

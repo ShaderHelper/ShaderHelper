@@ -364,7 +364,7 @@ namespace FW
 		}
 	}
 
-	inline auto CompileGlsl(GpuShader* InShader, const TArray<FString>& ExtraArgs)
+	inline shaderc::SpvCompilationResult CompileGlsl(GpuShader* InShader, const TArray<FString>& ExtraArgs)
 	{
 		static shaderc::Compiler GlslCompiler;
 		shaderc::CompileOptions Options;

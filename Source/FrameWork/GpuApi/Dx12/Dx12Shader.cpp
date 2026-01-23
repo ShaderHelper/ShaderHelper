@@ -4,6 +4,12 @@
 #include "GpuApi/GpuFeature.h"
 #include "ShaderConductor.hpp"
 #include "GpuApi/GLSL.h"
+#include "nir_spirv.h"
+#include "nir_to_dxil.h"
+extern "C" {
+#include "dxil_spirv_nir.h"
+}
+#include "spirv_to_dxil.h"
 
 #include <Misc/FileHelper.h>
 #include <stdexcept>
@@ -152,20 +158,21 @@ namespace FW
 
 	DxcCompiler::DxcCompiler()
 	 {
-		 DxCheck(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(Compiler.GetInitReference())));
-		 DxCheck(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(CompilerUitls.GetInitReference())));
+		glsl_type_singleton_init_or_ref();
+		DxCheck(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(Compiler.GetInitReference())));
+		DxCheck(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(CompilerUitls.GetInitReference())));
 	 }
 
-	FString GetShaderProfile(ShaderType InType, GpuShaderModel InModel)
+	FString GetShaderProfile(ShaderType InStage, GpuShaderModel InModel)
 	{
 		FString ProfileName;
-		if (InType == ShaderType::VertexShader) {
+		if (InStage == ShaderType::VertexShader) {
 			ProfileName += "vs";
 		}
-		else if (InType == ShaderType::PixelShader) {
+		else if (InStage == ShaderType::PixelShader) {
 			ProfileName += "ps";
 		}
-		else if (InType == ShaderType::ComputeShader) {
+		else if (InStage == ShaderType::ComputeShader) {
 			ProfileName += "cs";
 		}
 
@@ -177,11 +184,171 @@ namespace FW
 		return ProfileName;
 	}
 
+	mesa_shader_stage MapMesaStage(ShaderType InStage)
+	{
+		switch (InStage)
+		{
+		case FW::ShaderType::VertexShader:         return MESA_SHADER_VERTEX;
+		case FW::ShaderType::PixelShader:          return MESA_SHADER_FRAGMENT;
+		case FW::ShaderType::ComputeShader:        return MESA_SHADER_COMPUTE;
+		default:
+			AUX::Unreachable();
+		}
+	}
+
+	static dxil_shader_model shader_model_d3d_to_dxil(D3D_SHADER_MODEL p_d3d_shader_model) {
+		static_assert(SHADER_MODEL_6_0 == 0x60000);
+		static_assert(SHADER_MODEL_6_3 == 0x60003);
+		static_assert(D3D_SHADER_MODEL_6_0 == 0x60);
+		static_assert(D3D_SHADER_MODEL_6_3 == 0x63);
+		return (dxil_shader_model)((p_d3d_shader_model >> 4) * 0x10000 + (p_d3d_shader_model & 0xf));
+	}
+
+	static IDxcValidator*
+		CreateDxcValidator(HMODULE dxil_mod)
+	{
+		DxcCreateInstanceProc dxil_create_func =
+			(DxcCreateInstanceProc)(void*)GetProcAddress(dxil_mod, "DxcCreateInstance");
+		if (!dxil_create_func) {
+			return NULL;
+		}
+
+		IDxcValidator* dxc_validator;
+		HRESULT hr = dxil_create_func(CLSID_DxcValidator,
+			IID_PPV_ARGS(&dxc_validator));
+		if (FAILED(hr)) {
+			return NULL;
+		}
+
+		return dxc_validator;
+	}
+
+	bool Validate(IDxcValidator* val, void* data, size_t size)
+	{
+		if (!val)
+			return false;
+
+		TRefCountPtr<IDxcBlobEncoding> BlobEncoding;
+		DxCheck(GShaderCompiler.CompilerUitls->CreateBlobFromPinned(data, size, CP_ACP, BlobEncoding.GetInitReference()));
+
+		TRefCountPtr<IDxcOperationResult> result;
+		val->Validate(BlobEncoding, DxcValidatorFlags_InPlaceEdit,
+			result.GetInitReference());
+
+		HRESULT hr;
+		result->GetStatus(&hr);
+
+		return SUCCEEDED(hr);
+	}
+
+	static bool ValidateDxil(struct blob* blob)
+	{
+		static HMODULE mod = LoadLibraryA("dxil.dll");
+		static IDxcValidator* val = CreateDxcValidator(mod);
+
+		bool res = Validate(val, blob->data,
+			blob->size);
+		return res;
+	}
+
+	static constexpr uint32_t REQUIRED_SHADER_MODEL = 0x62;
+
+	bool ConvertSpirvToNir(const TArray<uint32>& InSpv, ShaderType InStage, const char* InEnrtyPoint, nir_shader** OutNir)
+	{
+		nir_shader_compiler_options compiler_options = {};
+		const unsigned supported_bit_sizes = 16 | 32 | 64;
+		dxil_get_nir_compiler_options(&compiler_options, shader_model_d3d_to_dxil(D3D_SHADER_MODEL(REQUIRED_SHADER_MODEL)), supported_bit_sizes, supported_bit_sizes);
+		compiler_options.lower_base_vertex = false;
+
+		*OutNir = spirv_to_nir(InSpv.GetData(), InSpv.Num(),
+			nullptr, 0, MapMesaStage(InStage), InEnrtyPoint, dxil_spirv_nir_get_spirv_options(), &compiler_options);
+
+		if (!*OutNir) {
+			SH_LOG(LogShader, Error, TEXT("SPIR-V to NIR failed\n"));
+			return false;
+		}
+
+		dxil_spirv_runtime_conf conf = {};
+		conf.runtime_data_cbv.base_shader_register = 0;
+		conf.runtime_data_cbv.register_space = 31;
+		conf.push_constant_cbv.base_shader_register = 0;
+		conf.push_constant_cbv.register_space = 30;
+		conf.first_vertex_and_base_instance_mode = DXIL_SPIRV_SYSVAL_TYPE_ZERO;
+		conf.shader_model_max = shader_model_d3d_to_dxil(D3D_SHADER_MODEL(REQUIRED_SHADER_MODEL));
+
+		dxil_spirv_nir_prep(*OutNir);
+		dxil_spirv_metadata dxil_metadata = {};
+		dxil_spirv_nir_passes(*OutNir, &conf, &dxil_metadata);
+		return true;
+	}
+
+	bool ConvertNirToDxil(nir_shader* Nir, TArray<uint8>& OutDxil)
+	{
+		nir_to_dxil_options nir_to_dxil_options = {};
+		nir_to_dxil_options.environment = DXIL_ENVIRONMENT_VULKAN;
+		nir_to_dxil_options.shader_model_max = shader_model_d3d_to_dxil(D3D_SHADER_MODEL(REQUIRED_SHADER_MODEL));
+		nir_to_dxil_options.validator_version_max = NO_DXIL_VALIDATION;
+
+		dxil_logger logger = {};
+		logger.log = [](void* p_priv, const char* p_msg) {
+#if DEBUG_SHADER
+			SH_LOG(LogShader, Log, TEXT("DXIL Logger: %s"), UTF8_TO_TCHAR(p_msg));
+#endif
+		};
+
+		blob dxil_blob = {};
+		bool Success = nir_to_dxil(Nir, &nir_to_dxil_options, &logger, &dxil_blob);
+		ralloc_free(Nir);
+		if (!ValidateDxil(&dxil_blob))
+		{
+			SH_LOG(LogShader, Error, TEXT("Failed to validate DXIL\n"));
+			blob_finish(&dxil_blob);
+			return false;
+		}
+		OutDxil = { dxil_blob.data, (int)dxil_blob.size };
+		blob_finish(&dxil_blob);
+
+		return true;
+	}
+
+	bool ConvertSpirvToDxil(const TArray<uint32>& Spv, ShaderType InStage, const char* InEnrtyPoint, TArray<uint8>& OutDxil)
+	{
+		nir_shader* Nir = nullptr;
+		if (!ConvertSpirvToNir(Spv, InStage, InEnrtyPoint, &Nir))
+		{
+			return false;
+		}
+
+		if (!ConvertNirToDxil(Nir, OutDxil))
+		{
+			return false;
+		}
+		return true;
+	}
+
 	 bool DxcCompiler::Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs) const
 	 {
 		 FString ShaderName = InShader->GetShaderName();
 		 FString HlslSource;
 		 FString EntryPoint = InShader->GetEntryPoint();
+		 if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::CompileFromSpriv))
+		 {
+			 if (InShader->SpvCode.IsEmpty())
+			 {
+				 return false;
+			 }
+
+			 TArray<uint8> Dxil;
+			 if (!ConvertSpirvToDxil(InShader->SpvCode, InShader->GetShaderType(), TCHAR_TO_UTF8(*EntryPoint), Dxil))
+			 {
+				 return false;
+			 }
+			 IDxcBlobEncoding* ShaderBlob;
+			 DxCheck(CompilerUitls->CreateBlob(Dxil.GetData(), Dxil.Num(), CP_ACP, &ShaderBlob));
+			 InShader->SetCompilationResult(ShaderBlob);
+			 return true;
+		 }
+
 		 if (InShader->GetShaderLanguage() == GpuShaderLanguage::GLSL)
 		 {
 #if DEBUG_SHADER
@@ -190,19 +357,17 @@ namespace FW
 				 FFileHelper::SaveStringToFile(InShader->GetProcessedSourceText(), *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".glsl"));
 			 }
 #endif
-			 auto Result = CompileGlsl(InShader.GetReference(), ExtraArgs);
+			 shaderc::SpvCompilationResult Result = CompileGlsl(InShader.GetReference(), ExtraArgs);
 
 			 if(Result.GetCompilationStatus() != shaderc_compilation_status_success)
 			 {
 				 OutErrorInfo = UTF8_TO_TCHAR(Result.GetErrorMessage().c_str());
 				 return false;
 			 }
-
 			 std::vector<uint32> Spv = { Result.cbegin(), Result.cend() };
-
+			 TArray<uint32> SpvCode = { Result.cbegin(), (int32)(Result.cend() - Result.cbegin()) };
 			 if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
 			 {
-				 TArray<uint32> SpvCode = { Spv.data(), (int)Spv.size() };
 #if DEBUG_SHADER
 				 ShaderConductor::Compiler::DisassembleDesc SpvDisassembleDesc{
 					 .language = ShaderConductor::ShadingLanguage::SpirV,
@@ -236,7 +401,7 @@ namespace FW
 			 }
 			 catch (const std::runtime_error& e)
 			 {
-				 OutErrorInfo =  ANSI_TO_TCHAR(e.what());
+				 OutErrorInfo = ANSI_TO_TCHAR(e.what());
 				 return false;
 			 }
 		 }
@@ -244,6 +409,16 @@ namespace FW
 		 {
 			 HlslSource = InShader->GetProcessedSourceText();
 		 }
+
+			 /*TArray<uint8> Dxil;
+			 if (!ConvertSpirvToDxil(SpvCode, InShader->GetShaderType(), TCHAR_TO_UTF8(*EntryPoint), Dxil))
+			 {
+				 return false;
+			 }
+			 IDxcBlobEncoding* ShaderBlob;
+			 DxCheck(CompilerUitls->CreateBlob(Dxil.GetData(), Dxil.Num(), CP_ACP, &ShaderBlob));
+			 InShader->SetCompilationResult(ShaderBlob);
+			 return true;*/
 
 #if DEBUG_SHADER
 		 if (!ShaderName.IsEmpty())

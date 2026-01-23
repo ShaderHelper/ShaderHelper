@@ -45,9 +45,10 @@ project "FrameWork"
         pchsource "CommonHeader.cpp"
         
         private_uses {
-            "AgilitySDK", "WinPixEventRuntime"
+            "AgilitySDK", "WinPixEventRuntime", "Spirv2Dxil"
         }
         addToProjectHierarchy(shaderConductorHierarchy)
+        addToProjectHierarchy(spirv2DxilHierarchy)
 		addToProjectHierarchy(AgilitySDKHierarchy)
 		addToProjectHierarchy(WinPixEventRuntimeHierarchy)
 		
