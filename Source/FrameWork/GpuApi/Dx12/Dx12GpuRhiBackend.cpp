@@ -25,6 +25,7 @@ void Dx12GpuRhiBackend::InitApiEnv()
 	InitDx12Core();
 	InitBufferAllocator();
 	InitDescriptorAllocator();
+	CleanupShaderCache();
 }
 
 void Dx12GpuRhiBackend::WaitGpu()

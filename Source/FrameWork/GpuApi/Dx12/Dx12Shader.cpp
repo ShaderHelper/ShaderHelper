@@ -212,6 +212,70 @@ namespace FW
 		std::atomic<ULONG> RefCount = 0;
 	};
 
+	void CleanupShaderCache(int32 MaxAgeDays, int64 MaxTotalSizeBytes)
+	{
+		FString CacheDir = PathHelper::SavedShaderDir() / TEXT("Cache");
+		if (!IFileManager::Get().DirectoryExists(*CacheDir))
+		{
+			return;
+		}
+
+		// Collect all .dxil cache files with their info
+		struct CacheFileInfo
+		{
+			FString Path;
+			FDateTime ModTime;
+			int64 Size;
+		};
+		TArray<CacheFileInfo> CacheFiles;
+		int64 TotalSize = 0;
+
+		FDateTime Now = FDateTime::Now();
+		FTimespan MaxAge = FTimespan::FromDays(MaxAgeDays);
+
+		IFileManager::Get().IterateDirectory(*CacheDir, [&](const TCHAR* FilePath, bool bIsDirectory) -> bool
+		{
+			if (!bIsDirectory && FPaths::GetExtension(FilePath) == TEXT("dxil"))
+			{
+				FFileStatData StatData = IFileManager::Get().GetStatData(FilePath);
+				if (StatData.bIsValid)
+				{
+					// Delete files older than MaxAgeDays
+					if (Now - StatData.ModificationTime > MaxAge)
+					{
+						IFileManager::Get().Delete(FilePath);
+					}
+					else
+					{
+						CacheFiles.Add({ FilePath, StatData.ModificationTime, StatData.FileSize });
+						TotalSize += StatData.FileSize;
+					}
+				}
+			}
+			return true;
+		});
+
+		// If total size exceeds limit, delete oldest files until under limit
+		if (TotalSize > MaxTotalSizeBytes)
+		{
+			// Sort by modification time, oldest first
+			CacheFiles.Sort([](const CacheFileInfo& A, const CacheFileInfo& B)
+			{
+				return A.ModTime < B.ModTime;
+			});
+
+			for (const CacheFileInfo& FileInfo : CacheFiles)
+			{
+				if (TotalSize <= MaxTotalSizeBytes)
+				{
+					break;
+				}
+				IFileManager::Get().Delete(*FileInfo.Path);
+				TotalSize -= FileInfo.Size;
+			}
+		}
+	}
+
 	DxcCompiler::DxcCompiler()
 	 {
 		 DxCheck(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(Compiler.GetInitReference())));

@@ -29,6 +29,9 @@ namespace FW
 	TRefCountPtr<Dx12Shader> CreateDx12Shader(const GpuShaderFileDesc& FileDesc);
     TRefCountPtr<Dx12Shader> CreateDx12Shader(const GpuShaderSourceDesc& SourceDesc);
 
+	// Clean up expired shader cache files
+	void CleanupShaderCache(int32 MaxAgeDays = 7, int64 MaxTotalSizeBytes = 100 * 1024 * 1024);
+
 	class DxcCompiler
 	{
 	public:
