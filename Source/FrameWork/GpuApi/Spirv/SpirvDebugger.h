@@ -370,6 +370,10 @@ namespace FW
 
 	FRAMEWORK_API TValueOrError<std::tuple<SpvType*, int32>, FString> GetAccess(const SpvVariable* Var, const TArray<int32>& Indexes);
 	SpvId PatchDebuggerBuffer(SpvPatcher& Patcher);
+	SpvId PatchDebuggerParams(SpvPatcher& Patcher);
 	int32 GetInstIndex(const TArray<TUniquePtr<SpvInstruction>>* Insts, SpvId Inst);
+
+	inline constexpr int DebuggerBufferBindingSlot = 0721;
+	inline constexpr int DebuggerParamsBindingSlot = 0722;
 
 }

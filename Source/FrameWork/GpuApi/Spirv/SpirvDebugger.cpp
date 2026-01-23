@@ -90,10 +90,40 @@ namespace FW
 		}
 		int SetNumber = 0;
 		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(DebuggerBuffer, SpvDecorationKind::DescriptorSet, TArray<uint8>{ (uint8*)&SetNumber, sizeof(int) }));
-		int BindingNumber = 0721;
+		int BindingNumber = DebuggerBufferBindingSlot;
 		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(DebuggerBuffer, SpvDecorationKind::Binding, TArray<uint8>{ (uint8*)&BindingNumber, sizeof(int) }));
 
 		return DebuggerBuffer;
+	}
+
+	// Creates a uniform buffer containing: uvec2 PixelCoord
+	SpvId PatchDebuggerParams(SpvPatcher& Patcher)
+	{
+		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
+		SpvId UInt2Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, 2));
+		
+		// Create struct type with uvec2 member for PixelCoord
+		SpvId DebuggerParamsType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeStruct>(TArray<SpvId>{UInt2Type}));
+		SpvId DebuggerParamsPointerType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Uniform, DebuggerParamsType));
+
+		// Decorations
+		int MemberOffset = 0;
+		Patcher.AddAnnotation(MakeUnique<SpvOpMemberDecorate>(DebuggerParamsType, 0, SpvDecorationKind::Offset, TArray<uint8>{ (uint8*)&MemberOffset, sizeof(int) }));
+		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(DebuggerParamsType, SpvDecorationKind::Block));
+
+		SpvId DebuggerParams = Patcher.NewId();
+		{
+			auto VarOp = MakeUnique<SpvOpVariable>(DebuggerParamsPointerType, SpvStorageClass::Uniform);
+			VarOp->SetId(DebuggerParams);
+			Patcher.AddGlobalVariable(MoveTemp(VarOp));
+			Patcher.AddDebugName(MakeUnique<SpvOpName>(DebuggerParams, "_DebuggerParams_"));
+		}
+		int SetNumber = 0;
+		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(DebuggerParams, SpvDecorationKind::DescriptorSet, TArray<uint8>{ (uint8*)&SetNumber, sizeof(int) }));
+		int BindingNumber = DebuggerParamsBindingSlot;
+		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(DebuggerParams, SpvDecorationKind::Binding, TArray<uint8>{ (uint8*)&BindingNumber, sizeof(int) }));
+
+		return DebuggerParams;
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvDebugDeclare* Inst)

@@ -70,16 +70,26 @@ namespace FW
 
 	TRefCountPtr<Dx12Buffer> CreateDx12ConstantBuffer(const GpuBufferDesc& InBufferDesc, bool IsDeferred)
 	{
+		TRefCountPtr<Dx12Buffer> RetBuffer;
 		if (EnumHasAnyFlags(InBufferDesc.Usage, GpuBufferUsage::Temporary))
 		{
 			BumpAllocationData AllocationData = GTempUniformBufferAllocator[GetCurFrameSourceIndex()]->Alloc(InBufferDesc.ByteSize);
-			return new Dx12Buffer{ InBufferDesc, GpuResourceState::UniformBuffer, AllocationData, IsDeferred };
+			RetBuffer = new Dx12Buffer{ InBufferDesc, GpuResourceState::UniformBuffer, AllocationData, IsDeferred };
 		}
 		else
 		{
 			BuddyAllocationData AllocationData = GPersistantUniformBufferAllocator->Alloc(InBufferDesc.ByteSize);
-			return new Dx12Buffer{ InBufferDesc, GpuResourceState::UniformBuffer, AllocationData, IsDeferred };
+			RetBuffer = new Dx12Buffer{ InBufferDesc, GpuResourceState::UniformBuffer, AllocationData, IsDeferred };
 		}
+
+		// Upload InitialData if provided
+		if (!InBufferDesc.InitialData.IsEmpty())
+		{
+			void* CpuAddr = RetBuffer->GetAllocation().GetCpuAddr();
+			FMemory::Memcpy(CpuAddr, InBufferDesc.InitialData.GetData(), InBufferDesc.InitialData.Num());
+		}
+
+		return RetBuffer;
 	}
 
 	TRefCountPtr<Dx12Buffer> CreateDx12Buffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InResourceState, bool IsDeferred)

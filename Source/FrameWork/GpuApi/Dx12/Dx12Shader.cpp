@@ -7,6 +7,7 @@
 
 #include <Misc/FileHelper.h>
 #include <stdexcept>
+#include <Misc/CRC.h>
 namespace FW
 {
 	Dx12Shader::Dx12Shader(const GpuShaderFileDesc& Desc)
@@ -74,6 +75,67 @@ namespace FW
     {
         return new Dx12Shader(SourceDesc);
     }
+
+	uint32 Dx12Shader::ComputeSourceHash(const TArray<FString>& ExtraArgs) const
+	{
+		// Include processed source, entry point, shader type, and extra args in hash
+		FString HashInput = ProcessedSourceText + EntryPoint + FString::FromInt((int)Type);
+		for (const FString& Arg : ExtraArgs)
+		{
+			HashInput += Arg;
+		}
+		return FCrc::StrCrc32(*HashInput);
+	}
+
+	FString Dx12Shader::GetCacheFilePath(const TArray<FString>& ExtraArgs) const
+	{
+		uint32 Hash = ComputeSourceHash(ExtraArgs);
+		FString CacheFileName = FString::Printf(TEXT("%s_%08X.dxil"), *ShaderName, Hash);
+		return PathHelper::SavedShaderDir() / TEXT("Cache") / CacheFileName;
+	}
+
+	bool Dx12Shader::TryLoadCachedByteCode(const TArray<FString>& ExtraArgs)
+	{
+		FString CachePath = GetCacheFilePath(ExtraArgs);
+		if (!IFileManager::Get().FileExists(*CachePath))
+		{
+			return false;
+		}
+
+		TArray<uint8> CachedData;
+		if (!FFileHelper::LoadFileToArray(CachedData, *CachePath))
+		{
+			return false;
+		}
+
+		if (CachedData.Num() == 0)
+		{
+			return false;
+		}
+
+		// Create a DXC blob from cached data
+		TRefCountPtr<IDxcBlobEncoding> BlobEncoding;
+		if (FAILED(GShaderCompiler.CompilerUitls->CreateBlob(
+			CachedData.GetData(), CachedData.Num(), DXC_CP_ACP, BlobEncoding.GetInitReference())))
+		{
+			return false;
+		}
+
+		ByteCode = BlobEncoding;
+		return true;
+	}
+
+	void Dx12Shader::SaveByteCodeToCache(const TArray<FString>& ExtraArgs) const
+	{
+		if (!ByteCode.IsValid())
+		{
+			return;
+		}
+
+		FString CachePath = GetCacheFilePath(ExtraArgs);
+		TArray<uint8> BinaryData{ (uint8*)ByteCode->GetBufferPointer(), (int32)ByteCode->GetBufferSize() };
+		FFileHelper::SaveArrayToFile(BinaryData, *CachePath);
+	}
 
 	class ShIncludeHandler final : public IDxcIncludeHandler
 	{
@@ -179,6 +241,15 @@ namespace FW
 
 	 bool DxcCompiler::Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs) const
 	 {
+		 // Try to load from cache first (skip for debug SPV generation)
+		 if (!EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
+		 {
+			 if (InShader->TryLoadCachedByteCode(ExtraArgs))
+			 {
+				 return true;
+			 }
+		 }
+
 		 FString ShaderName = InShader->GetShaderName();
 		 FString HlslSource;
 		 FString EntryPoint = InShader->GetEntryPoint();
@@ -375,6 +446,8 @@ namespace FW
 				else
 				{
 					InShader->SetCompilationResult(ShaderBlob);
+					// Save compiled bytecode to cache for future reuse
+					InShader->SaveByteCodeToCache(ExtraArgs);
 #if DEBUG_SHADER
 					TRefCountPtr<IDxcBlob> PdbBlob;
 					TRefCountPtr<IDxcBlobUtf16> PdbNameBlob;

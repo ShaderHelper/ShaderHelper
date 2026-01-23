@@ -100,6 +100,7 @@ namespace SH
 		TRefCountPtr<FW::GpuShader> DebugShader;
 		TArray<FW::SpvDebugState> DebugStates;
 		TRefCountPtr<FW::GpuBuffer> DebugBuffer;
+		TRefCountPtr<FW::GpuBuffer> DebugParamsBuffer;
 		bool bEnableUbsan = false;
 
 		FW::Vector2u PixelCoord;

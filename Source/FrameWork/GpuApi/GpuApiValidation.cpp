@@ -122,11 +122,6 @@ namespace FW
 				SH_LOG(LogRhiValidation, Error, TEXT("CreateBuffer Error(InitState must be Unknown) for GpuBufferUsage(%s)"), ANSI_TO_TCHAR(magic_enum::enum_name(InBufferDesc.Usage).data()));
 				return false;
 			}
-			else if (!InBufferDesc.InitialData.IsEmpty())
-			{
-				SH_LOG(LogRhiValidation, Error, TEXT("CreateBuffer Error(UniformBuffer can not have the InitialData)"));
-				return false;
-			}
 		}
 		else if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::RWStructured))
 		{

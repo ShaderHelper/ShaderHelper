@@ -23,5 +23,9 @@ namespace FW
 
 	protected:
 		void PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) override;
+		void ParseInternal() override;
+
+	protected:
+		SpvId DebuggerParams;
 	};
 }

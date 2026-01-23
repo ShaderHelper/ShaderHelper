@@ -7,6 +7,15 @@ namespace FW
 	: SpvDebuggerVisitor(InPixelContext, InLanguage, InEnableUbsan)
 	{}
 
+	void SpvPixelDebuggerVisitor::ParseInternal()
+	{
+		// Patch DebuggerParams uniform buffer before base class processing
+		DebuggerParams = PatchDebuggerParams(Patcher);
+		
+		// Call base class implementation
+		SpvDebuggerVisitor::ParseInternal();
+	}
+
 	void SpvPixelDebuggerVisitor::PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList)
 	{
 		SpvId FloatType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFloat>(32));
@@ -16,8 +25,6 @@ namespace FW
 		SpvId Bool2Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(BoolType, 2));
 		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
 		SpvId UInt2Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, 2));
-
-		SpvPixelDebuggerContext& PixelContext = static_cast<SpvPixelDebuggerContext&>(Context);
 
 		SpvId LoadedFragCoord = Patcher.NewId();
 		auto LoadedFragCoordOp = MakeUnique<SpvOpLoad>(Float4Type, Context.BuiltIns[SpvBuiltIn::FragCoord]);
@@ -34,8 +41,20 @@ namespace FW
 		UIntFragCoordXYOp->SetId(UIntFragCoordXY);
 		InstList.Add(MoveTemp(UIntFragCoordXYOp));
 
+		// Load PixelCoord from DebuggerParams uniform buffer instead of using constant
+		SpvId UInt2PointerUniformType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Uniform, UInt2Type));
+		SpvId PixelCoordPtr = Patcher.NewId();
+		auto PixelCoordPtrOp = MakeUnique<SpvOpAccessChain>(UInt2PointerUniformType, DebuggerParams, TArray<SpvId>{Patcher.FindOrAddConstant(0u)});
+		PixelCoordPtrOp->SetId(PixelCoordPtr);
+		InstList.Add(MoveTemp(PixelCoordPtrOp));
+
+		SpvId PixelCoord = Patcher.NewId();
+		auto PixelCoordOp = MakeUnique<SpvOpLoad>(UInt2Type, PixelCoordPtr);
+		PixelCoordOp->SetId(PixelCoord);
+		InstList.Add(MoveTemp(PixelCoordOp));
+
 		SpvId IEqual = Patcher.NewId();;
-		auto IEqualOp = MakeUnique<SpvOpIEqual>(Bool2Type, UIntFragCoordXY, Patcher.FindOrAddConstant(PixelContext.PixelCoord));
+		auto IEqualOp = MakeUnique<SpvOpIEqual>(Bool2Type, UIntFragCoordXY, PixelCoord);
 		IEqualOp->SetId(IEqual);
 		InstList.Add(MoveTemp(IEqualOp));
 

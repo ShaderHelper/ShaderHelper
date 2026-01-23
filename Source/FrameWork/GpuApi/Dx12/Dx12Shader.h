@@ -16,6 +16,12 @@ namespace FW
 		virtual bool IsCompiled() const override { return ByteCode.IsValid(); }
 		void SetCompilationResult(TRefCountPtr<IDxcBlob> InByteCode) { ByteCode = MoveTemp(InByteCode); }
 
+		// Shader cache
+		bool TryLoadCachedByteCode(const TArray<FString>& ExtraArgs);
+		void SaveByteCodeToCache(const TArray<FString>& ExtraArgs) const;
+		FString GetCacheFilePath(const TArray<FString>& ExtraArgs) const;
+		uint32 ComputeSourceHash(const TArray<FString>& ExtraArgs) const;
+
 	private:
 		TRefCountPtr<IDxcBlob> ByteCode;
 	};

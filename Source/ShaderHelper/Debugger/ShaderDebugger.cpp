@@ -1235,6 +1235,17 @@ namespace SH
 			.Usage = GpuBufferUsage::RWRaw,
 			.InitialData = Datas,
 		});
+
+		// Create DebugParamsBuffer with PixelCoord (uvec2)
+		TArray<uint8> ParamsDatas;
+		ParamsDatas.SetNumZeroed(sizeof(Vector2u));
+		FMemory::Memcpy(ParamsDatas.GetData(), &PixelCoord, sizeof(Vector2u));
+		DebugParamsBuffer = GGpuRhi->CreateBuffer({
+			.ByteSize = sizeof(Vector2u),
+			.Usage = GpuBufferUsage::Uniform,
+			.InitialData = ParamsDatas,
+		});
+
 		auto SetupBinding = [&](const std::optional<BindingBuilder>& Builder)
 			{
 				if (!Builder.has_value())
@@ -1272,8 +1283,12 @@ namespace SH
 				if (SetNumber == BindingContext::GlobalSlot)
 				{
 					//Add the debugger buffer
-					BindGroupDesc.Resources.Add(0721, { AUX::StaticCastRefCountPtr<GpuResource>(DebugBuffer) });
-					LayoutDesc.Layouts.Add(0721, { BindingType::RWRawBuffer });
+					BindGroupDesc.Resources.Add(DebuggerBufferBindingSlot, { AUX::StaticCastRefCountPtr<GpuResource>(DebugBuffer) });
+					LayoutDesc.Layouts.Add(DebuggerBufferBindingSlot, { BindingType::RWRawBuffer });
+
+					//Add the debugger params buffer (contains PixelCoord)
+					BindGroupDesc.Resources.Add(DebuggerParamsBindingSlot, { AUX::StaticCastRefCountPtr<GpuResource>(DebugParamsBuffer) });
+					LayoutDesc.Layouts.Add(DebuggerParamsBindingSlot, { BindingType::UniformBuffer });
 
 					TRefCountPtr<GpuBindGroupLayout> PatchedBindGroupLayout = GGpuRhi->CreateBindGroupLayout(LayoutDesc);
 					BindGroupDesc.Layout = PatchedBindGroupLayout;
@@ -1484,6 +1499,7 @@ namespace SH
 		SpvBindings.Empty();
 		DebugShader = nullptr;
 		DebugBuffer = nullptr;
+		DebugParamsBuffer = nullptr;
 		bEnableUbsan = false;
 
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
