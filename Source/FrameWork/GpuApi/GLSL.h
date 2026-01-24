@@ -612,7 +612,7 @@ namespace FW
 		return Name == "PrintAtMouse" || Name == "Print" || Name == "Assert" || Name == "AssertFormat";
 	}
 
-	inline FString GetTypeName(const glslang::TType& type) {
+	inline FString GetTypeName(const glslang::TType& type, bool bIgnoreStorageQualifier = false) {
 		FString TypeName;
 		if (type.isStruct()) {
 			TypeName = UTF8_TO_TCHAR(type.getTypeName().c_str());
@@ -623,6 +623,11 @@ namespace FW
 		else
 		{
 			TypeName = UTF8_TO_TCHAR(type.getBasicTypeString().c_str());
+		}
+
+		if (bIgnoreStorageQualifier)
+		{
+			return TypeName.TrimStartAndEnd();
 		}
 
 		FString Qualifier;
@@ -877,23 +882,48 @@ namespace FW
 
 		bool visitSelection(glslang::TVisit Visit, glslang::TIntermSelection* Node) override
 		{
-			if (Visit == glslang::EvPostVisit) return true;
-			const auto& StartLoc = Node->getLoc();
-			if (Node->getFalseBlock() && Node->getFalseBlock()->getAsAggregate())
-			{
-				const auto& EndLoc = Node->getFalseBlock()->getAsAggregate()->getEndLoc();
-				Context.GuideLineScopes.Emplace(Vector2i(StartLoc.line, StartLoc.column),
-					Vector2i(EndLoc.line, EndLoc.column));
+			bool bHasElseIfChain = Node->getFalseBlock() && Node->getFalseBlock()->getAsSelectionNode();
+
+			if (Visit == glslang::EvPostVisit) {
+				if (bHasElseIfChain) {
+					SelectionChainDepth--;
+				}
+				return true;
 			}
-			else if ( Node->getTrueBlock() && Node->getTrueBlock()->getAsAggregate())
+
+			const auto& StartLoc = Node->getLoc();
+
+			// Only generate scope for the outermost if in an if-else if chain
+			if (SelectionChainDepth == 0)
 			{
-				const auto& EndLoc = Node->getTrueBlock()->getAsAggregate()->getEndLoc();
+				// Recursively find the end location of the entire if-else if-else chain
+				auto GetSelectionEndLoc = [](glslang::TIntermSelection* Sel, auto&& Self) -> glslang::TSourceLoc {
+					if (Sel->getFalseBlock()) {
+						if (auto* FalseAggregate = Sel->getFalseBlock()->getAsAggregate()) {
+							return FalseAggregate->getEndLoc();
+						}
+						else if (auto* FalseSelection = Sel->getFalseBlock()->getAsSelectionNode()) {
+							return Self(FalseSelection, Self);
+						}
+					}
+					if (Sel->getTrueBlock() && Sel->getTrueBlock()->getAsAggregate()) {
+						return Sel->getTrueBlock()->getAsAggregate()->getEndLoc();
+					}
+					return Sel->getLoc();
+					};
+
+				const auto& EndLoc = GetSelectionEndLoc(Node, GetSelectionEndLoc);
 				if (EndLoc.line > StartLoc.line)
 				{
 					Context.GuideLineScopes.Emplace(Vector2i(StartLoc.line, StartLoc.column),
 						Vector2i(EndLoc.line, EndLoc.column));
 				}
 			}
+
+			if (bHasElseIfChain) {
+				SelectionChainDepth++;
+			}
+
 			return true;
 		}
 
@@ -1153,6 +1183,10 @@ namespace FW
 					}
 				}
 			}
+			else
+			{
+				HandleBuiltInFunction(Node);
+			}
 			return true;
 		}
 
@@ -1161,10 +1195,52 @@ namespace FW
 			if (BuiltInOps.Contains(Node->getOp()))
 			{
 				FString FuncName = BuiltInOps[Node->getOp()];
-				FString ReturnTypeName = GetTypeName(Node->getType());
-				FString ParamTypeName = GetTypeName(Node->getOperand()->getType());
+				FString ReturnTypeName = GetTypeName(Node->getType(), true);
+				FString ParamTypeName = GetTypeName(Node->getOperand()->getType(), true);
 				FString FuncTypeName = ReturnTypeName + "(" + ParamTypeName + ")";
 				FString FullFuncName = ReturnTypeName + " " + FuncName + "(" + ParamTypeName + ")";
+
+				Context.SymbolTable.AddUnique({
+					.Id = FullFuncName,
+					.Kind = ShaderTokenType::BuiltinFunc,
+					.Name = FuncName,
+					.TypeName = FuncTypeName
+				});
+
+				if (auto* Def = Context.SymbolTable.FindByPredicate([&, this](auto&& Item) { return Item.Id == FullFuncName; }))
+				{
+					Context.SymbolRefs.AddUnique(*Def, GlslSymbolRef{
+						.Name = FuncName,
+						.File = Node->getLoc().getFilenameStr(),
+						.Location = {Node->getLoc().line, Node->getLoc().column}
+					});
+				}
+			}
+		}
+
+		void HandleBuiltInFunction(glslang::TIntermAggregate* Node)
+		{
+			if (BuiltInOps.Contains(Node->getOp()))
+			{
+				FString FuncName = BuiltInOps[Node->getOp()];
+				FString ReturnTypeName = GetTypeName(Node->getType(), true);
+
+				FString ParamsTypeName;
+				const glslang::TIntermSequence& Sequence = Node->getSequence();
+				for (int i = 0; i < Sequence.size(); i++)
+				{
+					if (const glslang::TIntermTyped* TypedNode = Sequence[i]->getAsTyped())
+					{
+						ParamsTypeName += GetTypeName(TypedNode->getType(), true);
+						if (i < Sequence.size() - 1)
+						{
+							ParamsTypeName += ",";
+						}
+					}
+				}
+
+				FString FuncTypeName = ReturnTypeName + "(" + ParamsTypeName + ")";
+				FString FullFuncName = ReturnTypeName + " " + FuncName + "(" + ParamsTypeName + ")";
 
 				Context.SymbolTable.AddUnique({
 					.Id = FullFuncName,
@@ -1187,6 +1263,7 @@ namespace FW
 	private:
 		GlslContext& Context;
 		TArray<ShaderScope> ScopeStack;
+		int32 SelectionChainDepth = 0;
 	};
 
 	class FRAMEWORK_API GlslTU : public ShaderTU
