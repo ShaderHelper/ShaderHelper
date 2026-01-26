@@ -16,6 +16,8 @@ namespace SH
 		virtual FString GetFullContent() const = 0;
 		//The line num of invisible content(eg. binding codegen)
 		virtual int32 GetExtraLineNum() const = 0;
+		TArray<FString> GetIncludeDirs() const;
+		FString GetShaderName() const;
 		virtual FW::GpuShaderSourceDesc GetShaderDesc(const FString& InContent) const = 0;
 		
 	public:

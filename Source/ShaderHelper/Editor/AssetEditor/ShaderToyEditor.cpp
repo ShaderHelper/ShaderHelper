@@ -13,7 +13,7 @@ using namespace FW;
 namespace SH
 {
     REFLECTION_REGISTER(AddClass<ShaderToyOp>()
-		.BaseClass<AssetOp>()
+		.BaseClass<ShAssetOp>()
 	)
 
 	MetaType* ShaderToyOp::SupportType()

@@ -106,6 +106,7 @@ namespace FW
 
 	enum class ShaderType
 	{
+		None,
 		VertexShader,
 		PixelShader,
 		ComputeShader,

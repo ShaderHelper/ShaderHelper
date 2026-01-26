@@ -1264,7 +1264,7 @@ constexpr int PaddingLineNum = 22;
         CustomCursorHighlighter = CursorHighlighter::Create(&CursorInfo);
         CursorLineHighlighter = CustomCursorHighlighter;
         
-        CurEditState = ShaderAssetObj->bCompilationSucceed ? EditState::Succeed : EditState::Failed;
+        CurEditState = !ShaderAssetObj->Shader || ShaderAssetObj->bCompilationSucceed ? EditState::Succeed : EditState::Failed;
 
 		RefreshFont();
     }
@@ -1594,6 +1594,38 @@ constexpr int PaddingLineNum = 22;
 			return;
 		}
 		const auto& TokenizedLine = ShaderMarshaller->TokenizedLines[Location.GetLineIndex()];
+		
+		// Check if this is an #include line
+		FString IncludePath;
+		FString LineText;
+		ShaderMultiLineEditableText->GetTextLine(Location.GetLineIndex(), LineText);
+		std::wregex IncludePattern(LR"(#include\s*["<]([^"<>]+)[">])");
+		std::wsmatch Match;
+		std::wstring LineTextStd(*LineText);
+		if (std::regex_search(LineTextStd, Match, IncludePattern) && Match.size() > 1)
+		{
+			IncludePath = Match[1].str().c_str();
+		}
+		
+		if (!IncludePath.IsEmpty())
+		{
+			// Try to find in include directories
+			for (const FString& IncludeDir : ShaderAssetObj->GetIncludeDirs())
+			{
+				FString FullPath = FPaths::Combine(IncludeDir, IncludePath);
+				if (TSingleton<AssetManager>::Get().IsValidAsset(FullPath))
+				{
+					AssetPtr<ShaderAsset> TargetShaderAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderAsset>(FullPath);
+					if (TargetShaderAsset)
+					{
+						AssetOp::OpenAsset(TargetShaderAsset);
+						return;
+					}
+				}
+			}
+			return;
+		}
+		
 		int32 TokenOffset{};
 		int32 TokenEndOffset{};
 		for (const auto& Token : TokenizedLine.Tokens)
@@ -1609,11 +1641,48 @@ constexpr int PaddingLineNum = 22;
 		{
 			int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
 			auto Symbol = SyntaxTUCopy->GetSymbolInfo(Location.GetLineIndex() + ExtraLineNum + 1, TokenOffset + 1, TokenEndOffset - TokenOffset);
-			int SymbolLineNumber = Symbol.Row - ExtraLineNum;
-			//TODO: Handle include files
-			if (SymbolLineNumber > 0 && Symbol.File == ShaderAssetObj->Shader->GetShaderName())
+			
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			int32 SymbolExtraLineNum = ExtraLineNum;
+			AssetPtr<ShaderAsset> TargetShaderAsset = nullptr;
+			
+			if (!Symbol.File.IsEmpty() && Symbol.File != ShaderAssetObj->GetShaderName())
 			{
-				JumpTo(GetLineIndex(SymbolLineNumber));
+				FString SymbolFilePath = Symbol.File;
+				// Try to find in include directories
+				for (const FString& IncludeDir : ShaderAssetObj->GetIncludeDirs())
+				{
+					FString FullPath = FPaths::Combine(IncludeDir, SymbolFilePath);
+					if (TSingleton<AssetManager>::Get().IsValidAsset(FullPath))
+					{
+						TargetShaderAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderAsset>(FullPath);
+						break;
+					}
+				}
+				
+				if (TargetShaderAsset)
+				{
+					SymbolExtraLineNum = TargetShaderAsset->GetExtraLineNum();
+				}
+			}
+			
+			int SymbolLineNumber = Symbol.Row - SymbolExtraLineNum;
+			if (SymbolLineNumber > 0)
+			{
+				if (TargetShaderAsset)
+				{
+					AssetOp::OpenAsset(TargetShaderAsset);
+					SShaderEditorBox* NewShaderEditor = ShEditor->GetShaderEditor(TargetShaderAsset);
+					if (NewShaderEditor)
+					{
+						NewShaderEditor->JumpTo(NewShaderEditor->GetLineIndex(SymbolLineNumber));
+					}
+				}
+				else if (Symbol.File.IsEmpty() || Symbol.File == ShaderAssetObj->GetShaderName())
+				{
+					// Jump to definition in current file
+					JumpTo(GetLineIndex(SymbolLineNumber));
+				}
 			}
 		}
 	}
@@ -1909,7 +1978,7 @@ constexpr int PaddingLineNum = 22;
 			TArray<ShaderOccurrence> Occurrences;
 			for (const ShaderTokenizer::Token& Token : ShaderMarshaller->TokenizedLines[CursorLineIndex].Tokens)
 			{
-				if (CursorOffset >= Token.BeginOffset && CursorOffset <= Token.EndOffset && Token.Type == ShaderTokenType::Identifier)
+				if (CursorOffset >= Token.BeginOffset && CursorOffset <= Token.EndOffset && Token.Type == ShaderTokenType::Identifier && SyntaxTUCopy)
 				{
 					Occurrences = SyntaxTUCopy->GetOccurrences(GetLineNumber(CursorLineIndex) + AddedLineNum, Token.BeginOffset + 1);
 					break;
@@ -2319,6 +2388,12 @@ constexpr int PaddingLineNum = 22;
 
 	void SShaderEditorBox::Compile()
     {
+		if (!ShaderAssetObj->Shader)
+		{
+			CurEditState = EditState::Succeed;
+			return;
+		}
+
 		int32 AddedLineNum = ShaderAssetObj->GetExtraLineNum();
 		
 		//TODO Async and show "Compiling" state
@@ -4232,7 +4307,27 @@ constexpr int PaddingLineNum = 22;
 								}
 							}
 
-							int SymbolLineNumber = Symbol.Row - ExtraLineNum;
+							int32 SymbolExtraLineNum = ExtraLineNum;
+							if (!Symbol.File.IsEmpty() && Symbol.File != Owner->GetShaderAsset()->GetShaderName())
+							{
+								FString SymbolFilePath = Symbol.File;
+								AssetPtr<ShaderAsset> SymbolAsset = nullptr;
+								// Try to find in include directories
+								for (const FString& IncludeDir : Owner->GetShaderAsset()->GetIncludeDirs())
+								{
+									FString FullPath = FPaths::Combine(IncludeDir, SymbolFilePath);
+									if (TSingleton<AssetManager>::Get().IsValidAsset(FullPath))
+									{
+										SymbolAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderAsset>(FullPath);
+										break;
+									}
+								}
+								if (SymbolAsset)
+								{
+									SymbolExtraLineNum = SymbolAsset->GetExtraLineNum();
+								}
+							}
+							int SymbolLineNumber = Symbol.Row - SymbolExtraLineNum;
 							if (SymbolLineNumber > 0 || !Symbol.Url.IsEmpty())
 							{
 								Box->AddSlot().AutoHeight()[SNew(SSeparator).Thickness(1.0f).ColorAndOpacity(FStyleColors::Border)];

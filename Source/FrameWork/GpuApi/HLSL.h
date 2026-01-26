@@ -3,6 +3,7 @@
 #include "GpuShader.h"
 #include "Common/Path/PathHelper.h"
 #include <Serialization/JsonSerializer.h>
+#include <regex>
 
 THIRD_PARTY_INCLUDES_START
 #if PLATFORM_WINDOWS
@@ -143,7 +144,7 @@ namespace HLSL
 		case FW::ShaderType::VertexShader:  StageStr = TEXT("VS"); break;
 		case FW::ShaderType::PixelShader:   StageStr = TEXT("PS"); break;
 		case FW::ShaderType::ComputeShader: StageStr = TEXT("CS"); break;
-		default: return false;
+		default: return true; // None stage means match all
 		}
 		return ItemStages.Contains(StageStr);
 	}
@@ -297,10 +298,78 @@ namespace FW
 
 	class FRAMEWORK_API HlslTU : public ShaderTU
 	{
+	private:
+		// Collect all #include directives from shader source and resolve them recursively
+		void CollectAndProcessIncludes(
+			const FString& SourceText, 
+			const TArray<FString>& IncludeDirs,
+			const TFunction<FString(const FString&)>& IncludeHandler,
+			GpuShaderLanguage Language,
+			TSet<FString>& ProcessedFiles,
+			const FString& VirtualIncludeDir)
+		{
+			// Regex to match #include "filename" or #include <filename>
+			std::regex IncludePattern(R"(#\s*include\s*[\"<]([^\"<>]+)[\">])");
+			std::string SourceStr = TCHAR_TO_UTF8(*SourceText);
+			std::smatch Match;
+			std::string::const_iterator SearchStart = SourceStr.cbegin();
+
+			while (std::regex_search(SearchStart, SourceStr.cend(), Match, IncludePattern))
+			{
+				FString IncludeName = UTF8_TO_TCHAR(Match[1].str().c_str());
+				SearchStart = Match.suffix().first;
+				
+				// Try to find the included file in include directories
+				for (const FString& IncludeDir : IncludeDirs)
+				{
+					FString IncludedFilePath = FPaths::Combine(IncludeDir, IncludeName);
+					if (IFileManager::Get().FileExists(*IncludedFilePath))
+					{
+						// Normalize path to use as key
+						FString NormalizedPath = FPaths::ConvertRelativePathToFull(IncludedFilePath);
+						FPaths::NormalizeFilename(NormalizedPath);
+
+						if (!ProcessedFiles.Contains(NormalizedPath))
+						{
+							ProcessedFiles.Add(NormalizedPath);
+
+							// Load file content
+							FString ShaderText;
+							if (IncludeHandler)
+							{
+								ShaderText = IncludeHandler(IncludedFilePath);
+							}
+							else
+							{
+								FFileHelper::LoadFileToString(ShaderText, *IncludedFilePath);
+							}
+
+							// Process the shader text
+							ShaderText = GpuShaderPreProcessor{ ShaderText, Language }
+								.ReplacePrintStringLiteral()
+								.Finalize();
+
+							// Create virtual file path preserving the include name structure
+							FString VirtualFilePath = VirtualIncludeDir / IncludeName;
+							
+							// Ensure directory exists and write the processed file
+							IFileManager::Get().MakeDirectory(*FPaths::GetPath(VirtualFilePath), true);
+							FFileHelper::SaveStringToFile(ShaderText, *VirtualFilePath);
+
+							// Recursively process includes in this file
+							CollectAndProcessIncludes(ShaderText, IncludeDirs, IncludeHandler, Language, ProcessedFiles, VirtualIncludeDir);
+						}
+						break;
+					}
+				}
+			}
+		}
+
 	public:
 		HlslTU(TRefCountPtr<GpuShader> InShader)
 			: ShaderTU(InShader->GetSourceText(), InShader->GetShaderName())
 			, Stage(InShader->GetShaderType())
+			, IncludeDirs(InShader->GetIncludeDirs())
 		{
 			DxcCreateInstance(CLSID_DxcIntelliSense, IID_PPV_ARGS(ISense.GetInitReference()));
 			ISense->CreateIndex(Index.GetInitReference());
@@ -308,19 +377,30 @@ namespace FW
 			auto ShaderNameUTF8 = StringCast<UTF8CHAR>(*ShaderName);
 			ISense->CreateUnsavedFile((char*)ShaderNameUTF8.Get(), (char*)SourceText.Get(), SourceText.Length() * sizeof(UTF8CHAR), Unsaved.GetInitReference());
 
+			// Create virtual include directory for processed includes
+			VirtualIncludeDir = PathHelper::SavedShaderDir() / TEXT("VirtualIncludes") / ShaderName;
+			IFileManager::Get().MakeDirectory(*VirtualIncludeDir, true);
+
+			// Collect and process all includes recursively
+			TSet<FString> ProcessedFiles;
+			CollectAndProcessIncludes(
+				InShader->GetSourceText(),
+				InShader->GetIncludeDirs(),
+				InShader->GetIncludeHandler(),
+				InShader->GetShaderLanguage(),
+				ProcessedFiles,
+				VirtualIncludeDir);
+
 			TArray<const char*> DxcArgs;
 			DxcArgs.Add("-D");
 			DxcArgs.Add("ENABLE_PRINT=0");
 			DxcArgs.Add("-D");
 			DxcArgs.Add("EDITOR_ISENSE=1");
 
-			TArray<FTCHARToUTF8> CharIncludeDirs;
-			for (const FString& IncludeDir : InShader->GetIncludeDirs())
-			{
-				DxcArgs.Add("-I");
-				CharIncludeDirs.Emplace(*IncludeDir);
-				DxcArgs.Add(CharIncludeDirs.Last().Get());
-			}
+			// Use virtual include directory instead of original include dirs
+			FTCHARToUTF8 VirtualIncludeDirUTF8(*VirtualIncludeDir);
+			DxcArgs.Add("-I");
+			DxcArgs.Add(VirtualIncludeDirUTF8.Get());
 
 			DxcTranslationUnitFlags UnitFlag = DxcTranslationUnitFlags(DxcTranslationUnitFlags_UseCallerThread | DxcTranslationUnitFlags_DetailedPreprocessingRecord);
 			Index->ParseTranslationUnit((char*)ShaderNameUTF8.Get(), DxcArgs.GetData(), DxcArgs.Num(), AUX::GetAddrExt(Unsaved.GetReference()), 1, UnitFlag, TU.GetInitReference());
@@ -858,6 +938,51 @@ namespace FW
 		{
 			TArray<ShaderCandidateInfo> Candidates;
 
+			// Check if we're in an #include context
+			FString LineText = GetLineStr(Row);
+			std::regex IncludePattern(R"(^\s*#\s*include\s*["<])");
+			if (std::regex_search(TCHAR_TO_UTF8(*LineText), IncludePattern))
+			{
+				// Extract partial path being typed
+				int32 QuotePos = LineText.Find(TEXT("\""), ESearchCase::IgnoreCase, ESearchDir::FromEnd);
+				int32 AnglePos = LineText.Find(TEXT("<"), ESearchCase::IgnoreCase, ESearchDir::FromEnd);
+				int32 StartPos = FMath::Max(QuotePos, AnglePos);
+				FString PartialPath;
+				if (StartPos != INDEX_NONE && StartPos + 1 < LineText.Len())
+				{
+					PartialPath = LineText.Mid(StartPos + 1);
+				}
+
+				// Collect available include files from all include directories
+				TSet<FString> AddedFiles;
+				for (const FString& IncludeDir : IncludeDirs)
+				{
+					TArray<FString> FoundFiles;
+					IFileManager::Get().FindFilesRecursive(FoundFiles, *IncludeDir, TEXT("*.*"), true, false);
+					for (const FString& FilePath : FoundFiles)
+					{
+						// Get relative path from include directory
+						FString RelativePath = FilePath;
+						FPaths::MakePathRelativeTo(RelativePath, *(IncludeDir + TEXT("/")));
+						
+						// Filter by partial path and common shader extensions
+						FString Extension = FPaths::GetExtension(RelativePath).ToLower();
+						if (Extension == TEXT("hlsl") || Extension == TEXT("h") || Extension == TEXT("header"))
+						{
+							if (PartialPath.IsEmpty() || RelativePath.StartsWith(PartialPath))
+							{
+								if (!AddedFiles.Contains(RelativePath))
+								{
+									AddedFiles.Add(RelativePath);
+									Candidates.Add({ ShaderCandidateKind::File, RelativePath });
+								}
+							}
+						}
+					}
+				}
+				return Candidates;
+			}
+
 			TRefCountPtr<IDxcCodeCompleteResults> CodeCompleteResults;
 			uint32 NumResult{};
 			auto ShaderNameUTF8 = StringCast<UTF8CHAR>(*ShaderName);
@@ -950,6 +1075,12 @@ namespace FW
 				File->GetName(&FileNamePtr);
 				OutFile = FileNamePtr;
 				CoTaskMemFree(FileNamePtr);
+				
+				FPaths::NormalizeFilename(OutFile);
+				if (OutFile.StartsWith(VirtualIncludeDir))
+				{
+					OutFile = OutFile.Mid(VirtualIncludeDir.Len() + 1);
+				}
 			}
 		}
 
@@ -1053,6 +1184,11 @@ namespace FW
 							Vector2i FuncStart, FuncEnd;
 							GetCursorRange(ChildCursor, FuncStart, FuncEnd);
 
+							// Get file name for this function
+							FString FuncFile;
+							uint32 FuncRow;
+							GetCursorLocation(ChildCursor, FuncFile, FuncRow);
+
 							if (Kind == DxcCursor_CXXMethod)
 							{
 								LPSTR ParCursorName;
@@ -1060,15 +1196,24 @@ namespace FW
 								ShaderFunc Func{
 									.Name = ANSI_TO_TCHAR(CursorName),
 									.FullName = FString(ANSI_TO_TCHAR(ParCursorName)) + "." + ANSI_TO_TCHAR(CursorName),
+									.File = FuncFile,
 									.Start = FuncStart,
 									.End = FuncEnd,
 									.Params = {ShaderParameter{"this"}}
 								};
 								Funcs.Add(MoveTemp(Func));
+								CoTaskMemFree(ParCursorName);
 							}
 							else
 							{
-								Funcs.Emplace(ANSI_TO_TCHAR(CursorName), ANSI_TO_TCHAR(CursorName), FuncStart, FuncEnd);
+								ShaderFunc Func{
+									.Name = ANSI_TO_TCHAR(CursorName),
+									.FullName = ANSI_TO_TCHAR(CursorName),
+									.File = FuncFile,
+									.Start = FuncStart,
+									.End = FuncEnd
+								};
+								Funcs.Add(MoveTemp(Func));
 							}
 
 							CoTaskMemFree(CursorName);
@@ -1146,5 +1291,7 @@ namespace FW
 		TRefCountPtr<IDxcCursor> DxcRootCursor;
 		ShaderType Stage;
 		TArray<Vector2u> SkippedLines;
+		TArray<FString> IncludeDirs;
+		FString VirtualIncludeDir;
 	};
 }

@@ -10,7 +10,7 @@ using namespace FW;
 namespace SH
 {
     REFLECTION_REGISTER(AddClass<StShaderOp>()
-                                .BaseClass<AssetOp>()
+                                .BaseClass<ShAssetOp>()
 	)
 
     MetaType* StShaderOp::SupportType()

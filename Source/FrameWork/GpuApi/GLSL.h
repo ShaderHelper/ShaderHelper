@@ -295,7 +295,14 @@ namespace FW
 				if (IFileManager::Get().FileExists(*IncludedFile))
 				{
 					FString ShaderText;
-					FFileHelper::LoadFileToString(ShaderText, *IncludedFile);
+					if (Shader->GetIncludeHandler())
+					{
+						ShaderText = Shader->GetIncludeHandler()(IncludedFile);
+					}
+					else
+					{
+						FFileHelper::LoadFileToString(ShaderText, *IncludedFile);
+					}
 					ShaderText = GpuShaderPreProcessor{ ShaderText, Shader->GetShaderLanguage() }
 						.ReplacePrintStringLiteral()
 						.Finalize();
@@ -1117,6 +1124,7 @@ namespace FW
 				Context.Funcs.Add(ShaderFunc{
 					.Name = FuncName,
 					.FullName = Name,
+					.File = Node->getLoc().getFilenameStr(),
 					.Start = StartLoc,
 					.End = EndLoc,
 					.Params = Params

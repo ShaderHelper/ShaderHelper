@@ -42,7 +42,8 @@ namespace FW
 		Var,
 		Func,
 		Macro,
-		Type
+		Type,
+		File
 	};
 
 	enum class ShaderTokenType
@@ -118,6 +119,7 @@ namespace FW
             PathHelper::ShaderDir(), 
             FPaths::GetPath(*FileName)
         };
+		TFunction<FString(const FString&)> IncludeHandler;
     };
 
     struct GpuShaderSourceDesc
@@ -130,6 +132,7 @@ namespace FW
         TArray<FString> IncludeDirs = { 
             PathHelper::ShaderDir() 
         };
+		TFunction<FString(const FString&)> IncludeHandler;
     };
 
 	struct GpuShaderLayoutBinding
@@ -157,7 +160,7 @@ namespace FW
         
 		const FString& GetFileName() const { return FileName; }
         const TArray<FString>& GetIncludeDirs() const { return IncludeDirs; }
-        
+		const TFunction<FString(const FString&)>& GetIncludeHandler() const { return IncludeHandler; }
         const FString& GetShaderName() const { return ShaderName; }
         ShaderType GetShaderType() const {return Type;}
         const FString& GetSourceText() const { return SourceText; }
@@ -184,6 +187,7 @@ namespace FW
         
         FString FileName;
         TArray<FString> IncludeDirs;
+		TFunction<FString(const FString&)> IncludeHandler;
     };
 
 	struct ShaderDiagnosticInfo
@@ -223,6 +227,7 @@ namespace FW
 	{
 		FString Name;
 		FString FullName;
+		FString File;
 		Vector2i Start;
 		Vector2i End;
 		TArray<ShaderParameter> Params;
@@ -282,6 +287,13 @@ namespace FW
 				return "";
 			}
 			return ShaderSource.Mid(LineRanges[Row - 1].BeginIndex + Col - 1, Size);
+		}
+		FString GetLineStr(uint32 Row) const {
+			if ((int32)Row > LineRanges.Num())
+			{
+				return "";
+			}
+			return ShaderSource.Mid(LineRanges[Row - 1].BeginIndex, LineRanges[Row - 1].Len());
 		}
         
     protected:

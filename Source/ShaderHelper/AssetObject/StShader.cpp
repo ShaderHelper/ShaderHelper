@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "StShader.h"
+#include "ShaderHeader.h"
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "Common/Path/PathHelper.h"
 #include "App/App.h"
@@ -8,6 +9,7 @@
 #include "UI/Widgets/Property/PropertyData/PropertyItem.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 #include "RenderResource/PrintBuffer.h"
+#include "AssetManager/AssetManager.h"
 
 using namespace FW;
 
@@ -72,11 +74,25 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         AssetObject::PostLoad();
         
         Shader = GGpuRhi->CreateShaderFromSource({
-            .Name = GetFileName() + "." + FileExtension(),
+            .Name = GetShaderName(),
             .Source = GetFullContent(),
             .Type = ShaderType::PixelShader,
             .EntryPoint = "MainPS",
-			.Language = Language
+			.Language = Language,
+			.IncludeDirs = GetIncludeDirs(),
+			.IncludeHandler = [](const FString& IncludePath) -> FString {
+				if (FPaths::GetExtension(IncludePath) == TEXT("header"))
+				{
+					AssetPtr<ShaderHeader> HeaderAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderHeader>(IncludePath);
+					if (HeaderAsset)
+					{
+						return HeaderAsset->GetFullContent();
+					}
+				}
+				FString Content;
+				FFileHelper::LoadFileToString(Content, *IncludePath);
+				return Content;
+			},
         });
 		FString ErrorInfo, WarnInfo;
 		bCompilationSucceed = GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo);
@@ -180,13 +196,26 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 	GpuShaderSourceDesc StShader::GetShaderDesc(const FString& InContent) const
 	{
 		FString FinalShaderSource = GetTemplateWithBinding() + InContent;
-		FString ShaderName = GetFileName() + "." + FileExtension();
 		auto Desc = GpuShaderSourceDesc{
-			.Name = ShaderName,
+			.Name = GetShaderName(),
 			.Source = MoveTemp(FinalShaderSource),
 			.Type = ShaderType::PixelShader,
 			.EntryPoint = "MainPS",
-			.Language = Language
+			.Language = Language,
+			.IncludeDirs = GetIncludeDirs(),
+			.IncludeHandler = [](const FString& IncludePath) -> FString {
+				if (FPaths::GetExtension(IncludePath) == TEXT("header"))
+				{
+					AssetPtr<ShaderHeader> HeaderAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderHeader>(IncludePath);
+					if (HeaderAsset)
+					{
+						return HeaderAsset->GetFullContent();
+					}
+				}
+				FString Content;
+				FFileHelper::LoadFileToString(Content, *IncludePath);
+				return Content;
+			},
 		};
 		return Desc;
 	}

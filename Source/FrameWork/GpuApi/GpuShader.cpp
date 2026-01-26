@@ -316,6 +316,7 @@ namespace FW
 		, ShaderLanguage(FileDesc.Language)
         , FileName(FileDesc.FileName)
         , IncludeDirs(FileDesc.IncludeDirs)
+		, IncludeHandler(FileDesc.IncludeHandler)
 	{
 		ShaderName = FPaths::GetBaseFilename(FileName);
 		FString ShaderFileText;
@@ -333,6 +334,7 @@ namespace FW
 		, SourceText(SourceDesc.Source)
 		, ProcessedSourceText(SourceDesc.Source)
         , IncludeDirs(SourceDesc.IncludeDirs)
+		, IncludeHandler(SourceDesc.IncludeHandler)
 	{
 
 	}

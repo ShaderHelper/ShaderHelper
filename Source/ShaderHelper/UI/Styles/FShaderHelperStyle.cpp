@@ -60,6 +60,7 @@ namespace SH {
 		TSharedRef<FSlateStyleSet> Style = MakeShared<FSlateStyleSet>("ShaderHelperStyle");
         Style->SetContentRoot(BaseResourcePath::Custom_SlateResourceDir);
         Style->Set("AssetBrowser.Shader", new IMAGE_BRUSH_SVG("Shader", FVector2D(64.0, 64.0)));
+		Style->Set("AssetBrowser.Header", new IMAGE_BRUSH_SVG("Header", FVector2D(64.0, 64.0)));
 		Style->Set("Icons.StepInto", new IMAGE_BRUSH_SVG("StepInto", FVector2D(16.0, 16.0)));
 		Style->Set("Icons.StepOver", new IMAGE_BRUSH_SVG("StepOver", FVector2D(16.0, 16.0)));
 		Style->Set("Icons.Bug", new IMAGE_BRUSH("Bug", FVector2D(16.0, 16.0), FLinearColor::Green));

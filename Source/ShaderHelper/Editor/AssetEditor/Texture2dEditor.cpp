@@ -7,7 +7,7 @@ using namespace FW;
 namespace SH
 {
     REFLECTION_REGISTER(AddClass<Texture2dOp>()
-		.BaseClass<AssetOp>()
+		.BaseClass<ShAssetOp>()
 	)
 
 	MetaType* Texture2dOp::SupportType()
