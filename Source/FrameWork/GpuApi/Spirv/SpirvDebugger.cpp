@@ -668,9 +668,10 @@ namespace FW
 			SpvId IntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 1));
 			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
 			TArray<SpvId> ParamterTypes;
-			ParamterTypes.Add(UIntType);
-			ParamterTypes.Add(UIntType);
-			ParamterTypes.Add(UIntType);
+			ParamterTypes.Add(UIntType); // StateType
+			ParamterTypes.Add(UIntType); // Line
+			ParamterTypes.Add(UIntType); // Source
+			ParamterTypes.Add(UIntType); // VarId
 			for (int32 i = 0; i < IndexNum; i++)
 			{
 				ParamterTypes.Add(IntType);
@@ -692,6 +693,12 @@ namespace FW
 			LineParamOp->SetId(LineParam);
 			AppendAccessFuncInsts.Add(MoveTemp(LineParamOp));
 			Patcher.AddDebugName(MakeUnique<SpvOpName>(LineParam, "_DebuggerLine_"));
+
+			SpvId SourceParam = Patcher.NewId();
+			auto SourceParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
+			SourceParamOp->SetId(SourceParam);
+			AppendAccessFuncInsts.Add(MoveTemp(SourceParamOp));
+			Patcher.AddDebugName(MakeUnique<SpvOpName>(SourceParam, "_DebuggerSource_"));
 
 			SpvId VarIdParam = Patcher.NewId();
 			auto VarIdParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
@@ -717,6 +724,7 @@ namespace FW
 			PatchActiveCondition(AppendAccessFuncInsts);
 			PatchToDebugger(StateTypeParam, UIntType, AppendAccessFuncInsts);
 			PatchToDebugger(LineParam, UIntType, AppendAccessFuncInsts);
+			PatchToDebugger(SourceParam, UIntType, AppendAccessFuncInsts);
 			PatchToDebugger(VarIdParam, UIntType, AppendAccessFuncInsts);
 			PatchToDebugger(Patcher.FindOrAddConstant((uint32)IndexNum), UIntType, AppendAccessFuncInsts);
 			for (int32 i = 0; i < IndexNum; i++)
@@ -905,10 +913,11 @@ namespace FW
 		{
 			SpvId StateType = Patcher.FindOrAddConstant((uint32)SpvDebuggerStateType::Access);
 			SpvId Line = Patcher.FindOrAddConstant((uint32)CurLine);
+			SpvId Source = Patcher.FindOrAddConstant(CurSource.GetValue());
 			SpvId VarId = Patcher.FindOrAddConstant(Pointer->Var->Id.GetValue());
 			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
 			SpvId IntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 1));
-			TArray<SpvId> Arguments = { StateType, Line, VarId };
+			TArray<SpvId> Arguments = { StateType, Line, Source, VarId };
 			for (SpvId Index : Pointer->Indexes)
 			{
 				SpvId BitCastIndex = Patcher.NewId();

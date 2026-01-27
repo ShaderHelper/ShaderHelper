@@ -84,10 +84,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 				if (FPaths::GetExtension(IncludePath) == TEXT("header"))
 				{
 					AssetPtr<ShaderHeader> HeaderAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderHeader>(IncludePath);
-					if (HeaderAsset)
-					{
-						return HeaderAsset->GetFullContent();
-					}
+					return HeaderAsset ? HeaderAsset->GetFullContent() : "";
 				}
 				FString Content;
 				FFileHelper::LoadFileToString(Content, *IncludePath);
@@ -95,7 +92,9 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 			},
         });
 		FString ErrorInfo, WarnInfo;
+		Shader->CompilerFlag |= GpuShaderCompilerFlag::SkipCache;
 		bCompilationSucceed = GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo);
+		Shader->CompilerFlag &= ~GpuShaderCompilerFlag::SkipCache;
     }
 
 	GpuShader* StShader::GetVertexShader()
@@ -206,11 +205,9 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 			.IncludeHandler = [](const FString& IncludePath) -> FString {
 				if (FPaths::GetExtension(IncludePath) == TEXT("header"))
 				{
+					FScopeLock ScopeLock(&GAssetCS);
 					AssetPtr<ShaderHeader> HeaderAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderHeader>(IncludePath);
-					if (HeaderAsset)
-					{
-						return HeaderAsset->GetFullContent();
-					}
+					return HeaderAsset ? HeaderAsset->GetFullContent() : "";
 				}
 				FString Content;
 				FFileHelper::LoadFileToString(Content, *IncludePath);

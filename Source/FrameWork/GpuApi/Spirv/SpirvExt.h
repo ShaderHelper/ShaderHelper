@@ -316,8 +316,8 @@ namespace FW
 	class SpvLexicalScope
 	{
 	public:
-		SpvLexicalScope(SpvId InId, SpvScopeKind InKind, SpvLexicalScope* InParent)
-		: Id(InId), Kind(InKind), Parent(InParent)
+		SpvLexicalScope(SpvId InId, SpvScopeKind InKind, SpvLexicalScope* InParent, SpvId InSource = 0)
+		: Id(InId), Kind(InKind), Parent(InParent), Source(InSource)
 		{}
 		virtual ~SpvLexicalScope() = default;
 		
@@ -325,6 +325,7 @@ namespace FW
 		virtual int32 GetLine() const {return 0;}
 		SpvScopeKind GetKind() const { return Kind; }
 		SpvLexicalScope* GetParent() const { return Parent; }
+		SpvId GetSource() const { return Source; }
 		bool Contains(SpvLexicalScope* Child) const {
 			if(!Child)
 			{
@@ -344,6 +345,7 @@ namespace FW
 		SpvId Id;
 		SpvScopeKind Kind;
 		SpvLexicalScope* Parent;
+		SpvId Source;
 	};
 
 	class SpvCompilationUnit :  public SpvLexicalScope
@@ -356,7 +358,7 @@ namespace FW
 	class SpvLexicalBlock : public SpvLexicalScope
 	{
 	public:
-		SpvLexicalBlock(SpvId InId, int32 InLine, SpvLexicalScope* InParent) : SpvLexicalScope(InId, SpvScopeKind::Block, InParent)
+		SpvLexicalBlock(SpvId InId, int32 InLine, SpvLexicalScope* InParent, SpvId InSource) : SpvLexicalScope(InId, SpvScopeKind::Block, InParent, InSource)
 		, Line(InLine)
 		{}
 		
@@ -369,8 +371,8 @@ namespace FW
 	class SpvFunctionDesc : public SpvLexicalScope
 	{
 	public:
-		SpvFunctionDesc(SpvId InId, SpvLexicalScope* InParent, const FString& InName, SpvFuncTypeDesc* InTypeDesc, int32 InLine, int32 InScopeLine)
-		: SpvLexicalScope(InId, SpvScopeKind::Function, InParent)
+		SpvFunctionDesc(SpvId InId, SpvLexicalScope* InParent, const FString& InName, SpvFuncTypeDesc* InTypeDesc, int32 InLine, int32 InScopeLine, SpvId InSource)
+		: SpvLexicalScope(InId, SpvScopeKind::Function, InParent, InSource)
 		, Name(InName)
 		, TypeDesc(InTypeDesc)
 		, Line(InLine)

@@ -212,8 +212,7 @@ namespace SH
 	void ShaderToyPassNode::OnFinalizePixel(const FW::Vector2u& PixelCoord)
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(ShaderAssetObj);
-		ShaderEditor->DebugPixel(PixelCoord, GetInvocationState());
+		ShEditor->DebugPixel(PixelCoord, GetInvocationState());
 	}
 
 	ShaderAsset* ShaderToyPassNode::GetShaderAsset() const
@@ -540,13 +539,6 @@ namespace SH
 	void ShaderToyPassNode::OnEndDebuggging()
 	{
 		IsDebugging = false;
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		if(SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(ShaderAssetObj))
-		{
-			ShaderEditor->ResetDebugger();
-		}
-		
-        ShEditor->CloseDebuggerTabs();
 	}
 
     void ShaderToyPassNode::InitPins()

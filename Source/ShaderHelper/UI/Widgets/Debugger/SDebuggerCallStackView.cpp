@@ -38,10 +38,10 @@ namespace SH
 				.FillWidth(0.1f)
 				.DefaultLabel(LOCALIZATION(CallPointColId.ToString()))
 				+ SHeaderRow::Column(FuncNameColId)
-				.FillWidth(0.6f)
+				.FillWidth(0.5f)
 				.DefaultLabel(LOCALIZATION(FuncNameColId.ToString()))
 				+ SHeaderRow::Column(LocationColId)
-				.FillWidth(0.3f)
+				.FillWidth(0.4f)
 				.DefaultLabel(LOCALIZATION(LocationColId.ToString()))
 			)
 		];

@@ -5,6 +5,7 @@
 namespace FW
 {
 	int GAssetVer;
+	FCriticalSection GAssetCS;
 
 	void AssetManager::MountProject(const FString& InProjectContentDir)
 	{

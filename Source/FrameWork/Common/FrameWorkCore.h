@@ -20,7 +20,9 @@ namespace FW
 	class FRAMEWORK_API ShObject : FNoncopyable
 	{
 		REFLECTION_TYPE(ShObject)
-		
+
+		template<typename T, ObjectOwnerShip>
+		friend class ObjectPtr;
 		template<typename T, typename... ArgTypes>
 		friend ObjectPtr<T, ObjectOwnerShip::Retain> NewShObject(ShObject* InOuter, ArgTypes&&... InArgs);
 		template<typename T>
@@ -32,6 +34,21 @@ namespace FW
 		//Init only be called when a non-default object is created by NewShObject
 		virtual void Init() {}
 
+		int32 Add()
+		{
+			return ++NumRefs;
+		}
+		int32 Release()
+		{
+			int32 Refs = --NumRefs;
+			check(Refs >= 0);
+			if (Refs == 0)
+			{
+				Destroy();
+			}
+			return Refs;
+		}
+
     public:
 		FGuid GetGuid() const { return Guid; }
 		//Use the serialization system from unreal engine
@@ -42,22 +59,9 @@ namespace FW
 		virtual bool CanChangeProperty(PropertyData* InProperty) { return true; };
         virtual void PostPropertyChanged(PropertyData* InProperty);
     
-        uint32 Add()
+        int32 GetRefCount() const
         {
-            return uint32(++NumRefs);
-        }
-        uint32 Release()
-        {
-            uint32 Refs = uint32(--NumRefs);
-            if(Refs == 0)
-            {
-				Destroy();
-            }
-            return Refs;
-        }
-        uint32 GetRefCount() const
-        {
-            return uint32(NumRefs);
+            return NumRefs;
         }
         
         void SetOuter(ShObject* InOuter);
@@ -71,7 +75,8 @@ namespace FW
 	protected:
 		FGuid Guid;
         TArray<TSharedRef<PropertyData>> PropertyDatas;
-        int32 NumRefs;
+        std::atomic<int32> NumRefs;
+
 
     private:
         //For all Shobject except AssetObject

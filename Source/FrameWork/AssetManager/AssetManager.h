@@ -9,7 +9,7 @@ namespace FW
 {
 	class GpuTexture;
 
-    template<typename T, typename = std::enable_if_t<std::is_base_of_v<AssetObject, T>>>
+    template<typename T>
     using AssetPtr = ObjectPtr<T, ObjectOwnerShip::Retain>;
 
 	//Ensure the GuidToPath of AssetManager is always accessed with a normalized path.
@@ -34,6 +34,7 @@ namespace FW
 	};
 
 	FRAMEWORK_API extern int GAssetVer;
+	FRAMEWORK_API extern FCriticalSection GAssetCS;
 
 	class FRAMEWORK_API AssetManager
 	{

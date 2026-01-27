@@ -278,7 +278,6 @@ namespace SH
 			if (std::holds_alternative<PixelState>(Invocation))
 			{
 				IsValidating = true;
-				SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(ShEditor->GetDebuggaleObject()->GetShaderAsset());
 				PixelCoord = { -1 };
 				GApp->EnableBusyBlocker();
 				FNotificationInfo Info(LOCALIZATION("StartValidatorTip"));
@@ -292,7 +291,7 @@ namespace SH
 					std::optional<Vector2u> ErrorCoord;
 					try
 					{
-						ErrorCoord = ShaderEditor->ValidatePixel(Invocation);
+						ErrorCoord = ShEditor->ValidatePixel(Invocation);
 					}
 					catch (const std::runtime_error& e)
 					{

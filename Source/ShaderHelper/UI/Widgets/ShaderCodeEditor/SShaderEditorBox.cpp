@@ -24,8 +24,6 @@
 #include <Styling/StyleColors.h>
 #include <Widgets/Colors/SColorBlock.h>
 #include <Widgets/Text/SRichTextBlock.h>
-#include <Framework/Notifications/NotificationManager.h>
-#include <Widgets/Notifications/SNotificationList.h>
 
 #include <regex>
 
@@ -138,7 +136,6 @@ constexpr int PaddingLineNum = 22;
     }
     
 	SShaderEditorBox::SShaderEditorBox()
-	: Debugger(this)
 	{
 	}
 
@@ -639,6 +636,7 @@ constexpr int PaddingLineNum = 22;
 							.OnContextMenuOpening_Lambda([this] {
 								FMenuBuilder MenuBuilder(true, UICommandList);
 								{
+									MenuBuilder.AddMenuEntry(CodeEditorCommands::Get().GoToDefinition);
 									MenuBuilder.BeginSection("EditText", FText::FromString("Edit Text"));
 									{
 										MenuBuilder.AddMenuEntry(CodeEditorCommands::Get().Cut, NAME_None, {}, {},
@@ -1609,19 +1607,10 @@ constexpr int PaddingLineNum = 22;
 		
 		if (!IncludePath.IsEmpty())
 		{
-			// Try to find in include directories
-			for (const FString& IncludeDir : ShaderAssetObj->GetIncludeDirs())
+			AssetPtr<ShaderAsset> TargetShaderAsset = ShaderAssetObj->FindIncludeAsset(IncludePath);
+			if (TargetShaderAsset)
 			{
-				FString FullPath = FPaths::Combine(IncludeDir, IncludePath);
-				if (TSingleton<AssetManager>::Get().IsValidAsset(FullPath))
-				{
-					AssetPtr<ShaderAsset> TargetShaderAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderAsset>(FullPath);
-					if (TargetShaderAsset)
-					{
-						AssetOp::OpenAsset(TargetShaderAsset);
-						return;
-					}
-				}
+				AssetOp::OpenAsset(TargetShaderAsset);
 			}
 			return;
 		}
@@ -1644,26 +1633,11 @@ constexpr int PaddingLineNum = 22;
 			
 			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 			int32 SymbolExtraLineNum = ExtraLineNum;
-			AssetPtr<ShaderAsset> TargetShaderAsset = nullptr;
+			AssetPtr<ShaderAsset> TargetShaderAsset = ShaderAssetObj->FindIncludeAsset(Symbol.File);
 			
-			if (!Symbol.File.IsEmpty() && Symbol.File != ShaderAssetObj->GetShaderName())
+			if (TargetShaderAsset)
 			{
-				FString SymbolFilePath = Symbol.File;
-				// Try to find in include directories
-				for (const FString& IncludeDir : ShaderAssetObj->GetIncludeDirs())
-				{
-					FString FullPath = FPaths::Combine(IncludeDir, SymbolFilePath);
-					if (TSingleton<AssetManager>::Get().IsValidAsset(FullPath))
-					{
-						TargetShaderAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderAsset>(FullPath);
-						break;
-					}
-				}
-				
-				if (TargetShaderAsset)
-				{
-					SymbolExtraLineNum = TargetShaderAsset->GetExtraLineNum();
-				}
+				SymbolExtraLineNum = TargetShaderAsset->GetExtraLineNum();
 			}
 			
 			int SymbolLineNumber = Symbol.Row - SymbolExtraLineNum;
@@ -2398,6 +2372,7 @@ constexpr int PaddingLineNum = 22;
 		
 		//TODO Async and show "Compiling" state
 		TRefCountPtr<GpuShader> Shader = CreateGpuShader();
+		Shader->CompilerFlag |= GpuShaderCompilerFlag::SkipCache;
 		FString ErrorInfo, WarnInfo;
         if (GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo))
         {
@@ -2422,6 +2397,7 @@ constexpr int PaddingLineNum = 22;
 				SH_LOG(LogShader, Error, TEXT("%s"), *ErrorInfo);
 			}
 		}
+		Shader->CompilerFlag &= ~GpuShaderCompilerFlag::SkipCache;
     }
 
     void SShaderEditorBox::OnShaderTextChanged(const FString& InShaderSouce)
@@ -2429,9 +2405,10 @@ constexpr int PaddingLineNum = 22;
         FString NewShaderSource = InShaderSouce.Replace(TEXT("\r\n"), TEXT("\n"));
         if (NewShaderSource != ShaderAssetObj->EditorContent)
         {
-			if(Debugger.IsValid())
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			if(ShEditor->GetDebugger().IsValid())
 			{
-				bEditDuringDebugging = true;
+				ShEditor->GetDebugger().MarkEditDuringDebugging();
 			}
 			CurEditState = EditState::Editing;
 			ShaderAssetObj->EditorContent = NewShaderSource;
@@ -3195,6 +3172,10 @@ constexpr int PaddingLineNum = 22;
 
     TSharedRef<ITableRow> SShaderEditorBox::GenerateRowForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
     {
+		auto GetDebugger = []() -> ShaderDebugger& {
+			return static_cast<ShaderHelperEditor*>(GApp->GetEditor())->GetDebugger();
+		};
+		
 		float LineHeight = ShaderMarshaller->TextLayout->GetUniformLineHeight() / ShaderMarshaller->TextLayout->GetScale();
 		auto LineHeightBox = SNew(SBox).HeightOverride(LineHeight);
 		auto LineNumberRow = SNew(STableRow<LineNumberItemPtr>, OwnerTable)
@@ -3278,7 +3259,7 @@ constexpr int PaddingLineNum = 22;
 			{
 				return FAppStyle::Get().GetBrush("Icons.Warning");
 			}
-			else if(Debugger.GetStopLineNumber() == LineNumber)
+			else if(GetDebugger().GetStopLineNumber() == LineNumber)
 			{
 				return FShaderHelperStyle::Get().GetBrush("Icons.ArrowBoldRight");
 			}
@@ -3293,11 +3274,11 @@ constexpr int PaddingLineNum = 22;
 			{
 				return FStyleColors::Error;
 			}
-			else if (!Debugger.GetDebuggerError().Key.IsEmpty() && Debugger.GetDebuggerError().Value == LineNumber)
+			else if (!GetDebugger().GetDebuggerError().Key.IsEmpty() && GetDebugger().GetDebuggerError().Value == LineNumber)
 			{
 				return FStyleColors::Error;
 			}
-			else if(Debugger.GetStopLineNumber() == LineNumber)
+			else if(GetDebugger().GetStopLineNumber() == LineNumber)
 			{
 				return FLinearColor::Green;
 			}
@@ -3308,7 +3289,7 @@ constexpr int PaddingLineNum = 22;
 			{
 				return EVisibility::Visible;
 			}
-			else if(BreakPointLineNumbers.Contains(LineNumber) || Debugger.GetStopLineNumber() == LineNumber)
+			else if(BreakPointLineNumbers.Contains(LineNumber) || GetDebugger().GetStopLineNumber() == LineNumber)
 			{
 				return EVisibility::HitTestInvisible;
 			}
@@ -3359,8 +3340,8 @@ constexpr int PaddingLineNum = 22;
 				[
 					SNew(SBox)
 					.HeightOverride(1.0)
-					.Visibility_Lambda([this, LineNumber]{
-						if(BreakPointLineNumbers.Contains(LineNumber) || Debugger.GetStopLineNumber() == LineNumber)
+					.Visibility_Lambda([this, LineNumber, GetDebugger]{
+						if(BreakPointLineNumbers.Contains(LineNumber) || GetDebugger().GetStopLineNumber() == LineNumber)
 						{
 							return EVisibility::HitTestInvisible;
 						}
@@ -3369,12 +3350,12 @@ constexpr int PaddingLineNum = 22;
 					[
 						SNew(SImage)
 						.Image(FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect2"))
-						.ColorAndOpacity_Lambda([this, LineNumber]{
-							if (!Debugger.GetDebuggerError().Key.IsEmpty() && Debugger.GetDebuggerError().Value == LineNumber)
+						.ColorAndOpacity_Lambda([this, LineNumber, GetDebugger]{
+							if (!GetDebugger().GetDebuggerError().Key.IsEmpty() && GetDebugger().GetDebuggerError().Value == LineNumber)
 							{
 								return FLinearColor{ 1,0,0,0.7f };
 							}
-							else if(Debugger.GetStopLineNumber() == LineNumber)
+							else if(GetDebugger().GetStopLineNumber() == LineNumber)
 							{
 								return FLinearColor{0,1,0,0.7f};
 							}
@@ -3385,20 +3366,20 @@ constexpr int PaddingLineNum = 22;
 				+SOverlay::Slot()
 				[
 					SNew(SImage)
-					.Visibility_Lambda([this, LineNumber]{
-						if(BreakPointLineNumbers.Contains(LineNumber) || Debugger.GetStopLineNumber() == LineNumber)
+					.Visibility_Lambda([this, LineNumber, GetDebugger]{
+						if(BreakPointLineNumbers.Contains(LineNumber) || GetDebugger().GetStopLineNumber() == LineNumber)
 						{
 							return EVisibility::HitTestInvisible;
 						}
 						return EVisibility::Collapsed;
 					})
 					.Image(FAppStyle::Get().GetBrush("WhiteBrush"))
-					.ColorAndOpacity_Lambda([this, LineNumber]{
-						if (!Debugger.GetDebuggerError().Key.IsEmpty() && Debugger.GetDebuggerError().Value == LineNumber)
+					.ColorAndOpacity_Lambda([this, LineNumber, GetDebugger]{
+						if (!GetDebugger().GetDebuggerError().Key.IsEmpty() && GetDebugger().GetDebuggerError().Value == LineNumber)
 						{
 							return FLinearColor{ 1,0,0,0.06f };
 						}
-						else if(Debugger.GetStopLineNumber() == LineNumber)
+						else if(GetDebugger().GetStopLineNumber() == LineNumber)
 						{
 							return FLinearColor{0,1,0,0.06f};
 						}
@@ -3412,6 +3393,10 @@ constexpr int PaddingLineNum = 22;
 
     TSharedRef<ITableRow> SShaderEditorBox::GenerateLineTipForItem(LineNumberItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable)
     {
+		auto GetDebugger = []() -> ShaderDebugger& {
+			return static_cast<ShaderHelperEditor*>(GApp->GetEditor())->GetDebugger();
+		};
+		
 		float LineHeight = ShaderMarshaller->TextLayout->GetUniformLineHeight() / ShaderMarshaller->TextLayout->GetScale();
 		auto LineHeightBox = SNew(SBox).HeightOverride(LineHeight);
 		auto LineTip = SNew(STableRow<LineNumberItemPtr>, OwnerTable)
@@ -3441,8 +3426,8 @@ constexpr int PaddingLineNum = 22;
 				[
 					SNew(SBox)
 					.HeightOverride(1.0)
-					.Visibility_Lambda([this, LineNumber]{
-						if(BreakPointLineNumbers.Contains(LineNumber) || Debugger.GetStopLineNumber() == LineNumber)
+					.Visibility_Lambda([this, LineNumber, GetDebugger]{
+						if(BreakPointLineNumbers.Contains(LineNumber) || GetDebugger().GetStopLineNumber() == LineNumber)
 						{
 							return EVisibility::HitTestInvisible;
 						}
@@ -3451,12 +3436,12 @@ constexpr int PaddingLineNum = 22;
 					[
 						SNew(SImage)
 						.Image(FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect2"))
-						.ColorAndOpacity_Lambda([this, LineNumber]{
-							if (!Debugger.GetDebuggerError().Key.IsEmpty() && Debugger.GetDebuggerError().Value == LineNumber)
+						.ColorAndOpacity_Lambda([this, LineNumber, GetDebugger]{
+							if (!GetDebugger().GetDebuggerError().Key.IsEmpty() && GetDebugger().GetDebuggerError().Value == LineNumber)
 							{
 								return FLinearColor{ 1,0,0,0.7f };
 							}
-							else if(Debugger.GetStopLineNumber() == LineNumber)
+							else if(GetDebugger().GetStopLineNumber() == LineNumber)
 							{
 								return FLinearColor{0,1,0,0.7f};
 							}
@@ -3467,26 +3452,26 @@ constexpr int PaddingLineNum = 22;
 				+SOverlay::Slot()
 				[
 					SNew(SBorder)
-					.Visibility_Lambda([this, LineNumber]{
-						if(BreakPointLineNumbers.Contains(LineNumber) || Debugger.GetStopLineNumber() == LineNumber)
+					.Visibility_Lambda([this, LineNumber, GetDebugger]{
+						if(BreakPointLineNumbers.Contains(LineNumber) || GetDebugger().GetStopLineNumber() == LineNumber)
 						{
 							return EVisibility::HitTestInvisible;
 						}
 						return EVisibility::Collapsed;
 					})
-					.BorderImage_Lambda([this, LineNumber]{
-						if (!Debugger.GetDebuggerError().Key.IsEmpty() && Debugger.GetDebuggerError().Value == LineNumber)
+					.BorderImage_Lambda([this, LineNumber, GetDebugger]{
+						if (!GetDebugger().GetDebuggerError().Key.IsEmpty() && GetDebugger().GetDebuggerError().Value == LineNumber)
 						{
 							return FAppStyle::Get().GetBrush("WhiteBrush");
 						}
 						return FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect");
 					})
-					.BorderBackgroundColor_Lambda([this, LineNumber]{
-						if (!Debugger.GetDebuggerError().Key.IsEmpty() && Debugger.GetDebuggerError().Value == LineNumber)
+					.BorderBackgroundColor_Lambda([this, LineNumber, GetDebugger]{
+						if (!GetDebugger().GetDebuggerError().Key.IsEmpty() && GetDebugger().GetDebuggerError().Value == LineNumber)
 						{
 							return FLinearColor{ 1,0,0,0.3f };
 						}
-						else if(Debugger.GetStopLineNumber() == LineNumber)
+						else if(GetDebugger().GetStopLineNumber() == LineNumber)
 						{
 							return FLinearColor{0,1,0,0.3f};
 						}
@@ -3498,11 +3483,11 @@ constexpr int PaddingLineNum = 22;
 					[
 						SNew(STextBlock)
 						.Font(GetCodeFontInfo())
-						.Visibility_Lambda([this, LineNumber] { 
-							return !Debugger.GetDebuggerError().Key.IsEmpty() && Debugger.GetDebuggerError().Value == LineNumber ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+						.Visibility_Lambda([this, LineNumber, GetDebugger] { 
+							return !GetDebugger().GetDebuggerError().Key.IsEmpty() && GetDebugger().GetDebuggerError().Value == LineNumber ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 						})
-						.Text_Lambda([this] { 
-							return FText::FromString(Debugger.GetDebuggerError().Key); 
+						.Text_Lambda([GetDebugger] { 
+							return FText::FromString(GetDebugger().GetDebuggerError().Key); 
 						})
 						.ColorAndOpacity(FLinearColor::Red)
 					]
@@ -3510,12 +3495,12 @@ constexpr int PaddingLineNum = 22;
         );
 
     
-        LineTip->SetBorderBackgroundColor(TAttribute<FSlateColor>::CreateLambda([this, LineNumber]{
+        LineTip->SetBorderBackgroundColor(TAttribute<FSlateColor>::CreateLambda([this, LineNumber, GetDebugger]{
             const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
             const int32 CurLineIndex = CursorLocation.GetLineIndex();
             auto FocusedWidget = FSlateApplication::Get().GetUserFocusedWidget(0);
             if(CanHighlightCursorLine() && FocusedWidget == ShaderMultiLineEditableText && LineNumber == GetLineNumber(CurLineIndex)
-			   && !BreakPointLineNumbers.Contains(LineNumber) && Debugger.GetStopLineNumber() != LineNumber)
+			   && !BreakPointLineNumbers.Contains(LineNumber) && GetDebugger().GetStopLineNumber() != LineNumber)
             {
                 double CurTime = FPlatformTime::Seconds();
                 float Speed = 1.8f;
@@ -3823,6 +3808,7 @@ constexpr int PaddingLineNum = 22;
 		FGeometry WindowGeometry = ShaderEditorTipWindow->GetWindowGeometryInScreen();
 		bool bMouseInTipWindow = ShaderEditorTipWindow->IsVisible() && WindowGeometry.IsUnderLocation(ScreenSpaceCursorPos);
 		bool IsTopLevel = FSlateApplication::Get().GetActiveTopLevelRegularWindow() == FSlateApplication::Get().FindWidgetWindow(Owner->AsShared());
+		bool bHasActiveMenu = FSlateApplication::Get().AnyMenusVisible();
 
 		static double LastCheckTime = 0.0;
 		const double CheckInterval = 0.4;
@@ -3832,11 +3818,6 @@ constexpr int PaddingLineNum = 22;
 
 		//Show the debug value when hovering over variables
 		auto CheckDebuggerTip = [&] {
-			if (!IsTopLevel)
-			{
-				return false;
-			}
-
 			ExpressionNodePtr HoverExpr;
 			FTextLocation CurrentHoverLocation;
 			FString CurrentTokenName;
@@ -3853,7 +3834,8 @@ constexpr int PaddingLineNum = 22;
 			{
 				FVector2D LocalSpaceCursorPos = AllottedGeometry.AbsoluteToLocal(ScreenSpaceCursorPos);
 				CurrentHoverLocation = Owner->ShaderMarshaller->TextLayout->GetTextLocationAt(LocalSpaceCursorPos * AllottedGeometry.Scale);
-				if (Owner->Debugger.IsValid())
+				auto& Debugger = static_cast<ShaderHelperEditor*>(GApp->GetEditor())->GetDebugger();
+				if (Debugger.IsValid())
 				{
 					int32 ExtraLineNum = Owner->GetShaderAsset()->GetExtraLineNum();
 					const auto& TokenizedLine = Owner->ShaderMarshaller->TokenizedLines[CurrentHoverLocation.GetLineIndex()];
@@ -3910,7 +3892,7 @@ constexpr int PaddingLineNum = 22;
 						}
 						else
 						{
-							ExpressionNode EvalResult = Owner->Debugger.EvaluateExpression(Expression);
+							ExpressionNode EvalResult = Debugger.EvaluateExpression(Expression);
 							if (EvalResult.ValueStr != LOCALIZATION("InvalidExpr").ToString())
 							{
 								HoverExpr = MakeShared<ExpressionNode>(MoveTemp(EvalResult));
@@ -3962,7 +3944,7 @@ constexpr int PaddingLineNum = 22;
 		};
 
 		auto CheckColorBlockTip = [&] {
-			if (!SShaderEditorBox::CanShowColorBlock() || !IsTopLevel)
+			if (!SShaderEditorBox::CanShowColorBlock())
 			{
 				return false;
 			}
@@ -4100,12 +4082,12 @@ constexpr int PaddingLineNum = 22;
 		};
 
 		auto CheckQuickInfo = [&] {
-			if (!SShaderEditorBox::CanShowQuickInfo() || !IsTopLevel)
+			if (!SShaderEditorBox::CanShowQuickInfo())
 			{
 				return false;
 			}
 
-			if (AllottedGeometry.IsUnderLocation(ScreenSpaceCursorPos) && !Owner->Debugger.IsValid())
+			if (AllottedGeometry.IsUnderLocation(ScreenSpaceCursorPos) && !static_cast<ShaderHelperEditor*>(GApp->GetEditor())->GetDebugger().IsValid())
 			{
 				FVector2D LocalSpaceCursorPos = AllottedGeometry.AbsoluteToLocal(ScreenSpaceCursorPos);
 				FTextLocation CurrentHoverLocation = Owner->ShaderMarshaller->TextLayout->GetTextLocationAt(LocalSpaceCursorPos * AllottedGeometry.Scale);
@@ -4308,24 +4290,10 @@ constexpr int PaddingLineNum = 22;
 							}
 
 							int32 SymbolExtraLineNum = ExtraLineNum;
-							if (!Symbol.File.IsEmpty() && Symbol.File != Owner->GetShaderAsset()->GetShaderName())
+							AssetPtr<ShaderAsset> SymbolAsset = Owner->GetShaderAsset()->FindIncludeAsset(Symbol.File);
+							if (SymbolAsset)
 							{
-								FString SymbolFilePath = Symbol.File;
-								AssetPtr<ShaderAsset> SymbolAsset = nullptr;
-								// Try to find in include directories
-								for (const FString& IncludeDir : Owner->GetShaderAsset()->GetIncludeDirs())
-								{
-									FString FullPath = FPaths::Combine(IncludeDir, SymbolFilePath);
-									if (TSingleton<AssetManager>::Get().IsValidAsset(FullPath))
-									{
-										SymbolAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderAsset>(FullPath);
-										break;
-									}
-								}
-								if (SymbolAsset)
-								{
-									SymbolExtraLineNum = SymbolAsset->GetExtraLineNum();
-								}
+								SymbolExtraLineNum = SymbolAsset->GetExtraLineNum();
 							}
 							int SymbolLineNumber = Symbol.Row - SymbolExtraLineNum;
 							if (SymbolLineNumber > 0 || !Symbol.Url.IsEmpty())
@@ -4391,7 +4359,7 @@ constexpr int PaddingLineNum = 22;
 
 		if (bShouldCheck)
 		{
-			if (!CheckDebuggerTip() && !CheckColorBlockTip() && !CheckQuickInfo())
+			if (bHasActiveMenu || !IsTopLevel || (!CheckDebuggerTip() && !CheckColorBlockTip() && !CheckQuickInfo()))
 			{
 				ShaderEditorTipWindow->SetContent(SNullWidget::NullWidget);
 				ShaderEditorTipWindow->HideWindow();
@@ -4503,82 +4471,5 @@ constexpr int PaddingLineNum = 22;
 			int32 TargetLineIndex = FMath::Clamp(InLineIndex + VisibleLineCount / 2, 0, LineCount - 1);
 			ShaderMultiLineEditableText->ScrollTo({ TargetLineIndex, 0 });
 		}
-	}
-
-	void SShaderEditorBox::Continue(StepMode Mode)
-	{
-		AssetOp::OpenAsset(ShaderAssetObj);
-		if(bEditDuringDebugging)
-		{
-			auto Ret = MessageDialog::Open(MessageDialog::OkCancel, MessageDialog::Shocked, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("EditDuringDebugging"));
-			if(Ret == MessageDialog::MessageRet::Ok)
-			{
-				bEditDuringDebugging = false;
-			}
-			else
-			{
-				return;
-			}
-		}
-		
-		if(Debugger.Continue(Mode))
-		{
-			Debugger.ShowDebuggerResult();
-			JumpTo(GetLineIndex(Debugger.GetStopLineNumber()));
-			UnFold(Debugger.GetStopLineNumber());
-		}
-		else
-		{
-			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-			ShEditor->EndDebugging();
-		}
-	}
-
-	void SShaderEditorBox::ResetDebugger()
-	{
-		bEditDuringDebugging = false;
-		Debugger.Reset();
-	}
-
-	std::optional<Vector2u> SShaderEditorBox::ValidatePixel(const InvocationState& InState)
-	{
-		return Debugger.ValidatePixel(InState);
-	}
-
-	void SShaderEditorBox::DebugPixel(const Vector2u& InPixelCoord, const InvocationState& InState)
-	{
-		GApp->EnableBusyBlocker();
-		FNotificationInfo Info(LOCALIZATION("StartDebuggerTip"));
-		Info.Image = FAppStyle::Get().GetBrush("NoBrush");
-		Info.bFireAndForget = false;
-		Info.FadeInDuration = 0.0f;
-		Info.FadeOutDuration = 0.0f;
-		auto Notification = FSlateNotificationManager::Get().AddNotification(Info);
-		Notification->SetCompletionState(SNotificationItem::CS_Pending);
-		Async(EAsyncExecution::Thread, [=, this]() {
-			try
-			{
-				Debugger.DebugPixel(InPixelCoord, InState);
-			}
-			catch (const std::runtime_error& e)
-			{
-				AsyncTask(ENamedThreads::GameThread, [=, this] {
-					Notification->Fadeout();
-					GApp->DisableBusyBlocker();
-					FText FailureInfo = LOCALIZATION("DebugFailure");
-					SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo.ToString(), UTF8_TO_TCHAR(e.what()));
-					MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), FailureInfo);
-					auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-					ShEditor->EndDebugging();
-				});
-				return;
-			}
-
-			AsyncTask(ENamedThreads::GameThread, [=, this] {
-				Notification->Fadeout();
-				GApp->DisableBusyBlocker();
-				Continue();
-			});
-		});
 	}
 }

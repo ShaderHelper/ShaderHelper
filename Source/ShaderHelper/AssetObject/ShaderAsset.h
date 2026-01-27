@@ -1,5 +1,5 @@
 #pragma once
-#include "AssetObject/AssetObject.h"
+#include "AssetManager/AssetManager.h"
 #include "GpuApi/GpuShader.h"
 
 namespace SH
@@ -19,6 +19,8 @@ namespace SH
 		TArray<FString> GetIncludeDirs() const;
 		FString GetShaderName() const;
 		virtual FW::GpuShaderSourceDesc GetShaderDesc(const FString& InContent) const = 0;
+
+		FW::AssetPtr<ShaderAsset> FindIncludeAsset(const FString& InShaderName);
 		
 	public:
 		//Only visible content in editor

@@ -416,20 +416,22 @@ namespace FW
 	void SpvMetaVisitor::Visit(const SpvDebugLexicalBlock* Inst)
 	{
 		SpvId ResultId = Inst->GetId().value();
+		SpvId Source = Inst->GetSource();
 		int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLine()].Storage).Value.GetData();
 		SpvLexicalScope* ParentScope = Context.LexicalScopes[Inst->GetParentId()].Get();
-		Context.LexicalScopes.emplace(ResultId, MakeUnique<SpvLexicalBlock>(ResultId, Line, ParentScope));
+		Context.LexicalScopes.emplace(ResultId, MakeUnique<SpvLexicalBlock>(ResultId, Line, ParentScope, Source));
 	}
 
 	void SpvMetaVisitor::Visit(const SpvDebugFunction* Inst)
 	{
 		SpvId ResultId = Inst->GetId().value();
+		SpvId Source = Inst->GetSource();
 		SpvLexicalScope* ParentScope = Context.LexicalScopes[Inst->GetParentId()].Get();
 		const FString& FuncName = Context.DebugStrs[Inst->GetNameId()];
 		SpvFuncTypeDesc* FuncTypeDesc = static_cast<SpvFuncTypeDesc*>(Context.TypeDescs[Inst->GetTypeDescId()].Get());
 		int32 Line = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetLine()].Storage).Value.GetData();
 		int32 ScopeLine = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Inst->GetScopeLine()].Storage).Value.GetData();
-		Context.LexicalScopes.emplace(ResultId, MakeUnique<SpvFunctionDesc>(ResultId, ParentScope, FuncName, FuncTypeDesc, Line, ScopeLine));
+		Context.LexicalScopes.emplace(ResultId, MakeUnique<SpvFunctionDesc>(ResultId, ParentScope, FuncName, FuncTypeDesc, Line, ScopeLine, Source));
 	}
 
 	void SpvMetaVisitor::Visit(const SpvDebugInlinedAt* Inst)
@@ -1554,19 +1556,21 @@ namespace FW
 					}
 					else if(ExtOp == SpvDebugInfo100::DebugLexicalBlock)
 					{
+						SpvId Source = SpvCode[WordOffset + 5];
 						SpvId Line = SpvCode[WordOffset + 6];
 						SpvId Parent = SpvCode[WordOffset + 8];
-						DecodedInst = MakeUnique<SpvDebugLexicalBlock>(Line, Parent);
+						DecodedInst = MakeUnique<SpvDebugLexicalBlock>(Source, Line, Parent);
 						DecodedInst->SetId(ResultId);
 					}
 					else if(ExtOp == SpvDebugInfo100::DebugFunction)
 					{
 						SpvId Name = SpvCode[WordOffset + 5];
 						SpvId TypeDesc = SpvCode[WordOffset + 6];
+						SpvId Source = SpvCode[WordOffset + 7];
 						SpvId Line = SpvCode[WordOffset + 8];
 						SpvId Parent = SpvCode[WordOffset + 10];
 						SpvId ScopeLine = SpvCode[WordOffset + 13];
-						DecodedInst = MakeUnique<SpvDebugFunction>(Name, TypeDesc, Line, Parent, ScopeLine);
+						DecodedInst = MakeUnique<SpvDebugFunction>(Name, TypeDesc, Source, Line, Parent, ScopeLine);
 						DecodedInst->SetId(ResultId);
 					}
 					else if(ExtOp == SpvDebugInfo100::DebugScope)

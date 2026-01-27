@@ -4,6 +4,7 @@
 #include "Editor/ShaderHelperEditor.h"
 #include "GpuApi/Spirv/SpirvExprDebugger.h"
 #include "GpuApi/Spirv/SpirvValidator.h"
+#include "Editor/AssetEditor/AssetEditor.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 
 using namespace FW;
@@ -319,21 +320,20 @@ namespace SH
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		SDebuggerCallStackView* DebuggerCallStackView = ShEditor->GetDebuggerCallStackView();
-		ShaderAsset* ShaderAssetObj = ShaderEditor->GetShaderAsset();
-		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
 		TArray<CallStackDataPtr> CallStackDatas;
 
 		GpuShaderLanguage Lang = DebugShader->GetShaderLanguage();
 		SpvFunctionDesc* FuncDesc = GetFunctionDesc(Scope);
-		FString Location = FString::Printf(TEXT("%s (Line %d)"), *ShaderAssetObj->Shader->GetShaderName(), StopLineNumber);
+		FString Location = FString::Printf(TEXT("%s (Line %d)"), *StopFile, StopLineNumber);
 		CallStackDatas.Add(MakeShared<CallStackData>(GetFunctionSig(FuncDesc, Lang), MoveTemp(Location)));
 		for (int i = CallStack.Num() - 1; i >= 0; i--)
 		{
 			SpvFunctionDesc* FuncDesc = GetFunctionDesc(CallStack[i].Scope);
+			int32 ExtraLineNum = CurShaderAsset->FindIncludeAsset(CallStack[i].File)->GetExtraLineNum();
 			int JumpLineNumber = CallStack[i].Line - ExtraLineNum;
 			if (JumpLineNumber > 0)
 			{
-				FString Location = FString::Printf(TEXT("%s (Line %d)"), *ShaderAssetObj->Shader->GetShaderName(), JumpLineNumber);
+				FString Location = FString::Printf(TEXT("%s (Line %d)"), *CallStack[i].File, JumpLineNumber);
 				CallStackDatas.Add(MakeShared<CallStackData>(GetFunctionSig(FuncDesc, Lang), MoveTemp(Location)));
 			}
 		}
@@ -353,7 +353,9 @@ namespace SH
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		SDebuggerVariableView* DebuggerLocalVariableView = ShEditor->GetDebuggerLocalVariableView();
 		SDebuggerVariableView* DebuggerGlobalVariableView = ShEditor->GetDebuggerGlobalVariableView();
-		int32 ExtraLineNum = ShaderEditor->GetShaderAsset()->GetExtraLineNum();
+		
+		AssetPtr<ShaderAsset> StopShader = CurShaderAsset->FindIncludeAsset(StopFile);
+		int32 ExtraLineNum = StopShader->GetExtraLineNum();
 
 		TArray<ExpressionNodePtr> LocalVarNodeDatas;
 		TArray<ExpressionNodePtr> GlobalVarNodeDatas;
@@ -445,25 +447,31 @@ namespace SH
 		}
 		ValidLines.Sort();
 		auto CallStackAtStop = CallStack;
-		int32 ExtraLineNum = ShaderEditor->GetShaderAsset()->GetExtraLineNum();
 		while (CurDebugStateIndex < DebugStates.Num())
 		{
 			const SpvDebugState& DebugState = DebugStates[CurDebugStateIndex];
 			std::optional<int32> NextValidLine;
+			SpvId NextSource{};
 			if (CurDebugStateIndex + 1 < DebugStates.Num())
 			{
 				const SpvDebugState& NextDebugState = DebugStates[CurDebugStateIndex + 1];
 				if (std::holds_alternative<SpvDebugState_VarChange>(NextDebugState))
 				{
-					NextValidLine = std::get<SpvDebugState_VarChange>(NextDebugState).Line;
+					const auto& State = std::get<SpvDebugState_VarChange>(NextDebugState);
+					NextValidLine = State.Line;
+					NextSource = State.Source;
 				}
 				else if (std::holds_alternative<SpvDebugState_FuncCall>(NextDebugState))
 				{
-					NextValidLine = std::get<SpvDebugState_FuncCall>(NextDebugState).Line;
+					const auto& State = std::get<SpvDebugState_FuncCall>(NextDebugState);
+					NextValidLine = State.Line;
+					NextSource = State.Source;
 				}
 				else if (std::holds_alternative<SpvDebugState_Tag>(NextDebugState))
 				{
-					NextValidLine = std::get<SpvDebugState_Tag>(NextDebugState).Line;
+					const auto& State = std::get<SpvDebugState_Tag>(NextDebugState);
+					NextValidLine = State.Line;
+					NextSource = State.Source;
 				}
 			}
 
@@ -480,7 +488,8 @@ namespace SH
 				uint32& TypedValue = *(uint32*)Value.GetData();
 				if (TypedValue != 1)
 				{
-					StopLineNumber = CurValidLine.value() - ExtraLineNum;
+					StopFile = DebuggerContext->GetSourceFileName(NextSource);
+					StopLineNumber = CurValidLine.value() - GetExtraLineNumForSource(NextSource);
 					DebuggerError = { "Assert failed", StopLineNumber };
 					TypedValue = 1;
 					break;
@@ -490,42 +499,61 @@ namespace SH
 
 			if (NextValidLine && NextValidLine.value())
 			{
-				bool MatchBreakPoint = Scope && ShaderEditor->BreakPointLineNumbers.ContainsByPredicate([&](int32 InEntry) {
-					int32 BreakPointLine = InEntry + ExtraLineNum;
-					int32 BreakPointValidLine = ValidLines[Algo::UpperBound(ValidLines, BreakPointLine - 1)];
-					for (const auto& [_, BB] : DebuggerContext->BBs)
+				int32 NextSourceExtraLineNum = GetExtraLineNumForSource(NextSource);
+				FString NextSourceFile = DebuggerContext->GetSourceFileName(NextSource);
+				
+				bool MatchBreakPoint = false;
+				if (Scope)
+				{
+					TArray<int32> SourceBreakPoints;
+					auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+					
+					if (AssetPtr<ShaderAsset> IncludeShader = CurShaderAsset->FindIncludeAsset(NextSourceFile))
 					{
-						if (BB.ValidLines.Contains(BreakPointValidLine) && BB.ValidLines.Contains(NextValidLine))
+						if (SShaderEditorBox* IncludeEditor = ShEditor->GetShaderEditor(IncludeShader))
 						{
-							if (!CurValidLine)
-							{
-								if (!GetFunctionDesc(Scope))
-								{
-									continue;
-								}
-								int32 FuncLine = GetFunctionDesc(Scope)->GetLine();
-								return (BreakPointLine >= FuncLine) && (BreakPointLine <= NextValidLine.value());
-							}
-							else
-							{
-								return (BreakPointValidLine > CurValidLine.value()) && (BreakPointValidLine <= NextValidLine.value());
-							}
+							SourceBreakPoints = IncludeEditor->BreakPointLineNumbers;
 						}
 					}
-					return false;
-				});
+					
+					MatchBreakPoint = SourceBreakPoints.ContainsByPredicate([&](int32 InEntry) {
+						int32 BreakPointLine = InEntry + NextSourceExtraLineNum;
+						int32 BreakPointValidLine = ValidLines[Algo::UpperBound(ValidLines, BreakPointLine - 1)];
+						for (const auto& [_, BB] : DebuggerContext->BBs)
+						{
+							if (BB.ValidLines.Contains(BreakPointValidLine) && BB.ValidLines.Contains(NextValidLine))
+							{
+								if (!CurValidLine)
+								{
+									if (!GetFunctionDesc(Scope))
+									{
+										continue;
+									}
+									int32 FuncLine = GetFunctionDesc(Scope)->GetLine();
+									return (BreakPointLine >= FuncLine) && (BreakPointLine <= NextValidLine.value());
+								}
+								else
+								{
+									return (BreakPointValidLine > CurValidLine.value()) && (BreakPointValidLine <= NextValidLine.value());
+								}
+							}
+						}
+						return false;
+					});
+				}
 				bool SameStack = CurValidLine != NextValidLine && CallStackAtStop.Num() == CallStack.Num();
 				bool ReturnStack = CallStackAtStop.Num() > CallStack.Num();
 				bool CrossStack = CallStackAtStop.Num() != CallStack.Num();
 
-				bool StopStepOver = Mode == StepMode::StepOver && NextValidLine.value() - ExtraLineNum > 0 && (SameStack || ReturnStack);
-				bool StopStepInto = Mode == StepMode::StepInto && NextValidLine.value() - ExtraLineNum > 0 && (SameStack || CrossStack);
+				bool StopStepOver = Mode == StepMode::StepOver && NextValidLine.value() - NextSourceExtraLineNum > 0 && (SameStack || ReturnStack);
+				bool StopStepInto = Mode == StepMode::StepInto && NextValidLine.value() - NextSourceExtraLineNum > 0 && (SameStack || CrossStack);
 
 				CurValidLine = NextValidLine;
 				if (MatchBreakPoint || StopStepOver || StopStepInto)
 				{
 					CallStackAtStop = CallStack;
-					StopLineNumber = NextValidLine.value() - ExtraLineNum;
+					StopFile = DebuggerContext->GetSourceFileName(NextSource);
+					StopLineNumber = NextValidLine.value() - NextSourceExtraLineNum;
 					break;
 				}
 			}
@@ -534,8 +562,7 @@ namespace SH
 		return CurDebugStateIndex < DebugStates.Num() && StopLineNumber > 0;
 	}
 
-	ShaderDebugger::ShaderDebugger(SShaderEditorBox* InShaderEditor)
-	: ShaderEditor(InShaderEditor)
+	ShaderDebugger::ShaderDebugger()
 	{
 	}
 
@@ -546,9 +573,22 @@ namespace SH
 		return EnableUbsan;
 	}
 
+	int32 ShaderDebugger::GetExtraLineNumForSource(SpvId Source) const
+	{
+		if (!DebuggerContext || !CurShaderAsset)
+		{
+			return 0;
+		}
+		FString SourceFileName = DebuggerContext->GetSourceFileName(Source);
+		if (AssetPtr<ShaderAsset> SourceShader = CurShaderAsset->FindIncludeAsset(SourceFileName))
+		{
+			return SourceShader->GetExtraLineNum();
+		}
+		return CurShaderAsset->GetExtraLineNum();
+	}
+
 	void ShaderDebugger::ApplyDebugState(const SpvDebugState& InState, FString& Error)
 	{
-		int32 ExtraLineNum = ShaderEditor->GetShaderAsset()->GetExtraLineNum();
 		if (std::holds_alternative<SpvDebugState_VarChange>(InState))
 		{
 			const auto& State = std::get<SpvDebugState_VarChange>(InState);
@@ -557,7 +597,8 @@ namespace SH
 				if (bEnableUbsan)
 				{
 					Error = "Undefined";
-					StopLineNumber = State.Line - ExtraLineNum;
+					StopFile = DebuggerContext->GetSourceFileName(State.Source);
+					StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 					SH_LOG(LogShader, Error, TEXT("%s"), *State.Error);
 				}
 				return;
@@ -616,7 +657,8 @@ namespace SH
 			}
 			if (Scope)
 			{
-				CallStack.Emplace(Scope, State.Line, CurDebugStateIndex, &Call);
+				FString SourceFile = DebuggerContext->GetSourceFileName(State.Source);
+				CallStack.Emplace(Scope, State.Line, MoveTemp(SourceFile), CurDebugStateIndex, &Call);
 				CurValidLine.reset();
 			}
 		}
@@ -635,14 +677,15 @@ namespace SH
 		{
 			const auto& State = std::get<SpvDebugState_Access>(InState);
 			SpvVariable* Var = DebuggerContext->FindVar(State.VarId);
-			if (Var->GetBufferSize() > 0)
+			if (Var && Var->GetBufferSize() > 0)
 			{
 				auto Range = Var->GetInitializedRange();
 				auto AccessOrError = GetAccess(Var, State.Indexes);
 				if (AccessOrError.HasError())
 				{
 					Error = "Undefined";
-					StopLineNumber = State.Line - ExtraLineNum;
+					StopFile = DebuggerContext->GetSourceFileName(State.Source);
+					StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 					SH_LOG(LogShader, Error, TEXT("%s"), *AccessOrError.GetError());
 				}
 				else
@@ -652,7 +695,8 @@ namespace SH
 					if (ByteOffset < Range.X || ByteOffset + Size > Range.Y)
 					{
 						Error = "Undefined";
-						StopLineNumber = State.Line - ExtraLineNum;
+						StopFile = DebuggerContext->GetSourceFileName(State.Source);
+						StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 						SH_LOG(LogShader, Error, TEXT("Reading the unintialized memory of the variable: %s!"), *DebuggerContext->Names[Var->Id]);
 					}
 				}
@@ -669,7 +713,8 @@ namespace SH
 			if (FMemory::Memcmp(State.X.GetData(), ZeroBuffer.GetData(), ZeroBuffer.Num()) == 0)
 			{
 				Error = "Undefined";
-				StopLineNumber = State.Line - ExtraLineNum;
+				StopFile = DebuggerContext->GetSourceFileName(State.Source);
+				StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 				SH_LOG(LogShader, Error, TEXT("normalize: normalizing a zero scalar or vector is undefined."));
 			}
 		}
@@ -687,13 +732,15 @@ namespace SH
 					if (X < 0.0f)
 					{
 						Error = "Undefined";
-						StopLineNumber = State.Line - ExtraLineNum;
+						StopFile = DebuggerContext->GetSourceFileName(State.Source);
+						StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 						SH_LOG(LogShader, Error, TEXT("pow: x(%f) < 0 for component %d, the result is undefined."), X, i);
 					}
 					else if (X == 0.0f && Y <= 0.0f)
 					{
 						Error = "Undefined";
-						StopLineNumber = State.Line - ExtraLineNum;
+						StopFile = DebuggerContext->GetSourceFileName(State.Source);
+						StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 						SH_LOG(LogShader, Error, TEXT("pow: x = 0 and y(%f) <= 0 for component %d, the result is undefined."), Y, i);
 					}
 				}
@@ -705,13 +752,15 @@ namespace SH
 				if (X < 0.0f)
 				{
 					Error = "Undefined";
-					StopLineNumber = State.Line - ExtraLineNum;
+					StopFile = DebuggerContext->GetSourceFileName(State.Source);
+					StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 					SH_LOG(LogShader, Error, TEXT("pow: x(%f) < 0, the result is undefined."), X);
 				}
 				else if (X == 0.0f && Y <= 0.0f)
 				{
 					Error = "Undefined";
-					StopLineNumber = State.Line - ExtraLineNum;
+					StopFile = DebuggerContext->GetSourceFileName(State.Source);
+					StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 					SH_LOG(LogShader, Error, TEXT("pow: x = 0 and y(%f) <= 0, the result is undefined."), Y);
 				}
 			}
@@ -732,7 +781,8 @@ namespace SH
 						if (MinVal > MaxVal)
 						{
 							Error = "Undefined";
-							StopLineNumber = State.Line - ExtraLineNum;
+							StopFile = DebuggerContext->GetSourceFileName(State.Source);
+							StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 							SH_LOG(LogShader, Error, TEXT("clamp: minVal(%f) > maxVal(%f) for component %d, the result is undefined."), MinVal, MaxVal, i);
 						}
 					}
@@ -745,7 +795,8 @@ namespace SH
 							if (MinVal > MaxVal)
 							{
 								Error = "Undefined";
-								StopLineNumber = State.Line - ExtraLineNum;
+								StopFile = DebuggerContext->GetSourceFileName(State.Source);
+								StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 								SH_LOG(LogShader, Error, TEXT("clamp: minVal(%d) > maxVal(%d) for component %d, the result is undefined."), MinVal, MaxVal, i);
 							}
 						}
@@ -756,7 +807,8 @@ namespace SH
 							if (MinVal > MaxVal)
 							{
 								Error = "Undefined";
-								StopLineNumber = State.Line - ExtraLineNum;
+								StopFile = DebuggerContext->GetSourceFileName(State.Source);
+								StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 								SH_LOG(LogShader, Error, TEXT("clamp: minVal(%d) > maxVal(%d) for component %d, the result is undefined."), MinVal, MaxVal, i);
 							}
 						}
@@ -772,7 +824,8 @@ namespace SH
 					if (MinVal > MaxVal)
 					{
 						Error = "Undefined";
-						StopLineNumber = State.Line - ExtraLineNum;
+						StopFile = DebuggerContext->GetSourceFileName(State.Source);
+						StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 						SH_LOG(LogShader, Error, TEXT("clamp: minVal(%f) > maxVal(%f), the result is undefined."), MinVal, MaxVal);
 					}
 				}
@@ -785,7 +838,8 @@ namespace SH
 						if (MinVal > MaxVal)
 						{
 							Error = "Undefined";
-							StopLineNumber = State.Line - ExtraLineNum;
+							StopFile = DebuggerContext->GetSourceFileName(State.Source);
+							StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 							SH_LOG(LogShader, Error, TEXT("clamp: minVal(%d) > maxVal(%d), the result is undefined."), MinVal, MaxVal);
 						}
 					}
@@ -796,7 +850,8 @@ namespace SH
 						if (MinVal > MaxVal)
 						{
 							Error = "Undefined";
-							StopLineNumber = State.Line - ExtraLineNum;
+							StopFile = DebuggerContext->GetSourceFileName(State.Source);
+							StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 							SH_LOG(LogShader, Error, TEXT("clamp: minVal(%d) > maxVal(%d), the result is undefined."), MinVal, MaxVal);
 						}
 					}
@@ -817,7 +872,8 @@ namespace SH
 					if (e0 >= e1)
 					{
 						Error = "Undefined";
-						StopLineNumber = State.Line - ExtraLineNum;
+						StopFile = DebuggerContext->GetSourceFileName(State.Source);
+						StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 						SH_LOG(LogShader, Error, TEXT("smoothstep: Edge0(%f) >= Edge1(%f) for component %d, the result is undefined."), e0, e1, i);
 					}
 				}
@@ -829,7 +885,8 @@ namespace SH
 				if (e0 >= e1)
 				{
 					Error = "Undefined";
-					StopLineNumber = State.Line - ExtraLineNum;
+					StopFile = DebuggerContext->GetSourceFileName(State.Source);
+					StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 					SH_LOG(LogShader, Error, TEXT("smoothstep: Edge0(%f) >= Edge1(%f), the result is undefined."), e0, e1);
 				}
 			}
@@ -849,7 +906,8 @@ namespace SH
 						if (Operand2 == 0)
 						{
 							Error = "Undefined";
-							StopLineNumber = State.Line - ExtraLineNum;
+							StopFile = DebuggerContext->GetSourceFileName(State.Source);
+							StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 							SH_LOG(LogShader, Error, TEXT("Division by zero is undefined for component %d."), i);
 						}
 					}
@@ -859,7 +917,8 @@ namespace SH
 						if (Operand2 == 0)
 						{
 							Error = "Undefined";
-							StopLineNumber = State.Line - ExtraLineNum;
+							StopFile = DebuggerContext->GetSourceFileName(State.Source);
+							StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 							SH_LOG(LogShader, Error, TEXT("Division by zero is undefined for component %d."), i);
 						}
 					}
@@ -869,7 +928,8 @@ namespace SH
 						if (Operand2 == 0)
 						{
 							Error = "Undefined";
-							StopLineNumber = State.Line - ExtraLineNum;
+							StopFile = DebuggerContext->GetSourceFileName(State.Source);
+							StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 							SH_LOG(LogShader, Error, TEXT("Division by zero is undefined for component %d."), i);
 						}
 					}
@@ -882,7 +942,8 @@ namespace SH
 				if (FMemory::Memcmp(State.Operand2.GetData(), ZeroBuffer.GetData(), ZeroBuffer.Num()) == 0)
 				{
 					Error = "Undefined";
-					StopLineNumber = State.Line - ExtraLineNum;
+					StopFile = DebuggerContext->GetSourceFileName(State.Source);
+					StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 					SH_LOG(LogShader, Error, TEXT("Division by zero is undefined."));
 				}
 			}
@@ -902,7 +963,8 @@ namespace SH
 						if (int64(f) < int64(std::numeric_limits<int32>::min()) || int64(f) > int64(std::numeric_limits<int32>::max()))
 						{
 							Error = "Undefined";
-							StopLineNumber = State.Line - ExtraLineNum;
+							StopFile = DebuggerContext->GetSourceFileName(State.Source);
+							StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 							SH_LOG(LogShader, Error, TEXT("Conversion(float to int) is undefined for component %d: It's not wide enough to hold the converted value(%f)."), i, f);
 						}
 					}
@@ -911,7 +973,8 @@ namespace SH
 						if (f < 0.0f || uint64(f) > uint64(std::numeric_limits<uint32>::max()))
 						{
 							Error = "Undefined";
-							StopLineNumber = State.Line - ExtraLineNum;
+							StopFile = DebuggerContext->GetSourceFileName(State.Source);
+							StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 							SH_LOG(LogShader, Error, TEXT("Conversion(float to uint) is undefined for component %d: It's not wide enough to hold the converted value(%f)."), i, f);
 						}
 					}
@@ -925,7 +988,8 @@ namespace SH
 					if (int64(f) < int64(std::numeric_limits<int32>::min()) || int64(f) > int64(std::numeric_limits<int32>::max()))
 					{
 						Error = "Undefined";
-						StopLineNumber = State.Line - ExtraLineNum;
+						StopFile = DebuggerContext->GetSourceFileName(State.Source);
+						StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 						SH_LOG(LogShader, Error, TEXT("Conversion(float to int) is undefined: It's not wide enough to hold the converted value(%f)."), f);
 					}
 				}
@@ -934,7 +998,8 @@ namespace SH
 					if (f < 0.0f || uint64(f) > uint64(std::numeric_limits<uint32>::max()))
 					{
 						Error = "Undefined";
-						StopLineNumber = State.Line - ExtraLineNum;
+						StopFile = DebuggerContext->GetSourceFileName(State.Source);
+						StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 						SH_LOG(LogShader, Error, TEXT("Conversion(float to uint) is undefined: It's not wide enough to hold the converted value(%f)."), f);
 					}
 				}
@@ -956,7 +1021,8 @@ namespace SH
 						if (Operand2 == 0)
 						{
 							Error = "Undefined";
-							StopLineNumber = State.Line - ExtraLineNum;
+							StopFile = DebuggerContext->GetSourceFileName(State.Source);
+							StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 							SH_LOG(LogShader, Error, TEXT("float remainder by zero is undefined for component %d."), i);
 						}
 					}
@@ -967,13 +1033,15 @@ namespace SH
 						if (Operand2 == 0)
 						{
 							Error = "Undefined";
-							StopLineNumber = State.Line - ExtraLineNum;
+							StopFile = DebuggerContext->GetSourceFileName(State.Source);
+							StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 							SH_LOG(LogShader, Error, TEXT("int remainder by zero is undefined for component %d."), i);
 						}
 						else if (Operand2 == -1 && Operand1 == std::numeric_limits<int32>::min())
 						{
 							Error = "Undefined";
-							StopLineNumber = State.Line - ExtraLineNum;
+							StopFile = DebuggerContext->GetSourceFileName(State.Source);
+							StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 							SH_LOG(LogShader, Error, TEXT("The remainder causing signed overflow is undefined for component %d."), i);
 						}
 					}
@@ -983,7 +1051,8 @@ namespace SH
 						if (Operand2 == 0)
 						{
 							Error = "Undefined";
-							StopLineNumber = State.Line - ExtraLineNum;
+							StopFile = DebuggerContext->GetSourceFileName(State.Source);
+							StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 							SH_LOG(LogShader, Error, TEXT("uint remainder by zero is undefined for component %d."), i);
 						}
 					}
@@ -997,7 +1066,8 @@ namespace SH
 					if (Operand2 == 0)
 					{
 						Error = "Undefined";
-						StopLineNumber = State.Line - ExtraLineNum;
+						StopFile = DebuggerContext->GetSourceFileName(State.Source);
+						StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 						SH_LOG(LogShader, Error, TEXT("float remainder by zero is undefined."));
 					}
 				}
@@ -1008,13 +1078,15 @@ namespace SH
 					if (Operand2 == 0)
 					{
 						Error = "Undefined";
-						StopLineNumber = State.Line - ExtraLineNum;
+						StopFile = DebuggerContext->GetSourceFileName(State.Source);
+						StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 						SH_LOG(LogShader, Error, TEXT("int remainder by zero is undefined."));
 					}
 					else if (Operand2 == -1 && Operand1 == std::numeric_limits<int32>::min())
 					{
 						Error = "Undefined";
-						StopLineNumber = State.Line - ExtraLineNum;
+						StopFile = DebuggerContext->GetSourceFileName(State.Source);
+						StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 						SH_LOG(LogShader, Error, TEXT("The remainder causing signed overflow is undefined."));
 					}
 				}
@@ -1024,7 +1096,8 @@ namespace SH
 					if (Operand2 == 0)
 					{
 						Error = "Undefined";
-						StopLineNumber = State.Line - ExtraLineNum;
+						StopFile = DebuggerContext->GetSourceFileName(State.Source);
+						StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 						SH_LOG(LogShader, Error, TEXT("uint remainder by zero is undefined."));
 					}
 				}
@@ -1043,7 +1116,8 @@ namespace SH
 					if (X <= 0.0f)
 					{
 						Error = "Undefined";
-						StopLineNumber = State.Line - ExtraLineNum;
+						StopFile = DebuggerContext->GetSourceFileName(State.Source);
+						StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 						SH_LOG(LogShader, Error, TEXT("log: x(%f) <= 0 for component %d, may produce an indeterminate result."), X, i);
 					}
 				}
@@ -1054,7 +1128,8 @@ namespace SH
 				if (X <= 0.0f)
 				{
 					Error = "Undefined";
-					StopLineNumber = State.Line - ExtraLineNum;
+					StopFile = DebuggerContext->GetSourceFileName(State.Source);
+					StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 					SH_LOG(LogShader, Error, TEXT("log: x(%f) <= 0, may produce an indeterminate result."), X);
 				}
 			}
@@ -1072,7 +1147,8 @@ namespace SH
 					if (FMath::Abs(X) > 1.0f)
 					{
 						Error = "Undefined";
-						StopLineNumber = State.Line - ExtraLineNum;
+						StopFile = DebuggerContext->GetSourceFileName(State.Source);
+						StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 						SH_LOG(LogShader, Error, TEXT("Asin: abs x(%f) > 1 for component %d, may produce an indeterminate result."), X, i);
 					}
 				}
@@ -1083,7 +1159,8 @@ namespace SH
 				if (FMath::Abs(X) > 1.0f)
 				{
 					Error = "Undefined";
-					StopLineNumber = State.Line - ExtraLineNum;
+					StopFile = DebuggerContext->GetSourceFileName(State.Source);
+					StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 					SH_LOG(LogShader, Error, TEXT("Asin: abs x(%f) > 1, may produce an indeterminate result."), X);
 				}
 			}
@@ -1101,7 +1178,8 @@ namespace SH
 					if (FMath::Abs(X) > 1.0f)
 					{
 						Error = "Undefined";
-						StopLineNumber = State.Line - ExtraLineNum;
+						StopFile = DebuggerContext->GetSourceFileName(State.Source);
+						StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 						SH_LOG(LogShader, Error, TEXT("Acos: abs x(%f) > 1 for component %d, may produce an indeterminate result."), X, i);
 					}
 				}
@@ -1112,7 +1190,8 @@ namespace SH
 				if (FMath::Abs(X) > 1.0f)
 				{
 					Error = "Undefined";
-					StopLineNumber = State.Line - ExtraLineNum;
+					StopFile = DebuggerContext->GetSourceFileName(State.Source);
+					StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 					SH_LOG(LogShader, Error, TEXT("Acos: abs x(%f) > 1, may produce an indeterminate result."), X);
 				}
 			}
@@ -1130,7 +1209,8 @@ namespace SH
 					if (X < 0.0f)
 					{
 						Error = "Undefined";
-						StopLineNumber = State.Line - ExtraLineNum;
+						StopFile = DebuggerContext->GetSourceFileName(State.Source);
+						StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 						SH_LOG(LogShader, Error, TEXT("Sqrt: x(%f) < 0 for component %d, may produce an indeterminate result."), X, i);
 					}
 				}
@@ -1141,7 +1221,8 @@ namespace SH
 				if (X < 0.0f)
 				{
 					Error = "Undefined";
-					StopLineNumber = State.Line - ExtraLineNum;
+					StopFile = DebuggerContext->GetSourceFileName(State.Source);
+					StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 					SH_LOG(LogShader, Error, TEXT("Sqrt: x(%f) < 0, may produce an indeterminate result."), X);
 				}
 			}
@@ -1159,7 +1240,8 @@ namespace SH
 					if (X <= 0.0f)
 					{
 						Error = "Undefined";
-						StopLineNumber = State.Line - ExtraLineNum;
+						StopFile = DebuggerContext->GetSourceFileName(State.Source);
+						StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 						SH_LOG(LogShader, Error, TEXT("InverseSqrt: x(%f) <= 0 for component %d, may produce an indeterminate result."), X, i);
 					}
 				}
@@ -1170,7 +1252,8 @@ namespace SH
 				if (X <= 0.0f)
 				{
 					Error = "Undefined";
-					StopLineNumber = State.Line - ExtraLineNum;
+					StopFile = DebuggerContext->GetSourceFileName(State.Source);
+					StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 					SH_LOG(LogShader, Error, TEXT("InverseSqrt: x(%f) <= 0, may produce an indeterminate result."), X);
 				}
 			}
@@ -1189,7 +1272,8 @@ namespace SH
 					if (Y == 0.0f && X == 0.0f)
 					{
 						Error = "Undefined";
-						StopLineNumber = State.Line - ExtraLineNum;
+						StopFile = DebuggerContext->GetSourceFileName(State.Source);
+						StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 						SH_LOG(LogShader, Error, TEXT("Atan2: y = x = 0 for component %d, the result is undefined."), i);
 					}
 				}
@@ -1201,7 +1285,8 @@ namespace SH
 				if (Y == 0.0f && X == 0.0f)
 				{
 					Error = "Undefined";
-					StopLineNumber = State.Line - ExtraLineNum;
+					StopFile = DebuggerContext->GetSourceFileName(State.Source);
+					StopLineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 					SH_LOG(LogShader, Error, TEXT("Atan2: y = x = 0, the result is undefined."));
 				}
 			}
@@ -1212,7 +1297,7 @@ namespace SH
 	{
 		const auto& PsInvocation = std::get<PixelState>(Invocation);
 
-		DebugShader = ShaderEditor->CreateGpuShader();
+		DebugShader = GGpuRhi->CreateShaderFromSource(CurShaderAsset->GetShaderDesc(ShaderSourceText));
 		DebugShader->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
 		GpuShaderLanguage Lang = DebugShader->GetShaderLanguage();
 
@@ -1493,6 +1578,7 @@ namespace SH
 		DebuggerError = {};
 		DirtyVars.Empty();
 		StopLineNumber = 0;
+		StopFile.Empty();
 		ReturnValue.Empty();
 		DebugStates.Reset();
 		SortedVariableDescs.clear();
@@ -1501,6 +1587,7 @@ namespace SH
 		DebugBuffer = nullptr;
 		DebugParamsBuffer = nullptr;
 		bEnableUbsan = false;
+		bEditDuringDebugging = false;
 
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		SDebuggerVariableView* DebuggerLocalVariableView = ShEditor->GetDebuggerLocalVariableView();
@@ -1543,13 +1630,21 @@ namespace SH
 		});
 
 		DebuggerCallStackView->OnSelectionChanged = [this, DebuggerWatchView](const FString& FuncName) {
-			int32 ExtraLineNum = ShaderEditor->GetShaderAsset()->GetExtraLineNum();
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 			if (GetFunctionSig(GetFunctionDesc(Scope), DebugShader->GetShaderLanguage()) == FuncName)
 			{
-				StopLineNumber = CurValidLine.value() - ExtraLineNum;
+				StopFile = DebuggerContext->GetSourceFileName(Scope->GetSource());
+				int32 ExtraLineNum = CurShaderAsset->GetExtraLineNum();
+				AssetPtr<ShaderAsset> StopShader = CurShaderAsset->FindIncludeAsset(StopFile);
+				ExtraLineNum = StopShader->GetExtraLineNum();
+				AssetOp::OpenAsset(StopShader);
+				if (SShaderEditorBox* StopEditor = ShEditor->GetShaderEditor(StopShader))
+				{
+					StopLineNumber = CurValidLine.value() - ExtraLineNum;
+					StopEditor->JumpTo(StopEditor->GetLineIndex(StopLineNumber));
+				}
 				ShowDeuggerVariable(Scope);
 				ActiveCallPoint.reset();
-				ShaderEditor->JumpTo(ShaderEditor->GetLineIndex(StopLineNumber));
 			}
 			else if (auto CallPoint = CallStack.FindByPredicate([this, FuncName](const auto& InItem) {
 				if (GetFunctionSig(GetFunctionDesc(InItem.Scope), DebugShader->GetShaderLanguage()) == FuncName)
@@ -1559,10 +1654,18 @@ namespace SH
 				return false;
 			}))
 			{
-				StopLineNumber = CallPoint->Line - ExtraLineNum;
+				int32 ExtraLineNum = CurShaderAsset->GetExtraLineNum();
+				StopFile = CallPoint->File;
+				AssetPtr<ShaderAsset> StopShader = CurShaderAsset->FindIncludeAsset(CallPoint->File);
+				ExtraLineNum = StopShader->GetExtraLineNum();
+				AssetOp::OpenAsset(StopShader);
+				if (SShaderEditorBox* EntryEditor = ShEditor->GetShaderEditor(StopShader))
+				{
+					StopLineNumber = CallPoint->Line - ExtraLineNum;
+					EntryEditor->JumpTo(EntryEditor->GetLineIndex(StopLineNumber));
+				}
 				ShowDeuggerVariable(CallPoint->Scope);
 				ActiveCallPoint = *CallPoint;
-				ShaderEditor->JumpTo(ShaderEditor->GetLineIndex(StopLineNumber));
 			}
 			DebuggerWatchView->Refresh();
 		};

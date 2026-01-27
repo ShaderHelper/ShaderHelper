@@ -47,11 +47,9 @@ namespace SH
 			.IncludeHandler = [](const FString& IncludePath) -> FString {
 				if (FPaths::GetExtension(IncludePath) == TEXT("header"))
 				{
+					FScopeLock ScopeLock(&GAssetCS);
 					AssetPtr<ShaderHeader> HeaderAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderHeader>(IncludePath);
-					if (HeaderAsset)
-					{
-						return HeaderAsset->GetFullContent();
-					}
+					return HeaderAsset ? HeaderAsset->GetFullContent() : "";
 				}
 				FString Content;
 				FFileHelper::LoadFileToString(Content, *IncludePath);

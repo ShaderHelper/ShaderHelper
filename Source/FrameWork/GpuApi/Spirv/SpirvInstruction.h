@@ -2350,14 +2350,16 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 	class SpvDebugLexicalBlock : public SpvInstructionBase<SpvDebugLexicalBlock>
 	{
 	public:
-		SpvDebugLexicalBlock(SpvId InLine, SpvId InParent) : SpvInstructionBase(SpvDebugInfo100::DebugLexicalBlock)
-		, Line(InLine), Parent(InParent)
+		SpvDebugLexicalBlock(SpvId InSource, SpvId InLine, SpvId InParent) : SpvInstructionBase(SpvDebugInfo100::DebugLexicalBlock)
+		, Source(InSource), Line(InLine), Parent(InParent)
 		{}
 		
+		SpvId GetSource() const { return Source; }
 		SpvId GetLine() const { return Line; }
 		SpvId GetParentId() const { return Parent; }
 		
 	private:
+		SpvId Source;
 		SpvId Line;
 		SpvId Parent;
 	};
@@ -2365,15 +2367,16 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 	class SpvDebugFunction : public SpvInstructionBase<SpvDebugFunction>
 	{
 	public:
-		SpvDebugFunction(SpvId InName, SpvId InTypeDesc, SpvId InLine, SpvId InParent, SpvId InScopeLine)
+		SpvDebugFunction(SpvId InName, SpvId InTypeDesc, SpvId InSource, SpvId InLine, SpvId InParent, SpvId InScopeLine)
 		: SpvInstructionBase(SpvDebugInfo100::DebugFunction)
 		, Name(InName), TypeDesc(InTypeDesc)
-		, Line(InLine), Parent(InParent)
+		, Source(InSource), Line(InLine), Parent(InParent)
 		, ScopeLine(InScopeLine)
 		{}
 		
 		SpvId GetNameId() const { return Name; }
 		SpvId GetTypeDescId() const { return TypeDesc; }
+		SpvId GetSource() const { return Source; }
 		SpvId GetLine() const { return Line; }
 		SpvId GetParentId() const { return Parent; }
 		SpvId GetScopeLine() const { return ScopeLine; }
@@ -2381,6 +2384,7 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 	private:
 		SpvId Name;
 		SpvId TypeDesc;
+		SpvId Source;
 		SpvId Line;
 		SpvId Parent;
 		SpvId ScopeLine;

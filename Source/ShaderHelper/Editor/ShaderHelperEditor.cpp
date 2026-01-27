@@ -13,11 +13,14 @@
 #include "Renderer/ShaderToyRenderComp.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 #include "AssetManager/AssetImporter/AssetImporter.h"
+#include "UI/Widgets/MessageDialog/SMessageDialog.h"
 
 #include <Serialization/JsonSerializer.h>
 #include <Misc/FileHelper.h>
 #include <Framework/Docking/SDockingTabStack.h>
 #include <DesktopPlatformModule.h>
+#include <Framework/Notifications/NotificationManager.h>
+#include <Widgets/Notifications/SNotificationList.h>
 
 STEAL_PRIVATE_MEMBER(FTabManager, TArray<TSharedRef<FTabManager::FArea>>, CollapsedDockAreas)
 
@@ -62,8 +65,7 @@ namespace SH
 		UICommandList->MapAction(
 			CodeEditorCommands::Get().Continue,
 			FExecuteAction::CreateLambda([this] {
-				SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
-				ShaderEditor->Continue();
+				Continue();
 			}),
 			FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); }),
 			EUIActionRepeatMode::RepeatEnabled
@@ -71,8 +73,7 @@ namespace SH
 		UICommandList->MapAction(
 			CodeEditorCommands::Get().StepInto,
 			FExecuteAction::CreateLambda([this]{
-				SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
-				ShaderEditor->Continue(StepMode::StepInto);
+				Continue(StepMode::StepInto);
 			}),
 			FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); }),
 			EUIActionRepeatMode::RepeatEnabled
@@ -80,8 +81,7 @@ namespace SH
 		UICommandList->MapAction(
 			CodeEditorCommands::Get().StepOver,
 			FExecuteAction::CreateLambda([this]{
-				SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
-				ShaderEditor->Continue(StepMode::StepOver);
+				Continue(StepMode::StepOver);
 			}),
 			FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); }),
 			EUIActionRepeatMode::RepeatEnabled
@@ -987,6 +987,97 @@ namespace SH
 	{
 		IsDebugging = false;
 		CurDebuggableObject->OnEndDebuggging();
+		Debugger.Reset();
+		CloseDebuggerTabs();
+	}
+
+	void ShaderHelperEditor::Continue(StepMode Mode)
+	{
+		if(Debugger.HasEditDuringDebugging())
+		{
+			auto Ret = MessageDialog::Open(MessageDialog::OkCancel, MessageDialog::Shocked, GetMainWindow(), LOCALIZATION("EditDuringDebugging"));
+			if(Ret == MessageDialog::MessageRet::Ok)
+			{
+				Debugger.ClearEditDuringDebugging();
+			}
+			else
+			{
+				return;
+			}
+		}
+		
+		if(Debugger.Continue(Mode))
+		{
+			Debugger.ShowDebuggerResult();
+			FString StopFile = Debugger.GetStopFile();
+			ShaderAsset* MainShader = CurDebuggableObject->GetShaderAsset();
+			AssetPtr<ShaderAsset> StopShader = MainShader->FindIncludeAsset(StopFile);
+			if (StopShader)
+			{
+				AssetOp::OpenAsset(StopShader);
+				SShaderEditorBox* ShaderEditor = GetShaderEditor(StopShader);
+				ShaderEditor->JumpTo(ShaderEditor->GetLineIndex(Debugger.GetStopLineNumber()));
+				ShaderEditor->UnFold(Debugger.GetStopLineNumber());
+			}
+			else
+			{
+				SShaderEditorBox* ShaderEditor = GetShaderEditor(MainShader);
+				ShaderEditor->JumpTo(ShaderEditor->GetLineIndex(Debugger.GetStopLineNumber()));
+				ShaderEditor->UnFold(Debugger.GetStopLineNumber());
+			}
+		}
+		else
+		{
+			EndDebugging();
+		}
+	}
+
+	std::optional<Vector2u> ShaderHelperEditor::ValidatePixel(const InvocationState& InState)
+	{
+		SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
+		Debugger.SetShaderAsset(ShaderEditor->GetShaderAsset());
+		Debugger.SetShaderSource(ShaderEditor->GetCurrentShaderSource());
+		return Debugger.ValidatePixel(InState);
+	}
+
+	void ShaderHelperEditor::DebugPixel(const Vector2u& InPixelCoord, const InvocationState& InState)
+	{
+		SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
+		Debugger.SetShaderAsset(ShaderEditor->GetShaderAsset());
+		Debugger.SetShaderSource(ShaderEditor->GetCurrentShaderSource());
+		
+		GApp->EnableBusyBlocker();
+		FNotificationInfo Info(LOCALIZATION("StartDebuggerTip"));
+		Info.Image = FAppStyle::Get().GetBrush("NoBrush");
+		Info.bFireAndForget = false;
+		Info.FadeInDuration = 0.0f;
+		Info.FadeOutDuration = 0.0f;
+		auto Notification = FSlateNotificationManager::Get().AddNotification(Info);
+		Notification->SetCompletionState(SNotificationItem::CS_Pending);
+		Async(EAsyncExecution::Thread, [=, this]() {
+			try
+			{
+				Debugger.DebugPixel(InPixelCoord, InState);
+			}
+			catch (const std::runtime_error& e)
+			{
+				AsyncTask(ENamedThreads::GameThread, [=, this] {
+					Notification->Fadeout();
+					GApp->DisableBusyBlocker();
+					FText FailureInfo = LOCALIZATION("DebugFailure");
+					SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo.ToString(), UTF8_TO_TCHAR(e.what()));
+					MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GetMainWindow(), FailureInfo);
+					EndDebugging();
+				});
+				return;
+			}
+
+			AsyncTask(ENamedThreads::GameThread, [=, this] {
+				Notification->Fadeout();
+				GApp->DisableBusyBlocker();
+				Continue();
+			});
+		});
 	}
 
 	void ShaderHelperEditor::StartDebugging(bool GlobalValidation)

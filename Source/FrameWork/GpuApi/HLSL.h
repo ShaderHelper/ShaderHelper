@@ -54,6 +54,8 @@ namespace HLSL
 	inline ShaderBuiltinData& GetBuiltinData()
 	{
 		static ShaderBuiltinData Data;
+		static FCriticalSection DataCS;
+		FScopeLock Lock(&DataCS);
 		if (!Data.bLoaded)
 		{
 			FString JsonPath = FW::PathHelper::ShaderDir() / TEXT("HLSL.json");
@@ -379,6 +381,7 @@ namespace FW
 
 			// Create virtual include directory for processed includes
 			VirtualIncludeDir = PathHelper::SavedShaderDir() / TEXT("VirtualIncludes") / ShaderName;
+			IFileManager::Get().DeleteDirectory(*VirtualIncludeDir, false, true);
 			IFileManager::Get().MakeDirectory(*VirtualIncludeDir, true);
 
 			// Collect and process all includes recursively

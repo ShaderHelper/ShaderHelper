@@ -312,8 +312,8 @@ namespace FW
 
 	 bool DxcCompiler::Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs) const
 	 {
-		 // Try to load from cache first (skip for debug SPV generation)
-		 if (!EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
+		 // Try to load from cache first (skip for debug SPV generation or when SkipCache is set)
+		 if (!EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging | GpuShaderCompilerFlag::SkipCache))
 		 {
 			 if (InShader->TryLoadCachedByteCode(ExtraArgs))
 			 {

@@ -18,6 +18,7 @@
 #include "AssetObject/DebuggableObject.h"
 #include "UI/Widgets/Misc/SShWindow.h"
 #include "UI/Widgets/SShViewport.h"
+#include "Debugger/ShaderDebugger.h"
 
 #include <Widgets/SViewport.h>
 
@@ -74,6 +75,7 @@ namespace SH
 		TSharedPtr<SWindow> GetShaderEditorTipWindow() const { return ShaderEditorTipWindow; }
 		FW::SGraphPanel* GetGraphPanel() const { return GraphPanel.Get(); }
 		FW::SAssetBrowser* GetAssetBrowser() const { return AssetBrowser.Get(); }
+		ShaderDebugger& GetDebugger() { return Debugger; }
 		void InvokeDebuggerTabs();
 		void CloseDebuggerTabs();
         
@@ -98,6 +100,9 @@ namespace SH
 		void EndDebugging();
 		//If globalvalidation is true, the validation error location will be automatically selected.
 		void StartDebugging(bool GlobalValidation = false);
+		void Continue(StepMode Mode = StepMode::Continue);
+		std::optional<FW::Vector2u> ValidatePixel(const InvocationState& InState);
+		void DebugPixel(const FW::Vector2u& InPixelCoord, const InvocationState& InState);
 		TArray<TSharedPtr<SShaderEditorBox>> GetShaderEditors() const { 
 			TArray<TSharedPtr<SShaderEditorBox>> Ret;
 			ShaderEditors.GenerateValueArray(Ret);
@@ -164,6 +169,7 @@ namespace SH
 		TSharedPtr<SWindow> ShaderEditorTipWindow;
 		DebuggableObject* CurDebuggableObject = nullptr;
 		bool IsDebugging{};
+		ShaderDebugger Debugger;
 
 		static constexpr int MaxNavigation = 233;
 		int32 NavigationIndex = INDEX_NONE;

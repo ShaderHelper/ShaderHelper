@@ -32,4 +32,29 @@ namespace SH
 		ShEditor->OpenShaderTab(MoveTemp(LoadedShaderHeader));
 	}
 
+	void ShaderHeaderOp::OnRename(const FString& OldPath, const FString& NewPath)
+	{
+		AssetOp::OnRename(OldPath, NewPath);
+		OnMove(OldPath, NewPath);
+	}
+
+	void ShaderHeaderOp::OnMove(const FString& OldPath, const FString& NewPath)
+	{
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->UpdateShaderPath(NewPath);
+	}
+
+	void ShaderHeaderOp::OnDelete(const FString& InAssetPath)
+	{
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		FName TabId{ TSingleton<AssetManager>::Get().GetGuid(InAssetPath).ToString() };
+		TSharedPtr<SDockTab> ExistingTab = ShEditor->GetCodeTabManager()->FindExistingLiveTab(TabId);
+		if (ExistingTab)
+		{
+			ExistingTab->RequestCloseTab();
+		}
+
+		AssetOp::OnDelete(InAssetPath);
+	}
+
 }

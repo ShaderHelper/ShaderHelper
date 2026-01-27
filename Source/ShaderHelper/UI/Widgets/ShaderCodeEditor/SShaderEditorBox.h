@@ -3,7 +3,6 @@
 #include "Renderer/ShRenderer.h"
 #include "GpuApi/GpuShader.h"
 #include "AssetObject/ShaderAsset.h"
-#include "Debugger/ShaderDebugger.h"
 #include "SCodeSearchWidget.h"
 
 #include <Framework/Text/BaseTextLayoutMarshaller.h>
@@ -237,6 +236,7 @@ namespace SH
 		bool IsWarningLine(int InLineNumber) const;
 		FVector2D GetCodeCompletionCanvasSize() const;
 
+		const FString& GetCurrentShaderSource() const { return CurrentShaderSource; }
 		ShaderAsset* GetShaderAsset() const { return ShaderAssetObj; }
 		TRefCountPtr<FW::GpuShader> CreateGpuShader();
         FText GetEditStateText() const;
@@ -267,11 +267,6 @@ namespace SH
 		void RefreshSyntaxHighlight();
 		void RefreshOccurrenceHighlight();
 		void RefreshBracketHighlight();
-		
-		std::optional<FW::Vector2u> ValidatePixel(const InvocationState& InState);
-		void DebugPixel(const FW::Vector2u& InPixelCoord, const InvocationState& InState);
-		void Continue(StepMode Mode = StepMode::Continue);
-		void ResetDebugger();
 
 	protected:
 		virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
@@ -317,14 +312,9 @@ namespace SH
 		std::atomic<bool> bRefreshSyntax{};
 		FEvent* SyntaxEvent = nullptr;
 		//---------------------------------------
-
-		//----------------Debugger----------------
-		ShaderDebugger Debugger;
-		bool bEditDuringDebugging{};
-		//---------------------------------------
         
 	private:
-        //The text after unfolding, but that may not be the content compiled finally.
+		//The text after unfolding, but that may not be the content compiled finally.
 		//The shader may contain extra declaration(eg. binding codegen)
 		FString CurrentShaderSource;
         
