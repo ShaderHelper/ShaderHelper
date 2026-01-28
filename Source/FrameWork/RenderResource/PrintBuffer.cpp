@@ -16,16 +16,16 @@ namespace FW
 		});
 	}
 
-	TArray<FString> PrintBuffer::GetPrintStrings(ShaderAssertInfo& OutAssertInfo)
+	TArray<ShaderPrintInfo> PrintBuffer::GetPrintStrings(ShaderAssertInfo& OutAssertInfo)
 	{
-		TArray<FString> PrintStrings;
+		TArray<ShaderPrintInfo> PrintInfos;
 		HLSL::Printer* Printer = (HLSL::Printer*)GGpuRhi->MapGpuBuffer(InternalBuffer, GpuResourceMapMode::Read_Only);
 		uint32 ByteOffset = 4;
 		while (ByteOffset < Printer->ByteSize)
 		{
 			uint8 AssertFlag = *((uint8*)Printer + ByteOffset);
 			ByteOffset += 1;
-			int LineNumber = *((uint16*)((uint8*)Printer + ByteOffset));
+			int Line = *((uint16*)((uint8*)Printer + ByteOffset));
 			ByteOffset += 2;
 			FString PrintStr{ (char*)Printer + ByteOffset };
 			
@@ -118,14 +118,14 @@ namespace FW
 				{
 					OutAssertInfo.AssertString += ":" + FString::Format(*PrintStr, Args);
 				}
-				OutAssertInfo.LineNumber = LineNumber;
+				OutAssertInfo.Line = Line;
 				break;
 			}
 			
-			PrintStrings.Add(FString::Format(*PrintStr, Args));
+			PrintInfos.Emplace(FString::Format(*PrintStr, Args), Line);
 		}
 		GGpuRhi->UnMapGpuBuffer(InternalBuffer);
-		return PrintStrings;
+		return PrintInfos;
 	}
 
 	void PrintBuffer::Clear()

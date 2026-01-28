@@ -19,6 +19,10 @@ namespace SH
 		int32 GetExtraLineNum() const override { return 0; }
 		FW::GpuShaderSourceDesc GetShaderDesc(const FString& InContent) const override;
 
+		//ShObject interface
+		bool CanChangeProperty(FW::PropertyData* InProperty) override;
+		void PostPropertyChanged(FW::PropertyData* InProperty) override;
+
 	public:
 		FW::GpuShaderLanguage Language;
 	};

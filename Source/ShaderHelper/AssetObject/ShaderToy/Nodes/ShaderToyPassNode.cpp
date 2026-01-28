@@ -903,19 +903,33 @@ namespace SH
 			ShaderToyContext.RG->Execute();
 
 			ShaderAssertInfo AssertInfo;
-			TArray<FString> ShaderPrintLogs = TSingleton<PrintBuffer>::Get().GetPrintStrings(AssertInfo);
+			TArray<ShaderPrintInfo> ShaderPrintLogs = TSingleton<PrintBuffer>::Get().GetPrintStrings(AssertInfo);
 			TSingleton<PrintBuffer>::Get().Clear();
+			int AddedLineNum = ShaderAssetObj->GetExtraLineNum();
 			if(AssertInfo.AssertString.IsEmpty())
 			{
-				for (const FString& PrintLog : ShaderPrintLogs)
+				for (const ShaderPrintInfo& PrintLog : ShaderPrintLogs)
 				{
-					SH_LOG(LogShader, Display, TEXT("%s:%s"), *ObjectName.ToString(), *PrintLog);
+					if (PrintLog.Line - AddedLineNum > 0)
+					{
+						SH_LOG(LogShader, Display, TEXT("%s:%d:%s"), *ObjectName.ToString(), PrintLog.Line - AddedLineNum, *PrintLog.PrintStr);
+					}
+					else
+					{
+						SH_LOG(LogShader, Display, TEXT("%s:%s"), *ObjectName.ToString(), *PrintLog.PrintStr);
+					}
 				}
 			}
 			else
 			{
-				int AddedLineNum = ShaderAssetObj->GetExtraLineNum();
-				SH_LOG(LogShader, Error, TEXT("%s:%d:%s"), *ObjectName.ToString(), AssertInfo.LineNumber - AddedLineNum, *AssertInfo.AssertString);
+				if (AssertInfo.Line - AddedLineNum > 0)
+				{
+					SH_LOG(LogShader, Error, TEXT("%s:%d:%s"), *ObjectName.ToString(), AssertInfo.Line - AddedLineNum, *AssertInfo.AssertString);
+				}
+				else
+				{
+					SH_LOG(LogShader, Error, TEXT("%s:%s"), *ObjectName.ToString(), *AssertInfo.AssertString);
+				}
 				AssertError = true;
 				return {true, true};
 			}

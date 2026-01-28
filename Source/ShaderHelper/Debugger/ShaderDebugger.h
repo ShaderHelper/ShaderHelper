@@ -45,6 +45,15 @@ namespace SH
 		StepInto,
 	};
 
+	struct DebuggerLocation
+	{
+		FString File;
+		int32 LineNumber{};
+		
+		bool IsValid() const { return !File.IsEmpty() && LineNumber > 0; }
+		void Reset() { File.Empty(); LineNumber = 0; }
+	};
+
 	class ShaderDebugger
 	{
 	public:
@@ -69,9 +78,8 @@ namespace SH
 		void DebugCompute(const InvocationState& InState);
 		void Reset();
 
-		TPair<FString, int> GetDebuggerError() const { return DebuggerError; }
-		int32 GetStopLineNumber() const { return StopLineNumber; }
-		FString GetStopFile() const { return StopFile; }
+		TPair<FString, DebuggerLocation> GetDebuggerError() const { return DebuggerError; }
+		const DebuggerLocation& GetStopLocation() const { return StopLocation; }
 		bool IsValid() const { return DebuggerContext != nullptr; }
 		void MarkEditDuringDebugging() { bEditDuringDebugging = true; }
 		bool HasEditDuringDebugging() const { return bEditDuringDebugging; }
@@ -97,12 +105,11 @@ namespace SH
 		std::optional<FuncCallPoint> ActiveCallPoint;
 		FW::SpvVariable* AssertResult = nullptr;
 		TMultiMap<FW::SpvId, FW::SpvVarDirtyRange> DirtyVars;
-		int32 StopLineNumber{};
-		FString StopFile;
+		DebuggerLocation StopLocation;
 		TArray<uint8> ReturnValue;
 		//ValidLine: Line that can trigger a breakpoint
 		std::optional<int32> CurValidLine;
-		TPair<FString, int> DebuggerError;
+		TPair<FString, DebuggerLocation> DebuggerError;
 		int32 CurDebugStateIndex{};
 		std::vector<std::pair<FW::SpvId, FW::SpvVariableDesc*>> SortedVariableDescs;
 

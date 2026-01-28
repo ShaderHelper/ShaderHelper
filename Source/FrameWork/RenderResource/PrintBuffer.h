@@ -6,7 +6,13 @@ namespace FW
 	struct ShaderAssertInfo
 	{
 		FString AssertString;
-		int LineNumber;
+		int Line{};
+	};
+
+	struct ShaderPrintInfo
+	{
+		FString PrintStr;
+		int Line{};
 	};
 
 	class FRAMEWORK_API PrintBuffer
@@ -15,7 +21,7 @@ namespace FW
 		PrintBuffer();
 
 	public:
-		TArray<FString> GetPrintStrings(ShaderAssertInfo& OutAssertInfo);
+		TArray<ShaderPrintInfo> GetPrintStrings(ShaderAssertInfo& OutAssertInfo);
 		void Clear();
 		GpuBuffer* GetResource() const { return InternalBuffer; }
 

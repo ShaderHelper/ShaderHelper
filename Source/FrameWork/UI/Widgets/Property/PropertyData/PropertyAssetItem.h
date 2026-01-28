@@ -74,7 +74,7 @@ namespace FW
             })
             [
                 SNew(SBorder)
-                .BorderImage(FAppStyle::Get().GetBrush("Brushes.Black"))
+                .BorderImage(FAppStyle::Get().GetBrush("Brushes.Input"))
                 [
                     Display.ToSharedRef()
                 ]

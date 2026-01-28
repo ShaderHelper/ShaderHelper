@@ -1,7 +1,11 @@
 #include "CommonHeader.h"
 #include "ShaderHeader.h"
 #include "UI/Styles/FShaderHelperStyle.h"
-#include "AssetManager/AssetManager.h"
+#include "App/App.h"
+#include "Editor/ShaderHelperEditor.h"
+#include "UI/Widgets/MessageDialog/SMessageDialog.h"
+#include "UI/Widgets/Property/PropertyData/PropertyItem.h"
+#include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 
 using namespace FW;
 
@@ -12,8 +16,11 @@ namespace SH
 		.Data<&ShaderHeader::Language, MetaInfo::Property>(LOCALIZATION("Language"))
 	)
 
+	const FString DefaultHeader = "#pragma once\n";
+
 	ShaderHeader::ShaderHeader() : Language(GpuShaderLanguage::HLSL)
 	{
+		EditorContent = DefaultHeader;
 	}
 
 	void ShaderHeader::Serialize(FArchive& Ar)
@@ -57,5 +64,38 @@ namespace SH
 			},
 		};
 		return Desc;
+	}
+
+	bool ShaderHeader::CanChangeProperty(FW::PropertyData* InProperty)
+	{
+		if (InProperty->IsOfType<PropertyEnumItem>() && InProperty->GetDisplayName().EqualTo(LOCALIZATION("Language")))
+		{
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			auto Ret = MessageDialog::Open(MessageDialog::OkCancel, MessageDialog::Shocked, ShEditor->GetMainWindow(), LOCALIZATION("ShaderLanguageTip"));
+			if (Ret == MessageDialog::MessageRet::Cancel)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	void ShaderHeader::PostPropertyChanged(FW::PropertyData* InProperty)
+	{
+		if (InProperty->IsOfType<PropertyEnumItem>() && InProperty->GetDisplayName().EqualTo(LOCALIZATION("Language")))
+		{
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			GpuShaderLanguage NewLanguage = *static_cast<GpuShaderLanguage*>(static_cast<PropertyEnumItem*>(InProperty)->GetEnum());
+			if (NewLanguage == GpuShaderLanguage::HLSL)
+			{
+				ShEditor->OpenShaderTab(this);
+				ShEditor->GetShaderEditor(this)->SetText(FText::FromString(DefaultHeader));
+			}
+			else if (NewLanguage == GpuShaderLanguage::GLSL)
+			{
+				ShEditor->OpenShaderTab(this);
+				ShEditor->GetShaderEditor(this)->SetText(FText::FromString(DefaultHeader));
+			}
+		}
 	}
 }

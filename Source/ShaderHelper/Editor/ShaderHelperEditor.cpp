@@ -1009,21 +1009,21 @@ namespace SH
 		if(Debugger.Continue(Mode))
 		{
 			Debugger.ShowDebuggerResult();
-			FString StopFile = Debugger.GetStopFile();
+			FString StopFile = Debugger.GetStopLocation().File;
 			ShaderAsset* MainShader = CurDebuggableObject->GetShaderAsset();
 			AssetPtr<ShaderAsset> StopShader = MainShader->FindIncludeAsset(StopFile);
 			if (StopShader)
 			{
 				AssetOp::OpenAsset(StopShader);
 				SShaderEditorBox* ShaderEditor = GetShaderEditor(StopShader);
-				ShaderEditor->JumpTo(ShaderEditor->GetLineIndex(Debugger.GetStopLineNumber()));
-				ShaderEditor->UnFold(Debugger.GetStopLineNumber());
+				ShaderEditor->JumpTo(ShaderEditor->GetLineIndex(Debugger.GetStopLocation().LineNumber));
+				ShaderEditor->UnFold(Debugger.GetStopLocation().LineNumber);
 			}
 			else
 			{
 				SShaderEditorBox* ShaderEditor = GetShaderEditor(MainShader);
-				ShaderEditor->JumpTo(ShaderEditor->GetLineIndex(Debugger.GetStopLineNumber()));
-				ShaderEditor->UnFold(Debugger.GetStopLineNumber());
+				ShaderEditor->JumpTo(ShaderEditor->GetLineIndex(Debugger.GetStopLocation().LineNumber));
+				ShaderEditor->UnFold(Debugger.GetStopLocation().LineNumber);
 			}
 		}
 		else

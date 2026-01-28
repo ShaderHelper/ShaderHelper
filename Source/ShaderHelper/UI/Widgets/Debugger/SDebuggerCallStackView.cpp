@@ -95,7 +95,7 @@ namespace SH
 		return Border;
 	}
 
-	void SDebuggerCallStackView::SetCallStackDatas(const TArray<CallStackDataPtr>& InDatas, const TPair<FString, int>& InDebuggerError)
+	void SDebuggerCallStackView::SetCallStackDatas(const TArray<CallStackDataPtr>& InDatas, const TPair<FString, DebuggerLocation>& InDebuggerError)
 	{
 		DebuggerError = InDebuggerError;
 		CallStackDatas = InDatas;

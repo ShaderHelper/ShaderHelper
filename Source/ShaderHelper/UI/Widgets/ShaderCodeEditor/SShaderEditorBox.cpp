@@ -3259,7 +3259,7 @@ constexpr int PaddingLineNum = 22;
 			{
 				return FAppStyle::Get().GetBrush("Icons.Warning");
 			}
-			else if(GetDebugger().GetStopLineNumber() == LineNumber)
+			else if(GetDebugger().GetShaderAsset()->FindIncludeAsset(GetDebugger().GetStopLocation().File) == ShaderAssetObj && GetDebugger().GetStopLocation().LineNumber == LineNumber)
 			{
 				return FShaderHelperStyle::Get().GetBrush("Icons.ArrowBoldRight");
 			}
@@ -3274,11 +3274,11 @@ constexpr int PaddingLineNum = 22;
 			{
 				return FStyleColors::Error;
 			}
-			else if (!GetDebugger().GetDebuggerError().Key.IsEmpty() && GetDebugger().GetDebuggerError().Value == LineNumber)
+			else if (!GetDebugger().GetDebuggerError().Key.IsEmpty() && GetDebugger().GetShaderAsset()->FindIncludeAsset(GetDebugger().GetDebuggerError().Value.File) == ShaderAssetObj && GetDebugger().GetDebuggerError().Value.LineNumber == LineNumber)
 			{
 				return FStyleColors::Error;
 			}
-			else if(GetDebugger().GetStopLineNumber() == LineNumber)
+			else if(GetDebugger().GetShaderAsset()->FindIncludeAsset(GetDebugger().GetStopLocation().File) == ShaderAssetObj && GetDebugger().GetStopLocation().LineNumber == LineNumber)
 			{
 				return FLinearColor::Green;
 			}
@@ -3289,7 +3289,7 @@ constexpr int PaddingLineNum = 22;
 			{
 				return EVisibility::Visible;
 			}
-			else if(BreakPointLineNumbers.Contains(LineNumber) || GetDebugger().GetStopLineNumber() == LineNumber)
+			else if(BreakPointLineNumbers.Contains(LineNumber) || (GetDebugger().GetShaderAsset()->FindIncludeAsset(GetDebugger().GetStopLocation().File) == ShaderAssetObj && GetDebugger().GetStopLocation().LineNumber == LineNumber))
 			{
 				return EVisibility::HitTestInvisible;
 			}
@@ -3341,7 +3341,7 @@ constexpr int PaddingLineNum = 22;
 					SNew(SBox)
 					.HeightOverride(1.0)
 					.Visibility_Lambda([this, LineNumber, GetDebugger]{
-						if(BreakPointLineNumbers.Contains(LineNumber) || GetDebugger().GetStopLineNumber() == LineNumber)
+						if(BreakPointLineNumbers.Contains(LineNumber) || (GetDebugger().GetShaderAsset()->FindIncludeAsset(GetDebugger().GetStopLocation().File) == ShaderAssetObj && GetDebugger().GetStopLocation().LineNumber == LineNumber))
 						{
 							return EVisibility::HitTestInvisible;
 						}
@@ -3351,11 +3351,11 @@ constexpr int PaddingLineNum = 22;
 						SNew(SImage)
 						.Image(FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect2"))
 						.ColorAndOpacity_Lambda([this, LineNumber, GetDebugger]{
-							if (!GetDebugger().GetDebuggerError().Key.IsEmpty() && GetDebugger().GetDebuggerError().Value == LineNumber)
+							if (!GetDebugger().GetDebuggerError().Key.IsEmpty() && GetDebugger().GetShaderAsset()->FindIncludeAsset(GetDebugger().GetDebuggerError().Value.File) == ShaderAssetObj && GetDebugger().GetDebuggerError().Value.LineNumber == LineNumber)
 							{
 								return FLinearColor{ 1,0,0,0.7f };
 							}
-							else if(GetDebugger().GetStopLineNumber() == LineNumber)
+							else if(GetDebugger().GetShaderAsset()->FindIncludeAsset(GetDebugger().GetStopLocation().File) == ShaderAssetObj && GetDebugger().GetStopLocation().LineNumber == LineNumber)
 							{
 								return FLinearColor{0,1,0,0.7f};
 							}
@@ -3367,7 +3367,7 @@ constexpr int PaddingLineNum = 22;
 				[
 					SNew(SImage)
 					.Visibility_Lambda([this, LineNumber, GetDebugger]{
-						if(BreakPointLineNumbers.Contains(LineNumber) || GetDebugger().GetStopLineNumber() == LineNumber)
+						if(BreakPointLineNumbers.Contains(LineNumber) || GetDebugger().GetShaderAsset()->FindIncludeAsset(GetDebugger().GetStopLocation().File) == ShaderAssetObj && GetDebugger().GetStopLocation().LineNumber == LineNumber)
 						{
 							return EVisibility::HitTestInvisible;
 						}
@@ -3375,11 +3375,11 @@ constexpr int PaddingLineNum = 22;
 					})
 					.Image(FAppStyle::Get().GetBrush("WhiteBrush"))
 					.ColorAndOpacity_Lambda([this, LineNumber, GetDebugger]{
-						if (!GetDebugger().GetDebuggerError().Key.IsEmpty() && GetDebugger().GetDebuggerError().Value == LineNumber)
+						if (!GetDebugger().GetDebuggerError().Key.IsEmpty() && GetDebugger().GetShaderAsset()->FindIncludeAsset(GetDebugger().GetDebuggerError().Value.File) == ShaderAssetObj && GetDebugger().GetDebuggerError().Value.LineNumber == LineNumber)
 						{
 							return FLinearColor{ 1,0,0,0.06f };
 						}
-						else if(GetDebugger().GetStopLineNumber() == LineNumber)
+						else if(GetDebugger().GetShaderAsset()->FindIncludeAsset(GetDebugger().GetStopLocation().File) == ShaderAssetObj && GetDebugger().GetStopLocation().LineNumber == LineNumber)
 						{
 							return FLinearColor{0,1,0,0.06f};
 						}
@@ -3427,7 +3427,7 @@ constexpr int PaddingLineNum = 22;
 					SNew(SBox)
 					.HeightOverride(1.0)
 					.Visibility_Lambda([this, LineNumber, GetDebugger]{
-						if(BreakPointLineNumbers.Contains(LineNumber) || GetDebugger().GetStopLineNumber() == LineNumber)
+						if(BreakPointLineNumbers.Contains(LineNumber) || (GetDebugger().GetShaderAsset()->FindIncludeAsset(GetDebugger().GetStopLocation().File) == ShaderAssetObj && GetDebugger().GetStopLocation().LineNumber == LineNumber))
 						{
 							return EVisibility::HitTestInvisible;
 						}
@@ -3437,11 +3437,11 @@ constexpr int PaddingLineNum = 22;
 						SNew(SImage)
 						.Image(FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect2"))
 						.ColorAndOpacity_Lambda([this, LineNumber, GetDebugger]{
-							if (!GetDebugger().GetDebuggerError().Key.IsEmpty() && GetDebugger().GetDebuggerError().Value == LineNumber)
+							if (!GetDebugger().GetDebuggerError().Key.IsEmpty() && GetDebugger().GetShaderAsset()->FindIncludeAsset(GetDebugger().GetDebuggerError().Value.File) == ShaderAssetObj && GetDebugger().GetDebuggerError().Value.LineNumber == LineNumber)
 							{
 								return FLinearColor{ 1,0,0,0.7f };
 							}
-							else if(GetDebugger().GetStopLineNumber() == LineNumber)
+							else if(GetDebugger().GetShaderAsset()->FindIncludeAsset(GetDebugger().GetStopLocation().File) == ShaderAssetObj && GetDebugger().GetStopLocation().LineNumber == LineNumber)
 							{
 								return FLinearColor{0,1,0,0.7f};
 							}
@@ -3453,25 +3453,25 @@ constexpr int PaddingLineNum = 22;
 				[
 					SNew(SBorder)
 					.Visibility_Lambda([this, LineNumber, GetDebugger]{
-						if(BreakPointLineNumbers.Contains(LineNumber) || GetDebugger().GetStopLineNumber() == LineNumber)
+						if(BreakPointLineNumbers.Contains(LineNumber) || (GetDebugger().GetShaderAsset()->FindIncludeAsset(GetDebugger().GetStopLocation().File) == ShaderAssetObj && GetDebugger().GetStopLocation().LineNumber == LineNumber))
 						{
 							return EVisibility::HitTestInvisible;
 						}
 						return EVisibility::Collapsed;
 					})
 					.BorderImage_Lambda([this, LineNumber, GetDebugger]{
-						if (!GetDebugger().GetDebuggerError().Key.IsEmpty() && GetDebugger().GetDebuggerError().Value == LineNumber)
+						if (!GetDebugger().GetDebuggerError().Key.IsEmpty() && GetDebugger().GetShaderAsset()->FindIncludeAsset(GetDebugger().GetDebuggerError().Value.File) == ShaderAssetObj && GetDebugger().GetDebuggerError().Value.LineNumber == LineNumber)
 						{
 							return FAppStyle::Get().GetBrush("WhiteBrush");
 						}
 						return FShaderHelperStyle::Get().GetBrush("LineTip.BreakPointEffect");
 					})
 					.BorderBackgroundColor_Lambda([this, LineNumber, GetDebugger]{
-						if (!GetDebugger().GetDebuggerError().Key.IsEmpty() && GetDebugger().GetDebuggerError().Value == LineNumber)
+						if (!GetDebugger().GetDebuggerError().Key.IsEmpty() && GetDebugger().GetShaderAsset()->FindIncludeAsset(GetDebugger().GetDebuggerError().Value.File) == ShaderAssetObj && GetDebugger().GetDebuggerError().Value.LineNumber == LineNumber)
 						{
 							return FLinearColor{ 1,0,0,0.3f };
 						}
-						else if(GetDebugger().GetStopLineNumber() == LineNumber)
+						else if(GetDebugger().GetShaderAsset()->FindIncludeAsset(GetDebugger().GetStopLocation().File) == ShaderAssetObj && GetDebugger().GetStopLocation().LineNumber == LineNumber)
 						{
 							return FLinearColor{0,1,0,0.3f};
 						}
@@ -3484,7 +3484,7 @@ constexpr int PaddingLineNum = 22;
 						SNew(STextBlock)
 						.Font(GetCodeFontInfo())
 						.Visibility_Lambda([this, LineNumber, GetDebugger] { 
-							return !GetDebugger().GetDebuggerError().Key.IsEmpty() && GetDebugger().GetDebuggerError().Value == LineNumber ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+							return !GetDebugger().GetDebuggerError().Key.IsEmpty() && GetDebugger().GetShaderAsset()->FindIncludeAsset(GetDebugger().GetDebuggerError().Value.File) == ShaderAssetObj && GetDebugger().GetDebuggerError().Value.LineNumber == LineNumber ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 						})
 						.Text_Lambda([GetDebugger] { 
 							return FText::FromString(GetDebugger().GetDebuggerError().Key); 
@@ -3500,7 +3500,7 @@ constexpr int PaddingLineNum = 22;
             const int32 CurLineIndex = CursorLocation.GetLineIndex();
             auto FocusedWidget = FSlateApplication::Get().GetUserFocusedWidget(0);
             if(CanHighlightCursorLine() && FocusedWidget == ShaderMultiLineEditableText && LineNumber == GetLineNumber(CurLineIndex)
-			   && !BreakPointLineNumbers.Contains(LineNumber) && GetDebugger().GetStopLineNumber() != LineNumber)
+			   && !BreakPointLineNumbers.Contains(LineNumber) && GetDebugger().GetStopLocation().LineNumber != LineNumber)
             {
                 double CurTime = FPlatformTime::Seconds();
                 float Speed = 1.8f;
