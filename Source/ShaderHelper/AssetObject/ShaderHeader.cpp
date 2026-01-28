@@ -16,7 +16,7 @@ namespace SH
 		.Data<&ShaderHeader::Language, MetaInfo::Property>(LOCALIZATION("Language"))
 	)
 
-	const FString DefaultHeader = "#pragma once\n";
+	const FString DefaultHeader = "";
 
 	ShaderHeader::ShaderHeader() : Language(GpuShaderLanguage::HLSL)
 	{

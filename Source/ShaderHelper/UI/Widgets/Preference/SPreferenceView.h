@@ -1,6 +1,7 @@
 #pragma once
 #include "PluginManager/ShPluginManager.h"
 #include "SKeybindingText.h"
+#include "GpuApi/GpuRhi.h"
 
 namespace SH
 {
@@ -68,12 +69,13 @@ namespace SH
 		bool IsNaming{};
 	};
 
-	class SDebugView : public SCompoundWidget
+	class SEnvironmentView : public SCompoundWidget
 	{
 	public:
-		SLATE_BEGIN_ARGS(SDebugView) {}
+		SLATE_BEGIN_ARGS(SEnvironmentView) {}
 		SLATE_END_ARGS()
 		void Construct(const FArguments& InArgs);
+		TArray<TSharedPtr<FW::GpuRhiBackendType>> Backends;
 	};
 
 	class SPreferenceView : public SCompoundWidget
@@ -92,6 +94,6 @@ namespace SH
 		TSharedPtr<SPluginView> PluginView;
 		TSharedPtr<SKeymapView> KeymapView;
 		TSharedPtr<SAppearanceView> AppearanceView;
-		TSharedPtr<SDebugView> DebugView;
+		TSharedPtr<SEnvironmentView> EnvView;
 	};
 }

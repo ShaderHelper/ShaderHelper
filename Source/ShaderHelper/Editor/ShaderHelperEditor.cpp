@@ -1082,11 +1082,11 @@ namespace SH
 
 	void ShaderHelperEditor::StartDebugging(bool GlobalValidation)
 	{		
-		TRefCountPtr<GpuTexture> DebugTarget = CurDebuggableObject->OnStartDebugging();
-		if(DebugTarget)
+		DebugTargetInfo DebugTarget = CurDebuggableObject->OnStartDebugging();
+		if(DebugTarget.Tex)
 		{
 			IsDebugging = true;
-			DebuggerViewport->SetDebugTarget(MoveTemp(DebugTarget), GlobalValidation);
+			DebuggerViewport->SetDebugTarget(DebugTarget, GlobalValidation);
 			if (!GlobalValidation)
 			{
 				auto User0 = FSlateApplication::Get().GetUser(0);

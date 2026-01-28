@@ -9,6 +9,7 @@
 #include "AssetObject/Pins/Pins.h"
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
+#include "AssetObject/ShaderHeader.h"
 
 PYBIND11_EMBEDDED_MODULE(ShaderHelper, m)
 {
@@ -16,7 +17,8 @@ PYBIND11_EMBEDDED_MODULE(ShaderHelper, m)
 	RegisterPyFW(m, m_slate);
 
 	py::class_<SH::ShaderToy, FW::Graph, FW::ObjectPtr<SH::ShaderToy>>(m, "ShaderToy")
-		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::ShaderToy>(Outer); }), py::arg("Outer") = nullptr);
+		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::ShaderToy>(Outer); }), py::arg("Outer") = nullptr)
+		.def_readwrite("FlipY", &SH::ShaderToy::FlipY);
 	py::class_<SH::ShaderAsset, FW::AssetObject, FW::ObjectPtr<SH::ShaderAsset>>(m, "ShaderAsset")
 		.def_property("EditorContent", 
 		[](const SH::ShaderAsset& Self) -> std::string {
@@ -28,6 +30,9 @@ PYBIND11_EMBEDDED_MODULE(ShaderHelper, m)
 	py::class_<SH::StShader, SH::ShaderAsset, FW::ObjectPtr<SH::StShader>>(m, "StShader")
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::StShader>(Outer); }), py::arg("Outer") = nullptr)
 		.def_readwrite("Language", &SH::StShader::Language);
+	py::class_<SH::ShaderHeader, SH::ShaderAsset, FW::ObjectPtr<SH::ShaderHeader>>(m, "ShaderHeader")
+		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::ShaderHeader>(Outer); }), py::arg("Outer") = nullptr)
+		.def_readwrite("Language", &SH::ShaderHeader::Language);
 	py::native_enum<SH::ShaderToyFilterMode>(m, "ShaderToyFilterMode", "enum.Enum")
 		.value("Nearest", SH::ShaderToyFilterMode::Nearest)
 		.value("Linear", SH::ShaderToyFilterMode::Linear)

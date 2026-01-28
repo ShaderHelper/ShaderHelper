@@ -15,7 +15,6 @@
 #include "UI/Widgets/Debugger/SDebuggerCallStackView.h"
 #include "UI/Widgets/Debugger/SDebuggerWatchView.h"
 #include "UI/Widgets/Preference/SPreferenceView.h"
-#include "AssetObject/DebuggableObject.h"
 #include "UI/Widgets/Misc/SShWindow.h"
 #include "UI/Widgets/SShViewport.h"
 #include "Debugger/ShaderDebugger.h"

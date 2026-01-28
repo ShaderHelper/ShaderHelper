@@ -56,6 +56,11 @@ vec2 GPrivate_fragCoord;
 void main()
 {
     vec2 fragCoord = gl_FragCoord.xy;
+    if(iFlipY == 1)
+    {
+        fragCoord.y = iResolution.y - fragCoord.y;	
+    }
+
     GPrivate_fragCoord = fragCoord;
     vec4 fragColor;
     mainImage(fragColor, fragCoord);

@@ -125,6 +125,8 @@ EditDuringDebugging,"Shader changed. The debugger may behave unexpectedly. Conti
 Preferences,Preferences,
 Plugins,Plugins,
 Keymap,Keymap,
+Environment,Environment,
+GraphicsApi,Graphics Api,
 Reset,Reset,
 Command,Command,
 AssetViewCommands,Asset browser,

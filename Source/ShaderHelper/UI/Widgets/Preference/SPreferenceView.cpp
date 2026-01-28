@@ -733,9 +733,9 @@ namespace SH
 		];
 	}
 
-	void SDebugView::Construct(const FArguments& InArgs)
+	void SEnvironmentView::Construct(const FArguments& InArgs)
 	{
-		auto DebugGrid = SNew(SGridPanel).FillColumn(0, 0.4f).FillColumn(1, 0.5f).FillColumn(2, 0.1f);
+		auto EnvGrid = SNew(SGridPanel).FillColumn(0, 0.4f).FillColumn(1, 0.5f).FillColumn(2, 0.1f);
 		auto AppendItem = [ItemNum = 0](auto& InGrid, const FText& InLabel, const FText& InToolTipText = FText::GetEmpty()) mutable -> SHorizontalBox::FScopedWidgetSlotArguments
 		{
 			InGrid->AddSlot(0, ItemNum)
@@ -755,13 +755,40 @@ namespace SH
 			return HBox->AddSlot();
 		};
 
-		AppendItem(DebugGrid, LOCALIZATION("EnableUbsan"), LOCALIZATION("EnableUbsanTip"))
+		for (int Backend = 0; Backend < (int)GpuRhiBackendType::Num; Backend++)
+		{
+			Backends.Add(MakeShared<GpuRhiBackendType>(static_cast<GpuRhiBackendType>(Backend)));
+		}
+
+		AppendItem(EnvGrid, LOCALIZATION("GraphicsApi"))
+		[
+			SNew(SComboBox<TSharedPtr<GpuRhiBackendType>>)
+			.OptionsSource(&Backends)
+			.OnSelectionChanged_Lambda([this](TSharedPtr<GpuRhiBackendType> InItem, ESelectInfo::Type) {
+				FString BackendName = ANSI_TO_TCHAR(magic_enum::enum_name(*InItem).data());
+				Editor::GetEditorConfig()->SetString(TEXT("Environment"), TEXT("GraphicsApi"), *BackendName);
+				Editor::SaveEditorConfig();
+			})
+			.OnGenerateWidget_Lambda([this](TSharedPtr<GpuRhiBackendType> InItem) {
+				FString BackendName = ANSI_TO_TCHAR(magic_enum::enum_name(*InItem).data());
+				return SNew(STextBlock).Text(FText::FromString(BackendName));
+			})
+			[
+				SNew(STextBlock).Text_Lambda([this] {
+					GpuRhiBackendType BackendType = GetGpuRhiBackendType();
+					FString BackendName = ANSI_TO_TCHAR(magic_enum::enum_name(BackendType).data());
+					return FText::FromString(BackendName);
+				})
+			]
+		];
+
+		AppendItem(EnvGrid, LOCALIZATION("EnableUbsan"), LOCALIZATION("EnableUbsanTip"))
 		[
 			SNew(SCheckBox).IsChecked_Lambda([] {
 				return ShaderDebugger::EnableUbsan() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;;
 			})
 			.OnCheckStateChanged_Lambda([](ECheckBoxState InState) {
-				Editor::GetEditorConfig()->SetBool(TEXT("Debugger"), TEXT("EnableUbsan"), InState == ECheckBoxState::Checked);
+				Editor::GetEditorConfig()->SetBool(TEXT("Environment"), TEXT("EnableUbsan"), InState == ECheckBoxState::Checked);
 				Editor::SaveEditorConfig();
 			})
 		];
@@ -775,7 +802,7 @@ namespace SH
 				SNew(SBorder)
 				.BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
 				[
-					DebugGrid
+					EnvGrid
 				]
 			]
 	
@@ -787,12 +814,12 @@ namespace SH
 		SAssignNew(KeymapView, SKeymapView);
 		SAssignNew(PluginView, SPluginView);
 		SAssignNew(AppearanceView, SAppearanceView);
-		SAssignNew(DebugView, SDebugView);
+		SAssignNew(EnvView, SEnvironmentView);
 
 		auto PluginPreference = CreatePreference(LOCALIZATION("Plugins"), PluginView.ToSharedRef());
 		auto AppearancePreference = CreatePreference(LOCALIZATION("Appearance"), AppearanceView.ToSharedRef());
 		auto KeymapPreference = CreatePreference(LOCALIZATION("Keymap"), KeymapView.ToSharedRef());
-		auto DebugPreference = CreatePreference(LOCALIZATION("Debug"), DebugView.ToSharedRef());
+		auto EnvPreference = CreatePreference(LOCALIZATION("Environment"), EnvView.ToSharedRef());
 		CurPreference = &*PluginPreference;
 
 		ChildSlot
@@ -829,7 +856,7 @@ namespace SH
 						+ SVerticalBox::Slot()
 						.AutoHeight()
 						[
-							DebugPreference
+							EnvPreference
 						]
 					]
 				]

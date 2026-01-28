@@ -32,7 +32,7 @@ namespace FW
 					ObjectData = nullptr;
 					PropertyDatas = nullptr;
 				}
-				else
+				else if(PropertyDatas)
 				{
 					for (const auto& Data : *PropertyDatas)
 					{

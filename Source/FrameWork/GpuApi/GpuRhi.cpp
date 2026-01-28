@@ -1,6 +1,7 @@
 #include "CommonHeader.h"
 
 #include "GpuRhi.h"
+#include "Editor/Editor.h"
 
 #if PLATFORM_WINDOWS
 #include "./Dx12/Dx12GpuRhiBackend.h"
@@ -332,7 +333,7 @@ private:
 	TArray<TUniquePtr<GpuCmdRecorderValidation>> RequestedCmdRecorders;
 };
 
-bool GpuRhi::InitGpuRhi(const GpuRhiConfig &InConfig)
+void GpuRhi::InitGpuRhi(const GpuRhiConfig &InConfig)
 {
 	TUniquePtr<GpuRhi> RhiBackend;
 	switch (InConfig.BackendType) {
@@ -341,13 +342,8 @@ bool GpuRhi::InitGpuRhi(const GpuRhiConfig &InConfig)
 #elif PLATFORM_MAC
 	case GpuRhiBackendType::Metal: RhiBackend = MakeUnique<MetalGpuRhiBackend>(); break;
 #endif
-	case GpuRhiBackendType::Vulkan:
-		// TODO: create vulkan backends.
-		unimplemented();
-		break;
-	default: // unreachable
-		checkf(false, TEXT("Invalid GpuApiBackendType."));
-		return false;
+	default:
+		AUX::Unreachable();
 	}
 
 	if (InConfig.EnableValidationCheck) {
@@ -355,9 +351,38 @@ bool GpuRhi::InitGpuRhi(const GpuRhiConfig &InConfig)
 	} else {
 		GGpuRhi = MoveTemp(RhiBackend);
 	}
-	return true;
 }
 
 GpuCmdRecorder* GGpuCmdRecorder;
 TUniquePtr<GpuRhi> GGpuRhi;
+FRAMEWORK_API GpuRhiBackendType GetGpuRhiBackendType()
+{
+#if PLATFORM_WINDOWS
+	FString BackendName = TEXT("DX12");
+#elif PLATFORM_MAC
+	FString BackendName = TEXT("Metal");
+#endif 
+	Editor::GetEditorConfig()->GetString(TEXT("Environment"), TEXT("GraphicsApi"), BackendName);
+#if PLATFORM_WINDOWS
+	if (BackendName.Equals(TEXT("DX12"), ESearchCase::IgnoreCase))
+	{
+		return GpuRhiBackendType::DX12;
+	}
+	else if (BackendName.Equals(TEXT("Vulkan"), ESearchCase::IgnoreCase))
+	{
+		return GpuRhiBackendType::Vulkan;
+	}
+#endif
+#if PLATFORM_MAC
+	if (BackendName.Equals(TEXT("Metal"), ESearchCase::IgnoreCase))
+	{
+		return GpuRhiBackendType::Metal;
+	}
+#endif 
+	else
+	{
+		FPlatformMisc::MessageBoxExt(EAppMsgType::Ok, *FString::Printf(TEXT("Invalid graphics backend:%s"), *BackendName), TEXT("Error:"));
+		std::_Exit(0);
+	}
+}
 }

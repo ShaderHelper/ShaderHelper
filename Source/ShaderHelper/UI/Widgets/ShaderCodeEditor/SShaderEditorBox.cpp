@@ -2652,7 +2652,13 @@ constexpr int PaddingLineNum = 22;
 		return FReply::Handled();
     }
 
-    FReply SShaderEditorBox::HandleKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent)
+	void SShaderEditorBox::SetText(const FText& Text)
+	{
+		ShaderMultiLineEditableText->SelectAllText();
+		ShaderMultiLineEditableText->InsertTextAtCursor(Text);
+	}
+
+	FReply SShaderEditorBox::HandleKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent)
     {
         TSharedPtr<SMultiLineEditableText> Text = ShaderMultiLineEditableText;
 		if (bShortcutHandled)

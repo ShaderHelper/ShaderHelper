@@ -221,10 +221,7 @@ namespace SH
         void SetFocus() {
             FSlateApplication::Get().SetUserFocus(0, ShaderMultiLineEditableText);
         }
-		void SetText(const FText& Text) { 
-			ShaderMarshaller->TextLayout->GetLineModels().Reset();
-			ShaderMultiLineEditableText->SetText(Text); 
-		};
+		void SetText(const FText& Text);
         
         //If type a char, trigger KeyDown and then KeyChar.
 		FReply HandleKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent);
@@ -267,7 +264,7 @@ namespace SH
 		void RefreshSyntaxHighlight();
 		void RefreshOccurrenceHighlight();
 		void RefreshBracketHighlight();
-
+		
 	protected:
 		virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 		virtual FReply OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
@@ -312,9 +309,9 @@ namespace SH
 		std::atomic<bool> bRefreshSyntax{};
 		FEvent* SyntaxEvent = nullptr;
 		//---------------------------------------
-        
+
 	private:
-		//The text after unfolding, but that may not be the content compiled finally.
+        //The text after unfolding, but that may not be the content compiled finally.
 		//The shader may contain extra declaration(eg. binding codegen)
 		FString CurrentShaderSource;
         

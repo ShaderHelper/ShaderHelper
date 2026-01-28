@@ -125,6 +125,8 @@ EditDuringDebugging,"检测到shader改变,这可能导致调试器表现异常.
 Preferences,偏好设置,
 Plugins,插件,
 Keymap,键位映射,
+Environment,环境,
+GraphicsApi,图形api,
 Reset,重置,
 Command,命令,
 AssetViewCommands,资产浏览器,

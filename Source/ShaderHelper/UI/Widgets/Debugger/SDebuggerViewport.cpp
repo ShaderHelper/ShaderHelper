@@ -231,45 +231,45 @@ namespace SH
 		return SCompoundWidget::OnPaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
 	}
 
-	void SDebuggerViewport::SetDebugTarget(TRefCountPtr<GpuTexture> InTarget, bool GlobalValidation)
+	void SDebuggerViewport::SetDebugTarget(const DebugTargetInfo& InTarget, bool GlobalValidation)
 	{
 		bFinalizePixel = false;
 		Zoom = 1;
 		Offset = 0.0f;
 		DpiScale = FSlateApplication::Get().FindWidgetWindow(AsShared())->GetNativeWindow()->GetDPIScaleFactor();
 		
-		uint32 Width = InTarget->GetWidth();
-		uint32 Height = InTarget->GetHeight();
+		uint32 Width = InTarget.Tex->GetWidth();
+		uint32 Height = InTarget.Tex->GetHeight();
 		
 		DebuggerTex = GGpuRhi->CreateTexture({
 			.Width = Width,
 			.Height = Height,
-			.Format = InTarget->GetFormat(),
+			.Format = InTarget.Tex->GetFormat(),
 			.Usage =  GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared
 		});
-		RawTex = InTarget;
+		RawTex = InTarget.Tex;
 		ViewPort->SetViewPortRenderTexture(DebuggerTex);
 		
 		uint32 PaddedRowPitch;
-		uint8* PaddedData = (uint8*)GGpuRhi->MapGpuTexture(InTarget, GpuResourceMapMode::Read_Only, PaddedRowPitch);
+		uint8* PaddedData = (uint8*)GGpuRhi->MapGpuTexture(InTarget.Tex, GpuResourceMapMode::Read_Only, PaddedRowPitch);
 		TexDatas.SetNum(Width * Height);
 		for (uint32 y = 0; y < Height; ++y)
 		{
 			const uint8* SrcRow = PaddedData + y * PaddedRowPitch;
 			for (uint32 x = 0; x < Width; ++x)
 			{
-				const uint8* Pixel = SrcRow + x * GetTextureFormatByteSize(InTarget->GetFormat());
-				if(InTarget->GetFormat() == GpuTextureFormat::B8G8R8A8_UNORM)
+				const uint8* Pixel = SrcRow + x * GetTextureFormatByteSize(InTarget.Tex->GetFormat());
+				if(InTarget.Tex->GetFormat() == GpuTextureFormat::B8G8R8A8_UNORM)
 				{
 					TexDatas[y * Width + x] = {Pixel[2] / 255.0f, Pixel[1] / 255.0f, Pixel[0] / 255.0f, Pixel[3] / 255.0f};
 				}
-				else if (InTarget->GetFormat() == GpuTextureFormat::R32G32B32A32_FLOAT)
+				else if (InTarget.Tex->GetFormat() == GpuTextureFormat::R32G32B32A32_FLOAT)
 				{
 					TexDatas[y * Width + x] = { *((float*)Pixel), *((float*)Pixel + 1), *((float*)Pixel + 2), *((float*)Pixel + 3) };
 				}
 			}
 		}
-		GGpuRhi->UnMapGpuTexture(InTarget);
+		GGpuRhi->UnMapGpuTexture(InTarget.Tex);
 
 		if (GlobalValidation)
 		{

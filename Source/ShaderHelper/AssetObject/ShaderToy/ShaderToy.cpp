@@ -13,7 +13,8 @@ using namespace FW;
 namespace SH
 {
     REFLECTION_REGISTER(AddClass<ShaderToy>("ShaderToy Graph")
-								.BaseClass<Graph>()
+						.BaseClass<Graph>()
+						.Data<&ShaderToy::FlipY, MetaInfo::Property>(LOCALIZATION("FlipY"))
 	)
 
     ShaderToy::~ShaderToy()
@@ -24,6 +25,7 @@ namespace SH
 	void ShaderToy::Serialize(FArchive& Ar)
 	{
 		Graph::Serialize(Ar);
+		Ar << FlipY;
 	}
 
 	FString ShaderToy::FileExtension() const

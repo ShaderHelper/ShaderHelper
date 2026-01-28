@@ -27,6 +27,11 @@ static float2 GPrivate_fragCoord;
 float4 MainPS(PIn Input) : SV_Target
 {
     float2 fragCoord = float2(Input.Pos.x, Input.Pos.y);
+    if(iFlipY == 1)
+    {
+        fragCoord.y = iResolution.y - fragCoord.y;
+    }
+
     GPrivate_fragCoord = fragCoord;
     float4 fragColor;
     mainImage(fragColor, fragCoord);

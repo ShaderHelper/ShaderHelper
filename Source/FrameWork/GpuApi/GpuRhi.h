@@ -8,19 +8,11 @@ enum class GpuRhiBackendType
 {
 #if PLATFORM_WINDOWS
 	DX12,
+	Vulkan,
 #elif PLATFORM_MAC
 	Metal,
 #endif
-	Vulkan,
-
-// default backend for different platforms.
-#if PLATFORM_WINDOWS
-	Default = DX12,
-#elif PLATFORM_MAC
-	Default = Metal,
-#else
-	Default = Vulkan
-#endif
+	Num,
 };
 
 struct GpuRhiConfig
@@ -149,9 +141,9 @@ public:
 	virtual void Submit(const TArray<GpuCmdRecorder*>& CmdRecorders) = 0;
 
 public:
-	static bool InitGpuRhi(const GpuRhiConfig &InConfig);
+	static void InitGpuRhi(const GpuRhiConfig &InConfig);
 };
 
 FRAMEWORK_API extern TUniquePtr<GpuRhi> GGpuRhi;
-
+FRAMEWORK_API GpuRhiBackendType GetGpuRhiBackendType();
 }

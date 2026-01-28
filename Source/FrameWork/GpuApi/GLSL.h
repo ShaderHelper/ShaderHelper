@@ -3,7 +3,6 @@
 #include "GpuShader.h"
 #include "Common/Path/PathHelper.h"
 #include "magic_enum.hpp"
-#include <Serialization/JsonSerializer.h>
 
 THIRD_PARTY_INCLUDES_START
 #pragma push_macro("check")
@@ -14,6 +13,9 @@ THIRD_PARTY_INCLUDES_START
 #include "shaderc/shaderc.hpp"
 #pragma pop_macro("check")
 THIRD_PARTY_INCLUDES_END
+
+#include <Serialization/JsonSerializer.h>
+#include <regex>
 
 namespace GLSL
 {
@@ -141,7 +143,7 @@ namespace GLSL
 		case FW::ShaderType::VertexShader:  StageStr = TEXT("VS"); break;
 		case FW::ShaderType::PixelShader:   StageStr = TEXT("PS"); break;
 		case FW::ShaderType::ComputeShader: StageStr = TEXT("CS"); break;
-		default: return false;
+		default: return true; // None stage means match all
 		}
 		return ItemStages.Contains(StageStr);
 	}
@@ -268,7 +270,7 @@ namespace FW
 		case ShaderType::PixelShader:    return shaderc_shader_kind::shaderc_fragment_shader;
 		case ShaderType::ComputeShader:  return shaderc_shader_kind::shaderc_compute_shader;
 		default:
-			AUX::Unreachable();
+			return shaderc_shader_kind::shaderc_vertex_shader;
 		}
 	}
 
@@ -1281,6 +1283,7 @@ namespace FW
 			: ShaderTU(InShader->GetSourceText(), InShader->GetShaderName())
 			, Context(Funcs, GuideLineScopes)
 			, Stage(InShader->GetShaderType())
+			, IncludeDirs(InShader->GetIncludeDirs())
 		{
 			shaderc::Compiler GlslCompiler;
 			shaderc::CompileOptions Options;
@@ -1762,6 +1765,51 @@ namespace FW
 		{
 
 			TArray<ShaderCandidateInfo> Candidates;
+
+			// Check if we're in an #include context
+			FString LineText = GetLineStr(Row);
+			std::regex IncludePattern(R"(^\s*#\s*include\s*["<])");
+			if (std::regex_search(TCHAR_TO_UTF8(*LineText), IncludePattern))
+			{
+				// Extract partial path being typed
+				int32 QuotePos = LineText.Find(TEXT("\""), ESearchCase::IgnoreCase, ESearchDir::FromEnd);
+				int32 AnglePos = LineText.Find(TEXT("<"), ESearchCase::IgnoreCase, ESearchDir::FromEnd);
+				int32 StartPos = FMath::Max(QuotePos, AnglePos);
+				FString PartialPath;
+				if (StartPos != INDEX_NONE && StartPos + 1 < LineText.Len())
+				{
+					PartialPath = LineText.Mid(StartPos + 1);
+				}
+
+				// Collect available include files from all include directories
+				TSet<FString> AddedFiles;
+				for (const FString& IncludeDir : IncludeDirs)
+				{
+					TArray<FString> FoundFiles;
+					IFileManager::Get().FindFilesRecursive(FoundFiles, *IncludeDir, TEXT("*.*"), true, false);
+					for (const FString& FilePath : FoundFiles)
+					{
+						// Get relative path from include directory
+						FString RelativePath = FilePath;
+						FPaths::MakePathRelativeTo(RelativePath, *(IncludeDir + TEXT("/")));
+
+						// Filter by partial path and common shader extensions
+						FString Extension = FPaths::GetExtension(RelativePath).ToLower();
+						if (Extension == TEXT("glsl") || Extension == TEXT("h") || Extension == TEXT("header"))
+						{
+							if (PartialPath.IsEmpty() || RelativePath.StartsWith(PartialPath))
+							{
+								if (!AddedFiles.Contains(RelativePath))
+								{
+									AddedFiles.Add(RelativePath);
+									Candidates.Add({ ShaderCandidateKind::File, RelativePath });
+								}
+							}
+						}
+					}
+				}
+				return Candidates;
+			}
 			
 			// Helper to check if a position is within a scope
 			auto IsInScope = [](const ShaderScope& Scope, int32 InRow, int32 InCol) {
@@ -1921,5 +1969,6 @@ namespace FW
 		shaderc::ParsedGlslangShader ParsedShader;
 		GlslContext Context;
 		ShaderType Stage;
+		TArray<FString> IncludeDirs;
 	};
 }

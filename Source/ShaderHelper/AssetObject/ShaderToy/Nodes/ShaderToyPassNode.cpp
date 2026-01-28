@@ -185,7 +185,7 @@ namespace SH
 		};
 	}
 
-	TRefCountPtr<GpuTexture> ShaderToyPassNode::OnStartDebugging()
+	DebugTargetInfo ShaderToyPassNode::OnStartDebugging()
 	{
 		AssetOp::OpenAsset(ShaderAssetObj);
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
@@ -201,7 +201,7 @@ namespace SH
 		{
 			IsDebugging = true;
 			auto PassOutput = static_cast<GpuTexturePin*>(GetPin("RT"));
-			return PassOutput->GetValue();
+			return { PassOutput->GetValue() };
 		}
 		else
 		{
@@ -304,15 +304,19 @@ namespace SH
 			RemoveMacroCalls(ShaderToy, "AssertFormat");
 			
 			//Flip y
-			std::regex MainImagePattern(R"(void\s+mainImage\s*\([^)]*vec2\s+(\w+)\s*\)[^}]*\})");
-			std::smatch MainImageMatch;
-			if (std::regex_search(ShaderToy, MainImageMatch, MainImagePattern))
+			if (!static_cast<class ShaderToy*>(GetOuter())->FlipY)
 			{
-				std::string FragCoordParamName = MainImageMatch[1].str();
-				std::regex FunctionBodyPattern(R"((void\s+mainImage\s*\([^)]*\)\s*\{)(\s*))");
-				std::string Replacement = "$1$2" + FragCoordParamName + ".y = iResolution.y - " + FragCoordParamName + ".y;\n$2";
-				ShaderToy = std::regex_replace(ShaderToy, FunctionBodyPattern, Replacement);
+				std::regex MainImagePattern(R"(void\s+mainImage\s*\([^)]*vec2\s+(\w+)\s*\)[^}]*\})");
+				std::smatch MainImageMatch;
+				if (std::regex_search(ShaderToy, MainImageMatch, MainImagePattern))
+				{
+					std::string FragCoordParamName = MainImageMatch[1].str();
+					std::regex FunctionBodyPattern(R"((void\s+mainImage\s*\([^)]*\)\s*\{)(\s*))");
+					std::string Replacement = "$1$2" + FragCoordParamName + ".y = iResolution.y - " + FragCoordParamName + ".y;\n$2";
+					ShaderToy = std::regex_replace(ShaderToy, FunctionBodyPattern, Replacement);
+				}
 			}
+
 			return ShaderToy;
 		}
 		
@@ -526,13 +530,17 @@ namespace SH
 			ShaderToy = ExtractedStructs + "\n" + ShaderToy;
 		}
 		//Flip y
-		if (std::regex_search(ShaderToy, MainImageMatch, MainImagePattern))
+		if (!static_cast<class ShaderToy*>(GetOuter())->FlipY)
 		{
-			std::string FragCoordParamName = MainImageMatch[1].str();
-			std::regex FunctionBodyPattern(R"((void\s+mainImage\s*\([^)]*\)\s*\{)(\s*))");
-			std::string Replacement = "$1$2" + FragCoordParamName + ".y = iResolution.y - " + FragCoordParamName + ".y;\n$2";
-			ShaderToy = std::regex_replace(ShaderToy, FunctionBodyPattern, Replacement);
+			if (std::regex_search(ShaderToy, MainImageMatch, MainImagePattern))
+			{
+				std::string FragCoordParamName = MainImageMatch[1].str();
+				std::regex FunctionBodyPattern(R"((void\s+mainImage\s*\([^)]*\)\s*\{)(\s*))");
+				std::string Replacement = "$1$2" + FragCoordParamName + ".y = iResolution.y - " + FragCoordParamName + ".y;\n$2";
+				ShaderToy = std::regex_replace(ShaderToy, FunctionBodyPattern, Replacement);
+			}
 		}
+
 		return ShaderToy;
 	}
 
@@ -804,6 +812,7 @@ namespace SH
 		BuiltinUniformBuffer->GetMember<float>("iTime") = Context.iTime;
 		BuiltinUniformBuffer->GetMember<int32>("iFrame") = Context.FrameCount;
 		BuiltinUniformBuffer->GetMember<Vector4f>("iMouse") = Context.iMouse;
+		BuiltinUniformBuffer->GetMember<int32>("iFlipY") = static_cast<ShaderToy*>(GetOuter())->FlipY;
 
 		auto iChannelResolution = BuiltinUniformBuffer->GetMember<Vector3f[4]>("iChannelResolution");
 		for (int i = 0; i < 4; i++)

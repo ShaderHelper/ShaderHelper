@@ -260,6 +260,10 @@ namespace FW
 		if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
 		{
 			ClearSelectedNode();
+			if (ShObjectOp* Op = GetShObjectOp(GraphData))
+			{
+				Op->OnSelect(GraphData);
+			}
 			if (MarqueeStart)
 			{
 				Vector2D MarqueeUpperLeft = { FMath::Min((*MarqueeStart).x, MarqueeEnd.x), FMath::Min((*MarqueeStart).y, MarqueeEnd.y) };

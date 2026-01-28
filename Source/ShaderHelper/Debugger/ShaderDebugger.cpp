@@ -570,7 +570,7 @@ namespace SH
 	bool ShaderDebugger::EnableUbsan()
 	{
 		bool EnableUbsan = false;
-		Editor::GetEditorConfig()->GetBool(TEXT("Debugger"), TEXT("EnableUbsan"), EnableUbsan);
+		Editor::GetEditorConfig()->GetBool(TEXT("Environment"), TEXT("EnableUbsan"), EnableUbsan);
 		return EnableUbsan;
 	}
 

@@ -224,6 +224,7 @@ def create_shadertoy_assets(shadertoy_id, shadertoy_info):
         
         shadertoy_name = shadertoy_info['Name']
         shadertoy_graph = Sh.Asset.CreateAsset(shadertoy_name, Sh.ShaderToy)
+        shadertoy_graph.FlipY = True
 
         id_to_builtin_resource = {
             "XdX3Rn": "Abstract 1",
@@ -249,13 +250,24 @@ def create_shadertoy_assets(shadertoy_id, shadertoy_info):
             "XdfGRn": "Stars",
             "XsfGRn": "Wood"
         }
+
+        include_common_code = ""
+        for pass_name, pass_data in shadertoy_info['RenderPass'].items():
+            if pass_data is not None and pass_data['type'] == 'common':
+                shadertoy_shader = Sh.Asset.CreateAsset(pass_name, Sh.ShaderHeader)
+                shadertoy_shader.EditorContent = pass_data['code']
+                shadertoy_shader.Language = Sh.GpuShaderLanguage.GLSL
+                saved_file_path = os.path.join(target_dir, f"{pass_name}.{shadertoy_shader.FileExtension}")
+                Sh.Asset.SaveToFile(shadertoy_shader, saved_file_path)
+                include_common_code = f"#include \"{pass_name}.{shadertoy_shader.FileExtension}\"\n"
+                break
     
         id_to_node = {}
         # Create the shadertoy graph that contains all needed nodes and shaders
         for pass_name, pass_data in shadertoy_info['RenderPass'].items():
-            if pass_data is not None:
+            if pass_data is not None and pass_data['type'] != 'common':
                 shadertoy_shader = Sh.Asset.CreateAsset(pass_name, Sh.StShader)
-                shadertoy_shader.EditorContent = pass_data['code']
+                shadertoy_shader.EditorContent = include_common_code + pass_data['code']
                 shadertoy_shader.Language = Sh.GpuShaderLanguage.GLSL
                 saved_file_path = os.path.join(target_dir, f"{pass_name}.{shadertoy_shader.FileExtension}")
                 Sh.Asset.SaveToFile(shadertoy_shader, saved_file_path)
@@ -303,7 +315,7 @@ def create_shadertoy_assets(shadertoy_id, shadertoy_info):
                 break
 
         for pass_name, pass_data in shadertoy_info['RenderPass'].items():
-            if pass_data is not None:
+            if pass_data is not None and pass_data['type'] != 'common':
                 pass_id = pass_data['outputs'][0]['id']
                 pass_node = id_to_node[pass_id]
                 if pass_data['name'] == 'Image':
@@ -342,7 +354,7 @@ def scrape_shadertoy_shader(shader_url):
         shader_data = json.loads(response_text)[0]
 
         shadertoy_info = {}
-        shadertoy_info['RenderPass'] = {'Image': None, 'Buffer A': None, 'Buffer B': None, 'Buffer C': None, 'Buffer D': None}
+        shadertoy_info['RenderPass'] = {'Common': None, 'Image': None, 'Buffer A': None, 'Buffer B': None, 'Buffer C': None, 'Buffer D': None}
         shadertoy_info['Name'] = shader_data['info']['name']
         for pass_name in shadertoy_info['RenderPass']:
             for pass_data in shader_data['renderpass']:

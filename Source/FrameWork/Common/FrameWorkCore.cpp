@@ -238,6 +238,8 @@ namespace FW
     
     ShObjectOp* GetShObjectOp(ShObject* InObject)
     {
+		if (!InObject) return nullptr;
+
         return GetDefaultObject<ShObjectOp>([InObject](ShObjectOp* CurShObjectOp) {
             return CurShObjectOp->SupportType() == InObject->DynamicMetaType();
         });

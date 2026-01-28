@@ -3,7 +3,7 @@
 #include "AssetObject/StShader.h"
 #include "AssetManager/AssetManager.h"
 #include "Editor/PreviewViewPort.h"
-#include "AssetObject/DebuggableObject.h"
+#include "Debugger/DebuggableObject.h"
 #include "AssetObject/ShaderToy/ShaderToy.h"
 
 namespace SH
@@ -65,7 +65,7 @@ namespace SH
     
 		//ShDebuggableObject
 		InvocationState GetInvocationState() override;
-		TRefCountPtr<FW::GpuTexture> OnStartDebugging() override;
+		DebugTargetInfo OnStartDebugging() override;
 		void OnFinalizePixel(const FW::Vector2u& PixelCoord) override;
 		void OnEndDebuggging() override;
 		ShaderAsset* GetShaderAsset() const override;

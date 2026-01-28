@@ -23,5 +23,8 @@ namespace SH
 		
 		void OnDragEnter(TSharedPtr<FDragDropOperation> DragDropOp) override;
 		void OnDrop(TSharedPtr<FDragDropOperation> DragDropOp, const FW::Vector2D& Pos) override;
+
+	public:
+		bool FlipY{};
 	};
 }

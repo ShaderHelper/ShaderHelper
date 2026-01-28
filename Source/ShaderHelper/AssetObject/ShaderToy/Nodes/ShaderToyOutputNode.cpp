@@ -17,7 +17,6 @@ namespace SH
 			.Min = [](const ShaderToyOutputNode*) { return 0.0f; },
 			.Max = [](const ShaderToyOutputNode*) { return 1.0f; }
 		})
-		.Data<&ShaderToyOutputNode::FlipY, MetaInfo::Property>(LOCALIZATION("FlipY"))
 	)
     REFLECTION_REGISTER(AddClass<ShaderToyOutputNodeOp>()
         .BaseClass<ShObjectOp>()
@@ -57,7 +56,7 @@ namespace SH
 
 	ShaderToyOutputNode::ShaderToyOutputNode()
 	: Format(ShaderToyFormat::B8G8R8A8_UNORM)
-	, Layer(0), AreaFraction(1.0f), FlipY(false)
+	, Layer(0), AreaFraction(1.0f)
 	{
 		ObjectName = LOCALIZATION("Present");
 	}
@@ -86,7 +85,6 @@ namespace SH
 		GraphNode::Serialize(Ar);
 		Ar << Layer;
 		Ar << AreaFraction;
-		Ar << FlipY;
 	}
 
     ExecRet ShaderToyOutputNode::Exec(GraphExecContext& Context)
@@ -96,10 +94,6 @@ namespace SH
         auto ResultPin = static_cast<GpuTexturePin*>(GetPin("RT"));	
         
         BlitPassInput Input;
-		if (FlipY)
-		{
-			Input.VariantDefinitions.insert("FLIP_Y");
-		}
         Input.InputTex = ResultPin->GetValue();
         Input.InputTexSampler = GpuResourceHelper::GetSampler({});
         Input.OutputRenderTarget = ShaderToyContext.FinalRT;
@@ -112,8 +106,7 @@ namespace SH
 	void ShaderToyOutputNode::PostPropertyChanged(PropertyData* InProperty)
 	{
 		GraphNode::PostPropertyChanged(InProperty);
-		if (InProperty->GetDisplayName().EqualTo(LOCALIZATION("AreaFraction")) || InProperty->GetDisplayName().EqualTo(LOCALIZATION("Layer")) ||
-			InProperty->GetDisplayName().EqualTo(LOCALIZATION("FlipY")))
+		if (InProperty->GetDisplayName().EqualTo(LOCALIZATION("AreaFraction")) || InProperty->GetDisplayName().EqualTo(LOCALIZATION("Layer")))
 		{
 			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 			ShEditor->ForceRender();

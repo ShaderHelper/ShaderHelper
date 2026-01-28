@@ -96,7 +96,7 @@ namespace FW {
 #else
 		Config.EnableValidationCheck = true;
 #endif
-		Config.BackendType = GpuRhiBackendType::Default;
+		Config.BackendType = GetGpuRhiBackendType();
 
 		if (FParse::Param(FCommandLine::Get(), TEXT("disableValidation"))) {
 			Config.EnableValidationCheck = false;
@@ -105,24 +105,6 @@ namespace FW {
 			Config.EnableValidationCheck = true;
 		}
 
-		FString BackendName;
-		if (FParse::Value(FCommandLine::Get(), TEXT("backend="), BackendName)) {
-			if (BackendName.Equals(TEXT("Vulkan"))) {
-				Config.BackendType = GpuRhiBackendType::Vulkan;
-			}
-#if PLATFORM_MAC
-			else if (BackendName.Equals(TEXT("Metal"))) {
-				Config.BackendType = GpuRhiBackendType::Metal;
-			}
-#elif PLATFORM_WINDOWS
-			else if (BackendName.Equals(TEXT("DX12"))) {
-				Config.BackendType = GpuRhiBackendType::DX12;
-			}
-#endif
-			else {
-				// invalid backend name, use default backend type.
-			}
-		}
 		GpuRhi::InitGpuRhi(Config);
 		GGpuRhi->InitApiEnv();
 

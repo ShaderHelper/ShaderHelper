@@ -1,5 +1,6 @@
 #pragma once
 #include "Editor/PreviewViewPort.h"
+#include "Debugger/DebuggableObject.h"
 
 namespace SH
 {
@@ -15,7 +16,7 @@ namespace SH
 		virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 		virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
 		
-		void SetDebugTarget(TRefCountPtr<FW::GpuTexture> InTarget, bool GlobalValidation);
+		void SetDebugTarget(const DebugTargetInfo& InTarget, bool GlobalValidation);
 		void Draw() const;
 		
 		FW::Vector2i GetPixelCoord() const {

@@ -2,8 +2,6 @@
 
 #include "GpuShader.h"
 #include "Common/Path/PathHelper.h"
-#include <Serialization/JsonSerializer.h>
-#include <regex>
 
 THIRD_PARTY_INCLUDES_START
 #if PLATFORM_WINDOWS
@@ -17,6 +15,9 @@ THIRD_PARTY_INCLUDES_START
 #include "dxcisense.h"
 #endif
 THIRD_PARTY_INCLUDES_END
+
+#include <Serialization/JsonSerializer.h>
+#include <regex>
 
 namespace HLSL
 {
