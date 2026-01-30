@@ -811,8 +811,13 @@ namespace SH
 		BuiltinUniformBuffer->GetMember<Vector3f>("iResolution") = Context.iResolution;
 		BuiltinUniformBuffer->GetMember<float>("iTime") = Context.iTime;
 		BuiltinUniformBuffer->GetMember<int32>("iFrame") = Context.FrameCount;
-		BuiltinUniformBuffer->GetMember<Vector4f>("iMouse") = Context.iMouse;
+		auto iMouse = BuiltinUniformBuffer->GetMember<Vector4f>("iMouse");
+		iMouse = Context.iMouse;
 		BuiltinUniformBuffer->GetMember<int32>("iFlipY") = static_cast<ShaderToy*>(GetOuter())->FlipY;
+		if (static_cast<ShaderToy*>(GetOuter())->FlipY)
+		{
+			iMouse = Vector4f{ Context.iMouse.x, Context.iResolution.y - Context.iMouse.y, Context.iMouse.z, Context.iMouse.z };
+		}
 
 		auto iChannelResolution = BuiltinUniformBuffer->GetMember<Vector3f[4]>("iChannelResolution");
 		for (int i = 0; i < 4; i++)
@@ -894,7 +899,7 @@ namespace SH
 
 			try
 			{
-				PipelineState = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
+				PipelineState = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 			}
 			catch (const std::runtime_error& e)
 			{

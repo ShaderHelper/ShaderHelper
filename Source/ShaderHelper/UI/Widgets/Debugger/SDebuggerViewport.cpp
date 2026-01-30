@@ -209,7 +209,7 @@ namespace SH
 		};
 		Bindings.ApplyBindGroupLayout(PipelineDesc);
 		
-		TRefCountPtr<GpuRenderPipelineState> Pipeline = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
+		TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 		
 		auto CmdRecorder = GGpuRhi->BeginRecording();
 		{

@@ -1597,12 +1597,12 @@ constexpr int PaddingLineNum = 22;
 		FString IncludePath;
 		FString LineText;
 		ShaderMultiLineEditableText->GetTextLine(Location.GetLineIndex(), LineText);
-		std::wregex IncludePattern(LR"(#include\s*["<]([^"<>]+)[">])");
-		std::wsmatch Match;
-		std::wstring LineTextStd(*LineText);
+		std::regex IncludePattern(R"(#include\s*["<]([^"<>]+)[">])");
+		std::smatch Match;
+		std::string LineTextStd(TCHAR_TO_UTF8(*LineText));
 		if (std::regex_search(LineTextStd, Match, IncludePattern) && Match.size() > 1)
 		{
-			IncludePath = Match[1].str().c_str();
+			IncludePath = UTF8_TO_TCHAR(Match[1].str().c_str());
 		}
 		
 		if (!IncludePath.IsEmpty())

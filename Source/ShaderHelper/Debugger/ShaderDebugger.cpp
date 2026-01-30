@@ -264,7 +264,7 @@ namespace SH
 						.Primitive = PsInvocation.PipelineDesc.Primitive
 					};
 					PatchedBindings.ApplyBindGroupLayout(PatchedPipelineDesc);
-					TRefCountPtr<GpuRenderPipelineState> Pipeline = GGpuRhi->CreateRenderPipelineState(PatchedPipelineDesc);
+					TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PatchedPipelineDesc);
 
 					auto CmdRecorder = GGpuRhi->BeginRecording();
 					{
@@ -1496,7 +1496,7 @@ namespace SH
 			.Primitive = PsInvocation.PipelineDesc.Primitive
 		};
 		PatchedBindings.ApplyBindGroupLayout(PatchedPipelineDesc);
-		TRefCountPtr<GpuRenderPipelineState> Pipeline = GGpuRhi->CreateRenderPipelineState(PatchedPipelineDesc);
+		TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PatchedPipelineDesc);
 
 		auto CmdRecorder = GGpuRhi->BeginRecording();
 		{

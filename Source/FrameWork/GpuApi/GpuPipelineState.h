@@ -2,6 +2,7 @@
 #include "GpuResourceCommon.h"
 #include "GpuShader.h"
 #include "GpuBindGroupLayout.h"
+#include "Containers/LruCache.h"
 
 namespace FW
 {
@@ -77,6 +78,55 @@ namespace FW
 
 	private:
 		GpuComputePipelineStateDesc Desc;
+	};
+
+	// PSO Cache Key - uniquely identifies a pipeline state based on shader bytecode and pipeline parameters
+	struct GpuPsoCacheKey
+	{
+		uint32 Hash;
+
+		bool operator==(const GpuPsoCacheKey& Other) const = default;
+		friend uint32 GetTypeHash(const GpuPsoCacheKey& Key)
+		{
+			return ::GetTypeHash(Key.Hash);
+		}
+	};
+
+	// Generic PSO Cache Manager - manages LRU cache for pipeline states
+	class FRAMEWORK_API GpuPsoCacheManager
+	{
+	public:
+		static constexpr int32 DefaultRenderPsoCacheSize = 128;
+		static constexpr int32 DefaultComputePsoCacheSize = 64;
+
+		static GpuPsoCacheManager& Get();
+
+		// Try to find cached PSO, returns nullptr if not found
+		TRefCountPtr<GpuRenderPipelineState> FindRenderPso(const GpuPsoCacheKey& Key);
+		TRefCountPtr<GpuComputePipelineState> FindComputePso(const GpuPsoCacheKey& Key);
+
+		void AddRenderPso(const GpuPsoCacheKey& Key, TRefCountPtr<GpuRenderPipelineState> Pso);
+		void AddComputePso(const GpuPsoCacheKey& Key, TRefCountPtr<GpuComputePipelineState> Pso);
+
+		// Compute cache key from pipeline state desc
+		static GpuPsoCacheKey ComputeRenderPsoKey(const GpuRenderPipelineStateDesc& Desc);
+		static GpuPsoCacheKey ComputeComputePsoKey(const GpuComputePipelineStateDesc& Desc);
+
+		// Create pipeline state with caching
+		TRefCountPtr<GpuRenderPipelineState> CreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc);
+		TRefCountPtr<GpuComputePipelineState> CreateComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc);
+
+		void ClearCache();
+
+		int32 GetRenderPsoCacheSize() const;
+		int32 GetComputePsoCacheSize() const;
+
+	private:
+		GpuPsoCacheManager();
+
+		TLruCache<GpuPsoCacheKey, TRefCountPtr<GpuRenderPipelineState>> RenderPsoCache;
+		TLruCache<GpuPsoCacheKey, TRefCountPtr<GpuComputePipelineState>> ComputePsoCache;
+		mutable FCriticalSection CacheLock;
 	};
 }
 

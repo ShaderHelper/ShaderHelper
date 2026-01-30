@@ -26,7 +26,7 @@ namespace FW
 		};
 		Bindings.ApplyBindGroupLayout(PipelineDesc);
 
-		TRefCountPtr<GpuRenderPipelineState> Pipeline = GGpuRhi->CreateRenderPipelineState(PipelineDesc);
+		TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 
 		Graph.AddRenderPass("BlitPass", MoveTemp(BlitPassDesc), MoveTemp(Bindings),
 			[Pipeline, Scissor = PassInput.Scissor](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {

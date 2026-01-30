@@ -7,6 +7,7 @@
 
 namespace FW
 {
+
 	D3D12_PRIMITIVE_TOPOLOGY_TYPE MapTopologyType(D3D_PRIMITIVE_TOPOLOGY InTopology)
 	{
 		switch (InTopology)
@@ -107,6 +108,7 @@ namespace FW
 
 		TRefCountPtr<ID3D12PipelineState> Pso;
 		DxCheck(GDevice->CreateComputePipelineState(&PsoDesc, IID_PPV_ARGS(Pso.GetInitReference())));
+		
 		return new Dx12ComputePso(InPipelineStateDesc, MoveTemp(Pso));
 	}
 }

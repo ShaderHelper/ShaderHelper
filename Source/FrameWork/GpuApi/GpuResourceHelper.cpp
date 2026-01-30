@@ -68,7 +68,7 @@ namespace FW::GpuResourceHelper
 
 		GpuComputePipelineStateDesc PipelineDesc{ .Cs = Cs };
 		Bindings.ApplyBindGroupLayout(PipelineDesc);
-		TRefCountPtr<GpuComputePipelineState> Pipeline = GGpuRhi->CreateComputePipelineState(PipelineDesc);
+		TRefCountPtr<GpuComputePipelineState> Pipeline = GpuPsoCacheManager::Get().CreateComputePipelineState(PipelineDesc);
 
 		auto PassRecorder = CmdRecorder->BeginComputePass("ClearRWResource");
 		{
