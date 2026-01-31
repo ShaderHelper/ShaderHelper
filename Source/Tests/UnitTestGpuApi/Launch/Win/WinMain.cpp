@@ -11,7 +11,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInInstance, _In_opt_ HINSTANCE hPrevInstance,
 	WinLaunch([](const TCHAR* CommandLine)
 		{
 			FW::GApp = MakeUnique<UNITTEST_GPUAPI::UnitTestApp>(
-				FVector2D{ 800, 600 },
+				FVector2D{ 400, 300 },
 				CommandLine
 			);
 			FW::GApp->Run();

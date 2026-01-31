@@ -121,7 +121,7 @@ namespace FW
 		OnMouseUpDelegate MouseUpHandler;
 		OnMouseMoveDelegate MouseMoveHandler;
 
-	private:
+	protected:
 		TWeakPtr<SWidget> AssociatedWidget;
 		TSharedPtr<FSlateUpdatableTexture> ViewPortRT;
 		int32 SizeX;
