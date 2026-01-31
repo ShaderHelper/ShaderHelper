@@ -12,6 +12,8 @@ namespace SH
 		ShaderToyKeyboardNodeOp() = default;
         
         FW::MetaType* SupportType() override;
+				void OnCancelSelect(FW::ShObject* InObject) override;
+		void OnSelect(FW::ShObject* InObject) override;
     };
 
 	class ShaderToyKeyboardNode : public FW::GraphNode

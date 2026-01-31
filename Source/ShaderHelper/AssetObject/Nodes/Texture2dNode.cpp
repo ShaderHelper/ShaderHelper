@@ -29,6 +29,18 @@ namespace SH
 		return GetMetaType<Texture2dNode>();
 	}
 
+	void Texture2dNodeOp::OnCancelSelect(FW::ShObject* InObject)
+	{
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->RefreshProperty(true);
+	}
+
+	void Texture2dNodeOp::OnSelect(ShObject* InObject)
+	{
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->ShowProperty(InObject);
+	}
+
 	Texture2dNode::Texture2dNode()
 	{
 		ObjectName = LOCALIZATION("Texture2d");
