@@ -25,18 +25,6 @@ namespace SH
 		return GetMetaType<ShaderToyKeyboardNode>();
 	}
 
-	void ShaderToyKeyboardNodeOp::OnCancelSelect(FW::ShObject* InObject)
-	{
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->RefreshProperty(true);
-	}
-
-	void ShaderToyKeyboardNodeOp::OnSelect(ShObject* InObject)
-	{
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->ShowProperty(InObject);
-	}
-
 	ShaderToyKeyboardNode::ShaderToyKeyboardNode()
 	: Format(GpuTextureFormat::R8_UNORM), Width(256), Height(3)
 	{

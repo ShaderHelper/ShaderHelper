@@ -88,12 +88,10 @@ namespace SH
 			GpuShaderLanguage NewLanguage = *static_cast<GpuShaderLanguage*>(static_cast<PropertyEnumItem*>(InProperty)->GetEnum());
 			if (NewLanguage == GpuShaderLanguage::HLSL)
 			{
-				ShEditor->OpenShaderTab(this);
 				ShEditor->GetShaderEditor(this)->SetText(FText::FromString(DefaultHeader));
 			}
 			else if (NewLanguage == GpuShaderLanguage::GLSL)
 			{
-				ShEditor->OpenShaderTab(this);
 				ShEditor->GetShaderEditor(this)->SetText(FText::FromString(DefaultHeader));
 			}
 		}

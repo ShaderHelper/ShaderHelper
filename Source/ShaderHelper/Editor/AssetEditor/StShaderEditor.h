@@ -10,7 +10,6 @@ namespace SH
 		StShaderOp() = default;
 
         FW::MetaType* SupportType() override;
-        void OnSelect(FW::ShObject* InObject) override;
 		void OnOpen(const FString& InAssetPath) override;
        
         void OnRename(const FString& OldPath, const FString& NewPath) override;

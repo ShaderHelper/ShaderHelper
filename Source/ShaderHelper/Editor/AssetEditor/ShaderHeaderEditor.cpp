@@ -18,17 +18,10 @@ namespace SH
         return GetMetaType<ShaderHeader>();
     }
 
-	void ShaderHeaderOp::OnSelect(FW::ShObject* InObject)
-	{
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->ShowProperty(InObject);
-	}
-
 	void ShaderHeaderOp::OnOpen(const FString& InAssetPath)
 	{
 		AssetPtr<ShaderHeader> LoadedShaderHeader = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderHeader>(InAssetPath);
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->AddNavigationInfo(LoadedShaderHeader->GetGuid(), {});
 		ShEditor->OpenShaderTab(MoveTemp(LoadedShaderHeader));
 	}
 

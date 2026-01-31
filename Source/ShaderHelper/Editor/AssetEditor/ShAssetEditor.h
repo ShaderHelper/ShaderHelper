@@ -10,5 +10,7 @@ namespace SH
 		ShAssetOp() = default;
 
 		void OnNavigate(const FString& InAssetPath) override;
+		void OnCancelSelect(FW::ShObject* InObject) override;
+		void OnSelect(FW::ShObject* InObject) override;
 	};
 }

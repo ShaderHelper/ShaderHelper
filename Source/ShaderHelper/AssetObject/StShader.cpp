@@ -524,12 +524,10 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 			GpuShaderLanguage NewLanguage = *static_cast<GpuShaderLanguage*>(static_cast<PropertyEnumItem*>(InProperty)->GetEnum());
 			if (NewLanguage == GpuShaderLanguage::HLSL)
 			{
-				ShEditor->OpenShaderTab(this);
 				ShEditor->GetShaderEditor(this)->SetText(FText::FromString(DefaultPixelShaderBody));
 			}
 			else if(NewLanguage == GpuShaderLanguage::GLSL)
 			{
-				ShEditor->OpenShaderTab(this);
 				ShEditor->GetShaderEditor(this)->SetText(FText::FromString(DefaultGLSLPixelShaderBody));
 			}
 		}

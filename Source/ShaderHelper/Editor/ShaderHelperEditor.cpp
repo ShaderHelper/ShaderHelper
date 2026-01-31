@@ -508,7 +508,7 @@ namespace SH
 		if (NavigationHistory.Num() > 0)
 		{			
 			if (NavigationHistory[NavigationIndex].Key == Id && 
-				(NavigationHistory[NavigationIndex].Value == InLocation || FMath::Abs(NavigationHistory[NavigationIndex].Value.GetLineIndex() - InLocation.GetLineIndex()) < 10))
+				(NavigationHistory[NavigationIndex].Value == InLocation || NavigationHistory[NavigationIndex].Value == FTextLocation{} || FMath::Abs(NavigationHistory[NavigationIndex].Value.GetLineIndex() - InLocation.GetLineIndex()) < 8))
 			{
 				NavigationHistory[NavigationIndex] = {Id, InLocation};
 				return;
@@ -604,6 +604,10 @@ namespace SH
 			})
             .OnTabClosed_Lambda([this, TabId, Args](TSharedRef<SDockTab> ClosedTab) {
                 auto ShaderAssetObj = *CurProject->OpenedShaders.FindKey(ClosedTab);
+				if (ShObjectOp* Op = GetShObjectOp(ShaderAssetObj))
+				{
+					Op->OnCancelSelect(ShaderAssetObj);
+				}
                 CurProject->OpenedShaders.Remove(ShaderAssetObj);
                 ShaderPathBoxMap.Remove(ShaderAssetObj);
                 ShaderEditors.Remove(ShaderAssetObj);
@@ -921,11 +925,14 @@ namespace SH
                 CodeTabManager->InsertNewDocumentTab(InitialInsertPointTabId, ShaderTabId, FTabManager::FRequireClosedTab{}, NewShaderTab, true);
             }
             NewShaderTab->ActivateInParent(ETabActivationCause::SetDirectly);
+			AddNavigationInfo(InShader->GetGuid(), {});
         }
-        else
+        else if(!(*TabPtr)->IsActive())
         {
             (*TabPtr)->ActivateInParent(ETabActivationCause::SetDirectly);
+			AddNavigationInfo(InShader->GetGuid(), GetShaderEditor(InShader)->ShaderMultiLineEditableText->GetCursorLocation());
         }
+
 		GetShaderEditor(InShader)->SetFocus();
     }
 

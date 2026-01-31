@@ -19,4 +19,18 @@ namespace SH
 		AssetBrowser->SetCurrentDisplyPath(FPaths::GetPath(InAssetPath));
 		AssetBrowser->GetAssetView()->SetSelectedItem(InAssetPath);
 	}
+
+	void ShAssetOp::OnCancelSelect(FW::ShObject* InObject)
+	{
+		if (auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor()))
+		{
+			ShEditor->RefreshProperty(true);
+		}
+	}
+
+	void ShAssetOp::OnSelect(FW::ShObject* InObject)
+	{
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->ShowProperty(InObject);
+	}
 }

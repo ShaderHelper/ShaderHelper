@@ -21,12 +21,6 @@ namespace SH
 		return GetMetaType<ShaderToy>();
 	}
 
-	void ShaderToyOp::OnSelect(FW::ShObject* InObject)
-	{
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->ShowProperty(InObject);
-	}
-
 	void ShaderToyOp::OnOpen(const FString& InAssetPath)
 	{
 		AssetPtr<ShaderToy> LoadedShaderToy = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderToy>(InAssetPath);

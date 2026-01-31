@@ -355,7 +355,6 @@ constexpr int PaddingLineNum = 22;
 	int32 SShaderMultiLineEditableText::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 	{
 		const float InverseScale = Inverse(AllottedGeometry.Scale);
-		const double OffsetX = 4;
 
 		if (Owner->CanShowGuideLine() && Owner->SyntaxTUCopy.IsValid())
 		{
@@ -366,17 +365,30 @@ constexpr int PaddingLineNum = 22;
 			{
 				int32 StartLineIndex = Scope.Start.X - ExtraLineNum - 1;
 				int32 StartOffset = Scope.Start.Y - 1;
-				if (StartLineIndex >= 0)
+				int32 EndLineIndex = Scope.End.X - ExtraLineNum - 1;
+				if (StartLineIndex >= 0 && StartLineIndex < EndLineIndex)
 				{
-					int32 EndLineIndex = Scope.End.X - ExtraLineNum - 1;
-					TSharedPtr<ILayoutBlock> Block = Owner->ShaderMarshaller->TextLayout->GetBlockAt({ StartLineIndex, StartOffset });
-					if (Block && StartLineIndex < EndLineIndex)
-					{
-						FVector2D P0 = TransformPoint(InverseScale, Block->GetLocationOffset() + FVector2D{ OffsetX, 2.0 });
-						FVector2D P1 = TransformPoint(InverseScale, Block->GetLocationOffset() + FVector2D{ OffsetX, Block->GetSize().Y * (EndLineIndex - StartLineIndex) });
-						FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), { P0, P1 }, 
-							ESlateDrawEffect::None, FStyleColors::Foreground.GetSpecifiedColor().CopyWithNewOpacity(0.4f));
-					}
+					// Calculate position using uniform line height and measure actual text width
+					float LineHeight = Owner->ShaderMarshaller->TextLayout->GetUniformLineHeight();
+					float Scale = Owner->ShaderMarshaller->TextLayout->GetScale();
+					FVector2D ScrollOffset = Owner->ShaderMultiLineEditableTextLayout->GetScrollOffset() * Scale;
+					const FSlateFontInfo& FontInfo = Owner->GetCodeFontInfo();
+					auto MeasureService = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
+					
+					// Measure actual text width up to StartOffset
+					FString LineText;
+					GetTextLine(StartLineIndex, LineText);
+					FString Prefix = LineText.Left(StartOffset);
+					constexpr float BaseFontSize = 10.0f;
+					const double FontSizeScale = FontInfo.Size / BaseFontSize;
+					const double ExtraOffset = 4.0 * Scale * FontSizeScale;
+					double PosX = MeasureService->Measure(Prefix, FontInfo, Scale).X + ExtraOffset - ScrollOffset.X;
+					double PosY = LineHeight * StartLineIndex - ScrollOffset.Y;
+
+					FVector2D P0 = TransformPoint(InverseScale, FVector2D{ PosX, PosY });
+					FVector2D P1 = TransformPoint(InverseScale, FVector2D{ PosX, PosY + LineHeight * (EndLineIndex - StartLineIndex) });
+					FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), { P0, P1 }, 
+						ESlateDrawEffect::None, FStyleColors::Foreground.GetSpecifiedColor().CopyWithNewOpacity(0.4f));
 				}
 			}
 
@@ -1937,6 +1949,7 @@ constexpr int PaddingLineNum = 22;
 					ShaderMarshaller->FoldingBraceGroups.Add(BraceGroup.OpenLineIndex, BraceGroup);
 				}
 			}
+			RefreshBracketHighlight();
 		}
 		
 		GetPrivate_FTextLayout_DirtyFlags(*ShaderMarshaller->TextLayout) |= (1 << 0);
