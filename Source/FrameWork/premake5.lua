@@ -28,7 +28,7 @@ project "FrameWork"
     addToProjectHierarchy(pythonHierarchy)
     addToProjectHierarchy(shadercHierarchy)
 
-    filter {"files:**/External/UE/**"}
+    filter {"files:**/External/UE/** or **/External/Vulkan/**"}
         flags {"ExcludeFromBuild"}
 			
     filter {"system:macosx","files:**/Dx12/*.cpp"}
@@ -45,11 +45,12 @@ project "FrameWork"
         pchsource "CommonHeader.cpp"
         
         private_uses {
-            "AgilitySDK", "WinPixEventRuntime"
+            "AgilitySDK", "WinPixEventRuntime", "Vulkan"
         }
         addToProjectHierarchy(shaderConductorHierarchy)
 		addToProjectHierarchy(AgilitySDKHierarchy)
 		addToProjectHierarchy(WinPixEventRuntimeHierarchy)
+        addToProjectHierarchy(vulkanHierarchy)
 		
         links {
             "d3d12", "dxgi", "dxguid"

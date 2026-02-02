@@ -5,6 +5,7 @@
 
 #if PLATFORM_WINDOWS
 #include "./Dx12/Dx12GpuRhiBackend.h"
+#include "./Vulkan/VkGpuRhiBackend.h"
 #elif PLATFORM_MAC
 #include "./Metal/MetalGpuRhiBackend.h"
 #endif
@@ -339,6 +340,7 @@ void GpuRhi::InitGpuRhi(const GpuRhiConfig &InConfig)
 	switch (InConfig.BackendType) {
 #if PLATFORM_WINDOWS
 	case GpuRhiBackendType::DX12: RhiBackend = MakeUnique<Dx12GpuRhiBackend>(); break;
+	case GpuRhiBackendType::Vulkan: RhiBackend = MakeUnique<VkGpuRhiBackend>(); break;
 #elif PLATFORM_MAC
 	case GpuRhiBackendType::Metal: RhiBackend = MakeUnique<MetalGpuRhiBackend>(); break;
 #endif
@@ -362,7 +364,13 @@ FRAMEWORK_API GpuRhiBackendType GetGpuRhiBackendType()
 #elif PLATFORM_MAC
 	FString BackendName = TEXT("Metal");
 #endif 
-	Editor::GetEditorConfig()->GetString(TEXT("Environment"), TEXT("GraphicsApi"), BackendName);
+	if (IFileManager::Get().FileExists(*EditorConfigPath()))
+	{
+		auto Config = MakeUnique<FConfigFile>();
+		Config->Read(EditorConfigPath());
+		Config->GetString(TEXT("Environment"), TEXT("GraphicsApi"), BackendName);
+	}
+		
 #if PLATFORM_WINDOWS
 	if (BackendName.Equals(TEXT("DX12"), ESearchCase::IgnoreCase))
 	{
