@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #define VOLK_IMPLEMENTATION
+#define VMA_IMPLEMENTATION
 #include "VkDevice.h"
 
 namespace FW
@@ -28,9 +29,8 @@ namespace FW
 					return;
 				}
 			}
-			FString Message = FString::Printf(TEXT("Required Vulkan extension %hs is not supported."), ExtName);
-			FPlatformMisc::MessageBoxExt(EAppMsgType::Ok, *Message, TEXT("Error:"));
-			std::_Exit(0);
+			FString Message = FString::Printf(TEXT("Required Vulkan instance extension %hs is not supported."), ExtName);
+			throw std::runtime_error(TCHAR_TO_UTF8(*Message));
 		};
 
 		auto CheckLayerSupported = [&AvailableLayers](const char* LayerName) {
@@ -41,9 +41,8 @@ namespace FW
 					return;
 				}
 			}
-			FString Message = FString::Printf(TEXT("Required Vulkan layer %hs is not supported."), LayerName);
-			FPlatformMisc::MessageBoxExt(EAppMsgType::Ok, *Message, TEXT("Error:"));
-			std::_Exit(0);
+			FString Message = FString::Printf(TEXT("Required Vulkan instance layer %hs is not supported."), LayerName);
+			throw std::runtime_error(TCHAR_TO_UTF8(*Message));
 		};
 
 		TArray<const char*> Exts, Layers;
@@ -51,9 +50,9 @@ namespace FW
 		bool bEnableValidationLayer = FParse::Param(FCommandLine::Get(), TEXT("VulkanValidation"));
 		if (bEnableValidationLayer)
 		{
-			Exts.Add(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 			Layers.Add("VK_LAYER_KHRONOS_validation");
 		}
+		Exts.Add(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 		for (const char* ExtName : Exts)
 		{
 			CheckExtSupported(ExtName);
@@ -67,7 +66,7 @@ namespace FW
 		VkApplicationInfo AppInfo{
 			.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
 			.pApplicationName = "ShaderHelper",
-			.apiVersion = VK_API_VERSION_1_3
+			.apiVersion = VK_API_VERSION_1_1
 		};
 
 		VkInstanceCreateInfo InstanceInfo{
@@ -78,8 +77,11 @@ namespace FW
 			.enabledExtensionCount = (uint32_t)Exts.Num(),
 			.ppEnabledExtensionNames = Exts.GetData(),
 		};
-
-		VkCheck(vkCreateInstance(&InstanceInfo, nullptr, &GInstance));
+		VkResult Result = vkCreateInstance(&InstanceInfo, nullptr, &GInstance);
+		if (Result != VK_SUCCESS)
+		{
+			throw std::runtime_error("Failed to create instance, could not find a compatible Vulkan driver.");
+		}
 	}
 
 	void CreateDevice()
@@ -92,6 +94,9 @@ namespace FW
 		VkCheck(vkEnumeratePhysicalDevices(GInstance, &DeviceCount, PhysicalDevices.GetData()));
 
 		TArray<const char*> DeviceExts;
+		DeviceExts.Add(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
+		bool bAnyDeviceMissingExt = false;
+		const char* FirstMissingExt = nullptr;
 		auto GetGraphicsQueueIndex = [](VkPhysicalDevice InDevice) -> int32
 		{
 			uint32_t QueueFamilyCount = 0;
@@ -119,12 +124,23 @@ namespace FW
 
 			for (const char* ExtName : DeviceExts)
 			{
+				bool bFound = false;
 				for (const auto& AvailableExt : AvailableDeviceExts)
 				{
-					if (FCStringAnsi::Strcmp(AvailableExt.extensionName, ExtName) != 0)
+					if (FCStringAnsi::Strcmp(AvailableExt.extensionName, ExtName) == 0)
 					{
-						return false;
+						bFound = true;
+						break;
 					}
+				}
+				if (!bFound)
+				{
+					bAnyDeviceMissingExt = true;
+					if (!FirstMissingExt)
+					{
+						FirstMissingExt = ExtName;
+					}
+					return false;
 				}
 			}
 
@@ -165,23 +181,25 @@ namespace FW
 			return GetDeviceTypePriority(PropsA.properties.deviceType) < GetDeviceTypePriority(PropsB.properties.deviceType);
 		});
 
-		VkPhysicalDevice TargetDevice = VK_NULL_HANDLE;
-		int32 TargetGraphicsQueueIndex = -1;
 		if (SuitableDevices.Num() > 0)
 		{
-			TargetDevice = SuitableDevices[0];
-			TargetGraphicsQueueIndex = GetGraphicsQueueIndex(TargetDevice);
+			GPhysicalDevice = SuitableDevices[0];
+			GraphicsQueueIndex = GetGraphicsQueueIndex(GPhysicalDevice);
 		}
-		if (TargetDevice == VK_NULL_HANDLE)
+		if (GPhysicalDevice == VK_NULL_HANDLE)
 		{
-			FPlatformMisc::MessageBoxExt(EAppMsgType::Ok, TEXT("Could not find the suitable physical device!"), TEXT("Error:"));
-			std::_Exit(0);
+			if (bAnyDeviceMissingExt && FirstMissingExt)
+			{
+				FString Message = FString::Printf(TEXT("Could not find suitable physical device: required device extension \"%hs\" is not supported."), FirstMissingExt);
+				throw std::runtime_error(TCHAR_TO_UTF8(*Message));
+			}
+			throw std::runtime_error("Could not find the suitable physical device!");
 		}
 
 		TArray<float> QueuePriorities{ 1.0f };
 		VkDeviceQueueCreateInfo QueueInfo{
 			.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-			.queueFamilyIndex = (uint32_t)TargetGraphicsQueueIndex,
+			.queueFamilyIndex = GraphicsQueueIndex,
 			.queueCount = 1,
 			.pQueuePriorities = QueuePriorities.GetData()
 		};
@@ -189,7 +207,7 @@ namespace FW
 		VkPhysicalDeviceFeatures2 Features{
 			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2
 		};	
-		vkGetPhysicalDeviceFeatures2(TargetDevice, &Features);
+		vkGetPhysicalDeviceFeatures2(GPhysicalDevice, &Features);
 
 		VkDeviceCreateInfo DeviceInfo{
 			.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -200,19 +218,15 @@ namespace FW
 			.ppEnabledExtensionNames = DeviceExts.GetData(),
 		};
 
-		VkCheck(vkCreateDevice(TargetDevice, &DeviceInfo, nullptr, &GDevice));
-		vkGetDeviceQueue(GDevice, TargetGraphicsQueueIndex, 0, &GGraphicsQueue);
+		VkCheck(vkCreateDevice(GPhysicalDevice, &DeviceInfo, nullptr, &GDevice));
+		vkGetDeviceQueue(GDevice, GraphicsQueueIndex, 0, &GGraphicsQueue);
 	}
 
 	void InitVulkanCore()
 	{
 		if (volkInitialize() != VK_SUCCESS)
 		{
-			FPlatformMisc::MessageBoxExt(
-				EAppMsgType::Ok,
-				TEXT("Current device does not support Vulkan. Please try updating your graphics driver."),
-				TEXT("Error:"));
-			std::_Exit(0);
+			throw std::runtime_error("Current device does not support Vulkan. Please try updating your graphics driver.");
 		}
 
 		CreateInstance();
@@ -220,6 +234,21 @@ namespace FW
 
 		CreateDevice();
 		volkLoadDevice(GDevice);
+
+		VmaAllocatorCreateInfo AllocatorCreateInfo = {};
+		AllocatorCreateInfo.flags = VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT |
+			VMA_ALLOCATOR_CREATE_EXT_MEMORY_PRIORITY_BIT |
+			VMA_ALLOCATOR_CREATE_KHR_EXTERNAL_MEMORY_WIN32_BIT;
+		AllocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_1;
+		AllocatorCreateInfo.physicalDevice = GPhysicalDevice;
+		AllocatorCreateInfo.device = GDevice;
+		AllocatorCreateInfo.instance = GInstance;
+
+		VmaVulkanFunctions VulkanFunctions;
+		vmaImportVulkanFunctionsFromVolk(&AllocatorCreateInfo, &VulkanFunctions);
+		AllocatorCreateInfo.pVulkanFunctions = &VulkanFunctions;
+
+		vmaCreateAllocator(&AllocatorCreateInfo, &GAllocator);
 	}
 }
 

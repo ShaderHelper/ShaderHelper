@@ -106,7 +106,15 @@ namespace FW {
 		}
 
 		GpuRhi::InitGpuRhi(Config);
-		GGpuRhi->InitApiEnv();
+		try
+		{
+			GGpuRhi->InitApiEnv();
+		}
+		catch (const std::exception& e)
+		{
+			FPlatformMisc::MessageBoxExt(EAppMsgType::Ok, UTF8_TO_TCHAR(e.what()), TEXT("Error:"));
+			std::_Exit(0);
+		}
 
 		FDirectoryWatcherModule& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>(TEXT("DirectoryWatcher"));
 		DirectoryWatcher = DirectoryWatcherModule.Get();

@@ -1,6 +1,7 @@
 #include "CommonHeader.h"
 #include "VkGpuRhiBackend.h"
 #include "VkDevice.h"
+#include "VkTexture.h"
 
 namespace FW
 {
@@ -13,7 +14,7 @@ namespace FW
 
 	void VkGpuRhiBackend::WaitGpu()
 	{
-
+		vkDeviceWaitIdle(GDevice);
 	}
 
 	void VkGpuRhiBackend::BeginFrame()
@@ -28,7 +29,7 @@ namespace FW
 
 	TRefCountPtr<GpuTexture> VkGpuRhiBackend::CreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
 	{
-		return TRefCountPtr<GpuTexture>();
+		return AUX::StaticCastRefCountPtr<GpuTexture>(CreateVulkanTexture(InTexDesc, InitState));
 	}
 
 	TRefCountPtr<GpuBuffer> VkGpuRhiBackend::CreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState)
@@ -91,7 +92,7 @@ namespace FW
 
 	void* VkGpuRhiBackend::GetSharedHandle(GpuTexture* InGpuTexture)
 	{
-		return nullptr;
+		return static_cast<VulkanTexture*>(InGpuTexture)->GetSharedHandle();
 	}
 
 	GpuCmdRecorder* VkGpuRhiBackend::BeginRecording(const FString& RecorderName)

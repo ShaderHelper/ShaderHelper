@@ -31,9 +31,9 @@ namespace UNITTEST_GPUAPI
 			static_cast<uint32>(SizeX),
 			static_cast<uint32>(SizeY),
 			RenderTargetFormat,
-			GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared
+			GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared,
 		};
-		RenderTarget = GGpuRhi->CreateTexture(Desc);
+		RenderTarget = GGpuRhi->CreateTexture(Desc, GpuResourceState::RenderTargetWrite);
 		SetViewPortRenderTexture(RenderTarget);
 	}
 }
