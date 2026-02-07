@@ -4,6 +4,7 @@
 
 namespace FW
 {
+	static VmaPool ExternalPool = VK_NULL_HANDLE;
 	VkImageUsageFlags DetermineTextureUsage(const GpuTextureDesc& InTexDesc)
 	{
 		VkImageUsageFlags Usage = 0;
@@ -40,9 +41,6 @@ namespace FW
 		VmaAllocationCreateInfo AllocCreateInfo = {};
 		AllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
 
-		VkImage Image;
-		VmaAllocation Allocation;
-		VmaPool Pool = VK_NULL_HANDLE;
 		if (EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::Shared))
 		{
 			VkPhysicalDeviceExternalImageFormatInfo ExternalImgFormatInfo = {
@@ -81,22 +79,42 @@ namespace FW
 
 			ImgCreateInfo.pNext = &ExternalImgCreateInfo;
 
-			uint32_t MemTypeIndex = 0;
-			VkCheck(vmaFindMemoryTypeIndexForImageInfo(GAllocator, &ImgCreateInfo, &AllocCreateInfo, &MemTypeIndex));
-			VmaPoolCreateInfo PoolCreateInfo = {
-				.memoryTypeIndex = MemTypeIndex,
-				.pMemoryAllocateNext = (void*)&ExportAllocInfo
-			};
+			static bool InitExternalPool = [&] {
+				uint32_t MemTypeIndex = 0;
+				VkCheck(vmaFindMemoryTypeIndexForImageInfo(GAllocator, &ImgCreateInfo, &AllocCreateInfo, &MemTypeIndex));
+				VmaPoolCreateInfo PoolCreateInfo = {
+					.memoryTypeIndex = MemTypeIndex,
+					.pMemoryAllocateNext = (void*)&ExportAllocInfo
+				};
+				VkCheck(vmaCreatePool(GAllocator, &PoolCreateInfo, &ExternalPool));
+				return true;
+			}();
 
-			VkCheck(vmaCreatePool(GAllocator, &PoolCreateInfo, &Pool));
-			AllocCreateInfo.pool = Pool;
+			AllocCreateInfo.pool = ExternalPool;
 			if (DedicatedAlloc)
 			{
 				AllocCreateInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
 			}
 		}
 
+		VkImage Image;
+		VmaAllocation Allocation;
 		VkCheck(vmaCreateImage(GAllocator, &ImgCreateInfo, &AllocCreateInfo, &Image, &Allocation, nullptr));
-		return new VulkanTexture(InTexDesc, InitState, Image, Allocation, Pool);
+		VkImageViewCreateInfo ViewInfo = { 
+			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, 
+			.image = Image,
+			.viewType = VK_IMAGE_VIEW_TYPE_2D,
+			.format = ImgCreateInfo.format,
+			.subresourceRange = {
+				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.baseMipLevel = 0,
+				.levelCount = 1,
+				.baseArrayLayer = 0,
+				.layerCount = 1
+			}
+		};
+		VkImageView ImageView;
+		VkCheck(vkCreateImageView(GDevice, &ViewInfo, nullptr, &ImageView));
+		return new VulkanTexture(InTexDesc, InitState, Image, ImageView, Allocation);
 	}
 }

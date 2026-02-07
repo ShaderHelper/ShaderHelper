@@ -94,9 +94,9 @@ namespace FW
 		VkCheck(vkEnumeratePhysicalDevices(GInstance, &DeviceCount, PhysicalDevices.GetData()));
 
 		TArray<const char*> DeviceExts;
+#if PLATFORM_WINDOWS
 		DeviceExts.Add(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
-		bool bAnyDeviceMissingExt = false;
-		const char* FirstMissingExt = nullptr;
+#endif
 		auto GetGraphicsQueueIndex = [](VkPhysicalDevice InDevice) -> int32
 		{
 			uint32_t QueueFamilyCount = 0;
@@ -135,11 +135,6 @@ namespace FW
 				}
 				if (!bFound)
 				{
-					bAnyDeviceMissingExt = true;
-					if (!FirstMissingExt)
-					{
-						FirstMissingExt = ExtName;
-					}
 					return false;
 				}
 			}
@@ -153,44 +148,49 @@ namespace FW
 			return true;
 		};
 
-		auto GetDeviceTypePriority = [](VkPhysicalDeviceType Type) -> int32 {
-			switch (Type)
-			{
-			case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:   return 0;
-			case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: return 1;
-			case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:    return 2;
-			case VK_PHYSICAL_DEVICE_TYPE_CPU:            return 3;
-			default:                                     return 4;
-			}
-		};
-
-		TArray<VkPhysicalDevice> SuitableDevices;
-		for (auto Device : PhysicalDevices)
+		if (CheckPhysicalDevice(PhysicalDevices[0]))
 		{
-			if (CheckPhysicalDevice(Device))
-			{
-				SuitableDevices.Add(Device);
-			}
-		}
-
-		Algo::Sort(SuitableDevices, [&](VkPhysicalDevice A, VkPhysicalDevice B) {
-			VkPhysicalDeviceProperties2 PropsA{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
-			VkPhysicalDeviceProperties2 PropsB{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
-			vkGetPhysicalDeviceProperties2(A, &PropsA);
-			vkGetPhysicalDeviceProperties2(B, &PropsB);
-			return GetDeviceTypePriority(PropsA.properties.deviceType) < GetDeviceTypePriority(PropsB.properties.deviceType);
-		});
-
-		if (SuitableDevices.Num() > 0)
-		{
-			GPhysicalDevice = SuitableDevices[0];
+			GPhysicalDevice = PhysicalDevices[0];
 			GraphicsQueueIndex = GetGraphicsQueueIndex(GPhysicalDevice);
+
+			VkPhysicalDeviceProperties2 Props{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
+			vkGetPhysicalDeviceProperties2(GPhysicalDevice, &Props);
+			SH_LOG(LogVulkan, Display, TEXT("Physical Device: %hs (Type: %hs, API: %u.%u.%u)"),
+				Props.properties.deviceName,
+				magic_enum::enum_name(Props.properties.deviceType).data(),
+				VK_VERSION_MAJOR(Props.properties.apiVersion),
+				VK_VERSION_MINOR(Props.properties.apiVersion),
+				VK_VERSION_PATCH(Props.properties.apiVersion));
 		}
 		if (GPhysicalDevice == VK_NULL_HANDLE)
 		{
-			if (bAnyDeviceMissingExt && FirstMissingExt)
+			uint32_t DeviceExtCount = 0;
+			vkEnumerateDeviceExtensionProperties(PhysicalDevices[0], nullptr, &DeviceExtCount, nullptr);
+			TArray<VkExtensionProperties> AvailableDeviceExts;
+			AvailableDeviceExts.SetNum(DeviceExtCount);
+			vkEnumerateDeviceExtensionProperties(PhysicalDevices[0], nullptr, &DeviceExtCount, AvailableDeviceExts.GetData());
+
+			FString MissingExts;
+			for (const char* ExtName : DeviceExts)
 			{
-				FString Message = FString::Printf(TEXT("Could not find suitable physical device: required device extension \"%hs\" is not supported."), FirstMissingExt);
+				bool bSupported = false;
+				for (const auto& AvailableExt : AvailableDeviceExts)
+				{
+					if (FCStringAnsi::Strcmp(AvailableExt.extensionName, ExtName) == 0)
+					{
+						bSupported = true;
+						break;
+					}
+				}
+				if (!bSupported)
+				{
+					if (!MissingExts.IsEmpty()) MissingExts += TEXT(", ");
+					MissingExts += UTF8_TO_TCHAR(ExtName);
+				}
+			}
+			if (!MissingExts.IsEmpty())
+			{
+				FString Message = FString::Printf(TEXT("The preferred physical device does not support required device extension(s) [%s]."), *MissingExts);
 				throw std::runtime_error(TCHAR_TO_UTF8(*Message));
 			}
 			throw std::runtime_error("Could not find the suitable physical device!");

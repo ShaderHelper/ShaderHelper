@@ -56,7 +56,7 @@ namespace UNITTEST_GPUAPI
 				.FileName = PathHelper::ShaderDir() / "Test/TestCast.hlsl",
 				.Type = ShaderType::VertexShader,
 				.EntryPoint = "MainVS",
-				});
+			});
 			if (GpuFeature::Support16bitType) {
 				Vs->CompilerFlag |= GpuShaderCompilerFlag::Enable16bitType;
 			}
@@ -108,13 +108,13 @@ namespace UNITTEST_GPUAPI
 				.FileName = PathHelper::ShaderDir() / "Test/TestTriangle.hlsl",
 				.Type = ShaderType::VertexShader,
 				.EntryPoint = "MainVS",
-				});
+			});
 
 			TRefCountPtr<GpuShader> Ps = GGpuRhi->CreateShaderFromFile({
 				.FileName = PathHelper::ShaderDir() / "Test/TestTriangle.hlsl",
 				.Type = ShaderType::PixelShader,
 				.EntryPoint = "MainPS",
-				});
+			});
 
 			FString ErrorInfo, WarnInfo;
 			GGpuRhi->CompileShader(Vs, ErrorInfo, WarnInfo);

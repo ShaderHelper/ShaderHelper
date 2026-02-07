@@ -70,12 +70,14 @@ TRefCountPtr<GpuTexture> Dx12GpuRhiBackend::CreateTexture(const GpuTextureDesc& 
 
 TRefCountPtr<GpuShader> Dx12GpuRhiBackend::CreateShaderFromSource(const GpuShaderSourceDesc& Desc) const
 {
-	return AUX::StaticCastRefCountPtr<GpuShader>(CreateDx12Shader(Desc));
+	TRefCountPtr<Dx12Shader> NewShader = new Dx12Shader(Desc);
+	return AUX::StaticCastRefCountPtr<GpuShader>(NewShader);
 }
 
 TRefCountPtr<GpuShader> Dx12GpuRhiBackend::CreateShaderFromFile(const GpuShaderFileDesc& Desc)
 {
-	return AUX::StaticCastRefCountPtr<GpuShader>(CreateDx12Shader(Desc));
+	TRefCountPtr<Dx12Shader> NewShader = new Dx12Shader(Desc);
+	return AUX::StaticCastRefCountPtr<GpuShader>(NewShader);
 }
 
 TRefCountPtr<GpuBindGroup> Dx12GpuRhiBackend::CreateBindGroup(const GpuBindGroupDesc &InBindGroupDesc)

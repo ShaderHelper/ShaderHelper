@@ -66,16 +66,6 @@ namespace FW
 		return ShaderLayoutBindings;
 	}
 
-	TRefCountPtr<Dx12Shader> CreateDx12Shader(const GpuShaderFileDesc& FileDesc)
-	{
-		return new Dx12Shader(FileDesc);
-	}
-
-	TRefCountPtr<Dx12Shader> CreateDx12Shader(const GpuShaderSourceDesc& SourceDesc)
-    {
-        return new Dx12Shader(SourceDesc);
-    }
-
 	uint32 Dx12Shader::ComputeSourceHash(const TArray<FString>& ExtraArgs) const
 	{
 		// Include processed source, entry point, shader type, and extra args in hash

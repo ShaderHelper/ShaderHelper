@@ -109,16 +109,6 @@ namespace FW
 		return ShaderLayoutBindings;
 	}
 
-    TRefCountPtr<MetalShader> CreateMetalShader(const GpuShaderFileDesc& FileDesc)
-    {
-        return new MetalShader(FileDesc);
-    }
-
-    TRefCountPtr<MetalShader> CreateMetalShader(const GpuShaderSourceDesc& SourceDesc)
-    {
-        return new MetalShader(SourceDesc);
-    }
-
     bool CompileShaderFromMSL(TRefCountPtr<MetalShader> InShader, FString& OutErrorInfo)
     {
         check(!InShader->GetMslText().IsEmpty());

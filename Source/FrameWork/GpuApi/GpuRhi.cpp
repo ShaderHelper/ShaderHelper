@@ -357,7 +357,7 @@ void GpuRhi::InitGpuRhi(const GpuRhiConfig &InConfig)
 
 GpuCmdRecorder* GGpuCmdRecorder;
 TUniquePtr<GpuRhi> GGpuRhi;
-FRAMEWORK_API GpuRhiBackendType GetGpuRhiBackendType()
+GpuRhiBackendType GetGpuRhiBackendType()
 {
 #if PLATFORM_WINDOWS
 	FString BackendName = TEXT("DX12");

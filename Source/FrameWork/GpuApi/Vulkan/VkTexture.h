@@ -11,25 +11,34 @@ namespace FW
 	class VulkanTexture : public GpuTexture
 	{
 	public:
-		VulkanTexture(const GpuTextureDesc& InDesc, GpuResourceState InResourceState, VkImage InImage, VmaAllocation InAllocation, VmaPool InPool) 
+		VulkanTexture(const GpuTextureDesc& InDesc, GpuResourceState InResourceState, VkImage InImage, VkImageView InImageView, VmaAllocation InAllocation)
 			: GpuTexture(InDesc, InResourceState)
-			, Image(InImage), Allocation(InAllocation), Pool(InPool), Handle(nullptr)
+			, Image(InImage), ImageView(InImageView)
+			, Allocation(InAllocation), Handle(nullptr)
 		{}
 		~VulkanTexture() {
+			vkDestroyImageView(GDevice, ImageView, nullptr);
 			vmaDestroyImage(GAllocator, Image, Allocation);
 			CloseHandle(Handle);
 		}
 
+		VkImageView GetView() const { return ImageView; }
+
 		void* GetSharedHandle()
 		{
-			VkCheck(vmaGetMemoryWin32Handle2(GAllocator, Allocation, ExternalHandleType, nullptr, &Handle));
+			if (Handle == nullptr)
+			{
+#if PLATFORM_WINDOWS
+				VkCheck(vmaGetMemoryWin32Handle2(GAllocator, Allocation, ExternalHandleType, nullptr, &Handle));
+#endif
+			}
 			return Handle;
 		}
 
 	private:
 		VkImage Image;
+		VkImageView ImageView;
 		VmaAllocation Allocation;
-		VmaPool Pool;
 		HANDLE Handle;
 	};
 

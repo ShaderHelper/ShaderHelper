@@ -26,4 +26,26 @@ namespace FW
 		}
 	}
 
+	inline VkAttachmentLoadOp MapLoadAction(RenderTargetLoadAction InLoadAction)
+	{
+		switch (InLoadAction)
+		{
+		case RenderTargetLoadAction::DontCare:      return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		case RenderTargetLoadAction::Load:          return VK_ATTACHMENT_LOAD_OP_LOAD;
+		case RenderTargetLoadAction::Clear:         return VK_ATTACHMENT_LOAD_OP_CLEAR;
+		default:
+			AUX::Unreachable();
+		}
+	}
+
+	inline VkAttachmentStoreOp MapStoreAction(RenderTargetStoreAction InStoreAction)
+	{
+		switch (InStoreAction)
+		{
+		case RenderTargetStoreAction::DontCare:      return VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		case RenderTargetStoreAction::Store:         return VK_ATTACHMENT_STORE_OP_STORE;
+		default:
+			AUX::Unreachable();
+		}
+	}
 }

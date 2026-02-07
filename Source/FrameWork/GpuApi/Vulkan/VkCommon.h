@@ -1,15 +1,15 @@
 #pragma once
 
-#pragma warning(push)
-#pragma warning(disable:4191)
 #if PLATFORM_WINDOWS
-#define VK_USE_PLATFORM_WIN32_KHR
+	#pragma warning(push)
+	#pragma warning(disable:4191)
+	#define VK_USE_PLATFORM_WIN32_KHR
 #endif
+
 #include "Volk/volk.h"
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
 #include "vma/vk_mem_alloc.h"
-#pragma warning(pop)
 
 #define VkCheck(Call)                                           \
 	do                                                          \

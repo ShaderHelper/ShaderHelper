@@ -2,6 +2,8 @@
 #include "VkGpuRhiBackend.h"
 #include "VkDevice.h"
 #include "VkTexture.h"
+#include "VkCommandRecorder.h"
+#include "VkShader.h"
 
 namespace FW
 {
@@ -24,7 +26,8 @@ namespace FW
 
 	void VkGpuRhiBackend::EndFrame()
 	{
-
+		WaitGpu();
+		GVkCmdRecorderPool.Empty();
 	}
 
 	TRefCountPtr<GpuTexture> VkGpuRhiBackend::CreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
@@ -39,12 +42,14 @@ namespace FW
 
 	TRefCountPtr<GpuShader> VkGpuRhiBackend::CreateShaderFromSource(const GpuShaderSourceDesc& Desc) const
 	{
-		return TRefCountPtr<GpuShader>();
+		TRefCountPtr<VulkanShader> NewShader = new VulkanShader(Desc);
+		return TRefCountPtr<GpuShader>(NewShader);
 	}
 
 	TRefCountPtr<GpuShader> VkGpuRhiBackend::CreateShaderFromFile(const GpuShaderFileDesc& Desc)
 	{
-		return TRefCountPtr<GpuShader>();
+		TRefCountPtr<VulkanShader> NewShader = new VulkanShader(Desc);
+		return TRefCountPtr<GpuShader>(NewShader);
 	}
 
 	TRefCountPtr<GpuBindGroup> VkGpuRhiBackend::CreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc)
@@ -79,7 +84,7 @@ namespace FW
 
 	bool VkGpuRhiBackend::CompileShader(GpuShader* InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs)
 	{
-		return false;
+		return CompileVulkanShader(static_cast<VulkanShader*>(InShader), OutErrorInfo, OutWarnInfo, ExtraArgs);
 	}
 
 	void VkGpuRhiBackend::BeginGpuCapture(const FString& CaptureName)
@@ -97,17 +102,34 @@ namespace FW
 
 	GpuCmdRecorder* VkGpuRhiBackend::BeginRecording(const FString& RecorderName)
 	{
-		return nullptr;
+		VulkanCmdRecorder* VkCmdRecorder = GVkCmdRecorderPool.AcquireCmdRecorder(RecorderName);
+		VkCommandBufferBeginInfo BeginInfo{ 
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+			.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+		};
+		VkCheck(vkBeginCommandBuffer(VkCmdRecorder->GetCommandBuffer(), &BeginInfo));
+		return VkCmdRecorder;
 	}
 
 	void VkGpuRhiBackend::EndRecording(GpuCmdRecorder* InCmdRecorder)
 	{
-
+		VulkanCmdRecorder* VkCmdRecorder = static_cast<VulkanCmdRecorder*>(InCmdRecorder);
+		VkCheck(vkEndCommandBuffer(VkCmdRecorder->GetCommandBuffer()));
 	}
 
 	void VkGpuRhiBackend::Submit(const TArray<GpuCmdRecorder*>& CmdRecorders)
 	{
-
+		TArray<VkCommandBuffer> CommamdBuffers;
+		for (auto* Recorder : CmdRecorders)
+		{
+			CommamdBuffers.Add(static_cast<VulkanCmdRecorder*>(Recorder)->GetCommandBuffer());
+		}
+		VkSubmitInfo SubmitInfo{
+			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+			.commandBufferCount = (uint32_t)CmdRecorders.Num(),
+			.pCommandBuffers = CommamdBuffers.GetData()
+		};
+		VkCheck(vkQueueSubmit(GGraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE));
 	}
 
 	void* VkGpuRhiBackend::MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapMode InMapMode, uint32& OutRowPitch)

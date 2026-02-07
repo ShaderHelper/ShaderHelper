@@ -1,4 +1,5 @@
 #pragma once
+#include "VkDevice.h"
 #include "GpuApi/GpuRhi.h"
 
 namespace FW
@@ -19,7 +20,11 @@ namespace FW
 	class VulkanRenderPassRecorder : public GpuRenderPassRecorder
 	{
 	public:
-		VulkanRenderPassRecorder() {}
+		VulkanRenderPassRecorder(VkRenderPass InRenderPass, VkFramebuffer InFrameBuffer) : RenderPass(InRenderPass), FrameBuffer(InFrameBuffer) {}
+		~VulkanRenderPassRecorder() {
+			vkDestroyFramebuffer(GDevice, FrameBuffer, nullptr);
+			vkDestroyRenderPass(GDevice, RenderPass, nullptr); 
+		}
 
 	public:
 		void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount) override;
@@ -30,12 +35,15 @@ namespace FW
 		void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override;
 
 	private:
+		VkRenderPass RenderPass;
+		VkFramebuffer FrameBuffer;
 	};
 
 	class VulkanCmdRecorder : public GpuCmdRecorder
 	{
 	public:
-		VulkanCmdRecorder() {}
+		VulkanCmdRecorder(VkCommandBuffer InCmdBuffer) : CommandBuffer(InCmdBuffer) {}
+		VkCommandBuffer GetCommandBuffer() const { return CommandBuffer; }
 
 	public:
 		GpuComputePassRecorder* BeginComputePass(const FString& PassName) override;
@@ -50,5 +58,20 @@ namespace FW
 		void CopyBufferToBuffer(GpuBuffer* SrcBuffer, uint32 SrcOffset, GpuBuffer* DestBuffer, uint32 DestOffset, uint32 Size) override;
 
 	private:
+		VkCommandBuffer CommandBuffer;
+		TArray<TUniquePtr<VulkanRenderPassRecorder>> RenderPassRecorders;
 	};
+
+	class VulkanCmdRecorderPool
+	{
+	public:
+		VulkanCmdRecorder* AcquireCmdRecorder(const FString& RecorderName);
+		void Empty() { CmdRecorders.Empty(); }
+
+	private:
+		VkCommandPool CommandPool = VK_NULL_HANDLE;
+		TArray<TUniquePtr<VulkanCmdRecorder>> CmdRecorders;
+	};
+
+	inline VulkanCmdRecorderPool GVkCmdRecorderPool;
 }

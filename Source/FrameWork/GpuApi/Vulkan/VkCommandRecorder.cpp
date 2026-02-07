@@ -1,5 +1,7 @@
 #include "CommonHeader.h"
 #include "VkCommandRecorder.h"
+#include "VkMap.h"
+#include "VkTexture.h"
 
 namespace FW
 {
@@ -14,11 +16,80 @@ namespace FW
 
 	GpuRenderPassRecorder* VulkanCmdRecorder::BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName)
 	{
-		return nullptr;
+		TArray<VkClearValue> ClearValues;
+		TArray<VkImageView> Attachments;
+		TArray<VkAttachmentDescription> AttachmentDescs;
+		TArray<VkAttachmentReference> AttachmentRefs;
+		if (PassDesc.ColorRenderTargets.Num() == 0)
+		{
+			AttachmentRefs.Emplace(VK_ATTACHMENT_UNUSED);
+		}
+
+		for (int32 Index = 0; Index < PassDesc.ColorRenderTargets.Num(); Index ++)
+		{
+			const GpuRenderTargetInfo& RenderTargetInfo = PassDesc.ColorRenderTargets[Index];
+			if (RenderTargetInfo.LoadAction == RenderTargetLoadAction::Clear)
+			{
+				ClearValues.Add({ .color = {RenderTargetInfo.ClearColor.X, RenderTargetInfo.ClearColor.Y, RenderTargetInfo.ClearColor.Z, RenderTargetInfo.ClearColor.W} });
+			}
+			Attachments.Add(static_cast<VulkanTexture*>(RenderTargetInfo.Texture)->GetView());
+			AttachmentDescs.Add({
+				.format = MapTextureFormat(RenderTargetInfo.Texture->GetFormat()),
+				.samples = VK_SAMPLE_COUNT_1_BIT,
+				.loadOp = MapLoadAction(RenderTargetInfo.LoadAction),
+				.storeOp = MapStoreAction(RenderTargetInfo.StoreAction),
+				.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+			});
+			AttachmentRefs.Emplace(Index, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		}
+
+		VkSubpassDescription SubpassDesc{
+			.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+			.colorAttachmentCount = (uint32_t)PassDesc.ColorRenderTargets.Num(),
+			.pColorAttachments = AttachmentRefs.GetData()
+		};
+		VkRenderPassCreateInfo RenderPassInfo{
+			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+			.attachmentCount = (uint32_t)PassDesc.ColorRenderTargets.Num(),
+			.pAttachments = AttachmentDescs.GetData(),
+			.subpassCount = 1,
+			.pSubpasses = &SubpassDesc
+		};
+		VkRenderPass RenderPass;
+		VkCheck(vkCreateRenderPass(GDevice, &RenderPassInfo, nullptr, &RenderPass));
+
+		VkFramebufferCreateInfo FrameBufferInfo{
+			.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+			.renderPass = RenderPass,
+			.attachmentCount = (uint32_t)PassDesc.ColorRenderTargets.Num(),
+			.pAttachments = Attachments.GetData(),
+			.width = PassDesc.ColorRenderTargets.Num() > 0 ? PassDesc.ColorRenderTargets[0].Texture->GetWidth() : 1,
+			.height = PassDesc.ColorRenderTargets.Num() > 0 ? PassDesc.ColorRenderTargets[0].Texture->GetHeight() : 1,
+			.layers = 1
+		};
+		VkFramebuffer FrameBuffer;
+		VkCheck(vkCreateFramebuffer(GDevice, &FrameBufferInfo, nullptr, &FrameBuffer));
+		RenderPassRecorders.Add(MakeUnique<VulkanRenderPassRecorder>(RenderPass, FrameBuffer));
+
+		VkRenderPassBeginInfo PassBeginInfo{
+			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+			.renderPass = RenderPass,
+			.framebuffer = FrameBuffer,
+			.renderArea = {
+				.offset = {0, 0},
+				.extent = {FrameBufferInfo.width, FrameBufferInfo.height}
+			},
+			.clearValueCount = (uint32_t)ClearValues.Num(),
+			.pClearValues = ClearValues.GetData()
+		};
+		vkCmdBeginRenderPass(CommandBuffer, &PassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+		return RenderPassRecorders.Last().Get();
 	}
 
 	void VulkanCmdRecorder::EndRenderPass(GpuRenderPassRecorder* InRenderPassRecorder)
 	{
+
 	}
 
 	void VulkanCmdRecorder::BeginCaptureEvent(const FString& EventName)
@@ -79,5 +150,31 @@ namespace FW
 
 	void VulkanRenderPassRecorder::SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)
 	{
+
+	}
+
+	VulkanCmdRecorder* VulkanCmdRecorderPool::AcquireCmdRecorder(const FString& RecorderName)
+	{
+		if (CommandPool == VK_NULL_HANDLE)
+		{
+			VkCommandPoolCreateInfo PoolCreateInfo{
+				.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+				.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
+				.queueFamilyIndex = GraphicsQueueIndex
+			};
+			VkCheck(vkCreateCommandPool(GDevice, &PoolCreateInfo, nullptr, &CommandPool));
+		}
+
+		VkCommandBufferAllocateInfo CmdBufAllocInfo{
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+			.commandPool = CommandPool,
+			.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+			.commandBufferCount = 1
+		};
+
+		VkCommandBuffer CommandBuffer;
+		VkCheck(vkAllocateCommandBuffers(GDevice, &CmdBufAllocInfo, &CommandBuffer));
+		CmdRecorders.Add(MakeUnique<VulkanCmdRecorder>(CommandBuffer));
+		return CmdRecorders.Last().Get();
 	}
 }
