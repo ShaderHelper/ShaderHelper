@@ -1,9 +1,18 @@
 #include "CommonHeader.h"
 #include "VkTexture.h"
 #include "VkMap.h"
+#include "VkGpuRhiBackend.h"
 
 namespace FW
 {
+	VulkanTexture::VulkanTexture(const GpuTextureDesc& InDesc, GpuResourceState InResourceState, VkImage InImage, VkImageView InImageView, VmaAllocation InAllocation)
+		: GpuTexture(InDesc, InResourceState)
+		, Image(InImage), ImageView(InImageView)
+		, Allocation(InAllocation), Handle(nullptr)
+	{
+		GDeferredReleaseOneFrame.Add(this);
+	}
+
 	static VmaPool ExternalPool = VK_NULL_HANDLE;
 	VkImageUsageFlags DetermineTextureUsage(const GpuTextureDesc& InTexDesc)
 	{

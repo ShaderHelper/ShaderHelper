@@ -28,18 +28,19 @@ namespace FW
 		for (int32 Index = 0; Index < PassDesc.ColorRenderTargets.Num(); Index ++)
 		{
 			const GpuRenderTargetInfo& RenderTargetInfo = PassDesc.ColorRenderTargets[Index];
+			VulkanTexture* RT = static_cast<VulkanTexture*>(RenderTargetInfo.Texture);
 			if (RenderTargetInfo.LoadAction == RenderTargetLoadAction::Clear)
 			{
 				ClearValues.Add({ .color = {RenderTargetInfo.ClearColor.X, RenderTargetInfo.ClearColor.Y, RenderTargetInfo.ClearColor.Z, RenderTargetInfo.ClearColor.W} });
 			}
-			Attachments.Add(static_cast<VulkanTexture*>(RenderTargetInfo.Texture)->GetView());
+			Attachments.Add(RT->GetView());
 			AttachmentDescs.Add({
 				.format = MapTextureFormat(RenderTargetInfo.Texture->GetFormat()),
 				.samples = VK_SAMPLE_COUNT_1_BIT,
 				.loadOp = MapLoadAction(RenderTargetInfo.LoadAction),
 				.storeOp = MapStoreAction(RenderTargetInfo.StoreAction),
-				.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-				.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+				.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+				.finalLayout = VK_IMAGE_LAYOUT_GENERAL
 			});
 			AttachmentRefs.Emplace(Index, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 		}
@@ -89,7 +90,7 @@ namespace FW
 
 	void VulkanCmdRecorder::EndRenderPass(GpuRenderPassRecorder* InRenderPassRecorder)
 	{
-
+		vkCmdEndRenderPass(CommandBuffer);
 	}
 
 	void VulkanCmdRecorder::BeginCaptureEvent(const FString& EventName)

@@ -91,7 +91,7 @@ namespace SH
         void RefreshProperty(bool bClear = false);
         void ShowProperty(FW::ShObject* InObjectData);
         void UpdateShaderPath(const FString& InShaderPath);
-
+		bool IsPropertyLocked() { return PropertyView->IsLocked(); }
 		void AddNavigationInfo(const FGuid& Id, const FTextLocation& InLocation);
 		
 		DebuggableObject* GetDebuggaleObject() const { return CurDebuggableObject; }

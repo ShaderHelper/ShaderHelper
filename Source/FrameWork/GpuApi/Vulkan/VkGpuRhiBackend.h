@@ -37,5 +37,6 @@ namespace FW
 		virtual void UnMapGpuBuffer(GpuBuffer* InGpuBuffer) override;
 	};
 
+	inline TArray<TRefCountPtr<GpuResource>> GDeferredReleaseOneFrame;
 	inline VkGpuRhiBackend* GVkGpuRhi;
 }

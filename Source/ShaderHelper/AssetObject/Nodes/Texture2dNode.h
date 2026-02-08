@@ -1,4 +1,5 @@
 #pragma once
+#include "Editor/AssetEditor/ShAssetEditor.h"
 #include "AssetObject/Graph.h"
 #include "AssetObject/Texture2D.h"
 #include "Editor/PreviewViewPort.h"
@@ -6,15 +7,13 @@
 
 namespace SH
 {
-	class Texture2dNodeOp : public FW::ShObjectOp
+	class Texture2dNodeOp : public ShPropertyOp
 	{
 		REFLECTION_TYPE(Texture2dNodeOp)
 	public:
 		Texture2dNodeOp() = default;
 		
 		FW::MetaType* SupportType() override;
-		void OnCancelSelect(FW::ShObject* InObject) override;
-		void OnSelect(FW::ShObject* InObject) override;
 	};
 
 	enum class TextureChannelFilter

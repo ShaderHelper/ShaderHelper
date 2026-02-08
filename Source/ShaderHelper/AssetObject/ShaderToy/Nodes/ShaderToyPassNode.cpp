@@ -44,8 +44,8 @@ namespace SH
 
 	void ShaderToyPassNodeOp::OnCancelSelect(ShObject* InObject)
 	{
+		ShPropertyOp::OnCancelSelect(InObject);
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->RefreshProperty(true);
 		if(!static_cast<ShaderToyPassNode*>(InObject)->IsDebugging) {
 			ShEditor->SetDebuggableObject(nullptr);
 		}
@@ -53,8 +53,8 @@ namespace SH
 
     void ShaderToyPassNodeOp::OnSelect(ShObject* InObject)
     {
+		ShPropertyOp::OnSelect(InObject);
         auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-        ShEditor->ShowProperty(InObject);
 		ShEditor->SetDebuggableObject(static_cast<ShaderToyPassNode*>(InObject));
     }
 

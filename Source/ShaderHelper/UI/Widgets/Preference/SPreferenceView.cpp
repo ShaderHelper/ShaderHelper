@@ -775,8 +775,8 @@ namespace SH
 			})
 			[
 				SNew(STextBlock).Text_Lambda([this] {
-					GpuRhiBackendType BackendType = GetGpuRhiBackendType();
-					FString BackendName = ANSI_TO_TCHAR(magic_enum::enum_name(BackendType).data());
+					FString BackendName;
+					Editor::GetEditorConfig()->GetString(TEXT("Environment"), TEXT("GraphicsApi"), BackendName);
 					return FText::FromString(BackendName);
 				})
 			]

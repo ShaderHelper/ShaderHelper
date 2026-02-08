@@ -56,7 +56,7 @@ namespace FW
 				}
 				else
 				{
-					check(false);
+					AUX::Unreachable();
 				}
 				
 			}

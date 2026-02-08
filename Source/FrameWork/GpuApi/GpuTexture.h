@@ -29,6 +29,7 @@ namespace FW
         GpuTextureFormat GetFormat() const { return TexDesc.Format; }
         uint32 GetWidth() const { return TexDesc.Width; }
         uint32 GetHeight() const { return TexDesc.Height; }
+		virtual uint32 GetAllocationSize() const { AUX::Unreachable(); return 0; }
 
     private:
         GpuTextureDesc TexDesc;

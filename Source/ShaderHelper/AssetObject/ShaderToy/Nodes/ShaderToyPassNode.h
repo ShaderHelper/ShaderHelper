@@ -1,4 +1,5 @@
 #pragma once
+#include "Editor/AssetEditor/ShAssetEditor.h"
 #include "AssetObject/Graph.h"
 #include "AssetObject/StShader.h"
 #include "AssetManager/AssetManager.h"
@@ -8,7 +9,7 @@
 
 namespace SH
 {
-    class ShaderToyPassNodeOp : public FW::ShObjectOp
+    class ShaderToyPassNodeOp : public ShPropertyOp
     {
         REFLECTION_TYPE(ShaderToyPassNodeOp)
     public:

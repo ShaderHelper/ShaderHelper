@@ -4,6 +4,7 @@
 #include "VkTexture.h"
 #include "VkCommandRecorder.h"
 #include "VkShader.h"
+#include "VkPipeline.h"
 
 namespace FW
 {
@@ -28,6 +29,7 @@ namespace FW
 	{
 		WaitGpu();
 		GVkCmdRecorderPool.Empty();
+		GDeferredReleaseOneFrame.Empty();
 	}
 
 	TRefCountPtr<GpuTexture> VkGpuRhiBackend::CreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
@@ -64,7 +66,7 @@ namespace FW
 
 	TRefCountPtr<GpuRenderPipelineState> VkGpuRhiBackend::CreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc)
 	{
-		return TRefCountPtr<GpuRenderPipelineState>();
+		return AUX::StaticCastRefCountPtr<GpuRenderPipelineState>(CreateVulkanRenderPipelineState(InPipelineStateDesc));
 	}
 
 	TRefCountPtr<GpuComputePipelineState> VkGpuRhiBackend::CreateComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc)
