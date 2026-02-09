@@ -35,7 +35,8 @@ namespace FW
 #if PLATFORM_WINDOWS
 		if (BackendType == GpuRhiBackendType::Vulkan)
 		{
-			UpdatableTexture = UIRenderer->CreateSharedHandleTextureFromVulkan(SharedHandle, InGpuTex->GetWidth(), InGpuTex->GetHeight(),
+			UpdatableTexture = UIRenderer->CreateSharedHandleTextureFromVulkan(SharedHandle,
+				InGpuTex->GetWidth(), InGpuTex->GetHeight(),
 				MapTextureFormatToGLInternalFormat(InGpuTex->GetFormat()), InGpuTex->GetAllocationSize());
 		}
 		else

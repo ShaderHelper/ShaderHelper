@@ -15,7 +15,7 @@ namespace FW
 		}
 
 	public:
-
+		VkPipeline GetPipeline() const { return Pipeline; }
 
 	private:
 		VkPipeline Pipeline;

@@ -2,15 +2,17 @@
 #include "VkTexture.h"
 #include "VkMap.h"
 #include "VkGpuRhiBackend.h"
+#include "VkUtil.h"
 
 namespace FW
 {
 	VulkanTexture::VulkanTexture(const GpuTextureDesc& InDesc, GpuResourceState InResourceState, VkImage InImage, VkImageView InImageView, VmaAllocation InAllocation)
 		: GpuTexture(InDesc, InResourceState)
 		, Image(InImage), ImageView(InImageView)
-		, Allocation(InAllocation), Handle(nullptr)
+		, Allocation(InAllocation)
+		, SharedTextureHandle(nullptr)
 	{
-		GDeferredReleaseOneFrame.Add(this);
+		GVkDeferredReleaseManager.AddResource(this);
 	}
 
 	static VmaPool ExternalPool = VK_NULL_HANDLE;
@@ -54,7 +56,7 @@ namespace FW
 		{
 			VkPhysicalDeviceExternalImageFormatInfo ExternalImgFormatInfo = {
 				.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO,
-				.handleType = ExternalHandleType
+				.handleType = ExternalMemoryHandleType
 			};
 			VkPhysicalDeviceImageFormatInfo2 ImgFormatInfo2 = {
 				.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2,
@@ -74,16 +76,15 @@ namespace FW
 			};
 			vkGetPhysicalDeviceImageFormatProperties2(GPhysicalDevice, &ImgFormatInfo2, &ImgFormatProps2);
 			check((ExternalImgFormatProps.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT) != 0);
-			bool DedicatedAlloc = (ExternalImgFormatProps.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT) != 0;
 
 			static constexpr VkExportMemoryAllocateInfo ExportAllocInfo = {
 				.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO,
-				.handleTypes = ExternalHandleType
+				.handleTypes = ExternalMemoryHandleType
 			};
 
 			static constexpr VkExternalMemoryImageCreateInfo ExternalImgCreateInfo = {
 				.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO,
-				.handleTypes = ExternalHandleType
+				.handleTypes = ExternalMemoryHandleType
 			};
 
 			ImgCreateInfo.pNext = &ExternalImgCreateInfo;
@@ -100,10 +101,7 @@ namespace FW
 			}();
 
 			AllocCreateInfo.pool = ExternalPool;
-			if (DedicatedAlloc)
-			{
-				AllocCreateInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
-			}
+			AllocCreateInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
 		}
 
 		VkImage Image;
@@ -124,6 +122,19 @@ namespace FW
 		};
 		VkImageView ImageView;
 		VkCheck(vkCreateImageView(GDevice, &ViewInfo, nullptr, &ImageView));
-		return new VulkanTexture(InTexDesc, InitState, Image, ImageView, Allocation);
+
+		VulkanTexture* NewTex = new VulkanTexture(InTexDesc, InitState, Image, ImageView, Allocation);
+		//Vulkan requires the initialLayout member of VkImageCreateInfo must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED..
+		//but we want to create the texture in the correct initial state, so we need an explicit layout transition after creation.
+		NewTex->State = GpuResourceState::Unknown;
+		GpuCmdRecorder* CmdRecorder = GVkGpuRhi->BeginRecording();
+		{
+			CmdRecorder->Barriers({
+				{NewTex, InitState}
+			});
+		}
+		GVkGpuRhi->EndRecording(CmdRecorder);
+		GVkGpuRhi->Submit({ CmdRecorder });
+		return NewTex;
 	}
 }

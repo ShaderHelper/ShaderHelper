@@ -9,7 +9,7 @@ namespace FW
     : GpuBuffer(InBufferDesc, InResourceState)
     , Buffer(MoveTemp(InBuffer))
     {
-        GDeferredReleaseOneFrame.Add(this);
+        GMtlDeferredReleaseManager.AddResource(this);
     }
 
     TRefCountPtr<MetalBuffer> CreateMetalBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InResourceState)

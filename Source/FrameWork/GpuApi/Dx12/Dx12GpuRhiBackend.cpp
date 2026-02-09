@@ -59,7 +59,7 @@ void Dx12GpuRhiBackend::EndFrame()
 		CurGpuFrame = CurGpuFrame + 1;
 	}
 
-	GDeferredReleaseManager->ProcessResources();
+	GDx12DeferredReleaseManager->ProcessResources();
 }
 
 TRefCountPtr<GpuTexture> Dx12GpuRhiBackend::CreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)

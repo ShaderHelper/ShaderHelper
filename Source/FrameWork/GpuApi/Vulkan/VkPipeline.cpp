@@ -3,6 +3,7 @@
 #include "VkShader.h"
 #include "VkMap.h"
 #include "VkGpuRhiBackend.h"
+#include "VkUtil.h"
 
 namespace FW
 {
@@ -10,7 +11,7 @@ namespace FW
 		: GpuRenderPipelineState(InDesc)
 		, Pipeline(InPipeline), PipelineLayout(InPipelineLayout), RenderPass(InRednedrPass)
 	{
-		GDeferredReleaseOneFrame.Add(this);
+		GVkDeferredReleaseManager.AddResource(this);
 	}
 
 	TRefCountPtr<VulkanRenderPipelineState> CreateVulkanRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc)

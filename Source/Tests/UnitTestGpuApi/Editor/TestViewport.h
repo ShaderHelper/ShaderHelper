@@ -17,6 +17,9 @@ namespace UNITTEST_GPUAPI
 	private:
 		void CreateRenderTarget(const FW::Vector2f& InSize);
 
+	public:
+		TFunction<void(TestViewport*)> RenderFunc;
+
 	private:
 		TRefCountPtr<FW::GpuTexture> RenderTarget;
 		FW::GpuTextureFormat RenderTargetFormat;

@@ -96,6 +96,7 @@ namespace FW
 		TArray<const char*> DeviceExts;
 #if PLATFORM_WINDOWS
 		DeviceExts.Add(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
+		DeviceExts.Add(VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME);
 #endif
 		auto GetGraphicsQueueIndex = [](VkPhysicalDevice InDevice) -> int32
 		{
@@ -249,6 +250,22 @@ namespace FW
 		AllocatorCreateInfo.pVulkanFunctions = &VulkanFunctions;
 
 		vmaCreateAllocator(&AllocatorCreateInfo, &GAllocator);
+
+		/*VkExportSemaphoreCreateInfo ExportSemaphoreInfo = {
+			.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO,
+			.handleTypes = ExternalSemaphoreHandleType
+		};
+		VkSemaphoreCreateInfo SemaphoreInfo = {
+			.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+			.pNext = &ExportSemaphoreInfo
+		};
+		VkCheck(vkCreateSemaphore(GDevice, &SemaphoreInfo, nullptr, &GSharedSemaphore));
+		VkSemaphoreGetWin32HandleInfoKHR GetHandleInfo = {
+					.sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_WIN32_HANDLE_INFO_KHR,
+					.semaphore = GSharedSemaphore,
+					.handleType = ExternalSemaphoreHandleType
+		};
+		VkCheck(vkGetSemaphoreWin32HandleKHR(GDevice, &GetHandleInfo, &GSharedSemaphoreHandle))*/;
 	}
 }
 

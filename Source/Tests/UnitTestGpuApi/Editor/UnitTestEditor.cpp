@@ -16,6 +16,7 @@ namespace UNITTEST_GPUAPI
 	void UnitTestEditor::AddTest(const FString& InName, const TFunction<void(TestViewport*)> InTest, FW::GpuTextureFormat ViewportFormat)
 	{
 		auto Viewport = MakeShared<TestViewport>(WindowSize, ViewportFormat);
+		Viewport->RenderFunc = InTest;
 		auto TestWindow = SNew(SWindow)
 			.Title(FText::FromString(InName))
 			.ClientSize(WindowSize)

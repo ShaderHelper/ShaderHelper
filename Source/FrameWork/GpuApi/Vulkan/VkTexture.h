@@ -4,10 +4,6 @@
 
 namespace FW
 {
-#if PLATFORM_WINDOWS
-	constexpr VkExternalMemoryHandleTypeFlagBits ExternalHandleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-#endif
-
 	class VulkanTexture : public GpuTexture
 	{
 	public:
@@ -15,9 +11,10 @@ namespace FW
 		~VulkanTexture() {
 			vkDestroyImageView(GDevice, ImageView, nullptr);
 			vmaDestroyImage(GAllocator, Image, Allocation);
-			CloseHandle(Handle);
+			CloseHandle(SharedTextureHandle);
 		}
 
+		VkImage GetImage() const { return Image; }
 		VkImageView GetView() const { return ImageView; }
 		uint32 GetAllocationSize() const override {
 			VmaAllocationInfo AllocInfo;
@@ -27,20 +24,20 @@ namespace FW
 
 		void* GetSharedHandle()
 		{
-			if (Handle == nullptr)
+			if (SharedTextureHandle == nullptr)
 			{
 #if PLATFORM_WINDOWS
-				VkCheck(vmaGetMemoryWin32Handle2(GAllocator, Allocation, ExternalHandleType, nullptr, &Handle));
+				VkCheck(vmaGetMemoryWin32Handle2(GAllocator, Allocation, ExternalMemoryHandleType, nullptr, &SharedTextureHandle));
 #endif
 			}
-			return Handle;
+			return SharedTextureHandle;
 		}
 
 	private:
 		VkImage Image;
 		VkImageView ImageView;
 		VmaAllocation Allocation;
-		HANDLE Handle;
+		HANDLE SharedTextureHandle;
 	};
 
 	TRefCountPtr<VulkanTexture> CreateVulkanTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState);

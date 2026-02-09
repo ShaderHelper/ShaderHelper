@@ -13,7 +13,7 @@ namespace FW
     : GpuSampler(InDesc)
 	, Sampler(MoveTemp(InSampler))
     {
-        GDeferredReleaseOneFrame.Add(this);
+        GMtlDeferredReleaseManager.AddResource(this);
     }
 
     MetalTexture::MetalTexture(MTLTexturePtr InTex, GpuTextureDesc InDesc, CVPixelBufferRef InSharedHandle)
@@ -21,7 +21,7 @@ namespace FW
     , Tex(MoveTemp(InTex))
     , SharedHandle(InSharedHandle)
     {
-        GDeferredReleaseOneFrame.Add(this);
+        GMtlDeferredReleaseManager.AddResource(this);
     }
 
     static void SetTextureUsage(GpuTextureUsage InUsage, MTL::TextureDescriptor* OutTexDesc)

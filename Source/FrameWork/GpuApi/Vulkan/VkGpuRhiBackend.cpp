@@ -5,6 +5,7 @@
 #include "VkCommandRecorder.h"
 #include "VkShader.h"
 #include "VkPipeline.h"
+#include "VkUtil.h"
 
 namespace FW
 {
@@ -29,7 +30,7 @@ namespace FW
 	{
 		WaitGpu();
 		GVkCmdRecorderPool.Empty();
-		GDeferredReleaseOneFrame.Empty();
+		GVkDeferredReleaseManager.ProcessResources();
 	}
 
 	TRefCountPtr<GpuTexture> VkGpuRhiBackend::CreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)

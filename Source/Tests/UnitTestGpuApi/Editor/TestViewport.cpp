@@ -19,6 +19,10 @@ namespace UNITTEST_GPUAPI
 		if (InSize.X > 0 && InSize.Y > 0)
 		{
 			CreateRenderTarget(InSize);
+			if (RenderFunc)
+			{
+				RenderFunc(this);
+			}
 		}
 	}
 

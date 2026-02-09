@@ -4,10 +4,78 @@
 
 namespace FW
 {
+	class VulkanCmdRecorder;
+	class VulkanRenderPipelineState;
+	class VulkanComputePipelineState;
+
+	class VkRenderStateCache
+	{
+	public:
+		VkRenderStateCache(VulkanCmdRecorder* InOwner, TArray<GpuTexture*> InRenderTargets);
+		void ApplyDrawState();
+
+		void SetPipeline(VulkanRenderPipelineState* InPipelineState);
+		void SetVertexBuffer(GpuBuffer* InBuffer);
+		void SetViewPort(VkViewport InViewPort);
+		void SetScissorRect(VkRect2D InScissorRect);
+		void SetBindGroups(GpuBindGroup* InGroup0, GpuBindGroup* InGroup1, GpuBindGroup* InGroup2, GpuBindGroup* InGroup3);
+
+	public:
+		bool IsRenderPipelineDirty : 1;
+		bool IsViewportDirty : 1;
+		bool IsScissorRectDirty : 1;
+		bool IsVertexBufferDirty : 1;
+
+		bool IsBindGroup0Dirty : 1;
+		bool IsBindGroup1Dirty : 1;
+		bool IsBindGroup2Dirty : 1;
+		bool IsBindGroup3Dirty : 1;
+
+	private:
+		VulkanCmdRecorder* Owner;
+		VulkanRenderPipelineState* CurrentRenderPipelineState = nullptr;
+		GpuBuffer* CurrentVertexBuffer = nullptr;
+		TOptional<VkViewport> CurrentViewPort;
+		TOptional<VkRect2D> CurrentScissorRect;
+
+		GpuBindGroup* CurrentBindGroup0 = nullptr;
+		GpuBindGroup* CurrentBindGroup1 = nullptr;
+		GpuBindGroup* CurrentBindGroup2 = nullptr;
+		GpuBindGroup* CurrentBindGroup3 = nullptr;
+
+		TArray<GpuTexture*> RenderTargets;
+	};
+
+	class VkComputeStateCache
+	{
+	public:
+		VkComputeStateCache();
+		void ApplyComputeState(VkCommandBuffer InCmdBuffer);
+
+		void SetPipeline(VulkanComputePipelineState* InPipelineState);
+		void SetBindGroups(GpuBindGroup* InGroup0, GpuBindGroup* InGroup1, GpuBindGroup* InGroup2, GpuBindGroup* InGroup3);
+
+	public:
+		bool IsComputePipelineDirty : 1;
+		bool IsBindGroup0Dirty : 1;
+		bool IsBindGroup1Dirty : 1;
+		bool IsBindGroup2Dirty : 1;
+		bool IsBindGroup3Dirty : 1;
+
+	private:
+		VulkanComputePipelineState* CurrentComputePipelineState = nullptr;
+		GpuBindGroup* CurrentBindGroup0 = nullptr;
+		GpuBindGroup* CurrentBindGroup1 = nullptr;
+		GpuBindGroup* CurrentBindGroup2 = nullptr;
+		GpuBindGroup* CurrentBindGroup3 = nullptr;
+	};
+
 	class VulkanComputePassRecorder : public GpuComputePassRecorder
 	{
 	public:
-		VulkanComputePassRecorder() {}
+		VulkanComputePassRecorder(VulkanCmdRecorder* InOwner)
+			: Owner(InOwner)
+		{}
 
 	public:
 		void Dispatch(uint32 ThreadGroupCountX, uint32 ThreadGroupCountY, uint32 ThreadGroupCountZ) override;
@@ -15,12 +83,18 @@ namespace FW
 		void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override;
 
 	private:
+		VulkanCmdRecorder* Owner;
+		VkComputeStateCache StateCache;
 	};
 
 	class VulkanRenderPassRecorder : public GpuRenderPassRecorder
 	{
 	public:
-		VulkanRenderPassRecorder(VkRenderPass InRenderPass, VkFramebuffer InFrameBuffer) : RenderPass(InRenderPass), FrameBuffer(InFrameBuffer) {}
+		VulkanRenderPassRecorder(VulkanCmdRecorder* InOwner, VkRenderPass InRenderPass, VkFramebuffer InFrameBuffer, TArray<GpuTexture*> InRenderTargets) 
+			: Owner(InOwner)
+			, RenderPass(InRenderPass), FrameBuffer(InFrameBuffer)
+			, StateCache(InOwner, MoveTemp(InRenderTargets))
+		{}
 		~VulkanRenderPassRecorder() {
 			vkDestroyFramebuffer(GDevice, FrameBuffer, nullptr);
 			vkDestroyRenderPass(GDevice, RenderPass, nullptr); 
@@ -35,15 +109,17 @@ namespace FW
 		void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override;
 
 	private:
+		VulkanCmdRecorder* Owner;
 		VkRenderPass RenderPass;
 		VkFramebuffer FrameBuffer;
+		VkRenderStateCache StateCache;
 	};
 
 	class VulkanCmdRecorder : public GpuCmdRecorder
 	{
 	public:
 		VulkanCmdRecorder(VkCommandBuffer InCmdBuffer) : CommandBuffer(InCmdBuffer) {}
-		VkCommandBuffer GetCommandBuffer() const { return CommandBuffer; }
+		const VkCommandBuffer& GetCommandBuffer() const { return CommandBuffer; }
 
 	public:
 		GpuComputePassRecorder* BeginComputePass(const FString& PassName) override;
@@ -60,6 +136,7 @@ namespace FW
 	private:
 		VkCommandBuffer CommandBuffer;
 		TArray<TUniquePtr<VulkanRenderPassRecorder>> RenderPassRecorders;
+		TArray<TUniquePtr<VulkanComputePassRecorder>> ComputePassRecorders;
 	};
 
 	class VulkanCmdRecorderPool

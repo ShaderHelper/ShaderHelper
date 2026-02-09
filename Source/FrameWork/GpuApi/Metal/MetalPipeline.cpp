@@ -13,14 +13,14 @@ namespace FW
     , PipelineState(MoveTemp(InPipelineState))
     , PrimitiveType(InPrimitiveType)
     {
-        GDeferredReleaseOneFrame.Add(this);
+        GMtlDeferredReleaseManager.AddResource(this);
     }
 
     MetalComputePipelineState::MetalComputePipelineState(GpuComputePipelineStateDesc InDesc, MTLComputePipelineStatePtr InPipelineState)
     : GpuComputePipelineState(MoveTemp(InDesc))
     , PipelineState(MoveTemp(InPipelineState))
     {
-        GDeferredReleaseOneFrame.Add(this);
+        GMtlDeferredReleaseManager.AddResource(this);
     }
 
 	TRefCountPtr<MetalRenderPipelineState> CreateMetalRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc)

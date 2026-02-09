@@ -112,7 +112,7 @@ namespace FW
     MetalBindGroup::MetalBindGroup(const GpuBindGroupDesc& InDesc)
         : GpuBindGroup(InDesc)
     {
-        GDeferredReleaseOneFrame.Add(this);
+        GMtlDeferredReleaseManager.AddResource(this);
         
         MetalBindGroupLayout* BindGroupLayout = static_cast<MetalBindGroupLayout*>(InDesc.Layout.GetReference());
         MTL::ArgumentEncoder* VertexArgumentEncoder = BindGroupLayout->GetVertexArgumentEncoder();
