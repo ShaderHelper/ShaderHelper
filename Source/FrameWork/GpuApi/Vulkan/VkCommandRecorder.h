@@ -115,10 +115,27 @@ namespace FW
 		VkRenderStateCache StateCache;
 	};
 
+	class VulkanCmdRecorderPool
+	{
+	public:
+		VulkanCmdRecorder* AcquireCmdRecorder(const FString& RecorderName);
+		VkCommandPool GetCommandPool() const { return CommandPool; }
+		void Empty() { CmdRecorders.Empty(); }
+
+	private:
+		VkCommandPool CommandPool = VK_NULL_HANDLE;
+		TArray<TUniquePtr<VulkanCmdRecorder>> CmdRecorders;
+	};
+
+	inline VulkanCmdRecorderPool GVkCmdRecorderPool;
+
 	class VulkanCmdRecorder : public GpuCmdRecorder
 	{
 	public:
 		VulkanCmdRecorder(VkCommandBuffer InCmdBuffer) : CommandBuffer(InCmdBuffer) {}
+		~VulkanCmdRecorder() {
+			vkFreeCommandBuffers(GDevice, GVkCmdRecorderPool.GetCommandPool(), 1, &CommandBuffer);
+		}
 		const VkCommandBuffer& GetCommandBuffer() const { return CommandBuffer; }
 
 	public:
@@ -138,17 +155,4 @@ namespace FW
 		TArray<TUniquePtr<VulkanRenderPassRecorder>> RenderPassRecorders;
 		TArray<TUniquePtr<VulkanComputePassRecorder>> ComputePassRecorders;
 	};
-
-	class VulkanCmdRecorderPool
-	{
-	public:
-		VulkanCmdRecorder* AcquireCmdRecorder(const FString& RecorderName);
-		void Empty() { CmdRecorders.Empty(); }
-
-	private:
-		VkCommandPool CommandPool = VK_NULL_HANDLE;
-		TArray<TUniquePtr<VulkanCmdRecorder>> CmdRecorders;
-	};
-
-	inline VulkanCmdRecorderPool GVkCmdRecorderPool;
 }

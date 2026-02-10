@@ -103,6 +103,10 @@ namespace FW
 			DxcArgs.Add("-fvk-use-dx-layout");
 			//DxcArgs.Add("-Gis");
 			DxcArgs.Add("/Od"); //TODO
+			if (InShader->GetShaderType() == ShaderType::VertexShader)
+			{
+				DxcArgs.Add("-fvk-invert-y");
+			}
 
 			if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
 			{
