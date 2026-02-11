@@ -1,9 +1,23 @@
 #pragma once
 #include "VkDevice.h"
 #include "GpuApi/GpuResource.h"
+#include "GpuApi/GpuSampler.h"
 
 namespace FW
 {
+	class VulkanSampler : public GpuSampler
+	{
+	public:
+		VulkanSampler(VkSampler InSampler, const GpuSamplerDesc& InDesc);
+		~VulkanSampler() {
+			vkDestroySampler(GDevice, Sampler, nullptr);
+		}
+		VkSampler GetSampler() const { return Sampler; }
+
+	private:
+		VkSampler Sampler;
+	};
+
 	class VulkanTexture : public GpuTexture
 	{
 	public:
@@ -41,4 +55,5 @@ namespace FW
 	};
 
 	TRefCountPtr<VulkanTexture> CreateVulkanTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState);
+	TRefCountPtr<VulkanSampler> CreateVulkanSampler(const GpuSamplerDesc& InSamplerDesc);
 }

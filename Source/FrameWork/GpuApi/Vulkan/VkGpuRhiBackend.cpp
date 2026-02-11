@@ -6,6 +6,8 @@
 #include "VkShader.h"
 #include "VkPipeline.h"
 #include "VkUtil.h"
+#include "VkBuffer.h"
+#include "VkDescriptorSet.h"
 
 namespace FW
 {
@@ -40,7 +42,8 @@ namespace FW
 
 	TRefCountPtr<GpuBuffer> VkGpuRhiBackend::CreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState)
 	{
-		return TRefCountPtr<GpuBuffer>();
+		GpuResourceState ValidState = InitState == GpuResourceState::Unknown ? GetBufferState(InBufferDesc.Usage) : InitState;
+		return AUX::StaticCastRefCountPtr<GpuBuffer>(CreateVulkanBuffer(InBufferDesc, ValidState));
 	}
 
 	TRefCountPtr<GpuShader> VkGpuRhiBackend::CreateShaderFromSource(const GpuShaderSourceDesc& Desc) const
@@ -57,12 +60,12 @@ namespace FW
 
 	TRefCountPtr<GpuBindGroup> VkGpuRhiBackend::CreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc)
 	{
-		return TRefCountPtr<GpuBindGroup>();
+		return AUX::StaticCastRefCountPtr<GpuBindGroup>(CreateVulkanBindGroup(InBindGroupDesc));
 	}
 
 	TRefCountPtr<GpuBindGroupLayout> VkGpuRhiBackend::CreateBindGroupLayout(const GpuBindGroupLayoutDesc& InBindGroupLayoutDesc)
 	{
-		return TRefCountPtr<GpuBindGroupLayout>();
+		return AUX::StaticCastRefCountPtr<GpuBindGroupLayout>(CreateVulkanBindGroupLayout(InBindGroupLayoutDesc));
 	}
 
 	TRefCountPtr<GpuRenderPipelineState> VkGpuRhiBackend::CreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc)
@@ -77,7 +80,7 @@ namespace FW
 
 	TRefCountPtr<GpuSampler> VkGpuRhiBackend::CreateSampler(const GpuSamplerDesc& InSamplerDesc)
 	{
-		return TRefCountPtr<GpuSampler>();
+		return AUX::StaticCastRefCountPtr<GpuSampler>(CreateVulkanSampler(InSamplerDesc));
 	}
 
 	void VkGpuRhiBackend::SetResourceName(const FString& Name, GpuResource* InResource)
@@ -147,11 +150,15 @@ namespace FW
 
 	void* VkGpuRhiBackend::MapGpuBuffer(GpuBuffer* InGpuBuffer, GpuResourceMapMode InMapMode)
 	{
-		return nullptr;
+		VulkanBuffer* VkBuffer = static_cast<VulkanBuffer*>(InGpuBuffer);
+		void* MappedData = nullptr;
+		VkCheck(vmaMapMemory(GAllocator, VkBuffer->GetAllocation(), &MappedData));
+		return MappedData;
 	}
 
 	void VkGpuRhiBackend::UnMapGpuBuffer(GpuBuffer* InGpuBuffer)
 	{
-
+		VulkanBuffer* VkBuffer = static_cast<VulkanBuffer*>(InGpuBuffer);
+		vmaUnmapMemory(GAllocator, VkBuffer->GetAllocation());
 	}
 }

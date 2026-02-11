@@ -4,6 +4,7 @@
 #include "VkMap.h"
 #include "VkGpuRhiBackend.h"
 #include "VkUtil.h"
+#include "VkDescriptorSet.h"
 
 namespace FW
 {
@@ -87,9 +88,31 @@ namespace FW
 			.pAttachments = BlendAttachments.GetData()
 		};
 		
+		static VkDescriptorSetLayout DummyLayout = [&] {
+			VkDescriptorSetLayoutCreateInfo LayoutInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+			VkDescriptorSetLayout DummyLayout;
+			VkCheck(vkCreateDescriptorSetLayout(GDevice, &LayoutInfo, nullptr, &DummyLayout));
+			return DummyLayout;
+		}();
+		TArray<VkDescriptorSetLayout, TFixedAllocator<GpuResourceLimit::MaxBindableBingGroupNum>> SetLayouts;
+		SetLayouts.Init(DummyLayout, GpuResourceLimit::MaxBindableBingGroupNum);
+		auto AddLayout = [&](GpuBindGroupLayout* InLayout)
+		{
+			if (!InLayout) { return; }
+			VulkanBindGroupLayout* BindGroupLayout = static_cast<VulkanBindGroupLayout*>(InLayout);
+			BindingGroupSlot GroupNumber = BindGroupLayout->GetGroupNumber();
+			SetLayouts[GroupNumber] = BindGroupLayout->GetLayout();
+		};
+		AddLayout(InPipelineStateDesc.BindGroupLayout0);
+		AddLayout(InPipelineStateDesc.BindGroupLayout1);
+		AddLayout(InPipelineStateDesc.BindGroupLayout2);
+		AddLayout(InPipelineStateDesc.BindGroupLayout3);
+
 		VkPipelineLayout PipelineLayout;
 		VkPipelineLayoutCreateInfo PipelineLayoutInfo = {
-			.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+			.setLayoutCount = (uint32_t)SetLayouts.Num(),
+			.pSetLayouts = SetLayouts.GetData(),
 		};
 		VkCheck(vkCreatePipelineLayout(GDevice, &PipelineLayoutInfo, nullptr, &PipelineLayout));
 

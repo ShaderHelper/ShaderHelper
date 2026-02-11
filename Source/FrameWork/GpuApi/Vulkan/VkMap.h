@@ -127,4 +127,56 @@ namespace FW
 			AUX::Unreachable();
 		}
 	}
+
+	inline VkSamplerAddressMode MapSamplerAddressMode(SamplerAddressMode InMode)
+	{
+		switch (InMode)
+		{
+		case SamplerAddressMode::Clamp:      return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		case SamplerAddressMode::Wrap:       return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		case SamplerAddressMode::Mirror:     return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+		default:
+			AUX::Unreachable();
+		}
+	}
+
+	inline VkCompareOp MapCompareOp(CompareMode InMode)
+	{
+		switch (InMode)
+		{
+		case CompareMode::Never:             return VK_COMPARE_OP_NEVER;
+		case CompareMode::Less:              return VK_COMPARE_OP_LESS;
+		case CompareMode::Equal:             return VK_COMPARE_OP_EQUAL;
+		case CompareMode::LessEqual:         return VK_COMPARE_OP_LESS_OR_EQUAL;
+		case CompareMode::Greater:           return VK_COMPARE_OP_GREATER;
+		case CompareMode::NotEqual:          return VK_COMPARE_OP_NOT_EQUAL;
+		case CompareMode::GreaterEqual:      return VK_COMPARE_OP_GREATER_OR_EQUAL;
+		case CompareMode::Always:            return VK_COMPARE_OP_ALWAYS;
+		default:
+			AUX::Unreachable();
+		}
+	}
+
+	inline VkImageLayout MapImageLayout(GpuResourceState InState)
+	{
+		if (InState == GpuResourceState::Unknown)
+			return VK_IMAGE_LAYOUT_UNDEFINED;
+		// Write states are exclusive, map 1:1
+		if (EnumHasAnyFlags(InState, GpuResourceState::RenderTargetWrite))
+			return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		if (EnumHasAnyFlags(InState, GpuResourceState::UnorderedAccess))
+			return VK_IMAGE_LAYOUT_GENERAL;
+		if (EnumHasAnyFlags(InState, GpuResourceState::CopyDst))
+			return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		// Multiple read states combined -> GENERAL (Vulkan image can only be in one layout)
+		GpuResourceState ReadBits = InState & GpuResourceState::ReadMask;
+		if (FMath::CountBits(static_cast<uint32>(ReadBits)) > 1)
+			return VK_IMAGE_LAYOUT_GENERAL;
+		// Single read state
+		if (EnumHasAnyFlags(InState, GpuResourceState::CopySrc))
+			return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+		if (EnumHasAnyFlags(InState, GpuResourceState::ShaderResourceRead))
+			return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		return VK_IMAGE_LAYOUT_GENERAL;
+	}
 }

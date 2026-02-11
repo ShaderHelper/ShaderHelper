@@ -133,7 +133,7 @@ namespace UNITTEST_GPUAPI
 			TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 
 			GpuRenderPassDesc PassDesc;
-			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ RenderTarget, RenderTargetLoadAction::Clear, RenderTargetStoreAction::Store });
+			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ RenderTarget, RenderTargetLoadAction::Load, RenderTargetStoreAction::Store });
 
 			auto CmdRecorder = GGpuRhi->BeginRecording();
 			{

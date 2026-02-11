@@ -4207,6 +4207,11 @@ constexpr int PaddingLineNum = 22;
 										InBox->ClearChildren();
 										for (const auto& Param : Params)
 										{
+											if (Param.Desc.IsEmpty())
+											{
+												continue;
+											}
+
 											auto ParamRow = SNew(SHorizontalBox);
 
 											// Bullet point
@@ -4245,15 +4250,12 @@ constexpr int PaddingLineNum = 22;
 											];
 
 											// Description
-											if (!Param.Desc.IsEmpty())
-											{
-												ParamRow->AddSlot().AutoWidth()
-												[
-													SNew(STextBlock)
-														.Text(FText::FromString(TEXT(" \u2014 ") + Param.Desc))
-														.Font(FCoreStyle::GetDefaultFontStyle("NormalText", SShaderEditorBox::GetFontSize()))
-												];
-											}
+											ParamRow->AddSlot().AutoWidth()
+											[
+												SNew(STextBlock)
+													.Text(FText::FromString(TEXT(" \u2014 ") + Param.Desc))
+													.Font(FCoreStyle::GetDefaultFontStyle("NormalText", SShaderEditorBox::GetFontSize()))
+											];
 
 											InBox->AddSlot().AutoHeight()[ParamRow];
 										}

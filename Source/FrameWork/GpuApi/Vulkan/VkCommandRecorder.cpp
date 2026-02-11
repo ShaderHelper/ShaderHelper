@@ -2,6 +2,7 @@
 #include "VkCommandRecorder.h"
 #include "VkMap.h"
 #include "VkTexture.h"
+#include "VkBuffer.h"
 #include "VkPipeline.h"
 
 namespace FW
@@ -315,29 +316,6 @@ namespace FW
 			}
 		};
 
-		auto GetImageLayout = [](GpuResourceState InState) -> VkImageLayout
-		{
-			if (InState == GpuResourceState::Unknown)
-				return VK_IMAGE_LAYOUT_UNDEFINED;
-			// Write states are exclusive, map 1:1
-			if (EnumHasAnyFlags(InState, GpuResourceState::RenderTargetWrite))
-				return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-			if (EnumHasAnyFlags(InState, GpuResourceState::UnorderedAccess))
-				return VK_IMAGE_LAYOUT_GENERAL;
-			if (EnumHasAnyFlags(InState, GpuResourceState::CopyDst))
-				return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-			// Multiple read states combined -> GENERAL (Vulkan image can only be in one layout)
-			GpuResourceState ReadBits = InState & GpuResourceState::ReadMask;
-			if (FMath::CountBits(static_cast<uint32>(ReadBits)) > 1)
-				return VK_IMAGE_LAYOUT_GENERAL;
-			// Single read state
-			if (EnumHasAnyFlags(InState, GpuResourceState::CopySrc))
-				return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-			if (EnumHasAnyFlags(InState, GpuResourceState::ShaderResourceRead))
-				return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			return VK_IMAGE_LAYOUT_GENERAL;
-		};
-
 		for (const GpuBarrierInfo& Info : BarrierInfos)
 		{
 			check(Info.NewState != GpuResourceState::Unknown);
@@ -352,8 +330,8 @@ namespace FW
 			if (Info.Resource->GetType() == GpuResourceType::Texture)
 			{
 				VulkanTexture* VkTex = static_cast<VulkanTexture*>(Info.Resource);
-				VkImageLayout OldLayout = GetImageLayout(Info.Resource->State);
-				VkImageLayout NewLayout = GetImageLayout(Info.NewState);
+				VkImageLayout OldLayout = MapImageLayout(Info.Resource->State);
+				VkImageLayout NewLayout = MapImageLayout(Info.NewState);
 
 				ImageBarriers.Add({
 					.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -387,14 +365,62 @@ namespace FW
 
 	void VulkanCmdRecorder::CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture)
 	{
+		VulkanBuffer* SrcBuffer = static_cast<VulkanBuffer*>(InBuffer);
+		VulkanTexture* DstTexture = static_cast<VulkanTexture*>(InTexture);
+
+		VkBufferImageCopy Region{
+			.bufferOffset = 0,
+			.bufferRowLength = 0,
+			.bufferImageHeight = 0,
+			.imageSubresource = {
+				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.mipLevel = 0,
+				.baseArrayLayer = 0,
+				.layerCount = 1
+			},
+			.imageOffset = {0, 0, 0},
+			.imageExtent = {InTexture->GetWidth(), InTexture->GetHeight(), 1}
+		};
+
+		vkCmdCopyBufferToImage(CommandBuffer, SrcBuffer->GetBuffer(), DstTexture->GetImage(),
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &Region);
 	}
 
 	void VulkanCmdRecorder::CopyTextureToBuffer(GpuTexture* InTexture, GpuBuffer* InBuffer)
 	{
+		VulkanTexture* SrcTexture = static_cast<VulkanTexture*>(InTexture);
+		VulkanBuffer* DstBuffer = static_cast<VulkanBuffer*>(InBuffer);
+
+		VkBufferImageCopy Region{
+			.bufferOffset = 0,
+			.bufferRowLength = 0,
+			.bufferImageHeight = 0,
+			.imageSubresource = {
+				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.mipLevel = 0,
+				.baseArrayLayer = 0,
+				.layerCount = 1
+			},
+			.imageOffset = {0, 0, 0},
+			.imageExtent = {InTexture->GetWidth(), InTexture->GetHeight(), 1}
+		};
+
+		vkCmdCopyImageToBuffer(CommandBuffer, SrcTexture->GetImage(),
+			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, DstBuffer->GetBuffer(), 1, &Region);
 	}
 
 	void VulkanCmdRecorder::CopyBufferToBuffer(GpuBuffer* SrcBuffer, uint32 SrcOffset, GpuBuffer* DestBuffer, uint32 DestOffset, uint32 Size)
 	{
+		VulkanBuffer* VkSrcBuffer = static_cast<VulkanBuffer*>(SrcBuffer);
+		VulkanBuffer* VkDstBuffer = static_cast<VulkanBuffer*>(DestBuffer);
+
+		VkBufferCopy CopyRegion{
+			.srcOffset = SrcOffset,
+			.dstOffset = DestOffset,
+			.size = Size
+		};
+
+		vkCmdCopyBuffer(CommandBuffer, VkSrcBuffer->GetBuffer(), VkDstBuffer->GetBuffer(), 1, &CopyRegion);
 	}
 
 	void VulkanComputePassRecorder::Dispatch(uint32 ThreadGroupCountX, uint32 ThreadGroupCountY, uint32 ThreadGroupCountZ)

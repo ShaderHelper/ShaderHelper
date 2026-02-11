@@ -68,18 +68,18 @@ namespace FW
 		}
 	}
 
-	TRefCountPtr<Dx12Buffer> CreateDx12ConstantBuffer(const GpuBufferDesc& InBufferDesc, bool IsDeferred)
+	TRefCountPtr<Dx12Buffer> CreateDx12ConstantBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InResourceState, bool IsDeferred)
 	{
 		TRefCountPtr<Dx12Buffer> RetBuffer;
 		if (EnumHasAnyFlags(InBufferDesc.Usage, GpuBufferUsage::Temporary))
 		{
 			BumpAllocationData AllocationData = GTempUniformBufferAllocator[GetCurFrameSourceIndex()]->Alloc(InBufferDesc.ByteSize);
-			RetBuffer = new Dx12Buffer{ InBufferDesc, GpuResourceState::UniformBuffer, AllocationData, IsDeferred };
+			RetBuffer = new Dx12Buffer{ InBufferDesc, InResourceState, AllocationData, IsDeferred };
 		}
 		else
 		{
 			BuddyAllocationData AllocationData = GPersistantUniformBufferAllocator->Alloc(InBufferDesc.ByteSize);
-			RetBuffer = new Dx12Buffer{ InBufferDesc, GpuResourceState::UniformBuffer, AllocationData, IsDeferred };
+			RetBuffer = new Dx12Buffer{ InBufferDesc, InResourceState, AllocationData, IsDeferred };
 		}
 
 		// Upload InitialData if provided
@@ -96,7 +96,7 @@ namespace FW
 	{
 		if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::Uniform))
 		{
-			return CreateDx12ConstantBuffer(InBufferDesc, IsDeferred);
+			return CreateDx12ConstantBuffer(InBufferDesc, InResourceState, IsDeferred);
 		}
 
 		bool bHasInitialData = false;
