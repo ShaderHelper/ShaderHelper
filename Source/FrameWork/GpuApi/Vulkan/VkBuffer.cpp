@@ -20,7 +20,11 @@ namespace FW
 		};
 		VmaAllocationCreateInfo AllocInfo{ .usage = VMA_MEMORY_USAGE_AUTO };
 
-		if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::Upload))
+		if (EnumHasAnyFlags(InBufferDesc.Usage, GpuBufferUsage::RWStructured | GpuBufferUsage::Structured | GpuBufferUsage::Raw | GpuBufferUsage::RWRaw))
+		{
+			BufferInfo.usage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+		}
+		else if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::Upload))
 		{
 			BufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 			AllocInfo.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;

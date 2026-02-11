@@ -8,6 +8,13 @@
 
 namespace FW
 {
+	VulkanComputePipelineState::VulkanComputePipelineState(GpuComputePipelineStateDesc InDesc, VkPipeline InPipeline, VkPipelineLayout InPipelineLayout)
+		: GpuComputePipelineState(InDesc)
+		, Pipeline(InPipeline), PipelineLayout(InPipelineLayout)
+	{
+		GVkDeferredReleaseManager.AddResource(this);
+	}
+
 	VulkanRenderPipelineState::VulkanRenderPipelineState(GpuRenderPipelineStateDesc InDesc, VkPipeline InPipeline, VkPipelineLayout InPipelineLayout, VkRenderPass InRednedrPass)
 		: GpuRenderPipelineState(InDesc)
 		, Pipeline(InPipeline), PipelineLayout(InPipelineLayout), RenderPass(InRednedrPass)
@@ -164,5 +171,55 @@ namespace FW
 		VkPipeline Pipeline;
 		VkCheck(vkCreateGraphicsPipelines(GDevice, VK_NULL_HANDLE, 1, &PipelineInfo, nullptr, &Pipeline));
 		return new VulkanRenderPipelineState(InPipelineStateDesc, Pipeline, PipelineLayout, RenderPass);
+	}
+
+	TRefCountPtr<VulkanComputePipelineState> CreateVulkanComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc)
+	{
+		VulkanShader* Cs = static_cast<VulkanShader*>(InPipelineStateDesc.Cs);
+		auto CsEntryPoint = StringCast<UTF8CHAR>(*Cs->GetEntryPoint());
+
+		VkPipelineShaderStageCreateInfo StageInfo{
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+			.stage = VK_SHADER_STAGE_COMPUTE_BIT,
+			.module = Cs->GetCompilationResult(),
+			.pName = (char*)CsEntryPoint.Get()
+		};
+
+		static VkDescriptorSetLayout DummyLayout = [] {
+			VkDescriptorSetLayoutCreateInfo LayoutInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+			VkDescriptorSetLayout Layout;
+			VkCheck(vkCreateDescriptorSetLayout(GDevice, &LayoutInfo, nullptr, &Layout));
+			return Layout;
+		}();
+		TArray<VkDescriptorSetLayout, TFixedAllocator<GpuResourceLimit::MaxBindableBingGroupNum>> SetLayouts;
+		SetLayouts.Init(DummyLayout, GpuResourceLimit::MaxBindableBingGroupNum);
+		auto AddLayout = [&](GpuBindGroupLayout* InLayout)
+		{
+			if (!InLayout) { return; }
+			VulkanBindGroupLayout* BindGroupLayout = static_cast<VulkanBindGroupLayout*>(InLayout);
+			BindingGroupSlot GroupNumber = BindGroupLayout->GetGroupNumber();
+			SetLayouts[GroupNumber] = BindGroupLayout->GetLayout();
+		};
+		AddLayout(InPipelineStateDesc.BindGroupLayout0);
+		AddLayout(InPipelineStateDesc.BindGroupLayout1);
+		AddLayout(InPipelineStateDesc.BindGroupLayout2);
+		AddLayout(InPipelineStateDesc.BindGroupLayout3);
+
+		VkPipelineLayout PipelineLayout;
+		VkPipelineLayoutCreateInfo PipelineLayoutInfo{
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+			.setLayoutCount = (uint32_t)SetLayouts.Num(),
+			.pSetLayouts = SetLayouts.GetData(),
+		};
+		VkCheck(vkCreatePipelineLayout(GDevice, &PipelineLayoutInfo, nullptr, &PipelineLayout));
+
+		VkComputePipelineCreateInfo PipelineInfo{
+			.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+			.stage = StageInfo,
+			.layout = PipelineLayout,
+		};
+		VkPipeline Pipeline;
+		VkCheck(vkCreateComputePipelines(GDevice, VK_NULL_HANDLE, 1, &PipelineInfo, nullptr, &Pipeline));
+		return new VulkanComputePipelineState(InPipelineStateDesc, Pipeline, PipelineLayout);
 	}
 }

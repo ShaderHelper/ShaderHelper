@@ -30,4 +30,6 @@ namespace FW
 	};
 
 	inline VkDeferredReleaseManager GVkDeferredReleaseManager;
+
+	void SetVkObjectName(VkObjectType InObjectType, uint64 InObjectHandle, const FString& InName);
 }

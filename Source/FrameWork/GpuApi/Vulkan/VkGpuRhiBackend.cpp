@@ -37,7 +37,8 @@ namespace FW
 
 	TRefCountPtr<GpuTexture> VkGpuRhiBackend::CreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
 	{
-		return AUX::StaticCastRefCountPtr<GpuTexture>(CreateVulkanTexture(InTexDesc, InitState));
+		GpuResourceState ValidState = InitState == GpuResourceState::Unknown ? GetTextureState(InTexDesc.Usage) : InitState;
+		return AUX::StaticCastRefCountPtr<GpuTexture>(CreateVulkanTexture(InTexDesc, ValidState));
 	}
 
 	TRefCountPtr<GpuBuffer> VkGpuRhiBackend::CreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState)
@@ -75,7 +76,7 @@ namespace FW
 
 	TRefCountPtr<GpuComputePipelineState> VkGpuRhiBackend::CreateComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc)
 	{
-		return TRefCountPtr<GpuComputePipelineState>();
+		return AUX::StaticCastRefCountPtr<GpuComputePipelineState>(CreateVulkanComputePipelineState(InPipelineStateDesc));
 	}
 
 	TRefCountPtr<GpuSampler> VkGpuRhiBackend::CreateSampler(const GpuSamplerDesc& InSamplerDesc)
@@ -85,7 +86,29 @@ namespace FW
 
 	void VkGpuRhiBackend::SetResourceName(const FString& Name, GpuResource* InResource)
 	{
-
+		switch (InResource->GetType())
+		{
+		case GpuResourceType::Texture:
+			SetVkObjectName(VK_OBJECT_TYPE_IMAGE, (uint64)static_cast<VulkanTexture*>(InResource)->GetImage(), Name);
+			break;
+		case GpuResourceType::Buffer:
+			SetVkObjectName(VK_OBJECT_TYPE_BUFFER, (uint64)static_cast<VulkanBuffer*>(InResource)->GetBuffer(), Name);
+			break;
+		case GpuResourceType::Sampler:
+			SetVkObjectName(VK_OBJECT_TYPE_SAMPLER, (uint64)static_cast<VulkanSampler*>(InResource)->GetSampler(), Name);
+			break;
+		case GpuResourceType::RenderPipelineState:
+			SetVkObjectName(VK_OBJECT_TYPE_PIPELINE, (uint64)static_cast<VulkanRenderPipelineState*>(InResource)->GetPipeline(), Name);
+			break;
+		case GpuResourceType::ComputePipelineState:
+			SetVkObjectName(VK_OBJECT_TYPE_PIPELINE, (uint64)static_cast<VulkanComputePipelineState*>(InResource)->GetPipeline(), Name);
+			break;
+		case GpuResourceType::Shader:
+			SetVkObjectName(VK_OBJECT_TYPE_SHADER_MODULE, (uint64)static_cast<VulkanShader*>(InResource)->GetCompilationResult(), Name);
+			break;
+		default:
+			break;
+		}
 	}
 
 	bool VkGpuRhiBackend::CompileShader(GpuShader* InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs)
@@ -114,6 +137,7 @@ namespace FW
 			.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
 		};
 		VkCheck(vkBeginCommandBuffer(VkCmdRecorder->GetCommandBuffer(), &BeginInfo));
+		SetVkObjectName(VK_OBJECT_TYPE_COMMAND_BUFFER, (uint64)VkCmdRecorder->GetCommandBuffer(), RecorderName);
 		return VkCmdRecorder;
 	}
 

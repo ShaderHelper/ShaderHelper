@@ -22,7 +22,7 @@ namespace UNITTEST_GPUAPI
 		
 		AppEditor = MakeUnique<UnitTestEditor>(AppClientSize);
 		//Add test otherwise the run loop will immediately exit.
-		//AddTestCast();
+		AddTestCast();
 		AddTestTriangle();
 	}
 
@@ -51,6 +51,7 @@ namespace UNITTEST_GPUAPI
 
 			GpuTextureDesc Desc{ 1, 1, GpuTextureFormat::R16_FLOAT, GpuTextureUsage::ShaderResource , RawData };
 			TRefCountPtr<GpuTexture> TestTex = GGpuRhi->CreateTexture(Desc);
+			GGpuRhi->SetResourceName("TestCast_Tex", TestTex);
 
 			TRefCountPtr<GpuShader> Vs = GGpuRhi->CreateShaderFromFile({
 				.FileName = PathHelper::ShaderDir() / "Test/TestCast.hlsl",

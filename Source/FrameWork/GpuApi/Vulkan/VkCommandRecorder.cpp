@@ -4,6 +4,8 @@
 #include "VkTexture.h"
 #include "VkBuffer.h"
 #include "VkPipeline.h"
+#include "VkDescriptorSet.h"
+#include "VkUtil.h"
 
 namespace FW
 {
@@ -83,17 +85,14 @@ namespace FW
 		// Default viewport from render target if user hasn't set one
 		if (!CurrentViewPort.IsSet())
 		{
-			if (RenderTargets.Num() > 0)
-			{
-				VkViewport DefaultViewPort{};
-				DefaultViewPort.x = 0.0f;
-				DefaultViewPort.y = 0.0f;
-				DefaultViewPort.width = (float)RenderTargets[0]->GetWidth();
-				DefaultViewPort.height = (float)RenderTargets[0]->GetHeight();
-				DefaultViewPort.minDepth = 0.0f;
-				DefaultViewPort.maxDepth = 1.0f;
-				SetViewPort(MoveTemp(DefaultViewPort));
-			}
+			VkViewport DefaultViewPort{};
+			DefaultViewPort.x = 0.0f;
+			DefaultViewPort.y = 0.0f;
+			DefaultViewPort.width = RenderTargets.Num() > 0 ? (float)RenderTargets[0]->GetWidth() : 1;
+			DefaultViewPort.height = RenderTargets.Num() > 0 ? (float)RenderTargets[0]->GetHeight() : 1;
+			DefaultViewPort.minDepth = 0.0f;
+			DefaultViewPort.maxDepth = 1.0f;
+			SetViewPort(MoveTemp(DefaultViewPort));
 		}
 		// Default scissor rect from viewport if user hasn't set one
 		if (!CurrentScissorRect.IsSet() && CurrentViewPort)
@@ -124,7 +123,21 @@ namespace FW
 		}
 
 		// TODO: Apply vertex buffer binding
-		// TODO: Apply bind groups (descriptor sets)
+
+		auto ApplyBindGroup = [&, this](bool& IsDirty, GpuBindGroup* InBindGroup)
+		{
+			if (!IsDirty || !InBindGroup) return;
+			VulkanBindGroup* VkBindGroup = static_cast<VulkanBindGroup*>(InBindGroup);
+			VkDescriptorSet Set = VkBindGroup->GetDescriptorSet();
+			uint32 SetIndex = InBindGroup->GetLayout()->GetGroupNumber();
+			vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+				CurrentRenderPipelineState->GetPipelineLayout(), SetIndex, 1, &Set, 0, nullptr);
+			IsDirty = false;
+		};
+		ApplyBindGroup(IsBindGroup0Dirty, CurrentBindGroup0);
+		ApplyBindGroup(IsBindGroup1Dirty, CurrentBindGroup1);
+		ApplyBindGroup(IsBindGroup2Dirty, CurrentBindGroup2);
+		ApplyBindGroup(IsBindGroup3Dirty, CurrentBindGroup3);
 	}
 
 	VkComputeStateCache::VkComputeStateCache()
@@ -166,7 +179,27 @@ namespace FW
 
 	void VkComputeStateCache::ApplyComputeState(VkCommandBuffer InCmdBuffer)
 	{
-		// TODO: Apply compute pipeline and descriptor sets
+		if (IsComputePipelineDirty)
+		{
+			check(CurrentComputePipelineState);
+			vkCmdBindPipeline(InCmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, CurrentComputePipelineState->GetPipeline());
+			IsComputePipelineDirty = false;
+		}
+
+		auto ApplyBindGroup = [&](bool& IsDirty, GpuBindGroup* InBindGroup)
+		{
+			if (!IsDirty || !InBindGroup) return;
+			VulkanBindGroup* VkBindGroup = static_cast<VulkanBindGroup*>(InBindGroup);
+			VkDescriptorSet Set = VkBindGroup->GetDescriptorSet();
+			uint32 SetIndex = InBindGroup->GetLayout()->GetGroupNumber();
+			vkCmdBindDescriptorSets(InCmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+				CurrentComputePipelineState->GetPipelineLayout(), SetIndex, 1, &Set, 0, nullptr);
+			IsDirty = false;
+		};
+		ApplyBindGroup(IsBindGroup0Dirty, CurrentBindGroup0);
+		ApplyBindGroup(IsBindGroup1Dirty, CurrentBindGroup1);
+		ApplyBindGroup(IsBindGroup2Dirty, CurrentBindGroup2);
+		ApplyBindGroup(IsBindGroup3Dirty, CurrentBindGroup3);
 	}
 	GpuComputePassRecorder* VulkanCmdRecorder::BeginComputePass(const FString& PassName)
 	{
@@ -223,6 +256,7 @@ namespace FW
 		};
 		VkRenderPass RenderPass;
 		VkCheck(vkCreateRenderPass(GDevice, &RenderPassInfo, nullptr, &RenderPass));
+		SetVkObjectName(VK_OBJECT_TYPE_RENDER_PASS, (uint64)RenderPass, PassName);
 
 		VkFramebufferCreateInfo FrameBufferInfo{
 			.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
@@ -265,10 +299,18 @@ namespace FW
 
 	void VulkanCmdRecorder::BeginCaptureEvent(const FString& EventName)
 	{
+		FTCHARToUTF8 Utf8Name(*EventName);
+		VkDebugUtilsLabelEXT Label{
+			.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
+			.pLabelName = Utf8Name.Get(),
+			.color = {1.0f, 1.0f, 1.0f, 1.0f}
+		};
+		vkCmdBeginDebugUtilsLabelEXT(CommandBuffer, &Label);
 	}
 
 	void VulkanCmdRecorder::EndCaptureEvent()
 	{
+		vkCmdEndDebugUtilsLabelEXT(CommandBuffer);
 	}
 
 	void VulkanCmdRecorder::Barriers(const TArray<GpuBarrierInfo>& BarrierInfos)
@@ -425,11 +467,13 @@ namespace FW
 
 	void VulkanComputePassRecorder::Dispatch(uint32 ThreadGroupCountX, uint32 ThreadGroupCountY, uint32 ThreadGroupCountZ)
 	{
+		StateCache.ApplyComputeState(Owner->GetCommandBuffer());
+		vkCmdDispatch(Owner->GetCommandBuffer(), ThreadGroupCountX, ThreadGroupCountY, ThreadGroupCountZ);
 	}
 
 	void VulkanComputePassRecorder::SetComputePipelineState(GpuComputePipelineState* InPipelineState)
 	{
-		// TODO: StateCache.SetPipeline(static_cast<VulkanComputePipelineState*>(InPipelineState));
+		StateCache.SetPipeline(static_cast<VulkanComputePipelineState*>(InPipelineState));
 	}
 
 	void VulkanComputePassRecorder::SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)

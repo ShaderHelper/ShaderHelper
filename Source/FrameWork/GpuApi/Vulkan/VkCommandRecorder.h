@@ -21,15 +21,15 @@ namespace FW
 		void SetBindGroups(GpuBindGroup* InGroup0, GpuBindGroup* InGroup1, GpuBindGroup* InGroup2, GpuBindGroup* InGroup3);
 
 	public:
-		bool IsRenderPipelineDirty : 1;
-		bool IsViewportDirty : 1;
-		bool IsScissorRectDirty : 1;
-		bool IsVertexBufferDirty : 1;
+		bool IsRenderPipelineDirty;
+		bool IsViewportDirty;
+		bool IsScissorRectDirty;
+		bool IsVertexBufferDirty;
 
-		bool IsBindGroup0Dirty : 1;
-		bool IsBindGroup1Dirty : 1;
-		bool IsBindGroup2Dirty : 1;
-		bool IsBindGroup3Dirty : 1;
+		bool IsBindGroup0Dirty;
+		bool IsBindGroup1Dirty;
+		bool IsBindGroup2Dirty;
+		bool IsBindGroup3Dirty;
 
 	private:
 		VulkanCmdRecorder* Owner;
@@ -56,11 +56,11 @@ namespace FW
 		void SetBindGroups(GpuBindGroup* InGroup0, GpuBindGroup* InGroup1, GpuBindGroup* InGroup2, GpuBindGroup* InGroup3);
 
 	public:
-		bool IsComputePipelineDirty : 1;
-		bool IsBindGroup0Dirty : 1;
-		bool IsBindGroup1Dirty : 1;
-		bool IsBindGroup2Dirty : 1;
-		bool IsBindGroup3Dirty : 1;
+		bool IsComputePipelineDirty;
+		bool IsBindGroup0Dirty;
+		bool IsBindGroup1Dirty;
+		bool IsBindGroup2Dirty;
+		bool IsBindGroup3Dirty;
 
 	private:
 		VulkanComputePipelineState* CurrentComputePipelineState = nullptr;

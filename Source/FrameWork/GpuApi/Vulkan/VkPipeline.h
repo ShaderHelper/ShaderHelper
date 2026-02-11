@@ -4,6 +4,23 @@
 
 namespace FW
 {
+	class VulkanComputePipelineState : public GpuComputePipelineState
+	{
+	public:
+		VulkanComputePipelineState(GpuComputePipelineStateDesc InDesc, VkPipeline InPipeline, VkPipelineLayout InPipelineLayout);
+		~VulkanComputePipelineState() {
+			vkDestroyPipeline(GDevice, Pipeline, nullptr);
+			vkDestroyPipelineLayout(GDevice, PipelineLayout, nullptr);
+		}
+	public:
+		VkPipeline GetPipeline() const { return Pipeline; }
+		VkPipelineLayout GetPipelineLayout() const { return PipelineLayout; }
+
+	private:
+		VkPipeline Pipeline;
+		VkPipelineLayout PipelineLayout;
+	};
+
 	class VulkanRenderPipelineState : public GpuRenderPipelineState
 	{
 	public:
@@ -16,6 +33,7 @@ namespace FW
 
 	public:
 		VkPipeline GetPipeline() const { return Pipeline; }
+		VkPipelineLayout GetPipelineLayout() const { return PipelineLayout; }
 
 	private:
 		VkPipeline Pipeline;
@@ -24,4 +42,5 @@ namespace FW
 	};
 
 	TRefCountPtr<VulkanRenderPipelineState> CreateVulkanRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc);
+	TRefCountPtr<VulkanComputePipelineState> CreateVulkanComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc);
 }

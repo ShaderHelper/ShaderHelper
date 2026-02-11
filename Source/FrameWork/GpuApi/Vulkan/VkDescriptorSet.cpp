@@ -3,6 +3,7 @@
 #include "VkBuffer.h"
 #include "VkTexture.h"
 #include "VkMap.h"
+#include "VkUtil.h"
 
 namespace FW
 {
@@ -17,7 +18,7 @@ namespace FW
 		: GpuBindGroup(InDesc)
 		, DescriptorSet(InDescriptorSet)
 	{
-
+		GVkDeferredReleaseManager.AddResource(this);
 	}
 	
 	VkDescriptorType MapBindingType(BindingType InType)
