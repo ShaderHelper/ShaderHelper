@@ -6,6 +6,7 @@
 #include "RenderResource/Shader/DebuggerGridShader.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
+#include "Renderer/RenderGraph.h"
 
 #include <Widgets/SViewport.h>
 #include <Framework/Notifications/NotificationManager.h>
@@ -211,18 +212,15 @@ namespace SH
 		
 		TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 		
-		auto CmdRecorder = GGpuRhi->BeginRecording();
-		{
-			auto PassRecorder = CmdRecorder->BeginRenderPass(MoveTemp(PassDesc), "DebuggerGrid");
-			{
+		RenderGraph RG;
+		RG.AddRenderPass(TEXT("DebuggerGrid"), MoveTemp(PassDesc), MoveTemp(Bindings),
+			[Pipeline](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
 				Bindings.ApplyBindGroup(PassRecorder);
 				PassRecorder->SetRenderPipelineState(Pipeline);
 				PassRecorder->DrawPrimitive(0, 3, 0, 1);
 			}
-			CmdRecorder->EndRenderPass(PassRecorder);
-		}
-		GGpuRhi->EndRecording(CmdRecorder);
-		GGpuRhi->Submit({ CmdRecorder });
+		);
+		RG.Execute();
 	}
 
 	int32 SDebuggerViewport::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const

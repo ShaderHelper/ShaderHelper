@@ -20,6 +20,7 @@ namespace FW
 	bool ValidateCreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc);
     bool ValidateCreateBindGroupLayout(const GpuBindGroupLayoutDesc& InBindGroupLayoutDesc);
 	bool ValidateCreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc);
+	bool ValidateBeginRenderPass(const GpuRenderPassDesc& InPassDesc);
 	bool ValidateCreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState);
 	bool ValidateBarriers(const TArray<GpuBarrierInfo>& BarrierInfos);
 	bool ValidateGpuResourceState(GpuResourceState InState);

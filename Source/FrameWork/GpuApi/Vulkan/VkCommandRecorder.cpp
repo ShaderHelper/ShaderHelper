@@ -88,8 +88,8 @@ namespace FW
 			VkViewport DefaultViewPort{};
 			DefaultViewPort.x = 0.0f;
 			DefaultViewPort.y = 0.0f;
-			DefaultViewPort.width = RenderTargets.Num() > 0 ? (float)RenderTargets[0]->GetWidth() : 1;
-			DefaultViewPort.height = RenderTargets.Num() > 0 ? (float)RenderTargets[0]->GetHeight() : 1;
+			DefaultViewPort.width = (float)RenderTargets[0]->GetWidth();
+			DefaultViewPort.height = (float)RenderTargets[0]->GetHeight();
 			DefaultViewPort.minDepth = 0.0f;
 			DefaultViewPort.maxDepth = 1.0f;
 			SetViewPort(MoveTemp(DefaultViewPort));
@@ -217,10 +217,6 @@ namespace FW
 		TArray<VkImageView> Attachments;
 		TArray<VkAttachmentDescription> AttachmentDescs;
 		TArray<VkAttachmentReference> AttachmentRefs;
-		if (PassDesc.ColorRenderTargets.Num() == 0)
-		{
-			AttachmentRefs.Emplace(VK_ATTACHMENT_UNUSED);
-		}
 
 		for (int32 Index = 0; Index < PassDesc.ColorRenderTargets.Num(); Index ++)
 		{
@@ -263,8 +259,8 @@ namespace FW
 			.renderPass = RenderPass,
 			.attachmentCount = (uint32_t)PassDesc.ColorRenderTargets.Num(),
 			.pAttachments = Attachments.GetData(),
-			.width = PassDesc.ColorRenderTargets.Num() > 0 ? PassDesc.ColorRenderTargets[0].Texture->GetWidth() : 1,
-			.height = PassDesc.ColorRenderTargets.Num() > 0 ? PassDesc.ColorRenderTargets[0].Texture->GetHeight() : 1,
+			.width = PassDesc.ColorRenderTargets[0].Texture->GetWidth(),
+			.height = PassDesc.ColorRenderTargets[0].Texture->GetHeight(),
 			.layers = 1
 		};
 		VkFramebuffer FrameBuffer;

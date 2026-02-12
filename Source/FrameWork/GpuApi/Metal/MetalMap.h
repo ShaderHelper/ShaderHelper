@@ -5,7 +5,6 @@
 
 namespace FW
 {
-
     inline MTLColorWriteMask MapWriteMask(BlendMask InMask)
     {
         MTLColorWriteMask Mask = 0;
@@ -85,13 +84,6 @@ namespace FW
             RawPassDesc.colorAttachments[i].clearColor = MTLClearColorMake(RtInfo.ClearColor.x, RtInfo.ClearColor.y, RtInfo.ClearColor.z, RtInfo.ClearColor.w);
         }
         
-        if(PassRtNum <= 0)
-        {
-            //targetless rasterization
-            RawPassDesc.renderTargetWidth = 1;
-            RawPassDesc.renderTargetHeight = 1;
-            RawPassDesc.defaultRasterSampleCount = 1;
-        }
         return [RawPassDesc autorelease];
     }
     

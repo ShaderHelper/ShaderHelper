@@ -73,17 +73,21 @@ namespace UNITTEST_GPUAPI
 				.SetExistingBinding(0, TestTex)
 				.Build();
 
+			TRefCountPtr<GpuTexture> DummyRT = GGpuRhi->CreateTexture({ 1, 1, GpuTextureFormat::R8G8B8A8_UNORM, GpuTextureUsage::RenderTarget });
+
 			GpuRenderPipelineStateDesc PipelineDesc{
 				.CheckLayout = true,
 				.Vs = Vs,
+				.Targets = { {.TargetFormat = DummyRT->GetFormat()}},
 				.BindGroupLayout0 = BindGroupLayout
 			};
-
 			TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
+			GpuRenderPassDesc PassDesc;
+			PassDesc.ColorRenderTargets.Add({ DummyRT });
 
 			auto CmdRecorder = GGpuRhi->BeginRecording();
 			{
-				auto PassRecorder = CmdRecorder->BeginRenderPass({}, TEXT("TestCast"));
+				auto PassRecorder = CmdRecorder->BeginRenderPass(PassDesc, TEXT("TestCast"));
 				{
 					PassRecorder->SetRenderPipelineState(Pipeline);
 					PassRecorder->SetBindGroups(BindGroup, nullptr, nullptr, nullptr);

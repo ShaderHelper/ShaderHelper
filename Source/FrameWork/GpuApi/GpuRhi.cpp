@@ -112,6 +112,7 @@ public:
 	GpuRenderPassRecorder* BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName) override
 	{
 		check(State == CmdRecorderState::Begin);
+		check(ValidateBeginRenderPass(PassDesc));
 		auto PassRecorderValidation = MakeUnique<GpuRenderPassRecorderValidation>(CmdRecorder->BeginRenderPass(PassDesc, PassName));
 		RequestedRenderPassRecorders.Add(MoveTemp(PassRecorderValidation));
 		return RequestedRenderPassRecorders.Last().Get();

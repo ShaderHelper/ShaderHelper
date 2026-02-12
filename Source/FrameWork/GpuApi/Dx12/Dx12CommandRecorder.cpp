@@ -70,17 +70,14 @@ namespace FW
 
 		if (!CurrentViewPort.IsSet())
 		{
-			if (CurrentRenderTargets.Num() > 0)
-			{
-				D3D12_VIEWPORT DefaultViewPort{};
-				DefaultViewPort.Width = (float)CurrentRenderTargets[0]->GetWidth();
-				DefaultViewPort.Height = (float)CurrentRenderTargets[0]->GetHeight();
-				DefaultViewPort.MinDepth = 0;
-				DefaultViewPort.MaxDepth = 1;
-				DefaultViewPort.TopLeftX = 0;
-				DefaultViewPort.TopLeftY = 0;
-				SetViewPort(MoveTemp(DefaultViewPort));
-			}
+			D3D12_VIEWPORT DefaultViewPort{};
+			DefaultViewPort.Width = (float)CurrentRenderTargets[0]->GetWidth();
+			DefaultViewPort.Height = (float)CurrentRenderTargets[0]->GetHeight();
+			DefaultViewPort.MinDepth = 0;
+			DefaultViewPort.MaxDepth = 1;
+			DefaultViewPort.TopLeftX = 0;
+			DefaultViewPort.TopLeftY = 0;
+			SetViewPort(MoveTemp(DefaultViewPort));
 		}
 		if (!CurrentScissorRect.IsSet() && CurrentViewPort)
 		{
