@@ -26,7 +26,7 @@ namespace FW
 	static VmaPool ExternalPool = VK_NULL_HANDLE;
 	VkImageUsageFlags DetermineTextureUsage(const GpuTextureDesc& InTexDesc)
 	{
-		VkImageUsageFlags Usage = 0;
+		VkImageUsageFlags Usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 		if (EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::RenderTarget))
 		{
 			Usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -40,7 +40,6 @@ namespace FW
 			Usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 		}
 				
-		check(Usage != 0);
 		return Usage;
 	}
 

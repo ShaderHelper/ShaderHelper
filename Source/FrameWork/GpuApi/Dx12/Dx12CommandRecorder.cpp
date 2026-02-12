@@ -537,6 +537,11 @@ namespace FW
 
 	void Dx12CmdRecorder::Barriers(const TArray<GpuBarrierInfo>& BarrierInfos)
 	{
+		if (BarrierInfos.IsEmpty())
+		{
+			return;
+		}
+
 		TArray<CD3DX12_RESOURCE_BARRIER> DxBarriers;
 		for (const GpuBarrierInfo& BarrierInfo : BarrierInfos)
 		{

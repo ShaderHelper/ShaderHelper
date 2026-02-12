@@ -315,7 +315,13 @@ namespace FW
 
 	void VulkanCmdRecorder::Barriers(const TArray<GpuBarrierInfo>& BarrierInfos)
 	{
+		if (BarrierInfos.IsEmpty())
+		{
+			return;
+		}
+
 		TArray<VkImageMemoryBarrier> ImageBarriers;
+		TArray<VkBufferMemoryBarrier> BufferBarriers;
 		VkPipelineStageFlags SrcStageMask = 0;
 		VkPipelineStageFlags DstStageMask = 0;
 
@@ -387,6 +393,20 @@ namespace FW
 					.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_REMAINING_MIP_LEVELS, 0, VK_REMAINING_ARRAY_LAYERS },
 				});
 			}
+			else if (Info.Resource->GetType() == GpuResourceType::Buffer)
+			{
+				VulkanBuffer* VkBuffer = static_cast<VulkanBuffer*>(Info.Resource);
+				BufferBarriers.Add({
+					.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+					.srcAccessMask = SrcAccess,
+					.dstAccessMask = DstAccess,
+					.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+					.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+					.buffer = VkBuffer->GetBuffer(),
+					.offset = 0,
+					.size = VK_WHOLE_SIZE
+				});
+			}
 			else
 			{
 				AUX::Unreachable();
@@ -401,7 +421,7 @@ namespace FW
 
 		vkCmdPipelineBarrier(CommandBuffer, SrcStageMask, DstStageMask, 0,
 			0, nullptr,
-			0, nullptr,
+			BufferBarriers.Num(), BufferBarriers.GetData(),
 			ImageBarriers.Num(), ImageBarriers.GetData());
 	}
 

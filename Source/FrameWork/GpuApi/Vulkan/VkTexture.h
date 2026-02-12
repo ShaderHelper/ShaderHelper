@@ -47,6 +47,10 @@ namespace FW
 			return SharedTextureHandle;
 		}
 
+		TRefCountPtr<GpuBuffer> UploadBuffer;
+		TRefCountPtr<GpuBuffer> ReadBackBuffer;
+		bool bIsMappingForWriting = false;
+
 	private:
 		VkImage Image;
 		VkImageView ImageView;

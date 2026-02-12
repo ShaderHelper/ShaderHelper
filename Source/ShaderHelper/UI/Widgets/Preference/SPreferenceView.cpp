@@ -762,22 +762,42 @@ namespace SH
 
 		AppendItem(EnvGrid, LOCALIZATION("GraphicsApi"))
 		[
-			SNew(SComboBox<TSharedPtr<GpuRhiBackendType>>)
-			.OptionsSource(&Backends)
-			.OnSelectionChanged_Lambda([this](TSharedPtr<GpuRhiBackendType> InItem, ESelectInfo::Type) {
-				FString BackendName = ANSI_TO_TCHAR(magic_enum::enum_name(*InItem).data());
-				Editor::GetEditorConfig()->SetString(TEXT("Environment"), TEXT("GraphicsApi"), *BackendName);
-				Editor::SaveEditorConfig();
-			})
-			.OnGenerateWidget_Lambda([this](TSharedPtr<GpuRhiBackendType> InItem) {
-				FString BackendName = ANSI_TO_TCHAR(magic_enum::enum_name(*InItem).data());
-				return SNew(STextBlock).Text(FText::FromString(BackendName));
-			})
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
 			[
-				SNew(STextBlock).Text_Lambda([this] {
-					FString BackendName;
-					Editor::GetEditorConfig()->GetString(TEXT("Environment"), TEXT("GraphicsApi"), BackendName);
-					return FText::FromString(BackendName);
+				SNew(SComboBox<TSharedPtr<GpuRhiBackendType>>)
+				.OptionsSource(&Backends)
+				.OnSelectionChanged_Lambda([this](TSharedPtr<GpuRhiBackendType> InItem, ESelectInfo::Type) {
+					FString BackendName = ANSI_TO_TCHAR(magic_enum::enum_name(*InItem).data());
+					Editor::GetEditorConfig()->SetString(TEXT("Environment"), TEXT("GraphicsApi"), *BackendName);
+					Editor::SaveEditorConfig();
+				})
+				.OnGenerateWidget_Lambda([this](TSharedPtr<GpuRhiBackendType> InItem) {
+					FString BackendName = ANSI_TO_TCHAR(magic_enum::enum_name(*InItem).data());
+					return SNew(STextBlock).Text(FText::FromString(BackendName));
+				})
+				[
+					SNew(STextBlock).Text_Lambda([this] {
+						FString BackendName;
+						Editor::GetEditorConfig()->GetString(TEXT("Environment"), TEXT("GraphicsApi"), BackendName);
+						return FText::FromString(BackendName);
+					})
+				]
+			]
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			.VAlign(VAlign_Center)
+			.Padding(5.f, 0, 0, 0)
+			[
+				SNew(STextBlock)
+				.Text(LOCALIZATION("RestartRequiredTip"))
+				.ColorAndOpacity(FLinearColor(1.0f, 0.0f, 0.0f))
+				.Visibility_Lambda([] {
+					FString ConfigBackend;
+					Editor::GetEditorConfig()->GetString(TEXT("Environment"), TEXT("GraphicsApi"), ConfigBackend);
+					FString RunningBackend = ANSI_TO_TCHAR(magic_enum::enum_name(GetGpuRhiBackendType()).data());
+					return ConfigBackend != RunningBackend ? EVisibility::Visible : EVisibility::Collapsed;
 				})
 			]
 		];

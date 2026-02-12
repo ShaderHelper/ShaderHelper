@@ -22,7 +22,7 @@ namespace FW
 
 		if (EnumHasAnyFlags(InBufferDesc.Usage, GpuBufferUsage::RWStructured | GpuBufferUsage::Structured | GpuBufferUsage::Raw | GpuBufferUsage::RWRaw))
 		{
-			BufferInfo.usage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+			BufferInfo.usage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 		}
 		else if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::Upload))
 		{

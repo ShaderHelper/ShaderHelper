@@ -20,7 +20,7 @@ namespace FW
 		virtual bool IsCompiled() const override { return ShaderModule != VK_NULL_HANDLE; }
 
 	private:
-		VkShaderModule ShaderModule;
+		VkShaderModule ShaderModule = VK_NULL_HANDLE;
 	};
 
 	bool CompileVulkanShader(TRefCountPtr<VulkanShader> InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs);

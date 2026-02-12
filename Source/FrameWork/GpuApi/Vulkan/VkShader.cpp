@@ -2,6 +2,7 @@
 #include "VkShader.h"
 #include "ShaderConductor.hpp"
 #include "GpuApi/GLSL.h"
+#include "VkUtil.h"
 
 namespace FW
 {
@@ -195,6 +196,7 @@ namespace FW
 		};
 		VkShaderModule ShaderModule;
 		VkCheck(vkCreateShaderModule(GDevice, &ModuleCreateInfo, nullptr, &ShaderModule));
+		SetVkObjectName(VK_OBJECT_TYPE_SHADER_MODULE, (uint64)ShaderModule, ShaderName);
 		InShader->SetCompilationResult(ShaderModule);
 		InShader->SpvCode = MoveTemp(SpvCode);
 		return true;

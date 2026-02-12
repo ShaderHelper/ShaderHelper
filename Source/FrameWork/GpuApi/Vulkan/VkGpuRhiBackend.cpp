@@ -164,25 +164,125 @@ namespace FW
 
 	void* VkGpuRhiBackend::MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapMode InMapMode, uint32& OutRowPitch)
 	{
-		return nullptr;
+		VulkanTexture* Texture = static_cast<VulkanTexture*>(InGpuTexture);
+		void* Data = nullptr;
+		const uint32 BytesPerTexel = GetTextureFormatByteSize(InGpuTexture->GetFormat());
+		const uint32 BufferSize = InGpuTexture->GetWidth() * InGpuTexture->GetHeight() * BytesPerTexel;
+		OutRowPitch = InGpuTexture->GetWidth() * BytesPerTexel;
+
+		if (InMapMode == GpuResourceMapMode::Write_Only)
+		{
+			if (!Texture->UploadBuffer)
+			{
+				Texture->UploadBuffer = AUX::StaticCastRefCountPtr<GpuBuffer>(CreateVulkanBuffer({ BufferSize, GpuBufferUsage::Upload }, GpuResourceState::CopySrc));
+			}
+			VulkanBuffer* VkBuffer = static_cast<VulkanBuffer*>(Texture->UploadBuffer.GetReference());
+			VkCheck(vmaMapMemory(GAllocator, VkBuffer->GetAllocation(), &Data));
+			Texture->bIsMappingForWriting = true;
+		}
+		else if (InMapMode == GpuResourceMapMode::Read_Only)
+		{
+			if (!Texture->ReadBackBuffer)
+			{
+				Texture->ReadBackBuffer = AUX::StaticCastRefCountPtr<GpuBuffer>(CreateVulkanBuffer({ BufferSize, GpuBufferUsage::ReadBack }, GpuResourceState::CopyDst));
+			}
+			auto CmdRecorder = GVkGpuRhi->BeginRecording();
+			{
+				GpuResourceState LastState = InGpuTexture->State;
+				CmdRecorder->Barriers({
+					{ InGpuTexture, GpuResourceState::CopySrc }
+				});
+				CmdRecorder->CopyTextureToBuffer(InGpuTexture, Texture->ReadBackBuffer);
+				CmdRecorder->Barriers({
+					{ InGpuTexture, LastState }
+				});
+			}
+			GVkGpuRhi->EndRecording(CmdRecorder);
+			GVkGpuRhi->Submit({ CmdRecorder });
+			GVkGpuRhi->WaitGpu();
+
+			VulkanBuffer* VkBuffer = static_cast<VulkanBuffer*>(Texture->ReadBackBuffer.GetReference());
+			VkCheck(vmaMapMemory(GAllocator, VkBuffer->GetAllocation(), &Data));
+		}
+
+		return Data;
 	}
 
 	void VkGpuRhiBackend::UnMapGpuTexture(GpuTexture* InGpuTexture)
 	{
+		VulkanTexture* Texture = static_cast<VulkanTexture*>(InGpuTexture);
+		if (Texture->bIsMappingForWriting)
+		{
+			VulkanBuffer* VkUploadBuffer = static_cast<VulkanBuffer*>(Texture->UploadBuffer.GetReference());
+			vmaUnmapMemory(GAllocator, VkUploadBuffer->GetAllocation());
 
+			auto CmdRecorder = GVkGpuRhi->BeginRecording();
+			{
+				GpuResourceState LastState = InGpuTexture->State;
+				CmdRecorder->Barriers({
+					{ InGpuTexture, GpuResourceState::CopyDst }
+				});
+				CmdRecorder->CopyBufferToTexture(Texture->UploadBuffer, InGpuTexture);
+				CmdRecorder->Barriers({
+					{ InGpuTexture, LastState }
+				});
+			}
+			GVkGpuRhi->EndRecording(CmdRecorder);
+			GVkGpuRhi->Submit({ CmdRecorder });
+
+			Texture->bIsMappingForWriting = false;
+		}
+		else
+		{
+			VulkanBuffer* VkReadBackBuffer = static_cast<VulkanBuffer*>(Texture->ReadBackBuffer.GetReference());
+			vmaUnmapMemory(GAllocator, VkReadBackBuffer->GetAllocation());
+		}
 	}
 
 	void* VkGpuRhiBackend::MapGpuBuffer(GpuBuffer* InGpuBuffer, GpuResourceMapMode InMapMode)
 	{
+		GpuBufferUsage Usage = InGpuBuffer->GetUsage();
 		VulkanBuffer* VkBuffer = static_cast<VulkanBuffer*>(InGpuBuffer);
-		void* MappedData = nullptr;
-		VkCheck(vmaMapMemory(GAllocator, VkBuffer->GetAllocation(), &MappedData));
-		return MappedData;
+		void* Data = nullptr;
+
+		if (EnumHasAnyFlags(Usage, GpuBufferUsage::DynamicMask))
+		{
+			VkCheck(vmaMapMemory(GAllocator, VkBuffer->GetAllocation(), &Data));
+		}
+		else
+		{
+			if (InMapMode == GpuResourceMapMode::Read_Only)
+			{
+				TRefCountPtr<VulkanBuffer> ReadBackBuffer = CreateVulkanBuffer({ InGpuBuffer->GetByteSize(), GpuBufferUsage::ReadBack }, GpuResourceState::CopyDst);
+				auto CmdRecorder = GVkGpuRhi->BeginRecording();
+				{
+					GpuResourceState LastState = InGpuBuffer->State;
+					CmdRecorder->Barriers({
+						{ InGpuBuffer, GpuResourceState::CopySrc },
+					});
+					CmdRecorder->CopyBufferToBuffer(InGpuBuffer, 0, ReadBackBuffer, 0, InGpuBuffer->GetByteSize());
+					CmdRecorder->Barriers({
+						{ InGpuBuffer, LastState }
+					});
+				}
+				GVkGpuRhi->EndRecording(CmdRecorder);
+				GVkGpuRhi->Submit({ CmdRecorder });
+				GVkGpuRhi->WaitGpu();
+
+				VkCheck(vmaMapMemory(GAllocator, ReadBackBuffer->GetAllocation(), &Data));
+			}
+		}
+
+		return Data;
 	}
 
 	void VkGpuRhiBackend::UnMapGpuBuffer(GpuBuffer* InGpuBuffer)
 	{
-		VulkanBuffer* VkBuffer = static_cast<VulkanBuffer*>(InGpuBuffer);
-		vmaUnmapMemory(GAllocator, VkBuffer->GetAllocation());
+		GpuBufferUsage Usage = InGpuBuffer->GetUsage();
+		if (EnumHasAnyFlags(Usage, GpuBufferUsage::DynamicMask))
+		{
+			VulkanBuffer* VkBuffer = static_cast<VulkanBuffer*>(InGpuBuffer);
+			vmaUnmapMemory(GAllocator, VkBuffer->GetAllocation());
+		}
 	}
 }
