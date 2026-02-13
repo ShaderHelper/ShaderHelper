@@ -381,9 +381,9 @@ namespace FW
 		if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
 		{
 			Options.SetGenerateDebugInfo();
-			Options.SetOptimizationLevel(shaderc_optimization_level_zero);
 			Options.SetNonSemanticShaderDebugSource();
 		}
+		Options.SetOptimizationLevel(shaderc_optimization_level_zero);
 		Options.SetIncluder(std::make_unique<ShadercIncludeHandler>(InShader));
 		auto Result = GlslCompiler.CompileGlslToSpv(TCHAR_TO_UTF8(*InShader->GetProcessedSourceText()),
 			MapShadercKind(InShader->GetShaderType()), TCHAR_TO_UTF8(*InShader->GetShaderName()), Options);

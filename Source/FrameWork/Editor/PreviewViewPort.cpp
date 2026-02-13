@@ -26,6 +26,11 @@ namespace FW
 		}
 	}
 
+	bool IsBGRFormat(GpuTextureFormat InTexFormat)
+	{
+		return InTexFormat == GpuTextureFormat::B8G8R8A8_UNORM || InTexFormat == GpuTextureFormat::B8G8R8A8_UNORM_SRGB;
+	}
+
 	void PreviewViewPort::SetViewPortRenderTexture(GpuTexture* InGpuTex)
 	{
 		FSlateRenderer* UIRenderer = FSlateApplication::Get().GetRenderer();
@@ -37,7 +42,7 @@ namespace FW
 		{
 			UpdatableTexture = UIRenderer->CreateSharedHandleTextureFromVulkan(SharedHandle,
 				InGpuTex->GetWidth(), InGpuTex->GetHeight(),
-				MapTextureFormatToGLInternalFormat(InGpuTex->GetFormat()), InGpuTex->GetAllocationSize());
+				MapTextureFormatToGLInternalFormat(InGpuTex->GetFormat()), InGpuTex->GetAllocationSize(), !IsBGRFormat(InGpuTex->GetFormat()));
 		}
 		else
 		{
