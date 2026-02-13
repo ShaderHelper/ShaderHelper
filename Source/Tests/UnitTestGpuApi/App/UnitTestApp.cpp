@@ -22,7 +22,7 @@ namespace UNITTEST_GPUAPI
 		
 		AppEditor = MakeUnique<UnitTestEditor>(AppClientSize);
 		//Add test otherwise the run loop will immediately exit.
-		//AddTestCast();
+		AddTestCast();
 		AddTestTriangle();
 	}
 
@@ -51,12 +51,13 @@ namespace UNITTEST_GPUAPI
 
 			GpuTextureDesc Desc{ 1, 1, GpuTextureFormat::R16_FLOAT, GpuTextureUsage::ShaderResource , RawData };
 			TRefCountPtr<GpuTexture> TestTex = GGpuRhi->CreateTexture(Desc);
+			GGpuRhi->SetResourceName("TestCast_Tex", TestTex);
 
 			TRefCountPtr<GpuShader> Vs = GGpuRhi->CreateShaderFromFile({
 				.FileName = PathHelper::ShaderDir() / "Test/TestCast.hlsl",
 				.Type = ShaderType::VertexShader,
 				.EntryPoint = "MainVS",
-				});
+			});
 			if (GpuFeature::Support16bitType) {
 				Vs->CompilerFlag |= GpuShaderCompilerFlag::Enable16bitType;
 			}
@@ -72,17 +73,21 @@ namespace UNITTEST_GPUAPI
 				.SetExistingBinding(0, TestTex)
 				.Build();
 
+			TRefCountPtr<GpuTexture> DummyRT = GGpuRhi->CreateTexture({ 1, 1, GpuTextureFormat::R8G8B8A8_UNORM, GpuTextureUsage::RenderTarget });
+
 			GpuRenderPipelineStateDesc PipelineDesc{
 				.CheckLayout = true,
 				.Vs = Vs,
+				.Targets = { {.TargetFormat = DummyRT->GetFormat()}},
 				.BindGroupLayout0 = BindGroupLayout
 			};
-
 			TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
+			GpuRenderPassDesc PassDesc;
+			PassDesc.ColorRenderTargets.Add({ DummyRT });
 
 			auto CmdRecorder = GGpuRhi->BeginRecording();
 			{
-				auto PassRecorder = CmdRecorder->BeginRenderPass({}, TEXT("TestCast"));
+				auto PassRecorder = CmdRecorder->BeginRenderPass(PassDesc, TEXT("TestCast"));
 				{
 					PassRecorder->SetRenderPipelineState(Pipeline);
 					PassRecorder->SetBindGroups(BindGroup, nullptr, nullptr, nullptr);
@@ -108,13 +113,13 @@ namespace UNITTEST_GPUAPI
 				.FileName = PathHelper::ShaderDir() / "Test/TestTriangle.hlsl",
 				.Type = ShaderType::VertexShader,
 				.EntryPoint = "MainVS",
-				});
+			});
 
 			TRefCountPtr<GpuShader> Ps = GGpuRhi->CreateShaderFromFile({
 				.FileName = PathHelper::ShaderDir() / "Test/TestTriangle.hlsl",
 				.Type = ShaderType::PixelShader,
 				.EntryPoint = "MainPS",
-				});
+			});
 
 			FString ErrorInfo, WarnInfo;
 			GGpuRhi->CompileShader(Vs, ErrorInfo, WarnInfo);
@@ -133,7 +138,7 @@ namespace UNITTEST_GPUAPI
 			TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 
 			GpuRenderPassDesc PassDesc;
-			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ RenderTarget, RenderTargetLoadAction::Clear, RenderTargetStoreAction::Store });
+			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ RenderTarget, RenderTargetLoadAction::Load, RenderTargetStoreAction::Store });
 
 			auto CmdRecorder = GGpuRhi->BeginRecording();
 			{

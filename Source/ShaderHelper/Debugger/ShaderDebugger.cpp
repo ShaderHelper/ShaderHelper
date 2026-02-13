@@ -6,6 +6,7 @@
 #include "GpuApi/Spirv/SpirvValidator.h"
 #include "Editor/AssetEditor/AssetEditor.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
+#include "Renderer/RenderGraph.h"
 
 using namespace FW;
 
@@ -257,30 +258,37 @@ namespace SH
 				});
 				if (GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
 				{
+					auto DummyRenderTarget = GGpuRhi->CreateTexture({
+						.Width = (uint32)PsInvocation.ViewPortDesc.Width,
+						.Height = (uint32)PsInvocation.ViewPortDesc.Height,
+						.Format = PsInvocation.PipelineDesc.Targets[0].TargetFormat,
+						.Usage = GpuTextureUsage::RenderTarget
+					});
 					GpuRenderPipelineStateDesc PatchedPipelineDesc{
 						.Vs = PsInvocation.PipelineDesc.Vs,
 						.Ps = PatchedShader,
+						.Targets = {{DummyRenderTarget->GetFormat()}},
 						.RasterizerState = PsInvocation.PipelineDesc.RasterizerState,
 						.Primitive = PsInvocation.PipelineDesc.Primitive
 					};
 					PatchedBindings.ApplyBindGroupLayout(PatchedPipelineDesc);
 					TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PatchedPipelineDesc);
 
+					GpuRenderPassDesc DummyPassDesc;
+					DummyPassDesc.ColorRenderTargets.Add({ DummyRenderTarget });
+
 					auto CmdRecorder = GGpuRhi->BeginRecording();
-					{
-						GpuResourceHelper::ClearRWResource(CmdRecorder, DebugBuffer);
-						CmdRecorder->Barriers({ GpuBarrierInfo{.Resource = DebugBuffer, .NewState = GpuResourceState::UnorderedAccess} });
-						auto PassRecorder = CmdRecorder->BeginRenderPass({}, TEXT("ExprDebugger"));
-						{
+					GpuResourceHelper::ClearRWResource(CmdRecorder, DebugBuffer);
+					RenderGraph RG(CmdRecorder);
+					RG.AddRenderPass(TEXT("ExprDebugger"), MoveTemp(DummyPassDesc), PatchedBindings,
+						[&](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
 							PassRecorder->SetViewPort(PsInvocation.ViewPortDesc);
 							PassRecorder->SetRenderPipelineState(Pipeline);
-							PatchedBindings.ApplyBindGroup(PassRecorder);
+							Bindings.ApplyBindGroup(PassRecorder);
 							PsInvocation.DrawFunction(PassRecorder);
 						}
-						CmdRecorder->EndRenderPass(PassRecorder);
-					}
-					GGpuRhi->EndRecording(CmdRecorder);
-					GGpuRhi->Submit({ CmdRecorder });
+					);
+					RG.Execute();
 
 					uint8* DebugBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebugBuffer, GpuResourceMapMode::Read_Only);
 					SpvId TypeDescId = *(uint32*)(DebugBufferData);
@@ -1488,31 +1496,38 @@ namespace SH
 			throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
 		}
 
+		auto DummyRenderTarget = GGpuRhi->CreateTexture({
+			.Width = (uint32)PsInvocation.ViewPortDesc.Width,
+			.Height = (uint32)PsInvocation.ViewPortDesc.Height,
+			.Format = PsInvocation.PipelineDesc.Targets[0].TargetFormat,
+			.Usage = GpuTextureUsage::RenderTarget
+		});
 		GpuRenderPipelineStateDesc PatchedPipelineDesc{
 			.CheckLayout = true,
 			.Vs = PsInvocation.PipelineDesc.Vs,
 			.Ps = PatchedShader,
+			.Targets = {{DummyRenderTarget->GetFormat()}},
 			.RasterizerState = PsInvocation.PipelineDesc.RasterizerState,
 			.Primitive = PsInvocation.PipelineDesc.Primitive
 		};
 		PatchedBindings.ApplyBindGroupLayout(PatchedPipelineDesc);
 		TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PatchedPipelineDesc);
 
+		GpuRenderPassDesc DummyPassDesc;
+		DummyPassDesc.ColorRenderTargets.Add({ DummyRenderTarget });
+
 		auto CmdRecorder = GGpuRhi->BeginRecording();
-		{
-			GpuResourceHelper::ClearRWResource(CmdRecorder, DebugBuffer);
-			CmdRecorder->Barriers({ GpuBarrierInfo{.Resource = DebugBuffer, .NewState = GpuResourceState::UnorderedAccess} });
-			auto PassRecorder = CmdRecorder->BeginRenderPass({}, TEXT("Debugger"));
-			{
+		GpuResourceHelper::ClearRWResource(CmdRecorder, DebugBuffer);
+		RenderGraph RG(CmdRecorder);
+		RG.AddRenderPass(TEXT("Debugger"), MoveTemp(DummyPassDesc), PatchedBindings,
+			[&](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
 				PassRecorder->SetViewPort(PsInvocation.ViewPortDesc);
 				PassRecorder->SetRenderPipelineState(Pipeline);
-				PatchedBindings.ApplyBindGroup(PassRecorder);
+				Bindings.ApplyBindGroup(PassRecorder);
 				PsInvocation.DrawFunction(PassRecorder);
 			}
-			CmdRecorder->EndRenderPass(PassRecorder);
-		}
-		GGpuRhi->EndRecording(CmdRecorder);
-		GGpuRhi->Submit({ CmdRecorder });
+		);
+		RG.Execute();
 	}
 
 	void ShaderDebugger::DebugPixel(const Vector2u& InPixelCoord, const InvocationState& InState)

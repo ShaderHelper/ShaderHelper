@@ -1,19 +1,18 @@
 #pragma once
+#include "Editor/AssetEditor/ShAssetEditor.h"
 #include "AssetObject/Graph.h"
 #include "AssetObject/ShaderToy/ShaderToy.h"
 #include "AssetObject/ShaderToy/Nodes/ShaderToyPassNode.h"
 
 namespace SH
 {
-	class ShaderToyPreviousFrameNodeOp : public FW::ShObjectOp
+	class ShaderToyPreviousFrameNodeOp : public ShPropertyOp
 	{
 		REFLECTION_TYPE(ShaderToyPreviousFrameNodeOp)
 	public:
 		ShaderToyPreviousFrameNodeOp() = default;
 
 		FW::MetaType* SupportType() override;
-		void OnCancelSelect(FW::ShObject* InObject) override;
-		void OnSelect(FW::ShObject* InObject) override;
 	};
 
 	class ShaderToyPreviousFrameNode : public FW::GraphNode

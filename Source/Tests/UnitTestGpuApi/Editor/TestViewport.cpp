@@ -19,6 +19,10 @@ namespace UNITTEST_GPUAPI
 		if (InSize.X > 0 && InSize.Y > 0)
 		{
 			CreateRenderTarget(InSize);
+			if (RenderFunc)
+			{
+				RenderFunc(this);
+			}
 		}
 	}
 
@@ -27,13 +31,18 @@ namespace UNITTEST_GPUAPI
 		SizeX = static_cast<int32>(InSize.X);
 		SizeY = static_cast<int32>(InSize.Y);
 
+		TArray<uint8> WhiteData;
+		WhiteData.SetNumUninitialized(SizeX * SizeY * 4);
+		FMemory::Memset(WhiteData.GetData(), 0xFF, WhiteData.Num());
+
 		GpuTextureDesc Desc{
 			static_cast<uint32>(SizeX),
 			static_cast<uint32>(SizeY),
 			RenderTargetFormat,
-			GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared
+			GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared,
+			WhiteData
 		};
-		RenderTarget = GGpuRhi->CreateTexture(Desc);
+		RenderTarget = GGpuRhi->CreateTexture(Desc, GpuResourceState::RenderTargetWrite);
 		SetViewPortRenderTexture(RenderTarget);
 	}
 }

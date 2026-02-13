@@ -38,6 +38,29 @@ public:
     virtual void UnMapGpuBuffer(GpuBuffer* InGpuBuffer) override;
 };
 
-inline TArray<TRefCountPtr<GpuResource>> GDeferredReleaseOneFrame;
+class MtlDeferredReleaseManager
+{
+public:
+	void AddResource(TRefCountPtr<GpuResource> InResource)
+	{
+		Resources.Add(MoveTemp(InResource));
+	}
+
+	void ProcessResources()
+	{
+		for (auto It = Resources.CreateIterator(); It; ++It)
+		{
+			if ((*It).GetRefCount() == 1)
+			{
+				It.RemoveCurrent();
+			}
+		}
+	}
+
+private:
+	TSparseArray<TRefCountPtr<GpuResource>> Resources;
+};
+
+inline MtlDeferredReleaseManager GMtlDeferredReleaseManager;
 inline MetalGpuRhiBackend* GMtlGpuRhi;
 }

@@ -81,6 +81,7 @@ namespace FW
 		Enable16bitType = 1u << 0,
 		GenSpvForDebugging = 1u << 1,
 		SkipCache = 1u << 2,
+		CompileFromSpvCode = 1u << 3,
 	};
 	ENUM_CLASS_FLAGS(GpuShaderCompilerFlag);
 

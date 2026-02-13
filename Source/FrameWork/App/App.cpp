@@ -18,7 +18,7 @@ namespace FW {
 	TUniquePtr<App> GApp;
 
 	static void UE_Init(const TCHAR* CommandLine)
-    {
+	{
 		GUseCrashReportClient = false;
 		//Debug check() crsah report
 		//GIgnoreDebugger = true;
@@ -75,7 +75,21 @@ namespace FW {
 		//This project uses slate as UI framework, so we need to initialize it.
 		SetSlateFontPath(FW::BaseResourcePath::UE_SlateFontDir);
 		FSlateApplication::SetCoreStylePath(FW::BaseResourcePath::UE_CoreStyleDir);
-		FSlateApplication::InitializeAsStandaloneApplication(GetStandardStandaloneRenderer(FW::BaseResourcePath::UE_StandaloneRenderShaderDir));
+#if PLATFORM_WINDOWS
+		//Since vulkan appears to be unable to export shared textures to dx11 and can only import them,
+		//the slate backend needs switch to opengl
+		if (GetGpuRhiBackendType() == GpuRhiBackendType::Vulkan)
+		{
+			FCommandLine::Append(TEXT(" -opengl"));
+			FSlateApplication::InitializeAsStandaloneApplication(GetStandardStandaloneRenderer(FW::BaseResourcePath::UE_StandaloneRenderGLShaderDir));
+		}
+		else
+		{
+			FSlateApplication::InitializeAsStandaloneApplication(GetStandardStandaloneRenderer(FW::BaseResourcePath::UE_StandaloneRenderDxShaderDir));
+		}
+#else
+		FSlateApplication::InitializeAsStandaloneApplication(GetStandardStandaloneRenderer(FW::BaseResourcePath::UE_StandaloneRenderGLShaderDir));
+#endif 
 	
 	}
 
@@ -106,7 +120,15 @@ namespace FW {
 		}
 
 		GpuRhi::InitGpuRhi(Config);
-		GGpuRhi->InitApiEnv();
+		try
+		{
+			GGpuRhi->InitApiEnv();
+		}
+		catch (const std::exception& e)
+		{
+			FPlatformMisc::MessageBoxExt(EAppMsgType::Ok, UTF8_TO_TCHAR(e.what()), TEXT("Error:"));
+			std::_Exit(0);
+		}
 
 		FDirectoryWatcherModule& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>(TEXT("DirectoryWatcher"));
 		DirectoryWatcher = DirectoryWatcherModule.Get();

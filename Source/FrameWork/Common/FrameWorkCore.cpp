@@ -165,10 +165,6 @@ namespace FW
 
 	void ShObject::Destroy()
 	{
-		if (ShObjectOp* Op = GetShObjectOp(this))
-		{
-			Op->OnCancelSelect(this);
-		}
 		OnDestroy.Broadcast();
 		NumRefs = 0;
 		delete this;

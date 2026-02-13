@@ -7,7 +7,7 @@
 namespace FW
 {
 	//To make sure that gpu resources do not ahead release when allow gpu lag several frames behind cpu.
-	class DeferredReleaseManager
+	class Dx12DeferredReleaseManager
 	{
 		struct PendingResource
 		{
@@ -47,7 +47,7 @@ namespace FW
 		TSparseArray<PendingResource> PendingResources;
 	};
 
-	inline DeferredReleaseManager* GDeferredReleaseManager = new DeferredReleaseManager;
+	inline Dx12DeferredReleaseManager* GDx12DeferredReleaseManager = new Dx12DeferredReleaseManager;
 
 	template<typename T>
 	class Dx12DeferredDeleteObject
@@ -57,7 +57,7 @@ namespace FW
 		{
 			static_assert(std::is_base_of_v<GpuResource, T>);
 			if (IsDeferred) {
-				GDeferredReleaseManager->AddResource(static_cast<T*>(this));
+				GDx12DeferredReleaseManager->AddResource(static_cast<T*>(this));
 			}
 		}
 		virtual ~Dx12DeferredDeleteObject() = default;

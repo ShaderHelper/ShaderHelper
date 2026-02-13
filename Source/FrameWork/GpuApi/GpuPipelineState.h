@@ -22,7 +22,7 @@ namespace FW
 		BlendFactor DestFactor = BlendFactor::InvSrcAlpha;
 		BlendFactor SrcAlphaFactor = BlendFactor::One;
 		BlendOp AlphaOp = BlendOp::Add;
-		BlendFactor DestAlphaFactor = BlendFactor::One;
+		BlendFactor DestAlphaFactor = BlendFactor::Zero;
 		BlendMask Mask = BlendMask::All;
     };
 

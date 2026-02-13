@@ -392,11 +392,18 @@ constexpr int PaddingLineNum = 22;
 				}
 			}
 
-			// Draw a background layer for every non-whitespace block
+			// Draw a background layer for every non-whitespace block (only for visible region)
 			const auto& LineViews = Owner->ShaderMarshaller->TextLayout->GetLineViews();
-			for (int32 LineIndex = 0; LineIndex < LineViews.Num(); ++LineIndex)
+			int32 StartVisibleModelIndex = Owner->ShaderMarshaller->TextLayout->GetStartVisibleLineIndex();
+			int32 EndVisibleModelIndex = Owner->ShaderMarshaller->TextLayout->GetEndVisibleLineIndex();
+			for (int32 ViewIndex = 0; ViewIndex < LineViews.Num(); ++ViewIndex)
 			{
-				const FTextLayout::FLineView& LineView = LineViews[LineIndex];
+				const FTextLayout::FLineView& LineView = LineViews[ViewIndex];
+				// Skip lines outside visible model index range
+				if (LineView.ModelIndex < StartVisibleModelIndex - 1 || LineView.ModelIndex > EndVisibleModelIndex)
+				{
+					continue;
+				}
 				for (const TSharedRef< ILayoutBlock >& Block : LineView.Blocks)
 				{
 					const FTextRange BlockRange = Block->GetTextRange();
@@ -1764,12 +1771,15 @@ constexpr int PaddingLineNum = 22;
 			}
 		}
 
-        if(LineNumberList) {
-            LineNumberList->RequestListRefresh();
-        }
-        
-        if(LineTipList){
-            LineTipList->RequestListRefresh();
+        if(DeltaLineCount != 0)
+        {
+            if(LineNumberList) {
+                LineNumberList->RequestListRefresh();
+            }
+            
+            if(LineTipList){
+                LineTipList->RequestListRefresh();
+            }
         }
     }
 
@@ -4157,6 +4167,7 @@ constexpr int PaddingLineNum = 22;
 								[
 									SNew(STextBlock)
 										.Text(FText::FromString(Token.Key))
+										.Font(FCoreStyle::GetDefaultFontStyle("NormalText", SShaderEditorBox::GetFontSize()))
 										.TextStyle(&SShaderEditorBox::GetTokenStyleMap()[Token.Value])
 								];
 							}
@@ -4186,6 +4197,7 @@ constexpr int PaddingLineNum = 22;
 												[
 													SNew(STextBlock)
 														.Text(FText::FromString(Token.Key))
+														.Font(FCoreStyle::GetDefaultFontStyle("NormalText", SShaderEditorBox::GetFontSize()))
 														.TextStyle(&SShaderEditorBox::GetTokenStyleMap()[Token.Value])
 												];
 										}
@@ -4195,12 +4207,18 @@ constexpr int PaddingLineNum = 22;
 										InBox->ClearChildren();
 										for (const auto& Param : Params)
 										{
+											if (Param.Desc.IsEmpty())
+											{
+												continue;
+											}
+
 											auto ParamRow = SNew(SHorizontalBox);
 
 											// Bullet point
 											ParamRow->AddSlot().AutoWidth()
 												[
 													SNew(STextBlock).Text(FText::FromString(TEXT("\u2022 ")))
+														.Font(FCoreStyle::GetDefaultFontStyle("NormalText", SShaderEditorBox::GetFontSize()))
 												];
 
 											// SemaFlag (in/out/inout)
@@ -4218,11 +4236,12 @@ constexpr int PaddingLineNum = 22;
 												[
 													SNew(STextBlock)
 														.Text(FText::FromString(SemaStr + TEXT(" ")))
+														.Font(FCoreStyle::GetDefaultFontStyle("NormalText", SShaderEditorBox::GetFontSize()))
 														.TextStyle(&SShaderEditorBox::GetTokenStyleMap()[ShaderTokenType::Keyword])
 												];
 											}
 
-											// Parameter name (bold)
+											// Parameter name
 											ParamRow->AddSlot().AutoWidth()
 											[
 												SNew(STextBlock)
@@ -4231,14 +4250,12 @@ constexpr int PaddingLineNum = 22;
 											];
 
 											// Description
-											if (!Param.Desc.IsEmpty())
-											{
-												ParamRow->AddSlot().AutoWidth()
-												[
-													SNew(STextBlock)
-														.Text(FText::FromString(TEXT(" \u2014 ") + Param.Desc))
-												];
-											}
+											ParamRow->AddSlot().AutoWidth()
+											[
+												SNew(STextBlock)
+													.Text(FText::FromString(TEXT(" \u2014 ") + Param.Desc))
+													.Font(FCoreStyle::GetDefaultFontStyle("NormalText", SShaderEditorBox::GetFontSize()))
+											];
 
 											InBox->AddSlot().AutoHeight()[ParamRow];
 										}
@@ -4254,7 +4271,7 @@ constexpr int PaddingLineNum = 22;
 										.AutoWidth()
 										.VAlign(VAlign_Center)
 										[
-											SNew(SIconButton).Icon(FAppStyle::Get().GetBrush("Icons.ChevronUp")).IconSize(FVector2D{ 12,12 })
+											SNew(SIconButton).Icon(FAppStyle::Get().GetBrush("Icons.ChevronUp")).IconSize(FVector2D{ (float)SShaderEditorBox::GetFontSize(), (float)SShaderEditorBox::GetFontSize() })
 											.OnClicked_Lambda([OverloadTokensBox, ParamsBox, BuildOverloadTokens, BuildParamsBox]() {
 												if (Overloads.Num() > 0)
 												{
@@ -4274,12 +4291,13 @@ constexpr int PaddingLineNum = 22;
 											.Text_Lambda([]() {
 												return FText::FromString(FString::Printf(TEXT("%d/%d"), CurrentOverloadIndex + 1, Overloads.Num()));
 											})
+											.Font(FCoreStyle::GetDefaultFontStyle("NormalText", SShaderEditorBox::GetFontSize()))
 										]
 										+ SHorizontalBox::Slot()
 										.AutoWidth()
 										.VAlign(VAlign_Center)
 										[
-											SNew(SIconButton).Icon(FAppStyle::Get().GetBrush("Icons.ChevronDown")).IconSize(FVector2D{ 12,12 })
+											SNew(SIconButton).Icon(FAppStyle::Get().GetBrush("Icons.ChevronDown")).IconSize(FVector2D{ (float)SShaderEditorBox::GetFontSize(), (float)SShaderEditorBox::GetFontSize() })
 											.OnClicked_Lambda([OverloadTokensBox, ParamsBox, BuildOverloadTokens, BuildParamsBox]() {
 												if (Overloads.Num() > 0)
 												{
@@ -4304,7 +4322,12 @@ constexpr int PaddingLineNum = 22;
 
 								if (!Symbol.Desc.IsEmpty())
 								{
-									Box->AddSlot().AutoHeight().Padding(0, 4, 0, 0)[SNew(STextBlock).Text(FText::FromString(Symbol.Desc))];
+									Box->AddSlot().AutoHeight().Padding(0, 4, 0, 0)
+										[
+											SNew(STextBlock)
+												.Text(FText::FromString(Symbol.Desc))
+												.Font(FCoreStyle::GetDefaultFontStyle("NormalText", SShaderEditorBox::GetFontSize()))
+										];
 								}
 							}
 
@@ -4331,7 +4354,7 @@ constexpr int PaddingLineNum = 22;
 
 								LocationBox->AddSlot().AutoWidth().VAlign(VAlign_Center)
 								[
-									SNew(STextBlock).Text(FText::FromString(LocationText))
+									SNew(STextBlock).Text(FText::FromString(LocationText)).Font(FCoreStyle::GetDefaultFontStyle("NormalText", SShaderEditorBox::GetFontSize()))
 								];
 
 								if (!Symbol.Url.IsEmpty())
@@ -4340,7 +4363,7 @@ constexpr int PaddingLineNum = 22;
 									[
 										SNew(SIconButton)
 										.Icon(FShaderHelperStyle::Get().GetBrush("Icons.World"))
-										.IconSize(FVector2D{ 12, 12 })
+										.IconSize(FVector2D{ (float)SShaderEditorBox::GetFontSize(), (float)SShaderEditorBox::GetFontSize() })
 										.OnClicked_Lambda([Url = Symbol.Url]() {
 											FPlatformProcess::LaunchURL(*Url, nullptr, nullptr);
 											return FReply::Handled();

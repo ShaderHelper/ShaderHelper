@@ -1,11 +1,12 @@
 #pragma once
+#include "Editor/AssetEditor/ShAssetEditor.h"
 #include "AssetObject/Graph.h"
 #include "AssetObject/ShaderToy/ShaderToy.h"
 
 namespace SH
 {
 
-    class ShaderToyOutputNodeOp : public FW::ShObjectOp
+    class ShaderToyOutputNodeOp : public ShPropertyOp
     {
         REFLECTION_TYPE(ShaderToyOutputNodeOp)
     public:

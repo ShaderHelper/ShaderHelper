@@ -23,18 +23,6 @@ namespace SH
 		return GetMetaType<ShaderToyPreviousFrameNode>();
 	}
 
-	void ShaderToyPreviousFrameNodeOp::OnCancelSelect(FW::ShObject* InObject)
-	{
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->RefreshProperty(true);
-	}
-
-	void ShaderToyPreviousFrameNodeOp::OnSelect(ShObject* InObject)
-	{
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->ShowProperty(InObject);
-	}
-
 	ShaderToyPreviousFrameNode::ShaderToyPreviousFrameNode()
 	{
 		ObjectName = LOCALIZATION("PreviousFrame");

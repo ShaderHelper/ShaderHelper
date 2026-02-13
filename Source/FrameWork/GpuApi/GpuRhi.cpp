@@ -5,6 +5,7 @@
 
 #if PLATFORM_WINDOWS
 #include "./Dx12/Dx12GpuRhiBackend.h"
+#include "./Vulkan/VkGpuRhiBackend.h"
 #elif PLATFORM_MAC
 #include "./Metal/MetalGpuRhiBackend.h"
 #endif
@@ -111,6 +112,7 @@ public:
 	GpuRenderPassRecorder* BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName) override
 	{
 		check(State == CmdRecorderState::Begin);
+		check(ValidateBeginRenderPass(PassDesc));
 		auto PassRecorderValidation = MakeUnique<GpuRenderPassRecorderValidation>(CmdRecorder->BeginRenderPass(PassDesc, PassName));
 		RequestedRenderPassRecorders.Add(MoveTemp(PassRecorderValidation));
 		return RequestedRenderPassRecorders.Last().Get();
@@ -220,6 +222,7 @@ public:
 
 	TRefCountPtr<GpuShader> CreateShaderFromFile(const GpuShaderFileDesc& Desc) override
 	{
+		checkf(IFileManager::Get().FileExists(*Desc.FileName), TEXT("Can not find the shader file:%s"), *Desc.FileName);
 		return RhiBackend->CreateShaderFromFile(Desc);
 	}
 
@@ -339,6 +342,7 @@ void GpuRhi::InitGpuRhi(const GpuRhiConfig &InConfig)
 	switch (InConfig.BackendType) {
 #if PLATFORM_WINDOWS
 	case GpuRhiBackendType::DX12: RhiBackend = MakeUnique<Dx12GpuRhiBackend>(); break;
+	case GpuRhiBackendType::Vulkan: RhiBackend = MakeUnique<VkGpuRhiBackend>(); break;
 #elif PLATFORM_MAC
 	case GpuRhiBackendType::Metal: RhiBackend = MakeUnique<MetalGpuRhiBackend>(); break;
 #endif
@@ -355,34 +359,48 @@ void GpuRhi::InitGpuRhi(const GpuRhiConfig &InConfig)
 
 GpuCmdRecorder* GGpuCmdRecorder;
 TUniquePtr<GpuRhi> GGpuRhi;
-FRAMEWORK_API GpuRhiBackendType GetGpuRhiBackendType()
+GpuRhiBackendType GetGpuRhiBackendType()
 {
-#if PLATFORM_WINDOWS
-	FString BackendName = TEXT("DX12");
-#elif PLATFORM_MAC
-	FString BackendName = TEXT("Metal");
-#endif 
-	Editor::GetEditorConfig()->GetString(TEXT("Environment"), TEXT("GraphicsApi"), BackendName);
-#if PLATFORM_WINDOWS
-	if (BackendName.Equals(TEXT("DX12"), ESearchCase::IgnoreCase))
-	{
-		return GpuRhiBackendType::DX12;
-	}
-	else if (BackendName.Equals(TEXT("Vulkan"), ESearchCase::IgnoreCase))
-	{
-		return GpuRhiBackendType::Vulkan;
-	}
-#endif
-#if PLATFORM_MAC
-	if (BackendName.Equals(TEXT("Metal"), ESearchCase::IgnoreCase))
-	{
-		return GpuRhiBackendType::Metal;
-	}
-#endif 
-	else
-	{
-		FPlatformMisc::MessageBoxExt(EAppMsgType::Ok, *FString::Printf(TEXT("Invalid graphics backend:%s"), *BackendName), TEXT("Error:"));
-		std::_Exit(0);
-	}
+	static GpuRhiBackendType BackendType = [] {
+	#if PLATFORM_WINDOWS
+		FString BackendName = TEXT("DX12");
+	#elif PLATFORM_MAC
+		FString BackendName = TEXT("Metal");
+	#endif 
+		auto Config = MakeUnique<FConfigFile>();
+		Config->Read(EditorConfigPath());
+		if (IFileManager::Get().FileExists(*EditorConfigPath()))
+		{
+			Config->GetString(TEXT("Environment"), TEXT("GraphicsApi"), BackendName);
+		}
+		
+		ON_SCOPE_EXIT
+		{
+			Config->SetString(TEXT("Environment"), TEXT("GraphicsApi"), *BackendName);
+			Config->Write(EditorConfigPath());
+		};
+	#if PLATFORM_WINDOWS
+		if (BackendName.Equals(TEXT("DX12"), ESearchCase::IgnoreCase))
+		{
+			return GpuRhiBackendType::DX12;
+		}
+		else if (BackendName.Equals(TEXT("Vulkan"), ESearchCase::IgnoreCase))
+		{
+			return GpuRhiBackendType::Vulkan;
+		}
+	#endif
+	#if PLATFORM_MAC
+		if (BackendName.Equals(TEXT("Metal"), ESearchCase::IgnoreCase))
+		{
+			return GpuRhiBackendType::Metal;
+		}
+	#endif 
+		else
+		{
+			FPlatformMisc::MessageBoxExt(EAppMsgType::Ok, *FString::Printf(TEXT("Invalid graphics backend:%s"), *BackendName), TEXT("Error:"));
+			std::_Exit(0);
+		}
+	}();
+	return BackendType;
 }
 }

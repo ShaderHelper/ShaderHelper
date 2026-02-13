@@ -70,17 +70,14 @@ namespace FW
 
 		if (!CurrentViewPort.IsSet())
 		{
-			if (CurrentRenderTargets.Num() > 0)
-			{
-				D3D12_VIEWPORT DefaultViewPort{};
-				DefaultViewPort.Width = (float)CurrentRenderTargets[0]->GetWidth();
-				DefaultViewPort.Height = (float)CurrentRenderTargets[0]->GetHeight();
-				DefaultViewPort.MinDepth = 0;
-				DefaultViewPort.MaxDepth = 1;
-				DefaultViewPort.TopLeftX = 0;
-				DefaultViewPort.TopLeftY = 0;
-				SetViewPort(MoveTemp(DefaultViewPort));
-			}
+			D3D12_VIEWPORT DefaultViewPort{};
+			DefaultViewPort.Width = (float)CurrentRenderTargets[0]->GetWidth();
+			DefaultViewPort.Height = (float)CurrentRenderTargets[0]->GetHeight();
+			DefaultViewPort.MinDepth = 0;
+			DefaultViewPort.MaxDepth = 1;
+			DefaultViewPort.TopLeftX = 0;
+			DefaultViewPort.TopLeftY = 0;
+			SetViewPort(MoveTemp(DefaultViewPort));
 		}
 		if (!CurrentScissorRect.IsSet() && CurrentViewPort)
 		{
@@ -537,6 +534,11 @@ namespace FW
 
 	void Dx12CmdRecorder::Barriers(const TArray<GpuBarrierInfo>& BarrierInfos)
 	{
+		if (BarrierInfos.IsEmpty())
+		{
+			return;
+		}
+
 		TArray<CD3DX12_RESOURCE_BARRIER> DxBarriers;
 		for (const GpuBarrierInfo& BarrierInfo : BarrierInfos)
 		{

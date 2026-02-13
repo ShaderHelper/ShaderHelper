@@ -31,16 +31,16 @@ namespace SH
 
 	void ShaderToyOutputNodeOp::OnCancelSelect(ShObject* InObject)
 	{
+		ShPropertyOp::OnCancelSelect(InObject);
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->RefreshProperty(true);
 		TSharedPtr<SShViewport> ViewportWidget = StaticCastSharedPtr<SShViewport>(ShEditor->GetViewPort()->GetAssociatedWidget().Pin());
 		ViewportWidget->ResetSpliter();
 	}
 
 	void ShaderToyOutputNodeOp::OnSelect(ShObject* InObject)
     {
+		ShPropertyOp::OnSelect(InObject);
         auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-        ShEditor->ShowProperty(InObject);
 		ShEditor->ForceRender();
 
 		TSharedPtr<SShViewport> ViewportWidget = StaticCastSharedPtr<SShViewport>(ShEditor->GetViewPort()->GetAssociatedWidget().Pin());

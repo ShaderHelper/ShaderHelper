@@ -101,6 +101,16 @@ namespace FW
 			&& ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout2, 2) && ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout3, 3);
 	}
 
+	bool ValidateBeginRenderPass(const GpuRenderPassDesc& InPassDesc)
+	{
+		if (InPassDesc.ColorRenderTargets.Num() <= 0)
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("BeginRenderPass Error(ColorRenderTargets must not be empty)"));
+			return false;
+		}
+		return true;
+	}
+
 	bool ValidateCreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState)
 	{
         if(InBufferDesc.ByteSize <= 0)

@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "PathHelper.h"
+#include "GpuApi/GpuRhi.h"
 
 namespace FW {
 
@@ -47,7 +48,7 @@ namespace FW {
 
 	FString PathHelper::SavedShaderDir()
 	{
-		return SavedDir() / TEXT("Shader");
+		return SavedDir() / TEXT("Shader") / ANSI_TO_TCHAR(magic_enum::enum_name(GetGpuRhiBackendType()).data());
 	}
 
 	FString PathHelper::SavedConfigDir()

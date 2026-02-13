@@ -41,7 +41,7 @@ void MetalGpuRhiBackend::EndFrame()
 {
 	WaitGpu();
 	GMtlCmdRecorderPool.Empty();
-    GDeferredReleaseOneFrame.Empty();
+	GMtlDeferredReleaseManager.ProcessResources();
 }
 
 TRefCountPtr<GpuTexture> MetalGpuRhiBackend::CreateTexture(const GpuTextureDesc &InTexDesc, GpuResourceState InitState)
@@ -51,12 +51,14 @@ TRefCountPtr<GpuTexture> MetalGpuRhiBackend::CreateTexture(const GpuTextureDesc 
 
 TRefCountPtr<GpuShader> MetalGpuRhiBackend::CreateShaderFromSource(const GpuShaderSourceDesc& Desc) const
 {
-	return AUX::StaticCastRefCountPtr<GpuShader>(CreateMetalShader(Desc));
+	TRefCountPtr<MetalShader> NewShader = new MetalShader(Desc);
+	return AUX::StaticCastRefCountPtr<GpuShader>(NewShader);
 }
 
 TRefCountPtr<GpuShader> MetalGpuRhiBackend::CreateShaderFromFile(const GpuShaderFileDesc& Desc)
 {
-	return AUX::StaticCastRefCountPtr<GpuShader>(CreateMetalShader(Desc));
+	TRefCountPtr<MetalShader> NewShader = new MetalShader(Desc);
+	return AUX::StaticCastRefCountPtr<GpuShader>(NewShader);
 }
 
 TRefCountPtr<GpuBindGroup> MetalGpuRhiBackend::CreateBindGroup(const GpuBindGroupDesc &InBindGroupDesc)

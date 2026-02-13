@@ -11,8 +11,8 @@ namespace FW
     class MtlRenderStateCache
     {
     public:
-		MtlRenderStateCache(const FString& InName, MTLCommandBufferPtr InCmdBuffer, MTLRenderPassDescriptorPtr InRenderPassDesc);
-        void ApplyDrawState();
+		MtlRenderStateCache(MTLRenderPassDescriptorPtr InRenderPassDesc);
+        void ApplyDrawState(MTL::RenderCommandEncoder* RenderCommandEncoder);
         
         void SetPipeline(MetalRenderPipelineState* InPipelineState);
         void SetVertexBuffer(MetalBuffer* InBuffer);
@@ -23,7 +23,6 @@ namespace FW
             check(CurrentRenderPipelineState);
             return (MTL::PrimitiveType)CurrentRenderPipelineState->GetPrimitiveType();
         }
-		MTL::RenderCommandEncoder* GetEncoder() const { return RenderCommandEncoder.get(); }
         
     public:
         bool IsRenderPipelineDirty : 1;
@@ -47,9 +46,6 @@ namespace FW
         MetalBindGroup* CurrentBindGroup2;
         MetalBindGroup* CurrentBindGroup3;
         
-		FString Name;
-		MTLCommandBufferPtr CmdBuffer;
-		MTLRenderCommandEncoderPtr RenderCommandEncoder;
         MTLRenderPassDescriptorPtr RenderPassDesc;
     };
 
@@ -80,12 +76,14 @@ namespace FW
     class MtlRenderPassRecorder : public GpuRenderPassRecorder
     {
     public:
-        MtlRenderPassRecorder(const FString& InName, MTLCommandBufferPtr InCmdBuffer, MTLRenderPassDescriptorPtr InRenderPassDesc)
-            : StateCache(InName, MoveTemp(InCmdBuffer), MoveTemp(InRenderPassDesc))
+        MtlRenderPassRecorder(MTLRenderCommandEncoderPtr InCmdEncoder, MTLRenderPassDescriptorPtr InRenderPassDesc)
+            : CmdEncoder(MoveTemp(InCmdEncoder))
+            , StateCache(MoveTemp(InRenderPassDesc))
         {}
         
+        MTL::RenderCommandEncoder* GetEncoder() const { return CmdEncoder.get(); }
+        
     public:
-		void End();
         void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount) override;
         void SetRenderPipelineState(GpuRenderPipelineState* InPipelineState) override;
         void SetVertexBuffer(GpuBuffer* InVertexBuffer) override;
@@ -94,6 +92,7 @@ namespace FW
         void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override;
         
     private:
+        MTLRenderCommandEncoderPtr CmdEncoder;
         MtlRenderStateCache StateCache;
     };
 
