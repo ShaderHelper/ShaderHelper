@@ -31,7 +31,7 @@ project "FrameWork"
     filter {"files:**/External/UE/** or **/External/Vulkan/**"}
         flags {"ExcludeFromBuild"}
 			
-    filter {"system:macosx","files:**/Dx12/*.cpp"}
+    filter {"system:macosx","files:**/Dx12/*.cpp or **/Vulkan/*.cpp"}
         flags {"ExcludeFromBuild"}
 
     filter {"system:windows","files:**/Metal/*.cpp"}
