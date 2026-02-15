@@ -463,7 +463,7 @@ constexpr int PaddingLineNum = 22;
 
 		UICommandList = MakeShared<FUICommandList>();
 
-        SAssignNew(ShaderMultiLineVScrollBar, SScrollBar).Orientation(EOrientation::Orient_Vertical).Padding(0)
+        SAssignNew(ShaderMultiLineVScrollBar, SMarkerScrollBar).Orientation(EOrientation::Orient_Vertical).Padding(0)
 			.Style(&FShaderHelperStyle::Get().GetWidgetStyle<FScrollBarStyle>("CustomScrollbar")).Thickness(8.0f);
 		ShaderMultiLineVScrollBar->OnSetState = [this](float InOffsetFraction, float InThumbSizeFraction) {
 			LineNumberList->SetScrollOffset(InOffsetFraction * LineNumberList->GetNumItemsBeingObserved());
@@ -760,6 +760,7 @@ constexpr int PaddingLineNum = 22;
 								ShaderMultiLineEditableText->GoTo(ShaderMultiLineEditableText->GetSelection().GetBeginning());
 								ShaderMultiLineEditableText->SetSearchText(InTextToSearch);
 								ScrollTo(ShaderMultiLineEditableText->GetSelection().GetBeginning().GetLineIndex());
+								RefreshScrollBarMarkers();
 							})
 							.OnReplaced_Lambda([this](const FText& InTextToReplace, bool ReplaceAll) {
 								FText CurSearchText = CodeSearchWidget->GetSearchText();
@@ -789,22 +790,26 @@ constexpr int PaddingLineNum = 22;
 										ShaderMultiLineEditableText->InsertTextAtCursor(InTextToReplace.ToString());
 									}
 								}
+								RefreshScrollBarMarkers();
 							})
 							.OnClosed_Lambda([this] {
 								ShaderMultiLineEditableText->SetSearchText({});
 								FSlateApplication::Get().SetUserFocus(0, ShaderMultiLineEditableText);
+								RefreshScrollBarMarkers();
 							})
 							.OnMatchCaseChanged_Lambda([this](bool MatchCase) {
 								ShaderMultiLineEditableTextLayout->SearchCase = MatchCase ? ESearchCase::CaseSensitive : ESearchCase::IgnoreCase;
 								ShaderMultiLineEditableText->GoTo(ShaderMultiLineEditableText->GetSelection().GetBeginning());
 								ShaderMultiLineEditableText->SetSearchText(CodeSearchWidget->GetSearchText());
 								ScrollTo(ShaderMultiLineEditableText->GetSelection().GetBeginning().GetLineIndex());
+								RefreshScrollBarMarkers();
 							})
 							.OnMatchWholeChanged_Lambda([this](bool MatchWhole) {
 								ShaderMultiLineEditableTextLayout->MatchWhole = MatchWhole;
 								ShaderMultiLineEditableText->GoTo(ShaderMultiLineEditableText->GetSelection().GetBeginning());
 								ShaderMultiLineEditableText->SetSearchText(CodeSearchWidget->GetSearchText());
 								ScrollTo(ShaderMultiLineEditableText->GetSelection().GetBeginning().GetLineIndex());
+								RefreshScrollBarMarkers();
 							})
 							.SearchResultData_Lambda([this]() {
 								SSearchBox::FSearchResultData Result{};
@@ -2107,6 +2112,24 @@ constexpr int PaddingLineNum = 22;
 		}
 	}
 
+	void SShaderEditorBox::RefreshScrollBarMarkers()
+	{
+		TArray<FScrollBarMarker> AllMarkers;
+
+		for (const FTextLineHighlight& Highlight : OccurrenceHighlights)
+		{
+			AllMarkers.Add({ Highlight.LineIndex, FLinearColor::Gray });
+		}
+
+		for (const auto& Pair : ShaderMultiLineEditableTextLayout->SearchResultToIndexMap)
+		{
+			AllMarkers.Add({ Pair.Key.GetLineIndex(), FLinearColor(0.8f, 0.6f, 0.1f, 0.85f) });
+		}
+
+		ShaderMultiLineVScrollBar->SetTotalLineCount(GetCurDisplayLineCount() + PaddingLineNum);
+		ShaderMultiLineVScrollBar->SetMarkers(AllMarkers);
+	}
+
     void SShaderEditorBox::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
     {
 		//ShaderMultiLineEditableText updates its VScrollBar when it ticks, and we sync the LineNumberList/LineTipList according to its VScrollBar callback.
@@ -2138,6 +2161,7 @@ constexpr int PaddingLineNum = 22;
 			bTryComplete = false;
 			bTryMergeUndoState = false;
 			RefreshOccurrenceHighlight();
+			RefreshScrollBarMarkers();
 		}
 		bKeyChar = false;
 		RefreshBracketHighlight();

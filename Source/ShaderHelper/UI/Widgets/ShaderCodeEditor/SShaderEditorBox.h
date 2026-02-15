@@ -4,6 +4,7 @@
 #include "GpuApi/GpuShader.h"
 #include "AssetObject/ShaderAsset.h"
 #include "SCodeSearchWidget.h"
+#include "SMarkerScrollBar.h"
 
 #include <Framework/Text/BaseTextLayoutMarshaller.h>
 #include <Widgets/Views/SListView.h>
@@ -264,6 +265,7 @@ namespace SH
 		void RefreshSyntaxHighlight();
 		void RefreshOccurrenceHighlight();
 		void RefreshBracketHighlight();
+		void RefreshScrollBarMarkers();
 		
 	protected:
 		virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
@@ -320,7 +322,7 @@ namespace SH
 		TArray<LineNumberItemPtr> LineNumberData;
 		TSharedPtr<FUICommandList> UICommandList;
         
-        TSharedPtr<SScrollBar> ShaderMultiLineVScrollBar;
+        TSharedPtr<SMarkerScrollBar> ShaderMultiLineVScrollBar;
         TSharedPtr<SScrollBar> ShaderMultiLineHScrollBar;
 
 		TArray<FTextLineHighlight> OccurrenceHighlights;
