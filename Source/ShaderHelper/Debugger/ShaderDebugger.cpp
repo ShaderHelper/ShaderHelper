@@ -12,6 +12,83 @@ using namespace FW;
 
 namespace SH
 {
+	
+	static void DumpDebugStatesToFile(const TArray<SpvDebugState>& InDebugStates, const SpvDebuggerContext* InContext, const FString& File)
+	{
+	   FString Dump;
+	   Dump += FString::Printf(TEXT("=== Debug States Dump (%d states) ===\n\n"), InDebugStates.Num());
+
+	   for (int32 i = 0; i < InDebugStates.Num(); i++)
+	   {
+		   const SpvDebugState& State = InDebugStates[i];
+		   Dump += FString::Printf(TEXT("[%d] "), i);
+
+		   if (std::holds_alternative<SpvDebugState_VarChange>(State))
+		   {
+			   const auto& S = std::get<SpvDebugState_VarChange>(State);
+			   FString SourceFile = InContext->GetSourceFileName(S.Source);
+			   FString VarName = InContext->Names.contains(S.Change.VarId) ? InContext->Names.at(S.Change.VarId) : FString::Printf(TEXT("%d"), S.Change.VarId.GetValue());
+			   Dump += FString::Printf(TEXT("VarChange  Line=%d Source=%s Var=%s"), S.Line, *SourceFile, *VarName);
+			   if (!S.Error.IsEmpty())
+			   {
+				   Dump += FString::Printf(TEXT(" Error=\"%s\""), *S.Error);
+			   }
+		   }
+		   else if (std::holds_alternative<SpvDebugState_ScopeChange>(State))
+		   {
+			   const auto& S = std::get<SpvDebugState_ScopeChange>(State);
+			   Dump += FString::Printf(TEXT("ScopeChange  Pre=%d New=%d"), S.Change.PreScope ? S.Change.PreScope->GetId().GetValue() : 0, S.Change.NewScope ? S.Change.NewScope->GetId().GetValue() : 0);
+		   }
+		   else if (std::holds_alternative<SpvDebugState_ReturnValue>(State))
+		   {
+			   const auto& S = std::get<SpvDebugState_ReturnValue>(State);
+			   Dump += FString::Printf(TEXT("ReturnValue  Line=%d Source=%s"), S.Line, *InContext->GetSourceFileName(S.Source));
+		   }
+		   else if (std::holds_alternative<SpvDebugState_FuncCall>(State))
+		   {
+			   const auto& S = std::get<SpvDebugState_FuncCall>(State);
+			   Dump += FString::Printf(TEXT("FuncCall  Line=%d Source=%s CallId=%d"), S.Line, *InContext->GetSourceFileName(S.Source), S.CallId.GetValue());
+		   }
+		   else if (std::holds_alternative<SpvDebugState_Tag>(State))
+		   {
+			   const auto& S = std::get<SpvDebugState_Tag>(State);
+			   Dump += FString::Printf(TEXT("Tag  Line=%d Source=%s"), S.Line, *InContext->GetSourceFileName(S.Source));
+			   if (S.bCondition) Dump += TEXT(" Condition");
+			   if (S.bFuncCallAfterReturn) Dump += TEXT(" FuncCallAfterReturn");
+			   if (S.bReturn) Dump += TEXT(" Return");
+			   if (S.bKill) Dump += TEXT(" Kill");
+		   }
+		   else if (std::holds_alternative<SpvDebugState_Access>(State))
+		   {
+			   const auto& S = std::get<SpvDebugState_Access>(State);
+			   FString VarName = InContext->Names.contains(S.VarId) ? InContext->Names.at(S.VarId) : FString::Printf(TEXT("%d"), S.VarId.GetValue());
+			   Dump += FString::Printf(TEXT("Access  Line=%d Source=%s Var=%s"), S.Line, *InContext->GetSourceFileName(S.Source), *VarName);
+		   }
+		   else
+		   {
+			   struct { int32 Line; SpvId Source; const TCHAR* TypeName; } Info{};
+			   if (std::holds_alternative<SpvDebugState_Normalize>(State))       { const auto& S = std::get<SpvDebugState_Normalize>(State);    Info = {S.Line, S.Source, TEXT("Normalize")}; }
+			   else if (std::holds_alternative<SpvDebugState_SmoothStep>(State)) { const auto& S = std::get<SpvDebugState_SmoothStep>(State);   Info = {S.Line, S.Source, TEXT("SmoothStep")}; }
+			   else if (std::holds_alternative<SpvDebugState_Pow>(State))        { const auto& S = std::get<SpvDebugState_Pow>(State);           Info = {S.Line, S.Source, TEXT("Pow")}; }
+			   else if (std::holds_alternative<SpvDebugState_Clamp>(State))      { const auto& S = std::get<SpvDebugState_Clamp>(State);         Info = {S.Line, S.Source, TEXT("Clamp")}; }
+			   else if (std::holds_alternative<SpvDebugState_Div>(State))        { const auto& S = std::get<SpvDebugState_Div>(State);           Info = {S.Line, S.Source, TEXT("Div")}; }
+			   else if (std::holds_alternative<SpvDebugState_ConvertF>(State))   { const auto& S = std::get<SpvDebugState_ConvertF>(State);      Info = {S.Line, S.Source, TEXT("ConvertF")}; }
+			   else if (std::holds_alternative<SpvDebugState_Remainder>(State))  { const auto& S = std::get<SpvDebugState_Remainder>(State);     Info = {S.Line, S.Source, TEXT("Remainder")}; }
+			   else if (std::holds_alternative<SpvDebugState_Log>(State))        { const auto& S = std::get<SpvDebugState_Log>(State);           Info = {S.Line, S.Source, TEXT("Log")}; }
+			   else if (std::holds_alternative<SpvDebugState_Asin>(State))       { const auto& S = std::get<SpvDebugState_Asin>(State);          Info = {S.Line, S.Source, TEXT("Asin")}; }
+			   else if (std::holds_alternative<SpvDebugState_Acos>(State))       { const auto& S = std::get<SpvDebugState_Acos>(State);          Info = {S.Line, S.Source, TEXT("Acos")}; }
+			   else if (std::holds_alternative<SpvDebugState_Sqrt>(State))       { const auto& S = std::get<SpvDebugState_Sqrt>(State);          Info = {S.Line, S.Source, TEXT("Sqrt")}; }
+			   else if (std::holds_alternative<SpvDebugState_InverseSqrt>(State)){ const auto& S = std::get<SpvDebugState_InverseSqrt>(State);   Info = {S.Line, S.Source, TEXT("InverseSqrt")}; }
+			   else if (std::holds_alternative<SpvDebugState_Atan2>(State))      { const auto& S = std::get<SpvDebugState_Atan2>(State);         Info = {S.Line, S.Source, TEXT("Atan2")}; }
+			   Dump += FString::Printf(TEXT("%s  Line=%d Source=%s"), Info.TypeName, Info.Line, *InContext->GetSourceFileName(Info.Source));
+		   }
+
+		   Dump += TEXT("\n");
+	   }
+
+	   FFileHelper::SaveStringToFile(Dump, *File);
+	}
+
 	TArray<ExpressionNodePtr> AppendChildNodes(GpuShaderLanguage Lang, SpvTypeDesc* TypeDesc, const TArray<Vector2i>& InitializedRanges, const TArray<SpvVarDirtyRange>& DirtyRanges, const TArray<uint8>& Value, int32 InOffset)
 	{
 		TArray<ExpressionNodePtr> Nodes;
@@ -198,7 +275,26 @@ namespace SH
 			{
 				DebugStateIndex = ActiveCallPoint.value().DebugStateIndex;
 			}
-			SpvPixelExprDebuggerContext ExprContext{ DebugStates[DebugStateIndex], DebugStateIndex,
+			// _DebugStateNum_ in ExprDebugger only counts GPU-side _Append*_ calls,
+			// but DebugStateIndex includes CPU-reconstructed states (ScopeChange, FuncCallAfterReturn).
+			// Subtract CPU-only state count to get the correct GPU-side index.
+			int32 GpuStateIndex = DebugStateIndex;
+			for (int32 i = 0; i <= DebugStateIndex; i++)
+			{
+				if (std::holds_alternative<SpvDebugState_ScopeChange>(DebugStates[i]))
+				{
+					GpuStateIndex--;
+				}
+				else if (std::holds_alternative<SpvDebugState_Tag>(DebugStates[i]))
+				{
+					const auto& Tag = std::get<SpvDebugState_Tag>(DebugStates[i]);
+					if (Tag.bFuncCallAfterReturn)
+					{
+						GpuStateIndex--;
+					}
+				}
+			}
+			SpvPixelExprDebuggerContext ExprContext{ DebugStates[DebugStateIndex], GpuStateIndex,
 				PixelCoord, SpvBindings };
 			SpirvParser Parser;
 			Parser.Parse(DebugShader->SpvCode);
@@ -241,81 +337,84 @@ namespace SH
 			{
 				FString Pattern = "_AppendExprDummy_()";
 				int32 ReplaceIndex = PatchedSource.Find(Pattern, ESearchCase::IgnoreCase, ESearchDir::FromEnd);
-				PatchedSource.RemoveAt(ReplaceIndex, Pattern.Len());
-				PatchedSource.InsertAt(ReplaceIndex, "_AppendExpr_(" + InExpression + ")");
-				int32 RemoveStartIndex = PatchedSource.Find("void _AppendExprDummy_()", ESearchCase::IgnoreCase, ESearchDir::FromEnd, ReplaceIndex);
-				int32 RemoveEndIndex = PatchedSource.Find("}", ESearchCase::IgnoreCase, ESearchDir::FromStart, RemoveStartIndex);
-				PatchedSource.RemoveAt(RemoveStartIndex, RemoveEndIndex - RemoveStartIndex + 1);
-				
-				FString FileName = DebugShader->GetShaderName() + TEXT("ExprPatched") + FileExtension;
-				FFileHelper::SaveStringToFile(PatchedSource, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / FileName));
-
-				TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
-					.Source = MoveTemp(PatchedSource),
-					.Type = DebugShader->GetShaderType(),
-					.EntryPoint = EntryPoint,
-					.Language = Lang
-				});
-				if (GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
+				if(ReplaceIndex != INDEX_NONE)
 				{
-					auto DummyRenderTarget = GGpuRhi->CreateTexture({
-						.Width = (uint32)PsInvocation.ViewPortDesc.Width,
-						.Height = (uint32)PsInvocation.ViewPortDesc.Height,
-						.Format = PsInvocation.PipelineDesc.Targets[0].TargetFormat,
-						.Usage = GpuTextureUsage::RenderTarget
+					PatchedSource.RemoveAt(ReplaceIndex, Pattern.Len());
+					PatchedSource.InsertAt(ReplaceIndex, "_AppendExpr_(" + InExpression + ")");
+					int32 RemoveStartIndex = PatchedSource.Find("void _AppendExprDummy_()", ESearchCase::IgnoreCase, ESearchDir::FromEnd, ReplaceIndex);
+					int32 RemoveEndIndex = PatchedSource.Find("}", ESearchCase::IgnoreCase, ESearchDir::FromStart, RemoveStartIndex);
+					PatchedSource.RemoveAt(RemoveStartIndex, RemoveEndIndex - RemoveStartIndex + 1);
+					
+					FString FileName = DebugShader->GetShaderName() + TEXT("ExprPatched") + FileExtension;
+					FFileHelper::SaveStringToFile(PatchedSource, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / FileName));
+					
+					TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
+						.Source = MoveTemp(PatchedSource),
+						.Type = DebugShader->GetShaderType(),
+						.EntryPoint = EntryPoint,
+						.Language = Lang
 					});
-					GpuRenderPipelineStateDesc PatchedPipelineDesc{
-						.Vs = PsInvocation.PipelineDesc.Vs,
-						.Ps = PatchedShader,
-						.Targets = {{DummyRenderTarget->GetFormat()}},
-						.RasterizerState = PsInvocation.PipelineDesc.RasterizerState,
-						.Primitive = PsInvocation.PipelineDesc.Primitive
-					};
-					PatchedBindings.ApplyBindGroupLayout(PatchedPipelineDesc);
-					TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PatchedPipelineDesc);
-
-					GpuRenderPassDesc DummyPassDesc;
-					DummyPassDesc.ColorRenderTargets.Add({ DummyRenderTarget });
-
-					auto CmdRecorder = GGpuRhi->BeginRecording();
-					GpuResourceHelper::ClearRWResource(CmdRecorder, DebugBuffer);
-					RenderGraph RG(CmdRecorder);
-					RG.AddRenderPass(TEXT("ExprDebugger"), MoveTemp(DummyPassDesc), PatchedBindings,
-						[&](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
+					if (GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
+					{
+						auto DummyRenderTarget = GGpuRhi->CreateTexture({
+							.Width = (uint32)PsInvocation.ViewPortDesc.Width,
+							.Height = (uint32)PsInvocation.ViewPortDesc.Height,
+							.Format = PsInvocation.PipelineDesc.Targets[0].TargetFormat,
+							.Usage = GpuTextureUsage::RenderTarget
+						});
+						GpuRenderPipelineStateDesc PatchedPipelineDesc{
+							.Vs = PsInvocation.PipelineDesc.Vs,
+							.Ps = PatchedShader,
+							.Targets = {{DummyRenderTarget->GetFormat()}},
+							.RasterizerState = PsInvocation.PipelineDesc.RasterizerState,
+							.Primitive = PsInvocation.PipelineDesc.Primitive
+						};
+						PatchedBindings.ApplyBindGroupLayout(PatchedPipelineDesc);
+						TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PatchedPipelineDesc);
+						
+						GpuRenderPassDesc DummyPassDesc;
+						DummyPassDesc.ColorRenderTargets.Add({ DummyRenderTarget });
+						
+						auto CmdRecorder = GGpuRhi->BeginRecording();
+						GpuResourceHelper::ClearRWResource(CmdRecorder, DebugBuffer);
+						RenderGraph RG(CmdRecorder);
+						RG.AddRenderPass(TEXT("ExprDebugger"), MoveTemp(DummyPassDesc), PatchedBindings,
+										 [&](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
 							PassRecorder->SetViewPort(PsInvocation.ViewPortDesc);
 							PassRecorder->SetRenderPipelineState(Pipeline);
 							Bindings.ApplyBindGroup(PassRecorder);
 							PsInvocation.DrawFunction(PassRecorder);
 						}
-					);
-					RG.Execute();
-
-					uint8* DebugBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebugBuffer, GpuResourceMapMode::Read_Only);
-					SpvId TypeDescId = *(uint32*)(DebugBufferData);
-					int32 ResultSize = *(int32*)(DebugBufferData + 4);
-					TArray<uint8> ResultValue = { DebugBufferData + 8, ResultSize };
-					GGpuRhi->UnMapGpuBuffer(DebugBuffer);
-
-					SpvTypeDesc* ResultTypeDesc = ExprContext.TypeDescs[TypeDescId].Get();
-					if (ResultTypeDesc && !ResultValue.IsEmpty())
-					{
-						 FText TypeName = FText::FromString(GetTypeDescStr(ResultTypeDesc, Lang));
-
-						TArray<Vector2i> ResultRange;
-						ResultRange.Add({ 0, ResultValue.Num() });
-						FString ValueStr = GetValueStr(ResultValue, ResultTypeDesc, ResultRange, 0, DebuggerViewHex);
-
-						TArray<TSharedPtr<ExpressionNode>> Children;
-						if (ResultTypeDesc->GetKind() == SpvTypeDescKind::Composite || ResultTypeDesc->GetKind() == SpvTypeDescKind::Array
-							|| ResultTypeDesc->GetKind() == SpvTypeDescKind::Matrix)
+										 );
+						RG.Execute();
+						
+						uint8* DebugBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebugBuffer, GpuResourceMapMode::Read_Only);
+						SpvId TypeDescId = *(uint32*)(DebugBufferData);
+						int32 ResultSize = *(int32*)(DebugBufferData + 16);
+						TArray<uint8> ResultValue = { DebugBufferData + 32, ResultSize };
+						GGpuRhi->UnMapGpuBuffer(DebugBuffer);
+						
+						SpvTypeDesc* ResultTypeDesc = ExprContext.TypeDescs[TypeDescId].Get();
+						if (ResultTypeDesc && !ResultValue.IsEmpty())
 						{
-							Children = AppendChildNodes(Lang, ResultTypeDesc, ResultRange, {}, ResultValue, 0);
+							FText TypeName = FText::FromString(GetTypeDescStr(ResultTypeDesc, Lang));
+							
+							TArray<Vector2i> ResultRange;
+							ResultRange.Add({ 0, ResultValue.Num() });
+							FString ValueStr = GetValueStr(ResultValue, ResultTypeDesc, ResultRange, 0, DebuggerViewHex);
+							
+							TArray<TSharedPtr<ExpressionNode>> Children;
+							if (ResultTypeDesc->GetKind() == SpvTypeDescKind::Composite || ResultTypeDesc->GetKind() == SpvTypeDescKind::Array
+								|| ResultTypeDesc->GetKind() == SpvTypeDescKind::Matrix)
+							{
+								Children = AppendChildNodes(Lang, ResultTypeDesc, ResultRange, {}, ResultValue, 0);
+							}
+							
+							return { .Expr = InExpression, .ValueStr = ValueStr,
+								.TypeName = TypeName.ToString(), .Children = MoveTemp(Children) };
 						}
-
-						return { .Expr = InExpression, .ValueStr = ValueStr,
-							.TypeName = TypeName.ToString(), .Children = MoveTemp(Children) };
+						
 					}
-		
 				}
 			}
 	
@@ -620,7 +719,7 @@ namespace SH
 			FMemory::Memcpy(Dest, Src, State.Change.NewDirtyValue.Num());
 
 			SpvVarDirtyRange DirtyRange = { State.Change.ByteOffset, State.Change.NewDirtyValue.Num() };
-			Var->InitializedRanges.Add({ State.Change.ByteOffset, State.Change.NewDirtyValue.Num() });
+			Var->InitializedRanges.Add({ State.Change.ByteOffset, State.Change.ByteOffset + State.Change.NewDirtyValue.Num() });
 			DirtyVars.Add(State.Change.VarId, MoveTemp(DirtyRange));
 
 			//Propagate changes made to the parameter back to the argument.
@@ -663,6 +762,15 @@ namespace SH
 				SpvVariable* ParameterVar = DebuggerContext->FindVar(Parameters[i]);
 				ParameterVar->Storage = ArgumentVar->Storage;
 				ParameterVar->InitializedRanges = ArgumentVar->InitializedRanges;
+				// Compiler-generated argument temporaries are not in VariableDescMap,
+				// so their stores are not tracked and InitializedRanges stays empty.
+				// Since the compiler always initializes these temps before the call, treat them as fully initialized.
+				if (ParameterVar->InitializedRanges.IsEmpty()
+					&& !DebuggerContext->VariableDescMap.contains(Call.Arguments[i])
+					&& !DebuggerContext->IsParameter(Call.Arguments[i]))
+				{
+					ParameterVar->InitializedRanges.Add({0, ParameterVar->GetBufferSize()});
+				}
 			}
 			if (Scope)
 			{
@@ -1321,7 +1429,7 @@ namespace SH
 			throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
 		}
 
-		uint32 BufferSize = GlobalValidation ? 1024 : 1024 * 1024 * 2;
+		uint32 BufferSize = GlobalValidation ? 1024 : 1024 * 1024 * 4;
 		TArray<uint8> Datas;
 		Datas.SetNumZeroed(BufferSize);
 		DebugBuffer = GGpuRhi->CreateBuffer({
@@ -1503,7 +1611,6 @@ namespace SH
 			.Usage = GpuTextureUsage::RenderTarget
 		});
 		GpuRenderPipelineStateDesc PatchedPipelineDesc{
-			.CheckLayout = true,
 			.Vs = PsInvocation.PipelineDesc.Vs,
 			.Ps = PatchedShader,
 			.Targets = {{DummyRenderTarget->GetFormat()}},
@@ -1517,7 +1624,6 @@ namespace SH
 		DummyPassDesc.ColorRenderTargets.Add({ DummyRenderTarget });
 
 		auto CmdRecorder = GGpuRhi->BeginRecording();
-		GpuResourceHelper::ClearRWResource(CmdRecorder, DebugBuffer);
 		RenderGraph RG(CmdRecorder);
 		RG.AddRenderPass(TEXT("Debugger"), MoveTemp(DummyPassDesc), PatchedBindings,
 			[&](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
@@ -1538,8 +1644,12 @@ namespace SH
 		
 		InvokePixel();
 		uint8* DebugBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebugBuffer, GpuResourceMapMode::Read_Only);
-		GenDebugStates(DebugBufferData);
+		DebugStates = GenDebugStates(DebugBufferData);
 		GGpuRhi->UnMapGpuBuffer(DebugBuffer);
+		
+#if !SH_SHIPPING
+		DumpDebugStatesToFile(DebugStates, DebuggerContext.Get(), PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / TEXT("DebugStates.txt"));
+#endif
 
 		InitDebuggerView();
 
@@ -1686,39 +1796,81 @@ namespace SH
 		};
 	}
 
-	void ShaderDebugger::GenDebugStates(uint8* DebuggerData)
+	TArray<SpvDebugState> ShaderDebugger::GenDebugStates(uint8* DebuggerData)
 	{
+		TArray<SpvDebugState> States;
 		int Offset = 0;
-		SpvDebuggerStateType StateType = *(SpvDebuggerStateType*)(DebuggerData + Offset);
+		uint32 PackedHeader = *(uint32*)(DebuggerData + Offset);
+		SpvDebuggerStateType StateType;
+		uint32 UnpackedSource;
+		uint32 UnpackedLine;
+		UnpackDebugHeader(PackedHeader, StateType, UnpackedSource, UnpackedLine);
 		SpvLexicalScope* PreScope = nullptr;
+
+		// Call stack to track FuncCall Line/Source for inferring FuncCallAfterReturn
+		struct FuncCallInfo { int32 Line; SpvId Source; };
+		TArray<FuncCallInfo> GenCallStack;
+		bool bJustEnteredCall = false;
+
 		while (StateType != SpvDebuggerStateType::None)
 		{
-			Offset += sizeof(SpvDebuggerStateType);
+			if (SpvId* ScopeIdPtr = DebuggerContext->HeaderToScope.Find(PackedHeader))
+			{
+				SpvLexicalScope* NewScope = DebuggerContext->LexicalScopes[*ScopeIdPtr].Get();
+				if (NewScope != PreScope)
+				{
+					// Detect function return: scope changes from callee function to caller function
+					// bJustEnteredCall is true when the previous state was a FuncCall (entering a function, not returning)
+					SpvFunctionDesc* PreFuncDesc = GetFunctionDesc(PreScope);
+					SpvFunctionDesc* NewFuncDesc = GetFunctionDesc(NewScope);
+					bool bFuncReturn = PreFuncDesc && NewFuncDesc && PreFuncDesc != NewFuncDesc
+						&& !bJustEnteredCall && !GenCallStack.IsEmpty();
+
+					States.Add(SpvDebugState_ScopeChange{
+						{
+							.PreScope = PreScope,
+							.NewScope = NewScope,
+						}
+					});
+
+					if (bFuncReturn)
+					{
+						auto CallInfo = GenCallStack.Pop();
+						States.Add(SpvDebugState_Tag{
+							.Line = CallInfo.Line,
+							.Source = CallInfo.Source,
+							.bFuncCallAfterReturn = true,
+						});
+					}
+
+					PreScope = NewScope;
+				}
+			}
+
+			bJustEnteredCall = false;
+			Offset += sizeof(uint32);
+			int32 Line = (int32)UnpackedLine;
+			SpvId Source = SpvId(UnpackedSource);
 			switch (StateType)
 			{
 			case SpvDebuggerStateType::VarChange:
 			{
-				int32 Line = *(int32*)(DebuggerData + Offset);
-				Offset += 4;
-				SpvId Source = *(SpvId*)(DebuggerData + Offset);
-				Offset += 4;
 				SpvId VarId = *(SpvId*)(DebuggerData + Offset);
 				Offset += 4;
 				int32 IndexNum = *(int32*)(DebuggerData + Offset);
 				Offset += 4;
 				TArray<int32> Indexes = { (int32*)(DebuggerData + Offset), IndexNum};
 				Offset += IndexNum * 4;
-				int32 ValueSize = *(int32*)(DebuggerData + Offset);
-				Offset += 4;
-				TArray<uint8> DirtyValue = {DebuggerData + Offset, ValueSize};
-				Offset += DirtyValue.Num();
 
 				SpvVariable* DirtyVar = DebuggerContext->FindVar(VarId);
 				auto AccessOrError = GetAccess(DirtyVar, Indexes);
 				if (!AccessOrError.HasError())
 				{
-					const auto& [_, ByteOffset] = AccessOrError.GetValue();
+					const auto& [AccessedType, ByteOffset] = AccessOrError.GetValue();
+					int32 ValueSize = GetTypeByteSize(AccessedType);
 					TArray<uint8> PreDirtyValue = { &DirtyVar->GetBuffer()[ByteOffset], ValueSize };
+					TArray<uint8> DirtyValue = {DebuggerData + Offset, ValueSize};
+					Offset += ValueSize;
 
 					auto NewDebugState = SpvDebugState_VarChange{
 						.Line = Line,
@@ -1730,45 +1882,30 @@ namespace SH
 							.ByteOffset = ByteOffset,
 						},
 					};
-					DebugStates.Add(MoveTemp(NewDebugState));
+					States.Add(MoveTemp(NewDebugState));
 				}
 				else
 				{
+					// Still need to advance past the value data in the buffer.
+					Offset += GetTypeByteSize(GetAccessedType(DirtyVar, Indexes));
+
 					auto NewDebugState = SpvDebugState_VarChange{
 						.Line = Line,
 						.Source = Source,
 						.Error = AccessOrError.GetError()
 					};
-					DebugStates.Add(MoveTemp(NewDebugState));
+					States.Add(MoveTemp(NewDebugState));
 				}
 
 				break;
 			}
-			case SpvDebuggerStateType::ScopeChange:
-			{
-				SpvId ScopeId = *(SpvId*)(DebuggerData + Offset);
-				Offset += 4;
-				SpvLexicalScope* NewScope = DebuggerContext->LexicalScopes[ScopeId].Get();
-				DebugStates.Add(SpvDebugState_ScopeChange{
-					{
-						.PreScope = PreScope,
-						.NewScope = NewScope,
-					}
-				});
-				PreScope = NewScope;
-				break;
-			}
 			case SpvDebuggerStateType::ReturnValue:
 			{
-				int32 Line = *(int32*)(DebuggerData + Offset);
-				Offset += 4;
-				SpvId Source = *(SpvId*)(DebuggerData + Offset);
-				Offset += 4;
 				int32 ValueSize = *(int32*)(DebuggerData + Offset);
 				Offset += 4;
 				TArray<uint8> ReturnValue = { DebuggerData + Offset, ValueSize };
 				Offset += ReturnValue.Num();
-				DebugStates.Add(SpvDebugState_ReturnValue{
+				States.Add(SpvDebugState_ReturnValue{
 					.Line = Line,
 					.Source = Source,
 					.Value = MoveTemp(ReturnValue)
@@ -1777,12 +1914,10 @@ namespace SH
 			}
 			case SpvDebuggerStateType::Access:
 			{
-				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
-				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId VarId = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 IndexNum = *(int32*)(DebuggerData + Offset); Offset += 4;
 				TArray<int32> Indexes = { (int32*)(DebuggerData + Offset), IndexNum }; Offset += IndexNum * 4;
-				DebugStates.Add(SpvDebugState_Access{
+				States.Add(SpvDebugState_Access{
 					.Line = Line,
 					.Source = Source,
 					.VarId = VarId,
@@ -1792,12 +1927,10 @@ namespace SH
 			}
 			case SpvDebuggerStateType::Normalize:
 			{
-				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
-				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
-				DebugStates.Add(SpvDebugState_Normalize{
+				States.Add(SpvDebugState_Normalize{
 					.Line = Line,
 					.Source = Source,
 					.ResultType = ResultType,
@@ -1807,13 +1940,11 @@ namespace SH
 			}
 			case SpvDebuggerStateType::SmoothStep:
 			{
-				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
-				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> Edge0 = { DebuggerData + Offset, Size }; Offset += Edge0.Num();
 				TArray<uint8> Edge1 = { DebuggerData + Offset, Size }; Offset += Edge1.Num();
-				DebugStates.Add(SpvDebugState_SmoothStep{
+				States.Add(SpvDebugState_SmoothStep{
 					.Line = Line,
 					.Source = Source,
 					.ResultType = ResultType,
@@ -1824,13 +1955,11 @@ namespace SH
 			}
 			case SpvDebuggerStateType::Pow:
 			{
-				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
-				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
 				TArray<uint8> Y = { DebuggerData + Offset, Size }; Offset += Y.Num();
-				DebugStates.Add(SpvDebugState_Pow{
+				States.Add(SpvDebugState_Pow{
 					.Line = Line,
 					.Source = Source,
 					.ResultType = ResultType,
@@ -1841,13 +1970,11 @@ namespace SH
 			}
 			case SpvDebuggerStateType::Clamp:
 			{
-				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
-				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> MinVal = { DebuggerData + Offset, Size }; Offset += MinVal.Num();
 				TArray<uint8> MaxVal = { DebuggerData + Offset, Size }; Offset += MaxVal.Num();
-				DebugStates.Add(SpvDebugState_Clamp{
+				States.Add(SpvDebugState_Clamp{
 					.Line = Line,
 					.Source = Source,
 					.ResultType = ResultType,
@@ -1858,12 +1985,10 @@ namespace SH
 			}
 			case SpvDebuggerStateType::Div:
 			{
-				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
-				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> Operand2 = { DebuggerData + Offset, Size }; Offset += Operand2.Num();
-				DebugStates.Add(SpvDebugState_Div{
+				States.Add(SpvDebugState_Div{
 					.Line = Line,
 					.Source = Source,
 					.ResultType = ResultType,
@@ -1873,12 +1998,10 @@ namespace SH
 			}
 			case SpvDebuggerStateType::ConvertF:
 			{
-				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
-				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> FloatValue = { DebuggerData + Offset, Size }; Offset += FloatValue.Num();
-				DebugStates.Add(SpvDebugState_ConvertF{
+				States.Add(SpvDebugState_ConvertF{
 					.Line = Line,
 					.Source = Source,
 					.ResultType = ResultType,
@@ -1888,13 +2011,11 @@ namespace SH
 			}
 			case SpvDebuggerStateType::Remainder:
 			{
-				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
-				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> Operand1 = { DebuggerData + Offset, Size }; Offset += Operand1.Num();
 				TArray<uint8> Operand2 = { DebuggerData + Offset, Size }; Offset += Operand2.Num();
-				DebugStates.Add(SpvDebugState_Remainder{
+				States.Add(SpvDebugState_Remainder{
 					.Line = Line,
 					.Source = Source,
 					.ResultType = ResultType,
@@ -1905,12 +2026,10 @@ namespace SH
 			}
 			case SpvDebuggerStateType::Log:
 			{
-				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
-				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
-				DebugStates.Add(SpvDebugState_Log{
+				States.Add(SpvDebugState_Log{
 					.Line = Line,
 					.Source = Source,
 					.ResultType = ResultType,
@@ -1920,12 +2039,10 @@ namespace SH
 			}
 			case SpvDebuggerStateType::Asin:
 			{
-				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
-				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
-				DebugStates.Add(SpvDebugState_Asin{
+				States.Add(SpvDebugState_Asin{
 					.Line = Line,
 					.Source = Source,
 					.ResultType = ResultType,
@@ -1935,12 +2052,10 @@ namespace SH
 			}
 			case SpvDebuggerStateType::Acos:
 			{
-				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
-				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
-				DebugStates.Add(SpvDebugState_Acos{
+				States.Add(SpvDebugState_Acos{
 					.Line = Line,
 					.Source = Source,
 					.ResultType = ResultType,
@@ -1950,12 +2065,10 @@ namespace SH
 			}
 			case SpvDebuggerStateType::Sqrt:
 			{
-				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
-				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
-				DebugStates.Add(SpvDebugState_Sqrt{
+				States.Add(SpvDebugState_Sqrt{
 					.Line = Line,
 					.Source = Source,
 					.ResultType = ResultType,
@@ -1965,12 +2078,10 @@ namespace SH
 			}
 			case SpvDebuggerStateType::InverseSqrt:
 			{
-				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
-				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
-				DebugStates.Add(SpvDebugState_InverseSqrt{
+				States.Add(SpvDebugState_InverseSqrt{
 					.Line = Line,
 					.Source = Source,
 					.ResultType = ResultType,
@@ -1980,13 +2091,11 @@ namespace SH
 			}
 			case SpvDebuggerStateType::Atan2:
 			{
-				int32 Line = *(int32*)(DebuggerData + Offset); Offset += 4;
-				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				SpvId ResultType = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 Size = GetTypeByteSize(DebuggerContext->Types[ResultType].Get());
 				TArray<uint8> Y = { DebuggerData + Offset, Size }; Offset += Y.Num();
 				TArray<uint8> X = { DebuggerData + Offset, Size }; Offset += X.Num();
-				DebugStates.Add(SpvDebugState_Atan2{
+				States.Add(SpvDebugState_Atan2{
 					.Line = Line,
 					.Source = Source,
 					.ResultType = ResultType,
@@ -1997,62 +2106,37 @@ namespace SH
 			}
 			case SpvDebuggerStateType::Condition:
 			{
-				int32 Line = *(int32*)(DebuggerData + Offset);
-				Offset += 4;
-				SpvId Source = *(SpvId*)(DebuggerData + Offset);
-				Offset += 4;
-				DebugStates.Add(SpvDebugState_Tag{
+				States.Add(SpvDebugState_Tag{
 					.Line = Line,
 					.Source = Source,
 					.bCondition = true,
 				});
 				break;
 			}
-			case SpvDebuggerStateType::FuncCall:
-			{
-				int32 Line = *(int32*)(DebuggerData + Offset);  Offset += 4;
-				SpvId Source = *(SpvId*)(DebuggerData + Offset); Offset += 4;
-				SpvId CallId = *(SpvId*)(DebuggerData + Offset); Offset += 4;
-				DebugStates.Add(SpvDebugState_FuncCall{
-					.Line = Line,
-					.Source = Source,
-					.CallId = CallId,
-				});
-				break;
-			}
-			case SpvDebuggerStateType::FuncCallAfterReturn:
-			{
-				int32 Line = *(int32*)(DebuggerData + Offset);
-				Offset += 4;
-				SpvId Source = *(SpvId*)(DebuggerData + Offset);
-				Offset += 4;
-				DebugStates.Add(SpvDebugState_Tag{
-					.Line = Line,
-					.Source = Source,
-					.bFuncCallAfterReturn = true,
-				});
-				break;
-			}
 			case SpvDebuggerStateType::Return:
 			{
-				int32 Line = *(int32*)(DebuggerData + Offset);
-				Offset += 4;
-				SpvId Source = *(SpvId*)(DebuggerData + Offset);
-				Offset += 4;
-				DebugStates.Add(SpvDebugState_Tag{
+				States.Add(SpvDebugState_Tag{
 					.Line = Line,
 					.Source = Source,
 					.bReturn = true,
 				});
 				break;
 			}
+			case SpvDebuggerStateType::FuncCall:
+			{
+				SpvId CallId = *(SpvId*)(DebuggerData + Offset); Offset += 4;
+				States.Add(SpvDebugState_FuncCall{
+					.Line = Line,
+					.Source = Source,
+					.CallId = CallId,
+				});
+				GenCallStack.Add({ Line, Source });
+				bJustEnteredCall = true;
+				break;
+			}
 			case SpvDebuggerStateType::Kill:
 			{
-				int32 Line = *(int32*)(DebuggerData + Offset);
-				Offset += 4;
-				SpvId Source = *(SpvId*)(DebuggerData + Offset);
-				Offset += 4;
-				DebugStates.Add(SpvDebugState_Tag{
+				States.Add(SpvDebugState_Tag{
 					.Line = Line,
 					.Source = Source,
 					.bKill = true,
@@ -2062,8 +2146,12 @@ namespace SH
 			default:
 				AUX::Unreachable();
 			}
-			StateType = *(SpvDebuggerStateType*)(DebuggerData + Offset);
+			// Align offset to 16-byte boundary (uvec4 stride)
+			Offset = (Offset + 15) & ~15;
+			PackedHeader = *(uint32*)(DebuggerData + Offset);
+			UnpackDebugHeader(PackedHeader, StateType, UnpackedSource, UnpackedLine);
 		}
+		return States;
 	}
 
 }

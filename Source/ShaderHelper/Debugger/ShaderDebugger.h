@@ -87,7 +87,7 @@ namespace SH
 	private:
 		int32 GetExtraLineNumForSource(FW::SpvId Source) const;
 		void InitDebuggerView();
-		void GenDebugStates(uint8* DebuggerData);
+		TArray<FW::SpvDebugState> GenDebugStates(uint8* DebuggerData);
 
 	private:
 		ShaderAsset* CurShaderAsset = nullptr;

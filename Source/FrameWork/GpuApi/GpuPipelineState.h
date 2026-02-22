@@ -24,6 +24,8 @@ namespace FW
 		BlendOp AlphaOp = BlendOp::Add;
 		BlendFactor DestAlphaFactor = BlendFactor::Zero;
 		BlendMask Mask = BlendMask::All;
+
+		bool operator==(const PipelineTargetDesc& Other) const = default;
     };
 
 	struct GpuComputePipelineStateDesc
@@ -81,14 +83,50 @@ namespace FW
 	};
 
 	// PSO Cache Key - uniquely identifies a pipeline state based on shader bytecode and pipeline parameters
-	struct GpuPsoCacheKey
+	// Note: Hash is used for bucket lookup (GetTypeHash), but operator== compares the full descriptor
+	// to avoid hash collisions (e.g. PointerHash truncates 64-bit pointers to 32-bit on 64-bit platforms).
+	struct GpuRenderPsoCacheKey
 	{
 		uint32 Hash;
+		GpuRenderPipelineStateDesc Desc;
 
-		bool operator==(const GpuPsoCacheKey& Other) const = default;
-		friend uint32 GetTypeHash(const GpuPsoCacheKey& Key)
+		bool operator==(const GpuRenderPsoCacheKey& Other) const
 		{
-			return ::GetTypeHash(Key.Hash);
+			return Desc.Vs == Other.Desc.Vs
+				&& Desc.Ps == Other.Desc.Ps
+				&& Desc.BindGroupLayout0 == Other.Desc.BindGroupLayout0
+				&& Desc.BindGroupLayout1 == Other.Desc.BindGroupLayout1
+				&& Desc.BindGroupLayout2 == Other.Desc.BindGroupLayout2
+				&& Desc.BindGroupLayout3 == Other.Desc.BindGroupLayout3
+				&& Desc.RasterizerState.FillMode == Other.Desc.RasterizerState.FillMode
+				&& Desc.RasterizerState.CullMode == Other.Desc.RasterizerState.CullMode
+				&& Desc.Primitive == Other.Desc.Primitive
+				&& Desc.Targets == Other.Desc.Targets;
+		}
+
+		friend uint32 GetTypeHash(const GpuRenderPsoCacheKey& Key)
+		{
+			return Key.Hash;
+		}
+	};
+
+	struct GpuComputePsoCacheKey
+	{
+		uint32 Hash;
+		GpuComputePipelineStateDesc Desc;
+
+		bool operator==(const GpuComputePsoCacheKey& Other) const
+		{
+			return Desc.Cs == Other.Desc.Cs
+				&& Desc.BindGroupLayout0 == Other.Desc.BindGroupLayout0
+				&& Desc.BindGroupLayout1 == Other.Desc.BindGroupLayout1
+				&& Desc.BindGroupLayout2 == Other.Desc.BindGroupLayout2
+				&& Desc.BindGroupLayout3 == Other.Desc.BindGroupLayout3;
+		}
+
+		friend uint32 GetTypeHash(const GpuComputePsoCacheKey& Key)
+		{
+			return Key.Hash;
 		}
 	};
 
@@ -102,18 +140,20 @@ namespace FW
 		static GpuPsoCacheManager& Get();
 
 		// Try to find cached PSO, returns nullptr if not found
-		TRefCountPtr<GpuRenderPipelineState> FindRenderPso(const GpuPsoCacheKey& Key);
-		TRefCountPtr<GpuComputePipelineState> FindComputePso(const GpuPsoCacheKey& Key);
+		TRefCountPtr<GpuRenderPipelineState> FindRenderPso(const GpuRenderPsoCacheKey& Key);
+		TRefCountPtr<GpuComputePipelineState> FindComputePso(const GpuComputePsoCacheKey& Key);
 
-		void AddRenderPso(const GpuPsoCacheKey& Key, TRefCountPtr<GpuRenderPipelineState> Pso);
-		void AddComputePso(const GpuPsoCacheKey& Key, TRefCountPtr<GpuComputePipelineState> Pso);
+		void AddRenderPso(const GpuRenderPsoCacheKey& Key, TRefCountPtr<GpuRenderPipelineState> Pso);
+		void AddComputePso(const GpuComputePsoCacheKey& Key, TRefCountPtr<GpuComputePipelineState> Pso);
 
 		// Compute cache key from pipeline state desc
-		static GpuPsoCacheKey ComputeRenderPsoKey(const GpuRenderPipelineStateDesc& Desc);
-		static GpuPsoCacheKey ComputeComputePsoKey(const GpuComputePipelineStateDesc& Desc);
+		static GpuRenderPsoCacheKey ComputeRenderPsoKey(const GpuRenderPipelineStateDesc& Desc);
+		static GpuComputePsoCacheKey ComputeComputePsoKey(const GpuComputePipelineStateDesc& Desc);
 
 		// Create pipeline state with caching
 		TRefCountPtr<GpuRenderPipelineState> CreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc);
+		void CreateRenderPipelineStateAsync(const GpuRenderPipelineStateDesc& InPipelineStateDesc,
+			TFunction<void(TRefCountPtr<GpuRenderPipelineState>)> Callback);
 		TRefCountPtr<GpuComputePipelineState> CreateComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc);
 
 		void ClearCache();
@@ -124,8 +164,8 @@ namespace FW
 	private:
 		GpuPsoCacheManager();
 
-		TLruCache<GpuPsoCacheKey, TRefCountPtr<GpuRenderPipelineState>> RenderPsoCache;
-		TLruCache<GpuPsoCacheKey, TRefCountPtr<GpuComputePipelineState>> ComputePsoCache;
+		TLruCache<GpuRenderPsoCacheKey, TRefCountPtr<GpuRenderPipelineState>> RenderPsoCache;
+		TLruCache<GpuComputePsoCacheKey, TRefCountPtr<GpuComputePipelineState>> ComputePsoCache;
 		mutable FCriticalSection CacheLock;
 	};
 }

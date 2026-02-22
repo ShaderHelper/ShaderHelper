@@ -4,6 +4,23 @@
 
 namespace FW
 {
+	SpvType* GetAccessedType(const SpvVariable* Var, const TArray<int32>& Indexes)
+	{
+		SpvType* CurType = Var->Type;
+		for (int32 Index : Indexes)
+		{
+			switch (CurType->GetKind())
+			{
+			case SpvTypeKind::Vector: CurType = static_cast<SpvVectorType*>(CurType)->ElementType; break;
+			case SpvTypeKind::Array:  CurType = static_cast<SpvArrayType*>(CurType)->ElementType;  break;
+			case SpvTypeKind::Matrix: CurType = static_cast<SpvMatrixType*>(CurType)->ElementType;  break;
+			case SpvTypeKind::Struct: CurType = static_cast<SpvStructType*>(CurType)->MemberTypes[Index]; break;
+			default: AUX::Unreachable();
+			}
+		}
+		return CurType;
+	}
+
 	TValueOrError<std::tuple<SpvType*, int32>, FString> GetAccess(const SpvVariable* Var, const TArray<int32>& Indexes)
 	{
 		int32 Offset = 0;
@@ -71,11 +88,12 @@ namespace FW
 	SpvId PatchDebuggerBuffer(SpvPatcher& Patcher)
 	{
 		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
-		SpvId RunTimeArrayType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeRuntimeArray>(UIntType));
+		SpvId UVec4Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, 4));
+		SpvId RunTimeArrayType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeRuntimeArray>(UVec4Type));
 		SpvId DebuggerBufferType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeStruct>(TArray<SpvId>{RunTimeArrayType}));
 		SpvId DebuggerBufferPointerType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Uniform, DebuggerBufferType));
 
-		int ArrayStride = 4;
+		int ArrayStride = 16;
 		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(RunTimeArrayType, SpvDecorationKind::ArrayStride, TArray<uint8>{ (uint8*)&ArrayStride, sizeof(int) }));
 		int MemberOffset = 0;
 		Patcher.AddAnnotation(MakeUnique<SpvOpMemberDecorate>(DebuggerBufferType, 0, SpvDecorationKind::Offset, TArray<uint8>{ (uint8*)&MemberOffset, sizeof(int) }));
@@ -152,7 +170,6 @@ namespace FW
 	void SpvDebuggerVisitor::Visit(const SpvDebugScope* Inst)
 	{
 		CurScope = Context.LexicalScopes[Inst->GetScope()].Get();
-		AppendScope([&] { return Inst->GetWordOffset().value() + Inst->GetWordLen().value(); });
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvOpFunction* Inst)
@@ -174,19 +191,16 @@ namespace FW
 		
 		TArray<TUniquePtr<SpvInstruction>> AppendCallInsts;
 		{
-			SpvId StateType = Patcher.FindOrAddConstant((uint32)SpvDebuggerStateType::FuncCall);
-			SpvId Line = Patcher.FindOrAddConstant((uint32)CurLine);
-			SpvId Source = Patcher.FindOrAddConstant(CurSource.GetValue());
+			uint32 PackedHeaderValue = PackDebugHeader(SpvDebuggerStateType::FuncCall, CurSource.GetValue(), (uint32)CurLine);
+			if (CurScope) { Context.HeaderToScope.Add(PackedHeaderValue, CurScope->GetId()); }
+			SpvId PackedHeader = Patcher.FindOrAddConstant(PackedHeaderValue);
 			SpvId CallId = Patcher.FindOrAddConstant(ResultId.GetValue());
 			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
-			auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendCallFuncId, TArray<SpvId>{ StateType, Line, Source, CallId});
+			auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendCallFuncId, TArray<SpvId>{ PackedHeader, CallId});
 			FuncCallOp->SetId(Patcher.NewId());
 			AppendCallInsts.Add(MoveTemp(FuncCallOp));
 		}
 		Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(AppendCallInsts));
-
-		AppendTag([&] { return Inst->GetWordOffset().value() + Inst->GetWordLen().value(); }, SpvDebuggerStateType::FuncCallAfterReturn);
-		AppendScope([&] { return Inst->GetWordOffset().value() + Inst->GetWordLen().value(); });
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvOpFunctionParameter* Inst)
@@ -248,7 +262,11 @@ namespace FW
 		if (EnableUbsan)
 		{
 			SpvPointer* Pointer = Context.FindPointer(Inst->GetPointer());
-			AppendAccess([&] {return Inst->GetWordOffset().value(); }, Pointer);
+			// Only check initialization for user-declared variables
+			if (Pointer && Context.VariableDescMap.contains(Pointer->Var->Id))
+			{
+				AppendAccess([&] {return Inst->GetWordOffset().value(); }, Pointer);
+			}
 		}
 
 	}
@@ -256,6 +274,11 @@ namespace FW
 	void SpvDebuggerVisitor::Visit(const SpvOpStore* Inst)
 	{
 		SpvPointer* Pointer = Context.FindPointer(Inst->GetPointer());
+		// Only track user-declared variables, skip compiler-generated temporaries (param, param_1, etc.)
+		if (!Pointer || !Context.VariableDescMap.contains(Pointer->Var->Id))
+		{
+			return;
+		}
 		if (SpvOpFunctionCall* FuncCall = AppendVar([&] {return Inst->GetWordOffset().value() + Inst->GetWordLen().value(); }, Pointer))
 		{
 			AppendVarCallToStore.Add(FuncCall, Inst);
@@ -518,138 +541,231 @@ namespace FW
 
 	void SpvDebuggerVisitor::PatchToDebugger(SpvId InValueId, SpvId InTypeId, TArray<TUniquePtr<SpvInstruction>>& InstList)
 	{
+		TArray<SpvId> UIntValues;
+		FlattenToUInts(InValueId, InTypeId, InstList, UIntValues);
+		BatchStoreToDebugBuffer(UIntValues, InstList);
+	}
+
+	void SpvDebuggerVisitor::FlattenToUInts(SpvId InValueId, SpvId InTypeId, TArray<TUniquePtr<SpvInstruction>>& InstList, TArray<SpvId>& OutUIntValues)
+	{
 		SpvType* Type = Context.Types.at(InTypeId).Get();
 		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
-		SpvId IntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 1));
 		if (InTypeId == UIntType)
 		{
-			SpvId LoadedDebuggerOffset = Patcher.NewId();
-			auto LoadedDebuggerOffsetOp = MakeUnique<SpvOpLoad>(UIntType, DebuggerOffset);
-			LoadedDebuggerOffsetOp->SetId(LoadedDebuggerOffset);
-			InstList.Add(MoveTemp(LoadedDebuggerOffsetOp));
+			OutUIntValues.Add(InValueId);
+		}
+		else if (Type->IsScalar())
+		{
+			if (Type->GetKind() == SpvTypeKind::Bool)
+			{
+				SpvId SelectValue = Patcher.NewId();
+				auto SelectOp = MakeUnique<SpvOpSelect>(UIntType, InValueId, Patcher.FindOrAddConstant(1u), Patcher.FindOrAddConstant(0u));
+				SelectOp->SetId(SelectValue);
+				InstList.Add(MoveTemp(SelectOp));
+				OutUIntValues.Add(SelectValue);
+			}
+			else if (SpvIntegerType* IntegerType = dynamic_cast<SpvIntegerType*>(Type); IntegerType && IntegerType->GetWidth() == 64)
+			{
+				SpvId UInt2Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, 2));
+				SpvId UInt64Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(64, 0));
+				SpvId CastInput = InValueId;
+				if (IntegerType->IsSigend())
+				{
+					CastInput = Patcher.NewId();
+					auto BitCastOp = MakeUnique<SpvOpBitcast>(UInt64Type, InValueId);
+					BitCastOp->SetId(CastInput);
+					InstList.Add(MoveTemp(BitCastOp));
+				}
+				SpvId BitCastValue = Patcher.NewId();
+				auto BitCastOp = MakeUnique<SpvOpBitcast>(UInt2Type, CastInput);
+				BitCastOp->SetId(BitCastValue);
+				InstList.Add(MoveTemp(BitCastOp));
+				FlattenToUInts(BitCastValue, UInt2Type, InstList, OutUIntValues);
+			}
+			else
+			{
+				SpvId BitCastValue = Patcher.NewId();
+				auto BitCastOp = MakeUnique<SpvOpBitcast>(UIntType, InValueId);
+				BitCastOp->SetId(BitCastValue);
+				InstList.Add(MoveTemp(BitCastOp));
+				OutUIntValues.Add(BitCastValue);
+			}
+		}
+		else if (Type->GetKind() == SpvTypeKind::Vector)
+		{
+			SpvVectorType* VectorType = static_cast<SpvVectorType*>(Type);
+			for (uint32 Index = 0; Index < VectorType->ElementCount; Index++)
+			{
+				SpvId ElementTypeId = VectorType->ElementType->GetId();
+				SpvId ExtractedValue = Patcher.NewId();
+				auto ExtractOp = MakeUnique<SpvOpCompositeExtract>(ElementTypeId, InValueId, TArray<uint32>{Index});
+				ExtractOp->SetId(ExtractedValue);
+				InstList.Add(MoveTemp(ExtractOp));
+				FlattenToUInts(ExtractedValue, ElementTypeId, InstList, OutUIntValues);
+			}
+		}
+		else if (Type->GetKind() == SpvTypeKind::Struct)
+		{
+			SpvStructType* StructType = static_cast<SpvStructType*>(Type);
+			for (uint32 Index = 0; Index < (uint32)StructType->MemberTypes.Num(); Index++)
+			{
+				SpvId MemberTypeId = StructType->MemberTypes[Index]->GetId();
+				SpvId ExtractedValue = Patcher.NewId();
+				auto ExtractOp = MakeUnique<SpvOpCompositeExtract>(MemberTypeId, InValueId, TArray<uint32>{Index});
+				ExtractOp->SetId(ExtractedValue);
+				InstList.Add(MoveTemp(ExtractOp));
+				FlattenToUInts(ExtractedValue, MemberTypeId, InstList, OutUIntValues);
+			}
+		}
+		else if (Type->GetKind() == SpvTypeKind::Array)
+		{
+			SpvArrayType* ArrayType = static_cast<SpvArrayType*>(Type);
+			for (uint32 Index = 0; Index < ArrayType->Length; Index++)
+			{
+				SpvId ElementTypeId = ArrayType->ElementType->GetId();
+				SpvId ExtractedValue = Patcher.NewId();
+				auto ExtractOp = MakeUnique<SpvOpCompositeExtract>(ElementTypeId, InValueId, TArray<uint32>{Index});
+				ExtractOp->SetId(ExtractedValue);
+				InstList.Add(MoveTemp(ExtractOp));
+				FlattenToUInts(ExtractedValue, ElementTypeId, InstList, OutUIntValues);
+			}
+		}
+		else if (Type->GetKind() == SpvTypeKind::Matrix)
+		{
+			SpvMatrixType* MatrixType = static_cast<SpvMatrixType*>(Type);
+			for (uint32 Index = 0; Index < MatrixType->ElementCount; Index++)
+			{
+				SpvId ElementTypeId = MatrixType->ElementType->GetId();
+				SpvId ExtractedValue = Patcher.NewId();
+				auto ExtractOp = MakeUnique<SpvOpCompositeExtract>(ElementTypeId, InValueId, TArray<uint32>{Index});
+				ExtractOp->SetId(ExtractedValue);
+				InstList.Add(MoveTemp(ExtractOp));
+				FlattenToUInts(ExtractedValue, ElementTypeId, InstList, OutUIntValues);
+			}
+		}
+	}
 
-			SpvId AlignedDebuggerOffset = Patcher.NewId();
-			auto AlignedDebuggerOffsetOp = MakeUnique<SpvOpShiftRightLogical>(UIntType, LoadedDebuggerOffset, Patcher.FindOrAddConstant(2u));
-			AlignedDebuggerOffsetOp->SetId(AlignedDebuggerOffset);
-			InstList.Add(MoveTemp(AlignedDebuggerOffsetOp));
+	void SpvDebuggerVisitor::BatchStoreToDebugBuffer(const TArray<SpvId>& UIntValues, TArray<TUniquePtr<SpvInstruction>>& InstList)
+	{
+		if (UIntValues.IsEmpty())
+		{
+			return;
+		}
 
-			SpvId UIntPointerUniformType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Uniform, UIntType));
-			SpvId DebuggerBufferStorage = Patcher.NewId();
-			auto DebuggerBufferStorageOp = MakeUnique<SpvOpAccessChain>(UIntPointerUniformType, DebuggerBuffer, TArray<SpvId>{Patcher.FindOrAddConstant(0u), AlignedDebuggerOffset});
-			DebuggerBufferStorageOp->SetId(DebuggerBufferStorage);
-			InstList.Add(MoveTemp(DebuggerBufferStorageOp));
+		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
+		SpvId UVec4Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, 4));
+		SpvId UVec4PointerUniformType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Uniform, UVec4Type));
+		SpvId Zero = Patcher.FindOrAddConstant(0u);
 
-			InstList.Add(MakeUnique<SpvOpStore>(DebuggerBufferStorage, InValueId));
+		// Load offset once
+		SpvId LoadedDebuggerOffset = Patcher.NewId();
+		{
+			auto Op = MakeUnique<SpvOpLoad>(UIntType, DebuggerOffset);
+			Op->SetId(LoadedDebuggerOffset);
+			InstList.Add(MoveTemp(Op));
+		}
 
-			SpvId NewDebuggerOffset = Patcher.NewId();
-			auto AddOp = MakeUnique<SpvOpIAdd>(UIntType, LoadedDebuggerOffset, Patcher.FindOrAddConstant(4u));
+		// Base index = offset / 16 (since each element is uvec4 = 16 bytes)
+		SpvId BaseIndex = Patcher.NewId();
+		{
+			auto ShiftOp = MakeUnique<SpvOpShiftRightLogical>(UIntType, LoadedDebuggerOffset, Patcher.FindOrAddConstant(4u));
+			ShiftOp->SetId(BaseIndex);
+			InstList.Add(MoveTemp(ShiftOp));
+		}
+
+		int32 NumValues = UIntValues.Num();
+		int32 NumFullVec4s = NumValues / 4;
+		int32 Remainder = NumValues % 4;
+
+		// Store full uvec4 groups
+		for (int32 i = 0; i < NumFullVec4s; i++)
+		{
+			// Construct uvec4
+			SpvId Vec4Value = Patcher.NewId();
+			{
+				auto ConstructOp = MakeUnique<SpvOpCompositeConstruct>(UVec4Type, TArray<SpvId>{
+					UIntValues[i * 4 + 0], UIntValues[i * 4 + 1], UIntValues[i * 4 + 2], UIntValues[i * 4 + 3]
+				});
+				ConstructOp->SetId(Vec4Value);
+				InstList.Add(MoveTemp(ConstructOp));
+			}
+
+			// AccessChain to buffer[0][baseIndex + i]
+			SpvId StoreIndex;
+			if (i == 0)
+			{
+				StoreIndex = BaseIndex;
+			}
+			else
+			{
+				StoreIndex = Patcher.NewId();
+				auto AddOp = MakeUnique<SpvOpIAdd>(UIntType, BaseIndex, Patcher.FindOrAddConstant((uint32)i));
+				AddOp->SetId(StoreIndex);
+				InstList.Add(MoveTemp(AddOp));
+			}
+
+			SpvId StoragePtr = Patcher.NewId();
+			{
+				auto ChainOp = MakeUnique<SpvOpAccessChain>(UVec4PointerUniformType, DebuggerBuffer, TArray<SpvId>{Zero, StoreIndex});
+				ChainOp->SetId(StoragePtr);
+				InstList.Add(MoveTemp(ChainOp));
+			}
+
+			InstList.Add(MakeUnique<SpvOpStore>(StoragePtr, Vec4Value));
+		}
+
+		// Store remaining values (pad with 0)
+		if (Remainder > 0)
+		{
+			TArray<SpvId> Components;
+			for (int32 i = 0; i < Remainder; i++)
+			{
+				Components.Add(UIntValues[NumFullVec4s * 4 + i]);
+			}
+			for (int32 i = Remainder; i < 4; i++)
+			{
+				Components.Add(Zero);
+			}
+
+			SpvId Vec4Value = Patcher.NewId();
+			{
+				auto ConstructOp = MakeUnique<SpvOpCompositeConstruct>(UVec4Type, Components);
+				ConstructOp->SetId(Vec4Value);
+				InstList.Add(MoveTemp(ConstructOp));
+			}
+
+			SpvId StoreIndex;
+			if (NumFullVec4s == 0)
+			{
+				StoreIndex = BaseIndex;
+			}
+			else
+			{
+				StoreIndex = Patcher.NewId();
+				auto AddOp = MakeUnique<SpvOpIAdd>(UIntType, BaseIndex, Patcher.FindOrAddConstant((uint32)NumFullVec4s));
+				AddOp->SetId(StoreIndex);
+				InstList.Add(MoveTemp(AddOp));
+			}
+
+			SpvId StoragePtr = Patcher.NewId();
+			{
+				auto ChainOp = MakeUnique<SpvOpAccessChain>(UVec4PointerUniformType, DebuggerBuffer, TArray<SpvId>{Zero, StoreIndex});
+				ChainOp->SetId(StoragePtr);
+				InstList.Add(MoveTemp(ChainOp));
+			}
+
+			InstList.Add(MakeUnique<SpvOpStore>(StoragePtr, Vec4Value));
+		}
+
+		// Update offset: advance by ceil(NumValues/4)*16 bytes (uvec4-aligned)
+		int32 TotalVec4s = NumFullVec4s + (Remainder > 0 ? 1 : 0);
+		SpvId NewDebuggerOffset = Patcher.NewId();
+		{
+			auto AddOp = MakeUnique<SpvOpIAdd>(UIntType, LoadedDebuggerOffset, Patcher.FindOrAddConstant((uint32)(TotalVec4s * 16)));
 			AddOp->SetId(NewDebuggerOffset);
 			InstList.Add(MoveTemp(AddOp));
-
-			InstList.Add(MakeUnique<SpvOpStore>(DebuggerOffset, NewDebuggerOffset));
 		}
-		else
-		{
-			if (Type->IsScalar())
-			{
-				if (Type->GetKind() == SpvTypeKind::Bool)
-				{
-					SpvId SelectValue = Patcher.NewId();
-					auto SelectOp = MakeUnique<SpvOpSelect>(UIntType, InValueId, Patcher.FindOrAddConstant(1u), Patcher.FindOrAddConstant(0u));
-					SelectOp->SetId(SelectValue);
-					InstList.Add(MoveTemp(SelectOp));
-					PatchToDebugger(SelectValue, UIntType, InstList);
-				}
-				else if(SpvIntegerType* IntegerType = dynamic_cast<SpvIntegerType*>(Type) ; IntegerType && IntegerType->GetWidth() == 64)
-				{
-					SpvId UInt2Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, 2));
-					SpvId UInt64Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(64, 0));
-					if (IntegerType->IsSigend())
-					{
-						SpvId UInt64Value = Patcher.NewId();
-						{
-							auto BitCastOp = MakeUnique<SpvOpBitcast>(UInt64Type, InValueId);
-							BitCastOp->SetId(UInt64Value);
-							InstList.Add(MoveTemp(BitCastOp));
-						}
-						SpvId BitCastValue = Patcher.NewId();
-						auto BitCastOp = MakeUnique<SpvOpBitcast>(UInt2Type, UInt64Value);
-						BitCastOp->SetId(BitCastValue);
-						InstList.Add(MoveTemp(BitCastOp));
-						PatchToDebugger(BitCastValue, UInt2Type, InstList);
-					}
-					else
-					{
-						SpvId BitCastValue = Patcher.NewId();
-						auto BitCastOp = MakeUnique<SpvOpBitcast>(UInt2Type, InValueId);
-						BitCastOp->SetId(BitCastValue);
-						InstList.Add(MoveTemp(BitCastOp));
-						PatchToDebugger(BitCastValue, UInt2Type, InstList);
-					}
-				}
-				else
-				{
-					SpvId BitCastValue = Patcher.NewId();
-					auto BitCastOp = MakeUnique<SpvOpBitcast>(UIntType, InValueId);
-					BitCastOp->SetId(BitCastValue);
-					InstList.Add(MoveTemp(BitCastOp));
-					PatchToDebugger(BitCastValue, UIntType, InstList);
-				}
-			}
-			else if (Type->GetKind() == SpvTypeKind::Vector)
-			{
-				SpvVectorType* VectorType = static_cast<SpvVectorType*>(Type);
-				for (uint32 Index = 0; Index < VectorType->ElementCount; Index++)
-				{
-					SpvId ElementTypeId = VectorType->ElementType->GetId();
-					SpvId ExtractedValue = Patcher.NewId();
-					auto ExtractOp = MakeUnique<SpvOpCompositeExtract>(ElementTypeId, InValueId, TArray<uint32>{Index});
-					ExtractOp->SetId(ExtractedValue);
-					InstList.Add(MoveTemp(ExtractOp));
-					PatchToDebugger(ExtractedValue, ElementTypeId, InstList);
-				}
-			}
-			else if (Type->GetKind() == SpvTypeKind::Struct)
-			{
-				SpvStructType* StructType = static_cast<SpvStructType*>(Type);
-				for (uint32 Index = 0; Index < (uint32)StructType->MemberTypes.Num(); Index++)
-				{
-					SpvId MemberTypeId = StructType->MemberTypes[Index]->GetId();
-					SpvId ExtractedValue = Patcher.NewId();
-					auto ExtractOp = MakeUnique<SpvOpCompositeExtract>(MemberTypeId, InValueId, TArray<uint32>{Index});
-					ExtractOp->SetId(ExtractedValue);
-					InstList.Add(MoveTemp(ExtractOp));
-					PatchToDebugger(ExtractedValue, MemberTypeId, InstList);
-				}
-			}
-			else if (Type->GetKind() == SpvTypeKind::Array)
-			{
-				SpvArrayType* ArrayType = static_cast<SpvArrayType*>(Type);
-				for (uint32 Index = 0; Index < ArrayType->Length; Index++)
-				{
-					SpvId ElementTypeId = ArrayType->ElementType->GetId();
-					SpvId ExtractedValue = Patcher.NewId();
-					auto ExtractOp = MakeUnique<SpvOpCompositeExtract>(ElementTypeId, InValueId, TArray<uint32>{Index});
-					ExtractOp->SetId(ExtractedValue);
-					InstList.Add(MoveTemp(ExtractOp));
-					PatchToDebugger(ExtractedValue, ElementTypeId, InstList);
-				}
-			}
-			else if (Type->GetKind() == SpvTypeKind::Matrix)
-			{
-				SpvMatrixType* MatrixType = static_cast<SpvMatrixType*>(Type);
-				for (uint32 Index = 0; Index < MatrixType->ElementCount; Index++)
-				{
-					SpvId ElementTypeId = MatrixType->ElementType->GetId();
-					SpvId ExtractedValue = Patcher.NewId();
-					auto ExtractOp = MakeUnique<SpvOpCompositeExtract>(ElementTypeId, InValueId, TArray<uint32>{Index});
-					ExtractOp->SetId(ExtractedValue);
-					InstList.Add(MoveTemp(ExtractOp));
-					PatchToDebugger(ExtractedValue, ElementTypeId, InstList);
-				}
-			}
-		}
-
+		InstList.Add(MakeUnique<SpvOpStore>(DebuggerOffset, NewDebuggerOffset));
 	}
 
 	void SpvDebuggerVisitor::PatchAppendAccessFunc(int32 IndexNum)
@@ -668,9 +784,7 @@ namespace FW
 			SpvId IntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 1));
 			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
 			TArray<SpvId> ParamterTypes;
-			ParamterTypes.Add(UIntType); // StateType
-			ParamterTypes.Add(UIntType); // Line
-			ParamterTypes.Add(UIntType); // Source
+			ParamterTypes.Add(UIntType); // PackedHeader
 			ParamterTypes.Add(UIntType); // VarId
 			for (int32 i = 0; i < IndexNum; i++)
 			{
@@ -682,23 +796,11 @@ namespace FW
 			FuncOp->SetId(AppendAccessFuncId);
 			AppendAccessFuncInsts.Add(MoveTemp(FuncOp));
 
-			SpvId StateTypeParam = Patcher.NewId();
-			auto StateTypeParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
-			StateTypeParamOp->SetId(StateTypeParam);
-			AppendAccessFuncInsts.Add(MoveTemp(StateTypeParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(StateTypeParam, "_DebuggerStateType_"));
-
-			SpvId LineParam = Patcher.NewId();
-			auto LineParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
-			LineParamOp->SetId(LineParam);
-			AppendAccessFuncInsts.Add(MoveTemp(LineParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(LineParam, "_DebuggerLine_"));
-
-			SpvId SourceParam = Patcher.NewId();
-			auto SourceParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
-			SourceParamOp->SetId(SourceParam);
-			AppendAccessFuncInsts.Add(MoveTemp(SourceParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(SourceParam, "_DebuggerSource_"));
+			SpvId PackedHeaderParam = Patcher.NewId();
+			auto PackedHeaderParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
+			PackedHeaderParamOp->SetId(PackedHeaderParam);
+			AppendAccessFuncInsts.Add(MoveTemp(PackedHeaderParamOp));
+			Patcher.AddDebugName(MakeUnique<SpvOpName>(PackedHeaderParam, "_DebuggerPackedHeader_"));
 
 			SpvId VarIdParam = Patcher.NewId();
 			auto VarIdParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
@@ -722,15 +824,15 @@ namespace FW
 			AppendAccessFuncInsts.Add(MoveTemp(LabelOp));
 
 			PatchActiveCondition(AppendAccessFuncInsts);
-			PatchToDebugger(StateTypeParam, UIntType, AppendAccessFuncInsts);
-			PatchToDebugger(LineParam, UIntType, AppendAccessFuncInsts);
-			PatchToDebugger(SourceParam, UIntType, AppendAccessFuncInsts);
-			PatchToDebugger(VarIdParam, UIntType, AppendAccessFuncInsts);
-			PatchToDebugger(Patcher.FindOrAddConstant((uint32)IndexNum), UIntType, AppendAccessFuncInsts);
+			TArray<SpvId> AllValues;
+			FlattenToUInts(PackedHeaderParam, UIntType, AppendAccessFuncInsts, AllValues);
+			FlattenToUInts(VarIdParam, UIntType, AppendAccessFuncInsts, AllValues);
+			FlattenToUInts(Patcher.FindOrAddConstant((uint32)IndexNum), UIntType, AppendAccessFuncInsts, AllValues);
 			for (int32 i = 0; i < IndexNum; i++)
 			{
-				PatchToDebugger(IndexParams[i], IntType, AppendAccessFuncInsts);
+				FlattenToUInts(IndexParams[i], IntType, AppendAccessFuncInsts, AllValues);
 			}
+			BatchStoreToDebugBuffer(AllValues, AppendAccessFuncInsts);
 
 			AppendAccessFuncInsts.Add(MakeUnique<SpvOpReturn>());
 			AppendAccessFuncInsts.Add(MakeUnique<SpvOpFunctionEnd>());
@@ -754,9 +856,7 @@ namespace FW
 			SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
 			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
 			TArray<SpvId> ParamterTypes;
-			ParamterTypes.Add(UIntType); // StateType
-			ParamterTypes.Add(UIntType); // Line
-			ParamterTypes.Add(UIntType); // Source
+			ParamterTypes.Add(UIntType); // PackedHeader
 			ParamterTypes.Add(UIntType); // ResultTypeId
 			for (int32 i = 0; i < OperandNum; i++)
 			{
@@ -768,23 +868,11 @@ namespace FW
 			FuncOp->SetId(AppendMathFuncId);
 			AppendMathFuncInsts.Add(MoveTemp(FuncOp));
 
-			SpvId StateTypeParam = Patcher.NewId();
-			auto StateTypeParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
-			StateTypeParamOp->SetId(StateTypeParam);
-			AppendMathFuncInsts.Add(MoveTemp(StateTypeParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(StateTypeParam, "_DebuggerStateType_"));
-
-			SpvId LineParam = Patcher.NewId();
-			auto LineParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
-			LineParamOp->SetId(LineParam);
-			AppendMathFuncInsts.Add(MoveTemp(LineParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(LineParam, "_DebuggerLine_"));
-
-			SpvId SourceParam = Patcher.NewId();
-			auto SourceParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
-			SourceParamOp->SetId(SourceParam);
-			AppendMathFuncInsts.Add(MoveTemp(SourceParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(SourceParam, "_DebuggerSource_"));
+			SpvId PackedHeaderParam = Patcher.NewId();
+			auto PackedHeaderParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
+			PackedHeaderParamOp->SetId(PackedHeaderParam);
+			AppendMathFuncInsts.Add(MoveTemp(PackedHeaderParamOp));
+			Patcher.AddDebugName(MakeUnique<SpvOpName>(PackedHeaderParam, "_DebuggerPackedHeader_"));
 
 			SpvId ResultTypeIdParam = Patcher.NewId();
 			auto ResultTypeIdParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
@@ -808,14 +896,14 @@ namespace FW
 			AppendMathFuncInsts.Add(MoveTemp(LabelOp));
 
 			PatchActiveCondition(AppendMathFuncInsts);
-			PatchToDebugger(StateTypeParam, UIntType, AppendMathFuncInsts);
-			PatchToDebugger(LineParam, UIntType, AppendMathFuncInsts);
-			PatchToDebugger(SourceParam, UIntType, AppendMathFuncInsts);
-			PatchToDebugger(ResultTypeIdParam, UIntType, AppendMathFuncInsts);
+			TArray<SpvId> AllValues;
+			FlattenToUInts(PackedHeaderParam, UIntType, AppendMathFuncInsts, AllValues);
+			FlattenToUInts(ResultTypeIdParam, UIntType, AppendMathFuncInsts, AllValues);
 			for (int32 i = 0; i < OperandNum; i++)
 			{
-				PatchToDebugger(OperandParams[i], OperandType->GetId(), AppendMathFuncInsts);
+				FlattenToUInts(OperandParams[i], OperandType->GetId(), AppendMathFuncInsts, AllValues);
 			}
+			BatchStoreToDebugBuffer(AllValues, AppendMathFuncInsts);
 
 			AppendMathFuncInsts.Add(MakeUnique<SpvOpReturn>());
 			AppendMathFuncInsts.Add(MakeUnique<SpvOpFunctionEnd>());
@@ -844,12 +932,12 @@ namespace FW
 		SpvOpFunctionCall* FuncCall{};
 		TArray<TUniquePtr<SpvInstruction>> AppendVarInsts;
 		{
-			SpvId StateType = Patcher.FindOrAddConstant((uint32)SpvDebuggerStateType::VarChange);
-			SpvId Line = Patcher.FindOrAddConstant((uint32)CurLine);
-			SpvId Source = Patcher.FindOrAddConstant(CurSource.GetValue());
+			uint32 PackedHeaderValue = PackDebugHeader(SpvDebuggerStateType::VarChange, CurSource.GetValue(), (uint32)CurLine);
+			if (CurScope) { Context.HeaderToScope.Add(PackedHeaderValue, CurScope->GetId()); }
+			SpvId PackedHeader = Patcher.FindOrAddConstant(PackedHeaderValue);
 			SpvId VarId = Patcher.FindOrAddConstant(Pointer->Var->Id.GetValue());
 			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
-			TArray<SpvId> Arguments{ StateType, Line, Source, VarId };
+			TArray<SpvId> Arguments{ PackedHeader, VarId };
 			if (IndexNum > 0)
 			{
 				SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
@@ -885,25 +973,6 @@ namespace FW
 		return FuncCall;
 	}
 
-	void SpvDebuggerVisitor::AppendScope(const TFunction<int32()>& OffsetEval)
-	{
-		if (!CurScope)
-		{
-			return;
-		}
-
-		TArray<TUniquePtr<SpvInstruction>> AppendScopeInsts;
-		{
-			SpvId StateType = Patcher.FindOrAddConstant((uint32)SpvDebuggerStateType::ScopeChange);
-			SpvId ScopeId = Patcher.FindOrAddConstant(CurScope->GetId().GetValue());
-			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
-			auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendScopeFuncId, TArray<SpvId>{ StateType, ScopeId});
-			FuncCallOp->SetId(Patcher.NewId());
-			AppendScopeInsts.Add(MoveTemp(FuncCallOp));
-		}
-		Patcher.AddInstructions(OffsetEval(), MoveTemp(AppendScopeInsts));
-	}
-
 	void SpvDebuggerVisitor::AppendAccess(const TFunction<int32()>& OffsetEval, SpvPointer* Pointer)
 	{
 		int32 IndexNum = Pointer->Indexes.Num();
@@ -911,13 +980,13 @@ namespace FW
 		SpvId AppendAccessFuncId = AppendAccessFuncIds[IndexNum];
 		TArray<TUniquePtr<SpvInstruction>> AppendAccessInsts;
 		{
-			SpvId StateType = Patcher.FindOrAddConstant((uint32)SpvDebuggerStateType::Access);
-			SpvId Line = Patcher.FindOrAddConstant((uint32)CurLine);
-			SpvId Source = Patcher.FindOrAddConstant(CurSource.GetValue());
+			uint32 PackedHeaderValue = PackDebugHeader(SpvDebuggerStateType::Access, CurSource.GetValue(), (uint32)CurLine);
+			if (CurScope) { Context.HeaderToScope.Add(PackedHeaderValue, CurScope->GetId()); }
+			SpvId PackedHeader = Patcher.FindOrAddConstant(PackedHeaderValue);
 			SpvId VarId = Patcher.FindOrAddConstant(Pointer->Var->Id.GetValue());
 			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
 			SpvId IntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 1));
-			TArray<SpvId> Arguments = { StateType, Line, Source, VarId };
+			TArray<SpvId> Arguments = { PackedHeader, VarId };
 			for (SpvId Index : Pointer->Indexes)
 			{
 				SpvId BitCastIndex = Patcher.NewId();
@@ -951,9 +1020,7 @@ namespace FW
 			SpvId IntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 1));
 			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
 			TArray<SpvId> ParamterTypes;
-			ParamterTypes.Add(UIntType); // StateType
-			ParamterTypes.Add(UIntType); // Line
-			ParamterTypes.Add(UIntType); // Source
+			ParamterTypes.Add(UIntType); // PackedHeader
 			ParamterTypes.Add(UIntType); // VarId
 
 			SpvId ArrType;
@@ -970,23 +1037,11 @@ namespace FW
 			FuncOp->SetId(AppendVarFuncId);
 			AppendVarFuncInsts.Add(MoveTemp(FuncOp));
 
-			SpvId StateTypeParam = Patcher.NewId();
-			auto StateTypeParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
-			StateTypeParamOp->SetId(StateTypeParam);
-			AppendVarFuncInsts.Add(MoveTemp(StateTypeParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(StateTypeParam, "_DebuggerStateType_"));
-
-			SpvId LineParam = Patcher.NewId();
-			auto LineParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
-			LineParamOp->SetId(LineParam);
-			AppendVarFuncInsts.Add(MoveTemp(LineParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(LineParam, "_DebuggerLine_"));
-
-			SpvId SourceParam = Patcher.NewId();
-			auto SourceParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
-			SourceParamOp->SetId(SourceParam);
-			AppendVarFuncInsts.Add(MoveTemp(SourceParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(SourceParam, "_DebuggerSource_"));
+			SpvId PackedHeaderParam = Patcher.NewId();
+			auto PackedHeaderParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
+			PackedHeaderParamOp->SetId(PackedHeaderParam);
+			AppendVarFuncInsts.Add(MoveTemp(PackedHeaderParamOp));
+			Patcher.AddDebugName(MakeUnique<SpvOpName>(PackedHeaderParam, "_DebuggerPackedHeader_"));
 
 			SpvId VarIdParam = Patcher.NewId();
 			auto VarIdParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
@@ -1015,17 +1070,16 @@ namespace FW
 			AppendVarFuncInsts.Add(MoveTemp(LabelOp));
 
 			PatchActiveCondition(AppendVarFuncInsts);
-			PatchToDebugger(StateTypeParam, UIntType, AppendVarFuncInsts);
-			PatchToDebugger(LineParam, UIntType, AppendVarFuncInsts);
-			PatchToDebugger(SourceParam, UIntType, AppendVarFuncInsts);
-			PatchToDebugger(VarIdParam, UIntType, AppendVarFuncInsts);
-			PatchToDebugger(Patcher.FindOrAddConstant((uint32)IndexNum), UIntType, AppendVarFuncInsts);
+			TArray<SpvId> AllValues;
+			FlattenToUInts(PackedHeaderParam, UIntType, AppendVarFuncInsts, AllValues);
+			FlattenToUInts(VarIdParam, UIntType, AppendVarFuncInsts, AllValues);
+			FlattenToUInts(Patcher.FindOrAddConstant((uint32)IndexNum), UIntType, AppendVarFuncInsts, AllValues);
 			if (IndexNum > 0)
 			{
-				PatchToDebugger(IndexArrParam, ArrType, AppendVarFuncInsts);
+				FlattenToUInts(IndexArrParam, ArrType, AppendVarFuncInsts, AllValues);
 			}
-			PatchToDebugger(Patcher.FindOrAddConstant((uint32)GetTypeByteSize(PointeeType)), UIntType, AppendVarFuncInsts);
-			PatchToDebugger(ValueParam, PointeeType->GetId(), AppendVarFuncInsts);
+			FlattenToUInts(ValueParam, PointeeType->GetId(), AppendVarFuncInsts, AllValues);
+			BatchStoreToDebugBuffer(AllValues, AppendVarFuncInsts);
 
 			AppendVarFuncInsts.Add(MakeUnique<SpvOpReturn>());
 			AppendVarFuncInsts.Add(MakeUnique<SpvOpFunctionEnd>());
@@ -1049,9 +1103,7 @@ namespace FW
 			SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
 			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
 			TArray<SpvId> ParamterTypes;
-			ParamterTypes.Add(UIntType); // StateType
-			ParamterTypes.Add(UIntType); // Line
-			ParamterTypes.Add(UIntType); // Source
+			ParamterTypes.Add(UIntType); // PackedHeader
 			ParamterTypes.Add(ValueType->GetId()); // Value
 
 			SpvId FuncType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFunction>(VoidType, ParamterTypes));
@@ -1059,23 +1111,11 @@ namespace FW
 			FuncOp->SetId(AppendValueFuncId);
 			AppendValueFuncInsts.Add(MoveTemp(FuncOp));
 
-			SpvId StateTypeParam = Patcher.NewId();
-			auto StateTypeParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
-			StateTypeParamOp->SetId(StateTypeParam);
-			AppendValueFuncInsts.Add(MoveTemp(StateTypeParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(StateTypeParam, "_DebuggerStateType_"));
-
-			SpvId LineParam = Patcher.NewId();
-			auto LineParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
-			LineParamOp->SetId(LineParam);
-			AppendValueFuncInsts.Add(MoveTemp(LineParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(LineParam, "_DebuggerLine_"));
-
-			SpvId SourceParam = Patcher.NewId();
-			auto SourceParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
-			SourceParamOp->SetId(SourceParam);
-			AppendValueFuncInsts.Add(MoveTemp(SourceParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(SourceParam, "_DebuggerSource_"));
+			SpvId PackedHeaderParam = Patcher.NewId();
+			auto PackedHeaderParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
+			PackedHeaderParamOp->SetId(PackedHeaderParam);
+			AppendValueFuncInsts.Add(MoveTemp(PackedHeaderParamOp));
+			Patcher.AddDebugName(MakeUnique<SpvOpName>(PackedHeaderParam, "_DebuggerPackedHeader_"));
 
 			SpvId ValueParam = Patcher.NewId();
 			auto ValueParamOp = MakeUnique<SpvOpFunctionParameter>(ValueType->GetId());
@@ -1088,11 +1128,11 @@ namespace FW
 			AppendValueFuncInsts.Add(MoveTemp(LabelOp));
 
 			PatchActiveCondition(AppendValueFuncInsts);
-			PatchToDebugger(StateTypeParam, UIntType, AppendValueFuncInsts);
-			PatchToDebugger(LineParam, UIntType, AppendValueFuncInsts);
-			PatchToDebugger(SourceParam, UIntType, AppendValueFuncInsts);
-			PatchToDebugger(Patcher.FindOrAddConstant((uint32)GetTypeByteSize(ValueType)), UIntType, AppendValueFuncInsts);
-			PatchToDebugger(ValueParam, ValueType->GetId(), AppendValueFuncInsts);
+			TArray<SpvId> AllValues;
+			FlattenToUInts(PackedHeaderParam, UIntType, AppendValueFuncInsts, AllValues);
+			FlattenToUInts(Patcher.FindOrAddConstant((uint32)GetTypeByteSize(ValueType)), UIntType, AppendValueFuncInsts, AllValues);
+			FlattenToUInts(ValueParam, ValueType->GetId(), AppendValueFuncInsts, AllValues);
+			BatchStoreToDebugBuffer(AllValues, AppendValueFuncInsts);
 
 			AppendValueFuncInsts.Add(MakeUnique<SpvOpReturn>());
 			AppendValueFuncInsts.Add(MakeUnique<SpvOpFunctionEnd>());
@@ -1110,11 +1150,11 @@ namespace FW
 
 		TArray<TUniquePtr<SpvInstruction>> AppendTagInsts;
 		{
-			SpvId StateType = Patcher.FindOrAddConstant((uint32)InStateType);
-			SpvId Line = Patcher.FindOrAddConstant((uint32)CurLine);
-			SpvId Source = Patcher.FindOrAddConstant(CurSource.GetValue());
+			uint32 PackedHeaderValue = PackDebugHeader(InStateType, CurSource.GetValue(), (uint32)CurLine);
+			if (CurScope) { Context.HeaderToScope.Add(PackedHeaderValue, CurScope->GetId()); }
+			SpvId PackedHeader = Patcher.FindOrAddConstant(PackedHeaderValue);
 			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
-			auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendTagFuncId, TArray<SpvId>{ StateType, Line, Source});
+			auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendTagFuncId, TArray<SpvId>{ PackedHeader });
 			FuncCallOp->SetId(Patcher.NewId());
 			AppendTagInsts.Add(MoveTemp(FuncCallOp));
 		}
@@ -1127,11 +1167,11 @@ namespace FW
 		SpvId AppendValueFuncId = AppendValueFuncIds[ValueType];
 		TArray<TUniquePtr<SpvInstruction>> AppendValueInsts;
 		{
-			SpvId StateType = Patcher.FindOrAddConstant((uint32)InStateType);
-			SpvId Line = Patcher.FindOrAddConstant((uint32)CurLine);
-			SpvId Source = Patcher.FindOrAddConstant(CurSource.GetValue());
+			uint32 PackedHeaderValue = PackDebugHeader(InStateType, CurSource.GetValue(), (uint32)CurLine);
+			if (CurScope) { Context.HeaderToScope.Add(PackedHeaderValue, CurScope->GetId()); }
+			SpvId PackedHeader = Patcher.FindOrAddConstant(PackedHeaderValue);
 			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
-			auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendValueFuncId, TArray<SpvId>{ StateType, Line, Source, Value});
+			auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendValueFuncId, TArray<SpvId>{ PackedHeader, Value});
 			FuncCallOp->SetId(Patcher.NewId());
 			AppendValueInsts.Add(MoveTemp(FuncCallOp));
 		}
@@ -1145,12 +1185,12 @@ namespace FW
 		SpvId AppendMathFuncId = AppendMathFuncIds[{ResultType, OperandType, OperandNum}];
 		TArray<TUniquePtr<SpvInstruction>> AppendMathInsts;
 		{
-			SpvId StateType = Patcher.FindOrAddConstant((uint32)InStateType);
-			SpvId Line = Patcher.FindOrAddConstant((uint32)CurLine);
-			SpvId Source = Patcher.FindOrAddConstant(CurSource.GetValue());
+			uint32 PackedHeaderValue = PackDebugHeader(InStateType, CurSource.GetValue(), (uint32)CurLine);
+			if (CurScope) { Context.HeaderToScope.Add(PackedHeaderValue, CurScope->GetId()); }
+			SpvId PackedHeader = Patcher.FindOrAddConstant(PackedHeaderValue);
 			SpvId ResultTypeId = Patcher.FindOrAddConstant(ResultType->GetId().GetValue());
 			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
-			TArray<SpvId> Arguments = { StateType, Line, Source, ResultTypeId };
+			TArray<SpvId> Arguments = { PackedHeader, ResultTypeId };
 			Arguments.Append(Operands);
 			auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendMathFuncId, Arguments);
 			FuncCallOp->SetId(Patcher.NewId());
@@ -1165,6 +1205,16 @@ namespace FW
 		Patcher.SetSpvContext(Insts, SpvCode, &Context);
 		//Get entry point loc
 		InstIndex = GetInstIndex(this->Insts, Context.EntryPoint);
+
+		// DXC may emit DebugDeclare after the OpStore that initializes a variable,
+		// so pre-scan to populate VariableDescMap.
+		for (const auto& Inst : Insts)
+		{
+			if (auto* Declare = dynamic_cast<const SpvDebugDeclare*>(Inst.Get()))
+			{
+				SpvDebuggerVisitor::Visit(Declare);
+			}
+		}
 
 		ParseInternal();
 	}
@@ -1218,77 +1268,31 @@ namespace FW
 			Patcher.AddDebugName(MakeUnique<SpvOpName>(DebuggerOffset, "_DebuggerOffset_"));
 		}
 
-		//Patch AppendScope function
+		//Patch AppendTag function
 		SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
-		AppendScopeFuncId = Patcher.NewId();
-		Patcher.AddDebugName(MakeUnique<SpvOpName>(AppendScopeFuncId, "_AppendScope_"));
-		TArray<TUniquePtr<SpvInstruction>> AppendScopeFuncInsts;
-		{
-			SpvId FuncType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFunction>(VoidType, TArray<SpvId>{ UIntType, UIntType }));
-			auto FuncOp = MakeUnique<SpvOpFunction>(VoidType, SpvFunctionControl::None, FuncType);
-			FuncOp->SetId(AppendScopeFuncId);
-			AppendScopeFuncInsts.Add(MoveTemp(FuncOp));
-
-			SpvId StateTypeParam = Patcher.NewId();
-			auto StateTypeParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
-			StateTypeParamOp->SetId(StateTypeParam);
-			AppendScopeFuncInsts.Add(MoveTemp(StateTypeParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(StateTypeParam, "_DebuggerStateType_"));
-
-			SpvId ScopeIdParam = Patcher.NewId();
-			auto ScopeIdParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
-			ScopeIdParamOp->SetId(ScopeIdParam);
-			AppendScopeFuncInsts.Add(MoveTemp(ScopeIdParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(ScopeIdParam, "_DebuggerScopeId_"));
-
-			auto LabelOp = MakeUnique<SpvOpLabel>();
-			LabelOp->SetId(Patcher.NewId());
-			AppendScopeFuncInsts.Add(MoveTemp(LabelOp));
-
-			PatchActiveCondition(AppendScopeFuncInsts);
-			PatchToDebugger(StateTypeParam, UIntType, AppendScopeFuncInsts);
-			PatchToDebugger(ScopeIdParam, UIntType, AppendScopeFuncInsts);
-
-			AppendScopeFuncInsts.Add(MakeUnique<SpvOpReturn>());
-			AppendScopeFuncInsts.Add(MakeUnique<SpvOpFunctionEnd>());
-		}
-		Patcher.AddFunction(MoveTemp(AppendScopeFuncInsts));
-
 		AppendTagFuncId = Patcher.NewId();
 		Patcher.AddDebugName(MakeUnique<SpvOpName>(AppendTagFuncId, "_AppendTag_"));
 		TArray<TUniquePtr<SpvInstruction>> AppendTagFuncInsts;
 		{
-			SpvId FuncType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFunction>(VoidType, TArray<SpvId>{ UIntType, UIntType, UIntType }));
+			SpvId FuncType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFunction>(VoidType, TArray<SpvId>{ UIntType }));
 			auto FuncOp = MakeUnique<SpvOpFunction>(VoidType, SpvFunctionControl::None, FuncType);
 			FuncOp->SetId(AppendTagFuncId);
 			AppendTagFuncInsts.Add(MoveTemp(FuncOp));
 
-			SpvId StateTypeParam = Patcher.NewId();
-			auto StateTypeParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
-			StateTypeParamOp->SetId(StateTypeParam);
-			AppendTagFuncInsts.Add(MoveTemp(StateTypeParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(StateTypeParam, "_DebuggerStateType_"));
-
-			SpvId LineParam = Patcher.NewId();
-			auto LineParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
-			LineParamOp->SetId(LineParam);
-			AppendTagFuncInsts.Add(MoveTemp(LineParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(LineParam, "_DebuggerLine_"));
-
-			SpvId SourceParam = Patcher.NewId();
-			auto SourceParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
-			SourceParamOp->SetId(SourceParam);
-			AppendTagFuncInsts.Add(MoveTemp(SourceParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(SourceParam, "_DebuggerSource_"));
+			SpvId PackedHeaderParam = Patcher.NewId();
+			auto PackedHeaderParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
+			PackedHeaderParamOp->SetId(PackedHeaderParam);
+			AppendTagFuncInsts.Add(MoveTemp(PackedHeaderParamOp));
+			Patcher.AddDebugName(MakeUnique<SpvOpName>(PackedHeaderParam, "_DebuggerPackedHeader_"));
 
 			auto LabelOp = MakeUnique<SpvOpLabel>();
 			LabelOp->SetId(Patcher.NewId());
 			AppendTagFuncInsts.Add(MoveTemp(LabelOp));
 
 			PatchActiveCondition(AppendTagFuncInsts);
-			PatchToDebugger(StateTypeParam, UIntType, AppendTagFuncInsts);
-			PatchToDebugger(LineParam, UIntType, AppendTagFuncInsts);
-			PatchToDebugger(SourceParam, UIntType, AppendTagFuncInsts);
+			TArray<SpvId> AllValues;
+			FlattenToUInts(PackedHeaderParam, UIntType, AppendTagFuncInsts, AllValues);
+			BatchStoreToDebugBuffer(AllValues, AppendTagFuncInsts);
 
 			AppendTagFuncInsts.Add(MakeUnique<SpvOpReturn>());
 			AppendTagFuncInsts.Add(MakeUnique<SpvOpFunctionEnd>());
@@ -1299,28 +1303,16 @@ namespace FW
 		Patcher.AddDebugName(MakeUnique<SpvOpName>(AppendCallFuncId, "_AppendCall_"));
 		TArray<TUniquePtr<SpvInstruction>> AppendCallFuncInsts;
 		{
-			SpvId FuncType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFunction>(VoidType, TArray<SpvId>{ UIntType, UIntType, UIntType, UIntType }));
+			SpvId FuncType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFunction>(VoidType, TArray<SpvId>{ UIntType, UIntType }));
 			auto FuncOp = MakeUnique<SpvOpFunction>(VoidType, SpvFunctionControl::None, FuncType);
 			FuncOp->SetId(AppendCallFuncId);
 			AppendCallFuncInsts.Add(MoveTemp(FuncOp));
 
-			SpvId StateTypeParam = Patcher.NewId();
-			auto StateTypeParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
-			StateTypeParamOp->SetId(StateTypeParam);
-			AppendCallFuncInsts.Add(MoveTemp(StateTypeParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(StateTypeParam, "_DebuggerStateType_"));
-
-			SpvId LineParam = Patcher.NewId();
-			auto LineParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
-			LineParamOp->SetId(LineParam);
-			AppendCallFuncInsts.Add(MoveTemp(LineParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(LineParam, "_DebuggerLine_"));
-
-			SpvId SourceParam = Patcher.NewId();
-			auto SourceParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
-			SourceParamOp->SetId(SourceParam);
-			AppendCallFuncInsts.Add(MoveTemp(SourceParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(SourceParam, "_DebuggerSource_"));
+			SpvId PackedHeaderParam = Patcher.NewId();
+			auto PackedHeaderParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
+			PackedHeaderParamOp->SetId(PackedHeaderParam);
+			AppendCallFuncInsts.Add(MoveTemp(PackedHeaderParamOp));
+			Patcher.AddDebugName(MakeUnique<SpvOpName>(PackedHeaderParam, "_DebuggerPackedHeader_"));
 
 			SpvId CallIdParam = Patcher.NewId();
 			auto CallIdParamOp = MakeUnique<SpvOpFunctionParameter>(UIntType);
@@ -1333,10 +1325,10 @@ namespace FW
 			AppendCallFuncInsts.Add(MoveTemp(LabelOp));
 
 			PatchActiveCondition(AppendCallFuncInsts);
-			PatchToDebugger(StateTypeParam, UIntType, AppendCallFuncInsts);
-			PatchToDebugger(LineParam, UIntType, AppendCallFuncInsts);
-			PatchToDebugger(SourceParam, UIntType, AppendCallFuncInsts);
-			PatchToDebugger(CallIdParam, UIntType, AppendCallFuncInsts);
+			TArray<SpvId> AllValues;
+			FlattenToUInts(PackedHeaderParam, UIntType, AppendCallFuncInsts, AllValues);
+			FlattenToUInts(CallIdParam, UIntType, AppendCallFuncInsts, AllValues);
+			BatchStoreToDebugBuffer(AllValues, AppendCallFuncInsts);
 
 			AppendCallFuncInsts.Add(MakeUnique<SpvOpReturn>());
 			AppendCallFuncInsts.Add(MakeUnique<SpvOpFunctionEnd>());

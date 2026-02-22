@@ -3,7 +3,12 @@
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "UI/Widgets/Misc/MiscWidget.h"
 #include "Editor/DebuggerViewCommands.h"
+#include "App/App.h"
+
 #include <Widgets/Colors/SColorBlock.h>
+#include <Async/Async.h>
+#include <Framework/Notifications/NotificationManager.h>
+#include <Widgets/Notifications/SNotificationList.h>
 #include <regex>
 
 using namespace FW;
@@ -130,8 +135,8 @@ namespace SH
 					}
 					if(Owner->OnWatch && NewText.ToString() != Data->Expr)
 					{
-						*Data = Owner->OnWatch(NewText.ToString());
-						Owner->ExpressionTreeView->RebuildList();
+						Data->Expr = NewText.ToString();
+						Owner->EvalExpressionAsync(Data);
 					}
 				}
 			});
@@ -154,8 +159,7 @@ namespace SH
 					SNew(SIconButton).Visibility_Lambda([ManualRefresh] { return ManualRefresh ? EVisibility::Visible : EVisibility::Hidden; })
 					.Icon(FAppStyle::Get().GetBrush("Icons.refresh")).IconSize(FVector2D{12,12})
 					.OnClicked_Lambda([this] {
-						*Data = Owner->OnWatch(Data->Expr);
-						Owner->ExpressionTreeView->RebuildList();
+						Owner->EvalExpressionAsync(Data);
 						return FReply::Handled();
 					})
 				]
@@ -264,6 +268,52 @@ namespace SH
 			}
 		}
 		ExpressionTreeView->RebuildList();
+	}
+
+	void SDebuggerWatchView::EvalExpressionAsync(ExpressionNodePtr InData)
+	{
+		// Fast path: simple variable identifiers are evaluated synchronously
+		FString TrimmedExpr = InData->Expr.TrimStartAndEnd();
+		bool bIsSimpleIdentifier = !TrimmedExpr.IsEmpty();
+		for (int32 i = 0; i < TrimmedExpr.Len() && bIsSimpleIdentifier; i++)
+		{
+			if (!FChar::IsIdentifier(TrimmedExpr[i]))
+			{
+				bIsSimpleIdentifier = false;
+			}
+		}
+		if (bIsSimpleIdentifier)
+		{
+			*InData = OnWatch(InData->Expr);
+			ExpressionTreeView->RebuildList();
+			return;
+		}
+
+		// Slow path: complex expressions need GPU pipeline, run async
+		InData->ValueStr = LOCALIZATION("EvaluatingExpr").ToString();
+		InData->TypeName = {};
+		InData->Children.Empty();
+		ExpressionTreeView->RebuildList();
+		
+		GApp->EnableBusyBlocker();
+		FNotificationInfo Info(LOCALIZATION("EvaluatingExpr"));
+		Info.Image = FAppStyle::Get().GetBrush("NoBrush");
+		Info.bFireAndForget = false;
+		Info.FadeInDuration = 0.0f;
+		Info.FadeOutDuration = 0.0f;
+		auto Notification = FSlateNotificationManager::Get().AddNotification(Info);
+		Notification->SetCompletionState(SNotificationItem::CS_Pending);
+
+		FString Expression = InData->Expr;
+		Async(EAsyncExecution::Thread, [this, InData, Expression, Notification]() {
+			ExpressionNode Result = OnWatch(Expression);
+			AsyncTask(ENamedThreads::GameThread, [this, InData, Result = MoveTemp(Result), Notification]() {
+				Notification->Fadeout();
+				GApp->DisableBusyBlocker();
+				*InData = Result;
+				ExpressionTreeView->RebuildList();
+			});
+		});
 	}
 
 	TSharedRef<ITableRow> SDebuggerWatchView::OnGenerateRow(ExpressionNodePtr InTreeNode, const TSharedRef<STableViewBase>& OwnerTable)

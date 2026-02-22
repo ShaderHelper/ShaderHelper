@@ -65,7 +65,6 @@ namespace FW
         if (!PipelineState)
         {
             SH_LOG(LogMetal, Fatal, TEXT("Failed to create render pipeline: %s"), *NSStringToFString(err->localizedDescription()));
-            //TDOO: fallback to default pipeline.
         }
         
         return new MetalRenderPipelineState(InPipelineStateDesc, MoveTemp(PipelineState), MapPrimitiveType(InPipelineStateDesc.Primitive));

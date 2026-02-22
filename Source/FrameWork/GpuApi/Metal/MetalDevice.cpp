@@ -8,7 +8,10 @@ namespace FW
     {
         GDevice = MTL::CreateSystemDefaultDevice();
 		GpuFeature::Support16bitType = true;
-
+//		if(@available(macOS 13.3, *))
+//		{
+//			GDevice->setShouldMaximizeConcurrentCompilation(true);
+//		}
         GCommandQueue = GDevice->newCommandQueue();
     }
 }

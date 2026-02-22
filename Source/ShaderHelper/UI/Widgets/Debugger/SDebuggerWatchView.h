@@ -33,6 +33,7 @@ namespace SH
 		void Refresh();
 		TSharedRef<ITableRow> OnGenerateRow(ExpressionNodePtr InTreeNode, const TSharedRef<STableViewBase>& OwnerTable);
 		void OnGetChildren(ExpressionNodePtr InTreeNode, TArray<ExpressionNodePtr>& OutChildren);
+		void EvalExpressionAsync(ExpressionNodePtr InData);
 		
 		TSharedPtr<FUICommandList> UICommandList;
 		TSharedPtr<STreeView<ExpressionNodePtr>> ExpressionTreeView;

@@ -116,7 +116,7 @@ namespace FW
         NS::Error* err = nullptr;
         NS::SharedPtr<MTL::CompileOptions> CompOpt = NS::TransferPtr(MTL::CompileOptions::alloc()->init());
         CompOpt->setLanguageVersion(MTL::LanguageVersion2_2);
-		//CompOpt->setFastMathEnabled(false);
+		CompOpt->setOptimizationLevel(MTL::LibraryOptimizationLevel::LibraryOptimizationLevelSize);
         
         MTLLibraryPtr ByteCodeLib = NS::TransferPtr(GDevice->newLibrary(FStringToNSString(InShader->GetMslText()), CompOpt.get(), &err));
         

@@ -17,11 +17,13 @@ namespace FW
 	public:
 		void AddResource(TRefCountPtr<GpuResource> InResource) 
 		{
+			FScopeLock Lock(&CS);
 			Resources.Add(MoveTemp(InResource));
 		}
 
 		void ProcessResources() 
 		{
+			FScopeLock Lock(&CS);
 			for (auto It = Resources.CreateIterator(); It; ++It)
 			{
 				if ((*It).GetRefCount() == 1)
@@ -45,6 +47,7 @@ namespace FW
 
 		//Resources no longer held by user
 		TSparseArray<PendingResource> PendingResources;
+		FCriticalSection CS;
 	};
 
 	inline Dx12DeferredReleaseManager* GDx12DeferredReleaseManager = new Dx12DeferredReleaseManager;
