@@ -252,7 +252,7 @@ namespace SH
 					return Data->Dirty ? FStyleColors::AccentRed : FStyleColors::Foreground;
 				});
 
-			if (Data->TypeName == "float3" || Data->TypeName == "float4")
+			if (Data->TypeName == "float3" || Data->TypeName == "float4" || Data->TypeName == "vec3" || Data->TypeName == "vec4")
 			{
 				std::string Str = TCHAR_TO_UTF8(*Data->ValueStr);
 				std::regex Pattern(
