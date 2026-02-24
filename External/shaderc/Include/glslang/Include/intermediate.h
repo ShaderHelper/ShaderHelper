@@ -1377,7 +1377,7 @@ protected:
 
 class TIntermConstantUnion : public TIntermTyped {
 public:
-    TIntermConstantUnion(const TConstUnionArray& ua, const TType& t) : TIntermTyped(t), constArray(ua), literal(false) { }
+    TIntermConstantUnion(const TConstUnionArray& ua, const TType& t) : TIntermTyped(t), constArray(ua), literal(false), originalVariableId(-1) { }
     const TConstUnionArray& getConstArray() const { return constArray; }
     virtual       TIntermConstantUnion* getAsConstantUnion()       { return this; }
     virtual const TIntermConstantUnion* getAsConstantUnion() const { return this; }
@@ -1388,11 +1388,20 @@ public:
     void setExpression() { literal = false; }
     bool isLiteral() const { return literal; }
 
+    // Track the original variable when this constant was folded from a const variable reference.
+    // This preserves symbol info for LSP features (hover, go-to-definition, find-references, etc.)
+    void setOriginalVariable(const TString& name, long long id) { originalVariableName = name; originalVariableId = id; }
+    bool hasOriginalVariable() const { return originalVariableId >= 0; }
+    const TString& getOriginalVariableName() const { return originalVariableName; }
+    long long getOriginalVariableId() const { return originalVariableId; }
+
 protected:
     TIntermConstantUnion& operator=(const TIntermConstantUnion&);
 
     const TConstUnionArray constArray;
     bool literal;  // true if node represents a literal in the source code
+    TString originalVariableName;  // name of the const variable this was folded from (empty if literal)
+    long long originalVariableId;  // unique id of the const variable (-1 if not from a variable)
 };
 
 // Represent the independent aspects of a texturing TOperator

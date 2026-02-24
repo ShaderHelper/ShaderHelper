@@ -37,12 +37,9 @@ namespace FW
 		{
 			if (Decoration.Kind == SpvDecorationKind::DescriptorSet)
 			{
-				if (!SpvReflectionBindings.Contains(Id))
-				{
-					auto& LayoutBinding = SpvReflectionBindings.FindOrAdd(Id);
-					LayoutBinding.Name = MetaContext.Names[Id];
-					LayoutBinding.Group = Decoration.DescriptorSet.Number;
-				}
+				auto& LayoutBinding = SpvReflectionBindings.FindOrAdd(Id);
+				LayoutBinding.Name = MetaContext.Names[Id];
+				LayoutBinding.Group = Decoration.DescriptorSet.Number;
 			}
 			else if (Decoration.Kind == SpvDecorationKind::Binding)
 			{

@@ -590,19 +590,6 @@ namespace SH
 				DebuggerError = { MoveTemp(Error), StopLocation };
 				break;
 			}
-			if (AssertResult && AssertResult->IsCompletelyInitialized())
-			{
-				TArray<uint8>& Value = AssertResult->GetBuffer();
-				uint32& TypedValue = *(uint32*)Value.GetData();
-				if (TypedValue != 1)
-				{
-					StopLocation.File = DebuggerContext->GetSourceFileName(NextSource);
-					StopLocation.LineNumber = CurValidLine.value() - GetExtraLineNumForSource(NextSource);
-					DebuggerError = { "Assert failed", StopLocation };
-					TypedValue = 1;
-					break;
-				}
-			}
 			CurDebugStateIndex++;
 
 			if (NextValidLine && NextValidLine.value())
@@ -737,6 +724,19 @@ namespace SH
 						ArgumentVar->InitializedRanges = Var->InitializedRanges;
 						break;
 					}
+				}
+			}
+			
+			if (AssertResult && AssertResult->IsCompletelyInitialized())
+			{
+				TArray<uint8>& Value = AssertResult->GetBuffer();
+				uint32& TypedValue = *(uint32*)Value.GetData();
+				if (TypedValue != 1)
+				{
+					StopLocation.File = DebuggerContext->GetSourceFileName(State.Source);
+					StopLocation.LineNumber = CurValidLine.value() - GetExtraLineNumForSource(State.Source);
+					Error = "Assert failed";
+					TypedValue = 1;
 				}
 			}
 		}

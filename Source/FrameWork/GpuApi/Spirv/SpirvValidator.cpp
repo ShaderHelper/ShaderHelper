@@ -294,7 +294,25 @@ namespace FW
 		{
 			PreAnalyzeInitialization();
 		}
-		
+
+		// Track uninitialized global Private variables.
+		// Uniform/Input/Output/UniformConstant are system-bound and always initialized.
+		if (EnableUbsan)
+		{
+			for (auto& [VarId, Var] : Context.GlobalVariables)
+			{
+				if (Var.StorageClass != SpvStorageClass::Private)
+				{
+					continue;
+				}
+				if (!Context.VariableDescMap.contains(VarId))
+				{
+					continue;
+				}
+				PatchVarInitializedRange(&Var);
+			}
+		}
+
 		{
 			int32 InstIndex = GetInstIndex(this->Insts, Context.EntryPoint);
 			while (InstIndex < Insts.Num())
@@ -487,14 +505,25 @@ namespace FW
 
 	void SpvValidator::Visit(const SpvOpLoad* Inst)
 	{
-		if (!LocalPointers.contains(Inst->GetPointer()))
+		SpvPointer* Pointer = FindPointer(Inst->GetPointer());
+		if (!Pointer)
 		{
 			return;
 		}
-
-		SpvPointer* Pointer = &LocalPointers[Inst->GetPointer()];
 		if (!VarInitializedRange.Contains(Pointer->Var->Id))
 		{
+			// No VarInitializedRange: static analysis confirmed the variable is fully initialized,
+			// but dynamic indexes may still be out of bounds. Use GetAccess for bounds checking.
+			if (EnableUbsan && !Pointer->Indexes.IsEmpty())
+			{
+				SpvType* VarType = Pointer->Var->Type;
+				TArray<TUniquePtr<SpvInstruction>> BoundsCheckInsts;
+				GetAccess(VarType, Pointer->Indexes, BoundsCheckInsts);
+				if (BoundsCheckInsts.Num() > 0)
+				{
+					Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(BoundsCheckInsts));
+				}
+			}
 			return;
 		}
 
@@ -746,14 +775,23 @@ namespace FW
 
 	void SpvValidator::Visit(const SpvOpStore* Inst)
 	{
-		if (!LocalPointers.contains(Inst->GetPointer()))
+		SpvPointer* Pointer = FindPointer(Inst->GetPointer());
+		if (!Pointer)
 		{
 			return;
 		}
-
-		SpvPointer* Pointer = &LocalPointers[Inst->GetPointer()];
 		if (!VarInitializedRange.Contains(Pointer->Var->Id))
 		{
+			if (EnableUbsan && !Pointer->Indexes.IsEmpty())
+			{
+				SpvType* VarType = Pointer->Var->Type;
+				TArray<TUniquePtr<SpvInstruction>> BoundsCheckInsts;
+				GetAccess(VarType, Pointer->Indexes, BoundsCheckInsts);
+				if (BoundsCheckInsts.Num() > 0)
+				{
+					Patcher.AddInstructions(Inst->GetWordOffset().value() + Inst->GetWordLen().value(), MoveTemp(BoundsCheckInsts));
+				}
+			}
 			return;
 		}
 
@@ -927,14 +965,14 @@ namespace FW
 
 	void SpvValidator::Visit(const SpvOpAccessChain* Inst)
 	{
-		if (!LocalPointers.contains(Inst->GetBasePointer()))
+		SpvPointer* BasePointer = FindPointer(Inst->GetBasePointer());
+		if (!BasePointer)
 		{
 			return;
 		}
 
 		SpvId ResultId = Inst->GetId().value();
 		SpvPointerType* PointerType = static_cast<SpvPointerType*>(Context.Types[Inst->GetResultType()].Get());
-		SpvPointer* BasePointer = &LocalPointers[Inst->GetBasePointer()];
 		TArray<SpvId> Indexes = BasePointer->Indexes;
 		Indexes.Append(Inst->GetIndexes());
 
@@ -2067,8 +2105,63 @@ namespace FW
 		InstList.Add(MoveTemp(FuncCallOp));
 	}
 
+	int32 SpvValidator::ComputeConstantAccess(SpvType* Type, const TArray<SpvId>& Indexes, int32 StartIdx)
+	{
+		if (StartIdx >= Indexes.Num())
+		{
+			return 0;
+		}
+
+		int32 IndexVal = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Indexes[StartIdx]].Storage).Value.GetData();
+
+		switch (Type->GetKind())
+		{
+		case SpvTypeKind::Vector:
+		{
+			SpvVectorType* VecType = static_cast<SpvVectorType*>(Type);
+			return IndexVal * GetTypeByteSize(VecType->ElementType) / 4;
+		}
+		case SpvTypeKind::Array:
+		{
+			SpvArrayType* ArrType = static_cast<SpvArrayType*>(Type);
+			return IndexVal * GetTypeByteSize(ArrType->ElementType) / 4 + ComputeConstantAccess(ArrType->ElementType, Indexes, StartIdx + 1);
+		}
+		case SpvTypeKind::Struct:
+		{
+			SpvStructType* StructType = static_cast<SpvStructType*>(Type);
+			int32 Offset = 0;
+			for (int32 i = 0; i < IndexVal; i++)
+			{
+				Offset += GetTypeByteSize(StructType->MemberTypes[i]);
+			}
+			return Offset / 4 + ComputeConstantAccess(StructType->MemberTypes[IndexVal], Indexes, StartIdx + 1);
+		}
+		case SpvTypeKind::Matrix:
+		{
+			SpvMatrixType* MatType = static_cast<SpvMatrixType*>(Type);
+			return IndexVal * GetTypeByteSize(MatType->ElementType) / 4 + ComputeConstantAccess(MatType->ElementType, Indexes, StartIdx + 1);
+		}
+		default:
+			return 0;
+		}
+	}
+
 	SpvId SpvValidator::GetAccess(SpvType* VarType, const TArray<SpvId>& Indexes, TArray<TUniquePtr<SpvInstruction>>& InstList)
 	{
+		bool AllConstant = true;
+		for (SpvId Index : Indexes)
+		{
+			if (!Context.Constants.contains(Index))
+			{
+				AllConstant = false;
+				break;
+			}
+		}
+		if (AllConstant)
+		{
+			return Patcher.FindOrAddConstant(ComputeConstantAccess(VarType, Indexes, 0));
+		}
+
 		int32 MaxIndexNum = GetMaxIndexNum(VarType);
 		PatchGetAccessFunc(VarType);
 

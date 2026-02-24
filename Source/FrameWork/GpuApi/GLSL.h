@@ -781,6 +781,21 @@ namespace FW
 
 		void visitConstantUnion(glslang::TIntermConstantUnion* Node) override
 		{
+			//constant folding variable
+			if(Node->hasOriginalVariable())
+			{
+				if (auto* Def = Context.SymbolTable.FindByPredicate([&, this](auto&& Item) { return Item.Id == LexToString(Node->getOriginalVariableId()); }))
+				{
+					FString VarName = UTF8_TO_TCHAR(Node->getOriginalVariableName().c_str());
+					Vector2i Location = { Node->getLoc().line, Node->getLoc().column };
+					Context.SymbolRefs.AddUnique(*Def, GlslSymbolRef{
+						.Name = VarName,
+						.File = Node->getLoc().getFilenameStr(),
+						.Location = Location
+					});
+				}
+			}
+			
 			if (Node->getType().isStruct())
 			{
 				FString TypeName = GetTypeName(Node->getType());
@@ -825,7 +840,7 @@ namespace FW
 			const glslang::TIntermSymbol* DeclSymbol = Node->getDeclSymbol();
 			FString SymbolName = UTF8_TO_TCHAR(DeclSymbol->getName().c_str());
 			//uniform buffer block without instance name
-			if(SymbolName == "anon@0" && DeclSymbol->getType().isStruct())
+			if(SymbolName.StartsWith("anon@", ESearchCase::CaseSensitive) && DeclSymbol->getType().isStruct())
 			{
 				for (const auto& Member : *DeclSymbol->getType().getStruct())
 				{
@@ -944,7 +959,7 @@ namespace FW
 			{
 				const glslang::TIntermSymbol* LeftSymbol = Node->getLeft()->getAsSymbolNode();
 				FString SymbolName = UTF8_TO_TCHAR(LeftSymbol->getName().c_str());
-				if (SymbolName == "anon@0" && LeftSymbol->getType().isStruct())
+				if (SymbolName.StartsWith("anon@", ESearchCase::CaseSensitive) && LeftSymbol->getType().isStruct())
 				{
 					int32 MemberIndex = Node->getRight()->getAsConstantUnion()->getConstArray()[0].getIConst();
 					FString MemberName = UTF8_TO_TCHAR((*LeftSymbol->getType().getStruct())[MemberIndex].type->getFieldName().c_str());
