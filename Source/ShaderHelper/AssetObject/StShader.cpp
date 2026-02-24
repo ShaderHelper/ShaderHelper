@@ -127,6 +127,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 			BuiltInUbLayout
 				.AddVector3f("iResolution")
 				.AddFloat("iTime")
+				.AddFloat("iTimeDelta")
 				.AddInt("iFrame")
 				.AddVector3fArray("iChannelResolution", 4)
 				.AddVector4f("iMouse")

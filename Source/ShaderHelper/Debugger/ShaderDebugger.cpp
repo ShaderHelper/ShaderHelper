@@ -586,7 +586,7 @@ namespace SH
 			ApplyDebugState(DebugState, Error);
 			if (!Error.IsEmpty())
 			{
-				CurValidLine = NextValidLine;
+				CurValidLine = StopLocation.LineNumber + GetExtraLineNumForFile(StopLocation.File);
 				DebuggerError = { MoveTemp(Error), StopLocation };
 				break;
 			}
@@ -675,7 +675,16 @@ namespace SH
 			return 0;
 		}
 		FString SourceFileName = DebuggerContext->GetSourceFileName(Source);
-		if (AssetPtr<ShaderAsset> SourceShader = CurShaderAsset->FindIncludeAsset(SourceFileName))
+		return GetExtraLineNumForFile(SourceFileName);
+	}
+
+	int32 ShaderDebugger::GetExtraLineNumForFile(const FString& FileName) const
+	{
+		if (!DebuggerContext || !CurShaderAsset)
+		{
+			return 0;
+		}
+		if (AssetPtr<ShaderAsset> SourceShader = CurShaderAsset->FindIncludeAsset(FileName))
 		{
 			return SourceShader->GetExtraLineNum();
 		}
@@ -734,7 +743,7 @@ namespace SH
 				if (TypedValue != 1)
 				{
 					StopLocation.File = DebuggerContext->GetSourceFileName(State.Source);
-					StopLocation.LineNumber = CurValidLine.value() - GetExtraLineNumForSource(State.Source);
+					StopLocation.LineNumber = State.Line - GetExtraLineNumForSource(State.Source);
 					Error = "Assert failed";
 					TypedValue = 1;
 				}
@@ -762,15 +771,6 @@ namespace SH
 				SpvVariable* ParameterVar = DebuggerContext->FindVar(Parameters[i]);
 				ParameterVar->Storage = ArgumentVar->Storage;
 				ParameterVar->InitializedRanges = ArgumentVar->InitializedRanges;
-				// Compiler-generated argument temporaries are not in VariableDescMap,
-				// so their stores are not tracked and InitializedRanges stays empty.
-				// Since the compiler always initializes these temps before the call, treat them as fully initialized.
-				if (ParameterVar->InitializedRanges.IsEmpty()
-					&& !DebuggerContext->VariableDescMap.contains(Call.Arguments[i])
-					&& !DebuggerContext->IsParameter(Call.Arguments[i]))
-				{
-					ParameterVar->InitializedRanges.Add({0, ParameterVar->GetBufferSize()});
-				}
 			}
 			if (Scope)
 			{

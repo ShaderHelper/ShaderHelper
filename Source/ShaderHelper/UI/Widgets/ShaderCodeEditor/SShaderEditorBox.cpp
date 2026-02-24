@@ -2116,6 +2116,16 @@ constexpr int PaddingLineNum = 22;
 	{
 		TArray<FScrollBarMarker> AllMarkers;
 
+		for (const auto& [LineNumber, DiagInfo] : EffectMarshller->LineNumberToDiagInfo)
+		{
+			int32 LineIndex = GetLineIndex(LineNumber);
+			if (LineIndex != INDEX_NONE)
+			{
+				FLinearColor Color = DiagInfo.IsError ? FLinearColor::Red : FLinearColor::Yellow;
+				AllMarkers.Add({ LineIndex, Color });
+			}
+		}
+
 		for (const FTextLineHighlight& Highlight : OccurrenceHighlights)
 		{
 			AllMarkers.Add({ Highlight.LineIndex, FLinearColor::Gray });
@@ -2139,6 +2149,7 @@ constexpr int PaddingLineNum = 22;
 		if (bRefreshIsense.load(std::memory_order_acquire))
 		{
 			RefreshLineNumberToDiagInfo();
+			RefreshScrollBarMarkers();
 			RefreshCodeCompletionTip();
 			bRefreshIsense.store(false, std::memory_order_relaxed);
 		}

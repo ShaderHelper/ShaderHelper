@@ -273,22 +273,24 @@ def create_shadertoy_assets(shadertoy_id, shadertoy_info):
                 Sh.Asset.SaveToFile(shadertoy_shader, saved_file_path)
                 
                 shadertoy_pass_node = Sh.ShaderToyPassNode(shadertoy_graph, shadertoy_shader)
-                pass_id = pass_data['outputs'][0]['id']
+                # Compatible with old shaders on shadertoy: outputs may be empty
+                pass_id = pass_data['outputs'][0]['id'] if pass_data.get('outputs') else pass_name
                 id_to_node[pass_id] = shadertoy_pass_node
                 for input_data in pass_data['inputs']:
                     input_id = input_data['id']
-                    if input_id in id_to_builtin_resource:
-                        if input_data['type'] == 'texture':
-                            tex_path = os.path.join(Sh.PathHelper.BuiltinDir, "ShaderToy", f"{id_to_builtin_resource[input_id]}.texture")
-                            shadertoy_tex = Sh.Asset.LoadAsset(tex_path)
-                            if shadertoy_tex is not None:
-                                texture_node = Sh.Texture2dNode(shadertoy_graph, shadertoy_tex)
-                                id_to_node[input_id] = texture_node
-                                shadertoy_graph.AddNode(texture_node)
-                    elif input_data['type'] == 'keyboard':
-                        keyboard_node = Sh.ShaderToyKeyboardNode(shadertoy_graph)
-                        id_to_node[input_id] = keyboard_node
-                        shadertoy_graph.AddNode(keyboard_node)
+                    if input_id not in id_to_node:
+                        if input_id in id_to_builtin_resource:
+                            if input_data['type'] == 'texture':
+                                tex_path = os.path.join(Sh.PathHelper.BuiltinDir, "ShaderToy", f"{id_to_builtin_resource[input_id]}.texture")
+                                shadertoy_tex = Sh.Asset.LoadAsset(tex_path)
+                                if shadertoy_tex is not None:
+                                    texture_node = Sh.Texture2dNode(shadertoy_graph, shadertoy_tex)
+                                    id_to_node[input_id] = texture_node
+                                    shadertoy_graph.AddNode(texture_node)
+                        elif input_data['type'] == 'keyboard':
+                            keyboard_node = Sh.ShaderToyKeyboardNode(shadertoy_graph)
+                            id_to_node[input_id] = keyboard_node
+                            shadertoy_graph.AddNode(keyboard_node)
 
                     channel_index = input_data['channel']
                     sampler = input_data['sampler']
@@ -316,9 +318,11 @@ def create_shadertoy_assets(shadertoy_id, shadertoy_info):
 
         for pass_name, pass_data in shadertoy_info['RenderPass'].items():
             if pass_data is not None and pass_data['type'] != 'common':
-                pass_id = pass_data['outputs'][0]['id']
+                # Compatible with old shaders on shadertoy: outputs may be empty
+                pass_id = pass_data['outputs'][0]['id'] if pass_data.get('outputs') else pass_name
                 pass_node = id_to_node[pass_id]
-                if pass_data['name'] == 'Image':
+                # Compatible with old shaders on shadertoy: name may be empty, use type as fallback
+                if pass_data.get('name') == 'Image' or pass_data.get('type') == 'image':
                     shadertoy_graph.AddLink(pass_node.GetPin('RT'), present_node.GetPin('RT'))
                 for input_data in pass_data['inputs']:
                     input_id = input_data['id']
@@ -356,11 +360,34 @@ def scrape_shadertoy_shader(shader_url):
         shadertoy_info = {}
         shadertoy_info['RenderPass'] = {'Common': None, 'Image': None, 'Buffer A': None, 'Buffer B': None, 'Buffer C': None, 'Buffer D': None}
         shadertoy_info['Name'] = shader_data['info']['name']
-        for pass_name in shadertoy_info['RenderPass']:
-            for pass_data in shader_data['renderpass']:
-                if pass_data.get('name') == pass_name:
-                    shadertoy_info['RenderPass'][pass_name] = pass_data
-                    break
+
+        # Compatible with old shaders on shadertoy: name may be empty, use type as fallback
+        type_to_pass_name = {
+            'image': 'Image',
+            'common': 'Common',
+        }
+        buffer_name_map = {
+            'Buf A': 'Buffer A',
+            'Buf B': 'Buffer B',
+            'Buf C': 'Buffer C',
+            'Buf D': 'Buffer D',
+        }
+
+        for pass_data in shader_data['renderpass']:
+            pass_name = pass_data.get('name', '')
+            pass_type = pass_data.get('type', '')
+
+            matched_name = None
+            if pass_name in shadertoy_info['RenderPass']:
+                matched_name = pass_name
+            elif pass_name in buffer_name_map:
+                matched_name = buffer_name_map[pass_name]
+            elif pass_type in type_to_pass_name:
+                matched_name = type_to_pass_name[pass_type]
+
+            if matched_name and matched_name in shadertoy_info['RenderPass']:
+                shadertoy_info['RenderPass'][matched_name] = pass_data
+
         return shadertoy_info
 
     except Exception as e:

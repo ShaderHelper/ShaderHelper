@@ -274,8 +274,7 @@ namespace FW
 	void SpvDebuggerVisitor::Visit(const SpvOpStore* Inst)
 	{
 		SpvPointer* Pointer = Context.FindPointer(Inst->GetPointer());
-		// Only track user-declared variables, skip compiler-generated temporaries (param, param_1, etc.)
-		if (!Pointer || !Context.VariableDescMap.contains(Pointer->Var->Id))
+		if (!Pointer)
 		{
 			return;
 		}
@@ -1206,8 +1205,8 @@ namespace FW
 		//Get entry point loc
 		InstIndex = GetInstIndex(this->Insts, Context.EntryPoint);
 
-		// DXC may emit DebugDeclare after the OpStore that initializes a variable,
-		// so pre-scan to populate VariableDescMap.
+		// DXC may emit DebugDeclare after the OpLoad/OpStore that references a variable,
+		// so pre-scan to populate VariableDescMap for UBSan access checks in OpLoad.
 		for (const auto& Inst : Insts)
 		{
 			if (auto* Declare = dynamic_cast<const SpvDebugDeclare*>(Inst.Get()))

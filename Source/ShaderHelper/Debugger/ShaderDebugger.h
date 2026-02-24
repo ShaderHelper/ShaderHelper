@@ -86,6 +86,7 @@ namespace SH
 		void ClearEditDuringDebugging() { bEditDuringDebugging = false; }
 	private:
 		int32 GetExtraLineNumForSource(FW::SpvId Source) const;
+		int32 GetExtraLineNumForFile(const FString& FileName) const;
 		void InitDebuggerView();
 		TArray<FW::SpvDebugState> GenDebugStates(uint8* DebuggerData);
 
