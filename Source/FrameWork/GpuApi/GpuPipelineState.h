@@ -82,26 +82,31 @@ namespace FW
 		GpuComputePipelineStateDesc Desc;
 	};
 
-	// PSO Cache Key - uniquely identifies a pipeline state based on shader bytecode and pipeline parameters
-	// Note: Hash is used for bucket lookup (GetTypeHash), but operator== compares the full descriptor
-	// to avoid hash collisions (e.g. PointerHash truncates 64-bit pointers to 32-bit on 64-bit platforms).
 	struct GpuRenderPsoCacheKey
 	{
 		uint32 Hash;
-		GpuRenderPipelineStateDesc Desc;
+		TRefCountPtr<GpuShader> Vs;
+		TRefCountPtr<GpuShader> Ps;
+		TOptional<GpuBindGroupLayoutDesc> BindGroupLayout0;
+		TOptional<GpuBindGroupLayoutDesc> BindGroupLayout1;
+		TOptional<GpuBindGroupLayoutDesc> BindGroupLayout2;
+		TOptional<GpuBindGroupLayoutDesc> BindGroupLayout3;
+		RasterizerStateDesc RasterizerState;
+		PrimitiveType Primitive;
+		TArray<PipelineTargetDesc, TFixedAllocator<GpuResourceLimit::MaxRenderTargetNum>> Targets;
 
 		bool operator==(const GpuRenderPsoCacheKey& Other) const
 		{
-			return Desc.Vs == Other.Desc.Vs
-				&& Desc.Ps == Other.Desc.Ps
-				&& Desc.BindGroupLayout0 == Other.Desc.BindGroupLayout0
-				&& Desc.BindGroupLayout1 == Other.Desc.BindGroupLayout1
-				&& Desc.BindGroupLayout2 == Other.Desc.BindGroupLayout2
-				&& Desc.BindGroupLayout3 == Other.Desc.BindGroupLayout3
-				&& Desc.RasterizerState.FillMode == Other.Desc.RasterizerState.FillMode
-				&& Desc.RasterizerState.CullMode == Other.Desc.RasterizerState.CullMode
-				&& Desc.Primitive == Other.Desc.Primitive
-				&& Desc.Targets == Other.Desc.Targets;
+			return Vs == Other.Vs
+				&& Ps == Other.Ps
+				&& BindGroupLayout0 == Other.BindGroupLayout0
+				&& BindGroupLayout1 == Other.BindGroupLayout1
+				&& BindGroupLayout2 == Other.BindGroupLayout2
+				&& BindGroupLayout3 == Other.BindGroupLayout3
+				&& RasterizerState.FillMode == Other.RasterizerState.FillMode
+				&& RasterizerState.CullMode == Other.RasterizerState.CullMode
+				&& Primitive == Other.Primitive
+				&& Targets == Other.Targets;
 		}
 
 		friend uint32 GetTypeHash(const GpuRenderPsoCacheKey& Key)
@@ -113,15 +118,19 @@ namespace FW
 	struct GpuComputePsoCacheKey
 	{
 		uint32 Hash;
-		GpuComputePipelineStateDesc Desc;
+		TRefCountPtr<GpuShader> Cs;
+		TOptional<GpuBindGroupLayoutDesc> BindGroupLayout0;
+		TOptional<GpuBindGroupLayoutDesc> BindGroupLayout1;
+		TOptional<GpuBindGroupLayoutDesc> BindGroupLayout2;
+		TOptional<GpuBindGroupLayoutDesc> BindGroupLayout3;
 
 		bool operator==(const GpuComputePsoCacheKey& Other) const
 		{
-			return Desc.Cs == Other.Desc.Cs
-				&& Desc.BindGroupLayout0 == Other.Desc.BindGroupLayout0
-				&& Desc.BindGroupLayout1 == Other.Desc.BindGroupLayout1
-				&& Desc.BindGroupLayout2 == Other.Desc.BindGroupLayout2
-				&& Desc.BindGroupLayout3 == Other.Desc.BindGroupLayout3;
+			return Cs == Other.Cs
+				&& BindGroupLayout0 == Other.BindGroupLayout0
+				&& BindGroupLayout1 == Other.BindGroupLayout1
+				&& BindGroupLayout2 == Other.BindGroupLayout2
+				&& BindGroupLayout3 == Other.BindGroupLayout3;
 		}
 
 		friend uint32 GetTypeHash(const GpuComputePsoCacheKey& Key)

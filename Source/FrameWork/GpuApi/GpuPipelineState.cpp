@@ -85,7 +85,18 @@ namespace FW
 			Hash = HashCombine(Hash, ::GetTypeHash(Target.Mask));
 		}
 
-		return GpuRenderPsoCacheKey{ Hash, Desc };
+		return GpuRenderPsoCacheKey{
+			.Hash = Hash,
+			.Vs = Desc.Vs,
+			.Ps = Desc.Ps,
+			.BindGroupLayout0 = Desc.BindGroupLayout0 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout0->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
+			.BindGroupLayout1 = Desc.BindGroupLayout1 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout1->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
+			.BindGroupLayout2 = Desc.BindGroupLayout2 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout2->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
+			.BindGroupLayout3 = Desc.BindGroupLayout3 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout3->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
+			.RasterizerState = Desc.RasterizerState,
+			.Primitive = Desc.Primitive,
+			.Targets = Desc.Targets,
+		};
 	}
 
 	GpuComputePsoCacheKey GpuPsoCacheManager::ComputeComputePsoKey(const GpuComputePipelineStateDesc& Desc)
@@ -104,7 +115,14 @@ namespace FW
 		if (Desc.BindGroupLayout2) { Hash = HashCombine(Hash, GetTypeHash(Desc.BindGroupLayout2->GetDesc())); }
 		if (Desc.BindGroupLayout3) { Hash = HashCombine(Hash, GetTypeHash(Desc.BindGroupLayout3->GetDesc())); }
 
-		return GpuComputePsoCacheKey{ Hash, Desc };
+		return GpuComputePsoCacheKey{
+			.Hash = Hash,
+			.Cs = Desc.Cs,
+			.BindGroupLayout0 = Desc.BindGroupLayout0 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout0->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
+			.BindGroupLayout1 = Desc.BindGroupLayout1 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout1->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
+			.BindGroupLayout2 = Desc.BindGroupLayout2 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout2->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
+			.BindGroupLayout3 = Desc.BindGroupLayout3 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout3->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
+		};
 	}
 
 	void GpuPsoCacheManager::ClearCache()

@@ -3561,7 +3561,7 @@
                 "PS",
                 "CS"
             ],
-            "desc": "generate a step function by comparing two values",
+            "desc": "generate a step function by comparing two values\nFor element i of the return value, 0.0 is returned if x[i] < edge[i], and 1.0 is returned otherwise.",
             "signatures": [
                 {
                     "returnType": "genFType",

@@ -1980,7 +1980,9 @@ constexpr int PaddingLineNum = 22;
 			TArray<ShaderOccurrence> Occurrences;
 			for (const ShaderTokenizer::Token& Token : ShaderMarshaller->TokenizedLines[CursorLineIndex].Tokens)
 			{
-				if (CursorOffset >= Token.BeginOffset && CursorOffset <= Token.EndOffset && Token.Type == ShaderTokenType::Identifier && SyntaxTUCopy)
+				if (CursorOffset >= Token.BeginOffset && CursorOffset <= Token.EndOffset
+					&& (Token.Type == ShaderTokenType::Identifier || Token.Type == ShaderTokenType::Preprocess)
+					&& SyntaxTUCopy)
 				{
 					Occurrences = SyntaxTUCopy->GetOccurrences(GetLineNumber(CursorLineIndex) + AddedLineNum, Token.BeginOffset + 1);
 					break;
