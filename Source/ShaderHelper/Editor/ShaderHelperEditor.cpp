@@ -137,7 +137,13 @@ namespace SH
 			});
 		SAssignNew(DebuggerViewport, SDebuggerViewport)
 			.Visibility_Lambda([this]{
-				return IsDebugging ? EVisibility::Visible : EVisibility::Hidden;
+				return (IsDebugging && !bShowingLinePreview) ? EVisibility::Visible : EVisibility::Hidden;
+			});
+		LinePreviewViewPort = MakeShared<FW::PreviewViewPort>();
+		SAssignNew(LinePreviewWidget, SViewport)
+			.ViewportInterface(LinePreviewViewPort)
+			.Visibility_Lambda([this]{
+				return (IsDebugging && bShowingLinePreview) ? EVisibility::Visible : EVisibility::Hidden;
 			});
 		ViewPort->SetAssociatedWidget(ViewportWidget);
 
@@ -732,6 +738,10 @@ namespace SH
 					[
 						DebuggerViewport.ToSharedRef()
 					]
+					+SOverlay::Slot()
+					[
+						LinePreviewWidget.ToSharedRef()
+					]
                 ]
 			
 			);
@@ -992,10 +1002,32 @@ namespace SH
 
 	void ShaderHelperEditor::EndDebugging()
 	{
+		DismissLinePreview();
 		IsDebugging = false;
 		CurDebuggableObject->OnEndDebuggging();
 		Debugger.Reset();
 		CloseDebuggerTabs();
+	}
+
+	void ShaderHelperEditor::ShowLinePreview(const DebuggerLocation& Loc)
+	{
+		const auto& PreviewTextures = Debugger.GetLinePreviewTextures();
+		if (const auto* TexPtr = PreviewTextures.Find(Loc))
+		{
+			LinePreviewViewPort->SetViewPortRenderTexture(TexPtr->GetReference());
+			LinePreviewLocation = Loc;
+			bShowingLinePreview = true;
+		}
+	}
+
+	void ShaderHelperEditor::DismissLinePreview()
+	{
+		if (bShowingLinePreview)
+		{
+			bShowingLinePreview = false;
+			LinePreviewLocation = {};
+			LinePreviewViewPort->Clear();
+		}
 	}
 
 	void ShaderHelperEditor::Continue(StepMode Mode)
@@ -1200,6 +1232,24 @@ namespace SH
 			FText::GetEmpty(), FText::GetEmpty(),
 			FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.FullText"),
 			EUserInterfaceActionType::Button
+		);
+		ToolBarBuilder.AddToolBarWidget(
+			SNew(STextBlock)
+			.Margin(FMargin(8.0f, 0.0f, 0.0f, 0.0f))
+			.Visibility_Lambda([this] {
+				return (IsDebugging && bShowingLinePreview) ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+			})
+			.Text_Lambda([this] {
+				const auto& PreviewData = Debugger.GetLinePreviewData();
+				if (const auto* Info = PreviewData.Find(LinePreviewLocation))
+				{
+					return FText::Format(LOCALIZATION("InspectingPreview"),
+						FText::FromString(Info->VarName),
+						FText::FromString(LinePreviewLocation.File),
+						FText::AsNumber(LinePreviewLocation.LineNumber));
+				}
+				return FText::GetEmpty();
+			})
 		);
 		return ToolBarBuilder;
 	}

@@ -3,6 +3,7 @@
 #include "ShaderConductor.hpp"
 #include "Editor/ShaderHelperEditor.h"
 #include "GpuApi/Spirv/SpirvExprDebugger.h"
+#include "GpuApi/Spirv/SpirvPixelPreviewer.h"
 #include "GpuApi/Spirv/SpirvValidator.h"
 #include "Editor/AssetEditor/AssetEditor.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
@@ -448,14 +449,27 @@ namespace SH
 		DebuggerCallStackView->ActiveData = CallStackDatas[0];
 		ActiveCallPoint.reset();
 
-		ShowDeuggerVariable(Scope);
+		ShowDebuggerVariable(Scope);
 
 		SDebuggerWatchView* DebuggerWatchView = ShEditor->GetDebuggerWatchView();
 		DebuggerWatchView->OnWatch = [this](const FString& Expression) { return EvaluateExpression(Expression); };
 		DebuggerWatchView->Refresh();
+
+		//Compute and render per-line preview thumbnails
+		if (EnableLinePreview())
+		{
+			ComputeLinePreviewData();
+			InvokePixelPreview();
+
+			//Refresh LineTipList to show preview thumbnails
+			for (auto ShaderEditor : ShEditor->GetShaderEditors())
+			{
+				ShaderEditor->RefreshLineTips();
+			}
+		}
 	}
 
-	void ShaderDebugger::ShowDeuggerVariable(SpvLexicalScope* InScope) const
+	void ShaderDebugger::ShowDebuggerVariable(SpvLexicalScope* InScope) const
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		SDebuggerVariableView* DebuggerLocalVariableView = ShEditor->GetDebuggerLocalVariableView();
@@ -489,6 +503,11 @@ namespace SH
 					if (VisibleScope && VisibleLine)
 					{
 						FString VarName = VarDesc->Name;
+						if(VarName.StartsWith("GPrivate_"))
+						{
+							continue;
+						}
+						
 						//If there are variables with the same name, only the one in the most recent scope is shown.
 						if (LocalVarNodeDatas.ContainsByPredicate([&](const ExpressionNodePtr& InItem) { return InItem->Expr.Equals(VarName); }))
 						{
@@ -666,6 +685,13 @@ namespace SH
 		bool EnableUbsan = false;
 		Editor::GetEditorConfig()->GetBool(TEXT("Environment"), TEXT("EnableUbsan"), EnableUbsan);
 		return EnableUbsan;
+	}
+
+	bool ShaderDebugger::EnableLinePreview()
+	{
+		bool bEnable = true;
+		Editor::GetEditorConfig()->GetBool(TEXT("Environment"), TEXT("EnableLinePreview"), bEnable);
+		return bEnable;
 	}
 
 	int32 ShaderDebugger::GetExtraLineNumForSource(SpvId Source) const
@@ -1693,6 +1719,311 @@ namespace SH
 
 	}
 
+	void ShaderDebugger::ComputeLinePreviewData()
+	{
+		if (!DebuggerContext || DebugStates.IsEmpty())
+		{
+			return;
+		}
+
+		//Only scan newly traversed states since last call
+		int32 StartIdx = PrevPreviewStateIndex;
+
+		TSet<DebuggerLocation> ConditionLines;
+
+		for (int32 i = StartIdx; i < CurDebugStateIndex && i < DebugStates.Num(); i++)
+		{
+			if (std::holds_alternative<SpvDebugState_Tag>(DebugStates[i]))
+			{
+				const auto& Tag = std::get<SpvDebugState_Tag>(DebugStates[i]);
+				if (Tag.bCondition)
+				{
+					FString TagFile = DebuggerContext->GetSourceFileName(Tag.Source);
+					int32 TagLine = Tag.Line - GetExtraLineNumForSource(Tag.Source);
+					if (TagLine > 0)
+					{
+						ConditionLines.Add({ MoveTemp(TagFile), TagLine });
+					}
+				}
+				continue;
+			}
+
+			if (!std::holds_alternative<SpvDebugState_VarChange>(DebugStates[i]))
+			{
+				continue;
+			}
+			const auto& VarChange = std::get<SpvDebugState_VarChange>(DebugStates[i]);
+			if (VarChange.Error.IsEmpty())
+			{
+				//Skip non-user-declared variables (e.g. GPrivate_*)
+				FString VarName;
+				auto It = DebuggerContext->VariableDescMap.find(VarChange.Change.VarId);
+				if (It == DebuggerContext->VariableDescMap.end())
+				{
+					continue;
+				}
+				
+				VarName = It->second->Name;
+				if (VarName.StartsWith("GPrivate_"))
+				{
+					continue;
+				}
+
+				//Only support scalar and vector types for preview
+				SpvTypeDescKind TypeKind = It->second->TypeDesc->GetKind();
+				if (TypeKind != SpvTypeDescKind::Basic && TypeKind != SpvTypeDescKind::Vector)
+				{
+					continue;
+				}
+
+				int32 LineNumber = VarChange.Line - GetExtraLineNumForSource(VarChange.Source);
+				FString SourceFile = DebuggerContext->GetSourceFileName(VarChange.Source);
+				if (LineNumber > 0)
+				{
+					DebuggerLocation Loc{ SourceFile, LineNumber };
+					LinePreviewInfo& Existing = LinePreviewData.FindOrAdd(Loc);
+					if (Existing.VarId.IsValid() && Existing.VarId != VarChange.Change.VarId)
+					{
+						//Multiple different vars on this line, mark as invalid
+						Existing.VarId = {};
+					}
+					else
+					{
+						uint32 PH = FW::PackDebugHeader(FW::SpvDebuggerStateType::VarChange, VarChange.Source.GetValue(), (uint32)VarChange.Line);
+						int32 Iteration = (Existing.VarId == VarChange.Change.VarId) ? Existing.IterationIndex + 1 : 0;
+						Existing = { VarChange.Change.VarId, Iteration, PH, MoveTemp(VarName) };
+					}
+				}
+			}
+		}
+
+		PrevPreviewStateIndex = CurDebugStateIndex;
+
+		//Remove lines that are also condition (if/else) lines
+		for (const DebuggerLocation& CondLoc : ConditionLines)
+		{
+			LinePreviewData.Remove(CondLoc);
+		}
+	}
+
+	void ShaderDebugger::InvokePixelPreview()
+	{
+		if (LinePreviewData.IsEmpty())
+		{
+			return;
+		}
+
+		const auto& PsInvocation = std::get<PixelState>(Invocation);
+		GpuShaderLanguage Lang = DebugShader->GetShaderLanguage();
+		TArray<FString> ExtraArgs;
+		ExtraArgs.Add("-D");
+		ExtraArgs.Add("ENABLE_PRINT=0");
+		ExtraArgs.Add("-ignore-validation-error");
+
+		SpvPixelPreviewerContext PreviewContext{ SpvBindings };
+		SpirvParser Parser;
+		Parser.Parse(DebugShader->SpvCode);
+		SpvMetaVisitor MetaVisitor{ PreviewContext };
+		Parser.Accept(&MetaVisitor);
+		SpvPixelPreviewerVisitor PreviewVisitor{ PreviewContext, Lang };
+		Parser.Accept(&PreviewVisitor);
+		PreviewVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Preview.spvasm");
+
+		const TArray<uint32>& PatchedSpv = PreviewVisitor.GetPatcher().GetSpv();
+
+		ShaderConductor::Compiler::TargetDesc TargetDesc{};
+		ShaderConductor::Compiler::Options Options{};
+		Options.force_zero_initialized_variables = true;
+		FString FileExtension;
+		FString EntryPoint = DebugShader->GetEntryPoint();
+		if (Lang == GpuShaderLanguage::HLSL)
+		{
+			TargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
+			TargetDesc.version = "66";
+			FileExtension = TEXT(".hlsl");
+		}
+		else
+		{
+			Options.vulkanSemantics = true;
+			TargetDesc.language = ShaderConductor::ShadingLanguage::Glsl;
+			TargetDesc.version = "450";
+			FileExtension = TEXT(".glsl");
+		}
+
+		auto EntryPointUTF8 = StringCast<UTF8CHAR>(*EntryPoint);
+		ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile(
+			Options, { PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 },
+			(const char*)EntryPointUTF8.Get(),
+			ShaderConductor::ShaderStage::PixelShader, TargetDesc);
+
+		if (ShaderResultDesc.hasError)
+		{
+			SH_LOG(LogDebugger, Error, TEXT("[Preview] SpvCross error: %s"),
+				*FString(static_cast<const char*>(ShaderResultDesc.errorWarningMsg.Data())));
+			return;
+		}
+
+		FString PatchedSource = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
+		FFileHelper::SaveStringToFile(PatchedSource, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / (DebugShader->GetShaderName() + TEXT("Preview") + FileExtension)));
+
+		FString ErrorInfo, WarnInfo;
+		TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
+			.Name = DebugShader->GetShaderName(),
+			.Source = PatchedSource,
+			.Type = DebugShader->GetShaderType(),
+			.EntryPoint = EntryPoint,
+			.Language = Lang,
+		});
+		if (!GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
+		{
+			SH_LOG(LogDebugger, Error, TEXT("[Preview] Compile error: %s"), *ErrorInfo);
+			return;
+		}
+
+		//Setup bindings: rebuild from SpvBindings, grouped by DescriptorSet
+		TMap<int32, GpuBindGroupDesc> BaseGroupDescs;
+		TMap<int32, GpuBindGroupLayoutDesc> BaseLayoutDescs;
+		for (const auto& Binding : SpvBindings)
+		{
+			BaseGroupDescs.FindOrAdd(Binding.DescriptorSet).Resources.Add(Binding.Binding, { Binding.Resource });
+			auto& LayoutDesc = BaseLayoutDescs.FindOrAdd(Binding.DescriptorSet);
+			LayoutDesc.GroupNumber = Binding.DescriptorSet;
+			BindingType BType = BindingType::UniformBuffer;
+			if (GpuBuffer* Buf = dynamic_cast<GpuBuffer*>(Binding.Resource.GetReference()))
+			{
+				if (EnumHasAllFlags(Buf->GetUsage(), GpuBufferUsage::RWRaw))
+					BType = BindingType::RWRawBuffer;
+				else if (EnumHasAllFlags(Buf->GetUsage(), GpuBufferUsage::RWStructured))
+					BType = BindingType::RWStructuredBuffer;
+				else if (EnumHasAllFlags(Buf->GetUsage(), GpuBufferUsage::Uniform))
+					BType = BindingType::UniformBuffer;
+			}
+			else if (dynamic_cast<GpuTexture*>(Binding.Resource.GetReference()))
+			{
+				BType = BindingType::Texture;
+			}
+			else if (dynamic_cast<GpuSampler*>(Binding.Resource.GetReference()))
+			{
+				BType = BindingType::Sampler;
+			}
+			BaseLayoutDescs.FindOrAdd(Binding.DescriptorSet).Layouts.Add(Binding.Binding, { BType });
+		}
+
+		//Add previewer params slot to layout
+		BaseLayoutDescs.FindOrAdd(BindingContext::GlobalSlot).Layouts.Add(PreviewerParamsBindingSlot, { BindingType::UniformBuffer });
+
+		//Add debugger buffer slot (the preview shader still declares it even though PatchActiveCondition returns false)
+		BaseLayoutDescs.FindOrAdd(BindingContext::GlobalSlot).Layouts.Add(DebuggerBufferBindingSlot, { BindingType::RWRawBuffer });
+		BaseGroupDescs.FindOrAdd(BindingContext::GlobalSlot).Resources.Add(DebuggerBufferBindingSlot, { AUX::StaticCastRefCountPtr<GpuResource>(DebugBuffer) });
+
+		//Build non-global bind groups (shared across all lines)
+		TRefCountPtr<GpuBindGroupLayout> GlobalLayout;
+		BindingContext SharedBindings;
+		for (auto& [SetNumber, LayoutDesc] : BaseLayoutDescs)
+		{
+			TRefCountPtr<GpuBindGroupLayout> Layout = GGpuRhi->CreateBindGroupLayout(LayoutDesc);
+			if (SetNumber == BindingContext::GlobalSlot)
+			{
+				GlobalLayout = Layout;
+				SharedBindings.SetGlobalBindGroupLayout(Layout);
+			}
+			else
+			{
+				BaseGroupDescs[SetNumber].Layout = Layout;
+				TRefCountPtr<GpuBindGroup> Group = GGpuRhi->CreateBindGroup(BaseGroupDescs[SetNumber]);
+				if (SetNumber == BindingContext::PassSlot)
+				{
+					SharedBindings.SetPassBindGroup(Group);
+					SharedBindings.SetPassBindGroupLayout(Layout);
+				}
+				else if (SetNumber == BindingContext::ShaderSlot)
+				{
+					SharedBindings.SetShaderBindGroup(Group);
+					SharedBindings.SetShaderBindGroupLayout(Layout);
+				}
+			}
+		}
+
+		GpuRenderPipelineStateDesc PreviewPipelineDesc{
+			.Vs = PsInvocation.PipelineDesc.Vs,
+			.Ps = PatchedShader,
+			.Targets = {{ GpuTextureFormat::R32G32B32A32_FLOAT }},
+			.RasterizerState = PsInvocation.PipelineDesc.RasterizerState,
+			.Primitive = PsInvocation.PipelineDesc.Primitive
+		};
+		SharedBindings.ApplyBindGroupLayout(PreviewPipelineDesc);
+		TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PreviewPipelineDesc);
+
+		//Per-line: create params buffer, bind group, render target, and collect render passes
+		struct PerLineRenderData
+		{
+			TRefCountPtr<GpuBuffer> ParamsBuffer;
+			TRefCountPtr<GpuTexture> RenderTarget;
+			BindingContext Bindings;
+		};
+		TMap<DebuggerLocation, PerLineRenderData> PerLineData;
+
+		for (const auto& [Loc, Info] : LinePreviewData)
+		{
+			if (!Info.VarId.IsValid())
+			{
+				continue;
+			}
+			TArray<uint8> ParamsDatas;
+			ParamsDatas.SetNumZeroed(3 * sizeof(uint32));
+			uint32 TargetIteration = (uint32)Info.IterationIndex;
+			uint32 TargetPackedHeader = Info.PackedHeader;
+			uint32 TargetVarId = Info.VarId.GetValue();
+			FMemory::Memcpy(ParamsDatas.GetData(), &TargetIteration, sizeof(uint32));
+			FMemory::Memcpy(ParamsDatas.GetData() + sizeof(uint32), &TargetPackedHeader, sizeof(uint32));
+			FMemory::Memcpy(ParamsDatas.GetData() + 2 * sizeof(uint32), &TargetVarId, sizeof(uint32));
+
+			TRefCountPtr<GpuBuffer> ParamsBuffer = GGpuRhi->CreateBuffer({
+				.ByteSize = 3 * sizeof(uint32),
+				.Usage = GpuBufferUsage::Uniform,
+				.InitialData = ParamsDatas,
+			});
+
+			//Build global bind group with this line's params buffer
+			GpuBindGroupDesc GlobalGroupDesc = BaseGroupDescs.FindOrAdd(BindingContext::GlobalSlot);
+			GlobalGroupDesc.Resources.Add(PreviewerParamsBindingSlot, { AUX::StaticCastRefCountPtr<GpuResource>(ParamsBuffer) });
+			GlobalGroupDesc.Layout = GlobalLayout;
+			TRefCountPtr<GpuBindGroup> GlobalGroup = GGpuRhi->CreateBindGroup(GlobalGroupDesc);
+
+			auto RenderTarget = GGpuRhi->CreateTexture({
+				.Width = (uint32)PsInvocation.ViewPortDesc.Width,
+				.Height = (uint32)PsInvocation.ViewPortDesc.Height,
+				.Format = GpuTextureFormat::R32G32B32A32_FLOAT,
+				.Usage = GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared
+			});
+
+			BindingContext LineBindings = SharedBindings;
+			LineBindings.SetGlobalBindGroup(GlobalGroup);
+
+			PerLineData.Add(Loc, { ParamsBuffer, RenderTarget, MoveTemp(LineBindings) });
+		}
+
+		auto CmdRecorder = GGpuRhi->BeginRecording();
+		RenderGraph RG(CmdRecorder);
+		for (auto& [Loc, Data] : PerLineData)
+		{
+			GpuRenderPassDesc PassDesc;
+			PassDesc.ColorRenderTargets.Add({ .Texture = Data.RenderTarget, .StoreAction = RenderTargetStoreAction::Store });
+
+			RG.AddRenderPass(TEXT("Preview"), MoveTemp(PassDesc), Data.Bindings,
+				[&](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
+					PassRecorder->SetViewPort(PsInvocation.ViewPortDesc);
+					PassRecorder->SetRenderPipelineState(Pipeline);
+					Bindings.ApplyBindGroup(PassRecorder);
+					PsInvocation.DrawFunction(PassRecorder);
+				}
+			);
+
+			LinePreviewTextures.Add(Loc, Data.RenderTarget);
+		}
+		RG.Execute();
+	}
+
 	void ShaderDebugger::Reset()
 	{
 		CurValidLine.reset();
@@ -1713,6 +2044,10 @@ namespace SH
 		DebugParamsBuffer = nullptr;
 		bEnableUbsan = false;
 		bEditDuringDebugging = false;
+
+		LinePreviewData.Empty();
+		LinePreviewTextures.Empty();
+		PrevPreviewStateIndex = 0;
 
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		SDebuggerVariableView* DebuggerLocalVariableView = ShEditor->GetDebuggerLocalVariableView();
@@ -1736,21 +2071,21 @@ namespace SH
 		DebuggerLocalVariableView->SetOnShowChanged([this] { 
 			if (ActiveCallPoint)
 			{
-				ShowDeuggerVariable(ActiveCallPoint.value().Scope);
+				ShowDebuggerVariable(ActiveCallPoint.value().Scope);
 			}
 			else
 			{
-				ShowDeuggerVariable(Scope);
+				ShowDebuggerVariable(Scope);
 			}
 		});
 		DebuggerGlobalVariableView->SetOnShowChanged([this] {
 			if (ActiveCallPoint)
 			{
-				ShowDeuggerVariable(ActiveCallPoint.value().Scope);
+				ShowDebuggerVariable(ActiveCallPoint.value().Scope);
 			}
 			else
 			{
-				ShowDeuggerVariable(Scope);
+				ShowDebuggerVariable(Scope);
 			}
 		});
 
@@ -1768,7 +2103,7 @@ namespace SH
 					StopLocation.LineNumber = CurValidLine.value() - ExtraLineNum;
 					StopEditor->JumpTo(StopEditor->GetLineIndex(StopLocation.LineNumber));
 				}
-				ShowDeuggerVariable(Scope);
+				ShowDebuggerVariable(Scope);
 				ActiveCallPoint.reset();
 			}
 			else if (auto CallPoint = CallStack.FindByPredicate([this, FuncName](const auto& InItem) {
@@ -1789,7 +2124,7 @@ namespace SH
 					StopLocation.LineNumber = CallPoint->Line - ExtraLineNum;
 					EntryEditor->JumpTo(EntryEditor->GetLineIndex(StopLocation.LineNumber));
 				}
-				ShowDeuggerVariable(CallPoint->Scope);
+				ShowDebuggerVariable(CallPoint->Scope);
 				ActiveCallPoint = *CallPoint;
 			}
 			DebuggerWatchView->Refresh();

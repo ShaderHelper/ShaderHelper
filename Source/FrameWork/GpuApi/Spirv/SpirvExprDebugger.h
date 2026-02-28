@@ -22,7 +22,7 @@ namespace FW
 
 	protected:
 		void ParseInternal() override;
-		void PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) override;
+		bool PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) override;
 		void PatchBaseTypeAppendExprFunc();
 		void PatchAppendExprFunc(const SpvType* Type, const SpvTypeDesc* TypeDesc);
 		void PatchAppendExprDummyFunc();

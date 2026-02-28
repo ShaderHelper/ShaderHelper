@@ -1,7 +1,9 @@
 #pragma once
 #include "GpuApi/Spirv/SpirvParser.h"
 #include "GpuApi/Spirv/SpirvPixelDebugger.h"
+#include "GpuApi/Spirv/SpirvPixelPreviewer.h"
 #include "GpuApi/GpuRhi.h"
+#include "Editor/PreviewViewPort.h"
 #include "RenderResource/Shader/Shader.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogDebugger, Log, All);
@@ -38,6 +40,15 @@ namespace SH
 
 	using InvocationState = std::variant<PixelState, ComputeState>;
 
+	//Per-line preview info: a line with exactly one uniquely modified variable
+	struct LinePreviewInfo
+	{
+		FW::SpvId VarId;
+		int32 IterationIndex;    //How many times this (PackedHeader, VarId) was seen before (for loop iterations)
+		uint32 PackedHeader;     //Packed debug header (StateType|Source|Line)
+		FString VarName;
+	};
+
 	enum class StepMode
 	{
 		Continue,
@@ -52,6 +63,8 @@ namespace SH
 		
 		bool IsValid() const { return !File.IsEmpty() && LineNumber > 0; }
 		void Reset() { File.Empty(); LineNumber = 0; }
+		bool operator==(const DebuggerLocation& Other) const { return File == Other.File && LineNumber == Other.LineNumber; }
+		friend uint32 GetTypeHash(const DebuggerLocation& Loc) { return HashCombine(GetTypeHash(Loc.File), ::GetTypeHash(Loc.LineNumber)); }
 	};
 
 	class ShaderDebugger
@@ -59,6 +72,7 @@ namespace SH
 	public:
 		ShaderDebugger();
 		static bool EnableUbsan();
+		static bool EnableLinePreview();
 
 	public:
 		void SetShaderAsset(ShaderAsset* InShaderAsset) { CurShaderAsset = InShaderAsset; }
@@ -67,7 +81,7 @@ namespace SH
 		
 		void ApplyDebugState(const FW::SpvDebugState& InState, FString& Error);
 		void ShowDebuggerResult();
-		void ShowDeuggerVariable(FW::SpvLexicalScope* InScope) const;
+		void ShowDebuggerVariable(FW::SpvLexicalScope* InScope) const;
 		struct ExpressionNode EvaluateExpression(const FString& InExpression) const;
 		bool Continue(StepMode Mode);
 
@@ -77,6 +91,12 @@ namespace SH
 
 		void DebugCompute(const InvocationState& InState);
 		void Reset();
+
+		//Compute per-line preview data and render preview textures
+		void ComputeLinePreviewData();
+		void InvokePixelPreview();
+		const TMap<DebuggerLocation, TRefCountPtr<FW::GpuTexture>>& GetLinePreviewTextures() const { return LinePreviewTextures; }
+		const TMap<DebuggerLocation, LinePreviewInfo>& GetLinePreviewData() const { return LinePreviewData; }
 
 		TPair<FString, DebuggerLocation> GetDebuggerError() const { return DebuggerError; }
 		const DebuggerLocation& GetStopLocation() const { return StopLocation; }
@@ -126,5 +146,10 @@ namespace SH
 		bool bEditDuringDebugging = false;
 
 		FW::Vector2u PixelCoord;
+
+		//Per-line preview: maps DebuggerLocation -> info/texture
+		TMap<DebuggerLocation, LinePreviewInfo> LinePreviewData;
+		TMap<DebuggerLocation, TRefCountPtr<FW::GpuTexture>> LinePreviewTextures;
+		int32 PrevPreviewStateIndex = 0;
 	};
 }

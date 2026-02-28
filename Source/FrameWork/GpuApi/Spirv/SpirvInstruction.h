@@ -1271,6 +1271,16 @@ namespace FW
 		
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetFloatValue() const { return FloatValue; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(FloatValue.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ConvertFToS;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -1286,6 +1296,16 @@ namespace FW
 		
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetSignedValue() const { return SignedValue; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(SignedValue.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ConvertSToF;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -1293,19 +1313,28 @@ namespace FW
 	};
 
 	class SpvOpConvertUToF : public SpvInstructionBase<SpvOpConvertUToF>
-	   {
-	   public:
-		   SpvOpConvertUToF(SpvId InResultType, SpvId InUnsignedValue) : SpvInstructionBase(SpvOp::ConvertUToF)
-		   , ResultType(InResultType), UnsignedValue(InUnsignedValue)
-		   {}
-		   
-		   SpvId GetResultType() const { return ResultType; }
-		   SpvId GetUnsignedValue() const { return UnsignedValue; }
-		   
-	   private:
-		   SpvId ResultType;
-		   SpvId UnsignedValue;
-	   };
+	{
+	public:
+		SpvOpConvertUToF(SpvId InResultType, SpvId InUnsignedValue) : SpvInstructionBase(SpvOp::ConvertUToF)
+		, ResultType(InResultType), UnsignedValue(InUnsignedValue)
+		{}
+		
+		SpvId GetResultType() const { return ResultType; }
+		SpvId GetUnsignedValue() const { return UnsignedValue; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(UnsignedValue.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ConvertUToF;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
+	private:
+		SpvId ResultType;
+		SpvId UnsignedValue;
+	};
 
 	class SpvOpBitcast : public SpvInstructionBase<SpvOpBitcast>
 	{

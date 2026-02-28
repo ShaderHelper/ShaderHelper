@@ -350,7 +350,7 @@ namespace FW
 		void Visit(const SpvOpReturnValue* Inst) override;
 
 	protected:
-		virtual void PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) {}
+		virtual bool PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) { return true; }
 		virtual void ParseInternal();
 		void PatchToDebugger(SpvId InValueId, SpvId InTypeId, TArray<TUniquePtr<SpvInstruction>>& InstList);
 		void FlattenToUInts(SpvId InValueId, SpvId InTypeId, TArray<TUniquePtr<SpvInstruction>>& InstList, TArray<SpvId>& OutUIntValues);

@@ -5,11 +5,22 @@
 
 namespace FW
 {
+	auto SpvInstOffsetProjection = [](SpvInstruction* Inst) { return Inst->GetWordOffset().value(); };
+
 	void SpvPatcher::SetSpvContext(const TArray<TUniquePtr<SpvInstruction>>& InInsts, const TArray<uint32>& InSpvCode, SpvMetaContext* InMetaContext)
 	{
 		OriginInsts = &InInsts;
 		SpvCode = InSpvCode;
 		MetaVisitor = MakeUnique<SpvMetaVisitor>(*InMetaContext);
+
+		SortedOriginInsts.Reserve(InInsts.Num());
+		for (const auto& Inst : InInsts)
+		{
+			SortedOriginInsts.Add(Inst.Get());
+		}
+		SortedOriginInsts.Sort([](SpvInstruction& A, SpvInstruction& B) {
+			return A.GetWordOffset().value() < B.GetWordOffset().value();
+		});
 	}
 
 	void SpvPatcher::Dump(const FString& SavedFileName) const
@@ -32,97 +43,66 @@ namespace FW
 	SpvId SpvPatcher::FindOrAddTypeDesc(TUniquePtr<SpvInstruction> InInst)
 	{
 		SpvMetaContext& Context = MetaVisitor->GetContext();
+		const SpvInstKind& Kind = InInst->GetKind();
+		const auto* DebugOp = std::get_if<SpvDebugInfo100>(&Kind);
 
-		auto HasTypeDesc = [&](SpvInstruction* A, SpvInstruction* B) {
-			if (A->GetKind() == B->GetKind())
+		if (DebugOp)
+		{
+			if (*DebugOp == SpvDebugInfo100::DebugTypeBasic)
 			{
-				SpvDebugInfo100 OpCode = std::get<SpvDebugInfo100>(A->GetKind());
-				if (OpCode == SpvDebugInfo100::DebugTypeBasic)
+				auto* Inst = static_cast<SpvDebugTypeBasic*>(InInst.Get());
+				int32 InstSize = *(int32*)std::get<SpvObject::Internal>(Context.Constants.at(Inst->GetSize()).Storage).Value.GetData();
+				auto InstEncoding = *(SpvDebugBasicTypeEncoding*)std::get<SpvObject::Internal>(Context.Constants.at(Inst->GetEncoding()).Storage).Value.GetData();
+
+				for (const auto& [Id, Desc] : Context.TypeDescs)
 				{
-					SpvDebugTypeBasic* TypeA = static_cast<SpvDebugTypeBasic*>(A);
-					SpvDebugTypeBasic* TypeB = static_cast<SpvDebugTypeBasic*>(B);
-					return TypeA->GetSize() == TypeB->GetSize() && TypeA->GetEncoding() == TypeB->GetEncoding();
+					if (Desc->GetKind() == SpvTypeDescKind::Basic)
+					{
+						auto* BasicDesc = static_cast<SpvBasicTypeDesc*>(Desc.Get());
+						if (BasicDesc->GetSize() == InstSize && BasicDesc->GetEncoding() == InstEncoding)
+							return Id;
+					}
 				}
-				else if (OpCode == SpvDebugInfo100::DebugTypeVector)
+			}
+			else if (*DebugOp == SpvDebugInfo100::DebugTypeVector)
+			{
+				auto* Inst = static_cast<SpvDebugTypeVector*>(InInst.Get());
+				int32 CompCount = *(int32*)std::get<SpvObject::Internal>(Context.Constants.at(Inst->GetComponentCount()).Storage).Value.GetData();
+				SpvTypeDesc* BasicTypeDesc = Context.TypeDescs.contains(Inst->GetBasicType()) ?
+					Context.TypeDescs.at(Inst->GetBasicType()).Get() : nullptr;
+
+				for (const auto& [Id, Desc] : Context.TypeDescs)
 				{
-					SpvDebugTypeVector* TypeA = static_cast<SpvDebugTypeVector*>(A);
-					SpvDebugTypeVector* TypeB = static_cast<SpvDebugTypeVector*>(B);
-					return TypeA->GetBasicType() == TypeB->GetBasicType() && TypeA->GetComponentCount() == TypeB->GetComponentCount();
+					if (Desc->GetKind() == SpvTypeDescKind::Vector)
+					{
+						auto* VecDesc = static_cast<SpvVectorTypeDesc*>(Desc.Get());
+						if (VecDesc->GetCompCount() == CompCount && VecDesc->GetBasicTypeDesc() == BasicTypeDesc)
+							return Id;
+					}
 				}
 			}
-			return false;
-		};
-
-		SpvId ResultId;
-		for (auto& Inst : *OriginInsts)
-		{
-			if (HasTypeDesc(Inst.Get(), InInst.Get()))
-			{
-				ResultId = Inst->GetId().value();
-			}
-		}
-		for (auto& Inst : PatchedInsts)
-		{
-			if (HasTypeDesc(Inst.Get(), InInst.Get()))
-			{
-				ResultId = Inst->GetId().value();
-			}
 		}
 
-		if (!ResultId.IsValid())
-		{
-			ResultId = NewId();
-			InInst->SetId(ResultId);
-
-			AddInstruction(Context.Sections[SpvSectionKind::Type].EndOffset, MoveTemp(InInst));
-		}
-
+		SpvId ResultId = NewId();
+		InInst->SetId(ResultId);
+		AddInstruction(Context.Sections[SpvSectionKind::Type].EndOffset, MoveTemp(InInst));
 		return ResultId;
 	}
 
 	SpvId SpvPatcher::FindOrAddDebugStr(const FString& Str)
 	{
 		SpvMetaContext& Context = MetaVisitor->GetContext();
+
+		for (const auto& [Id, ExistingStr] : Context.DebugStrs)
+		{
+			if (ExistingStr == Str)
+				return Id;
+		}
+
 		TUniquePtr<SpvInstruction> InInst = MakeUnique<SpvOpString>(Str);
-
-		auto HasStr = [&](SpvInstruction* A, SpvInstruction* B) {
-			if (A->GetKind() == B->GetKind())
-			{
-				SpvOp OpCode = std::get<SpvOp>(A->GetKind());
-				if (OpCode == SpvOp::String)
-				{
-					SpvOpString* TypeA = static_cast<SpvOpString*>(A);
-					SpvOpString* TypeB = static_cast<SpvOpString*>(B);
-					return TypeA->GetStr() == TypeB->GetStr();
-				}
-			}
-			return false;
-		};
-
-		SpvId ResultId;
-		for (auto& Inst : *OriginInsts)
-		{
-			if (HasStr(Inst.Get(), InInst.Get()))
-			{
-				ResultId = Inst->GetId().value();
-			}
-		}
-		for (auto& Inst : PatchedInsts)
-		{
-			if (HasStr(Inst.Get(), InInst.Get()))
-			{
-				ResultId = Inst->GetId().value();
-			}
-		}
-
-		if (!ResultId.IsValid())
-		{
-			ResultId = NewId();
-			InInst->SetId(ResultId);
-
-			AddInstruction(Context.Sections[SpvSectionKind::DebugString].EndOffset, MoveTemp(InInst));
-		}
-
+		SpvId ResultId = NewId();
+		InInst->SetId(ResultId);
+		AddInstruction(Context.Sections[SpvSectionKind::DebugString].EndOffset, MoveTemp(InInst));
 		return ResultId;
 	}
 
@@ -141,138 +121,125 @@ namespace FW
 	SpvId SpvPatcher::FindOrAddType(TUniquePtr<SpvInstruction> InInst)
 	{
 		SpvMetaContext& Context = MetaVisitor->GetContext();
+		const SpvInstKind& Kind = InInst->GetKind();
+		const auto* Op = std::get_if<SpvOp>(&Kind);
 
-		//Avoid duplicate non-aggregate type declarations
-		auto HasType = [&](SpvInstruction* A, SpvInstruction* B) {
-			if (A->GetKind() == B->GetKind())
+		if (Op)
+		{
+			for (const auto& [Id, Type] : Context.Types)
 			{
-				SpvOp OpCode = std::get<SpvOp>(A->GetKind());
-				if (OpCode == SpvOp::TypeInt)
+				if (*Op == SpvOp::TypeInt && Type->GetKind() == SpvTypeKind::Integer)
 				{
-					SpvOpTypeInt* TypeA = static_cast<SpvOpTypeInt*>(A);
-					SpvOpTypeInt* TypeB = static_cast<SpvOpTypeInt*>(B);
-					return TypeA->GetSignedness() == TypeB->GetSignedness() && TypeA->GetWidth() == TypeB->GetWidth();
+					auto* Src = static_cast<SpvOpTypeInt*>(InInst.Get());
+					auto* Dst = static_cast<SpvIntegerType*>(Type.Get());
+					if (Src->GetWidth() == Dst->GetWidth() && (Src->GetSignedness() == 1) == Dst->IsSigend())
+						return Id;
 				}
-				else if (OpCode == SpvOp::TypeFloat)
+				else if (*Op == SpvOp::TypeFloat && Type->GetKind() == SpvTypeKind::Float)
 				{
-					SpvOpTypeFloat* TypeA = static_cast<SpvOpTypeFloat*>(A);
-					SpvOpTypeFloat* TypeB = static_cast<SpvOpTypeFloat*>(B);
-					return TypeA->GetWidth() == TypeB->GetWidth();
+					auto* Src = static_cast<SpvOpTypeFloat*>(InInst.Get());
+					auto* Dst = static_cast<SpvFloatType*>(Type.Get());
+					if (Src->GetWidth() == Dst->GetWidth())
+						return Id;
 				}
-				else if (OpCode == SpvOp::TypeArray)
+				else if (*Op == SpvOp::TypeVector && Type->GetKind() == SpvTypeKind::Vector)
 				{
-					SpvOpTypeArray* TypeA = static_cast<SpvOpTypeArray*>(A);
-					SpvOpTypeArray* TypeB = static_cast<SpvOpTypeArray*>(B);
-					return TypeA->GetElementType() == TypeB->GetElementType() && TypeA->GetLength() == TypeB->GetLength();
+					auto* Src = static_cast<SpvOpTypeVector*>(InInst.Get());
+					auto* Dst = static_cast<SpvVectorType*>(Type.Get());
+					if (Src->GetComponentType() == Dst->ElementType->GetId() && Src->GetComponentCount() == Dst->ElementCount)
+						return Id;
 				}
-				else if (OpCode == SpvOp::TypeMatrix)
+				else if (*Op == SpvOp::TypeMatrix && Type->GetKind() == SpvTypeKind::Matrix)
 				{
-					SpvOpTypeMatrix* TypeA = static_cast<SpvOpTypeMatrix*>(A);
-					SpvOpTypeMatrix* TypeB = static_cast<SpvOpTypeMatrix*>(B);
-					return TypeA->GetColumnCount() == TypeB->GetColumnCount() && TypeA->GetColumnType() == TypeB->GetColumnType();
+					auto* Src = static_cast<SpvOpTypeMatrix*>(InInst.Get());
+					auto* Dst = static_cast<SpvMatrixType*>(Type.Get());
+					if (Src->GetColumnType() == Dst->ElementType->GetId() && Src->GetColumnCount() == Dst->ElementCount)
+						return Id;
 				}
-				else if (OpCode == SpvOp::TypeVector)
+				else if (*Op == SpvOp::TypeArray && Type->GetKind() == SpvTypeKind::Array)
 				{
-					SpvOpTypeVector* TypeA = static_cast<SpvOpTypeVector*>(A);
-					SpvOpTypeVector* TypeB = static_cast<SpvOpTypeVector*>(B);
-					return TypeA->GetComponentCount() == TypeB->GetComponentCount() && TypeA->GetComponentType() == TypeB->GetComponentType();
+					auto* Src = static_cast<SpvOpTypeArray*>(InInst.Get());
+					auto* Dst = static_cast<SpvArrayType*>(Type.Get());
+					if (Src->GetElementType() == Dst->ElementType->GetId() && Dst->Length == *(uint32*)std::get<SpvObject::Internal>(Context.Constants.at(Src->GetLength()).Storage).Value.GetData())
+						return Id;
 				}
-				else if (OpCode == SpvOp::TypeFunction)
+				else if (*Op == SpvOp::TypePointer && Type->GetKind() == SpvTypeKind::Pointer)
 				{
-					SpvOpTypeFunction* TypeA = static_cast<SpvOpTypeFunction*>(A);
-					SpvOpTypeFunction* TypeB = static_cast<SpvOpTypeFunction*>(B);
-					return TypeA->GetParameterTypes() == TypeB->GetParameterTypes() && TypeA->GetReturnType() == TypeB->GetReturnType();
+					auto* Src = static_cast<SpvOpTypePointer*>(InInst.Get());
+					auto* Dst = static_cast<SpvPointerType*>(Type.Get());
+					if (Src->GetPointeeType() == Dst->PointeeType->GetId() && Src->GetStorageClass() == Dst->StorageClass)
+						return Id;
 				}
-				else if (OpCode == SpvOp::TypePointer)
+				else if (*Op == SpvOp::TypeFunction && Type->GetKind() == SpvTypeKind::Function)
 				{
-					SpvOpTypePointer* TypeA = static_cast<SpvOpTypePointer*>(A);
-					SpvOpTypePointer* TypeB = static_cast<SpvOpTypePointer*>(B);
-					return TypeA->GetPointeeType() == TypeB->GetPointeeType() && TypeA->GetStorageClass() == TypeB->GetStorageClass();
+					auto* Src = static_cast<SpvOpTypeFunction*>(InInst.Get());
+					auto* Dst = static_cast<SpvFunctionType*>(Type.Get());
+					if (Src->GetReturnType() == Dst->ReturnType->GetId() && Src->GetParameterTypes().Num() == Dst->ParameterTypes.Num())
+					{
+						bool Match = true;
+						for (int i = 0; i < Src->GetParameterTypes().Num(); i++)
+						{
+							if (Src->GetParameterTypes()[i] != Dst->ParameterTypes[i]->GetId()) { Match = false; break; }
+						}
+						if (Match) return Id;
+					}
 				}
-				else if (OpCode == SpvOp::TypeVoid)
+				else if (*Op == SpvOp::TypeVoid && Type->GetKind() == SpvTypeKind::Void)
 				{
-					return true;
+					return Id;
 				}
-				else if (OpCode == SpvOp::TypeBool)
+				else if (*Op == SpvOp::TypeBool && Type->GetKind() == SpvTypeKind::Bool)
 				{
-					return true;
+					return Id;
 				}
 			}
-			return false;
-		};
-
-		SpvId ResultId;
-		for (auto& Inst : *OriginInsts)
-		{
-			if (HasType(Inst.Get(), InInst.Get()))
-			{
-				ResultId = Inst->GetId().value();
-			}
-		}
-		for (auto& Inst : PatchedInsts)
-		{
-			if (HasType(Inst.Get(), InInst.Get()))
-			{
-				ResultId = Inst->GetId().value();
-			}
-		}
-		
-		if(!ResultId.IsValid())
-		{
-			ResultId = NewId();
-			InInst->SetId(ResultId);
-
-			AddInstruction(Context.Sections[SpvSectionKind::Type].EndOffset, MoveTemp(InInst));
 		}
 
+		SpvId ResultId = NewId();
+		InInst->SetId(ResultId);
+		AddInstruction(Context.Sections[SpvSectionKind::Type].EndOffset, MoveTemp(InInst));
 		return ResultId;
 	}
 
 	SpvId SpvPatcher::FindOrAddConstant(TUniquePtr<SpvInstruction> InInst)
 	{
 		SpvMetaContext& Context = MetaVisitor->GetContext();
-		auto HasConstant = [&](SpvInstruction* A, SpvInstruction* B) {
-			if (A->GetKind() == B->GetKind())
-			{
-				SpvOp OpCode = std::get<SpvOp>(A->GetKind());
-				if (OpCode == SpvOp::Constant)
-				{
-					SpvOpConstant* ConstantA = static_cast<SpvOpConstant*>(A);
-					SpvOpConstant* ConstantB = static_cast<SpvOpConstant*>(B);
-					return ConstantA->GetResultType() == ConstantB->GetResultType() && ConstantA->GetValue() == ConstantB->GetValue();
-				}
-				else if (OpCode == SpvOp::ConstantComposite)
-				{
-					SpvOpConstantComposite* ConstantA = static_cast<SpvOpConstantComposite*>(A);
-					SpvOpConstantComposite* ConstantB = static_cast<SpvOpConstantComposite*>(B);
-					return ConstantA->GetResultType() == ConstantB->GetResultType() && ConstantA->GetConstituents() == ConstantB->GetConstituents();
-				}
-			}
-			return false;
-			};
+		const SpvInstKind& Kind = InInst->GetKind();
+		SpvOp OpCode = std::get<SpvOp>(Kind);
 
-		SpvId ResultId;
-		for (auto& Inst : *OriginInsts)
+		SpvId ResultTypeId;
+		TArray<uint8> ValueBytes;
+
+		if (OpCode == SpvOp::Constant)
 		{
-			if (HasConstant(Inst.Get(), InInst.Get()))
-			{
-				ResultId = Inst->GetId().value();
-			}
+			auto* C = static_cast<SpvOpConstant*>(InInst.Get());
+			ResultTypeId = C->GetResultType();
+			ValueBytes = C->GetValue();
 		}
-		for (auto& Inst : PatchedInsts)
+		else if (OpCode == SpvOp::ConstantComposite)
 		{
-			if (HasConstant(Inst.Get(), InInst.Get()))
+			auto* C = static_cast<SpvOpConstantComposite*>(InInst.Get());
+			ResultTypeId = C->GetResultType();
+			for (SpvId ConstituentId : C->GetConstituents())
 			{
-				ResultId = Inst->GetId().value();
+				const auto& Obj = Context.Constants.at(ConstituentId);
+				ValueBytes.Append(std::get<SpvObject::Internal>(Obj.Storage).Value);
 			}
 		}
 
-		if (!ResultId.IsValid())
+		for (const auto& [Id, Obj] : Context.Constants)
 		{
-			ResultId = NewId();
-			InInst->SetId(ResultId);
-			AddInstruction(Context.Sections[SpvSectionKind::Contant].EndOffset, MoveTemp(InInst));
+			if (Obj.Type && Obj.Type->GetId() == ResultTypeId)
+			{
+				const auto& ObjValue = std::get<SpvObject::Internal>(Obj.Storage).Value;
+				if (ObjValue == ValueBytes)
+					return Id;
+			}
 		}
+
+		SpvId ResultId = NewId();
+		InInst->SetId(ResultId);
+		AddInstruction(Context.Sections[SpvSectionKind::Contant].EndOffset, MoveTemp(InInst));
 		return ResultId;
 	}
 
@@ -382,7 +349,11 @@ namespace FW
 		{
 			InInst->Accept(MetaVisitor.Get());
 		}
+		SpvInstruction* RawPtr = InInst.Get();
 		PatchedInsts.Add(MoveTemp(InInst));
+
+		int InsertIdx = Algo::LowerBoundBy(SortedPatchedInsts, WordOffset, SpvInstOffsetProjection);
+		SortedPatchedInsts.Insert(RawPtr, InsertIdx);
 	}
 
 	void SpvPatcher::UpdateSection(SpvSectionKind DirtySection, int WordSize)
@@ -398,21 +369,18 @@ namespace FW
 
 	void SpvPatcher::UpdateInsts(int WordOffset, int WordSize)
 	{
-		for (auto& Inst : *OriginInsts)
+		int OriginStart = Algo::LowerBoundBy(SortedOriginInsts, WordOffset, SpvInstOffsetProjection);
+		for (int i = OriginStart; i < SortedOriginInsts.Num(); i++)
 		{
-			int CurInstOffset = Inst->GetWordOffset().value();
-			if (CurInstOffset >= WordOffset)
-			{
-				Inst->SetWordOffset(CurInstOffset + WordSize);
-			}
+			int CurInstOffset = SortedOriginInsts[i]->GetWordOffset().value();
+			SortedOriginInsts[i]->SetWordOffset(CurInstOffset + WordSize);
 		}
-		for (auto& Inst : PatchedInsts)
+
+		int PatchedStart = Algo::LowerBoundBy(SortedPatchedInsts, WordOffset, SpvInstOffsetProjection);
+		for (int i = PatchedStart; i < SortedPatchedInsts.Num(); i++)
 		{
-			int CurInstOffset = Inst->GetWordOffset().value();
-			if (CurInstOffset >= WordOffset)
-			{
-				Inst->SetWordOffset(CurInstOffset + WordSize);
-			}
+			int CurInstOffset = SortedPatchedInsts[i]->GetWordOffset().value();
+			SortedPatchedInsts[i]->SetWordOffset(CurInstOffset + WordSize);
 		}
 	}
 }

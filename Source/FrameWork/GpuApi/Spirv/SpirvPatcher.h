@@ -43,5 +43,9 @@ namespace FW
 		TArray<TUniquePtr<SpvInstruction>> PatchedInsts;
 		TArray<uint32> SpvCode;
 		TUniquePtr<SpvMetaVisitor> MetaVisitor;
+
+		// Sorted indices for efficient offset updates (binary search)
+		TArray<SpvInstruction*> SortedOriginInsts;
+		TArray<SpvInstruction*> SortedPatchedInsts;
 	};
 }

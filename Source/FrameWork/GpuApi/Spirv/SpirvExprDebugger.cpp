@@ -300,7 +300,7 @@ namespace FW
 		Patcher.AddInstructions(OffsetEval(), MoveTemp(AppendExprDummyInsts));
 	}
 
-	void SpvPixelExprDebuggerVisitor::PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList)
+	bool SpvPixelExprDebuggerVisitor::PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList)
 	{
 		SpvPixelDebuggerVisitor::PatchActiveCondition(InstList);
 
@@ -340,11 +340,8 @@ namespace FW
 		InstList.Add(MoveTemp(AddOp));
 
 		InstList.Add(MakeUnique<SpvOpStore>(DebugStateNum, NewDebugStateNum));
-		InstList.Add(MakeUnique<SpvOpReturn>());
 
-		auto LabelOp = MakeUnique<SpvOpLabel>();
-		LabelOp->SetId(Patcher.NewId());
-		InstList.Add(MoveTemp(LabelOp));
+		return false;
 	}
 
 	void SpvPixelExprDebuggerVisitor::PatchBaseTypeAppendExprFunc()

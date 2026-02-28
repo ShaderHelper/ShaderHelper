@@ -22,7 +22,7 @@ namespace FW
 		void Visit(const SpvOpKill* Inst) override;
 
 	protected:
-		void PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) override;
+		bool PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) override;
 		void ParseInternal() override;
 
 	protected:
