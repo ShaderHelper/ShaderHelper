@@ -55,6 +55,19 @@ namespace FW
 		Atan2,
 	};
 
+	// Packed debug header format: StateType(8) | Source(8) | Line(16)
+	inline uint32 PackDebugHeader(SpvDebuggerStateType StateType, uint32 Source, uint32 Line)
+	{
+		return ((uint32)StateType & 0xFF) | ((Source & 0xFF) << 8) | ((Line & 0xFFFF) << 16);
+	}
+
+	inline void UnpackDebugHeader(uint32 Header, SpvDebuggerStateType& OutStateType, uint32& OutSource, uint32& OutLine)
+	{
+		OutStateType = (SpvDebuggerStateType)(Header & 0xFF);
+		OutSource = (Header >> 8) & 0xFF;
+		OutLine = (Header >> 16) & 0xFFFF;
+	}
+
 	struct SpvDebugState_VarChange
 	{
 		int32 Line{};
@@ -235,6 +248,8 @@ namespace FW
 		std::unordered_map<SpvId, SpvFuncCall> FuncCalls;
 		std::unordered_map<SpvId, SpvFunc> Funcs;
 		std::unordered_map<SpvId, SpvBasicBlock> BBs;
+		// Maps PackedHeader value -> ScopeId for CPU-side scope reconstruction
+		TMap<uint32, SpvId> HeaderToScope;
 
 		SpvVariable* FindVar(SpvId Id)
 		{
@@ -335,15 +350,16 @@ namespace FW
 		void Visit(const SpvOpReturnValue* Inst) override;
 
 	protected:
-		virtual void PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) {}
+		virtual bool PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) { return true; }
 		virtual void ParseInternal();
 		void PatchToDebugger(SpvId InValueId, SpvId InTypeId, TArray<TUniquePtr<SpvInstruction>>& InstList);
+		void FlattenToUInts(SpvId InValueId, SpvId InTypeId, TArray<TUniquePtr<SpvInstruction>>& InstList, TArray<SpvId>& OutUIntValues);
+		void BatchStoreToDebugBuffer(const TArray<SpvId>& UIntValues, TArray<TUniquePtr<SpvInstruction>>& InstList);
 		void PatchAppendAccessFunc(int32 IndexNum);
 		void PatchAppendVarFunc(SpvPointer* Pointer, int32 IndexNum);
 		void PatchAppendValueFunc(SpvType* ValueType);
 		void PatchAppendMathFunc(SpvType* ResultType, SpvType* OperandType, int32 OperandNum);
 		SpvOpFunctionCall* AppendVar(const TFunction<int32()>& OffsetEval, SpvPointer* Pointer);
-		void AppendScope(const TFunction<int32()>& OffsetEval);
 		void AppendAccess(const TFunction<int32()>& OffsetEval, SpvPointer* Pointer);
 		void AppendTag(const TFunction<int32()>& OffsetEval, SpvDebuggerStateType InStateType);
 		void AppendValue(const TFunction<int32()>& OffsetEval, SpvType* ValueType, SpvId Value, SpvDebuggerStateType InStateType);
@@ -364,7 +380,7 @@ namespace FW
 		const TArray<TUniquePtr<SpvInstruction>>* Insts;
 		SpvId DebuggerBuffer;
 		SpvId DebuggerOffset;
-		SpvId AppendScopeFuncId, AppendTagFuncId;
+		SpvId AppendTagFuncId;
 		SpvId AppendCallFuncId;
 		TMap<TPair<SpvType*, int32>, SpvId> AppendVarFuncIds;
 		TMap<SpvType*, SpvId> AppendValueFuncIds;
@@ -387,6 +403,7 @@ namespace FW
 		SpvPatcher Patcher;
 	};
 
+	FRAMEWORK_API SpvType* GetAccessedType(const SpvVariable* Var, const TArray<int32>& Indexes);
 	FRAMEWORK_API TValueOrError<std::tuple<SpvType*, int32>, FString> GetAccess(const SpvVariable* Var, const TArray<int32>& Indexes);
 	SpvId PatchDebuggerBuffer(SpvPatcher& Patcher);
 	SpvId PatchDebuggerParams(SpvPatcher& Patcher);

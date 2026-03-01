@@ -91,6 +91,7 @@ namespace FW
 
 			TSingleton<AssetManager>::Get().Clear();
 			TSingleton<AssetManager>::Get().MountProject(GetActiveContentDirectory());
+			TSingleton<AssetManager>::Get().MountProject(PathHelper::BuiltinDir());
 			ActiveProject->Open(ProjectPath);
 			AddToProjMgmt(ProjectPath);
 			return ActiveProject.Get();

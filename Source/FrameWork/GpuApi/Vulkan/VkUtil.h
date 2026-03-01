@@ -9,11 +9,13 @@ namespace FW
 	public:
 		void AddResource(TRefCountPtr<GpuResource> InResource)
 		{
+			FScopeLock Lock(&CS);
 			Resources.Add(MoveTemp(InResource));
 		}
 
 		void ProcessResources()
 		{
+			FScopeLock Lock(&CS);
 			for (auto It = Resources.CreateIterator(); It; ++It)
 			{
 				if ((*It).GetRefCount() == 1)
@@ -27,6 +29,7 @@ namespace FW
 
 	private:
 		TSparseArray<TRefCountPtr<GpuResource>> Resources;
+		FCriticalSection CS;
 	};
 
 	inline VkDeferredReleaseManager GVkDeferredReleaseManager;

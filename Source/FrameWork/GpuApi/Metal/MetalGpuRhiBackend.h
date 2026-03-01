@@ -43,11 +43,13 @@ class MtlDeferredReleaseManager
 public:
 	void AddResource(TRefCountPtr<GpuResource> InResource)
 	{
+		FScopeLock Lock(&CS);
 		Resources.Add(MoveTemp(InResource));
 	}
 
 	void ProcessResources()
 	{
+		FScopeLock Lock(&CS);
 		for (auto It = Resources.CreateIterator(); It; ++It)
 		{
 			if ((*It).GetRefCount() == 1)
@@ -59,6 +61,7 @@ public:
 
 private:
 	TSparseArray<TRefCountPtr<GpuResource>> Resources;
+	FCriticalSection CS;
 };
 
 inline MtlDeferredReleaseManager GMtlDeferredReleaseManager;

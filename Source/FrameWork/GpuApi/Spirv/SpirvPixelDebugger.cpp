@@ -16,7 +16,7 @@ namespace FW
 		SpvDebuggerVisitor::ParseInternal();
 	}
 
-	void SpvPixelDebuggerVisitor::PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList)
+	bool SpvPixelDebuggerVisitor::PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList)
 	{
 		SpvId FloatType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFloat>(32));
 		SpvId Float2Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(FloatType, 2));
@@ -75,6 +75,7 @@ namespace FW
 		TrueLabelOp->SetId(TrueLabel);
 		InstList.Add(MoveTemp(TrueLabelOp));
 
+		return true;
 	}
 
 	void SpvPixelDebuggerVisitor::Visit(const SpvOpKill* Inst)

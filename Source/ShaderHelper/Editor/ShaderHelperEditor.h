@@ -102,6 +102,11 @@ namespace SH
 		void Continue(StepMode Mode = StepMode::Continue);
 		std::optional<FW::Vector2u> ValidatePixel(const InvocationState& InState);
 		void DebugPixel(const FW::Vector2u& InPixelCoord, const InvocationState& InState);
+		void ShowLinePreview(const DebuggerLocation& Loc);
+		void DismissLinePreview();
+		bool IsShowingLinePreview() const { return bShowingLinePreview; }
+		const DebuggerLocation& GetLinePreviewLocation() const { return LinePreviewLocation; }
+
 		TArray<TSharedPtr<SShaderEditorBox>> GetShaderEditors() const { 
 			TArray<TSharedPtr<SShaderEditorBox>> Ret;
 			ShaderEditors.GenerateValueArray(Ret);
@@ -165,6 +170,10 @@ namespace SH
 		TSharedPtr<SDebuggerCallStackView> DebuggerCallStackView;
 		TSharedPtr<SDebuggerWatchView> DebuggerWatchView;
 		TSharedPtr<SDebuggerViewport> DebuggerViewport;
+		TSharedPtr<SViewport> LinePreviewWidget;
+		TSharedPtr<FW::PreviewViewPort> LinePreviewViewPort;
+		bool bShowingLinePreview{};
+		DebuggerLocation LinePreviewLocation;
 		TSharedPtr<SWindow> ShaderEditorTipWindow;
 		DebuggableObject* CurDebuggableObject = nullptr;
 		bool IsDebugging{};

@@ -266,6 +266,7 @@ namespace SH
 		void RefreshOccurrenceHighlight();
 		void RefreshBracketHighlight();
 		void RefreshScrollBarMarkers();
+		void RefreshLineTips();
 		
 	protected:
 		virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;

@@ -37,12 +37,9 @@ namespace FW
 		{
 			if (Decoration.Kind == SpvDecorationKind::DescriptorSet)
 			{
-				if (!SpvReflectionBindings.Contains(Id))
-				{
-					auto& LayoutBinding = SpvReflectionBindings.FindOrAdd(Id);
-					LayoutBinding.Name = MetaContext.Names[Id];
-					LayoutBinding.Group = Decoration.DescriptorSet.Number;
-				}
+				auto& LayoutBinding = SpvReflectionBindings.FindOrAdd(Id);
+				LayoutBinding.Name = MetaContext.Names[Id];
+				LayoutBinding.Group = Decoration.DescriptorSet.Number;
 			}
 			else if (Decoration.Kind == SpvDecorationKind::Binding)
 			{
@@ -116,7 +113,7 @@ namespace FW
         NS::Error* err = nullptr;
         NS::SharedPtr<MTL::CompileOptions> CompOpt = NS::TransferPtr(MTL::CompileOptions::alloc()->init());
         CompOpt->setLanguageVersion(MTL::LanguageVersion2_2);
-		//CompOpt->setFastMathEnabled(false);
+		CompOpt->setOptimizationLevel(MTL::LibraryOptimizationLevel::LibraryOptimizationLevelSize);
         
         MTLLibraryPtr ByteCodeLib = NS::TransferPtr(GDevice->newLibrary(FStringToNSString(InShader->GetMslText()), CompOpt.get(), &err));
         

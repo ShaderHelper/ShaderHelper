@@ -105,6 +105,7 @@ namespace SH
 	void ShaderToyRenderComp::RenderBegin()
 	{
 		Context.iTime = TSingleton<ShProjectManager>::Get().GetProject()->TimelineCurTime;
+		Context.iTimeDelta = GApp->GetDeltaTime();
 		Context.Ontputs.Reset();
 		Context.FrameCount++;
 		if (Context.bResetPreviousFrame)

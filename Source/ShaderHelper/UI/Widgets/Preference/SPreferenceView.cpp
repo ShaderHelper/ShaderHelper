@@ -813,6 +813,17 @@ namespace SH
 			})
 		];
 
+		AppendItem(EnvGrid, LOCALIZATION("EnableLinePreview"), LOCALIZATION("EnableLinePreviewTip"))
+		[
+			SNew(SCheckBox).IsChecked_Lambda([] {
+				return ShaderDebugger::EnableLinePreview() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+			})
+			.OnCheckStateChanged_Lambda([](ECheckBoxState InState) {
+				Editor::GetEditorConfig()->SetBool(TEXT("Environment"), TEXT("EnableLinePreview"), InState == ECheckBoxState::Checked);
+				Editor::SaveEditorConfig();
+			})
+		];
+
 		ChildSlot
 		[
 			SNew(SVerticalBox)

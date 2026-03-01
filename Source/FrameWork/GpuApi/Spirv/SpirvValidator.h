@@ -47,10 +47,9 @@ namespace FW
 	protected:
 		void PatchGetAccessFunc(SpvType* Type);
 		void PatchAppendErrorFunc();
-		void PatchValidateInitializedRangeFunc(SpvId VarId);
-		void PatchUpdateInitializedRangeFunc(SpvId VarId);
 		void AppendError(TArray<TUniquePtr<SpvInstruction>>& InstList);
 		SpvId GetAccess(SpvType* VarType, const TArray<SpvId>& Indexes, TArray<TUniquePtr<SpvInstruction>>& InstList);
+		int32 ComputeConstantAccess(SpvType* Type, const TArray<SpvId>& Indexes, int32 StartIdx);
 		void AppendAnyComparisonZeroError(const TFunction<int32()>& OffsetEval, SpvId ResultTypeId, SpvId ValueId, SpvOp Comparison);
 		SpvId GetScalarOrVectorTypeId(SpvType* ResultType, SpvId ScalarTypeId);
 		template<typename T>
@@ -72,6 +71,7 @@ namespace FW
 			
 		}
 		void PatchVarInitializedRange(SpvVariable* Var);
+		void PreAnalyzeInitialization();
 
 	private:
 		SpvMetaContext& Context;
@@ -82,14 +82,26 @@ namespace FW
 		SpvId HasError;
 		SpvId AppendErrorFuncId;
 		SpvPatcher Patcher;
-		TMap<SpvId, SpvId> VarInitializedRange;//VarId->RangeArray
-		TMap<SpvId, SpvId> UpdateInitializedRangeFuncIds;//VarId->FuncId
-		TMap<SpvId, SpvId> ValidateInitializedRangeFuncIds;
+		TMap<SpvId, SpvId> VarInitializedRange;//VarId->RangeBitmask (single uint or uint[K])
+		TMap<SpvId, int32> VarInitializedRangeUnitCount;//VarId->NumUnits
 		TMap<SpvType*, SpvId> GetAccessFuncIds;
+		SpvPointer* FindPointer(SpvId Id)
+		{
+			if (LocalPointers.contains(Id))
+			{
+				return &LocalPointers[Id];
+			}
+			if (Context.GlobalPointers.contains(Id))
+			{
+				return &Context.GlobalPointers[Id];
+			}
+			return nullptr;
+		}
 		std::unordered_map<SpvId, SpvPointer> LocalPointers;
 		std::unordered_map<SpvId, SpvVariable> LocalVariables;
 		SpvFunc* CurFunc{};
 		TMap<SpvId, SpvFunc> Funcs;
+		TSet<SpvId> StaticallyInitializedVars;
 	};
 
 	int32 GetMaxIndexNum(SpvType* Type);

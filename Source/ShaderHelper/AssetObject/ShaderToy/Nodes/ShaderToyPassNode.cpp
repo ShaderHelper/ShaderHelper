@@ -810,6 +810,7 @@ namespace SH
 	{
 		BuiltinUniformBuffer->GetMember<Vector3f>("iResolution") = Context.iResolution;
 		BuiltinUniformBuffer->GetMember<float>("iTime") = Context.iTime;
+		BuiltinUniformBuffer->GetMember<float>("iTimeDelta") = Context.iTimeDelta;
 		BuiltinUniformBuffer->GetMember<int32>("iFrame") = Context.FrameCount;
 		auto iMouse = BuiltinUniformBuffer->GetMember<Vector4f>("iMouse");
 		iMouse = Context.iMouse;

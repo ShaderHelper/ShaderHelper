@@ -10,6 +10,7 @@
 #include "Common/Path/BaseResourcePath.h"
 #include "UI/Widgets/ColorPicker/SColorPicker.h"
 #include "UI/Widgets/Misc/MiscWidget.h"
+#include "Editor/PreviewViewPort.h"
 
 #include <Widgets/Text/SlateEditableTextLayout.h>
 #include <Widgets/Layout/SScrollBarTrack.h>
@@ -24,6 +25,7 @@
 #include <Styling/StyleColors.h>
 #include <Widgets/Colors/SColorBlock.h>
 #include <Widgets/Text/SRichTextBlock.h>
+#include <Widgets/SViewport.h>
 
 #include <regex>
 
@@ -686,7 +688,8 @@ constexpr int PaddingLineNum = 22;
 							.OnGenerateRow(this, &SShaderEditorBox::GenerateLineTipForItem)
 							.ScrollbarVisibility(EVisibility::Collapsed)
 							.IsFocusable(false)
-							.Visibility(EVisibility::HitTestInvisible)
+							.IsSelfDisabled(true)
+							.Visibility(EVisibility::SelfHitTestInvisible)
 						]
 						+ SOverlay::Slot()
 						.VAlign(VAlign_Bottom)
@@ -1980,7 +1983,9 @@ constexpr int PaddingLineNum = 22;
 			TArray<ShaderOccurrence> Occurrences;
 			for (const ShaderTokenizer::Token& Token : ShaderMarshaller->TokenizedLines[CursorLineIndex].Tokens)
 			{
-				if (CursorOffset >= Token.BeginOffset && CursorOffset <= Token.EndOffset && Token.Type == ShaderTokenType::Identifier && SyntaxTUCopy)
+				if (CursorOffset >= Token.BeginOffset && CursorOffset <= Token.EndOffset
+					&& (Token.Type == ShaderTokenType::Identifier || Token.Type == ShaderTokenType::Preprocess)
+					&& SyntaxTUCopy)
 				{
 					Occurrences = SyntaxTUCopy->GetOccurrences(GetLineNumber(CursorLineIndex) + AddedLineNum, Token.BeginOffset + 1);
 					break;
@@ -2116,6 +2121,16 @@ constexpr int PaddingLineNum = 22;
 	{
 		TArray<FScrollBarMarker> AllMarkers;
 
+		for (const auto& [LineNumber, DiagInfo] : EffectMarshller->LineNumberToDiagInfo)
+		{
+			int32 LineIndex = GetLineIndex(LineNumber);
+			if (LineIndex != INDEX_NONE)
+			{
+				FLinearColor Color = DiagInfo.IsError ? FLinearColor::Red : FLinearColor::Yellow;
+				AllMarkers.Add({ LineIndex, Color });
+			}
+		}
+
 		for (const FTextLineHighlight& Highlight : OccurrenceHighlights)
 		{
 			AllMarkers.Add({ Highlight.LineIndex, FLinearColor::Gray });
@@ -2130,6 +2145,14 @@ constexpr int PaddingLineNum = 22;
 		ShaderMultiLineVScrollBar->SetMarkers(AllMarkers);
 	}
 
+	void SShaderEditorBox::RefreshLineTips()
+	{
+		if (LineTipList)
+		{
+			LineTipList->RebuildList();
+		}
+	}
+
     void SShaderEditorBox::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
     {
 		//ShaderMultiLineEditableText updates its VScrollBar when it ticks, and we sync the LineNumberList/LineTipList according to its VScrollBar callback.
@@ -2139,6 +2162,7 @@ constexpr int PaddingLineNum = 22;
 		if (bRefreshIsense.load(std::memory_order_acquire))
 		{
 			RefreshLineNumberToDiagInfo();
+			RefreshScrollBarMarkers();
 			RefreshCodeCompletionTip();
 			bRefreshIsense.store(false, std::memory_order_relaxed);
 		}
@@ -3451,9 +3475,10 @@ constexpr int PaddingLineNum = 22;
 		};
 		
 		float LineHeight = ShaderMarshaller->TextLayout->GetUniformLineHeight() / ShaderMarshaller->TextLayout->GetScale();
-		auto LineHeightBox = SNew(SBox).HeightOverride(LineHeight);
+		auto LineHeightBox = SNew(SBox).HeightOverride(LineHeight).Visibility(EVisibility::HitTestInvisible);
 		auto LineTip = SNew(STableRow<LineNumberItemPtr>, OwnerTable)
 			.Style(&FShaderHelperStyle::Get().GetWidgetStyle<FTableRowStyle>("LineTipItemStyle"))
+			.Visibility(EVisibility::SelfHitTestInvisible)
 			.Content()
 			[
 				LineHeightBox
@@ -3463,13 +3488,30 @@ constexpr int PaddingLineNum = 22;
 		if (Item->ToString() == "-")
 		{
 			return SNew(STableRow<LineNumberItemPtr>, OwnerTable).Style(&FShaderHelperStyle::Get().GetWidgetStyle<FTableRowStyle>("LineNumberItemStyle"))
+				.Visibility(EVisibility::SelfHitTestInvisible)
 				.Content()[LineHeightBox];
 		}
 
 		int32 LineNumber = FCString::Atoi(*(*Item).ToString());
+
+		//Create preview viewport for this line if a preview texture exists
+		TSharedPtr<FW::PreviewViewPort> LinePreviewViewPort;
+		DebuggerLocation LineLoc{ShaderAssetObj->GetShaderName(), LineNumber};
+		{
+			const auto& PreviewTextures = GetDebugger().GetLinePreviewTextures();
+			if (!PreviewTextures.IsEmpty())
+			{
+				if (const auto* TexPtr = PreviewTextures.Find(LineLoc))
+				{
+					LinePreviewViewPort = MakeShared<FW::PreviewViewPort>();
+					LinePreviewViewPort->SetViewPortRenderTexture(TexPtr->GetReference());
+				}
+			}
+		}
 		
 		LineTip->SetContent(
 				SNew(SOverlay)
+				.Visibility(EVisibility::SelfHitTestInvisible)
 				+SOverlay::Slot()
 				[
 					LineHeightBox
@@ -3543,6 +3585,43 @@ constexpr int PaddingLineNum = 22;
 							return FText::FromString(GetDebugger().GetDebuggerError().Key); 
 						})
 						.ColorAndOpacity(FLinearColor::Red)
+					]
+				]
+				+SOverlay::Slot()
+				.HAlign(HAlign_Right)
+				.VAlign(VAlign_Center)
+				[
+					SNew(SBox)
+					.HeightOverride(LineHeight)
+					[
+						SNew(SBorder)
+						.BorderImage(FAppStyle::Get().GetBrush("WhiteBrush"))
+						.BorderBackgroundColor_Lambda([LineLoc] {
+							auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+							bool bActive = ShEditor->IsShowingLinePreview() && ShEditor->GetLinePreviewLocation() == LineLoc;
+							return bActive ? FStyleColors::AccentOrange : FStyleColors::Transparent;
+						})
+						.Padding(1.0f)
+						.Visibility_Lambda([LinePreviewViewPort, GetDebugger, LineLoc] {
+							return LinePreviewViewPort.IsValid() && GetDebugger().IsValid() ? EVisibility::Visible : EVisibility::Collapsed;
+						})
+						.OnMouseButtonDown_Lambda([LineLoc](const FGeometry&, const FPointerEvent&) {
+							auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+							if (ShEditor->IsShowingLinePreview() && ShEditor->GetLinePreviewLocation() == LineLoc)
+							{
+								ShEditor->DismissLinePreview();
+							}
+							else
+							{
+								ShEditor->ShowLinePreview(LineLoc);
+							}
+							return FReply::Handled();
+						})
+						[
+							SNew(SViewport)
+							.ViewportInterface(LinePreviewViewPort)
+							.ViewportSize(FVector2D(LineHeight, LineHeight))
+						]
 					]
 				]
         );

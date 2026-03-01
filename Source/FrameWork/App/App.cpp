@@ -37,7 +37,7 @@ namespace FW {
 		
 		FPlatformOutputDevices::SetupOutputDevices();
 
-		FTaskGraphInterface::Startup(FPlatformMisc::NumberOfIOWorkerThreadsToSpawn());
+		FTaskGraphInterface::Startup(FPlatformMisc::NumberOfWorkerThreadsToSpawn());
 		FTaskGraphInterface::Get().AttachToThread(ENamedThreads::GameThread);
 		if(FPlatformProcess::SupportsMultithreading())
 		{

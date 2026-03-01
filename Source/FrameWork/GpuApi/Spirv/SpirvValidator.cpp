@@ -50,24 +50,212 @@ namespace FW
 	void SpvValidator::PatchVarInitializedRange(SpvVariable* Var)
 	{
 		int32 VarSize = GetTypeByteSize(Var->Type);
-		if (VarSize > 0 && VarSize % 4 == 0)
+		if (VarSize <= 0 || VarSize % 4 != 0)
 		{
-			SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
-			SpvId ArrType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeArray>(UIntType, Patcher.FindOrAddConstant(VarSize / 4)));
-			SpvId InitializedRange = Patcher.NewId();
+			return;
+		}
+
+		int32 NumUnits = VarSize / 4;
+		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
+		SpvId InitializedRange = Patcher.NewId();
+
+		if (NumUnits <= 32)
+		{
+			// Single uint bitmask: 1 bit per 4 bytes, up to 128 bytes
+			SpvId UIntPointerPrivateType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Private, UIntType));
+			auto VarOp = MakeUnique<SpvOpVariable>(UIntPointerPrivateType, SpvStorageClass::Private);
+			VarOp->SetId(InitializedRange);
+			Patcher.AddGlobalVariable(MoveTemp(VarOp));
+		}
+		else
+		{
+			// uint[K] array bitmask for variables > 128 bytes
+			int32 K = (NumUnits + 31) / 32;
+			SpvId ArrType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeArray>(UIntType, Patcher.FindOrAddConstant(K)));
+			SpvId ArrPointerPrivateType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Private, ArrType));
+			auto VarOp = MakeUnique<SpvOpVariable>(ArrPointerPrivateType, SpvStorageClass::Private);
+			VarOp->SetId(InitializedRange);
+			Patcher.AddGlobalVariable(MoveTemp(VarOp));
+		}
+
+		FString VarName = FString::FromInt(Var->Id.GetValue());
+		if (Context.Names.contains(Var->Id))
+		{
+			VarName = Context.Names[Var->Id];
+		}
+		Patcher.AddDebugName(MakeUnique<SpvOpName>(InitializedRange, FString::Printf(TEXT("_InitializedRange_%s_"), *VarName)));
+
+		VarInitializedRange.Add(Var->Id, InitializedRange);
+		VarInitializedRangeUnitCount.Add(Var->Id, NumUnits);
+	}
+
+	void SpvValidator::PreAnalyzeInitialization()
+	{
+		// Static analysis: identify local variables that are provably fully initialized
+		// before any read, so we can skip expensive GPU-side initialization tracking for them.
+		//
+		// Strategy (conservative, entry-block analysis):
+		// For each function's entry block (straight-line code before any branch):
+		//   - A variable that receives a direct OpStore (not through OpAccessChain) is "fully initialized"
+		//   - A variable that is loaded (directly or via OpAccessChain) before being fully initialized
+		//     is potentially uninitialized and needs runtime tracking
+		//   - At any branch instruction, analysis stops (conservative for control flow)
+		//
+		// Variables used as function call arguments are excluded from the safe set,
+		// because their initialization state needs to be propagated to callee parameters at runtime.
+
+		// Phase 1: Collect variable IDs used as function call arguments
+		TSet<SpvId> FuncCallArgVars;
+		{
+			int32 InstIndex = GetInstIndex(Insts, Context.EntryPoint);
+			while (InstIndex < Insts->Num())
 			{
-				SpvId VarPointerPrivateType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Private, ArrType));
-				auto VarOp = MakeUnique<SpvOpVariable>(VarPointerPrivateType, SpvStorageClass::Private);
-				VarOp->SetId(InitializedRange);
-				Patcher.AddGlobalVariable(MoveTemp(VarOp));
-				FString VarName = FString::FromInt(Var->Id.GetValue());
-				if (Context.Names.contains(Var->Id))
+				if (auto* CallInst = dynamic_cast<SpvOpFunctionCall*>((*Insts)[InstIndex].Get()))
 				{
-					VarName = Context.Names[Var->Id];
+					for (SpvId Arg : CallInst->GetArguments())
+					{
+						FuncCallArgVars.Add(Arg);
+					}
 				}
-				Patcher.AddDebugName(MakeUnique<SpvOpName>(InitializedRange, FString::Printf(TEXT("_InitializedRange_%s_"), *VarName)));
+				InstIndex++;
 			}
-			VarInitializedRange.Add(Var->Id, InitializedRange);
+		}
+
+		// Phase 1.5: Mark compiler-generated temporaries as statically initialized.
+		// Compiler-generated temporaries are always initialized before use. No need for GPU-side tracking.
+		{
+			int32 InstIndex = GetInstIndex(Insts, Context.EntryPoint);
+			while (InstIndex < Insts->Num())
+			{
+				if (auto* VarInst = dynamic_cast<SpvOpVariable*>((*Insts)[InstIndex].Get()))
+				{
+					if (VarInst->GetStorageClass() == SpvStorageClass::Function)
+					{
+						SpvId VarId = VarInst->GetId().value();
+						if (!Context.VariableDescMap.contains(VarId) && !FuncCallArgVars.Contains(VarId))
+						{
+							StaticallyInitializedVars.Add(VarId);
+						}
+					}
+				}
+				InstIndex++;
+			}
+		}
+
+		// Phase 2: Analyze each function's entry block
+		enum class AnalysisState { Outside, BeforeEntryLabel, InEntryBlock, PastEntryBlock };
+		AnalysisState CurState = AnalysisState::Outside;
+
+		TSet<SpvId> EntryBlockVars;       // Variables declared in current function's entry block
+		TSet<SpvId> FullyInitializedVars; // Variables that got a full direct OpStore
+		TMap<SpvId, SpvId> AccessChainBase; // AccessChain result → base variable
+
+		auto FinalizeFunction = [&]()
+		{
+			for (SpvId VarId : FullyInitializedVars)
+			{
+				if (!FuncCallArgVars.Contains(VarId))
+				{
+					StaticallyInitializedVars.Add(VarId);
+				}
+			}
+			EntryBlockVars.Empty();
+			FullyInitializedVars.Empty();
+			AccessChainBase.Empty();
+		};
+
+		int32 InstIndex = GetInstIndex(Insts, Context.EntryPoint);
+		while (InstIndex < Insts->Num())
+		{
+			SpvInstruction* Inst = (*Insts)[InstIndex].Get();
+
+			if (dynamic_cast<SpvOpFunction*>(Inst))
+			{
+				if (CurState != AnalysisState::Outside)
+				{
+					FinalizeFunction();
+				}
+				CurState = AnalysisState::BeforeEntryLabel;
+			}
+			else if (dynamic_cast<SpvOpFunctionEnd*>(Inst))
+			{
+				FinalizeFunction();
+				CurState = AnalysisState::Outside;
+			}
+			else if (dynamic_cast<SpvOpLabel*>(Inst))
+			{
+				if (CurState == AnalysisState::BeforeEntryLabel)
+				{
+					CurState = AnalysisState::InEntryBlock;
+				}
+				else if (CurState == AnalysisState::InEntryBlock)
+				{
+					CurState = AnalysisState::PastEntryBlock;
+				}
+			}
+			else if (CurState == AnalysisState::InEntryBlock)
+			{
+				if (auto* VarInst = dynamic_cast<SpvOpVariable*>(Inst))
+				{
+					if (VarInst->GetStorageClass() == SpvStorageClass::Function)
+					{
+						EntryBlockVars.Add(VarInst->GetId().value());
+						if (VarInst->GetInitializer().has_value())
+						{
+							FullyInitializedVars.Add(VarInst->GetId().value());
+						}
+					}
+				}
+				else if (dynamic_cast<SpvOpBranch*>(Inst) ||
+					dynamic_cast<SpvOpBranchConditional*>(Inst) ||
+					dynamic_cast<SpvOpSwitch*>(Inst) ||
+					dynamic_cast<SpvOpReturn*>(Inst) ||
+					dynamic_cast<SpvOpReturnValue*>(Inst) ||
+					dynamic_cast<SpvOpKill*>(Inst))
+				{
+					CurState = AnalysisState::PastEntryBlock;
+				}
+				else if (auto* StoreInst = dynamic_cast<SpvOpStore*>(Inst))
+				{
+					SpvId Pointer = StoreInst->GetPointer();
+					if (EntryBlockVars.Contains(Pointer))
+					{
+						FullyInitializedVars.Add(Pointer);
+					}
+				}
+				else if (auto* LoadInst = dynamic_cast<SpvOpLoad*>(Inst))
+				{
+					SpvId Pointer = LoadInst->GetPointer();
+					SpvId BaseVar = Pointer;
+					if (SpvId* Base = AccessChainBase.Find(Pointer))
+					{
+						BaseVar = *Base;
+					}
+					if (EntryBlockVars.Contains(BaseVar) && !FullyInitializedVars.Contains(BaseVar))
+					{
+						EntryBlockVars.Remove(BaseVar);
+					}
+				}
+				else if (auto* ACInst = dynamic_cast<SpvOpAccessChain*>(Inst))
+				{
+					SpvId Base = ACInst->GetBasePointer();
+					if (SpvId* TransitiveBase = AccessChainBase.Find(Base))
+					{
+						Base = *TransitiveBase;
+					}
+					if (EntryBlockVars.Contains(Base))
+					{
+						AccessChainBase.Add(ACInst->GetId().value(), Base);
+					}
+				}
+			}
+
+			InstIndex++;
+		}
+
+		if (CurState != AnalysisState::Outside)
+		{
+			FinalizeFunction();
 		}
 	}
 
@@ -75,6 +263,18 @@ namespace FW
 	{
 		this->Insts = &Insts;
 		Patcher.SetSpvContext(Insts, SpvCode, &Context);
+
+		// Pre-scan SpvDebugDeclare to populate VariableDescMap
+		for (const auto& Inst : Insts)
+		{
+			if (auto* Declare = dynamic_cast<const SpvDebugDeclare*>(Inst.Get()))
+			{
+				if (Context.VariableDescs.contains(Declare->GetVarDesc()))
+				{
+					Context.VariableDescMap.emplace(Declare->GetVariable(), &Context.VariableDescs[Declare->GetVarDesc()]);
+				}
+			}
+		}
 
 		DebuggerBuffer = PatchDebuggerBuffer(Patcher);
 
@@ -89,7 +289,30 @@ namespace FW
 		}
 
 		PatchAppendErrorFunc();
-		
+
+		if (EnableUbsan)
+		{
+			PreAnalyzeInitialization();
+		}
+
+		// Track uninitialized global Private variables.
+		// Uniform/Input/Output/UniformConstant are system-bound and always initialized.
+		if (EnableUbsan)
+		{
+			for (auto& [VarId, Var] : Context.GlobalVariables)
+			{
+				if (Var.StorageClass != SpvStorageClass::Private)
+				{
+					continue;
+				}
+				if (!Context.VariableDescMap.contains(VarId))
+				{
+					continue;
+				}
+				PatchVarInitializedRange(&Var);
+			}
+		}
+
 		{
 			int32 InstIndex = GetInstIndex(this->Insts, Context.EntryPoint);
 			while (InstIndex < Insts.Num())
@@ -136,7 +359,7 @@ namespace FW
 			.Type = PointerType
 		};
 		LocalPointers.emplace(ResultId, MoveTemp(Pointer));
-		if (EnableUbsan)
+		if (EnableUbsan && !StaticallyInitializedVars.Contains(ResultId))
 		{
 			PatchVarInitializedRange(&LocalVariables[ResultId]);
 		}
@@ -163,33 +386,93 @@ namespace FW
 					continue;
 				}
 
-				SpvVariable* ArgumentVar = &LocalVariables[Argument];
-				int32 VarSize = GetTypeByteSize(ArgumentVar->Type);
 				SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
-				SpvId ArrType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeArray>(UIntType, Patcher.FindOrAddConstant(VarSize / 4)));
+				int32 NumUnits = VarInitializedRangeUnitCount[Argument];
 
+				if (NumUnits <= 32)
 				{
-					TArray<TUniquePtr<SpvInstruction>> InstList;
-					SpvId LoadedArgument = Patcher.NewId();
-					auto LoadedArgumentOp = MakeUnique<SpvOpLoad>(ArrType, VarInitializedRange[Argument]);
-					LoadedArgumentOp->SetId(LoadedArgument);
-					InstList.Add(MoveTemp(LoadedArgumentOp));
+					// Single uint: copy directly
+					// Before call: copy arg bitmask → param bitmask
+					{
+						TArray<TUniquePtr<SpvInstruction>> InstList;
+						SpvId LoadedArgument = Patcher.NewId();
+						auto LoadedArgumentOp = MakeUnique<SpvOpLoad>(UIntType, VarInitializedRange[Argument]);
+						LoadedArgumentOp->SetId(LoadedArgument);
+						InstList.Add(MoveTemp(LoadedArgumentOp));
 
-					InstList.Add(MakeUnique<SpvOpStore>(VarInitializedRange[Parameter], LoadedArgument));
+						InstList.Add(MakeUnique<SpvOpStore>(VarInitializedRange[Parameter], LoadedArgument));
 
-					Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(InstList));
+						Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(InstList));
+					}
+				
+					// After call: copy param bitmask → arg bitmask
+					{
+						TArray<TUniquePtr<SpvInstruction>> InstList;
+						SpvId LoadedParameter = Patcher.NewId();
+						auto LoadedParameterOp = MakeUnique<SpvOpLoad>(UIntType, VarInitializedRange[Parameter]);
+						LoadedParameterOp->SetId(LoadedParameter);
+						InstList.Add(MoveTemp(LoadedParameterOp));
+
+						InstList.Add(MakeUnique<SpvOpStore>(VarInitializedRange[Argument], LoadedParameter));
+
+						Patcher.AddInstructions(Inst->GetWordOffset().value() + Inst->GetWordLen().value(), MoveTemp(InstList));
+					}
 				}
-			
+				else
 				{
-					TArray<TUniquePtr<SpvInstruction>> InstList;
-					SpvId LoadedParameter = Patcher.NewId();
-					auto LoadedParameterOp = MakeUnique<SpvOpLoad>(ArrType, VarInitializedRange[Parameter]);
-					LoadedParameterOp->SetId(LoadedParameter);
-					InstList.Add(MoveTemp(LoadedParameterOp));
+					// Array bitmask: copy each element
+					int32 K = (NumUnits + 31) / 32;
+					SpvId UIntPointerPrivateType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Private, UIntType));
 
-					InstList.Add(MakeUnique<SpvOpStore>(VarInitializedRange[Argument], LoadedParameter));
+					// Before call: copy arg array → param array
+					{
+						TArray<TUniquePtr<SpvInstruction>> InstList;
+						for (int32 i = 0; i < K; i++)
+						{
+							SpvId ArgElemPtr = Patcher.NewId();
+							auto ArgElemPtrOp = MakeUnique<SpvOpAccessChain>(UIntPointerPrivateType, VarInitializedRange[Argument], TArray<SpvId>{Patcher.FindOrAddConstant((uint32)i)});
+							ArgElemPtrOp->SetId(ArgElemPtr);
+							InstList.Add(MoveTemp(ArgElemPtrOp));
 
-					Patcher.AddInstructions(Inst->GetWordOffset().value() + Inst->GetWordLen().value(), MoveTemp(InstList));
+							SpvId LoadedElem = Patcher.NewId();
+							auto LoadedElemOp = MakeUnique<SpvOpLoad>(UIntType, ArgElemPtr);
+							LoadedElemOp->SetId(LoadedElem);
+							InstList.Add(MoveTemp(LoadedElemOp));
+
+							SpvId ParamElemPtr = Patcher.NewId();
+							auto ParamElemPtrOp = MakeUnique<SpvOpAccessChain>(UIntPointerPrivateType, VarInitializedRange[Parameter], TArray<SpvId>{Patcher.FindOrAddConstant((uint32)i)});
+							ParamElemPtrOp->SetId(ParamElemPtr);
+							InstList.Add(MoveTemp(ParamElemPtrOp));
+
+							InstList.Add(MakeUnique<SpvOpStore>(ParamElemPtr, LoadedElem));
+						}
+						Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(InstList));
+					}
+
+					// After call: copy param array → arg array
+					{
+						TArray<TUniquePtr<SpvInstruction>> InstList;
+						for (int32 i = 0; i < K; i++)
+						{
+							SpvId ParamElemPtr = Patcher.NewId();
+							auto ParamElemPtrOp = MakeUnique<SpvOpAccessChain>(UIntPointerPrivateType, VarInitializedRange[Parameter], TArray<SpvId>{Patcher.FindOrAddConstant((uint32)i)});
+							ParamElemPtrOp->SetId(ParamElemPtr);
+							InstList.Add(MoveTemp(ParamElemPtrOp));
+
+							SpvId LoadedElem = Patcher.NewId();
+							auto LoadedElemOp = MakeUnique<SpvOpLoad>(UIntType, ParamElemPtr);
+							LoadedElemOp->SetId(LoadedElem);
+							InstList.Add(MoveTemp(LoadedElemOp));
+
+							SpvId ArgElemPtr = Patcher.NewId();
+							auto ArgElemPtrOp = MakeUnique<SpvOpAccessChain>(UIntPointerPrivateType, VarInitializedRange[Argument], TArray<SpvId>{Patcher.FindOrAddConstant((uint32)i)});
+							ArgElemPtrOp->SetId(ArgElemPtr);
+							InstList.Add(MoveTemp(ArgElemPtrOp));
+
+							InstList.Add(MakeUnique<SpvOpStore>(ArgElemPtr, LoadedElem));
+						}
+						Patcher.AddInstructions(Inst->GetWordOffset().value() + Inst->GetWordLen().value(), MoveTemp(InstList));
+					}
 				}
 			}
 		}
@@ -222,86 +505,474 @@ namespace FW
 
 	void SpvValidator::Visit(const SpvOpLoad* Inst)
 	{
-		if (!LocalPointers.contains(Inst->GetPointer()))
+		SpvPointer* Pointer = FindPointer(Inst->GetPointer());
+		if (!Pointer)
 		{
 			return;
 		}
-
-		SpvPointer* Pointer = &LocalPointers[Inst->GetPointer()];
 		if (!VarInitializedRange.Contains(Pointer->Var->Id))
 		{
+			// No VarInitializedRange: static analysis confirmed the variable is fully initialized,
+			// but dynamic indexes may still be out of bounds. Use GetAccess for bounds checking.
+			if (EnableUbsan && !Pointer->Indexes.IsEmpty())
+			{
+				SpvType* VarType = Pointer->Var->Type;
+				TArray<TUniquePtr<SpvInstruction>> BoundsCheckInsts;
+				GetAccess(VarType, Pointer->Indexes, BoundsCheckInsts);
+				if (BoundsCheckInsts.Num() > 0)
+				{
+					Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(BoundsCheckInsts));
+				}
+			}
 			return;
 		}
 
 		if (EnableUbsan)
 		{
 			SpvType* VarType = Pointer->Var->Type;
-			SpvId IntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 1));
-			TArray<TUniquePtr<SpvInstruction>> GetAccessInsts;
+			SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
+			SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
+			int32 NumUnits = VarInitializedRangeUnitCount[Pointer->Var->Id];
+			int32 Count = GetTypeByteSize(Pointer->Type->PointeeType) / 4;
+			TArray<TUniquePtr<SpvInstruction>> ValidateInsts;
+
+			if (NumUnits <= 32)
 			{
-				SpvId StartInitUnit = GetAccess(VarType, Pointer->Indexes, GetAccessInsts);
+				// Single uint bitmask path
+				SpvId StartInitUnit = GetAccess(VarType, Pointer->Indexes, ValidateInsts);
 
-				SpvId EndInitUnit = Patcher.NewId();
-				auto AddOp = MakeUnique<SpvOpIAdd>(IntType, StartInitUnit, Patcher.FindOrAddConstant(GetTypeByteSize(Pointer->Type->PointeeType) / 4));
-				AddOp->SetId(EndInitUnit);
-				GetAccessInsts.Add(MoveTemp(AddOp));
+				uint32 RawMask = ((1u << Count) - 1u);
+				SpvId RawMaskConst = Patcher.FindOrAddConstant(RawMask);
 
-				PatchValidateInitializedRangeFunc(Pointer->Var->Id);
-				SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
-				auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, ValidateInitializedRangeFuncIds[Pointer->Var->Id], TArray<SpvId>{StartInitUnit, EndInitUnit});
-				FuncCallOp->SetId(Patcher.NewId());
-				GetAccessInsts.Add(MoveTemp(FuncCallOp));
+				SpvId Mask = Patcher.NewId();
+				auto MaskOp = MakeUnique<SpvOpShiftLeftLogical>(UIntType, RawMaskConst, StartInitUnit);
+				MaskOp->SetId(Mask);
+				ValidateInsts.Add(MoveTemp(MaskOp));
+
+				SpvId Loaded = Patcher.NewId();
+				auto LoadOp = MakeUnique<SpvOpLoad>(UIntType, VarInitializedRange[Pointer->Var->Id]);
+				LoadOp->SetId(Loaded);
+				ValidateInsts.Add(MoveTemp(LoadOp));
+
+				SpvId Masked = Patcher.NewId();
+				auto AndOp = MakeUnique<SpvOpBitwiseAnd>(UIntType, Loaded, Mask);
+				AndOp->SetId(Masked);
+				ValidateInsts.Add(MoveTemp(AndOp));
+
+				SpvId NotFullyInit = Patcher.NewId();
+				auto NotEqualOp = MakeUnique<SpvOpINotEqual>(BoolType, Masked, Mask);
+				NotEqualOp->SetId(NotFullyInit);
+				ValidateInsts.Add(MoveTemp(NotEqualOp));
+
+				auto TrueLabel = Patcher.NewId();
+				auto MergeLabel = Patcher.NewId();
+				ValidateInsts.Add(MakeUnique<SpvOpSelectionMerge>(MergeLabel, SpvSelectionControl::None));
+				ValidateInsts.Add(MakeUnique<SpvOpBranchConditional>(NotFullyInit, TrueLabel, MergeLabel));
+
+				auto TrueLabelOp = MakeUnique<SpvOpLabel>();
+				TrueLabelOp->SetId(TrueLabel);
+				ValidateInsts.Add(MoveTemp(TrueLabelOp));
+				AppendError(ValidateInsts);
+				ValidateInsts.Add(MakeUnique<SpvOpBranch>(MergeLabel));
+
+				auto MergeLabelOp = MakeUnique<SpvOpLabel>();
+				MergeLabelOp->SetId(MergeLabel);
+				ValidateInsts.Add(MoveTemp(MergeLabelOp));
 			}
-			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(GetAccessInsts));
+			else if (Count > 32)
+			{
+				// Full/large access on array bitmask: unroll check over all K elements
+				int32 K = (NumUnits + 31) / 32;
+				SpvId UIntPointerPrivateType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Private, UIntType));
+				for (int32 i = 0; i < K; i++)
+				{
+					int32 Remaining = (i < K - 1) ? 32 : ((NumUnits % 32 == 0) ? 32 : (NumUnits % 32));
+					uint32 ExpectedMask = ((1u << Remaining) - 1u);
+
+					SpvId ElemPtr = Patcher.NewId();
+					auto ElemPtrOp = MakeUnique<SpvOpAccessChain>(UIntPointerPrivateType, VarInitializedRange[Pointer->Var->Id], TArray<SpvId>{Patcher.FindOrAddConstant((uint32)i)});
+					ElemPtrOp->SetId(ElemPtr);
+					ValidateInsts.Add(MoveTemp(ElemPtrOp));
+
+					SpvId ElemLoaded = Patcher.NewId();
+					auto ElemLoadOp = MakeUnique<SpvOpLoad>(UIntType, ElemPtr);
+					ElemLoadOp->SetId(ElemLoaded);
+					ValidateInsts.Add(MoveTemp(ElemLoadOp));
+
+					SpvId NotFull = Patcher.NewId();
+					auto NotFullOp = MakeUnique<SpvOpINotEqual>(BoolType, ElemLoaded, Patcher.FindOrAddConstant(ExpectedMask));
+					NotFullOp->SetId(NotFull);
+					ValidateInsts.Add(MoveTemp(NotFullOp));
+
+					auto ErrorLabel = Patcher.NewId();
+					auto ElemMerge = Patcher.NewId();
+					ValidateInsts.Add(MakeUnique<SpvOpSelectionMerge>(ElemMerge, SpvSelectionControl::None));
+					ValidateInsts.Add(MakeUnique<SpvOpBranchConditional>(NotFull, ErrorLabel, ElemMerge));
+
+					auto ErrorLabelOp = MakeUnique<SpvOpLabel>();
+					ErrorLabelOp->SetId(ErrorLabel);
+					ValidateInsts.Add(MoveTemp(ErrorLabelOp));
+					AppendError(ValidateInsts);
+					ValidateInsts.Add(MakeUnique<SpvOpBranch>(ElemMerge));
+
+					auto ElemMergeOp = MakeUnique<SpvOpLabel>();
+					ElemMergeOp->SetId(ElemMerge);
+					ValidateInsts.Add(MoveTemp(ElemMergeOp));
+				}
+			}
+			else
+			{
+				// Sub-member access on array bitmask (Count <= 32)
+				SpvId StartInitUnit = GetAccess(VarType, Pointer->Indexes, ValidateInsts);
+				SpvId UIntPointerPrivateType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Private, UIntType));
+
+				// elemIdx = StartInitUnit >> 5
+				SpvId ElemIdx = Patcher.NewId();
+				auto ElemIdxOp = MakeUnique<SpvOpShiftRightLogical>(UIntType, StartInitUnit, Patcher.FindOrAddConstant(5u));
+				ElemIdxOp->SetId(ElemIdx);
+				ValidateInsts.Add(MoveTemp(ElemIdxOp));
+
+				// bitPos = StartInitUnit & 31
+				SpvId BitPos = Patcher.NewId();
+				auto BitPosOp = MakeUnique<SpvOpBitwiseAnd>(UIntType, StartInitUnit, Patcher.FindOrAddConstant(31u));
+				BitPosOp->SetId(BitPos);
+				ValidateInsts.Add(MoveTemp(BitPosOp));
+
+				// ptr = AccessChain(array, elemIdx)
+				SpvId ElemPtr = Patcher.NewId();
+				auto ElemPtrOp = MakeUnique<SpvOpAccessChain>(UIntPointerPrivateType, VarInitializedRange[Pointer->Var->Id], TArray<SpvId>{ElemIdx});
+				ElemPtrOp->SetId(ElemPtr);
+				ValidateInsts.Add(MoveTemp(ElemPtrOp));
+
+				// loaded = Load(ptr)
+				SpvId Loaded = Patcher.NewId();
+				auto LoadOp = MakeUnique<SpvOpLoad>(UIntType, ElemPtr);
+				LoadOp->SetId(Loaded);
+				ValidateInsts.Add(MoveTemp(LoadOp));
+
+				// mask = rawMask << bitPos
+				uint32 RawMask = ((1u << Count) - 1u);
+				SpvId RawMaskConst = Patcher.FindOrAddConstant(RawMask);
+				SpvId Mask = Patcher.NewId();
+				auto MaskOp = MakeUnique<SpvOpShiftLeftLogical>(UIntType, RawMaskConst, BitPos);
+				MaskOp->SetId(Mask);
+				ValidateInsts.Add(MoveTemp(MaskOp));
+
+				// masked = loaded & mask
+				SpvId Masked = Patcher.NewId();
+				auto AndOp = MakeUnique<SpvOpBitwiseAnd>(UIntType, Loaded, Mask);
+				AndOp->SetId(Masked);
+				ValidateInsts.Add(MoveTemp(AndOp));
+
+				// notFullyInit = (masked != mask)
+				SpvId NotFullyInit = Patcher.NewId();
+				auto NotEqualOp = MakeUnique<SpvOpINotEqual>(BoolType, Masked, Mask);
+				NotEqualOp->SetId(NotFullyInit);
+				ValidateInsts.Add(MoveTemp(NotEqualOp));
+
+				// if (notFullyInit) AppendError()
+				auto PrimaryErrorLabel = Patcher.NewId();
+				auto PrimaryMergeLabel = Patcher.NewId();
+				ValidateInsts.Add(MakeUnique<SpvOpSelectionMerge>(PrimaryMergeLabel, SpvSelectionControl::None));
+				ValidateInsts.Add(MakeUnique<SpvOpBranchConditional>(NotFullyInit, PrimaryErrorLabel, PrimaryMergeLabel));
+
+				auto PrimaryErrorLabelOp = MakeUnique<SpvOpLabel>();
+				PrimaryErrorLabelOp->SetId(PrimaryErrorLabel);
+				ValidateInsts.Add(MoveTemp(PrimaryErrorLabelOp));
+				AppendError(ValidateInsts);
+				ValidateInsts.Add(MakeUnique<SpvOpBranch>(PrimaryMergeLabel));
+
+				auto PrimaryMergeLabelOp = MakeUnique<SpvOpLabel>();
+				PrimaryMergeLabelOp->SetId(PrimaryMergeLabel);
+				ValidateInsts.Add(MoveTemp(PrimaryMergeLabelOp));
+
+				// Handle potential spanning into next element (only when Count > 1)
+				if (Count > 1)
+				{
+					// hasOverflow = (bitPos + Count > 32) iff (bitPos > 32 - Count)
+					SpvId HasOverflow = Patcher.NewId();
+					auto HasOverflowOp = MakeUnique<SpvOpUGreaterThan>(BoolType, BitPos, Patcher.FindOrAddConstant((uint32)(32 - Count)));
+					HasOverflowOp->SetId(HasOverflow);
+					ValidateInsts.Add(MoveTemp(HasOverflowOp));
+
+					auto OverflowBodyLabel = Patcher.NewId();
+					auto OverflowMergeLabel = Patcher.NewId();
+					ValidateInsts.Add(MakeUnique<SpvOpSelectionMerge>(OverflowMergeLabel, SpvSelectionControl::None));
+					ValidateInsts.Add(MakeUnique<SpvOpBranchConditional>(HasOverflow, OverflowBodyLabel, OverflowMergeLabel));
+
+					auto OverflowBodyLabelOp = MakeUnique<SpvOpLabel>();
+					OverflowBodyLabelOp->SetId(OverflowBodyLabel);
+					ValidateInsts.Add(MoveTemp(OverflowBodyLabelOp));
+					{
+						// elemIdx2 = elemIdx + 1
+						SpvId ElemIdx2 = Patcher.NewId();
+						auto ElemIdx2Op = MakeUnique<SpvOpIAdd>(UIntType, ElemIdx, Patcher.FindOrAddConstant(1u));
+						ElemIdx2Op->SetId(ElemIdx2);
+						ValidateInsts.Add(MoveTemp(ElemIdx2Op));
+
+						// ptr2 = AccessChain(array, elemIdx2)
+						SpvId ElemPtr2 = Patcher.NewId();
+						auto ElemPtr2Op = MakeUnique<SpvOpAccessChain>(UIntPointerPrivateType, VarInitializedRange[Pointer->Var->Id], TArray<SpvId>{ElemIdx2});
+						ElemPtr2Op->SetId(ElemPtr2);
+						ValidateInsts.Add(MoveTemp(ElemPtr2Op));
+
+						// loaded2 = Load(ptr2)
+						SpvId Loaded2 = Patcher.NewId();
+						auto Load2Op = MakeUnique<SpvOpLoad>(UIntType, ElemPtr2);
+						Load2Op->SetId(Loaded2);
+						ValidateInsts.Add(MoveTemp(Load2Op));
+
+						// shiftRight = 32 - bitPos (safe: hasOverflow guarantees bitPos > 0)
+						SpvId ShiftRight = Patcher.NewId();
+						auto ShiftRightOp = MakeUnique<SpvOpISub>(UIntType, Patcher.FindOrAddConstant(32u), BitPos);
+						ShiftRightOp->SetId(ShiftRight);
+						ValidateInsts.Add(MoveTemp(ShiftRightOp));
+
+						// mask2 = rawMask >> shiftRight
+						SpvId Mask2 = Patcher.NewId();
+						auto Mask2Op = MakeUnique<SpvOpShiftRightLogical>(UIntType, RawMaskConst, ShiftRight);
+						Mask2Op->SetId(Mask2);
+						ValidateInsts.Add(MoveTemp(Mask2Op));
+
+						// masked2 = loaded2 & mask2
+						SpvId Masked2 = Patcher.NewId();
+						auto And2Op = MakeUnique<SpvOpBitwiseAnd>(UIntType, Loaded2, Mask2);
+						And2Op->SetId(Masked2);
+						ValidateInsts.Add(MoveTemp(And2Op));
+
+						// notFullyInit2 = (masked2 != mask2)
+						SpvId NotFullyInit2 = Patcher.NewId();
+						auto NotEqual2Op = MakeUnique<SpvOpINotEqual>(BoolType, Masked2, Mask2);
+						NotEqual2Op->SetId(NotFullyInit2);
+						ValidateInsts.Add(MoveTemp(NotEqual2Op));
+
+						// if (notFullyInit2) AppendError()
+						auto OverflowErrorLabel = Patcher.NewId();
+						auto OverflowErrorMerge = Patcher.NewId();
+						ValidateInsts.Add(MakeUnique<SpvOpSelectionMerge>(OverflowErrorMerge, SpvSelectionControl::None));
+						ValidateInsts.Add(MakeUnique<SpvOpBranchConditional>(NotFullyInit2, OverflowErrorLabel, OverflowErrorMerge));
+
+						auto OverflowErrorLabelOp = MakeUnique<SpvOpLabel>();
+						OverflowErrorLabelOp->SetId(OverflowErrorLabel);
+						ValidateInsts.Add(MoveTemp(OverflowErrorLabelOp));
+						AppendError(ValidateInsts);
+						ValidateInsts.Add(MakeUnique<SpvOpBranch>(OverflowErrorMerge));
+
+						auto OverflowErrorMergeOp = MakeUnique<SpvOpLabel>();
+						OverflowErrorMergeOp->SetId(OverflowErrorMerge);
+						ValidateInsts.Add(MoveTemp(OverflowErrorMergeOp));
+					}
+					ValidateInsts.Add(MakeUnique<SpvOpBranch>(OverflowMergeLabel));
+
+					auto OverflowMergeLabelOp = MakeUnique<SpvOpLabel>();
+					OverflowMergeLabelOp->SetId(OverflowMergeLabel);
+					ValidateInsts.Add(MoveTemp(OverflowMergeLabelOp));
+				}
+			}
+			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(ValidateInsts));
 		}
 	}
 
 	void SpvValidator::Visit(const SpvOpStore* Inst)
 	{
-		if (!LocalPointers.contains(Inst->GetPointer()))
+		SpvPointer* Pointer = FindPointer(Inst->GetPointer());
+		if (!Pointer)
 		{
 			return;
 		}
-
-		SpvPointer* Pointer = &LocalPointers[Inst->GetPointer()];
 		if (!VarInitializedRange.Contains(Pointer->Var->Id))
 		{
+			if (EnableUbsan && !Pointer->Indexes.IsEmpty())
+			{
+				SpvType* VarType = Pointer->Var->Type;
+				TArray<TUniquePtr<SpvInstruction>> BoundsCheckInsts;
+				GetAccess(VarType, Pointer->Indexes, BoundsCheckInsts);
+				if (BoundsCheckInsts.Num() > 0)
+				{
+					Patcher.AddInstructions(Inst->GetWordOffset().value() + Inst->GetWordLen().value(), MoveTemp(BoundsCheckInsts));
+				}
+			}
 			return;
 		}
 
 		if (EnableUbsan)
 		{
 			SpvType* VarType = Pointer->Var->Type;
-			SpvId IntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 1));
-			TArray<TUniquePtr<SpvInstruction>> GetAccessInsts;
+			SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
+			int32 NumUnits = VarInitializedRangeUnitCount[Pointer->Var->Id];
+			int32 Count = GetTypeByteSize(Pointer->Type->PointeeType) / 4;
+			TArray<TUniquePtr<SpvInstruction>> UpdateInsts;
+
+			if (NumUnits <= 32)
 			{
-				SpvId StartInitUnit = GetAccess(VarType, Pointer->Indexes, GetAccessInsts);
+				// Single uint bitmask path
+				SpvId StartInitUnit = GetAccess(VarType, Pointer->Indexes, UpdateInsts);
 
-				SpvId EndInitUnit = Patcher.NewId();
-				auto AddOp = MakeUnique<SpvOpIAdd>(IntType, StartInitUnit, Patcher.FindOrAddConstant(GetTypeByteSize(Pointer->Type->PointeeType) / 4));
-				AddOp->SetId(EndInitUnit);
-				GetAccessInsts.Add(MoveTemp(AddOp));
+				uint32 RawMask = ((1u << Count) - 1u);
+				SpvId RawMaskConst = Patcher.FindOrAddConstant(RawMask);
 
-				PatchUpdateInitializedRangeFunc(Pointer->Var->Id);
-				SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
-				auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, UpdateInitializedRangeFuncIds[Pointer->Var->Id], TArray<SpvId>{StartInitUnit, EndInitUnit});
-				FuncCallOp->SetId(Patcher.NewId());
-				GetAccessInsts.Add(MoveTemp(FuncCallOp));
+				SpvId Mask = Patcher.NewId();
+				auto MaskOp = MakeUnique<SpvOpShiftLeftLogical>(UIntType, RawMaskConst, StartInitUnit);
+				MaskOp->SetId(Mask);
+				UpdateInsts.Add(MoveTemp(MaskOp));
+
+				SpvId Loaded = Patcher.NewId();
+				auto LoadOp = MakeUnique<SpvOpLoad>(UIntType, VarInitializedRange[Pointer->Var->Id]);
+				LoadOp->SetId(Loaded);
+				UpdateInsts.Add(MoveTemp(LoadOp));
+
+				SpvId Updated = Patcher.NewId();
+				auto OrOp = MakeUnique<SpvOpBitwiseOr>(UIntType, Loaded, Mask);
+				OrOp->SetId(Updated);
+				UpdateInsts.Add(MoveTemp(OrOp));
+
+				UpdateInsts.Add(MakeUnique<SpvOpStore>(VarInitializedRange[Pointer->Var->Id], Updated));
 			}
-			Patcher.AddInstructions(Inst->GetWordOffset().value() + Inst->GetWordLen().value(), MoveTemp(GetAccessInsts));
+			else if (Count > 32)
+			{
+				// Full/large store on array bitmask: unroll store over all K elements
+				int32 K = (NumUnits + 31) / 32;
+				SpvId UIntPointerPrivateType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Private, UIntType));
+				for (int32 i = 0; i < K; i++)
+				{
+					int32 Remaining = (i < K - 1) ? 32 : ((NumUnits % 32 == 0) ? 32 : (NumUnits % 32));
+					uint32 FullMask = ((1u << Remaining) - 1u);
+
+					SpvId ElemPtr = Patcher.NewId();
+					auto ElemPtrOp = MakeUnique<SpvOpAccessChain>(UIntPointerPrivateType, VarInitializedRange[Pointer->Var->Id], TArray<SpvId>{Patcher.FindOrAddConstant((uint32)i)});
+					ElemPtrOp->SetId(ElemPtr);
+					UpdateInsts.Add(MoveTemp(ElemPtrOp));
+
+					UpdateInsts.Add(MakeUnique<SpvOpStore>(ElemPtr, Patcher.FindOrAddConstant(FullMask)));
+				}
+			}
+			else
+			{
+				// Sub-member store on array bitmask (Count <= 32)
+				SpvId StartInitUnit = GetAccess(VarType, Pointer->Indexes, UpdateInsts);
+				SpvId UIntPointerPrivateType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Private, UIntType));
+
+				// elemIdx = StartInitUnit >> 5
+				SpvId ElemIdx = Patcher.NewId();
+				auto ElemIdxOp = MakeUnique<SpvOpShiftRightLogical>(UIntType, StartInitUnit, Patcher.FindOrAddConstant(5u));
+				ElemIdxOp->SetId(ElemIdx);
+				UpdateInsts.Add(MoveTemp(ElemIdxOp));
+
+				// bitPos = StartInitUnit & 31
+				SpvId BitPos = Patcher.NewId();
+				auto BitPosOp = MakeUnique<SpvOpBitwiseAnd>(UIntType, StartInitUnit, Patcher.FindOrAddConstant(31u));
+				BitPosOp->SetId(BitPos);
+				UpdateInsts.Add(MoveTemp(BitPosOp));
+
+				// ptr = AccessChain(array, elemIdx)
+				SpvId ElemPtr = Patcher.NewId();
+				auto ElemPtrOp = MakeUnique<SpvOpAccessChain>(UIntPointerPrivateType, VarInitializedRange[Pointer->Var->Id], TArray<SpvId>{ElemIdx});
+				ElemPtrOp->SetId(ElemPtr);
+				UpdateInsts.Add(MoveTemp(ElemPtrOp));
+
+				// loaded = Load(ptr)
+				SpvId Loaded = Patcher.NewId();
+				auto LoadOp = MakeUnique<SpvOpLoad>(UIntType, ElemPtr);
+				LoadOp->SetId(Loaded);
+				UpdateInsts.Add(MoveTemp(LoadOp));
+
+				// mask = rawMask << bitPos
+				uint32 RawMask = ((1u << Count) - 1u);
+				SpvId RawMaskConst = Patcher.FindOrAddConstant(RawMask);
+				SpvId Mask = Patcher.NewId();
+				auto MaskOp = MakeUnique<SpvOpShiftLeftLogical>(UIntType, RawMaskConst, BitPos);
+				MaskOp->SetId(Mask);
+				UpdateInsts.Add(MoveTemp(MaskOp));
+
+				// updated = loaded | mask
+				SpvId Updated = Patcher.NewId();
+				auto OrOp = MakeUnique<SpvOpBitwiseOr>(UIntType, Loaded, Mask);
+				OrOp->SetId(Updated);
+				UpdateInsts.Add(MoveTemp(OrOp));
+
+				// store back
+				UpdateInsts.Add(MakeUnique<SpvOpStore>(ElemPtr, Updated));
+
+				// Handle potential spanning into next element (only when Count > 1)
+				if (Count > 1)
+				{
+					SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
+
+					// hasOverflow = (bitPos > 32 - Count)
+					SpvId HasOverflow = Patcher.NewId();
+					auto HasOverflowOp = MakeUnique<SpvOpUGreaterThan>(BoolType, BitPos, Patcher.FindOrAddConstant((uint32)(32 - Count)));
+					HasOverflowOp->SetId(HasOverflow);
+					UpdateInsts.Add(MoveTemp(HasOverflowOp));
+
+					auto OverflowBodyLabel = Patcher.NewId();
+					auto OverflowMergeLabel = Patcher.NewId();
+					UpdateInsts.Add(MakeUnique<SpvOpSelectionMerge>(OverflowMergeLabel, SpvSelectionControl::None));
+					UpdateInsts.Add(MakeUnique<SpvOpBranchConditional>(HasOverflow, OverflowBodyLabel, OverflowMergeLabel));
+
+					auto OverflowBodyLabelOp = MakeUnique<SpvOpLabel>();
+					OverflowBodyLabelOp->SetId(OverflowBodyLabel);
+					UpdateInsts.Add(MoveTemp(OverflowBodyLabelOp));
+					{
+						// elemIdx2 = elemIdx + 1
+						SpvId ElemIdx2 = Patcher.NewId();
+						auto ElemIdx2Op = MakeUnique<SpvOpIAdd>(UIntType, ElemIdx, Patcher.FindOrAddConstant(1u));
+						ElemIdx2Op->SetId(ElemIdx2);
+						UpdateInsts.Add(MoveTemp(ElemIdx2Op));
+
+						// ptr2 = AccessChain(array, elemIdx2)
+						SpvId ElemPtr2 = Patcher.NewId();
+						auto ElemPtr2Op = MakeUnique<SpvOpAccessChain>(UIntPointerPrivateType, VarInitializedRange[Pointer->Var->Id], TArray<SpvId>{ElemIdx2});
+						ElemPtr2Op->SetId(ElemPtr2);
+						UpdateInsts.Add(MoveTemp(ElemPtr2Op));
+
+						// loaded2 = Load(ptr2)
+						SpvId Loaded2 = Patcher.NewId();
+						auto Load2Op = MakeUnique<SpvOpLoad>(UIntType, ElemPtr2);
+						Load2Op->SetId(Loaded2);
+						UpdateInsts.Add(MoveTemp(Load2Op));
+
+						// shiftRight = 32 - bitPos
+						SpvId ShiftRight = Patcher.NewId();
+						auto ShiftRightOp = MakeUnique<SpvOpISub>(UIntType, Patcher.FindOrAddConstant(32u), BitPos);
+						ShiftRightOp->SetId(ShiftRight);
+						UpdateInsts.Add(MoveTemp(ShiftRightOp));
+
+						// mask2 = rawMask >> shiftRight
+						SpvId Mask2 = Patcher.NewId();
+						auto Mask2Op = MakeUnique<SpvOpShiftRightLogical>(UIntType, RawMaskConst, ShiftRight);
+						Mask2Op->SetId(Mask2);
+						UpdateInsts.Add(MoveTemp(Mask2Op));
+
+						// updated2 = loaded2 | mask2
+						SpvId Updated2 = Patcher.NewId();
+						auto Or2Op = MakeUnique<SpvOpBitwiseOr>(UIntType, Loaded2, Mask2);
+						Or2Op->SetId(Updated2);
+						UpdateInsts.Add(MoveTemp(Or2Op));
+
+						// store back
+						UpdateInsts.Add(MakeUnique<SpvOpStore>(ElemPtr2, Updated2));
+					}
+					UpdateInsts.Add(MakeUnique<SpvOpBranch>(OverflowMergeLabel));
+
+					auto OverflowMergeLabelOp = MakeUnique<SpvOpLabel>();
+					OverflowMergeLabelOp->SetId(OverflowMergeLabel);
+					UpdateInsts.Add(MoveTemp(OverflowMergeLabelOp));
+				}
+			}
+			Patcher.AddInstructions(Inst->GetWordOffset().value() + Inst->GetWordLen().value(), MoveTemp(UpdateInsts));
 		}
 	}
 
 	void SpvValidator::Visit(const SpvOpAccessChain* Inst)
 	{
-		if (!LocalPointers.contains(Inst->GetBasePointer()))
+		SpvPointer* BasePointer = FindPointer(Inst->GetBasePointer());
+		if (!BasePointer)
 		{
 			return;
 		}
 
 		SpvId ResultId = Inst->GetId().value();
 		SpvPointerType* PointerType = static_cast<SpvPointerType*>(Context.Types[Inst->GetResultType()].Get());
-		SpvPointer* BasePointer = &LocalPointers[Inst->GetBasePointer()];
 		TArray<SpvId> Indexes = BasePointer->Indexes;
 		Indexes.Append(Inst->GetIndexes());
 
@@ -1286,19 +1957,26 @@ namespace FW
 			AppendErrorFuncInsts.Add(MakeUnique<SpvOpStore>(HasError, Patcher.FindOrAddConstant(1u)));
 
 			{
+				SpvId UVec4Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, 4));
+				SpvId UVec4PointerUniformType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Uniform, UVec4Type));
 				SpvId UIntPointerUniformType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Uniform, UIntType));
-				SpvId DebuggerBufferStorage = Patcher.NewId();
 				SpvId Zero = Patcher.FindOrAddConstant(0u);
-				auto DebuggerBufferStorageOp = MakeUnique<SpvOpAccessChain>(UIntPointerUniformType, DebuggerBuffer, TArray<SpvId>{Zero, Zero});
+
+				// Access the first component of the first uvec4 element for atomic counter
+				// AccessChain: DebuggerBuffer -> member 0 (RuntimeArray) -> element 0 (first uvec4) -> component 0 (first uint)
+				SpvId DebuggerBufferStorage = Patcher.NewId();
+				auto DebuggerBufferStorageOp = MakeUnique<SpvOpAccessChain>(UIntPointerUniformType, DebuggerBuffer, TArray<SpvId>{Zero, Zero, Zero});
 				DebuggerBufferStorageOp->SetId(DebuggerBufferStorage);
 				AppendErrorFuncInsts.Add(MoveTemp(DebuggerBufferStorageOp));
 
+				// Atomic add 8 bytes (2 uints) to get a byte offset for storing FragCoord
 				SpvId OriginalValue = Patcher.NewId();
 				auto AtomicOp = MakeUnique<SpvOpAtomicIAdd>(UIntType, DebuggerBufferStorage, Patcher.FindOrAddConstant((uint32)SpvMemoryScope::Device),
 					Patcher.FindOrAddConstant((uint32)SpvMemorySemantics::None), Patcher.FindOrAddConstant(8u));
 				AtomicOp->SetId(OriginalValue);
 				AppendErrorFuncInsts.Add(MoveTemp(AtomicOp));
 
+				// Compute byte offsets for the two stores
 				SpvId OriginalValuePlus4 = Patcher.NewId();
 				auto Add4Op = MakeUnique<SpvOpIAdd>(UIntType, OriginalValue, Patcher.FindOrAddConstant(4u));
 				Add4Op->SetId(OriginalValuePlus4);
@@ -1314,6 +1992,7 @@ namespace FW
 				Add12Op->SetId(OriginalValuePlus12);
 				AppendErrorFuncInsts.Add(MoveTemp(Add12Op));
 
+				// Bounds check: if OriginalValuePlus12 > 1024, return
 				SpvId UGreaterThan = Patcher.NewId();;
 				auto UGreaterThanOp = MakeUnique<SpvOpUGreaterThan>(BoolType, OriginalValuePlus12, Patcher.FindOrAddConstant(1024u));
 				UGreaterThanOp->SetId(UGreaterThan);
@@ -1334,23 +2013,51 @@ namespace FW
 				AppendErrorFuncInsts.Add(MoveTemp(FalseLabelOp));
 
 				{
-					SpvId AlignedOffsetX = Patcher.NewId();
-					auto AlignedOffsetXOp = MakeUnique<SpvOpShiftRightLogical>(UIntType, OriginalValuePlus4, Patcher.FindOrAddConstant(2u));
-					AlignedOffsetXOp->SetId(AlignedOffsetX);
-					AppendErrorFuncInsts.Add(MoveTemp(AlignedOffsetXOp));
+					// For uvec4 buffer: byteOffset -> vecIndex = byteOffset / 16, componentIndex = (byteOffset / 4) % 4
+					// byteOffset / 4 = ShiftRight by 2
+					// byteOffset / 16 = ShiftRight by 4
+					// componentIndex = (byteOffset / 4) & 3
 
-					SpvId AlignedOffsetY = Patcher.NewId();
-					auto AlignedOffsetYOp = MakeUnique<SpvOpShiftRightLogical>(UIntType, OriginalValuePlus8, Patcher.FindOrAddConstant(2u));
-					AlignedOffsetYOp->SetId(AlignedOffsetY);
-					AppendErrorFuncInsts.Add(MoveTemp(AlignedOffsetYOp));
+					// Compute vec index and component index for OriginalValuePlus4 (FragCoord.x)
+					SpvId DivBy4_X = Patcher.NewId();
+					auto DivBy4_XOp = MakeUnique<SpvOpShiftRightLogical>(UIntType, OriginalValuePlus4, Patcher.FindOrAddConstant(2u));
+					DivBy4_XOp->SetId(DivBy4_X);
+					AppendErrorFuncInsts.Add(MoveTemp(DivBy4_XOp));
 
+					SpvId VecIndex_X = Patcher.NewId();
+					auto VecIndex_XOp = MakeUnique<SpvOpShiftRightLogical>(UIntType, OriginalValuePlus4, Patcher.FindOrAddConstant(4u));
+					VecIndex_XOp->SetId(VecIndex_X);
+					AppendErrorFuncInsts.Add(MoveTemp(VecIndex_XOp));
+
+					SpvId CompIndex_X = Patcher.NewId();
+					auto CompIndex_XOp = MakeUnique<SpvOpBitwiseAnd>(UIntType, DivBy4_X, Patcher.FindOrAddConstant(3u));
+					CompIndex_XOp->SetId(CompIndex_X);
+					AppendErrorFuncInsts.Add(MoveTemp(CompIndex_XOp));
+
+					// Compute vec index and component index for OriginalValuePlus8 (FragCoord.y)
+					SpvId DivBy4_Y = Patcher.NewId();
+					auto DivBy4_YOp = MakeUnique<SpvOpShiftRightLogical>(UIntType, OriginalValuePlus8, Patcher.FindOrAddConstant(2u));
+					DivBy4_YOp->SetId(DivBy4_Y);
+					AppendErrorFuncInsts.Add(MoveTemp(DivBy4_YOp));
+
+					SpvId VecIndex_Y = Patcher.NewId();
+					auto VecIndex_YOp = MakeUnique<SpvOpShiftRightLogical>(UIntType, OriginalValuePlus8, Patcher.FindOrAddConstant(4u));
+					VecIndex_YOp->SetId(VecIndex_Y);
+					AppendErrorFuncInsts.Add(MoveTemp(VecIndex_YOp));
+
+					SpvId CompIndex_Y = Patcher.NewId();
+					auto CompIndex_YOp = MakeUnique<SpvOpBitwiseAnd>(UIntType, DivBy4_Y, Patcher.FindOrAddConstant(3u));
+					CompIndex_YOp->SetId(CompIndex_Y);
+					AppendErrorFuncInsts.Add(MoveTemp(CompIndex_YOp));
+
+					// AccessChain to get pointer to the uint component: DebuggerBuffer[0][vecIndex][compIndex]
 					SpvId DebuggerBufferStorageX = Patcher.NewId();
-					auto DebuggerBufferStorageXOp = MakeUnique<SpvOpAccessChain>(UIntPointerUniformType, DebuggerBuffer, TArray<SpvId>{Zero, AlignedOffsetX});
+					auto DebuggerBufferStorageXOp = MakeUnique<SpvOpAccessChain>(UIntPointerUniformType, DebuggerBuffer, TArray<SpvId>{Zero, VecIndex_X, CompIndex_X});
 					DebuggerBufferStorageXOp->SetId(DebuggerBufferStorageX);
 					AppendErrorFuncInsts.Add(MoveTemp(DebuggerBufferStorageXOp));
 
 					SpvId DebuggerBufferStorageY = Patcher.NewId();
-					auto DebuggerBufferStorageYOp = MakeUnique<SpvOpAccessChain>(UIntPointerUniformType, DebuggerBuffer, TArray<SpvId>{Zero, AlignedOffsetY});
+					auto DebuggerBufferStorageYOp = MakeUnique<SpvOpAccessChain>(UIntPointerUniformType, DebuggerBuffer, TArray<SpvId>{Zero, VecIndex_Y, CompIndex_Y});
 					DebuggerBufferStorageYOp->SetId(DebuggerBufferStorageY);
 					AppendErrorFuncInsts.Add(MoveTemp(DebuggerBufferStorageYOp));
 
@@ -1390,266 +2097,6 @@ namespace FW
 		Patcher.AddFunction(MoveTemp(AppendErrorFuncInsts));
 	}
 
-	void SpvValidator::PatchValidateInitializedRangeFunc(SpvId VarId)
-	{
-		if (ValidateInitializedRangeFuncIds.Contains(VarId))
-		{
-			return;
-		}
-
-		SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
-		SpvId IntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 1));
-		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
-		SpvId IntPointerFunctionType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Function, IntType));
-		SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
-
-		SpvId ValidateInitializedRangeFuncId = Patcher.NewId();
-		Patcher.AddDebugName(MakeUnique<SpvOpName>(ValidateInitializedRangeFuncId, FString::Printf(TEXT("_ValidateInitializedRange_%d_"), VarId.GetValue())));
-		TArray<TUniquePtr<SpvInstruction>> ValidateRangeFuncInsts;
-		{
-			SpvId FuncType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFunction>(VoidType, TArray<SpvId>{IntPointerFunctionType, IntPointerFunctionType}));
-			auto FuncOp = MakeUnique<SpvOpFunction>(VoidType, SpvFunctionControl::None, FuncType);
-			FuncOp->SetId(ValidateInitializedRangeFuncId);
-			ValidateRangeFuncInsts.Add(MoveTemp(FuncOp));
-
-			SpvId StartParam = Patcher.NewId();
-			auto StartParamOp = MakeUnique<SpvOpFunctionParameter>(IntPointerFunctionType);
-			StartParamOp->SetId(StartParam);
-			ValidateRangeFuncInsts.Add(MoveTemp(StartParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(StartParam, "_Start_"));
-
-			SpvId EndParam = Patcher.NewId();
-			auto EndParamOp = MakeUnique<SpvOpFunctionParameter>(IntPointerFunctionType);
-			EndParamOp->SetId(EndParam);
-			ValidateRangeFuncInsts.Add(MoveTemp(EndParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(EndParam, "_End_"));
-
-			auto LabelOp = MakeUnique<SpvOpLabel>();
-			LabelOp->SetId(Patcher.NewId());
-			ValidateRangeFuncInsts.Add(MoveTemp(LabelOp));
-
-			SpvId ForCheckLabel = Patcher.NewId();
-			SpvId ForBodyLabel = Patcher.NewId();
-			SpvId ForMergeLabel = Patcher.NewId();
-			SpvId ForContinueLabel = Patcher.NewId();
-			ValidateRangeFuncInsts.Add(MakeUnique<SpvOpBranch>(ForCheckLabel));
-			{
-				auto LabelOp = MakeUnique<SpvOpLabel>();
-				LabelOp->SetId(ForCheckLabel);
-				ValidateRangeFuncInsts.Add(MoveTemp(LabelOp));
-
-				SpvId LoadedStart = Patcher.NewId();
-				auto LoadedStartOp = MakeUnique<SpvOpLoad>(IntType, StartParam);
-				LoadedStartOp->SetId(LoadedStart);
-				ValidateRangeFuncInsts.Add(MoveTemp(LoadedStartOp));
-
-				SpvId LoadedEnd = Patcher.NewId();
-				auto LoadedEndOp = MakeUnique<SpvOpLoad>(IntType, EndParam);
-				LoadedEndOp->SetId(LoadedEnd);
-				ValidateRangeFuncInsts.Add(MoveTemp(LoadedEndOp));
-
-				SpvId SLessThan = Patcher.NewId();
-				auto SLessThanOp = MakeUnique<SpvOpSLessThan>(BoolType, LoadedStart, LoadedEnd);
-				SLessThanOp->SetId(SLessThan);
-				ValidateRangeFuncInsts.Add(MoveTemp(SLessThanOp));
-
-				ValidateRangeFuncInsts.Add(MakeUnique<SpvOpLoopMerge>(ForMergeLabel, ForContinueLabel, SpvLoopControl::None));
-				ValidateRangeFuncInsts.Add(MakeUnique<SpvOpBranchConditional>(SLessThan, ForBodyLabel, ForMergeLabel));
-			}
-
-			{
-				auto LabelOp = MakeUnique<SpvOpLabel>();
-				LabelOp->SetId(ForBodyLabel);
-				ValidateRangeFuncInsts.Add(MoveTemp(LabelOp));
-
-				SpvId LoadedStart = Patcher.NewId();
-				auto LoadedStartOp = MakeUnique<SpvOpLoad>(IntType, StartParam);
-				LoadedStartOp->SetId(LoadedStart);
-				ValidateRangeFuncInsts.Add(MoveTemp(LoadedStartOp));
-
-				SpvId UIntPointerPrivateType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Private, UIntType));
-				SpvId InitializedRangeStorage = Patcher.NewId();
-				auto InitializedRangeStorageOp = MakeUnique<SpvOpAccessChain>(UIntPointerPrivateType, VarInitializedRange[VarId], TArray<SpvId>{LoadedStart});
-				InitializedRangeStorageOp->SetId(InitializedRangeStorage);
-				ValidateRangeFuncInsts.Add(MoveTemp(InitializedRangeStorageOp));
-
-				SpvId LoadedInitializedRange = Patcher.NewId();
-				auto LoadedInitializedRangeOp = MakeUnique<SpvOpLoad>(IntType, InitializedRangeStorage);
-				LoadedInitializedRangeOp->SetId(LoadedInitializedRange);
-				ValidateRangeFuncInsts.Add(MoveTemp(LoadedInitializedRangeOp));
-
-				SpvId IEqual = Patcher.NewId();;
-				auto IEqualOp = MakeUnique<SpvOpIEqual>(BoolType, LoadedInitializedRange, Patcher.FindOrAddConstant(0));
-				IEqualOp->SetId(IEqual);
-				ValidateRangeFuncInsts.Add(MoveTemp(IEqualOp));
-				
-				auto TrueLabel = Patcher.NewId();
-				auto FalseLabel = Patcher.NewId();
-				ValidateRangeFuncInsts.Add(MakeUnique<SpvOpSelectionMerge>(TrueLabel, SpvSelectionControl::None));
-				ValidateRangeFuncInsts.Add(MakeUnique<SpvOpBranchConditional>(IEqual, TrueLabel, FalseLabel));
-
-				auto TrueLabelOp = MakeUnique<SpvOpLabel>();
-				TrueLabelOp->SetId(TrueLabel);
-				ValidateRangeFuncInsts.Add(MoveTemp(TrueLabelOp));
-				AppendError(ValidateRangeFuncInsts);
-				ValidateRangeFuncInsts.Add(MakeUnique<SpvOpReturn>());
-
-				auto FalseLabelOp = MakeUnique<SpvOpLabel>();
-				FalseLabelOp->SetId(FalseLabel);
-				ValidateRangeFuncInsts.Add(MoveTemp(FalseLabelOp));		
-				ValidateRangeFuncInsts.Add(MakeUnique<SpvOpBranch>(ForContinueLabel));
-			}
-
-			{
-				auto LabelOp = MakeUnique<SpvOpLabel>();
-				LabelOp->SetId(ForContinueLabel);
-				ValidateRangeFuncInsts.Add(MoveTemp(LabelOp));
-
-				SpvId LoadedStart = Patcher.NewId();
-				auto LoadedStartOp = MakeUnique<SpvOpLoad>(IntType, StartParam);
-				LoadedStartOp->SetId(LoadedStart);
-				ValidateRangeFuncInsts.Add(MoveTemp(LoadedStartOp));
-
-				SpvId AddRet = Patcher.NewId();
-				auto AddOp = MakeUnique<SpvOpIAdd>(IntType, LoadedStart, Patcher.FindOrAddConstant(1));
-				AddOp->SetId(AddRet);
-				ValidateRangeFuncInsts.Add(MoveTemp(AddOp));
-
-				ValidateRangeFuncInsts.Add(MakeUnique<SpvOpStore>(StartParam, AddRet));
-				ValidateRangeFuncInsts.Add(MakeUnique<SpvOpBranch>(ForCheckLabel));
-			}
-
-			{
-				auto LabelOp = MakeUnique<SpvOpLabel>();
-				LabelOp->SetId(ForMergeLabel);
-				ValidateRangeFuncInsts.Add(MoveTemp(LabelOp));
-			}
-
-			ValidateRangeFuncInsts.Add(MakeUnique<SpvOpReturn>());
-			ValidateRangeFuncInsts.Add(MakeUnique<SpvOpFunctionEnd>());
-		}
-		Patcher.AddFunction(MoveTemp(ValidateRangeFuncInsts));
-		ValidateInitializedRangeFuncIds.Add(VarId, ValidateInitializedRangeFuncId);
-	}
-
-	void SpvValidator::PatchUpdateInitializedRangeFunc(SpvId VarId)
-	{
-		if (UpdateInitializedRangeFuncIds.Contains(VarId))
-		{
-			return;
-		}
-
-		SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
-		SpvId IntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 1));
-		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
-		SpvId IntPointerFunctionType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Function, IntType));
-		SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
-
-		SpvId UpdateInitializedRangeFuncId = Patcher.NewId();
-		Patcher.AddDebugName(MakeUnique<SpvOpName>(UpdateInitializedRangeFuncId, FString::Printf(TEXT("_UpdateInitializedRange_%d_"), VarId.GetValue())));
-		TArray<TUniquePtr<SpvInstruction>> UpdateFuncInsts;
-		{
-			SpvId FuncType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFunction>(VoidType, TArray<SpvId>{IntPointerFunctionType, IntPointerFunctionType}));
-			auto FuncOp = MakeUnique<SpvOpFunction>(VoidType, SpvFunctionControl::None, FuncType);
-			FuncOp->SetId(UpdateInitializedRangeFuncId);
-			UpdateFuncInsts.Add(MoveTemp(FuncOp));
-
-			SpvId StartParam = Patcher.NewId();
-			auto StartParamOp = MakeUnique<SpvOpFunctionParameter>(IntPointerFunctionType);
-			StartParamOp->SetId(StartParam);
-			UpdateFuncInsts.Add(MoveTemp(StartParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(StartParam, "_Start_"));
-
-			SpvId EndParam = Patcher.NewId();
-			auto EndParamOp = MakeUnique<SpvOpFunctionParameter>(IntPointerFunctionType);
-			EndParamOp->SetId(EndParam);
-			UpdateFuncInsts.Add(MoveTemp(EndParamOp));
-			Patcher.AddDebugName(MakeUnique<SpvOpName>(EndParam, "_End_"));
-
-			auto LabelOp = MakeUnique<SpvOpLabel>();
-			LabelOp->SetId(Patcher.NewId());
-			UpdateFuncInsts.Add(MoveTemp(LabelOp));
-
-			SpvId ForCheckLabel = Patcher.NewId();
-			SpvId ForBodyLabel = Patcher.NewId();
-			SpvId ForMergeLabel = Patcher.NewId();
-			SpvId ForContinueLabel = Patcher.NewId();
-			UpdateFuncInsts.Add(MakeUnique<SpvOpBranch>(ForCheckLabel));
-			{
-				auto LabelOp = MakeUnique<SpvOpLabel>();
-				LabelOp->SetId(ForCheckLabel);
-				UpdateFuncInsts.Add(MoveTemp(LabelOp));
-
-				SpvId LoadedStart = Patcher.NewId();
-				auto LoadedStartOp = MakeUnique<SpvOpLoad>(IntType, StartParam);
-				LoadedStartOp->SetId(LoadedStart);
-				UpdateFuncInsts.Add(MoveTemp(LoadedStartOp));
-
-				SpvId LoadedEnd = Patcher.NewId();
-				auto LoadedEndOp = MakeUnique<SpvOpLoad>(IntType, EndParam);
-				LoadedEndOp->SetId(LoadedEnd);
-				UpdateFuncInsts.Add(MoveTemp(LoadedEndOp));
-
-				SpvId SLessThan = Patcher.NewId();
-				auto SLessThanOp = MakeUnique<SpvOpSLessThan>(BoolType, LoadedStart, LoadedEnd);
-				SLessThanOp->SetId(SLessThan);
-				UpdateFuncInsts.Add(MoveTemp(SLessThanOp));
-
-				UpdateFuncInsts.Add(MakeUnique<SpvOpLoopMerge>(ForMergeLabel, ForContinueLabel, SpvLoopControl::None));
-				UpdateFuncInsts.Add(MakeUnique<SpvOpBranchConditional>(SLessThan, ForBodyLabel, ForMergeLabel));
-			}
-
-			{
-				auto LabelOp = MakeUnique<SpvOpLabel>();
-				LabelOp->SetId(ForBodyLabel);
-				UpdateFuncInsts.Add(MoveTemp(LabelOp));
-
-				SpvId LoadedStart = Patcher.NewId();
-				auto LoadedStartOp = MakeUnique<SpvOpLoad>(IntType, StartParam);
-				LoadedStartOp->SetId(LoadedStart);
-				UpdateFuncInsts.Add(MoveTemp(LoadedStartOp));
-
-				SpvId UIntPointerPrivateType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Private, UIntType));
-				SpvId InitializedRangeStorage = Patcher.NewId();
-				auto InitializedRangeStorageOp = MakeUnique<SpvOpAccessChain>(UIntPointerPrivateType, VarInitializedRange[VarId], TArray<SpvId>{LoadedStart});
-				InitializedRangeStorageOp->SetId(InitializedRangeStorage);
-				UpdateFuncInsts.Add(MoveTemp(InitializedRangeStorageOp));
-				UpdateFuncInsts.Add(MakeUnique<SpvOpStore>(InitializedRangeStorage, Patcher.FindOrAddConstant(1u)));
-				UpdateFuncInsts.Add(MakeUnique<SpvOpBranch>(ForContinueLabel));
-			}
-			
-			{
-				auto LabelOp = MakeUnique<SpvOpLabel>();
-				LabelOp->SetId(ForContinueLabel);
-				UpdateFuncInsts.Add(MoveTemp(LabelOp));
-
-				SpvId LoadedStart = Patcher.NewId();
-				auto LoadedStartOp = MakeUnique<SpvOpLoad>(IntType, StartParam);
-				LoadedStartOp->SetId(LoadedStart);
-				UpdateFuncInsts.Add(MoveTemp(LoadedStartOp));
-
-				SpvId AddRet = Patcher.NewId();
-				auto AddOp = MakeUnique<SpvOpIAdd>(IntType, LoadedStart, Patcher.FindOrAddConstant(1));
-				AddOp->SetId(AddRet);
-				UpdateFuncInsts.Add(MoveTemp(AddOp));
-
-				UpdateFuncInsts.Add(MakeUnique<SpvOpStore>(StartParam, AddRet));
-				UpdateFuncInsts.Add(MakeUnique<SpvOpBranch>(ForCheckLabel));
-			}
-
-			{
-				auto LabelOp = MakeUnique<SpvOpLabel>();
-				LabelOp->SetId(ForMergeLabel);
-				UpdateFuncInsts.Add(MoveTemp(LabelOp));
-			}
-
-			UpdateFuncInsts.Add(MakeUnique<SpvOpReturn>());
-			UpdateFuncInsts.Add(MakeUnique<SpvOpFunctionEnd>());
-		}
-		Patcher.AddFunction(MoveTemp(UpdateFuncInsts));
-		UpdateInitializedRangeFuncIds.Add(VarId, UpdateInitializedRangeFuncId);
-	}
-
 	void SpvValidator::AppendError(TArray<TUniquePtr<SpvInstruction>>& InstList)
 	{
 		SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
@@ -1658,8 +2105,63 @@ namespace FW
 		InstList.Add(MoveTemp(FuncCallOp));
 	}
 
+	int32 SpvValidator::ComputeConstantAccess(SpvType* Type, const TArray<SpvId>& Indexes, int32 StartIdx)
+	{
+		if (StartIdx >= Indexes.Num())
+		{
+			return 0;
+		}
+
+		int32 IndexVal = *(int32*)std::get<SpvObject::Internal>(Context.Constants[Indexes[StartIdx]].Storage).Value.GetData();
+
+		switch (Type->GetKind())
+		{
+		case SpvTypeKind::Vector:
+		{
+			SpvVectorType* VecType = static_cast<SpvVectorType*>(Type);
+			return IndexVal * GetTypeByteSize(VecType->ElementType) / 4;
+		}
+		case SpvTypeKind::Array:
+		{
+			SpvArrayType* ArrType = static_cast<SpvArrayType*>(Type);
+			return IndexVal * GetTypeByteSize(ArrType->ElementType) / 4 + ComputeConstantAccess(ArrType->ElementType, Indexes, StartIdx + 1);
+		}
+		case SpvTypeKind::Struct:
+		{
+			SpvStructType* StructType = static_cast<SpvStructType*>(Type);
+			int32 Offset = 0;
+			for (int32 i = 0; i < IndexVal; i++)
+			{
+				Offset += GetTypeByteSize(StructType->MemberTypes[i]);
+			}
+			return Offset / 4 + ComputeConstantAccess(StructType->MemberTypes[IndexVal], Indexes, StartIdx + 1);
+		}
+		case SpvTypeKind::Matrix:
+		{
+			SpvMatrixType* MatType = static_cast<SpvMatrixType*>(Type);
+			return IndexVal * GetTypeByteSize(MatType->ElementType) / 4 + ComputeConstantAccess(MatType->ElementType, Indexes, StartIdx + 1);
+		}
+		default:
+			return 0;
+		}
+	}
+
 	SpvId SpvValidator::GetAccess(SpvType* VarType, const TArray<SpvId>& Indexes, TArray<TUniquePtr<SpvInstruction>>& InstList)
 	{
+		bool AllConstant = true;
+		for (SpvId Index : Indexes)
+		{
+			if (!Context.Constants.contains(Index))
+			{
+				AllConstant = false;
+				break;
+			}
+		}
+		if (AllConstant)
+		{
+			return Patcher.FindOrAddConstant(ComputeConstantAccess(VarType, Indexes, 0));
+		}
+
 		int32 MaxIndexNum = GetMaxIndexNum(VarType);
 		PatchGetAccessFunc(VarType);
 

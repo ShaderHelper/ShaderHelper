@@ -17,33 +17,33 @@ namespace FW
 	{
 	}
 
-	TRefCountPtr<GpuRenderPipelineState> GpuPsoCacheManager::FindRenderPso(const GpuPsoCacheKey& Key)
+	TRefCountPtr<GpuRenderPipelineState> GpuPsoCacheManager::FindRenderPso(const GpuRenderPsoCacheKey& Key)
 	{
 		FScopeLock Lock(&CacheLock);
 		const TRefCountPtr<GpuRenderPipelineState>* Found = RenderPsoCache.FindAndTouch(Key);
 		return Found ? *Found : nullptr;
 	}
 
-	TRefCountPtr<GpuComputePipelineState> GpuPsoCacheManager::FindComputePso(const GpuPsoCacheKey& Key)
+	TRefCountPtr<GpuComputePipelineState> GpuPsoCacheManager::FindComputePso(const GpuComputePsoCacheKey& Key)
 	{
 		FScopeLock Lock(&CacheLock);
 		const TRefCountPtr<GpuComputePipelineState>* Found = ComputePsoCache.FindAndTouch(Key);
 		return Found ? *Found : nullptr;
 	}
 
-	void GpuPsoCacheManager::AddRenderPso(const GpuPsoCacheKey& Key, TRefCountPtr<GpuRenderPipelineState> Pso)
+	void GpuPsoCacheManager::AddRenderPso(const GpuRenderPsoCacheKey& Key, TRefCountPtr<GpuRenderPipelineState> Pso)
 	{
 		FScopeLock Lock(&CacheLock);
 		RenderPsoCache.Add(Key, MoveTemp(Pso));
 	}
 
-	void GpuPsoCacheManager::AddComputePso(const GpuPsoCacheKey& Key, TRefCountPtr<GpuComputePipelineState> Pso)
+	void GpuPsoCacheManager::AddComputePso(const GpuComputePsoCacheKey& Key, TRefCountPtr<GpuComputePipelineState> Pso)
 	{
 		FScopeLock Lock(&CacheLock);
 		ComputePsoCache.Add(Key, MoveTemp(Pso));
 	}
 
-	GpuPsoCacheKey GpuPsoCacheManager::ComputeRenderPsoKey(const GpuRenderPipelineStateDesc& Desc)
+	GpuRenderPsoCacheKey GpuPsoCacheManager::ComputeRenderPsoKey(const GpuRenderPipelineStateDesc& Desc)
 	{
 		uint32 Hash = 0;
 		
@@ -85,10 +85,21 @@ namespace FW
 			Hash = HashCombine(Hash, ::GetTypeHash(Target.Mask));
 		}
 
-		return GpuPsoCacheKey{ Hash };
+		return GpuRenderPsoCacheKey{
+			.Hash = Hash,
+			.Vs = Desc.Vs,
+			.Ps = Desc.Ps,
+			.BindGroupLayout0 = Desc.BindGroupLayout0 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout0->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
+			.BindGroupLayout1 = Desc.BindGroupLayout1 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout1->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
+			.BindGroupLayout2 = Desc.BindGroupLayout2 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout2->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
+			.BindGroupLayout3 = Desc.BindGroupLayout3 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout3->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
+			.RasterizerState = Desc.RasterizerState,
+			.Primitive = Desc.Primitive,
+			.Targets = Desc.Targets,
+		};
 	}
 
-	GpuPsoCacheKey GpuPsoCacheManager::ComputeComputePsoKey(const GpuComputePipelineStateDesc& Desc)
+	GpuComputePsoCacheKey GpuPsoCacheManager::ComputeComputePsoKey(const GpuComputePipelineStateDesc& Desc)
 	{
 		uint32 Hash = 0;
 		
@@ -104,7 +115,14 @@ namespace FW
 		if (Desc.BindGroupLayout2) { Hash = HashCombine(Hash, GetTypeHash(Desc.BindGroupLayout2->GetDesc())); }
 		if (Desc.BindGroupLayout3) { Hash = HashCombine(Hash, GetTypeHash(Desc.BindGroupLayout3->GetDesc())); }
 
-		return GpuPsoCacheKey{ Hash };
+		return GpuComputePsoCacheKey{
+			.Hash = Hash,
+			.Cs = Desc.Cs,
+			.BindGroupLayout0 = Desc.BindGroupLayout0 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout0->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
+			.BindGroupLayout1 = Desc.BindGroupLayout1 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout1->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
+			.BindGroupLayout2 = Desc.BindGroupLayout2 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout2->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
+			.BindGroupLayout3 = Desc.BindGroupLayout3 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout3->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
+		};
 	}
 
 	void GpuPsoCacheManager::ClearCache()
@@ -128,7 +146,7 @@ namespace FW
 
 	TRefCountPtr<GpuRenderPipelineState> GpuPsoCacheManager::CreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc)
 	{
-		GpuPsoCacheKey CacheKey = ComputeRenderPsoKey(InPipelineStateDesc);
+		GpuRenderPsoCacheKey CacheKey = ComputeRenderPsoKey(InPipelineStateDesc);
 		TRefCountPtr<GpuRenderPipelineState> CachedPso = FindRenderPso(CacheKey);
 		if (CachedPso)
 		{
@@ -142,7 +160,7 @@ namespace FW
 
 	TRefCountPtr<GpuComputePipelineState> GpuPsoCacheManager::CreateComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc)
 	{
-		GpuPsoCacheKey CacheKey = ComputeComputePsoKey(InPipelineStateDesc);
+		GpuComputePsoCacheKey CacheKey = ComputeComputePsoKey(InPipelineStateDesc);
 		TRefCountPtr<GpuComputePipelineState> CachedPso = FindComputePso(CacheKey);
 		if (CachedPso)
 		{

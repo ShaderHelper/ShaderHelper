@@ -140,7 +140,7 @@ namespace SH
 								CurState = StateSet::Id;
 								CurOffset += 1;
 							}
-							else if (CurChar == '#') {
+							else if (!bInComment && !bInMultilineComment && CurChar == '#') {
 								CurState = StateSet::Macro;
 								CurOffset += 1;
 							}
@@ -242,17 +242,17 @@ namespace SH
 							int32 TokenEnd = CurOffset;
 							FTextRange TokenRange{ TokenStart, TokenEnd };
 							FString TokenString = CodeString.Mid(TokenRange.BeginIndex, TokenRange.Len());
-							if (bInMacro)
-							{
-								LastState = StateSet::Macro;
-							}
-							else if(bInComment)
+							if(bInComment)
 							{
 								LastState = StateSet::Comment;
 							}
 							else if(bInMultilineComment)
 							{
 								LastState = StateSet::MultilineComment;
+							}
+							else if (bInMacro)
+							{
+								LastState = StateSet::Macro;
 							}
 							else if (bInString)
 							{
@@ -333,17 +333,17 @@ namespace SH
 						bInMultilineComment = false;
 					}
 				}
-				if (bInMacro)
-				{
-					LastState = StateSet::Macro;
-				}
-				else if (bInComment)
+				if (bInComment)
 				{
 					LastState = StateSet::Comment;
 				}
 				else if (bInMultilineComment)
 				{
 					LastState = StateSet::MultilineComment;
+				}
+				else if (bInMacro)
+				{
+					LastState = StateSet::Macro;
 				}
 				else if (bInString)
 				{
