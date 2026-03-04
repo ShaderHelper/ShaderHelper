@@ -461,6 +461,15 @@ namespace SH
 			ComputeLinePreviewData();
 			InvokePixelPreview();
 
+			if (ShEditor->IsShowingLinePreview())
+			{
+				const DebuggerLocation& PreviewLoc = ShEditor->GetLinePreviewLocation();
+				if (DirtyLinePreviewLocs.Contains(PreviewLoc))
+				{
+					ShEditor->ShowLinePreview(PreviewLoc);
+				}
+			}
+
 			//Refresh LineTipList to show preview thumbnails
 			for (auto ShaderEditor : ShEditor->GetShaderEditors())
 			{
@@ -1729,10 +1738,27 @@ namespace SH
 		//Only scan newly traversed states since last call
 		int32 StartIdx = PrevPreviewStateIndex;
 
-		TSet<DebuggerLocation> ConditionLines;
+		DirtyLinePreviewLocs.Empty();
 
+		SpvFunctionDesc* CurFuncDesc = GetFunctionDesc(Scope);
+		SpvLexicalScope* ScanScope = PrevPreviewScope;
+
+		auto IsInCurrentFunc = [&]() { return ScanScope && GetFunctionDesc(ScanScope) == CurFuncDesc; };
+
+		TSet<DebuggerLocation> ConditionLines;
 		for (int32 i = StartIdx; i < CurDebugStateIndex && i < DebugStates.Num(); i++)
 		{
+			if (std::holds_alternative<SpvDebugState_ScopeChange>(DebugStates[i]))
+			{
+				ScanScope = std::get<SpvDebugState_ScopeChange>(DebugStates[i]).Change.NewScope;
+				continue;
+			}
+
+			if (!IsInCurrentFunc())
+			{
+				continue;
+			}
+
 			if (std::holds_alternative<SpvDebugState_Tag>(DebugStates[i]))
 			{
 				const auto& Tag = std::get<SpvDebugState_Tag>(DebugStates[i]);
@@ -1752,17 +1778,18 @@ namespace SH
 			{
 				continue;
 			}
+
 			const auto& VarChange = std::get<SpvDebugState_VarChange>(DebugStates[i]);
 			if (VarChange.Error.IsEmpty())
 			{
-				//Skip non-user-declared variables (e.g. GPrivate_*)
+				//Skip non-user-declared variables
 				FString VarName;
 				auto It = DebuggerContext->VariableDescMap.find(VarChange.Change.VarId);
 				if (It == DebuggerContext->VariableDescMap.end())
 				{
 					continue;
 				}
-				
+
 				VarName = It->second->Name;
 				if (VarName.StartsWith("GPrivate_"))
 				{
@@ -1786,29 +1813,33 @@ namespace SH
 					{
 						//Multiple different vars on this line, mark as invalid
 						Existing.VarId = {};
+						DirtyLinePreviewLocs.Add(Loc);
 					}
 					else
 					{
 						uint32 PH = FW::PackDebugHeader(FW::SpvDebuggerStateType::VarChange, VarChange.Source.GetValue(), (uint32)VarChange.Line);
 						int32 Iteration = (Existing.VarId == VarChange.Change.VarId) ? Existing.IterationIndex + 1 : 0;
 						Existing = { VarChange.Change.VarId, Iteration, PH, MoveTemp(VarName) };
+						DirtyLinePreviewLocs.Add(Loc);
 					}
 				}
 			}
 		}
 
-		PrevPreviewStateIndex = CurDebugStateIndex;
-
-		//Remove lines that are also condition (if/else) lines
+		//Remove lines that are also condition lines
 		for (const DebuggerLocation& CondLoc : ConditionLines)
 		{
 			LinePreviewData.Remove(CondLoc);
+			DirtyLinePreviewLocs.Remove(CondLoc);
 		}
+
+		PrevPreviewStateIndex = CurDebugStateIndex;
+		PrevPreviewScope = Scope;
 	}
 
 	void ShaderDebugger::InvokePixelPreview()
 	{
-		if (LinePreviewData.IsEmpty())
+		if (DirtyLinePreviewLocs.IsEmpty())
 		{
 			return;
 		}
@@ -1963,12 +1994,14 @@ namespace SH
 		};
 		TMap<DebuggerLocation, PerLineRenderData> PerLineData;
 
-		for (const auto& [Loc, Info] : LinePreviewData)
+		for (const DebuggerLocation& Loc : DirtyLinePreviewLocs)
 		{
-			if (!Info.VarId.IsValid())
+			const LinePreviewInfo* InfoPtr = LinePreviewData.Find(Loc);
+			if (!InfoPtr || !InfoPtr->VarId.IsValid())
 			{
 				continue;
 			}
+			const LinePreviewInfo& Info = *InfoPtr;
 			TArray<uint8> ParamsDatas;
 			ParamsDatas.SetNumZeroed(3 * sizeof(uint32));
 			uint32 TargetIteration = (uint32)Info.IterationIndex;
@@ -2046,8 +2079,10 @@ namespace SH
 		bEditDuringDebugging = false;
 
 		LinePreviewData.Empty();
+		DirtyLinePreviewLocs.Empty();
 		LinePreviewTextures.Empty();
 		PrevPreviewStateIndex = 0;
+		PrevPreviewScope = nullptr;
 
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		SDebuggerVariableView* DebuggerLocalVariableView = ShEditor->GetDebuggerLocalVariableView();

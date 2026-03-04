@@ -149,7 +149,9 @@ namespace SH
 
 		//Per-line preview: maps DebuggerLocation -> info/texture
 		TMap<DebuggerLocation, LinePreviewInfo> LinePreviewData;
+		TSet<DebuggerLocation> DirtyLinePreviewLocs;
 		TMap<DebuggerLocation, TRefCountPtr<FW::GpuTexture>> LinePreviewTextures;
 		int32 PrevPreviewStateIndex = 0;
+		FW::SpvLexicalScope* PrevPreviewScope = nullptr;
 	};
 }

@@ -1559,6 +1559,17 @@ namespace FW
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetOperand1() const { return Operand1; }
 		SpvId GetOperand2() const { return Operand2; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Operand1.GetValue());
+			Bin.Add(Operand2.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::FDiv;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
@@ -2755,15 +2766,28 @@ DEFINE_COMPARISON(FOrdGreaterThanEqual)
 	class SpvFloor : public SpvInstructionBase<SpvFloor>
 	{
 	public:
-		SpvFloor(SpvId InResultType, SpvId InX) : SpvInstructionBase(SpvGLSLstd450::Floor)
-		, ResultType(InResultType), X(InX)
+		SpvFloor(SpvId InResultType, SpvId InExtSet, SpvId InX) : SpvInstructionBase(SpvGLSLstd450::Floor)
+		, ResultType(InResultType), ExtSet(InExtSet), X(InX)
 		{}
 		
 		SpvId GetResultType() const { return ResultType; }
 		SpvId GetX() const { return X; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(ExtSet.GetValue());
+			Bin.Add((uint32)SpvGLSLstd450::Floor);
+			Bin.Add(X.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ExtInst;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvId ResultType;
+		SpvId ExtSet;
 		SpvId X;
 	};
 

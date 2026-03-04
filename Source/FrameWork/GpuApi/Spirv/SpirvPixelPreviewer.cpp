@@ -385,6 +385,109 @@ namespace FW
 		if (OutputVarId.IsValid())
 		{
 			int32 EntryIndex = GetInstIndex(Insts, Context.EntryPoint);
+
+			//Insert grid-pattern default for _PreviewOutput_ at the start of the entry point
+			//Computes a checkerboard: if (floor(fragCoord.x/8) + floor(fragCoord.y/8)) is odd -> 0.15 else 0.1
+			if (Context.BuiltIns.Contains(SpvBuiltIn::FragCoord))
+			{
+				for (int32 i = EntryIndex; i < Insts->Num(); i++)
+				{
+					if (auto* Label = dynamic_cast<const SpvOpLabel*>((*Insts)[i].Get()))
+					{
+						TArray<TUniquePtr<SpvInstruction>> GridInsts;
+						SpvId ConstGridSize = Patcher.FindOrAddConstant(8.0f);
+						SpvId ConstDark = Patcher.FindOrAddConstant(0.1f);
+						SpvId ConstLight = Patcher.FindOrAddConstant(0.15f);
+
+						//Load FragCoord
+						SpvId LoadedFragCoord = Patcher.NewId();
+						auto LoadFragCoordOp = MakeUnique<SpvOpLoad>(Float4Type, Context.BuiltIns[SpvBuiltIn::FragCoord]);
+						LoadFragCoordOp->SetId(LoadedFragCoord);
+						GridInsts.Add(MoveTemp(LoadFragCoordOp));
+
+						//Extract x and y
+						SpvId FragX = Patcher.NewId();
+						auto ExtractXOp = MakeUnique<SpvOpCompositeExtract>(FloatType, LoadedFragCoord, TArray<uint32>{0});
+						ExtractXOp->SetId(FragX);
+						GridInsts.Add(MoveTemp(ExtractXOp));
+
+						SpvId FragY = Patcher.NewId();
+						auto ExtractYOp = MakeUnique<SpvOpCompositeExtract>(FloatType, LoadedFragCoord, TArray<uint32>{1});
+						ExtractYOp->SetId(FragY);
+						GridInsts.Add(MoveTemp(ExtractYOp));
+
+						//Divide by grid size
+						SpvId ScaledX = Patcher.NewId();
+						auto DivXOp = MakeUnique<SpvOpFDiv>(FloatType, FragX, ConstGridSize);
+						DivXOp->SetId(ScaledX);
+						GridInsts.Add(MoveTemp(DivXOp));
+
+						SpvId ScaledY = Patcher.NewId();
+						auto DivYOp = MakeUnique<SpvOpFDiv>(FloatType, FragY, ConstGridSize);
+						DivYOp->SetId(ScaledY);
+						GridInsts.Add(MoveTemp(DivYOp));
+
+						//Floor
+						SpvId ExtSet450 = *Context.ExtSets.FindKey(SpvExtSet::GLSLstd450);
+						SpvId FloorX = Patcher.NewId();
+						auto FloorXOp = MakeUnique<SpvFloor>(FloatType, ExtSet450, ScaledX);
+						FloorXOp->SetId(FloorX);
+						GridInsts.Add(MoveTemp(FloorXOp));
+
+						SpvId FloorY = Patcher.NewId();
+						auto FloorYOp = MakeUnique<SpvFloor>(FloatType, ExtSet450, ScaledY);
+						FloorYOp->SetId(FloorY);
+						GridInsts.Add(MoveTemp(FloorYOp));
+
+						//Convert to uint
+						SpvId UintX = Patcher.NewId();
+						auto ConvXOp = MakeUnique<SpvOpConvertFToU>(UIntType, FloorX);
+						ConvXOp->SetId(UintX);
+						GridInsts.Add(MoveTemp(ConvXOp));
+
+						SpvId UintY = Patcher.NewId();
+						auto ConvYOp = MakeUnique<SpvOpConvertFToU>(UIntType, FloorY);
+						ConvYOp->SetId(UintY);
+						GridInsts.Add(MoveTemp(ConvYOp));
+
+						//Add and check parity: (ux + uy) & 1
+						SpvId Sum = Patcher.NewId();
+						auto AddOp = MakeUnique<SpvOpIAdd>(UIntType, UintX, UintY);
+						AddOp->SetId(Sum);
+						GridInsts.Add(MoveTemp(AddOp));
+
+						SpvId Parity = Patcher.NewId();
+						auto AndOp = MakeUnique<SpvOpBitwiseAnd>(UIntType, Sum, Patcher.FindOrAddConstant(1u));
+						AndOp->SetId(Parity);
+						GridInsts.Add(MoveTemp(AndOp));
+
+						//Compare parity != 0
+						SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
+						SpvId IsOdd = Patcher.NewId();
+						auto CmpOp = MakeUnique<SpvOpINotEqual>(BoolType, Parity, Patcher.FindOrAddConstant(0u));
+						CmpOp->SetId(IsOdd);
+						GridInsts.Add(MoveTemp(CmpOp));
+
+						//Select dark or light
+						SpvId GridVal = Patcher.NewId();
+						auto SelectOp = MakeUnique<SpvOpSelect>(FloatType, IsOdd, ConstLight, ConstDark);
+						SelectOp->SetId(GridVal);
+						GridInsts.Add(MoveTemp(SelectOp));
+
+						//Construct float4 and store to _PreviewOutput_
+						SpvId GridColor = Patcher.NewId();
+						auto ConstructOp = MakeUnique<SpvOpCompositeConstruct>(Float4Type, TArray<SpvId>{ GridVal, GridVal, GridVal, Patcher.FindOrAddConstant(1.0f) });
+						ConstructOp->SetId(GridColor);
+						GridInsts.Add(MoveTemp(ConstructOp));
+
+						GridInsts.Add(MakeUnique<SpvOpStore>(PreviewOutputVar, GridColor));
+
+						Patcher.AddInstructions(Label->GetWordOffset().value() + Label->ToBinary().Num(), MoveTemp(GridInsts));
+						break;
+					}
+				}
+			}
+
 			for (int32 i = EntryIndex; i < Insts->Num(); i++)
 			{
 				if (dynamic_cast<const SpvOpFunctionEnd*>((*Insts)[i].Get()))

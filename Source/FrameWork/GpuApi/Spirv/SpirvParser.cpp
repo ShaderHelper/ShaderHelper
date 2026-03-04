@@ -1699,7 +1699,7 @@ namespace FW
 					else if(ExtOp == SpvGLSLstd450::Floor)
 					{
 						SpvId X = SpvCode[WordOffset + 5];
-						DecodedInst = MakeUnique<SpvFloor>(ResultType, X);
+						DecodedInst = MakeUnique<SpvFloor>(ResultType, ExtSetId, X);
 						DecodedInst->SetId(ResultId);
 					}
 					else if(ExtOp == SpvGLSLstd450::Ceil)
