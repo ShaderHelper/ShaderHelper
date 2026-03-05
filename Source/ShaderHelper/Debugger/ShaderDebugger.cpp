@@ -1808,9 +1808,8 @@ namespace SH
 					{
 						//Multiple different vars on this line, mark as invalid
 						Existing.VarId = {};
-						Existing.bInvalidated = true;
 					}
-					else if (!Existing.bInvalidated)
+					else
 					{
 						uint32 PH = FW::PackDebugHeader(FW::SpvDebuggerStateType::VarChange, VarChange.Source.GetValue(), (uint32)VarChange.Line);
 						int32 Iteration = (Existing.VarId == VarChange.Change.VarId) ? Existing.IterationIndex + 1 : 0;
