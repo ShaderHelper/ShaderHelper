@@ -1754,11 +1754,6 @@ namespace SH
 				continue;
 			}
 
-			if (!IsInCurrentFunc())
-			{
-				continue;
-			}
-
 			if (std::holds_alternative<SpvDebugState_Tag>(DebugStates[i]))
 			{
 				const auto& Tag = std::get<SpvDebugState_Tag>(DebugStates[i]);
@@ -1813,14 +1808,17 @@ namespace SH
 					{
 						//Multiple different vars on this line, mark as invalid
 						Existing.VarId = {};
-						DirtyLinePreviewLocs.Add(Loc);
+						Existing.bInvalidated = true;
 					}
-					else
+					else if (!Existing.bInvalidated)
 					{
 						uint32 PH = FW::PackDebugHeader(FW::SpvDebuggerStateType::VarChange, VarChange.Source.GetValue(), (uint32)VarChange.Line);
 						int32 Iteration = (Existing.VarId == VarChange.Change.VarId) ? Existing.IterationIndex + 1 : 0;
 						Existing = { VarChange.Change.VarId, Iteration, PH, MoveTemp(VarName) };
-						DirtyLinePreviewLocs.Add(Loc);
+						if (IsInCurrentFunc())
+						{
+							DirtyLinePreviewLocs.Add(Loc);
+						}
 					}
 				}
 			}
