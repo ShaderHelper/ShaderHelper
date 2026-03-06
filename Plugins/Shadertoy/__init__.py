@@ -263,6 +263,7 @@ def create_shadertoy_assets(shadertoy_id, shadertoy_info):
                 break
     
         id_to_node = {}
+        node_to_pass_name = {}
         # Create the shadertoy graph that contains all needed nodes and shaders
         for pass_name, pass_data in shadertoy_info['RenderPass'].items():
             if pass_data is not None and pass_data['type'] != 'common':
@@ -276,6 +277,7 @@ def create_shadertoy_assets(shadertoy_id, shadertoy_info):
                 # Compatible with old shaders on shadertoy: outputs may be empty
                 pass_id = pass_data['outputs'][0]['id'] if pass_data.get('outputs') else pass_name
                 id_to_node[pass_id] = shadertoy_pass_node
+                node_to_pass_name[id(shadertoy_pass_node)] = pass_name
                 for input_data in pass_data['inputs']:
                     input_id = input_data['id']
                     if input_id not in id_to_node:
@@ -316,6 +318,9 @@ def create_shadertoy_assets(shadertoy_id, shadertoy_info):
                 present_node = node
                 break
 
+        # Shadertoy fixed execution order: Buffer A -> B -> C -> D -> Image
+        execution_order = {'Buffer A': 0, 'Buffer B': 1, 'Buffer C': 2, 'Buffer D': 3, 'Image': 4}
+
         for pass_name, pass_data in shadertoy_info['RenderPass'].items():
             if pass_data is not None and pass_data['type'] != 'common':
                 # Compatible with old shaders on shadertoy: outputs may be empty
@@ -329,9 +334,16 @@ def create_shadertoy_assets(shadertoy_id, shadertoy_info):
                     if input_id in id_to_node:
                         input_node = id_to_node[input_id]
                         channel_index = input_data['channel']
-                        # self-dependency
-                        if input_node == pass_node:
-                            preframe_node = Sh.ShaderToyPreviousFrameNode(shadertoy_graph, pass_node)
+                        # Self-dependency or forward reference (input pass executes after current pass)
+                        # requires PreviousFrameNode to match Shadertoy semantics and avoid graph cycles
+                        needs_previous_frame = (input_node == pass_node)
+                        if isinstance(input_node, Sh.ShaderToyPassNode) and input_node != pass_node:
+                            cur_order = execution_order.get(node_to_pass_name.get(id(pass_node)), -1)
+                            inp_order = execution_order.get(node_to_pass_name.get(id(input_node)), -1)
+                            if cur_order <= inp_order:
+                                needs_previous_frame = True
+                        if needs_previous_frame:
+                            preframe_node = Sh.ShaderToyPreviousFrameNode(shadertoy_graph, input_node)
                             shadertoy_graph.AddNode(preframe_node)
                             shadertoy_graph.AddLink(preframe_node.GetPin('RT'), pass_node.GetPin(f"iChannel{channel_index}"))
                         else:
