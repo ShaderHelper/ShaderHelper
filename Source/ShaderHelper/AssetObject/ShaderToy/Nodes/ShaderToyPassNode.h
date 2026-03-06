@@ -105,6 +105,9 @@ namespace SH
         TRefCountPtr<FW::GpuBindGroup> CustomBindGroup;
 		std::optional<FW::GpuBindGroupBuilder> CustomBindGroupBuilder;
 
+		//Flipped channel textures for correct sampling when FlipY is enabled
+		TRefCountPtr<FW::GpuTexture> FlippedChannelTextures[4];
+
 		//Debugger
 		FW::GpuRenderPipelineStateDesc PipelineDesc;
 		bool AssertError{};

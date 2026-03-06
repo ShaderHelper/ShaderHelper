@@ -10,6 +10,8 @@
 #include "UI/Widgets/Property/PropertyData/PropertyAssetItem.h"
 #include "ShaderConductor.hpp"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
+#include "RenderResource/RenderPass/BlitPass.h"
+#include "Renderer/RenderGraph.h"
 
 #include <regex>
 #include <vector>
@@ -82,14 +84,14 @@ namespace SH
 	}
 
 	ShaderToyPassNode::ShaderToyPassNode()
-	: Format(ShaderToyFormat::B8G8R8A8_UNORM)
+	: Format(ShaderToyFormat::R32G32B32A32_FLOAT)
 	{
 		ObjectName = FText::FromString("ShaderPass");
 	}
 
 	ShaderToyPassNode::ShaderToyPassNode(FW::AssetPtr<StShader> InShaderAssetObj)
 	: ShaderAssetObj(MoveTemp(InShaderAssetObj))
-	, Format(ShaderToyFormat::B8G8R8A8_UNORM)
+	, Format(ShaderToyFormat::R32G32B32A32_FLOAT)
 	{
 		ObjectName = ShaderAssetObj->ObjectName;
 	}
@@ -121,39 +123,27 @@ namespace SH
 			.SetExistingBinding(0, TSingleton<PrintBuffer>::Get().GetResource())
 			.SetUniformBuffer("BuiltInUniform", BuiltinUniformBuffer->GetGpuResource());
 
-		GpuTexturePin* iChannel0 = static_cast<GpuTexturePin*>(GetPin("iChannel0"));
-		GpuTexturePin* iChannel1 = static_cast<GpuTexturePin*>(GetPin("iChannel1"));
-		GpuTexturePin* iChannel2 = static_cast<GpuTexturePin*>(GetPin("iChannel2"));
-		GpuTexturePin* iChannel3 = static_cast<GpuTexturePin*>(GetPin("iChannel3"));
+		GpuTexturePin* iChannels[4] = {
+			static_cast<GpuTexturePin*>(GetPin("iChannel0")),
+			static_cast<GpuTexturePin*>(GetPin("iChannel1")),
+			static_cast<GpuTexturePin*>(GetPin("iChannel2")),
+			static_cast<GpuTexturePin*>(GetPin("iChannel3"))
+		};
+		const ShaderToyChannelDesc* ChannelDescs[4] = { &iChannelDesc0, &iChannelDesc1, &iChannelDesc2, &iChannelDesc3 };
 
-		Builder.SetTexture("iChannel0_texture", iChannel0->GetValue());
-		Builder.SetSampler("iChannel0_sampler", GpuResourceHelper::GetSampler({
-			.Filter = (SamplerFilter)iChannelDesc0.Filter,
-			.AddressU = (SamplerAddressMode)iChannelDesc0.Wrap,
-			.AddressV = (SamplerAddressMode)iChannelDesc0.Wrap,
-			.AddressW = (SamplerAddressMode)iChannelDesc0.Wrap
-		}));
-		Builder.SetTexture("iChannel1_texture", iChannel1->GetValue());
-		Builder.SetSampler("iChannel1_sampler", GpuResourceHelper::GetSampler({
-			.Filter = (SamplerFilter)iChannelDesc1.Filter,
-			.AddressU = (SamplerAddressMode)iChannelDesc1.Wrap,
-			.AddressV = (SamplerAddressMode)iChannelDesc1.Wrap,
-			.AddressW = (SamplerAddressMode)iChannelDesc1.Wrap
-		}));
-		Builder.SetTexture("iChannel2_texture", iChannel2->GetValue());
-		Builder.SetSampler("iChannel2_sampler", GpuResourceHelper::GetSampler({
-			.Filter = (SamplerFilter)iChannelDesc2.Filter,
-			.AddressU = (SamplerAddressMode)iChannelDesc2.Wrap,
-			.AddressV = (SamplerAddressMode)iChannelDesc2.Wrap,
-			.AddressW = (SamplerAddressMode)iChannelDesc2.Wrap
-		}));
-		Builder.SetTexture("iChannel3_texture", iChannel3->GetValue());
-		Builder.SetSampler("iChannel3_sampler", GpuResourceHelper::GetSampler({
-			.Filter = (SamplerFilter)iChannelDesc3.Filter,
-			.AddressU = (SamplerAddressMode)iChannelDesc3.Wrap,
-			.AddressV = (SamplerAddressMode)iChannelDesc3.Wrap,
-			.AddressW = (SamplerAddressMode)iChannelDesc3.Wrap
-		}));
+		for (int i = 0; i < 4; i++)
+		{
+			FString TexName = FString::Printf(TEXT("iChannel%d_texture"), i);
+			FString SamplerName = FString::Printf(TEXT("iChannel%d_sampler"), i);
+			GpuTexture* TexToUse = FlippedChannelTextures[i].IsValid() ? FlippedChannelTextures[i].GetReference() : iChannels[i]->GetValue();
+			Builder.SetTexture(TexName, TexToUse);
+			Builder.SetSampler(SamplerName, GpuResourceHelper::GetSampler({
+				.Filter = (SamplerFilter)ChannelDescs[i]->Filter,
+				.AddressU = (SamplerAddressMode)ChannelDescs[i]->Wrap,
+				.AddressV = (SamplerAddressMode)ChannelDescs[i]->Wrap,
+				.AddressW = (SamplerAddressMode)ChannelDescs[i]->Wrap
+			}));
+		}
 		return Builder;
 	}
 
@@ -875,6 +865,55 @@ namespace SH
                 TRefCountPtr<GpuTexture> PassOuputTex = GGpuRhi->CreateTexture(MoveTemp(Desc), GpuResourceState::RenderTargetWrite);
                 Preview->SetViewPortRenderTexture(PassOuputTex);
                 PassOutput->SetValue(PassOuputTex);
+            }
+
+            // Flip iChannel textures vertically when FlipY is enabled so that
+            // texture(iChannelN, uv) samples with the same orientation as Shadertoy (bottom-left origin).
+            if (static_cast<ShaderToy*>(GetOuter())->FlipY)
+            {
+                GpuTexturePin* iChannels[4] = {
+                    static_cast<GpuTexturePin*>(GetPin("iChannel0")),
+                    static_cast<GpuTexturePin*>(GetPin("iChannel1")),
+                    static_cast<GpuTexturePin*>(GetPin("iChannel2")),
+                    static_cast<GpuTexturePin*>(GetPin("iChannel3"))
+                };
+                for (int i = 0; i < 4; i++)
+                {
+                    if (iChannels[i]->HasLink())
+                    {
+                        GpuTexture* SrcTex = iChannels[i]->GetValue();
+                        if (!FlippedChannelTextures[i].IsValid() ||
+                            FlippedChannelTextures[i]->GetWidth() != SrcTex->GetWidth() ||
+                            FlippedChannelTextures[i]->GetHeight() != SrcTex->GetHeight() ||
+                            FlippedChannelTextures[i]->GetFormat() != SrcTex->GetFormat())
+                        {
+                            FlippedChannelTextures[i] = GGpuRhi->CreateTexture({
+                                .Width = SrcTex->GetWidth(),
+                                .Height = SrcTex->GetHeight(),
+                                .Format = SrcTex->GetFormat(),
+                                .Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget
+                            }, GpuResourceState::RenderTargetWrite);
+                        }
+
+                        BlitPassInput FlipInput;
+                        FlipInput.InputTex = SrcTex;
+                        FlipInput.InputTexSampler = GpuResourceHelper::GetSampler({});
+                        FlipInput.OutputRenderTarget = FlippedChannelTextures[i];
+                        FlipInput.VariantDefinitions.insert(FString(TEXT("FLIP_Y")));
+                        AddBlitPass(*ShaderToyContext.RG, MoveTemp(FlipInput));
+                    }
+                    else
+                    {
+                        FlippedChannelTextures[i] = nullptr;
+                    }
+                }
+            }
+            else
+            {
+                for (int i = 0; i < 4; i++)
+                {
+                    FlippedChannelTextures[i] = nullptr;
+                }
             }
 
             GpuRenderPassDesc PassDesc;

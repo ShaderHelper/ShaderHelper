@@ -295,6 +295,9 @@ namespace FW
 			ClearColorValues = MoveTemp(InClearColorValues);
 			LoadActions = MoveTemp(InLoadActions);
 			IsRenderTargetDirty = true;
+
+			CurrentViewPort.Reset();
+			CurrentScissorRect.Reset();
 		}
 	}
 
