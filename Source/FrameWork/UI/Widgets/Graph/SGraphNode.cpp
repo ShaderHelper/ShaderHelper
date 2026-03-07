@@ -154,6 +154,18 @@ namespace FW
 					Owner->Links.AddUnique(OutputPin, Pin);
 				}
 			}
+			else if (Pin->PinData->Direction == PinDirection::Output)
+			{
+				TArray<FGuid> LinkedInputGuids;
+				NodeData->OutPinToInPin.MultiFind(Pin->PinData->GetGuid(), LinkedInputGuids);
+				for (const FGuid& InputGuid : LinkedInputGuids)
+				{
+					if (SGraphPin* InputPin = Owner->GetGraphPin(InputGuid))
+					{
+						Owner->Links.AddUnique(Pin, InputPin);
+					}
+				}
+			}
 		}
 	}
 
