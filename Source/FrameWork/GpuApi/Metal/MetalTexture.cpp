@@ -16,8 +16,8 @@ namespace FW
         GMtlDeferredReleaseManager.AddResource(this);
     }
 
-    MetalTexture::MetalTexture(MTLTexturePtr InTex, GpuTextureDesc InDesc, CVPixelBufferRef InSharedHandle)
-    : GpuTexture(MoveTemp(InDesc), GpuResourceState::Unknown)
+    MetalTexture::MetalTexture(MTLTexturePtr InTex, GpuTextureDesc InDesc, GpuResourceState InitState, CVPixelBufferRef InSharedHandle)
+    : GpuTexture(MoveTemp(InDesc), InitState)
     , Tex(MoveTemp(InTex))
     , SharedHandle(InSharedHandle)
     {
@@ -75,12 +75,12 @@ namespace FW
         return new MetalSampler(MoveTemp(Sampler), InSamplerDesc);
     }
 
-    TRefCountPtr<MetalTexture> CreateMetalTexture2D(const GpuTextureDesc& InTexDesc)
+    TRefCountPtr<MetalTexture> CreateMetalTexture2D(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
     {
         TRefCountPtr<MetalTexture> RetTexture;
         if(EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::Shared))
         {
-            RetTexture = CreateSharedMetalTexture(InTexDesc);
+            RetTexture = CreateSharedMetalTexture(InTexDesc, InitState);
         }
         else
         {
@@ -98,7 +98,7 @@ namespace FW
             SetTextureUsage(InTexDesc.Usage, TexDesc);
             
             MTLTexturePtr Tex = NS::TransferPtr(GDevice->newTexture(TexDesc));
-            RetTexture = new MetalTexture(MoveTemp(Tex), InTexDesc);
+            RetTexture = new MetalTexture(MoveTemp(Tex), InTexDesc, InitState);
         }
         
         if (!InTexDesc.InitialData.IsEmpty()) {
@@ -131,7 +131,7 @@ namespace FW
         }
     }
 
-    TRefCountPtr<MetalTexture> CreateSharedMetalTexture(const GpuTextureDesc& InTexDesc)
+    TRefCountPtr<MetalTexture> CreateSharedMetalTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
     {
         MTLPixelFormat TexFormat = MapTextureFormat(InTexDesc.Format);
         CVPixelBufferRef CVPixelBuffer;
@@ -170,6 +170,6 @@ namespace FW
         
         CFRelease(CVMTLTextureCache);
         CVBufferRelease(CVMTLTexture);
-        return new MetalTexture(NS::TransferPtr((MTL::Texture*)Texture), InTexDesc, CVPixelBuffer);
+        return new MetalTexture(NS::TransferPtr((MTL::Texture*)Texture), InTexDesc, InitState, CVPixelBuffer);
     }
 }

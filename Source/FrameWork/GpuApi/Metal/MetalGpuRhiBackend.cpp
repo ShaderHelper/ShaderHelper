@@ -46,7 +46,7 @@ void MetalGpuRhiBackend::EndFrame()
 
 TRefCountPtr<GpuTexture> MetalGpuRhiBackend::CreateTextureInternal(const GpuTextureDesc &InTexDesc, GpuResourceState InitState)
 {
-	return AUX::StaticCastRefCountPtr<GpuTexture>(CreateMetalTexture2D(InTexDesc));
+	return AUX::StaticCastRefCountPtr<GpuTexture>(CreateMetalTexture2D(InTexDesc, InitState));
 }
 
 TRefCountPtr<GpuShader> MetalGpuRhiBackend::CreateShaderFromSourceInternal(const GpuShaderSourceDesc& Desc) const
