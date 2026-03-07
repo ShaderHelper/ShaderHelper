@@ -74,13 +74,14 @@ namespace SH
 		std::string GetShaderToyCode() const;
 		
     private:
-		FW::GpuBindGroupBuilder GetBuiltInBindGroupBuiler();
-		TRefCountPtr<FW::GpuBindGroup> GetBuiltInBindGroup();
+		FW::GpuBindGroupBuilder GetBuiltInBindGroupBuiler(FW::GpuBindGroupLayout* Layout);
+		TRefCountPtr<FW::GpuBindGroup> GetBuiltInBindGroup(FW::GpuBindGroupLayout* Layout);
 
 		void InitShaderAsset();
 		void InitCustomBindGroup();
         void ClearBindingProperty();
         void RefreshProperty(bool bCopyUniformBuffer = true);
+		void UpdateChannelPinTypes();
 		void UpdateBuiltinUniformBuffer(struct ShaderToyExecContext& Context);
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromBinding();
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromUniform(FW::UniformBuffer* InUb, bool Enabled);

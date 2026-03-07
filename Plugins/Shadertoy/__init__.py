@@ -98,8 +98,22 @@ def init_shadertoy_pass(page, shadertoy_context, shadertoy_pass):
                 if is_shadertoy_texture:
                     page.locator(texture_selector).click()
                     page.locator("//a[@onclick=\"openTab('Textures')\"]").click()
-                    page.locator(pagebutton).click()
+                    page.locator(f"#textureNav {pagebutton}").click()
                     span = page.locator('span.spanName', has_text=texture.FileName).first
+                    td = span.locator('xpath=ancestor::td[1]')
+                    img = td.locator('xpath=preceding-sibling::td[1]//img').first
+                    img_id = img.get_attribute("id")
+                    page.locator(f"#{img_id}").click()
+                    page.locator("#pickTextureHeader div").nth(1).click()
+                    resource_set_successfully = True
+        elif isinstance(item_value, Sh.TextureCubeNode):
+            cubemap = item_value.Texture
+            if cubemap is not None:
+                cubemap_names = ['Forest', 'Forest Blurred', "St. Peter's Basilica", "St. Peter's Basilica Blurred", 'Uffizi Gallery', 'Uffizi Gallery Blurred']
+                if cubemap.FileName in cubemap_names:
+                    page.locator(texture_selector).click()
+                    page.locator("//a[@onclick=\"openTab('Cubemaps')\"]").click()
+                    span = page.locator('span.spanName', has_text=cubemap.FileName).first
                     td = span.locator('xpath=ancestor::td[1]')
                     img = td.locator('xpath=preceding-sibling::td[1]//img').first
                     img_id = img.get_attribute("id")
@@ -248,7 +262,14 @@ def create_shadertoy_assets(shadertoy_id, shadertoy_info):
             "4dXGRn": "Rock Tiles",
             "4sXGRn": "Rusty Metal",
             "XdfGRn": "Stars",
-            "XsfGRn": "Wood"
+            "XsfGRn": "Wood",
+
+            "XsX3zn" : "Forest",
+            "4sX3zn" : "Forest Blurred",
+            "XdX3zn" : "St. Peter's Basilica",
+            "4dX3zn" : "St. Peter's Basilica Blurred",
+            "XsfGzn": "Uffizi Gallery",
+            "4sfGzn": "Uffizi Gallery Blurred",
         }
 
         include_common_code = ""
@@ -270,9 +291,16 @@ def create_shadertoy_assets(shadertoy_id, shadertoy_info):
                 shadertoy_shader = Sh.Asset.CreateAsset(pass_name, Sh.StShader)
                 shadertoy_shader.EditorContent = include_common_code + pass_data['code']
                 shadertoy_shader.Language = Sh.GpuShaderLanguage.GLSL
+                
+                # Set CubeChannelMask before saving so the shader compiles with correct bindings
+                cube_channel_mask = 0
+                for input_data in pass_data['inputs']:
+                    if input_data['type'] == 'cubemap':
+                        cube_channel_mask |= (1 << input_data['channel'])
+                shadertoy_shader.CubeChannelMask = cube_channel_mask
                 saved_file_path = os.path.join(target_dir, f"{pass_name}.{shadertoy_shader.FileExtension}")
                 Sh.Asset.SaveToFile(shadertoy_shader, saved_file_path)
-                
+
                 shadertoy_pass_node = Sh.ShaderToyPassNode(shadertoy_graph, shadertoy_shader)
                 # Compatible with old shaders on shadertoy: outputs may be empty
                 pass_id = pass_data['outputs'][0]['id'] if pass_data.get('outputs') else pass_name
@@ -283,12 +311,19 @@ def create_shadertoy_assets(shadertoy_id, shadertoy_info):
                     if input_id not in id_to_node:
                         if input_id in id_to_builtin_resource:
                             if input_data['type'] == 'texture':
-                                tex_path = os.path.join(Sh.PathHelper.BuiltinDir, "ShaderToy", f"{id_to_builtin_resource[input_id]}.texture")
+                                tex_path = os.path.join(Sh.PathHelper.BuiltinDir, "ShaderToy", "Texture", f"{id_to_builtin_resource[input_id]}.texture")
                                 shadertoy_tex = Sh.Asset.LoadAsset(tex_path)
                                 if shadertoy_tex is not None:
                                     texture_node = Sh.Texture2dNode(shadertoy_graph, shadertoy_tex)
                                     id_to_node[input_id] = texture_node
                                     shadertoy_graph.AddNode(texture_node)
+                            elif input_data['type'] == 'cubemap':
+                                cube_path = os.path.join(Sh.PathHelper.BuiltinDir, "ShaderToy", "Cubemap", f"{id_to_builtin_resource[input_id]}.cubemap")
+                                shadertoy_cube = Sh.Asset.LoadAsset(cube_path)
+                                if shadertoy_cube is not None:
+                                    cubemap_node = Sh.TextureCubeNode(shadertoy_graph, shadertoy_cube)
+                                    id_to_node[input_id] = cubemap_node
+                                    shadertoy_graph.AddNode(cubemap_node)
                         elif input_data['type'] == 'keyboard':
                             keyboard_node = Sh.ShaderToyKeyboardNode(shadertoy_graph)
                             id_to_node[input_id] = keyboard_node

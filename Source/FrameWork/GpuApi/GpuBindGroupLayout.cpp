@@ -42,6 +42,16 @@ namespace FW
 		return *this;
 	}
 
+	GpuBindGroupLayoutBuilder& GpuBindGroupLayoutBuilder::AddTextureCube(const FString& BindingName, BindingShaderStage InStage)
+	{
+		while (LayoutDesc.Layouts.Contains(AutoSlot)) { AutoSlot++; };
+		LayoutDesc.HlslCodegenDeclaration += FString::Printf(TEXT("TextureCube %s : register(t%d, space%d);\n"), *BindingName, AutoSlot, LayoutDesc.GroupNumber);
+		LayoutDesc.GlslCodegenDeclaration += FString::Printf(TEXT("layout(binding = %d, set = %d) uniform textureCube %s;\n"), AutoSlot, LayoutDesc.GroupNumber, *BindingName);
+		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, AutoSlot);
+		LayoutDesc.Layouts.Add(AutoSlot++, {BindingType::TextureCube, InStage });
+		return *this;
+	}
+
 	GpuBindGroupLayoutBuilder& GpuBindGroupLayoutBuilder::AddSampler(const FString& BindingName, BindingShaderStage InStage)
 	{
 		while (LayoutDesc.Layouts.Contains(AutoSlot)) { AutoSlot++; };

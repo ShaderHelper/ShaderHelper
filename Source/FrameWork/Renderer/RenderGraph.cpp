@@ -24,7 +24,7 @@ namespace FW
 		}
 
 		InOutPass.Bindings.EnumerateBinding([&](const ResourceBinding& ResourceBindingEntry, const LayoutBinding& LayoutBindingEntry) {
-			if (LayoutBindingEntry.Type == BindingType::Texture)
+			if (LayoutBindingEntry.Type == BindingType::Texture || LayoutBindingEntry.Type == BindingType::TextureCube)
 			{
 				GpuTexture* Tex = static_cast<GpuTexture*>(ResourceBindingEntry.Resource.GetReference());
 				InOutPass.PassTexStates.Add(Tex, GpuResourceState::ShaderResourceRead);

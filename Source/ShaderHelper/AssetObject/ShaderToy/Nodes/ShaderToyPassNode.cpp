@@ -12,6 +12,7 @@
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 #include "RenderResource/RenderPass/BlitPass.h"
 #include "Renderer/RenderGraph.h"
+#include "UI/Widgets/Graph/SGraphPanel.h"
 
 #include <regex>
 #include <vector>
@@ -109,6 +110,7 @@ namespace SH
 	{
 		InitPins();
 		InitShaderAsset();
+		UpdateChannelPinTypes();
 		BuiltinUniformBuffer = StShader::GetBuiltInUbBuilder().Build();
 		if (ShaderAssetObj)
 		{
@@ -117,25 +119,35 @@ namespace SH
 		InitCustomBindGroup();
 	}
 
-	GpuBindGroupBuilder ShaderToyPassNode::GetBuiltInBindGroupBuiler()
+	GpuBindGroupBuilder ShaderToyPassNode::GetBuiltInBindGroupBuiler(GpuBindGroupLayout* Layout)
 	{
-		auto Builder = GpuBindGroupBuilder{ StShader::GetBuiltInBindLayout() }
+		auto Builder = GpuBindGroupBuilder{ Layout }
 			.SetExistingBinding(0, TSingleton<PrintBuffer>::Get().GetResource())
 			.SetUniformBuffer("BuiltInUniform", BuiltinUniformBuffer->GetGpuResource());
 
-		GpuTexturePin* iChannels[4] = {
-			static_cast<GpuTexturePin*>(GetPin("iChannel0")),
-			static_cast<GpuTexturePin*>(GetPin("iChannel1")),
-			static_cast<GpuTexturePin*>(GetPin("iChannel2")),
-			static_cast<GpuTexturePin*>(GetPin("iChannel3"))
-		};
 		const ShaderToyChannelDesc* ChannelDescs[4] = { &iChannelDesc0, &iChannelDesc1, &iChannelDesc2, &iChannelDesc3 };
+		uint8 CubeChannelMask = ShaderAssetObj->CubeChannelMask;
 
 		for (int i = 0; i < 4; i++)
 		{
+			FString ChannelName = FString::Printf(TEXT("iChannel%d"), i);
 			FString TexName = FString::Printf(TEXT("iChannel%d_texture"), i);
 			FString SamplerName = FString::Printf(TEXT("iChannel%d_sampler"), i);
-			GpuTexture* TexToUse = FlippedChannelTextures[i].IsValid() ? FlippedChannelTextures[i].GetReference() : iChannels[i]->GetValue();
+
+			GpuTexture* TexToUse;
+			if (FlippedChannelTextures[i].IsValid())
+			{
+				TexToUse = FlippedChannelTextures[i].GetReference();
+			}
+			else if (CubeChannelMask & (1 << i))
+			{
+				TexToUse = static_cast<GpuCubemapPin*>(GetPin(ChannelName))->GetValue();
+			}
+			else
+			{
+				TexToUse = static_cast<GpuTexturePin*>(GetPin(ChannelName))->GetValue();
+			}
+
 			Builder.SetTexture(TexName, TexToUse);
 			Builder.SetSampler(SamplerName, GpuResourceHelper::GetSampler({
 				.Filter = (SamplerFilter)ChannelDescs[i]->Filter,
@@ -147,25 +159,26 @@ namespace SH
 		return Builder;
 	}
 
-	TRefCountPtr<FW::GpuBindGroup> ShaderToyPassNode::GetBuiltInBindGroup()
+	TRefCountPtr<FW::GpuBindGroup> ShaderToyPassNode::GetBuiltInBindGroup(GpuBindGroupLayout* Layout)
 	{
-		return GetBuiltInBindGroupBuiler().Build();
+		return GetBuiltInBindGroupBuiler(Layout).Build();
 	}
 
 	InvocationState ShaderToyPassNode::GetInvocationState()
 	{
 		auto RT = static_cast<GpuTexturePin*>(GetPin("RT"))->GetValue();
+		auto BuiltInLayout = ShaderAssetObj->GetBuiltInBindLayout(ShaderAssetObj->CubeChannelMask);
 		
 		return PixelState{
 			.ViewPortDesc = {(float)RT->GetWidth(), (float)RT->GetHeight()},
 			.Builders = BindingState{
 				.GlobalBuilder = BindingBuilder{
-					.BingGroupBuilder = GetBuiltInBindGroupBuiler(),
-					.LayoutBuilder = StShader::GetBuiltInBindLayoutBuilder()
+					.BingGroupBuilder = GetBuiltInBindGroupBuiler(BuiltInLayout),
+					.LayoutBuilder = ShaderAssetObj->GetBuiltInBindLayoutBuilder(ShaderAssetObj->CubeChannelMask)
 				},
 				.PassBuilder = BindingBuilder{
 					.BingGroupBuilder = *CustomBindGroupBuilder,
-					.LayoutBuilder = ShaderAssetObj->CustomBindGroupLayoutBuilder,
+					.LayoutBuilder = ShaderAssetObj->CustomBindGroupLayoutBuilder
 				}
 			},
 			.PipelineDesc = PipelineDesc,
@@ -583,6 +596,7 @@ namespace SH
 			if(Ar.IsLoading())
 			{
 				InitShaderAsset();
+				UpdateChannelPinTypes();
 				CustomUniformBuffer = ShaderAssetObj->CustomUniformBufferBuilder.Build();
 			}
 			
@@ -678,19 +692,14 @@ namespace SH
     {
         auto BuiltInCategory = MakeShared<PropertyCategory>(this, LOCALIZATION("Builtin"));
         {
-            const GpuBindGroupLayoutDesc& BuiltInLayoutDesc = StShader::GetBuiltInBindLayoutBuilder().GetDesc();
-            for(const auto& [BindingName, Slot] : BuiltInLayoutDesc.CodegenBindingNameToSlot)
             {
-                if(BuiltInLayoutDesc.GetBindingType(Slot) == BindingType::UniformBuffer)
+                auto UniformCategory = MakeShared<PropertyCategory>(this, "BuiltInUniform");
+                auto PropertyDataUniforms = PropertyDatasFromUniform(BuiltinUniformBuffer.Get(), false);
+                for(auto Data : PropertyDataUniforms)
                 {
-                    auto UniformCategory = MakeShared<PropertyCategory>(this, BindingName);
-                    auto PropertyDataUniforms = PropertyDatasFromUniform(BuiltinUniformBuffer.Get(), false);
-                    for(auto Data : PropertyDataUniforms)
-                    {
-                        UniformCategory->AddChild(Data);
-                    }
-                    BuiltInCategory->AddChild(MoveTemp(UniformCategory));
+                    UniformCategory->AddChild(Data);
                 }
+                BuiltInCategory->AddChild(MoveTemp(UniformCategory));
             }
             auto SlotCategory = MakeShared<PropertyCategory>(this, "Slot");
             {
@@ -771,8 +780,69 @@ namespace SH
         ShEditor->RefreshProperty();
     }
 
+	void ShaderToyPassNode::UpdateChannelPinTypes()
+	{
+		if (!ShaderAssetObj) return;
+
+		uint8 CubeChannelMask = ShaderAssetObj->CubeChannelMask;
+		bool bChanged = false;
+
+		for (int i = 0; i < 4; i++)
+		{
+			GraphPin* OldPin = Pins[i + 1];
+			bool bWantCubemap = (CubeChannelMask & (1 << i)) != 0;
+			bool bIsCubemap = DynamicCast<GpuCubemapPin>(OldPin) != nullptr;
+
+			if (bWantCubemap == bIsCubemap) continue;
+
+			// Break existing link at data model level
+			if (OldPin->SourcePin.IsValid())
+			{
+				if (GraphPin* SrcPin = OldPin->GetSourcePin())
+				{
+					GraphNode* SrcNode = static_cast<GraphNode*>(SrcPin->GetOuter());
+					SrcNode->OutPinToInPin.Remove(SrcPin->GetGuid(), OldPin->GetGuid());
+					Graph* OwnerGraph = static_cast<Graph*>(GetOuter());
+					OwnerGraph->RemoveDep(SrcNode, this);
+				}
+				OldPin->SourcePin.Invalidate();
+				OldPin->Refuse();
+			}
+
+			// Create new pin of the correct type
+			ObjectPtr<GraphPin> NewPin;
+			if (bWantCubemap)
+			{
+				NewPin = NewShObject<GpuCubemapPin>(this);
+			}
+			else
+			{
+				NewPin = NewShObject<GpuTexturePin>(this);
+			}
+			NewPin->ObjectName = OldPin->ObjectName;
+			NewPin->Direction = OldPin->Direction;
+
+			Pins[i + 1] = NewPin;
+			bChanged = true;
+		}
+
+		if (bChanged)
+		{
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			if (auto* GraphPanel = ShEditor->GetGraphPanel())
+			{
+				if (auto* NodeWidget = GraphPanel->GetNode(this))
+				{
+					NodeWidget->RebuildPins();
+				}
+			}
+		}
+	}
+
     void ShaderToyPassNode::RefreshProperty(bool bCopyUniformBuffer)
     {
+        UpdateChannelPinTypes();
+
         CustomBindLayout = ShaderAssetObj->CustomBindGroupLayoutBuilder.Build();
         CustomBindGroupBuilder = GpuBindGroupBuilder{ CustomBindLayout };
         
@@ -811,13 +881,23 @@ namespace SH
 		}
 
 		auto iChannelResolution = BuiltinUniformBuffer->GetMember<Vector3f[4]>("iChannelResolution");
+		uint8 CubeChannelMask = ShaderAssetObj->CubeChannelMask;
 		for (int i = 0; i < 4; i++)
 		{
 			FString ChannelName = FString::Printf(TEXT("iChannel%d"), i);
-			GpuTexturePin* iChannel = static_cast<GpuTexturePin*>(GetPin(ChannelName));
+			GraphPin* iChannel = GetPin(ChannelName);
 			if (iChannel->HasLink())
 			{
-				iChannelResolution[i] = Vector3f{ (float)iChannel->GetValue()->GetWidth(), (float)iChannel->GetValue()->GetHeight(), 1 };
+				GpuTexture* Tex;
+				if (CubeChannelMask & (1 << i))
+				{
+					Tex = static_cast<GpuCubemapPin*>(iChannel)->GetValue();
+				}
+				else
+				{
+					Tex = static_cast<GpuTexturePin*>(iChannel)->GetValue();
+				}
+				iChannelResolution[i] = Vector3f{ (float)Tex->GetWidth(), (float)Tex->GetHeight(), 1 };
 			}
 			else
 			{
@@ -871,17 +951,21 @@ namespace SH
             // texture(iChannelN, uv) samples with the same orientation as Shadertoy (bottom-left origin).
             if (static_cast<ShaderToy*>(GetOuter())->FlipY)
             {
-                GpuTexturePin* iChannels[4] = {
-                    static_cast<GpuTexturePin*>(GetPin("iChannel0")),
-                    static_cast<GpuTexturePin*>(GetPin("iChannel1")),
-                    static_cast<GpuTexturePin*>(GetPin("iChannel2")),
-                    static_cast<GpuTexturePin*>(GetPin("iChannel3"))
-                };
+                uint8 CubeMask = ShaderAssetObj->CubeChannelMask;
                 for (int i = 0; i < 4; i++)
                 {
-                    if (iChannels[i]->HasLink())
+                    // Skip FlipY for cubemap channels — they are sampled by direction, not UV
+                    if (CubeMask & (1 << i))
                     {
-                        GpuTexture* SrcTex = iChannels[i]->GetValue();
+                        FlippedChannelTextures[i] = nullptr;
+                        continue;
+                    }
+
+                    FString ChannelName = FString::Printf(TEXT("iChannel%d"), i);
+                    auto* iChannel = static_cast<GpuTexturePin*>(GetPin(ChannelName));
+                    if (iChannel->HasLink())
+                    {
+                        GpuTexture* SrcTex = iChannel->GetValue();
                         if (!FlippedChannelTextures[i].IsValid() ||
                             FlippedChannelTextures[i]->GetWidth() != SrcTex->GetWidth() ||
                             FlippedChannelTextures[i]->GetHeight() != SrcTex->GetHeight() ||
@@ -919,11 +1003,13 @@ namespace SH
             GpuRenderPassDesc PassDesc;
             PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassOutput->GetValue(), RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
 
+			auto BuiltInLayout = ShaderAssetObj->GetBuiltInBindLayout(ShaderAssetObj->CubeChannelMask);
+
 			BindingContext Bindings;
-			Bindings.SetGlobalBindGroup(GetBuiltInBindGroup());
-			Bindings.SetGlobalBindGroupLayout(StShader::GetBuiltInBindLayout());
-			Bindings.SetPassBindGroup(CustomBindGroup);
+			Bindings.SetGlobalBindGroupLayout(BuiltInLayout);
 			Bindings.SetPassBindGroupLayout(CustomBindLayout);
+			Bindings.SetGlobalBindGroup(GetBuiltInBindGroup(BuiltInLayout));
+			Bindings.SetPassBindGroup(CustomBindGroup);
 
 			PipelineDesc = GpuRenderPipelineStateDesc{
 				.CheckLayout = true,
@@ -931,7 +1017,7 @@ namespace SH
                 .Ps = ShaderAssetObj->GetPixelShader(),
 				.Targets = {
                     { .TargetFormat = PassOutput->GetValue()->GetFormat() }
-                }
+                },
             };
 			Bindings.ApplyBindGroupLayout(PipelineDesc);
 

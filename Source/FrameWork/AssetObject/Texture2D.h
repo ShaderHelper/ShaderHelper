@@ -18,6 +18,7 @@ namespace FW
 		FString FileExtension() const override;
 		GpuTexture* GetThumbnail() const override;
 		GpuTexture* GetGpuData() const { return GpuData; }
+		const TArray<uint8>& GetRawData() const { return RawData; }
 		uint32 GetWidth() const { return Width; }
 		uint32 GetHeight() const { return Height; }
 		GpuTextureFormat GetFormat() const { return Format; }

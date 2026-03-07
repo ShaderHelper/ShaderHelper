@@ -580,17 +580,18 @@ namespace FW
 		CmdList->ResourceBarrier(DxBarriers.Num(), DxBarriers.GetData());
 	}
 
-	void Dx12CmdRecorder::CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture)
+	void Dx12CmdRecorder::CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture, uint32 ArrayLayer, uint32 MipLevel)
 	{
 		Dx12Texture* Texture = static_cast<Dx12Texture*>(InTexture);
 		Dx12Buffer* Buffer = static_cast<Dx12Buffer*>(InBuffer);
 
+		const uint32 Subresource = D3D12CalcSubresource(MipLevel, ArrayLayer, 0, InTexture->GetResourceDesc().NumMips, Texture->GetResource()->GetDesc().DepthOrArraySize);
         D3D12_RESOURCE_DESC Desc = Texture->GetResource()->GetDesc();
         D3D12_PLACED_SUBRESOURCE_FOOTPRINT Layout{};
-		GDevice->GetCopyableFootprints(&Desc, 0, 1, 0, &Layout, nullptr, nullptr, nullptr);
+		GDevice->GetCopyableFootprints(&Desc, Subresource, 1, 0, &Layout, nullptr, nullptr, nullptr);
 
 		const CommonAllocationData& AllocationData = Buffer->GetAllocation().GetAllocationData().Get<CommonAllocationData>();
-        CD3DX12_TEXTURE_COPY_LOCATION DestLoc{ Texture->GetResource() };
+        CD3DX12_TEXTURE_COPY_LOCATION DestLoc{ Texture->GetResource(), Subresource };
         CD3DX12_TEXTURE_COPY_LOCATION SrcLoc{ AllocationData.UnderlyResource, Layout };
 		CmdList->CopyTextureRegion(&DestLoc, 0, 0, 0, &SrcLoc, nullptr);
 	}

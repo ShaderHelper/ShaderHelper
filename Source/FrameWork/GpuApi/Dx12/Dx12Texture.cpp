@@ -33,7 +33,7 @@ namespace FW
 			return false;
 		}
 
-		if (InTexDesc.Depth > 1) {
+		if (InTexDesc.Dimension == GpuTextureDimension::Tex2D && InTexDesc.Depth > 1) {
 			SH_LOG(LogDx12, Error, TEXT("Invalid Texture Depth. TODO: Support 3d texture"));
 			return false;
 		}
@@ -87,7 +87,21 @@ namespace FW
 
 		if (InFlags.bSRV) {
 			InTexture->SRV = AllocCpuCbvSrvUav();
-			GDevice->CreateShaderResourceView(InTexture->GetResource(), nullptr, InTexture->SRV->GetHandle());
+			if (InTexture->GetResourceDesc().Dimension == GpuTextureDimension::TexCube)
+			{
+				D3D12_SHADER_RESOURCE_VIEW_DESC SrvDesc{};
+				SrvDesc.Format = InTexture->GetResource()->GetDesc().Format;
+				SrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+				SrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+				SrvDesc.TextureCube.MostDetailedMip = 0;
+				SrvDesc.TextureCube.MipLevels = 1;
+				SrvDesc.TextureCube.ResourceMinLODClamp = 0.0f;
+				GDevice->CreateShaderResourceView(InTexture->GetResource(), &SrvDesc, InTexture->SRV->GetHandle());
+			}
+			else
+			{
+				GDevice->CreateShaderResourceView(InTexture->GetResource(), nullptr, InTexture->SRV->GetHandle());
+			}
 		}
 
 		if (InFlags.bRTV) {
@@ -117,7 +131,7 @@ namespace FW
 			MapTextureFormat(InTexDesc.Format),
 			InTexDesc.Width,
 			InTexDesc.Height,
-			InTexDesc.Depth,
+			InTexDesc.Dimension == GpuTextureDimension::TexCube ? 6 : InTexDesc.Depth,
 			InTexDesc.NumMips,
 			1,0,
 			ResourceFlags

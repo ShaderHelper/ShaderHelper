@@ -14,6 +14,8 @@
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 #include "AssetManager/AssetImporter/AssetImporter.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
+#include "AssetObject/TextureCube.h"
+#include "AssetObject/Texture2D.h"
 
 #include <Serialization/JsonSerializer.h>
 #include <Misc/FileHelper.h>
@@ -147,38 +149,7 @@ namespace SH
 			});
 		ViewPort->SetAssociatedWidget(ViewportWidget);
 
-		FString BuiltInShaderToyDir = PathHelper::BuiltinDir() / "ShaderToy";
-		if (!IFileManager::Get().DirectoryExists(*BuiltInShaderToyDir))
-		{
-			IFileManager::Get().MakeDirectory(*BuiltInShaderToyDir, true);
-
-			FString ShaderToyResourceDir = PathHelper::ResourceDir() / TEXT("ShaderToy");
-			if (IFileManager::Get().DirectoryExists(*ShaderToyResourceDir))
-			{
-				TArray<FString> FileNames;
-				IFileManager::Get().FindFilesRecursive(FileNames, *ShaderToyResourceDir, TEXT("*"), true, false);
-
-				for (const FString& FilePath : FileNames)
-				{
-					AssetImporter* Importer = GetAssetImporter(FilePath);
-					if (Importer)
-					{
-						TUniquePtr<AssetObject> Asset = Importer->CreateAssetObject(FilePath);
-						if (Asset)
-						{
-							FString AssetExt = Asset->FileExtension();
-							FString FileWithoutExt = FPaths::GetBaseFilename(FilePath);
-							FString SavedFilePath = BuiltInShaderToyDir / (FileWithoutExt + TEXT(".") + AssetExt);
-
-							TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFilePath));
-							Asset->ObjectName = FText::FromString(FPaths::GetBaseFilename(SavedFilePath));
-							Asset->Serialize(*Ar);
-						}
-					}
-				}
-			}
-		}
-		TSingleton<AssetManager>::Get().MountProject(PathHelper::BuiltinDir());
+		CreateBuiltinAssets();
 		
 		SAssignNew(AssetBrowser, SAssetBrowser)
 		.ContentPathShowed(TSingleton<ShProjectManager>::Get().GetActiveContentDirectory())
@@ -208,6 +179,122 @@ namespace SH
 			.SizingRule(ESizingRule::Autosized)
 			.ActivationPolicy(EWindowActivationPolicy::Never);
 		FSlateApplication::Get().AddWindow(ShaderEditorTipWindow.ToSharedRef(), false);
+	}
+
+	void ShaderHelperEditor::CreateBuiltinAssets()
+	{
+		FString BuiltInShaderToyDir = PathHelper::BuiltinDir() / TEXT("ShaderToy");
+		if (!IFileManager::Get().DirectoryExists(*BuiltInShaderToyDir))
+		{
+			IFileManager::Get().MakeDirectory(*BuiltInShaderToyDir, true);
+
+			FString ShaderToyResourceDir = PathHelper::ResourceDir() / TEXT("ShaderToy");
+
+			// Import Texture2D assets from Texture subfolder
+			FString TextureResourceDir = ShaderToyResourceDir / TEXT("Texture");
+			if (IFileManager::Get().DirectoryExists(*TextureResourceDir))
+			{
+				FString TextureSaveDir = BuiltInShaderToyDir / TEXT("Texture");
+				IFileManager::Get().MakeDirectory(*TextureSaveDir, true);
+
+				TArray<FString> TextureFiles;
+				IFileManager::Get().FindFiles(TextureFiles, *(TextureResourceDir / TEXT("*")), true, false);
+				for (const FString& FileName : TextureFiles)
+				{
+					FString FilePath = TextureResourceDir / FileName;
+					AssetImporter* Importer = GetAssetImporter(FilePath);
+					if (Importer)
+					{
+						TUniquePtr<AssetObject> Asset = Importer->CreateAssetObject(FilePath);
+						if (Asset)
+						{
+							FString SavedFilePath = TextureSaveDir / (FPaths::GetBaseFilename(FileName) + TEXT(".") + Asset->FileExtension());
+							TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFilePath));
+							Asset->ObjectName = FText::FromString(FPaths::GetBaseFilename(FileName));
+							Asset->Serialize(*Ar);
+						}
+					}
+				}
+			}
+
+			// Import TextureCube assets from Cubemap subfolder
+			FString CubemapResourceDir = ShaderToyResourceDir / TEXT("Cubemap");
+			if (IFileManager::Get().DirectoryExists(*CubemapResourceDir))
+			{
+				FString CubemapSaveDir = BuiltInShaderToyDir / TEXT("Cubemap");
+				IFileManager::Get().MakeDirectory(*CubemapSaveDir, true);
+
+				const TCHAR* FaceSuffixes[] = { TEXT("_Right"), TEXT("_Left"), TEXT("_Top"), TEXT("_Bottom"), TEXT("_Front"), TEXT("_Back") };
+
+				TArray<FString> CubemapDirs;
+				IFileManager::Get().FindFiles(CubemapDirs, *(CubemapResourceDir / TEXT("*")), false, true);
+
+				for (const FString& CubemapDirName : CubemapDirs)
+				{
+					FString CubemapDir = CubemapResourceDir / CubemapDirName;
+					TArray<FString> FaceFiles;
+					IFileManager::Get().FindFiles(FaceFiles, *(CubemapDir / TEXT("*")), true, false);
+
+					TArray<TArray<uint8>> FaceData;
+					FaceData.SetNum(6);
+					uint32 CubeSize = 0;
+					GpuTextureFormat CubeFormat = GpuTextureFormat::B8G8R8A8_UNORM;
+					bool bAllFacesValid = true;
+
+					for (int32 FaceIndex = 0; FaceIndex < 6 && bAllFacesValid; FaceIndex++)
+					{
+						FString* FoundFile = FaceFiles.FindByPredicate([&](const FString& FileName) {
+							return FPaths::GetBaseFilename(FileName).EndsWith(FaceSuffixes[FaceIndex]);
+						});
+
+						if (!FoundFile)
+						{
+							bAllFacesValid = false;
+							break;
+						}
+
+						FString FaceFilePath = CubemapDir / *FoundFile;
+						AssetImporter* Importer = GetAssetImporter(FaceFilePath);
+						if (!Importer)
+						{
+							bAllFacesValid = false;
+							break;
+						}
+
+						TUniquePtr<AssetObject> FaceAsset = Importer->CreateAssetObject(FaceFilePath);
+						Texture2D* FaceTex = static_cast<Texture2D*>(FaceAsset.Get());
+						if (!FaceTex || FaceTex->GetWidth() != FaceTex->GetHeight())
+						{
+							bAllFacesValid = false;
+							break;
+						}
+
+						if (FaceIndex == 0)
+						{
+							CubeSize = FaceTex->GetWidth();
+							CubeFormat = FaceTex->GetFormat();
+						}
+						else if (FaceTex->GetWidth() != CubeSize || FaceTex->GetFormat() != CubeFormat)
+						{
+							bAllFacesValid = false;
+							break;
+						}
+
+						FaceData[FaceIndex] = FaceTex->GetRawData();
+					}
+
+					if (bAllFacesValid && CubeSize > 0)
+					{
+						auto CubeAsset = MakeUnique<TextureCube>(CubeSize, CubeFormat, FaceData);
+						FString SavedFilePath = CubemapSaveDir / (CubemapDirName + TEXT(".") + CubeAsset->FileExtension());
+						TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFilePath));
+						CubeAsset->ObjectName = FText::FromString(CubemapDirName);
+						CubeAsset->Serialize(*Ar);
+					}
+				}
+			}
+		}
+		TSingleton<AssetManager>::Get().MountProject(PathHelper::BuiltinDir());
 	}
 
 	void ShaderHelperEditor::ForceRender()

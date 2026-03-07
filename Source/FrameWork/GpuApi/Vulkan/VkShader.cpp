@@ -8,21 +8,10 @@ namespace FW
 {
 	VulkanShader::VulkanShader(const GpuShaderFileDesc& Desc) : GpuShader(Desc)
 	{
-		ProcessedSourceText = GpuShaderPreProcessor{ SourceText, ShaderLanguage }
-			.ReplacePrintStringLiteral()
-			.Finalize();
 	}
 
 	VulkanShader::VulkanShader(const GpuShaderSourceDesc& Desc) : GpuShader(Desc)
 	{
-		ProcessedSourceText = GpuShaderPreProcessor{ SourceText, ShaderLanguage }
-			.ReplacePrintStringLiteral()
-			.Finalize();
-	}
-
-	TArray<GpuShaderLayoutBinding> VulkanShader::GetLayout() const
-	{
-		return TArray<GpuShaderLayoutBinding>();
 	}
 
 	bool CompileVulkanShader(TRefCountPtr<VulkanShader> InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs)

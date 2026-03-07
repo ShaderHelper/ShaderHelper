@@ -86,7 +86,14 @@ namespace FW
         {
             MTL::PixelFormat TexFormat = (MTL::PixelFormat)MapTextureFormat(InTexDesc.Format);
             MTL::TextureDescriptor* TexDesc = MTL::TextureDescriptor::texture2DDescriptor(TexFormat, InTexDesc.Width, InTexDesc.Height, InTexDesc.NumMips > 1);
-            TexDesc->setTextureType(MTL::TextureType2D);
+            if (InTexDesc.Dimension == GpuTextureDimension::TexCube)
+            {
+                TexDesc->setTextureType(MTL::TextureTypeCube);
+            }
+            else
+            {
+                TexDesc->setTextureType(MTL::TextureType2D);
+            }
             TexDesc->setStorageMode(MTL::StorageModePrivate);
             SetTextureUsage(InTexDesc.Usage, TexDesc);
             

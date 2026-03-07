@@ -332,7 +332,7 @@ namespace FW
         
     }
 
-    void MtlCmdRecorder::CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture)
+    void MtlCmdRecorder::CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture, uint32 ArrayLayer, uint32 MipLevel)
     {
         MetalBuffer* SrcMtlBuffer = static_cast<MetalBuffer*>(InBuffer);
         MetalTexture* DstMtlTexture = static_cast<MetalTexture*>(InTexture);
@@ -342,7 +342,7 @@ namespace FW
         const uint32 BytesPerTexel = GetTextureFormatByteSize(InTexture->GetFormat());
         const uint32 BytesPerRow = InTexture->GetWidth() * BytesPerTexel;
         const uint32 BytesImage = InTexture->GetWidth() * InTexture->GetHeight() * BytesPerTexel;
-        BlitCommandEncoder->copyFromBuffer(SrcMtlBuffer->GetResource(), 0, BytesPerRow, BytesImage, Size, DstMtlTexture->GetResource(), 0, 0, Origin);
+        BlitCommandEncoder->copyFromBuffer(SrcMtlBuffer->GetResource(), 0, BytesPerRow, BytesImage, Size, DstMtlTexture->GetResource(), ArrayLayer, MipLevel, Origin);
         BlitCommandEncoder->endEncoding();
     }
 

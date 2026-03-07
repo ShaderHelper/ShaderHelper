@@ -125,14 +125,14 @@ namespace FW
 			SH_LOG(LogRhiValidation, Error, TEXT("CreateBuffer Error(Usage can only be either dynamic or static.)"));
 			return false;
 		}
-		else if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::Uniform))
-		{
-			if (InitState != GpuResourceState::Unknown)
-			{
-				SH_LOG(LogRhiValidation, Error, TEXT("CreateBuffer Error(InitState must be Unknown) for GpuBufferUsage(%s)"), ANSI_TO_TCHAR(magic_enum::enum_name(InBufferDesc.Usage).data()));
-				return false;
-			}
-		}
+		//else if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::Uniform))
+		//{
+		//	if (InitState != GpuResourceState::Unknown)
+		//	{
+		//		SH_LOG(LogRhiValidation, Error, TEXT("CreateBuffer Error(InitState must be Unknown) for GpuBufferUsage(%s)"), ANSI_TO_TCHAR(magic_enum::enum_name(InBufferDesc.Usage).data()));
+		//		return false;
+		//	}
+		//}
 		else if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::RWStructured))
 		{
 			if (InBufferDesc.StructuredInit.Stride == 0 || (InBufferDesc.ByteSize % InBufferDesc.StructuredInit.Stride != 0))

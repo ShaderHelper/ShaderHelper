@@ -3,7 +3,9 @@
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "AssetObject/Texture2D.h"
+#include "AssetObject/TextureCube.h"
 #include "AssetObject/Nodes/Texture2dNode.h"
+#include "AssetObject/Nodes/TextureCubeNode.h"
 #include "AssetObject/StShader.h"
 #include "AssetObject/ShaderToy/Nodes/ShaderToyPassNode.h"
 #include "UI/Widgets/Graph/SGraphPanel.h"
@@ -41,7 +43,7 @@ namespace SH
 			for (const auto& DropFilePath : DropFilePaths)
 			{
 				MetaType* DropAssetMetaType = GetAssetMetaType(DropFilePath);
-				if (DropAssetMetaType->IsType<Texture2D>() || DropAssetMetaType->IsType<StShader>())
+				if (DropAssetMetaType->IsType<Texture2D>() || DropAssetMetaType->IsType<TextureCube>() || DropAssetMetaType->IsType<StShader>())
 				{
 					DragDropOp->SetCursorOverride(EMouseCursor::GrabHand);
 					return;
@@ -68,6 +70,15 @@ namespace SH
 					SGraphPanel::ScopedTransaction Transcation(GraphPanel);
 					auto NewTexNode = NewShObject<Texture2dNode>(this, MoveTemp(TexAsset));
 					GraphPanel->DoCommand(MakeShared<AddNodeCommand>(GraphPanel, NewTexNode, Pos));
+					GraphPanel->SetFocus();
+				}
+				else if (DropAssetMetaType->IsType<TextureCube>())
+				{
+					AssetPtr<TextureCube> CubeAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<TextureCube>(DropFilePath);
+
+					SGraphPanel::ScopedTransaction Transcation(GraphPanel);
+					auto NewCubeNode = NewShObject<TextureCubeNode>(this, MoveTemp(CubeAsset));
+					GraphPanel->DoCommand(MakeShared<AddNodeCommand>(GraphPanel, NewCubeNode, Pos));
 					GraphPanel->SetFocus();
 				}
 				else if (DropAssetMetaType->IsType<StShader>())

@@ -421,7 +421,7 @@ namespace FW
 			ImageBarriers.Num(), ImageBarriers.GetData());
 	}
 
-	void VulkanCmdRecorder::CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture)
+	void VulkanCmdRecorder::CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture, uint32 ArrayLayer, uint32 MipLevel)
 	{
 		VulkanBuffer* SrcBuffer = static_cast<VulkanBuffer*>(InBuffer);
 		VulkanTexture* DstTexture = static_cast<VulkanTexture*>(InTexture);
@@ -432,8 +432,8 @@ namespace FW
 			.bufferImageHeight = 0,
 			.imageSubresource = {
 				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-				.mipLevel = 0,
-				.baseArrayLayer = 0,
+				.mipLevel = MipLevel,
+				.baseArrayLayer = ArrayLayer,
 				.layerCount = 1
 			},
 			.imageOffset = {0, 0, 0},

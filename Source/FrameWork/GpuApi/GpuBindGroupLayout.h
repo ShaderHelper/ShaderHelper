@@ -23,6 +23,7 @@ namespace FW
 	{
 		UniformBuffer,
 		Texture,
+		TextureCube,
 		Sampler,
 		StructuredBuffer,
 		RWStructuredBuffer,
@@ -125,6 +126,7 @@ namespace FW
 		//Add the codegen bindings, then get the CodegenDeclaration that will be injected into a shader.
 		GpuBindGroupLayoutBuilder& AddUniformBuffer(const FString& BindingName, const UniformBufferBuilder& UbBuilder, BindingShaderStage InStage = BindingShaderStage::All);
 		GpuBindGroupLayoutBuilder& AddTexture(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
+		GpuBindGroupLayoutBuilder& AddTextureCube(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
 		//TODO StaticSampler ? It will be embed into BingGroupLayout, vulkan has the same concept, but metal might not have.
 		GpuBindGroupLayoutBuilder& AddSampler(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
 

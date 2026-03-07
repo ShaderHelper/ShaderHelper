@@ -6,6 +6,12 @@
 
 namespace SH
 {
+	enum class ShaderToySlotType
+	{
+		Texture2D,
+		TextureCube
+	};
+
 	class StShader : public ShaderAsset
 	{
 		REFLECTION_TYPE(StShader)
@@ -16,8 +22,8 @@ namespace SH
 		FW::GpuShader* GetPixelShader() const { return Shader; }
 		FW::GpuShader* GetVertexShader();
         static FW::UniformBufferBuilder& GetBuiltInUbBuilder();
-        static FW::GpuBindGroupLayout* GetBuiltInBindLayout();
-        static FW::GpuBindGroupLayoutBuilder& GetBuiltInBindLayoutBuilder();
+		TRefCountPtr<FW::GpuBindGroupLayout> GetBuiltInBindLayout(uint8 CubeChannelMask = 0);
+        FW::GpuBindGroupLayoutBuilder GetBuiltInBindLayoutBuilder(uint8 CubeChannelMask) const;
 
 	public:
 		//AssetObject interface
@@ -30,9 +36,11 @@ namespace SH
 		FString GetFullContent() const override;
 		int32 GetExtraLineNum() const override;
 		FW::GpuShaderSourceDesc GetShaderDesc(const FString& InContent) const override;
+		int32 GetExtraLineNum(uint8 CubeChannelMask) const;
+		FW::GpuShaderSourceDesc GetShaderDesc(const FString& InContent, uint8 CubeChannelMask) const;
 		
-        FString GetBinding() const;
-        FString GetTemplateWithBinding() const;
+        FString GetBinding(uint8 CubeChannelMask = 0) const;
+        FString GetTemplateWithBinding(uint8 CubeChannelMask = 0) const;
         
 		//ShObject interface
 		bool CanChangeProperty(FW::PropertyData* InProperty) override;
@@ -43,7 +51,6 @@ namespace SH
         
         void AddUniform(TAttribute<FText> TypeName);
         void RefreshBuilder();
-        
     private:
         TSharedRef<SWidget> GetCategoryMenu();
         bool HasBindingName(const FString& InName);
@@ -51,6 +58,7 @@ namespace SH
         
 	public:
 		FW::GpuShaderLanguage Language;
+		uint8 CubeChannelMask = 0;
 
         TSharedPtr<FW::PropertyCategory> BuiltInCategory;
         TSharedPtr<FW::PropertyCategory> CustomCategory;

@@ -31,8 +31,10 @@ namespace FW
 
 	public:
 		virtual void Serialize(FArchive& Ar) override;
+		//Check if this input pin can accept a connection from SourcePin (type compatibility only, no value transfer)
+		virtual bool CanAccept(GraphPin* SourcePin) { return false; }
 		//Called when connected as an input.
-		virtual bool Accept(GraphPin* SourcePin) { return false; }
+		virtual void Accept(GraphPin* SourcePin) {}
         virtual void Refuse() {}
 		bool HasLink() const;
 		virtual FLinearColor GetPinColor() const { return FLinearColor::White; }

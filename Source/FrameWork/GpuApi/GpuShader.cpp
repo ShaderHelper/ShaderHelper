@@ -2,6 +2,7 @@
 #include "GpuShader.h"
 #include "HLSL.h"
 #include "GLSL.h"
+#include "Spirv/SpirvParser.h"
 
 //ue regex is invalid if disable icu, so use the regex from std.
 //TODO RE2
@@ -322,7 +323,9 @@ namespace FW
 		FString ShaderFileText;
 		FFileHelper::LoadFileToString(ShaderFileText, *FileName);
 		SourceText = FileDesc.ExtraDecl + ShaderFileText;
-		ProcessedSourceText = SourceText;
+		ProcessedSourceText = GpuShaderPreProcessor{ SourceText, ShaderLanguage }
+			.ReplacePrintStringLiteral()
+			.Finalize();
 	}
 
 	GpuShader::GpuShader(const GpuShaderSourceDesc& SourceDesc)
@@ -332,11 +335,12 @@ namespace FW
 		, EntryPoint(SourceDesc.EntryPoint)
 		, ShaderLanguage(SourceDesc.Language)
 		, SourceText(SourceDesc.Source)
-		, ProcessedSourceText(SourceDesc.Source)
         , IncludeDirs(SourceDesc.IncludeDirs)
 		, IncludeHandler(SourceDesc.IncludeHandler)
 	{
-
+		ProcessedSourceText = GpuShaderPreProcessor{ SourceText, ShaderLanguage }
+			.ReplacePrintStringLiteral()
+			.Finalize();
 	}
 
 	GpuShaderModel GpuShader::GetShaderModelVer() const
@@ -385,6 +389,89 @@ namespace FW
 		}
 
 		return Candidates;
+	}
+
+	TArray<GpuShaderLayoutBinding> GpuShader::GetLayout() const
+	{
+		TArray<GpuShaderLayoutBinding> ShaderLayoutBindings;
+		SpvMetaContext MetaContext;
+		SpvMetaVisitor MetaVisitor{ MetaContext };
+		SpirvParser Parser;
+		Parser.Parse(SpvCode);
+		Parser.Accept(&MetaVisitor);
+		TMap<SpvId, GpuShaderLayoutBinding> SpvReflectionBindings;
+		for (auto [Id, Decoration] : MetaContext.Decorations)
+		{
+			if (Decoration.Kind == SpvDecorationKind::DescriptorSet)
+			{
+				auto& LayoutBinding = SpvReflectionBindings.FindOrAdd(Id);
+				LayoutBinding.Name = MetaContext.Names[Id];
+				LayoutBinding.Group = Decoration.DescriptorSet.Number;
+			}
+			else if (Decoration.Kind == SpvDecorationKind::Binding)
+			{
+				SpvReflectionBindings.FindOrAdd(Id).Slot = Decoration.Binding.Number;
+			}
+		}
+		for (auto& [Id, ShaderLayoutBinding] : SpvReflectionBindings)
+		{
+			SpvType* Type = MetaContext.GlobalVariables[Id].Type;
+			std::optional<BindingType> ShaderBindingType;
+			ON_SCOPE_EXIT
+			{
+				check(ShaderBindingType.has_value());
+				ShaderLayoutBinding.Type = ShaderBindingType.value();
+				ShaderLayoutBindings.Add(MoveTemp(ShaderLayoutBinding));
+			};
+
+			if (Type->GetKind() == SpvTypeKind::Image)
+			{
+				SpvImageType* ImageType = static_cast<SpvImageType*>(Type);
+				ShaderBindingType = ImageType->Dim == SpvDim::Cube ? BindingType::TextureCube : BindingType::Texture;
+			}
+			else if (Type->GetKind() == SpvTypeKind::Sampler)
+			{
+				ShaderBindingType = BindingType::Sampler;
+			}
+			else if (Type->GetKind() == SpvTypeKind::Struct)
+			{
+				SpvStructType* StructType = static_cast<SpvStructType*>(Type);
+				TArray<SpvDecoration> TypeDecorations;
+				MetaContext.Decorations.MultiFind(Type->GetId(), TypeDecorations);
+				if (TypeDecorations.ContainsByPredicate([&](const SpvDecoration& InItem) {
+					return InItem.Kind == SpvDecorationKind::Block;
+				}))
+				{
+					ShaderBindingType = BindingType::UniformBuffer;
+				}
+				else
+				{
+					if (TypeDecorations.ContainsByPredicate([&](const SpvDecoration& InItem) {
+						return InItem.Kind == SpvDecorationKind::BufferBlock;
+					}))
+					{
+						bool Writable = !TypeDecorations.ContainsByPredicate([&](const SpvDecoration& InItem) {
+							return InItem.Kind == SpvDecorationKind::NonWritable;
+						});
+
+						if (StructType->MemberTypes.Num() == 1 && StructType->MemberTypes[0]->GetKind() == SpvTypeKind::RuntimeArray)
+						{
+							SpvRuntimeArrayType* RuntimeArrayType = static_cast<SpvRuntimeArrayType*>(StructType->MemberTypes[0]);
+							if(RuntimeArrayType->ElementType->GetKind() == SpvTypeKind::Integer &&
+							   static_cast<SpvIntegerType*>(RuntimeArrayType->ElementType)->IsSigend() == false &&
+							   static_cast<SpvIntegerType*>(RuntimeArrayType->ElementType)->GetWidth() == 32)
+							{
+								ShaderBindingType = Writable ? BindingType::RWRawBuffer : BindingType::RawBuffer;
+								continue;
+							}
+						}
+
+						ShaderBindingType = Writable ? BindingType::RWStructuredBuffer : BindingType::StructuredBuffer;
+					}
+				}
+			}
+		}
+		return ShaderLayoutBindings;
 	}
 
 	ShaderTU::ShaderTU(const FString& InShaderSource, const FString& InShaderName)

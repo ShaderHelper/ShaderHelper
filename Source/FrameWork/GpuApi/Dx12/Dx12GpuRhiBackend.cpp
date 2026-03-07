@@ -62,19 +62,18 @@ void Dx12GpuRhiBackend::EndFrame()
 	GDx12DeferredReleaseManager->ProcessResources();
 }
 
-TRefCountPtr<GpuTexture> Dx12GpuRhiBackend::CreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
+TRefCountPtr<GpuTexture> Dx12GpuRhiBackend::CreateTextureInternal(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
 {
-	GpuResourceState ValidState = InitState == GpuResourceState::Unknown ? GetTextureState(InTexDesc.Usage) : InitState;
-	return AUX::StaticCastRefCountPtr<GpuTexture>(CreateDx12Texture2D(InTexDesc, ValidState));
+	return AUX::StaticCastRefCountPtr<GpuTexture>(CreateDx12Texture2D(InTexDesc, InitState));
 }
 
-TRefCountPtr<GpuShader> Dx12GpuRhiBackend::CreateShaderFromSource(const GpuShaderSourceDesc& Desc) const
+TRefCountPtr<GpuShader> Dx12GpuRhiBackend::CreateShaderFromSourceInternal(const GpuShaderSourceDesc& Desc) const
 {
 	TRefCountPtr<Dx12Shader> NewShader = new Dx12Shader(Desc);
 	return AUX::StaticCastRefCountPtr<GpuShader>(NewShader);
 }
 
-TRefCountPtr<GpuShader> Dx12GpuRhiBackend::CreateShaderFromFile(const GpuShaderFileDesc& Desc)
+TRefCountPtr<GpuShader> Dx12GpuRhiBackend::CreateShaderFromFileInternal(const GpuShaderFileDesc& Desc)
 {
 	TRefCountPtr<Dx12Shader> NewShader = new Dx12Shader(Desc);
 	return AUX::StaticCastRefCountPtr<GpuShader>(NewShader);
@@ -90,20 +89,19 @@ TRefCountPtr<GpuBindGroupLayout> Dx12GpuRhiBackend::CreateBindGroupLayout(const 
 	return AUX::StaticCastRefCountPtr<GpuBindGroupLayout>(CreateDx12BindGroupLayout(InBindGroupLayoutDesc));
 }
 
-TRefCountPtr<GpuRenderPipelineState> Dx12GpuRhiBackend::CreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc)
+TRefCountPtr<GpuRenderPipelineState> Dx12GpuRhiBackend::CreateRenderPipelineStateInternal(const GpuRenderPipelineStateDesc& InPipelineStateDesc)
 {
 	return AUX::StaticCastRefCountPtr<GpuRenderPipelineState>(CreateDx12RenderPso(InPipelineStateDesc));
 }
 
-TRefCountPtr<GpuComputePipelineState> Dx12GpuRhiBackend::CreateComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc)
+TRefCountPtr<GpuComputePipelineState> Dx12GpuRhiBackend::CreateComputePipelineStateInternal(const GpuComputePipelineStateDesc& InPipelineStateDesc)
 {
 	return AUX::StaticCastRefCountPtr<GpuComputePipelineState>(CreateDx12ComputePso(InPipelineStateDesc));
 }
 
-TRefCountPtr<GpuBuffer> Dx12GpuRhiBackend::CreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState)
+TRefCountPtr<GpuBuffer> Dx12GpuRhiBackend::CreateBufferInternal(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState)
 {
-	GpuResourceState ValidState = InitState == GpuResourceState::Unknown ? GetBufferState(InBufferDesc.Usage) : InitState;
-	return AUX::StaticCastRefCountPtr<GpuBuffer>(CreateDx12Buffer(InBufferDesc, ValidState));
+	return AUX::StaticCastRefCountPtr<GpuBuffer>(CreateDx12Buffer(InBufferDesc, InitState));
 }
 
 TRefCountPtr<GpuSampler> Dx12GpuRhiBackend::CreateSampler(const GpuSamplerDesc &InSamplerDesc)

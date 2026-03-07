@@ -13,17 +13,11 @@ namespace FW
 	Dx12Shader::Dx12Shader(const GpuShaderFileDesc& Desc)
 		: GpuShader(Desc)
 	{
-		ProcessedSourceText = GpuShaderPreProcessor{ SourceText, ShaderLanguage }
-			.ReplacePrintStringLiteral()
-			.Finalize();
 	}
 
 	Dx12Shader::Dx12Shader(const GpuShaderSourceDesc& Desc)
 		: GpuShader(Desc)
 	{
-		ProcessedSourceText = GpuShaderPreProcessor{ SourceText, ShaderLanguage }
-			.ReplacePrintStringLiteral()
-			.Finalize();
 	}
 
 	BindingType MapBindingType(D3D_SHADER_INPUT_TYPE Type)
@@ -55,11 +49,16 @@ namespace FW
 		{
 			D3D12_SHADER_INPUT_BIND_DESC BindDesc;
 			Reflection->GetResourceBindingDesc(Index, &BindDesc);
+			BindingType BType = MapBindingType(BindDesc.Type);
+			if (BType == BindingType::Texture && BindDesc.Dimension == D3D_SRV_DIMENSION_TEXTURECUBE)
+			{
+				BType = BindingType::TextureCube;
+			}
 			ShaderLayoutBindings.Add({
 				.Name = BindDesc.Name,
 				.Slot = (int)BindDesc.BindPoint,
 				.Group = (int)BindDesc.Space,
-				.Type = MapBindingType(BindDesc.Type)
+				.Type = BType
 			});
 
 		}

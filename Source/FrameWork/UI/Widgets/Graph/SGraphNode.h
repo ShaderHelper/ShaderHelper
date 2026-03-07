@@ -3,7 +3,7 @@
 
 namespace FW
 {
-	class SGraphNode : public SCompoundWidget
+	class FRAMEWORK_API SGraphNode : public SCompoundWidget
 	{
 	public:
 		SLATE_BEGIN_ARGS(SGraphNode) : _NodeData(nullptr)
@@ -12,6 +12,7 @@ namespace FW
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs, class SGraphPanel* InOwnerPanel);
+		void RebuildPins();
 		virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 		virtual FReply OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 		TSharedRef<SWidget> CreateContextMenu();
@@ -25,7 +26,9 @@ namespace FW
 		TArray<class SGraphPin*> Pins;
 
 	private:
+		void PopulatePinWidgets();
 		FVector2D MousePos;
 		TSharedPtr<SInlineEditableTextBlock> NodeTitleEditText;
+		TSharedPtr<SVerticalBox> PinContainer;
 	};
 }

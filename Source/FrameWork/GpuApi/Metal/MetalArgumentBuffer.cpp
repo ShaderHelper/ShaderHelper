@@ -59,6 +59,13 @@ namespace FW
                 ArgDesc.access = MTLArgumentAccessReadOnly;
                 ResourceUsages.Add(Slot, MTLResourceUsageRead);
             }
+            else if(LayoutBindingEntry.Type == BindingType::TextureCube)
+            {
+                ArgDesc.dataType = MTLDataTypeTexture;
+                ArgDesc.textureType = MTLTextureTypeCube;
+                ArgDesc.access = MTLArgumentAccessReadOnly;
+                ResourceUsages.Add(Slot, MTLResourceUsageRead);
+            }
             else if(LayoutBindingEntry.Type == BindingType::Sampler)
             {
                 ArgDesc.dataType = MTLDataTypeSampler;
