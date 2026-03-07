@@ -78,7 +78,7 @@ namespace FW
     TRefCountPtr<MetalTexture> CreateMetalTexture2D(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
     {
         TRefCountPtr<MetalTexture> RetTexture;
-        if(EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::Shared))
+        if(EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::Shared) && InTexDesc.Dimension != GpuTextureDimension::TexCube)
         {
             RetTexture = CreateSharedMetalTexture(InTexDesc, InitState);
         }

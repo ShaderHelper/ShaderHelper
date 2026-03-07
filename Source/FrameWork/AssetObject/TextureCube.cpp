@@ -46,7 +46,7 @@ namespace FW
 		Desc.Width = Size;
 		Desc.Height = Size;
 		Desc.Format = Format;
-		Desc.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::Shared;
+		Desc.Usage = GpuTextureUsage::ShaderResource;
 		Desc.Dimension = GpuTextureDimension::TexCube;
 
 		GpuData = GGpuRhi->CreateTexture(Desc, GpuResourceState::CopyDst);
@@ -72,6 +72,13 @@ namespace FW
 		}
 		GGpuRhi->EndRecording(CmdRecorder);
 		GGpuRhi->Submit({CmdRecorder});
+
+		// Create a 2D shared texture from face 0 for preview/thumbnail
+		if (FaceData.Num() == 6 && FaceData[0].Num() > 0)
+		{
+			GpuTextureDesc PreviewDesc{ Size, Size, Format, GpuTextureUsage::ShaderResource | GpuTextureUsage::Shared, FaceData[0] };
+			PreviewData = GGpuRhi->CreateTexture(MoveTemp(PreviewDesc));
+		}
 	}
 
 	FString TextureCube::FileExtension() const
@@ -81,9 +88,9 @@ namespace FW
 
 	GpuTexture* TextureCube::GetThumbnail() const
 	{
-		if (GpuData.IsValid() && FaceData.Num() == 6 && FaceData[0].Num() > 0)
+		if (PreviewData.IsValid())
 		{
-			return GpuData;
+			return PreviewData;
 		}
 		return nullptr;
 	}

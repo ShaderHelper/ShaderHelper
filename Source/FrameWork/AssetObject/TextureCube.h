@@ -18,6 +18,7 @@ namespace FW
 		FString FileExtension() const override;
 		GpuTexture* GetThumbnail() const override;
 		GpuTexture* GetGpuData() const { return GpuData; }
+		GpuTexture* GetPreviewTexture() const { return PreviewData; }
 		uint32 GetSize() const { return Size; }
 		GpuTextureFormat GetFormat() const { return Format; }
 		const TArray<TArray<uint8>>& GetFaceData() const { return FaceData; }
@@ -30,5 +31,6 @@ namespace FW
 		uint32 Size; // cubemap faces are square: Width == Height == Size
 		TArray<TArray<uint8>> FaceData; // 6 faces: +X, -X, +Y, -Y, +Z, -Z
 		TRefCountPtr<GpuTexture> GpuData;
+		TRefCountPtr<GpuTexture> PreviewData;
 	};
 }

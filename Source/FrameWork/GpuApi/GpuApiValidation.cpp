@@ -182,6 +182,11 @@ namespace FW
 
 	bool ValidateCreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
 	{
+		if (InTexDesc.Dimension == GpuTextureDimension::TexCube && EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::Shared))
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(Shared usage is not supported for cubemap textures)"));
+			return false;
+		}
 		if (EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::RenderTarget) && EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::ShaderResource) 
 			&& InitState == GpuResourceState::Unknown)
 		{

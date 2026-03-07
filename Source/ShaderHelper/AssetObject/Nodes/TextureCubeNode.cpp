@@ -89,12 +89,12 @@ namespace SH
 
 	void TextureCubeNode::RefreshPreview()
 	{
-		if (!Texture || !Texture->GetGpuData())
+		if (!Texture || !Texture->GetPreviewTexture())
 		{
 			return;
 		}
 
-		Preview->SetViewPortRenderTexture(Texture->GetGpuData());
+		Preview->SetViewPortRenderTexture(Texture->GetPreviewTexture());
 	}
 
 	void TextureCubeNode::RefreshProperty()
