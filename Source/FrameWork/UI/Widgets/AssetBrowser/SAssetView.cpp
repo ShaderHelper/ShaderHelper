@@ -213,7 +213,10 @@ namespace FW
 
 									if (AssetOp* AssetOp_ = GetAssetOp(NewAsset->DynamicMetaType()))
 									{
-										AssetOp_->OnCreate(NewAsset);
+										if (!AssetOp_->OnCreate(NewAsset))
+										{
+											return;
+										}
 									}
 
 									TSharedRef<AssetViewAssetItem> NewAssetItem = MakeShared<AssetViewAssetItem>(this, SavedFileName);

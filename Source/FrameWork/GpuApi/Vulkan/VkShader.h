@@ -14,7 +14,6 @@ namespace FW
 		}
 
 	public:
-		TArray<GpuShaderLayoutBinding> GetLayout() const override;
 		void SetCompilationResult(VkShaderModule InShaderModule) { ShaderModule = InShaderModule; }
 		VkShaderModule GetCompilationResult() const { return ShaderModule; }
 		virtual bool IsCompiled() const override { return ShaderModule != VK_NULL_HANDLE; }

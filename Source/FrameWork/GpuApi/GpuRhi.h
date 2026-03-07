@@ -78,13 +78,14 @@ public:
 	virtual void BeginCaptureEvent(const FString& EventName) = 0;
 	virtual void EndCaptureEvent() = 0;
 	virtual void Barriers(const TArray<GpuBarrierInfo>& BarrierInfos) = 0;
-	virtual void CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture) = 0;
+	virtual void CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture, uint32 ArrayLayer = 0, uint32 MipLevel = 0) = 0;
 	virtual void CopyTextureToBuffer(GpuTexture* InTexture, GpuBuffer* InBuffer) = 0;
 	virtual void CopyBufferToBuffer(GpuBuffer* SrcBuffer, uint32 SrcOffset, GpuBuffer* DestBuffer, uint32 DestOffset, uint32 Size) = 0;
 };
 
 class FRAMEWORK_API GpuRhi
 {
+	friend class GpuRhiValidation;
 public:
 	GpuRhi() = default;
 	virtual ~GpuRhi() = default;
@@ -99,18 +100,16 @@ public:
 	virtual void BeginFrame() = 0;
 	virtual void EndFrame() = 0;
 
-	//If the initial state is unknown, then the state be determined based on usage,
-	//but it may not be possible to infer the state from some composite usage e.g. GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget
-	virtual TRefCountPtr<GpuTexture> CreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState = GpuResourceState::Unknown) = 0;
-	virtual TRefCountPtr<GpuBuffer> CreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState = GpuResourceState::Unknown) = 0;
+	TRefCountPtr<GpuTexture> CreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState = GpuResourceState::Unknown);
+	TRefCountPtr<GpuBuffer> CreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState = GpuResourceState::Unknown);
 
-	virtual TRefCountPtr<GpuShader> CreateShaderFromSource(const GpuShaderSourceDesc& Desc) const = 0;
+	TRefCountPtr<GpuShader> CreateShaderFromSource(const GpuShaderSourceDesc& Desc) const;
 	// The file directory will be considered as a include dir by default.
-	virtual TRefCountPtr<GpuShader> CreateShaderFromFile(const GpuShaderFileDesc& Desc) = 0;
+	TRefCountPtr<GpuShader> CreateShaderFromFile(const GpuShaderFileDesc& Desc);
 	virtual TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc &InBindGroupDesc) = 0;
 	virtual TRefCountPtr<GpuBindGroupLayout> CreateBindGroupLayout(const GpuBindGroupLayoutDesc &InBindGroupLayoutDesc) = 0;
-	virtual TRefCountPtr<GpuRenderPipelineState> CreateRenderPipelineState(const GpuRenderPipelineStateDesc &InPipelineStateDesc) = 0;
-	virtual TRefCountPtr<GpuComputePipelineState> CreateComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc) = 0;
+	TRefCountPtr<GpuRenderPipelineState> CreateRenderPipelineState(const GpuRenderPipelineStateDesc &InPipelineStateDesc);
+	TRefCountPtr<GpuComputePipelineState> CreateComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc);
 	virtual TRefCountPtr<GpuSampler> CreateSampler(const GpuSamplerDesc &InSamplerDesc) = 0;
 
 	virtual void SetResourceName(const FString &Name, GpuResource *InResource) = 0;
@@ -142,6 +141,14 @@ public:
 
 public:
 	static void InitGpuRhi(const GpuRhiConfig &InConfig);
+
+protected:
+	virtual TRefCountPtr<GpuTexture> CreateTextureInternal(const GpuTextureDesc& InTexDesc, GpuResourceState InitState) = 0;
+	virtual TRefCountPtr<GpuBuffer> CreateBufferInternal(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState) = 0;
+	virtual TRefCountPtr<GpuRenderPipelineState> CreateRenderPipelineStateInternal(const GpuRenderPipelineStateDesc &InPipelineStateDesc) = 0;
+	virtual TRefCountPtr<GpuComputePipelineState> CreateComputePipelineStateInternal(const GpuComputePipelineStateDesc& InPipelineStateDesc) = 0;
+	virtual TRefCountPtr<GpuShader> CreateShaderFromSourceInternal(const GpuShaderSourceDesc& Desc) const = 0;
+	virtual TRefCountPtr<GpuShader> CreateShaderFromFileInternal(const GpuShaderFileDesc& Desc) = 0;
 };
 
 FRAMEWORK_API extern TUniquePtr<GpuRhi> GGpuRhi;

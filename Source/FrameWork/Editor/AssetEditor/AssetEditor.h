@@ -22,8 +22,8 @@ namespace FW
 
 		virtual void OnNavigate(const FString& InAssetPath) {};
 
-		//For non-imported resources
-		virtual void OnCreate(AssetObject* InAsset) {};
+		//For non-imported resources. Return false to cancel creation.
+		virtual bool OnCreate(AssetObject* InAsset) { return true; };
 	};
     
     AssetOp* GetAssetOp(const FString& InAssetPath);

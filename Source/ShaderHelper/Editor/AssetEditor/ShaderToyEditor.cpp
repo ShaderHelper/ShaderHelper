@@ -31,10 +31,11 @@ namespace SH
         ShEditor->OpenGraph(LoadedShaderToy, MakeShared<ShaderToyRenderComp>(LoadedShaderToy, ShEditor->GetViewPort()));
 	}
 
-	void ShaderToyOp::OnCreate(AssetObject* InAsset)
+	bool ShaderToyOp::OnCreate(AssetObject* InAsset)
 	{
         auto OutputNode = NewShObject<ShaderToyOutputNode>(InAsset);
 		static_cast<ShaderToy*>(InAsset)->AddNode(MoveTemp(OutputNode));
+		return true;
 	}
 
 	void ShaderToyOp::OnDelete(const FString& InAssetPath)

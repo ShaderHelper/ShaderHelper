@@ -131,7 +131,7 @@ namespace FW
         void BeginCaptureEvent(const FString& EventName) override;
         void EndCaptureEvent() override;
 		void Barriers(const TArray<GpuBarrierInfo>& BarrierInfos) override;
-        void CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture) override;
+        void CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture, uint32 ArrayLayer = 0, uint32 MipLevel = 0) override;
         void CopyTextureToBuffer(GpuTexture* InTexture, GpuBuffer* InBuffer) override;
 		void CopyBufferToBuffer(GpuBuffer* SrcBuffer, uint32 SrcOffset, GpuBuffer* DestBuffer, uint32 DestOffset, uint32 Size) override;
         

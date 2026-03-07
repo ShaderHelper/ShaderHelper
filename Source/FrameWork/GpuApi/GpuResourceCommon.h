@@ -49,6 +49,12 @@ namespace FW
 		NUM,
 	};
 
+	enum class GpuTextureDimension
+	{
+		Tex2D,
+		TexCube,
+	};
+
 	enum class GpuTextureUsage : uint32
 	{
 		None = 0,

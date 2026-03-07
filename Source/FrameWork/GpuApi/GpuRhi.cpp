@@ -10,9 +10,44 @@
 #include "./Metal/MetalGpuRhiBackend.h"
 #endif
 #include "GpuApiValidation.h"
+#include "GpuShader.h"
 
 namespace FW
 {
+
+TRefCountPtr<GpuTexture> GpuRhi::CreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
+{
+	//If the initial state is unknown, then the state be determined based on usage,
+	//but it may not be possible to infer the state from some composite usage e.g. GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget
+	GpuResourceState ValidState = InitState == GpuResourceState::Unknown ? GetTextureState(InTexDesc.Usage) : InitState;
+	return CreateTextureInternal(InTexDesc, ValidState);
+}
+
+TRefCountPtr<GpuBuffer> GpuRhi::CreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState)
+{
+	GpuResourceState ValidState = InitState == GpuResourceState::Unknown ? GetBufferState(InBufferDesc.Usage) : InitState;
+	return CreateBufferInternal(InBufferDesc, ValidState);
+}
+
+TRefCountPtr<GpuShader> GpuRhi::CreateShaderFromSource(const GpuShaderSourceDesc& Desc) const
+{
+	return CreateShaderFromSourceInternal(Desc);
+}
+
+TRefCountPtr<GpuShader> GpuRhi::CreateShaderFromFile(const GpuShaderFileDesc& Desc)
+{
+	return CreateShaderFromFileInternal(Desc);
+}
+
+TRefCountPtr<GpuRenderPipelineState> GpuRhi::CreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc)
+{
+	return CreateRenderPipelineStateInternal(InPipelineStateDesc);
+}
+
+TRefCountPtr<GpuComputePipelineState> GpuRhi::CreateComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc)
+{
+	return CreateComputePipelineStateInternal(InPipelineStateDesc);
+}
 
 class GpuComputePassRecorderValidation : public GpuComputePassRecorder
 {
@@ -143,11 +178,11 @@ public:
 		CmdRecorder->Barriers(BarrierInfos);
 	}
 
-	void CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture) override
+	void CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture, uint32 ArrayLayer = 0, uint32 MipLevel = 0) override
 	{
 		check(State == CmdRecorderState::Begin);
 		check(EnumHasAnyFlags(InBuffer->State, GpuResourceState::CopySrc) && EnumHasAnyFlags(InTexture->State, GpuResourceState::CopyDst));
-		CmdRecorder->CopyBufferToTexture(InBuffer, InTexture);
+		CmdRecorder->CopyBufferToTexture(InBuffer, InTexture, ArrayLayer, MipLevel);
 	}
 
 	void CopyTextureToBuffer(GpuTexture* InTexture, GpuBuffer* InBuffer) override
@@ -203,27 +238,27 @@ public:
 		RequestedCmdRecorders.Empty();
 	}
 
-	TRefCountPtr<GpuTexture> CreateTexture(const GpuTextureDesc &InTexDesc, GpuResourceState InitState) override
+	TRefCountPtr<GpuTexture> CreateTextureInternal(const GpuTextureDesc &InTexDesc, GpuResourceState InitState) override
 	{
 		check(ValidateCreateTexture(InTexDesc, InitState));
-		return RhiBackend->CreateTexture(InTexDesc, InitState);
+		return RhiBackend->CreateTextureInternal(InTexDesc, InitState);
 	}
 
-	TRefCountPtr<GpuBuffer> CreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState) override
+	TRefCountPtr<GpuBuffer> CreateBufferInternal(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState) override
 	{
 		check(ValidateCreateBuffer(InBufferDesc, InitState));
-		return RhiBackend->CreateBuffer(InBufferDesc);
+		return RhiBackend->CreateBufferInternal(InBufferDesc, InitState);
 	}
 
-	TRefCountPtr<GpuShader> CreateShaderFromSource(const GpuShaderSourceDesc& Desc) const override
+	TRefCountPtr<GpuShader> CreateShaderFromSourceInternal(const GpuShaderSourceDesc& Desc) const override
 	{
-		return RhiBackend->CreateShaderFromSource(Desc);
+		return RhiBackend->CreateShaderFromSourceInternal(Desc);
 	}
 
-	TRefCountPtr<GpuShader> CreateShaderFromFile(const GpuShaderFileDesc& Desc) override
+	TRefCountPtr<GpuShader> CreateShaderFromFileInternal(const GpuShaderFileDesc& Desc) override
 	{
 		checkf(IFileManager::Get().FileExists(*Desc.FileName), TEXT("Can not find the shader file:%s"), *Desc.FileName);
-		return RhiBackend->CreateShaderFromFile(Desc);
+		return RhiBackend->CreateShaderFromFileInternal(Desc);
 	}
 
 	TRefCountPtr<GpuBindGroup> CreateBindGroup(const GpuBindGroupDesc &InBindGroupDesc) override
@@ -238,15 +273,15 @@ public:
 		return RhiBackend->CreateBindGroupLayout(InBindGroupLayoutDesc);
 	}
 
-	TRefCountPtr<GpuRenderPipelineState> CreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc) override
+	TRefCountPtr<GpuRenderPipelineState> CreateRenderPipelineStateInternal(const GpuRenderPipelineStateDesc& InPipelineStateDesc) override
 	{
 		check(ValidateCreateRenderPipelineState(InPipelineStateDesc));
-		return RhiBackend->CreateRenderPipelineState(InPipelineStateDesc);
+		return RhiBackend->CreateRenderPipelineStateInternal(InPipelineStateDesc);
 	}
 
-	TRefCountPtr<GpuComputePipelineState> CreateComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc)
+	TRefCountPtr<GpuComputePipelineState> CreateComputePipelineStateInternal(const GpuComputePipelineStateDesc& InPipelineStateDesc) override
 	{
-		return RhiBackend->CreateComputePipelineState(InPipelineStateDesc);
+		return RhiBackend->CreateComputePipelineStateInternal(InPipelineStateDesc);
 	}
 
 	TRefCountPtr<GpuSampler> CreateSampler(const GpuSamplerDesc &InSamplerDesc) override

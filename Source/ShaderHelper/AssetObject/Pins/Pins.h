@@ -11,15 +11,34 @@ namespace SH
 		using GraphPin::GraphPin;
 
 		void Serialize(FArchive& Ar) override;
-		bool Accept(FW::GraphPin* SourcePin) override;
-        void Refuse() override;
-		FLinearColor GetPinColor() const override { return FLinearColor{0.24f, 0.7f, 0.44f}; }
+		bool CanAccept(FW::GraphPin* SourcePin) override;
+		void Accept(FW::GraphPin* SourcePin) override;
+		void Refuse() override;
+		FLinearColor GetPinColor() const override { return FLinearColor{ 0.24f, 0.7f, 0.44f }; }
 
-        void SetValue(TRefCountPtr<FW::GpuTexture> InValue);
+		void SetValue(TRefCountPtr<FW::GpuTexture> InValue);
 		FW::GpuTexture* GetValue();
 
 	private:
 		TRefCountPtr<FW::GpuTexture> Value;
 	};
 
+	class GpuCubemapPin : public FW::GraphPin
+	{
+		REFLECTION_TYPE(GpuCubemapPin)
+	public:
+		using GraphPin::GraphPin;
+
+		void Serialize(FArchive& Ar) override;
+		bool CanAccept(FW::GraphPin* SourcePin) override;
+		void Accept(FW::GraphPin* SourcePin) override;
+		void Refuse() override;
+		FLinearColor GetPinColor() const override { return FLinearColor{ 0.19f, 0.05f, 0.19f }; }
+
+		void SetValue(TRefCountPtr<FW::GpuTexture> InValue);
+		FW::GpuTexture* GetValue();
+
+	private:
+		TRefCountPtr<FW::GpuTexture> Value;
+	};
 }

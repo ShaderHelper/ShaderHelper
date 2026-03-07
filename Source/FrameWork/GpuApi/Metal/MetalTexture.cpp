@@ -16,8 +16,8 @@ namespace FW
         GMtlDeferredReleaseManager.AddResource(this);
     }
 
-    MetalTexture::MetalTexture(MTLTexturePtr InTex, GpuTextureDesc InDesc, CVPixelBufferRef InSharedHandle)
-    : GpuTexture(MoveTemp(InDesc), GpuResourceState::Unknown)
+    MetalTexture::MetalTexture(MTLTexturePtr InTex, GpuTextureDesc InDesc, GpuResourceState InitState, CVPixelBufferRef InSharedHandle)
+    : GpuTexture(MoveTemp(InDesc), InitState)
     , Tex(MoveTemp(InTex))
     , SharedHandle(InSharedHandle)
     {
@@ -75,23 +75,30 @@ namespace FW
         return new MetalSampler(MoveTemp(Sampler), InSamplerDesc);
     }
 
-    TRefCountPtr<MetalTexture> CreateMetalTexture2D(const GpuTextureDesc& InTexDesc)
+    TRefCountPtr<MetalTexture> CreateMetalTexture2D(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
     {
         TRefCountPtr<MetalTexture> RetTexture;
-        if(EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::Shared))
+        if(EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::Shared) && InTexDesc.Dimension != GpuTextureDimension::TexCube)
         {
-            RetTexture = CreateSharedMetalTexture(InTexDesc);
+            RetTexture = CreateSharedMetalTexture(InTexDesc, InitState);
         }
         else
         {
             MTL::PixelFormat TexFormat = (MTL::PixelFormat)MapTextureFormat(InTexDesc.Format);
             MTL::TextureDescriptor* TexDesc = MTL::TextureDescriptor::texture2DDescriptor(TexFormat, InTexDesc.Width, InTexDesc.Height, InTexDesc.NumMips > 1);
-            TexDesc->setTextureType(MTL::TextureType2D);
+            if (InTexDesc.Dimension == GpuTextureDimension::TexCube)
+            {
+                TexDesc->setTextureType(MTL::TextureTypeCube);
+            }
+            else
+            {
+                TexDesc->setTextureType(MTL::TextureType2D);
+            }
             TexDesc->setStorageMode(MTL::StorageModePrivate);
             SetTextureUsage(InTexDesc.Usage, TexDesc);
             
             MTLTexturePtr Tex = NS::TransferPtr(GDevice->newTexture(TexDesc));
-            RetTexture = new MetalTexture(MoveTemp(Tex), InTexDesc);
+            RetTexture = new MetalTexture(MoveTemp(Tex), InTexDesc, InitState);
         }
         
         if (!InTexDesc.InitialData.IsEmpty()) {
@@ -124,7 +131,7 @@ namespace FW
         }
     }
 
-    TRefCountPtr<MetalTexture> CreateSharedMetalTexture(const GpuTextureDesc& InTexDesc)
+    TRefCountPtr<MetalTexture> CreateSharedMetalTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
     {
         MTLPixelFormat TexFormat = MapTextureFormat(InTexDesc.Format);
         CVPixelBufferRef CVPixelBuffer;
@@ -163,6 +170,6 @@ namespace FW
         
         CFRelease(CVMTLTextureCache);
         CVBufferRelease(CVMTLTexture);
-        return new MetalTexture(NS::TransferPtr((MTL::Texture*)Texture), InTexDesc, CVPixelBuffer);
+        return new MetalTexture(NS::TransferPtr((MTL::Texture*)Texture), InTexDesc, InitState, CVPixelBuffer);
     }
 }

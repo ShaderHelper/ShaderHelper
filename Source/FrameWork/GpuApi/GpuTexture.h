@@ -14,6 +14,7 @@ namespace FW
         Vector4f ClearValues{0,0,0,1};
 		uint32 Depth = 1;
 		uint32 NumMips = 1;
+		GpuTextureDimension Dimension = GpuTextureDimension::Tex2D;
     };
 
     class GpuTexture : public GpuTrackedResource

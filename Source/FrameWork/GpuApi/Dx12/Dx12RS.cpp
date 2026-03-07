@@ -11,6 +11,7 @@ namespace FW
 		switch (InType)
 		{
 		case BindingType::Texture:
+		case BindingType::TextureCube:
 		case BindingType::StructuredBuffer:
 		case BindingType::RawBuffer:
 			return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -44,7 +45,7 @@ namespace FW
 				Range.RegisterSpace = LayoutDesc.GroupNumber;
 				Range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-				if (LayoutBindingEntry.Type == BindingType::Texture || 
+				if (LayoutBindingEntry.Type == BindingType::Texture || LayoutBindingEntry.Type == BindingType::TextureCube ||
 					LayoutBindingEntry.Type == BindingType::RWStructuredBuffer || LayoutBindingEntry.Type == BindingType::StructuredBuffer ||
 					LayoutBindingEntry.Type == BindingType::RWRawBuffer || LayoutBindingEntry.Type == BindingType::RawBuffer)
 				{

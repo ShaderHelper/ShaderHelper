@@ -22,7 +22,7 @@ namespace FW
 	class MetalTexture : public GpuTexture
 	{
     public:
-        MetalTexture(MTLTexturePtr InTex, GpuTextureDesc InDesc, CVPixelBufferRef InSharedHandle = nullptr);
+        MetalTexture(MTLTexturePtr InTex, GpuTextureDesc InDesc, GpuResourceState InitState, CVPixelBufferRef InSharedHandle = nullptr);
         
         ~MetalTexture()
         {
@@ -48,8 +48,8 @@ namespace FW
         CVPixelBufferRef SharedHandle;
 	};
 
-    TRefCountPtr<MetalTexture> CreateMetalTexture2D(const GpuTextureDesc& InTexDesc);
-    TRefCountPtr<MetalTexture> CreateSharedMetalTexture(const GpuTextureDesc& InTexDesc);
+    TRefCountPtr<MetalTexture> CreateMetalTexture2D(const GpuTextureDesc& InTexDesc, GpuResourceState InitState);
+    TRefCountPtr<MetalTexture> CreateSharedMetalTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState);
 
     TRefCountPtr<MetalSampler> CreateMetalSampler(const GpuSamplerDesc& InSamplerDesc);
 }

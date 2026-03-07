@@ -65,7 +65,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 	void StShader::Serialize(FArchive& Ar)
 	{
 		ShaderAsset::Serialize(Ar);
-		Ar << Language;
+		Ar << Language << CubeChannelMask;
         Ar << CustomUniformBufferBuilder << CustomBindGroupLayoutBuilder;
 	}
 
@@ -114,12 +114,6 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 		return VertexShader;
 	}
 
-    GpuBindGroupLayout* StShader::GetBuiltInBindLayout()
-    {
-        static TRefCountPtr<GpuBindGroupLayout> BuiltInBindLayout = GetBuiltInBindLayoutBuilder().Build();
-        return BuiltInBindLayout;
-    }
-
     UniformBufferBuilder& StShader::GetBuiltInUbBuilder()
     {
         static UniformBufferBuilder BuiltInUbLayout{ UniformBufferUsage::Persistant };
@@ -137,25 +131,29 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         return BuiltInUbLayout;
     }
 
-    GpuBindGroupLayoutBuilder& StShader::GetBuiltInBindLayoutBuilder()
-    {
-        static GpuBindGroupLayoutBuilder BuiltInBindLayout{ BindingContext::GlobalSlot };
-        static int Init = [&] {
-            BuiltInBindLayout
-				.AddExistingBinding(0, BindingType::RWRawBuffer, BindingShaderStage::Pixel)
-                .AddUniformBuffer("BuiltInUniform", GetBuiltInUbBuilder(), BindingShaderStage::Pixel)
-                .AddTexture("iChannel0_texture", BindingShaderStage::Pixel)
-                .AddSampler("iChannel0_sampler", BindingShaderStage::Pixel)
-                .AddTexture("iChannel1_texture", BindingShaderStage::Pixel)
-                .AddSampler("iChannel1_sampler", BindingShaderStage::Pixel)
-                .AddTexture("iChannel2_texture", BindingShaderStage::Pixel)
-                .AddSampler("iChannel2_sampler", BindingShaderStage::Pixel)
-                .AddTexture("iChannel3_texture", BindingShaderStage::Pixel)
-                .AddSampler("iChannel3_sampler", BindingShaderStage::Pixel);
-            return 0;
-        }();
-        return BuiltInBindLayout;
-    }
+	GpuBindGroupLayoutBuilder StShader::GetBuiltInBindLayoutBuilder(uint8 CubeChannelMask) const
+	{
+		GpuBindGroupLayoutBuilder Builder{ BindingContext::GlobalSlot };
+		Builder
+			.AddExistingBinding(0, BindingType::RWRawBuffer, BindingShaderStage::Pixel)
+			.AddUniformBuffer("BuiltInUniform", GetBuiltInUbBuilder(), BindingShaderStage::Pixel);
+		for (int i = 0; i < 4; i++)
+		{
+			FString TexName = FString::Printf(TEXT("iChannel%d_texture"), i);
+			FString SamplerName = FString::Printf(TEXT("iChannel%d_sampler"), i);
+			if (CubeChannelMask & (1 << i))
+				Builder.AddTextureCube(TexName, BindingShaderStage::Pixel);
+			else
+				Builder.AddTexture(TexName, BindingShaderStage::Pixel);
+			Builder.AddSampler(SamplerName, BindingShaderStage::Pixel);
+		}
+		return Builder;
+	}
+
+	TRefCountPtr<GpuBindGroupLayout> StShader::GetBuiltInBindLayout(uint8 CubeChannelMask)
+	{
+		return GetBuiltInBindLayoutBuilder(CubeChannelMask).Build();
+	}
 
 	FString StShader::FileExtension() const
 	{
@@ -167,12 +165,24 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 		return FShaderHelperStyle::Get().GetBrush("AssetBrowser.Shader");
 	}
 
-    FString StShader::GetBinding() const
+    FString StShader::GetBinding(uint8 CubeChannelMask) const
     {
-        return GetBuiltInBindLayoutBuilder().GetCodegenDeclaration(Language) + CustomBindGroupLayoutBuilder.GetCodegenDeclaration(Language);
+        FString Result = GetBuiltInBindLayoutBuilder(CubeChannelMask).GetCodegenDeclaration(Language);
+        if (Language == GpuShaderLanguage::GLSL)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                if (CubeChannelMask & (1 << i))
+                    Result += FString::Printf(TEXT("#define iChannel%d samplerCube(iChannel%d_texture, iChannel%d_sampler)\n"), i, i, i);
+                else
+                    Result += FString::Printf(TEXT("#define iChannel%d sampler2D(iChannel%d_texture, iChannel%d_sampler)\n"), i, i, i);
+            }
+        }
+        Result += CustomBindGroupLayoutBuilder.GetCodegenDeclaration(Language);
+        return Result;
     }
 
-    FString StShader::GetTemplateWithBinding() const
+    FString StShader::GetTemplateWithBinding(uint8 CubeChannelMask) const
     {
 		FString Template, Header;
 		if (Language == GpuShaderLanguage::HLSL)
@@ -184,19 +194,29 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 			Header = "#version 450\n";
 			FFileHelper::LoadFileToString(Template, *(PathHelper::ShaderDir() / "ShaderHelper/StShaderTemplate.glsl"));
 		}
-        return Header + GetBinding() + Template;
+        return Header + GetBinding(CubeChannelMask) + Template;
     }
 
 	int StShader::GetExtraLineNum() const
 	{
+		return GetExtraLineNum(CubeChannelMask);
+	}
+
+	int StShader::GetExtraLineNum(uint8 CubeChannelMask) const
+	{
 		TArray<FString> AddedLines;
-		int AddedLineNum = GetTemplateWithBinding().ParseIntoArrayLines(AddedLines, false) - 1;
+		int AddedLineNum = GetTemplateWithBinding(CubeChannelMask).ParseIntoArrayLines(AddedLines, false) - 1;
 		return AddedLineNum;
 	}
 
 	GpuShaderSourceDesc StShader::GetShaderDesc(const FString& InContent) const
 	{
-		FString FinalShaderSource = GetTemplateWithBinding() + InContent;
+		return GetShaderDesc(InContent, CubeChannelMask);
+	}
+
+	GpuShaderSourceDesc StShader::GetShaderDesc(const FString& InContent, uint8 CubeChannelMask) const
+	{
+		FString FinalShaderSource = GetTemplateWithBinding(CubeChannelMask) + InContent;
 		auto Desc = GpuShaderSourceDesc{
 			.Name = GetShaderName(),
 			.Source = MoveTemp(FinalShaderSource),
@@ -221,7 +241,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 
 	FString StShader::GetFullContent() const
 	{
-        FString FullShader = GetTemplateWithBinding() + EditorContent;
+        FString FullShader = GetTemplateWithBinding(CubeChannelMask) + EditorContent;
 		return FullShader;
 	}
 
@@ -450,34 +470,35 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
     {
         BuiltInCategory = MakeShared<PropertyCategory>(this, LOCALIZATION("Builtin"));
         {
-            const GpuBindGroupLayoutDesc& BuiltInLayoutDesc = GetBuiltInBindLayoutBuilder().GetDesc();
-            for(const auto& [BindingName, Slot] : BuiltInLayoutDesc.CodegenBindingNameToSlot)
             {
-                if(BuiltInLayoutDesc.GetBindingType(Slot) == BindingType::UniformBuffer)
+                auto UniformCategory = MakeShared<PropertyCategory>(this, "BuiltInUniform");
+                auto PropertyDataUniforms = PropertyDatasFromUniform(GetBuiltInUbBuilder(), false);
+                for(auto Data : PropertyDataUniforms)
                 {
-                    auto UniformCategory = MakeShared<PropertyCategory>(this, BindingName);
-                    auto PropertyDataUniforms = PropertyDatasFromUniform(GetBuiltInUbBuilder(), false);
-                    for(auto Data : PropertyDataUniforms)
-                    {
-                        UniformCategory->AddChild(Data);
-                    }
-                    BuiltInCategory->AddChild(MoveTemp(UniformCategory));
+                    UniformCategory->AddChild(Data);
                 }
+                BuiltInCategory->AddChild(MoveTemp(UniformCategory));
             }
             auto SlotCategory = MakeShared<PropertyCategory>(this, "Slot");
             {
-                auto iChannel0Item = MakeShared<PropertyItemBase>(this, "iChannel0");
-                iChannel0Item->SetEnabled(false);
-                auto iChannel1Item = MakeShared<PropertyItemBase>(this, "iChannel1");
-                iChannel1Item->SetEnabled(false);
-                auto iChannel2Item = MakeShared<PropertyItemBase>(this, "iChannel2");
-                iChannel2Item->SetEnabled(false);
-                auto iChannel3Item = MakeShared<PropertyItemBase>(this, "iChannel3");
-                iChannel3Item->SetEnabled(false);
-                SlotCategory->AddChild(MoveTemp(iChannel0Item));
-                SlotCategory->AddChild(MoveTemp(iChannel1Item));
-                SlotCategory->AddChild(MoveTemp(iChannel2Item));
-                SlotCategory->AddChild(MoveTemp(iChannel3Item));
+                TMap<FString, TSharedPtr<void>> SlotTypeEntries;
+                SlotTypeEntries.Add("Texture2d", MakeShared<ShaderToySlotType>(ShaderToySlotType::Texture2D));
+                SlotTypeEntries.Add("TextureCube", MakeShared<ShaderToySlotType>(ShaderToySlotType::TextureCube));
+
+                for (int i = 0; i < 4; i++)
+                {
+                    FString ChannelName = FString::Printf(TEXT("iChannel%d"), i);
+                    auto EnumValueName = MakeShared<FString>((CubeChannelMask & (1 << i)) ? "TextureCube" : "Texture2d");
+                    auto Setter = [this, i](void* NewValue) {
+                        ShaderToySlotType NewType = *static_cast<ShaderToySlotType*>(NewValue);
+                        if (NewType == ShaderToySlotType::TextureCube)
+                            CubeChannelMask |= (1 << i);
+                        else
+                            CubeChannelMask &= ~(1 << i);
+                    };
+                    auto ChannelItem = MakeShared<PropertyEnumItem>(this, FText::FromString(ChannelName), EnumValueName, SlotTypeEntries, Setter);
+                    SlotCategory->AddChild(MoveTemp(ChannelItem));
+                }
             }
             BuiltInCategory->AddChild(MoveTemp(SlotCategory));
         }
@@ -530,6 +551,15 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 			else if(NewLanguage == GpuShaderLanguage::GLSL)
 			{
 				ShEditor->GetShaderEditor(this)->SetText(FText::FromString(DefaultGLSLPixelShaderBody));
+			}
+		}
+		else if (InProperty->IsOfType<PropertyEnumItem>())
+		{
+			FString DisplayName = InProperty->GetDisplayName().ToString();
+			if (DisplayName.StartsWith("iChannel"))
+			{
+				OnRefreshBuilder.Broadcast();
+				MarkDirty();
 			}
 		}
 	}

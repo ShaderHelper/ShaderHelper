@@ -173,7 +173,7 @@ namespace FW
 		GpuShaderLanguage GetShaderLanguage() const { return ShaderLanguage; }
 		GpuShaderModel GetShaderModelVer() const;
 
-		virtual TArray<GpuShaderLayoutBinding> GetLayout() const = 0;
+		virtual TArray<GpuShaderLayoutBinding> GetLayout() const;
 
 	public:
 		GpuShaderCompilerFlag CompilerFlag = GpuShaderCompilerFlag::None;

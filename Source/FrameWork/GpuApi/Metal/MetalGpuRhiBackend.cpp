@@ -44,18 +44,18 @@ void MetalGpuRhiBackend::EndFrame()
 	GMtlDeferredReleaseManager.ProcessResources();
 }
 
-TRefCountPtr<GpuTexture> MetalGpuRhiBackend::CreateTexture(const GpuTextureDesc &InTexDesc, GpuResourceState InitState)
+TRefCountPtr<GpuTexture> MetalGpuRhiBackend::CreateTextureInternal(const GpuTextureDesc &InTexDesc, GpuResourceState InitState)
 {
-	return AUX::StaticCastRefCountPtr<GpuTexture>(CreateMetalTexture2D(InTexDesc));
+	return AUX::StaticCastRefCountPtr<GpuTexture>(CreateMetalTexture2D(InTexDesc, InitState));
 }
 
-TRefCountPtr<GpuShader> MetalGpuRhiBackend::CreateShaderFromSource(const GpuShaderSourceDesc& Desc) const
+TRefCountPtr<GpuShader> MetalGpuRhiBackend::CreateShaderFromSourceInternal(const GpuShaderSourceDesc& Desc) const
 {
 	TRefCountPtr<MetalShader> NewShader = new MetalShader(Desc);
 	return AUX::StaticCastRefCountPtr<GpuShader>(NewShader);
 }
 
-TRefCountPtr<GpuShader> MetalGpuRhiBackend::CreateShaderFromFile(const GpuShaderFileDesc& Desc)
+TRefCountPtr<GpuShader> MetalGpuRhiBackend::CreateShaderFromFileInternal(const GpuShaderFileDesc& Desc)
 {
 	TRefCountPtr<MetalShader> NewShader = new MetalShader(Desc);
 	return AUX::StaticCastRefCountPtr<GpuShader>(NewShader);
@@ -71,17 +71,17 @@ TRefCountPtr<GpuBindGroupLayout> MetalGpuRhiBackend::CreateBindGroupLayout(const
 	return AUX::StaticCastRefCountPtr<GpuBindGroupLayout>(CreateMetalBindGroupLayout(InBindGroupLayoutDesc));
 }
 
-TRefCountPtr<GpuRenderPipelineState> MetalGpuRhiBackend::CreateRenderPipelineState(const GpuRenderPipelineStateDesc &InPipelineStateDesc)
+TRefCountPtr<GpuRenderPipelineState> MetalGpuRhiBackend::CreateRenderPipelineStateInternal(const GpuRenderPipelineStateDesc &InPipelineStateDesc)
 {
 	return AUX::StaticCastRefCountPtr<GpuRenderPipelineState>(CreateMetalRenderPipelineState(InPipelineStateDesc));
 }
 
-TRefCountPtr<GpuComputePipelineState> MetalGpuRhiBackend::CreateComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc)
+TRefCountPtr<GpuComputePipelineState> MetalGpuRhiBackend::CreateComputePipelineStateInternal(const GpuComputePipelineStateDesc& InPipelineStateDesc)
 {
     return AUX::StaticCastRefCountPtr<GpuComputePipelineState>(CreateMetalComputePipelineState(InPipelineStateDesc));
 }
 
-TRefCountPtr<GpuBuffer> MetalGpuRhiBackend::CreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState)
+TRefCountPtr<GpuBuffer> MetalGpuRhiBackend::CreateBufferInternal(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState)
 {
 	return AUX::StaticCastRefCountPtr<GpuBuffer>(CreateMetalBuffer(InBufferDesc, InitState));
 }

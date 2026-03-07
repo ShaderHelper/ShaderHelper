@@ -154,6 +154,11 @@ constexpr int PaddingLineNum = 22;
 		SyntaxEvent->Trigger();
 		SyntaxThread->Join();
 		FPlatformProcess::ReturnSynchEventToPool(SyntaxEvent);
+
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		TSharedPtr<SWindow> ShaderEditorTipWindow = ShEditor->GetShaderEditorTipWindow();
+		ShaderEditorTipWindow->SetContent(SNullWidget::NullWidget);
+		ShaderEditorTipWindow->HideWindow();
     }
 
     static bool FuzzyMatch(const FString& Candidate, const FString& Token)
@@ -1676,7 +1681,13 @@ constexpr int PaddingLineNum = 22;
 					SShaderEditorBox* NewShaderEditor = ShEditor->GetShaderEditor(TargetShaderAsset);
 					if (NewShaderEditor)
 					{
-						NewShaderEditor->JumpTo(NewShaderEditor->GetLineIndex(SymbolLineNumber));
+						auto FrameCount = MakeShared<int32>(2);
+						FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda(
+							[NewShaderEditor, SymbolLineNumber, FrameCount](float) {
+								if (--(*FrameCount) > 0) return true;
+								NewShaderEditor->JumpTo(NewShaderEditor->GetLineIndex(SymbolLineNumber));
+								return false;
+							}));
 					}
 				}
 				else if (Symbol.File.IsEmpty() || Symbol.File == ShaderAssetObj->GetShaderName())

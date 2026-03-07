@@ -125,14 +125,14 @@ namespace FW
 			SH_LOG(LogRhiValidation, Error, TEXT("CreateBuffer Error(Usage can only be either dynamic or static.)"));
 			return false;
 		}
-		else if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::Uniform))
-		{
-			if (InitState != GpuResourceState::Unknown)
-			{
-				SH_LOG(LogRhiValidation, Error, TEXT("CreateBuffer Error(InitState must be Unknown) for GpuBufferUsage(%s)"), ANSI_TO_TCHAR(magic_enum::enum_name(InBufferDesc.Usage).data()));
-				return false;
-			}
-		}
+		//else if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::Uniform))
+		//{
+		//	if (InitState != GpuResourceState::Unknown)
+		//	{
+		//		SH_LOG(LogRhiValidation, Error, TEXT("CreateBuffer Error(InitState must be Unknown) for GpuBufferUsage(%s)"), ANSI_TO_TCHAR(magic_enum::enum_name(InBufferDesc.Usage).data()));
+		//		return false;
+		//	}
+		//}
 		else if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::RWStructured))
 		{
 			if (InBufferDesc.StructuredInit.Stride == 0 || (InBufferDesc.ByteSize % InBufferDesc.StructuredInit.Stride != 0))
@@ -182,6 +182,11 @@ namespace FW
 
 	bool ValidateCreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
 	{
+		if (InTexDesc.Dimension == GpuTextureDimension::TexCube && EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::Shared))
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(Shared usage is not supported for cubemap textures)"));
+			return false;
+		}
 		if (EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::RenderTarget) && EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::ShaderResource) 
 			&& InitState == GpuResourceState::Unknown)
 		{

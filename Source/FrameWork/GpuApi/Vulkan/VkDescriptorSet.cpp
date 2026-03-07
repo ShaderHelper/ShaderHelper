@@ -28,6 +28,7 @@ namespace FW
 		case BindingType::UniformBuffer:
 			return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		case BindingType::Texture:
+		case BindingType::TextureCube:
 			return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
 		case BindingType::Sampler:
 			return VK_DESCRIPTOR_TYPE_SAMPLER;
@@ -156,7 +157,7 @@ namespace FW
 			{
 				VulkanTexture* Texture = static_cast<VulkanTexture*>(Resource);
 				BindingType SlotBindingType = LayoutDesc.GetBindingType(Slot);
-				VkImageLayout ImageLayout = SlotBindingType == BindingType::Texture
+				VkImageLayout ImageLayout = (SlotBindingType == BindingType::Texture || SlotBindingType == BindingType::TextureCube)
 					? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 					: VK_IMAGE_LAYOUT_GENERAL;
 				ImageInfos.Add({

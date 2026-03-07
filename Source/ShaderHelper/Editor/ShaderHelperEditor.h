@@ -127,6 +127,7 @@ namespace SH
 		FToolBarBuilder CreateToolBarBuilder();
         FMenuBarBuilder CreateMenuBarBuilder();
 		void CreateInternalWidgets();
+		void CreateBuiltinAssets();
 		void FillMenu(FMenuBuilder& MenuBuilder, FString MenuName);
 		
 	private:

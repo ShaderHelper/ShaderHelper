@@ -31,7 +31,17 @@ namespace FW
 			SGraphPin* StartPin = StaticCastSharedPtr<GraphDragDropOp>(DragDropOp)->StartPin;
 			if (PinData->Direction != StartPin->PinData->Direction && StartPin->Owner != Owner)
 			{
-				OwnerPanel->PreviewEnd = OwnerPanel->GetTickSpaceGeometry().AbsoluteToLocal(MyGeometry.GetAbsolutePositionAtCoordinates(FVector2D(0.5f, 0.5f)));
+				GraphPin* InputPinData = PinData->Direction == PinDirection::Input ? PinData : StartPin->PinData;
+				GraphPin* OutputPinData = PinData->Direction == PinDirection::Output ? PinData : StartPin->PinData;
+				if (InputPinData->CanAccept(OutputPinData))
+				{
+					DragDropOp->SetCursorOverride(TOptional<EMouseCursor::Type>());
+					OwnerPanel->PreviewEnd = OwnerPanel->GetTickSpaceGeometry().AbsoluteToLocal(MyGeometry.GetAbsolutePositionAtCoordinates(FVector2D(0.5f, 0.5f)));
+				}
+				else
+				{
+					DragDropOp->SetCursorOverride(EMouseCursor::SlashedCircle);
+				}
 				return FReply::Handled();
 			}
 		}
@@ -47,6 +57,13 @@ namespace FW
 			SGraphPin* EndPin = this;
 			if (PinData->Direction != StartPin->PinData->Direction && StartPin->Owner != Owner)
 			{
+				GraphPin* InputPinData = PinData->Direction == PinDirection::Input ? PinData : StartPin->PinData;
+				GraphPin* OutputPinData = PinData->Direction == PinDirection::Output ? PinData : StartPin->PinData;
+				if (!InputPinData->CanAccept(OutputPinData))
+				{
+					OwnerPanel->PreviewStart.Reset();
+					return FReply::Handled().ReleaseMouseLock();
+				}
 				SGraphPanel::ScopedTransaction Transaction{ OwnerPanel };
 				if (PinData->Direction == PinDirection::Output)
 				{

@@ -2,6 +2,7 @@
 #include "ShPluginManager.h"
 #include "AssetObject/ShaderToy/ShaderToy.h"
 #include "AssetObject/Nodes/Texture2dNode.h"
+#include "AssetObject/Nodes/TextureCubeNode.h"
 #include "AssetObject/ShaderToy/Nodes/ShaderToyPassNode.h"
 #include "AssetObject/ShaderToy/Nodes/ShaderToyOutputNode.h"
 #include "AssetObject/ShaderToy/Nodes/ShaderToyKeyboardNode.h"
@@ -29,7 +30,8 @@ PYBIND11_EMBEDDED_MODULE(ShaderHelper, m)
 		});
 	py::class_<SH::StShader, SH::ShaderAsset, FW::ObjectPtr<SH::StShader>>(m, "StShader")
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::StShader>(Outer); }), py::arg("Outer") = nullptr)
-		.def_readwrite("Language", &SH::StShader::Language);
+		.def_readwrite("Language", &SH::StShader::Language)
+		.def_readwrite("CubeChannelMask", &SH::StShader::CubeChannelMask);
 	py::class_<SH::ShaderHeader, SH::ShaderAsset, FW::ObjectPtr<SH::ShaderHeader>>(m, "ShaderHeader")
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::ShaderHeader>(Outer); }), py::arg("Outer") = nullptr)
 		.def_readwrite("Language", &SH::ShaderHeader::Language);
@@ -64,6 +66,10 @@ PYBIND11_EMBEDDED_MODULE(ShaderHelper, m)
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::Texture2dNode>(Outer); }), py::arg("Outer") = nullptr)
 		.def(py::init([](FW::ShObject* Outer, FW::AssetPtr<FW::Texture2D> InTex) { return NewShObject<SH::Texture2dNode>(Outer, InTex); }))
 		.def_property_readonly("Texture", [](const SH::Texture2dNode& Self) { return Self.Texture.Get(); });
+	py::class_<SH::TextureCubeNode, FW::GraphNode, FW::ObjectPtr<SH::TextureCubeNode>>(m, "TextureCubeNode")
+		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::TextureCubeNode>(Outer); }), py::arg("Outer") = nullptr)
+		.def(py::init([](FW::ShObject* Outer, FW::AssetPtr<FW::TextureCube> InTexture) { return NewShObject<SH::TextureCubeNode>(Outer, InTexture); }))
+		.def_property_readonly("Texture", [](const SH::TextureCubeNode& Self) { return Self.Texture.Get(); });
 
 	py::class_<SH::GpuTexturePin, FW::GraphPin, FW::ObjectPtr<SH::GpuTexturePin>>(m, "GpuTexturePin")
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::GpuTexturePin>(Outer); }), py::arg("Outer") = nullptr);

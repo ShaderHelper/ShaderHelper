@@ -15,7 +15,7 @@ namespace FW
 		NodeData = InArgs._NodeData;
 		Owner = InOwnerPanel;
 
-		TSharedRef<SVerticalBox> PinContainer = SNew(SVerticalBox);
+		PinContainer = SNew(SVerticalBox);
 
 		ChildSlot
 		[
@@ -43,10 +43,18 @@ namespace FW
 				.BorderImage(FAppCommonStyle::Get().GetBrush("Graph.NodeContentBackground"))
 				.Padding(FMargin{ 0.0f, 3.0f, 0.0f, 0.0f })
 				[
-					PinContainer
+					PinContainer.ToSharedRef()
 				]
 			]
 		];
+
+		PopulatePinWidgets();
+	}
+
+	void SGraphNode::PopulatePinWidgets()
+	{
+		Pins.Empty();
+		PinContainer->ClearChildren();
 
 		for (GraphPin* Pin : NodeData->Pins)
 		{
@@ -89,7 +97,6 @@ namespace FW
 			if (Pin->Direction == PinDirection::Input)
 			{
 				PinDesc->SetHAlign(HAlign_Left);
-
 				PinContainer->AddSlot()
 				.HAlign(HAlign_Left)
 				.AutoHeight()
@@ -101,7 +108,6 @@ namespace FW
 			else
 			{
 				PinDesc->SetHAlign(HAlign_Right);
-
 				PinContainer->AddSlot()
 				.HAlign(HAlign_Right)
 				.AutoHeight()
@@ -115,6 +121,51 @@ namespace FW
 		if (TSharedPtr<SWidget> ExtraWidget = NodeData->ExtraNodeWidget())
 		{
 			PinContainer->AddSlot()[ExtraWidget.ToSharedRef()];
+		}
+	}
+
+	void SGraphNode::RebuildPins()
+	{
+		// Remove all links involving this node's pins
+		for (SGraphPin* Pin : Pins)
+		{
+			if (Pin->PinData->Direction == PinDirection::Input)
+			{
+				if (SGraphPin* OutputPin = Owner->GetOuputPin(Pin))
+				{
+					Owner->Links.Remove(OutputPin, Pin);
+				}
+			}
+			else
+			{
+				Owner->Links.Remove(Pin);
+			}
+		}
+
+		PopulatePinWidgets();
+
+		// Restore links from data model state
+		for (SGraphPin* Pin : Pins)
+		{
+			if (Pin->PinData->Direction == PinDirection::Input && Pin->PinData->SourcePin.IsValid())
+			{
+				if (SGraphPin* OutputPin = Owner->GetGraphPin(Pin->PinData->SourcePin))
+				{
+					Owner->Links.AddUnique(OutputPin, Pin);
+				}
+			}
+			else if (Pin->PinData->Direction == PinDirection::Output)
+			{
+				TArray<FGuid> LinkedInputGuids;
+				NodeData->OutPinToInPin.MultiFind(Pin->PinData->GetGuid(), LinkedInputGuids);
+				for (const FGuid& InputGuid : LinkedInputGuids)
+				{
+					if (SGraphPin* InputPin = Owner->GetGraphPin(InputGuid))
+					{
+						Owner->Links.AddUnique(Pin, InputPin);
+					}
+				}
+			}
 		}
 	}
 

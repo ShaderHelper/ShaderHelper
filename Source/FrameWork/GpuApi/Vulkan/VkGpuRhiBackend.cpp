@@ -35,25 +35,23 @@ namespace FW
 		GVkDeferredReleaseManager.ProcessResources();
 	}
 
-	TRefCountPtr<GpuTexture> VkGpuRhiBackend::CreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
+	TRefCountPtr<GpuTexture> VkGpuRhiBackend::CreateTextureInternal(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
 	{
-		GpuResourceState ValidState = InitState == GpuResourceState::Unknown ? GetTextureState(InTexDesc.Usage) : InitState;
-		return AUX::StaticCastRefCountPtr<GpuTexture>(CreateVulkanTexture(InTexDesc, ValidState));
+		return AUX::StaticCastRefCountPtr<GpuTexture>(CreateVulkanTexture(InTexDesc, InitState));
 	}
 
-	TRefCountPtr<GpuBuffer> VkGpuRhiBackend::CreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState)
+	TRefCountPtr<GpuBuffer> VkGpuRhiBackend::CreateBufferInternal(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState)
 	{
-		GpuResourceState ValidState = InitState == GpuResourceState::Unknown ? GetBufferState(InBufferDesc.Usage) : InitState;
-		return AUX::StaticCastRefCountPtr<GpuBuffer>(CreateVulkanBuffer(InBufferDesc, ValidState));
+		return AUX::StaticCastRefCountPtr<GpuBuffer>(CreateVulkanBuffer(InBufferDesc, InitState));
 	}
 
-	TRefCountPtr<GpuShader> VkGpuRhiBackend::CreateShaderFromSource(const GpuShaderSourceDesc& Desc) const
+	TRefCountPtr<GpuShader> VkGpuRhiBackend::CreateShaderFromSourceInternal(const GpuShaderSourceDesc& Desc) const
 	{
 		TRefCountPtr<VulkanShader> NewShader = new VulkanShader(Desc);
 		return TRefCountPtr<GpuShader>(NewShader);
 	}
 
-	TRefCountPtr<GpuShader> VkGpuRhiBackend::CreateShaderFromFile(const GpuShaderFileDesc& Desc)
+	TRefCountPtr<GpuShader> VkGpuRhiBackend::CreateShaderFromFileInternal(const GpuShaderFileDesc& Desc)
 	{
 		TRefCountPtr<VulkanShader> NewShader = new VulkanShader(Desc);
 		return TRefCountPtr<GpuShader>(NewShader);
@@ -69,12 +67,12 @@ namespace FW
 		return AUX::StaticCastRefCountPtr<GpuBindGroupLayout>(CreateVulkanBindGroupLayout(InBindGroupLayoutDesc));
 	}
 
-	TRefCountPtr<GpuRenderPipelineState> VkGpuRhiBackend::CreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc)
+	TRefCountPtr<GpuRenderPipelineState> VkGpuRhiBackend::CreateRenderPipelineStateInternal(const GpuRenderPipelineStateDesc& InPipelineStateDesc)
 	{
 		return AUX::StaticCastRefCountPtr<GpuRenderPipelineState>(CreateVulkanRenderPipelineState(InPipelineStateDesc));
 	}
 
-	TRefCountPtr<GpuComputePipelineState> VkGpuRhiBackend::CreateComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc)
+	TRefCountPtr<GpuComputePipelineState> VkGpuRhiBackend::CreateComputePipelineStateInternal(const GpuComputePipelineStateDesc& InPipelineStateDesc)
 	{
 		return AUX::StaticCastRefCountPtr<GpuComputePipelineState>(CreateVulkanComputePipelineState(InPipelineStateDesc));
 	}

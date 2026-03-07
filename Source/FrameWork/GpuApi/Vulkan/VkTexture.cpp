@@ -45,16 +45,23 @@ namespace FW
 
 	TRefCountPtr<VulkanTexture> CreateVulkanTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
 	{
+		const bool bIsCube = InTexDesc.Dimension == GpuTextureDimension::TexCube;
+		const uint32 ArrayLayers = bIsCube ? 6 : 1;
+
 		VkImageCreateInfo ImgCreateInfo = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
 		ImgCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 		ImgCreateInfo.extent.width = InTexDesc.Width;
 		ImgCreateInfo.extent.height = InTexDesc.Height;
 		ImgCreateInfo.extent.depth = 1;
 		ImgCreateInfo.mipLevels = 1;
-		ImgCreateInfo.arrayLayers = 1;
+		ImgCreateInfo.arrayLayers = ArrayLayers;
 		ImgCreateInfo.format = MapTextureFormat(InTexDesc.Format);
 		ImgCreateInfo.usage = DetermineTextureUsage(InTexDesc);
 		ImgCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		if (bIsCube)
+		{
+			ImgCreateInfo.flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+		}
 
 		VmaAllocationCreateInfo AllocCreateInfo = {};
 		AllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
@@ -117,14 +124,14 @@ namespace FW
 		VkImageViewCreateInfo ViewInfo = { 
 			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, 
 			.image = Image,
-			.viewType = VK_IMAGE_VIEW_TYPE_2D,
+			.viewType = bIsCube ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D,
 			.format = ImgCreateInfo.format,
 			.subresourceRange = {
 				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
 				.baseMipLevel = 0,
 				.levelCount = 1,
 				.baseArrayLayer = 0,
-				.layerCount = 1
+				.layerCount = ArrayLayers
 			}
 		};
 		VkImageView ImageView;
