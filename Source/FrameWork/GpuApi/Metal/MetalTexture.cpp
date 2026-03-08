@@ -22,6 +22,12 @@ namespace FW
     , SharedHandle(InSharedHandle)
     {
         GMtlDeferredReleaseManager.AddResource(this);
+
+        GpuTextureViewDesc DefaultViewDesc;
+        DefaultViewDesc.Texture = RetTexture;
+        DefaultViewDesc.BaseMipLevel = 0;
+        DefaultViewDesc.MipLevelCount = GetNumMips();
+        DefaultView = GMtlGpuRhi->CreateTextureView(DefaultViewDesc);
     }
 
     static void SetTextureUsage(GpuTextureUsage InUsage, MTL::TextureDescriptor* OutTexDesc)
@@ -86,6 +92,7 @@ namespace FW
         {
             MTL::PixelFormat TexFormat = (MTL::PixelFormat)MapTextureFormat(InTexDesc.Format);
             MTL::TextureDescriptor* TexDesc = MTL::TextureDescriptor::texture2DDescriptor(TexFormat, InTexDesc.Width, InTexDesc.Height, InTexDesc.NumMips > 1);
+            TexDesc->setMipmapLevelCount(InTexDesc.NumMips);
             if (InTexDesc.Dimension == GpuTextureDimension::TexCube)
             {
                 TexDesc->setTextureType(MTL::TextureTypeCube);
@@ -101,14 +108,6 @@ namespace FW
             RetTexture = new MetalTexture(MoveTemp(Tex), InTexDesc, InitState);
         }
 
-		{
-			GpuTextureViewDesc DefaultViewDesc;
-			DefaultViewDesc.Texture = RetTexture;
-			DefaultViewDesc.BaseMipLevel = 0;
-			DefaultViewDesc.MipLevelCount = InTexDesc.NumMips;
-			RetTexture->DefaultView = GMtlGpuRhi->CreateTextureView(DefaultViewDesc);
-		}
-        
         if (!InTexDesc.InitialData.IsEmpty()) {
             const uint32 BytesImage = InTexDesc.InitialData.Num();
 			TRefCountPtr<MetalBuffer> UploadBuffer = CreateMetalBuffer({BytesImage, GpuBufferUsage::Upload});

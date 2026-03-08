@@ -48,11 +48,20 @@ namespace FW
 			.Width = (uint32)Width, 
 			.Height = (uint32)Height, 
 			.Format = Format,
-			.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared ,
+			.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget,
 			.InitialData = RawData,
 			.NumMips = 0,
 		};
 		GpuData = GGpuRhi->CreateTexture(MoveTemp(Desc), GpuResourceState::ShaderResourceRead);
+
+		GpuTextureDesc PreviewDesc{ 
+			.Width = (uint32)Width, 
+			.Height = (uint32)Height, 
+			.Format = Format,
+			.Usage = GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared,
+			.InitialData = RawData,
+		};
+		PreviewTex = GGpuRhi->CreateTexture(MoveTemp(PreviewDesc));
 	}
 
 	FString Texture2D::FileExtension() const

@@ -230,7 +230,7 @@ namespace SH
 					if (LoadFaceImage(OpenedFileNames[0], ImageData))
 					{
 						FaceImages[FaceIndex] = MoveTemp(ImageData);
-						FaceViewports[FaceIndex]->SetViewPortRenderTexture(FaceImages[FaceIndex].Texture->GetGpuData());
+						FaceViewports[FaceIndex]->SetViewPortRenderTexture(FaceImages[FaceIndex].Texture->GetPreviewTexture());
 					}
 				}
 			}

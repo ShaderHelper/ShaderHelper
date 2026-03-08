@@ -42,7 +42,10 @@ namespace FW
         
         ~MetalTexture()
         {
-            CVPixelBufferRelease(SharedHandle);
+            if (SharedHandle)
+            {
+                CVPixelBufferRelease(SharedHandle);
+            }
         }
         
     public:
@@ -64,7 +67,7 @@ namespace FW
         
     private:
         MTLTexturePtr Tex;
-        CVPixelBufferRef SharedHandle;
+        CVPixelBufferRef SharedHandle = nullptr;
 	};
 
     TRefCountPtr<MetalTexture> CreateMetalTexture2D(const GpuTextureDesc& InTexDesc, GpuResourceState InitState);
