@@ -22,8 +22,8 @@ namespace SH
 		FW::GpuShader* GetPixelShader() const { return Shader; }
 		FW::GpuShader* GetVertexShader();
         static FW::UniformBufferBuilder& GetBuiltInUbBuilder();
-		TRefCountPtr<FW::GpuBindGroupLayout> GetBuiltInBindLayout(uint8 CubeChannelMask = 0);
-        FW::GpuBindGroupLayoutBuilder GetBuiltInBindLayoutBuilder(uint8 CubeChannelMask) const;
+		TRefCountPtr<FW::GpuBindGroupLayout> GetBuiltInBindLayout();
+        FW::GpuBindGroupLayoutBuilder GetBuiltInBindLayoutBuilder() const;
 
 	public:
 		//AssetObject interface
@@ -36,11 +36,8 @@ namespace SH
 		FString GetFullContent() const override;
 		int32 GetExtraLineNum() const override;
 		FW::GpuShaderSourceDesc GetShaderDesc(const FString& InContent) const override;
-		int32 GetExtraLineNum(uint8 CubeChannelMask) const;
-		FW::GpuShaderSourceDesc GetShaderDesc(const FString& InContent, uint8 CubeChannelMask) const;
-		
-        FString GetBinding(uint8 CubeChannelMask = 0) const;
-        FString GetTemplateWithBinding(uint8 CubeChannelMask = 0) const;
+		FString GetBinding() const;
+        FString GetTemplateWithBinding() const;
         
 		//ShObject interface
 		bool CanChangeProperty(FW::PropertyData* InProperty) override;
@@ -58,7 +55,7 @@ namespace SH
         
 	public:
 		FW::GpuShaderLanguage Language;
-		uint8 CubeChannelMask = 0;
+		ShaderToySlotType ChannelSlotTypes[4] = { ShaderToySlotType::Texture2D, ShaderToySlotType::Texture2D, ShaderToySlotType::Texture2D, ShaderToySlotType::Texture2D };
 
         TSharedPtr<FW::PropertyCategory> BuiltInCategory;
         TSharedPtr<FW::PropertyCategory> CustomCategory;

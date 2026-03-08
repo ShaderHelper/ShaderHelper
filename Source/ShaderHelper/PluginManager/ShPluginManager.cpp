@@ -31,13 +31,25 @@ PYBIND11_EMBEDDED_MODULE(ShaderHelper, m)
 	py::class_<SH::StShader, SH::ShaderAsset, FW::ObjectPtr<SH::StShader>>(m, "StShader")
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::StShader>(Outer); }), py::arg("Outer") = nullptr)
 		.def_readwrite("Language", &SH::StShader::Language)
-		.def_readwrite("CubeChannelMask", &SH::StShader::CubeChannelMask);
+		.def_property("ChannelSlotTypes",
+			[](const SH::StShader& Self) {
+				return py::make_tuple(Self.ChannelSlotTypes[0], Self.ChannelSlotTypes[1], Self.ChannelSlotTypes[2], Self.ChannelSlotTypes[3]);
+			},
+			[](SH::StShader& Self, py::tuple t) {
+				for (int i = 0; i < 4 && i < py::len(t); i++)
+					Self.ChannelSlotTypes[i] = t[i].cast<SH::ShaderToySlotType>();
+			});
 	py::class_<SH::ShaderHeader, SH::ShaderAsset, FW::ObjectPtr<SH::ShaderHeader>>(m, "ShaderHeader")
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::ShaderHeader>(Outer); }), py::arg("Outer") = nullptr)
 		.def_readwrite("Language", &SH::ShaderHeader::Language);
+	py::native_enum<SH::ShaderToySlotType>(m, "ShaderToySlotType", "enum.Enum")
+		.value("Texture2D", SH::ShaderToySlotType::Texture2D)
+		.value("TextureCube", SH::ShaderToySlotType::TextureCube)
+		.finalize();
 	py::native_enum<SH::ShaderToyFilterMode>(m, "ShaderToyFilterMode", "enum.Enum")
 		.value("Nearest", SH::ShaderToyFilterMode::Nearest)
 		.value("Linear", SH::ShaderToyFilterMode::Linear)
+		.value("Mipmap", SH::ShaderToyFilterMode::Mipmap)
 		.finalize();
 	py::native_enum<SH::ShaderToyWrapMode>(m, "ShaderToyWrapMode", "enum.Enum")
 		.value("Clamp", SH::ShaderToyWrapMode::Clamp)

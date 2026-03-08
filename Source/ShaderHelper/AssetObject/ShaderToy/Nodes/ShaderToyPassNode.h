@@ -23,7 +23,8 @@ namespace SH
 	enum class ShaderToyFilterMode
 	{
 		Linear = (int)FW::SamplerFilter::Bilinear,
-		Nearest = (int)FW::SamplerFilter::Point
+		Nearest = (int)FW::SamplerFilter::Point,
+		Mipmap = (int)FW::SamplerFilter::Trilinear
 	};
 
 	enum class ShaderToyWrapMode

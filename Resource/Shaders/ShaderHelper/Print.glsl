@@ -125,7 +125,7 @@ uint GPrivate_AssertResult = 1u;
 #define Print1(StrArrDecl, Arg1) { \
     StrArrDecl; \
     uint CharNum = uint(StrArr.length()); \
-    uint ArgByteSize = 1u + GetArgSize(Arg1); \
+    uint ArgByteSize = 1u + 1u + GetArgSize(Arg1); \
     uint Increment = 3u + CharNum + ArgByteSize; \
     uint OldByteSize = Printer.Data[0]; \
     uint ByteOffset = PRINT_MAX_BYTES; \
@@ -147,7 +147,7 @@ uint GPrivate_AssertResult = 1u;
 #define Print2(StrArrDecl, Arg1, Arg2) { \
     StrArrDecl; \
     uint CharNum = uint(StrArr.length()); \
-    uint ArgByteSize = 1u + GetArgSize(Arg1) + GetArgSize(Arg2); \
+    uint ArgByteSize = 1u + 2u + GetArgSize(Arg1) + GetArgSize(Arg2); \
     uint Increment = 3u + CharNum + ArgByteSize; \
     uint OldByteSize = Printer.Data[0]; \
     uint ByteOffset = PRINT_MAX_BYTES; \
@@ -170,7 +170,7 @@ uint GPrivate_AssertResult = 1u;
 #define Print3(StrArrDecl, Arg1, Arg2, Arg3) { \
     StrArrDecl; \
     uint CharNum = uint(StrArr.length()); \
-    uint ArgByteSize = 1u + GetArgSize(Arg1) + GetArgSize(Arg2) + GetArgSize(Arg3); \
+    uint ArgByteSize = 1u + 3u + GetArgSize(Arg1) + GetArgSize(Arg2) + GetArgSize(Arg3); \
     uint Increment = 3u + CharNum + ArgByteSize; \
     uint OldByteSize = Printer.Data[0]; \
     uint ByteOffset = PRINT_MAX_BYTES; \

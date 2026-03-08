@@ -292,12 +292,12 @@ def create_shadertoy_assets(shadertoy_id, shadertoy_info):
                 shadertoy_shader.EditorContent = include_common_code + pass_data['code']
                 shadertoy_shader.Language = Sh.GpuShaderLanguage.GLSL
                 
-                # Set CubeChannelMask before saving so the shader compiles with correct bindings
-                cube_channel_mask = 0
+                # Set per-channel slot types before saving so the shader compiles with correct bindings
+                slot_types = [Sh.ShaderToySlotType.Texture2D] * 4
                 for input_data in pass_data['inputs']:
                     if input_data['type'] == 'cubemap':
-                        cube_channel_mask |= (1 << input_data['channel'])
-                shadertoy_shader.CubeChannelMask = cube_channel_mask
+                        slot_types[input_data['channel']] = Sh.ShaderToySlotType.TextureCube
+                shadertoy_shader.ChannelSlotTypes = tuple(slot_types)
                 saved_file_path = os.path.join(target_dir, f"{pass_name}.{shadertoy_shader.FileExtension}")
                 Sh.Asset.SaveToFile(shadertoy_shader, saved_file_path)
 
@@ -337,6 +337,8 @@ def create_shadertoy_assets(shadertoy_id, shadertoy_info):
                         channel_desc.Filter = Sh.ShaderToyFilterMode.Linear
                     elif filter_str == 'nearest':
                         channel_desc.Filter = Sh.ShaderToyFilterMode.Nearest
+                    elif filter_str == 'mipmap':
+                        channel_desc.Filter = Sh.ShaderToyFilterMode.Mipmap
                 
                     wrap_str = sampler['wrap']
                     if wrap_str == 'clamp':
