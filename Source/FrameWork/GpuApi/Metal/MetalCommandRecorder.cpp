@@ -329,7 +329,33 @@ namespace FW
 
     void MtlCmdRecorder::Barriers(const TArray<GpuBarrierInfo>& BarrierInfos)
     {
-        
+        for (const GpuBarrierInfo& Info : BarrierInfos)
+        {
+            if (Info.Resource->GetType() == GpuResourceType::Texture)
+            {
+                GpuTexture* Tex = static_cast<GpuTexture*>(Info.Resource);
+                Tex->SetAllSubResourceStates(Info.NewState);
+            }
+            else if (Info.Resource->GetType() == GpuResourceType::TextureView)
+            {
+                GpuTextureView* View = static_cast<GpuTextureView*>(Info.Resource);
+                GpuTexture* Tex = View->GetTexture();
+                uint32 ArrayLayers = Tex->GetArrayLayerCount();
+                for (uint32 i = 0; i < View->GetMipLevelCount(); i++)
+                {
+                    uint32 Mip = View->GetBaseMipLevel() + i;
+                    for (uint32 Layer = 0; Layer < ArrayLayers; Layer++)
+                    {
+                        Tex->SetSubResourceState(Mip, Layer, Info.NewState);
+                    }
+                }
+            }
+            else
+            {
+                GpuBuffer* Buf = static_cast<GpuBuffer*>(Info.Resource);
+                Buf->State = Info.NewState;
+            }
+        }
     }
 
     void MtlCmdRecorder::CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture, uint32 ArrayLayer, uint32 MipLevel)

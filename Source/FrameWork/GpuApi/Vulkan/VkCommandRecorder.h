@@ -11,7 +11,7 @@ namespace FW
 	class VkRenderStateCache
 	{
 	public:
-		VkRenderStateCache(VulkanCmdRecorder* InOwner, TArray<GpuTexture*> InRenderTargets);
+		VkRenderStateCache(VulkanCmdRecorder* InOwner, TArray<GpuTextureView*> InRenderTargetViews);
 		void ApplyDrawState();
 
 		void SetPipeline(VulkanRenderPipelineState* InPipelineState);
@@ -43,7 +43,7 @@ namespace FW
 		GpuBindGroup* CurrentBindGroup2 = nullptr;
 		GpuBindGroup* CurrentBindGroup3 = nullptr;
 
-		TArray<GpuTexture*> RenderTargets;
+		TArray<GpuTextureView*> RenderTargetViews;
 	};
 
 	class VkComputeStateCache
@@ -90,10 +90,10 @@ namespace FW
 	class VulkanRenderPassRecorder : public GpuRenderPassRecorder
 	{
 	public:
-		VulkanRenderPassRecorder(VulkanCmdRecorder* InOwner, VkRenderPass InRenderPass, VkFramebuffer InFrameBuffer, TArray<GpuTexture*> InRenderTargets) 
+		VulkanRenderPassRecorder(VulkanCmdRecorder* InOwner, VkRenderPass InRenderPass, VkFramebuffer InFrameBuffer, TArray<GpuTextureView*> InRenderTargetViews) 
 			: Owner(InOwner)
 			, RenderPass(InRenderPass), FrameBuffer(InFrameBuffer)
-			, StateCache(InOwner, MoveTemp(InRenderTargets))
+			, StateCache(InOwner, MoveTemp(InRenderTargetViews))
 		{}
 		~VulkanRenderPassRecorder() {
 			vkDestroyFramebuffer(GDevice, FrameBuffer, nullptr);

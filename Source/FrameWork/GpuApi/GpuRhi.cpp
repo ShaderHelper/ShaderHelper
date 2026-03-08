@@ -11,6 +11,8 @@
 #endif
 #include "GpuApiValidation.h"
 #include "GpuShader.h"
+#include "GpuResourceHelper.h"
+#include "Renderer/RenderGraph.h"
 
 namespace FW
 {
@@ -20,6 +22,24 @@ TRefCountPtr<GpuTexture> GpuRhi::CreateTexture(const GpuTextureDesc& InTexDesc, 
 	//If the initial state is unknown, then the state be determined based on usage,
 	//but it may not be possible to infer the state from some composite usage e.g. GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget
 	GpuResourceState ValidState = InitState == GpuResourceState::Unknown ? GetTextureState(InTexDesc.Usage) : InitState;
+
+	bool bAutoMipmap = InTexDesc.NumMips == 0;
+	if (bAutoMipmap)
+	{
+		//InitialData for mip0
+		check(!InTexDesc.InitialData.IsEmpty());
+		check(EnumHasAllFlags(InTexDesc.Usage, GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget));
+		GpuTextureDesc Desc = InTexDesc;
+		Desc.NumMips = FMath::FloorLog2(FMath::Max(InTexDesc.Width, InTexDesc.Height)) + 1;
+		TRefCountPtr<GpuTexture> Texture = CreateTextureInternal(Desc, ValidState);
+
+		RenderGraph Graph;
+		GpuResourceHelper::GenerateMipmap(Graph, Texture);
+		Graph.Execute();
+
+		return Texture;
+	}
+
 	return CreateTextureInternal(InTexDesc, ValidState);
 }
 
@@ -27,6 +47,11 @@ TRefCountPtr<GpuBuffer> GpuRhi::CreateBuffer(const GpuBufferDesc& InBufferDesc, 
 {
 	GpuResourceState ValidState = InitState == GpuResourceState::Unknown ? GetBufferState(InBufferDesc.Usage) : InitState;
 	return CreateBufferInternal(InBufferDesc, ValidState);
+}
+
+TRefCountPtr<GpuTextureView> GpuRhi::CreateTextureView(const GpuTextureViewDesc& InViewDesc)
+{
+	return CreateTextureViewInternal(InViewDesc);
 }
 
 TRefCountPtr<GpuShader> GpuRhi::CreateShaderFromSource(const GpuShaderSourceDesc& Desc) const
@@ -181,14 +206,14 @@ public:
 	void CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture, uint32 ArrayLayer = 0, uint32 MipLevel = 0) override
 	{
 		check(State == CmdRecorderState::Begin);
-		check(EnumHasAnyFlags(InBuffer->State, GpuResourceState::CopySrc) && EnumHasAnyFlags(InTexture->State, GpuResourceState::CopyDst));
+		check(EnumHasAnyFlags(InBuffer->State, GpuResourceState::CopySrc) && EnumHasAnyFlags(InTexture->GetSubResourceState(MipLevel, ArrayLayer), GpuResourceState::CopyDst));
 		CmdRecorder->CopyBufferToTexture(InBuffer, InTexture, ArrayLayer, MipLevel);
 	}
 
 	void CopyTextureToBuffer(GpuTexture* InTexture, GpuBuffer* InBuffer) override
 	{
 		check(State == CmdRecorderState::Begin);
-		check(EnumHasAnyFlags(InBuffer->State, GpuResourceState::CopyDst) && EnumHasAnyFlags(InTexture->State, GpuResourceState::CopySrc));
+		check(EnumHasAnyFlags(InBuffer->State, GpuResourceState::CopyDst) && EnumHasAnyFlags(InTexture->GetSubResourceState(0, 0), GpuResourceState::CopySrc));
 		CmdRecorder->CopyTextureToBuffer(InTexture, InBuffer);
 	}
 
@@ -248,6 +273,11 @@ public:
 	{
 		check(ValidateCreateBuffer(InBufferDesc, InitState));
 		return RhiBackend->CreateBufferInternal(InBufferDesc, InitState);
+	}
+
+	TRefCountPtr<GpuTextureView> CreateTextureViewInternal(const GpuTextureViewDesc& InViewDesc) override
+	{
+		return RhiBackend->CreateTextureViewInternal(InViewDesc);
 	}
 
 	TRefCountPtr<GpuShader> CreateShaderFromSourceInternal(const GpuShaderSourceDesc& Desc) const override

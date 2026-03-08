@@ -9,7 +9,7 @@
 
 namespace FW
 {
-	VkRenderStateCache::VkRenderStateCache(VulkanCmdRecorder* InOwner, TArray<GpuTexture*> InRenderTargets)
+	VkRenderStateCache::VkRenderStateCache(VulkanCmdRecorder* InOwner, TArray<GpuTextureView*> InRenderTargetViews)
 		: IsRenderPipelineDirty(false)
 		, IsViewportDirty(false)
 		, IsScissorRectDirty(false)
@@ -19,7 +19,7 @@ namespace FW
 		, IsBindGroup2Dirty(false)
 		, IsBindGroup3Dirty(false)
 		, Owner(InOwner)
-		, RenderTargets(MoveTemp(InRenderTargets))
+		, RenderTargetViews(MoveTemp(InRenderTargetViews))
 	{}
 
 	void VkRenderStateCache::SetPipeline(VulkanRenderPipelineState* InPipelineState)
@@ -88,8 +88,8 @@ namespace FW
 			VkViewport DefaultViewPort{};
 			DefaultViewPort.x = 0.0f;
 			DefaultViewPort.y = 0.0f;
-			DefaultViewPort.width = (float)RenderTargets[0]->GetWidth();
-			DefaultViewPort.height = (float)RenderTargets[0]->GetHeight();
+			DefaultViewPort.width = (float)RenderTargetViews[0]->GetWidth();
+			DefaultViewPort.height = (float)RenderTargetViews[0]->GetHeight();
 			DefaultViewPort.minDepth = 0.0f;
 			DefaultViewPort.maxDepth = 1.0f;
 			SetViewPort(MoveTemp(DefaultViewPort));
@@ -221,14 +221,14 @@ namespace FW
 		for (int32 Index = 0; Index < PassDesc.ColorRenderTargets.Num(); Index ++)
 		{
 			const GpuRenderTargetInfo& RenderTargetInfo = PassDesc.ColorRenderTargets[Index];
-			VulkanTexture* RT = static_cast<VulkanTexture*>(RenderTargetInfo.Texture);
+			VulkanTextureView* RtView = static_cast<VulkanTextureView*>(RenderTargetInfo.View);
 			if (RenderTargetInfo.LoadAction == RenderTargetLoadAction::Clear)
 			{
 				ClearValues.Add({ .color = {RenderTargetInfo.ClearColor.X, RenderTargetInfo.ClearColor.Y, RenderTargetInfo.ClearColor.Z, RenderTargetInfo.ClearColor.W} });
 			}
-			Attachments.Add(RT->GetView());
+			Attachments.Add(RtView->GetView());
 			AttachmentDescs.Add({
-				.format = MapTextureFormat(RenderTargetInfo.Texture->GetFormat()),
+				.format = MapTextureFormat(RtView->GetTexture()->GetFormat()),
 				.samples = VK_SAMPLE_COUNT_1_BIT,
 				.loadOp = MapLoadAction(RenderTargetInfo.LoadAction),
 				.storeOp = MapStoreAction(RenderTargetInfo.StoreAction),
@@ -259,19 +259,19 @@ namespace FW
 			.renderPass = RenderPass,
 			.attachmentCount = (uint32_t)PassDesc.ColorRenderTargets.Num(),
 			.pAttachments = Attachments.GetData(),
-			.width = PassDesc.ColorRenderTargets[0].Texture->GetWidth(),
-			.height = PassDesc.ColorRenderTargets[0].Texture->GetHeight(),
+			.width = PassDesc.ColorRenderTargets[0].View->GetWidth(),
+			.height = PassDesc.ColorRenderTargets[0].View->GetHeight(),
 			.layers = 1
 		};
 		VkFramebuffer FrameBuffer;
 		VkCheck(vkCreateFramebuffer(GDevice, &FrameBufferInfo, nullptr, &FrameBuffer));
 
-		TArray<GpuTexture*> RTs;
+		TArray<GpuTextureView*> RTViews;
 		for (int32 Index = 0; Index < PassDesc.ColorRenderTargets.Num(); Index++)
 		{
-			RTs.Add(PassDesc.ColorRenderTargets[Index].Texture);
+			RTViews.Add(PassDesc.ColorRenderTargets[Index].View);
 		}
-		RenderPassRecorders.Add(MakeUnique<VulkanRenderPassRecorder>(this, RenderPass, FrameBuffer, MoveTemp(RTs)));
+		RenderPassRecorders.Add(MakeUnique<VulkanRenderPassRecorder>(this, RenderPass, FrameBuffer, MoveTemp(RTViews)));
 
 		VkRenderPassBeginInfo PassBeginInfo{
 			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -364,34 +364,104 @@ namespace FW
 		{
 			check(Info.NewState != GpuResourceState::Unknown);
 
-			VkAccessFlags SrcAccess{};
 			VkAccessFlags DstAccess{};
-			VkPipelineStageFlags SrcStage{};
 			VkPipelineStageFlags DstStage{};
-			GetAccessAndStage(Info.Resource->State, SrcAccess, SrcStage);
 			GetAccessAndStage(Info.NewState, DstAccess, DstStage);
 
 			if (Info.Resource->GetType() == GpuResourceType::Texture)
 			{
 				VulkanTexture* VkTex = static_cast<VulkanTexture*>(Info.Resource);
-				VkImageLayout OldLayout = MapImageLayout(Info.Resource->State);
+				uint32 NumMips = VkTex->GetNumMips();
+				uint32 ArrayLayers = VkTex->GetArrayLayerCount();
 				VkImageLayout NewLayout = MapImageLayout(Info.NewState);
 
-				ImageBarriers.Add({
-					.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-					.srcAccessMask = SrcAccess,
-					.dstAccessMask = DstAccess,
-					.oldLayout = OldLayout,
-					.newLayout = NewLayout,
-					.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-					.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-					.image = VkTex->GetImage(),
-					.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_REMAINING_MIP_LEVELS, 0, VK_REMAINING_ARRAY_LAYERS },
-				});
+				for (uint32 Mip = 0; Mip < NumMips; Mip++)
+				{
+					for (uint32 Layer = 0; Layer < ArrayLayers; Layer++)
+					{
+						GpuResourceState SubOldState = VkTex->GetSubResourceState(Mip, Layer);
+						if (SubOldState == Info.NewState && Info.NewState != GpuResourceState::UnorderedAccess) continue;
+
+						VkAccessFlags SrcAccess{};
+						VkPipelineStageFlags SrcStage{};
+						GetAccessAndStage(SubOldState, SrcAccess, SrcStage);
+
+						ImageBarriers.Add({
+							.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+							.srcAccessMask = SrcAccess,
+							.dstAccessMask = DstAccess,
+							.oldLayout = MapImageLayout(SubOldState),
+							.newLayout = NewLayout,
+							.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+							.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+							.image = VkTex->GetImage(),
+							.subresourceRange = {
+								.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+								.baseMipLevel = Mip,
+								.levelCount = 1,
+								.baseArrayLayer = Layer,
+								.layerCount = 1
+							},
+						});
+						SrcStageMask |= SrcStage;
+					}
+				}
+				VkTex->SetAllSubResourceStates(Info.NewState);
+			}
+			else if (Info.Resource->GetType() == GpuResourceType::TextureView)
+			{
+				GpuTextureView* View = static_cast<GpuTextureView*>(Info.Resource);
+				VulkanTexture* VkTex = static_cast<VulkanTexture*>(View->GetTexture());
+				uint32 ArrayLayers = VkTex->GetArrayLayerCount();
+				VkImageLayout NewLayout = MapImageLayout(Info.NewState);
+
+				for (uint32 i = 0; i < View->GetMipLevelCount(); i++)
+				{
+					uint32 Mip = View->GetBaseMipLevel() + i;
+					for (uint32 Layer = 0; Layer < ArrayLayers; Layer++)
+					{
+						GpuResourceState SubOldState = VkTex->GetSubResourceState(Mip, Layer);
+						if (SubOldState == Info.NewState && Info.NewState != GpuResourceState::UnorderedAccess) continue;
+
+						VkAccessFlags SrcAccess{};
+						VkPipelineStageFlags SrcStage{};
+						GetAccessAndStage(SubOldState, SrcAccess, SrcStage);
+
+						ImageBarriers.Add({
+							.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+							.srcAccessMask = SrcAccess,
+							.dstAccessMask = DstAccess,
+							.oldLayout = MapImageLayout(SubOldState),
+							.newLayout = NewLayout,
+							.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+							.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+							.image = VkTex->GetImage(),
+							.subresourceRange = {
+								.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+								.baseMipLevel = Mip,
+								.levelCount = 1,
+								.baseArrayLayer = Layer,
+								.layerCount = 1
+							},
+						});
+						SrcStageMask |= SrcStage;
+						VkTex->SetSubResourceState(Mip, Layer, Info.NewState);
+					}
+				}
 			}
 			else if (Info.Resource->GetType() == GpuResourceType::Buffer)
 			{
 				VulkanBuffer* VkBuffer = static_cast<VulkanBuffer*>(Info.Resource);
+				GpuResourceState OldState = VkBuffer->State;
+				if (OldState == Info.NewState && Info.NewState != GpuResourceState::UnorderedAccess)
+				{
+					continue;
+				}
+
+				VkAccessFlags SrcAccess{};
+				VkPipelineStageFlags SrcStage{};
+				GetAccessAndStage(OldState, SrcAccess, SrcStage);
+
 				BufferBarriers.Add({
 					.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
 					.srcAccessMask = SrcAccess,
@@ -402,18 +472,19 @@ namespace FW
 					.offset = 0,
 					.size = VK_WHOLE_SIZE
 				});
+				SrcStageMask |= SrcStage;
+				VkBuffer->State = Info.NewState;
 			}
 			else
 			{
 				AUX::Unreachable();
 			}
 
-			SrcStageMask |= SrcStage;
 			DstStageMask |= DstStage;
-			Info.Resource->State = Info.NewState;
 		}
 
-		check(SrcStageMask != 0 && DstStageMask != 0);
+		if (SrcStageMask == 0) SrcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		if (DstStageMask == 0) DstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
 
 		vkCmdPipelineBarrier(CommandBuffer, SrcStageMask, DstStageMask, 0,
 			0, nullptr,

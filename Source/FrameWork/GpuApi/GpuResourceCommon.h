@@ -87,6 +87,7 @@ namespace FW
 	{
 		Buffer,
 		Texture,
+		TextureView,
 		BindGroup,
 		BindGroupLayout,
 		RenderPipelineState,
@@ -222,13 +223,6 @@ namespace FW
 
 	private:
 		GpuResourceType Type;
-	};
-
-	class GpuTrackedResource : public GpuResource
-	{
-	public:
-		GpuTrackedResource(GpuResourceType InType, GpuResourceState InState);
-		GpuResourceState State;
 	};
 
 	FRAMEWORK_API uint32 GetTextureFormatByteSize(GpuTextureFormat InFormat);

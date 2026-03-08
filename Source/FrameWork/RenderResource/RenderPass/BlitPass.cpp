@@ -8,12 +8,12 @@ namespace FW
 	void AddBlitPass(RenderGraph& Graph, const BlitPassInput& PassInput)
 	{
 		GpuRenderPassDesc BlitPassDesc;
-		BlitPassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassInput.OutputRenderTarget, PassInput.LoadAction, RenderTargetStoreAction::Store });
+		BlitPassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassInput.OutputView, PassInput.LoadAction, RenderTargetStoreAction::Store });
 
 		BlitShader* PassShader = GetShader<BlitShader>(PassInput.VariantDefinitions);
 
 		BindingContext Bindings;
-		BlitShader::Parameters ShaderParameter{ PassInput.InputTex, PassInput.InputTexSampler };
+		BlitShader::Parameters ShaderParameter{ PassInput.InputView, PassInput.InputTexSampler };
 		Bindings.SetShaderBindGroup(PassShader->GetBindGroup(ShaderParameter));
 		Bindings.SetShaderBindGroupLayout(PassShader->GetBindGroupLayout());
 
@@ -21,7 +21,7 @@ namespace FW
 			.Vs = PassShader->GetVertexShader(),
 			.Ps = PassShader->GetPixelShader(),
 			.Targets = {
-				{ .TargetFormat = PassInput.OutputRenderTarget->GetFormat() }
+				{ .TargetFormat = PassInput.OutputView->GetTexture()->GetFormat() }
 			}
 		};
 		Bindings.ApplyBindGroupLayout(PipelineDesc);

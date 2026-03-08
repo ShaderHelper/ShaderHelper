@@ -2,9 +2,25 @@
 #include "MetalCommon.h"
 #include "GpuApi/GpuResource.h"
 #include "MetalBuffer.h"
+#include "MetalGpuRhiBackend.h"
 
 namespace FW
 {
+	class MetalTextureView : public GpuTextureView
+	{
+	public:
+		MetalTextureView(GpuTextureViewDesc InDesc, MTLTexturePtr InTexView)
+			: GpuTextureView(MoveTemp(InDesc))
+			, TexView(MoveTemp(InTexView))
+		{
+			GMtlDeferredReleaseManager.AddResource(this);
+		}
+
+		MTL::Texture* GetResource() const { return TexView.get(); }
+
+	private:
+		MTLTexturePtr TexView;
+	};
     
     class MetalSampler : public GpuSampler
     {
@@ -42,6 +58,9 @@ namespace FW
     public:
         TRefCountPtr<MetalBuffer> UploadBuffer;
         TRefCountPtr<MetalBuffer> ReadBackBuffer;
+
+	public:
+		MetalTextureView* GetMtlDefaultView() const { return static_cast<MetalTextureView*>(DefaultView.GetReference()); }
         
     private:
         MTLTexturePtr Tex;

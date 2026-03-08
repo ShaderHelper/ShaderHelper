@@ -60,6 +60,7 @@ namespace FW
 
 	struct RootSignatureDesc
 	{
+		RootSignatureDesc() = default;
 		RootSignatureDesc(Dx12BindGroupLayout* InLayout0, Dx12BindGroupLayout* InLayout1,
 			Dx12BindGroupLayout* InLayout2, Dx12BindGroupLayout* InLayout3)
 			: Layout0(InLayout0), Layout1(InLayout1), Layout2(InLayout2), Layout3(InLayout3)
@@ -70,10 +71,10 @@ namespace FW
 			if (Layout3) { LayoutDesc3 = Layout3->GetDesc(); }
 		}
 
-		Dx12BindGroupLayout* Layout0;
-		Dx12BindGroupLayout* Layout1;
-		Dx12BindGroupLayout* Layout2;
-		Dx12BindGroupLayout* Layout3;
+		Dx12BindGroupLayout* Layout0{};
+		Dx12BindGroupLayout* Layout1{};
+		Dx12BindGroupLayout* Layout2{};
+		Dx12BindGroupLayout* Layout3{};
 		TOptional<GpuBindGroupLayoutDesc> LayoutDesc0;
 		TOptional<GpuBindGroupLayoutDesc> LayoutDesc1;
 		TOptional<GpuBindGroupLayoutDesc> LayoutDesc2;

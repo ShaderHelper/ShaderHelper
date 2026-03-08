@@ -27,9 +27,11 @@ namespace FW
 		void SetPipeline(Dx12ComputePso* InPso);
 		void SetGraphicsRootSignature(Dx12RootSignature* InRootSignature);
 		void SetComputeRootSignature(Dx12RootSignature* InRootSignature);
-		void SetRenderTargets(TArray<Dx12Texture*> InRTs, TArray<Vector4f> InClearColorValues, TArray<RenderTargetLoadAction> InLoadActions);
+		void SetRenderTargets(TArray<Dx12TextureView*> InRTViews, TArray<Vector4f> InClearColorValues, TArray<RenderTargetLoadAction> InLoadActions);
 		void SetGraphicsBindGroups(Dx12BindGroup* InGroup0, Dx12BindGroup* InGroup1, Dx12BindGroup* InGroup2, Dx12BindGroup* InGroup3);
 		void SetComputeBindGroups(Dx12BindGroup* InGroup0, Dx12BindGroup* InGroup1, Dx12BindGroup* InGroup2, Dx12BindGroup* InGroup3);
+
+		Dx12RootSignature* GetGraphicsRootSignature() const { return CurrentGraphicsRootSignature; }
 
 	public:
 		bool IsPipelineStateDirty : 1;
@@ -56,7 +58,7 @@ namespace FW
 		Dx12Buffer* CurrentVertexBuffer = nullptr;
 		TOptional<D3D12_VIEWPORT> CurrentViewPort;
 		TOptional<D3D12_RECT> CurrentScissorRect;
-		TArray<Dx12Texture*> CurrentRenderTargets;
+		TArray<Dx12TextureView*> CurrentRenderTargetViews;
 		TArray<Vector4f> ClearColorValues;
 		TArray<RenderTargetLoadAction> LoadActions;
 

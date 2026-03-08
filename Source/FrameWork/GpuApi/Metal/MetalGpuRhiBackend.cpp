@@ -49,6 +49,18 @@ TRefCountPtr<GpuTexture> MetalGpuRhiBackend::CreateTextureInternal(const GpuText
 	return AUX::StaticCastRefCountPtr<GpuTexture>(CreateMetalTexture2D(InTexDesc, InitState));
 }
 
+TRefCountPtr<GpuTextureView> MetalGpuRhiBackend::CreateTextureViewInternal(const GpuTextureViewDesc& InViewDesc)
+{
+	MetalTexture* MtlTexture = static_cast<MetalTexture*>(InViewDesc.Texture);
+	MTL::PixelFormat PixelFormat = MtlTexture->GetResource()->pixelFormat();
+	MTL::TextureType TexType = MtlTexture->GetResource()->textureType();
+	NS::Range LevelRange(InViewDesc.BaseMipLevel, InViewDesc.MipLevelCount);
+	NS::Range SliceRange(0, TexType == MTL::TextureTypeCube ? 6 : 1);
+	MTLTexturePtr MipView = NS::RetainPtr(MtlTexture->GetResource()->newTextureView(PixelFormat, TexType, LevelRange, SliceRange));
+	GpuTextureViewDesc Desc = InViewDesc;
+	return new MetalTextureView(MoveTemp(Desc), MoveTemp(MipView));
+}
+
 TRefCountPtr<GpuShader> MetalGpuRhiBackend::CreateShaderFromSourceInternal(const GpuShaderSourceDesc& Desc) const
 {
 	TRefCountPtr<MetalShader> NewShader = new MetalShader(Desc);

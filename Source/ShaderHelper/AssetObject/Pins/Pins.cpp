@@ -1,6 +1,7 @@
 #include "CommonHeader.h"
 #include "Pins.h"
 #include "GpuApi/GpuRhi.h"
+#include "GpuApi/GpuResourceHelper.h"
 
 using namespace FW;
 
@@ -89,9 +90,7 @@ namespace SH
 	GpuTexture* GpuCubemapPin::GetValue()
 	{
 		if (!Value) {
-			TArray<uint8> RawData = { 0,0,0, 255 };
-			GpuTextureDesc Desc{ 1, 1, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared, RawData };
-			static auto DefaultValue = GGpuRhi->CreateTexture(MoveTemp(Desc), GpuResourceState::RenderTargetWrite);
+			static auto DefaultValue = GpuResourceHelper::GetGlobalBlackCubemapTex();
 			Value = DefaultValue;
 		}
 		return Value;

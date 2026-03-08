@@ -167,19 +167,37 @@ namespace FW
             else if(ResourceBindingEntry.Resource->GetType() == GpuResourceType::Texture)
             {
                 MetalTexture* Tex = static_cast<MetalTexture*>(ResourceBindingEntry.Resource.GetReference());
+                MetalTextureView* TexView = Tex->GetMtlDefaultView();
 				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Vertex))
                 {
-                    VertexArgumentEncoder->setTexture(Tex->GetResource(), Slot);
+                    VertexArgumentEncoder->setTexture(TexView->GetResource(), Slot);
                 }
 				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Pixel))
                 {
-                    FragmentArgumentEncoder->setTexture(Tex->GetResource(), Slot);
+                    FragmentArgumentEncoder->setTexture(TexView->GetResource(), Slot);
                 }
 				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Compute))
 				{
-					ComputeArgumentEncoder->setTexture(Tex->GetResource(), Slot);
+					ComputeArgumentEncoder->setTexture(TexView->GetResource(), Slot);
 				}
-                BindGroupResources.Add(Slot, Tex->GetResource());
+                BindGroupResources.Add(Slot, TexView->GetResource());
+            }
+            else if(ResourceBindingEntry.Resource->GetType() == GpuResourceType::TextureView)
+            {
+                MetalTextureView* TexView = static_cast<MetalTextureView*>(ResourceBindingEntry.Resource.GetReference());
+				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Vertex))
+                {
+                    VertexArgumentEncoder->setTexture(TexView->GetResource(), Slot);
+                }
+				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Pixel))
+                {
+                    FragmentArgumentEncoder->setTexture(TexView->GetResource(), Slot);
+                }
+				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Compute))
+				{
+					ComputeArgumentEncoder->setTexture(TexView->GetResource(), Slot);
+				}
+                BindGroupResources.Add(Slot, TexView->GetResource());
             }
             else if(ResourceBindingEntry.Resource->GetType() == GpuResourceType::Sampler)
             {

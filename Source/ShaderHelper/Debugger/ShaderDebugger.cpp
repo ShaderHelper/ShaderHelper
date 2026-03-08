@@ -374,7 +374,7 @@ namespace SH
 						TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PatchedPipelineDesc);
 						
 						GpuRenderPassDesc DummyPassDesc;
-						DummyPassDesc.ColorRenderTargets.Add({ DummyRenderTarget });
+						DummyPassDesc.ColorRenderTargets.Add({ DummyRenderTarget->GetDefaultView() });
 						
 						auto CmdRecorder = GGpuRhi->BeginRecording();
 						GpuResourceHelper::ClearRWResource(CmdRecorder, DebugBuffer);
@@ -1656,7 +1656,7 @@ namespace SH
 		TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PatchedPipelineDesc);
 
 		GpuRenderPassDesc DummyPassDesc;
-		DummyPassDesc.ColorRenderTargets.Add({ DummyRenderTarget });
+		DummyPassDesc.ColorRenderTargets.Add({ DummyRenderTarget->GetDefaultView() });
 
 		auto CmdRecorder = GGpuRhi->BeginRecording();
 		RenderGraph RG(CmdRecorder);
@@ -2038,7 +2038,7 @@ namespace SH
 		for (auto& [Loc, Data] : PerLineData)
 		{
 			GpuRenderPassDesc PassDesc;
-			PassDesc.ColorRenderTargets.Add({ .Texture = Data.RenderTarget, .StoreAction = RenderTargetStoreAction::Store });
+			PassDesc.ColorRenderTargets.Add({ .View = Data.RenderTarget->GetDefaultView(), .StoreAction = RenderTargetStoreAction::Store });
 
 			RG.AddRenderPass(TEXT("Preview"), MoveTemp(PassDesc), Data.Bindings,
 				[&](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {

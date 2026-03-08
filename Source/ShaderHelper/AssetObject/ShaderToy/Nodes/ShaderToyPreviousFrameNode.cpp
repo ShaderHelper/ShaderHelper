@@ -148,14 +148,14 @@ namespace SH
 		BlitPassInput Input;
 		if (ShaderToyContext.bResetPreviousFrame)
 		{
-			Input.InputTex = GpuResourceHelper::GetGlobalBlackTex();
+			Input.InputView = GpuResourceHelper::GetGlobalBlackTex()->GetDefaultView();
 		}
 		else
 		{
-			Input.InputTex = PassNodeOutputPin->GetValue();
+			Input.InputView = PassNodeOutputPin->GetValue()->GetDefaultView();
 		}
 		Input.InputTexSampler = GpuResourceHelper::GetSampler({});
-		Input.OutputRenderTarget = PreFramePassTex;
+		Input.OutputView = PreFramePassTex->GetDefaultView();
 
 		AddBlitPass(*ShaderToyContext.RG, MoveTemp(Input));
 

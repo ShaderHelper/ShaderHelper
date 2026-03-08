@@ -19,16 +19,19 @@ namespace FW
 		};
 	};
 
-	class GpuBuffer : public GpuTrackedResource
+	class GpuBuffer : public GpuResource
 	{
 	public:
 		GpuBuffer(GpuBufferDesc InDesc, GpuResourceState InState)
-			: GpuTrackedResource(GpuResourceType::Buffer, InState)
+			: GpuResource(GpuResourceType::Buffer)
 			, Desc(MoveTemp(InDesc))
+			, State(InState)
 		{}
 
 		GpuBufferUsage GetUsage() const { return Desc.Usage; }
 		uint32 GetByteSize() const { return Desc.ByteSize; }
+
+		GpuResourceState State;
 
 	private:
 		GpuBufferDesc Desc;

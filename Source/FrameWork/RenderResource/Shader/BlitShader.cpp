@@ -45,7 +45,7 @@ namespace FW
 	TRefCountPtr<GpuBindGroup> BlitShader::GetBindGroup(const Parameters& InParameters)
 	{
 		return GpuBindGroupBuilder{ BindGroupLayout }
-				.SetExistingBinding(0, InParameters.InputTex)
+				.SetExistingBinding(0, InParameters.InputView)
 				.SetExistingBinding(1, InParameters.InputTexSampler)
 				.Build();
 	}

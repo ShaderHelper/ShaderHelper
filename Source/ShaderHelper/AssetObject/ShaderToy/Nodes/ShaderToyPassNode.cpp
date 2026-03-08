@@ -932,6 +932,7 @@ namespace SH
         {
             ShaderToyExecContext& ShaderToyContext = static_cast<ShaderToyExecContext&>(Context);
 			UpdateBuiltinUniformBuffer(ShaderToyContext);
+			const ShaderToyChannelDesc* ChannelDescs[4] = { &iChannelDesc0, &iChannelDesc1, &iChannelDesc2, &iChannelDesc3 };
 
             auto PassOutput = static_cast<GpuTexturePin*>(GetPin("RT"));
             if(PassOutput->GetValue()->GetWidth() != (uint32)ShaderToyContext.iResolution.x ||
@@ -962,25 +963,33 @@ namespace SH
                     if (iChannel->HasLink())
                     {
                         GpuTexture* SrcTex = iChannel->GetValue();
+						const bool bNeedMipChain = ChannelDescs[i]->Filter == ShaderToyFilterMode::Mipmap && SrcTex->GetNumMips() > 1;
                         if (!FlippedChannelTextures[i].IsValid() ||
                             FlippedChannelTextures[i]->GetWidth() != SrcTex->GetWidth() ||
                             FlippedChannelTextures[i]->GetHeight() != SrcTex->GetHeight() ||
-                            FlippedChannelTextures[i]->GetFormat() != SrcTex->GetFormat())
+							FlippedChannelTextures[i]->GetFormat() != SrcTex->GetFormat() ||
+							FlippedChannelTextures[i]->GetNumMips() != (bNeedMipChain ? SrcTex->GetNumMips() : 1))
                         {
                             FlippedChannelTextures[i] = GGpuRhi->CreateTexture({
                                 .Width = SrcTex->GetWidth(),
                                 .Height = SrcTex->GetHeight(),
                                 .Format = SrcTex->GetFormat(),
-                                .Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget
+								.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget,
+								.NumMips = bNeedMipChain ? SrcTex->GetNumMips() : 1
                             }, GpuResourceState::RenderTargetWrite);
                         }
 
                         BlitPassInput FlipInput;
-                        FlipInput.InputTex = SrcTex;
+                        FlipInput.InputView = SrcTex->GetDefaultView();
                         FlipInput.InputTexSampler = GpuResourceHelper::GetSampler({});
-                        FlipInput.OutputRenderTarget = FlippedChannelTextures[i];
+						FlipInput.OutputView = GGpuRhi->CreateTextureView({ FlippedChannelTextures[i], 0, 1 });
                         FlipInput.VariantDefinitions.insert(FString(TEXT("FLIP_Y")));
                         AddBlitPass(*ShaderToyContext.RG, MoveTemp(FlipInput));
+
+						if (bNeedMipChain)
+						{
+							GpuResourceHelper::GenerateMipmap(*ShaderToyContext.RG, FlippedChannelTextures[i]);
+						}
                     }
                     else
                     {
@@ -997,7 +1006,7 @@ namespace SH
             }
 
             GpuRenderPassDesc PassDesc;
-            PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassOutput->GetValue(), RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
+            PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassOutput->GetValue()->GetDefaultView(), RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
 
 			auto BuiltInLayout = ShaderAssetObj->GetBuiltInBindLayout();
 

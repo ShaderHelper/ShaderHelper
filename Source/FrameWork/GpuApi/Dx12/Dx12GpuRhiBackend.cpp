@@ -67,6 +67,48 @@ TRefCountPtr<GpuTexture> Dx12GpuRhiBackend::CreateTextureInternal(const GpuTextu
 	return AUX::StaticCastRefCountPtr<GpuTexture>(CreateDx12Texture2D(InTexDesc, InitState));
 }
 
+TRefCountPtr<GpuTextureView> Dx12GpuRhiBackend::CreateTextureViewInternal(const GpuTextureViewDesc& InViewDesc)
+{
+	Dx12Texture* DxTexture = static_cast<Dx12Texture*>(InViewDesc.Texture);
+	TUniquePtr<CpuDescriptor> SRV;
+	TUniquePtr<CpuDescriptor> RTV;
+
+	if (EnumHasAnyFlags(InViewDesc.Texture->GetResourceDesc().Usage, GpuTextureUsage::ShaderResource))
+	{
+		SRV = AllocCpuCbvSrvUav();
+		D3D12_SHADER_RESOURCE_VIEW_DESC SrvDesc{};
+		SrvDesc.Format = DxTexture->GetResource()->GetDesc().Format;
+		SrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		if (InViewDesc.Texture->GetResourceDesc().Dimension == GpuTextureDimension::TexCube)
+		{
+			SrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+			SrvDesc.TextureCube.MostDetailedMip = InViewDesc.BaseMipLevel;
+			SrvDesc.TextureCube.MipLevels = InViewDesc.MipLevelCount;
+			SrvDesc.TextureCube.ResourceMinLODClamp = 0.0f;
+		}
+		else
+		{
+			SrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+			SrvDesc.Texture2D.MostDetailedMip = InViewDesc.BaseMipLevel;
+			SrvDesc.Texture2D.MipLevels = InViewDesc.MipLevelCount;
+		}
+		GDevice->CreateShaderResourceView(DxTexture->GetResource(), &SrvDesc, SRV->GetHandle());
+	}
+
+	if (EnumHasAnyFlags(InViewDesc.Texture->GetResourceDesc().Usage, GpuTextureUsage::RenderTarget))
+	{
+		RTV = AllocRtv();
+		D3D12_RENDER_TARGET_VIEW_DESC RtvDesc{};
+		RtvDesc.Format = DxTexture->GetResource()->GetDesc().Format;
+		RtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+		RtvDesc.Texture2D.MipSlice = InViewDesc.BaseMipLevel;
+		GDevice->CreateRenderTargetView(DxTexture->GetResource(), &RtvDesc, RTV->GetHandle());
+	}
+
+	GpuTextureViewDesc ViewDesc = InViewDesc;
+	return new Dx12TextureView(MoveTemp(ViewDesc), MoveTemp(SRV), MoveTemp(RTV));
+}
+
 TRefCountPtr<GpuShader> Dx12GpuRhiBackend::CreateShaderFromSourceInternal(const GpuShaderSourceDesc& Desc) const
 {
 	TRefCountPtr<Dx12Shader> NewShader = new Dx12Shader(Desc);
@@ -170,7 +212,7 @@ void* Dx12GpuRhiBackend::MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapM
 		Data = Texture->ReadBackBuffer->GetAllocation().GetCpuAddr();
 		auto CmdRecorder = GDx12GpuRhi->BeginRecording();
 		{
-			GpuResourceState LastState = InGpuTexture->State;
+			GpuResourceState LastState = InGpuTexture->GetSubResourceState(0, 0);
 			CmdRecorder->Barriers({
 				{ InGpuTexture, GpuResourceState::CopySrc } 
 			});
@@ -194,7 +236,7 @@ void Dx12GpuRhiBackend::UnMapGpuTexture(GpuTexture* InGpuTexture)
 	if (Texture->bIsMappingForWriting) {
 		auto CmdRecorder = GDx12GpuRhi->BeginRecording();
 		{
-			GpuResourceState LastState = InGpuTexture->State;
+			GpuResourceState LastState = InGpuTexture->GetSubResourceState(0, 0);
 			CmdRecorder->Barriers({
 				{InGpuTexture, GpuResourceState::CopyDst} 
 			});

@@ -187,7 +187,7 @@ namespace SH
 		}
 		
 		GpuRenderPassDesc PassDesc;
-		PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ DebuggerTex, RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
+		PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ DebuggerTex->GetDefaultView(), RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
 		
 		DebuggerGridShader* PassShader = GetShader<DebuggerGridShader>();
 		

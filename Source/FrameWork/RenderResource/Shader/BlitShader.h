@@ -9,7 +9,7 @@ namespace FW
 	public:
 		struct Parameters
 		{
-			TRefCountPtr<GpuTexture> InputTex;
+			TRefCountPtr<GpuTextureView> InputView;
 			TRefCountPtr<GpuSampler> InputTexSampler;
 		};
 

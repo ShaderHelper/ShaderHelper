@@ -20,19 +20,19 @@ namespace FW
 		for (uint32 i = 0; i < PassRtNum; i++)
 		{
 			const GpuRenderTargetInfo& RtInfo = InOutPass.Desc.ColorRenderTargets[i];
-			InOutPass.PassTexStates.Add(RtInfo.Texture, GpuResourceState::RenderTargetWrite);
+			InOutPass.PassResourceStates.Add(RtInfo.View, GpuResourceState::RenderTargetWrite);
 		}
 
 		InOutPass.Bindings.EnumerateBinding([&](const ResourceBinding& ResourceBindingEntry, const LayoutBinding& LayoutBindingEntry) {
 			if (LayoutBindingEntry.Type == BindingType::Texture || LayoutBindingEntry.Type == BindingType::TextureCube)
 			{
-				GpuTexture* Tex = static_cast<GpuTexture*>(ResourceBindingEntry.Resource.GetReference());
-				InOutPass.PassTexStates.Add(Tex, GpuResourceState::ShaderResourceRead);
+				GpuResource* Res = static_cast<GpuResource*>(ResourceBindingEntry.Resource.GetReference());
+				InOutPass.PassResourceStates.Add(Res, GpuResourceState::ShaderResourceRead);
 			}
 			else if (LayoutBindingEntry.Type == BindingType::RWStructuredBuffer || LayoutBindingEntry.Type == BindingType::RWRawBuffer)
 			{
 				GpuBuffer* Buffer = static_cast<GpuBuffer*>(ResourceBindingEntry.Resource.GetReference());
-				InOutPass.PassBufferStates.Add(Buffer, GpuResourceState::UnorderedAccess);
+				InOutPass.PassResourceStates.Add(Buffer, GpuResourceState::UnorderedAccess);
 			}
 		});
 	}
@@ -40,21 +40,9 @@ namespace FW
 	void RenderGraph::CreatePassBarriers(const RGRenderPass& InPass)
 	{
 		TArray<GpuBarrierInfo> BarrierInfos;
-		for (auto [Tex, PassTexState] : InPass.PassTexStates)
+		for (auto [Res, DesiredState] : InPass.PassResourceStates)
 		{
-			GpuResourceState TexState = Tex->State;
-			if (TexState != PassTexState || TexState == GpuResourceState::UnorderedAccess)
-			{
-				BarrierInfos.Emplace(Tex, PassTexState);
-			}
-		}
-		for (auto [Buffer, PassBufferState] : InPass.PassBufferStates)
-		{
-			GpuResourceState BufferState = Buffer->State;
-			if (BufferState != PassBufferState || BufferState == GpuResourceState::UnorderedAccess)
-			{
-				BarrierInfos.Emplace(Buffer, PassBufferState);
-			}
+			BarrierInfos.Emplace(Res, DesiredState);
 		}
 		CmdRecorder->Barriers(BarrierInfos);
 	}

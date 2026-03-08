@@ -44,8 +44,15 @@ namespace FW
 
 	void Texture2D::InitGpudata()
 	{
-		GpuTextureDesc Desc{ (uint32)Width, (uint32)Height, Format, GpuTextureUsage::ShaderResource | GpuTextureUsage::Shared , RawData };
-		GpuData = GGpuRhi->CreateTexture(MoveTemp(Desc));
+		GpuTextureDesc Desc{ 
+			.Width = (uint32)Width, 
+			.Height = (uint32)Height, 
+			.Format = Format,
+			.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared ,
+			.InitialData = RawData,
+			.NumMips = 0,
+		};
+		GpuData = GGpuRhi->CreateTexture(MoveTemp(Desc), GpuResourceState::ShaderResourceRead);
 	}
 
 	FString Texture2D::FileExtension() const
@@ -68,9 +75,9 @@ namespace FW
 		RenderGraph Graph;
 		{
 			BlitPassInput Input;
-			Input.InputTex = GpuData;
+			Input.InputView = GpuData->GetDefaultView();
 			Input.InputTexSampler = GpuResourceHelper::GetSampler({.Filter = SamplerFilter::Bilinear});
-			Input.OutputRenderTarget = Thumbnail;
+			Input.OutputView = Thumbnail->GetDefaultView();
 
 			AddBlitPass(Graph, MoveTemp(Input));
 		}

@@ -71,8 +71,8 @@ namespace FW
 		if (!CurrentViewPort.IsSet())
 		{
 			D3D12_VIEWPORT DefaultViewPort{};
-			DefaultViewPort.Width = (float)CurrentRenderTargets[0]->GetWidth();
-			DefaultViewPort.Height = (float)CurrentRenderTargets[0]->GetHeight();
+			DefaultViewPort.Width = (float)CurrentRenderTargetViews[0]->GetWidth();
+			DefaultViewPort.Height = (float)CurrentRenderTargetViews[0]->GetHeight();
 			DefaultViewPort.MinDepth = 0;
 			DefaultViewPort.MaxDepth = 1;
 			DefaultViewPort.TopLeftX = 0;
@@ -144,7 +144,7 @@ namespace FW
 
 		if (IsRenderTargetDirty)
 		{
-			const uint32 RenderTargetNum = CurrentRenderTargets.Num();
+			const uint32 RenderTargetNum = CurrentRenderTargetViews.Num();
 			if (RenderTargetNum > 0)
 			{
 				check(ClearColorValues.Num() == RenderTargetNum);
@@ -155,22 +155,22 @@ namespace FW
 
 				for (uint32 i = 0; i < RenderTargetNum; i++)
 				{
-					Dx12Texture* RenderTarget = CurrentRenderTargets[i];
-					check(RenderTarget);
-					check(RenderTarget->RTV->IsValid());
+					Dx12TextureView* RtView = CurrentRenderTargetViews[i];
+					check(RtView);
+					check(RtView->GetRTV()->IsValid());
 
 					if (LoadActions[i] == RenderTargetLoadAction::Clear)
 					{
-						Vector4f OptimizedClearValue = RenderTarget->GetResourceDesc().ClearValues;
+						Vector4f OptimizedClearValue = RtView->GetTexture()->GetResourceDesc().ClearValues;
 						Vector4f ClearColorValue = ClearColorValues[i];
 						if (!ClearColorValue.Equals(OptimizedClearValue))
 						{
 							SH_LOG(LogDx12, Warning, TEXT("OptimizedClearValue(%s) != ClearColorValue(%s) that may result in invalid fast clear optimization."), *OptimizedClearValue.ToString(), *ClearColorValue.ToString());
 						}
-						InCmdList->ClearRenderTargetView(RenderTarget->RTV->GetHandle(), ClearColorValue.GetData(), 0, nullptr);
+						InCmdList->ClearRenderTargetView(RtView->GetRTV()->GetHandle(), ClearColorValue.GetData(), 0, nullptr);
 					}
 			
-					RenderTargetDescriptors[i] = RenderTarget->RTV->GetHandle();
+					RenderTargetDescriptors[i] = RtView->GetRTV()->GetHandle();
 				}
 
 				InCmdList->OMSetRenderTargets(RenderTargetNum, RenderTargetDescriptors.GetData(), false, nullptr);
@@ -198,7 +198,7 @@ namespace FW
 		CurrentComputeBindGroup2 = nullptr;
 		CurrentComputeBindGroup3 = nullptr;
 
-		CurrentRenderTargets.Empty();
+		CurrentRenderTargetViews.Empty();
 		LoadActions.Reset();
 		ClearColorValues.Reset();
 
@@ -287,11 +287,11 @@ namespace FW
 		}
 	}
 
-	void Dx12StateCache::SetRenderTargets(TArray<Dx12Texture*> InRTs, TArray<Vector4f> InClearColorValues, TArray<RenderTargetLoadAction> InLoadActions)
+	void Dx12StateCache::SetRenderTargets(TArray<Dx12TextureView*> InRTViews, TArray<Vector4f> InClearColorValues, TArray<RenderTargetLoadAction> InLoadActions)
 	{
-		if (InRTs != CurrentRenderTargets || InClearColorValues != ClearColorValues || LoadActions != InLoadActions)
+		if (InRTViews != CurrentRenderTargetViews || InClearColorValues != ClearColorValues || LoadActions != InLoadActions)
 		{
-			CurrentRenderTargets = MoveTemp(InRTs);
+			CurrentRenderTargetViews = MoveTemp(InRTViews);
 			ClearColorValues = MoveTemp(InClearColorValues);
 			LoadActions = MoveTemp(InLoadActions);
 			IsRenderTargetDirty = true;
@@ -408,6 +408,11 @@ namespace FW
 	void Dx12RenderPassRecorder::SetRenderPipelineState(GpuRenderPipelineState* InPipelineState)
 	{
 		StateCache.SetPipeline(static_cast<Dx12RenderPso*>(InPipelineState));
+		if (!StateCache.GetGraphicsRootSignature())
+		{
+			RootSignatureDesc EmptyRsDesc{};
+			StateCache.SetGraphicsRootSignature(Dx12RootSignatureManager::GetRootSignature(EmptyRsDesc));
+		}
 	}
 
 	void Dx12RenderPassRecorder::SetVertexBuffer(GpuBuffer* InVertexBuffer)
@@ -499,18 +504,18 @@ namespace FW
 	{
 		BeginCaptureEvent(PassName);
 
-		TArray<Dx12Texture*> RTs;
+		TArray<Dx12TextureView*> RTViews;
 		TArray<Vector4f> ClearColorValues;
 		TArray<RenderTargetLoadAction> LoadActions;
 
 		for (int32 i = 0; i < PassDesc.ColorRenderTargets.Num(); i++) {
-			Dx12Texture* Rt = static_cast<Dx12Texture*>(PassDesc.ColorRenderTargets[i].Texture);
-			RTs.Add(Rt);
+			Dx12TextureView* RtView = static_cast<Dx12TextureView*>(PassDesc.ColorRenderTargets[i].View);
+			RTViews.Add(RtView);
 			ClearColorValues.Add(PassDesc.ColorRenderTargets[i].ClearColor);
 			LoadActions.Add(PassDesc.ColorRenderTargets[i].LoadAction);
 		}
 
-		StateCache.SetRenderTargets(MoveTemp(RTs), MoveTemp(ClearColorValues), MoveTemp(LoadActions));
+		StateCache.SetRenderTargets(MoveTemp(RTViews), MoveTemp(ClearColorValues), MoveTemp(LoadActions));
 		auto NewPassRecorder = MakeUnique<Dx12RenderPassRecorder>(CmdList, StateCache);
 		RequestedRenderPassRecorders.Add(MoveTemp(NewPassRecorder));
 		return RequestedRenderPassRecorders.Last().Get();
@@ -545,39 +550,82 @@ namespace FW
 		TArray<CD3DX12_RESOURCE_BARRIER> DxBarriers;
 		for (const GpuBarrierInfo& BarrierInfo : BarrierInfos)
 		{
-			check(BarrierInfo.Resource->State != GpuResourceState::Unknown);
-			D3D12_RESOURCE_STATES BeforeDx12State = MapResourceState(BarrierInfo.Resource->State);
 			D3D12_RESOURCE_STATES AfterDx12State = MapResourceState(BarrierInfo.NewState);
-			bool UAVBarrier = BarrierInfo.Resource->State == BarrierInfo.NewState && BarrierInfo.NewState == GpuResourceState::UnorderedAccess;
-			if (BeforeDx12State == AfterDx12State && !UAVBarrier) {
-				return;
-			}
 
-			CD3DX12_RESOURCE_BARRIER Barrier;
-			if (UAVBarrier)
+			if (BarrierInfo.Resource->GetType() == GpuResourceType::Texture)
 			{
-				Barrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
+				Dx12Texture* DxTex = static_cast<Dx12Texture*>(BarrierInfo.Resource);
+				uint32 NumMips = DxTex->GetNumMips();
+				uint32 ArraySize = DxTex->GetArrayLayerCount();
+				bool bNeedUAVBarrier = false;
+				for (uint32 Mip = 0; Mip < NumMips; Mip++)
+				{
+					for (uint32 ArraySlice = 0; ArraySlice < ArraySize; ArraySlice++)
+					{
+						D3D12_RESOURCE_STATES BeforeDx12State = MapResourceState(DxTex->GetSubResourceState(Mip, ArraySlice));
+						if (BeforeDx12State == AfterDx12State)
+						{
+							if (BarrierInfo.NewState == GpuResourceState::UnorderedAccess) bNeedUAVBarrier = true;
+							continue;
+						}
+						uint32 Subresource = D3D12CalcSubresource(Mip, ArraySlice, 0, NumMips, ArraySize);
+						DxBarriers.Add(CD3DX12_RESOURCE_BARRIER::Transition(DxTex->GetResource(), BeforeDx12State, AfterDx12State, Subresource));
+					}
+				}
+				if (bNeedUAVBarrier) DxBarriers.Add(CD3DX12_RESOURCE_BARRIER::UAV(DxTex->GetResource()));
+				DxTex->SetAllSubResourceStates(BarrierInfo.NewState);
+			}
+			else if (BarrierInfo.Resource->GetType() == GpuResourceType::TextureView)
+			{
+				GpuTextureView* View = static_cast<GpuTextureView*>(BarrierInfo.Resource);
+				Dx12Texture* DxTex = static_cast<Dx12Texture*>(View->GetTexture());
+				uint32 NumMips = DxTex->GetNumMips();
+				uint32 ArraySize = DxTex->GetArrayLayerCount();
+				bool bNeedUAVBarrier = false;
+				for (uint32 i = 0; i < View->GetMipLevelCount(); i++)
+				{
+					uint32 Mip = View->GetBaseMipLevel() + i;
+					for (uint32 ArraySlice = 0; ArraySlice < ArraySize; ArraySlice++)
+					{
+						D3D12_RESOURCE_STATES BeforeDx12State = MapResourceState(DxTex->GetSubResourceState(Mip, ArraySlice));
+						if (BeforeDx12State == AfterDx12State)
+						{
+							if (BarrierInfo.NewState == GpuResourceState::UnorderedAccess) bNeedUAVBarrier = true;
+							continue;
+						}
+						uint32 Subresource = D3D12CalcSubresource(Mip, ArraySlice, 0, NumMips, ArraySize);
+						DxBarriers.Add(CD3DX12_RESOURCE_BARRIER::Transition(DxTex->GetResource(), BeforeDx12State, AfterDx12State, Subresource));
+						DxTex->SetSubResourceState(Mip, ArraySlice, BarrierInfo.NewState);
+					}
+				}
+				if (bNeedUAVBarrier) DxBarriers.Add(CD3DX12_RESOURCE_BARRIER::UAV(DxTex->GetResource()));
+			}
+			else if (BarrierInfo.Resource->GetType() == GpuResourceType::Buffer)
+			{
+				Dx12Buffer* DxBuffer = static_cast<Dx12Buffer*>(BarrierInfo.Resource);
+				GpuResourceState OldState = DxBuffer->State;
+				if (OldState == BarrierInfo.NewState)
+				{
+					if (BarrierInfo.NewState == GpuResourceState::UnorderedAccess)
+						DxBarriers.Add(CD3DX12_RESOURCE_BARRIER::UAV(DxBuffer->GetAllocation().GetResource()));
+				}
+				else
+				{
+					D3D12_RESOURCE_STATES BeforeDx12State = MapResourceState(OldState);
+					DxBarriers.Add(CD3DX12_RESOURCE_BARRIER::Transition(DxBuffer->GetAllocation().GetResource(), BeforeDx12State, AfterDx12State));
+				}
+				DxBuffer->State = BarrierInfo.NewState;
 			}
 			else
 			{
-				if (BarrierInfo.Resource->GetType() == GpuResourceType::Texture) {
-					Dx12Texture* DxTex = static_cast<Dx12Texture*>(BarrierInfo.Resource);
-					Barrier = CD3DX12_RESOURCE_BARRIER::Transition(DxTex->GetResource(), BeforeDx12State, AfterDx12State);
-				}
-				else if (BarrierInfo.Resource->GetType() == GpuResourceType::Buffer) {
-					Dx12Buffer* DxBuffer = static_cast<Dx12Buffer*>(BarrierInfo.Resource);
-					Barrier = CD3DX12_RESOURCE_BARRIER::Transition(DxBuffer->GetAllocation().GetResource(), BeforeDx12State, AfterDx12State);
-				}
-				else {
-					check(false);
-				}
+				check(false);
 			}
-	
-			BarrierInfo.Resource->State = BarrierInfo.NewState;
-			DxBarriers.Add(MoveTemp(Barrier));
 		}
 
-		CmdList->ResourceBarrier(DxBarriers.Num(), DxBarriers.GetData());
+		if (DxBarriers.Num() > 0)
+		{
+			CmdList->ResourceBarrier(DxBarriers.Num(), DxBarriers.GetData());
+		}
 	}
 
 	void Dx12CmdRecorder::CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture, uint32 ArrayLayer, uint32 MipLevel)

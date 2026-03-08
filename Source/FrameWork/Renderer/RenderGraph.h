@@ -15,8 +15,7 @@ namespace FW
 		BindingContext Bindings;
 		RenderPassExecution Execution;
 
-		TMap<GpuTexture*, GpuResourceState> PassTexStates;
-		TMap<GpuBuffer*, GpuResourceState> PassBufferStates;
+		TMap<GpuResource*, GpuResourceState> PassResourceStates;
 	};
 
 	class FRAMEWORK_API RenderGraph : FNoncopyable

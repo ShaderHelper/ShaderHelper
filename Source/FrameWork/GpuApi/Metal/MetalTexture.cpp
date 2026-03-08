@@ -100,6 +100,14 @@ namespace FW
             MTLTexturePtr Tex = NS::TransferPtr(GDevice->newTexture(TexDesc));
             RetTexture = new MetalTexture(MoveTemp(Tex), InTexDesc, InitState);
         }
+
+		{
+			GpuTextureViewDesc DefaultViewDesc;
+			DefaultViewDesc.Texture = RetTexture;
+			DefaultViewDesc.BaseMipLevel = 0;
+			DefaultViewDesc.MipLevelCount = InTexDesc.NumMips;
+			RetTexture->DefaultView = GMtlGpuRhi->CreateTextureView(DefaultViewDesc);
+		}
         
         if (!InTexDesc.InitialData.IsEmpty()) {
             const uint32 BytesImage = InTexDesc.InitialData.Num();

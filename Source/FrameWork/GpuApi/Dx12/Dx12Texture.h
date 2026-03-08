@@ -7,6 +7,23 @@
 
 namespace FW
 {
+	class Dx12TextureView : public GpuTextureView, public Dx12DeferredDeleteObject<Dx12TextureView>
+	{
+	public:
+		Dx12TextureView(GpuTextureViewDesc InDesc, TUniquePtr<CpuDescriptor> InSRV, TUniquePtr<CpuDescriptor> InRTV)
+			: GpuTextureView(MoveTemp(InDesc))
+			, SRV(MoveTemp(InSRV))
+			, RTV(MoveTemp(InRTV))
+		{}
+
+		CpuDescriptor* GetSRV() const { return SRV.Get(); }
+		CpuDescriptor* GetRTV() const { return RTV.Get(); }
+
+	private:
+		TUniquePtr<CpuDescriptor> SRV;
+		TUniquePtr<CpuDescriptor> RTV;
+	};
+
 	class Dx12Sampler : public GpuSampler, public Dx12DeferredDeleteObject<Dx12Sampler>
 	{
 	public:
@@ -39,11 +56,12 @@ namespace FW
 		void* SharedHandle;
 
 	public:
-		TUniquePtr<CpuDescriptor> RTV;
-		TUniquePtr<CpuDescriptor> SRV;
 		TRefCountPtr<Dx12Buffer> UploadBuffer;
 		TRefCountPtr<Dx12Buffer> ReadBackBuffer;
 		bool bIsMappingForWriting = false;
+
+	public:
+		Dx12TextureView* GetDx12DefaultView() const { return static_cast<Dx12TextureView*>(DefaultView.GetReference()); }
 		
 	};
 

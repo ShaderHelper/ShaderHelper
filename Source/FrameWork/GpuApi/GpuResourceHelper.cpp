@@ -1,6 +1,8 @@
 #include "CommonHeader.h"
 #include "GpuRhi.h"
 #include "RenderResource/Shader/ClearShader.h"
+#include "RenderResource/Shader/Shader.h"
+#include "RenderResource/RenderPass/BlitPass.h"
 
 namespace FW::GpuResourceHelper
 {
@@ -28,6 +30,42 @@ namespace FW::GpuResourceHelper
 		GpuTextureDesc Desc{ 1, 1, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource , RawData};
 		static TRefCountPtr<GpuTexture> GlobalBlackTex = GGpuRhi->CreateTexture(MoveTemp(Desc));
 		return GlobalBlackTex;
+	}
+
+	GpuTexture* GetGlobalBlackCubemapTex()
+	{
+		static TRefCountPtr<GpuTexture> GlobalBlackCubemap = []() {
+			GpuTextureDesc Desc;
+			Desc.Width = 1;
+			Desc.Height = 1;
+			Desc.Format = GpuTextureFormat::B8G8R8A8_UNORM;
+			Desc.Usage = GpuTextureUsage::ShaderResource;
+			Desc.Dimension = GpuTextureDimension::TexCube;
+
+			TRefCountPtr<GpuTexture> DefaultCubemap = GGpuRhi->CreateTexture(Desc, GpuResourceState::CopyDst);
+
+			TArray<uint8> RawData = { 0, 0, 0, 255 };
+			TRefCountPtr<GpuBuffer> UploadBuffer = GGpuRhi->CreateBuffer(
+				{ (uint32)RawData.Num(), GpuBufferUsage::Upload },
+				GpuResourceState::CopySrc
+			);
+			void* Mapped = GGpuRhi->MapGpuBuffer(UploadBuffer, GpuResourceMapMode::Write_Only);
+			FMemory::Memcpy(Mapped, RawData.GetData(), RawData.Num());
+			GGpuRhi->UnMapGpuBuffer(UploadBuffer);
+
+			GpuCmdRecorder* CmdRecorder = GGpuRhi->BeginRecording(TEXT("InitDefaultCubemap"));
+			for (uint32 FaceIndex = 0; FaceIndex < 6; ++FaceIndex)
+			{
+				CmdRecorder->CopyBufferToTexture(UploadBuffer, DefaultCubemap, FaceIndex, 0);
+			}
+			CmdRecorder->Barriers({ { DefaultCubemap, GpuResourceState::ShaderResourceRead } });
+			GGpuRhi->EndRecording(CmdRecorder);
+			GGpuRhi->Submit({ CmdRecorder });
+
+			return DefaultCubemap;
+		}();
+
+		return GlobalBlackCubemap;
 	}
 
 	void ClearRWResource(GpuCmdRecorder* CmdRecorder, GpuResource* InResource)
@@ -77,5 +115,29 @@ namespace FW::GpuResourceHelper
 			PassRecorder->Dispatch(ThreadGroupCountX, 1, 1);
 		}
 		CmdRecorder->EndComputePass(PassRecorder);
+	}
+
+	void GenerateMipmap(RenderGraph& Graph, GpuTexture* InTexture)
+	{
+		uint32 NumMips = InTexture->GetNumMips();
+		if (NumMips <= 1) return;
+
+		GpuSampler* BilinearSampler = GetSampler({SamplerFilter::Bilinear});
+
+		auto PrevView = GGpuRhi->CreateTextureView({InTexture, 0, 1});
+
+		for (uint32 MipLevel = 1; MipLevel < NumMips; MipLevel++)
+		{
+			auto DstView = GGpuRhi->CreateTextureView({InTexture, MipLevel, 1});
+
+			BlitPassInput Input;
+			Input.InputView = PrevView;
+			Input.InputTexSampler = BilinearSampler;
+			Input.OutputView = DstView;
+
+			AddBlitPass(Graph, Input);
+
+			PrevView = DstView;
+		}
 	}
 }

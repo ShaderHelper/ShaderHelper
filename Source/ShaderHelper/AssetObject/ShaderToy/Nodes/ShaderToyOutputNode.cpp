@@ -94,9 +94,9 @@ namespace SH
         auto ResultPin = static_cast<GpuTexturePin*>(GetPin("RT"));	
         
         BlitPassInput Input;
-        Input.InputTex = ResultPin->GetValue();
+        Input.InputView = ResultPin->GetValue()->GetDefaultView();
         Input.InputTexSampler = GpuResourceHelper::GetSampler({});
-        Input.OutputRenderTarget = ShaderToyContext.FinalRT;
+        Input.OutputView = ShaderToyContext.FinalRT->GetDefaultView();
 		Input.Scissor = GpuScissorRectDesc{0, 0, (uint32)(AreaFraction * ShaderToyContext.FinalRT->GetWidth()), ShaderToyContext.FinalRT->GetHeight()};
 
 		ShaderToyContext.Ontputs.Emplace(MoveTemp(Input), Layer);

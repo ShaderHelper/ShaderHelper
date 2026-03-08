@@ -2,9 +2,31 @@
 #include "VkDevice.h"
 #include "GpuApi/GpuResource.h"
 #include "GpuApi/GpuSampler.h"
+#include "VkUtil.h"
 
 namespace FW
 {
+	class VulkanTextureView : public GpuTextureView
+	{
+	public:
+		VulkanTextureView(GpuTextureViewDesc InDesc, VkImageView InImageView)
+			: GpuTextureView(MoveTemp(InDesc))
+			, ImageView(InImageView)
+		{
+			GVkDeferredReleaseManager.AddResource(this);
+		}
+
+		~VulkanTextureView()
+		{
+			vkDestroyImageView(GDevice, ImageView, nullptr);
+		}
+
+		VkImageView GetView() const { return ImageView; }
+
+	private:
+		VkImageView ImageView;
+	};
+
 	class VulkanSampler : public GpuSampler
 	{
 	public:
@@ -21,15 +43,14 @@ namespace FW
 	class VulkanTexture : public GpuTexture
 	{
 	public:
-		VulkanTexture(const GpuTextureDesc& InDesc, GpuResourceState InResourceState, VkImage InImage, VkImageView InImageView, VmaAllocation InAllocation);
+		VulkanTexture(const GpuTextureDesc& InDesc, GpuResourceState InResourceState, VkImage InImage, VmaAllocation InAllocation);
 		~VulkanTexture() {
-			vkDestroyImageView(GDevice, ImageView, nullptr);
 			vmaDestroyImage(GAllocator, Image, Allocation);
 			CloseHandle(SharedTextureHandle);
 		}
 
 		VkImage GetImage() const { return Image; }
-		VkImageView GetView() const { return ImageView; }
+		VulkanTextureView* GetVkDefaultView() const { return static_cast<VulkanTextureView*>(DefaultView.GetReference()); }
 		uint32 GetAllocationSize() const override {
 			VmaAllocationInfo AllocInfo;
 			vmaGetAllocationInfo(GAllocator, Allocation, &AllocInfo);
@@ -53,7 +74,6 @@ namespace FW
 
 	private:
 		VkImage Image;
-		VkImageView ImageView;
 		VmaAllocation Allocation;
 		HANDLE SharedTextureHandle;
 	};

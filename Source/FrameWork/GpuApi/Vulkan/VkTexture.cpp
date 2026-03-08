@@ -14,19 +14,25 @@ namespace FW
 		GVkDeferredReleaseManager.AddResource(this);
 	}
 
-	VulkanTexture::VulkanTexture(const GpuTextureDesc& InDesc, GpuResourceState InResourceState, VkImage InImage, VkImageView InImageView, VmaAllocation InAllocation)
+	VulkanTexture::VulkanTexture(const GpuTextureDesc& InDesc, GpuResourceState InResourceState, VkImage InImage, VmaAllocation InAllocation)
 		: GpuTexture(InDesc, InResourceState)
-		, Image(InImage), ImageView(InImageView)
+		, Image(InImage)
 		, Allocation(InAllocation)
 		, SharedTextureHandle(nullptr)
 	{
 		GVkDeferredReleaseManager.AddResource(this);
+
+		GpuTextureViewDesc DefaultViewDesc;
+		DefaultViewDesc.Texture = this;
+		DefaultViewDesc.BaseMipLevel = 0;
+		DefaultViewDesc.MipLevelCount = GetNumMips();
+		DefaultView = GVkGpuRhi->CreateTextureView(DefaultViewDesc);
 	}
 
 	static VmaPool ExternalPool = VK_NULL_HANDLE;
 	VkImageUsageFlags DetermineTextureUsage(const GpuTextureDesc& InTexDesc)
 	{
-		VkImageUsageFlags Usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+		VkImageUsageFlags Usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 		if (EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::RenderTarget))
 		{
 			Usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -34,12 +40,7 @@ namespace FW
 		if (EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::ShaderResource))
 		{
 			Usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
-		}
-		if (!InTexDesc.InitialData.IsEmpty())
-		{
-			Usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-		}
-				
+		}	
 		return Usage;
 	}
 
@@ -53,7 +54,7 @@ namespace FW
 		ImgCreateInfo.extent.width = InTexDesc.Width;
 		ImgCreateInfo.extent.height = InTexDesc.Height;
 		ImgCreateInfo.extent.depth = 1;
-		ImgCreateInfo.mipLevels = 1;
+		ImgCreateInfo.mipLevels = InTexDesc.NumMips;
 		ImgCreateInfo.arrayLayers = ArrayLayers;
 		ImgCreateInfo.format = MapTextureFormat(InTexDesc.Format);
 		ImgCreateInfo.usage = DetermineTextureUsage(InTexDesc);
@@ -121,26 +122,11 @@ namespace FW
 		VkImage Image;
 		VmaAllocation Allocation;
 		VkCheck(vmaCreateImage(GAllocator, &ImgCreateInfo, &AllocCreateInfo, &Image, &Allocation, nullptr));
-		VkImageViewCreateInfo ViewInfo = { 
-			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, 
-			.image = Image,
-			.viewType = bIsCube ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D,
-			.format = ImgCreateInfo.format,
-			.subresourceRange = {
-				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-				.baseMipLevel = 0,
-				.levelCount = 1,
-				.baseArrayLayer = 0,
-				.layerCount = ArrayLayers
-			}
-		};
-		VkImageView ImageView;
-		VkCheck(vkCreateImageView(GDevice, &ViewInfo, nullptr, &ImageView));
 
-		VulkanTexture* NewTex = new VulkanTexture(InTexDesc, InitState, Image, ImageView, Allocation);
+		VulkanTexture* NewTex = new VulkanTexture(InTexDesc, InitState, Image, Allocation);
 		//Vulkan requires the initialLayout member of VkImageCreateInfo must be VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED..
 		//but we want to create the texture in the correct initial state, so we need an explicit layout transition after creation.
-		NewTex->State = GpuResourceState::Unknown;
+		NewTex->SetAllSubResourceStates(GpuResourceState::Unknown);
 
 		if (!InTexDesc.InitialData.IsEmpty())
 		{

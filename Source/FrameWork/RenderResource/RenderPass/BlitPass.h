@@ -7,10 +7,10 @@ namespace FW
 	struct BlitPassInput
 	{
 		std::set<FString> VariantDefinitions;
-		TRefCountPtr<GpuTexture> InputTex;
+		TRefCountPtr<GpuTextureView> InputView;
 		TRefCountPtr<GpuSampler> InputTexSampler;
 
-		TRefCountPtr<GpuTexture> OutputRenderTarget;
+		TRefCountPtr<GpuTextureView> OutputView;
 		
 		TOptional<GpuScissorRectDesc> Scissor;
 		RenderTargetLoadAction LoadAction = RenderTargetLoadAction::DontCare;

@@ -18,18 +18,17 @@ namespace FW
 		, Resource(MoveTemp(InResource))
 		, SharedHandle(InSharedHandle)
 	{
-
+		GpuTextureViewDesc ViewDesc;
+		ViewDesc.Texture = this;
+		ViewDesc.BaseMipLevel = 0;
+		ViewDesc.MipLevelCount = GetNumMips();
+		DefaultView = GDx12GpuRhi->CreateTextureView(ViewDesc);
 	}
 
 	static bool ValidateTexture(const GpuTextureDesc& InTexDesc)
 	{
 		if (InTexDesc.Width <= 0 || InTexDesc.Height <= 0) {
 			SH_LOG(LogDx12, Error, TEXT("Invalid Texture dimensions %ux%u"), InTexDesc.Width, InTexDesc.Height);
-			return false;
-		}
-
-		if (InTexDesc.NumMips != 1) {
-			SH_LOG(LogDx12, Error, TEXT("Invalid Texture MipLevels. TODO: Support texture subresource"));
 			return false;
 		}
 
@@ -80,34 +79,6 @@ namespace FW
 
 		check(false);
 		return D3D12_RESOURCE_STATE_COMMON;
-	}
-
-	static void CreateTextureView(const FlagSets& InFlags, Dx12Texture* InTexture)
-	{
-
-		if (InFlags.bSRV) {
-			InTexture->SRV = AllocCpuCbvSrvUav();
-			if (InTexture->GetResourceDesc().Dimension == GpuTextureDimension::TexCube)
-			{
-				D3D12_SHADER_RESOURCE_VIEW_DESC SrvDesc{};
-				SrvDesc.Format = InTexture->GetResource()->GetDesc().Format;
-				SrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-				SrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-				SrvDesc.TextureCube.MostDetailedMip = 0;
-				SrvDesc.TextureCube.MipLevels = 1;
-				SrvDesc.TextureCube.ResourceMinLODClamp = 0.0f;
-				GDevice->CreateShaderResourceView(InTexture->GetResource(), &SrvDesc, InTexture->SRV->GetHandle());
-			}
-			else
-			{
-				GDevice->CreateShaderResourceView(InTexture->GetResource(), nullptr, InTexture->SRV->GetHandle());
-			}
-		}
-
-		if (InFlags.bRTV) {
-			InTexture->RTV = AllocRtv();
-			GDevice->CreateRenderTargetView(InTexture->GetResource(), nullptr, InTexture->RTV->GetHandle());
-		}
 	}
 
 	TRefCountPtr<Dx12Texture> CreateDx12Texture2D(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
@@ -171,7 +142,6 @@ namespace FW
 		
 		TRefCountPtr<Dx12Texture> RetTexture = new Dx12Texture{ MoveTemp(TexResource), bHasInitialData ? GpuResourceState::CopyDst : InitState, 
 			InTexDesc, SharedHandle };
-		CreateTextureView(Flags, RetTexture);
 
 		TRefCountPtr<Dx12Buffer> UploadBuffer;
 		if (bHasInitialData) {

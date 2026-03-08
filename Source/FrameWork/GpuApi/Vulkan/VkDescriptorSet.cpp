@@ -161,7 +161,20 @@ namespace FW
 					? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 					: VK_IMAGE_LAYOUT_GENERAL;
 				ImageInfos.Add({
-					.imageView = Texture->GetView(),
+					.imageView = Texture->GetVkDefaultView()->GetView(),
+					.imageLayout = ImageLayout
+				});
+				Write.pImageInfo = &ImageInfos.Last();
+			}
+			else if (Resource->GetType() == GpuResourceType::TextureView)
+			{
+				VulkanTextureView* View = static_cast<VulkanTextureView*>(Resource);
+				BindingType SlotBindingType = LayoutDesc.GetBindingType(Slot);
+				VkImageLayout ImageLayout = (SlotBindingType == BindingType::Texture || SlotBindingType == BindingType::TextureCube)
+					? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+					: VK_IMAGE_LAYOUT_GENERAL;
+				ImageInfos.Add({
+					.imageView = View->GetView(),
 					.imageLayout = ImageLayout
 				});
 				Write.pImageInfo = &ImageInfos.Last();

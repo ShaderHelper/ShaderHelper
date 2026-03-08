@@ -25,12 +25,12 @@ namespace FW
 
 	struct GpuRenderTargetInfo
 	{
-		GpuTexture* Texture;
+		GpuTextureView* View;
 		RenderTargetLoadAction LoadAction = RenderTargetLoadAction::DontCare;
 		RenderTargetStoreAction StoreAction = RenderTargetStoreAction::DontCare;
         
         //only valid when the load action is clear.
-		Vector4f ClearColor = Texture->GetResourceDesc().ClearValues;
+		Vector4f ClearColor = View->GetTexture()->GetResourceDesc().ClearValues;
 	};
 
 	struct GpuRenderPassDesc

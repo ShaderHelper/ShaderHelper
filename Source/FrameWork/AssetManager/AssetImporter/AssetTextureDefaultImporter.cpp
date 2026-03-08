@@ -44,7 +44,7 @@ namespace FW
 
 	TArray<FString> AssetTextureDefaultImporter::SupportFileExts() const
 	{
-		return { "png", "jpeg", "jpg", "tga" };
+		return { "png", "jpeg", "jpg", "tga", "bmp" };
 	}
 
 	MetaType* AssetTextureDefaultImporter::SupportAsset()

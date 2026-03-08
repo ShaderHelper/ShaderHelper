@@ -148,7 +148,12 @@ namespace FW
 			else if (BindingResource->GetType() == GpuResourceType::Texture)
 			{
 				Dx12Texture* Texture = static_cast<Dx12Texture*>(BindingResource);
-				SrcDescriptorRange_CbvSrvUav.FindOrAdd(BindingVisibility).Add(Texture->SRV->GetHandle());
+				SrcDescriptorRange_CbvSrvUav.FindOrAdd(BindingVisibility).Add(Texture->GetDx12DefaultView()->GetSRV()->GetHandle());
+			}
+			else if (BindingResource->GetType() == GpuResourceType::TextureView)
+			{
+				Dx12TextureView* View = static_cast<Dx12TextureView*>(BindingResource);
+				SrcDescriptorRange_CbvSrvUav.FindOrAdd(BindingVisibility).Add(View->GetSRV()->GetHandle());
 			}
 			else if (BindingResource->GetType() == GpuResourceType::Buffer)
 			{

@@ -186,9 +186,9 @@ namespace SH
 		RenderGraph Graph;
 		{
 			BlitPassInput Input;
-			Input.InputTex = Texture->GetGpuData();
+			Input.InputView = Texture->GetGpuData()->GetDefaultView();
 			Input.InputTexSampler = GpuResourceHelper::GetSampler({});
-			Input.OutputRenderTarget = PreviewTex;
+			Input.OutputView = PreviewTex->GetDefaultView();
 			Input.VariantDefinitions.insert(FString::Printf(TEXT("CHANNEL_FILTER_%s"), ANSI_TO_TCHAR(magic_enum::enum_name(ChannelFilter).data())));
 			AddBlitPass(Graph, MoveTemp(Input));
 		}

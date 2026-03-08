@@ -65,7 +65,7 @@ public:
 
 struct GpuBarrierInfo
 {
-	GpuTrackedResource* Resource;
+	GpuResource* Resource;
 	GpuResourceState NewState;
 };
 
@@ -102,6 +102,7 @@ public:
 
 	TRefCountPtr<GpuTexture> CreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState = GpuResourceState::Unknown);
 	TRefCountPtr<GpuBuffer> CreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState = GpuResourceState::Unknown);
+	TRefCountPtr<GpuTextureView> CreateTextureView(const GpuTextureViewDesc& InViewDesc);
 
 	TRefCountPtr<GpuShader> CreateShaderFromSource(const GpuShaderSourceDesc& Desc) const;
 	// The file directory will be considered as a include dir by default.
@@ -145,6 +146,7 @@ public:
 protected:
 	virtual TRefCountPtr<GpuTexture> CreateTextureInternal(const GpuTextureDesc& InTexDesc, GpuResourceState InitState) = 0;
 	virtual TRefCountPtr<GpuBuffer> CreateBufferInternal(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState) = 0;
+	virtual TRefCountPtr<GpuTextureView> CreateTextureViewInternal(const GpuTextureViewDesc& InViewDesc) = 0;
 	virtual TRefCountPtr<GpuRenderPipelineState> CreateRenderPipelineStateInternal(const GpuRenderPipelineStateDesc &InPipelineStateDesc) = 0;
 	virtual TRefCountPtr<GpuComputePipelineState> CreateComputePipelineStateInternal(const GpuComputePipelineStateDesc& InPipelineStateDesc) = 0;
 	virtual TRefCountPtr<GpuShader> CreateShaderFromSourceInternal(const GpuShaderSourceDesc& Desc) const = 0;

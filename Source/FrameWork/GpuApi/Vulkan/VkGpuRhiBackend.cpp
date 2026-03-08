@@ -8,6 +8,7 @@
 #include "VkUtil.h"
 #include "VkBuffer.h"
 #include "VkDescriptorSet.h"
+#include "VkMap.h"
 
 namespace FW
 {
@@ -38,6 +39,30 @@ namespace FW
 	TRefCountPtr<GpuTexture> VkGpuRhiBackend::CreateTextureInternal(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
 	{
 		return AUX::StaticCastRefCountPtr<GpuTexture>(CreateVulkanTexture(InTexDesc, InitState));
+	}
+
+	TRefCountPtr<GpuTextureView> VkGpuRhiBackend::CreateTextureViewInternal(const GpuTextureViewDesc& InViewDesc)
+	{
+		VulkanTexture* VkTex = static_cast<VulkanTexture*>(InViewDesc.Texture);
+		bool bIsCube = InViewDesc.Texture->GetResourceDesc().Dimension == GpuTextureDimension::TexCube;
+		VkImageViewCreateInfo ViewInfo = {
+			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+			.image = VkTex->GetImage(),
+			.viewType = bIsCube ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D,
+			.format = MapTextureFormat(InViewDesc.Texture->GetFormat()),
+			.subresourceRange = {
+				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.baseMipLevel = InViewDesc.BaseMipLevel,
+				.levelCount = InViewDesc.MipLevelCount,
+				.baseArrayLayer = 0,
+				.layerCount = bIsCube ? 6u : 1u
+			}
+		};
+		VkImageView ImageView;
+		VkCheck(vkCreateImageView(GDevice, &ViewInfo, nullptr, &ImageView));
+
+		GpuTextureViewDesc ViewDesc = InViewDesc;
+		return new VulkanTextureView(MoveTemp(ViewDesc), ImageView);
 	}
 
 	TRefCountPtr<GpuBuffer> VkGpuRhiBackend::CreateBufferInternal(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState)
@@ -186,7 +211,7 @@ namespace FW
 			}
 			auto CmdRecorder = GVkGpuRhi->BeginRecording();
 			{
-				GpuResourceState LastState = InGpuTexture->State;
+				GpuResourceState LastState = InGpuTexture->GetSubResourceState(0, 0);
 				CmdRecorder->Barriers({
 					{ InGpuTexture, GpuResourceState::CopySrc }
 				});
@@ -216,7 +241,7 @@ namespace FW
 
 			auto CmdRecorder = GVkGpuRhi->BeginRecording();
 			{
-				GpuResourceState LastState = InGpuTexture->State;
+				GpuResourceState LastState = InGpuTexture->GetSubResourceState(0, 0);
 				CmdRecorder->Barriers({
 					{ InGpuTexture, GpuResourceState::CopyDst }
 				});

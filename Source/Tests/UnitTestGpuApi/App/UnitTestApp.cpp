@@ -83,7 +83,7 @@ namespace UNITTEST_GPUAPI
 			};
 			TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 			GpuRenderPassDesc PassDesc;
-			PassDesc.ColorRenderTargets.Add({ DummyRT });
+			PassDesc.ColorRenderTargets.Add({ DummyRT->GetDefaultView() });
 
 			auto CmdRecorder = GGpuRhi->BeginRecording();
 			{
@@ -138,7 +138,7 @@ namespace UNITTEST_GPUAPI
 			TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 
 			GpuRenderPassDesc PassDesc;
-			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ RenderTarget, RenderTargetLoadAction::Load, RenderTargetStoreAction::Store });
+			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ RenderTarget->GetDefaultView(), RenderTargetLoadAction::Load, RenderTargetStoreAction::Store });
 
 			auto CmdRecorder = GGpuRhi->BeginRecording();
 			{
