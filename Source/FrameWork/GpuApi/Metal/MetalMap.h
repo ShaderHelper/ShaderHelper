@@ -79,7 +79,6 @@ namespace FW
             const GpuRenderTargetInfo& RtInfo = PassDesc.ColorRenderTargets[i];
             MetalTextureView* RtView = static_cast<MetalTextureView*>(RtInfo.View);
             RawPassDesc.colorAttachments[i].texture = (id<MTLTexture>)RtView->GetResource();
-            RawPassDesc.colorAttachments[i].level = RtView->GetBaseMipLevel();
             RawPassDesc.colorAttachments[i].loadAction = MapLoadAction(RtInfo.LoadAction);
             RawPassDesc.colorAttachments[i].storeAction = MapStoreAction(RtInfo.StoreAction);
             RawPassDesc.colorAttachments[i].clearColor = MTLClearColorMake(RtInfo.ClearColor.x, RtInfo.ClearColor.y, RtInfo.ClearColor.z, RtInfo.ClearColor.w);

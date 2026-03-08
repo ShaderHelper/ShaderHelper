@@ -24,7 +24,7 @@ namespace FW
         GMtlDeferredReleaseManager.AddResource(this);
 
         GpuTextureViewDesc DefaultViewDesc;
-        DefaultViewDesc.Texture = RetTexture;
+        DefaultViewDesc.Texture = this;
         DefaultViewDesc.BaseMipLevel = 0;
         DefaultViewDesc.MipLevelCount = GetNumMips();
         DefaultView = GMtlGpuRhi->CreateTextureView(DefaultViewDesc);

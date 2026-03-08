@@ -5,6 +5,7 @@
 #include "VkGpuRhiBackend.h"
 #include "VkUtil.h"
 #include "VkDescriptorSet.h"
+#include "GpuApi/GpuApiValidation.h"
 
 namespace FW
 {
@@ -31,10 +32,20 @@ namespace FW
 			.pDynamicStates = DynamicStates
 		};
 
-		TArray<VkPipelineShaderStageCreateInfo> Stages;
 		VulkanShader* Vs = static_cast<VulkanShader*>(InPipelineStateDesc.Vs);
-		auto VsEntryPoint = StringCast<UTF8CHAR>(*Vs->GetEntryPoint());
 		VulkanShader* Ps = static_cast<VulkanShader*>(InPipelineStateDesc.Ps);
+
+		if (InPipelineStateDesc.CheckLayout)
+		{
+			CheckShaderLayoutBinding(InPipelineStateDesc, Vs);
+			if (Ps)
+			{
+				CheckShaderLayoutBinding(InPipelineStateDesc, Ps);
+			}
+		}
+
+		TArray<VkPipelineShaderStageCreateInfo> Stages;
+		auto VsEntryPoint = StringCast<UTF8CHAR>(*Vs->GetEntryPoint());
 		Stages.Add({
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
 			.stage = VK_SHADER_STAGE_VERTEX_BIT,
@@ -176,6 +187,11 @@ namespace FW
 	TRefCountPtr<VulkanComputePipelineState> CreateVulkanComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc)
 	{
 		VulkanShader* Cs = static_cast<VulkanShader*>(InPipelineStateDesc.Cs);
+		if (InPipelineStateDesc.CheckLayout)
+		{
+			CheckShaderLayoutBinding(InPipelineStateDesc, Cs);
+		}
+
 		auto CsEntryPoint = StringCast<UTF8CHAR>(*Cs->GetEntryPoint());
 
 		VkPipelineShaderStageCreateInfo StageInfo{

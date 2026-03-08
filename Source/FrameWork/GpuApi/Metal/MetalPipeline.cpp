@@ -30,10 +30,10 @@ namespace FW
 
 		if (InPipelineStateDesc.CheckLayout)
 		{
-			CheckShaderLayoutBinding(InPipelineStateDesc, Vs->GetLayout());
+			CheckShaderLayoutBinding(InPipelineStateDesc, Vs);
 			if (Ps)
 			{
-				CheckShaderLayoutBinding(InPipelineStateDesc, Ps->GetLayout());
+				CheckShaderLayoutBinding(InPipelineStateDesc, Ps);
 			}
 		}
         
@@ -75,7 +75,7 @@ namespace FW
         MetalShader* Cs = static_cast<MetalShader*>(InPipelineStateDesc.Cs);
 		if (InPipelineStateDesc.CheckLayout)
 		{
-			CheckShaderLayoutBinding(InPipelineStateDesc, Cs->GetLayout());
+			CheckShaderLayoutBinding(InPipelineStateDesc, Cs);
 		}
 
         NS::Error* err = nullptr;

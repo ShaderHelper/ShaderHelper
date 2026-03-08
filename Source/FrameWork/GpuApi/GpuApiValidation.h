@@ -1,5 +1,6 @@
 #pragma once
 #include "GpuResource.h"
+#include "GpuShader.h"
 #include <stdexcept>
 
 DECLARE_LOG_CATEGORY_EXTERN(LogRhiValidation , Log, All);
@@ -27,8 +28,9 @@ namespace FW
 	bool ValidateCreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState);
 
 	template<typename PipelineStateDesc>
-	void CheckShaderLayoutBinding(const PipelineStateDesc& InPipelineStateDesc, const TArray<GpuShaderLayoutBinding>& InShaderLayoutBindings)
+	void CheckShaderLayoutBinding(const PipelineStateDesc& InPipelineStateDesc, GpuShader* InShader)
 	{
+		const TArray<GpuShaderLayoutBinding> ShaderLayoutBindings = InShader->GetLayout();
 		auto CheckGroup = [&](const GpuShaderLayoutBinding& ShaderLayoutBinding, GpuBindGroupLayout* InLayout)
 			{
 				if (!InLayout)
@@ -49,7 +51,7 @@ namespace FW
 				return false;
 			};
 
-		for (const auto& ShaderLayoutBinding : InShaderLayoutBindings)
+		for (const auto& ShaderLayoutBinding : ShaderLayoutBindings)
 		{
 			bool HasError{};
 			if (ShaderLayoutBinding.Group == 0)
@@ -75,8 +77,8 @@ namespace FW
 
 			if (HasError)
 			{
-				FString ErrorInfo = FString::Printf(TEXT("Binding layouts do not match shaders:\ncontain a binding %s(Slot:%d, Group:%d, Type:%s), but it cannot be found in provided layouts."),
-					*ShaderLayoutBinding.Name, ShaderLayoutBinding.Slot, ShaderLayoutBinding.Group, ANSI_TO_TCHAR(magic_enum::enum_name(ShaderLayoutBinding.Type).data()));
+				FString ErrorInfo = FString::Printf(TEXT("The %s[%s] contains a binding %s(Slot:%d, Group:%d, Type:%s), but it cannot be found in provided binding layouts."),
+					ANSI_TO_TCHAR(magic_enum::enum_name(InShader->GetShaderType()).data()), *InShader->GetShaderName(), *ShaderLayoutBinding.Name, ShaderLayoutBinding.Slot, ShaderLayoutBinding.Group, ANSI_TO_TCHAR(magic_enum::enum_name(ShaderLayoutBinding.Type).data()));
 				throw std::runtime_error(TCHAR_TO_ANSI(*ErrorInfo));
 			}
 		}

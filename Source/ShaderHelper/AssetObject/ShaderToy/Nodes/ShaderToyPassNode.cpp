@@ -1034,7 +1034,7 @@ namespace SH
 			}
 			catch (const std::runtime_error& e)
 			{
-				SH_LOG(LogShader, Error, TEXT("Execution failed: can not declare resource bindings in stshader.\n%s"), ANSI_TO_TCHAR(e.what()));
+				SH_LOG(LogShader, Error, TEXT("Execution failed: %s"), ANSI_TO_TCHAR(e.what()));
 				return { true, true };
 			}
 
