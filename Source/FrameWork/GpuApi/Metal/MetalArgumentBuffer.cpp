@@ -40,6 +40,7 @@ namespace FW
             
             MTLArgumentDescriptor* ArgDesc = [MTLArgumentDescriptor argumentDescriptor];
             ArgDesc.index = Slot;
+            MTLArgumentDescriptor* CombinedSamplerArgDesc = nil;
             if(LayoutBindingEntry.Type == BindingType::RWStructuredBuffer || LayoutBindingEntry.Type == BindingType::RWRawBuffer)
             {
                 ArgDesc.dataType = MTLDataTypePointer;
@@ -59,16 +60,10 @@ namespace FW
                 ArgDesc.access = MTLArgumentAccessReadOnly;
                 ResourceUsages.Add(Slot, MTLResourceUsageRead);
 
-                MTLArgumentDescriptor* SamplerArgDesc = [MTLArgumentDescriptor argumentDescriptor];
-                SamplerArgDesc.index = Slot;
-                SamplerArgDesc.dataType = MTLDataTypeSampler;
-                SamplerArgDesc.access = MTLArgumentAccessReadOnly;
-                if(EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Vertex))
-                    VertexArgDescs.Add(SamplerArgDesc);
-                if(EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Pixel))
-                    FragmentArgDescs.Add(SamplerArgDesc);
-                if(EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Compute))
-                    ComputeArgDescs.Add(SamplerArgDesc);
+				CombinedSamplerArgDesc = [MTLArgumentDescriptor argumentDescriptor];
+				CombinedSamplerArgDesc.index = Slot + 1;
+				CombinedSamplerArgDesc.dataType = MTLDataTypeSampler;
+				CombinedSamplerArgDesc.access = MTLArgumentAccessReadOnly;
             }
             else if(LayoutBindingEntry.Type == BindingType::Texture)
             {
@@ -108,6 +103,17 @@ namespace FW
             if(EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Compute))
             {
                 ComputeArgDescs.Add(ArgDesc);
+            }
+            
+            // Add sampler descriptor AFTER the texture descriptor to keep indices sorted
+            if(CombinedSamplerArgDesc != nil)
+            {
+                if(EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Vertex))
+                    VertexArgDescs.Add(CombinedSamplerArgDesc);
+                if(EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Pixel))
+                    FragmentArgDescs.Add(CombinedSamplerArgDesc);
+                if(EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Compute))
+                    ComputeArgDescs.Add(CombinedSamplerArgDesc);
             }
         }
         
@@ -238,17 +244,17 @@ namespace FW
 				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Vertex))
                 {
                     VertexArgumentEncoder->setTexture(TexView->GetResource(), Slot);
-                    VertexArgumentEncoder->setSamplerState(Sampler->GetResource(), Slot);
+                    VertexArgumentEncoder->setSamplerState(Sampler->GetResource(), Slot + 1);
                 }
 				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Pixel))
                 {
                     FragmentArgumentEncoder->setTexture(TexView->GetResource(), Slot);
-                    FragmentArgumentEncoder->setSamplerState(Sampler->GetResource(), Slot);
+                    FragmentArgumentEncoder->setSamplerState(Sampler->GetResource(), Slot + 1);
                 }
 				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Compute))
 				{
 					ComputeArgumentEncoder->setTexture(TexView->GetResource(), Slot);
-					ComputeArgumentEncoder->setSamplerState(Sampler->GetResource(), Slot);
+					ComputeArgumentEncoder->setSamplerState(Sampler->GetResource(), Slot + 1);
 				}
                 BindGroupResources.Add(Slot, TexView->GetResource());
             }
