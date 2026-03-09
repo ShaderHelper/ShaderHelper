@@ -52,6 +52,24 @@ namespace FW
                 ArgDesc.access = MTLArgumentAccessReadOnly;
                 ResourceUsages.Add(Slot, MTLResourceUsageRead);
             }
+            else if(LayoutBindingEntry.Type == BindingType::CombinedTextureSampler || LayoutBindingEntry.Type == BindingType::CombinedTextureCubeSampler)
+            {
+                ArgDesc.dataType = MTLDataTypeTexture;
+                ArgDesc.textureType = LayoutBindingEntry.Type == BindingType::CombinedTextureSampler ? MTLTextureType2D : MTLTextureTypeCube;
+                ArgDesc.access = MTLArgumentAccessReadOnly;
+                ResourceUsages.Add(Slot, MTLResourceUsageRead);
+
+                MTLArgumentDescriptor* SamplerArgDesc = [MTLArgumentDescriptor argumentDescriptor];
+                SamplerArgDesc.index = Slot;
+                SamplerArgDesc.dataType = MTLDataTypeSampler;
+                SamplerArgDesc.access = MTLArgumentAccessReadOnly;
+                if(EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Vertex))
+                    VertexArgDescs.Add(SamplerArgDesc);
+                if(EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Pixel))
+                    FragmentArgDescs.Add(SamplerArgDesc);
+                if(EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Compute))
+                    ComputeArgDescs.Add(SamplerArgDesc);
+            }
             else if(LayoutBindingEntry.Type == BindingType::Texture)
             {
                 ArgDesc.dataType = MTLDataTypeTexture;
@@ -210,6 +228,29 @@ namespace FW
                 {
                     FragmentArgumentEncoder->setSamplerState(Sampler->GetResource(), Slot);
                 }
+            }
+            else if(ResourceBindingEntry.Resource->GetType() == GpuResourceType::CombinedTextureSampler)
+            {
+                GpuCombinedTextureSampler* Combined = static_cast<GpuCombinedTextureSampler*>(ResourceBindingEntry.Resource.GetReference());
+                MetalTexture* Tex = static_cast<MetalTexture*>(Combined->GetTexture());
+                MetalTextureView* TexView = Tex->GetMtlDefaultView();
+                MetalSampler* Sampler = static_cast<MetalSampler*>(Combined->GetSampler());
+				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Vertex))
+                {
+                    VertexArgumentEncoder->setTexture(TexView->GetResource(), Slot);
+                    VertexArgumentEncoder->setSamplerState(Sampler->GetResource(), Slot);
+                }
+				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Pixel))
+                {
+                    FragmentArgumentEncoder->setTexture(TexView->GetResource(), Slot);
+                    FragmentArgumentEncoder->setSamplerState(Sampler->GetResource(), Slot);
+                }
+				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Compute))
+				{
+					ComputeArgumentEncoder->setTexture(TexView->GetResource(), Slot);
+					ComputeArgumentEncoder->setSamplerState(Sampler->GetResource(), Slot);
+				}
+                BindGroupResources.Add(Slot, TexView->GetResource());
             }
             else
             {

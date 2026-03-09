@@ -128,6 +128,13 @@ namespace FW
 		Context.Types.emplace(ResultId, MakeUnique<SpvSamplerType>(ResultId));
 	}
 
+	void SpvMetaVisitor::Visit(const SpvOpTypeSampledImage* Inst)
+	{
+		SpvId ResultId = Inst->GetId().value();
+		SpvImageType* ImageType = static_cast<SpvImageType*>(Context.Types[Inst->GetImageType()].Get());
+		Context.Types.emplace(ResultId, MakeUnique<SpvSampledImageType>(ResultId, ImageType));
+	}
+
 	void SpvMetaVisitor::Visit(const SpvOpTypeArray* Inst)
 	{
 		SpvType* ElementType = Context.Types[Inst->GetElementType()].Get();
@@ -686,6 +693,14 @@ namespace FW
 			{
 				SpvId ResultId = SpvCode[WordOffset + 1];
 				DecodedInst = MakeUnique<SpvOpTypeSampler>();
+				DecodedInst->SetId(ResultId);
+				break;
+			}
+			case SpvOp::TypeSampledImage:
+			{
+				SpvId ResultId = SpvCode[WordOffset + 1];
+				SpvId ImageType = SpvCode[WordOffset + 2];
+				DecodedInst = MakeUnique<SpvOpTypeSampledImage>(ImageType);
 				DecodedInst->SetId(ResultId);
 				break;
 			}

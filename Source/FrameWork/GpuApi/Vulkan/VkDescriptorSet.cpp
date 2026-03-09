@@ -4,6 +4,7 @@
 #include "VkTexture.h"
 #include "VkMap.h"
 #include "VkUtil.h"
+#include "GpuApi/GpuBindGroup.h"
 
 namespace FW
 {
@@ -32,6 +33,9 @@ namespace FW
 			return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
 		case BindingType::Sampler:
 			return VK_DESCRIPTOR_TYPE_SAMPLER;
+		case BindingType::CombinedTextureSampler:
+		case BindingType::CombinedTextureCubeSampler:
+			return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		case BindingType::StructuredBuffer:
 		case BindingType::RWStructuredBuffer:
 		case BindingType::RawBuffer:
@@ -98,8 +102,7 @@ namespace FW
 			VkDescriptorPoolSize PoolSizes[] = {
 						{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 256 },
 						{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 256 },
-						{ VK_DESCRIPTOR_TYPE_SAMPLER, 256 },
-						{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 256 },
+						{ VK_DESCRIPTOR_TYPE_SAMPLER, 256 },					{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 256 },						{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 256 },
 			};
 			VkDescriptorPoolCreateInfo PoolInfo{
 				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
@@ -157,7 +160,8 @@ namespace FW
 			{
 				VulkanTexture* Texture = static_cast<VulkanTexture*>(Resource);
 				BindingType SlotBindingType = LayoutDesc.GetBindingType(Slot);
-				VkImageLayout ImageLayout = (SlotBindingType == BindingType::Texture || SlotBindingType == BindingType::TextureCube)
+				VkImageLayout ImageLayout = (SlotBindingType == BindingType::Texture || SlotBindingType == BindingType::TextureCube
+					|| SlotBindingType == BindingType::CombinedTextureSampler || SlotBindingType == BindingType::CombinedTextureCubeSampler)
 					? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 					: VK_IMAGE_LAYOUT_GENERAL;
 				ImageInfos.Add({
@@ -170,7 +174,8 @@ namespace FW
 			{
 				VulkanTextureView* View = static_cast<VulkanTextureView*>(Resource);
 				BindingType SlotBindingType = LayoutDesc.GetBindingType(Slot);
-				VkImageLayout ImageLayout = (SlotBindingType == BindingType::Texture || SlotBindingType == BindingType::TextureCube)
+				VkImageLayout ImageLayout = (SlotBindingType == BindingType::Texture || SlotBindingType == BindingType::TextureCube
+					|| SlotBindingType == BindingType::CombinedTextureSampler || SlotBindingType == BindingType::CombinedTextureCubeSampler)
 					? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 					: VK_IMAGE_LAYOUT_GENERAL;
 				ImageInfos.Add({
@@ -184,6 +189,22 @@ namespace FW
 				VulkanSampler* Sampler = static_cast<VulkanSampler*>(Resource);
 				ImageInfos.Add({
 					.sampler = Sampler->GetSampler(),
+				});
+				Write.pImageInfo = &ImageInfos.Last();
+			}
+			else if (Resource->GetType() == GpuResourceType::CombinedTextureSampler)
+			{
+				GpuCombinedTextureSampler* Combined = static_cast<GpuCombinedTextureSampler*>(Resource);
+				VkImageView ImageView;
+				if (Combined->GetTexture()->GetType() == GpuResourceType::Texture)
+					ImageView = static_cast<VulkanTexture*>(Combined->GetTexture())->GetVkDefaultView()->GetView();
+				else
+					ImageView = static_cast<VulkanTextureView*>(Combined->GetTexture())->GetView();
+				VulkanSampler* Sampler = static_cast<VulkanSampler*>(Combined->GetSampler());
+				ImageInfos.Add({
+					.sampler = Sampler->GetSampler(),
+					.imageView = ImageView,
+					.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 				});
 				Write.pImageInfo = &ImageInfos.Last();
 			}

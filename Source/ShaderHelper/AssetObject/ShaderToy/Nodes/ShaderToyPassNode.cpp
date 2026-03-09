@@ -130,8 +130,6 @@ namespace SH
 		for (int i = 0; i < 4; i++)
 		{
 			FString ChannelName = FString::Printf(TEXT("iChannel%d"), i);
-			FString TexName = FString::Printf(TEXT("iChannel%d_texture"), i);
-			FString SamplerName = FString::Printf(TEXT("iChannel%d_sampler"), i);
 
 			GpuTexture* TexToUse;
 			if (FlippedChannelTextures[i].IsValid())
@@ -147,13 +145,24 @@ namespace SH
 				TexToUse = static_cast<GpuTexturePin*>(GetPin(ChannelName))->GetValue();
 			}
 
-			Builder.SetTexture(TexName, TexToUse);
-			Builder.SetSampler(SamplerName, GpuResourceHelper::GetSampler({
+			GpuSampler* SamplerToUse = GpuResourceHelper::GetSampler({
 				.Filter = (SamplerFilter)ChannelDescs[i]->Filter,
 				.AddressU = (SamplerAddressMode)ChannelDescs[i]->Wrap,
 				.AddressV = (SamplerAddressMode)ChannelDescs[i]->Wrap,
 				.AddressW = (SamplerAddressMode)ChannelDescs[i]->Wrap
-			}));
+			});
+
+			if (ShaderAssetObj->Language == GpuShaderLanguage::GLSL)
+			{
+				Builder.SetCombinedTextureSampler(ChannelName, TexToUse, SamplerToUse);
+			}
+			else
+			{
+				FString TexName = FString::Printf(TEXT("iChannel%d_texture"), i);
+				FString SamplerName = FString::Printf(TEXT("iChannel%d_sampler"), i);
+				Builder.SetTexture(TexName, TexToUse);
+				Builder.SetSampler(SamplerName, SamplerToUse);
+			}
 		}
 		return Builder;
 	}

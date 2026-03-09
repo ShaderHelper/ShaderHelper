@@ -32,7 +32,8 @@ namespace FW
 	void AssetObject::Serialize(FArchive& Ar)
 	{
 		ShObject::Serialize(Ar);
-		Ar << GAssetVer;
+		FileAssetVer = GAssetVer;
+		Ar << FileAssetVer;
 	}
 
     void AssetObject::PostLoad()

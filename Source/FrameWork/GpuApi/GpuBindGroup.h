@@ -6,6 +6,22 @@
 
 namespace FW
 {
+	class GpuCombinedTextureSampler : public GpuResource
+	{
+	public:
+		GpuCombinedTextureSampler(GpuResource* InTexture, GpuResource* InSampler)
+			: GpuResource(GpuResourceType::CombinedTextureSampler)
+			, Texture(InTexture), Sampler(InSampler)
+		{}
+
+		GpuResource* GetTexture() const { return Texture; }
+		GpuResource* GetSampler() const { return Sampler; }
+
+	private:
+		TRefCountPtr<GpuResource> Texture;
+		TRefCountPtr<GpuResource> Sampler;
+	};
+
 	struct ResourceBinding
 	{
 		TRefCountPtr<GpuResource> Resource;
@@ -41,6 +57,7 @@ namespace FW
 		GpuBindGroupBuilder& SetUniformBuffer(const FString& BindingName, GpuResource* InResource);
 		GpuBindGroupBuilder& SetTexture(const FString& BindingName, GpuResource* InResource);
 		GpuBindGroupBuilder& SetSampler(const FString& BindingName, GpuResource* InResource);
+		GpuBindGroupBuilder& SetCombinedTextureSampler(const FString& BindingName, GpuResource* InTexture, GpuResource* InSampler);
 
 		TRefCountPtr<GpuBindGroup> Build() const;
 

@@ -38,6 +38,11 @@ namespace FW
 
 	TArray<GpuShaderLayoutBinding> Dx12Shader::GetLayout() const
 	{
+		if (ShaderLanguage == GpuShaderLanguage::GLSL)
+		{
+			return GpuShader::GetLayout();
+		}
+
 		check(ByteCode.IsValid());
 		TArray<GpuShaderLayoutBinding> ShaderLayoutBindings;
 		TRefCountPtr<ID3D12ShaderReflection> Reflection;
@@ -330,10 +335,9 @@ namespace FW
 			 }
 
 			 std::vector<uint32> Spv = { Result.cbegin(), Result.cend() };
-
+			 TArray<uint32> SpvCode = { Spv.data(), (int)Spv.size() };
 			 if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
 			 {
-				 TArray<uint32> SpvCode = { Spv.data(), (int)Spv.size() };
 #if DEBUG_SHADER
 				 ShaderConductor::Compiler::DisassembleDesc SpvDisassembleDesc{
 					 .language = ShaderConductor::ShadingLanguage::SpirV,
@@ -364,6 +368,7 @@ namespace FW
 				 ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile({}, { Spv.data(), (uint32)Spv.size() * 4 }, "main",
 					 MapShaderCunductorStage(InShader->GetShaderType()), HlslTargetDesc);
 				 HlslSource = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
+				 InShader->SpvCode = MoveTemp(SpvCode);
 			 }
 			 catch (const std::runtime_error& e)
 			 {
@@ -403,6 +408,11 @@ namespace FW
 		Arguments.Add(TEXT("/Od")); //TODO
 		Arguments.Add(TEXT("-Zpr"));
         //Arguments.Add(TEXT("-no-warnings"));
+
+		if (InShader->GetShaderLanguage() == GpuShaderLanguage::GLSL)
+		{
+			Arguments.Add(TEXT("-ignore-validation-error"));
+		}
 
 		if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
 		{

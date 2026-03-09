@@ -26,10 +26,13 @@ namespace FW
 		//Determine the asset icon in the asset browser.
 		virtual GpuTexture* GetThumbnail() const { return nullptr; }
         virtual const FSlateBrush* GetImage() const;
-		//
+		int GetFileAssetVer() const { return FileAssetVer; }
         
         FString GetFileName() const;
         FString GetPath() const;
+
+	protected:
+		int FileAssetVer = 0;
 	};
 
     FRAMEWORK_API MetaType* GetAssetMetaType(const FString& InPath);

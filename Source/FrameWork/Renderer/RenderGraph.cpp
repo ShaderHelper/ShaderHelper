@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "RenderGraph.h"
+#include "GpuApi/GpuBindGroup.h"
 
 namespace FW
 {
@@ -26,8 +27,13 @@ namespace FW
 		InOutPass.Bindings.EnumerateBinding([&](const ResourceBinding& ResourceBindingEntry, const LayoutBinding& LayoutBindingEntry) {
 			if (LayoutBindingEntry.Type == BindingType::Texture || LayoutBindingEntry.Type == BindingType::TextureCube)
 			{
-				GpuResource* Res = static_cast<GpuResource*>(ResourceBindingEntry.Resource.GetReference());
+				GpuResource* Res = ResourceBindingEntry.Resource.GetReference();
 				InOutPass.PassResourceStates.Add(Res, GpuResourceState::ShaderResourceRead);
+			}
+			else if (LayoutBindingEntry.Type == BindingType::CombinedTextureSampler || LayoutBindingEntry.Type == BindingType::CombinedTextureCubeSampler)
+			{
+				GpuCombinedTextureSampler* Combined = static_cast<GpuCombinedTextureSampler*>(ResourceBindingEntry.Resource.GetReference());
+				InOutPass.PassResourceStates.Add(Combined->GetTexture(), GpuResourceState::ShaderResourceRead);
 			}
 			else if (LayoutBindingEntry.Type == BindingType::RWStructuredBuffer || LayoutBindingEntry.Type == BindingType::RWRawBuffer)
 			{

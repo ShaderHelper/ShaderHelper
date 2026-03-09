@@ -214,11 +214,14 @@ namespace FW
 		SpvDebugState_Access, SpvDebugState_Normalize, SpvDebugState_SmoothStep, SpvDebugState_Pow, SpvDebugState_Clamp, SpvDebugState_Div, SpvDebugState_ConvertF, 
 		SpvDebugState_Remainder, SpvDebugState_Log, SpvDebugState_Asin, SpvDebugState_Acos, SpvDebugState_Sqrt, SpvDebugState_InverseSqrt, SpvDebugState_Atan2>;
 
+	enum class BindingType;
+
 	struct SpvBinding
 	{
 		int32 DescriptorSet;
 		int32 Binding;
-		
+		BindingType Type;
+
 		TRefCountPtr<GpuResource> Resource;
 	};
 

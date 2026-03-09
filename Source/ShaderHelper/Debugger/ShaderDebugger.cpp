@@ -754,7 +754,7 @@ namespace SH
 			DirtyVars.Add(State.Change.VarId, MoveTemp(DirtyRange));
 
 			//Propagate changes made to the parameter back to the argument.
-			//This assumes that OpFunctionParameter's result type is always a pointer type
+			//Value-type params have SSA value arguments which are not variables, skip them.
 			if (DebuggerContext->IsParameter(Var->Id) && !CallStack.IsEmpty())
 			{
 				const SpvFuncCall* SourceCall = CallStack.Last().Call;
@@ -764,6 +764,8 @@ namespace SH
 					if (Parameters[i] == Var->Id)
 					{
 						SpvVariable* ArgumentVar = DebuggerContext->FindVar(SourceCall->Arguments[i]);
+						if (!ArgumentVar)
+							break;
 						ArgumentVar->Storage = Var->Storage;
 						ArgumentVar->InitializedRanges = Var->InitializedRanges;
 						break;
@@ -804,6 +806,9 @@ namespace SH
 			{
 				SpvVariable* ArgumentVar = DebuggerContext->FindVar(Call.Arguments[i]);
 				SpvVariable* ParameterVar = DebuggerContext->FindVar(Parameters[i]);
+				//Value-type params (non-pointer) are not tracked as variables, so skip them.
+				if (!ArgumentVar || !ParameterVar)
+					continue;
 				ParameterVar->Storage = ArgumentVar->Storage;
 				ParameterVar->InitializedRanges = ArgumentVar->InitializedRanges;
 			}
@@ -1497,6 +1502,7 @@ namespace SH
 					SpvBindings.Add({
 						.DescriptorSet = SetNumber,
 						.Binding = Slot,
+						.Type = LayoutBindingEntry.Type,
 						.Resource = ResourceBindingEntry.Resource
 						});
 
@@ -1804,20 +1810,12 @@ namespace SH
 				{
 					DebuggerLocation Loc{ SourceFile, LineNumber };
 					LinePreviewInfo& Existing = LinePreviewData.FindOrAdd(Loc);
-					if (Existing.VarId.IsValid() && Existing.VarId != VarChange.Change.VarId)
+					uint32 PH = FW::PackDebugHeader(FW::SpvDebuggerStateType::VarChange, VarChange.Source.GetValue(), (uint32)VarChange.Line);
+					int32 Iteration = (Existing.VarId == VarChange.Change.VarId) ? Existing.IterationIndex + 1 : 0;
+					Existing = { VarChange.Change.VarId, Iteration, PH, MoveTemp(VarName) };
+					if (IsInCurrentFunc())
 					{
-						//Multiple different vars on this line, mark as invalid
-						Existing.VarId = {};
-					}
-					else
-					{
-						uint32 PH = FW::PackDebugHeader(FW::SpvDebuggerStateType::VarChange, VarChange.Source.GetValue(), (uint32)VarChange.Line);
-						int32 Iteration = (Existing.VarId == VarChange.Change.VarId) ? Existing.IterationIndex + 1 : 0;
-						Existing = { VarChange.Change.VarId, Iteration, PH, MoveTemp(VarName) };
-						if (IsInCurrentFunc())
-						{
-							DirtyLinePreviewLocs.Add(Loc);
-						}
+						DirtyLinePreviewLocs.Add(Loc);
 					}
 				}
 			}
@@ -1916,31 +1914,13 @@ namespace SH
 			BaseGroupDescs.FindOrAdd(Binding.DescriptorSet).Resources.Add(Binding.Binding, { Binding.Resource });
 			auto& LayoutDesc = BaseLayoutDescs.FindOrAdd(Binding.DescriptorSet);
 			LayoutDesc.GroupNumber = Binding.DescriptorSet;
-			BindingType BType = BindingType::UniformBuffer;
-			if (GpuBuffer* Buf = dynamic_cast<GpuBuffer*>(Binding.Resource.GetReference()))
-			{
-				if (EnumHasAllFlags(Buf->GetUsage(), GpuBufferUsage::RWRaw))
-					BType = BindingType::RWRawBuffer;
-				else if (EnumHasAllFlags(Buf->GetUsage(), GpuBufferUsage::RWStructured))
-					BType = BindingType::RWStructuredBuffer;
-				else if (EnumHasAllFlags(Buf->GetUsage(), GpuBufferUsage::Uniform))
-					BType = BindingType::UniformBuffer;
-			}
-			else if (dynamic_cast<GpuTexture*>(Binding.Resource.GetReference()))
-			{
-				BType = BindingType::Texture;
-			}
-			else if (dynamic_cast<GpuSampler*>(Binding.Resource.GetReference()))
-			{
-				BType = BindingType::Sampler;
-			}
-			BaseLayoutDescs.FindOrAdd(Binding.DescriptorSet).Layouts.Add(Binding.Binding, { BType });
+			LayoutDesc.Layouts.Add(Binding.Binding, { Binding.Type });
 		}
 
 		//Add previewer params slot to layout
 		BaseLayoutDescs.FindOrAdd(BindingContext::GlobalSlot).Layouts.Add(PreviewerParamsBindingSlot, { BindingType::UniformBuffer });
 
-		//Add debugger buffer slot (the preview shader still declares it even though PatchActiveCondition returns false)
+		//Add debugger buffer slot
 		BaseLayoutDescs.FindOrAdd(BindingContext::GlobalSlot).Layouts.Add(DebuggerBufferBindingSlot, { BindingType::RWRawBuffer });
 		BaseGroupDescs.FindOrAdd(BindingContext::GlobalSlot).Resources.Add(DebuggerBufferBindingSlot, { AUX::StaticCastRefCountPtr<GpuResource>(DebugBuffer) });
 
@@ -1971,7 +1951,7 @@ namespace SH
 				}
 			}
 		}
-
+		 
 		GpuRenderPipelineStateDesc PreviewPipelineDesc{
 			.Vs = PsInvocation.PipelineDesc.Vs,
 			.Ps = PatchedShader,

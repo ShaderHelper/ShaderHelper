@@ -94,6 +94,7 @@ namespace FW
 		ComputePipelineState,
 		Shader,
 		Sampler,
+		CombinedTextureSampler,
 	};
 
 	enum class GpuResourceMapMode

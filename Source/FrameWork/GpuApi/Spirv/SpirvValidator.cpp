@@ -482,20 +482,35 @@ namespace FW
 	{
 		SpvId ResultId = Inst->GetId().value();
 
-		SpvPointerType* PointerType = static_cast<SpvPointerType*>(Context.Types[Inst->GetResultType()].Get());
-		SpvVariable Var = { {ResultId, PointerType->PointeeType}, SpvStorageClass::Function };
+		SpvType* ParamType = Context.Types[Inst->GetResultType()].Get();
+		if (ParamType->GetKind() == SpvTypeKind::Pointer)
+		{
+			SpvPointerType* PointerType = static_cast<SpvPointerType*>(ParamType);
+			SpvVariable Var = { {ResultId, PointerType->PointeeType}, SpvStorageClass::Function };
 
-		TArray<uint8> Value;
-		Value.SetNumZeroed(GetTypeByteSize(PointerType->PointeeType));
-		Var.Storage = SpvObject::Internal{ MoveTemp(Value) };
+			TArray<uint8> Value;
+			Value.SetNumZeroed(GetTypeByteSize(PointerType->PointeeType));
+			Var.Storage = SpvObject::Internal{ MoveTemp(Value) };
 
-		LocalVariables.emplace(ResultId, MoveTemp(Var));
-		SpvPointer Pointer{
-			.Id = ResultId,
-			.Var = &LocalVariables[ResultId],
-			.Type = PointerType
-		};
-		LocalPointers.emplace(ResultId, MoveTemp(Pointer));
+			LocalVariables.emplace(ResultId, MoveTemp(Var));
+			SpvPointer Pointer{
+				.Id = ResultId,
+				.Var = &LocalVariables[ResultId],
+				.Type = PointerType
+			};
+			LocalPointers.emplace(ResultId, MoveTemp(Pointer));
+		}
+		else
+		{
+			// Value-type parameter (passed by value, not pointer)
+			SpvVariable Var = { {ResultId, ParamType}, SpvStorageClass::Function };
+
+			TArray<uint8> Value;
+			Value.SetNumZeroed(GetTypeByteSize(ParamType));
+			Var.Storage = SpvObject::Internal{ MoveTemp(Value) };
+
+			LocalVariables.emplace(ResultId, MoveTemp(Var));
+		}
 		CurFunc->Parameters.Add(ResultId);
 		if (EnableUbsan)
 		{

@@ -429,6 +429,11 @@ namespace FW
 				SpvImageType* ImageType = static_cast<SpvImageType*>(Type);
 				ShaderBindingType = ImageType->Dim == SpvDim::Cube ? BindingType::TextureCube : BindingType::Texture;
 			}
+			else if (Type->GetKind() == SpvTypeKind::SampledImage)
+			{
+				SpvSampledImageType* SampledImageType = static_cast<SpvSampledImageType*>(Type);
+				ShaderBindingType = SampledImageType->ImageType->Dim == SpvDim::Cube ? BindingType::CombinedTextureCubeSampler : BindingType::CombinedTextureSampler;
+			}
 			else if (Type->GetKind() == SpvTypeKind::Sampler)
 			{
 				ShaderBindingType = BindingType::Sampler;

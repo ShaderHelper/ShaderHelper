@@ -140,13 +140,24 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 			.AddUniformBuffer("BuiltInUniform", GetBuiltInUbBuilder(), BindingShaderStage::Pixel);
 		for (int i = 0; i < 4; i++)
 		{
-			FString TexName = FString::Printf(TEXT("iChannel%d_texture"), i);
-			FString SamplerName = FString::Printf(TEXT("iChannel%d_sampler"), i);
-			if (ChannelSlotTypes[i] == ShaderToySlotType::TextureCube)
-				Builder.AddTextureCube(TexName, BindingShaderStage::Pixel);
+			if (Language == GpuShaderLanguage::GLSL)
+			{
+				FString ChannelName = FString::Printf(TEXT("iChannel%d"), i);
+				if (ChannelSlotTypes[i] == ShaderToySlotType::TextureCube)
+					Builder.AddCombinedTextureCubeSampler(ChannelName, BindingShaderStage::Pixel);
+				else
+					Builder.AddCombinedTextureSampler(ChannelName, BindingShaderStage::Pixel);
+			}
 			else
-				Builder.AddTexture(TexName, BindingShaderStage::Pixel);
-			Builder.AddSampler(SamplerName, BindingShaderStage::Pixel);
+			{
+				FString TexName = FString::Printf(TEXT("iChannel%d_texture"), i);
+				FString SamplerName = FString::Printf(TEXT("iChannel%d_sampler"), i);
+				if (ChannelSlotTypes[i] == ShaderToySlotType::TextureCube)
+					Builder.AddTextureCube(TexName, BindingShaderStage::Pixel);
+				else
+					Builder.AddTexture(TexName, BindingShaderStage::Pixel);
+				Builder.AddSampler(SamplerName, BindingShaderStage::Pixel);
+			}
 		}
 		return Builder;
 	}
@@ -169,16 +180,6 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
     FString StShader::GetBinding() const
     {
         FString Result = GetBuiltInBindLayoutBuilder().GetCodegenDeclaration(Language);
-        if (Language == GpuShaderLanguage::GLSL)
-        {
-            for (int i = 0; i < 4; i++)
-            {
-                if (ChannelSlotTypes[i] == ShaderToySlotType::TextureCube)
-                    Result += FString::Printf(TEXT("#define iChannel%d samplerCube(iChannel%d_texture, iChannel%d_sampler)\n"), i, i, i);
-                else
-                    Result += FString::Printf(TEXT("#define iChannel%d sampler2D(iChannel%d_texture, iChannel%d_sampler)\n"), i, i, i);
-            }
-        }
         Result += CustomBindGroupLayoutBuilder.GetCodegenDeclaration(Language);
         return Result;
     }

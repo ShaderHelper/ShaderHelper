@@ -37,6 +37,13 @@ namespace FW
 		return *this;
 	}
 
+	GpuBindGroupBuilder& GpuBindGroupBuilder::SetCombinedTextureSampler(const FString& BindingName, GpuResource* InTexture, GpuResource* InSampler)
+	{
+		BindingSlot Slot = Desc.Layout->GetDesc().CodegenBindingNameToSlot[BindingName];
+		Desc.Resources.Add(Slot, { new GpuCombinedTextureSampler(InTexture, InSampler) });
+		return *this;
+	}
+
 	TRefCountPtr<GpuBindGroup> GpuBindGroupBuilder::Build() const
 	{
 		return GGpuRhi->CreateBindGroup(Desc);

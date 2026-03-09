@@ -62,18 +62,50 @@ namespace FW
 		return *this;
 	}
 
+	GpuBindGroupLayoutBuilder& GpuBindGroupLayoutBuilder::AddCombinedTextureSampler(const FString& BindingName, BindingShaderStage InStage)
+	{
+		while (LayoutDesc.Layouts.Contains(AutoSlot)) { AutoSlot++; };
+		LayoutDesc.GlslCodegenDeclaration += FString::Printf(TEXT("layout(binding = %d, set = %d) uniform sampler2D %s;\n"), AutoSlot, LayoutDesc.GroupNumber, *BindingName);
+		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, AutoSlot);
+		LayoutDesc.Layouts.Add(AutoSlot++, {BindingType::CombinedTextureSampler, InStage });
+		return *this;
+	}
+
+	GpuBindGroupLayoutBuilder& GpuBindGroupLayoutBuilder::AddCombinedTextureCubeSampler(const FString& BindingName, BindingShaderStage InStage)
+	{
+		while (LayoutDesc.Layouts.Contains(AutoSlot)) { AutoSlot++; };
+		LayoutDesc.GlslCodegenDeclaration += FString::Printf(TEXT("layout(binding = %d, set = %d) uniform samplerCube %s;\n"), AutoSlot, LayoutDesc.GroupNumber, *BindingName);
+		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, AutoSlot);
+		LayoutDesc.Layouts.Add(AutoSlot++, {BindingType::CombinedTextureCubeSampler, InStage });
+		return *this;
+	}
+
 	TRefCountPtr<GpuBindGroupLayout> GpuBindGroupLayoutBuilder::Build() const
 	{
 		return GGpuRhi->CreateBindGroupLayout(LayoutDesc);
 	}
 
+	static void ValidateNoHlslCombinedSampler(GpuShaderLanguage Language, const TSortedMap<BindingSlot, LayoutBinding>& Layouts)
+	{
+		if (Language == GpuShaderLanguage::HLSL)
+		{
+			for (const auto& [Slot, LayoutBindingEntry] : Layouts)
+			{
+				checkf(LayoutBindingEntry.Type != BindingType::CombinedTextureSampler && LayoutBindingEntry.Type != BindingType::CombinedTextureCubeSampler,
+					TEXT("HLSL does not support combined sampler. Slot: %d"), Slot);
+			}
+		}
+	}
+
 	const FString& GpuBindGroupLayout::GetCodegenDeclaration(GpuShaderLanguage Language) const
 	{
+		ValidateNoHlslCombinedSampler(Language, Desc.Layouts);
 		return Language == GpuShaderLanguage::HLSL ? Desc.HlslCodegenDeclaration : Desc.GlslCodegenDeclaration;
 	}
 
 	const FString& GpuBindGroupLayoutBuilder::GetCodegenDeclaration(GpuShaderLanguage Language) const
 	{
+		ValidateNoHlslCombinedSampler(Language, LayoutDesc.Layouts);
 		return Language == GpuShaderLanguage::HLSL ? LayoutDesc.HlslCodegenDeclaration : LayoutDesc.GlslCodegenDeclaration;
 	}
 

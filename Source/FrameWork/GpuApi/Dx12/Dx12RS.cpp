@@ -12,6 +12,8 @@ namespace FW
 		{
 		case BindingType::Texture:
 		case BindingType::TextureCube:
+		case BindingType::CombinedTextureSampler:
+		case BindingType::CombinedTextureCubeSampler:
 		case BindingType::StructuredBuffer:
 		case BindingType::RawBuffer:
 			return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -45,7 +47,19 @@ namespace FW
 				Range.RegisterSpace = LayoutDesc.GroupNumber;
 				Range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-				if (LayoutBindingEntry.Type == BindingType::Texture || LayoutBindingEntry.Type == BindingType::TextureCube ||
+				if (LayoutBindingEntry.Type == BindingType::CombinedTextureSampler || LayoutBindingEntry.Type == BindingType::CombinedTextureCubeSampler)
+				{
+					DescriptorTableRanges_CbvSrvUav.FindOrAdd(BindingVisibility).Add(MoveTemp(Range));
+
+					CD3DX12_DESCRIPTOR_RANGE SamplerRange{};
+					SamplerRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+					SamplerRange.NumDescriptors = 1;
+					SamplerRange.BaseShaderRegister = Slot;
+					SamplerRange.RegisterSpace = LayoutDesc.GroupNumber;
+					SamplerRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+					DescriptorTableRanges_Sampler.FindOrAdd(BindingVisibility).Add(MoveTemp(SamplerRange));
+				}
+				else if (LayoutBindingEntry.Type == BindingType::Texture || LayoutBindingEntry.Type == BindingType::TextureCube ||
 					LayoutBindingEntry.Type == BindingType::RWStructuredBuffer || LayoutBindingEntry.Type == BindingType::StructuredBuffer ||
 					LayoutBindingEntry.Type == BindingType::RWRawBuffer || LayoutBindingEntry.Type == BindingType::RawBuffer)
 				{
@@ -59,7 +73,6 @@ namespace FW
 				{
 					AUX::Unreachable();
 				}
-				
 			}
 		};
 
@@ -166,6 +179,23 @@ namespace FW
 				{
 					SrcDescriptorRange_CbvSrvUav.FindOrAdd(BindingVisibility).Add(Buffer->SRV->GetHandle());
 				}
+			}
+			else if (BindingResource->GetType() == GpuResourceType::CombinedTextureSampler)
+			{
+				GpuCombinedTextureSampler* Combined = static_cast<GpuCombinedTextureSampler*>(BindingResource);
+				GpuResource* Tex = Combined->GetTexture();
+				if (Tex->GetType() == GpuResourceType::Texture)
+				{
+					Dx12Texture* DxTex = static_cast<Dx12Texture*>(Tex);
+					SrcDescriptorRange_CbvSrvUav.FindOrAdd(BindingVisibility).Add(DxTex->GetDx12DefaultView()->GetSRV()->GetHandle());
+				}
+				else
+				{
+					Dx12TextureView* DxView = static_cast<Dx12TextureView*>(Tex);
+					SrcDescriptorRange_CbvSrvUav.FindOrAdd(BindingVisibility).Add(DxView->GetSRV()->GetHandle());
+				}
+				Dx12Sampler* DxSampler = static_cast<Dx12Sampler*>(Combined->GetSampler());
+				SrcDescriptorRange_Sampler.FindOrAdd(BindingVisibility).Add(DxSampler->GetCpuDescriptor()->GetHandle());
 			}
 		};
 

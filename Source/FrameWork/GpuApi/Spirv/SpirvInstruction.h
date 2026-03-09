@@ -30,6 +30,7 @@ namespace FW
 		virtual void Visit(const class SpvOpTypeStruct* Inst) {}
 		virtual void Visit(const class SpvOpTypeImage* Inst) {}
 		virtual void Visit(const class SpvOpTypeSampler* Inst) {}
+		virtual void Visit(const class SpvOpTypeSampledImage* Inst) {}
 		virtual void Visit(const class SpvOpTypeArray* Inst) {}
 		virtual void Visit(const class SpvOpTypeRuntimeArray* Inst) {}
 		
@@ -542,6 +543,15 @@ namespace FW
 	{
 	public:
 		SpvOpTypeSampler() : SpvInstructionBase(SpvOp::TypeSampler) {}
+	};
+
+	class SpvOpTypeSampledImage : public SpvInstructionBase<SpvOpTypeSampledImage>
+	{
+	public:
+		SpvOpTypeSampledImage(SpvId InImageType) : SpvInstructionBase(SpvOp::TypeSampledImage), ImageType(InImageType) {}
+		SpvId GetImageType() const { return ImageType; }
+	private:
+		SpvId ImageType;
 	};
 
 	class SpvOpTypeArray : public SpvInstructionBase<SpvOpTypeArray>

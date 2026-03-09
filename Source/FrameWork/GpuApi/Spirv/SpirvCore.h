@@ -57,6 +57,7 @@ namespace FW
 		Struct,
 		Image,
 		Sampler,
+		SampledImage,
 		Array,
 		RuntimeArray,
 	};
@@ -307,6 +308,13 @@ namespace FW
 	{
 	public:
 		SpvSamplerType(SpvId InId) : SpvType(SpvTypeKind::Sampler, InId) {}
+	};
+
+	class SpvSampledImageType : public SpvType
+	{
+	public:
+		SpvSampledImageType(SpvId InId, SpvImageType* InImageType) : SpvType(SpvTypeKind::SampledImage, InId), ImageType(InImageType) {}
+		SpvImageType* ImageType;
 	};
 
 	class SpvVoidType : public SpvType
@@ -625,6 +633,7 @@ namespace FW
 		TypeMatrix = 24,
 		TypeImage = 25,
 		TypeSampler = 26,
+		TypeSampledImage = 27,
 		TypeArray = 28,
 		TypeRuntimeArray = 29,
 		TypeStruct = 30,
