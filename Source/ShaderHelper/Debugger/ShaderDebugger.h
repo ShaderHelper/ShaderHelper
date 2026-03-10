@@ -44,9 +44,10 @@ namespace SH
 	struct LinePreviewInfo
 	{
 		FW::SpvId VarId;
-		int32 IterationIndex;    //How many times this (PackedHeader, VarId) was seen before (for loop iterations)
+		int32 IterationIndex;    //How many times this (PackedHeader, VarId, CallStackHash) was seen before (for loop iterations)
 		uint32 PackedHeader;     //Packed debug header (StateType|Source|Line)
 		FString VarName;
+		uint32 CallStackHash;    //Hash of the call stack at the point of this VarChange
 	};
 
 	enum class StepMode
@@ -153,5 +154,7 @@ namespace SH
 		TMap<DebuggerLocation, TRefCountPtr<FW::GpuTexture>> LinePreviewTextures;
 		int32 PrevPreviewStateIndex = 0;
 		FW::SpvLexicalScope* PrevPreviewScope = nullptr;
+		uint32 PrevPreviewCallStackHash = 0;
+		TArray<FW::SpvId> PrevPreviewCallIdStack;
 	};
 }

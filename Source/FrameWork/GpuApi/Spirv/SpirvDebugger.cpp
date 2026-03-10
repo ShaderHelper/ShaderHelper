@@ -190,17 +190,26 @@ namespace FW
 		Context.FuncCalls.emplace(ResultId, SpvFuncCall{Inst->GetFunction(), Inst->GetArguments() });
 		
 		TArray<TUniquePtr<SpvInstruction>> AppendCallInsts;
+		uint32 PackedHeaderValue = PackDebugHeader(SpvDebuggerStateType::FuncCall, CurSource.GetValue(), (uint32)CurLine);
+		if (CurScope) { Context.HeaderToScope.Add(PackedHeaderValue, CurScope->GetId()); }
+		SpvId PackedHeader = Patcher.FindOrAddConstant(PackedHeaderValue);
+		SpvId CallId = Patcher.FindOrAddConstant(ResultId.GetValue());
 		{
-			uint32 PackedHeaderValue = PackDebugHeader(SpvDebuggerStateType::FuncCall, CurSource.GetValue(), (uint32)CurLine);
-			if (CurScope) { Context.HeaderToScope.Add(PackedHeaderValue, CurScope->GetId()); }
-			SpvId PackedHeader = Patcher.FindOrAddConstant(PackedHeaderValue);
-			SpvId CallId = Patcher.FindOrAddConstant(ResultId.GetValue());
 			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
 			auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, AppendCallFuncId, TArray<SpvId>{ PackedHeader, CallId});
 			FuncCallOp->SetId(Patcher.NewId());
 			AppendCallInsts.Add(MoveTemp(FuncCallOp));
 		}
+		PostAppendCall(AppendCallInsts, PackedHeader, CallId);
 		Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(AppendCallInsts));
+
+		//Insert PostCallReturn instructions after the original OpFunctionCall
+		TArray<TUniquePtr<SpvInstruction>> PostReturnInsts;
+		PostCallReturn(PostReturnInsts, CallId);
+		if (PostReturnInsts.Num() > 0)
+		{
+			Patcher.AddInstructions(Inst->GetWordOffset().value() + Inst->GetWordLen().value(), MoveTemp(PostReturnInsts));
+		}
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvOpFunctionParameter* Inst)
@@ -211,7 +220,7 @@ namespace FW
 		if (ParamType->GetKind() == SpvTypeKind::Pointer)
 		{
 			SpvPointerType* PointerType = static_cast<SpvPointerType*>(ParamType);
-			SpvVariable Var = { {ResultId, PointerType->PointeeType}, SpvStorageClass::Function};
+			SpvVariable Var = { {ResultId, PointerType->PointeeType}, SpvStorageClass::Function, PointerType};
 
 			TArray<uint8> Value;
 			Value.SetNumZeroed(GetTypeByteSize(PointerType->PointeeType));
@@ -985,6 +994,8 @@ namespace FW
 			FuncCallOp->SetId(Patcher.NewId());
 			FuncCall = FuncCallOp.Get();
 			AppendVarInsts.Add(MoveTemp(FuncCallOp));
+
+			PostAppendVar(AppendVarInsts, Pointer, PackedHeader, VarId);
 		}
 		Patcher.AddInstructions(OffsetEval(), MoveTemp(AppendVarInsts));
 		return FuncCall;

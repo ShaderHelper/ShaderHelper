@@ -7,7 +7,7 @@ namespace FW
 	{
 		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
 
-		SpvId PreviewerParamsType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeStruct>(TArray<SpvId>{ UIntType, UIntType, UIntType }));
+		SpvId PreviewerParamsType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeStruct>(TArray<SpvId>{ UIntType, UIntType, UIntType, UIntType }));
 		SpvId PreviewerParamsPointerType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Uniform, PreviewerParamsType));
 
 		int MemberOffset0 = 0;
@@ -16,6 +16,8 @@ namespace FW
 		Patcher.AddAnnotation(MakeUnique<SpvOpMemberDecorate>(PreviewerParamsType, 1, SpvDecorationKind::Offset, TArray<uint8>{ (uint8*)&MemberOffset1, sizeof(int) }));
 		int MemberOffset2 = 8;
 		Patcher.AddAnnotation(MakeUnique<SpvOpMemberDecorate>(PreviewerParamsType, 2, SpvDecorationKind::Offset, TArray<uint8>{ (uint8*)&MemberOffset2, sizeof(int) }));
+		int MemberOffset3 = 12;
+		Patcher.AddAnnotation(MakeUnique<SpvOpMemberDecorate>(PreviewerParamsType, 3, SpvDecorationKind::Offset, TArray<uint8>{ (uint8*)&MemberOffset3, sizeof(int) }));
 		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(PreviewerParamsType, SpvDecorationKind::Block));
 
 		SpvId Params = Patcher.NewId();
@@ -55,43 +57,43 @@ namespace FW
 
 	bool SpvPixelPreviewerVisitor::PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList)
 	{
-		//Check if this is an _AppendVar_ function by finding the OpFunction ID
-		SpvId FuncId;
-		for (const auto& Inst : InstList)
+		//Preview is handled entirely at call sites via PostAppendVar.
+		return false;
+	}
+
+	void SpvPixelPreviewerVisitor::PostAppendVar(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvPointer* Pointer, SpvId PackedHeaderConst, SpvId VarIdConst)
+	{
+		int32 IndexNum = Pointer->Indexes.Num();
+		SpvType* PointeeType = Pointer->Type->PointeeType;
+		SpvType* VarType = Pointer->Var->PointerType->PointeeType;
+
+		//Determine preview type and pointer to load from
+		SpvType* PreviewType;
+		SpvId PreviewPointer;
+		if (IndexNum == 0)
 		{
-			if (auto* Func = dynamic_cast<const SpvOpFunction*>(Inst.Get()))
-			{
-				FuncId = Func->GetId().value();
-				break;
-			}
+			//Whole-variable write: load from the variable itself
+			PreviewType = VarType;
+			PreviewPointer = Pointer->Var->Id;
+		}
+		else if (VarType->IsScalar() || VarType->GetKind() == SpvTypeKind::Vector)
+		{
+			//Component access of a scalar/vector variable (e.g. fragColor.r): load the full variable
+			PreviewType = VarType;
+			PreviewPointer = Pointer->Var->Id;
+		}
+		else
+		{
+			//Struct/array member or nested access: load from the accessed element
+			PreviewType = PointeeType;
+			PreviewPointer = Pointer->Id;
 		}
 
-		auto* Key = AppendVarFuncIds.FindKey(FuncId);
-		if (!Key)
+		//Only preview scalar and vector types
+		if (!PreviewType->IsScalar() && PreviewType->GetKind() != SpvTypeKind::Vector)
 		{
-			return false;
+			return;
 		}
-
-		SpvType* PointeeType = Key->Key;
-
-		//Only patch preview for scalar and vector types
-		if (!PointeeType->IsScalar() && PointeeType->GetKind() != SpvTypeKind::Vector)
-		{
-			return false;
-		}
-
-		//Collect function parameters: PackedHeader (1st), VarId (2nd), Value (last)
-		TArray<SpvId> AllParams;
-		for (const auto& Inst : InstList)
-		{
-			if (auto* Param = dynamic_cast<const SpvOpFunctionParameter*>(Inst.Get()))
-			{
-				AllParams.Add(Param->GetId().value());
-			}
-		}
-		SpvId PackedHeaderParam = AllParams[0];
-		SpvId VarIdParam = AllParams[1];
-		SpvId ValueParam = AllParams.Last();
 
 		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
 		SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
@@ -119,33 +121,61 @@ namespace FW
 		TargetVarIdOp->SetId(TargetVarId);
 		InstList.Add(MoveTemp(TargetVarIdOp));
 
-		//Check if this call targets the same (PackedHeader, VarId)
+		//Check if (PackedHeader, VarId) match the target
 		SpvId MatchHeader = Patcher.NewId();
-		auto MatchHeaderOp = MakeUnique<SpvOpIEqual>(BoolType, PackedHeaderParam, TargetHeader);
+		auto MatchHeaderOp = MakeUnique<SpvOpIEqual>(BoolType, PackedHeaderConst, TargetHeader);
 		MatchHeaderOp->SetId(MatchHeader);
 		InstList.Add(MoveTemp(MatchHeaderOp));
 
 		SpvId MatchVarId = Patcher.NewId();
-		auto MatchVarIdOp = MakeUnique<SpvOpIEqual>(BoolType, VarIdParam, TargetVarId);
+		auto MatchVarIdOp = MakeUnique<SpvOpIEqual>(BoolType, VarIdConst, TargetVarId);
 		MatchVarIdOp->SetId(MatchVarId);
 		InstList.Add(MoveTemp(MatchVarIdOp));
 
-		SpvId IsTargetVar = Patcher.NewId();
-		auto IsTargetVarOp = MakeUnique<SpvOpLogicalAnd>(BoolType, MatchHeader, MatchVarId);
-		IsTargetVarOp->SetId(IsTargetVar);
-		InstList.Add(MoveTemp(IsTargetVarOp));
+		//Load TargetCallStackHash from uniform member 3
+		SpvId TargetHashPtr = Patcher.NewId();
+		auto TargetHashPtrOp = MakeUnique<SpvOpAccessChain>(UIntPointerUniformType, PreviewerParams, TArray<SpvId>{ Patcher.FindOrAddConstant(3u) });
+		TargetHashPtrOp->SetId(TargetHashPtr);
+		InstList.Add(MoveTemp(TargetHashPtrOp));
+
+		SpvId TargetHash = Patcher.NewId();
+		auto TargetHashOp = MakeUnique<SpvOpLoad>(UIntType, TargetHashPtr);
+		TargetHashOp->SetId(TargetHash);
+		InstList.Add(MoveTemp(TargetHashOp));
+
+		//Load current CallStackHash value
+		SpvId CurHash = Patcher.NewId();
+		auto CurHashOp = MakeUnique<SpvOpLoad>(UIntType, CallStackHashVar);
+		CurHashOp->SetId(CurHash);
+		InstList.Add(MoveTemp(CurHashOp));
+
+		SpvId MatchHash = Patcher.NewId();
+		auto MatchHashOp = MakeUnique<SpvOpIEqual>(BoolType, CurHash, TargetHash);
+		MatchHashOp->SetId(MatchHash);
+		InstList.Add(MoveTemp(MatchHashOp));
+
+		//Combine: (PackedHeader && VarId && CallStackHash)
+		SpvId MatchHeaderAndVarId = Patcher.NewId();
+		auto MatchHeaderAndVarIdOp = MakeUnique<SpvOpLogicalAnd>(BoolType, MatchHeader, MatchVarId);
+		MatchHeaderAndVarIdOp->SetId(MatchHeaderAndVarId);
+		InstList.Add(MoveTemp(MatchHeaderAndVarIdOp));
+
+		SpvId IsTarget = Patcher.NewId();
+		auto IsTargetOp = MakeUnique<SpvOpLogicalAnd>(BoolType, MatchHeaderAndVarId, MatchHash);
+		IsTargetOp->SetId(IsTarget);
+		InstList.Add(MoveTemp(IsTargetOp));
 
 		//Outer branch: only enter when (PackedHeader, VarId) match the target
 		auto OuterMerge = Patcher.NewId();
 		auto OuterThen = Patcher.NewId();
 		InstList.Add(MakeUnique<SpvOpSelectionMerge>(OuterMerge, SpvSelectionControl::None));
-		InstList.Add(MakeUnique<SpvOpBranchConditional>(IsTargetVar, OuterThen, OuterMerge));
+		InstList.Add(MakeUnique<SpvOpBranchConditional>(IsTarget, OuterThen, OuterMerge));
 
 		auto OuterThenOp = MakeUnique<SpvOpLabel>();
 		OuterThenOp->SetId(OuterThen);
 		InstList.Add(MoveTemp(OuterThenOp));
 
-		//Inside outer branch: load iteration counter, increment it, then check iteration match
+		//Iteration counting: increment counter, then check if it matches the target iteration
 		SpvId LoadedCounter = Patcher.NewId();
 		auto LoadCounterOp = MakeUnique<SpvOpLoad>(UIntType, StateCounter);
 		LoadCounterOp->SetId(LoadedCounter);
@@ -174,7 +204,7 @@ namespace FW
 		MatchIterOp->SetId(MatchIter);
 		InstList.Add(MoveTemp(MatchIterOp));
 
-		//Inner branch: iteration matches -> store preview output
+		//Inner branch: iteration matches -> load variable and store to _PreviewOutput_
 		auto InnerMerge = Patcher.NewId();
 		auto InnerThen = Patcher.NewId();
 		InstList.Add(MakeUnique<SpvOpSelectionMerge>(InnerMerge, SpvSelectionControl::None));
@@ -184,8 +214,13 @@ namespace FW
 		InnerThenOp->SetId(InnerThen);
 		InstList.Add(MoveTemp(InnerThenOp));
 
+		SpvId FullValue = Patcher.NewId();
+		auto LoadOp = MakeUnique<SpvOpLoad>(PreviewType->GetId(), PreviewPointer);
+		LoadOp->SetId(FullValue);
+		InstList.Add(MoveTemp(LoadOp));
+
 		SpvId Float4Val;
-		ConvertToFloat4(PointeeType, ValueParam, InstList, Float4Val);
+		ConvertToFloat4(PreviewType, FullValue, InstList, Float4Val);
 		InstList.Add(MakeUnique<SpvOpStore>(PreviewOutputVar, Float4Val));
 
 		InstList.Add(MakeUnique<SpvOpBranch>(InnerMerge));
@@ -199,8 +234,53 @@ namespace FW
 		auto OuterMergeOp = MakeUnique<SpvOpLabel>();
 		OuterMergeOp->SetId(OuterMerge);
 		InstList.Add(MoveTemp(OuterMergeOp));
+	}
 
-		return false;
+	void SpvPixelPreviewerVisitor::PostAppendCall(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvId PackedHeader, SpvId CallId)
+	{
+		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
+
+		//Update hash: hash = hash * 31 + CallId
+		SpvId LoadedHash = Patcher.NewId();
+		auto LoadOp = MakeUnique<SpvOpLoad>(UIntType, CallStackHashVar);
+		LoadOp->SetId(LoadedHash);
+		InstList.Add(MoveTemp(LoadOp));
+
+		SpvId HashMul = Patcher.NewId();
+		auto MulOp = MakeUnique<SpvOpIMul>(UIntType, LoadedHash, Patcher.FindOrAddConstant(31u));
+		MulOp->SetId(HashMul);
+		InstList.Add(MoveTemp(MulOp));
+
+		SpvId NewHash = Patcher.NewId();
+		auto AddOp = MakeUnique<SpvOpIAdd>(UIntType, HashMul, CallId);
+		AddOp->SetId(NewHash);
+		InstList.Add(MoveTemp(AddOp));
+
+		InstList.Add(MakeUnique<SpvOpStore>(CallStackHashVar, NewHash));
+	}
+
+	void SpvPixelPreviewerVisitor::PostCallReturn(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvId CallId)
+	{
+		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
+
+		//Reverse hash: hash = (hash - CallId) * 31^(-1) mod 2^32
+		//31^(-1) mod 2^32 = 3186588639
+		SpvId LoadedHash = Patcher.NewId();
+		auto LoadOp = MakeUnique<SpvOpLoad>(UIntType, CallStackHashVar);
+		LoadOp->SetId(LoadedHash);
+		InstList.Add(MoveTemp(LoadOp));
+
+		SpvId SubResult = Patcher.NewId();
+		auto SubOp = MakeUnique<SpvOpISub>(UIntType, LoadedHash, CallId);
+		SubOp->SetId(SubResult);
+		InstList.Add(MoveTemp(SubOp));
+
+		SpvId RestoredHash = Patcher.NewId();
+		auto MulOp = MakeUnique<SpvOpIMul>(UIntType, SubResult, Patcher.FindOrAddConstant(3186588639u));
+		MulOp->SetId(RestoredHash);
+		InstList.Add(MoveTemp(MulOp));
+
+		InstList.Add(MakeUnique<SpvOpStore>(CallStackHashVar, RestoredHash));
 	}
 
 	void SpvPixelPreviewerVisitor::ConvertScalarToFloat(SpvType* SrcType, SpvId SrcValue, TArray<TUniquePtr<SpvInstruction>>& InstList, SpvId& OutFloatValue)
@@ -372,6 +452,15 @@ namespace FW
 			VarOp->SetId(StateCounter);
 			Patcher.AddGlobalVariable(MoveTemp(VarOp));
 			Patcher.AddDebugName(MakeUnique<SpvOpName>(StateCounter, "_PreviewStateCounter_"));
+		}
+
+		//Add _PreviewCallStackHash_ uint Private global initialized to 0
+		CallStackHashVar = Patcher.NewId();
+		{
+			auto VarOp = MakeUnique<SpvOpVariable>(UIntPointerPrivateType, SpvStorageClass::Private);
+			VarOp->SetId(CallStackHashVar);
+			Patcher.AddGlobalVariable(MoveTemp(VarOp));
+			Patcher.AddDebugName(MakeUnique<SpvOpName>(CallStackHashVar, "_PreviewCallStackHash_"));
 		}
 
 		//Add _PreviewerParams_ uniform buffer

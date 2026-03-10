@@ -486,7 +486,7 @@ namespace FW
 		if (ParamType->GetKind() == SpvTypeKind::Pointer)
 		{
 			SpvPointerType* PointerType = static_cast<SpvPointerType*>(ParamType);
-			SpvVariable Var = { {ResultId, PointerType->PointeeType}, SpvStorageClass::Function };
+			SpvVariable Var = { {ResultId, PointerType->PointeeType}, SpvStorageClass::Function, PointerType };
 
 			TArray<uint8> Value;
 			Value.SetNumZeroed(GetTypeByteSize(PointerType->PointeeType));

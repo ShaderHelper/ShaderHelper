@@ -354,6 +354,9 @@ namespace FW
 
 	protected:
 		virtual bool PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) { return true; }
+		virtual void PostAppendVar(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvPointer* Pointer, SpvId PackedHeader, SpvId VarId) {}
+		virtual void PostAppendCall(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvId PackedHeader, SpvId CallId) {}
+		virtual void PostCallReturn(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvId CallId) {}
 		virtual void ParseInternal();
 		void PatchToDebugger(SpvId InValueId, SpvId InTypeId, TArray<TUniquePtr<SpvInstruction>>& InstList);
 		void FlattenToUInts(SpvId InValueId, SpvId InTypeId, TArray<TUniquePtr<SpvInstruction>>& InstList, TArray<SpvId>& OutUIntValues);

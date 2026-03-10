@@ -1748,6 +1748,8 @@ namespace SH
 
 		SpvFunctionDesc* CurFuncDesc = GetFunctionDesc(Scope);
 		SpvLexicalScope* ScanScope = PrevPreviewScope;
+		uint32 CallStackHash = PrevPreviewCallStackHash;
+		TArray<SpvId> CallIdStack = PrevPreviewCallIdStack;
 
 		auto IsInCurrentFunc = [&]() { return ScanScope && GetFunctionDesc(ScanScope) == CurFuncDesc; };
 
@@ -1772,6 +1774,19 @@ namespace SH
 						ConditionLines.Add({ MoveTemp(TagFile), TagLine });
 					}
 				}
+				if (Tag.bReturn && !CallIdStack.IsEmpty())
+				{
+					SpvId CallId = CallIdStack.Pop();
+					CallStackHash = (CallStackHash - CallId.GetValue()) * 3186588639u;
+				}
+				continue;
+			}
+
+			if (std::holds_alternative<SpvDebugState_FuncCall>(DebugStates[i]))
+			{
+				const auto& FC = std::get<SpvDebugState_FuncCall>(DebugStates[i]);
+				CallIdStack.Push(FC.CallId);
+				CallStackHash = CallStackHash * 31 + FC.CallId.GetValue();
 				continue;
 			}
 
@@ -1811,8 +1826,8 @@ namespace SH
 					DebuggerLocation Loc{ SourceFile, LineNumber };
 					LinePreviewInfo& Existing = LinePreviewData.FindOrAdd(Loc);
 					uint32 PH = FW::PackDebugHeader(FW::SpvDebuggerStateType::VarChange, VarChange.Source.GetValue(), (uint32)VarChange.Line);
-					int32 Iteration = (Existing.VarId == VarChange.Change.VarId) ? Existing.IterationIndex + 1 : 0;
-					Existing = { VarChange.Change.VarId, Iteration, PH, MoveTemp(VarName) };
+					int32 Iteration = (Existing.VarId == VarChange.Change.VarId && Existing.CallStackHash == CallStackHash) ? Existing.IterationIndex + 1 : 0;
+					Existing = { VarChange.Change.VarId, Iteration, PH, MoveTemp(VarName), CallStackHash };
 					if (IsInCurrentFunc())
 					{
 						DirtyLinePreviewLocs.Add(Loc);
@@ -1830,6 +1845,8 @@ namespace SH
 
 		PrevPreviewStateIndex = CurDebugStateIndex;
 		PrevPreviewScope = Scope;
+		PrevPreviewCallStackHash = CallStackHash;
+		PrevPreviewCallIdStack = MoveTemp(CallIdStack);
 	}
 
 	void ShaderDebugger::InvokePixelPreview()
@@ -1980,16 +1997,18 @@ namespace SH
 			}
 			const LinePreviewInfo& Info = *InfoPtr;
 			TArray<uint8> ParamsDatas;
-			ParamsDatas.SetNumZeroed(3 * sizeof(uint32));
+			ParamsDatas.SetNumZeroed(4 * sizeof(uint32));
 			uint32 TargetIteration = (uint32)Info.IterationIndex;
 			uint32 TargetPackedHeader = Info.PackedHeader;
 			uint32 TargetVarId = Info.VarId.GetValue();
+			uint32 TargetCallStackHash = Info.CallStackHash;
 			FMemory::Memcpy(ParamsDatas.GetData(), &TargetIteration, sizeof(uint32));
 			FMemory::Memcpy(ParamsDatas.GetData() + sizeof(uint32), &TargetPackedHeader, sizeof(uint32));
 			FMemory::Memcpy(ParamsDatas.GetData() + 2 * sizeof(uint32), &TargetVarId, sizeof(uint32));
+			FMemory::Memcpy(ParamsDatas.GetData() + 3 * sizeof(uint32), &TargetCallStackHash, sizeof(uint32));
 
 			TRefCountPtr<GpuBuffer> ParamsBuffer = GGpuRhi->CreateBuffer({
-				.ByteSize = 3 * sizeof(uint32),
+				.ByteSize = 4 * sizeof(uint32),
 				.Usage = GpuBufferUsage::Uniform,
 				.InitialData = ParamsDatas,
 			});
@@ -2060,6 +2079,8 @@ namespace SH
 		LinePreviewTextures.Empty();
 		PrevPreviewStateIndex = 0;
 		PrevPreviewScope = nullptr;
+		PrevPreviewCallStackHash = 0;
+		PrevPreviewCallIdStack.Empty();
 
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		SDebuggerVariableView* DebuggerLocalVariableView = ShEditor->GetDebuggerLocalVariableView();

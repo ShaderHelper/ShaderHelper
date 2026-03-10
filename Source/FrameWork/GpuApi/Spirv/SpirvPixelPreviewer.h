@@ -13,9 +13,10 @@ namespace FW
 	};
 
 	//Patches shader to output a preview variable value as fragColor.
-	//A float4 global _PreviewOutput_ is assigned when PackedHeader and VarId match
+	//A float4 global _PreviewOutput_ is assigned when PackedHeader, VarId, and CallStackHash match
 	//the uniform target, and the per-match iteration counter equals TargetIteration.
-	//The counter only increments for the target (PackedHeader, VarId) pair,
+	//CallStackHash tracks the call path via a reversible hash (hash = hash*31 + CallId on enter,
+	//undo on return), ensuring only pixels with the same call stack contribute.
 	//The original output variable is overridden.
 	class FRAMEWORK_API SpvPixelPreviewerVisitor : public SpvDebuggerVisitor
 	{
@@ -27,6 +28,9 @@ namespace FW
 	protected:
 		void ParseInternal() override;
 		bool PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) override;
+		void PostAppendVar(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvPointer* Pointer, SpvId PackedHeader, SpvId VarId) override;
+		void PostAppendCall(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvId PackedHeader, SpvId CallId) override;
+		void PostCallReturn(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvId CallId) override;
 
 	private:
 		//Create the _PreviewerParams_ uniform buffer (contains uint TargetIteration, TargetPackedHeader, TargetVarId)
@@ -40,8 +44,9 @@ namespace FW
 
 	private:
 		SpvId PreviewOutputVar;   // float4 Private global
-		SpvId StateCounter;       // uint Private global - counts how many times target (PackedHeader, VarId) matched
-		SpvId PreviewerParams;    // uniform buffer with TargetIteration, TargetPackedHeader, TargetVarId
+		SpvId StateCounter;       // uint Private global - counts how many times target (PackedHeader, VarId, CallStackHash) matched
+		SpvId CallStackHashVar;   // uint Private global - hash of the current call stack
+		SpvId PreviewerParams;    // uniform buffer with TargetIteration, TargetPackedHeader, TargetVarId, TargetCallStackHash
 		SpvId OutputVarId;        // the original Output variable (fragColor/outColor)
 	};
 }

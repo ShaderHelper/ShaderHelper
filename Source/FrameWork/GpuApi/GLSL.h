@@ -53,6 +53,8 @@ namespace GLSL
 	inline ShaderBuiltinData& GetBuiltinData()
 	{
 		static ShaderBuiltinData Data;
+		static FCriticalSection DataCS;
+		FScopeLock Lock(&DataCS);
 		if (!Data.bLoaded)
 		{
 			FString JsonPath = FW::PathHelper::ShaderDir() / TEXT("GLSL.json");
