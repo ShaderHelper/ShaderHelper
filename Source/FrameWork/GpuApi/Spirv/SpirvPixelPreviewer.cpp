@@ -63,6 +63,14 @@ namespace FW
 
 	void SpvPixelPreviewerVisitor::PostAppendVar(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvPointer* Pointer, SpvId PackedHeaderConst, SpvId VarIdConst)
 	{
+		//Skip constant-value stores — no useful preview
+		uint32 PH = PackDebugHeader(SpvDebuggerStateType::VarChange, CurSource.GetValue(), (uint32)CurLine);
+		uint64 ConstKey = ((uint64)PH << 32) | Pointer->Var->Id.GetValue();
+		if (Context.ConstInitVarChanges.Contains(ConstKey))
+		{
+			return;
+		}
+
 		int32 IndexNum = Pointer->Indexes.Num();
 		SpvType* PointeeType = Pointer->Type->PointeeType;
 		SpvType* VarType = Pointer->Var->PointerType->PointeeType;

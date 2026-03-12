@@ -112,6 +112,10 @@ namespace FW
 		SpvId Source{};
 		SpvId VarId;
 		TArray<int32> Indexes;
+		// Bitmask of which init-units (4 bytes each) need initialization checking.
+		// Each bit corresponds to one init-unit. 0xFFFFFFFF means check all units.
+		// A narrowed mask means only the bits set to 1 are truly consumed externally
+		uint32 CheckMask = 0xFFFFFFFFu;
 	};
 	struct SpvDebugState_Normalize
 	{
@@ -236,11 +240,16 @@ namespace FW
 		SpvId Type;
 		SpvId ReturnType;
 		TArray<SpvId> Parameters;
+		TArray<SpvId> BasicBlocks; // first element is always the entry block
 	};
 
 	struct SpvBasicBlock
 	{
+		int32 StartIdx = -1;
+		int32 EndIdx = -1;
 		TArray<int32> ValidLines;
+		TArray<SpvId> Successors;
+		TArray<SpvId> Predecessors;
 	};
 
 	struct SpvDebuggerContext : SpvMetaContext
@@ -253,6 +262,12 @@ namespace FW
 		std::unordered_map<SpvId, SpvBasicBlock> BBs;
 		// Maps PackedHeader value -> ScopeId for CPU-side scope reconstruction
 		TMap<uint32, SpvId> HeaderToScope;
+		// Maps (PackedHeader << 32 | VarId) -> CheckMask for CPU-side load usage analysis.
+		// Narrowed masks indicate only certain init-units are externally consumed and need init checking.
+		TMap<uint64, uint32> AccessCheckMasks;
+		// Set of (PackedHeader << 32 | VarId) for VarChange events where the stored value is a compile-time constant.
+		// Used to skip constant-initialization lines in per-line preview.
+		TSet<uint64> ConstInitVarChanges;
 
 		SpvVariable* FindVar(SpvId Id)
 		{
@@ -406,6 +421,8 @@ namespace FW
 		};
 		TMap<MathFuncSearchKey, SpvId> AppendMathFuncIds;
 		TMap<const SpvOpFunctionCall*, const SpvOpStore*> AppendVarCallToStore;
+		TMap<SpvId, uint32> LoadUsedInitUnits; // OpLoad ResultId -> escaped init-unit bitmask (0 = skip access check)
+		TSet<SpvId> StaticallyInitializedVars; // Vars provably fully initialized before any read
 		SpvPatcher Patcher;
 	};
 
@@ -414,6 +431,12 @@ namespace FW
 	SpvId PatchDebuggerBuffer(SpvPatcher& Patcher);
 	SpvId PatchDebuggerParams(SpvPatcher& Patcher);
 	int32 GetInstIndex(const TArray<TUniquePtr<SpvInstruction>>* Insts, SpvId Inst);
+
+	// For each OpLoad of a composite type, analyze which init-units are truly consumed
+	TPair<int32, int32> ComputeExtractInitUnitRange(SpvType* Type, const TArray<uint32>& Indexes, int32 StartIdx = 0);
+	TMap<SpvId, uint32> ComputeLoadCheckMasks(const TArray<TUniquePtr<SpvInstruction>>* Insts, const SpvMetaContext& Context, const SpvPatcher& Patcher);
+	void BuildSpvCFG(const TArray<TUniquePtr<SpvInstruction>>* Insts, const SpvMetaContext& Context, std::unordered_map<SpvId, SpvBasicBlock>& OutBBs, std::unordered_map<SpvId, SpvFunc>& OutFuncs);
+	TSet<SpvId> ComputeStaticallyInitializedVars(const TArray<TUniquePtr<SpvInstruction>>* Insts, const SpvMetaContext& Context, const TMap<SpvId, uint32>& LoadUsedInitUnits, const std::unordered_map<SpvId, SpvBasicBlock>& BBs, const std::unordered_map<SpvId, SpvFunc>& Funcs);
 
 	inline constexpr int DebuggerBufferBindingSlot = 0721;
 	inline constexpr int DebuggerParamsBindingSlot = 0722;

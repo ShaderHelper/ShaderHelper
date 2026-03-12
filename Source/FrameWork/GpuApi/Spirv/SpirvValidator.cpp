@@ -91,172 +91,12 @@ namespace FW
 
 	void SpvValidator::PreAnalyzeInitialization()
 	{
-		// Static analysis: identify local variables that are provably fully initialized
-		// before any read, so we can skip expensive GPU-side initialization tracking for them.
-		//
-		// Strategy (conservative, entry-block analysis):
-		// For each function's entry block (straight-line code before any branch):
-		//   - A variable that receives a direct OpStore (not through OpAccessChain) is "fully initialized"
-		//   - A variable that is loaded (directly or via OpAccessChain) before being fully initialized
-		//     is potentially uninitialized and needs runtime tracking
-		//   - At any branch instruction, analysis stops (conservative for control flow)
-		//
-		// Variables used as function call arguments are excluded from the safe set,
-		// because their initialization state needs to be propagated to callee parameters at runtime.
+		StaticallyInitializedVars = ComputeStaticallyInitializedVars(Insts, Context, LoadUsedInitUnits, BBs, Funcs);
+	}
 
-		// Phase 1: Collect variable IDs used as function call arguments
-		TSet<SpvId> FuncCallArgVars;
-		{
-			int32 InstIndex = GetInstIndex(Insts, Context.EntryPoint);
-			while (InstIndex < Insts->Num())
-			{
-				if (auto* CallInst = dynamic_cast<SpvOpFunctionCall*>((*Insts)[InstIndex].Get()))
-				{
-					for (SpvId Arg : CallInst->GetArguments())
-					{
-						FuncCallArgVars.Add(Arg);
-					}
-				}
-				InstIndex++;
-			}
-		}
-
-		// Phase 1.5: Mark compiler-generated temporaries as statically initialized.
-		// Compiler-generated temporaries are always initialized before use. No need for GPU-side tracking.
-		{
-			int32 InstIndex = GetInstIndex(Insts, Context.EntryPoint);
-			while (InstIndex < Insts->Num())
-			{
-				if (auto* VarInst = dynamic_cast<SpvOpVariable*>((*Insts)[InstIndex].Get()))
-				{
-					if (VarInst->GetStorageClass() == SpvStorageClass::Function)
-					{
-						SpvId VarId = VarInst->GetId().value();
-						if (!Context.VariableDescMap.contains(VarId) && !FuncCallArgVars.Contains(VarId))
-						{
-							StaticallyInitializedVars.Add(VarId);
-						}
-					}
-				}
-				InstIndex++;
-			}
-		}
-
-		// Phase 2: Analyze each function's entry block
-		enum class AnalysisState { Outside, BeforeEntryLabel, InEntryBlock, PastEntryBlock };
-		AnalysisState CurState = AnalysisState::Outside;
-
-		TSet<SpvId> EntryBlockVars;       // Variables declared in current function's entry block
-		TSet<SpvId> FullyInitializedVars; // Variables that got a full direct OpStore
-		TMap<SpvId, SpvId> AccessChainBase; // AccessChain result → base variable
-
-		auto FinalizeFunction = [&]()
-		{
-			for (SpvId VarId : FullyInitializedVars)
-			{
-				if (!FuncCallArgVars.Contains(VarId))
-				{
-					StaticallyInitializedVars.Add(VarId);
-				}
-			}
-			EntryBlockVars.Empty();
-			FullyInitializedVars.Empty();
-			AccessChainBase.Empty();
-		};
-
-		int32 InstIndex = GetInstIndex(Insts, Context.EntryPoint);
-		while (InstIndex < Insts->Num())
-		{
-			SpvInstruction* Inst = (*Insts)[InstIndex].Get();
-
-			if (dynamic_cast<SpvOpFunction*>(Inst))
-			{
-				if (CurState != AnalysisState::Outside)
-				{
-					FinalizeFunction();
-				}
-				CurState = AnalysisState::BeforeEntryLabel;
-			}
-			else if (dynamic_cast<SpvOpFunctionEnd*>(Inst))
-			{
-				FinalizeFunction();
-				CurState = AnalysisState::Outside;
-			}
-			else if (dynamic_cast<SpvOpLabel*>(Inst))
-			{
-				if (CurState == AnalysisState::BeforeEntryLabel)
-				{
-					CurState = AnalysisState::InEntryBlock;
-				}
-				else if (CurState == AnalysisState::InEntryBlock)
-				{
-					CurState = AnalysisState::PastEntryBlock;
-				}
-			}
-			else if (CurState == AnalysisState::InEntryBlock)
-			{
-				if (auto* VarInst = dynamic_cast<SpvOpVariable*>(Inst))
-				{
-					if (VarInst->GetStorageClass() == SpvStorageClass::Function)
-					{
-						EntryBlockVars.Add(VarInst->GetId().value());
-						if (VarInst->GetInitializer().has_value())
-						{
-							FullyInitializedVars.Add(VarInst->GetId().value());
-						}
-					}
-				}
-				else if (dynamic_cast<SpvOpBranch*>(Inst) ||
-					dynamic_cast<SpvOpBranchConditional*>(Inst) ||
-					dynamic_cast<SpvOpSwitch*>(Inst) ||
-					dynamic_cast<SpvOpReturn*>(Inst) ||
-					dynamic_cast<SpvOpReturnValue*>(Inst) ||
-					dynamic_cast<SpvOpKill*>(Inst))
-				{
-					CurState = AnalysisState::PastEntryBlock;
-				}
-				else if (auto* StoreInst = dynamic_cast<SpvOpStore*>(Inst))
-				{
-					SpvId Pointer = StoreInst->GetPointer();
-					if (EntryBlockVars.Contains(Pointer))
-					{
-						FullyInitializedVars.Add(Pointer);
-					}
-				}
-				else if (auto* LoadInst = dynamic_cast<SpvOpLoad*>(Inst))
-				{
-					SpvId Pointer = LoadInst->GetPointer();
-					SpvId BaseVar = Pointer;
-					if (SpvId* Base = AccessChainBase.Find(Pointer))
-					{
-						BaseVar = *Base;
-					}
-					if (EntryBlockVars.Contains(BaseVar) && !FullyInitializedVars.Contains(BaseVar))
-					{
-						EntryBlockVars.Remove(BaseVar);
-					}
-				}
-				else if (auto* ACInst = dynamic_cast<SpvOpAccessChain*>(Inst))
-				{
-					SpvId Base = ACInst->GetBasePointer();
-					if (SpvId* TransitiveBase = AccessChainBase.Find(Base))
-					{
-						Base = *TransitiveBase;
-					}
-					if (EntryBlockVars.Contains(Base))
-					{
-						AccessChainBase.Add(ACInst->GetId().value(), Base);
-					}
-				}
-			}
-
-			InstIndex++;
-		}
-
-		if (CurState != AnalysisState::Outside)
-		{
-			FinalizeFunction();
-		}
+	void SpvValidator::PreAnalyzeLoadUsage()
+	{
+		LoadUsedInitUnits = ComputeLoadCheckMasks(Insts, Context, Patcher);
 	}
 
 	void SpvValidator::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections, const TMap<SpvId, SpvExtSet>& InExtSets)
@@ -290,8 +130,11 @@ namespace FW
 
 		PatchAppendErrorFunc();
 
+		BuildSpvCFG(this->Insts, Context, BBs, Funcs);
+
 		if (EnableUbsan)
 		{
+			PreAnalyzeLoadUsage();
 			PreAnalyzeInitialization();
 		}
 
@@ -367,9 +210,7 @@ namespace FW
 
 	void SpvValidator::Visit(const SpvOpFunction* Inst)
 	{
-		SpvId ResultId = Inst->GetId().value();
-		Funcs.Add(ResultId, SpvFunc{ Inst->GetFunctionType(), Inst->GetResultType() });
-		CurFunc = &Funcs[ResultId];
+		CurFunc = &Funcs[Inst->GetId().value()];
 	}
 
 	void SpvValidator::Visit(const SpvOpFunctionCall* Inst)
@@ -511,7 +352,6 @@ namespace FW
 
 			LocalVariables.emplace(ResultId, MoveTemp(Var));
 		}
-		CurFunc->Parameters.Add(ResultId);
 		if (EnableUbsan)
 		{
 			PatchVarInitializedRange(&LocalVariables[ResultId]);
@@ -557,6 +397,15 @@ namespace FW
 				SpvId StartInitUnit = GetAccess(VarType, Pointer->Indexes, ValidateInsts);
 
 				uint32 RawMask = ((1u << Count) - 1u);
+
+				// Narrow the mask if only a subset of the composite's init-units are actually used.
+				// e.g. glslang compiles c.xyz as OpLoad vec4 + OpVectorShuffle 0 1 2,
+				// so we only need bits 0-2 instead of all 4. Also handles structs/arrays/matrices.
+				if (uint32* UsedMask = LoadUsedInitUnits.Find(Inst->GetId().value()))
+				{
+					RawMask = *UsedMask;
+				}
+
 				SpvId RawMaskConst = Patcher.FindOrAddConstant(RawMask);
 
 				SpvId Mask = Patcher.NewId();
@@ -667,6 +516,10 @@ namespace FW
 
 				// mask = rawMask << bitPos
 				uint32 RawMask = ((1u << Count) - 1u);
+				if (uint32* UsedMask = LoadUsedInitUnits.Find(Inst->GetId().value()))
+				{
+					RawMask = *UsedMask;
+				}
 				SpvId RawMaskConst = Patcher.FindOrAddConstant(RawMask);
 				SpvId Mask = Patcher.NewId();
 				auto MaskOp = MakeUnique<SpvOpShiftLeftLogical>(UIntType, RawMaskConst, BitPos);
@@ -816,6 +669,48 @@ namespace FW
 			SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
 			int32 NumUnits = VarInitializedRangeUnitCount[Pointer->Var->Id];
 			int32 Count = GetTypeByteSize(Pointer->Type->PointeeType) / 4;
+			uint32 RawMask = ((1u << Count) - 1u);
+
+			// Detect VectorShuffle read-modify-write pattern (swizzle write).
+			// Only mark the actually-written components as initialized.
+			SpvType* PointeeType = Pointer->Type->PointeeType;
+			if (PointeeType->GetKind() == SpvTypeKind::Vector)
+			{
+				SpvId ObjectId = Inst->GetObject();
+				int32 DefIdx = GetInstIndex(Insts, ObjectId);
+				if (DefIdx != INDEX_NONE)
+				{
+					if (auto* Shuffle = dynamic_cast<SpvOpVectorShuffle*>((*Insts)[DefIdx].Get()))
+					{
+						SpvId Vec1Id = Shuffle->GetVector1();
+						SpvVectorType* VecType = static_cast<SpvVectorType*>(PointeeType);
+						uint32 Vec1Count = VecType->ElementCount;
+
+						auto IsLoadOfSamePtr = [&](SpvId VecId) -> bool {
+							int32 LoadIdx = GetInstIndex(Insts, VecId);
+							if (LoadIdx == INDEX_NONE) return false;
+							auto* Load = dynamic_cast<SpvOpLoad*>((*Insts)[LoadIdx].Get());
+							return Load && Load->GetPointer() == Inst->GetPointer();
+						};
+
+						if (IsLoadOfSamePtr(Vec1Id))
+						{
+							const TArray<uint32>& Comps = Shuffle->GetComponents();
+							uint32 WriteMask = 0;
+							for (int32 i = 0; i < Comps.Num(); i++)
+							{
+								if (Comps[i] >= Vec1Count)
+									WriteMask |= (1u << i);
+							}
+							if (WriteMask != 0 && WriteMask != ((1u << Comps.Num()) - 1))
+							{
+								RawMask = WriteMask;
+							}
+						}
+					}
+				}
+			}
+
 			TArray<TUniquePtr<SpvInstruction>> UpdateInsts;
 
 			if (NumUnits <= 32)
@@ -823,7 +718,6 @@ namespace FW
 				// Single uint bitmask path
 				SpvId StartInitUnit = GetAccess(VarType, Pointer->Indexes, UpdateInsts);
 
-				uint32 RawMask = ((1u << Count) - 1u);
 				SpvId RawMaskConst = Patcher.FindOrAddConstant(RawMask);
 
 				SpvId Mask = Patcher.NewId();
@@ -892,7 +786,6 @@ namespace FW
 				UpdateInsts.Add(MoveTemp(LoadOp));
 
 				// mask = rawMask << bitPos
-				uint32 RawMask = ((1u << Count) - 1u);
 				SpvId RawMaskConst = Patcher.FindOrAddConstant(RawMask);
 				SpvId Mask = Patcher.NewId();
 				auto MaskOp = MakeUnique<SpvOpShiftLeftLogical>(UIntType, RawMaskConst, BitPos);
@@ -1550,11 +1443,11 @@ namespace FW
 			SpvId Int64ResultType = GetScalarOrVectorTypeId(ResultType, Int64Type);
 			TArray<TUniquePtr<SpvInstruction>> ConvertFValidationInsts;
 			{
-				SpvId Minimum = GetScalarOrVectorId(ResultType, (int64)std::numeric_limits<int32>::max());
+				SpvId Minimum = GetScalarOrVectorId(ResultType, (int64)std::numeric_limits<int32>::min());
 				SpvId Maximum = GetScalarOrVectorId(ResultType, (int64)std::numeric_limits<int32>::max());
 
 				SpvId Int64Value = Patcher.NewId();
-				auto Int64ValueOp = MakeUnique<SpvOpConvertFToU>(Int64ResultType, Inst->GetFloatValue());
+				auto Int64ValueOp = MakeUnique<SpvOpConvertFToS>(Int64ResultType, Inst->GetFloatValue());
 				Int64ValueOp->SetId(Int64Value);
 				ConvertFValidationInsts.Add(MoveTemp(Int64ValueOp));
 

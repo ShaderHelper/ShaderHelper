@@ -72,6 +72,7 @@ namespace FW
 		}
 		void PatchVarInitializedRange(SpvVariable* Var);
 		void PreAnalyzeInitialization();
+		void PreAnalyzeLoadUsage();
 
 	private:
 		SpvMetaContext& Context;
@@ -100,8 +101,10 @@ namespace FW
 		std::unordered_map<SpvId, SpvPointer> LocalPointers;
 		std::unordered_map<SpvId, SpvVariable> LocalVariables;
 		SpvFunc* CurFunc{};
-		TMap<SpvId, SpvFunc> Funcs;
+		std::unordered_map<SpvId, SpvFunc> Funcs;
+		std::unordered_map<SpvId, SpvBasicBlock> BBs;
 		TSet<SpvId> StaticallyInitializedVars;
+		TMap<SpvId, uint32> LoadUsedInitUnits; // OpLoad ResultId -> used init-unit bitmask
 	};
 
 	int32 GetMaxIndexNum(SpvType* Type);

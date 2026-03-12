@@ -836,7 +836,6 @@ namespace SH
 			SpvVariable* Var = DebuggerContext->FindVar(State.VarId);
 			if (Var && Var->GetBufferSize() > 0)
 			{
-				auto Range = Var->GetInitializedRange();
 				auto AccessOrError = GetAccess(Var, State.Indexes);
 				if (AccessOrError.HasError())
 				{
@@ -847,9 +846,42 @@ namespace SH
 				}
 				else
 				{
+					bool Uninitialized = false;
 					auto [Type, ByteOffset] = AccessOrError.GetValue();
 					int32 Size = GetTypeByteSize(Type);
-					if (ByteOffset < Range.X || ByteOffset + Size > Range.Y)
+					if (State.CheckMask != 0xFFFFFFFFu)
+					{
+						// Only check init-units whose bits are set in CheckMask (each init-unit = 4 bytes).
+						// CheckMask is relative to the OpLoad result type, so offset by ByteOffset.
+						for (uint32 Bit = 0; Bit < (uint32)(Size / 4); Bit++)
+						{
+							if (!(State.CheckMask & (1u << Bit)))
+								continue;
+							int32 UnitStart = ByteOffset + Bit * 4;
+							int32 UnitEnd = UnitStart + 4;
+							if (UnitEnd > Var->GetBufferSize())
+								break;
+							bool UnitInit = false;
+							for (const Vector2i& R : Var->InitializedRanges)
+							{
+								if (R.X <= UnitStart && R.Y >= UnitEnd)
+								{
+									UnitInit = true;
+									break;
+								}
+							}
+							if (!UnitInit)
+							{
+								Uninitialized = true;
+								break;
+							}
+						}
+					}
+					else
+					{
+						Uninitialized = !Var->IsRangeInitialized(ByteOffset, ByteOffset + Size);
+					}
+					if (Uninitialized)
 					{
 						Error = "Undefined";
 						StopLocation.File = DebuggerContext->GetSourceFileName(State.Source);
@@ -1819,13 +1851,20 @@ namespace SH
 					continue;
 				}
 
+				//Skip constant-value stores — useless for preview
+				uint32 PH = FW::PackDebugHeader(FW::SpvDebuggerStateType::VarChange, VarChange.Source.GetValue(), (uint32)VarChange.Line);
+				uint64 ConstKey = ((uint64)PH << 32) | VarChange.Change.VarId.GetValue();
+				if (DebuggerContext->ConstInitVarChanges.Contains(ConstKey))
+				{
+					continue;
+				}
+
 				int32 LineNumber = VarChange.Line - GetExtraLineNumForSource(VarChange.Source);
 				FString SourceFile = DebuggerContext->GetSourceFileName(VarChange.Source);
 				if (LineNumber > 0)
 				{
 					DebuggerLocation Loc{ SourceFile, LineNumber };
 					LinePreviewInfo& Existing = LinePreviewData.FindOrAdd(Loc);
-					uint32 PH = FW::PackDebugHeader(FW::SpvDebuggerStateType::VarChange, VarChange.Source.GetValue(), (uint32)VarChange.Line);
 					int32 Iteration = (Existing.VarId == VarChange.Change.VarId && Existing.CallStackHash == CallStackHash) ? Existing.IterationIndex + 1 : 0;
 					Existing = { VarChange.Change.VarId, Iteration, PH, MoveTemp(VarName), CallStackHash };
 					if (IsInCurrentFunc())
@@ -2285,11 +2324,14 @@ namespace SH
 				SpvId VarId = *(SpvId*)(DebuggerData + Offset); Offset += 4;
 				int32 IndexNum = *(int32*)(DebuggerData + Offset); Offset += 4;
 				TArray<int32> Indexes = { (int32*)(DebuggerData + Offset), IndexNum }; Offset += IndexNum * 4;
+				uint64 MaskKey = ((uint64)PackedHeader << 32) | VarId.GetValue();
+				uint32 CheckMask = DebuggerContext->AccessCheckMasks.Contains(MaskKey) ? DebuggerContext->AccessCheckMasks[MaskKey] : 0xFFFFFFFFu;
 				States.Add(SpvDebugState_Access{
 					.Line = Line,
 					.Source = Source,
 					.VarId = VarId,
-					.Indexes = MoveTemp(Indexes)
+					.Indexes = MoveTemp(Indexes),
+					.CheckMask = CheckMask
 				});
 				break;
 			}

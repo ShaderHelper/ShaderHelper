@@ -252,6 +252,7 @@ namespace FW
 		SpvTypeDesc* GetTypeDesc() const { return TypeDesc; }
 		//In Bits
 		int32 GetOffset() const {return Offset; }
+		//glslang may not provide size for struct member, in that case, the size will be 0
 		int32 GetSize() const { return Size; }
 		
 	private:
@@ -571,7 +572,8 @@ namespace FW
 		}
 		else if(TypeDesc->GetKind() == SpvTypeDescKind::Member)
 		{
-			return static_cast<const SpvMemberTypeDesc*>(TypeDesc)->GetSize() / 8;
+			const SpvMemberTypeDesc* MemberTypeDesc = static_cast<const SpvMemberTypeDesc*>(TypeDesc);
+			return GetTypeByteSize(MemberTypeDesc->GetTypeDesc());
 		}
 		else if(TypeDesc->GetKind() == SpvTypeDescKind::Array)
 		{

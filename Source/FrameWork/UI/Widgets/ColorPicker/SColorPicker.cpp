@@ -30,8 +30,8 @@ namespace FW
 		ChildSlot
 		[
 			SNew(SBox)
-			.WidthOverride(330.f)
-			.HeightOverride(170.f)
+			.WidthOverride(350.f)
+			.HeightOverride(190.f)
 			[
 				SNew(SBorder)
 				.Padding(8.0f)
@@ -41,8 +41,8 @@ namespace FW
 					.AutoWidth()
 					[
 						SNew(SBox)
-						.WidthOverride(150.f)
-						.HeightOverride(150.f)
+						.WidthOverride(160.f)
+						.HeightOverride(160.f)
 						[
 							SNew(SColorWheel)
 							.SelectedColor_Lambda([this] {

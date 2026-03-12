@@ -31,7 +31,7 @@ namespace FW
 			{
 				SpvVectorType* VectorType = static_cast<SpvVectorType*>(CurType);
 				int32 Increment = Index * GetTypeByteSize(VectorType->ElementType);
-				if (Increment > GetTypeByteSize(VectorType) || Increment < 0)
+				if (Increment >= GetTypeByteSize(VectorType) || Increment < 0)
 				{
 					return MakeError(FString::Printf(TEXT("Index %d is out of bounds"), Index));
 				}
@@ -52,7 +52,7 @@ namespace FW
 			{
 				SpvArrayType* ArrayType = static_cast<SpvArrayType*>(CurType);
 				int32 Increment = Index * GetTypeByteSize(ArrayType->ElementType);
-				if (Increment > GetTypeByteSize(ArrayType) || Increment < 0)
+				if (Increment >= GetTypeByteSize(ArrayType) || Increment < 0)
 				{
 					return MakeError(FString::Printf(TEXT("Index %d is out of bounds"), Index));
 				}
@@ -63,7 +63,7 @@ namespace FW
 			{
 				SpvMatrixType* MatrixType = static_cast<SpvMatrixType*>(CurType);
 				int32 Increment = Index * GetTypeByteSize(MatrixType->ElementType);
-				if (Increment > GetTypeByteSize(MatrixType) || Increment < 0)
+				if (Increment >= GetTypeByteSize(MatrixType) || Increment < 0)
 				{
 					return MakeError(FString::Printf(TEXT("Index %d is out of bounds"), Index));
 				}
@@ -83,6 +83,662 @@ namespace FW
 		return Insts->IndexOfByPredicate([&](const TUniquePtr<SpvInstruction>& InInst) {
 			return InInst->GetId() ? InInst->GetId().value() == Inst : false;
 		});
+	}
+
+	TPair<int32, int32> ComputeExtractInitUnitRange(SpvType* Type, const TArray<uint32>& Indexes, int32 StartIdx)
+	{
+		if (StartIdx >= Indexes.Num())
+		{
+			return { 0, GetTypeByteSize(Type) / 4 };
+		}
+
+		uint32 Idx = Indexes[StartIdx];
+
+		switch (Type->GetKind())
+		{
+		case SpvTypeKind::Vector:
+		{
+			auto* VecType = static_cast<SpvVectorType*>(Type);
+			int32 ElemSize = GetTypeByteSize(VecType->ElementType) / 4;
+			auto Sub = ComputeExtractInitUnitRange(VecType->ElementType, Indexes, StartIdx + 1);
+			if (Sub.Key < 0) return { -1, 0 };
+			return { (int32)Idx * ElemSize + Sub.Key, Sub.Value };
+		}
+		case SpvTypeKind::Struct:
+		{
+			auto* StructType = static_cast<SpvStructType*>(Type);
+			if ((int32)Idx >= StructType->MemberTypes.Num()) return { -1, 0 };
+			int32 Offset = 0;
+			for (int32 i = 0; i < (int32)Idx; i++)
+			{
+				Offset += GetTypeByteSize(StructType->MemberTypes[i]) / 4;
+			}
+			auto Sub = ComputeExtractInitUnitRange(StructType->MemberTypes[Idx], Indexes, StartIdx + 1);
+			if (Sub.Key < 0) return { -1, 0 };
+			return { Offset + Sub.Key, Sub.Value };
+		}
+		case SpvTypeKind::Array:
+		{
+			auto* ArrType = static_cast<SpvArrayType*>(Type);
+			int32 ElemSize = GetTypeByteSize(ArrType->ElementType) / 4;
+			auto Sub = ComputeExtractInitUnitRange(ArrType->ElementType, Indexes, StartIdx + 1);
+			if (Sub.Key < 0) return { -1, 0 };
+			return { (int32)Idx * ElemSize + Sub.Key, Sub.Value };
+		}
+		case SpvTypeKind::Matrix:
+		{
+			auto* MatType = static_cast<SpvMatrixType*>(Type);
+			int32 ElemSize = GetTypeByteSize(MatType->ElementType) / 4;
+			auto Sub = ComputeExtractInitUnitRange(MatType->ElementType, Indexes, StartIdx + 1);
+			if (Sub.Key < 0) return { -1, 0 };
+			return { (int32)Idx * ElemSize + Sub.Key, Sub.Value };
+		}
+		default:
+			return { -1, 0 };
+		}
+	}
+
+	// Analyze each OpLoad to determine which init-units (4-byte slots) are actually consumed externally.
+	// Returns LoadResultId -> narrowed CheckMask.
+	TMap<SpvId, uint32> ComputeLoadCheckMasks(const TArray<TUniquePtr<SpvInstruction>>* Insts, const SpvMetaContext& Context, const SpvPatcher& Patcher)
+	{
+		TMap<SpvId, uint32> Result;
+
+		int32 EntryIndex = GetInstIndex(Insts, Context.EntryPoint);
+		// UseMap: SSA value (raw uint32) -> list of instruction indices that reference it as an operand.
+		TMap<uint32, TArray<int32>> UseMap;
+		// IdResultType: SSA value -> its result type, used later to resolve vector sizes.
+		TMap<uint32, SpvId> IdResultType;
+
+		// a shuffle component index "2" could collide with SSA ID %2 in raw word scan).
+		auto AddUse = [&](uint32 Id, int32 InstIdx) { UseMap.FindOrAdd(Id).AddUnique(InstIdx); };
+		for (int32 i = EntryIndex; i < Insts->Num(); i++)
+		{
+			SpvInstruction* Inst = (*Insts)[i].Get();
+
+			if (auto* Load = dynamic_cast<SpvOpLoad*>(Inst))
+			{
+				IdResultType.Add(Load->GetId().value().GetValue(), Load->GetResultType());
+				AddUse(Load->GetPointer().GetValue(), i);
+			}
+			else if (auto* Store = dynamic_cast<SpvOpStore*>(Inst))
+			{
+				AddUse(Store->GetPointer().GetValue(), i);
+				AddUse(Store->GetObject().GetValue(), i);
+			}
+			else if (auto* Shuffle = dynamic_cast<SpvOpVectorShuffle*>(Inst))
+			{
+				IdResultType.Add(Shuffle->GetId().value().GetValue(), Shuffle->GetResultType());
+				AddUse(Shuffle->GetVector1().GetValue(), i);
+				AddUse(Shuffle->GetVector2().GetValue(), i);
+				// Components are literals, not IDs — intentionally skipped
+			}
+			else if (auto* Extract = dynamic_cast<SpvOpCompositeExtract*>(Inst))
+			{
+				IdResultType.Add(Extract->GetId().value().GetValue(), Extract->GetResultType());
+				AddUse(Extract->GetComposite().GetValue(), i);
+				// Indexes are literals, not IDs — intentionally skipped
+			}
+			else if (auto* Construct = dynamic_cast<SpvOpCompositeConstruct*>(Inst))
+			{
+				IdResultType.Add(Construct->GetId().value().GetValue(), Construct->GetResultType());
+				for (SpvId C : Construct->GetConstituents())
+					AddUse(C.GetValue(), i);
+			}
+			else
+			{
+				// Unrecognized instruction: conservatively register all words as potential uses.
+				// Skip header (word 0) and result type + result id if present (they are definitions, not uses).
+				// For ExtInst: [header][ResultType][ResultId][ExtSet][Opcode(literal)][operands...]
+				// Also skip ExtSet (import id, not a data value) and the literal opcode at word 4.
+				const TArray<uint32>& SpvCode = Patcher.GetSpv();
+				int32 Offset = Inst->GetWordOffset().value();
+				int32 Len = Inst->GetWordLen().value();
+				bool bIsExtInst = std::holds_alternative<SpvGLSLstd450>(Inst->GetKind())
+					|| std::holds_alternative<SpvDebugInfo100>(Inst->GetKind());
+				int32 Start = bIsExtInst ? Offset + 5
+					: (Inst->GetId().has_value() ? Offset + 3 : Offset + 1);
+				for (int32 w = Start; w < Offset + Len; w++)
+				{
+					AddUse(SpvCode[w], i);
+				}
+			}
+		}
+
+		// For each OpLoad, propagate the loaded value through its consumers.
+		for (int32 InstIndex = EntryIndex; InstIndex < Insts->Num(); InstIndex++)
+		{
+			auto* LoadInst = dynamic_cast<SpvOpLoad*>((*Insts)[InstIndex].Get());
+			if (!LoadInst)
+				continue;
+
+			SpvId LoadResultId = LoadInst->GetId().value();
+			SpvId ResultTypeId = LoadInst->GetResultType();
+
+			auto TypeIt = Context.Types.find(ResultTypeId);
+			if (TypeIt == Context.Types.end())
+				continue;
+
+			SpvType* LoadedType = TypeIt->second.Get();
+			int32 TotalUnits = GetTypeByteSize(LoadedType) / 4;
+			if (TotalUnits > 32 || LoadedType->IsScalar())
+				continue;
+
+			uint32 FullMask = (TotalUnits == 32) ? 0xFFFFFFFFu : ((1u << TotalUnits) - 1u);
+			SpvId LoadPointer = LoadInst->GetPointer();
+
+			// CarriesMask: SSA value -> bitmask of init-units from the original Load that this value carries.
+			// As values flow through shuffles/extracts, the mask gets narrowed to relevant units.
+			TMap<uint32, uint32> CarriesMask;
+			CarriesMask.Add(LoadResultId.GetValue(), FullMask);
+
+			// CheckMask accumulates bits for init-units that are externally consumed (not written back).
+			uint32 CheckMask = 0;
+			// Worklist of SSA values (raw uint32) whose consumers still need analysis.
+			TArray<uint32> Worklist;
+			Worklist.Add(LoadResultId.GetValue());
+
+			while (Worklist.Num() > 0 && CheckMask != FullMask)
+			{
+				uint32 ValId = Worklist[0];
+				Worklist.RemoveAt(0);
+				uint32 ValMask = CarriesMask[ValId];
+				if (ValMask == 0)
+					continue;
+
+				const TArray<int32>* Users = UseMap.Find(ValId);
+				if (!Users)
+					continue;
+
+				for (int32 UserIdx : *Users)
+				{
+					if (CheckMask == FullMask)
+						break;
+
+					SpvInstruction* User = (*Insts)[UserIdx].Get();
+
+					if (User->GetId().has_value() && User->GetId().value().GetValue() == ValId)
+						continue;
+
+					if (auto* Store = dynamic_cast<SpvOpStore*>(User))
+					{
+						if (Store->GetObject().GetValue() == ValId)
+						{
+							// Store back to the same pointer, bits stay unchecked.
+							// Store to a different pointer, mark all carried bits.
+							if (Store->GetPointer() == LoadPointer)
+								continue;
+							else
+								CheckMask |= ValMask;
+						}
+						continue;
+					}
+
+					// VectorShuffle: track which components of the result originate from the tracked value.
+					// Only propagate the bits corresponding to source components that are actually selected.
+					if (auto* Shuffle = dynamic_cast<SpvOpVectorShuffle*>(User))
+					{
+						bool IsVec1 = (Shuffle->GetVector1().GetValue() == ValId);
+						bool IsVec2 = (Shuffle->GetVector2().GetValue() == ValId);
+						if (!IsVec1 && !IsVec2)
+						{
+							CheckMask |= ValMask;
+							continue;
+						}
+
+						uint32 Vec1Size = 0;
+						{
+							SpvId Vec1Id = Shuffle->GetVector1();
+							SpvId Vec1TypeId;
+							if (Vec1Id == LoadResultId)
+								Vec1TypeId = ResultTypeId;
+							else if (SpvId* FoundType = IdResultType.Find(Vec1Id.GetValue()))
+								Vec1TypeId = *FoundType;
+
+							auto Vec1TypeIt = Context.Types.find(Vec1TypeId);
+							if (Vec1TypeIt != Context.Types.end() && Vec1TypeIt->second->GetKind() == SpvTypeKind::Vector)
+							{
+								Vec1Size = static_cast<SpvVectorType*>(Vec1TypeIt->second.Get())->ElementCount;
+							}
+							else
+							{
+								CheckMask |= ValMask;
+								continue;
+							}
+						}
+
+						uint32 NewMask = 0;
+						const TArray<uint32>& Comps = Shuffle->GetComponents();
+						for (uint32 ci = 0; ci < (uint32)Comps.Num(); ci++)
+						{
+							uint32 Comp = Comps[ci];
+							if (Comp == 0xFFFFFFFF) continue;
+
+							if (IsVec1 && Comp < Vec1Size)
+							{
+								if (ValMask & (1u << Comp))
+									NewMask |= (1u << Comp);
+							}
+							else if (IsVec2 && Comp >= Vec1Size)
+							{
+								uint32 SrcComp = Comp - Vec1Size;
+								if (ValMask & (1u << SrcComp))
+									NewMask |= (1u << SrcComp);
+							}
+						}
+
+						if (NewMask != 0)
+						{
+							SpvId ShuffleId = Shuffle->GetId().value();
+							uint32* Existing = CarriesMask.Find(ShuffleId.GetValue());
+							uint32 Old = Existing ? *Existing : 0;
+							if ((Old | NewMask) != Old)
+							{
+								CarriesMask.Add(ShuffleId.GetValue(), Old | NewMask);
+								Worklist.AddUnique(ShuffleId.GetValue());
+							}
+						}
+						continue;
+					}
+
+					// CompositeExtract: narrow the mask to just the init-units covered by the extracted sub-range.
+					// E.g. extracting .xy from a mat2 only needs init-units for columns 0-1.
+					if (auto* Extract = dynamic_cast<SpvOpCompositeExtract*>(User))
+					{
+						if (Extract->GetComposite().GetValue() != ValId)
+						{
+							CheckMask |= ValMask;
+							continue;
+						}
+
+						SpvId ExtId = Extract->GetId().value();
+						uint32 NewMask = ValMask;
+
+						if (ValId == LoadResultId.GetValue() && Extract->GetIndexes().Num() > 0)
+						{
+							auto Range = ComputeExtractInitUnitRange(LoadedType, Extract->GetIndexes());
+							if (Range.Key >= 0)
+							{
+								uint32 ExtractMask = 0;
+								for (int32 u = Range.Key; u < Range.Key + Range.Value && u < 32; u++)
+									ExtractMask |= (1u << u);
+								NewMask = ValMask & ExtractMask;
+							}
+						}
+
+						if (NewMask != 0)
+						{
+							uint32* Existing = CarriesMask.Find(ExtId.GetValue());
+							uint32 Old = Existing ? *Existing : 0;
+							if ((Old | NewMask) != Old)
+							{
+								CarriesMask.Add(ExtId.GetValue(), Old | NewMask);
+								Worklist.AddUnique(ExtId.GetValue());
+							}
+						}
+						continue;
+					}
+
+					// Fallback for unrecognized instructions: conservatively scan raw SPIR-V words.
+					// If the tracked value ID appears anywhere in the operands, mark all carried bits as escaped.
+					const TArray<uint32>& SpvCode = Patcher.GetSpv();
+					int32 Off = User->GetWordOffset().value();
+					int32 Ln = User->GetWordLen().value();
+					// Skip header, result type and result id — they are definitions, not uses.
+					// ExtInst additionally has ExtSet and a literal opcode to skip.
+					bool bIsExtInst = std::holds_alternative<SpvGLSLstd450>(User->GetKind())
+						|| std::holds_alternative<SpvDebugInfo100>(User->GetKind());
+					int32 Start = bIsExtInst ? Off + 5
+						: (User->GetId().has_value() ? Off + 3 : Off + 1);
+					for (int32 w = Start; w < Off + Ln; w++)
+					{
+						if (SpvCode[w] == ValId)
+						{
+							CheckMask |= ValMask;
+							break;
+						}
+					}
+
+				}
+			}
+
+			// Only record loads whose CheckMask is narrower than FullMask.
+			// These loads have some init-units that are only written back (not externally consumed),
+			// so we can skip the uninitialized-access check for those bits.
+			if (CheckMask != FullMask)
+			{
+				Result.Add(LoadResultId, CheckMask);
+			}
+		}
+
+		return Result;
+	}
+
+	void BuildSpvCFG(const TArray<TUniquePtr<SpvInstruction>>* Insts, const SpvMetaContext& Context, std::unordered_map<SpvId, SpvBasicBlock>& OutBBs, std::unordered_map<SpvId, SpvFunc>& OutFuncs)
+	{
+		int32 EntryIndex = GetInstIndex(Insts, Context.EntryPoint);
+		SpvId CurLabel = 0;
+		SpvId CurFuncId = 0;
+		bool InBlock = false;
+
+		for (int32 i = EntryIndex; i < Insts->Num(); i++)
+		{
+			if (auto* FuncInst = dynamic_cast<SpvOpFunction*>((*Insts)[i].Get()))
+			{
+				CurFuncId = FuncInst->GetId().value();
+				OutFuncs.emplace(CurFuncId, SpvFunc{FuncInst->GetFunctionType(), FuncInst->GetResultType()});
+			}
+			else if (auto* ParamInst = dynamic_cast<SpvOpFunctionParameter*>((*Insts)[i].Get()))
+			{
+				OutFuncs[CurFuncId].Parameters.Add(ParamInst->GetId().value());
+			}
+			else if (dynamic_cast<SpvOpFunctionEnd*>((*Insts)[i].Get()))
+			{
+				CurFuncId = 0;
+			}
+			else if (auto* LabelInst = dynamic_cast<SpvOpLabel*>((*Insts)[i].Get()))
+			{
+				CurLabel = LabelInst->GetId().value();
+				auto& BB = OutBBs.try_emplace(CurLabel, SpvBasicBlock{}).first->second;
+				BB.StartIdx = i + 1;
+				OutFuncs[CurFuncId].BasicBlocks.Add(CurLabel);
+				InBlock = true;
+			}
+			else if (InBlock)
+			{
+				bool IsTerminator = false;
+				if (auto* Br = dynamic_cast<SpvOpBranch*>((*Insts)[i].Get()))
+				{
+					OutBBs[CurLabel].Successors.Add(Br->GetTargetLabel());
+					IsTerminator = true;
+				}
+				else if (auto* BrCond = dynamic_cast<SpvOpBranchConditional*>((*Insts)[i].Get()))
+				{
+					OutBBs[CurLabel].Successors.Add(BrCond->GetTrueLabel());
+					OutBBs[CurLabel].Successors.Add(BrCond->GetFalseLabel());
+					IsTerminator = true;
+				}
+				else if (auto* Sw = dynamic_cast<SpvOpSwitch*>((*Insts)[i].Get()))
+				{
+					OutBBs[CurLabel].Successors.Add(Sw->GetDefault());
+					for (const auto& Target : Sw->GetTargets())
+						OutBBs[CurLabel].Successors.Add(Target.Value);
+					IsTerminator = true;
+				}
+				else if (dynamic_cast<SpvOpReturn*>((*Insts)[i].Get()) ||
+					dynamic_cast<SpvOpReturnValue*>((*Insts)[i].Get()) ||
+					dynamic_cast<SpvOpKill*>((*Insts)[i].Get()))
+				{
+					IsTerminator = true;
+				}
+				if (IsTerminator)
+				{
+					OutBBs[CurLabel].EndIdx = i;
+					InBlock = false;
+				}
+			}
+		}
+
+		// Build predecessor lists from successor edges
+		for (auto& [Label, BB] : OutBBs)
+		{
+			for (SpvId Succ : BB.Successors)
+			{
+				if (OutBBs.contains(Succ))
+					OutBBs[Succ].Predecessors.Add(Label);
+			}
+		}
+	}
+
+	TSet<SpvId> ComputeStaticallyInitializedVars(const TArray<TUniquePtr<SpvInstruction>>* Insts, const SpvMetaContext& Context, const TMap<SpvId, uint32>& LoadUsedInitUnits, const std::unordered_map<SpvId, SpvBasicBlock>& BBs, const std::unordered_map<SpvId, SpvFunc>& Funcs)
+	{
+		// Identify local variables that are provably fully initialized before any read,
+		// using classic forward dataflow analysis over the CFG.
+		//
+		// A variable is "statically initialized" if on every path from function entry to
+		// any OpLoad of V, there exists an OpStore directly to V (not through OpAccessChain).
+		//
+		// Variables used as function call arguments are excluded because their initialization
+		// state needs runtime propagation to callee parameters.
+
+		TSet<SpvId> Result;
+		int32 EntryIndex = GetInstIndex(Insts, Context.EntryPoint);
+
+		// Phase 1: Collect variable IDs used as function call arguments
+		TSet<SpvId> FuncCallArgVars;
+		for (int32 i = EntryIndex; i < Insts->Num(); i++)
+		{
+			if (auto* CallInst = dynamic_cast<SpvOpFunctionCall*>((*Insts)[i].Get()))
+			{
+				for (SpvId Arg : CallInst->GetArguments())
+					FuncCallArgVars.Add(Arg);
+			}
+		}
+
+		// Phase 1.5: Mark compiler-generated temporaries as statically initialized
+		for (int32 i = EntryIndex; i < Insts->Num(); i++)
+		{
+			if (auto* VarInst = dynamic_cast<SpvOpVariable*>((*Insts)[i].Get()))
+			{
+				if (VarInst->GetStorageClass() == SpvStorageClass::Function)
+				{
+					SpvId VarId = VarInst->GetId().value();
+					if (!Context.VariableDescMap.contains(VarId) && !FuncCallArgVars.Contains(VarId))
+						Result.Add(VarId);
+				}
+			}
+		}
+
+		// Phase 2: Per-function CFG-based definite-assignment analysis
+
+		for (const auto& [FuncId, Func] : Funcs)
+		{
+			const TArray<SpvId>& BlockLabels = Func.BasicBlocks;
+			// Collect local variables and AccessChain mappings from this function's blocks
+			TSet<SpvId> LocalVars;
+			TMap<SpvId, SpvId> ACBaseVar;
+
+			for (SpvId Label : BlockLabels)
+			{
+				const auto& BB = BBs.at(Label);
+				if (BB.EndIdx < 0) continue;
+				for (int32 i = BB.StartIdx; i <= BB.EndIdx; i++)
+				{
+					if (auto* VarInst = dynamic_cast<SpvOpVariable*>((*Insts)[i].Get()))
+					{
+						if (VarInst->GetStorageClass() == SpvStorageClass::Function)
+						{
+							SpvId VarId = VarInst->GetId().value();
+							if (!Result.Contains(VarId) && !FuncCallArgVars.Contains(VarId))
+								LocalVars.Add(VarId);
+						}
+					}
+				}
+			}
+
+			if (LocalVars.IsEmpty())
+				continue;
+
+			for (SpvId Label : BlockLabels)
+			{
+				const auto& BB = BBs.at(Label);
+				if (BB.EndIdx < 0) continue;
+				for (int32 i = BB.StartIdx; i <= BB.EndIdx; i++)
+				{
+					if (auto* ACInst = dynamic_cast<SpvOpAccessChain*>((*Insts)[i].Get()))
+					{
+						SpvId Base = ACInst->GetBasePointer();
+						if (SpvId* TransitiveBase = ACBaseVar.Find(Base))
+							Base = *TransitiveBase;
+						if (LocalVars.Contains(Base))
+							ACBaseVar.Add(ACInst->GetId().value(), Base);
+					}
+				}
+			}
+
+			// Find entry label and compute GEN sets
+			if (BlockLabels.IsEmpty())
+				continue;
+			SpvId FuncEntryLabel = BlockLabels[0];
+			TMap<SpvId, TSet<SpvId>> Gen;
+
+			for (SpvId Label : BlockLabels)
+			{
+				Gen.Add(Label, {});
+			}
+
+			// Compute GEN sets: direct OpStore to local var, or OpVariable with initializer
+			for (auto& [Label, GenSet] : Gen)
+			{
+				const auto& BB = BBs.at(Label);
+				if (BB.EndIdx < 0) continue;
+				for (int32 i = BB.StartIdx; i <= BB.EndIdx; i++)
+				{
+					if (auto* StoreInst = dynamic_cast<SpvOpStore*>((*Insts)[i].Get()))
+					{
+						if (LocalVars.Contains(StoreInst->GetPointer()))
+							GenSet.Add(StoreInst->GetPointer());
+					}
+					else if (auto* VarInst = dynamic_cast<SpvOpVariable*>((*Insts)[i].Get()))
+					{
+						SpvId VarId = VarInst->GetId().value();
+						if (VarInst->GetInitializer().has_value() && LocalVars.Contains(VarId))
+							GenSet.Add(VarId);
+					}
+				}
+			}
+
+			// ---- Forward definite-assignment dataflow ----
+			// Domain: TSet<SpvId> per block (set of definitely-assigned local vars)
+			// Meet: intersection (∩)  — var is assigned only if assigned on ALL predecessors
+			// Transfer: DefOut[B] = DefIn[B] ∪ Gen[B]
+			// Init: DefOut[entry] = Gen[entry], DefOut[others] = LocalVars (optimistic)
+			TMap<SpvId, TSet<SpvId>> DefOut;
+			for (auto& [Label, GenSet] : Gen)
+			{
+				if (Label == FuncEntryLabel)
+					DefOut.Add(Label, GenSet);
+				else
+					DefOut.Add(Label, LocalVars);
+			}
+
+			bool Changed = true;
+			while (Changed)
+			{
+				Changed = false;
+				for (auto& [Label, GenSet] : Gen)
+				{
+					if (Label == FuncEntryLabel)
+						continue;
+
+					TSet<SpvId> NewDefIn;
+					const auto& Preds = BBs.at(Label).Predecessors;
+					if (Preds.Num() == 0)
+					{
+						NewDefIn = LocalVars; // Unreachable block
+					}
+					else
+					{
+						NewDefIn = DefOut[Preds[0]];
+						for (int32 p = 1; p < Preds.Num(); p++)
+						{
+							TSet<SpvId> Intersected;
+							for (SpvId Id : NewDefIn)
+							{
+								if (DefOut[Preds[p]].Contains(Id))
+									Intersected.Add(Id);
+							}
+							NewDefIn = MoveTemp(Intersected);
+						}
+					}
+
+					TSet<SpvId> NewDefOut = NewDefIn;
+					NewDefOut.Append(GenSet);
+
+					// Lattice is monotonically descending; size decrease ⟹ change
+					if (NewDefOut.Num() < DefOut[Label].Num())
+					{
+						DefOut[Label] = MoveTemp(NewDefOut);
+						Changed = true;
+					}
+				}
+			}
+
+			// Compute final DefIn per block
+			TMap<SpvId, TSet<SpvId>> DefIn;
+			for (auto& [Label, GenSet] : Gen)
+			{
+				if (Label == FuncEntryLabel)
+				{
+					DefIn.Add(Label, TSet<SpvId>{});
+				}
+				else
+				{
+					const auto& Preds = BBs.at(Label).Predecessors;
+					if (Preds.Num() == 0)
+					{
+						DefIn.Add(Label, LocalVars);
+					}
+					else
+					{
+						TSet<SpvId> In = DefOut[Preds[0]];
+						for (int32 p = 1; p < Preds.Num(); p++)
+						{
+							TSet<SpvId> Intersected;
+							for (SpvId Id : In)
+							{
+								if (DefOut[Preds[p]].Contains(Id))
+									Intersected.Add(Id);
+							}
+							In = MoveTemp(Intersected);
+						}
+						DefIn.Add(Label, MoveTemp(In));
+					}
+				}
+			}
+
+			// ---- Check all loads: find vars with at least one uninitialized read ----
+			TSet<SpvId> UnsafeVars;
+			for (auto& [Label, GenSet] : Gen)
+			{
+				const auto& BB = BBs.at(Label);
+				if (BB.EndIdx < 0) continue;
+				TSet<SpvId> Assigned = DefIn[Label];
+
+				for (int32 i = BB.StartIdx; i <= BB.EndIdx; i++)
+				{
+					if (auto* VarInst = dynamic_cast<SpvOpVariable*>((*Insts)[i].Get()))
+					{
+						SpvId VarId = VarInst->GetId().value();
+						if (VarInst->GetInitializer().has_value() && LocalVars.Contains(VarId))
+							Assigned.Add(VarId);
+					}
+					else if (auto* StoreInst = dynamic_cast<SpvOpStore*>((*Insts)[i].Get()))
+					{
+						if (LocalVars.Contains(StoreInst->GetPointer()))
+							Assigned.Add(StoreInst->GetPointer());
+					}
+					else if (auto* LoadInst = dynamic_cast<SpvOpLoad*>((*Insts)[i].Get()))
+					{
+						SpvId Pointer = LoadInst->GetPointer();
+						SpvId BaseVar = Pointer;
+						if (SpvId* Base = ACBaseVar.Find(Pointer))
+							BaseVar = *Base;
+						if (LocalVars.Contains(BaseVar) && !Assigned.Contains(BaseVar))
+							UnsafeVars.Add(BaseVar);
+					}
+				}
+			}
+
+			// All local vars not in UnsafeVars are statically initialized
+			for (SpvId VarId : LocalVars)
+			{
+				if (!UnsafeVars.Contains(VarId))
+					Result.Add(VarId);
+			}
+		}
+
+		return Result;
 	}
 
 	SpvId PatchDebuggerBuffer(SpvPatcher& Patcher)
@@ -174,9 +830,7 @@ namespace FW
 
 	void SpvDebuggerVisitor::Visit(const SpvOpFunction* Inst)
 	{
-		SpvId ResultId = Inst->GetId().value();
-		Context.Funcs.emplace(ResultId, SpvFunc{Inst->GetFunctionType(), Inst->GetResultType()});
-		CurFunc = &Context.Funcs[ResultId];
+		CurFunc = &Context.Funcs[Inst->GetId().value()];
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvOpFunctionCall* Inst)
@@ -244,7 +898,6 @@ namespace FW
 
 			Context.LocalVariables.emplace(ResultId, MoveTemp(Var));
 		}
-		CurFunc->Parameters.Add(ResultId);
 	}
 
 	void SpvDebuggerVisitor::Visit(const SpvOpVariable* Inst)
@@ -276,7 +929,7 @@ namespace FW
 	void SpvDebuggerVisitor::Visit(const SpvOpLabel* Inst)
 	{
 		SpvId ResultId = Inst->GetId().value();
-		Context.BBs.emplace(ResultId, SpvBasicBlock{});
+		Context.BBs.try_emplace(ResultId, SpvBasicBlock{});
 		CurBlock = &Context.BBs[ResultId];
 	}
 
@@ -288,7 +941,45 @@ namespace FW
 			// Only check initialization for user-declared variables
 			if (Pointer && Context.VariableDescMap.contains(Pointer->Var->Id))
 			{
-				AppendAccess([&] {return Inst->GetWordOffset().value(); }, Pointer);
+				if (StaticallyInitializedVars.Contains(Pointer->Var->Id))
+				{
+					// Statically initialized: skip AppendAccess entirely when all indexes are constants.
+					// Dynamic indexes still need AppendAccess for bounds checking on the CPU side.
+					bool HasDynamicIndex = false;
+					for (SpvId Index : Pointer->Indexes)
+					{
+						if (!Context.Constants.contains(Index))
+						{
+							HasDynamicIndex = true;
+							break;
+						}
+					}
+					if (HasDynamicIndex)
+					{
+						uint32 PackedHeaderValue = PackDebugHeader(SpvDebuggerStateType::Access, CurSource.GetValue(), (uint32)CurLine);
+						uint64 Key = ((uint64)PackedHeaderValue << 32) | Pointer->Var->Id.GetValue();
+						Context.AccessCheckMasks.FindOrAdd(Key, 0) |= 0xFFFFFFFFu;
+
+						AppendAccess([&] {return Inst->GetWordOffset().value(); }, Pointer);
+					}
+				}
+				else
+				{
+					// Not statically initialized: full init-check path
+					uint32 CheckMask = 0xFFFFFFFFu;
+					if (uint32* Mask = LoadUsedInitUnits.Find(Inst->GetId().value()))
+					{
+						CheckMask = *Mask;
+					}
+					if (CheckMask != 0)
+					{
+						uint32 PackedHeaderValue = PackDebugHeader(SpvDebuggerStateType::Access, CurSource.GetValue(), (uint32)CurLine);
+						uint64 Key = ((uint64)PackedHeaderValue << 32) | Pointer->Var->Id.GetValue();
+						Context.AccessCheckMasks.FindOrAdd(Key, 0) |= CheckMask;
+
+						AppendAccess([&] {return Inst->GetWordOffset().value(); }, Pointer);
+					}
+				}
 			}
 		}
 
@@ -301,6 +992,102 @@ namespace FW
 		{
 			return;
 		}
+		if (Context.Constants.contains(Inst->GetObject()))
+		{
+			uint32 PH = PackDebugHeader(SpvDebuggerStateType::VarChange, CurSource.GetValue(), (uint32)CurLine);
+			Context.ConstInitVarChanges.Add(((uint64)PH << 32) | Pointer->Var->Id.GetValue());
+		}
+
+		// Detect vector swizzle write (read-modify-write via OpVectorShuffle).
+		// Instead of recording the full vector store, emit per-component AppendVar calls
+		// for only the actually-written components, so CPU-side gets precise byte ranges.
+		SpvType* PointeeType = Pointer->Type->PointeeType;
+		if (PointeeType->GetKind() == SpvTypeKind::Vector)
+		{
+			SpvId ObjectId = Inst->GetObject();
+			int32 DefIdx = GetInstIndex(Insts, ObjectId);
+			if (DefIdx != INDEX_NONE)
+			{
+				if (auto* Shuffle = dynamic_cast<SpvOpVectorShuffle*>((*Insts)[DefIdx].Get()))
+				{
+					SpvId Vec1Id = Shuffle->GetVector1();
+					SpvVectorType* VecType = static_cast<SpvVectorType*>(PointeeType);
+					uint32 Vec1Count = VecType->ElementCount;
+
+					auto IsLoadOfSamePtr = [&](SpvId VecId) -> bool {
+						int32 LoadIdx = GetInstIndex(Insts, VecId);
+						if (LoadIdx == INDEX_NONE) return false;
+						auto* Load = dynamic_cast<SpvOpLoad*>((*Insts)[LoadIdx].Get());
+						return Load && Load->GetPointer() == Inst->GetPointer();
+					};
+
+					if (IsLoadOfSamePtr(Vec1Id))
+					{
+						const TArray<uint32>& Comps = Shuffle->GetComponents();
+						uint32 WriteMask = 0;
+						for (int32 i = 0; i < Comps.Num(); i++)
+						{
+							if (Comps[i] >= Vec1Count)
+								WriteMask |= (1u << i);
+						}
+
+						if (WriteMask != 0 && WriteMask != ((1u << Comps.Num()) - 1))
+						{
+							// Emit per-component AppendVar for each written component.
+							SpvScalarType* ElementType = VecType->ElementType;
+							SpvPointerType* VecPtrType = Pointer->Type;
+							SpvId ScalarPtrTypeId = Patcher.FindOrAddType(
+								MakeUnique<SpvOpTypePointer>(VecPtrType->StorageClass, ElementType->GetId()));
+							SpvPointerType* ScalarPtrType = static_cast<SpvPointerType*>(
+								Context.Types[ScalarPtrTypeId].Get());
+
+							// Build OpAccessChain instructions for all written components.
+							TArray<TUniquePtr<SpvInstruction>> AccessChainInsts;
+							TArray<SpvId> CompPtrIds;
+							for (int32 i = 0; i < Comps.Num(); i++)
+							{
+								if (!(WriteMask & (1u << i)))
+									continue;
+
+								SpvId CompIndex = Patcher.FindOrAddConstant((uint32)i);
+								SpvId CompPtrId = Patcher.NewId();
+								auto ChainOp = MakeUnique<SpvOpAccessChain>(ScalarPtrTypeId, Pointer->Id, TArray<SpvId>{CompIndex});
+								ChainOp->SetId(CompPtrId);
+								AccessChainInsts.Add(MoveTemp(ChainOp));
+
+								// Register as local pointer so AppendVar can resolve type/indexes.
+								TArray<SpvId> CompIndexes = Pointer->Indexes;
+								CompIndexes.Add(CompIndex);
+								Context.LocalPointers.emplace(CompPtrId, SpvPointer{
+									.Id = CompPtrId,
+									.Var = Pointer->Var,
+									.Indexes = MoveTemp(CompIndexes),
+									.Type = ScalarPtrType
+								});
+								CompPtrIds.Add(CompPtrId);
+							}
+
+							// Call AppendVar for each component (reverse ordered by Patcher,
+							// but all OpAccessChains will be emitted after, placing them before all loads).
+							auto OffsetEval = [&] { return Inst->GetWordOffset().value() + Inst->GetWordLen().value(); };
+							for (SpvId CompPtrId : CompPtrIds)
+							{
+								SpvPointer* CompPointer = &Context.LocalPointers[CompPtrId];
+								if (SpvOpFunctionCall* FuncCall = AppendVar(OffsetEval, CompPointer))
+								{
+									AppendVarCallToStore.Add(FuncCall, Inst);
+								}
+							}
+
+							// Emit all OpAccessChains — added last so they appear first in binary.
+							Patcher.AddInstructions(OffsetEval(), MoveTemp(AccessChainInsts));
+							return;
+						}
+					}
+				}
+			}
+		}
+
 		if (SpvOpFunctionCall* FuncCall = AppendVar([&] {return Inst->GetWordOffset().value() + Inst->GetWordLen().value(); }, Pointer))
 		{
 			AppendVarCallToStore.Add(FuncCall, Inst);
@@ -1004,8 +1791,7 @@ namespace FW
 	void SpvDebuggerVisitor::AppendAccess(const TFunction<int32()>& OffsetEval, SpvPointer* Pointer)
 	{
 		int32 IndexNum = Pointer->Indexes.Num();
-		PatchAppendAccessFunc(IndexNum);
-		SpvId AppendAccessFuncId = AppendAccessFuncIds[IndexNum];
+
 		TArray<TUniquePtr<SpvInstruction>> AppendAccessInsts;
 		{
 			uint32 PackedHeaderValue = PackDebugHeader(SpvDebuggerStateType::Access, CurSource.GetValue(), (uint32)CurLine);
@@ -1013,6 +1799,9 @@ namespace FW
 			SpvId PackedHeader = Patcher.FindOrAddConstant(PackedHeaderValue);
 			SpvId VarId = Patcher.FindOrAddConstant(Pointer->Var->Id.GetValue());
 			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
+
+			PatchAppendAccessFunc(IndexNum);
+			SpvId AppendAccessFuncId = AppendAccessFuncIds[IndexNum];
 			SpvId IntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 1));
 			TArray<SpvId> Arguments = { PackedHeader, VarId };
 			for (SpvId Index : Pointer->Indexes)
@@ -1248,6 +2037,14 @@ namespace FW
 			}
 		}
 
+		BuildSpvCFG(this->Insts, Context, Context.BBs, Context.Funcs);
+
+		if (EnableUbsan)
+		{
+			LoadUsedInitUnits = ComputeLoadCheckMasks(this->Insts, Context, Patcher);
+			StaticallyInitializedVars = ComputeStaticallyInitializedVars(this->Insts, Context, LoadUsedInitUnits, Context.BBs, Context.Funcs);
+		}
+
 		ParseInternal();
 	}
 
@@ -1294,7 +2091,8 @@ namespace FW
 		DebuggerBuffer = PatchDebuggerBuffer(Patcher);
 		DebuggerOffset = Patcher.NewId();
 		{
-			auto VarOp = MakeUnique<SpvOpVariable>(UIntPointerPrivateType, SpvStorageClass::Private);
+			SpvId ZeroU = Patcher.FindOrAddConstant(0u);
+			auto VarOp = MakeUnique<SpvOpVariable>(UIntPointerPrivateType, SpvStorageClass::Private, ZeroU);
 			VarOp->SetId(DebuggerOffset);
 			Patcher.AddGlobalVariable(MoveTemp(VarOp));
 			Patcher.AddDebugName(MakeUnique<SpvOpName>(DebuggerOffset, "_DebuggerOffset_"));

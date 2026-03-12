@@ -43,8 +43,8 @@ namespace SH
 			return LayerId;
 		}
 
-		const float BarHeight = AllottedGeometry.GetLocalSize().Y;
-		const float BarWidth = AllottedGeometry.GetLocalSize().X;
+		const float BarHeight = (float)AllottedGeometry.GetLocalSize().Y;
+		const float BarWidth = (float)AllottedGeometry.GetLocalSize().X;
 
 		if (BarHeight <= 0.0f || BarWidth <= 0.0f)
 		{
