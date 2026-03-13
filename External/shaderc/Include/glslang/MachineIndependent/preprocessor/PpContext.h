@@ -212,11 +212,13 @@ public:
         TString name;
         TSourceLoc defineLoc; // location of macro name in the #define
         bool functionLike = false;
+        TString bodyText;     // raw body text of the macro definition
     };
     struct TMacroExpansion {
         TString name;
         TSourceLoc callLoc;    // location of macro name at call site
         bool functionLike = false;
+        TString expandedText;  // one-level expanded text (body with args substituted)
     };
 
     // Inactive region data (for LSP semantic tokens / inactive regions).
@@ -565,6 +567,9 @@ protected:
     int scanHeaderName(TPpToken* ppToken, char delimit);
     TokenStream* PrescanMacroArg(TokenStream&, TPpToken*, bool newLineOkay);
     MacroExpandResult MacroExpand(TPpToken* ppToken, bool expandUndef, bool newLineOkay);
+
+    // Convert a token + TPpToken to its text representation.
+    static TString tokenToText(int tok, const TPpToken& ppTok);
 
     //
     // From PpTokens.cpp

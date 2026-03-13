@@ -231,12 +231,15 @@ def extract_shader_id(url):
         return match.group(1)
     return None
 
+def sanitize_filename(name):
+    return re.sub(r'[<>:"/\\|?*]', '', name).strip()
+
 def create_shadertoy_assets(shadertoy_id, shadertoy_info):
     if shadertoy_info is not None:
         target_dir = os.path.join(Sh.Context.CurAssetBrowserDir, shadertoy_id)
         os.makedirs(target_dir, exist_ok=True)
         
-        shadertoy_name = shadertoy_info['Name']
+        shadertoy_name = sanitize_filename(shadertoy_info['Name'])
         shadertoy_graph = Sh.Asset.CreateAsset(shadertoy_name, Sh.ShaderToy)
         shadertoy_graph.FlipY = True
 

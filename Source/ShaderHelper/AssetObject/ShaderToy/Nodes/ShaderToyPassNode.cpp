@@ -99,6 +99,11 @@ namespace SH
 
 	ShaderToyPassNode::~ShaderToyPassNode()
 	{
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		if(ShEditor->GetDebuggaleObject() == this)
+		{
+			ShEditor->EndDebugging();
+		}
 		if(ShaderAssetObj)
 		{
 			ShaderAssetObj->OnDestroy.RemoveAll(this);

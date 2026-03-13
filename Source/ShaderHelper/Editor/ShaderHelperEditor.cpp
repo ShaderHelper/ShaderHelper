@@ -62,7 +62,9 @@ namespace SH
 					StartDebugging();
 				}
 			}),
-			FCanExecuteAction::CreateLambda([this] { return CurDebuggableObject != nullptr; })
+			FCanExecuteAction::CreateLambda([this] { 
+				return CurDebuggableObject != nullptr && CurDebuggableObject->GetShaderAsset() != nullptr;
+			})
 		);
 		UICommandList->MapAction(
 			CodeEditorCommands::Get().Continue,
@@ -1092,6 +1094,7 @@ namespace SH
 		DismissLinePreview();
 		IsDebugging = false;
 		CurDebuggableObject->OnEndDebuggging();
+		CurDebuggableObject = nullptr;
 		Debugger.Reset();
 		CloseDebuggerTabs();
 	}

@@ -4244,7 +4244,8 @@ constexpr int PaddingLineNum = 22;
 			
 				for (const auto& Token : TokenizedLine.Tokens)
 				{
-					if (Token.Type == ShaderTokenType::Identifier && CurrentHoverLocation.GetOffset() >= Token.BeginOffset && CurrentHoverLocation.GetOffset() <= Token.EndOffset)
+					if ((Token.Type == ShaderTokenType::Identifier || Token.Type == ShaderTokenType::Preprocess)
+						&& CurrentHoverLocation.GetOffset() >= Token.BeginOffset && CurrentHoverLocation.GetOffset() <= Token.EndOffset)
 					{
 						TokenOffset = Token.BeginOffset;
 						TokenEndOffset = Token.EndOffset;
@@ -4292,6 +4293,23 @@ constexpr int PaddingLineNum = 22;
 								[
 									TokensBox
 								];
+
+							if (Symbol.ExpandedTokens.Num() > 0)
+							{
+								Box->AddSlot().AutoHeight()[SNew(SSeparator).Thickness(1.0f).ColorAndOpacity(FStyleColors::Border)];
+								auto ExpandedBox = SNew(SHorizontalBox);
+								for (const auto& Token : Symbol.ExpandedTokens)
+								{
+									ExpandedBox->AddSlot().AutoWidth()
+									[
+										SNew(STextBlock)
+											.Text(FText::FromString(Token.Key))
+											.Font(FCoreStyle::GetDefaultFontStyle("NormalText", SShaderEditorBox::GetFontSize()))
+											.TextStyle(&SShaderEditorBox::GetTokenStyleMap()[Token.Value])
+									];
+								}
+								Box->AddSlot().AutoHeight()[ExpandedBox];
+							}
 
 							if (Overloads.Num() > 0 || !Symbol.Desc.IsEmpty())
 							{

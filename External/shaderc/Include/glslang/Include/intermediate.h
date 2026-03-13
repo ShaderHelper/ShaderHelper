@@ -86,6 +86,7 @@ enum TOperator {
     EOpCopyObject,
 
     EOpDeclare,        // Used by debugging to force declaration of variable in correct scope
+    EOpFunctionPrototype, // Function forward declaration (no body) - for LSP support
 
     // Operator used to represent all conversions between int, float, and bool.
     // The specific types are inferred from TBasicType.

@@ -238,6 +238,7 @@ namespace FW
 	struct ShaderOccurrence
 	{
 		uint32 Row, Col;
+		bool operator==(const ShaderOccurrence&) const = default;
 	};
 
 	struct ShaderScope
@@ -250,6 +251,7 @@ namespace FW
 	{
 		ShaderTokenType Type;
 		TArray<TPair<FString, ShaderTokenType>> Tokens;
+		TArray<TPair<FString, ShaderTokenType>> ExpandedTokens;
 		FString File;
 		uint32 Row;
 		FString Desc;

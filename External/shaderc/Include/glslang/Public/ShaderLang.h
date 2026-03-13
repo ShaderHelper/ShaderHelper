@@ -720,11 +720,13 @@ public:
         std::string name;        // macro name
         MacroLocation define;    // macro definition site (macro identifier in #define)
         bool functionLike = false;
+        std::string bodyText;    // raw body text of the macro definition
     };
     struct MacroExpansion {
         std::string name;        // macro name
         MacroLocation call;      // macro call site (macro identifier)
         bool functionLike = false;
+        std::string expandedText; // one-level expanded text (body with args substituted)
     };
 
     // ------------------------------------------------------------
