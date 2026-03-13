@@ -126,6 +126,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 				.AddInt("iFrame")
 				.AddVector3fArray("iChannelResolution", 4)
 				.AddVector4f("iMouse")
+				.AddVector4f("iDate")
 				.AddInt("iFlipY");
             return 0;
         }();

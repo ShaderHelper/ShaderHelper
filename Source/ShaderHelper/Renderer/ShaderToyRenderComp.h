@@ -21,6 +21,7 @@ namespace SH
 		int FrameCount = 0;
 		FW::Vector3f iResolution{};
 		FW::Vector4f iMouse{};
+		FW::Vector4f iDate{};
 		FW::RenderGraph* RG = nullptr;
         TRefCountPtr<FW::GpuTexture> FinalRT;
 		TRefCountPtr<FW::GpuTexture> Keyboard;
@@ -36,8 +37,9 @@ namespace SH
         ~ShaderToyRenderComp();
 
 	public:
-		void RenderBegin();
+		void RenderBegin() override;
 		void RenderInternal() override;
+		void RenderEnd() override;
 		void RefreshKeyboard();
 
 		ShaderToyExecContext Context;

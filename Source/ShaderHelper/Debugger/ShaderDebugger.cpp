@@ -380,13 +380,13 @@ namespace SH
 						GpuResourceHelper::ClearRWResource(CmdRecorder, DebugBuffer);
 						RenderGraph RG(CmdRecorder);
 						RG.AddRenderPass(TEXT("ExprDebugger"), MoveTemp(DummyPassDesc), PatchedBindings,
-										 [&](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
-							PassRecorder->SetViewPort(PsInvocation.ViewPortDesc);
-							PassRecorder->SetRenderPipelineState(Pipeline);
-							Bindings.ApplyBindGroup(PassRecorder);
-							PsInvocation.DrawFunction(PassRecorder);
-						}
-										 );
+							[&](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
+								PassRecorder->SetViewPort(PsInvocation.ViewPortDesc);
+								PassRecorder->SetRenderPipelineState(Pipeline);
+								Bindings.ApplyBindGroup(PassRecorder);
+								PsInvocation.DrawFunction(PassRecorder);
+							}
+						);
 						RG.Execute();
 						
 						uint8* DebugBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebugBuffer, GpuResourceMapMode::Read_Only);
@@ -2027,6 +2027,23 @@ namespace SH
 		};
 		TMap<DebuggerLocation, PerLineRenderData> PerLineData;
 
+		//Generate CPU-side grid pattern for preview RT initialization
+		uint32 TexWidth = (uint32)PsInvocation.ViewPortDesc.Width;
+		uint32 TexHeight = (uint32)PsInvocation.ViewPortDesc.Height;
+		TArray<uint8> GridData;
+		GridData.SetNum(TexWidth * TexHeight * 4 * sizeof(float));
+		float* GridPixels = reinterpret_cast<float*>(GridData.GetData());
+		for (uint32 y = 0; y < TexHeight; y++)
+		{
+			for (uint32 x = 0; x < TexWidth; x++)
+			{
+				bool Odd = ((x / 8) + (y / 8)) % 2 != 0;
+				float Val = Odd ? 0.15f : 0.1f;
+				float* P = GridPixels + (y * TexWidth + x) * 4;
+				P[0] = Val; P[1] = Val; P[2] = Val; P[3] = 1.0f;
+			}
+		}
+
 		for (const DebuggerLocation& Loc : DirtyLinePreviewLocs)
 		{
 			const LinePreviewInfo* InfoPtr = LinePreviewData.Find(Loc);
@@ -2059,10 +2076,11 @@ namespace SH
 			TRefCountPtr<GpuBindGroup> GlobalGroup = GGpuRhi->CreateBindGroup(GlobalGroupDesc);
 
 			auto RenderTarget = GGpuRhi->CreateTexture({
-				.Width = (uint32)PsInvocation.ViewPortDesc.Width,
-				.Height = (uint32)PsInvocation.ViewPortDesc.Height,
+				.Width = TexWidth,
+				.Height = TexHeight,
 				.Format = GpuTextureFormat::R32G32B32A32_FLOAT,
-				.Usage = GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared
+				.Usage = GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared,
+				.InitialData = GridData,
 			});
 
 			BindingContext LineBindings = SharedBindings;
@@ -2071,12 +2089,11 @@ namespace SH
 			PerLineData.Add(Loc, { ParamsBuffer, RenderTarget, MoveTemp(LineBindings) });
 		}
 
-		auto CmdRecorder = GGpuRhi->BeginRecording();
-		RenderGraph RG(CmdRecorder);
+		RenderGraph RG;
 		for (auto& [Loc, Data] : PerLineData)
 		{
 			GpuRenderPassDesc PassDesc;
-			PassDesc.ColorRenderTargets.Add({ .View = Data.RenderTarget->GetDefaultView(), .StoreAction = RenderTargetStoreAction::Store });
+			PassDesc.ColorRenderTargets.Add({ .View = Data.RenderTarget->GetDefaultView(), .LoadAction = RenderTargetLoadAction::Load, .StoreAction = RenderTargetStoreAction::Store });
 
 			RG.AddRenderPass(TEXT("Preview"), MoveTemp(PassDesc), Data.Bindings,
 				[&](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {

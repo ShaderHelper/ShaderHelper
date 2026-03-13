@@ -61,6 +61,27 @@ namespace FW
 		return false;
 	}
 
+	void SpvPixelPreviewerVisitor::Visit(const SpvOpPhi* Inst)
+	{
+		SpvDebuggerVisitor::Visit(Inst);
+
+		//PostAppendVar splits blocks by inserting SelectionMerge/BranchConditional.
+		//OpPhi parent block references become stale when the original block is split.
+		//Fix them by replacing old block labels with the last continuation label.
+		int Offset = Inst->GetWordOffset().value();
+		int Len = Inst->GetWordLen().value();
+		const TArray<uint32>& Spv = Patcher.GetSpv();
+		// OpPhi binary: Header(1) | ResultType(1) | ResultId(1) | [Value(1) Parent(1)]*
+		for (int i = 4; i < Len; i += 2)
+		{
+			SpvId ParentId(Spv[Offset + i]);
+			if (SpvId* Remap = BlockSplitRemaps.Find(ParentId))
+			{
+				Patcher.OverwriteWord(Offset + i, Remap->GetValue());
+			}
+		}
+	}
+
 	void SpvPixelPreviewerVisitor::PostAppendVar(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvPointer* Pointer, SpvId PackedHeaderConst, SpvId VarIdConst)
 	{
 		//Skip constant-value stores — no useful preview
@@ -242,6 +263,10 @@ namespace FW
 		auto OuterMergeOp = MakeUnique<SpvOpLabel>();
 		OuterMergeOp->SetId(OuterMerge);
 		InstList.Add(MoveTemp(OuterMergeOp));
+
+		//Track that the current block was split: any OpPhi referencing the original
+		//block label as a parent needs to reference OuterMerge instead.
+		BlockSplitRemaps.FindOrAdd(CurBlock->Label) = OuterMerge;
 	}
 
 	void SpvPixelPreviewerVisitor::PostAppendCall(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvId PackedHeader, SpvId CallId)

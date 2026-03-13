@@ -106,8 +106,16 @@ namespace SH
 	{
 		Context.iTime = TSingleton<ShProjectManager>::Get().GetProject()->TimelineCurTime;
 		Context.iTimeDelta = GApp->GetDeltaTime();
+		{
+			FDateTime Now = FDateTime::Now();
+			Context.iDate = FW::Vector4f{
+				(float)Now.GetYear(),
+				(float)(Now.GetMonth() - 1),
+				(float)Now.GetDay(),
+				(float)(Now.GetHour() * 3600 + Now.GetMinute() * 60 + Now.GetSecond())
+			};
+		}
 		Context.Ontputs.Reset();
-		Context.FrameCount++;
 		if (Context.bResetPreviousFrame)
 		{
 			Context.FrameCount = 0;
@@ -157,7 +165,17 @@ namespace SH
                 }
             }
             Graph.Execute();
+
+			if (!Context.bResetPreviousFrame)
+			{
+				Context.FrameCount++;
+			}
+			
         }
+	}
+
+	void ShaderToyRenderComp::RenderEnd()
+	{
 	}
 
 

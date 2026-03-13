@@ -830,6 +830,7 @@ namespace FW
 				{
 					SpvId Variable = SpvCode[WordOffset + Index * 2 + 3];
 					SpvId parent = SpvCode[WordOffset + Index * 2 + 4];
+					Operands.Add({Variable, parent});
 				}
 				DecodedInst = MakeUnique<SpvOpPhi>(ResultType, Operands);
 				DecodedInst->SetId(ResultId);

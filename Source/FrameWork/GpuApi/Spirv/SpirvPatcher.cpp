@@ -356,6 +356,21 @@ namespace FW
 		SortedPatchedInsts.Insert(RawPtr, InsertIdx);
 	}
 
+	void SpvPatcher::OverwriteInstruction(int WordOffset, int OldWordLen, TUniquePtr<SpvInstruction> NewInst)
+	{
+		TArray<uint32> NewBin = NewInst->ToBinary();
+		check(NewBin.Num() == OldWordLen);
+		for (int i = 0; i < NewBin.Num(); i++)
+		{
+			SpvCode[WordOffset + i] = NewBin[i];
+		}
+	}
+
+	void SpvPatcher::OverwriteWord(int WordOffset, uint32 NewWord)
+	{
+		SpvCode[WordOffset] = NewWord;
+	}
+
 	void SpvPatcher::UpdateSection(SpvSectionKind DirtySection, int WordSize)
 	{
 		SpvMetaContext& Context = MetaVisitor->GetContext();

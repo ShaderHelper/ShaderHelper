@@ -1094,7 +1094,6 @@ namespace SH
 		DismissLinePreview();
 		IsDebugging = false;
 		CurDebuggableObject->OnEndDebuggging();
-		CurDebuggableObject = nullptr;
 		Debugger.Reset();
 		CloseDebuggerTabs();
 	}

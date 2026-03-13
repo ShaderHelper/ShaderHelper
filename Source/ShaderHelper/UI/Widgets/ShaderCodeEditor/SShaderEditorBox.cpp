@@ -3614,7 +3614,7 @@ constexpr int PaddingLineNum = 22;
 						})
 						.Padding(1.0f)
 						.Visibility_Lambda([LinePreviewViewPort, GetDebugger, LineLoc] {
-							return LinePreviewViewPort.IsValid() && GetDebugger().IsValid() ? EVisibility::Visible : EVisibility::Collapsed;
+							return LinePreviewViewPort.IsValid() && GetDebugger().IsValid() && !GetDebugger().GetLinePreviewData().IsEmpty() ? EVisibility::Visible : EVisibility::Collapsed;
 						})
 						.OnMouseButtonDown_Lambda([LineLoc](const FGeometry&, const FPointerEvent&) {
 							auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());

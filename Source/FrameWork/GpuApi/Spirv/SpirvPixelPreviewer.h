@@ -32,6 +32,9 @@ namespace FW
 		void PostAppendCall(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvId PackedHeader, SpvId CallId) override;
 		void PostCallReturn(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvId CallId) override;
 
+	public:
+		void Visit(const SpvOpPhi* Inst) override;
+
 	private:
 		//Create the _PreviewerParams_ uniform buffer (contains uint TargetIteration, TargetPackedHeader, TargetVarId)
 		SpvId PatchPreviewerParams();
@@ -48,5 +51,6 @@ namespace FW
 		SpvId CallStackHashVar;   // uint Private global - hash of the current call stack
 		SpvId PreviewerParams;    // uniform buffer with TargetIteration, TargetPackedHeader, TargetVarId, TargetCallStackHash
 		SpvId OutputVarId;        // the original Output variable (fragColor/outColor)
+		TMap<SpvId, SpvId> BlockSplitRemaps; // original block label -> last continuation label after PostAppendVar split
 	};
 }

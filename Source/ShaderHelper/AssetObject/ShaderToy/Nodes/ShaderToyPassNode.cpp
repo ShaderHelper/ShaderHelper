@@ -103,6 +103,7 @@ namespace SH
 		if(ShEditor->GetDebuggaleObject() == this)
 		{
 			ShEditor->EndDebugging();
+			ShEditor->SetDebuggableObject(nullptr);
 		}
 		if(ShaderAssetObj)
 		{
@@ -209,9 +210,13 @@ namespace SH
 		ShaderEditor->Compile();
 		//Render once immediately for debugging
 		{
+			auto RenderComp = dynamic_cast<ShaderToyRenderComp*>(ShEditor->GetGraphRenderComp());
+			//debugging doesn't change the frame counter.
+			int SavedFrameCount = RenderComp->Context.FrameCount;
 			TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = false;
 			ShEditor->GetRenderer()->Render();
 			TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = true;
+			RenderComp->Context.FrameCount = SavedFrameCount;
 		}
 		if (!AnyError || AssertError)
 		{
@@ -886,6 +891,7 @@ namespace SH
 		BuiltinUniformBuffer->GetMember<int32>("iFrame") = Context.FrameCount;
 		auto iMouse = BuiltinUniformBuffer->GetMember<Vector4f>("iMouse");
 		iMouse = Context.iMouse;
+		BuiltinUniformBuffer->GetMember<Vector4f>("iDate") = Context.iDate;
 		BuiltinUniformBuffer->GetMember<int32>("iFlipY") = static_cast<ShaderToy*>(GetOuter())->FlipY;
 		if (static_cast<ShaderToy*>(GetOuter())->FlipY)
 		{

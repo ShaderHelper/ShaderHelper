@@ -60,6 +60,7 @@ namespace SH
 		~ShaderHelperEditor();
     public:
 		ShRenderer* GetRenderer() const { return Renderer;}
+		FW::RenderComponent* GetGraphRenderComp() const { return GraphRenderComp.Get(); }
         FTabManager* GetCodeTabManager() const { return CodeTabManager.Get(); }
 		FTabManager* GetTabManager() const { return TabManager.Get(); }
 		TSharedPtr<SWindow> GetMainWindow() const override { return MainWindow; }

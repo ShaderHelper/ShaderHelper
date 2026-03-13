@@ -245,6 +245,7 @@ namespace FW
 
 	struct SpvBasicBlock
 	{
+		SpvId Label{};
 		int32 StartIdx = -1;
 		int32 EndIdx = -1;
 		TArray<int32> ValidLines;

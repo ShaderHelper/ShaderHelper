@@ -34,6 +34,9 @@ namespace FW
 		void AddInstructions(int WordOffset, TArray<TUniquePtr<SpvInstruction>>&& InInsts);
 		void AddInstruction(int WordOffset, TUniquePtr<SpvInstruction> InInst);
 
+		void OverwriteInstruction(int WordOffset, int OldWordLen, TUniquePtr<SpvInstruction> NewInst);
+		void OverwriteWord(int WordOffset, uint32 NewWord);
+
 	private:
 		void UpdateSection(SpvSectionKind DirtySection, int WordSize);
 		void UpdateInsts(int WordOffset, int WordSize);

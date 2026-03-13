@@ -440,6 +440,7 @@ namespace FW
 			{
 				CurLabel = LabelInst->GetId().value();
 				auto& BB = OutBBs.try_emplace(CurLabel, SpvBasicBlock{}).first->second;
+				BB.Label = CurLabel;
 				BB.StartIdx = i + 1;
 				OutFuncs[CurFuncId].BasicBlocks.Add(CurLabel);
 				InBlock = true;
