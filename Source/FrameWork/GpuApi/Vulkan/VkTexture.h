@@ -4,7 +4,7 @@
 #include "GpuApi/GpuSampler.h"
 #include "VkUtil.h"
 
-namespace FW
+namespace FW::VK
 {
 	class VulkanTextureView : public GpuTextureView
 	{

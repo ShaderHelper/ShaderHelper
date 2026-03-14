@@ -6,7 +6,7 @@
 #include "VkUtil.h"
 #include "GpuApi/GpuBindGroup.h"
 
-namespace FW
+namespace FW::VK
 {
 	VulkanBindGroupLayout::VulkanBindGroupLayout(const GpuBindGroupLayoutDesc& LayoutDesc, VkDescriptorSetLayout InVkLayout)
 		: GpuBindGroupLayout(LayoutDesc)

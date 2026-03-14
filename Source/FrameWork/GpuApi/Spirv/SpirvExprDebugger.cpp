@@ -67,188 +67,69 @@ namespace FW
 			UnpackDebugHeader(PackedHeader, StateType, Source, Line);
 			return StateType;
 		};
-		//Find a suitable location to insert AppendExprDummy
+
+		// Find a suitable location to insert AppendExprDummy.
+		// StopDebugState is guaranteed to be a GPU-visible state (CPU-only states
+		// like ScopeChange and FuncCallAfterReturn are resolved to the next GPU
+		// state by EvaluateExpression before reaching here).
 		SpvPixelExprDebuggerContext& ExprContext = static_cast<SpvPixelExprDebuggerContext&>(Context);
-		for(const auto& Inst : Patcher.GetPathcedInsts())
+
+		// Extract target line from StopDebugState (all GPU-visible states have .Line)
+		int32 TargetLine = std::visit([](auto&& S) -> int32 {
+			if constexpr (requires { S.Line; }) return S.Line;
+			return 0;
+		}, ExprContext.StopDebugState);
+
+		bool IsVarChangeState = std::holds_alternative<SpvDebugState_VarChange>(ExprContext.StopDebugState);
+		bool IsFuncCallState = std::holds_alternative<SpvDebugState_FuncCall>(ExprContext.StopDebugState);
+		bool IsTagState = std::holds_alternative<SpvDebugState_Tag>(ExprContext.StopDebugState);
+		bool IsAccessState = std::holds_alternative<SpvDebugState_Access>(ExprContext.StopDebugState);
+
+		for (const auto& Inst : Patcher.GetPathcedInsts())
 		{
-			if (SpvOpFunctionCall * FuncCall = dynamic_cast<SpvOpFunctionCall*>(Inst.Get()))
+			SpvOpFunctionCall* FuncCall = dynamic_cast<SpvOpFunctionCall*>(Inst.Get());
+			if (!FuncCall) continue;
+
+			int32 Line = GetLineFromPackedHeader(FuncCall);
+			if (Line != TargetLine) continue;
+
+			if (IsVarChangeState && AppendVarFuncIds.FindKey(FuncCall->GetFunction()))
 			{
-				if (std::holds_alternative<SpvDebugState_VarChange>(ExprContext.StopDebugState) && AppendVarFuncIds.FindKey(FuncCall->GetFunction()))
+				AppendExprDummy([&] { return AppendVarCallToStore[FuncCall]->GetWordOffset().value(); });
+				break;
+			}
+			else if (IsFuncCallState && FuncCall->GetFunction() == AppendCallFuncId)
+			{
+				AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
+				break;
+			}
+			else if (IsTagState && FuncCall->GetFunction() == AppendTagFuncId)
+			{
+				const auto& State = std::get<SpvDebugState_Tag>(ExprContext.StopDebugState);
+				SpvDebuggerStateType StateType = GetStateTypeFromPackedHeader(FuncCall);
+				if ((StateType == SpvDebuggerStateType::Condition && State.bCondition) ||
+					(StateType == SpvDebuggerStateType::Kill && State.bKill) ||
+					(StateType == SpvDebuggerStateType::Return && State.bReturn))
 				{
-					const auto& State = std::get<SpvDebugState_VarChange>(ExprContext.StopDebugState);
-					int32 Line = GetLineFromPackedHeader(FuncCall);
-					if (State.Line == Line)
-					{
-						AppendExprDummy([&] { return AppendVarCallToStore[FuncCall]->GetWordOffset().value(); });
-						break;
-					}
+					AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
+					break;
 				}
-				else if (std::holds_alternative<SpvDebugState_FuncCall>(ExprContext.StopDebugState) && FuncCall->GetFunction() == AppendCallFuncId)
+			}
+			else if (IsAccessState && AppendAccessFuncIds.FindKey(FuncCall->GetFunction()))
+			{
+				const auto& State = std::get<SpvDebugState_Access>(ExprContext.StopDebugState);
+				SpvId VarId = *(SpvId*)std::get<SpvObject::Internal>(Context.Constants[FuncCall->GetArguments()[1]].Storage).Value.GetData();
+				if (State.VarId == VarId)
 				{
-					const auto& State = std::get<SpvDebugState_FuncCall>(ExprContext.StopDebugState);
-					int32 Line = GetLineFromPackedHeader(FuncCall);
-					if (State.Line == Line)
-					{
-						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
-						break;
-					}
+					AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
+					break;
 				}
-				else if (std::holds_alternative<SpvDebugState_Tag>(ExprContext.StopDebugState) && FuncCall->GetFunction() == AppendTagFuncId)
-				{
-					const auto& State = std::get<SpvDebugState_Tag>(ExprContext.StopDebugState);
-					SpvDebuggerStateType StateType = GetStateTypeFromPackedHeader(FuncCall);
-					int32 Line = GetLineFromPackedHeader(FuncCall);
-					if (((StateType == SpvDebuggerStateType::Condition && State.bCondition) ||
-						(StateType == SpvDebuggerStateType::Kill && State.bKill) ||
-						(StateType == SpvDebuggerStateType::Return && State.bReturn)) &&
-						State.Line == Line)
-					{
-						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
-						break;
-					}
-				}
-				//Stopped due to UBSan.
-				else if (std::holds_alternative<SpvDebugState_Access>(ExprContext.StopDebugState) && AppendAccessFuncIds.FindKey(FuncCall->GetFunction()))
-				{
-					const auto& State = std::get<SpvDebugState_Access>(ExprContext.StopDebugState);
-					int32 Line = GetLineFromPackedHeader(FuncCall);
-					SpvId VarId = *(SpvId*)std::get<SpvObject::Internal>(Context.Constants[FuncCall->GetArguments()[1]].Storage).Value.GetData();
-					if (State.Line == Line && State.VarId == VarId)
-					{
-						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
-						break;
-					}
-				}
-				else if (std::holds_alternative<SpvDebugState_Normalize>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
-				{
-					const auto& State = std::get<SpvDebugState_Normalize>(ExprContext.StopDebugState);
-					int32 Line = GetLineFromPackedHeader(FuncCall);
-					if (State.Line == Line)
-					{
-						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
-						break;
-					}
-				}
-				else if (std::holds_alternative<SpvDebugState_SmoothStep>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
-				{
-					const auto& State = std::get<SpvDebugState_SmoothStep>(ExprContext.StopDebugState);
-					int32 Line = GetLineFromPackedHeader(FuncCall);
-					if (State.Line == Line)
-					{
-						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
-						break;
-					}
-				}
-				else if (std::holds_alternative<SpvDebugState_Pow>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
-				{
-					const auto& State = std::get<SpvDebugState_Pow>(ExprContext.StopDebugState);
-					int32 Line = GetLineFromPackedHeader(FuncCall);
-					if (State.Line == Line)
-					{
-						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
-						break;
-					}
-				}
-				else if (std::holds_alternative<SpvDebugState_Clamp>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
-				{
-					const auto& State = std::get<SpvDebugState_Clamp>(ExprContext.StopDebugState);
-					int32 Line = GetLineFromPackedHeader(FuncCall);
-					if (State.Line == Line)
-					{
-						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
-						break;
-					}
-				}
-				else if (std::holds_alternative<SpvDebugState_Div>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
-				{
-					const auto& State = std::get<SpvDebugState_Div>(ExprContext.StopDebugState);
-					int32 Line = GetLineFromPackedHeader(FuncCall);
-					if (State.Line == Line)
-					{
-						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
-						break;
-					}
-				}
-				else if (std::holds_alternative<SpvDebugState_ConvertF>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
-				{
-					const auto& State = std::get<SpvDebugState_ConvertF>(ExprContext.StopDebugState);
-					int32 Line = GetLineFromPackedHeader(FuncCall);
-					if (State.Line == Line)
-					{
-						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
-						break;
-					}
-				}
-				else if (std::holds_alternative<SpvDebugState_Remainder>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
-				{
-					const auto& State = std::get<SpvDebugState_Remainder>(ExprContext.StopDebugState);
-					int32 Line = GetLineFromPackedHeader(FuncCall);
-					if (State.Line == Line)
-					{
-						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
-						break;
-					}
-				}
-				else if (std::holds_alternative<SpvDebugState_Log>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
-				{
-					const auto& State = std::get<SpvDebugState_Log>(ExprContext.StopDebugState);
-					int32 Line = GetLineFromPackedHeader(FuncCall);
-					if (State.Line == Line)
-					{
-						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
-						break;
-					}
-				}
-				else if (std::holds_alternative<SpvDebugState_Asin>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
-				{
-					const auto& State = std::get<SpvDebugState_Asin>(ExprContext.StopDebugState);
-					int32 Line = GetLineFromPackedHeader(FuncCall);
-					if (State.Line == Line)
-					{
-						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
-						break;
-					}
-				}
-				else if (std::holds_alternative<SpvDebugState_Acos>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
-				{
-					const auto& State = std::get<SpvDebugState_Acos>(ExprContext.StopDebugState);
-					int32 Line = GetLineFromPackedHeader(FuncCall);
-					if (State.Line == Line)
-					{
-						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
-						break;
-					}
-				}
-				else if (std::holds_alternative<SpvDebugState_Sqrt>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
-				{
-					const auto& State = std::get<SpvDebugState_Sqrt>(ExprContext.StopDebugState);
-					int32 Line = GetLineFromPackedHeader(FuncCall);
-					if (State.Line == Line)
-					{
-						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
-						break;
-					}
-				}
-				else if (std::holds_alternative<SpvDebugState_InverseSqrt>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
-				{
-					const auto& State = std::get<SpvDebugState_InverseSqrt>(ExprContext.StopDebugState);
-					int32 Line = GetLineFromPackedHeader(FuncCall);
-					if (State.Line == Line)
-					{
-						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
-						break;
-					}
-				}
-				else if (std::holds_alternative<SpvDebugState_Atan2>(ExprContext.StopDebugState) && AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
-				{
-					const auto& State = std::get<SpvDebugState_Atan2>(ExprContext.StopDebugState);
-					int32 Line = GetLineFromPackedHeader(FuncCall);
-					if (State.Line == Line)
-					{
-						AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
-						break;
-					}
-				}
+			}
+			else if (!IsVarChangeState && !IsFuncCallState && !IsTagState && !IsAccessState
+				&& AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
+			{
+				AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
+				break;
 			}
 		}
 	

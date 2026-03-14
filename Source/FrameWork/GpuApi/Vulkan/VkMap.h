@@ -2,7 +2,7 @@
 #include "VkCommon.h"
 #include "GpuApi/GpuResource.h"
 
-namespace FW
+namespace FW::VK
 {
 	inline VkFormat MapTextureFormat(GpuTextureFormat InTexFormat)
 	{

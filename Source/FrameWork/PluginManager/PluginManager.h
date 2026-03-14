@@ -329,6 +329,18 @@ namespace FW
 				}
 			}
 		}
+
+		void UnregisterActivePlugins()
+		{
+			for (auto& Plugin : Context.Plugins)
+			{
+				if (Plugin.bActive && !Plugin.bFailed)
+				{
+					UnregisterPlugin(Plugin);
+				}
+			}
+		}
+
 		void RegisterPlugin(ShPlugin& InPlugin)
 		{
 			try

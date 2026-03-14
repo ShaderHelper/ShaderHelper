@@ -3,7 +3,7 @@
 #define VMA_IMPLEMENTATION
 #include "VkDevice.h"
 
-namespace FW
+namespace FW::VK
 {
 	void CreateInstance()
 	{

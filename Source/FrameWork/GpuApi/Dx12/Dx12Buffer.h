@@ -22,6 +22,7 @@ namespace FW
 	public:
 		TUniquePtr<CpuDescriptor> SRV;
 		TUniquePtr<CpuDescriptor> UAV;
+		TRefCountPtr<Dx12Buffer> ReadBackBuffer;
         
     private:
 		ResourceAllocation Allocation;

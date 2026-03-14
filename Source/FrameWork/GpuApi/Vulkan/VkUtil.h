@@ -2,7 +2,7 @@
 #include "GpuApi/GpuResource.h"
 #include "VkCommon.h"
 
-namespace FW
+namespace FW::VK
 {
 	class VkDeferredReleaseManager
 	{

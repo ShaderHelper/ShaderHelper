@@ -2,7 +2,7 @@
 #include "VkUtil.h"
 #include "VkDevice.h"
 
-namespace FW
+namespace FW::VK
 {
     void SetVkObjectName(VkObjectType InObjectType, uint64 InObjectHandle, const FString& InName)
 	{

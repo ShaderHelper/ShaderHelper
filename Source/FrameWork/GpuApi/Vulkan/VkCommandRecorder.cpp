@@ -7,7 +7,7 @@
 #include "VkDescriptorSet.h"
 #include "VkUtil.h"
 
-namespace FW
+namespace FW::VK
 {
 	VkRenderStateCache::VkRenderStateCache(VulkanCmdRecorder* InOwner, TArray<GpuTextureView*> InRenderTargetViews)
 		: IsRenderPipelineDirty(false)

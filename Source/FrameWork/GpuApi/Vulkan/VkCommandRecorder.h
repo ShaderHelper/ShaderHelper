@@ -2,7 +2,7 @@
 #include "VkDevice.h"
 #include "GpuApi/GpuRhi.h"
 
-namespace FW
+namespace FW::VK
 {
 	class VulkanCmdRecorder;
 	class VulkanRenderPipelineState;

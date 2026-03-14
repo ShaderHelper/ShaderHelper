@@ -276,26 +276,32 @@ namespace SH
 			{
 				DebugStateIndex = ActiveCallPoint.value().DebugStateIndex;
 			}
-			// _DebugStateNum_ in ExprDebugger only counts GPU-side _Append*_ calls,
-			// but DebugStateIndex includes CPU-reconstructed states (ScopeChange, FuncCallAfterReturn).
-			// Subtract CPU-only state count to get the correct GPU-side index.
-			int32 GpuStateIndex = DebugStateIndex;
-			for (int32 i = 0; i <= DebugStateIndex; i++)
+			// CPU-only states (ScopeChange, FuncCallAfterReturn) have no corresponding
+			// SPIR-V instruction. Skip forward to the next GPU-visible state so the
+			// ExprDebugger can find a valid insertion point.
+			auto IsCpuOnlyState = [](const SpvDebugState& State) {
+				if (std::holds_alternative<SpvDebugState_ScopeChange>(State))
+					return true;
+				if (auto* Tag = std::get_if<SpvDebugState_Tag>(&State))
+					return Tag->bFuncCallAfterReturn;
+				return false;
+			};
+			int32 ExprStateIndex = DebugStateIndex;
+			while (ExprStateIndex < DebugStates.Num() && IsCpuOnlyState(DebugStates[ExprStateIndex]))
 			{
-				if (std::holds_alternative<SpvDebugState_ScopeChange>(DebugStates[i]))
+				ExprStateIndex++;
+			}
+			// _DebugStateNum_ in ExprDebugger only counts GPU-side _Append*_ calls.
+			// Subtract CPU-only state count to get the correct GPU-side index.
+			int32 GpuStateIndex = ExprStateIndex;
+			for (int32 i = 0; i < ExprStateIndex; i++)
+			{
+				if (IsCpuOnlyState(DebugStates[i]))
 				{
 					GpuStateIndex--;
 				}
-				else if (std::holds_alternative<SpvDebugState_Tag>(DebugStates[i]))
-				{
-					const auto& Tag = std::get<SpvDebugState_Tag>(DebugStates[i]);
-					if (Tag.bFuncCallAfterReturn)
-					{
-						GpuStateIndex--;
-					}
-				}
 			}
-			SpvPixelExprDebuggerContext ExprContext{ DebugStates[DebugStateIndex], GpuStateIndex,
+			SpvPixelExprDebuggerContext ExprContext{ DebugStates[ExprStateIndex], GpuStateIndex,
 				PixelCoord, SpvBindings };
 			SpirvParser Parser;
 			Parser.Parse(DebugShader->SpvCode);

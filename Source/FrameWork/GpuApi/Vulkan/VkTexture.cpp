@@ -5,7 +5,7 @@
 #include "VkUtil.h"
 #include "VkBuffer.h"
 
-namespace FW
+namespace FW::VK
 {
 	VulkanSampler::VulkanSampler(VkSampler InSampler, const GpuSamplerDesc& InDesc)
 		: GpuSampler(InDesc)

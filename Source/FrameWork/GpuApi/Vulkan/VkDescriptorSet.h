@@ -2,7 +2,7 @@
 #include "VkDevice.h"
 #include "GpuApi/GpuResource.h"
 
-namespace FW
+namespace FW::VK
 {
 	class VulkanBindGroupLayout : public GpuBindGroupLayout
 	{

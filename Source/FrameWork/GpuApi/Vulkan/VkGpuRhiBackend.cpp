@@ -10,6 +10,8 @@
 #include "VkDescriptorSet.h"
 #include "VkMap.h"
 
+using namespace FW::VK;
+
 namespace FW
 {
 	VkGpuRhiBackend::VkGpuRhiBackend() { GVkGpuRhi = this; }
@@ -276,14 +278,14 @@ namespace FW
 		{
 			if (InMapMode == GpuResourceMapMode::Read_Only)
 			{
-				TRefCountPtr<VulkanBuffer> ReadBackBuffer = CreateVulkanBuffer({ InGpuBuffer->GetByteSize(), GpuBufferUsage::ReadBack }, GpuResourceState::CopyDst);
+				VkBuffer->ReadBackBuffer = CreateVulkanBuffer({ InGpuBuffer->GetByteSize(), GpuBufferUsage::ReadBack }, GpuResourceState::CopyDst);
 				auto CmdRecorder = GVkGpuRhi->BeginRecording();
 				{
 					GpuResourceState LastState = InGpuBuffer->State;
 					CmdRecorder->Barriers({
 						{ InGpuBuffer, GpuResourceState::CopySrc },
 					});
-					CmdRecorder->CopyBufferToBuffer(InGpuBuffer, 0, ReadBackBuffer, 0, InGpuBuffer->GetByteSize());
+					CmdRecorder->CopyBufferToBuffer(InGpuBuffer, 0, VkBuffer->ReadBackBuffer, 0, InGpuBuffer->GetByteSize());
 					CmdRecorder->Barriers({
 						{ InGpuBuffer, LastState }
 					});
@@ -292,7 +294,7 @@ namespace FW
 				GVkGpuRhi->Submit({ CmdRecorder });
 				GVkGpuRhi->WaitGpu();
 
-				VkCheck(vmaMapMemory(GAllocator, ReadBackBuffer->GetAllocation(), &Data));
+				VkCheck(vmaMapMemory(GAllocator, VkBuffer->ReadBackBuffer->GetAllocation(), &Data));
 			}
 		}
 
@@ -301,11 +303,16 @@ namespace FW
 
 	void VkGpuRhiBackend::UnMapGpuBuffer(GpuBuffer* InGpuBuffer)
 	{
+		VulkanBuffer* VkBuffer = static_cast<VulkanBuffer*>(InGpuBuffer);
 		GpuBufferUsage Usage = InGpuBuffer->GetUsage();
 		if (EnumHasAnyFlags(Usage, GpuBufferUsage::DynamicMask))
 		{
-			VulkanBuffer* VkBuffer = static_cast<VulkanBuffer*>(InGpuBuffer);
 			vmaUnmapMemory(GAllocator, VkBuffer->GetAllocation());
+		}
+		else if (VkBuffer->ReadBackBuffer)
+		{
+			vmaUnmapMemory(GAllocator, VkBuffer->ReadBackBuffer->GetAllocation());
+			VkBuffer->ReadBackBuffer = nullptr;
 		}
 	}
 }

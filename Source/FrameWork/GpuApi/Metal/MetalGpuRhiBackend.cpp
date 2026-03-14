@@ -158,15 +158,15 @@ void *MetalGpuRhiBackend::MapGpuBuffer(GpuBuffer *InGpuBuffer, GpuResourceMapMod
 	{
 		if (InMapMode == GpuResourceMapMode::Read_Only)
 		{
-			TRefCountPtr<MetalBuffer> ReadBackBuffer = CreateMetalBuffer({Buffer->GetByteSize(), GpuBufferUsage::ReadBack});
+			Buffer->ReadBackBuffer = CreateMetalBuffer({Buffer->GetByteSize(), GpuBufferUsage::ReadBack});
 			auto CmdRecorder = GMtlGpuRhi->BeginRecording();
 			{
-				CmdRecorder->CopyBufferToBuffer(Buffer, 0, ReadBackBuffer, 0, Buffer->GetByteSize());
+				CmdRecorder->CopyBufferToBuffer(Buffer, 0, Buffer->ReadBackBuffer, 0, Buffer->GetByteSize());
 			}
 			GMtlGpuRhi->EndRecording(CmdRecorder);
 			GMtlGpuRhi->Submit({CmdRecorder});
 			GMtlGpuRhi->WaitGpu();
-			Data = ReadBackBuffer->GetContents();
+			Data = Buffer->ReadBackBuffer->GetContents();
 		}
 	}
 
@@ -175,7 +175,8 @@ void *MetalGpuRhiBackend::MapGpuBuffer(GpuBuffer *InGpuBuffer, GpuResourceMapMod
 
 void MetalGpuRhiBackend::UnMapGpuBuffer(GpuBuffer *InGpuBuffer)
 {
-	// do nothing.
+	MetalBuffer* Buffer = static_cast<MetalBuffer*>(InGpuBuffer);
+	Buffer->ReadBackBuffer = nullptr;
 }
 
 bool MetalGpuRhiBackend::CompileShader(GpuShader *InShader, FString &OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs)

@@ -3,7 +3,7 @@
 #include "VkGpuRhiBackend.h"
 #include "VkUtil.h"
 
-namespace FW
+namespace FW::VK
 {
 	VulkanBuffer::VulkanBuffer(const GpuBufferDesc& InDesc, GpuResourceState InResourceState, VkBuffer InBuffer, VmaAllocation InAllocation)
 		: GpuBuffer(InDesc, InResourceState)

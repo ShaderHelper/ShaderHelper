@@ -1,7 +1,7 @@
 #pragma once
 #include "VkCommon.h"
 
-namespace FW
+namespace FW::VK
 {
 	inline VkInstance GInstance;
 	inline VkDevice GDevice;

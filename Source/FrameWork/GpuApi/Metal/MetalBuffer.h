@@ -17,6 +17,9 @@ namespace FW
             return Data;
         }
         
+    public:
+        TRefCountPtr<MetalBuffer> ReadBackBuffer;
+
     private:
         MTLBufferPtr Buffer;
     };

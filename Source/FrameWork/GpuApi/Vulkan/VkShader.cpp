@@ -4,7 +4,7 @@
 #include "GpuApi/GLSL.h"
 #include "VkUtil.h"
 
-namespace FW
+namespace FW::VK
 {
 	VulkanShader::VulkanShader(const GpuShaderFileDesc& Desc) : GpuShader(Desc)
 	{

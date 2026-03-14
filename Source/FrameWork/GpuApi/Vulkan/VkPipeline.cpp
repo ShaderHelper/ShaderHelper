@@ -7,7 +7,7 @@
 #include "VkDescriptorSet.h"
 #include "GpuApi/GpuApiValidation.h"
 
-namespace FW
+namespace FW::VK
 {
 	VulkanComputePipelineState::VulkanComputePipelineState(GpuComputePipelineStateDesc InDesc, VkPipeline InPipeline, VkPipelineLayout InPipelineLayout)
 		: GpuComputePipelineState(InDesc)

@@ -266,14 +266,14 @@ void* Dx12GpuRhiBackend::MapGpuBuffer(GpuBuffer* InGpuBuffer, GpuResourceMapMode
 	{
 		if (InMapMode == GpuResourceMapMode::Read_Only)
 		{
-			TRefCountPtr<Dx12Buffer> ReadBackBuffer = CreateDx12Buffer({ Buffer->GetByteSize(), GpuBufferUsage::ReadBack}, GpuResourceState::CopyDst);
+			Buffer->ReadBackBuffer = CreateDx12Buffer({ Buffer->GetByteSize(), GpuBufferUsage::ReadBack}, GpuResourceState::CopyDst);
 			auto CmdRecorder = GDx12GpuRhi->BeginRecording();
 			{
 				GpuResourceState LastState = InGpuBuffer->State;
 				CmdRecorder->Barriers({
 					{ InGpuBuffer, GpuResourceState::CopySrc },
 				});
-				CmdRecorder->CopyBufferToBuffer(InGpuBuffer, 0, ReadBackBuffer, 0, Buffer->GetByteSize());
+				CmdRecorder->CopyBufferToBuffer(InGpuBuffer, 0, Buffer->ReadBackBuffer, 0, Buffer->GetByteSize());
 				CmdRecorder->Barriers({
 					{ InGpuBuffer, LastState }
 				});
@@ -282,7 +282,7 @@ void* Dx12GpuRhiBackend::MapGpuBuffer(GpuBuffer* InGpuBuffer, GpuResourceMapMode
 			GDx12GpuRhi->Submit({ CmdRecorder });
 			GDx12GpuRhi->WaitGpu();
 
-			Data = ReadBackBuffer->GetAllocation().GetCpuAddr();
+			Data = Buffer->ReadBackBuffer->GetAllocation().GetCpuAddr();
 		}
 	}
 
@@ -291,7 +291,8 @@ void* Dx12GpuRhiBackend::MapGpuBuffer(GpuBuffer* InGpuBuffer, GpuResourceMapMode
 
 void Dx12GpuRhiBackend::UnMapGpuBuffer(GpuBuffer* InGpuBuffer)
 {
-	
+	Dx12Buffer* Buffer = static_cast<Dx12Buffer*>(InGpuBuffer);
+	Buffer->ReadBackBuffer = nullptr;
 }
 
 void Dx12GpuRhiBackend::BeginGpuCapture(const FString &CaptureName)

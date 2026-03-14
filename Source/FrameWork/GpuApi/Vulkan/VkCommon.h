@@ -28,7 +28,7 @@
 DECLARE_LOG_CATEGORY_EXTERN(LogVulkan, Log, All);
 inline DEFINE_LOG_CATEGORY(LogVulkan);
 
-namespace FW
+namespace FW::VK
 {
 	inline void OutputVkError(VkResult Result, const ANSICHAR* Code, const ANSICHAR* Filename, uint32 Line)
 	{

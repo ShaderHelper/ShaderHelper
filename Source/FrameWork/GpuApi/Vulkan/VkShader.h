@@ -2,7 +2,7 @@
 #include "GpuApi/GpuResource.h"
 #include "VkDevice.h"
 
-namespace FW
+namespace FW::VK
 {
 	class VulkanShader : public GpuShader
 	{

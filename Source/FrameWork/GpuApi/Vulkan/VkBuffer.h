@@ -2,7 +2,7 @@
 #include "VkDevice.h"
 #include "GpuApi/GpuResource.h"
 
-namespace FW
+namespace FW::VK
 {
 	class VulkanBuffer : public GpuBuffer
 	{
@@ -13,6 +13,9 @@ namespace FW
 		}
 		VkBuffer GetBuffer() const { return Buffer; }
 		VmaAllocation GetAllocation() const { return Allocation; }
+
+	public:
+		TRefCountPtr<VulkanBuffer> ReadBackBuffer;
 
 	private:
 		VkBuffer Buffer;

@@ -238,7 +238,7 @@ namespace FW
 			TUniquePtr<GpuDescriptorRange> GpuHeapRanges = AllocGpuCbvSrvUavRange(NumDescriptors);
 			for (int Index = 0; Index < NumDescriptors; Index++)
 			{
-				GDevice->CopyDescriptorsSimple(NumDescriptors, GpuHeapRanges->GetCpuHandle(Index), SrcRange[Index], D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				GDevice->CopyDescriptorsSimple(1, GpuHeapRanges->GetCpuHandle(Index), SrcRange[Index], D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 			}
 			DescriptorTableStorage_CbvSrvUav.Add(DxVisibility, MoveTemp(GpuHeapRanges));
 		}
@@ -249,7 +249,7 @@ namespace FW
 			TUniquePtr<GpuDescriptorRange> GpuHeapRanges = AllocGpuSamplerRange(NumDescriptors);
 			for (int Index = 0; Index < NumDescriptors; Index++)
 			{
-				GDevice->CopyDescriptorsSimple(NumDescriptors, GpuHeapRanges->GetCpuHandle(Index), SrcRange[Index], D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+				GDevice->CopyDescriptorsSimple(1, GpuHeapRanges->GetCpuHandle(Index), SrcRange[Index], D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
 			}
 			DescriptorTableStorage_Sampler.Add(DxVisibility, MoveTemp(GpuHeapRanges));
 		}

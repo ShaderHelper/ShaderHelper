@@ -517,6 +517,7 @@ namespace SH
 			FSlateApplication::Get().RequestDestroyWindow(InWindow);
 		}));
 
+		TSingleton<ShPluginManager>::Get().UnregisterActivePlugins();
 		TSingleton<ShPluginManager>::Get().RegisterActivePlugins();
 	}
 
