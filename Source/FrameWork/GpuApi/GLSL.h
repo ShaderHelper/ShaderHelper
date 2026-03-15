@@ -1156,6 +1156,19 @@ namespace FW
 				FString ReturnTypeName = GetTypeName(Node->getType());
 				FString FuncTypeName = ReturnTypeName + "(" + ParamsTypeName + ")";
 
+				if (Node->getType().isStruct())
+				{
+					auto TypeLoc = Node->getType().loc;
+					if (auto* Def = Context.SymbolTable.FindByPredicate([&, this](auto&& Item) { return Item.Id == ReturnTypeName; }))
+					{
+						Context.SymbolRefs.AddUnique(*Def, GlslSymbolRef{
+							.Name = ReturnTypeName,
+							.File = TypeLoc.getFilenameStr(),
+							.Location = {TypeLoc.line, TypeLoc.column}
+						});
+					}
+				}
+
 				FString Name = UTF8_TO_TCHAR(Node->getName().c_str());
 				FString FuncName, _;
 				Name.Split(TEXT("("), &FuncName, &_);
