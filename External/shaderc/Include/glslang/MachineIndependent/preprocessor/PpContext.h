@@ -210,6 +210,7 @@ public:
     //
     struct TMacroDefinition {
         TString name;
+        TString fullName;
         TSourceLoc defineLoc; // location of macro name in the #define
         bool functionLike = false;
         TString bodyText;     // raw body text of the macro definition
@@ -218,7 +219,7 @@ public:
         TString name;
         TSourceLoc callLoc;    // location of macro name at call site
         bool functionLike = false;
-        TString expandedText;  // one-level expanded text (body with args substituted)
+        TString expandedText;
     };
 
     // Inactive region data (for LSP semantic tokens / inactive regions).
@@ -570,6 +571,9 @@ protected:
 
     // Convert a token + TPpToken to its text representation.
     static TString tokenToText(int tok, const TPpToken& ppTok);
+
+    // Accumulate token text into expandedText for all active macro expansions on the input stack.
+    void accumulateExpandedToken(int token, const TPpToken& ppToken);
 
     //
     // From PpTokens.cpp

@@ -1376,9 +1376,19 @@ protected:
     TIntermTyped* constSubtree;
 };
 
+// Tracks a const variable reference that was folded into a constant.
+// Each entry preserves the variable's name, unique id, and source location,
+// so that LSP features (hover, go-to-definition, find-references) can still
+// resolve folded constants back to the original variable declarations.
+struct TOriginalVariableRef {
+    TString name;
+    long long id;
+    TSourceLoc loc;
+};
+
 class TIntermConstantUnion : public TIntermTyped {
 public:
-    TIntermConstantUnion(const TConstUnionArray& ua, const TType& t) : TIntermTyped(t), constArray(ua), literal(false), originalVariableId(-1) { }
+    TIntermConstantUnion(const TConstUnionArray& ua, const TType& t) : TIntermTyped(t), constArray(ua), literal(false) { }
     const TConstUnionArray& getConstArray() const { return constArray; }
     virtual       TIntermConstantUnion* getAsConstantUnion()       { return this; }
     virtual const TIntermConstantUnion* getAsConstantUnion() const { return this; }
@@ -1389,20 +1399,28 @@ public:
     void setExpression() { literal = false; }
     bool isLiteral() const { return literal; }
 
-    // Track the original variable when this constant was folded from a const variable reference.
-    // This preserves symbol info for LSP features (hover, go-to-definition, find-references, etc.)
-    void setOriginalVariable(const TString& name, long long id) { originalVariableName = name; originalVariableId = id; }
-    bool hasOriginalVariable() const { return originalVariableId >= 0; }
-    const TString& getOriginalVariableName() const { return originalVariableName; }
-    long long getOriginalVariableId() const { return originalVariableId; }
+    // Track original variable(s) when this constant was folded from const variable references.
+    // Multiple entries are possible when e.g. sb * mxr is folded (both sb and mxr are preserved).
+    void addOriginalVariable(const TString& name, long long id, const TSourceLoc& loc) {
+        TOriginalVariableRef ref;
+        ref.name = name;
+        ref.id = id;
+        ref.loc = loc;
+        originalVariables.push_back(ref);
+    }
+    void addOriginalVariables(const TVector<TOriginalVariableRef>& refs) {
+        for (size_t i = 0; i < refs.size(); ++i)
+            originalVariables.push_back(refs[i]);
+    }
+    bool hasOriginalVariable() const { return !originalVariables.empty(); }
+    const TVector<TOriginalVariableRef>& getOriginalVariables() const { return originalVariables; }
 
 protected:
     TIntermConstantUnion& operator=(const TIntermConstantUnion&);
 
     const TConstUnionArray constArray;
     bool literal;  // true if node represents a literal in the source code
-    TString originalVariableName;  // name of the const variable this was folded from (empty if literal)
-    long long originalVariableId;  // unique id of the const variable (-1 if not from a variable)
+    TVector<TOriginalVariableRef> originalVariables;  // const variables this was folded from
 };
 
 // Represent the independent aspects of a texturing TOperator

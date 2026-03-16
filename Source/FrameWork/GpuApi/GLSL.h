@@ -766,9 +766,10 @@ namespace FW
 	class GlslVisitor : public glslang::TIntermTraverser
 	{
 	public:
-		GlslVisitor(GlslContext& InContext, int32 FileEndLine)
+		GlslVisitor(GlslContext& InContext, int32 FileEndLine, const FString& InShaderFile)
 			: glslang::TIntermTraverser(true, false, true) // preVisit, inVisit, postVisit
 			, Context(InContext)
+			, ShaderFile(InShaderFile)
 		{
 			ScopeStack.Push({ Vector2i(1, 1), Vector2i(FileEndLine, 1) });
 			for (const auto& Def : Context.MacroDefinitions)
@@ -802,29 +803,30 @@ namespace FW
 
 		void visitConstantUnion(glslang::TIntermConstantUnion* Node) override
 		{
-			//constant folding variable
+			//constant folding variables
 			if(Node->hasOriginalVariable())
 			{
-				if (auto* Def = Context.SymbolTable.FindByPredicate([&, this](auto&& Item) { return Item.Id == LexToString(Node->getOriginalVariableId()); }))
+				for (const auto& OriginalVar :Node->getOriginalVariables())
 				{
-					FString VarName = UTF8_TO_TCHAR(Node->getOriginalVariableName().c_str());
-					Vector2i Location = { Node->getLoc().line, Node->getLoc().column };
-					Context.SymbolRefs.AddUnique(*Def, GlslSymbolRef{
-						.Name = VarName,
-						.File = Node->getLoc().getFilenameStr(),
-						.Location = Location
-					});
+					if (auto* Def = Context.SymbolTable.FindByPredicate([&, this](auto&& Item) { return Item.Id == LexToString(OriginalVar.id); }))
+					{
+						Context.SymbolRefs.AddUnique(*Def, GlslSymbolRef{
+							.Name = UTF8_TO_TCHAR(OriginalVar.name.c_str()),
+							.File = Node->getLoc().getFilenameStr(),
+							.Location = {OriginalVar.loc.line, OriginalVar.loc.column}
+						});
+					}
 				}
 			}
 			
 			if (Node->getType().isStruct())
 			{
-				FString TypeName = GetTypeName(Node->getType());
+				FString TypenameWithoutQualifier = GetTypeName(Node->getType(), true);
 				auto TypeLoc = Node->getType().loc;
-				if (auto* Def = Context.SymbolTable.FindByPredicate([&, this](auto&& Item) { return Item.Id == TypeName; }))
+				if (auto* Def = Context.SymbolTable.FindByPredicate([&, this](auto&& Item) { return Item.Id == TypenameWithoutQualifier; }))
 				{
 					Context.SymbolRefs.AddUnique(*Def, GlslSymbolRef{
-						.Name = TypeName,
+						.Name = TypenameWithoutQualifier,
 						.File = TypeLoc.getFilenameStr(),
 						.Location = {TypeLoc.line, TypeLoc.column}
 					});
@@ -958,7 +960,7 @@ namespace FW
 					};
 
 				const auto& EndLoc = GetSelectionEndLoc(Node, GetSelectionEndLoc);
-				if (EndLoc.line > StartLoc.line)
+				if (EndLoc.line > StartLoc.line && StartLoc.getFilenameStr() == ShaderFile)
 				{
 					Context.GuideLineScopes.Emplace(Vector2i(StartLoc.line, StartLoc.column),
 						Vector2i(EndLoc.line, EndLoc.column));
@@ -1010,8 +1012,11 @@ namespace FW
 				{
 					const auto& StartLoc = Symbol->getType().startLoc;
 					const auto& EndLoc = Symbol->getType().endLoc;
-					Context.GuideLineScopes.Emplace(Vector2i(StartLoc.line, StartLoc.column),
-						Vector2i(EndLoc.line, EndLoc.column));
+					if (Node->getLoc().getFilenameStr() == ShaderFile)
+					{
+						Context.GuideLineScopes.Emplace(Vector2i(StartLoc.line, StartLoc.column),
+							Vector2i(EndLoc.line, EndLoc.column));
+					}
 
 					FString TypeName = UTF8_TO_TCHAR(Symbol->getType().getTypeName().c_str());
 					Context.SymbolTable.AddUnique({
@@ -1080,7 +1085,10 @@ namespace FW
 				Vector2i StartLoc = { Node->getStartLoc().line, Node->getStartLoc().column };
 				Vector2i EndLoc = { Node->getEndLoc().line, Node->getEndLoc().column }; 
 				ShaderScope FuncScope = { StartLoc, EndLoc };
-				Context.GuideLineScopes.Emplace(FuncScope);
+				if (Op == glslang::EOpFunction && Node->getLoc().getFilenameStr() == ShaderFile)
+				{
+					Context.GuideLineScopes.Emplace(FuncScope);
+				}
 
 				FString ParamsTypeName;
 				TArray<ShaderParameter> Params;
@@ -1141,10 +1149,11 @@ namespace FW
 						if (bIsStruct)
 						{
 							auto TypeLoc = ParamSymbol->getType().loc;
-							if (auto* Def = Context.SymbolTable.FindByPredicate([&, this](auto&& Item) { return Item.Id == TypeName; }))
+							FString TypenameWithoutQualifier = GetTypeName(ParamSymbol->getType(), true);
+							if (auto* Def = Context.SymbolTable.FindByPredicate([&, this](auto&& Item) { return Item.Id == TypenameWithoutQualifier; }))
 							{
 								Context.SymbolRefs.AddUnique(*Def, GlslSymbolRef{
-									.Name = TypeName,
+									.Name = TypenameWithoutQualifier,
 									.File = TypeLoc.getFilenameStr(),
 									.Location = {TypeLoc.line, TypeLoc.column}
 								});
@@ -1159,10 +1168,11 @@ namespace FW
 				if (Node->getType().isStruct())
 				{
 					auto TypeLoc = Node->getType().loc;
-					if (auto* Def = Context.SymbolTable.FindByPredicate([&, this](auto&& Item) { return Item.Id == ReturnTypeName; }))
+					FString TypenameWithoutQualifier = GetTypeName(Node->getType(), true);
+					if (auto* Def = Context.SymbolTable.FindByPredicate([&, this](auto&& Item) { return Item.Id == TypenameWithoutQualifier; }))
 					{
 						Context.SymbolRefs.AddUnique(*Def, GlslSymbolRef{
-							.Name = ReturnTypeName,
+							.Name = TypenameWithoutQualifier,
 							.File = TypeLoc.getFilenameStr(),
 							.Location = {TypeLoc.line, TypeLoc.column}
 						});
@@ -1172,14 +1182,17 @@ namespace FW
 				FString Name = UTF8_TO_TCHAR(Node->getName().c_str());
 				FString FuncName, _;
 				Name.Split(TEXT("("), &FuncName, &_);
-				Context.Funcs.Add(ShaderFunc{
-					.Name = FuncName,
-					.FullName = Name,
-					.File = Node->getLoc().getFilenameStr(),
-					.Start = StartLoc,
-					.End = EndLoc,
-					.Params = Params
-				});
+				if (Op == glslang::EOpFunction)
+				{
+					Context.Funcs.Add(ShaderFunc{
+						.Name = FuncName,
+						.FullName = Name,
+						.File = Node->getLoc().getFilenameStr(),
+						.Start = StartLoc,
+						.End = EndLoc,
+						.Params = Params
+					});
+				}
 				Context.SymbolTable.AddUnique({
 					.Id = Name,
 					.Kind = ShaderTokenType::Func,
@@ -1221,7 +1234,7 @@ namespace FW
 				const auto& StartLoc = Node->getLoc();
 				const auto& EndLoc = Node->getEndLoc();
 				ShaderScope Scope = { Vector2i(StartLoc.line, StartLoc.column), Vector2i(EndLoc.line, EndLoc.column) };
-				if (!getParentNode()->getAsSelectionNode() && !getParentNode()->getAsLoopNode())
+				if (!getParentNode()->getAsSelectionNode() && !getParentNode()->getAsLoopNode() && StartLoc.getFilenameStr() == ShaderFile)
 				{
 					Context.GuideLineScopes.Add(Scope);
 				}
@@ -1322,6 +1335,7 @@ namespace FW
 
 	private:
 		GlslContext& Context;
+		FString ShaderFile;
 		TArray<ShaderScope> ScopeStack;
 		int32 SelectionChainDepth = 0;
 	};
@@ -1400,7 +1414,7 @@ namespace FW
 					Root->traverse(&DumpTraverser);
 					DumpTraverser.SaveDump();
 #endif
-					GlslVisitor Visitor(Context, LineRanges.Num());
+					GlslVisitor Visitor(Context, LineRanges.Num(), ShaderName);
 					Root->traverse(&Visitor);
 				}
 
@@ -1433,6 +1447,67 @@ namespace FW
 			{
 				return {};
 			}
+
+			// Tokenize arbitrary shader text into fine-grained token types
+			auto TokenizeShaderText = [this](const FString& Text, TArray<TPair<FString, ShaderTokenType>>& OutTokens) {
+				int32 i = 0;
+				while (i < Text.Len())
+				{
+					TCHAR Ch = Text[i];
+					if (FChar::IsWhitespace(Ch))
+					{
+						int32 Start = i;
+						while (i < Text.Len() && FChar::IsWhitespace(Text[i])) i++;
+						OutTokens.Add({ Text.Mid(Start, i - Start), ShaderTokenType::Unknown });
+					}
+					else if (FChar::IsAlpha(Ch) || FChar::IsUnderscore(Ch))
+					{
+						int32 Start = i;
+						while (i < Text.Len() && FChar::IsIdentifier(Text[i])) i++;
+						FString Word = Text.Mid(Start, i - Start);
+						ShaderTokenType Type = ShaderTokenType::Identifier;
+						if (GLSL::FindKeyword(Word, Stage))
+							Type = ShaderTokenType::Keyword;
+						else if (GLSL::FindBuiltinType(Word, Stage))
+							Type = ShaderTokenType::BuiltinType;
+						else if (GLSL::FindBuiltinFunc(Word, Stage))
+							Type = ShaderTokenType::BuiltinFunc;
+						else
+						{
+							for (const auto& Sym : Context.SymbolTable)
+							{
+								if (Sym.Name == Word) { Type = Sym.Kind; break; }
+							}
+						}
+						OutTokens.Add({ MoveTemp(Word), Type });
+					}
+					else if (FChar::IsDigit(Ch))
+					{
+						int32 Start = i;
+						while (i < Text.Len() && (FChar::IsDigit(Text[i]) || FChar::IsAlpha(Text[i]) || Text[i] == '.')) i++;
+						OutTokens.Add({ Text.Mid(Start, i - Start), ShaderTokenType::Number });
+					}
+					else if (Ch == '"')
+					{
+						int32 Start = i++;
+						while (i < Text.Len() && Text[i] != '"') i++;
+						if (i < Text.Len()) i++;
+						OutTokens.Add({ Text.Mid(Start, i - Start), ShaderTokenType::String });
+					}
+					else
+					{
+						if (Ch == ',')
+						{
+							OutTokens.Add({ TEXT(", "), ShaderTokenType::Punctuation });
+						}
+						else
+						{
+							OutTokens.Add({ Text.Mid(i, 1), ShaderTokenType::Punctuation });
+						}
+						i++;
+					}
+				}
+			};
 
 			// Tokenize type name, splitting keyword modifiers from core type
 			auto TokenizeTypeName = [this](const FString& TypeName, TArray<TPair<FString, ShaderTokenType>>& OutTokens) {
@@ -1673,7 +1748,6 @@ namespace FW
 						{
 							if (Func.Name == Def.Name)
 							{
-								// Find the function symbol to get its TypeName
 								const GlslSymbol* FuncSymbol = Context.SymbolTable.FindByPredicate([&](const GlslSymbol& Sym) {
 									return Sym.Kind == ShaderTokenType::Func && Sym.Name == Func.Name && Sym.Id == Func.FullName;
 								});
@@ -1721,9 +1795,11 @@ namespace FW
 						if(!IsPrintMacro(TCHAR_TO_UTF8(*TokenStr)))
 						{
 							for (const auto& MacDef : Context.MacroDefinitions)
-							{
+							{ 
 								if (UTF8_TO_TCHAR(MacDef.name.c_str()) == TokenStr)
 								{
+									Symbol.Tokens.RemoveAt(0);
+									Symbol.Tokens.Add({ UTF8_TO_TCHAR(MacDef.fullName.c_str()), ShaderTokenType::Preprocess});
 									FString BodyText = FString(UTF8_TO_TCHAR(MacDef.bodyText.c_str())).TrimStartAndEnd();
 									if (!BodyText.IsEmpty())
 									{
@@ -1742,7 +1818,7 @@ namespace FW
 									FString ExpText = FString(UTF8_TO_TCHAR(Exp.expandedText.c_str())).TrimStartAndEnd();
 									if (!ExpText.IsEmpty())
 									{
-										Symbol.ExpandedTokens.Add({ MoveTemp(ExpText), ShaderTokenType::Preprocess });
+										TokenizeShaderText(ExpText, Symbol.ExpandedTokens);
 									}
 									break;
 								}
@@ -1827,7 +1903,7 @@ namespace FW
 				FString TokenStr = GetStr(Row, Col, Size);
 				for (const auto& [Def, Ref] : Context.SymbolRefs)
 				{
-					if (Ref.File == ShaderName && Row == (uint32)Ref.Location.X && Col >= (uint32)Ref.Location.Y && Col <= (uint32)Ref.Location.Y + Ref.Name.Len())
+					if (Ref.File == ShaderName && Row == (uint32)Ref.Location.X && Col == (uint32)Ref.Location.Y)
 					{
 						return Def.Kind;
 					}
@@ -2041,13 +2117,16 @@ namespace FW
 			TArray<ShaderOccurrence> Occurrences;
 			for (const auto& [Def, Ref] : Context.SymbolRefs)
 			{
-				if (Ref.File == ShaderName && Row == (uint32)Ref.Location.X && Col >= (uint32)Ref.Location.Y && Col <= (uint32)Ref.Location.Y + Ref.Name.Len())
+				if (Ref.File == ShaderName && Row == (uint32)Ref.Location.X && Col == (uint32)Ref.Location.Y)
 				{
 					TArray<GlslSymbolRef> Refs;
 					Context.FindAllRefs(Def, Refs);
 					for (const auto& R : Refs)
-					{
-						Occurrences.AddUnique(ShaderOccurrence(R.Location.X, R.Location.Y));
+					{ 
+						if (R.File == ShaderName)
+						{
+							Occurrences.AddUnique(ShaderOccurrence(R.Location.X, R.Location.Y));
+						}
 					}
 					break;
 				}

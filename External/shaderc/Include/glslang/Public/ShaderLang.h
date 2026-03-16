@@ -718,6 +718,7 @@ public:
     };
     struct MacroDefinition {
         std::string name;        // macro name
+        std::string fullName;
         MacroLocation define;    // macro definition site (macro identifier in #define)
         bool functionLike = false;
         std::string bodyText;    // raw body text of the macro definition
@@ -726,7 +727,7 @@ public:
         std::string name;        // macro name
         MacroLocation call;      // macro call site (macro identifier)
         bool functionLike = false;
-        std::string expandedText; // one-level expanded text (body with args substituted)
+        std::string expandedText;
     };
 
     // ------------------------------------------------------------
