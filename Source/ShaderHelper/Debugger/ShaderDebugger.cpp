@@ -215,7 +215,8 @@ namespace SH
 				// Try to find variable by name from SortedVariableDescs
 				for (const auto& [VarId, VarDesc] : SortedVariableDescs)
 				{
-					if (VarDesc->Name == TrimmedExpr)
+					//Note: FString opreator== case insensitive
+					if (VarDesc->Name.Equals(TrimmedExpr))
 					{
 						if (SpvVariable* Var = DebuggerContext->FindVar(VarId))
 						{
