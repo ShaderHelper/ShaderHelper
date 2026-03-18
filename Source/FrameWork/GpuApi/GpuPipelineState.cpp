@@ -47,15 +47,10 @@ namespace FW
 	{
 		uint32 Hash = 0;
 		
-		// Hash shader pointers directly
-		if (Desc.Vs)
-		{
-			Hash = HashCombine(Hash, PointerHash(Desc.Vs));
-		}
-		if (Desc.Ps)
-		{
-			Hash = HashCombine(Hash, PointerHash(Desc.Ps));
-		}
+		uint32 VsHash = Desc.Vs ? GetTypeHash(*Desc.Vs) : 0;
+		uint32 PsHash = Desc.Ps ? GetTypeHash(*Desc.Ps) : 0;
+		Hash = HashCombine(Hash, VsHash);
+		Hash = HashCombine(Hash, PsHash);
 
 		// Hash bind group layouts
 		if (Desc.BindGroupLayout0) { Hash = HashCombine(Hash, GetTypeHash(Desc.BindGroupLayout0->GetDesc())); }
@@ -103,11 +98,8 @@ namespace FW
 	{
 		uint32 Hash = 0;
 		
-		// Hash shader pointer directly
-		if (Desc.Cs)
-		{
-			Hash = HashCombine(Hash, PointerHash(Desc.Cs));
-		}
+		uint32 CsHash = Desc.Cs ? GetTypeHash(*Desc.Cs) : 0;
+		Hash = HashCombine(Hash, CsHash);
 
 		// Hash bind group layouts
 		if (Desc.BindGroupLayout0) { Hash = HashCombine(Hash, GetTypeHash(Desc.BindGroupLayout0->GetDesc())); }

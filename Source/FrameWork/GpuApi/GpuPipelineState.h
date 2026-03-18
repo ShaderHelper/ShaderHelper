@@ -97,8 +97,14 @@ namespace FW
 
 		bool operator==(const GpuRenderPsoCacheKey& Other) const
 		{
-			return Vs == Other.Vs
-				&& Ps == Other.Ps
+			const bool VsEqual =  Vs && Other.Vs
+					&& Vs->GetSourceText() == Other.Vs->GetSourceText()
+					&& Vs->CompileExtraArgs == Other.Vs->CompileExtraArgs;
+			const bool PsEqual = (Ps == Other.Ps)
+				|| (Ps && Other.Ps
+					&& Ps->GetSourceText() == Other.Ps->GetSourceText()
+					&& Ps->CompileExtraArgs == Other.Ps->CompileExtraArgs);
+			return VsEqual && PsEqual
 				&& BindGroupLayout0 == Other.BindGroupLayout0
 				&& BindGroupLayout1 == Other.BindGroupLayout1
 				&& BindGroupLayout2 == Other.BindGroupLayout2
@@ -126,8 +132,10 @@ namespace FW
 
 		bool operator==(const GpuComputePsoCacheKey& Other) const
 		{
-			return Cs == Other.Cs
-				&& BindGroupLayout0 == Other.BindGroupLayout0
+			const bool CsEqual = Cs && Other.Cs
+					&& Cs->GetSourceText() == Other.Cs->GetSourceText()
+					&& Cs->CompileExtraArgs == Other.Cs->CompileExtraArgs;
+			return CsEqual && BindGroupLayout0 == Other.BindGroupLayout0
 				&& BindGroupLayout1 == Other.BindGroupLayout1
 				&& BindGroupLayout2 == Other.BindGroupLayout2
 				&& BindGroupLayout3 == Other.BindGroupLayout3;

@@ -21,6 +21,8 @@ namespace FW
 		void Visit(const SpvOpLoad* Inst) override;
 		void Visit(const SpvOpStore* Inst) override;
 		void Visit(const SpvOpAccessChain* Inst) override;
+		void Visit(const SpvOpLabel* Inst) override;
+		void Visit(const SpvOpPhi* Inst) override;
 
 		void Visit(const SpvPow* Inst) override;
 		void Visit(const SpvNormalize* Inst) override;
@@ -105,6 +107,9 @@ namespace FW
 		std::unordered_map<SpvId, SpvBasicBlock> BBs;
 		TSet<SpvId> StaticallyInitializedVars;
 		TMap<SpvId, uint32> LoadUsedInitUnits; // OpLoad ResultId -> used init-unit bitmask
+		SpvId CurBlockLabel;
+		TMap<SpvId, SpvId> BlockSplitRemaps; // original block label -> last continuation label after block split
+		void AddBlockSplittingInstructions(int32 Offset, TArray<TUniquePtr<SpvInstruction>>&& InstList);
 	};
 
 	int32 GetMaxIndexNum(SpvType* Type);

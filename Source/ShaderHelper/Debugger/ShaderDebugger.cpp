@@ -1600,89 +1600,47 @@ namespace SH
 
 		auto PixelDebuggerContext = MakeUnique<SpvPixelDebuggerContext>(PixelCoord, SpvBindings);
 
-		ShaderConductor::Compiler::TargetDesc TargetDesc{};
-		ShaderConductor::Compiler::Options Options{};
-		Options.force_zero_initialized_variables = true;
-		FString FileExtension;
+		FString FileExtension = (Lang == GpuShaderLanguage::HLSL) ? TEXT(".hlsl") : TEXT(".glsl");
 		FString EntryPoint = DebugShader->GetEntryPoint();
-		if (Lang == GpuShaderLanguage::HLSL)
-		{
-			TargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
-			TargetDesc.version = "66";
-			FileExtension = TEXT(".hlsl");
-		}
-		else
-		{
-			Options.vulkanSemantics = true;
-			TargetDesc.language = ShaderConductor::ShadingLanguage::Glsl;
-			TargetDesc.version = "450";
-			FileExtension = TEXT(".glsl");
-		}
 
 		SpirvParser Parser;
 		Parser.Parse(DebugShader->SpvCode);
 		SpvMetaVisitor MetaVisitor{ *PixelDebuggerContext };
 		Parser.Accept(&MetaVisitor);
 		TArray<uint32> PatchedSpv;
+		FString PatchedSpvAsm;
 		if (GlobalValidation)
 		{
 			SpvValidator Validator{ *PixelDebuggerContext, bEnableUbsan, ShaderType::PixelShader };
 			Parser.Accept(&Validator);
-			Validator.GetPatcher().Dump(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Validation" + FileExtension + ".spvasm");
 			PatchedSpv = Validator.GetPatcher().GetSpv();
+			PatchedSpvAsm = Validator.GetPatcher().GetAsm();
+			FFileHelper::SaveStringToFile(PatchedSpvAsm, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Validation" + FileExtension + ".spvasm"));
 		}
 		else
 		{
 			SpvPixelDebuggerVisitor DebuggerVisitor{ *PixelDebuggerContext, Lang, bEnableUbsan };
 			Parser.Accept(&DebuggerVisitor);
-			DebuggerVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Patched" + FileExtension + ".spvasm");
 			PatchedSpv = DebuggerVisitor.GetPatcher().GetSpv();
-		}
-		
-		auto EntryPointUTF8 = StringCast<UTF8CHAR>(*EntryPoint);
-		FString PatchedSource;
-		ON_SCOPE_EXIT
-		{
-			FString FileName = DebugShader->GetShaderName() + (GlobalValidation ? TEXT("Validation") : TEXT("Patched")) + FileExtension;
-			FFileHelper::SaveStringToFile(PatchedSource, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / FileName));
-		};
-
-		try
-		{
-			ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile(
-				Options, { PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 }, (const char*)EntryPointUTF8.Get(),
-				ShaderConductor::ShaderStage::PixelShader, TargetDesc);
-
-			if (ShaderResultDesc.hasError)
-			{
-				FString ErrorInfo = "[SpvCrossError] " + FString(static_cast<const char*>(ShaderResultDesc.errorWarningMsg.Data()));
-				PatchedSource = ErrorInfo;
-				throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
-			}
-
-			PatchedSource = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
-		}
-		catch(const std::runtime_error& e)
-		{
-			FString ErrorInfo = "[SpvCrossError] " + FString(UTF8_TO_TCHAR(e.what()));
-			PatchedSource = ErrorInfo;
-			throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
+			PatchedSpvAsm = DebuggerVisitor.GetPatcher().GetAsm();
+			FFileHelper::SaveStringToFile(PatchedSpvAsm, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Patched" + FileExtension + ".spvasm"));
 		}
 		
 		CurDebugStateIndex = 0;
 		DebuggerContext = MoveTemp(PixelDebuggerContext);
 		TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
 			.Name = DebugShader->GetShaderName(),
-			.Source = PatchedSource,
+			.Source = PatchedSpvAsm, //for pso cache
 			.Type = DebugShader->GetShaderType(),
 			.EntryPoint = EntryPoint,
-			.Language = Lang,
 		});
+		PatchedShader->SpvCode = MoveTemp(PatchedSpv);
+		PatchedShader->CompilerFlag |= GpuShaderCompilerFlag::CompileFromSpvCode;
 		if (!GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
 		{
 			throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
 		}
-
+		 
 		auto DummyRenderTarget = GGpuRhi->CreateTexture({
 			.Width = (uint32)PsInvocation.ViewPortDesc.Width,
 			.Height = (uint32)PsInvocation.ViewPortDesc.Height,

@@ -23,7 +23,7 @@ namespace FW
 		});
 	}
 
-	void SpvPatcher::Dump(const FString& SavedFileName) const
+	FString SpvPatcher::GetAsm() const
 	{
 		ShaderConductor::Compiler::DisassembleDesc SpvDisassembleDesc{
 						.language = ShaderConductor::ShadingLanguage::SpirV,
@@ -37,7 +37,12 @@ namespace FW
 			FString ErrorInfo = static_cast<const char*>(SpvTextResultDesc.errorWarningMsg.Data());
 			SpvSourceText = MoveTemp(ErrorInfo);
 		}
-		FFileHelper::SaveStringToFile(SpvSourceText, *SavedFileName);
+		return SpvSourceText;
+	}
+
+	void SpvPatcher::Dump(const FString& SavedFileName) const
+	{
+		FFileHelper::SaveStringToFile(GetAsm(), *SavedFileName);
 	}
 
 	SpvId SpvPatcher::FindOrAddTypeDesc(TUniquePtr<SpvInstruction> InInst)

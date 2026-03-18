@@ -59,11 +59,12 @@ namespace FW
 		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
 		SpvId InitializedRange = Patcher.NewId();
 
+		SpvId ZeroU = Patcher.FindOrAddConstant(0u);
 		if (NumUnits <= 32)
 		{
 			// Single uint bitmask: 1 bit per 4 bytes, up to 128 bytes
 			SpvId UIntPointerPrivateType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Private, UIntType));
-			auto VarOp = MakeUnique<SpvOpVariable>(UIntPointerPrivateType, SpvStorageClass::Private);
+			auto VarOp = MakeUnique<SpvOpVariable>(UIntPointerPrivateType, SpvStorageClass::Private, ZeroU);
 			VarOp->SetId(InitializedRange);
 			Patcher.AddGlobalVariable(MoveTemp(VarOp));
 		}
@@ -73,7 +74,10 @@ namespace FW
 			int32 K = (NumUnits + 31) / 32;
 			SpvId ArrType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeArray>(UIntType, Patcher.FindOrAddConstant(K)));
 			SpvId ArrPointerPrivateType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Private, ArrType));
-			auto VarOp = MakeUnique<SpvOpVariable>(ArrPointerPrivateType, SpvStorageClass::Private);
+			TArray<SpvId> ZeroConstituents;
+			for (int32 i = 0; i < K; ++i) ZeroConstituents.Add(ZeroU);
+			SpvId ZeroArr = Patcher.FindOrAddConstant(MakeUnique<SpvOpConstantComposite>(ArrType, MoveTemp(ZeroConstituents)));
+			auto VarOp = MakeUnique<SpvOpVariable>(ArrPointerPrivateType, SpvStorageClass::Private, ZeroArr);
 			VarOp->SetId(InitializedRange);
 			Patcher.AddGlobalVariable(MoveTemp(VarOp));
 		}
@@ -122,7 +126,8 @@ namespace FW
 		SpvId UIntPointerPrivateType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Private, UIntType));
 		HasError = Patcher.NewId();
 		{
-			auto VarOp = MakeUnique<SpvOpVariable>(UIntPointerPrivateType, SpvStorageClass::Private);
+			SpvId ZeroU = Patcher.FindOrAddConstant(0u);
+			auto VarOp = MakeUnique<SpvOpVariable>(UIntPointerPrivateType, SpvStorageClass::Private, ZeroU);
 			VarOp->SetId(HasError);
 			Patcher.AddGlobalVariable(MoveTemp(VarOp));
 			Patcher.AddDebugName(MakeUnique<SpvOpName>(HasError, "_HasError_"));
@@ -181,6 +186,42 @@ namespace FW
 			}
 		}
 	
+	}
+
+	void SpvValidator::Visit(const SpvOpLabel* Inst)
+	{
+		CurBlockLabel = Inst->GetId().value();
+	}
+
+	void SpvValidator::Visit(const SpvOpPhi* Inst)
+	{
+		//Block-splitting insertions (SelectionMerge/BranchConditional) make OpPhi
+		//parent block references stale. Fix them by replacing old labels with the
+		//last continuation label from BlockSplitRemaps.
+		int Offset = Inst->GetWordOffset().value();
+		int Len = Inst->GetWordLen().value();
+		const TArray<uint32>& Spv = Patcher.GetSpv();
+		// OpPhi binary: Header(1) | ResultType(1) | ResultId(1) | [Value(1) Parent(1)]*
+		for (int i = 4; i < Len; i += 2)
+		{
+			SpvId ParentId(Spv[Offset + i]);
+			if (SpvId* Remap = BlockSplitRemaps.Find(ParentId))
+			{
+				Patcher.OverwriteWord(Offset + i, Remap->GetValue());
+			}
+		}
+	}
+
+	void SpvValidator::AddBlockSplittingInstructions(int32 Offset, TArray<TUniquePtr<SpvInstruction>>&& InstList)
+	{
+		if (!InstList.IsEmpty() && CurBlockLabel.IsValid())
+		{
+			if (auto* Label = dynamic_cast<SpvOpLabel*>(InstList.Last().Get()))
+			{
+				BlockSplitRemaps.FindOrAdd(CurBlockLabel) = Label->GetId().value();
+			}
+		}
+		Patcher.AddInstructions(Offset, MoveTemp(InstList));
 	}
 
 	void SpvValidator::Visit(const SpvOpVariable* Inst)
@@ -243,7 +284,7 @@ namespace FW
 
 						InstList.Add(MakeUnique<SpvOpStore>(VarInitializedRange[Parameter], LoadedArgument));
 
-						Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(InstList));
+						AddBlockSplittingInstructions(Inst->GetWordOffset().value(), MoveTemp(InstList));
 					}
 				
 					// After call: copy param bitmask → arg bitmask
@@ -256,7 +297,7 @@ namespace FW
 
 						InstList.Add(MakeUnique<SpvOpStore>(VarInitializedRange[Argument], LoadedParameter));
 
-						Patcher.AddInstructions(Inst->GetWordOffset().value() + Inst->GetWordLen().value(), MoveTemp(InstList));
+						AddBlockSplittingInstructions(Inst->GetWordOffset().value() + Inst->GetWordLen().value(), MoveTemp(InstList));
 					}
 				}
 				else
@@ -287,7 +328,7 @@ namespace FW
 
 							InstList.Add(MakeUnique<SpvOpStore>(ParamElemPtr, LoadedElem));
 						}
-						Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(InstList));
+						AddBlockSplittingInstructions(Inst->GetWordOffset().value(), MoveTemp(InstList));
 					}
 
 					// After call: copy param array → arg array
@@ -312,7 +353,7 @@ namespace FW
 
 							InstList.Add(MakeUnique<SpvOpStore>(ArgElemPtr, LoadedElem));
 						}
-						Patcher.AddInstructions(Inst->GetWordOffset().value() + Inst->GetWordLen().value(), MoveTemp(InstList));
+						AddBlockSplittingInstructions(Inst->GetWordOffset().value() + Inst->GetWordLen().value(), MoveTemp(InstList));
 					}
 				}
 			}
@@ -376,7 +417,7 @@ namespace FW
 				GetAccess(VarType, Pointer->Indexes, BoundsCheckInsts);
 				if (BoundsCheckInsts.Num() > 0)
 				{
-					Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(BoundsCheckInsts));
+					AddBlockSplittingInstructions(Inst->GetWordOffset().value(), MoveTemp(BoundsCheckInsts));
 				}
 			}
 			return;
@@ -637,7 +678,7 @@ namespace FW
 					ValidateInsts.Add(MoveTemp(OverflowMergeLabelOp));
 				}
 			}
-			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(ValidateInsts));
+			AddBlockSplittingInstructions(Inst->GetWordOffset().value(), MoveTemp(ValidateInsts));
 		}
 	}
 
@@ -657,7 +698,7 @@ namespace FW
 				GetAccess(VarType, Pointer->Indexes, BoundsCheckInsts);
 				if (BoundsCheckInsts.Num() > 0)
 				{
-					Patcher.AddInstructions(Inst->GetWordOffset().value() + Inst->GetWordLen().value(), MoveTemp(BoundsCheckInsts));
+					AddBlockSplittingInstructions(Inst->GetWordOffset().value() + Inst->GetWordLen().value(), MoveTemp(BoundsCheckInsts));
 				}
 			}
 			return;
@@ -867,7 +908,7 @@ namespace FW
 					UpdateInsts.Add(MoveTemp(OverflowMergeLabelOp));
 				}
 			}
-			Patcher.AddInstructions(Inst->GetWordOffset().value() + Inst->GetWordLen().value(), MoveTemp(UpdateInsts));
+			AddBlockSplittingInstructions(Inst->GetWordOffset().value() + Inst->GetWordLen().value(), MoveTemp(UpdateInsts));
 		}
 	}
 
@@ -953,7 +994,7 @@ namespace FW
 				FalseLabelOp->SetId(FalseLabel);
 				PowValidationInsts.Add(MoveTemp(FalseLabelOp));
 			}
-			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(PowValidationInsts));
+			AddBlockSplittingInstructions(Inst->GetWordOffset().value(), MoveTemp(PowValidationInsts));
 		}
 	}
 
@@ -968,16 +1009,16 @@ namespace FW
 			TArray<TUniquePtr<SpvInstruction>> NormalizeValidationInsts;
 			{
 				SpvId Zero = GetScalarOrVectorId(ResultType, 0.0f);
-				SpvId IEqual = Patcher.NewId();;
-				auto IEqualOp = MakeUnique<SpvOpIEqual>(BoolResultType, Inst->GetX(), Zero);
-				IEqualOp->SetId(IEqual);
-				NormalizeValidationInsts.Add(MoveTemp(IEqualOp));
+				SpvId FOrdEqual = Patcher.NewId();;
+				auto FOrdEqualOp = MakeUnique<SpvOpFOrdEqual>(BoolResultType, Inst->GetX(), Zero);
+				FOrdEqualOp->SetId(FOrdEqual);
+				NormalizeValidationInsts.Add(MoveTemp(FOrdEqualOp));
 
-				SpvId Condition = IEqual;
+				SpvId Condition = FOrdEqual;
 				if (!ResultType->IsScalar())
 				{
 					SpvId All = Patcher.NewId();
-					auto AllOp = MakeUnique<SpvOpAll>(BoolType, IEqual);
+					auto AllOp = MakeUnique<SpvOpAll>(BoolType, FOrdEqual);
 					AllOp->SetId(All);
 					NormalizeValidationInsts.Add(MoveTemp(AllOp));
 					Condition = All;
@@ -998,7 +1039,7 @@ namespace FW
 				FalseLabelOp->SetId(FalseLabel);
 				NormalizeValidationInsts.Add(MoveTemp(FalseLabelOp));
 			}
-			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(NormalizeValidationInsts));
+			AddBlockSplittingInstructions(Inst->GetWordOffset().value(), MoveTemp(NormalizeValidationInsts));
 		}
 	}
 
@@ -1067,7 +1108,7 @@ namespace FW
 				FalseLabelOp->SetId(FalseLabel);
 				AsinValidationInsts.Add(MoveTemp(FalseLabelOp));
 			}
-			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(AsinValidationInsts));
+			AddBlockSplittingInstructions(Inst->GetWordOffset().value(), MoveTemp(AsinValidationInsts));
 		}
 	}
 
@@ -1120,7 +1161,7 @@ namespace FW
 				FalseLabelOp->SetId(FalseLabel);
 				AcosValidationInsts.Add(MoveTemp(FalseLabelOp));
 			}
-			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(AcosValidationInsts));
+			AddBlockSplittingInstructions(Inst->GetWordOffset().value(), MoveTemp(AcosValidationInsts));
 		}
 	}
 
@@ -1193,7 +1234,7 @@ namespace FW
 				FalseLabelOp->SetId(FalseLabel);
 				Atan2ValidationInsts.Add(MoveTemp(FalseLabelOp));
 			}
-			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(Atan2ValidationInsts));
+			AddBlockSplittingInstructions(Inst->GetWordOffset().value(), MoveTemp(Atan2ValidationInsts));
 		}
 	}
 
@@ -1236,7 +1277,7 @@ namespace FW
 				FalseLabelOp->SetId(FalseLabel);
 				ClampValidationInsts.Add(MoveTemp(FalseLabelOp));
 			}
-			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(ClampValidationInsts));
+			AddBlockSplittingInstructions(Inst->GetWordOffset().value(), MoveTemp(ClampValidationInsts));
 		}
 	}
 
@@ -1279,7 +1320,7 @@ namespace FW
 				FalseLabelOp->SetId(FalseLabel);
 				ClampValidationInsts.Add(MoveTemp(FalseLabelOp));
 			}
-			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(ClampValidationInsts));
+			AddBlockSplittingInstructions(Inst->GetWordOffset().value(), MoveTemp(ClampValidationInsts));
 		}
 	}
 
@@ -1322,7 +1363,7 @@ namespace FW
 				FalseLabelOp->SetId(FalseLabel);
 				ClampValidationInsts.Add(MoveTemp(FalseLabelOp));
 			}
-			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(ClampValidationInsts));
+			AddBlockSplittingInstructions(Inst->GetWordOffset().value(), MoveTemp(ClampValidationInsts));
 		}
 	}
 
@@ -1365,7 +1406,7 @@ namespace FW
 				FalseLabelOp->SetId(FalseLabel);
 				SmoothStepValidationInsts.Add(MoveTemp(FalseLabelOp));
 			}
-			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(SmoothStepValidationInsts));
+			AddBlockSplittingInstructions(Inst->GetWordOffset().value(), MoveTemp(SmoothStepValidationInsts));
 		}
 	}
 
@@ -1374,32 +1415,27 @@ namespace FW
 		if (EnableUbsan)
 		{
 			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			SpvId FloatType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFloat>(32));
+			SpvId FloatInputTypeId = GetScalarOrVectorTypeId(ResultType, FloatType);
+			SpvType* FloatInputType = Context.Types[FloatInputTypeId].Get();
 			SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
 			SpvId BoolResultType = GetScalarOrVectorTypeId(ResultType, BoolType);
-			SpvId UInt64Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(64, 0));
-			SpvId UInt64ResultType = GetScalarOrVectorTypeId(ResultType, UInt64Type);
 			TArray<TUniquePtr<SpvInstruction>> ConvertFValidationInsts;
 			{
-				SpvId Zero = GetScalarOrVectorId(ResultType, 0.0f);
+				SpvId Zero = GetScalarOrVectorId(FloatInputType, 0.0f);
 				SpvId FOrdLessThan = Patcher.NewId();
 				auto FOrdLessThanOp = MakeUnique<SpvOpFOrdLessThan>(BoolResultType, Inst->GetFloatValue(), Zero);
 				FOrdLessThanOp->SetId(FOrdLessThan);
 				ConvertFValidationInsts.Add(MoveTemp(FOrdLessThanOp));
 
-				SpvId Maximum = GetScalarOrVectorId(ResultType, (uint64)std::numeric_limits<uint32>::max());
-
-				SpvId UInt64Value = Patcher.NewId();
-				auto UInt64ValueOp = MakeUnique<SpvOpConvertFToU>(UInt64ResultType, Inst->GetFloatValue());
-				UInt64ValueOp->SetId(UInt64Value);
-				ConvertFValidationInsts.Add(MoveTemp(UInt64ValueOp));
-
-				SpvId UGreaterThan = Patcher.NewId();;
-				auto UGreaterThanOp = MakeUnique<SpvOpUGreaterThan>(BoolResultType, UInt64Value, Maximum);
-				UGreaterThanOp->SetId(UGreaterThan);
-				ConvertFValidationInsts.Add(MoveTemp(UGreaterThanOp));
+				SpvId UpperBound = GetScalarOrVectorId(FloatInputType, 4294967296.0f);
+				SpvId FOrdGTE = Patcher.NewId();
+				auto FOrdGTEOp = MakeUnique<SpvOpFOrdGreaterThanEqual>(BoolResultType, Inst->GetFloatValue(), UpperBound);
+				FOrdGTEOp->SetId(FOrdGTE);
+				ConvertFValidationInsts.Add(MoveTemp(FOrdGTEOp));
 
 				SpvId LogicalOr = Patcher.NewId();
-				auto LogicalOrOp = MakeUnique<SpvOpLogicalOr>(BoolResultType, FOrdLessThan, UGreaterThan);
+				auto LogicalOrOp = MakeUnique<SpvOpLogicalOr>(BoolResultType, FOrdLessThan, FOrdGTE);
 				LogicalOrOp->SetId(LogicalOr);
 				ConvertFValidationInsts.Add(MoveTemp(LogicalOrOp));
 
@@ -1428,7 +1464,7 @@ namespace FW
 				FalseLabelOp->SetId(FalseLabel);
 				ConvertFValidationInsts.Add(MoveTemp(FalseLabelOp));
 			}
-			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(ConvertFValidationInsts));
+			AddBlockSplittingInstructions(Inst->GetWordOffset().value(), MoveTemp(ConvertFValidationInsts));
 		}
 	}
 
@@ -1437,32 +1473,27 @@ namespace FW
 		if (EnableUbsan)
 		{
 			SpvType* ResultType = Context.Types[Inst->GetResultType()].Get();
+			SpvId FloatType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFloat>(32));
+			SpvId FloatInputTypeId = GetScalarOrVectorTypeId(ResultType, FloatType);
+			SpvType* FloatInputType = Context.Types[FloatInputTypeId].Get();
 			SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
 			SpvId BoolResultType = GetScalarOrVectorTypeId(ResultType, BoolType);
-			SpvId Int64Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(64, 1));
-			SpvId Int64ResultType = GetScalarOrVectorTypeId(ResultType, Int64Type);
 			TArray<TUniquePtr<SpvInstruction>> ConvertFValidationInsts;
 			{
-				SpvId Minimum = GetScalarOrVectorId(ResultType, (int64)std::numeric_limits<int32>::min());
-				SpvId Maximum = GetScalarOrVectorId(ResultType, (int64)std::numeric_limits<int32>::max());
+				SpvId LowerBound = GetScalarOrVectorId(FloatInputType, -2147483648.0f);
+				SpvId FOrdLT = Patcher.NewId();
+				auto FOrdLTOp = MakeUnique<SpvOpFOrdLessThan>(BoolResultType, Inst->GetFloatValue(), LowerBound);
+				FOrdLTOp->SetId(FOrdLT);
+				ConvertFValidationInsts.Add(MoveTemp(FOrdLTOp));
 
-				SpvId Int64Value = Patcher.NewId();
-				auto Int64ValueOp = MakeUnique<SpvOpConvertFToS>(Int64ResultType, Inst->GetFloatValue());
-				Int64ValueOp->SetId(Int64Value);
-				ConvertFValidationInsts.Add(MoveTemp(Int64ValueOp));
-
-				SpvId SLessThan = Patcher.NewId();
-				auto SLessThanOp = MakeUnique<SpvOpSLessThan>(BoolResultType, Int64Value, Minimum);
-				SLessThanOp->SetId(SLessThan);
-				ConvertFValidationInsts.Add(MoveTemp(SLessThanOp));
-
-				SpvId SGreaterThan = Patcher.NewId();;
-				auto SGreaterThanOp = MakeUnique<SpvOpSGreaterThan>(BoolResultType, Int64Value, Maximum);
-				SGreaterThanOp->SetId(SGreaterThan);
-				ConvertFValidationInsts.Add(MoveTemp(SGreaterThanOp));
+				SpvId UpperBound = GetScalarOrVectorId(FloatInputType, 2147483648.0f);
+				SpvId FOrdGTE = Patcher.NewId();
+				auto FOrdGTEOp = MakeUnique<SpvOpFOrdGreaterThanEqual>(BoolResultType, Inst->GetFloatValue(), UpperBound);
+				FOrdGTEOp->SetId(FOrdGTE);
+				ConvertFValidationInsts.Add(MoveTemp(FOrdGTEOp));
 
 				SpvId LogicalOr = Patcher.NewId();
-				auto LogicalOrOp = MakeUnique<SpvOpLogicalOr>(BoolResultType, SLessThan, SGreaterThan);
+				auto LogicalOrOp = MakeUnique<SpvOpLogicalOr>(BoolResultType, FOrdLT, FOrdGTE);
 				LogicalOrOp->SetId(LogicalOr);
 				ConvertFValidationInsts.Add(MoveTemp(LogicalOrOp));
 
@@ -1491,7 +1522,7 @@ namespace FW
 				FalseLabelOp->SetId(FalseLabel);
 				ConvertFValidationInsts.Add(MoveTemp(FalseLabelOp));
 			}
-			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(ConvertFValidationInsts));
+			AddBlockSplittingInstructions(Inst->GetWordOffset().value(), MoveTemp(ConvertFValidationInsts));
 		}
 	}
 
@@ -1578,7 +1609,7 @@ namespace FW
 				FalseLabelOp->SetId(FalseLabel);
 				SRemValidationInsts.Add(MoveTemp(FalseLabelOp));
 			}
-			Patcher.AddInstructions(Inst->GetWordOffset().value(), MoveTemp(SRemValidationInsts));
+			AddBlockSplittingInstructions(Inst->GetWordOffset().value(), MoveTemp(SRemValidationInsts));
 		}
 	}
 
@@ -1603,27 +1634,27 @@ namespace FW
 		TArray<TUniquePtr<SpvInstruction>> GetAccessFuncInsts;
 		{
 			SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
-			SpvId ArrType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeArray>(IntType, Patcher.FindOrAddConstant(MaxIndexNum)));
 
 			TArray<SpvId> ParamTypes;
-			if (MaxIndexNum > 0)
+			for (int32 i = 0; i < MaxIndexNum; i++)
 			{
-				ParamTypes.Add(ArrType);
+				ParamTypes.Add(IntType);
 			}
 			
 			SpvId FuncType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFunction>(IntType, ParamTypes));
-			auto FuncOp = MakeUnique<SpvOpFunction>(IntType, SpvFunctionControl::None, FuncType);
+			auto FuncOp = MakeUnique<SpvOpFunction>(IntType, SpvFunctionControl::DontInline, FuncType);
 			FuncOp->SetId(GetAccessFuncId);
 			GetAccessFuncInsts.Add(MoveTemp(FuncOp));
 
-			SpvId IndexParam;
-			if (MaxIndexNum > 0)
+			TArray<SpvId> IndexParams;
+			for (int32 i = 0; i < MaxIndexNum; i++)
 			{
-				IndexParam = Patcher.NewId();
-				auto IndexParamOp = MakeUnique<SpvOpFunctionParameter>(ArrType);
+				SpvId IndexParam = Patcher.NewId();
+				auto IndexParamOp = MakeUnique<SpvOpFunctionParameter>(IntType);
 				IndexParamOp->SetId(IndexParam);
 				GetAccessFuncInsts.Add(MoveTemp(IndexParamOp));
-				Patcher.AddDebugName(MakeUnique<SpvOpName>(IndexParam, "_Indexes_"));
+				Patcher.AddDebugName(MakeUnique<SpvOpName>(IndexParam, FString::Printf(TEXT("_Index%d_"), i)));
+				IndexParams.Add(IndexParam);
 			}
 
 			auto LabelOp = MakeUnique<SpvOpLabel>();
@@ -1632,10 +1663,7 @@ namespace FW
 
 			if (MaxIndexNum > 0)
 			{
-				SpvId FirstIndex = Patcher.NewId();
-				auto ExtractOp = MakeUnique<SpvOpCompositeExtract>(IntType, IndexParam, TArray<uint32>{0});
-				ExtractOp->SetId(FirstIndex);
-				GetAccessFuncInsts.Add(MoveTemp(ExtractOp));
+				SpvId FirstIndex = IndexParams[0];
 
 				if (Type->GetKind() == SpvTypeKind::Vector)
 				{
@@ -1690,11 +1718,7 @@ namespace FW
 						int32 MemberMaxIndexNum = GetMaxIndexNum(MemberType);
 						for (int i = 0; i < MemberMaxIndexNum; i++)
 						{
-							SpvId NewIndex = Patcher.NewId();
-							auto ExtractOp = MakeUnique<SpvOpCompositeExtract>(IntType, IndexParam, TArray<uint32>{(uint32)i + 1});
-							ExtractOp->SetId(NewIndex);
-							GetAccessFuncInsts.Add(MoveTemp(ExtractOp));
-							MemberIndexes.Add(NewIndex);
+							MemberIndexes.Add(IndexParams[i + 1]);
 						}
 						SpvId Ret = GetAccess(MemberType, MemberIndexes, GetAccessFuncInsts);
 
@@ -1737,11 +1761,7 @@ namespace FW
 						int32 MemberMaxIndexNum = GetMaxIndexNum(ArrayType->ElementType);
 						for (int i = 0; i < MemberMaxIndexNum; i++)
 						{
-							SpvId NewIndex = Patcher.NewId();
-							auto ExtractOp = MakeUnique<SpvOpCompositeExtract>(IntType, IndexParam, TArray<uint32>{(uint32)i + 1});
-							ExtractOp->SetId(NewIndex);
-							GetAccessFuncInsts.Add(MoveTemp(ExtractOp));
-							MemberIndexes.Add(NewIndex);
+							MemberIndexes.Add(IndexParams[i + 1]);
 						}
 						SpvId Ret = GetAccess(ArrayType->ElementType, MemberIndexes, GetAccessFuncInsts);
 
@@ -1782,11 +1802,7 @@ namespace FW
 						int32 MemberMaxIndexNum = GetMaxIndexNum(MatrixType->ElementType);
 						for (int i = 0; i < MemberMaxIndexNum; i++)
 						{
-							SpvId NewIndex = Patcher.NewId();
-							auto ExtractOp = MakeUnique<SpvOpCompositeExtract>(IntType, IndexParam, TArray<uint32>{(uint32)i + 1});
-							ExtractOp->SetId(NewIndex);
-							GetAccessFuncInsts.Add(MoveTemp(ExtractOp));
-							MemberIndexes.Add(NewIndex);
+							MemberIndexes.Add(IndexParams[i + 1]);
 						}
 						SpvId Ret = GetAccess(MatrixType->ElementType, MemberIndexes, GetAccessFuncInsts);
 
@@ -1831,7 +1847,7 @@ namespace FW
 		TArray<TUniquePtr<SpvInstruction>> AppendErrorFuncInsts;
 		{
 			SpvId FuncType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFunction>(VoidType));
-			auto FuncOp = MakeUnique<SpvOpFunction>(VoidType, SpvFunctionControl::None, FuncType);
+			auto FuncOp = MakeUnique<SpvOpFunction>(VoidType, SpvFunctionControl::DontInline, FuncType);
 			FuncOp->SetId(AppendErrorFuncId);
 			AppendErrorFuncInsts.Add(MoveTemp(FuncOp));
 
@@ -2075,30 +2091,19 @@ namespace FW
 
 		SpvId GetAccessFuncId = GetAccessFuncIds[VarType];
 		SpvId IntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 1));
-		SpvId ArrType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeArray>(IntType, Patcher.FindOrAddConstant(MaxIndexNum)));
 
 		TArray<SpvId> Arguments;
-		if (MaxIndexNum > 0)
+		for (SpvId Index : Indexes)
 		{
-			SpvId IndexArr = Patcher.NewId();
-			TArray<SpvId> Constituents;
-			for (SpvId Index : Indexes)
-			{
-				SpvId BitCastValue = Patcher.NewId();
-				auto BitCastOp = MakeUnique<SpvOpBitcast>(IntType, Index);
-				BitCastOp->SetId(BitCastValue);
-				InstList.Add(MoveTemp(BitCastOp));
-				Constituents.Add(BitCastValue);
-			}
-			while (MaxIndexNum - Constituents.Num() > 0)
-			{
-				Constituents.Add(Patcher.FindOrAddConstant(0));
-			}
-
-			auto IndexArrOp = MakeUnique<SpvOpCompositeConstruct>(ArrType, Constituents);
-			IndexArrOp->SetId(IndexArr);
-			InstList.Add(MoveTemp(IndexArrOp));
-			Arguments.Add(IndexArr);
+			SpvId BitCastValue = Patcher.NewId();
+			auto BitCastOp = MakeUnique<SpvOpBitcast>(IntType, Index);
+			BitCastOp->SetId(BitCastValue);
+			InstList.Add(MoveTemp(BitCastOp));
+			Arguments.Add(BitCastValue);
+		}
+		while (MaxIndexNum - Arguments.Num() > 0)
+		{
+			Arguments.Add(Patcher.FindOrAddConstant(0));
 		}
 
 		SpvId FuncCallRet = Patcher.NewId();
@@ -2198,6 +2203,6 @@ namespace FW
 			FalseLabelOp->SetId(FalseLabel);
 			InstList.Add(MoveTemp(FalseLabelOp));
 		}
-		Patcher.AddInstructions(OffsetEval(), MoveTemp(InstList));
+		AddBlockSplittingInstructions(OffsetEval(), MoveTemp(InstList));
 	}
 }

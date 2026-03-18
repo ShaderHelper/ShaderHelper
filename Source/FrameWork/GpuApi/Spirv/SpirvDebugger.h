@@ -378,9 +378,9 @@ namespace FW
 		void FlattenToUInts(SpvId InValueId, SpvId InTypeId, TArray<TUniquePtr<SpvInstruction>>& InstList, TArray<SpvId>& OutUIntValues);
 		void BatchStoreToDebugBuffer(const TArray<SpvId>& UIntValues, TArray<TUniquePtr<SpvInstruction>>& InstList);
 		void PatchAppendAccessFunc(int32 IndexNum);
-		void PatchAppendVarFunc(SpvPointer* Pointer, int32 IndexNum);
-		void PatchAppendValueFunc(SpvType* ValueType);
-		void PatchAppendMathFunc(SpvType* ResultType, SpvType* OperandType, int32 OperandNum);
+		void PatchAppendVarFunc(int32 ValueUIntCount, int32 IndexNum);
+		void PatchAppendValueFunc(int32 ValueUIntCount);
+		void PatchAppendMathFunc(int32 TotalOperandUIntCount);
 		SpvOpFunctionCall* AppendVar(const TFunction<int32()>& OffsetEval, SpvPointer* Pointer);
 		void AppendAccess(const TFunction<int32()>& OffsetEval, SpvPointer* Pointer);
 		void AppendTag(const TFunction<int32()>& OffsetEval, SpvDebuggerStateType InStateType);
@@ -404,23 +404,10 @@ namespace FW
 		SpvId DebuggerOffset;
 		SpvId AppendTagFuncId;
 		SpvId AppendCallFuncId;
-		TMap<TPair<SpvType*, int32>, SpvId> AppendVarFuncIds;
-		TMap<SpvType*, SpvId> AppendValueFuncIds;
+		TMap<TPair<int32, int32>, SpvId> AppendVarFuncIds;
+		TMap<int32, SpvId> AppendValueFuncIds;
 		TMap<int32, SpvId> AppendAccessFuncIds;
-		struct MathFuncSearchKey
-		{
-			SpvType* ResultType{};
-			SpvType* OperandType{};
-			int32 OperandNum{};
-			bool operator==(const MathFuncSearchKey& Other) const = default;
-			friend uint32 GetTypeHash(const MathFuncSearchKey& Key)
-			{
-				uint32 Hash = HashCombine(::GetTypeHash(Key.ResultType), ::GetTypeHash(Key.OperandType));
-				Hash = HashCombine(Hash, ::GetTypeHash(Key.OperandNum));
-				return Hash;
-			}
-		};
-		TMap<MathFuncSearchKey, SpvId> AppendMathFuncIds;
+		TMap<int32, SpvId> AppendMathFuncIds;
 		TMap<const SpvOpFunctionCall*, const SpvOpStore*> AppendVarCallToStore;
 		TMap<SpvId, uint32> LoadUsedInitUnits; // OpLoad ResultId -> escaped init-unit bitmask (0 = skip access check)
 		TSet<SpvId> StaticallyInitializedVars; // Vars provably fully initialized before any read

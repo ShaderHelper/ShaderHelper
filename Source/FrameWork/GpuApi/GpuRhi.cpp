@@ -326,6 +326,7 @@ public:
 
 	bool CompileShader(GpuShader *InShader, FString &OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs) override
 	{
+		InShader->CompileExtraArgs = ExtraArgs;
 		return RhiBackend->CompileShader(InShader, OutErrorInfo, OutWarnInfo, ExtraArgs);
 	}
 

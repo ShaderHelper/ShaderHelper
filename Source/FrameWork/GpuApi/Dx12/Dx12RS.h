@@ -1,5 +1,4 @@
 #pragma once
-#pragma once
 #include "Dx12Common.h"
 #include "GpuApi/GpuResource.h"
 #include "Dx12Descriptor.h"

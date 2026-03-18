@@ -175,9 +175,20 @@ namespace FW
 
 		virtual TArray<GpuShaderLayoutBinding> GetLayout() const;
 
+		friend uint32 GetTypeHash(const GpuShader& Shader)
+		{
+			uint32 Hash = ::GetTypeHash(Shader.SourceText);
+			for (const FString& Arg : Shader.CompileExtraArgs)
+			{
+				Hash = HashCombine(Hash, ::GetTypeHash(Arg));
+			}
+			return Hash;
+		}
+
 	public:
 		GpuShaderCompilerFlag CompilerFlag = GpuShaderCompilerFlag::None;
 		TArray<uint32> SpvCode;
+		TArray<FString> CompileExtraArgs;
         
     protected:
         ShaderType Type;

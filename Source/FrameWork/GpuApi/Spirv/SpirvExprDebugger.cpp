@@ -23,16 +23,18 @@ namespace FW
 		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
 		SpvId UIntPointerPrivateType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Private, UIntType));
 
+		SpvId ZeroU = Patcher.FindOrAddConstant(0u);
+
 		DebugStateNum = Patcher.NewId();
 		{
-			auto VarOp = MakeUnique<SpvOpVariable>(UIntPointerPrivateType, SpvStorageClass::Private);
+			auto VarOp = MakeUnique<SpvOpVariable>(UIntPointerPrivateType, SpvStorageClass::Private, ZeroU);
 			VarOp->SetId(DebugStateNum);
 			Patcher.AddGlobalVariable(MoveTemp(VarOp));
 			Patcher.AddDebugName(MakeUnique<SpvOpName>(DebugStateNum, "_DebugStateNum_"));
 		}
 		DoAppendExpr = Patcher.NewId();
 		{
-			auto VarOp = MakeUnique<SpvOpVariable>(UIntPointerPrivateType, SpvStorageClass::Private);
+			auto VarOp = MakeUnique<SpvOpVariable>(UIntPointerPrivateType, SpvStorageClass::Private, ZeroU);
 			VarOp->SetId(DoAppendExpr);
 			Patcher.AddGlobalVariable(MoveTemp(VarOp));
 			Patcher.AddDebugName(MakeUnique<SpvOpName>(DoAppendExpr, "_DoAppendExpr_"));

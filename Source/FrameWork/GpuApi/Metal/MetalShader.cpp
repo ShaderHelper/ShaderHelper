@@ -56,8 +56,12 @@ namespace FW
 		FString ShaderName = InShader->GetShaderName();
 		FString EntryPoint = InShader->GetEntryPoint();;
 		TArray<uint32> SpvCode;
-		
-		if(InShader->GetShaderLanguage() == GpuShaderLanguage::GLSL)
+
+		if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::CompileFromSpvCode))
+		{
+			SpvCode = MoveTemp(InShader->SpvCode);
+		}
+		else if(InShader->GetShaderLanguage() == GpuShaderLanguage::GLSL)
 		{
 #if DEBUG_SHADER
 			if (!ShaderName.IsEmpty())

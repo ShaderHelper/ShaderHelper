@@ -12,6 +12,7 @@ namespace FW
 		void SetSpvContext(const TArray<TUniquePtr<SpvInstruction>>& InInsts, const TArray<uint32>& InSpvCode, SpvMetaContext* InMetaContext);
 		const TArray<uint32>& GetSpv() const { return SpvCode; }
 		const TArray<TUniquePtr<SpvInstruction>>& GetPathcedInsts() const { return PatchedInsts; }
+		FString GetAsm() const;
 		void Dump(const FString& SavedFileName) const;
 		SpvId NewId() {
 			return SpvCode[3]++;

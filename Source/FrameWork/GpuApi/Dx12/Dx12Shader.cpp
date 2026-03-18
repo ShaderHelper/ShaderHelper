@@ -307,7 +307,7 @@ namespace FW
 	 bool DxcCompiler::Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs) const
 	 {
 		 // Try to load from cache first (skip for debug SPV generation or when SkipCache is set)
-		 if (!EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging | GpuShaderCompilerFlag::SkipCache))
+		 if (!EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging | GpuShaderCompilerFlag::SkipCache | GpuShaderCompilerFlag::CompileFromSpvCode))
 		 {
 			 if (InShader->TryLoadCachedByteCode(ExtraArgs))
 			 {
@@ -318,7 +318,37 @@ namespace FW
 		 FString ShaderName = InShader->GetShaderName();
 		 FString HlslSource;
 		 FString EntryPoint = InShader->GetEntryPoint();
-		 if (InShader->GetShaderLanguage() == GpuShaderLanguage::GLSL)
+		 if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::CompileFromSpvCode))
+		 {
+			 ShaderConductor::Compiler::TargetDesc HlslTargetDesc{};
+			 HlslTargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
+			 HlslTargetDesc.version = "66";
+			 ShaderConductor::Compiler::Options Options{};
+			 Options.force_zero_initialized_variables = true;
+
+			 try
+			 {
+				 auto EntryPointUTF8 = StringCast<UTF8CHAR>(*EntryPoint);
+				 ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile(
+					 Options, { InShader->SpvCode.GetData(), (uint32)InShader->SpvCode.Num() * 4 },
+					 (const char*)EntryPointUTF8.Get(),
+					 MapShaderCunductorStage(InShader->GetShaderType()), HlslTargetDesc);
+
+				 if (ShaderResultDesc.hasError)
+				 {
+					 OutErrorInfo = "[SpvCrossError] " + FString(static_cast<const char*>(ShaderResultDesc.errorWarningMsg.Data()));
+					 return false;
+				 }
+
+				 HlslSource = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
+			 }
+			 catch (const std::runtime_error& e)
+			 {
+				 OutErrorInfo = "[SpvCrossError] " + FString(UTF8_TO_TCHAR(e.what()));
+				 return false;
+			 }
+		 }
+		 else if (InShader->GetShaderLanguage() == GpuShaderLanguage::GLSL)
 		 {
 #if DEBUG_SHADER
 			 if (!ShaderName.IsEmpty())
@@ -363,9 +393,11 @@ namespace FW
 			 ShaderConductor::Compiler::TargetDesc HlslTargetDesc{};
 			 HlslTargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
 			 HlslTargetDesc.version = "66";
+			 ShaderConductor::Compiler::Options Options{};
+			 Options.force_zero_initialized_variables = true;
 			 try
 			 {
-				 ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile({}, { Spv.data(), (uint32)Spv.size() * 4 }, "main",
+				 ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile(Options, { Spv.data(), (uint32)Spv.size() * 4 }, "main",
 					 MapShaderCunductorStage(InShader->GetShaderType()), HlslTargetDesc);
 				 HlslSource = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
 				 InShader->SpvCode = MoveTemp(SpvCode);

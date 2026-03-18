@@ -469,9 +469,11 @@ namespace FW
 
 		//Add _PreviewOutput_ float4 Private global initialized to vec4(0)
 		SpvId Float4PointerPrivateType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Private, Float4Type));
+		SpvId ZeroF = Patcher.FindOrAddConstant(0.0f);
+		SpvId ZeroFloat4 = Patcher.FindOrAddConstant(MakeUnique<SpvOpConstantComposite>(Float4Type, TArray<SpvId>{ZeroF, ZeroF, ZeroF, ZeroF}));
 		PreviewOutputVar = Patcher.NewId();
 		{
-			auto VarOp = MakeUnique<SpvOpVariable>(Float4PointerPrivateType, SpvStorageClass::Private);
+			auto VarOp = MakeUnique<SpvOpVariable>(Float4PointerPrivateType, SpvStorageClass::Private, ZeroFloat4);
 			VarOp->SetId(PreviewOutputVar);
 			Patcher.AddGlobalVariable(MoveTemp(VarOp));
 			Patcher.AddDebugName(MakeUnique<SpvOpName>(PreviewOutputVar, "_PreviewOutput_"));
@@ -479,9 +481,10 @@ namespace FW
 
 		//Add _PreviewStateCounter_ uint Private global initialized to 0
 		SpvId UIntPointerPrivateType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Private, UIntType));
+		SpvId ZeroU = Patcher.FindOrAddConstant(0u);
 		StateCounter = Patcher.NewId();
 		{
-			auto VarOp = MakeUnique<SpvOpVariable>(UIntPointerPrivateType, SpvStorageClass::Private);
+			auto VarOp = MakeUnique<SpvOpVariable>(UIntPointerPrivateType, SpvStorageClass::Private, ZeroU);
 			VarOp->SetId(StateCounter);
 			Patcher.AddGlobalVariable(MoveTemp(VarOp));
 			Patcher.AddDebugName(MakeUnique<SpvOpName>(StateCounter, "_PreviewStateCounter_"));
@@ -490,7 +493,7 @@ namespace FW
 		//Add _PreviewCallStackHash_ uint Private global initialized to 0
 		CallStackHashVar = Patcher.NewId();
 		{
-			auto VarOp = MakeUnique<SpvOpVariable>(UIntPointerPrivateType, SpvStorageClass::Private);
+			auto VarOp = MakeUnique<SpvOpVariable>(UIntPointerPrivateType, SpvStorageClass::Private, ZeroU);
 			VarOp->SetId(CallStackHashVar);
 			Patcher.AddGlobalVariable(MoveTemp(VarOp));
 			Patcher.AddDebugName(MakeUnique<SpvOpName>(CallStackHashVar, "_PreviewCallStackHash_"));
@@ -516,6 +519,20 @@ namespace FW
 				{
 					if (auto* Label = dynamic_cast<const SpvOpLabel*>((*Insts)[i].Get()))
 					{
+						//Skip past all Function-scoped OpVariable instructions (SPIR-V requires them at block start)
+						const SpvInstruction* InsertAfter = Label;
+						for (int32 j = i + 1; j < Insts->Num(); j++)
+						{
+							if (dynamic_cast<const SpvOpVariable*>((*Insts)[j].Get()))
+							{
+								InsertAfter = (*Insts)[j].Get();
+							}
+							else
+							{
+								break;
+							}
+						}
+
 						TArray<TUniquePtr<SpvInstruction>> GridInsts;
 						SpvId ConstGridSize = Patcher.FindOrAddConstant(8.0f);
 						SpvId ConstDark = Patcher.FindOrAddConstant(0.1f);
@@ -604,7 +621,7 @@ namespace FW
 
 						GridInsts.Add(MakeUnique<SpvOpStore>(PreviewOutputVar, GridColor));
 
-						Patcher.AddInstructions(Label->GetWordOffset().value() + Label->ToBinary().Num(), MoveTemp(GridInsts));
+						Patcher.AddInstructions(InsertAfter->GetWordOffset().value() + InsertAfter->ToBinary().Num(), MoveTemp(GridInsts));
 						break;
 					}
 				}

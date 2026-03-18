@@ -98,6 +98,7 @@ namespace FW::VK
 		DeviceExts.Add(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
 		DeviceExts.Add(VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME);
 #endif
+		DeviceExts.Add(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
 		auto GetGraphicsQueueIndex = [](VkPhysicalDevice InDevice) -> int32
 		{
 			uint32_t QueueFamilyCount = 0;
