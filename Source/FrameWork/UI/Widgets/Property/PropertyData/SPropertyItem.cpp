@@ -23,6 +23,9 @@ namespace FW
 			.Text_Lambda([this] {
 				return *DisplayName;
 			})
+			.ToolTipText_Lambda([this] {
+				return *DisplayName;
+			})
 			.OnTextCommitted_Lambda([this, InArgs](const FText& NewText, ETextCommit::Type) {
 			if (NewText.ToString().IsEmpty())
 			{

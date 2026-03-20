@@ -26,9 +26,11 @@ namespace FW
 		void SetFaceData(int32 FaceIndex, const TArray<uint8>& InData);
 		void SetData(uint32 InSize, GpuTextureFormat InFormat, TArray<TArray<uint8>> InFaceData);
 
-	private:
+	public:
 		GpuTextureFormat Format;
 		uint32 Size; // cubemap faces are square: Width == Height == Size
+
+	private:
 		TArray<TArray<uint8>> FaceData; // 6 faces: +X, -X, +Y, -Y, +Z, -Z
 		TRefCountPtr<GpuTexture> GpuData;
 		TRefCountPtr<GpuTexture> PreviewData;

@@ -213,6 +213,10 @@ namespace SH
 							FString SavedFilePath = TextureSaveDir / (FPaths::GetBaseFilename(FileName) + TEXT(".") + Asset->FileExtension());
 							TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFilePath));
 							Asset->ObjectName = FText::FromString(FPaths::GetBaseFilename(FileName));
+							if (Texture2D* Texture2dAsset = dynamic_cast<Texture2D*>(Asset.Get()))
+							{
+								Texture2dAsset->GenerateMipmap = true;
+							}
 							Asset->Serialize(*Ar);
 						}
 					}

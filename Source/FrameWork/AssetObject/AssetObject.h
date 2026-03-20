@@ -22,6 +22,7 @@ namespace FW
 		bool IsDirty();
 
 		virtual FString FileExtension() const = 0;
+		bool IsBuiltInAsset() const;
 
 		//Determine the asset icon in the asset browser.
 		virtual GpuTexture* GetThumbnail() const { return nullptr; }

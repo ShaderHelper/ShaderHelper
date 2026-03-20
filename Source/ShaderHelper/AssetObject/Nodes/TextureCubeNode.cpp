@@ -11,8 +11,6 @@ namespace SH
 	REFLECTION_REGISTER(AddClass<TextureCubeNode>("TextureCube Node")
 		.BaseClass<GraphNode>()
 		.Data<&TextureCubeNode::Texture, MetaInfo::Property>(LOCALIZATION("Texture"))
-		.Data<&TextureCubeNode::Format, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("Format"))
-		.Data<&TextureCubeNode::Size, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("Size"))
 	)
 	REFLECTION_REGISTER(AddClass<TextureCubeNodeOp>()
 		.BaseClass<ShObjectOp>()
@@ -73,7 +71,10 @@ namespace SH
 
 	TSharedPtr<SWidget> TextureCubeNode::ExtraNodeWidget()
 	{
-		return SNew(SViewport).ViewportInterface(Preview).ViewportSize(FVector2D{80, 80});
+		return SNew(SBox).Padding(4.0f)
+			[
+				SNew(SViewport).ViewportInterface(Preview).ViewportSize(FVector2D{80, 80})
+			];
 	}
 
 	void TextureCubeNode::InitTexture()

@@ -3,9 +3,8 @@
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "AssetObject/Pins/Pins.h"
-#include "UI/Widgets/Misc/MiscWidget.h"
-#include "RenderResource/RenderPass/BlitPass.h"
-#include "Renderer/RenderGraph.h"
+
+#include <Widgets/SViewport.h>
 
 using namespace FW;
 
@@ -14,9 +13,6 @@ namespace SH
 	REFLECTION_REGISTER(AddClass<Texture2dNode>("Texture2d Node")
 		.BaseClass<GraphNode>()
 		.Data<&Texture2dNode::Texture, MetaInfo::Property>(LOCALIZATION("Texture"))
-		.Data<&Texture2dNode::Format, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("Format"))
-		.Data<&Texture2dNode::Width, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("Width"))
-		.Data<&Texture2dNode::Height, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("Height"))
 	)
 	REFLECTION_REGISTER(AddClass<Texture2dNodeOp>()
 		.BaseClass<ShObjectOp>()
@@ -68,7 +64,6 @@ namespace SH
 		GraphNode::Serialize(Ar);
 		
 		Ar << Texture;
-		Ar << ChannelFilter;
 	}
 
 	void Texture2dNode::PostLoad()
@@ -80,85 +75,10 @@ namespace SH
 
 	TSharedPtr<SWidget> Texture2dNode::ExtraNodeWidget()
 	{
-		return	SNew(SVerticalBox)
-				+ SVerticalBox::Slot()
-				.Padding(4, 0, 4, 0)
-				.AutoHeight()
-				[
-					SNew(SBorder).BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
-					[
-						SNew(SHorizontalBox)
-						+ SHorizontalBox::Slot()
-						[
-							SNew(SShToggleButton).Text(FText::FromString("R"))
-							.IsChecked_Lambda([this] { return ChannelFilter == TextureChannelFilter::R ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
-							.OnCheckStateChanged_Lambda([this](ECheckBoxState InState) {
-								if (InState == ECheckBoxState::Checked)
-								{
-									ChannelFilter = TextureChannelFilter::R;
-								}
-								else
-								{
-									ChannelFilter = TextureChannelFilter::None;
-								}
-								RefershPreview();
-							})
-						]
-						+ SHorizontalBox::Slot()
-						[
-							SNew(SShToggleButton).Text(FText::FromString("G"))
-							.IsChecked_Lambda([this] { return ChannelFilter == TextureChannelFilter::G ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
-							.OnCheckStateChanged_Lambda([this](ECheckBoxState InState) {
-								if (InState == ECheckBoxState::Checked)
-								{
-									ChannelFilter = TextureChannelFilter::G;
-								}
-								else
-								{
-									ChannelFilter = TextureChannelFilter::None;
-								}
-								RefershPreview();
-							})
-						]
-						+ SHorizontalBox::Slot()
-						[
-							SNew(SShToggleButton).Text(FText::FromString("B"))
-							.IsChecked_Lambda([this] { return ChannelFilter == TextureChannelFilter::B ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
-							.OnCheckStateChanged_Lambda([this](ECheckBoxState InState) {
-								if (InState == ECheckBoxState::Checked)
-								{
-									ChannelFilter = TextureChannelFilter::B;
-								}
-								else
-								{
-									ChannelFilter = TextureChannelFilter::None;
-								}
-								RefershPreview();
-							})
-						]
-						+ SHorizontalBox::Slot()
-						[
-							SNew(SShToggleButton).Text(FText::FromString("A"))
-							.IsChecked_Lambda([this] { return ChannelFilter == TextureChannelFilter::A ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
-							.OnCheckStateChanged_Lambda([this](ECheckBoxState InState) {
-								if (InState == ECheckBoxState::Checked)
-								{
-									ChannelFilter = TextureChannelFilter::A;
-								}
-								else
-								{
-									ChannelFilter = TextureChannelFilter::None;
-								}
-								RefershPreview();
-							})
-						]
-					]
-				]
-				+ SVerticalBox::Slot()
-				.Padding(4, 0 ,4 ,4)
-				[
-					SNew(SViewport).ViewportInterface(Preview).ViewportSize(FVector2D{ 80, 80 })
-				];
+		return SNew(SBox).Padding(4.0f)
+			[
+				SNew(SViewport).ViewportInterface(Preview).ViewportSize(FVector2D{80, 80})
+			];
 	}
 
 	void Texture2dNode::InitTexture()
@@ -175,27 +95,12 @@ namespace SH
 
 	void Texture2dNode::RefershPreview()
 	{
-		if (!Texture)
+		if (!Texture || !Texture->GetPreviewTexture())
 		{
 			return;
 		}
 
-		GpuTextureDesc Desc{ Width, Height, Format, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
-		TRefCountPtr<GpuTexture> PreviewTex = GGpuRhi->CreateTexture(MoveTemp(Desc));
-
-		RenderGraph Graph;
-		{
-			BlitPassInput Input;
-			Input.InputView = Texture->GetGpuData()->GetDefaultView();
-			Input.InputTexSampler = GpuResourceHelper::GetSampler({});
-			Input.OutputView = PreviewTex->GetDefaultView();
-			Input.VariantDefinitions.insert(FString::Printf(TEXT("CHANNEL_FILTER_%s"), ANSI_TO_TCHAR(magic_enum::enum_name(ChannelFilter).data())));
-			AddBlitPass(Graph, MoveTemp(Input));
-		}
-		Graph.Execute();
-
-		Preview->SetViewPortRenderTexture(PreviewTex);
-
+		Preview->SetViewPortRenderTexture(Texture->GetPreviewTexture());
 	}
 
 	void Texture2dNode::RefreshProprety()

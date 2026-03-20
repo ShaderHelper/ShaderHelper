@@ -4,6 +4,9 @@
 #include "AssetObject/Texture2D.h"
 #include "Editor/PreviewViewPort.h"
 #include "AssetManager/AssetImporter/AssetImporter.h"
+#include "Editor/ShaderHelperEditor.h"
+#include "App/App.h"
+#include "UI/Widgets/STexturePreviewer.h"
 
 #include <Widgets/SViewport.h>
 #include <DesktopPlatformModule.h>
@@ -295,5 +298,16 @@ namespace SH
 			CubeAsset->SetData(FaceSize, FaceFormat, MoveTemp(AllFaceData));
 		}
 		return bConfirmed;
+	}
+
+	void TextureCubeOp::OnOpen(const FString& InAssetPath)
+	{
+		AssetPtr<TextureCube> Asset = TSingleton<AssetManager>::Get().LoadAssetByPath<TextureCube>(InAssetPath);
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->ShowProperty(Asset.Get());
+		STexturePreviewer::OpenTexturePreviewer(Asset, FPointerEventHandler::CreateLambda([=](const FGeometry&, const FPointerEvent&) {
+			ShEditor->ShowProperty(Asset.Get());
+			return FReply::Handled();
+		}), ShEditor->GetMainWindow());
 	}
 }

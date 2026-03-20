@@ -10,5 +10,6 @@ namespace SH
 		Texture2dOp() = default;
 
 		FW::MetaType* SupportType() override;
+		void OnOpen(const FString& InAssetPath) override;
 	};
 }

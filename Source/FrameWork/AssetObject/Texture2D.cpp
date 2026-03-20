@@ -5,11 +5,16 @@
 #include "AssetManager/AssetManager.h"
 #include "Renderer/RenderGraph.h"
 #include "RenderResource/RenderPass/BlitPass.h"
+#include "UI/Widgets/Property/PropertyData/PropertyData.h"
 
 namespace FW
 {
     REFLECTION_REGISTER(AddClass<Texture2D>("Texture2D")
                                 .BaseClass<AssetObject>()
+								.Data<&Texture2D::Format, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("Format"))
+								.Data<&Texture2D::Width, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("Width"))
+								.Data<&Texture2D::Height, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("Height"))
+								.Data<&Texture2D::GenerateMipmap, MetaInfo::Property>(LOCALIZATION("GenerateMipmap"))
 	)
 
 	Texture2D::Texture2D()
@@ -34,12 +39,22 @@ namespace FW
 		Ar << Width;
 		Ar << Height;
 		Ar << RawData;
+		Ar << GenerateMipmap;
 	}
 
 	void Texture2D::PostLoad()
 	{
 		AssetObject::PostLoad();
 		InitGpudata();
+	}
+
+	void Texture2D::PostPropertyChanged(PropertyData* InProperty)
+	{
+		AssetObject::PostPropertyChanged(InProperty);
+		if (InProperty->GetDisplayName().EqualTo(LOCALIZATION("GenerateMipmap")))
+		{
+			InitGpudata();
+		}
 	}
 
 	void Texture2D::InitGpudata()
@@ -50,7 +65,7 @@ namespace FW
 			.Format = Format,
 			.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget,
 			.InitialData = RawData,
-			.NumMips = 0,
+			.NumMips = GenerateMipmap ? 0u : 1u,
 		};
 		GpuData = GGpuRhi->CreateTexture(MoveTemp(Desc), GpuResourceState::ShaderResourceRead);
 

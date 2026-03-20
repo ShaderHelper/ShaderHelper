@@ -13,6 +13,7 @@ namespace FW
 	public:
 		void Serialize(FArchive& Ar) override;
 		void PostLoad() override;
+		void PostPropertyChanged(PropertyData* InProperty) override;
 		
 		void InitGpudata();
 		FString FileExtension() const override;
@@ -24,9 +25,12 @@ namespace FW
 		uint32 GetHeight() const { return Height; }
 		GpuTextureFormat GetFormat() const { return Format; }
 
-	private:
+	public:
 		GpuTextureFormat Format;
-        uint32 Width, Height;
+		uint32 Width, Height;
+		bool GenerateMipmap = false;
+
+	private:
 		TArray<uint8> RawData;
 		TRefCountPtr<GpuTexture> GpuData;
 		TRefCountPtr<GpuTexture> PreviewTex;

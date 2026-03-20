@@ -7,6 +7,8 @@ namespace FW
 {
 	REFLECTION_REGISTER(AddClass<TextureCube>("TextureCube")
 		.BaseClass<AssetObject>()
+		.Data<&TextureCube::Format, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("Format"))
+		.Data<&TextureCube::Size, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("Size"))
 	)
 
 	TextureCube::TextureCube()

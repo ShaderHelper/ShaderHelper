@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "AssetObject.h"
+#include "Common/Path/PathHelper.h"
 #include "Common/Util/Reflection.h"
 #include "AssetManager/AssetManager.h"
 #include "ProjectManager/ProjectManager.h"
@@ -66,6 +67,11 @@ namespace FW
 	{
 		return GProject->IsPendingAsset(this);
 	}
+
+    bool AssetObject::IsBuiltInAsset() const
+    {
+        return FPaths::IsUnderDirectory(GetPath(), PathHelper::BuiltinDir());
+    }
 
 	FString AssetObject::GetFileName() const
     {

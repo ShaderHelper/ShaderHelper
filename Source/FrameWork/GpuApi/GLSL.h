@@ -1476,7 +1476,7 @@ namespace FW
 						{
 							for (const auto& Sym : Context.SymbolTable)
 							{
-								if (Sym.Name == Word) { Type = Sym.Kind; break; }
+								if (Sym.Name.Equals(Word)) { Type = Sym.Kind; break; }
 							}
 						}
 						OutTokens.Add({ MoveTemp(Word), Type });

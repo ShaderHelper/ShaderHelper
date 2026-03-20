@@ -16,15 +16,6 @@ namespace SH
 		FW::MetaType* SupportType() override;
 	};
 
-	enum class TextureChannelFilter
-	{
-		None,
-		R,
-		G,
-		B,
-		A
-	};
-
 	class Texture2dNode : public FW::GraphNode
 	{
 		REFLECTION_TYPE(Texture2dNode)
@@ -57,7 +48,6 @@ namespace SH
 		uint32 Height{};
 		
 	private:
-		TextureChannelFilter ChannelFilter = TextureChannelFilter::None;
 		TSharedPtr<FW::PreviewViewPort> Preview = MakeShared<FW::PreviewViewPort>();
 		
 	};

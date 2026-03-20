@@ -10,6 +10,7 @@ namespace SH
 		TextureCubeOp() = default;
 
 		FW::MetaType* SupportType() override;
+		void OnOpen(const FString& InAssetPath) override;
 		bool OnCreate(FW::AssetObject* InAsset) override;
 	};
 }
