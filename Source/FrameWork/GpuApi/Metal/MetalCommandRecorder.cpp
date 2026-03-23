@@ -255,7 +255,7 @@ namespace FW
     void MtlRenderPassRecorder::DrawIndexed(uint32 StartIndexLocation, uint32 IndexCount, int32 BaseVertexLocation, uint32 StartInstanceLocation, uint32 InstanceCount)
     {
         StateCache.ApplyDrawState(CmdEncoder.get());
-        CmdEncoder->drawIndexedPrimitives(StateCache.GetPrimitiveType(), IndexCount, MapIndexFormat(StateCache.GetIndexFormat()), StateCache.GetIndexBuffer()->GetResource(), StateCache.GetIndexOffset(), InstanceCount, BaseVertexLocation, StartInstanceLocation);
+        CmdEncoder->drawIndexedPrimitives(StateCache.GetPrimitiveType(), IndexCount, static_cast<MTL::IndexType>(MapIndexFormat(StateCache.GetIndexFormat())), StateCache.GetIndexBuffer()->GetResource(), StateCache.GetIndexOffset(), InstanceCount, BaseVertexLocation, StartInstanceLocation);
     }
     
     void MtlRenderPassRecorder::SetRenderPipelineState(GpuRenderPipelineState* InPipelineState)
