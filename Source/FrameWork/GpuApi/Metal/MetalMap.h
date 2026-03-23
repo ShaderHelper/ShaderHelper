@@ -126,6 +126,18 @@ namespace FW
         }
     }
 
+    inline MTLCullMode MapRasterizerCullMode(RasterizerCullMode InMode)
+    {
+        switch (InMode)
+        {
+        case RasterizerCullMode::None:     return MTLCullModeNone;
+        case RasterizerCullMode::Front:    return MTLCullModeFront;
+        case RasterizerCullMode::Back:     return MTLCullModeBack;
+        default:
+            AUX::Unreachable();
+        }
+    }
+
 	inline MTLVertexFormat MapVertexFormat(GpuFormat InFormat)
     {
         switch (InFormat)

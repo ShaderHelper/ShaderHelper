@@ -51,12 +51,12 @@ namespace FW
                 const GpuVertexLayoutDesc& BufferLayout = InPipelineStateDesc.VertexLayout[BufferSlot];
                 MTL::VertexBufferLayoutDescriptor* LayoutDesc = VertexDesc->layouts()->object(BufferSlot + GpuResourceLimit::MaxBindableBingGroupNum);
                 LayoutDesc->setStride(BufferLayout.ByteStride);
-                LayoutDesc->setStepFunction(MapVertexStepMode(BufferLayout.StepMode));
+                LayoutDesc->setStepFunction(static_cast<MTL::VertexStepFunction>(MapVertexStepMode(BufferLayout.StepMode)));
                 LayoutDesc->setStepRate(BufferLayout.StepMode == GpuVertexStepMode::Instance ? 1 : 1);
                 for (const GpuVertexAttributeDesc& Attribute : BufferLayout.Attributes)
                 {
                     MTL::VertexAttributeDescriptor* AttributeDesc = VertexDesc->attributes()->object(Attribute.Location);
-                    AttributeDesc->setFormat(MapVertexFormat(Attribute.Format));
+                    AttributeDesc->setFormat(static_cast<MTL::VertexFormat>(MapVertexFormat(Attribute.Format)));
                     AttributeDesc->setOffset(Attribute.ByteOffset);
                     AttributeDesc->setBufferIndex(BufferSlot + GpuResourceLimit::MaxBindableBingGroupNum);
                 }

@@ -135,6 +135,8 @@ namespace FW
         {
             check(CurrentRenderPipelineState);
             RenderCommandEncoder->setRenderPipelineState(CurrentRenderPipelineState->GetResource());
+            RenderCommandEncoder->setFrontFacingWinding(MTL::WindingClockwise);
+            RenderCommandEncoder->setCullMode(static_cast<MTL::CullMode>(MapRasterizerCullMode(CurrentRenderPipelineState->GetDesc().RasterizerState.CullMode)));
             IsRenderPipelineDirty = false;
         }
         
