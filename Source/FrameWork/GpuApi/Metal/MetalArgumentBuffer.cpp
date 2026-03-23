@@ -6,6 +6,10 @@
 
 namespace FW
 {
+    static bool HasRenderStage(BindingShaderStage InStage)
+    {
+        return EnumHasAnyFlags(InStage, BindingShaderStage::Vertex | BindingShaderStage::Pixel);
+    }
 
     static MTLRenderStages MapShaderVisibility(BindingShaderStage InStage)
     {
@@ -90,13 +94,9 @@ namespace FW
                 check(false);
             }
             
-            if(EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Vertex))
+            if(HasRenderStage(LayoutBindingEntry.Stage))
             {
                 VertexArgDescs.Add(ArgDesc);
-            }
-            
-            if(EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Pixel))
-            {
                 FragmentArgDescs.Add(ArgDesc);
             }
 
@@ -108,10 +108,11 @@ namespace FW
             // Add sampler descriptor AFTER the texture descriptor to keep indices sorted
             if(CombinedSamplerArgDesc != nil)
             {
-                if(EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Vertex))
+                if(HasRenderStage(LayoutBindingEntry.Stage))
+                {
                     VertexArgDescs.Add(CombinedSamplerArgDesc);
-                if(EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Pixel))
                     FragmentArgDescs.Add(CombinedSamplerArgDesc);
+                }
                 if(EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Compute))
                     ComputeArgDescs.Add(CombinedSamplerArgDesc);
             }
@@ -174,12 +175,9 @@ namespace FW
             if(ResourceBindingEntry.Resource->GetType() == GpuResourceType::Buffer)
             {
                 MetalBuffer* Buffer = static_cast<MetalBuffer*>(ResourceBindingEntry.Resource.GetReference());
-                if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Vertex))
+                if(HasRenderStage(Layouts[Slot].Stage))
                 {
                     VertexArgumentEncoder->setBuffer(Buffer->GetResource(), 0, Slot);
-                }
-                if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Pixel))
-                {
                     FragmentArgumentEncoder->setBuffer(Buffer->GetResource(), 0, Slot);
                 }
                 if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Compute))
@@ -192,12 +190,9 @@ namespace FW
             {
                 MetalTexture* Tex = static_cast<MetalTexture*>(ResourceBindingEntry.Resource.GetReference());
                 MetalTextureView* TexView = Tex->GetMtlDefaultView();
-				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Vertex))
+				if(HasRenderStage(Layouts[Slot].Stage))
                 {
                     VertexArgumentEncoder->setTexture(TexView->GetResource(), Slot);
-                }
-				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Pixel))
-                {
                     FragmentArgumentEncoder->setTexture(TexView->GetResource(), Slot);
                 }
 				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Compute))
@@ -209,12 +204,9 @@ namespace FW
             else if(ResourceBindingEntry.Resource->GetType() == GpuResourceType::TextureView)
             {
                 MetalTextureView* TexView = static_cast<MetalTextureView*>(ResourceBindingEntry.Resource.GetReference());
-				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Vertex))
+				if(HasRenderStage(Layouts[Slot].Stage))
                 {
                     VertexArgumentEncoder->setTexture(TexView->GetResource(), Slot);
-                }
-				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Pixel))
-                {
                     FragmentArgumentEncoder->setTexture(TexView->GetResource(), Slot);
                 }
 				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Compute))
@@ -226,12 +218,9 @@ namespace FW
             else if(ResourceBindingEntry.Resource->GetType() == GpuResourceType::Sampler)
             {
                 MetalSampler* Sampler = static_cast<MetalSampler*>(ResourceBindingEntry.Resource.GetReference());
-				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Vertex))
+				if(HasRenderStage(Layouts[Slot].Stage))
                 {
                     VertexArgumentEncoder->setSamplerState(Sampler->GetResource(), Slot);
-                }
-				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Pixel))
-                {
                     FragmentArgumentEncoder->setSamplerState(Sampler->GetResource(), Slot);
                 }
             }
@@ -241,13 +230,10 @@ namespace FW
                 MetalTexture* Tex = static_cast<MetalTexture*>(Combined->GetTexture());
                 MetalTextureView* TexView = Tex->GetMtlDefaultView();
                 MetalSampler* Sampler = static_cast<MetalSampler*>(Combined->GetSampler());
-				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Vertex))
+				if(HasRenderStage(Layouts[Slot].Stage))
                 {
                     VertexArgumentEncoder->setTexture(TexView->GetResource(), Slot);
                     VertexArgumentEncoder->setSamplerState(Sampler->GetResource(), Slot + 1);
-                }
-				if(EnumHasAnyFlags(Layouts[Slot].Stage, BindingShaderStage::Pixel))
-                {
                     FragmentArgumentEncoder->setTexture(TexView->GetResource(), Slot);
                     FragmentArgumentEncoder->setSamplerState(Sampler->GetResource(), Slot + 1);
                 }
