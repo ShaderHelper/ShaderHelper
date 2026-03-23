@@ -1976,7 +1976,7 @@ namespace SH
 		GpuRenderPipelineStateDesc PreviewPipelineDesc{
 			.Vs = PsInvocation.PipelineDesc.Vs,
 			.Ps = PatchedShader,
-			.Targets = {{ GpuTextureFormat::R32G32B32A32_FLOAT }},
+			.Targets = {{ GpuFormat::R32G32B32A32_FLOAT }},
 			.RasterizerState = PsInvocation.PipelineDesc.RasterizerState,
 			.Primitive = PsInvocation.PipelineDesc.Primitive
 		};
@@ -2043,7 +2043,7 @@ namespace SH
 			auto RenderTarget = GGpuRhi->CreateTexture({
 				.Width = TexWidth,
 				.Height = TexHeight,
-				.Format = GpuTextureFormat::R32G32B32A32_FLOAT,
+				.Format = GpuFormat::R32G32B32A32_FLOAT,
 				.Usage = GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared,
 				.InitialData = GridData,
 			});

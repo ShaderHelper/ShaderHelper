@@ -5,8 +5,8 @@ using namespace FW;
 
 namespace UNITTEST_GPUAPI
 {
-	TestViewport::TestViewport(const Vector2f& InSize, FW::GpuTextureFormat InFormat)
-		: RenderTargetFormat(FW::GpuTextureFormat::B8G8R8A8_UNORM)
+	TestViewport::TestViewport(const Vector2f& InSize, FW::GpuFormat InFormat)
+		: RenderTargetFormat(FW::GpuFormat::B8G8R8A8_UNORM)
 	{
 		CreateRenderTarget(InSize);
 		ResizeHandler.AddLambda([this](const Vector2f& InNewSize) {

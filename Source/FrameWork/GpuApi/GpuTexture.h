@@ -9,7 +9,7 @@ namespace FW
     {
         uint32 Width;
         uint32 Height;
-		GpuTextureFormat Format;
+		GpuFormat Format;
 		GpuTextureUsage Usage = GpuTextureUsage::None;
  
 		TArrayView<uint8> InitialData;
@@ -33,7 +33,7 @@ namespace FW
         
     public:
         const GpuTextureDesc& GetResourceDesc() const { return TexDesc; }
-        GpuTextureFormat GetFormat() const { return TexDesc.Format; }
+        GpuFormat GetFormat() const { return TexDesc.Format; }
         uint32 GetWidth() const { return TexDesc.Width; }
         uint32 GetHeight() const { return TexDesc.Height; }
 		uint32 GetNumMips() const { return TexDesc.NumMips; }

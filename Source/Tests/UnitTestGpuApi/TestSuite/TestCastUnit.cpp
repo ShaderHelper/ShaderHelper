@@ -17,7 +17,7 @@ namespace UNITTEST_GPUAPI
 		uint16 TestData = 0xFD5E;
 		TArray<uint8> RawData((uint8*)&TestData, sizeof(TestData));
 
-		TestTex = GGpuRhi->CreateTexture({ 1, 1, GpuTextureFormat::R16_FLOAT, GpuTextureUsage::ShaderResource, RawData });
+		TestTex = GGpuRhi->CreateTexture({ 1, 1, GpuFormat::R16_FLOAT, GpuTextureUsage::ShaderResource, RawData });
 		GGpuRhi->SetResourceName("TestCast_Tex", TestTex);
 
 		Vs = GGpuRhi->CreateShaderFromFile({
@@ -42,7 +42,7 @@ namespace UNITTEST_GPUAPI
 			.SetExistingBinding(0, TestTex)
 			.Build();
 
-		DummyRT = GGpuRhi->CreateTexture({ 1, 1, GpuTextureFormat::R8G8B8A8_UNORM, GpuTextureUsage::RenderTarget });
+		DummyRT = GGpuRhi->CreateTexture({ 1, 1, GpuFormat::R8G8B8A8_UNORM, GpuTextureUsage::RenderTarget });
 
 		GpuRenderPipelineStateDesc PipelineDesc{
 			.CheckLayout = true,

@@ -23,7 +23,7 @@ namespace SH
 		}
 		Context.Keyboard = GGpuRhi->CreateTexture({
 			.Width = 256, .Height = 3,
-			.Format = GpuTextureFormat::R8_UNORM,
+			.Format = GpuFormat::R8_UNORM,
 			.Usage = GpuTextureUsage::ShaderResource,
 			.InitialData = RawData
 		});
@@ -139,7 +139,7 @@ namespace SH
 					Context.FinalRT = GGpuRhi->CreateTexture({
 						.Width = (uint32)Context.iResolution.x,
 						.Height = (uint32)Context.iResolution.y,
-						.Format = GpuTextureFormat::B8G8R8A8_UNORM,
+						.Format = GpuFormat::B8G8R8A8_UNORM,
 						.Usage = GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared,
 					});
 					GGpuRhi->SetResourceName("FinalRT", Context.FinalRT);

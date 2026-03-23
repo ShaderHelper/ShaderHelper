@@ -286,7 +286,7 @@ namespace SH
 		if (bConfirmed)
 		{
 			uint32 FaceSize = FaceImages[0].Texture->GetWidth();
-			GpuTextureFormat FaceFormat = FaceImages[0].Texture->GetFormat();
+			GpuFormat FaceFormat = FaceImages[0].Texture->GetFormat();
 
 			TArray<TArray<uint8>> AllFaceData;
 			AllFaceData.SetNum(6);

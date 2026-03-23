@@ -191,7 +191,7 @@ namespace FW
 	{
 		VulkanTexture* Texture = static_cast<VulkanTexture*>(InGpuTexture);
 		void* Data = nullptr;
-		const uint32 BytesPerTexel = GetTextureFormatByteSize(InGpuTexture->GetFormat());
+		const uint32 BytesPerTexel = GetFormatByteSize(InGpuTexture->GetFormat());
 		const uint32 BufferSize = InGpuTexture->GetWidth() * InGpuTexture->GetHeight() * BytesPerTexel;
 		OutRowPitch = InGpuTexture->GetWidth() * BytesPerTexel;
 

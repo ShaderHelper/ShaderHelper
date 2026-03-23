@@ -49,11 +49,10 @@ namespace FW
 		R32G32B32A32_FLOAT,
 		R11G11B10_FLOAT,
 		R16_FLOAT,
-        R32_FLOAT,
+		R32_FLOAT,
 
 		NUM,
 	};
-	using GpuTextureFormat = GpuFormat;
 
 	enum class GpuTextureDimension
 	{
@@ -241,7 +240,6 @@ namespace FW
 	};
 
 	FRAMEWORK_API uint32 GetFormatByteSize(GpuFormat InFormat);
-	FRAMEWORK_API uint32 GetTextureFormatByteSize(GpuTextureFormat InFormat);
 
 	FRAMEWORK_API GpuResourceState GetBufferState(GpuBufferUsage Usage);
 

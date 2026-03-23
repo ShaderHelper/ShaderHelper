@@ -44,7 +44,7 @@ namespace SH
 	public:
 		FW::AssetPtr<FW::TextureCube> Texture;
 		uint32 Size{};
-		FW::GpuTextureFormat Format;
+		FW::GpuFormat Format;
 
 	private:
 		TSharedPtr<FW::PreviewViewPort> Preview = MakeShared<FW::PreviewViewPort>();

@@ -29,7 +29,7 @@ namespace SH
 		FSlateColor GetNodeColor() const override { return FLinearColor{ 0.2f, 0.2f, 0.4f }; }
         FW::ExecRet Exec(FW::GraphExecContext& Context) override;
 
-		FW::GpuTextureFormat Format;
+		FW::GpuFormat Format;
 		uint32 Width{};
 		uint32 Height{};
 	};

@@ -29,12 +29,12 @@ namespace FW
 				if (Format == ERGBFormat::Gray)
 				{
 					ImageWrpper->GetRaw(ERGBFormat::Gray, 8, UnCompressedData);
-					return MakeUnique<Texture2D>(ImageWrpper->GetWidth(), ImageWrpper->GetHeight(), GpuTextureFormat::R8_UNORM, UnCompressedData);
+					return MakeUnique<Texture2D>(ImageWrpper->GetWidth(), ImageWrpper->GetHeight(), GpuFormat::R8_UNORM, UnCompressedData);
 				}
 				else
 				{
 					ImageWrpper->GetRaw(ERGBFormat::BGRA, 8, UnCompressedData);
-					return MakeUnique<Texture2D>(ImageWrpper->GetWidth(), ImageWrpper->GetHeight(), GpuTextureFormat::B8G8R8A8_UNORM, UnCompressedData);
+					return MakeUnique<Texture2D>(ImageWrpper->GetWidth(), ImageWrpper->GetHeight(), GpuFormat::B8G8R8A8_UNORM, UnCompressedData);
 				}
 			}
 		}

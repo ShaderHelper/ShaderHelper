@@ -405,7 +405,7 @@ namespace FW
         MTL::BlitCommandEncoder* BlitCommandEncoder = CmdBuffer->blitCommandEncoder();
         MTL::Origin Origin{0, 0, 0};
         MTL::Size Size{ InTexture->GetWidth(), InTexture->GetHeight(), 1};
-        const uint32 BytesPerTexel = GetTextureFormatByteSize(InTexture->GetFormat());
+        const uint32 BytesPerTexel = GetFormatByteSize(InTexture->GetFormat());
         const uint32 BytesPerRow = InTexture->GetWidth() * BytesPerTexel;
         const uint32 BytesImage = InTexture->GetWidth() * InTexture->GetHeight() * BytesPerTexel;
         BlitCommandEncoder->copyFromBuffer(SrcMtlBuffer->GetResource(), 0, BytesPerRow, BytesImage, Size, DstMtlTexture->GetResource(), ArrayLayer, MipLevel, Origin);
@@ -419,7 +419,7 @@ namespace FW
         MTL::Size Size{InTexture->GetWidth(), InTexture->GetHeight(), 1};
         MetalTexture* SrcMtlTexture = static_cast<MetalTexture*>(InTexture);
         MetalBuffer* DstMtlBuffer = static_cast<MetalBuffer*>(InBuffer);
-        const uint32 BytesPerTexel = GetTextureFormatByteSize(InTexture->GetFormat());
+        const uint32 BytesPerTexel = GetFormatByteSize(InTexture->GetFormat());
         const uint32 BytesImage = InTexture->GetWidth() * InTexture->GetHeight() * BytesPerTexel;
         const uint32 RowPitch = InTexture->GetWidth() * BytesPerTexel;
         BlitCommandEncoder->copyFromTexture(SrcMtlTexture->GetResource(), 0, 0, Origin, Size, DstMtlBuffer->GetResource(), 0, RowPitch, BytesImage);

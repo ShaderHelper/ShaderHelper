@@ -8,7 +8,7 @@ namespace FW
 		REFLECTION_TYPE(Texture2D)
 	public:
 		Texture2D();
-		Texture2D(uint32 InWidth, uint32 InHeight, GpuTextureFormat InFormat, const TArray<uint8>& InRawData);
+		Texture2D(uint32 InWidth, uint32 InHeight, GpuFormat InFormat, const TArray<uint8>& InRawData);
 
 	public:
 		void Serialize(FArchive& Ar) override;
@@ -23,10 +23,10 @@ namespace FW
 		const TArray<uint8>& GetRawData() const { return RawData; }
 		uint32 GetWidth() const { return Width; }
 		uint32 GetHeight() const { return Height; }
-		GpuTextureFormat GetFormat() const { return Format; }
+		GpuFormat GetFormat() const { return Format; }
 
 	public:
-		GpuTextureFormat Format;
+		GpuFormat Format;
 		uint32 Width, Height;
 		bool GenerateMipmap = false;
 

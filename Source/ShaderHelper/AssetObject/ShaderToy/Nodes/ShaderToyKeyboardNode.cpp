@@ -26,7 +26,7 @@ namespace SH
 	}
 
 	ShaderToyKeyboardNode::ShaderToyKeyboardNode()
-	: Format(GpuTextureFormat::R8_UNORM), Width(256), Height(3)
+	: Format(GpuFormat::R8_UNORM), Width(256), Height(3)
 	{
 		ObjectName = LOCALIZATION("Keyboard");
 	}

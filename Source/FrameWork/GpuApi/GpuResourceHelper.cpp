@@ -6,7 +6,7 @@
 
 namespace FW::GpuResourceHelper
 {
-	TRefCountPtr<GpuTexture> TempRenderTarget(GpuTextureFormat InFormat, GpuTextureUsage InUsage)
+	TRefCountPtr<GpuTexture> TempRenderTarget(GpuFormat InFormat, GpuTextureUsage InUsage)
 	{
 		GpuTextureDesc Desc{ 1, 1, InFormat,  InUsage};
 		return GGpuRhi->CreateTexture(MoveTemp(Desc));
@@ -27,7 +27,7 @@ namespace FW::GpuResourceHelper
 	GpuTexture* GetGlobalBlackTex()
 	{
         TArray<uint8> RawData = {0,0,0,255};
-		GpuTextureDesc Desc{ 1, 1, GpuTextureFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource , RawData};
+		GpuTextureDesc Desc{ 1, 1, GpuFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource , RawData};
 		static TRefCountPtr<GpuTexture> GlobalBlackTex = GGpuRhi->CreateTexture(MoveTemp(Desc));
 		return GlobalBlackTex;
 	}
@@ -38,7 +38,7 @@ namespace FW::GpuResourceHelper
 			GpuTextureDesc Desc;
 			Desc.Width = 1;
 			Desc.Height = 1;
-			Desc.Format = GpuTextureFormat::B8G8R8A8_UNORM;
+			Desc.Format = GpuFormat::B8G8R8A8_UNORM;
 			Desc.Usage = GpuTextureUsage::ShaderResource;
 			Desc.Dimension = GpuTextureDimension::TexCube;
 

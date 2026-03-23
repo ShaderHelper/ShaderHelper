@@ -38,11 +38,6 @@ namespace FW
 		}
 	}
 
-	uint32 GetTextureFormatByteSize(GpuTextureFormat InFormat)
-	{
-		return GetFormatByteSize(InFormat);
-	}
-
 	GpuResourceState GetBufferState(GpuBufferUsage Usage)
 	{
 		GpuResourceState Result = GpuResourceState::Unknown;

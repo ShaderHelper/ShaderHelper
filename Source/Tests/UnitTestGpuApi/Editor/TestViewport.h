@@ -8,11 +8,11 @@ namespace UNITTEST_GPUAPI
 	class TestViewport : public FW::PreviewViewPort
 	{
 	public:
-		TestViewport(const FW::Vector2f& InSize, FW::GpuTextureFormat InFormat);
+		TestViewport(const FW::Vector2f& InSize, FW::GpuFormat InFormat);
 
 		void Resize(const FW::Vector2f& InSize);
 		FW::GpuTexture* GetRenderTarget() const { return RenderTarget.GetReference(); }
-		FW::GpuTextureFormat GetRenderTargetFormat() const { return RenderTargetFormat; }
+		FW::GpuFormat GetRenderTargetFormat() const { return RenderTargetFormat; }
 
 	private:
 		void CreateRenderTarget(const FW::Vector2f& InSize);
@@ -22,6 +22,6 @@ namespace UNITTEST_GPUAPI
 
 	private:
 		TRefCountPtr<FW::GpuTexture> RenderTarget;
-		FW::GpuTextureFormat RenderTargetFormat;
+		FW::GpuFormat RenderTargetFormat;
 	};
 }

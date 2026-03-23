@@ -8,7 +8,7 @@ namespace FW
 		REFLECTION_TYPE(TextureCube)
 	public:
 		TextureCube();
-		TextureCube(uint32 InSize, GpuTextureFormat InFormat, const TArray<TArray<uint8>>& InFaceData);
+		TextureCube(uint32 InSize, GpuFormat InFormat, const TArray<TArray<uint8>>& InFaceData);
 
 	public:
 		void Serialize(FArchive& Ar) override;
@@ -20,14 +20,14 @@ namespace FW
 		GpuTexture* GetGpuData() const { return GpuData; }
 		GpuTexture* GetPreviewTexture() const { return PreviewData; }
 		uint32 GetSize() const { return Size; }
-		GpuTextureFormat GetFormat() const { return Format; }
+		GpuFormat GetFormat() const { return Format; }
 		const TArray<TArray<uint8>>& GetFaceData() const { return FaceData; }
 
 		void SetFaceData(int32 FaceIndex, const TArray<uint8>& InData);
-		void SetData(uint32 InSize, GpuTextureFormat InFormat, TArray<TArray<uint8>> InFaceData);
+		void SetData(uint32 InSize, GpuFormat InFormat, TArray<TArray<uint8>> InFaceData);
 
 	public:
-		GpuTextureFormat Format;
+		GpuFormat Format;
 		uint32 Size; // cubemap faces are square: Width == Height == Size
 
 	private:

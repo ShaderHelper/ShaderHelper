@@ -18,12 +18,12 @@ namespace FW
 	)
 
 	Texture2D::Texture2D()
-		: Width(0), Height(0), Format(GpuTextureFormat::B8G8R8A8_UNORM)
+		: Width(0), Height(0), Format(GpuFormat::B8G8R8A8_UNORM)
 	{
 
 	}
 
-	Texture2D::Texture2D(uint32 InWidth, uint32 InHeight, GpuTextureFormat InFormat, const TArray<uint8>& InRawData)
+	Texture2D::Texture2D(uint32 InWidth, uint32 InHeight, GpuFormat InFormat, const TArray<uint8>& InRawData)
 		: Width(InWidth)
 		, Height(InHeight)
 		, Format(InFormat)

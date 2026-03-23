@@ -130,7 +130,7 @@ namespace FW::VK
 
 		if (!InTexDesc.InitialData.IsEmpty())
 		{
-			const uint32 UploadSize = InTexDesc.Width * InTexDesc.Height * GetTextureFormatByteSize(InTexDesc.Format);
+			const uint32 UploadSize = InTexDesc.Width * InTexDesc.Height * GetFormatByteSize(InTexDesc.Format);
 			TRefCountPtr<VulkanBuffer> UploadBuffer = CreateVulkanBuffer(
 				{ .ByteSize = UploadSize, .Usage = GpuBufferUsage::Upload },
 				GpuResourceState::CopySrc

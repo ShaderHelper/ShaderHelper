@@ -244,7 +244,7 @@ namespace SH
 					TArray<TArray<uint8>> FaceData;
 					FaceData.SetNum(6);
 					uint32 CubeSize = 0;
-					GpuTextureFormat CubeFormat = GpuTextureFormat::B8G8R8A8_UNORM;
+					GpuFormat CubeFormat = GpuFormat::B8G8R8A8_UNORM;
 					bool bAllFacesValid = true;
 
 					for (int32 FaceIndex = 0; FaceIndex < 6 && bAllFacesValid; FaceIndex++)

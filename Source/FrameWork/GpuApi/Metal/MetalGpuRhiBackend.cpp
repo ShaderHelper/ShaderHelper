@@ -115,7 +115,7 @@ void *MetalGpuRhiBackend::MapGpuTexture(GpuTexture *InGpuTexture, GpuResourceMap
 {
 	MetalTexture *Texture = static_cast<MetalTexture *>(InGpuTexture);
 	if (InMapMode == GpuResourceMapMode::Read_Only) {
-		const uint32 BytesPerTexel = GetTextureFormatByteSize(InGpuTexture->GetFormat());
+		const uint32 BytesPerTexel = GetFormatByteSize(InGpuTexture->GetFormat());
 		const uint64 UnpaddedSize = InGpuTexture->GetWidth() * InGpuTexture->GetHeight() * BytesPerTexel;
 		if (!Texture->ReadBackBuffer.IsValid()) {
 			Texture->ReadBackBuffer = CreateMetalBuffer({(uint32)UnpaddedSize, GpuBufferUsage::ReadBack});

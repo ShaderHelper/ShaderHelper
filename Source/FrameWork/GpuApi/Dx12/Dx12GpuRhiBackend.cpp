@@ -226,7 +226,7 @@ void* Dx12GpuRhiBackend::MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapM
 		// To make sure ReadBackBuffer finished copying, so cpu can read the mapped data.
 		GDx12GpuRhi->WaitGpu();
 	}
-	OutRowPitch = Align(InGpuTexture->GetWidth() * GetTextureFormatByteSize(InGpuTexture->GetFormat()), D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+	OutRowPitch = Align(InGpuTexture->GetWidth() * GetFormatByteSize(InGpuTexture->GetFormat()), D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
 	return Data;
 }
 

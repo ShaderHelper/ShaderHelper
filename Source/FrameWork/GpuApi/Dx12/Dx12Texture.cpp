@@ -155,7 +155,7 @@ namespace FW
 
 			D3D12_SUBRESOURCE_DATA textureData = {};
 			textureData.pData = &InTexDesc.InitialData[0];
-			textureData.RowPitch = InTexDesc.Width * GetTextureFormatByteSize(InTexDesc.Format);
+			textureData.RowPitch = InTexDesc.Width * GetFormatByteSize(InTexDesc.Format);
 			textureData.SlicePitch = textureData.RowPitch * InTexDesc.Height;
 
 			const CommonAllocationData& AllocationData = UploadBuffer->GetAllocation().GetAllocationData().Get<CommonAllocationData>();

@@ -102,7 +102,7 @@ namespace FW
 
 			Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 
-			Preview->ResizeHandler.AddLambda([this](const Vector2f&) {
+			ResizeHandlerHandle = Preview->ResizeHandler.AddLambda([this](const Vector2f&) {
 				Render();
 			});
 
@@ -138,6 +138,14 @@ namespace FW
 				Render();
 				return FReply::Handled();
 			});
+		}
+
+		~CubemapPreviewScene()
+		{
+			Preview->ResizeHandler.Remove(ResizeHandlerHandle);
+			Preview->MouseDownHandler.Unbind();
+			Preview->MouseUpHandler.Unbind();
+			Preview->MouseMoveHandler.Unbind();
 		}
 
 		void SetChannelFilter(TextureChannelFilter InChannelFilter)
@@ -188,7 +196,7 @@ namespace FW
 			GpuTextureDesc Desc{
 				.Width = static_cast<uint32>(ViewportSize.X),
 				.Height = static_cast<uint32>(ViewportSize.Y),
-				.Format = GpuTextureFormat::B8G8R8A8_UNORM,
+				.Format = GpuFormat::B8G8R8A8_UNORM,
 				.Usage = GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared,
 				.ClearValues = Vector4f(0.08f, 0.08f, 0.08f, 1.0f),
 			};
@@ -199,6 +207,7 @@ namespace FW
 	private:
 		PreviewViewPort* Preview = nullptr;
 		TextureCube* TextureCubeAsset = nullptr;
+		FDelegateHandle ResizeHandlerHandle;
 		TextureChannelFilter ChannelFilter = TextureChannelFilter::None;
 		Camera ViewCamera;
 		MeshBuffers CubeBuffers;
@@ -432,8 +441,9 @@ namespace FW
 			}
 			else
 			{
+				CubemapPreviewSceneInstance.Reset();
 				uint32 S = TexCube->GetSize();
-				uint32 BytePerPixel = GetTextureFormatByteSize(TexCube->GetFormat());
+				uint32 BytePerPixel = GetFormatByteSize(TexCube->GetFormat());
 				uint32 OutputW = 4 * S;
 				uint32 OutputH = 3 * S;
 
@@ -466,11 +476,7 @@ namespace FW
 				UpdateFilteredPreview(CompositeTexture);
 			}
 		}
-		else
-		{
-			PreviewTexture = nullptr;
-			Preview->Clear();
-		}
+
 	}
 
 	FReply STexturePreviewer::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)

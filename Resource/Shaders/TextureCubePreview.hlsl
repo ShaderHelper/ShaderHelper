@@ -16,13 +16,13 @@ VsOutput MainVS(VsInput Input)
 {
 	VsOutput Output;
 	Output.Position = mul(float4(Input.Position, 1.0), Transform);
-	Output.SampleDir = normalize(float3(-Input.Position.z, Input.Position.y, Input.Position.x));
+	Output.SampleDir = Input.Position;
 	return Output;
 }
 
 float4 MainPS(VsOutput Input) : SV_Target
 {
-	const float4 Color = PreviewCube.Sample(PreviewCubeSampler, normalize(Input.SampleDir));
+	const float4 Color = PreviewCube.Sample(PreviewCubeSampler, Input.SampleDir);
 
 	if (ChannelFilter == 1)
 	{

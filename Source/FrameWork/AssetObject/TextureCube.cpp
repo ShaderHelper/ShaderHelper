@@ -12,12 +12,12 @@ namespace FW
 	)
 
 	TextureCube::TextureCube()
-		: Size(0), Format(GpuTextureFormat::B8G8R8A8_UNORM)
+		: Size(0), Format(GpuFormat::B8G8R8A8_UNORM)
 	{
 		FaceData.SetNum(6);
 	}
 
-	TextureCube::TextureCube(uint32 InSize, GpuTextureFormat InFormat, const TArray<TArray<uint8>>& InFaceData)
+	TextureCube::TextureCube(uint32 InSize, GpuFormat InFormat, const TArray<TArray<uint8>>& InFaceData)
 		: Size(InSize)
 		, Format(InFormat)
 		, FaceData(InFaceData)
@@ -55,7 +55,7 @@ namespace FW
 
 		GpuCmdRecorder* CmdRecorder = GGpuRhi->BeginRecording(TEXT("InitCubeMap"));
 		{
-			const uint32 FaceByteSize = Size * Size * GetTextureFormatByteSize(Format);
+			const uint32 FaceByteSize = Size * Size * GetFormatByteSize(Format);
 			for (int32 Face = 0; Face < 6; Face++)
 			{
 				if (FaceData[Face].Num() == 0) continue;
@@ -103,7 +103,7 @@ namespace FW
 		FaceData[FaceIndex] = InData;
 	}
 
-	void TextureCube::SetData(uint32 InSize, GpuTextureFormat InFormat, TArray<TArray<uint8>> InFaceData)
+	void TextureCube::SetData(uint32 InSize, GpuFormat InFormat, TArray<TArray<uint8>> InFaceData)
 	{
 		check(InFaceData.Num() == 6);
 		Size = InSize;

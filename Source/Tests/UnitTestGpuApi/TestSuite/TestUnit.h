@@ -16,9 +16,9 @@ namespace UNITTEST_GPUAPI
 		virtual ~TestUnit() = default;
 		virtual void Init() {}
 		virtual void Render() {};
-		virtual FW::GpuTextureFormat GetViewportFormat() const
+		virtual FW::GpuFormat GetViewportFormat() const
 		{
-			return FW::GpuTextureFormat::B8G8R8A8_UNORM;
+			return FW::GpuFormat::B8G8R8A8_UNORM;
 		}
 
 		FString Name;
