@@ -28,7 +28,11 @@ namespace SH
         auto ShProject = TSingleton<ShProjectManager>::Get().GetProject();
         
         ShProject->TimelineStop = true;
-        ShEditor->OpenGraph(LoadedShaderToy, MakeShared<ShaderToyRenderComp>(LoadedShaderToy, ShEditor->GetViewPort()));
+		if (ShEditor->OpenGraph(LoadedShaderToy))
+		{
+			ShEditor->SetGraphRenderComp(nullptr);
+			ShEditor->SetGraphRenderComp(MakeShared<ShaderToyRenderComp>(LoadedShaderToy, ShEditor->GetViewPort()));
+		}
 	}
 
 	bool ShaderToyOp::OnCreate(AssetObject* InAsset)
@@ -44,7 +48,8 @@ namespace SH
         auto Graph = TSingleton<ShProjectManager>::Get().GetProject()->Graph;
         if(Graph && Graph->GetPath() == InAssetPath)
         {
-            ShEditor->OpenGraph(nullptr, nullptr);
+			ShEditor->SetGraphRenderComp(nullptr);
+			ShEditor->OpenGraph(nullptr);
         }
         
         AssetOp::OnDelete(InAssetPath);

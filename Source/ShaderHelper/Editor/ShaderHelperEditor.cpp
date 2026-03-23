@@ -962,7 +962,7 @@ namespace SH
         TabManager->FindExistingLiveTab(CodeTabId)->GetParentDockTabStack()->SetCanDropToAttach(false);
 	}
 
-	void ShaderHelperEditor::OpenGraph(AssetPtr<Graph> InGraphData, TSharedPtr<RenderComponent> InGraphRenderComp)
+	bool ShaderHelperEditor::OpenGraph(AssetPtr<Graph> InGraphData)
 	{
 		if(CurProject->Graph && CurProject->Graph->IsDirty() &&
 			InGraphData != nullptr && InGraphData != CurProject->Graph)
@@ -970,7 +970,7 @@ namespace SH
 			auto Ret = MessageDialog::Open(MessageDialog::OkNoCancel, MessageDialog::Shocked, MainWindow, LOCALIZATION("SaveAssetTip"));
 			if(Ret == MessageDialog::MessageRet::Cancel)
 			{
-				return;
+				return false;
 			}
 			else if (Ret == MessageDialog::MessageRet::Ok)
 			{
@@ -981,13 +981,6 @@ namespace SH
 				CurProject->Graph->MarkDirty(false);
 			}
 		}
-		
-		Renderer->UnRegisterRenderComp(GraphRenderComp.Get());
-		GraphRenderComp = InGraphRenderComp;
-		if (GraphRenderComp)
-		{
-			Renderer->RegisterRenderComp(GraphRenderComp.Get());
-		}
 
 		GraphPanel->SetGraphData(InGraphData);
 		CurProject->Graph = InGraphData;
@@ -996,6 +989,18 @@ namespace SH
         {
             ViewPort->Clear();
         }
+
+		return true;
+	}
+
+	void ShaderHelperEditor::SetGraphRenderComp(TSharedPtr<RenderComponent> InGraphRenderComp)
+	{
+		Renderer->UnRegisterRenderComp(GraphRenderComp.Get());
+		GraphRenderComp = MoveTemp(InGraphRenderComp);
+		if (GraphRenderComp)
+		{
+			Renderer->RegisterRenderComp(GraphRenderComp.Get());
+		}
 	}
 
     void ShaderHelperEditor::RefreshProperty(bool bClear)

@@ -88,7 +88,8 @@ namespace SH
 		void ForceRender();
         void OpenShaderTab(FW::AssetPtr<ShaderAsset> InShader);
 		
-		void OpenGraph(FW::AssetPtr<FW::Graph> InGraphData, TSharedPtr<FW::RenderComponent> InGraphRenderComp);
+		bool OpenGraph(FW::AssetPtr<FW::Graph> InGraphData);
+		void SetGraphRenderComp(TSharedPtr<FW::RenderComponent> InGraphRenderComp);
         void RefreshProperty(bool bClear = false);
         void ShowProperty(FW::ShObject* InObjectData);
         void UpdateShaderPath(const FString& InShaderPath);
