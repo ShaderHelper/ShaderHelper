@@ -6,6 +6,21 @@
 
 namespace FW
 {
+	static D3D12_SHADER_VISIBILITY ResolveDx12ShaderVisibility(BindingShaderStage InStage)
+	{
+		if (InStage == BindingShaderStage::Vertex)
+		{
+			return D3D12_SHADER_VISIBILITY_VERTEX;
+		}
+
+		if (InStage == BindingShaderStage::Pixel)
+		{
+			return D3D12_SHADER_VISIBILITY_PIXEL;
+		}
+		
+		return D3D12_SHADER_VISIBILITY_ALL;
+	}
+
 	D3D12_DESCRIPTOR_RANGE_TYPE BindingTypeToDescriptorRangeType(BindingType InType)
 	{
 		switch (InType)
@@ -78,26 +93,7 @@ namespace FW
 
 		for (const auto& [Slot, LayoutBindingEntry] : Desc.Layouts)
 		{
-			BindingShaderStage RHIShaderStage = LayoutBindingEntry.Stage;
-			
-			//we dont just set it always to D3D12_SHADER_VISIBILITY_ALL, which might produce inconsistent result on different backend and have some performance impacts
-			if (EnumHasAllFlags(RHIShaderStage, BindingShaderStage::All) || EnumHasAnyFlags(RHIShaderStage, BindingShaderStage::Compute))
-			{
-				SetRootParameterInfo(Slot, LayoutBindingEntry, D3D12_SHADER_VISIBILITY_ALL);
-			}
-			else
-			{
-				if (EnumHasAnyFlags(RHIShaderStage, BindingShaderStage::Vertex))
-				{
-					SetRootParameterInfo(Slot, LayoutBindingEntry, D3D12_SHADER_VISIBILITY_VERTEX);
-				}
-
-				if (EnumHasAnyFlags(RHIShaderStage, BindingShaderStage::Pixel))
-				{
-					SetRootParameterInfo(Slot, LayoutBindingEntry, D3D12_SHADER_VISIBILITY_PIXEL);
-				}
-
-			}
+			SetRootParameterInfo(Slot, LayoutBindingEntry, ResolveDx12ShaderVisibility(LayoutBindingEntry.Stage));
 		}
 
 		for (const auto& [BindingVisibility, Ranges] : DescriptorTableRanges_CbvSrvUav)
@@ -214,22 +210,7 @@ namespace FW
 				}
 			}
 
-			if (EnumHasAllFlags(RHIShaderStage, BindingShaderStage::All) || EnumHasAnyFlags(RHIShaderStage, BindingShaderStage::Compute))
-			{
-				SetBindingTable(Slot, ResourceBindingEntry, D3D12_SHADER_VISIBILITY_ALL);
-			}
-			else
-			{
-				if (EnumHasAnyFlags(RHIShaderStage, BindingShaderStage::Vertex))
-				{
-					SetBindingTable(Slot, ResourceBindingEntry, D3D12_SHADER_VISIBILITY_VERTEX);
-				}
-
-				if (EnumHasAnyFlags(RHIShaderStage, BindingShaderStage::Pixel))
-				{
-					SetBindingTable(Slot, ResourceBindingEntry, D3D12_SHADER_VISIBILITY_PIXEL);
-				}
-			}
+			SetBindingTable(Slot, ResourceBindingEntry, ResolveDx12ShaderVisibility(RHIShaderStage));
 		}
 
 		for (const auto& [DxVisibility, SrcRange] : SrcDescriptorRange_CbvSrvUav)
@@ -352,9 +333,14 @@ namespace FW
 		AddRootParameter(InDesc.Layout2);
 		AddRootParameter(InDesc.Layout3);
 
-		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC RootSignatureDesc = { 
-			(uint32)RootParameters.Num(), RootParameters.GetData(),
-		};
+		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC RootSignatureDesc;
+		RootSignatureDesc.Init_1_0(
+			(uint32)RootParameters.Num(),
+			RootParameters.GetData(),
+			0,
+			nullptr,
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
+		);
 
 		TRefCountPtr<ID3DBlob> Signature;
 		TRefCountPtr<ID3DBlob> Error;

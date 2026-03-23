@@ -7,9 +7,9 @@ namespace FW
 {
 	DECLARE_MULTICAST_DELEGATE_OneParam(OnViewportResizeDelegate, const Vector2f&)
 	DECLARE_MULTICAST_DELEGATE_OneParam(OnFocusLostDelegate, const FFocusEvent&)
-	DECLARE_MULTICAST_DELEGATE_TwoParams(OnMouseDownDelegate, const FGeometry&, const FPointerEvent&)
-	DECLARE_MULTICAST_DELEGATE_TwoParams(OnMouseUpDelegate, const FGeometry&, const FPointerEvent&)
-	DECLARE_MULTICAST_DELEGATE_TwoParams(OnMouseMoveDelegate, const FGeometry&, const FPointerEvent&)
+	DECLARE_DELEGATE_RetVal_TwoParams(FReply, OnMouseDownDelegate, const FGeometry&, const FPointerEvent&)
+	DECLARE_DELEGATE_RetVal_TwoParams(FReply, OnMouseUpDelegate, const FGeometry&, const FPointerEvent&)
+	DECLARE_DELEGATE_RetVal_TwoParams(FReply, OnMouseMoveDelegate, const FGeometry&, const FPointerEvent&)
 	DECLARE_MULTICAST_DELEGATE_TwoParams(OnKeyDownDelegate, const FGeometry&, const FKeyEvent&)
 	DECLARE_MULTICAST_DELEGATE_TwoParams(OnKeyUpDelegate, const FGeometry&, const FKeyEvent&)
 
@@ -77,10 +77,9 @@ namespace FW
 			FReply Reply = FReply::Unhandled();
 			if (MouseDownHandler.IsBound())
 			{
-				MouseDownHandler.Broadcast(MyGeometry, MouseEvent);
-				Reply = FReply::Handled();
+				Reply = MouseDownHandler.Execute(MyGeometry, MouseEvent);
 			}
-			if(AssociatedWidget.IsValid())
+			if(AssociatedWidget.IsValid() && Reply.IsEventHandled())
 			{
 				Reply.CaptureMouse(AssociatedWidget.Pin().ToSharedRef());
 			}
@@ -92,10 +91,9 @@ namespace FW
 			FReply Reply = FReply::Unhandled();
 			if (MouseUpHandler.IsBound())
 			{
-				MouseUpHandler.Broadcast(MyGeometry, MouseEvent);
-				Reply = FReply::Handled();
+				Reply = MouseUpHandler.Execute(MyGeometry, MouseEvent);
 			}
-			if(AssociatedWidget.IsValid())
+			if(AssociatedWidget.IsValid() && Reply.IsEventHandled())
 			{
 				Reply.ReleaseMouseCapture();
 			}
@@ -106,8 +104,7 @@ namespace FW
 		{
 			if (MouseMoveHandler.IsBound())
 			{
-				MouseMoveHandler.Broadcast(MyGeometry, MouseEvent);
-				return FReply::Handled();
+				return MouseMoveHandler.Execute(MyGeometry, MouseEvent);
 			}
 			return FReply::Unhandled();
 		}

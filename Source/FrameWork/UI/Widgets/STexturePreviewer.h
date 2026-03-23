@@ -8,6 +8,8 @@
 
 namespace FW
 {
+	class CubemapPreviewScene;
+
 	enum class TextureChannelFilter
 	{
 		None,
@@ -28,8 +30,6 @@ namespace FW
 		void Construct(const FArguments& InArgs);
 
 		virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
-
-		void SetTexture(AssetPtr<AssetObject> InTexture);
 		AssetObject* GetTexture() const { return TextureAsset.Get(); }
 
 		static void OpenTexturePreviewer(AssetPtr<AssetObject> InTexture, const FPointerEventHandler& InOnMouseButtonDown = {}, TSharedPtr<SWindow> InParentWindow = nullptr);
@@ -42,6 +42,7 @@ namespace FW
 		TextureChannelFilter ChannelFilter = TextureChannelFilter::None;
 		bool bView3D = false;
 		TRefCountPtr<GpuTexture> PreviewTexture;
+		TUniquePtr<CubemapPreviewScene> CubemapPreviewSceneInstance;
 		TSharedPtr<PreviewViewPort> Preview;
 		TSharedPtr<SHorizontalBox> Toolbar;
 		FPointerEventHandler MouseButtonDownHandler;

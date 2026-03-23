@@ -63,8 +63,33 @@ namespace FW::VK
 			});
 		}
 
+		TArray<VkVertexInputBindingDescription> BindingDescriptions;
+		TArray<VkVertexInputAttributeDescription> AttributeDescriptions;
+		for (int32 BufferSlot = 0; BufferSlot < InPipelineStateDesc.VertexLayout.Num(); ++BufferSlot)
+		{
+			const GpuVertexLayoutDesc& BufferLayout = InPipelineStateDesc.VertexLayout[BufferSlot];
+			BindingDescriptions.Add({
+				.binding = static_cast<uint32>(BufferSlot),
+				.stride = BufferLayout.ByteStride,
+				.inputRate = MapVertexStepMode(BufferLayout.StepMode)
+			});
+			for (const GpuVertexAttributeDesc& Attribute : BufferLayout.Attributes)
+			{
+				AttributeDescriptions.Add({
+					.location = Attribute.Location,
+					.binding = static_cast<uint32>(BufferSlot),
+					.format = MapTextureFormat(Attribute.Format),
+					.offset = Attribute.ByteOffset
+				});
+			}
+		}
+
 		VkPipelineVertexInputStateCreateInfo VertexInputInfo = {
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+			.vertexBindingDescriptionCount = (uint32)BindingDescriptions.Num(),
+			.pVertexBindingDescriptions = BindingDescriptions.GetData(),
+			.vertexAttributeDescriptionCount = (uint32)AttributeDescriptions.Num(),
+			.pVertexAttributeDescriptions = AttributeDescriptions.GetData(),
 		};
 		VkPipelineInputAssemblyStateCreateInfo InputAssemblyInfo = {
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,

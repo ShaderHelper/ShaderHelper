@@ -17,13 +17,16 @@ namespace FW
         , IsBindGroup2Dirty(false)
         , IsBindGroup3Dirty(false)
         , CurrentRenderPipelineState(nullptr)
-        , CurrentVertexBuffer(nullptr)
+        , CurrentIndexBuffer(nullptr)
+		, CurrentIndexFormat(GpuFormat::R16_UINT)
+        , CurrentIndexOffset(0)
         , CurrentBindGroup0(nullptr)
         , CurrentBindGroup1(nullptr)
         , CurrentBindGroup2(nullptr)
         , CurrentBindGroup3(nullptr)
         , RenderPassDesc(MoveTemp(InRenderPassDesc))
-    {}
+    {
+	}
 
     MtlComputeStateCache::MtlComputeStateCache()
         : IsComputePipelineDirty(false)
@@ -47,12 +50,22 @@ namespace FW
         }
     }
 
-    void MtlRenderStateCache::SetVertexBuffer(MetalBuffer* InBuffer)
+    void MtlRenderStateCache::SetVertexBuffer(uint32 Slot, MetalBuffer* InBuffer, uint32 Offset)
     {
-        if (CurrentVertexBuffer != InBuffer)
+        if (CurrentVertexBuffers[Slot].Buffer != InBuffer || CurrentVertexBuffers[Slot].Offset != Offset)
         {
-            CurrentVertexBuffer = InBuffer;
+            CurrentVertexBuffers[Slot] = { InBuffer, Offset };
             IsVertexBufferDirty = true;
+        }
+    }
+
+    void MtlRenderStateCache::SetIndexBuffer(MetalBuffer* InBuffer, GpuFormat InIndexFormat, uint32 Offset)
+    {
+        if (CurrentIndexBuffer != InBuffer || CurrentIndexFormat != InIndexFormat || CurrentIndexOffset != Offset)
+        {
+            CurrentIndexBuffer = InBuffer;
+            CurrentIndexFormat = InIndexFormat;
+            CurrentIndexOffset = Offset;
         }
     }
 
@@ -122,6 +135,8 @@ namespace FW
         {
             check(CurrentRenderPipelineState);
             RenderCommandEncoder->setRenderPipelineState(CurrentRenderPipelineState->GetResource());
+            RenderCommandEncoder->setFrontFacingWinding(MTL::WindingClockwise);
+            RenderCommandEncoder->setCullMode(static_cast<MTL::CullMode>(MapRasterizerCullMode(CurrentRenderPipelineState->GetDesc().RasterizerState.CullMode)));
             IsRenderPipelineDirty = false;
         }
         
@@ -135,6 +150,20 @@ namespace FW
 			RenderCommandEncoder->setScissorRect(*CurrentScissorRect);
 			IsScissorRectDirty = false;
 		}
+
+        if (IsVertexBufferDirty && CurrentRenderPipelineState)
+        {
+            for (int32 BufferSlot = 0; BufferSlot < CurrentRenderPipelineState->GetDesc().VertexLayout.Num(); ++BufferSlot)
+            {
+                const VertexBufferBinding& Binding = CurrentVertexBuffers[BufferSlot];
+                if (!Binding.Buffer)
+                {
+                    continue;
+                }
+                RenderCommandEncoder->setVertexBuffer(Binding.Buffer->GetResource(), Binding.Offset, BufferSlot + GpuResourceLimit::MaxBindableBingGroupNum);
+            }
+            IsVertexBufferDirty = false;
+        }
         
         if(CurrentBindGroup0 && IsBindGroup0Dirty) 
 		{ 
@@ -224,15 +253,26 @@ namespace FW
         StateCache.ApplyDrawState(CmdEncoder.get());
 		CmdEncoder->drawPrimitives(StateCache.GetPrimitiveType(), StartVertexLocation, VertexCount, InstanceCount, StartInstanceLocation);
     }
+
+    void MtlRenderPassRecorder::DrawIndexed(uint32 StartIndexLocation, uint32 IndexCount, int32 BaseVertexLocation, uint32 StartInstanceLocation, uint32 InstanceCount)
+    {
+        StateCache.ApplyDrawState(CmdEncoder.get());
+        CmdEncoder->drawIndexedPrimitives(StateCache.GetPrimitiveType(), IndexCount, static_cast<MTL::IndexType>(MapIndexFormat(StateCache.GetIndexFormat())), StateCache.GetIndexBuffer()->GetResource(), StateCache.GetIndexOffset(), InstanceCount, BaseVertexLocation, StartInstanceLocation);
+    }
     
     void MtlRenderPassRecorder::SetRenderPipelineState(GpuRenderPipelineState* InPipelineState)
     {
         StateCache.SetPipeline(static_cast<MetalRenderPipelineState*>(InPipelineState));
     }
     
-    void MtlRenderPassRecorder::SetVertexBuffer(GpuBuffer* InVertexBuffer)
+    void MtlRenderPassRecorder::SetVertexBuffer(uint32 Slot, GpuBuffer* InVertexBuffer, uint32 Offset)
     {
-        StateCache.SetVertexBuffer(static_cast<MetalBuffer*>(InVertexBuffer));
+        StateCache.SetVertexBuffer(Slot, static_cast<MetalBuffer*>(InVertexBuffer), Offset);
+    }
+
+    void MtlRenderPassRecorder::SetIndexBuffer(GpuBuffer* InIndexBuffer, GpuFormat IndexFormat, uint32 Offset)
+    {
+        StateCache.SetIndexBuffer(static_cast<MetalBuffer*>(InIndexBuffer), IndexFormat, Offset);
     }
 
     void MtlRenderPassRecorder::SetViewPort(const GpuViewPortDesc& InViewPortDesc)

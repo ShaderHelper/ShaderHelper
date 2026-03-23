@@ -87,22 +87,26 @@ namespace FW
         return [RawPassDesc autorelease];
     }
     
-    inline MTLPixelFormat MapTextureFormat(const GpuTextureFormat& InTextureFormat)
+    inline MTLPixelFormat MapTextureFormat(const GpuFormat& InTextureFormat)
     {
         switch(InTextureFormat)
         {
-		case GpuTextureFormat::R8_UNORM:              return MTLPixelFormatR8Unorm;
-        case GpuTextureFormat::R8G8B8A8_UNORM:        return MTLPixelFormatRGBA8Unorm;
-        case GpuTextureFormat::B8G8R8A8_UNORM:        return MTLPixelFormatBGRA8Unorm;
-        case GpuTextureFormat::R10G10B10A2_UNORM:     return MTLPixelFormatRGB10A2Unorm;
-        case GpuTextureFormat::R16G16B16A16_UNORM:    return MTLPixelFormatRGBA16Unorm;
-        case GpuTextureFormat::R16G16B16A16_UINT:     return MTLPixelFormatRGBA16Uint;
-        case GpuTextureFormat::R32G32B32A32_UINT:     return MTLPixelFormatRGBA32Uint;
-        case GpuTextureFormat::R16G16B16A16_FLOAT:    return MTLPixelFormatRGBA16Float;
-        case GpuTextureFormat::R32G32B32A32_FLOAT:    return MTLPixelFormatRGBA32Float;
-        case GpuTextureFormat::R11G11B10_FLOAT:       return MTLPixelFormatRG11B10Float;
-		case GpuTextureFormat::R16_FLOAT:             return MTLPixelFormatR16Float;
-        case GpuTextureFormat::R32_FLOAT:             return MTLPixelFormatR32Float;
+        case GpuFormat::R8_UNORM:              return MTLPixelFormatR8Unorm;
+        case GpuFormat::R8G8B8A8_UNORM:        return MTLPixelFormatRGBA8Unorm;
+        case GpuFormat::B8G8R8A8_UNORM:        return MTLPixelFormatBGRA8Unorm;
+        case GpuFormat::R10G10B10A2_UNORM:     return MTLPixelFormatRGB10A2Unorm;
+        case GpuFormat::R16_UINT:              return MTLPixelFormatR16Uint;
+        case GpuFormat::R32_UINT:              return MTLPixelFormatR32Uint;
+        case GpuFormat::R16G16B16A16_UNORM:    return MTLPixelFormatRGBA16Unorm;
+        case GpuFormat::R16G16B16A16_UINT:     return MTLPixelFormatRGBA16Uint;
+        case GpuFormat::R32G32_UINT:           return MTLPixelFormatRG32Uint;
+        case GpuFormat::R32G32B32A32_UINT:     return MTLPixelFormatRGBA32Uint;
+        case GpuFormat::R32G32_FLOAT:          return MTLPixelFormatRG32Float;
+        case GpuFormat::R16G16B16A16_FLOAT:    return MTLPixelFormatRGBA16Float;
+        case GpuFormat::R32G32B32A32_FLOAT:    return MTLPixelFormatRGBA32Float;
+        case GpuFormat::R11G11B10_FLOAT:       return MTLPixelFormatRG11B10Float;
+        case GpuFormat::R16_FLOAT:             return MTLPixelFormatR16Float;
+        case GpuFormat::R32_FLOAT:             return MTLPixelFormatR32Float;
         default:
 			AUX::Unreachable();
         }
@@ -119,6 +123,57 @@ namespace FW
         case PrimitiveType::TriangleStrip:        return MTLPrimitiveTypeTriangleStrip;
         default:
 			AUX::Unreachable();
+        }
+    }
+
+    inline MTLCullMode MapRasterizerCullMode(RasterizerCullMode InMode)
+    {
+        switch (InMode)
+        {
+        case RasterizerCullMode::None:     return MTLCullModeNone;
+        case RasterizerCullMode::Front:    return MTLCullModeFront;
+        case RasterizerCullMode::Back:     return MTLCullModeBack;
+        default:
+            AUX::Unreachable();
+        }
+    }
+
+	inline MTLVertexFormat MapVertexFormat(GpuFormat InFormat)
+    {
+        switch (InFormat)
+        {
+        case GpuFormat::R32_FLOAT: return MTLVertexFormatFloat;
+        case GpuFormat::R32G32_FLOAT: return MTLVertexFormatFloat2;
+        case GpuFormat::R32G32B32_FLOAT: return MTLVertexFormatFloat3;
+        case GpuFormat::R32G32B32A32_FLOAT: return MTLVertexFormatFloat4;
+        case GpuFormat::R32_UINT: return MTLVertexFormatUInt;
+        case GpuFormat::R32G32_UINT: return MTLVertexFormatUInt2;
+        case GpuFormat::R32G32B32_UINT: return MTLVertexFormatUInt3;
+        case GpuFormat::R32G32B32A32_UINT: return MTLVertexFormatUInt4;
+        default:
+            AUX::Unreachable();
+        }
+    }
+
+    inline MTLVertexStepFunction MapVertexStepMode(GpuVertexStepMode InMode)
+    {
+        switch (InMode)
+        {
+        case GpuVertexStepMode::Vertex: return MTLVertexStepFunctionPerVertex;
+        case GpuVertexStepMode::Instance: return MTLVertexStepFunctionPerInstance;
+        default:
+            AUX::Unreachable();
+        }
+    }
+
+	inline MTLIndexType MapIndexFormat(GpuFormat InFormat)
+    {
+        switch (InFormat)
+        {
+        case GpuFormat::R16_UINT: return MTLIndexTypeUInt16;
+        case GpuFormat::R32_UINT: return MTLIndexTypeUInt32;
+        default:
+            AUX::Unreachable();
         }
     }
 

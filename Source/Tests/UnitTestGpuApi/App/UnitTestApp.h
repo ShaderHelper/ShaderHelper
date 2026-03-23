@@ -5,13 +5,6 @@
 
 namespace UNITTEST_GPUAPI
 {
-	struct TestUnit
-	{
-		FString Name;
-		TFunction<void(TestViewport*)> TestFunc;
-		TSharedPtr<TestViewport> Viewport;
-	};
-
 	class UnitTestApp : public FW::App
 	{
 	public:
@@ -22,11 +15,7 @@ namespace UNITTEST_GPUAPI
 		void Update(float DeltaTime) override;
 		void Render() override;
 
-		TArray<TestUnit> TestUnits;
-	private:
-		void AddTestCast();
-		void AddTestTriangle();
-
+		TArray<TUniquePtr<class TestUnit>> TestUnits;
 	};
 }
 

@@ -42,8 +42,10 @@ public:
 
 public:
 	virtual void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount) = 0;
+	virtual void DrawIndexed(uint32 StartIndexLocation, uint32 IndexCount, int32 BaseVertexLocation = 0, uint32 StartInstanceLocation = 0, uint32 InstanceCount = 1) = 0;
 	virtual void SetRenderPipelineState(GpuRenderPipelineState* InPipelineState) = 0;
-	virtual void SetVertexBuffer(GpuBuffer* InVertexBuffer) = 0;
+	virtual void SetVertexBuffer(uint32 Slot, GpuBuffer* InVertexBuffer, uint32 Offset = 0) = 0;
+	virtual void SetIndexBuffer(GpuBuffer* InIndexBuffer, GpuFormat IndexFormat = GpuFormat::R32_UINT, uint32 Offset = 0) = 0;
 	// If omitted, it defaults to SetViewPort(GpuViewPortDesc{RenderTarget.Width, RenderTarget.Height}).
 	virtual void SetViewPort(const GpuViewPortDesc& InViewPortDesc) = 0;
 	// If omitted, it defaults to SetScissorRect(GpuScissorRectDesc{0, 0, Viewport.Width, Viewport.Height}).

@@ -11,11 +11,18 @@ namespace FW
     class MtlRenderStateCache
     {
     public:
+        struct VertexBufferBinding
+        {
+            MetalBuffer* Buffer = nullptr;
+            uint32 Offset = 0;
+        };
+
 		MtlRenderStateCache(MTLRenderPassDescriptorPtr InRenderPassDesc);
         void ApplyDrawState(MTL::RenderCommandEncoder* RenderCommandEncoder);
         
         void SetPipeline(MetalRenderPipelineState* InPipelineState);
-        void SetVertexBuffer(MetalBuffer* InBuffer);
+        void SetVertexBuffer(uint32 Slot, MetalBuffer* InBuffer, uint32 Offset);
+		void SetIndexBuffer(MetalBuffer* InBuffer, GpuFormat InIndexFormat, uint32 Offset);
         void SetViewPort(MTL::Viewport InViewPort);
 		void SetScissorRect(MTL::ScissorRect InSissorRect);
         void SetBindGroups(MetalBindGroup* InGroup0, MetalBindGroup* InGroup1, MetalBindGroup* InGroup2, MetalBindGroup* InGroup3);
@@ -23,6 +30,9 @@ namespace FW
             check(CurrentRenderPipelineState);
             return (MTL::PrimitiveType)CurrentRenderPipelineState->GetPrimitiveType();
         }
+		MetalBuffer* GetIndexBuffer() const { return CurrentIndexBuffer; }
+        GpuFormat GetIndexFormat() const { return CurrentIndexFormat; }
+		uint32 GetIndexOffset() const { return CurrentIndexOffset; }
         
     public:
         bool IsRenderPipelineDirty : 1;
@@ -37,7 +47,10 @@ namespace FW
         
     private:
         MetalRenderPipelineState* CurrentRenderPipelineState;
-        MetalBuffer* CurrentVertexBuffer;
+        std::array<VertexBufferBinding, GpuResourceLimit::MaxVertexBufferSlotNum> CurrentVertexBuffers{};
+        MetalBuffer* CurrentIndexBuffer;
+		GpuFormat CurrentIndexFormat;
+        uint32 CurrentIndexOffset;
         TOptional<MTL::Viewport> CurrentViewPort;
         TOptional<MTL::ScissorRect> CurrentScissorRect;
         
@@ -85,8 +98,10 @@ namespace FW
         
     public:
         void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount) override;
+		void DrawIndexed(uint32 StartIndexLocation, uint32 IndexCount, int32 BaseVertexLocation, uint32 StartInstanceLocation, uint32 InstanceCount) override;
         void SetRenderPipelineState(GpuRenderPipelineState* InPipelineState) override;
-        void SetVertexBuffer(GpuBuffer* InVertexBuffer) override;
+		void SetVertexBuffer(uint32 Slot, GpuBuffer* InVertexBuffer, uint32 Offset) override;
+        void SetIndexBuffer(GpuBuffer* InIndexBuffer, GpuFormat IndexFormat, uint32 Offset) override;
         void SetViewPort(const GpuViewPortDesc& InViewPortDesc) override;
 		void SetScissorRect(const GpuScissorRectDesc& InScissorRectDes) override;
         void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override;

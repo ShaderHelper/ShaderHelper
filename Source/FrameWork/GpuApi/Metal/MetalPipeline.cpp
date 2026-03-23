@@ -42,6 +42,27 @@ namespace FW
 		if (Ps) {
 			PipelineDesc->setFragmentFunction(Ps->GetCompilationResult());
 		}
+
+        if (InPipelineStateDesc.VertexLayout.Num() > 0)
+        {
+            MTL::VertexDescriptor* VertexDesc = MTL::VertexDescriptor::vertexDescriptor();
+            for (int32 BufferSlot = 0; BufferSlot < InPipelineStateDesc.VertexLayout.Num(); ++BufferSlot)
+            {
+                const GpuVertexLayoutDesc& BufferLayout = InPipelineStateDesc.VertexLayout[BufferSlot];
+                MTL::VertexBufferLayoutDescriptor* LayoutDesc = VertexDesc->layouts()->object(BufferSlot + GpuResourceLimit::MaxBindableBingGroupNum);
+                LayoutDesc->setStride(BufferLayout.ByteStride);
+                LayoutDesc->setStepFunction(static_cast<MTL::VertexStepFunction>(MapVertexStepMode(BufferLayout.StepMode)));
+                LayoutDesc->setStepRate(BufferLayout.StepMode == GpuVertexStepMode::Instance ? 1 : 1);
+                for (const GpuVertexAttributeDesc& Attribute : BufferLayout.Attributes)
+                {
+                    MTL::VertexAttributeDescriptor* AttributeDesc = VertexDesc->attributes()->object(Attribute.Location);
+                    AttributeDesc->setFormat(static_cast<MTL::VertexFormat>(MapVertexFormat(Attribute.Format)));
+                    AttributeDesc->setOffset(Attribute.ByteOffset);
+                    AttributeDesc->setBufferIndex(BufferSlot + GpuResourceLimit::MaxBindableBingGroupNum);
+                }
+            }
+            PipelineDesc->setVertexDescriptor(VertexDesc);
+        }
         
         MTL::RenderPipelineColorAttachmentDescriptorArray* ColorAttachments = PipelineDesc->colorAttachments();
         for(uint32 i = 0; i < InPipelineStateDesc.Targets.Num(); i++)

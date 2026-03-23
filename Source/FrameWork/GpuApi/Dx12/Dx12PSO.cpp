@@ -49,6 +49,30 @@ namespace FW
 			static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout2), static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout3)
 		};
 
+		TArray<TArray<ANSICHAR>> SemanticNameStorage;
+		TArray<D3D12_INPUT_ELEMENT_DESC> InputElements;
+		for (int32 BufferSlot = 0; BufferSlot < InPipelineStateDesc.VertexLayout.Num(); ++BufferSlot)
+		{
+			const GpuVertexLayoutDesc& BufferLayout = InPipelineStateDesc.VertexLayout[BufferSlot];
+			for (const GpuVertexAttributeDesc& Attribute : BufferLayout.Attributes)
+			{
+				checkf(!Attribute.SemanticName.IsEmpty(), TEXT("DX12 vertex attribute semantic name must not be empty."));
+				auto& Storage = SemanticNameStorage.AddDefaulted_GetRef();
+				FTCHARToUTF8 SemanticNameUtf8(*Attribute.SemanticName);
+				Storage.Append(reinterpret_cast<const ANSICHAR*>(SemanticNameUtf8.Get()), SemanticNameUtf8.Length());
+				Storage.Add('\0');
+				InputElements.Add({
+					.SemanticName = Storage.GetData(),
+					.SemanticIndex = Attribute.SemanticIndex,
+					.Format = MapTextureFormat(Attribute.Format),
+					.InputSlot = static_cast<uint32>(BufferSlot),
+					.AlignedByteOffset = Attribute.ByteOffset,
+					.InputSlotClass = MapVertexStepMode(BufferLayout.StepMode),
+					.InstanceDataStepRate = BufferLayout.StepMode == GpuVertexStepMode::Instance ? 1u : 0u,
+				});
+			}
+		}
+
         D3D12_GRAPHICS_PIPELINE_STATE_DESC PsoDesc{};
 		PsoDesc.pRootSignature = Dx12RootSignatureManager::GetRootSignature(RsDesc)->GetResource();
         PsoDesc.VS = { Vs->GetCompilationResult()->GetBufferPointer(), Vs->GetCompilationResult()->GetBufferSize() };
@@ -56,6 +80,7 @@ namespace FW
 		{
 			PsoDesc.PS = { Ps->GetCompilationResult()->GetBufferPointer(), Ps->GetCompilationResult()->GetBufferSize() };
 		}
+		PsoDesc.InputLayout = { InputElements.GetData(), (uint32)InputElements.Num() };
 
         PsoDesc.RasterizerState = MapRasterizerState(InPipelineStateDesc.RasterizerState);
         PsoDesc.DepthStencilState.DepthEnable = false;

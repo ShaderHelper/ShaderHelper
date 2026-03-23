@@ -61,12 +61,13 @@ namespace SH
 			RefreshKeyboard();
 			ShEditor->ForceRender();
 		});
-		MouseDownHandle = Context.ViewPort->MouseDownHandler.AddLambda([this, ShEditor](const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) {
+		Context.ViewPort->MouseDownHandler.BindLambda([this, ShEditor](const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) {
 			Context.iMouse.xy = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * MyGeometry.Scale);
 			Context.iMouse.zw = Context.iMouse.xy;
 			ShEditor->ForceRender();
+			return FReply::Unhandled();
 		});
-		MouseUpHandle = Context.ViewPort->MouseUpHandler.AddLambda([this](const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) {
+		Context.ViewPort->MouseUpHandler.BindLambda([this](const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) {
 			if (Context.iMouse.z > 0)
 			{
 				Context.iMouse.z = -Context.iMouse.z;
@@ -75,8 +76,9 @@ namespace SH
 			{
 				Context.iMouse.w = -Context.iMouse.w;
 			}
+			return FReply::Unhandled();
 		});
-		MouseMoveHandle = Context.ViewPort->MouseMoveHandler.AddLambda([this, ShEditor](const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) {
+		Context.ViewPort->MouseMoveHandler.BindLambda([this, ShEditor](const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) {
 			if (Context.iMouse.z > 0)
 			{
 				Context.iMouse.xy = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * MyGeometry.Scale);
@@ -86,6 +88,7 @@ namespace SH
 				}
 				ShEditor->ForceRender();
 			}
+			return FReply::Unhandled();
 		});
 		RefreshKeyboard();
 		Context.iResolution = { (float)Context.ViewPort->GetSize().X, (float)Context.ViewPort->GetSize().Y, (float)Context.ViewPort->GetSize().Y / Context.ViewPort->GetSize().X };
@@ -97,9 +100,9 @@ namespace SH
 		Context.ViewPort->FocusLostHandler.Remove(FocusLostHandle);
 		Context.ViewPort->KeyDownHandler.Remove(KeyDownHandle);
 		Context.ViewPort->KeyUpHandler.Remove(KeyUpHandle);
-		Context.ViewPort->MouseDownHandler.Remove(MouseDownHandle);
-		Context.ViewPort->MouseUpHandler.Remove(MouseUpHandle);
-		Context.ViewPort->MouseMoveHandler.Remove(MouseMoveHandle);
+		Context.ViewPort->MouseDownHandler.Unbind();
+		Context.ViewPort->MouseUpHandler.Unbind();
+		Context.ViewPort->MouseMoveHandler.Unbind();
     }
 
 	void ShaderToyRenderComp::RenderBegin()

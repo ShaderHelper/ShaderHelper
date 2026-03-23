@@ -11,11 +11,18 @@ namespace FW::VK
 	class VkRenderStateCache
 	{
 	public:
+		struct VertexBufferBinding
+		{
+			GpuBuffer* Buffer = nullptr;
+			uint32 Offset = 0;
+		};
+
 		VkRenderStateCache(VulkanCmdRecorder* InOwner, TArray<GpuTextureView*> InRenderTargetViews);
 		void ApplyDrawState();
 
 		void SetPipeline(VulkanRenderPipelineState* InPipelineState);
-		void SetVertexBuffer(GpuBuffer* InBuffer);
+		void SetVertexBuffer(uint32 Slot, GpuBuffer* InBuffer, uint32 Offset);
+		void SetIndexBuffer(GpuBuffer* InBuffer, GpuFormat InIndexFormat, uint32 Offset);
 		void SetViewPort(VkViewport InViewPort);
 		void SetScissorRect(VkRect2D InScissorRect);
 		void SetBindGroups(GpuBindGroup* InGroup0, GpuBindGroup* InGroup1, GpuBindGroup* InGroup2, GpuBindGroup* InGroup3);
@@ -25,6 +32,7 @@ namespace FW::VK
 		bool IsViewportDirty;
 		bool IsScissorRectDirty;
 		bool IsVertexBufferDirty;
+		bool IsIndexBufferDirty;
 
 		bool IsBindGroup0Dirty;
 		bool IsBindGroup1Dirty;
@@ -34,7 +42,10 @@ namespace FW::VK
 	private:
 		VulkanCmdRecorder* Owner;
 		VulkanRenderPipelineState* CurrentRenderPipelineState = nullptr;
-		GpuBuffer* CurrentVertexBuffer = nullptr;
+		std::array<VertexBufferBinding, GpuResourceLimit::MaxVertexBufferSlotNum> CurrentVertexBuffers{};
+		GpuBuffer* CurrentIndexBuffer = nullptr;
+		GpuFormat CurrentIndexFormat = GpuFormat::R16_UINT;
+		uint32 CurrentIndexOffset = 0;
 		TOptional<VkViewport> CurrentViewPort;
 		TOptional<VkRect2D> CurrentScissorRect;
 
@@ -102,8 +113,10 @@ namespace FW::VK
 
 	public:
 		void DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount) override;
+		void DrawIndexed(uint32 StartIndexLocation, uint32 IndexCount, int32 BaseVertexLocation, uint32 StartInstanceLocation, uint32 InstanceCount) override;
 		void SetRenderPipelineState(GpuRenderPipelineState* InPipelineState) override;
-		void SetVertexBuffer(GpuBuffer* InVertexBuffer) override;
+		void SetVertexBuffer(uint32 Slot, GpuBuffer* InVertexBuffer, uint32 Offset) override;
+		void SetIndexBuffer(GpuBuffer* InIndexBuffer, GpuFormat IndexFormat, uint32 Offset) override;
 		void SetViewPort(const GpuViewPortDesc& InViewPortDesc) override;
 		void SetScissorRect(const GpuScissorRectDesc& InScissorRectDes) override;
 		void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override;

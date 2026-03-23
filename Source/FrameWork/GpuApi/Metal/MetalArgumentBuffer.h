@@ -9,14 +9,8 @@ namespace FW
     {
     public:
         MetalBindGroupLayout(const GpuBindGroupLayoutDesc& LayoutDesc);
-        MTL::ArgumentEncoder* GetVertexArgumentEncoder() const {
-            return VertexArgumentEncoder.get();
-        }
-        MTL::ArgumentEncoder* GetFragmentArgumentEncoder() const {
-            return FragmentArgumentEncoder.get();
-        }
-        MTL::ArgumentEncoder* GetComputeArgumentEncoder() const {
-            return ComputeArgumentEncoder.get();
+        MTL::ArgumentEncoder* GetArgumentEncoder() const {
+            return ArgumentEncoder.get();
         }
         
         MTLResourceUsage GetResourceUsage(BindingSlot InSlot) const {
@@ -27,9 +21,7 @@ namespace FW
         }
 
     private:
-        MTLArgumentEncoderPtr VertexArgumentEncoder;
-        MTLArgumentEncoderPtr FragmentArgumentEncoder;
-        MTLArgumentEncoderPtr ComputeArgumentEncoder;
+        MTLArgumentEncoderPtr ArgumentEncoder;
         TMap<BindingSlot, MTLResourceUsage> ResourceUsages;
         TMap<BindingSlot, MTLRenderStages> RenderStages;
     };
@@ -43,9 +35,7 @@ namespace FW
         void Apply(MTL::ComputeCommandEncoder* Encoder);
         
     private:
-        TRefCountPtr<MetalBuffer> VertexArgumentBuffer;
-        TRefCountPtr<MetalBuffer> FragmentArgumentBuffer;
-        TRefCountPtr<MetalBuffer> ComputeArgumentBuffer;
+        TRefCountPtr<MetalBuffer> ArgumentBuffer;
         TMap<BindingSlot, MTL::Resource*> BindGroupResources;
     };
 

@@ -114,15 +114,27 @@ public:
 		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));
 		PassRecorder->DrawPrimitive(StartVertexLocation, VertexCount, StartInstanceLocation, InstanceCount);
 	}
+	void DrawIndexed(uint32 StartIndexLocation, uint32 IndexCount, int32 BaseVertexLocation, uint32 StartInstanceLocation, uint32 InstanceCount) override
+	{
+		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));
+		PassRecorder->DrawIndexed(StartIndexLocation, IndexCount, BaseVertexLocation, StartInstanceLocation, InstanceCount);
+	}
 	void SetRenderPipelineState(GpuRenderPipelineState* InPipelineState) override
 	{
 		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));
 		PassRecorder->SetRenderPipelineState(InPipelineState);
 	}
-	void SetVertexBuffer(GpuBuffer* InVertexBuffer) override
+	void SetVertexBuffer(uint32 Slot, GpuBuffer* InVertexBuffer, uint32 Offset) override
 	{
 		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));
-		PassRecorder->SetVertexBuffer(InVertexBuffer);
+		check(ValidateSetVertexBuffer(Slot, InVertexBuffer, Offset));
+		PassRecorder->SetVertexBuffer(Slot, InVertexBuffer, Offset);
+	}
+	void SetIndexBuffer(GpuBuffer* InIndexBuffer, GpuFormat IndexFormat, uint32 Offset) override
+	{
+		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));
+		check(ValidateSetIndexBuffer(InIndexBuffer, IndexFormat, Offset));
+		PassRecorder->SetIndexBuffer(InIndexBuffer, IndexFormat, Offset);
 	}
 	void SetViewPort(const GpuViewPortDesc& InViewPortDesc) override
 	{

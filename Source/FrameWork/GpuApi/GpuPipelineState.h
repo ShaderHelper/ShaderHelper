@@ -6,6 +6,26 @@
 
 namespace FW
 {
+	struct GpuVertexAttributeDesc
+	{
+		uint32 Location = 0;
+		FString SemanticName;
+		uint32 SemanticIndex = 0;
+		GpuFormat Format = GpuFormat::R32G32B32_FLOAT;
+		uint32 ByteOffset = 0;
+
+		bool operator==(const GpuVertexAttributeDesc& Other) const = default;
+	};
+
+	struct GpuVertexLayoutDesc
+	{
+		uint32 ByteStride = 0;
+		GpuVertexStepMode StepMode = GpuVertexStepMode::Vertex;
+		TArray<GpuVertexAttributeDesc> Attributes;
+
+		bool operator==(const GpuVertexLayoutDesc& Other) const = default;
+	};
+
     struct RasterizerStateDesc
     {
         RasterizerFillMode FillMode;
@@ -14,7 +34,7 @@ namespace FW
 
     struct PipelineTargetDesc
     {
-		GpuTextureFormat TargetFormat;
+		GpuFormat TargetFormat;
 
 		bool BlendEnable = false;
 		BlendFactor SrcFactor = BlendFactor::SrcAlpha;
@@ -50,6 +70,8 @@ namespace FW
 		GpuBindGroupLayout* BindGroupLayout1 = nullptr;
 		GpuBindGroupLayout* BindGroupLayout2 = nullptr;
 		GpuBindGroupLayout* BindGroupLayout3 = nullptr;
+		// Each element describes one vertex buffer.
+		TArray<GpuVertexLayoutDesc> VertexLayout;
 
 		RasterizerStateDesc RasterizerState{ RasterizerFillMode::Solid, RasterizerCullMode::None };
 		PrimitiveType Primitive = PrimitiveType::TriangleList;
@@ -91,6 +113,7 @@ namespace FW
 		TOptional<GpuBindGroupLayoutDesc> BindGroupLayout1;
 		TOptional<GpuBindGroupLayoutDesc> BindGroupLayout2;
 		TOptional<GpuBindGroupLayoutDesc> BindGroupLayout3;
+		TArray<GpuVertexLayoutDesc> VertexLayout;
 		RasterizerStateDesc RasterizerState;
 		PrimitiveType Primitive;
 		TArray<PipelineTargetDesc, TFixedAllocator<GpuResourceLimit::MaxRenderTargetNum>> Targets;
@@ -109,6 +132,7 @@ namespace FW
 				&& BindGroupLayout1 == Other.BindGroupLayout1
 				&& BindGroupLayout2 == Other.BindGroupLayout2
 				&& BindGroupLayout3 == Other.BindGroupLayout3
+				&& VertexLayout == Other.VertexLayout
 				&& RasterizerState.FillMode == Other.RasterizerState.FillMode
 				&& RasterizerState.CullMode == Other.RasterizerState.CullMode
 				&& Primitive == Other.Primitive
