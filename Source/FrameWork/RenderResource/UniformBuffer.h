@@ -1,6 +1,7 @@
 #pragma once
 #include "GpuApi/GpuRhi.h"
 #include "GpuApi/GpuShader.h"
+#include "Math/Matrix.h"
 #include <string_view>
 #include <type_traits>
 
@@ -229,6 +230,7 @@ namespace FW
 	template<> struct UniformBufferMemberTypeString<Vector2f> { static constexpr std::string_view Value = "float2"; static constexpr std::string_view GlslValue = "vec2"; };
 	template<> struct UniformBufferMemberTypeString<Vector3f> { static constexpr std::string_view Value = "float3"; static constexpr std::string_view GlslValue = "vec3"; };
 	template<> struct UniformBufferMemberTypeString<Vector4f> { static constexpr std::string_view Value = "float4"; static constexpr std::string_view GlslValue = "vec4"; };
+	template<> struct UniformBufferMemberTypeString<FMatrix44f> { static constexpr std::string_view Value = "row_major float4x4"; static constexpr std::string_view GlslValue = "mat4"; };
 
 	enum class UniformBufferUsage : uint32
 	{
@@ -295,6 +297,12 @@ namespace FW
 		UniformBufferBuilder& AddVector4f(const FString& MemberName)
 		{
 			AddMember<Vector4f>(MemberName);
+			return *this;
+		}
+
+		UniformBufferBuilder& AddMatrix4x4f(const FString& MemberName)
+		{
+			AddMember<FMatrix44f>(MemberName);
 			return *this;
 		}
 

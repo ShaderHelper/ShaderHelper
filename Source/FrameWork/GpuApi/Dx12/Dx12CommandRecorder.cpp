@@ -8,6 +8,7 @@ namespace FW
 		: IsPipelineStateDirty(false)
 		, IsRenderTargetDirty(false)
 		, IsVertexBufferDirty(false)
+		, IsIndexBufferDirty(false)
 		, IsViewportDirty(false)
 		, IsScissorRectDirty(false)
 		, IsGraphicsRootSigDirty(false)
@@ -21,7 +22,6 @@ namespace FW
 		, IsComputeBindGroup2Dirty(false)
 		, IsComputeBindGroup3Dirty(false)
 	{
-
 	}
 
 	void Dx12StateCache::ApplyComputeState(ID3D12GraphicsCommandList* InCmdList)
@@ -99,12 +99,43 @@ namespace FW
 
 		if (IsVertexBufferDirty)
 		{
-			if (CurrentVertexBuffer) {
+			if (RenderPso && RenderPso->GetDesc().VertexLayout.Num() > 0) {
+				for (int32 BufferSlot = 0; BufferSlot < RenderPso->GetDesc().VertexLayout.Num(); ++BufferSlot)
+				{
+					const GpuVertexLayoutDesc& BufferLayout = RenderPso->GetDesc().VertexLayout[BufferSlot];
+					const Dx12VertexBufferBinding& Binding = CurrentVertexBuffers[BufferSlot];
+					if (!Binding.Buffer)
+					{
+						continue;
+					}
+					D3D12_VERTEX_BUFFER_VIEW View{};
+					View.BufferLocation = Binding.Buffer->GetAllocation().GetGpuAddr() + Binding.Offset;
+					View.StrideInBytes = BufferLayout.ByteStride;
+					View.SizeInBytes = Binding.Buffer->GetByteSize() - Binding.Offset;
+					InCmdList->IASetVertexBuffers(BufferSlot, 1, &View);
+				}
 			}
 			else {
 				InCmdList->IASetVertexBuffers(0, 0, nullptr);
 			}
 			IsVertexBufferDirty = false;
+		}
+
+		if (IsIndexBufferDirty)
+		{
+			if (CurrentIndexBuffer)
+			{
+				D3D12_INDEX_BUFFER_VIEW View{};
+				View.BufferLocation = CurrentIndexBuffer->GetAllocation().GetGpuAddr() + CurrentIndexOffset;
+				View.SizeInBytes = CurrentIndexBuffer->GetByteSize() - CurrentIndexOffset;
+				View.Format = MapIndexFormat(CurrentIndexFormat);
+				InCmdList->IASetIndexBuffer(&View);
+			}
+			else
+			{
+				InCmdList->IASetIndexBuffer(nullptr);
+			}
+			IsIndexBufferDirty = false;
 		}
 
 		if (IsPipelineStateDirty)
@@ -183,6 +214,13 @@ namespace FW
 	{
 		RenderPso = nullptr;
 		ComputePso = nullptr;
+		for (Dx12VertexBufferBinding& Binding : CurrentVertexBuffers)
+		{
+			Binding = {};
+		}
+		CurrentIndexBuffer = nullptr;
+		CurrentIndexFormat = GpuFormat::R16_UINT;
+		CurrentIndexOffset = 0;
 		CurrentViewPort.Reset();
 		CurrentScissorRect.Reset();
 
@@ -205,6 +243,7 @@ namespace FW
 		IsPipelineStateDirty = false;
 		IsRenderTargetDirty = false;
 		IsVertexBufferDirty = false;
+		IsIndexBufferDirty = false;
 		IsViewportDirty = false;
 		IsScissorRectDirty = false;
 
@@ -240,12 +279,24 @@ namespace FW
 		}
 	}
 
-	void Dx12StateCache::SetVertexBuffer(Dx12Buffer* InBuffer)
+	void Dx12StateCache::SetVertexBuffer(uint32 Slot, Dx12Buffer* InBuffer, uint32 Offset)
 	{
-		if (CurrentVertexBuffer != InBuffer)
+		Dx12VertexBufferBinding NewBinding{ InBuffer, Offset };
+		if (CurrentVertexBuffers[Slot].Buffer != NewBinding.Buffer || CurrentVertexBuffers[Slot].Offset != NewBinding.Offset)
 		{
-			CurrentVertexBuffer = InBuffer;
+			CurrentVertexBuffers[Slot] = NewBinding;
 			IsVertexBufferDirty = true;
+		}
+	}
+
+	void Dx12StateCache::SetIndexBuffer(Dx12Buffer* InBuffer, GpuFormat InIndexFormat, uint32 Offset)
+	{
+		if (CurrentIndexBuffer != InBuffer || CurrentIndexFormat != InIndexFormat || CurrentIndexOffset != Offset)
+		{
+			CurrentIndexBuffer = InBuffer;
+			CurrentIndexFormat = InIndexFormat;
+			CurrentIndexOffset = Offset;
+			IsIndexBufferDirty = true;
 		}
 	}
 
@@ -405,6 +456,12 @@ namespace FW
 		CmdList->DrawInstanced(VertexCount, InstanceCount, StartVertexLocation, StartInstanceLocation);
 	}
 
+	void Dx12RenderPassRecorder::DrawIndexed(uint32 StartIndexLocation, uint32 IndexCount, int32 BaseVertexLocation, uint32 StartInstanceLocation, uint32 InstanceCount)
+	{
+		StateCache.ApplyDrawState(CmdList);
+		CmdList->DrawIndexedInstanced(IndexCount, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
+	}
+
 	void Dx12RenderPassRecorder::SetRenderPipelineState(GpuRenderPipelineState* InPipelineState)
 	{
 		StateCache.SetPipeline(static_cast<Dx12RenderPso*>(InPipelineState));
@@ -415,9 +472,14 @@ namespace FW
 		}
 	}
 
-	void Dx12RenderPassRecorder::SetVertexBuffer(GpuBuffer* InVertexBuffer)
+	void Dx12RenderPassRecorder::SetVertexBuffer(uint32 Slot, GpuBuffer* InVertexBuffer, uint32 Offset)
 	{
-		StateCache.SetVertexBuffer(static_cast<Dx12Buffer*>(InVertexBuffer));
+		StateCache.SetVertexBuffer(Slot, static_cast<Dx12Buffer*>(InVertexBuffer), Offset);
+	}
+
+	void Dx12RenderPassRecorder::SetIndexBuffer(GpuBuffer* InIndexBuffer, GpuFormat IndexFormat, uint32 Offset)
+	{
+		StateCache.SetIndexBuffer(static_cast<Dx12Buffer*>(InIndexBuffer), IndexFormat, Offset);
 	}
 
 	void Dx12RenderPassRecorder::SetViewPort(const GpuViewPortDesc& InViewPortDesc)

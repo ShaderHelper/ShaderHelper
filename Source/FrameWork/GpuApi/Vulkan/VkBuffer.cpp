@@ -31,6 +31,22 @@ namespace FW::VK
 				BufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 			}
 		}
+		if (EnumHasAnyFlags(InBufferDesc.Usage, GpuBufferUsage::Vertex))
+		{
+			BufferInfo.usage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+			if (bHasInitialData)
+			{
+				BufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+			}
+		}
+		if (EnumHasAnyFlags(InBufferDesc.Usage, GpuBufferUsage::Index))
+		{
+			BufferInfo.usage |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+			if (bHasInitialData)
+			{
+				BufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+			}
+		}
 		else if (EnumHasAllFlags(InBufferDesc.Usage, GpuBufferUsage::Upload))
 		{
 			BufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;

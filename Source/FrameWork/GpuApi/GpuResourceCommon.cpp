@@ -4,31 +4,43 @@
 
 namespace FW
 {
-	uint32 GetTextureFormatByteSize(GpuTextureFormat InFormat)
+	uint32 GetFormatByteSize(GpuFormat InFormat)
 	{
 		switch (InFormat)
 		{
-		case GpuTextureFormat::R8_UNORM:
+		case GpuFormat::R8_UNORM:
 			return 1;
-		case GpuTextureFormat::R16_FLOAT:
+		case GpuFormat::R16_UINT:
+		case GpuFormat::R16_FLOAT:
 			return 2;
-		case GpuTextureFormat::R8G8B8A8_UNORM:
-		case GpuTextureFormat::B8G8R8A8_UNORM:
-		case GpuTextureFormat::B8G8R8A8_UNORM_SRGB:
-		case GpuTextureFormat::R10G10B10A2_UNORM:
-		case GpuTextureFormat::R11G11B10_FLOAT:
-		case GpuTextureFormat::R32_FLOAT:
+		case GpuFormat::R8G8B8A8_UNORM:
+		case GpuFormat::B8G8R8A8_UNORM:
+		case GpuFormat::B8G8R8A8_UNORM_SRGB:
+		case GpuFormat::R10G10B10A2_UNORM:
+		case GpuFormat::R11G11B10_FLOAT:
+		case GpuFormat::R32_UINT:
+		case GpuFormat::R32_FLOAT:
 			return 4;
-		case GpuTextureFormat::R16G16B16A16_UNORM:
-		case GpuTextureFormat::R16G16B16A16_UINT:
-		case GpuTextureFormat::R16G16B16A16_FLOAT:
+		case GpuFormat::R32G32_UINT:
+		case GpuFormat::R32G32_FLOAT:
+		case GpuFormat::R16G16B16A16_UNORM:
+		case GpuFormat::R16G16B16A16_UINT:
+		case GpuFormat::R16G16B16A16_FLOAT:
 			return 8;
-		case GpuTextureFormat::R32G32B32A32_UINT:
-		case GpuTextureFormat::R32G32B32A32_FLOAT:
+		case GpuFormat::R32G32B32_UINT:
+		case GpuFormat::R32G32B32_FLOAT:
+			return 12;
+		case GpuFormat::R32G32B32A32_UINT:
+		case GpuFormat::R32G32B32A32_FLOAT:
 			return 16;
 		default:
 			AUX::Unreachable();
 		}
+	}
+
+	uint32 GetTextureFormatByteSize(GpuTextureFormat InFormat)
+	{
+		return GetFormatByteSize(InFormat);
 	}
 
 	GpuResourceState GetBufferState(GpuBufferUsage Usage)
@@ -45,6 +57,14 @@ namespace FW
 		if (EnumHasAllFlags(Usage, GpuBufferUsage::Uniform))
 		{
 			Result |= GpuResourceState::UniformBuffer;
+		}
+		if (EnumHasAllFlags(Usage, GpuBufferUsage::Vertex))
+		{
+			Result |= GpuResourceState::VertexBufferRead;
+		}
+		if (EnumHasAllFlags(Usage, GpuBufferUsage::Index))
+		{
+			Result |= GpuResourceState::IndexBufferRead;
 		}
 		if (EnumHasAllFlags(Usage, GpuBufferUsage::ReadBack))
 		{

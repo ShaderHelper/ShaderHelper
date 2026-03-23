@@ -352,9 +352,14 @@ namespace FW
 		AddRootParameter(InDesc.Layout2);
 		AddRootParameter(InDesc.Layout3);
 
-		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC RootSignatureDesc = { 
-			(uint32)RootParameters.Num(), RootParameters.GetData(),
-		};
+		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC RootSignatureDesc;
+		RootSignatureDesc.Init_1_0(
+			(uint32)RootParameters.Num(),
+			RootParameters.GetData(),
+			0,
+			nullptr,
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
+		);
 
 		TRefCountPtr<ID3DBlob> Signature;
 		TRefCountPtr<ID3DBlob> Error;

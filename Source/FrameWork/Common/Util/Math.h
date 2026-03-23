@@ -2,10 +2,35 @@
 
 namespace FW
 {
+	// Project space uses X-right, Y-up, Z-forward.
+	// UE math uses X-forward, Y-right, Z-up, so project rotations are converted through a fixed basis swap.
+	inline FMatrix44f RotationMatrix(float InYaw, float InPitch, float InRoll = 0.0f)
+	{
+		const FRotator3f UeRotator(
+			FMath::RadiansToDegrees(InPitch),
+			FMath::RadiansToDegrees(InYaw),
+			FMath::RadiansToDegrees(InRoll)
+		);
+		const FMatrix44f ProjectToUeBasis(
+			FPlane4f(0.0f, 0.0f, 1.0f, 0.0f),
+			FPlane4f(1.0f, 0.0f, 0.0f, 0.0f),
+			FPlane4f(0.0f, 1.0f, 0.0f, 0.0f),
+			FPlane4f(0.0f, 0.0f, 0.0f, 1.0f)
+		);
+		const FMatrix44f UeToProjectBasis(
+			FPlane4f(0.0f, 1.0f, 0.0f, 0.0f),
+			FPlane4f(0.0f, 0.0f, 1.0f, 0.0f),
+			FPlane4f(1.0f, 0.0f, 0.0f, 0.0f),
+			FPlane4f(0.0f, 0.0f, 0.0f, 1.0f)
+		);
+
+		return UeToProjectBasis * FRotationMatrix44f(UeRotator) * ProjectToUeBasis;
+	}
+
 	// Solve the equation x^3 + Ax^2 + Bx + C = 0 for real roots. Requires an array of size 3 
 	// for the results. The return value is the number of results, ranging from 1 to 3.
 	// Using Viete's trig formula. See: https://en.wikipedia.org/wiki/Cubic_equation
-	int32 CubicRoots(double A, double B, double C, double Result[])
+	inline int32 CubicRoots(double A, double B, double C, double Result[])
 	{
 		double A2 = A * A;
 		double P = (A2 - 3.0 * B) / 9.0;
@@ -52,7 +77,7 @@ namespace FW
 		}
 	}
 
-	bool LineBezierIntersection(const Vector2D& A, const Vector2D& B,
+	inline bool LineBezierIntersection(const Vector2D& A, const Vector2D& B,
 		const Vector2D& C0, const Vector2D& C1, const Vector2D& C2, const Vector2D& C3)
 	{
 		const double Ax = 3 * (C1.x - C2.x) + C3.x - C0.x;

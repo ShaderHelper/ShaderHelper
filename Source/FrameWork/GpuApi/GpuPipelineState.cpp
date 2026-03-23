@@ -62,6 +62,22 @@ namespace FW
 		Hash = HashCombine(Hash, ::GetTypeHash(Desc.RasterizerState.FillMode));
 		Hash = HashCombine(Hash, ::GetTypeHash(Desc.RasterizerState.CullMode));
 
+		Hash = HashCombine(Hash, ::GetTypeHash(Desc.VertexLayout.Num()));
+		for (const auto& BufferLayout : Desc.VertexLayout)
+		{
+			Hash = HashCombine(Hash, ::GetTypeHash(BufferLayout.ByteStride));
+			Hash = HashCombine(Hash, ::GetTypeHash(BufferLayout.StepMode));
+			Hash = HashCombine(Hash, ::GetTypeHash(BufferLayout.Attributes.Num()));
+			for (const auto& Attribute : BufferLayout.Attributes)
+			{
+				Hash = HashCombine(Hash, ::GetTypeHash(Attribute.Location));
+				Hash = HashCombine(Hash, GetTypeHash(Attribute.SemanticName));
+				Hash = HashCombine(Hash, ::GetTypeHash(Attribute.SemanticIndex));
+				Hash = HashCombine(Hash, ::GetTypeHash(Attribute.Format));
+				Hash = HashCombine(Hash, ::GetTypeHash(Attribute.ByteOffset));
+			}
+		}
+
 		// Hash primitive type
 		Hash = HashCombine(Hash, ::GetTypeHash(Desc.Primitive));
 
@@ -88,6 +104,7 @@ namespace FW
 			.BindGroupLayout1 = Desc.BindGroupLayout1 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout1->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
 			.BindGroupLayout2 = Desc.BindGroupLayout2 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout2->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
 			.BindGroupLayout3 = Desc.BindGroupLayout3 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout3->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
+			.VertexLayout = Desc.VertexLayout,
 			.RasterizerState = Desc.RasterizerState,
 			.Primitive = Desc.Primitive,
 			.Targets = Desc.Targets,

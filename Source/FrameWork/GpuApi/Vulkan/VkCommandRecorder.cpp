@@ -14,13 +14,15 @@ namespace FW::VK
 		, IsViewportDirty(false)
 		, IsScissorRectDirty(false)
 		, IsVertexBufferDirty(false)
+		, IsIndexBufferDirty(false)
 		, IsBindGroup0Dirty(false)
 		, IsBindGroup1Dirty(false)
 		, IsBindGroup2Dirty(false)
 		, IsBindGroup3Dirty(false)
 		, Owner(InOwner)
 		, RenderTargetViews(MoveTemp(InRenderTargetViews))
-	{}
+	{
+	}
 
 	void VkRenderStateCache::SetPipeline(VulkanRenderPipelineState* InPipelineState)
 	{
@@ -31,12 +33,23 @@ namespace FW::VK
 		}
 	}
 
-	void VkRenderStateCache::SetVertexBuffer(GpuBuffer* InBuffer)
+	void VkRenderStateCache::SetVertexBuffer(uint32 Slot, GpuBuffer* InBuffer, uint32 Offset)
 	{
-		if (CurrentVertexBuffer != InBuffer)
+		if (CurrentVertexBuffers[Slot].Buffer != InBuffer || CurrentVertexBuffers[Slot].Offset != Offset)
 		{
-			CurrentVertexBuffer = InBuffer;
+			CurrentVertexBuffers[Slot] = { InBuffer, Offset };
 			IsVertexBufferDirty = true;
+		}
+	}
+
+	void VkRenderStateCache::SetIndexBuffer(GpuBuffer* InBuffer, GpuFormat InIndexFormat, uint32 Offset)
+	{
+		if (CurrentIndexBuffer != InBuffer || CurrentIndexFormat != InIndexFormat || CurrentIndexOffset != Offset)
+		{
+			CurrentIndexBuffer = InBuffer;
+			CurrentIndexFormat = InIndexFormat;
+			CurrentIndexOffset = Offset;
+			IsIndexBufferDirty = true;
 		}
 	}
 
@@ -122,7 +135,31 @@ namespace FW::VK
 			IsScissorRectDirty = false;
 		}
 
-		// TODO: Apply vertex buffer binding
+		if (IsVertexBufferDirty && CurrentRenderPipelineState)
+		{
+			for (int32 BufferSlot = 0; BufferSlot < CurrentRenderPipelineState->GetDesc().VertexLayout.Num(); ++BufferSlot)
+			{
+				const VertexBufferBinding& Binding = CurrentVertexBuffers[BufferSlot];
+				if (!Binding.Buffer)
+				{
+					continue;
+				}
+				VkBuffer VkBuffers[] = { static_cast<VulkanBuffer*>(Binding.Buffer)->GetBuffer() };
+				VkDeviceSize Offsets[] = { Binding.Offset };
+				vkCmdBindVertexBuffers(CmdBuffer, BufferSlot, 1, VkBuffers, Offsets);
+			}
+			IsVertexBufferDirty = false;
+		}
+
+		if (IsIndexBufferDirty)
+		{
+			if (CurrentIndexBuffer)
+			{
+				VulkanBuffer* VkBuffer = static_cast<VulkanBuffer*>(CurrentIndexBuffer);
+				vkCmdBindIndexBuffer(CmdBuffer, VkBuffer->GetBuffer(), CurrentIndexOffset, MapIndexFormat(CurrentIndexFormat));
+			}
+			IsIndexBufferDirty = false;
+		}
 
 		auto ApplyBindGroup = [&, this](bool& IsDirty, GpuBindGroup* InBindGroup)
 		{
@@ -574,14 +611,25 @@ namespace FW::VK
 		vkCmdDraw(Owner->GetCommandBuffer(), VertexCount, InstanceCount, StartVertexLocation, StartInstanceLocation);
 	}
 
+	void VulkanRenderPassRecorder::DrawIndexed(uint32 StartIndexLocation, uint32 IndexCount, int32 BaseVertexLocation, uint32 StartInstanceLocation, uint32 InstanceCount)
+	{
+		StateCache.ApplyDrawState();
+		vkCmdDrawIndexed(Owner->GetCommandBuffer(), IndexCount, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
+	}
+
 	void VulkanRenderPassRecorder::SetRenderPipelineState(GpuRenderPipelineState* InPipelineState)
 	{
 		StateCache.SetPipeline(static_cast<VulkanRenderPipelineState*>(InPipelineState));
 	}
 
-	void VulkanRenderPassRecorder::SetVertexBuffer(GpuBuffer* InVertexBuffer)
+	void VulkanRenderPassRecorder::SetVertexBuffer(uint32 Slot, GpuBuffer* InVertexBuffer, uint32 Offset)
 	{
-		StateCache.SetVertexBuffer(InVertexBuffer);
+		StateCache.SetVertexBuffer(Slot, InVertexBuffer, Offset);
+	}
+
+	void VulkanRenderPassRecorder::SetIndexBuffer(GpuBuffer* InIndexBuffer, GpuFormat IndexFormat, uint32 Offset)
+	{
+		StateCache.SetIndexBuffer(InIndexBuffer, IndexFormat, Offset);
 	}
 
 	void VulkanRenderPassRecorder::SetViewPort(const GpuViewPortDesc& InViewPortDesc)

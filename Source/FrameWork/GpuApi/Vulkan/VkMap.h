@@ -4,23 +4,29 @@
 
 namespace FW::VK
 {
-	inline VkFormat MapTextureFormat(GpuTextureFormat InTexFormat)
+	inline VkFormat MapTextureFormat(GpuFormat InTexFormat)
 	{
 		switch (InTexFormat)
 		{
-		case GpuTextureFormat::R8_UNORM:              return VK_FORMAT_R8_UNORM;
-		case GpuTextureFormat::R8G8B8A8_UNORM:        return VK_FORMAT_R8G8B8A8_UNORM;
-		case GpuTextureFormat::B8G8R8A8_UNORM:        return VK_FORMAT_B8G8R8A8_UNORM;
-		case GpuTextureFormat::B8G8R8A8_UNORM_SRGB:   return VK_FORMAT_B8G8R8A8_SRGB;
-		case GpuTextureFormat::R10G10B10A2_UNORM:     return VK_FORMAT_A2B10G10R10_UNORM_PACK32;
-		case GpuTextureFormat::R16G16B16A16_UNORM:    return VK_FORMAT_R16G16B16A16_UNORM;
-		case GpuTextureFormat::R16G16B16A16_UINT:     return VK_FORMAT_R16G16B16A16_UINT;
-		case GpuTextureFormat::R32G32B32A32_UINT:     return VK_FORMAT_R32G32B32A32_UINT;
-		case GpuTextureFormat::R16G16B16A16_FLOAT:    return VK_FORMAT_R16G16B16A16_SFLOAT;
-		case GpuTextureFormat::R32G32B32A32_FLOAT:    return VK_FORMAT_R32G32B32A32_SFLOAT;
-		case GpuTextureFormat::R11G11B10_FLOAT:       return VK_FORMAT_B10G11R11_UFLOAT_PACK32;
-		case GpuTextureFormat::R16_FLOAT:             return VK_FORMAT_R16_SFLOAT;
-		case GpuTextureFormat::R32_FLOAT:             return VK_FORMAT_R32_SFLOAT;
+		case GpuFormat::R8_UNORM:              return VK_FORMAT_R8_UNORM;
+		case GpuFormat::R8G8B8A8_UNORM:        return VK_FORMAT_R8G8B8A8_UNORM;
+		case GpuFormat::B8G8R8A8_UNORM:        return VK_FORMAT_B8G8R8A8_UNORM;
+		case GpuFormat::B8G8R8A8_UNORM_SRGB:   return VK_FORMAT_B8G8R8A8_SRGB;
+		case GpuFormat::R10G10B10A2_UNORM:     return VK_FORMAT_A2B10G10R10_UNORM_PACK32;
+		case GpuFormat::R16_UINT:              return VK_FORMAT_R16_UINT;
+		case GpuFormat::R32_UINT:              return VK_FORMAT_R32_UINT;
+		case GpuFormat::R16G16B16A16_UNORM:    return VK_FORMAT_R16G16B16A16_UNORM;
+		case GpuFormat::R16G16B16A16_UINT:     return VK_FORMAT_R16G16B16A16_UINT;
+		case GpuFormat::R32G32_UINT:           return VK_FORMAT_R32G32_UINT;
+		case GpuFormat::R32G32B32_UINT:        return VK_FORMAT_R32G32B32_UINT;
+		case GpuFormat::R32G32B32A32_UINT:     return VK_FORMAT_R32G32B32A32_UINT;
+		case GpuFormat::R32G32_FLOAT:          return VK_FORMAT_R32G32_SFLOAT;
+		case GpuFormat::R32G32B32_FLOAT:       return VK_FORMAT_R32G32B32_SFLOAT;
+		case GpuFormat::R16G16B16A16_FLOAT:    return VK_FORMAT_R16G16B16A16_SFLOAT;
+		case GpuFormat::R32G32B32A32_FLOAT:    return VK_FORMAT_R32G32B32A32_SFLOAT;
+		case GpuFormat::R11G11B10_FLOAT:       return VK_FORMAT_B10G11R11_UFLOAT_PACK32;
+		case GpuFormat::R16_FLOAT:             return VK_FORMAT_R16_SFLOAT;
+		case GpuFormat::R32_FLOAT:             return VK_FORMAT_R32_SFLOAT;
 		default:
 			AUX::Unreachable();
 		}
@@ -123,6 +129,28 @@ namespace FW::VK
 		case PrimitiveType::LineStrip:            return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
 		case PrimitiveType::TriangleList:         return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 		case PrimitiveType::TriangleStrip:        return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+		default:
+			AUX::Unreachable();
+		}
+	}
+
+	inline VkVertexInputRate MapVertexStepMode(GpuVertexStepMode InMode)
+	{
+		switch (InMode)
+		{
+		case GpuVertexStepMode::Vertex: return VK_VERTEX_INPUT_RATE_VERTEX;
+		case GpuVertexStepMode::Instance: return VK_VERTEX_INPUT_RATE_INSTANCE;
+		default:
+			AUX::Unreachable();
+		}
+	}
+
+	inline VkIndexType MapIndexFormat(GpuFormat InFormat)
+	{
+		switch (InFormat)
+		{
+		case GpuFormat::R16_UINT: return VK_INDEX_TYPE_UINT16;
+		case GpuFormat::R32_UINT: return VK_INDEX_TYPE_UINT32;
 		default:
 			AUX::Unreachable();
 		}

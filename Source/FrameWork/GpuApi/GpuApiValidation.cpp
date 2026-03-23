@@ -5,6 +5,36 @@
 namespace FW
 {
 
+	static bool ValidateVertexLayout(const TArray<GpuVertexLayoutDesc>& InVertexLayout)
+	{
+		TSet<uint32> UsedLocations;
+		if (InVertexLayout.Num() > GpuResourceLimit::MaxVertexBufferSlotNum)
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("CreateRenderPipelineState Error(Vertex layout count exceeds max vertex buffer slot count:%d)"), GpuResourceLimit::MaxVertexBufferSlotNum);
+			return false;
+		}
+
+		for (int32 BufferSlot = 0; BufferSlot < InVertexLayout.Num(); ++BufferSlot)
+		{
+			const GpuVertexLayoutDesc& BufferLayout = InVertexLayout[BufferSlot];
+			if (BufferLayout.ByteStride == 0)
+			{
+				SH_LOG(LogRhiValidation, Error, TEXT("CreateRenderPipelineState Error(Vertex buffer stride must be greater than zero)"));
+				return false;
+			}
+			for (const GpuVertexAttributeDesc& Attribute : BufferLayout.Attributes)
+			{
+				if (UsedLocations.Contains(Attribute.Location))
+				{
+					SH_LOG(LogRhiValidation, Error, TEXT("CreateRenderPipelineState Error(Duplicated vertex attribute location:%d)"), Attribute.Location);
+					return false;
+				}
+				UsedLocations.Add(Attribute.Location);
+			}
+		}
+		return true;
+	}
+
 	bool ValidateSetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)
 	{
 		auto ValidateBindGroupNumber = [](GpuBindGroup* BindGroup, BindingGroupSlot ExpectedSlot)
@@ -112,7 +142,8 @@ namespace FW
 			return true;
 		};
 		return ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout0, 0) && ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout1, 1)
-			&& ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout2, 2) && ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout3, 3);
+			&& ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout2, 2) && ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout3, 3)
+			&& ValidateVertexLayout(InPipelineStateDesc.VertexLayout);
 	}
 
 	bool ValidateBeginRenderPass(const GpuRenderPassDesc& InPassDesc)
@@ -156,6 +187,60 @@ namespace FW
 			}
 		}
 		return ValidateGpuResourceState(InitState);
+	}
+
+	bool ValidateSetVertexBuffer(uint32 Slot, GpuBuffer* InVertexBuffer, uint32 Offset)
+	{
+		if (!InVertexBuffer)
+		{
+			return true;
+		}
+		if (Slot >= GpuResourceLimit::MaxVertexBufferSlotNum)
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("SetVertexBuffer Error(Slot out of range:%d)"), Slot);
+			return false;
+		}
+		if (!EnumHasAnyFlags(InVertexBuffer->GetUsage(), GpuBufferUsage::Vertex))
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("SetVertexBuffer Error(Buffer usage does not include Vertex). Slot:%d"), Slot);
+			return false;
+		}
+		if (Offset >= InVertexBuffer->GetByteSize())
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("SetVertexBuffer Error(Offset out of range). Slot:%d Offset:%d ByteSize:%d"), Slot, Offset, InVertexBuffer->GetByteSize());
+			return false;
+		}
+		return true;
+	}
+
+	bool ValidateSetIndexBuffer(GpuBuffer* InIndexBuffer, GpuFormat IndexFormat, uint32 Offset)
+	{
+		if (!InIndexBuffer)
+		{
+			return true;
+		}
+		if (!EnumHasAnyFlags(InIndexBuffer->GetUsage(), GpuBufferUsage::Index))
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("SetIndexBuffer Error(Buffer usage does not include Index)"));
+			return false;
+		}
+		if (Offset >= InIndexBuffer->GetByteSize())
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("SetIndexBuffer Error(Offset out of range). Offset:%d ByteSize:%d"), Offset, InIndexBuffer->GetByteSize());
+			return false;
+		}
+		if (IndexFormat != GpuFormat::R16_UINT && IndexFormat != GpuFormat::R32_UINT)
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("SetIndexBuffer Error(Index format must be R16_UINT or R32_UINT)"));
+			return false;
+		}
+		const uint32 IndexByteSize = IndexFormat == GpuFormat::R16_UINT ? sizeof(uint16) : sizeof(uint32);
+		if ((Offset % IndexByteSize) != 0)
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("SetIndexBuffer Error(Offset must align to index format size). Offset:%d IndexByteSize:%d"), Offset, IndexByteSize);
+			return false;
+		}
+		return true;
 	}
 
 	bool ValidateBarriers(const TArray<GpuBarrierInfo>& BarrierInfos)

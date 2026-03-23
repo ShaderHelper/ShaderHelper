@@ -50,7 +50,5 @@ namespace SH
 		FDelegateHandle ResizeHandle;
 		FDelegateHandle FocusLostHandle;
 		FDelegateHandle KeyDownHandle, KeyUpHandle;
-		FDelegateHandle MouseDownHandle, MouseUpHandle;
-		FDelegateHandle MouseMoveHandle;
 	};
 }

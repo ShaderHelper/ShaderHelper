@@ -1,13 +1,218 @@
 #include "CommonHeader.h"
 #include "STexturePreviewer.h"
+#include "AssetObject/TextureCube.h"
+#include "Common/Path/PathHelper.h"
+#include "Editor/PreviewViewPort.h"
 #include "UI/Widgets/Misc/MiscWidget.h"
 #include "GpuApi/GpuRhi.h"
+#include "RenderResource/Camera.h"
+#include "RenderResource/Mesh.h"
 #include "RenderResource/RenderPass/BlitPass.h"
+#include "RenderResource/UniformBuffer.h"
 #include "Renderer/RenderGraph.h"
 #include "Common/Util/Reflection.h"
 
 namespace FW
 {
+	class CubemapPreviewScene
+	{
+	public:
+		explicit CubemapPreviewScene(PreviewViewPort* InPreview, TextureCube* InTextureCube)
+			: Preview(InPreview)
+			, TextureCubeAsset(InTextureCube)
+		{
+			ViewCamera.Position = { 0.0f, 0.0f, -1.6f };
+			ViewCamera.VerticalFov = 2.0f * FMath::Atan(1.0f / 1.4f);
+			ViewCamera.NearPlane = 0.1f;
+			ViewCamera.FarPlane = 100.0f;
+
+			CubeBuffers = UploadMesh(CreateCube());
+
+			UniformBufferBuilder PreviewUbBuilder{ UniformBufferUsage::Persistant };
+			PreviewUbBuilder.AddMatrix4x4f(TEXT("Transform"))
+							.AddUint(TEXT("ChannelFilter"));
+			PreviewUniformBuffer = PreviewUbBuilder.Build();
+
+			BindGroupLayout = GpuBindGroupLayoutBuilder{0}
+				.AddUniformBuffer(TEXT("PreviewUb"), PreviewUbBuilder)
+				.AddTextureCube(TEXT("PreviewCube"), BindingShaderStage::Pixel)
+				.AddSampler(TEXT("PreviewCubeSampler"), BindingShaderStage::Pixel)
+				.Build();
+
+			PreviewBindGroup = GpuBindGroupBuilder{BindGroupLayout}
+				.SetUniformBuffer(TEXT("PreviewUb"), PreviewUniformBuffer->GetGpuResource())
+				.SetTexture(TEXT("PreviewCube"), TextureCubeAsset->GetGpuData()->GetDefaultView())
+				.SetSampler(TEXT("PreviewCubeSampler"), GpuResourceHelper::GetSampler({ .Filter = SamplerFilter::Bilinear }))
+				.Build();
+
+			const FString ShaderPath = PathHelper::ShaderDir() / TEXT("TextureCubePreview.hlsl");
+
+			TRefCountPtr<GpuShader> Vs = GGpuRhi->CreateShaderFromFile({
+				.FileName = ShaderPath,
+				.Type = ShaderType::VertexShader,
+				.EntryPoint = TEXT("MainVS"),
+				.ExtraDecl = BindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL),
+			});
+
+			TRefCountPtr<GpuShader> Ps = GGpuRhi->CreateShaderFromFile({
+				.FileName = ShaderPath,
+				.Type = ShaderType::PixelShader,
+				.EntryPoint = TEXT("MainPS"),
+				.ExtraDecl = BindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL),
+			});
+
+			FString ErrorInfo;
+			FString WarnInfo;
+			GGpuRhi->CompileShader(Vs, ErrorInfo, WarnInfo);
+			check(ErrorInfo.IsEmpty());
+			GGpuRhi->CompileShader(Ps, ErrorInfo, WarnInfo);
+			check(ErrorInfo.IsEmpty());
+
+			GpuRenderPipelineStateDesc PipelineDesc{
+				.Vs = Vs,
+				.Ps = Ps,
+				.Targets = {
+					{ .TargetFormat = GpuFormat::B8G8R8A8_UNORM }
+				},
+				.BindGroupLayout0 = BindGroupLayout,
+				.VertexLayout = {
+					{
+						.ByteStride = sizeof(MeshVertex),
+						.Attributes = {
+							{
+								.Location = 0,
+								.SemanticName = TEXT("POSITION"),
+								.Format = GpuFormat::R32G32B32_FLOAT,
+								.ByteOffset = offsetof(MeshVertex, Position),
+							},
+							{
+								.Location = 1,
+								.SemanticName = TEXT("NORMAL"),
+								.Format = GpuFormat::R32G32B32_FLOAT,
+								.ByteOffset = offsetof(MeshVertex, Normal),
+							},
+						}
+					}
+				},
+				.RasterizerState = {
+					.FillMode = RasterizerFillMode::Solid,
+					.CullMode = RasterizerCullMode::Back,
+				},
+			};
+
+			Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
+
+			Preview->ResizeHandler.AddLambda([this](const Vector2f&) {
+				Render();
+			});
+
+			Preview->MouseDownHandler.BindLambda([this](const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) {
+				if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+				{
+					bDragging = true;
+					LastMousePos = (Vector2f)MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
+				}
+				return FReply::Unhandled();
+			});
+
+			Preview->MouseUpHandler.BindLambda([this](const FGeometry&, const FPointerEvent& MouseEvent) {
+				if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+				{
+					bDragging = false;
+					return FReply::Handled();
+				}
+				return FReply::Unhandled();
+			});
+
+			Preview->MouseMoveHandler.BindLambda([this](const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) {
+				if (!bDragging || !MouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton))
+				{
+					return FReply::Unhandled();
+				}
+
+				const Vector2f CurrentMousePos = (Vector2f)MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
+				const Vector2f MouseDelta = CurrentMousePos - LastMousePos;
+				LastMousePos = CurrentMousePos;
+				ModelYaw -= MouseDelta.x * 0.01f;
+				ModelPitch = FMath::Clamp(ModelPitch + MouseDelta.y * 0.01f, -1.4f, 1.4f);
+				Render();
+				return FReply::Handled();
+			});
+		}
+
+		void SetChannelFilter(TextureChannelFilter InChannelFilter)
+		{
+			ChannelFilter = InChannelFilter;
+		}
+
+		void Render()
+		{
+			ResizeRenderTargetIfNeeded();
+
+			const FMatrix44f ModelMatrix = RotationMatrix(ModelYaw, ModelPitch);
+			const FMatrix44f Transform = ModelMatrix * ViewCamera.GetViewProjectionMatrix();
+			PreviewUniformBuffer->GetMember<FMatrix44f>(TEXT("Transform")) = Transform;
+			PreviewUniformBuffer->GetMember<uint32>(TEXT("ChannelFilter")) = static_cast<uint32>(ChannelFilter);
+
+			GpuRenderPassDesc PassDesc;
+			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ RenderTarget->GetDefaultView(), RenderTargetLoadAction::Clear, RenderTargetStoreAction::Store });
+
+			auto CmdRecorder = GGpuRhi->BeginRecording(TEXT("TextureCubePreview"));
+			{
+				auto PassRecorder = CmdRecorder->BeginRenderPass(PassDesc, TEXT("TextureCubePreview"));
+				{
+					PassRecorder->SetRenderPipelineState(Pipeline);
+					PassRecorder->SetBindGroups(PreviewBindGroup, nullptr, nullptr, nullptr);
+					PassRecorder->SetVertexBuffer(0, CubeBuffers.VertexBuffer);
+					PassRecorder->SetIndexBuffer(CubeBuffers.IndexBuffer);
+					PassRecorder->DrawIndexed(0, CubeBuffers.IndexCount);
+				}
+				CmdRecorder->EndRenderPass(PassRecorder);
+			}
+			GGpuRhi->EndRecording(CmdRecorder);
+			GGpuRhi->Submit({ CmdRecorder });
+
+			Preview->SetViewPortRenderTexture(RenderTarget);
+		}
+
+		void ResizeRenderTargetIfNeeded()
+		{
+			const FIntPoint ViewportSize = Preview->GetSize();
+			if (RenderTarget.IsValid()
+				&& RenderTarget->GetWidth() == static_cast<uint32>(ViewportSize.X)
+				&& RenderTarget->GetHeight() == static_cast<uint32>(ViewportSize.Y))
+			{
+				return;
+			}
+
+			GpuTextureDesc Desc{
+				.Width = static_cast<uint32>(ViewportSize.X),
+				.Height = static_cast<uint32>(ViewportSize.Y),
+				.Format = GpuTextureFormat::B8G8R8A8_UNORM,
+				.Usage = GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared,
+				.ClearValues = Vector4f(0.08f, 0.08f, 0.08f, 1.0f),
+			};
+			RenderTarget = GGpuRhi->CreateTexture(Desc, GpuResourceState::RenderTargetWrite);
+			ViewCamera.AspectRatio = (float)RenderTarget->GetWidth() / (float)RenderTarget->GetHeight();
+		}
+
+	private:
+		PreviewViewPort* Preview = nullptr;
+		TextureCube* TextureCubeAsset = nullptr;
+		TextureChannelFilter ChannelFilter = TextureChannelFilter::None;
+		Camera ViewCamera;
+		MeshBuffers CubeBuffers;
+		TUniquePtr<UniformBuffer> PreviewUniformBuffer;
+		TRefCountPtr<GpuBindGroupLayout> BindGroupLayout;
+		TRefCountPtr<GpuBindGroup> PreviewBindGroup;
+		TRefCountPtr<GpuRenderPipelineState> Pipeline;
+		TRefCountPtr<GpuTexture> RenderTarget;
+		bool bDragging = false;
+		Vector2f LastMousePos = { 0.0f, 0.0f };
+		float ModelYaw = 0.0f;
+		float ModelPitch = 0.0f;
+	};
+
 
 	class STexturePreviewCanvas : public SPanel
 	{
@@ -99,7 +304,9 @@ namespace FW
 	void STexturePreviewer::Construct(const FArguments& InArgs)
 	{
 		MouseButtonDownHandler = InArgs._OnMouseButtonDown;
+		TextureAsset = InArgs._InTexture;
 		Preview = MakeShared<PreviewViewPort>();
+		const bool bIsTextureCube = DynamicCast<TextureCube>(TextureAsset.Get()) != nullptr;
 
 		TSharedPtr<SHorizontalBox> ChannelToolbar;
 
@@ -121,9 +328,7 @@ namespace FW
 				.Padding(2, 0)
 				[
 					SNew(SCheckBox)
-					.IsEnabled_Lambda([this] {
-						return DynamicCast<TextureCube>(TextureAsset.Get()) != nullptr;
-					})
+					.IsEnabled(bIsTextureCube)
 					.IsChecked_Lambda([this] {
 						return bView3D ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 					})
@@ -132,7 +337,7 @@ namespace FW
 						RefreshPreview();
 					})
 					[
-						SNew(STextBlock).Text(FText::FromString("3D View"))
+						SNew(STextBlock).Text(LOCALIZATION("TexturePreview3DView"))
 					]
 				]
 			]
@@ -176,10 +381,7 @@ namespace FW
 		AddChannelButton("B", TextureChannelFilter::B);
 		AddChannelButton("A", TextureChannelFilter::A);
 
-		if (InArgs._InTexture)
-		{
-			SetTexture(InArgs._InTexture);
-		}
+		RefreshPreview();
 	}
 
 	void STexturePreviewer::RefreshPreview()
@@ -220,7 +422,13 @@ namespace FW
 		{
 			if (bView3D)
 			{
-				UpdateFilteredPreview(TexCube->GetPreviewTexture());
+				if (!CubemapPreviewSceneInstance)
+				{
+					CubemapPreviewSceneInstance = MakeUnique<CubemapPreviewScene>(Preview.Get(), TexCube);
+				}
+				PreviewTexture = nullptr;
+				CubemapPreviewSceneInstance->SetChannelFilter(ChannelFilter);
+				CubemapPreviewSceneInstance->Render();
 			}
 			else
 			{
@@ -272,13 +480,6 @@ namespace FW
 			return MouseButtonDownHandler.Execute(MyGeometry, MouseEvent);
 		}
 		return FReply::Handled();
-	}
-
-	void STexturePreviewer::SetTexture(AssetPtr<AssetObject> InTexture)
-	{
-		TextureAsset = InTexture;
-		ChannelFilter = TextureChannelFilter::None;
-		RefreshPreview();
 	}
 
 	void STexturePreviewer::OpenTexturePreviewer(AssetPtr<AssetObject> InTexture, const FPointerEventHandler& InOnMouseButtonDown, TSharedPtr<SWindow> InParentWindow)

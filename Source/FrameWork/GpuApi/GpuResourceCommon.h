@@ -6,6 +6,7 @@ namespace FW
 	{
 		inline constexpr int32 MaxRenderTargetNum = 8; //follow dx12:D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT
 		inline constexpr int32 MaxBindableBingGroupNum = 4; //Only support 4 BindGroups to adapt some mobile devices.
+		inline constexpr int32 MaxVertexBufferSlotNum = 16;
 	}
 
 	enum class GpuResourceState : uint32
@@ -15,39 +16,44 @@ namespace FW
 		UniformBuffer = 1u << 0,
 		ShaderResourceRead = 1u << 1,
 		CopySrc = 1u << 2,
+		VertexBufferRead = 1u << 6,
+		IndexBufferRead = 1u << 7,
 
 		//Write State
 		RenderTargetWrite = 1u << 3,
 		CopyDst = 1u << 4,
 		UnorderedAccess = 1u << 5,
 
-		ReadMask = ShaderResourceRead | CopySrc,
+		ReadMask = UniformBuffer | ShaderResourceRead | CopySrc | VertexBufferRead | IndexBufferRead,
 		WriteMask = RenderTargetWrite | CopyDst | UnorderedAccess,
 	};
 	ENUM_CLASS_FLAGS(GpuResourceState);
 
-	enum class GpuTextureFormat
+	enum class GpuFormat
 	{
-		//Unorm
 		R8_UNORM,
 		R8G8B8A8_UNORM,
 		B8G8R8A8_UNORM,
 		B8G8R8A8_UNORM_SRGB,
 		R10G10B10A2_UNORM,
 		R16G16B16A16_UNORM,
-
-		//Uint
+		R16_UINT,
+		R32_UINT,
 		R16G16B16A16_UINT,
+		R32G32_UINT,
+		R32G32B32_UINT,
 		R32G32B32A32_UINT,
-
-		//Float
+		R32G32_FLOAT,
+		R32G32B32_FLOAT,
 		R16G16B16A16_FLOAT,
 		R32G32B32A32_FLOAT,
 		R11G11B10_FLOAT,
 		R16_FLOAT,
         R32_FLOAT,
+
 		NUM,
 	};
+	using GpuTextureFormat = GpuFormat;
 
 	enum class GpuTextureDimension
 	{
@@ -77,11 +83,19 @@ namespace FW
 		RWStructured = 1u << 5,
 		Raw = 1u << 6,
 		RWRaw = 1u << 7,
+		Vertex = 1u << 8,
+		Index = 1u << 9,
 
-		StaticMask = RWStructured | Structured | Raw | RWRaw, //Only Gpu r/w
+		StaticMask = RWStructured | Structured | Raw | RWRaw | Vertex | Index, //Only Gpu r/w
 		DynamicMask = Upload | ReadBack | Uniform, //Cpu can r/w
 	};
 	ENUM_CLASS_FLAGS(GpuBufferUsage);
+
+	enum class GpuVertexStepMode : uint8
+	{
+		Vertex,
+		Instance,
+	};
 
 	enum class GpuResourceType
 	{
@@ -226,6 +240,7 @@ namespace FW
 		GpuResourceType Type;
 	};
 
+	FRAMEWORK_API uint32 GetFormatByteSize(GpuFormat InFormat);
 	FRAMEWORK_API uint32 GetTextureFormatByteSize(GpuTextureFormat InFormat);
 
 	FRAMEWORK_API GpuResourceState GetBufferState(GpuBufferUsage Usage);

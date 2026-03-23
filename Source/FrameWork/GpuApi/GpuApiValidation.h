@@ -23,6 +23,8 @@ namespace FW
 	bool ValidateCreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc);
 	bool ValidateBeginRenderPass(const GpuRenderPassDesc& InPassDesc);
 	bool ValidateCreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState);
+	bool ValidateSetVertexBuffer(uint32 Slot, GpuBuffer* InVertexBuffer, uint32 Offset);
+	bool ValidateSetIndexBuffer(GpuBuffer* InIndexBuffer, GpuFormat IndexFormat, uint32 Offset);
 	bool ValidateBarriers(const TArray<GpuBarrierInfo>& BarrierInfos);
 	bool ValidateGpuResourceState(GpuResourceState InState);
 	bool ValidateCreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState);

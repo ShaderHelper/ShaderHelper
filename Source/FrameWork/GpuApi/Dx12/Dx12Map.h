@@ -16,10 +16,15 @@ namespace FW
 			check(!EnumHasAnyFlags(InResourceState, GpuResourceState::WriteMask));
 			D3D12_RESOURCE_STATES State{};
 
-			if (EnumHasAnyFlags(InResourceState, GpuResourceState::UniformBuffer))
+			if (EnumHasAnyFlags(InResourceState, GpuResourceState::UniformBuffer | GpuResourceState::VertexBufferRead))
 			{
 				State |= D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
 			}
+
+            if (EnumHasAnyFlags(InResourceState, GpuResourceState::IndexBufferRead))
+            {
+                State |= D3D12_RESOURCE_STATE_INDEX_BUFFER;
+            }
 			if (EnumHasAnyFlags(InResourceState, GpuResourceState::ShaderResourceRead))
 			{
 				State |= D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
@@ -97,25 +102,42 @@ namespace FW
 		return Desc;
 	}
 
-    inline DXGI_FORMAT MapTextureFormat(GpuTextureFormat InTexFormat)
+    inline DXGI_FORMAT MapTextureFormat(GpuFormat InTexFormat)
     {
         switch (InTexFormat)
         {
-		case GpuTextureFormat::R8_UNORM:              return DXGI_FORMAT_R8_UNORM;
-        case GpuTextureFormat::R8G8B8A8_UNORM:        return DXGI_FORMAT_R8G8B8A8_UNORM;
-        case GpuTextureFormat::B8G8R8A8_UNORM:        return DXGI_FORMAT_B8G8R8A8_UNORM;
-		case GpuTextureFormat::B8G8R8A8_UNORM_SRGB:   return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
-        case GpuTextureFormat::R10G10B10A2_UNORM:     return DXGI_FORMAT_R10G10B10A2_UNORM;
-        case GpuTextureFormat::R16G16B16A16_UNORM:    return DXGI_FORMAT_R16G16B16A16_UNORM;
-        case GpuTextureFormat::R16G16B16A16_UINT:     return DXGI_FORMAT_R16G16B16A16_UINT;
-        case GpuTextureFormat::R32G32B32A32_UINT:     return DXGI_FORMAT_R32G32B32A32_UINT;
-        case GpuTextureFormat::R16G16B16A16_FLOAT:    return DXGI_FORMAT_R16G16B16A16_FLOAT;
-        case GpuTextureFormat::R32G32B32A32_FLOAT:    return DXGI_FORMAT_R32G32B32A32_FLOAT;
-        case GpuTextureFormat::R11G11B10_FLOAT:       return DXGI_FORMAT_R11G11B10_FLOAT;
-		case GpuTextureFormat::R16_FLOAT:             return DXGI_FORMAT_R16_FLOAT;
-        case GpuTextureFormat::R32_FLOAT:             return DXGI_FORMAT_R32_FLOAT;
+        case GpuFormat::R8_UNORM:              return DXGI_FORMAT_R8_UNORM;
+        case GpuFormat::R8G8B8A8_UNORM:        return DXGI_FORMAT_R8G8B8A8_UNORM;
+        case GpuFormat::B8G8R8A8_UNORM:        return DXGI_FORMAT_B8G8R8A8_UNORM;
+        case GpuFormat::B8G8R8A8_UNORM_SRGB:   return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+        case GpuFormat::R10G10B10A2_UNORM:     return DXGI_FORMAT_R10G10B10A2_UNORM;
+        case GpuFormat::R16_UINT:              return DXGI_FORMAT_R16_UINT;
+        case GpuFormat::R32_UINT:              return DXGI_FORMAT_R32_UINT;
+        case GpuFormat::R16G16B16A16_UNORM:    return DXGI_FORMAT_R16G16B16A16_UNORM;
+        case GpuFormat::R16G16B16A16_UINT:     return DXGI_FORMAT_R16G16B16A16_UINT;
+        case GpuFormat::R32G32_UINT:           return DXGI_FORMAT_R32G32_UINT;
+        case GpuFormat::R32G32B32_UINT:        return DXGI_FORMAT_R32G32B32_UINT;
+        case GpuFormat::R32G32B32A32_UINT:     return DXGI_FORMAT_R32G32B32A32_UINT;
+        case GpuFormat::R32G32_FLOAT:          return DXGI_FORMAT_R32G32_FLOAT;
+        case GpuFormat::R32G32B32_FLOAT:       return DXGI_FORMAT_R32G32B32_FLOAT;
+        case GpuFormat::R16G16B16A16_FLOAT:    return DXGI_FORMAT_R16G16B16A16_FLOAT;
+        case GpuFormat::R32G32B32A32_FLOAT:    return DXGI_FORMAT_R32G32B32A32_FLOAT;
+        case GpuFormat::R11G11B10_FLOAT:       return DXGI_FORMAT_R11G11B10_FLOAT;
+        case GpuFormat::R16_FLOAT:             return DXGI_FORMAT_R16_FLOAT;
+        case GpuFormat::R32_FLOAT:             return DXGI_FORMAT_R32_FLOAT;
 		default:
 			AUX::Unreachable();
+        }
+    }
+
+    inline DXGI_FORMAT MapIndexFormat(GpuFormat InFormat)
+    {
+        switch (InFormat)
+        {
+        case GpuFormat::R16_UINT: return DXGI_FORMAT_R16_UINT;
+        case GpuFormat::R32_UINT: return DXGI_FORMAT_R32_UINT;
+        default:
+            AUX::Unreachable();
         }
     }
 
@@ -149,6 +171,17 @@ namespace FW
 			AUX::Unreachable();
 		}
 	}
+
+    inline D3D12_INPUT_CLASSIFICATION MapVertexStepMode(GpuVertexStepMode InMode)
+    {
+        switch (InMode)
+        {
+        case GpuVertexStepMode::Vertex: return D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+        case GpuVertexStepMode::Instance: return D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA;
+        default:
+            AUX::Unreachable();
+        }
+    }
 
 	inline D3D12_TEXTURE_ADDRESS_MODE MapTextureAddressMode(SamplerAddressMode InMode)
 	{
