@@ -35,28 +35,4 @@ namespace FW
 
         GCommandQueue = GDevice->newCommandQueue();
     }
-
-    MetalQuerySet::MetalQuerySet(uint32 InCount, NS::SharedPtr<MTL::CounterSampleBuffer> InSampleBuffer)
-        : GpuQuerySet(InCount), SampleBuffer(std::move(InSampleBuffer))
-    {
-    }
-
-    double MetalQuerySet::GetTimestampPeriodNs() const
-    {
-        // Metal timestamps are already in nanoseconds
-        return 1.0;
-    }
-
-    void MetalQuerySet::ResolveResults(uint32 FirstQuery, uint32 QueryCount, TArray<uint64>& OutTimestamps)
-    {
-        OutTimestamps.SetNum(QueryCount);
-        NS::Range Range = NS::Range::Make(FirstQuery, QueryCount);
-        NS::Data* Data = SampleBuffer->resolveCounterRange(Range);
-
-        const MTL::CounterResultTimestamp* Results = static_cast<const MTL::CounterResultTimestamp*>(Data->mutableBytes());
-        for (uint32 i = 0; i < QueryCount; i++)
-        {
-            OutTimestamps[i] = Results[i].timestamp;
-        }
-    }
 }

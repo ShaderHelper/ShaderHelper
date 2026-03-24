@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "VkCommandRecorder.h"
+#include "VkGpuRhiBackend.h"
 #include "VkMap.h"
 #include "VkTexture.h"
 #include "VkBuffer.h"

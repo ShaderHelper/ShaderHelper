@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "Dx12CommandRecorder.h"
+#include "Dx12GpuRhiBackend.h"
 #include "Dx12Map.h"
 
 namespace FW

@@ -486,4 +486,11 @@ GpuRhiBackendType GetGpuRhiBackendType()
 	}();
 	return BackendType;
 }
+
+bool ShowTimestampMs()
+{
+	bool bShow = true;
+	Editor::GetEditorConfig()->GetBool(TEXT("Environment"), TEXT("ShowTimestamp"), bShow);
+	return bShow;
+}
 }

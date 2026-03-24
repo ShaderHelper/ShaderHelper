@@ -1,5 +1,6 @@
 #pragma once
 #include "GpuApi/GpuRhi.h"
+#include "VkDevice.h"
 
 namespace FW
 {
@@ -40,4 +41,16 @@ namespace FW
 	};
 
 	inline VkGpuRhiBackend* GVkGpuRhi;
+
+	class VulkanQuerySet : public GpuQuerySet
+	{
+	public:
+		VulkanQuerySet(uint32 InCount);
+		~VulkanQuerySet();
+		double GetTimestampPeriodNs() const override;
+		void ResolveResults(uint32 FirstQuery, uint32 QueryCount, TArray<uint64>& OutTimestamps) override;
+		VkQueryPool GetPool() const { return Pool; }
+	private:
+		VkQueryPool Pool = VK_NULL_HANDLE;
+	};
 }

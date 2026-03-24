@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "MetalCommandRecorder.h"
 #include "MetalMap.h"
-#include "MetalDevice.h"
+#include "MetalGpuRhiBackend.h"
 #include "MetalShader.h"
 
 namespace FW

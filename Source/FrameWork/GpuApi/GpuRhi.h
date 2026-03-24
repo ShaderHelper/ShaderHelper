@@ -171,4 +171,5 @@ protected:
 
 FRAMEWORK_API extern TUniquePtr<GpuRhi> GGpuRhi;
 FRAMEWORK_API GpuRhiBackendType GetGpuRhiBackendType();
+FRAMEWORK_API bool ShowTimestampMs();
 }

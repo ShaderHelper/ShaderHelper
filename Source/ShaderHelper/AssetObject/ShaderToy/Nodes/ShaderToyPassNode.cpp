@@ -1027,17 +1027,25 @@ namespace SH
             }
 
             // Resolve previous frame's timestamps
-            if (TimestampQuerySet)
+            if (!ShowTimestampMs())
             {
-                TArray<uint64> Timestamps;
-                TimestampQuerySet->ResolveResults(0, 2, Timestamps);
-				double PeriodNs = TimestampQuerySet->GetTimestampPeriodNs();
-				GpuTimeMs = (double)(Timestamps[1] - Timestamps[0]) * PeriodNs / 1e6;
+                GpuTimeMs = 0.0;
+                TimestampQuerySet = nullptr;
             }
-
-            if (GpuFeature::SupportTimestampQuery && !TimestampQuerySet)
+            else
             {
-                TimestampQuerySet = GGpuRhi->CreateQuerySet(2);
+                if (TimestampQuerySet)
+                {
+                    TArray<uint64> Timestamps;
+                    TimestampQuerySet->ResolveResults(0, 2, Timestamps);
+				    double PeriodNs = TimestampQuerySet->GetTimestampPeriodNs();
+				    GpuTimeMs = (double)(Timestamps[1] - Timestamps[0]) * PeriodNs / 1e6;
+                }
+
+                if (GpuFeature::SupportTimestampQuery && !TimestampQuerySet)
+                {
+                    TimestampQuerySet = GGpuRhi->CreateQuerySet(2);
+                }
             }
 
             GpuRenderPassDesc PassDesc;

@@ -178,38 +178,4 @@ namespace FW
 		GGraphicsQueue->SetName(TEXT("Dx12GlobalGraphicsQueue"));
 	}
 
-	Dx12QuerySet::Dx12QuerySet(uint32 InCount)
-		: GpuQuerySet(InCount)
-	{
-		D3D12_QUERY_HEAP_DESC HeapDesc{
-			.Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP,
-			.Count = InCount,
-		};
-		DxCheck(GDevice->CreateQueryHeap(&HeapDesc, IID_PPV_ARGS(QueryHeap.GetInitReference())));
-
-		D3D12_HEAP_PROPERTIES HeapProps{ .Type = D3D12_HEAP_TYPE_READBACK };
-		D3D12_RESOURCE_DESC BufferDesc = CD3DX12_RESOURCE_DESC::Buffer(InCount * sizeof(uint64));
-		DxCheck(GDevice->CreateCommittedResource(&HeapProps, D3D12_HEAP_FLAG_NONE,
-			&BufferDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
-			IID_PPV_ARGS(ReadbackBuffer.GetInitReference())));
-	}
-
-	double Dx12QuerySet::GetTimestampPeriodNs() const
-	{
-		uint64 Frequency = 0;
-		GGraphicsQueue->GetTimestampFrequency(&Frequency);
-		return Frequency > 0 ? 1e9 / (double)Frequency : 0.0;
-	}
-
-	void Dx12QuerySet::ResolveResults(uint32 FirstQuery, uint32 QueryCount, TArray<uint64>& OutTimestamps)
-	{
-		OutTimestamps.SetNum(QueryCount);
-		void* Data = nullptr;
-		D3D12_RANGE ReadRange{ FirstQuery * sizeof(uint64), (FirstQuery + QueryCount) * sizeof(uint64) };
-		ReadbackBuffer->Map(0, &ReadRange, &Data);
-
-		uint64* Timestamps = reinterpret_cast<uint64*>(static_cast<uint8*>(Data) + FirstQuery * sizeof(uint64));
-		FMemory::Memcpy(OutTimestamps.GetData(), Timestamps, QueryCount * sizeof(uint64));
-	}
-
 }

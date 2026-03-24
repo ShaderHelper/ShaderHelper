@@ -7,6 +7,7 @@
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 #include "UI/Widgets/Misc/MiscWidget.h"
+#include "GpuApi/GpuRhi.h"
 
 #include <Styling/StyleColors.h>
 #include <Widgets/Input/SSearchBox.h>
@@ -820,6 +821,17 @@ namespace SH
 			})
 			.OnCheckStateChanged_Lambda([](ECheckBoxState InState) {
 				Editor::GetEditorConfig()->SetBool(TEXT("Environment"), TEXT("EnableLinePreview"), InState == ECheckBoxState::Checked);
+				Editor::SaveEditorConfig();
+			})
+		];
+
+		AppendItem(EnvGrid, LOCALIZATION("ShowTimestamp"))
+		[
+			SNew(SCheckBox).IsChecked_Lambda([] {
+				return ShowTimestampMs() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+			})
+			.OnCheckStateChanged_Lambda([](ECheckBoxState InState) {
+				Editor::GetEditorConfig()->SetBool(TEXT("Environment"), TEXT("ShowTimestamp"), InState == ECheckBoxState::Checked);
 				Editor::SaveEditorConfig();
 			})
 		];

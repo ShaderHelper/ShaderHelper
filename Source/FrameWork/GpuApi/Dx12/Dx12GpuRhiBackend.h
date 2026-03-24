@@ -42,4 +42,17 @@ public:
 };
 
 inline Dx12GpuRhiBackend* GDx12GpuRhi;
+
+class Dx12QuerySet : public GpuQuerySet, public Dx12DeferredDeleteObject<Dx12QuerySet>
+{
+public:
+	Dx12QuerySet(uint32 InCount);
+	double GetTimestampPeriodNs() const override;
+	void ResolveResults(uint32 FirstQuery, uint32 QueryCount, TArray<uint64>& OutTimestamps) override;
+	ID3D12QueryHeap* GetHeap() const { return QueryHeap; }
+	ID3D12Resource* GetReadbackBuffer() const;
+private:
+	TRefCountPtr<ID3D12QueryHeap> QueryHeap;
+	TRefCountPtr<GpuBuffer> ReadbackBuffer;
+};
 }

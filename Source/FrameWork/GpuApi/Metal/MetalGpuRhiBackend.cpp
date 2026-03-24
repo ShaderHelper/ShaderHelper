@@ -280,4 +280,29 @@ TRefCountPtr<GpuQuerySet> MetalGpuRhiBackend::CreateQuerySet(uint32 Count)
     return new MetalQuerySet(Count, NS::TransferPtr(SampleBuffer));
 }
 
+MetalQuerySet::MetalQuerySet(uint32 InCount, NS::SharedPtr<MTL::CounterSampleBuffer> InSampleBuffer)
+    : GpuQuerySet(InCount), SampleBuffer(std::move(InSampleBuffer))
+{
+    GMtlDeferredReleaseManager.AddResource(this);
+}
+
+double MetalQuerySet::GetTimestampPeriodNs() const
+{
+    return 1.0;
+}
+
+void MetalQuerySet::ResolveResults(uint32 FirstQuery, uint32 QueryCount, TArray<uint64>& OutTimestamps)
+{
+    GMtlGpuRhi->WaitGpu();
+    OutTimestamps.SetNum(QueryCount);
+    NS::Range Range = NS::Range::Make(FirstQuery, QueryCount);
+    NS::Data* Data = SampleBuffer->resolveCounterRange(Range);
+
+    const MTL::CounterResultTimestamp* Results = static_cast<const MTL::CounterResultTimestamp*>(Data->mutableBytes());
+    for (uint32 i = 0; i < QueryCount; i++)
+    {
+        OutTimestamps[i] = Results[i].timestamp;
+    }
+}
+
 }

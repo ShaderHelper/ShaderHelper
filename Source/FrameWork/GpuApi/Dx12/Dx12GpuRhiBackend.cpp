@@ -340,4 +340,36 @@ TRefCountPtr<GpuQuerySet> Dx12GpuRhiBackend::CreateQuerySet(uint32 Count)
 	return new Dx12QuerySet(Count);
 }
 
+Dx12QuerySet::Dx12QuerySet(uint32 InCount)
+	: GpuQuerySet(InCount)
+{
+	D3D12_QUERY_HEAP_DESC HeapDesc{
+		.Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP,
+		.Count = InCount,
+	};
+	DxCheck(GDevice->CreateQueryHeap(&HeapDesc, IID_PPV_ARGS(QueryHeap.GetInitReference())));
+	ReadbackBuffer = CreateDx12Buffer({ InCount * sizeof(uint64), GpuBufferUsage::ReadBack }, GpuResourceState::CopyDst);
+}
+
+ID3D12Resource* Dx12QuerySet::GetReadbackBuffer() const
+{
+	return static_cast<Dx12Buffer*>(ReadbackBuffer.GetReference())->GetAllocation().GetResource();
+}
+
+double Dx12QuerySet::GetTimestampPeriodNs() const
+{
+	uint64 Frequency = 0;
+	GGraphicsQueue->GetTimestampFrequency(&Frequency);
+	return Frequency > 0 ? 1e9 / (double)Frequency : 0.0;
+}
+
+void Dx12QuerySet::ResolveResults(uint32 FirstQuery, uint32 QueryCount, TArray<uint64>& OutTimestamps)
+{
+	GDx12GpuRhi->WaitGpu();
+	OutTimestamps.SetNum(QueryCount);
+	uint64* Data = static_cast<uint64*>(GDx12GpuRhi->MapGpuBuffer(ReadbackBuffer, GpuResourceMapMode::Read_Only));
+	FMemory::Memcpy(OutTimestamps.GetData(), Data + FirstQuery, QueryCount * sizeof(uint64));
+	GDx12GpuRhi->UnMapGpuBuffer(ReadbackBuffer);
+}
+
 }
