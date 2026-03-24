@@ -4,7 +4,6 @@
 #include "GpuApi/GpuResource.h"
 #include "MetalBuffer.h"
 #include "MetalArgumentBuffer.h"
-#include "MetalDevice.h"
 #include "GpuApi/GpuRhi.h"
 
 namespace FW
@@ -89,6 +88,7 @@ namespace FW
 
     class MtlRenderPassRecorder : public GpuRenderPassRecorder
     {
+        friend class MtlCmdRecorder;
     public:
         MtlRenderPassRecorder(MTLRenderCommandEncoderPtr InCmdEncoder, MTLRenderPassDescriptorPtr InRenderPassDesc)
             : CmdEncoder(MoveTemp(InCmdEncoder))
@@ -110,6 +110,8 @@ namespace FW
     private:
         MTLRenderCommandEncoderPtr CmdEncoder;
         MtlRenderStateCache StateCache;
+        MTL::CounterSampleBuffer* TimestampSampleBuffer = nullptr;
+        NS::UInteger EndOfPassSampleIndex = 0;
     };
 
 	class MtlComputePassRecorder: public GpuComputePassRecorder

@@ -346,6 +346,15 @@ namespace FW
         MTL::RenderCommandEncoder* RenderCommandEncoder = CmdBuffer->renderCommandEncoder(RenderPassDesc.get());
         RenderCommandEncoder->setLabel(FStringToNSString(PassName));
         auto PassRecorder = MakeUnique<MtlRenderPassRecorder>(NS::RetainPtr(RenderCommandEncoder), MoveTemp(RenderPassDesc));
+
+        if (PassDesc.TimestampWrites && !GSupportStageBoundaryCounter)
+        {
+            MetalQuerySet* MtlQuerySet = static_cast<MetalQuerySet*>(PassDesc.TimestampWrites->QuerySet);
+            PassRecorder->TimestampSampleBuffer = MtlQuerySet->GetSampleBuffer();
+            PassRecorder->EndOfPassSampleIndex = PassDesc.TimestampWrites->EndOfPassWriteIndex;
+            RenderCommandEncoder->sampleCountersInBuffer(MtlQuerySet->GetSampleBuffer(), PassDesc.TimestampWrites->BeginningOfPassWriteIndex, true);
+        }
+
         RenderPassRecorders.Add(MoveTemp(PassRecorder));
         return RenderPassRecorders.Last().Get();
     }
@@ -353,6 +362,10 @@ namespace FW
     void MtlCmdRecorder::EndRenderPass(GpuRenderPassRecorder* InRenderPassRecorder)
     {
         MtlRenderPassRecorder* PassRecorder = static_cast<MtlRenderPassRecorder*>(InRenderPassRecorder);
+        if (PassRecorder->TimestampSampleBuffer)
+        {
+            PassRecorder->GetEncoder()->sampleCountersInBuffer(PassRecorder->TimestampSampleBuffer, PassRecorder->EndOfPassSampleIndex, true);
+        }
 		PassRecorder->GetEncoder()->endEncoding();
     }
 

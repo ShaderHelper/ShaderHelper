@@ -7,6 +7,7 @@ namespace FW
     inline MTL::Device* GDevice;
     inline MTL::CommandQueue* GCommandQueue;
     inline MTL::CounterSet* GTimestampCounterSet = nullptr;
+    inline bool GSupportStageBoundaryCounter = false;
 
     class MetalQuerySet : public GpuQuerySet
     {

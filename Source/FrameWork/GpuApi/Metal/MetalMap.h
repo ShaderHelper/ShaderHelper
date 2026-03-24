@@ -2,7 +2,7 @@
 #include "MetalCommon.h"
 #include "GpuApi/GpuResource.h"
 #include "MetalTexture.h"
-
+#include "MetalDevice.h"
 namespace FW
 {
     inline MTLColorWriteMask MapWriteMask(BlendMask InMask)
@@ -84,7 +84,7 @@ namespace FW
             RawPassDesc.colorAttachments[i].clearColor = MTLClearColorMake(RtInfo.ClearColor.x, RtInfo.ClearColor.y, RtInfo.ClearColor.z, RtInfo.ClearColor.w);
         }
 
-        if (PassDesc.TimestampWrites)
+        if (PassDesc.TimestampWrites && GSupportStageBoundaryCounter)
         {
             const GpuRenderPassTimestampWrites& TsWrites = *PassDesc.TimestampWrites;
             MetalQuerySet* MtlQuerySet = static_cast<MetalQuerySet*>(TsWrites.QuerySet);

@@ -26,6 +26,7 @@ namespace FW
 					{
 						GTimestampCounterSet = CS;
 					    GpuFeature::SupportTimestampQuery = true;
+						GSupportStageBoundaryCounter = GDevice->supportsCounterSampling(MTL::CounterSamplingPointAtStageBoundary);
 						break;
 					}
 				}
@@ -52,7 +53,7 @@ namespace FW
         NS::Range Range = NS::Range::Make(FirstQuery, QueryCount);
         NS::Data* Data = SampleBuffer->resolveCounterRange(Range);
 
-        const MTL::CounterResultTimestamp* Results = static_cast<const MTL::CounterResultTimestamp*>(Data->bytes());
+        const MTL::CounterResultTimestamp* Results = static_cast<const MTL::CounterResultTimestamp*>(Data->mutableBytes());
         for (uint32 i = 0; i < QueryCount; i++)
         {
             OutTimestamps[i] = Results[i].timestamp;
