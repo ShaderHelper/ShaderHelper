@@ -74,6 +74,12 @@ TRefCountPtr<GpuComputePipelineState> GpuRhi::CreateComputePipelineState(const G
 	return CreateComputePipelineStateInternal(InPipelineStateDesc);
 }
 
+bool GpuRhi::CompileShader(GpuShader* InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs)
+{
+	InShader->CompileExtraArgs = ExtraArgs;
+	return CompileShaderInternal(InShader, OutErrorInfo, OutWarnInfo, ExtraArgs);
+}
+
 class GpuComputePassRecorderValidation : public GpuComputePassRecorder
 {
 public:
@@ -336,9 +342,8 @@ public:
 		RhiBackend->SetResourceName(Name, InResource);
 	}
 
-	bool CompileShader(GpuShader *InShader, FString &OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs) override
+	bool CompileShaderInternal(GpuShader *InShader, FString &OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs) override
 	{
-		InShader->CompileExtraArgs = ExtraArgs;
 		return RhiBackend->CompileShader(InShader, OutErrorInfo, OutWarnInfo, ExtraArgs);
 	}
 

@@ -179,7 +179,7 @@ void MetalGpuRhiBackend::UnMapGpuBuffer(GpuBuffer *InGpuBuffer)
 	Buffer->ReadBackBuffer = nullptr;
 }
 
-bool MetalGpuRhiBackend::CompileShader(GpuShader *InShader, FString &OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs)
+bool MetalGpuRhiBackend::CompileShaderInternal(GpuShader *InShader, FString &OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs)
 {
 	return CompileMetalShader(static_cast<MetalShader *>(InShader), OutErrorInfo, OutWarnInfo, ExtraArgs);
 }

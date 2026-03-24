@@ -129,7 +129,7 @@ public:
 
 	virtual void SetResourceName(const FString &Name, GpuResource *InResource) = 0;
 
-	virtual bool CompileShader(GpuShader* InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs = {}) = 0;
+	bool CompileShader(GpuShader* InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs = {});
 
 	// Need OutRowPitch to correctly read or write data, because the mapped buffer actually contains the *padded* texture data.
 	// RowPitch != Width x ElementByteSize
@@ -167,6 +167,7 @@ protected:
 	virtual TRefCountPtr<GpuComputePipelineState> CreateComputePipelineStateInternal(const GpuComputePipelineStateDesc& InPipelineStateDesc) = 0;
 	virtual TRefCountPtr<GpuShader> CreateShaderFromSourceInternal(const GpuShaderSourceDesc& Desc) const = 0;
 	virtual TRefCountPtr<GpuShader> CreateShaderFromFileInternal(const GpuShaderFileDesc& Desc) = 0;
+	virtual bool CompileShaderInternal(GpuShader* InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs) = 0;
 };
 
 FRAMEWORK_API extern TUniquePtr<GpuRhi> GGpuRhi;

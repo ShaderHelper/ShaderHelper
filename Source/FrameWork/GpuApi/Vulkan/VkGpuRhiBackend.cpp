@@ -136,7 +136,7 @@ namespace FW
 		}
 	}
 
-	bool VkGpuRhiBackend::CompileShader(GpuShader* InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs)
+	bool VkGpuRhiBackend::CompileShaderInternal(GpuShader* InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs)
 	{
 		return CompileVulkanShader(static_cast<VulkanShader*>(InShader), OutErrorInfo, OutWarnInfo, ExtraArgs);
 	}
