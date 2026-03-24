@@ -253,7 +253,7 @@ void *MetalGpuRhiBackend::GetSharedHandle(GpuTexture *InGpuTexture)
 GpuCmdRecorder* MetalGpuRhiBackend::BeginRecording(const FString& RecorderName)
 {
 	//mtl commandbuffer is transient(lightweight) and do not support reuse, so create new one per request.
-    MTLCommandBufferPtr Cb = NS::RetainPtr(GCommandQueue->commandBuffer());
+    MTLCommandBufferPtr Cb = NS::RetainPtr(GCommandQueue->commandBufferWithUnretainedReferences());
     if(!RecorderName.IsEmpty())
     {
         Cb->setLabel(FStringToNSString(RecorderName));
@@ -265,7 +265,19 @@ GpuCmdRecorder* MetalGpuRhiBackend::BeginRecording(const FString& RecorderName)
 
 void MetalGpuRhiBackend::EndRecording(GpuCmdRecorder* InCmdRecorder)
 {
-    
+
+}
+
+TRefCountPtr<GpuQuerySet> MetalGpuRhiBackend::CreateQuerySet(uint32 Count)
+{
+    auto Desc = NS::TransferPtr(MTL::CounterSampleBufferDescriptor::alloc()->init());
+    Desc->setCounterSet(GTimestampCounterSet);
+    Desc->setSampleCount(Count);
+    Desc->setStorageMode(MTL::StorageModeShared);
+
+    NS::Error* Error = nullptr;
+    MTL::CounterSampleBuffer* SampleBuffer = GDevice->newCounterSampleBuffer(Desc.get(), &Error);
+    return new MetalQuerySet(Count, NS::TransferPtr(SampleBuffer));
 }
 
 }

@@ -315,4 +315,9 @@ namespace FW
 			VkBuffer->ReadBackBuffer = nullptr;
 		}
 	}
+
+	TRefCountPtr<GpuQuerySet> VkGpuRhiBackend::CreateQuerySet(uint32 Count)
+	{
+		return new VulkanQuerySet(Count);
+	}
 }

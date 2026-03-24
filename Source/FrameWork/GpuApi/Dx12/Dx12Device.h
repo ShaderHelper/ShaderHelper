@@ -1,5 +1,6 @@
 #pragma once
 #include "Dx12Common.h"
+#include "GpuApi/GpuRhi.h"
 
 namespace FW
 {
@@ -19,9 +20,22 @@ namespace FW
 	inline uint64 CurGpuFrame;
 	inline D3D_SHADER_MODEL GMaxShaderModel;
 
+	class Dx12QuerySet : public GpuQuerySet
+	{
+	public:
+		Dx12QuerySet(uint32 InCount);
+		double GetTimestampPeriodNs() const override;
+		void ResolveResults(uint32 FirstQuery, uint32 QueryCount, TArray<uint64>& OutTimestamps) override;
+		ID3D12QueryHeap* GetHeap() const { return QueryHeap; }
+		ID3D12Resource* GetReadbackBuffer() const { return ReadbackBuffer; }
+	private:
+		TRefCountPtr<ID3D12QueryHeap> QueryHeap;
+		TRefCountPtr<ID3D12Resource> ReadbackBuffer;
+	};
+
     extern void InitDx12Core();
 	inline uint32 GetCurFrameSourceIndex() {
 		return CurCpuFrame % FrameSourceNum;
 	}
- 	
+
 }

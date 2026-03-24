@@ -71,6 +71,18 @@ struct GpuBarrierInfo
 	GpuResourceState NewState;
 };
 
+class FRAMEWORK_API GpuQuerySet : public GpuResource
+{
+public:
+	GpuQuerySet(uint32 InCount) : GpuResource(GpuResourceType::QuerySet), Count(InCount) {}
+	virtual ~GpuQuerySet() = default;
+	uint32 GetCount() const { return Count; }
+	virtual double GetTimestampPeriodNs() const = 0;
+	virtual void ResolveResults(uint32 FirstQuery, uint32 QueryCount, TArray<uint64>& OutTimestamps) = 0;
+private:
+	uint32 Count;
+};
+
 //Recorder is designed as transient within one frame, can not reuse it
 class GpuCmdRecorder : public GpuComputeCmdRecorder
 {
@@ -141,6 +153,8 @@ public:
 	virtual GpuCmdRecorder* BeginRecording(const FString& RecorderName = {}) = 0;
 	virtual void EndRecording(GpuCmdRecorder* InCmdRecorder) = 0;
 	virtual void Submit(const TArray<GpuCmdRecorder*>& CmdRecorders) = 0;
+
+	virtual TRefCountPtr<GpuQuerySet> CreateQuerySet(uint32 Count) = 0;
 
 public:
 	static void InitGpuRhi(const GpuRhiConfig &InConfig);

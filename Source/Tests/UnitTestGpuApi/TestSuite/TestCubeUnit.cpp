@@ -62,7 +62,6 @@ namespace UNITTEST_GPUAPI
 			.VertexLayout = {
 				{
 					.ByteStride = sizeof(MeshVertex),
-					.StepMode = GpuVertexStepMode::Vertex,
 					.Attributes = {
 						{
 							.Location = 0,

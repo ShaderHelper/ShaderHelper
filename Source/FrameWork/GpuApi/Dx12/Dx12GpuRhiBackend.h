@@ -38,6 +38,7 @@ public:
 	virtual void UnMapGpuTexture(GpuTexture* InGpuTexture) override;
 	virtual void* MapGpuBuffer(GpuBuffer* InGpuBuffer, GpuResourceMapMode InMapMode) override;
 	virtual void UnMapGpuBuffer(GpuBuffer* InGpuBuffer) override;
+	TRefCountPtr<GpuQuerySet> CreateQuerySet(uint32 Count) override;
 };
 
 inline Dx12GpuRhiBackend* GDx12GpuRhi;

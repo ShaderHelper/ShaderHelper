@@ -3,7 +3,7 @@
 #include "Dx12Map.h"
 
 namespace FW
-{	
+{
 	Dx12StateCache::Dx12StateCache()
 		: IsPipelineStateDirty(false)
 		, IsRenderTargetDirty(false)
@@ -577,6 +577,13 @@ namespace FW
 			LoadActions.Add(PassDesc.ColorRenderTargets[i].LoadAction);
 		}
 
+		CurrentTimestampWrites = PassDesc.TimestampWrites;
+		if (CurrentTimestampWrites)
+		{
+			Dx12QuerySet* DxQuerySet = static_cast<Dx12QuerySet*>(CurrentTimestampWrites->QuerySet);
+			CmdList->EndQuery(DxQuerySet->GetHeap(), D3D12_QUERY_TYPE_TIMESTAMP, CurrentTimestampWrites->BeginningOfPassWriteIndex);
+		}
+
 		StateCache.SetRenderTargets(MoveTemp(RTViews), MoveTemp(ClearColorValues), MoveTemp(LoadActions));
 		auto NewPassRecorder = MakeUnique<Dx12RenderPassRecorder>(CmdList, StateCache);
 		RequestedRenderPassRecorders.Add(MoveTemp(NewPassRecorder));
@@ -585,6 +592,17 @@ namespace FW
 
 	void Dx12CmdRecorder::EndRenderPass(GpuRenderPassRecorder* InRenderPassRecorder)
 	{
+		if (CurrentTimestampWrites)
+		{
+			Dx12QuerySet* DxQuerySet = static_cast<Dx12QuerySet*>(CurrentTimestampWrites->QuerySet);
+			CmdList->EndQuery(DxQuerySet->GetHeap(), D3D12_QUERY_TYPE_TIMESTAMP, CurrentTimestampWrites->EndOfPassWriteIndex);
+
+			uint32 FirstQuery = FMath::Min(CurrentTimestampWrites->BeginningOfPassWriteIndex, CurrentTimestampWrites->EndOfPassWriteIndex);
+			uint32 Count = FMath::Abs((int32)CurrentTimestampWrites->EndOfPassWriteIndex - (int32)CurrentTimestampWrites->BeginningOfPassWriteIndex) + 1;
+			CmdList->ResolveQueryData(DxQuerySet->GetHeap(), D3D12_QUERY_TYPE_TIMESTAMP, FirstQuery, Count,
+				DxQuerySet->GetReadbackBuffer(), FirstQuery * sizeof(uint64));
+			CurrentTimestampWrites.Reset();
+		}
 		EndCaptureEvent();
 	}
 

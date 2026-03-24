@@ -11,4 +11,5 @@ namespace FW::GpuFeature
 	else
 
 	FRAMEWORK_API extern bool Support16bitType;
+	FRAMEWORK_API extern bool SupportTimestampQuery;
 }

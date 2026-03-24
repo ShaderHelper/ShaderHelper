@@ -4,6 +4,8 @@
 
 namespace FW
 {
+	class GpuQuerySet;
+
 	struct GpuViewPortDesc
 	{
 		float Width;
@@ -28,14 +30,22 @@ namespace FW
 		GpuTextureView* View;
 		RenderTargetLoadAction LoadAction = RenderTargetLoadAction::DontCare;
 		RenderTargetStoreAction StoreAction = RenderTargetStoreAction::DontCare;
-        
+
         //only valid when the load action is clear.
 		Vector4f ClearColor = View->GetTexture()->GetResourceDesc().ClearValues;
+	};
+
+	struct GpuRenderPassTimestampWrites
+	{
+		GpuQuerySet* QuerySet;
+		uint32 BeginningOfPassWriteIndex;
+		uint32 EndOfPassWriteIndex;
 	};
 
 	struct GpuRenderPassDesc
 	{
 		TArray<GpuRenderTargetInfo, TFixedAllocator<GpuResourceLimit::MaxRenderTargetNum>> ColorRenderTargets;
+		TOptional<GpuRenderPassTimestampWrites> TimestampWrites;
 	};
 
 }

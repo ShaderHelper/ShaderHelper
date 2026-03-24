@@ -69,6 +69,7 @@ namespace FW
         bool AnyError = false;
 		bool HasResponse = false;
 		bool IsDebugging = false;
+		double GpuTimeMs = 0.0;
 	};
 
 	DECLARE_MULTICAST_DELEGATE_OneParam(OnAddNodeDelegate, ObjectPtr<GraphNode>)

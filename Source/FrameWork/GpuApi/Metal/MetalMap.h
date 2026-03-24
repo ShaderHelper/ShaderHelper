@@ -83,10 +83,21 @@ namespace FW
             RawPassDesc.colorAttachments[i].storeAction = MapStoreAction(RtInfo.StoreAction);
             RawPassDesc.colorAttachments[i].clearColor = MTLClearColorMake(RtInfo.ClearColor.x, RtInfo.ClearColor.y, RtInfo.ClearColor.z, RtInfo.ClearColor.w);
         }
-        
+
+        if (PassDesc.TimestampWrites)
+        {
+            const GpuRenderPassTimestampWrites& TsWrites = *PassDesc.TimestampWrites;
+            MetalQuerySet* MtlQuerySet = static_cast<MetalQuerySet*>(TsWrites.QuerySet);
+            RawPassDesc.sampleBufferAttachments[0].sampleBuffer = (id<MTLCounterSampleBuffer>)MtlQuerySet->GetSampleBuffer();
+            RawPassDesc.sampleBufferAttachments[0].startOfVertexSampleIndex = TsWrites.BeginningOfPassWriteIndex;
+            RawPassDesc.sampleBufferAttachments[0].endOfFragmentSampleIndex = TsWrites.EndOfPassWriteIndex;
+            RawPassDesc.sampleBufferAttachments[0].startOfFragmentSampleIndex = MTLCounterDontSample;
+            RawPassDesc.sampleBufferAttachments[0].endOfVertexSampleIndex = MTLCounterDontSample;
+        }
+
         return [RawPassDesc autorelease];
     }
-    
+
     inline MTLPixelFormat MapTextureFormat(const GpuFormat& InTextureFormat)
     {
         switch(InTextureFormat)

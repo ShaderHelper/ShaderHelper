@@ -6,6 +6,8 @@
 
 #include <Widgets/Input/SSearchBox.h>
 #include <Styling/StyleColors.h>
+#include <Fonts/FontMeasure.h>
+
 namespace FW
 {
 
@@ -506,6 +508,28 @@ namespace FW
 					ESlateDrawEffect::None,
 					FLinearColor{1.0f, 0.55f, 0.0f, 0.4f}
 				);
+			}
+
+			if (CurNodeWidget->NodeData->GpuTimeMs > 0.0)
+			{
+				FString TimeText = FString::Printf(TEXT("%.2f ms"), CurNodeWidget->NodeData->GpuTimeMs);
+				FSlateFontInfo Font = FCoreStyle::GetDefaultFontStyle("Regular", 8);
+				const TSharedRef<FSlateFontMeasure> FontMeasureService = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
+				FVector2D TextSize = FontMeasureService->Measure(TimeText, Font);
+
+				FVector2D NodeSize = CurWidget.Geometry.GetLocalSize();
+				FVector2D BadgePos{ NodeSize.X - TextSize.X - 3.0, -(TextSize.Y + 3.0) };
+
+				FSlateDrawElement::MakeBox(OutDrawElements, TopNodeLayer + 1,
+					CurWidget.Geometry.ToPaintGeometry(
+						FVector2D{TextSize.X + 6.0, TextSize.Y + 2.0},
+						FSlateLayoutTransform(FVector2D{BadgePos.X - 3.0, BadgePos.Y - 1.0})),
+					FAppCommonStyle::Get().GetBrush("WhiteBrush"),
+					ESlateDrawEffect::None, FLinearColor{0, 0, 0, 0.6f});
+
+				FSlateDrawElement::MakeText(OutDrawElements, TopNodeLayer + 1,
+					CurWidget.Geometry.ToPaintGeometry(BadgePos, TextSize),
+					TimeText, Font, ESlateDrawEffect::None, FLinearColor{0.3f, 1.0f, 0.3f});
 			}
 
 		}

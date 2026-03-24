@@ -4,4 +4,5 @@
 namespace FW::GpuFeature
 {
 	bool Support16bitType;
+	bool SupportTimestampQuery;
 }

@@ -409,6 +409,11 @@ public:
 		RhiBackend->UnMapGpuBuffer(InGpuBuffer);
 	}
 
+	TRefCountPtr<GpuQuerySet> CreateQuerySet(uint32 Count) override
+	{
+		return RhiBackend->CreateQuerySet(Count);
+	}
+
 private:
 	TUniquePtr<GpuRhi> RhiBackend;
 	TArray<TUniquePtr<GpuCmdRecorderValidation>> RequestedCmdRecorders;

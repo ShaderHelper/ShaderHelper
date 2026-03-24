@@ -6,7 +6,6 @@
 
 namespace FW
 {
-
     MtlRenderStateCache::MtlRenderStateCache(MTLRenderPassDescriptorPtr InRenderPassDesc)
         : IsRenderPipelineDirty(false)
         , IsViewportDirty(false)

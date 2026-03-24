@@ -335,4 +335,9 @@ void Dx12GpuRhiBackend::EndRecording(GpuCmdRecorder* InCmdRecorder)
 	DxCmdRecorder->End();
 }
 
+TRefCountPtr<GpuQuerySet> Dx12GpuRhiBackend::CreateQuerySet(uint32 Count)
+{
+	return new Dx12QuerySet(Count);
+}
+
 }

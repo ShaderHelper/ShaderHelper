@@ -2,6 +2,7 @@
 #define VOLK_IMPLEMENTATION
 #define VMA_IMPLEMENTATION
 #include "VkDevice.h"
+#include "GpuApi/GpuFeature.h"
 
 namespace FW::VK
 {
@@ -163,6 +164,8 @@ namespace FW::VK
 				VK_VERSION_MAJOR(Props.properties.apiVersion),
 				VK_VERSION_MINOR(Props.properties.apiVersion),
 				VK_VERSION_PATCH(Props.properties.apiVersion));
+
+			GpuFeature::SupportTimestampQuery = (Props.properties.limits.timestampComputeAndGraphics == VK_TRUE);
 		}
 		if (GPhysicalDevice == VK_NULL_HANDLE)
 		{
@@ -267,6 +270,40 @@ namespace FW::VK
 					.handleType = ExternalSemaphoreHandleType
 		};
 		VkCheck(vkGetSemaphoreWin32HandleKHR(GDevice, &GetHandleInfo, &GSharedSemaphoreHandle))*/;
+	}
+
+	VulkanQuerySet::VulkanQuerySet(uint32 InCount)
+		: GpuQuerySet(InCount)
+	{
+		VkQueryPoolCreateInfo PoolInfo{
+			.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
+			.queryType = VK_QUERY_TYPE_TIMESTAMP,
+			.queryCount = InCount
+		};
+		VkCheck(vkCreateQueryPool(GDevice, &PoolInfo, nullptr, &Pool));
+	}
+
+	VulkanQuerySet::~VulkanQuerySet()
+	{
+		if (Pool != VK_NULL_HANDLE)
+		{
+			vkDestroyQueryPool(GDevice, Pool, nullptr);
+		}
+	}
+
+	double VulkanQuerySet::GetTimestampPeriodNs() const
+	{
+		VkPhysicalDeviceProperties Props;
+		vkGetPhysicalDeviceProperties(GPhysicalDevice, &Props);
+		return (double)Props.limits.timestampPeriod;
+	}
+
+	void VulkanQuerySet::ResolveResults(uint32 FirstQuery, uint32 QueryCount, TArray<uint64>& OutTimestamps)
+	{
+		OutTimestamps.SetNum(QueryCount);
+		vkGetQueryPoolResults(GDevice, Pool, FirstQuery, QueryCount,
+			QueryCount * sizeof(uint64), OutTimestamps.GetData(), sizeof(uint64),
+			VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
 	}
 }
 

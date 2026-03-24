@@ -1,6 +1,5 @@
 #pragma once
 #include "VkDevice.h"
-#include "GpuApi/GpuRhi.h"
 
 namespace FW::VK
 {
@@ -101,14 +100,16 @@ namespace FW::VK
 	class VulkanRenderPassRecorder : public GpuRenderPassRecorder
 	{
 	public:
-		VulkanRenderPassRecorder(VulkanCmdRecorder* InOwner, VkRenderPass InRenderPass, VkFramebuffer InFrameBuffer, TArray<GpuTextureView*> InRenderTargetViews) 
+		VulkanRenderPassRecorder(VulkanCmdRecorder* InOwner, VkRenderPass InRenderPass, VkFramebuffer InFrameBuffer, TArray<GpuTextureView*> InRenderTargetViews,
+			TOptional<GpuRenderPassTimestampWrites> InTimestampWrites = {})
 			: Owner(InOwner)
 			, RenderPass(InRenderPass), FrameBuffer(InFrameBuffer)
 			, StateCache(InOwner, MoveTemp(InRenderTargetViews))
+			, TimestampWrites(MoveTemp(InTimestampWrites))
 		{}
 		~VulkanRenderPassRecorder() {
 			vkDestroyFramebuffer(GDevice, FrameBuffer, nullptr);
-			vkDestroyRenderPass(GDevice, RenderPass, nullptr); 
+			vkDestroyRenderPass(GDevice, RenderPass, nullptr);
 		}
 
 	public:
@@ -120,6 +121,8 @@ namespace FW::VK
 		void SetViewPort(const GpuViewPortDesc& InViewPortDesc) override;
 		void SetScissorRect(const GpuScissorRectDesc& InScissorRectDes) override;
 		void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override;
+
+		TOptional<GpuRenderPassTimestampWrites> TimestampWrites;
 
 	private:
 		VulkanCmdRecorder* Owner;

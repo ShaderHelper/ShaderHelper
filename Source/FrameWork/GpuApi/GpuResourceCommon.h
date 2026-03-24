@@ -108,6 +108,7 @@ namespace FW
 		Shader,
 		Sampler,
 		CombinedTextureSampler,
+		QuerySet,
 	};
 
 	enum class GpuResourceMapMode

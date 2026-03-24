@@ -13,6 +13,7 @@
 #include "RenderResource/RenderPass/BlitPass.h"
 #include "Renderer/RenderGraph.h"
 #include "UI/Widgets/Graph/SGraphPanel.h"
+#include "GpuApi/GpuFeature.h"
 
 #include <regex>
 #include <vector>
@@ -1025,8 +1026,27 @@ namespace SH
                 }
             }
 
+            // Resolve previous frame's timestamps
+            if (TimestampQuerySet)
+            {
+                TArray<uint64> Timestamps;
+                TimestampQuerySet->ResolveResults(0, 2, Timestamps);
+				double PeriodNs = TimestampQuerySet->GetTimestampPeriodNs();
+				GpuTimeMs = (double)(Timestamps[1] - Timestamps[0]) * PeriodNs / 1e6;
+            }
+
+            if (GpuFeature::SupportTimestampQuery && !TimestampQuerySet)
+            {
+                TimestampQuerySet = GGpuRhi->CreateQuerySet(2);
+            }
+
             GpuRenderPassDesc PassDesc;
             PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassOutput->GetValue()->GetDefaultView(), RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
+
+            if (TimestampQuerySet)
+            {
+                PassDesc.TimestampWrites = GpuRenderPassTimestampWrites{TimestampQuerySet, 0, 1 };
+            }
 
 			auto BuiltInLayout = ShaderAssetObj->GetBuiltInBindLayout();
 

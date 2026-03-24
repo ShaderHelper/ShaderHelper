@@ -4,6 +4,7 @@
 #include "GpuApi/GpuResource.h"
 #include "MetalBuffer.h"
 #include "MetalArgumentBuffer.h"
+#include "MetalDevice.h"
 #include "GpuApi/GpuRhi.h"
 
 namespace FW
