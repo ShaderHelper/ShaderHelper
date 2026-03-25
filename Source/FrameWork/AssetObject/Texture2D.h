@@ -17,13 +17,14 @@ namespace FW
 		
 		void InitGpudata();
 		FString FileExtension() const override;
-		GpuTexture* GetThumbnail() const override;
 		GpuTexture* GetGpuData() const { return GpuData; }
 		GpuTexture* GetPreviewTexture() const { return PreviewTex; }
 		const TArray<uint8>& GetRawData() const { return RawData; }
 		uint32 GetWidth() const { return Width; }
 		uint32 GetHeight() const { return Height; }
 		GpuFormat GetFormat() const { return Format; }
+
+		TRefCountPtr<GpuTexture> GenerateThumbnail() const override;
 
 	public:
 		GpuFormat Format;

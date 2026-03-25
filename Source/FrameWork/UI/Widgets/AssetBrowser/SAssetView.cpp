@@ -19,6 +19,13 @@
 
 namespace FW
 {
+	SAssetView::~SAssetView()
+	{
+		if (ThumbnailLoadTickerHandle.IsValid())
+		{
+			FTicker::GetCoreTicker().RemoveTicker(ThumbnailLoadTickerHandle);
+		}
+	}
 
 	void SAssetView::Construct(const FArguments& InArgs, SAssetBrowser* InBrowser)
 	{
@@ -37,11 +44,16 @@ namespace FW
 			AssetViewCommands::Get().Save,
 			FExecuteAction::CreateRaw(this, &SAssetView::OnHandleSaveAction)
 		);
-
 		ContentPathShowed = InArgs._ContentPathShowed;
 		BuiltInDir = InArgs._BuiltInDir;
         OnFolderOpen = InArgs._OnFolderOpen;
         State = InArgs._State;
+		ThumbnailLoadTickerHandle = FTicker::GetCoreTicker().AddTicker(
+			FTickerDelegate::CreateLambda([this](float DeltaTime) {
+				TickAssetIconLoading(DeltaTime);
+				return true;
+			})
+		);
 
 		ChildSlot
 		[
@@ -98,7 +110,6 @@ namespace FW
 				]
 			]
 		];
-
 	}
 
 	void SAssetView::SetNewViewDirectory(const FString& NewViewDirectory)
@@ -114,6 +125,7 @@ namespace FW
 
 	void SAssetView::PopulateAssetView(const FString& ViewDirectory, const FText& InFilterText)
 	{
+		ResetAssetIconLoadingState();
 		AssetViewItems.Reset();
 
 		TArray<FString> FileOrFolderNames;
@@ -675,20 +687,56 @@ namespace FW
 		}
 		else
 		{
-			TSingleton<AssetManager>::Get().AsyncLoadAssetByPath<AssetObject>(ViewItem->GetPath(), [WeakItem = TWeakPtr<AssetViewAssetItem>{ ViewItem }](AssetPtr<AssetObject> Asset) {
-				if (WeakItem.IsValid())
+			if (MetaType* AssetMetaType = GetAssetMetaType(ViewItem->GetPath()))
+			{
+				if (auto* DefaultAsset = static_cast<AssetObject*>(AssetMetaType->GetDefaultObject()))
 				{
+					ViewItem->SetAssetImage(DefaultAsset->GetImage());
+				}
+			}
+
+			PendingThumbnailLoads.Add({ ViewItem, ViewItem->GetPath() });
+		}
+	}
+
+	void SAssetView::TickAssetIconLoading(float DeltaTime)
+	{
+		while (InflightThumbnailLoads < MaxThumbnailLoadRequests && NextPendingThumbnailLoad < PendingThumbnailLoads.Num())
+		{
+			PendingThumbnailLoad Request = PendingThumbnailLoads[NextPendingThumbnailLoad++];
+			TSharedPtr<AssetViewAssetItem> PinnedItem = Request.Item.Pin();
+			if (!PinnedItem.IsValid())
+			{
+				continue;
+			}
+
+			++InflightThumbnailLoads;
+			TSingleton<AssetManager>::Get().AsyncLoadAssetByPath<AssetObject>(Request.Path,
+				[WeakItem = Request.Item, Path = Request.Path, this](AssetPtr<AssetObject> Asset) {
+					--InflightThumbnailLoads;
+
+					TSharedPtr<AssetViewAssetItem> Pinned = WeakItem.Pin();
+					if (!Pinned.IsValid() || Pinned->GetPath() != Path || !Asset)
+					{
+						return;
+					}
+
 					if (auto* Thumbnail = Asset->GetThumbnail())
 					{
-						WeakItem.Pin()->SetAssetThumbnail(Thumbnail);
+						Pinned->SetAssetThumbnail(Thumbnail);
 					}
 					else
 					{
-						WeakItem.Pin()->SetAssetImage(Asset->GetImage());
+						Pinned->SetAssetImage(Asset->GetImage());
 					}
-				}
-			});
+				});
 		}
+	}
+
+	void SAssetView::ResetAssetIconLoadingState()
+	{
+		PendingThumbnailLoads.Reset();
+		NextPendingThumbnailLoad = 0;
 	}
 
 }

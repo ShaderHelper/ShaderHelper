@@ -88,4 +88,21 @@ namespace FW
         return FAppCommonStyle::Get().GetBrush("Icons.File");
     }
 
+    GpuTexture* AssetObject::GetThumbnail() const
+    {
+        if (GpuTexture* Thumbnail = TSingleton<AssetManager>::Get().FindAssetThumbnail(Guid))
+        {
+            return Thumbnail;
+        }
+
+        TRefCountPtr<GpuTexture> Thumbnail = GenerateThumbnail();
+        if (Thumbnail.IsValid())
+        {
+            TSingleton<AssetManager>::Get().AddAssetThumbnail(Guid, Thumbnail);
+            return Thumbnail;
+        }
+
+        return nullptr;
+    }
+
 }

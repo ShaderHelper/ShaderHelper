@@ -43,7 +43,7 @@ namespace FW
         FGuid Guid = TSingleton<AssetManager>::Get().GetGuid(InPath);
         GuidToPath.Remove(Guid);
 
-		AssetThumbnailPool.Remove(Guid);
+		RemoveAssetThumbnail(Guid);
     }
 
 	FString AssetManager::GetPath(const FGuid& InGuid) const
@@ -70,6 +70,11 @@ namespace FW
 	void AssetManager::AddAssetThumbnail(const FGuid& InGuid, TRefCountPtr<GpuTexture> InThumbnail)
 	{
 		AssetThumbnailPool.Add(InGuid, InThumbnail);
+	}
+
+	void AssetManager::RemoveAssetThumbnail(const FGuid& InGuid)
+	{
+		AssetThumbnailPool.Remove(InGuid);
 	}
 
 	GpuTexture* AssetManager::FindAssetThumbnail(const FGuid& InGuid) const

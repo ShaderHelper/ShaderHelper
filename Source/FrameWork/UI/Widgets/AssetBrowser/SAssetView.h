@@ -17,6 +17,13 @@ namespace FW
 	public:
 		static constexpr float MinAssetViewSize = 50;
 		static constexpr float MaxAssetViewSize = 150;
+		static constexpr int32 MaxThumbnailLoadRequests = 1;
+
+		struct PendingThumbnailLoad
+		{
+			TWeakPtr<class AssetViewAssetItem> Item;
+			FString Path;
+		};
 
 	public:
         SLATE_BEGIN_ARGS(SAssetView) : _State(nullptr)
@@ -27,6 +34,7 @@ namespace FW
             SLATE_ARGUMENT(AssetViewPersistentState*, State)
 		SLATE_END_ARGS()
 
+		~SAssetView();
 		void Construct(const FArguments& InArgs, SAssetBrowser* InBrowser);
 		void SetNewViewDirectory(const FString& NewViewDirectory);
 		FString GetViewDirectory() const { return CurViewDirectory; }
@@ -62,6 +70,8 @@ namespace FW
 		void OnHandleSaveAction();
 		void OnHandleOpenAction(TSharedRef<AssetViewItem> ViewItem);
 		void SetAssetIcon(TSharedRef<class AssetViewAssetItem> ViewItem);
+		void TickAssetIconLoading(float DeltaTime);
+		void ResetAssetIconLoadingState();
 
 	private:
 		SAssetBrowser* Browser;
@@ -74,6 +84,10 @@ namespace FW
 		FString ContentPathShowed, BuiltInDir;
 
         AssetViewPersistentState* State;
+		TArray<PendingThumbnailLoad> PendingThumbnailLoads;
+		int32 NextPendingThumbnailLoad = 0;
+		int32 InflightThumbnailLoads = 0;
+		FDelegateHandle ThumbnailLoadTickerHandle;
 	};
 
 }

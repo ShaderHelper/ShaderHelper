@@ -16,7 +16,6 @@ namespace FW
 
 		void InitGpuData();
 		FString FileExtension() const override;
-		GpuTexture* GetThumbnail() const override;
 		GpuTexture* GetGpuData() const { return GpuData; }
 		GpuTexture* GetPreviewTexture() const { return PreviewData; }
 		uint32 GetSize() const { return Size; }
@@ -25,6 +24,8 @@ namespace FW
 
 		void SetFaceData(int32 FaceIndex, const TArray<uint8>& InData);
 		void SetData(uint32 InSize, GpuFormat InFormat, TArray<TArray<uint8>> InFaceData);
+
+		TRefCountPtr<GpuTexture> GenerateThumbnail() const override;
 
 	public:
 		GpuFormat Format;

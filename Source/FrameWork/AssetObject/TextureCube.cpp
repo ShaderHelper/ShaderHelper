@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "TextureCube.h"
+#include "AssetManager/AssetManager.h"
 #include "Common/Util/Reflection.h"
 #include "GpuApi/GpuRhi.h"
 
@@ -88,13 +89,9 @@ namespace FW
 		return TEXT("cubemap");
 	}
 
-	GpuTexture* TextureCube::GetThumbnail() const
+	TRefCountPtr<GpuTexture> TextureCube::GenerateThumbnail() const
 	{
-		if (PreviewData.IsValid())
-		{
-			return PreviewData;
-		}
-		return nullptr;
+		return PreviewData;
 	}
 
 	void TextureCube::SetFaceData(int32 FaceIndex, const TArray<uint8>& InData)

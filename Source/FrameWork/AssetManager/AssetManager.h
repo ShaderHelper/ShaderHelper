@@ -176,6 +176,7 @@ namespace FW
         void DestroyAsset(const FString& InAssetPath);
 
 		void AddAssetThumbnail(const FGuid& InGuid, TRefCountPtr<GpuTexture> InThumbnail);
+		void RemoveAssetThumbnail(const FGuid& InGuid);
 		GpuTexture* FindAssetThumbnail(const FGuid& InGuid) const;
 
         void RemoveAsset(AssetObject* InAsset);

@@ -84,14 +84,9 @@ namespace FW
 		return "texture";
 	}
 
-	GpuTexture* Texture2D::GetThumbnail() const
+	TRefCountPtr<GpuTexture> Texture2D::GenerateThumbnail() const
 	{
 		check(GpuData.IsValid());
-
-		if (GpuTexture* Thumbnail = TSingleton<AssetManager>::Get().FindAssetThumbnail(Guid))
-		{
-			return Thumbnail;
-		}
 
 		GpuTextureDesc Desc{ Width / 2, Height / 2, Format, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
 		TRefCountPtr<GpuTexture> Thumbnail = GGpuRhi->CreateTexture(MoveTemp(Desc));
@@ -106,8 +101,6 @@ namespace FW
 			AddBlitPass(Graph, MoveTemp(Input));
 		}
 		Graph.Execute();
-
-		TSingleton<AssetManager>::Get().AddAssetThumbnail(Guid, Thumbnail);
 		return Thumbnail;
 	}
 }

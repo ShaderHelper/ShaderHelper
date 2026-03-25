@@ -25,7 +25,7 @@ namespace FW
 		bool IsBuiltInAsset() const;
 
 		//Determine the asset icon in the asset browser.
-		virtual GpuTexture* GetThumbnail() const { return nullptr; }
+		GpuTexture* GetThumbnail() const;
         virtual const FSlateBrush* GetImage() const;
 		int GetFileAssetVer() const { return FileAssetVer; }
         
@@ -33,6 +33,7 @@ namespace FW
         FString GetPath() const;
 
 	protected:
+		virtual TRefCountPtr<GpuTexture> GenerateThumbnail() const { return nullptr; }
 		int FileAssetVer = 0;
 	};
 
