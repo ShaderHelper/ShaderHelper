@@ -79,6 +79,18 @@ namespace FW
 
 	void MtlRenderStateCache::SetScissorRect(MTL::ScissorRect InSissorRect)
 	{
+        MTL::RenderPassColorAttachmentDescriptor* Attachment = RenderPassDesc->colorAttachments()->object(0);
+        MTL::Texture* RenderTarget = Attachment->texture();
+        
+        const uint32 PassWidth = static_cast<uint32>(RenderTarget->width());
+        const uint32 PassHeight = static_cast<uint32>(RenderTarget->height());
+        const uint32 ClampedX = FMath::Min<uint32>(InSissorRect.x, PassWidth);
+        const uint32 ClampedY = FMath::Min<uint32>(InSissorRect.y, PassHeight);
+        InSissorRect.x = ClampedX;
+        InSissorRect.y = ClampedY;
+        InSissorRect.width = FMath::Min<uint32>(InSissorRect.width, PassWidth - ClampedX);
+        InSissorRect.height = FMath::Min<uint32>(InSissorRect.height, PassHeight - ClampedY);
+
 		if (!CurrentScissorRect || FMemory::Memcmp(&*CurrentScissorRect, &InSissorRect, sizeof(MTL::ScissorRect)))
 		{
 			CurrentScissorRect = MoveTemp(InSissorRect);
