@@ -11,6 +11,8 @@
 	Type Name : register(JOIN(s, RegisterSlot), space2);
 #define DECLARE_SHADER_RW_BUFFER(Type, Name, RegisterSlot) \
 	Type Name : register(JOIN(u, RegisterSlot), space2);
+#define DECLARE_SHADER_RW_TEXTURE(Type, Name, RegisterSlot) \
+	Type Name : register(JOIN(u, RegisterSlot), space2);
 
 #define DECLARE_GLOBAL_TEXTURE(Type, Name, RegisterSlot) \
 	Type Name : register(JOIN(t, RegisterSlot), space0);
@@ -18,12 +20,16 @@
 	Type Name : register(JOIN(s, RegisterSlot), space0);
 #define DECLARE_GLOBAL_RW_BUFFER(Type, Name, RegisterSlot) \
 	Type Name : register(JOIN(u, RegisterSlot), space0);
+#define DECLARE_GLOBAL_RW_TEXTURE(Type, Name, RegisterSlot) \
+	Type Name : register(JOIN(u, RegisterSlot), space0);
 
 #define DECLARE_PASS_TEXTURE(Type, Name, RegisterSlot) \
 	Type Name : register(JOIN(t, RegisterSlot), space1);
 #define DECLARE_PASS_SAMPLER(Type, Name, RegisterSlot) \
 	Type Name : register(JOIN(s, RegisterSlot), space1);
 #define DECLARE_PASS_RW_BUFFER(Type, Name, RegisterSlot) \
+	Type Name : register(JOIN(u, RegisterSlot), space1);
+#define DECLARE_PASS_RW_TEXTURE(Type, Name, RegisterSlot) \
 	Type Name : register(JOIN(u, RegisterSlot), space1);
 
 template<typename T, typename U>

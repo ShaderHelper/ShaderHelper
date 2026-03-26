@@ -15,21 +15,34 @@ namespace FW
 			ExtraArgs.Add(D);
 		}
 
-		BindGroupLayout = GpuBindGroupLayoutBuilder{ BindingContext::ShaderSlot }
-							.AddExistingBinding(0, BindingType::Texture, BindingShaderStage::Pixel)
-							.AddExistingBinding(1, BindingType::Sampler, BindingShaderStage::Pixel)
-							.Build();
-		
+		bUseMipLevel = VariantDefinitions.count(TEXT("USE_MIP_LEVEL")) > 0;
+
+		GpuBindGroupLayoutBuilder LayoutBuilder{ BindingContext::ShaderSlot };
+		LayoutBuilder.AddExistingBinding(0, BindingType::Texture, BindingShaderStage::Pixel)
+			.AddExistingBinding(1, BindingType::Sampler, BindingShaderStage::Pixel);
+
+		if (bUseMipLevel)
+		{
+			BlitUbBuilder.AddFloat(TEXT("BlitMipLevel"));
+			LayoutBuilder.AddUniformBuffer(TEXT("BlitUb"), BlitUbBuilder, BindingShaderStage::Pixel);
+		}
+
+		BindGroupLayout = LayoutBuilder.Build();
+
+		FString ExtraDecl = BindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL);
+
 		Vs = GGpuRhi->CreateShaderFromFile({
 			.FileName = PathHelper::ShaderDir() / "Blit.hlsl",
 			.Type = ShaderType::VertexShader,
-			.EntryPoint = "MainVS"
+			.EntryPoint = "MainVS",
+			.ExtraDecl = ExtraDecl,
 		});
 
 		Ps = GGpuRhi->CreateShaderFromFile({
 			.FileName = PathHelper::ShaderDir() / "Blit.hlsl",
 			.Type = ShaderType::PixelShader,
-			.EntryPoint = "MainPS"
+			.EntryPoint = "MainPS",
+			.ExtraDecl = ExtraDecl,
 		});
 
 		FString ErrorInfo, WarnInfo;
@@ -42,10 +55,18 @@ namespace FW
 
 	TRefCountPtr<GpuBindGroup> BlitShader::GetBindGroup(const Parameters& InParameters)
 	{
-		return GpuBindGroupBuilder{ BindGroupLayout }
-				.SetExistingBinding(0, InParameters.InputView)
-				.SetExistingBinding(1, InParameters.InputTexSampler)
-				.Build();
+		GpuBindGroupBuilder Builder{ BindGroupLayout };
+		Builder.SetExistingBinding(0, InParameters.InputView)
+			.SetExistingBinding(1, InParameters.InputTexSampler);
+
+		if (bUseMipLevel)
+		{
+			TUniquePtr<UniformBuffer> BlitUb = BlitUbBuilder.Build();
+			BlitUb->GetMember<float>(TEXT("BlitMipLevel")) = InParameters.MipLevel;
+			Builder.SetUniformBuffer(TEXT("BlitUb"), BlitUb->GetGpuResource());
+		}
+
+		return Builder.Build();
 	}
 
 }

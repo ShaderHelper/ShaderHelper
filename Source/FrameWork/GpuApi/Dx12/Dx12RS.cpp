@@ -27,14 +27,18 @@ namespace FW
 		{
 		case BindingType::Texture:
 		case BindingType::TextureCube:
+		case BindingType::Texture3D:
 		case BindingType::CombinedTextureSampler:
 		case BindingType::CombinedTextureCubeSampler:
+		case BindingType::CombinedTexture3DSampler:
 		case BindingType::StructuredBuffer:
 		case BindingType::RawBuffer:
 			return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 		case BindingType::Sampler:			return D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
 		case BindingType::RWStructuredBuffer:
 		case BindingType::RWRawBuffer:
+		case BindingType::RWTexture:
+		case BindingType::RWTexture3D:
 			return D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
 		default:
 			AUX::Unreachable();
@@ -62,7 +66,7 @@ namespace FW
 				Range.RegisterSpace = LayoutDesc.GroupNumber;
 				Range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-				if (LayoutBindingEntry.Type == BindingType::CombinedTextureSampler || LayoutBindingEntry.Type == BindingType::CombinedTextureCubeSampler)
+				if (LayoutBindingEntry.Type == BindingType::CombinedTextureSampler || LayoutBindingEntry.Type == BindingType::CombinedTextureCubeSampler || LayoutBindingEntry.Type == BindingType::CombinedTexture3DSampler)
 				{
 					DescriptorTableRanges_CbvSrvUav.FindOrAdd(BindingVisibility).Add(MoveTemp(Range));
 
@@ -74,9 +78,10 @@ namespace FW
 					SamplerRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 					DescriptorTableRanges_Sampler.FindOrAdd(BindingVisibility).Add(MoveTemp(SamplerRange));
 				}
-				else if (LayoutBindingEntry.Type == BindingType::Texture || LayoutBindingEntry.Type == BindingType::TextureCube ||
+				else if (LayoutBindingEntry.Type == BindingType::Texture || LayoutBindingEntry.Type == BindingType::TextureCube || LayoutBindingEntry.Type == BindingType::Texture3D ||
 					LayoutBindingEntry.Type == BindingType::RWStructuredBuffer || LayoutBindingEntry.Type == BindingType::StructuredBuffer ||
-					LayoutBindingEntry.Type == BindingType::RWRawBuffer || LayoutBindingEntry.Type == BindingType::RawBuffer)
+					LayoutBindingEntry.Type == BindingType::RWRawBuffer || LayoutBindingEntry.Type == BindingType::RawBuffer ||
+					LayoutBindingEntry.Type == BindingType::RWTexture || LayoutBindingEntry.Type == BindingType::RWTexture3D)
 				{
 					DescriptorTableRanges_CbvSrvUav.FindOrAdd(BindingVisibility).Add(MoveTemp(Range));
 				}
@@ -162,7 +167,15 @@ namespace FW
 			else if (BindingResource->GetType() == GpuResourceType::TextureView)
 			{
 				Dx12TextureView* View = static_cast<Dx12TextureView*>(BindingResource);
-				SrcDescriptorRange_CbvSrvUav.FindOrAdd(BindingVisibility).Add(View->GetSRV()->GetHandle());
+				BindingType SlotType = GetLayout()->GetDesc().GetBindingType(Slot);
+				if (SlotType == BindingType::RWTexture || SlotType == BindingType::RWTexture3D)
+				{
+					SrcDescriptorRange_CbvSrvUav.FindOrAdd(BindingVisibility).Add(View->GetUAV()->GetHandle());
+				}
+				else
+				{
+					SrcDescriptorRange_CbvSrvUav.FindOrAdd(BindingVisibility).Add(View->GetSRV()->GetHandle());
+				}
 			}
 			else if (BindingResource->GetType() == GpuResourceType::Buffer)
 			{
@@ -285,6 +298,11 @@ namespace FW
 		if (TOptional<uint32> RootParameterIndex = RootSig->GetCbvSrvUavTableRootParameterIndex(D3D12_SHADER_VISIBILITY_ALL, GroupSlot))
 		{
 			CommandList->SetComputeRootDescriptorTable(*RootParameterIndex, GetDescriptorTableStart_CbvSrvUav(D3D12_SHADER_VISIBILITY_ALL));
+		}
+
+		if (TOptional<uint32> RootParameterIndex = RootSig->GetSamplerTableRootParameterIndex(D3D12_SHADER_VISIBILITY_ALL, GroupSlot))
+		{
+			CommandList->SetComputeRootDescriptorTable(*RootParameterIndex, GetDescriptorTableStart_Sampler(D3D12_SHADER_VISIBILITY_ALL));
 		}
 	}
 

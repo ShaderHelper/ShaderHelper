@@ -564,7 +564,7 @@ namespace FW::VK
 				.layerCount = 1
 			},
 			.imageOffset = {0, 0, 0},
-			.imageExtent = {InTexture->GetWidth(), InTexture->GetHeight(), 1}
+			.imageExtent = {InTexture->GetWidth(), InTexture->GetHeight(), InTexture->GetDepth()}
 		};
 
 		vkCmdCopyBufferToImage(CommandBuffer, SrcBuffer->GetBuffer(), DstTexture->GetImage(),

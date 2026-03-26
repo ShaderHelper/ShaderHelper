@@ -12,11 +12,9 @@
 #include "GpuApiValidation.h"
 #include "GpuShader.h"
 #include "GpuResourceHelper.h"
-#include "Renderer/RenderGraph.h"
 
 namespace FW
 {
-
 TRefCountPtr<GpuTexture> GpuRhi::CreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
 {
 	//If the initial state is unknown, then the state be determined based on usage,
@@ -28,14 +26,15 @@ TRefCountPtr<GpuTexture> GpuRhi::CreateTexture(const GpuTextureDesc& InTexDesc, 
 	{
 		//InitialData for mip0
 		check(!InTexDesc.InitialData.IsEmpty());
-		check(EnumHasAllFlags(InTexDesc.Usage, GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget));
+		check(EnumHasAllFlags(InTexDesc.Usage, GpuTextureUsage::ShaderResource | GpuTextureUsage::UnorderedAccess));
 		GpuTextureDesc Desc = InTexDesc;
-		Desc.NumMips = FMath::FloorLog2(FMath::Max(InTexDesc.Width, InTexDesc.Height)) + 1;
-		TRefCountPtr<GpuTexture> Texture = CreateTextureInternal(Desc, ValidState);
+		uint32 MaxDim = FMath::Max(InTexDesc.Width, InTexDesc.Height);
+		if (InTexDesc.Dimension == GpuTextureDimension::Tex3D)
+			MaxDim = FMath::Max(MaxDim, InTexDesc.Depth);
+		Desc.NumMips = FMath::FloorLog2(MaxDim) + 1;
 
-		RenderGraph Graph;
-		GpuResourceHelper::GenerateMipmap(Graph, Texture);
-		Graph.Execute();
+		TRefCountPtr<GpuTexture> Texture = CreateTextureInternal(Desc, ValidState);
+		GpuResourceHelper::GenerateMipmap(Texture);
 
 		return Texture;
 	}

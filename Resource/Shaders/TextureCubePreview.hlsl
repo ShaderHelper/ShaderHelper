@@ -22,7 +22,7 @@ VsOutput MainVS(VsInput Input)
 
 float4 MainPS(VsOutput Input) : SV_Target
 {
-	const float4 Color = PreviewCube.Sample(PreviewCubeSampler, Input.SampleDir);
+	const float4 Color = PreviewCube.SampleLevel(PreviewCubeSampler, Input.SampleDir, MipLevel);
 
 	if (ChannelFilter == 1)
 	{

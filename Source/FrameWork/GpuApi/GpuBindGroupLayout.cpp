@@ -52,6 +52,16 @@ namespace FW
 		return *this;
 	}
 
+	GpuBindGroupLayoutBuilder& GpuBindGroupLayoutBuilder::AddTexture3D(const FString& BindingName, BindingShaderStage InStage)
+	{
+		while (LayoutDesc.Layouts.Contains(AutoSlot)) { AutoSlot++; };
+		LayoutDesc.HlslCodegenDeclaration += FString::Printf(TEXT("Texture3D %s : register(t%d, space%d);\n"), *BindingName, AutoSlot, LayoutDesc.GroupNumber);
+		LayoutDesc.GlslCodegenDeclaration += FString::Printf(TEXT("layout(binding = %d, set = %d) uniform texture3D %s;\n"), AutoSlot, LayoutDesc.GroupNumber, *BindingName);
+		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, AutoSlot);
+		LayoutDesc.Layouts.Add(AutoSlot++, {BindingType::Texture3D, InStage });
+		return *this;
+	}
+
 	GpuBindGroupLayoutBuilder& GpuBindGroupLayoutBuilder::AddSampler(const FString& BindingName, BindingShaderStage InStage)
 	{
 		while (LayoutDesc.Layouts.Contains(AutoSlot)) { AutoSlot++; };
@@ -82,6 +92,16 @@ namespace FW
 		return *this;
 	}
 
+	GpuBindGroupLayoutBuilder& GpuBindGroupLayoutBuilder::AddCombinedTexture3DSampler(const FString& BindingName, BindingShaderStage InStage)
+	{
+		while (LayoutDesc.Layouts.Contains(AutoSlot) || LayoutDesc.Layouts.Contains(AutoSlot + 1)) { AutoSlot++; };
+		LayoutDesc.GlslCodegenDeclaration += FString::Printf(TEXT("layout(binding = %d, set = %d) uniform sampler3D %s;\n"), AutoSlot, LayoutDesc.GroupNumber, *BindingName);
+		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, AutoSlot);
+		LayoutDesc.Layouts.Add(AutoSlot, {BindingType::CombinedTexture3DSampler, InStage });
+		AutoSlot += 2;
+		return *this;
+	}
+
 	TRefCountPtr<GpuBindGroupLayout> GpuBindGroupLayoutBuilder::Build() const
 	{
 		return GGpuRhi->CreateBindGroupLayout(LayoutDesc);
@@ -93,7 +113,7 @@ namespace FW
 		{
 			for (const auto& [Slot, LayoutBindingEntry] : Layouts)
 			{
-				checkf(LayoutBindingEntry.Type != BindingType::CombinedTextureSampler && LayoutBindingEntry.Type != BindingType::CombinedTextureCubeSampler,
+				checkf(LayoutBindingEntry.Type != BindingType::CombinedTextureSampler && LayoutBindingEntry.Type != BindingType::CombinedTextureCubeSampler && LayoutBindingEntry.Type != BindingType::CombinedTexture3DSampler,
 					TEXT("HLSL does not support combined sampler. Slot: %d"), Slot);
 			}
 		}

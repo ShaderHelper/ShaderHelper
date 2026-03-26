@@ -3,6 +3,7 @@
 #include "AssetObject/Graph.h"
 #include "AssetObject/Texture2D.h"
 #include "AssetObject/TextureCube.h"
+#include "AssetObject/Texture3D.h"
 #include "AssetManager/AssetManager.h"
 #include "AssetManager/AssetImporter/AssetImporter.h"
 #include "Editor/AssetEditor/AssetEditor.h"
@@ -71,6 +72,7 @@ void RegisterPyFW(py::module_& m, py::module_& m_slate)
 		.def_property_readonly("FileExtension", [](const FW::AssetObject& Self) { return std::string(TCHAR_TO_UTF8(*Self.FileExtension())); });
 	py::class_<FW::Texture2D, FW::AssetObject, FW::ObjectPtr<FW::Texture2D>>(m, "Texture2D");
 	py::class_<FW::TextureCube, FW::AssetObject, FW::ObjectPtr<FW::TextureCube>>(m, "TextureCube");
+	py::class_<FW::Texture3D, FW::AssetObject, FW::ObjectPtr<FW::Texture3D>>(m, "Texture3D");
 	py::class_<FW::Graph, FW::AssetObject, FW::ObjectPtr<FW::Graph>>(m, "Graph")
 		.def("AddNode", &FW::Graph::AddNode)
 		.def("AddLink", &FW::Graph::AddLink)

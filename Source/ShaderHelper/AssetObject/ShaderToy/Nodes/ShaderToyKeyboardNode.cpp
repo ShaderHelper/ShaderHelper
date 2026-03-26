@@ -18,7 +18,7 @@ namespace SH
 	REFLECTION_REGISTER(AddClass<ShaderToyKeyboardNodeOp>()
 		.BaseClass<ShObjectOp>()
 	)
-	REGISTER_NODE_TO_GRAPH(ShaderToyKeyboardNode, "ShaderToy Graph")
+	REGISTER_NODE_TO_GRAPH(ShaderToyKeyboardNode, "ShaderToy")
 
 	MetaType* ShaderToyKeyboardNodeOp::SupportType()
 	{

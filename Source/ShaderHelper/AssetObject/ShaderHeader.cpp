@@ -11,7 +11,7 @@ using namespace FW;
 
 namespace SH
 {
-	REFLECTION_REGISTER(AddClass<ShaderHeader>("Shader Header")
+	REFLECTION_REGISTER(AddClass<ShaderHeader>("ShaderHeader")
 		.BaseClass<ShaderAsset>()
 		.Data<&ShaderHeader::Language, MetaInfo::Property>(LOCALIZATION("Language"))
 	)

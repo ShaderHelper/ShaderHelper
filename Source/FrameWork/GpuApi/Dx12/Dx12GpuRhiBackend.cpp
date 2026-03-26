@@ -72,6 +72,7 @@ TRefCountPtr<GpuTextureView> Dx12GpuRhiBackend::CreateTextureViewInternal(const 
 	Dx12Texture* DxTexture = static_cast<Dx12Texture*>(InViewDesc.Texture);
 	TUniquePtr<CpuDescriptor> SRV;
 	TUniquePtr<CpuDescriptor> RTV;
+	TUniquePtr<CpuDescriptor> UAV;
 
 	if (EnumHasAnyFlags(InViewDesc.Texture->GetResourceDesc().Usage, GpuTextureUsage::ShaderResource))
 	{
@@ -81,10 +82,30 @@ TRefCountPtr<GpuTextureView> Dx12GpuRhiBackend::CreateTextureViewInternal(const 
 		SrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 		if (InViewDesc.Texture->GetResourceDesc().Dimension == GpuTextureDimension::TexCube)
 		{
-			SrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-			SrvDesc.TextureCube.MostDetailedMip = InViewDesc.BaseMipLevel;
-			SrvDesc.TextureCube.MipLevels = InViewDesc.MipLevelCount;
-			SrvDesc.TextureCube.ResourceMinLODClamp = 0.0f;
+			if (InViewDesc.ArrayLayerCount == 6)
+			{
+				SrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+				SrvDesc.TextureCube.MostDetailedMip = InViewDesc.BaseMipLevel;
+				SrvDesc.TextureCube.MipLevels = InViewDesc.MipLevelCount;
+				SrvDesc.TextureCube.ResourceMinLODClamp = 0.0f;
+			}
+			else
+			{
+				SrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+				SrvDesc.Texture2DArray.MostDetailedMip = InViewDesc.BaseMipLevel;
+				SrvDesc.Texture2DArray.MipLevels = InViewDesc.MipLevelCount;
+				SrvDesc.Texture2DArray.FirstArraySlice = InViewDesc.BaseArrayLayer;
+				SrvDesc.Texture2DArray.ArraySize = InViewDesc.ArrayLayerCount;
+				SrvDesc.Texture2DArray.PlaneSlice = 0;
+				SrvDesc.Texture2DArray.ResourceMinLODClamp = 0.0f;
+			}
+		}
+		else if (InViewDesc.Texture->GetResourceDesc().Dimension == GpuTextureDimension::Tex3D)
+		{
+			SrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+			SrvDesc.Texture3D.MostDetailedMip = InViewDesc.BaseMipLevel;
+			SrvDesc.Texture3D.MipLevels = InViewDesc.MipLevelCount;
+			SrvDesc.Texture3D.ResourceMinLODClamp = 0.0f;
 		}
 		else
 		{
@@ -105,8 +126,37 @@ TRefCountPtr<GpuTextureView> Dx12GpuRhiBackend::CreateTextureViewInternal(const 
 		GDevice->CreateRenderTargetView(DxTexture->GetResource(), &RtvDesc, RTV->GetHandle());
 	}
 
+	if (EnumHasAnyFlags(InViewDesc.Texture->GetResourceDesc().Usage, GpuTextureUsage::UnorderedAccess))
+	{
+		UAV = AllocCpuCbvSrvUav();
+		D3D12_UNORDERED_ACCESS_VIEW_DESC UavDesc{};
+		UavDesc.Format = DxTexture->GetResource()->GetDesc().Format;
+		if (InViewDesc.Texture->GetResourceDesc().Dimension == GpuTextureDimension::Tex3D)
+		{
+			UavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
+			UavDesc.Texture3D.MipSlice = InViewDesc.BaseMipLevel;
+			UavDesc.Texture3D.FirstWSlice = 0;
+			UavDesc.Texture3D.WSize = -1;
+		}
+		else if (InViewDesc.Texture->GetResourceDesc().Dimension == GpuTextureDimension::TexCube)
+		{
+			UavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+			UavDesc.Texture2DArray.MipSlice = InViewDesc.BaseMipLevel;
+			UavDesc.Texture2DArray.FirstArraySlice = InViewDesc.BaseArrayLayer;
+			UavDesc.Texture2DArray.ArraySize = InViewDesc.ArrayLayerCount;
+			UavDesc.Texture2DArray.PlaneSlice = 0;
+		}
+		else
+		{
+			UavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+			UavDesc.Texture2D.MipSlice = InViewDesc.BaseMipLevel;
+			UavDesc.Texture2D.PlaneSlice = 0;
+		}
+		GDevice->CreateUnorderedAccessView(DxTexture->GetResource(), nullptr, &UavDesc, UAV->GetHandle());
+	}
+
 	GpuTextureViewDesc ViewDesc = InViewDesc;
-	return new Dx12TextureView(MoveTemp(ViewDesc), MoveTemp(SRV), MoveTemp(RTV));
+	return new Dx12TextureView(MoveTemp(ViewDesc), MoveTemp(SRV), MoveTemp(RTV), MoveTemp(UAV));
 }
 
 TRefCountPtr<GpuShader> Dx12GpuRhiBackend::CreateShaderFromSourceInternal(const GpuShaderSourceDesc& Desc) const

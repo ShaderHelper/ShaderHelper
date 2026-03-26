@@ -46,7 +46,7 @@ namespace SH
 	{
 		if (!Value) {
 			TArray<uint8> RawData = {0,0,0, 255};
-			GpuTextureDesc Desc{ 1, 1, GpuFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared, RawData};
+			GpuTextureDesc Desc{ 1, 1, GpuFormat::R8G8B8A8_UNORM, GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared, RawData};
 			static auto DefaultValue = GGpuRhi->CreateTexture(MoveTemp(Desc), GpuResourceState::RenderTargetWrite);
 			Value = DefaultValue;
 		}
@@ -91,6 +91,49 @@ namespace SH
 	{
 		if (!Value) {
 			static auto DefaultValue = GpuResourceHelper::GetGlobalBlackCubemapTex();
+			Value = DefaultValue;
+		}
+		return Value;
+	}
+
+	REFLECTION_REGISTER(AddClass<GpuTexture3DPin>("GpuTexture3DPin")
+		.BaseClass<GraphPin>()
+	)
+
+	void GpuTexture3DPin::Serialize(FArchive& Ar)
+	{
+		GraphPin::Serialize(Ar);
+	}
+
+	bool GpuTexture3DPin::CanAccept(GraphPin* SourcePin)
+	{
+		return DynamicCast<GpuTexture3DPin>(SourcePin) != nullptr;
+	}
+
+	void GpuTexture3DPin::Accept(GraphPin* SourcePin)
+	{
+		Value = static_cast<GpuTexture3DPin*>(SourcePin)->GetValue();
+	}
+
+	void GpuTexture3DPin::Refuse()
+	{
+		Value.SafeRelease();
+	}
+
+	void GpuTexture3DPin::SetValue(TRefCountPtr<GpuTexture> InValue)
+	{
+		Value = MoveTemp(InValue);
+		auto TargetPins = GetTargetPins();
+		for (GraphPin* Pin : TargetPins)
+		{
+			Pin->Accept(this);
+		}
+	}
+
+	GpuTexture* GpuTexture3DPin::GetValue()
+	{
+		if (!Value) {
+			static auto DefaultValue = GpuResourceHelper::GetGlobalBlackVolumeTex();
 			Value = DefaultValue;
 		}
 		return Value;

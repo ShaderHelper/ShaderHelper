@@ -1,5 +1,5 @@
 #include "CommonHeader.h"
-#include "TextureCubeNode.h"
+#include "Texture3dNode.h"
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "AssetObject/Pins/Pins.h"
@@ -8,34 +8,34 @@ using namespace FW;
 
 namespace SH
 {
-	REFLECTION_REGISTER(AddClass<TextureCubeNode>("TextureCube Node")
+	REFLECTION_REGISTER(AddClass<Texture3dNode>("Texture3D Node")
 		.BaseClass<GraphNode>()
-		.Data<&TextureCubeNode::Texture, MetaInfo::Property>(LOCALIZATION("Texture"))
+		.Data<&Texture3dNode::Texture, MetaInfo::Property>(LOCALIZATION("Texture"))
 	)
-	REFLECTION_REGISTER(AddClass<TextureCubeNodeOp>()
+	REFLECTION_REGISTER(AddClass<Texture3dNodeOp>()
 		.BaseClass<ShObjectOp>()
 	)
 
-	REGISTER_NODE_TO_GRAPH(TextureCubeNode, "ShaderToy")
+	REGISTER_NODE_TO_GRAPH(Texture3dNode, "ShaderToy")
 
-	MetaType* TextureCubeNodeOp::SupportType()
+	MetaType* Texture3dNodeOp::SupportType()
 	{
-		return GetMetaType<TextureCubeNode>();
+		return GetMetaType<Texture3dNode>();
 	}
 
-	TextureCubeNode::TextureCubeNode()
+	Texture3dNode::Texture3dNode()
 	{
-		ObjectName = LOCALIZATION("TextureCube");
+		ObjectName = LOCALIZATION("Texture3D");
 	}
 
-	TextureCubeNode::TextureCubeNode(FW::AssetPtr<FW::TextureCube> InTexture)
+	Texture3dNode::Texture3dNode(FW::AssetPtr<FW::Texture3D> InTexture)
 		: Texture(MoveTemp(InTexture))
 	{
 		ObjectName = FText::FromString(Texture->GetFileName());
 		InitTexture();
 	}
 
-	TextureCubeNode::~TextureCubeNode()
+	Texture3dNode::~Texture3dNode()
 	{
 		if (Texture)
 		{
@@ -43,33 +43,33 @@ namespace SH
 		}
 	}
 
-	void TextureCubeNode::Init()
+	void Texture3dNode::Init()
 	{
 		InitPins();
 	}
 
-	void TextureCubeNode::InitPins()
+	void Texture3dNode::InitPins()
 	{
-		auto ResultPin = NewShObject<GpuCubemapPin>(this);
+		auto ResultPin = NewShObject<GpuTexture3DPin>(this);
 		ResultPin->ObjectName = FText::FromString("RT");
 		ResultPin->Direction = PinDirection::Output;
 
 		Pins = {ResultPin};
 	}
 
-	void TextureCubeNode::Serialize(FArchive& Ar)
+	void Texture3dNode::Serialize(FArchive& Ar)
 	{
 		GraphNode::Serialize(Ar);
 		Ar << Texture;
 	}
 
-	void TextureCubeNode::PostLoad()
+	void Texture3dNode::PostLoad()
 	{
 		GraphNode::PostLoad();
 		InitTexture();
 	}
 
-	TSharedPtr<SWidget> TextureCubeNode::ExtraNodeWidget()
+	TSharedPtr<SWidget> Texture3dNode::ExtraNodeWidget()
 	{
 		return SNew(SBox).Padding(4.0f)
 			[
@@ -77,18 +77,20 @@ namespace SH
 			];
 	}
 
-	void TextureCubeNode::InitTexture()
+	void Texture3dNode::InitTexture()
 	{
 		if (Texture)
 		{
-			Texture->OnDestroy.AddRaw(this, &TextureCubeNode::ClearProperty);
+			Texture->OnDestroy.AddRaw(this, &Texture3dNode::ClearProperty);
 			Format = Texture->GetFormat();
-			Size = Texture->GetSize();
+			Width = Texture->GetWidth();
+			Height = Texture->GetHeight();
+			Depth = Texture->GetDepth();
 			RefreshPreview();
 		}
 	}
 
-	void TextureCubeNode::RefreshPreview()
+	void Texture3dNode::RefreshPreview()
 	{
 		if (!Texture || !Texture->GetPreviewTexture())
 		{
@@ -98,7 +100,7 @@ namespace SH
 		Preview->SetViewPortRenderTexture(Texture->GetPreviewTexture());
 	}
 
-	void TextureCubeNode::RefreshProperty()
+	void Texture3dNode::RefreshProperty()
 	{
 		PropertyDatas.Empty();
 		ShObject::GetPropertyDatas();
@@ -106,18 +108,18 @@ namespace SH
 		ShEditor->RefreshProperty();
 	}
 
-	void TextureCubeNode::ClearProperty()
+	void Texture3dNode::ClearProperty()
 	{
-		Size = 0;
+		Width = Height = Depth = 0;
 		Format = GpuFormat::R8G8B8A8_UNORM;
-		auto ResultPin = static_cast<GpuCubemapPin*>(GetPin("RT"));
+		auto ResultPin = static_cast<GpuTexture3DPin*>(GetPin("RT"));
 		ResultPin->SetValue(nullptr);
 		Preview->Clear();
 		GetOuterMost()->MarkDirty();
 		RefreshProperty();
 	}
 
-	void TextureCubeNode::PostPropertyChanged(PropertyData* InProperty)
+	void Texture3dNode::PostPropertyChanged(PropertyData* InProperty)
 	{
 		ShObject::PostPropertyChanged(InProperty);
 
@@ -128,11 +130,11 @@ namespace SH
 		}
 	}
 
-	ExecRet TextureCubeNode::Exec(GraphExecContext& Context)
+	ExecRet Texture3dNode::Exec(GraphExecContext& Context)
 	{
 		if (Texture)
 		{
-			auto ResultPin = static_cast<GpuCubemapPin*>(GetPin("RT"));
+			auto ResultPin = static_cast<GpuTexture3DPin*>(GetPin("RT"));
 			ResultPin->SetValue(Texture->GetGpuData());
 		}
 		return {};

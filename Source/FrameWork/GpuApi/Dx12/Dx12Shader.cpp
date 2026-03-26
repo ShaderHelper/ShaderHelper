@@ -59,6 +59,10 @@ namespace FW
 			{
 				BType = BindingType::TextureCube;
 			}
+			else if (BType == BindingType::Texture && BindDesc.Dimension == D3D_SRV_DIMENSION_TEXTURE3D)
+			{
+				BType = BindingType::Texture3D;
+			}
 			ShaderLayoutBindings.Add({
 				.Name = BindDesc.Name,
 				.Slot = (int)BindDesc.BindPoint,

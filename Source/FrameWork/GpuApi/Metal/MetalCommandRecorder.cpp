@@ -416,7 +416,8 @@ namespace FW
         MetalTexture* DstMtlTexture = static_cast<MetalTexture*>(InTexture);
         MTL::BlitCommandEncoder* BlitCommandEncoder = CmdBuffer->blitCommandEncoder();
         MTL::Origin Origin{0, 0, 0};
-        MTL::Size Size{ InTexture->GetWidth(), InTexture->GetHeight(), 1};
+        const uint32 Depth = InTexture->GetDepth();
+        MTL::Size Size{ InTexture->GetWidth(), InTexture->GetHeight(), Depth};
         const uint32 BytesPerTexel = GetFormatByteSize(InTexture->GetFormat());
         const uint32 BytesPerRow = InTexture->GetWidth() * BytesPerTexel;
         const uint32 BytesImage = InTexture->GetWidth() * InTexture->GetHeight() * BytesPerTexel;

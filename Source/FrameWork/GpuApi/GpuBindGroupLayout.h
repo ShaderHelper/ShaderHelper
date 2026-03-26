@@ -24,13 +24,17 @@ namespace FW
 		UniformBuffer,
 		Texture,
 		TextureCube,
+		Texture3D,
 		Sampler,
 		CombinedTextureSampler,
 		CombinedTextureCubeSampler,
+		CombinedTexture3DSampler,
 		StructuredBuffer,
 		RWStructuredBuffer,
 		RawBuffer,
 		RWRawBuffer,
+		RWTexture,
+		RWTexture3D,
 	};
 
 	struct LayoutBinding
@@ -129,10 +133,12 @@ namespace FW
 		GpuBindGroupLayoutBuilder& AddUniformBuffer(const FString& BindingName, const UniformBufferBuilder& UbBuilder, BindingShaderStage InStage = BindingShaderStage::All);
 		GpuBindGroupLayoutBuilder& AddTexture(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
 		GpuBindGroupLayoutBuilder& AddTextureCube(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
+		GpuBindGroupLayoutBuilder& AddTexture3D(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
 		//TODO StaticSampler ? It will be embed into BingGroupLayout, vulkan has the same concept, but metal might not have.
 		GpuBindGroupLayoutBuilder& AddSampler(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
 		GpuBindGroupLayoutBuilder& AddCombinedTextureSampler(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
 		GpuBindGroupLayoutBuilder& AddCombinedTextureCubeSampler(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
+		GpuBindGroupLayoutBuilder& AddCombinedTexture3DSampler(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
 
 		const FString& GetCodegenDeclaration(GpuShaderLanguage Language) const;
         const GpuBindGroupLayoutDesc& GetDesc() const { return LayoutDesc; }

@@ -10,7 +10,7 @@ using namespace FW;
 
 namespace SH
 {
-	REFLECTION_REGISTER(AddClass<Texture2dNode>("Texture2d Node")
+	REFLECTION_REGISTER(AddClass<Texture2dNode>("Texture2D Node")
 		.BaseClass<GraphNode>()
 		.Data<&Texture2dNode::Texture, MetaInfo::Property>(LOCALIZATION("Texture"))
 	)
@@ -18,7 +18,7 @@ namespace SH
 		.BaseClass<ShObjectOp>()
 	)
 
-	REGISTER_NODE_TO_GRAPH(Texture2dNode, "ShaderToy Graph")
+	REGISTER_NODE_TO_GRAPH(Texture2dNode, "ShaderToy")
 
 	MetaType* Texture2dNodeOp::SupportType()
 	{
@@ -27,7 +27,7 @@ namespace SH
 
 	Texture2dNode::Texture2dNode()
 	{
-		ObjectName = LOCALIZATION("Texture2d");
+		ObjectName = LOCALIZATION("Texture2D");
 	}
 
 	Texture2dNode::~Texture2dNode()
@@ -114,7 +114,7 @@ namespace SH
 	void Texture2dNode::ClearProperty()
 	{
 		Width = Height = 1;
-		Format = GpuFormat::B8G8R8A8_UNORM;
+		Format = GpuFormat::R8G8B8A8_UNORM;
 		auto ResultPin = static_cast<GpuTexturePin*>(GetPin("RT"));
 		ResultPin->SetValue(nullptr);
 		Preview->Clear();

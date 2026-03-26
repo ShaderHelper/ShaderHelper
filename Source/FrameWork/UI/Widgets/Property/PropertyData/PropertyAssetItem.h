@@ -122,7 +122,7 @@ namespace FW
                     [
                         SNew(STextBlock)
                         .Text_Lambda([this]{
-                            return FText::FromString("(" + static_cast<AssetObject*>(AssetMetaType->GetDefaultObject())->FileExtension() + ")");
+                            return FText::FromString("(" + GetRegisteredName(AssetMetaType) + ")");
                         })
                     ]
                 ]

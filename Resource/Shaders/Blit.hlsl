@@ -24,7 +24,11 @@ float4 MainPS(VsOutput Input) : SV_Target
 #if FLIP_Y
 	UV.y = 1 - UV.y;	
 #endif
+#if USE_MIP_LEVEL
+	float4 color = InputTex.SampleLevel(InputTexSampler, UV, BlitMipLevel);
+#else
 	float4 color = InputTex.Sample(InputTexSampler, UV);
+#endif
 #if CHANNEL_FILTER_R
 	return float4(color.r, 0, 0, 1);
 #elif CHANNEL_FILTER_G

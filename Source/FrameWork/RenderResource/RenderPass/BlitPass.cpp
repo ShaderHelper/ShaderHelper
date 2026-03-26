@@ -10,10 +10,16 @@ namespace FW
 		GpuRenderPassDesc BlitPassDesc;
 		BlitPassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassInput.OutputView, PassInput.LoadAction, RenderTargetStoreAction::Store });
 
-		BlitShader* PassShader = GetShader<BlitShader>(PassInput.VariantDefinitions);
+		std::set<FString> VariantDefs = PassInput.VariantDefinitions;
+		if (PassInput.MipLevel >= 0)
+		{
+			VariantDefs.insert(TEXT("USE_MIP_LEVEL"));
+		}
+
+		BlitShader* PassShader = GetShader<BlitShader>(VariantDefs);
 
 		BindingContext Bindings;
-		BlitShader::Parameters ShaderParameter{ PassInput.InputView, PassInput.InputTexSampler };
+		BlitShader::Parameters ShaderParameter{ PassInput.InputView, PassInput.InputTexSampler, (float)PassInput.MipLevel };
 		Bindings.SetShaderBindGroup(PassShader->GetBindGroup(ShaderParameter));
 		Bindings.SetShaderBindGroupLayout(PassShader->GetBindGroupLayout());
 
@@ -29,9 +35,13 @@ namespace FW
 		TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 
 		Graph.AddRenderPass("BlitPass", MoveTemp(BlitPassDesc), MoveTemp(Bindings),
-			[Pipeline, Scissor = PassInput.Scissor](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
+			[Pipeline, Scissor = PassInput.Scissor, Viewport = PassInput.Viewport](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
 				Bindings.ApplyBindGroup(PassRecorder);
 				PassRecorder->SetRenderPipelineState(Pipeline);
+				if (Viewport)
+				{
+					PassRecorder->SetViewPort(Viewport.GetValue());
+				}
 				if (Scissor)
 				{
 					PassRecorder->SetScissorRect(Scissor.GetValue());

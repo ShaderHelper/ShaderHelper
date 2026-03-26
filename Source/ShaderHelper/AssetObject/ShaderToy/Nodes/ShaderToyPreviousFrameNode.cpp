@@ -16,7 +16,7 @@ namespace SH
 	REFLECTION_REGISTER(AddClass<ShaderToyPreviousFrameNodeOp>()
 		.BaseClass<ShObjectOp>()
 	)
-	REGISTER_NODE_TO_GRAPH(ShaderToyPreviousFrameNode, "ShaderToy Graph")
+	REGISTER_NODE_TO_GRAPH(ShaderToyPreviousFrameNode, "ShaderToy")
 
 	MetaType* ShaderToyPreviousFrameNodeOp::SupportType()
 	{
