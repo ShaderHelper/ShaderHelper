@@ -296,6 +296,12 @@ namespace FW
 			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(Shared usage is not supported for textures with multiple mip levels)"));
 			return false;
 		}
+		if (EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::Shared)
+			&& (InTexDesc.Format == GpuFormat::R8G8B8A8_UNORM))
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(Metal does not support creating shared R8G8B8A8 textures)"));
+			return false;
+		}
 		if (EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::RenderTarget) && EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::ShaderResource) 
 			&& InitState == GpuResourceState::Unknown)
 		{

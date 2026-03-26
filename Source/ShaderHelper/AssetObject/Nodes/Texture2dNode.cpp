@@ -114,7 +114,7 @@ namespace SH
 	void Texture2dNode::ClearProperty()
 	{
 		Width = Height = 1;
-		Format = GpuFormat::R8G8B8A8_UNORM;
+		Format = GpuFormat::B8G8R8A8_UNORM;
 		auto ResultPin = static_cast<GpuTexturePin*>(GetPin("RT"));
 		ResultPin->SetValue(nullptr);
 		Preview->Clear();

@@ -15,7 +15,7 @@ namespace FW
 	)
 
 	TextureCube::TextureCube()
-		: Size(0), Format(GpuFormat::R8G8B8A8_UNORM)
+		: Size(0), Format(GpuFormat::B8G8R8A8_UNORM)
 	{
 		FaceData.SetNum(6);
 	}

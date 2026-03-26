@@ -42,7 +42,7 @@ namespace UNITTEST_GPUAPI
 			.SetExistingBinding(0, TestTex)
 			.Build();
 
-		DummyRT = GGpuRhi->CreateTexture({ 1, 1, GpuFormat::R8G8B8A8_UNORM, GpuTextureUsage::RenderTarget });
+		DummyRT = GGpuRhi->CreateTexture({ 1, 1, GpuFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget });
 
 		GpuRenderPipelineStateDesc PipelineDesc{
 			.CheckLayout = true,

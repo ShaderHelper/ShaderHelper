@@ -257,9 +257,9 @@ namespace SH
 			for (uint32 x = 0; x < Width; ++x)
 			{
 				const uint8* Pixel = SrcRow + x * GetFormatByteSize(InTarget.Tex->GetFormat());
-				if(InTarget.Tex->GetFormat() == GpuFormat::R8G8B8A8_UNORM)
+				if (InTarget.Tex->GetFormat() == GpuFormat::B8G8R8A8_UNORM)
 				{
-					TexDatas[y * Width + x] = {Pixel[0] / 255.0f, Pixel[1] / 255.0f, Pixel[2] / 255.0f, Pixel[3] / 255.0f};
+					TexDatas[y * Width + x] = {Pixel[2] / 255.0f, Pixel[1] / 255.0f, Pixel[0] / 255.0f, Pixel[3] / 255.0f};
 				}
 				else if (InTarget.Tex->GetFormat() == GpuFormat::R32G32B32A32_FLOAT)
 				{
