@@ -25,12 +25,12 @@ namespace FW
 		}
 
 		InOutPass.Bindings.EnumerateBinding([&](const ResourceBinding& ResourceBindingEntry, const LayoutBinding& LayoutBindingEntry) {
-			if (LayoutBindingEntry.Type == BindingType::Texture || LayoutBindingEntry.Type == BindingType::TextureCube)
+			if (LayoutBindingEntry.Type == BindingType::Texture || LayoutBindingEntry.Type == BindingType::TextureCube || LayoutBindingEntry.Type == BindingType::Texture3D)
 			{
 				GpuResource* Res = ResourceBindingEntry.Resource.GetReference();
 				InOutPass.PassResourceStates.Add(Res, GpuResourceState::ShaderResourceRead);
 			}
-			else if (LayoutBindingEntry.Type == BindingType::CombinedTextureSampler || LayoutBindingEntry.Type == BindingType::CombinedTextureCubeSampler)
+			else if (LayoutBindingEntry.Type == BindingType::CombinedTextureSampler || LayoutBindingEntry.Type == BindingType::CombinedTextureCubeSampler || LayoutBindingEntry.Type == BindingType::CombinedTexture3DSampler)
 			{
 				GpuCombinedTextureSampler* Combined = static_cast<GpuCombinedTextureSampler*>(ResourceBindingEntry.Resource.GetReference());
 				InOutPass.PassResourceStates.Add(Combined->GetTexture(), GpuResourceState::ShaderResourceRead);
@@ -39,6 +39,11 @@ namespace FW
 			{
 				GpuBuffer* Buffer = static_cast<GpuBuffer*>(ResourceBindingEntry.Resource.GetReference());
 				InOutPass.PassResourceStates.Add(Buffer, GpuResourceState::UnorderedAccess);
+			}
+			else if (LayoutBindingEntry.Type == BindingType::RWTexture || LayoutBindingEntry.Type == BindingType::RWTexture3D)
+			{
+				GpuResource* Res = ResourceBindingEntry.Resource.GetReference();
+				InOutPass.PassResourceStates.Add(Res, GpuResourceState::UnorderedAccess);
 			}
 		});
 	}

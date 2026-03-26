@@ -55,10 +55,11 @@ namespace FW
                 ArgDesc.access = MTLArgumentAccessReadOnly;
                 ResourceUsages.Add(Slot, MTLResourceUsageRead);
             }
-            else if(LayoutBindingEntry.Type == BindingType::CombinedTextureSampler || LayoutBindingEntry.Type == BindingType::CombinedTextureCubeSampler)
+            else if(LayoutBindingEntry.Type == BindingType::CombinedTextureSampler || LayoutBindingEntry.Type == BindingType::CombinedTextureCubeSampler || LayoutBindingEntry.Type == BindingType::CombinedTexture3DSampler)
             {
                 ArgDesc.dataType = MTLDataTypeTexture;
-                ArgDesc.textureType = LayoutBindingEntry.Type == BindingType::CombinedTextureSampler ? MTLTextureType2D : MTLTextureTypeCube;
+                ArgDesc.textureType = LayoutBindingEntry.Type == BindingType::CombinedTextureCubeSampler ? MTLTextureTypeCube :
+                    (LayoutBindingEntry.Type == BindingType::CombinedTexture3DSampler ? MTLTextureType3D : MTLTextureType2D);
                 ArgDesc.access = MTLArgumentAccessReadOnly;
                 ResourceUsages.Add(Slot, MTLResourceUsageRead);
 
@@ -80,6 +81,27 @@ namespace FW
                 ArgDesc.textureType = MTLTextureTypeCube;
                 ArgDesc.access = MTLArgumentAccessReadOnly;
                 ResourceUsages.Add(Slot, MTLResourceUsageRead);
+            }
+            else if(LayoutBindingEntry.Type == BindingType::Texture3D)
+            {
+                ArgDesc.dataType = MTLDataTypeTexture;
+                ArgDesc.textureType = MTLTextureType3D;
+                ArgDesc.access = MTLArgumentAccessReadOnly;
+                ResourceUsages.Add(Slot, MTLResourceUsageRead);
+            }
+            else if(LayoutBindingEntry.Type == BindingType::RWTexture)
+            {
+                ArgDesc.dataType = MTLDataTypeTexture;
+                ArgDesc.textureType = MTLTextureType2D;
+                ArgDesc.access = MTLArgumentAccessReadWrite;
+                ResourceUsages.Add(Slot, MTLResourceUsageRead | MTLResourceUsageWrite);
+            }
+            else if(LayoutBindingEntry.Type == BindingType::RWTexture3D)
+            {
+                ArgDesc.dataType = MTLDataTypeTexture;
+                ArgDesc.textureType = MTLTextureType3D;
+                ArgDesc.access = MTLArgumentAccessReadWrite;
+                ResourceUsages.Add(Slot, MTLResourceUsageRead | MTLResourceUsageWrite);
             }
             else if(LayoutBindingEntry.Type == BindingType::Sampler)
             {

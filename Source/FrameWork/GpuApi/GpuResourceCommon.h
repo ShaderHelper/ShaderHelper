@@ -58,6 +58,7 @@ namespace FW
 	{
 		Tex2D,
 		TexCube,
+		Tex3D,
 	};
 
 	enum class GpuTextureUsage : uint32
@@ -66,6 +67,7 @@ namespace FW
 		RenderTarget = 1u << 0,
 		ShaderResource = 1u << 1,
 		Shared = 1u << 2,
+		UnorderedAccess = 1u << 3,
 	};
 	ENUM_CLASS_FLAGS(GpuTextureUsage);
 

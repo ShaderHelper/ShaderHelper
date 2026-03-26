@@ -39,7 +39,7 @@ namespace SH
 		.Data<&ShaderToyChannelDesc::Wrap, MetaInfo::Property>(LOCALIZATION("WrapMode"))
 	)
 
-	REGISTER_NODE_TO_GRAPH(ShaderToyPassNode, "ShaderToy Graph")
+	REGISTER_NODE_TO_GRAPH(ShaderToyPassNode, "ShaderToy")
 
     MetaType* ShaderToyPassNodeOp::SupportType()
     {
@@ -146,6 +146,10 @@ namespace SH
 			else if (ShaderAssetObj->ChannelSlotTypes[i] == ShaderToySlotType::TextureCube)
 			{
 				TexToUse = static_cast<GpuCubemapPin*>(GetPin(ChannelName))->GetValue();
+			}
+			else if (ShaderAssetObj->ChannelSlotTypes[i] == ShaderToySlotType::Texture3D)
+			{
+				TexToUse = static_cast<GpuTexture3DPin*>(GetPin(ChannelName))->GetValue();
 			}
 			else
 			{
@@ -808,10 +812,16 @@ namespace SH
 		for (int i = 0; i < 4; i++)
 		{
 			GraphPin* OldPin = Pins[i + 1];
-			bool bWantCubemap = ShaderAssetObj->ChannelSlotTypes[i] == ShaderToySlotType::TextureCube;
+			ShaderToySlotType WantType = ShaderAssetObj->ChannelSlotTypes[i];
 			bool bIsCubemap = DynamicCast<GpuCubemapPin>(OldPin) != nullptr;
+			bool bIsVolume = DynamicCast<GpuTexture3DPin>(OldPin) != nullptr;
 
-			if (bWantCubemap == bIsCubemap) continue;
+			bool bNeedSwap = false;
+			if (WantType == ShaderToySlotType::TextureCube && !bIsCubemap) bNeedSwap = true;
+			else if (WantType == ShaderToySlotType::Texture3D && !bIsVolume) bNeedSwap = true;
+			else if (WantType == ShaderToySlotType::Texture2D && (bIsCubemap || bIsVolume)) bNeedSwap = true;
+
+			if (!bNeedSwap) continue;
 
 			// Break existing link at data model level
 			if (OldPin->SourcePin.IsValid())
@@ -829,9 +839,13 @@ namespace SH
 
 			// Create new pin of the correct type
 			ObjectPtr<GraphPin> NewPin;
-			if (bWantCubemap)
+			if (WantType == ShaderToySlotType::TextureCube)
 			{
 				NewPin = NewShObject<GpuCubemapPin>(this);
+			}
+			else if (WantType == ShaderToySlotType::Texture3D)
+			{
+				NewPin = NewShObject<GpuTexture3DPin>(this);
 			}
 			else
 			{
@@ -911,11 +925,15 @@ namespace SH
 				{
 					Tex = static_cast<GpuCubemapPin*>(iChannel)->GetValue();
 				}
+				else if (ShaderAssetObj->ChannelSlotTypes[i] == ShaderToySlotType::Texture3D)
+				{
+					Tex = static_cast<GpuTexture3DPin*>(iChannel)->GetValue();
+				}
 				else
 				{
 					Tex = static_cast<GpuTexturePin*>(iChannel)->GetValue();
 				}
-				iChannelResolution[i] = Vector3f{ (float)Tex->GetWidth(), (float)Tex->GetHeight(), 1 };
+				iChannelResolution[i] = Vector3f{ (float)Tex->GetWidth(), (float)Tex->GetHeight(), (float)Tex->GetDepth() };
 			}
 			else
 			{
@@ -972,8 +990,9 @@ namespace SH
             {
                 for (int i = 0; i < 4; i++)
                 {
-                    // Skip FlipY for cubemap channels — they are sampled by direction, not UV
-                    if (ShaderAssetObj->ChannelSlotTypes[i] == ShaderToySlotType::TextureCube)
+                    // Skip FlipY for cubemap and volume channels — they are sampled by direction/uvw, not UV
+                    if (ShaderAssetObj->ChannelSlotTypes[i] == ShaderToySlotType::TextureCube ||
+                        ShaderAssetObj->ChannelSlotTypes[i] == ShaderToySlotType::Texture3D)
                     {
                         FlippedChannelTextures[i] = nullptr;
                         continue;
@@ -995,7 +1014,7 @@ namespace SH
                                 .Width = SrcTex->GetWidth(),
                                 .Height = SrcTex->GetHeight(),
                                 .Format = SrcTex->GetFormat(),
-								.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget,
+								.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget | (bNeedMipChain ? GpuTextureUsage::UnorderedAccess : GpuTextureUsage::None),
 								.NumMips = bNeedMipChain ? SrcTex->GetNumMips() : 1
                             }, GpuResourceState::RenderTargetWrite);
                         }
@@ -1009,7 +1028,7 @@ namespace SH
 
 						if (bNeedMipChain)
 						{
-							GpuResourceHelper::GenerateMipmap(*ShaderToyContext.RG, FlippedChannelTextures[i]);
+							GpuResourceHelper::GenerateMipmap(FlippedChannelTextures[i]);
 						}
                     }
                     else

@@ -18,23 +18,27 @@ namespace FW
 	{
 		IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>("ImageWrapper");
 		EImageFormat ImportFormat = ImageWrapperHelper::GetImageFormat(FPaths::GetExtension(InFilePath));
-		TSharedPtr<IImageWrapper> ImageWrpper = ImageWrapperModule.CreateImageWrapper(ImportFormat);
+		TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(ImportFormat);
 		TArray<uint8> CompressedData;
 		if (FFileHelper::LoadFileToArray(CompressedData, *InFilePath))
 		{
-			if (ImageWrpper.IsValid() && ImageWrpper->SetCompressed(CompressedData.GetData(), CompressedData.Num()))
+			if (ImageWrapper.IsValid() && ImageWrapper->SetCompressed(CompressedData.GetData(), CompressedData.Num()))
 			{
-				ERGBFormat Format = ImageWrpper->GetFormat();
+				ERGBFormat Format = ImageWrapper->GetFormat();
 				TArray<uint8> UnCompressedData;
 				if (Format == ERGBFormat::Gray)
 				{
-					ImageWrpper->GetRaw(ERGBFormat::Gray, 8, UnCompressedData);
-					return MakeUnique<Texture2D>(ImageWrpper->GetWidth(), ImageWrpper->GetHeight(), GpuFormat::R8_UNORM, UnCompressedData);
+					ImageWrapper->GetRaw(ERGBFormat::Gray, 8, UnCompressedData);
+					return MakeUnique<Texture2D>(ImageWrapper->GetWidth(), ImageWrapper->GetHeight(), GpuFormat::R8_UNORM, UnCompressedData);
 				}
 				else
 				{
-					ImageWrpper->GetRaw(ERGBFormat::BGRA, 8, UnCompressedData);
-					return MakeUnique<Texture2D>(ImageWrpper->GetWidth(), ImageWrpper->GetHeight(), GpuFormat::B8G8R8A8_UNORM, UnCompressedData);
+					ImageWrapper->GetRaw(ERGBFormat::BGRA, 8, UnCompressedData);
+					for (int32 PixelIndex = 0; PixelIndex + 3 < UnCompressedData.Num(); PixelIndex += 4)
+					{
+						Swap(UnCompressedData[PixelIndex], UnCompressedData[PixelIndex + 2]);
+					}
+					return MakeUnique<Texture2D>(ImageWrapper->GetWidth(), ImageWrapper->GetHeight(), GpuFormat::R8G8B8A8_UNORM, UnCompressedData);
 				}
 			}
 		}

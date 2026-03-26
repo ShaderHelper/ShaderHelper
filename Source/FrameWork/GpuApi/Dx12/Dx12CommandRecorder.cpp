@@ -380,7 +380,7 @@ namespace FW
 			IsComputeBindGroup0Dirty = true;
 		}
 		if (InGroup1 != CurrentComputeBindGroup1) {
-			CurrentGraphicsBindGroup1 = InGroup1;
+			CurrentComputeBindGroup1 = InGroup1;
 			IsComputeBindGroup1Dirty = true;
 		}
 		if (InGroup2 != CurrentComputeBindGroup2) {

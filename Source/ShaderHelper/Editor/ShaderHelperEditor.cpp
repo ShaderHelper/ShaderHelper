@@ -16,6 +16,7 @@
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "AssetObject/TextureCube.h"
 #include "AssetObject/Texture2D.h"
+#include "AssetObject/Texture3D.h"
 
 #include <Serialization/JsonSerializer.h>
 #include <Misc/FileHelper.h>
@@ -244,7 +245,7 @@ namespace SH
 					TArray<TArray<uint8>> FaceData;
 					FaceData.SetNum(6);
 					uint32 CubeSize = 0;
-					GpuFormat CubeFormat = GpuFormat::B8G8R8A8_UNORM;
+					GpuFormat CubeFormat = GpuFormat::R8G8B8A8_UNORM;
 					bool bAllFacesValid = true;
 
 					for (int32 FaceIndex = 0; FaceIndex < 6 && bAllFacesValid; FaceIndex++)
@@ -295,8 +296,71 @@ namespace SH
 						FString SavedFilePath = CubemapSaveDir / (CubemapDirName + TEXT(".") + CubeAsset->FileExtension());
 						TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFilePath));
 						CubeAsset->ObjectName = FText::FromString(CubemapDirName);
+						CubeAsset->GenerateMipmap = true;
 						CubeAsset->Serialize(*Ar);
 					}
+				}
+			}
+
+			// Import Texture3D assets from Volume subfolder (.bin format)
+			FString VolumeResourceDir = ShaderToyResourceDir / TEXT("Volume");
+			if (IFileManager::Get().DirectoryExists(*VolumeResourceDir))
+			{
+				FString VolumeSaveDir = BuiltInShaderToyDir / TEXT("Volume");
+				IFileManager::Get().MakeDirectory(*VolumeSaveDir, true);
+
+				TArray<FString> VolumeFiles;
+				IFileManager::Get().FindFiles(VolumeFiles, *(VolumeResourceDir / TEXT("*.bin")), true, false);
+				for (const FString& FileName : VolumeFiles)
+				{
+					FString FilePath = VolumeResourceDir / FileName;
+					TArray<uint8> FileData;
+					if (!FFileHelper::LoadFileToArray(FileData, *FilePath)) continue;
+
+					// .bin header: magic "BIN\0" (4 bytes) + uint32 width + uint32 height + uint32 depth + uint32 channels
+					if (FileData.Num() < 20) continue;
+					const uint8* Header = FileData.GetData();
+					if (Header[0] != 'B' || Header[1] != 'I' || Header[2] != 'N' || Header[3] != '\0') continue;
+
+					uint32 VolWidth = *reinterpret_cast<const uint32*>(Header + 4);
+					uint32 VolHeight = *reinterpret_cast<const uint32*>(Header + 8);
+					uint32 VolDepth = *reinterpret_cast<const uint32*>(Header + 12);
+					uint32 Channels = *reinterpret_cast<const uint32*>(Header + 16);
+
+					GpuFormat VolFormat;
+					if (Channels == 1) VolFormat = GpuFormat::R8_UNORM;
+					else if (Channels == 4) VolFormat = GpuFormat::R8G8B8A8_UNORM;
+					else continue;
+
+					const uint32 ExpectedDataSize = VolWidth * VolHeight * VolDepth * Channels;
+					if ((uint32)FileData.Num() - 20 < ExpectedDataSize) continue;
+
+					TArray<uint8> RawData;
+					RawData.SetNum(VolWidth * VolHeight * VolDepth * 4);
+
+					const uint8* SrcData = FileData.GetData() + 20;
+					if (Channels == 4)
+					{
+						FMemory::Memcpy(RawData.GetData(), SrcData, ExpectedDataSize);
+					}
+					else // Channels == 1, expand to RGBA
+					{
+						for (uint32 j = 0; j < VolWidth * VolHeight * VolDepth; j++)
+						{
+							RawData[j * 4 + 0] = SrcData[j];
+							RawData[j * 4 + 1] = SrcData[j];
+							RawData[j * 4 + 2] = SrcData[j];
+							RawData[j * 4 + 3] = 255;
+						}
+						VolFormat = GpuFormat::R8G8B8A8_UNORM;
+					}
+
+					auto VolumeAsset = MakeUnique<Texture3D>(VolWidth, VolHeight, VolDepth, VolFormat, RawData);
+					FString SavedFilePath = VolumeSaveDir / (FPaths::GetBaseFilename(FileName) + TEXT(".") + VolumeAsset->FileExtension());
+					TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFilePath));
+					VolumeAsset->ObjectName = FText::FromString(FPaths::GetBaseFilename(FileName));
+					VolumeAsset->GenerateMipmap = true;
+					VolumeAsset->Serialize(*Ar);
 				}
 			}
 		}

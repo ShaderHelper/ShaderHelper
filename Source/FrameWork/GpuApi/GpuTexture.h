@@ -36,6 +36,7 @@ namespace FW
         GpuFormat GetFormat() const { return TexDesc.Format; }
         uint32 GetWidth() const { return TexDesc.Width; }
         uint32 GetHeight() const { return TexDesc.Height; }
+		uint32 GetDepth() const { return TexDesc.Depth; }
 		uint32 GetNumMips() const { return TexDesc.NumMips; }
 		uint32 GetArrayLayerCount() const { return TexDesc.Dimension == GpuTextureDimension::TexCube ? 6 : 1; }
 		uint32 GetNumSubResources() const { return GetNumMips() * GetArrayLayerCount(); }

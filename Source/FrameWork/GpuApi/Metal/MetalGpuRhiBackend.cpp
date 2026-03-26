@@ -55,8 +55,27 @@ TRefCountPtr<GpuTextureView> MetalGpuRhiBackend::CreateTextureViewInternal(const
 	MTL::PixelFormat PixelFormat = MtlTexture->GetResource()->pixelFormat();
 	MTL::TextureType TexType = MtlTexture->GetResource()->textureType();
 	NS::Range LevelRange(InViewDesc.BaseMipLevel, InViewDesc.MipLevelCount);
-	NS::Range SliceRange(0, TexType == MTL::TextureTypeCube ? 6 : 1);
-	MTLTexturePtr MipView = NS::RetainPtr(MtlTexture->GetResource()->newTextureView(PixelFormat, TexType, LevelRange, SliceRange));
+
+	MTLTexturePtr MipView;
+	if (TexType == MTL::TextureType3D)
+	{
+		MipView = NS::RetainPtr(MtlTexture->GetResource()->newTextureView(PixelFormat, TexType, LevelRange, NS::Range(0, 1)));
+	}
+	else if (TexType == MTL::TextureTypeCube)
+	{
+		if (InViewDesc.ArrayLayerCount == 6)
+		{
+			MipView = NS::RetainPtr(MtlTexture->GetResource()->newTextureView(PixelFormat, TexType, LevelRange, NS::Range(0, 6)));
+		}
+		else
+		{
+			MipView = NS::RetainPtr(MtlTexture->GetResource()->newTextureView(PixelFormat, MTL::TextureType2D, LevelRange, NS::Range(InViewDesc.BaseArrayLayer, InViewDesc.ArrayLayerCount)));
+		}
+	}
+	else
+	{
+		MipView = NS::RetainPtr(MtlTexture->GetResource()->newTextureView(PixelFormat, TexType, LevelRange, NS::Range(0, 1)));
+	}
 	GpuTextureViewDesc Desc = InViewDesc;
 	return new MetalTextureView(MoveTemp(Desc), MoveTemp(MipView));
 }

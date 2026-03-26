@@ -18,7 +18,7 @@ namespace UNITTEST_GPUAPI
 		virtual void Render() {};
 		virtual FW::GpuFormat GetViewportFormat() const
 		{
-			return FW::GpuFormat::B8G8R8A8_UNORM;
+			return FW::GpuFormat::R8G8B8A8_UNORM;
 		}
 
 		FString Name;

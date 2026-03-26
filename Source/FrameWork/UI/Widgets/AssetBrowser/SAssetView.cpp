@@ -210,7 +210,7 @@ namespace FW
                         {
 							auto NewAsset = NewShObject<AssetObject>(MetaTypePtr, nullptr);
 							MenuBuilder.AddMenuEntry(
-								LOCALIZATION(NewAsset->FileExtension()),
+								LOCALIZATION(GetRegisteredName(NewAsset->DynamicMetaType())),
 								FText::GetEmpty(),
 								FSlateIcon(),
 								FUIAction(FExecuteAction::CreateLambda([NewAsset, this] {

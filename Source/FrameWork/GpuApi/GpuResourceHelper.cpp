@@ -2,7 +2,8 @@
 #include "GpuRhi.h"
 #include "RenderResource/Shader/ClearShader.h"
 #include "RenderResource/Shader/Shader.h"
-#include "RenderResource/RenderPass/BlitPass.h"
+#include "Common/Path/PathHelper.h"
+#include "GpuPipelineState.h"
 
 namespace FW::GpuResourceHelper
 {
@@ -27,7 +28,7 @@ namespace FW::GpuResourceHelper
 	GpuTexture* GetGlobalBlackTex()
 	{
         TArray<uint8> RawData = {0,0,0,255};
-		GpuTextureDesc Desc{ 1, 1, GpuFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource , RawData};
+		GpuTextureDesc Desc{ 1, 1, GpuFormat::R8G8B8A8_UNORM, GpuTextureUsage::ShaderResource , RawData};
 		static TRefCountPtr<GpuTexture> GlobalBlackTex = GGpuRhi->CreateTexture(MoveTemp(Desc));
 		return GlobalBlackTex;
 	}
@@ -38,7 +39,7 @@ namespace FW::GpuResourceHelper
 			GpuTextureDesc Desc;
 			Desc.Width = 1;
 			Desc.Height = 1;
-			Desc.Format = GpuFormat::B8G8R8A8_UNORM;
+			Desc.Format = GpuFormat::R8G8B8A8_UNORM;
 			Desc.Usage = GpuTextureUsage::ShaderResource;
 			Desc.Dimension = GpuTextureDimension::TexCube;
 
@@ -66,6 +67,21 @@ namespace FW::GpuResourceHelper
 		}();
 
 		return GlobalBlackCubemap;
+	}
+
+	GpuTexture* GetGlobalBlackVolumeTex()
+	{
+		TArray<uint8> RawData = {0, 0, 0, 255};
+		GpuTextureDesc Desc{};
+		Desc.Width = 1;
+		Desc.Height = 1;
+		Desc.Depth = 1;
+		Desc.Format = GpuFormat::R8G8B8A8_UNORM;
+		Desc.Usage = GpuTextureUsage::ShaderResource;
+		Desc.Dimension = GpuTextureDimension::Tex3D;
+		Desc.InitialData = RawData;
+		static TRefCountPtr<GpuTexture> GlobalBlackVolumeTex = GGpuRhi->CreateTexture(MoveTemp(Desc));
+		return GlobalBlackVolumeTex;
 	}
 
 	void ClearRWResource(GpuCmdRecorder* CmdRecorder, GpuResource* InResource)
@@ -98,46 +114,239 @@ namespace FW::GpuResourceHelper
 			}
 		}
 
-		check(Cs && BindGroupLayout && BindGroup);
-
-		BindingContext Bindings;
-		Bindings.SetShaderBindGroup(BindGroup);
-		Bindings.SetShaderBindGroupLayout(BindGroupLayout);
-
-		GpuComputePipelineStateDesc PipelineDesc{ .Cs = Cs };
-		Bindings.ApplyBindGroupLayout(PipelineDesc);
+		GpuComputePipelineStateDesc PipelineDesc{ 
+			.Cs = Cs,
+			.BindGroupLayout2 = BindGroupLayout
+		};
 		TRefCountPtr<GpuComputePipelineState> Pipeline = GpuPsoCacheManager::Get().CreateComputePipelineState(PipelineDesc);
 
 		auto PassRecorder = CmdRecorder->BeginComputePass("ClearRWResource");
 		{
-			Bindings.ApplyBindGroup(PassRecorder);
+			PassRecorder->SetBindGroups(nullptr, nullptr, BindGroup, nullptr);
 			PassRecorder->SetComputePipelineState(Pipeline);
 			PassRecorder->Dispatch(ThreadGroupCountX, 1, 1);
 		}
 		CmdRecorder->EndComputePass(PassRecorder);
 	}
 
-	void GenerateMipmap(RenderGraph& Graph, GpuTexture* InTexture)
+	struct MipResources
+	{
+		static constexpr uint32 BindGroupSlot = 2;
+		static constexpr uint32 InputTexBinding = 0;
+		static constexpr uint32 SamplerBinding = 1;
+		static constexpr uint32 OutputTexBinding = 2;
+		static constexpr uint32 ParamsBinding = 3;
+
+		TRefCountPtr<GpuShader> Cs2D;
+		TRefCountPtr<GpuShader> Cs3D;
+		TRefCountPtr<GpuBindGroupLayout> Layout2D;
+		TRefCountPtr<GpuBindGroupLayout> Layout3D;
+	};
+
+	static const MipResources& GetMipResources()
+	{
+		static MipResources Resources = [] {
+			MipResources Result;
+
+			Result.Layout2D = GpuBindGroupLayoutBuilder{ MipResources::BindGroupSlot }
+				.AddExistingBinding(MipResources::InputTexBinding, BindingType::Texture, BindingShaderStage::Compute)
+				.AddExistingBinding(MipResources::SamplerBinding, BindingType::Sampler, BindingShaderStage::Compute)
+				.AddExistingBinding(MipResources::OutputTexBinding, BindingType::RWTexture, BindingShaderStage::Compute)
+				.AddExistingBinding(MipResources::ParamsBinding, BindingType::UniformBuffer, BindingShaderStage::Compute)
+				.Build();
+
+			Result.Layout3D = GpuBindGroupLayoutBuilder{ MipResources::BindGroupSlot }
+				.AddExistingBinding(MipResources::InputTexBinding, BindingType::Texture3D, BindingShaderStage::Compute)
+				.AddExistingBinding(MipResources::SamplerBinding, BindingType::Sampler, BindingShaderStage::Compute)
+				.AddExistingBinding(MipResources::OutputTexBinding, BindingType::RWTexture3D, BindingShaderStage::Compute)
+				.AddExistingBinding(MipResources::ParamsBinding, BindingType::UniformBuffer, BindingShaderStage::Compute)
+				.Build();
+
+			Result.Cs2D = GGpuRhi->CreateShaderFromFile({
+				.FileName = PathHelper::ShaderDir() / "Mip2D.hlsl",
+				.Type = ShaderType::ComputeShader,
+				.EntryPoint = "MainCS"
+			});
+
+			Result.Cs3D = GGpuRhi->CreateShaderFromFile({
+				.FileName = PathHelper::ShaderDir() / "Mip3D.hlsl",
+				.Type = ShaderType::ComputeShader,
+				.EntryPoint = "MainCS"
+			});
+
+			FString ErrorInfo, WarnInfo;
+			GGpuRhi->CompileShader(Result.Cs2D, ErrorInfo, WarnInfo);
+			check(ErrorInfo.IsEmpty());
+			GGpuRhi->CompileShader(Result.Cs3D, ErrorInfo, WarnInfo);
+			check(ErrorInfo.IsEmpty());
+
+			return Result;
+		}();
+
+		return Resources;
+	}
+
+	static void DispatchMip2D(GpuCmdRecorder* CmdRecorder,
+		GpuTextureView* SrcView, GpuTextureView* DstView, GpuSampler* Sampler, uint32 DstWidth, uint32 DstHeight)
+	{
+		const MipResources& Mip = GetMipResources();
+
+		TRefCountPtr<GpuBuffer> ParamBuf = GGpuRhi->CreateBuffer({
+			.ByteSize = 256,
+			.Usage = GpuBufferUsage::Uniform | GpuBufferUsage::Temporary
+		});
+		void* Mapped = GGpuRhi->MapGpuBuffer(ParamBuf, GpuResourceMapMode::Write_Only);
+		FMemory::Memzero(Mapped, 256);
+		uint32* Params = (uint32*)Mapped;
+		Params[0] = DstWidth;
+		Params[1] = DstHeight;
+		GGpuRhi->UnMapGpuBuffer(ParamBuf);
+
+		TRefCountPtr<GpuBindGroup> BindGroup = GpuBindGroupBuilder{ Mip.Layout2D }
+			.SetExistingBinding(MipResources::InputTexBinding, SrcView)
+			.SetExistingBinding(MipResources::SamplerBinding, Sampler)
+			.SetExistingBinding(MipResources::OutputTexBinding, DstView)
+			.SetExistingBinding(MipResources::ParamsBinding, ParamBuf)
+			.Build();
+
+		CmdRecorder->Barriers({
+			{SrcView, GpuResourceState::ShaderResourceRead},
+			{DstView, GpuResourceState::UnorderedAccess}
+		});
+
+		GpuComputePipelineStateDesc PipelineDesc{ 
+			.Cs = Mip.Cs2D,
+			.BindGroupLayout2 = Mip.Layout2D
+		};
+		TRefCountPtr<GpuComputePipelineState> Pipeline = GpuPsoCacheManager::Get().CreateComputePipelineState(PipelineDesc);
+
+		auto PassRecorder = CmdRecorder->BeginComputePass("Mip2DPass");
+		{
+			PassRecorder->SetBindGroups(nullptr, nullptr, BindGroup, nullptr);
+			PassRecorder->SetComputePipelineState(Pipeline);
+			PassRecorder->Dispatch(
+				FMath::CeilToInt((float)DstWidth / 8.0f),
+				FMath::CeilToInt((float)DstHeight / 8.0f),
+				1
+			);
+		}
+		CmdRecorder->EndComputePass(PassRecorder);
+	}
+
+	static void DispatchMip3D(GpuCmdRecorder* CmdRecorder,
+		GpuTextureView* SrcView, GpuTextureView* DstView, GpuSampler* Sampler, uint32 DstWidth, uint32 DstHeight, uint32 DstDepth)
+	{
+		const MipResources& Mip = GetMipResources();
+
+		TRefCountPtr<GpuBuffer> ParamBuf = GGpuRhi->CreateBuffer({
+			.ByteSize = 256,
+			.Usage = GpuBufferUsage::Uniform | GpuBufferUsage::Temporary
+		});
+		void* Mapped = GGpuRhi->MapGpuBuffer(ParamBuf, GpuResourceMapMode::Write_Only);
+		FMemory::Memzero(Mapped, 256);
+		uint32* Params = (uint32*)Mapped;
+		Params[0] = DstWidth;
+		Params[1] = DstHeight;
+		Params[2] = DstDepth;
+		GGpuRhi->UnMapGpuBuffer(ParamBuf);
+
+		TRefCountPtr<GpuBindGroup> BindGroup = GpuBindGroupBuilder{ Mip.Layout3D }
+			.SetExistingBinding(MipResources::InputTexBinding, SrcView)
+			.SetExistingBinding(MipResources::SamplerBinding, Sampler)
+			.SetExistingBinding(MipResources::OutputTexBinding, DstView)
+			.SetExistingBinding(MipResources::ParamsBinding, ParamBuf)
+			.Build();
+
+		CmdRecorder->Barriers({
+			{SrcView, GpuResourceState::ShaderResourceRead},
+			{DstView, GpuResourceState::UnorderedAccess}
+		});
+
+		GpuComputePipelineStateDesc PipelineDesc{ 
+			.Cs = Mip.Cs3D,
+			.BindGroupLayout2 = Mip.Layout3D
+		};
+		TRefCountPtr<GpuComputePipelineState> Pipeline = GpuPsoCacheManager::Get().CreateComputePipelineState(PipelineDesc);
+
+		auto PassRecorder = CmdRecorder->BeginComputePass("Mip3DPass");
+		{
+			PassRecorder->SetBindGroups(nullptr, nullptr, BindGroup, nullptr);
+			PassRecorder->SetComputePipelineState(Pipeline);
+			PassRecorder->Dispatch(
+				FMath::CeilToInt((float)DstWidth / 4.0f),
+				FMath::CeilToInt((float)DstHeight / 4.0f),
+				FMath::CeilToInt((float)DstDepth / 4.0f)
+			);
+		}
+		CmdRecorder->EndComputePass(PassRecorder);
+	}
+
+	void GenerateMipmap(GpuTexture* InTexture)
 	{
 		uint32 NumMips = InTexture->GetNumMips();
 		if (NumMips <= 1) return;
+		GpuResourceState InitialState = InTexture->GetSubResourceState(0, 0);
 
 		GpuSampler* BilinearSampler = GetSampler({SamplerFilter::Bilinear});
+		GpuTextureDimension Dimension = InTexture->GetResourceDesc().Dimension;
 
-		auto PrevView = GGpuRhi->CreateTextureView({InTexture, 0, 1});
-
-		for (uint32 MipLevel = 1; MipLevel < NumMips; MipLevel++)
+		if (Dimension == GpuTextureDimension::Tex3D)
 		{
-			auto DstView = GGpuRhi->CreateTextureView({InTexture, MipLevel, 1});
+			GpuCmdRecorder* CmdRecorder = GGpuRhi->BeginRecording(TEXT("GenerateMipmap3D"));
 
-			BlitPassInput Input;
-			Input.InputView = PrevView;
-			Input.InputTexSampler = BilinearSampler;
-			Input.OutputView = DstView;
+			for (uint32 MipLevel = 1; MipLevel < NumMips; MipLevel++)
+			{
+				auto SrcView = GGpuRhi->CreateTextureView({InTexture, MipLevel - 1, 1});
+				auto DstView = GGpuRhi->CreateTextureView({InTexture, MipLevel, 1});
 
-			AddBlitPass(Graph, Input);
+				uint32 DstWidth  = FMath::Max(InTexture->GetWidth()  >> MipLevel, 1u);
+				uint32 DstHeight = FMath::Max(InTexture->GetHeight() >> MipLevel, 1u);
+				uint32 DstDepth  = FMath::Max(InTexture->GetDepth()  >> MipLevel, 1u);
 
-			PrevView = DstView;
+				DispatchMip3D(CmdRecorder, SrcView, DstView, BilinearSampler, DstWidth, DstHeight, DstDepth);
+			}
+
+			CmdRecorder->Barriers({ {InTexture, InitialState} });
+			GGpuRhi->EndRecording(CmdRecorder);
+			GGpuRhi->Submit({ CmdRecorder });
+		}
+		else
+		{
+			GpuCmdRecorder* CmdRecorder = GGpuRhi->BeginRecording(TEXT("GenerateMipmap2D"));
+
+			if (Dimension == GpuTextureDimension::TexCube)
+			{
+				for (uint32 Face = 0; Face < 6; Face++)
+				{
+					for (uint32 MipLevel = 1; MipLevel < NumMips; MipLevel++)
+					{
+						auto SrcView = GGpuRhi->CreateTextureView({InTexture, MipLevel - 1, 1, Face, 1});
+						auto DstView = GGpuRhi->CreateTextureView({InTexture, MipLevel, 1, Face, 1});
+
+						uint32 DstWidth  = FMath::Max(InTexture->GetWidth()  >> MipLevel, 1u);
+						uint32 DstHeight = FMath::Max(InTexture->GetHeight() >> MipLevel, 1u);
+
+						DispatchMip2D(CmdRecorder, SrcView, DstView, BilinearSampler, DstWidth, DstHeight);
+					}
+				}
+			}
+			else
+			{
+				for (uint32 MipLevel = 1; MipLevel < NumMips; MipLevel++)
+				{
+					auto SrcView = GGpuRhi->CreateTextureView({InTexture, MipLevel - 1, 1});
+					auto DstView = GGpuRhi->CreateTextureView({InTexture, MipLevel, 1});
+
+					uint32 DstWidth  = FMath::Max(InTexture->GetWidth()  >> MipLevel, 1u);
+					uint32 DstHeight = FMath::Max(InTexture->GetHeight() >> MipLevel, 1u);
+
+					DispatchMip2D(CmdRecorder, SrcView, DstView, BilinearSampler, DstWidth, DstHeight);
+				}
+			}
+
+			CmdRecorder->Barriers({ {InTexture, InitialState} });
+			GGpuRhi->EndRecording(CmdRecorder);
+			GGpuRhi->Submit({ CmdRecorder });
 		}
 	}
 }

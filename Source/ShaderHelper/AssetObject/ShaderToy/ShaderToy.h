@@ -5,8 +5,7 @@ namespace SH
 {
 	enum class ShaderToyFormat
 	{
-		//Note: BGRA8_UNORM is default framebuffer format in ue standalone renderer framework.
-		B8G8R8A8_UNORM = (int)FW::GpuFormat::B8G8R8A8_UNORM,
+			R8G8B8A8_UNORM = (int)FW::GpuFormat::R8G8B8A8_UNORM,
 		R32G32B32A32_FLOAT = (int)FW::GpuFormat::R32G32B32A32_FLOAT
 	};
 

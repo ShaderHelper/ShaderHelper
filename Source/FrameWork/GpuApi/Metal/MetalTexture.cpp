@@ -4,7 +4,6 @@
 #include "MetalDevice.h"
 #import <CoreVideo/CVMetalTexture.h>
 #import <CoreVideo/CVMetalTextureCache.h>
-#include "MetalCommandRecorder.h"
 #include "MetalGpuRhiBackend.h"
 
 namespace FW
@@ -27,6 +26,7 @@ namespace FW
         DefaultViewDesc.Texture = this;
         DefaultViewDesc.BaseMipLevel = 0;
         DefaultViewDesc.MipLevelCount = GetNumMips();
+        DefaultViewDesc.ArrayLayerCount = GetArrayLayerCount();
         DefaultView = GMtlGpuRhi->CreateTextureView(DefaultViewDesc);
     }
 
@@ -41,6 +41,11 @@ namespace FW
         if(EnumHasAnyFlags(InUsage, GpuTextureUsage::ShaderResource))
         {
             Usage |= MTLTextureUsageShaderRead;
+        }
+
+        if(EnumHasAnyFlags(InUsage, GpuTextureUsage::UnorderedAccess))
+        {
+            Usage |= MTLTextureUsageShaderWrite;
         }
         OutTexDesc->setUsage(Usage);
     }
@@ -84,7 +89,7 @@ namespace FW
     TRefCountPtr<MetalTexture> CreateMetalTexture2D(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
     {
         TRefCountPtr<MetalTexture> RetTexture;
-        if(EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::Shared) && InTexDesc.Dimension != GpuTextureDimension::TexCube)
+        if(EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::Shared) && InTexDesc.Dimension == GpuTextureDimension::Tex2D)
         {
             RetTexture = CreateSharedMetalTexture(InTexDesc, InitState);
         }
@@ -96,6 +101,11 @@ namespace FW
             if (InTexDesc.Dimension == GpuTextureDimension::TexCube)
             {
                 TexDesc->setTextureType(MTL::TextureTypeCube);
+            }
+            else if (InTexDesc.Dimension == GpuTextureDimension::Tex3D)
+            {
+                TexDesc->setTextureType(MTL::TextureType3D);
+                TexDesc->setDepth(InTexDesc.Depth);
             }
             else
             {
@@ -109,18 +119,26 @@ namespace FW
         }
 
         if (!InTexDesc.InitialData.IsEmpty()) {
-            const uint32 BytesImage = InTexDesc.InitialData.Num();
-			TRefCountPtr<MetalBuffer> UploadBuffer = CreateMetalBuffer({BytesImage, GpuBufferUsage::Upload});
-            uint8* BufferData = (uint8*)UploadBuffer->GetContents();
-            FMemory::Memcpy(BufferData, InTexDesc.InitialData.GetData(), BytesImage);
+            const uint32 BytesPerTexel = GetFormatByteSize(InTexDesc.Format);
+            const uint32 FaceByteSize = InTexDesc.Width * InTexDesc.Height * BytesPerTexel;
             auto CmdRecorder = GMtlGpuRhi->BeginRecording("InitTexture");
             {
-                CmdRecorder->CopyBufferToTexture(UploadBuffer, RetTexture);
+                if (InTexDesc.Dimension == GpuTextureDimension::TexCube) {
+                    for (uint32 Face = 0; Face < 6; Face++) {
+                        TRefCountPtr<MetalBuffer> FaceUpload = CreateMetalBuffer({FaceByteSize, GpuBufferUsage::Upload});
+                        FMemory::Memcpy(FaceUpload->GetContents(), InTexDesc.InitialData.GetData() + Face * FaceByteSize, FaceByteSize);
+                        CmdRecorder->CopyBufferToTexture(FaceUpload, RetTexture, Face, 0);
+                    }
+                } else {
+                    const uint32 BytesTotal = InTexDesc.InitialData.Num();
+                    TRefCountPtr<MetalBuffer> UploadBuffer = CreateMetalBuffer({BytesTotal, GpuBufferUsage::Upload});
+                    FMemory::Memcpy(UploadBuffer->GetContents(), InTexDesc.InitialData.GetData(), BytesTotal);
+                    CmdRecorder->CopyBufferToTexture(UploadBuffer, RetTexture);
+                    RetTexture->UploadBuffer = MoveTemp(UploadBuffer);
+                }
             }
             GMtlGpuRhi->EndRecording(CmdRecorder);
             GMtlGpuRhi->Submit({CmdRecorder});
-            
-            RetTexture->UploadBuffer = MoveTemp(UploadBuffer);
         }
         
         return RetTexture;
@@ -130,6 +148,7 @@ namespace FW
     {
         switch(InFormat)
         {
+        case MTLPixelFormatR8G8B8A8Unorm: return kCVPixelFormatType_32RGBA;
         case MTLPixelFormatBGRA8Unorm:  return kCVPixelFormatType_32BGRA;
 		case MTLPixelFormatR8Unorm:		return kCVPixelFormatType_OneComponent8;
 		case MTLPixelFormatRGBA32Float: return kCVPixelFormatType_128RGBAFloat;

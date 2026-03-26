@@ -22,7 +22,7 @@ namespace SH
         .BaseClass<ShObjectOp>()
     )
 
-	REGISTER_NODE_TO_GRAPH(ShaderToyOutputNode, "ShaderToy Graph")
+	REGISTER_NODE_TO_GRAPH(ShaderToyOutputNode, "ShaderToy")
 
     MetaType* ShaderToyOutputNodeOp::SupportType()
     {
@@ -55,7 +55,7 @@ namespace SH
     }
 
 	ShaderToyOutputNode::ShaderToyOutputNode()
-	: Format(ShaderToyFormat::B8G8R8A8_UNORM)
+	: Format(ShaderToyFormat::R8G8B8A8_UNORM)
 	, Layer(0), AreaFraction(1.0f)
 	{
 		ObjectName = LOCALIZATION("Present");

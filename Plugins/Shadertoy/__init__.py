@@ -273,6 +273,9 @@ def create_shadertoy_assets(shadertoy_id, shadertoy_info):
             "4dX3zn" : "St. Peter's Basilica Blurred",
             "XsfGzn": "Uffizi Gallery",
             "4sfGzn": "Uffizi Gallery Blurred",
+
+            "4sfGRr": "Grey Noise3D",
+            "XdX3Rr": "RGBA Noise3D",
         }
 
         include_common_code = ""
@@ -300,6 +303,8 @@ def create_shadertoy_assets(shadertoy_id, shadertoy_info):
                 for input_data in pass_data['inputs']:
                     if input_data['type'] == 'cubemap':
                         slot_types[input_data['channel']] = Sh.ShaderToySlotType.TextureCube
+                    elif input_data['type'] == 'volume':
+                        slot_types[input_data['channel']] = Sh.ShaderToySlotType.Texture3D
                 shadertoy_shader.ChannelSlotTypes = tuple(slot_types)
                 saved_file_path = os.path.join(target_dir, f"{pass_name}.{shadertoy_shader.FileExtension}")
                 Sh.Asset.SaveToFile(shadertoy_shader, saved_file_path)
@@ -327,6 +332,13 @@ def create_shadertoy_assets(shadertoy_id, shadertoy_info):
                                     cubemap_node = Sh.TextureCubeNode(shadertoy_graph, shadertoy_cube)
                                     id_to_node[input_id] = cubemap_node
                                     shadertoy_graph.AddNode(cubemap_node)
+                            elif input_data['type'] == 'volume':
+                                vol_path = os.path.join(Sh.PathHelper.BuiltinDir, "ShaderToy", "Volume", f"{id_to_builtin_resource[input_id]}.texture3d")
+                                shadertoy_vol = Sh.Asset.LoadAsset(vol_path)
+                                if shadertoy_vol is not None:
+                                    volume_node = Sh.Texture3dNode(shadertoy_graph, shadertoy_vol)
+                                    id_to_node[input_id] = volume_node
+                                    shadertoy_graph.AddNode(volume_node)
                         elif input_data['type'] == 'keyboard':
                             keyboard_node = Sh.ShaderToyKeyboardNode(shadertoy_graph)
                             id_to_node[input_id] = keyboard_node

@@ -79,6 +79,9 @@ namespace FW
 		if (EnumHasAllFlags(Usage, GpuTextureUsage::RenderTarget)) {
 			Result |= GpuResourceState::RenderTargetWrite;
 		}
+		if (EnumHasAllFlags(Usage, GpuTextureUsage::UnorderedAccess)) {
+			Result |= GpuResourceState::UnorderedAccess;
+		}
 		if (EnumHasAllFlags(Usage, GpuTextureUsage::ShaderResource)) {
 			Result |= GpuResourceState::ShaderResourceRead;
 		}

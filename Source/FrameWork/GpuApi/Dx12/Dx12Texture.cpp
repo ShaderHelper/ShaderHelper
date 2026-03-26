@@ -11,6 +11,7 @@ namespace FW
 		bool bShared;
 		bool bRTV;
 		bool bSRV;
+		bool bUAV;
 	};
 
 	Dx12Texture::Dx12Texture(TRefCountPtr<ID3D12Resource> InResource, GpuResourceState InResourceState, GpuTextureDesc InDesc, void* InSharedHandle)
@@ -22,6 +23,7 @@ namespace FW
 		ViewDesc.Texture = this;
 		ViewDesc.BaseMipLevel = 0;
 		ViewDesc.MipLevelCount = GetNumMips();
+		ViewDesc.ArrayLayerCount = GetArrayLayerCount();
 		DefaultView = GDx12GpuRhi->CreateTextureView(ViewDesc);
 	}
 
@@ -33,7 +35,7 @@ namespace FW
 		}
 
 		if (InTexDesc.Dimension == GpuTextureDimension::Tex2D && InTexDesc.Depth > 1) {
-			SH_LOG(LogDx12, Error, TEXT("Invalid Texture Depth. TODO: Support 3d texture"));
+			SH_LOG(LogDx12, Error, TEXT("Invalid Texture Depth for Tex2D"));
 			return false;
 		}
 		
@@ -54,6 +56,11 @@ namespace FW
 
 		if (EnumHasAnyFlags(InFlags, GpuTextureUsage::ShaderResource)) {
 			OutFlags.bSRV = true;
+		}
+
+		if (EnumHasAnyFlags(InFlags, GpuTextureUsage::UnorderedAccess)) {
+			OutResourceFlag |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+			OutFlags.bUAV = true;
 		}
 	}
 
@@ -98,15 +105,24 @@ namespace FW
 		FlagSets Flags{};
 		GetDx12ResourceFlags(InTexDesc.Usage, ResourceFlags, Flags);
 
-		CD3DX12_RESOURCE_DESC TexDesc = CD3DX12_RESOURCE_DESC::Tex2D(
-			MapTextureFormat(InTexDesc.Format),
-			InTexDesc.Width,
-			InTexDesc.Height,
-			InTexDesc.Dimension == GpuTextureDimension::TexCube ? 6 : InTexDesc.Depth,
-			InTexDesc.NumMips,
-			1,0,
-			ResourceFlags
-		);
+		CD3DX12_RESOURCE_DESC TexDesc = InTexDesc.Dimension == GpuTextureDimension::Tex3D ?
+			CD3DX12_RESOURCE_DESC::Tex3D(
+				MapTextureFormat(InTexDesc.Format),
+				InTexDesc.Width,
+				InTexDesc.Height,
+				InTexDesc.Depth,
+				InTexDesc.NumMips,
+				ResourceFlags
+			) :
+			CD3DX12_RESOURCE_DESC::Tex2D(
+				MapTextureFormat(InTexDesc.Format),
+				InTexDesc.Width,
+				InTexDesc.Height,
+				InTexDesc.Dimension == GpuTextureDimension::TexCube ? 6 : InTexDesc.Depth,
+				InTexDesc.NumMips,
+				1,0,
+				ResourceFlags
+			);
 
 		CD3DX12_HEAP_PROPERTIES HeapType{ D3D12_HEAP_TYPE_DEFAULT };
 		D3D12_HEAP_FLAGS HeapFlag = Flags.bShared ? D3D12_HEAP_FLAG_SHARED : D3D12_HEAP_FLAG_NONE;
@@ -145,29 +161,69 @@ namespace FW
 
 		TRefCountPtr<Dx12Buffer> UploadBuffer;
 		if (bHasInitialData) {
-			const uint32 UploadBufferSize = (uint32)GetRequiredIntermediateSize(RetTexture->GetResource(), 0, 1);
-			UploadBuffer = CreateDx12Buffer({
-				.ByteSize = UploadBufferSize, 
-				.Usage = GpuBufferUsage::Upload
-				},
-				GpuResourceState::CopySrc
-			);
+			const bool bIsCube = InTexDesc.Dimension == GpuTextureDimension::TexCube;
 
-			D3D12_SUBRESOURCE_DATA textureData = {};
-			textureData.pData = &InTexDesc.InitialData[0];
-			textureData.RowPitch = InTexDesc.Width * GetFormatByteSize(InTexDesc.Format);
-			textureData.SlicePitch = textureData.RowPitch * InTexDesc.Height;
+			const uint32 RowPitch = InTexDesc.Width * GetFormatByteSize(InTexDesc.Format);
+			const uint32 SlicePitch = RowPitch * InTexDesc.Height;
 
-			const CommonAllocationData& AllocationData = UploadBuffer->GetAllocation().GetAllocationData().Get<CommonAllocationData>();
-			GpuCmdRecorder* CmdRecorder = GDx12GpuRhi->BeginRecording("InitTexture");
+			if (bIsCube)
 			{
-				UpdateSubresources(static_cast<Dx12CmdRecorder*>(CmdRecorder)->GetCommandList(), RetTexture->GetResource(), AllocationData.UnderlyResource, 0, 0, 1, &textureData);
-				CmdRecorder->Barriers({
-					{RetTexture, InitState} 
-				});
+				const uint32 NumMips = RetTexture->GetResource()->GetDesc().MipLevels;
+				const uint64 SingleFaceUploadSize = GetRequiredIntermediateSize(RetTexture->GetResource(), 0, 1);
+				UploadBuffer = CreateDx12Buffer({
+					.ByteSize = (uint32)(SingleFaceUploadSize * 6),
+					.Usage = GpuBufferUsage::Upload
+					},
+					GpuResourceState::CopySrc
+				);
+
+				const CommonAllocationData& AllocationData = UploadBuffer->GetAllocation().GetAllocationData().Get<CommonAllocationData>();
+				GpuCmdRecorder* CmdRecorder = GDx12GpuRhi->BeginRecording("InitTexture");
+				{
+					for (uint32 Face = 0; Face < 6; Face++)
+					{
+						D3D12_SUBRESOURCE_DATA FaceData{};
+						FaceData.pData = &InTexDesc.InitialData[Face * SlicePitch];
+						FaceData.RowPitch = RowPitch;
+						FaceData.SlicePitch = SlicePitch;
+
+						UpdateSubresources(static_cast<Dx12CmdRecorder*>(CmdRecorder)->GetCommandList(),
+							RetTexture->GetResource(), AllocationData.UnderlyResource,
+							Face * SingleFaceUploadSize, Face * NumMips, 1, &FaceData);
+					}
+					CmdRecorder->Barriers({
+						{RetTexture, InitState}
+					});
+				}
+				GDx12GpuRhi->EndRecording(CmdRecorder);
+				GDx12GpuRhi->Submit({ CmdRecorder });
 			}
-			GDx12GpuRhi->EndRecording(CmdRecorder);
-			GDx12GpuRhi->Submit({ CmdRecorder });
+			else
+			{
+				const uint32 UploadBufferSize = (uint32)GetRequiredIntermediateSize(RetTexture->GetResource(), 0, 1);
+				UploadBuffer = CreateDx12Buffer({
+					.ByteSize = UploadBufferSize,
+					.Usage = GpuBufferUsage::Upload
+					},
+					GpuResourceState::CopySrc
+				);
+
+				D3D12_SUBRESOURCE_DATA textureData{};
+				textureData.pData = InTexDesc.InitialData.GetData();
+				textureData.RowPitch = RowPitch;
+				textureData.SlicePitch = SlicePitch;
+
+				const CommonAllocationData& AllocationData = UploadBuffer->GetAllocation().GetAllocationData().Get<CommonAllocationData>();
+				GpuCmdRecorder* CmdRecorder = GDx12GpuRhi->BeginRecording("InitTexture");
+				{
+					UpdateSubresources(static_cast<Dx12CmdRecorder*>(CmdRecorder)->GetCommandList(), RetTexture->GetResource(), AllocationData.UnderlyResource, 0, 0, 1, &textureData);
+					CmdRecorder->Barriers({
+						{RetTexture, InitState}
+					});
+				}
+				GDx12GpuRhi->EndRecording(CmdRecorder);
+				GDx12GpuRhi->Submit({ CmdRecorder });
+			}
 		}
 	
 		return RetTexture;

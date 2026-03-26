@@ -3,12 +3,12 @@
 
 namespace FW
 {
-	class FRAMEWORK_API TextureCube : public AssetObject
+	class FRAMEWORK_API Texture3D : public AssetObject
 	{
-		REFLECTION_TYPE(TextureCube)
+		REFLECTION_TYPE(Texture3D)
 	public:
-		TextureCube();
-		TextureCube(uint32 InSize, GpuFormat InFormat, const TArray<TArray<uint8>>& InFaceData);
+		Texture3D();
+		Texture3D(uint32 InWidth, uint32 InHeight, uint32 InDepth, GpuFormat InFormat, const TArray<uint8>& InRawData);
 
 	public:
 		void Serialize(FArchive& Ar) override;
@@ -19,22 +19,21 @@ namespace FW
 		FString FileExtension() const override;
 		GpuTexture* GetGpuData() const { return GpuData; }
 		GpuTexture* GetPreviewTexture() const { return PreviewData; }
-		uint32 GetSize() const { return Size; }
+		const TArray<uint8>& GetRawData() const { return RawData; }
+		uint32 GetWidth() const { return Width; }
+		uint32 GetHeight() const { return Height; }
+		uint32 GetDepth() const { return Depth; }
 		GpuFormat GetFormat() const { return Format; }
-		const TArray<TArray<uint8>>& GetFaceData() const { return FaceData; }
-
-		void SetFaceData(int32 FaceIndex, const TArray<uint8>& InData);
-		void SetData(uint32 InSize, GpuFormat InFormat, TArray<TArray<uint8>> InFaceData);
 
 		TRefCountPtr<GpuTexture> GenerateThumbnail() const override;
 
 	public:
 		GpuFormat Format;
-		uint32 Size; // cubemap faces are square: Width == Height == Size
+		uint32 Width, Height, Depth;
 		bool GenerateMipmap = false;
 
 	private:
-		TArray<TArray<uint8>> FaceData; // 6 faces: +X, -X, +Y, -Y, +Z, -Z
+		TArray<uint8> RawData;
 		TRefCountPtr<GpuTexture> GpuData;
 		TRefCountPtr<GpuTexture> PreviewData;
 	};

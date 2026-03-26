@@ -47,17 +47,46 @@ namespace FW
 	{
 		VulkanTexture* VkTex = static_cast<VulkanTexture*>(InViewDesc.Texture);
 		bool bIsCube = InViewDesc.Texture->GetResourceDesc().Dimension == GpuTextureDimension::TexCube;
+		bool bIs3D = InViewDesc.Texture->GetResourceDesc().Dimension == GpuTextureDimension::Tex3D;
+
+		VkImageViewType ViewType;
+		uint32 BaseArrayLayer = 0;
+		uint32 LayerCount = 1;
+
+		if (bIsCube)
+		{
+			if (InViewDesc.ArrayLayerCount == 6)
+			{
+				ViewType = VK_IMAGE_VIEW_TYPE_CUBE;
+				LayerCount = 6;
+			}
+			else
+			{
+				ViewType = VK_IMAGE_VIEW_TYPE_2D;
+				BaseArrayLayer = InViewDesc.BaseArrayLayer;
+				LayerCount = InViewDesc.ArrayLayerCount;
+			}
+		}
+		else if (bIs3D)
+		{
+			ViewType = VK_IMAGE_VIEW_TYPE_3D;
+		}
+		else
+		{
+			ViewType = VK_IMAGE_VIEW_TYPE_2D;
+		}
+
 		VkImageViewCreateInfo ViewInfo = {
 			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 			.image = VkTex->GetImage(),
-			.viewType = bIsCube ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D,
+			.viewType = ViewType,
 			.format = MapTextureFormat(InViewDesc.Texture->GetFormat()),
 			.subresourceRange = {
 				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
 				.baseMipLevel = InViewDesc.BaseMipLevel,
 				.levelCount = InViewDesc.MipLevelCount,
-				.baseArrayLayer = 0,
-				.layerCount = bIsCube ? 6u : 1u
+				.baseArrayLayer = BaseArrayLayer,
+				.layerCount = LayerCount
 			}
 		};
 		VkImageView ImageView;

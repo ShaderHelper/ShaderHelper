@@ -286,6 +286,11 @@ namespace FW
 			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(Shared usage is not supported for cubemap textures)"));
 			return false;
 		}
+		if (InTexDesc.Dimension == GpuTextureDimension::Tex3D && EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::Shared))
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(Shared usage is not supported for 3D textures)"));
+			return false;
+		}
 		if (InTexDesc.NumMips > 1 && EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::Shared))
 		{
 			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(Shared usage is not supported for textures with multiple mip levels)"));

@@ -26,6 +26,7 @@ namespace FW::VK
 		DefaultViewDesc.Texture = this;
 		DefaultViewDesc.BaseMipLevel = 0;
 		DefaultViewDesc.MipLevelCount = GetNumMips();
+		DefaultViewDesc.ArrayLayerCount = GetArrayLayerCount();
 		DefaultView = GVkGpuRhi->CreateTextureView(DefaultViewDesc);
 	}
 
@@ -40,6 +41,10 @@ namespace FW::VK
 		if (EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::ShaderResource))
 		{
 			Usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+		}
+		if (EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::UnorderedAccess))
+		{
+			Usage |= VK_IMAGE_USAGE_STORAGE_BIT;
 		}	
 		return Usage;
 	}
@@ -47,13 +52,14 @@ namespace FW::VK
 	TRefCountPtr<VulkanTexture> CreateVulkanTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
 	{
 		const bool bIsCube = InTexDesc.Dimension == GpuTextureDimension::TexCube;
+		const bool bIs3D = InTexDesc.Dimension == GpuTextureDimension::Tex3D;
 		const uint32 ArrayLayers = bIsCube ? 6 : 1;
 
 		VkImageCreateInfo ImgCreateInfo = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
-		ImgCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+		ImgCreateInfo.imageType = bIs3D ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D;
 		ImgCreateInfo.extent.width = InTexDesc.Width;
 		ImgCreateInfo.extent.height = InTexDesc.Height;
-		ImgCreateInfo.extent.depth = 1;
+		ImgCreateInfo.extent.depth = bIs3D ? InTexDesc.Depth : 1;
 		ImgCreateInfo.mipLevels = InTexDesc.NumMips;
 		ImgCreateInfo.arrayLayers = ArrayLayers;
 		ImgCreateInfo.format = MapTextureFormat(InTexDesc.Format);
@@ -130,23 +136,40 @@ namespace FW::VK
 
 		if (!InTexDesc.InitialData.IsEmpty())
 		{
-			const uint32 UploadSize = InTexDesc.Width * InTexDesc.Height * GetFormatByteSize(InTexDesc.Format);
-			TRefCountPtr<VulkanBuffer> UploadBuffer = CreateVulkanBuffer(
-				{ .ByteSize = UploadSize, .Usage = GpuBufferUsage::Upload },
-				GpuResourceState::CopySrc
-			);
-
-			void* MappedData = nullptr;
-			VkCheck(vmaMapMemory(GAllocator, UploadBuffer->GetAllocation(), &MappedData));
-			FMemory::Memcpy(MappedData, InTexDesc.InitialData.GetData(), UploadSize);
-			vmaUnmapMemory(GAllocator, UploadBuffer->GetAllocation());
+			const uint32 BytePerTexel = GetFormatByteSize(InTexDesc.Format);
+			const uint32 FaceByteSize = InTexDesc.Width * InTexDesc.Height * BytePerTexel;
 
 			GpuCmdRecorder* CmdRecorder = GVkGpuRhi->BeginRecording();
 			{
 				CmdRecorder->Barriers({
 					{NewTex, GpuResourceState::CopyDst}
 				});
-				CmdRecorder->CopyBufferToTexture(UploadBuffer, NewTex);
+
+				if (bIsCube) {
+					for (uint32 Face = 0; Face < 6; Face++) {
+						TRefCountPtr<VulkanBuffer> FaceUpload = CreateVulkanBuffer(
+							{ .ByteSize = FaceByteSize, .Usage = GpuBufferUsage::Upload },
+							GpuResourceState::CopySrc
+						);
+						void* FaceMapped = nullptr;
+						VkCheck(vmaMapMemory(GAllocator, FaceUpload->GetAllocation(), &FaceMapped));
+						FMemory::Memcpy(FaceMapped, InTexDesc.InitialData.GetData() + Face * FaceByteSize, FaceByteSize);
+						vmaUnmapMemory(GAllocator, FaceUpload->GetAllocation());
+						CmdRecorder->CopyBufferToTexture(FaceUpload, NewTex, Face, 0);
+					}
+				} else {
+					const uint32 UploadSize = FaceByteSize * (bIs3D ? InTexDesc.Depth : 1);
+					TRefCountPtr<VulkanBuffer> UploadBuffer = CreateVulkanBuffer(
+						{ .ByteSize = UploadSize, .Usage = GpuBufferUsage::Upload },
+						GpuResourceState::CopySrc
+					);
+					void* MappedData = nullptr;
+					VkCheck(vmaMapMemory(GAllocator, UploadBuffer->GetAllocation(), &MappedData));
+					FMemory::Memcpy(MappedData, InTexDesc.InitialData.GetData(), UploadSize);
+					vmaUnmapMemory(GAllocator, UploadBuffer->GetAllocation());
+					CmdRecorder->CopyBufferToTexture(UploadBuffer, NewTex);
+				}
+
 				CmdRecorder->Barriers({
 					{NewTex, InitState}
 				});

@@ -139,7 +139,7 @@ namespace SH
 					Context.FinalRT = GGpuRhi->CreateTexture({
 						.Width = (uint32)Context.iResolution.x,
 						.Height = (uint32)Context.iResolution.y,
-						.Format = GpuFormat::B8G8R8A8_UNORM,
+						.Format = GpuFormat::R8G8B8A8_UNORM,
 						.Usage = GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared,
 					});
 					GGpuRhi->SetResourceName("FinalRT", Context.FinalRT);

@@ -9,7 +9,8 @@ namespace SH
 	enum class ShaderToySlotType
 	{
 		Texture2D,
-		TextureCube
+		TextureCube,
+		Texture3D
 	};
 
 	class StShader : public ShaderAsset

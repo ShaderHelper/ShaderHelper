@@ -18,7 +18,7 @@ namespace FW
 	)
 
 	Texture2D::Texture2D()
-		: Width(0), Height(0), Format(GpuFormat::B8G8R8A8_UNORM)
+		: Width(0), Height(0), Format(GpuFormat::R8G8B8A8_UNORM)
 	{
 
 	}
@@ -63,7 +63,7 @@ namespace FW
 			.Width = (uint32)Width, 
 			.Height = (uint32)Height, 
 			.Format = Format,
-			.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget,
+			.Usage = GpuTextureUsage::ShaderResource | (GenerateMipmap ? (GpuTextureUsage::UnorderedAccess | GpuTextureUsage::RenderTarget) : GpuTextureUsage::None),
 			.InitialData = RawData,
 			.NumMips = GenerateMipmap ? 0u : 1u,
 		};
@@ -90,11 +90,12 @@ namespace FW
 
 		GpuTextureDesc Desc{ Width / 2, Height / 2, Format, GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared };
 		TRefCountPtr<GpuTexture> Thumbnail = GGpuRhi->CreateTexture(MoveTemp(Desc));
+		TRefCountPtr<GpuTextureView> ThumbnailInputView = GGpuRhi->CreateTextureView({ GpuData, 0, 1 });
 
 		RenderGraph Graph;
 		{
 			BlitPassInput Input;
-			Input.InputView = GpuData->GetDefaultView();
+			Input.InputView = ThumbnailInputView;
 			Input.InputTexSampler = GpuResourceHelper::GetSampler({.Filter = SamplerFilter::Bilinear});
 			Input.OutputView = Thumbnail->GetDefaultView();
 

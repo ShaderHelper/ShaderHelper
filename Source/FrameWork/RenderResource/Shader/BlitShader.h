@@ -1,5 +1,6 @@
 #pragma once
 #include "GpuApi/GpuResource.h"
+#include "RenderResource/UniformBuffer.h"
 #include "Shader.h"
 
 namespace FW
@@ -11,6 +12,7 @@ namespace FW
 		{
 			TRefCountPtr<GpuTextureView> InputView;
 			TRefCountPtr<GpuSampler> InputTexSampler;
+			float MipLevel = 0.0f;
 		};
 
 		BlitShader(const std::set<FString>& VariantDefinitions = {});
@@ -26,6 +28,8 @@ namespace FW
 		TRefCountPtr<GpuShader> Ps;
 
 		TRefCountPtr<GpuBindGroupLayout> BindGroupLayout;
+		UniformBufferBuilder BlitUbBuilder{UniformBufferUsage::Temp};
+		bool bUseMipLevel = false;
 	};
 
 }

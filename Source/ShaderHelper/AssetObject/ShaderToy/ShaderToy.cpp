@@ -14,7 +14,7 @@ using namespace FW;
 
 namespace SH
 {
-    REFLECTION_REGISTER(AddClass<ShaderToy>("ShaderToy Graph")
+    REFLECTION_REGISTER(AddClass<ShaderToy>("ShaderToy")
 						.BaseClass<Graph>()
 						.Data<&ShaderToy::FlipY, MetaInfo::Property>(LOCALIZATION("FlipY"))
 	)

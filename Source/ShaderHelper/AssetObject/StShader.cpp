@@ -10,6 +10,9 @@
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 #include "RenderResource/PrintBuffer.h"
 #include "AssetManager/AssetManager.h"
+#include "AssetObject/Texture2D.h"
+#include "AssetObject/TextureCube.h"
+#include "AssetObject/Texture3D.h"
 
 using namespace FW;
 
@@ -146,6 +149,8 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 				FString ChannelName = FString::Printf(TEXT("iChannel%d"), i);
 				if (ChannelSlotTypes[i] == ShaderToySlotType::TextureCube)
 					Builder.AddCombinedTextureCubeSampler(ChannelName, BindingShaderStage::Pixel);
+				else if (ChannelSlotTypes[i] == ShaderToySlotType::Texture3D)
+					Builder.AddCombinedTexture3DSampler(ChannelName, BindingShaderStage::Pixel);
 				else
 					Builder.AddCombinedTextureSampler(ChannelName, BindingShaderStage::Pixel);
 			}
@@ -155,6 +160,8 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 				FString SamplerName = FString::Printf(TEXT("iChannel%d_sampler"), i);
 				if (ChannelSlotTypes[i] == ShaderToySlotType::TextureCube)
 					Builder.AddTextureCube(TexName, BindingShaderStage::Pixel);
+				else if (ChannelSlotTypes[i] == ShaderToySlotType::Texture3D)
+					Builder.AddTexture3D(TexName, BindingShaderStage::Pixel);
 				else
 					Builder.AddTexture(TexName, BindingShaderStage::Pixel);
 				Builder.AddSampler(SamplerName, BindingShaderStage::Pixel);
@@ -475,13 +482,16 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
             auto SlotCategory = MakeShared<PropertyCategory>(this, "Slot");
             {
                 TMap<FString, TSharedPtr<void>> SlotTypeEntries;
-                SlotTypeEntries.Add("Texture2d", MakeShared<ShaderToySlotType>(ShaderToySlotType::Texture2D));
-                SlotTypeEntries.Add("TextureCube", MakeShared<ShaderToySlotType>(ShaderToySlotType::TextureCube));
+                SlotTypeEntries.Add(GetRegisteredName(GetMetaType<Texture2D>()), MakeShared<ShaderToySlotType>(ShaderToySlotType::Texture2D));
+                SlotTypeEntries.Add(GetRegisteredName(GetMetaType<TextureCube>()), MakeShared<ShaderToySlotType>(ShaderToySlotType::TextureCube));
+                SlotTypeEntries.Add(GetRegisteredName(GetMetaType<Texture3D>()), MakeShared<ShaderToySlotType>(ShaderToySlotType::Texture3D));
 
                 for (int i = 0; i < 4; i++)
                 {
                     FString ChannelName = FString::Printf(TEXT("iChannel%d"), i);
-                    auto EnumValueName = MakeShared<FString>(ChannelSlotTypes[i] == ShaderToySlotType::TextureCube ? "TextureCube" : "Texture2d");
+                    auto EnumValueName = MakeShared<FString>(
+                        ChannelSlotTypes[i] == ShaderToySlotType::TextureCube ? *GetRegisteredName(GetMetaType<TextureCube>()) :
+                        (ChannelSlotTypes[i] == ShaderToySlotType::Texture3D ? *GetRegisteredName(GetMetaType<Texture3D>()) : *GetRegisteredName(GetMetaType<Texture2D>())));
                     auto Setter = [this, i](void* NewValue) {
                         ChannelSlotTypes[i] = *static_cast<ShaderToySlotType*>(NewValue);
                     };
