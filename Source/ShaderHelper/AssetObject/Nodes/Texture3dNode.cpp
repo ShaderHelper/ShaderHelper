@@ -111,7 +111,7 @@ namespace SH
 	void Texture3dNode::ClearProperty()
 	{
 		Width = Height = Depth = 0;
-		Format = GpuFormat::R8G8B8A8_UNORM;
+		Format = GpuFormat::B8G8R8A8_UNORM;
 		auto ResultPin = static_cast<GpuTexture3DPin*>(GetPin("RT"));
 		ResultPin->SetValue(nullptr);
 		Preview->Clear();

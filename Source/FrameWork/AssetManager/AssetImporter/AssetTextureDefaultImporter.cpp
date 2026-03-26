@@ -34,11 +34,7 @@ namespace FW
 				else
 				{
 					ImageWrapper->GetRaw(ERGBFormat::BGRA, 8, UnCompressedData);
-					for (int32 PixelIndex = 0; PixelIndex + 3 < UnCompressedData.Num(); PixelIndex += 4)
-					{
-						Swap(UnCompressedData[PixelIndex], UnCompressedData[PixelIndex + 2]);
-					}
-					return MakeUnique<Texture2D>(ImageWrapper->GetWidth(), ImageWrapper->GetHeight(), GpuFormat::R8G8B8A8_UNORM, UnCompressedData);
+					return MakeUnique<Texture2D>(ImageWrapper->GetWidth(), ImageWrapper->GetHeight(), GpuFormat::B8G8R8A8_UNORM, UnCompressedData);
 				}
 			}
 		}

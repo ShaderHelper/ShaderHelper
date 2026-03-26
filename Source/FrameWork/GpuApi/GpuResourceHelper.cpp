@@ -28,7 +28,7 @@ namespace FW::GpuResourceHelper
 	GpuTexture* GetGlobalBlackTex()
 	{
         TArray<uint8> RawData = {0,0,0,255};
-		GpuTextureDesc Desc{ 1, 1, GpuFormat::R8G8B8A8_UNORM, GpuTextureUsage::ShaderResource , RawData};
+		GpuTextureDesc Desc{ 1, 1, GpuFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource , RawData};
 		static TRefCountPtr<GpuTexture> GlobalBlackTex = GGpuRhi->CreateTexture(MoveTemp(Desc));
 		return GlobalBlackTex;
 	}
@@ -39,7 +39,7 @@ namespace FW::GpuResourceHelper
 			GpuTextureDesc Desc;
 			Desc.Width = 1;
 			Desc.Height = 1;
-			Desc.Format = GpuFormat::R8G8B8A8_UNORM;
+			Desc.Format = GpuFormat::B8G8R8A8_UNORM;
 			Desc.Usage = GpuTextureUsage::ShaderResource;
 			Desc.Dimension = GpuTextureDimension::TexCube;
 
@@ -76,7 +76,7 @@ namespace FW::GpuResourceHelper
 		Desc.Width = 1;
 		Desc.Height = 1;
 		Desc.Depth = 1;
-		Desc.Format = GpuFormat::R8G8B8A8_UNORM;
+		Desc.Format = GpuFormat::B8G8R8A8_UNORM;
 		Desc.Usage = GpuTextureUsage::ShaderResource;
 		Desc.Dimension = GpuTextureDimension::Tex3D;
 		Desc.InitialData = RawData;

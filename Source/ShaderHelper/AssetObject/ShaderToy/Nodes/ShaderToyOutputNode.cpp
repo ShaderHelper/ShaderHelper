@@ -55,7 +55,7 @@ namespace SH
     }
 
 	ShaderToyOutputNode::ShaderToyOutputNode()
-	: Format(ShaderToyFormat::R8G8B8A8_UNORM)
+	: Format(ShaderToyFormat::B8G8R8A8_UNORM)
 	, Layer(0), AreaFraction(1.0f)
 	{
 		ObjectName = LOCALIZATION("Present");

@@ -74,7 +74,7 @@ namespace FW
 				.Vs = Vs,
 				.Ps = Ps,
 				.Targets = {
-					{ .TargetFormat = GpuFormat::R8G8B8A8_UNORM }
+					{ .TargetFormat = GpuFormat::B8G8R8A8_UNORM }
 				},
 				.BindGroupLayout0 = BindGroupLayout,
 				.VertexLayout = {
@@ -213,7 +213,7 @@ namespace FW
 			GpuTextureDesc Desc{
 				.Width = static_cast<uint32>(ViewportSize.X),
 				.Height = static_cast<uint32>(ViewportSize.Y),
-				.Format = GpuFormat::R8G8B8A8_UNORM,
+				.Format = GpuFormat::B8G8R8A8_UNORM,
 				.Usage = GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared,
 				.ClearValues = Vector4f(0.08f, 0.08f, 0.08f, 1.0f),
 			};
@@ -301,7 +301,7 @@ namespace FW
 				.Vs = Vs,
 				.Ps = Ps,
 				.Targets = {
-					{ .TargetFormat = GpuFormat::R8G8B8A8_UNORM }
+					{ .TargetFormat = GpuFormat::B8G8R8A8_UNORM }
 				},
 				.BindGroupLayout0 = BindGroupLayout,
 				.VertexLayout = {
@@ -445,7 +445,7 @@ namespace FW
 			GpuTextureDesc Desc{
 				.Width = static_cast<uint32>(ViewportSize.X),
 				.Height = static_cast<uint32>(ViewportSize.Y),
-				.Format = GpuFormat::R8G8B8A8_UNORM,
+				.Format = GpuFormat::B8G8R8A8_UNORM,
 				.Usage = GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared,
 				.ClearValues = Vector4f(0.08f, 0.08f, 0.08f, 1.0f),
 			};

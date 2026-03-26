@@ -245,7 +245,7 @@ namespace SH
 					TArray<TArray<uint8>> FaceData;
 					FaceData.SetNum(6);
 					uint32 CubeSize = 0;
-					GpuFormat CubeFormat = GpuFormat::R8G8B8A8_UNORM;
+					GpuFormat CubeFormat = GpuFormat::B8G8R8A8_UNORM;
 					bool bAllFacesValid = true;
 
 					for (int32 FaceIndex = 0; FaceIndex < 6 && bAllFacesValid; FaceIndex++)
@@ -329,7 +329,7 @@ namespace SH
 
 					GpuFormat VolFormat;
 					if (Channels == 1) VolFormat = GpuFormat::R8_UNORM;
-					else if (Channels == 4) VolFormat = GpuFormat::R8G8B8A8_UNORM;
+					else if (Channels == 4) VolFormat = GpuFormat::B8G8R8A8_UNORM;
 					else continue;
 
 					const uint32 ExpectedDataSize = VolWidth * VolHeight * VolDepth * Channels;
@@ -341,7 +341,13 @@ namespace SH
 					const uint8* SrcData = FileData.GetData() + 20;
 					if (Channels == 4)
 					{
-						FMemory::Memcpy(RawData.GetData(), SrcData, ExpectedDataSize);
+						for (uint32 j = 0; j < VolWidth * VolHeight * VolDepth; j++)
+						{
+							RawData[j * 4 + 0] = SrcData[j * 4 + 2];
+							RawData[j * 4 + 1] = SrcData[j * 4 + 1];
+							RawData[j * 4 + 2] = SrcData[j * 4 + 0];
+							RawData[j * 4 + 3] = SrcData[j * 4 + 3];
+						}
 					}
 					else // Channels == 1, expand to RGBA
 					{
@@ -352,7 +358,7 @@ namespace SH
 							RawData[j * 4 + 2] = SrcData[j];
 							RawData[j * 4 + 3] = 255;
 						}
-						VolFormat = GpuFormat::R8G8B8A8_UNORM;
+						VolFormat = GpuFormat::B8G8R8A8_UNORM;
 					}
 
 					auto VolumeAsset = MakeUnique<Texture3D>(VolWidth, VolHeight, VolDepth, VolFormat, RawData);

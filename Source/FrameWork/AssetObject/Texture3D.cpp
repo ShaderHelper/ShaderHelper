@@ -16,7 +16,7 @@ namespace FW
 	)
 
 	Texture3D::Texture3D()
-		: Width(0), Height(0), Depth(0), Format(GpuFormat::R8G8B8A8_UNORM)
+		: Width(0), Height(0), Depth(0), Format(GpuFormat::B8G8R8A8_UNORM)
 	{
 	}
 
