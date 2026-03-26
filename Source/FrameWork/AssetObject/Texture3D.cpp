@@ -88,6 +88,16 @@ namespace FW
 		}
 	}
 
+	void Texture3D::SetData(uint32 InWidth, uint32 InHeight, uint32 InDepth, GpuFormat InFormat, TArray<uint8> InRawData)
+	{
+		Width = InWidth;
+		Height = InHeight;
+		Depth = InDepth;
+		Format = InFormat;
+		RawData = MoveTemp(InRawData);
+		InitGpuData();
+	}
+
 	FString Texture3D::FileExtension() const
 	{
 		return TEXT("texture3d");

@@ -24,6 +24,7 @@ namespace FW
 		uint32 GetHeight() const { return Height; }
 		uint32 GetDepth() const { return Depth; }
 		GpuFormat GetFormat() const { return Format; }
+		void SetData(uint32 InWidth, uint32 InHeight, uint32 InDepth, GpuFormat InFormat, TArray<uint8> InRawData);
 
 		TRefCountPtr<GpuTexture> GenerateThumbnail() const override;
 
