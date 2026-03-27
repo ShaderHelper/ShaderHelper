@@ -1355,6 +1355,7 @@ namespace FW
 			Options.AddMacroDefinition("EDITOR_ISENSE", "1");
 			Options.AddMacroDefinition("ENABLE_PRINT", "0");
 			Options.AddMacroDefinition("ENABLE_ASSERT", "0");
+			Options.SetForcedVersionProfile(450, shaderc_profile_core);
 			Options.SetGenerateDebugInfo();
 			Options.SetNonSemanticShaderDebugSource();
 			Options.SetOptimizationLevel(shaderc_optimization_level_zero);

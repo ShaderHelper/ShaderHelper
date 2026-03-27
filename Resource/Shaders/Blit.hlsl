@@ -36,7 +36,7 @@ float4 MainPS(VsOutput Input) : SV_Target
 #elif CHANNEL_FILTER_B
 	return float4(0, 0, color.b, 1);
 #elif CHANNEL_FILTER_A
-	return float4(0, 0, 0, color.a);
+	return float4(color.a, color.a, color.a, 1);
 #else
 	return color;
 #endif

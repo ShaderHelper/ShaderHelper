@@ -301,7 +301,7 @@ namespace FW
 				.Vs = Vs,
 				.Ps = Ps,
 				.Targets = {
-					{ .TargetFormat = GpuFormat::B8G8R8A8_UNORM }
+					{ .TargetFormat = GpuFormat::B8G8R8A8_UNORM, .BlendEnable = true }
 				},
 				.BindGroupLayout0 = BindGroupLayout,
 				.VertexLayout = {

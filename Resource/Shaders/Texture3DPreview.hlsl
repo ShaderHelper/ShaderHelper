@@ -72,7 +72,7 @@ float4 MainPS(VsOutput Input) : SV_Target
 	if (ChannelFilter == 3)
 		return float4(0.0, 0.0, result.b, 1.0);
 	if (ChannelFilter == 4)
-		return float4(0.0, 0.0, 0.0, result.a);
+		return float4(result.a, result.a, result.a, 1.0);
 
-	return float4(result.rgb, 1.0);
+	return float4(result.rgb, result.a);
 }

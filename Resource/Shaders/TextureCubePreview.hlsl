@@ -38,7 +38,7 @@ float4 MainPS(VsOutput Input) : SV_Target
 	}
 	if (ChannelFilter == 4)
 	{
-		return float4(0.0, 0.0, 0.0, Color.a);
+		return float4(Color.a, Color.a, Color.a, 1.0);
 	}
 
 	return Color;
