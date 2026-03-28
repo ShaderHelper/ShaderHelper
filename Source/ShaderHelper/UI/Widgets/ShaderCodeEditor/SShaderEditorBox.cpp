@@ -1441,15 +1441,19 @@ constexpr int PaddingLineNum = 22;
         default:                   return LOCALIZATION("SUCCEED");
         }
     }
-
     FSlateColor SShaderEditorBox::GetEditStateColor() const
     {
+		if (!ShaderAssetObj->Shader)
+		{
+			return FStyleColors::Panel;
+		}
+
         switch(CurEditState)
         {
-        case EditState::Compiling: return FLinearColor{1.0f, 0.5f, 0, 1.0f};
-        case EditState::Failed:    return FLinearColor::Red;
-		case EditState::Editing:   return FLinearColor::Gray;
-        default:                   return FLinearColor{0.6f, 1.0f , 0.1f, 1.0f};
+		case EditState::Compiling: return FLinearColor{1.0f, 0.5f, 0.0f, 0.5f};
+		case EditState::Failed:    return FLinearColor{1.0f, 0.1f, 0.1f, 0.5f};
+		case EditState::Editing:   return FLinearColor{0.6f, 0.6f, 0.6f, 0.5f};
+		default:                   return FLinearColor{0.6f, 1.0f, 0.1f, 0.45f};
         }
     }
 
@@ -1486,7 +1490,9 @@ constexpr int PaddingLineNum = 22;
 		InfoBarBox->ClearChildren();
 
 		FSlateFontInfo InforBarFontInfo = FShaderHelperStyle::Get().GetFontStyle("CodeFont");
-		InfoBarBox->AddSlot()
+		if (ShaderAssetObj->Shader)
+		{
+			InfoBarBox->AddSlot()
 			.AutoWidth()
 			[
 				SNew(SButton)
@@ -1502,7 +1508,7 @@ constexpr int PaddingLineNum = 22;
 				]
 			];
 
-		InfoBarBox->AddSlot()
+			InfoBarBox->AddSlot()
 			.Padding(2, 0, 0, 0)
 			.AutoWidth()
 			[
@@ -1512,13 +1518,13 @@ constexpr int PaddingLineNum = 22;
 				.VAlign(VAlign_Center)
 				[
 					SNew(STextBlock)
-						.Justification(ETextJustify::Center)
-						.MinDesiredWidth(80)
-						.Font(InforBarFontInfo)
-						.ColorAndOpacity(FLinearColor::Black)
-						.Text(this, &SShaderEditorBox::GetEditStateText)
+					.Justification(ETextJustify::Center)
+					.MinDesiredWidth(80)
+					.Font(InforBarFontInfo)
+					.Text(this, &SShaderEditorBox::GetEditStateText)
 				]
 			];
+		}
 
 		InfoBarBox->AddSlot()
 			.FillWidth(1.0f)
@@ -1537,7 +1543,6 @@ constexpr int PaddingLineNum = 22;
 					[
 						SNew(STextBlock)
 							.Font(InforBarFontInfo)
-							.ColorAndOpacity(FLinearColor::Black)
 							.Text(this, &SShaderEditorBox::GetRowColText)
 							.Margin(FMargin{ 8, 0, 8, 0 })
 					]
@@ -2359,7 +2364,13 @@ constexpr int PaddingLineNum = 22;
         EffectMarshller->LineNumberToDiagInfo.Reset();
         for (const ShaderDiagnosticInfo& DiagInfo : DiagnosticInfos)
         {
-            int32 DiagInfoLineNumber = (int32)DiagInfo.Row - ShaderAssetObj->GetExtraLineNum();
+            bool bIsMainFile = DiagInfo.File == ShaderAssetObj->GetShaderName();
+			if (!bIsMainFile)
+			{
+				continue;
+			}
+
+			int32 DiagInfoLineNumber = (int32)DiagInfo.Row - ShaderAssetObj->GetExtraLineNum();
             if (!EffectMarshller->LineNumberToDiagInfo.Contains(DiagInfoLineNumber))
             {
                 int32 LineIndex = GetLineIndex(DiagInfoLineNumber);
@@ -2426,18 +2437,24 @@ constexpr int PaddingLineNum = 22;
 		return { FTextLocation(LineIndex, WordStart), FTextLocation(LineIndex, WordEnd)};
 	}
 
-	FString AdjustDiagLineNumber(const FString& DiagInfo, int32 Delta)
+	FString AdjustDiagLineNumber(const FString& DiagInfo, const FString& MainFileName, int32 Delta)
 	{
 		std::string DiagString{ TCHAR_TO_UTF8(*DiagInfo) };
-		std::regex Pattern{ ":([0-9]+):.* (?:error|warning):" };
+		std::regex Pattern{ "(.+?):([0-9]+)(?::([0-9]+))?:\\s*(error|warning):" };
 		std::smatch Match;
 		std::size_t SearchPos = 0;
 		while (std::regex_search(DiagString.cbegin() + SearchPos, DiagString.cend(), Match, Pattern))
 		{
-			std::string RowStr = Match[1];
-			std::string RowNumber = std::to_string(std::stoi(RowStr) + Delta);
-			DiagString.replace(SearchPos + Match.position(1), Match[1].length(), RowNumber);
-			SearchPos += Match.position() + Match.length();
+			FString DiagFileName = UTF8_TO_TCHAR(Match[1].str().c_str());
+			std::size_t NextSearchPos = SearchPos + Match.position() + Match.length();
+			if (DiagFileName == MainFileName)
+			{
+				std::string RowStr = Match[2];
+				std::string RowNumber = std::to_string(std::stoi(RowStr) + Delta);
+				DiagString.replace(SearchPos + Match.position(2), Match[2].length(), RowNumber);
+				NextSearchPos += RowNumber.length() - RowStr.length();
+			}
+			SearchPos = NextSearchPos;
 		}
 		return FString{ UTF8_TO_TCHAR(DiagString.data()) };
 	}
@@ -2464,7 +2481,7 @@ constexpr int PaddingLineNum = 22;
 			
 			if(!WarnInfo.IsEmpty())
 			{
-				WarnInfo = AdjustDiagLineNumber(WarnInfo, -AddedLineNum);
+				WarnInfo = AdjustDiagLineNumber(WarnInfo, ShaderAssetObj->GetShaderName(), -AddedLineNum);
 				SH_LOG(LogShader, Warning, TEXT("%s"), *WarnInfo);
 			}
         }
@@ -2475,7 +2492,7 @@ constexpr int PaddingLineNum = 22;
 			
 			if(!ErrorInfo.IsEmpty())
 			{
-				ErrorInfo = AdjustDiagLineNumber(ErrorInfo, -AddedLineNum);
+				ErrorInfo = AdjustDiagLineNumber(ErrorInfo, ShaderAssetObj->GetShaderName(), -AddedLineNum);
 				SH_LOG(LogShader, Error, TEXT("%s"), *ErrorInfo);
 			}
 		}

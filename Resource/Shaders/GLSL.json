@@ -3895,7 +3895,19 @@
                 "CS"
             ],
             "desc": "Returns an unsigned integer value representing the encoding of a float",
-            "signatures": [],
+            "signatures": [
+                {
+                    "returnType": "genUType",
+                    "parameters": [
+                        {
+                            "type": "genFType",
+                            "name": "x",
+                            "desc": "Specifies the value whose floating point encoding to return",
+                            "io": "in"
+                        }
+                     ]
+                }
+            ],
             "url": "https://docs.vulkan.org/glsl/latest/chapters/builtinfunctions.html#_floatbitstouint"
         },
         {
@@ -3929,7 +3941,19 @@
                 "CS"
             ],
             "desc": "Returns a float value corresponding to an unsigned integer encoding of a float",
-            "signatures": [],
+            "signatures": [
+                {
+                    "returnType": "genFType",
+                    "parameters": [
+                        {
+                            "type": "genUType",
+                            "name": "x",
+                            "desc": "Specifies the bit encoding to return as a floating point value",
+                            "io": "in"
+                        }
+                    ]
+                }
+            ],
             "url": "https://docs.vulkan.org/glsl/latest/chapters/builtinfunctions.html#_uintbitstofloat"
         },
         {
@@ -4031,8 +4055,20 @@
                 "PS",
                 "CS"
             ],
-            "desc": "Packs two floats into uint",
-            "signatures": [],
+            "desc": "convert two normalized floating-point values to 16-bit unsigned integer representations and pack them into a single 32-bit unsigned integer\nEquivalent per component: round(clamp(c, 0, +1) * 65535.0)",
+            "signatures": [
+                {
+                    "returnType": "uint",
+                    "parameters": [
+                        {
+                            "type": "vec2",
+                            "name": "v",
+                            "desc": "Specifies a two-component normalized floating-point vector to convert and pack",
+                            "io": "in"
+                        }
+                    ]
+                }
+            ],
             "url": "https://docs.vulkan.org/glsl/latest/chapters/builtinfunctions.html#_packunorm2x16"
         },
         {
@@ -4042,8 +4078,20 @@
                 "PS",
                 "CS"
             ],
-            "desc": "Packs two signed floats into uint",
-            "signatures": [],
+            "desc": "convert two normalized floating-point values to 16-bit signed integer representations and pack them into a single 32-bit unsigned integer\nEquivalent per component: round(clamp(c, -1, +1) * 32767.0)",
+            "signatures": [
+                {
+                    "returnType": "uint",
+                    "parameters": [
+                        {
+                            "type": "vec2",
+                            "name": "v",
+                            "desc": "Specifies a two-component normalized floating-point vector to convert and pack",
+                            "io": "in"
+                        }
+                    ]
+                }
+            ],
             "url": "https://docs.vulkan.org/glsl/latest/chapters/builtinfunctions.html#_packsnorm2x16"
         },
         {
@@ -4053,8 +4101,20 @@
                 "PS",
                 "CS"
             ],
-            "desc": "Packs four floats into uint",
-            "signatures": [],
+            "desc": "convert four normalized floating-point values to 8-bit unsigned integer representations and pack them into a single 32-bit unsigned integer\nEquivalent per component: round(clamp(c, 0, +1) * 255.0)",
+            "signatures": [
+                {
+                    "returnType": "uint",
+                    "parameters": [
+                        {
+                            "type": "vec4",
+                            "name": "v",
+                            "desc": "Specifies a four-component normalized floating-point vector to convert and pack",
+                            "io": "in"
+                        }
+                    ]
+                }
+            ],
             "url": "https://docs.vulkan.org/glsl/latest/chapters/builtinfunctions.html#_packunorm4x8"
         },
         {
@@ -4064,8 +4124,20 @@
                 "PS",
                 "CS"
             ],
-            "desc": "Packs four signed floats into uint",
-            "signatures": [],
+            "desc": "convert four normalized floating-point values to 8-bit signed integer representations and pack them into a single 32-bit unsigned integer\nEquivalent per component: round(clamp(c, -1, +1) * 127.0)",
+            "signatures": [
+                {
+                    "returnType": "uint",
+                    "parameters": [
+                        {
+                            "type": "vec4",
+                            "name": "v",
+                            "desc": "Specifies a four-component normalized floating-point vector to convert and pack",
+                            "io": "in"
+                        }
+                    ]
+                }
+            ],
             "url": "https://docs.vulkan.org/glsl/latest/chapters/builtinfunctions.html#_packsnorm4x8"
         },
         {
@@ -4075,8 +4147,20 @@
                 "PS",
                 "CS"
             ],
-            "desc": "Unpacks uint to two floats",
-            "signatures": [],
+            "desc": "unpack a single 32-bit unsigned integer into two 16-bit unsigned integer values and convert them to normalized floating-point values\nEquivalent per component: f / 65535.0",
+            "signatures": [
+                {
+                    "returnType": "vec2",
+                    "parameters": [
+                        {
+                            "type": "uint",
+                            "name": "p",
+                            "desc": "Specifies a 32-bit unsigned integer containing two packed 16-bit unsigned values",
+                            "io": "in"
+                        }
+                    ]
+                }
+            ],
             "url": "https://docs.vulkan.org/glsl/latest/chapters/builtinfunctions.html#_unpackunorm2x16"
         },
         {
@@ -4086,8 +4170,20 @@
                 "PS",
                 "CS"
             ],
-            "desc": "Unpacks uint to two signed floats",
-            "signatures": [],
+            "desc": "unpack a single 32-bit unsigned integer into two 16-bit signed integer values and convert them to normalized floating-point values\nEquivalent per component: clamp(f / 32767.0, -1, +1)",
+            "signatures": [
+                {
+                    "returnType": "vec2",
+                    "parameters": [
+                        {
+                            "type": "uint",
+                            "name": "p",
+                            "desc": "Specifies a 32-bit unsigned integer containing two packed 16-bit signed values",
+                            "io": "in"
+                        }
+                    ]
+                }
+            ],
             "url": "https://docs.vulkan.org/glsl/latest/chapters/builtinfunctions.html#_unpacksnorm2x16"
         },
         {
@@ -4097,8 +4193,20 @@
                 "PS",
                 "CS"
             ],
-            "desc": "Unpacks uint to four floats",
-            "signatures": [],
+            "desc": "unpack a single 32-bit unsigned integer into four 8-bit unsigned integer values and convert them to normalized floating-point values\nEquivalent per component: f / 255.0",
+            "signatures": [
+                {
+                    "returnType": "vec4",
+                    "parameters": [
+                        {
+                            "type": "uint",
+                            "name": "p",
+                            "desc": "Specifies a 32-bit unsigned integer containing four packed 8-bit unsigned values",
+                            "io": "in"
+                        }
+                    ]
+                }
+            ],
             "url": "https://docs.vulkan.org/glsl/latest/chapters/builtinfunctions.html#_unpackunorm4x8"
         },
         {
@@ -4108,8 +4216,20 @@
                 "PS",
                 "CS"
             ],
-            "desc": "Unpacks uint to four signed floats",
-            "signatures": [],
+            "desc": "unpack a single 32-bit unsigned integer into four 8-bit signed integer values and convert them to normalized floating-point values\nEquivalent per component: clamp(f / 127.0, -1, +1)",
+            "signatures": [
+                {
+                    "returnType": "vec4",
+                    "parameters": [
+                        {
+                            "type": "uint",
+                            "name": "p",
+                            "desc": "Specifies a 32-bit unsigned integer containing four packed 8-bit signed values",
+                            "io": "in"
+                        }
+                    ]
+                }
+            ],
             "url": "https://docs.vulkan.org/glsl/latest/chapters/builtinfunctions.html#_unpacksnorm4x8"
         },
         {
@@ -4119,7 +4239,7 @@
                 "PS",
                 "CS"
             ],
-            "desc": "convert two 32-bit floating-point quantities to 16-bit quantities and pack them into a single 32-bit integer",
+            "desc": "convert a two-component floating-point vector to 16-bit floating-point representations and pack them into a single 32-bit unsigned integer",
             "signatures": [
                 {
                     "returnType": "uint",
@@ -4127,7 +4247,7 @@
                         {
                             "type": "vec2",
                             "name": "v",
-                            "desc": "Specify a vector of two 32-bit floating point values that are to be converted to 16-bit representation and packed into the result",
+                            "desc": "Specifies a two-component floating-point vector to convert to 16-bit representation and pack",
                             "io": "in"
                         }
                     ]
@@ -4142,7 +4262,7 @@
                 "PS",
                 "CS"
             ],
-            "desc": "convert two 16-bit floating-point values packed into a single 32-bit integer into a vector of two 32-bit floating-point quantities",
+            "desc": "unpack a 32-bit unsigned integer into two 16-bit floating-point values and convert them to a two-component floating-point vector",
             "signatures": [
                 {
                     "returnType": "vec2",
@@ -4150,7 +4270,7 @@
                         {
                             "type": "uint",
                             "name": "v",
-                            "desc": "Specify a single 32-bit unsigned integer values that contains two 16-bit floating point values to be unpacked",
+                            "desc": "Specifies a 32-bit unsigned integer containing two packed 16-bit floating-point values",
                             "io": "in"
                         }
                     ]
@@ -4165,7 +4285,7 @@
                 "PS",
                 "CS"
             ],
-            "desc": "create a double-precision value from a pair of unsigned integers",
+            "desc": "pack a two-component unsigned integer vector into a double-precision floating-point value",
             "signatures": [
                 {
                     "returnType": "double",
@@ -4173,7 +4293,7 @@
                         {
                             "type": "uvec2",
                             "name": "v",
-                            "desc": "Specifies a vector of two unsigned integers to be packed into a single double-precision result",
+                            "desc": "Specifies a two-component unsigned integer vector to pack into a double-precision value",
                             "io": "in"
                         }
                     ]
@@ -4188,15 +4308,15 @@
                 "PS",
                 "CS"
             ],
-            "desc": "produce two unsigned integers containing the bit encoding of a double precision floating point value",
+            "desc": "unpack a double-precision floating-point value into a two-component unsigned integer vector",
             "signatures": [
                 {
                     "returnType": "uvec2",
                     "parameters": [
                         {
                             "type": "double",
-                            "name": "d",
-                            "desc": "Specifies double precision value to break into a pair of unsigned integers",
+                            "name": "v",
+                            "desc": "Specifies a double-precision value to unpack into two unsigned integers",
                             "io": "in"
                         }
                     ]

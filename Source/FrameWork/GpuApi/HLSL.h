@@ -235,42 +235,35 @@ namespace FW
 	{
 		TArray<ShaderDiagnosticInfo> Ret;
 
-		int32 LineInfoFirstPos = HlslDiagnosticInfo.Find(ShaderName + ":");
-		while (LineInfoFirstPos != INDEX_NONE)
+		const std::string DiagnosticText = TCHAR_TO_UTF8(*FString(HlslDiagnosticInfo));
+		const std::regex Pattern("(.+?):([0-9]+):([0-9]+):\\s*(error|warning):\\s*(.*)$");
+		const std::sregex_iterator End;
+		for (std::sregex_iterator It(DiagnosticText.begin(), DiagnosticText.end(), Pattern); It != End; ++It)
 		{
+			const std::smatch& Match = *It;
+
 			ShaderDiagnosticInfo DiagnosticInfo;
+			DiagnosticInfo.File = UTF8_TO_TCHAR(Match[1].str().c_str());
+			DiagnosticInfo.Row = FCString::Atoi(UTF8_TO_TCHAR(Match[2].str().c_str()));
+			DiagnosticInfo.Col = FCString::Atoi(UTF8_TO_TCHAR(Match[3].str().c_str()));
 
-			int32 LineInfoLastPos = HlslDiagnosticInfo.Find(TEXT("\n"), LineInfoFirstPos);
-			FStringView LineStringView{ HlslDiagnosticInfo.GetData() + LineInfoFirstPos, LineInfoLastPos - LineInfoFirstPos };
-
-			int32 LineInfoFirstColonPos = ShaderName.Len();
-			int32 Pos2 = LineStringView.Find(TEXT(":"), LineInfoFirstColonPos + 1);
-			DiagnosticInfo.Row = FCString::Atoi(LineStringView.SubStr(LineInfoFirstColonPos + 1, Pos2 - LineInfoFirstColonPos - 1).GetData());
-			int32 Pos3 = LineStringView.Find(TEXT(":"), Pos2 + 1);
-			DiagnosticInfo.Col = FCString::Atoi(LineStringView.SubStr(Pos2 + 1, Pos3 - Pos2 - 1).GetData());
-
-			int32 ErrorPos = LineStringView.Find(TEXT("error: "), Pos3);
-			if (ErrorPos != INDEX_NONE)
+			if (DiagnosticInfo.File.IsEmpty())
 			{
-				int32 ErrorInfoEnd = LineStringView.Find(TEXT("["), ErrorPos + 7);
-				if (ErrorInfoEnd == INDEX_NONE) {
-					ErrorInfoEnd = LineStringView.Len();
-				}
-				DiagnosticInfo.Error = LineStringView.SubStr(ErrorPos + 7, ErrorInfoEnd - ErrorPos - 7);
-				Ret.Add(MoveTemp(DiagnosticInfo));
+				DiagnosticInfo.File = ShaderName;
+			}
+
+			FString Message = UTF8_TO_TCHAR(Match[5].str().c_str());
+			Message = Message.TrimStartAndEnd();
+			if (Match[4].str() == "error")
+			{
+				DiagnosticInfo.Error = MoveTemp(Message);
 			}
 			else
 			{
-				int32 WarnPos = LineStringView.Find(TEXT("warning: "), Pos3);
-				int32 WarnInfoEnd = LineStringView.Find(TEXT("["), WarnPos + 9);
-				if (WarnInfoEnd == INDEX_NONE) {
-					WarnInfoEnd = LineStringView.Len();
-				}
-				DiagnosticInfo.Warn = LineStringView.SubStr(WarnPos + 9, WarnInfoEnd - WarnPos - 9);
-				Ret.Add(MoveTemp(DiagnosticInfo));
+				DiagnosticInfo.Warn = MoveTemp(Message);
 			}
 
-			LineInfoFirstPos = HlslDiagnosticInfo.Find(ShaderName + ":", LineInfoLastPos);
+			Ret.Add(MoveTemp(DiagnosticInfo));
 		}
 
 		return Ret;

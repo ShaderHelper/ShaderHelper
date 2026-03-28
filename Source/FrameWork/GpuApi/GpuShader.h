@@ -205,6 +205,7 @@ namespace FW
 
 	struct ShaderDiagnosticInfo
 	{
+		FString File;
 		uint32 Row, Col;
 		FString Error;
 		FString Warn;

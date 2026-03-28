@@ -232,34 +232,33 @@ namespace FW
 	inline TArray<ShaderDiagnosticInfo> ParseDiagnosticInfoFromGlslang(const FString& ShaderName, FStringView GlslDiagnosticInfo)
 	{
 		TArray<ShaderDiagnosticInfo> Ret;
-		int32 LineInfoFirstPos = GlslDiagnosticInfo.Find(ShaderName + ":");
-		while (LineInfoFirstPos != INDEX_NONE)
+		const std::string DiagnosticText = TCHAR_TO_UTF8(*FString(GlslDiagnosticInfo));
+		const std::regex Pattern("(.+?):([0-9]+):\\s*(error|warning):\\s*(.*)$");
+		const std::sregex_iterator End;
+		for (std::sregex_iterator It(DiagnosticText.begin(), DiagnosticText.end(), Pattern); It != End; ++It)
 		{
+			const std::smatch& Match = *It;
+
 			ShaderDiagnosticInfo DiagnosticInfo;
+			DiagnosticInfo.File = UTF8_TO_TCHAR(Match[1].str().c_str());
+			DiagnosticInfo.Row = FCString::Atoi(UTF8_TO_TCHAR(Match[2].str().c_str()));
 
-			int32 LineInfoLastPos = GlslDiagnosticInfo.Find(TEXT("\n"), LineInfoFirstPos);
-			FStringView LineStringView{ GlslDiagnosticInfo.GetData() + LineInfoFirstPos, LineInfoLastPos - LineInfoFirstPos };
-
-			int32 LineInfoFirstColonPos = ShaderName.Len();
-			int32 Pos2 = LineStringView.Find(TEXT(":"), LineInfoFirstColonPos + 1);
-			DiagnosticInfo.Row = FCString::Atoi(LineStringView.SubStr(LineInfoFirstColonPos + 1, Pos2 - LineInfoFirstColonPos - 1).GetData());
-
-			int32 ErrorPos = LineStringView.Find(TEXT("error: "), Pos2);
-			if (ErrorPos != INDEX_NONE)
+			if (DiagnosticInfo.File.IsEmpty())
 			{
-				int32 ErrorInfoEnd = LineStringView.Len();
-				DiagnosticInfo.Error = LineStringView.SubStr(ErrorPos + 7, ErrorInfoEnd - ErrorPos - 7);
-				Ret.Add(MoveTemp(DiagnosticInfo));
+				DiagnosticInfo.File = ShaderName;
+			}
+
+			FString Message = UTF8_TO_TCHAR(Match[4].str().c_str());
+			if (Match[3].str() == "error")
+			{
+				DiagnosticInfo.Error = MoveTemp(Message);
 			}
 			else
 			{
-				int32 WarnPos = LineStringView.Find(TEXT("warning: "), Pos2);
-				int32 WarnInfoEnd = LineStringView.Len();
-				DiagnosticInfo.Warn = LineStringView.SubStr(WarnPos + 9, WarnInfoEnd - WarnPos - 9);
-				Ret.Add(MoveTemp(DiagnosticInfo));
+				DiagnosticInfo.Warn = MoveTemp(Message);
 			}
 
-			LineInfoFirstPos = GlslDiagnosticInfo.Find(ShaderName + ":", LineInfoLastPos);
+			Ret.Add(MoveTemp(DiagnosticInfo));
 		}
 		return Ret;
 	}
@@ -687,7 +686,6 @@ namespace FW
 		{glslang::EOpAsin,             "asin"},
 		{glslang::EOpAcos,             "acos"},
 		{glslang::EOpAtan,             "atan"},
-		{glslang::EOpAtan,             "atan"},
 		{glslang::EOpPow,              "pow"},
 		{glslang::EOpExp,              "exp"},
 		{glslang::EOpLog,              "log"},
@@ -758,10 +756,27 @@ namespace FW
 		{glslang::EOpAtomicCompSwap,   "atomicCompSwap"},
 		{glslang::EOpMix,              "mix"},
 		{glslang::EOpMix,              "mix"},
-
+		{glslang::EOpFloatBitsToInt,   "floatBitsToInt"},
+		{glslang::EOpFloatBitsToUint,  "floatBitsToUint"},
+		{glslang::EOpIntBitsToFloat,   "intBitsToFloat"},
+		{glslang::EOpUintBitsToFloat,  "floatBitsToUint"},
 		{glslang::EOpDPdx,             "dFdx"},
 		{glslang::EOpDPdy,             "dFdy"},
 		{glslang::EOpFwidth,           "fwidth"},
+		{glslang::EOpTextureQuerySize, "textureSize"},
+		{glslang::EOpTexture,          "texture"},
+		{glslang::EOpTextureLod,       "textureLod"},
+		{glslang::EOpTextureFetch,     "texelFetch"},
+		{glslang::EOpPackUnorm2x16,    "packUnorm2x16"},
+		{glslang::EOpPackSnorm2x16,	   "packSnorm2x16"},
+		{glslang::EOpPackUnorm4x8,     "packUnorm4x8"},
+		{glslang::EOpPackSnorm4x8,     "packSnorm4x8"},
+		{glslang::EOpUnpackUnorm2x16,  "unpackUnorm2x16"},
+		{glslang::EOpUnpackSnorm2x16,  "unpackSnorm2x16"},
+		{glslang::EOpUnpackUnorm4x8,   "unpackUnorm4x8"},
+		{glslang::EOpUnpackSnorm4x8,   "unpackSnorm4x8"},
+		{glslang::EOpPackHalf2x16,     "packHalf2x16"},
+		{glslang::EOpUnpackHalf2x16,   "unpackHalf2x16"},
 	};
 
 	class GlslVisitor : public glslang::TIntermTraverser
