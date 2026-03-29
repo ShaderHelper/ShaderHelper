@@ -112,8 +112,12 @@ namespace FW::VK
 		if (!CurrentScissorRect.IsSet() && CurrentViewPort)
 		{
 			VkRect2D DefaultScissorRect{};
-			DefaultScissorRect.offset = { 0, 0 };
-			DefaultScissorRect.extent = { (uint32)(*CurrentViewPort).width, (uint32)(*CurrentViewPort).height };
+			const int32 ScissorLeft = (int32)(*CurrentViewPort).x;
+			const int32 ScissorTop = (int32)(*CurrentViewPort).y;
+			const int32 ScissorRight = (int32)((*CurrentViewPort).x + (*CurrentViewPort).width);
+			const int32 ScissorBottom = (int32)((*CurrentViewPort).y + (*CurrentViewPort).height);
+			DefaultScissorRect.offset = { ScissorLeft, ScissorTop };
+			DefaultScissorRect.extent = { (uint32)(ScissorRight - ScissorLeft), (uint32)(ScissorBottom - ScissorTop) };
 			SetScissorRect(MoveTemp(DefaultScissorRect));
 		}
 

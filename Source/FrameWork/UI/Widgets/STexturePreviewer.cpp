@@ -779,12 +779,6 @@ namespace FW
 					Input.InputTexSampler = GpuResourceHelper::GetSampler({ .Filter = SamplerFilter::Bilinear });
 					Input.OutputView = PreviewTexture->GetDefaultView();
 					Input.Viewport = GpuViewPortDesc{ static_cast<float>(FaceS), static_cast<float>(FaceS), 0.0f, 1.0f, OffX, OffY };
-					Input.Scissor = GpuScissorRectDesc{
-						static_cast<uint32>(OffX),
-						static_cast<uint32>(OffY),
-						static_cast<uint32>(OffX) + FaceS,
-						static_cast<uint32>(OffY) + FaceS,
-					};
 					Input.LoadAction = (Face == 0) ? RenderTargetLoadAction::Clear : RenderTargetLoadAction::Load;
 					Input.VariantDefinitions.insert(FString::Printf(TEXT("CHANNEL_FILTER_%s"),
 						ANSI_TO_TCHAR(magic_enum::enum_name(ChannelFilter).data())));

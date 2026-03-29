@@ -1386,6 +1386,14 @@ struct TOriginalVariableRef {
     TSourceLoc loc;
 };
 
+// Tracks a built-in function call that was constant-folded away.
+// Stores the original AST node (TIntermUnary or TIntermAggregate) so that
+// LSP features (hover, go-to-definition) can access all call information
+// including operator, arguments, function name, type, and source location.
+struct TFoldedFunctionCall {
+    TIntermTyped* node;  // the original unary/aggregate call node before folding
+};
+
 class TIntermConstantUnion : public TIntermTyped {
 public:
     TIntermConstantUnion(const TConstUnionArray& ua, const TType& t) : TIntermTyped(t), constArray(ua), literal(false) { }
@@ -1415,12 +1423,27 @@ public:
     bool hasOriginalVariable() const { return !originalVariables.empty(); }
     const TVector<TOriginalVariableRef>& getOriginalVariables() const { return originalVariables; }
 
+    // Track built-in function call(s) that were constant-folded into this node.
+    // Multiple entries are possible when successive folds occur (e.g. normalize(sin(1.0))).
+    void addFoldedFunctionCall(TIntermTyped* callNode) {
+        TFoldedFunctionCall call;
+        call.node = callNode;
+        foldedFunctionCalls.push_back(call);
+    }
+    void addFoldedFunctionCalls(const TVector<TFoldedFunctionCall>& calls) {
+        for (size_t i = 0; i < calls.size(); ++i)
+            foldedFunctionCalls.push_back(calls[i]);
+    }
+    bool hasFoldedFunctionCall() const { return !foldedFunctionCalls.empty(); }
+    const TVector<TFoldedFunctionCall>& getFoldedFunctionCalls() const { return foldedFunctionCalls; }
+
 protected:
     TIntermConstantUnion& operator=(const TIntermConstantUnion&);
 
     const TConstUnionArray constArray;
     bool literal;  // true if node represents a literal in the source code
     TVector<TOriginalVariableRef> originalVariables;  // const variables this was folded from
+    TVector<TFoldedFunctionCall> foldedFunctionCalls;  // function calls this was folded from
 };
 
 // Represent the independent aspects of a texturing TOperator

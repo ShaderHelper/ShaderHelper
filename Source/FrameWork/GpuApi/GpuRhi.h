@@ -48,7 +48,7 @@ public:
 	virtual void SetIndexBuffer(GpuBuffer* InIndexBuffer, GpuFormat IndexFormat = GpuFormat::R32_UINT, uint32 Offset = 0) = 0;
 	// If omitted, it defaults to SetViewPort(GpuViewPortDesc{RenderTarget.Width, RenderTarget.Height}).
 	virtual void SetViewPort(const GpuViewPortDesc& InViewPortDesc) = 0;
-	// If omitted, it defaults to SetScissorRect(GpuScissorRectDesc{0, 0, Viewport.Width, Viewport.Height}).
+	// If omitted, it defaults to SetScissorRect(GpuScissorRectDesc{Viewport.TopLeftX, Viewport.TopLeftY, Viewport.TopLeftX + Viewport.Width, Viewport.TopLeftY + Viewport.Height}).
 	virtual void SetScissorRect(const GpuScissorRectDesc& InScissorRectDes) = 0;
 	// Only support 4 BindGroups to adapt some mobile devices.
 	virtual void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) = 0;

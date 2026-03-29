@@ -138,7 +138,11 @@ namespace FW
         }
 		if (!CurrentScissorRect.IsSet() && CurrentViewPort)
 		{
-			MTL::ScissorRect ScissorRect{ 0, 0, (uint32)(*CurrentViewPort).width, (uint32)(*CurrentViewPort).height };
+            const uint32 ScissorX = (uint32)(*CurrentViewPort).originX;
+            const uint32 ScissorY = (uint32)(*CurrentViewPort).originY;
+            const uint32 ScissorWidth = (uint32)((*CurrentViewPort).originX + (*CurrentViewPort).width) - ScissorX;
+            const uint32 ScissorHeight = (uint32)((*CurrentViewPort).originY + (*CurrentViewPort).height) - ScissorY;
+            MTL::ScissorRect ScissorRect{ ScissorX, ScissorY, ScissorWidth, ScissorHeight };
 			SetScissorRect(MoveTemp(ScissorRect));
 		}
         

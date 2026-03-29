@@ -834,6 +834,21 @@ namespace FW
 					}
 				}
 			}
+
+			if(Node->hasFoldedFunctionCall())
+			{
+				for (const auto& FoldedCall : Node->getFoldedFunctionCalls())
+				{
+					if(glslang::TIntermUnary* Node = FoldedCall.node->getAsUnaryNode())
+					{
+						HandleBuiltInFunction(Node);
+					}
+					else if (glslang::TIntermAggregate* Node = FoldedCall.node->getAsAggregate())
+					{
+						HandleBuiltInFunction(Node);
+					}
+				}
+			}
 			
 			if (Node->getType().isStruct())
 			{

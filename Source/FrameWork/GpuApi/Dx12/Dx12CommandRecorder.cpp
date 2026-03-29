@@ -82,7 +82,11 @@ namespace FW
 		}
 		if (!CurrentScissorRect.IsSet() && CurrentViewPort)
 		{
-			D3D12_RECT DefaultScissorRect = CD3DX12_RECT(0, 0, (LONG)(*CurrentViewPort).Width, (LONG)(*CurrentViewPort).Height);
+			const LONG ScissorLeft = (LONG)(*CurrentViewPort).TopLeftX;
+			const LONG ScissorTop = (LONG)(*CurrentViewPort).TopLeftY;
+			const LONG ScissorRight = (LONG)((*CurrentViewPort).TopLeftX + (*CurrentViewPort).Width);
+			const LONG ScissorBottom = (LONG)((*CurrentViewPort).TopLeftY + (*CurrentViewPort).Height);
+			D3D12_RECT DefaultScissorRect = CD3DX12_RECT(ScissorLeft, ScissorTop, ScissorRight, ScissorBottom);
 			SetScissorRect(MoveTemp(DefaultScissorRect));
 		}
 
@@ -341,15 +345,15 @@ namespace FW
 
 	void Dx12StateCache::SetRenderTargets(TArray<Dx12TextureView*> InRTViews, TArray<Vector4f> InClearColorValues, TArray<RenderTargetLoadAction> InLoadActions)
 	{
+		CurrentViewPort.Reset();
+		CurrentScissorRect.Reset();
+
 		if (InRTViews != CurrentRenderTargetViews || InClearColorValues != ClearColorValues || LoadActions != InLoadActions)
 		{
 			CurrentRenderTargetViews = MoveTemp(InRTViews);
 			ClearColorValues = MoveTemp(InClearColorValues);
 			LoadActions = MoveTemp(InLoadActions);
 			IsRenderTargetDirty = true;
-
-			CurrentViewPort.Reset();
-			CurrentScissorRect.Reset();
 		}
 	}
 
