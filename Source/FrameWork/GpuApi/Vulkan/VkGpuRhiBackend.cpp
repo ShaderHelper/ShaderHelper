@@ -201,7 +201,7 @@ namespace FW
 		VkCheck(vkEndCommandBuffer(VkCmdRecorder->GetCommandBuffer()));
 	}
 
-	void VkGpuRhiBackend::Submit(const TArray<GpuCmdRecorder*>& CmdRecorders)
+	void VkGpuRhiBackend::SubmitInternal(const TArray<GpuCmdRecorder*>& CmdRecorders)
 	{
 		TArray<VkCommandBuffer> CommamdBuffers;
 		for (auto* Recorder : CmdRecorders)

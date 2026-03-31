@@ -31,7 +31,7 @@ namespace FW
 		void* GetSharedHandle(GpuTexture* InGpuTexture) override;
 		GpuCmdRecorder* BeginRecording(const FString& RecorderName = {}) override;
 		void EndRecording(GpuCmdRecorder* InCmdRecorder) override;
-		void Submit(const TArray<GpuCmdRecorder*>& CmdRecorders) override;
+		void SubmitInternal(const TArray<GpuCmdRecorder*>& CmdRecorders) override;
 		virtual void* MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapMode InMapMode, uint32& OutRowPitch) override;
 		virtual void UnMapGpuTexture(GpuTexture* InGpuTexture) override;
 		virtual void* MapGpuBuffer(GpuBuffer* InGpuBuffer, GpuResourceMapMode InMapMode) override;

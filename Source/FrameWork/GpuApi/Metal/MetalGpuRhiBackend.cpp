@@ -203,13 +203,11 @@ bool MetalGpuRhiBackend::CompileShaderInternal(GpuShader *InShader, FString &Out
 	return CompileMetalShader(static_cast<MetalShader *>(InShader), OutErrorInfo, OutWarnInfo, ExtraArgs);
 }
 
-void MetalGpuRhiBackend::Submit(const TArray<GpuCmdRecorder*>& CmdRecorders)
+void MetalGpuRhiBackend::SubmitInternal(const TArray<GpuCmdRecorder*>& CmdRecorders)
 {
-	for(auto CmdRecorder : CmdRecorders)
+    for (auto* CmdRecorder : CmdRecorders)
     {
-        MtlCmdRecorder* MetalCmdRecorder = static_cast<MtlCmdRecorder*>(CmdRecorder);
-        MTL::CommandBuffer* CmdBuffer = MetalCmdRecorder->GetCommandBuffer();
-        CmdBuffer->commit();
+        static_cast<MtlCmdRecorder*>(CmdRecorder)->GetCommandBuffer()->commit();
     }
     LastSubmittedCmdRecorder = static_cast<MtlCmdRecorder*>(CmdRecorders.Last());
 }

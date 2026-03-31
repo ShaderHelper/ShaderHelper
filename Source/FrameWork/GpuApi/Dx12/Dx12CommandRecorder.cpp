@@ -647,7 +647,7 @@ namespace FW
 				{
 					for (uint32 ArraySlice = 0; ArraySlice < ArraySize; ArraySlice++)
 					{
-						D3D12_RESOURCE_STATES BeforeDx12State = MapResourceState(DxTex->GetSubResourceState(Mip, ArraySlice));
+						D3D12_RESOURCE_STATES BeforeDx12State = MapResourceState(GetLocalTextureSubResourceState(DxTex, Mip, ArraySlice));
 						if (BeforeDx12State == AfterDx12State)
 						{
 							if (BarrierInfo.NewState == GpuResourceState::UnorderedAccess) bNeedUAVBarrier = true;
@@ -658,7 +658,7 @@ namespace FW
 					}
 				}
 				if (bNeedUAVBarrier) DxBarriers.Add(CD3DX12_RESOURCE_BARRIER::UAV(DxTex->GetResource()));
-				DxTex->SetAllSubResourceStates(BarrierInfo.NewState);
+				SetLocalTextureAllSubResourceStates(DxTex, BarrierInfo.NewState);
 			}
 			else if (BarrierInfo.Resource->GetType() == GpuResourceType::TextureView)
 			{
@@ -672,7 +672,7 @@ namespace FW
 					uint32 Mip = View->GetBaseMipLevel() + i;
 					for (uint32 ArraySlice = 0; ArraySlice < ArraySize; ArraySlice++)
 					{
-						D3D12_RESOURCE_STATES BeforeDx12State = MapResourceState(DxTex->GetSubResourceState(Mip, ArraySlice));
+						D3D12_RESOURCE_STATES BeforeDx12State = MapResourceState(GetLocalTextureSubResourceState(DxTex, Mip, ArraySlice));
 						if (BeforeDx12State == AfterDx12State)
 						{
 							if (BarrierInfo.NewState == GpuResourceState::UnorderedAccess) bNeedUAVBarrier = true;
@@ -680,7 +680,7 @@ namespace FW
 						}
 						uint32 Subresource = D3D12CalcSubresource(Mip, ArraySlice, 0, NumMips, ArraySize);
 						DxBarriers.Add(CD3DX12_RESOURCE_BARRIER::Transition(DxTex->GetResource(), BeforeDx12State, AfterDx12State, Subresource));
-						DxTex->SetSubResourceState(Mip, ArraySlice, BarrierInfo.NewState);
+						SetLocalTextureSubResourceState(DxTex, Mip, ArraySlice, BarrierInfo.NewState);
 					}
 				}
 				if (bNeedUAVBarrier) DxBarriers.Add(CD3DX12_RESOURCE_BARRIER::UAV(DxTex->GetResource()));
@@ -688,7 +688,7 @@ namespace FW
 			else if (BarrierInfo.Resource->GetType() == GpuResourceType::Buffer)
 			{
 				Dx12Buffer* DxBuffer = static_cast<Dx12Buffer*>(BarrierInfo.Resource);
-				GpuResourceState OldState = DxBuffer->State;
+				GpuResourceState OldState = GetLocalBufferState(DxBuffer);
 				if (OldState == BarrierInfo.NewState)
 				{
 					if (BarrierInfo.NewState == GpuResourceState::UnorderedAccess)
@@ -699,7 +699,7 @@ namespace FW
 					D3D12_RESOURCE_STATES BeforeDx12State = MapResourceState(OldState);
 					DxBarriers.Add(CD3DX12_RESOURCE_BARRIER::Transition(DxBuffer->GetAllocation().GetResource(), BeforeDx12State, AfterDx12State));
 				}
-				DxBuffer->State = BarrierInfo.NewState;
+				SetLocalBufferState(DxBuffer, BarrierInfo.NewState);
 			}
 			else
 			{

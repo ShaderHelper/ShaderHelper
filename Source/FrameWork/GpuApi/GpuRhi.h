@@ -21,7 +21,7 @@ struct GpuRhiConfig
 	GpuRhiBackendType BackendType;
 };
 
-//Note: doesn't support state inheritance across pass
+//Note: PassRecorder doesn't support state inheritance across pass
 class GpuComputePassRecorder
 {
 public:
@@ -83,7 +83,9 @@ private:
 	uint32 Count;
 };
 
-//Recorder is designed as transient within one frame, can not reuse it
+//Recorder is designed as transient within one frame, can not reuse it.
+//Resource states are tracked per-recorder for thread safety during parallel recording.
+//States are resolved to global resources at Submit() time.
 class GpuCmdRecorder : public GpuComputeCmdRecorder
 {
 public:
@@ -95,6 +97,26 @@ public:
 	virtual void CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture, uint32 ArrayLayer = 0, uint32 MipLevel = 0) = 0;
 	virtual void CopyTextureToBuffer(GpuTexture* InTexture, GpuBuffer* InBuffer) = 0;
 	virtual void CopyBufferToBuffer(GpuBuffer* SrcBuffer, uint32 SrcOffset, GpuBuffer* DestBuffer, uint32 DestOffset, uint32 Size) = 0;
+
+	// Per-recorder local resource state tracking (thread-safe for parallel recording)
+	GpuResourceState GetLocalTextureSubResourceState(GpuTexture* Texture, uint32 MipLevel, uint32 ArraySlice);
+	void SetLocalTextureSubResourceState(GpuTexture* Texture, uint32 MipLevel, uint32 ArraySlice, GpuResourceState NewState);
+	void SetLocalTextureAllSubResourceStates(GpuTexture* Texture, GpuResourceState NewState);
+	GpuResourceState GetLocalBufferState(GpuBuffer* Buffer);
+	void SetLocalBufferState(GpuBuffer* Buffer, GpuResourceState NewState);
+	void ResolveToGlobalStates();
+
+	const TMap<GpuTexture*, TArray<GpuResourceState>>& GetInitialTextureStates() const { return InitialTextureStates; }
+	const TMap<GpuBuffer*, GpuResourceState>& GetInitialBufferStates() const { return InitialBufferStates; }
+	const TMap<GpuTexture*, TArray<GpuResourceState>>& GetLocalTextureStates() const { return LocalTextureStates; }
+	const TMap<GpuBuffer*, GpuResourceState>& GetLocalBufferStates() const { return LocalBufferStates; }
+
+protected:
+	// Snapshot of global state at first access per resource (used for bridge barriers)
+	TMap<GpuTexture*, TArray<GpuResourceState>> InitialTextureStates;
+	TMap<GpuBuffer*, GpuResourceState> InitialBufferStates;
+	TMap<GpuTexture*, TArray<GpuResourceState>> LocalTextureStates;
+	TMap<GpuBuffer*, GpuResourceState> LocalBufferStates;
 };
 
 class FRAMEWORK_API GpuRhi
@@ -152,7 +174,7 @@ public:
 	//virtual void EndRecordingAndSubmit(GpuComputeCmdRecorder* InCmdRecorder) = 0;
 	virtual GpuCmdRecorder* BeginRecording(const FString& RecorderName = {}) = 0;
 	virtual void EndRecording(GpuCmdRecorder* InCmdRecorder) = 0;
-	virtual void Submit(const TArray<GpuCmdRecorder*>& CmdRecorders) = 0;
+	void Submit(const TArray<GpuCmdRecorder*>& CmdRecorders);
 
 	virtual TRefCountPtr<GpuQuerySet> CreateQuerySet(uint32 Count) = 0;
 
@@ -160,6 +182,7 @@ public:
 	static void InitGpuRhi(const GpuRhiConfig &InConfig);
 
 protected:
+	virtual void SubmitInternal(const TArray<GpuCmdRecorder*>& CmdRecorders) = 0;
 	virtual TRefCountPtr<GpuTexture> CreateTextureInternal(const GpuTextureDesc& InTexDesc, GpuResourceState InitState) = 0;
 	virtual TRefCountPtr<GpuBuffer> CreateBufferInternal(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState) = 0;
 	virtual TRefCountPtr<GpuTextureView> CreateTextureViewInternal(const GpuTextureViewDesc& InViewDesc) = 0;

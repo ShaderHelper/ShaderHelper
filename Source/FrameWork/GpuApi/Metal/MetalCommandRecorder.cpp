@@ -402,7 +402,7 @@ namespace FW
             if (Info.Resource->GetType() == GpuResourceType::Texture)
             {
                 GpuTexture* Tex = static_cast<GpuTexture*>(Info.Resource);
-                Tex->SetAllSubResourceStates(Info.NewState);
+                SetLocalTextureAllSubResourceStates(Tex, Info.NewState);
             }
             else if (Info.Resource->GetType() == GpuResourceType::TextureView)
             {
@@ -414,14 +414,14 @@ namespace FW
                     uint32 Mip = View->GetBaseMipLevel() + i;
                     for (uint32 Layer = 0; Layer < ArrayLayers; Layer++)
                     {
-                        Tex->SetSubResourceState(Mip, Layer, Info.NewState);
+                        SetLocalTextureSubResourceState(Tex, Mip, Layer, Info.NewState);
                     }
                 }
             }
             else
             {
                 GpuBuffer* Buf = static_cast<GpuBuffer*>(Info.Resource);
-                Buf->State = Info.NewState;
+                SetLocalBufferState(Buf, Info.NewState);
             }
         }
     }

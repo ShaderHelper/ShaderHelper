@@ -15,6 +15,206 @@
 
 namespace FW
 {
+
+GpuResourceState GpuCmdRecorder::GetLocalTextureSubResourceState(GpuTexture* Texture, uint32 MipLevel, uint32 ArraySlice)
+{
+	if (auto* Found = LocalTextureStates.Find(Texture))
+	{
+		return (*Found)[Texture->CalcSubResourceIndex(MipLevel, ArraySlice)];
+	}
+	return Texture->GetSubResourceState(MipLevel, ArraySlice);
+}
+
+void GpuCmdRecorder::SetLocalTextureSubResourceState(GpuTexture* Texture, uint32 MipLevel, uint32 ArraySlice, GpuResourceState NewState)
+{
+	auto& States = LocalTextureStates.FindOrAdd(Texture);
+	if (States.IsEmpty())
+	{
+		uint32 Num = Texture->GetNumSubResources();
+		States.SetNum(Num);
+		for (uint32 i = 0; i < Num; i++)
+		{
+			uint32 Mip = i % Texture->GetNumMips();
+			uint32 Layer = i / Texture->GetNumMips();
+			States[i] = Texture->GetSubResourceState(Mip, Layer);
+		}
+		// Record initial snapshot
+		if (!InitialTextureStates.Contains(Texture))
+		{
+			InitialTextureStates.Add(Texture, States);
+		}
+	}
+	States[Texture->CalcSubResourceIndex(MipLevel, ArraySlice)] = NewState;
+}
+
+void GpuCmdRecorder::SetLocalTextureAllSubResourceStates(GpuTexture* Texture, GpuResourceState NewState)
+{
+	auto& States = LocalTextureStates.FindOrAdd(Texture);
+	if (States.IsEmpty() && !InitialTextureStates.Contains(Texture))
+	{
+		uint32 Num = Texture->GetNumSubResources();
+		TArray<GpuResourceState> InitStates;
+		InitStates.SetNum(Num);
+		for (uint32 i = 0; i < Num; i++)
+		{
+			uint32 Mip = i % Texture->GetNumMips();
+			uint32 Layer = i / Texture->GetNumMips();
+			InitStates[i] = Texture->GetSubResourceState(Mip, Layer);
+		}
+		InitialTextureStates.Add(Texture, MoveTemp(InitStates));
+	}
+	States.SetNum(Texture->GetNumSubResources());
+	for (auto& S : States) S = NewState;
+}
+
+GpuResourceState GpuCmdRecorder::GetLocalBufferState(GpuBuffer* Buffer)
+{
+	if (auto* Found = LocalBufferStates.Find(Buffer))
+	{
+		return *Found;
+	}
+	return Buffer->State;
+}
+
+void GpuCmdRecorder::SetLocalBufferState(GpuBuffer* Buffer, GpuResourceState NewState)
+{
+	if (!InitialBufferStates.Contains(Buffer))
+	{
+		InitialBufferStates.Add(Buffer, Buffer->State);
+	}
+	LocalBufferStates.FindOrAdd(Buffer) = NewState;
+}
+
+void GpuCmdRecorder::ResolveToGlobalStates()
+{
+	for (auto& [Texture, States] : LocalTextureStates)
+	{
+		uint32 Num = States.Num();
+		for (uint32 i = 0; i < Num; i++)
+		{
+			uint32 Mip = i % Texture->GetNumMips();
+			uint32 Layer = i / Texture->GetNumMips();
+			Texture->SetSubResourceState(Mip, Layer, States[i]);
+		}
+	}
+	for (auto& [Buffer, State] : LocalBufferStates)
+	{
+		Buffer->State = State;
+	}
+	LocalTextureStates.Empty();
+	LocalBufferStates.Empty();
+	InitialTextureStates.Empty();
+	InitialBufferStates.Empty();
+}
+
+void GpuRhi::Submit(const TArray<GpuCmdRecorder*>& CmdRecorders)
+{
+	if (CmdRecorders.Num() <= 1)
+	{
+		SubmitInternal(CmdRecorders);
+		CmdRecorders[0]->ResolveToGlobalStates();
+		return;
+	}
+
+	// For multiple recorders, insert bridge barriers between adjacent recorders
+	// to correct mismatched initial snapshots.
+	TArray<GpuCmdRecorder*> FinalCmdRecorders;
+	TArray<TRefCountPtr<GpuTextureView>> BridgeTextureViews;
+
+	for (int32 i = 0; i < CmdRecorders.Num(); i++)
+	{
+		if (i > 0)
+		{
+			GpuCmdRecorder* Prev = CmdRecorders[i - 1];
+			GpuCmdRecorder* Next = CmdRecorders[i];
+			TArray<GpuBarrierInfo> BridgeBarriers;
+
+			for (auto& [Texture, NextInitStates] : Next->GetInitialTextureStates())
+			{
+				uint32 NumMips = Texture->GetNumMips();
+				uint32 Num = NextInitStates.Num();
+
+				// Check if all initial states are uniform — if so, a single whole-texture barrier suffices
+				bool bUniformInitState = true;
+				for (uint32 j = 1; j < Num; j++)
+				{
+					if (NextInitStates[j] != NextInitStates[0]) { bUniformInitState = false; break; }
+				}
+
+				bool bHasMismatch = false;
+				for (uint32 j = 0; j < Num; j++)
+				{
+					uint32 Mip = j % NumMips;
+					uint32 Layer = j / NumMips;
+					GpuResourceState PrevFinalState;
+					auto* PrevLocalStates = Prev->GetLocalTextureStates().Find(Texture);
+					if (PrevLocalStates)
+					{
+						PrevFinalState = (*PrevLocalStates)[j];
+					}
+					else
+					{
+						PrevFinalState = Texture->GetSubResourceState(Mip, Layer);
+					}
+
+					if (PrevFinalState != NextInitStates[j])
+					{
+						if (bUniformInitState)
+						{
+							BridgeBarriers.Add({.Resource = Texture, .NewState = NextInitStates[0]});
+							break;
+						}
+						else
+						{
+							TRefCountPtr<GpuTextureView> BridgeView = CreateTextureView({
+								.Texture = Texture, .BaseMipLevel = Mip, .MipLevelCount = 1,
+								.BaseArrayLayer = Layer, .ArrayLayerCount = 1
+							});
+							BridgeBarriers.Add({.Resource = BridgeView.GetReference(), .NewState = NextInitStates[j]});
+							BridgeTextureViews.Add(MoveTemp(BridgeView));
+						}
+					}
+				}
+			}
+
+			for (auto& [Buffer, NextInitState] : Next->GetInitialBufferStates())
+			{
+				GpuResourceState PrevFinalState;
+				auto* PrevLocalState = Prev->GetLocalBufferStates().Find(Buffer);
+				if (PrevLocalState)
+				{
+					PrevFinalState = *PrevLocalState;
+				}
+				else
+				{
+					PrevFinalState = Buffer->State;
+				}
+
+				if (PrevFinalState != NextInitState)
+				{
+					BridgeBarriers.Add({.Resource = Buffer, .NewState = NextInitState});
+				}
+			}
+
+			if (!BridgeBarriers.IsEmpty())
+			{
+				GpuCmdRecorder* BridgeRecorder = BeginRecording(TEXT("BridgeBarrier"));
+				BridgeRecorder->Barriers(BridgeBarriers);
+				EndRecording(BridgeRecorder);
+				FinalCmdRecorders.Add(BridgeRecorder);
+			}
+		}
+		FinalCmdRecorders.Add(CmdRecorders[i]);
+	}
+
+	SubmitInternal(FinalCmdRecorders);
+
+	for (auto* Recorder : FinalCmdRecorders)
+	{
+		Recorder->ResolveToGlobalStates();
+	}
+}
+
 TRefCountPtr<GpuTexture> GpuRhi::CreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
 {
 	//If the initial state is unknown, then the state be determined based on usage,
@@ -223,21 +423,21 @@ public:
 	void CopyBufferToTexture(GpuBuffer* InBuffer, GpuTexture* InTexture, uint32 ArrayLayer = 0, uint32 MipLevel = 0) override
 	{
 		check(State == CmdRecorderState::Begin);
-		check(EnumHasAnyFlags(InBuffer->State, GpuResourceState::CopySrc) && EnumHasAnyFlags(InTexture->GetSubResourceState(MipLevel, ArrayLayer), GpuResourceState::CopyDst));
+		check(EnumHasAnyFlags(CmdRecorder->GetLocalBufferState(InBuffer), GpuResourceState::CopySrc) && EnumHasAnyFlags(CmdRecorder->GetLocalTextureSubResourceState(InTexture, MipLevel, ArrayLayer), GpuResourceState::CopyDst));
 		CmdRecorder->CopyBufferToTexture(InBuffer, InTexture, ArrayLayer, MipLevel);
 	}
 
 	void CopyTextureToBuffer(GpuTexture* InTexture, GpuBuffer* InBuffer) override
 	{
 		check(State == CmdRecorderState::Begin);
-		check(EnumHasAnyFlags(InBuffer->State, GpuResourceState::CopyDst) && EnumHasAnyFlags(InTexture->GetSubResourceState(0, 0), GpuResourceState::CopySrc));
+		check(EnumHasAnyFlags(CmdRecorder->GetLocalBufferState(InBuffer), GpuResourceState::CopyDst) && EnumHasAnyFlags(CmdRecorder->GetLocalTextureSubResourceState(InTexture, 0, 0), GpuResourceState::CopySrc));
 		CmdRecorder->CopyTextureToBuffer(InTexture, InBuffer);
 	}
 
 	void CopyBufferToBuffer(GpuBuffer* SrcBuffer, uint32 SrcOffset, GpuBuffer* DestBuffer, uint32 DestOffset, uint32 Size) override
 	{
 		check(State == CmdRecorderState::Begin);
-		check(EnumHasAnyFlags(DestBuffer->State, GpuResourceState::CopyDst) && EnumHasAnyFlags(SrcBuffer->State, GpuResourceState::CopySrc));
+		check(EnumHasAnyFlags(CmdRecorder->GetLocalBufferState(DestBuffer), GpuResourceState::CopyDst) && EnumHasAnyFlags(CmdRecorder->GetLocalBufferState(SrcBuffer), GpuResourceState::CopySrc));
 		CmdRecorder->CopyBufferToBuffer(SrcBuffer, SrcOffset, DestBuffer, DestOffset, Size);
 	}
 
@@ -376,7 +576,7 @@ public:
 		CmdRecorderValidation->State = CmdRecorderState::End;
 	}
 
-	void Submit(const TArray<GpuCmdRecorder*>& CmdRecorders) override
+	void SubmitInternal(const TArray<GpuCmdRecorder*>& CmdRecorders) override
 	{
 		TArray<GpuCmdRecorder*> RealCmdRecorders;
 		for (int Index = 0; Index < CmdRecorders.Num(); Index++)
@@ -390,7 +590,6 @@ public:
 			RealCmdRecorders.Add(CmdRecorderValidation->CmdRecorder);
 		}
 		RhiBackend->Submit(MoveTemp(RealCmdRecorders));
-
 	}
 
 	void* MapGpuTexture(GpuTexture* InGpuTexture, GpuResourceMapMode InMapMode, uint32& OutRowPitch) override

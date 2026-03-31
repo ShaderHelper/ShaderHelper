@@ -439,7 +439,7 @@ namespace FW::VK
 				{
 					for (uint32 Layer = 0; Layer < ArrayLayers; Layer++)
 					{
-						GpuResourceState SubOldState = VkTex->GetSubResourceState(Mip, Layer);
+						GpuResourceState SubOldState = GetLocalTextureSubResourceState(VkTex, Mip, Layer);
 						if (SubOldState == Info.NewState && Info.NewState != GpuResourceState::UnorderedAccess) continue;
 
 						VkAccessFlags SrcAccess{};
@@ -466,7 +466,7 @@ namespace FW::VK
 						SrcStageMask |= SrcStage;
 					}
 				}
-				VkTex->SetAllSubResourceStates(Info.NewState);
+				SetLocalTextureAllSubResourceStates(VkTex, Info.NewState);
 			}
 			else if (Info.Resource->GetType() == GpuResourceType::TextureView)
 			{
@@ -480,7 +480,7 @@ namespace FW::VK
 					uint32 Mip = View->GetBaseMipLevel() + i;
 					for (uint32 Layer = 0; Layer < ArrayLayers; Layer++)
 					{
-						GpuResourceState SubOldState = VkTex->GetSubResourceState(Mip, Layer);
+						GpuResourceState SubOldState = GetLocalTextureSubResourceState(VkTex, Mip, Layer);
 						if (SubOldState == Info.NewState && Info.NewState != GpuResourceState::UnorderedAccess) continue;
 
 						VkAccessFlags SrcAccess{};
@@ -505,14 +505,14 @@ namespace FW::VK
 							},
 						});
 						SrcStageMask |= SrcStage;
-						VkTex->SetSubResourceState(Mip, Layer, Info.NewState);
+						SetLocalTextureSubResourceState(VkTex, Mip, Layer, Info.NewState);
 					}
 				}
 			}
 			else if (Info.Resource->GetType() == GpuResourceType::Buffer)
 			{
 				VulkanBuffer* VkBuffer = static_cast<VulkanBuffer*>(Info.Resource);
-				GpuResourceState OldState = VkBuffer->State;
+				GpuResourceState OldState = GetLocalBufferState(VkBuffer);
 				if (OldState == Info.NewState && Info.NewState != GpuResourceState::UnorderedAccess)
 				{
 					continue;
@@ -533,7 +533,7 @@ namespace FW::VK
 					.size = VK_WHOLE_SIZE
 				});
 				SrcStageMask |= SrcStage;
-				VkBuffer->State = Info.NewState;
+				SetLocalBufferState(VkBuffer, Info.NewState);
 			}
 			else
 			{

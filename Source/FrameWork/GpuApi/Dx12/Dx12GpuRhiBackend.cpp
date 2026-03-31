@@ -224,7 +224,7 @@ bool Dx12GpuRhiBackend::CompileShaderInternal(GpuShader *InShader, FString &OutE
 }
 
 
-void Dx12GpuRhiBackend::Submit(const TArray<GpuCmdRecorder*>& CmdRecorders)
+void Dx12GpuRhiBackend::SubmitInternal(const TArray<GpuCmdRecorder*>& CmdRecorders)
 {
 	TArray<ID3D12CommandList*> CmdLists;
 	for (auto CmdRecorder : CmdRecorders)

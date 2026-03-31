@@ -16,13 +16,13 @@ namespace FW
 		UniformBuffer = 1u << 0,
 		ShaderResourceRead = 1u << 1,
 		CopySrc = 1u << 2,
-		VertexBufferRead = 1u << 6,
-		IndexBufferRead = 1u << 7,
+		VertexBufferRead = 1u << 3,
+		IndexBufferRead = 1u << 4,
 
 		//Write State
-		RenderTargetWrite = 1u << 3,
-		CopyDst = 1u << 4,
-		UnorderedAccess = 1u << 5,
+		RenderTargetWrite = 1u << 5,
+		CopyDst = 1u << 6,
+		UnorderedAccess = 1u << 7,
 
 		ReadMask = UniformBuffer | ShaderResourceRead | CopySrc | VertexBufferRead | IndexBufferRead,
 		WriteMask = RenderTargetWrite | CopyDst | UnorderedAccess,
