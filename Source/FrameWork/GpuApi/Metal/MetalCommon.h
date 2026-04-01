@@ -32,6 +32,7 @@ typedef NS::SharedPtr<MTL::TileRenderPipelineDescriptor> MTLTileRenderPipelineDe
 
 typedef NS::SharedPtr<MTL::RenderPipelineState> MTLRenderPipelineStatePtr;
 typedef NS::SharedPtr<MTL::ComputePipelineState> MTLComputePipelineStatePtr;
+typedef NS::SharedPtr<MTL::DepthStencilState> MTLDepthStencilStatePtr;
 
 typedef NS::SharedPtr<MTL::RenderPipelineReflection> MTLRenderPipelineReflectionPtr;
 typedef NS::SharedPtr<MTL::ComputePipelineReflection> MTLComputePipelineReflectionPtr;

@@ -84,6 +84,16 @@ namespace FW
             RawPassDesc.colorAttachments[i].clearColor = MTLClearColorMake(RtInfo.ClearColor.x, RtInfo.ClearColor.y, RtInfo.ClearColor.z, RtInfo.ClearColor.w);
         }
 
+        if (PassDesc.DepthStencilTarget.IsSet())
+        {
+            const GpuDepthStencilTargetInfo& DepthInfo = *PassDesc.DepthStencilTarget;
+            MetalTextureView* DsView = static_cast<MetalTextureView*>(DepthInfo.View);
+            RawPassDesc.depthAttachment.texture = (id<MTLTexture>)DsView->GetResource();
+            RawPassDesc.depthAttachment.loadAction = MapLoadAction(DepthInfo.LoadAction);
+            RawPassDesc.depthAttachment.storeAction = MapStoreAction(DepthInfo.StoreAction);
+            RawPassDesc.depthAttachment.clearDepth = DepthInfo.ClearDepth;
+        }
+
         if (PassDesc.TimestampWrites && GSupportStageBoundaryCounter)
         {
             const GpuRenderPassTimestampWrites& TsWrites = *PassDesc.TimestampWrites;
@@ -118,6 +128,7 @@ namespace FW
         case GpuFormat::R11G11B10_FLOAT:       return MTLPixelFormatRG11B10Float;
         case GpuFormat::R16_FLOAT:             return MTLPixelFormatR16Float;
         case GpuFormat::R32_FLOAT:             return MTLPixelFormatR32Float;
+        case GpuFormat::D32_FLOAT:             return MTLPixelFormatDepth32Float;
         default:
 			AUX::Unreachable();
         }

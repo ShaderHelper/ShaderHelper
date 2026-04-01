@@ -20,7 +20,7 @@ project "FrameWork"
 	}
 
     uses {
-        "UE", "magic_enum", "Python","ShaderConductor", "shaderc"
+        "UE", "magic_enum", "Python","ShaderConductor", "shaderc", "Fbx"
     }
 	
 	addToProjectHierarchy(UeHierarchy)

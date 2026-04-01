@@ -20,6 +20,7 @@ namespace FW
 		case GpuFormat::R11G11B10_FLOAT:
 		case GpuFormat::R32_UINT:
 		case GpuFormat::R32_FLOAT:
+		case GpuFormat::D32_FLOAT:
 			return 4;
 		case GpuFormat::R32G32_UINT:
 		case GpuFormat::R32G32_FLOAT:
@@ -78,6 +79,9 @@ namespace FW
 		GpuResourceState Result = GpuResourceState::Unknown;
 		if (EnumHasAllFlags(Usage, GpuTextureUsage::RenderTarget)) {
 			Result |= GpuResourceState::RenderTargetWrite;
+		}
+		if (EnumHasAllFlags(Usage, GpuTextureUsage::DepthStencil)) {
+			Result |= GpuResourceState::DepthStencilWrite;
 		}
 		if (EnumHasAllFlags(Usage, GpuTextureUsage::UnorderedAccess)) {
 			Result |= GpuResourceState::UnorderedAccess;

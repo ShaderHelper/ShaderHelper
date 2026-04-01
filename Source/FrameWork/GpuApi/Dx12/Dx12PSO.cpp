@@ -83,12 +83,17 @@ namespace FW
 		PsoDesc.InputLayout = { InputElements.GetData(), (uint32)InputElements.Num() };
 
         PsoDesc.RasterizerState = MapRasterizerState(InPipelineStateDesc.RasterizerState);
-        PsoDesc.DepthStencilState.DepthEnable = false;
+        PsoDesc.DepthStencilState.DepthEnable = InPipelineStateDesc.DepthStencilState.IsSet();
+        if (InPipelineStateDesc.DepthStencilState)
+        {
+            PsoDesc.DepthStencilState.DepthWriteMask = InPipelineStateDesc.DepthStencilState->DepthWriteEnable ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
+            PsoDesc.DepthStencilState.DepthFunc = MapComparisonFunc(InPipelineStateDesc.DepthStencilState->DepthCompare);
+            PsoDesc.DSVFormat = MapTextureFormat(InPipelineStateDesc.DepthStencilState->DepthFormat);
+        }
         PsoDesc.DepthStencilState.StencilEnable = false;
         PsoDesc.SampleMask = UINT_MAX;
         PsoDesc.PrimitiveTopologyType = MapTopologyType(MapPrimitiveType(InPipelineStateDesc.Primitive));
         PsoDesc.NumRenderTargets = TargetNum;
-        PsoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
         PsoDesc.SampleDesc.Count = 1;
         PsoDesc.SampleDesc.Quality = 0;
         

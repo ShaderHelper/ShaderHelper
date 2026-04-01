@@ -35,6 +35,14 @@ namespace FW
 		Vector4f ClearColor = View->GetTexture()->GetResourceDesc().ClearValues;
 	};
 
+	struct GpuDepthStencilTargetInfo
+	{
+		GpuTextureView* View;
+		RenderTargetLoadAction LoadAction = RenderTargetLoadAction::Clear;
+		RenderTargetStoreAction StoreAction = RenderTargetStoreAction::DontCare;
+		float ClearDepth = 1.0f;
+	};
+
 	struct GpuRenderPassTimestampWrites
 	{
 		GpuQuerySet* QuerySet;
@@ -45,6 +53,7 @@ namespace FW
 	struct GpuRenderPassDesc
 	{
 		TArray<GpuRenderTargetInfo, TFixedAllocator<GpuResourceLimit::MaxRenderTargetNum>> ColorRenderTargets;
+		TOptional<GpuDepthStencilTargetInfo> DepthStencilTarget;
 		TOptional<GpuRenderPassTimestampWrites> TimestampWrites;
 	};
 

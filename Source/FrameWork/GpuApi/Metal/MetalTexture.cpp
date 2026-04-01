@@ -47,6 +47,11 @@ namespace FW
         {
             Usage |= MTLTextureUsageShaderWrite;
         }
+
+        if(EnumHasAnyFlags(InUsage, GpuTextureUsage::DepthStencil))
+        {
+            Usage |= MTLTextureUsageRenderTarget;
+        }
         OutTexDesc->setUsage(Usage);
     }
 

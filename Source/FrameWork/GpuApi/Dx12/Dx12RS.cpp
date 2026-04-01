@@ -53,29 +53,29 @@ namespace FW
 			//For the moment, all uniformbuffers in the layout are bound via root descriptor.
 			if (LayoutBindingEntry.Type == BindingType::UniformBuffer)
 			{
-				CD3DX12_ROOT_PARAMETER DynamicBufferRootParameter;
-				DynamicBufferRootParameter.InitAsConstantBufferView(Slot, Desc.GroupNumber, BindingVisibility);
+				CD3DX12_ROOT_PARAMETER1 DynamicBufferRootParameter;
+				DynamicBufferRootParameter.InitAsConstantBufferView(Slot, Desc.GroupNumber, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, BindingVisibility);
 				DynamicBufferRootParameters.Add(Slot, MoveTemp(DynamicBufferRootParameter));
 			}
 			else
 			{
-				CD3DX12_DESCRIPTOR_RANGE Range{};
-				Range.RangeType = BindingTypeToDescriptorRangeType(LayoutBindingEntry.Type);
-				Range.NumDescriptors = 1;
-				Range.BaseShaderRegister = Slot;
-				Range.RegisterSpace = LayoutDesc.GroupNumber;
-				Range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+				CD3DX12_DESCRIPTOR_RANGE1 Range{};
+				Range.Init(
+					BindingTypeToDescriptorRangeType(LayoutBindingEntry.Type),
+					1,
+					Slot,
+					LayoutDesc.GroupNumber);
 
 				if (LayoutBindingEntry.Type == BindingType::CombinedTextureSampler || LayoutBindingEntry.Type == BindingType::CombinedTextureCubeSampler || LayoutBindingEntry.Type == BindingType::CombinedTexture3DSampler)
 				{
 					DescriptorTableRanges_CbvSrvUav.FindOrAdd(BindingVisibility).Add(MoveTemp(Range));
 
-					CD3DX12_DESCRIPTOR_RANGE SamplerRange{};
-					SamplerRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-					SamplerRange.NumDescriptors = 1;
-					SamplerRange.BaseShaderRegister = Slot;
-					SamplerRange.RegisterSpace = LayoutDesc.GroupNumber;
-					SamplerRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+					CD3DX12_DESCRIPTOR_RANGE1 SamplerRange{};
+					SamplerRange.Init(
+						D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER,
+						1,
+						Slot,
+						LayoutDesc.GroupNumber);
 					DescriptorTableRanges_Sampler.FindOrAdd(BindingVisibility).Add(MoveTemp(SamplerRange));
 				}
 				else if (LayoutBindingEntry.Type == BindingType::Texture || LayoutBindingEntry.Type == BindingType::TextureCube || LayoutBindingEntry.Type == BindingType::Texture3D ||
@@ -103,7 +103,7 @@ namespace FW
 
 		for (const auto& [BindingVisibility, Ranges] : DescriptorTableRanges_CbvSrvUav)
 		{
-			CD3DX12_ROOT_PARAMETER DescriptorTableRootParameter;
+			CD3DX12_ROOT_PARAMETER1 DescriptorTableRootParameter;
 			DescriptorTableRootParameter.InitAsDescriptorTable((uint32)Ranges.Num(), Ranges.GetData(), BindingVisibility);
 
 			DescriptorTableRootParameters_CbvSrvUav.Add(BindingVisibility, MoveTemp(DescriptorTableRootParameter));
@@ -111,7 +111,7 @@ namespace FW
 
 		for (const auto& [BindingVisibility, Ranges] : DescriptorTableRanges_Sampler)
 		{
-			CD3DX12_ROOT_PARAMETER DescriptorTableRootParameter;
+			CD3DX12_ROOT_PARAMETER1 DescriptorTableRootParameter;
 			DescriptorTableRootParameter.InitAsDescriptorTable((uint32)Ranges.Num(), Ranges.GetData(), BindingVisibility);
 
 			DescriptorTableRootParameters_Sampler.Add(BindingVisibility, MoveTemp(DescriptorTableRootParameter));
@@ -308,7 +308,7 @@ namespace FW
 
 	Dx12RootSignature::Dx12RootSignature(const RootSignatureDesc& InDesc)
 	{
-		TArray<CD3DX12_ROOT_PARAMETER> RootParameters;
+		TArray<CD3DX12_ROOT_PARAMETER1> RootParameters;
 		auto AddRootParameter = [&](const Dx12BindGroupLayout* Layout) {
 
 			if (Layout != nullptr)
@@ -329,13 +329,13 @@ namespace FW
 				for (int Visibility = 0; Visibility <= D3D12_SHADER_VISIBILITY_MESH; Visibility++)
 				{
 					D3D12_SHADER_VISIBILITY DxVisibility = static_cast<D3D12_SHADER_VISIBILITY>(Visibility);
-					if (TOptional<CD3DX12_ROOT_PARAMETER> RootParameter = Layout->GetDescriptorTableRootParameter_CbvSrvUav(DxVisibility))
+					if (TOptional<CD3DX12_ROOT_PARAMETER1> RootParameter = Layout->GetDescriptorTableRootParameter_CbvSrvUav(DxVisibility))
 					{
 						RootParameters.Add(*RootParameter);
 						CbvSrvUavTableToRootParameterIndex[CurGroupNumber].Add(DxVisibility, RootParameters.Num() - 1);
 					}
 
-					if (TOptional<CD3DX12_ROOT_PARAMETER> RootParameter = Layout->GetDescriptorTableRootParameter_Sampler(DxVisibility))
+					if (TOptional<CD3DX12_ROOT_PARAMETER1> RootParameter = Layout->GetDescriptorTableRootParameter_Sampler(DxVisibility))
 					{
 						RootParameters.Add(*RootParameter);
 						SamplerTableToRootParameterIndex[CurGroupNumber].Add(DxVisibility, RootParameters.Num() - 1);
@@ -352,7 +352,7 @@ namespace FW
 		AddRootParameter(InDesc.Layout3);
 
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC RootSignatureDesc;
-		RootSignatureDesc.Init_1_0(
+		RootSignatureDesc.Init_1_1(
 			(uint32)RootParameters.Num(),
 			RootParameters.GetData(),
 			0,

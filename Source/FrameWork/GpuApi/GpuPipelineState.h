@@ -59,6 +59,15 @@ namespace FW
 		GpuBindGroupLayout* BindGroupLayout3 = nullptr;
 	};
 
+	struct DepthStencilStateDesc
+	{
+		GpuFormat DepthFormat;
+		bool DepthWriteEnable = true;
+		CompareMode DepthCompare = CompareMode::Less;
+
+		bool operator==(const DepthStencilStateDesc& Other) const = default;
+	};
+
     struct GpuRenderPipelineStateDesc
     {
 		bool CheckLayout = false;
@@ -75,6 +84,8 @@ namespace FW
 
 		RasterizerStateDesc RasterizerState{ RasterizerFillMode::Solid, RasterizerCullMode::None };
 		PrimitiveType Primitive = PrimitiveType::TriangleList;
+
+		TOptional<DepthStencilStateDesc> DepthStencilState;
     };
 
     class GpuRenderPipelineState : public GpuResource
@@ -117,6 +128,7 @@ namespace FW
 		RasterizerStateDesc RasterizerState;
 		PrimitiveType Primitive;
 		TArray<PipelineTargetDesc, TFixedAllocator<GpuResourceLimit::MaxRenderTargetNum>> Targets;
+		TOptional<DepthStencilStateDesc> DepthStencilState;
 
 		bool operator==(const GpuRenderPsoCacheKey& Other) const
 		{
@@ -136,7 +148,8 @@ namespace FW
 				&& RasterizerState.FillMode == Other.RasterizerState.FillMode
 				&& RasterizerState.CullMode == Other.RasterizerState.CullMode
 				&& Primitive == Other.Primitive
-				&& Targets == Other.Targets;
+				&& Targets == Other.Targets
+				&& DepthStencilState == Other.DepthStencilState;
 		}
 
 		friend uint32 GetTypeHash(const GpuRenderPsoCacheKey& Key)

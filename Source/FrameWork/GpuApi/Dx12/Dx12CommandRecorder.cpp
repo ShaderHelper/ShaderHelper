@@ -209,7 +209,13 @@ namespace FW
 					RenderTargetDescriptors[i] = RtView->GetRTV()->GetHandle();
 				}
 
-				InCmdList->OMSetRenderTargets(RenderTargetNum, RenderTargetDescriptors.GetData(), false, nullptr);
+				InCmdList->OMSetRenderTargets(RenderTargetNum, RenderTargetDescriptors.GetData(), false, 
+					CurrentDSVView ? &CurrentDSVView->GetDSV()->GetHandle() : nullptr);
+
+				if (CurrentDSVView && DSVLoadAction == RenderTargetLoadAction::Clear)
+				{
+					InCmdList->ClearDepthStencilView(CurrentDSVView->GetDSV()->GetHandle(), D3D12_CLEAR_FLAG_DEPTH, DSVClearDepth, 0, 0, nullptr);
+				}
 			}
 			IsRenderTargetDirty = false;
 		}
@@ -348,6 +354,8 @@ namespace FW
 		CurrentViewPort.Reset();
 		CurrentScissorRect.Reset();
 
+		CurrentDSVView = nullptr;
+
 		if (InRTViews != CurrentRenderTargetViews || InClearColorValues != ClearColorValues || LoadActions != InLoadActions)
 		{
 			CurrentRenderTargetViews = MoveTemp(InRTViews);
@@ -355,6 +363,14 @@ namespace FW
 			LoadActions = MoveTemp(InLoadActions);
 			IsRenderTargetDirty = true;
 		}
+	}
+
+	void Dx12StateCache::SetDepthStencilTarget(Dx12TextureView* InDSVView, RenderTargetLoadAction InLoadAction, float InClearDepth)
+	{
+		CurrentDSVView = InDSVView;
+		DSVLoadAction = InLoadAction;
+		DSVClearDepth = InClearDepth;
+		IsRenderTargetDirty = true;
 	}
 
 	void Dx12StateCache::SetGraphicsBindGroups(Dx12BindGroup* InGroup0, Dx12BindGroup* InGroup1, Dx12BindGroup* InGroup2, Dx12BindGroup* InGroup3)
@@ -590,6 +606,13 @@ namespace FW
 		}
 
 		StateCache.SetRenderTargets(MoveTemp(RTViews), MoveTemp(ClearColorValues), MoveTemp(LoadActions));
+
+		if (PassDesc.DepthStencilTarget)
+		{
+			Dx12TextureView* DsvView = static_cast<Dx12TextureView*>(PassDesc.DepthStencilTarget->View);
+			StateCache.SetDepthStencilTarget(DsvView, PassDesc.DepthStencilTarget->LoadAction, PassDesc.DepthStencilTarget->ClearDepth);
+		}
+
 		auto NewPassRecorder = MakeUnique<Dx12RenderPassRecorder>(CmdList, StateCache);
 		RequestedRenderPassRecorders.Add(MoveTemp(NewPassRecorder));
 		return RequestedRenderPassRecorders.Last().Get();

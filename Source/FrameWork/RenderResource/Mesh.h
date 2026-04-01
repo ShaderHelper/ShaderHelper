@@ -10,12 +10,45 @@ namespace FW
 		Vector3f Normal;
 		Vector2f UV;
 		Vector4f Color = Vector4f(1.0f);
+
+		bool operator==(const MeshVertex& Other) const
+		{
+			return Position == Other.Position
+				&& Normal == Other.Normal
+				&& UV == Other.UV
+				&& Color == Other.Color;
+		}
+
+		friend uint32 GetTypeHash(const MeshVertex& Vertex)
+		{
+			uint32 Hash = GetTypeHash(Vertex.Position);
+			Hash = HashCombine(Hash, GetTypeHash(Vertex.Normal));
+			Hash = HashCombine(Hash, GetTypeHash(Vertex.UV));
+			Hash = HashCombine(Hash, GetTypeHash(Vertex.Color));
+			return Hash;
+		}
+
+		friend FArchive& operator<<(FArchive& Ar, MeshVertex& InVertex)
+		{
+			Ar << InVertex.Position;
+			Ar << InVertex.Normal;
+			Ar << InVertex.UV;
+			Ar << InVertex.Color;
+			return Ar;
+		}
 	};
 
 	struct MeshData
 	{
 		TArray<MeshVertex> Vertices;
 		TArray<uint32> Indices;
+
+		friend FArchive& operator<<(FArchive& Ar, MeshData& InMeshData)
+		{
+			Ar << InMeshData.Vertices;
+			Ar << InMeshData.Indices;
+			return Ar;
+		}
 	};
 
 	struct MeshBuffers

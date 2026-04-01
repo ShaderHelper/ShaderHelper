@@ -175,10 +175,28 @@ namespace FW::VK
 				.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			});
 		}
+
+		VkAttachmentReference DepthAttachmentRef{};
+		bool bHasDepth = InPipelineStateDesc.DepthStencilState.IsSet();
+		if (bHasDepth)
+		{
+			DepthAttachmentRef = {
+				.attachment = uint32_t(AttachmentDescs.Num()),
+				.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			};
+			AttachmentDescs.Add({
+				.format = MapTextureFormat(InPipelineStateDesc.DepthStencilState->DepthFormat),
+				.samples = VK_SAMPLE_COUNT_1_BIT,
+				.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			});
+		}
+
 		VkSubpassDescription SubpassDesc = {
 			.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
 			.colorAttachmentCount = (uint32_t)AttachmentRefs.Num(),
-			.pColorAttachments = AttachmentRefs.GetData()
+			.pColorAttachments = AttachmentRefs.GetData(),
+			.pDepthStencilAttachment = bHasDepth ? &DepthAttachmentRef : nullptr
 		};
 		VkRenderPassCreateInfo RenderPassInfo{
 			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
@@ -190,6 +208,13 @@ namespace FW::VK
 		VkRenderPass RenderPass;
 		VkCheck(vkCreateRenderPass(GDevice, &RenderPassInfo, nullptr, &RenderPass));
 
+		VkPipelineDepthStencilStateCreateInfo DepthStencilInfo{
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+			.depthTestEnable = bHasDepth ? VK_TRUE : VK_FALSE,
+			.depthWriteEnable = bHasDepth && InPipelineStateDesc.DepthStencilState->DepthWriteEnable ? VK_TRUE : VK_FALSE,
+			.depthCompareOp = bHasDepth ? MapCompareOp(InPipelineStateDesc.DepthStencilState->DepthCompare) : VK_COMPARE_OP_NEVER,
+		};
+
 		VkGraphicsPipelineCreateInfo PipelineInfo = {
 			.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
 			.stageCount = (uint32_t)Stages.Num(),
@@ -199,6 +224,7 @@ namespace FW::VK
 			.pViewportState = &ViewportStateInfo,
 			.pRasterizationState = &RasterizationInfo,
 			.pMultisampleState = &MultisampleInfo,
+			.pDepthStencilState = &DepthStencilInfo,
 			.pColorBlendState = &ColorBlendInfo,
 			.pDynamicState = &DynamicStateInfo,
 			.layout = PipelineLayout,

@@ -28,7 +28,7 @@ namespace FW
 			CpuHandle.ptr = 0;
 		}
 
-		CD3DX12_CPU_DESCRIPTOR_HANDLE GetHandle() const
+		const CD3DX12_CPU_DESCRIPTOR_HANDLE& GetHandle() const
 		{
 			check(IsValid());
 			return CpuHandle;
@@ -114,6 +114,7 @@ namespace FW
 
 	void InitDescriptorAllocator();
 	TUniquePtr<CpuDescriptor> AllocRtv();
+	TUniquePtr<CpuDescriptor> AllocDsv();
 	TUniquePtr<CpuDescriptor> AllocSampler();
 	TUniquePtr<CpuDescriptor> AllocCpuCbvSrvUav();
 	TUniquePtr<GpuDescriptorRange> AllocGpuCbvSrvUavRange(uint32 InDescriptorNum);

@@ -280,14 +280,42 @@ namespace FW::VK
 			AttachmentRefs.Emplace(Index, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 		}
 
+		VkAttachmentReference DepthAttachmentRef{};
+		bool bHasDepth = PassDesc.DepthStencilTarget.IsSet();
+		if (bHasDepth)
+		{
+			const GpuDepthStencilTargetInfo& DepthInfo = *PassDesc.DepthStencilTarget;
+			VulkanTextureView* DsView = static_cast<VulkanTextureView*>(DepthInfo.View);
+			DepthAttachmentRef = {
+				.attachment = uint32_t(AttachmentDescs.Num()),
+				.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			};
+			if (DepthInfo.LoadAction == RenderTargetLoadAction::Clear)
+			{
+				ClearValues.Add({ .depthStencil = {DepthInfo.ClearDepth, 0} });
+			}
+			Attachments.Add(DsView->GetView());
+			AttachmentDescs.Add({
+				.format = MapTextureFormat(DsView->GetTexture()->GetFormat()),
+				.samples = VK_SAMPLE_COUNT_1_BIT,
+				.loadOp = MapLoadAction(DepthInfo.LoadAction),
+				.storeOp = MapStoreAction(DepthInfo.StoreAction),
+				.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+				.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+				.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+			});
+		}
+
 		VkSubpassDescription SubpassDesc{
 			.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
 			.colorAttachmentCount = (uint32_t)PassDesc.ColorRenderTargets.Num(),
-			.pColorAttachments = AttachmentRefs.GetData()
+			.pColorAttachments = AttachmentRefs.GetData(),
+			.pDepthStencilAttachment = bHasDepth ? &DepthAttachmentRef : nullptr
 		};
 		VkRenderPassCreateInfo RenderPassInfo{
 			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-			.attachmentCount = (uint32_t)PassDesc.ColorRenderTargets.Num(),
+			.attachmentCount = (uint32_t)AttachmentDescs.Num(),
 			.pAttachments = AttachmentDescs.GetData(),
 			.subpassCount = 1,
 			.pSubpasses = &SubpassDesc
@@ -299,7 +327,7 @@ namespace FW::VK
 		VkFramebufferCreateInfo FrameBufferInfo{
 			.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 			.renderPass = RenderPass,
-			.attachmentCount = (uint32_t)PassDesc.ColorRenderTargets.Num(),
+			.attachmentCount = (uint32_t)Attachments.Num(),
 			.pAttachments = Attachments.GetData(),
 			.width = PassDesc.ColorRenderTargets[0].View->GetWidth(),
 			.height = PassDesc.ColorRenderTargets[0].View->GetHeight(),
@@ -418,6 +446,11 @@ namespace FW::VK
 				OutAccess |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
 				OutStage |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 			}
+			if (EnumHasAnyFlags(InState, GpuResourceState::DepthStencilWrite))
+			{
+				OutAccess |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+				OutStage |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+			}
 		};
 
 		for (const GpuBarrierInfo& Info : BarrierInfos)
@@ -434,6 +467,8 @@ namespace FW::VK
 				uint32 NumMips = VkTex->GetNumMips();
 				uint32 ArrayLayers = VkTex->GetArrayLayerCount();
 				VkImageLayout NewLayout = MapImageLayout(Info.NewState);
+				VkImageAspectFlags AspectMask = EnumHasAnyFlags(VkTex->GetResourceDesc().Usage, GpuTextureUsage::DepthStencil)
+					? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
 
 				for (uint32 Mip = 0; Mip < NumMips; Mip++)
 				{
@@ -456,7 +491,7 @@ namespace FW::VK
 							.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 							.image = VkTex->GetImage(),
 							.subresourceRange = {
-								.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+								.aspectMask = AspectMask,
 								.baseMipLevel = Mip,
 								.levelCount = 1,
 								.baseArrayLayer = Layer,
@@ -474,6 +509,8 @@ namespace FW::VK
 				VulkanTexture* VkTex = static_cast<VulkanTexture*>(View->GetTexture());
 				uint32 ArrayLayers = VkTex->GetArrayLayerCount();
 				VkImageLayout NewLayout = MapImageLayout(Info.NewState);
+				VkImageAspectFlags AspectMask = EnumHasAnyFlags(VkTex->GetResourceDesc().Usage, GpuTextureUsage::DepthStencil)
+					? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
 
 				for (uint32 i = 0; i < View->GetMipLevelCount(); i++)
 				{
@@ -497,7 +534,7 @@ namespace FW::VK
 							.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 							.image = VkTex->GetImage(),
 							.subresourceRange = {
-								.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+								.aspectMask = AspectMask,
 								.baseMipLevel = Mip,
 								.levelCount = 1,
 								.baseArrayLayer = Layer,

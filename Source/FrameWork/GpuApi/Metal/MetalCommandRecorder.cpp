@@ -152,6 +152,10 @@ namespace FW
             RenderCommandEncoder->setRenderPipelineState(CurrentRenderPipelineState->GetResource());
             RenderCommandEncoder->setFrontFacingWinding(MTL::WindingClockwise);
             RenderCommandEncoder->setCullMode(static_cast<MTL::CullMode>(MapRasterizerCullMode(CurrentRenderPipelineState->GetDesc().RasterizerState.CullMode)));
+            if (CurrentRenderPipelineState->GetDepthStencilState())
+            {
+                RenderCommandEncoder->setDepthStencilState(CurrentRenderPipelineState->GetDepthStencilState());
+            }
             IsRenderPipelineDirty = false;
         }
         

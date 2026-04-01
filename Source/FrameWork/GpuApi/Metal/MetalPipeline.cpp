@@ -8,10 +8,11 @@
 
 namespace FW
 {
-    MetalRenderPipelineState::MetalRenderPipelineState(GpuRenderPipelineStateDesc InDesc, MTLRenderPipelineStatePtr InPipelineState, MTLPrimitiveType InPrimitiveType)
+    MetalRenderPipelineState::MetalRenderPipelineState(GpuRenderPipelineStateDesc InDesc, MTLRenderPipelineStatePtr InPipelineState, MTLPrimitiveType InPrimitiveType, MTLDepthStencilStatePtr InDepthStencilState)
     : GpuRenderPipelineState(MoveTemp(InDesc))
     , PipelineState(MoveTemp(InPipelineState))
     , PrimitiveType(InPrimitiveType)
+    , DepthStencilState(MoveTemp(InDepthStencilState))
     {
         GMtlDeferredReleaseManager.AddResource(this);
     }
@@ -81,14 +82,29 @@ namespace FW
             ColorAttachment->setPixelFormat((MTL::PixelFormat)MapTextureFormat(Target.TargetFormat));
         }
 
+        if (InPipelineStateDesc.DepthStencilState)
+        {
+            PipelineDesc->setDepthAttachmentPixelFormat((MTL::PixelFormat)MapTextureFormat(InPipelineStateDesc.DepthStencilState->DepthFormat));
+        }
+
         NS::Error* err = nullptr;
         MTLRenderPipelineStatePtr PipelineState = NS::TransferPtr(GDevice->newRenderPipelineState(PipelineDesc.get(), MTL::PipelineOptionNone ,nullptr ,&err));
         if (!PipelineState)
         {
             SH_LOG(LogMetal, Fatal, TEXT("Failed to create render pipeline: %s"), *NSStringToFString(err->localizedDescription()));
         }
+
+        MTLDepthStencilStatePtr DepthStencilState;
+        if (InPipelineStateDesc.DepthStencilState)
+        {
+            MTL::DepthStencilDescriptor* DsDesc = MTL::DepthStencilDescriptor::alloc()->init();
+            DsDesc->setDepthCompareFunction((MTL::CompareFunction)MapCompareFunction(InPipelineStateDesc.DepthStencilState->DepthCompare));
+            DsDesc->setDepthWriteEnabled(InPipelineStateDesc.DepthStencilState->DepthWriteEnable);
+            DepthStencilState = NS::TransferPtr(GDevice->newDepthStencilState(DsDesc));
+            DsDesc->release();
+        }
         
-        return new MetalRenderPipelineState(InPipelineStateDesc, MoveTemp(PipelineState), MapPrimitiveType(InPipelineStateDesc.Primitive));
+        return new MetalRenderPipelineState(InPipelineStateDesc, MoveTemp(PipelineState), MapPrimitiveType(InPipelineStateDesc.Primitive), MoveTemp(DepthStencilState));
     }
 
     TRefCountPtr<MetalComputePipelineState> CreateMetalComputePipelineState(const GpuComputePipelineStateDesc& InPipelineStateDesc)

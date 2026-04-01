@@ -281,6 +281,11 @@ namespace FW
 
 	bool ValidateCreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
 	{
+		auto IsDepthFormat = [](GpuFormat Format)
+		{
+			return Format == GpuFormat::D32_FLOAT;
+		};
+
 		if (InTexDesc.Dimension == GpuTextureDimension::TexCube && EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::Shared))
 		{
 			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(Shared usage is not supported for cubemap textures)"));
@@ -302,10 +307,24 @@ namespace FW
 			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(Metal does not support creating shared R8G8B8A8 textures)"));
 			return false;
 		}
-		if (EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::RenderTarget) && EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::ShaderResource) 
-			&& InitState == GpuResourceState::Unknown)
+		if (EnumHasAllFlags(InTexDesc.Usage, GpuTextureUsage::RenderTarget | GpuTextureUsage::DepthStencil))
 		{
-			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(The InitState must be specified) for current texture usage."));
+			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(RenderTarget and DepthStencil usage cannot be combined on the same texture)"));
+			return false;
+		}
+		if (EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::DepthStencil) && !IsDepthFormat(InTexDesc.Format))
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(DepthStencil usage requires a depth format)"));
+			return false;
+		}
+		if (!EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::DepthStencil) && IsDepthFormat(InTexDesc.Format))
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(Depth formats must be created with DepthStencil usage)"));
+			return false;
+		}
+		if (InitState == GpuResourceState::Unknown)
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(The initial state cannot be inferred from the texture usage; specify InitState explicitly)"));
 			return false;
 		}
 		return ValidateGpuResourceState(InitState);

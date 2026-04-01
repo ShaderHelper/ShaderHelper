@@ -155,8 +155,19 @@ TRefCountPtr<GpuTextureView> Dx12GpuRhiBackend::CreateTextureViewInternal(const 
 		GDevice->CreateUnorderedAccessView(DxTexture->GetResource(), nullptr, &UavDesc, UAV->GetHandle());
 	}
 
+	TUniquePtr<CpuDescriptor> DSV;
+	if (EnumHasAnyFlags(InViewDesc.Texture->GetResourceDesc().Usage, GpuTextureUsage::DepthStencil))
+	{
+		DSV = AllocDsv();
+		D3D12_DEPTH_STENCIL_VIEW_DESC DsvDesc{};
+		DsvDesc.Format = DxTexture->GetResource()->GetDesc().Format;
+		DsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+		DsvDesc.Texture2D.MipSlice = InViewDesc.BaseMipLevel;
+		GDevice->CreateDepthStencilView(DxTexture->GetResource(), &DsvDesc, DSV->GetHandle());
+	}
+
 	GpuTextureViewDesc ViewDesc = InViewDesc;
-	return new Dx12TextureView(MoveTemp(ViewDesc), MoveTemp(SRV), MoveTemp(RTV), MoveTemp(UAV));
+	return new Dx12TextureView(MoveTemp(ViewDesc), MoveTemp(SRV), MoveTemp(RTV), MoveTemp(UAV), MoveTemp(DSV));
 }
 
 TRefCountPtr<GpuShader> Dx12GpuRhiBackend::CreateShaderFromSourceInternal(const GpuShaderSourceDesc& Desc) const

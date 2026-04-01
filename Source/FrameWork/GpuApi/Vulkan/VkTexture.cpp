@@ -45,7 +45,11 @@ namespace FW::VK
 		if (EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::UnorderedAccess))
 		{
 			Usage |= VK_IMAGE_USAGE_STORAGE_BIT;
-		}	
+		}
+		if (EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::DepthStencil))
+		{
+			Usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+		}
 		return Usage;
 	}
 

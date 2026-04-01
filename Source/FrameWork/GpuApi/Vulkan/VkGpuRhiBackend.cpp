@@ -76,13 +76,16 @@ namespace FW
 			ViewType = VK_IMAGE_VIEW_TYPE_2D;
 		}
 
+		VkImageAspectFlags AspectMask = EnumHasAnyFlags(InViewDesc.Texture->GetResourceDesc().Usage, GpuTextureUsage::DepthStencil)
+			? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+
 		VkImageViewCreateInfo ViewInfo = {
 			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 			.image = VkTex->GetImage(),
 			.viewType = ViewType,
 			.format = MapTextureFormat(InViewDesc.Texture->GetFormat()),
 			.subresourceRange = {
-				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.aspectMask = AspectMask,
 				.baseMipLevel = InViewDesc.BaseMipLevel,
 				.levelCount = InViewDesc.MipLevelCount,
 				.baseArrayLayer = BaseArrayLayer,
