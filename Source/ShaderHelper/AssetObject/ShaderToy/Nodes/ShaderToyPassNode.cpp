@@ -1061,7 +1061,7 @@ namespace SH
 				    GpuTimeMs = (double)(Timestamps[1] - Timestamps[0]) * PeriodNs / 1e6;
                 }
 
-				if (GGpuRhi && GGpuRhi->GetFeature().SupportTimestampQuery() && !TimestampQuerySet)
+				if (GGpuRhi->GetFeature().SupportTimestampQuery() && !TimestampQuerySet)
                 {
                     TimestampQuerySet = GGpuRhi->CreateQuerySet(2);
                 }

@@ -25,7 +25,7 @@ namespace UNITTEST_GPUAPI
 			.Type = ShaderType::VertexShader,
 			.EntryPoint = "MainVS",
 		});
-		if (GGpuRhi && GGpuRhi->GetFeature().Support16bitType())
+		if (GGpuRhi->GetFeature().Support16bitType())
 		{
 			Vs->CompilerFlag |= GpuShaderCompilerFlag::Enable16bitType;
 		}

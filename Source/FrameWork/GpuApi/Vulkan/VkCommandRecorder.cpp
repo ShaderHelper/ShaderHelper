@@ -277,10 +277,7 @@ namespace FW::VK
 				.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 			});
 			VkClearValue& ColorClearValue = ClearValues.AddDefaulted_GetRef();
-			if (RenderTargetInfo.LoadAction == RenderTargetLoadAction::Clear)
-			{
-				ColorClearValue.color = { RenderTargetInfo.ClearColor.X, RenderTargetInfo.ClearColor.Y, RenderTargetInfo.ClearColor.Z, RenderTargetInfo.ClearColor.W };
-			}
+			ColorClearValue.color = { RenderTargetInfo.ClearColor.X, RenderTargetInfo.ClearColor.Y, RenderTargetInfo.ClearColor.Z, RenderTargetInfo.ClearColor.W };
 			AttachmentRefs.Emplace(AttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 			if (RenderTargetInfo.ResolveTarget)
@@ -332,10 +329,7 @@ namespace FW::VK
 				.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
 			});
 			VkClearValue& DepthClearValue = ClearValues.AddDefaulted_GetRef();
-			if (DepthInfo.LoadAction == RenderTargetLoadAction::Clear)
-			{
-				DepthClearValue.depthStencil = { DepthInfo.ClearDepth, 0 };
-			}
+			DepthClearValue.depthStencil = { DepthInfo.ClearDepth, 0 };
 		}
 
 		VkSubpassDescription SubpassDesc{
