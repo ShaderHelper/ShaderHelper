@@ -10,21 +10,24 @@ namespace FW
 	class Dx12TextureView : public GpuTextureView, public Dx12DeferredDeleteObject<Dx12TextureView>
 	{
 	public:
-		Dx12TextureView(GpuTextureViewDesc InDesc, TUniquePtr<CpuDescriptor> InSRV, TUniquePtr<CpuDescriptor> InRTV, TUniquePtr<CpuDescriptor> InUAV)
+		Dx12TextureView(GpuTextureViewDesc InDesc, TUniquePtr<CpuDescriptor> InSRV, TUniquePtr<CpuDescriptor> InRTV, TUniquePtr<CpuDescriptor> InUAV, TUniquePtr<CpuDescriptor> InDSV)
 			: GpuTextureView(MoveTemp(InDesc))
 			, SRV(MoveTemp(InSRV))
 			, RTV(MoveTemp(InRTV))
 			, UAV(MoveTemp(InUAV))
+			, DSV(MoveTemp(InDSV))
 		{}
 
 		CpuDescriptor* GetSRV() const { return SRV.Get(); }
 		CpuDescriptor* GetRTV() const { return RTV.Get(); }
 		CpuDescriptor* GetUAV() const { return UAV.Get(); }
+		CpuDescriptor* GetDSV() const { return DSV.Get(); }
 
 	private:
 		TUniquePtr<CpuDescriptor> SRV;
 		TUniquePtr<CpuDescriptor> RTV;
 		TUniquePtr<CpuDescriptor> UAV;
+		TUniquePtr<CpuDescriptor> DSV;
 	};
 
 	class Dx12Sampler : public GpuSampler, public Dx12DeferredDeleteObject<Dx12Sampler>

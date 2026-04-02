@@ -45,7 +45,11 @@ namespace FW::VK
 		if (EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::UnorderedAccess))
 		{
 			Usage |= VK_IMAGE_USAGE_STORAGE_BIT;
-		}	
+		}
+		if (EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::DepthStencil))
+		{
+			Usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+		}
 		return Usage;
 	}
 
@@ -64,7 +68,7 @@ namespace FW::VK
 		ImgCreateInfo.arrayLayers = ArrayLayers;
 		ImgCreateInfo.format = MapTextureFormat(InTexDesc.Format);
 		ImgCreateInfo.usage = DetermineTextureUsage(InTexDesc);
-		ImgCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		ImgCreateInfo.samples = MapSampleCount(InTexDesc.SampleCount);
 		if (bIsCube)
 		{
 			ImgCreateInfo.flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;

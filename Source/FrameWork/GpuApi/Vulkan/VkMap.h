@@ -4,6 +4,19 @@
 
 namespace FW::VK
 {
+	inline VkSampleCountFlagBits MapSampleCount(uint32 InSampleCount)
+	{
+		switch (InSampleCount)
+		{
+		case 1: return VK_SAMPLE_COUNT_1_BIT;
+		case 2: return VK_SAMPLE_COUNT_2_BIT;
+		case 4: return VK_SAMPLE_COUNT_4_BIT;
+		case 8: return VK_SAMPLE_COUNT_8_BIT;
+		default:
+			AUX::Unreachable();
+		}
+	}
+
 	inline VkFormat MapTextureFormat(GpuFormat InTexFormat)
 	{
 		switch (InTexFormat)
@@ -27,6 +40,7 @@ namespace FW::VK
 		case GpuFormat::R11G11B10_FLOAT:       return VK_FORMAT_B10G11R11_UFLOAT_PACK32;
 		case GpuFormat::R16_FLOAT:             return VK_FORMAT_R16_SFLOAT;
 		case GpuFormat::R32_FLOAT:             return VK_FORMAT_R32_SFLOAT;
+		case GpuFormat::D32_FLOAT:             return VK_FORMAT_D32_SFLOAT;
 		default:
 			AUX::Unreachable();
 		}
@@ -192,6 +206,8 @@ namespace FW::VK
 		// Write states are exclusive, map 1:1
 		if (EnumHasAnyFlags(InState, GpuResourceState::RenderTargetWrite))
 			return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		if (EnumHasAnyFlags(InState, GpuResourceState::DepthStencilWrite))
+			return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		if (EnumHasAnyFlags(InState, GpuResourceState::UnorderedAccess))
 			return VK_IMAGE_LAYOUT_GENERAL;
 		if (EnumHasAnyFlags(InState, GpuResourceState::CopyDst))

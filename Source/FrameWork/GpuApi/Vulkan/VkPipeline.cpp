@@ -109,7 +109,7 @@ namespace FW::VK
 		};
 		VkPipelineMultisampleStateCreateInfo MultisampleInfo = {
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-			.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT
+			.rasterizationSamples = MapSampleCount(InPipelineStateDesc.SampleCount)
 		};
 		TArray<VkPipelineColorBlendAttachmentState> BlendAttachments;
 		for (const auto& Target : InPipelineStateDesc.Targets)
@@ -166,7 +166,7 @@ namespace FW::VK
 		{
 			AttachmentDescs.Add({
 				.format = MapTextureFormat(InPipelineStateDesc.Targets[i].TargetFormat),
-				.samples = VK_SAMPLE_COUNT_1_BIT,
+				.samples = MapSampleCount(InPipelineStateDesc.SampleCount),
 				.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 				.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			});
@@ -175,10 +175,49 @@ namespace FW::VK
 				.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			});
 		}
+
+		TArray<VkAttachmentReference> ResolveAttachmentRefs;
+		if (InPipelineStateDesc.SampleCount > 1)
+		{
+			for (int32 i = 0; i < InPipelineStateDesc.Targets.Num(); i++)
+			{
+				ResolveAttachmentRefs.Add({
+					.attachment = uint32_t(AttachmentDescs.Num()),
+					.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				});
+				AttachmentDescs.Add({
+					.format = MapTextureFormat(InPipelineStateDesc.Targets[i].TargetFormat),
+					.samples = VK_SAMPLE_COUNT_1_BIT,
+					.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+					.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+					.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+					.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				});
+			}
+		}
+
+		VkAttachmentReference DepthAttachmentRef{};
+		bool bHasDepth = InPipelineStateDesc.DepthStencilState.IsSet();
+		if (bHasDepth)
+		{
+			DepthAttachmentRef = {
+				.attachment = uint32_t(AttachmentDescs.Num()),
+				.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			};
+			AttachmentDescs.Add({
+				.format = MapTextureFormat(InPipelineStateDesc.DepthStencilState->DepthFormat),
+				.samples = MapSampleCount(InPipelineStateDesc.SampleCount),
+				.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			});
+		}
+
 		VkSubpassDescription SubpassDesc = {
 			.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
 			.colorAttachmentCount = (uint32_t)AttachmentRefs.Num(),
-			.pColorAttachments = AttachmentRefs.GetData()
+			.pColorAttachments = AttachmentRefs.GetData(),
+			.pResolveAttachments = ResolveAttachmentRefs.Num() > 0 ? ResolveAttachmentRefs.GetData() : nullptr,
+			.pDepthStencilAttachment = bHasDepth ? &DepthAttachmentRef : nullptr
 		};
 		VkRenderPassCreateInfo RenderPassInfo{
 			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
@@ -190,6 +229,13 @@ namespace FW::VK
 		VkRenderPass RenderPass;
 		VkCheck(vkCreateRenderPass(GDevice, &RenderPassInfo, nullptr, &RenderPass));
 
+		VkPipelineDepthStencilStateCreateInfo DepthStencilInfo{
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+			.depthTestEnable = bHasDepth ? VK_TRUE : VK_FALSE,
+			.depthWriteEnable = bHasDepth && InPipelineStateDesc.DepthStencilState->DepthWriteEnable ? VK_TRUE : VK_FALSE,
+			.depthCompareOp = bHasDepth ? MapCompareOp(InPipelineStateDesc.DepthStencilState->DepthCompare) : VK_COMPARE_OP_NEVER,
+		};
+
 		VkGraphicsPipelineCreateInfo PipelineInfo = {
 			.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
 			.stageCount = (uint32_t)Stages.Num(),
@@ -199,6 +245,7 @@ namespace FW::VK
 			.pViewportState = &ViewportStateInfo,
 			.pRasterizationState = &RasterizationInfo,
 			.pMultisampleState = &MultisampleInfo,
+			.pDepthStencilState = &DepthStencilInfo,
 			.pColorBlendState = &ColorBlendInfo,
 			.pDynamicState = &DynamicStateInfo,
 			.layout = PipelineLayout,

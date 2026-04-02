@@ -35,6 +35,7 @@ namespace FW
 		void SetGraphicsRootSignature(Dx12RootSignature* InRootSignature);
 		void SetComputeRootSignature(Dx12RootSignature* InRootSignature);
 		void SetRenderTargets(TArray<Dx12TextureView*> InRTViews, TArray<Vector4f> InClearColorValues, TArray<RenderTargetLoadAction> InLoadActions);
+		void SetDepthStencilTarget(Dx12TextureView* InDSVView, RenderTargetLoadAction InLoadAction, float InClearDepth);
 		void SetGraphicsBindGroups(Dx12BindGroup* InGroup0, Dx12BindGroup* InGroup1, Dx12BindGroup* InGroup2, Dx12BindGroup* InGroup3);
 		void SetComputeBindGroups(Dx12BindGroup* InGroup0, Dx12BindGroup* InGroup1, Dx12BindGroup* InGroup2, Dx12BindGroup* InGroup3);
 
@@ -72,6 +73,10 @@ namespace FW
 		TArray<Dx12TextureView*> CurrentRenderTargetViews;
 		TArray<Vector4f> ClearColorValues;
 		TArray<RenderTargetLoadAction> LoadActions;
+
+		Dx12TextureView* CurrentDSVView = nullptr;
+		RenderTargetLoadAction DSVLoadAction = RenderTargetLoadAction::DontCare;
+		float DSVClearDepth = 1.0f;
 
 		Dx12RootSignature* CurrentGraphicsRootSignature = nullptr;
 		Dx12BindGroup* CurrentGraphicsBindGroup0 = nullptr;
@@ -192,6 +197,7 @@ namespace FW
 		TArray<TUniquePtr<Dx12ComputePassRecorder>> RequestedComputePassRecorders;
 		TRefCountPtr<ID3D12Fence> Fence;
 		bool IsEnd = false;
+		TOptional<GpuRenderPassDesc> CurrentRenderPassDesc;
 		TOptional<GpuRenderPassTimestampWrites> CurrentTimestampWrites;
 	};
 

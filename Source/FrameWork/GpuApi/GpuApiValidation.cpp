@@ -4,7 +4,6 @@
 
 namespace FW
 {
-
 	static bool ValidateVertexLayout(const TArray<GpuVertexLayoutDesc>& InVertexLayout)
 	{
 		TSet<uint32> UsedLocations;
@@ -153,6 +152,39 @@ namespace FW
 			SH_LOG(LogRhiValidation, Error, TEXT("BeginRenderPass Error(ColorRenderTargets must not be empty)"));
 			return false;
 		}
+
+		const GpuTextureView* FirstColorView = InPassDesc.ColorRenderTargets[0].View;
+		const uint32 ExpectedSampleCount = FirstColorView->GetTexture()->GetSampleCount();
+		for (const GpuRenderTargetInfo& RenderTargetInfo : InPassDesc.ColorRenderTargets)
+		{
+			GpuTextureView* ColorView = RenderTargetInfo.View;
+			if (ColorView->GetTexture()->GetSampleCount() != ExpectedSampleCount)
+			{
+				SH_LOG(LogRhiValidation, Error, TEXT("BeginRenderPass Error(All color attachments must use the same SampleCount)"));
+				return false;
+			}
+
+			if (RenderTargetInfo.ResolveTarget)
+			{
+				GpuTextureView* ResolveView = RenderTargetInfo.ResolveTarget;
+				if (ResolveView->GetTexture()->GetSampleCount() != 1)
+				{
+					SH_LOG(LogRhiValidation, Error, TEXT("BeginRenderPass Error(ResolveTarget SampleCount must be 1)"));
+					return false;
+				}
+				if (ResolveView->GetWidth() != ColorView->GetWidth() || ResolveView->GetHeight() != ColorView->GetHeight())
+				{
+					SH_LOG(LogRhiValidation, Error, TEXT("BeginRenderPass Error(ResolveTarget size must match the multisampled color attachment)"));
+					return false;
+				}
+			}
+		}
+
+		if (InPassDesc.DepthStencilTarget && InPassDesc.DepthStencilTarget->View->GetTexture()->GetSampleCount() != ExpectedSampleCount)
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("BeginRenderPass Error(Depth attachment SampleCount must match color attachments)"));
+			return false;
+		}
 		return true;
 	}
 
@@ -281,6 +313,35 @@ namespace FW
 
 	bool ValidateCreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
 	{
+		auto IsPowerOfTwo = [](uint32 Value)
+		{
+			return Value > 0 && (Value & (Value - 1)) == 0;
+		};
+
+		if (!IsPowerOfTwo(InTexDesc.SampleCount))
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(SampleCount must be a power of two): %u"), InTexDesc.SampleCount);
+			return false;
+		}
+		if (InTexDesc.SampleCount > 1)
+		{
+			if (InTexDesc.Dimension != GpuTextureDimension::Tex2D)
+			{
+				SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(Multisampled textures must be 2D textures)"));
+				return false;
+			}
+			if (InTexDesc.NumMips != 1)
+			{
+				SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(Multisampled textures must have exactly one mip level)"));
+				return false;
+			}
+			if (!EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::RenderTarget | GpuTextureUsage::DepthStencil))
+			{
+				SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(Multisampled textures must be created as render targets or depth-stencil targets)"));
+				return false;
+			}
+		}
+
 		if (InTexDesc.Dimension == GpuTextureDimension::TexCube && EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::Shared))
 		{
 			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(Shared usage is not supported for cubemap textures)"));
@@ -302,10 +363,24 @@ namespace FW
 			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(Metal does not support creating shared R8G8B8A8 textures)"));
 			return false;
 		}
-		if (EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::RenderTarget) && EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::ShaderResource) 
-			&& InitState == GpuResourceState::Unknown)
+		if (EnumHasAllFlags(InTexDesc.Usage, GpuTextureUsage::RenderTarget | GpuTextureUsage::DepthStencil))
 		{
-			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(The InitState must be specified) for current texture usage."));
+			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(RenderTarget and DepthStencil usage cannot be combined on the same texture)"));
+			return false;
+		}
+		if (EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::DepthStencil) && !IsDepthFormat(InTexDesc.Format))
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(DepthStencil usage requires a depth format)"));
+			return false;
+		}
+		if (!EnumHasAnyFlags(InTexDesc.Usage, GpuTextureUsage::DepthStencil) && IsDepthFormat(InTexDesc.Format))
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(Depth formats must be created with DepthStencil usage)"));
+			return false;
+		}
+		if (InitState == GpuResourceState::Unknown)
+		{
+			SH_LOG(LogRhiValidation, Error, TEXT("CreateTexture Error(The initial state cannot be inferred from the texture usage; specify InitState explicitly)"));
 			return false;
 		}
 		return ValidateGpuResourceState(InitState);

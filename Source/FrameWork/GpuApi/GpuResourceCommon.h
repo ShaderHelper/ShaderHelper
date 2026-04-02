@@ -23,9 +23,10 @@ namespace FW
 		RenderTargetWrite = 1u << 5,
 		CopyDst = 1u << 6,
 		UnorderedAccess = 1u << 7,
+		DepthStencilWrite = 1u << 8,
 
 		ReadMask = UniformBuffer | ShaderResourceRead | CopySrc | VertexBufferRead | IndexBufferRead,
-		WriteMask = RenderTargetWrite | CopyDst | UnorderedAccess,
+		WriteMask = RenderTargetWrite | CopyDst | UnorderedAccess | DepthStencilWrite,
 	};
 	ENUM_CLASS_FLAGS(GpuResourceState);
 
@@ -51,6 +52,8 @@ namespace FW
 		R16_FLOAT,
 		R32_FLOAT,
 
+		D32_FLOAT,
+
 		NUM,
 	};
 
@@ -68,6 +71,7 @@ namespace FW
 		ShaderResource = 1u << 1,
 		Shared = 1u << 2,
 		UnorderedAccess = 1u << 3,
+		DepthStencil = 1u << 4,
 	};
 	ENUM_CLASS_FLAGS(GpuTextureUsage);
 
@@ -243,6 +247,8 @@ namespace FW
 	};
 
 	FRAMEWORK_API uint32 GetFormatByteSize(GpuFormat InFormat);
+
+	FRAMEWORK_API bool IsDepthFormat(GpuFormat InFormat);
 
 	FRAMEWORK_API GpuResourceState GetBufferState(GpuBufferUsage Usage);
 

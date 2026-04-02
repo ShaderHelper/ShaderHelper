@@ -10,6 +10,7 @@ namespace FW
 	DECLARE_DELEGATE_RetVal_TwoParams(FReply, OnMouseDownDelegate, const FGeometry&, const FPointerEvent&)
 	DECLARE_DELEGATE_RetVal_TwoParams(FReply, OnMouseUpDelegate, const FGeometry&, const FPointerEvent&)
 	DECLARE_DELEGATE_RetVal_TwoParams(FReply, OnMouseMoveDelegate, const FGeometry&, const FPointerEvent&)
+	DECLARE_DELEGATE_RetVal_TwoParams(FReply, OnMouseWheelDelegate, const FGeometry&, const FPointerEvent&)
 	DECLARE_MULTICAST_DELEGATE_TwoParams(OnKeyDownDelegate, const FGeometry&, const FKeyEvent&)
 	DECLARE_MULTICAST_DELEGATE_TwoParams(OnKeyUpDelegate, const FGeometry&, const FKeyEvent&)
 
@@ -109,6 +110,15 @@ namespace FW
 			return FReply::Unhandled();
 		}
 
+		FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
+		{
+			if (MouseWheelHandler.IsBound())
+			{
+				return MouseWheelHandler.Execute(MyGeometry, MouseEvent);
+			}
+			return FReply::Unhandled();
+		}
+
 	public:
 		OnViewportResizeDelegate ResizeHandler;
 		OnFocusLostDelegate FocusLostHandler;
@@ -117,6 +127,7 @@ namespace FW
 		OnMouseDownDelegate MouseDownHandler;
 		OnMouseUpDelegate MouseUpHandler;
 		OnMouseMoveDelegate MouseMoveHandler;
+		OnMouseWheelDelegate MouseWheelHandler;
 
 	protected:
 		TWeakPtr<SWidget> AssociatedWidget;

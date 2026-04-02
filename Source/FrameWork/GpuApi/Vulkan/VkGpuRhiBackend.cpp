@@ -14,6 +14,48 @@ using namespace FW::VK;
 
 namespace FW
 {
+	static uint32 GetVkMaxSupportedSampleCount(VkSampleCountFlags InFlags)
+	{
+		if ((InFlags & VK_SAMPLE_COUNT_8_BIT) != 0) return 8;
+		if ((InFlags & VK_SAMPLE_COUNT_4_BIT) != 0) return 4;
+		if ((InFlags & VK_SAMPLE_COUNT_2_BIT) != 0) return 2;
+		return 1;
+	}
+	class VkGpuFeature final : public GpuFeature
+	{
+	public:
+		bool Support16bitType() const override
+		{
+			return false;
+		}
+
+		bool SupportTimestampQuery() const override
+		{
+			VkPhysicalDeviceProperties Properties{};
+			vkGetPhysicalDeviceProperties(GPhysicalDevice, &Properties);
+			return Properties.limits.timestampComputeAndGraphics == VK_TRUE;
+		}
+
+		uint32 GetMaxSampleCount(GpuFormat Format) const override
+		{
+			VkImageFormatProperties ImageFormatProperties{};
+			const VkImageUsageFlags Usage = IsDepthFormat(Format) ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+			const VkResult Result = vkGetPhysicalDeviceImageFormatProperties(
+				GPhysicalDevice,
+				MapTextureFormat(Format),
+				VK_IMAGE_TYPE_2D,
+				VK_IMAGE_TILING_OPTIMAL,
+				Usage,
+				0,
+				&ImageFormatProperties);
+			if (Result != VK_SUCCESS)
+			{
+				return 1;
+			}
+			return GetVkMaxSupportedSampleCount(ImageFormatProperties.sampleCounts);
+		}
+	};
+
 	VkGpuRhiBackend::VkGpuRhiBackend() { GVkGpuRhi = this; }
 
 	void VkGpuRhiBackend::InitApiEnv()
@@ -36,6 +78,12 @@ namespace FW
 		WaitGpu();
 		GVkCmdRecorderPool.Empty();
 		GVkDeferredReleaseManager.ProcessResources();
+	}
+
+	const GpuFeature& VkGpuRhiBackend::GetFeature() const
+	{
+		static VkGpuFeature Feature;
+		return Feature;
 	}
 
 	TRefCountPtr<GpuTexture> VkGpuRhiBackend::CreateTextureInternal(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
@@ -76,13 +124,16 @@ namespace FW
 			ViewType = VK_IMAGE_VIEW_TYPE_2D;
 		}
 
+		VkImageAspectFlags AspectMask = EnumHasAnyFlags(InViewDesc.Texture->GetResourceDesc().Usage, GpuTextureUsage::DepthStencil)
+			? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+
 		VkImageViewCreateInfo ViewInfo = {
 			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 			.image = VkTex->GetImage(),
 			.viewType = ViewType,
 			.format = MapTextureFormat(InViewDesc.Texture->GetFormat()),
 			.subresourceRange = {
-				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.aspectMask = AspectMask,
 				.baseMipLevel = InViewDesc.BaseMipLevel,
 				.levelCount = InViewDesc.MipLevelCount,
 				.baseArrayLayer = BaseArrayLayer,

@@ -5,6 +5,7 @@ namespace FW
 {
 
 	TUniquePtr<CpuDescriptorAllocator> RtvAllocator;
+	TUniquePtr<CpuDescriptorAllocator> DsvAllocator;
 	TUniquePtr<CpuDescriptorAllocator> Cpu_CbvSrvUavAllocator;
 	TUniquePtr<GpuDescriptorAllocator> Gpu_CbvSrvUavAllocator;
 	TUniquePtr<CpuDescriptorAllocator> Cpu_SamplerAllocator;
@@ -13,6 +14,7 @@ namespace FW
 	void InitDescriptorAllocator()
 	{
 		RtvAllocator = MakeUnique<CpuDescriptorAllocator>(4096, DescriptorType::Rtv);
+		DsvAllocator = MakeUnique<CpuDescriptorAllocator>(256, DescriptorType::Dsv);
 		Cpu_CbvSrvUavAllocator = MakeUnique<CpuDescriptorAllocator>(4096, DescriptorType::CbvSrvUav);
 		Gpu_CbvSrvUavAllocator = MakeUnique<GpuDescriptorAllocator>(4096, DescriptorType::CbvSrvUav);
 		Cpu_SamplerAllocator = MakeUnique<CpuDescriptorAllocator>(128, DescriptorType::Sampler);
@@ -22,6 +24,11 @@ namespace FW
 	TUniquePtr<CpuDescriptor> AllocRtv()
 	{
 		return RtvAllocator->Allocate();
+	}
+
+	TUniquePtr<CpuDescriptor> AllocDsv()
+	{
+		return DsvAllocator->Allocate();
 	}
 
 	TUniquePtr<CpuDescriptor> AllocSampler()

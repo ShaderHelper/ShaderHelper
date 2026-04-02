@@ -12,6 +12,7 @@ namespace FW
 		case GpuResourceState::RenderTargetWrite:                return D3D12_RESOURCE_STATE_RENDER_TARGET;
 		case GpuResourceState::CopyDst:                          return D3D12_RESOURCE_STATE_COPY_DEST;
 		case GpuResourceState::UnorderedAccess:                  return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+		case GpuResourceState::DepthStencilWrite:                return D3D12_RESOURCE_STATE_DEPTH_WRITE;
 		default:
 			check(!EnumHasAnyFlags(InResourceState, GpuResourceState::WriteMask));
 			D3D12_RESOURCE_STATES State{};
@@ -125,6 +126,7 @@ namespace FW
         case GpuFormat::R11G11B10_FLOAT:       return DXGI_FORMAT_R11G11B10_FLOAT;
         case GpuFormat::R16_FLOAT:             return DXGI_FORMAT_R16_FLOAT;
         case GpuFormat::R32_FLOAT:             return DXGI_FORMAT_R32_FLOAT;
+        case GpuFormat::D32_FLOAT:             return DXGI_FORMAT_D32_FLOAT;
 		default:
 			AUX::Unreachable();
         }

@@ -14,6 +14,43 @@
 
 namespace FW
 {
+static uint32 GetDx12MaxSupportedSampleCount(DXGI_FORMAT InFormat)
+{
+	for (uint32 SampleCount : { 8u, 4u, 2u, 1u })
+	{
+		D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS QualityLevels{
+			.Format = InFormat,
+			.SampleCount = SampleCount,
+			.Flags = D3D12_MULTISAMPLE_QUALITY_LEVELS_FLAG_NONE,
+			.NumQualityLevels = 0,
+		};
+		if (SUCCEEDED(GDevice->CheckFeatureSupport(D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS, &QualityLevels, sizeof(QualityLevels)))
+			&& QualityLevels.NumQualityLevels > 0)
+		{
+			return SampleCount;
+		}
+	}
+	return 1;
+}
+class Dx12GpuFeature final : public GpuFeature
+{
+public:
+	bool Support16bitType() const override
+	{
+		return GMaxShaderModel >= D3D_SHADER_MODEL_6_2;
+	}
+
+	bool SupportTimestampQuery() const override
+	{
+		return true;
+	}
+
+	uint32 GetMaxSampleCount(GpuFormat Format) const override
+	{
+		return GetDx12MaxSupportedSampleCount(MapTextureFormat(Format));
+	}
+};
+
 Dx12GpuRhiBackend::Dx12GpuRhiBackend() { 
 	GDx12GpuRhi = this;
 }
@@ -62,6 +99,12 @@ void Dx12GpuRhiBackend::EndFrame()
 	GDx12DeferredReleaseManager->ProcessResources();
 }
 
+const GpuFeature& Dx12GpuRhiBackend::GetFeature() const
+{
+	static Dx12GpuFeature Feature;
+	return Feature;
+}
+
 TRefCountPtr<GpuTexture> Dx12GpuRhiBackend::CreateTextureInternal(const GpuTextureDesc& InTexDesc, GpuResourceState InitState)
 {
 	return AUX::StaticCastRefCountPtr<GpuTexture>(CreateDx12Texture2D(InTexDesc, InitState));
@@ -70,6 +113,7 @@ TRefCountPtr<GpuTexture> Dx12GpuRhiBackend::CreateTextureInternal(const GpuTextu
 TRefCountPtr<GpuTextureView> Dx12GpuRhiBackend::CreateTextureViewInternal(const GpuTextureViewDesc& InViewDesc)
 {
 	Dx12Texture* DxTexture = static_cast<Dx12Texture*>(InViewDesc.Texture);
+	const bool bIsMultisampled = InViewDesc.Texture->GetSampleCount() > 1;
 	TUniquePtr<CpuDescriptor> SRV;
 	TUniquePtr<CpuDescriptor> RTV;
 	TUniquePtr<CpuDescriptor> UAV;
@@ -121,8 +165,15 @@ TRefCountPtr<GpuTextureView> Dx12GpuRhiBackend::CreateTextureViewInternal(const 
 		RTV = AllocRtv();
 		D3D12_RENDER_TARGET_VIEW_DESC RtvDesc{};
 		RtvDesc.Format = DxTexture->GetResource()->GetDesc().Format;
-		RtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-		RtvDesc.Texture2D.MipSlice = InViewDesc.BaseMipLevel;
+		if (bIsMultisampled)
+		{
+			RtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DMS;
+		}
+		else
+		{
+			RtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+			RtvDesc.Texture2D.MipSlice = InViewDesc.BaseMipLevel;
+		}
 		GDevice->CreateRenderTargetView(DxTexture->GetResource(), &RtvDesc, RTV->GetHandle());
 	}
 
@@ -155,8 +206,26 @@ TRefCountPtr<GpuTextureView> Dx12GpuRhiBackend::CreateTextureViewInternal(const 
 		GDevice->CreateUnorderedAccessView(DxTexture->GetResource(), nullptr, &UavDesc, UAV->GetHandle());
 	}
 
+	TUniquePtr<CpuDescriptor> DSV;
+	if (EnumHasAnyFlags(InViewDesc.Texture->GetResourceDesc().Usage, GpuTextureUsage::DepthStencil))
+	{
+		DSV = AllocDsv();
+		D3D12_DEPTH_STENCIL_VIEW_DESC DsvDesc{};
+		DsvDesc.Format = DxTexture->GetResource()->GetDesc().Format;
+		if (bIsMultisampled)
+		{
+			DsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DMS;
+		}
+		else
+		{
+			DsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+			DsvDesc.Texture2D.MipSlice = InViewDesc.BaseMipLevel;
+		}
+		GDevice->CreateDepthStencilView(DxTexture->GetResource(), &DsvDesc, DSV->GetHandle());
+	}
+
 	GpuTextureViewDesc ViewDesc = InViewDesc;
-	return new Dx12TextureView(MoveTemp(ViewDesc), MoveTemp(SRV), MoveTemp(RTV), MoveTemp(UAV));
+	return new Dx12TextureView(MoveTemp(ViewDesc), MoveTemp(SRV), MoveTemp(RTV), MoveTemp(UAV), MoveTemp(DSV));
 }
 
 TRefCountPtr<GpuShader> Dx12GpuRhiBackend::CreateShaderFromSourceInternal(const GpuShaderSourceDesc& Desc) const

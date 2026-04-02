@@ -12,6 +12,7 @@ namespace FW
 		bool bRTV;
 		bool bSRV;
 		bool bUAV;
+		bool bDSV;
 	};
 
 	Dx12Texture::Dx12Texture(TRefCountPtr<ID3D12Resource> InResource, GpuResourceState InResourceState, GpuTextureDesc InDesc, void* InSharedHandle)
@@ -62,11 +63,16 @@ namespace FW
 			OutResourceFlag |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 			OutFlags.bUAV = true;
 		}
+
+		if (EnumHasAnyFlags(InFlags, GpuTextureUsage::DepthStencil)) {
+			OutResourceFlag |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+			OutFlags.bDSV = true;
+		}
 	}
 
 	static D3D12_RESOURCE_STATES GetInitialResourceState(const FlagSets& InFlags)
 	{
-		bool bWritable = InFlags.bRTV;
+		bool bWritable = InFlags.bRTV || InFlags.bDSV;
 		bool bReadable = InFlags.bSRV;
 		check(!(bWritable && bReadable));
 
@@ -79,6 +85,9 @@ namespace FW
 		}
 		else
 		{
+			if (InFlags.bDSV) {
+				return D3D12_RESOURCE_STATE_DEPTH_WRITE;
+			}
 			if (InFlags.bRTV) {
 				return D3D12_RESOURCE_STATE_RENDER_TARGET;
 			}
@@ -120,7 +129,7 @@ namespace FW
 				InTexDesc.Height,
 				InTexDesc.Dimension == GpuTextureDimension::TexCube ? 6 : InTexDesc.Depth,
 				InTexDesc.NumMips,
-				1,0,
+				InTexDesc.SampleCount, 0,
 				ResourceFlags
 			);
 

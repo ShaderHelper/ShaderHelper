@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "Dx12Shader.h"
 #include "Common/Path/PathHelper.h"
-#include "GpuApi/GpuFeature.h"
+#include "Dx12GpuRhiBackend.h"
 #include "ShaderConductor.hpp"
 #include "GpuApi/GLSL.h"
 
@@ -461,7 +461,7 @@ namespace FW
 			//Arguments.Add(TEXT("-fspv-reflect"));
 		}
 
-		ValidateGpuFeature(GpuFeature::Support16bitType, TEXT("Hardware does not support 16bitType, shader model <= 6.2"))
+		ValidateGpuFeature(GDx12GpuRhi->GetFeature().Support16bitType(), TEXT("Hardware does not support 16bitType, shader model <= 6.2"))
 		{
 			if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::Enable16bitType))
 			{

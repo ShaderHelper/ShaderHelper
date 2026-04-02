@@ -13,7 +13,7 @@ namespace FW::GpuResourceHelper
 		return GGpuRhi->CreateTexture(MoveTemp(Desc));
 	}
 
-	FRAMEWORK_API GpuSampler* GetSampler(const GpuSamplerDesc& InDesc)
+	GpuSampler* GetSampler(const GpuSamplerDesc& InDesc)
 	{
 		static TArray<TRefCountPtr<GpuSampler>> GpuSamplerCache;
 		if (auto* ExistingSampler = GpuSamplerCache.FindByPredicate([&](auto&& Item) { return InDesc == Item->GetDesc();}))

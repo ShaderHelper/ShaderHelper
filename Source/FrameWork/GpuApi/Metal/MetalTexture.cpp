@@ -47,6 +47,11 @@ namespace FW
         {
             Usage |= MTLTextureUsageShaderWrite;
         }
+
+        if(EnumHasAnyFlags(InUsage, GpuTextureUsage::DepthStencil))
+        {
+            Usage |= MTLTextureUsageRenderTarget;
+        }
         OutTexDesc->setUsage(Usage);
     }
 
@@ -96,9 +101,15 @@ namespace FW
         else
         {
             MTL::PixelFormat TexFormat = (MTL::PixelFormat)MapTextureFormat(InTexDesc.Format);
+            const bool bIsMultisampled = InTexDesc.SampleCount > 1;
             MTL::TextureDescriptor* TexDesc = MTL::TextureDescriptor::texture2DDescriptor(TexFormat, InTexDesc.Width, InTexDesc.Height, InTexDesc.NumMips > 1);
             TexDesc->setMipmapLevelCount(InTexDesc.NumMips);
-            if (InTexDesc.Dimension == GpuTextureDimension::TexCube)
+            if (bIsMultisampled)
+            {
+                TexDesc->setTextureType(MTL::TextureType2DMultisample);
+                TexDesc->setSampleCount(InTexDesc.SampleCount);
+            }
+            else if (InTexDesc.Dimension == GpuTextureDimension::TexCube)
             {
                 TexDesc->setTextureType(MTL::TextureTypeCube);
             }

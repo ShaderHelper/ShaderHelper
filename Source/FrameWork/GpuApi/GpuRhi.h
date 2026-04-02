@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GpuResource.h"
+#include "GpuFeature.h"
 
 namespace FW
 {
@@ -135,6 +136,7 @@ public:
 
 	virtual void BeginFrame() = 0;
 	virtual void EndFrame() = 0;
+	virtual const GpuFeature& GetFeature() const = 0;
 
 	TRefCountPtr<GpuTexture> CreateTexture(const GpuTextureDesc& InTexDesc, GpuResourceState InitState = GpuResourceState::Unknown);
 	TRefCountPtr<GpuBuffer> CreateBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState = GpuResourceState::Unknown);

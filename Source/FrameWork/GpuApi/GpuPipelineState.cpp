@@ -80,6 +80,7 @@ namespace FW
 
 		// Hash primitive type
 		Hash = HashCombine(Hash, ::GetTypeHash(Desc.Primitive));
+		Hash = HashCombine(Hash, ::GetTypeHash(Desc.SampleCount));
 
 		// Hash render targets
 		Hash = HashCombine(Hash, ::GetTypeHash(Desc.Targets.Num()));
@@ -96,6 +97,15 @@ namespace FW
 			Hash = HashCombine(Hash, ::GetTypeHash(Target.Mask));
 		}
 
+		// Hash depth stencil state
+		Hash = HashCombine(Hash, ::GetTypeHash(Desc.DepthStencilState.IsSet()));
+		if (Desc.DepthStencilState)
+		{
+			Hash = HashCombine(Hash, ::GetTypeHash(Desc.DepthStencilState->DepthFormat));
+			Hash = HashCombine(Hash, ::GetTypeHash(Desc.DepthStencilState->DepthWriteEnable));
+			Hash = HashCombine(Hash, ::GetTypeHash(Desc.DepthStencilState->DepthCompare));
+		}
+
 		return GpuRenderPsoCacheKey{
 			.Hash = Hash,
 			.Vs = Desc.Vs,
@@ -107,7 +117,9 @@ namespace FW
 			.VertexLayout = Desc.VertexLayout,
 			.RasterizerState = Desc.RasterizerState,
 			.Primitive = Desc.Primitive,
+			.SampleCount = Desc.SampleCount,
 			.Targets = Desc.Targets,
+			.DepthStencilState = Desc.DepthStencilState,
 		};
 	}
 
