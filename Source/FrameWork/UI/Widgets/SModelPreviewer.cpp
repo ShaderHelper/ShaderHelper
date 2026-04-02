@@ -70,6 +70,13 @@ namespace FW
 			return FReply::Handled();
 		});
 
+		Preview->MouseWheelHandler.BindLambda([this](const FGeometry&, const FPointerEvent& MouseEvent) {
+			const float ZoomFactor = FMath::Pow(0.9f, MouseEvent.GetWheelDelta());
+			UpdateCameraDistance(CameraDistance * ZoomFactor);
+			Render();
+			return FReply::Handled();
+		});
+
 		Render();
 	}
 
@@ -79,11 +86,12 @@ namespace FW
 		float Radius;
 		ModelAsset->ComputeBounds(Center, Radius);
 
-		float Distance = Radius / FMath::Tan(ViewCamera.VerticalFov * 0.5f) * 1.6f;
-		ViewCamera.Position = { 0.0f, 0.0f, -Distance };
-		ViewCamera.NearPlane = FMath::Max(0.01f, Radius * 0.05f);
-		ViewCamera.FarPlane = Distance + Radius * 4.0f;
 		ModelCenter = Center;
+		ModelRadius = FMath::Max(Radius, 0.01f);
+		CameraDistance = ModelRadius / FMath::Tan(ViewCamera.VerticalFov * 0.5f) * 1.6f;
+		MinCameraDistance = FMath::Max(ModelRadius * 0.2f, 0.02f);
+		MaxCameraDistance = FMath::Max(CameraDistance * 8.0f, MinCameraDistance + 1.0f);
+		UpdateCameraDistance(CameraDistance);
 
 		UniformBufferBuilder UbBuilder{ UniformBufferUsage::Persistant };
 		UbBuilder.AddMatrix4x4f("Transform");
@@ -164,6 +172,14 @@ namespace FW
 		};
 
 		Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
+	}
+
+	void SModelPreviewer::UpdateCameraDistance(float InDistance)
+	{
+		CameraDistance = FMath::Clamp(InDistance, MinCameraDistance, MaxCameraDistance);
+		ViewCamera.Position = { 0.0f, 0.0f, -CameraDistance };
+		ViewCamera.NearPlane = FMath::Max(0.01f, FMath::Min(ModelRadius * 0.05f, CameraDistance * 0.5f));
+		ViewCamera.FarPlane = CameraDistance + ModelRadius * 4.0f;
 	}
 
 	void SModelPreviewer::ResizeRenderTargetIfNeeded()

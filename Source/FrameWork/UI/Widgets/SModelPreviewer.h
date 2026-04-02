@@ -28,6 +28,7 @@ namespace FW
 		void InitRenderResources();
 		void Render();
 		void ResizeRenderTargetIfNeeded();
+		void UpdateCameraDistance(float InDistance);
 
 	private:
 		AssetPtr<Model> ModelAsset;
@@ -40,6 +41,10 @@ namespace FW
 
 		Camera ViewCamera;
 		Vector3f ModelCenter = { 0.0f, 0.0f, 0.0f };
+		float ModelRadius = 1.0f;
+		float CameraDistance = 1.0f;
+		float MinCameraDistance = 0.1f;
+		float MaxCameraDistance = 1000.0f;
 		float ModelYaw = PI + PI / 8;
 		float ModelPitch = 0.0f;
 		bool bDragging = false;
