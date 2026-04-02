@@ -3,7 +3,7 @@ fbxHierarchy = {
 }
 
 usage "fbx"
-    includedirs
+    externalincludedirs
     {
         "./Include",
     }
@@ -15,12 +15,16 @@ usage "fbx"
     {
         "FBXSDK_SHARED",
     }
-    links
-    {
-        "libfbxsdk"
-    }
     filter "system:macosx"
+        links
+        {
+            "fbxsdk"
+        }
         prebuildcommands "{COPYFILE} %{wks.location}/External/Fbx/Lib/*.dylib %{cfg.targetdir}"
 
     filter "system:windows"
+        links
+        {
+            "libfbxsdk"
+        }
         prebuildcommands "{COPYFILE} \"%{wks.location}/External/Fbx/Lib/*.dll\" %{cfg.targetdir}"
