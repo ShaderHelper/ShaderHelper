@@ -157,7 +157,8 @@ namespace FW
 				.FillMode = RasterizerFillMode::Solid,
 				.CullMode = RasterizerCullMode::Back,
 			},
-			.DepthStencilState = DepthStencilStateDesc{
+			.SampleCount = 4,
+			.DepthStencilState = DepthStencilStateDesc {
 				.DepthFormat = GpuFormat::D32_FLOAT,
 			},
 		};
@@ -184,11 +185,17 @@ namespace FW
 		};
 		RenderTarget = GGpuRhi->CreateTexture(Desc);
 
+		GpuTextureDesc MsaaDesc = Desc;
+		MsaaDesc.Usage = GpuTextureUsage::RenderTarget;
+		MsaaDesc.SampleCount = 4;
+		MsaaRenderTarget = GGpuRhi->CreateTexture(MsaaDesc);
+
 		GpuTextureDesc DepthDesc{
 			.Width = static_cast<uint32>(ViewportSize.X),
 			.Height = static_cast<uint32>(ViewportSize.Y),
 			.Format = GpuFormat::D32_FLOAT,
 			.Usage = GpuTextureUsage::DepthStencil,
+			.SampleCount = 4,
 		};
 		DepthTarget = GGpuRhi->CreateTexture(DepthDesc);
 
@@ -207,9 +214,11 @@ namespace FW
 
 		GpuRenderPassDesc PassDesc;
 		PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{
-			RenderTarget->GetDefaultView(),
+			MsaaRenderTarget->GetDefaultView(),
 			RenderTargetLoadAction::Clear,
-			RenderTargetStoreAction::Store
+			RenderTargetStoreAction::DontCare,
+			Vector4f(0.08f, 0.08f, 0.08f, 1.0f),
+			RenderTarget->GetDefaultView()
 		});
 		PassDesc.DepthStencilTarget = GpuDepthStencilTargetInfo{
 			DepthTarget->GetDefaultView(),

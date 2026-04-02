@@ -132,11 +132,6 @@ namespace FW
 		DxCheck(D3D12CreateDevice(Adapter, D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&GDevice)));
 		DxCheck(GDevice->QueryInterface(&GCompatDevice));
 		GMaxShaderModel = GetMaxShaderModel(GDevice);
-		if (GMaxShaderModel >= D3D_SHADER_MODEL_6_2)
-		{
-			GpuFeature::Support16bitType = true;
-		}
-		GpuFeature::SupportTimestampQuery = true;
 
 #if GPU_API_DEBUG
 		if (bEnableDebugLayer) {

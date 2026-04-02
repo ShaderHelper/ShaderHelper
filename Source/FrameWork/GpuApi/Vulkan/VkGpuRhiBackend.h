@@ -15,6 +15,7 @@ namespace FW
 		void WaitGpu() override;
 		void BeginFrame() override;
 		void EndFrame() override;
+		const GpuFeature& GetFeature() const override;
 		TRefCountPtr<GpuTexture> CreateTextureInternal(const GpuTextureDesc& InTexDesc, GpuResourceState InitState) override;
 		TRefCountPtr<GpuBuffer> CreateBufferInternal(const GpuBufferDesc& InBufferDesc, GpuResourceState InitState) override;
 		TRefCountPtr<GpuTextureView> CreateTextureViewInternal(const GpuTextureViewDesc& InViewDesc) override;

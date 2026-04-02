@@ -80,6 +80,7 @@ namespace FW
 
 		// Hash primitive type
 		Hash = HashCombine(Hash, ::GetTypeHash(Desc.Primitive));
+		Hash = HashCombine(Hash, ::GetTypeHash(Desc.SampleCount));
 
 		// Hash render targets
 		Hash = HashCombine(Hash, ::GetTypeHash(Desc.Targets.Num()));
@@ -116,6 +117,7 @@ namespace FW
 			.VertexLayout = Desc.VertexLayout,
 			.RasterizerState = Desc.RasterizerState,
 			.Primitive = Desc.Primitive,
+			.SampleCount = Desc.SampleCount,
 			.Targets = Desc.Targets,
 			.DepthStencilState = Desc.DepthStencilState,
 		};

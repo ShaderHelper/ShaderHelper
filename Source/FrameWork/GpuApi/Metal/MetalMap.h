@@ -80,7 +80,18 @@ namespace FW
             MetalTextureView* RtView = static_cast<MetalTextureView*>(RtInfo.View);
             RawPassDesc.colorAttachments[i].texture = (id<MTLTexture>)RtView->GetResource();
             RawPassDesc.colorAttachments[i].loadAction = MapLoadAction(RtInfo.LoadAction);
-            RawPassDesc.colorAttachments[i].storeAction = MapStoreAction(RtInfo.StoreAction);
+            if (RtInfo.ResolveTarget)
+            {
+                MetalTextureView* ResolveView = static_cast<MetalTextureView*>(RtInfo.ResolveTarget);
+                RawPassDesc.colorAttachments[i].resolveTexture = (id<MTLTexture>)ResolveView->GetResource();
+                RawPassDesc.colorAttachments[i].storeAction = RtInfo.StoreAction == RenderTargetStoreAction::Store
+                    ? MTLStoreActionStoreAndMultisampleResolve
+                    : MTLStoreActionMultisampleResolve;
+            }
+            else
+            {
+                RawPassDesc.colorAttachments[i].storeAction = MapStoreAction(RtInfo.StoreAction);
+            }
             RawPassDesc.colorAttachments[i].clearColor = MTLClearColorMake(RtInfo.ClearColor.x, RtInfo.ClearColor.y, RtInfo.ClearColor.z, RtInfo.ClearColor.w);
         }
 

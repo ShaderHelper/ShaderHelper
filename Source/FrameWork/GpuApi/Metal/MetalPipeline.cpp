@@ -81,6 +81,7 @@ namespace FW
             ColorAttachment->setWriteMask(MapWriteMask(Target.Mask));
             ColorAttachment->setPixelFormat((MTL::PixelFormat)MapTextureFormat(Target.TargetFormat));
         }
+        PipelineDesc->setRasterSampleCount(InPipelineStateDesc.SampleCount);
 
         if (InPipelineStateDesc.DepthStencilState)
         {

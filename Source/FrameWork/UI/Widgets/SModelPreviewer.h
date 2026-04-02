@@ -35,6 +35,7 @@ namespace FW
 
 		TSharedPtr<PreviewViewPort> Preview;
 		TRefCountPtr<GpuTexture> RenderTarget;
+		TRefCountPtr<GpuTexture> MsaaRenderTarget;
 		TRefCountPtr<GpuTexture> DepthTarget;
 
 		Camera ViewCamera;

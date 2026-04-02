@@ -259,25 +259,55 @@ namespace FW::VK
 		TArray<VkImageView> Attachments;
 		TArray<VkAttachmentDescription> AttachmentDescs;
 		TArray<VkAttachmentReference> AttachmentRefs;
+		TArray<VkAttachmentReference> ResolveAttachmentRefs;
 
 		for (int32 Index = 0; Index < PassDesc.ColorRenderTargets.Num(); Index ++)
 		{
 			const GpuRenderTargetInfo& RenderTargetInfo = PassDesc.ColorRenderTargets[Index];
 			VulkanTextureView* RtView = static_cast<VulkanTextureView*>(RenderTargetInfo.View);
-			if (RenderTargetInfo.LoadAction == RenderTargetLoadAction::Clear)
-			{
-				ClearValues.Add({ .color = {RenderTargetInfo.ClearColor.X, RenderTargetInfo.ClearColor.Y, RenderTargetInfo.ClearColor.Z, RenderTargetInfo.ClearColor.W} });
-			}
+			const uint32 SampleCount = RtView->GetTexture()->GetSampleCount();
+			const uint32 AttachmentIndex = static_cast<uint32>(AttachmentDescs.Num());
 			Attachments.Add(RtView->GetView());
 			AttachmentDescs.Add({
 				.format = MapTextureFormat(RtView->GetTexture()->GetFormat()),
-				.samples = VK_SAMPLE_COUNT_1_BIT,
+				.samples = MapSampleCount(SampleCount),
 				.loadOp = MapLoadAction(RenderTargetInfo.LoadAction),
 				.storeOp = MapStoreAction(RenderTargetInfo.StoreAction),
 				.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 				.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 			});
-			AttachmentRefs.Emplace(Index, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+			VkClearValue& ColorClearValue = ClearValues.AddDefaulted_GetRef();
+			if (RenderTargetInfo.LoadAction == RenderTargetLoadAction::Clear)
+			{
+				ColorClearValue.color = { RenderTargetInfo.ClearColor.X, RenderTargetInfo.ClearColor.Y, RenderTargetInfo.ClearColor.Z, RenderTargetInfo.ClearColor.W };
+			}
+			AttachmentRefs.Emplace(AttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+			if (RenderTargetInfo.ResolveTarget)
+			{
+				VulkanTextureView* ResolveView = static_cast<VulkanTextureView*>(RenderTargetInfo.ResolveTarget);
+				ResolveAttachmentRefs.Add({
+					.attachment = uint32_t(AttachmentDescs.Num()),
+					.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				});
+				Attachments.Add(ResolveView->GetView());
+				AttachmentDescs.Add({
+					.format = MapTextureFormat(ResolveView->GetTexture()->GetFormat()),
+					.samples = VK_SAMPLE_COUNT_1_BIT,
+					.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+					.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+					.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+					.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+				});
+				ClearValues.AddDefaulted();
+			}
+			else if (SampleCount > 1)
+			{
+				ResolveAttachmentRefs.Add({
+					.attachment = VK_ATTACHMENT_UNUSED,
+					.layout = VK_IMAGE_LAYOUT_UNDEFINED,
+				});
+			}
 		}
 
 		VkAttachmentReference DepthAttachmentRef{};
@@ -290,14 +320,10 @@ namespace FW::VK
 				.attachment = uint32_t(AttachmentDescs.Num()),
 				.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 			};
-			if (DepthInfo.LoadAction == RenderTargetLoadAction::Clear)
-			{
-				ClearValues.Add({ .depthStencil = {DepthInfo.ClearDepth, 0} });
-			}
 			Attachments.Add(DsView->GetView());
 			AttachmentDescs.Add({
 				.format = MapTextureFormat(DsView->GetTexture()->GetFormat()),
-				.samples = VK_SAMPLE_COUNT_1_BIT,
+				.samples = MapSampleCount(DsView->GetTexture()->GetSampleCount()),
 				.loadOp = MapLoadAction(DepthInfo.LoadAction),
 				.storeOp = MapStoreAction(DepthInfo.StoreAction),
 				.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
@@ -305,12 +331,18 @@ namespace FW::VK
 				.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 				.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
 			});
+			VkClearValue& DepthClearValue = ClearValues.AddDefaulted_GetRef();
+			if (DepthInfo.LoadAction == RenderTargetLoadAction::Clear)
+			{
+				DepthClearValue.depthStencil = { DepthInfo.ClearDepth, 0 };
+			}
 		}
 
 		VkSubpassDescription SubpassDesc{
 			.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
 			.colorAttachmentCount = (uint32_t)PassDesc.ColorRenderTargets.Num(),
 			.pColorAttachments = AttachmentRefs.GetData(),
+			.pResolveAttachments = ResolveAttachmentRefs.Num() > 0 ? ResolveAttachmentRefs.GetData() : nullptr,
 			.pDepthStencilAttachment = bHasDepth ? &DepthAttachmentRef : nullptr
 		};
 		VkRenderPassCreateInfo RenderPassInfo{

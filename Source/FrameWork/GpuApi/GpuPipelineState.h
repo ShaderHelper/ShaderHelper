@@ -84,6 +84,7 @@ namespace FW
 
 		RasterizerStateDesc RasterizerState{ RasterizerFillMode::Solid, RasterizerCullMode::None };
 		PrimitiveType Primitive = PrimitiveType::TriangleList;
+		uint32 SampleCount = 1;
 
 		TOptional<DepthStencilStateDesc> DepthStencilState;
     };
@@ -127,6 +128,7 @@ namespace FW
 		TArray<GpuVertexLayoutDesc> VertexLayout;
 		RasterizerStateDesc RasterizerState;
 		PrimitiveType Primitive;
+		uint32 SampleCount = 1;
 		TArray<PipelineTargetDesc, TFixedAllocator<GpuResourceLimit::MaxRenderTargetNum>> Targets;
 		TOptional<DepthStencilStateDesc> DepthStencilState;
 
@@ -148,6 +150,7 @@ namespace FW
 				&& RasterizerState.FillMode == Other.RasterizerState.FillMode
 				&& RasterizerState.CullMode == Other.RasterizerState.CullMode
 				&& Primitive == Other.Primitive
+				&& SampleCount == Other.SampleCount
 				&& Targets == Other.Targets
 				&& DepthStencilState == Other.DepthStencilState;
 		}

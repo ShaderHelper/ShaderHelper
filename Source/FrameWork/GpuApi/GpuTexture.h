@@ -17,6 +17,7 @@ namespace FW
 		uint32 Depth = 1;
 		// 0 means auto-calculate mip count and generate mipmaps.
 		uint32 NumMips = 1;
+		uint32 SampleCount = 1;
 		GpuTextureDimension Dimension = GpuTextureDimension::Tex2D;
     };
 
@@ -38,6 +39,7 @@ namespace FW
         uint32 GetHeight() const { return TexDesc.Height; }
 		uint32 GetDepth() const { return TexDesc.Depth; }
 		uint32 GetNumMips() const { return TexDesc.NumMips; }
+		uint32 GetSampleCount() const { return TexDesc.SampleCount; }
 		uint32 GetArrayLayerCount() const { return TexDesc.Dimension == GpuTextureDimension::TexCube ? 6 : 1; }
 		uint32 GetNumSubResources() const { return GetNumMips() * GetArrayLayerCount(); }
 		virtual uint32 GetAllocationSize() const { AUX::Unreachable(); return 0; }

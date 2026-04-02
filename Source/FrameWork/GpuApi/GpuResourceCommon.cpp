@@ -39,6 +39,17 @@ namespace FW
 		}
 	}
 
+	bool IsDepthFormat(GpuFormat InFormat)
+	{
+		switch (InFormat)
+		{
+		case GpuFormat::D32_FLOAT:
+			return true;
+		default:
+			return false;
+		}
+	}
+
 	GpuResourceState GetBufferState(GpuBufferUsage Usage)
 	{
 		GpuResourceState Result = GpuResourceState::Unknown;

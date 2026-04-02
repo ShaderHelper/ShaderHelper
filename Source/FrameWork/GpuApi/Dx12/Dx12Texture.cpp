@@ -129,7 +129,7 @@ namespace FW
 				InTexDesc.Height,
 				InTexDesc.Dimension == GpuTextureDimension::TexCube ? 6 : InTexDesc.Depth,
 				InTexDesc.NumMips,
-				1,0,
+				InTexDesc.SampleCount, 0,
 				ResourceFlags
 			);
 

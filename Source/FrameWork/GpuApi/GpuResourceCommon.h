@@ -248,6 +248,8 @@ namespace FW
 
 	FRAMEWORK_API uint32 GetFormatByteSize(GpuFormat InFormat);
 
+	FRAMEWORK_API bool IsDepthFormat(GpuFormat InFormat);
+
 	FRAMEWORK_API GpuResourceState GetBufferState(GpuBufferUsage Usage);
 
 	FRAMEWORK_API GpuResourceState GetTextureState(GpuTextureUsage Usage);

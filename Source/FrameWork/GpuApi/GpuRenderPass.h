@@ -33,6 +33,7 @@ namespace FW
 
         //only valid when the load action is clear.
 		Vector4f ClearColor = View->GetTexture()->GetResourceDesc().ClearValues;
+		GpuTextureView* ResolveTarget = nullptr;
 	};
 
 	struct GpuDepthStencilTargetInfo

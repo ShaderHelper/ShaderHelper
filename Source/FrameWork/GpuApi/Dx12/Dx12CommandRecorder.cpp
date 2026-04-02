@@ -5,6 +5,56 @@
 
 namespace FW
 {
+	static void ResolveDx12MsaaTarget(ID3D12GraphicsCommandList* CmdList, GpuCmdRecorder* Recorder, Dx12TextureView* SourceView, Dx12TextureView* ResolveView)
+	{
+		Dx12Texture* SourceTexture = static_cast<Dx12Texture*>(SourceView->GetTexture());
+		Dx12Texture* ResolveTexture = static_cast<Dx12Texture*>(ResolveView->GetTexture());
+		check(SourceTexture->GetSampleCount() > 1);
+		check(ResolveTexture->GetSampleCount() == 1);
+		check(SourceTexture->GetNumMips() == 1);
+		check(SourceTexture->GetArrayLayerCount() == 1);
+
+		const uint32 ResolveMip = ResolveView->GetBaseMipLevel();
+		const uint32 ResolveArrayLayer = ResolveView->GetBaseArrayLayer();
+		const uint32 SourceSubResource = 0;
+		const uint32 ResolveSubResource = D3D12CalcSubresource(ResolveMip, ResolveArrayLayer, 0, ResolveTexture->GetNumMips(), ResolveTexture->GetArrayLayerCount());
+
+		const GpuResourceState SourceState = Recorder->GetLocalTextureSubResourceState(SourceTexture, 0, 0);
+		const GpuResourceState ResolveState = Recorder->GetLocalTextureSubResourceState(ResolveTexture, ResolveMip, ResolveArrayLayer);
+		const D3D12_RESOURCE_STATES SourceDxState = MapResourceState(SourceState);
+		const D3D12_RESOURCE_STATES ResolveDxState = MapResourceState(ResolveState);
+
+		TArray<CD3DX12_RESOURCE_BARRIER, TFixedAllocator<2>> Barriers;
+		if (SourceDxState != D3D12_RESOURCE_STATE_RESOLVE_SOURCE)
+		{
+			Barriers.Add(CD3DX12_RESOURCE_BARRIER::Transition(SourceTexture->GetResource(), SourceDxState, D3D12_RESOURCE_STATE_RESOLVE_SOURCE, SourceSubResource));
+		}
+		if (ResolveDxState != D3D12_RESOURCE_STATE_RESOLVE_DEST)
+		{
+			Barriers.Add(CD3DX12_RESOURCE_BARRIER::Transition(ResolveTexture->GetResource(), ResolveDxState, D3D12_RESOURCE_STATE_RESOLVE_DEST, ResolveSubResource));
+		}
+		if (Barriers.Num() > 0)
+		{
+			CmdList->ResourceBarrier(Barriers.Num(), Barriers.GetData());
+		}
+
+		CmdList->ResolveSubresource(ResolveTexture->GetResource(), ResolveSubResource, SourceTexture->GetResource(), SourceSubResource, MapTextureFormat(SourceTexture->GetFormat()));
+
+		Barriers.Reset();
+		if (SourceDxState != D3D12_RESOURCE_STATE_RESOLVE_SOURCE)
+		{
+			Barriers.Add(CD3DX12_RESOURCE_BARRIER::Transition(SourceTexture->GetResource(), D3D12_RESOURCE_STATE_RESOLVE_SOURCE, SourceDxState, SourceSubResource));
+		}
+		if (ResolveDxState != D3D12_RESOURCE_STATE_RESOLVE_DEST)
+		{
+			Barriers.Add(CD3DX12_RESOURCE_BARRIER::Transition(ResolveTexture->GetResource(), D3D12_RESOURCE_STATE_RESOLVE_DEST, ResolveDxState, ResolveSubResource));
+		}
+		if (Barriers.Num() > 0)
+		{
+			CmdList->ResourceBarrier(Barriers.Num(), Barriers.GetData());
+		}
+	}
+
 	Dx12StateCache::Dx12StateCache()
 		: IsPipelineStateDirty(false)
 		, IsRenderTargetDirty(false)
@@ -598,6 +648,7 @@ namespace FW
 			LoadActions.Add(PassDesc.ColorRenderTargets[i].LoadAction);
 		}
 
+		CurrentRenderPassDesc = PassDesc;
 		CurrentTimestampWrites = PassDesc.TimestampWrites;
 		if (CurrentTimestampWrites)
 		{
@@ -620,6 +671,18 @@ namespace FW
 
 	void Dx12CmdRecorder::EndRenderPass(GpuRenderPassRecorder* InRenderPassRecorder)
 	{
+		if (CurrentRenderPassDesc)
+		{
+			for (const GpuRenderTargetInfo& RenderTargetInfo : CurrentRenderPassDesc->ColorRenderTargets)
+			{
+				if (RenderTargetInfo.ResolveTarget)
+				{
+					ResolveDx12MsaaTarget(CmdList.GetReference(), this, static_cast<Dx12TextureView*>(RenderTargetInfo.View), static_cast<Dx12TextureView*>(RenderTargetInfo.ResolveTarget));
+				}
+			}
+			CurrentRenderPassDesc.Reset();
+		}
+
 		if (CurrentTimestampWrites)
 		{
 			Dx12QuerySet* DxQuerySet = static_cast<Dx12QuerySet*>(CurrentTimestampWrites->QuerySet);

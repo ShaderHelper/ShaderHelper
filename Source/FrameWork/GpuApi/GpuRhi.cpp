@@ -480,6 +480,11 @@ public:
 		RequestedCmdRecorders.Empty();
 	}
 
+	const GpuFeature& GetFeature() const override
+	{
+		return RhiBackend->GetFeature();
+	}
+
 	TRefCountPtr<GpuTexture> CreateTextureInternal(const GpuTextureDesc &InTexDesc, GpuResourceState InitState) override
 	{
 		check(ValidateCreateTexture(InTexDesc, InitState));

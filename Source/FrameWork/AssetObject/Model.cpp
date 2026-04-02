@@ -111,6 +111,7 @@ namespace FW
 		const uint32 ThumbnailSize = 128;
 		const GpuFormat ThumbnailFormat = GpuFormat::B8G8R8A8_UNORM;
 		const GpuFormat DepthFormat = GpuFormat::D32_FLOAT;
+		const uint32 SampleCount = 4;
 
 		GpuTextureDesc RtDesc{
 			.Width = ThumbnailSize,
@@ -121,11 +122,23 @@ namespace FW
 		};
 		TRefCountPtr<GpuTexture> Thumbnail = GGpuRhi->CreateTexture(MoveTemp(RtDesc));
 
+		TRefCountPtr<GpuTexture> MsaaThumbnail;
+		GpuTextureDesc MsaaRtDesc{
+			.Width = ThumbnailSize,
+			.Height = ThumbnailSize,
+			.Format = ThumbnailFormat,
+			.Usage = GpuTextureUsage::RenderTarget,
+			.ClearValues = Vector4f(0.08f, 0.08f, 0.08f, 1.0f),
+			.SampleCount = SampleCount,
+		};
+		MsaaThumbnail = GGpuRhi->CreateTexture(MoveTemp(MsaaRtDesc));
+
 		GpuTextureDesc DepthDesc{
 			.Width = ThumbnailSize,
 			.Height = ThumbnailSize,
 			.Format = DepthFormat,
 			.Usage = GpuTextureUsage::DepthStencil,
+			.SampleCount = SampleCount,
 		};
 		TRefCountPtr<GpuTexture> DepthTarget = GGpuRhi->CreateTexture(MoveTemp(DepthDesc));
 
@@ -220,6 +233,7 @@ namespace FW
 				.FillMode = RasterizerFillMode::Solid,
 				.CullMode = RasterizerCullMode::Back,
 			},
+			.SampleCount = SampleCount,
 			.DepthStencilState = DepthStencilStateDesc{
 				.DepthFormat = DepthFormat,
 			},
@@ -228,10 +242,11 @@ namespace FW
 
 		GpuRenderPassDesc PassDesc;
 		PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{
-			Thumbnail->GetDefaultView(),
+			MsaaThumbnail->GetDefaultView(),
 			RenderTargetLoadAction::Clear,
-			RenderTargetStoreAction::Store,
-			Vector4f(0.08f, 0.08f, 0.08f, 1.0f)
+			RenderTargetStoreAction::DontCare,
+			Vector4f(0.08f, 0.08f, 0.08f, 1.0f),
+			Thumbnail->GetDefaultView()
 		});
 		PassDesc.DepthStencilTarget = GpuDepthStencilTargetInfo{
 			DepthTarget->GetDefaultView(),

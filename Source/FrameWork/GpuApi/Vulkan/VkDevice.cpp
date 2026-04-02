@@ -165,8 +165,6 @@ namespace FW::VK
 				VK_VERSION_MAJOR(Props.properties.apiVersion),
 				VK_VERSION_MINOR(Props.properties.apiVersion),
 				VK_VERSION_PATCH(Props.properties.apiVersion));
-
-			GpuFeature::SupportTimestampQuery = (Props.properties.limits.timestampComputeAndGraphics == VK_TRUE);
 		}
 		if (GPhysicalDevice == VK_NULL_HANDLE)
 		{

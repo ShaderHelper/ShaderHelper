@@ -7,7 +7,6 @@ namespace FW
     void InitMetalCore()
     {
         GDevice = MTL::CreateSystemDefaultDevice();
-		GpuFeature::Support16bitType = true;
 
 //		if(@available(macOS 13.3, *))
 //		{
@@ -25,7 +24,6 @@ namespace FW
 					if (CS->name()->isEqualToString(MTL::CommonCounterSetTimestamp))
 					{
 						GTimestampCounterSet = CS;
-					    GpuFeature::SupportTimestampQuery = true;
 						GSupportStageBoundaryCounter = GDevice->supportsCounterSampling(MTL::CounterSamplingPointAtStageBoundary);
 						break;
 					}

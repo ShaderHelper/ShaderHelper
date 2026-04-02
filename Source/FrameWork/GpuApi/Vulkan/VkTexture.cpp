@@ -68,7 +68,7 @@ namespace FW::VK
 		ImgCreateInfo.arrayLayers = ArrayLayers;
 		ImgCreateInfo.format = MapTextureFormat(InTexDesc.Format);
 		ImgCreateInfo.usage = DetermineTextureUsage(InTexDesc);
-		ImgCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		ImgCreateInfo.samples = MapSampleCount(InTexDesc.SampleCount);
 		if (bIsCube)
 		{
 			ImgCreateInfo.flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;

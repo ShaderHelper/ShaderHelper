@@ -4,6 +4,19 @@
 
 namespace FW::VK
 {
+	inline VkSampleCountFlagBits MapSampleCount(uint32 InSampleCount)
+	{
+		switch (InSampleCount)
+		{
+		case 1: return VK_SAMPLE_COUNT_1_BIT;
+		case 2: return VK_SAMPLE_COUNT_2_BIT;
+		case 4: return VK_SAMPLE_COUNT_4_BIT;
+		case 8: return VK_SAMPLE_COUNT_8_BIT;
+		default:
+			AUX::Unreachable();
+		}
+	}
+
 	inline VkFormat MapTextureFormat(GpuFormat InTexFormat)
 	{
 		switch (InTexFormat)

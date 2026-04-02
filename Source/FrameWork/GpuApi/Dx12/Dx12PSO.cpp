@@ -94,7 +94,7 @@ namespace FW
         PsoDesc.SampleMask = UINT_MAX;
         PsoDesc.PrimitiveTopologyType = MapTopologyType(MapPrimitiveType(InPipelineStateDesc.Primitive));
         PsoDesc.NumRenderTargets = TargetNum;
-        PsoDesc.SampleDesc.Count = 1;
+		PsoDesc.SampleDesc.Count = InPipelineStateDesc.SampleCount;
         PsoDesc.SampleDesc.Quality = 0;
         
 		CD3DX12_BLEND_DESC BlendDesc = CD3DX12_BLEND_DESC(CD3DX12_DEFAULT{});

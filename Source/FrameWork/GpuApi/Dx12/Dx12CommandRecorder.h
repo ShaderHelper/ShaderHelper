@@ -197,6 +197,7 @@ namespace FW
 		TArray<TUniquePtr<Dx12ComputePassRecorder>> RequestedComputePassRecorders;
 		TRefCountPtr<ID3D12Fence> Fence;
 		bool IsEnd = false;
+		TOptional<GpuRenderPassDesc> CurrentRenderPassDesc;
 		TOptional<GpuRenderPassTimestampWrites> CurrentTimestampWrites;
 	};
 
