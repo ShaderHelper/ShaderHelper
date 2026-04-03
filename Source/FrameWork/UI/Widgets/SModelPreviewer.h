@@ -45,8 +45,6 @@ namespace FW
 		float CameraDistance = 1.0f;
 		float MinCameraDistance = 0.1f;
 		float MaxCameraDistance = 1000.0f;
-		float ModelYaw = PI + PI / 8;
-		float ModelPitch = 0.0f;
 		bool bDragging = false;
 		Vector2f LastMousePos = { 0.0f, 0.0f };
 		FDelegateHandle ResizeHandlerHandle;

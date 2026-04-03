@@ -8,6 +8,13 @@
 
 namespace FW
 {
+	static Vector3f GetOrbitCameraPosition(float InDistance, float InYaw, float InPitch)
+	{
+		const FMatrix44f OrbitRotation = RotationMatrix(InYaw, InPitch);
+		const Vector4f OrbitPosition = OrbitRotation.TransformFVector4(FVector4f(0.0f, 0.0f, -InDistance, 1.0f));
+		return Vector3f(OrbitPosition.X, OrbitPosition.Y, OrbitPosition.Z);
+	}
+
 	void SModelPreviewer::Construct(const FArguments& InArgs)
 	{
 		MouseButtonDownHandler = InArgs._OnMouseButtonDown;
@@ -15,6 +22,8 @@ namespace FW
 		Preview = MakeShared<PreviewViewPort>();
 
 		ViewCamera.Position = { 0.0f, 0.0f, -1.0f };
+		ViewCamera.Yaw = -(PI + PI / 8);
+		ViewCamera.Pitch = 0.0f;
 		ViewCamera.VerticalFov = FMath::DegreesToRadians(45.0f);
 		ViewCamera.AspectRatio = 1.0f;
 		ViewCamera.NearPlane = 0.01f;
@@ -64,8 +73,9 @@ namespace FW
 			const Vector2f CurrentMousePos = (Vector2f)MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
 			const Vector2f MouseDelta = CurrentMousePos - LastMousePos;
 			LastMousePos = CurrentMousePos;
-			ModelYaw -= MouseDelta.x * 0.01f;
-			ModelPitch = FMath::Clamp(ModelPitch - MouseDelta.y * 0.01f, -1.4f, 1.4f);
+			ViewCamera.Yaw += MouseDelta.x * 0.01f;
+			ViewCamera.Pitch = FMath::Clamp(ViewCamera.Pitch - MouseDelta.y * 0.01f, -1.4f, 1.4f);
+			UpdateCameraDistance(CameraDistance);
 			Render();
 			return FReply::Handled();
 		});
@@ -88,7 +98,7 @@ namespace FW
 
 		ModelCenter = Center;
 		ModelRadius = FMath::Max(Radius, 0.01f);
-		CameraDistance = ModelRadius / FMath::Tan(ViewCamera.VerticalFov * 0.5f) * 1.6f;
+		CameraDistance = ModelRadius / FMath::Tan(ViewCamera.VerticalFov * 0.5f) * 1.3f;
 		MinCameraDistance = FMath::Max(ModelRadius * 0.2f, 0.02f);
 		MaxCameraDistance = FMath::Max(CameraDistance * 8.0f, MinCameraDistance + 1.0f);
 		UpdateCameraDistance(CameraDistance);
@@ -98,7 +108,6 @@ namespace FW
 		UbBuilder.AddMatrix4x4f("NormalMatrix");
 		UbBuilder.AddVector3f("LightDir");
 		ModelUniformBuffer = UbBuilder.Build();
-		ModelUniformBuffer->GetMember<Vector3f>("LightDir") = Vector3f(0.0f, 0.0f, -1.0f);
 
 		BindGroupLayout = GpuBindGroupLayoutBuilder{0}
 			.AddUniformBuffer("ModelUb", UbBuilder, BindingShaderStage::Vertex | BindingShaderStage::Pixel)
@@ -177,7 +186,7 @@ namespace FW
 	void SModelPreviewer::UpdateCameraDistance(float InDistance)
 	{
 		CameraDistance = FMath::Clamp(InDistance, MinCameraDistance, MaxCameraDistance);
-		ViewCamera.Position = { 0.0f, 0.0f, -CameraDistance };
+		ViewCamera.Position = GetOrbitCameraPosition(CameraDistance, ViewCamera.Yaw, ViewCamera.Pitch);
 		ViewCamera.NearPlane = FMath::Max(0.01f, FMath::Min(ModelRadius * 0.05f, CameraDistance * 0.5f));
 		ViewCamera.FarPlane = CameraDistance + ModelRadius * 4.0f;
 	}
@@ -222,11 +231,12 @@ namespace FW
 	{
 		ResizeRenderTargetIfNeeded();
 
-		const FMatrix44f ModelMatrix = FTranslationMatrix44f(-ModelCenter) * RotationMatrix(ModelYaw, ModelPitch);
+		const FMatrix44f ModelMatrix = FTranslationMatrix44f(-ModelCenter);
 		const FMatrix44f Transform = ModelMatrix * ViewCamera.GetViewProjectionMatrix();
 		const FMatrix44f NormalMatrix = ModelMatrix.Inverse().GetTransposed();
 		ModelUniformBuffer->GetMember<FMatrix44f>("Transform") = Transform;
 		ModelUniformBuffer->GetMember<FMatrix44f>("NormalMatrix") = NormalMatrix;
+		ModelUniformBuffer->GetMember<Vector3f>("LightDir") = FVector3f(ViewCamera.Position).GetSafeNormal();
 
 		GpuRenderPassDesc PassDesc;
 		PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{

@@ -8,43 +8,38 @@
 
 namespace FW
 {
-	static uint32 CountVertices(const TArray<MeshData>& InSubMeshes)
-	{
-		uint32 VertexCount = 0;
-		for (const MeshData& SubMesh : InSubMeshes)
-		{
-			VertexCount += SubMesh.Vertices.Num();
-		}
-		return VertexCount;
-	}
-
-	static uint32 CountFaces(const TArray<MeshData>& InSubMeshes)
-	{
-		uint32 FaceCount = 0;
-		for (const MeshData& SubMesh : InSubMeshes)
-		{
-			FaceCount += SubMesh.Indices.Num() / 3;
-		}
-		return FaceCount;
-	}
 
 	REFLECTION_REGISTER(AddClass<Model>("Model")
-								.BaseClass<AssetObject>()
-								.Data<&Model::VertexCount, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("VertexCount"))
-								.Data<&Model::TriangleFaceCount, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("TriangleFaceCount"))
+		.BaseClass<AssetObject>()
+		.Data<&Model::VertexCount, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("VertexCount"))
+		.Data<&Model::TriangleFaceCount, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("TriangleFaceCount"))
+		.Data<&Model::SubMeshCount, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("SubMeshCount"))
 	)
+
+	static void UpdateModelStats(const TArray<MeshData>& InSubMeshes, uint32& OutSubMeshCount, uint32& OutVertexCount, uint32& OutTriangleFaceCount)
+	{
+		OutVertexCount = 0;
+		OutTriangleFaceCount = 0;
+		OutSubMeshCount = InSubMeshes.Num();
+
+		for (const MeshData& SubMesh : InSubMeshes)
+		{
+			OutVertexCount += SubMesh.Vertices.Num();
+			OutTriangleFaceCount += SubMesh.Indices.Num() / 3;
+		}
+	}
 
 	Model::Model()
 		: VertexCount(0)
 		, TriangleFaceCount(0)
+		, SubMeshCount(0)
 	{
 	}
 
 	Model::Model(TArray<MeshData> InSubMeshes)
 		: SubMeshes(MoveTemp(InSubMeshes))
 	{
-		VertexCount = CountVertices(SubMeshes);
-		TriangleFaceCount = CountFaces(SubMeshes);
+		UpdateModelStats(SubMeshes, SubMeshCount, VertexCount, TriangleFaceCount);
 		InitGpuData();
 	}
 
@@ -53,8 +48,7 @@ namespace FW
 		AssetObject::Serialize(Ar);
 		Ar << SubMeshes;
 
-		VertexCount = CountVertices(SubMeshes);
-		TriangleFaceCount = CountFaces(SubMeshes);
+		UpdateModelStats(SubMeshes, SubMeshCount, VertexCount, TriangleFaceCount);
 	}
 
 	void Model::PostLoad()
@@ -150,12 +144,12 @@ namespace FW
 		ViewCamera.VerticalFov = FMath::DegreesToRadians(45.0f);
 		ViewCamera.AspectRatio = 1.0f;
 		ViewCamera.NearPlane = FMath::Max(0.01f, Radius * 0.05f);
-		const float Distance = Radius / FMath::Tan(ViewCamera.VerticalFov * 0.5f) * 1.6f;
+		const float Distance = Radius / FMath::Tan(ViewCamera.VerticalFov * 0.5f) * 1.3f;
 		ViewCamera.FarPlane = Distance + Radius * 4.0f;
 		ViewCamera.Position = Vector3f(0.0f, 0.0f, -Distance);
 
 		const FMatrix44f ViewProj = ViewCamera.GetViewProjectionMatrix();
-		const FMatrix44f ModelMatrix = RotationMatrix(PI + PI / 8, 0);
+		const FMatrix44f ModelMatrix = FTranslationMatrix44f(-Center) * RotationMatrix(PI + PI / 8, 0);
 		const FMatrix44f Transform = ModelMatrix * ViewProj;
 		const FMatrix44f NormalMatrix = ModelMatrix.Inverse().GetTransposed();
 

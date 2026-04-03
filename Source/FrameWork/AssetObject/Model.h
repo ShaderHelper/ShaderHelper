@@ -25,8 +25,9 @@ namespace FW
 		void ComputeBounds(Vector3f& OutCenter, float& OutRadius) const;
 
 	public:
-		uint32 VertexCount = 0;
-		uint32 TriangleFaceCount = 0;
+		uint32 VertexCount;
+		uint32 TriangleFaceCount;
+		uint32 SubMeshCount;
 
 	private:
 		TArray<MeshData> SubMeshes;

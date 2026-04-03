@@ -142,7 +142,7 @@ namespace FW
 		}
 		Importer->Destroy();
 
-		FbxAxisSystem::DirectX.ConvertScene(Scene);
+		FbxAxisSystem::DirectX.DeepConvertScene(Scene);
 
 		FbxGeometryConverter Converter(Manager);
 		Converter.Triangulate(Scene, true);
