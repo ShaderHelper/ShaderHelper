@@ -8,7 +8,6 @@ namespace FW
 	class UniformBufferBuilder;
 
 	using BindingGroupSlot = int32;
-	using BindingSlot = int32;
 
 	enum class BindingShaderStage : uint32
 	{
@@ -35,6 +34,31 @@ namespace FW
 		RWRawBuffer,
 		RWTexture,
 		RWTexture3D,
+	};
+
+	struct BindingSlot
+	{
+		int32 SlotNum;
+		BindingType Type;
+
+		bool operator==(const BindingSlot& Other) const = default;
+		bool operator<(const BindingSlot& Other) const
+		{
+			if (SlotNum != Other.SlotNum) return SlotNum < Other.SlotNum;
+			return Type < Other.Type;
+		}
+
+		friend uint32 GetTypeHash(const BindingSlot& Key)
+		{
+			return HashCombine(::GetTypeHash(Key.SlotNum), ::GetTypeHash(Key.Type));
+		}
+
+		friend FArchive& operator<<(FArchive& Ar, BindingSlot& Slot)
+		{
+			Ar << Slot.SlotNum;
+			Ar << Slot.Type;
+			return Ar;
+		}
 	};
 
 	struct LayoutBinding
@@ -72,7 +96,7 @@ namespace FW
 			uint32 Hash = ::GetTypeHash(Key.GroupNumber);
 			for (const auto& [K, V] : Key.Layouts)
 			{
-				Hash = HashCombine(Hash, ::GetTypeHash(K));
+				Hash = HashCombine(Hash, GetTypeHash(K));
 				Hash = HashCombine(Hash, GetTypeHash(V));
 			}
 			return Hash;
@@ -90,6 +114,15 @@ namespace FW
         BindingType GetBindingType(BindingSlot InSlot) const
         {
             return Layouts[InSlot].Type;
+        }
+        
+        bool ContainsSlotNum(int32 InSlotNum) const
+        {
+            for (const auto& [Slot, _] : Layouts)
+            {
+                if (Slot.SlotNum == InSlotNum) return true;
+            }
+            return false;
         }
         
         bool HasCodegenBinding(const FString& BindingName) const
@@ -127,7 +160,7 @@ namespace FW
 	public:
 		GpuBindGroupLayoutBuilder(BindingGroupSlot InGroupSlot);
 		//!! If have bindings that are not from codegen, must first call this method for each binding, to make sure the bindings are compact.
-		GpuBindGroupLayoutBuilder& AddExistingBinding(BindingSlot InSlot, BindingType Type, BindingShaderStage InStage = BindingShaderStage::All);
+		GpuBindGroupLayoutBuilder& AddExistingBinding(int32 InSlotNum, BindingType Type, BindingShaderStage InStage = BindingShaderStage::All);
 
 		//Add the codegen bindings, then get the CodegenDeclaration that will be injected into a shader.
 		GpuBindGroupLayoutBuilder& AddUniformBuffer(const FString& BindingName, const UniformBufferBuilder& UbBuilder, BindingShaderStage InStage = BindingShaderStage::All);
@@ -152,7 +185,7 @@ namespace FW
         }
 
 	private:
-		BindingSlot AutoSlot;
+		int32 AutoSlot;
 		GpuBindGroupLayoutDesc LayoutDesc;
 	};
 

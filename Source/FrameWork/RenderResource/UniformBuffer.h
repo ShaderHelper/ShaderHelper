@@ -230,6 +230,12 @@ namespace FW
 	template<> struct UniformBufferMemberTypeString<Vector3f> { static constexpr std::string_view Value = "float3"; static constexpr std::string_view GlslValue = "vec3"; };
 	template<> struct UniformBufferMemberTypeString<Vector4f> { static constexpr std::string_view Value = "float4"; static constexpr std::string_view GlslValue = "vec4"; };
 	template<> struct UniformBufferMemberTypeString<FMatrix44f> { static constexpr std::string_view Value = "float4x4"; static constexpr std::string_view GlslValue = "mat4"; };
+	template<> struct UniformBufferMemberTypeString<Vector2i> { static constexpr std::string_view Value = "int2"; static constexpr std::string_view GlslValue = "ivec2"; };
+	template<> struct UniformBufferMemberTypeString<Vector3i> { static constexpr std::string_view Value = "int3"; static constexpr std::string_view GlslValue = "ivec3"; };
+	template<> struct UniformBufferMemberTypeString<Vector4i> { static constexpr std::string_view Value = "int4"; static constexpr std::string_view GlslValue = "ivec4"; };
+	template<> struct UniformBufferMemberTypeString<Vector2u> { static constexpr std::string_view Value = "uint2"; static constexpr std::string_view GlslValue = "uvec2"; };
+	template<> struct UniformBufferMemberTypeString<Vector3u> { static constexpr std::string_view Value = "uint3"; static constexpr std::string_view GlslValue = "uvec3"; };
+	template<> struct UniformBufferMemberTypeString<Vector4u> { static constexpr std::string_view Value = "uint4"; static constexpr std::string_view GlslValue = "uvec4"; };
 
 	enum class UniformBufferUsage : uint32
 	{
@@ -302,6 +308,42 @@ namespace FW
 		UniformBufferBuilder& AddMatrix4x4f(const FString& MemberName)
 		{
 			AddMember<FMatrix44f>(MemberName);
+			return *this;
+		}
+
+		UniformBufferBuilder& AddVector2i(const FString& MemberName)
+		{
+			AddMember<Vector2i>(MemberName);
+			return *this;
+		}
+
+		UniformBufferBuilder& AddVector3i(const FString& MemberName)
+		{
+			AddMember<Vector3i>(MemberName);
+			return *this;
+		}
+
+		UniformBufferBuilder& AddVector4i(const FString& MemberName)
+		{
+			AddMember<Vector4i>(MemberName);
+			return *this;
+		}
+
+		UniformBufferBuilder& AddVector2u(const FString& MemberName)
+		{
+			AddMember<Vector2u>(MemberName);
+			return *this;
+		}
+
+		UniformBufferBuilder& AddVector3u(const FString& MemberName)
+		{
+			AddMember<Vector3u>(MemberName);
+			return *this;
+		}
+
+		UniformBufferBuilder& AddVector4u(const FString& MemberName)
+		{
+			AddMember<Vector4u>(MemberName);
 			return *this;
 		}
 

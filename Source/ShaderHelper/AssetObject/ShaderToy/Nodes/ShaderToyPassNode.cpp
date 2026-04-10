@@ -67,12 +67,15 @@ namespace SH
 		if(ShaderAssetObj)
 		{
 			ShaderAssetObj->OnDestroy.AddRaw(this, &ShaderToyPassNode::ClearBindingProperty);
-			ShaderAssetObj->OnRefreshBuilder.AddRaw(this, &ShaderToyPassNode::RefreshProperty, true);
+			ShaderAssetObj->OnShaderRefreshed.AddRaw(this, &ShaderToyPassNode::OnShaderBindingChanged, true);
 		}
 	}
 
-	void ShaderToyPassNode::InitCustomBindGroup()
+	void ShaderToyPassNode::RebuildCustomBindGroup()
 	{
+		CustomBindLayout.SafeRelease();
+		CustomBindGroup.SafeRelease();
+
 		if(ShaderAssetObj)
 		{
 			CustomBindLayout = ShaderAssetObj->CustomBindGroupLayoutBuilder.Build();
@@ -109,7 +112,7 @@ namespace SH
 		if(ShaderAssetObj)
 		{
 			ShaderAssetObj->OnDestroy.RemoveAll(this);
-			ShaderAssetObj->OnRefreshBuilder.RemoveAll(this);
+			ShaderAssetObj->OnShaderRefreshed.RemoveAll(this);
 		}
 	}
 
@@ -123,13 +126,13 @@ namespace SH
 		{
 			CustomUniformBuffer = ShaderAssetObj->CustomUniformBufferBuilder.Build();
 		}
-		InitCustomBindGroup();
+		RebuildCustomBindGroup();
 	}
 
 	GpuBindGroupBuilder ShaderToyPassNode::GetBuiltInBindGroupBuiler(GpuBindGroupLayout* Layout)
 	{
 		auto Builder = GpuBindGroupBuilder{ Layout }
-			.SetExistingBinding(0, TSingleton<PrintBuffer>::Get().GetResource())
+			.SetExistingBinding(0, BindingType::RWRawBuffer, TSingleton<PrintBuffer>::Get().GetResource())
 			.SetUniformBuffer("BuiltInUniform", BuiltinUniformBuffer->GetGpuResource());
 
 		const ShaderToyChannelDesc* ChannelDescs[4] = { &iChannelDesc0, &iChannelDesc1, &iChannelDesc2, &iChannelDesc3 };
@@ -658,7 +661,7 @@ namespace SH
 				{
 					CustomUniformBufferData.Empty();
 				}
-				InitCustomBindGroup();
+				RebuildCustomBindGroup();
 			}
 		}
 	
@@ -726,10 +729,10 @@ namespace SH
             }
             auto SlotCategory = MakeShared<PropertyCategory>(this, "Slot");
             {
-				auto PropertyDatas0 = GeneratePropertyDatas(this, GetMetaType<ShaderToyPassNode>()->GetMetaMemberData("iChannel0"), this, true);
-				auto PropertyDatas1 = GeneratePropertyDatas(this, GetMetaType<ShaderToyPassNode>()->GetMetaMemberData("iChannel1"), this, true);
-				auto PropertyDatas2 = GeneratePropertyDatas(this, GetMetaType<ShaderToyPassNode>()->GetMetaMemberData("iChannel2"), this, true);
-				auto PropertyDatas3 = GeneratePropertyDatas(this, GetMetaType<ShaderToyPassNode>()->GetMetaMemberData("iChannel3"), this, true);
+				auto PropertyDatas0 = FW::GeneratePropertyDatas(this, GetMetaType<ShaderToyPassNode>()->GetMetaMemberData("iChannel0"), this, true);
+				auto PropertyDatas1 = FW::GeneratePropertyDatas(this, GetMetaType<ShaderToyPassNode>()->GetMetaMemberData("iChannel1"), this, true);
+				auto PropertyDatas2 = FW::GeneratePropertyDatas(this, GetMetaType<ShaderToyPassNode>()->GetMetaMemberData("iChannel2"), this, true);
+				auto PropertyDatas3 = FW::GeneratePropertyDatas(this, GetMetaType<ShaderToyPassNode>()->GetMetaMemberData("iChannel3"), this, true);
                 SlotCategory->AddChilds(MoveTemp(PropertyDatas0));
 				SlotCategory->AddChilds(MoveTemp(PropertyDatas1));
 				SlotCategory->AddChilds(MoveTemp(PropertyDatas2));
@@ -765,7 +768,7 @@ namespace SH
 			if(ShaderAssetObj)
 			{
 				ShaderAssetObj->OnDestroy.RemoveAll(this);
-				ShaderAssetObj->OnRefreshBuilder.RemoveAll(this);
+				ShaderAssetObj->OnShaderRefreshed.RemoveAll(this);
 			}
 		}
 		return true;
@@ -779,8 +782,8 @@ namespace SH
         if(InProperty->IsOfType<PropertyAssetItem>() && InProperty->GetDisplayName().EqualTo(LOCALIZATION("Shader")))
         {
 			ShaderAssetObj->OnDestroy.AddRaw(this, &ShaderToyPassNode::ClearBindingProperty);
-			ShaderAssetObj->OnRefreshBuilder.AddRaw(this, &ShaderToyPassNode::RefreshProperty, true);
-            RefreshProperty(false);
+			ShaderAssetObj->OnShaderRefreshed.AddRaw(this, &ShaderToyPassNode::OnShaderBindingChanged, true);
+            OnShaderBindingChanged(false);
         }
 		else if(IsProperyUniformItem(InProperty))
 		{
@@ -791,14 +794,10 @@ namespace SH
 
     void ShaderToyPassNode::ClearBindingProperty()
     {
-        CustomBindLayout.SafeRelease();
         CustomUniformBuffer.Reset();
-        CustomBindGroup.SafeRelease();
+        RebuildCustomBindGroup();
         
-        PropertyDatas.Empty();
-        ShObject::GetPropertyDatas();
         GetOuterMost()->MarkDirty();
-        
         auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
         ShEditor->RefreshProperty();
     }
@@ -871,13 +870,10 @@ namespace SH
 		}
 	}
 
-    void ShaderToyPassNode::RefreshProperty(bool bCopyUniformBuffer)
+    void ShaderToyPassNode::OnShaderBindingChanged(bool bCopyUniformBuffer)
     {
         UpdateChannelPinTypes();
 
-        CustomBindLayout = ShaderAssetObj->CustomBindGroupLayoutBuilder.Build();
-        CustomBindGroupBuilder = GpuBindGroupBuilder{ CustomBindLayout };
-        
         auto NewCustomUniformBuffer = ShaderAssetObj->CustomUniformBufferBuilder.Build();
         if(NewCustomUniformBuffer.IsValid())
         {
@@ -886,14 +882,14 @@ namespace SH
                 NewCustomUniformBuffer->CopySameMember(*CustomUniformBuffer);
             }
             CustomUniformBuffer = MoveTemp(NewCustomUniformBuffer);
-			(*CustomBindGroupBuilder).SetUniformBuffer("CustomUniform", CustomUniformBuffer->GetGpuResource());
         }
-        CustomBindGroup = (*CustomBindGroupBuilder).Build();
+        else
+        {
+            CustomUniformBuffer.Reset();
+        }
+        RebuildCustomBindGroup();
         
-        PropertyDatas.Empty();
-        GetPropertyDatas();
         GetOuterMost()->MarkDirty();
-        
         auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
         ShEditor->RefreshProperty();
     }
@@ -943,20 +939,16 @@ namespace SH
 
 	}
 
-    TArray<TSharedRef<PropertyData>>* ShaderToyPassNode::GetPropertyDatas()
+    TArray<TSharedRef<PropertyData>> ShaderToyPassNode::GeneratePropertyDatas()
     {
-        if(PropertyDatas.IsEmpty())
+        TArray<TSharedRef<PropertyData>> Result = ShObject::GeneratePropertyDatas();
+        
+        //Custom binding
+        if(ShaderAssetObj)
         {
-            //Reflection data
-            ShObject::GetPropertyDatas();
-            
-            //Custom binding
-            if(ShaderAssetObj)
-            {
-                PropertyDatas.Append(PropertyDatasFromBinding());
-            }
+            Result.Append(PropertyDatasFromBinding());
         }
-        return &PropertyDatas;
+        return Result;
     }
 
     ExecRet ShaderToyPassNode::Exec(GraphExecContext& Context)

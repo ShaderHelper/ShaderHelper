@@ -38,7 +38,6 @@ namespace SH
 		
 	private:
 		void RefershPreview();
-		void RefreshProprety();
 		void ClearProperty();
 		
 	public:

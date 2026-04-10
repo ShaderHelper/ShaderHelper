@@ -197,7 +197,7 @@ namespace FW
 			.Targets = {
 				{.TargetFormat = ThumbnailFormat}
 			},
-			.BindGroupLayout0 = BindGroupLayout,
+			.BindGroupLayouts = { BindGroupLayout },
 			.VertexLayout = {
 				{
 					.ByteStride = sizeof(MeshVertex),
@@ -254,7 +254,7 @@ namespace FW
 			auto PassRecorder = CmdRecorder->BeginRenderPass(PassDesc, "ModelThumbnail");
 			{
 				PassRecorder->SetRenderPipelineState(Pipeline);
-				PassRecorder->SetBindGroups(BindGroup, nullptr, nullptr, nullptr);
+				PassRecorder->SetBindGroups({ BindGroup });
 				for (const MeshBuffers& Buffers : GpuMeshes)
 				{
 					PassRecorder->SetVertexBuffer(0, Buffers.VertexBuffer);

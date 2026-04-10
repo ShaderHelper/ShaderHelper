@@ -43,6 +43,7 @@ namespace FW
 		void OnDirectoryTreeSelectionChanged(const FString& SelectedDirectory);
         
         void SetCurrentDisplyPath(const FString& DisplayDir);
+        void RefreshAssetThumbnail(const FString& AssetPath);
 		FString GetCurrentDisplayPath() const;
 		SSearchBox* GetAssetSearchBox() const { return AssetSearchBox.Get(); }
 		SAssetView* GetAssetView() const { return AssetView.Get(); }

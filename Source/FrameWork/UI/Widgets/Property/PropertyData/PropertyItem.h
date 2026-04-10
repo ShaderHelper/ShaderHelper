@@ -4,6 +4,7 @@
 #include "UI/Widgets/Misc/MiscWidget.h"
 #include "AssetManager/AssetManager.h"
 
+#include <Widgets/Input/SEditableTextBox.h>
 #include <Widgets/Input/SSpinBox.h>
 
 namespace FW
@@ -202,6 +203,50 @@ namespace FW
 		TOptional<T> MinValue, MaxValue;
     };
 
+	class PropertyStringItem : public PropertyItemBase
+	{
+		MANUAL_RTTI_TYPE(PropertyStringItem, PropertyItemBase)
+	public:
+		PropertyStringItem(ShObject* InOwner, const FString& InName, FString* InValueRef = nullptr, bool InReadOnly = false)
+			: PropertyStringItem(InOwner, FText::FromString(InName), InValueRef, InReadOnly)
+		{}
+
+		PropertyStringItem(ShObject* InOwner, FText InName, FString* InValueRef = nullptr, bool InReadOnly = false)
+			: PropertyItemBase(InOwner, MoveTemp(InName))
+			, ValueRef(InValueRef)
+			, ReadOnly(InReadOnly)
+		{}
+
+		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
+		{
+			auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
+			if (ValueRef)
+			{
+				Item->AddWidget(
+					SNew(SEditableTextBox)
+					.IsReadOnly(ReadOnly)
+					.Text_Lambda([this] {
+						return FText::FromString(*ValueRef);
+					})
+					.OnTextCommitted_Lambda([this](const FText& InText, ETextCommit::Type InCommitType) {
+						const FString NewValue = InText.ToString();
+						if (*ValueRef != NewValue && Owner->CanChangeProperty(this))
+						{
+							*ValueRef = NewValue;
+							Owner->PostPropertyChanged(this);
+						}
+					})
+				);
+			}
+
+			return Row;
+		}
+
+	private:
+		FString* ValueRef;
+		bool ReadOnly;
+	};
+
     class PropertyVector2fItem : public PropertyItemBase
     {
         MANUAL_RTTI_TYPE(PropertyVector2fItem, PropertyItemBase)
@@ -393,6 +438,186 @@ namespace FW
 
 	private:
 		Vector4f* ValueRef;
+	};
+
+	class PropertyVector2iItem : public PropertyItemBase
+	{
+		MANUAL_RTTI_TYPE(PropertyVector2iItem, PropertyItemBase)
+	public:
+		PropertyVector2iItem(ShObject* InOwner, FText InName, int32* InValues = nullptr)
+			: PropertyItemBase(InOwner, MoveTemp(InName))
+			, Values(InValues)
+		{}
+
+		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
+		{
+			auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
+			if (Values)
+			{
+				auto ValueWidget = SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					[
+						SNew(SSpinBox<int32>)
+						.OnValueChanged_Lambda([this](int32 NewValue) {
+							if (Values[0] != NewValue && Owner->CanChangeProperty(this))
+							{
+								Values[0] = NewValue;
+								Owner->PostPropertyChanged(this);
+							}
+						})
+						.Value_Lambda([this] { return Values[0]; })
+					]
+					+ SHorizontalBox::Slot()
+					[
+						SNew(SSpinBox<int32>)
+						.OnValueChanged_Lambda([this](int32 NewValue) {
+							if (Values[1] != NewValue && Owner->CanChangeProperty(this))
+							{
+								Values[1] = NewValue;
+								Owner->PostPropertyChanged(this);
+							}
+						})
+						.Value_Lambda([this] { return Values[1]; })
+					];
+				Item->AddWidget(MoveTemp(ValueWidget));
+			}
+			return Row;
+		}
+
+	private:
+		int32* Values;
+	};
+
+	class PropertyVector3iItem : public PropertyItemBase
+	{
+		MANUAL_RTTI_TYPE(PropertyVector3iItem, PropertyItemBase)
+	public:
+		PropertyVector3iItem(ShObject* InOwner, FText InName, int32* InValues = nullptr)
+			: PropertyItemBase(InOwner, MoveTemp(InName))
+			, Values(InValues)
+		{}
+
+		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
+		{
+			auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
+			if (Values)
+			{
+				auto ValueWidget = SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					[
+						SNew(SSpinBox<int32>)
+						.OnValueChanged_Lambda([this](int32 NewValue) {
+							if (Values[0] != NewValue && Owner->CanChangeProperty(this))
+							{
+								Values[0] = NewValue;
+								Owner->PostPropertyChanged(this);
+							}
+						})
+						.Value_Lambda([this] { return Values[0]; })
+					]
+					+ SHorizontalBox::Slot()
+					[
+						SNew(SSpinBox<int32>)
+						.OnValueChanged_Lambda([this](int32 NewValue) {
+							if (Values[1] != NewValue && Owner->CanChangeProperty(this))
+							{
+								Values[1] = NewValue;
+								Owner->PostPropertyChanged(this);
+							}
+						})
+						.Value_Lambda([this] { return Values[1]; })
+					]
+					+ SHorizontalBox::Slot()
+					[
+						SNew(SSpinBox<int32>)
+						.OnValueChanged_Lambda([this](int32 NewValue) {
+							if (Values[2] != NewValue && Owner->CanChangeProperty(this))
+							{
+								Values[2] = NewValue;
+								Owner->PostPropertyChanged(this);
+							}
+						})
+						.Value_Lambda([this] { return Values[2]; })
+					];
+				Item->AddWidget(MoveTemp(ValueWidget));
+			}
+			return Row;
+		}
+
+	private:
+		int32* Values;
+	};
+
+	class PropertyVector4iItem : public PropertyItemBase
+	{
+		MANUAL_RTTI_TYPE(PropertyVector4iItem, PropertyItemBase)
+	public:
+		PropertyVector4iItem(ShObject* InOwner, FText InName, int32* InValues = nullptr)
+			: PropertyItemBase(InOwner, MoveTemp(InName))
+			, Values(InValues)
+		{}
+
+		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
+		{
+			auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
+			if (Values)
+			{
+				auto ValueWidget = SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					[
+						SNew(SSpinBox<int32>)
+						.OnValueChanged_Lambda([this](int32 NewValue) {
+							if (Values[0] != NewValue && Owner->CanChangeProperty(this))
+							{
+								Values[0] = NewValue;
+								Owner->PostPropertyChanged(this);
+							}
+						})
+						.Value_Lambda([this] { return Values[0]; })
+					]
+					+ SHorizontalBox::Slot()
+					[
+						SNew(SSpinBox<int32>)
+						.OnValueChanged_Lambda([this](int32 NewValue) {
+							if (Values[1] != NewValue && Owner->CanChangeProperty(this))
+							{
+								Values[1] = NewValue;
+								Owner->PostPropertyChanged(this);
+							}
+						})
+						.Value_Lambda([this] { return Values[1]; })
+					]
+					+ SHorizontalBox::Slot()
+					[
+						SNew(SSpinBox<int32>)
+						.OnValueChanged_Lambda([this](int32 NewValue) {
+							if (Values[2] != NewValue && Owner->CanChangeProperty(this))
+							{
+								Values[2] = NewValue;
+								Owner->PostPropertyChanged(this);
+							}
+						})
+						.Value_Lambda([this] { return Values[2]; })
+					]
+					+ SHorizontalBox::Slot()
+					[
+						SNew(SSpinBox<int32>)
+						.OnValueChanged_Lambda([this](int32 NewValue) {
+							if (Values[3] != NewValue && Owner->CanChangeProperty(this))
+							{
+								Values[3] = NewValue;
+								Owner->PostPropertyChanged(this);
+							}
+						})
+						.Value_Lambda([this] { return Values[3]; })
+					];
+				Item->AddWidget(MoveTemp(ValueWidget));
+			}
+			return Row;
+		}
+
+	private:
+		int32* Values;
 	};
 
 }

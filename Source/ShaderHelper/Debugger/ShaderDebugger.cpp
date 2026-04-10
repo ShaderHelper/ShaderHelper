@@ -1540,7 +1540,7 @@ namespace SH
 					const auto& LayoutBindingEntry = LayoutDesc.Layouts[Slot];
 					SpvBindings.Add({
 						.DescriptorSet = SetNumber,
-						.Binding = Slot,
+						.Binding = Slot.SlotNum,
 						.Type = LayoutBindingEntry.Type,
 						.Resource = ResourceBindingEntry.Resource
 						});
@@ -1565,12 +1565,12 @@ namespace SH
 				if (SetNumber == BindingContext::GlobalSlot)
 				{
 					//Add the debugger buffer
-					BindGroupDesc.Resources.Add(DebuggerBufferBindingSlot, { AUX::StaticCastRefCountPtr<GpuResource>(DebugBuffer) });
-					LayoutDesc.Layouts.Add(DebuggerBufferBindingSlot, { BindingType::RWRawBuffer });
+					BindGroupDesc.Resources.Add(BindingSlot{DebuggerBufferBindingSlot, BindingType::RWRawBuffer}, { AUX::StaticCastRefCountPtr<GpuResource>(DebugBuffer) });
+					LayoutDesc.Layouts.Add(BindingSlot{DebuggerBufferBindingSlot, BindingType::RWRawBuffer}, { BindingType::RWRawBuffer });
 
 					//Add the debugger params buffer (contains PixelCoord)
-					BindGroupDesc.Resources.Add(DebuggerParamsBindingSlot, { AUX::StaticCastRefCountPtr<GpuResource>(DebugParamsBuffer) });
-					LayoutDesc.Layouts.Add(DebuggerParamsBindingSlot, { BindingType::UniformBuffer });
+					BindGroupDesc.Resources.Add(BindingSlot{DebuggerParamsBindingSlot, BindingType::UniformBuffer}, { AUX::StaticCastRefCountPtr<GpuResource>(DebugParamsBuffer) });
+					LayoutDesc.Layouts.Add(BindingSlot{DebuggerParamsBindingSlot, BindingType::UniformBuffer}, { BindingType::UniformBuffer });
 
 					TRefCountPtr<GpuBindGroupLayout> PatchedBindGroupLayout = GGpuRhi->CreateBindGroupLayout(LayoutDesc);
 					BindGroupDesc.Layout = PatchedBindGroupLayout;
@@ -1932,18 +1932,19 @@ namespace SH
 		TMap<int32, GpuBindGroupLayoutDesc> BaseLayoutDescs;
 		for (const auto& Binding : SpvBindings)
 		{
-			BaseGroupDescs.FindOrAdd(Binding.DescriptorSet).Resources.Add(Binding.Binding, { Binding.Resource });
+			BindingSlot BSlot{Binding.Binding, Binding.Type};
+			BaseGroupDescs.FindOrAdd(Binding.DescriptorSet).Resources.Add(BSlot, { Binding.Resource });
 			auto& LayoutDesc = BaseLayoutDescs.FindOrAdd(Binding.DescriptorSet);
 			LayoutDesc.GroupNumber = Binding.DescriptorSet;
-			LayoutDesc.Layouts.Add(Binding.Binding, { Binding.Type });
+			LayoutDesc.Layouts.Add(BSlot, { Binding.Type });
 		}
 
 		//Add previewer params slot to layout
-		BaseLayoutDescs.FindOrAdd(BindingContext::GlobalSlot).Layouts.Add(PreviewerParamsBindingSlot, { BindingType::UniformBuffer });
+		BaseLayoutDescs.FindOrAdd(BindingContext::GlobalSlot).Layouts.Add(BindingSlot{PreviewerParamsBindingSlot, BindingType::UniformBuffer}, { BindingType::UniformBuffer });
 
 		//Add debugger buffer slot
-		BaseLayoutDescs.FindOrAdd(BindingContext::GlobalSlot).Layouts.Add(DebuggerBufferBindingSlot, { BindingType::RWRawBuffer });
-		BaseGroupDescs.FindOrAdd(BindingContext::GlobalSlot).Resources.Add(DebuggerBufferBindingSlot, { AUX::StaticCastRefCountPtr<GpuResource>(DebugBuffer) });
+		BaseLayoutDescs.FindOrAdd(BindingContext::GlobalSlot).Layouts.Add(BindingSlot{DebuggerBufferBindingSlot, BindingType::RWRawBuffer}, { BindingType::RWRawBuffer });
+		BaseGroupDescs.FindOrAdd(BindingContext::GlobalSlot).Resources.Add(BindingSlot{DebuggerBufferBindingSlot, BindingType::RWRawBuffer}, { AUX::StaticCastRefCountPtr<GpuResource>(DebugBuffer) });
 
 		//Build non-global bind groups (shared across all lines)
 		TRefCountPtr<GpuBindGroupLayout> GlobalLayout;
@@ -2036,7 +2037,7 @@ namespace SH
 
 			//Build global bind group with this line's params buffer
 			GpuBindGroupDesc GlobalGroupDesc = BaseGroupDescs.FindOrAdd(BindingContext::GlobalSlot);
-			GlobalGroupDesc.Resources.Add(PreviewerParamsBindingSlot, { AUX::StaticCastRefCountPtr<GpuResource>(ParamsBuffer) });
+			GlobalGroupDesc.Resources.Add(BindingSlot{PreviewerParamsBindingSlot, BindingType::UniformBuffer}, { AUX::StaticCastRefCountPtr<GpuResource>(ParamsBuffer) });
 			GlobalGroupDesc.Layout = GlobalLayout;
 			TRefCountPtr<GpuBindGroup> GlobalGroup = GGpuRhi->CreateBindGroup(GlobalGroupDesc);
 

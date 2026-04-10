@@ -60,37 +60,31 @@ namespace FW
 	struct RootSignatureDesc
 	{
 		RootSignatureDesc() = default;
-		RootSignatureDesc(Dx12BindGroupLayout* InLayout0, Dx12BindGroupLayout* InLayout1,
-			Dx12BindGroupLayout* InLayout2, Dx12BindGroupLayout* InLayout3)
-			: Layout0(InLayout0), Layout1(InLayout1), Layout2(InLayout2), Layout3(InLayout3)
+		RootSignatureDesc(const TArray<GpuBindGroupLayout*>& InBindGroupLayouts)
 		{
-			if (Layout0) { LayoutDesc0 = Layout0->GetDesc(); }
-			if (Layout1) { LayoutDesc1 = Layout1->GetDesc(); }
-			if (Layout2) { LayoutDesc2 = Layout2->GetDesc(); }
-			if (Layout3) { LayoutDesc3 = Layout3->GetDesc(); }
+			for (GpuBindGroupLayout* InLayout : InBindGroupLayouts)
+			{
+				if (!InLayout) continue;
+				Layouts.Add(static_cast<Dx12BindGroupLayout*>(InLayout));
+				LayoutDescs.Add({InLayout->GetGroupNumber(), InLayout->GetDesc()});
+			}
 		}
 
-		Dx12BindGroupLayout* Layout0{};
-		Dx12BindGroupLayout* Layout1{};
-		Dx12BindGroupLayout* Layout2{};
-		Dx12BindGroupLayout* Layout3{};
-		TOptional<GpuBindGroupLayoutDesc> LayoutDesc0;
-		TOptional<GpuBindGroupLayoutDesc> LayoutDesc1;
-		TOptional<GpuBindGroupLayoutDesc> LayoutDesc2;
-		TOptional<GpuBindGroupLayoutDesc> LayoutDesc3;
+		TArray<Dx12BindGroupLayout*> Layouts;
+		TArray<TPair<BindingGroupSlot, GpuBindGroupLayoutDesc>> LayoutDescs;
 
 		bool operator==(const RootSignatureDesc& Other) const
 		{
-			return LayoutDesc0 == Other.LayoutDesc0 && LayoutDesc1 == Other.LayoutDesc1 &&
-				LayoutDesc2 == Other.LayoutDesc2 && LayoutDesc3 == Other.LayoutDesc3;
+			return LayoutDescs == Other.LayoutDescs;
 		}
 
 		friend uint32 GetTypeHash(const RootSignatureDesc& Key) {
 			uint32 Hash = 0;
-			if (Key.LayoutDesc0) { Hash = HashCombine(Hash, GetTypeHash(*Key.LayoutDesc0)); }
-			if (Key.LayoutDesc1) { Hash = HashCombine(Hash, GetTypeHash(*Key.LayoutDesc1)); }
-			if (Key.LayoutDesc2) { Hash = HashCombine(Hash, GetTypeHash(*Key.LayoutDesc2)); }
-			if (Key.LayoutDesc3) { Hash = HashCombine(Hash, GetTypeHash(*Key.LayoutDesc3)); }
+			for (const auto& [GroupSlot, Desc] : Key.LayoutDescs)
+			{
+				Hash = HashCombine(Hash, ::GetTypeHash(GroupSlot));
+				Hash = HashCombine(Hash, GetTypeHash(Desc));
+			}
 			return Hash;
 		}
 	};

@@ -336,7 +336,7 @@ namespace SH
 		FTextSelection SelectionBeforeEdit;
 
 		ShaderAsset* ShaderAssetObj;
-		FDelegateHandle RefreshBuilderHandle;
+		FDelegateHandle ShaderRefreshHandle;
         EditState CurEditState;
 		TSharedPtr<SHorizontalBox> InfoBarBox;
 		TSharedPtr<SCodeSearchWidget> CodeSearchWidget;

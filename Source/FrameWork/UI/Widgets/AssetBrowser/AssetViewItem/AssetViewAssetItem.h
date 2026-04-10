@@ -14,10 +14,15 @@ namespace FW
 		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override;
         void EnterRenameState();
 		void SetAssetThumbnail(GpuTexture* InAssetThumbnail) { 
+			ImageBrush = nullptr;
 			AssetThumbnail = InAssetThumbnail; 
 			ThumbnailViewport->SetViewPortRenderTexture(AssetThumbnail);
 		}
-		void SetAssetImage(const FSlateBrush* InImage) { ImageBrush = InImage; };
+		void SetAssetImage(const FSlateBrush* InImage) {
+			AssetThumbnail = nullptr;
+			ThumbnailViewport->Clear();
+			ImageBrush = InImage;
+		};
         FReply HandleOnDragDetected(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent);
         
 	private:

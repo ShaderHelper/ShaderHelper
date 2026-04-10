@@ -17,7 +17,7 @@ namespace FW
 		Finish,
 	};
 
-	bool ValidateSetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3);
+	bool ValidateSetBindGroups(const TArray<GpuBindGroup*>& BindGroups);
 	bool ValidateCreateBindGroup(const GpuBindGroupDesc& InBindGroupDesc);
     bool ValidateCreateBindGroupLayout(const GpuBindGroupLayoutDesc& InBindGroupLayoutDesc);
 	bool ValidateCreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc);
@@ -39,7 +39,7 @@ namespace FW
 				{
 					return true;
 				}
-				else if (auto* LayoutBinding = InLayout->GetDesc().Layouts.Find(ShaderLayoutBinding.Slot))
+				else if (auto* LayoutBinding = InLayout->GetDesc().Layouts.Find(BindingSlot{ShaderLayoutBinding.Slot, ShaderLayoutBinding.Type}))
 				{
 					if (LayoutBinding->Type != ShaderLayoutBinding.Type)
 					{
@@ -56,26 +56,16 @@ namespace FW
 		for (const auto& ShaderLayoutBinding : ShaderLayoutBindings)
 		{
 			bool HasError{};
-			if (ShaderLayoutBinding.Group == 0)
+			GpuBindGroupLayout* MatchedLayout = nullptr;
+			for (GpuBindGroupLayout* Layout : InPipelineStateDesc.BindGroupLayouts)
 			{
-				HasError = CheckGroup(ShaderLayoutBinding, InPipelineStateDesc.BindGroupLayout0);
+				if (Layout && Layout->GetGroupNumber() == ShaderLayoutBinding.Group)
+				{
+					MatchedLayout = Layout;
+					break;
+				}
 			}
-			else if (ShaderLayoutBinding.Group == 1)
-			{
-				HasError = CheckGroup(ShaderLayoutBinding, InPipelineStateDesc.BindGroupLayout1);
-			}
-			else if (ShaderLayoutBinding.Group == 2)
-			{
-				HasError = CheckGroup(ShaderLayoutBinding, InPipelineStateDesc.BindGroupLayout2);
-			}
-			else if (ShaderLayoutBinding.Group == 3)
-			{
-				HasError = CheckGroup(ShaderLayoutBinding, InPipelineStateDesc.BindGroupLayout3);
-			}
-			else
-			{
-				HasError = true;
-			}
+			HasError = CheckGroup(ShaderLayoutBinding, MatchedLayout);
 
 			if (HasError)
 			{

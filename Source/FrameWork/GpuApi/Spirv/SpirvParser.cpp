@@ -167,6 +167,11 @@ namespace FW
 		Context.Names.emplace(Inst->GetTarget(), Inst->GetName());
 	}
 
+	void SpvMetaVisitor::Visit(const SpvOpMemberName* Inst)
+	{
+		Context.MemberNames[Inst->GetType()].Add(Inst->GetMember(), Inst->GetName());
+	}
+
 	void SpvMetaVisitor::Visit(const SpvOpString* Inst)
 	{
 		Context.DebugStrs.emplace(Inst->GetId().value(), Inst->GetStr());
@@ -571,6 +576,14 @@ namespace FW
 				SpvId Target = SpvCode[WordOffset + 1];
 				char* Str = (char*)&SpvCode[WordOffset + 2];
 				DecodedInst = MakeUnique<SpvOpName>(Target, FString(Str));
+				break;
+			}
+			case SpvOp::MemberName:
+			{
+				SpvId Type = SpvCode[WordOffset + 1];
+				uint32 Member = SpvCode[WordOffset + 2];
+				char* Str = (char*)&SpvCode[WordOffset + 3];
+				DecodedInst = MakeUnique<SpvOpMemberName>(Type, Member, FString(Str));
 				break;
 			}
 			case SpvOp::String:

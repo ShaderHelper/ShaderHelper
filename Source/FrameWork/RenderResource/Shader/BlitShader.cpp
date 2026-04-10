@@ -56,8 +56,8 @@ namespace FW
 	TRefCountPtr<GpuBindGroup> BlitShader::GetBindGroup(const Parameters& InParameters)
 	{
 		GpuBindGroupBuilder Builder{ BindGroupLayout };
-		Builder.SetExistingBinding(0, InParameters.InputView)
-			.SetExistingBinding(1, InParameters.InputTexSampler);
+		Builder.SetExistingBinding(0, BindingType::Texture, InParameters.InputView)
+			.SetExistingBinding(1, BindingType::Sampler, InParameters.InputTexSampler);
 
 		if (bUseMipLevel)
 		{

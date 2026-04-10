@@ -16,10 +16,7 @@ namespace FW::VK
 		, IsScissorRectDirty(false)
 		, IsVertexBufferDirty(false)
 		, IsIndexBufferDirty(false)
-		, IsBindGroup0Dirty(false)
-		, IsBindGroup1Dirty(false)
-		, IsBindGroup2Dirty(false)
-		, IsBindGroup3Dirty(false)
+		, IsBindGroupDirty{}
 		, Owner(InOwner)
 		, RenderTargetViews(MoveTemp(InRenderTargetViews))
 	{
@@ -72,23 +69,16 @@ namespace FW::VK
 		}
 	}
 
-	void VkRenderStateCache::SetBindGroups(GpuBindGroup* InGroup0, GpuBindGroup* InGroup1, GpuBindGroup* InGroup2, GpuBindGroup* InGroup3)
+	void VkRenderStateCache::SetBindGroups(const TArray<GpuBindGroup*>& InGroups)
 	{
-		if (InGroup0 != CurrentBindGroup0) {
-			CurrentBindGroup0 = InGroup0;
-			IsBindGroup0Dirty = true;
-		}
-		if (InGroup1 != CurrentBindGroup1) {
-			CurrentBindGroup1 = InGroup1;
-			IsBindGroup1Dirty = true;
-		}
-		if (InGroup2 != CurrentBindGroup2) {
-			CurrentBindGroup2 = InGroup2;
-			IsBindGroup2Dirty = true;
-		}
-		if (InGroup3 != CurrentBindGroup3) {
-			CurrentBindGroup3 = InGroup3;
-			IsBindGroup3Dirty = true;
+		for (GpuBindGroup* Group : InGroups)
+		{
+			if (!Group) continue;
+			int32 Slot = Group->GetLayout()->GetGroupNumber();
+			if (Group != CurrentBindGroups[Slot]) {
+				CurrentBindGroups[Slot] = Group;
+				IsBindGroupDirty[Slot] = true;
+			}
 		}
 	}
 
@@ -176,18 +166,15 @@ namespace FW::VK
 				CurrentRenderPipelineState->GetPipelineLayout(), SetIndex, 1, &Set, 0, nullptr);
 			IsDirty = false;
 		};
-		ApplyBindGroup(IsBindGroup0Dirty, CurrentBindGroup0);
-		ApplyBindGroup(IsBindGroup1Dirty, CurrentBindGroup1);
-		ApplyBindGroup(IsBindGroup2Dirty, CurrentBindGroup2);
-		ApplyBindGroup(IsBindGroup3Dirty, CurrentBindGroup3);
+		for (int32 i = 0; i < GpuResourceLimit::MaxBindableBingGroupNum; ++i)
+		{
+			ApplyBindGroup(IsBindGroupDirty[i], CurrentBindGroups[i]);
+		}
 	}
 
 	VkComputeStateCache::VkComputeStateCache()
 		: IsComputePipelineDirty(false)
-		, IsBindGroup0Dirty(false)
-		, IsBindGroup1Dirty(false)
-		, IsBindGroup2Dirty(false)
-		, IsBindGroup3Dirty(false)
+		, IsBindGroupDirty{}
 	{}
 
 	void VkComputeStateCache::SetPipeline(VulkanComputePipelineState* InPipelineState)
@@ -199,23 +186,16 @@ namespace FW::VK
 		}
 	}
 
-	void VkComputeStateCache::SetBindGroups(GpuBindGroup* InGroup0, GpuBindGroup* InGroup1, GpuBindGroup* InGroup2, GpuBindGroup* InGroup3)
+	void VkComputeStateCache::SetBindGroups(const TArray<GpuBindGroup*>& InGroups)
 	{
-		if (InGroup0 != CurrentBindGroup0) {
-			CurrentBindGroup0 = InGroup0;
-			IsBindGroup0Dirty = true;
-		}
-		if (InGroup1 != CurrentBindGroup1) {
-			CurrentBindGroup1 = InGroup1;
-			IsBindGroup1Dirty = true;
-		}
-		if (InGroup2 != CurrentBindGroup2) {
-			CurrentBindGroup2 = InGroup2;
-			IsBindGroup2Dirty = true;
-		}
-		if (InGroup3 != CurrentBindGroup3) {
-			CurrentBindGroup3 = InGroup3;
-			IsBindGroup3Dirty = true;
+		for (GpuBindGroup* Group : InGroups)
+		{
+			if (!Group) continue;
+			int32 Slot = Group->GetLayout()->GetGroupNumber();
+			if (Group != CurrentBindGroups[Slot]) {
+				CurrentBindGroups[Slot] = Group;
+				IsBindGroupDirty[Slot] = true;
+			}
 		}
 	}
 
@@ -238,10 +218,10 @@ namespace FW::VK
 				CurrentComputePipelineState->GetPipelineLayout(), SetIndex, 1, &Set, 0, nullptr);
 			IsDirty = false;
 		};
-		ApplyBindGroup(IsBindGroup0Dirty, CurrentBindGroup0);
-		ApplyBindGroup(IsBindGroup1Dirty, CurrentBindGroup1);
-		ApplyBindGroup(IsBindGroup2Dirty, CurrentBindGroup2);
-		ApplyBindGroup(IsBindGroup3Dirty, CurrentBindGroup3);
+		for (int32 i = 0; i < GpuResourceLimit::MaxBindableBingGroupNum; ++i)
+		{
+			ApplyBindGroup(IsBindGroupDirty[i], CurrentBindGroups[i]);
+		}
 	}
 	GpuComputePassRecorder* VulkanCmdRecorder::BeginComputePass(const FString& PassName)
 	{
@@ -686,9 +666,9 @@ namespace FW::VK
 		StateCache.SetPipeline(static_cast<VulkanComputePipelineState*>(InPipelineState));
 	}
 
-	void VulkanComputePassRecorder::SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)
+	void VulkanComputePassRecorder::SetBindGroups(const TArray<GpuBindGroup*>& BindGroups)
 	{
-		StateCache.SetBindGroups(BindGroup0, BindGroup1, BindGroup2, BindGroup3);
+		StateCache.SetBindGroups(BindGroups);
 	}
 
 	void VulkanRenderPassRecorder::DrawPrimitive(uint32 StartVertexLocation, uint32 VertexCount, uint32 StartInstanceLocation, uint32 InstanceCount)
@@ -738,9 +718,9 @@ namespace FW::VK
 		StateCache.SetScissorRect(MoveTemp(ScissorRect));
 	}
 
-	void VulkanRenderPassRecorder::SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)
+	void VulkanRenderPassRecorder::SetBindGroups(const TArray<GpuBindGroup*>& BindGroups)
 	{
-		StateCache.SetBindGroups(BindGroup0, BindGroup1, BindGroup2, BindGroup3);
+		StateCache.SetBindGroups(BindGroups);
 	}
 
 	VulkanCmdRecorder* VulkanCmdRecorderPool::AcquireCmdRecorder(const FString& RecorderName)

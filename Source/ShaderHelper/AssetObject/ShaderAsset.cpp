@@ -1,11 +1,28 @@
 #include "CommonHeader.h"
 #include "ShaderAsset.h"
 #include "ProjectManager/ShProjectManager.h"
+#include "UI/Widgets/Property/PropertyData/PropertyData.h"
+#include "UI/Widgets/Property/PropertyData/PropertyItem.h"
 
 using namespace FW;
 
 namespace SH
 {
+	namespace
+	{
+		TSharedRef<PropertyData> CreateBindingInfoProperty(ShObject* InOwner, const FString& InBindingName, const FString& InBindingInfo)
+		{
+			auto Property = MakeShared<PropertyItemBase>(InOwner, InBindingName);
+			Property->SetEnabled(false);
+			Property->SetEmbedWidget(
+				SNew(STextBlock)
+				.TextStyle(&FAppCommonStyle::Get().GetWidgetStyle<FTextBlockStyle>("MinorText"))
+				.Text(FText::FromString(InBindingInfo))
+			);
+			return Property;
+		}
+	}
+
 	REFLECTION_REGISTER(AddClass<ShaderAsset>("ShaderAsset")
 								.BaseClass<AssetObject>()
 	)
@@ -60,5 +77,24 @@ namespace SH
 		}
 		
 		return nullptr;
+	}
+
+	TArray<TSharedRef<PropertyData>> ShaderAsset::BuildBindingPropertyDatas() const
+	{
+		auto BindingCategory = MakeShared<PropertyCategory>(const_cast<ShaderAsset*>(this), LOCALIZATION("Bindings"));
+		TArray<TSharedRef<PropertyData>> BindingProperties;
+		BindingProperties.Add(BindingCategory);
+		if (!Shader || !Shader->IsCompiled())
+		{
+			return BindingProperties;
+		}
+
+		TArray<GpuShaderLayoutBinding> Bindings = Shader->GetLayout();
+		for (const GpuShaderLayoutBinding& Binding : Bindings)
+		{
+			const FString BindingTypeName = ANSI_TO_TCHAR(magic_enum::enum_name(Binding.Type).data());
+			BindingCategory->AddChild(CreateBindingInfoProperty(const_cast<ShaderAsset*>(this), Binding.Name, BindingTypeName));
+		}
+		return BindingProperties;
 	}
 }

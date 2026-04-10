@@ -43,7 +43,7 @@ namespace SH
 		//ShObject interface
 		bool CanChangeProperty(FW::PropertyData* InProperty) override;
 		void PostPropertyChanged(FW::PropertyData* InProperty) override;
-        TArray<TSharedRef<FW::PropertyData>>* GetPropertyDatas() override;
+        TArray<TSharedRef<FW::PropertyData>> GeneratePropertyDatas() override;
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromBinding();
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromUniform(const FW::UniformBufferBuilder& InBuilder, bool Enabled);
         

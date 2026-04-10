@@ -36,8 +36,8 @@ namespace FW
 		void SetComputeRootSignature(Dx12RootSignature* InRootSignature);
 		void SetRenderTargets(TArray<Dx12TextureView*> InRTViews, TArray<Vector4f> InClearColorValues, TArray<RenderTargetLoadAction> InLoadActions);
 		void SetDepthStencilTarget(Dx12TextureView* InDSVView, RenderTargetLoadAction InLoadAction, float InClearDepth);
-		void SetGraphicsBindGroups(Dx12BindGroup* InGroup0, Dx12BindGroup* InGroup1, Dx12BindGroup* InGroup2, Dx12BindGroup* InGroup3);
-		void SetComputeBindGroups(Dx12BindGroup* InGroup0, Dx12BindGroup* InGroup1, Dx12BindGroup* InGroup2, Dx12BindGroup* InGroup3);
+		void SetGraphicsBindGroups(const TArray<Dx12BindGroup*>& InGroups);
+		void SetComputeBindGroups(const TArray<Dx12BindGroup*>& InGroups);
 
 		Dx12RootSignature* GetGraphicsRootSignature() const { return CurrentGraphicsRootSignature; }
 
@@ -50,16 +50,10 @@ namespace FW
 		bool IsScissorRectDirty : 1;
 
 		bool IsGraphicsRootSigDirty : 1;
-		bool IsGraphicsBindGroup0Dirty : 1;
-		bool IsGraphicsBindGroup1Dirty : 1;
-		bool IsGraphicsBindGroup2Dirty : 1;
-		bool IsGraphicsBindGroup3Dirty : 1;
+		bool IsGraphicsBindGroupDirty[GpuResourceLimit::MaxBindableBingGroupNum];
 
 		bool IsComputeRootSigDirty : 1;
-		bool IsComputeBindGroup0Dirty : 1;
-		bool IsComputeBindGroup1Dirty : 1;
-		bool IsComputeBindGroup2Dirty : 1;
-		bool IsComputeBindGroup3Dirty : 1;
+		bool IsComputeBindGroupDirty[GpuResourceLimit::MaxBindableBingGroupNum];
 	
 	private:
 		Dx12RenderPso* RenderPso = nullptr;
@@ -79,16 +73,10 @@ namespace FW
 		float DSVClearDepth = 1.0f;
 
 		Dx12RootSignature* CurrentGraphicsRootSignature = nullptr;
-		Dx12BindGroup* CurrentGraphicsBindGroup0 = nullptr;
-		Dx12BindGroup* CurrentGraphicsBindGroup1 = nullptr;
-		Dx12BindGroup* CurrentGraphicsBindGroup2 = nullptr;
-		Dx12BindGroup* CurrentGraphicsBindGroup3 = nullptr;
+		Dx12BindGroup* CurrentGraphicsBindGroups[GpuResourceLimit::MaxBindableBingGroupNum] = {};
 
 		Dx12RootSignature* CurrentComputeRootSignature = nullptr;
-		Dx12BindGroup* CurrentComputeBindGroup0 = nullptr;
-		Dx12BindGroup* CurrentComputeBindGroup1 = nullptr;
-		Dx12BindGroup* CurrentComputeBindGroup2 = nullptr;
-		Dx12BindGroup* CurrentComputeBindGroup3 = nullptr;
+		Dx12BindGroup* CurrentComputeBindGroups[GpuResourceLimit::MaxBindableBingGroupNum] = {};
 	};
 
 	class Dx12ComputePassRecorder : public GpuComputePassRecorder
@@ -102,7 +90,7 @@ namespace FW
 	public:
 		void Dispatch(uint32 ThreadGroupCountX, uint32 ThreadGroupCountY, uint32 ThreadGroupCountZ) override;
 		void SetComputePipelineState(GpuComputePipelineState* InPipelineState) override;
-		void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override;
+		void SetBindGroups(const TArray<GpuBindGroup*>& BindGroups) override;
 
 	private:
 		ID3D12GraphicsCommandList* CmdList;
@@ -124,7 +112,7 @@ namespace FW
 		void SetIndexBuffer(GpuBuffer* InIndexBuffer, GpuFormat IndexFormat, uint32 Offset) override;
 		void SetViewPort(const GpuViewPortDesc& InViewPortDesc) override;
 		void SetScissorRect(const GpuScissorRectDesc& InScissorRectDes) override;
-		void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override;
+		void SetBindGroups(const TArray<GpuBindGroup*>& BindGroups) override;
 	
 	private:
 		ID3D12GraphicsCommandList* CmdList;

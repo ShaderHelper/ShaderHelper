@@ -76,7 +76,7 @@ namespace FW
 				.Targets = {
 					{ .TargetFormat = GpuFormat::B8G8R8A8_UNORM }
 				},
-				.BindGroupLayout0 = BindGroupLayout,
+				.BindGroupLayouts = { BindGroupLayout },
 				.VertexLayout = {
 					{
 						.ByteStride = sizeof(MeshVertex),
@@ -136,7 +136,7 @@ namespace FW
 				const Vector2f MouseDelta = CurrentMousePos - LastMousePos;
 				LastMousePos = CurrentMousePos;
 				ModelYaw -= MouseDelta.x * 0.01f;
-				ModelPitch = FMath::Clamp(ModelPitch + MouseDelta.y * 0.01f, -1.4f, 1.4f);
+				ModelPitch = FMath::Clamp(ModelPitch - MouseDelta.y * 0.01f, -1.4f, 1.4f);
 				Render();
 				return FReply::Handled();
 			});
@@ -187,7 +187,7 @@ namespace FW
 				auto PassRecorder = CmdRecorder->BeginRenderPass(PassDesc, TEXT("TextureCubePreview"));
 				{
 					PassRecorder->SetRenderPipelineState(Pipeline);
-					PassRecorder->SetBindGroups(PreviewBindGroup, nullptr, nullptr, nullptr);
+					PassRecorder->SetBindGroups({ PreviewBindGroup });
 					PassRecorder->SetVertexBuffer(0, CubeBuffers.VertexBuffer);
 					PassRecorder->SetIndexBuffer(CubeBuffers.IndexBuffer);
 					PassRecorder->DrawIndexed(0, CubeBuffers.IndexCount);
@@ -236,7 +236,7 @@ namespace FW
 		TRefCountPtr<GpuTexture> RenderTarget;
 		bool bDragging = false;
 		Vector2f LastMousePos = { 0.0f, 0.0f };
-		float ModelYaw = 0.0f;
+		float ModelYaw = PI;
 		float ModelPitch = 0.0f;
 	};
 
@@ -303,7 +303,7 @@ namespace FW
 				.Targets = {
 					{ .TargetFormat = GpuFormat::B8G8R8A8_UNORM, .BlendEnable = true }
 				},
-				.BindGroupLayout0 = BindGroupLayout,
+				.BindGroupLayouts = { BindGroupLayout },
 				.VertexLayout = {
 					{
 						.ByteStride = sizeof(MeshVertex),
@@ -419,7 +419,7 @@ namespace FW
 				auto PassRecorder = CmdRecorder->BeginRenderPass(PassDesc, TEXT("Texture3DPreview"));
 				{
 					PassRecorder->SetRenderPipelineState(Pipeline);
-					PassRecorder->SetBindGroups(VolumeBindGroup, nullptr, nullptr, nullptr);
+					PassRecorder->SetBindGroups({ VolumeBindGroup });
 					PassRecorder->SetVertexBuffer(0, CubeBuffers.VertexBuffer);
 					PassRecorder->SetIndexBuffer(CubeBuffers.IndexBuffer);
 					PassRecorder->DrawIndexed(0, CubeBuffers.IndexCount);

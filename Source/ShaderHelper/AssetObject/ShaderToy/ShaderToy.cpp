@@ -6,7 +6,7 @@
 #include "AssetObject/TextureCube.h"
 #include "AssetObject/Nodes/Texture2dNode.h"
 #include "AssetObject/Nodes/TextureCubeNode.h"
-#include "AssetObject/StShader.h"
+#include "AssetObject/ShaderToy/StShader.h"
 #include "AssetObject/ShaderToy/Nodes/ShaderToyPassNode.h"
 #include "UI/Widgets/Graph/SGraphPanel.h"
 

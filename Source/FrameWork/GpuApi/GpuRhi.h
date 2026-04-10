@@ -32,7 +32,7 @@ public:
 public:
 	virtual void Dispatch(uint32 ThreadGroupCountX, uint32 ThreadGroupCountY, uint32 ThreadGroupCountZ) = 0;
 	virtual void SetComputePipelineState(GpuComputePipelineState* InPipelineState) = 0;
-	virtual void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) = 0;
+	virtual void SetBindGroups(const TArray<GpuBindGroup*>& BindGroups) = 0;
 };
 
 class GpuRenderPassRecorder
@@ -51,8 +51,7 @@ public:
 	virtual void SetViewPort(const GpuViewPortDesc& InViewPortDesc) = 0;
 	// If omitted, it defaults to SetScissorRect(GpuScissorRectDesc{Viewport.TopLeftX, Viewport.TopLeftY, Viewport.TopLeftX + Viewport.Width, Viewport.TopLeftY + Viewport.Height}).
 	virtual void SetScissorRect(const GpuScissorRectDesc& InScissorRectDes) = 0;
-	// Only support 4 BindGroups to adapt some mobile devices.
-	virtual void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) = 0;
+	virtual void SetBindGroups(const TArray<GpuBindGroup*>& BindGroups) = 0;
 };
 
 class GpuComputeCmdRecorder

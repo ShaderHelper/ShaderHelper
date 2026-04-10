@@ -11,23 +11,15 @@ namespace FW
 		Dx12Shader(const GpuShaderSourceDesc& Desc);
         
 		TArray<GpuShaderLayoutBinding> GetLayout() const override;
+		TArray<GpuShaderVertexInput> GetVertexInputs() const override;
     public:
 		IDxcBlob* GetCompilationResult() const { return ByteCode; }
 		virtual bool IsCompiled() const override { return ByteCode.IsValid(); }
 		void SetCompilationResult(TRefCountPtr<IDxcBlob> InByteCode) { ByteCode = MoveTemp(InByteCode); }
 
-		// Shader cache
-		bool TryLoadCachedByteCode(const TArray<FString>& ExtraArgs);
-		void SaveByteCodeToCache(const TArray<FString>& ExtraArgs) const;
-		FString GetCacheFilePath(const TArray<FString>& ExtraArgs) const;
-		uint32 ComputeSourceHash(const TArray<FString>& ExtraArgs) const;
-
 	private:
 		TRefCountPtr<IDxcBlob> ByteCode;
 	};
-
-	// Clean up expired shader cache files
-	void CleanupShaderCache(int32 MaxAgeDays = 7, int64 MaxTotalSizeBytes = 100 * 1024 * 1024);
 
 	class DxcCompiler
 	{

@@ -297,11 +297,11 @@ public:
 		PassRecorder->SetComputePipelineState(InPipelineState);
 	}
 
-	void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override
+	void SetBindGroups(const TArray<GpuBindGroup*>& BindGroups) override
 	{
 		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));
-		check(ValidateSetBindGroups(BindGroup0, BindGroup1, BindGroup2, BindGroup3));
-		PassRecorder->SetBindGroups(BindGroup0, BindGroup1, BindGroup2, BindGroup3);
+		check(ValidateSetBindGroups(BindGroups));
+		PassRecorder->SetBindGroups(BindGroups);
 	}
 
 	GpuComputePassRecorder* PassRecorder;
@@ -351,11 +351,11 @@ public:
 		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));
 		PassRecorder->SetScissorRect(InScissorRectDes);
 	}
-	void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override
+	void SetBindGroups(const TArray<GpuBindGroup*>& BindGroups) override
 	{
 		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));
-		check(ValidateSetBindGroups(BindGroup0, BindGroup1, BindGroup2, BindGroup3));
-		PassRecorder->SetBindGroups(BindGroup0, BindGroup1, BindGroup2, BindGroup3);
+		check(ValidateSetBindGroups(BindGroups));
+		PassRecorder->SetBindGroups(BindGroups);
 	}
 
 	GpuRenderPassRecorder* PassRecorder;

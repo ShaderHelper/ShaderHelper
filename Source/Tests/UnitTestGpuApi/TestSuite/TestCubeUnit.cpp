@@ -58,7 +58,7 @@ namespace UNITTEST_GPUAPI
 			.Targets = {
 				{.TargetFormat = Viewport->GetRenderTargetFormat() }
 			},
-			.BindGroupLayout0 = BindGroupLayout,
+			.BindGroupLayouts = { BindGroupLayout },
 			.VertexLayout = {
 				{
 					.ByteStride = sizeof(MeshVertex),
@@ -139,7 +139,7 @@ namespace UNITTEST_GPUAPI
 			auto PassRecorder = CmdRecorder->BeginRenderPass(PassDesc, TEXT("TestCube"));
 			{
 				PassRecorder->SetRenderPipelineState(Pipeline);
-				PassRecorder->SetBindGroups(BindGroup, nullptr, nullptr, nullptr);
+				PassRecorder->SetBindGroups({ BindGroup });
 				PassRecorder->SetVertexBuffer(0, PrimitiveBuffers.VertexBuffer);
 				PassRecorder->SetIndexBuffer(PrimitiveBuffers.IndexBuffer);
 				PassRecorder->DrawIndexed(0, PrimitiveBuffers.IndexCount);

@@ -143,7 +143,7 @@ constexpr int PaddingLineNum = 22;
 
 	SShaderEditorBox::~SShaderEditorBox()
     {
-		ShaderAssetObj->OnRefreshBuilder.Remove(RefreshBuilderHandle);
+		ShaderAssetObj->OnShaderRefreshed.Remove(ShaderRefreshHandle);
 
 		bQuitISense = true;
 		ISenseEvent->Trigger();
@@ -461,7 +461,7 @@ constexpr int PaddingLineNum = 22;
     void SShaderEditorBox::Construct(const FArguments& InArgs)
     {
 		ShaderAssetObj = InArgs._ShaderAssetObj;
-		RefreshBuilderHandle = ShaderAssetObj->OnRefreshBuilder.AddLambda([this]{
+		ShaderRefreshHandle = ShaderAssetObj->OnShaderRefreshed.AddLambda([this]{
 			ISenseTask Task{};
 			Task.ShaderDesc = ShaderAssetObj->GetShaderDesc(CurrentShaderSource);
 			ISenseQueue.Enqueue(MoveTemp(Task));
@@ -2471,12 +2471,12 @@ constexpr int PaddingLineNum = 22;
 		
 		//TODO Async and show "Compiling" state
 		TRefCountPtr<GpuShader> Shader = CreateGpuShader();
-		Shader->CompilerFlag |= GpuShaderCompilerFlag::SkipCache;
 		FString ErrorInfo, WarnInfo;
         if (GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo))
         {
 			ShaderAssetObj->Shader = Shader;
 			ShaderAssetObj->bCompilationSucceed = true;
+			ShaderAssetObj->OnShaderRefreshed.Broadcast();
             CurEditState = EditState::Succeed;
 			
 			if(!WarnInfo.IsEmpty())
@@ -2496,7 +2496,6 @@ constexpr int PaddingLineNum = 22;
 				SH_LOG(LogShader, Error, TEXT("%s"), *ErrorInfo);
 			}
 		}
-		Shader->CompilerFlag &= ~GpuShaderCompilerFlag::SkipCache;
     }
 
     void SShaderEditorBox::OnShaderTextChanged(const FString& InShaderSouce)

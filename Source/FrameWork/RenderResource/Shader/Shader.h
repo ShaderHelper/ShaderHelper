@@ -55,26 +55,22 @@ namespace FW
 
 		void ApplyBindGroupLayout(GpuRenderPipelineStateDesc& OutDesc) const
 		{
-			OutDesc.BindGroupLayout0 = GlobalBindGroupLayout;
-			OutDesc.BindGroupLayout1 = PassBindGroupLayout;
-			OutDesc.BindGroupLayout2 = ShaderBindGroupLayout;
+			OutDesc.BindGroupLayouts = { GlobalBindGroupLayout, PassBindGroupLayout, ShaderBindGroupLayout };
 		}
 
 		void ApplyBindGroupLayout(GpuComputePipelineStateDesc& OutDesc) const
 		{
-			OutDesc.BindGroupLayout0 = GlobalBindGroupLayout;
-			OutDesc.BindGroupLayout1 = PassBindGroupLayout;
-			OutDesc.BindGroupLayout2 = ShaderBindGroupLayout;
+			OutDesc.BindGroupLayouts = { GlobalBindGroupLayout, PassBindGroupLayout, ShaderBindGroupLayout };
 		}
 
 		void ApplyBindGroup(GpuRenderPassRecorder* InPassRecorder) const
 		{
-			InPassRecorder->SetBindGroups(GlobalBindGroup, PassBindGroup, ShaderBindGroup, nullptr);
+			InPassRecorder->SetBindGroups({ GlobalBindGroup, PassBindGroup, ShaderBindGroup });
 		}
 
 		void ApplyBindGroup(GpuComputePassRecorder* InPassRecorder) const
 		{
-			InPassRecorder->SetBindGroups(GlobalBindGroup, PassBindGroup, ShaderBindGroup, nullptr);
+			InPassRecorder->SetBindGroups({ GlobalBindGroup, PassBindGroup, ShaderBindGroup });
 		}
 
 		void EnumerateBinding(TFunctionRef<void(const ResourceBinding&, const LayoutBinding&)> Func);

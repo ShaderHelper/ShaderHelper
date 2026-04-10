@@ -10,9 +10,9 @@ namespace FW
 		Desc.Layout = InLayout;
 	}
 
-	GpuBindGroupBuilder& GpuBindGroupBuilder::SetExistingBinding(BindingSlot InSlot, GpuResource* InResource)
+	GpuBindGroupBuilder& GpuBindGroupBuilder::SetExistingBinding(int32 InSlotNum, BindingType InType, GpuResource* InResource)
 	{
-		Desc.Resources.Add(InSlot, { InResource });
+		Desc.Resources.Add(BindingSlot{InSlotNum, InType}, { InResource });
 		return *this;
 	}
 

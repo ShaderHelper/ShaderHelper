@@ -21,6 +21,9 @@ namespace SH
 		virtual FW::GpuShaderSourceDesc GetShaderDesc(const FString& InContent) const = 0;
 
 		FW::AssetPtr<ShaderAsset> FindIncludeAsset(const FString& InShaderName);
+
+	protected:
+		TArray<TSharedRef<FW::PropertyData>> BuildBindingPropertyDatas() const;
 		
 	public:
 		//Only visible content in editor
@@ -29,7 +32,7 @@ namespace SH
 		TRefCountPtr<FW::GpuShader> Shader;
 		bool bCompilationSucceed{};
 		
-		FSimpleMulticastDelegate OnRefreshBuilder;
+		FSimpleMulticastDelegate OnShaderRefreshed;
 	};
 
 }

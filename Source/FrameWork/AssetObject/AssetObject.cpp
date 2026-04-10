@@ -32,9 +32,18 @@ namespace FW
 
 	void AssetObject::Serialize(FArchive& Ar)
 	{
-		ShObject::Serialize(Ar);
-		FileAssetVer = GAssetVer;
-		Ar << FileAssetVer;
+        AssetHeader Header;
+        if (Ar.IsSaving())
+        {
+            Header.Guid = Guid;
+            Header.DependencyGuids = CollectReflectedDependencyGuids();
+            Header.FileAssetVer = GAssetVer;
+        }
+
+        Ar << Header;
+
+        Guid = Header.Guid;
+        FileAssetVer = Header.FileAssetVer;
 	}
 
     void AssetObject::PostLoad()
@@ -42,6 +51,39 @@ namespace FW
         ShObject::PostLoad();
         ObjectName = FText::FromString(GetFileName());
     }
+
+	void AssetObject::PostPropertyChanged(PropertyData* InProperty)
+	{
+		ShObject::PostPropertyChanged(InProperty);
+		RegisterReflectedDependencies();
+	}
+
+    TArray<FGuid> AssetObject::CollectReflectedDependencyGuids() const
+	{
+		TArray<FGuid> DependencyGuids;
+		MetaType* Mt = DynamicMetaType();
+		while (Mt && !Mt->IsType<AssetObject>())
+		{
+			for (const MetaMemberData& Member : Mt->Datas)
+			{
+				if (Member.IsAssetRef())
+				{
+                    auto& AssetRef = *(AssetPtr<AssetObject>*)Member.Get(const_cast<AssetObject*>(this));
+                    if (AssetRef && !DependencyGuids.Contains(AssetRef->GetGuid()))
+					{
+                        DependencyGuids.Add(AssetRef->GetGuid());
+					}
+				}
+			}
+			Mt = Mt->GetBaseClass();
+		}
+        return DependencyGuids;
+    }
+
+    void AssetObject::RegisterReflectedDependencies()
+    {
+        TSingleton<AssetManager>::Get().RegisterAssetDependencies(GetGuid(), CollectReflectedDependencyGuids());
+	}
 
 	void AssetObject::Save()
 	{

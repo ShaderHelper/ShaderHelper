@@ -24,7 +24,7 @@ namespace FW::VK
 		void SetIndexBuffer(GpuBuffer* InBuffer, GpuFormat InIndexFormat, uint32 Offset);
 		void SetViewPort(VkViewport InViewPort);
 		void SetScissorRect(VkRect2D InScissorRect);
-		void SetBindGroups(GpuBindGroup* InGroup0, GpuBindGroup* InGroup1, GpuBindGroup* InGroup2, GpuBindGroup* InGroup3);
+		void SetBindGroups(const TArray<GpuBindGroup*>& InGroups);
 
 	public:
 		bool IsRenderPipelineDirty;
@@ -33,10 +33,7 @@ namespace FW::VK
 		bool IsVertexBufferDirty;
 		bool IsIndexBufferDirty;
 
-		bool IsBindGroup0Dirty;
-		bool IsBindGroup1Dirty;
-		bool IsBindGroup2Dirty;
-		bool IsBindGroup3Dirty;
+		bool IsBindGroupDirty[GpuResourceLimit::MaxBindableBingGroupNum];
 
 	private:
 		VulkanCmdRecorder* Owner;
@@ -48,10 +45,7 @@ namespace FW::VK
 		TOptional<VkViewport> CurrentViewPort;
 		TOptional<VkRect2D> CurrentScissorRect;
 
-		GpuBindGroup* CurrentBindGroup0 = nullptr;
-		GpuBindGroup* CurrentBindGroup1 = nullptr;
-		GpuBindGroup* CurrentBindGroup2 = nullptr;
-		GpuBindGroup* CurrentBindGroup3 = nullptr;
+		GpuBindGroup* CurrentBindGroups[GpuResourceLimit::MaxBindableBingGroupNum] = {};
 
 		TArray<GpuTextureView*> RenderTargetViews;
 	};
@@ -63,21 +57,15 @@ namespace FW::VK
 		void ApplyComputeState(VkCommandBuffer InCmdBuffer);
 
 		void SetPipeline(VulkanComputePipelineState* InPipelineState);
-		void SetBindGroups(GpuBindGroup* InGroup0, GpuBindGroup* InGroup1, GpuBindGroup* InGroup2, GpuBindGroup* InGroup3);
+		void SetBindGroups(const TArray<GpuBindGroup*>& InGroups);
 
 	public:
 		bool IsComputePipelineDirty;
-		bool IsBindGroup0Dirty;
-		bool IsBindGroup1Dirty;
-		bool IsBindGroup2Dirty;
-		bool IsBindGroup3Dirty;
+		bool IsBindGroupDirty[GpuResourceLimit::MaxBindableBingGroupNum];
 
 	private:
 		VulkanComputePipelineState* CurrentComputePipelineState = nullptr;
-		GpuBindGroup* CurrentBindGroup0 = nullptr;
-		GpuBindGroup* CurrentBindGroup1 = nullptr;
-		GpuBindGroup* CurrentBindGroup2 = nullptr;
-		GpuBindGroup* CurrentBindGroup3 = nullptr;
+		GpuBindGroup* CurrentBindGroups[GpuResourceLimit::MaxBindableBingGroupNum] = {};
 	};
 
 	class VulkanComputePassRecorder : public GpuComputePassRecorder
@@ -90,7 +78,7 @@ namespace FW::VK
 	public:
 		void Dispatch(uint32 ThreadGroupCountX, uint32 ThreadGroupCountY, uint32 ThreadGroupCountZ) override;
 		void SetComputePipelineState(GpuComputePipelineState* InPipelineState) override;
-		void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override;
+		void SetBindGroups(const TArray<GpuBindGroup*>& BindGroups) override;
 
 	private:
 		VulkanCmdRecorder* Owner;
@@ -120,7 +108,7 @@ namespace FW::VK
 		void SetIndexBuffer(GpuBuffer* InIndexBuffer, GpuFormat IndexFormat, uint32 Offset) override;
 		void SetViewPort(const GpuViewPortDesc& InViewPortDesc) override;
 		void SetScissorRect(const GpuScissorRectDesc& InScissorRectDes) override;
-		void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override;
+		void SetBindGroups(const TArray<GpuBindGroup*>& BindGroups) override;
 
 		TOptional<GpuRenderPassTimestampWrites> TimestampWrites;
 

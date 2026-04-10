@@ -146,10 +146,10 @@ namespace FW::VK
 			BindingGroupSlot GroupNumber = BindGroupLayout->GetGroupNumber();
 			SetLayouts[GroupNumber] = BindGroupLayout->GetLayout();
 		};
-		AddLayout(InPipelineStateDesc.BindGroupLayout0);
-		AddLayout(InPipelineStateDesc.BindGroupLayout1);
-		AddLayout(InPipelineStateDesc.BindGroupLayout2);
-		AddLayout(InPipelineStateDesc.BindGroupLayout3);
+		for (GpuBindGroupLayout* Layout : InPipelineStateDesc.BindGroupLayouts)
+		{
+			AddLayout(Layout);
+		}
 
 		VkPipelineLayout PipelineLayout;
 		VkPipelineLayoutCreateInfo PipelineLayoutInfo = {
@@ -288,10 +288,10 @@ namespace FW::VK
 			BindingGroupSlot GroupNumber = BindGroupLayout->GetGroupNumber();
 			SetLayouts[GroupNumber] = BindGroupLayout->GetLayout();
 		};
-		AddLayout(InPipelineStateDesc.BindGroupLayout0);
-		AddLayout(InPipelineStateDesc.BindGroupLayout1);
-		AddLayout(InPipelineStateDesc.BindGroupLayout2);
-		AddLayout(InPipelineStateDesc.BindGroupLayout3);
+		for (GpuBindGroupLayout* Layout : InPipelineStateDesc.BindGroupLayouts)
+		{
+			AddLayout(Layout);
+		}
 
 		VkPipelineLayout PipelineLayout;
 		VkPipelineLayoutCreateInfo PipelineLayoutInfo{

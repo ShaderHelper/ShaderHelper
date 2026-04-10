@@ -17,6 +17,7 @@ namespace FW
 
 		virtual void Serialize(FArchive& Ar) override;
         virtual void PostLoad() override;
+		virtual void PostPropertyChanged(PropertyData* InProperty) override;
 		virtual void Save();
 		virtual void MarkDirty(bool IsDirty = true);
 		bool IsDirty();
@@ -35,6 +36,10 @@ namespace FW
 	protected:
 		virtual TRefCountPtr<GpuTexture> GenerateThumbnail() const { return nullptr; }
 		int FileAssetVer = 0;
+
+	private:
+		TArray<FGuid> CollectReflectedDependencyGuids() const;
+		void RegisterReflectedDependencies();
 	};
 
     FRAMEWORK_API MetaType* GetAssetMetaType(const FString& InPath);

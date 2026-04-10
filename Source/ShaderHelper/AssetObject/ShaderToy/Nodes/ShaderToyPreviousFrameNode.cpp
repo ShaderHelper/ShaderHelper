@@ -111,13 +111,13 @@ namespace SH
 			];
 	}
 
-	TArray<TSharedRef<FW::PropertyData>>* ShaderToyPreviousFrameNode::GetPropertyDatas()
+	TArray<TSharedRef<FW::PropertyData>> ShaderToyPreviousFrameNode::GeneratePropertyDatas()
 	{
-		ShObject::GetPropertyDatas();
+		TArray<TSharedRef<FW::PropertyData>> Result = ShObject::GeneratePropertyDatas();
 		auto PassNodePropertyItem = MakeShared<PropertyItemBase>(this, "Pass");
 		PassNodePropertyItem->SetEmbedWidget(ExtraNodeWidget());
-		PropertyDatas.Add(PassNodePropertyItem);
-		return &PropertyDatas;
+		Result.Add(PassNodePropertyItem);
+		return Result;
 	}
 
 	ExecRet ShaderToyPreviousFrameNode::Exec(GraphExecContext& Context)

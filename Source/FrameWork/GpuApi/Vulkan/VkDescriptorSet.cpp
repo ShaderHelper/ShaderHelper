@@ -77,7 +77,7 @@ namespace FW::VK
 		for (const auto& [Slot, LayoutBindingEntry] : LayoutDesc.Layouts)
 		{
 			VkDescriptorSetLayoutBinding Binding{};
-			Binding.binding = (uint32)Slot;
+			Binding.binding = (uint32)Slot.SlotNum;
 			Binding.descriptorType = MapBindingType(LayoutBindingEntry.Type);
 			Binding.descriptorCount = 1;
 			Binding.stageFlags = MapShaderStage(LayoutBindingEntry.Stage);
@@ -146,7 +146,7 @@ namespace FW::VK
 			VkWriteDescriptorSet Write{
 				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 				.dstSet = Set,
-				.dstBinding = (uint32)Slot,
+				.dstBinding = (uint32)Slot.SlotNum,
 				.dstArrayElement = 0,
 				.descriptorCount = 1,
 				.descriptorType = DescType,

@@ -38,7 +38,6 @@ namespace SH
 
 	private:
 		void RefreshPreview();
-		void RefreshProperty();
 		void ClearProperty();
 
 	public:
