@@ -35,6 +35,14 @@ namespace FW
 		return AssetView->GetViewDirectory();
 	}
 
+    void SAssetBrowser::RefreshAssetThumbnail(const FString& AssetPath)
+    {
+        if (AssetView.IsValid())
+        {
+            AssetView->RefreshAssetThumbnail(AssetPath);
+        }
+    }
+
     void SAssetBrowser::InitDirectory(AssetBrowserDirectory& OutDirectory, const FString& Path)
     {
         OutDirectory.Path = Path;
@@ -283,8 +291,8 @@ namespace FW
                         if(Change.Action == FFileChangeData::FCA_Added)
                         {
                             FGuid RemovedAssetId = TSingleton<AssetManager>::Get().GetGuid(FileChange.Filename);
-                            FGuid AddedAssetId = TSingleton<AssetManager>::Get().ReadAssetGuidInDisk(Change.Filename);
-                            return RemovedAssetId == AddedAssetId;
+                            AssetHeader AddedAssetHeader = TSingleton<AssetManager>::Get().ReadAssetHeaderInDisk(Change.Filename);
+                            return RemovedAssetId == AddedAssetHeader.Guid;
                         }
                         return false;
                     }))

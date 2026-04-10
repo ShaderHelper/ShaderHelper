@@ -17,6 +17,7 @@ namespace SH
 	)
 
 	REGISTER_NODE_TO_GRAPH(TextureCubeNode, "ShaderToy")
+	REGISTER_NODE_TO_GRAPH(TextureCubeNode, "Render")
 
 	MetaType* TextureCubeNodeOp::SupportType()
 	{
@@ -98,14 +99,6 @@ namespace SH
 		Preview->SetViewPortRenderTexture(Texture->GetPreviewTexture());
 	}
 
-	void TextureCubeNode::RefreshProperty()
-	{
-		PropertyDatas.Empty();
-		ShObject::GetPropertyDatas();
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->RefreshProperty();
-	}
-
 	void TextureCubeNode::ClearProperty()
 	{
 		Size = 0;
@@ -114,7 +107,7 @@ namespace SH
 		ResultPin->SetValue(nullptr);
 		Preview->Clear();
 		GetOuterMost()->MarkDirty();
-		RefreshProperty();
+		static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
 	}
 
 	void TextureCubeNode::PostPropertyChanged(PropertyData* InProperty)
@@ -124,7 +117,7 @@ namespace SH
 		if (InProperty->GetDisplayName().EqualTo(LOCALIZATION("Texture")))
 		{
 			InitTexture();
-			RefreshProperty();
+			static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
 		}
 	}
 

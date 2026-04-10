@@ -36,6 +36,21 @@ namespace FW
 	FRAMEWORK_API extern int GAssetVer;
 	FRAMEWORK_API extern FCriticalSection GAssetCS;
 
+	struct AssetHeader
+	{
+		FGuid Guid;
+		TArray<FGuid> DependencyGuids;
+		int FileAssetVer = 0;
+
+		friend FArchive& operator<<(FArchive& Ar, AssetHeader& InHeader)
+		{
+			Ar << InHeader.Guid;
+			Ar << InHeader.DependencyGuids;
+			Ar << InHeader.FileAssetVer;
+			return Ar;
+		}
+	};
+
 	class FRAMEWORK_API AssetManager
 	{
 	public:
@@ -160,7 +175,7 @@ namespace FW
             return FindLoadedAsset(GetGuid(InPath));
         }
 
-        FGuid ReadAssetGuidInDisk(const FString& InPath);
+		AssetHeader ReadAssetHeaderInDisk(const FString& InPath);
 		void UpdateGuidToPath(const FString& InPath);
         void RemoveGuidToPath(const FString& InPath);
 
@@ -178,6 +193,8 @@ namespace FW
 		void AddAssetThumbnail(const FGuid& InGuid, TRefCountPtr<GpuTexture> InThumbnail);
 		void RemoveAssetThumbnail(const FGuid& InGuid);
 		GpuTexture* FindAssetThumbnail(const FGuid& InGuid) const;
+		void RegisterAssetDependencies(const FGuid& DependentGuid, const TArray<FGuid>& DependencyGuids);
+		TSet<FGuid> GetAssetDependents(const FGuid& DependencyGuid) const;
 
         void RemoveAsset(AssetObject* InAsset);
 		TArray<FString> GetManageredExts() const;
@@ -222,6 +239,7 @@ namespace FW
 		TMap<FGuid, AssetObject*> Assets; //Loaded asset
 		TMap<FGuid, TRefCountPtr<GpuTexture>> AssetThumbnailPool;
 		TMap<FGuid, TArray<TFunction<void(AssetObject*)>>> PendingLoads;
+		TMap<FGuid, TSet<FGuid>> AssetDependents;
 	};
 
     template<typename T>

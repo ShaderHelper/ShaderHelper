@@ -118,8 +118,8 @@ namespace FW
             .BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
             .Padding(4.0)
         ];
-        PropertyDatas = ObjectData->GetPropertyDatas();
-        if(PropertyDatas && !PropertyDatas->IsEmpty())
+        PropertyDatas = ObjectData->GeneratePropertyDatas();
+        if(!PropertyDatas.IsEmpty())
         {
             PropertyContent->SetContent(
                 SAssignNew(PropertyTree, STreeView<TSharedRef<PropertyData>>)
@@ -128,7 +128,7 @@ namespace FW
                         && ObjectData->DynamicMetaType()->IsDerivedFrom<AssetObject>()
                         && static_cast<AssetObject*>(ObjectData.Get())->IsBuiltInAsset());
                 })
-                .TreeItemsSource(PropertyDatas)
+                .TreeItemsSource(&PropertyDatas)
                 .OnGetChildren_Lambda([](TSharedRef<PropertyData> InTreeNode, TArray<TSharedRef<PropertyData>>& OutChildren) {
                     InTreeNode->GetChildren(OutChildren);
                 })
@@ -141,7 +141,7 @@ namespace FW
                 .SelectionMode(ESelectionMode::None)
             );
             
-            for(const auto& Data : *PropertyDatas)
+            for(const auto& Data : PropertyDatas)
             {
                 TryExpandItemRecursively(Data);
             }

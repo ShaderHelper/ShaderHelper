@@ -751,7 +751,7 @@ namespace SH
 				{
 					DirtyChar = "*";
 				}
-				return FText::FromString(LoadedShader->GetFileName() + DirtyChar);
+				return FText::FromString(DirtyChar + LoadedShader->GetFileName());
 			})
 			.OnCanCloseTab_Lambda([this, TabId]{
 				if(CurDebuggableObject && IsDebugging)

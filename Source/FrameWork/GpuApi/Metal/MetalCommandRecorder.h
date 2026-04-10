@@ -25,7 +25,7 @@ namespace FW
 		void SetIndexBuffer(MetalBuffer* InBuffer, GpuFormat InIndexFormat, uint32 Offset);
         void SetViewPort(MTL::Viewport InViewPort);
 		void SetScissorRect(MTL::ScissorRect InSissorRect);
-        void SetBindGroups(MetalBindGroup* InGroup0, MetalBindGroup* InGroup1, MetalBindGroup* InGroup2, MetalBindGroup* InGroup3);
+        void SetBindGroups(const TArray<MetalBindGroup*>& InGroups);
         MTL::PrimitiveType GetPrimitiveType() const {
             check(CurrentRenderPipelineState);
             return (MTL::PrimitiveType)CurrentRenderPipelineState->GetPrimitiveType();
@@ -40,10 +40,7 @@ namespace FW
 		bool IsScissorRectDirty : 1;
         bool IsVertexBufferDirty : 1;
        
-        bool IsBindGroup0Dirty : 1;
-        bool IsBindGroup1Dirty : 1;
-        bool IsBindGroup2Dirty : 1;
-        bool IsBindGroup3Dirty : 1;
+        bool IsBindGroupDirty[GpuResourceLimit::MaxBindableBingGroupNum];
         
     private:
         MetalRenderPipelineState* CurrentRenderPipelineState;
@@ -54,10 +51,7 @@ namespace FW
         TOptional<MTL::Viewport> CurrentViewPort;
         TOptional<MTL::ScissorRect> CurrentScissorRect;
         
-        MetalBindGroup* CurrentBindGroup0;
-        MetalBindGroup* CurrentBindGroup1;
-        MetalBindGroup* CurrentBindGroup2;
-        MetalBindGroup* CurrentBindGroup3;
+        MetalBindGroup* CurrentBindGroups[GpuResourceLimit::MaxBindableBingGroupNum] = {};
         
         MTLRenderPassDescriptorPtr RenderPassDesc;
     };
@@ -68,22 +62,16 @@ namespace FW
         MtlComputeStateCache();
         void ApplyComputeState(MTL::ComputeCommandEncoder* ComputeCommandEncoder);
         void SetPipeline(MetalComputePipelineState* InPipelineState);
-        void SetBindGroups(MetalBindGroup* InGroup0, MetalBindGroup* InGroup1, MetalBindGroup* InGroup2, MetalBindGroup* InGroup3);
+        void SetBindGroups(const TArray<MetalBindGroup*>& InGroups);
         MetalComputePipelineState* GetPipeline() const { return CurrentComputePipelineState; }
 
     public:
         bool IsComputePipelineDirty : 1;
-        bool IsBindGroup0Dirty : 1;
-        bool IsBindGroup1Dirty : 1;
-        bool IsBindGroup2Dirty : 1;
-        bool IsBindGroup3Dirty : 1;
+        bool IsBindGroupDirty[GpuResourceLimit::MaxBindableBingGroupNum];
 
     private:
         MetalComputePipelineState* CurrentComputePipelineState;
-        MetalBindGroup* CurrentBindGroup0;
-        MetalBindGroup* CurrentBindGroup1;
-        MetalBindGroup* CurrentBindGroup2;
-        MetalBindGroup* CurrentBindGroup3;
+        MetalBindGroup* CurrentBindGroups[GpuResourceLimit::MaxBindableBingGroupNum] = {};
     };
 
     class MtlRenderPassRecorder : public GpuRenderPassRecorder
@@ -105,7 +93,7 @@ namespace FW
         void SetIndexBuffer(GpuBuffer* InIndexBuffer, GpuFormat IndexFormat, uint32 Offset) override;
         void SetViewPort(const GpuViewPortDesc& InViewPortDesc) override;
 		void SetScissorRect(const GpuScissorRectDesc& InScissorRectDes) override;
-        void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override;
+        void SetBindGroups(const TArray<GpuBindGroup*>& BindGroups) override;
         
     private:
         MTLRenderCommandEncoderPtr CmdEncoder;
@@ -125,7 +113,7 @@ namespace FW
 	public:
 		void Dispatch(uint32 ThreadGroupCountX, uint32 ThreadGroupCountY, uint32 ThreadGroupCountZ) override;
 		void SetComputePipelineState(GpuComputePipelineState* InPipelineState) override;
-		void SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3) override;
+		void SetBindGroups(const TArray<GpuBindGroup*>& BindGroups) override;
 		
 	private:
 		MTLComputeCommandEncoderPtr CmdEncoder;

@@ -1,9 +1,14 @@
 #include "CommonHeader.h"
+#include "AssetObject/PixelShader.h"
+#include "AssetObject/Render/Nodes/RenderOutputNode.h"
+#include "AssetObject/Render/Render.h"
+#include "AssetObject/VertexShader.h"
 #include "ShPluginManager.h"
 #include "AssetObject/ShaderToy/ShaderToy.h"
 #include "AssetObject/Nodes/Texture2dNode.h"
 #include "AssetObject/Nodes/TextureCubeNode.h"
 #include "AssetObject/Nodes/Texture3dNode.h"
+#include "AssetObject/ShaderToy/StShader.h"
 #include "AssetObject/ShaderToy/Nodes/ShaderToyPassNode.h"
 #include "AssetObject/ShaderToy/Nodes/ShaderToyOutputNode.h"
 #include "AssetObject/ShaderToy/Nodes/ShaderToyKeyboardNode.h"
@@ -21,6 +26,8 @@ PYBIND11_EMBEDDED_MODULE(ShaderHelper, m)
 	py::class_<SH::ShaderToy, FW::Graph, FW::ObjectPtr<SH::ShaderToy>>(m, "ShaderToy")
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::ShaderToy>(Outer); }), py::arg("Outer") = nullptr)
 		.def_readwrite("FlipY", &SH::ShaderToy::FlipY);
+	py::class_<SH::Render, FW::Graph, FW::ObjectPtr<SH::Render>>(m, "Render")
+		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::Render>(Outer); }), py::arg("Outer") = nullptr);
 	py::class_<SH::ShaderAsset, FW::AssetObject, FW::ObjectPtr<SH::ShaderAsset>>(m, "ShaderAsset")
 		.def_property("EditorContent", 
 		[](const SH::ShaderAsset& Self) -> std::string {
@@ -40,6 +47,12 @@ PYBIND11_EMBEDDED_MODULE(ShaderHelper, m)
 				for (int i = 0; i < 4 && i < py::len(t); i++)
 					Self.ChannelSlotTypes[i] = t[i].cast<SH::ShaderToySlotType>();
 			});
+	py::class_<SH::VertexShader, SH::ShaderAsset, FW::ObjectPtr<SH::VertexShader>>(m, "VertexShader")
+		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::VertexShader>(Outer); }), py::arg("Outer") = nullptr)
+		.def_readwrite("Language", &SH::VertexShader::Language);
+	py::class_<SH::PixelShader, SH::ShaderAsset, FW::ObjectPtr<SH::PixelShader>>(m, "PixelShader")
+		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::PixelShader>(Outer); }), py::arg("Outer") = nullptr)
+		.def_readwrite("Language", &SH::PixelShader::Language);
 	py::class_<SH::ShaderHeader, SH::ShaderAsset, FW::ObjectPtr<SH::ShaderHeader>>(m, "ShaderHeader")
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::ShaderHeader>(Outer); }), py::arg("Outer") = nullptr)
 		.def_readwrite("Language", &SH::ShaderHeader::Language);
@@ -70,6 +83,8 @@ PYBIND11_EMBEDDED_MODULE(ShaderHelper, m)
 		.def_readwrite("iChannel3", &SH::ShaderToyPassNode::iChannelDesc3);
 	py::class_<SH::ShaderToyOutputNode, FW::GraphNode, FW::ObjectPtr<SH::ShaderToyOutputNode>>(m, "ShaderToyOutputNode")
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::ShaderToyOutputNode>(Outer); }), py::arg("Outer") = nullptr);
+	py::class_<SH::RenderOutputNode, FW::GraphNode, FW::ObjectPtr<SH::RenderOutputNode>>(m, "RenderOutputNode")
+		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::RenderOutputNode>(Outer); }), py::arg("Outer") = nullptr);
 	py::class_<SH::ShaderToyKeyboardNode, FW::GraphNode, FW::ObjectPtr<SH::ShaderToyKeyboardNode>>(m, "ShaderToyKeyboardNode")
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::ShaderToyKeyboardNode>(Outer); }), py::arg("Outer") = nullptr);
 	py::class_<SH::ShaderToyPreviousFrameNode, FW::GraphNode, FW::ObjectPtr<SH::ShaderToyPreviousFrameNode>>(m, "ShaderToyPreviousFrameNode")

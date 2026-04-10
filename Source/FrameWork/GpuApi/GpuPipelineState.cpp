@@ -53,10 +53,13 @@ namespace FW
 		Hash = HashCombine(Hash, PsHash);
 
 		// Hash bind group layouts
-		if (Desc.BindGroupLayout0) { Hash = HashCombine(Hash, GetTypeHash(Desc.BindGroupLayout0->GetDesc())); }
-		if (Desc.BindGroupLayout1) { Hash = HashCombine(Hash, GetTypeHash(Desc.BindGroupLayout1->GetDesc())); }
-		if (Desc.BindGroupLayout2) { Hash = HashCombine(Hash, GetTypeHash(Desc.BindGroupLayout2->GetDesc())); }
-		if (Desc.BindGroupLayout3) { Hash = HashCombine(Hash, GetTypeHash(Desc.BindGroupLayout3->GetDesc())); }
+		for (GpuBindGroupLayout* Layout : Desc.BindGroupLayouts)
+		{
+			if (Layout) {
+				Hash = HashCombine(Hash, ::GetTypeHash(Layout->GetGroupNumber()));
+				Hash = HashCombine(Hash, GetTypeHash(Layout->GetDesc()));
+			}
+		}
 
 		// Hash rasterizer state
 		Hash = HashCombine(Hash, ::GetTypeHash(Desc.RasterizerState.FillMode));
@@ -106,14 +109,17 @@ namespace FW
 			Hash = HashCombine(Hash, ::GetTypeHash(Desc.DepthStencilState->DepthCompare));
 		}
 
+		TArray<TPair<BindingGroupSlot, GpuBindGroupLayoutDesc>> CacheBindGroupLayouts;
+		for (GpuBindGroupLayout* Layout : Desc.BindGroupLayouts)
+		{
+			if (Layout) { CacheBindGroupLayouts.Add({Layout->GetGroupNumber(), Layout->GetDesc()}); }
+		}
+
 		return GpuRenderPsoCacheKey{
 			.Hash = Hash,
 			.Vs = Desc.Vs,
 			.Ps = Desc.Ps,
-			.BindGroupLayout0 = Desc.BindGroupLayout0 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout0->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
-			.BindGroupLayout1 = Desc.BindGroupLayout1 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout1->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
-			.BindGroupLayout2 = Desc.BindGroupLayout2 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout2->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
-			.BindGroupLayout3 = Desc.BindGroupLayout3 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout3->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
+			.BindGroupLayouts = MoveTemp(CacheBindGroupLayouts),
 			.VertexLayout = Desc.VertexLayout,
 			.RasterizerState = Desc.RasterizerState,
 			.Primitive = Desc.Primitive,
@@ -131,18 +137,24 @@ namespace FW
 		Hash = HashCombine(Hash, CsHash);
 
 		// Hash bind group layouts
-		if (Desc.BindGroupLayout0) { Hash = HashCombine(Hash, GetTypeHash(Desc.BindGroupLayout0->GetDesc())); }
-		if (Desc.BindGroupLayout1) { Hash = HashCombine(Hash, GetTypeHash(Desc.BindGroupLayout1->GetDesc())); }
-		if (Desc.BindGroupLayout2) { Hash = HashCombine(Hash, GetTypeHash(Desc.BindGroupLayout2->GetDesc())); }
-		if (Desc.BindGroupLayout3) { Hash = HashCombine(Hash, GetTypeHash(Desc.BindGroupLayout3->GetDesc())); }
+		for (GpuBindGroupLayout* Layout : Desc.BindGroupLayouts)
+		{
+			if (Layout) {
+				Hash = HashCombine(Hash, ::GetTypeHash(Layout->GetGroupNumber()));
+				Hash = HashCombine(Hash, GetTypeHash(Layout->GetDesc()));
+			}
+		}
+
+		TArray<TPair<BindingGroupSlot, GpuBindGroupLayoutDesc>> CacheBindGroupLayouts;
+		for (GpuBindGroupLayout* Layout : Desc.BindGroupLayouts)
+		{
+			if (Layout) { CacheBindGroupLayouts.Add({Layout->GetGroupNumber(), Layout->GetDesc()}); }
+		}
 
 		return GpuComputePsoCacheKey{
 			.Hash = Hash,
 			.Cs = Desc.Cs,
-			.BindGroupLayout0 = Desc.BindGroupLayout0 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout0->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
-			.BindGroupLayout1 = Desc.BindGroupLayout1 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout1->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
-			.BindGroupLayout2 = Desc.BindGroupLayout2 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout2->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
-			.BindGroupLayout3 = Desc.BindGroupLayout3 ? TOptional<GpuBindGroupLayoutDesc>(Desc.BindGroupLayout3->GetDesc()) : TOptional<GpuBindGroupLayoutDesc>(),
+			.BindGroupLayouts = MoveTemp(CacheBindGroupLayouts),
 		};
 	}
 

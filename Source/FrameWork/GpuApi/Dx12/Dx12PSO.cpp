@@ -44,10 +44,7 @@ namespace FW
 			}
 		}
 
-		RootSignatureDesc RsDesc{
-			static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout0), static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout1),
-			static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout2), static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout3)
-		};
+		RootSignatureDesc RsDesc{InPipelineStateDesc.BindGroupLayouts};
 
 		TArray<TArray<ANSICHAR>> SemanticNameStorage;
 		TArray<D3D12_INPUT_ELEMENT_DESC> InputElements;
@@ -127,10 +124,7 @@ namespace FW
 			CheckShaderLayoutBinding(InPipelineStateDesc, Cs);
 		}
 
-		RootSignatureDesc RsDesc{
-			static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout0), static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout1),
-			static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout2), static_cast<Dx12BindGroupLayout*>(InPipelineStateDesc.BindGroupLayout3)
-		};
+		RootSignatureDesc RsDesc{InPipelineStateDesc.BindGroupLayouts};
 
 		D3D12_COMPUTE_PIPELINE_STATE_DESC PsoDesc{};
 		PsoDesc.CS = { Cs->GetCompilationResult()->GetBufferPointer(), Cs->GetCompilationResult()->GetBufferSize() };

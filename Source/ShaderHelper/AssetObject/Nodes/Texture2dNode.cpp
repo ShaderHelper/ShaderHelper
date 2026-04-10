@@ -19,6 +19,7 @@ namespace SH
 	)
 
 	REGISTER_NODE_TO_GRAPH(Texture2dNode, "ShaderToy")
+	REGISTER_NODE_TO_GRAPH(Texture2dNode, "Render")
 
 	MetaType* Texture2dNodeOp::SupportType()
 	{
@@ -103,14 +104,6 @@ namespace SH
 		Preview->SetViewPortRenderTexture(Texture->GetPreviewTexture());
 	}
 
-	void Texture2dNode::RefreshProprety()
-	{
-		PropertyDatas.Empty();
-		ShObject::GetPropertyDatas();
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->RefreshProperty();
-	}
-
 	void Texture2dNode::ClearProperty()
 	{
 		Width = Height = 1;
@@ -119,7 +112,7 @@ namespace SH
 		ResultPin->SetValue(nullptr);
 		Preview->Clear();
 		GetOuterMost()->MarkDirty();
-		RefreshProprety();
+		static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
 	}
 
 	void Texture2dNode::PostPropertyChanged(PropertyData* InProperty)
@@ -130,7 +123,7 @@ namespace SH
 		if(InProperty->GetDisplayName().EqualTo(LOCALIZATION("Texture")))
 		{
 			InitTexture();
-			RefreshProprety();
+			static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
 		}
 	}
 

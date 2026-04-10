@@ -82,6 +82,7 @@ namespace SH
 
 	void ShaderHeader::PostPropertyChanged(FW::PropertyData* InProperty)
 	{
+		ShObject::PostPropertyChanged(InProperty);
 		if (InProperty->IsOfType<PropertyEnumItem>() && InProperty->GetDisplayName().EqualTo(LOCALIZATION("Language")))
 		{
 			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());

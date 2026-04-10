@@ -39,7 +39,7 @@ namespace UNITTEST_GPUAPI
 			.Build();
 
 		BindGroup = GpuBindGroupBuilder{ BindGroupLayout }
-			.SetExistingBinding(0, TestTex)
+			.SetExistingBinding(0, BindingType::Texture, TestTex)
 			.Build();
 
 		DummyRT = GGpuRhi->CreateTexture({ 1, 1, GpuFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget });
@@ -48,7 +48,7 @@ namespace UNITTEST_GPUAPI
 			.CheckLayout = true,
 			.Vs = Vs,
 			.Targets = { {.TargetFormat = DummyRT->GetFormat()} },
-			.BindGroupLayout0 = BindGroupLayout,
+			.BindGroupLayouts = { BindGroupLayout },
 		};
 		Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 	}
@@ -65,7 +65,7 @@ namespace UNITTEST_GPUAPI
 			auto PassRecorder = CmdRecorder->BeginRenderPass(PassDesc, TEXT("TestCast"));
 			{
 				PassRecorder->SetRenderPipelineState(Pipeline);
-				PassRecorder->SetBindGroups(BindGroup, nullptr, nullptr, nullptr);
+				PassRecorder->SetBindGroups({ BindGroup });
 				PassRecorder->DrawPrimitive(0, 3, 0, 1);
 			}
 			CmdRecorder->EndRenderPass(PassRecorder);

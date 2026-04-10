@@ -55,7 +55,7 @@ namespace FW
 		virtual void Serialize(FArchive& Ar);
         virtual void PostLoad();
         //
-        virtual TArray<TSharedRef<PropertyData>>* GetPropertyDatas();
+        virtual TArray<TSharedRef<PropertyData>> GeneratePropertyDatas();
 		virtual bool CanChangeProperty(PropertyData* InProperty) { return true; };
         virtual void PostPropertyChanged(PropertyData* InProperty);
     
@@ -74,7 +74,6 @@ namespace FW
 
 	protected:
 		FGuid Guid;
-        TArray<TSharedRef<PropertyData>> PropertyDatas;
         std::atomic<int32> NumRefs;
 
 

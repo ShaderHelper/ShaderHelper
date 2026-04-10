@@ -98,6 +98,11 @@ namespace FW
 			}
 			Item = MoveTemp(ScalarItem);
 		}
+		else if (MetaMemData->IsType<FString>())
+		{
+			FString* StringValue = (FString*)MetaMemData->Get(Instance);
+			Item = MakeShared<PropertyStringItem>(InObject, MetaMemData->MemberName, StringValue, ReadOnly);
+		}
 		//Struct/Class
 		else if(MemberMetaType && MemberMetaType->Datas.Num() > 0)
 		{
@@ -229,10 +234,9 @@ namespace FW
         GetOuterMost()->MarkDirty();
     }
 
-    TArray<TSharedRef<PropertyData>>* ShObject::GetPropertyDatas()
+    TArray<TSharedRef<PropertyData>> ShObject::GeneratePropertyDatas()
     {
-        PropertyDatas = GeneratePropertyDatas(this, this->DynamicMetaType());
-        return &PropertyDatas;
+        return FW::GeneratePropertyDatas(this, this->DynamicMetaType());
     }
     
     ShObjectOp* GetShObjectOp(ShObject* InObject)

@@ -116,13 +116,13 @@ namespace FW::GpuResourceHelper
 
 		GpuComputePipelineStateDesc PipelineDesc{ 
 			.Cs = Cs,
-			.BindGroupLayout2 = BindGroupLayout
+			.BindGroupLayouts = { BindGroupLayout }
 		};
 		TRefCountPtr<GpuComputePipelineState> Pipeline = GpuPsoCacheManager::Get().CreateComputePipelineState(PipelineDesc);
 
 		auto PassRecorder = CmdRecorder->BeginComputePass("ClearRWResource");
 		{
-			PassRecorder->SetBindGroups(nullptr, nullptr, BindGroup, nullptr);
+			PassRecorder->SetBindGroups({ BindGroup });
 			PassRecorder->SetComputePipelineState(Pipeline);
 			PassRecorder->Dispatch(ThreadGroupCountX, 1, 1);
 		}
@@ -203,10 +203,10 @@ namespace FW::GpuResourceHelper
 		GGpuRhi->UnMapGpuBuffer(ParamBuf);
 
 		TRefCountPtr<GpuBindGroup> BindGroup = GpuBindGroupBuilder{ Mip.Layout2D }
-			.SetExistingBinding(MipResources::InputTexBinding, SrcView)
-			.SetExistingBinding(MipResources::SamplerBinding, Sampler)
-			.SetExistingBinding(MipResources::OutputTexBinding, DstView)
-			.SetExistingBinding(MipResources::ParamsBinding, ParamBuf)
+			.SetExistingBinding(MipResources::InputTexBinding, BindingType::Texture, SrcView)
+			.SetExistingBinding(MipResources::SamplerBinding, BindingType::Sampler, Sampler)
+			.SetExistingBinding(MipResources::OutputTexBinding, BindingType::RWTexture, DstView)
+			.SetExistingBinding(MipResources::ParamsBinding, BindingType::UniformBuffer, ParamBuf)
 			.Build();
 
 		CmdRecorder->Barriers({
@@ -216,13 +216,13 @@ namespace FW::GpuResourceHelper
 
 		GpuComputePipelineStateDesc PipelineDesc{ 
 			.Cs = Mip.Cs2D,
-			.BindGroupLayout2 = Mip.Layout2D
+			.BindGroupLayouts = { Mip.Layout2D }
 		};
 		TRefCountPtr<GpuComputePipelineState> Pipeline = GpuPsoCacheManager::Get().CreateComputePipelineState(PipelineDesc);
 
 		auto PassRecorder = CmdRecorder->BeginComputePass("Mip2DPass");
 		{
-			PassRecorder->SetBindGroups(nullptr, nullptr, BindGroup, nullptr);
+			PassRecorder->SetBindGroups({ BindGroup });
 			PassRecorder->SetComputePipelineState(Pipeline);
 			PassRecorder->Dispatch(
 				FMath::CeilToInt((float)DstWidth / 8.0f),
@@ -251,10 +251,10 @@ namespace FW::GpuResourceHelper
 		GGpuRhi->UnMapGpuBuffer(ParamBuf);
 
 		TRefCountPtr<GpuBindGroup> BindGroup = GpuBindGroupBuilder{ Mip.Layout3D }
-			.SetExistingBinding(MipResources::InputTexBinding, SrcView)
-			.SetExistingBinding(MipResources::SamplerBinding, Sampler)
-			.SetExistingBinding(MipResources::OutputTexBinding, DstView)
-			.SetExistingBinding(MipResources::ParamsBinding, ParamBuf)
+			.SetExistingBinding(MipResources::InputTexBinding, BindingType::Texture3D, SrcView)
+			.SetExistingBinding(MipResources::SamplerBinding, BindingType::Sampler, Sampler)
+			.SetExistingBinding(MipResources::OutputTexBinding, BindingType::RWTexture3D, DstView)
+			.SetExistingBinding(MipResources::ParamsBinding, BindingType::UniformBuffer, ParamBuf)
 			.Build();
 
 		CmdRecorder->Barriers({
@@ -264,13 +264,13 @@ namespace FW::GpuResourceHelper
 
 		GpuComputePipelineStateDesc PipelineDesc{ 
 			.Cs = Mip.Cs3D,
-			.BindGroupLayout2 = Mip.Layout3D
+			.BindGroupLayouts = { Mip.Layout3D }
 		};
 		TRefCountPtr<GpuComputePipelineState> Pipeline = GpuPsoCacheManager::Get().CreateComputePipelineState(PipelineDesc);
 
 		auto PassRecorder = CmdRecorder->BeginComputePass("Mip3DPass");
 		{
-			PassRecorder->SetBindGroups(nullptr, nullptr, BindGroup, nullptr);
+			PassRecorder->SetBindGroups({ BindGroup });
 			PassRecorder->SetComputePipelineState(Pipeline);
 			PassRecorder->Dispatch(
 				FMath::CeilToInt((float)DstWidth / 4.0f),

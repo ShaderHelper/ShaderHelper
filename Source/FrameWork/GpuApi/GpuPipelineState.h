@@ -53,10 +53,7 @@ namespace FW
 		bool CheckLayout = false;
 		GpuShader* Cs;
 
-		GpuBindGroupLayout* BindGroupLayout0 = nullptr;
-		GpuBindGroupLayout* BindGroupLayout1 = nullptr;
-		GpuBindGroupLayout* BindGroupLayout2 = nullptr;
-		GpuBindGroupLayout* BindGroupLayout3 = nullptr;
+		TArray<GpuBindGroupLayout*> BindGroupLayouts;
 	};
 
 	struct DepthStencilStateDesc
@@ -75,10 +72,7 @@ namespace FW
         GpuShader* Ps;
 		TArray<PipelineTargetDesc, TFixedAllocator<GpuResourceLimit::MaxRenderTargetNum>> Targets;
 
-		GpuBindGroupLayout* BindGroupLayout0 = nullptr;
-		GpuBindGroupLayout* BindGroupLayout1 = nullptr;
-		GpuBindGroupLayout* BindGroupLayout2 = nullptr;
-		GpuBindGroupLayout* BindGroupLayout3 = nullptr;
+		TArray<GpuBindGroupLayout*> BindGroupLayouts;
 		// Each element describes one vertex buffer.
 		TArray<GpuVertexLayoutDesc> VertexLayout;
 
@@ -121,10 +115,7 @@ namespace FW
 		uint32 Hash;
 		TRefCountPtr<GpuShader> Vs;
 		TRefCountPtr<GpuShader> Ps;
-		TOptional<GpuBindGroupLayoutDesc> BindGroupLayout0;
-		TOptional<GpuBindGroupLayoutDesc> BindGroupLayout1;
-		TOptional<GpuBindGroupLayoutDesc> BindGroupLayout2;
-		TOptional<GpuBindGroupLayoutDesc> BindGroupLayout3;
+		TArray<TPair<BindingGroupSlot, GpuBindGroupLayoutDesc>> BindGroupLayouts;
 		TArray<GpuVertexLayoutDesc> VertexLayout;
 		RasterizerStateDesc RasterizerState;
 		PrimitiveType Primitive;
@@ -142,10 +133,7 @@ namespace FW
 					&& Ps->GetSourceText().Equals(Other.Ps->GetSourceText())
 					&& Ps->CompileExtraArgs == Other.Ps->CompileExtraArgs);
 			return VsEqual && PsEqual
-				&& BindGroupLayout0 == Other.BindGroupLayout0
-				&& BindGroupLayout1 == Other.BindGroupLayout1
-				&& BindGroupLayout2 == Other.BindGroupLayout2
-				&& BindGroupLayout3 == Other.BindGroupLayout3
+				&& BindGroupLayouts == Other.BindGroupLayouts
 				&& VertexLayout == Other.VertexLayout
 				&& RasterizerState.FillMode == Other.RasterizerState.FillMode
 				&& RasterizerState.CullMode == Other.RasterizerState.CullMode
@@ -165,20 +153,14 @@ namespace FW
 	{
 		uint32 Hash;
 		TRefCountPtr<GpuShader> Cs;
-		TOptional<GpuBindGroupLayoutDesc> BindGroupLayout0;
-		TOptional<GpuBindGroupLayoutDesc> BindGroupLayout1;
-		TOptional<GpuBindGroupLayoutDesc> BindGroupLayout2;
-		TOptional<GpuBindGroupLayoutDesc> BindGroupLayout3;
+		TArray<TPair<BindingGroupSlot, GpuBindGroupLayoutDesc>> BindGroupLayouts;
 
 		bool operator==(const GpuComputePsoCacheKey& Other) const
 		{
 			const bool CsEqual = Cs && Other.Cs
 					&& Cs->GetSourceText().Equals(Other.Cs->GetSourceText())
 					&& Cs->CompileExtraArgs == Other.Cs->CompileExtraArgs;
-			return CsEqual && BindGroupLayout0 == Other.BindGroupLayout0
-				&& BindGroupLayout1 == Other.BindGroupLayout1
-				&& BindGroupLayout2 == Other.BindGroupLayout2
-				&& BindGroupLayout3 == Other.BindGroupLayout3;
+			return CsEqual && BindGroupLayouts == Other.BindGroupLayouts;
 		}
 
 		friend uint32 GetTypeHash(const GpuComputePsoCacheKey& Key)

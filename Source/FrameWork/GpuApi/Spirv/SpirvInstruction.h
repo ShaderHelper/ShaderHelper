@@ -16,6 +16,7 @@ namespace FW
 		virtual void Visit(const class SpvOpEntryPoint* Inst) {}
 		virtual void Visit(const class SpvOpExecutionMode* Inst) {}
 		virtual void Visit(const class SpvOpName* Inst) {}
+		virtual void Visit(const class SpvOpMemberName* Inst) {}
 		virtual void Visit(const class SpvOpString* Inst) {}
 		virtual void Visit(const class SpvOpDecorate* Inst) {}
 		virtual void Visit(const class SpvOpMemberDecorate* Inst) {}
@@ -704,6 +705,37 @@ namespace FW
 		
 	private:
 		SpvId Target;
+		FString Name;
+	};
+
+	class SpvOpMemberName : public SpvInstructionBase<SpvOpMemberName>
+	{
+	public:
+		SpvOpMemberName(SpvId InType, uint32 InMember, const FString& InName)
+		: SpvInstructionBase(SpvOp::MemberName)
+		, Type(InType)
+		, Member(InMember)
+		, Name(InName)
+		{}
+		
+		SpvId GetType() const { return Type; }
+		uint32 GetMember() const { return Member; }
+		const FString& GetName() const { return Name; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(Type.GetValue());
+			Bin.Add(Member);
+			std::string Utf8Name(TCHAR_TO_UTF8(*Name));
+			Bin.Append((uint32*)Utf8Name.c_str(), ((int)Utf8Name.size() + 1 + 3) / 4);
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::MemberName;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
+		
+	private:
+		SpvId Type;
+		uint32 Member;
 		FString Name;
 	};
 

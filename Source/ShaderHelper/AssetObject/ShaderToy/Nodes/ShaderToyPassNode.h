@@ -1,7 +1,7 @@
 #pragma once
 #include "Editor/AssetEditor/ShAssetEditor.h"
 #include "AssetObject/Graph.h"
-#include "AssetObject/StShader.h"
+#include "AssetObject/ShaderToy/StShader.h"
 #include "AssetManager/AssetManager.h"
 #include "Editor/PreviewViewPort.h"
 #include "Debugger/DebuggableObject.h"
@@ -63,7 +63,7 @@ namespace SH
 
 		bool CanChangeProperty(FW::PropertyData* InProperty) override;
         void PostPropertyChanged(FW::PropertyData* InProperty) override;
-        TArray<TSharedRef<FW::PropertyData>>* GetPropertyDatas() override;
+        TArray<TSharedRef<FW::PropertyData>> GeneratePropertyDatas() override;
     
 		//ShDebuggableObject
 		InvocationState GetInvocationState() override;
@@ -79,9 +79,9 @@ namespace SH
 		TRefCountPtr<FW::GpuBindGroup> GetBuiltInBindGroup(FW::GpuBindGroupLayout* Layout);
 
 		void InitShaderAsset();
-		void InitCustomBindGroup();
+		void RebuildCustomBindGroup();
         void ClearBindingProperty();
-        void RefreshProperty(bool bCopyUniformBuffer = true);
+        void OnShaderBindingChanged(bool bCopyUniformBuffer = true);
 		void UpdateChannelPinTypes();
 		void UpdateBuiltinUniformBuffer(struct ShaderToyExecContext& Context);
         TArray<TSharedRef<FW::PropertyData>> PropertyDatasFromBinding();

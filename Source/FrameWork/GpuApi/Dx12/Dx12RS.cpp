@@ -54,7 +54,7 @@ namespace FW
 			if (LayoutBindingEntry.Type == BindingType::UniformBuffer)
 			{
 				CD3DX12_ROOT_PARAMETER1 DynamicBufferRootParameter;
-				DynamicBufferRootParameter.InitAsConstantBufferView(Slot, Desc.GroupNumber, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, BindingVisibility);
+				DynamicBufferRootParameter.InitAsConstantBufferView(Slot.SlotNum, Desc.GroupNumber, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, BindingVisibility);
 				DynamicBufferRootParameters.Add(Slot, MoveTemp(DynamicBufferRootParameter));
 			}
 			else
@@ -63,7 +63,7 @@ namespace FW
 				Range.Init(
 					BindingTypeToDescriptorRangeType(LayoutBindingEntry.Type),
 					1,
-					Slot,
+					Slot.SlotNum,
 					LayoutDesc.GroupNumber);
 
 				if (LayoutBindingEntry.Type == BindingType::CombinedTextureSampler || LayoutBindingEntry.Type == BindingType::CombinedTextureCubeSampler || LayoutBindingEntry.Type == BindingType::CombinedTexture3DSampler)
@@ -74,7 +74,7 @@ namespace FW
 					SamplerRange.Init(
 						D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER,
 						1,
-						Slot,
+						Slot.SlotNum,
 						LayoutDesc.GroupNumber);
 					DescriptorTableRanges_Sampler.FindOrAdd(BindingVisibility).Add(MoveTemp(SamplerRange));
 				}
@@ -346,10 +346,10 @@ namespace FW
 	
 		};
 
-		AddRootParameter(InDesc.Layout0);
-		AddRootParameter(InDesc.Layout1);
-		AddRootParameter(InDesc.Layout2);
-		AddRootParameter(InDesc.Layout3);
+		for (Dx12BindGroupLayout* Layout : InDesc.Layouts)
+		{
+			AddRootParameter(Layout);
+		}
 
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC RootSignatureDesc;
 		RootSignatureDesc.Init_1_1(

@@ -678,6 +678,50 @@ namespace FW
 		}
 	}
 
+	void SAssetView::RefreshAssetThumbnail(const FString& InAssetPath)
+	{
+		TSharedPtr<AssetViewAssetItem> TargetItem;
+		for (const TSharedRef<AssetViewItem>& Item : AssetViewItems)
+		{
+			if (Item->GetPath() == InAssetPath && Item->IsOfType<AssetViewAssetItem>())
+			{
+				TargetItem = StaticCastSharedRef<AssetViewAssetItem>(Item);
+				break;
+			}
+		}
+
+		if (!TargetItem.IsValid())
+		{
+			return;
+		}
+
+		AssetManager& AM = TSingleton<AssetManager>::Get();
+		if (TOptional<FGuid> Id = AM.TryGetGuid(InAssetPath))
+		{
+			AM.RemoveAssetThumbnail(*Id);
+		}
+
+		AM.AsyncLoadAssetByPath<AssetObject>(InAssetPath,
+			[this, WeakItem = TWeakPtr<AssetViewAssetItem>(TargetItem), Path = InAssetPath](AssetPtr<AssetObject> Asset) {
+				TSharedPtr<AssetViewAssetItem> Pinned = WeakItem.Pin();
+				if (!Pinned.IsValid() || Pinned->GetPath() != Path || !Asset)
+				{
+					return;
+				}
+
+				if (GpuTexture* Thumbnail = Asset->GetThumbnail())
+				{
+					Pinned->SetAssetThumbnail(Thumbnail);
+				}
+				else
+				{
+					Pinned->SetAssetImage(Asset->GetImage());
+				}
+
+				AssetTileView->RequestListRefresh();
+			});
+	}
+
 	void SAssetView::SetAssetIcon(TSharedRef<AssetViewAssetItem> ViewItem)
 	{
 		TOptional<FGuid> Id = TSingleton<AssetManager>::Get().TryGetGuid(ViewItem->GetPath());

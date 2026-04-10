@@ -11,33 +11,19 @@ namespace FW
         , IsViewportDirty(false)
 		, IsScissorRectDirty(false)
         , IsVertexBufferDirty(false)
-        , IsBindGroup0Dirty(false)
-        , IsBindGroup1Dirty(false)
-        , IsBindGroup2Dirty(false)
-        , IsBindGroup3Dirty(false)
+        , IsBindGroupDirty{}
         , CurrentRenderPipelineState(nullptr)
         , CurrentIndexBuffer(nullptr)
 		, CurrentIndexFormat(GpuFormat::R16_UINT)
         , CurrentIndexOffset(0)
-        , CurrentBindGroup0(nullptr)
-        , CurrentBindGroup1(nullptr)
-        , CurrentBindGroup2(nullptr)
-        , CurrentBindGroup3(nullptr)
         , RenderPassDesc(MoveTemp(InRenderPassDesc))
     {
 	}
 
     MtlComputeStateCache::MtlComputeStateCache()
         : IsComputePipelineDirty(false)
-        , IsBindGroup0Dirty(false)
-        , IsBindGroup1Dirty(false)
-        , IsBindGroup2Dirty(false)
-        , IsBindGroup3Dirty(false)
+        , IsBindGroupDirty{}
         , CurrentComputePipelineState(nullptr)
-        , CurrentBindGroup0(nullptr)
-        , CurrentBindGroup1(nullptr)
-        , CurrentBindGroup2(nullptr)
-        , CurrentBindGroup3(nullptr)
     {}
 
     void MtlRenderStateCache::SetPipeline(MetalRenderPipelineState* InPipelineState)
@@ -98,23 +84,16 @@ namespace FW
 		}
 	}
 
-	void MtlRenderStateCache::SetBindGroups(MetalBindGroup* InGroup0, MetalBindGroup* InGroup1, MetalBindGroup* InGroup2, MetalBindGroup* InGroup3)
+	void MtlRenderStateCache::SetBindGroups(const TArray<MetalBindGroup*>& InGroups)
     {
-        if (InGroup0 != CurrentBindGroup0) {
-            CurrentBindGroup0 = InGroup0;
-            IsBindGroup0Dirty = true;
-        }
-        if (InGroup1 != CurrentBindGroup1) {
-            CurrentBindGroup1 = InGroup1;
-            IsBindGroup1Dirty = true;
-        }
-        if (InGroup2 != CurrentBindGroup2) {
-            CurrentBindGroup2 = InGroup2;
-            IsBindGroup2Dirty = true;
-        }
-        if (InGroup3 != CurrentBindGroup3) {
-            CurrentBindGroup3 = InGroup3;
-            IsBindGroup3Dirty = true;;
+        for (MetalBindGroup* Group : InGroups)
+        {
+            if (!Group) continue;
+            int32 Slot = Group->GetLayout()->GetGroupNumber();
+            if (Group != CurrentBindGroups[Slot]) {
+                CurrentBindGroups[Slot] = Group;
+                IsBindGroupDirty[Slot] = true;
+            }
         }
     }
 
@@ -184,26 +163,14 @@ namespace FW
             IsVertexBufferDirty = false;
         }
         
-        if(CurrentBindGroup0 && IsBindGroup0Dirty) 
-		{ 
-			CurrentBindGroup0->Apply(RenderCommandEncoder);
-            IsBindGroup0Dirty = false;
-		}
-        if(CurrentBindGroup1 && IsBindGroup1Dirty)
-		{ 
-			CurrentBindGroup1->Apply(RenderCommandEncoder);
-            IsBindGroup1Dirty = false;
-		}
-		if(CurrentBindGroup2 && IsBindGroup2Dirty)
-		{ 
-			CurrentBindGroup2->Apply(RenderCommandEncoder);
-            IsBindGroup2Dirty = false;
-		}
-        if(CurrentBindGroup3 && IsBindGroup3Dirty)
-		{ 
-			CurrentBindGroup3->Apply(RenderCommandEncoder);
-            IsBindGroup3Dirty = false;
-		}
+        for (int32 i = 0; i < GpuResourceLimit::MaxBindableBingGroupNum; ++i)
+        {
+            if (CurrentBindGroups[i] && IsBindGroupDirty[i])
+            {
+                CurrentBindGroups[i]->Apply(RenderCommandEncoder);
+                IsBindGroupDirty[i] = false;
+            }
+        }
     }
 
     void MtlComputeStateCache::ApplyComputeState(MTL::ComputeCommandEncoder* ComputeCommandEncoder)
@@ -216,26 +183,14 @@ namespace FW
             IsComputePipelineDirty = false;
         }
 
-        if(CurrentBindGroup0 && IsBindGroup0Dirty) 
-		{ 
-			CurrentBindGroup0->Apply(ComputeCommandEncoder);
-            IsBindGroup0Dirty = false;
-		}
-        if(CurrentBindGroup1 && IsBindGroup1Dirty)
-		{ 
-			CurrentBindGroup1->Apply(ComputeCommandEncoder);
-            IsBindGroup1Dirty = false;
-		}
-		if(CurrentBindGroup2 && IsBindGroup2Dirty)
-		{ 
-			CurrentBindGroup2->Apply(ComputeCommandEncoder);
-            IsBindGroup2Dirty = false;
-		}
-        if(CurrentBindGroup3 && IsBindGroup3Dirty)
-		{ 
-			CurrentBindGroup3->Apply(ComputeCommandEncoder);
-            IsBindGroup3Dirty = false;
-		}
+        for (int32 i = 0; i < GpuResourceLimit::MaxBindableBingGroupNum; ++i)
+        {
+            if (CurrentBindGroups[i] && IsBindGroupDirty[i])
+            {
+                CurrentBindGroups[i]->Apply(ComputeCommandEncoder);
+                IsBindGroupDirty[i] = false;
+            }
+        }
     }
 
     void MtlComputeStateCache::SetPipeline(MetalComputePipelineState* InPipelineState)
@@ -247,23 +202,16 @@ namespace FW
         }
     }
 
-    void MtlComputeStateCache::SetBindGroups(MetalBindGroup* InGroup0, MetalBindGroup* InGroup1, MetalBindGroup* InGroup2, MetalBindGroup* InGroup3)
+    void MtlComputeStateCache::SetBindGroups(const TArray<MetalBindGroup*>& InGroups)
     {
-        if (InGroup0 != CurrentBindGroup0) {
-            CurrentBindGroup0 = InGroup0;
-            IsBindGroup0Dirty = true;
-        }
-        if (InGroup1 != CurrentBindGroup1) {
-            CurrentBindGroup1 = InGroup1;
-            IsBindGroup1Dirty = true;
-        }
-        if (InGroup2 != CurrentBindGroup2) {
-            CurrentBindGroup2 = InGroup2;
-            IsBindGroup2Dirty = true;
-        }
-        if (InGroup3 != CurrentBindGroup3) {
-            CurrentBindGroup3 = InGroup3;
-            IsBindGroup3Dirty = true;;
+        for (MetalBindGroup* Group : InGroups)
+        {
+            if (!Group) continue;
+            int32 Slot = Group->GetLayout()->GetGroupNumber();
+            if (Group != CurrentBindGroups[Slot]) {
+                CurrentBindGroups[Slot] = Group;
+                IsBindGroupDirty[Slot] = true;
+            }
         }
     }
                                        
@@ -311,14 +259,14 @@ namespace FW
 		StateCache.SetScissorRect(MoveTemp(ScissorRect));
 	}
 
-    void MtlRenderPassRecorder::SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)
+    void MtlRenderPassRecorder::SetBindGroups(const TArray<GpuBindGroup*>& BindGroups)
     {
-        StateCache.SetBindGroups(
-            static_cast<MetalBindGroup *>(BindGroup0),
-            static_cast<MetalBindGroup *>(BindGroup1),
-            static_cast<MetalBindGroup *>(BindGroup2),
-            static_cast<MetalBindGroup *>(BindGroup3)
-        );
+        TArray<MetalBindGroup*> MtlBindGroups;
+        for (GpuBindGroup* Group : BindGroups)
+        {
+            MtlBindGroups.Add(static_cast<MetalBindGroup*>(Group));
+        }
+        StateCache.SetBindGroups(MtlBindGroups);
     }
 
     void MtlComputePassRecorder::Dispatch(uint32 ThreadGroupCountX, uint32 ThreadGroupCountY, uint32 ThreadGroupCountZ)
@@ -335,14 +283,14 @@ namespace FW
         StateCache.SetPipeline(static_cast<MetalComputePipelineState*>(InPipelineState));
     }
 
-    void MtlComputePassRecorder::SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)
+    void MtlComputePassRecorder::SetBindGroups(const TArray<GpuBindGroup*>& BindGroups)
     {
-        StateCache.SetBindGroups(
-            static_cast<MetalBindGroup *>(BindGroup0),
-            static_cast<MetalBindGroup *>(BindGroup1),
-            static_cast<MetalBindGroup *>(BindGroup2),
-            static_cast<MetalBindGroup *>(BindGroup3)
-        );
+        TArray<MetalBindGroup*> MtlBindGroups;
+        for (GpuBindGroup* Group : BindGroups)
+        {
+            MtlBindGroups.Add(static_cast<MetalBindGroup*>(Group));
+        }
+        StateCache.SetBindGroups(MtlBindGroups);
     }
 
     GpuComputePassRecorder* MtlCmdRecorder::BeginComputePass(const FString& PassName)

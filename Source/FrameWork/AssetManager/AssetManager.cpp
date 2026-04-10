@@ -16,32 +16,34 @@ namespace FW
 		{
 			if (ManagedExts.Contains(FPaths::GetExtension(FileName)))
 			{
-                FGuid Guid = ReadAssetGuidInDisk(FileName);
-                GuidToPath.Add(Guid, FileName);
+				AssetHeader Header = ReadAssetHeaderInDisk(FileName);
+				GuidToPath.Add(Header.Guid, FileName);
+				RegisterAssetDependencies(Header.Guid, Header.DependencyGuids);
 			}
 		
 		}
 	}
 
-    FGuid AssetManager::ReadAssetGuidInDisk(const FString& InPath)
+	AssetHeader AssetManager::ReadAssetHeaderInDisk(const FString& InPath)
     {
-        //ps: Guid must be first entry in the asset binary.
         TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*InPath));
-        FGuid Guid;
-        *Ar << Guid;
-        return Guid;
+		AssetHeader Header;
+		*Ar << Header;
+		return Header;
     }
 
 	void AssetManager::UpdateGuidToPath(const FString& InPath)
 	{
-        FGuid Guid = ReadAssetGuidInDisk(InPath);
-        GuidToPath.FindOrAdd(Guid) = InPath;
+		AssetHeader Header = ReadAssetHeaderInDisk(InPath);
+		GuidToPath.FindOrAdd(Header.Guid) = InPath;
+		RegisterAssetDependencies(Header.Guid, Header.DependencyGuids);
 	}
 
     void AssetManager::RemoveGuidToPath(const FString& InPath)
     {
         FGuid Guid = TSingleton<AssetManager>::Get().GetGuid(InPath);
         GuidToPath.Remove(Guid);
+		RegisterAssetDependencies(Guid, {});
 
 		RemoveAssetThumbnail(Guid);
     }
@@ -99,7 +101,7 @@ namespace FW
 		Assets.Empty();
         GuidToPath.Empty();
 		AssetThumbnailPool.Empty();
-		
+		AssetDependents.Empty();
 	}
 
 	void AssetManager::DestroyAsset(const FString& InAssetPath)
@@ -126,6 +128,32 @@ namespace FW
             ManageredExts.Add(CurAssetObject->FileExtension());
         });
 		return ManageredExts;
+	}
+
+	void AssetManager::RegisterAssetDependencies(const FGuid& DependentGuid, const TArray<FGuid>& DependencyGuids)
+	{
+		for (auto& [Guid, Dependents] : AssetDependents)
+		{
+			Dependents.Remove(DependentGuid);
+		}
+
+		for (const FGuid& DependencyGuid : DependencyGuids)
+		{
+			if (DependencyGuid.IsValid())
+			{
+				AssetDependents.FindOrAdd(DependencyGuid).Add(DependentGuid);
+			}
+		}
+	}
+
+	TSet<FGuid> AssetManager::GetAssetDependents(const FGuid& DependencyGuid) const
+	{
+		if (const TSet<FGuid>* Dependents = AssetDependents.Find(DependencyGuid))
+		{
+			return *Dependents;
+		}
+
+		return {};
 	}
 
 }

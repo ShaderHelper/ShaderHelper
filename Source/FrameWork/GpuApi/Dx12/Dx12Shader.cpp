@@ -7,7 +7,6 @@
 
 #include <Misc/FileHelper.h>
 #include <stdexcept>
-#include <Misc/CRC.h>
 namespace FW
 {
 	Dx12Shader::Dx12Shader(const GpuShaderFileDesc& Desc)
@@ -70,69 +69,129 @@ namespace FW
 				.Type = BType
 			});
 
+			if (BType == BindingType::UniformBuffer)
+			{
+				GpuShaderLayoutBinding& LayoutBinding = ShaderLayoutBindings.Last();
+				ID3D12ShaderReflectionConstantBuffer* CbReflection = Reflection->GetConstantBufferByName(BindDesc.Name);
+				D3D12_SHADER_BUFFER_DESC CbDesc;
+				if (CbReflection && SUCCEEDED(CbReflection->GetDesc(&CbDesc)))
+				{
+					for (uint32 VarIdx = 0; VarIdx < CbDesc.Variables; VarIdx++)
+					{
+						ID3D12ShaderReflectionVariable* VarReflection = CbReflection->GetVariableByIndex(VarIdx);
+						D3D12_SHADER_VARIABLE_DESC VarDesc;
+						if (SUCCEEDED(VarReflection->GetDesc(&VarDesc)))
+						{
+							ID3D12ShaderReflectionType* TypeReflection = VarReflection->GetType();
+							D3D12_SHADER_TYPE_DESC TypeDesc;
+							FString Type;
+							if (TypeReflection && SUCCEEDED(TypeReflection->GetDesc(&TypeDesc)))
+							{
+								if (TypeDesc.Class == D3D_SVC_MATRIX_COLUMNS || TypeDesc.Class == D3D_SVC_MATRIX_ROWS)
+								{
+									Type = FString::Printf(TEXT("float%dx%d"), TypeDesc.Rows, TypeDesc.Columns);
+								}
+								else if (TypeDesc.Class == D3D_SVC_VECTOR)
+								{
+									Type = FString::Printf(TEXT("float%d"), TypeDesc.Columns);
+								}
+								else if (TypeDesc.Class == D3D_SVC_SCALAR)
+								{
+									switch (TypeDesc.Type)
+									{
+									case D3D_SVT_FLOAT: Type = TEXT("float"); break;
+									case D3D_SVT_INT: Type = TEXT("int"); break;
+									case D3D_SVT_UINT: Type = TEXT("uint"); break;
+									default: Type = TEXT("unknown"); break;
+									}
+								}
+							}
+
+							LayoutBinding.UbMembers.Add({
+								.Name = VarDesc.Name,
+								.Type = Type,
+								.Offset = VarDesc.StartOffset,
+								.Size = VarDesc.Size,
+							});
+						}
+					}
+				}
+			}
+
 		}
 		return ShaderLayoutBindings;
 	}
 
-	uint32 Dx12Shader::ComputeSourceHash(const TArray<FString>& ExtraArgs) const
+	TArray<GpuShaderVertexInput> Dx12Shader::GetVertexInputs() const
 	{
-		// Include processed source, entry point, shader type, and extra args in hash
-		FString HashInput = ProcessedSourceText + EntryPoint + FString::FromInt((int)Type);
-		for (const FString& Arg : ExtraArgs)
+		if (ShaderLanguage == GpuShaderLanguage::GLSL)
 		{
-			HashInput += Arg;
-		}
-		return FCrc::StrCrc32(*HashInput);
-	}
-
-	FString Dx12Shader::GetCacheFilePath(const TArray<FString>& ExtraArgs) const
-	{
-		uint32 Hash = ComputeSourceHash(ExtraArgs);
-		FString CacheFileName = FString::Printf(TEXT("%s_%08X.dxil"), *ShaderName, Hash);
-		return PathHelper::SavedShaderDir() / TEXT("Cache") / CacheFileName;
-	}
-
-	bool Dx12Shader::TryLoadCachedByteCode(const TArray<FString>& ExtraArgs)
-	{
-		FString CachePath = GetCacheFilePath(ExtraArgs);
-		if (!IFileManager::Get().FileExists(*CachePath))
-		{
-			return false;
+			return GpuShader::GetVertexInputs();
 		}
 
-		TArray<uint8> CachedData;
-		if (!FFileHelper::LoadFileToArray(CachedData, *CachePath))
+		TArray<GpuShaderVertexInput> VertexInputs;
+		if (Type != ShaderType::VertexShader || !ByteCode.IsValid())
 		{
-			return false;
+			return VertexInputs;
 		}
 
-		if (CachedData.Num() == 0)
+		TRefCountPtr<ID3D12ShaderReflection> Reflection;
+		DxcBuffer DxilBuffer{.Ptr = ByteCode->GetBufferPointer(), .Size = ByteCode->GetBufferSize()};
+		GShaderCompiler.CompilerUitls->CreateReflection(&DxilBuffer, IID_PPV_ARGS(Reflection.GetInitReference()));
+		D3D12_SHADER_DESC ShaderDesc;
+		Reflection->GetDesc(&ShaderDesc);
+
+		for (uint32 Index = 0; Index < ShaderDesc.InputParameters; Index++)
 		{
-			return false;
+			D3D12_SIGNATURE_PARAMETER_DESC ParamDesc;
+			Reflection->GetInputParameterDesc(Index, &ParamDesc);
+
+			// Filter out system values (SV_VertexID, SV_InstanceID, etc.)
+			if (ParamDesc.SystemValueType != D3D_NAME_UNDEFINED)
+			{
+				continue;
+			}
+
+			// Determine component count from Mask
+			uint32 ComponentCount = 0;
+			uint32 Mask = ParamDesc.Mask;
+			while (Mask)
+			{
+				ComponentCount += (Mask & 1);
+				Mask >>= 1;
+			}
+
+			FString TypeStr;
+			switch (ParamDesc.ComponentType)
+			{
+			case D3D_REGISTER_COMPONENT_FLOAT32:
+				TypeStr = ComponentCount > 1 ? FString::Printf(TEXT("float%d"), ComponentCount) : TEXT("float");
+				break;
+			case D3D_REGISTER_COMPONENT_SINT32:
+				TypeStr = ComponentCount > 1 ? FString::Printf(TEXT("int%d"), ComponentCount) : TEXT("int");
+				break;
+			case D3D_REGISTER_COMPONENT_UINT32:
+				TypeStr = ComponentCount > 1 ? FString::Printf(TEXT("uint%d"), ComponentCount) : TEXT("uint");
+				break;
+			default:
+				TypeStr = TEXT("unknown");
+				break;
+			}
+
+			GpuShaderVertexInput Input;
+			Input.Location = ParamDesc.Register;
+			Input.SemanticName = ParamDesc.SemanticName;
+			Input.SemanticIndex = ParamDesc.SemanticIndex;
+			Input.Type = TypeStr;
+
+			VertexInputs.Add(MoveTemp(Input));
 		}
 
-		// Create a DXC blob from cached data
-		TRefCountPtr<IDxcBlobEncoding> BlobEncoding;
-		if (FAILED(GShaderCompiler.CompilerUitls->CreateBlob(
-			CachedData.GetData(), CachedData.Num(), DXC_CP_ACP, BlobEncoding.GetInitReference())))
-		{
-			return false;
-		}
+		VertexInputs.Sort([](const GpuShaderVertexInput& A, const GpuShaderVertexInput& B) {
+			return A.Location < B.Location;
+		});
 
-		ByteCode = BlobEncoding;
-		return true;
-	}
-
-	void Dx12Shader::SaveByteCodeToCache(const TArray<FString>& ExtraArgs) const
-	{
-		if (!ByteCode.IsValid())
-		{
-			return;
-		}
-
-		FString CachePath = GetCacheFilePath(ExtraArgs);
-		TArray<uint8> BinaryData{ (uint8*)ByteCode->GetBufferPointer(), (int32)ByteCode->GetBufferSize() };
-		FFileHelper::SaveArrayToFile(BinaryData, *CachePath);
+		return VertexInputs;
 	}
 
 	class ShIncludeHandler final : public IDxcIncludeHandler
@@ -217,70 +276,6 @@ namespace FW
 		std::atomic<ULONG> RefCount = 0;
 	};
 
-	void CleanupShaderCache(int32 MaxAgeDays, int64 MaxTotalSizeBytes)
-	{
-		FString CacheDir = PathHelper::SavedShaderDir() / TEXT("Cache");
-		if (!IFileManager::Get().DirectoryExists(*CacheDir))
-		{
-			return;
-		}
-
-		// Collect all .dxil cache files with their info
-		struct CacheFileInfo
-		{
-			FString Path;
-			FDateTime ModTime;
-			int64 Size;
-		};
-		TArray<CacheFileInfo> CacheFiles;
-		int64 TotalSize = 0;
-
-		FDateTime Now = FDateTime::Now();
-		FTimespan MaxAge = FTimespan::FromDays(MaxAgeDays);
-
-		IFileManager::Get().IterateDirectory(*CacheDir, [&](const TCHAR* FilePath, bool bIsDirectory) -> bool
-		{
-			if (!bIsDirectory && FPaths::GetExtension(FilePath) == TEXT("dxil"))
-			{
-				FFileStatData StatData = IFileManager::Get().GetStatData(FilePath);
-				if (StatData.bIsValid)
-				{
-					// Delete files older than MaxAgeDays
-					if (Now - StatData.ModificationTime > MaxAge)
-					{
-						IFileManager::Get().Delete(FilePath);
-					}
-					else
-					{
-						CacheFiles.Add({ FilePath, StatData.ModificationTime, StatData.FileSize });
-						TotalSize += StatData.FileSize;
-					}
-				}
-			}
-			return true;
-		});
-
-		// If total size exceeds limit, delete oldest files until under limit
-		if (TotalSize > MaxTotalSizeBytes)
-		{
-			// Sort by modification time, oldest first
-			CacheFiles.Sort([](const CacheFileInfo& A, const CacheFileInfo& B)
-			{
-				return A.ModTime < B.ModTime;
-			});
-
-			for (const CacheFileInfo& FileInfo : CacheFiles)
-			{
-				if (TotalSize <= MaxTotalSizeBytes)
-				{
-					break;
-				}
-				IFileManager::Get().Delete(*FileInfo.Path);
-				TotalSize -= FileInfo.Size;
-			}
-		}
-	}
-
 	DxcCompiler::DxcCompiler()
 	 {
 		 DxCheck(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(Compiler.GetInitReference())));
@@ -310,15 +305,6 @@ namespace FW
 
 	 bool DxcCompiler::Compile(TRefCountPtr<Dx12Shader> InShader, FString& OutErrorInfo, FString& OutWarnInfo, const TArray<FString>& ExtraArgs) const
 	 {
-		 // Try to load from cache first (skip for debug SPV generation or when SkipCache is set)
-		 if (!EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging | GpuShaderCompilerFlag::SkipCache | GpuShaderCompilerFlag::CompileFromSpvCode))
-		 {
-			 if (InShader->TryLoadCachedByteCode(ExtraArgs))
-			 {
-				 return true;
-			 }
-		 }
-
 		 FString ShaderName = InShader->GetShaderName();
 		 FString HlslSource;
 		 FString EntryPoint = InShader->GetEntryPoint();
@@ -552,8 +538,6 @@ namespace FW
 				else
 				{
 					InShader->SetCompilationResult(ShaderBlob);
-					// Save compiled bytecode to cache for future reuse
-					InShader->SaveByteCodeToCache(ExtraArgs);
 #if DEBUG_SHADER
 					TRefCountPtr<IDxcBlob> PdbBlob;
 					TRefCountPtr<IDxcBlobUtf16> PdbNameBlob;

@@ -29,7 +29,7 @@ namespace SH
 		void Serialize(FArchive& Ar) override;
 		void PostLoad() override;
 		TSharedPtr<SWidget> ExtraNodeWidget() override;
-		TArray<TSharedRef<FW::PropertyData>>* GetPropertyDatas() override;
+		TArray<TSharedRef<FW::PropertyData>> GeneratePropertyDatas() override;
 		FSlateColor GetNodeColor() const override { return FLinearColor{ 0.27f, 0.13f, 0.0f }; }
 		FW::ExecRet Exec(FW::GraphExecContext& Context) override;
 		ShaderToyPassNode* GetPassNode();

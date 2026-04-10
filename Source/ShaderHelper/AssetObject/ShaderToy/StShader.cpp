@@ -1,6 +1,6 @@
 #include "CommonHeader.h"
 #include "StShader.h"
-#include "ShaderHeader.h"
+#include "AssetObject/ShaderHeader.h"
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "Common/Path/PathHelper.h"
 #include "App/App.h"
@@ -96,9 +96,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 			},
         });
 		FString ErrorInfo, WarnInfo;
-		Shader->CompilerFlag |= GpuShaderCompilerFlag::SkipCache;
 		bCompilationSucceed = GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo);
-		Shader->CompilerFlag &= ~GpuShaderCompilerFlag::SkipCache;
     }
 
 	GpuShader* StShader::GetVertexShader()
@@ -281,7 +279,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
         CustomUniformBufferBuilder = NewCustomUniformBufferBuilder;
         CustomBindGroupLayoutBuilder = NewCustomBindGroupLayoutBuilder;
         
-        OnRefreshBuilder.Broadcast();
+        OnShaderRefreshed.Broadcast();
     }
 
     bool StShader::HasBindingName(const FString& InName)
@@ -539,6 +537,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 	}
 	void StShader::PostPropertyChanged(FW::PropertyData* InProperty)
 	{
+        ShObject::PostPropertyChanged(InProperty);
 		if (InProperty->IsOfType<PropertyEnumItem>() && InProperty->GetDisplayName().EqualTo(LOCALIZATION("Language")))
 		{
 			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
@@ -557,20 +556,16 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 			FString DisplayName = InProperty->GetDisplayName().ToString();
 			if (DisplayName.StartsWith("iChannel"))
 			{
-				OnRefreshBuilder.Broadcast();
-				MarkDirty();
+				OnShaderRefreshed.Broadcast();
 			}
 		}
 	}
 
-	TArray<TSharedRef<PropertyData>>* StShader::GetPropertyDatas()
+	TArray<TSharedRef<PropertyData>> StShader::GeneratePropertyDatas()
     {
-		if (PropertyDatas.IsEmpty())
-		{
-			ShObject::GetPropertyDatas();
-			PropertyDatas.Append(PropertyDatasFromBinding());
-		}
-		return &PropertyDatas;
+		TArray<TSharedRef<PropertyData>> Result = ShObject::GeneratePropertyDatas();
+		Result.Append(PropertyDatasFromBinding());
+		return Result;
     }
 
 }

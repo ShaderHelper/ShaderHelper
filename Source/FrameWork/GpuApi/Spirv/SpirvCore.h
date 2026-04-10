@@ -125,7 +125,10 @@ namespace FW
 
 	enum class SpvBuiltIn
 	{
+		Position = 0,
 		FragCoord = 15,
+		VertexIndex = 42,
+		InstanceIndex = 43,
 	};
 
 	enum class SpvExecutionModel
@@ -465,12 +468,71 @@ namespace FW
 		{
 			return "SamplerState";
 		}
-		AUX::Unreachable();
+		else if (Type->GetKind() == SpvTypeKind::Array)
+		{
+			SpvArrayType* ArrayType = static_cast<SpvArrayType*>(Type);
+			return GetHlslTypeStr(ArrayType->ElementType) + FString::Printf(TEXT("[%d]"), ArrayType->Length);
+		}
+		return "";
 	};
 
 	inline FString GetGlslTypeStr(SpvType* Type)
 	{
-		if (Type->GetKind() == SpvTypeKind::Image)
+		if (Type->GetKind() == SpvTypeKind::Float)
+		{
+			return "float";
+		}
+		else if (Type->GetKind() == SpvTypeKind::Bool)
+		{
+			return "bool";
+		}
+		else if (Type->GetKind() == SpvTypeKind::Integer)
+		{
+			SpvIntegerType* IntegerType = static_cast<SpvIntegerType*>(Type);
+			if (IntegerType->GetWidth() == 64)
+			{
+				return IntegerType->IsSigend() ? "int64_t" : "uint64_t";
+			}
+			return IntegerType->IsSigend() ? "int" : "uint";
+		}
+		else if (Type->GetKind() == SpvTypeKind::Vector)
+		{
+			SpvVectorType* VectorType = static_cast<SpvVectorType*>(Type);
+			const FString ElementTypeStr = GetGlslTypeStr(VectorType->ElementType);
+			if (ElementTypeStr == TEXT("float"))
+			{
+				return FString::Printf(TEXT("vec%d"), VectorType->ElementCount);
+			}
+			if (ElementTypeStr == TEXT("bool"))
+			{
+				return FString::Printf(TEXT("bvec%d"), VectorType->ElementCount);
+			}
+			if (ElementTypeStr == TEXT("int"))
+			{
+				return FString::Printf(TEXT("ivec%d"), VectorType->ElementCount);
+			}
+			if (ElementTypeStr == TEXT("uint"))
+			{
+				return FString::Printf(TEXT("uvec%d"), VectorType->ElementCount);
+			}
+			return ElementTypeStr + FString::Printf(TEXT("%d"), VectorType->ElementCount);
+		}
+		else if (Type->GetKind() == SpvTypeKind::Matrix)
+		{
+			SpvMatrixType* MatrixType = static_cast<SpvMatrixType*>(Type);
+			SpvVectorType* ElementType = MatrixType->ElementType;
+			const FString BasicTypeStr = GetGlslTypeStr(ElementType->ElementType);
+			if (BasicTypeStr == TEXT("float"))
+			{
+				if (MatrixType->ElementCount == ElementType->ElementCount)
+				{
+					return FString::Printf(TEXT("mat%d"), MatrixType->ElementCount);
+				}
+				return FString::Printf(TEXT("mat%dx%d"), MatrixType->ElementCount, ElementType->ElementCount);
+			}
+			return BasicTypeStr + FString::Printf(TEXT("%dx%d"), MatrixType->ElementCount, ElementType->ElementCount);
+		}
+		else if (Type->GetKind() == SpvTypeKind::Image)
 		{
 			SpvImageType* ImageType = static_cast<SpvImageType*>(Type);
 			if (ImageType->Sampled == 2)
@@ -486,7 +548,17 @@ namespace FW
 		{
 			return "sampler";
 		}
-		AUX::Unreachable();
+		else if (Type->GetKind() == SpvTypeKind::Array)
+		{
+			SpvArrayType* ArrayType = static_cast<SpvArrayType*>(Type);
+			return GetGlslTypeStr(ArrayType->ElementType) + FString::Printf(TEXT("[%d]"), ArrayType->Length);
+		}
+		return "";
+	}
+
+	inline FString GetTypeStr(SpvType* Type, GpuShaderLanguage Language)
+	{
+		return Language == GpuShaderLanguage::GLSL ? GetGlslTypeStr(Type) : GetHlslTypeStr(Type);
 	}
 
 	//Only valid for the type of the internal object,

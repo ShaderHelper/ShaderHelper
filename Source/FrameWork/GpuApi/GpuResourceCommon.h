@@ -5,7 +5,7 @@ namespace FW
 	namespace GpuResourceLimit
 	{
 		inline constexpr int32 MaxRenderTargetNum = 8; //follow dx12:D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT
-		inline constexpr int32 MaxBindableBingGroupNum = 4; //Only support 4 BindGroups to adapt some mobile devices.
+		inline constexpr int32 MaxBindableBingGroupNum = 8;
 		inline constexpr int32 MaxVertexBufferSlotNum = 16;
 	}
 

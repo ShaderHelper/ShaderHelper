@@ -30,11 +30,12 @@ namespace FW
 				if (bClear)
 				{
 					ObjectData = nullptr;
-					PropertyDatas = nullptr;
+					PropertyDatas.Empty();
 				}
-				else if(PropertyDatas)
+				else if(ObjectData.IsValid())
 				{
-					for (const auto& Data : *PropertyDatas)
+					PropertyDatas = ObjectData->GeneratePropertyDatas();
+					for (const auto& Data : PropertyDatas)
 					{
 						TryExpandItemRecursively(Data);
 					}
@@ -69,7 +70,7 @@ namespace FW
 	private:
         ObserverObjectPtr<ShObject> ObjectData;
         bool Locked = false;
-		TArray<TSharedRef<PropertyData>>* PropertyDatas;
+		TArray<TSharedRef<PropertyData>> PropertyDatas;
 		TSharedPtr<STreeView<TSharedRef<PropertyData>>> PropertyTree;
 		
 	};

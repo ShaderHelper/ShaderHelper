@@ -48,7 +48,8 @@ namespace FW
 	MeshData CreateQuad()
 	{
 		MeshData OutMeshData;
-		AppendFace(OutMeshData, Vector3f{ 0.0f, 0.0f, 1.0f }, Vector3f{ -0.5f, -0.5f, 0.0f }, Vector3f{ 0.5f, -0.5f, 0.0f }, Vector3f{ 0.5f, 0.5f, 0.0f }, Vector3f{ -0.5f, 0.5f, 0.0f });
+		AppendFace(OutMeshData, Vector3f{ 0.0f, 0.0f, 1.0f },
+			Vector3f{ 0.5f, 0.5f, 0.0f }, Vector3f{ -0.5f, 0.5f, 0.0f }, Vector3f{ -0.5f, -0.5f, 0.0f }, Vector3f{ 0.5f, -0.5f, 0.0f });
 		return OutMeshData;
 	}
 
@@ -127,7 +128,7 @@ namespace FW
 				const uint32 I1 = I0 + 1;
 				const uint32 I2 = I0 + RingVertexCount;
 				const uint32 I3 = I2 + 1;
-				OutMeshData.Indices.Append({ I0, I2, I1, I1, I2, I3 });
+				OutMeshData.Indices.Append({ I0, I1, I2, I1, I3, I2 });
 			}
 		}
 

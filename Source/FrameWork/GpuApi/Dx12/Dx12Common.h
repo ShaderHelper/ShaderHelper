@@ -2,7 +2,7 @@
 
 #ifndef USE_PIX
 //Pix or renderdoc may affect debug layer ouput, so disbale it by default
-    #define USE_PIX 1
+    #define USE_PIX 0
 #endif
 
 #include <Windows/PreWindowsApi.h>

@@ -34,21 +34,18 @@ namespace FW
 		return true;
 	}
 
-	bool ValidateSetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)
+	bool ValidateSetBindGroups(const TArray<GpuBindGroup*>& BindGroups)
 	{
-		auto ValidateBindGroupNumber = [](GpuBindGroup* BindGroup, BindingGroupSlot ExpectedSlot)
+		for (GpuBindGroup* Group : BindGroups)
 		{
-			if (BindGroup)
-			{
-				BindingGroupSlot GroupNumber = BindGroup->GetLayout()->GetGroupNumber();
-				if (GroupNumber != ExpectedSlot) {
-					SH_LOG(LogRhiValidation, Error, TEXT("SetBindGroups Error(Mismatched BindingGroupSlot) - BindGroup%d : (%d), Expected : (%d)"), ExpectedSlot, GroupNumber, ExpectedSlot);
-					return false;
-				}
+			if (!Group) continue;
+			BindingGroupSlot GroupNumber = Group->GetLayout()->GetGroupNumber();
+			if (GroupNumber < 0 || GroupNumber >= GpuResourceLimit::MaxBindableBingGroupNum) {
+				SH_LOG(LogRhiValidation, Error, TEXT("SetBindGroups Error(GroupNumber out of range) - BindGroup GroupNumber: (%d), MaxBindableBingGroupNum: (%d)"), GroupNumber, GpuResourceLimit::MaxBindableBingGroupNum);
+				return false;
 			}
-			return true;
-		};
-		return ValidateBindGroupNumber(BindGroup0, 0) && ValidateBindGroupNumber(BindGroup1, 1) && ValidateBindGroupNumber(BindGroup2, 2) && ValidateBindGroupNumber(BindGroup3, 3);
+		}
+		return true;
 	}
 
 	static bool ValidateBindGroupResource(BindingSlot Slot, const ResourceBinding& InResourceBinding, BindingType LayoutEntryType)
@@ -60,7 +57,7 @@ namespace FW
 			if (GroupEntryType != GpuResourceType::Buffer)
 			{
 				SH_LOG(LogRhiValidation, Error, TEXT("CreateBindGroup Error(Mismatched GpuResourceType)"
-					" - Slot%d : (%s), Expected : (Buffer)"), Slot, ANSI_TO_TCHAR(magic_enum::enum_name(GroupEntryType).data()));
+					" - Slot%d : (%s), Expected : (Buffer)"), Slot.SlotNum, ANSI_TO_TCHAR(magic_enum::enum_name(GroupEntryType).data()));
 				return false;
 			}
 			else
@@ -69,7 +66,7 @@ namespace FW
 				if (!EnumHasAllFlags(BufferUsage, GpuBufferUsage::Uniform))
 				{
 					SH_LOG(LogRhiValidation, Error, TEXT("CreateBindGroup Error(Mismatched GpuBufferUsage)"
-						" - Slot%d : (%s), Expected : (PersistentUniform or TemporaryUniform)"), Slot, ANSI_TO_TCHAR(magic_enum::enum_name(BufferUsage).data()));
+						" - Slot%d : (%s), Expected : (PersistentUniform or TemporaryUniform)"), Slot.SlotNum, ANSI_TO_TCHAR(magic_enum::enum_name(BufferUsage).data()));
 					return false;
 				}
 			}
@@ -90,7 +87,7 @@ namespace FW
 			else
 			{
 				SH_LOG(LogRhiValidation, Error, TEXT("CreateBindGroup Error(Missing BindingSlot) - Not find the slot : (%d)  Type: (%s)"), 
-					Slot, ANSI_TO_TCHAR(magic_enum::enum_name(LayoutBindingEntry.Type).data()));
+					Slot.SlotNum, ANSI_TO_TCHAR(magic_enum::enum_name(LayoutBindingEntry.Type).data()));
 				Valid = false;
 			}
 		}
@@ -104,7 +101,7 @@ namespace FW
         {
             if(Slots.Contains(Slot))
             {
-                SH_LOG(LogRhiValidation, Error, TEXT("CreateBindGroupLayout Error(Duplicated BindingSlot) -  slot detected: (%d)"), Slot);
+                SH_LOG(LogRhiValidation, Error, TEXT("CreateBindGroupLayout Error(Duplicated BindingSlot) -  slot detected: (%d)"), Slot.SlotNum);
                 return false;
             }
             Slots.Add(Slot);
@@ -114,13 +111,12 @@ namespace FW
         {
             if(LayoutBindingEntry.Type == BindingType::CombinedTextureSampler || LayoutBindingEntry.Type == BindingType::CombinedTextureCubeSampler)
             {
-                BindingSlot SamplerSlot = Slot + 1;
-                if(Slots.Contains(SamplerSlot))
+                int32 SamplerSlotNum = Slot.SlotNum + 1;
+                if(Slots.ContainsByPredicate([SamplerSlotNum](const BindingSlot& S) { return S.SlotNum == SamplerSlotNum; }))
                 {
-                    SH_LOG(LogRhiValidation, Error, TEXT("CreateBindGroupLayout Error(CombinedSampler slot conflict) - CombinedSampler at slot (%d) requires slot (%d) for its sampler, but slot (%d) is already occupied"), Slot, SamplerSlot, SamplerSlot);
+                    SH_LOG(LogRhiValidation, Error, TEXT("CreateBindGroupLayout Error(CombinedSampler slot conflict) - CombinedSampler at slot (%d) requires slot (%d) for its sampler, but slot (%d) is already occupied"), Slot.SlotNum, SamplerSlotNum, SamplerSlotNum);
                     return false;
                 }
-                Slots.Add(SamplerSlot);
             }
         }
         return true;
@@ -128,21 +124,18 @@ namespace FW
 
 	bool ValidateCreateRenderPipelineState(const GpuRenderPipelineStateDesc& InPipelineStateDesc)
 	{
-		auto ValidateBindGroupNumber = [](GpuBindGroupLayout* BindGroupLayout, BindingGroupSlot ExpectedSlot)
+		for (GpuBindGroupLayout* BindGroupLayout : InPipelineStateDesc.BindGroupLayouts)
 		{
 			if (BindGroupLayout)
 			{
 				BindingGroupSlot GroupNumber = BindGroupLayout->GetGroupNumber();
-				if (GroupNumber != ExpectedSlot) {
-					SH_LOG(LogRhiValidation, Error, TEXT("CreateRenderPipelineState Error(Mismatched BindingGroupSlot) - BindGroupLayout%d : (%d), Expected : (%d)"), ExpectedSlot, GroupNumber, ExpectedSlot);
+				if (GroupNumber < 0 || GroupNumber >= GpuResourceLimit::MaxBindableBingGroupNum) {
+					SH_LOG(LogRhiValidation, Error, TEXT("CreateRenderPipelineState Error(GroupNumber out of range) - BindGroupLayout GroupNumber: (%d), MaxBindableBingGroupNum: (%d)"), GroupNumber, GpuResourceLimit::MaxBindableBingGroupNum);
 					return false;
 				}
 			}
-			return true;
-		};
-		return ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout0, 0) && ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout1, 1)
-			&& ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout2, 2) && ValidateBindGroupNumber(InPipelineStateDesc.BindGroupLayout3, 3)
-			&& ValidateVertexLayout(InPipelineStateDesc.VertexLayout);
+		}
+		return ValidateVertexLayout(InPipelineStateDesc.VertexLayout);
 	}
 
 	bool ValidateBeginRenderPass(const GpuRenderPassDesc& InPassDesc)

@@ -15,6 +15,7 @@ namespace FW
 		std::unordered_map<SpvId, FString> DebugStrs;
 		std::unordered_map<SpvId, SpvId> DebugSources; //DebugSourceId -> FileOpStringId
 		std::unordered_map<SpvId, FString> Names; //VarId/TypeId etc. -> Name
+		std::unordered_map<SpvId, TMap<uint32, FString>> MemberNames; //StructTypeId -> (MemberIndex -> Name)
 		std::unordered_map<SpvId, TUniquePtr<SpvType>> Types;
 		std::unordered_map<SpvId, SpvObject> Constants;
 		std::unordered_map<SpvId, SpvPointer> GlobalPointers;
@@ -83,6 +84,7 @@ namespace FW
 		void Visit(const SpvOpTypeRuntimeArray* Inst) override;
 		void Visit(const SpvOpDecorate* Inst) override;
 		void Visit(const SpvOpMemberDecorate* Inst) override;
+		void Visit(const SpvOpMemberName* Inst) override;
 		void Visit(const SpvOpExecutionMode* Inst) override;
 		void Visit(const SpvOpName* Inst) override;
 		void Visit(const SpvOpString* Inst) override;

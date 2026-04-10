@@ -50,7 +50,6 @@ namespace FW
 			{
 				bDragging = true;
 				LastMousePos = (Vector2f)MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
-				return FReply::Handled();
 			}
 			return FReply::Unhandled();
 		});
@@ -144,7 +143,7 @@ namespace FW
 			.Targets = {
 				{ .TargetFormat = GpuFormat::B8G8R8A8_UNORM }
 			},
-			.BindGroupLayout0 = BindGroupLayout,
+			.BindGroupLayouts = { BindGroupLayout },
 			.VertexLayout = {
 				{
 					.ByteStride = sizeof(MeshVertex),
@@ -258,7 +257,7 @@ namespace FW
 			auto PassRecorder = CmdRecorder->BeginRenderPass(PassDesc, "ModelPreview");
 			{
 				PassRecorder->SetRenderPipelineState(Pipeline);
-				PassRecorder->SetBindGroups(BindGroup, nullptr, nullptr, nullptr);
+				PassRecorder->SetBindGroups({ BindGroup });
 				for (const MeshBuffers& Buffers : ModelAsset->GetGpuMeshes())
 				{
 					PassRecorder->SetVertexBuffer(0, Buffers.VertexBuffer);

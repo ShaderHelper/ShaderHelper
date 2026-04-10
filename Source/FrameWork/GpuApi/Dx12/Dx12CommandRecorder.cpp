@@ -63,15 +63,9 @@ namespace FW
 		, IsViewportDirty(false)
 		, IsScissorRectDirty(false)
 		, IsGraphicsRootSigDirty(false)
-		, IsGraphicsBindGroup0Dirty(false)
-		, IsGraphicsBindGroup1Dirty(false)
-		, IsGraphicsBindGroup2Dirty(false)
-		, IsGraphicsBindGroup3Dirty(false)
+		, IsGraphicsBindGroupDirty{}
 		, IsComputeRootSigDirty(false)
-		, IsComputeBindGroup0Dirty(false)
-		, IsComputeBindGroup1Dirty(false)
-		, IsComputeBindGroup2Dirty(false)
-		, IsComputeBindGroup3Dirty(false)
+		, IsComputeBindGroupDirty{}
 	{
 	}
 
@@ -93,24 +87,12 @@ namespace FW
 			IsComputeRootSigDirty = false;
 		}
 
-		if (CurrentComputeBindGroup0 && IsComputeBindGroup0Dirty) {
-			CurrentComputeBindGroup0->ApplyComputeBinding(InCmdList, CurrentComputeRootSignature);
-			IsComputeBindGroup0Dirty = false;
-		}
-
-		if (CurrentComputeBindGroup1 && IsComputeBindGroup1Dirty) {
-			CurrentComputeBindGroup1->ApplyComputeBinding(InCmdList, CurrentComputeRootSignature);
-			IsComputeBindGroup1Dirty = false;
-		}
-
-		if (CurrentComputeBindGroup2 && IsComputeBindGroup2Dirty) {
-			CurrentComputeBindGroup2->ApplyComputeBinding(InCmdList, CurrentComputeRootSignature);
-			IsComputeBindGroup2Dirty = false;
-		}
-
-		if (CurrentComputeBindGroup3 && IsComputeBindGroup3Dirty) {
-			CurrentComputeBindGroup3->ApplyComputeBinding(InCmdList, CurrentComputeRootSignature);
-			IsComputeBindGroup3Dirty = false;
+		for (int32 i = 0; i < GpuResourceLimit::MaxBindableBingGroupNum; ++i)
+		{
+			if (CurrentComputeBindGroups[i] && IsComputeBindGroupDirty[i]) {
+				CurrentComputeBindGroups[i]->ApplyComputeBinding(InCmdList, CurrentComputeRootSignature);
+				IsComputeBindGroupDirty[i] = false;
+			}
 		}
 
 	}
@@ -208,24 +190,12 @@ namespace FW
 			IsGraphicsRootSigDirty = false;
 		}
 
-		if (CurrentGraphicsBindGroup0 && IsGraphicsBindGroup0Dirty) {
-			CurrentGraphicsBindGroup0->ApplyDrawBinding(InCmdList, CurrentGraphicsRootSignature);
-			IsGraphicsBindGroup0Dirty = false;
-		}
-
-		if (CurrentGraphicsBindGroup1 && IsGraphicsBindGroup1Dirty) {
-			CurrentGraphicsBindGroup1->ApplyDrawBinding(InCmdList, CurrentGraphicsRootSignature);
-			IsGraphicsBindGroup1Dirty = false;
-		}
-
-		if (CurrentGraphicsBindGroup2 && IsGraphicsBindGroup2Dirty) {
-			CurrentGraphicsBindGroup2->ApplyDrawBinding(InCmdList, CurrentGraphicsRootSignature);
-			IsGraphicsBindGroup2Dirty = false;
-		}
-
-		if (CurrentGraphicsBindGroup3 && IsGraphicsBindGroup3Dirty) {
-			CurrentGraphicsBindGroup3->ApplyDrawBinding(InCmdList, CurrentGraphicsRootSignature);
-			IsGraphicsBindGroup3Dirty = false;
+		for (int32 i = 0; i < GpuResourceLimit::MaxBindableBingGroupNum; ++i)
+		{
+			if (CurrentGraphicsBindGroups[i] && IsGraphicsBindGroupDirty[i]) {
+				CurrentGraphicsBindGroups[i]->ApplyDrawBinding(InCmdList, CurrentGraphicsRootSignature);
+				IsGraphicsBindGroupDirty[i] = false;
+			}
 		}
 
 		if (IsRenderTargetDirty)
@@ -286,16 +256,10 @@ namespace FW
 		CurrentScissorRect.Reset();
 
 		CurrentGraphicsRootSignature = nullptr;
-		CurrentGraphicsBindGroup0 = nullptr;
-		CurrentGraphicsBindGroup1 = nullptr;
-		CurrentGraphicsBindGroup2 = nullptr;
-		CurrentGraphicsBindGroup3 = nullptr;
+		FMemory::Memzero(CurrentGraphicsBindGroups);
 
 		CurrentComputeRootSignature = nullptr;
-		CurrentComputeBindGroup0 = nullptr;
-		CurrentComputeBindGroup1 = nullptr;
-		CurrentComputeBindGroup2 = nullptr;
-		CurrentComputeBindGroup3 = nullptr;
+		FMemory::Memzero(CurrentComputeBindGroups);
 
 		CurrentRenderTargetViews.Empty();
 		LoadActions.Reset();
@@ -309,16 +273,10 @@ namespace FW
 		IsScissorRectDirty = false;
 
 		IsGraphicsRootSigDirty = false;
-		IsGraphicsBindGroup0Dirty = false;
-		IsGraphicsBindGroup1Dirty = false;
-		IsGraphicsBindGroup2Dirty = false;
-		IsGraphicsBindGroup3Dirty = false;
+		FMemory::Memzero(IsGraphicsBindGroupDirty);
 
 		IsComputeRootSigDirty = false;
-		IsComputeBindGroup0Dirty = false;
-		IsComputeBindGroup1Dirty = false;
-		IsComputeBindGroup2Dirty = false;
-		IsComputeBindGroup3Dirty = false;
+		FMemory::Memzero(IsComputeBindGroupDirty);
 
 	}
 
@@ -423,43 +381,29 @@ namespace FW
 		IsRenderTargetDirty = true;
 	}
 
-	void Dx12StateCache::SetGraphicsBindGroups(Dx12BindGroup* InGroup0, Dx12BindGroup* InGroup1, Dx12BindGroup* InGroup2, Dx12BindGroup* InGroup3)
+	void Dx12StateCache::SetGraphicsBindGroups(const TArray<Dx12BindGroup*>& InGroups)
 	{
-		if (InGroup0 != CurrentGraphicsBindGroup0) {
-			CurrentGraphicsBindGroup0 = InGroup0;
-			IsGraphicsBindGroup0Dirty = true;
-		}
-		if (InGroup1 != CurrentGraphicsBindGroup1) {
-			CurrentGraphicsBindGroup1 = InGroup1;
-			IsGraphicsBindGroup1Dirty = true;
-		}
-		if (InGroup2 != CurrentGraphicsBindGroup2) {
-			CurrentGraphicsBindGroup2 = InGroup2;
-			IsGraphicsBindGroup2Dirty = true;
-		}
-		if (InGroup3 != CurrentGraphicsBindGroup3) {
-			CurrentGraphicsBindGroup3 = InGroup3;
-			IsGraphicsBindGroup3Dirty = true;
+		for (Dx12BindGroup* Group : InGroups)
+		{
+			if (!Group) continue;
+			int32 Slot = Group->GetLayout()->GetGroupNumber();
+			if (Group != CurrentGraphicsBindGroups[Slot]) {
+				CurrentGraphicsBindGroups[Slot] = Group;
+				IsGraphicsBindGroupDirty[Slot] = true;
+			}
 		}
 	}
 
-	void Dx12StateCache::SetComputeBindGroups(Dx12BindGroup* InGroup0, Dx12BindGroup* InGroup1, Dx12BindGroup* InGroup2, Dx12BindGroup* InGroup3)
+	void Dx12StateCache::SetComputeBindGroups(const TArray<Dx12BindGroup*>& InGroups)
 	{
-		if (InGroup0 != CurrentComputeBindGroup0) {
-			CurrentComputeBindGroup0 = InGroup0;
-			IsComputeBindGroup0Dirty = true;
-		}
-		if (InGroup1 != CurrentComputeBindGroup1) {
-			CurrentComputeBindGroup1 = InGroup1;
-			IsComputeBindGroup1Dirty = true;
-		}
-		if (InGroup2 != CurrentComputeBindGroup2) {
-			CurrentComputeBindGroup2 = InGroup2;
-			IsComputeBindGroup2Dirty = true;
-		}
-		if (InGroup3 != CurrentComputeBindGroup3) {
-			CurrentComputeBindGroup3 = InGroup3;
-			IsComputeBindGroup3Dirty = true;
+		for (Dx12BindGroup* Group : InGroups)
+		{
+			if (!Group) continue;
+			int32 Slot = Group->GetLayout()->GetGroupNumber();
+			if (Group != CurrentComputeBindGroups[Slot]) {
+				CurrentComputeBindGroups[Slot] = Group;
+				IsComputeBindGroupDirty[Slot] = true;
+			}
 		}
 	}
 
@@ -572,22 +516,20 @@ namespace FW
 		StateCache.SetScissorRect(MoveTemp(ScissorRect));
 	}
 
-	void Dx12RenderPassRecorder::SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)
+	void Dx12RenderPassRecorder::SetBindGroups(const TArray<GpuBindGroup*>& BindGroups)
 	{
-		RootSignatureDesc RsDesc{
-		BindGroup0 ? static_cast<Dx12BindGroupLayout*>(BindGroup0->GetLayout()) : nullptr,
-		BindGroup1 ? static_cast<Dx12BindGroupLayout*>(BindGroup1->GetLayout()) : nullptr,
-		BindGroup2 ? static_cast<Dx12BindGroupLayout*>(BindGroup2->GetLayout()) : nullptr,
-		BindGroup3 ? static_cast<Dx12BindGroupLayout*>(BindGroup3->GetLayout()) : nullptr
-		};
+		TArray<GpuBindGroupLayout*> BindGroupLayouts;
+		TArray<Dx12BindGroup*> Dx12BindGroups;
+		for (GpuBindGroup* Group : BindGroups)
+		{
+			if (!Group) continue;
+			BindGroupLayouts.Add(Group->GetLayout());
+			Dx12BindGroups.Add(static_cast<Dx12BindGroup*>(Group));
+		}
 
-		Dx12BindGroup* Dx12BindGroup0 = static_cast<Dx12BindGroup*>(BindGroup0);
-		Dx12BindGroup* Dx12BindGroup1 = static_cast<Dx12BindGroup*>(BindGroup1);
-		Dx12BindGroup* Dx12BindGroup2 = static_cast<Dx12BindGroup*>(BindGroup2);
-		Dx12BindGroup* Dx12BindGroup3 = static_cast<Dx12BindGroup*>(BindGroup3);
-
+		RootSignatureDesc RsDesc{BindGroupLayouts};
 		StateCache.SetGraphicsRootSignature(Dx12RootSignatureManager::GetRootSignature(RsDesc));
-		StateCache.SetGraphicsBindGroups(Dx12BindGroup0, Dx12BindGroup1, Dx12BindGroup2, Dx12BindGroup3);
+		StateCache.SetGraphicsBindGroups(Dx12BindGroups);
 	}
 
 
@@ -602,22 +544,20 @@ namespace FW
 		StateCache.SetPipeline(static_cast<Dx12ComputePso*>(InPipelineState));
 	}
 
-	void Dx12ComputePassRecorder::SetBindGroups(GpuBindGroup* BindGroup0, GpuBindGroup* BindGroup1, GpuBindGroup* BindGroup2, GpuBindGroup* BindGroup3)
+	void Dx12ComputePassRecorder::SetBindGroups(const TArray<GpuBindGroup*>& BindGroups)
 	{
-		RootSignatureDesc RsDesc{
-		BindGroup0 ? static_cast<Dx12BindGroupLayout*>(BindGroup0->GetLayout()) : nullptr,
-		BindGroup1 ? static_cast<Dx12BindGroupLayout*>(BindGroup1->GetLayout()) : nullptr,
-		BindGroup2 ? static_cast<Dx12BindGroupLayout*>(BindGroup2->GetLayout()) : nullptr,
-		BindGroup3 ? static_cast<Dx12BindGroupLayout*>(BindGroup3->GetLayout()) : nullptr
-		};
+		TArray<GpuBindGroupLayout*> BindGroupLayouts;
+		TArray<Dx12BindGroup*> Dx12BindGroups;
+		for (GpuBindGroup* Group : BindGroups)
+		{
+			if (!Group) continue;
+			BindGroupLayouts.Add(Group->GetLayout());
+			Dx12BindGroups.Add(static_cast<Dx12BindGroup*>(Group));
+		}
 
-		Dx12BindGroup* Dx12BindGroup0 = static_cast<Dx12BindGroup*>(BindGroup0);
-		Dx12BindGroup* Dx12BindGroup1 = static_cast<Dx12BindGroup*>(BindGroup1);
-		Dx12BindGroup* Dx12BindGroup2 = static_cast<Dx12BindGroup*>(BindGroup2);
-		Dx12BindGroup* Dx12BindGroup3 = static_cast<Dx12BindGroup*>(BindGroup3);
-
+		RootSignatureDesc RsDesc{BindGroupLayouts};
 		StateCache.SetComputeRootSignature(Dx12RootSignatureManager::GetRootSignature(RsDesc));
-		StateCache.SetComputeBindGroups(Dx12BindGroup0, Dx12BindGroup1, Dx12BindGroup2, Dx12BindGroup3);
+		StateCache.SetComputeBindGroups(Dx12BindGroups);
 	}
 
 	GpuComputePassRecorder* Dx12CmdRecorder::BeginComputePass(const FString& PassName)

@@ -450,6 +450,37 @@ namespace FW
 				}))
 				{
 					ShaderBindingType = BindingType::UniformBuffer;
+					auto BlockNameIt = MetaContext.Names.find(Type->GetId());
+					if (BlockNameIt != MetaContext.Names.end())
+					{
+						ShaderLayoutBinding.Name = BlockNameIt->second;
+					}
+
+					auto MemberNamesIt = MetaContext.MemberNames.find(Type->GetId());
+					TArray<SpvDecoration> MemberDecorations;
+					MetaContext.Decorations.MultiFind(Type->GetId(), MemberDecorations);
+
+					for (int32 MemberIdx = 0; MemberIdx < StructType->MemberTypes.Num(); MemberIdx++)
+					{
+						GpuShaderUbMemberInfo MemberInfo;
+						if (MemberNamesIt != MetaContext.MemberNames.end() && MemberNamesIt->second.Contains(MemberIdx))
+						{
+							MemberInfo.Name = MemberNamesIt->second[MemberIdx];
+						}
+						MemberInfo.Type = GetTypeStr(StructType->MemberTypes[MemberIdx], ShaderLanguage);
+						MemberInfo.Size = GetTypeByteSize(StructType->MemberTypes[MemberIdx]);
+
+						for (const SpvDecoration& Dec : MemberDecorations)
+						{
+							if (Dec.Kind == SpvDecorationKind::Offset && Dec.Offset.MemberIndex == (uint32)MemberIdx)
+							{
+								MemberInfo.Offset = Dec.Offset.ByteOffset;
+								break;
+							}
+						}
+
+						ShaderLayoutBinding.UbMembers.Add(MoveTemp(MemberInfo));
+					}
 				}
 				else
 				{
@@ -479,6 +510,90 @@ namespace FW
 			}
 		}
 		return ShaderLayoutBindings;
+	}
+
+	TArray<GpuShaderVertexInput> GpuShader::GetVertexInputs() const
+	{
+		TArray<GpuShaderVertexInput> VertexInputs;
+		if (Type != ShaderType::VertexShader || SpvCode.IsEmpty())
+		{
+			return VertexInputs;
+		}
+
+		SpvMetaContext MetaContext;
+		SpvMetaVisitor MetaVisitor{ MetaContext };
+		SpirvParser Parser;
+		Parser.Parse(SpvCode);
+		Parser.Accept(&MetaVisitor);
+
+		TMap<SpvId, uint32> LocationMap;
+		for (auto [Id, Decoration] : MetaContext.Decorations)
+		{
+			if (Decoration.Kind == SpvDecorationKind::Location)
+			{
+				LocationMap.Add(Id, Decoration.Location.Number);
+			}
+		}
+
+		// Iterate global variables with Input storage class
+		for (auto& [Id, Var] : MetaContext.GlobalVariables)
+		{
+			if (Var.StorageClass != SpvStorageClass::Input)
+			{
+				continue;
+			}
+			uint32* LocationPtr = LocationMap.Find(Id);
+			if (!LocationPtr)
+			{
+				continue;
+			}
+
+			SpvType* PointeeType = Var.PointerType->PointeeType;
+			GpuShaderVertexInput Input;
+			Input.Location = *LocationPtr;
+			Input.Type = GetTypeStr(PointeeType, ShaderLanguage);
+
+			if (ShaderLanguage == GpuShaderLanguage::HLSL)
+			{
+				// HLSL via SPIRV: OpName is like "in.var.POSITION" or "in.var.TEXCOORD0"
+				// Strip "in.var." prefix, then parse trailing digits for SemanticIndex
+				FString Semantic;
+				auto NameIt = MetaContext.Names.find(Id);
+				if (NameIt != MetaContext.Names.end())
+				{
+					Semantic = NameIt->second;
+				}
+				if (Semantic.StartsWith(TEXT("in.var.")))
+				{
+					Semantic = Semantic.Mid(7);
+				}
+
+				// Split trailing digits
+				int32 TrailStart = Semantic.Len();
+				while (TrailStart > 0 && FChar::IsDigit(Semantic[TrailStart - 1]))
+				{
+					TrailStart--;
+				}
+				if (TrailStart < Semantic.Len())
+				{
+					Input.SemanticIndex = FCString::Atoi(*Semantic.Mid(TrailStart));
+					Input.SemanticName = Semantic.Left(TrailStart);
+				}
+				else
+				{
+					Input.SemanticName = Semantic;
+					Input.SemanticIndex = 0;
+				}
+			}
+
+			VertexInputs.Add(MoveTemp(Input));
+		}
+
+		VertexInputs.Sort([](const GpuShaderVertexInput& A, const GpuShaderVertexInput& B) {
+			return A.Location < B.Location;
+		});
+
+		return VertexInputs;
 	}
 
 	ShaderTU::ShaderTU(const FString& InShaderSource, const FString& InShaderName)

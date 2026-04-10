@@ -59,6 +59,7 @@ namespace FW
 			return AssetTileView->GetSelectedItems();
 		}
 		void SetSelectedItem(const FString& InItem);
+		void RefreshAssetThumbnail(const FString& InAssetPath);
 
 		virtual FReply OnDragOver(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent) override;
 		virtual FReply OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent) override;
