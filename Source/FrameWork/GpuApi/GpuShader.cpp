@@ -413,10 +413,45 @@ namespace FW
 				SpvReflectionBindings.FindOrAdd(Id).Slot = Decoration.Binding.Number;
 			}
 		}
+
+		// Scan function body for actually referenced global variable IDs
+		TSet<uint32> ReferencedVarIds;
+		if (const SpvSection* FuncSection = MetaContext.Sections.Find(SpvSectionKind::Function))
+		{
+			int32 EndOffset = FuncSection->EndOffset > FuncSection->StartOffset ? FuncSection->EndOffset : SpvCode.Num();
+			for (int32 w = FuncSection->StartOffset; w < EndOffset; w++)
+			{
+				uint32 Word = SpvCode[w];
+				if (SpvReflectionBindings.Contains(SpvId(Word)))
+				{
+					ReferencedVarIds.Add(Word);
+				}
+			}
+		}
+
+		// Remove unreferenced bindings
+		for (auto It = SpvReflectionBindings.CreateIterator(); It; ++It)
+		{
+			if (!ReferencedVarIds.Contains(It->Key.GetValue()))
+			{
+				It.RemoveCurrent();
+			}
+		}
+
 		for (auto& [Id, ShaderLayoutBinding] : SpvReflectionBindings)
 		{
 			SpvType* Type = MetaContext.GlobalVariables[Id].Type;
 			std::optional<BindingType> ShaderBindingType;
+
+			// Tag binding with the shader stage it comes from
+			switch (this->Type)
+			{
+			case ShaderType::VertexShader:  ShaderLayoutBinding.Stage = BindingShaderStage::Vertex;  break;
+			case ShaderType::PixelShader:   ShaderLayoutBinding.Stage = BindingShaderStage::Pixel;   break;
+			case ShaderType::ComputeShader: ShaderLayoutBinding.Stage = BindingShaderStage::Compute; break;
+			default: break;
+			}
+
 			ON_SCOPE_EXIT
 			{
 				check(ShaderBindingType.has_value());
@@ -451,7 +486,7 @@ namespace FW
 				{
 					ShaderBindingType = BindingType::UniformBuffer;
 					auto BlockNameIt = MetaContext.Names.find(Type->GetId());
-					if (BlockNameIt != MetaContext.Names.end())
+					if (ShaderLanguage == GpuShaderLanguage::GLSL && BlockNameIt != MetaContext.Names.end())
 					{
 						ShaderLayoutBinding.Name = BlockNameIt->second;
 					}
@@ -555,8 +590,6 @@ namespace FW
 
 			if (ShaderLanguage == GpuShaderLanguage::HLSL)
 			{
-				// HLSL via SPIRV: OpName is like "in.var.POSITION" or "in.var.TEXCOORD0"
-				// Strip "in.var." prefix, then parse trailing digits for SemanticIndex
 				FString Semantic;
 				auto NameIt = MetaContext.Names.find(Id);
 				if (NameIt != MetaContext.Names.end())
@@ -585,6 +618,11 @@ namespace FW
 					Input.SemanticIndex = 0;
 				}
 			}
+			else
+			{
+				Input.SemanticName = TEXT("TEXCOORD");
+				Input.SemanticIndex = Input.Location;
+			}
 
 			VertexInputs.Add(MoveTemp(Input));
 		}
@@ -594,6 +632,132 @@ namespace FW
 		});
 
 		return VertexInputs;
+	}
+
+	TArray<GpuShaderStageSemantic> GpuShader::GetStageOutputSemantics() const
+	{
+		TArray<GpuShaderStageSemantic> Semantics;
+		if (SpvCode.IsEmpty())
+		{
+			return Semantics;
+		}
+
+		SpvMetaContext MetaContext;
+		SpvMetaVisitor MetaVisitor{ MetaContext };
+		SpirvParser Parser;
+		Parser.Parse(SpvCode);
+		Parser.Accept(&MetaVisitor);
+
+		TSet<SpvId> BuiltInIds;
+		for (auto [Id, Decoration] : MetaContext.Decorations)
+		{
+			if (Decoration.Kind == SpvDecorationKind::BuiltIn)
+			{
+				BuiltInIds.Add(Id);
+			}
+		}
+
+		for (auto& [Id, Var] : MetaContext.GlobalVariables)
+		{
+			if (Var.StorageClass != SpvStorageClass::Output || BuiltInIds.Contains(Id))
+			{
+				continue;
+			}
+
+			auto NameIt = MetaContext.Names.find(Id);
+			if (NameIt == MetaContext.Names.end())
+			{
+				continue;
+			}
+
+			FString Semantic = NameIt->second;
+			if (Semantic.StartsWith(TEXT("out.var.")))
+			{
+				Semantic = Semantic.Mid(8);
+			}
+
+			GpuShaderStageSemantic Output;
+			int32 TrailStart = Semantic.Len();
+			while (TrailStart > 0 && FChar::IsDigit(Semantic[TrailStart - 1]))
+			{
+				TrailStart--;
+			}
+			if (TrailStart < Semantic.Len())
+			{
+				Output.SemanticIndex = FCString::Atoi(*Semantic.Mid(TrailStart));
+				Output.SemanticName = Semantic.Left(TrailStart);
+			}
+			else
+			{
+				Output.SemanticName = Semantic;
+				Output.SemanticIndex = 0;
+			}
+			Semantics.Add(MoveTemp(Output));
+		}
+		return Semantics;
+	}
+
+	TArray<GpuShaderStageSemantic> GpuShader::GetStageInputSemantics() const
+	{
+		TArray<GpuShaderStageSemantic> Semantics;
+		if (SpvCode.IsEmpty())
+		{
+			return Semantics;
+		}
+
+		SpvMetaContext MetaContext;
+		SpvMetaVisitor MetaVisitor{ MetaContext };
+		SpirvParser Parser;
+		Parser.Parse(SpvCode);
+		Parser.Accept(&MetaVisitor);
+
+		TSet<SpvId> BuiltInIds;
+		for (auto [Id, Decoration] : MetaContext.Decorations)
+		{
+			if (Decoration.Kind == SpvDecorationKind::BuiltIn)
+			{
+				BuiltInIds.Add(Id);
+			}
+		}
+
+		for (auto& [Id, Var] : MetaContext.GlobalVariables)
+		{
+			if (Var.StorageClass != SpvStorageClass::Input || BuiltInIds.Contains(Id))
+			{
+				continue;
+			}
+
+			auto NameIt = MetaContext.Names.find(Id);
+			if (NameIt == MetaContext.Names.end())
+			{
+				continue;
+			}
+
+			FString Semantic = NameIt->second;
+			if (Semantic.StartsWith(TEXT("in.var.")))
+			{
+				Semantic = Semantic.Mid(7);
+			}
+
+			GpuShaderStageSemantic Input;
+			int32 TrailStart = Semantic.Len();
+			while (TrailStart > 0 && FChar::IsDigit(Semantic[TrailStart - 1]))
+			{
+				TrailStart--;
+			}
+			if (TrailStart < Semantic.Len())
+			{
+				Input.SemanticIndex = FCString::Atoi(*Semantic.Mid(TrailStart));
+				Input.SemanticName = Semantic.Left(TrailStart);
+			}
+			else
+			{
+				Input.SemanticName = Semantic;
+				Input.SemanticIndex = 0;
+			}
+			Semantics.Add(MoveTemp(Input));
+		}
+		return Semantics;
 	}
 
 	ShaderTU::ShaderTU(const FString& InShaderSource, const FString& InShaderName)

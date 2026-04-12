@@ -147,42 +147,85 @@ namespace SH
 	{
 		TArray<MaterialBindingMemberDefault> OldDefaults = MoveTemp(BindingMemberDefaults);
 
+		TArray<GpuShaderLayoutBinding> SeenUbs;
+
+		auto UbLayoutsMatch = [](const TArray<GpuShaderUbMemberInfo>& A, const TArray<GpuShaderUbMemberInfo>& B) {
+			if (A.Num() != B.Num()) return false;
+			for (int32 i = 0; i < A.Num(); ++i)
+			{
+				if (A[i].Name != B[i].Name || A[i].Offset != B[i].Offset || A[i].Size != B[i].Size || A[i].Type != B[i].Type)
+					return false;
+			}
+			return true;
+		};
+
+		auto PreserveOldValues = [&](MaterialBindingMemberDefault& NewDefault) {
+			for (const auto& Old : OldDefaults)
+			{
+				if (Old.MemberName != NewDefault.MemberName) continue;
+				FString Left, Right;
+				bool bSplit = Old.BindingName.Split(TEXT("/"), &Left, &Right);
+				if (Old.BindingName == NewDefault.BindingName ||
+					(bSplit && (Left == NewDefault.BindingName || Right == NewDefault.BindingName)))
+				{
+					NewDefault.MatrixValue = Old.MatrixValue;
+					FMemory::Memcpy(NewDefault.Values, Old.Values, sizeof(NewDefault.Values));
+					break;
+				}
+			}
+		};
+
+		auto AddUbMembers = [&](const FString& DisplayName, const TArray<GpuShaderUbMemberInfo>& UbMembers, BindingShaderStage Stage) {
+			for (const GpuShaderUbMemberInfo& Member : UbMembers)
+			{
+				MaterialBindingMemberDefault NewDefault;
+				NewDefault.BindingName = DisplayName;
+				NewDefault.MemberName = Member.Name;
+				NewDefault.Type = Member.Type;
+				NewDefault.Stage = Stage;
+				PreserveOldValues(NewDefault);
+				BindingMemberDefaults.Add(MoveTemp(NewDefault));
+			}
+		};
+
 		auto CollectUbMembers = [&](const ShaderAsset* InShader) {
 			for (const GpuShaderLayoutBinding& Binding : GetShaderBindings(InShader))
 			{
 				if (Binding.Type != BindingType::UniformBuffer) continue;
-				for (const GpuShaderUbMemberInfo& Member : Binding.UbMembers)
+
+				auto* Seen = SeenUbs.FindByPredicate([&](const GpuShaderLayoutBinding& S) {
+					return S.Group == Binding.Group && S.Slot == Binding.Slot;
+				});
+				if (Seen)
 				{
-					// Skip if already collected (same binding from both VS and PS)
-					bool bAlreadyAdded = false;
-					for (const auto& Existing : BindingMemberDefaults)
+					if (UbLayoutsMatch(Seen->UbMembers, Binding.UbMembers))
 					{
-						if (Existing.BindingName == Binding.Name && Existing.MemberName == Member.Name)
+						// Same layout: merge names if different, combine stages
+						if (Seen->Name != Binding.Name)
 						{
-							bAlreadyAdded = true;
-							break;
+							FString OldName = Seen->Name;
+							Seen->Name = OldName + TEXT("/") + Binding.Name;
+							for (auto& D : BindingMemberDefaults)
+							{
+								if (D.BindingName == OldName) D.BindingName = Seen->Name;
+							}
+						}
+						for (auto& D : BindingMemberDefaults)
+						{
+							if (D.BindingName == Seen->Name) D.Stage = D.Stage | Binding.Stage;
 						}
 					}
-					if (bAlreadyAdded) continue;
-
-					MaterialBindingMemberDefault NewDefault;
-					NewDefault.BindingName = Binding.Name;
-					NewDefault.MemberName = Member.Name;
-					NewDefault.Type = Member.Type;
-
-					// Preserve old values if existed
-					for (const auto& Old : OldDefaults)
+					else
 					{
-						if (Old.BindingName == Binding.Name && Old.MemberName == Member.Name)
-						{
-							NewDefault.MatrixValue = Old.MatrixValue;
-							FMemory::Memcpy(NewDefault.Values, Old.Values, sizeof(NewDefault.Values));
-							break;
-						}
+						// Different layout: keep separate with per-stage
+						SeenUbs.Add(Binding);
+						AddUbMembers(Binding.Name, Binding.UbMembers, Binding.Stage);
 					}
-
-					BindingMemberDefaults.Add(MoveTemp(NewDefault));
+					continue;
 				}
+
+				SeenUbs.Add(Binding);
+				AddUbMembers(Binding.Name, Binding.UbMembers, Binding.Stage);
 			}
 		};
 
@@ -193,6 +236,8 @@ namespace SH
 	void Material::RebuildBindingResourceDefaults()
 	{
 		TArray<MaterialBindingResourceDefault> OldDefaults = MoveTemp(BindingResourceDefaults);
+
+		TArray<GpuShaderLayoutBinding> SeenResBindings;
 
 		auto CollectResourceBindings = [&](const ShaderAsset* InShader) {
 			for (const GpuShaderLayoutBinding& Binding : GetShaderBindings(InShader))
@@ -206,26 +251,41 @@ namespace SH
 				default: continue;
 				}
 
-				// Skip if already collected
-				bool bAlreadyAdded = false;
-				for (const auto& Existing : BindingResourceDefaults)
+				// Check if already processed a binding at this (Group, Slot, Type)
+				auto* Seen = SeenResBindings.FindByPredicate([&](const GpuShaderLayoutBinding& S) {
+					return S.Group == Binding.Group && S.Slot == Binding.Slot && S.Type == Binding.Type;
+				});
+				if (Seen)
 				{
-					if (Existing.BindingName == Binding.Name)
+					// Merge: update name and stage on existing default
+					for (auto& D : BindingResourceDefaults)
 					{
-						bAlreadyAdded = true;
-						break;
+						if (D.BindingName == Seen->Name && D.BindingType == Seen->Type)
+						{
+							D.Stage = D.Stage | Binding.Stage;
+							if (Seen->Name != Binding.Name)
+								D.BindingName = Seen->Name + TEXT("/") + Binding.Name;
+							break;
+						}
 					}
+					if (Seen->Name != Binding.Name)
+						Seen->Name = Seen->Name + TEXT("/") + Binding.Name;
+					continue;
 				}
-				if (bAlreadyAdded) continue;
+
+				SeenResBindings.Add(Binding);
 
 				MaterialBindingResourceDefault NewDefault;
 				NewDefault.BindingName = Binding.Name;
 				NewDefault.BindingType = Binding.Type;
+				NewDefault.Stage = Binding.Stage;
 
 				// Preserve old values if existed
 				for (const auto& Old : OldDefaults)
 				{
-					if (Old.BindingName == Binding.Name)
+					FString Left, Right;
+					bool bMergedName = Old.BindingName.Split(TEXT("/"), &Left, &Right);
+					if (Old.BindingName == Binding.Name || (bMergedName && (Left == Binding.Name || Right == Binding.Name)))
 					{
 						NewDefault.TextureAsset = Old.TextureAsset;
 						NewDefault.Filter = Old.Filter;
@@ -459,17 +519,41 @@ namespace SH
 		TArray<TSharedRef<PropertyData>> Properties;
 		Properties.Add(BindingCategory);
 
-		// UB member defaults - group by BindingName
+		// Vertex/Pixel stage categories (lazily attached)
+		auto VertexCategory = MakeShared<PropertyCategory>(this, LOCALIZATION("Vertex"));
+		auto PixelCategory = MakeShared<PropertyCategory>(this, LOCALIZATION("Pixel"));
+		bool bAddedVertex = false, bAddedPixel = false;
+
+		auto GetStageParent = [&](BindingShaderStage Stage) -> TSharedRef<PropertyCategory> {
+			if (Stage == BindingShaderStage::Vertex)
+			{
+				if (!bAddedVertex) { BindingCategory->AddChild(VertexCategory); bAddedVertex = true; }
+				return VertexCategory;
+			}
+			if (Stage == BindingShaderStage::Pixel)
+			{
+				if (!bAddedPixel) { BindingCategory->AddChild(PixelCategory); bAddedPixel = true; }
+				return PixelCategory;
+			}
+			return BindingCategory;
+		};
+
+		// UB member defaults - group by (BindingName, Stage)
 		TMap<FString, TSharedRef<PropertyCategory>> UbCategories;
 		for (auto& Default : BindingMemberDefaults)
 		{
-			if (!UbCategories.Contains(Default.BindingName))
+			FString CatKey = Default.BindingName;
+			if (Default.Stage == BindingShaderStage::Vertex) CatKey += TEXT("|VS");
+			else if (Default.Stage == BindingShaderStage::Pixel) CatKey += TEXT("|PS");
+
+			if (!UbCategories.Contains(CatKey))
 			{
-				auto UbCategory = MakeShared<PropertyCategory>(this, Default.BindingName);
-				UbCategories.Add(Default.BindingName, UbCategory);
-				BindingCategory->AddChild(UbCategory);
+				auto Parent = GetStageParent(Default.Stage);
+				auto UbCat = MakeShared<PropertyCategory>(this, Default.BindingName);
+				UbCategories.Add(CatKey, UbCat);
+				Parent->AddChild(UbCat);
 			}
-			auto& UbCategory = UbCategories[Default.BindingName];
+			auto& UbCategory = UbCategories[CatKey];
 
 			FText ItemLabel = FText::FromString(Default.MemberName + TEXT(" (") + Default.Type + TEXT(")"));
 
@@ -574,6 +658,8 @@ namespace SH
 		// Resource binding defaults
 		for (auto& Default : BindingResourceDefaults)
 		{
+			auto Parent = GetStageParent(Default.Stage);
+
 			switch (Default.BindingType)
 			{
 			case BindingType::Texture:
@@ -590,13 +676,13 @@ namespace SH
 					TexMetaType,
 					&Default.TextureAsset
 				);
-				BindingCategory->AddChild(Item);
+				Parent->AddChild(Item);
 				break;
 			}
 			case BindingType::Sampler:
 			{
 				auto SamplerCategory = MakeShared<PropertyCategory>(this, Default.BindingName);
-				BindingCategory->AddChild(SamplerCategory);
+				Parent->AddChild(SamplerCategory);
 
 				// Filter mode
 				{
@@ -654,7 +740,7 @@ namespace SH
 			case BindingType::CombinedTexture3DSampler:
 			{
 				auto CombinedCategory = MakeShared<PropertyCategory>(this, Default.BindingName);
-				BindingCategory->AddChild(CombinedCategory);
+				Parent->AddChild(CombinedCategory);
 
 				// Texture asset
 				MetaType* TexMetaType = GetMetaType<Texture2D>();

@@ -680,6 +680,12 @@ namespace FW
 
 	void SAssetView::RefreshAssetThumbnail(const FString& InAssetPath)
 	{
+		AssetManager& AM = TSingleton<AssetManager>::Get();
+		if (TOptional<FGuid> Id = AM.TryGetGuid(InAssetPath))
+		{
+			AM.RemoveAssetThumbnail(*Id);
+		}
+
 		TSharedPtr<AssetViewAssetItem> TargetItem;
 		for (const TSharedRef<AssetViewItem>& Item : AssetViewItems)
 		{
@@ -693,12 +699,6 @@ namespace FW
 		if (!TargetItem.IsValid())
 		{
 			return;
-		}
-
-		AssetManager& AM = TSingleton<AssetManager>::Get();
-		if (TOptional<FGuid> Id = AM.TryGetGuid(InAssetPath))
-		{
-			AM.RemoveAssetThumbnail(*Id);
 		}
 
 		AM.AsyncLoadAssetByPath<AssetObject>(InAssetPath,

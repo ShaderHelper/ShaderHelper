@@ -22,11 +22,15 @@ namespace SH
 	void MaterialOp::OnOpen(const FString& InAssetPath)
 	{
 		AssetPtr<Material> Asset = TSingleton<AssetManager>::Get().LoadAssetByPath<Material>(InAssetPath);
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->ShowProperty(Asset.Get());
-		SMaterialPreviewer::OpenMaterialPreviewer(Asset, FPointerEventHandler::CreateLambda([=](const FGeometry&, const FPointerEvent&) {
+		if (Asset)
+		{
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 			ShEditor->ShowProperty(Asset.Get());
-			return FReply::Handled();
-		}), ShEditor->GetMainWindow());
+			SMaterialPreviewer::OpenMaterialPreviewer(Asset, FPointerEventHandler::CreateLambda([=](const FGeometry&, const FPointerEvent&) {
+				ShEditor->ShowProperty(Asset.Get());
+				return FReply::Handled();
+			}), ShEditor->GetMainWindow());
+		}
+		
 	}
 }

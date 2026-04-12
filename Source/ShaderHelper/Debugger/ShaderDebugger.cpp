@@ -362,6 +362,8 @@ namespace SH
 						.EntryPoint = EntryPoint,
 						.Language = Lang
 					});
+					// SPIRV-Cross output already has correct binding numbers; skip shaderc's SetBindingBase to avoid double-shifting.
+					PatchedShader->CompilerFlag |= GpuShaderCompilerFlag::SkipBindingShift;
 					if (GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
 					{
 						auto DummyRenderTarget = GGpuRhi->CreateTexture({
@@ -1565,12 +1567,12 @@ namespace SH
 				if (SetNumber == BindingContext::GlobalSlot)
 				{
 					//Add the debugger buffer
-					BindGroupDesc.Resources.Add(BindingSlot{DebuggerBufferBindingSlot, BindingType::RWRawBuffer}, { AUX::StaticCastRefCountPtr<GpuResource>(DebugBuffer) });
-					LayoutDesc.Layouts.Add(BindingSlot{DebuggerBufferBindingSlot, BindingType::RWRawBuffer}, { BindingType::RWRawBuffer });
+					BindGroupDesc.Resources.Add(BindingSlot{DebuggerBufferBindingSlot, BindingType::RWRawBuffer, BindingShaderStage::Pixel}, { AUX::StaticCastRefCountPtr<GpuResource>(DebugBuffer) });
+					LayoutDesc.Layouts.Add(BindingSlot{DebuggerBufferBindingSlot, BindingType::RWRawBuffer, BindingShaderStage::Pixel}, { BindingType::RWRawBuffer, BindingShaderStage::Pixel });
 
 					//Add the debugger params buffer (contains PixelCoord)
-					BindGroupDesc.Resources.Add(BindingSlot{DebuggerParamsBindingSlot, BindingType::UniformBuffer}, { AUX::StaticCastRefCountPtr<GpuResource>(DebugParamsBuffer) });
-					LayoutDesc.Layouts.Add(BindingSlot{DebuggerParamsBindingSlot, BindingType::UniformBuffer}, { BindingType::UniformBuffer });
+					BindGroupDesc.Resources.Add(BindingSlot{DebuggerParamsBindingSlot, BindingType::UniformBuffer, BindingShaderStage::Pixel}, { AUX::StaticCastRefCountPtr<GpuResource>(DebugParamsBuffer) });
+					LayoutDesc.Layouts.Add(BindingSlot{DebuggerParamsBindingSlot, BindingType::UniformBuffer, BindingShaderStage::Pixel}, { BindingType::UniformBuffer, BindingShaderStage::Pixel });
 
 					TRefCountPtr<GpuBindGroupLayout> PatchedBindGroupLayout = GGpuRhi->CreateBindGroupLayout(LayoutDesc);
 					BindGroupDesc.Layout = PatchedBindGroupLayout;
@@ -1921,6 +1923,8 @@ namespace SH
 			.EntryPoint = EntryPoint,
 			.Language = Lang,
 		});
+		// SPIRV-Cross output already has correct binding numbers; skip shaderc's SetBindingBase to avoid double-shifting.
+		PatchedShader->CompilerFlag |= GpuShaderCompilerFlag::SkipBindingShift;
 		if (!GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
 		{
 			SH_LOG(LogDebugger, Error, TEXT("[Preview] Compile error: %s"), *ErrorInfo);
@@ -1932,19 +1936,19 @@ namespace SH
 		TMap<int32, GpuBindGroupLayoutDesc> BaseLayoutDescs;
 		for (const auto& Binding : SpvBindings)
 		{
-			BindingSlot BSlot{Binding.Binding, Binding.Type};
+			BindingSlot BSlot{Binding.Binding, Binding.Type, BindingShaderStage::Pixel};
 			BaseGroupDescs.FindOrAdd(Binding.DescriptorSet).Resources.Add(BSlot, { Binding.Resource });
 			auto& LayoutDesc = BaseLayoutDescs.FindOrAdd(Binding.DescriptorSet);
 			LayoutDesc.GroupNumber = Binding.DescriptorSet;
-			LayoutDesc.Layouts.Add(BSlot, { Binding.Type });
+			LayoutDesc.Layouts.Add(BSlot, { Binding.Type, BindingShaderStage::Pixel });
 		}
 
 		//Add previewer params slot to layout
-		BaseLayoutDescs.FindOrAdd(BindingContext::GlobalSlot).Layouts.Add(BindingSlot{PreviewerParamsBindingSlot, BindingType::UniformBuffer}, { BindingType::UniformBuffer });
+		BaseLayoutDescs.FindOrAdd(BindingContext::GlobalSlot).Layouts.Add(BindingSlot{PreviewerParamsBindingSlot, BindingType::UniformBuffer, BindingShaderStage::Pixel}, { BindingType::UniformBuffer, BindingShaderStage::Pixel });
 
 		//Add debugger buffer slot
-		BaseLayoutDescs.FindOrAdd(BindingContext::GlobalSlot).Layouts.Add(BindingSlot{DebuggerBufferBindingSlot, BindingType::RWRawBuffer}, { BindingType::RWRawBuffer });
-		BaseGroupDescs.FindOrAdd(BindingContext::GlobalSlot).Resources.Add(BindingSlot{DebuggerBufferBindingSlot, BindingType::RWRawBuffer}, { AUX::StaticCastRefCountPtr<GpuResource>(DebugBuffer) });
+		BaseLayoutDescs.FindOrAdd(BindingContext::GlobalSlot).Layouts.Add(BindingSlot{DebuggerBufferBindingSlot, BindingType::RWRawBuffer, BindingShaderStage::Pixel}, { BindingType::RWRawBuffer, BindingShaderStage::Pixel });
+		BaseGroupDescs.FindOrAdd(BindingContext::GlobalSlot).Resources.Add(BindingSlot{DebuggerBufferBindingSlot, BindingType::RWRawBuffer, BindingShaderStage::Pixel}, { AUX::StaticCastRefCountPtr<GpuResource>(DebugBuffer) });
 
 		//Build non-global bind groups (shared across all lines)
 		TRefCountPtr<GpuBindGroupLayout> GlobalLayout;
@@ -2037,7 +2041,7 @@ namespace SH
 
 			//Build global bind group with this line's params buffer
 			GpuBindGroupDesc GlobalGroupDesc = BaseGroupDescs.FindOrAdd(BindingContext::GlobalSlot);
-			GlobalGroupDesc.Resources.Add(BindingSlot{PreviewerParamsBindingSlot, BindingType::UniformBuffer}, { AUX::StaticCastRefCountPtr<GpuResource>(ParamsBuffer) });
+			GlobalGroupDesc.Resources.Add(BindingSlot{PreviewerParamsBindingSlot, BindingType::UniformBuffer, BindingShaderStage::Pixel}, { AUX::StaticCastRefCountPtr<GpuResource>(ParamsBuffer) });
 			GlobalGroupDesc.Layout = GlobalLayout;
 			TRefCountPtr<GpuBindGroup> GlobalGroup = GGpuRhi->CreateBindGroup(GlobalGroupDesc);
 

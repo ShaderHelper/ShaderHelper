@@ -132,7 +132,7 @@ namespace SH
 	GpuBindGroupBuilder ShaderToyPassNode::GetBuiltInBindGroupBuiler(GpuBindGroupLayout* Layout)
 	{
 		auto Builder = GpuBindGroupBuilder{ Layout }
-			.SetExistingBinding(0, BindingType::RWRawBuffer, TSingleton<PrintBuffer>::Get().GetResource())
+			.SetExistingBinding(0, BindingType::RWRawBuffer, TSingleton<PrintBuffer>::Get().GetResource(), BindingShaderStage::Pixel)
 			.SetUniformBuffer("BuiltInUniform", BuiltinUniformBuffer->GetGpuResource());
 
 		const ShaderToyChannelDesc* ChannelDescs[4] = { &iChannelDesc0, &iChannelDesc1, &iChannelDesc2, &iChannelDesc3 };

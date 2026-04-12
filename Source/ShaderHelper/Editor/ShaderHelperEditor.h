@@ -91,7 +91,6 @@ namespace SH
 		bool OpenGraph(FW::AssetPtr<FW::Graph> InGraphData);
 		void SetGraphRenderComp(TSharedPtr<FW::RenderComponent> InGraphRenderComp);
         void RefreshProperty(bool bClear = false);
-		void RefreshPropertyView() { PropertyView->Refresh(false); }
         void ShowProperty(FW::ShObject* InObjectData);
         void UpdateShaderPath(const FString& InShaderPath);
 		bool IsPropertyLocked() { return PropertyView->IsLocked(); }

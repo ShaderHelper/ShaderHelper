@@ -15,7 +15,7 @@ namespace FW
 
 	GpuBindGroupLayoutBuilder& GpuBindGroupLayoutBuilder::AddExistingBinding(int32 InSlotNum, BindingType Type, BindingShaderStage InStage)
 	{
-		BindingSlot Slot{InSlotNum, Type};
+		BindingSlot Slot{InSlotNum, Type, InStage};
 		checkf(!LayoutDesc.Layouts.Contains(Slot), *FString::Printf(TEXT("Slot:%d already existed."), InSlotNum));
 		LayoutDesc.Layouts.Add(Slot, { Type, InStage });
 		return *this;
@@ -27,8 +27,8 @@ namespace FW
 
 		LayoutDesc.HlslCodegenDeclaration += FString::Format(*UbBuilder.GetLayoutDeclaration(GpuShaderLanguage::HLSL), {BindingName, AutoSlot, LayoutDesc.GroupNumber});
 		LayoutDesc.GlslCodegenDeclaration += FString::Format(*UbBuilder.GetLayoutDeclaration(GpuShaderLanguage::GLSL), { BindingName, AutoSlot, LayoutDesc.GroupNumber });
-		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, BindingSlot{AutoSlot, BindingType::UniformBuffer});
-		LayoutDesc.Layouts.Add(BindingSlot{AutoSlot++, BindingType::UniformBuffer}, {BindingType::UniformBuffer, InStage });
+		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, BindingSlot{AutoSlot, BindingType::UniformBuffer, InStage});
+		LayoutDesc.Layouts.Add(BindingSlot{AutoSlot++, BindingType::UniformBuffer, InStage}, {BindingType::UniformBuffer, InStage });
 
 		return *this;
 	}
@@ -38,8 +38,8 @@ namespace FW
 		while (LayoutDesc.ContainsSlotNum(AutoSlot)) { AutoSlot++; };
 		LayoutDesc.HlslCodegenDeclaration += FString::Printf(TEXT("Texture2D %s : register(t%d, space%d);\n"), *BindingName, AutoSlot, LayoutDesc.GroupNumber);
 		LayoutDesc.GlslCodegenDeclaration += FString::Printf(TEXT("layout(binding = %d, set = %d) uniform texture2D %s;\n"), AutoSlot, LayoutDesc.GroupNumber,*BindingName);
-		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, BindingSlot{AutoSlot, BindingType::Texture});
-		LayoutDesc.Layouts.Add(BindingSlot{AutoSlot++, BindingType::Texture}, {BindingType::Texture, InStage });
+		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, BindingSlot{AutoSlot, BindingType::Texture, InStage});
+		LayoutDesc.Layouts.Add(BindingSlot{AutoSlot++, BindingType::Texture, InStage}, {BindingType::Texture, InStage });
 		return *this;
 	}
 
@@ -48,8 +48,8 @@ namespace FW
 		while (LayoutDesc.ContainsSlotNum(AutoSlot)) { AutoSlot++; };
 		LayoutDesc.HlslCodegenDeclaration += FString::Printf(TEXT("TextureCube %s : register(t%d, space%d);\n"), *BindingName, AutoSlot, LayoutDesc.GroupNumber);
 		LayoutDesc.GlslCodegenDeclaration += FString::Printf(TEXT("layout(binding = %d, set = %d) uniform textureCube %s;\n"), AutoSlot, LayoutDesc.GroupNumber, *BindingName);
-		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, BindingSlot{AutoSlot, BindingType::TextureCube});
-		LayoutDesc.Layouts.Add(BindingSlot{AutoSlot++, BindingType::TextureCube}, {BindingType::TextureCube, InStage });
+		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, BindingSlot{AutoSlot, BindingType::TextureCube, InStage});
+		LayoutDesc.Layouts.Add(BindingSlot{AutoSlot++, BindingType::TextureCube, InStage}, {BindingType::TextureCube, InStage });
 		return *this;
 	}
 
@@ -58,8 +58,8 @@ namespace FW
 		while (LayoutDesc.ContainsSlotNum(AutoSlot)) { AutoSlot++; };
 		LayoutDesc.HlslCodegenDeclaration += FString::Printf(TEXT("Texture3D %s : register(t%d, space%d);\n"), *BindingName, AutoSlot, LayoutDesc.GroupNumber);
 		LayoutDesc.GlslCodegenDeclaration += FString::Printf(TEXT("layout(binding = %d, set = %d) uniform texture3D %s;\n"), AutoSlot, LayoutDesc.GroupNumber, *BindingName);
-		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, BindingSlot{AutoSlot, BindingType::Texture3D});
-		LayoutDesc.Layouts.Add(BindingSlot{AutoSlot++, BindingType::Texture3D}, {BindingType::Texture3D, InStage });
+		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, BindingSlot{AutoSlot, BindingType::Texture3D, InStage});
+		LayoutDesc.Layouts.Add(BindingSlot{AutoSlot++, BindingType::Texture3D, InStage}, {BindingType::Texture3D, InStage });
 		return *this;
 	}
 
@@ -68,8 +68,8 @@ namespace FW
 		while (LayoutDesc.ContainsSlotNum(AutoSlot)) { AutoSlot++; };
 		LayoutDesc.HlslCodegenDeclaration += FString::Printf(TEXT("SamplerState %s : register(s%d, space%d);\n"), *BindingName, AutoSlot, LayoutDesc.GroupNumber);
 		LayoutDesc.GlslCodegenDeclaration += FString::Printf(TEXT("layout(binding = %d, set = %d) uniform sampler %s;\n"), AutoSlot, LayoutDesc.GroupNumber, *BindingName);
-		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, BindingSlot{AutoSlot, BindingType::Sampler});
-		LayoutDesc.Layouts.Add(BindingSlot{AutoSlot++, BindingType::Sampler}, {BindingType::Sampler, InStage });
+		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, BindingSlot{AutoSlot, BindingType::Sampler, InStage});
+		LayoutDesc.Layouts.Add(BindingSlot{AutoSlot++, BindingType::Sampler, InStage}, {BindingType::Sampler, InStage });
 		return *this;
 	}
 
@@ -77,8 +77,8 @@ namespace FW
 	{
 		while (LayoutDesc.ContainsSlotNum(AutoSlot) || LayoutDesc.ContainsSlotNum(AutoSlot + 1)) { AutoSlot++; };
 		LayoutDesc.GlslCodegenDeclaration += FString::Printf(TEXT("layout(binding = %d, set = %d) uniform sampler2D %s;\n"), AutoSlot, LayoutDesc.GroupNumber, *BindingName);
-		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, BindingSlot{AutoSlot, BindingType::CombinedTextureSampler});
-		LayoutDesc.Layouts.Add(BindingSlot{AutoSlot, BindingType::CombinedTextureSampler}, {BindingType::CombinedTextureSampler, InStage });
+		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, BindingSlot{AutoSlot, BindingType::CombinedTextureSampler, InStage});
+		LayoutDesc.Layouts.Add(BindingSlot{AutoSlot, BindingType::CombinedTextureSampler, InStage}, {BindingType::CombinedTextureSampler, InStage });
 		AutoSlot += 2;
 		return *this;
 	}
@@ -87,8 +87,8 @@ namespace FW
 	{
 		while (LayoutDesc.ContainsSlotNum(AutoSlot) || LayoutDesc.ContainsSlotNum(AutoSlot + 1)) { AutoSlot++; };
 		LayoutDesc.GlslCodegenDeclaration += FString::Printf(TEXT("layout(binding = %d, set = %d) uniform samplerCube %s;\n"), AutoSlot, LayoutDesc.GroupNumber, *BindingName);
-		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, BindingSlot{AutoSlot, BindingType::CombinedTextureCubeSampler});
-		LayoutDesc.Layouts.Add(BindingSlot{AutoSlot, BindingType::CombinedTextureCubeSampler}, {BindingType::CombinedTextureCubeSampler, InStage });
+		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, BindingSlot{AutoSlot, BindingType::CombinedTextureCubeSampler, InStage});
+		LayoutDesc.Layouts.Add(BindingSlot{AutoSlot, BindingType::CombinedTextureCubeSampler, InStage}, {BindingType::CombinedTextureCubeSampler, InStage });
 		AutoSlot += 2;
 		return *this;
 	}
@@ -97,8 +97,8 @@ namespace FW
 	{
 		while (LayoutDesc.ContainsSlotNum(AutoSlot) || LayoutDesc.ContainsSlotNum(AutoSlot + 1)) { AutoSlot++; };
 		LayoutDesc.GlslCodegenDeclaration += FString::Printf(TEXT("layout(binding = %d, set = %d) uniform sampler3D %s;\n"), AutoSlot, LayoutDesc.GroupNumber, *BindingName);
-		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, BindingSlot{AutoSlot, BindingType::CombinedTexture3DSampler});
-		LayoutDesc.Layouts.Add(BindingSlot{AutoSlot, BindingType::CombinedTexture3DSampler}, {BindingType::CombinedTexture3DSampler, InStage });
+		LayoutDesc.CodegenBindingNameToSlot.Add(BindingName, BindingSlot{AutoSlot, BindingType::CombinedTexture3DSampler, InStage});
+		LayoutDesc.Layouts.Add(BindingSlot{AutoSlot, BindingType::CombinedTexture3DSampler, InStage}, {BindingType::CombinedTexture3DSampler, InStage });
 		AutoSlot += 2;
 		return *this;
 	}

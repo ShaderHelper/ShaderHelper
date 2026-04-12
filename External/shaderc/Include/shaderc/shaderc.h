@@ -227,6 +227,8 @@ typedef enum {
   // Unordered Access View, in HLSL.  (Writable storage image or storage
   // buffer.)
   shaderc_uniform_kind_unordered_access_view,
+  // Combined image and sampler in GLSL (e.g. sampler2D).
+  shaderc_uniform_kind_combined_image_sampler,
 } shaderc_uniform_kind;
 
 // Usage examples:

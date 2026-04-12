@@ -12,7 +12,10 @@ namespace SH
 	{
 		None,
 		BuiltInModel,
+		BuiltInView,
+		BuiltInProj,
 		BuiltInViewProj,
+		BuiltInMVP,
 	};
 
 	enum class BuiltInVertexAttribute : uint8
@@ -29,6 +32,7 @@ namespace SH
 		FString BindingName;
 		FString MemberName;
 		FString Type;
+		FW::BindingShaderStage Stage = FW::BindingShaderStage::All;
 		BuiltInMatrix4x4Value MatrixValue = BuiltInMatrix4x4Value::None;
 		union {
 			float Values[4];
@@ -40,7 +44,7 @@ namespace SH
 
 		friend FArchive& operator<<(FArchive& Ar, MaterialBindingMemberDefault& Default)
 		{
-			Ar << Default.BindingName << Default.MemberName << Default.Type << Default.MatrixValue;
+			Ar << Default.BindingName << Default.MemberName << Default.Type << Default.Stage << Default.MatrixValue;
 			for (int i = 0; i < 4; ++i) Ar << Default.UintValues[i];
 			return Ar;
 		}
@@ -50,6 +54,7 @@ namespace SH
 	{
 		FString BindingName;
 		FW::BindingType BindingType = FW::BindingType::Texture;
+		FW::BindingShaderStage Stage = FW::BindingShaderStage::All;
 
 		// Texture/RWTexture
 		FW::AssetPtr<FW::AssetObject> TextureAsset;
@@ -60,7 +65,7 @@ namespace SH
 
 		friend FArchive& operator<<(FArchive& Ar, MaterialBindingResourceDefault& Default)
 		{
-			Ar << Default.BindingName << Default.BindingType;
+			Ar << Default.BindingName << Default.BindingType << Default.Stage;
 			Ar << Default.TextureAsset;
 			Ar << Default.Filter << Default.AddressMode;
 			return Ar;

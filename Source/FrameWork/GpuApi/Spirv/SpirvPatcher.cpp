@@ -2,9 +2,22 @@
 #include "SpirvPatcher.h"
 #include "SpirvParser.h"
 #include "ShaderConductor.hpp"
+#include "GpuApi/GpuRhi.h"
 
 namespace FW
 {
+	int32 GetSpirvPatchBindingNumber(int32 SlotNumber, BindingType Type, BindingShaderStage Stage)
+	{
+#if PLATFORM_WINDOWS
+		if (GetGpuRhiBackendType() == GpuRhiBackendType::Vulkan)
+			return SlotNumber + GetBindingShift(Type) + GetStageBindingOffset(Stage);
+		else
+			return SlotNumber;
+#else
+		return SlotNumber + GetBindingShift(Type);
+#endif
+	}
+
 	auto SpvInstOffsetProjection = [](SpvInstruction* Inst) { return Inst->GetWordOffset().value(); };
 
 	void SpvPatcher::SetSpvContext(const TArray<TUniquePtr<SpvInstruction>>& InInsts, const TArray<uint32>& InSpvCode, SpvMetaContext* InMetaContext)

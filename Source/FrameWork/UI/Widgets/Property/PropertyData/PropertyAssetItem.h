@@ -126,6 +126,26 @@ namespace FW
                         })
                     ]
                 ]
+                +SHorizontalBox::Slot()
+                .AutoWidth()
+                .HAlign(HAlign_Right)
+                [
+                    SNew(SIconButton).Icon(FAppCommonStyle::Get().GetBrush("Icons.Close"))
+                    .Visibility_Lambda([this]{
+                        auto& AssetRef = *(AssetPtr<AssetObject>*)AssetPtrRef;
+                        return AssetRef ? EVisibility::Visible : EVisibility::Collapsed;
+                    })
+                    .OnClicked_Lambda([this]{
+                        auto& AssetRef = *(AssetPtr<AssetObject>*)AssetPtrRef;
+                        if (AssetRef && OuterObject->CanChangeProperty(Owner))
+                        {
+                            AssetRef = nullptr;
+                            Display->SetContent(SNullWidget::NullWidget);
+                            OnAssetChanged.ExecuteIfBound();
+                        }
+                        return FReply::Handled();
+                    })
+                ]
             ];
         }
         

@@ -44,6 +44,16 @@ namespace FW
 
 		check(ByteCode.IsValid());
 		TArray<GpuShaderLayoutBinding> ShaderLayoutBindings;
+
+		BindingShaderStage ShaderStage;
+		switch (Type)
+		{
+		case ShaderType::VertexShader:  ShaderStage = BindingShaderStage::Vertex;  break;
+		case ShaderType::PixelShader:   ShaderStage = BindingShaderStage::Pixel;   break;
+		case ShaderType::ComputeShader: ShaderStage = BindingShaderStage::Compute; break;
+		default: ShaderStage = BindingShaderStage::All; break;
+		}
+
 		TRefCountPtr<ID3D12ShaderReflection> Reflection;
 		DxcBuffer DxilBuffer{.Ptr = ByteCode->GetBufferPointer(), .Size = ByteCode->GetBufferSize()};
 		GShaderCompiler.CompilerUitls->CreateReflection(&DxilBuffer, IID_PPV_ARGS(Reflection.GetInitReference()));
@@ -66,7 +76,8 @@ namespace FW
 				.Name = BindDesc.Name,
 				.Slot = (int)BindDesc.BindPoint,
 				.Group = (int)BindDesc.Space,
-				.Type = BType
+				.Type = BType,
+				.Stage = ShaderStage
 			});
 
 			if (BType == BindingType::UniformBuffer)
@@ -192,6 +203,95 @@ namespace FW
 		});
 
 		return VertexInputs;
+	}
+
+	TArray<GpuShaderStageSemantic> Dx12Shader::GetStageOutputSemantics() const
+	{
+		if (ShaderLanguage == GpuShaderLanguage::GLSL)
+		{
+			return GpuShader::GetStageOutputSemantics();
+		}
+
+		TArray<GpuShaderStageSemantic> Semantics;
+		if (!ByteCode.IsValid())
+		{
+			return Semantics;
+		}
+
+		TRefCountPtr<ID3D12ShaderReflection> Reflection;
+		DxcBuffer DxilBuffer{.Ptr = ByteCode->GetBufferPointer(), .Size = ByteCode->GetBufferSize()};
+		GShaderCompiler.CompilerUitls->CreateReflection(&DxilBuffer, IID_PPV_ARGS(Reflection.GetInitReference()));
+		D3D12_SHADER_DESC ShaderDesc;
+		Reflection->GetDesc(&ShaderDesc);
+
+		for (uint32 Index = 0; Index < ShaderDesc.OutputParameters; Index++)
+		{
+			D3D12_SIGNATURE_PARAMETER_DESC ParamDesc;
+			Reflection->GetOutputParameterDesc(Index, &ParamDesc);
+
+			if (ParamDesc.SystemValueType != D3D_NAME_UNDEFINED)
+			{
+				continue;
+			}
+
+			// ReadWriteMask for outputs: bits indicate components NEVER written.
+			// Skip outputs where no component is actually written.
+			uint8 WrittenMask = ParamDesc.Mask & ~ParamDesc.ReadWriteMask;
+			if (WrittenMask == 0)
+			{
+				continue;
+			}
+
+			GpuShaderStageSemantic Semantic;
+			Semantic.SemanticName = ParamDesc.SemanticName;
+			Semantic.SemanticIndex = ParamDesc.SemanticIndex;
+			Semantics.Add(MoveTemp(Semantic));
+		}
+		return Semantics;
+	}
+
+	TArray<GpuShaderStageSemantic> Dx12Shader::GetStageInputSemantics() const
+	{
+		if (ShaderLanguage == GpuShaderLanguage::GLSL)
+		{
+			return GpuShader::GetStageInputSemantics();
+		}
+
+		TArray<GpuShaderStageSemantic> Semantics;
+		if (!ByteCode.IsValid())
+		{
+			return Semantics;
+		}
+
+		TRefCountPtr<ID3D12ShaderReflection> Reflection;
+		DxcBuffer DxilBuffer{.Ptr = ByteCode->GetBufferPointer(), .Size = ByteCode->GetBufferSize()};
+		GShaderCompiler.CompilerUitls->CreateReflection(&DxilBuffer, IID_PPV_ARGS(Reflection.GetInitReference()));
+		D3D12_SHADER_DESC ShaderDesc;
+		Reflection->GetDesc(&ShaderDesc);
+
+		for (uint32 Index = 0; Index < ShaderDesc.InputParameters; Index++)
+		{
+			D3D12_SIGNATURE_PARAMETER_DESC ParamDesc;
+			Reflection->GetInputParameterDesc(Index, &ParamDesc);
+
+			if (ParamDesc.SystemValueType != D3D_NAME_UNDEFINED)
+			{
+				continue;
+			}
+
+			// ReadWriteMask for inputs: bits indicate components ALWAYS read.
+			// Skip inputs that are never actually read.
+			if (ParamDesc.ReadWriteMask == 0)
+			{
+				continue;
+			}
+
+			GpuShaderStageSemantic Semantic;
+			Semantic.SemanticName = ParamDesc.SemanticName;
+			Semantic.SemanticIndex = ParamDesc.SemanticIndex;
+			Semantics.Add(MoveTemp(Semantic));
+		}
+		return Semantics;
 	}
 
 	class ShIncludeHandler final : public IDxcIncludeHandler
