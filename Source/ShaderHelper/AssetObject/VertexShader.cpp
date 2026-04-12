@@ -25,10 +25,9 @@ namespace SH
 	float2 TexCoord : TEXCOORD0;
 };
 
-cbuffer TransformUb
+cbuffer Transform : register(b0)
 {
-	float4x4 Model;
-	float4x4 ViewProj;
+	float4x4 MVP;
 };
 
 struct VSOutput
@@ -40,7 +39,7 @@ struct VSOutput
 VSOutput main(VSInput Input)
 {
 	VSOutput Output;
-	Output.Position = mul(mul(float4(Input.Position, 1.0), Model), ViewProj);
+	Output.Position = mul(float4(Input.Position, 1.0), MVP);
 	Output.TexCoord = Input.TexCoord;
 	return Output;
 })";
@@ -50,10 +49,9 @@ VSOutput main(VSInput Input)
 layout(location = 0) in vec3 Position;
 layout(location = 1) in vec2 TexCoord;
 
-layout(std140, binding = 0) uniform TransformUb
+layout(std140, binding = 0) uniform Transform
 {
-	mat4 Model;
-	mat4 ViewProj;
+	mat4 MVP;
 };
 
 layout(location = 0) out vec2 OutTexCoord;
@@ -61,7 +59,7 @@ layout(location = 0) out vec2 OutTexCoord;
 void main()
 {
 	OutTexCoord = TexCoord;
-	gl_Position = ViewProj * Model * vec4(Position, 1.0);
+	gl_Position = MVP * vec4(Position, 1.0);
 })";
 
 	namespace

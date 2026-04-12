@@ -100,12 +100,16 @@ namespace SH
 						.ViewportInterface(Preview)
 					]
 					+ SOverlay::Slot()
-					.HAlign(HAlign_Left)
+					.HAlign(HAlign_Fill)
 					.VAlign(VAlign_Top)
 					.Padding(8)
 					[
 						SAssignNew(ErrorText, STextBlock)
+						.Text_Lambda([this]{ return Renderer->GetErrorReason(); })
 						.ColorAndOpacity(FLinearColor::Red)
+						.AutoWrapText(true)
+						.WrappingPolicy(ETextWrappingPolicy::AllowPerCharacterWrapping)
+						.Clipping(EWidgetClipping::ClipToBounds)
 						.Visibility(EVisibility::Collapsed)
 					]
 				]
@@ -225,11 +229,9 @@ namespace SH
 		}
 		else
 		{
-			FString Reason = Renderer->GetErrorReason();
 			Renderer->RenderErrorColor(ViewportSize.X, ViewportSize.Y);
 			Preview->SetViewPortRenderTexture(Renderer->GetRenderTarget());
-			ErrorText->SetText(FText::FromString(Reason));
-			ErrorText->SetVisibility(Reason.IsEmpty() ? EVisibility::Collapsed : EVisibility::HitTestInvisible);
+			ErrorText->SetVisibility(EVisibility::HitTestInvisible);
 		}
 	}
 }

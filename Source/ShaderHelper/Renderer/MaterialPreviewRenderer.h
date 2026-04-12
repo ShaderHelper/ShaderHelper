@@ -30,7 +30,7 @@ namespace SH
 		void SetCameraDistance(float InDistance);
 		bool Render(uint32 InWidth, uint32 InHeight);
 		void RenderErrorColor(uint32 InWidth, uint32 InHeight);
-		FString GetErrorReason() const;
+		FText GetErrorReason() const;
 		FW::GpuTexture* GetRenderTarget() const { return RenderTarget.GetReference(); }
 
 		static TRefCountPtr<FW::GpuTexture> RenderThumbnail(const Material* InMaterial, uint32 InSize = 128, MaterialPreviewPrimitive InPreviewPrimitive = MaterialPreviewPrimitive::Sphere);
@@ -66,5 +66,6 @@ namespace SH
 		float CameraDistance = 2.0f;
 		MaterialPreviewPrimitive PreviewPrimitive = MaterialPreviewPrimitive::Sphere;
 		bool bPreviewMeshInitialized = false;
+		TFunction<FText()> LinkageErrorFunc;
 	};
 }

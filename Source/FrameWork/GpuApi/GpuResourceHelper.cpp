@@ -203,10 +203,10 @@ namespace FW::GpuResourceHelper
 		GGpuRhi->UnMapGpuBuffer(ParamBuf);
 
 		TRefCountPtr<GpuBindGroup> BindGroup = GpuBindGroupBuilder{ Mip.Layout2D }
-			.SetExistingBinding(MipResources::InputTexBinding, BindingType::Texture, SrcView)
-			.SetExistingBinding(MipResources::SamplerBinding, BindingType::Sampler, Sampler)
-			.SetExistingBinding(MipResources::OutputTexBinding, BindingType::RWTexture, DstView)
-			.SetExistingBinding(MipResources::ParamsBinding, BindingType::UniformBuffer, ParamBuf)
+			.SetExistingBinding(MipResources::InputTexBinding, BindingType::Texture, SrcView, BindingShaderStage::Compute)
+			.SetExistingBinding(MipResources::SamplerBinding, BindingType::Sampler, Sampler, BindingShaderStage::Compute)
+			.SetExistingBinding(MipResources::OutputTexBinding, BindingType::RWTexture, DstView, BindingShaderStage::Compute)
+			.SetExistingBinding(MipResources::ParamsBinding, BindingType::UniformBuffer, ParamBuf, BindingShaderStage::Compute)
 			.Build();
 
 		CmdRecorder->Barriers({
@@ -251,10 +251,10 @@ namespace FW::GpuResourceHelper
 		GGpuRhi->UnMapGpuBuffer(ParamBuf);
 
 		TRefCountPtr<GpuBindGroup> BindGroup = GpuBindGroupBuilder{ Mip.Layout3D }
-			.SetExistingBinding(MipResources::InputTexBinding, BindingType::Texture3D, SrcView)
-			.SetExistingBinding(MipResources::SamplerBinding, BindingType::Sampler, Sampler)
-			.SetExistingBinding(MipResources::OutputTexBinding, BindingType::RWTexture3D, DstView)
-			.SetExistingBinding(MipResources::ParamsBinding, BindingType::UniformBuffer, ParamBuf)
+			.SetExistingBinding(MipResources::InputTexBinding, BindingType::Texture3D, SrcView, BindingShaderStage::Compute)
+			.SetExistingBinding(MipResources::SamplerBinding, BindingType::Sampler, Sampler, BindingShaderStage::Compute)
+			.SetExistingBinding(MipResources::OutputTexBinding, BindingType::RWTexture3D, DstView, BindingShaderStage::Compute)
+			.SetExistingBinding(MipResources::ParamsBinding, BindingType::UniformBuffer, ParamBuf, BindingShaderStage::Compute)
 			.Build();
 
 		CmdRecorder->Barriers({

@@ -120,7 +120,12 @@ namespace FW::VK
 
 		if (IsViewportDirty && CurrentViewPort)
 		{
-			vkCmdSetViewport(CmdBuffer, 0, 1, &*CurrentViewPort);
+			// Use negative viewport height (VK_KHR_maintenance1) to flip Y,
+			// making Vulkan's NDC match DX12/Metal (+Y up) without shader-level inversion.
+			VkViewport FlippedViewPort = *CurrentViewPort;
+			FlippedViewPort.y = FlippedViewPort.y + FlippedViewPort.height;
+			FlippedViewPort.height = -FlippedViewPort.height;
+			vkCmdSetViewport(CmdBuffer, 0, 1, &FlippedViewPort);
 			IsViewportDirty = false;
 		}
 

@@ -93,7 +93,19 @@ namespace SH
 		for (const GpuShaderLayoutBinding& Binding : Bindings)
 		{
 			const FString BindingTypeName = ANSI_TO_TCHAR(magic_enum::enum_name(Binding.Type).data());
-			BindingCategory->AddChild(CreateBindingInfoProperty(const_cast<ShaderAsset*>(this), Binding.Name, BindingTypeName));
+			if (Binding.Type == BindingType::UniformBuffer && Binding.UbMembers.Num() > 0)
+			{
+				auto UniformBufferCategory = MakeShared<PropertyCategory>(const_cast<ShaderAsset*>(this), Binding.Name);
+				for (const GpuShaderUbMemberInfo& Member : Binding.UbMembers)
+				{
+					UniformBufferCategory->AddChild(CreateBindingInfoProperty(const_cast<ShaderAsset*>(this), Member.Name, Member.Type));
+				}
+				BindingCategory->AddChild(UniformBufferCategory);
+				continue;
+			}
+
+			auto BindingProperty = CreateBindingInfoProperty(const_cast<ShaderAsset*>(this), Binding.Name, BindingTypeName);
+			BindingCategory->AddChild(BindingProperty);
 		}
 		return BindingProperties;
 	}

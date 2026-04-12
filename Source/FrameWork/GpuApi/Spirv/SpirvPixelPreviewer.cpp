@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "SpirvPixelPreviewer.h"
+#include "GpuApi/GpuRhi.h"
 
 namespace FW
 {
@@ -29,7 +30,7 @@ namespace FW
 		}
 		int SetNumber = 0;
 		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(Params, SpvDecorationKind::DescriptorSet, TArray<uint8>{ (uint8*)&SetNumber, sizeof(int) }));
-		int BindingNumber = PreviewerParamsBindingSlot;
+		int BindingNumber = GetSpirvPatchBindingNumber(PreviewerParamsBindingSlot, BindingType::UniformBuffer, BindingShaderStage::Pixel);
 		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(Params, SpvDecorationKind::Binding, TArray<uint8>{ (uint8*)&BindingNumber, sizeof(int) }));
 
 		return Params;

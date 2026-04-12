@@ -12,6 +12,8 @@ namespace FW
         
 		TArray<GpuShaderLayoutBinding> GetLayout() const override;
 		TArray<GpuShaderVertexInput> GetVertexInputs() const override;
+		TArray<GpuShaderStageSemantic> GetStageOutputSemantics() const override;
+		TArray<GpuShaderStageSemantic> GetStageInputSemantics() const override;
     public:
 		IDxcBlob* GetCompilationResult() const { return ByteCode; }
 		virtual bool IsCompiled() const override { return ByteCode.IsValid(); }

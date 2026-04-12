@@ -1,10 +1,16 @@
 #pragma once
 #include "SpirvInstruction.h"
+#include "GpuApi/GpuBindGroupLayout.h"
 
 namespace FW
 {
 	struct SpvMetaContext;
 	class SpvMetaVisitor;
+
+	// Compute the SPIRV binding decoration for patched variables (debugger/previewer).
+	// DX12: no shift (SPIRV cross-compiles to HLSL registers 1:1).
+	// Vulkan: type shift + per-stage offset.  Metal: type shift only.
+	FRAMEWORK_API int32 GetSpirvPatchBindingNumber(int32 SlotNumber, BindingType Type, BindingShaderStage Stage);
 
 	class FRAMEWORK_API SpvPatcher
 	{

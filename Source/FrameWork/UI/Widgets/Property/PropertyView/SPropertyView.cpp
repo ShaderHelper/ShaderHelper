@@ -12,13 +12,13 @@ namespace FW
 
     void SPropertyView::SetObjectData(ShObject* InObjectData)
     {
-        if(!InObjectData) return;
         if(Locked || InObjectData == ObjectData)
         {
             return;
         }
             
         ObjectData = InObjectData;
+		if (!ObjectData.IsValid()) return;
         
         TSharedPtr<SBorder> PropertyContent;
         auto Content = SNew(SVerticalBox)

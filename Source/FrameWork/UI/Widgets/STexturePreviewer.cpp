@@ -36,7 +36,7 @@ namespace FW
 			PreviewUniformBuffer = PreviewUbBuilder.Build();
 
 			BindGroupLayout = GpuBindGroupLayoutBuilder{0}
-				.AddUniformBuffer(TEXT("PreviewUb"), PreviewUbBuilder)
+				.AddUniformBuffer(TEXT("PreviewUb"), PreviewUbBuilder, BindingShaderStage::All)
 				.AddTextureCube(TEXT("PreviewCube"), BindingShaderStage::Pixel)
 				.AddSampler(TEXT("PreviewCubeSampler"), BindingShaderStage::Pixel)
 				.Build();
@@ -263,7 +263,7 @@ namespace FW
 			VolumeUniformBuffer = VolumeUbBuilder.Build();
 
 			BindGroupLayout = GpuBindGroupLayoutBuilder{0}
-				.AddUniformBuffer(TEXT("VolumeUb"), VolumeUbBuilder)
+				.AddUniformBuffer(TEXT("VolumeUb"), VolumeUbBuilder, BindingShaderStage::All)
 				.AddTexture3D(TEXT("VolumeTex"), BindingShaderStage::Pixel)
 				.AddSampler(TEXT("VolumeSampler"), BindingShaderStage::Pixel)
 				.Build();

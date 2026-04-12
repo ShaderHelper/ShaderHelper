@@ -1,11 +1,12 @@
 #pragma once
 #include "GpuResourceCommon.h"
-#include <Misc/FileHelper.h>
 #include "Common/Path/PathHelper.h"
 #include "Containers/Array.h"
 #include "Containers/UnrealString.h"
 #include "GpuBindGroupLayout.h"
 #include "ShaderConductor.hpp"
+
+#include <Misc/FileHelper.h>
 
 DECLARE_LOG_CATEGORY_EXTERN(LogShader, Log, All);
 inline DEFINE_LOG_CATEGORY(LogShader);
@@ -81,6 +82,7 @@ namespace FW
 		Enable16bitType = 1u << 0,
 		GenSpvForDebugging = 1u << 1,
 		CompileFromSpvCode = 1u << 2,
+		SkipBindingShift = 1u << 3,
 	};
 	ENUM_CLASS_FLAGS(GpuShaderCompilerFlag);
 
@@ -152,6 +154,12 @@ namespace FW
 		FString Type;
 	};
 
+	struct GpuShaderStageSemantic
+	{
+		FString SemanticName;
+		uint32 SemanticIndex = 0;
+	};
+
 	inline bool IsShaderMatrix4x4Type(const FString& InType) { return InType == TEXT("float4x4") || InType == TEXT("mat4") || InType == TEXT("mat4x4"); }
 	inline bool IsShaderVector4Type(const FString& InType)   { return InType == TEXT("float4") || InType == TEXT("vec4"); }
 	inline bool IsShaderVector3Type(const FString& InType)   { return InType == TEXT("float3") || InType == TEXT("vec3"); }
@@ -186,6 +194,7 @@ namespace FW
 		int32 Slot;
 		BindingGroupSlot Group;
 		BindingType Type;
+		BindingShaderStage Stage;
 		TArray<GpuShaderUbMemberInfo> UbMembers;
 	};
 
@@ -219,6 +228,8 @@ namespace FW
 
 		virtual TArray<GpuShaderLayoutBinding> GetLayout() const;
 		virtual TArray<GpuShaderVertexInput> GetVertexInputs() const;
+		virtual TArray<GpuShaderStageSemantic> GetStageOutputSemantics() const;
+		virtual TArray<GpuShaderStageSemantic> GetStageInputSemantics() const;
 
 		friend uint32 GetTypeHash(const GpuShader& Shader)
 		{

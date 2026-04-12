@@ -39,7 +39,7 @@ namespace UNITTEST_GPUAPI
 			.Build();
 
 		BindGroup = GpuBindGroupBuilder{ BindGroupLayout }
-			.SetExistingBinding(0, BindingType::Texture, TestTex)
+			.SetExistingBinding(0, BindingType::Texture, TestTex, BindingShaderStage::Vertex)
 			.Build();
 
 		DummyRT = GGpuRhi->CreateTexture({ 1, 1, GpuFormat::B8G8R8A8_UNORM, GpuTextureUsage::RenderTarget });

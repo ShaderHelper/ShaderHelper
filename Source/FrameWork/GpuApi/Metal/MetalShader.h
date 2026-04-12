@@ -17,6 +17,15 @@ namespace FW
         virtual bool IsCompiled() const override { return (bool)ByteCodeFunc; }
         void SetCompilationResult(MTLFunctionPtr InByteCodeFunc) { ByteCodeFunc = MoveTemp(InByteCodeFunc); }
         void SetMslText(FString InText) { MslText = MoveTemp(InText); }
+        virtual TArray<GpuShaderLayoutBinding> GetLayout() const override
+        {
+            TArray<GpuShaderLayoutBinding> Bindings = GpuShader::GetLayout();
+            for (auto& Binding : Bindings)
+            {
+                Binding.Slot -= GetBindingShift(Binding.Type);
+            }
+            return Bindings;
+        }
         
     public:
         Vector3u ThreadGroupSize{};

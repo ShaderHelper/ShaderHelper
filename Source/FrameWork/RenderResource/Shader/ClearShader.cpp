@@ -45,7 +45,7 @@ namespace FW
 		ClearUb->GetMember<uint32>("Size") = ResourceByteSize / 4;
 
 		return GpuBindGroupBuilder{ BindGroupLayout }
-			.SetExistingBinding(0, InType, InResource)
+			.SetExistingBinding(0, InType, InResource, BindingShaderStage::Compute)
 			.SetUniformBuffer("ClearUb", ClearUb->GetGpuResource())
 			.Build();
 	}

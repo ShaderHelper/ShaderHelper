@@ -40,23 +40,27 @@ namespace FW
 	{
 		int32 SlotNum;
 		BindingType Type;
+		BindingShaderStage Stage;
 
 		bool operator==(const BindingSlot& Other) const = default;
 		bool operator<(const BindingSlot& Other) const
 		{
 			if (SlotNum != Other.SlotNum) return SlotNum < Other.SlotNum;
-			return Type < Other.Type;
+			if (Type != Other.Type) return Type < Other.Type;
+			return Stage < Other.Stage;
 		}
 
 		friend uint32 GetTypeHash(const BindingSlot& Key)
 		{
-			return HashCombine(::GetTypeHash(Key.SlotNum), ::GetTypeHash(Key.Type));
+			uint32 Hash = HashCombine(::GetTypeHash(Key.SlotNum), ::GetTypeHash(Key.Type));
+			return HashCombine(Hash, ::GetTypeHash(Key.Stage));
 		}
 
 		friend FArchive& operator<<(FArchive& Ar, BindingSlot& Slot)
 		{
 			Ar << Slot.SlotNum;
 			Ar << Slot.Type;
+			Ar << Slot.Stage;
 			return Ar;
 		}
 	};
@@ -64,7 +68,7 @@ namespace FW
 	struct LayoutBinding
 	{
 		BindingType Type;
-		BindingShaderStage Stage = BindingShaderStage::All;
+		BindingShaderStage Stage;
 		
 		bool operator==(const LayoutBinding& Other) const
 		{
@@ -160,18 +164,18 @@ namespace FW
 	public:
 		GpuBindGroupLayoutBuilder(BindingGroupSlot InGroupSlot);
 		//!! If have bindings that are not from codegen, must first call this method for each binding, to make sure the bindings are compact.
-		GpuBindGroupLayoutBuilder& AddExistingBinding(int32 InSlotNum, BindingType Type, BindingShaderStage InStage = BindingShaderStage::All);
+		GpuBindGroupLayoutBuilder& AddExistingBinding(int32 InSlotNum, BindingType Type, BindingShaderStage InStage);
 
 		//Add the codegen bindings, then get the CodegenDeclaration that will be injected into a shader.
-		GpuBindGroupLayoutBuilder& AddUniformBuffer(const FString& BindingName, const UniformBufferBuilder& UbBuilder, BindingShaderStage InStage = BindingShaderStage::All);
-		GpuBindGroupLayoutBuilder& AddTexture(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
-		GpuBindGroupLayoutBuilder& AddTextureCube(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
-		GpuBindGroupLayoutBuilder& AddTexture3D(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
+		GpuBindGroupLayoutBuilder& AddUniformBuffer(const FString& BindingName, const UniformBufferBuilder& UbBuilder, BindingShaderStage InStage);
+		GpuBindGroupLayoutBuilder& AddTexture(const FString& BindingName, BindingShaderStage InStage);
+		GpuBindGroupLayoutBuilder& AddTextureCube(const FString& BindingName, BindingShaderStage InStage);
+		GpuBindGroupLayoutBuilder& AddTexture3D(const FString& BindingName, BindingShaderStage InStage);
 		//TODO StaticSampler ? It will be embed into BingGroupLayout, vulkan has the same concept, but metal might not have.
-		GpuBindGroupLayoutBuilder& AddSampler(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
-		GpuBindGroupLayoutBuilder& AddCombinedTextureSampler(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
-		GpuBindGroupLayoutBuilder& AddCombinedTextureCubeSampler(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
-		GpuBindGroupLayoutBuilder& AddCombinedTexture3DSampler(const FString& BindingName, BindingShaderStage InStage = BindingShaderStage::All);
+		GpuBindGroupLayoutBuilder& AddSampler(const FString& BindingName, BindingShaderStage InStage);
+		GpuBindGroupLayoutBuilder& AddCombinedTextureSampler(const FString& BindingName, BindingShaderStage InStage);
+		GpuBindGroupLayoutBuilder& AddCombinedTextureCubeSampler(const FString& BindingName, BindingShaderStage InStage);
+		GpuBindGroupLayoutBuilder& AddCombinedTexture3DSampler(const FString& BindingName, BindingShaderStage InStage);
 
 		const FString& GetCodegenDeclaration(GpuShaderLanguage Language) const;
         const GpuBindGroupLayoutDesc& GetDesc() const { return LayoutDesc; }
@@ -189,4 +193,47 @@ namespace FW
 		GpuBindGroupLayoutDesc LayoutDesc;
 	};
 
+	// Binding shift offsets to separate HLSL register namespaces (b/t/s/u)
+	// into non-overlapping flat binding/index ranges for backends that need it (Vulkan, Metal).
+	inline constexpr int32 BindingShift_Buffer  = 0;
+	inline constexpr int32 BindingShift_Texture = 128;
+	inline constexpr int32 BindingShift_Sampler = 256;
+	inline constexpr int32 BindingShift_UAV     = 384;
+
+	// Per-stage binding offset for Vulkan: PS bindings are shifted by this amount
+	// so that VS and PS can independently use the same slot numbers.
+	inline constexpr int32 StageBindingOffset_Pixel = 512;
+
+	inline int32 GetStageBindingOffset(BindingShaderStage Stage)
+	{
+		if (Stage == BindingShaderStage::Pixel) return StageBindingOffset_Pixel;
+		return 0;
+	}
+
+	inline int32 GetBindingShift(BindingType Type)
+	{
+		switch (Type)
+		{
+		case BindingType::UniformBuffer:
+			return BindingShift_Buffer;
+		case BindingType::Texture:
+		case BindingType::TextureCube:
+		case BindingType::Texture3D:
+		case BindingType::CombinedTextureSampler:
+		case BindingType::CombinedTextureCubeSampler:
+		case BindingType::CombinedTexture3DSampler:
+		case BindingType::StructuredBuffer:
+		case BindingType::RawBuffer:
+			return BindingShift_Texture;
+		case BindingType::Sampler:
+			return BindingShift_Sampler;
+		case BindingType::RWStructuredBuffer:
+		case BindingType::RWRawBuffer:
+		case BindingType::RWTexture:
+		case BindingType::RWTexture3D:
+			return BindingShift_UAV;
+		default:
+			AUX::Unreachable();
+		}
+	}
 }

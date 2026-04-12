@@ -765,7 +765,7 @@ namespace FW
 		}
 		int SetNumber = 0;
 		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(DebuggerBuffer, SpvDecorationKind::DescriptorSet, TArray<uint8>{ (uint8*)&SetNumber, sizeof(int) }));
-		int BindingNumber = DebuggerBufferBindingSlot;
+		int BindingNumber = GetSpirvPatchBindingNumber(DebuggerBufferBindingSlot, BindingType::RWRawBuffer, BindingShaderStage::Pixel);
 		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(DebuggerBuffer, SpvDecorationKind::Binding, TArray<uint8>{ (uint8*)&BindingNumber, sizeof(int) }));
 
 		return DebuggerBuffer;
@@ -795,7 +795,7 @@ namespace FW
 		}
 		int SetNumber = 0;
 		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(DebuggerParams, SpvDecorationKind::DescriptorSet, TArray<uint8>{ (uint8*)&SetNumber, sizeof(int) }));
-		int BindingNumber = DebuggerParamsBindingSlot;
+		int BindingNumber = GetSpirvPatchBindingNumber(DebuggerParamsBindingSlot, BindingType::UniformBuffer, BindingShaderStage::Pixel);
 		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(DebuggerParams, SpvDecorationKind::Binding, TArray<uint8>{ (uint8*)&BindingNumber, sizeof(int) }));
 
 		return DebuggerParams;

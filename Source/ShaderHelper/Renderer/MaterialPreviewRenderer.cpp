@@ -21,21 +21,38 @@ namespace SH
 		constexpr GpuFormat PreviewDepthFormat = GpuFormat::D32_FLOAT;
 		const Vector4f PreviewClearColor(0.08f, 0.08f, 0.08f, 1.0f);
 
-		void AddUbMemberToBuilder(UniformBufferBuilder& Builder, const GpuShaderUbMemberInfo& Member)
+		TUniquePtr<UniformBuffer> BuildUniformBufferFromReflection(const TArray<GpuShaderUbMemberInfo>& Members)
 		{
-			if (IsShaderMatrix4x4Type(Member.Type))             Builder.AddMatrix4x4f(Member.Name);
-			else if (IsShaderVector4Type(Member.Type))          Builder.AddVector4f(Member.Name);
-			else if (IsShaderVector3Type(Member.Type))          Builder.AddVector3f(Member.Name);
-			else if (IsShaderVector2Type(Member.Type))          Builder.AddVector2f(Member.Name);
-			else if (Member.Type == TEXT("float"))             Builder.AddFloat(Member.Name);
-			else if (Member.Type == TEXT("int") || IsShaderBoolType(Member.Type))  Builder.AddInt(Member.Name);
-			else if (Member.Type == TEXT("uint"))              Builder.AddUint(Member.Name);
-			else if (IsShaderIntVector4Type(Member.Type) || IsShaderBoolVector4Type(Member.Type))  Builder.AddVector4i(Member.Name);
-			else if (IsShaderIntVector3Type(Member.Type) || IsShaderBoolVector3Type(Member.Type))  Builder.AddVector3i(Member.Name);
-			else if (IsShaderIntVector2Type(Member.Type) || IsShaderBoolVector2Type(Member.Type))  Builder.AddVector2i(Member.Name);
-			else if (IsShaderUintVector4Type(Member.Type))     Builder.AddVector4u(Member.Name);
-			else if (IsShaderUintVector3Type(Member.Type))     Builder.AddVector3u(Member.Name);
-			else if (IsShaderUintVector2Type(Member.Type))     Builder.AddVector2u(Member.Name);
+			UniformBufferMetaData MetaData;
+			uint32 MaxEnd = 0;
+			for (const auto& Member : Members)
+			{
+				FString HlslType, GlslType;
+				if (IsShaderMatrix4x4Type(Member.Type))                                                        { HlslType = TEXT("float4x4"); GlslType = TEXT("mat4"); }
+				else if (IsShaderVector4Type(Member.Type))                                                     { HlslType = TEXT("float4"); GlslType = TEXT("vec4"); }
+				else if (IsShaderVector3Type(Member.Type))                                                     { HlslType = TEXT("float3"); GlslType = TEXT("vec3"); }
+				else if (IsShaderVector2Type(Member.Type))                                                     { HlslType = TEXT("float2"); GlslType = TEXT("vec2"); }
+				else if (Member.Type == TEXT("float"))                                                         { HlslType = TEXT("float"); GlslType = TEXT("float"); }
+				else if (Member.Type == TEXT("int") || IsShaderBoolType(Member.Type))                          { HlslType = TEXT("int"); GlslType = TEXT("int"); }
+				else if (Member.Type == TEXT("uint"))                                                          { HlslType = TEXT("uint"); GlslType = TEXT("uint"); }
+				else if (IsShaderIntVector4Type(Member.Type) || IsShaderBoolVector4Type(Member.Type))           { HlslType = TEXT("int4"); GlslType = TEXT("ivec4"); }
+				else if (IsShaderIntVector3Type(Member.Type) || IsShaderBoolVector3Type(Member.Type))           { HlslType = TEXT("int3"); GlslType = TEXT("ivec3"); }
+				else if (IsShaderIntVector2Type(Member.Type) || IsShaderBoolVector2Type(Member.Type))           { HlslType = TEXT("int2"); GlslType = TEXT("ivec2"); }
+				else if (IsShaderUintVector4Type(Member.Type))                                                 { HlslType = TEXT("uint4"); GlslType = TEXT("uvec4"); }
+				else if (IsShaderUintVector3Type(Member.Type))                                                 { HlslType = TEXT("uint3"); GlslType = TEXT("uvec3"); }
+				else if (IsShaderUintVector2Type(Member.Type))                                                 { HlslType = TEXT("uint2"); GlslType = TEXT("uvec2"); }
+				else                                                                                          { HlslType = Member.Type; GlslType = Member.Type; }
+
+				MetaData.Members.Add(Member.Name, { Member.Offset, Member.Size, HlslType, GlslType });
+				MaxEnd = FMath::Max(MaxEnd, Member.Offset + Member.Size);
+			}
+			MetaData.UniformBufferSize = Align(MaxEnd, 16u);
+			if (MetaData.UniformBufferSize > 0)
+			{
+				TRefCountPtr<GpuBuffer> Buffer = GGpuRhi->CreateBuffer({ MetaData.UniformBufferSize, GpuBufferUsage::Uniform });
+				return MakeUnique<UniformBuffer>(MoveTemp(Buffer), MoveTemp(MetaData));
+			}
+			return {};
 		}
 	}
 
@@ -53,6 +70,7 @@ namespace SH
 		BindGroups.Empty();
 		PreviewUniformBuffers.Empty();
 		bPreviewMeshInitialized = false;
+		LinkageErrorFunc = nullptr;
 	}
 
 	void MaterialPreviewRenderer::SetPreviewPrimitive(MaterialPreviewPrimitive InPreviewPrimitive)
@@ -194,20 +212,25 @@ namespace SH
 		GGpuRhi->Submit({ CmdRecorder });
 	}
 
-	FString MaterialPreviewRenderer::GetErrorReason() const
+	FText MaterialPreviewRenderer::GetErrorReason() const
 	{
-		TArray<FString> Errors;
+		TArray<FText> Errors;
 		if (!MaterialAsset->VertexShaderAsset)
-			Errors.Add(LOCALIZATION("VsNotSpecified").ToString());
+			Errors.Add(LOCALIZATION("VsNotSpecified"));
 		else if (!MaterialAsset->VertexShaderAsset->Shader || !MaterialAsset->VertexShaderAsset->Shader->IsCompiled())
-			Errors.Add(LOCALIZATION("VsCompileFailed").ToString());
+			Errors.Add(LOCALIZATION("VsCompileFailed"));
 
 		if (!MaterialAsset->PixelShaderAsset)
-			Errors.Add(LOCALIZATION("PsNotSpecified").ToString());
+			Errors.Add(LOCALIZATION("PsNotSpecified"));
 		else if (!MaterialAsset->PixelShaderAsset->Shader || !MaterialAsset->PixelShaderAsset->Shader->IsCompiled())
-			Errors.Add(LOCALIZATION("PsCompileFailed").ToString());
+			Errors.Add(LOCALIZATION("PsCompileFailed"));
 
-		return FString::Join(Errors, TEXT("\n"));
+		if (LinkageErrorFunc)
+			Errors.Add(LinkageErrorFunc());
+
+		TArray<FString> ErrorStrings;
+		for (const auto& E : Errors) ErrorStrings.Add(E.ToString());
+		return FText::FromString(FString::Join(ErrorStrings, TEXT("\n")));
 	}
 
 	TRefCountPtr<GpuTexture> MaterialPreviewRenderer::RenderThumbnail(const Material* InMaterial, uint32 InSize, MaterialPreviewPrimitive InPreviewPrimitive)
@@ -241,9 +264,47 @@ namespace SH
 			return false;
 		}
 
+		if (Vs->GetShaderLanguage() != Ps->GetShaderLanguage())
+		{
+			LinkageErrorFunc = []{ return LOCALIZATION("ShaderLanguageMismatch"); };
+			return false;
+		}
+
+		// Validate VS output / PS input linkage before creating pipeline
+		{
+			TArray<GpuShaderStageSemantic> VsOutputs = Vs->GetStageOutputSemantics();
+			TArray<GpuShaderStageSemantic> PsInputs = Ps->GetStageInputSemantics();
+			TArray<FString> MissingSemantics;
+			for (const auto& PsInput : PsInputs)
+			{
+				bool bFound = VsOutputs.ContainsByPredicate([&](const GpuShaderStageSemantic& VsOutput) {
+					return VsOutput.SemanticName.Equals(PsInput.SemanticName, ESearchCase::IgnoreCase)
+						&& VsOutput.SemanticIndex == PsInput.SemanticIndex;
+				});
+				if (!bFound)
+				{
+					FString SemanticStr = PsInput.SemanticIndex > 0
+						? FString::Printf(TEXT("%s%d"), *PsInput.SemanticName, PsInput.SemanticIndex)
+						: PsInput.SemanticName;
+					MissingSemantics.Add(MoveTemp(SemanticStr));
+				}
+			}
+			if (MissingSemantics.Num() > 0)
+			{
+				FString Joined = FString::Join(MissingSemantics, TEXT(", "));
+				LinkageErrorFunc = [Joined]{ return FText::Format(LOCALIZATION("SemanticLinkageError"), FText::FromString(Joined)); };
+				return false;
+			}
+			LinkageErrorFunc = nullptr;
+		}
+
 		if (BindGroupLayouts.IsEmpty())
 		{
 			BuildBindGroupFromMaterial();
+			if (LinkageErrorFunc)
+			{
+				return false;
+			}
 		}
 
 		// Build vertex layout dynamically from Material's VertexInputDefaults
@@ -427,55 +488,86 @@ float4 MainPS() : SV_Target { return float4(1.0, 0.0, 1.0, 1.0); }
 			GroupedBindings.FindOrAdd(Binding.Group).Add(&Binding);
 		}
 
-		for (auto& [GroupSlot, Bindings] : GroupedBindings)
+		// Merge bindings with same slot+type (for UBs, also require same layout): combine stage visibility
+		auto UbLayoutsMatch = [](const TArray<GpuShaderUbMemberInfo>& A, const TArray<GpuShaderUbMemberInfo>& B) {
+			if (A.Num() != B.Num()) return false;
+			for (int32 i = 0; i < A.Num(); ++i)
+			{
+				if (A[i].Name != B[i].Name || A[i].Offset != B[i].Offset || A[i].Size != B[i].Size || A[i].Type != B[i].Type)
+					return false;
+			}
+			return true;
+		};
+
+		auto MakeUbKey = [](const FString& Name, BindingShaderStage Stage) -> FString {
+			if (Stage == BindingShaderStage::Vertex) return Name + TEXT("|VS");
+			if (Stage == BindingShaderStage::Pixel) return Name + TEXT("|PS");
+			return Name;
+		};
+
+		TMap<BindingGroupSlot, TArray<GpuShaderLayoutBinding>> MergedGroupedBindings;
+		for (const auto& [GroupSlot, Bindings] : GroupedBindings)
 		{
-			GpuBindGroupLayoutBuilder LayoutBuilder{GroupSlot};
-			TSet<BindingSlot> AddedSlots;
+			auto& MergedBindings = MergedGroupedBindings.FindOrAdd(GroupSlot);
 			for (const auto* Binding : Bindings)
 			{
-				BindingSlot BSlot{Binding->Slot, Binding->Type};
-				if (!AddedSlots.Contains(BSlot))
+				auto* Existing = MergedBindings.FindByPredicate([&](const GpuShaderLayoutBinding& M) {
+					if (M.Slot != Binding->Slot || M.Type != Binding->Type) return false;
+					if (M.Type == BindingType::UniformBuffer)
+						return UbLayoutsMatch(M.UbMembers, Binding->UbMembers);
+					return true;
+				});
+				if (Existing)
 				{
-					AddedSlots.Add(BSlot);
-					LayoutBuilder.AddExistingBinding(Binding->Slot, Binding->Type);
+					if (Existing->Name != Binding->Name)
+						Existing->Name = Existing->Name + TEXT("/") + Binding->Name;
+					Existing->Stage = Existing->Stage | Binding->Stage;
 				}
+				else
+				{
+					// For UBs with different layout at same slot, keep separate entries
+					MergedBindings.Add(*Binding);
+				}
+			}
+		}
+
+		for (auto& [GroupSlot, MergedBindings] : MergedGroupedBindings)
+		{
+			GpuBindGroupLayoutBuilder LayoutBuilder{GroupSlot};
+			for (const auto& Binding : MergedBindings)
+			{
+				LayoutBuilder.AddExistingBinding(Binding.Slot, Binding.Type, Binding.Stage);
 			}
 			BindGroupLayouts.Add(GroupSlot, LayoutBuilder.Build());
 		}
 
 		// Build UBs and bind groups per group
-		for (auto& [GroupSlot, Bindings] : GroupedBindings)
+		for (auto& [GroupSlot, MergedBindings] : MergedGroupedBindings)
 		{
 			GpuBindGroupBuilder GroupBuilder{BindGroupLayouts[GroupSlot]};
-			TSet<BindingSlot> BuiltSlots;
 
-			for (const auto* Binding : Bindings)
+			for (const auto& Binding : MergedBindings)
 			{
-				BindingSlot BSlot{Binding->Slot, Binding->Type};
-				if (Binding->Type == BindingType::UniformBuffer && !BuiltSlots.Contains(BSlot))
+				if (Binding.Type == BindingType::UniformBuffer)
 				{
-					BuiltSlots.Add(BSlot);
-					UniformBufferBuilder UbBuilder{ UniformBufferUsage::Persistant };
-					for (const auto& Member : Binding->UbMembers)
+					FString UbKey = MakeUbKey(Binding.Name, Binding.Stage);
+					if (!PreviewUniformBuffers.Contains(UbKey))
 					{
-						AddUbMemberToBuilder(UbBuilder, Member);
+						PreviewUniformBuffers.Add(UbKey, BuildUniformBufferFromReflection(Binding.UbMembers));
 					}
-					PreviewUniformBuffers.Add(Binding->Name, UbBuilder.Build());
-					GroupBuilder.SetExistingBinding(Binding->Slot, Binding->Type, PreviewUniformBuffers[Binding->Name]->GetGpuResource());
+					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, PreviewUniformBuffers[UbKey]->GetGpuResource(), Binding.Stage);
 				}
 			}
 
 			// Bind resource defaults
-			for (const auto* Binding : Bindings)
+			for (const auto& Binding : MergedBindings)
 			{
-				BindingSlot BSlot{Binding->Slot, Binding->Type};
-				if (BuiltSlots.Contains(BSlot)) continue;
-				BuiltSlots.Add(BSlot);
+				if (Binding.Type == BindingType::UniformBuffer) continue;
 
 				const MaterialBindingResourceDefault* ResDefault = nullptr;
 				for (const auto& D : MaterialAsset->BindingResourceDefaults)
 				{
-					if (D.BindingName == Binding->Name)
+					if (D.BindingName == Binding.Name)
 					{
 						ResDefault = &D;
 						break;
@@ -513,23 +605,23 @@ float4 MainPS() : SV_Target { return float4(1.0, 0.0, 1.0, 1.0); }
 					return GpuResourceHelper::GetSampler(Desc);
 				};
 
-				switch (Binding->Type)
+				switch (Binding.Type)
 				{
 				case BindingType::Texture:
 				case BindingType::TextureCube:
 				case BindingType::Texture3D:
-					GroupBuilder.SetExistingBinding(Binding->Slot, Binding->Type, GetTextureView(*ResDefault, Binding->Type));
+					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, GetTextureView(*ResDefault, Binding.Type), Binding.Stage);
 					break;
 				case BindingType::Sampler:
-					GroupBuilder.SetExistingBinding(Binding->Slot, Binding->Type, GetSamplerResource(*ResDefault));
+					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, GetSamplerResource(*ResDefault), Binding.Stage);
 					break;
 				case BindingType::CombinedTextureSampler:
 				case BindingType::CombinedTextureCubeSampler:
 				case BindingType::CombinedTexture3DSampler:
 				{
-					GpuResource* TexView = GetTextureView(*ResDefault, Binding->Type);
+					GpuResource* TexView = GetTextureView(*ResDefault, Binding.Type);
 					GpuSampler* Sampler = GetSamplerResource(*ResDefault);
-					GroupBuilder.SetExistingBinding(Binding->Slot, Binding->Type, new GpuCombinedTextureSampler(TexView, Sampler));
+					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, new GpuCombinedTextureSampler(TexView, Sampler), Binding.Stage);
 					break;
 				}
 				default:
@@ -606,20 +698,43 @@ float4 MainPS() : SV_Target { return float4(1.0, 0.0, 1.0, 1.0); }
 		ViewCamera.Position = Vector3f(OrbitPos.X, OrbitPos.Y, OrbitPos.Z);
 
 		const FMatrix44f ModelMatrix = FMatrix44f::Identity;
-		const FMatrix44f ViewProjMatrix = ViewCamera.GetViewProjectionMatrix();
+		const FMatrix44f ViewMatrix = ViewCamera.GetViewMatrix();
+		const FMatrix44f ProjMatrix = ViewCamera.GetProjectionMatrix();
+		const FMatrix44f ViewProjMatrix = ViewMatrix * ProjMatrix;
+		const FMatrix44f MVPMatrix = ModelMatrix * ViewProjMatrix;
 
-		for (auto& [UbName, Ub] : PreviewUniformBuffers)
+		for (auto& [UbKey, Ub] : PreviewUniformBuffers)
 		{
+			FString UbBaseName = UbKey;
+			BindingShaderStage UbStage = BindingShaderStage::All;
+			if (UbKey.EndsWith(TEXT("|VS")))
+			{
+				UbBaseName = UbKey.LeftChop(3);
+				UbStage = BindingShaderStage::Vertex;
+			}
+			else if (UbKey.EndsWith(TEXT("|PS")))
+			{
+				UbBaseName = UbKey.LeftChop(3);
+				UbStage = BindingShaderStage::Pixel;
+			}
+
 			for (const auto& Default : MaterialAsset->BindingMemberDefaults)
 			{
-				if (Default.BindingName != UbName) continue;
+				if (Default.BindingName != UbBaseName) continue;
+				if (UbStage != BindingShaderStage::All && Default.Stage != UbStage) continue;
 
 				if (IsShaderMatrix4x4Type(Default.Type))
 				{
 					if (Default.MatrixValue == BuiltInMatrix4x4Value::BuiltInModel)
 						Ub->GetMember<FMatrix44f>(Default.MemberName) = ModelMatrix;
+					else if (Default.MatrixValue == BuiltInMatrix4x4Value::BuiltInView)
+						Ub->GetMember<FMatrix44f>(Default.MemberName) = ViewMatrix;
+					else if (Default.MatrixValue == BuiltInMatrix4x4Value::BuiltInProj)
+						Ub->GetMember<FMatrix44f>(Default.MemberName) = ProjMatrix;
 					else if (Default.MatrixValue == BuiltInMatrix4x4Value::BuiltInViewProj)
 						Ub->GetMember<FMatrix44f>(Default.MemberName) = ViewProjMatrix;
+					else if (Default.MatrixValue == BuiltInMatrix4x4Value::BuiltInMVP)
+						Ub->GetMember<FMatrix44f>(Default.MemberName) = MVPMatrix;
 				}
 				else if (Default.Type == TEXT("float"))
 					Ub->GetMember<float>(Default.MemberName) = Default.Values[0];

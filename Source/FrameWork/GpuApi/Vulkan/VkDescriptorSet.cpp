@@ -76,14 +76,42 @@ namespace FW::VK
 
 		for (const auto& [Slot, LayoutBindingEntry] : LayoutDesc.Layouts)
 		{
-			VkDescriptorSetLayoutBinding Binding{};
-			Binding.binding = (uint32)Slot.SlotNum;
-			Binding.descriptorType = MapBindingType(LayoutBindingEntry.Type);
-			Binding.descriptorCount = 1;
-			Binding.stageFlags = MapShaderStage(LayoutBindingEntry.Stage);
-			Binding.pImmutableSamplers = nullptr;
+			// Expand into separate VS and PS entries when the binding is visible to both stages
+			bool bNeedVsPsExpansion = EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Vertex)
+				&& EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Pixel);
 
-			VkBindings.Add(Binding);
+			if (bNeedVsPsExpansion)
+			{
+				VkShaderStageFlags VsStageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+				if (EnumHasAnyFlags(LayoutBindingEntry.Stage, BindingShaderStage::Compute))
+					VsStageFlags |= VK_SHADER_STAGE_COMPUTE_BIT;
+
+				VkDescriptorSetLayoutBinding VsBinding{};
+				VsBinding.binding = (uint32)(Slot.SlotNum + GetBindingShift(Slot.Type));
+				VsBinding.descriptorType = MapBindingType(LayoutBindingEntry.Type);
+				VsBinding.descriptorCount = 1;
+				VsBinding.stageFlags = VsStageFlags;
+				VsBinding.pImmutableSamplers = nullptr;
+				VkBindings.Add(VsBinding);
+
+				VkDescriptorSetLayoutBinding PsBinding{};
+				PsBinding.binding = (uint32)(Slot.SlotNum + GetBindingShift(Slot.Type) + StageBindingOffset_Pixel);
+				PsBinding.descriptorType = MapBindingType(LayoutBindingEntry.Type);
+				PsBinding.descriptorCount = 1;
+				PsBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+				PsBinding.pImmutableSamplers = nullptr;
+				VkBindings.Add(PsBinding);
+			}
+			else
+			{
+				VkDescriptorSetLayoutBinding Binding{};
+				Binding.binding = (uint32)(Slot.SlotNum + GetBindingShift(Slot.Type) + GetStageBindingOffset(LayoutBindingEntry.Stage));
+				Binding.descriptorType = MapBindingType(LayoutBindingEntry.Type);
+				Binding.descriptorCount = 1;
+				Binding.stageFlags = MapShaderStage(LayoutBindingEntry.Stage);
+				Binding.pImmutableSamplers = nullptr;
+				VkBindings.Add(Binding);
+			}
 		}
 
 		VkDescriptorSetLayoutCreateInfo LayoutInfo{
@@ -146,7 +174,7 @@ namespace FW::VK
 			VkWriteDescriptorSet Write{
 				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 				.dstSet = Set,
-				.dstBinding = (uint32)Slot.SlotNum,
+				.dstBinding = (uint32)(Slot.SlotNum + GetBindingShift(Slot.Type) + GetStageBindingOffset(Slot.Stage)),
 				.dstArrayElement = 0,
 				.descriptorCount = 1,
 				.descriptorType = DescType,
@@ -216,6 +244,19 @@ namespace FW::VK
 			}
 
 			Writes.Add(Write);
+
+			// Write same resource to both VS and PS binding offsets when visible to both stages
+			{
+				const LayoutBinding& LayoutEntry = LayoutDesc.Layouts[Slot];
+				bool bNeedVsPsExpansion = EnumHasAnyFlags(LayoutEntry.Stage, BindingShaderStage::Vertex)
+					&& EnumHasAnyFlags(LayoutEntry.Stage, BindingShaderStage::Pixel);
+				if (bNeedVsPsExpansion)
+				{
+					VkWriteDescriptorSet PsWrite = Write;
+					PsWrite.dstBinding = (uint32)(Slot.SlotNum + GetBindingShift(Slot.Type) + StageBindingOffset_Pixel);
+					Writes.Add(PsWrite);
+				}
+			}
 		}
 
 		vkUpdateDescriptorSets(GDevice, (uint32)Writes.Num(), Writes.GetData(), 0, nullptr);

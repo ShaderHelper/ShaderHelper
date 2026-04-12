@@ -39,7 +39,7 @@ namespace FW
 				{
 					return true;
 				}
-				else if (auto* LayoutBinding = InLayout->GetDesc().Layouts.Find(BindingSlot{ShaderLayoutBinding.Slot, ShaderLayoutBinding.Type}))
+				else if (auto* LayoutBinding = InLayout->GetDesc().Layouts.Find(BindingSlot{ShaderLayoutBinding.Slot, ShaderLayoutBinding.Type, ShaderLayoutBinding.Stage}))
 				{
 					if (LayoutBinding->Type != ShaderLayoutBinding.Type)
 					{

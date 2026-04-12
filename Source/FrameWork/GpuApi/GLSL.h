@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GpuShader.h"
+#include "GpuRhi.h"
 #include "Common/Path/PathHelper.h"
 #include "magic_enum.hpp"
 
@@ -386,6 +387,35 @@ namespace FW
 		}
 		Options.SetOptimizationLevel(shaderc_optimization_level_zero);
 		Options.SetPreserveBindings(true);
+		//Compatible with opengl glsl syntax
+		Options.SetVulkanRulesRelaxed(true);
+		Options.SetAutoBindUniforms(true);
+		Options.SetAutoMapLocations(true);
+		if (FW::GetGpuRhiBackendType() != FW::GpuRhiBackendType::DX12
+			&& !EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::SkipBindingShift))
+		{
+			// Stage offset only applies to Vulkan: PS bindings shifted so VS and PS can use the same binding numbers.
+			if(FW::GetGpuRhiBackendType() == FW::GpuRhiBackendType::Vulkan)
+			{
+				const int32 StageOffset = InShader->GetShaderType() == ShaderType::PixelShader ? StageBindingOffset_Pixel : 0;
+				Options.SetBindingBase(shaderc_uniform_kind_buffer, BindingShift_Buffer + StageOffset);
+				Options.SetBindingBase(shaderc_uniform_kind_texture, BindingShift_Texture + StageOffset);
+				Options.SetBindingBase(shaderc_uniform_kind_combined_image_sampler, BindingShift_Texture + StageOffset);
+				Options.SetBindingBase(shaderc_uniform_kind_sampler, BindingShift_Sampler + StageOffset);
+				Options.SetBindingBase(shaderc_uniform_kind_image, BindingShift_UAV + StageOffset);
+				Options.SetBindingBase(shaderc_uniform_kind_storage_buffer, BindingShift_UAV + StageOffset);
+
+			}
+			else
+			{
+				Options.SetBindingBase(shaderc_uniform_kind_buffer, BindingShift_Buffer);
+				Options.SetBindingBase(shaderc_uniform_kind_texture, BindingShift_Texture);
+				Options.SetBindingBase(shaderc_uniform_kind_combined_image_sampler, BindingShift_Texture);
+				Options.SetBindingBase(shaderc_uniform_kind_sampler, BindingShift_Sampler);
+				Options.SetBindingBase(shaderc_uniform_kind_image, BindingShift_UAV);
+				Options.SetBindingBase(shaderc_uniform_kind_storage_buffer, BindingShift_UAV);
+			}
+		}
 		Options.SetIncluder(std::make_unique<ShadercIncludeHandler>(InShader));
 		auto Result = GlslCompiler.CompileGlslToSpv(TCHAR_TO_UTF8(*InShader->GetProcessedSourceText()),
 			MapShadercKind(InShader->GetShaderType()), TCHAR_TO_UTF8(*InShader->GetShaderName()), Options);
@@ -1387,6 +1417,9 @@ namespace FW
 			Options.AddMacroDefinition("ENABLE_ASSERT", "0");
 			Options.SetForcedVersionProfile(450, shaderc_profile_core);
 			Options.SetGenerateDebugInfo();
+			Options.SetVulkanRulesRelaxed(true);
+			Options.SetAutoBindUniforms(true);
+			Options.SetAutoMapLocations(true);
 			Options.SetNonSemanticShaderDebugSource();
 			Options.SetOptimizationLevel(shaderc_optimization_level_zero);
 			Options.SetIncluder(std::make_unique<ShadercIncludeHandler>(InShader));

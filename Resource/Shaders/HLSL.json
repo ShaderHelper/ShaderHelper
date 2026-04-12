@@ -2684,54 +2684,6 @@
             "desc": "Sampler object type"
         },
         {
-            "label": "sampler1D",
-            "stages": [
-                "VS",
-                "PS",
-                "CS",
-                "GS",
-                "HS",
-                "DS"
-            ],
-            "desc": "1D sampler type"
-        },
-        {
-            "label": "sampler2D",
-            "stages": [
-                "VS",
-                "PS",
-                "CS",
-                "GS",
-                "HS",
-                "DS"
-            ],
-            "desc": "2D sampler type"
-        },
-        {
-            "label": "sampler3D",
-            "stages": [
-                "VS",
-                "PS",
-                "CS",
-                "GS",
-                "HS",
-                "DS"
-            ],
-            "desc": "3D sampler type"
-        },
-        {
-            "label": "samplerCUBE",
-            "stages": [
-                "VS",
-                "PS",
-                "CS",
-                "GS",
-                "HS",
-                "DS"
-            ],
-            "desc": "Cube sampler type"
-        },
-        {
             "label": "SamplerComparisonState",
             "stages": [
                 "VS",
