@@ -20,11 +20,11 @@ namespace SH
 
 	enum class BuiltInVertexAttribute : uint8
 	{
-		None,
 		BuiltInPosition,
 		BuiltInNormal,
 		BuiltInUV,
 		BuiltInColor,
+		BuiltInTangent,
 	};
 
 	struct MaterialBindingMemberDefault
@@ -75,14 +75,15 @@ namespace SH
 	struct MaterialVertexInputDefault
 	{
 		uint32 Location = 0;
+		FString Name;
 		FString SemanticName;
 		uint32 SemanticIndex = 0;
 		FString Type;
-		BuiltInVertexAttribute Attribute = BuiltInVertexAttribute::None;
+		BuiltInVertexAttribute Attribute = BuiltInVertexAttribute::BuiltInPosition;
 
 		friend FArchive& operator<<(FArchive& Ar, MaterialVertexInputDefault& Default)
 		{
-			Ar << Default.Location << Default.SemanticName << Default.SemanticIndex;
+			Ar << Default.Location << Default.Name << Default.SemanticName << Default.SemanticIndex;
 			Ar << Default.Type << Default.Attribute;
 			return Ar;
 		}

@@ -400,8 +400,8 @@ namespace FW
 				const int32 StageOffset = InShader->GetShaderType() == ShaderType::PixelShader ? StageBindingOffset_Pixel : 0;
 				Options.SetBindingBase(shaderc_uniform_kind_buffer, BindingShift_Buffer + StageOffset);
 				Options.SetBindingBase(shaderc_uniform_kind_texture, BindingShift_Texture + StageOffset);
-				Options.SetBindingBase(shaderc_uniform_kind_combined_image_sampler, BindingShift_Texture + StageOffset);
 				Options.SetBindingBase(shaderc_uniform_kind_sampler, BindingShift_Sampler + StageOffset);
+				Options.SetBindingBase(shaderc_uniform_kind_combined_image_sampler, BindingShift_CombinedSampler + StageOffset);
 				Options.SetBindingBase(shaderc_uniform_kind_image, BindingShift_UAV + StageOffset);
 				Options.SetBindingBase(shaderc_uniform_kind_storage_buffer, BindingShift_UAV + StageOffset);
 
@@ -410,8 +410,8 @@ namespace FW
 			{
 				Options.SetBindingBase(shaderc_uniform_kind_buffer, BindingShift_Buffer);
 				Options.SetBindingBase(shaderc_uniform_kind_texture, BindingShift_Texture);
-				Options.SetBindingBase(shaderc_uniform_kind_combined_image_sampler, BindingShift_Texture);
 				Options.SetBindingBase(shaderc_uniform_kind_sampler, BindingShift_Sampler);
+				Options.SetBindingBase(shaderc_uniform_kind_combined_image_sampler, BindingShift_CombinedSampler);
 				Options.SetBindingBase(shaderc_uniform_kind_image, BindingShift_UAV);
 				Options.SetBindingBase(shaderc_uniform_kind_storage_buffer, BindingShift_UAV);
 			}

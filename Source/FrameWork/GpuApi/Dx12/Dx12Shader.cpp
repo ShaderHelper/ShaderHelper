@@ -229,22 +229,13 @@ namespace FW
 			D3D12_SIGNATURE_PARAMETER_DESC ParamDesc;
 			Reflection->GetOutputParameterDesc(Index, &ParamDesc);
 
-			if (ParamDesc.SystemValueType != D3D_NAME_UNDEFINED)
-			{
-				continue;
-			}
-
-			// ReadWriteMask for outputs: bits indicate components NEVER written.
-			// Skip outputs where no component is actually written.
-			uint8 WrittenMask = ParamDesc.Mask & ~ParamDesc.ReadWriteMask;
-			if (WrittenMask == 0)
-			{
-				continue;
-			}
+			const uint8 WrittenMask = ParamDesc.Mask & ~ParamDesc.ReadWriteMask;
 
 			GpuShaderStageSemantic Semantic;
 			Semantic.SemanticName = ParamDesc.SemanticName;
 			Semantic.SemanticIndex = ParamDesc.SemanticIndex;
+			Semantic.Location = ParamDesc.Register;
+			Semantic.bWritten = WrittenMask != 0;
 			Semantics.Add(MoveTemp(Semantic));
 		}
 		return Semantics;
@@ -274,21 +265,11 @@ namespace FW
 			D3D12_SIGNATURE_PARAMETER_DESC ParamDesc;
 			Reflection->GetInputParameterDesc(Index, &ParamDesc);
 
-			if (ParamDesc.SystemValueType != D3D_NAME_UNDEFINED)
-			{
-				continue;
-			}
-
-			// ReadWriteMask for inputs: bits indicate components ALWAYS read.
-			// Skip inputs that are never actually read.
-			if (ParamDesc.ReadWriteMask == 0)
-			{
-				continue;
-			}
-
 			GpuShaderStageSemantic Semantic;
 			Semantic.SemanticName = ParamDesc.SemanticName;
 			Semantic.SemanticIndex = ParamDesc.SemanticIndex;
+			Semantic.Location = ParamDesc.Register;
+			Semantic.bRead = ParamDesc.ReadWriteMask != 0;
 			Semantics.Add(MoveTemp(Semantic));
 		}
 		return Semantics;

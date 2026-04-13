@@ -10,13 +10,15 @@ namespace FW
 		Vector3f Normal;
 		Vector2f UV;
 		Vector4f Color = Vector4f(1.0f);
+		Vector4f Tangent = Vector4f(1.0f, 0.0f, 0.0f, 1.0f);
 
 		bool operator==(const MeshVertex& Other) const
 		{
 			return Position == Other.Position
 				&& Normal == Other.Normal
 				&& UV == Other.UV
-				&& Color == Other.Color;
+				&& Color == Other.Color
+				&& Tangent == Other.Tangent;
 		}
 
 		friend uint32 GetTypeHash(const MeshVertex& Vertex)
@@ -25,6 +27,7 @@ namespace FW
 			Hash = HashCombine(Hash, GetTypeHash(Vertex.Normal));
 			Hash = HashCombine(Hash, GetTypeHash(Vertex.UV));
 			Hash = HashCombine(Hash, GetTypeHash(Vertex.Color));
+			Hash = HashCombine(Hash, GetTypeHash(Vertex.Tangent));
 			return Hash;
 		}
 
@@ -34,6 +37,7 @@ namespace FW
 			Ar << InVertex.Normal;
 			Ar << InVertex.UV;
 			Ar << InVertex.Color;
+			Ar << InVertex.Tangent;
 			return Ar;
 		}
 	};

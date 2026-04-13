@@ -10,14 +10,14 @@
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
 #include "vma/vk_mem_alloc.h"
-
+#include <stdexcept>
 #define VkCheck(Call)                                           \
 	do                                                          \
 	{                                                           \
 		VkResult Result = Call;                                 \
 		if(Result != VK_SUCCESS) {                              \
 			OutputVkError(Result, #Call, __FILE__, __LINE__);   \
-			std::abort();                                       \
+			throw std::runtime_error("Internal api error");     \
 		}                                                       \
 	} while (0)
 

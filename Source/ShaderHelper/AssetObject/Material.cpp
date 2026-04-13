@@ -313,6 +313,7 @@ namespace SH
 			{
 				MaterialVertexInputDefault NewDefault;
 				NewDefault.Location = Input.Location;
+				NewDefault.Name = Input.Name;
 				NewDefault.SemanticName = Input.SemanticName;
 				NewDefault.SemanticIndex = Input.SemanticIndex;
 				NewDefault.Type = Input.Type;
@@ -326,29 +327,6 @@ namespace SH
 						NewDefault.Attribute = Old.Attribute;
 						bPreserved = true;
 						break;
-					}
-				}
-
-				// Auto-assign heuristic if not preserved
-				if (!bPreserved)
-				{
-					FString MatchStr = Input.SemanticName;
-					MatchStr = MatchStr.ToUpper();
-					if (MatchStr.Contains(TEXT("POSITION")))
-					{
-						NewDefault.Attribute = BuiltInVertexAttribute::BuiltInPosition;
-					}
-					else if (MatchStr.Contains(TEXT("NORMAL")))
-					{
-						NewDefault.Attribute = BuiltInVertexAttribute::BuiltInNormal;
-					}
-					else if (MatchStr.Contains(TEXT("TEXCOORD")) || MatchStr.Contains(TEXT("UV")))
-					{
-						NewDefault.Attribute = BuiltInVertexAttribute::BuiltInUV;
-					}
-					else if (MatchStr.Contains(TEXT("COLOR")))
-					{
-						NewDefault.Attribute = BuiltInVertexAttribute::BuiltInColor;
 					}
 				}
 
@@ -480,8 +458,8 @@ namespace SH
 			}
 			else
 			{
-				// GLSL: "location N (Type)"
-				ItemLabel = FText::FromString(FString::Printf(TEXT("location %d (%s)"), Default.Location, *Default.Type));
+				// GLSL: Attribute name (Type)
+				ItemLabel = FText::FromString(Default.Name + TEXT(" (") + Default.Type + TEXT(")"));
 			}
 
 			auto CurrentValueName = MakeShared<FString>(ANSI_TO_TCHAR(magic_enum::enum_name(Default.Attribute).data()));
