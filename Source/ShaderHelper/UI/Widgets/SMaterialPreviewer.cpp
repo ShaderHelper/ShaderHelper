@@ -29,11 +29,10 @@ namespace SH
 		MaterialAsset = InArgs._InMaterial;
 		Preview = MakeShared<PreviewViewPort>();
 		Renderer = MakeUnique<MaterialPreviewRenderer>(MaterialAsset.Get());
-		OrbitYaw = PI;
-		PreviewPrimitiveOptions = {
-			MakeShared<MaterialPreviewPrimitive>(MaterialPreviewPrimitive::Sphere),
-			MakeShared<MaterialPreviewPrimitive>(MaterialPreviewPrimitive::Quad),
-		};
+		for (auto Value : magic_enum::enum_values<MaterialPreviewPrimitive>())
+		{
+			PreviewPrimitiveOptions.Add(MakeShared<MaterialPreviewPrimitive>(Value));
+		}
 
 		ChildSlot
 		[

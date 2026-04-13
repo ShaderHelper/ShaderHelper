@@ -149,6 +149,7 @@ namespace FW
 	struct GpuShaderVertexInput
 	{
 		uint32 Location = 0;
+		FString Name;
 		FString SemanticName;
 		uint32 SemanticIndex = 0;
 		FString Type;
@@ -158,6 +159,9 @@ namespace FW
 	{
 		FString SemanticName;
 		uint32 SemanticIndex = 0;
+		uint32 Location = 0;
+		bool bRead = false;
+		bool bWritten = false;
 	};
 
 	inline bool IsShaderMatrix4x4Type(const FString& InType) { return InType == TEXT("float4x4") || InType == TEXT("mat4") || InType == TEXT("mat4x4"); }

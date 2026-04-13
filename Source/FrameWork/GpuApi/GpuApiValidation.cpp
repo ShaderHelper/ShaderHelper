@@ -106,19 +106,6 @@ namespace FW
             }
             Slots.Add(Slot);
         }
-
-        for(const auto& [Slot, LayoutBindingEntry] : InBindGroupLayoutDesc.Layouts)
-        {
-            if(LayoutBindingEntry.Type == BindingType::CombinedTextureSampler || LayoutBindingEntry.Type == BindingType::CombinedTextureCubeSampler)
-            {
-                int32 SamplerSlotNum = Slot.SlotNum + 1;
-                if(Slots.ContainsByPredicate([SamplerSlotNum](const BindingSlot& S) { return S.SlotNum == SamplerSlotNum; }))
-                {
-                    SH_LOG(LogRhiValidation, Error, TEXT("CreateBindGroupLayout Error(CombinedSampler slot conflict) - CombinedSampler at slot (%d) requires slot (%d) for its sampler, but slot (%d) is already occupied"), Slot.SlotNum, SamplerSlotNum, SamplerSlotNum);
-                    return false;
-                }
-            }
-        }
         return true;
     }
 

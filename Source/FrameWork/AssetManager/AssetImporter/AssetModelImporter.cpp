@@ -64,6 +64,16 @@ namespace FW
 				UVSetName = FbxMeshObj->GetElementUV(0)->GetName();
 			}
 
+			// Generate tangent/binormal data if not present (requires UVs)
+			if (UVSetName && FbxMeshObj->GetElementTangentCount() == 0)
+			{
+				FbxMeshObj->GenerateTangentsData(UVSetName);
+			}
+
+			FbxGeometryElementTangent* TangentElement = FbxMeshObj->GetElementTangentCount() > 0 ? FbxMeshObj->GetElementTangent(0) : nullptr;
+			FbxGeometryElementBinormal* BinormalElement = FbxMeshObj->GetElementBinormalCount() > 0 ? FbxMeshObj->GetElementBinormal(0) : nullptr;
+
+			int VertexCounter = 0;
 			int PolygonCount = FbxMeshObj->GetPolygonCount();
 			for (int Poly = 0; Poly < PolygonCount; ++Poly)
 			{
@@ -93,6 +103,35 @@ namespace FW
 						}
 					}
 
+					if (TangentElement)
+					{
+						int TangentIndex = TangentElement->GetMappingMode() == FbxGeometryElement::eByControlPoint ? ControlPointIndex : VertexCounter;
+						if (TangentElement->GetReferenceMode() == FbxGeometryElement::eIndexToDirect)
+						{
+							TangentIndex = TangentElement->GetIndexArray().GetAt(TangentIndex);
+						}
+						FbxVector4 Tan = TangentElement->GetDirectArray().GetAt(TangentIndex);
+						const FbxVector4 TransformedTangent = NormalTransform.MultT(FbxVector4(Tan[0], Tan[1], Tan[2], 0.0));
+						FVector3f T = FVector3f((float)TransformedTangent[0], (float)TransformedTangent[1], (float)TransformedTangent[2]).GetSafeNormal();
+
+						float Sign = 1.0f;
+						if (BinormalElement)
+						{
+							int BinormalIndex = BinormalElement->GetMappingMode() == FbxGeometryElement::eByControlPoint ? ControlPointIndex : VertexCounter;
+							if (BinormalElement->GetReferenceMode() == FbxGeometryElement::eIndexToDirect)
+							{
+								BinormalIndex = BinormalElement->GetIndexArray().GetAt(BinormalIndex);
+							}
+							FbxVector4 Bin = BinormalElement->GetDirectArray().GetAt(BinormalIndex);
+							const FbxVector4 TransformedBinormal = NormalTransform.MultT(FbxVector4(Bin[0], Bin[1], Bin[2], 0.0));
+							FVector3f B((float)TransformedBinormal[0], (float)TransformedBinormal[1], (float)TransformedBinormal[2]);
+							Sign = FVector3f::DotProduct(FVector3f::CrossProduct(FVector3f(V.Normal), T), B) >= 0.0f ? 1.0f : -1.0f;
+						}
+
+						V.Tangent = Vector4f(T.X, T.Y, T.Z, Sign);
+					}
+
+					++VertexCounter;
 					Data.Indices.Add(Data.Vertices.Num());
 					Data.Vertices.Add(V);
 				}

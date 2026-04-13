@@ -10,6 +10,8 @@
 #include "RenderResource/UniformBuffer.h"
 #include "Common/Util/Math.h"
 
+#include <stdexcept>
+
 using namespace FW;
 
 namespace SH
@@ -237,7 +239,7 @@ namespace SH
 	{
 		MaterialPreviewRenderer Renderer(const_cast<Material*>(InMaterial));
 		Renderer.SetPreviewPrimitive(InPreviewPrimitive);
-		Renderer.SetOrbit(PI, 0.0f);
+		Renderer.SetOrbit(0.0f, 0.0f);
 		if (!Renderer.Render(InSize, InSize))
 		{
 			Renderer.RenderErrorColor(InSize, InSize);
@@ -277,11 +279,16 @@ namespace SH
 			TArray<FString> MissingSemantics;
 			for (const auto& PsInput : PsInputs)
 			{
-				bool bFound = VsOutputs.ContainsByPredicate([&](const GpuShaderStageSemantic& VsOutput) {
+				if (!PsInput.bRead)
+				{
+					continue;
+				}
+
+				const GpuShaderStageSemantic* MatchingVsOutput = VsOutputs.FindByPredicate([&](const GpuShaderStageSemantic& VsOutput) {
 					return VsOutput.SemanticName.Equals(PsInput.SemanticName, ESearchCase::IgnoreCase)
 						&& VsOutput.SemanticIndex == PsInput.SemanticIndex;
 				});
-				if (!bFound)
+				if (!MatchingVsOutput || !MatchingVsOutput->bWritten)
 				{
 					FString SemanticStr = PsInput.SemanticIndex > 0
 						? FString::Printf(TEXT("%s%d"), *PsInput.SemanticName, PsInput.SemanticIndex)
@@ -295,6 +302,7 @@ namespace SH
 				LinkageErrorFunc = [Joined]{ return FText::Format(LOCALIZATION("SemanticLinkageError"), FText::FromString(Joined)); };
 				return false;
 			}
+
 			LinkageErrorFunc = nullptr;
 		}
 
@@ -312,11 +320,6 @@ namespace SH
 		VertexLayoutDesc.ByteStride = sizeof(MeshVertex);
 		for (const auto& InputDefault : MaterialAsset->VertexInputDefaults)
 		{
-			if (InputDefault.Attribute == BuiltInVertexAttribute::None)
-			{
-				continue;
-			}
-
 			GpuVertexAttributeDesc AttrDesc;
 			AttrDesc.Location = InputDefault.Location;
 			AttrDesc.SemanticName = InputDefault.SemanticName;
@@ -336,6 +339,9 @@ namespace SH
 				break;
 			case BuiltInVertexAttribute::BuiltInColor:
 				AttrDesc.ByteOffset = offsetof(MeshVertex, Color);
+				break;
+			case BuiltInVertexAttribute::BuiltInTangent:
+				AttrDesc.ByteOffset = offsetof(MeshVertex, Tangent);
 				break;
 			default:
 				break;
@@ -376,7 +382,15 @@ namespace SH
 				}) : TOptional<DepthStencilStateDesc>(),
 		};
 
-		Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
+		try
+		{
+			Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
+		}
+		catch (const std::runtime_error& e)
+		{
+			FString ErrorMsg = ANSI_TO_TCHAR(e.what());
+			LinkageErrorFunc = [ErrorMsg]{ return FText::FromString(ErrorMsg); };
+		}
 		return Pipeline.IsValid();
 	}
 
@@ -643,6 +657,10 @@ float4 MainPS() : SV_Target { return float4(1.0, 0.0, 1.0, 1.0); }
 		if (PreviewPrimitive == MaterialPreviewPrimitive::Sphere)
 		{
 			PreviewMeshBuffers = UploadMesh(SphereMesh);
+		}
+		else if(PreviewPrimitive == MaterialPreviewPrimitive::Cube)
+		{
+			PreviewMeshBuffers = UploadMesh(CubeMesh);
 		}
 		else
 		{

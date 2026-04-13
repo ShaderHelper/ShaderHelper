@@ -620,6 +620,12 @@ namespace FW
 			}
 			else
 			{
+				auto NameIt = MetaContext.Names.find(Id);
+				if (NameIt != MetaContext.Names.end())
+				{
+					Input.Name = NameIt->second;
+				}
+				// TEXCOORD is the default semantic name used by spirv-cross when translating SPIR-V to HLSL
 				Input.SemanticName = TEXT("TEXCOORD");
 				Input.SemanticIndex = Input.Location;
 			}
@@ -692,6 +698,17 @@ namespace FW
 				Output.SemanticName = Semantic;
 				Output.SemanticIndex = 0;
 			}
+			Output.bWritten = true;
+
+			for (auto It = MetaContext.Decorations.CreateConstKeyIterator(Id); It; ++It)
+			{
+				if (It.Value().Kind == SpvDecorationKind::Location)
+				{
+					Output.Location = It.Value().Location.Number;
+					break;
+				}
+			}
+
 			Semantics.Add(MoveTemp(Output));
 		}
 		return Semantics;
@@ -755,6 +772,17 @@ namespace FW
 				Input.SemanticName = Semantic;
 				Input.SemanticIndex = 0;
 			}
+			Input.bRead = true;
+
+			for (auto It = MetaContext.Decorations.CreateConstKeyIterator(Id); It; ++It)
+			{
+				if (It.Value().Kind == SpvDecorationKind::Location)
+				{
+					Input.Location = It.Value().Location.Number;
+					break;
+				}
+			}
+
 			Semantics.Add(MoveTemp(Input));
 		}
 		return Semantics;

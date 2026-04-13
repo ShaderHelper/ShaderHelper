@@ -22,14 +22,14 @@ THIRD_PARTY_INCLUDES_START
 #endif
 THIRD_PARTY_INCLUDES_END
 #include <Windows/PostWindowsApi.h>
-
+#include <stdexcept>
 #define DxCheck(Call)                                           \
 	do                                                          \
 	{                                                           \
 		HRESULT hr = Call;                                      \
 		if(FAILED(hr)) {                                        \
 			OutputDxError(hr, #Call, __FILE__, __LINE__);       \
-			std::abort();                                       \
+			throw std::runtime_error("Internal api error");     \
 		}                                                       \
 	} while (0)
 

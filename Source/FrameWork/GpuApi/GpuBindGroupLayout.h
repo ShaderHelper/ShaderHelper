@@ -198,6 +198,7 @@ namespace FW
 	inline constexpr int32 BindingShift_Buffer  = 0;
 	inline constexpr int32 BindingShift_Texture = 128;
 	inline constexpr int32 BindingShift_Sampler = 256;
+	inline constexpr int32 BindingShift_CombinedSampler = 320;
 	inline constexpr int32 BindingShift_UAV     = 384;
 
 	// Per-stage binding offset for Vulkan: PS bindings are shifted by this amount
@@ -219,9 +220,6 @@ namespace FW
 		case BindingType::Texture:
 		case BindingType::TextureCube:
 		case BindingType::Texture3D:
-		case BindingType::CombinedTextureSampler:
-		case BindingType::CombinedTextureCubeSampler:
-		case BindingType::CombinedTexture3DSampler:
 		case BindingType::StructuredBuffer:
 		case BindingType::RawBuffer:
 			return BindingShift_Texture;
@@ -232,6 +230,10 @@ namespace FW
 		case BindingType::RWTexture:
 		case BindingType::RWTexture3D:
 			return BindingShift_UAV;
+		case BindingType::CombinedTextureSampler:
+		case BindingType::CombinedTextureCubeSampler:
+		case BindingType::CombinedTexture3DSampler:
+			return BindingShift_CombinedSampler;
 		default:
 			AUX::Unreachable();
 		}

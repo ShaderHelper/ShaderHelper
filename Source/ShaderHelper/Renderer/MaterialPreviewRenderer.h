@@ -17,6 +17,7 @@ namespace SH
 	{
 		Sphere,
 		Quad,
+		Cube,
 	};
 
 	class MaterialPreviewRenderer
@@ -47,6 +48,7 @@ namespace SH
 		Material* MaterialAsset = nullptr;
 		FW::MeshData QuadMesh = FW::CreateQuad();
 		FW::MeshData SphereMesh = FW::CreateSphere();
+		FW::MeshData CubeMesh = FW::CreateCube();
 		TMap<int32, TRefCountPtr<FW::GpuBindGroupLayout>> BindGroupLayouts;
 		TMap<int32, TRefCountPtr<FW::GpuBindGroup>> BindGroups;
 		TRefCountPtr<FW::GpuRenderPipelineState> Pipeline;
@@ -61,7 +63,7 @@ namespace SH
 		TRefCountPtr<FW::GpuTexture> RenderTarget;
 		TRefCountPtr<FW::GpuTexture> MsaaRenderTarget;
 		TRefCountPtr<FW::GpuTexture> DepthTarget;
-		float OrbitYaw = PI;
+		float OrbitYaw = 0.0f;
 		float OrbitPitch = 0.0f;
 		float CameraDistance = 2.0f;
 		MaterialPreviewPrimitive PreviewPrimitive = MaterialPreviewPrimitive::Sphere;
