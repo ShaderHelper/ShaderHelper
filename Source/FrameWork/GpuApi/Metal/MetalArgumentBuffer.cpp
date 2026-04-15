@@ -6,6 +6,11 @@
 
 namespace FW
 {
+    static int32 GetMetalArgumentIndex(BindingSlot InSlot)
+    {
+        return InSlot.SlotNum + GetBindingShift(InSlot.Type);
+    }
+
     static bool HasRenderStage(BindingShaderStage InStage)
     {
         return EnumHasAnyFlags(InStage, BindingShaderStage::Vertex | BindingShaderStage::Pixel);
@@ -32,8 +37,18 @@ namespace FW
         : GpuBindGroupLayout(LayoutDesc)
     {
         TArray<MTLArgumentDescriptor*> ArgDescs;
+        TArray<TPair<BindingSlot, LayoutBinding>> SortedLayouts;
 
-        for(const auto& [Slot, LayoutBindingEntry] : Desc.Layouts)
+        for (const auto& LayoutEntry : Desc.Layouts)
+        {
+            SortedLayouts.Add(LayoutEntry);
+        }
+
+        SortedLayouts.Sort([](const TPair<BindingSlot, LayoutBinding>& A, const TPair<BindingSlot, LayoutBinding>& B) {
+            return GetMetalArgumentIndex(A.Key) < GetMetalArgumentIndex(B.Key);
+        });
+
+        for(const auto& [Slot, LayoutBindingEntry] : SortedLayouts)
         {
             if(HasRenderStage(LayoutBindingEntry.Stage))
             {
@@ -41,7 +56,7 @@ namespace FW
             }
             
             MTLArgumentDescriptor* ArgDesc = [MTLArgumentDescriptor argumentDescriptor];
-            ArgDesc.index = Slot.SlotNum + GetBindingShift(LayoutBindingEntry.Type);
+            ArgDesc.index = GetMetalArgumentIndex(Slot);
             MTLArgumentDescriptor* CombinedSamplerArgDesc = nil;
             if(LayoutBindingEntry.Type == BindingType::RWStructuredBuffer || LayoutBindingEntry.Type == BindingType::RWRawBuffer)
             {
@@ -64,7 +79,7 @@ namespace FW
                 ResourceUsages.Add(Slot, MTLResourceUsageRead);
 
 				CombinedSamplerArgDesc = [MTLArgumentDescriptor argumentDescriptor];
-				CombinedSamplerArgDesc.index = Slot.SlotNum + GetBindingShift(LayoutBindingEntry.Type) + 1;
+                CombinedSamplerArgDesc.index = GetMetalArgumentIndex(Slot) + 1;
 				CombinedSamplerArgDesc.dataType = MTLDataTypeSampler;
 				CombinedSamplerArgDesc.access = MTLArgumentAccessReadOnly;
             }
@@ -154,7 +169,7 @@ namespace FW
                 MetalBuffer* Buffer = static_cast<MetalBuffer*>(ResourceBindingEntry.Resource.GetReference());
                 if(ArgumentEncoder != nullptr)
                 {
-                    ArgumentEncoder->setBuffer(Buffer->GetResource(), 0, Slot.SlotNum + GetBindingShift(Slot.Type));
+                    ArgumentEncoder->setBuffer(Buffer->GetResource(), 0, GetMetalArgumentIndex(Slot));
                 }
                 BindGroupResources.Add(Slot, Buffer->GetResource());
             }
@@ -164,7 +179,7 @@ namespace FW
                 MetalTextureView* TexView = Tex->GetMtlDefaultView();
 				if(ArgumentEncoder != nullptr)
                 {
-					ArgumentEncoder->setTexture(TexView->GetResource(), Slot.SlotNum + GetBindingShift(Slot.Type));
+					ArgumentEncoder->setTexture(TexView->GetResource(), GetMetalArgumentIndex(Slot));
 				}
                 BindGroupResources.Add(Slot, TexView->GetResource());
             }
@@ -173,7 +188,7 @@ namespace FW
                 MetalTextureView* TexView = static_cast<MetalTextureView*>(ResourceBindingEntry.Resource.GetReference());
 				if(ArgumentEncoder != nullptr)
                 {
-					ArgumentEncoder->setTexture(TexView->GetResource(), Slot.SlotNum + GetBindingShift(Slot.Type));
+					ArgumentEncoder->setTexture(TexView->GetResource(), GetMetalArgumentIndex(Slot));
 				}
                 BindGroupResources.Add(Slot, TexView->GetResource());
             }
@@ -182,7 +197,7 @@ namespace FW
                 MetalSampler* Sampler = static_cast<MetalSampler*>(ResourceBindingEntry.Resource.GetReference());
 				if(ArgumentEncoder != nullptr)
                 {
-                    ArgumentEncoder->setSamplerState(Sampler->GetResource(), Slot.SlotNum + GetBindingShift(Slot.Type));
+                    ArgumentEncoder->setSamplerState(Sampler->GetResource(), GetMetalArgumentIndex(Slot));
                 }
             }
             else if(ResourceBindingEntry.Resource->GetType() == GpuResourceType::CombinedTextureSampler)
@@ -193,8 +208,8 @@ namespace FW
                 MetalSampler* Sampler = static_cast<MetalSampler*>(Combined->GetSampler());
 				if(ArgumentEncoder != nullptr)
                 {
-					ArgumentEncoder->setTexture(TexView->GetResource(), Slot.SlotNum + GetBindingShift(Slot.Type));
-					ArgumentEncoder->setSamplerState(Sampler->GetResource(), Slot.SlotNum + GetBindingShift(Slot.Type) + 1);
+					ArgumentEncoder->setTexture(TexView->GetResource(), GetMetalArgumentIndex(Slot));
+					ArgumentEncoder->setSamplerState(Sampler->GetResource(), GetMetalArgumentIndex(Slot) + 1);
 				}
                 BindGroupResources.Add(Slot, TexView->GetResource());
             }
