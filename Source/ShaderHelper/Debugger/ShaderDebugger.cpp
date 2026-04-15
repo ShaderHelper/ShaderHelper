@@ -362,7 +362,7 @@ namespace SH
 						.EntryPoint = EntryPoint,
 						.Language = Lang
 					});
-					// SPIRV-Cross output already has correct binding numbers; skip shaderc's SetBindingBase to avoid double-shifting.
+					// SPIRV-Cross output already has correct binding numbers; skip BindingShift to avoid double-shifting.
 					PatchedShader->CompilerFlag |= GpuShaderCompilerFlag::SkipBindingShift;
 					if (GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
 					{
@@ -1923,7 +1923,7 @@ namespace SH
 			.EntryPoint = EntryPoint,
 			.Language = Lang,
 		});
-		// SPIRV-Cross output already has correct binding numbers; skip shaderc's SetBindingBase to avoid double-shifting.
+		// SPIRV-Cross output already has correct binding numbers; skip BindingShift to avoid double-shifting.
 		PatchedShader->CompilerFlag |= GpuShaderCompilerFlag::SkipBindingShift;
 		if (!GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
 		{
