@@ -47,10 +47,10 @@ namespace FW
 		const Vector4f Tangent = ComputeFaceTangent(Normal, P0, P1, P2, UV0, UV1, UV2);
 		const uint32 BaseVertex = OutMeshData.Vertices.Num();
 		OutMeshData.Vertices.Append({
-			{ P0, Normal, UV0, Vector4f(1.0f), Tangent },
-			{ P1, Normal, UV1, Vector4f(1.0f), Tangent },
-			{ P2, Normal, UV2, Vector4f(1.0f), Tangent },
-			{ P3, Normal, UV3, Vector4f(1.0f), Tangent },
+			{ P0, Normal, {UV0, UV0, UV0, UV0}, Vector4f(1.0f), Tangent },
+			{ P1, Normal, {UV1, UV1, UV1, UV1}, Vector4f(1.0f), Tangent },
+			{ P2, Normal, {UV2, UV2, UV2, UV2}, Vector4f(1.0f), Tangent },
+			{ P3, Normal, {UV3, UV3, UV3, UV3}, Vector4f(1.0f), Tangent },
 		});
 		OutMeshData.Indices.Append({
 			BaseVertex + 0, BaseVertex + 1, BaseVertex + 2,
@@ -146,7 +146,8 @@ namespace FW
 				const Vector3f Normal{ SinPhi * CosTheta, CosPhi, SinPhi * SinTheta };
 				// dP/dTheta direction, normalized: (-SinTheta, 0, CosTheta). At poles SinPhi≈0, fallback is fine since the direction is still valid.
 				const Vector3f T{ -SinTheta, 0.0f, CosTheta };
-				OutMeshData.Vertices.Add({ Normal * 0.5f, Normal, Vector2f{ U, V }, Vector4f(1.0f), Vector4f(T.X, T.Y, T.Z, 1.0f) });
+				const Vector2f SphereUV{ U, V };
+				OutMeshData.Vertices.Add({ Normal * 0.5f, Normal, {SphereUV, SphereUV, SphereUV, SphereUV}, Vector4f(1.0f), Vector4f(T.X, T.Y, T.Z, 1.0f) });
 			}
 		}
 
