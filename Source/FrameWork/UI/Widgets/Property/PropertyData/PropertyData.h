@@ -85,6 +85,12 @@ namespace FW
 		}
 
 		void SetAddMenuWidget(TSharedPtr<SWidget> InWidget) { AddMenuWidget = MoveTemp(InWidget); }
+		void SetCheckBox(TAttribute<ECheckBoxState> InState, FOnCheckStateChanged InOnChanged)
+		{
+			bHasCheckBox = true;
+			CheckBoxState = MoveTemp(InState);
+			OnCheckBoxStateChanged = MoveTemp(InOnChanged);
+		}
 		bool IsRootCategory() const { return Parent == nullptr; }
 		bool IsComposite() const { return bComposite; }
 
@@ -102,14 +108,20 @@ namespace FW
                 .DisplayName(DisplayName)
                 .IsRootCategory(IsRootCategory())
 				.CategoryBrush(CategoryBrush)
-                .AddMenuWidget(AddMenuWidget);
+                .AddMenuWidget(AddMenuWidget)
+				.HasCheckBox(bHasCheckBox)
+				.CheckBoxState(CheckBoxState)
+				.OnCheckBoxStateChanged(OnCheckBoxStateChanged);
 			
             Row->SetRowContent(RowContent);
             return Row;
         }
 	private:
 		bool bComposite;
+		bool bHasCheckBox = false;
 		TSharedPtr<SWidget> AddMenuWidget;
+		TAttribute<ECheckBoxState> CheckBoxState;
+		FOnCheckStateChanged OnCheckBoxStateChanged;
 	};
 
 	class PropertyCustomWidget : public PropertyData

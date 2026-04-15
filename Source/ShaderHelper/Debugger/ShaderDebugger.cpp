@@ -269,7 +269,7 @@ namespace SH
 		FString ErrorInfo, WarnInfo;
 		GpuShaderLanguage Lang = DebugShader->GetShaderLanguage();
 
-		if (DebugShader->GetShaderType() == ShaderType::PixelShader)
+		if (DebugShader->GetShaderType() == ShaderType::Pixel)
 		{
 			const auto& PsInvocation = std::get<PixelState>(Invocation);
 			int32 DebugStateIndex = CurDebugStateIndex;
@@ -1495,7 +1495,7 @@ namespace SH
 	{
 		const auto& PsInvocation = std::get<PixelState>(Invocation);
 
-		DebugShader = GGpuRhi->CreateShaderFromSource(CurShaderAsset->GetShaderDesc(ShaderSourceText));
+		DebugShader = GGpuRhi->CreateShaderFromSource(CurShaderAsset->GetShaderDesc(ShaderSourceText, ShaderType::Pixel).SourceDesc);
 		DebugShader->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
 		GpuShaderLanguage Lang = DebugShader->GetShaderLanguage();
 
@@ -1614,7 +1614,7 @@ namespace SH
 		FString PatchedSpvAsm;
 		if (GlobalValidation)
 		{
-			SpvValidator Validator{ *PixelDebuggerContext, bEnableUbsan, ShaderType::PixelShader };
+			SpvValidator Validator{ *PixelDebuggerContext, bEnableUbsan, ShaderType::Pixel };
 			Parser.Accept(&Validator);
 			PatchedSpv = Validator.GetPatcher().GetSpv();
 			PatchedSpvAsm = Validator.GetPatcher().GetAsm();

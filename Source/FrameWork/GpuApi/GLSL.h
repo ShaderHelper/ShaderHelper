@@ -143,9 +143,9 @@ namespace GLSL
 		FString StageStr;
 		switch (Stage)
 		{
-		case FW::ShaderType::VertexShader:  StageStr = TEXT("VS"); break;
-		case FW::ShaderType::PixelShader:   StageStr = TEXT("PS"); break;
-		case FW::ShaderType::ComputeShader: StageStr = TEXT("CS"); break;
+		case FW::ShaderType::Vertex:  StageStr = TEXT("VS"); break;
+		case FW::ShaderType::Pixel:   StageStr = TEXT("PS"); break;
+		case FW::ShaderType::Compute: StageStr = TEXT("CS"); break;
 		default: return true; // None stage means match all
 		}
 		return ItemStages.Contains(StageStr);
@@ -194,7 +194,7 @@ namespace GLSL
 		const ShaderBuiltinData& Data = GetBuiltinData();
 		for (const auto& Item : Data.Functions)
 		{
-			if (Item.Label == FuncName && IsStageMatch(Item.Stages, Stage))
+			if (Item.Label.Equals(FuncName, ESearchCase::CaseSensitive) && IsStageMatch(Item.Stages, Stage))
 			{
 				return &Item;
 			}
@@ -206,7 +206,7 @@ namespace GLSL
 		const ShaderBuiltinData& Data = GetBuiltinData();
 		for (const auto& Item : Data.Types)
 		{
-			if (Item.Label == TypeName && IsStageMatch(Item.Stages, Stage))
+			if (Item.Label.Equals(TypeName, ESearchCase::CaseSensitive) && IsStageMatch(Item.Stages, Stage))
 			{
 				return &Item;
 			}
@@ -218,7 +218,7 @@ namespace GLSL
 		const ShaderBuiltinData& Data = GetBuiltinData();
 		for (const auto& Item : Data.Keywords)
 		{
-			if (Item.Label == Keyword && IsStageMatch(Item.Stages, Stage))
+			if (Item.Label.Equals(Keyword, ESearchCase::CaseSensitive) && IsStageMatch(Item.Stages, Stage))
 			{
 				return &Item;
 			}
@@ -268,9 +268,9 @@ namespace FW
 	{
 		switch (InType)
 		{
-		case ShaderType::VertexShader:   return shaderc_shader_kind::shaderc_vertex_shader;
-		case ShaderType::PixelShader:    return shaderc_shader_kind::shaderc_fragment_shader;
-		case ShaderType::ComputeShader:  return shaderc_shader_kind::shaderc_compute_shader;
+		case ShaderType::Vertex:   return shaderc_shader_kind::shaderc_vertex_shader;
+		case ShaderType::Pixel:    return shaderc_shader_kind::shaderc_fragment_shader;
+		case ShaderType::Compute:  return shaderc_shader_kind::shaderc_compute_shader;
 		default:
 			return shaderc_shader_kind::shaderc_vertex_shader;
 		}
@@ -397,7 +397,7 @@ namespace FW
 			// Stage offset only applies to Vulkan: PS bindings shifted so VS and PS can use the same binding numbers.
 			if(FW::GetGpuRhiBackendType() == FW::GpuRhiBackendType::Vulkan)
 			{
-				const int32 StageOffset = InShader->GetShaderType() == ShaderType::PixelShader ? StageBindingOffset_Pixel : 0;
+				const int32 StageOffset = InShader->GetShaderType() == ShaderType::Pixel ? StageBindingOffset_Pixel : 0;
 				Options.SetBindingBase(shaderc_uniform_kind_buffer, BindingShift_Buffer + StageOffset);
 				Options.SetBindingBase(shaderc_uniform_kind_texture, BindingShift_Texture + StageOffset);
 				Options.SetBindingBase(shaderc_uniform_kind_sampler, BindingShift_Sampler + StageOffset);
@@ -923,7 +923,7 @@ namespace FW
 			if (Visit == glslang::EvPostVisit) return true;
 			const glslang::TIntermSymbol* DeclSymbol = Node->getDeclSymbol();
 			FString SymbolName = UTF8_TO_TCHAR(DeclSymbol->getName().c_str());
-			//uniform buffer block without instance name
+			//uniform buffer block without instance name 
 			if(SymbolName.StartsWith("anon@", ESearchCase::CaseSensitive) && DeclSymbol->getType().isStruct())
 			{
 				for (const auto& Member : *DeclSymbol->getType().getStruct())
@@ -1415,6 +1415,7 @@ namespace FW
 			Options.AddMacroDefinition("EDITOR_ISENSE", "1");
 			Options.AddMacroDefinition("ENABLE_PRINT", "0");
 			Options.AddMacroDefinition("ENABLE_ASSERT", "0");
+			ParseExtraArgs(InShader->CompileExtraArgs, Options);
 			Options.SetForcedVersionProfile(450, shaderc_profile_core);
 			Options.SetGenerateDebugInfo();
 			Options.SetVulkanRulesRelaxed(true);
@@ -1974,15 +1975,15 @@ namespace FW
 					}
 				}
 
-				if (GLSL::GetBuiltinTypes(Stage).Contains(TokenStr))
+				if (GLSL::FindBuiltinType(TokenStr, Stage))
 				{
 					return ShaderTokenType::BuiltinType;
 				}
-				else if (GLSL::GetBuiltinFuncs(Stage).Contains(TokenStr))
+				else if (GLSL::FindBuiltinFunc(TokenStr, Stage))
 				{
 					return ShaderTokenType::BuiltinFunc;
 				}
-				else if (GLSL::GetKeyWords(Stage).Contains(TokenStr))
+				else if (GLSL::FindKeyword(TokenStr, Stage))
 				{
 					return ShaderTokenType::Keyword;
 				}

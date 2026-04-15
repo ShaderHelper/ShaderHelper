@@ -15,11 +15,11 @@ namespace SH
 {
 	namespace
 	{
-		TArray<GpuShaderLayoutBinding> GetShaderBindings(const ShaderAsset* InShader)
+		TArray<GpuShaderLayoutBinding> GetShaderBindings(GpuShader* InShader)
 		{
-			if (InShader && InShader->Shader && InShader->Shader->IsCompiled())
+			if (InShader && InShader->IsCompiled())
 			{
-				return InShader->Shader->GetLayout();
+				return InShader->GetLayout();
 			}
 			return {};
 		}
@@ -188,7 +188,7 @@ namespace SH
 			}
 		};
 
-		auto CollectUbMembers = [&](const ShaderAsset* InShader) {
+		auto CollectUbMembers = [&](GpuShader* InShader) {
 			for (const GpuShaderLayoutBinding& Binding : GetShaderBindings(InShader))
 			{
 				if (Binding.Type != BindingType::UniformBuffer) continue;
@@ -229,8 +229,8 @@ namespace SH
 			}
 		};
 
-		CollectUbMembers(VertexShaderAsset.Get());
-		CollectUbMembers(PixelShaderAsset.Get());
+		CollectUbMembers(VertexShaderAsset ? VertexShaderAsset->GetCompiledShader(ShaderType::Vertex) : nullptr);
+		CollectUbMembers(PixelShaderAsset ? PixelShaderAsset->GetCompiledShader(ShaderType::Pixel) : nullptr);
 	}
 
 	void Material::RebuildBindingResourceDefaults()
@@ -239,7 +239,7 @@ namespace SH
 
 		TArray<GpuShaderLayoutBinding> SeenResBindings;
 
-		auto CollectResourceBindings = [&](const ShaderAsset* InShader) {
+		auto CollectResourceBindings = [&](GpuShader* InShader) {
 			for (const GpuShaderLayoutBinding& Binding : GetShaderBindings(InShader))
 			{
 				switch (Binding.Type)
@@ -298,17 +298,18 @@ namespace SH
 			}
 		};
 
-		CollectResourceBindings(VertexShaderAsset.Get());
-		CollectResourceBindings(PixelShaderAsset.Get());
+		CollectResourceBindings(VertexShaderAsset ? VertexShaderAsset->GetCompiledShader(ShaderType::Vertex) : nullptr);
+		CollectResourceBindings(PixelShaderAsset ? PixelShaderAsset->GetCompiledShader(ShaderType::Pixel) : nullptr);
 	}
 
 	void Material::RebuildVertexInputDefaults()
 	{
 		TArray<MaterialVertexInputDefault> OldDefaults = MoveTemp(VertexInputDefaults);
 
-		if (VertexShaderAsset && VertexShaderAsset->Shader && VertexShaderAsset->Shader->IsCompiled())
+		GpuShader* VsShader = VertexShaderAsset ? VertexShaderAsset->GetCompiledShader(ShaderType::Vertex) : nullptr;
+		if (VsShader)
 		{
-			TArray<GpuShaderVertexInput> Inputs = VertexShaderAsset->Shader->GetVertexInputs();
+			TArray<GpuShaderVertexInput> Inputs = VsShader->GetVertexInputs();
 			for (const GpuShaderVertexInput& Input : Inputs)
 			{
 				MaterialVertexInputDefault NewDefault;
@@ -444,7 +445,7 @@ namespace SH
 		{
 			// Build label based on shader language
 			FText ItemLabel;
-			GpuShaderLanguage VsLanguage = VertexShaderAsset->Shader->GetShaderLanguage();
+			GpuShaderLanguage VsLanguage = VertexShaderAsset->Language;
 
 			if (VsLanguage == GpuShaderLanguage::HLSL)
 			{

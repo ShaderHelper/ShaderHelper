@@ -34,14 +34,14 @@ namespace UNITTEST_GPUAPI
 
 		TRefCountPtr<GpuShader> Vs = GGpuRhi->CreateShaderFromFile({
 			.FileName = PathHelper::ShaderDir() / "Test/TestCube.hlsl",
-			.Type = ShaderType::VertexShader,
+			.Type = ShaderType::Vertex,
 			.EntryPoint = "MainVS",
 			.ExtraDecl = BindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL),
 		});
 
 		TRefCountPtr<GpuShader> Ps = GGpuRhi->CreateShaderFromFile({
 			.FileName = PathHelper::ShaderDir() / "Test/TestCube.hlsl",
-			.Type = ShaderType::PixelShader,
+			.Type = ShaderType::Pixel,
 			.EntryPoint = "MainPS",
 			.ExtraDecl = BindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL),
 		});

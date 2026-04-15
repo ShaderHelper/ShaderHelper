@@ -33,14 +33,14 @@ namespace FW
 
 		Vs = GGpuRhi->CreateShaderFromFile({
 			.FileName = PathHelper::ShaderDir() / "Blit.hlsl",
-			.Type = ShaderType::VertexShader,
+			.Type = ShaderType::Vertex,
 			.EntryPoint = "MainVS",
 			.ExtraDecl = ExtraDecl,
 		});
 
 		Ps = GGpuRhi->CreateShaderFromFile({
 			.FileName = PathHelper::ShaderDir() / "Blit.hlsl",
-			.Type = ShaderType::PixelShader,
+			.Type = ShaderType::Pixel,
 			.EntryPoint = "MainPS",
 			.ExtraDecl = ExtraDecl,
 		});

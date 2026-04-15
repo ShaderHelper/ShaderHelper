@@ -25,7 +25,7 @@ namespace SH
 	public:
 		explicit MaterialPreviewRenderer(Material* InMaterial = nullptr);
 
-		void SetMaterial(Material* InMaterial);
+		void ResetRenderContext();
 		void SetPreviewPrimitive(MaterialPreviewPrimitive InPreviewPrimitive);
 		void SetOrbit(float InYaw, float InPitch);
 		void SetCameraDistance(float InDistance);

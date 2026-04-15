@@ -64,14 +64,12 @@ namespace SH
 		check(MaterialAsset);
 	}
 
-	void MaterialPreviewRenderer::SetMaterial(Material* InMaterial)
+	void MaterialPreviewRenderer::ResetRenderContext()
 	{
-		MaterialAsset = InMaterial;
 		Pipeline = nullptr;
 		BindGroupLayouts.Empty();
 		BindGroups.Empty();
 		PreviewUniformBuffers.Empty();
-		bPreviewMeshInitialized = false;
 		LinkageErrorFunc = nullptr;
 	}
 
@@ -219,13 +217,13 @@ namespace SH
 		TArray<FText> Errors;
 		if (!MaterialAsset->VertexShaderAsset)
 			Errors.Add(LOCALIZATION("VsNotSpecified"));
-		else if (!MaterialAsset->VertexShaderAsset->Shader || !MaterialAsset->VertexShaderAsset->Shader->IsCompiled())
-			Errors.Add(LOCALIZATION("VsCompileFailed"));
+		else if (!MaterialAsset->VertexShaderAsset->GetCompiledShader(ShaderType::Vertex))
+			Errors.Add(LOCALIZATION("VsInvalidShader"));
 
 		if (!MaterialAsset->PixelShaderAsset)
 			Errors.Add(LOCALIZATION("PsNotSpecified"));
-		else if (!MaterialAsset->PixelShaderAsset->Shader || !MaterialAsset->PixelShaderAsset->Shader->IsCompiled())
-			Errors.Add(LOCALIZATION("PsCompileFailed"));
+		else if (!MaterialAsset->PixelShaderAsset->GetCompiledShader(ShaderType::Pixel))
+			Errors.Add(LOCALIZATION("PsInvalidShader"));
 
 		if (LinkageErrorFunc)
 			Errors.Add(LinkageErrorFunc());
@@ -259,9 +257,9 @@ namespace SH
 			return false;
 		}
 
-		GpuShader* Vs = MaterialAsset->VertexShaderAsset->Shader;
-		GpuShader* Ps = MaterialAsset->PixelShaderAsset->Shader;
-		if (!Vs || !Vs->IsCompiled() || !Ps || !Ps->IsCompiled())
+		GpuShader* Vs = MaterialAsset->VertexShaderAsset->GetCompiledShader(ShaderType::Vertex);
+		GpuShader* Ps = MaterialAsset->PixelShaderAsset->GetCompiledShader(ShaderType::Pixel);
+		if (!Vs || !Ps)
 		{
 			return false;
 		}
@@ -429,13 +427,13 @@ float4 MainPS() : SV_Target { return float4(1.0, 0.0, 1.0, 1.0); }
 		TRefCountPtr<GpuShader> Vs = GGpuRhi->CreateShaderFromSource({
 			.Name = "MaterialErrorVS",
 			.Source = VsSource,
-			.Type = ShaderType::VertexShader,
+			.Type = ShaderType::Vertex,
 			.EntryPoint = "MainVS",
 		});
 		TRefCountPtr<GpuShader> Ps = GGpuRhi->CreateShaderFromSource({
 			.Name = "MaterialErrorPS",
 			.Source = PsSource,
-			.Type = ShaderType::PixelShader,
+			.Type = ShaderType::Pixel,
 			.EntryPoint = "MainPS",
 		});
 
@@ -487,13 +485,15 @@ float4 MainPS() : SV_Target { return float4(1.0, 0.0, 1.0, 1.0); }
 
 		// Collect bindings from both shaders
 		TArray<GpuShaderLayoutBinding> AllBindings;
-		if (MaterialAsset->VertexShaderAsset && MaterialAsset->VertexShaderAsset->Shader && MaterialAsset->VertexShaderAsset->Shader->IsCompiled())
+		GpuShader* VsForBindGroup = MaterialAsset->VertexShaderAsset ? MaterialAsset->VertexShaderAsset->GetCompiledShader(ShaderType::Vertex) : nullptr;
+		if (VsForBindGroup)
 		{
-			AllBindings.Append(MaterialAsset->VertexShaderAsset->Shader->GetLayout());
+			AllBindings.Append(VsForBindGroup->GetLayout());
 		}
-		if (MaterialAsset->PixelShaderAsset && MaterialAsset->PixelShaderAsset->Shader && MaterialAsset->PixelShaderAsset->Shader->IsCompiled())
+		GpuShader* PsForBindGroup = MaterialAsset->PixelShaderAsset ? MaterialAsset->PixelShaderAsset->GetCompiledShader(ShaderType::Pixel) : nullptr;
+		if (PsForBindGroup)
 		{
-			AllBindings.Append(MaterialAsset->PixelShaderAsset->Shader->GetLayout());
+			AllBindings.Append(PsForBindGroup->GetLayout());
 		}
 
 		TMap<BindingGroupSlot, TArray<const GpuShaderLayoutBinding*>> GroupedBindings;

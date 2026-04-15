@@ -22,7 +22,7 @@ namespace UNITTEST_GPUAPI
 
 		Vs = GGpuRhi->CreateShaderFromFile({
 			.FileName = PathHelper::ShaderDir() / "Test/TestCast.hlsl",
-			.Type = ShaderType::VertexShader,
+			.Type = ShaderType::Vertex,
 			.EntryPoint = "MainVS",
 		});
 		if (GGpuRhi->GetFeature().Support16bitType())

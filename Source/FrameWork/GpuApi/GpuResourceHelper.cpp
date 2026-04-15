@@ -164,13 +164,13 @@ namespace FW::GpuResourceHelper
 
 			Result.Cs2D = GGpuRhi->CreateShaderFromFile({
 				.FileName = PathHelper::ShaderDir() / "Mip2D.hlsl",
-				.Type = ShaderType::ComputeShader,
+				.Type = ShaderType::Compute,
 				.EntryPoint = "MainCS"
 			});
 
 			Result.Cs3D = GGpuRhi->CreateShaderFromFile({
 				.FileName = PathHelper::ShaderDir() / "Mip3D.hlsl",
-				.Type = ShaderType::ComputeShader,
+				.Type = ShaderType::Compute,
 				.EntryPoint = "MainCS"
 			});
 

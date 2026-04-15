@@ -1,6 +1,5 @@
 #pragma once
-#include "AssetObject/PixelShader.h"
-#include "AssetObject/VertexShader.h"
+#include "AssetObject/Shader.h"
 #include "AssetObject/Texture2D.h"
 #include "AssetObject/TextureCube.h"
 #include "AssetObject/Texture3D.h"
@@ -105,8 +104,8 @@ namespace SH
 		void RefreshShaderBindings();
 
 	public:
-		FW::AssetPtr<VertexShader> VertexShaderAsset;
-		FW::AssetPtr<PixelShader> PixelShaderAsset;
+		FW::AssetPtr<Shader> VertexShaderAsset;
+		FW::AssetPtr<Shader> PixelShaderAsset;
 		TArray<MaterialBindingMemberDefault> BindingMemberDefaults;
 		TArray<MaterialBindingResourceDefault> BindingResourceDefaults;
 		TArray<MaterialVertexInputDefault> VertexInputDefaults;

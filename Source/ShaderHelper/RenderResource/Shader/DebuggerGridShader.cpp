@@ -23,14 +23,14 @@ namespace SH
 		
 		Vs = GGpuRhi->CreateShaderFromFile({
 			.FileName = PathHelper::ShaderDir() / "ShaderHelper/Debugger/Grid.hlsl",
-			.Type = ShaderType::VertexShader,
+			.Type = ShaderType::Vertex,
 			.EntryPoint = "MainVS",
 			.ExtraDecl = BindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL)
 		});
 
 		Ps = GGpuRhi->CreateShaderFromFile({
 			.FileName = PathHelper::ShaderDir() / "ShaderHelper/Debugger/Grid.hlsl",
-			.Type = ShaderType::PixelShader,
+			.Type = ShaderType::Pixel,
 			.EntryPoint = "MainPS",
 			.ExtraDecl = BindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL)
 		});

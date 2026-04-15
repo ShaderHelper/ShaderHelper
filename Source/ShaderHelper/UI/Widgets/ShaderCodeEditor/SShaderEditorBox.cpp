@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "SShaderEditorBox.h"
+#include "AssetObject/Shader.h"
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "GpuApi/GpuRhi.h"
 #include "ShaderCodeEditorLineHighlighter.h"
@@ -462,10 +463,7 @@ constexpr int PaddingLineNum = 22;
     {
 		ShaderAssetObj = InArgs._ShaderAssetObj;
 		ShaderRefreshHandle = ShaderAssetObj->OnShaderRefreshed.AddLambda([this]{
-			ISenseTask Task{};
-			Task.ShaderDesc = ShaderAssetObj->GetShaderDesc(CurrentShaderSource);
-			ISenseQueue.Enqueue(MoveTemp(Task));
-			ISenseEvent->Trigger();
+			SubmitLangServiceTasks();
 		});
 
 		UICommandList = MakeShared<FUICommandList>();
@@ -499,7 +497,8 @@ constexpr int PaddingLineNum = 22;
 				while (ISenseQueue.Dequeue(Task));
 				if (Task.ShaderDesc)
 				{
-					TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(Task.ShaderDesc.value());
+					TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(Task.ShaderDesc->SourceDesc);
+					Shader->CompileExtraArgs = Task.ShaderDesc->ExtraArgs;
 					auto TU = ShaderTU::Create( Shader);
 					DiagnosticInfos = TU->GetDiagnostic();
 
@@ -581,7 +580,8 @@ constexpr int PaddingLineNum = 22;
 				while (SyntaxQueue.Dequeue(Task));
 				if (Task.ShaderDesc)
 				{
-					TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(Task.ShaderDesc.value());
+					TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(Task.ShaderDesc->SourceDesc);
+					Shader->CompileExtraArgs = Task.ShaderDesc->ExtraArgs;
 					auto TU = ShaderTU::Create(Shader);
 					LineSyntaxHighlightMaps.Reset();
 					LineSyntaxHighlightMaps.SetNum(Task.LineTokens.Num());
@@ -1294,7 +1294,7 @@ constexpr int PaddingLineNum = 22;
         CustomCursorHighlighter = CursorHighlighter::Create(&CursorInfo);
         CursorLineHighlighter = CustomCursorHighlighter;
         
-        CurEditState = !ShaderAssetObj->Shader || ShaderAssetObj->bCompilationSucceed ? EditState::Succeed : EditState::Failed;
+        CurEditState = !ShaderAssetObj->IsCompilable() || ShaderAssetObj->IsCompilationSucceeded() ? EditState::Succeed : EditState::Failed;
 
 		RefreshFont();
     }
@@ -1428,7 +1428,7 @@ constexpr int PaddingLineNum = 22;
 
 	TRefCountPtr<GpuShader> SShaderEditorBox::CreateGpuShader()
 	{
-		return GGpuRhi->CreateShaderFromSource(ShaderAssetObj->GetShaderDesc(CurrentShaderSource));;
+		return GGpuRhi->CreateShaderFromSource(ShaderAssetObj->GetShaderDesc(CurrentShaderSource, SelectedStage).SourceDesc);;
 	}
 
 	FText SShaderEditorBox::GetEditStateText() const
@@ -1443,7 +1443,7 @@ constexpr int PaddingLineNum = 22;
     }
     FSlateColor SShaderEditorBox::GetEditStateColor() const
     {
-		if (!ShaderAssetObj->Shader)
+		if (!ShaderAssetObj->IsCompilable())
 		{
 			return FStyleColors::Panel;
 		}
@@ -1483,6 +1483,21 @@ constexpr int PaddingLineNum = 22;
 		return FText::FromString(FString::Format(*Fmt, { GetLineNumber(CursorRow), CursorCol }));
     }
 
+	void SShaderEditorBox::SyncStageSelectorOptions(const TArray<FW::ShaderType>& InEnabledStages)
+	{
+		StageComboOptions.Empty();
+		for (FW::ShaderType Type : InEnabledStages)
+		{
+			StageComboOptions.Add(MakeShared<FW::ShaderType>(Type));
+		}
+
+		if (InEnabledStages.Num() > 0 && !InEnabledStages.Contains(SelectedStage))
+		{
+			SelectedStage = InEnabledStages[0];
+			SubmitLangServiceTasks();
+		}
+	}
+
     TSharedRef<SWidget> SShaderEditorBox::BuildInfoBar()
     {
         SAssignNew(InfoBarBox, SHorizontalBox);
@@ -1490,7 +1505,7 @@ constexpr int PaddingLineNum = 22;
 		InfoBarBox->ClearChildren();
 
 		FSlateFontInfo InforBarFontInfo = FShaderHelperStyle::Get().GetFontStyle("CodeFont");
-		if (ShaderAssetObj->Shader)
+		if (ShaderAssetObj->IsCompilable())
 		{
 			InfoBarBox->AddSlot()
 			.AutoWidth()
@@ -1531,6 +1546,57 @@ constexpr int PaddingLineNum = 22;
 			[
 				SNullWidget::NullWidget
 			];
+
+		// Stage selector for Shader assets
+		if (Shader* ShaderObj = dynamic_cast<Shader*>(ShaderAssetObj))
+		{
+			StageComboOptions.Empty();
+			for (FW::ShaderType Type : ShaderObj->GetEnabledStageList())
+			{
+				StageComboOptions.Add(MakeShared<FW::ShaderType>(Type));
+			}
+
+			TSharedPtr<FW::ShaderType> InitialSelection;
+			for (auto& Option : StageComboOptions)
+			{
+				if (*Option == SelectedStage)
+				{
+					InitialSelection = Option;
+					break;
+				}
+			}
+			if (!InitialSelection && StageComboOptions.Num() > 0)
+			{
+				SelectedStage = *StageComboOptions[0];
+				InitialSelection = StageComboOptions[0];
+			}
+
+			InfoBarBox->AddSlot()
+			.AutoWidth()
+			.Padding(0, 0, 4, 0)
+			[
+				SNew(SComboBox<TSharedPtr<FW::ShaderType>>)
+				.ToolTipText(LOCALIZATION("StageSelectorTip"))
+				.OptionsSource(&StageComboOptions)
+				.InitiallySelectedItem(InitialSelection)
+				.OnGenerateWidget_Lambda([](TSharedPtr<FW::ShaderType> InItem) {
+					return SNew(STextBlock).Text(FText::FromString(ANSI_TO_TCHAR(magic_enum::enum_name(*InItem).data())));
+				})
+				.OnSelectionChanged_Lambda([this](TSharedPtr<FW::ShaderType> InSelection, ESelectInfo::Type) {
+					if (InSelection.IsValid())
+					{
+						SelectedStage = *InSelection;
+						SubmitLangServiceTasks();
+					}
+				})
+				[
+					SNew(STextBlock)
+					.Text_Lambda([this] {
+						return FText::FromString(ANSI_TO_TCHAR(magic_enum::enum_name(SelectedStage).data()));
+					})
+				]
+			];
+		}
 
 		InfoBarBox->AddSlot()
 			.AutoWidth()
@@ -1864,6 +1930,72 @@ constexpr int PaddingLineNum = 22;
         FSlateTextLayout* EffectTextLayout = static_cast<FSlateTextLayout*>(EffectMarshller->TextLayout);
         EffectTextLayout->SetVisibleRegion(EffectMultiLineGeometry.GetLocalSize(), ShaderScrollOffset * EffectTextLayout->GetScale());
     }
+
+	void SShaderEditorBox::SubmitLangServiceTasks()
+	{
+		ISenseTask ITask{};
+		ITask.ShaderDesc = ShaderAssetObj->GetShaderDesc(CurrentShaderSource, SelectedStage);
+
+		if (bTryComplete)
+		{
+			const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
+			const int32 CursorRow = CursorLocation.GetLineIndex();
+			const int32 CursorCol = CursorLocation.GetOffset();
+			int32 AddedLineNum = ShaderAssetObj->GetExtraLineNum();
+
+			FString CurLineText;
+			ShaderMultiLineEditableText->GetTextLine(CursorRow, CurLineText);
+			FString CursorLeft = CurLineText.Mid(0, CursorCol);
+
+			TArray<ShaderTokenizer::TokenizedLine> TokenizedLines = ShaderMarshaller->Tokenizer->Tokenize(CursorLeft, true);
+			auto Token = TokenizedLines[0].Tokens.Last();
+			FString LeftToken = CursorLeft.Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
+			if (TokenizedLines[0].Tokens.Num() > 1)
+			{
+				Token = TokenizedLines[0].Tokens.Last(1);
+				FString LeftToken2 = CursorLeft.Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
+				if (LeftToken2 == ".")
+				{
+					ITask.IsMemberAccess = true;
+				}
+			}
+			CurToken = LeftToken;
+
+			ITask.Row = GetLineNumber(CursorRow) + AddedLineNum;
+			if (LeftToken == ".")
+			{
+				ITask.IsMemberAccess = true;
+				ITask.Col = CursorCol + 1;
+			}
+			else
+			{
+				ITask.Col = CursorCol + 1 - LeftToken.Len();
+			}
+			ITask.CursorToken = MoveTemp(LeftToken);
+		}
+
+		ISenseQueue.Enqueue(MoveTemp(ITask));
+		ISenseEvent->Trigger();
+
+		auto& LineModels = ShaderMarshaller->TextLayout->GetLineModels();
+		SyntaxTask STask;
+		STask.ShaderDesc = ShaderAssetObj->GetShaderDesc(CurrentShaderSource, SelectedStage);
+		STask.LineTokens.SetNum(LineModels.Num());
+		for (int32 LineIndex = 0; LineIndex < LineModels.Num(); LineIndex++)
+		{
+			ShaderTokenizer::TokenizedLine* CurTokenizedLine = static_cast<ShaderTokenizer::TokenizedLine*>(LineModels[LineIndex].CustomData.Get());
+			if (CurTokenizedLine)
+			{
+				for (const ShaderTokenizer::Token& Token : CurTokenizedLine->Tokens)
+				{
+					STask.LineTokens[LineIndex].Add(Token);
+				}
+			}
+		}
+		bRefreshSyntax.store(false, std::memory_order_relaxed);
+		SyntaxQueue.Enqueue(MoveTemp(STask));
+		SyntaxEvent->Trigger();
+	}
 
 	void SShaderEditorBox::RefreshSyntaxHighlight()
 	{
@@ -2461,7 +2593,7 @@ constexpr int PaddingLineNum = 22;
 
 	void SShaderEditorBox::Compile()
     {
-		if (!ShaderAssetObj->Shader)
+		if (!ShaderAssetObj->IsCompilable())
 		{
 			CurEditState = EditState::Succeed;
 			return;
@@ -2470,12 +2602,9 @@ constexpr int PaddingLineNum = 22;
 		int32 AddedLineNum = ShaderAssetObj->GetExtraLineNum();
 		
 		//TODO Async and show "Compiling" state
-		TRefCountPtr<GpuShader> Shader = CreateGpuShader();
 		FString ErrorInfo, WarnInfo;
-        if (GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo))
+        if (ShaderAssetObj->CompileShader(ErrorInfo, WarnInfo))
         {
-			ShaderAssetObj->Shader = Shader;
-			ShaderAssetObj->bCompilationSucceed = true;
 			ShaderAssetObj->OnShaderRefreshed.Broadcast();
             CurEditState = EditState::Succeed;
 			
@@ -2487,7 +2616,6 @@ constexpr int PaddingLineNum = 22;
         }
 		else
 		{
-			ShaderAssetObj->bCompilationSucceed = false;
 			CurEditState = EditState::Failed;
 			
 			if(!ErrorInfo.IsEmpty())
@@ -2515,50 +2643,7 @@ constexpr int PaddingLineNum = 22;
         
         CurrentShaderSource = NewShaderSource;
 
-		ISenseTask Task{};
-		Task.ShaderDesc = ShaderAssetObj->GetShaderDesc(CurrentShaderSource);
-
-		if (bTryComplete)
-		{
-			//Note: The cursor has advanced here. CursorLocation starts from 0, but libclang 1
-			const FTextLocation CursorLocation = ShaderMultiLineEditableText->GetCursorLocation();
-			const int32 CursorRow = CursorLocation.GetLineIndex();
-			const int32 CursorCol = CursorLocation.GetOffset();
-			int32 AddedLineNum = ShaderAssetObj->GetExtraLineNum();
-
-			FString CurLineText;
-			ShaderMultiLineEditableText->GetTextLine(CursorRow, CurLineText);
-			FString CursorLeft = CurLineText.Mid(0, CursorCol);
-
-			TArray<ShaderTokenizer::TokenizedLine> TokenizedLines = ShaderMarshaller->Tokenizer->Tokenize(CursorLeft, true);
-			auto Token = TokenizedLines[0].Tokens.Last();
-			FString LeftToken = CursorLeft.Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
-			if (TokenizedLines[0].Tokens.Num() > 1)
-			{
-				Token = TokenizedLines[0].Tokens.Last(1);
-				FString LeftToken2 = CursorLeft.Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
-				if (LeftToken2 == ".")
-				{
-					Task.IsMemberAccess = true;
-				}
-			}
-			CurToken = LeftToken;
-
-			Task.Row = GetLineNumber(CursorRow) + AddedLineNum;
-			if (LeftToken == ".")
-			{
-				Task.IsMemberAccess = true;
-				Task.Col = CursorCol + 1;
-			}
-			else
-			{
-				Task.Col = CursorCol + 1 - LeftToken.Len();
-			}
-			Task.CursorToken = MoveTemp(LeftToken);
-		}
-
-		ISenseQueue.Enqueue(MoveTemp(Task));
-		ISenseEvent->Trigger();
+		SubmitLangServiceTasks();
     }
 
     static int32 GetNumSpacesAtStartOfLine(const FString& InLine)
@@ -3808,21 +3893,11 @@ constexpr int PaddingLineNum = 22;
 		}
 
 		this->TokenizedLines.Empty();
-		SyntaxTask Task;
-		Task.ShaderDesc = OwnerWidget->GetShaderAsset()->GetShaderDesc(SourceString);
-		Task.LineTokens.SetNum(LineModels.Num());
 		for (int32 LineIndex = 0; LineIndex < LineModels.Num(); LineIndex++)
 		{
 			ShaderTokenizer::TokenizedLine* CurTokenizedLine = static_cast<ShaderTokenizer::TokenizedLine*>(LineModels[LineIndex].CustomData.Get());
 			this->TokenizedLines.Add(*CurTokenizedLine);
-			for (const ShaderTokenizer::Token& Token : CurTokenizedLine->Tokens)
-			{
-				Task.LineTokens[LineIndex].Add(Token);
-			}
 		}
-		OwnerWidget->bRefreshSyntax.store(false, std::memory_order_relaxed);
-		OwnerWidget->SyntaxQueue.Enqueue(MoveTemp(Task));
-		OwnerWidget->SyntaxEvent->Trigger();
 		
         if(EditableTextLayout && EditableTextLayout->CurrentUndoLevel >= 0)
         {

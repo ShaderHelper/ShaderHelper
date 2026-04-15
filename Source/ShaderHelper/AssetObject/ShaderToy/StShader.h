@@ -20,7 +20,7 @@ namespace SH
 		StShader();
 		~StShader();
         
-		FW::GpuShader* GetPixelShader() const { return Shader; }
+		FW::GpuShader* GetPixelShader() const { return PixelShader; }
 		FW::GpuShader* GetVertexShader();
         static FW::UniformBufferBuilder& GetBuiltInUbBuilder();
 		TRefCountPtr<FW::GpuBindGroupLayout> GetBuiltInBindLayout();
@@ -36,7 +36,10 @@ namespace SH
 		//ShaderAsset interface
 		FString GetFullContent() const override;
 		int32 GetExtraLineNum() const override;
-		FW::GpuShaderSourceDesc GetShaderDesc(const FString& InContent) const override;
+		ShaderDesc GetShaderDesc(const FString& InContent, FW::ShaderType InStage = FW::ShaderType::Vertex) const override;
+		bool IsCompilable() const override { return true; }
+		bool CompileShader(FString& OutError, FString& OutWarn) override;
+		bool IsCompilationSucceeded() const override { return bCompilationSucceed; }
 		FString GetBinding() const;
         FString GetTemplateWithBinding() const;
         
@@ -62,6 +65,9 @@ namespace SH
         TSharedPtr<FW::PropertyCategory> CustomCategory;
         FW::UniformBufferBuilder CustomUniformBufferBuilder{FW::UniformBufferUsage::Persistant};
         FW::GpuBindGroupLayoutBuilder CustomBindGroupLayoutBuilder{ FW::BindingContext::PassSlot };
+		
+		TRefCountPtr<FW::GpuShader> PixelShader;
+		bool bCompilationSucceed{};
 	};
 
 }

@@ -430,18 +430,6 @@
             ]
         },
         {
-            "label": "SV_POSITION",
-            "stages": [
-                "VS",
-                "PS",
-                "CS",
-                "GS",
-                "HS",
-                "DS"
-            ],
-            "desc": "Clip-space position semantic"
-        },
-        {
             "label": "SV_Position",
             "stages": [
                 "VS",
@@ -537,13 +525,6 @@
                 "PS"
             ],
             "desc": "Sample index semantic"
-        },
-        {
-            "label": "SV_TARGET",
-            "stages": [
-                "PS"
-            ],
-            "desc": "Render target output semantic"
         },
         {
             "label": "SV_Target",

@@ -134,11 +134,9 @@ namespace FW
 
 	enum class ShaderType
 	{
-		None,
-		VertexShader,
-		PixelShader,
-		ComputeShader,
-		Num
+		Vertex,
+		Pixel,
+		Compute,
 	};
 
 	enum class RasterizerCullMode

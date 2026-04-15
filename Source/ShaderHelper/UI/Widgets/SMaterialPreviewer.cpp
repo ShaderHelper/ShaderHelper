@@ -162,7 +162,7 @@ namespace SH
 		if (MaterialAsset)
 		{
 			MaterialChangedHandle = MaterialAsset->OnMaterialChanged.AddLambda([this] {
-				Renderer->SetMaterial(MaterialAsset.Get());
+				Renderer->ResetRenderContext();
 				Render();
 			});
 		}

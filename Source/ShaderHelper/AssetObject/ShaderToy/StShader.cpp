@@ -1,6 +1,5 @@
 #include "CommonHeader.h"
 #include "StShader.h"
-#include "AssetObject/ShaderHeader.h"
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "Common/Path/PathHelper.h"
 #include "App/App.h"
@@ -9,7 +8,6 @@
 #include "UI/Widgets/Property/PropertyData/PropertyItem.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 #include "RenderResource/PrintBuffer.h"
-#include "AssetManager/AssetManager.h"
 #include "AssetObject/Texture2D.h"
 #include "AssetObject/TextureCube.h"
 #include "AssetObject/Texture3D.h"
@@ -76,28 +74,16 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
     void StShader::PostLoad()
     {
         AssetObject::PostLoad();
-        
-        Shader = GGpuRhi->CreateShaderFromSource({
-            .Name = GetShaderName(),
-            .Source = GetFullContent(),
-            .Type = ShaderType::PixelShader,
-            .EntryPoint = "MainPS",
-			.Language = Language,
-			.IncludeDirs = GetIncludeDirs(),
-			.IncludeHandler = [](const FString& IncludePath) -> FString {
-				if (FPaths::GetExtension(IncludePath) == TEXT("header"))
-				{
-					AssetPtr<ShaderHeader> HeaderAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderHeader>(IncludePath);
-					return HeaderAsset ? HeaderAsset->GetFullContent() : "";
-				}
-				FString Content;
-				FFileHelper::LoadFileToString(Content, *IncludePath);
-				return Content;
-			},
-        });
 		FString ErrorInfo, WarnInfo;
-		bCompilationSucceed = GGpuRhi->CompileShader(Shader, ErrorInfo, WarnInfo);
+		CompileShader(ErrorInfo, WarnInfo);
     }
+
+	bool StShader::CompileShader(FString& OutError, FString& OutWarn)
+	{
+		PixelShader = GGpuRhi->CreateShaderFromSource(GetShaderDesc(EditorContent).SourceDesc);
+		bCompilationSucceed = GGpuRhi->CompileShader(PixelShader, OutError, OutWarn);
+		return bCompilationSucceed;
+	}
 
 	GpuShader* StShader::GetVertexShader()
 	{
@@ -105,7 +91,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 		static int Init = [&] {
 			VertexShader = GGpuRhi->CreateShaderFromSource({
 				.Source = DefaultVertexShader,
-				.Type = ShaderType::VertexShader,
+				.Type = ShaderType::Vertex,
 				.EntryPoint = "MainVS"
 			});
 			FString ErrorInfo, WarnInfo;
@@ -212,27 +198,18 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 		return AddedLineNum;
 	}
 
-	GpuShaderSourceDesc StShader::GetShaderDesc(const FString& InContent) const
+	ShaderDesc StShader::GetShaderDesc(const FString& InContent, ShaderType InStage) const
 	{
 		FString FinalShaderSource = GetTemplateWithBinding() + InContent;
-		auto Desc = GpuShaderSourceDesc{
+		ShaderDesc Desc;
+		Desc.SourceDesc = {
 			.Name = GetShaderName(),
 			.Source = MoveTemp(FinalShaderSource),
-			.Type = ShaderType::PixelShader,
+			.Type = ShaderType::Pixel,
 			.EntryPoint = "MainPS",
 			.Language = Language,
 			.IncludeDirs = GetIncludeDirs(),
-			.IncludeHandler = [](const FString& IncludePath) -> FString {
-				if (FPaths::GetExtension(IncludePath) == TEXT("header"))
-				{
-					FScopeLock ScopeLock(&GAssetCS);
-					AssetPtr<ShaderHeader> HeaderAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderHeader>(IncludePath);
-					return HeaderAsset ? HeaderAsset->GetFullContent() : "";
-				}
-				FString Content;
-				FFileHelper::LoadFileToString(Content, *IncludePath);
-				return Content;
-			},
+			.IncludeHandler = &ShaderAsset::LoadIncludeFile,
 		};
 		return Desc;
 	}

@@ -17,7 +17,7 @@ namespace SH
 		//ShaderAsset interface
 		FString GetFullContent() const override;
 		int32 GetExtraLineNum() const override { return 0; }
-		FW::GpuShaderSourceDesc GetShaderDesc(const FString& InContent) const override;
+		ShaderDesc GetShaderDesc(const FString& InContent, FW::ShaderType InStage = FW::ShaderType::Vertex) const override;
 
 		//ShObject interface
 		bool CanChangeProperty(FW::PropertyData* InProperty) override;

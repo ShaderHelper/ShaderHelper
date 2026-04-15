@@ -51,14 +51,14 @@ namespace FW
 
 			TRefCountPtr<GpuShader> Vs = GGpuRhi->CreateShaderFromFile({
 				.FileName = ShaderPath,
-				.Type = ShaderType::VertexShader,
+				.Type = ShaderType::Vertex,
 				.EntryPoint = TEXT("MainVS"),
 				.ExtraDecl = BindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL),
 			});
 
 			TRefCountPtr<GpuShader> Ps = GGpuRhi->CreateShaderFromFile({
 				.FileName = ShaderPath,
-				.Type = ShaderType::PixelShader,
+				.Type = ShaderType::Pixel,
 				.EntryPoint = TEXT("MainPS"),
 				.ExtraDecl = BindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL),
 			});
@@ -278,14 +278,14 @@ namespace FW
 
 			TRefCountPtr<GpuShader> Vs = GGpuRhi->CreateShaderFromFile({
 				.FileName = ShaderPath,
-				.Type = ShaderType::VertexShader,
+				.Type = ShaderType::Vertex,
 				.EntryPoint = TEXT("MainVS"),
 				.ExtraDecl = BindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL),
 			});
 
 			TRefCountPtr<GpuShader> Ps = GGpuRhi->CreateShaderFromFile({
 				.FileName = ShaderPath,
-				.Type = ShaderType::PixelShader,
+				.Type = ShaderType::Pixel,
 				.EntryPoint = TEXT("MainPS"),
 				.ExtraDecl = BindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL),
 			});
