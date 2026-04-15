@@ -7,11 +7,15 @@ namespace FW
 	public:
 		SLATE_BEGIN_ARGS(SPropertyCatergory)
 		: _CategoryBrush(nullptr)
+		, _HasCheckBox(false)
 		{}
 			SLATE_ARGUMENT(FText, DisplayName)
 			SLATE_ARGUMENT(TSharedPtr<SWidget>, AddMenuWidget)
 			SLATE_ARGUMENT(bool, IsRootCategory)
 			SLATE_ARGUMENT( const FSlateBrush*, CategoryBrush )
+			SLATE_ARGUMENT(bool, HasCheckBox)
+			SLATE_ATTRIBUTE(ECheckBoxState, CheckBoxState)
+			SLATE_EVENT(FOnCheckStateChanged, OnCheckBoxStateChanged)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs, const TSharedPtr<class ITableRow>& TableRow);

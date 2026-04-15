@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
-#include "VertexShaderEditor.h"
+#include "ShaderEditor.h"
 #include "AssetManager/AssetManager.h"
-#include "AssetObject/VertexShader.h"
+#include "AssetObject/Shader.h"
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 
@@ -9,35 +9,35 @@ using namespace FW;
 
 namespace SH
 {
-	REFLECTION_REGISTER(AddClass<VertexShaderOp>()
+	REFLECTION_REGISTER(AddClass<ShaderOp>()
 		.BaseClass<ShAssetOp>()
 	)
 
-	MetaType* VertexShaderOp::SupportType()
+	MetaType* ShaderOp::SupportType()
 	{
-		return GetMetaType<VertexShader>();
+		return GetMetaType<Shader>();
 	}
 
-	void VertexShaderOp::OnOpen(const FString& InAssetPath)
+	void ShaderOp::OnOpen(const FString& InAssetPath)
 	{
-		AssetPtr<VertexShader> LoadedVertexShader = TSingleton<AssetManager>::Get().LoadAssetByPath<VertexShader>(InAssetPath);
+		AssetPtr<Shader> LoadedShader = TSingleton<AssetManager>::Get().LoadAssetByPath<Shader>(InAssetPath);
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->OpenShaderTab(MoveTemp(LoadedVertexShader));
+		ShEditor->OpenShaderTab(MoveTemp(LoadedShader));
 	}
 
-	void VertexShaderOp::OnRename(const FString& OldPath, const FString& NewPath)
+	void ShaderOp::OnRename(const FString& OldPath, const FString& NewPath)
 	{
 		AssetOp::OnRename(OldPath, NewPath);
 		OnMove(OldPath, NewPath);
 	}
 
-	void VertexShaderOp::OnMove(const FString& OldPath, const FString& NewPath)
+	void ShaderOp::OnMove(const FString& OldPath, const FString& NewPath)
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		ShEditor->UpdateShaderPath(NewPath);
 	}
 
-	void VertexShaderOp::OnDelete(const FString& InAssetPath)
+	void ShaderOp::OnDelete(const FString& InAssetPath)
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		FName TabId{ TSingleton<AssetManager>::Get().GetGuid(InAssetPath).ToString() };

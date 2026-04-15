@@ -322,7 +322,7 @@ namespace SH
 
 	std::string ShaderToyPassNode::GetShaderToyCode() const
 	{
-		if(ShaderAssetObj->Shader->GetShaderLanguage() == GpuShaderLanguage::GLSL)
+		if(ShaderAssetObj->GetPixelShader()->GetShaderLanguage() == GpuShaderLanguage::GLSL)
 		{
 			std::string ShaderToy = TCHAR_TO_UTF8(*ShaderAssetObj->EditorContent);
 			
@@ -358,25 +358,25 @@ namespace SH
 		ShaderConductor::Compiler::Options SCOptions;
 		SCOptions.DXCArgs = DxcArgs.GetData();
 		SCOptions.numDXCArgs = DxcArgs.Num();
-		GpuShaderModel Sm = ShaderAssetObj->Shader->GetShaderModelVer();
+		GpuShaderModel Sm = ShaderAssetObj->GetPixelShader()->GetShaderModelVer();
 		SCOptions.shaderModel = { Sm.Major, Sm.Minor };
 
 		ShaderConductor::Compiler::SourceDesc SourceDesc{};
-		TArray<char> EntryPointAnsi{ TCHAR_TO_ANSI(*ShaderAssetObj->Shader->GetEntryPoint()), ShaderAssetObj->Shader->GetEntryPoint().Len() + 1 };
+		TArray<char> EntryPointAnsi{ TCHAR_TO_ANSI(*ShaderAssetObj->GetPixelShader()->GetEntryPoint()), ShaderAssetObj->GetPixelShader()->GetEntryPoint().Len() + 1 };
 		SourceDesc.entryPoint = EntryPointAnsi.GetData();
 		SourceDesc.stage = ShaderConductor::ShaderStage::PixelShader;
-		auto SourceUTF8 = StringCast<UTF8CHAR>(*ShaderAssetObj->Shader->GetProcessedSourceText());
+		auto SourceUTF8 = StringCast<UTF8CHAR>(*ShaderAssetObj->GetPixelShader()->GetProcessedSourceText());
 		SourceDesc.source = (char*)SourceUTF8.Get();
 
 		SourceDesc.loadIncludeCallback = [this](const char* includeName) -> ShaderConductor::Blob {
-			for (const FString& IncludeDir : ShaderAssetObj->Shader->GetIncludeDirs())
+			for (const FString& IncludeDir : ShaderAssetObj->GetPixelShader()->GetIncludeDirs())
 			{
 				FString IncludedFile = FPaths::Combine(IncludeDir, includeName);
 				if (IFileManager::Get().FileExists(*IncludedFile))
 				{
 					FString ShaderText;
 					FFileHelper::LoadFileToString(ShaderText, *IncludedFile);
-					ShaderText = GpuShaderPreProcessor{ ShaderText, ShaderAssetObj->Shader->GetShaderLanguage()}
+					ShaderText = GpuShaderPreProcessor{ ShaderText, ShaderAssetObj->GetPixelShader()->GetShaderLanguage()}
 						.ReplacePrintStringLiteral()
 						.Finalize();
 					auto SourceText = StringCast<UTF8CHAR>(*ShaderText);
@@ -1139,7 +1139,7 @@ namespace SH
 			}
         }
         
-        if(!ShaderAssetObj->bCompilationSucceed)
+        if(!ShaderAssetObj->IsCompilationSucceeded())
         {
             return {true, false};
         }

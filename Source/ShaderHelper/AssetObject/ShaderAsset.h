@@ -4,6 +4,12 @@
 
 namespace SH
 {
+	struct ShaderDesc
+	{
+		FW::GpuShaderSourceDesc SourceDesc;
+		TArray<FString> ExtraArgs;
+	};
+
 	class ShaderAsset : public FW::AssetObject
 	{
 		REFLECTION_TYPE(ShaderAsset)
@@ -18,19 +24,26 @@ namespace SH
 		virtual int32 GetExtraLineNum() const = 0;
 		TArray<FString> GetIncludeDirs() const;
 		FString GetShaderName() const;
-		virtual FW::GpuShaderSourceDesc GetShaderDesc(const FString& InContent) const = 0;
+		virtual ShaderDesc GetShaderDesc(const FString& InContent, FW::ShaderType InStage = FW::ShaderType::Vertex) const = 0;
 
 		FW::AssetPtr<ShaderAsset> FindIncludeAsset(const FString& InShaderName);
 
+		//Whether this shader asset type supports compilation (false for headers)
+		virtual bool IsCompilable() const { return false; }
+		//Compile the shader. Subclass implements its own compilation logic.
+		virtual bool CompileShader(FString& OutError, FString& OutWarn) { return false; }
+		//Query overall compilation success status
+		virtual bool IsCompilationSucceeded() const { return false; }
+
+		static FString LoadIncludeFile(const FString& IncludePath);
+
 	protected:
-		TArray<TSharedRef<FW::PropertyData>> BuildBindingPropertyDatas() const;
+		TArray<TSharedRef<FW::PropertyData>> BuildBindingPropertyDatas(FW::GpuShader* InShader) const;
 		
 	public:
 		//Only visible content in editor
 		FString EditorContent;
 		FString SavedEditorContent;
-		TRefCountPtr<FW::GpuShader> Shader;
-		bool bCompilationSucceed{};
 		
 		FSimpleMulticastDelegate OnShaderRefreshed;
 	};

@@ -1,8 +1,7 @@
 #include "CommonHeader.h"
-#include "AssetObject/PixelShader.h"
+#include "AssetObject/Shader.h"
 #include "AssetObject/Render/Nodes/RenderOutputNode.h"
 #include "AssetObject/Render/Render.h"
-#include "AssetObject/VertexShader.h"
 #include "ShPluginManager.h"
 #include "AssetObject/ShaderToy/ShaderToy.h"
 #include "AssetObject/Nodes/Texture2dNode.h"
@@ -47,12 +46,9 @@ PYBIND11_EMBEDDED_MODULE(ShaderHelper, m)
 				for (int i = 0; i < 4 && i < py::len(t); i++)
 					Self.ChannelSlotTypes[i] = t[i].cast<SH::ShaderToySlotType>();
 			});
-	py::class_<SH::VertexShader, SH::ShaderAsset, FW::ObjectPtr<SH::VertexShader>>(m, "VertexShader")
-		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::VertexShader>(Outer); }), py::arg("Outer") = nullptr)
-		.def_readwrite("Language", &SH::VertexShader::Language);
-	py::class_<SH::PixelShader, SH::ShaderAsset, FW::ObjectPtr<SH::PixelShader>>(m, "PixelShader")
-		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::PixelShader>(Outer); }), py::arg("Outer") = nullptr)
-		.def_readwrite("Language", &SH::PixelShader::Language);
+	py::class_<SH::Shader, SH::ShaderAsset, FW::ObjectPtr<SH::Shader>>(m, "Shader")
+		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::Shader>(Outer); }), py::arg("Outer") = nullptr)
+		.def_readwrite("Language", &SH::Shader::Language);
 	py::class_<SH::ShaderHeader, SH::ShaderAsset, FW::ObjectPtr<SH::ShaderHeader>>(m, "ShaderHeader")
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::ShaderHeader>(Outer); }), py::arg("Outer") = nullptr)
 		.def_readwrite("Language", &SH::ShaderHeader::Language);

@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "ShaderAsset.h"
+#include "AssetObject/ShaderHeader.h"
 #include "ProjectManager/ShProjectManager.h"
 #include "UI/Widgets/Property/PropertyData/PropertyData.h"
 #include "UI/Widgets/Property/PropertyData/PropertyItem.h"
@@ -49,6 +50,20 @@ namespace SH
 		};
 	}
 
+	FString ShaderAsset::LoadIncludeFile(const FString& IncludePath)
+	{
+		if (FPaths::GetExtension(IncludePath) == TEXT("header"))
+		{
+			FScopeLock ScopeLock(&GAssetCS);
+			AssetPtr<ShaderHeader> HeaderAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderHeader>(IncludePath);
+			return HeaderAsset ? HeaderAsset->GetFullContent() : "";
+		}
+
+		FString Content;
+		FFileHelper::LoadFileToString(Content, *IncludePath);
+		return Content;
+	}
+
 	FString ShaderAsset::GetShaderName() const
 	{
 		return GetFileName() + "." + FileExtension();
@@ -79,17 +94,17 @@ namespace SH
 		return nullptr;
 	}
 
-	TArray<TSharedRef<PropertyData>> ShaderAsset::BuildBindingPropertyDatas() const
+	TArray<TSharedRef<PropertyData>> ShaderAsset::BuildBindingPropertyDatas(GpuShader* InShader) const
 	{
 		auto BindingCategory = MakeShared<PropertyCategory>(const_cast<ShaderAsset*>(this), LOCALIZATION("Bindings"));
 		TArray<TSharedRef<PropertyData>> BindingProperties;
 		BindingProperties.Add(BindingCategory);
-		if (!Shader || !Shader->IsCompiled())
+		if (!InShader || !InShader->IsCompiled())
 		{
 			return BindingProperties;
 		}
 
-		TArray<GpuShaderLayoutBinding> Bindings = Shader->GetLayout();
+		TArray<GpuShaderLayoutBinding> Bindings = InShader->GetLayout();
 		for (const GpuShaderLayoutBinding& Binding : Bindings)
 		{
 			const FString BindingTypeName = ANSI_TO_TCHAR(magic_enum::enum_name(Binding.Type).data());

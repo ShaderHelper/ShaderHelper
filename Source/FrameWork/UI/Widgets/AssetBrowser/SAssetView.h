@@ -18,6 +18,7 @@ namespace FW
 		static constexpr float MinAssetViewSize = 50;
 		static constexpr float MaxAssetViewSize = 150;
 		static constexpr int32 MaxThumbnailLoadRequests = 1;
+		static constexpr float ThumbnailRefreshDelay = 0.3f;
 
 		struct PendingThumbnailLoad
 		{
@@ -72,6 +73,7 @@ namespace FW
 		void OnHandleOpenAction(TSharedRef<AssetViewItem> ViewItem);
 		void SetAssetIcon(TSharedRef<class AssetViewAssetItem> ViewItem);
 		void TickAssetIconLoading(float DeltaTime);
+		void FlushDirtyThumbnails(float DeltaTime);
 		void ResetAssetIconLoadingState();
 
 	private:
@@ -89,6 +91,8 @@ namespace FW
 		int32 NextPendingThumbnailLoad = 0;
 		int32 InflightThumbnailLoads = 0;
 		FDelegateHandle ThumbnailLoadTickerHandle;
+		TSet<FString> DirtyThumbnailPaths;
+		float ThumbnailRefreshAccumulator = 0.0f;
 	};
 
 }

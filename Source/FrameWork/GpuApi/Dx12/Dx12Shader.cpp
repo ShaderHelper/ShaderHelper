@@ -48,9 +48,9 @@ namespace FW
 		BindingShaderStage ShaderStage;
 		switch (Type)
 		{
-		case ShaderType::VertexShader:  ShaderStage = BindingShaderStage::Vertex;  break;
-		case ShaderType::PixelShader:   ShaderStage = BindingShaderStage::Pixel;   break;
-		case ShaderType::ComputeShader: ShaderStage = BindingShaderStage::Compute; break;
+		case ShaderType::Vertex:  ShaderStage = BindingShaderStage::Vertex;  break;
+		case ShaderType::Pixel:   ShaderStage = BindingShaderStage::Pixel;   break;
+		case ShaderType::Compute: ShaderStage = BindingShaderStage::Compute; break;
 		default: ShaderStage = BindingShaderStage::All; break;
 		}
 
@@ -141,7 +141,7 @@ namespace FW
 		}
 
 		TArray<GpuShaderVertexInput> VertexInputs;
-		if (Type != ShaderType::VertexShader || !ByteCode.IsValid())
+		if (Type != ShaderType::Vertex || !ByteCode.IsValid())
 		{
 			return VertexInputs;
 		}
@@ -366,13 +366,13 @@ namespace FW
 	FString GetShaderProfile(ShaderType InType, GpuShaderModel InModel)
 	{
 		FString ProfileName;
-		if (InType == ShaderType::VertexShader) {
+		if (InType == ShaderType::Vertex) {
 			ProfileName += "vs";
 		}
-		else if (InType == ShaderType::PixelShader) {
+		else if (InType == ShaderType::Pixel) {
 			ProfileName += "ps";
 		}
-		else if (InType == ShaderType::ComputeShader) {
+		else if (InType == ShaderType::Compute) {
 			ProfileName += "cs";
 		}
 

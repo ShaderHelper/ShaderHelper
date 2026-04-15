@@ -132,7 +132,7 @@ namespace SH
 
 	struct ISenseTask
 	{
-		std::optional<FW::GpuShaderSourceDesc> ShaderDesc;
+		std::optional<ShaderDesc> ShaderDesc;
 
 		FString CursorToken;
 		uint32 Row = 0;
@@ -142,7 +142,7 @@ namespace SH
 
 	struct SyntaxTask
 	{
-		std::optional<FW::GpuShaderSourceDesc> ShaderDesc;
+		std::optional<ShaderDesc> ShaderDesc;
 		TArray<TArray<ShaderTokenizer::Token>> LineTokens;
 	};
 
@@ -262,6 +262,8 @@ namespace SH
 		void ClearDiagInfoEffect();
         void RefreshLineNumberToDiagInfo();
         void RefreshCodeCompletionTip();
+		void SyncStageSelectorOptions(const TArray<FW::ShaderType>& InEnabledStages);
+		void SubmitLangServiceTasks();
 		void RefreshSyntaxHighlight();
 		void RefreshOccurrenceHighlight();
 		void RefreshBracketHighlight();
@@ -297,6 +299,7 @@ namespace SH
         FString CurrentEditorSource;
 		const FSlateBrush* BackgroundLayerBrush{};
 		TSharedPtr<FShaderEditorMarshaller> ShaderMarshaller;
+		FW::ShaderType SelectedStage = FW::ShaderType::Vertex;
 
 		TSharedPtr<FShaderEditorEffectMarshaller> EffectMarshller;
 		TSharedPtr<SMultiLineEditableText> EffectMultiLineEditableText;
@@ -340,6 +343,7 @@ namespace SH
         EditState CurEditState;
 		TSharedPtr<SHorizontalBox> InfoBarBox;
 		TSharedPtr<SCodeSearchWidget> CodeSearchWidget;
+		TArray<TSharedPtr<FW::ShaderType>> StageComboOptions;
 
 		bool IsFoldEditTransaction{};
 		FCurveSequence FoldingArrowAnim;

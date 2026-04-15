@@ -174,13 +174,13 @@ namespace FW
 
 		TRefCountPtr<GpuShader> Vs = GGpuRhi->CreateShaderFromFile({
 			.FileName = PathHelper::ShaderDir() / "ModelPreview.hlsl",
-			.Type = ShaderType::VertexShader,
+			.Type = ShaderType::Vertex,
 			.EntryPoint = "MainVS",
 			.ExtraDecl = ExtraDecl,
 		});
 		TRefCountPtr<GpuShader> Ps = GGpuRhi->CreateShaderFromFile({
 			.FileName = PathHelper::ShaderDir() / "ModelPreview.hlsl",
-			.Type = ShaderType::PixelShader,
+			.Type = ShaderType::Pixel,
 			.EntryPoint = "MainPS",
 			.ExtraDecl = ExtraDecl,
 		});

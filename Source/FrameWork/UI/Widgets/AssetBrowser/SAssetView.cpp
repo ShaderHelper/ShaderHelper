@@ -51,6 +51,7 @@ namespace FW
 		ThumbnailLoadTickerHandle = FTicker::GetCoreTicker().AddTicker(
 			FTickerDelegate::CreateLambda([this](float DeltaTime) {
 				TickAssetIconLoading(DeltaTime);
+				FlushDirtyThumbnails(DeltaTime);
 				return true;
 			})
 		);
@@ -680,46 +681,49 @@ namespace FW
 
 	void SAssetView::RefreshAssetThumbnail(const FString& InAssetPath)
 	{
-		AssetManager& AM = TSingleton<AssetManager>::Get();
-		if (TOptional<FGuid> Id = AM.TryGetGuid(InAssetPath))
-		{
-			AM.RemoveAssetThumbnail(*Id);
-		}
+		DirtyThumbnailPaths.Add(InAssetPath);
+		ThumbnailRefreshAccumulator = 0.0f;
+	}
 
-		TSharedPtr<AssetViewAssetItem> TargetItem;
-		for (const TSharedRef<AssetViewItem>& Item : AssetViewItems)
-		{
-			if (Item->GetPath() == InAssetPath && Item->IsOfType<AssetViewAssetItem>())
-			{
-				TargetItem = StaticCastSharedRef<AssetViewAssetItem>(Item);
-				break;
-			}
-		}
-
-		if (!TargetItem.IsValid())
+	void SAssetView::FlushDirtyThumbnails(float DeltaTime)
+	{
+		if (DirtyThumbnailPaths.IsEmpty())
 		{
 			return;
 		}
 
-		AM.AsyncLoadAssetByPath<AssetObject>(InAssetPath,
-			[this, WeakItem = TWeakPtr<AssetViewAssetItem>(TargetItem), Path = InAssetPath](AssetPtr<AssetObject> Asset) {
-				TSharedPtr<AssetViewAssetItem> Pinned = WeakItem.Pin();
-				if (!Pinned.IsValid() || Pinned->GetPath() != Path || !Asset)
-				{
-					return;
-				}
+		ThumbnailRefreshAccumulator += DeltaTime;
+		if (ThumbnailRefreshAccumulator < ThumbnailRefreshDelay)
+		{
+			return;
+		}
 
-				if (GpuTexture* Thumbnail = Asset->GetThumbnail())
-				{
-					Pinned->SetAssetThumbnail(Thumbnail);
-				}
-				else
-				{
-					Pinned->SetAssetImage(Asset->GetImage());
-				}
+		TSet<FString> PathsToRefresh = MoveTemp(DirtyThumbnailPaths);
+		DirtyThumbnailPaths.Reset();
 
-				AssetTileView->RequestListRefresh();
-			});
+		AssetManager& AM = TSingleton<AssetManager>::Get();
+		for (const FString& AssetPath : PathsToRefresh)
+		{
+			if (TOptional<FGuid> Id = AM.TryGetGuid(AssetPath))
+			{
+				AM.RemoveAssetThumbnail(*Id);
+			}
+
+			TSharedPtr<AssetViewAssetItem> TargetItem;
+			for (const TSharedRef<AssetViewItem>& Item : AssetViewItems)
+			{
+				if (Item->GetPath() == AssetPath && Item->IsOfType<AssetViewAssetItem>())
+				{
+					TargetItem = StaticCastSharedRef<AssetViewAssetItem>(Item);
+					break;
+				}
+			}
+
+			if (TargetItem.IsValid())
+			{
+				PendingThumbnailLoads.Add({ TargetItem, AssetPath });
+			}
+		}
 	}
 
 	void SAssetView::SetAssetIcon(TSharedRef<AssetViewAssetItem> ViewItem)

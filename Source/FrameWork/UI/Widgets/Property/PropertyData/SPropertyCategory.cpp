@@ -29,16 +29,29 @@ namespace FW
 			[
 				SNew(SExpanderArrow, TableRow)
 				.IndentAmount(0)
-			]
-
-			+ SHorizontalBox::Slot()
-			.VAlign(VAlign_Center)
-			.Padding(4.0f, 0.0f, 0.0f, 0.0f)
-			[
-				SNew(STextBlock)
-				.Text(InArgs._DisplayName)
-				.Font(MoveTemp(CategoryTextFont))
 			];
+
+		if (InArgs._HasCheckBox)
+		{
+			HBox->AddSlot()
+			.AutoWidth()
+			.VAlign(VAlign_Center)
+			.Padding(2.0f, 0.0f)
+			[
+				SNew(SCheckBox)
+				.IsChecked(InArgs._CheckBoxState)
+				.OnCheckStateChanged(InArgs._OnCheckBoxStateChanged)
+			];
+		}
+
+		HBox->AddSlot()
+		.VAlign(VAlign_Center)
+		.Padding(4.0f, 0.0f, 0.0f, 0.0f)
+		[
+			SNew(STextBlock)
+			.Text(InArgs._DisplayName)
+			.Font(MoveTemp(CategoryTextFont))
+		];
 
 		if (InArgs._AddMenuWidget)
 		{

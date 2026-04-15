@@ -144,9 +144,9 @@ namespace HLSL
 		FString StageStr;
 		switch (Stage)
 		{
-		case FW::ShaderType::VertexShader:  StageStr = TEXT("VS"); break;
-		case FW::ShaderType::PixelShader:   StageStr = TEXT("PS"); break;
-		case FW::ShaderType::ComputeShader: StageStr = TEXT("CS"); break;
+		case FW::ShaderType::Vertex:  StageStr = TEXT("VS"); break;
+		case FW::ShaderType::Pixel:   StageStr = TEXT("PS"); break;
+		case FW::ShaderType::Compute: StageStr = TEXT("CS"); break;
 		default: return true; // None stage means match all
 		}
 		return ItemStages.Contains(StageStr);
@@ -195,7 +195,7 @@ namespace HLSL
 		const ShaderBuiltinData& Data = GetBuiltinData();
 		for (const auto& Item : Data.Functions)
 		{
-			if (Item.Label == FuncName && IsStageMatch(Item.Stages, Stage))
+			if (Item.Label.Equals(FuncName, ESearchCase::CaseSensitive) && IsStageMatch(Item.Stages, Stage))
 			{
 				return &Item;
 			}
@@ -207,7 +207,7 @@ namespace HLSL
 		const ShaderBuiltinData& Data = GetBuiltinData();
 		for (const auto& Item : Data.Types)
 		{
-			if (Item.Label == TypeName && IsStageMatch(Item.Stages, Stage))
+			if (Item.Label.Equals(TypeName, ESearchCase::CaseSensitive) && IsStageMatch(Item.Stages, Stage))
 			{
 				return &Item;
 			}
@@ -219,7 +219,9 @@ namespace HLSL
 		const ShaderBuiltinData& Data = GetBuiltinData();
 		for (const auto& Item : Data.Keywords)
 		{
-			if (Item.Label == Keyword && IsStageMatch(Item.Stages, Stage))
+			//hlsl SV_ semantics are case insensitive.
+			ESearchCase::Type Case = Item.Label.StartsWith(TEXT("SV_")) ? ESearchCase::IgnoreCase : ESearchCase::CaseSensitive;
+			if (Item.Label.Equals(Keyword, Case) && IsStageMatch(Item.Stages, Stage))
 			{
 				return &Item;
 			}
@@ -393,6 +395,13 @@ namespace FW
 			DxcArgs.Add("ENABLE_PRINT=0");
 			DxcArgs.Add("-D");
 			DxcArgs.Add("EDITOR_ISENSE=1");
+
+			TArray<FTCHARToUTF8> ExtraArgUTF8Storage;
+			for (const FString& Arg : InShader->CompileExtraArgs)
+			{
+				ExtraArgUTF8Storage.Emplace(*Arg);
+				DxcArgs.Add(ExtraArgUTF8Storage.Last().Get());
+			}
 
 			// Use virtual include directory instead of original include dirs
 			FTCHARToUTF8 VirtualIncludeDirUTF8(*VirtualIncludeDir);
@@ -907,15 +916,15 @@ namespace FW
 					}
 				}
 
-				if (HLSL::GetBuiltinTypes(Stage).Contains(TokenStr))
+				if (HLSL::FindBuiltinType(TokenStr, Stage))
 				{
 					return ShaderTokenType::BuiltinType;
 				}
-				else if (HLSL::GetBuiltinFuncs(Stage).Contains(TokenStr))
+				else if (HLSL::FindBuiltinFunc(TokenStr, Stage))
 				{
 					return ShaderTokenType::BuiltinFunc;
 				}
-				else if (HLSL::GetKeyWords(Stage).Contains(TokenStr))
+				else if (HLSL::FindKeyword(TokenStr, Stage))
 				{
 					return ShaderTokenType::Keyword;
 				}

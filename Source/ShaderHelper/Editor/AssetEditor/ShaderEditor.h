@@ -3,11 +3,11 @@
 
 namespace SH
 {
-	class VertexShaderOp : public ShAssetOp
+	class ShaderOp : public ShAssetOp
 	{
-		REFLECTION_TYPE(VertexShaderOp)
+		REFLECTION_TYPE(ShaderOp)
 	public:
-		VertexShaderOp() = default;
+		ShaderOp() = default;
 
 		FW::MetaType* SupportType() override;
 		void OnOpen(const FString& InAssetPath) override;

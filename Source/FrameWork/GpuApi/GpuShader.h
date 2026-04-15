@@ -18,9 +18,9 @@ namespace FW
 	{
 		switch (InType)
 		{
-		case ShaderType::VertexShader:         return ShaderConductor::ShaderStage::VertexShader;
-		case ShaderType::PixelShader:          return ShaderConductor::ShaderStage::PixelShader;
-		case ShaderType::ComputeShader:        return ShaderConductor::ShaderStage::ComputeShader;
+		case ShaderType::Vertex:         return ShaderConductor::ShaderStage::VertexShader;
+		case ShaderType::Pixel:          return ShaderConductor::ShaderStage::PixelShader;
+		case ShaderType::Compute:        return ShaderConductor::ShaderStage::ComputeShader;
 		default:
 			AUX::Unreachable();
 		}

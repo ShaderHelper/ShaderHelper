@@ -100,7 +100,7 @@ namespace FW::VK
 				DxcArgs.Add("-fvk-auto-shift-bindings");
 				// Shift HLSL register types into separate Vulkan binding ranges to avoid collisions.
 				// PS gets an additional per-stage offset so VS and PS can use the same slot numbers independently.
-				const int32 StageOffset = InShader->GetShaderType() == ShaderType::PixelShader ? StageBindingOffset_Pixel : 0;
+				const int32 StageOffset = InShader->GetShaderType() == ShaderType::Pixel ? StageBindingOffset_Pixel : 0;
 				std::string ShiftB = std::to_string(BindingShift_Buffer + StageOffset);
 				std::string ShiftT = std::to_string(BindingShift_Texture + StageOffset);
 				std::string ShiftS = std::to_string(BindingShift_Sampler + StageOffset);

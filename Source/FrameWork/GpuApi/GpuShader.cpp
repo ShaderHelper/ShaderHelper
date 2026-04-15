@@ -446,9 +446,9 @@ namespace FW
 			// Tag binding with the shader stage it comes from
 			switch (this->Type)
 			{
-			case ShaderType::VertexShader:  ShaderLayoutBinding.Stage = BindingShaderStage::Vertex;  break;
-			case ShaderType::PixelShader:   ShaderLayoutBinding.Stage = BindingShaderStage::Pixel;   break;
-			case ShaderType::ComputeShader: ShaderLayoutBinding.Stage = BindingShaderStage::Compute; break;
+			case ShaderType::Vertex:  ShaderLayoutBinding.Stage = BindingShaderStage::Vertex;  break;
+			case ShaderType::Pixel:   ShaderLayoutBinding.Stage = BindingShaderStage::Pixel;   break;
+			case ShaderType::Compute: ShaderLayoutBinding.Stage = BindingShaderStage::Compute; break;
 			default: break;
 			}
 
@@ -550,7 +550,7 @@ namespace FW
 	TArray<GpuShaderVertexInput> GpuShader::GetVertexInputs() const
 	{
 		TArray<GpuShaderVertexInput> VertexInputs;
-		if (Type != ShaderType::VertexShader || SpvCode.IsEmpty())
+		if (Type != ShaderType::Vertex || SpvCode.IsEmpty())
 		{
 			return VertexInputs;
 		}

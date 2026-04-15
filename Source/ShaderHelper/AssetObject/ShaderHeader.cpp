@@ -44,24 +44,15 @@ namespace SH
 		return EditorContent;
 	}
 
-	GpuShaderSourceDesc ShaderHeader::GetShaderDesc(const FString& InContent) const
+	ShaderDesc ShaderHeader::GetShaderDesc(const FString& InContent, ShaderType InStage) const
 	{
-		auto Desc = GpuShaderSourceDesc{
+		ShaderDesc Desc;
+		Desc.SourceDesc = {
 			.Name = GetShaderName(),
 			.Source = InContent,
 			.Language = Language,
 			.IncludeDirs = GetIncludeDirs(),
-			.IncludeHandler = [](const FString& IncludePath) -> FString {
-				if (FPaths::GetExtension(IncludePath) == TEXT("header"))
-				{
-					FScopeLock ScopeLock(&GAssetCS);
-					AssetPtr<ShaderHeader> HeaderAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderHeader>(IncludePath);
-					return HeaderAsset ? HeaderAsset->GetFullContent() : "";
-				}
-				FString Content;
-				FFileHelper::LoadFileToString(Content, *IncludePath);
-				return Content;
-			},
+			.IncludeHandler = &ShaderAsset::LoadIncludeFile,
 		};
 		return Desc;
 	}

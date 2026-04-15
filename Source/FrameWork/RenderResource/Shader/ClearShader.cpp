@@ -27,7 +27,7 @@ namespace FW
 
 		Cs = GGpuRhi->CreateShaderFromFile({
 			.FileName = PathHelper::ShaderDir() / "Clear.hlsl",
-			.Type = ShaderType::ComputeShader,
+			.Type = ShaderType::Compute,
 			.EntryPoint = "ClearCS",
 			.ExtraDecl = BindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL)
 		});
