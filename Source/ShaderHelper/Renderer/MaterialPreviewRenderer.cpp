@@ -332,8 +332,17 @@ namespace SH
 			case BuiltInVertexAttribute::BuiltInNormal:
 				AttrDesc.ByteOffset = offsetof(MeshVertex, Normal);
 				break;
-			case BuiltInVertexAttribute::BuiltInUV:
-				AttrDesc.ByteOffset = offsetof(MeshVertex, UV);
+			case BuiltInVertexAttribute::BuiltInUV0:
+				AttrDesc.ByteOffset = offsetof(MeshVertex, UVs[0]);
+				break;
+			case BuiltInVertexAttribute::BuiltInUV1:
+				AttrDesc.ByteOffset = offsetof(MeshVertex, UVs[1]);
+				break;
+			case BuiltInVertexAttribute::BuiltInUV2:
+				AttrDesc.ByteOffset = offsetof(MeshVertex, UVs[2]);
+				break;
+			case BuiltInVertexAttribute::BuiltInUV3:
+				AttrDesc.ByteOffset = offsetof(MeshVertex, UVs[3]);
 				break;
 			case BuiltInVertexAttribute::BuiltInColor:
 				AttrDesc.ByteOffset = offsetof(MeshVertex, Color);

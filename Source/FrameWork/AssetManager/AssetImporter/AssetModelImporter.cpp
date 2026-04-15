@@ -58,16 +58,17 @@ namespace FW
 			const FbxAMatrix NormalTransform = MeshTransform.Inverse().Transpose();
 			FbxVector4* ControlPoints = FbxMeshObj->GetControlPoints();
 
-			const char* UVSetName = nullptr;
-			if (FbxMeshObj->GetElementUVCount() > 0)
+			const int UVSetCount = FMath::Min(FbxMeshObj->GetElementUVCount(), (int)MaxMeshUVSets);
+			const char* UVSetNames[MaxMeshUVSets] = {};
+			for (int i = 0; i < UVSetCount; ++i)
 			{
-				UVSetName = FbxMeshObj->GetElementUV(0)->GetName();
+				UVSetNames[i] = FbxMeshObj->GetElementUV(i)->GetName();
 			}
 
 			// Generate tangent/binormal data if not present (requires UVs)
-			if (UVSetName && FbxMeshObj->GetElementTangentCount() == 0)
+			if (UVSetCount > 0 && FbxMeshObj->GetElementTangentCount() == 0)
 			{
-				FbxMeshObj->GenerateTangentsData(UVSetName);
+				FbxMeshObj->GenerateTangentsData(UVSetNames[0]);
 			}
 
 			FbxGeometryElementTangent* TangentElement = FbxMeshObj->GetElementTangentCount() > 0 ? FbxMeshObj->GetElementTangent(0) : nullptr;
@@ -93,13 +94,13 @@ namespace FW
 						V.Normal = FVector3f((float)TransformedNormal[0], (float)TransformedNormal[1], (float)TransformedNormal[2]).GetSafeNormal();
 					}
 
-					if (UVSetName)
+					for (int UVIdx = 0; UVIdx < UVSetCount; ++UVIdx)
 					{
 						FbxVector2 UV;
 						bool bUnmapped = false;
-						if (FbxMeshObj->GetPolygonVertexUV(Poly, Vert, UVSetName, UV, bUnmapped))
+						if (FbxMeshObj->GetPolygonVertexUV(Poly, Vert, UVSetNames[UVIdx], UV, bUnmapped))
 						{
-							V.UV = Vector2f((float)UV[0], (float)UV[1]);
+							V.UVs[UVIdx] = Vector2f((float)UV[0], (float)UV[1]);
 						}
 					}
 

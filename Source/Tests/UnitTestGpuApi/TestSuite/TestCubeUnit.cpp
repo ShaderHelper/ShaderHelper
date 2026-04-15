@@ -73,7 +73,7 @@ namespace UNITTEST_GPUAPI
 							.Location = 1,
 							.SemanticName = TEXT("TEXCOORD"),
 							.Format = GpuFormat::R32G32_FLOAT,
-							.ByteOffset = offsetof(MeshVertex, UV),
+							.ByteOffset = offsetof(MeshVertex, UVs[0]),
 						},
 					}
 				}

@@ -4,28 +4,31 @@
 
 namespace FW
 {
+	static constexpr uint32 MaxMeshUVSets = 4;
+
 	struct MeshVertex
 	{
 		Vector3f Position;
 		Vector3f Normal;
-		Vector2f UV;
+		Vector2f UVs[MaxMeshUVSets];
 		Vector4f Color = Vector4f(1.0f);
 		Vector4f Tangent = Vector4f(1.0f, 0.0f, 0.0f, 1.0f);
 
 		bool operator==(const MeshVertex& Other) const
 		{
-			return Position == Other.Position
-				&& Normal == Other.Normal
-				&& UV == Other.UV
-				&& Color == Other.Color
-				&& Tangent == Other.Tangent;
+			if (Position != Other.Position || Normal != Other.Normal || Color != Other.Color || Tangent != Other.Tangent)
+				return false;
+			for (uint32 i = 0; i < MaxMeshUVSets; ++i)
+				if (UVs[i] != Other.UVs[i]) return false;
+			return true;
 		}
 
 		friend uint32 GetTypeHash(const MeshVertex& Vertex)
 		{
 			uint32 Hash = GetTypeHash(Vertex.Position);
 			Hash = HashCombine(Hash, GetTypeHash(Vertex.Normal));
-			Hash = HashCombine(Hash, GetTypeHash(Vertex.UV));
+			for (uint32 i = 0; i < MaxMeshUVSets; ++i)
+				Hash = HashCombine(Hash, GetTypeHash(Vertex.UVs[i]));
 			Hash = HashCombine(Hash, GetTypeHash(Vertex.Color));
 			Hash = HashCombine(Hash, GetTypeHash(Vertex.Tangent));
 			return Hash;
@@ -35,7 +38,8 @@ namespace FW
 		{
 			Ar << InVertex.Position;
 			Ar << InVertex.Normal;
-			Ar << InVertex.UV;
+			for (uint32 i = 0; i < MaxMeshUVSets; ++i)
+				Ar << InVertex.UVs[i];
 			Ar << InVertex.Color;
 			Ar << InVertex.Tangent;
 			return Ar;

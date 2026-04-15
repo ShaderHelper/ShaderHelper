@@ -21,7 +21,10 @@ namespace SH
 	{
 		BuiltInPosition,
 		BuiltInNormal,
-		BuiltInUV,
+		BuiltInUV0,
+		BuiltInUV1,
+		BuiltInUV2,
+		BuiltInUV3,
 		BuiltInColor,
 		BuiltInTangent,
 	};

@@ -164,7 +164,7 @@ namespace FW
 							.Location = 2,
 							.SemanticName = "TEXCOORD",
 							.Format = GpuFormat::R32G32_FLOAT,
-							.ByteOffset = offsetof(MeshVertex, UV),
+							.ByteOffset = offsetof(MeshVertex, UVs[0]),
 						},
 					}
 				}
