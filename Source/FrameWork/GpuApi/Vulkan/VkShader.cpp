@@ -97,16 +97,17 @@ namespace FW::VK
 				//Storage buffers use the scalar layout instead of vector-relaxed 430
 				//to make it consistent with structuredbuffer, so that user side can unify the struct
 				DxcArgs.Add("-fvk-use-dx-layout");
+				std::string ShiftB, ShiftT, ShiftS, ShiftU;
 				if (!EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::SkipBindingShift))
 				{
 					DxcArgs.Add("-fvk-auto-shift-bindings");
 					// Shift HLSL register types into separate Vulkan binding ranges to avoid collisions.
 					// PS gets an additional per-stage offset so VS and PS can use the same slot numbers independently.
 					const int32 StageOffset = InShader->GetShaderType() == ShaderType::Pixel ? StageBindingOffset_Pixel : 0;
-					std::string ShiftB = std::to_string(BindingShift_Buffer + StageOffset);
-					std::string ShiftT = std::to_string(BindingShift_Texture + StageOffset);
-					std::string ShiftS = std::to_string(BindingShift_Sampler + StageOffset);
-					std::string ShiftU = std::to_string(BindingShift_UAV + StageOffset);
+					ShiftB = std::to_string(BindingShift_Buffer + StageOffset);
+					ShiftT = std::to_string(BindingShift_Texture + StageOffset);
+					ShiftS = std::to_string(BindingShift_Sampler + StageOffset);
+					ShiftU = std::to_string(BindingShift_UAV + StageOffset);
 					DxcArgs.Add("-fvk-b-shift"); DxcArgs.Add(ShiftB.c_str()); DxcArgs.Add("all");
 					DxcArgs.Add("-fvk-t-shift"); DxcArgs.Add(ShiftT.c_str()); DxcArgs.Add("all");
 					DxcArgs.Add("-fvk-s-shift"); DxcArgs.Add(ShiftS.c_str()); DxcArgs.Add("all");
