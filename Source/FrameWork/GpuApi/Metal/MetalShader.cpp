@@ -132,16 +132,19 @@ namespace FW
 			//Storage buffers use the scalar layout instead of vector-relaxed 430
 			//to make it consistent with structuredbuffer, so that user side can unify the struct
 			DxcArgs.Add("-fvk-use-dx-layout");
-			DxcArgs.Add("-fvk-auto-shift-bindings");
-			// Shift HLSL register types into separate argument buffer index ranges to avoid collisions
-			std::string ShiftB = std::to_string(BindingShift_Buffer);
-			std::string ShiftT = std::to_string(BindingShift_Texture);
-			std::string ShiftS = std::to_string(BindingShift_Sampler);
-			std::string ShiftU = std::to_string(BindingShift_UAV);
-			DxcArgs.Add("-fvk-b-shift"); DxcArgs.Add(ShiftB.c_str()); DxcArgs.Add("all");
-			DxcArgs.Add("-fvk-t-shift"); DxcArgs.Add(ShiftT.c_str()); DxcArgs.Add("all");
-			DxcArgs.Add("-fvk-s-shift"); DxcArgs.Add(ShiftS.c_str()); DxcArgs.Add("all");
-			DxcArgs.Add("-fvk-u-shift"); DxcArgs.Add(ShiftU.c_str()); DxcArgs.Add("all");
+			if (!EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::SkipBindingShift))
+			{
+				DxcArgs.Add("-fvk-auto-shift-bindings");
+				// Shift HLSL register types into separate argument buffer index ranges to avoid collisions.
+				std::string ShiftB = std::to_string(BindingShift_Buffer);
+				std::string ShiftT = std::to_string(BindingShift_Texture);
+				std::string ShiftS = std::to_string(BindingShift_Sampler);
+				std::string ShiftU = std::to_string(BindingShift_UAV);
+				DxcArgs.Add("-fvk-b-shift"); DxcArgs.Add(ShiftB.c_str()); DxcArgs.Add("all");
+				DxcArgs.Add("-fvk-t-shift"); DxcArgs.Add(ShiftT.c_str()); DxcArgs.Add("all");
+				DxcArgs.Add("-fvk-s-shift"); DxcArgs.Add(ShiftS.c_str()); DxcArgs.Add("all");
+				DxcArgs.Add("-fvk-u-shift"); DxcArgs.Add(ShiftU.c_str()); DxcArgs.Add("all");
+			}
 			//DxcArgs.Add("-Gis");
 			DxcArgs.Add("/Od"); //TODO
 			
