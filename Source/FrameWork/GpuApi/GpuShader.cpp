@@ -414,30 +414,6 @@ namespace FW
 			}
 		}
 
-		// Scan function body for actually referenced global variable IDs
-		TSet<uint32> ReferencedVarIds;
-		if (const SpvSection* FuncSection = MetaContext.Sections.Find(SpvSectionKind::Function))
-		{
-			int32 EndOffset = FuncSection->EndOffset > FuncSection->StartOffset ? FuncSection->EndOffset : SpvCode.Num();
-			for (int32 w = FuncSection->StartOffset; w < EndOffset; w++)
-			{
-				uint32 Word = SpvCode[w];
-				if (SpvReflectionBindings.Contains(SpvId(Word)))
-				{
-					ReferencedVarIds.Add(Word);
-				}
-			}
-		}
-
-		// Remove unreferenced bindings
-		for (auto It = SpvReflectionBindings.CreateIterator(); It; ++It)
-		{
-			if (!ReferencedVarIds.Contains(It->Key.GetValue()))
-			{
-				It.RemoveCurrent();
-			}
-		}
-
 		for (auto& [Id, ShaderLayoutBinding] : SpvReflectionBindings)
 		{
 			SpvType* Type = MetaContext.GlobalVariables[Id].Type;
