@@ -157,6 +157,7 @@ namespace FW
 
 	struct GpuShaderStageSemantic
 	{
+		FString Name;
 		FString SemanticName;
 		uint32 SemanticIndex = 0;
 		uint32 Location = 0;

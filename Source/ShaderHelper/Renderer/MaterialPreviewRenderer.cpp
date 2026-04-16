@@ -282,16 +282,30 @@ namespace SH
 					continue;
 				}
 
-				const GpuShaderStageSemantic* MatchingVsOutput = VsOutputs.FindByPredicate([&](const GpuShaderStageSemantic& VsOutput) {
-					return VsOutput.SemanticName.Equals(PsInput.SemanticName, ESearchCase::IgnoreCase)
-						&& VsOutput.SemanticIndex == PsInput.SemanticIndex;
-				});
-				if (!MatchingVsOutput || !MatchingVsOutput->bWritten)
+				if(Vs->GetShaderLanguage() == GpuShaderLanguage::HLSL)
 				{
-					FString SemanticStr = PsInput.SemanticIndex > 0
-						? FString::Printf(TEXT("%s%d"), *PsInput.SemanticName, PsInput.SemanticIndex)
-						: PsInput.SemanticName;
-					MissingSemantics.Add(MoveTemp(SemanticStr));
+					const GpuShaderStageSemantic* MatchingVsOutput = VsOutputs.FindByPredicate([&](const GpuShaderStageSemantic& VsOutput) {
+						return VsOutput.SemanticName.Equals(PsInput.SemanticName, ESearchCase::IgnoreCase)
+							&& VsOutput.SemanticIndex == PsInput.SemanticIndex;
+					});
+					if (!MatchingVsOutput || !MatchingVsOutput->bWritten)
+					{
+						FString SemanticStr = PsInput.SemanticIndex > 0
+							? FString::Printf(TEXT("%s%d"), *PsInput.SemanticName, PsInput.SemanticIndex)
+							: PsInput.SemanticName;
+						MissingSemantics.Add(MoveTemp(SemanticStr));
+					}
+				}
+				else
+				{
+					const GpuShaderStageSemantic* MatchingVsOutput = VsOutputs.FindByPredicate([&](const GpuShaderStageSemantic& VsOutput) {
+						return VsOutput.Location == PsInput.Location;
+					});
+					if (!MatchingVsOutput || !MatchingVsOutput->bWritten)
+					{
+						FString Desc = FString::Printf(TEXT("(location %d) %s"), PsInput.Location, *PsInput.Name);
+						MissingSemantics.Add(MoveTemp(Desc));
+					}
 				}
 			}
 			if (MissingSemantics.Num() > 0)
@@ -322,33 +336,40 @@ namespace SH
 			AttrDesc.Location = InputDefault.Location;
 			AttrDesc.SemanticName = InputDefault.SemanticName;
 			AttrDesc.SemanticIndex = InputDefault.SemanticIndex;
-			AttrDesc.Format = ShaderTypeToGpuFormat(InputDefault.Type);
 
 			switch (InputDefault.Attribute)
 			{
 			case BuiltInVertexAttribute::BuiltInPosition:
 				AttrDesc.ByteOffset = offsetof(MeshVertex, Position);
+				AttrDesc.Format = GpuFormat::R32G32B32_FLOAT;
 				break;
 			case BuiltInVertexAttribute::BuiltInNormal:
 				AttrDesc.ByteOffset = offsetof(MeshVertex, Normal);
+				AttrDesc.Format = GpuFormat::R32G32B32_FLOAT;
 				break;
 			case BuiltInVertexAttribute::BuiltInUV0:
 				AttrDesc.ByteOffset = offsetof(MeshVertex, UVs[0]);
+				AttrDesc.Format = GpuFormat::R32G32_FLOAT;
 				break;
 			case BuiltInVertexAttribute::BuiltInUV1:
 				AttrDesc.ByteOffset = offsetof(MeshVertex, UVs[1]);
+				AttrDesc.Format = GpuFormat::R32G32_FLOAT;
 				break;
 			case BuiltInVertexAttribute::BuiltInUV2:
 				AttrDesc.ByteOffset = offsetof(MeshVertex, UVs[2]);
+				AttrDesc.Format = GpuFormat::R32G32_FLOAT;
 				break;
 			case BuiltInVertexAttribute::BuiltInUV3:
 				AttrDesc.ByteOffset = offsetof(MeshVertex, UVs[3]);
+				AttrDesc.Format = GpuFormat::R32G32_FLOAT;
 				break;
 			case BuiltInVertexAttribute::BuiltInColor:
 				AttrDesc.ByteOffset = offsetof(MeshVertex, Color);
+				AttrDesc.Format = GpuFormat::R32G32B32A32_FLOAT;
 				break;
 			case BuiltInVertexAttribute::BuiltInTangent:
 				AttrDesc.ByteOffset = offsetof(MeshVertex, Tangent);
+				AttrDesc.Format = GpuFormat::R32G32B32A32_FLOAT;
 				break;
 			default:
 				break;

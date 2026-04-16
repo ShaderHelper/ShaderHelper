@@ -652,29 +652,38 @@ namespace FW
 				continue;
 			}
 
-			FString Semantic = NameIt->second;
-			if (Semantic.StartsWith(TEXT("out.var.")))
-			{
-				Semantic = Semantic.Mid(8);
-			}
-
 			GpuShaderStageSemantic Output;
-			int32 TrailStart = Semantic.Len();
-			while (TrailStart > 0 && FChar::IsDigit(Semantic[TrailStart - 1]))
+			Output.bWritten = true;
+
+			FString RawName = NameIt->second;
+			if (ShaderLanguage == GpuShaderLanguage::HLSL)
 			{
-				TrailStart--;
-			}
-			if (TrailStart < Semantic.Len())
-			{
-				Output.SemanticIndex = FCString::Atoi(*Semantic.Mid(TrailStart));
-				Output.SemanticName = Semantic.Left(TrailStart);
+				FString Semantic = RawName;
+				if (Semantic.StartsWith(TEXT("out.var.")))
+				{
+					Semantic = Semantic.Mid(8);
+				}
+
+				int32 TrailStart = Semantic.Len();
+				while (TrailStart > 0 && FChar::IsDigit(Semantic[TrailStart - 1]))
+				{
+					TrailStart--;
+				}
+				if (TrailStart < Semantic.Len())
+				{
+					Output.SemanticIndex = FCString::Atoi(*Semantic.Mid(TrailStart));
+					Output.SemanticName = Semantic.Left(TrailStart);
+				}
+				else
+				{
+					Output.SemanticName = Semantic;
+					Output.SemanticIndex = 0;
+				}
 			}
 			else
 			{
-				Output.SemanticName = Semantic;
-				Output.SemanticIndex = 0;
+				Output.Name = RawName;
 			}
-			Output.bWritten = true;
 
 			for (auto It = MetaContext.Decorations.CreateConstKeyIterator(Id); It; ++It)
 			{
@@ -726,29 +735,38 @@ namespace FW
 				continue;
 			}
 
-			FString Semantic = NameIt->second;
-			if (Semantic.StartsWith(TEXT("in.var.")))
-			{
-				Semantic = Semantic.Mid(7);
-			}
-
 			GpuShaderStageSemantic Input;
-			int32 TrailStart = Semantic.Len();
-			while (TrailStart > 0 && FChar::IsDigit(Semantic[TrailStart - 1]))
+			Input.bRead = true;
+
+			FString RawName = NameIt->second;
+			if (ShaderLanguage == GpuShaderLanguage::HLSL)
 			{
-				TrailStart--;
-			}
-			if (TrailStart < Semantic.Len())
-			{
-				Input.SemanticIndex = FCString::Atoi(*Semantic.Mid(TrailStart));
-				Input.SemanticName = Semantic.Left(TrailStart);
+				FString Semantic = RawName;
+				if (Semantic.StartsWith(TEXT("in.var.")))
+				{
+					Semantic = Semantic.Mid(7);
+				}
+
+				int32 TrailStart = Semantic.Len();
+				while (TrailStart > 0 && FChar::IsDigit(Semantic[TrailStart - 1]))
+				{
+					TrailStart--;
+				}
+				if (TrailStart < Semantic.Len())
+				{
+					Input.SemanticIndex = FCString::Atoi(*Semantic.Mid(TrailStart));
+					Input.SemanticName = Semantic.Left(TrailStart);
+				}
+				else
+				{
+					Input.SemanticName = Semantic;
+					Input.SemanticIndex = 0;
+				}
 			}
 			else
 			{
-				Input.SemanticName = Semantic;
-				Input.SemanticIndex = 0;
+				Input.Name = RawName;
 			}
-			Input.bRead = true;
 
 			for (auto It = MetaContext.Decorations.CreateConstKeyIterator(Id); It; ++It)
 			{
