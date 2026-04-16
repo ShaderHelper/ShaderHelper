@@ -234,7 +234,7 @@ namespace FW
 	{
 		TArray<ShaderDiagnosticInfo> Ret;
 		const std::string DiagnosticText = TCHAR_TO_UTF8(*FString(GlslDiagnosticInfo));
-		const std::regex Pattern("(.+?):([0-9]+):\\s*(error|warning):\\s*(.*)$");
+		const std::regex Pattern("(.+?):([0-9]+):\\s*(error|warning):\\s*(.*)");
 		const std::sregex_iterator End;
 		for (std::sregex_iterator It(DiagnosticText.begin(), DiagnosticText.end(), Pattern); It != End; ++It)
 		{
@@ -1416,7 +1416,10 @@ namespace FW
 			Options.AddMacroDefinition("ENABLE_PRINT", "0");
 			Options.AddMacroDefinition("ENABLE_ASSERT", "0");
 			ParseExtraArgs(InShader->CompileExtraArgs, Options);
-			Options.SetForcedVersionProfile(450, shaderc_profile_core);
+			if (!std::regex_search(TCHAR_TO_UTF8(*ShaderSource), std::regex(R"(^\s*#\s*version\s+\d+)")))
+			{
+				Options.SetForcedVersionProfile(450, shaderc_profile_none);
+			}
 			Options.SetGenerateDebugInfo();
 			Options.SetVulkanRulesRelaxed(true);
 			Options.SetAutoBindUniforms(true);

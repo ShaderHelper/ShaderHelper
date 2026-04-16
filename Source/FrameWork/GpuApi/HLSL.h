@@ -238,7 +238,7 @@ namespace FW
 		TArray<ShaderDiagnosticInfo> Ret;
 
 		const std::string DiagnosticText = TCHAR_TO_UTF8(*FString(HlslDiagnosticInfo));
-		const std::regex Pattern("(.+?):([0-9]+):([0-9]+):\\s*(error|warning):\\s*(.*)$");
+		const std::regex Pattern("(.+?):([0-9]+):([0-9]+):\\s*(error|warning):\\s*(.*)");
 		const std::sregex_iterator End;
 		for (std::sregex_iterator It(DiagnosticText.begin(), DiagnosticText.end(), Pattern); It != End; ++It)
 		{
