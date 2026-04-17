@@ -54,7 +54,7 @@ namespace FW
             {
                 ArgDesc.dataType = MTLDataTypePointer;
                 ArgDesc.access = MTLArgumentAccessReadWrite;
-                ResourceUsages.Add(Slot, MTLResourceUsageWrite);
+                ResourceUsages.Add(Slot, MTLResourceUsageRead | MTLResourceUsageWrite);
             }
             else if(LayoutBindingEntry.Type == BindingType::UniformBuffer || LayoutBindingEntry.Type == BindingType::StructuredBuffer || LayoutBindingEntry.Type == BindingType::RawBuffer)
             {

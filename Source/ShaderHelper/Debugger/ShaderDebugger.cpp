@@ -1570,9 +1570,12 @@ namespace SH
 					BindGroupDesc.Resources.Add(BindingSlot{DebuggerBufferBindingSlot, BindingType::RWRawBuffer, BindingShaderStage::Pixel}, { AUX::StaticCastRefCountPtr<GpuResource>(DebugBuffer) });
 					LayoutDesc.Layouts.Add(BindingSlot{DebuggerBufferBindingSlot, BindingType::RWRawBuffer, BindingShaderStage::Pixel}, { BindingType::RWRawBuffer, BindingShaderStage::Pixel });
 
-					//Add the debugger params buffer (contains PixelCoord)
-					BindGroupDesc.Resources.Add(BindingSlot{DebuggerParamsBindingSlot, BindingType::UniformBuffer, BindingShaderStage::Pixel}, { AUX::StaticCastRefCountPtr<GpuResource>(DebugParamsBuffer) });
-					LayoutDesc.Layouts.Add(BindingSlot{DebuggerParamsBindingSlot, BindingType::UniformBuffer, BindingShaderStage::Pixel}, { BindingType::UniformBuffer, BindingShaderStage::Pixel });
+					//Add the debugger params buffer (contains PixelCoord), only for non-validation path
+					if (!GlobalValidation)
+					{
+						BindGroupDesc.Resources.Add(BindingSlot{DebuggerParamsBindingSlot, BindingType::UniformBuffer, BindingShaderStage::Pixel}, { AUX::StaticCastRefCountPtr<GpuResource>(DebugParamsBuffer) });
+						LayoutDesc.Layouts.Add(BindingSlot{DebuggerParamsBindingSlot, BindingType::UniformBuffer, BindingShaderStage::Pixel}, { BindingType::UniformBuffer, BindingShaderStage::Pixel });
+					}
 
 					TRefCountPtr<GpuBindGroupLayout> PatchedBindGroupLayout = GGpuRhi->CreateBindGroupLayout(LayoutDesc);
 					BindGroupDesc.Layout = PatchedBindGroupLayout;
