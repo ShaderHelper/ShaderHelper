@@ -78,16 +78,23 @@ namespace FW
 	void PreviewViewPort::OnDrawViewport(const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled)
 	{
 		FIntPoint DrawSize = FIntPoint(FMath::RoundToInt(AllottedGeometry.GetDrawSize().X), FMath::RoundToInt(AllottedGeometry.GetDrawSize().Y));
-		if (GetSize() != DrawSize && DrawSize.X > 0 && DrawSize.Y > 0)
+		if (DrawSize.X <= 0 || DrawSize.Y <= 0) return;
+
+		if (DrawSize != PendingSize)
 		{
-			SizeX = DrawSize.X;
-			SizeY = DrawSize.Y;
+			PendingSize = DrawSize;
+			LastResizeTime = FPlatformTime::Seconds();
+		}
+
+		if (GetSize() != PendingSize && (FPlatformTime::Seconds() - LastResizeTime) > ResizeQuietTime)
+		{
+			SizeX = PendingSize.X;
+			SizeY = PendingSize.Y;
 			if (ResizeHandler.IsBound())
 			{
 				ResizeHandler.Broadcast(Vector2f{ (float)SizeX, (float)SizeY });
 			}
 		}
-
 	}
 
 }

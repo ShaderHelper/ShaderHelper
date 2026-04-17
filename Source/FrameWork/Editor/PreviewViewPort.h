@@ -134,5 +134,8 @@ namespace FW
 		TSharedPtr<FSlateUpdatableTexture> ViewPortRT;
 		int32 SizeX;
 		int32 SizeY;
+		FIntPoint PendingSize{0, 0};
+		double LastResizeTime = 0.0;
+		static constexpr double ResizeQuietTime = 0.15;
 	};
 }
