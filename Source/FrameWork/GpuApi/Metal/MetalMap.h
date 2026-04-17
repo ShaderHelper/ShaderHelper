@@ -171,6 +171,17 @@ namespace FW
         }
     }
 
+    inline MTLTriangleFillMode MapRasterizerFillMode(RasterizerFillMode InMode)
+    {
+        switch (InMode)
+        {
+        case RasterizerFillMode::WireFrame:    return MTLTriangleFillModeLines;
+        case RasterizerFillMode::Solid:        return MTLTriangleFillModeFill;
+        default:
+            AUX::Unreachable();
+        }
+    }
+
 	inline MTLVertexFormat MapVertexFormat(GpuFormat InFormat)
     {
         switch (InFormat)

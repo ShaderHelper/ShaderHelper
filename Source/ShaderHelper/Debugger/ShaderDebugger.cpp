@@ -1519,15 +1519,19 @@ namespace SH
 			.InitialData = Datas,
 		});
 
-		// Create DebugParamsBuffer with PixelCoord (uvec2)
-		TArray<uint8> ParamsDatas;
-		ParamsDatas.SetNumZeroed(sizeof(Vector2u));
-		FMemory::Memcpy(ParamsDatas.GetData(), &PixelCoord, sizeof(Vector2u));
-		DebugParamsBuffer = GGpuRhi->CreateBuffer({
-			.ByteSize = sizeof(Vector2u),
-			.Usage = GpuBufferUsage::Uniform,
-			.InitialData = ParamsDatas,
-		});
+		if(!GlobalValidation)
+		{
+			// Create DebugParamsBuffer with PixelCoord (uvec2)
+			TArray<uint8> ParamsDatas;
+			ParamsDatas.SetNumZeroed(sizeof(Vector2u));
+			FMemory::Memcpy(ParamsDatas.GetData(), &PixelCoord, sizeof(Vector2u));
+			DebugParamsBuffer = GGpuRhi->CreateBuffer({
+				.ByteSize = sizeof(Vector2u),
+				.Usage = GpuBufferUsage::Uniform,
+				.InitialData = ParamsDatas,
+			});
+		}
+		
 
 		auto SetupBinding = [&](const std::optional<BindingBuilder>& Builder)
 			{

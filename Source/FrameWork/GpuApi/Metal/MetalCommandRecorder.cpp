@@ -131,6 +131,7 @@ namespace FW
             RenderCommandEncoder->setRenderPipelineState(CurrentRenderPipelineState->GetResource());
             RenderCommandEncoder->setFrontFacingWinding(MTL::WindingClockwise);
             RenderCommandEncoder->setCullMode(static_cast<MTL::CullMode>(MapRasterizerCullMode(CurrentRenderPipelineState->GetDesc().RasterizerState.CullMode)));
+            RenderCommandEncoder->setTriangleFillMode(static_cast<MTL::TriangleFillMode>(MapRasterizerFillMode(CurrentRenderPipelineState->GetDesc().RasterizerState.FillMode)));
             if (CurrentRenderPipelineState->GetDepthStencilState())
             {
                 RenderCommandEncoder->setDepthStencilState(CurrentRenderPipelineState->GetDepthStencilState());
