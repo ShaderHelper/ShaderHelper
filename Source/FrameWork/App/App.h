@@ -16,6 +16,7 @@ namespace FW {
 
 		virtual bool HandleMouseButtonDownEvent(FSlateApplication& SlateApp, const FPointerEvent& MouseEvent) override { return true; }
 		virtual bool HandleMouseButtonUpEvent(FSlateApplication& SlateApp, const FPointerEvent& MouseEvent) override { return true; }
+		virtual bool HandleMouseButtonDoubleClickEvent(FSlateApplication& SlateApp, const FPointerEvent& MouseEvent) override { return true; }
 		virtual bool HandleMouseMoveEvent(FSlateApplication& SlateApp, const FPointerEvent& MouseEvent) override { return true; }
 		virtual bool HandleMouseWheelOrGestureEvent(FSlateApplication& SlateApp, const FPointerEvent& WheelEvent, const FPointerEvent* GestureEvent) override { return true; }
 
@@ -38,13 +39,18 @@ namespace FW {
 		Vector2D GetClientSize() const { return AppClientSize; }
 		float GetDeltaTime() const { return DeltaTime; }
 
-		void EnableBusyBlocker();
-		void DisableBusyBlocker();
+		//Pushes a task to run on the next frame in queue order.
+		//During this period, user input is blocked until all queued tasks complete.
+		void EnqueueBusyTask(TFunction<void(TFunction<void()>)> InTask);
 
 	protected:
 		virtual void Update(float DeltaTime);
 		virtual void Render();
 		virtual void Init();
+
+	private:
+		void EnableBusyBlocker();
+		void DisableBusyBlocker();
 
 	public:
 		TUniquePtr<Editor> AppEditor;
@@ -56,6 +62,8 @@ namespace FW {
 		FString CommandLine;
 		float DeltaTime = 0.01f;
 		double FixedDeltaTime = 1 / 30;
+		TArray<TFunction<void(TFunction<void()>)>> PendingBusyTasks;
+		int32 BusyTaskInFlightCount = 0;
 
 		IDirectoryWatcher* DirectoryWatcher{};
 	};

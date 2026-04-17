@@ -151,6 +151,18 @@ namespace FW {
 			bool bIdleMode = AreAllWindowsHidden();
 			if (BusyBlocker.IsValid())
 			{
+				if (BusyTaskInFlightCount == 0 && PendingBusyTasks.Num() > 0)
+				{
+					TArray<TFunction<void(TFunction<void()>)>> Tasks = MoveTemp(PendingBusyTasks);
+					PendingBusyTasks.Reset();
+					BusyTaskInFlightCount = Tasks.Num();
+					for (TFunction<void(TFunction<void()>)>& Task : Tasks)
+					{
+						Task([this]() {
+							DisableBusyBlocker();
+						});
+					}
+				}
 				FSlateApplication::Get().PumpMessages();
 				FSlateApplication::Get().Tick();
 				FTaskGraphInterface::Get().ProcessThreadUntilIdle(ENamedThreads::GameThread);
@@ -223,15 +235,28 @@ namespace FW {
 
 	void App::EnableBusyBlocker()
 	{
-		BusyBlocker = MakeShared<BusyInputBlocker>();
-		FSlateApplication::Get().RegisterInputPreProcessor(BusyBlocker);
+		if (!BusyBlocker.IsValid())
+		{
+			BusyBlocker = MakeShared<BusyInputBlocker>();
+			FSlateApplication::Get().RegisterInputPreProcessor(BusyBlocker);
+		}
 	}
 
 	void App::DisableBusyBlocker()
 	{
-		FSlateApplication::Get().UnregisterInputPreProcessor(BusyBlocker);
-		BusyBlocker.Reset();
+		BusyTaskInFlightCount = FMath::Max(0, BusyTaskInFlightCount - 1);
+		if (BusyTaskInFlightCount == 0 && PendingBusyTasks.Num() == 0 && BusyBlocker.IsValid())
+		{
+			FSlateApplication::Get().UnregisterInputPreProcessor(BusyBlocker);
+			BusyBlocker.Reset();
+		}
 		
+	}
+
+	void App::EnqueueBusyTask(TFunction<void(TFunction<void()>)> InTask)
+	{
+		EnableBusyBlocker();
+		PendingBusyTasks.Add(MoveTemp(InTask));
 	}
 
 	void App::Update(float DeltaTime)

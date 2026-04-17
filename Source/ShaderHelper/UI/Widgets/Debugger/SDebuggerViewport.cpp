@@ -277,53 +277,54 @@ namespace SH
 			{
 				IsValidating = true;
 				PixelCoord = { -1 };
-				GApp->EnableBusyBlocker();
-				FNotificationInfo Info(LOCALIZATION("StartValidatorTip"));
-				Info.Image = FAppStyle::Get().GetBrush("NoBrush");
-				Info.bFireAndForget = false;
-				Info.FadeInDuration = 0.0f;
-				Info.FadeOutDuration = 0.0f;
-				auto Notification = FSlateNotificationManager::Get().AddNotification(Info);
-				Notification->SetCompletionState(SNotificationItem::CS_Pending);
-				Async(EAsyncExecution::Thread, [=, this]() {
-					std::optional<Vector2u> ErrorCoord;
-					try
-					{
-						ErrorCoord = ShEditor->ValidatePixel(Invocation);
-					}
-					catch (const std::runtime_error& e)
-					{
+				GApp->EnqueueBusyTask([=, this](TFunction<void()> Done) {
+					FNotificationInfo Info(LOCALIZATION("StartValidatorTip"));
+					Info.Image = FAppStyle::Get().GetBrush("NoBrush");
+					Info.bFireAndForget = false;
+					Info.FadeInDuration = 0.0f;
+					Info.FadeOutDuration = 0.0f;
+					auto Notification = FSlateNotificationManager::Get().AddNotification(Info);
+					Notification->SetCompletionState(SNotificationItem::CS_Pending);
+					Async(EAsyncExecution::Thread, [=, this]() {
+						std::optional<Vector2u> ErrorCoord;
+						try
+						{
+							ErrorCoord = ShEditor->ValidatePixel(Invocation);
+						}
+						catch (const std::runtime_error& e)
+						{
+							AsyncTask(ENamedThreads::GameThread, [=, this] {
+								IsValidating = false;
+								Notification->Fadeout();
+								Done();
+								FText FailureInfo = LOCALIZATION("DebugFailure");
+								SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo.ToString(), UTF8_TO_TCHAR(e.what()));
+								MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), FailureInfo);
+								ShEditor->EndDebugging();
+							});
+							return;
+						}
+
 						AsyncTask(ENamedThreads::GameThread, [=, this] {
 							IsValidating = false;
 							Notification->Fadeout();
-							GApp->DisableBusyBlocker();
-							FText FailureInfo = LOCALIZATION("DebugFailure");
-							SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo.ToString(), UTF8_TO_TCHAR(e.what()));
-							MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GApp->GetEditor()->GetMainWindow(), FailureInfo);
-							ShEditor->EndDebugging();
+							Done();
+							if (ErrorCoord)
+							{
+								PixelCoord = ErrorCoord.value();
+								MouseLoc = PixelCoord * Zoom - Offset;
+								Draw();
+								bFinalizePixel = true;
+								ShEditor->GetDebuggaleObject()->OnFinalizePixel(PixelCoord);
+							}
+							else
+							{
+								MessageDialog::Open(MessageDialog::Ok, MessageDialog::Happy, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("ValidationTip"));
+								ShEditor->EndDebugging();
+							}
 						});
-						return;
-					}
-
-					AsyncTask(ENamedThreads::GameThread, [=, this] {
-						IsValidating = false;
-						Notification->Fadeout();
-						GApp->DisableBusyBlocker();
-						if (ErrorCoord)
-						{
-							PixelCoord = ErrorCoord.value();
-							MouseLoc = PixelCoord * Zoom - Offset;
-							Draw();
-							bFinalizePixel = true;
-							ShEditor->GetDebuggaleObject()->OnFinalizePixel(PixelCoord);
-						}
-						else
-						{
-							MessageDialog::Open(MessageDialog::Ok, MessageDialog::Happy, GApp->GetEditor()->GetMainWindow(), LOCALIZATION("ValidationTip"));
-							ShEditor->EndDebugging();
-						}
+						
 					});
-					
 				});
 
 			}

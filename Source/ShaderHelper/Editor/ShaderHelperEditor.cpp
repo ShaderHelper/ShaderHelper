@@ -1254,36 +1254,37 @@ namespace SH
 		Debugger.SetShaderAsset(ShaderEditor->GetShaderAsset());
 		Debugger.SetShaderSource(ShaderEditor->GetCurrentShaderSource());
 		
-		GApp->EnableBusyBlocker();
-		FNotificationInfo Info(LOCALIZATION("StartDebuggerTip"));
-		Info.Image = FAppStyle::Get().GetBrush("NoBrush");
-		Info.bFireAndForget = false;
-		Info.FadeInDuration = 0.0f;
-		Info.FadeOutDuration = 0.0f;
-		auto Notification = FSlateNotificationManager::Get().AddNotification(Info);
-		Notification->SetCompletionState(SNotificationItem::CS_Pending);
-		Async(EAsyncExecution::Thread, [=, this]() {
-			try
-			{
-				Debugger.DebugPixel(InPixelCoord, InState);
-			}
-			catch (const std::runtime_error& e)
-			{
+		GApp->EnqueueBusyTask([=, this](TFunction<void()> Done) {
+			FNotificationInfo Info(LOCALIZATION("StartDebuggerTip"));
+			Info.Image = FAppStyle::Get().GetBrush("NoBrush");
+			Info.bFireAndForget = false;
+			Info.FadeInDuration = 0.0f;
+			Info.FadeOutDuration = 0.0f;
+			auto Notification = FSlateNotificationManager::Get().AddNotification(Info);
+			Notification->SetCompletionState(SNotificationItem::CS_Pending);
+			Async(EAsyncExecution::Thread, [=, this]() {
+				try
+				{
+					Debugger.DebugPixel(InPixelCoord, InState);
+				}
+				catch (const std::runtime_error& e)
+				{
+					AsyncTask(ENamedThreads::GameThread, [=, this] {
+						Notification->Fadeout();
+						Done();
+						FText FailureInfo = LOCALIZATION("DebugFailure");
+						SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo.ToString(), UTF8_TO_TCHAR(e.what()));
+						MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GetMainWindow(), FailureInfo);
+						EndDebugging();
+					});
+					return;
+				}
+
 				AsyncTask(ENamedThreads::GameThread, [=, this] {
 					Notification->Fadeout();
-					GApp->DisableBusyBlocker();
-					FText FailureInfo = LOCALIZATION("DebugFailure");
-					SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo.ToString(), UTF8_TO_TCHAR(e.what()));
-					MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GetMainWindow(), FailureInfo);
-					EndDebugging();
+					Done();
+					Continue();
 				});
-				return;
-			}
-
-			AsyncTask(ENamedThreads::GameThread, [=, this] {
-				Notification->Fadeout();
-				GApp->DisableBusyBlocker();
-				Continue();
 			});
 		});
 	}

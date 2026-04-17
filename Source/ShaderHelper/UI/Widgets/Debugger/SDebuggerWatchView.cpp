@@ -295,23 +295,24 @@ namespace SH
 		InData->Children.Empty();
 		ExpressionTreeView->RebuildList();
 		
-		GApp->EnableBusyBlocker();
-		FNotificationInfo Info(LOCALIZATION("EvaluatingExpr"));
-		Info.Image = FAppStyle::Get().GetBrush("NoBrush");
-		Info.bFireAndForget = false;
-		Info.FadeInDuration = 0.0f;
-		Info.FadeOutDuration = 0.0f;
-		auto Notification = FSlateNotificationManager::Get().AddNotification(Info);
-		Notification->SetCompletionState(SNotificationItem::CS_Pending);
-
 		FString Expression = InData->Expr;
-		Async(EAsyncExecution::Thread, [this, InData, Expression, Notification]() {
-			ExpressionNode Result = OnWatch(Expression);
-			AsyncTask(ENamedThreads::GameThread, [this, InData, Result = MoveTemp(Result), Notification]() {
-				Notification->Fadeout();
-				GApp->DisableBusyBlocker();
-				*InData = Result;
-				ExpressionTreeView->RebuildList();
+		GApp->EnqueueBusyTask([this, InData, Expression](TFunction<void()> Done) {
+			FNotificationInfo Info(LOCALIZATION("EvaluatingExpr"));
+			Info.Image = FAppStyle::Get().GetBrush("NoBrush");
+			Info.bFireAndForget = false;
+			Info.FadeInDuration = 0.0f;
+			Info.FadeOutDuration = 0.0f;
+			auto Notification = FSlateNotificationManager::Get().AddNotification(Info);
+			Notification->SetCompletionState(SNotificationItem::CS_Pending);
+
+			Async(EAsyncExecution::Thread, [this, InData, Expression, Notification, Done]() {
+				ExpressionNode Result = OnWatch(Expression);
+				AsyncTask(ENamedThreads::GameThread, [this, InData, Result = MoveTemp(Result), Notification, Done]() {
+					Notification->Fadeout();
+					Done();
+					*InData = Result;
+					ExpressionTreeView->RebuildList();
+				});
 			});
 		});
 	}
