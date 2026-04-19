@@ -836,6 +836,30 @@ namespace SH
 			})
 		];
 
+		for (int Lang = 0; Lang < (int)SupportedLanguage::Num; Lang++)
+		{
+			Languages.Add(MakeShared<SupportedLanguage>(static_cast<SupportedLanguage>(Lang)));
+		}
+
+		AppendItem(EnvGrid, LOCALIZATION("Language"))
+		.AutoWidth()
+		[
+			SNew(SComboBox<TSharedPtr<SupportedLanguage>>)
+			.OptionsSource(&Languages)
+			.InitiallySelectedItem(Languages[(int)Editor::GetLanguage()])
+			.OnSelectionChanged_Lambda([](TSharedPtr<SupportedLanguage> InItem, ESelectInfo::Type) {
+				Editor::SetLanguage(*InItem);
+			})
+			.OnGenerateWidget_Lambda([](TSharedPtr<SupportedLanguage> InItem) {
+				return SNew(STextBlock).Text(LOCALIZATION(magic_enum::enum_name(*InItem).data()));
+			})
+			[
+				SNew(STextBlock).Text_Lambda([] {
+					return LOCALIZATION(magic_enum::enum_name(Editor::GetLanguage()).data());
+				})
+			]
+		];
+
 		ChildSlot
 		[
 			SNew(SVerticalBox)

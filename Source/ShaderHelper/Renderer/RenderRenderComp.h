@@ -1,6 +1,7 @@
 #pragma once
 #include "Editor/PreviewViewPort.h"
 #include "AssetObject/Render/Render.h"
+#include "AssetObject/Render/SceneObject.h"
 #include "Renderer/RenderComponent.h"
 #include "Renderer/RenderGraph.h"
 #include "RenderResource/RenderPass/BlitPass.h"
@@ -19,6 +20,7 @@ namespace SH
 		TRefCountPtr<FW::GpuTexture> FinalRT;
 		FW::PreviewViewPort* ViewPort = nullptr;
 		TArray<RenderOutputDesc> Outputs;
+		const TArray<FW::ObjectPtr<SceneObject>>* SceneObjects = nullptr;
 	};
 
 	class RenderRenderComp : public FW::RenderComponent

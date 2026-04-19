@@ -76,6 +76,7 @@ namespace SH
 		SLATE_END_ARGS()
 		void Construct(const FArguments& InArgs);
 		TArray<TSharedPtr<FW::GpuRhiBackendType>> Backends;
+		TArray<TSharedPtr<FW::SupportedLanguage>> Languages;
 	};
 
 	class SPreferenceView : public SCompoundWidget

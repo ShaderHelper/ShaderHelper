@@ -55,6 +55,7 @@ namespace FW
 	{
 		MetaProperty Min;
 		MetaProperty Max;
+		MetaProperty Visibility;
 	};
 
     struct MetaMemberData

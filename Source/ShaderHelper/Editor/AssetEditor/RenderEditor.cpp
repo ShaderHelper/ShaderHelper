@@ -5,7 +5,7 @@
 #include "AssetObject/Render/Nodes/RenderOutputNode.h"
 #include "AssetObject/Render/Render.h"
 #include "Editor/ShaderHelperEditor.h"
-#include "Renderer/RenderRenderComp.h"
+#include "Renderer/RenderSceneRenderComp.h"
 
 using namespace FW;
 
@@ -27,7 +27,7 @@ namespace SH
 		if (ShEditor->OpenGraph(LoadedRender))
 		{
 			ShEditor->SetGraphRenderComp(nullptr);
-			ShEditor->SetGraphRenderComp(MakeShared<RenderRenderComp>(LoadedRender, ShEditor->GetViewPort()));
+			ShEditor->SetGraphRenderComp(MakeShared<RenderSceneRenderComp>(LoadedRender, ShEditor->GetViewPort()));
 		}
 	}
 

@@ -9,6 +9,7 @@
 #include "UI/Widgets/Timeline/STimeline.h"
 #include "CodeEditorCommands.h"
 #include "DebuggerViewCommands.h"
+#include "SceneViewCommands.h"
 #include "PluginManager/ShPluginManager.h"
 #include "Renderer/ShaderToyRenderComp.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
@@ -17,6 +18,10 @@
 #include "AssetObject/TextureCube.h"
 #include "AssetObject/Texture2D.h"
 #include "AssetObject/Texture3D.h"
+#include "AssetObject/Model.h"
+#include "AssetObject/Render/Render.h"
+#include "RenderResource/Mesh.h"
+#include "UI/Widgets/Misc/MiscWidget.h"
 
 #include <Serialization/JsonSerializer.h>
 #include <Misc/FileHelper.h>
@@ -24,6 +29,7 @@
 #include <DesktopPlatformModule.h>
 #include <Framework/Notifications/NotificationManager.h>
 #include <Widgets/Notifications/SNotificationList.h>
+#include <Widgets/Input/SSegmentedControl.h>
 
 STEAL_PRIVATE_MEMBER(FTabManager, TArray<TSharedRef<FTabManager::FArea>>, CollapsedDockAreas)
 
@@ -35,12 +41,12 @@ namespace SH
 
 	const TArray<FName> TabIds{
 		PreviewTabId, PropretyTabId, CodeTabId, AssetTabId, GraphTabId, LogTabId,
-		LocalTabId, GlobalTabId, CallStackTabId, WatchTabId
+		LocalTabId, GlobalTabId, CallStackTabId, WatchTabId, SceneTabId
 	};
 
     const TArray<FName> WindowMenuTabIds{
         PreviewTabId, PropretyTabId, AssetTabId, GraphTabId, LogTabId,
-		LocalTabId, GlobalTabId, CallStackTabId, WatchTabId
+		LocalTabId, GlobalTabId, CallStackTabId, WatchTabId, SceneTabId
     };
 
 	ShaderHelperEditor::ShaderHelperEditor(const Vector2f& InWindowSize, ShRenderer* InRenderer)
@@ -49,6 +55,7 @@ namespace SH
 	{
 		CodeEditorCommands::Register();
 		DebuggerViewCommands::Register();
+		SceneViewCommands::Register();
 
 		UICommandList = MakeShared<FUICommandList>();
 		UICommandList->MapAction(
@@ -116,6 +123,19 @@ namespace SH
 			EUIActionRepeatMode::RepeatEnabled
 		);
 
+		UICommandList->MapAction(
+			SceneViewCommands::Get().GizmoMove,
+			FExecuteAction::CreateLambda([this] { CurProject->GizmoMode = GizmoMode::Move; })
+		);
+		UICommandList->MapAction(
+			SceneViewCommands::Get().GizmoRotate,
+			FExecuteAction::CreateLambda([this] { CurProject->GizmoMode = GizmoMode::Rotate; })
+		);
+		UICommandList->MapAction(
+			SceneViewCommands::Get().GizmoScale,
+			FExecuteAction::CreateLambda([this] { CurProject->GizmoMode = GizmoMode::Scale; })
+		);
+
 		CurProject = TSingleton<ShProjectManager>::Get().GetProject();
 		ViewPort = MakeShared<PreviewViewPort>();
 	}
@@ -163,6 +183,7 @@ namespace SH
 			.ObjectData(CurPropertyObject);
 		
 		SAssignNew(GraphPanel, SGraphPanel);
+		SAssignNew(SceneView, SSceneView);
 		if (CurProject->Graph)
 		{
 			AssetOp::OpenAsset(CurProject->Graph);
@@ -370,6 +391,29 @@ namespace SH
 				}
 			}
 		}
+		// Create built-in Mesh Model assets (Cube, Sphere, Quad)
+		FString BuiltInMeshDir = PathHelper::BuiltinDir() / TEXT("Mesh");
+		if (!IFileManager::Get().DirectoryExists(*BuiltInMeshDir))
+		{
+			IFileManager::Get().MakeDirectory(*BuiltInMeshDir, true);
+
+			struct BuiltinMeshInfo { const TCHAR* Name; TFunction<MeshData()> CreateFunc; };
+			BuiltinMeshInfo BuiltinMeshes[] = {
+				{ TEXT("Cube"),   [] { return CreateCube(); } },
+				{ TEXT("Sphere"), [] { return CreateSphere(); } },
+				{ TEXT("Quad"),   [] { return CreateQuad(); } },
+			};
+
+			for (const auto& MeshInfo : BuiltinMeshes)
+			{
+				auto MeshModel = MakeUnique<Model>(TArray<MeshData>{ MeshInfo.CreateFunc() });
+				MeshModel->ObjectName = FText::FromString(MeshInfo.Name);
+				FString SavedFilePath = BuiltInMeshDir / (FString(MeshInfo.Name) + TEXT(".") + MeshModel->FileExtension());
+				TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFilePath));
+				MeshModel->Serialize(*Ar);
+			}
+		}
+
 		TSingleton<AssetManager>::Get().MountProject(PathHelper::BuiltinDir());
 	}
 
@@ -429,18 +473,18 @@ namespace SH
 				(
 					FTabManager::NewSplitter()
 					->SetOrientation(Orient_Vertical)
-					->SetSizeCoefficient(0.48f)
+					->SetSizeCoefficient(0.53f)
 					->Split
 					(
 						FTabManager::NewStack()
-						->SetSizeCoefficient(0.7f)
+						->SetSizeCoefficient(0.75f)
 						->AddTab(CodeTabId, ETabState::OpenedTab)
 					)
 					->Split
 					(
 						FTabManager::NewSplitter()
 						->SetOrientation(Orient_Horizontal)
-						->SetSizeCoefficient(0.3f)
+						->SetSizeCoefficient(0.25f)
 						->Split
 						(
 							 FTabManager::NewStack()
@@ -462,9 +506,21 @@ namespace SH
 				)
                 ->Split
 				(
-					 FTabManager::NewStack()
-					 ->SetSizeCoefficient(0.15f)
-					 ->AddTab(PropretyTabId, ETabState::OpenedTab)
+					FTabManager::NewSplitter()
+					->SetOrientation(Orient_Vertical)
+					->SetSizeCoefficient(0.15f)
+					->Split
+					(
+						FTabManager::NewStack()
+						->SetSizeCoefficient(0.25f)
+						->AddTab(SceneTabId, ETabState::OpenedTab)
+					)
+					->Split
+					(
+						FTabManager::NewStack()
+						->SetSizeCoefficient(0.75f)
+						->AddTab(PropretyTabId, ETabState::OpenedTab)
+					)
 				)
 			);
 
@@ -910,6 +966,19 @@ namespace SH
 			
 			);
 		}
+		else if (TabId == SceneTabId)
+		{
+			SpawnedTab = SNew(SDockTab);
+			SpawnedTab->SetLabel(LOCALIZATION(SceneTabId.ToString()));
+			SpawnedTab->SetTabIcon(FShaderHelperStyle::Get().GetBrush("Icons.World"));
+			SpawnedTab->SetContent(
+				SNew(SBorder)
+				.Padding(FMargin{2,2,3,2})
+				[
+					SceneView.ToSharedRef()
+				]
+			);
+		}
 		else if (TabId == PropretyTabId) {
             SpawnedTab = SNew(SDockTab);
 			SpawnedTab->SetLabel(LOCALIZATION(PropretyTabId.ToString()));
@@ -1058,7 +1127,16 @@ namespace SH
         if(!InGraphData)
         {
             ViewPort->Clear();
+			SceneView->SetRender(nullptr);
         }
+		else if (auto* RenderGraph = dynamic_cast<Render*>(InGraphData.Get()))
+		{
+			SceneView->SetRender(RenderGraph);
+		}
+		else
+		{
+			SceneView->SetRender(nullptr);
+		}
 
 		return true;
 	}
@@ -1309,6 +1387,15 @@ namespace SH
 	{
 		FToolBarBuilder ToolBarBuilder(UICommandList, FMultiBoxCustomization::None, nullptr);
 		ToolBarBuilder.SetStyle(&FShaderHelperStyle::Get(), FName("Toolbar.ShaderHelper"));
+		auto MakeCenteredToolBarWidget = [](const TSharedRef<SWidget>& InWidget)
+		{
+			return SNew(SBox)
+				.MinDesiredHeight(25.0f)
+				.VAlign(VAlign_Center)
+				[
+					InWidget
+				];
+		};
 		ToolBarBuilder.AddToolBarButton(
 			CodeEditorCommands::Get().GoBack,
 			NAME_None,
@@ -1374,12 +1461,14 @@ namespace SH
 			EUserInterfaceActionType::Button
 		);
 		ToolBarBuilder.AddToolBarWidget(
-			SNew(SBorder)
-			.BorderImage(FAppStyle::Get().GetBrush("Brushes.Border"))
-			.Padding(1)
-			[
-				DebuggerToolBarBuilder.MakeWidget()
-			]
+			MakeCenteredToolBarWidget(
+				SNew(SBorder)
+				.BorderImage(FAppStyle::Get().GetBrush("Brushes.Border"))
+				.Padding(1)
+				[
+					DebuggerToolBarBuilder.MakeWidget()
+				]
+			)
 		);
 		ToolBarBuilder.AddToolBarButton(
 			FUIAction(
@@ -1404,22 +1493,65 @@ namespace SH
 			EUserInterfaceActionType::Button
 		);
 		ToolBarBuilder.AddToolBarWidget(
-			SNew(STextBlock)
-			.Margin(FMargin(8.0f, 0.0f, 0.0f, 0.0f))
-			.Visibility_Lambda([this] {
-				return (IsDebugging && bShowingLinePreview) ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
-			})
-			.Text_Lambda([this] {
-				const auto& PreviewData = Debugger.GetLinePreviewData();
-				if (const auto* Info = PreviewData.Find(LinePreviewLocation))
-				{
-					return FText::Format(LOCALIZATION("InspectingPreview"),
-						FText::FromString(Info->VarName),
-						FText::FromString(LinePreviewLocation.File),
-						FText::AsNumber(LinePreviewLocation.LineNumber));
-				}
-				return FText::GetEmpty();
-			})
+			MakeCenteredToolBarWidget(
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				.VAlign(VAlign_Center)
+				.Padding(12, 0, 0, 0)
+				[
+					SNew(SShToggleButton)
+						.Icon(FAppStyle::Get().GetBrush("Icons.Sphere"))
+						.ToolTipText_Lambda([this] { return CurProject->bScenePreview ? LOCALIZATION("SwitchToCustomTip") : LOCALIZATION("SwitchToPreviewTip"); })
+						.IsChecked_Lambda([this] { return !CurProject->bScenePreview ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
+						.OnCheckStateChanged_Lambda([this](ECheckBoxState NewState) { 
+							CurProject->bScenePreview = (NewState == ECheckBoxState::Unchecked); 
+						})
+				]
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				.VAlign(VAlign_Center)
+				.Padding(4, 0, 0, 0)
+				[
+					SNew(SSegmentedControl<int32>)
+					.Value_Lambda([this]{ return static_cast<int32>(CurProject->GizmoMode); })
+					.OnValueChanged_Lambda([this](int32 NewValue){ CurProject->GizmoMode = static_cast<SH::GizmoMode>(NewValue); })
+					+ SSegmentedControl<int32>::Slot(0).Text(LOCALIZATION("Move"))
+					+ SSegmentedControl<int32>::Slot(1).Text(LOCALIZATION("Rotate"))
+					+ SSegmentedControl<int32>::Slot(2).Text(LOCALIZATION("Scale"))
+				]
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				.VAlign(VAlign_Center)
+				.Padding(8, 0, 4, 0)
+				[
+					SNew(SSegmentedControl<int32>)
+					.Value_Lambda([this]{ return static_cast<int32>(CurProject->GizmoSpace); })
+					.OnValueChanged_Lambda([this](int32 NewValue){ CurProject->GizmoSpace = static_cast<SH::GizmoSpace>(NewValue); })
+					+ SSegmentedControl<int32>::Slot(0).Text(LOCALIZATION("Global"))
+					+ SSegmentedControl<int32>::Slot(1).Text(LOCALIZATION("Local"))
+				]
+			)
+		);
+		ToolBarBuilder.AddToolBarWidget(
+			MakeCenteredToolBarWidget(
+				SNew(STextBlock)
+				.Margin(FMargin(8.0f, 0.0f, 0.0f, 0.0f))
+				.Visibility_Lambda([this] {
+					return (IsDebugging && bShowingLinePreview) ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+				})
+				.Text_Lambda([this] {
+					const auto& PreviewData = Debugger.GetLinePreviewData();
+					if (const auto* Info = PreviewData.Find(LinePreviewLocation))
+					{
+						return FText::Format(LOCALIZATION("InspectingPreview"),
+							FText::FromString(Info->VarName),
+							FText::FromString(LinePreviewLocation.File),
+							FText::AsNumber(LinePreviewLocation.LineNumber));
+					}
+					return FText::GetEmpty();
+				})
+			)
 		);
 		return ToolBarBuilder;
 	}
@@ -1515,33 +1647,6 @@ namespace SH
 			
 		}
 		else if (MenuName == "Edit") {
-			MenuBuilder.AddSubMenu(LOCALIZATION("Language"), FText::GetEmpty(), FNewMenuDelegate::CreateLambda(
-				[this](FMenuBuilder& MenuBuilder) {
-					for (int Index{}; Index != static_cast<int>(SupportedLanguage::Num); Index++)
-					{
-						SupportedLanguage Lang{ Index };
-						MenuBuilder.AddMenuEntry(
-							LOCALIZATION(magic_enum::enum_name(Lang).data()),
-							FText::GetEmpty(), FSlateIcon(),
-							FUIAction(
-								FExecuteAction::CreateLambda(
-									[this, Lang]()
-									{
-										Editor::SetLanguage(Lang);
-									}),
-								FCanExecuteAction(),
-								FIsActionChecked::CreateLambda(
-									[Lang]()
-									{
-										return Editor::GetLanguage() == Lang;
-									})
-							),
-							NAME_None,
-							EUserInterfaceActionType::ToggleButton
-						);
-					}
-				}),
-				false, FSlateIcon(FShaderHelperStyle::Get().GetStyleSetName(), "Icons.World"));
 			MenuBuilder.AddMenuEntry(LOCALIZATION("Preferences"), FText::GetEmpty(), FSlateIcon(FAppStyle::Get().GetStyleSetName(), "Icons.Settings"),
 				FUIAction(
 					FExecuteAction::CreateLambda([this] {

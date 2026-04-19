@@ -4585,7 +4585,7 @@ constexpr int PaddingLineNum = 22;
 									LocationBox->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(4, 0, 0, 0)
 									[
 										SNew(SIconButton)
-										.Icon(FShaderHelperStyle::Get().GetBrush("Icons.World"))
+										.Icon(FShaderHelperStyle::Get().GetBrush("Icons.Networking"))
 										.IconSize(FVector2D{ (float)SShaderEditorBox::GetFontSize(), (float)SShaderEditorBox::GetFontSize() })
 										.OnClicked_Lambda([Url = Symbol.Url]() {
 											FPlatformProcess::LaunchURL(*Url, nullptr, nullptr);

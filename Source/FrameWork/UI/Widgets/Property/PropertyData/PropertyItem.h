@@ -251,12 +251,13 @@ namespace FW
     {
         MANUAL_RTTI_TYPE(PropertyVector2fItem, PropertyItemBase)
     public:
-		PropertyVector2fItem(ShObject* InOwner, const FString& InName, Vector2f* InValueRef = nullptr)
-			: PropertyVector2fItem(InOwner, FText::FromString(InName), InValueRef)
+		PropertyVector2fItem(ShObject* InOwner, const FString& InName, Vector2f* InValueRef = nullptr, bool InReadOnly = false)
+			: PropertyVector2fItem(InOwner, FText::FromString(InName), InValueRef, InReadOnly)
 		{}
-        PropertyVector2fItem(ShObject* InOwner, FText InName, Vector2f* InValueRef = nullptr)
+		PropertyVector2fItem(ShObject* InOwner, FText InName, Vector2f* InValueRef = nullptr, bool InReadOnly = false)
             : PropertyItemBase(InOwner, MoveTemp(InName))
             , ValueRef(InValueRef)
+			, ReadOnly(InReadOnly)
         {}
         
         TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
@@ -268,6 +269,7 @@ namespace FW
                     + SHorizontalBox::Slot()
                     [
                         SNew(SSpinBox<float>)
+						.IsEnabled(!ReadOnly)
                         .OnValueChanged_Lambda([this](float NewValue) {
                             if(ValueRef->x != NewValue && Owner->CanChangeProperty(this))
                             {
@@ -280,6 +282,7 @@ namespace FW
                     + SHorizontalBox::Slot()
                     [
                         SNew(SSpinBox<float>)
+						.IsEnabled(!ReadOnly)
                         .OnValueChanged_Lambda([this](float NewValue) {
                             if(ValueRef->y != NewValue && Owner->CanChangeProperty(this))
                             {
@@ -297,18 +300,20 @@ namespace FW
 
     private:
         Vector2f* ValueRef;
+		bool ReadOnly;
     };
 
 	class PropertyVector3fItem : public PropertyItemBase
 	{
 		MANUAL_RTTI_TYPE(PropertyVector3fItem, PropertyItemBase)
 	public:
-		PropertyVector3fItem(ShObject* InOwner, const FString& InName, Vector3f* InValueRef = nullptr)
-			: PropertyVector3fItem(InOwner, FText::FromString(InName), InValueRef)
+		PropertyVector3fItem(ShObject* InOwner, const FString& InName, Vector3f* InValueRef = nullptr, bool InReadOnly = false)
+			: PropertyVector3fItem(InOwner, FText::FromString(InName), InValueRef, InReadOnly)
 		{}
-		PropertyVector3fItem(ShObject* InOwner, FText InName, Vector3f* InValueRef = nullptr)
+		PropertyVector3fItem(ShObject* InOwner, FText InName, Vector3f* InValueRef = nullptr, bool InReadOnly = false)
 			: PropertyItemBase(InOwner, MoveTemp(InName))
 			, ValueRef(InValueRef)
+			, ReadOnly(InReadOnly)
 		{}
 		
 		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
@@ -320,6 +325,7 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<float>)
+						.IsEnabled(!ReadOnly)
 						.OnValueChanged_Lambda([this](float NewValue) {
 							if(ValueRef->x != NewValue && Owner->CanChangeProperty(this))
 							{
@@ -332,6 +338,7 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<float>)
+						.IsEnabled(!ReadOnly)
 						.OnValueChanged_Lambda([this](float NewValue) {
 							if(ValueRef->y != NewValue && Owner->CanChangeProperty(this))
 							{
@@ -344,6 +351,7 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<float>)
+						.IsEnabled(!ReadOnly)
 						.OnValueChanged_Lambda([this](float NewValue) {
 							if(ValueRef->z != NewValue && Owner->CanChangeProperty(this))
 							{
@@ -361,18 +369,20 @@ namespace FW
 
 	private:
 		Vector3f* ValueRef;
+		bool ReadOnly;
 	};
 
 	class PropertyVector4fItem : public PropertyItemBase
 	{
 		MANUAL_RTTI_TYPE(PropertyVector4fItem, PropertyItemBase)
 	public:
-		PropertyVector4fItem(ShObject* InOwner, const FString& InName, Vector4f* InValueRef = nullptr)
-			: PropertyVector4fItem(InOwner, FText::FromString(InName), InValueRef)
+		PropertyVector4fItem(ShObject* InOwner, const FString& InName, Vector4f* InValueRef = nullptr, bool InReadOnly = false)
+			: PropertyVector4fItem(InOwner, FText::FromString(InName), InValueRef, InReadOnly)
 		{}
-		PropertyVector4fItem(ShObject* InOwner, FText InName, Vector4f* InValueRef = nullptr)
+		PropertyVector4fItem(ShObject* InOwner, FText InName, Vector4f* InValueRef = nullptr, bool InReadOnly = false)
 			: PropertyItemBase(InOwner, MoveTemp(InName))
 			, ValueRef(InValueRef)
+			, ReadOnly(InReadOnly)
 		{
 		}
 
@@ -385,6 +395,7 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<float>)
+							.IsEnabled(!ReadOnly)
 							.OnValueChanged_Lambda([this](float NewValue) {
 								if (ValueRef->x != NewValue && Owner->CanChangeProperty(this))
 								{
@@ -397,6 +408,7 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<float>)
+							.IsEnabled(!ReadOnly)
 							.OnValueChanged_Lambda([this](float NewValue) {
 								if (ValueRef->y != NewValue && Owner->CanChangeProperty(this))
 								{
@@ -409,6 +421,7 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<float>)
+							.IsEnabled(!ReadOnly)
 							.OnValueChanged_Lambda([this](float NewValue) {
 								if (ValueRef->z != NewValue && Owner->CanChangeProperty(this))
 								{
@@ -421,6 +434,7 @@ namespace FW
 					+SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<float>)
+							.IsEnabled(!ReadOnly)
 							.OnValueChanged_Lambda([this](float NewValue) {
 								if (ValueRef->w != NewValue && Owner->CanChangeProperty(this))
 								{
@@ -438,15 +452,17 @@ namespace FW
 
 	private:
 		Vector4f* ValueRef;
+		bool ReadOnly;
 	};
 
 	class PropertyVector2iItem : public PropertyItemBase
 	{
 		MANUAL_RTTI_TYPE(PropertyVector2iItem, PropertyItemBase)
 	public:
-		PropertyVector2iItem(ShObject* InOwner, FText InName, int32* InValues = nullptr)
+		PropertyVector2iItem(ShObject* InOwner, FText InName, int32* InValues = nullptr, bool InReadOnly = false)
 			: PropertyItemBase(InOwner, MoveTemp(InName))
 			, Values(InValues)
+			, ReadOnly(InReadOnly)
 		{}
 
 		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
@@ -458,6 +474,7 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<int32>)
+						.IsEnabled(!ReadOnly)
 						.OnValueChanged_Lambda([this](int32 NewValue) {
 							if (Values[0] != NewValue && Owner->CanChangeProperty(this))
 							{
@@ -470,6 +487,7 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<int32>)
+						.IsEnabled(!ReadOnly)
 						.OnValueChanged_Lambda([this](int32 NewValue) {
 							if (Values[1] != NewValue && Owner->CanChangeProperty(this))
 							{
@@ -486,15 +504,17 @@ namespace FW
 
 	private:
 		int32* Values;
+		bool ReadOnly;
 	};
 
 	class PropertyVector3iItem : public PropertyItemBase
 	{
 		MANUAL_RTTI_TYPE(PropertyVector3iItem, PropertyItemBase)
 	public:
-		PropertyVector3iItem(ShObject* InOwner, FText InName, int32* InValues = nullptr)
+		PropertyVector3iItem(ShObject* InOwner, FText InName, int32* InValues = nullptr, bool InReadOnly = false)
 			: PropertyItemBase(InOwner, MoveTemp(InName))
 			, Values(InValues)
+			, ReadOnly(InReadOnly)
 		{}
 
 		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
@@ -506,6 +526,7 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<int32>)
+						.IsEnabled(!ReadOnly)
 						.OnValueChanged_Lambda([this](int32 NewValue) {
 							if (Values[0] != NewValue && Owner->CanChangeProperty(this))
 							{
@@ -518,6 +539,7 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<int32>)
+						.IsEnabled(!ReadOnly)
 						.OnValueChanged_Lambda([this](int32 NewValue) {
 							if (Values[1] != NewValue && Owner->CanChangeProperty(this))
 							{
@@ -530,6 +552,7 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<int32>)
+						.IsEnabled(!ReadOnly)
 						.OnValueChanged_Lambda([this](int32 NewValue) {
 							if (Values[2] != NewValue && Owner->CanChangeProperty(this))
 							{
@@ -546,15 +569,17 @@ namespace FW
 
 	private:
 		int32* Values;
+		bool ReadOnly;
 	};
 
 	class PropertyVector4iItem : public PropertyItemBase
 	{
 		MANUAL_RTTI_TYPE(PropertyVector4iItem, PropertyItemBase)
 	public:
-		PropertyVector4iItem(ShObject* InOwner, FText InName, int32* InValues = nullptr)
+		PropertyVector4iItem(ShObject* InOwner, FText InName, int32* InValues = nullptr, bool InReadOnly = false)
 			: PropertyItemBase(InOwner, MoveTemp(InName))
 			, Values(InValues)
+			, ReadOnly(InReadOnly)
 		{}
 
 		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
@@ -566,6 +591,7 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<int32>)
+						.IsEnabled(!ReadOnly)
 						.OnValueChanged_Lambda([this](int32 NewValue) {
 							if (Values[0] != NewValue && Owner->CanChangeProperty(this))
 							{
@@ -578,6 +604,7 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<int32>)
+						.IsEnabled(!ReadOnly)
 						.OnValueChanged_Lambda([this](int32 NewValue) {
 							if (Values[1] != NewValue && Owner->CanChangeProperty(this))
 							{
@@ -590,6 +617,7 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<int32>)
+						.IsEnabled(!ReadOnly)
 						.OnValueChanged_Lambda([this](int32 NewValue) {
 							if (Values[2] != NewValue && Owner->CanChangeProperty(this))
 							{
@@ -602,6 +630,7 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<int32>)
+						.IsEnabled(!ReadOnly)
 						.OnValueChanged_Lambda([this](int32 NewValue) {
 							if (Values[3] != NewValue && Owner->CanChangeProperty(this))
 							{
@@ -618,6 +647,7 @@ namespace FW
 
 	private:
 		int32* Values;
+		bool ReadOnly;
 	};
 
 }

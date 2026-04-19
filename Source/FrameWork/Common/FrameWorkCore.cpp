@@ -17,6 +17,16 @@ namespace FW
 			return {};
 		}
 
+		const MetaPropertyData& PropData = MetaMemData->PropertyData;
+		if (PropData.Visibility)
+		{
+			bool bVisible = std::any_cast<bool>(PropData.Visibility(Instance));
+			if (!bVisible)
+			{
+				return {};
+			}
+		}
+
 		TArray<TSharedRef<PropertyData>> Datas;
 		
 		MetaType* MemberMetaType = MetaMemData->GetMetaType();
@@ -103,6 +113,36 @@ namespace FW
 			FString* StringValue = (FString*)MetaMemData->Get(Instance);
 			Item = MakeShared<PropertyStringItem>(InObject, MetaMemData->MemberName, StringValue, ReadOnly);
 		}
+		else if(MetaMemData->IsType<Vector2f>())
+		{
+			Vector2f* VecValue = (Vector2f*)MetaMemData->Get(Instance);
+			Item = MakeShared<PropertyVector2fItem>(InObject, MetaMemData->MemberName, VecValue, ReadOnly);
+		}
+		else if(MetaMemData->IsType<Vector3f>())
+		{
+			Vector3f* VecValue = (Vector3f*)MetaMemData->Get(Instance);
+			Item = MakeShared<PropertyVector3fItem>(InObject, MetaMemData->MemberName, VecValue, ReadOnly);
+		}
+		else if(MetaMemData->IsType<Vector4f>())
+		{
+			Vector4f* VecValue = (Vector4f*)MetaMemData->Get(Instance);
+			Item = MakeShared<PropertyVector4fItem>(InObject, MetaMemData->MemberName, VecValue, ReadOnly);
+		}
+		else if(MetaMemData->IsType<Vector2i>())
+		{
+			Vector2i* VecValue = (Vector2i*)MetaMemData->Get(Instance);
+			Item = MakeShared<PropertyVector2iItem>(InObject, MetaMemData->MemberName, &VecValue->x, ReadOnly);
+		}
+		else if(MetaMemData->IsType<Vector3i>())
+		{
+			Vector3i* VecValue = (Vector3i*)MetaMemData->Get(Instance);
+			Item = MakeShared<PropertyVector3iItem>(InObject, MetaMemData->MemberName, &VecValue->x, ReadOnly);
+		}
+		else if(MetaMemData->IsType<Vector4i>())
+		{
+			Vector4i* VecValue = (Vector4i*)MetaMemData->Get(Instance);
+			Item = MakeShared<PropertyVector4iItem>(InObject, MetaMemData->MemberName, &VecValue->x, ReadOnly);
+		}
 		//Struct/Class
 		else if(MemberMetaType && MemberMetaType->Datas.Num() > 0)
 		{
@@ -133,6 +173,14 @@ namespace FW
     TArray<TSharedRef<PropertyData>> GeneratePropertyDatas(ShObject* InObject, MetaType* InMetaType)
     {
         TArray<TSharedRef<PropertyData>> Datas;
+
+		// Collect properties from base classes first
+		MetaType* BaseType = InMetaType->GetBaseClass();
+		if (BaseType)
+		{
+			Datas.Append(GeneratePropertyDatas(InObject, BaseType));
+		}
+
         TArray<MetaMemberData*> MetaMemDatas = GetProperties(InMetaType);
         for(MetaMemberData* MetaMemData : MetaMemDatas)
         {

@@ -1,5 +1,7 @@
 #include "CommonHeader.h"
 #include "Render.h"
+#include "MeshSceneObject.h"
+#include "CameraSceneObject.h"
 #include "App/App.h"
 #include "AssetManager/AssetManager.h"
 #include "AssetObject/Nodes/Texture2dNode.h"
@@ -26,6 +28,43 @@ namespace SH
 	FString Render::FileExtension() const
 	{
 		return "render";
+	}
+
+	void Render::Serialize(FArchive& Ar)
+	{
+		Graph::Serialize(Ar);
+
+		int SceneObjNum = SceneObjects.Num();
+		Ar << SceneObjNum;
+		if (Ar.IsSaving())
+		{
+			for (int Index = 0; Index < SceneObjNum; Index++)
+			{
+				FString TypeName = GetRegisteredName(SceneObjects[Index]->DynamicMetaType());
+				Ar << TypeName;
+				SceneObjects[Index]->Serialize(Ar);
+			}
+		}
+		else
+		{
+			SceneObjects.Reserve(SceneObjNum);
+			for (int Index = 0; Index < SceneObjNum; Index++)
+			{
+				FString TypeName;
+				Ar << TypeName;
+				auto LoadedObj = NewShObject<SceneObject>(GetMetaType(TypeName), this);
+				LoadedObj->Serialize(Ar);
+				SceneObjects.Emplace(LoadedObj);
+			}
+		}
+	}
+
+	void Render::RemoveSceneObject(SceneObject* InObject)
+	{
+		SceneObjects.RemoveAll([InObject](const ObjectPtr<SceneObject>& Element) {
+			return Element.Get() == InObject;
+		});
+		MarkDirty();
 	}
 
 	void Render::OnDragEnter(TSharedPtr<FDragDropOperation> DragDropOp)

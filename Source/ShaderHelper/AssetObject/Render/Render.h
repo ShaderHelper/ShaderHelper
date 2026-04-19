@@ -1,5 +1,6 @@
 #pragma once
 #include "AssetObject/Graph.h"
+#include "SceneObject.h"
 
 namespace SH
 {
@@ -18,7 +19,21 @@ namespace SH
 
 	public:
 		FString FileExtension() const override;
+		void Serialize(FArchive& Ar) override;
 		void OnDragEnter(TSharedPtr<FDragDropOperation> DragDropOp) override;
 		void OnDrop(TSharedPtr<FDragDropOperation> DragDropOp, const FW::Vector2D& Pos) override;
+
+		template<typename T>
+		FW::ObjectPtr<T> AddSceneObject()
+		{
+			auto Obj = FW::NewShObject<T>(this);
+			SceneObjects.Add(Obj);
+			MarkDirty();
+			return Obj;
+		}
+
+		void RemoveSceneObject(SceneObject* InObject);
+
+		TArray<FW::ObjectPtr<SceneObject>> SceneObjects;
 	};
 }

@@ -239,6 +239,7 @@ namespace FW
 		friend uint32 GetTypeHash(const GpuShader& Shader)
 		{
 			uint32 Hash = ::GetTypeHash(Shader.SourceText);
+			Hash = HashCombine(Hash, ::GetTypeHash(Shader.EntryPoint));
 			for (const FString& Arg : Shader.CompileExtraArgs)
 			{
 				Hash = HashCombine(Hash, ::GetTypeHash(Arg));
