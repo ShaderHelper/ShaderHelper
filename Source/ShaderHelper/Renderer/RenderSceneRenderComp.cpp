@@ -201,6 +201,7 @@ namespace SH
 					FMatrix44f OrientMat = GetGizmoOrientationMatrix(SelObj);
 					Vector3f AxisDir = GetOrientedAxisDir(DraggingAxis, OrientMat);
 					SelObj->Position = DragStartObjectPos + AxisDir * WorldDelta;
+					SelObj->GetOuterMost()->MarkDirty();
 				}
 				else if (Mode == GizmoMode::Rotate)
 				{
@@ -218,6 +219,7 @@ namespace SH
 					NewQuat.Normalize();
 					FRotator3f NewRotator = NewQuat.Rotator();
 					SelObj->Rotation = Vector3f(NewRotator.Pitch, NewRotator.Yaw, NewRotator.Roll);
+					SelObj->GetOuterMost()->MarkDirty();
 				}
 				else if (Mode == GizmoMode::Scale)
 				{
@@ -228,6 +230,7 @@ namespace SH
 					else if (DraggingAxis == GizmoAxis::Y) NewScale.Y *= ScaleFactor;
 					else NewScale.Z *= ScaleFactor;
 					SelObj->Scale = NewScale;
+					SelObj->GetOuterMost()->MarkDirty();
 				}
 			}
 			return FReply::Handled();
@@ -345,6 +348,8 @@ namespace SH
 			return;
 		}
 
+		PreviewRenderer.InitResources();
+
 		FIntPoint ViewSize = ViewPort->GetSize();
 		if (ViewSize.X == 0 || ViewSize.Y == 0)
 		{
@@ -414,9 +419,16 @@ namespace SH
 		// Render grid with depth test (clears if no meshes were drawn)
 		PreviewRenderer.RenderGrid(Graph, MsaaRTV, DepthDSV, PreviewCamera, !bMeshesDrawn);
 
-		// Render camera wireframes
+		// Render camera billboard icons
 		SceneObject* SelObj = GetSelectedSceneObject();
-		PreviewRenderer.RenderCameraWireframes(Graph, MsaaRTV, PreviewCamera, RenderGraphAsset->SceneObjects, SelObj);
+		PreviewRenderer.RenderBillboards(Graph, MsaaRTV, DepthDSV, PreviewCamera, RenderGraphAsset->SceneObjects);
+
+		// Render camera wireframes only when a camera is selected
+		CameraSceneObject* SelCam = dynamic_cast<CameraSceneObject*>(SelObj);
+		if (SelCam)
+		{
+			PreviewRenderer.RenderCameraWireframes(Graph, MsaaRTV, PreviewCamera, RenderGraphAsset->SceneObjects, SelObj);
+		}
 
 		// Render gizmo for selected object
 		if (SelObj)
@@ -434,6 +446,14 @@ namespace SH
 		if (SelObj)
 		{
 			PreviewRenderer.RenderOutline(Graph, FinalRTV, MaskRTV, PreviewCamera, SelObj);
+		}
+
+		// Render camera preview overlay when a camera is selected
+		if (SelCam)
+		{
+			Camera SelCamera = SelCam->ToCamera((float)ViewSize.X / (float)ViewSize.Y);
+			PreviewRenderer.RenderCameraPreview(Graph, FinalRTV, SelCamera,
+				RenderGraphAsset->SceneObjects, (uint32)ViewSize.X, (uint32)ViewSize.Y);
 		}
 
 		Graph.Execute();

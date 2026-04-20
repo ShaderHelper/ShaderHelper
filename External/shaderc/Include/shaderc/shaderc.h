@@ -514,6 +514,12 @@ SHADERC_EXPORT void shaderc_compile_options_set_invert_y(
 SHADERC_EXPORT void shaderc_compile_options_set_nan_clamp(
     shaderc_compile_options_t options, bool enable);
 
+// Sets whether the compiler should treat all push_constant blocks as uniform
+// blocks. This is useful when you want to compile shaders that use
+// push_constant but target an environment that uses uniform buffers instead.
+SHADERC_EXPORT void shaderc_compile_options_set_all_push_constant_as_uniform(
+    shaderc_compile_options_t options, bool enable);
+
 // An opaque handle to the results of a call to any shaderc_compile_into_*()
 // function.
 typedef struct shaderc_compilation_result* shaderc_compilation_result_t;

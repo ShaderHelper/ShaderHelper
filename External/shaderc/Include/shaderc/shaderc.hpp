@@ -382,6 +382,11 @@ class CompileOptions {
     shaderc_compile_options_set_nan_clamp(options_, enable);
   }
 
+  // Sets whether all push_constant blocks should be treated as uniform blocks.
+  void SetAllPushConstantAsUniform(bool enable) {
+    shaderc_compile_options_set_all_push_constant_as_uniform(options_, enable);
+  }
+
  private:
   CompileOptions& operator=(const CompileOptions& other) = delete;
   shaderc_compile_options_t options_;

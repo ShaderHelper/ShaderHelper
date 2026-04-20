@@ -5,11 +5,20 @@
 #include "RenderResource/OutlineShader.h"
 #include "RenderResource/GizmoShader.h"
 #include "RenderResource/CameraWireframeShader.h"
+#include "RenderResource/BillboardShader.h"
+#include "RenderResource/RenderPass/BlitPass.h"
 #include "AssetObject/Render/MeshSceneObject.h"
 #include "AssetObject/Render/CameraSceneObject.h"
 #include "AssetObject/Model.h"
 #include "GpuApi/GpuRhi.h"
+#include "GpuApi/GpuResourceHelper.h"
 #include "RenderResource/Mesh.h"
+#include "Common/Path/PathHelper.h"
+
+#include <IImageWrapperModule.h>
+#include <IImageWrapper.h>
+#include <ImageWrapperHelper.h>
+#include <Misc/FileHelper.h>
 
 using namespace FW;
 
@@ -17,6 +26,36 @@ namespace SH
 {
 	ScenePreviewRenderer::ScenePreviewRenderer()
 	{
+	}
+
+	void ScenePreviewRenderer::InitResources()
+	{
+		if (CameraIconTex.IsValid())
+		{
+			return;
+		}
+
+		FString IconPath = PathHelper::ResourceDir() / TEXT("CustomSlate/Camera.png");
+		IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>("ImageWrapper");
+		TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(EImageFormat::PNG);
+		TArray<uint8> CompressedData;
+		if (FFileHelper::LoadFileToArray(CompressedData, *IconPath))
+		{
+			if (ImageWrapper.IsValid() && ImageWrapper->SetCompressed(CompressedData.GetData(), CompressedData.Num()))
+			{
+				TArray<uint8> UnCompressedData;
+				ImageWrapper->GetRaw(ERGBFormat::BGRA, 8, UnCompressedData);
+				CameraIconTex = GGpuRhi->CreateTexture({
+					.Width = (uint32)ImageWrapper->GetWidth(),
+					.Height = (uint32)ImageWrapper->GetHeight(),
+					.Format = GpuFormat::B8G8R8A8_UNORM,
+					.Usage = GpuTextureUsage::ShaderResource,
+					.InitialData = UnCompressedData,
+				}, GpuResourceState::ShaderResourceRead);
+				GGpuRhi->SetResourceName("CameraIconTex", CameraIconTex);
+				CameraIconTexView = GGpuRhi->CreateTextureView({.Texture = CameraIconTex});
+			}
+		}
 	}
 
 	void ScenePreviewRenderer::RenderGrid(RenderGraph& Graph, GpuTextureView* OutputView,
@@ -495,6 +534,138 @@ namespace SH
 				}
 			);
 		}
+	}
+
+	void ScenePreviewRenderer::RenderBillboards(RenderGraph& Graph, GpuTextureView* OutputView,
+		GpuTextureView* DepthView,
+		const Camera& SceneCamera, const TArray<ObjectPtr<SceneObject>>& SceneObjects)
+	{
+		if (!CameraIconTexView.IsValid())
+		{
+			return;
+		}
+
+		BillboardShader* Shader = GetShader<BillboardShader>();
+
+		uint32 SampleCount = OutputView->GetTexture()->GetSampleCount();
+		FMatrix44f VP = SceneCamera.GetViewProjectionMatrix();
+
+		// Compute camera right and up vectors for billboarding
+		FMatrix44f ViewMat = SceneCamera.GetViewMatrix();
+		Vector3f CamRight(ViewMat.M[0][0], ViewMat.M[1][0], ViewMat.M[2][0]);
+		Vector3f CamUp(ViewMat.M[0][1], ViewMat.M[1][1], ViewMat.M[2][1]);
+
+		for (const auto& Obj : SceneObjects)
+		{
+			CameraSceneObject* CamObj = dynamic_cast<CameraSceneObject*>(Obj.Get());
+			if (!CamObj)
+			{
+				continue;
+			}
+
+			// Constant screen size: scale by distance from scene camera
+			Vector3f Delta = CamObj->Position - SceneCamera.Position;
+			float Dist = FMath::Sqrt(Delta.X * Delta.X + Delta.Y * Delta.Y + Delta.Z * Delta.Z);
+			float BillboardScale = FMath::Max(Dist * 0.06f, 0.01f);
+
+			TRefCountPtr<GpuBindGroup> BindGroup = Shader->GetBindGroup(VP, CamObj->Position, BillboardScale,
+				CamRight, CamUp, CameraIconTexView);
+
+			BindingContext Bindings;
+			Bindings.SetPassBindGroup(BindGroup);
+			Bindings.SetPassBindGroupLayout(Shader->GetBindGroupLayout());
+
+			GpuRenderPassDesc PassDesc;
+			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{OutputView, RenderTargetLoadAction::Load, RenderTargetStoreAction::Store});
+			PassDesc.DepthStencilTarget = GpuDepthStencilTargetInfo{DepthView, RenderTargetLoadAction::Load, RenderTargetStoreAction::Store};
+
+			GpuRenderPipelineStateDesc PipelineDesc{
+				.Vs = Shader->GetVertexShader(),
+				.Ps = Shader->GetPixelShader(),
+				.Targets = {{
+					.TargetFormat = OutputView->GetTexture()->GetFormat(),
+					.BlendEnable = true,
+					.SrcFactor = BlendFactor::SrcAlpha,
+					.ColorOp = BlendOp::Add,
+					.DestFactor = BlendFactor::InvSrcAlpha,
+				}},
+				.RasterizerState = {RasterizerFillMode::Solid, RasterizerCullMode::None},
+				.Primitive = PrimitiveType::TriangleList,
+				.SampleCount = SampleCount,
+				.DepthStencilState = DepthStencilStateDesc{
+					.DepthFormat = DepthView->GetTexture()->GetFormat(),
+					.DepthWriteEnable = false,
+					.DepthCompare = CompareMode::LessEqual,
+				},
+			};
+			Bindings.ApplyBindGroupLayout(PipelineDesc);
+			TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
+
+			Graph.AddRenderPass("Billboard", MoveTemp(PassDesc), Bindings,
+				[Pipeline](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
+					Bindings.ApplyBindGroup(PassRecorder);
+					PassRecorder->SetRenderPipelineState(Pipeline);
+					PassRecorder->DrawPrimitive(0, 6, 0, 1);
+				}
+			);
+		}
+	}
+
+	void ScenePreviewRenderer::RenderCameraPreview(RenderGraph& Graph, GpuTextureView* OutputView,
+		const Camera& SelectedCamera, const TArray<ObjectPtr<SceneObject>>& SceneObjects,
+		uint32 ViewWidth, uint32 ViewHeight)
+	{
+		uint32 PreviewWidth = FMath::Max(ViewWidth / 4, 1u);
+		uint32 PreviewHeight = FMath::Max(ViewHeight / 4, 1u);
+
+		// Create/resize preview render targets
+		if (!CamPreviewRT.IsValid() || CamPreviewRT->GetWidth() != PreviewWidth || CamPreviewRT->GetHeight() != PreviewHeight)
+		{
+			CamPreviewRT = GGpuRhi->CreateTexture({
+				.Width = PreviewWidth,
+				.Height = PreviewHeight,
+				.Format = GpuFormat::B8G8R8A8_UNORM,
+				.Usage = GpuTextureUsage::RenderTarget | GpuTextureUsage::ShaderResource,
+				.ClearValues = Vector4f(0.1f, 0.1f, 0.1f, 1.0f),
+			}, GpuResourceState::RenderTargetWrite);
+			GGpuRhi->SetResourceName("CamPreviewRT", CamPreviewRT);
+			CamPreviewRTV = GGpuRhi->CreateTextureView({.Texture = CamPreviewRT});
+
+			CamPreviewDepthRT = GGpuRhi->CreateTexture({
+				.Width = PreviewWidth,
+				.Height = PreviewHeight,
+				.Format = GpuFormat::D32_FLOAT,
+				.Usage = GpuTextureUsage::DepthStencil,
+			});
+			GGpuRhi->SetResourceName("CamPreviewDepthRT", CamPreviewDepthRT);
+			CamPreviewDepthDSV = GGpuRhi->CreateTextureView({.Texture = CamPreviewDepthRT});
+		}
+
+		// Render meshes from the selected camera's perspective
+		RenderMeshes(Graph, CamPreviewRTV, CamPreviewDepthDSV, SelectedCamera, SceneObjects, true);
+
+		// Blit preview onto the bottom-right corner of the output
+		float OverlayX = (float)(ViewWidth - PreviewWidth);
+		float OverlayY = (float)(ViewHeight - PreviewHeight);
+
+		BlitPassInput BlitInput;
+		BlitInput.InputView = CamPreviewRTV;
+		BlitInput.InputTexSampler = GpuResourceHelper::GetSampler({ .Filter = SamplerFilter::Bilinear });
+		BlitInput.OutputView = OutputView;
+		BlitInput.LoadAction = RenderTargetLoadAction::Load;
+		BlitInput.Viewport = GpuViewPortDesc{
+			.Width = (float)PreviewWidth,
+			.Height = (float)PreviewHeight,
+			.TopLeftX = OverlayX,
+			.TopLeftY = OverlayY,
+		};
+		BlitInput.Scissor = GpuScissorRectDesc{
+			.Left = (uint32)OverlayX,
+			.Top = (uint32)OverlayY,
+			.Right = ViewWidth,
+			.Bottom = ViewHeight,
+		};
+		AddBlitPass(Graph, BlitInput);
 	}
 
 	void ScenePreviewRenderer::ResolveMsaa(RenderGraph& Graph, GpuTextureView* MsaaView, GpuTextureView* ResolveView)

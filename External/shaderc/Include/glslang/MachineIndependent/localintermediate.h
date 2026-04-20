@@ -361,7 +361,8 @@ public:
         spirvRequirement(nullptr),
         spirvExecutionMode(nullptr),
         uniformLocationBase(0),
-        quadDerivMode(false), reqFullQuadsMode(false)
+        quadDerivMode(false), reqFullQuadsMode(false),
+        allPushConstantAsUniform(false)
     {
         localSize[0] = 1;
         localSize[1] = 1;
@@ -1033,6 +1034,9 @@ public:
     bool hasSpirvExecutionMode() const { return spirvExecutionMode != nullptr; }
     const TSpirvExecutionMode& getSpirvExecutionMode() const { return *spirvExecutionMode; }
 
+    void setAllPushConstantAsUniform(bool b) { allPushConstantAsUniform = b; }
+    bool getAllPushConstantAsUniform() const { return allPushConstantAsUniform; }
+
     void addBlockStorageOverride(const char* nameStr, TBlockStorageClass backing)
     {
         std::string name(nameStr);
@@ -1326,6 +1330,7 @@ protected:
     bool reqFullQuadsMode;
     TNumericFeatures numericFeatures;
     std::unordered_map<std::string, TBlockStorageClass> blockBackingOverrides;
+    bool allPushConstantAsUniform;
 
     std::unordered_set<int> usedConstantId; // specialization constant ids used
     std::vector<TOffsetRange> usedAtomics;  // sets of bindings used by atomic counters

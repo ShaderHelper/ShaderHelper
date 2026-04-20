@@ -45,8 +45,8 @@ namespace SH
 	{
 		Camera Cam;
 		Cam.Position = Position;
-		Cam.Yaw = FMath::DegreesToRadians(Rotation.X);
-		Cam.Pitch = FMath::DegreesToRadians(Rotation.Y);
+		Cam.Yaw = FMath::DegreesToRadians(Rotation.Y);
+		Cam.Pitch = FMath::DegreesToRadians(Rotation.X);
 		Cam.Roll = FMath::DegreesToRadians(Rotation.Z);
 		Cam.bOrthographic = bOrthographic;
 		Cam.OrthoSize = OrthoSize;
