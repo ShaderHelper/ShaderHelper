@@ -15,6 +15,10 @@ namespace SH
 		X = 1,
 		Y = 2,
 		Z = 3,
+		All = 4, // Uniform scale
+		XY = 5,  // Move on XY plane
+		XZ = 6,  // Move on XZ plane
+		YZ = 7,  // Move on YZ plane
 	};
 
 	class RenderSceneRenderComp : public FW::RenderComponent
@@ -48,6 +52,9 @@ namespace SH
 		float GetGizmoScale(const FW::Vector3f& GizmoPos) const;
 		FMatrix44f GetGizmoOrientationMatrix(SceneObject* Obj) const;
 		FW::Vector3f GetOrientedAxisDir(GizmoAxis Axis, const FMatrix44f& Orientation) const;
+		FW::Vector3f GetPlaneNormal(GizmoAxis PlaneAxis, const FMatrix44f& Orientation) const;
+		void ComputeMouseRay(const FVector2D& LocalPos, const FVector2D& ViewportSize, FW::Vector3f& OutOrigin, FW::Vector3f& OutDir) const;
+		static bool RayPlaneIntersect(const FW::Vector3f& RayOrigin, const FW::Vector3f& RayDir, const FW::Vector3f& PlanePoint, const FW::Vector3f& PlaneNormal, FW::Vector3f& HitPoint);
 		GizmoMode GetCurrentGizmoMode() const;
 		GizmoSpace GetCurrentGizmoSpace() const;
 
@@ -103,5 +110,8 @@ namespace SH
 		FVector2D DragStartMousePos{0, 0};
 		FVector2D DragAxisScreenDir{0, 0};
 		float DragPixelsPerUnit = 1.0f;
+		// Plane drag state
+		FW::Vector3f DragPlaneNormal{0, 1, 0};
+		FW::Vector3f DragPlaneHitStart{0, 0, 0};
 	};
 }

@@ -69,3 +69,41 @@ VsOutput ScaleCubeVS(in uint VertID : SV_VertexID)
 	Output.Color = BaseColor;
 	return Output;
 }
+
+// Scale center cube: single cube at GizmoCenter for uniform scale
+// 36 verts, TriangleList. HighlightAxis == 4 means this cube is hovered/active.
+VsOutput ScaleAllVS(in uint VertID : SV_VertexID)
+{
+	float BoxHalf = GizmoScale * 0.1;
+	int LocalVert = VertID % 36;
+
+	float3 AxisX = TransformAxis(float3(1, 0, 0));
+	float3 AxisY = TransformAxis(float3(0, 1, 0));
+	float3 AxisZ = TransformAxis(float3(0, 0, 1));
+
+	float3 C[8];
+	C[0] = GizmoCenter + (-AxisX - AxisY - AxisZ) * BoxHalf;
+	C[1] = GizmoCenter + ( AxisX - AxisY - AxisZ) * BoxHalf;
+	C[2] = GizmoCenter + ( AxisX + AxisY - AxisZ) * BoxHalf;
+	C[3] = GizmoCenter + (-AxisX + AxisY - AxisZ) * BoxHalf;
+	C[4] = GizmoCenter + (-AxisX - AxisY + AxisZ) * BoxHalf;
+	C[5] = GizmoCenter + ( AxisX - AxisY + AxisZ) * BoxHalf;
+	C[6] = GizmoCenter + ( AxisX + AxisY + AxisZ) * BoxHalf;
+	C[7] = GizmoCenter + (-AxisX + AxisY + AxisZ) * BoxHalf;
+
+	static const int Indices[36] = {
+		0,2,1, 0,3,2,
+		4,5,6, 4,6,7,
+		0,1,5, 0,5,4,
+		2,3,7, 2,7,6,
+		0,4,7, 0,7,3,
+		1,2,6, 1,6,5
+	};
+
+	float4 Color = (HighlightAxis == 4) ? float4(1.0, 1.0, 0.0, 1.0) : float4(0.85, 0.85, 0.85, 1.0);
+
+	VsOutput Output;
+	Output.Position = mul(float4(C[Indices[LocalVert]], 1.0), ViewProjection);
+	Output.Color = Color;
+	return Output;
+}

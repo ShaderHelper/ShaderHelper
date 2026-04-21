@@ -1,4 +1,4 @@
-#include "CommonHeader.h"
+﻿#include "CommonHeader.h"
 #include "SSceneView.h"
 #include "AssetObject/Render/MeshSceneObject.h"
 #include "AssetObject/Render/CameraSceneObject.h"
@@ -10,6 +10,7 @@
 #include "UI/Widgets/AssetBrowser/AssetViewItem/AssetViewItem.h"
 
 #include <Widgets/Input/SComboButton.h>
+#include <Widgets/Text/SInlineEditableTextBlock.h>
 
 using namespace FW;
 
@@ -164,6 +165,14 @@ namespace SH
 
 		FMenuBuilder MenuBuilder(true, nullptr);
 		MenuBuilder.AddMenuEntry(
+			LOCALIZATION("Rename"),
+			FText::GetEmpty(),
+			FSlateIcon(FAppStyle::Get().GetStyleSetName(), "GenericCommands.Rename"),
+			FUIAction(FExecuteAction::CreateLambda([this]() {
+				BeginRenameSelected();
+			}))
+		);
+		MenuBuilder.AddMenuEntry(
 			LOCALIZATION("Delete"),
 			FText::GetEmpty(),
 			FSlateIcon(FAppStyle::Get().GetStyleSetName(), "GenericCommands.Delete"),
@@ -194,9 +203,28 @@ namespace SH
 				.FillWidth(1.0f)
 				.VAlign(VAlign_Center)
 				[
-					SNew(STextBlock)
+					SAssignNew(Item->InlineTextBlock, SInlineEditableTextBlock)
 					.Text_Lambda([Item]() {
 						return Item && Item->Object ? Item->Object->ObjectName : FText::GetEmpty();
+					})
+					.IsSelected_Lambda([this, Item]() -> bool {
+						return Item && SelectedObject.Get() == Item->Object.Get();
+					})
+					.OnTextCommitted_Lambda([this, Item](const FText& NewText, ETextCommit::Type CommitType) {
+						if (CommitType == ETextCommit::OnCleared || !Item || !Item->Object || NewText.IsEmpty())
+						{
+							return;
+						}
+						FText OldName = Item->Object->ObjectName;
+						if (!OldName.EqualTo(NewText))
+						{
+							Item->Object->ObjectName = NewText;
+							Item->Object->GetOuterMost()->MarkDirty();
+							if (auto* Mgr = GetUndoManager())
+							{
+								Mgr->PushCommand(MakeShared<RenameSceneObjectCommand>(this, Item->Object, OldName, NewText));
+							}
+						}
 					})
 				]
 			];
@@ -242,6 +270,23 @@ namespace SH
 		if (auto* Mgr = GetUndoManager())
 		{
 			Mgr->PushCommand(MakeShared<SelectionCommand>(this, OldSelected, SelectedObject.Get()));
+		}
+	}
+
+
+	void SSceneView::BeginRenameSelected()
+	{
+		if (!SelectedObject)
+		{
+			return;
+		}
+		for (const auto& Item : SceneItems)
+		{
+			if (Item->Object.Get() == SelectedObject.Get() && Item->InlineTextBlock)
+			{
+				Item->InlineTextBlock->EnterEditingMode();
+				break;
+			}
 		}
 	}
 

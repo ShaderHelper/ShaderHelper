@@ -78,3 +78,38 @@ VsOutput MoveArrowVS(in uint VertID : SV_VertexID)
 	Output.Color = BaseColor;
 	return Output;
 }
+
+// Move plane quads: 3 planes × 2 triangles × 3 verts = 18 verts
+// PlaneIndex 0=XY, 1=XZ, 2=YZ
+VsOutput MovePlaneVS(in uint VertID : SV_VertexID)
+{
+	int PlaneIndex = VertID / 6;
+	int LocalVert = VertID % 6;
+
+	// Quad corner index from triangle list
+	int Corner;
+	if      (LocalVert == 0) Corner = 0;
+	else if (LocalVert == 1) Corner = 1;
+	else if (LocalVert == 2) Corner = 2;
+	else if (LocalVert == 3) Corner = 0;
+	else if (LocalVert == 4) Corner = 2;
+	else                     Corner = 3;
+
+	float PanelOffset = GizmoScale * 0.2;
+	float PanelSize   = GizmoScale * 0.2;
+
+	float3 AxisA, AxisB;
+	if      (PlaneIndex == 0) { AxisA = GetAxisDir(0); AxisB = GetAxisDir(1); } // XY
+	else if (PlaneIndex == 1) { AxisA = GetAxisDir(0); AxisB = GetAxisDir(2); } // XZ
+	else                      { AxisA = GetAxisDir(1); AxisB = GetAxisDir(2); } // YZ
+
+	float UA = (Corner == 0 || Corner == 3) ? PanelOffset : PanelOffset + PanelSize;
+	float UB = (Corner == 0 || Corner == 1) ? PanelOffset : PanelOffset + PanelSize;
+
+	float3 WorldPos = GizmoCenter + AxisA * UA + AxisB * UB;
+
+	VsOutput Output;
+	Output.Position = mul(float4(WorldPos, 1.0), ViewProjection);
+	Output.Color = GetPlaneColor(PlaneIndex);
+	return Output;
+}

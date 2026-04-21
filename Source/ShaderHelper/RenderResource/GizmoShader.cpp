@@ -37,9 +37,11 @@ namespace SH
 
 		MoveVs = CompileShader(TEXT("GizmoMove.hlsl"), TEXT("MoveVS"), ShaderType::Vertex);
 		MoveArrowVs = CompileShader(TEXT("GizmoMove.hlsl"), TEXT("MoveArrowVS"), ShaderType::Vertex);
+		MovePlaneVs = CompileShader(TEXT("GizmoMove.hlsl"), TEXT("MovePlaneVS"), ShaderType::Vertex);
 		RotateVs = CompileShader(TEXT("GizmoRotate.hlsl"), TEXT("RotateVS"), ShaderType::Vertex);
 		ScaleVs = CompileShader(TEXT("GizmoScale.hlsl"), TEXT("ScaleVS"), ShaderType::Vertex);
 		ScaleCubeVs = CompileShader(TEXT("GizmoScale.hlsl"), TEXT("ScaleCubeVS"), ShaderType::Vertex);
+		ScaleAllVs = CompileShader(TEXT("GizmoScale.hlsl"), TEXT("ScaleAllVS"), ShaderType::Vertex);
 
 		Ps = CompileShader(TEXT("GizmoCommon.hlsl"), TEXT("MainPS"), ShaderType::Pixel);
 	}

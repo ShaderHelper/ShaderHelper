@@ -11,9 +11,11 @@ namespace SH
 
 		FW::GpuShader* GetMoveVS() const { return MoveVs; }
 		FW::GpuShader* GetMoveArrowVS() const { return MoveArrowVs; }
+		FW::GpuShader* GetMovePlaneVS() const { return MovePlaneVs; }
 		FW::GpuShader* GetRotateVS() const { return RotateVs; }
 		FW::GpuShader* GetScaleVS() const { return ScaleVs; }
 		FW::GpuShader* GetScaleCubeVS() const { return ScaleCubeVs; }
+		FW::GpuShader* GetScaleAllVS() const { return ScaleAllVs; }
 		FW::GpuShader* GetPixelShader() const { return Ps; }
 
 		TRefCountPtr<FW::GpuBindGroupLayout> GetBindGroupLayout() const { return BindGroupLayout; }
@@ -25,9 +27,11 @@ namespace SH
 	private:
 		TRefCountPtr<FW::GpuShader> MoveVs;
 		TRefCountPtr<FW::GpuShader> MoveArrowVs;
+		TRefCountPtr<FW::GpuShader> MovePlaneVs;
 		TRefCountPtr<FW::GpuShader> RotateVs;
 		TRefCountPtr<FW::GpuShader> ScaleVs;
 		TRefCountPtr<FW::GpuShader> ScaleCubeVs;
+		TRefCountPtr<FW::GpuShader> ScaleAllVs;
 		TRefCountPtr<FW::GpuShader> Ps;
 		TRefCountPtr<FW::GpuBindGroupLayout> BindGroupLayout;
 		FW::UniformBufferBuilder UbBuilder{FW::UniformBufferUsage::Temp};

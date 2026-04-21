@@ -80,35 +80,67 @@ namespace SH
 					DragStartObjectScale = SelObj->Scale;
 					DragStartMousePos = LocalPos;
 
-					FMatrix44f OrientMat = GetGizmoOrientationMatrix(SelObj);
-					Vector3f AxisDir = GetOrientedAxisDir(DraggingAxis, OrientMat);
-					DragLocalAxisDir = AxisDir;
-
-					// Compute screen-space axis direction and pixels-per-unit
-					FVector2D CenterScreen = WorldToScreen(SelObj->Position, VpSize);
-					float GizScale = GetGizmoScale(SelObj->Position);
-					FVector2D EndScreen = WorldToScreen(SelObj->Position + AxisDir * GizScale, VpSize);
-					FVector2D ScreenDelta = EndScreen - CenterScreen;
-					DragPixelsPerUnit = (float)FMath::Sqrt(ScreenDelta.X * ScreenDelta.X + ScreenDelta.Y * ScreenDelta.Y);
-					if (DragPixelsPerUnit > 0.001f)
+					if (DraggingAxis == GizmoAxis::All)
 					{
-						DragAxisScreenDir = ScreenDelta * (1.0f / DragPixelsPerUnit);
-						DragPixelsPerUnit /= GizScale;
+						// Uniform scale: use camera-right as drag reference direction
+						float GizScale = GetGizmoScale(SelObj->Position);
+						FMatrix44f CamRotMat = PreviewCamera.GetWorldRotationMatrix();
+						Vector3f CamRight(CamRotMat.M[0][0], CamRotMat.M[0][1], CamRotMat.M[0][2]);
+						FVector2D CenterScreen = WorldToScreen(SelObj->Position, VpSize);
+						FVector2D EndScreen = WorldToScreen(SelObj->Position + CamRight * GizScale, VpSize);
+						FVector2D ScreenDelta = EndScreen - CenterScreen;
+						float Len = (float)FMath::Sqrt(ScreenDelta.X * ScreenDelta.X + ScreenDelta.Y * ScreenDelta.Y);
+						DragLocalAxisDir = Vector3f(0, 0, 0);
+						DragPixelsPerUnit = (Len > 0.001f) ? (Len / GizScale) : 100.0f;
+						DragAxisScreenDir = (Len > 0.001f) ? ScreenDelta * (1.0f / Len) : FVector2D(1, 0);
+					}
+					else if (DraggingAxis == GizmoAxis::XY || DraggingAxis == GizmoAxis::XZ || DraggingAxis == GizmoAxis::YZ)
+					{
+						// Plane drag: ray-cast to world plane to get start hit point
+						FMatrix44f OrientMat = GetGizmoOrientationMatrix(SelObj);
+						DragPlaneNormal = GetPlaneNormal(DraggingAxis, OrientMat);
+						Vector3f RayOrigin, RayDir;
+						ComputeMouseRay(LocalPos, VpSize, RayOrigin, RayDir);
+						Vector3f HitPt;
+						if (RayPlaneIntersect(RayOrigin, RayDir, SelObj->Position, DragPlaneNormal, HitPt))
+							DragPlaneHitStart = HitPt;
+						else
+							DragPlaneHitStart = SelObj->Position;
+						// DragPixelsPerUnit doesn't matter for plane drag; set sentinel
+						DragPixelsPerUnit = 1.0f;
+					}
+					else
+					{
+						FMatrix44f OrientMat = GetGizmoOrientationMatrix(SelObj);
+						Vector3f AxisDir = GetOrientedAxisDir(DraggingAxis, OrientMat);
+						DragLocalAxisDir = AxisDir;
 
-						if (GetCurrentGizmoMode() == GizmoMode::Rotate)
+						// Compute screen-space axis direction and pixels-per-unit
+						FVector2D CenterScreen = WorldToScreen(SelObj->Position, VpSize);
+						float GizScale = GetGizmoScale(SelObj->Position);
+						FVector2D EndScreen = WorldToScreen(SelObj->Position + AxisDir * GizScale, VpSize);
+						FVector2D ScreenDelta = EndScreen - CenterScreen;
+						DragPixelsPerUnit = (float)FMath::Sqrt(ScreenDelta.X * ScreenDelta.X + ScreenDelta.Y * ScreenDelta.Y);
+						if (DragPixelsPerUnit > 0.001f)
 						{
-							// Screen-space tangent: perpendicular to radial direction from center to grab point
-							FVector2D RadialDir = LocalPos - CenterScreen;
-							float RadialLen = (float)FMath::Sqrt(RadialDir.X * RadialDir.X + RadialDir.Y * RadialDir.Y);
-							if (RadialLen > 0.001f)
+							DragAxisScreenDir = ScreenDelta * (1.0f / DragPixelsPerUnit);
+							DragPixelsPerUnit /= GizScale;
+
+							if (GetCurrentGizmoMode() == GizmoMode::Rotate)
 							{
-								DragAxisScreenDir = FVector2D(-RadialDir.Y, RadialDir.X) * (1.0f / RadialLen);
-								// Flip when viewing from the back side of the rotation plane
-								Vector3f ViewDir = SelObj->Position - PreviewCamera.Position;
-								float AxisDot = ViewDir.X * AxisDir.X + ViewDir.Y * AxisDir.Y + ViewDir.Z * AxisDir.Z;
-								if (AxisDot > 0)
+								// Screen-space tangent: perpendicular to radial direction from center to grab point
+								FVector2D RadialDir = LocalPos - CenterScreen;
+								float RadialLen = (float)FMath::Sqrt(RadialDir.X * RadialDir.X + RadialDir.Y * RadialDir.Y);
+								if (RadialLen > 0.001f)
 								{
-									DragAxisScreenDir = DragAxisScreenDir * -1.0f;
+									DragAxisScreenDir = FVector2D(-RadialDir.Y, RadialDir.X) * (1.0f / RadialLen);
+									// Flip when viewing from the back side of the rotation plane
+									Vector3f ViewDir = SelObj->Position - PreviewCamera.Position;
+									float AxisDot = ViewDir.X * AxisDir.X + ViewDir.Y * AxisDir.Y + ViewDir.Z * AxisDir.Z;
+									if (AxisDot > 0)
+									{
+										DragAxisScreenDir = DragAxisScreenDir * -1.0f;
+									}
 								}
 							}
 						}
@@ -216,6 +248,31 @@ namespace SH
 			SceneObject* SelObj = GetSelectedSceneObject();
 			if (SelObj && DragPixelsPerUnit > 0.001f)
 			{
+				// Plane drag: use ray-plane intersection directly (bypasses screen-space projection)
+				if (DraggingAxis == GizmoAxis::XY || DraggingAxis == GizmoAxis::XZ || DraggingAxis == GizmoAxis::YZ)
+				{
+					Vector3f RayOrigin, RayDir;
+					ComputeMouseRay(LocalPos, VpSize, RayOrigin, RayDir);
+					Vector3f HitPt;
+					if (RayPlaneIntersect(RayOrigin, RayDir, SelObj->Position, DragPlaneNormal, HitPt))
+					{
+						Vector3f PlaneDelta = HitPt - DragPlaneHitStart;
+						// Project PlaneDelta onto allowed axes
+						FMatrix44f OrientMat = GetGizmoOrientationMatrix(SelObj);
+						GizmoAxis A, B;
+						if      (DraggingAxis == GizmoAxis::XY) { A = GizmoAxis::X; B = GizmoAxis::Y; }
+						else if (DraggingAxis == GizmoAxis::XZ) { A = GizmoAxis::X; B = GizmoAxis::Z; }
+						else                                    { A = GizmoAxis::Y; B = GizmoAxis::Z; }
+						Vector3f DirA = GetOrientedAxisDir(A, OrientMat);
+						Vector3f DirB = GetOrientedAxisDir(B, OrientMat);
+						float dA = PlaneDelta.X * DirA.X + PlaneDelta.Y * DirA.Y + PlaneDelta.Z * DirA.Z;
+						float dB = PlaneDelta.X * DirB.X + PlaneDelta.Y * DirB.Y + PlaneDelta.Z * DirB.Z;
+						SelObj->Position = DragStartObjectPos + DirA * dA + DirB * dB;
+						SelObj->GetOuterMost()->MarkDirty();
+					}
+					return FReply::Handled();
+				}
+
 				FVector2D MouseDelta = LocalPos - DragStartMousePos;
 				double Projected = MouseDelta.X * DragAxisScreenDir.X + MouseDelta.Y * DragAxisScreenDir.Y;
 				float WorldDelta = (float)(Projected / DragPixelsPerUnit);
@@ -253,7 +310,8 @@ namespace SH
 					float ScaleFactor = 1.0f + WorldDelta;
 					ScaleFactor = FMath::Max(ScaleFactor, 0.01f);
 					Vector3f NewScale = DragStartObjectScale;
-					if (DraggingAxis == GizmoAxis::X) NewScale.X *= ScaleFactor;
+					if (DraggingAxis == GizmoAxis::All) NewScale = DragStartObjectScale * ScaleFactor;
+					else if (DraggingAxis == GizmoAxis::X) NewScale.X *= ScaleFactor;
 					else if (DraggingAxis == GizmoAxis::Y) NewScale.Y *= ScaleFactor;
 					else NewScale.Z *= ScaleFactor;
 					SelObj->Scale = NewScale;
@@ -560,6 +618,18 @@ namespace SH
 		GizmoMode Mode = GetCurrentGizmoMode();
 		float AxisLen = GizScale;
 
+		// In Scale mode: check center cube first
+		if (Mode == GizmoMode::Scale)
+		{
+			const float CenterHitRadiusSq = 12.0f * 12.0f;
+			FVector2D Diff = LocalMousePos - CenterScreen;
+			float DistSq = (float)(Diff.X * Diff.X + Diff.Y * Diff.Y);
+			if (DistSq < CenterHitRadiusSq)
+			{
+				return GizmoAxis::All;
+			}
+		}
+
 		for (int i = 0; i < 3; i++)
 		{
 			Vector3f AxisDir = GetOrientedAxisDir(AxisEnums[i], OrientMat);
@@ -623,6 +693,47 @@ namespace SH
 			}
 		}
 
+		// In Move mode: check plane quads
+		if (Mode == GizmoMode::Move && BestAxis == GizmoAxis::None)
+		{
+			float PanelOffset = GizScale * 0.2f;
+			float PanelSize   = GizScale * 0.2f;
+			// PlaneIndex 0=XY, 1=XZ, 2=YZ
+			GizmoAxis PlaneAxes[3] = { GizmoAxis::XY, GizmoAxis::XZ, GizmoAxis::YZ };
+			// axis pairs: (A, B) for each plane
+			GizmoAxis PairA[3] = { GizmoAxis::X, GizmoAxis::X, GizmoAxis::Y };
+			GizmoAxis PairB[3] = { GizmoAxis::Y, GizmoAxis::Z, GizmoAxis::Z };
+			for (int p = 0; p < 3; p++)
+			{
+				Vector3f AxisA = GetOrientedAxisDir(PairA[p], OrientMat);
+				Vector3f AxisB = GetOrientedAxisDir(PairB[p], OrientMat);
+				// 4 corners of the quad
+				Vector3f C0 = Center + AxisA * PanelOffset           + AxisB * PanelOffset;
+				Vector3f C1 = Center + AxisA * (PanelOffset + PanelSize) + AxisB * PanelOffset;
+				Vector3f C2 = Center + AxisA * (PanelOffset + PanelSize) + AxisB * (PanelOffset + PanelSize);
+				Vector3f C3 = Center + AxisA * PanelOffset           + AxisB * (PanelOffset + PanelSize);
+				FVector2D S0 = WorldToScreen(C0, ViewportSize);
+				FVector2D S1 = WorldToScreen(C1, ViewportSize);
+				FVector2D S2 = WorldToScreen(C2, ViewportSize);
+				FVector2D S3 = WorldToScreen(C3, ViewportSize);
+				// Point-in-quad: check both triangles
+				auto PointInTri = [](FVector2D P, FVector2D A, FVector2D B, FVector2D C) -> bool {
+					auto Sign = [](FVector2D P, FVector2D A, FVector2D B) {
+						return (P.X - B.X) * (A.Y - B.Y) - (A.X - B.X) * (P.Y - B.Y);
+					};
+					double d1 = Sign(P, A, B), d2 = Sign(P, B, C), d3 = Sign(P, C, A);
+					bool HasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+					bool HasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+					return !(HasNeg && HasPos);
+				};
+				if (PointInTri(LocalMousePos, S0, S1, S2) || PointInTri(LocalMousePos, S0, S2, S3))
+				{
+					BestAxis = PlaneAxes[p];
+					break;
+				}
+			}
+		}
+
 		return BestAxis;
 	}
 
@@ -647,6 +758,41 @@ namespace SH
 
 		// Extract column from orientation matrix (row-major: row i, col ColIdx)
 		return Vector3f(Orientation.M[ColIdx][0], Orientation.M[ColIdx][1], Orientation.M[ColIdx][2]);
+	}
+
+	Vector3f RenderSceneRenderComp::GetPlaneNormal(GizmoAxis PlaneAxis, const FMatrix44f& Orientation) const
+	{
+		// Normal of the plane is the axis perpendicular to the two plane axes
+		if (PlaneAxis == GizmoAxis::XY) return GetOrientedAxisDir(GizmoAxis::Z, Orientation);
+		if (PlaneAxis == GizmoAxis::XZ) return GetOrientedAxisDir(GizmoAxis::Y, Orientation);
+		/* YZ */                        return GetOrientedAxisDir(GizmoAxis::X, Orientation);
+	}
+
+	void RenderSceneRenderComp::ComputeMouseRay(const FVector2D& LocalPos, const FVector2D& ViewportSize, Vector3f& OutOrigin, Vector3f& OutDir) const
+	{
+		float NdcX = (float)LocalPos.X / (float)ViewportSize.X * 2.0f - 1.0f;
+		float NdcY = 1.0f - (float)LocalPos.Y / (float)ViewportSize.Y * 2.0f;
+		FMatrix44f InvVP = PreviewCamera.GetViewProjectionMatrix().Inverse();
+		FVector4f Near = InvVP.TransformFVector4(FVector4f(NdcX, NdcY, 0.0f, 1.0f));
+		FVector4f Far  = InvVP.TransformFVector4(FVector4f(NdcX, NdcY, 1.0f, 1.0f));
+		Near = Near * (1.0f / Near.W);
+		Far  = Far  * (1.0f / Far.W);
+		OutOrigin = Vector3f(Near.X, Near.Y, Near.Z);
+		Vector3f RayDir(Far.X - Near.X, Far.Y - Near.Y, Far.Z - Near.Z);
+		float Len = FMath::Sqrt(RayDir.X * RayDir.X + RayDir.Y * RayDir.Y + RayDir.Z * RayDir.Z);
+		OutDir = (Len > SMALL_NUMBER) ? RayDir * (1.0f / Len) : Vector3f(0, 0, 1);
+	}
+
+	bool RenderSceneRenderComp::RayPlaneIntersect(const Vector3f& RayOrigin, const Vector3f& RayDir,
+		const Vector3f& PlanePoint, const Vector3f& PlaneNormal, Vector3f& HitPoint)
+	{
+		float Denom = PlaneNormal.X * RayDir.X + PlaneNormal.Y * RayDir.Y + PlaneNormal.Z * RayDir.Z;
+		if (FMath::Abs(Denom) < 0.0001f) return false;
+		Vector3f Diff(PlanePoint.X - RayOrigin.X, PlanePoint.Y - RayOrigin.Y, PlanePoint.Z - RayOrigin.Z);
+		float T = (PlaneNormal.X * Diff.X + PlaneNormal.Y * Diff.Y + PlaneNormal.Z * Diff.Z) / Denom;
+		if (T < 0.0f) return false;
+		HitPoint = RayOrigin + RayDir * T;
+		return true;
 	}
 
 	GizmoMode RenderSceneRenderComp::GetCurrentGizmoMode() const
@@ -674,22 +820,8 @@ namespace SH
 		}
 
 		// Compute ray from camera through pixel
-		float NdcX = (float)LocalPos.X / (float)ViewportSize.X * 2.0f - 1.0f;
-		float NdcY = 1.0f - (float)LocalPos.Y / (float)ViewportSize.Y * 2.0f;
-
-		FMatrix44f InvVP = PreviewCamera.GetViewProjectionMatrix().Inverse();
-		FVector4f NearClip = InvVP.TransformFVector4(FVector4f(NdcX, NdcY, 0.0f, 1.0f));
-		FVector4f FarClip = InvVP.TransformFVector4(FVector4f(NdcX, NdcY, 1.0f, 1.0f));
-		NearClip = NearClip * (1.0f / NearClip.W);
-		FarClip = FarClip * (1.0f / FarClip.W);
-
-		Vector3f RayOrigin(NearClip.X, NearClip.Y, NearClip.Z);
-		Vector3f RayDir(FarClip.X - NearClip.X, FarClip.Y - NearClip.Y, FarClip.Z - NearClip.Z);
-		float RayLen = FMath::Sqrt(RayDir.X * RayDir.X + RayDir.Y * RayDir.Y + RayDir.Z * RayDir.Z);
-		if (RayLen > SMALL_NUMBER)
-		{
-			RayDir = RayDir * (1.0f / RayLen);
-		}
+		Vector3f RayOrigin, RayDir;
+		ComputeMouseRay(LocalPos, ViewportSize, RayOrigin, RayDir);
 
 		SceneObject* ClosestObj = nullptr;
 		float ClosestT = FLT_MAX;

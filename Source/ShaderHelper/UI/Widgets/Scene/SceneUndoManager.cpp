@@ -124,7 +124,7 @@ namespace SH
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		ShEditor->ForceRender();
 	}
-	
+
 	void RemoveSceneObjectCommand::Do()
 	{
 		if (SceneView->GetSelectedObject() == Object.Get())
@@ -146,5 +146,19 @@ namespace SH
 
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		ShEditor->ForceRender();
+	}
+
+	void RenameSceneObjectCommand::Do()
+	{
+		Object->ObjectName = NewName;
+		Object->GetOuterMost()->MarkDirty();
+		SceneView->RefreshSceneItems();
+	}
+
+	void RenameSceneObjectCommand::Undo()
+	{
+		Object->ObjectName = OldName;
+		Object->GetOuterMost()->MarkDirty();
+		SceneView->RefreshSceneItems();
 	}
 }

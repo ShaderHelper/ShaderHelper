@@ -190,4 +190,23 @@ namespace SH
 		FW::ObjectPtr<SceneObject> Object;
 		int32 Index;
 	};
+
+	class RenameSceneObjectCommand : public SceneCommand
+	{
+	public:
+		RenameSceneObjectCommand(SSceneView* InSceneView, FW::ObjectPtr<SceneObject> InObject, const FText& InOldName, const FText& InNewName)
+			: SceneCommand(InSceneView)
+			, Object(MoveTemp(InObject))
+			, OldName(InOldName)
+			, NewName(InNewName)
+		{}
+
+		void Do() override;
+		void Undo() override;
+
+	private:
+		FW::ObjectPtr<SceneObject> Object;
+		FText OldName;
+		FText NewName;
+	};
 }

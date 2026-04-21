@@ -34,6 +34,16 @@ float4 GetAxisColor(int AxisIndex)
 	return float4(0.3, 0.3, 0.9, 1.0);
 }
 
+// PlaneIndex: 0=XY(HighlightAxis=5), 1=XZ(HighlightAxis=6), 2=YZ(HighlightAxis=7)
+float4 GetPlaneColor(int PlaneIndex)
+{
+	if (HighlightAxis == PlaneIndex + 5)
+		return float4(1.0, 1.0, 0.0, 0.6);
+	if (PlaneIndex == 0) return float4(0.3, 0.3, 0.9, 0.4); // XY: blue
+	if (PlaneIndex == 1) return float4(0.2, 0.9, 0.2, 0.4); // XZ: green
+	return float4(0.9, 0.2, 0.2, 0.4); // YZ: red
+}
+
 // Expand a line segment (P0, P1) into a screen-space quad.
 // QuadVert: 0-5 for the 6 vertices of 2 triangles forming a quad.
 // LineHalfWidth: half-width in pixels.

@@ -396,6 +396,31 @@ namespace SH
 					}
 				);
 			}
+
+			// Move plane quads: 3 planes × 2 tris × 3 verts = 18 verts (alpha blended)
+			{
+				GpuRenderPassDesc PassDesc;
+				PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{OutputView, RenderTargetLoadAction::Load, RenderTargetStoreAction::Store});
+
+				GpuRenderPipelineStateDesc PipelineDesc{
+					.Vs = Shader->GetMovePlaneVS(),
+					.Ps = Shader->GetPixelShader(),
+					.Targets = {{.TargetFormat = TargetFormat, .BlendEnable = true}},
+					.RasterizerState = {RasterizerFillMode::Solid, RasterizerCullMode::None},
+					.Primitive = PrimitiveType::TriangleList,
+					.SampleCount = SampleCount,
+				};
+				Bindings.ApplyBindGroupLayout(PipelineDesc);
+				TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
+
+				Graph.AddRenderPass("GizmoMovePlanes", MoveTemp(PassDesc), Bindings,
+					[Pipeline](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
+						Bindings.ApplyBindGroup(PassRecorder);
+						PassRecorder->SetRenderPipelineState(Pipeline);
+						PassRecorder->DrawPrimitive(0, 18, 0, 1);
+					}
+				);
+			}
 		}
 		else if (Mode == GizmoMode::Rotate)
 		{
@@ -470,6 +495,31 @@ namespace SH
 						Bindings.ApplyBindGroup(PassRecorder);
 						PassRecorder->SetRenderPipelineState(Pipeline);
 						PassRecorder->DrawPrimitive(0, 108, 0, 1);
+					}
+				);
+			}
+
+			// Scale center cube: uniform scale handle, 36 verts
+			{
+				GpuRenderPassDesc PassDesc;
+				PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{OutputView, RenderTargetLoadAction::Load, RenderTargetStoreAction::Store});
+
+				GpuRenderPipelineStateDesc PipelineDesc{
+					.Vs = Shader->GetScaleAllVS(),
+					.Ps = Shader->GetPixelShader(),
+					.Targets = {{.TargetFormat = TargetFormat}},
+					.RasterizerState = {RasterizerFillMode::Solid, RasterizerCullMode::None},
+					.Primitive = PrimitiveType::TriangleList,
+					.SampleCount = SampleCount,
+				};
+				Bindings.ApplyBindGroupLayout(PipelineDesc);
+				TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
+
+				Graph.AddRenderPass("GizmoScaleCenter", MoveTemp(PassDesc), Bindings,
+					[Pipeline](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
+						Bindings.ApplyBindGroup(PassRecorder);
+						PassRecorder->SetRenderPipelineState(Pipeline);
+						PassRecorder->DrawPrimitive(0, 36, 0, 1);
 					}
 				);
 			}
