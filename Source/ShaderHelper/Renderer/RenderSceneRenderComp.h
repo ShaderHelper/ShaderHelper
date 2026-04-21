@@ -2,10 +2,13 @@
 #include "RenderRenderComp.h"
 #include "ScenePreviewRenderer.h"
 #include "RenderResource/Camera.h"
-#include "UI/Widgets/Scene/SSceneView.h"
 
 namespace SH
 {
+	class SceneObject;
+	enum class GizmoMode : int32;
+	enum class GizmoSpace : int32;
+
 	enum class GizmoAxis : int32
 	{
 		None = 0,

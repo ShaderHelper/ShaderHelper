@@ -33,9 +33,11 @@ namespace FW
     {
         auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
         auto ValueWidget = SNew(SSpinBox<float>)
+            .OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
             .OnValueChanged_Lambda([this](float NewValue) {
                 if(ValueRef != NewValue && Owner->CanChangeProperty(this))
                 {
+                    BeginEdit();
                     ValueRef = NewValue;
                     Owner->PostPropertyChanged(this);
                 }
@@ -51,9 +53,11 @@ namespace FW
 	{
 		auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
 		auto ValueWidget = SNew(SSpinBox<int32>)
+			.OnValueCommitted_Lambda([this](int32, ETextCommit::Type) { EndEdit(); })
 			.OnValueChanged_Lambda([this](int32 NewValue) {
 				if (ValueRef != NewValue && Owner->CanChangeProperty(this))
 				{
+					BeginEdit();
 					ValueRef = NewValue;
 					Owner->PostPropertyChanged(this);
 				}
@@ -72,10 +76,12 @@ namespace FW
             + SHorizontalBox::Slot()
             [
                 SNew(SSpinBox<float>)
+                .OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
                 .OnValueChanged_Lambda([this](float NewValue) {
                     Vector2f& Value = ValueRef;
                     if(Value.x != NewValue && Owner->CanChangeProperty(this))
                     {
+                        BeginEdit();
                         ValueRef = {NewValue, Value.y};
                         Owner->PostPropertyChanged(this);
                     }
@@ -85,10 +91,12 @@ namespace FW
             + SHorizontalBox::Slot()
             [
                 SNew(SSpinBox<float>)
+                .OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
                 .OnValueChanged_Lambda([this](float NewValue) {
                     Vector2f& Value = ValueRef;
                     if(Value.y != NewValue && Owner->CanChangeProperty(this))
                     {
+                        BeginEdit();
                         ValueRef = {Value.x, NewValue};
                         Owner->PostPropertyChanged(this);
                     }
@@ -108,10 +116,12 @@ namespace FW
 			+ SHorizontalBox::Slot()
 			[
 				SNew(SSpinBox<float>)
+				.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
 				.OnValueChanged_Lambda([this](float NewValue) {
 					Vector3f& Value = ValueRef;
 					if(Value.x != NewValue && Owner->CanChangeProperty(this))
 					{
+						BeginEdit();
 						ValueRef = {NewValue, Value.y, Value.z};
 						Owner->PostPropertyChanged(this);
 					}
@@ -121,10 +131,12 @@ namespace FW
 			+ SHorizontalBox::Slot()
 			[
 				SNew(SSpinBox<float>)
+				.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
 				.OnValueChanged_Lambda([this](float NewValue) {
 					Vector3f& Value = ValueRef;
 					if(Value.y != NewValue && Owner->CanChangeProperty(this))
 					{
+						BeginEdit();
 						ValueRef = {Value.x, NewValue, Value.z};
 						Owner->PostPropertyChanged(this);
 					}
@@ -134,10 +146,12 @@ namespace FW
 			+ SHorizontalBox::Slot()
 			[
 				SNew(SSpinBox<float>)
+				.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
 				.OnValueChanged_Lambda([this](float NewValue) {
 					Vector3f& Value = ValueRef;
 					if(Value.z != NewValue && Owner->CanChangeProperty(this))
 					{
+						BeginEdit();
 						ValueRef = {Value.x, Value.y, NewValue};
 						Owner->PostPropertyChanged(this);
 					}
@@ -160,10 +174,12 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<float>)
+							.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
 							.OnValueChanged_Lambda([this](float NewValue) {
 							Vector4f& Value = ValueRef;
 							if (Value.x != NewValue && Owner->CanChangeProperty(this))
 							{
+								BeginEdit();
 								ValueRef = { NewValue, Value.y, Value.z, Value.w };
 								Owner->PostPropertyChanged(this);
 							}
@@ -173,10 +189,12 @@ namespace FW
 					+ SHorizontalBox::Slot()
 					[
 						SNew(SSpinBox<float>)
+							.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
 							.OnValueChanged_Lambda([this](float NewValue) {
 							Vector4f& Value = ValueRef;
 							if (Value.y != NewValue && Owner->CanChangeProperty(this))
 							{
+								BeginEdit();
 								ValueRef = { Value.x, NewValue, Value.z, Value.w };
 								Owner->PostPropertyChanged(this);
 							}
@@ -190,10 +208,12 @@ namespace FW
 				+SHorizontalBox::Slot()
 				[
 					SNew(SSpinBox<float>)
+						.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
 						.OnValueChanged_Lambda([this](float NewValue) {
 						Vector4f& Value = ValueRef;
 						if (Value.z != NewValue && Owner->CanChangeProperty(this))
 						{
+							BeginEdit();
 							ValueRef = { Value.x, Value.y, NewValue, Value.w };
 							Owner->PostPropertyChanged(this);
 						}
@@ -203,10 +223,12 @@ namespace FW
 				+ SHorizontalBox::Slot()
 				[
 					SNew(SSpinBox<float>)
+						.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
 						.OnValueChanged_Lambda([this](float NewValue) {
 						Vector4f& Value = ValueRef;
 						if (Value.w != NewValue && Owner->CanChangeProperty(this))
 						{
+							BeginEdit();
 							ValueRef = { Value.x, Value.y, Value.z, NewValue };
 							Owner->PostPropertyChanged(this);
 						}

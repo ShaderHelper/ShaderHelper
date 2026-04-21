@@ -198,6 +198,11 @@ namespace FW
 			}
 		}
 
+		ApplyRenderTargetState(InCmdList);
+	}
+
+	void Dx12StateCache::ApplyRenderTargetState(ID3D12GraphicsCommandList* InCmdList)
+	{
 		if (IsRenderTargetDirty)
 		{
 			const uint32 RenderTargetNum = CurrentRenderTargetViews.Num();
@@ -233,6 +238,15 @@ namespace FW
 					CurrentDSVView ? &CurrentDSVView->GetDSV()->GetHandle() : nullptr);
 
 				if (CurrentDSVView && DSVLoadAction == RenderTargetLoadAction::Clear)
+				{
+					InCmdList->ClearDepthStencilView(CurrentDSVView->GetDSV()->GetHandle(), D3D12_CLEAR_FLAG_DEPTH, DSVClearDepth, 0, 0, nullptr);
+				}
+			}
+			else if (CurrentDSVView)
+			{
+				InCmdList->OMSetRenderTargets(0, nullptr, false, &CurrentDSVView->GetDSV()->GetHandle());
+
+				if (DSVLoadAction == RenderTargetLoadAction::Clear)
 				{
 					InCmdList->ClearDepthStencilView(CurrentDSVView->GetDSV()->GetHandle(), D3D12_CLEAR_FLAG_DEPTH, DSVClearDepth, 0, 0, nullptr);
 				}
@@ -611,6 +625,8 @@ namespace FW
 
 	void Dx12CmdRecorder::EndRenderPass(GpuRenderPassRecorder* InRenderPassRecorder)
 	{
+		StateCache.ApplyRenderTargetState(CmdList);
+
 		if (CurrentRenderPassDesc)
 		{
 			for (const GpuRenderTargetInfo& RenderTargetInfo : CurrentRenderPassDesc->ColorRenderTargets)

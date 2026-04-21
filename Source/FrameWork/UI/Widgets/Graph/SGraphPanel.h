@@ -160,6 +160,10 @@ namespace FW
 		}
 
 		void SetFocus() { FSlateApplication::Get().SetKeyboardFocus(AsShared(), EFocusCause::SetDirectly); }
+		bool CanUndo() const { return !UndoStack.IsEmpty(); }
+		bool CanRedo() const { return !RedoStack.IsEmpty(); }
+		void Undo();
+		void Redo();
 		void AddNode(ObjectPtr<GraphNode> NewNodeData, const Vector2D& Pos);
 		
 		void Clear();

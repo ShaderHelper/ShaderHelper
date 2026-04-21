@@ -3,6 +3,9 @@
 #include "Common/Util/Math.h"
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
+#include "UI/Widgets/Scene/SSceneView.h"
+
+#include <Serialization/MemoryWriter.h>
 
 using namespace FW;
 
@@ -26,6 +29,25 @@ namespace SH
 		Ar << Position.X << Position.Y << Position.Z;
 		Ar << Rotation.X << Rotation.Y << Rotation.Z;
 		Ar << Scale.X << Scale.Y << Scale.Z;
+	}
+
+	void SceneObject::PostPropertyEdit(PropertyData* InProperty, TArray<uint8>&& OldData)
+	{
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		SSceneView* SceneViewWidget = ShEditor->GetSceneView();
+		
+		TArray<uint8> NewData;
+		FMemoryWriter Ar(NewData);
+		Serialize(Ar);
+		if (OldData == NewData)
+		{
+			return;
+		}
+
+		if (auto* Mgr = SceneViewWidget->GetUndoManager())
+		{
+			Mgr->PushCommand(MakeShared<PropertyChangeCommand>(SceneViewWidget, this, MoveTemp(OldData), MoveTemp(NewData)));
+		}
 	}
 
 	FMatrix44f SceneObject::GetWorldMatrix() const

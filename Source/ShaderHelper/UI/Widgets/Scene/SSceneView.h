@@ -1,6 +1,7 @@
 #pragma once
 #include "AssetObject/Render/SceneObject.h"
 #include "AssetObject/Render/Render.h"
+#include "SceneUndoManager.h"
 
 namespace SH
 {
@@ -33,6 +34,10 @@ namespace SH
 
 	class SSceneView : public SCompoundWidget
 	{
+		friend class SelectionCommand;
+		friend class AddSceneObjectCommand;
+		friend class RemoveSceneObjectCommand;
+
 	public:
 		SLATE_BEGIN_ARGS(SSceneView) {}
 		SLATE_END_ARGS()
@@ -43,12 +48,19 @@ namespace SH
 		SceneObject* GetSelectedObject() const { return SelectedObject.Get(); }
 		void SelectObject(SceneObject* InObject);
 
+		SceneUndoManager* GetUndoManager();
+		void Undo();
+		void Redo();
+		bool CanUndo() const;
+		bool CanRedo() const;
+
 		void OnDragEnter(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent) override;
 		void OnDragLeave(const FDragDropEvent& DragDropEvent) override;
 		FReply OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent) override;
 
 	private:
 		void RefreshSceneItems();
+		void SelectObjectInternal(SceneObject* InObject);
 		TSharedRef<ITableRow> GenerateRowForItem(SceneObjectListItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
 		TSharedRef<SWidget> MakeAddMenu();
 		TSharedPtr<SWidget> CreateContextMenu();
@@ -60,5 +72,8 @@ namespace SH
 		TArray<SceneObjectListItemPtr> SceneItems;
 		TSharedPtr<SListView<SceneObjectListItemPtr>> ListView;
 		SceneObjectPtr SelectedObject;
+
+		TMap<Render*, TUniquePtr<SceneUndoManager>> UndoManagers;
+		bool bIgnoreSelectionChanged = false;
 	};
 }

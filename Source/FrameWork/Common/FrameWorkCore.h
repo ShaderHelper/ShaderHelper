@@ -58,6 +58,9 @@ namespace FW
         virtual TArray<TSharedRef<PropertyData>> GeneratePropertyDatas();
 		virtual bool CanChangeProperty(PropertyData* InProperty) { return true; };
         virtual void PostPropertyChanged(PropertyData* InProperty);
+        // Called once per completed property edit (slider drag, typed commit, checkbox toggle, etc.).
+        // OldData is the serialized state of this object captured just before the edit began.
+        virtual void PostPropertyEdit(PropertyData* InProperty, TArray<uint8>&& OldData) {}
     
         int32 GetRefCount() const
         {

@@ -139,9 +139,11 @@ namespace FW
                         auto& AssetRef = *(AssetPtr<AssetObject>*)AssetPtrRef;
                         if (AssetRef && OuterObject->CanChangeProperty(Owner))
                         {
+                            Owner->BeginEdit();
                             AssetRef = nullptr;
                             Display->SetContent(SNullWidget::NullWidget);
                             OnAssetChanged.ExecuteIfBound();
+                            Owner->EndEdit();
                         }
                         return FReply::Handled();
                     })
@@ -196,9 +198,11 @@ namespace FW
 						auto& AssetRef = *(AssetPtr<AssetObject>*)AssetPtrRef;
 						if (AssetRef != Asset && OuterObject->CanChangeProperty(Owner))
 						{
+                            Owner->BeginEdit();
 							AssetRef = Asset;
 							RefreshAssetView();
 							OnAssetChanged.ExecuteIfBound();
+                            Owner->EndEdit();
 						}
 
 					}

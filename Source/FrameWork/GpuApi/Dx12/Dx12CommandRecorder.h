@@ -23,6 +23,7 @@ namespace FW
 		Dx12StateCache();
 
 		void ApplyDrawState(ID3D12GraphicsCommandList* InCmdList);
+		void ApplyRenderTargetState(ID3D12GraphicsCommandList* InCmdList);
 		void ApplyComputeState(ID3D12GraphicsCommandList* InCmdList);
 		void Clear();
 

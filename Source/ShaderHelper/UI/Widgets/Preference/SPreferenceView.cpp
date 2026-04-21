@@ -164,11 +164,13 @@ namespace SH
 	{
 		KeyDatas.Reset();
 		TArray<TSharedPtr<FUICommandInfo>> Commands;
-		TArray<TSharedPtr<FUICommandInfo>> DebuggerViewCommands, GraphEditorCommandInfos, CodeEditorCommandInfos, AssetViewCommands;
+		TArray<TSharedPtr<FUICommandInfo>> EditorCommandInfos, DebuggerViewCommands, GraphEditorCommandInfos, CodeEditorCommandInfos, AssetViewCommands;
+		FInputBindingManager::Get().GetCommandInfosFromContext("EditorCommands", EditorCommandInfos);
 		FInputBindingManager::Get().GetCommandInfosFromContext("DebuggerViewCommands", DebuggerViewCommands);
 		FInputBindingManager::Get().GetCommandInfosFromContext("AssetViewCommands", AssetViewCommands);
 		FInputBindingManager::Get().GetCommandInfosFromContext("GraphEditorCommands", GraphEditorCommandInfos);
 		FInputBindingManager::Get().GetCommandInfosFromContext("CodeEditorCommands", CodeEditorCommandInfos);
+		Commands.Append(MoveTemp(EditorCommandInfos));
 		Commands.Append(MoveTemp(CodeEditorCommandInfos));
 		Commands.Append(MoveTemp(AssetViewCommands));
 		Commands.Append(MoveTemp(GraphEditorCommandInfos));
@@ -885,7 +887,7 @@ namespace SH
 
 		auto PluginPreference = CreatePreference(LOCALIZATION("Plugins"), PluginView.ToSharedRef());
 		auto AppearancePreference = CreatePreference(LOCALIZATION("Appearance"), AppearanceView.ToSharedRef());
-		auto KeymapPreference = CreatePreference(LOCALIZATION("Keymap"), KeymapView.ToSharedRef());
+		auto KeymapPreference = CreatePreference(LOCALIZATION("ShortCut"), KeymapView.ToSharedRef());
 		auto EnvPreference = CreatePreference(LOCALIZATION("Environment"), EnvView.ToSharedRef());
 		CurPreference = &*PluginPreference;
 

@@ -10,6 +10,7 @@
 #include "CodeEditorCommands.h"
 #include "DebuggerViewCommands.h"
 #include "SceneViewCommands.h"
+#include "Editor/EditorCommands.h"
 #include "PluginManager/ShPluginManager.h"
 #include "Renderer/ShaderToyRenderComp.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
@@ -56,6 +57,7 @@ namespace SH
 		CodeEditorCommands::Register();
 		DebuggerViewCommands::Register();
 		SceneViewCommands::Register();
+		EditorCommands::Register();
 
 		UICommandList = MakeShared<FUICommandList>();
 		UICommandList->MapAction(
@@ -134,6 +136,18 @@ namespace SH
 		UICommandList->MapAction(
 			SceneViewCommands::Get().GizmoScale,
 			FExecuteAction::CreateLambda([this] { CurProject->GizmoMode = GizmoMode::Scale; })
+		);
+		UICommandList->MapAction(
+			EditorCommands::Get().Undo,
+			FExecuteAction::CreateLambda([this] { DoUndoActive(); }),
+			FCanExecuteAction::CreateLambda([this] { return CanUndoActive(); }),
+			EUIActionRepeatMode::RepeatEnabled
+		);
+		UICommandList->MapAction(
+			EditorCommands::Get().Redo,
+			FExecuteAction::CreateLambda([this] { DoRedoActive(); }),
+			FCanExecuteAction::CreateLambda([this] { return CanRedoActive(); }),
+			EUIActionRepeatMode::RepeatEnabled
 		);
 
 		CurProject = TSingleton<ShProjectManager>::Get().GetProject();
@@ -1558,7 +1572,7 @@ namespace SH
 
     FMenuBarBuilder ShaderHelperEditor::CreateMenuBarBuilder()
 	{
-		FMenuBarBuilder MenuBarBuilder = FMenuBarBuilder(TSharedPtr<FUICommandList>());
+		FMenuBarBuilder MenuBarBuilder = FMenuBarBuilder(UICommandList);
 		MenuBarBuilder.AddPullDownMenu(
 			LOCALIZATION("File"),
 			FText::GetEmpty(),
@@ -1647,6 +1661,25 @@ namespace SH
 			
 		}
 		else if (MenuName == "Edit") {
+			MenuBuilder.BeginSection("EditUndoRedo");
+			{
+				MenuBuilder.AddMenuEntry(
+					EditorCommands::Get().Undo,
+					NAME_None,
+					LOCALIZATION("Undo"),
+					FText::GetEmpty(),
+					FSlateIcon()
+				);
+				MenuBuilder.AddMenuEntry(
+					EditorCommands::Get().Redo,
+					NAME_None,
+					LOCALIZATION("Redo"),
+					FText::GetEmpty(),
+					FSlateIcon()
+				);
+			}
+			MenuBuilder.EndSection();
+
 			MenuBuilder.AddMenuEntry(LOCALIZATION("Preferences"), FText::GetEmpty(), FSlateIcon(FAppStyle::Get().GetStyleSetName(), "Icons.Settings"),
 				FUIAction(
 					FExecuteAction::CreateLambda([this] {
@@ -1719,6 +1752,114 @@ namespace SH
 			}
 		}
 
+	}
+
+	void ShaderHelperEditor::RefreshActiveUndoContext() const
+	{
+		TSharedPtr<SWidget> Focus = FSlateApplication::Get().GetKeyboardFocusedWidget();
+		while (Focus.IsValid())
+		{
+			if (GraphPanel.IsValid() && Focus == GraphPanel)
+			{
+				ActiveUndoContext = EActiveUndoContext::Graph;
+				return;
+			}
+			for (const auto& Pair : ShaderEditors)
+			{
+				if (Pair.Value.IsValid() && Focus == Pair.Value)
+				{
+					ActiveUndoContext = EActiveUndoContext::Code;
+					ActiveShaderEditor = Pair.Value;
+					return;
+				}
+			}
+			Focus = Focus->GetParentWidget();
+		}
+
+		ActiveUndoContext = EActiveUndoContext::Scene;
+	}
+
+	bool ShaderHelperEditor::CanUndoActive() const
+	{
+		RefreshActiveUndoContext();
+		switch (ActiveUndoContext)
+		{
+		case EActiveUndoContext::Graph:
+			return GraphPanel.IsValid() && GraphPanel->CanUndo();
+		case EActiveUndoContext::Code:
+			if (auto Editor = ActiveShaderEditor.Pin())
+			{
+				return Editor->ShaderMultiLineEditableTextLayout && Editor->ShaderMultiLineEditableTextLayout->CanExecuteUndo();
+			}
+			return false;
+		case EActiveUndoContext::Scene:
+			return SceneView.IsValid() && SceneView->CanUndo();
+		default:
+			return false;
+		}
+	}
+
+	bool ShaderHelperEditor::CanRedoActive() const
+	{
+		RefreshActiveUndoContext();
+		switch (ActiveUndoContext)
+		{
+		case EActiveUndoContext::Graph:
+			return GraphPanel.IsValid() && GraphPanel->CanRedo();
+		case EActiveUndoContext::Code:
+			if (auto Editor = ActiveShaderEditor.Pin())
+			{
+				auto* Layout = Editor->ShaderMultiLineEditableTextLayout;
+				return Layout && Layout->CurrentUndoLevel != INDEX_NONE && Layout->UndoStates.Num() > 0;
+			}
+			return false;
+		case EActiveUndoContext::Scene:
+			return SceneView.IsValid() && SceneView->CanRedo();
+		default:
+			return false;
+		}
+	}
+
+	void ShaderHelperEditor::DoUndoActive()
+	{
+		switch (ActiveUndoContext)
+		{
+		case EActiveUndoContext::Graph:
+			if (GraphPanel.IsValid()) GraphPanel->Undo();
+			break;
+		case EActiveUndoContext::Code:
+			if (auto Editor = ActiveShaderEditor.Pin())
+			{
+				if (Editor->ShaderMultiLineEditableTextLayout) Editor->ShaderMultiLineEditableTextLayout->Undo();
+			}
+			break;
+		case EActiveUndoContext::Scene:
+			if (SceneView.IsValid()) SceneView->Undo();
+			break;
+		default:
+			break;
+		}
+	}
+
+	void ShaderHelperEditor::DoRedoActive()
+	{
+		switch (ActiveUndoContext)
+		{
+		case EActiveUndoContext::Graph:
+			if (GraphPanel.IsValid()) GraphPanel->Redo();
+			break;
+		case EActiveUndoContext::Code:
+			if (auto Editor = ActiveShaderEditor.Pin())
+			{
+				if (Editor->ShaderMultiLineEditableTextLayout) Editor->ShaderMultiLineEditableTextLayout->Redo();
+			}
+			break;
+		case EActiveUndoContext::Scene:
+			if (SceneView.IsValid()) SceneView->Redo();
+			break;
+		default:
+			break;
+		}
 	}
 
 }

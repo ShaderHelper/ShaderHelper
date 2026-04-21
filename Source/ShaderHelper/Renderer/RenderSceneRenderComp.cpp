@@ -144,6 +144,33 @@ namespace SH
 		}
 		if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
 		{
+			if (DraggingAxis != GizmoAxis::None)
+			{
+				SceneObject* SelObj = GetSelectedSceneObject();
+				if (SelObj)
+				{
+					bool bChanged = (SelObj->Position != DragStartObjectPos) ||
+									(SelObj->Rotation != DragStartObjectRotation) ||
+									(SelObj->Scale != DragStartObjectScale);
+					if (bChanged)
+					{
+						auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+						SSceneView* SceneViewWidget = ShEditor->GetSceneView();
+						if (SceneViewWidget)
+						{
+							if (auto* Mgr = SceneViewWidget->GetUndoManager())
+							{
+								Mgr->PushCommand(MakeShared<TransformCommand>(
+									SceneViewWidget,
+									SelObj,
+									DragStartObjectPos, DragStartObjectRotation, DragStartObjectScale,
+									SelObj->Position, SelObj->Rotation, SelObj->Scale
+								));
+							}
+						}
+					}
+				}
+			}
 			DraggingAxis = GizmoAxis::None;
 			return FReply::Handled();
 		}

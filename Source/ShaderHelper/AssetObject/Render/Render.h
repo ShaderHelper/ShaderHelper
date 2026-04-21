@@ -33,6 +33,7 @@ namespace SH
 		}
 
 		void RemoveSceneObject(SceneObject* InObject);
+		void InsertSceneObject(int32 Index, FW::ObjectPtr<SceneObject> InObject);
 
 		TArray<FW::ObjectPtr<SceneObject>> SceneObjects;
 	};

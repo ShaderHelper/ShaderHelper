@@ -137,6 +137,13 @@ namespace SH
 		void CreateInternalWidgets();
 		void CreateBuiltinAssets();
 		void FillMenu(FMenuBuilder& MenuBuilder, FString MenuName);
+
+		enum class EActiveUndoContext { None, Graph, Code, Scene };
+		void RefreshActiveUndoContext() const;
+		bool CanUndoActive() const;
+		bool CanRedoActive() const;
+		void DoUndoActive();
+		void DoRedoActive();
 		
 	private:
 		TSharedPtr<FUICommandList> UICommandList;
@@ -196,6 +203,9 @@ namespace SH
 		
 		double LastForceRenderTime = 0.0;
 		static constexpr double ForceRenderThrottleInterval = 1.0 / 60.0;
+
+		mutable EActiveUndoContext ActiveUndoContext = EActiveUndoContext::None;
+		mutable TWeakPtr<SShaderEditorBox> ActiveShaderEditor;
 	};
 
 }

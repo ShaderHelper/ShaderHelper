@@ -123,7 +123,12 @@ namespace SH
 			FUIAction(FExecuteAction::CreateLambda([this]() {
 				if (CurRender)
 				{
-					CurRender->AddSceneObject<MeshSceneObject>();
+					auto Obj = CurRender->AddSceneObject<MeshSceneObject>();
+					int32 Index = CurRender->SceneObjects.Num() - 1;
+					if (auto* Mgr = GetUndoManager())
+					{
+						Mgr->PushCommand(MakeShared<AddSceneObjectCommand>(this, CurRender, Obj, Index));
+					}
 					RefreshSceneItems();
 				}
 			}))
@@ -136,7 +141,12 @@ namespace SH
 			FUIAction(FExecuteAction::CreateLambda([this]() {
 				if (CurRender)
 				{
-					CurRender->AddSceneObject<CameraSceneObject>();
+					auto Obj = CurRender->AddSceneObject<CameraSceneObject>();
+					int32 Index = CurRender->SceneObjects.Num() - 1;
+					if (auto* Mgr = GetUndoManager())
+					{
+						Mgr->PushCommand(MakeShared<AddSceneObjectCommand>(this, CurRender, Obj, Index));
+					}
 					RefreshSceneItems();
 				}
 			}))
@@ -194,9 +204,26 @@ namespace SH
 
 	void SSceneView::OnSelectionChanged(SceneObjectListItemPtr Item, ESelectInfo::Type SelectInfo)
 	{
+		if (bIgnoreSelectionChanged)
+		{
+			return;
+		}
+
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		SceneObjectPtr NewSelectedObject = Item ? Item->Object : SceneObjectPtr{};
-		
+
+		if (NewSelectedObject.Get() == SelectedObject.Get())
+		{
+			// Re-show property for same object click
+			if (SelectedObject)
+			{
+				ShEditor->ShowProperty(SelectedObject.Get());
+			}
+			return;
+		}
+
+		SceneObject* OldSelected = SelectedObject.Get();
+
 		if (SelectedObject)
 		{
 			if (!ShEditor->IsPropertyLocked())
@@ -210,6 +237,11 @@ namespace SH
 		if (SelectedObject)
 		{
 			ShEditor->ShowProperty(SelectedObject.Get());
+		}
+
+		if (auto* Mgr = GetUndoManager())
+		{
+			Mgr->PushCommand(MakeShared<SelectionCommand>(this, OldSelected, SelectedObject.Get()));
 		}
 	}
 
@@ -226,13 +258,47 @@ namespace SH
 			ShEditor->RefreshProperty(true);
 		}
 
+		// Find index before removing
+		int32 Index = INDEX_NONE;
+		for (int32 i = 0; i < CurRender->SceneObjects.Num(); i++)
+		{
+			if (CurRender->SceneObjects[i].Get() == SelectedObject.Get())
+			{
+				Index = i;
+				break;
+			}
+		}
+
+		SceneObjectPtr RemovedObject = SelectedObject;
 		CurRender->RemoveSceneObject(SelectedObject.Get());
 		SelectedObject = nullptr;
+
+		if (auto* Mgr = GetUndoManager())
+		{
+			Mgr->PushCommand(MakeShared<RemoveSceneObjectCommand>(this, CurRender, MoveTemp(RemovedObject), Index));
+		}
+
 		RefreshSceneItems();
 		ShEditor->ForceRender();
 	}
 
 	void SSceneView::SelectObject(SceneObject* InObject)
+	{
+		if (InObject == SelectedObject.Get())
+		{
+			return;
+		}
+
+		SceneObject* OldSelected = SelectedObject.Get();
+		SelectObjectInternal(InObject);
+
+		if (auto* Mgr = GetUndoManager())
+		{
+			Mgr->PushCommand(MakeShared<SelectionCommand>(this, OldSelected, InObject));
+		}
+	}
+
+	void SSceneView::SelectObjectInternal(SceneObject* InObject)
 	{
 		if (InObject == SelectedObject.Get())
 		{
@@ -251,6 +317,7 @@ namespace SH
 		// Update ListView selection
 		if (ListView)
 		{
+			bIgnoreSelectionChanged = true;
 			if (InObject)
 			{
 				for (const auto& Item : SceneItems)
@@ -266,6 +333,7 @@ namespace SH
 			{
 				ListView->ClearSelection();
 			}
+			bIgnoreSelectionChanged = false;
 		}
 
 		if (SelectedObject)
@@ -318,6 +386,11 @@ namespace SH
 					AssetPtr<Model> ModelAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<Model>(DropFilePath);
 					auto MeshObj = CurRender->AddSceneObject<MeshSceneObject>();
 					MeshObj->ModelAsset = MoveTemp(ModelAsset);
+					int32 Index = CurRender->SceneObjects.Num() - 1;
+					if (auto* Mgr = GetUndoManager())
+					{
+						Mgr->PushCommand(MakeShared<AddSceneObjectCommand>(this, CurRender, MeshObj, Index));
+					}
 				}
 			}
 			RefreshSceneItems();
@@ -327,4 +400,56 @@ namespace SH
 		}
 		return FReply::Unhandled();
 	}
+
+	SceneUndoManager* SSceneView::GetUndoManager()
+	{
+		if (!CurRender)
+		{
+			return nullptr;
+		}
+
+		auto& Mgr = UndoManagers.FindOrAdd(CurRender);
+		if (!Mgr)
+		{
+			Mgr = MakeUnique<SceneUndoManager>();
+		}
+		return Mgr.Get();
+	}
+
+	void SSceneView::Undo()
+	{
+		if (auto* Mgr = GetUndoManager())
+		{
+			Mgr->UndoAction();
+		}
+	}
+
+	void SSceneView::Redo()
+	{
+		if (auto* Mgr = GetUndoManager())
+		{
+			Mgr->RedoAction();
+		}
+	}
+
+	bool SSceneView::CanUndo() const
+	{
+		if (!CurRender)
+		{
+			return false;
+		}
+		auto* MgrPtr = UndoManagers.Find(CurRender);
+		return MgrPtr && (*MgrPtr)->CanUndo();
+	}
+
+	bool SSceneView::CanRedo() const
+	{
+		if (!CurRender)
+		{
+			return false;
+		}
+		auto* MgrPtr = UndoManagers.Find(CurRender);
+		return MgrPtr && (*MgrPtr)->CanRedo();
+	}
+
 }

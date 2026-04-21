@@ -10,6 +10,7 @@ namespace SH
 		SceneObject();
 
 		void Serialize(FArchive& Ar) override;
+		void PostPropertyEdit(FW::PropertyData* InProperty, TArray<uint8>&& OldData) override;
 		FMatrix44f GetWorldMatrix() const;
 
 		FW::Vector3f Position = {0, 0, 0};

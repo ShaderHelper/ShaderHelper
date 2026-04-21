@@ -916,18 +916,6 @@ constexpr int PaddingLineNum = 22;
                 Compile();
             })
         );
-		UICommandList->MapAction(CodeEditorCommands::Get().Undo,
-			FExecuteAction::CreateLambda([this] { ShaderMultiLineEditableTextLayout->Undo(); }),
-			FCanExecuteAction::CreateLambda([this] { return ShaderMultiLineEditableTextLayout->CanExecuteUndo(); }),
-			EUIActionRepeatMode::RepeatEnabled
-		);
-		UICommandList->MapAction(
-			CodeEditorCommands::Get().Redo,
-			FExecuteAction::CreateLambda([this] {
-				ShaderMultiLineEditableTextLayout->Redo();
-			}),
-			EUIActionRepeatMode::RepeatEnabled
-		);
 		UICommandList->MapAction(CodeEditorCommands::Get().Cut,
 			FExecuteAction::CreateLambda([this] { CutText(); }),
 			FCanExecuteAction::CreateLambda([this] { return !ShaderMultiLineEditableText->IsTextReadOnly(); }),

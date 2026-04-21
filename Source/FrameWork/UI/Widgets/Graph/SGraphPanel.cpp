@@ -28,34 +28,6 @@ namespace FW
 			})
 		);
 		UICommandList->MapAction(
-			GraphEditorCommands::Get().Undo,
-			FExecuteAction::CreateLambda([this] {
-				if (!UndoStack.IsEmpty()) {
-					auto State = UndoStack.Pop();
-					for (int Index = State.Commands.Num() - 1; Index >= 0; Index--)
-					{
-						State.Commands[Index]->Undo();
-					}
-					RedoStack.Add(State);
-				}
-			}),
-			EUIActionRepeatMode::RepeatEnabled
-		);
-		UICommandList->MapAction(
-			GraphEditorCommands::Get().Redo,
-			FExecuteAction::CreateLambda([this] {
-				if (!RedoStack.IsEmpty()) {
-					auto State = RedoStack.Pop();
-					for (const auto& Command : State.Commands)
-					{
-						Command->Do();
-					}
-					UndoStack.Add(State);
-				}
-			}),
-			EUIActionRepeatMode::RepeatEnabled
-		);
-		UICommandList->MapAction(
 			GraphEditorCommands::Get().CutLine,
 			FExecuteAction::CreateLambda([this] {
 				CutLineStart = MousePos;
@@ -114,6 +86,32 @@ namespace FW
 		ClearSelectedNode();
 		GraphData->AddNode(NewNodeData);
 		AddSelectedNode(NodeWidget);
+	}
+
+	void SGraphPanel::Undo()
+	{
+		if (!UndoStack.IsEmpty())
+		{
+			auto State = UndoStack.Pop();
+			for (int Index = State.Commands.Num() - 1; Index >= 0; Index--)
+			{
+				State.Commands[Index]->Undo();
+			}
+			RedoStack.Add(State);
+		}
+	}
+
+	void SGraphPanel::Redo()
+	{
+		if (!RedoStack.IsEmpty())
+		{
+			auto State = RedoStack.Pop();
+			for (const auto& Command : State.Commands)
+			{
+				Command->Do();
+			}
+			UndoStack.Add(State);
+		}
 	}
 
 	void SGraphPanel::AddLink(SGraphPin* Output, SGraphPin* Input)

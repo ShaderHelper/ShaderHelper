@@ -107,9 +107,11 @@ namespace FW
 				{
 					if (Owner->CanChangeProperty(this))
 					{
+						BeginEdit();
 						EnumValueName = InItem;
 						Setter(EnumEntries[*EnumValueName].Get());
 						Owner->PostPropertyChanged(this);
+						EndEdit();
 					}
 					else
 					{
@@ -171,8 +173,10 @@ namespace FW
 					.OnCheckStateChanged_Lambda([this](ECheckBoxState InState) {
 						if (Owner->CanChangeProperty(this))
 						{
+							BeginEdit();
 							*ValueRef = InState == ECheckBoxState::Checked;
 							Owner->PostPropertyChanged(this);
+							EndEdit();
 						}
 					});
 				}
@@ -182,9 +186,11 @@ namespace FW
 					.IsEnabled(!ReadOnly)
 					.MinValue(MinValue)
 					.MaxValue(MaxValue)
+					.OnValueCommitted_Lambda([this](T, ETextCommit::Type) { EndEdit(); })
 					.OnValueChanged_Lambda([this](T NewValue) {
 						if (*ValueRef != NewValue && Owner->CanChangeProperty(this))
 						{
+							BeginEdit();
 							*ValueRef = NewValue;
 							Owner->PostPropertyChanged(this);
 						}
@@ -232,8 +238,10 @@ namespace FW
 						const FString NewValue = InText.ToString();
 						if (*ValueRef != NewValue && Owner->CanChangeProperty(this))
 						{
+							BeginEdit();
 							*ValueRef = NewValue;
 							Owner->PostPropertyChanged(this);
+							EndEdit();
 						}
 					})
 				);
@@ -270,9 +278,11 @@ namespace FW
                     [
                         SNew(SSpinBox<float>)
 						.IsEnabled(!ReadOnly)
+                        .OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
                         .OnValueChanged_Lambda([this](float NewValue) {
                             if(ValueRef->x != NewValue && Owner->CanChangeProperty(this))
                             {
+                                BeginEdit();
                                 ValueRef->x = NewValue;
                                 Owner->PostPropertyChanged(this);
                             }
@@ -283,9 +293,11 @@ namespace FW
                     [
                         SNew(SSpinBox<float>)
 						.IsEnabled(!ReadOnly)
+                        .OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
                         .OnValueChanged_Lambda([this](float NewValue) {
                             if(ValueRef->y != NewValue && Owner->CanChangeProperty(this))
                             {
+                                BeginEdit();
                                 ValueRef->y = NewValue;
                                 Owner->PostPropertyChanged(this);
                             }
@@ -326,9 +338,11 @@ namespace FW
 					[
 						SNew(SSpinBox<float>)
 						.IsEnabled(!ReadOnly)
+						.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
 						.OnValueChanged_Lambda([this](float NewValue) {
 							if(ValueRef->x != NewValue && Owner->CanChangeProperty(this))
 							{
+								BeginEdit();
 								ValueRef->x = NewValue;
 								Owner->PostPropertyChanged(this);
 							}
@@ -339,9 +353,11 @@ namespace FW
 					[
 						SNew(SSpinBox<float>)
 						.IsEnabled(!ReadOnly)
+						.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
 						.OnValueChanged_Lambda([this](float NewValue) {
 							if(ValueRef->y != NewValue && Owner->CanChangeProperty(this))
 							{
+								BeginEdit();
 								ValueRef->y = NewValue;
 								Owner->PostPropertyChanged(this);
 							}
@@ -352,9 +368,11 @@ namespace FW
 					[
 						SNew(SSpinBox<float>)
 						.IsEnabled(!ReadOnly)
+						.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
 						.OnValueChanged_Lambda([this](float NewValue) {
 							if(ValueRef->z != NewValue && Owner->CanChangeProperty(this))
 							{
+								BeginEdit();
 								ValueRef->z = NewValue;
 								Owner->PostPropertyChanged(this);
 							}
@@ -396,9 +414,11 @@ namespace FW
 					[
 						SNew(SSpinBox<float>)
 							.IsEnabled(!ReadOnly)
+							.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
 							.OnValueChanged_Lambda([this](float NewValue) {
 								if (ValueRef->x != NewValue && Owner->CanChangeProperty(this))
 								{
+									BeginEdit();
 									ValueRef->x = NewValue;
 									Owner->PostPropertyChanged(this);
 								}
@@ -409,9 +429,11 @@ namespace FW
 					[
 						SNew(SSpinBox<float>)
 							.IsEnabled(!ReadOnly)
+							.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
 							.OnValueChanged_Lambda([this](float NewValue) {
 								if (ValueRef->y != NewValue && Owner->CanChangeProperty(this))
 								{
+									BeginEdit();
 									ValueRef->y = NewValue;
 									Owner->PostPropertyChanged(this);
 								}
@@ -422,9 +444,11 @@ namespace FW
 					[
 						SNew(SSpinBox<float>)
 							.IsEnabled(!ReadOnly)
+							.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
 							.OnValueChanged_Lambda([this](float NewValue) {
 								if (ValueRef->z != NewValue && Owner->CanChangeProperty(this))
 								{
+									BeginEdit();
 									ValueRef->z = NewValue;
 									Owner->PostPropertyChanged(this);
 								}
@@ -435,9 +459,11 @@ namespace FW
 					[
 						SNew(SSpinBox<float>)
 							.IsEnabled(!ReadOnly)
+							.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
 							.OnValueChanged_Lambda([this](float NewValue) {
 								if (ValueRef->w != NewValue && Owner->CanChangeProperty(this))
 								{
+									BeginEdit();
 									ValueRef->w = NewValue;
 									Owner->PostPropertyChanged(this);
 								}
@@ -475,9 +501,11 @@ namespace FW
 					[
 						SNew(SSpinBox<int32>)
 						.IsEnabled(!ReadOnly)
+						.OnValueCommitted_Lambda([this](int32, ETextCommit::Type) { EndEdit(); })
 						.OnValueChanged_Lambda([this](int32 NewValue) {
 							if (Values[0] != NewValue && Owner->CanChangeProperty(this))
 							{
+								BeginEdit();
 								Values[0] = NewValue;
 								Owner->PostPropertyChanged(this);
 							}
@@ -488,9 +516,11 @@ namespace FW
 					[
 						SNew(SSpinBox<int32>)
 						.IsEnabled(!ReadOnly)
+						.OnValueCommitted_Lambda([this](int32, ETextCommit::Type) { EndEdit(); })
 						.OnValueChanged_Lambda([this](int32 NewValue) {
 							if (Values[1] != NewValue && Owner->CanChangeProperty(this))
 							{
+								BeginEdit();
 								Values[1] = NewValue;
 								Owner->PostPropertyChanged(this);
 							}
@@ -527,9 +557,11 @@ namespace FW
 					[
 						SNew(SSpinBox<int32>)
 						.IsEnabled(!ReadOnly)
+						.OnValueCommitted_Lambda([this](int32, ETextCommit::Type) { EndEdit(); })
 						.OnValueChanged_Lambda([this](int32 NewValue) {
 							if (Values[0] != NewValue && Owner->CanChangeProperty(this))
 							{
+								BeginEdit();
 								Values[0] = NewValue;
 								Owner->PostPropertyChanged(this);
 							}
@@ -540,9 +572,11 @@ namespace FW
 					[
 						SNew(SSpinBox<int32>)
 						.IsEnabled(!ReadOnly)
+						.OnValueCommitted_Lambda([this](int32, ETextCommit::Type) { EndEdit(); })
 						.OnValueChanged_Lambda([this](int32 NewValue) {
 							if (Values[1] != NewValue && Owner->CanChangeProperty(this))
 							{
+								BeginEdit();
 								Values[1] = NewValue;
 								Owner->PostPropertyChanged(this);
 							}
@@ -553,9 +587,11 @@ namespace FW
 					[
 						SNew(SSpinBox<int32>)
 						.IsEnabled(!ReadOnly)
+						.OnValueCommitted_Lambda([this](int32, ETextCommit::Type) { EndEdit(); })
 						.OnValueChanged_Lambda([this](int32 NewValue) {
 							if (Values[2] != NewValue && Owner->CanChangeProperty(this))
 							{
+								BeginEdit();
 								Values[2] = NewValue;
 								Owner->PostPropertyChanged(this);
 							}
@@ -592,9 +628,11 @@ namespace FW
 					[
 						SNew(SSpinBox<int32>)
 						.IsEnabled(!ReadOnly)
+						.OnValueCommitted_Lambda([this](int32, ETextCommit::Type) { EndEdit(); })
 						.OnValueChanged_Lambda([this](int32 NewValue) {
 							if (Values[0] != NewValue && Owner->CanChangeProperty(this))
 							{
+								BeginEdit();
 								Values[0] = NewValue;
 								Owner->PostPropertyChanged(this);
 							}
@@ -605,9 +643,11 @@ namespace FW
 					[
 						SNew(SSpinBox<int32>)
 						.IsEnabled(!ReadOnly)
+						.OnValueCommitted_Lambda([this](int32, ETextCommit::Type) { EndEdit(); })
 						.OnValueChanged_Lambda([this](int32 NewValue) {
 							if (Values[1] != NewValue && Owner->CanChangeProperty(this))
 							{
+								BeginEdit();
 								Values[1] = NewValue;
 								Owner->PostPropertyChanged(this);
 							}
@@ -618,9 +658,11 @@ namespace FW
 					[
 						SNew(SSpinBox<int32>)
 						.IsEnabled(!ReadOnly)
+						.OnValueCommitted_Lambda([this](int32, ETextCommit::Type) { EndEdit(); })
 						.OnValueChanged_Lambda([this](int32 NewValue) {
 							if (Values[2] != NewValue && Owner->CanChangeProperty(this))
 							{
+								BeginEdit();
 								Values[2] = NewValue;
 								Owner->PostPropertyChanged(this);
 							}
@@ -631,9 +673,11 @@ namespace FW
 					[
 						SNew(SSpinBox<int32>)
 						.IsEnabled(!ReadOnly)
+						.OnValueCommitted_Lambda([this](int32, ETextCommit::Type) { EndEdit(); })
 						.OnValueChanged_Lambda([this](int32 NewValue) {
 							if (Values[3] != NewValue && Owner->CanChangeProperty(this))
 							{
+								BeginEdit();
 								Values[3] = NewValue;
 								Owner->PostPropertyChanged(this);
 							}

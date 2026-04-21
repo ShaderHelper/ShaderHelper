@@ -67,6 +67,19 @@ namespace SH
 		MarkDirty();
 	}
 
+	void Render::InsertSceneObject(int32 Index, ObjectPtr<SceneObject> InObject)
+	{
+		if (Index >= 0 && Index <= SceneObjects.Num())
+		{
+			SceneObjects.Insert(MoveTemp(InObject), Index);
+		}
+		else
+		{
+			SceneObjects.Add(MoveTemp(InObject));
+		}
+		MarkDirty();
+	}
+
 	void Render::OnDragEnter(TSharedPtr<FDragDropOperation> DragDropOp)
 	{
 		if (DragDropOp->IsOfType<AssetViewItemDragDropOp>())
