@@ -42,6 +42,9 @@ namespace SH
 		FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent);
 		void OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& KeyEvent);
 		void OnKeyUp(const FGeometry& MyGeometry, const FKeyEvent& KeyEvent);
+		void OnDragEnter(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent);
+		void OnDragLeave(const FDragDropEvent& DragDropEvent);
+		FReply OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent);
 		void UpdateCamera(float DeltaTime);
 
 		// Gizmo helpers

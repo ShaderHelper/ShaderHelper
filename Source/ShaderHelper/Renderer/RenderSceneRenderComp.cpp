@@ -5,10 +5,13 @@
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/Scene/SSceneView.h"
+#include "UI/Widgets/Scene/SceneUndoManager.h"
+#include "UI/Widgets/AssetBrowser/AssetViewItem/AssetViewItem.h"
 #include "Common/Util/Math.h"
 #include "AssetObject/Render/MeshSceneObject.h"
 #include "AssetObject/Render/CameraSceneObject.h"
 #include "AssetObject/Model.h"
+#include "AssetManager/AssetManager.h"
 
 using namespace FW;
 
@@ -32,6 +35,9 @@ namespace SH
 		ViewPort->MouseWheelHandler.BindRaw(this, &RenderSceneRenderComp::OnMouseWheel);
 		KeyDownHandle = ViewPort->KeyDownHandler.AddRaw(this, &RenderSceneRenderComp::OnKeyDown);
 		KeyUpHandle = ViewPort->KeyUpHandler.AddRaw(this, &RenderSceneRenderComp::OnKeyUp);
+		ViewPort->DragEnterHandler.BindRaw(this, &RenderSceneRenderComp::OnDragEnter);
+		ViewPort->DragLeaveHandler.BindRaw(this, &RenderSceneRenderComp::OnDragLeave);
+		ViewPort->DropHandler.BindRaw(this, &RenderSceneRenderComp::OnDrop);
 
 		// Create graph comp for custom mode
 		GraphComp = MakeUnique<RenderRenderComp>(InRenderGraph, InViewPort);
@@ -45,6 +51,9 @@ namespace SH
 		ViewPort->MouseWheelHandler.Unbind();
 		ViewPort->KeyDownHandler.Remove(KeyDownHandle);
 		ViewPort->KeyUpHandler.Remove(KeyUpHandle);
+		ViewPort->DragEnterHandler.Unbind();
+		ViewPort->DragLeaveHandler.Unbind();
+		ViewPort->DropHandler.Unbind();
 	}
 
 	FReply RenderSceneRenderComp::OnMouseDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
@@ -793,6 +802,74 @@ namespace SH
 		if (T < 0.0f) return false;
 		HitPoint = RayOrigin + RayDir * T;
 		return true;
+	}
+
+	void RenderSceneRenderComp::OnDragEnter(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)
+	{
+		TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
+		if (DragDropOp && DragDropOp->IsOfType<AssetViewItemDragDropOp>())
+		{
+			TArray<FString> DropFilePaths = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Paths;
+			for (const auto& DropFilePath : DropFilePaths)
+			{
+				MetaType* DropAssetMetaType = GetAssetMetaType(DropFilePath);
+				if (DropAssetMetaType && DropAssetMetaType->IsType<Model>())
+				{
+					DragDropOp->SetCursorOverride(EMouseCursor::GrabHand);
+					return;
+				}
+			}
+			DragDropOp->SetCursorOverride(EMouseCursor::SlashedCircle);
+		}
+	}
+
+	void RenderSceneRenderComp::OnDragLeave(const FDragDropEvent& DragDropEvent)
+	{
+		TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
+		if (DragDropOp)
+		{
+			DragDropOp->SetCursorOverride(TOptional<EMouseCursor::Type>());
+		}
+	}
+
+	FReply RenderSceneRenderComp::OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)
+	{
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		SSceneView* SceneViewWidget = ShEditor->GetSceneView();
+		if (!SceneViewWidget) return FReply::Unhandled();
+
+		Render* CurRender = SceneViewWidget->GetRender();
+		if (!CurRender) return FReply::Unhandled();
+
+		TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
+		if (DragDropOp && DragDropOp->IsOfType<AssetViewItemDragDropOp>())
+		{
+			TArray<FString> DropFilePaths = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Paths;
+			bool bDropped = false;
+			for (const auto& DropFilePath : DropFilePaths)
+			{
+				MetaType* DropAssetMetaType = GetAssetMetaType(DropFilePath);
+				if (DropAssetMetaType && DropAssetMetaType->IsType<Model>())
+				{
+					AssetPtr<Model> ModelAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<Model>(DropFilePath);
+					auto MeshObj = CurRender->AddSceneObject<MeshSceneObject>();
+					MeshObj->ModelAsset = MoveTemp(ModelAsset);
+					int32 Index = CurRender->SceneObjects.Num() - 1;
+					if (auto* Mgr = SceneViewWidget->GetUndoManager())
+					{
+						Mgr->PushCommand(MakeShared<AddSceneObjectCommand>(SceneViewWidget, CurRender, MeshObj, Index));
+					}
+					bDropped = true;
+				}
+			}
+			if (bDropped)
+			{
+				SceneViewWidget->RefreshSceneItems();
+				ShEditor->ForceRender();
+				return FReply::Handled();
+			}
+		}
+		return FReply::Unhandled();
 	}
 
 	GizmoMode RenderSceneRenderComp::GetCurrentGizmoMode() const
