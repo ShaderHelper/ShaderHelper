@@ -1,6 +1,7 @@
 #pragma once
 #include "SPropertyCategory.h"
 #include "UI/Styles/FAppCommonStyle.h"
+#include <Serialization/MemoryWriter.h>
 
 namespace FW
 {
@@ -65,11 +66,35 @@ namespace FW
     public:
         bool Expanded = true;
 
+        void BeginEdit()
+        {
+            if (bEditInProgress || !Owner)
+            {
+                return;
+            }
+            EditOldData.Reset();
+            FMemoryWriter Ar(EditOldData);
+            Owner->Serialize(Ar);
+            bEditInProgress = true;
+        }
+        void EndEdit()
+        {
+            if (!bEditInProgress || !Owner)
+            {
+                return;
+            }
+            bEditInProgress = false;
+            Owner->PostPropertyEdit(this, MoveTemp(EditOldData));
+            EditOldData.Reset();
+        }
+
 	protected:
         ShObject* Owner;
 		FText DisplayName;
 		PropertyData* Parent = nullptr;
 		TArray<TSharedRef<PropertyData>> Children;
+        TArray<uint8> EditOldData;
+        bool bEditInProgress = false;
 	};
 
 	class PropertyCategory : public PropertyData

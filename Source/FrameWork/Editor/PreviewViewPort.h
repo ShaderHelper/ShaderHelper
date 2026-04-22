@@ -13,6 +13,9 @@ namespace FW
 	DECLARE_DELEGATE_RetVal_TwoParams(FReply, OnMouseWheelDelegate, const FGeometry&, const FPointerEvent&)
 	DECLARE_MULTICAST_DELEGATE_TwoParams(OnKeyDownDelegate, const FGeometry&, const FKeyEvent&)
 	DECLARE_MULTICAST_DELEGATE_TwoParams(OnKeyUpDelegate, const FGeometry&, const FKeyEvent&)
+	DECLARE_DELEGATE_TwoParams(OnDragEnterDelegate, const FGeometry&, const FDragDropEvent&)
+	DECLARE_DELEGATE_OneParam(OnDragLeaveDelegate, const FDragDropEvent&)
+	DECLARE_DELEGATE_RetVal_TwoParams(FReply, OnDropDelegate, const FGeometry&, const FDragDropEvent&)
 
 	class FRAMEWORK_API PreviewViewPort : public ISlateViewport
 	{
@@ -128,6 +131,9 @@ namespace FW
 		OnMouseUpDelegate MouseUpHandler;
 		OnMouseMoveDelegate MouseMoveHandler;
 		OnMouseWheelDelegate MouseWheelHandler;
+		OnDragEnterDelegate DragEnterHandler;
+		OnDragLeaveDelegate DragLeaveHandler;
+		OnDropDelegate DropHandler;
 
 	protected:
 		TWeakPtr<SWidget> AssociatedWidget;

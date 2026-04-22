@@ -11,6 +11,7 @@ namespace SH
 		: RenderGraphAsset(InRenderGraph)
 	{
 		Context.ViewPort = InViewPort;
+		Context.SceneObjects = &InRenderGraph->SceneObjects;
 	}
 
 	void RenderRenderComp::RenderBegin()
@@ -42,8 +43,8 @@ namespace SH
 				.Usage = GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared,
 			});
 			GGpuRhi->SetResourceName("RenderFinalRT", Context.FinalRT);
-			Context.ViewPort->SetViewPortRenderTexture(Context.FinalRT);
 		}
+		Context.ViewPort->SetViewPortRenderTexture(Context.FinalRT);
 
 		ExecRet GraphRet = RenderGraphAsset->Exec(Context);
 		Context.Outputs.Sort([](const RenderOutputDesc& A, const RenderOutputDesc& B) {

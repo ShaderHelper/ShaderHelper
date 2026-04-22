@@ -164,11 +164,13 @@ namespace SH
 	{
 		KeyDatas.Reset();
 		TArray<TSharedPtr<FUICommandInfo>> Commands;
-		TArray<TSharedPtr<FUICommandInfo>> DebuggerViewCommands, GraphEditorCommandInfos, CodeEditorCommandInfos, AssetViewCommands;
+		TArray<TSharedPtr<FUICommandInfo>> EditorCommandInfos, DebuggerViewCommands, GraphEditorCommandInfos, CodeEditorCommandInfos, AssetViewCommands;
+		FInputBindingManager::Get().GetCommandInfosFromContext("EditorCommands", EditorCommandInfos);
 		FInputBindingManager::Get().GetCommandInfosFromContext("DebuggerViewCommands", DebuggerViewCommands);
 		FInputBindingManager::Get().GetCommandInfosFromContext("AssetViewCommands", AssetViewCommands);
 		FInputBindingManager::Get().GetCommandInfosFromContext("GraphEditorCommands", GraphEditorCommandInfos);
 		FInputBindingManager::Get().GetCommandInfosFromContext("CodeEditorCommands", CodeEditorCommandInfos);
+		Commands.Append(MoveTemp(EditorCommandInfos));
 		Commands.Append(MoveTemp(CodeEditorCommandInfos));
 		Commands.Append(MoveTemp(AssetViewCommands));
 		Commands.Append(MoveTemp(GraphEditorCommandInfos));
@@ -836,6 +838,30 @@ namespace SH
 			})
 		];
 
+		for (int Lang = 0; Lang < (int)SupportedLanguage::Num; Lang++)
+		{
+			Languages.Add(MakeShared<SupportedLanguage>(static_cast<SupportedLanguage>(Lang)));
+		}
+
+		AppendItem(EnvGrid, LOCALIZATION("Language"))
+		.AutoWidth()
+		[
+			SNew(SComboBox<TSharedPtr<SupportedLanguage>>)
+			.OptionsSource(&Languages)
+			.InitiallySelectedItem(Languages[(int)Editor::GetLanguage()])
+			.OnSelectionChanged_Lambda([](TSharedPtr<SupportedLanguage> InItem, ESelectInfo::Type) {
+				Editor::SetLanguage(*InItem);
+			})
+			.OnGenerateWidget_Lambda([](TSharedPtr<SupportedLanguage> InItem) {
+				return SNew(STextBlock).Text(LOCALIZATION(magic_enum::enum_name(*InItem).data()));
+			})
+			[
+				SNew(STextBlock).Text_Lambda([] {
+					return LOCALIZATION(magic_enum::enum_name(Editor::GetLanguage()).data());
+				})
+			]
+		];
+
 		ChildSlot
 		[
 			SNew(SVerticalBox)
@@ -861,7 +887,7 @@ namespace SH
 
 		auto PluginPreference = CreatePreference(LOCALIZATION("Plugins"), PluginView.ToSharedRef());
 		auto AppearancePreference = CreatePreference(LOCALIZATION("Appearance"), AppearanceView.ToSharedRef());
-		auto KeymapPreference = CreatePreference(LOCALIZATION("Keymap"), KeymapView.ToSharedRef());
+		auto KeymapPreference = CreatePreference(LOCALIZATION("ShortCut"), KeymapView.ToSharedRef());
 		auto EnvPreference = CreatePreference(LOCALIZATION("Environment"), EnvView.ToSharedRef());
 		CurPreference = &*PluginPreference;
 

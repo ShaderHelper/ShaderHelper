@@ -24,8 +24,6 @@ namespace SH
 			UI_COMMAND_SH(Cut, LOCALIZATION("Cut"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::X));
 			UI_COMMAND_SH(Copy, LOCALIZATION("Copy"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::C));
 			UI_COMMAND_SH(Paste, LOCALIZATION("Paste"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::V));
-			UI_COMMAND_SH(Undo, LOCALIZATION("Undo"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::Z));
-			UI_COMMAND_SH(Redo, LOCALIZATION("Redo"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control | EModifierKey::Shift, EKeys::Z));
 			UI_COMMAND_SH(DeleteLeft, LOCALIZATION("DeleteLeft"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EKeys::BackSpace));
 			UI_COMMAND_SH(DeleteRight, LOCALIZATION("DeleteRight"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EKeys::Delete));
 			UI_COMMAND_SH(DeleteTokenLeft, LOCALIZATION("DeleteTokenLeft"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::BackSpace));
@@ -65,8 +63,6 @@ namespace SH
 		TSharedPtr<FUICommandInfo> Cut;
 		TSharedPtr<FUICommandInfo> Copy;
 		TSharedPtr<FUICommandInfo> Paste;
-		TSharedPtr<FUICommandInfo> Undo;
-		TSharedPtr<FUICommandInfo> Redo;
 		TSharedPtr<FUICommandInfo> DeleteLeft;
 		TSharedPtr<FUICommandInfo> DeleteRight;
 		TSharedPtr<FUICommandInfo> DeleteTokenLeft;

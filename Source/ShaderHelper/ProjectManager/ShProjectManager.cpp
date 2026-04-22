@@ -36,6 +36,9 @@ namespace SH
 		Project::Serialize(Ar);
         
         Ar << TimelineMaxTime;
+		Ar << bScenePreview;
+		Ar << GizmoMode;
+		Ar << GizmoSpace;
 
 		//### AssetBrowserState ###
 		if (Ar.IsSaving())

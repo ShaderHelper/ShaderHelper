@@ -509,6 +509,7 @@ public:
     void setNanMinMaxClamp(bool nanMinMaxClamp);
     void setTextureSamplerTransformMode(EShTextureSamplerTransformMode mode);
     void addBlockStorageOverride(const char* nameStr, glslang::TBlockStorageClass backing);
+    void setAllPushConstantAsUniform(bool enable);
 
     void setGlobalUniformBlockName(const char* name);
     void setAtomicCounterBlockName(const char* name);

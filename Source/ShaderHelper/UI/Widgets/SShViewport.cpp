@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "SShViewport.h"
+#include "Editor/PreviewViewPort.h"
 
 using namespace FW;
 
@@ -72,6 +73,34 @@ namespace SH
 			}
 		}
 		return SViewport::OnMouseMove(MyGeometry, MouseEvent);
+	}
+
+	void SShViewport::OnDragEnter(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)
+	{
+		if (auto VP = StaticCastSharedPtr<PreviewViewPort>(GetViewportInterface().Pin()))
+		{
+			if (VP->DragEnterHandler.IsBound())
+				VP->DragEnterHandler.Execute(MyGeometry, DragDropEvent);
+		}
+	}
+
+	void SShViewport::OnDragLeave(const FDragDropEvent& DragDropEvent)
+	{
+		if (auto VP = StaticCastSharedPtr<PreviewViewPort>(GetViewportInterface().Pin()))
+		{
+			if (VP->DragLeaveHandler.IsBound())
+				VP->DragLeaveHandler.Execute(DragDropEvent);
+		}
+	}
+
+	FReply SShViewport::OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)
+	{
+		if (auto VP = StaticCastSharedPtr<PreviewViewPort>(GetViewportInterface().Pin()))
+		{
+			if (VP->DropHandler.IsBound())
+				return VP->DropHandler.Execute(MyGeometry, DragDropEvent);
+		}
+		return FReply::Unhandled();
 	}
 
 	int32 SShViewport::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const

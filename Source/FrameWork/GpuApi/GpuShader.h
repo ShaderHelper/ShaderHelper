@@ -161,6 +161,7 @@ namespace FW
 		FString SemanticName;
 		uint32 SemanticIndex = 0;
 		uint32 Location = 0;
+		FString Type;
 		bool bRead = false;
 		bool bWritten = false;
 	};
@@ -239,6 +240,7 @@ namespace FW
 		friend uint32 GetTypeHash(const GpuShader& Shader)
 		{
 			uint32 Hash = ::GetTypeHash(Shader.SourceText);
+			Hash = HashCombine(Hash, ::GetTypeHash(Shader.EntryPoint));
 			for (const FString& Arg : Shader.CompileExtraArgs)
 			{
 				Hash = HashCombine(Hash, ::GetTypeHash(Arg));

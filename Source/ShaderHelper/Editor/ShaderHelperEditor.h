@@ -15,6 +15,7 @@
 #include "UI/Widgets/Debugger/SDebuggerCallStackView.h"
 #include "UI/Widgets/Debugger/SDebuggerWatchView.h"
 #include "UI/Widgets/Preference/SPreferenceView.h"
+#include "UI/Widgets/Scene/SSceneView.h"
 #include "UI/Widgets/Misc/SShWindow.h"
 #include "UI/Widgets/SShViewport.h"
 #include "Debugger/ShaderDebugger.h"
@@ -33,6 +34,7 @@ namespace SH
 
 	const FName PreviewTabId = "Preview";
 	const FName PropretyTabId = "Propety";
+	const FName SceneTabId = "Scene";
 
 	const FName CodeTabId = "Code";
 	const FName InitialInsertPointTabId = "CodeInsertPoint";
@@ -75,6 +77,11 @@ namespace SH
 		TSharedPtr<SWindow> GetShaderEditorTipWindow() const { return ShaderEditorTipWindow; }
 		FW::SGraphPanel* GetGraphPanel() const { return GraphPanel.Get(); }
 		FW::SAssetBrowser* GetAssetBrowser() const { return AssetBrowser.Get(); }
+		SSceneView* GetSceneView() const { return SceneView.Get(); }
+		GizmoMode GetGizmoMode() const { return CurProject->GizmoMode; }
+		void SetGizmoMode(GizmoMode Mode) { CurProject->GizmoMode = Mode; }
+		GizmoSpace GetGizmoSpace() const { return CurProject->GizmoSpace; }
+		bool IsScenePreview() const { return CurProject->bScenePreview; }
 		ShaderDebugger& GetDebugger() { return Debugger; }
 		void InvokeDebuggerTabs();
 		void CloseDebuggerTabs();
@@ -131,6 +138,13 @@ namespace SH
 		void CreateInternalWidgets();
 		void CreateBuiltinAssets();
 		void FillMenu(FMenuBuilder& MenuBuilder, FString MenuName);
+
+		enum class EActiveUndoContext { None, Graph, Code, Scene };
+		void RefreshActiveUndoContext() const;
+		bool CanUndoActive() const;
+		bool CanRedoActive() const;
+		void DoUndoActive();
+		void DoRedoActive();
 		
 	private:
 		TSharedPtr<FUICommandList> UICommandList;
@@ -163,6 +177,8 @@ namespace SH
 		TSharedPtr<FW::SOutputLog> OutputLog;
 		TSharedPtr<FW::SGraphPanel> GraphPanel;
 
+		TSharedPtr<SSceneView> SceneView;
+
 		ShRenderer* Renderer;
 		TSharedPtr<FW::RenderComponent> GraphRenderComp;
         
@@ -188,6 +204,9 @@ namespace SH
 		
 		double LastForceRenderTime = 0.0;
 		static constexpr double ForceRenderThrottleInterval = 1.0 / 60.0;
+
+		mutable EActiveUndoContext ActiveUndoContext = EActiveUndoContext::None;
+		mutable TWeakPtr<SShaderEditorBox> ActiveShaderEditor;
 	};
 
 }

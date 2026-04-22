@@ -127,10 +127,12 @@ namespace FW
 		{
 			const bool VsEqual =  Vs && Other.Vs
 					&& Vs->GetSourceText().Equals(Other.Vs->GetSourceText())
+					&& Vs->GetEntryPoint() == Other.Vs->GetEntryPoint()
 					&& Vs->CompileExtraArgs == Other.Vs->CompileExtraArgs;
 			const bool PsEqual = (Ps == Other.Ps)
 				|| (Ps && Other.Ps
 					&& Ps->GetSourceText().Equals(Other.Ps->GetSourceText())
+					&& Ps->GetEntryPoint() == Other.Ps->GetEntryPoint()
 					&& Ps->CompileExtraArgs == Other.Ps->CompileExtraArgs);
 			return VsEqual && PsEqual
 				&& BindGroupLayouts == Other.BindGroupLayouts
@@ -159,6 +161,7 @@ namespace FW
 		{
 			const bool CsEqual = Cs && Other.Cs
 					&& Cs->GetSourceText().Equals(Other.Cs->GetSourceText())
+					&& Cs->GetEntryPoint() == Other.Cs->GetEntryPoint()
 					&& Cs->CompileExtraArgs == Other.Cs->CompileExtraArgs;
 			return CsEqual && BindGroupLayouts == Other.BindGroupLayouts;
 		}

@@ -3,6 +3,7 @@
 #include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
 #include "AssetObject/ShaderAsset.h"
 #include "AssetObject/Graph.h"
+#include "UI/Widgets/Scene/SSceneView.h"
 
 namespace SH
 {
@@ -33,6 +34,9 @@ namespace SH
         bool TimelineStop = true;
         float TimelineCurTime = 0;
         float TimelineMaxTime = 100;
+		bool bScenePreview = true;
+		GizmoMode GizmoMode = GizmoMode::Move;
+		GizmoSpace GizmoSpace = GizmoSpace::Global;
 	};
 
 	using ShProjectManager = FW::ProjectManager<ShProject>;
