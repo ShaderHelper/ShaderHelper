@@ -4,6 +4,7 @@
 #include "GpuApi/GpuResourceHelper.h"
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
+#include "Editor/SceneViewCommands.h"
 #include "UI/Widgets/Scene/SSceneView.h"
 #include "UI/Widgets/Scene/SceneUndoManager.h"
 #include "UI/Widgets/AssetBrowser/AssetViewItem/AssetViewItem.h"
@@ -38,6 +39,22 @@ namespace SH
 		ViewPort->DragEnterHandler.BindRaw(this, &RenderSceneRenderComp::OnDragEnter);
 		ViewPort->DragLeaveHandler.BindRaw(this, &RenderSceneRenderComp::OnDragLeave);
 		ViewPort->DropHandler.BindRaw(this, &RenderSceneRenderComp::OnDrop);
+
+		// Register gizmo mode switching commands
+		SceneCommandList = MakeShared<FUICommandList>();
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		SceneCommandList->MapAction(
+			SceneViewCommands::Get().GizmoMove,
+			FExecuteAction::CreateLambda([ShEditor] { ShEditor->SetGizmoMode(GizmoMode::Move); })
+		);
+		SceneCommandList->MapAction(
+			SceneViewCommands::Get().GizmoRotate,
+			FExecuteAction::CreateLambda([ShEditor] { ShEditor->SetGizmoMode(GizmoMode::Rotate); })
+		);
+		SceneCommandList->MapAction(
+			SceneViewCommands::Get().GizmoScale,
+			FExecuteAction::CreateLambda([ShEditor] { ShEditor->SetGizmoMode(GizmoMode::Scale); })
+		);
 
 		// Create graph comp for custom mode
 		GraphComp = MakeUnique<RenderRenderComp>(InRenderGraph, InViewPort);
@@ -348,6 +365,10 @@ namespace SH
 	{
 		if (!bRightMouseDown)
 		{
+			if (SceneCommandList->ProcessCommandBindings(KeyEvent))
+			{
+				return;
+			}
 			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 			if (ShEditor->GetUICommandList()->ProcessCommandBindings(KeyEvent))
 			{

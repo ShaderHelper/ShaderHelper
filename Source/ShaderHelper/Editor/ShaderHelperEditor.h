@@ -79,6 +79,7 @@ namespace SH
 		FW::SAssetBrowser* GetAssetBrowser() const { return AssetBrowser.Get(); }
 		SSceneView* GetSceneView() const { return SceneView.Get(); }
 		GizmoMode GetGizmoMode() const { return CurProject->GizmoMode; }
+		void SetGizmoMode(GizmoMode Mode) { CurProject->GizmoMode = Mode; }
 		GizmoSpace GetGizmoSpace() const { return CurProject->GizmoSpace; }
 		bool IsScenePreview() const { return CurProject->bScenePreview; }
 		ShaderDebugger& GetDebugger() { return Debugger; }

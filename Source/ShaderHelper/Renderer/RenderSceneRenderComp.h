@@ -102,6 +102,7 @@ namespace SH
 		// Viewport delegates
 		FDelegateHandle KeyDownHandle;
 		FDelegateHandle KeyUpHandle;
+		TSharedPtr<FUICommandList> SceneCommandList;
 
 		// Gizmo state
 		GizmoAxis HoveredAxis = GizmoAxis::None;

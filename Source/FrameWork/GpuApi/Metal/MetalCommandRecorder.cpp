@@ -168,7 +168,7 @@ namespace FW
         {
             if (CurrentBindGroups[i] && IsBindGroupDirty[i])
             {
-                CurrentBindGroups[i]->Apply(RenderCommandEncoder);
+                CurrentBindGroups[i]->Apply(RenderCommandEncoder, CurrentRenderPipelineState);
                 IsBindGroupDirty[i] = false;
             }
         }
@@ -188,7 +188,7 @@ namespace FW
         {
             if (CurrentBindGroups[i] && IsBindGroupDirty[i])
             {
-                CurrentBindGroups[i]->Apply(ComputeCommandEncoder);
+                CurrentBindGroups[i]->Apply(ComputeCommandEncoder, CurrentComputePipelineState);
                 IsBindGroupDirty[i] = false;
             }
         }

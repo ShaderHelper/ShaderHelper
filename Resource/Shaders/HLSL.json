@@ -12,6 +12,28 @@
             ]
         },
         {
+            "label": "interface",
+            "stages": [
+                "VS",
+                "PS",
+                "CS",
+                "GS",
+                "HS",
+                "DS"
+            ]
+        },
+        {
+            "label": "namespace",
+            "stages": [
+                "VS",
+                "PS",
+                "CS",
+                "GS",
+                "HS",
+                "DS"
+            ]
+        },
+        {
             "label": "register",
             "stages": [
                 "VS",

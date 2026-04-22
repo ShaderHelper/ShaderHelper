@@ -126,18 +126,6 @@ namespace SH
 		);
 
 		UICommandList->MapAction(
-			SceneViewCommands::Get().GizmoMove,
-			FExecuteAction::CreateLambda([this] { CurProject->GizmoMode = GizmoMode::Move; })
-		);
-		UICommandList->MapAction(
-			SceneViewCommands::Get().GizmoRotate,
-			FExecuteAction::CreateLambda([this] { CurProject->GizmoMode = GizmoMode::Rotate; })
-		);
-		UICommandList->MapAction(
-			SceneViewCommands::Get().GizmoScale,
-			FExecuteAction::CreateLambda([this] { CurProject->GizmoMode = GizmoMode::Scale; })
-		);
-		UICommandList->MapAction(
 			EditorCommands::Get().Undo,
 			FExecuteAction::CreateLambda([this] { DoUndoActive(); }),
 			FCanExecuteAction::CreateLambda([this] { return CanUndoActive(); }),
@@ -1137,10 +1125,10 @@ namespace SH
 
 		GraphPanel->SetGraphData(InGraphData);
 		CurProject->Graph = InGraphData;
+        ViewPort->Clear();
         
         if(!InGraphData)
         {
-            ViewPort->Clear();
 			SceneView->SetRender(nullptr);
         }
 		else if (auto* RenderGraph = dynamic_cast<Render*>(InGraphData.Get()))
