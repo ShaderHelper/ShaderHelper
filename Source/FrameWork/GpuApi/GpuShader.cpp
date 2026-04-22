@@ -685,13 +685,21 @@ namespace FW
 				Output.Name = RawName;
 			}
 
+			Output.Type = GetTypeStr(Var.PointerType->PointeeType, ShaderLanguage);
+
+			bool bHasLocation = false;
 			for (auto It = MetaContext.Decorations.CreateConstKeyIterator(Id); It; ++It)
 			{
 				if (It.Value().Kind == SpvDecorationKind::Location)
 				{
 					Output.Location = It.Value().Location.Number;
+					bHasLocation = true;
 					break;
 				}
+			}
+			if (!bHasLocation)
+			{
+				continue;
 			}
 
 			Semantics.Add(MoveTemp(Output));
@@ -768,13 +776,21 @@ namespace FW
 				Input.Name = RawName;
 			}
 
+			Input.Type = GetTypeStr(Var.PointerType->PointeeType, ShaderLanguage);
+
+			bool bHasLocation = false;
 			for (auto It = MetaContext.Decorations.CreateConstKeyIterator(Id); It; ++It)
 			{
 				if (It.Value().Kind == SpvDecorationKind::Location)
 				{
 					Input.Location = It.Value().Location.Number;
+					bHasLocation = true;
 					break;
 				}
+			}
+			if (!bHasLocation)
+			{
+				continue;
 			}
 
 			Semantics.Add(MoveTemp(Input));

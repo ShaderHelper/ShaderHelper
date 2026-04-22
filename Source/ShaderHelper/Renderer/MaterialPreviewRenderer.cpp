@@ -306,6 +306,12 @@ namespace SH
 						FString Desc = FString::Printf(TEXT("(location %d) %s"), PsInput.Location, *PsInput.Name);
 						MissingSemantics.Add(MoveTemp(Desc));
 					}
+					else if (!MatchingVsOutput->Type.IsEmpty() && !PsInput.Type.IsEmpty()
+						&& !MatchingVsOutput->Type.Equals(PsInput.Type, ESearchCase::IgnoreCase))
+					{
+						MissingSemantics.Add(FString::Printf(TEXT("(location %d) %s (type mismatch: VS=%s, PS=%s)"),
+							PsInput.Location, *PsInput.Name, *MatchingVsOutput->Type, *PsInput.Type));
+					}
 				}
 			}
 			if (MissingSemantics.Num() > 0)

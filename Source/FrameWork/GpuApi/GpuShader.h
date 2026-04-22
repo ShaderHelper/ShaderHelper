@@ -161,6 +161,7 @@ namespace FW
 		FString SemanticName;
 		uint32 SemanticIndex = 0;
 		uint32 Location = 0;
+		FString Type;
 		bool bRead = false;
 		bool bWritten = false;
 	};
