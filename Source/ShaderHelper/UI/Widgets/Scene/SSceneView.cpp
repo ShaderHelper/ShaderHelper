@@ -1,4 +1,4 @@
-﻿#include "CommonHeader.h"
+#include "CommonHeader.h"
 #include "SSceneView.h"
 #include "AssetObject/Render/MeshSceneObject.h"
 #include "AssetObject/Render/CameraSceneObject.h"
@@ -6,6 +6,7 @@
 #include "AssetManager/AssetManager.h"
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
+#include "Editor/SceneViewCommands.h"
 #include "UI/Widgets/Misc/MiscWidget.h"
 #include "UI/Widgets/AssetBrowser/AssetViewItem/AssetViewItem.h"
 
@@ -18,6 +19,17 @@ namespace SH
 {
 	void SSceneView::Construct(const FArguments& InArgs)
 	{
+		CommandList = MakeShared<FUICommandList>();
+		CommandList->MapAction(
+			SceneViewCommands::Get().DeleteObject,
+			FExecuteAction::CreateLambda([this]() { DeleteSelected(); }),
+			FCanExecuteAction::CreateLambda([this]() { return SelectedObject.IsValid(); })
+		);
+		CommandList->MapAction(
+			SceneViewCommands::Get().RenameObject,
+			FExecuteAction::CreateLambda([this]() { BeginRenameSelected(); }),
+			FCanExecuteAction::CreateLambda([this]() { return SelectedObject.IsValid(); })
+		);
 		ChildSlot
 		[
 			SNew(SVerticalBox)
@@ -30,6 +42,7 @@ namespace SH
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot()
+				.HAlign(HAlign_Left)
 				.AutoWidth()
 				[
 					SNew(SComboButton)
@@ -43,17 +56,6 @@ namespace SH
 					[
 						MakeAddMenu()
 					]
-				]
-				+ SHorizontalBox::Slot()
-				.HAlign(HAlign_Right)
-				.Padding(4, 0, 4, 0)
-				[
-					SNew(SIconButton)
-					.Icon(FAppStyle::Get().GetBrush("Icons.Delete"))
-					.OnClicked_Lambda([this]() {
-						DeleteSelected();
-						return FReply::Handled();
-					})
 				]
 			]
 			+ SVerticalBox::Slot()
@@ -131,6 +133,11 @@ namespace SH
 						Mgr->PushCommand(MakeShared<AddSceneObjectCommand>(this, CurRender, Obj, Index));
 					}
 					RefreshSceneItems();
+					SelectObjectInternal(Obj.Get());
+					FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this](float) -> bool {
+						BeginRenameSelected();
+						return false;
+					}));
 				}
 			}))
 		);
@@ -149,6 +156,11 @@ namespace SH
 						Mgr->PushCommand(MakeShared<AddSceneObjectCommand>(this, CurRender, Obj, Index));
 					}
 					RefreshSceneItems();
+					SelectObjectInternal(Obj.Get());
+					FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this](float) -> bool {
+						BeginRenameSelected();
+						return false;
+					}));
 				}
 			}))
 		);
@@ -163,23 +175,9 @@ namespace SH
 			return SNullWidget::NullWidget;
 		}
 
-		FMenuBuilder MenuBuilder(true, nullptr);
-		MenuBuilder.AddMenuEntry(
-			LOCALIZATION("Rename"),
-			FText::GetEmpty(),
-			FSlateIcon(FAppStyle::Get().GetStyleSetName(), "GenericCommands.Rename"),
-			FUIAction(FExecuteAction::CreateLambda([this]() {
-				BeginRenameSelected();
-			}))
-		);
-		MenuBuilder.AddMenuEntry(
-			LOCALIZATION("Delete"),
-			FText::GetEmpty(),
-			FSlateIcon(FAppStyle::Get().GetStyleSetName(), "GenericCommands.Delete"),
-			FUIAction(FExecuteAction::CreateLambda([this]() {
-				DeleteSelected();
-			}))
-		);
+		FMenuBuilder MenuBuilder(true, CommandList);
+		MenuBuilder.AddMenuEntry(SceneViewCommands::Get().RenameObject);
+		MenuBuilder.AddMenuEntry(SceneViewCommands::Get().DeleteObject);
 
 		return MenuBuilder.MakeWidget();
 	}
@@ -385,6 +383,15 @@ namespace SH
 		{
 			ShEditor->ShowProperty(SelectedObject.Get());
 		}
+	}
+
+	FReply SSceneView::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+	{
+		if (CommandList->ProcessCommandBindings(InKeyEvent))
+		{
+			return FReply::Handled();
+		}
+		return FReply::Unhandled();
 	}
 
 	void SSceneView::OnDragEnter(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)

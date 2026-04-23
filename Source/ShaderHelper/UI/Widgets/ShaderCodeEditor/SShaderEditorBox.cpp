@@ -2327,7 +2327,7 @@ constexpr int PaddingLineNum = 22;
 		RefreshBracketHighlight();
 
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->AddNavigationInfo(ShaderAssetObj->GetGuid(), InLocation);
+		ShEditor->AddNavigationInfo(ShaderAssetObj, InLocation);
 
 		TSharedPtr<SWindow> ShaderEditorTipWindow = ShEditor->GetShaderEditorTipWindow();
 		ShaderEditorTipWindow->SetContent(SNullWidget::NullWidget);

@@ -3,12 +3,104 @@
 #include "ProjectManager/ProjectManager.h"
 #include "UI/Widgets/Property/PropertyData/PropertyData.h"
 #include "UI/Widgets/Property/PropertyData/PropertyAssetItem.h"
+#include "UI/Widgets/Property/PropertyData/PropertyObjectItem.h"
 #include "PluginManager/PluginManager.h"
 
 namespace FW
 {
     REFLECTION_REGISTER(AddClass<ShObject>())
     REFLECTION_REGISTER(AddClass<ShObjectOp>())
+
+	namespace
+	{
+		struct ObjectPtrFixupContext
+		{
+			TMap<FGuid, ShObject*> GuidToObject;
+			TArray<ObjectPtrFixupRequest> Requests;
+		};
+
+		TArray<TUniquePtr<ObjectPtrFixupContext>>& GetObjectPtrFixupStack()
+		{
+			static TArray<TUniquePtr<ObjectPtrFixupContext>> FixupStack;
+			return FixupStack;
+		}
+
+		ObjectPtrFixupContext* GetCurrentObjectPtrFixupContext()
+		{
+			auto& FixupStack = GetObjectPtrFixupStack();
+			return FixupStack.IsEmpty() ? nullptr : FixupStack.Last().Get();
+		}
+	}
+
+	void BeginObjectPtrFixup()
+	{
+		GetObjectPtrFixupStack().Add(MakeUnique<ObjectPtrFixupContext>());
+	}
+
+	void ResolveObjectPtrFixups()
+	{
+		ObjectPtrFixupContext* Context = GetCurrentObjectPtrFixupContext();
+		if (!Context)
+		{
+			return;
+		}
+
+		for (const ObjectPtrFixupRequest& Request : Context->Requests)
+		{
+			if (!Request.Guid.IsValid())
+			{
+				continue;
+			}
+
+			ShObject** ResolvedObjectPtr = Context->GuidToObject.Find(Request.Guid);
+			if (!ResolvedObjectPtr || !*ResolvedObjectPtr)
+			{
+				SH_LOG(LogFrameWorkCore, Warning, TEXT("Failed to resolve object pointer guid: %s"), *Request.Guid.ToString());
+				continue;
+			}
+
+			bool bTypeMatched = false;
+			for (MetaType* CurMetaType = (*ResolvedObjectPtr)->DynamicMetaType(); CurMetaType; CurMetaType = CurMetaType->GetBaseClass())
+			{
+				if (CurMetaType == Request.TargetMetaType)
+				{
+					bTypeMatched = true;
+					break;
+				}
+			}
+
+			if (!bTypeMatched)
+			{
+				SH_LOG(LogFrameWorkCore, Warning, TEXT("Resolved guid %s with mismatched type."), *Request.Guid.ToString());
+				continue;
+			}
+
+			Request.AssignResolvedObject(Request.ObjectPtrAddress, *ResolvedObjectPtr);
+		}
+	}
+
+	void EndObjectPtrFixup()
+	{
+		auto& FixupStack = GetObjectPtrFixupStack();
+		check(!FixupStack.IsEmpty());
+		FixupStack.Pop();
+	}
+
+	void RegisterLoadedShObject(ShObject* InObject)
+	{
+		if (ObjectPtrFixupContext* Context = GetCurrentObjectPtrFixupContext())
+		{
+			Context->GuidToObject.FindOrAdd(InObject->GetGuid()) = InObject;
+		}
+	}
+
+	void RegisterObjectPtrFixup(const ObjectPtrFixupRequest& InRequest)
+	{
+		if (ObjectPtrFixupContext* Context = GetCurrentObjectPtrFixupContext())
+		{
+			Context->Requests.Add(InRequest);
+		}
+	}
 	
 	TArray<TSharedRef<PropertyData>> GeneratePropertyDatas(ShObject* InObject, const MetaMemberData* MetaMemData, void* Instance, bool bForce)
 	{
@@ -38,6 +130,24 @@ namespace FW
 		{
 			void* AssetPtrRef = MetaMemData->Get(Instance);
 			Item = MakeShared<PropertyAssetItem>(InObject, MetaMemData->MemberName, MemberMetaType, AssetPtrRef);
+		}
+		else if (MetaMemData->IsShObjectRef())
+		{
+			Item = MakeShared<PropertyObjectItem>(
+				InObject,
+				MetaMemData->MemberName,
+				MemberMetaType,
+				[MetaMemData, Instance]() {
+					return MetaMemData->GetReferencedShObject ? MetaMemData->GetReferencedShObject(Instance) : nullptr;
+				},
+				[MetaMemData, Instance](ShObject* NewObject) {
+					if (MetaMemData->SetReferencedShObject)
+					{
+						MetaMemData->SetReferencedShObject(Instance, NewObject);
+					}
+				},
+				ReadOnly
+			);
 		}
 		//IsEnum
 		else if(MetaMemData->GetEnumValueName)
@@ -257,6 +367,10 @@ namespace FW
 	void ShObject::Serialize(FArchive& Ar)
 	{
 		Ar << Guid;
+		if (Ar.IsLoading())
+		{
+			RegisterLoadedShObject(this);
+		}
 		ShSerializeText(Ar, ObjectName);
 	}
 

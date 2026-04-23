@@ -23,6 +23,12 @@ namespace FW
 		return MemberMetaType ? MemberMetaType->IsDerivedFrom<AssetObject>() : false;
     }
 
+	bool MetaMemberData::IsShObjectRef() const
+	{
+		MetaType* MemberMetaType = GetMetaType();
+		return MemberMetaType && MemberMetaType->IsDerivedFrom<ShObject>();
+	}
+
 	void* MetaType::GetDefaultObject()
 	{
 		if (!DefaultObject && Constructor)

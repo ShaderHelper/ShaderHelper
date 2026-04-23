@@ -104,10 +104,13 @@ namespace SH
 			CodeEditorCommands::Get().GoBack,
 			FExecuteAction::CreateLambda([this] {
 				NavigationIndex--;
-				const auto& [Id, Location] = NavigationHistory[NavigationIndex];
-				auto LoadedShaderAsset = TSingleton<AssetManager>::Get().LoadAssetByGuid<ShaderAsset>(Id);
-				OpenShaderTab(MoveTemp(LoadedShaderAsset));
-				GetShaderEditor(LoadedShaderAsset)->JumpTo(Location);
+				const auto& [ShaderAssetObj, Location] = NavigationHistory[NavigationIndex];
+				if (!ShaderAssetObj)
+				{
+					return;
+				}
+				OpenShaderTab(ShaderAssetObj);
+				GetShaderEditor(ShaderAssetObj)->JumpTo(Location);
 			}),
 			FCanExecuteAction::CreateLambda([this] { return NavigationIndex > 0; }),
 			EUIActionRepeatMode::RepeatEnabled
@@ -116,10 +119,13 @@ namespace SH
 			CodeEditorCommands::Get().GoForward,
 			FExecuteAction::CreateLambda([this] {
 				NavigationIndex++;
-				const auto& [Id, Location] = NavigationHistory[NavigationIndex];
-				auto LoadedShaderAsset = TSingleton<AssetManager>::Get().LoadAssetByGuid<ShaderAsset>(Id);
-				OpenShaderTab(MoveTemp(LoadedShaderAsset));
-				GetShaderEditor(LoadedShaderAsset)->JumpTo(Location);
+				const auto& [ShaderAssetObj, Location] = NavigationHistory[NavigationIndex];
+				if (!ShaderAssetObj)
+				{
+					return;
+				}
+				OpenShaderTab(ShaderAssetObj);
+				GetShaderEditor(ShaderAssetObj)->JumpTo(Location);
 			}),
 			FCanExecuteAction::CreateLambda([this] { return NavigationIndex < NavigationHistory.Num() - 1; }),
 			EUIActionRepeatMode::RepeatEnabled
@@ -731,21 +737,26 @@ namespace SH
         }
     }
 
-	void ShaderHelperEditor::AddNavigationInfo(const FGuid& Id, const FTextLocation& InLocation)
+	void ShaderHelperEditor::AddNavigationInfo(FW::AssetPtr<ShaderAsset> InShader, const FTextLocation& InLocation)
 	{
+		if (!InShader)
+		{
+			return;
+		}
+
 		if (NavigationHistory.Num() > 0)
 		{			
-			if (NavigationHistory[NavigationIndex].Key == Id && 
+			if (NavigationHistory[NavigationIndex].Key == InShader && 
 				(NavigationHistory[NavigationIndex].Value == InLocation || NavigationHistory[NavigationIndex].Value == FTextLocation{} || FMath::Abs(NavigationHistory[NavigationIndex].Value.GetLineIndex() - InLocation.GetLineIndex()) < 8))
 			{
-				NavigationHistory[NavigationIndex] = {Id, InLocation};
+				NavigationHistory[NavigationIndex] = {InShader, InLocation};
 				return;
 			}
 		}
 
 		NavigationIndex++;
 		NavigationHistory.SetNum(NavigationIndex);
-		NavigationHistory.Emplace(Id, InLocation);
+		NavigationHistory.Emplace(InShader, InLocation);
 
 		if (NavigationHistory.Num() > MaxNavigation)
 		{
@@ -886,7 +897,7 @@ namespace SH
             {
                 ShaderEditors[LoadedShader]->SetFocus();
 				auto ShaderEditor = GetShaderEditor(static_cast<ShaderAsset*>(LoadedShader));
-				AddNavigationInfo(LoadedShader->GetGuid(), ShaderEditor->ShaderMultiLineEditableText->GetCursorLocation());
+				AddNavigationInfo(LoadedShader, ShaderEditor->ShaderMultiLineEditableText->GetCursorLocation());
             }
             
         }));
@@ -1184,12 +1195,12 @@ namespace SH
                 CodeTabManager->InsertNewDocumentTab(InitialInsertPointTabId, ShaderTabId, FTabManager::FRequireClosedTab{}, NewShaderTab, true);
             }
             NewShaderTab->ActivateInParent(ETabActivationCause::SetDirectly);
-			AddNavigationInfo(InShader->GetGuid(), {});
+			AddNavigationInfo(InShader, {});
         }
         else if(!(*TabPtr)->IsActive())
         {
             (*TabPtr)->ActivateInParent(ETabActivationCause::SetDirectly);
-			AddNavigationInfo(InShader->GetGuid(), GetShaderEditor(InShader)->ShaderMultiLineEditableText->GetCursorLocation());
+			AddNavigationInfo(InShader, GetShaderEditor(InShader)->ShaderMultiLineEditableText->GetCursorLocation());
         }
 
 		GetShaderEditor(InShader)->SetFocus();

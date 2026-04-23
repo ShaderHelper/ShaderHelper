@@ -55,6 +55,15 @@ namespace SH
 			SceneViewCommands::Get().GizmoScale,
 			FExecuteAction::CreateLambda([ShEditor] { ShEditor->SetGizmoMode(GizmoMode::Scale); })
 		);
+		SceneCommandList->MapAction(
+			SceneViewCommands::Get().DeleteObject,
+			FExecuteAction::CreateLambda([ShEditor] {
+				ShEditor->GetSceneView()->DeleteSelected();
+			}),
+			FCanExecuteAction::CreateLambda([ShEditor] {
+				return ShEditor->GetSceneView()->GetSelectedObject() != nullptr;
+			})
+		);
 
 		// Create graph comp for custom mode
 		GraphComp = MakeUnique<RenderRenderComp>(InRenderGraph, InViewPort);
@@ -526,6 +535,8 @@ namespace SH
 		}
 		ViewPort->SetViewPortRenderTexture(FinalRT);
 
+		//GGpuRhi->BeginGpuCapture("RenderPreview");
+
 		FW::RenderGraph Graph;
 
 		// Render meshes first (clears color + depth on first draw)
@@ -572,6 +583,8 @@ namespace SH
 		}
 
 		Graph.Execute();
+
+		//GGpuRhi->EndGpuCapture();
 	}
 
 	void RenderSceneRenderComp::RenderGraph()

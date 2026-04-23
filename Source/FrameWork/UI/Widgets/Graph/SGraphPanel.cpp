@@ -117,7 +117,7 @@ namespace FW
 	void SGraphPanel::AddLink(SGraphPin* Output, SGraphPin* Input)
 	{
 		Input->PinData->Accept(Output->PinData);
-		Input->PinData->SourcePin = Output->PinData->GetGuid();
+		Input->PinData->SourcePin = Output->PinData;
 		GraphData->AddLink(Output->PinData, Input->PinData);
 		Links.AddUnique(Output, Input);
 	}
@@ -126,9 +126,12 @@ namespace FW
 	{
 		Links.Remove(Output, Input);
 		Output->Owner->RemoveDep(Input->Owner);
-		Input->PinData->SourcePin.Invalidate();
-		auto Kkey = Output->Owner->NodeData->OutPinToInPin.FindKey(Input->PinData->GetGuid());
-		Output->Owner->NodeData->OutPinToInPin.Remove(*Kkey, Input->PinData->GetGuid());
+		Input->PinData->SourcePin.Reset();
+		auto Kkey = Output->Owner->NodeData->OutPinToInPin.FindKey(Input->PinData);
+		if (Kkey)
+		{
+			Output->Owner->NodeData->OutPinToInPin.Remove(*Kkey, Input->PinData);
+		}
 		Input->PinData->Refuse();
 	}
 
@@ -184,10 +187,10 @@ namespace FW
 
 			for (auto& NodeData : GraphData->GetNodes())
 			{
-				for (auto [OutPinId, InPinId] : NodeData->OutPinToInPin)
+				for (auto [OutPinPtr, InPinPtr] : NodeData->OutPinToInPin)
 				{
-					SGraphPin* OutPin = GetGraphPin(OutPinId);
-					SGraphPin* InPin = GetGraphPin(InPinId);
+					SGraphPin* OutPin = GetGraphPin(OutPinPtr.GetGuid());
+					SGraphPin* InPin = GetGraphPin(InPinPtr.GetGuid());
 					if (OutPin && InPin)
 					{
 						AddLink(OutPin, InPin);

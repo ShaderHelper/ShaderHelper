@@ -1,4 +1,5 @@
 #include "CommonHeader.h"
+#include "AssetManager/AssetManager.h"
 #include "Graph.h"
 #include "UI/Widgets/Graph/SGraphNode.h"
 #include "UI/Widgets/Graph/SGraphPanel.h"
@@ -76,12 +77,12 @@ namespace FW
 		TArray<ObjectPtr<GraphNode>> ExecNodes = NodeDatas;
 
         AnyError = !Algo::TopologicalSort(ExecNodes, [this](const ObjectPtr<GraphNode>& Element) {
-			TArray<FGuid> DepIds;
-			NodeDeps.MultiFind(Element->GetGuid(), DepIds);
+			TArray<ObserverObjectPtr<GraphNode>> DepNodePtrs;
+			NodeDeps.MultiFind(Element, DepNodePtrs);
 			TArray<ObjectPtr<GraphNode>> DepNodes;
-			for (FGuid Id : DepIds)
+			for (const ObserverObjectPtr<GraphNode>& DepNodePtr : DepNodePtrs)
 			{
-				if (GraphNode* Node = GetNode(Id))
+				if (GraphNode* Node = DepNodePtr.Get())
 				{
 					DepNodes.Add(Node);
 				}
@@ -186,13 +187,17 @@ namespace FW
         GraphNode* Owner = static_cast<GraphNode*>(GetOuter());
         Graph* OwnerGraph = static_cast<Graph*>(Owner->GetOuter());
         
-        TArray<FGuid> TargetPinGuids;
-        Owner->OutPinToInPin.MultiFind(GetGuid(), TargetPinGuids);
+		TArray<ObserverObjectPtr<GraphPin>> TargetPinPtrs;
+		ObserverObjectPtr<GraphPin> ThisPin(const_cast<GraphPin*>(this));
+		Owner->OutPinToInPin.MultiFind(ThisPin, TargetPinPtrs);
         
         TArray<GraphPin*> TargetPins;
-        for(FGuid PinGuid :TargetPinGuids)
+		for (const ObserverObjectPtr<GraphPin>& TargetPinPtr : TargetPinPtrs)
         {
-            TargetPins.Add(OwnerGraph->GetPin(PinGuid));
+			if (GraphPin* TargetPin = TargetPinPtr.Get())
+			{
+				TargetPins.Add(TargetPin);
+			}
         }
         
         return TargetPins;
@@ -200,9 +205,7 @@ namespace FW
 
 	GraphPin* GraphPin::GetSourcePin() const
 	{
-		GraphNode* Owner = static_cast<GraphNode*>(GetOuter());
-		Graph* OwnerGraph = static_cast<Graph*>(Owner->GetOuter());
-		return OwnerGraph->GetPin(SourcePin);
+		return SourcePin.Get();
 	}
 
 	GraphNode* GraphPin::GetSourceNode() const

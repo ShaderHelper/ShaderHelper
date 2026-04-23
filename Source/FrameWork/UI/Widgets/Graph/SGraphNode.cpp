@@ -149,18 +149,18 @@ namespace FW
 		{
 			if (Pin->PinData->Direction == PinDirection::Input && Pin->PinData->SourcePin.IsValid())
 			{
-				if (SGraphPin* OutputPin = Owner->GetGraphPin(Pin->PinData->SourcePin))
+				if (SGraphPin* OutputPin = Owner->GetGraphPin(Pin->PinData->SourcePin.GetGuid()))
 				{
 					Owner->Links.AddUnique(OutputPin, Pin);
 				}
 			}
 			else if (Pin->PinData->Direction == PinDirection::Output)
 			{
-				TArray<FGuid> LinkedInputGuids;
-				NodeData->OutPinToInPin.MultiFind(Pin->PinData->GetGuid(), LinkedInputGuids);
-				for (const FGuid& InputGuid : LinkedInputGuids)
+				TArray<ObserverObjectPtr<GraphPin>> LinkedInputPins;
+				NodeData->OutPinToInPin.MultiFind(Pin->PinData, LinkedInputPins);
+				for (const ObserverObjectPtr<GraphPin>& InputPinPtr : LinkedInputPins)
 				{
-					if (SGraphPin* InputPin = Owner->GetGraphPin(InputGuid))
+					if (SGraphPin* InputPin = Owner->GetGraphPin(InputPinPtr.GetGuid()))
 					{
 						Owner->Links.AddUnique(Pin, InputPin);
 					}

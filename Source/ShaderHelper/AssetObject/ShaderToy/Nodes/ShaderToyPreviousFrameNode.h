@@ -38,8 +38,8 @@ namespace SH
 		void UpdatePassNodes();
 
 	private:
-		FGuid PassNode;
-		TArray<TSharedPtr<FGuid>> AllPassNodes;
+		FW::ObserverObjectPtr<ShaderToyPassNode> PassNode;
+		TArray<TSharedPtr<FW::ObserverObjectPtr<ShaderToyPassNode>>> AllPassNodes;
 		TRefCountPtr<FW::GpuTexture> PreFramePassTex;
 	};
 }

@@ -6,6 +6,7 @@
 namespace FW
 {
 	struct MetaType;
+	class ShObject;
     enum class ObjectOwnerShip;
     template<typename T, ObjectOwnerShip> class ObjectPtr;
     template<typename T>
@@ -79,6 +80,7 @@ namespace FW
         }
         
         bool IsAssetRef() const;
+		bool IsShObjectRef() const;
         
 		FText MemberName;
         FString TypeName;
@@ -89,6 +91,8 @@ namespace FW
         
 		//return nullptr for basic types
 		MetaType*(*GetMetaType)() = nullptr;
+		ShObject*(*GetReferencedShObject)(void*) = nullptr;
+		void(*SetReferencedShObject)(void*, ShObject*) = nullptr;
 		
 		FString(*GetEnumValueName)(void*) = nullptr;
 		TMap<FString, TSharedPtr<void>> EnumEntries;
@@ -241,10 +245,19 @@ namespace FW
             {
                 //the metatype of member may not be registered at the moment, so lazy getting.
 				MemberData.GetMetaType = [] { return GetMetaType<typename object_ptr_trait<RawType>::type>(); };
+				MemberData.GetReferencedShObject = [](void* Instance) -> ShObject* {
+					return static_cast<ShObject*>((((T*)Instance)->*DataPtr).Get());
+				};
+				MemberData.SetReferencedShObject = [](void* Instance, ShObject* Value) {
+					using PointeeType = typename object_ptr_trait<RawType>::type;
+					(((T*)Instance)->*DataPtr) = static_cast<PointeeType*>(Value);
+				};
             }
 			else
 			{
 				MemberData.GetMetaType = [] { return TryGetMetaType<RawType>(); };
+				MemberData.GetReferencedShObject = nullptr;
+				MemberData.SetReferencedShObject = nullptr;
 			}
  
             Meta->Datas.Add(MoveTemp(MemberData));

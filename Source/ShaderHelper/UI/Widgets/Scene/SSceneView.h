@@ -51,6 +51,8 @@ namespace SH
 		SceneObject* GetSelectedObject() const { return SelectedObject.Get(); }
 		void SelectObject(SceneObject* InObject);
 		void RefreshSceneItems();
+		void DeleteSelected();
+		void BeginRenameSelected();
 
 		SceneUndoManager* GetUndoManager();
 		void Undo();
@@ -61,6 +63,7 @@ namespace SH
 		void OnDragEnter(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent) override;
 		void OnDragLeave(const FDragDropEvent& DragDropEvent) override;
 		FReply OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent) override;
+		FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 
 	private:
 		void SelectObjectInternal(SceneObject* InObject);
@@ -68,8 +71,6 @@ namespace SH
 		TSharedRef<SWidget> MakeAddMenu();
 		TSharedPtr<SWidget> CreateContextMenu();
 		void OnSelectionChanged(SceneObjectListItemPtr Item, ESelectInfo::Type SelectInfo);
-		void DeleteSelected();
-		void BeginRenameSelected();
 
 	private:
 		Render* CurRender = nullptr;
@@ -79,5 +80,6 @@ namespace SH
 
 		TMap<Render*, TUniquePtr<SceneUndoManager>> UndoManagers;
 		bool bIgnoreSelectionChanged = false;
+		TSharedPtr<FUICommandList> CommandList;
 	};
 }

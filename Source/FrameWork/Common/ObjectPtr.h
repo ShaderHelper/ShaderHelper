@@ -10,53 +10,39 @@ namespace FW
         
     public:
         ObjectPtr(T* InReference = nullptr)
-            : Reference(InReference)
         {
-            if (OwnerShip != ObjectOwnerShip::Assign)
-            {
-                if(Reference)
-                {
-                    Reference->Add();
-                }
-            }
+            SetReference(InReference);
         }
         
         ~ObjectPtr()
         {
-            if (OwnerShip != ObjectOwnerShip::Assign)
-            {
-                if(IsValid())
-                {
-                    Reference->Release();
-                }
-            }
+            ReleaseReference();
         }
         
-        ObjectPtr(const ObjectPtr& Copy) : Reference(Copy.Reference)
+        ObjectPtr(const ObjectPtr& Copy)
         {
-            if (OwnerShip != ObjectOwnerShip::Assign)
-            {
-                if(Reference)
-                {
-                    Reference->Add();
-                }
-            }
+            SetReference(Copy.Reference);
+            Guid = Copy.Guid;
         }
 
         template<typename OtherType, ObjectOwnerShip OtherOwnerShip>
 		requires std::is_convertible_v<OtherType*, T*>
-        ObjectPtr(const ObjectPtr<OtherType, OtherOwnerShip>& Copy) : Reference(Copy.Reference)
+        ObjectPtr(const ObjectPtr<OtherType, OtherOwnerShip>& Copy)
         {
-            if (OwnerShip != ObjectOwnerShip::Assign)
-            {
-                if(Reference)
-                {
-                    Reference->Add();
-                }
-            }
+            SetReference(Copy.Reference);
+            Guid = Copy.Guid;
         }
         
         ObjectPtr& operator=(const ObjectPtr& OtherObjectPtr)
+        {
+            ObjectPtr Temp{ OtherObjectPtr };
+            Swap(Temp, *this);
+            return *this;
+        }
+
+        template<typename OtherType, ObjectOwnerShip OtherOwnerShip>
+		requires std::is_convertible_v<OtherType*, T*>
+        ObjectPtr& operator=(const ObjectPtr<OtherType, OtherOwnerShip>& OtherObjectPtr)
         {
             ObjectPtr Temp{ OtherObjectPtr };
             Swap(Temp, *this);
@@ -71,6 +57,44 @@ namespace FW
 
 		T* Get() const { return Reference; }
 
+        FGuid GetGuid() const
+        {
+            return Reference ? Reference->GetGuid() : Guid;
+        }
+
+        void SetReference(T* InReference)
+        {
+            if (Reference == InReference)
+            {
+                Guid = Reference ? Reference->GetGuid() : FGuid{};
+                return;
+            }
+
+            ReleaseReference();
+            Reference = InReference;
+            if (OwnerShip != ObjectOwnerShip::Assign)
+            {
+                if (Reference)
+                {
+                    Reference->Add();
+                }
+            }
+            Guid = Reference ? Reference->GetGuid() : FGuid{};
+        }
+
+        void Reset()
+        {
+            ReleaseReference();
+            Reference = nullptr;
+            Guid = {};
+        }
+
+        void SetGuid(const FGuid& InGuid)
+        {
+            Guid = InGuid;
+            check(!Reference || Reference->GetGuid() == Guid);
+        }
+
         operator T*() const
         {
             return Reference;
@@ -84,20 +108,31 @@ namespace FW
         explicit operator bool() const
         {
             return IsValid();
-        }
-        
+        }        
         friend uint32 GetTypeHash(const ObjectPtr& InPtr)
         {
-            return GetTypeHash(InPtr->GetGuid());
+			return GetTypeHash(InPtr.GetGuid());
         }
         
         template<typename OtherType, ObjectOwnerShip OtherOwnerShip>
         bool operator==(const ObjectPtr<OtherType, OtherOwnerShip>& Other) const
         {
-            return Reference == Other.Reference;
+            return GetGuid() == Other.GetGuid();
         }
                 
     private:
-        T* Reference;
+        void ReleaseReference()
+        {
+            if (OwnerShip != ObjectOwnerShip::Assign)
+            {
+                if (IsValid())
+                {
+                    Reference->Release();
+                }
+            }
+        }
+
+        T* Reference = nullptr;
+        FGuid Guid{};
     };
 }

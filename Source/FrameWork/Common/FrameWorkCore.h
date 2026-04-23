@@ -2,8 +2,13 @@
 
 namespace FW
 {
+	DECLARE_LOG_CATEGORY_EXTERN(LogFrameWorkCore, Log, All);
+	inline DEFINE_LOG_CATEGORY(LogFrameWorkCore);
+
     class PropertyData;
     class AssetObject;
+	struct MetaType;
+	class ShObject;
     
     enum class ObjectOwnerShip
     {
@@ -15,6 +20,41 @@ namespace FW
 
     template<typename T>
     using ObserverObjectPtr = ObjectPtr<T, ObjectOwnerShip::Assign>;
+
+	class ShObjectDragDropOp : public FDragDropOperation
+	{
+	public:
+		DRAG_DROP_OPERATOR_TYPE(ShObjectDragDropOp, FDragDropOperation)
+
+		static TSharedRef<ShObjectDragDropOp> New(ShObject* InObject)
+		{
+			TSharedRef<ShObjectDragDropOp> Operation = MakeShareable(new ShObjectDragDropOp(InObject));
+			Operation->MouseCursor = EMouseCursor::GrabHandClosed;
+			Operation->Construct();
+			return Operation;
+		}
+
+		ShObject* Object = nullptr;
+
+	private:
+		explicit ShObjectDragDropOp(ShObject* InObject)
+			: Object(InObject)
+		{}
+	};
+
+	struct ObjectPtrFixupRequest
+	{
+		void* ObjectPtrAddress = nullptr;
+		FGuid Guid;
+		MetaType* TargetMetaType = nullptr;
+		void(*AssignResolvedObject)(void*, ShObject*) = nullptr;
+	};
+
+	FRAMEWORK_API void BeginObjectPtrFixup();
+	FRAMEWORK_API void ResolveObjectPtrFixups();
+	FRAMEWORK_API void EndObjectPtrFixup();
+	FRAMEWORK_API void RegisterLoadedShObject(ShObject* InObject);
+	FRAMEWORK_API void RegisterObjectPtrFixup(const ObjectPtrFixupRequest& InRequest);
       
     //Note: All ShObject must be default constructible.
 	class FRAMEWORK_API ShObject : FNoncopyable

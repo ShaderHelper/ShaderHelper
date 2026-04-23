@@ -43,7 +43,7 @@ namespace FW
 		//The output pin relied upon when this pin is an input
 		GraphPin* GetSourcePin() const;
 		GraphNode* GetSourceNode() const;
-		FGuid SourcePin;
+		ObserverObjectPtr<GraphPin> SourcePin;
 	
 		PinDirection Direction = PinDirection::Output;
 	};
@@ -65,7 +65,7 @@ namespace FW
 
 		Vector2D Position{0};
         TArray<ObjectPtr<GraphPin>> Pins;
-		TMultiMap<FGuid, FGuid> OutPinToInPin;
+		TMultiMap<ObserverObjectPtr<GraphPin>, ObserverObjectPtr<GraphPin>> OutPinToInPin;
         bool AnyError = false;
 		bool HasResponse = false;
 		bool IsDebugging = false;
@@ -107,13 +107,13 @@ namespace FW
 		{
 			GraphNode* OutputNode = static_cast<GraphNode*>(Output->GetOuter());
 			GraphNode* InputNode = static_cast<GraphNode*>(Input->GetOuter());
-			OutputNode->OutPinToInPin.AddUnique(Output->GetGuid(), Input->GetGuid());
+			OutputNode->OutPinToInPin.AddUnique(Output, Input);
 			AddDep(OutputNode, InputNode);
 		}
 
 		const TArray<ObjectPtr<GraphNode>>& GetNodes() const { return NodeDatas; }
-		void AddDep(GraphNode* Node1, GraphNode* Node2) { NodeDeps.Add(Node1->GetGuid(), Node2->GetGuid()); }
-		void RemoveDep(GraphNode* Node1, GraphNode* Node2) { NodeDeps.Remove(Node1->GetGuid(), Node2->GetGuid()); }
+		void AddDep(GraphNode* Node1, GraphNode* Node2) { NodeDeps.Add(Node1, Node2); }
+		void RemoveDep(GraphNode* Node1, GraphNode* Node2) { NodeDeps.Remove(Node1, Node2); }
             
         GraphPin* GetPin(FGuid Id);
 	public:
@@ -131,7 +131,7 @@ namespace FW
 	protected:
 		//Keep layer order
 		TArray<ObjectPtr<GraphNode>> NodeDatas;
-		TMultiMap<FGuid, FGuid> NodeDeps;
+		TMultiMap<ObserverObjectPtr<GraphNode>, ObserverObjectPtr<GraphNode>> NodeDeps;
 	};
 
 	FRAMEWORK_API extern TMap<FString, TArray<MetaType*>> RegisteredNodes;
