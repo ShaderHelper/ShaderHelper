@@ -28,6 +28,65 @@ namespace SH
 		return nullptr;
 	}
 
+	static bool HasDroppableModelAsset(const TSharedPtr<FDragDropOperation>& DragDropOp)
+	{
+		if (!DragDropOp || !DragDropOp->IsOfType<AssetViewItemDragDropOp>())
+		{
+			return false;
+		}
+
+		const TArray<FString>& DropFilePaths = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Paths;
+		for (const FString& DropFilePath : DropFilePaths)
+		{
+			MetaType* DropAssetMetaType = GetAssetMetaType(DropFilePath);
+			if (DropAssetMetaType && DropAssetMetaType->IsType<Model>())
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	static bool HandleModelAssetDrop(SSceneView* SceneView, const TSharedPtr<FDragDropOperation>& DragDropOp, SceneObject* Parent = nullptr)
+	{
+		Render* Render = SceneView ? SceneView->GetRender() : nullptr;
+		if (!Render || !HasDroppableModelAsset(DragDropOp))
+		{
+			return false;
+		}
+
+		bool bAddedObject = false;
+		const TArray<FString>& DropFilePaths = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Paths;
+		for (const FString& DropFilePath : DropFilePaths)
+		{
+			MetaType* DropAssetMetaType = GetAssetMetaType(DropFilePath);
+			if (!DropAssetMetaType || !DropAssetMetaType->IsType<Model>())
+			{
+				continue;
+			}
+
+			AssetPtr<Model> ModelAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<Model>(DropFilePath);
+			auto MeshObj = Render->AddSceneObject<MeshSceneObject>(Parent);
+			MeshObj->ObjectName = ModelAsset->ObjectName;
+			MeshObj->ModelAsset = MoveTemp(ModelAsset);
+			int32 Index = Render->SceneObjects.Num() - 1;
+			int32 ParentChildIndex = Parent ? Parent->Children.Num() - 1 : INDEX_NONE;
+			SceneView->GetUndoManager().PushCommand(MakeShared<AddSceneObjectCommand>(SceneView, Render, MeshObj, Index, Parent, ParentChildIndex));
+			bAddedObject = true;
+		}
+
+		if (!bAddedObject)
+		{
+			return false;
+		}
+
+		SceneView->RefreshSceneItems();
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->ForceRender();
+		return true;
+	}
+
 	class SSceneObjectRow : public FW::SDropTargetTableRow<SceneObjectTreeItemPtr>
 	{
 	public:
@@ -46,7 +105,12 @@ namespace SH
 				STableRow<SceneObjectTreeItemPtr>::FArguments()
 				.Padding(FMargin{2, 1})
 				.OnDrop(FOnTableRowDrop::CreateLambda([this](const FDragDropEvent& DragDropEvent) -> FReply {
-					if (!SceneViewPtr || !Item) return FReply::Unhandled();
+					if (!SceneViewPtr || !Item || !Item->Object) return FReply::Unhandled();
+
+					if (HasDroppableModelAsset(DragDropEvent.GetOperation()))
+					{
+						return HandleModelAssetDrop(SceneViewPtr, DragDropEvent.GetOperation(), Item->Object.Get()) ? FReply::Handled() : FReply::Unhandled();
+					}
 
 					TArray<SceneObjectTreeItemPtr> DraggedItems;
 					if (auto TreeViewPin = TreeViewWeak.Pin())
@@ -108,7 +172,9 @@ namespace SH
 			);
 
 			SetDragFilter([this](const TSharedPtr<FDragDropOperation>& Op) -> bool {
-				if (!Op || !Op->IsOfType<ShObjectDragDropOp>()) return false;
+				if (!Op) return false;
+				if (HasDroppableModelAsset(Op)) return Item && Item->Object;
+				if (!Op->IsOfType<ShObjectDragDropOp>()) return false;
 				const auto ShOp = StaticCastSharedPtr<ShObjectDragDropOp>(Op);
 				if (!ShOp->Object || !dynamic_cast<SceneObject*>(ShOp->Object)) return false;
 				return IsValidDropTarget();
@@ -764,25 +830,24 @@ namespace SH
 	void SSceneView::OnDragEnter(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)
 	{
 		TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
-		if (CurRender && DragDropOp->IsOfType<AssetViewItemDragDropOp>())
+		if (!DragDropOp)
 		{
-			TArray<FString> DropFilePaths = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Paths;
-			for (const auto& DropFilePath : DropFilePaths)
-			{
-				MetaType* DropAssetMetaType = GetAssetMetaType(DropFilePath);
-				if (DropAssetMetaType && DropAssetMetaType->IsType<Model>())
-				{
-					DragDropOp->SetCursorOverride(EMouseCursor::GrabHand);
-					return;
-				}
-			}
-			DragDropOp->SetCursorOverride(EMouseCursor::SlashedCircle);
+			return;
 		}
-		else if (CurRender && DragDropOp->IsOfType<ShObjectDragDropOp>())
+
+		if (CurRender && HasDroppableModelAsset(DragDropOp))
+		{
+			DragDropOp->SetCursorOverride(EMouseCursor::GrabHand);
+			return;
+		}
+		if (CurRender && DragDropOp->IsOfType<ShObjectDragDropOp>())
 		{
 			// Dropping on the background = detach from parent (make root) — always valid
 			DragDropOp->SetCursorOverride(EMouseCursor::GrabHand);
+			return;
 		}
+
+		DragDropOp->SetCursorOverride(EMouseCursor::SlashedCircle);
 	}
 
 	void SSceneView::OnDragLeave(const FDragDropEvent& DragDropEvent)
@@ -801,24 +866,7 @@ namespace SH
 		TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
 		if (DragDropOp->IsOfType<AssetViewItemDragDropOp>())
 		{
-			TArray<FString> DropFilePaths = StaticCastSharedPtr<AssetViewItemDragDropOp>(DragDropOp)->Paths;
-			for (const auto& DropFilePath : DropFilePaths)
-			{
-				MetaType* DropAssetMetaType = GetAssetMetaType(DropFilePath);
-				if (DropAssetMetaType && DropAssetMetaType->IsType<Model>())
-				{
-					AssetPtr<Model> ModelAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<Model>(DropFilePath);
-					auto MeshObj = CurRender->AddSceneObject<MeshSceneObject>();
-					MeshObj->ObjectName = ModelAsset->ObjectName;
-					MeshObj->ModelAsset = MoveTemp(ModelAsset);
-					int32 Index = CurRender->SceneObjects.Num() - 1;
-					GetUndoManager().PushCommand(MakeShared<AddSceneObjectCommand>(this, CurRender, MeshObj, Index));
-				}
-			}
-			RefreshSceneItems();
-			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-			ShEditor->ForceRender();
-			return FReply::Handled();
+			return HandleModelAssetDrop(this, DragDropOp) ? FReply::Handled() : FReply::Unhandled();
 		}
 		else if (CurRender && DragDropOp->IsOfType<ShObjectDragDropOp>())
 		{
