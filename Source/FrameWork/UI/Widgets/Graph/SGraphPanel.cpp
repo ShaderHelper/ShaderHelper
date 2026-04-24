@@ -556,13 +556,32 @@ namespace FW
 		{
 			Vector2D MarqueeSize = { FMath::Abs(MarqueeEnd.x - (*MarqueeStart).x), FMath::Abs(MarqueeEnd.y - (*MarqueeStart).y)};
 			Vector2D UpperLeft = { FMath::Min((*MarqueeStart).x, MarqueeEnd.x), FMath::Min((*MarqueeStart).y, MarqueeEnd.y) };
+			Vector2D LowerRight = UpperLeft + MarqueeSize;
 			FSlateDrawElement::MakeBox(
 				OutDrawElements,
 				MaxTopNodeLayer,
 				AllottedGeometry.ToPaintGeometry(MarqueeSize, FSlateLayoutTransform(UpperLeft)),
-				FAppCommonStyle::Get().GetBrush("Graph.Selector"),
+				FAppStyle::Get().GetBrush("WhiteBrush"),
 				ESlateDrawEffect::None,
-				FStyleColors::Foreground.GetSpecifiedColor()
+				FLinearColor(0.15f, 0.45f, 0.95f, 0.12f)
+			);
+
+			TArray<FVector2D> MarqueeOutline;
+			MarqueeOutline.Add(UpperLeft);
+			MarqueeOutline.Add(Vector2D(LowerRight.x, UpperLeft.y));
+			MarqueeOutline.Add(LowerRight);
+			MarqueeOutline.Add(Vector2D(UpperLeft.x, LowerRight.y));
+			MarqueeOutline.Add(UpperLeft);
+
+			FSlateDrawElement::MakeLines(
+				OutDrawElements,
+				MaxTopNodeLayer + 1,
+				AllottedGeometry.ToPaintGeometry(),
+				MarqueeOutline,
+				ESlateDrawEffect::None,
+				FLinearColor(0.15f, 0.55f, 1.0f, 0.95f),
+				true,
+				1.0f
 			);
 		}
         

@@ -76,6 +76,7 @@ namespace SH {
 		Style->Set("Icons.MatchWhole", new IMAGE_BRUSH("MatchWhole", FVector2D{ 16.0f,16.0f }));
 		Style->Set("Icons.Replace", new IMAGE_BRUSH_SVG("Replace", FVector2D{ 16.0f,16.0f }));
 		Style->Set("Icons.ReplaceAll", new IMAGE_BRUSH_SVG("ReplaceAll", FVector2D{ 16.0f,16.0f }));
+		Style->Set("Icons.SceneObject.Camera", new IMAGE_BRUSH("Camera", FVector2D(14.0, 14.0)));
 
 		Style->SetContentRoot(BaseResourcePath::UE_SlateResourceDir);
 		FToolBarStyle ShToolbarStyle = FToolBarStyle::GetDefault();
@@ -87,6 +88,7 @@ namespace SH {
 		Style->Set("Icons.Validation", new IMAGE_BRUSH_SVG("Starship/Insights/Tasks_20", FVector2D(16.0, 16.0)));
 		Style->Set("Icons.World", new IMAGE_BRUSH_SVG("Starship/Common/World", FVector2D(16.0, 16.0)));
 		Style->Set("Icons.Networking", new IMAGE_BRUSH_SVG("Starship/Insights/Networking", FVector2D(16.0, 16.0)));
+		Style->Set("Icons.SceneObject.Mesh", new IMAGE_BRUSH_SVG("Starship/Common/box-perspective", FVector2D(14.0, 14.0)));
 		Style->Set("LineTip.BreakPointEffect2", new IMAGE_BRUSH("Common/Window/WindowTitle_Flashing", FVector2D(16.0, 16.0), FLinearColor::White, ESlateBrushTileType::Horizontal));
 
 		const FHeaderRowStyle& CoreHeaderRowStyle = FAppStyle::Get().GetWidgetStyle<FHeaderRowStyle>("TableView.Header");

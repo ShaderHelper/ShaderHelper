@@ -209,26 +209,28 @@ namespace SH
 
 	void ScenePreviewRenderer::RenderOutline(RenderGraph& Graph, GpuTextureView* OutputView,
 		GpuTextureView* MaskView,
-		const Camera& Camera, SceneObject* SelectedObject)
+		const Camera& Camera, const TArray<SceneObject*>& SelectedObjects)
 	{
-		MeshSceneObject* MeshObj = dynamic_cast<MeshSceneObject*>(SelectedObject);
-		if (!MeshObj || !MeshObj->ModelAsset)
-		{
-			return;
-		}
-
-		Model* ModelAsset = MeshObj->ModelAsset.Get();
-		if (!ModelAsset)
-		{
-			return;
-		}
-
 		OutlineShader* Shader = GetShader<OutlineShader>();
 		FMatrix44f VP = Camera.GetViewProjectionMatrix();
-		FMatrix44f WorldMat = MeshObj->GetWorldMatrix();
+		bool bHasOutlineMesh = false;
 
-		// Pass 1: Render selected object silhouette into mask
+		// Pass 1: Render selected object silhouettes into mask.
+		for (SceneObject* SelectedObject : SelectedObjects)
 		{
+			MeshSceneObject* MeshObj = dynamic_cast<MeshSceneObject*>(SelectedObject);
+			if (!MeshObj || !MeshObj->ModelAsset)
+			{
+				continue;
+			}
+
+			Model* ModelAsset = MeshObj->ModelAsset.Get();
+			if (!ModelAsset)
+			{
+				continue;
+			}
+
+			FMatrix44f WorldMat = MeshObj->GetWorldMatrix();
 			TRefCountPtr<GpuBindGroup> MaskBindGroup = Shader->GetMaskBindGroup(VP, WorldMat);
 
 			BindingContext Bindings;
@@ -246,7 +248,7 @@ namespace SH
 
 				GpuRenderPassDesc PassDesc;
 				PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{MaskView,
-					SubIdx == 0 ? RenderTargetLoadAction::Clear : RenderTargetLoadAction::Load,
+					bHasOutlineMesh ? RenderTargetLoadAction::Load : RenderTargetLoadAction::Clear,
 					RenderTargetStoreAction::Store});
 
 				GpuRenderPipelineStateDesc PipelineDesc{
@@ -276,7 +278,13 @@ namespace SH
 						PassRecorder->DrawIndexed(0, IdxCount);
 					}
 				);
+				bHasOutlineMesh = true;
 			}
+		}
+
+		if (!bHasOutlineMesh)
+		{
+			return;
 		}
 
 		// Pass 2: Post-process edge detection

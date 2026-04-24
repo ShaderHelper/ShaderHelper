@@ -30,13 +30,18 @@ namespace SH
 	public:
 		struct ScopedTransaction
 		{
-			ScopedTransaction(SceneUndoManager* InManager)
-				: Manager(InManager)
+			ScopedTransaction(SceneUndoManager& InManager)
+				: Manager(&InManager)
 			{
 				if (!Manager->CurrentTransaction)
 				{
 					Manager->CurrentTransaction = Transaction{};
 				}
+			}
+
+			ScopedTransaction(SceneUndoManager* InManager)
+				: ScopedTransaction(*InManager)
+			{
 			}
 
 			~ScopedTransaction()
@@ -96,18 +101,32 @@ namespace SH
 	class SelectionCommand : public SceneCommand
 	{
 	public:
-		SelectionCommand(SSceneView* InSceneView, SceneObject* InOldSelected, SceneObject* InNewSelected)
+		SelectionCommand(SSceneView* InSceneView, const TArray<SceneObject*>& InOldSelection, const TArray<SceneObject*>& InNewSelection)
 			: SceneCommand(InSceneView)
-			, OldSelected(InOldSelected)
-			, NewSelected(InNewSelected)
-		{}
+		{
+			for (SceneObject* Obj : InOldSelection)
+			{
+				if (Obj)
+				{
+					OldSelection.Add(Obj);
+				}
+			}
+
+			for (SceneObject* Obj : InNewSelection)
+			{
+				if (Obj)
+				{
+					NewSelection.Add(Obj);
+				}
+			}
+		}
 
 		void Do() override;
 		void Undo() override;
 
 	private:
-		FW::ObjectPtr<SceneObject> OldSelected;
-		FW::ObjectPtr<SceneObject> NewSelected;
+		TArray<FW::ObjectPtr<SceneObject>> OldSelection;
+		TArray<FW::ObjectPtr<SceneObject>> NewSelection;
 	};
 
 	class TransformCommand : public SceneCommand
@@ -156,11 +175,14 @@ namespace SH
 	class AddSceneObjectCommand : public SceneCommand
 	{
 	public:
-		AddSceneObjectCommand(SSceneView* InSceneView, Render* InRender, FW::ObjectPtr<SceneObject> InObject, int32 InIndex)
+		AddSceneObjectCommand(SSceneView* InSceneView, Render* InRender, FW::ObjectPtr<SceneObject> InObject, int32 InIndex,
+			SceneObject* InParent = nullptr, int32 InParentChildIndex = INDEX_NONE)
 			: SceneCommand(InSceneView)
 			, OwnerRender(InRender)
 			, Object(MoveTemp(InObject))
 			, Index(InIndex)
+			, ParentObject(InParent)
+			, ParentChildIndex(InParentChildIndex)
 		{}
 
 		void Do() override;
@@ -170,25 +192,41 @@ namespace SH
 		Render* OwnerRender;
 		FW::ObjectPtr<SceneObject> Object;
 		int32 Index;
+		SceneObject* ParentObject;
+		int32 ParentChildIndex;
 	};
 
 	class RemoveSceneObjectCommand : public SceneCommand
 	{
 	public:
-		RemoveSceneObjectCommand(SSceneView* InSceneView, Render* InRender, FW::ObjectPtr<SceneObject> InObject, int32 InIndex)
-			: SceneCommand(InSceneView)
-			, OwnerRender(InRender)
-			, Object(MoveTemp(InObject))
-			, Index(InIndex)
-		{}
+		RemoveSceneObjectCommand(SSceneView* InSceneView, Render* InRender, FW::ObjectPtr<SceneObject> InObject, int32 InIndex,
+			SceneObject* InParent = nullptr, int32 InParentChildIndex = INDEX_NONE);
 
 		void Do() override;
 		void Undo() override;
 
 	private:
+		struct RemovedSceneObjectState
+		{
+			FW::ObjectPtr<SceneObject> Object;
+			int32 Index = INDEX_NONE;
+			SceneObject* ParentObject = nullptr;
+			int32 ParentChildIndex = INDEX_NONE;
+			bool bWasExpanded = false;
+		};
+
+		void CaptureRemovedChildren(SceneObject* InObject);
+		bool WasObjectExpanded(SceneObject* InObject) const;
+		void RestoreExpansionState() const;
+		bool IsAnyRemovedObjectSelected() const;
+
 		Render* OwnerRender;
 		FW::ObjectPtr<SceneObject> Object;
 		int32 Index;
+		SceneObject* ParentObject;
+		int32 ParentChildIndex;
+		bool bWasExpanded = false;
+		TArray<RemovedSceneObjectState> RemovedChildren;
 	};
 
 	class RenameSceneObjectCommand : public SceneCommand
@@ -208,5 +246,28 @@ namespace SH
 		FW::ObjectPtr<SceneObject> Object;
 		FText OldName;
 		FText NewName;
+	};
+	class ReparentSceneObjectCommand : public SceneCommand
+	{
+	public:
+		ReparentSceneObjectCommand(SSceneView* InSceneView, FW::ObjectPtr<SceneObject> InObject,
+			SceneObject* InOldParent, const FW::Vector3f& InOldPos, const FW::Vector3f& InOldRot, const FW::Vector3f& InOldScale,
+			SceneObject* InNewParent)
+			: SceneCommand(InSceneView)
+			, Object(MoveTemp(InObject))
+			, OldParent(InOldParent)
+			, OldPos(InOldPos), OldRot(InOldRot), OldScale(InOldScale)
+			, NewParent(InNewParent)
+		{}
+
+		void Do() override;
+		void Undo() override;
+
+	private:
+		FW::ObjectPtr<SceneObject> Object;
+		SceneObject* OldParent;
+		FW::Vector3f OldPos, OldRot, OldScale;
+		SceneObject* NewParent;
+		FW::Vector3f NewPos, NewRot, NewScale;
 	};
 }

@@ -59,16 +59,53 @@ namespace SH
 		}
 	}
 
+	void Render::PostLoad()
+	{
+		Graph::PostLoad();
+
+		for (const ObjectPtr<SceneObject>& Obj : SceneObjects)
+		{
+			if (Obj->Parent.IsValid())
+			{
+				Obj->Parent->Children.Add(Obj.Get());
+			}
+		}
+	}
+
 	void Render::RemoveSceneObject(SceneObject* InObject)
 	{
+		if (InObject->Parent.IsValid())
+		{
+			InObject->Parent->Children.Remove(InObject);
+			InObject->Parent.Reset();
+		}
+
+		TArray<SceneObject*> ChildrenCopy = InObject->Children;
+		for (SceneObject* Child : ChildrenCopy)
+		{
+			RemoveSceneObject(Child);
+		}
+
 		SceneObjects.RemoveAll([InObject](const ObjectPtr<SceneObject>& Element) {
 			return Element.Get() == InObject;
 		});
 		MarkDirty();
 	}
 
-	void Render::InsertSceneObject(int32 Index, ObjectPtr<SceneObject> InObject)
+	void Render::InsertSceneObject(int32 Index, ObjectPtr<SceneObject> InObject, SceneObject* InParent, int32 ParentChildIndex)
 	{
+		if (InParent)
+		{
+			InObject->Parent = InParent;
+			if (ParentChildIndex >= 0 && ParentChildIndex <= InParent->Children.Num())
+			{
+				InParent->Children.Insert(InObject.Get(), ParentChildIndex);
+			}
+			else
+			{
+				InParent->Children.Add(InObject.Get());
+			}
+		}
 		if (Index >= 0 && Index <= SceneObjects.Num())
 		{
 			SceneObjects.Insert(MoveTemp(InObject), Index);

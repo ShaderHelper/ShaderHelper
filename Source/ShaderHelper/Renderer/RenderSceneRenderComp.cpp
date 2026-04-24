@@ -18,6 +18,80 @@ using namespace FW;
 
 namespace SH
 {
+	static Vector3f GetSceneObjectWorldPosition(const SceneObject* Obj)
+	{
+		const FVector3f Origin = Obj->GetWorldMatrix().GetOrigin();
+		return Vector3f(Origin.X, Origin.Y, Origin.Z);
+	}
+
+	static FMatrix44f GetSceneObjectWorldRotationMatrix(const SceneObject* Obj)
+	{
+		if (!Obj)
+		{
+			return FMatrix44f::Identity;
+		}
+
+		FMatrix44f WorldRotation = Obj->GetWorldMatrix().GetMatrixWithoutScale();
+		WorldRotation.SetOrigin(FVector3f::ZeroVector);
+		return WorldRotation;
+	}
+
+	static bool HasSelectedAncestor(const TArray<SceneObject*>& SelectedObjects, const SceneObject* Obj)
+	{
+		for (const SceneObject* Parent = Obj ? Obj->GetParent() : nullptr; Parent; Parent = Parent->GetParent())
+		{
+			if (SelectedObjects.Contains(const_cast<SceneObject*>(Parent)))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	static TArray<SceneObject*> GetTransformSelectionRoots(const TArray<SceneObject*>& SelectedObjects)
+	{
+		TArray<SceneObject*> RootObjects;
+		for (SceneObject* Obj : SelectedObjects)
+		{
+			if (!HasSelectedAncestor(SelectedObjects, Obj))
+			{
+				RootObjects.Add(Obj);
+			}
+		}
+		return RootObjects;
+	}
+
+	static Vector3f WorldPositionToLocalPosition(const SceneObject* Obj, const Vector3f& WorldPosition)
+	{
+		if (const SceneObject* Parent = Obj->GetParent())
+		{
+			const FVector4f LocalPosition = Parent->GetWorldMatrix().Inverse().TransformFVector4(
+				FVector4f(WorldPosition.X, WorldPosition.Y, WorldPosition.Z, 1.0f));
+			return Vector3f(LocalPosition.X, LocalPosition.Y, LocalPosition.Z);
+		}
+
+		return WorldPosition;
+	}
+
+	static Vector3f WorldDirectionToParentLocalDirection(const SceneObject* Obj, const Vector3f& WorldDirection)
+	{
+		if (const SceneObject* Parent = Obj ? Obj->GetParent() : nullptr)
+		{
+			const FMatrix44f ParentWorldRotation = GetSceneObjectWorldRotationMatrix(Parent);
+			const FVector4f LocalDirection = ParentWorldRotation.Inverse().TransformFVector4(
+				FVector4f(WorldDirection.X, WorldDirection.Y, WorldDirection.Z, 0.0f));
+			Vector3f Result(LocalDirection.X, LocalDirection.Y, LocalDirection.Z);
+			const float LenSq = Result.X * Result.X + Result.Y * Result.Y + Result.Z * Result.Z;
+			if (LenSq > SMALL_NUMBER)
+			{
+				Result = Result * (1.0f / FMath::Sqrt(LenSq));
+			}
+			return Result;
+		}
+
+		return WorldDirection;
+	}
+
 	RenderSceneRenderComp::RenderSceneRenderComp(Render* InRenderGraph, PreviewViewPort* InViewPort)
 		: RenderGraphAsset(InRenderGraph)
 		, ViewPort(InViewPort)
@@ -61,11 +135,16 @@ namespace SH
 				ShEditor->GetSceneView()->DeleteSelected();
 			}),
 			FCanExecuteAction::CreateLambda([ShEditor] {
-				return ShEditor->GetSceneView()->GetSelectedObject() != nullptr;
+				return !ShEditor->GetSceneView()->GetSelectedObjects().IsEmpty();
 			})
 		);
 
-		// Create graph comp for custom mode
+		ViewPort->DrawOverlayHandler = [this](const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect,
+			FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled)
+		{
+			return DrawViewportOverlay(AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
+		};
+
 		GraphComp = MakeUnique<RenderRenderComp>(InRenderGraph, InViewPort);
 	}
 
@@ -80,10 +159,49 @@ namespace SH
 		ViewPort->DragEnterHandler.Unbind();
 		ViewPort->DragLeaveHandler.Unbind();
 		ViewPort->DropHandler.Unbind();
+		ViewPort->DrawOverlayHandler = {};
+	}
+
+	bool RenderSceneRenderComp::IsScenePreviewActive() const
+	{
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		return ShEditor->IsScenePreview();
+	}
+
+	void RenderSceneRenderComp::ResetScenePreviewInteractionState()
+	{
+		bRightMouseDown = false;
+		bMiddleMouseDown = false;
+		bKeyW = false;
+		bKeyA = false;
+		bKeyS = false;
+		bKeyD = false;
+		bKeyQ = false;
+		bKeyE = false;
+		HoveredAxis = GizmoAxis::None;
+		DraggingAxis = GizmoAxis::None;
+		DragAllObjectStates.Empty();
+		PendingPickedObject = nullptr;
+		bPendingBoxSelection = false;
+		bBoxSelecting = false;
+		bBoxSelectAdditive = false;
+		DragLocalAxisDir = Vector3f(0, 0, 0);
+		DragPivotStart = Vector3f(0, 0, 0);
+		DragStartMousePos = FVector2D(0, 0);
+		DragAxisScreenDir = FVector2D(0, 0);
+		DragPixelsPerUnit = 1.0f;
+		DragPlaneNormal = Vector3f(0, 1, 0);
+		DragPlaneHitStart = Vector3f(0, 0, 0);
 	}
 
 	FReply RenderSceneRenderComp::OnMouseDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 	{
+		if (!IsScenePreviewActive())
+		{
+			ResetScenePreviewInteractionState();
+			return FReply::Unhandled();
+		}
+
 		if (MouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
 		{
 			bRightMouseDown = true;
@@ -110,19 +228,32 @@ namespace SH
 				if (SelObj)
 				{
 					DraggingAxis = HitAxis;
-					DragStartObjectPos = SelObj->Position;
-					DragStartObjectRotation = SelObj->Rotation;
-					DragStartObjectScale = SelObj->Scale;
 					DragStartMousePos = LocalPos;
+
+					// Snapshot all selected objects for multi-object drag.
+					DragAllObjectStates.Empty();
+					const TArray<SceneObject*> TransformObjects = GetTransformSelectionRoots(GetSceneViewWidget()->GetSelectedObjects());
+					for (SceneObject* Obj : TransformObjects)
+					{
+						DragObjectState State;
+						State.Object = Obj;
+						State.StartPos = Obj->Position;
+						State.StartWorldPos = GetSceneObjectWorldPosition(Obj);
+						State.StartRotation = Obj->Rotation;
+						State.StartScale = Obj->Scale;
+						DragAllObjectStates.Add(MoveTemp(State));
+					}
+					DragPivotStart = GetGizmoPivot();
+					Vector3f GizmoPivot = DragPivotStart;
 
 					if (DraggingAxis == GizmoAxis::All)
 					{
 						// Uniform scale: use camera-right as drag reference direction
-						float GizScale = GetGizmoScale(SelObj->Position);
+						float GizScale = GetGizmoScale(GizmoPivot);
 						FMatrix44f CamRotMat = PreviewCamera.GetWorldRotationMatrix();
 						Vector3f CamRight(CamRotMat.M[0][0], CamRotMat.M[0][1], CamRotMat.M[0][2]);
-						FVector2D CenterScreen = WorldToScreen(SelObj->Position, VpSize);
-						FVector2D EndScreen = WorldToScreen(SelObj->Position + CamRight * GizScale, VpSize);
+						FVector2D CenterScreen = WorldToScreen(GizmoPivot, VpSize);
+						FVector2D EndScreen = WorldToScreen(GizmoPivot + CamRight * GizScale, VpSize);
 						FVector2D ScreenDelta = EndScreen - CenterScreen;
 						float Len = (float)FMath::Sqrt(ScreenDelta.X * ScreenDelta.X + ScreenDelta.Y * ScreenDelta.Y);
 						DragLocalAxisDir = Vector3f(0, 0, 0);
@@ -137,10 +268,10 @@ namespace SH
 						Vector3f RayOrigin, RayDir;
 						ComputeMouseRay(LocalPos, VpSize, RayOrigin, RayDir);
 						Vector3f HitPt;
-						if (RayPlaneIntersect(RayOrigin, RayDir, SelObj->Position, DragPlaneNormal, HitPt))
+						if (RayPlaneIntersect(RayOrigin, RayDir, GizmoPivot, DragPlaneNormal, HitPt))
 							DragPlaneHitStart = HitPt;
 						else
-							DragPlaneHitStart = SelObj->Position;
+							DragPlaneHitStart = GizmoPivot;
 						// DragPixelsPerUnit doesn't matter for plane drag; set sentinel
 						DragPixelsPerUnit = 1.0f;
 					}
@@ -151,9 +282,9 @@ namespace SH
 						DragLocalAxisDir = AxisDir;
 
 						// Compute screen-space axis direction and pixels-per-unit
-						FVector2D CenterScreen = WorldToScreen(SelObj->Position, VpSize);
-						float GizScale = GetGizmoScale(SelObj->Position);
-						FVector2D EndScreen = WorldToScreen(SelObj->Position + AxisDir * GizScale, VpSize);
+						FVector2D CenterScreen = WorldToScreen(GizmoPivot, VpSize);
+						float GizScale = GetGizmoScale(GizmoPivot);
+						FVector2D EndScreen = WorldToScreen(GizmoPivot + AxisDir * GizScale, VpSize);
 						FVector2D ScreenDelta = EndScreen - CenterScreen;
 						DragPixelsPerUnit = (float)FMath::Sqrt(ScreenDelta.X * ScreenDelta.X + ScreenDelta.Y * ScreenDelta.Y);
 						if (DragPixelsPerUnit > 0.001f)
@@ -170,7 +301,7 @@ namespace SH
 								{
 									DragAxisScreenDir = FVector2D(-RadialDir.Y, RadialDir.X) * (1.0f / RadialLen);
 									// Flip when viewing from the back side of the rotation plane
-									Vector3f ViewDir = SelObj->Position - PreviewCamera.Position;
+									Vector3f ViewDir = GizmoPivot - PreviewCamera.Position;
 									float AxisDot = ViewDir.X * AxisDir.X + ViewDir.Y * AxisDir.Y + ViewDir.Z * AxisDir.Z;
 									if (AxisDot > 0)
 									{
@@ -184,14 +315,12 @@ namespace SH
 				}
 			}
 
-			// No gizmo hit — try picking a scene object
-			SceneObject* Picked = PickSceneObject(LocalPos, VpSize);
-			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-			SSceneView* SceneViewWidget = ShEditor->GetSceneView();
-			if (SceneViewWidget)
-			{
-				SceneViewWidget->SelectObject(Picked);
-			}
+			PendingPickedObject = PickSceneObject(LocalPos, VpSize);
+			bPendingBoxSelection = true;
+			bBoxSelecting = false;
+			bBoxSelectAdditive = MouseEvent.IsShiftDown();
+			BoxSelectionStart = LocalPos;
+			BoxSelectionEnd = LocalPos;
 			return FReply::Handled();
 		}
 		return FReply::Unhandled();
@@ -199,6 +328,12 @@ namespace SH
 
 	FReply RenderSceneRenderComp::OnMouseUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 	{
+		if (!IsScenePreviewActive())
+		{
+			ResetScenePreviewInteractionState();
+			return FReply::Unhandled();
+		}
+
 		if (MouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
 		{
 			bRightMouseDown = false;
@@ -213,30 +348,54 @@ namespace SH
 		{
 			if (DraggingAxis != GizmoAxis::None)
 			{
-				SceneObject* SelObj = GetSelectedSceneObject();
-				if (SelObj)
+				SSceneView* SceneViewWidget = GetSceneViewWidget();
+				if (SceneViewWidget->GetRender())
 				{
-					bool bChanged = (SelObj->Position != DragStartObjectPos) ||
-									(SelObj->Rotation != DragStartObjectRotation) ||
-									(SelObj->Scale != DragStartObjectScale);
-					if (bChanged)
+					SceneUndoManager::ScopedTransaction Transaction(SceneViewWidget->GetUndoManager());
+					for (auto& State : DragAllObjectStates)
 					{
-						auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-						SSceneView* SceneViewWidget = ShEditor->GetSceneView();
-						if (SceneViewWidget)
+						SceneObject* Obj = State.Object.Get();
+						bool bChanged = (Obj->Position != State.StartPos) ||
+										(Obj->Rotation != State.StartRotation) ||
+										(Obj->Scale != State.StartScale);
+						if (bChanged)
 						{
-							if (auto* Mgr = SceneViewWidget->GetUndoManager())
-							{
-								Mgr->PushCommand(MakeShared<TransformCommand>(
-									SceneViewWidget,
-									SelObj,
-									DragStartObjectPos, DragStartObjectRotation, DragStartObjectScale,
-									SelObj->Position, SelObj->Rotation, SelObj->Scale
-								));
-							}
+							SceneViewWidget->GetUndoManager().DoCommand(MakeShared<TransformCommand>(
+								SceneViewWidget,
+								Obj,
+								State.StartPos, State.StartRotation, State.StartScale,
+								Obj->Position, Obj->Rotation, Obj->Scale
+							));
 						}
 					}
 				}
+				DragAllObjectStates.Empty();
+				PendingPickedObject = nullptr;
+			}
+			else if (bPendingBoxSelection)
+			{
+				SSceneView* SceneViewWidget = GetSceneViewWidget();
+				if (bBoxSelecting)
+				{
+					TArray<SceneObject*> PickedObjects = PickSceneObjectsInRect(BoxSelectionStart, BoxSelectionEnd, MyGeometry.GetLocalSize());
+					SceneViewWidget->SelectObjects(PickedObjects, bBoxSelectAdditive);
+				}
+				else
+				{
+					SceneObject* Picked = PendingPickedObject.Get();
+					if (bBoxSelectAdditive && Picked)
+					{
+						SceneViewWidget->SelectObject(Picked, /*bAdditive=*/true);
+					}
+					else
+					{
+						SceneViewWidget->SelectObject(Picked);
+					}
+				}
+
+				PendingPickedObject = nullptr;
+				bPendingBoxSelection = false;
+				bBoxSelecting = false;
 			}
 			DraggingAxis = GizmoAxis::None;
 			return FReply::Handled();
@@ -246,6 +405,12 @@ namespace SH
 
 	FReply RenderSceneRenderComp::OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 	{
+		if (!IsScenePreviewActive())
+		{
+			ResetScenePreviewInteractionState();
+			return FReply::Unhandled();
+		}
+
 		if (bRightMouseDown)
 		{
 			FVector2D CurrentPos = MouseEvent.GetScreenSpacePosition();
@@ -283,17 +448,17 @@ namespace SH
 			SceneObject* SelObj = GetSelectedSceneObject();
 			if (SelObj && DragPixelsPerUnit > 0.001f)
 			{
+				FMatrix44f OrientMat = GetGizmoOrientationMatrix(SelObj);
+
 				// Plane drag: use ray-plane intersection directly (bypasses screen-space projection)
 				if (DraggingAxis == GizmoAxis::XY || DraggingAxis == GizmoAxis::XZ || DraggingAxis == GizmoAxis::YZ)
 				{
 					Vector3f RayOrigin, RayDir;
 					ComputeMouseRay(LocalPos, VpSize, RayOrigin, RayDir);
 					Vector3f HitPt;
-					if (RayPlaneIntersect(RayOrigin, RayDir, SelObj->Position, DragPlaneNormal, HitPt))
+					if (RayPlaneIntersect(RayOrigin, RayDir, DragPlaneHitStart, DragPlaneNormal, HitPt))
 					{
 						Vector3f PlaneDelta = HitPt - DragPlaneHitStart;
-						// Project PlaneDelta onto allowed axes
-						FMatrix44f OrientMat = GetGizmoOrientationMatrix(SelObj);
 						GizmoAxis A, B;
 						if      (DraggingAxis == GizmoAxis::XY) { A = GizmoAxis::X; B = GizmoAxis::Y; }
 						else if (DraggingAxis == GizmoAxis::XZ) { A = GizmoAxis::X; B = GizmoAxis::Z; }
@@ -302,8 +467,13 @@ namespace SH
 						Vector3f DirB = GetOrientedAxisDir(B, OrientMat);
 						float dA = PlaneDelta.X * DirA.X + PlaneDelta.Y * DirA.Y + PlaneDelta.Z * DirA.Z;
 						float dB = PlaneDelta.X * DirB.X + PlaneDelta.Y * DirB.Y + PlaneDelta.Z * DirB.Z;
-						SelObj->Position = DragStartObjectPos + DirA * dA + DirB * dB;
-						SelObj->GetOuterMost()->MarkDirty();
+						Vector3f MoveOffset = DirA * dA + DirB * dB;
+						for (auto& State : DragAllObjectStates)
+						{
+							Vector3f NewWorldPos = State.StartWorldPos + MoveOffset;
+							State.Object->Position = WorldPositionToLocalPosition(State.Object.Get(), NewWorldPos);
+							State.Object->GetOuterMost()->MarkDirty();
+						}
 					}
 					return FReply::Handled();
 				}
@@ -313,44 +483,117 @@ namespace SH
 				float WorldDelta = (float)(Projected / DragPixelsPerUnit);
 
 				GizmoMode Mode = GetCurrentGizmoMode();
-				GizmoSpace Space = GetCurrentGizmoSpace();
 
 				if (Mode == GizmoMode::Move)
 				{
-					FMatrix44f OrientMat = GetGizmoOrientationMatrix(SelObj);
 					Vector3f AxisDir = GetOrientedAxisDir(DraggingAxis, OrientMat);
-					SelObj->Position = DragStartObjectPos + AxisDir * WorldDelta;
-					SelObj->GetOuterMost()->MarkDirty();
+					Vector3f MoveOffset = AxisDir * WorldDelta;
+					for (auto& State : DragAllObjectStates)
+					{
+						Vector3f NewWorldPos = State.StartWorldPos + MoveOffset;
+						State.Object->Position = WorldPositionToLocalPosition(State.Object.Get(), NewWorldPos);
+						State.Object->GetOuterMost()->MarkDirty();
+					}
 				}
 				else if (Mode == GizmoMode::Rotate)
 				{
-					float AngleDelta = WorldDelta * 90.0f; // 90 degrees per gizmo-scale unit
+					float AngleDelta = WorldDelta * 90.0f;
+					float AngleRad = FMath::DegreesToRadians(AngleDelta);
+					float AxisLenSq = DragLocalAxisDir.X * DragLocalAxisDir.X +
+						DragLocalAxisDir.Y * DragLocalAxisDir.Y +
+						DragLocalAxisDir.Z * DragLocalAxisDir.Z;
+					Vector3f AxisDir = AxisLenSq > SMALL_NUMBER
+						? DragLocalAxisDir * (1.0f / FMath::Sqrt(AxisLenSq))
+						: Vector3f(0, 0, 1);
+					float CosAngle = FMath::Cos(AngleRad);
+					float SinAngle = FMath::Sin(AngleRad);
 
-					// Build quaternion for the start rotation
-					FRotator3f StartRotator(DragStartObjectRotation.X, DragStartObjectRotation.Y, DragStartObjectRotation.Z);
-					FQuat4f StartQuat = StartRotator.Quaternion();
+					for (auto& State : DragAllObjectStates)
+					{
+						Vector3f ParentLocalAxis = WorldDirectionToParentLocalDirection(State.Object.Get(), AxisDir);
+						FVector3f UeAxis(ParentLocalAxis.Z, ParentLocalAxis.X, ParentLocalAxis.Y);
+						FQuat4f DeltaQuat(UeAxis, AngleRad);
+						FRotator3f StartRotator(State.StartRotation.X, State.StartRotation.Y, State.StartRotation.Z);
+						FQuat4f StartQuat = StartRotator.Quaternion();
+						FQuat4f NewQuat = DeltaQuat * StartQuat;
+						NewQuat.Normalize();
+						FRotator3f NewRotator = NewQuat.Rotator();
 
-					// Convert axis from project space (X-right,Y-up,Z-forward) to UE space (X-forward,Y-right,Z-up)
-					FVector3f UeAxis(DragLocalAxisDir.Z, DragLocalAxisDir.X, DragLocalAxisDir.Y);
-					FQuat4f DeltaQuat(UeAxis, FMath::DegreesToRadians(AngleDelta));
+						Vector3f StartOffset = State.StartWorldPos - DragPivotStart;
+						float AxisDotOffset = StartOffset.X * AxisDir.X + StartOffset.Y * AxisDir.Y + StartOffset.Z * AxisDir.Z;
+						Vector3f AxisCrossOffset(
+							AxisDir.Y * StartOffset.Z - AxisDir.Z * StartOffset.Y,
+							AxisDir.Z * StartOffset.X - AxisDir.X * StartOffset.Z,
+							AxisDir.X * StartOffset.Y - AxisDir.Y * StartOffset.X);
+						Vector3f RotatedOffset =
+							StartOffset * CosAngle +
+							AxisCrossOffset * SinAngle +
+							AxisDir * (AxisDotOffset * (1.0f - CosAngle));
 
-					FQuat4f NewQuat = DeltaQuat * StartQuat;
-					NewQuat.Normalize();
-					FRotator3f NewRotator = NewQuat.Rotator();
-					SelObj->Rotation = Vector3f(NewRotator.Pitch, NewRotator.Yaw, NewRotator.Roll);
-					SelObj->GetOuterMost()->MarkDirty();
+						Vector3f NewWorldPos = DragPivotStart + RotatedOffset;
+						State.Object->Position = WorldPositionToLocalPosition(State.Object.Get(), NewWorldPos);
+						State.Object->Rotation = Vector3f(NewRotator.Pitch, NewRotator.Yaw, NewRotator.Roll);
+						State.Object->GetOuterMost()->MarkDirty();
+					}
 				}
 				else if (Mode == GizmoMode::Scale)
 				{
-					float ScaleFactor = 1.0f + WorldDelta;
-					ScaleFactor = FMath::Max(ScaleFactor, 0.01f);
-					Vector3f NewScale = DragStartObjectScale;
-					if (DraggingAxis == GizmoAxis::All) NewScale = DragStartObjectScale * ScaleFactor;
-					else if (DraggingAxis == GizmoAxis::X) NewScale.X *= ScaleFactor;
-					else if (DraggingAxis == GizmoAxis::Y) NewScale.Y *= ScaleFactor;
-					else NewScale.Z *= ScaleFactor;
-					SelObj->Scale = NewScale;
-					SelObj->GetOuterMost()->MarkDirty();
+					float ScaleFactor = FMath::Max(1.0f + WorldDelta, 0.01f);
+					Vector3f ScaleAxisDir(0, 0, 0);
+					if (DraggingAxis != GizmoAxis::All)
+					{
+						ScaleAxisDir = GetOrientedAxisDir(DraggingAxis, OrientMat);
+						float AxisLenSq = ScaleAxisDir.X * ScaleAxisDir.X +
+							ScaleAxisDir.Y * ScaleAxisDir.Y +
+							ScaleAxisDir.Z * ScaleAxisDir.Z;
+						if (AxisLenSq > SMALL_NUMBER)
+						{
+							ScaleAxisDir = ScaleAxisDir * (1.0f / FMath::Sqrt(AxisLenSq));
+						}
+					}
+
+					for (auto& State : DragAllObjectStates)
+					{
+						Vector3f NewScale = State.StartScale;
+						if (DraggingAxis == GizmoAxis::All) NewScale = State.StartScale * ScaleFactor;
+						else if (DraggingAxis == GizmoAxis::X) NewScale.X *= ScaleFactor;
+						else if (DraggingAxis == GizmoAxis::Y) NewScale.Y *= ScaleFactor;
+						else NewScale.Z *= ScaleFactor;
+
+						Vector3f StartOffset = State.StartWorldPos - DragPivotStart;
+						Vector3f ScaledOffset = StartOffset;
+						if (DraggingAxis == GizmoAxis::All)
+						{
+							ScaledOffset = StartOffset * ScaleFactor;
+						}
+						else
+						{
+							float AxisOffset = StartOffset.X * ScaleAxisDir.X +
+								StartOffset.Y * ScaleAxisDir.Y +
+								StartOffset.Z * ScaleAxisDir.Z;
+							ScaledOffset = StartOffset + ScaleAxisDir * (AxisOffset * (ScaleFactor - 1.0f));
+						}
+
+						Vector3f NewWorldPos = DragPivotStart + ScaledOffset;
+						State.Object->Position = WorldPositionToLocalPosition(State.Object.Get(), NewWorldPos);
+						State.Object->Scale = NewScale;
+						State.Object->GetOuterMost()->MarkDirty();
+					}
+				}
+			}
+			return FReply::Handled();
+		}
+
+		if (bPendingBoxSelection)
+		{
+			BoxSelectionEnd = LocalPos;
+			FVector2D DragDelta = BoxSelectionEnd - BoxSelectionStart;
+			if (!bBoxSelecting)
+			{
+				double DragLenSq = DragDelta.X * DragDelta.X + DragDelta.Y * DragDelta.Y;
+				if (DragLenSq >= BoxSelectionStartThreshold * BoxSelectionStartThreshold)
+				{
+					bBoxSelecting = true;
 				}
 			}
 			return FReply::Handled();
@@ -361,8 +604,54 @@ namespace SH
 		return FReply::Unhandled();
 	}
 
+	int32 RenderSceneRenderComp::DrawViewportOverlay(const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect,
+		FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
+	{
+		if (!IsScenePreviewActive() || !bBoxSelecting)
+		{
+			return LayerId;
+		}
+
+		FVector2D RectMin(FMath::Min(BoxSelectionStart.X, BoxSelectionEnd.X), FMath::Min(BoxSelectionStart.Y, BoxSelectionEnd.Y));
+		FVector2D RectMax(FMath::Max(BoxSelectionStart.X, BoxSelectionEnd.X), FMath::Max(BoxSelectionStart.Y, BoxSelectionEnd.Y));
+		FVector2D RectSize = RectMax - RectMin;
+
+		FSlateDrawElement::MakeBox(
+			OutDrawElements,
+			LayerId + 1,
+			AllottedGeometry.ToPaintGeometry(RectMin, RectSize),
+			FAppStyle::Get().GetBrush("WhiteBrush"),
+			ESlateDrawEffect::None,
+			FLinearColor(0.15f, 0.45f, 0.95f, 0.12f));
+
+		TArray<FVector2D> LinePoints;
+		LinePoints.Add(RectMin);
+		LinePoints.Add(FVector2D(RectMax.X, RectMin.Y));
+		LinePoints.Add(RectMax);
+		LinePoints.Add(FVector2D(RectMin.X, RectMax.Y));
+		LinePoints.Add(RectMin);
+
+		FSlateDrawElement::MakeLines(
+			OutDrawElements,
+			LayerId + 2,
+			AllottedGeometry.ToPaintGeometry(),
+			LinePoints,
+			ESlateDrawEffect::None,
+			FLinearColor(0.15f, 0.55f, 1.0f, 0.95f),
+			true,
+			1.0f);
+
+		return LayerId + 2;
+	}
+
 	FReply RenderSceneRenderComp::OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 	{
+		if (!IsScenePreviewActive())
+		{
+			ResetScenePreviewInteractionState();
+			return FReply::Unhandled();
+		}
+
 		float WheelDelta = MouseEvent.GetWheelDelta();
 		FMatrix44f RotMat = PreviewCamera.GetWorldRotationMatrix();
 		Vector3f Forward = Vector3f(RotMat.M[2][0], RotMat.M[2][1], RotMat.M[2][2]);
@@ -372,6 +661,12 @@ namespace SH
 
 	void RenderSceneRenderComp::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& KeyEvent)
 	{
+		if (!IsScenePreviewActive())
+		{
+			ResetScenePreviewInteractionState();
+			return;
+		}
+
 		if (!bRightMouseDown)
 		{
 			if (SceneCommandList->ProcessCommandBindings(KeyEvent))
@@ -396,6 +691,12 @@ namespace SH
 
 	void RenderSceneRenderComp::OnKeyUp(const FGeometry& MyGeometry, const FKeyEvent& KeyEvent)
 	{
+		if (!IsScenePreviewActive())
+		{
+			ResetScenePreviewInteractionState();
+			return;
+		}
+
 		FKey Key = KeyEvent.GetKey();
 		if (Key == EKeys::W) bKeyW = false;
 		else if (Key == EKeys::A) bKeyA = false;
@@ -436,8 +737,7 @@ namespace SH
 
 	void RenderSceneRenderComp::RenderBegin()
 	{
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		if (!ShEditor->IsScenePreview())
+		if (!IsScenePreviewActive())
 		{
 			GraphComp->RenderBegin();
 		}
@@ -445,21 +745,20 @@ namespace SH
 
 	void RenderSceneRenderComp::RenderInternal()
 	{
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		if (ShEditor->IsScenePreview())
+		if (IsScenePreviewActive())
 		{
 			RenderPreview();
 		}
 		else
 		{
+			ResetScenePreviewInteractionState();
 			RenderGraph();
 		}
 	}
 
 	void RenderSceneRenderComp::RenderEnd()
 	{
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		if (!ShEditor->IsScenePreview())
+		if (!IsScenePreviewActive())
 		{
 			GraphComp->RenderEnd();
 		}
@@ -562,16 +861,18 @@ namespace SH
 			int32 Highlight = static_cast<int32>(DraggingAxis != GizmoAxis::None ? DraggingAxis : HoveredAxis);
 			GizmoMode Mode = GetCurrentGizmoMode();
 			FMatrix44f OrientMat = GetGizmoOrientationMatrix(SelObj);
-			PreviewRenderer.RenderGizmo(Graph, MsaaRTV, PreviewCamera, SelObj->Position, Highlight, Mode, OrientMat);
+			Vector3f GizmoPivot = GetGizmoPivot();
+			PreviewRenderer.RenderGizmo(Graph, MsaaRTV, PreviewCamera, GizmoPivot, Highlight, Mode, OrientMat);
 		}
 
 		// Resolve MSAA to FinalRT
 		PreviewRenderer.ResolveMsaa(Graph, MsaaRTV, FinalRTV);
 
-		// Render outline for selected mesh (post-process on resolved FinalRT)
-		if (SelObj)
+		// Render outlines for all selected meshes (post-process on resolved FinalRT)
+		TArray<SceneObject*> SelectedObjects = GetSceneViewWidget()->GetSelectedObjects();
+		if (!SelectedObjects.IsEmpty())
 		{
-			PreviewRenderer.RenderOutline(Graph, FinalRTV, MaskRTV, PreviewCamera, SelObj);
+			PreviewRenderer.RenderOutline(Graph, FinalRTV, MaskRTV, PreviewCamera, SelectedObjects);
 		}
 
 		// Render camera preview overlay when a camera is selected
@@ -592,15 +893,28 @@ namespace SH
 		GraphComp->RenderInternal();
 	}
 
+	SSceneView* RenderSceneRenderComp::GetSceneViewWidget() const
+	{
+		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		return ShEditor->GetSceneView();
+	}
+
 	SceneObject* RenderSceneRenderComp::GetSelectedSceneObject() const
 	{
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		SSceneView* SceneViewWidget = ShEditor->GetSceneView();
-		if (SceneViewWidget)
+		TArray<SceneObject*> RootObjects = GetTransformSelectionRoots(GetSceneViewWidget()->GetSelectedObjects());
+		return RootObjects.IsEmpty() ? nullptr : RootObjects[0];
+	}
+
+	FW::Vector3f RenderSceneRenderComp::GetGizmoPivot() const
+	{
+		TArray<SceneObject*> Objs = GetTransformSelectionRoots(GetSceneViewWidget()->GetSelectedObjects());
+		if (Objs.IsEmpty()) return Vector3f(0, 0, 0);
+		Vector3f Sum(0, 0, 0);
+		for (SceneObject* Obj : Objs)
 		{
-			return SceneViewWidget->GetSelectedObject();
+			Sum += GetSceneObjectWorldPosition(Obj);
 		}
-		return nullptr;
+		return Sum * (1.0f / (float)Objs.Num());
 	}
 
 	FVector2D RenderSceneRenderComp::WorldToScreen(const Vector3f& WorldPos, const FVector2D& ViewportSize) const
@@ -647,7 +961,7 @@ namespace SH
 			return GizmoAxis::None;
 		}
 
-		Vector3f Center = SelObj->Position;
+		Vector3f Center = GetGizmoPivot();
 		float GizScale = GetGizmoScale(Center);
 		FVector2D CenterScreen = WorldToScreen(Center, ViewportSize);
 
@@ -785,10 +1099,7 @@ namespace SH
 		GizmoSpace Space = GetCurrentGizmoSpace();
 		if (Space == GizmoSpace::Local && Obj)
 		{
-			float PitchRad = FMath::DegreesToRadians(Obj->Rotation.X);
-			float YawRad = FMath::DegreesToRadians(Obj->Rotation.Y);
-			float RollRad = FMath::DegreesToRadians(Obj->Rotation.Z);
-			return RotationMatrix(YawRad, PitchRad, RollRad);
+			return GetSceneObjectWorldRotationMatrix(Obj);
 		}
 		return FMatrix44f::Identity;
 	}
@@ -840,6 +1151,12 @@ namespace SH
 
 	void RenderSceneRenderComp::OnDragEnter(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)
 	{
+		if (!IsScenePreviewActive())
+		{
+			ResetScenePreviewInteractionState();
+			return;
+		}
+
 		TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
 		if (DragDropOp && DragDropOp->IsOfType<AssetViewItemDragDropOp>())
 		{
@@ -859,6 +1176,12 @@ namespace SH
 
 	void RenderSceneRenderComp::OnDragLeave(const FDragDropEvent& DragDropEvent)
 	{
+		if (!IsScenePreviewActive())
+		{
+			ResetScenePreviewInteractionState();
+			return;
+		}
+
 		TSharedPtr<FDragDropOperation> DragDropOp = DragDropEvent.GetOperation();
 		if (DragDropOp)
 		{
@@ -868,9 +1191,14 @@ namespace SH
 
 	FReply RenderSceneRenderComp::OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)
 	{
+		if (!IsScenePreviewActive())
+		{
+			ResetScenePreviewInteractionState();
+			return FReply::Unhandled();
+		}
+
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		SSceneView* SceneViewWidget = ShEditor->GetSceneView();
-		if (!SceneViewWidget) return FReply::Unhandled();
+		SSceneView* SceneViewWidget = GetSceneViewWidget();
 
 		Render* CurRender = SceneViewWidget->GetRender();
 		if (!CurRender) return FReply::Unhandled();
@@ -887,12 +1215,10 @@ namespace SH
 				{
 					AssetPtr<Model> ModelAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<Model>(DropFilePath);
 					auto MeshObj = CurRender->AddSceneObject<MeshSceneObject>();
+					MeshObj->ObjectName = ModelAsset->ObjectName;
 					MeshObj->ModelAsset = MoveTemp(ModelAsset);
 					int32 Index = CurRender->SceneObjects.Num() - 1;
-					if (auto* Mgr = SceneViewWidget->GetUndoManager())
-					{
-						Mgr->PushCommand(MakeShared<AddSceneObjectCommand>(SceneViewWidget, CurRender, MeshObj, Index));
-					}
+					SceneViewWidget->GetUndoManager().PushCommand(MakeShared<AddSceneObjectCommand>(SceneViewWidget, CurRender, MeshObj, Index));
 					bDropped = true;
 				}
 			}
@@ -916,6 +1242,77 @@ namespace SH
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		return ShEditor->GetGizmoSpace();
+	}
+
+	TArray<SceneObject*> RenderSceneRenderComp::PickSceneObjectsInRect(const FVector2D& RectStart, const FVector2D& RectEnd, const FVector2D& ViewportSize) const
+	{
+		TArray<SceneObject*> Result;
+		if (!RenderGraphAsset || ViewportSize.X <= 0 || ViewportSize.Y <= 0)
+		{
+			return Result;
+		}
+
+		FVector2D RectMin(FMath::Min(RectStart.X, RectEnd.X), FMath::Min(RectStart.Y, RectEnd.Y));
+		FVector2D RectMax(FMath::Max(RectStart.X, RectEnd.X), FMath::Max(RectStart.Y, RectEnd.Y));
+		for (const auto& Obj : RenderGraphAsset->SceneObjects)
+		{
+			FVector2D ObjMin, ObjMax;
+			if (GetSceneObjectScreenRect(Obj.Get(), ViewportSize, ObjMin, ObjMax) &&
+				ObjMax.X >= RectMin.X && ObjMin.X <= RectMax.X &&
+				ObjMax.Y >= RectMin.Y && ObjMin.Y <= RectMax.Y)
+			{
+				Result.Add(Obj.Get());
+			}
+		}
+		return Result;
+	}
+
+	bool RenderSceneRenderComp::GetSceneObjectScreenRect(SceneObject* Obj, const FVector2D& ViewportSize, FVector2D& OutMin, FVector2D& OutMax) const
+	{
+		Vector3f BoundsMin, BoundsMax;
+		if (MeshSceneObject* MeshObj = dynamic_cast<MeshSceneObject*>(Obj))
+		{
+			Model* Mdl = MeshObj->ModelAsset.Get();
+			if (!Mdl)
+			{
+				return false;
+			}
+			Vector3f Center;
+			float Radius;
+			Mdl->ComputeBounds(Center, Radius);
+			BoundsMin = Center - Vector3f(Radius);
+			BoundsMax = Center + Vector3f(Radius);
+		}
+		else
+		{
+			BoundsMin = Vector3f(-0.3f);
+			BoundsMax = Vector3f(0.3f);
+		}
+
+		FMatrix44f WorldMat = Obj->GetWorldMatrix();
+		OutMin = FVector2D(FLT_MAX, FLT_MAX);
+		OutMax = FVector2D(-FLT_MAX, -FLT_MAX);
+		bool bHasValidPoint = false;
+		for (int i = 0; i < 8; ++i)
+		{
+			Vector3f Corner(
+				(i & 1) ? BoundsMax.X : BoundsMin.X,
+				(i & 2) ? BoundsMax.Y : BoundsMin.Y,
+				(i & 4) ? BoundsMax.Z : BoundsMin.Z);
+			FVector4f WorldCorner = WorldMat.TransformFVector4(FVector4f(Corner.X, Corner.Y, Corner.Z, 1.0f));
+			FVector2D ScreenPoint = WorldToScreen(Vector3f(WorldCorner.X, WorldCorner.Y, WorldCorner.Z), ViewportSize);
+			if (ScreenPoint.X <= -9999.0f || ScreenPoint.Y <= -9999.0f)
+			{
+				continue;
+			}
+
+			bHasValidPoint = true;
+			OutMin.X = FMath::Min(OutMin.X, ScreenPoint.X);
+			OutMin.Y = FMath::Min(OutMin.Y, ScreenPoint.Y);
+			OutMax.X = FMath::Max(OutMax.X, ScreenPoint.X);
+			OutMax.Y = FMath::Max(OutMax.Y, ScreenPoint.Y);
+		}
+		return bHasValidPoint;
 	}
 
 	SceneObject* RenderSceneRenderComp::PickSceneObject(const FVector2D& LocalPos, const FVector2D& ViewportSize) const

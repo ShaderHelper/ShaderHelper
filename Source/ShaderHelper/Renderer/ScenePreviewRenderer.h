@@ -21,7 +21,7 @@ namespace SH
 
 		void RenderOutline(FW::RenderGraph& Graph, FW::GpuTextureView* OutputView,
 			FW::GpuTextureView* MaskView,
-			const FW::Camera& Camera, SceneObject* SelectedObject);
+			const FW::Camera& Camera, const TArray<SceneObject*>& SelectedObjects);
 
 		void RenderGizmo(FW::RenderGraph& Graph, FW::GpuTextureView* OutputView,
 			const FW::Camera& Camera, const FW::Vector3f& GizmoPosition, int32 HighlightAxis,
