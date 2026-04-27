@@ -1,5 +1,6 @@
 #pragma once
 #include "AssetObject/Material.h"
+#include "Renderer/MaterialRenderResources.h"
 #include "RenderResource/Mesh.h"
 
 namespace FW
@@ -54,10 +55,7 @@ namespace SH
 		TRefCountPtr<FW::GpuRenderPipelineState> Pipeline;
 		TMap<FString, TUniquePtr<FW::UniformBuffer>> PreviewUniformBuffers;
 
-		TRefCountPtr<FW::GpuBindGroupLayout> ErrorBindGroupLayout;
-		TRefCountPtr<FW::GpuBindGroup> ErrorBindGroup;
-		TRefCountPtr<FW::GpuRenderPipelineState> ErrorPipeline;
-		TUniquePtr<FW::UniformBuffer> ErrorUniformBuffer;
+		MaterialErrorRenderResources ErrorResources;
 
 		FW::MeshBuffers PreviewMeshBuffers;
 		TRefCountPtr<FW::GpuTexture> RenderTarget;

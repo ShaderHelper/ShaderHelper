@@ -2,6 +2,7 @@
 #include "FrameWorkCore.h"
 #include "ProjectManager/ProjectManager.h"
 #include "UI/Widgets/Property/PropertyData/PropertyData.h"
+#include "UI/Widgets/Property/PropertyData/PropertyArrayItem.h"
 #include "UI/Widgets/Property/PropertyData/PropertyAssetItem.h"
 #include "UI/Widgets/Property/PropertyData/PropertyObjectItem.h"
 #include "PluginManager/PluginManager.h"
@@ -101,6 +102,163 @@ namespace FW
 			Context->Requests.Add(InRequest);
 		}
 	}
+
+	namespace
+	{
+		struct PropertyValueAccess
+		{
+			FText DisplayName;
+			FString TypeName;
+			void* ValuePtr = nullptr;
+			TFunction<void(void*)> SetValue;
+			TFunction<MetaType*()> GetMetaType;
+			TFunction<ShObject*()> GetReferencedShObject;
+			TFunction<void(ShObject*)> SetReferencedShObject;
+			TFunction<FString()> GetEnumValueName;
+			TMap<FString, TSharedPtr<void>> EnumEntries;
+			const MetaPropertyData* PropertyData = nullptr;
+			void* VisibilityInstance = nullptr;
+			bool ReadOnly = false;
+		};
+
+		template<typename ValueType>
+		ValueType* CastPropertyValue(void* ValuePtr)
+		{
+			return static_cast<ValueType*>(ValuePtr);
+		}
+
+		TSharedPtr<PropertyData> GeneratePropertyDataForValue(ShObject* InObject, const PropertyValueAccess& Access)
+		{
+			MetaType* MemberMetaType = Access.GetMetaType ? Access.GetMetaType() : nullptr;
+			TSharedPtr<PropertyData> Item;
+
+			if (MemberMetaType && MemberMetaType->IsDerivedFrom<AssetObject>() && Access.GetReferencedShObject)
+			{
+				Item = MakeShared<PropertyAssetItem>(InObject, Access.DisplayName, MemberMetaType, Access.ValuePtr);
+			}
+			else if (MemberMetaType && MemberMetaType->IsDerivedFrom<ShObject>() && Access.GetReferencedShObject)
+			{
+				Item = MakeShared<PropertyObjectItem>(
+					InObject,
+					Access.DisplayName,
+					MemberMetaType,
+					Access.GetReferencedShObject,
+					Access.SetReferencedShObject,
+					Access.ReadOnly
+				);
+			}
+			else if (Access.GetEnumValueName)
+			{
+				auto EnumValueName = MakeShared<FString>(Access.GetEnumValueName());
+				Item = MakeShared<PropertyEnumItem>(InObject, Access.DisplayName, EnumValueName, Access.EnumEntries, Access.SetValue, Access.ReadOnly);
+			}
+			else if (Access.TypeName == AUX::TypeName<bool>)
+			{
+				Item = MakeShared<PropertyScalarItem<bool>>(InObject, Access.DisplayName, CastPropertyValue<bool>(Access.ValuePtr), Access.ReadOnly);
+			}
+			else if (Access.TypeName == AUX::TypeName<int32>)
+			{
+				auto ScalarItem = MakeShared<PropertyScalarItem<int32>>(InObject, Access.DisplayName, CastPropertyValue<int32>(Access.ValuePtr), Access.ReadOnly);
+				if (Access.PropertyData && Access.PropertyData->Min)
+				{
+					ScalarItem->SetMinValue(std::any_cast<int32>(Access.PropertyData->Min(InObject)));
+				}
+				if (Access.PropertyData && Access.PropertyData->Max)
+				{
+					ScalarItem->SetMaxValue(std::any_cast<int32>(Access.PropertyData->Max(InObject)));
+				}
+				Item = MoveTemp(ScalarItem);
+			}
+			else if (Access.TypeName == AUX::TypeName<uint32>)
+			{
+				auto ScalarItem = MakeShared<PropertyScalarItem<uint32>>(InObject, Access.DisplayName, CastPropertyValue<uint32>(Access.ValuePtr), Access.ReadOnly);
+				if (Access.PropertyData && Access.PropertyData->Min)
+				{
+					ScalarItem->SetMinValue(std::any_cast<uint32>(Access.PropertyData->Min(InObject)));
+				}
+				if (Access.PropertyData && Access.PropertyData->Max)
+				{
+					ScalarItem->SetMaxValue(std::any_cast<uint32>(Access.PropertyData->Max(InObject)));
+				}
+				Item = MoveTemp(ScalarItem);
+			}
+			else if (Access.TypeName == AUX::TypeName<float>)
+			{
+				auto ScalarItem = MakeShared<PropertyScalarItem<float>>(InObject, Access.DisplayName, CastPropertyValue<float>(Access.ValuePtr), Access.ReadOnly);
+				if (Access.PropertyData && Access.PropertyData->Min)
+				{
+					ScalarItem->SetMinValue(std::any_cast<float>(Access.PropertyData->Min(InObject)));
+				}
+				if (Access.PropertyData && Access.PropertyData->Max)
+				{
+					ScalarItem->SetMaxValue(std::any_cast<float>(Access.PropertyData->Max(InObject)));
+				}
+				Item = MoveTemp(ScalarItem);
+			}
+			else if (Access.TypeName == AUX::TypeName<double>)
+			{
+				auto ScalarItem = MakeShared<PropertyScalarItem<double>>(InObject, Access.DisplayName, CastPropertyValue<double>(Access.ValuePtr), Access.ReadOnly);
+				if (Access.PropertyData && Access.PropertyData->Min)
+				{
+					ScalarItem->SetMinValue(std::any_cast<double>(Access.PropertyData->Min(InObject)));
+				}
+				if (Access.PropertyData && Access.PropertyData->Max)
+				{
+					ScalarItem->SetMaxValue(std::any_cast<double>(Access.PropertyData->Max(InObject)));
+				}
+				Item = MoveTemp(ScalarItem);
+			}
+			else if (Access.TypeName == AUX::TypeName<FString>)
+			{
+				Item = MakeShared<PropertyStringItem>(InObject, Access.DisplayName, CastPropertyValue<FString>(Access.ValuePtr), Access.ReadOnly);
+			}
+			else if (Access.TypeName == AUX::TypeName<Vector2f>)
+			{
+				Item = MakeShared<PropertyVector2fItem>(InObject, Access.DisplayName, CastPropertyValue<Vector2f>(Access.ValuePtr), Access.ReadOnly);
+			}
+			else if (Access.TypeName == AUX::TypeName<Vector3f>)
+			{
+				Item = MakeShared<PropertyVector3fItem>(InObject, Access.DisplayName, CastPropertyValue<Vector3f>(Access.ValuePtr), Access.ReadOnly);
+			}
+			else if (Access.TypeName == AUX::TypeName<Vector4f>)
+			{
+				Item = MakeShared<PropertyVector4fItem>(InObject, Access.DisplayName, CastPropertyValue<Vector4f>(Access.ValuePtr), Access.ReadOnly);
+			}
+			else if (Access.TypeName == AUX::TypeName<Vector2i>)
+			{
+				Vector2i* VecValue = CastPropertyValue<Vector2i>(Access.ValuePtr);
+				Item = MakeShared<PropertyVector2iItem>(InObject, Access.DisplayName, &VecValue->x, Access.ReadOnly);
+			}
+			else if (Access.TypeName == AUX::TypeName<Vector3i>)
+			{
+				Vector3i* VecValue = CastPropertyValue<Vector3i>(Access.ValuePtr);
+				Item = MakeShared<PropertyVector3iItem>(InObject, Access.DisplayName, &VecValue->x, Access.ReadOnly);
+			}
+			else if (Access.TypeName == AUX::TypeName<Vector4i>)
+			{
+				Vector4i* VecValue = CastPropertyValue<Vector4i>(Access.ValuePtr);
+				Item = MakeShared<PropertyVector4iItem>(InObject, Access.DisplayName, &VecValue->x, Access.ReadOnly);
+			}
+			else if (MemberMetaType && MemberMetaType->Datas.Num() > 0)
+			{
+				Item = MakeShared<PropertyCategory>(InObject, Access.DisplayName, true);
+				void* CompositeInstance = Access.ValuePtr;
+				for (MetaMemberData* ProperyMember : GetProperties(MemberMetaType))
+				{
+					if (MemberMetaType->IsDerivedFrom<ShObject>())
+					{
+						Item->AddChilds(GeneratePropertyDatas(static_cast<ShObject*>(CompositeInstance), ProperyMember, CompositeInstance));
+					}
+					else
+					{
+						Item->AddChilds(GeneratePropertyDatas(InObject, ProperyMember, CompositeInstance));
+					}
+				}
+			}
+
+			return Item;
+		}
+	}
 	
 	TArray<TSharedRef<PropertyData>> GeneratePropertyDatas(ShObject* InObject, const MetaMemberData* MetaMemData, void* Instance, bool bForce)
 	{
@@ -120,157 +278,123 @@ namespace FW
 		}
 
 		TArray<TSharedRef<PropertyData>> Datas;
-		
-		MetaType* MemberMetaType = MetaMemData->GetMetaType();
-		TSharedPtr<PropertyData> Item;
 		bool ReadOnly = EnumHasAnyFlags(MetaMemData->InfoType, MetaInfo::ReadOnly);
+		TSharedPtr<PropertyData> Item;
 
-		const MetaPropertyData& PropertyData = MetaMemData->PropertyData;
-		if(MetaMemData->IsAssetRef())
+		if (MetaMemData->IsArray())
 		{
-			void* AssetPtrRef = MetaMemData->Get(Instance);
-			Item = MakeShared<PropertyAssetItem>(InObject, MetaMemData->MemberName, MemberMetaType, AssetPtrRef);
-		}
-		else if (MetaMemData->IsShObjectRef())
-		{
-			Item = MakeShared<PropertyObjectItem>(
+			auto ArrayItem = MakeShared<PropertyArrayItem>(
 				InObject,
 				MetaMemData->MemberName,
-				MemberMetaType,
-				[MetaMemData, Instance]() {
-					return MetaMemData->GetReferencedShObject ? MetaMemData->GetReferencedShObject(Instance) : nullptr;
+				[MetaMemData, Instance]() -> int32 {
+					return MetaMemData->GetArrayNum ? MetaMemData->GetArrayNum(Instance) : 0;
 				},
-				[MetaMemData, Instance](ShObject* NewObject) {
-					if (MetaMemData->SetReferencedShObject)
+				[MetaMemData, Instance](int32 NewNum) {
+					if (MetaMemData->SetArrayNum)
 					{
-						MetaMemData->SetReferencedShObject(Instance, NewObject);
+						MetaMemData->SetArrayNum(Instance, NewNum);
 					}
 				},
 				ReadOnly
 			);
+			ArrayItem->SetRemoveAt([MetaMemData, Instance](int32 Index) {
+				if (MetaMemData->RemoveArrayElement)
+				{
+					MetaMemData->RemoveArrayElement(Instance, Index);
+				}
+			});
+
+			ArrayItem->SetRebuildChildren([InObject, MetaMemData, Instance, ReadOnly](PropertyArrayItem& InArrayItem) {
+				const MetaMemberData* ElementMetaData = MetaMemData->ArrayElementData.Get();
+				if (!ElementMetaData)
+				{
+					return;
+				}
+				const int32 NumElements = MetaMemData->GetArrayNum ? MetaMemData->GetArrayNum(Instance) : 0;
+				for (int32 ElementIndex = 0; ElementIndex < NumElements; ++ElementIndex)
+				{
+					void* ElementPtr = MetaMemData->GetArrayElement ? MetaMemData->GetArrayElement(Instance, ElementIndex) : nullptr;
+					if (!ElementPtr)
+					{
+						continue;
+					}
+
+					PropertyValueAccess ElementAccess;
+					ElementAccess.DisplayName = FText::Format(LOCALIZATION("Element {0}"), FText::AsNumber(ElementIndex));
+					ElementAccess.TypeName = ElementMetaData->TypeName;
+					ElementAccess.ValuePtr = ElementMetaData->Get(ElementPtr);
+					ElementAccess.SetValue = [ElementMetaData, ElementPtr](void* NewValue) {
+						ElementMetaData->Set(ElementPtr, NewValue);
+					};
+					ElementAccess.GetMetaType = [ElementMetaData] {
+						return ElementMetaData->GetMetaType ? ElementMetaData->GetMetaType() : nullptr;
+					};
+					if (ElementMetaData->GetReferencedShObject)
+					{
+						ElementAccess.GetReferencedShObject = [ElementMetaData, ElementPtr] {
+							return ElementMetaData->GetReferencedShObject(ElementPtr);
+						};
+						ElementAccess.SetReferencedShObject = [ElementMetaData, ElementPtr](ShObject* NewObject) {
+							if (ElementMetaData->SetReferencedShObject)
+							{
+								ElementMetaData->SetReferencedShObject(ElementPtr, NewObject);
+							}
+						};
+					}
+					if (ElementMetaData->GetEnumValueName)
+					{
+						ElementAccess.GetEnumValueName = [ElementMetaData, ElementPtr] {
+							return ElementMetaData->GetEnumValueName(ElementPtr);
+						};
+						ElementAccess.EnumEntries = ElementMetaData->EnumEntries;
+					}
+					ElementAccess.PropertyData = &ElementMetaData->PropertyData;
+					ElementAccess.ReadOnly = ReadOnly;
+
+					if (TSharedPtr<PropertyData> ElementItem = GeneratePropertyDataForValue(InObject, ElementAccess))
+					{
+						ElementItem->SetArrayElementStyle(true);
+						InArrayItem.AddChild(ElementItem.ToSharedRef());
+					}
+				}
+			});
+			Item = MoveTemp(ArrayItem);
 		}
-		//IsEnum
-		else if(MetaMemData->GetEnumValueName)
+		else
 		{
-			auto EnumValueName = MakeShared<FString>(MetaMemData->GetEnumValueName(Instance));
-			Item = MakeShared<PropertyEnumItem>(InObject, MetaMemData->MemberName, EnumValueName, MetaMemData->EnumEntries, [=](void* NewValue){
+			PropertyValueAccess Access;
+			Access.DisplayName = MetaMemData->MemberName;
+			Access.TypeName = MetaMemData->TypeName;
+			Access.ValuePtr = MetaMemData->Get(Instance);
+			Access.SetValue = [MetaMemData, Instance](void* NewValue) {
 				MetaMemData->Set(Instance, NewValue);
-			}, ReadOnly);
-		}
-		else if (MetaMemData->IsType<bool>())
-		{
-			bool* BoolValue = (bool*)MetaMemData->Get(Instance);
-			Item = MakeShared<PropertyScalarItem<bool>>(InObject, MetaMemData->MemberName, BoolValue, ReadOnly);
-		}
-		else if(MetaMemData->IsType<int32>())
-		{
-			int32* IntValue = (int32*)MetaMemData->Get(Instance);
-			auto ScalarItem = MakeShared<PropertyScalarItem<int32>>(InObject, MetaMemData->MemberName, IntValue, ReadOnly);
-			if (PropertyData.Min)
+			};
+			Access.GetMetaType = [MetaMemData] {
+				return MetaMemData->GetMetaType ? MetaMemData->GetMetaType() : nullptr;
+			};
+			if (MetaMemData->GetReferencedShObject)
 			{
-				ScalarItem->SetMinValue(std::any_cast<int32>(PropertyData.Min(InObject)));
+				Access.GetReferencedShObject = [MetaMemData, Instance] {
+					return MetaMemData->GetReferencedShObject(Instance);
+				};
+				Access.SetReferencedShObject = [MetaMemData, Instance](ShObject* NewObject) {
+					if (MetaMemData->SetReferencedShObject)
+					{
+						MetaMemData->SetReferencedShObject(Instance, NewObject);
+					}
+				};
 			}
-			if (PropertyData.Max)
+			if (MetaMemData->GetEnumValueName)
 			{
-				ScalarItem->SetMaxValue(std::any_cast<int32>(PropertyData.Max(InObject)));
+				Access.GetEnumValueName = [MetaMemData, Instance] {
+					return MetaMemData->GetEnumValueName(Instance);
+				};
+				Access.EnumEntries = MetaMemData->EnumEntries;
 			}
-			Item = MoveTemp(ScalarItem);
-		}
-		else if(MetaMemData->IsType<uint32>())
-		{
-			uint32* UIntValue = (uint32*)MetaMemData->Get(Instance);
-			auto ScalarItem = MakeShared<PropertyScalarItem<uint32>>(InObject, MetaMemData->MemberName, UIntValue, ReadOnly);
-			if (PropertyData.Min)
-			{
-				ScalarItem->SetMinValue(std::any_cast<uint32>(PropertyData.Min(InObject)));
-			}
-			if (PropertyData.Max)
-			{
-				ScalarItem->SetMaxValue(std::any_cast<uint32>(PropertyData.Max(InObject)));
-			}
-			Item = MoveTemp(ScalarItem);
-		}
-		else if(MetaMemData->IsType<float>())
-		{
-			float* FloatValue = (float*)MetaMemData->Get(Instance);
-			auto ScalarItem = MakeShared<PropertyScalarItem<float>>(InObject, MetaMemData->MemberName, FloatValue, ReadOnly);
-			if (PropertyData.Min)
-			{
-				ScalarItem->SetMinValue(std::any_cast<float>(PropertyData.Min(InObject)));
-			}
-			if (PropertyData.Max)
-			{
-				ScalarItem->SetMaxValue(std::any_cast<float>(PropertyData.Max(InObject)));
-			}
-			Item = MoveTemp(ScalarItem);
-		}
-		else if(MetaMemData->IsType<double>())
-		{
-			double* DoubleValue = (double*)MetaMemData->Get(Instance);
-			auto ScalarItem = MakeShared<PropertyScalarItem<double>>(InObject, MetaMemData->MemberName, DoubleValue, ReadOnly);
-			if (PropertyData.Min)
-			{
-				ScalarItem->SetMinValue(std::any_cast<double>(PropertyData.Min(InObject)));
-			}
-			if (PropertyData.Max)
-			{
-				ScalarItem->SetMaxValue(std::any_cast<double>(PropertyData.Max(InObject)));
-			}
-			Item = MoveTemp(ScalarItem);
-		}
-		else if (MetaMemData->IsType<FString>())
-		{
-			FString* StringValue = (FString*)MetaMemData->Get(Instance);
-			Item = MakeShared<PropertyStringItem>(InObject, MetaMemData->MemberName, StringValue, ReadOnly);
-		}
-		else if(MetaMemData->IsType<Vector2f>())
-		{
-			Vector2f* VecValue = (Vector2f*)MetaMemData->Get(Instance);
-			Item = MakeShared<PropertyVector2fItem>(InObject, MetaMemData->MemberName, VecValue, ReadOnly);
-		}
-		else if(MetaMemData->IsType<Vector3f>())
-		{
-			Vector3f* VecValue = (Vector3f*)MetaMemData->Get(Instance);
-			Item = MakeShared<PropertyVector3fItem>(InObject, MetaMemData->MemberName, VecValue, ReadOnly);
-		}
-		else if(MetaMemData->IsType<Vector4f>())
-		{
-			Vector4f* VecValue = (Vector4f*)MetaMemData->Get(Instance);
-			Item = MakeShared<PropertyVector4fItem>(InObject, MetaMemData->MemberName, VecValue, ReadOnly);
-		}
-		else if(MetaMemData->IsType<Vector2i>())
-		{
-			Vector2i* VecValue = (Vector2i*)MetaMemData->Get(Instance);
-			Item = MakeShared<PropertyVector2iItem>(InObject, MetaMemData->MemberName, &VecValue->x, ReadOnly);
-		}
-		else if(MetaMemData->IsType<Vector3i>())
-		{
-			Vector3i* VecValue = (Vector3i*)MetaMemData->Get(Instance);
-			Item = MakeShared<PropertyVector3iItem>(InObject, MetaMemData->MemberName, &VecValue->x, ReadOnly);
-		}
-		else if(MetaMemData->IsType<Vector4i>())
-		{
-			Vector4i* VecValue = (Vector4i*)MetaMemData->Get(Instance);
-			Item = MakeShared<PropertyVector4iItem>(InObject, MetaMemData->MemberName, &VecValue->x, ReadOnly);
-		}
-		//Struct/Class
-		else if(MemberMetaType && MemberMetaType->Datas.Num() > 0)
-		{
-			Item = MakeShared<PropertyCategory>(InObject, MetaMemData->MemberName, true);
-			void* CompositeInstance = MetaMemData->Get(Instance);
-			for(MetaMemberData* ProperyMember : GetProperties(MemberMetaType))
-			{
-				if(MemberMetaType->IsDerivedFrom<ShObject>())
-				{
-					Item->AddChilds(GeneratePropertyDatas(static_cast<ShObject*>(CompositeInstance), ProperyMember, CompositeInstance));
-				}
-				else
-				{
-					Item->AddChilds(GeneratePropertyDatas(InObject, ProperyMember, CompositeInstance));
-				}
-				
-			}
-			
+			Access.PropertyData = &MetaMemData->PropertyData;
+			Access.VisibilityInstance = Instance;
+			Access.ReadOnly = ReadOnly;
+			Item = GeneratePropertyDataForValue(InObject, Access);
 		}
 		
 		if(Item) {

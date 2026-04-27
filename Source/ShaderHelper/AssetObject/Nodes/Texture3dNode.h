@@ -31,7 +31,7 @@ namespace SH
 		void Serialize(FArchive& Ar) override;
 		void PostLoad() override;
 		FSlateColor GetNodeColor() const override { return FLinearColor{0.34f, 0.24f, 0.5f}; }
-		TSharedPtr<SWidget> ExtraNodeWidget() override;
+		TSharedPtr<SWidget> ExtraNodeWidget(FW::SGraphNode* OwnerWidget) override;
 		FW::ExecRet Exec(FW::GraphExecContext& Context) override;
 
 		void PostPropertyChanged(FW::PropertyData* InProperty) override;

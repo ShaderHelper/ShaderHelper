@@ -36,7 +36,7 @@ namespace FW
 				if (InputPinData->CanAccept(OutputPinData))
 				{
 					DragDropOp->SetCursorOverride(TOptional<EMouseCursor::Type>());
-					OwnerPanel->PreviewEnd = OwnerPanel->GetTickSpaceGeometry().AbsoluteToLocal(MyGeometry.GetAbsolutePositionAtCoordinates(FVector2D(0.5f, 0.5f)));
+					OwnerPanel->PreviewEnd = OwnerPanel->GetPinConnectionPoint(this, OwnerPanel->GetTickSpaceGeometry(), false);
 				}
 				else
 				{
@@ -96,8 +96,8 @@ namespace FW
             {
                 SGraphPin* OutputPin = OwnerPanel->GetOuputPin(this);
                 OwnerPanel->PreviewStartDir = OutputPin->PinData->Direction;
-                OwnerPanel->PreviewStart = OwnerPanel->GetTickSpaceGeometry().AbsoluteToLocal(OutputPin->GetTickSpaceGeometry().GetAbsolutePositionAtCoordinates(FVector2D(0.5f, 0.5f)));
-                OwnerPanel->PreviewEnd = OwnerPanel->GetTickSpaceGeometry().AbsoluteToLocal(MyGeometry.GetAbsolutePositionAtCoordinates(FVector2D(0.5f, 0.5f)));
+				OwnerPanel->PreviewStart = OwnerPanel->GetPinConnectionPoint(OutputPin, OwnerPanel->GetTickSpaceGeometry(), false);
+				OwnerPanel->PreviewEnd = OwnerPanel->GetPinConnectionPoint(this, OwnerPanel->GetTickSpaceGeometry(), false);
 
 				SGraphPanel::ScopedTransaction Transaction{ OwnerPanel };
 				OwnerPanel->DoCommand(MakeShared<RemoveLinkCommand>(OwnerPanel, OutputPin->PinData, PinData));
@@ -107,7 +107,7 @@ namespace FW
             else
             {
                 OwnerPanel->PreviewStartDir = PinData->Direction;
-                OwnerPanel->PreviewStart = OwnerPanel->GetTickSpaceGeometry().AbsoluteToLocal(MyGeometry.GetAbsolutePositionAtCoordinates(FVector2D(0.5f, 0.5f)));
+				OwnerPanel->PreviewStart = OwnerPanel->GetPinConnectionPoint(this, OwnerPanel->GetTickSpaceGeometry(), false);
                 OwnerPanel->PreviewEnd = *OwnerPanel->PreviewStart;
                 return FReply::Handled().BeginDragDrop(MakeShared<GraphDragDropOp>(this));
             }

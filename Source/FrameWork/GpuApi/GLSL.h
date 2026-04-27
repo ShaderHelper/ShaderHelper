@@ -384,8 +384,8 @@ namespace FW
 		{
 			Options.SetGenerateDebugInfo();
 			Options.SetNonSemanticShaderDebugSource();
+			Options.SetOptimizationLevel(shaderc_optimization_level_zero);
 		}
-		Options.SetOptimizationLevel(shaderc_optimization_level_zero);
 		Options.SetPreserveBindings(true);
 		Options.SetAllPushConstantAsUniform(true);
 		//Compatible with opengl glsl syntax

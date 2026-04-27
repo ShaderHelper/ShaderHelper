@@ -298,8 +298,8 @@ namespace FW
 			{
                 for (auto [OuputPin, InputPin] : Links)
 				{
-					Vector2D C0 = MyGeometry.AbsoluteToLocal(OuputPin->GetTickSpaceGeometry().GetAbsolutePositionAtCoordinates({0.5, 0.5}));
-					Vector2D C3 = MyGeometry.AbsoluteToLocal(InputPin->GetTickSpaceGeometry().GetAbsolutePositionAtCoordinates({0.5, 0.5}));
+					Vector2D C0 = GetPinConnectionPoint(OuputPin, MyGeometry, false);
+					Vector2D C3 = GetPinConnectionPoint(InputPin, MyGeometry, false);
 					double Offset = FMath::Abs(C0.x - C3.x) / 2;
 					Vector2D C1 = {C0.x + Offset, C0.y};
 					Vector2D C2 = { C3.x - Offset, C3.y };
@@ -429,6 +429,17 @@ namespace FW
 			ESlateDrawEffect::None, FStyleColors::Foreground.GetSpecifiedColor());
 	}
 
+	Vector2D SGraphPanel::GetPinConnectionPoint(SGraphPin* Pin, const FGeometry& PanelGeometry, bool bUsePaintSpaceGeometry) const
+	{
+		if (Pin->Owner->NodeData->IsCollapsed)
+		{
+			return Pin->Owner->GetCollapsedPinConnectionPoint(PanelGeometry, Pin->PinData->Direction, bUsePaintSpaceGeometry);
+		}
+
+		const FGeometry PinGeometry = bUsePaintSpaceGeometry ? Pin->GetPaintSpaceGeometry() : Pin->GetTickSpaceGeometry();
+		return PanelGeometry.AbsoluteToLocal(PinGeometry.GetAbsolutePositionAtCoordinates(FVector2D{ 0.5f, 0.5f }));
+	}
+
 	int32 SGraphPanel::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 	{
 		FArrangedChildren ArrangedChildren(EVisibility::Visible);
@@ -542,8 +553,8 @@ namespace FW
 
 		for (auto [OutPin, InPin] : Links)
 		{
-			Vector2D OutPos = AllottedGeometry.AbsoluteToLocal(OutPin->GetPaintSpaceGeometry().GetAbsolutePositionAtCoordinates({ 0.5, 0.5 }));
-			Vector2D InPos = AllottedGeometry.AbsoluteToLocal(InPin->GetPaintSpaceGeometry().GetAbsolutePositionAtCoordinates({ 0.5, 0.5 }));
+			Vector2D OutPos = GetPinConnectionPoint(OutPin, AllottedGeometry, true);
+			Vector2D InPos = GetPinConnectionPoint(InPin, AllottedGeometry, true);
 			DrawConnection(AllottedGeometry.ToPaintGeometry(), OutDrawElements, PanelLayer, PinDirection::Output, OutPos, InPos);
 		}
 
@@ -825,6 +836,42 @@ namespace FW
 		NodeData->Position = OldPos;
 		Vector2D DeltaPos = NewPos - OldPos;
 		if (FMath::Abs(DeltaPos.x) > 0.8 || FMath::Abs(DeltaPos.y) > 0.8)
+		{
+			GraphPanel->GetGraphData()->MarkDirty();
+		}
+	}
+
+	void ResizeNodeCommand::Do()
+	{
+		NodeData->NodeWidth = NewWidth;
+		if (FMath::Abs(NewWidth - OldWidth) > 0.8f)
+		{
+			GraphPanel->GetGraphData()->MarkDirty();
+		}
+	}
+
+	void ResizeNodeCommand::Undo()
+	{
+		NodeData->NodeWidth = OldWidth;
+		if (FMath::Abs(NewWidth - OldWidth) > 0.8f)
+		{
+			GraphPanel->GetGraphData()->MarkDirty();
+		}
+	}
+
+	void SetNodeCollapsedCommand::Do()
+	{
+		NodeData->IsCollapsed = NewCollapsed;
+		if (OldCollapsed != NewCollapsed)
+		{
+			GraphPanel->GetGraphData()->MarkDirty();
+		}
+	}
+
+	void SetNodeCollapsedCommand::Undo()
+	{
+		NodeData->IsCollapsed = OldCollapsed;
+		if (OldCollapsed != NewCollapsed)
 		{
 			GraphPanel->GetGraphData()->MarkDirty();
 		}

@@ -138,7 +138,7 @@ namespace FW
                 .OnExpansionChanged_Lambda([](TSharedRef<PropertyData> InData, bool bExpanded){
                     InData->Expanded = bExpanded;
                 })
-                .SelectionMode(ESelectionMode::None)
+                .SelectionMode(ESelectionMode::Single)
             );
             
             for(const auto& Data : PropertyDatas)

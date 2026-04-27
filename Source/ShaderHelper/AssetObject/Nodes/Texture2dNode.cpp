@@ -74,7 +74,7 @@ namespace SH
 		InitTexture();
 	}
 
-	TSharedPtr<SWidget> Texture2dNode::ExtraNodeWidget()
+	TSharedPtr<SWidget> Texture2dNode::ExtraNodeWidget(SGraphNode* /*OwnerWidget*/)
 	{
 		return SNew(SBox).Padding(4.0f)
 			[

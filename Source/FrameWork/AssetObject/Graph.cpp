@@ -26,31 +26,8 @@ namespace FW
 	void Graph::Serialize(FArchive& Ar)
 	{
 		AssetObject::Serialize(Ar);
-		
-		int NodeNum = NodeDatas.Num();
-		Ar << NodeNum;
-		if (Ar.IsSaving())
-		{
-			for (int Index = 0; Index < NodeNum; Index++)
-			{
-				//Serialize polymorphic pointers
-				FString TypeName = GetRegisteredName(NodeDatas[Index]->DynamicMetaType());
-				Ar << TypeName;
-				NodeDatas[Index]->Serialize(Ar);
-			}
-		}
-		else
-		{
-			NodeDatas.Reserve(NodeNum);
-			for (int Index = 0; Index < NodeNum; Index++)
-			{
-				FString TypeName;
-				Ar << TypeName;
-				auto LoadedNodeData = NewShObject<GraphNode>(GetMetaType(TypeName), this);
-				LoadedNodeData->Serialize(Ar);
-				NodeDatas.Emplace(LoadedNodeData);
-			}
-		}
+
+		SerializePolymorphicObjectArray(Ar, NodeDatas, this);
 
 		Ar << NodeDeps;
 	}
@@ -122,31 +99,10 @@ namespace FW
 	{
 		ShObject::Serialize(Ar);
 		Ar << Position;
-        
-        int PinNum = Pins.Num();
-        Ar << PinNum;
-        if (Ar.IsSaving())
-        {
-            for (int Index = 0; Index < PinNum; Index++)
-            {
-                //Serialize polymorphic pointers
-                FString TypeName = GetRegisteredName(Pins[Index]->DynamicMetaType());
-                Ar << TypeName;
-                Pins[Index]->Serialize(Ar);
-            }
-        }
-        else
-        {
-			Pins = {};
-            for (int Index = 0; Index < PinNum; Index++)
-            {
-                FString TypeName;
-                Ar << TypeName;
-                auto LoadedPinData = NewShObject<GraphPin>(GetMetaType(TypeName), this);
-                LoadedPinData->Serialize(Ar);
-                Pins.Emplace(LoadedPinData);
-            }
-        }
+		Ar << NodeWidth;
+		Ar << IsCollapsed;
+
+		SerializePolymorphicObjectArray(Ar, Pins, this);
 
         
 		Ar << OutPinToInPin;

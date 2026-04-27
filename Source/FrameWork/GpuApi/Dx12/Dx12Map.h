@@ -143,6 +143,44 @@ namespace FW
         }
     }
 
+    inline DXGI_FORMAT MapTextureResourceFormat(const GpuTextureDesc& InDesc)
+    {
+        if (EnumHasAllFlags(InDesc.Usage, GpuTextureUsage::DepthStencil | GpuTextureUsage::ShaderResource))
+        {
+            switch (InDesc.Format)
+            {
+            case GpuFormat::D32_FLOAT:
+                return DXGI_FORMAT_R32_TYPELESS;
+            default:
+                break;
+            }
+        }
+
+        return MapTextureFormat(InDesc.Format);
+    }
+
+    inline DXGI_FORMAT MapShaderResourceViewFormat(GpuFormat InFormat)
+    {
+        switch (InFormat)
+        {
+        case GpuFormat::D32_FLOAT:
+            return DXGI_FORMAT_R32_FLOAT;
+        default:
+            return MapTextureFormat(InFormat);
+        }
+    }
+
+    inline DXGI_FORMAT MapDepthStencilViewFormat(GpuFormat InFormat)
+    {
+        switch (InFormat)
+        {
+        case GpuFormat::D32_FLOAT:
+            return DXGI_FORMAT_D32_FLOAT;
+        default:
+            AUX::Unreachable();
+        }
+    }
+
     inline D3D12_PRIMITIVE_TOPOLOGY MapPrimitiveType(PrimitiveType InType)
     {
         switch (InType)

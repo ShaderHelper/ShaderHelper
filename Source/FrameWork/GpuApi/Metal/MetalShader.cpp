@@ -147,7 +147,7 @@ namespace FW
 				DxcArgs.Add("-fvk-u-shift"); DxcArgs.Add(ShiftU.c_str()); DxcArgs.Add("all");
 			}
 			//DxcArgs.Add("-Gis");
-			DxcArgs.Add("/Od"); //TODO
+			//DxcArgs.Add("/Od");
 			
 			if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
 			{

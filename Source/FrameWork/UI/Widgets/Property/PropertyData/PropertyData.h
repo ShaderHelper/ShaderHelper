@@ -1,7 +1,10 @@
 #pragma once
 #include "SPropertyCategory.h"
 #include "UI/Styles/FAppCommonStyle.h"
+#include "UI/Widgets/Misc/MiscWidget.h"
 #include <Serialization/MemoryWriter.h>
+#include <Widgets/Input/SSpinBox.h>
+#include <Widgets/Views/STreeView.h>
 
 namespace FW
 {
@@ -23,6 +26,8 @@ namespace FW
 		FText GetDisplayName() const { return DisplayName; }
 
 		PropertyData* GetParent() const { return Parent; }
+		void SetArrayElementStyle(bool InArrayElementStyle) { bArrayElementStyle = InArrayElementStyle; }
+		bool HasArrayElementStyle() const { return bArrayElementStyle; }
 
 		void AddChild(TSharedRef<PropertyData> InChild) 
 		{ 
@@ -95,6 +100,7 @@ namespace FW
 		TArray<TSharedRef<PropertyData>> Children;
         TArray<uint8> EditOldData;
         bool bEditInProgress = false;
+		bool bArrayElementStyle = false;
 	};
 
 	class PropertyCategory : public PropertyData

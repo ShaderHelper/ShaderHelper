@@ -1,8 +1,10 @@
 #pragma once
+#include "PropertyData.h"
 #include "SPropertyItem.h"
 #include "UI/Styles/FAppCommonStyle.h"
 #include "UI/Widgets/Misc/MiscWidget.h"
 #include "AssetManager/AssetManager.h"
+#include "magic_enum.hpp"
 
 #include <Widgets/Input/SEditableTextBox.h>
 #include <Widgets/Input/SSpinBox.h>
@@ -26,6 +28,12 @@ namespace FW
         {
             auto Row = SNew(STableRow<TSharedRef<PropertyData>>, OwnerTable);
             Row->SetEnabled(IsEnabled);
+			const bool bArrayElement = HasArrayElementStyle();
+			const FMargin RowPadding = bArrayElement ? FMargin(3.0f, 1.0f, 3.0f, 0.0f) : FMargin(0.0f, 2.0f, 0.0f, 2.0f);
+			const FSlateBrush* RowBorder = bArrayElement
+				? FAppStyle::Get().GetBrush("Brushes.Input")
+				: FAppCommonStyle::Get().GetBrush("PropertyView.ItemColor");
+			const FSlateBrush* NoBrush = FAppStyle::Get().GetBrush("NoBrush");
                 
             SAssignNew(Item, SPropertyItem)
                     .CanApplyName(CanApplyName)
@@ -40,29 +48,39 @@ namespace FW
             
             Row->SetRowContent(
 				SNew(SBorder)
-				.Padding(FMargin{0,2,0,2})
-				.BorderImage_Lambda([this] {
-					if(Parent && Parent->IsOfType<PropertyCategory>() && static_cast<PropertyCategory*>(Parent)->IsComposite() )
-					{
-						return FAppCommonStyle::Get().GetBrush("PropertyView.CompositeItemColor");
-					}
-				   return FAppCommonStyle::Get().GetBrush("PropertyView.ItemColor");
+				.Padding(RowPadding)
+				.BorderImage_Lambda([Row, bArrayElement, RowBorder, NoBrush] {
+					return bArrayElement && Row->IsSelected() ? NoBrush : RowBorder;
 				})
 				[
-					SNew(SHorizontalBox)
-					+SHorizontalBox::Slot()
+					SNew(SBorder)
+					.BorderImage_Lambda([this, Row, bArrayElement, NoBrush] {
+						if (bArrayElement && Row->IsSelected())
+						{
+							return NoBrush;
+						}
+						if(Parent && Parent->IsOfType<PropertyCategory>() && static_cast<PropertyCategory*>(Parent)->IsComposite() )
+						{
+							return FAppCommonStyle::Get().GetBrush("PropertyView.CompositeItemColor");
+						}
+						return FAppCommonStyle::Get().GetBrush("PropertyView.ItemColor");
+					})
 					[
-						Item.ToSharedRef()
-					]
-					+SHorizontalBox::Slot()
-					.AutoWidth()
-					[
-						SNew(SIconButton).Icon(FAppStyle::Get().GetBrush("Icons.Delete"))
-							.Visibility_Lambda([this]{ return OnDelete? EVisibility::Visible : EVisibility::Hidden; })
-							.OnClicked_Lambda([this]{
-								if(OnDelete) OnDelete();
-								return FReply::Handled();
-							})
+						SNew(SHorizontalBox)
+						+SHorizontalBox::Slot()
+						[
+							Item.ToSharedRef()
+						]
+						+SHorizontalBox::Slot()
+						.AutoWidth()
+						[
+							SNew(SIconButton).Icon(FAppStyle::Get().GetBrush("Icons.Delete"))
+								.Visibility_Lambda([this]{ return OnDelete? EVisibility::Visible : EVisibility::Hidden; })
+								.OnClicked_Lambda([this]{
+									if(OnDelete) OnDelete();
+									return FReply::Handled();
+								})
+						]
 					]
 				]
             );
@@ -141,6 +159,38 @@ namespace FW
 		bool ReadOnly;
 		TArray<TSharedPtr<FString>> EnumItems;
 	};
+
+	template<typename EnumType>
+	TMap<FString, TSharedPtr<void>> MakePropertyEnumEntries()
+	{
+		TMap<FString, TSharedPtr<void>> Entries;
+		for (const auto& [EntryValue, EntryStr] : magic_enum::enum_entries<EnumType>())
+		{
+			Entries.Add(ANSI_TO_TCHAR(EntryStr.data()), MakeShared<EnumType>(EntryValue));
+		}
+		return Entries;
+	}
+
+	template<typename EnumType>
+	TSharedPtr<FString> MakePropertyEnumValueName(EnumType Value)
+	{
+		return MakeShared<FString>(ANSI_TO_TCHAR(magic_enum::enum_name(Value).data()));
+	}
+
+	template<typename EnumType>
+	TSharedRef<PropertyEnumItem> MakePropertyEnumItem(ShObject* InOwner, const FText& InName, EnumType Value,
+		const TFunction<void(EnumType)>& InSetter, bool InReadOnly = false)
+	{
+		return MakeShared<PropertyEnumItem>(
+			InOwner,
+			InName,
+			MakePropertyEnumValueName(Value),
+			MakePropertyEnumEntries<EnumType>(),
+			[InSetter](void* InValue) {
+				InSetter(*static_cast<EnumType*>(InValue));
+			},
+			InReadOnly);
+	}
 
 	template<typename T>
     class PropertyScalarItem : public PropertyItemBase

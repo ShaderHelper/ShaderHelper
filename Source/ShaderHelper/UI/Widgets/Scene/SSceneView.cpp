@@ -50,7 +50,7 @@ namespace SH
 
 	static bool HandleModelAssetDrop(SSceneView* SceneView, const TSharedPtr<FDragDropOperation>& DragDropOp, SceneObject* Parent = nullptr)
 	{
-		Render* Render = SceneView ? SceneView->GetRender() : nullptr;
+		Render* Render = SceneView->GetRender();
 		if (!Render || !HasDroppableModelAsset(DragDropOp))
 		{
 			return false;

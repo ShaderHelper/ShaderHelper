@@ -55,6 +55,8 @@ namespace FW
 	FRAMEWORK_API void EndObjectPtrFixup();
 	FRAMEWORK_API void RegisterLoadedShObject(ShObject* InObject);
 	FRAMEWORK_API void RegisterObjectPtrFixup(const ObjectPtrFixupRequest& InRequest);
+	FString GetRegisteredName(MetaType* InMt);
+	MetaType* GetMetaType(const FString& InRegisteredName);
       
     //Note: All ShObject must be default constructible.
 	class FRAMEWORK_API ShObject : FNoncopyable
@@ -145,6 +147,35 @@ namespace FW
 		NewObj->SetOuter(InOuter);
 		NewObj->Init();
 		return NewObj;
+	}
+
+	template<typename T>
+	void SerializePolymorphicObjectArray(FArchive& Ar, TArray<ObjectPtr<T, ObjectOwnerShip::Retain>>& Objects, ShObject* InOuter)
+	{
+		int32 ObjectNum = Objects.Num();
+		Ar << ObjectNum;
+		if (Ar.IsSaving())
+		{
+			for (const auto& Object : Objects)
+			{
+				FString TypeName = GetRegisteredName(Object->DynamicMetaType());
+				Ar << TypeName;
+				Object->Serialize(Ar);
+			}
+		}
+		else
+		{
+			Objects.Reset();
+			Objects.Reserve(ObjectNum);
+			for (int32 Index = 0; Index < ObjectNum; ++Index)
+			{
+				FString TypeName;
+				Ar << TypeName;
+				auto Object = NewShObject<T>(GetMetaType(TypeName), InOuter);
+				Object->Serialize(Ar);
+				Objects.Add(MoveTemp(Object));
+			}
+		}
 	}
 
 	class FRAMEWORK_API ShObjectOp

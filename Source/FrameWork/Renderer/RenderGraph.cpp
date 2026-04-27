@@ -23,6 +23,10 @@ namespace FW
 			const GpuRenderTargetInfo& RtInfo = InOutPass.Desc.ColorRenderTargets[i];
 			InOutPass.PassResourceStates.Add(RtInfo.View, GpuResourceState::RenderTargetWrite);
 		}
+		if (InOutPass.Desc.DepthStencilTarget)
+		{
+			InOutPass.PassResourceStates.Add(InOutPass.Desc.DepthStencilTarget->View, GpuResourceState::DepthStencilWrite);
+		}
 
 		InOutPass.Bindings.EnumerateBinding([&](const ResourceBinding& ResourceBindingEntry, const LayoutBinding& LayoutBindingEntry) {
 			if (LayoutBindingEntry.Type == BindingType::Texture || LayoutBindingEntry.Type == BindingType::TextureCube || LayoutBindingEntry.Type == BindingType::Texture3D)

@@ -1519,6 +1519,7 @@ namespace SH
 						.IsChecked_Lambda([this] { return !CurProject->bScenePreview ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
 						.OnCheckStateChanged_Lambda([this](ECheckBoxState NewState) { 
 							CurProject->bScenePreview = (NewState == ECheckBoxState::Unchecked); 
+							ForceRender();
 						})
 				]
 				+ SHorizontalBox::Slot()

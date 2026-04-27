@@ -38,6 +38,8 @@ namespace FW
         virtual void Refuse() {}
 		bool HasLink() const;
 		virtual FLinearColor GetPinColor() const { return FLinearColor::White; }
+		//If false, the pin is not laid out in the default left/right column;
+		virtual bool ShouldLayoutInNode() const { return true; }
 		//The pins connected to the output
         TArray<GraphPin*> GetTargetPins() const;
 		//The output pin relied upon when this pin is an input
@@ -56,14 +58,18 @@ namespace FW
 
 	public:
 		virtual TSharedRef<class SGraphNode> CreateNodeWidget(class SGraphPanel* OwnerPanel);
-		virtual TSharedPtr<SWidget> ExtraNodeWidget() { return {}; }
+		virtual TSharedPtr<SWidget> ExtraNodeWidget(class SGraphNode* OwnerWidget) { return {}; }
 		virtual void Serialize(FArchive& Ar) override;
 		virtual FSlateColor GetNodeColor() const;
         virtual ExecRet Exec(GraphExecContext& Context) = 0;
         GraphPin* GetPin(FGuid Id);
         GraphPin* GetPin(const FString& InName);
 
+		static constexpr float DefaultNodeWidth = 120.0f;
+		static constexpr float MinNodeWidth = 120.0f;
 		Vector2D Position{0};
+		float NodeWidth = DefaultNodeWidth;
+		bool IsCollapsed = false;
         TArray<ObjectPtr<GraphPin>> Pins;
 		TMultiMap<ObserverObjectPtr<GraphPin>, ObserverObjectPtr<GraphPin>> OutPinToInPin;
         bool AnyError = false;

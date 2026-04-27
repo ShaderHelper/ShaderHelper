@@ -77,7 +77,7 @@ namespace SH
 		GraphNode::PostLoad();
 	}
 
-	TSharedPtr<SWidget> ShaderToyPreviousFrameNode::ExtraNodeWidget()
+	TSharedPtr<SWidget> ShaderToyPreviousFrameNode::ExtraNodeWidget(SGraphNode* /*OwnerWidget*/)
 	{
 		return SNew(SBox).Padding(4)
 			[
@@ -119,7 +119,7 @@ namespace SH
 	{
 		TArray<TSharedRef<FW::PropertyData>> Result = ShObject::GeneratePropertyDatas();
 		auto PassNodePropertyItem = MakeShared<PropertyItemBase>(this, "Pass");
-		PassNodePropertyItem->SetEmbedWidget(ExtraNodeWidget());
+		PassNodePropertyItem->SetEmbedWidget(ExtraNodeWidget(nullptr));
 		Result.Add(PassNodePropertyItem);
 		return Result;
 	}

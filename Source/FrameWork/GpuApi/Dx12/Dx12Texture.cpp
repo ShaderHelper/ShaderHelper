@@ -116,7 +116,7 @@ namespace FW
 
 		CD3DX12_RESOURCE_DESC TexDesc = InTexDesc.Dimension == GpuTextureDimension::Tex3D ?
 			CD3DX12_RESOURCE_DESC::Tex3D(
-				MapTextureFormat(InTexDesc.Format),
+				MapTextureResourceFormat(InTexDesc),
 				InTexDesc.Width,
 				InTexDesc.Height,
 				InTexDesc.Depth,
@@ -124,7 +124,7 @@ namespace FW
 				ResourceFlags
 			) :
 			CD3DX12_RESOURCE_DESC::Tex2D(
-				MapTextureFormat(InTexDesc.Format),
+				MapTextureResourceFormat(InTexDesc),
 				InTexDesc.Width,
 				InTexDesc.Height,
 				InTexDesc.Dimension == GpuTextureDimension::TexCube ? 6 : InTexDesc.Depth,

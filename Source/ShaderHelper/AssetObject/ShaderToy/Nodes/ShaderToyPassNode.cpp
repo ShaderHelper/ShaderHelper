@@ -667,7 +667,7 @@ namespace SH
 	
 	}
 
-	TSharedPtr<SWidget> ShaderToyPassNode::ExtraNodeWidget()
+	TSharedPtr<SWidget> ShaderToyPassNode::ExtraNodeWidget(SGraphNode* /*OwnerWidget*/)
 	{
 		return SNew(SBox).Padding(4.0f)
 			[
