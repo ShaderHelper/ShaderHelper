@@ -38,10 +38,9 @@ namespace FW
         virtual void Refuse() {}
 		bool HasLink() const;
 		virtual FLinearColor GetPinColor() const { return FLinearColor::White; }
-		//If false, the pin is not laid out in the default left/right column;
-		virtual bool ShouldLayoutInNode() const { return true; }
 		//The pins connected to the output
         TArray<GraphPin*> GetTargetPins() const;
+		GraphNode* GetOwnerNode() const;
 		//The output pin relied upon when this pin is an input
 		GraphPin* GetSourcePin() const;
 		GraphNode* GetSourceNode() const;
@@ -92,6 +91,7 @@ namespace FW
 			NodeDatas.Add(InNode);
 			AddNodeHandler.Broadcast(MoveTemp(InNode));
 		}
+		void PostLoad() override;
 		void RemoveNode(FGuid Id) {
 			NodeDatas.RemoveAll([Id](const ObjectPtr<GraphNode>& Element) {
 				return Element->GetGuid() == Id;
@@ -111,14 +111,15 @@ namespace FW
 
 		void AddLink(GraphPin* Output, GraphPin* Input)
 		{
-			GraphNode* OutputNode = static_cast<GraphNode*>(Output->GetOuter());
-			GraphNode* InputNode = static_cast<GraphNode*>(Input->GetOuter());
+			GraphNode* OutputNode = Output->GetOwnerNode();
+			GraphNode* InputNode = Input->GetOwnerNode();
+			check(OutputNode && InputNode);
 			OutputNode->OutPinToInPin.AddUnique(Output, Input);
 			AddDep(OutputNode, InputNode);
 		}
 
 		const TArray<ObjectPtr<GraphNode>>& GetNodes() const { return NodeDatas; }
-		void AddDep(GraphNode* Node1, GraphNode* Node2) { NodeDeps.Add(Node1, Node2); }
+		void AddDep(GraphNode* Node1, GraphNode* Node2) { NodeDeps.AddUnique(Node1, Node2); }
 		void RemoveDep(GraphNode* Node1, GraphNode* Node2) { NodeDeps.Remove(Node1, Node2); }
             
         GraphPin* GetPin(FGuid Id);

@@ -1180,6 +1180,11 @@ namespace SH
 
 	void ShaderHelperEditor::OpenShaderTab(AssetPtr<ShaderAsset> InShader)
     {
+		if (!InShader)
+		{
+			return;
+		}
+
         TSharedPtr<SDockTab>* TabPtr = CurProject->OpenedShaders.Find(InShader);
         if(TabPtr == nullptr || !*TabPtr)
         {

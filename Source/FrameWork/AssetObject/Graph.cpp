@@ -28,8 +28,32 @@ namespace FW
 		AssetObject::Serialize(Ar);
 
 		SerializePolymorphicObjectArray(Ar, NodeDatas, this);
+	}
 
-		Ar << NodeDeps;
+	void Graph::PostLoad()
+	{
+		AssetObject::PostLoad();
+
+		NodeDeps.Empty();
+		for (const auto& NodeData : NodeDatas)
+		{
+			for (auto [OutPinPtr, InPinPtr] : NodeData->OutPinToInPin)
+			{
+				GraphPin* OutPin = OutPinPtr.Get();
+				GraphPin* InPin = InPinPtr.Get();
+				if (!OutPin || !InPin)
+				{
+					continue;
+				}
+
+				GraphNode* OutputNode = OutPin->GetOwnerNode();
+				GraphNode* InputNode = InPin->GetOwnerNode();
+				if (OutputNode && InputNode)
+				{
+					AddDep(OutputNode, InputNode);
+				}
+			}
+		}
 	}
 
 	const FSlateBrush* Graph::GetImage() const
@@ -140,8 +164,11 @@ namespace FW
 
     TArray<GraphPin*> GraphPin::GetTargetPins() const
     {
-        GraphNode* Owner = static_cast<GraphNode*>(GetOuter());
-        Graph* OwnerGraph = static_cast<Graph*>(Owner->GetOuter());
+		GraphNode* Owner = GetOwnerNode();
+		if (!Owner)
+		{
+			return {};
+		}
         
 		TArray<ObserverObjectPtr<GraphPin>> TargetPinPtrs;
 		ObserverObjectPtr<GraphPin> ThisPin(const_cast<GraphPin*>(this));
@@ -159,6 +186,20 @@ namespace FW
         return TargetPins;
     }
 
+	GraphNode* GraphPin::GetOwnerNode() const
+	{
+		ShObject* CurOuter = GetOuter();
+		while (CurOuter)
+		{
+			if (CurOuter->DynamicMetaType()->IsDerivedFrom<GraphNode>())
+			{
+				return static_cast<GraphNode*>(CurOuter);
+			}
+			CurOuter = CurOuter->GetOuter();
+		}
+		return nullptr;
+	}
+
 	GraphPin* GraphPin::GetSourcePin() const
 	{
 		return SourcePin.Get();
@@ -168,7 +209,7 @@ namespace FW
 	{
 		if(GraphPin* SrcPin = GetSourcePin())
 		{
-			return static_cast<GraphNode*>(SrcPin->GetOuter());
+			return SrcPin->GetOwnerNode();
 		}
 		return nullptr;
 	}

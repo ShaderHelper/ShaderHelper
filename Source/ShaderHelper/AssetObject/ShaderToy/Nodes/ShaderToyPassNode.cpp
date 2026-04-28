@@ -827,10 +827,12 @@ namespace SH
 			{
 				if (GraphPin* SrcPin = OldPin->GetSourcePin())
 				{
-					GraphNode* SrcNode = static_cast<GraphNode*>(SrcPin->GetOuter());
-					SrcNode->OutPinToInPin.Remove(SrcPin, OldPin);
-					Graph* OwnerGraph = static_cast<Graph*>(GetOuter());
-					OwnerGraph->RemoveDep(SrcNode, this);
+					if (GraphNode* SrcNode = SrcPin->GetOwnerNode())
+					{
+						SrcNode->OutPinToInPin.Remove(SrcPin, OldPin);
+						Graph* OwnerGraph = static_cast<Graph*>(GetOuter());
+						OwnerGraph->RemoveDep(SrcNode, this);
+					}
 				}
 				OldPin->SourcePin.Reset();
 				OldPin->Refuse();

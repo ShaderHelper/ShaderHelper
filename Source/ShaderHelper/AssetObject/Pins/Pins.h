@@ -21,6 +21,7 @@ namespace SH
 
 	private:
 		TRefCountPtr<FW::GpuTexture> Value;
+		TRefCountPtr<FW::GpuTexture> DefaultValue;
 	};
 
 	class GpuCubemapPin : public FW::GraphPin
@@ -40,6 +41,7 @@ namespace SH
 
 	private:
 		TRefCountPtr<FW::GpuTexture> Value;
+		TRefCountPtr<FW::GpuTexture> DefaultValue;
 	};
 
 	class GpuTexture3DPin : public FW::GraphPin
@@ -59,5 +61,6 @@ namespace SH
 
 	private:
 		TRefCountPtr<FW::GpuTexture> Value;
+		TRefCountPtr<FW::GpuTexture> DefaultValue;
 	};
 }

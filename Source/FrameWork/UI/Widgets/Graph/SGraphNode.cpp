@@ -102,10 +102,6 @@ namespace FW
 
 		for (GraphPin* Pin : NodeData->Pins)
 		{
-			if (!Pin->ShouldLayoutInNode())
-			{
-				continue;
-			}
 			auto PinIcon = SNew(SGraphPin, this).PinData(Pin);
 			Pins.Add(&*PinIcon);
 			auto PinDesc = SNew(SBox).MinDesiredWidth(100.0f)
@@ -320,7 +316,7 @@ namespace FW
 		if (bIsResizingWidth)
 		{
 			const FVector2D LocalMousePos = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
-			NodeData->NodeWidth = FMath::Max(GraphNode::MinNodeWidth, ResizeStartWidth + LocalMousePos.X - ResizeStartMouseX);
+			NodeData->NodeWidth = (float)FMath::Max(GraphNode::MinNodeWidth, ResizeStartWidth + LocalMousePos.X - ResizeStartMouseX);
 			return FReply::Handled();
 		}
 
@@ -337,7 +333,7 @@ namespace FW
 	bool SGraphNode::IsOnResizeHandle(const FGeometry& MyGeometry, const FVector2D& ScreenSpacePosition) const
 	{
 		const FVector2D LocalMousePos = MyGeometry.AbsoluteToLocal(ScreenSpacePosition);
-		const float NodeWidth = MyGeometry.GetLocalSize().X;
+		const float NodeWidth = (float)MyGeometry.GetLocalSize().X;
 		return LocalMousePos.X >= NodeWidth - NodeResizeHandleWidth && LocalMousePos.X <= NodeWidth + NodeResizeHandleWidth;
 	}
 

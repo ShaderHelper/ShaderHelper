@@ -288,8 +288,10 @@ namespace SH
 						GraphPin* SrcPin = P->GetSourcePin();
 						if (SrcPin)
 						{
-							GraphNode* SrcNode = static_cast<GraphNode*>(SrcPin->GetOuter());
-							SrcNode->OutPinToInPin.Remove(SrcPin, P.Get());
+							if (GraphNode* SrcNode = SrcPin->GetOwnerNode())
+							{
+								SrcNode->OutPinToInPin.Remove(SrcPin, P.Get());
+							}
 						}
 						P->SourcePin.Reset();
 						P->Refuse();

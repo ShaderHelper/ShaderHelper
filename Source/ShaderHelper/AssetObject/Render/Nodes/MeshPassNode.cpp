@@ -59,6 +59,13 @@ namespace SH
 		RebuildOutputPins();
 	}
 
+	void MeshPassNode::PostLoad()
+	{
+		GraphNode::PostLoad();
+		NormalizePreviewOutputName();
+		RebuildOutputPins();
+	}
+
 	GpuFormat MeshPassNode::ToGpuFormat(MeshPassColorFormat F)
 	{
 		switch (F)
@@ -201,8 +208,10 @@ namespace SH
 			{
 				if (GraphPin* Src = OP->GetSourcePin())
 				{
-					GraphNode* SrcNode = static_cast<GraphNode*>(Src->GetOuter());
-					SrcNode->OutPinToInPin.Remove(Src, OP.Get());
+					if (GraphNode* SrcNode = Src->GetOwnerNode())
+					{
+						SrcNode->OutPinToInPin.Remove(Src, OP.Get());
+					}
 				}
 				OP->SourcePin.Reset();
 				OP->Refuse();
@@ -236,10 +245,6 @@ namespace SH
 		Ar << ColorRTFormats;
 		Ar << DepthFormat;
 		Ar << PreviewOutputName;
-		if (Ar.IsLoading())
-		{
-			NormalizePreviewOutputName();
-		}
 
 		Ar << CameraRef;
 		Ar << RTSize;
@@ -364,7 +369,7 @@ namespace SH
 		// Ensure render resources for each MRO with the current format key.
 		TArray<GpuFormat> ColorFormatKey;
 		for (auto F : ColorRTFormats) ColorFormatKey.Add(ToGpuFormat(F));
-		GpuFormat DepthFormatKey = DepthFormat != MeshPassDepthFormat::None ? ToGpuFormat(DepthFormat) : GpuFormat::NUM;
+		GpuFormat DepthFormatKey = ToGpuFormat(DepthFormat);
 		const uint32 SampleCount = 1;
 
 		for (auto& MRO : MeshRenderObjects)
@@ -427,16 +432,6 @@ namespace SH
 	{
 		NormalizePreviewOutputName();
 
-		// Mark override pins as non-layout so default node pin pass ignores them.
-		for (auto& MRO : MeshRenderObjects)
-		{
-			for (auto& OP : MRO->OverridePins)
-			{
-				// Append to node's Pins array so SGraphPanel::GetGraphPin(Guid) can find them.
-				if (!Pins.Contains(OP)) Pins.Add(OP);
-			}
-		}
-
 		struct FMeshRenderObjectListItem
 		{
 			MeshRenderObject* Object = nullptr;
@@ -462,6 +457,8 @@ namespace SH
 					Item->Object = MROPtr.Get();
 					Items.Add(Item);
 				}
+
+				RegisterOverridePinWidgets();
 
 				ChildSlot
 				[
@@ -571,14 +568,13 @@ namespace SH
 				{
 					for (const auto& OP : Object->OverridePins)
 					{
-						auto PinIcon = SNew(SGraphPin, OwnerWidget).PinData(OP.Get());
-						OwnerWidget->Pins.Add(&*PinIcon);
+						TSharedPtr<SGraphPin> PinIcon = GetOverridePinWidget(OP.Get());
 						OverridePinBox->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(2,0)
 						[
 							SNew(SHorizontalBox)
 							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 							[
-								PinIcon
+								PinIcon.ToSharedRef()
 							]
 							+ SHorizontalBox::Slot().AutoWidth().Padding(2,0,0,0)
 							[
@@ -589,6 +585,31 @@ namespace SH
 				}
 
 				return Row;
+			}
+
+			void RegisterOverridePinWidgets()
+			{
+				for (const auto& MROPtr : Node->MeshRenderObjects)
+				{
+					MeshRenderObject* Object = MROPtr.Get();
+					for (const auto& OP : Object->OverridePins)
+					{
+						GetOverridePinWidget(OP.Get());
+					}
+				}
+			}
+
+			TSharedPtr<SGraphPin> GetOverridePinWidget(GraphPin* Pin)
+			{
+				if (TSharedPtr<SGraphPin>* Found = OverridePinWidgets.Find(Pin))
+				{
+					return *Found;
+				}
+
+				TSharedPtr<SGraphPin> PinIcon = SNew(SGraphPin, OwnerWidget).PinData(Pin);
+				OverridePinWidgets.Add(Pin, PinIcon);
+				OwnerWidget->Pins.Add(&*PinIcon);
+				return PinIcon;
 			}
 
 			virtual bool SupportsKeyboardFocus() const override { return true; }
@@ -700,6 +721,7 @@ namespace SH
 			bool bRecognizedDragDrop = false;
 			bool bHovered = false;
 			TArray<FMeshRenderObjectListItemPtr> Items;
+			TMap<GraphPin*, TSharedPtr<SGraphPin>> OverridePinWidgets;
 			TSharedPtr<SListView<FMeshRenderObjectListItemPtr>> ListView;
 		};
 
