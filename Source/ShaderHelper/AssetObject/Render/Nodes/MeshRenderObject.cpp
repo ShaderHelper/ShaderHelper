@@ -302,6 +302,7 @@ namespace SH
 			});
 		}
 		OverrideSlots.RemoveAt(SlotIndex);
+		InvalidateRenderResources();
 		if (auto* OuterMost = GetOuterMost()) OuterMost->MarkDirty();
 	}
 
@@ -410,9 +411,8 @@ namespace SH
 		}
 		MeshSceneObject* MSO = MeshSceneObjectRef.Get();
 		if (!MSO || !MSO->ModelAsset) return;
-		Model* ModelAsset = MSO->ModelAsset.Get();
-		if (!ModelAsset) return;
 
+		Model* ModelAsset = MSO->ModelAsset.Get();
 		const FMatrix44f ViewMat = InCamera.GetViewMatrix();
 		const FMatrix44f ProjMat = InCamera.GetProjectionMatrix();
 		const FMatrix44f ViewProjMat = ViewMat * ProjMat;
@@ -467,7 +467,6 @@ namespace SH
 		const TArray<MeshBuffers>& GpuMeshes = ModelAsset->GetGpuMeshes();
 		for (const MeshBuffers& MB : GpuMeshes)
 		{
-			if (!MB.VertexBuffer || !MB.IndexBuffer) continue;
 			Recorder->SetRenderPipelineState(Pipeline);
 			Recorder->SetBindGroups(BGArray);
 			Recorder->SetVertexBuffer(0, MB.VertexBuffer);

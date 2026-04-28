@@ -522,7 +522,7 @@ namespace SH
 				MeshRenderObject* Object = Item->Object;
 				TSharedRef<FMeshRenderObjectTableRow> Row = SNew(FMeshRenderObjectTableRow, OwnerTable);
 
-				TSharedPtr<SHorizontalBox> OverridePinBox;
+				TSharedPtr<SVerticalBox> OverridePinBox;
 				Row->SetContent(
 						SNew(SBorder)
 						.BorderImage(FAppStyle::Get().GetBrush("NoBrush"))
@@ -540,7 +540,7 @@ namespace SH
 							.AutoWidth()
 							.VAlign(VAlign_Center)
 							[
-								SAssignNew(OverridePinBox, SHorizontalBox)
+								SAssignNew(OverridePinBox, SVerticalBox)
 							]
 							+ SHorizontalBox::Slot()
 							.FillWidth(1.0f)
@@ -569,7 +569,7 @@ namespace SH
 					for (const auto& OP : Object->OverridePins)
 					{
 						TSharedPtr<SGraphPin> PinIcon = GetOverridePinWidget(OP.Get());
-						OverridePinBox->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(2,0)
+						OverridePinBox->AddSlot().AutoHeight().Padding(2,0)
 						[
 							SNew(SHorizontalBox)
 							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
