@@ -3596,15 +3596,22 @@ constexpr int PaddingLineNum = 22;
 
 		//Create preview viewport for this line if a preview texture exists
 		TSharedPtr<FW::PreviewViewPort> LinePreviewViewPort;
-		DebuggerLocation LineLoc{ShaderAssetObj->GetShaderName(), LineNumber};
+		DebuggerLocation LineLoc;
 		{
-			const auto& PreviewTextures = GetDebugger().GetLinePreviewTextures();
-			if (!PreviewTextures.IsEmpty())
+			ShaderDebugger& Debugger = GetDebugger();
+			ShaderAsset* DebuggerShaderAsset = Debugger.GetShaderAsset();
+			const auto& PreviewTextures = Debugger.GetLinePreviewTextures();
+			if (DebuggerShaderAsset && !PreviewTextures.IsEmpty())
 			{
-				if (const auto* TexPtr = PreviewTextures.Find(LineLoc))
+				for (const auto& [PreviewLoc, Texture] : PreviewTextures)
 				{
-					LinePreviewViewPort = MakeShared<FW::PreviewViewPort>();
-					LinePreviewViewPort->SetViewPortRenderTexture(TexPtr->GetReference());
+					if (PreviewLoc.LineNumber == LineNumber && DebuggerShaderAsset->FindIncludeAsset(PreviewLoc.File) == ShaderAssetObj)
+					{
+						LineLoc = PreviewLoc;
+						LinePreviewViewPort = MakeShared<FW::PreviewViewPort>();
+						LinePreviewViewPort->SetViewPortRenderTexture(Texture.GetReference());
+						break;
+					}
 				}
 			}
 		}
