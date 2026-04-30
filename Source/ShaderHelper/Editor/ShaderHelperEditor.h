@@ -68,7 +68,9 @@ namespace SH
 		TSharedPtr<SWindow> GetMainWindow() const override { return MainWindow; }
 		TWeakPtr<SWindow> GetPreferenceWindow() const { return PreferenceWindow; }
 		FW::PreviewViewPort* GetViewPort() const { return ViewPort.Get(); }
-		FW::ShObject* GetCurPropertyObject() const { return CurPropertyObject; }
+		FW::ShObject* GetCurPropertyObject() const { 
+			return CurPropertyObject.IsValid() ? CurPropertyObject.Get() : nullptr;
+		}
 		TSharedPtr<FUICommandList> GetUICommandList() const { return UICommandList; }
 		SDebuggerVariableView* GetDebuggerLocalVariableView() const { return DebuggerLocalVariableView.Get(); }
 		SDebuggerVariableView* GetDebuggerGlobalVariableView() const { return DebuggerGlobalVariableView.Get(); }
@@ -170,7 +172,7 @@ namespace SH
 
         TSharedPtr<SVerticalBox> WindowContentBox;
 		TSharedPtr<FW::SPropertyView> PropertyView;
-        FW::ShObject* CurPropertyObject = nullptr;
+        FW::ObserverObjectPtr<FW::ShObject> CurPropertyObject;
         
 		TSharedPtr<ShProject> CurProject;
 

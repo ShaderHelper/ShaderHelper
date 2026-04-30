@@ -8,7 +8,11 @@ namespace FW
 	void SPropertyCatergory::Construct(const FArguments& InArgs, const TSharedPtr<class ITableRow>& TableRow)
 	{
 		OwnerRowPtr = TableRow.Get();
+		bArrayElementStyle = InArgs._ArrayElementStyle;
 
+		const FSlateBrush* NoBrush = FAppStyle::Get().GetBrush("NoBrush");
+		const FSlateBrush* OuterBrush = bArrayElementStyle ? FAppStyle::Get().GetBrush("Brushes.Input") : FAppStyle::Get().GetBrush("Brushes.Recessed");
+		const FMargin OuterPadding = bArrayElementStyle ? FMargin{3.0f, 1.0f, 3.0f, 0.0f} : FMargin{0.0f, 3.0f, 0.0f, 0.0f};
 		const FSlateBrush* CategoryBrush = nullptr;
 		FSlateFontInfo CategoryTextFont;
 
@@ -78,11 +82,15 @@ namespace FW
 		ChildSlot
 		[
 			SNew(SBorder)
-            .BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
-			.Padding(FMargin{0.0f, 3.0f, 0.0f, 0.0f})
+			.BorderImage_Lambda([this, OuterBrush, NoBrush] {
+				return bArrayElementStyle && OwnerRowPtr && OwnerRowPtr->IsItemSelected() ? NoBrush : OuterBrush;
+			})
+			.Padding(OuterPadding)
 			[
 				SNew(SBorder)
-				.BorderImage(CategoryBrush)
+				.BorderImage_Lambda([this, CategoryBrush, NoBrush] {
+					return bArrayElementStyle && OwnerRowPtr && OwnerRowPtr->IsItemSelected() ? NoBrush : CategoryBrush;
+				})
 				[
 					HBox
 				]
@@ -97,9 +105,13 @@ namespace FW
 	{
 		if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
 		{
-			OwnerRowPtr->ToggleExpansion();
+			if (!bArrayElementStyle)
+			{
+				OwnerRowPtr->ToggleExpansion();
+				return FReply::Handled();
+			}
 		}
 
-		return FReply::Handled();
+		return FReply::Unhandled();
 	}
 }

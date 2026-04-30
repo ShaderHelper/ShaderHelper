@@ -10,7 +10,6 @@
 #include "UI/Widgets/Graph/SGraphPanel.h"
 #include "UI/Widgets/Graph/SGraphNode.h"
 #include "UI/Widgets/Graph/SGraphPin.h"
-#include "UI/Widgets/Misc/MiscWidget.h"
 #include "UI/Widgets/Property/PropertyData/PropertyData.h"
 #include "UI/Widgets/Property/PropertyData/PropertyArrayItem.h"
 #include "UI/Widgets/Property/PropertyData/PropertyObjectItem.h"
@@ -21,6 +20,7 @@
 
 #include <Widgets/Views/SListView.h>
 #include <Widgets/SViewport.h>
+#include <Widgets/Input/SCheckBox.h>
 #include <Widgets/Input/SComboBox.h>
 #include <Widgets/Input/SButton.h>
 #include <Widgets/Layout/SBox.h>
@@ -29,9 +29,13 @@ using namespace FW;
 
 namespace SH
 {
+	REFLECTION_REGISTER(AddClass<MeshPassColorRT>()
+		.Data<&MeshPassColorRT::ClearValue, MetaInfo::Property>(LOCALIZATION("Clear"))
+		.Data<&MeshPassColorRT::Format, MetaInfo::Property>(LOCALIZATION("Format"))
+	)
 	REFLECTION_REGISTER(AddClass<MeshPassNode>("MeshPass Node")
 		.BaseClass<GraphNode>()
-		.Data<&MeshPassNode::ColorRTFormats, MetaInfo::Property>(LOCALIZATION("ColorRTFormats"))
+		.Data<&MeshPassNode::ColorRTs, MetaInfo::Property>(LOCALIZATION("ColorRT"))
 	)
 	REFLECTION_REGISTER(AddClass<MeshPassNodeOp>()
 		.BaseClass<ShObjectOp>()
@@ -48,7 +52,7 @@ namespace SH
 	{
 		NodeWidth = 170.0f;
 		ObjectName = FText::FromString(TEXT("MeshPass"));
-		ColorRTFormats = { MeshPassColorFormat::B8G8R8A8_UNORM };
+		ColorRTs = { MeshPassColorRT{} };
 		Preview = MakeShared<PreviewViewPort>();
 	}
 
@@ -56,14 +60,14 @@ namespace SH
 
 	void MeshPassNode::Init()
 	{
-		RebuildOutputPins();
+		RebuildPins();
 	}
 
 	void MeshPassNode::PostLoad()
 	{
 		GraphNode::PostLoad();
 		NormalizePreviewOutputName();
-		RebuildOutputPins();
+		RebuildPins();
 	}
 
 	GpuFormat MeshPassNode::ToGpuFormat(MeshPassColorFormat F)
@@ -89,11 +93,11 @@ namespace SH
 	TArray<FString> MeshPassNode::GetPreviewOutputNames() const
 	{
 		TArray<FString> Result;
-		for (int32 i = 0; i < ColorRTFormats.Num(); ++i)
+		for (int32 i = 0; i < ColorRTs.Num(); ++i)
 		{
 			Result.Add(ColorPinName(i));
 		}
-		if (DepthFormat != MeshPassDepthFormat::None)
+		if (bDepthEnabled)
 		{
 			Result.Add(TEXT("Depth"));
 		}
@@ -110,50 +114,45 @@ namespace SH
 		PreviewOutputName = Options.Num() > 0 ? Options[0] : FString();
 	}
 
-	void MeshPassNode::RebuildOutputPins()
+	void MeshPassNode::RebuildPins()
 	{
-		// Preserve existing color/depth pins that still fit by matching name.
-		TMap<FString, ObjectPtr<GraphPin>> Existing;
-		for (auto& P : Pins)
+		auto FindReusablePin = [this](const FString& Name, PinDirection Direction) -> ObjectPtr<GraphPin>
 		{
-			Existing.Add(P->ObjectName.ToString(), P);
-		}
-
-		TArray<ObjectPtr<GraphPin>> NewPins;
-		for (int32 i = 0; i < ColorRTFormats.Num(); ++i)
-		{
-			FString Name = ColorPinName(i);
-			ObjectPtr<GraphPin> P;
-			if (auto* Found = Existing.Find(Name))
+			for (const ObjectPtr<GraphPin>& ExistingPin : Pins)
 			{
-				if (DynamicCast<GpuTexturePin>(Found->Get()))
+				if (ExistingPin
+					&& ExistingPin->Direction == Direction
+					&& ExistingPin->ObjectName.ToString() == Name
+					&& DynamicCast<GpuTexturePin>(ExistingPin.Get()))
 				{
-					P = *Found;
+					return ExistingPin;
 				}
 			}
-			if (!P)
-			{
-				P = NewShObject<GpuTexturePin>(this);
-				P->ObjectName = FText::FromString(Name);
-				P->Direction = PinDirection::Output;
-			}
-			NewPins.Add(MoveTemp(P));
-		}
-		if (DepthFormat != MeshPassDepthFormat::None)
+			return nullptr;
+		};
+
+		auto MakeTexturePin = [this, &FindReusablePin](const FString& Name, PinDirection Direction) -> ObjectPtr<GraphPin>
 		{
-			FString Name = TEXT("Depth");
-			ObjectPtr<GraphPin> P;
-			if (auto* Found = Existing.Find(Name))
+			ObjectPtr<GraphPin> Pin = FindReusablePin(Name, Direction);
+			if (!Pin)
 			{
-				if (DynamicCast<GpuTexturePin>(Found->Get())) P = *Found;
+				Pin = NewShObject<GpuTexturePin>(this);
 			}
-			if (!P)
-			{
-				P = NewShObject<GpuTexturePin>(this);
-				P->ObjectName = FText::FromString(Name);
-				P->Direction = PinDirection::Output;
-			}
-			NewPins.Add(MoveTemp(P));
+			Pin->ObjectName = FText::FromString(Name);
+			Pin->Direction = Direction;
+			return Pin;
+		};
+
+		TArray<ObjectPtr<GraphPin>> NewPins;
+		for (int32 i = 0; i < ColorRTs.Num(); ++i)
+		{
+			NewPins.Add(MakeTexturePin(ColorPinName(i), PinDirection::Input));
+			NewPins.Add(MakeTexturePin(ColorPinName(i), PinDirection::Output));
+		}
+		if (bDepthEnabled)
+		{
+			NewPins.Add(MakeTexturePin(TEXT("Depth"), PinDirection::Input));
+			NewPins.Add(MakeTexturePin(TEXT("Depth"), PinDirection::Output));
 		}
 
 		// Break links on pins that are being removed.
@@ -162,16 +161,31 @@ namespace SH
 			bool Kept = NewPins.ContainsByPredicate([&](const ObjectPtr<GraphPin>& NP) { return NP.Get() == OldP.Get(); });
 			if (!Kept)
 			{
-				TArray<ObserverObjectPtr<GraphPin>> Targets;
-				OutPinToInPin.MultiFind(OldP, Targets);
-				for (auto& T : Targets)
+				if (OldP->Direction == PinDirection::Output)
 				{
-					OutPinToInPin.Remove(OldP, T);
-					if (T.IsValid())
+					TArray<ObserverObjectPtr<GraphPin>> Targets;
+					OutPinToInPin.MultiFind(OldP, Targets);
+					for (auto& Target : Targets)
 					{
-						T->SourcePin.Reset();
-						T->Refuse();
+						OutPinToInPin.Remove(OldP, Target);
+						if (Target.IsValid())
+						{
+							Target->SourcePin.Reset();
+							Target->Refuse();
+						}
 					}
+				}
+				else if (OldP->SourcePin.IsValid())
+				{
+					if (GraphPin* SourcePin = OldP->GetSourcePin())
+					{
+						if (GraphNode* SourceNode = SourcePin->GetOwnerNode())
+						{
+							SourceNode->OutPinToInPin.Remove(SourcePin, OldP.Get());
+						}
+					}
+					OldP->SourcePin.Reset();
+					OldP->Refuse();
 				}
 			}
 		}
@@ -224,7 +238,7 @@ namespace SH
 	void MeshPassNode::OnRenderTargetsChanged()
 	{
 		NormalizePreviewOutputName();
-		RebuildOutputPins();
+		RebuildPins();
 		RefreshNodeWidget();
 	}
 
@@ -242,8 +256,9 @@ namespace SH
 	{
 		GraphNode::Serialize(Ar);
 
-		Ar << ColorRTFormats;
+		Ar << ColorRTs;
 		Ar << DepthFormat;
+		Ar << bDepthEnabled;
 		Ar << PreviewOutputName;
 
 		Ar << CameraRef;
@@ -260,12 +275,6 @@ namespace SH
 			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because render graph or final render target is invalid."), *ObjectName.ToString());
 			return { true, true };
 		}
-		if (!CameraRef.IsValid() || !CameraRef.Get())
-		{
-			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because no camera is assigned."), *ObjectName.ToString());
-			return { true, true };
-		}
-
 		uint32 Width  = (RTSize.X > 0) ? RTSize.X : Ctx.FinalRT->GetWidth();
 		uint32 Height = (RTSize.Y > 0) ? RTSize.Y : Ctx.FinalRT->GetHeight();
 		if (Width == 0 || Height == 0)
@@ -277,25 +286,43 @@ namespace SH
 		NormalizePreviewOutputName();
 
 		// (Re)create RTs if size/formats changed.
+		auto HasColorRTTextureDescChanged = [this]() {
+			if (CachedColorRTSettings.Num() != ColorRTs.Num())
+			{
+				return true;
+			}
+			for (int32 i = 0; i < ColorRTs.Num(); ++i)
+			{
+				if (CachedColorRTSettings[i].Format != ColorRTs[i].Format
+					|| CachedColorRTSettings[i].ClearValue != ColorRTs[i].ClearValue)
+				{
+					return true;
+				}
+			}
+			return false;
+		};
+
 		bool bNeedRebuild = CachedRTSize.X != Width || CachedRTSize.Y != Height
-			|| CachedColorFormats != ColorRTFormats || CachedDepthFormat != DepthFormat
-			|| CachedColorRTs.Num() != ColorRTFormats.Num();
+			|| bCachedDepthEnabled != bDepthEnabled
+			|| (bDepthEnabled && CachedDepthFormat != DepthFormat)
+			|| HasColorRTTextureDescChanged()
+			|| CachedColorRTs.Num() != ColorRTs.Num();
 
 		if (bNeedRebuild)
 		{
 			CachedColorRTs.Reset();
 			CachedDepthRT.SafeRelease();
-			for (int32 i = 0; i < ColorRTFormats.Num(); ++i)
+			for (int32 i = 0; i < ColorRTs.Num(); ++i)
 			{
 				GpuTextureDesc D{
 					.Width = Width, .Height = Height,
-					.Format = ToGpuFormat(ColorRTFormats[i]),
+					.Format = ToGpuFormat(ColorRTs[i].Format),
 					.Usage = GpuTextureUsage::RenderTarget | GpuTextureUsage::ShaderResource,
-					.ClearValues = Vector4f(0,0,0,1),
+					.ClearValues = ColorRTs[i].ClearValue,
 				};
 				CachedColorRTs.Add(GGpuRhi->CreateTexture(D, GpuResourceState::RenderTargetWrite));
 			}
-			if (DepthFormat != MeshPassDepthFormat::None)
+			if (bDepthEnabled)
 			{
 				GpuTextureDesc D{
 					.Width = Width, .Height = Height,
@@ -305,21 +332,90 @@ namespace SH
 				CachedDepthRT = GGpuRhi->CreateTexture(D, GpuResourceState::DepthStencilWrite);
 			}
 			CachedRTSize = FW::Vector2u(Width, Height);
-			CachedColorFormats = ColorRTFormats;
+			CachedColorRTSettings = ColorRTs;
+			bCachedDepthEnabled = bDepthEnabled;
 			CachedDepthFormat = DepthFormat;
+		}
+
+		TArray<TRefCountPtr<GpuTexture>> ActiveColorRTs;
+		ActiveColorRTs.SetNum(CachedColorRTs.Num());
+		for (int32 i = 0; i < CachedColorRTs.Num(); ++i)
+		{
+			ActiveColorRTs[i] = CachedColorRTs[i];
+			const FString InputPinName = ColorPinName(i);
+			GpuTexturePin* InputPin = DynamicCast<GpuTexturePin>(GetPin(InputPinName, PinDirection::Input));
+			if (!InputPin || !InputPin->GetSourcePin())
+			{
+				continue;
+			}
+
+			GpuTexture* InputTexture = InputPin->GetValue();
+			const FString& SlotName = InputPinName;
+			const GpuFormat ExpectedFormat = ToGpuFormat(ColorRTs[i].Format);
+
+			const GpuTextureDesc& InputDesc = InputTexture->GetResourceDesc();
+			if (InputTexture->GetSampleCount() != 1)
+			{
+				SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because %s sample count must be 1."), *ObjectName.ToString(), *SlotName);
+				return { true, true };
+			}
+			if (InputTexture->GetWidth() != Width || InputTexture->GetHeight() != Height)
+			{
+				SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because %s size is %u x %u, expected %u x %u."), *ObjectName.ToString(), *SlotName, InputTexture->GetWidth(), InputTexture->GetHeight(), Width, Height);
+				return { true, true };
+			}
+			if (InputTexture->GetFormat() != ExpectedFormat)
+			{
+				SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because %s format is %d, expected %d."), *ObjectName.ToString(), *SlotName, static_cast<int32>(InputTexture->GetFormat()), static_cast<int32>(ExpectedFormat));
+				return { true, true };
+			}
+
+			ActiveColorRTs[i] = InputTexture;
+		}
+
+		TRefCountPtr<GpuTexture> ActiveDepthRT = CachedDepthRT;
+		bool bHasDepthInput = false;
+		if (bDepthEnabled)
+		{
+			GpuTexturePin* InputPin = DynamicCast<GpuTexturePin>(GetPin(TEXT("Depth"), PinDirection::Input));
+			if (InputPin && InputPin->GetSourcePin())
+			{
+				GpuTexture* InputTexture = InputPin->GetValue();
+				const FString SlotName = TEXT("Depth");
+				const GpuFormat ExpectedFormat = ToGpuFormat(DepthFormat);
+
+				if (InputTexture->GetSampleCount() != 1)
+				{
+					SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because %s sample count must be 1."), *ObjectName.ToString(), *SlotName);
+					return { true, true };
+				}
+				if (InputTexture->GetWidth() != Width || InputTexture->GetHeight() != Height)
+				{
+					SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because %s size is %u x %u, expected %u x %u."), *ObjectName.ToString(), *SlotName, InputTexture->GetWidth(), InputTexture->GetHeight(), Width, Height);
+					return { true, true };
+				}
+				if (InputTexture->GetFormat() != ExpectedFormat)
+				{
+					SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because %s format is %d, expected %d."), *ObjectName.ToString(), *SlotName, static_cast<int32>(InputTexture->GetFormat()), static_cast<int32>(ExpectedFormat));
+					return { true, true };
+				}
+
+				ActiveDepthRT = InputTexture;
+				bHasDepthInput = true;
+			}
 		}
 
 		TRefCountPtr<GpuTexture> PreviewSourceTex;
 		if (PreviewOutputName == TEXT("Depth"))
 		{
-			PreviewSourceTex = CachedDepthRT;
+			PreviewSourceTex = ActiveDepthRT;
 		}
 		else if (PreviewOutputName.StartsWith(TEXT("Color")))
 		{
 			const int32 PreviewColorIndex = FCString::Atoi(*PreviewOutputName.RightChop(5));
-			if (CachedColorRTs.IsValidIndex(PreviewColorIndex))
+			if (ActiveColorRTs.IsValidIndex(PreviewColorIndex))
 			{
-				PreviewSourceTex = CachedColorRTs[PreviewColorIndex];
+				PreviewSourceTex = ActiveColorRTs[PreviewColorIndex];
 			}
 		}
 
@@ -347,29 +443,55 @@ namespace SH
 
 		// Build Pass Desc.
 		GpuRenderPassDesc PassDesc;
-		for (int32 i = 0; i < CachedColorRTs.Num(); ++i)
+		for (int32 i = 0; i < ActiveColorRTs.Num(); ++i)
 		{
 			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{
-				CachedColorRTs[i]->GetDefaultView(),
-				RenderTargetLoadAction::Clear,
+				ActiveColorRTs[i]->GetDefaultView(),
+				ColorRTs[i].bClearEnabled ? RenderTargetLoadAction::Clear : RenderTargetLoadAction::Load,
 				RenderTargetStoreAction::Store,
-				Vector4f(0,0,0,1)
+				ColorRTs[i].ClearValue
 			});
 		}
-		if (CachedDepthRT.IsValid())
+		if (ActiveDepthRT.IsValid())
 		{
 			PassDesc.DepthStencilTarget = GpuDepthStencilTargetInfo{
-				CachedDepthRT->GetDefaultView(),
-				RenderTargetLoadAction::Clear,
+				ActiveDepthRT->GetDefaultView(),
+				bHasDepthInput ? RenderTargetLoadAction::Load : RenderTargetLoadAction::Clear,
 				RenderTargetStoreAction::Store,
 				1.0f
 			};
 		}
 
+		if (!ShowTimestampMs())
+		{
+			GpuTimeMs = 0.0;
+			TimestampQuerySet = nullptr;
+		}
+		else
+		{
+			if (TimestampQuerySet)
+			{
+				TArray<uint64> Timestamps;
+				TimestampQuerySet->ResolveResults(0, 2, Timestamps);
+				double PeriodNs = TimestampQuerySet->GetTimestampPeriodNs();
+				GpuTimeMs = (double)(Timestamps[1] - Timestamps[0]) * PeriodNs / 1e6;
+			}
+
+			if (GGpuRhi->GetFeature().SupportTimestampQuery() && !TimestampQuerySet)
+			{
+				TimestampQuerySet = GGpuRhi->CreateQuerySet(2);
+			}
+		}
+
+		if (TimestampQuerySet)
+		{
+			PassDesc.TimestampWrites = GpuRenderPassTimestampWrites{ TimestampQuerySet, 0, 1 };
+		}
+
 		// Ensure render resources for each MRO with the current format key.
 		TArray<GpuFormat> ColorFormatKey;
-		for (auto F : ColorRTFormats) ColorFormatKey.Add(ToGpuFormat(F));
-		GpuFormat DepthFormatKey = ToGpuFormat(DepthFormat);
+		for (const MeshPassColorRT& ColorRT : ColorRTs) ColorFormatKey.Add(ToGpuFormat(ColorRT.Format));
+		GpuFormat DepthFormatKey = bDepthEnabled ? ToGpuFormat(DepthFormat) : GpuFormat::NUM;
 		const uint32 SampleCount = 1;
 
 		for (auto& MRO : MeshRenderObjects)
@@ -378,7 +500,11 @@ namespace SH
 		}
 
 		const float Aspect = (float)Width / (float)Height;
-		const Camera Cam = CameraRef->ToCamera(Aspect);
+		TOptional<Camera> Cam;
+		if (CameraRef.IsValid() && CameraRef.Get())
+		{
+			Cam = CameraRef->ToCamera(Aspect);
+		}
 
 		// Capture MRO pointers; ObjectPtrs ensure lifetime thru lambda.
 		TArray<ObjectPtr<MeshRenderObject>> MROsCopy = MeshRenderObjects;
@@ -387,6 +513,7 @@ namespace SH
 
 		Ctx.RG->AddRenderPass(ObjectName.ToString(), PassDesc, Bindings,
 			[MROsCopy, Cam](GpuRenderPassRecorder* Rec, BindingContext&) {
+				const Camera* CameraPtr = Cam.IsSet() ? &Cam.GetValue() : nullptr;
 				for (const auto& MRO : MROsCopy)
 				{
 					FMatrix44f ModelMat = FMatrix44f::Identity;
@@ -394,7 +521,7 @@ namespace SH
 					{
 						ModelMat = MRO->MeshSceneObjectRef->GetWorldMatrix();
 					}
-					MRO->Draw(Rec, Cam, ModelMat);
+					MRO->Draw(Rec, CameraPtr, ModelMat);
 				}
 			}
 		);
@@ -410,18 +537,18 @@ namespace SH
 		}
 
 		// Publish outputs.
-		for (int32 i = 0; i < CachedColorRTs.Num(); ++i)
+		for (int32 i = 0; i < ActiveColorRTs.Num(); ++i)
 		{
-			if (auto* Pin = static_cast<GpuTexturePin*>(GetPin(ColorPinName(i))))
+			if (auto* Pin = static_cast<GpuTexturePin*>(GetPin(ColorPinName(i), PinDirection::Output)))
 			{
-				Pin->SetValue(CachedColorRTs[i]);
+				Pin->SetValue(ActiveColorRTs[i]);
 			}
 		}
-		if (CachedDepthRT.IsValid())
+		if (ActiveDepthRT.IsValid())
 		{
-			if (auto* Pin = static_cast<GpuTexturePin*>(GetPin(TEXT("Depth"))))
+			if (auto* Pin = static_cast<GpuTexturePin*>(GetPin(TEXT("Depth"), PinDirection::Output)))
 			{
-				Pin->SetValue(CachedDepthRT);
+				Pin->SetValue(ActiveDepthRT);
 			}
 		}
 
@@ -765,7 +892,7 @@ namespace SH
 				[
 					SNew(SBorder).BorderImage(FAppStyle::Get().GetBrush("Brushes.Recessed"))
 					[
-						SNew(SBox).MinDesiredHeight(60.0f)
+						SNew(SBox).MinDesiredHeight(80.0f)
 						[
 							RowsList
 						]
@@ -815,12 +942,73 @@ namespace SH
 
 		auto RTCat = MakeShared<PropertyCategory>(this, LOCALIZATION("MeshPassRenderTargets").ToString());
 		{
-			if (const MetaMemberData* ColorRTFormatsMetaData = GetMetaType<MeshPassNode>()->GetMetaMemberData(LOCALIZATION("ColorRTFormats")))
+			auto ConfigureClearProperty = [this](PropertyData& InPropertyData, MeshPassColorRT& ColorRT)
 			{
-				RTCat->AddChilds(FW::GeneratePropertyDatas(this, ColorRTFormatsMetaData, this, true));
-			}
+				if (!InPropertyData.GetDisplayName().EqualTo(LOCALIZATION("Clear")) || !InPropertyData.IsOfType<PropertyVector4fItem>())
+				{
+					return;
+				}
+
+				bool* ClearEnabled = &ColorRT.bClearEnabled;
+				PropertyVector4fItem* ClearItem = static_cast<PropertyVector4fItem*>(&InPropertyData);
+				ClearItem->SetUseColorBlockPicker(true);
+				ClearItem->SetValueEnabled([ClearEnabled] { return *ClearEnabled; });
+				ClearItem->SetEmbedWidget(
+					SNew(SCheckBox)
+					.IsChecked_Lambda([ClearEnabled] {
+						return *ClearEnabled ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+						})
+					.OnCheckStateChanged_Lambda([this, ClearEnabled, ClearItem](ECheckBoxState InState) {
+						const bool bNewEnabled = InState == ECheckBoxState::Checked;
+						if (*ClearEnabled != bNewEnabled && CanChangeProperty(ClearItem))
+						{
+							ClearItem->BeginEdit();
+							*ClearEnabled = bNewEnabled;
+							PostPropertyChanged(ClearItem);
+							ClearItem->EndEdit();
+						}
+					}), true
+				);
+			};
+
+			auto ColorRTArrayItem = MakeShared<PropertyArrayItem>(
+				this,
+				LOCALIZATION("ColorRT"),
+				[this] { return ColorRTs.Num(); },
+				[this](int32 NewNum) { ColorRTs.SetNum(NewNum); }
+			);
+			ColorRTArrayItem->SetRemoveAt([this](int32 Index) {
+				if (ColorRTs.IsValidIndex(Index))
+				{
+					ColorRTs.RemoveAt(Index);
+				}
+			});
+			ColorRTArrayItem->SetRebuildChildren([this, ConfigureClearProperty](PropertyArrayItem& InArrayItem) {
+				MetaType* ColorRTMetaType = GetMetaType<MeshPassColorRT>();
+				for (int32 ElementIndex = 0; ElementIndex < ColorRTs.Num(); ++ElementIndex)
+				{
+					auto ElementItem = MakeShared<PropertyCategory>(this, FText::Format(LOCALIZATION("Element {0}"), FText::AsNumber(ElementIndex)), true);
+					ElementItem->SetArrayElementStyle(true);
+
+					for (MetaMemberData* PropertyMember : GetProperties(ColorRTMetaType))
+					{
+						TArray<TSharedRef<PropertyData>> PropertyDatas = FW::GeneratePropertyDatas(this, PropertyMember, &ColorRTs[ElementIndex], true);
+						for (const TSharedRef<PropertyData>& PropertyData : PropertyDatas)
+						{
+							ConfigureClearProperty(PropertyData.Get(), ColorRTs[ElementIndex]);
+							ElementItem->AddChild(PropertyData);
+						}
+					}
+
+					InArrayItem.AddChild(ElementItem);
+				}
+			});
+			RTCat->AddChild(ColorRTArrayItem);
 
 			{
+				auto DepthEnabledItem = MakeShared<PropertyScalarItem<bool>>(this, LOCALIZATION("MeshPassDepthEnabled"), &bDepthEnabled);
+				RTCat->AddChild(DepthEnabledItem);
+
 				auto EnumItem = MakePropertyEnumItem<MeshPassDepthFormat>(
 					this,
 					LOCALIZATION("MeshPassDepthFormat"),
@@ -830,31 +1018,26 @@ namespace SH
 					});
 				RTCat->AddChild(EnumItem);
 			}
+
+			auto WItem = MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("MeshPassRTWidthAuto"), &RTSize.X);
+			auto HItem = MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("MeshPassRTHeightAuto"), &RTSize.Y);
+			RTCat->AddChild(WItem);
+			RTCat->AddChild(HItem);
 		}
 		Result.Add(RTCat);
-
-		// RT Size (two scalar items).
-		{
-			auto SizeCat = MakeShared<PropertyCategory>(this, LOCALIZATION("MeshPassRTSizeAuto").ToString());
-			auto WItem = MakeShared<PropertyScalarItem<uint32>>(this, TEXT("Width"), &RTSize.X);
-			auto HItem = MakeShared<PropertyScalarItem<uint32>>(this, TEXT("Height"), &RTSize.Y);
-			SizeCat->AddChild(WItem);
-			SizeCat->AddChild(HItem);
-			Result.Add(SizeCat);
-		}
 
 		return Result;
 	}
 
 	bool MeshPassNode::CanChangeProperty(PropertyData* InProperty)
 	{
-		if (InProperty->IsOfType<PropertyArrayItem>() && InProperty->GetDisplayName().EqualTo(LOCALIZATION("ColorRTFormats")))
+		if (InProperty->IsOfType<PropertyArrayItem>() && InProperty->GetDisplayName().EqualTo(LOCALIZATION("ColorRT")))
 		{
 			const int32 NewNum = static_cast<PropertyArrayItem*>(InProperty)->GetPendingNum();
 			if (NewNum != INDEX_NONE && NewNum > 8)
 			{
 				auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-				MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, ShEditor->GetMainWindow(), LOCALIZATION("MeshPassColorRTFormatsMaxCountTip"));
+				MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, ShEditor->GetMainWindow(), LOCALIZATION("MeshPassColorRTMaxCountTip"));
 				return false;
 			}
 		}
@@ -868,7 +1051,8 @@ namespace SH
 
 		for (PropertyData* CurProperty = InProperty; CurProperty; CurProperty = CurProperty->GetParent())
 		{
-			if (CurProperty->GetDisplayName().EqualTo(LOCALIZATION("ColorRTFormats"))
+			if (CurProperty->GetDisplayName().EqualTo(LOCALIZATION("ColorRT"))
+				|| CurProperty->GetDisplayName().EqualTo(LOCALIZATION("MeshPassDepthEnabled"))
 				|| CurProperty->GetDisplayName().EqualTo(LOCALIZATION("MeshPassDepthFormat")))
 			{
 				OnRenderTargetsChanged();

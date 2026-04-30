@@ -50,10 +50,9 @@ namespace FW
 		bool bEnableDebugLayer = FParse::Param(FCommandLine::Get(), TEXT("DxDebugLayer"));
 		bEnableDebugLayer |= bEnableGBV;
 
-		TRefCountPtr<ID3D12Debug> Debug;
-		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(Debug.GetInitReference())))) {
-			if (bEnableDebugLayer) {
-
+		if (bEnableDebugLayer) {
+			TRefCountPtr<ID3D12Debug> Debug;
+			if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(Debug.GetInitReference())))) {
 				Debug->EnableDebugLayer();
 				if (bEnableGBV)
 				{
@@ -85,14 +84,14 @@ namespace FW
 					DxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_DXGI, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
 					DxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_DXGI, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
 				}
-			}
 
-			if (bEnableDred || bEnableDebugLayer)
-			{
-				TRefCountPtr<ID3D12Debug5> Debug5;
-				if (SUCCEEDED(Debug->QueryInterface(IID_PPV_ARGS(Debug5.GetInitReference()))))
+				if (bEnableDred || bEnableDebugLayer)
 				{
-					Debug5->SetEnableAutoName(true);
+					TRefCountPtr<ID3D12Debug5> Debug5;
+					if (SUCCEEDED(Debug->QueryInterface(IID_PPV_ARGS(Debug5.GetInitReference()))))
+					{
+						Debug5->SetEnableAutoName(true);
+					}
 				}
 			}
 		}

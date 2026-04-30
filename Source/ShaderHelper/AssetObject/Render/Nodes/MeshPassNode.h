@@ -8,6 +8,7 @@
 namespace FW
 {
 	class PreviewViewPort;
+	class GpuQuerySet;
 }
 
 namespace SH
@@ -24,8 +25,29 @@ namespace SH
 
 	enum class MeshPassDepthFormat : uint8
 	{
-		None,
 		D32_FLOAT,
+	};
+
+	struct MeshPassColorRT
+	{
+		MeshPassColorFormat Format = MeshPassColorFormat::B8G8R8A8_UNORM;
+		bool bClearEnabled = false;
+		FW::Vector4f ClearValue = FW::Vector4f(0, 0, 0, 1);
+
+		bool operator==(const MeshPassColorRT& Other) const
+		{
+			return Format == Other.Format
+				&& bClearEnabled == Other.bClearEnabled
+				&& ClearValue == Other.ClearValue;
+		}
+
+		friend FArchive& operator<<(FArchive& Ar, MeshPassColorRT& ColorRT)
+		{
+			Ar << ColorRT.Format;
+			Ar << ColorRT.bClearEnabled;
+			Ar << ColorRT.ClearValue;
+			return Ar;
+		}
 	};
 
 	class MeshPassNodeOp : public ShPropertyOp
@@ -55,18 +77,19 @@ namespace SH
 		void PostPropertyChanged(FW::PropertyData* InProperty) override;
 
 		// Pin management. Preserve existing Guids so links survive where possible.
-		void RebuildOutputPins();
+		void RebuildPins();
 
 		// Add/remove MeshRenderObject helpers (used by drag-drop + combo button).
 		MeshRenderObject* AddMeshRenderObject(MeshSceneObject* InMeshSceneObject);
 		void RemoveMeshRenderObject(MeshRenderObject* InObject);
 
-		// Called by property panel after Formats / DepthFormat / count changed.
+		// Called by property panel after Color RT / Depth target / count changed.
 		void OnRenderTargetsChanged();
 		void RefreshNodeWidget();
 
 	public:
-		TArray<MeshPassColorFormat> ColorRTFormats;
+		TArray<MeshPassColorRT> ColorRTs;
+		bool bDepthEnabled = true;
 		MeshPassDepthFormat DepthFormat = MeshPassDepthFormat::D32_FLOAT;
 		FW::ObserverObjectPtr<CameraSceneObject> CameraRef;
 		FW::Vector2u RTSize = {0, 0}; // 0,0 = auto from viewport
@@ -80,9 +103,11 @@ namespace SH
 		FString PreviewOutputName = TEXT("Color0");
 		TArray<TSharedPtr<FString>> PreviewOptions;
 		FW::Vector2u CachedRTSize = {0, 0};
-		TArray<MeshPassColorFormat> CachedColorFormats;
-		MeshPassDepthFormat CachedDepthFormat = MeshPassDepthFormat::None;
+		TArray<MeshPassColorRT> CachedColorRTSettings;
+		bool bCachedDepthEnabled = false;
+		MeshPassDepthFormat CachedDepthFormat = MeshPassDepthFormat::D32_FLOAT;
 		TSharedPtr<FW::PreviewViewPort> Preview;
+		TRefCountPtr<FW::GpuQuerySet> TimestampQuerySet;
 
 		TArray<FString> GetPreviewOutputNames() const;
 		void NormalizePreviewOutputName();

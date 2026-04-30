@@ -117,6 +117,7 @@ namespace SH
 		// Render State
 		FW::RasterizerFillMode FillMode = FW::RasterizerFillMode::Solid;
 		FW::RasterizerCullMode CullMode = FW::RasterizerCullMode::Back;
+		FW::PrimitiveType Primitive = FW::PrimitiveType::TriangleList;
 		bool BlendEnable = false;
 		FW::BlendFactor SrcBlendFactor = FW::BlendFactor::SrcAlpha;
 		FW::BlendFactor DestBlendFactor = FW::BlendFactor::InvSrcAlpha;

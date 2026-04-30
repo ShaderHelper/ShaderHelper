@@ -157,6 +157,18 @@ namespace FW
         return nullptr;
     }
 
+	GraphPin* GraphNode::GetPin(const FString& InName, PinDirection Direction) const
+	{
+		for (GraphPin* Pin : Pins)
+		{
+			if (Pin && Pin->Direction == Direction && Pin->ObjectName.ToString() == InName)
+			{
+				return Pin;
+			}
+		}
+		return nullptr;
+	}
+
 	bool GraphPin::HasLink() const
 	{
 		return GetSourceNode() != nullptr || !GetTargetPins().IsEmpty();

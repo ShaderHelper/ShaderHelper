@@ -316,6 +316,7 @@ namespace SH
 				.FillMode = MaterialAsset->FillMode,
 				.CullMode = MaterialAsset->CullMode,
 			},
+			.Primitive = MaterialAsset->Primitive,
 			.SampleCount = PreviewSampleCount,
 			.DepthStencilState = MaterialAsset->DepthTestEnable ?
 				TOptional<DepthStencilStateDesc>(DepthStencilStateDesc{

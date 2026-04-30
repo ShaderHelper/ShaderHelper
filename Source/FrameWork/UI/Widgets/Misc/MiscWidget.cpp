@@ -147,10 +147,25 @@ namespace FW
 			.AlphaDisplayMode(InArgs._AlphaDisplayMode)
 			.ShowBackgroundForAlpha(InArgs._ShowBackgroundForAlpha)
 			.Color(Color)
+			.UseSRGB(InArgs._UseSRGB)
 			.OnMouseButtonDown_Lambda([=, this](const FGeometry&, const FPointerEvent& MouseEvent)
 			{
 				if (!PickerWindow)
 				{
+					TSharedRef<SWidget> PickerContent = SNew(SColorPicker)
+						.TargetColorAttribute(Color)
+						.ShowAlpha(InArgs._ShowAlpha)
+						.OnColorChanged(OnColorChanged)
+						.PreviewSrgb(InArgs._UseSRGB.Get());
+
+					PickerContent->SlatePrepass(FSlateApplication::Get().GetApplicationScale());
+					const FVector2D ExpectedSize = PickerContent->GetDesiredSize();
+					const FGeometry ColorBlockGeometry = GetTickSpaceGeometry();
+					const FVector2D AnchorPos = ColorBlockGeometry.GetAbsolutePosition();
+					const FVector2D AnchorSize = ColorBlockGeometry.GetAbsoluteSize();
+					const FSlateRect Anchor(AnchorPos, AnchorPos + AnchorSize);
+					const FVector2D WindowPos = FSlateApplication::Get().CalculatePopupWindowPosition(Anchor, ExpectedSize, false, FVector2D::ZeroVector, Orient_Vertical);
+
 					SAssignNew(PickerWindow, SWindow)
 					.Type(EWindowType::ToolTip)
 					.CreateTitleBar(false)
@@ -159,17 +174,26 @@ namespace FW
 					.SupportsMinimize(false)
 					.IsPopupWindow(true)
 					.SizingRule(ESizingRule::Autosized)
+					.ScreenPosition(WindowPos)
+					.AutoCenter(EAutoCenter::None)
+					.ClientSize(ExpectedSize)
 					.ActivationPolicy(EWindowActivationPolicy::Never)
 					[
-						SNew(SColorPicker)
-						.TargetColorAttribute(Color)
-						.ShowAlpha(InArgs._ShowAlpha)
-						.OnColorChanged(OnColorChanged)
-						.PreviewSrgb(true)
+						PickerContent
 					];
-					FSlateApplication::Get().AddWindowAsNativeChild(PickerWindow.ToSharedRef(), ParentWindow.Pin().ToSharedRef());
-					FVector2D WindowPos = GetTickSpaceGeometry().GetAbsolutePosition();
-					WindowPos.Y += GetTickSpaceGeometry().GetAbsoluteSize().Y;
+					TSharedPtr<SWindow> OwningWindow = ParentWindow.Pin();
+					if (!OwningWindow)
+					{
+						OwningWindow = FSlateApplication::Get().FindWidgetWindow(AsShared());
+					}
+					if (OwningWindow)
+					{
+						FSlateApplication::Get().AddWindowAsNativeChild(PickerWindow.ToSharedRef(), OwningWindow.ToSharedRef());
+					}
+					else
+					{
+						FSlateApplication::Get().AddWindow(PickerWindow.ToSharedRef());
+					}
 					PickerWindow->MoveWindowTo(WindowPos);
 				}
 				

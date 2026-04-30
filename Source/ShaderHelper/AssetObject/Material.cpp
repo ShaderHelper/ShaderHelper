@@ -44,7 +44,7 @@ namespace SH
 		Ar << BindingMemberDefaults;
 		Ar << BindingResourceDefaults;
 		Ar << VertexInputDefaults;
-		Ar << FillMode << CullMode;
+		Ar << FillMode << CullMode << Primitive;
 		Ar << BlendEnable << SrcBlendFactor << DestBlendFactor << ColorBlendOp;
 		Ar << DepthTestEnable << DepthCompare;
 	}
@@ -360,6 +360,13 @@ namespace SH
 					[this](RasterizerCullMode InValue) { CullMode = InValue; });
 				RasterizerCategory->AddChild(Item);
 			}
+
+			// PrimitiveType
+			{
+				auto Item = MakePropertyEnumItem<PrimitiveType>(this, LOCALIZATION("PrimitiveType"), Primitive,
+					[this](PrimitiveType InValue) { Primitive = InValue; });
+				RasterizerCategory->AddChild(Item);
+			}
 		}
 
 		// Blend
@@ -522,17 +529,17 @@ namespace SH
 				);
 				UbCategory->AddChild(EnumItem);
 			}
-			else if (Default.Type == TEXT("float"))
+			else if (IsShaderFloatType(Default.Type))
 			{
 				auto Item = MakeShared<PropertyScalarItem<float>>(this, ItemLabel, &Default.Values[0]);
 				UbCategory->AddChild(Item);
 			}
-			else if (Default.Type == TEXT("int"))
+			else if (IsShaderIntType(Default.Type))
 			{
 				auto Item = MakeShared<PropertyScalarItem<int32>>(this, ItemLabel, &Default.IntValues[0]);
 				UbCategory->AddChild(Item);
 			}
-			else if (Default.Type == TEXT("uint"))
+			else if (IsShaderUintType(Default.Type))
 			{
 				auto Item = MakeShared<PropertyScalarItem<int32>>(this, ItemLabel, reinterpret_cast<int32*>(&Default.UintValues[0]));
 				Item->SetMinValue(0);

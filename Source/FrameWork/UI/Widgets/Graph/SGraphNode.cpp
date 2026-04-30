@@ -100,66 +100,101 @@ namespace FW
 		Pins.Empty();
 		PinContainer->ClearChildren();
 
-		for (GraphPin* Pin : NodeData->Pins)
-		{
+		auto MakePinIcon = [this](GraphPin* Pin) -> TSharedRef<SGraphPin> {
 			auto PinIcon = SNew(SGraphPin, this).PinData(Pin);
 			Pins.Add(&*PinIcon);
-			auto PinDesc = SNew(SBox).MinDesiredWidth(100.0f)
+			return PinIcon;
+		};
+
+		auto MakePinDesc = [](GraphPin* Pin, EHorizontalAlignment HAlign) -> TSharedRef<SWidget> {
+			return SNew(SBox)
+				.HAlign(HAlign)
 				[
 					SNew(STextBlock)
 						.Text(Pin->ObjectName)
 				];
+		};
 
-			auto InputPinContent = SNew(SHorizontalBox)
+		auto MakeInputPinContent = [&MakePinIcon, &MakePinDesc](GraphPin* Pin) -> TSharedRef<SWidget> {
+			return SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot()
 				.AutoWidth()
 				.VAlign(VAlign_Center)
 				[
-					PinIcon
+					MakePinIcon(Pin)
 				]
 				+ SHorizontalBox::Slot()
 				.Padding(2.0f, 0.0f, 0.0f, 0.0f)
 				.AutoWidth()
 				[
-					PinDesc
+					MakePinDesc(Pin, HAlign_Left)
 				];
+		};
 
-			auto OutputPinContent = SNew(SHorizontalBox)
+		auto MakeOutputPinContent = [&MakePinIcon, &MakePinDesc](GraphPin* Pin) -> TSharedRef<SWidget> {
+			return SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot()
 				.Padding(0.0f, 0.0f, 2.0f, 0.0f)
 				.AutoWidth()
 				[
-					PinDesc
+					MakePinDesc(Pin, HAlign_Right)
 				]
 				+ SHorizontalBox::Slot()
 				.AutoWidth()
 				.VAlign(VAlign_Center)
 				[
-					PinIcon
+					MakePinIcon(Pin)
 				];
+		};
 
+		TArray<GraphPin*> InputPins;
+		TArray<GraphPin*> OutputPins;
+		for (GraphPin* Pin : NodeData->Pins)
+		{
 			if (Pin->Direction == PinDirection::Input)
 			{
-				PinDesc->SetHAlign(HAlign_Left);
-				PinContainer->AddSlot()
-				.HAlign(HAlign_Left)
-				.AutoHeight()
-				.Padding(0.0f, 0.0f, 0.0f, 3.0f)
-				[
-					InputPinContent
-				];
+				InputPins.Add(Pin);
 			}
 			else
 			{
-				PinDesc->SetHAlign(HAlign_Right);
-				PinContainer->AddSlot()
-				.HAlign(HAlign_Right)
-				.AutoHeight()
-				.Padding(0.0f, 0.0f, 0.0f, 3.0f)
+				OutputPins.Add(Pin);
+			}
+		}
+
+		const int32 RowCount = FMath::Max(InputPins.Num(), OutputPins.Num());
+		for (int32 RowIndex = 0; RowIndex < RowCount; ++RowIndex)
+		{
+			TSharedRef<SHorizontalBox> RowContent = SNew(SHorizontalBox);
+			if (RowIndex < InputPins.Num())
+			{
+				RowContent->AddSlot()
+				.AutoWidth()
 				[
-					OutputPinContent
+					MakeInputPinContent(InputPins[RowIndex])
 				];
 			}
+
+			RowContent->AddSlot()
+			.FillWidth(1.0f)
+			[
+				SNullWidget::NullWidget
+			];
+
+			if (RowIndex < OutputPins.Num())
+			{
+				RowContent->AddSlot()
+				.AutoWidth()
+				[
+					MakeOutputPinContent(OutputPins[RowIndex])
+				];
+			}
+
+			PinContainer->AddSlot()
+			.AutoHeight()
+			.Padding(0.0f, 0.0f, 0.0f, 3.0f)
+			[
+				RowContent
+			];
 		}
 
 		if (TSharedPtr<SWidget> ExtraWidget = NodeData->ExtraNodeWidget(this))

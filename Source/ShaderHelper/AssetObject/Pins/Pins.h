@@ -63,4 +63,23 @@ namespace SH
 		TRefCountPtr<FW::GpuTexture> Value;
 		TRefCountPtr<FW::GpuTexture> DefaultValue;
 	};
+
+	class BytesPin : public FW::GraphPin
+	{
+		REFLECTION_TYPE(BytesPin)
+	public:
+		using GraphPin::GraphPin;
+
+		void Serialize(FArchive& Ar) override;
+		bool CanAccept(FW::GraphPin* SourcePin) override;
+		void Accept(FW::GraphPin* SourcePin) override;
+		void Refuse() override;
+		FLinearColor GetPinColor() const override { return FLinearColor{ 0.7f, 0.48f, 0.22f }; }
+
+		void SetBytes(TArray<uint8> InBytes);
+		const TArray<uint8>& GetBytes() const { return Bytes; }
+
+	private:
+		TArray<uint8> Bytes;
+	};
 }

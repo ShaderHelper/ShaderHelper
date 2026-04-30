@@ -151,6 +151,42 @@ namespace SH
 		.BaseClass<GraphPin>()
 	)
 
+	REFLECTION_REGISTER(AddClass<BytesPin>("BytesPin")
+		.BaseClass<GraphPin>()
+	)
+
+	void BytesPin::Serialize(FArchive& Ar)
+	{
+		GraphPin::Serialize(Ar);
+		Ar << Bytes;
+	}
+
+	bool BytesPin::CanAccept(GraphPin* SourcePin)
+	{
+		return DynamicCast<BytesPin>(SourcePin) != nullptr;
+	}
+
+	void BytesPin::Accept(GraphPin* SourcePin)
+	{
+		auto* SourceBytesPin = DynamicCast<BytesPin>(SourcePin);
+		Bytes = SourceBytesPin ? SourceBytesPin->Bytes : TArray<uint8>{};
+	}
+
+	void BytesPin::Refuse()
+	{
+		Bytes.Empty();
+	}
+
+	void BytesPin::SetBytes(TArray<uint8> InBytes)
+	{
+		Bytes = MoveTemp(InBytes);
+		auto TargetPins = GetTargetPins();
+		for (GraphPin* Pin : TargetPins)
+		{
+			Pin->Accept(this);
+		}
+	}
+
 	void GpuTexture3DPin::Serialize(FArchive& Ar)
 	{
 		GraphPin::Serialize(Ar);

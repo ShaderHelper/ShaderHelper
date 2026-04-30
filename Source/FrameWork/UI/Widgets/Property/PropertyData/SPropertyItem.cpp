@@ -5,13 +5,24 @@
 
 namespace FW
 {
-    void SPropertyItem::AddWidget(TSharedPtr<SWidget> InWidget)
+    void SPropertyItem::AddWidget(TSharedPtr<SWidget> InWidget, bool bAutoWidth)
     {
-        HBox->AddSlot()
-            .VAlign(VAlign_Center)
-        [
-            InWidget.ToSharedRef()
-        ];
+		auto Slot = HBox->AddSlot();
+		Slot.VAlign(VAlign_Center);
+
+		if (bAutoWidth)
+		{
+			Slot.AutoWidth();
+		}
+		else
+		{
+			Slot.FillWidth(1.0f);
+		}
+
+		Slot
+		[
+			InWidget.ToSharedRef()
+		];
     }
 
 	void SPropertyItem::Construct(const FArguments& InArgs)

@@ -73,6 +73,14 @@ namespace SH
 			return true;
 		}
 
+		template<typename ValueType>
+		ValueType ReadUniformValue(const uint8* SourceBytes)
+		{
+			ValueType Value{};
+			FMemory::Memcpy(&Value, SourceBytes, sizeof(ValueType));
+			return Value;
+		}
+
 		GpuTexture* GetTextureData(AssetObject* TextureAsset)
 		{
 			if (auto* Texture = dynamic_cast<Texture2D*>(TextureAsset)) return Texture->GetGpuData();
@@ -120,11 +128,11 @@ namespace SH
 			return GpuResourceHelper::GetSampler(Desc);
 		}
 
-		const MaterialBindingResourceDefault* FindResourceDefault(const Material& InMaterial, const FString& BindingName)
+		const MaterialBindingResourceDefault* FindResourceDefault(const Material& InMaterial, const FString& BindingName, BindingShaderStage Stage)
 		{
 			for (const auto& ResourceDefault : InMaterial.BindingResourceDefaults)
 			{
-				if (ResourceDefault.BindingName == BindingName)
+				if (ResourceDefault.BindingName == BindingName && ResourceDefault.Stage == Stage)
 				{
 					return &ResourceDefault;
 				}
@@ -150,8 +158,16 @@ namespace SH
 
 		void ApplyMaterialUniformMember(UniformBuffer& InOutUniformBuffer, const MaterialBindingMemberDefault& MemberDefault, const MaterialUniformBufferUpdateOptions& Options)
 		{
+			const uint8* SourceBytes = Options.UniformOverrideBytesResolver ? Options.UniformOverrideBytesResolver(MemberDefault) : nullptr;
+
 			if (IsShaderMatrix4x4Type(MemberDefault.Type))
 			{
+				if (SourceBytes)
+				{
+					InOutUniformBuffer.GetMember<FMatrix44f>(MemberDefault.MemberName) = ReadUniformValue<FMatrix44f>(SourceBytes);
+					return;
+				}
+
 				switch (MemberDefault.MatrixValue)
 				{
 				case BuiltInMatrix4x4Value::BuiltInModel:
@@ -175,36 +191,35 @@ namespace SH
 				return;
 			}
 
-			const uint8* SourceBytes = Options.ScalarOverrideResolver ? Options.ScalarOverrideResolver(MemberDefault) : nullptr;
 			if (!SourceBytes)
 			{
 				SourceBytes = reinterpret_cast<const uint8*>(MemberDefault.Values);
 			}
 
-			if (MemberDefault.Type == TEXT("float"))
-				InOutUniformBuffer.GetMember<float>(MemberDefault.MemberName) = *reinterpret_cast<const float*>(SourceBytes);
-			else if (MemberDefault.Type == TEXT("int") || IsShaderBoolType(MemberDefault.Type))
-				InOutUniformBuffer.GetMember<int32>(MemberDefault.MemberName) = *reinterpret_cast<const int32*>(SourceBytes);
-			else if (MemberDefault.Type == TEXT("uint"))
-				InOutUniformBuffer.GetMember<uint32>(MemberDefault.MemberName) = *reinterpret_cast<const uint32*>(SourceBytes);
+			if (IsShaderFloatType(MemberDefault.Type))
+				InOutUniformBuffer.GetMember<float>(MemberDefault.MemberName) = ReadUniformValue<float>(SourceBytes);
+			else if (IsShaderIntType(MemberDefault.Type) || IsShaderBoolType(MemberDefault.Type))
+				InOutUniformBuffer.GetMember<int32>(MemberDefault.MemberName) = ReadUniformValue<int32>(SourceBytes);
+			else if (IsShaderUintType(MemberDefault.Type))
+				InOutUniformBuffer.GetMember<uint32>(MemberDefault.MemberName) = ReadUniformValue<uint32>(SourceBytes);
 			else if (IsShaderVector2Type(MemberDefault.Type))
-				InOutUniformBuffer.GetMember<Vector2f>(MemberDefault.MemberName) = *reinterpret_cast<const Vector2f*>(SourceBytes);
+				InOutUniformBuffer.GetMember<Vector2f>(MemberDefault.MemberName) = ReadUniformValue<Vector2f>(SourceBytes);
 			else if (IsShaderVector3Type(MemberDefault.Type))
-				InOutUniformBuffer.GetMember<Vector3f>(MemberDefault.MemberName) = *reinterpret_cast<const Vector3f*>(SourceBytes);
+				InOutUniformBuffer.GetMember<Vector3f>(MemberDefault.MemberName) = ReadUniformValue<Vector3f>(SourceBytes);
 			else if (IsShaderVector4Type(MemberDefault.Type))
-				InOutUniformBuffer.GetMember<Vector4f>(MemberDefault.MemberName) = *reinterpret_cast<const Vector4f*>(SourceBytes);
+				InOutUniformBuffer.GetMember<Vector4f>(MemberDefault.MemberName) = ReadUniformValue<Vector4f>(SourceBytes);
 			else if (IsShaderIntVector2Type(MemberDefault.Type) || IsShaderBoolVector2Type(MemberDefault.Type))
-				InOutUniformBuffer.GetMember<Vector2i>(MemberDefault.MemberName) = *reinterpret_cast<const Vector2i*>(SourceBytes);
+				InOutUniformBuffer.GetMember<Vector2i>(MemberDefault.MemberName) = ReadUniformValue<Vector2i>(SourceBytes);
 			else if (IsShaderIntVector3Type(MemberDefault.Type) || IsShaderBoolVector3Type(MemberDefault.Type))
-				InOutUniformBuffer.GetMember<Vector3i>(MemberDefault.MemberName) = *reinterpret_cast<const Vector3i*>(SourceBytes);
+				InOutUniformBuffer.GetMember<Vector3i>(MemberDefault.MemberName) = ReadUniformValue<Vector3i>(SourceBytes);
 			else if (IsShaderIntVector4Type(MemberDefault.Type) || IsShaderBoolVector4Type(MemberDefault.Type))
-				InOutUniformBuffer.GetMember<Vector4i>(MemberDefault.MemberName) = *reinterpret_cast<const Vector4i*>(SourceBytes);
+				InOutUniformBuffer.GetMember<Vector4i>(MemberDefault.MemberName) = ReadUniformValue<Vector4i>(SourceBytes);
 			else if (IsShaderUintVector2Type(MemberDefault.Type))
-				InOutUniformBuffer.GetMember<Vector2u>(MemberDefault.MemberName) = *reinterpret_cast<const Vector2u*>(SourceBytes);
+				InOutUniformBuffer.GetMember<Vector2u>(MemberDefault.MemberName) = ReadUniformValue<Vector2u>(SourceBytes);
 			else if (IsShaderUintVector3Type(MemberDefault.Type))
-				InOutUniformBuffer.GetMember<Vector3u>(MemberDefault.MemberName) = *reinterpret_cast<const Vector3u*>(SourceBytes);
+				InOutUniformBuffer.GetMember<Vector3u>(MemberDefault.MemberName) = ReadUniformValue<Vector3u>(SourceBytes);
 			else if (IsShaderUintVector4Type(MemberDefault.Type))
-				InOutUniformBuffer.GetMember<Vector4u>(MemberDefault.MemberName) = *reinterpret_cast<const Vector4u*>(SourceBytes);
+				InOutUniformBuffer.GetMember<Vector4u>(MemberDefault.MemberName) = ReadUniformValue<Vector4u>(SourceBytes);
 		}
 	}
 
@@ -273,9 +288,9 @@ namespace SH
 			else if (IsShaderVector4Type(Member.Type))                                                      { HlslType = TEXT("float4"); GlslType = TEXT("vec4"); }
 			else if (IsShaderVector3Type(Member.Type))                                                      { HlslType = TEXT("float3"); GlslType = TEXT("vec3"); }
 			else if (IsShaderVector2Type(Member.Type))                                                      { HlslType = TEXT("float2"); GlslType = TEXT("vec2"); }
-			else if (Member.Type == TEXT("float"))                                                          { HlslType = TEXT("float"); GlslType = TEXT("float"); }
-			else if (Member.Type == TEXT("int") || IsShaderBoolType(Member.Type))                           { HlslType = TEXT("int"); GlslType = TEXT("int"); }
-			else if (Member.Type == TEXT("uint"))                                                           { HlslType = TEXT("uint"); GlslType = TEXT("uint"); }
+			else if (IsShaderFloatType(Member.Type))                                                         { HlslType = TEXT("float"); GlslType = TEXT("float"); }
+			else if (IsShaderIntType(Member.Type) || IsShaderBoolType(Member.Type))                          { HlslType = TEXT("int"); GlslType = TEXT("int"); }
+			else if (IsShaderUintType(Member.Type))                                                          { HlslType = TEXT("uint"); GlslType = TEXT("uint"); }
 			else if (IsShaderIntVector4Type(Member.Type) || IsShaderBoolVector4Type(Member.Type))            { HlslType = TEXT("int4"); GlslType = TEXT("ivec4"); }
 			else if (IsShaderIntVector3Type(Member.Type) || IsShaderBoolVector3Type(Member.Type))            { HlslType = TEXT("int3"); GlslType = TEXT("ivec3"); }
 			else if (IsShaderIntVector2Type(Member.Type) || IsShaderBoolVector2Type(Member.Type))            { HlslType = TEXT("int2"); GlslType = TEXT("ivec2"); }
@@ -392,7 +407,7 @@ namespace SH
 				if (Binding.Type == BindingType::UniformBuffer) continue;
 
 				GpuTexture* OverrideTexture = Options.TextureOverrideResolver ? Options.TextureOverrideResolver(Binding) : nullptr;
-				const MaterialBindingResourceDefault* ResourceDefault = FindResourceDefault(InMaterial, Binding.Name);
+				const MaterialBindingResourceDefault* ResourceDefault = FindResourceDefault(InMaterial, Binding.Name, Binding.Stage);
 
 				switch (Binding.Type)
 				{

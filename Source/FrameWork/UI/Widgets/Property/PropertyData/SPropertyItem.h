@@ -19,7 +19,7 @@ namespace FW
 
 		void Construct(const FArguments& InArgs);
     public:
-        void AddWidget(TSharedPtr<SWidget> InWidget);
+        void AddWidget(TSharedPtr<SWidget> InWidget, bool bAutoWidth = false);
         
 	private:
 		FText* DisplayName;

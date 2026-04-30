@@ -63,6 +63,7 @@ namespace FW
         virtual ExecRet Exec(GraphExecContext& Context) = 0;
         GraphPin* GetPin(FGuid Id);
         GraphPin* GetPin(const FString& InName);
+		GraphPin* GetPin(const FString& InName, PinDirection Direction) const;
 
 		static constexpr float DefaultNodeWidth = 120.0f;
 		static constexpr float MinNodeWidth = 120.0f;

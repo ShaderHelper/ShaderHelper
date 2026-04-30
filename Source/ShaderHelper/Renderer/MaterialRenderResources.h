@@ -14,7 +14,7 @@ namespace FW
 namespace SH
 {
 	using MaterialTextureOverrideResolver = TFunction<FW::GpuTexture*(const FW::GpuShaderLayoutBinding&)>;
-	using MaterialScalarOverrideResolver = TFunction<const uint8*(const MaterialBindingMemberDefault&)>;
+	using MaterialUniformOverrideBytesResolver = TFunction<const uint8*(const MaterialBindingMemberDefault&)>;
 
 	struct MaterialErrorRenderResources
 	{
@@ -41,7 +41,7 @@ namespace SH
 		FMatrix44f ProjMatrix = FMatrix44f::Identity;
 		FMatrix44f ViewProjMatrix = FMatrix44f::Identity;
 		FMatrix44f MVPMatrix = FMatrix44f::Identity;
-		MaterialScalarOverrideResolver ScalarOverrideResolver;
+		MaterialUniformOverrideBytesResolver UniformOverrideBytesResolver;
 	};
 
 	FW::GpuVertexLayoutDesc BuildMaterialMeshVertexLayout(const Material& InMaterial);

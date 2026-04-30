@@ -26,6 +26,7 @@ namespace FW
 		bPreviewSrgb = InArgs._PreviewSrgb;
 
 		CurrentColor = InArgs._TargetColorAttribute.IsSet() ? InArgs._TargetColorAttribute.Get() : FLinearColor::White;
+		SyncHSVColorFromCurrentColor();
 
 		ChildSlot
 		[
@@ -46,8 +47,7 @@ namespace FW
 						[
 							SNew(SColorWheel)
 							.SelectedColor_Lambda([this] {
-								FLinearColor HSV = CurrentColor.LinearRGBToHSV();
-								return FLinearColor(HSV.R, HSV.G, 0.f, 1.f);
+								return FLinearColor(CurrentHSVColor.R, CurrentHSVColor.G, 0.f, 1.f);
 							})
 							.OnValueChanged(FOnLinearColorValueChanged::CreateSP(this, &SColorPicker::HandleWheelColorChanged))
 						]
@@ -77,8 +77,7 @@ namespace FW
 							.SliderBarColor(FLinearColor::Transparent)
 							.Style(&FAppStyle::Get().GetWidgetStyle<FSliderStyle>("ColorPicker.Slider"))
 							.Value_Lambda([this]{ 
-								FLinearColor HSV = CurrentColor.LinearRGBToHSV();
-								return HSV.B;
+								return CurrentHSVColor.B;
 							})
 							.OnValueChanged_Lambda([this](float V){ HandleHSVChanged(V, 2); })
 						]
@@ -125,24 +124,21 @@ namespace FW
 								+ SGridPanel::Slot(0,0).VAlign(VAlign_Center)[ SNew(STextBlock).Text(FText::FromString(TEXT("H"))) ]
 								+ SGridPanel::Slot(1,0).Padding(6,0,0,0)[ SNew(SSpinBox<float>).MinValue(0.f).MaxValue(1.f).Delta(0.01f).MaxFractionalDigits(3)
 									.Value_Lambda([this]{ 
-										FLinearColor HSV = CurrentColor.LinearRGBToHSV();
-										return HSV.R / 360.f;
+										return CurrentHSVColor.R / 360.f;
 									})
 									.OnValueChanged_Lambda([this](float V){ HandleHSVChanged(V, 0); }) ]
 
 								+ SGridPanel::Slot(0,1).VAlign(VAlign_Center)[ SNew(STextBlock).Text(FText::FromString(TEXT("S"))) ]
 								+ SGridPanel::Slot(1,1).Padding(6,0,0,0)[ SNew(SSpinBox<float>).MinValue(0.f).MaxValue(1.f).Delta(0.01f).MaxFractionalDigits(3)
 									.Value_Lambda([this]{ 
-										FLinearColor HSV = CurrentColor.LinearRGBToHSV();
-										return HSV.G;
+										return CurrentHSVColor.G;
 									})
 									.OnValueChanged_Lambda([this](float V){ HandleHSVChanged(V, 1); }) ]
 
 								+ SGridPanel::Slot(0,2).VAlign(VAlign_Center)[ SNew(STextBlock).Text(FText::FromString(TEXT("V"))) ]
 								+ SGridPanel::Slot(1,2).Padding(6,0,0,0)[ SNew(SSpinBox<float>).MinValue(0.f).MaxValue(1.f).Delta(0.01f).MaxFractionalDigits(3)
 									.Value_Lambda([this]{ 
-										FLinearColor HSV = CurrentColor.LinearRGBToHSV();
-										return HSV.B;
+										return CurrentHSVColor.B;
 									})
 									.OnValueChanged_Lambda([this](float V){ HandleHSVChanged(V, 2); }) ]
 							]
@@ -175,6 +171,7 @@ namespace FW
 								.OnTextCommitted_Lambda([this](const FText& Text, ETextCommit::Type CommitType) {
 									FColor NewColor = FColor::FromHex(Text.ToString());
 									CurrentColor = FLinearColor(NewColor);
+									SyncHSVColorFromCurrentColor();
 									if (OnColorChanged.IsBound()) OnColorChanged.Execute(CurrentColor);
 								})
 							]
@@ -213,22 +210,40 @@ namespace FW
 		];
 	}
 
+	void SColorPicker::SyncHSVColorFromCurrentColor()
+	{
+		FLinearColor HSV = CurrentColor.LinearRGBToHSV();
+		if (!FMath::IsNearlyZero(HSV.G))
+		{
+			CurrentHSVColor.R = HSV.R;
+		}
+		CurrentHSVColor.G = HSV.G;
+		CurrentHSVColor.B = HSV.B;
+		CurrentHSVColor.A = CurrentColor.A;
+	}
+
+	void SColorPicker::ApplyHSVColor()
+	{
+		CurrentColor = CurrentHSVColor.HSVToLinearRGB();
+		CurrentColor.A = CurrentHSVColor.A;
+		if (OnColorChanged.IsBound()) OnColorChanged.Execute(CurrentColor);
+	}
+
 	void SColorPicker::HandleWheelColorChanged(FLinearColor NewColor)
 	{
-		float HueDegrees = NewColor.R;
-		float Saturation = FMath::Clamp(NewColor.G, 0.f, 1.f);
-		
-		FLinearColor HSV = CurrentColor.LinearRGBToHSV();
-		FLinearColor NewHSV(HueDegrees, Saturation, HSV.B, CurrentColor.A);
-		CurrentColor = NewHSV.HSVToLinearRGB();
-		CurrentColor.A = NewHSV.A;
-		
-		if (OnColorChanged.IsBound()) OnColorChanged.Execute(CurrentColor);
+		CurrentHSVColor.R = NewColor.R;
+		CurrentHSVColor.G = FMath::Clamp(NewColor.G, 0.f, 1.f);
+		if (FMath::IsNearlyZero(CurrentHSVColor.B))
+		{
+			CurrentHSVColor.B = 1.f;
+		}
+		ApplyHSVColor();
 	}
 
 	void SColorPicker::HandleAlphaChanged(float NewAlpha)
 	{
 		CurrentColor.A = FMath::Clamp(NewAlpha, 0.f, 1.f);
+		CurrentHSVColor.A = CurrentColor.A;
 		if (OnColorChanged.IsBound()) OnColorChanged.Execute(CurrentColor);
 	}
 
@@ -238,26 +253,24 @@ namespace FW
 		if (Component == 0) CurrentColor.R = NewValue;
 		else if (Component == 1) CurrentColor.G = NewValue;
 		else if (Component == 2) CurrentColor.B = NewValue;
+		SyncHSVColorFromCurrentColor();
 		if (OnColorChanged.IsBound()) OnColorChanged.Execute(CurrentColor);
 	}
 
 	void SColorPicker::HandleHSVChanged(float NewValue, int32 Component)
 	{
-		FLinearColor HSV = CurrentColor.LinearRGBToHSV();
 		if (Component == 0)
 		{
-			HSV.R = FMath::Clamp(NewValue, 0.f, 1.f) * 360.f;
+			CurrentHSVColor.R = FMath::Clamp(NewValue, 0.f, 1.f) * 360.f;
 		}
 		else if (Component == 1)
 		{
-			HSV.G = FMath::Clamp(NewValue, 0.f, 1.f);
+			CurrentHSVColor.G = FMath::Clamp(NewValue, 0.f, 1.f);
 		}
 		else if (Component == 2)
 		{
-			HSV.B = FMath::Clamp(NewValue, 0.f, 1.f);
+			CurrentHSVColor.B = FMath::Clamp(NewValue, 0.f, 1.f);
 		}
-		CurrentColor = HSV.HSVToLinearRGB();
-		CurrentColor.A = HSV.A;
-		if (OnColorChanged.IsBound()) OnColorChanged.Execute(CurrentColor);
+		ApplyHSVColor();
 	}
 }
