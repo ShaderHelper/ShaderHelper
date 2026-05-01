@@ -66,7 +66,7 @@ namespace HLSL
 #ifndef __cplusplus
 #include "Common.hlsl"
 
-DECLARE_GLOBAL_RW_BUFFER(RWByteAddressBuffer, Printer, 0)
+RWByteAddressBuffer Printer : register(u0, space0);
 
 // Layout in RWByteAddressBuffer Printer:
 // [0, 4)   : ByteSize (uint)

@@ -64,7 +64,7 @@ namespace SH
         TSharedPtr<FW::PropertyCategory> BuiltInCategory;
         TSharedPtr<FW::PropertyCategory> CustomCategory;
         FW::UniformBufferBuilder CustomUniformBufferBuilder{FW::UniformBufferUsage::Persistant};
-        FW::GpuBindGroupLayoutBuilder CustomBindGroupLayoutBuilder{ FW::BindingContext::PassSlot };
+		FW::GpuBindGroupLayoutBuilder CustomBindGroupLayoutBuilder{ 1 };
 		
 		TRefCountPtr<FW::GpuShader> PixelShader;
 		bool bCompilationSucceed{};

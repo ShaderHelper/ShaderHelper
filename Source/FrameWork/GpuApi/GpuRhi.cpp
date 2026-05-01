@@ -357,6 +357,12 @@ public:
 		check(ValidateSetBindGroups(BindGroups));
 		PassRecorder->SetBindGroups(BindGroups);
 	}
+	void Barriers(const TArray<GpuBarrierInfo>& BarrierInfos) override
+	{
+		checkf(!IsEnd, TEXT("Can not record the command on the pass recorder that already ended."));
+		check(ValidateBarriers(BarrierInfos));
+		PassRecorder->Barriers(BarrierInfos);
+	}
 
 	GpuRenderPassRecorder* PassRecorder;
 	bool IsEnd{};

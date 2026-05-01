@@ -728,6 +728,11 @@ namespace FW::VK
 		StateCache.SetBindGroups(BindGroups);
 	}
 
+	void VulkanRenderPassRecorder::Barriers(const TArray<GpuBarrierInfo>& BarrierInfos)
+	{
+		Owner->Barriers(BarrierInfos);
+	}
+
 	VulkanCmdRecorder* VulkanCmdRecorderPool::AcquireCmdRecorder(const FString& RecorderName)
 	{
 		if (CommandPool == VK_NULL_HANDLE)

@@ -10,29 +10,25 @@ namespace SH
 	public:
 		OutlineShader(const std::set<FString>& VariantDefinitions = {});
 
-		// Pass 1: Mask
 		FW::GpuShader* GetMaskVS() const { return MaskVs; }
 		FW::GpuShader* GetMaskPS() const { return MaskPs; }
-		TRefCountPtr<FW::GpuBindGroupLayout> GetMaskBindGroupLayout() const { return MaskBindGroupLayout; }
+		TRefCountPtr<FW::GpuBindGroupLayout> GetMaskShaderBindGroupLayout() const { return MaskShaderBindGroupLayout; }
 		TRefCountPtr<FW::GpuBindGroup> GetMaskBindGroup(const FMatrix44f& ViewProjection, const FMatrix44f& WorldMatrix);
 
-		// Pass 2: Post-process edge detection
 		FW::GpuShader* GetPostVS() const { return PostVs; }
 		FW::GpuShader* GetPostPS() const { return PostPs; }
-		TRefCountPtr<FW::GpuBindGroupLayout> GetPostBindGroupLayout() const { return PostBindGroupLayout; }
+		TRefCountPtr<FW::GpuBindGroupLayout> GetPostShaderBindGroupLayout() const { return PostShaderBindGroupLayout; }
 		TRefCountPtr<FW::GpuBindGroup> GetPostBindGroup(FW::GpuTextureView* MaskTexView, const FW::Vector4f& OutlineColor, const FW::Vector2f& TexelSize);
 
 	private:
-		// Mask pass
 		TRefCountPtr<FW::GpuShader> MaskVs;
 		TRefCountPtr<FW::GpuShader> MaskPs;
-		TRefCountPtr<FW::GpuBindGroupLayout> MaskBindGroupLayout;
+		TRefCountPtr<FW::GpuBindGroupLayout> MaskShaderBindGroupLayout;
 		FW::UniformBufferBuilder MaskUbBuilder{FW::UniformBufferUsage::Temp};
 
-		// Post pass
 		TRefCountPtr<FW::GpuShader> PostVs;
 		TRefCountPtr<FW::GpuShader> PostPs;
-		TRefCountPtr<FW::GpuBindGroupLayout> PostBindGroupLayout;
+		TRefCountPtr<FW::GpuBindGroupLayout> PostShaderBindGroupLayout;
 		FW::UniformBufferBuilder PostUbBuilder{FW::UniformBufferUsage::Temp};
 	};
 }

@@ -122,7 +122,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 
 	GpuBindGroupLayoutBuilder StShader::GetBuiltInBindLayoutBuilder() const
 	{
-		GpuBindGroupLayoutBuilder Builder{ BindingContext::GlobalSlot };
+        GpuBindGroupLayoutBuilder Builder{ 0 };
 		Builder
 			.AddExistingBinding(0, BindingType::RWRawBuffer, BindingShaderStage::Pixel)
 			.AddUniformBuffer("BuiltInUniform", GetBuiltInUbBuilder(), BindingShaderStage::Pixel);
@@ -223,7 +223,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
     void StShader::RefreshBuilder()
     {
         FW::UniformBufferBuilder NewCustomUniformBufferBuilder{FW::UniformBufferUsage::Persistant};
-        FW::GpuBindGroupLayoutBuilder NewCustomBindGroupLayoutBuilder{ BindingContext::PassSlot };
+        FW::GpuBindGroupLayoutBuilder NewCustomBindGroupLayoutBuilder{ 1 };
         
         auto CustomUniformCategory = CustomCategory->GetData("CustomUniform");
         if(CustomUniformCategory)

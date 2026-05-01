@@ -20,7 +20,7 @@ namespace FW
 
 		ClearUbBuilder.AddUint("Size");
 
-		BindGroupLayout = GpuBindGroupLayoutBuilder{ BindingContext::ShaderSlot }
+		BindGroupLayout = GpuBindGroupLayoutBuilder{ 2 }
 			.AddExistingBinding(0, InType, BindingShaderStage::Compute)
 			.AddUniformBuffer("ClearUb", ClearUbBuilder, BindingShaderStage::Compute)
 			.Build();

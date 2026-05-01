@@ -52,6 +52,7 @@ namespace SH
 
 		// Invalidate material-derived render resources.
 		void InvalidateRenderResources();
+		bool UsesTextureAsShaderInput(FW::GpuTexture* Texture, FString& OutBindingName) const;
 
 	public:
 		FW::ObserverObjectPtr<MeshSceneObject> MeshSceneObjectRef;

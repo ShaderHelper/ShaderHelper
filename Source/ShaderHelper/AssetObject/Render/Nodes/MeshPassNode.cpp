@@ -499,6 +499,33 @@ namespace SH
 			MRO->EnsureRenderResources(ColorFormatKey, DepthFormatKey, SampleCount);
 		}
 
+		auto ValidateRenderTargetNotShaderInput = [this](GpuTexture* RenderTarget, const FString& RenderTargetName) -> bool {
+			for (const auto& MRO : MeshRenderObjects)
+			{
+				FString BindingName;
+				if (MRO->UsesTextureAsShaderInput(RenderTarget, BindingName))
+				{
+					SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because %s is used as both render target and shader input \"%s\" by MeshRenderObject:\"%s\"."),
+						*ObjectName.ToString(), *RenderTargetName, *BindingName, *MRO->ObjectName.ToString());
+					return false;
+				}
+			}
+
+			return true;
+		};
+
+		for (int32 i = 0; i < ActiveColorRTs.Num(); ++i)
+		{
+			if (!ValidateRenderTargetNotShaderInput(ActiveColorRTs[i].GetReference(), ColorPinName(i)))
+			{
+				return { true, true };
+			}
+		}
+		if (!ValidateRenderTargetNotShaderInput(ActiveDepthRT.GetReference(), TEXT("Depth")))
+		{
+			return { true, true };
+		}
+
 		const float Aspect = (float)Width / (float)Height;
 		TOptional<Camera> Cam;
 		if (CameraRef.IsValid() && CameraRef.Get())
@@ -506,13 +533,9 @@ namespace SH
 			Cam = CameraRef->ToCamera(Aspect);
 		}
 
-		// Capture MRO pointers; ObjectPtrs ensure lifetime thru lambda.
 		TArray<ObjectPtr<MeshRenderObject>> MROsCopy = MeshRenderObjects;
-
-		BindingContext Bindings; // empty; MRO calls SetBindGroups directly, but we don't use RG barriers for bound textures.
-
-		Ctx.RG->AddRenderPass(ObjectName.ToString(), PassDesc, Bindings,
-			[MROsCopy, Cam](GpuRenderPassRecorder* Rec, BindingContext&) {
+		Ctx.RG->AddRenderPass(ObjectName.ToString(), PassDesc,
+			[MROsCopy, Cam](GpuRenderPassRecorder* Rec) {
 				const Camera* CameraPtr = Cam.IsSet() ? &Cam.GetValue() : nullptr;
 				for (const auto& MRO : MROsCopy)
 				{

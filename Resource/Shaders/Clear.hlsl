@@ -1,9 +1,9 @@
 #include "Common.hlsl"
 
 #if RESOURCE_STRUCTURED_BUFFER
-DECLARE_SHADER_RW_BUFFER(RWStructuredBuffer<uint>, ClearResource, 0)
+RWStructuredBuffer<uint> ClearResource : register(u0, space2);
 #elif RESOURCE_RAW_BUFFER
-DECLARE_SHADER_RW_BUFFER(RWByteAddressBuffer, ClearResource, 0)
+RWByteAddressBuffer ClearResource : register(u0, space2);
 #endif
 
 [numthreads(64, 1, 1)]

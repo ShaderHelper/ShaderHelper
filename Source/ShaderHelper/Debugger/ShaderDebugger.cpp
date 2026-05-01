@@ -13,6 +13,71 @@ using namespace FW;
 
 namespace SH
 {
+	static void EnsureBindGroupSlots(TArray<TRefCountPtr<GpuBindGroup>>& BindGroups, TArray<TRefCountPtr<GpuBindGroupLayout>>& BindGroupLayouts)
+	{
+		BindGroups.SetNum(GpuResourceLimit::MaxBindableBingGroupNum);
+		BindGroupLayouts.SetNum(GpuResourceLimit::MaxBindableBingGroupNum);
+	}
+
+	static TArray<GpuBindGroup*> MakeBindGroupSlots(const TArray<TRefCountPtr<GpuBindGroup>>& BindGroups)
+	{
+		TArray<GpuBindGroup*> Slots;
+		for (const TRefCountPtr<GpuBindGroup>& BindGroup : BindGroups)
+		{
+			if (BindGroup.IsValid())
+			{
+				Slots.Add(BindGroup.GetReference());
+			}
+		}
+		return Slots;
+	}
+
+	static TArray<GpuBindGroupLayout*> MakeBindGroupLayoutSlots(const TArray<TRefCountPtr<GpuBindGroupLayout>>& BindGroupLayouts)
+	{
+		TArray<GpuBindGroupLayout*> Slots;
+		for (const TRefCountPtr<GpuBindGroupLayout>& BindGroupLayout : BindGroupLayouts)
+		{
+			if (BindGroupLayout.IsValid())
+			{
+				Slots.Add(BindGroupLayout.GetReference());
+			}
+		}
+		return Slots;
+	}
+
+	static void AddBindingResourceAccess(RGRenderPass& RenderPass, BindingType Type, GpuResource* Resource)
+	{
+		switch (Type)
+		{
+		case BindingType::Texture:
+		case BindingType::TextureCube:
+		case BindingType::Texture3D:
+		case BindingType::CombinedTextureSampler:
+		case BindingType::CombinedTextureCubeSampler:
+		case BindingType::CombinedTexture3DSampler:
+		case BindingType::StructuredBuffer:
+		case BindingType::RawBuffer:
+			RenderPass.Read(Resource);
+			break;
+		case BindingType::RWStructuredBuffer:
+		case BindingType::RWRawBuffer:
+		case BindingType::RWTexture:
+		case BindingType::RWTexture3D:
+			RenderPass.Write(Resource);
+			break;
+		default:
+			break;
+		}
+	}
+
+	static void AddSpvBindingResourceAccess(RGRenderPass& RenderPass, const TArray<SpvBinding>& Bindings)
+	{
+		for (const SpvBinding& Binding : Bindings)
+		{
+			AddBindingResourceAccess(RenderPass, Binding.Type, Binding.Resource.GetReference());
+		}
+	}
+
 	
 	static void DumpDebugStatesToFile(const TArray<SpvDebugState>& InDebugStates, const SpvDebuggerContext* InContext, const FString& File)
 	{
@@ -372,14 +437,15 @@ namespace SH
 							.Format = PsInvocation.PipelineDesc.Targets[0].TargetFormat,
 							.Usage = GpuTextureUsage::RenderTarget
 						});
+							auto PatchedBindGroupLayoutSlots = MakeBindGroupLayoutSlots(PatchedBindGroupLayouts);
 						GpuRenderPipelineStateDesc PatchedPipelineDesc{
 							.Vs = PsInvocation.PipelineDesc.Vs,
 							.Ps = PatchedShader,
 							.Targets = {{DummyRenderTarget->GetFormat()}},
+							.BindGroupLayouts = PatchedBindGroupLayoutSlots,
 							.RasterizerState = PsInvocation.PipelineDesc.RasterizerState,
-							.Primitive = PsInvocation.PipelineDesc.Primitive
+							.Primitive = PsInvocation.PipelineDesc.Primitive,
 						};
-						PatchedBindings.ApplyBindGroupLayout(PatchedPipelineDesc);
 						TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PatchedPipelineDesc);
 						
 						GpuRenderPassDesc DummyPassDesc;
@@ -388,14 +454,16 @@ namespace SH
 						auto CmdRecorder = GGpuRhi->BeginRecording();
 						GpuResourceHelper::ClearRWResource(CmdRecorder, DebugBuffer);
 						RenderGraph RG(CmdRecorder);
-						RG.AddRenderPass(TEXT("ExprDebugger"), MoveTemp(DummyPassDesc), PatchedBindings,
-							[&](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
+						auto& RenderPass = RG.AddRenderPass(TEXT("ExprDebugger"), MoveTemp(DummyPassDesc),
+							[&, BindGroups = PatchedBindGroups](GpuRenderPassRecorder* PassRecorder) {
 								PassRecorder->SetViewPort(PsInvocation.ViewPortDesc);
 								PassRecorder->SetRenderPipelineState(Pipeline);
-								Bindings.ApplyBindGroup(PassRecorder);
+								PassRecorder->SetBindGroups(MakeBindGroupSlots(BindGroups));
 								PsInvocation.DrawFunction(PassRecorder);
 							}
 						);
+						AddSpvBindingResourceAccess(RenderPass, SpvBindings);
+						RenderPass.Write(DebugBuffer);
 						RG.Execute();
 						
 						uint8* DebugBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebugBuffer, GpuResourceMapMode::Read_Only);
@@ -1532,14 +1600,15 @@ namespace SH
 			});
 		}
 		
+		SpvBindings.Empty();
+		PatchedBindGroups.Empty();
+		PatchedBindGroupLayouts.Empty();
+		EnsureBindGroupSlots(PatchedBindGroups, PatchedBindGroupLayouts);
 
-		auto SetupBinding = [&](const std::optional<BindingBuilder>& Builder)
+		auto SetupBinding = [&](const BindingBuilder& Builder)
 			{
-				if (!Builder.has_value())
-					return;
-
-				GpuBindGroupDesc BindGroupDesc = (*Builder).BingGroupBuilder.GetDesc();
-				GpuBindGroupLayoutDesc LayoutDesc = (*Builder).LayoutBuilder.GetDesc();
+				GpuBindGroupDesc BindGroupDesc = Builder.BingGroupBuilder.GetDesc();
+				GpuBindGroupLayoutDesc LayoutDesc = Builder.LayoutBuilder.GetDesc();
 				int32 SetNumber = BindGroupDesc.Layout->GetGroupNumber();
 				for (const auto& [Slot, ResourceBindingEntry] : BindGroupDesc.Resources)
 				{
@@ -1568,7 +1637,7 @@ namespace SH
 					}
 				}
 
-				if (SetNumber == BindingContext::GlobalSlot)
+				if (SetNumber == 0)
 				{
 					//Add the debugger buffer
 					BindGroupDesc.Resources.Add(BindingSlot{DebuggerBufferBindingSlot, BindingType::RWRawBuffer, BindingShaderStage::Pixel}, { AUX::StaticCastRefCountPtr<GpuResource>(DebugBuffer) });
@@ -1580,33 +1649,19 @@ namespace SH
 						BindGroupDesc.Resources.Add(BindingSlot{DebuggerParamsBindingSlot, BindingType::UniformBuffer, BindingShaderStage::Pixel}, { AUX::StaticCastRefCountPtr<GpuResource>(DebugParamsBuffer) });
 						LayoutDesc.Layouts.Add(BindingSlot{DebuggerParamsBindingSlot, BindingType::UniformBuffer, BindingShaderStage::Pixel}, { BindingType::UniformBuffer, BindingShaderStage::Pixel });
 					}
+				}
 
-					TRefCountPtr<GpuBindGroupLayout> PatchedBindGroupLayout = GGpuRhi->CreateBindGroupLayout(LayoutDesc);
-					BindGroupDesc.Layout = PatchedBindGroupLayout;
-					TRefCountPtr<GpuBindGroup> PacthedBindGroup = GGpuRhi->CreateBindGroup(BindGroupDesc);
-					PatchedBindings.SetGlobalBindGroup(PacthedBindGroup);
-					PatchedBindings.SetGlobalBindGroupLayout(PatchedBindGroupLayout);
-				}
-				else if (SetNumber == BindingContext::PassSlot)
-				{
-					TRefCountPtr<GpuBindGroupLayout> PatchedBindGroupLayout = GGpuRhi->CreateBindGroupLayout(LayoutDesc);
-					BindGroupDesc.Layout = PatchedBindGroupLayout;
-					TRefCountPtr<GpuBindGroup> PacthedBindGroup = GGpuRhi->CreateBindGroup(BindGroupDesc);
-					PatchedBindings.SetPassBindGroup(PacthedBindGroup);
-					PatchedBindings.SetPassBindGroupLayout(PatchedBindGroupLayout);
-				}
-				else if (SetNumber == BindingContext::ShaderSlot)
-				{
-					TRefCountPtr<GpuBindGroupLayout> PatchedBindGroupLayout = GGpuRhi->CreateBindGroupLayout(LayoutDesc);
-					BindGroupDesc.Layout = PatchedBindGroupLayout;
-					TRefCountPtr<GpuBindGroup> PacthedBindGroup = GGpuRhi->CreateBindGroup(BindGroupDesc);
-					PatchedBindings.SetShaderBindGroup(PacthedBindGroup);
-					PatchedBindings.SetShaderBindGroupLayout(PatchedBindGroupLayout);
-				}
+				TRefCountPtr<GpuBindGroupLayout> PatchedBindGroupLayout = GGpuRhi->CreateBindGroupLayout(LayoutDesc);
+				BindGroupDesc.Layout = PatchedBindGroupLayout;
+				TRefCountPtr<GpuBindGroup> PacthedBindGroup = GGpuRhi->CreateBindGroup(BindGroupDesc);
+				check(PatchedBindGroups.IsValidIndex(SetNumber));
+				PatchedBindGroups[SetNumber] = PacthedBindGroup;
+				PatchedBindGroupLayouts[SetNumber] = PatchedBindGroupLayout;
 			};
-		SetupBinding(PsInvocation.Builders.GlobalBuilder);
-		SetupBinding(PsInvocation.Builders.PassBuilder);
-		SetupBinding(PsInvocation.Builders.ShaderBuilder);
+		for (const BindingBuilder& Builder : PsInvocation.Builders)
+		{
+			SetupBinding(Builder);
+		}
 
 		auto PixelDebuggerContext = MakeUnique<SpvPixelDebuggerContext>(PixelCoord, SpvBindings);
 
@@ -1657,14 +1712,15 @@ namespace SH
 			.Format = PsInvocation.PipelineDesc.Targets[0].TargetFormat,
 			.Usage = GpuTextureUsage::RenderTarget
 		});
+		auto PatchedBindGroupLayoutSlots = MakeBindGroupLayoutSlots(PatchedBindGroupLayouts);
 		GpuRenderPipelineStateDesc PatchedPipelineDesc{
 			.Vs = PsInvocation.PipelineDesc.Vs,
 			.Ps = PatchedShader,
 			.Targets = {{DummyRenderTarget->GetFormat()}},
+			.BindGroupLayouts = PatchedBindGroupLayoutSlots,
 			.RasterizerState = PsInvocation.PipelineDesc.RasterizerState,
-			.Primitive = PsInvocation.PipelineDesc.Primitive
+			.Primitive = PsInvocation.PipelineDesc.Primitive,
 		};
-		PatchedBindings.ApplyBindGroupLayout(PatchedPipelineDesc);
 		TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PatchedPipelineDesc);
 
 		GpuRenderPassDesc DummyPassDesc;
@@ -1672,14 +1728,16 @@ namespace SH
 
 		auto CmdRecorder = GGpuRhi->BeginRecording();
 		RenderGraph RG(CmdRecorder);
-		RG.AddRenderPass(TEXT("Debugger"), MoveTemp(DummyPassDesc), PatchedBindings,
-			[&](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
+		auto& RenderPass = RG.AddRenderPass(TEXT("Debugger"), MoveTemp(DummyPassDesc),
+			[&, BindGroups = PatchedBindGroups](GpuRenderPassRecorder* PassRecorder) {
 				PassRecorder->SetViewPort(PsInvocation.ViewPortDesc);
 				PassRecorder->SetRenderPipelineState(Pipeline);
-				Bindings.ApplyBindGroup(PassRecorder);
+				PassRecorder->SetBindGroups(MakeBindGroupSlots(BindGroups));
 				PsInvocation.DrawFunction(PassRecorder);
 			}
 		);
+		AddSpvBindingResourceAccess(RenderPass, SpvBindings);
+		RenderPass.Write(DebugBuffer);
 		RG.Execute();
 	}
 
@@ -1951,48 +2009,45 @@ namespace SH
 		}
 
 		//Add previewer params slot to layout
-		BaseLayoutDescs.FindOrAdd(BindingContext::GlobalSlot).Layouts.Add(BindingSlot{PreviewerParamsBindingSlot, BindingType::UniformBuffer, BindingShaderStage::Pixel}, { BindingType::UniformBuffer, BindingShaderStage::Pixel });
+		BaseLayoutDescs.FindOrAdd(0).Layouts.Add(BindingSlot{PreviewerParamsBindingSlot, BindingType::UniformBuffer, BindingShaderStage::Pixel}, { BindingType::UniformBuffer, BindingShaderStage::Pixel });
 
 		//Add debugger buffer slot
-		BaseLayoutDescs.FindOrAdd(BindingContext::GlobalSlot).Layouts.Add(BindingSlot{DebuggerBufferBindingSlot, BindingType::RWRawBuffer, BindingShaderStage::Pixel}, { BindingType::RWRawBuffer, BindingShaderStage::Pixel });
-		BaseGroupDescs.FindOrAdd(BindingContext::GlobalSlot).Resources.Add(BindingSlot{DebuggerBufferBindingSlot, BindingType::RWRawBuffer, BindingShaderStage::Pixel}, { AUX::StaticCastRefCountPtr<GpuResource>(DebugBuffer) });
+		BaseLayoutDescs.FindOrAdd(0).Layouts.Add(BindingSlot{DebuggerBufferBindingSlot, BindingType::RWRawBuffer, BindingShaderStage::Pixel}, { BindingType::RWRawBuffer, BindingShaderStage::Pixel });
+		BaseGroupDescs.FindOrAdd(0).Resources.Add(BindingSlot{DebuggerBufferBindingSlot, BindingType::RWRawBuffer, BindingShaderStage::Pixel}, { AUX::StaticCastRefCountPtr<GpuResource>(DebugBuffer) });
 
 		//Build non-global bind groups (shared across all lines)
 		TRefCountPtr<GpuBindGroupLayout> GlobalLayout;
-		BindingContext SharedBindings;
+		TArray<TRefCountPtr<GpuBindGroup>> SharedBindGroups;
+		TArray<TRefCountPtr<GpuBindGroupLayout>> SharedBindGroupLayouts;
+		EnsureBindGroupSlots(SharedBindGroups, SharedBindGroupLayouts);
 		for (auto& [SetNumber, LayoutDesc] : BaseLayoutDescs)
 		{
 			TRefCountPtr<GpuBindGroupLayout> Layout = GGpuRhi->CreateBindGroupLayout(LayoutDesc);
-			if (SetNumber == BindingContext::GlobalSlot)
+			if (SetNumber == 0)
 			{
 				GlobalLayout = Layout;
-				SharedBindings.SetGlobalBindGroupLayout(Layout);
+				check(SharedBindGroupLayouts.IsValidIndex(SetNumber));
+				SharedBindGroupLayouts[0] = Layout;
 			}
 			else
 			{
 				BaseGroupDescs[SetNumber].Layout = Layout;
 				TRefCountPtr<GpuBindGroup> Group = GGpuRhi->CreateBindGroup(BaseGroupDescs[SetNumber]);
-				if (SetNumber == BindingContext::PassSlot)
-				{
-					SharedBindings.SetPassBindGroup(Group);
-					SharedBindings.SetPassBindGroupLayout(Layout);
-				}
-				else if (SetNumber == BindingContext::ShaderSlot)
-				{
-					SharedBindings.SetShaderBindGroup(Group);
-					SharedBindings.SetShaderBindGroupLayout(Layout);
-				}
+				check(SharedBindGroups.IsValidIndex(SetNumber));
+				SharedBindGroups[SetNumber] = Group;
+				SharedBindGroupLayouts[SetNumber] = Layout;
 			}
 		}
 		 
+		auto SharedBindGroupLayoutSlots = MakeBindGroupLayoutSlots(SharedBindGroupLayouts);
 		GpuRenderPipelineStateDesc PreviewPipelineDesc{
 			.Vs = PsInvocation.PipelineDesc.Vs,
 			.Ps = PatchedShader,
 			.Targets = {{ GpuFormat::R32G32B32A32_FLOAT }},
+			.BindGroupLayouts = SharedBindGroupLayoutSlots,
 			.RasterizerState = PsInvocation.PipelineDesc.RasterizerState,
-			.Primitive = PsInvocation.PipelineDesc.Primitive
+			.Primitive = PsInvocation.PipelineDesc.Primitive,
 		};
-		SharedBindings.ApplyBindGroupLayout(PreviewPipelineDesc);
 		TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PreviewPipelineDesc);
 
 		//Per-line: create params buffer, bind group, render target, and collect render passes
@@ -2000,7 +2055,7 @@ namespace SH
 		{
 			TRefCountPtr<GpuBuffer> ParamsBuffer;
 			TRefCountPtr<GpuTexture> RenderTarget;
-			BindingContext Bindings;
+			TArray<TRefCountPtr<GpuBindGroup>> BindGroups;
 		};
 		TMap<DebuggerLocation, PerLineRenderData> PerLineData;
 
@@ -2047,7 +2102,7 @@ namespace SH
 			});
 
 			//Build global bind group with this line's params buffer
-			GpuBindGroupDesc GlobalGroupDesc = BaseGroupDescs.FindOrAdd(BindingContext::GlobalSlot);
+			GpuBindGroupDesc GlobalGroupDesc = BaseGroupDescs.FindOrAdd(0);
 			GlobalGroupDesc.Resources.Add(BindingSlot{PreviewerParamsBindingSlot, BindingType::UniformBuffer, BindingShaderStage::Pixel}, { AUX::StaticCastRefCountPtr<GpuResource>(ParamsBuffer) });
 			GlobalGroupDesc.Layout = GlobalLayout;
 			TRefCountPtr<GpuBindGroup> GlobalGroup = GGpuRhi->CreateBindGroup(GlobalGroupDesc);
@@ -2060,10 +2115,10 @@ namespace SH
 				.InitialData = GridData,
 			});
 
-			BindingContext LineBindings = SharedBindings;
-			LineBindings.SetGlobalBindGroup(GlobalGroup);
+			TArray<TRefCountPtr<GpuBindGroup>> LineBindGroups = SharedBindGroups;
+			LineBindGroups[0] = GlobalGroup;
 
-			PerLineData.Add(Loc, { ParamsBuffer, RenderTarget, MoveTemp(LineBindings) });
+			PerLineData.Add(Loc, { ParamsBuffer, RenderTarget, MoveTemp(LineBindGroups) });
 		}
 
 		RenderGraph RG;
@@ -2072,14 +2127,16 @@ namespace SH
 			GpuRenderPassDesc PassDesc;
 			PassDesc.ColorRenderTargets.Add({ .View = Data.RenderTarget->GetDefaultView(), .LoadAction = RenderTargetLoadAction::Load, .StoreAction = RenderTargetStoreAction::Store });
 
-			RG.AddRenderPass(TEXT("Preview"), MoveTemp(PassDesc), Data.Bindings,
-				[&](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
+			auto& RenderPass = RG.AddRenderPass(TEXT("Preview"), MoveTemp(PassDesc),
+				[&, BindGroups = Data.BindGroups](GpuRenderPassRecorder* PassRecorder) {
 					PassRecorder->SetViewPort(PsInvocation.ViewPortDesc);
 					PassRecorder->SetRenderPipelineState(Pipeline);
-					Bindings.ApplyBindGroup(PassRecorder);
+					PassRecorder->SetBindGroups(MakeBindGroupSlots(BindGroups));
 					PsInvocation.DrawFunction(PassRecorder);
 				}
 			);
+			AddSpvBindingResourceAccess(RenderPass, SpvBindings);
+			RenderPass.Write(DebugBuffer);
 
 			LinePreviewTextures.Add(Loc, Data.RenderTarget);
 		}

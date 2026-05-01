@@ -193,12 +193,12 @@ namespace SH
 		
 		return PixelState{
 			.ViewPortDesc = {(float)RT->GetWidth(), (float)RT->GetHeight()},
-			.Builders = BindingState{
-				.GlobalBuilder = BindingBuilder{
+			.Builders = {
+				{
 					.BingGroupBuilder = GetBuiltInBindGroupBuiler(BuiltInLayout),
 					.LayoutBuilder = ShaderAssetObj->GetBuiltInBindLayoutBuilder()
 				},
-				.PassBuilder = BindingBuilder{
+				{
 					.BingGroupBuilder = *CustomBindGroupBuilder,
 					.LayoutBuilder = ShaderAssetObj->CustomBindGroupLayoutBuilder
 				}
@@ -1070,12 +1070,8 @@ namespace SH
             }
 
 			auto BuiltInLayout = ShaderAssetObj->GetBuiltInBindLayout();
-
-			BindingContext Bindings;
-			Bindings.SetGlobalBindGroupLayout(BuiltInLayout);
-			Bindings.SetPassBindGroupLayout(CustomBindLayout);
-			Bindings.SetGlobalBindGroup(GetBuiltInBindGroup(BuiltInLayout));
-			Bindings.SetPassBindGroup(CustomBindGroup);
+			TRefCountPtr<GpuBindGroup> BuiltInBindGroup = GetBuiltInBindGroup(BuiltInLayout);
+			TRefCountPtr<GpuBindGroup> PassBindGroup = CustomBindGroup;
 
 			PipelineDesc = GpuRenderPipelineStateDesc{
 				.CheckLayout = true,
@@ -1084,8 +1080,8 @@ namespace SH
 				.Targets = {
                     { .TargetFormat = PassOutput->GetValue()->GetFormat() }
                 },
+				.BindGroupLayouts = { BuiltInLayout.GetReference(), CustomBindLayout.GetReference() },
             };
-			Bindings.ApplyBindGroupLayout(PipelineDesc);
 
 			TRefCountPtr<GpuRenderPipelineState> PipelineState;
 
@@ -1099,13 +1095,28 @@ namespace SH
 				return { true, true };
 			}
 
-			ShaderToyContext.RG->AddRenderPass(ObjectName.ToString(), MoveTemp(PassDesc), MoveTemp(Bindings),
-				[PipelineState](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
-					Bindings.ApplyBindGroup(PassRecorder);
+			auto& RenderPass = ShaderToyContext.RG->AddRenderPass(ObjectName.ToString(), MoveTemp(PassDesc),
+				[PipelineState, BuiltInBindGroup, PassBindGroup](GpuRenderPassRecorder* PassRecorder) {
+					PassRecorder->SetBindGroups({ BuiltInBindGroup.GetReference(), PassBindGroup.GetReference() });
 					PassRecorder->SetRenderPipelineState(PipelineState);;
 					PassRecorder->DrawPrimitive(0, 3, 0, 1);
 				}
 			);
+			RenderPass.Write(TSingleton<PrintBuffer>::Get().GetResource());
+			for (int i = 0; i < 4; i++)
+			{
+				FString ChannelName = FString::Printf(TEXT("iChannel%d"), i);
+				GpuTexture* ChannelTexture = nullptr;
+				if (FlippedChannelTextures[i].IsValid())
+				{
+					ChannelTexture = FlippedChannelTextures[i].GetReference();
+				}
+				else if (ShaderAssetObj->ChannelSlotTypes[i] == ShaderToySlotType::Texture2D)
+				{
+					ChannelTexture = static_cast<GpuTexturePin*>(GetPin(ChannelName))->GetValue();
+				}
+				RenderPass.Read(ChannelTexture);
+			}
 			ShaderToyContext.RG->Execute();
 
 			ShaderAssertInfo AssertInfo;

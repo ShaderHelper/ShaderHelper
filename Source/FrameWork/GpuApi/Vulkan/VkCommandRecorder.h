@@ -109,6 +109,7 @@ namespace FW::VK
 		void SetViewPort(const GpuViewPortDesc& InViewPortDesc) override;
 		void SetScissorRect(const GpuScissorRectDesc& InScissorRectDes) override;
 		void SetBindGroups(const TArray<GpuBindGroup*>& BindGroups) override;
+		void Barriers(const TArray<GpuBarrierInfo>& BarrierInfos) override;
 
 		TOptional<GpuRenderPassTimestampWrites> TimestampWrites;
 

@@ -9,7 +9,7 @@ namespace SH
 {
 	GizmoShader::GizmoShader(const std::set<FString>& VariantDefinitions)
 	{
-		GpuBindGroupLayoutBuilder LayoutBuilder{BindingContext::PassSlot};
+		GpuBindGroupLayoutBuilder LayoutBuilder{1};
 		UbBuilder.AddMatrix4x4f(TEXT("ViewProjection"));
 		UbBuilder.AddVector3f(TEXT("GizmoCenter"));
 		UbBuilder.AddFloat(TEXT("GizmoScale"));
@@ -18,9 +18,9 @@ namespace SH
 		UbBuilder.AddVector3f(TEXT("CameraPos"));
 		UbBuilder.AddVector2f(TEXT("ViewportSize"));
 		LayoutBuilder.AddUniformBuffer(TEXT("GizmoUb"), UbBuilder, BindingShaderStage::Vertex);
-		BindGroupLayout = LayoutBuilder.Build();
+		ShaderBindGroupLayout = LayoutBuilder.Build();
 
-		FString ExtraDecl = BindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL);
+		FString ExtraDecl = ShaderBindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL);
 
 		auto CompileShader = [&](const FString& FileName, const TCHAR* EntryPoint, ShaderType Type) -> TRefCountPtr<GpuShader> {
 			auto Shader = GGpuRhi->CreateShaderFromFile({
@@ -35,15 +35,15 @@ namespace SH
 			return Shader;
 		};
 
-		MoveVs = CompileShader(TEXT("GizmoMove.hlsl"), TEXT("MoveVS"), ShaderType::Vertex);
-		MoveArrowVs = CompileShader(TEXT("GizmoMove.hlsl"), TEXT("MoveArrowVS"), ShaderType::Vertex);
-		MovePlaneVs = CompileShader(TEXT("GizmoMove.hlsl"), TEXT("MovePlaneVS"), ShaderType::Vertex);
-		RotateVs = CompileShader(TEXT("GizmoRotate.hlsl"), TEXT("RotateVS"), ShaderType::Vertex);
-		ScaleVs = CompileShader(TEXT("GizmoScale.hlsl"), TEXT("ScaleVS"), ShaderType::Vertex);
-		ScaleCubeVs = CompileShader(TEXT("GizmoScale.hlsl"), TEXT("ScaleCubeVS"), ShaderType::Vertex);
-		ScaleAllVs = CompileShader(TEXT("GizmoScale.hlsl"), TEXT("ScaleAllVS"), ShaderType::Vertex);
+		MoveVs = CompileShader(TEXT("ShaderHelper/GizmoMove.hlsl"), TEXT("MoveVS"), ShaderType::Vertex);
+		MoveArrowVs = CompileShader(TEXT("ShaderHelper/GizmoMove.hlsl"), TEXT("MoveArrowVS"), ShaderType::Vertex);
+		MovePlaneVs = CompileShader(TEXT("ShaderHelper/GizmoMove.hlsl"), TEXT("MovePlaneVS"), ShaderType::Vertex);
+		RotateVs = CompileShader(TEXT("ShaderHelper/GizmoRotate.hlsl"), TEXT("RotateVS"), ShaderType::Vertex);
+		ScaleVs = CompileShader(TEXT("ShaderHelper/GizmoScale.hlsl"), TEXT("ScaleVS"), ShaderType::Vertex);
+		ScaleCubeVs = CompileShader(TEXT("ShaderHelper/GizmoScale.hlsl"), TEXT("ScaleCubeVS"), ShaderType::Vertex);
+		ScaleAllVs = CompileShader(TEXT("ShaderHelper/GizmoScale.hlsl"), TEXT("ScaleAllVS"), ShaderType::Vertex);
 
-		Ps = CompileShader(TEXT("GizmoCommon.hlsl"), TEXT("MainPS"), ShaderType::Pixel);
+		Ps = CompileShader(TEXT("ShaderHelper/GizmoCommon.hlsl"), TEXT("MainPS"), ShaderType::Pixel);
 	}
 
 	TRefCountPtr<GpuBindGroup> GizmoShader::GetBindGroup(const FMatrix44f& ViewProjection,
@@ -51,7 +51,7 @@ namespace SH
 		const FMatrix44f& GizmoOrientation, const Vector3f& CameraPos,
 		const FVector2f& ViewportSize)
 	{
-		GpuBindGroupBuilder Builder{BindGroupLayout};
+		GpuBindGroupBuilder Builder{ShaderBindGroupLayout};
 		TUniquePtr<UniformBuffer> Ub = UbBuilder.Build();
 		Ub->GetMember<FMatrix44f>(TEXT("ViewProjection")) = ViewProjection;
 		Ub->GetMember<Vector3f>(TEXT("GizmoCenter")) = GizmoCenter;

@@ -9,25 +9,25 @@ namespace SH
 {
 	SceneGridShader::SceneGridShader(const std::set<FString>& VariantDefinitions)
 	{
-		GpuBindGroupLayoutBuilder LayoutBuilder{BindingContext::PassSlot};
+		GpuBindGroupLayoutBuilder LayoutBuilder{1};
 		UbBuilder.AddMatrix4x4f(TEXT("ViewProjection"));
 		UbBuilder.AddVector3f(TEXT("CameraPos"));
 		UbBuilder.AddFloat(TEXT("GridSize"));
 		UbBuilder.AddFloat(TEXT("GridSpacing"));
 		LayoutBuilder.AddUniformBuffer(TEXT("SceneGridUb"), UbBuilder, BindingShaderStage::Vertex | BindingShaderStage::Pixel);
-		BindGroupLayout = LayoutBuilder.Build();
+		ShaderBindGroupLayout = LayoutBuilder.Build();
 
-		FString ExtraDecl = BindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL);
+		FString ExtraDecl = ShaderBindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL);
 
 		GridVs = GGpuRhi->CreateShaderFromFile({
-			.FileName = PathHelper::ShaderDir() / "SceneGrid.hlsl",
+			.FileName = PathHelper::ShaderDir() / "ShaderHelper/SceneGrid.hlsl",
 			.Type = ShaderType::Vertex,
 			.EntryPoint = "MainVS",
 			.ExtraDecl = ExtraDecl,
 		});
 
 		Ps = GGpuRhi->CreateShaderFromFile({
-			.FileName = PathHelper::ShaderDir() / "SceneGrid.hlsl",
+			.FileName = PathHelper::ShaderDir() / "ShaderHelper/SceneGrid.hlsl",
 			.Type = ShaderType::Pixel,
 			.EntryPoint = "MainPS",
 			.ExtraDecl = ExtraDecl,
@@ -42,7 +42,7 @@ namespace SH
 
 	TRefCountPtr<GpuBindGroup> SceneGridShader::GetBindGroup(const FMatrix44f& ViewProjection, const Vector3f& CameraPos, float GridSize, float GridSpacing)
 	{
-		GpuBindGroupBuilder Builder{BindGroupLayout};
+		GpuBindGroupBuilder Builder{ShaderBindGroupLayout};
 		TUniquePtr<UniformBuffer> Ub = UbBuilder.Build();
 		Ub->GetMember<FMatrix44f>(TEXT("ViewProjection")) = ViewProjection;
 		Ub->GetMember<Vector3f>(TEXT("CameraPos")) = CameraPos;

@@ -157,6 +157,35 @@ namespace SH
 			return TEXT("Texture2D");
 		}
 
+		bool IsTextureShaderInputBinding(BindingType BindingTypeValue)
+		{
+			switch (BindingTypeValue)
+			{
+			case BindingType::Texture:
+			case BindingType::TextureCube:
+			case BindingType::Texture3D:
+			case BindingType::CombinedTextureSampler:
+			case BindingType::CombinedTextureCubeSampler:
+			case BindingType::CombinedTexture3DSampler:
+				return true;
+			default:
+				return false;
+			}
+		}
+
+		GpuTexture* GetConnectedOverrideTexture(GraphPin* OverridePin)
+		{
+			if (!OverridePin || !OverridePin->SourcePin.IsValid())
+			{
+				return nullptr;
+			}
+
+			if (auto* TexturePin = DynamicCast<GpuTexturePin>(OverridePin)) return TexturePin->GetValue();
+			if (auto* CubemapPin = DynamicCast<GpuCubemapPin>(OverridePin)) return CubemapPin->GetValue();
+			if (auto* Texture3DPin = DynamicCast<GpuTexture3DPin>(OverridePin)) return Texture3DPin->GetValue();
+			return nullptr;
+		}
+
 		void BreakOverridePinLink(GraphPin* Pin)
 		{
 			if (!Pin || !Pin->SourcePin.IsValid())
@@ -682,12 +711,7 @@ namespace SH
 		Options.TextureOverrideResolver = [this](const GpuShaderLayoutBinding& Binding) -> GpuTexture* {
 				if (GraphPin* OverridePin = FindOverridePin(Binding.Name, TEXT(""), Binding.Stage))
 				{
-					if (OverridePin->SourcePin.IsValid())
-					{
-						if (auto* TexturePin = DynamicCast<GpuTexturePin>(OverridePin)) return TexturePin->GetValue();
-						if (auto* CubemapPin = DynamicCast<GpuCubemapPin>(OverridePin)) return CubemapPin->GetValue();
-						if (auto* Texture3DPin = DynamicCast<GpuTexture3DPin>(OverridePin)) return Texture3DPin->GetValue();
-					}
+					if (GpuTexture* Texture = GetConnectedOverrideTexture(OverridePin)) return Texture;
 				}
 
 				if (const auto* Override = OverrideSlots.FindByPredicate([&](const MaterialOverrideSlot& Slot) {
@@ -705,19 +729,86 @@ namespace SH
 		BuildMaterialBindGroups(*MaterialAsset, BindGroupLayouts, BindGroups, UniformBuffers, Options);
 	}
 
+	bool MeshRenderObject::UsesTextureAsShaderInput(GpuTexture* Texture, FString& OutBindingName) const
+	{
+		if (!MaterialAsset || bDrawMaterialError)
+		{
+			return false;
+		}
+
+		for (const MaterialBindingResourceDefault& ResourceDefault : MaterialAsset->BindingResourceDefaults)
+		{
+			if (!IsTextureShaderInputBinding(ResourceDefault.BindingType))
+			{
+				continue;
+			}
+
+			GpuTexture* ShaderInputTexture = nullptr;
+			if (GraphPin* OverridePin = FindOverridePin(ResourceDefault.BindingName, TEXT(""), ResourceDefault.Stage))
+			{
+				ShaderInputTexture = GetConnectedOverrideTexture(OverridePin);
+			}
+
+			if (ShaderInputTexture && ShaderInputTexture == Texture)
+			{
+				OutBindingName = ResourceDefault.BindingName;
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	bool MeshRenderObject::BuildPipeline(const TArray<GpuFormat>& ColorFormats, GpuFormat DepthFormat, uint32 SampleCount)
 	{
-		if (!MaterialAsset || !MaterialAsset->VertexShaderAsset || !MaterialAsset->PixelShaderAsset) return false;
+		const MeshPassNode* OwnerNode = dynamic_cast<MeshPassNode*>(GetOuter());
+		const FString NodeName = OwnerNode ? OwnerNode->ObjectName.ToString() : TEXT("<unknown>");
+		const FString RenderObjectName = ObjectName.ToString();
+
+		if (!MaterialAsset)
+		{
+			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" MeshRenderObject:\"%s\" cannot build pipeline because no material is assigned."), *NodeName, *RenderObjectName);
+			return false;
+		}
+
+		const FString MaterialPath = MaterialAsset->GetPath();
+		const FString MaterialName = MaterialPath.IsEmpty() ? MaterialAsset->ObjectName.ToString() : MaterialPath;
+		if (!MaterialAsset->VertexShaderAsset)
+		{
+			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" MeshRenderObject:\"%s\" material \"%s\" cannot build pipeline because the vertex shader asset is missing."), *NodeName, *RenderObjectName, *MaterialName);
+			return false;
+		}
+		if (!MaterialAsset->PixelShaderAsset)
+		{
+			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" MeshRenderObject:\"%s\" material \"%s\" cannot build pipeline because the pixel shader asset is missing."), *NodeName, *RenderObjectName, *MaterialName);
+			return false;
+		}
 
 		GpuShader* Vs = MaterialAsset->VertexShaderAsset->GetCompiledShader(ShaderType::Vertex);
 		GpuShader* Ps = MaterialAsset->PixelShaderAsset->GetCompiledShader(ShaderType::Pixel);
-		if (!Vs || !Ps) return false;
-		if (Vs->GetShaderLanguage() != Ps->GetShaderLanguage()) return false;
+		if (!Vs)
+		{
+			const FString VertexShaderPath = MaterialAsset->VertexShaderAsset->GetPath();
+			const FString VertexShaderName = VertexShaderPath.IsEmpty() ? MaterialAsset->VertexShaderAsset->ObjectName.ToString() : VertexShaderPath;
+			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" MeshRenderObject:\"%s\" material \"%s\" cannot build pipeline because the %s shader is unavailable. Shader asset: %s"), *NodeName, *RenderObjectName, *MaterialName, ANSI_TO_TCHAR(magic_enum::enum_name(ShaderType::Vertex).data()), *VertexShaderName);
+			return false;
+		}
+		if (!Ps)
+		{
+			const FString PixelShaderPath = MaterialAsset->PixelShaderAsset->GetPath();
+			const FString PixelShaderName = PixelShaderPath.IsEmpty() ? MaterialAsset->PixelShaderAsset->ObjectName.ToString() : PixelShaderPath;
+			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" MeshRenderObject:\"%s\" material \"%s\" cannot build pipeline because the %s shader is unavailable. Shader asset: %s"), *NodeName, *RenderObjectName, *MaterialName, ANSI_TO_TCHAR(magic_enum::enum_name(ShaderType::Pixel).data()), *PixelShaderName);
+			return false;
+		}
+		if (Vs->GetShaderLanguage() != Ps->GetShaderLanguage())
+		{
+			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" MeshRenderObject:\"%s\" material \"%s\" cannot build pipeline because shader languages differ (VS=%d, PS=%d)."), *NodeName, *RenderObjectName, *MaterialName, static_cast<int32>(Vs->GetShaderLanguage()), static_cast<int32>(Ps->GetShaderLanguage()));
+			return false;
+		}
 
 		if (BindGroupLayouts.IsEmpty())
 		{
 			BuildBindGroupFromMaterial();
-			if (BindGroupLayouts.IsEmpty()) return false;
 		}
 
 		GpuVertexLayoutDesc VertexLayoutDesc = BuildMaterialMeshVertexLayout(*MaterialAsset);
@@ -751,8 +842,19 @@ namespace SH
 				: TOptional<DepthStencilStateDesc>(),
 		};
 
-		try { Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(Desc); }
-		catch (const std::runtime_error&) { return false; }
+		try
+		{
+			Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(Desc);
+		}
+		catch (const std::runtime_error& Error)
+		{
+			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" MeshRenderObject:\"%s\" material \"%s\" failed to create render pipeline state: %s"), *NodeName, *RenderObjectName, *MaterialName, UTF8_TO_TCHAR(Error.what()));
+			return false;
+		}
+		if (!Pipeline.IsValid())
+		{
+			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" MeshRenderObject:\"%s\" material \"%s\" failed to create a valid render pipeline state."), *NodeName, *RenderObjectName, *MaterialName);
+		}
 		return Pipeline.IsValid();
 	}
 
@@ -798,13 +900,29 @@ namespace SH
 		}
 
 		bool bHasResourceOverride = false;
+		TSet<GpuTexture*> ConnectedOverrideTextures;
 		for (const auto& Slot : OverrideSlots)
 		{
 			if (Slot.bIsResource)
 			{
 				bHasResourceOverride = true;
-				break;
+				if (GraphPin* OverridePin = FindOverridePin(Slot.BindingName, TEXT(""), Slot.Stage))
+				{
+					if (GpuTexture* Texture = GetConnectedOverrideTexture(OverridePin))
+					{
+						ConnectedOverrideTextures.Add(Texture);
+					}
+				}
 			}
+		}
+		if (!ConnectedOverrideTextures.IsEmpty())
+		{
+			TArray<GpuBarrierInfo> BarrierInfos;
+			for (GpuTexture* Texture : ConnectedOverrideTextures)
+			{
+				BarrierInfos.Emplace(Texture, GpuResourceState::ShaderResourceRead);
+			}
+			Recorder->Barriers(BarrierInfos);
 		}
 		if (bHasResourceOverride)
 		{

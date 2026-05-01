@@ -8,6 +8,8 @@
 
 namespace FW
 {
+    class MtlCmdRecorder;
+
     class MtlRenderStateCache
     {
     public:
@@ -78,8 +80,9 @@ namespace FW
     {
         friend class MtlCmdRecorder;
     public:
-        MtlRenderPassRecorder(MTLRenderCommandEncoderPtr InCmdEncoder, MTLRenderPassDescriptorPtr InRenderPassDesc)
-            : CmdEncoder(MoveTemp(InCmdEncoder))
+        MtlRenderPassRecorder(MtlCmdRecorder* InOwner, MTLRenderCommandEncoderPtr InCmdEncoder, MTLRenderPassDescriptorPtr InRenderPassDesc)
+            : Owner(InOwner)
+            , CmdEncoder(MoveTemp(InCmdEncoder))
             , StateCache(MoveTemp(InRenderPassDesc))
         {}
         
@@ -94,8 +97,10 @@ namespace FW
         void SetViewPort(const GpuViewPortDesc& InViewPortDesc) override;
 		void SetScissorRect(const GpuScissorRectDesc& InScissorRectDes) override;
         void SetBindGroups(const TArray<GpuBindGroup*>& BindGroups) override;
+        void Barriers(const TArray<GpuBarrierInfo>& BarrierInfos) override;
         
     private:
+        MtlCmdRecorder* Owner;
         MTLRenderCommandEncoderPtr CmdEncoder;
         MtlRenderStateCache StateCache;
         MTL::CounterSampleBuffer* TimestampSampleBuffer = nullptr;
