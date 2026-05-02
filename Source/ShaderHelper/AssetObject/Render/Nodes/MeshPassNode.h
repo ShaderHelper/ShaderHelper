@@ -31,20 +31,17 @@ namespace SH
 	struct MeshPassColorRT
 	{
 		MeshPassColorFormat Format = MeshPassColorFormat::B8G8R8A8_UNORM;
-		bool bClearEnabled = false;
 		FW::Vector4f ClearValue = FW::Vector4f(0, 0, 0, 1);
 
 		bool operator==(const MeshPassColorRT& Other) const
 		{
 			return Format == Other.Format
-				&& bClearEnabled == Other.bClearEnabled
 				&& ClearValue == Other.ClearValue;
 		}
 
 		friend FArchive& operator<<(FArchive& Ar, MeshPassColorRT& ColorRT)
 		{
 			Ar << ColorRT.Format;
-			Ar << ColorRT.bClearEnabled;
 			Ar << ColorRT.ClearValue;
 			return Ar;
 		}

@@ -20,7 +20,6 @@
 
 #include <Widgets/Views/SListView.h>
 #include <Widgets/SViewport.h>
-#include <Widgets/Input/SCheckBox.h>
 #include <Widgets/Input/SComboBox.h>
 #include <Widgets/Input/SButton.h>
 #include <Widgets/Layout/SBox.h>
@@ -339,6 +338,8 @@ namespace SH
 
 		TArray<TRefCountPtr<GpuTexture>> ActiveColorRTs;
 		ActiveColorRTs.SetNum(CachedColorRTs.Num());
+		TArray<uint8> ColorInputConnected;
+		ColorInputConnected.SetNumZeroed(CachedColorRTs.Num());
 		for (int32 i = 0; i < CachedColorRTs.Num(); ++i)
 		{
 			ActiveColorRTs[i] = CachedColorRTs[i];
@@ -371,6 +372,7 @@ namespace SH
 			}
 
 			ActiveColorRTs[i] = InputTexture;
+			ColorInputConnected[i] = 1;
 		}
 
 		TRefCountPtr<GpuTexture> ActiveDepthRT = CachedDepthRT;
@@ -447,7 +449,7 @@ namespace SH
 		{
 			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{
 				ActiveColorRTs[i]->GetDefaultView(),
-				ColorRTs[i].bClearEnabled ? RenderTargetLoadAction::Clear : RenderTargetLoadAction::Load,
+				ColorInputConnected[i] ? RenderTargetLoadAction::Load : RenderTargetLoadAction::Clear,
 				RenderTargetStoreAction::Store,
 				ColorRTs[i].ClearValue
 			});
@@ -992,33 +994,15 @@ namespace SH
 
 		auto RTCat = MakeShared<PropertyCategory>(this, LOCALIZATION("MeshPassRenderTargets").ToString());
 		{
-			auto ConfigureClearProperty = [this](PropertyData& InPropertyData, MeshPassColorRT& ColorRT)
+			auto ConfigureClearProperty = [](PropertyData& InPropertyData)
 			{
 				if (!InPropertyData.GetDisplayName().EqualTo(LOCALIZATION("Clear")) || !InPropertyData.IsOfType<PropertyVector4fItem>())
 				{
 					return;
 				}
 
-				bool* ClearEnabled = &ColorRT.bClearEnabled;
 				PropertyVector4fItem* ClearItem = static_cast<PropertyVector4fItem*>(&InPropertyData);
 				ClearItem->SetUseColorBlockPicker(true);
-				ClearItem->SetValueEnabled([ClearEnabled] { return *ClearEnabled; });
-				ClearItem->SetEmbedWidget(
-					SNew(SCheckBox)
-					.IsChecked_Lambda([ClearEnabled] {
-						return *ClearEnabled ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
-						})
-					.OnCheckStateChanged_Lambda([this, ClearEnabled, ClearItem](ECheckBoxState InState) {
-						const bool bNewEnabled = InState == ECheckBoxState::Checked;
-						if (*ClearEnabled != bNewEnabled && CanChangeProperty(ClearItem))
-						{
-							ClearItem->BeginEdit();
-							*ClearEnabled = bNewEnabled;
-							PostPropertyChanged(ClearItem);
-							ClearItem->EndEdit();
-						}
-					}), true
-				);
 			};
 
 			auto ColorRTArrayItem = MakeShared<PropertyArrayItem>(
@@ -1045,7 +1029,7 @@ namespace SH
 						TArray<TSharedRef<PropertyData>> PropertyDatas = FW::GeneratePropertyDatas(this, PropertyMember, &ColorRTs[ElementIndex], true);
 						for (const TSharedRef<PropertyData>& PropertyData : PropertyDatas)
 						{
-							ConfigureClearProperty(PropertyData.Get(), ColorRTs[ElementIndex]);
+							ConfigureClearProperty(PropertyData.Get());
 							ElementItem->AddChild(PropertyData);
 						}
 					}
