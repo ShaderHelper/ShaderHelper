@@ -27,7 +27,7 @@ namespace SH
 		TArray<TSharedRef<FW::PropertyData>> GeneratePropertyDatas() override;
 
 		FString GetFullContent() const override;
-		int32 GetExtraLineNum() const override { return 0; }
+		int32 GetExtraLineNum() const override;
 		ShaderDesc GetShaderDesc(const FString& InContent, FW::ShaderType InStage = FW::ShaderType::Vertex) const override;
 
 		bool CanChangeProperty(FW::PropertyData* InProperty) override;

@@ -2,7 +2,7 @@
 
 namespace FW
 {
-	class SGraphPin : public SCompoundWidget
+	class FRAMEWORK_API SGraphPin : public SCompoundWidget
 	{
 	public:
 		SLATE_BEGIN_ARGS(SGraphPin) : _PinData(nullptr)

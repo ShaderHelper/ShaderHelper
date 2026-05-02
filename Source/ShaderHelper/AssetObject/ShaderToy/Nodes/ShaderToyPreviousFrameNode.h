@@ -28,7 +28,7 @@ namespace SH
 		void InitPins();
 		void Serialize(FArchive& Ar) override;
 		void PostLoad() override;
-		TSharedPtr<SWidget> ExtraNodeWidget() override;
+		TSharedPtr<SWidget> ExtraNodeWidget(FW::SGraphNode* OwnerWidget) override;
 		TArray<TSharedRef<FW::PropertyData>> GeneratePropertyDatas() override;
 		FSlateColor GetNodeColor() const override { return FLinearColor{ 0.27f, 0.13f, 0.0f }; }
 		FW::ExecRet Exec(FW::GraphExecContext& Context) override;
@@ -38,8 +38,8 @@ namespace SH
 		void UpdatePassNodes();
 
 	private:
-		FGuid PassNode;
-		TArray<TSharedPtr<FGuid>> AllPassNodes;
+		FW::ObserverObjectPtr<ShaderToyPassNode> PassNode;
+		TArray<TSharedPtr<FW::ObserverObjectPtr<ShaderToyPassNode>>> AllPassNodes;
 		TRefCountPtr<FW::GpuTexture> PreFramePassTex;
 	};
 }

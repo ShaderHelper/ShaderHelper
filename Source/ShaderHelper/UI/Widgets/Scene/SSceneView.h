@@ -9,18 +9,19 @@ namespace SH
 {
 	using SceneObjectPtr = FW::ObjectPtr<SceneObject>;
 
-	struct SceneObjectListItem
+	struct SceneObjectTreeItem
 	{
-		explicit SceneObjectListItem(SceneObjectPtr InObject)
+		explicit SceneObjectTreeItem(SceneObjectPtr InObject)
 			: Object(MoveTemp(InObject))
 		{
 		}
 
 		SceneObjectPtr Object;
 		TSharedPtr<SInlineEditableTextBlock> InlineTextBlock;
+		TArray<TSharedPtr<SceneObjectTreeItem>> Children;
 	};
 
-	using SceneObjectListItemPtr = TSharedPtr<SceneObjectListItem>;
+	using SceneObjectTreeItemPtr = TSharedPtr<SceneObjectTreeItem>;
 
 	enum class GizmoMode : int32
 	{
@@ -48,11 +49,14 @@ namespace SH
 		void Construct(const FArguments& InArgs);
 		void SetRender(Render* InRender);
 		Render* GetRender() const { return CurRender; }
-		SceneObject* GetSelectedObject() const { return SelectedObject.Get(); }
-		void SelectObject(SceneObject* InObject);
+		TArray<SceneObject*> GetSelectedObjects() const;
+		void SelectObjects(const TArray<SceneObject*>& InObjects, bool bAdditive = false);
+		void SelectObject(SceneObject* InObject, bool bAdditive = false);
 		void RefreshSceneItems();
+		void DeleteSelected();
+		void BeginRenameSelected();
 
-		SceneUndoManager* GetUndoManager();
+		SceneUndoManager& GetUndoManager();
 		void Undo();
 		void Redo();
 		bool CanUndo() const;
@@ -61,23 +65,34 @@ namespace SH
 		void OnDragEnter(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent) override;
 		void OnDragLeave(const FDragDropEvent& DragDropEvent) override;
 		FReply OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent) override;
+		FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
+
+		bool IsObjectSelected(const SceneObject* Obj) const;
+		void ReparentSceneObjects(const TArray<SceneObjectTreeItemPtr>& Items, SceneObject* NewParent);
 
 	private:
+		void SelectObjectsInternal(const TArray<SceneObject*>& InObjects);
 		void SelectObjectInternal(SceneObject* InObject);
-		TSharedRef<ITableRow> GenerateRowForItem(SceneObjectListItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
+		TSharedRef<ITableRow> GenerateRowForItem(SceneObjectTreeItemPtr Item, const TSharedRef<STableViewBase>& OwnerTable);
+		void GetChildrenForItem(SceneObjectTreeItemPtr Item, TArray<SceneObjectTreeItemPtr>& OutChildren);
 		TSharedRef<SWidget> MakeAddMenu();
+		TSharedRef<SWidget> MakeAddChildMenu();
 		TSharedPtr<SWidget> CreateContextMenu();
-		void OnSelectionChanged(SceneObjectListItemPtr Item, ESelectInfo::Type SelectInfo);
-		void DeleteSelected();
-		void BeginRenameSelected();
+		void OnSelectionChanged(SceneObjectTreeItemPtr Item, ESelectInfo::Type SelectInfo);
+
+		template<typename T>
+		void DoAddSceneObject(SceneObject* InParent = nullptr);
 
 	private:
 		Render* CurRender = nullptr;
-		TArray<SceneObjectListItemPtr> SceneItems;
-		TSharedPtr<SListView<SceneObjectListItemPtr>> ListView;
-		SceneObjectPtr SelectedObject;
+		TArray<SceneObjectTreeItemPtr> RootItems;
+		TMap<SceneObject*, SceneObjectTreeItemPtr> AllItems;
+		TSharedPtr<STreeView<SceneObjectTreeItemPtr>> TreeView;
 
-		TMap<Render*, TUniquePtr<SceneUndoManager>> UndoManagers;
+		SceneUndoManager UndoManager;
 		bool bIgnoreSelectionChanged = false;
+		TArray<SceneObjectPtr> LastSelectedObjects;
+		TSharedPtr<FUICommandList> CommandList;
 	};
 }
+

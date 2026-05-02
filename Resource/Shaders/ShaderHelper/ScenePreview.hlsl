@@ -5,14 +5,12 @@ struct VsInput
 	float3 Position : POSITION;
 	float3 Normal : NORMAL;
 	float2 UV : TEXCOORD0;
-	float4 Color : COLOR;
 };
 
 struct VsOutput
 {
 	float3 WorldNormal : NORMAL;
 	float2 UV : TEXCOORD0;
-	float4 Color : COLOR;
 	float3 WorldPos : TEXCOORD1;
 	float4 Position : SV_POSITION;
 };
@@ -25,7 +23,6 @@ VsOutput MainVS(VsInput Input)
 	Output.Position = mul(WorldPos, ViewProjection);
 	Output.WorldNormal = normalize(mul(float4(Input.Normal, 0.0), WorldMatrix).xyz);
 	Output.UV = Input.UV;
-	Output.Color = Input.Color;
 	return Output;
 }
 
@@ -42,6 +39,6 @@ float4 MainPS(VsOutput Input) : SV_Target
 	float3 V = normalize(CameraPos - Input.WorldPos);
 	float Rim = pow(1.0 - saturate(dot(N, V)), 3.0) * 0.3;
 	
-	float3 FinalColor = (Ambient + Diffuse + Rim) * Input.Color.rgb;
+	float3 FinalColor = (Ambient + Diffuse + Rim);
 	return float4(FinalColor, 1.0);
 }

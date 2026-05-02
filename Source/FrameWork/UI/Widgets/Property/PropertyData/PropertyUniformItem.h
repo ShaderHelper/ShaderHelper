@@ -14,11 +14,50 @@ namespace FW
 			, Writable(InWritable)
         {}
 
+		void SetUseColorBlockPicker(bool bInUseColorBlockPicker) { bUseColorBlockPicker = bInUseColorBlockPicker; }
+
         TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override;
+
+	protected:
+		TSharedPtr<SWidget> CreateContextMenu() override
+		{
+			if constexpr (std::is_same_v<T, Vector3f> || std::is_same_v<T, Vector4f>)
+			{
+				FMenuBuilder MenuBuilder(true, nullptr);
+				MenuBuilder.AddMenuEntry(
+					FText::FromString(TEXT("SpinBox")),
+					FText::GetEmpty(),
+					FSlateIcon(),
+					FUIAction(
+						FExecuteAction::CreateLambda([this] { bUseColorBlockPicker = false; }),
+						FCanExecuteAction(),
+						FIsActionChecked::CreateLambda([this] { return !bUseColorBlockPicker; })
+					),
+					NAME_None,
+					EUserInterfaceActionType::ToggleButton
+				);
+				MenuBuilder.AddMenuEntry(
+					FText::FromString(TEXT("Color Picker")),
+					FText::GetEmpty(),
+					FSlateIcon(),
+					FUIAction(
+						FExecuteAction::CreateLambda([this] { bUseColorBlockPicker = true; }),
+						FCanExecuteAction(),
+						FIsActionChecked::CreateLambda([this] { return bUseColorBlockPicker; })
+					),
+					NAME_None,
+					EUserInterfaceActionType::ToggleButton
+				);
+				return MenuBuilder.MakeWidget();
+			}
+
+			return nullptr;
+		}
 
     private:
         UniformBufferMemberWrapper<T> ValueRef;
 		TAttribute<bool> Writable;
+		bool bUseColorBlockPicker = false;
     };
 
 	bool IsProperyUniformItem(PropertyData* InProprety)
@@ -112,51 +151,62 @@ namespace FW
 	inline TSharedRef<ITableRow> PropertyUniformItem<Vector3f>::GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable)
 	{
 		auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
-		auto ValueWidget = SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot()
-			[
-				SNew(SSpinBox<float>)
+		auto MakeSpinBox = [this](int32 ComponentIdx) {
+			return SNew(SSpinBox<float>)
 				.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
-				.OnValueChanged_Lambda([this](float NewValue) {
-					Vector3f& Value = ValueRef;
-					if(Value.x != NewValue && Owner->CanChangeProperty(this))
+				.OnValueChanged_Lambda([this, ComponentIdx](float NewValue) {
+					Vector3f CurrentValue = ValueRef;
+					float* ComponentValue = ComponentIdx == 0 ? &CurrentValue.x : ComponentIdx == 1 ? &CurrentValue.y : &CurrentValue.z;
+					if (*ComponentValue != NewValue && Owner->CanChangeProperty(this))
 					{
 						BeginEdit();
-						ValueRef = {NewValue, Value.y, Value.z};
+						*ComponentValue = NewValue;
+						ValueRef = CurrentValue;
 						Owner->PostPropertyChanged(this);
 					}
 				})
-				.Value_Lambda([this] { return ((Vector3f)ValueRef).x; })
+				.Value_Lambda([this, ComponentIdx] {
+					Vector3f CurrentValue = ValueRef;
+					return ComponentIdx == 0 ? CurrentValue.x : ComponentIdx == 1 ? CurrentValue.y : CurrentValue.z;
+				});
+		};
+
+		auto ValueWidget = SNew(SWidgetSwitcher)
+			.WidgetIndex_Lambda([this] { return bUseColorBlockPicker ? 1 : 0; })
+			+ SWidgetSwitcher::Slot()
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot()
+				[
+					MakeSpinBox(0)
+				]
+				+ SHorizontalBox::Slot()
+				[
+					MakeSpinBox(1)
+				]
+				+ SHorizontalBox::Slot()
+				[
+					MakeSpinBox(2)
+				]
 			]
-			+ SHorizontalBox::Slot()
+			+ SWidgetSwitcher::Slot()
 			[
-				SNew(SSpinBox<float>)
-				.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
-				.OnValueChanged_Lambda([this](float NewValue) {
-					Vector3f& Value = ValueRef;
-					if(Value.y != NewValue && Owner->CanChangeProperty(this))
+				SNew(SShColorBlockPicker, TWeakPtr<SWindow>())
+				.UseSRGB(false)
+				.Color_Lambda([this] {
+					Vector3f CurrentValue = ValueRef;
+					return FLinearColor{ CurrentValue.x, CurrentValue.y, CurrentValue.z, 1.0f };
+				})
+				.OnColorChanged_Lambda([this](const FLinearColor& InColor) {
+					Vector3f CurrentValue = ValueRef;
+					if ((CurrentValue.x != InColor.R || CurrentValue.y != InColor.G || CurrentValue.z != InColor.B) && Owner->CanChangeProperty(this))
 					{
 						BeginEdit();
-						ValueRef = {Value.x, NewValue, Value.z};
+						ValueRef = { InColor.R, InColor.G, InColor.B };
 						Owner->PostPropertyChanged(this);
+						EndEdit();
 					}
 				})
-				.Value_Lambda([this] { return ((Vector3f&)ValueRef).y; })
-			]
-			+ SHorizontalBox::Slot()
-			[
-				SNew(SSpinBox<float>)
-				.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
-				.OnValueChanged_Lambda([this](float NewValue) {
-					Vector3f& Value = ValueRef;
-					if(Value.z != NewValue && Owner->CanChangeProperty(this))
-					{
-						BeginEdit();
-						ValueRef = {Value.x, Value.y, NewValue};
-						Owner->PostPropertyChanged(this);
-					}
-				})
-				.Value_Lambda([this] { return ((Vector3f&)ValueRef).z; })
 			];
 		ValueWidget->SetEnabled(Writable);
 		Item->AddWidget(MoveTemp(ValueWidget));
@@ -167,74 +217,90 @@ namespace FW
 	inline TSharedRef<ITableRow> PropertyUniformItem<Vector4f>::GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable)
 	{
 		auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
-		auto ValueWidget = SNew(SVerticalBox)
-			+SVerticalBox::Slot()
+		auto MakeSpinBox = [this](int32 ComponentIdx) {
+			return SNew(SSpinBox<float>)
+				.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
+				.OnValueChanged_Lambda([this, ComponentIdx](float NewValue) {
+					Vector4f CurrentValue = ValueRef;
+					float* ComponentValue = nullptr;
+					switch (ComponentIdx)
+					{
+					case 0: ComponentValue = &CurrentValue.x; break;
+					case 1: ComponentValue = &CurrentValue.y; break;
+					case 2: ComponentValue = &CurrentValue.z; break;
+					default: ComponentValue = &CurrentValue.w; break;
+					}
+					if (*ComponentValue != NewValue && Owner->CanChangeProperty(this))
+					{
+						BeginEdit();
+						*ComponentValue = NewValue;
+						ValueRef = CurrentValue;
+						Owner->PostPropertyChanged(this);
+					}
+				})
+				.Value_Lambda([this, ComponentIdx] {
+					Vector4f CurrentValue = ValueRef;
+					switch (ComponentIdx)
+					{
+					case 0: return CurrentValue.x;
+					case 1: return CurrentValue.y;
+					case 2: return CurrentValue.z;
+					default: return CurrentValue.w;
+					}
+				});
+		};
+
+		auto ValueWidget = SNew(SWidgetSwitcher)
+			.WidgetIndex_Lambda([this] { return bUseColorBlockPicker ? 1 : 0; })
+			+ SWidgetSwitcher::Slot()
 			[
-				SNew(SHorizontalBox)
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot()
+				[
+					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot()
 					[
-						SNew(SSpinBox<float>)
-							.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
-							.OnValueChanged_Lambda([this](float NewValue) {
-							Vector4f& Value = ValueRef;
-							if (Value.x != NewValue && Owner->CanChangeProperty(this))
-							{
-								BeginEdit();
-								ValueRef = { NewValue, Value.y, Value.z, Value.w };
-								Owner->PostPropertyChanged(this);
-							}
-								})
-							.Value_Lambda([this] { return ((Vector4f)ValueRef).x; })
+						MakeSpinBox(0)
 					]
 					+ SHorizontalBox::Slot()
 					[
-						SNew(SSpinBox<float>)
-							.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
-							.OnValueChanged_Lambda([this](float NewValue) {
-							Vector4f& Value = ValueRef;
-							if (Value.y != NewValue && Owner->CanChangeProperty(this))
-							{
-								BeginEdit();
-								ValueRef = { Value.x, NewValue, Value.z, Value.w };
-								Owner->PostPropertyChanged(this);
-							}
-								})
-							.Value_Lambda([this] { return ((Vector4f&)ValueRef).y; })
+						MakeSpinBox(1)
 					]
+				]
+				+ SVerticalBox::Slot()
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					[
+						MakeSpinBox(2)
+					]
+					+ SHorizontalBox::Slot()
+					[
+						MakeSpinBox(3)
+					]
+				]
 			]
-			+SVerticalBox::Slot()
+			+ SWidgetSwitcher::Slot()
 			[
-				SNew(SHorizontalBox)
-				+SHorizontalBox::Slot()
-				[
-					SNew(SSpinBox<float>)
-						.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
-						.OnValueChanged_Lambda([this](float NewValue) {
-						Vector4f& Value = ValueRef;
-						if (Value.z != NewValue && Owner->CanChangeProperty(this))
-						{
-							BeginEdit();
-							ValueRef = { Value.x, Value.y, NewValue, Value.w };
-							Owner->PostPropertyChanged(this);
-						}
-							})
-						.Value_Lambda([this] { return ((Vector4f&)ValueRef).z; })
-				]
-				+ SHorizontalBox::Slot()
-				[
-					SNew(SSpinBox<float>)
-						.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
-						.OnValueChanged_Lambda([this](float NewValue) {
-						Vector4f& Value = ValueRef;
-						if (Value.w != NewValue && Owner->CanChangeProperty(this))
-						{
-							BeginEdit();
-							ValueRef = { Value.x, Value.y, Value.z, NewValue };
-							Owner->PostPropertyChanged(this);
-						}
-							})
-						.Value_Lambda([this] { return ((Vector4f&)ValueRef).w; })
-				]
+				SNew(SShColorBlockPicker, TWeakPtr<SWindow>())
+				.UseSRGB(false)
+				.AlphaDisplayMode(EColorBlockAlphaDisplayMode::Separate)
+				.ShowBackgroundForAlpha(true)
+				.ShowAlpha(true)
+				.Color_Lambda([this] {
+					Vector4f CurrentValue = ValueRef;
+					return FLinearColor{ CurrentValue.x, CurrentValue.y, CurrentValue.z, CurrentValue.w };
+				})
+				.OnColorChanged_Lambda([this](const FLinearColor& InColor) {
+					Vector4f CurrentValue = ValueRef;
+					if ((CurrentValue.x != InColor.R || CurrentValue.y != InColor.G || CurrentValue.z != InColor.B || CurrentValue.w != InColor.A) && Owner->CanChangeProperty(this))
+					{
+						BeginEdit();
+						ValueRef = { InColor.R, InColor.G, InColor.B, InColor.A };
+						Owner->PostPropertyChanged(this);
+						EndEdit();
+					}
+				})
 			];
 		ValueWidget->SetEnabled(Writable);
 		Item->AddWidget(MoveTemp(ValueWidget));

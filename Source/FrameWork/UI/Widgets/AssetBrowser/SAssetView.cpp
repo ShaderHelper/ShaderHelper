@@ -209,13 +209,13 @@ namespace FW
                     {
                         if(!IsImportedAsset(MetaTypePtr) && MetaTypePtr->Constructor)
                         {
-							auto NewAsset = NewShObject<AssetObject>(MetaTypePtr, nullptr);
 							MenuBuilder.AddMenuEntry(
-								LOCALIZATION(GetRegisteredName(NewAsset->DynamicMetaType())),
+								LOCALIZATION(GetRegisteredName(MetaTypePtr)),
 								FText::GetEmpty(),
 								FSlateIcon(),
-								FUIAction(FExecuteAction::CreateLambda([NewAsset, this] {
+								FUIAction(FExecuteAction::CreateLambda([MetaTypePtr, this] {
 									int32 Number = 1;
+									auto NewAsset = NewShObject<AssetObject>(MetaTypePtr, nullptr);
 									FString GeneratedFileName = "New" + NewAsset->FileExtension();
 									FString SavedFileName = CurViewDirectory / GeneratedFileName + "." + NewAsset->FileExtension();
 									while (IFileManager::Get().FileExists(*SavedFileName))

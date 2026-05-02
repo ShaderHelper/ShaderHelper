@@ -6,6 +6,7 @@
 namespace SH
 {
 	class SceneObject;
+	class SSceneView;
 	enum class GizmoMode : int32;
 	enum class GizmoSpace : int32;
 
@@ -35,6 +36,8 @@ namespace SH
 	private:
 		void RenderPreview();
 		void RenderGraph();
+		bool IsScenePreviewActive() const;
+		void ResetScenePreviewInteractionState();
 
 		FReply OnMouseDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent);
 		FReply OnMouseUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent);
@@ -46,9 +49,13 @@ namespace SH
 		void OnDragLeave(const FDragDropEvent& DragDropEvent);
 		FReply OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent);
 		void UpdateCamera(float DeltaTime);
+		int32 DrawViewportOverlay(const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect,
+			FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const;
 
 		// Gizmo helpers
+		SSceneView* GetSceneViewWidget() const;
 		SceneObject* GetSelectedSceneObject() const;
+		FW::Vector3f GetGizmoPivot() const;
 		FVector2D WorldToScreen(const FW::Vector3f& WorldPos, const FVector2D& ViewportSize) const;
 		float PointToSegmentDistSq(const FVector2D& P, const FVector2D& A, const FVector2D& B) const;
 		GizmoAxis HitTestGizmo(const FVector2D& LocalMousePos, const FVector2D& ViewportSize) const;
@@ -63,6 +70,8 @@ namespace SH
 
 		// Picking
 		SceneObject* PickSceneObject(const FVector2D& LocalPos, const FVector2D& ViewportSize) const;
+		TArray<SceneObject*> PickSceneObjectsInRect(const FVector2D& RectStart, const FVector2D& RectEnd, const FVector2D& ViewportSize) const;
+		bool GetSceneObjectScreenRect(SceneObject* Obj, const FVector2D& ViewportSize, FVector2D& OutMin, FVector2D& OutMax) const;
 
 	private:
 		Render* RenderGraphAsset;
@@ -107,13 +116,28 @@ namespace SH
 		// Gizmo state
 		GizmoAxis HoveredAxis = GizmoAxis::None;
 		GizmoAxis DraggingAxis = GizmoAxis::None;
-		FW::Vector3f DragStartObjectPos{0, 0, 0};
-		FW::Vector3f DragStartObjectRotation{0, 0, 0};
-		FW::Vector3f DragStartObjectScale{1, 1, 1};
+
+		struct DragObjectState
+		{
+			FW::ObjectPtr<SceneObject> Object;
+			FW::Vector3f StartPos;
+			FW::Vector3f StartWorldPos;
+			FW::Vector3f StartRotation;
+			FW::Vector3f StartScale;
+		};
+		TArray<DragObjectState> DragAllObjectStates; // multi-object drag snapshots
 		FW::Vector3f DragLocalAxisDir{0, 0, 0};
+		FW::Vector3f DragPivotStart{0, 0, 0};
 		FVector2D DragStartMousePos{0, 0};
 		FVector2D DragAxisScreenDir{0, 0};
 		float DragPixelsPerUnit = 1.0f;
+		FW::ObjectPtr<SceneObject> PendingPickedObject;
+		bool bPendingBoxSelection = false;
+		bool bBoxSelecting = false;
+		bool bBoxSelectAdditive = false;
+		FVector2D BoxSelectionStart{0, 0};
+		FVector2D BoxSelectionEnd{0, 0};
+		static constexpr float BoxSelectionStartThreshold = 4.0f;
 		// Plane drag state
 		FW::Vector3f DragPlaneNormal{0, 1, 0};
 		FW::Vector3f DragPlaneHitStart{0, 0, 0};

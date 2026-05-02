@@ -8,7 +8,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord);
 
 vec2 GPrivate_fragCoord;
 
-#if ENABLE_PRINT == 1
+#if GPrivate_ENABLE_PRINT == 1
 #define PrintAtMouse0(StrArrDecl) do {                                                   \
     if (iMouse.z > 0.0 && all(equal(uvec2(iMouse.xy), uvec2(GPrivate_fragCoord))))       \
     {                                                                                    \
@@ -36,7 +36,7 @@ vec2 GPrivate_fragCoord;
         Print3(StrArrDecl, Arg1, Arg2, Arg3);                                            \
     }                                                                                    \
 } while(false)
-#elif EDITOR_ISENSE == 1
+#elif GPrivate_EDITOR_ISENSE == 1
 #define PrintAtMouse0(StrArrDecl) StrArrDecl;
 #define PrintAtMouse1(StrArrDecl, Arg1) StrArrDecl;Arg1;
 #define PrintAtMouse2(StrArrDecl, Arg1, Arg2) StrArrDecl;Arg1;Arg2;

@@ -1,11 +1,11 @@
 #include "CommonHeader.h"
 #include "ScenePreviewRenderer.h"
-#include "RenderResource/SceneGridShader.h"
-#include "RenderResource/ScenePreviewShader.h"
-#include "RenderResource/OutlineShader.h"
-#include "RenderResource/GizmoShader.h"
-#include "RenderResource/CameraWireframeShader.h"
-#include "RenderResource/BillboardShader.h"
+#include "RenderResource/Shader/SceneGridShader.h"
+#include "RenderResource/Shader/ScenePreviewShader.h"
+#include "RenderResource/Shader/OutlineShader.h"
+#include "RenderResource/Shader/GizmoShader.h"
+#include "RenderResource/Shader/CameraWireframeShader.h"
+#include "RenderResource/Shader/BillboardShader.h"
 #include "RenderResource/RenderPass/BlitPass.h"
 #include "AssetObject/Render/MeshSceneObject.h"
 #include "AssetObject/Render/CameraSceneObject.h"
@@ -68,10 +68,6 @@ namespace SH
 		FMatrix44f VP = Camera.GetViewProjectionMatrix();
 		TRefCountPtr<GpuBindGroup> BindGroup = GridShader->GetBindGroup(VP, Camera.Position, GridSize, GridSpacing);
 
-		BindingContext Bindings;
-		Bindings.SetPassBindGroup(BindGroup);
-		Bindings.SetPassBindGroupLayout(GridShader->GetBindGroupLayout());
-
 		// Grid ground plane (analytical grid in fragment shader)
 		{
 			GpuRenderPassDesc PassDesc;
@@ -92,6 +88,7 @@ namespace SH
 					.ColorOp = BlendOp::Add,
 					.DestFactor = BlendFactor::InvSrcAlpha,
 				}},
+				.BindGroupLayouts = { GridShader->GetShaderBindGroupLayout() },
 				.RasterizerState = {RasterizerFillMode::Solid, RasterizerCullMode::None},
 				.Primitive = PrimitiveType::TriangleList,
 				.SampleCount = SampleCount,
@@ -101,12 +98,11 @@ namespace SH
 					.DepthCompare = CompareMode::LessEqual,
 				},
 			};
-			Bindings.ApplyBindGroupLayout(PipelineDesc);
 			TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 
-			Graph.AddRenderPass("SceneGrid", MoveTemp(PassDesc), Bindings,
-				[Pipeline](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
-					Bindings.ApplyBindGroup(PassRecorder);
+			Graph.AddRenderPass("SceneGrid", MoveTemp(PassDesc),
+				[Pipeline, BindGroup](GpuRenderPassRecorder* PassRecorder) {
+					PassRecorder->SetBindGroups({ BindGroup.GetReference() });
 					PassRecorder->SetRenderPipelineState(Pipeline);
 					PassRecorder->DrawPrimitive(0, 6, 0, 1);
 				}
@@ -147,10 +143,6 @@ namespace SH
 			FMatrix44f WorldMat = MeshObj->GetWorldMatrix();
 			TRefCountPtr<GpuBindGroup> BindGroup = MeshShader->GetBindGroup(VP, WorldMat, Camera.Position, LightDir);
 
-			BindingContext Bindings;
-			Bindings.SetPassBindGroup(BindGroup);
-			Bindings.SetPassBindGroupLayout(MeshShader->GetBindGroupLayout());
-
 			const TArray<MeshBuffers>& GpuMeshes = ModelAsset->GetGpuMeshes();
 			for (int32 SubIdx = 0; SubIdx < GpuMeshes.Num(); SubIdx++)
 			{
@@ -173,13 +165,13 @@ namespace SH
 					.Vs = MeshShader->GetVertexShader(),
 					.Ps = MeshShader->GetPixelShader(),
 					.Targets = {{ .TargetFormat = OutputView->GetTexture()->GetFormat() }},
+					.BindGroupLayouts = { MeshShader->GetShaderBindGroupLayout() },
 					.VertexLayout = {{
 						.ByteStride = sizeof(MeshVertex),
 						.Attributes = {
 							{0, "POSITION", 0, GpuFormat::R32G32B32_FLOAT, offsetof(MeshVertex, Position)},
 							{1, "NORMAL", 0, GpuFormat::R32G32B32_FLOAT, offsetof(MeshVertex, Normal)},
 							{2, "TEXCOORD", 0, GpuFormat::R32G32_FLOAT, offsetof(MeshVertex, UVs)},
-							{3, "COLOR", 0, GpuFormat::R32G32B32A32_FLOAT, offsetof(MeshVertex, Color)},
 						},
 					}},
 					.RasterizerState = {RasterizerFillMode::Solid, RasterizerCullMode::Back},
@@ -190,13 +182,12 @@ namespace SH
 						.DepthCompare = CompareMode::Less,
 					},
 				};
-				Bindings.ApplyBindGroupLayout(PipelineDesc);
 				TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 
-				Graph.AddRenderPass("SceneMesh", MoveTemp(PassDesc), Bindings,
-					[Pipeline, VB = Buffers.VertexBuffer, IB = Buffers.IndexBuffer, IdxCount = Buffers.IndexCount]
-					(GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
-						Bindings.ApplyBindGroup(PassRecorder);
+				Graph.AddRenderPass("SceneMesh", MoveTemp(PassDesc),
+					[Pipeline, BindGroup, VB = Buffers.VertexBuffer, IB = Buffers.IndexBuffer, IdxCount = Buffers.IndexCount]
+					(GpuRenderPassRecorder* PassRecorder) {
+						PassRecorder->SetBindGroups({ BindGroup.GetReference() });
 						PassRecorder->SetRenderPipelineState(Pipeline);
 						PassRecorder->SetVertexBuffer(0, VB);
 						PassRecorder->SetIndexBuffer(IB);
@@ -210,31 +201,29 @@ namespace SH
 
 	void ScenePreviewRenderer::RenderOutline(RenderGraph& Graph, GpuTextureView* OutputView,
 		GpuTextureView* MaskView,
-		const Camera& Camera, SceneObject* SelectedObject)
+		const Camera& Camera, const TArray<SceneObject*>& SelectedObjects)
 	{
-		MeshSceneObject* MeshObj = dynamic_cast<MeshSceneObject*>(SelectedObject);
-		if (!MeshObj || !MeshObj->ModelAsset)
-		{
-			return;
-		}
-
-		Model* ModelAsset = MeshObj->ModelAsset.Get();
-		if (!ModelAsset)
-		{
-			return;
-		}
-
 		OutlineShader* Shader = GetShader<OutlineShader>();
 		FMatrix44f VP = Camera.GetViewProjectionMatrix();
-		FMatrix44f WorldMat = MeshObj->GetWorldMatrix();
+		bool bHasOutlineMesh = false;
 
-		// Pass 1: Render selected object silhouette into mask
+		// Pass 1: Render selected object silhouettes into mask.
+		for (SceneObject* SelectedObject : SelectedObjects)
 		{
-			TRefCountPtr<GpuBindGroup> MaskBindGroup = Shader->GetMaskBindGroup(VP, WorldMat);
+			MeshSceneObject* MeshObj = dynamic_cast<MeshSceneObject*>(SelectedObject);
+			if (!MeshObj || !MeshObj->ModelAsset)
+			{
+				continue;
+			}
 
-			BindingContext Bindings;
-			Bindings.SetPassBindGroup(MaskBindGroup);
-			Bindings.SetPassBindGroupLayout(Shader->GetMaskBindGroupLayout());
+			Model* ModelAsset = MeshObj->ModelAsset.Get();
+			if (!ModelAsset)
+			{
+				continue;
+			}
+
+			FMatrix44f WorldMat = MeshObj->GetWorldMatrix();
+			TRefCountPtr<GpuBindGroup> MaskBindGroup = Shader->GetMaskBindGroup(VP, WorldMat);
 
 			const TArray<MeshBuffers>& GpuMeshes = ModelAsset->GetGpuMeshes();
 			for (int32 SubIdx = 0; SubIdx < GpuMeshes.Num(); SubIdx++)
@@ -247,38 +236,43 @@ namespace SH
 
 				GpuRenderPassDesc PassDesc;
 				PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{MaskView,
-					SubIdx == 0 ? RenderTargetLoadAction::Clear : RenderTargetLoadAction::Load,
+					bHasOutlineMesh ? RenderTargetLoadAction::Load : RenderTargetLoadAction::Clear,
 					RenderTargetStoreAction::Store});
 
 				GpuRenderPipelineStateDesc PipelineDesc{
 					.Vs = Shader->GetMaskVS(),
 					.Ps = Shader->GetMaskPS(),
 					.Targets = {{ .TargetFormat = MaskView->GetTexture()->GetFormat() }},
+					.BindGroupLayouts = { Shader->GetMaskShaderBindGroupLayout() },
 					.VertexLayout = {{
 						.ByteStride = sizeof(MeshVertex),
 						.Attributes = {
 							{0, "POSITION", 0, GpuFormat::R32G32B32_FLOAT, offsetof(MeshVertex, Position)},
 							{1, "NORMAL", 0, GpuFormat::R32G32B32_FLOAT, offsetof(MeshVertex, Normal)},
 							{2, "TEXCOORD", 0, GpuFormat::R32G32_FLOAT, offsetof(MeshVertex, UVs)},
-							{3, "COLOR", 0, GpuFormat::R32G32B32A32_FLOAT, offsetof(MeshVertex, Color)},
 						},
 					}},
 					.RasterizerState = {RasterizerFillMode::Solid, RasterizerCullMode::Back},
 				};
-				Bindings.ApplyBindGroupLayout(PipelineDesc);
 				TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 
-				Graph.AddRenderPass("OutlineMask", MoveTemp(PassDesc), Bindings,
-					[Pipeline, VB = Buffers.VertexBuffer, IB = Buffers.IndexBuffer, IdxCount = Buffers.IndexCount]
-					(GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
-						Bindings.ApplyBindGroup(PassRecorder);
+				Graph.AddRenderPass("OutlineMask", MoveTemp(PassDesc),
+					[Pipeline, MaskBindGroup, VB = Buffers.VertexBuffer, IB = Buffers.IndexBuffer, IdxCount = Buffers.IndexCount]
+					(GpuRenderPassRecorder* PassRecorder) {
+						PassRecorder->SetBindGroups({ MaskBindGroup.GetReference() });
 						PassRecorder->SetRenderPipelineState(Pipeline);
 						PassRecorder->SetVertexBuffer(0, VB);
 						PassRecorder->SetIndexBuffer(IB);
 						PassRecorder->DrawIndexed(0, IdxCount);
 					}
 				);
+				bHasOutlineMesh = true;
 			}
+		}
+
+		if (!bHasOutlineMesh)
+		{
+			return;
 		}
 
 		// Pass 2: Post-process edge detection
@@ -289,10 +283,6 @@ namespace SH
 			Vector4f OutlineColor(1.0f, 0.6f, 0.0f, 1.0f); // Orange
 
 			TRefCountPtr<GpuBindGroup> PostBindGroup = Shader->GetPostBindGroup(MaskView, OutlineColor, TexelSize);
-
-			BindingContext Bindings;
-			Bindings.SetPassBindGroup(PostBindGroup);
-			Bindings.SetPassBindGroupLayout(Shader->GetPostBindGroupLayout());
 
 			GpuRenderPassDesc PassDesc;
 			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{OutputView, RenderTargetLoadAction::Load, RenderTargetStoreAction::Store});
@@ -307,18 +297,18 @@ namespace SH
 					.ColorOp = BlendOp::Add,
 					.DestFactor = BlendFactor::InvSrcAlpha,
 				}},
+				.BindGroupLayouts = { Shader->GetPostShaderBindGroupLayout() },
 				.RasterizerState = {RasterizerFillMode::Solid, RasterizerCullMode::None},
 			};
-			Bindings.ApplyBindGroupLayout(PipelineDesc);
 			TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 
-			Graph.AddRenderPass("OutlinePost", MoveTemp(PassDesc), Bindings,
-				[Pipeline](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
-					Bindings.ApplyBindGroup(PassRecorder);
+			Graph.AddRenderPass("OutlinePost", MoveTemp(PassDesc),
+				[Pipeline, PostBindGroup](GpuRenderPassRecorder* PassRecorder) {
+					PassRecorder->SetBindGroups({ PostBindGroup.GetReference() });
 					PassRecorder->SetRenderPipelineState(Pipeline);
 					PassRecorder->DrawPrimitive(0, 3, 0, 1);
 				}
-			);
+			).Read(MaskView);
 		}
 	}
 
@@ -338,10 +328,6 @@ namespace SH
 		TRefCountPtr<GpuBindGroup> BindGroup = Shader->GetBindGroup(VP, GizmoPosition, GizmoScale, HighlightAxis, Orientation, Camera.Position,
 			FVector2f((float)OutputView->GetTexture()->GetWidth(), (float)OutputView->GetTexture()->GetHeight()));
 
-		BindingContext Bindings;
-		Bindings.SetPassBindGroup(BindGroup);
-		Bindings.SetPassBindGroupLayout(Shader->GetBindGroupLayout());
-
 		GpuFormat TargetFormat = OutputView->GetTexture()->GetFormat();
 		uint32 SampleCount = OutputView->GetTexture()->GetSampleCount();
 
@@ -356,16 +342,16 @@ namespace SH
 					.Vs = Shader->GetMoveVS(),
 					.Ps = Shader->GetPixelShader(),
 					.Targets = {{.TargetFormat = TargetFormat}},
+					.BindGroupLayouts = { Shader->GetShaderBindGroupLayout() },
 					.RasterizerState = {RasterizerFillMode::Solid, RasterizerCullMode::None},
 					.Primitive = PrimitiveType::TriangleList,
 					.SampleCount = SampleCount,
 				};
-				Bindings.ApplyBindGroupLayout(PipelineDesc);
 				TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 
-				Graph.AddRenderPass("GizmoShafts", MoveTemp(PassDesc), Bindings,
-					[Pipeline](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
-						Bindings.ApplyBindGroup(PassRecorder);
+				Graph.AddRenderPass("GizmoShafts", MoveTemp(PassDesc),
+					[Pipeline, BindGroup](GpuRenderPassRecorder* PassRecorder) {
+						PassRecorder->SetBindGroups({ BindGroup.GetReference() });
 						PassRecorder->SetRenderPipelineState(Pipeline);
 						PassRecorder->DrawPrimitive(0, 18, 0, 1);
 					}
@@ -381,16 +367,16 @@ namespace SH
 					.Vs = Shader->GetMoveArrowVS(),
 					.Ps = Shader->GetPixelShader(),
 					.Targets = {{.TargetFormat = TargetFormat}},
+					.BindGroupLayouts = { Shader->GetShaderBindGroupLayout() },
 					.RasterizerState = {RasterizerFillMode::Solid, RasterizerCullMode::None},
 					.Primitive = PrimitiveType::TriangleList,
 					.SampleCount = SampleCount,
 				};
-				Bindings.ApplyBindGroupLayout(PipelineDesc);
 				TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 
-				Graph.AddRenderPass("GizmoArrows", MoveTemp(PassDesc), Bindings,
-					[Pipeline](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
-						Bindings.ApplyBindGroup(PassRecorder);
+				Graph.AddRenderPass("GizmoArrows", MoveTemp(PassDesc),
+					[Pipeline, BindGroup](GpuRenderPassRecorder* PassRecorder) {
+						PassRecorder->SetBindGroups({ BindGroup.GetReference() });
 						PassRecorder->SetRenderPipelineState(Pipeline);
 						PassRecorder->DrawPrimitive(0, 216, 0, 1);
 					}
@@ -406,16 +392,16 @@ namespace SH
 					.Vs = Shader->GetMovePlaneVS(),
 					.Ps = Shader->GetPixelShader(),
 					.Targets = {{.TargetFormat = TargetFormat, .BlendEnable = true}},
+					.BindGroupLayouts = { Shader->GetShaderBindGroupLayout() },
 					.RasterizerState = {RasterizerFillMode::Solid, RasterizerCullMode::None},
 					.Primitive = PrimitiveType::TriangleList,
 					.SampleCount = SampleCount,
 				};
-				Bindings.ApplyBindGroupLayout(PipelineDesc);
 				TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 
-				Graph.AddRenderPass("GizmoMovePlanes", MoveTemp(PassDesc), Bindings,
-					[Pipeline](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
-						Bindings.ApplyBindGroup(PassRecorder);
+				Graph.AddRenderPass("GizmoMovePlanes", MoveTemp(PassDesc),
+					[Pipeline, BindGroup](GpuRenderPassRecorder* PassRecorder) {
+						PassRecorder->SetBindGroups({ BindGroup.GetReference() });
 						PassRecorder->SetRenderPipelineState(Pipeline);
 						PassRecorder->DrawPrimitive(0, 18, 0, 1);
 					}
@@ -432,16 +418,16 @@ namespace SH
 				.Vs = Shader->GetRotateVS(),
 				.Ps = Shader->GetPixelShader(),
 				.Targets = {{.TargetFormat = TargetFormat}},
+				.BindGroupLayouts = { Shader->GetShaderBindGroupLayout() },
 				.RasterizerState = {RasterizerFillMode::Solid, RasterizerCullMode::None},
 				.Primitive = PrimitiveType::TriangleList,
 				.SampleCount = SampleCount,
 			};
-			Bindings.ApplyBindGroupLayout(PipelineDesc);
 			TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 
-			Graph.AddRenderPass("GizmoRotate", MoveTemp(PassDesc), Bindings,
-				[Pipeline](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
-					Bindings.ApplyBindGroup(PassRecorder);
+			Graph.AddRenderPass("GizmoRotate", MoveTemp(PassDesc),
+				[Pipeline, BindGroup](GpuRenderPassRecorder* PassRecorder) {
+					PassRecorder->SetBindGroups({ BindGroup.GetReference() });
 					PassRecorder->SetRenderPipelineState(Pipeline);
 					PassRecorder->DrawPrimitive(0, 1536, 0, 1);
 				}
@@ -458,16 +444,16 @@ namespace SH
 					.Vs = Shader->GetScaleVS(),
 					.Ps = Shader->GetPixelShader(),
 					.Targets = {{.TargetFormat = TargetFormat}},
+					.BindGroupLayouts = { Shader->GetShaderBindGroupLayout() },
 					.RasterizerState = {RasterizerFillMode::Solid, RasterizerCullMode::None},
 					.Primitive = PrimitiveType::TriangleList,
 					.SampleCount = SampleCount,
 				};
-				Bindings.ApplyBindGroupLayout(PipelineDesc);
 				TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 
-				Graph.AddRenderPass("GizmoScaleShafts", MoveTemp(PassDesc), Bindings,
-					[Pipeline](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
-						Bindings.ApplyBindGroup(PassRecorder);
+				Graph.AddRenderPass("GizmoScaleShafts", MoveTemp(PassDesc),
+					[Pipeline, BindGroup](GpuRenderPassRecorder* PassRecorder) {
+						PassRecorder->SetBindGroups({ BindGroup.GetReference() });
 						PassRecorder->SetRenderPipelineState(Pipeline);
 						PassRecorder->DrawPrimitive(0, 18, 0, 1);
 					}
@@ -483,16 +469,16 @@ namespace SH
 					.Vs = Shader->GetScaleCubeVS(),
 					.Ps = Shader->GetPixelShader(),
 					.Targets = {{.TargetFormat = TargetFormat}},
+					.BindGroupLayouts = { Shader->GetShaderBindGroupLayout() },
 					.RasterizerState = {RasterizerFillMode::Solid, RasterizerCullMode::None},
 					.Primitive = PrimitiveType::TriangleList,
 					.SampleCount = SampleCount,
 				};
-				Bindings.ApplyBindGroupLayout(PipelineDesc);
 				TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 
-				Graph.AddRenderPass("GizmoScaleCubes", MoveTemp(PassDesc), Bindings,
-					[Pipeline](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
-						Bindings.ApplyBindGroup(PassRecorder);
+				Graph.AddRenderPass("GizmoScaleCubes", MoveTemp(PassDesc),
+					[Pipeline, BindGroup](GpuRenderPassRecorder* PassRecorder) {
+						PassRecorder->SetBindGroups({ BindGroup.GetReference() });
 						PassRecorder->SetRenderPipelineState(Pipeline);
 						PassRecorder->DrawPrimitive(0, 108, 0, 1);
 					}
@@ -508,16 +494,16 @@ namespace SH
 					.Vs = Shader->GetScaleAllVS(),
 					.Ps = Shader->GetPixelShader(),
 					.Targets = {{.TargetFormat = TargetFormat}},
+					.BindGroupLayouts = { Shader->GetShaderBindGroupLayout() },
 					.RasterizerState = {RasterizerFillMode::Solid, RasterizerCullMode::None},
 					.Primitive = PrimitiveType::TriangleList,
 					.SampleCount = SampleCount,
 				};
-				Bindings.ApplyBindGroupLayout(PipelineDesc);
 				TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 
-				Graph.AddRenderPass("GizmoScaleCenter", MoveTemp(PassDesc), Bindings,
-					[Pipeline](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
-						Bindings.ApplyBindGroup(PassRecorder);
+				Graph.AddRenderPass("GizmoScaleCenter", MoveTemp(PassDesc),
+					[Pipeline, BindGroup](GpuRenderPassRecorder* PassRecorder) {
+						PassRecorder->SetBindGroups({ BindGroup.GetReference() });
 						PassRecorder->SetRenderPipelineState(Pipeline);
 						PassRecorder->DrawPrimitive(0, 36, 0, 1);
 					}
@@ -556,10 +542,6 @@ namespace SH
 
 			TRefCountPtr<GpuBindGroup> BindGroup = Shader->GetBindGroup(SceneVP, InvCamVP, WireColor);
 
-			BindingContext Bindings;
-			Bindings.SetPassBindGroup(BindGroup);
-			Bindings.SetPassBindGroupLayout(Shader->GetBindGroupLayout());
-
 			GpuRenderPassDesc PassDesc;
 			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{OutputView, RenderTargetLoadAction::Load, RenderTargetStoreAction::Store});
 
@@ -569,16 +551,16 @@ namespace SH
 				.Targets = {{
 					.TargetFormat = OutputView->GetTexture()->GetFormat(),
 				}},
+				.BindGroupLayouts = { Shader->GetShaderBindGroupLayout() },
 				.RasterizerState = {RasterizerFillMode::Solid, RasterizerCullMode::None},
 				.Primitive = PrimitiveType::LineList,
 				.SampleCount = SampleCount,
 			};
-			Bindings.ApplyBindGroupLayout(PipelineDesc);
 			TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 
-			Graph.AddRenderPass("CameraWireframe", MoveTemp(PassDesc), Bindings,
-				[Pipeline](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
-					Bindings.ApplyBindGroup(PassRecorder);
+			Graph.AddRenderPass("CameraWireframe", MoveTemp(PassDesc),
+				[Pipeline, BindGroup](GpuRenderPassRecorder* PassRecorder) {
+					PassRecorder->SetBindGroups({ BindGroup.GetReference() });
 					PassRecorder->SetRenderPipelineState(Pipeline);
 					PassRecorder->DrawPrimitive(0, 24, 0, 1); // 12 edges × 2 verts
 				}
@@ -621,10 +603,6 @@ namespace SH
 			TRefCountPtr<GpuBindGroup> BindGroup = Shader->GetBindGroup(VP, CamObj->Position, BillboardScale,
 				CamRight, CamUp, CameraIconTexView);
 
-			BindingContext Bindings;
-			Bindings.SetPassBindGroup(BindGroup);
-			Bindings.SetPassBindGroupLayout(Shader->GetBindGroupLayout());
-
 			GpuRenderPassDesc PassDesc;
 			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{OutputView, RenderTargetLoadAction::Load, RenderTargetStoreAction::Store});
 			PassDesc.DepthStencilTarget = GpuDepthStencilTargetInfo{DepthView, RenderTargetLoadAction::Load, RenderTargetStoreAction::Store};
@@ -639,6 +617,7 @@ namespace SH
 					.ColorOp = BlendOp::Add,
 					.DestFactor = BlendFactor::InvSrcAlpha,
 				}},
+				.BindGroupLayouts = { Shader->GetShaderBindGroupLayout() },
 				.RasterizerState = {RasterizerFillMode::Solid, RasterizerCullMode::None},
 				.Primitive = PrimitiveType::TriangleList,
 				.SampleCount = SampleCount,
@@ -648,16 +627,15 @@ namespace SH
 					.DepthCompare = CompareMode::LessEqual,
 				},
 			};
-			Bindings.ApplyBindGroupLayout(PipelineDesc);
 			TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 
-			Graph.AddRenderPass("Billboard", MoveTemp(PassDesc), Bindings,
-				[Pipeline](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
-					Bindings.ApplyBindGroup(PassRecorder);
+			Graph.AddRenderPass("Billboard", MoveTemp(PassDesc),
+				[Pipeline, BindGroup](GpuRenderPassRecorder* PassRecorder) {
+					PassRecorder->SetBindGroups({ BindGroup.GetReference() });
 					PassRecorder->SetRenderPipelineState(Pipeline);
 					PassRecorder->DrawPrimitive(0, 6, 0, 1);
 				}
-			);
+			).Read(CameraIconTexView);
 		}
 	}
 
@@ -729,8 +707,8 @@ namespace SH
 			ResolveView
 		});
 
-		Graph.AddRenderPass("ResolveMsaa", MoveTemp(PassDesc), {},
-			[](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
+		Graph.AddRenderPass("ResolveMsaa", MoveTemp(PassDesc),
+			[](GpuRenderPassRecorder* PassRecorder) {
 			}
 		);
 	}

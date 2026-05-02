@@ -2,6 +2,7 @@
 #include <Styling/StyleColors.h>
 
 namespace FW {
+	class ShObject;
 
 	enum class SupportedLanguage
 	{
@@ -28,6 +29,7 @@ namespace FW {
 
         virtual void Update(double DeltaTime) {}
 		virtual TSharedPtr<SWindow> GetMainWindow() const { return {}; }
+		virtual void ShowProperty(ShObject* InObjectData) {}
 		static FConfigFile* GetEditorConfig() { return EditorConfig.Get(); }
 		static void SaveEditorConfig();
 

@@ -10,7 +10,7 @@ namespace SH
 {
 	BillboardShader::BillboardShader(const std::set<FString>& VariantDefinitions)
 	{
-		GpuBindGroupLayoutBuilder LayoutBuilder{BindingContext::PassSlot};
+		GpuBindGroupLayoutBuilder LayoutBuilder{1};
 		UbBuilder.AddMatrix4x4f(TEXT("ViewProjection"));
 		UbBuilder.AddVector3f(TEXT("BillboardPos"));
 		UbBuilder.AddFloat(TEXT("BillboardScale"));
@@ -19,12 +19,12 @@ namespace SH
 		LayoutBuilder.AddUniformBuffer(TEXT("BillboardUb"), UbBuilder, BindingShaderStage::Vertex);
 		LayoutBuilder.AddTexture(TEXT("IconTex"), BindingShaderStage::Pixel);
 		LayoutBuilder.AddSampler(TEXT("IconTexSampler"), BindingShaderStage::Pixel);
-		BindGroupLayout = LayoutBuilder.Build();
+		ShaderBindGroupLayout = LayoutBuilder.Build();
 
-		FString ExtraDecl = BindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL);
+		FString ExtraDecl = ShaderBindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL);
 
 		Vs = GGpuRhi->CreateShaderFromFile({
-			.FileName = PathHelper::ShaderDir() / "Billboard.hlsl",
+			.FileName = PathHelper::ShaderDir() / "ShaderHelper/Billboard.hlsl",
 			.Type = ShaderType::Vertex,
 			.EntryPoint = "MainVS",
 			.ExtraDecl = ExtraDecl,
@@ -34,7 +34,7 @@ namespace SH
 		check(ErrorInfo.IsEmpty());
 
 		Ps = GGpuRhi->CreateShaderFromFile({
-			.FileName = PathHelper::ShaderDir() / "Billboard.hlsl",
+			.FileName = PathHelper::ShaderDir() / "ShaderHelper/Billboard.hlsl",
 			.Type = ShaderType::Pixel,
 			.EntryPoint = "MainPS",
 			.ExtraDecl = ExtraDecl,
@@ -48,7 +48,7 @@ namespace SH
 		const Vector3f& CameraRight, const Vector3f& CameraUp,
 		GpuTextureView* IconTexView)
 	{
-		GpuBindGroupBuilder Builder{BindGroupLayout};
+		GpuBindGroupBuilder Builder{ShaderBindGroupLayout};
 		TUniquePtr<UniformBuffer> Ub = UbBuilder.Build();
 		Ub->GetMember<FMatrix44f>(TEXT("ViewProjection")) = ViewProjection;
 		Ub->GetMember<Vector3f>(TEXT("BillboardPos")) = BillboardPos;

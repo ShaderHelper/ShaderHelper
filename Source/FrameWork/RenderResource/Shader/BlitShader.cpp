@@ -17,7 +17,7 @@ namespace FW
 
 		bUseMipLevel = VariantDefinitions.count(TEXT("USE_MIP_LEVEL")) > 0;
 
-		GpuBindGroupLayoutBuilder LayoutBuilder{ BindingContext::ShaderSlot };
+		GpuBindGroupLayoutBuilder LayoutBuilder{ 2 };
 		LayoutBuilder.AddExistingBinding(0, BindingType::Texture, BindingShaderStage::Pixel)
 			.AddExistingBinding(1, BindingType::Sampler, BindingShaderStage::Pixel);
 

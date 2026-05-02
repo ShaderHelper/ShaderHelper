@@ -45,6 +45,7 @@ namespace FW
 		void SetViewPortRenderTexture(GpuTexture* InGpuTex);
 	//	void UpdateViewPortRenderTexture(GpuTexture* InGpuTex);
 		void OnDrawViewport(const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) override;
+		TFunction<int32(const FGeometry&, const FSlateRect&, FSlateWindowElementList&, int32, const FWidgetStyle&, bool)> DrawOverlayHandler;
         
         void Clear() { ViewPortRT.Reset(); }
 

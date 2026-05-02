@@ -88,11 +88,13 @@ namespace FW
 			, _AlphaDisplayMode(EColorBlockAlphaDisplayMode::Ignore)
 			, _ShowBackgroundForAlpha(false)
 			, _ShowAlpha(false)
+			, _UseSRGB(true)
 		{}
 			SLATE_ATTRIBUTE(FLinearColor, Color)
 			SLATE_ATTRIBUTE(EColorBlockAlphaDisplayMode, AlphaDisplayMode)
 			SLATE_ATTRIBUTE(bool, ShowBackgroundForAlpha)
 			SLATE_ARGUMENT(bool, ShowAlpha)
+			SLATE_ATTRIBUTE(bool, UseSRGB)
 			SLATE_EVENT(FOnLinearColorValueChanged, OnColorChanged)
 		SLATE_END_ARGS()
 

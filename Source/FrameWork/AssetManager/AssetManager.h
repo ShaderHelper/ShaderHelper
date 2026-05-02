@@ -75,7 +75,13 @@ namespace FW
 			check(NewAssetObject.IsValid());
 
 			TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileReader(*InAssetPath));
+			BeginObjectPtrFixup();
+			ON_SCOPE_EXIT
+			{
+				EndObjectPtrFixup();
+			};
 			NewAssetObject->Serialize(*Ar);
+			ResolveObjectPtrFixups();
 			NewAssetObject->PostLoad();
 			Assets.Add(Guid, NewAssetObject);
 			return NewAssetObject;
@@ -134,7 +140,13 @@ namespace FW
 					FBufferReader Ar(RawData, FileSize, true);
 					AssetPtr<T> NewAssetObject = ConstructAssetObject<T>(InAssetPath);
 					check(NewAssetObject.IsValid());
+					BeginObjectPtrFixup();
+					ON_SCOPE_EXIT
+					{
+						EndObjectPtrFixup();
+					};
 					NewAssetObject->Serialize(Ar);
+					ResolveObjectPtrFixups();
 					NewAssetObject->PostLoad();
 					Assets.Add(Guid, NewAssetObject);
 					NotifyPendingLoads(Guid, NewAssetObject);
@@ -242,29 +254,83 @@ namespace FW
 		TMap<FGuid, TSet<FGuid>> AssetDependents;
 	};
 
-    template<typename T>
-    FArchive& operator<<(FArchive& Ar, AssetPtr<T>& InOutAssetPtr)
-    {
-        bool IsValid = !!InOutAssetPtr;
-        Ar << IsValid;
-        if (Ar.IsLoading())
-        {
-            if (IsValid)
-            {
-                FGuid AssetGuid;
-                Ar << AssetGuid;
-                //Maybe return a null AssetPtr because of outside deleting.
-                InOutAssetPtr = TSingleton<AssetManager>::Get().LoadAssetByGuid<T>(AssetGuid);
-            }
-        }
-        else
-        {
-            if (IsValid)
-            {
-                FGuid AssetGuid = InOutAssetPtr->GetGuid();;
-                Ar << AssetGuid;
-            }
-        }
-        return Ar;
-    }
+	template<typename T>
+	FArchive& operator<<(FArchive& Ar, ObserverObjectPtr<T>& InOutObjectPtr)
+	{
+		static_assert(std::is_base_of_v<ShObject, T>);
+
+		bool IsValid = Ar.IsLoading() ? false : InOutObjectPtr.GetGuid().IsValid();
+		Ar << IsValid;
+		if (!IsValid)
+		{
+			if (Ar.IsLoading())
+			{
+				InOutObjectPtr.Reset();
+			}
+			return Ar;
+		}
+
+		FGuid ObjectGuid = Ar.IsLoading() ? FGuid{} : InOutObjectPtr.GetGuid();
+		Ar << ObjectGuid;
+		if (Ar.IsLoading())
+		{
+			InOutObjectPtr.Reset();
+			InOutObjectPtr.SetGuid(ObjectGuid);
+			if constexpr(std::is_base_of_v<AssetObject, T>)
+			{
+				InOutObjectPtr = TSingleton<AssetManager>::Get().LoadAssetByGuid<T>(ObjectGuid);
+				if (!InOutObjectPtr)
+				{
+					InOutObjectPtr.SetGuid(ObjectGuid);
+				}
+			}
+			else if (ObjectGuid.IsValid())
+			{
+				ObjectPtrFixupRequest FixupRequest;
+				FixupRequest.ObjectPtrAddress = &InOutObjectPtr;
+				FixupRequest.Guid = ObjectGuid;
+				FixupRequest.TargetMetaType = GetMetaType<T>();
+				FixupRequest.AssignResolvedObject = [](void* InObjectPtrAddress, ShObject* InResolvedObject) {
+					static_cast<ObserverObjectPtr<T>*>(InObjectPtrAddress)->SetReference(static_cast<T*>(InResolvedObject));
+				};
+				RegisterObjectPtrFixup(FixupRequest);
+			}
+		}
+		return Ar;
+	}
+
+	template<typename T>
+	FArchive& operator<<(FArchive& Ar, AssetPtr<T>& InOutObjectPtr)
+	{
+		static_assert(std::is_base_of_v<AssetObject, T>);
+
+		bool IsValid = Ar.IsLoading() ? false : InOutObjectPtr.GetGuid().IsValid();
+		Ar << IsValid;
+		if (!IsValid)
+		{
+			if (Ar.IsLoading())
+			{
+				InOutObjectPtr.Reset();
+			}
+			return Ar;
+		}
+
+		FGuid ObjectGuid = Ar.IsLoading() ? FGuid{} : InOutObjectPtr.GetGuid();
+		Ar << ObjectGuid;
+		if (Ar.IsLoading())
+		{
+			InOutObjectPtr.Reset();
+			InOutObjectPtr.SetGuid(ObjectGuid);
+			InOutObjectPtr = TSingleton<AssetManager>::Get().LoadAssetByGuid<T>(ObjectGuid);
+			if (!InOutObjectPtr)
+			{
+				InOutObjectPtr.SetGuid(ObjectGuid);
+			}
+		}
+		return Ar;
+	}
+
+	template<typename T>
+		requires (!std::is_base_of_v<AssetObject, T>)
+	FArchive& operator<<(FArchive& Ar, ObjectPtr<T, ObjectOwnerShip::Retain>& InOutObjectPtr) = delete;
 }

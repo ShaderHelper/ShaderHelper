@@ -191,35 +191,33 @@ namespace SH
 		
 		DebuggerGridShader* PassShader = GetShader<DebuggerGridShader>();
 		
-		BindingContext Bindings;
 		DebuggerGridShader::Parameters ShaderParameter{
 			.InputTex = RawTex,
 			.Offset = Offset,
 			.Zoom = Zoom,
 			.MouseLoc = MouseLoc,
 		};
-		Bindings.SetShaderBindGroup(PassShader->GetBindGroup(ShaderParameter));
-		Bindings.SetShaderBindGroupLayout(PassShader->GetBindGroupLayout());
+		TRefCountPtr<GpuBindGroup> ShaderBindGroup = PassShader->GetBindGroup(ShaderParameter);
 		
 		GpuRenderPipelineStateDesc PipelineDesc{
 			.Vs = PassShader->GetVertexShader(),
 			.Ps = PassShader->GetPixelShader(),
 			.Targets = {
 				{ .TargetFormat = DebuggerTex->GetFormat() }
-			}
+			},
+			.BindGroupLayouts = { PassShader->GetShaderBindGroupLayout() },
 		};
-		Bindings.ApplyBindGroupLayout(PipelineDesc);
 		
 		TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 		
 		RenderGraph RG;
-		RG.AddRenderPass(TEXT("DebuggerGrid"), MoveTemp(PassDesc), MoveTemp(Bindings),
-			[Pipeline](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
-				Bindings.ApplyBindGroup(PassRecorder);
+		RG.AddRenderPass(TEXT("DebuggerGrid"), MoveTemp(PassDesc),
+			[Pipeline, ShaderBindGroup](GpuRenderPassRecorder* PassRecorder) {
+				PassRecorder->SetBindGroups({ ShaderBindGroup.GetReference() });
 				PassRecorder->SetRenderPipelineState(Pipeline);
 				PassRecorder->DrawPrimitive(0, 3, 0, 1);
 			}
-		);
+		).Read(RawTex);
 		RG.Execute();
 	}
 

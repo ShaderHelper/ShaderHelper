@@ -15,8 +15,8 @@ VsOutput MainVS(in uint VertID : SV_VertexID)
 	return Output;
 }
 
-DECLARE_SHADER_TEXTURE(Texture2D, InputTex, 0)
-DECLARE_SHADER_SAMPLER(SamplerState, InputTexSampler, 1)
+Texture2D InputTex : register(t0, space2);
+SamplerState InputTexSampler : register(s1, space2);
 
 float4 MainPS(VsOutput Input) : SV_Target
 {

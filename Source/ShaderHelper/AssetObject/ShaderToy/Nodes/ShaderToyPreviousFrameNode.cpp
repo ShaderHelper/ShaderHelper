@@ -29,9 +29,9 @@ namespace SH
 	}
 
 	ShaderToyPreviousFrameNode::ShaderToyPreviousFrameNode(ShaderToyPassNode* InPassNode)
+		: PassNode(InPassNode)
 	{
 		ObjectName = LOCALIZATION("PreviousFrame");
-		PassNode = InPassNode->GetGuid();
 	}
 
 	ShaderToyPreviousFrameNode::~ShaderToyPreviousFrameNode()
@@ -52,7 +52,7 @@ namespace SH
 		{
 			if (Node->DynamicMetaType() == GetMetaType<ShaderToyPassNode>())
 			{
-				AllPassNodes.Add(MakeShared<FGuid>(Node->GetGuid()));
+				AllPassNodes.Add(MakeShared<ObserverObjectPtr<ShaderToyPassNode>>(static_cast<ShaderToyPassNode*>(Node.Get())));
 			}
 		}
 	}
@@ -77,24 +77,28 @@ namespace SH
 		GraphNode::PostLoad();
 	}
 
-	TSharedPtr<SWidget> ShaderToyPreviousFrameNode::ExtraNodeWidget()
+	TSharedPtr<SWidget> ShaderToyPreviousFrameNode::ExtraNodeWidget(SGraphNode* /*OwnerWidget*/)
 	{
 		return SNew(SBox).Padding(4)
 			[
-				SNew(SComboBox<TSharedPtr<FGuid>>)
+				SNew(SComboBox<TSharedPtr<ObserverObjectPtr<ShaderToyPassNode>>>)
 				.OptionsSource(&AllPassNodes)
 				.OnComboBoxOpening_Lambda([this] {
 					UpdatePassNodes();
 				})
-				.OnSelectionChanged_Lambda([this](TSharedPtr<FGuid> InItem, ESelectInfo::Type) {
+				.OnSelectionChanged_Lambda([this](TSharedPtr<ObserverObjectPtr<ShaderToyPassNode>> InItem, ESelectInfo::Type) {
 					if (InItem && PassNode != *InItem)
 					{
-						PassNode = *InItem;
+						PassNode = InItem->Get();
 						GetOuterMost()->MarkDirty();
 					}
 				})
-				.OnGenerateWidget_Lambda([this](TSharedPtr<FGuid> InItem) {
-					FText NodeName = static_cast<ShaderToy*>(GetOuterMost())->GetNode(*InItem)->ObjectName;
+				.OnGenerateWidget_Lambda([this](TSharedPtr<ObserverObjectPtr<ShaderToyPassNode>> InItem) {
+					FText NodeName;
+					if (InItem && InItem->IsValid())
+					{
+						NodeName = InItem->Get()->ObjectName;
+					}
 					return SNew(STextBlock).Text(NodeName);
 				})
 				[
@@ -115,14 +119,14 @@ namespace SH
 	{
 		TArray<TSharedRef<FW::PropertyData>> Result = ShObject::GeneratePropertyDatas();
 		auto PassNodePropertyItem = MakeShared<PropertyItemBase>(this, "Pass");
-		PassNodePropertyItem->SetEmbedWidget(ExtraNodeWidget());
+		PassNodePropertyItem->SetEmbedWidget(ExtraNodeWidget(nullptr));
 		Result.Add(PassNodePropertyItem);
 		return Result;
 	}
 
 	ExecRet ShaderToyPreviousFrameNode::Exec(GraphExecContext& Context)
 	{
-		GraphNode* PassNodeInstance = static_cast<ShaderToy*>(GetOuterMost())->GetNode(PassNode);
+		ShaderToyPassNode* PassNodeInstance = GetPassNode();
 		if (!PassNodeInstance)
 		{
 			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" does not specify the corresponding ShaderPass Node."), *ObjectName.ToString());
@@ -164,6 +168,6 @@ namespace SH
 
 	ShaderToyPassNode* ShaderToyPreviousFrameNode::GetPassNode()
 	{
-		return static_cast<ShaderToyPassNode*>(static_cast<ShaderToy*>(GetOuterMost())->GetNode(PassNode).Get());
+		return PassNode.Get();
 	}
 }

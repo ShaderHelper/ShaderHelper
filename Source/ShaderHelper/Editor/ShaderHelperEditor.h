@@ -68,7 +68,9 @@ namespace SH
 		TSharedPtr<SWindow> GetMainWindow() const override { return MainWindow; }
 		TWeakPtr<SWindow> GetPreferenceWindow() const { return PreferenceWindow; }
 		FW::PreviewViewPort* GetViewPort() const { return ViewPort.Get(); }
-		FW::ShObject* GetCurPropertyObject() const { return CurPropertyObject; }
+		FW::ShObject* GetCurPropertyObject() const { 
+			return CurPropertyObject.IsValid() ? CurPropertyObject.Get() : nullptr;
+		}
 		TSharedPtr<FUICommandList> GetUICommandList() const { return UICommandList; }
 		SDebuggerVariableView* GetDebuggerLocalVariableView() const { return DebuggerLocalVariableView.Get(); }
 		SDebuggerVariableView* GetDebuggerGlobalVariableView() const { return DebuggerGlobalVariableView.Get(); }
@@ -98,10 +100,10 @@ namespace SH
 		bool OpenGraph(FW::AssetPtr<FW::Graph> InGraphData);
 		void SetGraphRenderComp(TSharedPtr<FW::RenderComponent> InGraphRenderComp);
         void RefreshProperty(bool bClear = false);
-        void ShowProperty(FW::ShObject* InObjectData);
+		void ShowProperty(FW::ShObject* InObjectData) override;
         void UpdateShaderPath(const FString& InShaderPath);
 		bool IsPropertyLocked() { return PropertyView->IsLocked(); }
-		void AddNavigationInfo(const FGuid& Id, const FTextLocation& InLocation);
+		void AddNavigationInfo(FW::AssetPtr<ShaderAsset> InShader, const FTextLocation& InLocation);
 		
 		DebuggableObject* GetDebuggaleObject() const { return CurDebuggableObject; }
 		void SetDebuggableObject(DebuggableObject* InObject) { CurDebuggableObject = InObject; }
@@ -170,7 +172,7 @@ namespace SH
 
         TSharedPtr<SVerticalBox> WindowContentBox;
 		TSharedPtr<FW::SPropertyView> PropertyView;
-        FW::ShObject* CurPropertyObject = nullptr;
+        FW::ObserverObjectPtr<FW::ShObject> CurPropertyObject;
         
 		TSharedPtr<ShProject> CurProject;
 
@@ -200,7 +202,7 @@ namespace SH
 
 		static constexpr int MaxNavigation = 233;
 		int32 NavigationIndex = INDEX_NONE;
-		TArray<TPair<FGuid, FTextLocation>> NavigationHistory;
+		TArray<TPair<FW::AssetPtr<ShaderAsset>, FTextLocation>> NavigationHistory;
 		
 		double LastForceRenderTime = 0.0;
 		static constexpr double ForceRenderThrottleInterval = 1.0 / 60.0;

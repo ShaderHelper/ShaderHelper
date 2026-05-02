@@ -132,7 +132,7 @@ namespace SH
 	GpuBindGroupBuilder ShaderToyPassNode::GetBuiltInBindGroupBuiler(GpuBindGroupLayout* Layout)
 	{
 		auto Builder = GpuBindGroupBuilder{ Layout }
-			.SetExistingBinding(0, BindingType::RWRawBuffer, TSingleton<PrintBuffer>::Get().GetResource(), BindingShaderStage::Pixel)
+			.SetExistingBinding(114, BindingType::RWRawBuffer, TSingleton<PrintBuffer>::Get().GetResource(), BindingShaderStage::Pixel)
 			.SetUniformBuffer("BuiltInUniform", BuiltinUniformBuffer->GetGpuResource());
 
 		const ShaderToyChannelDesc* ChannelDescs[4] = { &iChannelDesc0, &iChannelDesc1, &iChannelDesc2, &iChannelDesc3 };
@@ -193,12 +193,12 @@ namespace SH
 		
 		return PixelState{
 			.ViewPortDesc = {(float)RT->GetWidth(), (float)RT->GetHeight()},
-			.Builders = BindingState{
-				.GlobalBuilder = BindingBuilder{
+			.Builders = {
+				{
 					.BingGroupBuilder = GetBuiltInBindGroupBuiler(BuiltInLayout),
 					.LayoutBuilder = ShaderAssetObj->GetBuiltInBindLayoutBuilder()
 				},
-				.PassBuilder = BindingBuilder{
+				{
 					.BingGroupBuilder = *CustomBindGroupBuilder,
 					.LayoutBuilder = ShaderAssetObj->CustomBindGroupLayoutBuilder
 				}
@@ -352,7 +352,7 @@ namespace SH
 		TArray<const char*> DxcArgs;
 		DxcArgs.Add("/Od");
 		DxcArgs.Add("-D");
-		DxcArgs.Add("ENABLE_PRINT=0");
+		DxcArgs.Add("GPrivate_ENABLE_PRINT=0");
 		DxcArgs.Add("-D");
 		DxcArgs.Add("ENABLE_ASSERT=0");
 		ShaderConductor::Compiler::Options SCOptions;
@@ -667,7 +667,7 @@ namespace SH
 	
 	}
 
-	TSharedPtr<SWidget> ShaderToyPassNode::ExtraNodeWidget()
+	TSharedPtr<SWidget> ShaderToyPassNode::ExtraNodeWidget(SGraphNode* /*OwnerWidget*/)
 	{
 		return SNew(SBox).Padding(4.0f)
 			[
@@ -779,15 +779,19 @@ namespace SH
 		GraphNode::PostPropertyChanged(InProperty);
         
         //Shader asset changed.
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
         if(InProperty->IsOfType<PropertyAssetItem>() && InProperty->GetDisplayName().EqualTo(LOCALIZATION("Shader")))
         {
-			ShaderAssetObj->OnDestroy.AddRaw(this, &ShaderToyPassNode::ClearBindingProperty);
-			ShaderAssetObj->OnShaderRefreshed.AddRaw(this, &ShaderToyPassNode::OnShaderBindingChanged, true);
-            OnShaderBindingChanged(false);
+			if (ShaderAssetObj)
+			{
+				ShaderAssetObj->OnDestroy.AddRaw(this, &ShaderToyPassNode::ClearBindingProperty);
+				ShaderAssetObj->OnShaderRefreshed.AddRaw(this, &ShaderToyPassNode::OnShaderBindingChanged, true);
+				OnShaderBindingChanged(false);
+			}
+			ShEditor->RefreshProperty();
         }
 		else if(IsProperyUniformItem(InProperty))
 		{
-			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 			ShEditor->ForceRender();
 		}
     }
@@ -827,12 +831,14 @@ namespace SH
 			{
 				if (GraphPin* SrcPin = OldPin->GetSourcePin())
 				{
-					GraphNode* SrcNode = static_cast<GraphNode*>(SrcPin->GetOuter());
-					SrcNode->OutPinToInPin.Remove(SrcPin->GetGuid(), OldPin->GetGuid());
-					Graph* OwnerGraph = static_cast<Graph*>(GetOuter());
-					OwnerGraph->RemoveDep(SrcNode, this);
+					if (GraphNode* SrcNode = SrcPin->GetOwnerNode())
+					{
+						SrcNode->OutPinToInPin.Remove(SrcPin, OldPin);
+						Graph* OwnerGraph = static_cast<Graph*>(GetOuter());
+						OwnerGraph->RemoveDep(this, SrcNode);
+					}
 				}
-				OldPin->SourcePin.Invalidate();
+				OldPin->SourcePin.Reset();
 				OldPin->Refuse();
 			}
 
@@ -1068,12 +1074,8 @@ namespace SH
             }
 
 			auto BuiltInLayout = ShaderAssetObj->GetBuiltInBindLayout();
-
-			BindingContext Bindings;
-			Bindings.SetGlobalBindGroupLayout(BuiltInLayout);
-			Bindings.SetPassBindGroupLayout(CustomBindLayout);
-			Bindings.SetGlobalBindGroup(GetBuiltInBindGroup(BuiltInLayout));
-			Bindings.SetPassBindGroup(CustomBindGroup);
+			TRefCountPtr<GpuBindGroup> BuiltInBindGroup = GetBuiltInBindGroup(BuiltInLayout);
+			TRefCountPtr<GpuBindGroup> PassBindGroup = CustomBindGroup;
 
 			PipelineDesc = GpuRenderPipelineStateDesc{
 				.CheckLayout = true,
@@ -1082,8 +1084,8 @@ namespace SH
 				.Targets = {
                     { .TargetFormat = PassOutput->GetValue()->GetFormat() }
                 },
+				.BindGroupLayouts = { BuiltInLayout.GetReference(), CustomBindLayout.GetReference() },
             };
-			Bindings.ApplyBindGroupLayout(PipelineDesc);
 
 			TRefCountPtr<GpuRenderPipelineState> PipelineState;
 
@@ -1097,26 +1099,42 @@ namespace SH
 				return { true, true };
 			}
 
-			ShaderToyContext.RG->AddRenderPass(ObjectName.ToString(), MoveTemp(PassDesc), MoveTemp(Bindings),
-				[PipelineState](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
-					Bindings.ApplyBindGroup(PassRecorder);
+			auto& RenderPass = ShaderToyContext.RG->AddRenderPass(ObjectName.ToString(), MoveTemp(PassDesc),
+				[PipelineState, BuiltInBindGroup, PassBindGroup](GpuRenderPassRecorder* PassRecorder) {
+					PassRecorder->SetBindGroups({ BuiltInBindGroup.GetReference(), PassBindGroup.GetReference() });
 					PassRecorder->SetRenderPipelineState(PipelineState);;
 					PassRecorder->DrawPrimitive(0, 3, 0, 1);
 				}
 			);
+			RenderPass.Write(TSingleton<PrintBuffer>::Get().GetResource());
+			for (int i = 0; i < 4; i++)
+			{
+				FString ChannelName = FString::Printf(TEXT("iChannel%d"), i);
+				GpuTexture* ChannelTexture = nullptr;
+				if (FlippedChannelTextures[i].IsValid())
+				{
+					ChannelTexture = FlippedChannelTextures[i].GetReference();
+				}
+				else if (ShaderAssetObj->ChannelSlotTypes[i] == ShaderToySlotType::Texture2D)
+				{
+					ChannelTexture = static_cast<GpuTexturePin*>(GetPin(ChannelName))->GetValue();
+				}
+				RenderPass.Read(ChannelTexture);
+			}
 			ShaderToyContext.RG->Execute();
 
 			ShaderAssertInfo AssertInfo;
 			TArray<ShaderPrintInfo> ShaderPrintLogs = TSingleton<PrintBuffer>::Get().GetPrintStrings(AssertInfo);
 			TSingleton<PrintBuffer>::Get().Clear();
-			int AddedLineNum = ShaderAssetObj->GetExtraLineNum();
+			int ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
 			if(AssertInfo.AssertString.IsEmpty())
 			{
 				for (const ShaderPrintInfo& PrintLog : ShaderPrintLogs)
 				{
-					if (PrintLog.Line - AddedLineNum > 0)
+					//TODO Header print
+					if (PrintLog.Line - ExtraLineNum > 0)
 					{
-						SH_LOG(LogShader, Display, TEXT("%s:%d:%s"), *ObjectName.ToString(), PrintLog.Line - AddedLineNum, *PrintLog.PrintStr);
+						SH_LOG(LogShader, Display, TEXT("%s:%d:%s"), *ObjectName.ToString(), PrintLog.Line - ExtraLineNum, *PrintLog.PrintStr);
 					}
 					else
 					{
@@ -1126,9 +1144,9 @@ namespace SH
 			}
 			else
 			{
-				if (AssertInfo.Line - AddedLineNum > 0)
+				if (AssertInfo.Line - ExtraLineNum > 0)
 				{
-					SH_LOG(LogShader, Error, TEXT("%s:%d:%s"), *ObjectName.ToString(), AssertInfo.Line - AddedLineNum, *AssertInfo.AssertString);
+					SH_LOG(LogShader, Error, TEXT("%s:%d:%s"), *ObjectName.ToString(), AssertInfo.Line - ExtraLineNum, *AssertInfo.AssertString);
 				}
 				else
 				{

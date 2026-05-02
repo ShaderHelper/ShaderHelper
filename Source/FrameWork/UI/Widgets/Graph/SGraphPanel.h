@@ -58,6 +58,34 @@ namespace FW
 		Vector2D OldPos, NewPos;
 	};
 
+	class FRAMEWORK_API ResizeNodeCommand : public GraphCommand {
+	public:
+		ResizeNodeCommand(SGraphPanel* InGraphPanel, ObjectPtr<GraphNode> InNodeData, float InOldWidth, float InNewWidth)
+			: GraphCommand(InGraphPanel)
+			, NodeData(InNodeData), OldWidth(InOldWidth), NewWidth(InNewWidth)
+		{}
+		void Do() override;
+		void Undo() override;
+	private:
+		ObjectPtr<GraphNode> NodeData;
+		float OldWidth = GraphNode::DefaultNodeWidth;
+		float NewWidth = GraphNode::DefaultNodeWidth;
+	};
+
+	class FRAMEWORK_API SetNodeCollapsedCommand : public GraphCommand {
+	public:
+		SetNodeCollapsedCommand(SGraphPanel* InGraphPanel, ObjectPtr<GraphNode> InNodeData, bool InOldCollapsed, bool InNewCollapsed)
+			: GraphCommand(InGraphPanel)
+			, NodeData(InNodeData), OldCollapsed(InOldCollapsed), NewCollapsed(InNewCollapsed)
+		{}
+		void Do() override;
+		void Undo() override;
+	private:
+		ObjectPtr<GraphNode> NodeData;
+		bool OldCollapsed = false;
+		bool NewCollapsed = false;
+	};
+
 	class FRAMEWORK_API AddNodeCommand : public GraphCommand {
 	public:
 		AddNodeCommand(SGraphPanel* InGraphPanel, ObjectPtr<GraphNode> InNodeData, const Vector2D& InPos)
@@ -191,6 +219,7 @@ namespace FW
 		virtual bool SupportsKeyboardFocus() const override { return true; }
 		FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 		void DrawConnection(const FPaintGeometry& PaintGeometry, FSlateWindowElementList& OutDrawElements, int32 Layer, PinDirection InStartDir, const Vector2D& Start, const Vector2D& End) const;
+		Vector2D GetPinConnectionPoint(SGraphPin* Pin, const FGeometry& PanelGeometry, bool bUsePaintSpaceGeometry) const;
 		virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
 
 		void GenerateMenuNodeItems(const FText& InFilterText = FText::GetEmpty());

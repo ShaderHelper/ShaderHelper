@@ -546,7 +546,6 @@ namespace FW
 		StateCache.SetGraphicsBindGroups(Dx12BindGroups);
 	}
 
-
 	void Dx12ComputePassRecorder::Dispatch(uint32 ThreadGroupCountX, uint32 ThreadGroupCountY, uint32 ThreadGroupCountZ)
 	{
 		StateCache.ApplyComputeState(CmdList);

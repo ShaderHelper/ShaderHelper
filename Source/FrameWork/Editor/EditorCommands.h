@@ -22,7 +22,7 @@ namespace FW
 		{
 #define LOCTEXT_NAMESPACE ""
 			UI_COMMAND_SH(Undo, LOCALIZATION("Undo"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::Z));
-			UI_COMMAND_SH(Redo, LOCALIZATION("Redo"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::Y));
+			UI_COMMAND_SH(Redo, LOCALIZATION("Redo"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control | EModifierKey::Shift, EKeys::Z));
 #undef LOCTEXT_NAMESPACE
 		}
 

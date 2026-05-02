@@ -16,7 +16,7 @@ namespace SH
 				 .AddUint("Zoom")
 				 .AddVector2f("MouseLoc");
 		
-		BindGroupLayout = GpuBindGroupLayoutBuilder{ BindingContext::ShaderSlot }
+		ShaderBindGroupLayout = GpuBindGroupLayoutBuilder{ 2 }
 							.AddUniformBuffer("GridUb", GridUbBuilder, BindingShaderStage::Pixel)
 							.AddTexture("InputTex", BindingShaderStage::Pixel)
 							.Build();
@@ -25,14 +25,14 @@ namespace SH
 			.FileName = PathHelper::ShaderDir() / "ShaderHelper/Debugger/Grid.hlsl",
 			.Type = ShaderType::Vertex,
 			.EntryPoint = "MainVS",
-			.ExtraDecl = BindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL)
+			.ExtraDecl = ShaderBindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL)
 		});
 
 		Ps = GGpuRhi->CreateShaderFromFile({
 			.FileName = PathHelper::ShaderDir() / "ShaderHelper/Debugger/Grid.hlsl",
 			.Type = ShaderType::Pixel,
 			.EntryPoint = "MainPS",
-			.ExtraDecl = BindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL)
+			.ExtraDecl = ShaderBindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL)
 		});
 
 		FString ErrorInfo, WarnInfo;
@@ -50,7 +50,7 @@ namespace SH
 		GridUb->GetMember<Vector2f>("Offset") = InParameters.Offset;
 		GridUb->GetMember<Vector2f>("MouseLoc") = InParameters.MouseLoc;
 		
-		return GpuBindGroupBuilder{ BindGroupLayout }
+		return GpuBindGroupBuilder{ ShaderBindGroupLayout }
 				.SetUniformBuffer("GridUb", GridUb->GetGpuResource())
 				.SetTexture("InputTex", InParameters.InputTex)
 				.Build();

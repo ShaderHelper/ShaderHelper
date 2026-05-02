@@ -8,9 +8,9 @@ namespace FW
 	PrintBuffer::PrintBuffer()
 	{
 		TArray<uint8> Datas;
-		Datas.SetNumZeroed(sizeof(HLSL::Printer));
+		Datas.SetNumZeroed(sizeof(HLSL::GPrivate_PrinterBuffer));
 		InternalBuffer = GGpuRhi->CreateBuffer({
-			.ByteSize = sizeof(HLSL::Printer),
+			.ByteSize = sizeof(HLSL::GPrivate_PrinterBuffer),
 			.Usage = GpuBufferUsage::RWRaw,
 			.InitialData = Datas,
 		});
@@ -19,7 +19,7 @@ namespace FW
 	TArray<ShaderPrintInfo> PrintBuffer::GetPrintStrings(ShaderAssertInfo& OutAssertInfo)
 	{
 		TArray<ShaderPrintInfo> PrintInfos;
-		HLSL::Printer* Printer = (HLSL::Printer*)GGpuRhi->MapGpuBuffer(InternalBuffer, GpuResourceMapMode::Read_Only);
+		HLSL::GPrivate_PrinterBuffer* Printer = (HLSL::GPrivate_PrinterBuffer*)GGpuRhi->MapGpuBuffer(InternalBuffer, GpuResourceMapMode::Read_Only);
 		uint32 ByteOffset = 4;
 		while (ByteOffset < Printer->ByteSize)
 		{
@@ -35,76 +35,76 @@ namespace FW
 			TArray<FStringFormatArg> Args;
 			while (ArgNum--)
 			{
-				HLSL::TypeTag Tag = static_cast<HLSL::TypeTag>(*((uint8*)Printer + ByteOffset));
+				HLSL::GPrivate_TypeTag Tag = static_cast<HLSL::GPrivate_TypeTag>(*((uint8*)Printer + ByteOffset));
 				ByteOffset += 1;
 				void* ArgValue = (uint8*)Printer + ByteOffset;
-				if (Tag == HLSL::Print_float)
+				if (Tag == HLSL::GPrivate_Print_float)
 				{
 					FString Arg = FString::Printf(TEXT("%.9g"), *(float*)ArgValue);
 					Args.Add(Arg);
 					ByteOffset += sizeof(float);
 				}
-				else if (Tag == HLSL::Print_float2)
+				else if (Tag == HLSL::GPrivate_Print_float2)
 				{
 					Vector2f Arg = *(Vector2f*)ArgValue;
 					Args.Add(Arg.ToString());
 					ByteOffset += sizeof(Vector2f);
 				}
-				else if (Tag == HLSL::Print_float3)
+				else if (Tag == HLSL::GPrivate_Print_float3)
 				{
 					Vector3f Arg = *(Vector3f*)ArgValue;
 					Args.Add(Arg.ToString());
 					ByteOffset += sizeof(Vector3f);
 				}
-				else if (Tag == HLSL::Print_float4)
+				else if (Tag == HLSL::GPrivate_Print_float4)
 				{
 					Vector4f Arg = *(Vector4f*)ArgValue;
 					Args.Add(Arg.ToString());
 					ByteOffset += sizeof(Vector4f);
 				}
-				else if (Tag == HLSL::Print_int)
+				else if (Tag == HLSL::GPrivate_Print_int)
 				{
 					int Arg = *(int*)ArgValue;
 					Args.Add(Arg);
 					ByteOffset += sizeof(int);
 				}
-				else if (Tag == HLSL::Print_int2)
+				else if (Tag == HLSL::GPrivate_Print_int2)
 				{
 					Vector2i Arg = *(Vector2i*)ArgValue;
 					Args.Add(Arg.ToString());
 					ByteOffset += sizeof(Vector2i);
 				}
-				else if (Tag == HLSL::Print_int3)
+				else if (Tag == HLSL::GPrivate_Print_int3)
 				{
 					Vector3i Arg = *(Vector3i*)ArgValue;
 					Args.Add(Arg.ToString());
 					ByteOffset += sizeof(Vector3i);
 				}
-				else if (Tag == HLSL::Print_int4)
+				else if (Tag == HLSL::GPrivate_Print_int4)
 				{
 					Vector4i Arg = *(Vector4i*)ArgValue;
 					Args.Add(Arg.ToString());
 					ByteOffset += sizeof(Vector4i);
 				}
-				else if (Tag == HLSL::Print_uint || Tag == HLSL::Print_bool)
+				else if (Tag == HLSL::GPrivate_Print_uint || Tag == HLSL::GPrivate_Print_bool)
 				{
 					uint32 Arg = *(uint32*)ArgValue;
 					Args.Add(Arg);
 					ByteOffset += sizeof(uint32);
 				}
-				else if (Tag == HLSL::Print_uint2 || Tag == HLSL::Print_bool2)
+				else if (Tag == HLSL::GPrivate_Print_uint2 || Tag == HLSL::GPrivate_Print_bool2)
 				{
 					Vector2u Arg = *(Vector2u*)ArgValue;
 					Args.Add(Arg.ToString());
 					ByteOffset += sizeof(Vector2u);
 				}
-				else if (Tag == HLSL::Print_uint3 || Tag == HLSL::Print_bool3)
+				else if (Tag == HLSL::GPrivate_Print_uint3 || Tag == HLSL::GPrivate_Print_bool3)
 				{
 					Vector3u Arg = *(Vector3u*)ArgValue;
 					Args.Add(Arg.ToString());
 					ByteOffset += sizeof(Vector3u);
 				}
-				else if (Tag == HLSL::Print_uint4 || Tag == HLSL::Print_bool4)
+				else if (Tag == HLSL::GPrivate_Print_uint4 || Tag == HLSL::GPrivate_Print_bool4)
 				{
 					Vector4u Arg = *(Vector4u*)ArgValue;
 					Args.Add(Arg.ToString());

@@ -44,7 +44,7 @@ namespace SH
 		Ar << BindingMemberDefaults;
 		Ar << BindingResourceDefaults;
 		Ar << VertexInputDefaults;
-		Ar << FillMode << CullMode;
+		Ar << FillMode << CullMode << Primitive;
 		Ar << BlendEnable << SrcBlendFactor << DestBlendFactor << ColorBlendOp;
 		Ar << DepthTestEnable << DepthCompare;
 	}
@@ -349,23 +349,22 @@ namespace SH
 
 			// FillMode
 			{
-				auto CurrentName = MakeShared<FString>(ANSI_TO_TCHAR(magic_enum::enum_name(FillMode).data()));
-				TMap<FString, TSharedPtr<void>> Entries;
-				for (const auto& [V, S] : magic_enum::enum_entries<RasterizerFillMode>())
-					Entries.Add(ANSI_TO_TCHAR(S.data()), MakeShared<RasterizerFillMode>(V));
-				auto Item = MakeShared<PropertyEnumItem>(this, LOCALIZATION("FillMode"), CurrentName, Entries,
-					[this](void* InValue) { FillMode = *static_cast<RasterizerFillMode*>(InValue); });
+				auto Item = MakePropertyEnumItem<RasterizerFillMode>(this, LOCALIZATION("FillMode"), FillMode,
+					[this](RasterizerFillMode InValue) { FillMode = InValue; });
 				RasterizerCategory->AddChild(Item);
 			}
 
 			// CullMode
 			{
-				auto CurrentName = MakeShared<FString>(ANSI_TO_TCHAR(magic_enum::enum_name(CullMode).data()));
-				TMap<FString, TSharedPtr<void>> Entries;
-				for (const auto& [V, S] : magic_enum::enum_entries<RasterizerCullMode>())
-					Entries.Add(ANSI_TO_TCHAR(S.data()), MakeShared<RasterizerCullMode>(V));
-				auto Item = MakeShared<PropertyEnumItem>(this, LOCALIZATION("CullMode"), CurrentName, Entries,
-					[this](void* InValue) { CullMode = *static_cast<RasterizerCullMode*>(InValue); });
+				auto Item = MakePropertyEnumItem<RasterizerCullMode>(this, LOCALIZATION("CullMode"), CullMode,
+					[this](RasterizerCullMode InValue) { CullMode = InValue; });
+				RasterizerCategory->AddChild(Item);
+			}
+
+			// PrimitiveType
+			{
+				auto Item = MakePropertyEnumItem<PrimitiveType>(this, LOCALIZATION("PrimitiveType"), Primitive,
+					[this](PrimitiveType InValue) { Primitive = InValue; });
 				RasterizerCategory->AddChild(Item);
 			}
 		}
@@ -380,34 +379,22 @@ namespace SH
 
 			// SrcFactor
 			{
-				auto CurrentName = MakeShared<FString>(ANSI_TO_TCHAR(magic_enum::enum_name(SrcBlendFactor).data()));
-				TMap<FString, TSharedPtr<void>> Entries;
-				for (const auto& [V, S] : magic_enum::enum_entries<BlendFactor>())
-					Entries.Add(ANSI_TO_TCHAR(S.data()), MakeShared<BlendFactor>(V));
-				auto Item = MakeShared<PropertyEnumItem>(this, LOCALIZATION("SrcFactor"), CurrentName, Entries,
-					[this](void* InValue) { SrcBlendFactor = *static_cast<BlendFactor*>(InValue); });
+				auto Item = MakePropertyEnumItem<BlendFactor>(this, LOCALIZATION("SrcFactor"), SrcBlendFactor,
+					[this](BlendFactor InValue) { SrcBlendFactor = InValue; });
 				BlendCategory->AddChild(Item);
 			}
 
 			// DestFactor
 			{
-				auto CurrentName = MakeShared<FString>(ANSI_TO_TCHAR(magic_enum::enum_name(DestBlendFactor).data()));
-				TMap<FString, TSharedPtr<void>> Entries;
-				for (const auto& [V, S] : magic_enum::enum_entries<BlendFactor>())
-					Entries.Add(ANSI_TO_TCHAR(S.data()), MakeShared<BlendFactor>(V));
-				auto Item = MakeShared<PropertyEnumItem>(this, LOCALIZATION("DestFactor"), CurrentName, Entries,
-					[this](void* InValue) { DestBlendFactor = *static_cast<BlendFactor*>(InValue); });
+				auto Item = MakePropertyEnumItem<BlendFactor>(this, LOCALIZATION("DestFactor"), DestBlendFactor,
+					[this](BlendFactor InValue) { DestBlendFactor = InValue; });
 				BlendCategory->AddChild(Item);
 			}
 
 			// ColorBlendOp
 			{
-				auto CurrentName = MakeShared<FString>(ANSI_TO_TCHAR(magic_enum::enum_name(ColorBlendOp).data()));
-				TMap<FString, TSharedPtr<void>> Entries;
-				for (const auto& [V, S] : magic_enum::enum_entries<BlendOp>())
-					Entries.Add(ANSI_TO_TCHAR(S.data()), MakeShared<BlendOp>(V));
-				auto Item = MakeShared<PropertyEnumItem>(this, LOCALIZATION("BlendOp"), CurrentName, Entries,
-					[this](void* InValue) { ColorBlendOp = *static_cast<BlendOp*>(InValue); });
+				auto Item = MakePropertyEnumItem<BlendOp>(this, LOCALIZATION("BlendOp"), ColorBlendOp,
+					[this](BlendOp InValue) { ColorBlendOp = InValue; });
 				BlendCategory->AddChild(Item);
 			}
 		}
@@ -422,12 +409,8 @@ namespace SH
 
 			// CompareMode
 			{
-				auto CurrentName = MakeShared<FString>(ANSI_TO_TCHAR(magic_enum::enum_name(DepthCompare).data()));
-				TMap<FString, TSharedPtr<void>> Entries;
-				for (const auto& [V, S] : magic_enum::enum_entries<CompareMode>())
-					Entries.Add(ANSI_TO_TCHAR(S.data()), MakeShared<CompareMode>(V));
-				auto Item = MakeShared<PropertyEnumItem>(this, LOCALIZATION("CompareMode"), CurrentName, Entries,
-					[this](void* InValue) { DepthCompare = *static_cast<CompareMode*>(InValue); });
+				auto Item = MakePropertyEnumItem<CompareMode>(this, LOCALIZATION("CompareMode"), DepthCompare,
+					[this](CompareMode InValue) { DepthCompare = InValue; });
 				DepthCategory->AddChild(Item);
 			}
 		}
@@ -463,19 +446,10 @@ namespace SH
 				ItemLabel = FText::FromString(Default.Name + TEXT(" (") + Default.Type + TEXT(")"));
 			}
 
-			auto CurrentValueName = MakeShared<FString>(ANSI_TO_TCHAR(magic_enum::enum_name(Default.Attribute).data()));
-
-			TMap<FString, TSharedPtr<void>> EnumEntries;
-			for (const auto& [EntryValue, EntryStr] : magic_enum::enum_entries<BuiltInVertexAttribute>())
-			{
-				EnumEntries.Add(ANSI_TO_TCHAR(EntryStr.data()), MakeShared<BuiltInVertexAttribute>(EntryValue));
-			}
-
 			uint32 Location = Default.Location;
-			auto EnumItem = MakeShared<PropertyEnumItem>(
-				this, ItemLabel, CurrentValueName, EnumEntries,
-				[this, Location](void* InValue) {
-					BuiltInVertexAttribute NewValue = *static_cast<BuiltInVertexAttribute*>(InValue);
+			auto EnumItem = MakePropertyEnumItem<BuiltInVertexAttribute>(
+				this, ItemLabel, Default.Attribute,
+				[this, Location](BuiltInVertexAttribute NewValue) {
 					for (auto& D : VertexInputDefaults)
 					{
 						if (D.Location == Location)
@@ -538,20 +512,11 @@ namespace SH
 
 			if (IsShaderMatrix4x4Type(Default.Type))
 			{
-				auto CurrentValueName = MakeShared<FString>(ANSI_TO_TCHAR(magic_enum::enum_name(Default.MatrixValue).data()));
-
-				TMap<FString, TSharedPtr<void>> EnumEntries;
-				for (const auto& [EntryValue, EntryStr] : magic_enum::enum_entries<BuiltInMatrix4x4Value>())
-				{
-					EnumEntries.Add(ANSI_TO_TCHAR(EntryStr.data()), MakeShared<BuiltInMatrix4x4Value>(EntryValue));
-				}
-
 				FString BindingName = Default.BindingName;
 				FString MemberName = Default.MemberName;
-				auto EnumItem = MakeShared<PropertyEnumItem>(
-					this, ItemLabel, CurrentValueName, EnumEntries,
-					[this, BindingName, MemberName](void* InValue) {
-						BuiltInMatrix4x4Value NewValue = *static_cast<BuiltInMatrix4x4Value*>(InValue);
+				auto EnumItem = MakePropertyEnumItem<BuiltInMatrix4x4Value>(
+					this, ItemLabel, Default.MatrixValue,
+					[this, BindingName, MemberName](BuiltInMatrix4x4Value NewValue) {
 						for (auto& D : BindingMemberDefaults)
 						{
 							if (D.BindingName == BindingName && D.MemberName == MemberName)
@@ -564,17 +529,17 @@ namespace SH
 				);
 				UbCategory->AddChild(EnumItem);
 			}
-			else if (Default.Type == TEXT("float"))
+			else if (IsShaderFloatType(Default.Type))
 			{
 				auto Item = MakeShared<PropertyScalarItem<float>>(this, ItemLabel, &Default.Values[0]);
 				UbCategory->AddChild(Item);
 			}
-			else if (Default.Type == TEXT("int"))
+			else if (IsShaderIntType(Default.Type))
 			{
 				auto Item = MakeShared<PropertyScalarItem<int32>>(this, ItemLabel, &Default.IntValues[0]);
 				UbCategory->AddChild(Item);
 			}
-			else if (Default.Type == TEXT("uint"))
+			else if (IsShaderUintType(Default.Type))
 			{
 				auto Item = MakeShared<PropertyScalarItem<int32>>(this, ItemLabel, reinterpret_cast<int32*>(&Default.UintValues[0]));
 				Item->SetMinValue(0);
@@ -665,16 +630,10 @@ namespace SH
 
 				// Filter mode
 				{
-					auto CurrentFilterName = MakeShared<FString>(ANSI_TO_TCHAR(magic_enum::enum_name(Default.Filter).data()));
-					TMap<FString, TSharedPtr<void>> FilterEntries;
-					for (const auto& [V, S] : magic_enum::enum_entries<SamplerFilter>())
-						FilterEntries.Add(ANSI_TO_TCHAR(S.data()), MakeShared<SamplerFilter>(V));
-
 					FString BindingName = Default.BindingName;
-					auto FilterItem = MakeShared<PropertyEnumItem>(
-						this, LOCALIZATION("FilterMode"), CurrentFilterName, FilterEntries,
-						[this, BindingName](void* InValue) {
-							SamplerFilter NewFilter = *static_cast<SamplerFilter*>(InValue);
+					auto FilterItem = MakePropertyEnumItem<SamplerFilter>(
+						this, LOCALIZATION("FilterMode"), Default.Filter,
+						[this, BindingName](SamplerFilter NewFilter) {
 							for (auto& D : BindingResourceDefaults)
 							{
 								if (D.BindingName == BindingName)
@@ -690,16 +649,10 @@ namespace SH
 
 				// Address mode
 				{
-					auto CurrentAddrName = MakeShared<FString>(ANSI_TO_TCHAR(magic_enum::enum_name(Default.AddressMode).data()));
-					TMap<FString, TSharedPtr<void>> AddrEntries;
-					for (const auto& [V, S] : magic_enum::enum_entries<SamplerAddressMode>())
-						AddrEntries.Add(ANSI_TO_TCHAR(S.data()), MakeShared<SamplerAddressMode>(V));
-
 					FString BindingName = Default.BindingName;
-					auto AddrItem = MakeShared<PropertyEnumItem>(
-						this, LOCALIZATION("WrapMode"), CurrentAddrName, AddrEntries,
-						[this, BindingName](void* InValue) {
-							SamplerAddressMode NewMode = *static_cast<SamplerAddressMode*>(InValue);
+					auto AddrItem = MakePropertyEnumItem<SamplerAddressMode>(
+						this, LOCALIZATION("WrapMode"), Default.AddressMode,
+						[this, BindingName](SamplerAddressMode NewMode) {
 							for (auto& D : BindingResourceDefaults)
 							{
 								if (D.BindingName == BindingName)
@@ -736,16 +689,10 @@ namespace SH
 
 				// Filter mode
 				{
-					auto CurrentFilterName = MakeShared<FString>(ANSI_TO_TCHAR(magic_enum::enum_name(Default.Filter).data()));
-					TMap<FString, TSharedPtr<void>> FilterEntries;
-					for (const auto& [V, S] : magic_enum::enum_entries<SamplerFilter>())
-						FilterEntries.Add(ANSI_TO_TCHAR(S.data()), MakeShared<SamplerFilter>(V));
-
 					FString BindingName = Default.BindingName;
-					auto FilterItem = MakeShared<PropertyEnumItem>(
-						this, LOCALIZATION("FilterMode"), CurrentFilterName, FilterEntries,
-						[this, BindingName](void* InValue) {
-							SamplerFilter NewFilter = *static_cast<SamplerFilter*>(InValue);
+					auto FilterItem = MakePropertyEnumItem<SamplerFilter>(
+						this, LOCALIZATION("FilterMode"), Default.Filter,
+						[this, BindingName](SamplerFilter NewFilter) {
 							for (auto& D : BindingResourceDefaults)
 							{
 								if (D.BindingName == BindingName)
@@ -761,16 +708,10 @@ namespace SH
 
 				// Address mode
 				{
-					auto CurrentAddrName = MakeShared<FString>(ANSI_TO_TCHAR(magic_enum::enum_name(Default.AddressMode).data()));
-					TMap<FString, TSharedPtr<void>> AddrEntries;
-					for (const auto& [V, S] : magic_enum::enum_entries<SamplerAddressMode>())
-						AddrEntries.Add(ANSI_TO_TCHAR(S.data()), MakeShared<SamplerAddressMode>(V));
-
 					FString BindingName = Default.BindingName;
-					auto AddrItem = MakeShared<PropertyEnumItem>(
-						this, LOCALIZATION("WrapMode"), CurrentAddrName, AddrEntries,
-						[this, BindingName](void* InValue) {
-							SamplerAddressMode NewMode = *static_cast<SamplerAddressMode*>(InValue);
+					auto AddrItem = MakePropertyEnumItem<SamplerAddressMode>(
+						this, LOCALIZATION("WrapMode"), Default.AddressMode,
+						[this, BindingName](SamplerAddressMode NewMode) {
 							for (auto& D : BindingResourceDefaults)
 							{
 								if (D.BindingName == BindingName)

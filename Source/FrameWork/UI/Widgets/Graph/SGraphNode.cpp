@@ -5,10 +5,16 @@
 #include "SGraphPanel.h"
 #include "UI/Styles/FAppCommonStyle.h"
 #include "UI/Widgets/Graph/SGraphPin.h"
+#include "UI/Widgets/Misc/MiscWidget.h"
 #include "Editor/GraphEditorCommands.h"
 
 namespace FW
 {
+	namespace
+	{
+		constexpr float NodeResizeHandleWidth = 6.0f;
+	}
+
 	
 	void SGraphNode::Construct(const FArguments& InArgs, SGraphPanel* InOwnerPanel)
 	{
@@ -19,31 +25,69 @@ namespace FW
 
 		ChildSlot
 		[
-			SNew(SVerticalBox)
-			+SVerticalBox::Slot()
-			.AutoHeight()
+			SNew(SBox)
+			.WidthOverride_Lambda([this] {
+				return NodeData->NodeWidth;
+			})
 			[
-				SNew(SBorder)
-				.BorderImage(FAppCommonStyle::Get().GetBrush("Graph.NodeTitleBackground"))
-				.BorderBackgroundColor(NodeData->GetNodeColor())
-				.HAlign(HAlign_Center)
+				SNew(SVerticalBox)
+				+SVerticalBox::Slot()
+				.AutoHeight()
 				[
-					SAssignNew(NodeTitleEditText, SInlineEditableTextBlock)
-                    .IsSelected_Lambda([] {return false; })
-					.Text_Lambda([this] { return NodeData->ObjectName; })
-					.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
-						SGraphPanel::ScopedTransaction Transaction{ Owner };
-						Owner->DoCommand(MakeShared<RenameNodeCommand>(Owner, NodeData, NodeData->ObjectName, NewText));
-					})
+					SAssignNew(NodeTitleWidget, SBorder)
+					.BorderImage(FAppCommonStyle::Get().GetBrush("Graph.NodeTitleBackground"))
+					.BorderBackgroundColor(NodeData->GetNodeColor())
+					.HAlign(HAlign_Fill)
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot()
+						.AutoWidth()
+						.VAlign(VAlign_Center)
+						[
+							SNew(SIconButton)
+							.ButtonStyle(&FAppCommonStyle::Get().GetWidgetStyle<FButtonStyle>("SuperSimpleButton"))
+							.Icon_Lambda([this] {
+								return NodeData->IsCollapsed ? FAppStyle::Get().GetBrush("Icons.ChevronRight") : FAppStyle::Get().GetBrush("Icons.ChevronDown");
+							})
+							.IconSize(FVector2D{ 12.0f, 12.0f })
+							.IsFocusable(false)
+							.OnClicked_Lambda([this] {
+								SGraphPanel::ScopedTransaction Transaction{ Owner };
+								Owner->DoCommand(MakeShared<SetNodeCollapsedCommand>(Owner, NodeData, NodeData->IsCollapsed, !NodeData->IsCollapsed));
+								return FReply::Handled();
+							})
+						]
+						+ SHorizontalBox::Slot()
+						.FillWidth(1.0f)
+						.HAlign(HAlign_Center)
+						.VAlign(VAlign_Center)
+						[
+							SAssignNew(NodeTitleEditText, SInlineEditableTextBlock)
+							.IsSelected_Lambda([] {return false; })
+							.Text_Lambda([this] { return NodeData->ObjectName; })
+							.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
+								SGraphPanel::ScopedTransaction Transaction{ Owner };
+								Owner->DoCommand(MakeShared<RenameNodeCommand>(Owner, NodeData, NodeData->ObjectName, NewText));
+							})
+						]
+						+ SHorizontalBox::Slot()
+						.AutoWidth()
+						[
+							SNew(SSpacer).Size(FVector2D{ 12.0f, 1.0f })
+						]
+					]
 				]
-			]
-			+SVerticalBox::Slot()
-			[
-				SNew(SBorder)
-				.BorderImage(FAppCommonStyle::Get().GetBrush("Graph.NodeContentBackground"))
-				.Padding(FMargin{ 0.0f, 3.0f, 0.0f, 0.0f })
+				+SVerticalBox::Slot()
 				[
-					PinContainer.ToSharedRef()
+					SNew(SBorder)
+					.BorderImage(FAppCommonStyle::Get().GetBrush("Graph.NodeContentBackground"))
+					.Padding(FMargin{ 0.0f, 3.0f, 0.0f, 0.0f })
+					.Visibility_Lambda([this] {
+						return NodeData->IsCollapsed ? EVisibility::Collapsed : EVisibility::Visible;
+					})
+					[
+						PinContainer.ToSharedRef()
+					]
 				]
 			]
 		];
@@ -56,69 +100,104 @@ namespace FW
 		Pins.Empty();
 		PinContainer->ClearChildren();
 
-		for (GraphPin* Pin : NodeData->Pins)
-		{
+		auto MakePinIcon = [this](GraphPin* Pin) -> TSharedRef<SGraphPin> {
 			auto PinIcon = SNew(SGraphPin, this).PinData(Pin);
 			Pins.Add(&*PinIcon);
-			auto PinDesc = SNew(SBox).MinDesiredWidth(100.0f)
+			return PinIcon;
+		};
+
+		auto MakePinDesc = [](GraphPin* Pin, EHorizontalAlignment HAlign) -> TSharedRef<SWidget> {
+			return SNew(SBox)
+				.HAlign(HAlign)
 				[
 					SNew(STextBlock)
 						.Text(Pin->ObjectName)
 				];
+		};
 
-			auto InputPinContent = SNew(SHorizontalBox)
+		auto MakeInputPinContent = [&MakePinIcon, &MakePinDesc](GraphPin* Pin) -> TSharedRef<SWidget> {
+			return SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot()
 				.AutoWidth()
 				.VAlign(VAlign_Center)
 				[
-					PinIcon
+					MakePinIcon(Pin)
 				]
 				+ SHorizontalBox::Slot()
 				.Padding(2.0f, 0.0f, 0.0f, 0.0f)
 				.AutoWidth()
 				[
-					PinDesc
+					MakePinDesc(Pin, HAlign_Left)
 				];
+		};
 
-			auto OutputPinContent = SNew(SHorizontalBox)
+		auto MakeOutputPinContent = [&MakePinIcon, &MakePinDesc](GraphPin* Pin) -> TSharedRef<SWidget> {
+			return SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot()
 				.Padding(0.0f, 0.0f, 2.0f, 0.0f)
 				.AutoWidth()
 				[
-					PinDesc
+					MakePinDesc(Pin, HAlign_Right)
 				]
 				+ SHorizontalBox::Slot()
 				.AutoWidth()
 				.VAlign(VAlign_Center)
 				[
-					PinIcon
+					MakePinIcon(Pin)
 				];
+		};
 
+		TArray<GraphPin*> InputPins;
+		TArray<GraphPin*> OutputPins;
+		for (GraphPin* Pin : NodeData->Pins)
+		{
 			if (Pin->Direction == PinDirection::Input)
 			{
-				PinDesc->SetHAlign(HAlign_Left);
-				PinContainer->AddSlot()
-				.HAlign(HAlign_Left)
-				.AutoHeight()
-				.Padding(0.0f, 0.0f, 0.0f, 3.0f)
-				[
-					InputPinContent
-				];
+				InputPins.Add(Pin);
 			}
 			else
 			{
-				PinDesc->SetHAlign(HAlign_Right);
-				PinContainer->AddSlot()
-				.HAlign(HAlign_Right)
-				.AutoHeight()
-				.Padding(0.0f, 0.0f, 0.0f, 3.0f)
-				[
-					OutputPinContent
-				];
+				OutputPins.Add(Pin);
 			}
 		}
 
-		if (TSharedPtr<SWidget> ExtraWidget = NodeData->ExtraNodeWidget())
+		const int32 RowCount = FMath::Max(InputPins.Num(), OutputPins.Num());
+		for (int32 RowIndex = 0; RowIndex < RowCount; ++RowIndex)
+		{
+			TSharedRef<SHorizontalBox> RowContent = SNew(SHorizontalBox);
+			if (RowIndex < InputPins.Num())
+			{
+				RowContent->AddSlot()
+				.AutoWidth()
+				[
+					MakeInputPinContent(InputPins[RowIndex])
+				];
+			}
+
+			RowContent->AddSlot()
+			.FillWidth(1.0f)
+			[
+				SNullWidget::NullWidget
+			];
+
+			if (RowIndex < OutputPins.Num())
+			{
+				RowContent->AddSlot()
+				.AutoWidth()
+				[
+					MakeOutputPinContent(OutputPins[RowIndex])
+				];
+			}
+
+			PinContainer->AddSlot()
+			.AutoHeight()
+			.Padding(0.0f, 0.0f, 0.0f, 3.0f)
+			[
+				RowContent
+			];
+		}
+
+		if (TSharedPtr<SWidget> ExtraWidget = NodeData->ExtraNodeWidget(this))
 		{
 			PinContainer->AddSlot()[ExtraWidget.ToSharedRef()];
 		}
@@ -149,18 +228,18 @@ namespace FW
 		{
 			if (Pin->PinData->Direction == PinDirection::Input && Pin->PinData->SourcePin.IsValid())
 			{
-				if (SGraphPin* OutputPin = Owner->GetGraphPin(Pin->PinData->SourcePin))
+				if (SGraphPin* OutputPin = Owner->GetGraphPin(Pin->PinData->SourcePin.GetGuid()))
 				{
 					Owner->Links.AddUnique(OutputPin, Pin);
 				}
 			}
 			else if (Pin->PinData->Direction == PinDirection::Output)
 			{
-				TArray<FGuid> LinkedInputGuids;
-				NodeData->OutPinToInPin.MultiFind(Pin->PinData->GetGuid(), LinkedInputGuids);
-				for (const FGuid& InputGuid : LinkedInputGuids)
+				TArray<ObserverObjectPtr<GraphPin>> LinkedInputPins;
+				NodeData->OutPinToInPin.MultiFind(Pin->PinData, LinkedInputPins);
+				for (const ObserverObjectPtr<GraphPin>& InputPinPtr : LinkedInputPins)
 				{
-					if (SGraphPin* InputPin = Owner->GetGraphPin(InputGuid))
+					if (SGraphPin* InputPin = Owner->GetGraphPin(InputPinPtr.GetGuid()))
 					{
 						Owner->Links.AddUnique(Pin, InputPin);
 					}
@@ -171,6 +250,29 @@ namespace FW
 
 	FReply SGraphNode::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 	{
+		if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && IsOnResizeHandle(MyGeometry, MouseEvent.GetScreenSpacePosition()))
+		{
+			if (!Owner->IsSelectedNode(this))
+			{
+				if (!MouseEvent.IsShiftDown())
+				{
+					Owner->ClearSelectedNode();
+				}
+
+				Owner->AddSelectedNode(SharedThis(this));
+			}
+			if (ShObjectOp* Op = GetShObjectOp(NodeData))
+			{
+				Op->OnSelect(NodeData);
+			}
+
+			const FVector2D LocalMousePos = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
+			bIsResizingWidth = true;
+			ResizeStartWidth = NodeData->NodeWidth;
+			ResizeStartMouseX = (float)LocalMousePos.X;
+			return FReply::Handled().CaptureMouse(AsShared());
+		}
+
 		if (MouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton) || MouseEvent.IsMouseButtonDown(EKeys::RightMouseButton))
 		{
 			if (!Owner->IsSelectedNode(this))
@@ -202,6 +304,18 @@ namespace FW
 
 	FReply SGraphNode::OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 	{
+		if (bIsResizingWidth && MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+		{
+			bIsResizingWidth = false;
+			const float NewWidth = NodeData->NodeWidth;
+			if (FMath::Abs(NewWidth - ResizeStartWidth) > 0.8f)
+			{
+				SGraphPanel::ScopedTransaction Transaction{ Owner };
+				Owner->DoCommand(MakeShared<ResizeNodeCommand>(Owner, NodeData, ResizeStartWidth, NewWidth));
+			}
+			return FReply::Handled().ReleaseMouseCapture();
+		}
+
 		if (MouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
 		{
 			FWidgetPath WidgetPath = MouseEvent.GetEventPath() != nullptr ? *MouseEvent.GetEventPath() : FWidgetPath();
@@ -232,6 +346,44 @@ namespace FW
 		return FReply::Unhandled();
 	}
 
+	FReply SGraphNode::OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+	{
+		if (bIsResizingWidth)
+		{
+			const FVector2D LocalMousePos = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
+			NodeData->NodeWidth = (float)FMath::Max(GraphNode::MinNodeWidth, ResizeStartWidth + LocalMousePos.X - ResizeStartMouseX);
+			return FReply::Handled();
+		}
+
+		return FReply::Unhandled();
+	}
+
+	FCursorReply SGraphNode::OnCursorQuery(const FGeometry& MyGeometry, const FPointerEvent& CursorEvent) const
+	{
+		return bIsResizingWidth || IsOnResizeHandle(MyGeometry, CursorEvent.GetScreenSpacePosition())
+			? FCursorReply::Cursor(EMouseCursor::ResizeLeftRight)
+			: FCursorReply::Unhandled();
+	}
+
+	bool SGraphNode::IsOnResizeHandle(const FGeometry& MyGeometry, const FVector2D& ScreenSpacePosition) const
+	{
+		const FVector2D LocalMousePos = MyGeometry.AbsoluteToLocal(ScreenSpacePosition);
+		const float NodeWidth = (float)MyGeometry.GetLocalSize().X;
+		return LocalMousePos.X >= NodeWidth - NodeResizeHandleWidth && LocalMousePos.X <= NodeWidth + NodeResizeHandleWidth;
+	}
+
+	Vector2D SGraphNode::GetCollapsedPinConnectionPoint(const FGeometry& PanelGeometry, PinDirection Direction, bool bUsePaintSpaceGeometry) const
+	{
+		FGeometry AnchorGeometry = bUsePaintSpaceGeometry ? GetPaintSpaceGeometry() : GetTickSpaceGeometry();
+		if (NodeTitleWidget.IsValid())
+		{
+			AnchorGeometry = bUsePaintSpaceGeometry ? NodeTitleWidget->GetPaintSpaceGeometry() : NodeTitleWidget->GetTickSpaceGeometry();
+		}
+
+		const FVector2D AnchorCoordinates = Direction == PinDirection::Input ? FVector2D{ 0.0f, 0.5f } : FVector2D{ 1.0f, 0.5f };
+		return PanelGeometry.AbsoluteToLocal(AnchorGeometry.GetAbsolutePositionAtCoordinates(AnchorCoordinates));
+	}
+
 	TSharedRef<SWidget> SGraphNode::CreateContextMenu()
 	{
 		FMenuBuilder MenuBuilder{ true, Owner->UICommandList };
@@ -251,14 +403,14 @@ namespace FW
 		NodeTitleEditText->EnterEditingMode();
 	}
 
-	void SGraphNode::AddDep(SGraphNode* InNode)
+	void SGraphNode::AddDep(SGraphNode* DependentNode)
 	{
-		Owner->GetGraphData()->AddDep(InNode->NodeData, this->NodeData);
+		Owner->GetGraphData()->AddDep(DependentNode->NodeData, this->NodeData);
 	}
 
-	void SGraphNode::RemoveDep(SGraphNode* InNode)
+	void SGraphNode::RemoveDep(SGraphNode* DependentNode)
 	{
-		Owner->GetGraphData()->RemoveDep(InNode->NodeData, this->NodeData);
+		Owner->GetGraphData()->RemoveDep(DependentNode->NodeData, this->NodeData);
 	}
 
 }

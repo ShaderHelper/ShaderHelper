@@ -18,25 +18,23 @@ namespace FW
 
 		BlitShader* PassShader = GetShader<BlitShader>(VariantDefs);
 
-		BindingContext Bindings;
 		BlitShader::Parameters ShaderParameter{ PassInput.InputView, PassInput.InputTexSampler, (float)PassInput.MipLevel };
-		Bindings.SetShaderBindGroup(PassShader->GetBindGroup(ShaderParameter));
-		Bindings.SetShaderBindGroupLayout(PassShader->GetBindGroupLayout());
+		TRefCountPtr<GpuBindGroup> ShaderBindGroup = PassShader->GetBindGroup(ShaderParameter);
 
 		GpuRenderPipelineStateDesc PipelineDesc{
 			.Vs = PassShader->GetVertexShader(),
 			.Ps = PassShader->GetPixelShader(),
 			.Targets = {
 				{ .TargetFormat = PassInput.OutputView->GetTexture()->GetFormat() }
-			}
+			},
+			.BindGroupLayouts = { PassShader->GetBindGroupLayout() },
 		};
-		Bindings.ApplyBindGroupLayout(PipelineDesc);
 
 		TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 
-		Graph.AddRenderPass("BlitPass", MoveTemp(BlitPassDesc), MoveTemp(Bindings),
-			[Pipeline, Scissor = PassInput.Scissor, Viewport = PassInput.Viewport](GpuRenderPassRecorder* PassRecorder, BindingContext& Bindings) {
-				Bindings.ApplyBindGroup(PassRecorder);
+		Graph.AddRenderPass("BlitPass", MoveTemp(BlitPassDesc),
+			[Pipeline, ShaderBindGroup, Scissor = PassInput.Scissor, Viewport = PassInput.Viewport](GpuRenderPassRecorder* PassRecorder) {
+				PassRecorder->SetBindGroups({ ShaderBindGroup.GetReference() });
 				PassRecorder->SetRenderPipelineState(Pipeline);
 				if (Viewport)
 				{
@@ -48,7 +46,7 @@ namespace FW
 				}
 				PassRecorder->DrawPrimitive(0, 3, 0, 1);
 			}
-		);
+		).Read(PassInput.InputView);
 	}
 
 }

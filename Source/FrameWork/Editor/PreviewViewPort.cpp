@@ -95,6 +95,11 @@ namespace FW
 				ResizeHandler.Broadcast(Vector2f{ (float)SizeX, (float)SizeY });
 			}
 		}
+
+		if (DrawOverlayHandler)
+		{
+			LayerId = DrawOverlayHandler(AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
+		}
 	}
 
 }

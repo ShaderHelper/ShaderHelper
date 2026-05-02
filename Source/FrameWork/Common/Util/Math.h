@@ -4,6 +4,19 @@ namespace FW
 {
 	// Project space uses X-right, Y-up, Z-forward.
 	// UE math uses X-forward, Y-right, Z-up, so project rotations are converted through a fixed basis swap.
+	inline const FMatrix44f ProjectToUeBasis(
+		FPlane4f(0.0f, 0.0f, 1.0f, 0.0f),
+		FPlane4f(1.0f, 0.0f, 0.0f, 0.0f),
+		FPlane4f(0.0f, 1.0f, 0.0f, 0.0f),
+		FPlane4f(0.0f, 0.0f, 0.0f, 1.0f)
+	);
+	inline const FMatrix44f UeToProjectBasis(
+		FPlane4f(0.0f, 1.0f, 0.0f, 0.0f),
+		FPlane4f(0.0f, 0.0f, 1.0f, 0.0f),
+		FPlane4f(1.0f, 0.0f, 0.0f, 0.0f),
+		FPlane4f(0.0f, 0.0f, 0.0f, 1.0f)
+	);
+
 	inline FMatrix44f RotationMatrix(float InYaw, float InPitch, float InRoll = 0.0f)
 	{
 		const FRotator3f UeRotator(
@@ -11,19 +24,6 @@ namespace FW
 			FMath::RadiansToDegrees(InYaw),
 			FMath::RadiansToDegrees(InRoll)
 		);
-		const FMatrix44f ProjectToUeBasis(
-			FPlane4f(0.0f, 0.0f, 1.0f, 0.0f),
-			FPlane4f(1.0f, 0.0f, 0.0f, 0.0f),
-			FPlane4f(0.0f, 1.0f, 0.0f, 0.0f),
-			FPlane4f(0.0f, 0.0f, 0.0f, 1.0f)
-		);
-		const FMatrix44f UeToProjectBasis(
-			FPlane4f(0.0f, 1.0f, 0.0f, 0.0f),
-			FPlane4f(0.0f, 0.0f, 1.0f, 0.0f),
-			FPlane4f(1.0f, 0.0f, 0.0f, 0.0f),
-			FPlane4f(0.0f, 0.0f, 0.0f, 1.0f)
-		);
-
 		return UeToProjectBasis * FRotationMatrix44f(UeRotator) * ProjectToUeBasis;
 	}
 

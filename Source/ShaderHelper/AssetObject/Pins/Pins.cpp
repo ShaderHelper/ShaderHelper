@@ -1,12 +1,55 @@
 #include "CommonHeader.h"
 #include "Pins.h"
 #include "GpuApi/GpuRhi.h"
-#include "GpuApi/GpuResourceHelper.h"
 
 using namespace FW;
 
 namespace SH
 {
+	namespace
+	{
+		TRefCountPtr<GpuTexture> CreateDefaultTexture()
+		{
+			TArray<uint8> RawData = {0, 0, 0, 255};
+			GpuTextureDesc Desc{ 1, 1, GpuFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared, RawData };
+			return GGpuRhi->CreateTexture(MoveTemp(Desc), GpuResourceState::RenderTargetWrite);
+		}
+
+		TRefCountPtr<GpuTexture> CreateDefaultCubemap()
+		{
+			TArray<uint8> RawData;
+			RawData.SetNumZeroed(4 * 6);
+			for (uint32 FaceIndex = 0; FaceIndex < 6; ++FaceIndex)
+			{
+				RawData[FaceIndex * 4 + 3] = 255;
+			}
+
+			GpuTextureDesc Desc{};
+			Desc.Width = 1;
+			Desc.Height = 1;
+			Desc.Format = GpuFormat::B8G8R8A8_UNORM;
+			Desc.Usage = GpuTextureUsage::ShaderResource;
+			Desc.Dimension = GpuTextureDimension::TexCube;
+			Desc.InitialData = RawData;
+			return GGpuRhi->CreateTexture(Desc);
+		}
+
+		TRefCountPtr<GpuTexture> CreateDefaultVolumeTexture()
+		{
+			TArray<uint8> RawData = {0, 0, 0, 255};
+
+			GpuTextureDesc Desc{};
+			Desc.Width = 1;
+			Desc.Height = 1;
+			Desc.Depth = 1;
+			Desc.Format = GpuFormat::B8G8R8A8_UNORM;
+			Desc.Usage = GpuTextureUsage::ShaderResource;
+			Desc.Dimension = GpuTextureDimension::Tex3D;
+			Desc.InitialData = RawData;
+			return GGpuRhi->CreateTexture(MoveTemp(Desc));
+		}
+	}
+
     REFLECTION_REGISTER(AddClass<GpuTexturePin>("GpuTexturePin")
 		.BaseClass<GraphPin>()
 	)
@@ -44,13 +87,16 @@ namespace SH
 
 	GpuTexture* GpuTexturePin::GetValue()
 	{
-		if (!Value) {
-			TArray<uint8> RawData = {0,0,0, 255};
-			GpuTextureDesc Desc{ 1, 1, GpuFormat::B8G8R8A8_UNORM, GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared, RawData};
-			static auto DefaultValue = GGpuRhi->CreateTexture(MoveTemp(Desc), GpuResourceState::RenderTargetWrite);
-			Value = DefaultValue;
+		if (Value)
+		{
+			return Value;
 		}
-		return Value;
+
+		if (!DefaultValue)
+		{
+			DefaultValue = CreateDefaultTexture();
+		}
+		return DefaultValue;
 	}
 
 	REFLECTION_REGISTER(AddClass<GpuCubemapPin>("GpuCubemapPin")
@@ -89,16 +135,57 @@ namespace SH
 
 	GpuTexture* GpuCubemapPin::GetValue()
 	{
-		if (!Value) {
-			static auto DefaultValue = GpuResourceHelper::GetGlobalBlackCubemapTex();
-			Value = DefaultValue;
+		if (Value)
+		{
+			return Value;
 		}
-		return Value;
+
+		if (!DefaultValue)
+		{
+			DefaultValue = CreateDefaultCubemap();
+		}
+		return DefaultValue;
 	}
 
 	REFLECTION_REGISTER(AddClass<GpuTexture3DPin>("GpuTexture3DPin")
 		.BaseClass<GraphPin>()
 	)
+
+	REFLECTION_REGISTER(AddClass<BytesPin>("BytesPin")
+		.BaseClass<GraphPin>()
+	)
+
+	void BytesPin::Serialize(FArchive& Ar)
+	{
+		GraphPin::Serialize(Ar);
+		Ar << Bytes;
+	}
+
+	bool BytesPin::CanAccept(GraphPin* SourcePin)
+	{
+		return DynamicCast<BytesPin>(SourcePin) != nullptr;
+	}
+
+	void BytesPin::Accept(GraphPin* SourcePin)
+	{
+		auto* SourceBytesPin = DynamicCast<BytesPin>(SourcePin);
+		Bytes = SourceBytesPin ? SourceBytesPin->Bytes : TArray<uint8>{};
+	}
+
+	void BytesPin::Refuse()
+	{
+		Bytes.Empty();
+	}
+
+	void BytesPin::SetBytes(TArray<uint8> InBytes)
+	{
+		Bytes = MoveTemp(InBytes);
+		auto TargetPins = GetTargetPins();
+		for (GraphPin* Pin : TargetPins)
+		{
+			Pin->Accept(this);
+		}
+	}
 
 	void GpuTexture3DPin::Serialize(FArchive& Ar)
 	{
@@ -132,11 +219,16 @@ namespace SH
 
 	GpuTexture* GpuTexture3DPin::GetValue()
 	{
-		if (!Value) {
-			static auto DefaultValue = GpuResourceHelper::GetGlobalBlackVolumeTex();
-			Value = DefaultValue;
+		if (Value)
+		{
+			return Value;
 		}
-		return Value;
+
+		if (!DefaultValue)
+		{
+			DefaultValue = CreateDefaultVolumeTexture();
+		}
+		return DefaultValue;
 	}
 
 }

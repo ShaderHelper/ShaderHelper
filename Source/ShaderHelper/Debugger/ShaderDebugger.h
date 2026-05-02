@@ -20,15 +20,10 @@ namespace SH
 		FW::GpuBindGroupLayoutBuilder LayoutBuilder;
 	};
 
-	struct BindingState
-	{
-		std::optional<BindingBuilder> GlobalBuilder, PassBuilder, ShaderBuilder;
-	};
-
 	struct PixelState
 	{
 		FW::GpuViewPortDesc ViewPortDesc;
-		BindingState Builders;
+		TArray<BindingBuilder> Builders;
 		FW::GpuRenderPipelineStateDesc PipelineDesc;
 		TFunction<void(FW::GpuRenderPassRecorder*)> DrawFunction;
 	};
@@ -136,7 +131,8 @@ namespace SH
 		std::vector<std::pair<FW::SpvId, FW::SpvVariableDesc*>> SortedVariableDescs;
 
 		TArray<FW::SpvBinding> SpvBindings;
-		FW::BindingContext PatchedBindings;
+		TArray<TRefCountPtr<FW::GpuBindGroup>> PatchedBindGroups;
+		TArray<TRefCountPtr<FW::GpuBindGroupLayout>> PatchedBindGroupLayouts;
 		TUniquePtr<FW::SpvDebuggerContext> DebuggerContext;
 		InvocationState Invocation;
 		TRefCountPtr<FW::GpuShader> DebugShader;

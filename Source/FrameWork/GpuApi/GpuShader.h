@@ -170,12 +170,15 @@ namespace FW
 	inline bool IsShaderVector4Type(const FString& InType)   { return InType == TEXT("float4") || InType == TEXT("vec4"); }
 	inline bool IsShaderVector3Type(const FString& InType)   { return InType == TEXT("float3") || InType == TEXT("vec3"); }
 	inline bool IsShaderVector2Type(const FString& InType)   { return InType == TEXT("float2") || InType == TEXT("vec2"); }
+	inline bool IsShaderFloatType(const FString& InType)     { return InType == TEXT("float"); }
 	inline bool IsShaderIntVector4Type(const FString& InType)  { return InType == TEXT("int4") || InType == TEXT("ivec4"); }
 	inline bool IsShaderIntVector3Type(const FString& InType)  { return InType == TEXT("int3") || InType == TEXT("ivec3"); }
 	inline bool IsShaderIntVector2Type(const FString& InType)  { return InType == TEXT("int2") || InType == TEXT("ivec2"); }
+	inline bool IsShaderIntType(const FString& InType)         { return InType == TEXT("int"); }
 	inline bool IsShaderUintVector4Type(const FString& InType) { return InType == TEXT("uint4") || InType == TEXT("uvec4"); }
 	inline bool IsShaderUintVector3Type(const FString& InType) { return InType == TEXT("uint3") || InType == TEXT("uvec3"); }
 	inline bool IsShaderUintVector2Type(const FString& InType) { return InType == TEXT("uint2") || InType == TEXT("uvec2"); }
+	inline bool IsShaderUintType(const FString& InType)        { return InType == TEXT("uint"); }
 	inline bool IsShaderBoolType(const FString& InType)        { return InType == TEXT("bool"); }
 	inline bool IsShaderBoolVector4Type(const FString& InType) { return InType == TEXT("bool4") || InType == TEXT("bvec4"); }
 	inline bool IsShaderBoolVector3Type(const FString& InType) { return InType == TEXT("bool3") || InType == TEXT("bvec3"); }
@@ -186,11 +189,11 @@ namespace FW
 		if (IsShaderVector4Type(InType) || IsShaderMatrix4x4Type(InType)) return GpuFormat::R32G32B32A32_FLOAT;
 		if (IsShaderVector3Type(InType))   return GpuFormat::R32G32B32_FLOAT;
 		if (IsShaderVector2Type(InType))   return GpuFormat::R32G32_FLOAT;
-		if (InType == TEXT("float"))        return GpuFormat::R32_FLOAT;
+		if (IsShaderFloatType(InType))      return GpuFormat::R32_FLOAT;
 		if (IsShaderUintVector4Type(InType) || IsShaderIntVector4Type(InType)) return GpuFormat::R32G32B32A32_UINT;
 		if (IsShaderUintVector3Type(InType) || IsShaderIntVector3Type(InType)) return GpuFormat::R32G32B32_UINT;
 		if (IsShaderUintVector2Type(InType) || IsShaderIntVector2Type(InType)) return GpuFormat::R32G32_UINT;
-		if (InType == TEXT("uint") || InType == TEXT("int")) return GpuFormat::R32_UINT;
+		if (IsShaderUintType(InType) || IsShaderIntType(InType)) return GpuFormat::R32_UINT;
 		return GpuFormat::R32G32B32A32_FLOAT;
 	}
 

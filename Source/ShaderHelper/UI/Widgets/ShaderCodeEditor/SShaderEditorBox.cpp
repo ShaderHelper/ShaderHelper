@@ -514,6 +514,10 @@ constexpr int PaddingLineNum = 22;
 							}
 						}
 
+						CandidateInfos.RemoveAll([](const ShaderCandidateInfo& Candidate) {
+							return Candidate.Text.StartsWith(TEXT("GPrivate_"));
+						});
+
 						for (auto It = CandidateInfos.CreateIterator(); It; ++It)
 						{
 							if (Task.IsMemberAccess)
@@ -2327,7 +2331,7 @@ constexpr int PaddingLineNum = 22;
 		RefreshBracketHighlight();
 
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->AddNavigationInfo(ShaderAssetObj->GetGuid(), InLocation);
+		ShEditor->AddNavigationInfo(ShaderAssetObj, InLocation);
 
 		TSharedPtr<SWindow> ShaderEditorTipWindow = ShEditor->GetShaderEditorTipWindow();
 		ShaderEditorTipWindow->SetContent(SNullWidget::NullWidget);
@@ -3596,15 +3600,22 @@ constexpr int PaddingLineNum = 22;
 
 		//Create preview viewport for this line if a preview texture exists
 		TSharedPtr<FW::PreviewViewPort> LinePreviewViewPort;
-		DebuggerLocation LineLoc{ShaderAssetObj->GetShaderName(), LineNumber};
+		DebuggerLocation LineLoc;
 		{
-			const auto& PreviewTextures = GetDebugger().GetLinePreviewTextures();
-			if (!PreviewTextures.IsEmpty())
+			ShaderDebugger& Debugger = GetDebugger();
+			ShaderAsset* DebuggerShaderAsset = Debugger.GetShaderAsset();
+			const auto& PreviewTextures = Debugger.GetLinePreviewTextures();
+			if (DebuggerShaderAsset && !PreviewTextures.IsEmpty())
 			{
-				if (const auto* TexPtr = PreviewTextures.Find(LineLoc))
+				for (const auto& [PreviewLoc, Texture] : PreviewTextures)
 				{
-					LinePreviewViewPort = MakeShared<FW::PreviewViewPort>();
-					LinePreviewViewPort->SetViewPortRenderTexture(TexPtr->GetReference());
+					if (PreviewLoc.LineNumber == LineNumber && DebuggerShaderAsset->FindIncludeAsset(PreviewLoc.File) == ShaderAssetObj)
+					{
+						LineLoc = PreviewLoc;
+						LinePreviewViewPort = MakeShared<FW::PreviewViewPort>();
+						LinePreviewViewPort->SetViewPortRenderTexture(Texture.GetReference());
+						break;
+					}
 				}
 			}
 		}

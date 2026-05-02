@@ -40,10 +40,11 @@ namespace FW
 		virtual FLinearColor GetPinColor() const { return FLinearColor::White; }
 		//The pins connected to the output
         TArray<GraphPin*> GetTargetPins() const;
+		GraphNode* GetOwnerNode() const;
 		//The output pin relied upon when this pin is an input
 		GraphPin* GetSourcePin() const;
 		GraphNode* GetSourceNode() const;
-		FGuid SourcePin;
+		ObserverObjectPtr<GraphPin> SourcePin;
 	
 		PinDirection Direction = PinDirection::Output;
 	};
@@ -56,16 +57,21 @@ namespace FW
 
 	public:
 		virtual TSharedRef<class SGraphNode> CreateNodeWidget(class SGraphPanel* OwnerPanel);
-		virtual TSharedPtr<SWidget> ExtraNodeWidget() { return {}; }
+		virtual TSharedPtr<SWidget> ExtraNodeWidget(class SGraphNode* OwnerWidget) { return {}; }
 		virtual void Serialize(FArchive& Ar) override;
 		virtual FSlateColor GetNodeColor() const;
         virtual ExecRet Exec(GraphExecContext& Context) = 0;
         GraphPin* GetPin(FGuid Id);
         GraphPin* GetPin(const FString& InName);
+		GraphPin* GetPin(const FString& InName, PinDirection Direction) const;
 
+		static constexpr float DefaultNodeWidth = 120.0f;
+		static constexpr float MinNodeWidth = 120.0f;
 		Vector2D Position{0};
+		float NodeWidth = DefaultNodeWidth;
+		bool IsCollapsed = false;
         TArray<ObjectPtr<GraphPin>> Pins;
-		TMultiMap<FGuid, FGuid> OutPinToInPin;
+		TMultiMap<ObserverObjectPtr<GraphPin>, ObserverObjectPtr<GraphPin>> OutPinToInPin;
         bool AnyError = false;
 		bool HasResponse = false;
 		bool IsDebugging = false;
@@ -86,6 +92,7 @@ namespace FW
 			NodeDatas.Add(InNode);
 			AddNodeHandler.Broadcast(MoveTemp(InNode));
 		}
+		void PostLoad() override;
 		void RemoveNode(FGuid Id) {
 			NodeDatas.RemoveAll([Id](const ObjectPtr<GraphNode>& Element) {
 				return Element->GetGuid() == Id;
@@ -103,17 +110,18 @@ namespace FW
 			return nullptr;
 		}
 
-		void AddLink(GraphPin* Output, GraphPin* Input)
+		void AddLink(GraphPin* OutputPin, GraphPin* InputPin)
 		{
-			GraphNode* OutputNode = static_cast<GraphNode*>(Output->GetOuter());
-			GraphNode* InputNode = static_cast<GraphNode*>(Input->GetOuter());
-			OutputNode->OutPinToInPin.AddUnique(Output->GetGuid(), Input->GetGuid());
-			AddDep(OutputNode, InputNode);
+			GraphNode* OutputNode = OutputPin->GetOwnerNode();
+			GraphNode* InputNode = InputPin->GetOwnerNode();
+			check(OutputNode && InputNode);
+			OutputNode->OutPinToInPin.AddUnique(OutputPin, InputPin);
+			AddDep(InputNode, OutputNode);
 		}
 
 		const TArray<ObjectPtr<GraphNode>>& GetNodes() const { return NodeDatas; }
-		void AddDep(GraphNode* Node1, GraphNode* Node2) { NodeDeps.Add(Node1->GetGuid(), Node2->GetGuid()); }
-		void RemoveDep(GraphNode* Node1, GraphNode* Node2) { NodeDeps.Remove(Node1->GetGuid(), Node2->GetGuid()); }
+		void AddDep(GraphNode* DependentNode, GraphNode* DependencyNode) { NodeDeps.AddUnique(DependentNode, DependencyNode); }
+		void RemoveDep(GraphNode* DependentNode, GraphNode* DependencyNode) { NodeDeps.Remove(DependentNode, DependencyNode); }
             
         GraphPin* GetPin(FGuid Id);
 	public:
@@ -131,7 +139,7 @@ namespace FW
 	protected:
 		//Keep layer order
 		TArray<ObjectPtr<GraphNode>> NodeDatas;
-		TMultiMap<FGuid, FGuid> NodeDeps;
+		TMultiMap<ObserverObjectPtr<GraphNode>, ObserverObjectPtr<GraphNode>> NodeDeps;
 	};
 
 	FRAMEWORK_API extern TMap<FString, TArray<MetaType*>> RegisteredNodes;

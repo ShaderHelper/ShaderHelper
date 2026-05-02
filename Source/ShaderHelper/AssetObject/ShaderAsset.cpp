@@ -107,6 +107,11 @@ namespace SH
 		TArray<GpuShaderLayoutBinding> Bindings = InShader->GetLayout();
 		for (const GpuShaderLayoutBinding& Binding : Bindings)
 		{
+			if (Binding.Name.StartsWith(TEXT("GPrivate_")))
+			{
+				continue;
+			}
+
 			const FString BindingTypeName = ANSI_TO_TCHAR(magic_enum::enum_name(Binding.Type).data());
 			if (Binding.Type == BindingType::UniformBuffer && Binding.UbMembers.Num() > 0)
 			{

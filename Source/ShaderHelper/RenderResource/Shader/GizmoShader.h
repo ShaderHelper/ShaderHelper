@@ -18,7 +18,7 @@ namespace SH
 		FW::GpuShader* GetScaleAllVS() const { return ScaleAllVs; }
 		FW::GpuShader* GetPixelShader() const { return Ps; }
 
-		TRefCountPtr<FW::GpuBindGroupLayout> GetBindGroupLayout() const { return BindGroupLayout; }
+		TRefCountPtr<FW::GpuBindGroupLayout> GetShaderBindGroupLayout() const { return ShaderBindGroupLayout; }
 		TRefCountPtr<FW::GpuBindGroup> GetBindGroup(const FMatrix44f& ViewProjection,
 			const FW::Vector3f& GizmoCenter, float GizmoScale, int32 HighlightAxis,
 			const FMatrix44f& GizmoOrientation, const FW::Vector3f& CameraPos,
@@ -33,7 +33,7 @@ namespace SH
 		TRefCountPtr<FW::GpuShader> ScaleCubeVs;
 		TRefCountPtr<FW::GpuShader> ScaleAllVs;
 		TRefCountPtr<FW::GpuShader> Ps;
-		TRefCountPtr<FW::GpuBindGroupLayout> BindGroupLayout;
+		TRefCountPtr<FW::GpuBindGroupLayout> ShaderBindGroupLayout;
 		FW::UniformBufferBuilder UbBuilder{FW::UniformBufferUsage::Temp};
 	};
 }

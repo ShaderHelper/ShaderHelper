@@ -1,4 +1,5 @@
 #include "CommonHeader.h"
+#include "AssetManager/AssetManager.h"
 #include "Graph.h"
 #include "UI/Widgets/Graph/SGraphNode.h"
 #include "UI/Widgets/Graph/SGraphPanel.h"
@@ -25,33 +26,34 @@ namespace FW
 	void Graph::Serialize(FArchive& Ar)
 	{
 		AssetObject::Serialize(Ar);
-		
-		int NodeNum = NodeDatas.Num();
-		Ar << NodeNum;
-		if (Ar.IsSaving())
-		{
-			for (int Index = 0; Index < NodeNum; Index++)
-			{
-				//Serialize polymorphic pointers
-				FString TypeName = GetRegisteredName(NodeDatas[Index]->DynamicMetaType());
-				Ar << TypeName;
-				NodeDatas[Index]->Serialize(Ar);
-			}
-		}
-		else
-		{
-			NodeDatas.Reserve(NodeNum);
-			for (int Index = 0; Index < NodeNum; Index++)
-			{
-				FString TypeName;
-				Ar << TypeName;
-				auto LoadedNodeData = NewShObject<GraphNode>(GetMetaType(TypeName), this);
-				LoadedNodeData->Serialize(Ar);
-				NodeDatas.Emplace(LoadedNodeData);
-			}
-		}
 
-		Ar << NodeDeps;
+		SerializePolymorphicObjectArray(Ar, NodeDatas, this);
+	}
+
+	void Graph::PostLoad()
+	{
+		AssetObject::PostLoad();
+
+		NodeDeps.Empty();
+		for (const auto& NodeData : NodeDatas)
+		{
+			for (auto [OutPinPtr, InPinPtr] : NodeData->OutPinToInPin)
+			{
+				GraphPin* OutPin = OutPinPtr.Get();
+				GraphPin* InPin = InPinPtr.Get();
+				if (!OutPin || !InPin)
+				{
+					continue;
+				}
+
+				GraphNode* OutputNode = OutPin->GetOwnerNode();
+				GraphNode* InputNode = InPin->GetOwnerNode();
+				if (OutputNode && InputNode)
+				{
+					AddDep(InputNode, OutputNode);
+				}
+			}
+		}
 	}
 
 	const FSlateBrush* Graph::GetImage() const
@@ -76,17 +78,17 @@ namespace FW
 		TArray<ObjectPtr<GraphNode>> ExecNodes = NodeDatas;
 
         AnyError = !Algo::TopologicalSort(ExecNodes, [this](const ObjectPtr<GraphNode>& Element) {
-			TArray<FGuid> DepIds;
-			NodeDeps.MultiFind(Element->GetGuid(), DepIds);
-			TArray<ObjectPtr<GraphNode>> DepNodes;
-			for (FGuid Id : DepIds)
+			TArray<ObserverObjectPtr<GraphNode>> DependencyNodePtrs;
+			NodeDeps.MultiFind(Element, DependencyNodePtrs);
+			TArray<ObjectPtr<GraphNode>> DependencyNodes;
+			for (const ObserverObjectPtr<GraphNode>& DependencyNodePtr : DependencyNodePtrs)
 			{
-				if (GraphNode* Node = GetNode(Id))
+				if (GraphNode* Node = DependencyNodePtr.Get())
 				{
-					DepNodes.Add(Node);
+					DependencyNodes.Add(Node);
 				}
 			}
-			return DepNodes;
+			return DependencyNodes;
 		});
         
         if(AnyError)
@@ -121,31 +123,10 @@ namespace FW
 	{
 		ShObject::Serialize(Ar);
 		Ar << Position;
-        
-        int PinNum = Pins.Num();
-        Ar << PinNum;
-        if (Ar.IsSaving())
-        {
-            for (int Index = 0; Index < PinNum; Index++)
-            {
-                //Serialize polymorphic pointers
-                FString TypeName = GetRegisteredName(Pins[Index]->DynamicMetaType());
-                Ar << TypeName;
-                Pins[Index]->Serialize(Ar);
-            }
-        }
-        else
-        {
-			Pins = {};
-            for (int Index = 0; Index < PinNum; Index++)
-            {
-                FString TypeName;
-                Ar << TypeName;
-                auto LoadedPinData = NewShObject<GraphPin>(GetMetaType(TypeName), this);
-                LoadedPinData->Serialize(Ar);
-                Pins.Emplace(LoadedPinData);
-            }
-        }
+		Ar << NodeWidth;
+		Ar << IsCollapsed;
+
+		SerializePolymorphicObjectArray(Ar, Pins, this);
 
         
 		Ar << OutPinToInPin;
@@ -176,6 +157,18 @@ namespace FW
         return nullptr;
     }
 
+	GraphPin* GraphNode::GetPin(const FString& InName, PinDirection Direction) const
+	{
+		for (GraphPin* Pin : Pins)
+		{
+			if (Pin && Pin->Direction == Direction && Pin->ObjectName.ToString() == InName)
+			{
+				return Pin;
+			}
+		}
+		return nullptr;
+	}
+
 	bool GraphPin::HasLink() const
 	{
 		return GetSourceNode() != nullptr || !GetTargetPins().IsEmpty();
@@ -183,33 +176,52 @@ namespace FW
 
     TArray<GraphPin*> GraphPin::GetTargetPins() const
     {
-        GraphNode* Owner = static_cast<GraphNode*>(GetOuter());
-        Graph* OwnerGraph = static_cast<Graph*>(Owner->GetOuter());
+		GraphNode* Owner = GetOwnerNode();
+		if (!Owner)
+		{
+			return {};
+		}
         
-        TArray<FGuid> TargetPinGuids;
-        Owner->OutPinToInPin.MultiFind(GetGuid(), TargetPinGuids);
+		TArray<ObserverObjectPtr<GraphPin>> TargetPinPtrs;
+		ObserverObjectPtr<GraphPin> ThisPin(const_cast<GraphPin*>(this));
+		Owner->OutPinToInPin.MultiFind(ThisPin, TargetPinPtrs);
         
         TArray<GraphPin*> TargetPins;
-        for(FGuid PinGuid :TargetPinGuids)
+		for (const ObserverObjectPtr<GraphPin>& TargetPinPtr : TargetPinPtrs)
         {
-            TargetPins.Add(OwnerGraph->GetPin(PinGuid));
+			if (GraphPin* TargetPin = TargetPinPtr.Get())
+			{
+				TargetPins.Add(TargetPin);
+			}
         }
         
         return TargetPins;
     }
 
+	GraphNode* GraphPin::GetOwnerNode() const
+	{
+		ShObject* CurOuter = GetOuter();
+		while (CurOuter)
+		{
+			if (CurOuter->DynamicMetaType()->IsDerivedFrom<GraphNode>())
+			{
+				return static_cast<GraphNode*>(CurOuter);
+			}
+			CurOuter = CurOuter->GetOuter();
+		}
+		return nullptr;
+	}
+
 	GraphPin* GraphPin::GetSourcePin() const
 	{
-		GraphNode* Owner = static_cast<GraphNode*>(GetOuter());
-		Graph* OwnerGraph = static_cast<Graph*>(Owner->GetOuter());
-		return OwnerGraph->GetPin(SourcePin);
+		return SourcePin.Get();
 	}
 
 	GraphNode* GraphPin::GetSourceNode() const
 	{
 		if(GraphPin* SrcPin = GetSourcePin())
 		{
-			return static_cast<GraphNode*>(SrcPin->GetOuter());
+			return SrcPin->GetOwnerNode();
 		}
 		return nullptr;
 	}

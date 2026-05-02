@@ -117,7 +117,7 @@ namespace FW
 	void SGraphPanel::AddLink(SGraphPin* Output, SGraphPin* Input)
 	{
 		Input->PinData->Accept(Output->PinData);
-		Input->PinData->SourcePin = Output->PinData->GetGuid();
+		Input->PinData->SourcePin = Output->PinData;
 		GraphData->AddLink(Output->PinData, Input->PinData);
 		Links.AddUnique(Output, Input);
 	}
@@ -126,9 +126,12 @@ namespace FW
 	{
 		Links.Remove(Output, Input);
 		Output->Owner->RemoveDep(Input->Owner);
-		Input->PinData->SourcePin.Invalidate();
-		auto Kkey = Output->Owner->NodeData->OutPinToInPin.FindKey(Input->PinData->GetGuid());
-		Output->Owner->NodeData->OutPinToInPin.Remove(*Kkey, Input->PinData->GetGuid());
+		Input->PinData->SourcePin.Reset();
+		auto Kkey = Output->Owner->NodeData->OutPinToInPin.FindKey(Input->PinData);
+		if (Kkey)
+		{
+			Output->Owner->NodeData->OutPinToInPin.Remove(*Kkey, Input->PinData);
+		}
 		Input->PinData->Refuse();
 	}
 
@@ -184,10 +187,10 @@ namespace FW
 
 			for (auto& NodeData : GraphData->GetNodes())
 			{
-				for (auto [OutPinId, InPinId] : NodeData->OutPinToInPin)
+				for (auto [OutPinPtr, InPinPtr] : NodeData->OutPinToInPin)
 				{
-					SGraphPin* OutPin = GetGraphPin(OutPinId);
-					SGraphPin* InPin = GetGraphPin(InPinId);
+					SGraphPin* OutPin = GetGraphPin(OutPinPtr.GetGuid());
+					SGraphPin* InPin = GetGraphPin(InPinPtr.GetGuid());
 					if (OutPin && InPin)
 					{
 						AddLink(OutPin, InPin);
@@ -295,8 +298,8 @@ namespace FW
 			{
                 for (auto [OuputPin, InputPin] : Links)
 				{
-					Vector2D C0 = MyGeometry.AbsoluteToLocal(OuputPin->GetTickSpaceGeometry().GetAbsolutePositionAtCoordinates({0.5, 0.5}));
-					Vector2D C3 = MyGeometry.AbsoluteToLocal(InputPin->GetTickSpaceGeometry().GetAbsolutePositionAtCoordinates({0.5, 0.5}));
+					Vector2D C0 = GetPinConnectionPoint(OuputPin, MyGeometry, false);
+					Vector2D C3 = GetPinConnectionPoint(InputPin, MyGeometry, false);
 					double Offset = FMath::Abs(C0.x - C3.x) / 2;
 					Vector2D C1 = {C0.x + Offset, C0.y};
 					Vector2D C2 = { C3.x - Offset, C3.y };
@@ -426,6 +429,17 @@ namespace FW
 			ESlateDrawEffect::None, FStyleColors::Foreground.GetSpecifiedColor());
 	}
 
+	Vector2D SGraphPanel::GetPinConnectionPoint(SGraphPin* Pin, const FGeometry& PanelGeometry, bool bUsePaintSpaceGeometry) const
+	{
+		if (Pin->Owner->NodeData->IsCollapsed)
+		{
+			return Pin->Owner->GetCollapsedPinConnectionPoint(PanelGeometry, Pin->PinData->Direction, bUsePaintSpaceGeometry);
+		}
+
+		const FGeometry PinGeometry = bUsePaintSpaceGeometry ? Pin->GetPaintSpaceGeometry() : Pin->GetTickSpaceGeometry();
+		return PanelGeometry.AbsoluteToLocal(PinGeometry.GetAbsolutePositionAtCoordinates(FVector2D{ 0.5f, 0.5f }));
+	}
+
 	int32 SGraphPanel::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 	{
 		FArrangedChildren ArrangedChildren(EVisibility::Visible);
@@ -539,8 +553,8 @@ namespace FW
 
 		for (auto [OutPin, InPin] : Links)
 		{
-			Vector2D OutPos = AllottedGeometry.AbsoluteToLocal(OutPin->GetPaintSpaceGeometry().GetAbsolutePositionAtCoordinates({ 0.5, 0.5 }));
-			Vector2D InPos = AllottedGeometry.AbsoluteToLocal(InPin->GetPaintSpaceGeometry().GetAbsolutePositionAtCoordinates({ 0.5, 0.5 }));
+			Vector2D OutPos = GetPinConnectionPoint(OutPin, AllottedGeometry, true);
+			Vector2D InPos = GetPinConnectionPoint(InPin, AllottedGeometry, true);
 			DrawConnection(AllottedGeometry.ToPaintGeometry(), OutDrawElements, PanelLayer, PinDirection::Output, OutPos, InPos);
 		}
 
@@ -553,13 +567,32 @@ namespace FW
 		{
 			Vector2D MarqueeSize = { FMath::Abs(MarqueeEnd.x - (*MarqueeStart).x), FMath::Abs(MarqueeEnd.y - (*MarqueeStart).y)};
 			Vector2D UpperLeft = { FMath::Min((*MarqueeStart).x, MarqueeEnd.x), FMath::Min((*MarqueeStart).y, MarqueeEnd.y) };
+			Vector2D LowerRight = UpperLeft + MarqueeSize;
 			FSlateDrawElement::MakeBox(
 				OutDrawElements,
 				MaxTopNodeLayer,
 				AllottedGeometry.ToPaintGeometry(MarqueeSize, FSlateLayoutTransform(UpperLeft)),
-				FAppCommonStyle::Get().GetBrush("Graph.Selector"),
+				FAppStyle::Get().GetBrush("WhiteBrush"),
 				ESlateDrawEffect::None,
-				FStyleColors::Foreground.GetSpecifiedColor()
+				FLinearColor(0.15f, 0.45f, 0.95f, 0.12f)
+			);
+
+			TArray<FVector2D> MarqueeOutline;
+			MarqueeOutline.Add(UpperLeft);
+			MarqueeOutline.Add(Vector2D(LowerRight.x, UpperLeft.y));
+			MarqueeOutline.Add(LowerRight);
+			MarqueeOutline.Add(Vector2D(UpperLeft.x, LowerRight.y));
+			MarqueeOutline.Add(UpperLeft);
+
+			FSlateDrawElement::MakeLines(
+				OutDrawElements,
+				MaxTopNodeLayer + 1,
+				AllottedGeometry.ToPaintGeometry(),
+				MarqueeOutline,
+				ESlateDrawEffect::None,
+				FLinearColor(0.15f, 0.55f, 1.0f, 0.95f),
+				true,
+				1.0f
 			);
 		}
         
@@ -803,6 +836,42 @@ namespace FW
 		NodeData->Position = OldPos;
 		Vector2D DeltaPos = NewPos - OldPos;
 		if (FMath::Abs(DeltaPos.x) > 0.8 || FMath::Abs(DeltaPos.y) > 0.8)
+		{
+			GraphPanel->GetGraphData()->MarkDirty();
+		}
+	}
+
+	void ResizeNodeCommand::Do()
+	{
+		NodeData->NodeWidth = NewWidth;
+		if (FMath::Abs(NewWidth - OldWidth) > 0.8f)
+		{
+			GraphPanel->GetGraphData()->MarkDirty();
+		}
+	}
+
+	void ResizeNodeCommand::Undo()
+	{
+		NodeData->NodeWidth = OldWidth;
+		if (FMath::Abs(NewWidth - OldWidth) > 0.8f)
+		{
+			GraphPanel->GetGraphData()->MarkDirty();
+		}
+	}
+
+	void SetNodeCollapsedCommand::Do()
+	{
+		NodeData->IsCollapsed = NewCollapsed;
+		if (OldCollapsed != NewCollapsed)
+		{
+			GraphPanel->GetGraphData()->MarkDirty();
+		}
+	}
+
+	void SetNodeCollapsedCommand::Undo()
+	{
+		NodeData->IsCollapsed = OldCollapsed;
+		if (OldCollapsed != NewCollapsed)
 		{
 			GraphPanel->GetGraphData()->MarkDirty();
 		}

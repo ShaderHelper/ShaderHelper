@@ -5,7 +5,6 @@ struct MaskVsInput
 	float3 Position : POSITION;
 	float3 Normal : NORMAL;
 	float2 UV : TEXCOORD0;
-	float4 Color : COLOR;
 };
 
 struct MaskVsOutput

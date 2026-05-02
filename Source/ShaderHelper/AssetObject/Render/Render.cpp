@@ -2,6 +2,7 @@
 #include "Render.h"
 #include "MeshSceneObject.h"
 #include "CameraSceneObject.h"
+#include "AssetObject/Render/Nodes/MeshPassNode.h"
 #include "App/App.h"
 #include "AssetManager/AssetManager.h"
 #include "AssetObject/Nodes/Texture2dNode.h"
@@ -17,6 +18,58 @@ using namespace FW;
 
 namespace SH
 {
+	namespace
+	{
+		void RemoveMeshPassReferencesToSceneObject(Render* OwnerRender, SceneObject* RemovedObject)
+		{
+			if (!RemovedObject)
+			{
+				return;
+			}
+
+			MeshSceneObject* RemovedMesh = dynamic_cast<MeshSceneObject*>(RemovedObject);
+			CameraSceneObject* RemovedCamera = dynamic_cast<CameraSceneObject*>(RemovedObject);
+			if (!RemovedMesh && !RemovedCamera)
+			{
+				return;
+			}
+
+			for (const ObjectPtr<GraphNode>& Node : OwnerRender->GetNodes())
+			{
+				MeshPassNode* MeshPass = dynamic_cast<MeshPassNode*>(Node.Get());
+				if (!MeshPass)
+				{
+					continue;
+				}
+
+				bool bChanged = false;
+				if (RemovedCamera && MeshPass->CameraRef.Get() == RemovedCamera)
+				{
+					MeshPass->CameraRef.Reset();
+					bChanged = true;
+				}
+
+				if (RemovedMesh)
+				{
+					for (int32 Index = MeshPass->MeshRenderObjects.Num() - 1; Index >= 0; --Index)
+					{
+						MeshRenderObject* MeshRenderObj = MeshPass->MeshRenderObjects[Index].Get();
+						if (MeshRenderObj && MeshRenderObj->MeshSceneObjectRef.Get() == RemovedMesh)
+						{
+							MeshPass->RemoveMeshRenderObject(MeshRenderObj);
+							bChanged = true;
+						}
+					}
+				}
+
+				if (bChanged)
+				{
+					MeshPass->RefreshNodeWidget();
+				}
+			}
+		}
+	}
+
 	REFLECTION_REGISTER(AddClass<Render>("Render")
 		.BaseClass<Graph>()
 	)
@@ -34,41 +87,58 @@ namespace SH
 	{
 		Graph::Serialize(Ar);
 
-		int SceneObjNum = SceneObjects.Num();
-		Ar << SceneObjNum;
-		if (Ar.IsSaving())
+		SerializePolymorphicObjectArray(Ar, SceneObjects, this);
+	}
+
+	void Render::PostLoad()
+	{
+		Graph::PostLoad();
+
+		for (const ObjectPtr<SceneObject>& Obj : SceneObjects)
 		{
-			for (int Index = 0; Index < SceneObjNum; Index++)
+			if (Obj->Parent.IsValid())
 			{
-				FString TypeName = GetRegisteredName(SceneObjects[Index]->DynamicMetaType());
-				Ar << TypeName;
-				SceneObjects[Index]->Serialize(Ar);
-			}
-		}
-		else
-		{
-			SceneObjects.Reserve(SceneObjNum);
-			for (int Index = 0; Index < SceneObjNum; Index++)
-			{
-				FString TypeName;
-				Ar << TypeName;
-				auto LoadedObj = NewShObject<SceneObject>(GetMetaType(TypeName), this);
-				LoadedObj->Serialize(Ar);
-				SceneObjects.Emplace(LoadedObj);
+				Obj->Parent->Children.Add(Obj.Get());
 			}
 		}
 	}
 
 	void Render::RemoveSceneObject(SceneObject* InObject)
 	{
+		RemoveMeshPassReferencesToSceneObject(this, InObject);
+
+		if (InObject->Parent.IsValid())
+		{
+			InObject->Parent->Children.Remove(InObject);
+			InObject->Parent.Reset();
+		}
+
+		TArray<SceneObject*> ChildrenCopy = InObject->Children;
+		for (SceneObject* Child : ChildrenCopy)
+		{
+			RemoveSceneObject(Child);
+		}
+
 		SceneObjects.RemoveAll([InObject](const ObjectPtr<SceneObject>& Element) {
 			return Element.Get() == InObject;
 		});
 		MarkDirty();
 	}
 
-	void Render::InsertSceneObject(int32 Index, ObjectPtr<SceneObject> InObject)
+	void Render::InsertSceneObject(int32 Index, ObjectPtr<SceneObject> InObject, SceneObject* InParent, int32 ParentChildIndex)
 	{
+		if (InParent)
+		{
+			InObject->Parent = InParent;
+			if (ParentChildIndex >= 0 && ParentChildIndex <= InParent->Children.Num())
+			{
+				InParent->Children.Insert(InObject.Get(), ParentChildIndex);
+			}
+			else
+			{
+				InParent->Children.Add(InObject.Get());
+			}
+		}
 		if (Index >= 0 && Index <= SceneObjects.Num())
 		{
 			SceneObjects.Insert(MoveTemp(InObject), Index);

@@ -22,6 +22,12 @@ struct GpuRhiConfig
 	GpuRhiBackendType BackendType;
 };
 
+struct GpuBarrierInfo
+{
+	GpuResource* Resource;
+	GpuResourceState NewState;
+};
+
 //Note: PassRecorder doesn't support state inheritance across pass
 class GpuComputePassRecorder
 {
@@ -63,12 +69,6 @@ public:
 public:
 	virtual GpuComputePassRecorder* BeginComputePass(const FString& PassName) = 0;
 	virtual void EndComputePass(GpuComputePassRecorder* InComputePassRecorder) = 0;
-};
-
-struct GpuBarrierInfo
-{
-	GpuResource* Resource;
-	GpuResourceState NewState;
 };
 
 class FRAMEWORK_API GpuQuerySet : public GpuResource

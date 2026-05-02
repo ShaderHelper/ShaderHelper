@@ -29,10 +29,13 @@ namespace FW
 
 	private:
 		FLinearColor CurrentColor;
+		FLinearColor CurrentHSVColor = FLinearColor(0.f, 0.f, 1.f, 1.f);
 		FOnLinearColorValueChanged OnColorChanged;
 		FSimpleDelegate OnDestroyed;
 		bool bShowAlpha = true;
 		
+		void SyncHSVColorFromCurrentColor();
+		void ApplyHSVColor();
 		void HandleWheelColorChanged(FLinearColor NewColor);
 		void HandleAlphaChanged(float NewAlpha);
 		void HandleRGBChanged(float NewValue, int32 Component);

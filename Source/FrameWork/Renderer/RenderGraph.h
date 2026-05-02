@@ -6,16 +6,18 @@ namespace FW
 {
 	//TODO
 
-	using RenderPassExecution = TFunction<void(GpuRenderPassRecorder*, BindingContext&)>;
+	using RenderPassExecution = TFunction<void(GpuRenderPassRecorder*)>;
 
-	struct RGRenderPass
+	struct FRAMEWORK_API RGRenderPass
 	{
         FString Name;
 		GpuRenderPassDesc Desc;
-		BindingContext Bindings;
 		RenderPassExecution Execution;
 
 		TMap<GpuResource*, GpuResourceState> PassResourceStates;
+
+		RGRenderPass& Read(GpuResource* InResource);
+		RGRenderPass& Write(GpuResource* InResource);
 	};
 
 	class FRAMEWORK_API RenderGraph : FNoncopyable
@@ -23,8 +25,7 @@ namespace FW
 	public:
 		RenderGraph();
 		RenderGraph(GpuCmdRecorder* InCmdRecorder);
-		void AddRenderPass(const FString& PassName, const GpuRenderPassDesc& PassInfo, const BindingContext& Bindings,
-			const RenderPassExecution& InExecution);
+		RGRenderPass& AddRenderPass(const FString& PassName, GpuRenderPassDesc PassInfo, const RenderPassExecution& InExecution);
 
 		void Execute();
 	private:

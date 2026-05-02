@@ -6,6 +6,7 @@
 namespace FW
 {
 	struct MetaType;
+	class ShObject;
     enum class ObjectOwnerShip;
     template<typename T, ObjectOwnerShip> class ObjectPtr;
     template<typename T>
@@ -16,6 +17,15 @@ namespace FW
     struct object_ptr_trait;
     template<typename T, ObjectOwnerShip OwnerShip>
     struct object_ptr_trait<ObjectPtr<T, OwnerShip>> { using type = T;};
+
+	template<typename T>
+	struct is_tarray { static constexpr bool value = false; };
+	template<typename ElementType, typename AllocatorType>
+	struct is_tarray<TArray<ElementType, AllocatorType>> { static constexpr bool value = true; using type = ElementType; };
+	template<typename T>
+	struct tarray_trait;
+	template<typename ElementType, typename AllocatorType>
+	struct tarray_trait<TArray<ElementType, AllocatorType>> { using type = ElementType; };
 
 	FRAMEWORK_API TMap<FString, MetaType*>& GetTypeNameToMetaType();
 	FRAMEWORK_API TMap<FString, MetaType*>& GetRegisteredNameToMetaType();
@@ -79,6 +89,7 @@ namespace FW
         }
         
         bool IsAssetRef() const;
+		bool IsShObjectRef() const;
         
 		FText MemberName;
         FString TypeName;
@@ -89,9 +100,18 @@ namespace FW
         
 		//return nullptr for basic types
 		MetaType*(*GetMetaType)() = nullptr;
+		ShObject*(*GetReferencedShObject)(void*) = nullptr;
+		void(*SetReferencedShObject)(void*, ShObject*) = nullptr;
 		
 		FString(*GetEnumValueName)(void*) = nullptr;
 		TMap<FString, TSharedPtr<void>> EnumEntries;
+
+		bool IsArray() const { return GetArrayNum != nullptr; }
+		int32(*GetArrayNum)(void*) = nullptr;
+		void(*SetArrayNum)(void*, int32) = nullptr;
+		void(*RemoveArrayElement)(void*, int32) = nullptr;
+		void*(*GetArrayElement)(void*, int32) = nullptr;
+		TSharedPtr<MetaMemberData> ArrayElementData;
     };
 
 	struct MetaType
@@ -175,6 +195,48 @@ namespace FW
 	template<typename T>
 	class MetaTypeBuilder
 	{
+		template<typename ElementType>
+		static TSharedRef<MetaMemberData> MakeArrayElementData()
+		{
+			using RawElementType = std::decay_t<ElementType>;
+			auto ElementData = MakeShared<MetaMemberData>();
+			ElementData->TypeName = GetGeneratedTypeName<RawElementType>();
+			ElementData->InfoType = MetaInfo::Property;
+			ElementData->Set = [](void* Instance, void* Value) {
+				*static_cast<RawElementType*>(Instance) = *static_cast<RawElementType*>(Value);
+			};
+			ElementData->Get = [](void* Instance) -> void* {
+				return Instance;
+			};
+
+			if constexpr(std::is_enum_v<RawElementType>)
+			{
+				ElementData->GetEnumValueName = [](void* Instance) -> FString {
+					return magic_enum::enum_name(*static_cast<RawElementType*>(Instance)).data();
+				};
+				for(const auto& [EntryValue, EntryStr] : magic_enum::enum_entries<RawElementType>())
+				{
+					ElementData->EnumEntries.Add(EntryStr.data(), MakeShared<RawElementType>(EntryValue));
+				}
+			}
+			if constexpr(is_object_ptr<RawElementType>::value)
+			{
+				ElementData->GetMetaType = [] { return GetMetaType<typename object_ptr_trait<RawElementType>::type>(); };
+				ElementData->GetReferencedShObject = [](void* Instance) -> ShObject* {
+					return static_cast<ShObject*>(static_cast<RawElementType*>(Instance)->Get());
+				};
+				ElementData->SetReferencedShObject = [](void* Instance, ShObject* Value) {
+					using PointeeType = typename object_ptr_trait<RawElementType>::type;
+					*static_cast<RawElementType*>(Instance) = static_cast<PointeeType*>(Value);
+				};
+			}
+			else
+			{
+				ElementData->GetMetaType = [] { return TryGetMetaType<RawElementType>(); };
+			}
+			return ElementData;
+		}
+
 	public:
 		MetaTypeBuilder()
 		{
@@ -241,10 +303,42 @@ namespace FW
             {
                 //the metatype of member may not be registered at the moment, so lazy getting.
 				MemberData.GetMetaType = [] { return GetMetaType<typename object_ptr_trait<RawType>::type>(); };
+				MemberData.GetReferencedShObject = [](void* Instance) -> ShObject* {
+					return static_cast<ShObject*>((((T*)Instance)->*DataPtr).Get());
+				};
+				MemberData.SetReferencedShObject = [](void* Instance, ShObject* Value) {
+					using PointeeType = typename object_ptr_trait<RawType>::type;
+					(((T*)Instance)->*DataPtr) = static_cast<PointeeType*>(Value);
+				};
             }
 			else
 			{
 				MemberData.GetMetaType = [] { return TryGetMetaType<RawType>(); };
+				MemberData.GetReferencedShObject = nullptr;
+				MemberData.SetReferencedShObject = nullptr;
+			}
+			if constexpr(is_tarray<RawType>::value)
+			{
+				using ElementType = typename tarray_trait<RawType>::type;
+				MemberData.ArrayElementData = MakeArrayElementData<ElementType>();
+				MemberData.GetArrayNum = [](void* Instance) -> int32 {
+					return (static_cast<T*>(Instance)->*DataPtr).Num();
+				};
+				MemberData.SetArrayNum = [](void* Instance, int32 NewNum) {
+					if (NewNum < 0) NewNum = 0;
+					(static_cast<T*>(Instance)->*DataPtr).SetNum(NewNum);
+				};
+				MemberData.RemoveArrayElement = [](void* Instance, int32 Index) {
+					auto& Array = static_cast<T*>(Instance)->*DataPtr;
+					if (Array.IsValidIndex(Index))
+					{
+						Array.RemoveAt(Index);
+					}
+				};
+				MemberData.GetArrayElement = [](void* Instance, int32 Index) -> void* {
+					auto& Array = static_cast<T*>(Instance)->*DataPtr;
+					return Array.IsValidIndex(Index) ? &Array[Index] : nullptr;
+				};
 			}
  
             Meta->Datas.Add(MoveTemp(MemberData));

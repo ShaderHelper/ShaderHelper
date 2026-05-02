@@ -182,6 +182,7 @@ namespace FW
 		}
 		Importer->Destroy();
 
+		FbxSystemUnit::m.ConvertScene(Scene);
 		FbxAxisSystem::DirectX.DeepConvertScene(Scene);
 
 		FbxGeometryConverter Converter(Manager);

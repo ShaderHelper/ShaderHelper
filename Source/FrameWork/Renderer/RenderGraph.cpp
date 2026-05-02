@@ -4,6 +4,43 @@
 
 namespace FW
 {
+	static GpuResource* ResolveBarrierResource(GpuResource* InResource)
+	{
+		if (!InResource)
+		{
+			return nullptr;
+		}
+
+		if (InResource->GetType() == GpuResourceType::CombinedTextureSampler)
+		{
+			return static_cast<GpuCombinedTextureSampler*>(InResource)->GetTexture();
+		}
+
+		if (InResource->GetType() == GpuResourceType::Sampler)
+		{
+			return nullptr;
+		}
+
+		return InResource;
+	}
+
+	RGRenderPass& RGRenderPass::Read(GpuResource* InResource)
+	{
+		if (GpuResource* Resource = ResolveBarrierResource(InResource))
+		{
+			PassResourceStates.Add(Resource, GpuResourceState::ShaderResourceRead);
+		}
+		return *this;
+	}
+
+	RGRenderPass& RGRenderPass::Write(GpuResource* InResource)
+	{
+		if (GpuResource* Resource = ResolveBarrierResource(InResource))
+		{
+			PassResourceStates.Add(Resource, GpuResourceState::UnorderedAccess);
+		}
+		return *this;
+	}
 
 	RenderGraph::RenderGraph()
 	{
@@ -23,29 +60,10 @@ namespace FW
 			const GpuRenderTargetInfo& RtInfo = InOutPass.Desc.ColorRenderTargets[i];
 			InOutPass.PassResourceStates.Add(RtInfo.View, GpuResourceState::RenderTargetWrite);
 		}
-
-		InOutPass.Bindings.EnumerateBinding([&](const ResourceBinding& ResourceBindingEntry, const LayoutBinding& LayoutBindingEntry) {
-			if (LayoutBindingEntry.Type == BindingType::Texture || LayoutBindingEntry.Type == BindingType::TextureCube || LayoutBindingEntry.Type == BindingType::Texture3D)
-			{
-				GpuResource* Res = ResourceBindingEntry.Resource.GetReference();
-				InOutPass.PassResourceStates.Add(Res, GpuResourceState::ShaderResourceRead);
-			}
-			else if (LayoutBindingEntry.Type == BindingType::CombinedTextureSampler || LayoutBindingEntry.Type == BindingType::CombinedTextureCubeSampler || LayoutBindingEntry.Type == BindingType::CombinedTexture3DSampler)
-			{
-				GpuCombinedTextureSampler* Combined = static_cast<GpuCombinedTextureSampler*>(ResourceBindingEntry.Resource.GetReference());
-				InOutPass.PassResourceStates.Add(Combined->GetTexture(), GpuResourceState::ShaderResourceRead);
-			}
-			else if (LayoutBindingEntry.Type == BindingType::RWStructuredBuffer || LayoutBindingEntry.Type == BindingType::RWRawBuffer)
-			{
-				GpuBuffer* Buffer = static_cast<GpuBuffer*>(ResourceBindingEntry.Resource.GetReference());
-				InOutPass.PassResourceStates.Add(Buffer, GpuResourceState::UnorderedAccess);
-			}
-			else if (LayoutBindingEntry.Type == BindingType::RWTexture || LayoutBindingEntry.Type == BindingType::RWTexture3D)
-			{
-				GpuResource* Res = ResourceBindingEntry.Resource.GetReference();
-				InOutPass.PassResourceStates.Add(Res, GpuResourceState::UnorderedAccess);
-			}
-		});
+		if (InOutPass.Desc.DepthStencilTarget)
+		{
+			InOutPass.PassResourceStates.Add(InOutPass.Desc.DepthStencilTarget->View, GpuResourceState::DepthStencilWrite);
+		}
 	}
 
 	void RenderGraph::CreatePassBarriers(const RGRenderPass& InPass)
@@ -62,16 +80,18 @@ namespace FW
 	{
 		auto PassRecorder = CmdRecorder->BeginRenderPass(InPass.Desc, InPass.Name);
 		{
-			InPass.Execution(PassRecorder, InPass.Bindings);
+			InPass.Execution(PassRecorder);
 		}
 		CmdRecorder->EndRenderPass(PassRecorder);
 	}
 
-	void RenderGraph::AddRenderPass(const FString& PassName, const GpuRenderPassDesc& PassInfo, const BindingContext& Bindings, const RenderPassExecution& InExecution)
+	RGRenderPass& RenderGraph::AddRenderPass(const FString& PassName, GpuRenderPassDesc PassInfo, const RenderPassExecution& InExecution)
 	{
-		RGRenderPass NewPass{ PassName, PassInfo, Bindings, InExecution };
+		RGRenderPass NewPass{ PassName, MoveTemp(PassInfo), InExecution };
 		SetupPass(NewPass);
+		int32 PassIndex = RGRenderPasses.Num();
         RGRenderPasses.Add(MoveTemp(NewPass));
+		return RGRenderPasses[PassIndex];
 	}
 
 	void RenderGraph::Execute()

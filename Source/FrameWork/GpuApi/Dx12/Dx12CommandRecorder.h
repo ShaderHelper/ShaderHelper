@@ -10,6 +10,8 @@
 
 namespace FW
 {
+	class Dx12CmdRecorder;
+
 	//TODO More detailed states.
 	class Dx12StateCache
 	{
@@ -101,7 +103,7 @@ namespace FW
 	class Dx12RenderPassRecorder : public GpuRenderPassRecorder
 	{
 	public:
-		Dx12RenderPassRecorder(ID3D12GraphicsCommandList* InCmdList, Dx12StateCache& InStateCache) 
+		Dx12RenderPassRecorder(ID3D12GraphicsCommandList* InCmdList, Dx12StateCache& InStateCache)
 			: CmdList(InCmdList), StateCache(InStateCache)
 		{}
 

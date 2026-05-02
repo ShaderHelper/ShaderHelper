@@ -121,7 +121,7 @@ TRefCountPtr<GpuTextureView> Dx12GpuRhiBackend::CreateTextureViewInternal(const 
 	{
 		SRV = AllocCpuCbvSrvUav();
 		D3D12_SHADER_RESOURCE_VIEW_DESC SrvDesc{};
-		SrvDesc.Format = DxTexture->GetResource()->GetDesc().Format;
+		SrvDesc.Format = MapShaderResourceViewFormat(InViewDesc.Texture->GetFormat());
 		SrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 		if (InViewDesc.Texture->GetResourceDesc().Dimension == GpuTextureDimension::TexCube)
 		{
@@ -163,7 +163,7 @@ TRefCountPtr<GpuTextureView> Dx12GpuRhiBackend::CreateTextureViewInternal(const 
 	{
 		RTV = AllocRtv();
 		D3D12_RENDER_TARGET_VIEW_DESC RtvDesc{};
-		RtvDesc.Format = DxTexture->GetResource()->GetDesc().Format;
+		RtvDesc.Format = MapTextureFormat(InViewDesc.Texture->GetFormat());
 		if (bIsMultisampled)
 		{
 			RtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DMS;
@@ -180,7 +180,7 @@ TRefCountPtr<GpuTextureView> Dx12GpuRhiBackend::CreateTextureViewInternal(const 
 	{
 		UAV = AllocCpuCbvSrvUav();
 		D3D12_UNORDERED_ACCESS_VIEW_DESC UavDesc{};
-		UavDesc.Format = DxTexture->GetResource()->GetDesc().Format;
+		UavDesc.Format = MapTextureFormat(InViewDesc.Texture->GetFormat());
 		if (InViewDesc.Texture->GetResourceDesc().Dimension == GpuTextureDimension::Tex3D)
 		{
 			UavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
@@ -210,7 +210,7 @@ TRefCountPtr<GpuTextureView> Dx12GpuRhiBackend::CreateTextureViewInternal(const 
 	{
 		DSV = AllocDsv();
 		D3D12_DEPTH_STENCIL_VIEW_DESC DsvDesc{};
-		DsvDesc.Format = DxTexture->GetResource()->GetDesc().Format;
+		DsvDesc.Format = MapDepthStencilViewFormat(InViewDesc.Texture->GetFormat());
 		if (bIsMultisampled)
 		{
 			DsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DMS;

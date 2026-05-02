@@ -1,11 +1,16 @@
 #pragma once
+#include "PropertyData.h"
 #include "SPropertyItem.h"
 #include "UI/Styles/FAppCommonStyle.h"
 #include "UI/Widgets/Misc/MiscWidget.h"
 #include "AssetManager/AssetManager.h"
+#include "magic_enum.hpp"
 
+#include <Framework/MultiBox/MultiBoxBuilder.h>
 #include <Widgets/Input/SEditableTextBox.h>
 #include <Widgets/Input/SSpinBox.h>
+#include <Widgets/Layout/SWidgetSwitcher.h>
+#include <Widgets/SBoxPanel.h>
 
 namespace FW
 {
@@ -18,14 +23,22 @@ namespace FW
         
         void SetEnabled(bool Enabled) { IsEnabled = Enabled; }
         void SetCanApplyName(const TFunction<bool(const FText&)>& CanApply) { CanApplyName = CanApply; }
-        void SetOnDisplayNameChanged(const TFunction<void(const FText&)>& DisplayNameChanged) { OnDisplayNameChanged = DisplayNameChanged; }
-        void SetEmbedWidget(TSharedPtr<SWidget> InWidget) { EmbedWidget = MoveTemp(InWidget); }
+		void SetOnDisplayNameChanged(const TFunction<void(const FText&)>& DisplayNameChanged) { OnDisplayNameChanged = DisplayNameChanged; }
+		void SetEmbedWidget(TSharedPtr<SWidget> InWidget, bool bAutoWidth = false) { EmbedWidget = MoveTemp(InWidget); bEmbedWidgetAutoWidth = bAutoWidth; }
         void SetOnDelete(const TFunction<void()>& OnDeleteFunc) { OnDelete = OnDeleteFunc;}
         
         virtual TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
         {
             auto Row = SNew(STableRow<TSharedRef<PropertyData>>, OwnerTable);
             Row->SetEnabled(IsEnabled);
+			const bool bArrayElement = HasArrayElementStyle();
+			const bool bCompositeMember = Parent && Parent->IsOfType<PropertyCategory>() && static_cast<PropertyCategory*>(Parent)->IsComposite();
+			const FMargin RowPadding = bArrayElement ? FMargin(3.0f, 1.0f, 3.0f, 0.0f) :
+				(bCompositeMember ? FMargin(0.0f) : FMargin(0.0f, 2.0f, 0.0f, 2.0f));
+			const FSlateBrush* RowBorder = bArrayElement
+				? FAppStyle::Get().GetBrush("Brushes.Input")
+				: FAppCommonStyle::Get().GetBrush("PropertyView.ItemColor");
+			const FSlateBrush* NoBrush = FAppStyle::Get().GetBrush("NoBrush");
                 
             SAssignNew(Item, SPropertyItem)
                     .CanApplyName(CanApplyName)
@@ -35,34 +48,56 @@ namespace FW
             
             if(EmbedWidget)
             {
-                Item->AddWidget(EmbedWidget.ToSharedRef());
+				Item->AddWidget(EmbedWidget, bEmbedWidgetAutoWidth);
             }
             
             Row->SetRowContent(
 				SNew(SBorder)
-				.Padding(FMargin{0,2,0,2})
-				.BorderImage_Lambda([this] {
-					if(Parent && Parent->IsOfType<PropertyCategory>() && static_cast<PropertyCategory*>(Parent)->IsComposite() )
+				.Padding(RowPadding)
+				.OnMouseButtonDown_Lambda([this](const FGeometry&, const FPointerEvent& MouseEvent) {
+					if (MouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
 					{
-						return FAppCommonStyle::Get().GetBrush("PropertyView.CompositeItemColor");
+						if (TSharedPtr<SWidget> ContextMenu = CreateContextMenu())
+						{
+							FWidgetPath WidgetPath = MouseEvent.GetEventPath() != nullptr ? *MouseEvent.GetEventPath() : FWidgetPath();
+							FSlateApplication::Get().PushMenu(Item.ToSharedRef(), WidgetPath, ContextMenu.ToSharedRef(), FSlateApplication::Get().GetCursorPos(), FPopupTransitionEffect::ContextMenu);
+							return FReply::Handled();
+						}
 					}
-				   return FAppCommonStyle::Get().GetBrush("PropertyView.ItemColor");
+					return FReply::Unhandled();
+				})
+				.BorderImage_Lambda([Row, bArrayElement, RowBorder, NoBrush] {
+					return bArrayElement && Row->IsSelected() ? NoBrush : RowBorder;
 				})
 				[
-					SNew(SHorizontalBox)
-					+SHorizontalBox::Slot()
+					SNew(SBorder)
+					.BorderImage_Lambda([Row, bArrayElement, bCompositeMember, NoBrush] {
+						if (bArrayElement && Row->IsSelected())
+						{
+							return NoBrush;
+						}
+						if (bCompositeMember)
+						{
+							return FAppCommonStyle::Get().GetBrush("PropertyView.CompositeItemColor");
+						}
+						return FAppCommonStyle::Get().GetBrush("PropertyView.ItemColor");
+					})
 					[
-						Item.ToSharedRef()
-					]
-					+SHorizontalBox::Slot()
-					.AutoWidth()
-					[
-						SNew(SIconButton).Icon(FAppStyle::Get().GetBrush("Icons.Delete"))
-							.Visibility_Lambda([this]{ return OnDelete? EVisibility::Visible : EVisibility::Hidden; })
-							.OnClicked_Lambda([this]{
-								if(OnDelete) OnDelete();
-								return FReply::Handled();
-							})
+						SNew(SHorizontalBox)
+						+SHorizontalBox::Slot()
+						[
+							Item.ToSharedRef()
+						]
+						+SHorizontalBox::Slot()
+						.AutoWidth()
+						[
+							SNew(SIconButton).Icon(FAppStyle::Get().GetBrush("Icons.Delete"))
+								.Visibility_Lambda([this]{ return OnDelete? EVisibility::Visible : EVisibility::Hidden; })
+								.OnClicked_Lambda([this]{
+									if(OnDelete) OnDelete();
+									return FReply::Handled();
+								})
+						]
 					]
 				]
             );
@@ -70,9 +105,12 @@ namespace FW
         }
         
     protected:
+		virtual TSharedPtr<SWidget> CreateContextMenu() { return nullptr; }
+
         bool IsEnabled = true;
         TFunction<void()> OnDelete;
-        TSharedPtr<SWidget> EmbedWidget;
+		TSharedPtr<SWidget> EmbedWidget;
+		bool bEmbedWidgetAutoWidth = false;
         TSharedPtr<SPropertyItem> Item;
         TFunction<bool(const FText&)> CanApplyName;
         TFunction<void(const FText&)> OnDisplayNameChanged;
@@ -141,6 +179,38 @@ namespace FW
 		bool ReadOnly;
 		TArray<TSharedPtr<FString>> EnumItems;
 	};
+
+	template<typename EnumType>
+	TMap<FString, TSharedPtr<void>> MakePropertyEnumEntries()
+	{
+		TMap<FString, TSharedPtr<void>> Entries;
+		for (const auto& [EntryValue, EntryStr] : magic_enum::enum_entries<EnumType>())
+		{
+			Entries.Add(ANSI_TO_TCHAR(EntryStr.data()), MakeShared<EnumType>(EntryValue));
+		}
+		return Entries;
+	}
+
+	template<typename EnumType>
+	TSharedPtr<FString> MakePropertyEnumValueName(EnumType Value)
+	{
+		return MakeShared<FString>(ANSI_TO_TCHAR(magic_enum::enum_name(Value).data()));
+	}
+
+	template<typename EnumType>
+	TSharedRef<PropertyEnumItem> MakePropertyEnumItem(ShObject* InOwner, const FText& InName, EnumType Value,
+		const TFunction<void(EnumType)>& InSetter, bool InReadOnly = false)
+	{
+		return MakeShared<PropertyEnumItem>(
+			InOwner,
+			InName,
+			MakePropertyEnumValueName(Value),
+			MakePropertyEnumEntries<EnumType>(),
+			[InSetter](void* InValue) {
+				InSetter(*static_cast<EnumType*>(InValue));
+			},
+			InReadOnly);
+	}
 
 	template<typename T>
     class PropertyScalarItem : public PropertyItemBase
@@ -327,57 +397,24 @@ namespace FW
 			, ValueRef(InValueRef)
 			, ReadOnly(InReadOnly)
 		{}
+
+		void SetUseColorBlockPicker(bool bInUseColorBlockPicker) { bUseColorBlockPicker = bInUseColorBlockPicker; }
+		void SetValueEnabled(TFunction<bool()> InValueEnabled) { ValueEnabled = MoveTemp(InValueEnabled); }
 		
 		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
 		{
 			auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
 			if(ValueRef)
 			{
-				auto ValueWidget = SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot()
+				auto ValueWidget = SNew(SWidgetSwitcher)
+					.WidgetIndex_Lambda([this] { return bUseColorBlockPicker ? 1 : 0; })
+					+ SWidgetSwitcher::Slot()
 					[
-						SNew(SSpinBox<float>)
-						.IsEnabled(!ReadOnly)
-						.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
-						.OnValueChanged_Lambda([this](float NewValue) {
-							if(ValueRef->x != NewValue && Owner->CanChangeProperty(this))
-							{
-								BeginEdit();
-								ValueRef->x = NewValue;
-								Owner->PostPropertyChanged(this);
-							}
-						})
-						.Value_Lambda([this] { return ValueRef->x; })
+						MakeComponentWidget()
 					]
-					+ SHorizontalBox::Slot()
+					+ SWidgetSwitcher::Slot()
 					[
-						SNew(SSpinBox<float>)
-						.IsEnabled(!ReadOnly)
-						.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
-						.OnValueChanged_Lambda([this](float NewValue) {
-							if(ValueRef->y != NewValue && Owner->CanChangeProperty(this))
-							{
-								BeginEdit();
-								ValueRef->y = NewValue;
-								Owner->PostPropertyChanged(this);
-							}
-						})
-						.Value_Lambda([this] { return ValueRef->y; })
-					]
-					+ SHorizontalBox::Slot()
-					[
-						SNew(SSpinBox<float>)
-						.IsEnabled(!ReadOnly)
-						.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
-						.OnValueChanged_Lambda([this](float NewValue) {
-							if(ValueRef->z != NewValue && Owner->CanChangeProperty(this))
-							{
-								BeginEdit();
-								ValueRef->z = NewValue;
-								Owner->PostPropertyChanged(this);
-							}
-						})
-						.Value_Lambda([this] { return ValueRef->z; })
+						MakeColorPickerWidget()
 					];
 				Item->AddWidget(MoveTemp(ValueWidget));
 			}
@@ -385,9 +422,125 @@ namespace FW
 			return Row;
 		}
 
+	protected:
+		TSharedPtr<SWidget> CreateContextMenu() override
+		{
+			if (!ValueRef)
+			{
+				return nullptr;
+			}
+
+			FMenuBuilder MenuBuilder(true, nullptr);
+			MenuBuilder.AddMenuEntry(
+				FText::FromString(TEXT("SpinBox")),
+				FText::GetEmpty(),
+				FSlateIcon(),
+				FUIAction(
+					FExecuteAction::CreateLambda([this] { bUseColorBlockPicker = false; }),
+					FCanExecuteAction(),
+					FIsActionChecked::CreateLambda([this] { return !bUseColorBlockPicker; })
+				),
+				NAME_None,
+				EUserInterfaceActionType::ToggleButton
+			);
+			MenuBuilder.AddMenuEntry(
+				FText::FromString(TEXT("Color Picker")),
+				FText::GetEmpty(),
+				FSlateIcon(),
+				FUIAction(
+					FExecuteAction::CreateLambda([this] { bUseColorBlockPicker = true; }),
+					FCanExecuteAction(),
+					FIsActionChecked::CreateLambda([this] { return bUseColorBlockPicker; })
+				),
+				NAME_None,
+				EUserInterfaceActionType::ToggleButton
+			);
+			return MenuBuilder.MakeWidget();
+		}
+
 	private:
+		bool CanEditValue() const { return !ReadOnly && (!ValueEnabled || ValueEnabled()); }
+
+		float GetComponent(int32 ComponentIdx) const
+		{
+			return ComponentIdx == 0 ? ValueRef->x : ComponentIdx == 1 ? ValueRef->y : ValueRef->z;
+		}
+
+		void SetComponent(int32 ComponentIdx, float NewValue)
+		{
+			if (ComponentIdx == 0)
+			{
+				ValueRef->x = NewValue;
+			}
+			else if (ComponentIdx == 1)
+			{
+				ValueRef->y = NewValue;
+			}
+			else
+			{
+				ValueRef->z = NewValue;
+			}
+		}
+
+		TSharedRef<SWidget> MakeSpinBox(int32 ComponentIdx)
+		{
+			return SNew(SSpinBox<float>)
+				.IsEnabled_Lambda([this] { return CanEditValue(); })
+				.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
+				.OnValueChanged_Lambda([this, ComponentIdx](float NewValue) {
+					if (GetComponent(ComponentIdx) != NewValue && Owner->CanChangeProperty(this))
+					{
+						BeginEdit();
+						SetComponent(ComponentIdx, NewValue);
+						Owner->PostPropertyChanged(this);
+					}
+				})
+				.Value_Lambda([this, ComponentIdx] { return GetComponent(ComponentIdx); });
+		}
+
+		TSharedRef<SWidget> MakeComponentWidget()
+		{
+			return SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot()
+				[
+					MakeSpinBox(0)
+				]
+				+ SHorizontalBox::Slot()
+				[
+					MakeSpinBox(1)
+				]
+				+ SHorizontalBox::Slot()
+				[
+					MakeSpinBox(2)
+				];
+		}
+
+		TSharedRef<SWidget> MakeColorPickerWidget()
+		{
+			TWeakPtr<SWindow> ParentWindow;
+			return SNew(SShColorBlockPicker, ParentWindow)
+				.IsEnabled_Lambda([this] { return CanEditValue(); })
+				.UseSRGB(false)
+				.Color_Lambda([this] {
+					return FLinearColor{ ValueRef->x, ValueRef->y, ValueRef->z, 1.0f };
+				})
+				.OnColorChanged_Lambda([this](const FLinearColor& InColor) {
+					if ((ValueRef->x != InColor.R || ValueRef->y != InColor.G || ValueRef->z != InColor.B) && Owner->CanChangeProperty(this))
+					{
+						BeginEdit();
+						ValueRef->x = InColor.R;
+						ValueRef->y = InColor.G;
+						ValueRef->z = InColor.B;
+						Owner->PostPropertyChanged(this);
+						EndEdit();
+					}
+				});
+		}
+
 		Vector3f* ValueRef;
 		bool ReadOnly;
+		bool bUseColorBlockPicker = false;
+		TFunction<bool()> ValueEnabled;
 	};
 
 	class PropertyVector4fItem : public PropertyItemBase
@@ -404,71 +557,23 @@ namespace FW
 		{
 		}
 
+		void SetUseColorBlockPicker(bool bInUseColorBlockPicker) { bUseColorBlockPicker = bInUseColorBlockPicker; }
+		void SetValueEnabled(TFunction<bool()> InValueEnabled) { ValueEnabled = MoveTemp(InValueEnabled); }
+
 		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
 		{
 			auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
 			if (ValueRef)
 			{
-				auto ValueWidget = SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot()
+				auto ValueWidget = SNew(SWidgetSwitcher)
+					.WidgetIndex_Lambda([this] { return bUseColorBlockPicker ? 1 : 0; })
+					+ SWidgetSwitcher::Slot()
 					[
-						SNew(SSpinBox<float>)
-							.IsEnabled(!ReadOnly)
-							.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
-							.OnValueChanged_Lambda([this](float NewValue) {
-								if (ValueRef->x != NewValue && Owner->CanChangeProperty(this))
-								{
-									BeginEdit();
-									ValueRef->x = NewValue;
-									Owner->PostPropertyChanged(this);
-								}
-							})
-							.Value_Lambda([this] { return ValueRef->x; })
+						MakeComponentWidget()
 					]
-					+ SHorizontalBox::Slot()
+					+ SWidgetSwitcher::Slot()
 					[
-						SNew(SSpinBox<float>)
-							.IsEnabled(!ReadOnly)
-							.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
-							.OnValueChanged_Lambda([this](float NewValue) {
-								if (ValueRef->y != NewValue && Owner->CanChangeProperty(this))
-								{
-									BeginEdit();
-									ValueRef->y = NewValue;
-									Owner->PostPropertyChanged(this);
-								}
-							})
-							.Value_Lambda([this] { return ValueRef->y; })
-					]
-					+ SHorizontalBox::Slot()
-					[
-						SNew(SSpinBox<float>)
-							.IsEnabled(!ReadOnly)
-							.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
-							.OnValueChanged_Lambda([this](float NewValue) {
-								if (ValueRef->z != NewValue && Owner->CanChangeProperty(this))
-								{
-									BeginEdit();
-									ValueRef->z = NewValue;
-									Owner->PostPropertyChanged(this);
-								}
-							})
-							.Value_Lambda([this] { return ValueRef->z; })
-					]
-					+SHorizontalBox::Slot()
-					[
-						SNew(SSpinBox<float>)
-							.IsEnabled(!ReadOnly)
-							.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
-							.OnValueChanged_Lambda([this](float NewValue) {
-								if (ValueRef->w != NewValue && Owner->CanChangeProperty(this))
-								{
-									BeginEdit();
-									ValueRef->w = NewValue;
-									Owner->PostPropertyChanged(this);
-								}
-							})
-							.Value_Lambda([this] { return ValueRef->w; })
+						MakeColorPickerWidget()
 					];
 				Item->AddWidget(MoveTemp(ValueWidget));
 			}
@@ -476,8 +581,193 @@ namespace FW
 			return Row;
 		}
 
+	protected:
+		TSharedPtr<SWidget> CreateContextMenu() override
+		{
+			if (!ValueRef)
+			{
+				return nullptr;
+			}
+
+			FMenuBuilder MenuBuilder(true, nullptr);
+			MenuBuilder.AddMenuEntry(
+				FText::FromString(TEXT("SpinBox")),
+				FText::GetEmpty(),
+				FSlateIcon(),
+				FUIAction(
+					FExecuteAction::CreateLambda([this] { bUseColorBlockPicker = false; }),
+					FCanExecuteAction(),
+					FIsActionChecked::CreateLambda([this] { return !bUseColorBlockPicker; })
+				),
+				NAME_None,
+				EUserInterfaceActionType::ToggleButton
+			);
+			MenuBuilder.AddMenuEntry(
+				FText::FromString(TEXT("Color Picker")),
+				FText::GetEmpty(),
+				FSlateIcon(),
+				FUIAction(
+					FExecuteAction::CreateLambda([this] { bUseColorBlockPicker = true; }),
+					FCanExecuteAction(),
+					FIsActionChecked::CreateLambda([this] { return bUseColorBlockPicker; })
+				),
+				NAME_None,
+				EUserInterfaceActionType::ToggleButton
+			);
+			return MenuBuilder.MakeWidget();
+		}
+
 	private:
+		bool CanEditValue() const { return !ReadOnly && (!ValueEnabled || ValueEnabled()); }
+
+		float GetComponent(int32 ComponentIdx) const
+		{
+			switch (ComponentIdx)
+			{
+			case 0: return ValueRef->x;
+			case 1: return ValueRef->y;
+			case 2: return ValueRef->z;
+			default: return ValueRef->w;
+			}
+		}
+
+		void SetComponent(int32 ComponentIdx, float NewValue)
+		{
+			switch (ComponentIdx)
+			{
+			case 0: ValueRef->x = NewValue; break;
+			case 1: ValueRef->y = NewValue; break;
+			case 2: ValueRef->z = NewValue; break;
+			default: ValueRef->w = NewValue; break;
+			}
+		}
+
+		TSharedRef<SWidget> MakeSpinBox(int32 ComponentIdx)
+		{
+			return SNew(SSpinBox<float>)
+				.IsEnabled_Lambda([this] { return CanEditValue(); })
+				.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
+				.OnValueChanged_Lambda([this, ComponentIdx](float NewValue) {
+					if (GetComponent(ComponentIdx) != NewValue && Owner->CanChangeProperty(this))
+					{
+						BeginEdit();
+						SetComponent(ComponentIdx, NewValue);
+						Owner->PostPropertyChanged(this);
+					}
+				})
+				.Value_Lambda([this, ComponentIdx] { return GetComponent(ComponentIdx); });
+		}
+
+		TSharedRef<SWidget> MakeComponentWidget()
+		{
+			return SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot()
+				[
+					MakeSpinBox(0)
+				]
+				+ SHorizontalBox::Slot()
+				[
+					MakeSpinBox(1)
+				]
+				+ SHorizontalBox::Slot()
+				[
+					MakeSpinBox(2)
+				]
+				+ SHorizontalBox::Slot()
+				[
+					MakeSpinBox(3)
+				];
+		}
+
+		TSharedRef<SWidget> MakeColorPickerWidget()
+		{
+			TWeakPtr<SWindow> ParentWindow;
+			return SNew(SShColorBlockPicker, ParentWindow)
+				.IsEnabled_Lambda([this] { return CanEditValue(); })
+				.UseSRGB(false)
+				.AlphaDisplayMode(EColorBlockAlphaDisplayMode::Separate)
+				.ShowBackgroundForAlpha(true)
+				.ShowAlpha(true)
+				.Color_Lambda([this] {
+					return FLinearColor{ ValueRef->x, ValueRef->y, ValueRef->z, ValueRef->w };
+				})
+				.OnColorChanged_Lambda([this](const FLinearColor& InColor) {
+					if ((ValueRef->x != InColor.R || ValueRef->y != InColor.G || ValueRef->z != InColor.B || ValueRef->w != InColor.A) && Owner->CanChangeProperty(this))
+					{
+						BeginEdit();
+						ValueRef->x = InColor.R;
+						ValueRef->y = InColor.G;
+						ValueRef->z = InColor.B;
+						ValueRef->w = InColor.A;
+						Owner->PostPropertyChanged(this);
+						EndEdit();
+					}
+				});
+		}
+
 		Vector4f* ValueRef;
+		bool ReadOnly;
+		bool bUseColorBlockPicker = false;
+		TFunction<bool()> ValueEnabled;
+	};
+
+	class PropertyMatrix4x4fItem : public PropertyItemBase
+	{
+		MANUAL_RTTI_TYPE(PropertyMatrix4x4fItem, PropertyItemBase)
+	public:
+		PropertyMatrix4x4fItem(ShObject* InOwner, const FString& InName, float* InValues = nullptr, bool InReadOnly = false)
+			: PropertyMatrix4x4fItem(InOwner, FText::FromString(InName), InValues, InReadOnly)
+		{}
+		PropertyMatrix4x4fItem(ShObject* InOwner, FText InName, float* InValues = nullptr, bool InReadOnly = false)
+			: PropertyItemBase(InOwner, MoveTemp(InName))
+			, Values(InValues)
+			, ReadOnly(InReadOnly)
+		{}
+		PropertyMatrix4x4fItem(ShObject* InOwner, const FString& InName, FMatrix44f* InValueRef, bool InReadOnly = false)
+			: PropertyMatrix4x4fItem(InOwner, FText::FromString(InName), InValueRef, InReadOnly)
+		{}
+		PropertyMatrix4x4fItem(ShObject* InOwner, FText InName, FMatrix44f* InValueRef, bool InReadOnly = false)
+			: PropertyMatrix4x4fItem(InOwner, MoveTemp(InName), reinterpret_cast<float*>(InValueRef), InReadOnly)
+		{}
+
+		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
+		{
+			auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
+			if (Values)
+			{
+				auto ValueWidget = SNew(SVerticalBox);
+				for (int32 RowIndex = 0; RowIndex < 4; ++RowIndex)
+				{
+					auto RowWidget = SNew(SHorizontalBox);
+					for (int32 ColumnIndex = 0; ColumnIndex < 4; ++ColumnIndex)
+					{
+						const int32 ValueIndex = RowIndex * 4 + ColumnIndex;
+						RowWidget->AddSlot()
+						[
+							SNew(SSpinBox<float>)
+							.IsEnabled(!ReadOnly)
+							.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
+							.OnValueChanged_Lambda([this, ValueIndex](float NewValue) {
+								if (Values[ValueIndex] != NewValue && Owner->CanChangeProperty(this))
+								{
+									BeginEdit();
+									Values[ValueIndex] = NewValue;
+									Owner->PostPropertyChanged(this);
+								}
+							})
+							.Value_Lambda([this, ValueIndex] { return Values[ValueIndex]; })
+						];
+					}
+					ValueWidget->AddSlot().AutoHeight()[RowWidget];
+				}
+				Item->AddWidget(MoveTemp(ValueWidget));
+			}
+
+			return Row;
+		}
+
+	private:
+		float* Values;
 		bool ReadOnly;
 	};
 

@@ -39,12 +39,28 @@ namespace SH
 
 	void SelectionCommand::Do()
 	{
-		SceneView->SelectObjectInternal(NewSelected.Get());
+		TArray<SceneObject*> ResolvedSelection;
+		for (const auto& Obj : NewSelection)
+		{
+			if (Obj)
+			{
+				ResolvedSelection.Add(Obj.Get());
+			}
+		}
+		SceneView->SelectObjectsInternal(ResolvedSelection);
 	}
 
 	void SelectionCommand::Undo()
 	{
-		SceneView->SelectObjectInternal(OldSelected.Get());
+		TArray<SceneObject*> ResolvedSelection;
+		for (const auto& Obj : OldSelection)
+		{
+			if (Obj)
+			{
+				ResolvedSelection.Add(Obj.Get());
+			}
+		}
+		SceneView->SelectObjectsInternal(ResolvedSelection);
 	}
 
 	void TransformCommand::Do()
@@ -104,7 +120,7 @@ namespace SH
 
 	void AddSceneObjectCommand::Do()
 	{
-		OwnerRender->InsertSceneObject(Index, Object);
+		OwnerRender->InsertSceneObject(Index, Object, ParentObject, ParentChildIndex);
 		SceneView->RefreshSceneItems();
 
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
@@ -113,9 +129,15 @@ namespace SH
 
 	void AddSceneObjectCommand::Undo()
 	{
-		if (SceneView->GetSelectedObject() == Object.Get())
+		if (SceneView->IsObjectSelected(Object.Get()))
 		{
 			SceneView->SelectObjectInternal(nullptr);
+		}
+
+		ParentObject = Object->Parent.Get();
+		if (ParentObject)
+		{
+			ParentChildIndex = ParentObject->Children.IndexOfByKey(Object.Get());
 		}
 
 		OwnerRender->RemoveSceneObject(Object.Get());
@@ -125,9 +147,109 @@ namespace SH
 		ShEditor->ForceRender();
 	}
 
+	RemoveSceneObjectCommand::RemoveSceneObjectCommand(SSceneView* InSceneView, Render* InRender, FW::ObjectPtr<SceneObject> InObject,
+		int32 InIndex, SceneObject* InParent, int32 InParentChildIndex)
+		: SceneCommand(InSceneView)
+		, OwnerRender(InRender)
+		, Object(MoveTemp(InObject))
+		, Index(InIndex)
+		, ParentObject(InParent)
+		, ParentChildIndex(InParentChildIndex)
+	{
+		bWasExpanded = WasObjectExpanded(Object.Get());
+		CaptureRemovedChildren(Object.Get());
+		RemovedChildren.Sort([](const RemovedSceneObjectState& A, const RemovedSceneObjectState& B) {
+			return A.Index < B.Index;
+		});
+	}
+
+	bool RemoveSceneObjectCommand::WasObjectExpanded(SceneObject* InObject) const
+	{
+		if (!InObject)
+		{
+			return false;
+		}
+
+		if (SceneObjectTreeItemPtr* ItemPtr = SceneView->AllItems.Find(InObject))
+		{
+			return SceneView->TreeView->IsItemExpanded(*ItemPtr);
+		}
+
+		return false;
+	}
+
+	void RemoveSceneObjectCommand::CaptureRemovedChildren(SceneObject* InObject)
+	{
+		if (!InObject)
+		{
+			return;
+		}
+
+		for (SceneObject* Child : InObject->Children)
+		{
+			if (!Child)
+			{
+				continue;
+			}
+
+			RemovedSceneObjectState& State = RemovedChildren.AddDefaulted_GetRef();
+			State.Object = FW::ObjectPtr<SceneObject>(Child);
+			State.Index = OwnerRender->SceneObjects.IndexOfByPredicate([Child](const ObjectPtr<SceneObject>& Element) {
+				return Element.Get() == Child;
+			});
+			State.ParentObject = Child->Parent.Get();
+			State.ParentChildIndex = State.ParentObject ? State.ParentObject->Children.IndexOfByKey(Child) : INDEX_NONE;
+			State.bWasExpanded = WasObjectExpanded(Child);
+
+			CaptureRemovedChildren(Child);
+		}
+	}
+
+	void RemoveSceneObjectCommand::RestoreExpansionState() const
+	{
+		if (bWasExpanded)
+		{
+			if (SceneObjectTreeItemPtr* ItemPtr = SceneView->AllItems.Find(Object.Get()))
+			{
+				SceneView->TreeView->SetItemExpansion(*ItemPtr, true);
+			}
+		}
+
+		for (const RemovedSceneObjectState& State : RemovedChildren)
+		{
+			if (!State.bWasExpanded)
+			{
+				continue;
+			}
+
+			if (SceneObjectTreeItemPtr* ItemPtr = SceneView->AllItems.Find(State.Object.Get()))
+			{
+				SceneView->TreeView->SetItemExpansion(*ItemPtr, true);
+			}
+		}
+	}
+
+	bool RemoveSceneObjectCommand::IsAnyRemovedObjectSelected() const
+	{
+		if (SceneView->IsObjectSelected(Object.Get()))
+		{
+			return true;
+		}
+
+		for (const RemovedSceneObjectState& State : RemovedChildren)
+		{
+			if (SceneView->IsObjectSelected(State.Object.Get()))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	void RemoveSceneObjectCommand::Do()
 	{
-		if (SceneView->GetSelectedObject() == Object.Get())
+		if (IsAnyRemovedObjectSelected())
 		{
 			SceneView->SelectObjectInternal(nullptr);
 		}
@@ -141,8 +263,13 @@ namespace SH
 
 	void RemoveSceneObjectCommand::Undo()
 	{
-		OwnerRender->InsertSceneObject(Index, Object);
+		OwnerRender->InsertSceneObject(Index, Object, ParentObject, ParentChildIndex);
+		for (const RemovedSceneObjectState& State : RemovedChildren)
+		{
+			OwnerRender->InsertSceneObject(State.Index, State.Object, State.ParentObject, State.ParentChildIndex);
+		}
 		SceneView->RefreshSceneItems();
+		RestoreExpansionState();
 
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		ShEditor->ForceRender();
@@ -160,5 +287,43 @@ namespace SH
 		Object->ObjectName = OldName;
 		Object->GetOuterMost()->MarkDirty();
 		SceneView->RefreshSceneItems();
+	}
+
+	void ReparentSceneObjectCommand::Do()
+	{
+		Object->SetParent(NewParent);
+		NewPos = Object->Position;
+		NewRot = Object->Rotation;
+		NewScale = Object->Scale;
+
+		Object->GetOuterMost()->MarkDirty();
+		SceneView->RefreshSceneItems();
+
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->ForceRender();
+	}
+
+	void ReparentSceneObjectCommand::Undo()
+	{
+		// Directly restore old parent links and exact transform
+		if (Object->Parent.IsValid())
+		{
+			Object->Parent->Children.Remove(Object.Get());
+			Object->Parent.Reset();
+		}
+		if (OldParent)
+		{
+			Object->Parent = OldParent;
+			OldParent->Children.Add(Object.Get());
+		}
+		Object->Position = OldPos;
+		Object->Rotation = OldRot;
+		Object->Scale = OldScale;
+
+		Object->GetOuterMost()->MarkDirty();
+		SceneView->RefreshSceneItems();
+
+		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->ForceRender();
 	}
 }
