@@ -403,14 +403,14 @@ namespace FW
 		NodeTitleEditText->EnterEditingMode();
 	}
 
-	void SGraphNode::AddDep(SGraphNode* InNode)
+	void SGraphNode::AddDep(SGraphNode* DependentNode)
 	{
-		Owner->GetGraphData()->AddDep(InNode->NodeData, this->NodeData);
+		Owner->GetGraphData()->AddDep(DependentNode->NodeData, this->NodeData);
 	}
 
-	void SGraphNode::RemoveDep(SGraphNode* InNode)
+	void SGraphNode::RemoveDep(SGraphNode* DependentNode)
 	{
-		Owner->GetGraphData()->RemoveDep(InNode->NodeData, this->NodeData);
+		Owner->GetGraphData()->RemoveDep(DependentNode->NodeData, this->NodeData);
 	}
 
 }

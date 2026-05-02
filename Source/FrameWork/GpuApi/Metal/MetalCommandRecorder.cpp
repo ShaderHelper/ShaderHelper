@@ -270,11 +270,6 @@ namespace FW
         StateCache.SetBindGroups(MtlBindGroups);
     }
 
-    void MtlRenderPassRecorder::Barriers(const TArray<GpuBarrierInfo>& BarrierInfos)
-    {
-        Owner->Barriers(BarrierInfos);
-    }
-
     void MtlComputePassRecorder::Dispatch(uint32 ThreadGroupCountX, uint32 ThreadGroupCountY, uint32 ThreadGroupCountZ)
     {
         StateCache.ApplyComputeState(CmdEncoder.get());
@@ -319,7 +314,7 @@ namespace FW
         MTLRenderPassDescriptorPtr RenderPassDesc = NS::RetainPtr((MTL::RenderPassDescriptor*)MapRenderPassDesc(PassDesc));
         MTL::RenderCommandEncoder* RenderCommandEncoder = CmdBuffer->renderCommandEncoder(RenderPassDesc.get());
         RenderCommandEncoder->setLabel(FStringToNSString(PassName));
-        auto PassRecorder = MakeUnique<MtlRenderPassRecorder>(this, NS::RetainPtr(RenderCommandEncoder), MoveTemp(RenderPassDesc));
+        auto PassRecorder = MakeUnique<MtlRenderPassRecorder>(NS::RetainPtr(RenderCommandEncoder), MoveTemp(RenderPassDesc));
 
         if (PassDesc.TimestampWrites && !GSupportStageBoundaryCounter)
         {

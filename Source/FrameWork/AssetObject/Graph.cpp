@@ -50,7 +50,7 @@ namespace FW
 				GraphNode* InputNode = InPin->GetOwnerNode();
 				if (OutputNode && InputNode)
 				{
-					AddDep(OutputNode, InputNode);
+					AddDep(InputNode, OutputNode);
 				}
 			}
 		}
@@ -78,17 +78,17 @@ namespace FW
 		TArray<ObjectPtr<GraphNode>> ExecNodes = NodeDatas;
 
         AnyError = !Algo::TopologicalSort(ExecNodes, [this](const ObjectPtr<GraphNode>& Element) {
-			TArray<ObserverObjectPtr<GraphNode>> DepNodePtrs;
-			NodeDeps.MultiFind(Element, DepNodePtrs);
-			TArray<ObjectPtr<GraphNode>> DepNodes;
-			for (const ObserverObjectPtr<GraphNode>& DepNodePtr : DepNodePtrs)
+			TArray<ObserverObjectPtr<GraphNode>> DependencyNodePtrs;
+			NodeDeps.MultiFind(Element, DependencyNodePtrs);
+			TArray<ObjectPtr<GraphNode>> DependencyNodes;
+			for (const ObserverObjectPtr<GraphNode>& DependencyNodePtr : DependencyNodePtrs)
 			{
-				if (GraphNode* Node = DepNodePtr.Get())
+				if (GraphNode* Node = DependencyNodePtr.Get())
 				{
-					DepNodes.Add(Node);
+					DependencyNodes.Add(Node);
 				}
 			}
-			return DepNodes;
+			return DependencyNodes;
 		});
         
         if(AnyError)

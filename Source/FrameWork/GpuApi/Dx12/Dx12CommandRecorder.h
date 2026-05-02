@@ -103,8 +103,8 @@ namespace FW
 	class Dx12RenderPassRecorder : public GpuRenderPassRecorder
 	{
 	public:
-		Dx12RenderPassRecorder(Dx12CmdRecorder* InOwner, ID3D12GraphicsCommandList* InCmdList, Dx12StateCache& InStateCache)
-			: Owner(InOwner), CmdList(InCmdList), StateCache(InStateCache)
+		Dx12RenderPassRecorder(ID3D12GraphicsCommandList* InCmdList, Dx12StateCache& InStateCache)
+			: CmdList(InCmdList), StateCache(InStateCache)
 		{}
 
 	public:
@@ -116,10 +116,8 @@ namespace FW
 		void SetViewPort(const GpuViewPortDesc& InViewPortDesc) override;
 		void SetScissorRect(const GpuScissorRectDesc& InScissorRectDes) override;
 		void SetBindGroups(const TArray<GpuBindGroup*>& BindGroups) override;
-		void Barriers(const TArray<GpuBarrierInfo>& BarrierInfos) override;
 	
 	private:
-		Dx12CmdRecorder* Owner;
 		ID3D12GraphicsCommandList* CmdList;
 		Dx12StateCache& StateCache;
 	};

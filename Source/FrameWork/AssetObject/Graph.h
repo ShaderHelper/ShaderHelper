@@ -110,18 +110,18 @@ namespace FW
 			return nullptr;
 		}
 
-		void AddLink(GraphPin* Output, GraphPin* Input)
+		void AddLink(GraphPin* OutputPin, GraphPin* InputPin)
 		{
-			GraphNode* OutputNode = Output->GetOwnerNode();
-			GraphNode* InputNode = Input->GetOwnerNode();
+			GraphNode* OutputNode = OutputPin->GetOwnerNode();
+			GraphNode* InputNode = InputPin->GetOwnerNode();
 			check(OutputNode && InputNode);
-			OutputNode->OutPinToInPin.AddUnique(Output, Input);
-			AddDep(OutputNode, InputNode);
+			OutputNode->OutPinToInPin.AddUnique(OutputPin, InputPin);
+			AddDep(InputNode, OutputNode);
 		}
 
 		const TArray<ObjectPtr<GraphNode>>& GetNodes() const { return NodeDatas; }
-		void AddDep(GraphNode* Node1, GraphNode* Node2) { NodeDeps.AddUnique(Node1, Node2); }
-		void RemoveDep(GraphNode* Node1, GraphNode* Node2) { NodeDeps.Remove(Node1, Node2); }
+		void AddDep(GraphNode* DependentNode, GraphNode* DependencyNode) { NodeDeps.AddUnique(DependentNode, DependencyNode); }
+		void RemoveDep(GraphNode* DependentNode, GraphNode* DependencyNode) { NodeDeps.Remove(DependentNode, DependencyNode); }
             
         GraphPin* GetPin(FGuid Id);
 	public:

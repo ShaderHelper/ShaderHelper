@@ -548,12 +548,15 @@ namespace SH
 				}
 			}
 		);
+		TSet<GpuTexture*> ConnectedOverrideTextures;
 		for (const auto& MRO : MeshRenderObjects)
 		{
-			if (MRO)
-			{
-				RenderPass.Write(MRO->GetPrintBuffer()->GetResource());
-			}
+			MRO->CollectConnectedOverrideTextures(ConnectedOverrideTextures);
+			RenderPass.Write(MRO->GetPrintBuffer()->GetResource());
+		}
+		for (GpuTexture* Texture : ConnectedOverrideTextures)
+		{
+			RenderPass.Read(Texture);
 		}
 
 		Ctx.RG->Execute();

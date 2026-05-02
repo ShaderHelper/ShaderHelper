@@ -21,8 +21,8 @@ namespace FW
 		virtual FCursorReply OnCursorQuery(const FGeometry& MyGeometry, const FPointerEvent& CursorEvent) const override;
 		TSharedRef<SWidget> CreateContextMenu();
 		void HandleRenameAction();
-		void AddDep(SGraphNode* InNode);
-		void RemoveDep(SGraphNode* InNode);
+		void AddDep(SGraphNode* DependentNode);
+		void RemoveDep(SGraphNode* DependentNode);
 		Vector2D GetCollapsedPinConnectionPoint(const FGeometry& PanelGeometry, PinDirection Direction, bool bUsePaintSpaceGeometry) const;
 
 	public:

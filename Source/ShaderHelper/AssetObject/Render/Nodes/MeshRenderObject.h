@@ -54,6 +54,7 @@ namespace SH
 		// Invalidate material-derived render resources.
 		void InvalidateRenderResources();
 		bool UsesTextureAsShaderInput(FW::GpuTexture* Texture, FString& OutBindingName) const;
+		void CollectConnectedOverrideTextures(TSet<FW::GpuTexture*>& OutTextures) const;
 		FW::PrintBuffer* GetPrintBuffer();
 		bool FlushPrintBufferLogs(const FString& LogPrefix);
 

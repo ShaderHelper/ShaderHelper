@@ -58,7 +58,6 @@ public:
 	// If omitted, it defaults to SetScissorRect(GpuScissorRectDesc{Viewport.TopLeftX, Viewport.TopLeftY, Viewport.TopLeftX + Viewport.Width, Viewport.TopLeftY + Viewport.Height}).
 	virtual void SetScissorRect(const GpuScissorRectDesc& InScissorRectDes) = 0;
 	virtual void SetBindGroups(const TArray<GpuBindGroup*>& BindGroups) = 0;
-	virtual void Barriers(const TArray<GpuBarrierInfo>& BarrierInfos) = 0;
 };
 
 class GpuComputeCmdRecorder

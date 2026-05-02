@@ -835,7 +835,7 @@ namespace SH
 					{
 						SrcNode->OutPinToInPin.Remove(SrcPin, OldPin);
 						Graph* OwnerGraph = static_cast<Graph*>(GetOuter());
-						OwnerGraph->RemoveDep(SrcNode, this);
+						OwnerGraph->RemoveDep(this, SrcNode);
 					}
 				}
 				OldPin->SourcePin.Reset();

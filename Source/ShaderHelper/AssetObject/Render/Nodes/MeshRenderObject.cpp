@@ -730,6 +730,30 @@ namespace SH
 		BuildMaterialBindGroups(*MaterialAsset, BindGroupLayouts, BindGroups, UniformBuffers, Options);
 	}
 
+	void MeshRenderObject::CollectConnectedOverrideTextures(TSet<GpuTexture*>& OutTextures) const
+	{
+		if (!MaterialAsset || bDrawMaterialError)
+		{
+			return;
+		}
+
+		for (const MaterialOverrideSlot& Slot : OverrideSlots)
+		{
+			if (!Slot.bIsResource)
+			{
+				continue;
+			}
+
+			if (GraphPin* OverridePin = FindOverridePin(Slot.BindingName, TEXT(""), Slot.Stage))
+			{
+				if (GpuTexture* Texture = GetConnectedOverrideTexture(OverridePin))
+				{
+					OutTextures.Add(Texture);
+				}
+			}
+		}
+	}
+
 	PrintBuffer* MeshRenderObject::GetPrintBuffer()
 	{
 		if (!PrinterBuffer)
@@ -943,31 +967,9 @@ namespace SH
 			return;
 		}
 
-		bool bHasResourceOverride = false;
-		TSet<GpuTexture*> ConnectedOverrideTextures;
-		for (const auto& Slot : OverrideSlots)
-		{
-			if (Slot.bIsResource)
-			{
-				bHasResourceOverride = true;
-				if (GraphPin* OverridePin = FindOverridePin(Slot.BindingName, TEXT(""), Slot.Stage))
-				{
-					if (GpuTexture* Texture = GetConnectedOverrideTexture(OverridePin))
-					{
-						ConnectedOverrideTextures.Add(Texture);
-					}
-				}
-			}
-		}
-		if (!ConnectedOverrideTextures.IsEmpty())
-		{
-			TArray<GpuBarrierInfo> BarrierInfos;
-			for (GpuTexture* Texture : ConnectedOverrideTextures)
-			{
-				BarrierInfos.Emplace(Texture, GpuResourceState::ShaderResourceRead);
-			}
-			Recorder->Barriers(BarrierInfos);
-		}
+		const bool bHasResourceOverride = OverrideSlots.ContainsByPredicate([](const MaterialOverrideSlot& Slot) {
+			return Slot.bIsResource;
+		});
 		if (bHasResourceOverride)
 		{
 			BuildBindGroupFromMaterial(false, false);

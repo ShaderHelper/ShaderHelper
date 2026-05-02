@@ -546,12 +546,6 @@ namespace FW
 		StateCache.SetGraphicsBindGroups(Dx12BindGroups);
 	}
 
-	void Dx12RenderPassRecorder::Barriers(const TArray<GpuBarrierInfo>& BarrierInfos)
-	{
-		Owner->Barriers(BarrierInfos);
-	}
-
-
 	void Dx12ComputePassRecorder::Dispatch(uint32 ThreadGroupCountX, uint32 ThreadGroupCountY, uint32 ThreadGroupCountZ)
 	{
 		StateCache.ApplyComputeState(CmdList);
@@ -623,7 +617,7 @@ namespace FW
 			StateCache.SetDepthStencilTarget(DsvView, PassDesc.DepthStencilTarget->LoadAction, PassDesc.DepthStencilTarget->ClearDepth);
 		}
 
-		auto NewPassRecorder = MakeUnique<Dx12RenderPassRecorder>(this, CmdList, StateCache);
+		auto NewPassRecorder = MakeUnique<Dx12RenderPassRecorder>(CmdList, StateCache);
 		RequestedRenderPassRecorders.Add(MoveTemp(NewPassRecorder));
 		return RequestedRenderPassRecorders.Last().Get();
 	}
