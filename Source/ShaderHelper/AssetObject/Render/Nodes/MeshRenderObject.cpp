@@ -708,6 +708,7 @@ namespace SH
 		MaterialBindGroupBuildOptions Options;
 		Options.bRebuildLayouts = bRebuildLayouts;
 		Options.bRebuildUniformBuffers = bRebuildUniformBuffers;
+		Options.PrinterBuffer = GetPrintBuffer()->GetResource();
 		Options.TextureOverrideResolver = [this](const GpuShaderLayoutBinding& Binding) -> GpuTexture* {
 				if (GraphPin* OverridePin = FindOverridePin(Binding.Name, TEXT(""), Binding.Stage))
 				{
@@ -727,6 +728,49 @@ namespace SH
 			};
 
 		BuildMaterialBindGroups(*MaterialAsset, BindGroupLayouts, BindGroups, UniformBuffers, Options);
+	}
+
+	PrintBuffer* MeshRenderObject::GetPrintBuffer()
+	{
+		if (!PrinterBuffer)
+		{
+			PrinterBuffer = MakeUnique<PrintBuffer>();
+		}
+		return PrinterBuffer.Get();
+	}
+
+	bool MeshRenderObject::FlushPrintBufferLogs(const FString& LogPrefix)
+	{
+		int32 ExtraLineNum = 1;
+		ShaderAssertInfo AssertInfo;
+		TArray<ShaderPrintInfo> Logs = PrinterBuffer->GetPrintStrings(AssertInfo);
+		for (const ShaderPrintInfo& Log : Logs)
+		{
+			if (Log.Line - ExtraLineNum > 0)
+			{
+				SH_LOG(LogShader, Display, TEXT("%s:%d:%s"), *LogPrefix, Log.Line - ExtraLineNum, *Log.PrintStr);
+			}
+			else
+			{
+				SH_LOG(LogShader, Display, TEXT("%s:%s"), *LogPrefix, *Log.PrintStr);
+			}
+		}
+
+		const bool bAssertFailed = !AssertInfo.AssertString.IsEmpty();
+		if (bAssertFailed)
+		{
+			if (AssertInfo.Line - ExtraLineNum > 0)
+			{
+				SH_LOG(LogShader, Error, TEXT("%s:%d:%s"), *LogPrefix, AssertInfo.Line - ExtraLineNum, *AssertInfo.AssertString);
+			}
+			else
+			{
+				SH_LOG(LogShader, Error, TEXT("%s:%s"), *LogPrefix, *AssertInfo.AssertString);
+			}
+		}
+
+		PrinterBuffer->Clear();
+		return bAssertFailed;
 	}
 
 	bool MeshRenderObject::UsesTextureAsShaderInput(GpuTexture* Texture, FString& OutBindingName) const

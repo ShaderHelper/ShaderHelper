@@ -124,7 +124,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
 	{
         GpuBindGroupLayoutBuilder Builder{ 0 };
 		Builder
-			.AddExistingBinding(0, BindingType::RWRawBuffer, BindingShaderStage::Pixel)
+            .AddExistingBinding(114, BindingType::RWRawBuffer, BindingShaderStage::Pixel)
 			.AddUniformBuffer("BuiltInUniform", GetBuiltInUbBuilder(), BindingShaderStage::Pixel);
 		for (int i = 0; i < 4; i++)
 		{

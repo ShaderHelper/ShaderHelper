@@ -5,6 +5,7 @@
 #include "AssetObject/TextureCube.h"
 #include "AssetObject/Texture3D.h"
 #include "GpuApi/GpuResourceHelper.h"
+#include "RenderResource/PrintBuffer.h"
 #include "Common/Util/Math.h"
 
 #include <stdexcept>
@@ -405,6 +406,13 @@ namespace SH
 			for (const auto& Binding : MergedBindings)
 			{
 				if (Binding.Type == BindingType::UniformBuffer) continue;
+
+				if (Binding.Name == TEXT("GPrivate_Printer") && Binding.Type == BindingType::RWRawBuffer)
+				{
+					GpuBuffer* PrinterBuffer = Options.PrinterBuffer ? Options.PrinterBuffer : TSingleton<PrintBuffer>::Get().GetResource();
+					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, PrinterBuffer, Binding.Stage);
+					continue;
+				}
 
 				GpuTexture* OverrideTexture = Options.TextureOverrideResolver ? Options.TextureOverrideResolver(Binding) : nullptr;
 				const MaterialBindingResourceDefault* ResourceDefault = FindResourceDefault(InMaterial, Binding.Name, Binding.Stage);

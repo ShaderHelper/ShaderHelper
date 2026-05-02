@@ -514,6 +514,10 @@ constexpr int PaddingLineNum = 22;
 							}
 						}
 
+						CandidateInfos.RemoveAll([](const ShaderCandidateInfo& Candidate) {
+							return Candidate.Text.StartsWith(TEXT("GPrivate_"));
+						});
+
 						for (auto It = CandidateInfos.CreateIterator(); It; ++It)
 						{
 							if (Task.IsMemberAccess)

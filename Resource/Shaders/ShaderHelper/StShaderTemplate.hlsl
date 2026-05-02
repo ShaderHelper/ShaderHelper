@@ -9,15 +9,15 @@ struct PIn
 
 void mainImage(out float4 fragColor, in float2 fragCoord);
 
-#if ENABLE_PRINT == 1
+#if GPrivate_ENABLE_PRINT == 1
 #define PrintAtMouse(Str, ...) do {                                             \
     if(iMouse.z > 0 && all(uint2(iMouse.xy) == uint2(GPrivate_fragCoord)))      \
     {                                                                           \
         Print(EXPAND(Str), ##__VA_ARGS__);                                      \
     }                                                                           \
 } while(0)
-#elif EDITOR_ISENSE == 1
-#define PrintAtMouse(Str, ...) UNUSED_ARGS(__VA_ARGS__);
+#elif GPrivate_EDITOR_ISENSE == 1
+#define PrintAtMouse(Str, ...) GPrivate_UNUSED_ARGS(__VA_ARGS__);
 #else
 #define PrintAtMouse(Str, ...)
 #endif

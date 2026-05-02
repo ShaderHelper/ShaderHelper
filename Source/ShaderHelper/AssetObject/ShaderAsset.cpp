@@ -107,13 +107,26 @@ namespace SH
 		TArray<GpuShaderLayoutBinding> Bindings = InShader->GetLayout();
 		for (const GpuShaderLayoutBinding& Binding : Bindings)
 		{
+			if (Binding.Name.StartsWith(TEXT("GPrivate_")))
+			{
+				continue;
+			}
+
 			const FString BindingTypeName = ANSI_TO_TCHAR(magic_enum::enum_name(Binding.Type).data());
 			if (Binding.Type == BindingType::UniformBuffer && Binding.UbMembers.Num() > 0)
 			{
 				auto UniformBufferCategory = MakeShared<PropertyCategory>(const_cast<ShaderAsset*>(this), Binding.Name);
 				for (const GpuShaderUbMemberInfo& Member : Binding.UbMembers)
 				{
+					if (Member.Name.StartsWith(TEXT("GPrivate_")))
+					{
+						continue;
+					}
 					UniformBufferCategory->AddChild(CreateBindingInfoProperty(const_cast<ShaderAsset*>(this), Member.Name, Member.Type));
+				}
+				if (UniformBufferCategory->GetChildrenNum() == 0)
+				{
+					continue;
 				}
 				BindingCategory->AddChild(UniformBufferCategory);
 				continue;

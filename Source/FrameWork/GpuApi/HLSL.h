@@ -392,9 +392,9 @@ namespace FW
 
 			TArray<const char*> DxcArgs;
 			DxcArgs.Add("-D");
-			DxcArgs.Add("ENABLE_PRINT=0");
+			DxcArgs.Add("GPrivate_ENABLE_PRINT=0");
 			DxcArgs.Add("-D");
-			DxcArgs.Add("EDITOR_ISENSE=1");
+			DxcArgs.Add("GPrivate_EDITOR_ISENSE=1");
 
 			TArray<FTCHARToUTF8> ExtraArgUTF8Storage;
 			for (const FString& Arg : InShader->CompileExtraArgs)

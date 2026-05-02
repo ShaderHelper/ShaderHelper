@@ -1413,8 +1413,8 @@ namespace FW
 		{
 			shaderc::Compiler GlslCompiler;
 			shaderc::CompileOptions Options;
-			Options.AddMacroDefinition("EDITOR_ISENSE", "1");
-			Options.AddMacroDefinition("ENABLE_PRINT", "0");
+			Options.AddMacroDefinition("GPrivate_EDITOR_ISENSE", "1");
+			Options.AddMacroDefinition("GPrivate_ENABLE_PRINT", "0");
 			Options.AddMacroDefinition("ENABLE_ASSERT", "0");
 			ParseExtraArgs(InShader->CompileExtraArgs, Options);
 			if (!std::regex_search(TCHAR_TO_UTF8(*ShaderSource), std::regex(R"(^\s*#\s*version\s+\d+)")))

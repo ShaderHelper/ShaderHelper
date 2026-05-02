@@ -7,6 +7,7 @@
 #include "GpuApi/GpuBindGroupLayout.h"
 #include "GpuApi/GpuBindGroup.h"
 #include "Renderer/MaterialRenderResources.h"
+#include "RenderResource/PrintBuffer.h"
 
 namespace SH
 {
@@ -53,6 +54,8 @@ namespace SH
 		// Invalidate material-derived render resources.
 		void InvalidateRenderResources();
 		bool UsesTextureAsShaderInput(FW::GpuTexture* Texture, FString& OutBindingName) const;
+		FW::PrintBuffer* GetPrintBuffer();
+		bool FlushPrintBufferLogs(const FString& LogPrefix);
 
 	public:
 		FW::ObserverObjectPtr<MeshSceneObject> MeshSceneObjectRef;
@@ -76,6 +79,7 @@ namespace SH
 		TMap<int32, TRefCountPtr<FW::GpuBindGroup>> BindGroups;
 		TRefCountPtr<FW::GpuRenderPipelineState> Pipeline;
 		TMap<FString, TUniquePtr<FW::UniformBuffer>> UniformBuffers;
+		TUniquePtr<FW::PrintBuffer> PrinterBuffer;
 		MaterialErrorRenderResources ErrorResources;
 		FDelegateHandle MaterialChangedHandle;
 		Material* BoundMaterial = nullptr;

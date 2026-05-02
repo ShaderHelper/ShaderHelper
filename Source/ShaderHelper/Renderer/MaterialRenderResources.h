@@ -8,6 +8,7 @@
 namespace FW
 {
 	class GpuRenderPassRecorder;
+	class GpuBuffer;
 	struct MeshBuffers;
 }
 
@@ -30,6 +31,7 @@ namespace SH
 	struct MaterialBindGroupBuildOptions
 	{
 		MaterialTextureOverrideResolver TextureOverrideResolver;
+		FW::GpuBuffer* PrinterBuffer = nullptr;
 		bool bRebuildLayouts = true;
 		bool bRebuildUniformBuffers = true;
 	};

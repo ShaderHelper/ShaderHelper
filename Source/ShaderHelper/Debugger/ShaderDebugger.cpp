@@ -329,7 +329,7 @@ namespace SH
 
 		TArray<FString> ExtraArgs;
 		ExtraArgs.Add("-D");
-		ExtraArgs.Add("ENABLE_PRINT=0");
+		ExtraArgs.Add("GPrivate_ENABLE_PRINT=0");
 		ExtraArgs.Add("-ignore-validation-error");
 		FString ErrorInfo, WarnInfo;
 		GpuShaderLanguage Lang = DebugShader->GetShaderLanguage();
@@ -1569,7 +1569,7 @@ namespace SH
 
 		TArray<FString> ExtraArgs;
 		ExtraArgs.Add("-D");
-		ExtraArgs.Add("ENABLE_PRINT=0");
+		ExtraArgs.Add("GPrivate_ENABLE_PRINT=0");
 		ExtraArgs.Add("-ignore-validation-error");
 
 		FString ErrorInfo, WarnInfo;
@@ -1931,7 +1931,7 @@ namespace SH
 		GpuShaderLanguage Lang = DebugShader->GetShaderLanguage();
 		TArray<FString> ExtraArgs;
 		ExtraArgs.Add("-D");
-		ExtraArgs.Add("ENABLE_PRINT=0");
+		ExtraArgs.Add("GPrivate_ENABLE_PRINT=0");
 		ExtraArgs.Add("-ignore-validation-error");
 
 		SpvPixelPreviewerContext PreviewContext{ SpvBindings };

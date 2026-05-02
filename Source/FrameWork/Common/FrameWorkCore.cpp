@@ -454,6 +454,7 @@ namespace FW
 	{
 		if (GlobalValidShObjects.Contains(this))
 		{
+			GlobalValidShObjects.Remove(this);
 			OnDestroy.Broadcast();
 			NumRefs = 0;
 			delete this;

@@ -78,6 +78,30 @@ void main()
 
 	namespace
 	{
+		FString GetPrintInclude(GpuShaderLanguage Language)
+		{
+			return Language == GpuShaderLanguage::GLSL
+				? TEXT("#include \"ShaderHelper/Print.glsl\"\n")
+				: TEXT("#include \"Shared/Print.h\"\n");
+		}
+
+		FString InjectPrintInclude(const FString& Content, GpuShaderLanguage Language)
+		{
+			const FString Include = GetPrintInclude(Language);
+			if (Language != GpuShaderLanguage::GLSL || !Content.StartsWith(TEXT("#version")))
+			{
+				return Include + Content;
+			}
+
+			int32 FirstLineEnd = INDEX_NONE;
+			if (Content.FindChar(TEXT('\n'), FirstLineEnd))
+			{
+				return Content.Left(FirstLineEnd + 1) + Include + Content.RightChop(FirstLineEnd + 1);
+			}
+
+			return Content + TEXT("\n") + Include;
+		}
+
 		const FString& GetDefaultShader(GpuShaderLanguage Language)
 		{
 			return Language == GpuShaderLanguage::GLSL ? DefaultGlslShader : DefaultHlslShader;
@@ -179,7 +203,7 @@ void main()
 		{
 			if (!IsStageEnabled(Stage)) continue;
 			int32 Index = (int32)Stage;
-			ShaderDesc StageDesc = GetShaderDesc(GetFullContent(), Stage);
+			ShaderDesc StageDesc = GetShaderDesc(EditorContent, Stage);
 			CompiledShaders[Index] = GGpuRhi->CreateShaderFromSource(StageDesc.SourceDesc);
 			FString StageError, StageWarn;
 			StageCompileResults[Index] = GGpuRhi->CompileShader(CompiledShaders[Index], StageError, StageWarn, StageDesc.ExtraArgs);
@@ -310,15 +334,21 @@ void main()
 
 	FString Shader::GetFullContent() const
 	{
-		return EditorContent;
+		return InjectPrintInclude(EditorContent, Language);
+	}
+
+	int32 Shader::GetExtraLineNum() const
+	{
+		return 1;
 	}
 
 	ShaderDesc Shader::GetShaderDesc(const FString& InContent, ShaderType InStage) const
 	{
+		FString FullContent = InjectPrintInclude(InContent, Language);
 		ShaderDesc Desc;
 		Desc.SourceDesc = {
 			.Name = GetShaderName(),
-			.Source = InContent,
+			.Source = MoveTemp(FullContent),
 			.Type = InStage,
 			.EntryPoint = EntryPoints[(int32)InStage],
 			.Language = Language,

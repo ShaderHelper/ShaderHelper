@@ -8,8 +8,8 @@
 //so reference ue's approach by preprocessing shaders to generate uint arrays.
 #pragma once
 
-#ifndef ENABLE_PRINT
-    #define ENABLE_PRINT 1
+#ifndef GPrivate_ENABLE_PRINT
+    #define GPrivate_ENABLE_PRINT 1
 #endif
 
 #ifndef ENABLE_ASSERT
@@ -23,32 +23,32 @@ namespace HLSL
 {
 #endif
 
-    enum TypeTag
+    enum GPrivate_TypeTag
     {
-        Print_uint,
-        Print_uint2,
-        Print_uint3,
-        Print_uint4,
+        GPrivate_Print_uint,
+        GPrivate_Print_uint2,
+        GPrivate_Print_uint3,
+        GPrivate_Print_uint4,
 
-        Print_int,
-        Print_int2,
-        Print_int3,
-        Print_int4,
+        GPrivate_Print_int,
+        GPrivate_Print_int2,
+        GPrivate_Print_int3,
+        GPrivate_Print_int4,
 
-        Print_float,
-        Print_float2,
-        Print_float3,
-        Print_float4,
+        GPrivate_Print_float,
+        GPrivate_Print_float2,
+        GPrivate_Print_float3,
+        GPrivate_Print_float4,
 
-        Print_bool,
-        Print_bool2,
-        Print_bool3,
-        Print_bool4,
+        GPrivate_Print_bool,
+        GPrivate_Print_bool2,
+        GPrivate_Print_bool3,
+        GPrivate_Print_bool4,
 
-        Num,
+        GPrivate_Num,
     };
 
-    struct Printer
+    struct GPrivate_PrinterBuffer
     {
         static const uint MaxBufferSize = 511;
         static const uint MaxBufferByteSize = MaxBufferSize * 4;
@@ -66,100 +66,100 @@ namespace HLSL
 #ifndef __cplusplus
 #include "Common.hlsl"
 
-RWByteAddressBuffer Printer : register(u0, space0);
+RWByteAddressBuffer GPrivate_Printer : register(u114, space0);
 
-// Layout in RWByteAddressBuffer Printer:
+// Layout in RWByteAddressBuffer GPrivate_Printer:
 // [0, 4)   : ByteSize (uint)
-// [4, ...) : PrintBuffer bytes (Printer::MaxBufferSize * 4 bytes)
+// [4, ...) : PrintBuffer bytes (GPrivate_PrinterBuffer::MaxBufferSize * 4 bytes)
 // 1 byte append
-uint AppendChar(uint Offset, uint Char)
+uint GPrivate_AppendChar(uint Offset, uint Char)
 {
     uint Shift       = (Offset % 4) * 8;
     uint BufferIndex = Offset / 4;
     uint ByteAddress = 4 + BufferIndex * 4;
     uint Original;
-    Printer.InterlockedOr(ByteAddress, (Char & 0xFF) << Shift, Original);
+    GPrivate_Printer.InterlockedOr(ByteAddress, (Char & 0xFF) << Shift, Original);
     return Offset + 1;
 }
 
 template<typename T>
-uint GetArgValue(T Arg)
+uint GPrivate_GetArgValue(T Arg)
 {
     return asuint(Arg);
 }
 
 template<>
-uint GetArgValue(bool Arg)
+uint GPrivate_GetArgValue(bool Arg)
 {
     return Arg ? 1 : 0;
 }
 
 template<typename T, int N>
-uint AppendArg(uint Offset, TypeTag Tag, T Arg[N])
+uint GPrivate_AppendArg(uint Offset, GPrivate_TypeTag Tag, T Arg[N])
 {
-    uint NewOffset = AppendChar(Offset, Tag);
+    uint NewOffset = GPrivate_AppendChar(Offset, Tag);
 
     for (int i = 0; i < N; i++)
     {
         for (int j = 0; j < 4; j++)
         {
-            uint ArgVal = GetArgValue(Arg[i]);
+            uint ArgVal = GPrivate_GetArgValue(Arg[i]);
             uint Val = ArgVal >> (j * 8);
-            NewOffset = AppendChar(NewOffset, Val);
+            NewOffset = GPrivate_AppendChar(NewOffset, Val);
         }
     }
     return NewOffset;
 }
 
-#define AppendArgFunc(Type)                 \
-    uint AppendArg(uint Offset, Type Arg)                \
+#define GPrivate_AppendArgFunc(Type)                 \
+    uint GPrivate_AppendArg(uint Offset, Type Arg)                \
     {                                       \
         Type Arr[] = { Arg };         \
-        return AppendArg(Offset, Print_##Type, Arr);         \
+        return GPrivate_AppendArg(Offset, GPrivate_Print_##Type, Arr);         \
     }                                       \
-    uint AppendArg(uint Offset, Type##2 Arg)                \
+    uint GPrivate_AppendArg(uint Offset, Type##2 Arg)                \
     {                                       \
         Type Arr[] = { Arg.x, Arg.y };    \
-        return AppendArg(Offset, Print_##Type##2, Arr);                     \
+        return GPrivate_AppendArg(Offset, GPrivate_Print_##Type##2, Arr);                     \
     }                                       \
-    uint AppendArg(uint Offset, Type##3 Arg)                \
+    uint GPrivate_AppendArg(uint Offset, Type##3 Arg)                \
     {                                       \
         Type Arr[] = { Arg.x, Arg.y, Arg.z }; \
-        return AppendArg(Offset, Print_##Type##3, Arr);                                 \
+        return GPrivate_AppendArg(Offset, GPrivate_Print_##Type##3, Arr);                                 \
     }                                       \
-    uint AppendArg(uint Offset, Type##4 Arg)                \
+    uint GPrivate_AppendArg(uint Offset, Type##4 Arg)                \
     {                                       \
         Type Arr[] = { Arg.x, Arg.y, Arg.z, Arg.w };  \
-        return AppendArg(Offset, Print_##Type##4, Arr);         \
+        return GPrivate_AppendArg(Offset, GPrivate_Print_##Type##4, Arr);         \
     }
 
-AppendArgFunc(uint)
-AppendArgFunc(int)
-AppendArgFunc(float)
-AppendArgFunc(bool)
+GPrivate_AppendArgFunc(uint)
+GPrivate_AppendArgFunc(int)
+GPrivate_AppendArgFunc(float)
+GPrivate_AppendArgFunc(bool)
 
-#define SELECT_NUM(Arg0, Arg1, Arg2, Arg3, RESULT, ...) RESULT
-#define GET_ARG_NUM(...) SELECT_NUM(0, ##__VA_ARGS__, 3, 2, 1, 0)
+#define GPrivate_SELECT_NUM(Arg0, Arg1, Arg2, Arg3, RESULT, ...) RESULT
+#define GPrivate_GET_ARG_NUM(...) GPrivate_SELECT_NUM(0, ##__VA_ARGS__, 3, 2, 1, 0)
 
-#define GET_ARGS_SIZE_0() 0
-#define GET_ARGS_SIZE_1(Arg1) sizeof(Arg1)
-#define GET_ARGS_SIZE_2(Arg1, Arg2) sizeof(Arg1) + GET_ARGS_SIZE_1(Arg2)
-#define GET_ARGS_SIZE_3(Arg1, Arg2, Arg3) sizeof(Arg1) + GET_ARGS_SIZE_2(Arg2, Arg3)
-#define GET_ARGS_SIZE(...) JOIN(GET_ARGS_SIZE_, GET_ARG_NUM(__VA_ARGS__))(__VA_ARGS__)
+#define GPrivate_GET_ARGS_SIZE_0() 0
+#define GPrivate_GET_ARGS_SIZE_1(Arg1) sizeof(Arg1)
+#define GPrivate_GET_ARGS_SIZE_2(Arg1, Arg2) sizeof(Arg1) + GPrivate_GET_ARGS_SIZE_1(Arg2)
+#define GPrivate_GET_ARGS_SIZE_3(Arg1, Arg2, Arg3) sizeof(Arg1) + GPrivate_GET_ARGS_SIZE_2(Arg2, Arg3)
+#define GPrivate_GET_ARGS_SIZE(...) JOIN(GPrivate_GET_ARGS_SIZE_, GPrivate_GET_ARG_NUM(__VA_ARGS__))(__VA_ARGS__)
 
-#define APPEND_ARGS_0()
-#define APPEND_ARGS_1(Arg1) ByteOffset = AppendArg(ByteOffset, Arg1)
-#define APPEND_ARGS_2(Arg1, Arg2) ByteOffset = AppendArg(ByteOffset, Arg1); APPEND_ARGS_1(Arg2)
-#define APPEND_ARGS_3(Arg1, Arg2, Arg3) ByteOffset = AppendArg(ByteOffset, Arg1); APPEND_ARGS_2(Arg2, Arg3)
-#define APPEND_ARGS(...) JOIN(APPEND_ARGS_, GET_ARG_NUM(__VA_ARGS__))(__VA_ARGS__)
+#define GPrivate_APPEND_ARGS_0()
+#define GPrivate_APPEND_ARGS_1(Arg1) ByteOffset = GPrivate_AppendArg(ByteOffset, Arg1)
+#define GPrivate_APPEND_ARGS_2(Arg1, Arg2) ByteOffset = GPrivate_AppendArg(ByteOffset, Arg1); GPrivate_APPEND_ARGS_1(Arg2)
+#define GPrivate_APPEND_ARGS_3(Arg1, Arg2, Arg3) ByteOffset = GPrivate_AppendArg(ByteOffset, Arg1); GPrivate_APPEND_ARGS_2(Arg2, Arg3)
+#define GPrivate_APPEND_ARGS(...) JOIN(GPrivate_APPEND_ARGS_, GPrivate_GET_ARG_NUM(__VA_ARGS__))(__VA_ARGS__)
 
-#define UNUSED_ARGS_0()
-#define UNUSED_ARGS_1(Arg1) (void)Arg1
-#define UNUSED_ARGS_2(Arg1, Arg2) (void)Arg1; UNUSED_ARGS_1(Arg2);
-#define UNUSED_ARGS_3(Arg1, Arg2, Arg3) (void)Arg1; UNUSED_ARGS_2(Arg2, Arg3);
-#define UNUSED_ARGS(...) JOIN(UNUSED_ARGS_, GET_ARG_NUM(__VA_ARGS__))(__VA_ARGS__)
+#define GPrivate_UNUSED_ARGS_0()
+#define GPrivate_UNUSED_ARGS_1(Arg1) (void)Arg1
+#define GPrivate_UNUSED_ARGS_2(Arg1, Arg2) (void)Arg1; GPrivate_UNUSED_ARGS_1(Arg2);
+#define GPrivate_UNUSED_ARGS_3(Arg1, Arg2, Arg3) (void)Arg1; GPrivate_UNUSED_ARGS_2(Arg2, Arg3);
+#define GPrivate_UNUSED_ARGS(...) JOIN(GPrivate_UNUSED_ARGS_, GPrivate_GET_ARG_NUM(__VA_ARGS__))(__VA_ARGS__)
 
-#if ENABLE_PRINT == 1
+#if GPrivate_ENABLE_PRINT == 1
 //Up to 3 args now.
 //Print("abc {0}", t);
 #define Print(StrArrDecl, ...)  do {                                    \
@@ -167,15 +167,15 @@ AppendArgFunc(bool)
     {                                                                   \
         StrArrDecl;                                                     \
         uint CharNum = sizeof(StrArr) / sizeof(StrArr[0]);              \
-        uint ArgNum = GET_ARG_NUM(__VA_ARGS__);                         \
-        uint ArgByteSize = 1 + ArgNum + GET_ARGS_SIZE(__VA_ARGS__);     \
+        uint ArgNum = GPrivate_GET_ARG_NUM(__VA_ARGS__);                \
+        uint ArgByteSize = 1 + ArgNum + GPrivate_GET_ARGS_SIZE(__VA_ARGS__); \
         uint Increment = 3 + CharNum + ArgByteSize;                     \
-        uint OldByteSize = Printer.Load(0);                             \
-        uint ByteOffset = Printer::MaxBufferByteSize;                   \
-        while(OldByteSize + Increment <= Printer::MaxBufferByteSize)    \
+        uint OldByteSize = GPrivate_Printer.Load(0);                    \
+        uint ByteOffset = GPrivate_PrinterBuffer::MaxBufferByteSize;    \
+        while(OldByteSize + Increment <= GPrivate_PrinterBuffer::MaxBufferByteSize) \
         {                                                               \
             uint CompareValue = OldByteSize;                            \
-            Printer.InterlockedCompareExchange(0,                       \
+            GPrivate_Printer.InterlockedCompareExchange(0,              \
                 CompareValue, OldByteSize + Increment, OldByteSize);    \
             if(OldByteSize == CompareValue)                             \
             {                                                           \
@@ -183,23 +183,23 @@ AppendArgFunc(bool)
                 break;                                                  \
             }                                                           \
         }                                                               \
-        if (ByteOffset >= Printer::MaxBufferByteSize)                   \
+        if (ByteOffset >= GPrivate_PrinterBuffer::MaxBufferByteSize)    \
         {                                                               \
             break;                                                      \
         }                                                               \
-        ByteOffset = AppendChar(ByteOffset, GPrivate_AssertResult);     \
-        ByteOffset = AppendChar(ByteOffset, __LINE__ & 0xFF);           \
-        ByteOffset = AppendChar(ByteOffset, (__LINE__ >> 8) & 0xFF);    \
+        ByteOffset = GPrivate_AppendChar(ByteOffset, GPrivate_AssertResult); \
+        ByteOffset = GPrivate_AppendChar(ByteOffset, __LINE__ & 0xFF);  \
+        ByteOffset = GPrivate_AppendChar(ByteOffset, (__LINE__ >> 8) & 0xFF); \
         for (uint i = 0; i < CharNum; i++)                              \
         {                                                               \
-            ByteOffset = AppendChar(ByteOffset, StrArr[i]);             \
+            ByteOffset = GPrivate_AppendChar(ByteOffset, StrArr[i]);    \
         }                                                               \
-        ByteOffset = AppendChar(ByteOffset, ArgNum);                    \
-        APPEND_ARGS(__VA_ARGS__);                                       \
+        ByteOffset = GPrivate_AppendChar(ByteOffset, ArgNum);           \
+        GPrivate_APPEND_ARGS(__VA_ARGS__);                              \
     }                                                                   \
 } while(0)
-#elif EDITOR_ISENSE == 1
-#define Print(Str, ...) UNUSED_ARGS(__VA_ARGS__);
+#elif GPrivate_EDITOR_ISENSE == 1
+#define Print(Str, ...) GPrivate_UNUSED_ARGS(__VA_ARGS__);
 #else
 #define Print(Str, ...)
 #endif

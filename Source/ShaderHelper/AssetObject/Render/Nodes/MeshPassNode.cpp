@@ -534,7 +534,7 @@ namespace SH
 		}
 
 		TArray<ObjectPtr<MeshRenderObject>> MROsCopy = MeshRenderObjects;
-		Ctx.RG->AddRenderPass(ObjectName.ToString(), PassDesc,
+		auto& RenderPass = Ctx.RG->AddRenderPass(ObjectName.ToString(), PassDesc,
 			[MROsCopy, Cam](GpuRenderPassRecorder* Rec) {
 				const Camera* CameraPtr = Cam.IsSet() ? &Cam.GetValue() : nullptr;
 				for (const auto& MRO : MROsCopy)
@@ -548,6 +548,25 @@ namespace SH
 				}
 			}
 		);
+		for (const auto& MRO : MeshRenderObjects)
+		{
+			if (MRO)
+			{
+				RenderPass.Write(MRO->GetPrintBuffer()->GetResource());
+			}
+		}
+
+		Ctx.RG->Execute();
+
+		bool bAssertError = false;
+		for (const auto& MRO : MeshRenderObjects)
+		{
+			if (MRO)
+			{
+				const FString LogPrefix = FString::Printf(TEXT("%s:%s"), *ObjectName.ToString(), *MRO->ObjectName.ToString());
+				bAssertError |= MRO->FlushPrintBufferLogs(LogPrefix);
+			}
+		}
 
 		if (PreviewRT.IsValid() && PreviewSourceTex.IsValid())
 		{
@@ -573,6 +592,11 @@ namespace SH
 			{
 				Pin->SetValue(ActiveDepthRT);
 			}
+		}
+
+		if (bAssertError)
+		{
+			return { true, true };
 		}
 
 		return {};
