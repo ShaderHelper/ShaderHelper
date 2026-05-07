@@ -23,6 +23,7 @@
 #include "AssetObject/Render/Render.h"
 #include "RenderResource/Mesh.h"
 #include "UI/Widgets/Misc/MiscWidget.h"
+#include "magic_enum.hpp"
 
 #include <Serialization/JsonSerializer.h>
 #include <Misc/FileHelper.h>
@@ -72,8 +73,9 @@ namespace SH
 					StartDebugging();
 				}
 			}),
-			FCanExecuteAction::CreateLambda([this] { 
-				return CurDebuggableObject != nullptr && CurDebuggableObject->GetShaderAsset() != nullptr;
+			FCanExecuteAction::CreateLambda([this] {
+				DebuggableObject* Debuggable = GetDebuggaleObject();
+				return Debuggable && Debuggable->GetShaderAsset(CurrentDebugItem) != nullptr;
 			})
 		);
 		UICommandList->MapAction(
@@ -81,7 +83,7 @@ namespace SH
 			FExecuteAction::CreateLambda([this] {
 				Continue();
 			}),
-			FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); }),
+			FCanExecuteAction::CreateLambda([this] { return IsDebugging && FragmentDebuggerViewport->FinalizedPixel(); }),
 			EUIActionRepeatMode::RepeatEnabled
 		);
 		UICommandList->MapAction(
@@ -89,7 +91,7 @@ namespace SH
 			FExecuteAction::CreateLambda([this]{
 				Continue(StepMode::StepInto);
 			}),
-			FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); }),
+			FCanExecuteAction::CreateLambda([this] { return IsDebugging && FragmentDebuggerViewport->FinalizedPixel(); }),
 			EUIActionRepeatMode::RepeatEnabled
 		);
 		UICommandList->MapAction(
@@ -97,7 +99,7 @@ namespace SH
 			FExecuteAction::CreateLambda([this]{
 				Continue(StepMode::StepOver);
 			}),
-			FCanExecuteAction::CreateLambda([this] { return IsDebugging && DebuggerViewport->FinalizedPixel(); }),
+			FCanExecuteAction::CreateLambda([this] { return IsDebugging && FragmentDebuggerViewport->FinalizedPixel(); }),
 			EUIActionRepeatMode::RepeatEnabled
 		);
 		UICommandList->MapAction(
@@ -168,9 +170,13 @@ namespace SH
 			.Visibility_Lambda([this]{
 				return IsDebugging ? EVisibility::Hidden : EVisibility::Visible;
 			});
-		SAssignNew(DebuggerViewport, SDebuggerViewport)
+		SAssignNew(FragmentDebuggerViewport, SFragmentDebuggerViewport)
 			.Visibility_Lambda([this]{
-				return (IsDebugging && !bShowingLinePreview) ? EVisibility::Visible : EVisibility::Hidden;
+				return (IsDebugging && CurrentDebugItem == DebugItem::Fragment && !bShowingLinePreview) ? EVisibility::Visible : EVisibility::Hidden;
+			});
+		SAssignNew(VertexDebuggerViewport, SVertexDebuggerViewport)
+			.Visibility_Lambda([this]{
+				return (IsDebugging && CurrentDebugItem == DebugItem::Vertex && !bShowingLinePreview) ? EVisibility::Visible : EVisibility::Hidden;
 			});
 		LinePreviewViewPort = MakeShared<FW::PreviewViewPort>();
 		SAssignNew(LinePreviewWidget, SViewport)
@@ -823,9 +829,9 @@ namespace SH
 				return FText::FromString(DirtyChar + LoadedShader->GetFileName());
 			})
 			.OnCanCloseTab_Lambda([this, TabId]{
-				if(CurDebuggableObject && IsDebugging)
+				if(DebuggableObject* Debuggable = GetDebuggaleObject(); Debuggable && IsDebugging)
 				{
-					ShaderAsset* Shader = CurDebuggableObject->GetShaderAsset();
+					ShaderAsset* Shader = Debuggable->GetShaderAsset(CurrentDebugItem);
 					if(CurProject->OpenedShaders[Shader]->GetLayoutIdentifier() == TabId)
 					{
 						auto Ret = MessageDialog::Open(MessageDialog::OkCancel, MessageDialog::Shocked, MainWindow, LOCALIZATION("TerminateDebuggerTip"));
@@ -969,7 +975,11 @@ namespace SH
 					]
 					+SOverlay::Slot()
 					[
-						DebuggerViewport.ToSharedRef()
+						FragmentDebuggerViewport.ToSharedRef()
+					]
+					+SOverlay::Slot()
+					[
+						VertexDebuggerViewport.ToSharedRef()
 					]
 					+SOverlay::Slot()
 					[
@@ -1162,10 +1172,15 @@ namespace SH
 		{
 			Renderer->RegisterRenderComp(GraphRenderComp.Get());
 		}
+		TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = true;
 	}
 
     void ShaderHelperEditor::RefreshProperty(bool bClear)
     {
+		if (bClear)
+		{
+			CurPropertyObject.Reset();
+		}
         PropertyView->Refresh(bClear);
     }
 
@@ -1269,9 +1284,46 @@ namespace SH
 	{
 		DismissLinePreview();
 		IsDebugging = false;
-		CurDebuggableObject->OnEndDebuggging();
+		GetDebuggaleObject()->OnEndDebuggging();
 		Debugger.Reset();
 		CloseDebuggerTabs();
+	}
+
+	void ShaderHelperEditor::SetDebuggableObject(FW::ShObject* InObject)
+	{
+		if (InObject)
+		{
+			check(dynamic_cast<DebuggableObject*>(InObject));
+			CurDebuggableObject.SetReference(InObject);
+		}
+		else
+		{
+			CurDebuggableObject.Reset();
+		}
+		NormalizeCurrentDebugItem();
+	}
+
+	void ShaderHelperEditor::SetCurrentDebugItem(DebugItem InItem)
+	{
+		CurrentDebugItem = InItem;
+		NormalizeCurrentDebugItem();
+	}
+
+	void ShaderHelperEditor::NormalizeCurrentDebugItem()
+	{
+		DebuggableObject* Debuggable = GetDebuggaleObject();
+		if (!Debuggable)
+		{
+			CurrentDebugItem = DebugItem::Fragment;
+			return;
+		}
+
+		const TArray<DebugItem> SupportedItems = Debuggable->GetSupportedDebugItems();
+		if (SupportedItems.Contains(CurrentDebugItem))
+		{
+			return;
+		}
+		CurrentDebugItem = SupportedItems.Num() > 0 ? SupportedItems[0] : DebugItem::Fragment;
 	}
 
 	void ShaderHelperEditor::ShowLinePreview(const DebuggerLocation& Loc)
@@ -1314,7 +1366,7 @@ namespace SH
 		{
 			Debugger.ShowDebuggerResult();
 			FString StopFile = Debugger.GetStopLocation().File;
-			ShaderAsset* MainShader = CurDebuggableObject->GetShaderAsset();
+			ShaderAsset* MainShader = GetDebuggaleObject()->GetShaderAsset(CurrentDebugItem);
 			AssetPtr<ShaderAsset> StopShader = MainShader->FindIncludeAsset(StopFile);
 			if (StopShader)
 			{
@@ -1338,7 +1390,7 @@ namespace SH
 
 	std::optional<Vector2u> ShaderHelperEditor::ValidatePixel(const InvocationState& InState)
 	{
-		SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
+		SShaderEditorBox* ShaderEditor = GetShaderEditor(GetDebuggaleObject()->GetShaderAsset(CurrentDebugItem));
 		Debugger.SetShaderAsset(ShaderEditor->GetShaderAsset());
 		Debugger.SetShaderSource(ShaderEditor->GetCurrentShaderSource());
 		return Debugger.ValidatePixel(InState);
@@ -1346,7 +1398,7 @@ namespace SH
 
 	void ShaderHelperEditor::DebugPixel(const Vector2u& InPixelCoord, const InvocationState& InState)
 	{
-		SShaderEditorBox* ShaderEditor = GetShaderEditor(CurDebuggableObject->GetShaderAsset());
+		SShaderEditorBox* ShaderEditor = GetShaderEditor(GetDebuggaleObject()->GetShaderAsset(CurrentDebugItem));
 		Debugger.SetShaderAsset(ShaderEditor->GetShaderAsset());
 		Debugger.SetShaderSource(ShaderEditor->GetCurrentShaderSource());
 		
@@ -1386,16 +1438,31 @@ namespace SH
 	}
 
 	void ShaderHelperEditor::StartDebugging(bool GlobalValidation)
-	{		
-		DebugTargetInfo DebugTarget = CurDebuggableObject->OnStartDebugging();
+	{
+		NormalizeCurrentDebugItem();
+		DebuggableObject* Debuggable = GetDebuggaleObject();
+		if (!Debuggable || !Debuggable->GetSupportedDebugItems().Contains(CurrentDebugItem))
+		{
+			return;
+		}
+
+		if (CurrentDebugItem == DebugItem::Vertex)
+		{
+			Debuggable->OnStartDebugging(CurrentDebugItem);
+			IsDebugging = true;
+			return;
+		}
+
+		DebugTargetInfo DebugTarget = Debuggable->OnStartDebugging(CurrentDebugItem);
+		DebugTarget.Normalize();
 		if(DebugTarget.Tex)
 		{
 			IsDebugging = true;
-			DebuggerViewport->SetDebugTarget(DebugTarget, GlobalValidation);
+			FragmentDebuggerViewport->SetDebugTarget(DebugTarget, GlobalValidation);
 			if (!GlobalValidation)
 			{
 				auto User0 = FSlateApplication::Get().GetUser(0);
-				User0->LockCursor(DebuggerViewport.ToSharedRef());
+				User0->LockCursor(FragmentDebuggerViewport.ToSharedRef());
 			}
 
 		}
@@ -1426,19 +1493,44 @@ namespace SH
 			FText::GetEmpty(), LOCALIZATION("GoForward"),
 			FSlateIcon(FAppStyle::Get().GetStyleSetName(), "Icons.ArrowRight")
 		);
+		auto MakeDebugItemMenuContent = [this]() {
+			FMenuBuilder MenuBuilder(true, nullptr);
+			for (DebugItem Item : GetDebuggaleObject()->GetSupportedDebugItems())
+			{
+				MenuBuilder.AddMenuEntry(
+					FText::FromString(ANSI_TO_TCHAR(magic_enum::enum_name(Item).data())),
+					FText::GetEmpty(),
+					FSlateIcon(),
+					FUIAction(
+						FExecuteAction::CreateLambda([this, Item] { SetCurrentDebugItem(Item); }),
+						FCanExecuteAction(),
+						FIsActionChecked::CreateLambda([this, Item] { return Item == CurrentDebugItem; })
+					),
+					NAME_None,
+					EUserInterfaceActionType::ToggleButton
+				);
+			}
+			return MenuBuilder.MakeWidget();
+		};
 		FToolBarBuilder DebuggerToolBarBuilder(UICommandList, FMultiBoxCustomization::None, nullptr);
 		DebuggerToolBarBuilder.SetStyle(&FShaderHelperStyle::Get(), FName("Toolbar.ShaderHelper"));
 		
-		DebuggerToolBarBuilder.AddToolBarButton(
-			CodeEditorCommands::Get().Debug,
-			NAME_None,
-			FText::GetEmpty(), LOCALIZATION("Debug"),
-			TAttribute<FSlateIcon>::CreateLambda([this] {
-				if(IsDebugging) {
-					return FSlateIcon(FShaderHelperStyle::Get().GetStyleSetName(), "Icons.Pause");
-				}
-				return FSlateIcon( FShaderHelperStyle::Get().GetStyleSetName(), "Icons.Bug");
-			})
+		DebuggerToolBarBuilder.AddToolBarWidget(
+			SNew(SShSplitButton)
+			.CommandList(UICommandList)
+			.Command(CodeEditorCommands::Get().Debug)
+			.ButtonToolTipText(LOCALIZATION("Debug"))
+			.MenuToolTipText_Lambda([this] { return FText::FromString(ANSI_TO_TCHAR(magic_enum::enum_name(CurrentDebugItem).data())); })
+			.IsMenuEnabled_Lambda([this] { return GetDebuggaleObject() != nullptr; })
+			.OnGetMenuContent_Lambda(MakeDebugItemMenuContent)
+			[
+				SNew(SImage)
+				.Image_Lambda([this] {
+					return IsDebugging
+						? FShaderHelperStyle::Get().GetBrush("Icons.Pause")
+						: FShaderHelperStyle::Get().GetBrush("Icons.Bug");
+				})
+			]
 		);
 		DebuggerToolBarBuilder.AddToolBarButton(
 			CodeEditorCommands::Get().Continue,
@@ -1488,17 +1580,23 @@ namespace SH
 				]
 			)
 		);
-		ToolBarBuilder.AddToolBarButton(
-			FUIAction(
-				FExecuteAction::CreateLambda([this] {
+		ToolBarBuilder.AddToolBarWidget(
+			MakeCenteredToolBarWidget(
+				SNew(SShSplitButton)
+				.ButtonToolTipText(LOCALIZATION("Validation"))
+				.MenuToolTipText_Lambda([this] { return FText::FromString(ANSI_TO_TCHAR(magic_enum::enum_name(CurrentDebugItem).data())); })
+				.IsButtonEnabled_Lambda([this] { return !IsDebugging && GetDebuggaleObject() != nullptr && CurrentDebugItem == DebugItem::Fragment; })
+				.IsMenuEnabled_Lambda([this] { return GetDebuggaleObject() != nullptr; })
+				.OnClicked_Lambda([this] {
 					StartDebugging(true);
-				}),
-				FCanExecuteAction::CreateLambda([this] { return !IsDebugging && CurDebuggableObject != nullptr; })
-			),
-			NAME_None,
-			FText::GetEmpty(), LOCALIZATION("Validation"),
-			FSlateIcon(FShaderHelperStyle::Get().GetStyleSetName(), "Icons.Validation"),
-			EUserInterfaceActionType::Button
+					return FReply::Handled();
+				})
+				.OnGetMenuContent_Lambda(MakeDebugItemMenuContent)
+				[
+					SNew(SImage)
+					.Image(FShaderHelperStyle::Get().GetBrush("Icons.Validation"))
+				]
+			)
 		);
 		ToolBarBuilder.AddToolBarButton(
 			FUIAction(

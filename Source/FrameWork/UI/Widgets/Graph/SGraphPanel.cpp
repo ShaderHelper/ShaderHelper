@@ -126,12 +126,8 @@ namespace FW
 	{
 		Links.Remove(Output, Input);
 		Output->Owner->RemoveDep(Input->Owner);
+		Output->Owner->NodeData->OutPinToInPin.Remove(Output->PinData, Input->PinData);
 		Input->PinData->SourcePin.Reset();
-		auto Kkey = Output->Owner->NodeData->OutPinToInPin.FindKey(Input->PinData);
-		if (Kkey)
-		{
-			Output->Owner->NodeData->OutPinToInPin.Remove(*Kkey, Input->PinData);
-		}
 		Input->PinData->Refuse();
 	}
 

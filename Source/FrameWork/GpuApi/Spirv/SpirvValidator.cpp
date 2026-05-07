@@ -103,10 +103,11 @@ namespace FW
 		LoadUsedInitUnits = ComputeLoadCheckMasks(Insts, Context, Patcher);
 	}
 
-	void SpvValidator::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections, const TMap<SpvId, SpvExtSet>& InExtSets)
+	void SpvValidator::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections)
 	{
 		this->Insts = &Insts;
 		Patcher.SetSpvContext(Insts, SpvCode, &Context);
+		PatchExtSet(Patcher, Context, SpvExtSet::GLSLstd450);
 
 		// Pre-scan SpvDebugDeclare to populate VariableDescMap
 		for (const auto& Inst : Insts)
@@ -1832,15 +1833,145 @@ namespace FW
 		GetAccessFuncIds.Add(Type, GetAccessFuncId);
 	}
 
+	uint32 SpvValidator::GetAppendErrorLocationByteSize() const
+	{
+		switch (Type)
+		{
+		case ShaderType::Pixel:
+			return GetPixelAppendErrorLocationByteSize();
+		case ShaderType::Vertex:
+			return GetVertexAppendErrorLocationByteSize();
+		case ShaderType::Compute:
+			return GetComputeAppendErrorLocationByteSize();
+		default:
+			return 0u;
+		}
+	}
+
+	void SpvValidator::PatchAppendErrorLocation(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvId OriginalValue)
+	{
+		switch (Type)
+		{
+		case ShaderType::Pixel:
+			PatchPixelAppendErrorLocation(InstList, OriginalValue);
+			break;
+		case ShaderType::Vertex:
+			PatchVertexAppendErrorLocation(InstList, OriginalValue);
+			break;
+		case ShaderType::Compute:
+			PatchComputeAppendErrorLocation(InstList, OriginalValue);
+			break;
+		default:
+			break;
+		}
+	}
+
+	uint32 SpvValidator::GetPixelAppendErrorLocationByteSize() const
+	{
+		return sizeof(uint32) * 2;
+	}
+
+	uint32 SpvValidator::GetVertexAppendErrorLocationByteSize() const
+	{
+		return 0u;
+	}
+
+	uint32 SpvValidator::GetComputeAppendErrorLocationByteSize() const
+	{
+		return 0u;
+	}
+
+	void SpvValidator::PatchPixelAppendErrorLocation(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvId OriginalValue)
+	{
+		uint32 ErrorLocationByteSize = GetPixelAppendErrorLocationByteSize();
+		if (ErrorLocationByteSize == 0)
+		{
+			return;
+		}
+
+		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
+		SpvId UIntPointerUniformType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Uniform, UIntType));
+		SpvId Zero = Patcher.FindOrAddConstant(0u);
+
+		SpvId OffsetX = Patcher.NewId();
+		auto Add4Op = MakeUnique<SpvOpIAdd>(UIntType, OriginalValue, Patcher.FindOrAddConstant(4u));
+		Add4Op->SetId(OffsetX);
+		InstList.Add(MoveTemp(Add4Op));
+
+		SpvId OffsetY = Patcher.NewId();
+		auto Add8Op = MakeUnique<SpvOpIAdd>(UIntType, OriginalValue, Patcher.FindOrAddConstant(8u));
+		Add8Op->SetId(OffsetY);
+		InstList.Add(MoveTemp(Add8Op));
+
+		SpvId DivBy4_X = Patcher.NewId();
+		auto DivBy4_XOp = MakeUnique<SpvOpShiftRightLogical>(UIntType, OffsetX, Patcher.FindOrAddConstant(2u));
+		DivBy4_XOp->SetId(DivBy4_X);
+		InstList.Add(MoveTemp(DivBy4_XOp));
+
+		SpvId VecIndex_X = Patcher.NewId();
+		auto VecIndex_XOp = MakeUnique<SpvOpShiftRightLogical>(UIntType, OffsetX, Patcher.FindOrAddConstant(4u));
+		VecIndex_XOp->SetId(VecIndex_X);
+		InstList.Add(MoveTemp(VecIndex_XOp));
+
+		SpvId CompIndex_X = Patcher.NewId();
+		auto CompIndex_XOp = MakeUnique<SpvOpBitwiseAnd>(UIntType, DivBy4_X, Patcher.FindOrAddConstant(3u));
+		CompIndex_XOp->SetId(CompIndex_X);
+		InstList.Add(MoveTemp(CompIndex_XOp));
+
+		SpvId DivBy4_Y = Patcher.NewId();
+		auto DivBy4_YOp = MakeUnique<SpvOpShiftRightLogical>(UIntType, OffsetY, Patcher.FindOrAddConstant(2u));
+		DivBy4_YOp->SetId(DivBy4_Y);
+		InstList.Add(MoveTemp(DivBy4_YOp));
+
+		SpvId VecIndex_Y = Patcher.NewId();
+		auto VecIndex_YOp = MakeUnique<SpvOpShiftRightLogical>(UIntType, OffsetY, Patcher.FindOrAddConstant(4u));
+		VecIndex_YOp->SetId(VecIndex_Y);
+		InstList.Add(MoveTemp(VecIndex_YOp));
+
+		SpvId CompIndex_Y = Patcher.NewId();
+		auto CompIndex_YOp = MakeUnique<SpvOpBitwiseAnd>(UIntType, DivBy4_Y, Patcher.FindOrAddConstant(3u));
+		CompIndex_YOp->SetId(CompIndex_Y);
+		InstList.Add(MoveTemp(CompIndex_YOp));
+
+		SpvId DebuggerBufferStorageX = Patcher.NewId();
+		auto DebuggerBufferStorageXOp = MakeUnique<SpvOpAccessChain>(UIntPointerUniformType, DebuggerBuffer, TArray<SpvId>{Zero, VecIndex_X, CompIndex_X});
+		DebuggerBufferStorageXOp->SetId(DebuggerBufferStorageX);
+		InstList.Add(MoveTemp(DebuggerBufferStorageXOp));
+
+		SpvId DebuggerBufferStorageY = Patcher.NewId();
+		auto DebuggerBufferStorageYOp = MakeUnique<SpvOpAccessChain>(UIntPointerUniformType, DebuggerBuffer, TArray<SpvId>{Zero, VecIndex_Y, CompIndex_Y});
+		DebuggerBufferStorageYOp->SetId(DebuggerBufferStorageY);
+		InstList.Add(MoveTemp(DebuggerBufferStorageYOp));
+
+		SpvId UIntFragCoordXY = PatchLoadFragCoordXY(Patcher, Context, InstList);
+
+		SpvId UIntFragCoordX = Patcher.NewId();
+		auto ExtractXOp = MakeUnique<SpvOpCompositeExtract>(UIntType, UIntFragCoordXY, TArray<uint32>{0});
+		ExtractXOp->SetId(UIntFragCoordX);
+		InstList.Add(MoveTemp(ExtractXOp));
+
+		SpvId UIntFragCoordY = Patcher.NewId();
+		auto ExtractYOp = MakeUnique<SpvOpCompositeExtract>(UIntType, UIntFragCoordXY, TArray<uint32>{1});
+		ExtractYOp->SetId(UIntFragCoordY);
+		InstList.Add(MoveTemp(ExtractYOp));
+
+		InstList.Add(MakeUnique<SpvOpStore>(DebuggerBufferStorageX, UIntFragCoordX));
+		InstList.Add(MakeUnique<SpvOpStore>(DebuggerBufferStorageY, UIntFragCoordY));
+	}
+
+	void SpvValidator::PatchVertexAppendErrorLocation(TArray<TUniquePtr<SpvInstruction>>&, SpvId)
+	{
+	}
+
+	void SpvValidator::PatchComputeAppendErrorLocation(TArray<TUniquePtr<SpvInstruction>>&, SpvId)
+	{
+	}
+
 	void SpvValidator::PatchAppendErrorFunc()
 	{
 		SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
 		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
-		SpvId UInt2Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, 2));
 		SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
-		SpvId FloatType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFloat>(32));
-		SpvId Float2Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(FloatType, 2));
-		SpvId Float4Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(FloatType, 4));
 
 		AppendErrorFuncId = Patcher.NewId();
 		Patcher.AddDebugName(MakeUnique<SpvOpName>(AppendErrorFuncId, "_AppendError_"));
@@ -1881,10 +2012,9 @@ namespace FW
 			AppendErrorFuncInsts.Add(MakeUnique<SpvOpStore>(HasError, Patcher.FindOrAddConstant(1u)));
 
 			{
-				SpvId UVec4Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, 4));
-				SpvId UVec4PointerUniformType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Uniform, UVec4Type));
 				SpvId UIntPointerUniformType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Uniform, UIntType));
 				SpvId Zero = Patcher.FindOrAddConstant(0u);
+				uint32 ErrorLocationByteSize = GetAppendErrorLocationByteSize();
 
 				// Access the first component of the first uvec4 element for atomic counter
 				// AccessChain: DebuggerBuffer -> member 0 (RuntimeArray) -> element 0 (first uvec4) -> component 0 (first uint)
@@ -1893,32 +2023,20 @@ namespace FW
 				DebuggerBufferStorageOp->SetId(DebuggerBufferStorage);
 				AppendErrorFuncInsts.Add(MoveTemp(DebuggerBufferStorageOp));
 
-				// Atomic add 8 bytes (2 uints) to get a byte offset for storing FragCoord
 				SpvId OriginalValue = Patcher.NewId();
 				auto AtomicOp = MakeUnique<SpvOpAtomicIAdd>(UIntType, DebuggerBufferStorage, Patcher.FindOrAddConstant((uint32)SpvMemoryScope::Device),
-					Patcher.FindOrAddConstant((uint32)SpvMemorySemantics::None), Patcher.FindOrAddConstant(8u));
+					Patcher.FindOrAddConstant((uint32)SpvMemorySemantics::None), Patcher.FindOrAddConstant(ErrorLocationByteSize));
 				AtomicOp->SetId(OriginalValue);
 				AppendErrorFuncInsts.Add(MoveTemp(AtomicOp));
 
-				// Compute byte offsets for the two stores
-				SpvId OriginalValuePlus4 = Patcher.NewId();
-				auto Add4Op = MakeUnique<SpvOpIAdd>(UIntType, OriginalValue, Patcher.FindOrAddConstant(4u));
-				Add4Op->SetId(OriginalValuePlus4);
-				AppendErrorFuncInsts.Add(MoveTemp(Add4Op));
+				SpvId EndOffset = Patcher.NewId();
+				auto EndOffsetOp = MakeUnique<SpvOpIAdd>(UIntType, OriginalValue, Patcher.FindOrAddConstant(4u + ErrorLocationByteSize));
+				EndOffsetOp->SetId(EndOffset);
+				AppendErrorFuncInsts.Add(MoveTemp(EndOffsetOp));
 
-				SpvId OriginalValuePlus8 = Patcher.NewId();
-				auto Add8Op = MakeUnique<SpvOpIAdd>(UIntType, OriginalValue, Patcher.FindOrAddConstant(8u));
-				Add8Op->SetId(OriginalValuePlus8);
-				AppendErrorFuncInsts.Add(MoveTemp(Add8Op));
-
-				SpvId OriginalValuePlus12 = Patcher.NewId();
-				auto Add12Op = MakeUnique<SpvOpIAdd>(UIntType, OriginalValue, Patcher.FindOrAddConstant(12u));
-				Add12Op->SetId(OriginalValuePlus12);
-				AppendErrorFuncInsts.Add(MoveTemp(Add12Op));
-
-				// Bounds check: if OriginalValuePlus12 > 1024, return
+				// Bounds check: if the reserved range exceeds the validation buffer, return.
 				SpvId UGreaterThan = Patcher.NewId();;
-				auto UGreaterThanOp = MakeUnique<SpvOpUGreaterThan>(BoolType, OriginalValuePlus12, Patcher.FindOrAddConstant(1024u));
+				auto UGreaterThanOp = MakeUnique<SpvOpUGreaterThan>(BoolType, EndOffset, Patcher.FindOrAddConstant(1024u));
 				UGreaterThanOp->SetId(UGreaterThan);
 				AppendErrorFuncInsts.Add(MoveTemp(UGreaterThanOp));
 
@@ -1936,83 +2054,7 @@ namespace FW
 				FalseLabelOp->SetId(FalseLabel);
 				AppendErrorFuncInsts.Add(MoveTemp(FalseLabelOp));
 
-				{
-					// For uvec4 buffer: byteOffset -> vecIndex = byteOffset / 16, componentIndex = (byteOffset / 4) % 4
-					// byteOffset / 4 = ShiftRight by 2
-					// byteOffset / 16 = ShiftRight by 4
-					// componentIndex = (byteOffset / 4) & 3
-
-					// Compute vec index and component index for OriginalValuePlus4 (FragCoord.x)
-					SpvId DivBy4_X = Patcher.NewId();
-					auto DivBy4_XOp = MakeUnique<SpvOpShiftRightLogical>(UIntType, OriginalValuePlus4, Patcher.FindOrAddConstant(2u));
-					DivBy4_XOp->SetId(DivBy4_X);
-					AppendErrorFuncInsts.Add(MoveTemp(DivBy4_XOp));
-
-					SpvId VecIndex_X = Patcher.NewId();
-					auto VecIndex_XOp = MakeUnique<SpvOpShiftRightLogical>(UIntType, OriginalValuePlus4, Patcher.FindOrAddConstant(4u));
-					VecIndex_XOp->SetId(VecIndex_X);
-					AppendErrorFuncInsts.Add(MoveTemp(VecIndex_XOp));
-
-					SpvId CompIndex_X = Patcher.NewId();
-					auto CompIndex_XOp = MakeUnique<SpvOpBitwiseAnd>(UIntType, DivBy4_X, Patcher.FindOrAddConstant(3u));
-					CompIndex_XOp->SetId(CompIndex_X);
-					AppendErrorFuncInsts.Add(MoveTemp(CompIndex_XOp));
-
-					// Compute vec index and component index for OriginalValuePlus8 (FragCoord.y)
-					SpvId DivBy4_Y = Patcher.NewId();
-					auto DivBy4_YOp = MakeUnique<SpvOpShiftRightLogical>(UIntType, OriginalValuePlus8, Patcher.FindOrAddConstant(2u));
-					DivBy4_YOp->SetId(DivBy4_Y);
-					AppendErrorFuncInsts.Add(MoveTemp(DivBy4_YOp));
-
-					SpvId VecIndex_Y = Patcher.NewId();
-					auto VecIndex_YOp = MakeUnique<SpvOpShiftRightLogical>(UIntType, OriginalValuePlus8, Patcher.FindOrAddConstant(4u));
-					VecIndex_YOp->SetId(VecIndex_Y);
-					AppendErrorFuncInsts.Add(MoveTemp(VecIndex_YOp));
-
-					SpvId CompIndex_Y = Patcher.NewId();
-					auto CompIndex_YOp = MakeUnique<SpvOpBitwiseAnd>(UIntType, DivBy4_Y, Patcher.FindOrAddConstant(3u));
-					CompIndex_YOp->SetId(CompIndex_Y);
-					AppendErrorFuncInsts.Add(MoveTemp(CompIndex_YOp));
-
-					// AccessChain to get pointer to the uint component: DebuggerBuffer[0][vecIndex][compIndex]
-					SpvId DebuggerBufferStorageX = Patcher.NewId();
-					auto DebuggerBufferStorageXOp = MakeUnique<SpvOpAccessChain>(UIntPointerUniformType, DebuggerBuffer, TArray<SpvId>{Zero, VecIndex_X, CompIndex_X});
-					DebuggerBufferStorageXOp->SetId(DebuggerBufferStorageX);
-					AppendErrorFuncInsts.Add(MoveTemp(DebuggerBufferStorageXOp));
-
-					SpvId DebuggerBufferStorageY = Patcher.NewId();
-					auto DebuggerBufferStorageYOp = MakeUnique<SpvOpAccessChain>(UIntPointerUniformType, DebuggerBuffer, TArray<SpvId>{Zero, VecIndex_Y, CompIndex_Y});
-					DebuggerBufferStorageYOp->SetId(DebuggerBufferStorageY);
-					AppendErrorFuncInsts.Add(MoveTemp(DebuggerBufferStorageYOp));
-
-					SpvId LoadedFragCoord = Patcher.NewId();
-					auto LoadedFragCoordOp = MakeUnique<SpvOpLoad>(Float4Type, Context.BuiltIns[SpvBuiltIn::FragCoord]);
-					LoadedFragCoordOp->SetId(LoadedFragCoord);
-					AppendErrorFuncInsts.Add(MoveTemp(LoadedFragCoordOp));
-
-					SpvId FragCoordXY = Patcher.NewId();
-					auto FragCoordXYOp = MakeUnique<SpvOpVectorShuffle>(Float2Type, LoadedFragCoord, LoadedFragCoord, TArray<uint32>{0, 1});
-					FragCoordXYOp->SetId(FragCoordXY);
-					AppendErrorFuncInsts.Add(MoveTemp(FragCoordXYOp));
-
-					SpvId UIntFragCoordXY = Patcher.NewId();
-					auto UIntFragCoordXYOp = MakeUnique<SpvOpConvertFToU>(UInt2Type, FragCoordXY);
-					UIntFragCoordXYOp->SetId(UIntFragCoordXY);
-					AppendErrorFuncInsts.Add(MoveTemp(UIntFragCoordXYOp));
-
-					SpvId UIntFragCoordX = Patcher.NewId();
-					auto ExtractXOp = MakeUnique<SpvOpCompositeExtract>(UIntType, UIntFragCoordXY, TArray<uint32>{0});
-					ExtractXOp->SetId(UIntFragCoordX);
-					AppendErrorFuncInsts.Add(MoveTemp(ExtractXOp));
-
-					SpvId UIntFragCoordY= Patcher.NewId();
-					auto ExtractYOp = MakeUnique<SpvOpCompositeExtract>(UIntType, UIntFragCoordXY, TArray<uint32>{1});
-					ExtractYOp->SetId(UIntFragCoordY);
-					AppendErrorFuncInsts.Add(MoveTemp(ExtractYOp));
-
-					AppendErrorFuncInsts.Add(MakeUnique<SpvOpStore>(DebuggerBufferStorageX, UIntFragCoordX));
-					AppendErrorFuncInsts.Add(MakeUnique<SpvOpStore>(DebuggerBufferStorageY, UIntFragCoordY));
-				}
+				PatchAppendErrorLocation(AppendErrorFuncInsts, OriginalValue);
 			}
 
 			AppendErrorFuncInsts.Add(MakeUnique<SpvOpReturn>());

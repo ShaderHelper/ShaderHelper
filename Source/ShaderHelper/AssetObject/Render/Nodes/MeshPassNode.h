@@ -30,7 +30,7 @@ namespace SH
 
 	struct MeshPassColorRT
 	{
-		MeshPassColorFormat Format = MeshPassColorFormat::B8G8R8A8_UNORM;
+		MeshPassColorFormat Format = MeshPassColorFormat::R32G32B32A32_FLOAT;
 		FW::Vector4f ClearValue = FW::Vector4f(0, 0, 0, 1);
 
 		bool operator==(const MeshPassColorRT& Other) const
@@ -53,6 +53,8 @@ namespace SH
 	public:
 		MeshPassNodeOp() = default;
 		FW::MetaType* SupportType() override;
+		void OnCancelSelect(FW::ShObject* InObject) override;
+		void OnSelect(FW::ShObject* InObject) override;
 	};
 
 	class MeshPassNode : public FW::GraphNode
@@ -83,6 +85,14 @@ namespace SH
 		// Called by property panel after Color RT / Depth target / count changed.
 		void OnRenderTargetsChanged();
 		void RefreshNodeWidget();
+		DebugTargetInfo MakeDebugTargetInfo(TRefCountPtr<FW::GpuTexture> CoverageMask) const;
+		const TArray<TRefCountPtr<FW::GpuTexture>>& GetLastActiveColorRTs() const { return LastActiveColorRTs; }
+		TRefCountPtr<FW::GpuTexture> GetLastActiveDepthRT() const { return LastActiveDepthRT; }
+		const TArray<FW::GpuFormat>& GetLastColorFormats() const { return LastColorFormats; }
+		FW::GpuFormat GetLastDepthFormat() const { return LastDepthFormat; }
+		uint32 GetLastSampleCount() const { return LastSampleCount; }
+		FW::GpuViewPortDesc GetLastViewPortDesc() const { return LastViewPortDesc; }
+		TOptional<FW::Camera> GetLastCamera() const { return LastCamera; }
 
 	public:
 		TArray<MeshPassColorRT> ColorRTs;
@@ -105,6 +115,13 @@ namespace SH
 		MeshPassDepthFormat CachedDepthFormat = MeshPassDepthFormat::D32_FLOAT;
 		TSharedPtr<FW::PreviewViewPort> Preview;
 		TRefCountPtr<FW::GpuQuerySet> TimestampQuerySet;
+		TArray<TRefCountPtr<FW::GpuTexture>> LastActiveColorRTs;
+		TRefCountPtr<FW::GpuTexture> LastActiveDepthRT;
+		TArray<FW::GpuFormat> LastColorFormats;
+		FW::GpuFormat LastDepthFormat = FW::GpuFormat::NUM;
+		uint32 LastSampleCount = 1;
+		FW::GpuViewPortDesc LastViewPortDesc;
+		TOptional<FW::Camera> LastCamera;
 
 		TArray<FString> GetPreviewOutputNames() const;
 		void NormalizePreviewOutputName();

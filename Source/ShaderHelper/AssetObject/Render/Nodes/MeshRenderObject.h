@@ -8,6 +8,7 @@
 #include "GpuApi/GpuBindGroup.h"
 #include "Renderer/MaterialRenderResources.h"
 #include "RenderResource/PrintBuffer.h"
+#include "Debugger/DebuggableObject.h"
 
 namespace SH
 {
@@ -29,7 +30,7 @@ namespace SH
 			return Ar;
 		}
 	};
-	class MeshRenderObject : public FW::ShObject
+	class MeshRenderObject : public FW::ShObject, public DebuggableObject
 	{
 		REFLECTION_TYPE(MeshRenderObject)
 	public:
@@ -58,6 +59,14 @@ namespace SH
 		FW::PrintBuffer* GetPrintBuffer();
 		bool FlushPrintBufferLogs(const FString& LogPrefix);
 
+		// DebuggableObject
+		TArray<DebugItem> GetSupportedDebugItems() const override { return { DebugItem::Vertex, DebugItem::Fragment }; }
+		DebugTargetInfo OnStartDebugging(DebugItem Item) override;
+		void OnEndDebuggging() override { bDebugging = false; }
+		ShaderAsset* GetShaderAsset(DebugItem Item) const override;
+		InvocationState GetInvocationState(DebugItem Item) override;
+		void OnFinalizePixel(const FW::Vector2u& PixelCoord) override;
+
 	public:
 		FW::ObserverObjectPtr<MeshSceneObject> MeshSceneObjectRef;
 		FW::AssetPtr<Material> MaterialAsset;
@@ -70,6 +79,9 @@ namespace SH
 		void OnMaterialChanged();
 		void BuildBindGroupFromMaterial(bool bRebuildLayouts = true, bool bRebuildUniformBuffers = true);
 		bool BuildPipeline(const TArray<FW::GpuFormat>& ColorFormats, FW::GpuFormat DepthFormat, uint32 SampleCount);
+		void UpdateMaterialDrawState(const FMatrix44f& ModelMatrix, const FMatrix44f& ViewMat, const FMatrix44f& ProjMat);
+		TArray<BindingBuilder> BuildDebugBindingBuilders() const;
+		TRefCountPtr<FW::GpuTexture> BuildCoverageMask();
 		FW::GraphPin* FindOverridePin(const FString& BindingName, const FString& MemberName, FW::BindingShaderStage Stage) const;
 		void EnsureOverridePins();
 		void SyncOverridePinsFromSlots();
@@ -79,11 +91,13 @@ namespace SH
 		TMap<int32, TRefCountPtr<FW::GpuBindGroupLayout>> BindGroupLayouts;
 		TMap<int32, TRefCountPtr<FW::GpuBindGroup>> BindGroups;
 		TRefCountPtr<FW::GpuRenderPipelineState> Pipeline;
+		FW::GpuRenderPipelineStateDesc PipelineDesc;
 		TMap<FString, TUniquePtr<FW::UniformBuffer>> UniformBuffers;
 		TUniquePtr<FW::PrintBuffer> PrinterBuffer;
 		MaterialErrorRenderResources ErrorResources;
 		FDelegateHandle MaterialChangedHandle;
 		Material* BoundMaterial = nullptr;
 		bool bDrawMaterialError = false;
+		bool bDebugging = false;
 	};
 }

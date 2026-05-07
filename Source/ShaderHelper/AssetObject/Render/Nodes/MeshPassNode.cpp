@@ -47,6 +47,48 @@ namespace SH
 		return GetMetaType<MeshPassNode>();
 	}
 
+	void MeshPassNodeOp::OnCancelSelect(ShObject* InObject)
+	{
+		ShPropertyOp::OnCancelSelect(InObject);
+
+		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		auto* Node = static_cast<MeshPassNode*>(InObject);
+		auto* RenderAsset = static_cast<Render*>(Node->GetOuterMost());
+		if (RenderAsset->SelectedMeshRenderObject)
+		{
+			MeshRenderObject* SelectedMeshRenderObject = static_cast<MeshRenderObject*>(RenderAsset->SelectedMeshRenderObject.Get());
+			if (Node->MeshRenderObjects.ContainsByPredicate([SelectedMeshRenderObject](const ObjectPtr<MeshRenderObject>& Object) { return Object.Get() == SelectedMeshRenderObject; }))
+			{
+				RenderAsset->SelectedMeshRenderObject.Reset();
+				if (!ShEditor->IsInDebugging() && ShEditor->GetDebuggaleObject() == SelectedMeshRenderObject)
+				{
+					ShEditor->SetDebuggableObject(nullptr);
+				}
+			}
+		}
+	}
+
+	void MeshPassNodeOp::OnSelect(ShObject* InObject)
+	{
+		ShPropertyOp::OnSelect(InObject);
+
+		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		auto* Node = static_cast<MeshPassNode*>(InObject);
+		auto* RenderAsset = static_cast<Render*>(Node->GetOuterMost());
+		if (RenderAsset->SelectedMeshRenderObject)
+		{
+			MeshRenderObject* SelectedMeshRenderObject = static_cast<MeshRenderObject*>(RenderAsset->SelectedMeshRenderObject.Get());
+			if (Node->MeshRenderObjects.ContainsByPredicate([SelectedMeshRenderObject](const ObjectPtr<MeshRenderObject>& Object) { return Object.Get() == SelectedMeshRenderObject; }))
+			{
+				RenderAsset->SelectedMeshRenderObject.Reset();
+				if (!ShEditor->IsInDebugging() && ShEditor->GetDebuggaleObject() == SelectedMeshRenderObject)
+				{
+					ShEditor->SetDebuggableObject(nullptr);
+				}
+			}
+		}
+	}
+
 	MeshPassNode::MeshPassNode()
 	{
 		NodeWidth = 170.0f;
@@ -210,6 +252,18 @@ namespace SH
 	{
 		if (!InObject) return;
 		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		if (ShEditor->GetDebuggaleObject() == InObject)
+		{
+			if (ShEditor->IsInDebugging())
+			{
+				ShEditor->EndDebugging();
+			}
+			ShEditor->SetDebuggableObject(nullptr);
+		}
+		if (auto* RenderAsset = static_cast<Render*>(GetOuterMost()); RenderAsset->SelectedMeshRenderObject.Get() == InObject)
+		{
+			RenderAsset->SelectedMeshRenderObject.Reset();
+		}
 		if (ShEditor->GetCurPropertyObject() == InObject)
 		{
 			ShEditor->ShowProperty(this);
@@ -249,6 +303,33 @@ namespace SH
 		{
 			if (auto* NodeWidget = Panel->GetNode(this)) NodeWidget->RebuildPins();
 		}
+	}
+
+	DebugTargetInfo MeshPassNode::MakeDebugTargetInfo(TRefCountPtr<GpuTexture> CoverageMask) const
+	{
+		DebugTargetInfo Target;
+		for (int32 i = 0; i < LastActiveColorRTs.Num(); ++i)
+		{
+			if (LastActiveColorRTs[i])
+			{
+				Target.Outputs.Add({ ColorPinName(i), LastActiveColorRTs[i] });
+			}
+		}
+		if (LastActiveDepthRT)
+		{
+			Target.Outputs.Add({ TEXT("Depth"), LastActiveDepthRT });
+		}
+		for (int32 Index = 0; Index < Target.Outputs.Num(); ++Index)
+		{
+			if (Target.Outputs[Index].Name == PreviewOutputName)
+			{
+				Target.SelectedOutputIndex = Index;
+				break;
+			}
+		}
+		Target.CoverageMask = CoverageMask;
+		Target.Normalize();
+		return Target;
 	}
 
 	void MeshPassNode::Serialize(FArchive& Ar)
@@ -535,6 +616,14 @@ namespace SH
 			Cam = CameraRef->ToCamera(Aspect);
 		}
 
+		LastActiveColorRTs = ActiveColorRTs;
+		LastActiveDepthRT = ActiveDepthRT;
+		LastColorFormats = ColorFormatKey;
+		LastDepthFormat = DepthFormatKey;
+		LastSampleCount = SampleCount;
+		LastViewPortDesc = GpuViewPortDesc{ (float)Width, (float)Height };
+		LastCamera = Cam;
+
 		TArray<ObjectPtr<MeshRenderObject>> MROsCopy = MeshRenderObjects;
 		auto& RenderPass = Ctx.RG->AddRenderPass(ObjectName.ToString(), PassDesc,
 			[MROsCopy, Cam](GpuRenderPassRecorder* Rec) {
@@ -647,7 +736,7 @@ namespace SH
 						SAssignNew(ListView, SListView<FMeshRenderObjectListItemPtr>)
 						.AllowOverscroll(EAllowOverscroll::No)
 						.ListItemsSource(&Items)
-						.SelectionMode(ESelectionMode::Single)
+						.SelectionMode(ESelectionMode::None)
 						.OnGenerateRow(this, &SMeshRenderObjectList::GenerateRowForItem)
 						.OnSelectionChanged(this, &SMeshRenderObjectList::OnSelectionChanged)
 						.OnContextMenuOpening(this, &SMeshRenderObjectList::CreateContextMenu)
@@ -672,15 +761,6 @@ namespace SH
 						]
 					]
 				];
-
-				for (const auto& Item : Items)
-				{
-					if (Item->Object && static_cast<ShaderHelperEditor*>(GApp->GetEditor())->GetCurPropertyObject() == Item->Object)
-					{
-						ListView->SetSelection(Item, ESelectInfo::Direct);
-						break;
-					}
-				}
 			}
 
 			void OnMouseEnter(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
@@ -704,12 +784,23 @@ namespace SH
 				TSharedPtr<SVerticalBox> OverridePinBox;
 				Row->SetContent(
 						SNew(SBorder)
-						.BorderImage(FAppStyle::Get().GetBrush("NoBrush"))
+						.BorderImage(FAppStyle::Get().GetBrush("WhiteBrush"))
+						.BorderBackgroundColor_Lambda([this, Object] {
+							auto& SelectedMeshRenderObject = static_cast<Render*>(Node->GetOuterMost())->SelectedMeshRenderObject;
+							if (!SelectedMeshRenderObject || SelectedMeshRenderObject.Get() != Object)
+							{
+								return FLinearColor::Transparent;
+							}
+							return HasKeyboardFocus() || HasFocusedDescendants()
+								? FStyleColors::Select.GetSpecifiedColor()
+								: FStyleColors::SelectInactive.GetSpecifiedColor();
+						})
 						.Padding(0.0f)
-						.OnMouseButtonDown_Lambda([this, Row, Item](const FGeometry&, const FPointerEvent& MouseEvent) {
-							if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && Row->IsSelected())
+						.OnMouseButtonDown_Lambda([this, Item](const FGeometry&, const FPointerEvent& MouseEvent) {
+							if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
 							{
 								OnSelectionChanged(Item, ESelectInfo::OnMouseClick);
+								return FReply::Handled();
 							}
 							return FReply::Unhandled();
 						})
@@ -855,7 +946,28 @@ namespace SH
 				}
 				if (SelectedItem && SelectedItem->Object)
 				{
+					if (OwnerWidget && OwnerWidget->Owner && !OwnerWidget->Owner->IsSelectedNode(OwnerWidget))
+					{
+						OwnerWidget->Owner->ClearSelectedNode();
+						OwnerWidget->Owner->AddSelectedNode(StaticCastSharedRef<SGraphNode>(OwnerWidget->AsShared()));
+					}
+
+					auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+					static_cast<Render*>(Node->GetOuterMost())->SelectedMeshRenderObject = SelectedItem->Object;
+					if (!ShEditor->IsInDebugging())
+					{
+						ShEditor->SetDebuggableObject(SelectedItem->Object);
+					}
 					GApp->GetEditor()->ShowProperty(SelectedItem->Object);
+				}
+				else if (MeshRenderObject* SelectedObject = GetSelectedObject())
+				{
+					auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+					static_cast<Render*>(Node->GetOuterMost())->SelectedMeshRenderObject.Reset();
+					if (!ShEditor->IsInDebugging() && ShEditor->GetDebuggaleObject() == SelectedObject)
+					{
+						ShEditor->SetDebuggableObject(nullptr);
+					}
 				}
 			}
 
@@ -878,21 +990,34 @@ namespace SH
 		private:
 			bool HasSelectedObject() const
 			{
-				const TArray<FMeshRenderObjectListItemPtr> SelectedItems = ListView->GetSelectedItems();
-				return SelectedItems.Num() > 0 && SelectedItems[0]->Object;
+				return GetSelectedObject() != nullptr;
 			}
 
 			bool DeleteSelected()
 			{
-				const TArray<FMeshRenderObjectListItemPtr> SelectedItems = ListView->GetSelectedItems();
-				if (SelectedItems.Num() == 0 || !SelectedItems[0]->Object)
+				MeshRenderObject* SelectedObject = GetSelectedObject();
+				if (!SelectedObject)
 				{
 					return false;
 				}
 
-				Node->RemoveMeshRenderObject(SelectedItems[0]->Object);
+				Node->RemoveMeshRenderObject(SelectedObject);
 				Node->RefreshNodeWidget();
 				return true;
+			}
+
+			MeshRenderObject* GetSelectedObject() const
+			{
+				auto& SelectedMeshRenderObjectPtr = static_cast<Render*>(Node->GetOuterMost())->SelectedMeshRenderObject;
+				MeshRenderObject* SelectedMeshRenderObject = SelectedMeshRenderObjectPtr ? static_cast<MeshRenderObject*>(SelectedMeshRenderObjectPtr.Get()) : nullptr;
+				for (const auto& Item : Items)
+				{
+					if (Item->Object && Item->Object == SelectedMeshRenderObject)
+					{
+						return Item->Object;
+					}
+				}
+				return nullptr;
 			}
 
 			MeshPassNode* Node = nullptr;

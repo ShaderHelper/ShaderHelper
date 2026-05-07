@@ -5,8 +5,13 @@
 #include <Widgets/Colors/SColorBlock.h>
 #include <Styling/StyleColors.h>
 
+class FUICommandInfo;
+class FUICommandList;
+
 namespace FW
 {
+	DECLARE_DELEGATE_RetVal(TSharedRef<SWidget>, FOnGetShMenuContent);
+
 	class SShInlineEditableTextBlock : public SInlineEditableTextBlock
 	{
 	public:
@@ -54,6 +59,47 @@ namespace FW
 		}
 
 		void Construct(const FArguments& InArgs);
+	};
+
+	class FRAMEWORK_API SShSplitButton : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SShSplitButton)
+			: _ButtonStyle(nullptr)
+			, _ButtonContentPadding(FMargin(3.0f, 0.0f, 0.0f, 0.0f))
+			, _MenuContentPadding(FMargin(0.0f))
+			, _IsButtonEnabled(true)
+			, _IsMenuEnabled(true)
+			{}
+			SLATE_STYLE_ARGUMENT(FButtonStyle, ButtonStyle)
+			SLATE_ARGUMENT(TSharedPtr<FUICommandList>, CommandList)
+			SLATE_ARGUMENT(TSharedPtr<FUICommandInfo>, Command)
+			SLATE_ARGUMENT(FMargin, ButtonContentPadding)
+			SLATE_ARGUMENT(FMargin, MenuContentPadding)
+			SLATE_ATTRIBUTE(FText, ButtonToolTipText)
+			SLATE_ATTRIBUTE(FText, MenuToolTipText)
+			SLATE_ATTRIBUTE(bool, IsButtonEnabled)
+			SLATE_ATTRIBUTE(bool, IsMenuEnabled)
+			SLATE_EVENT(FOnClicked, OnClicked)
+			SLATE_EVENT(FOnGetShMenuContent, OnGetMenuContent)
+			SLATE_DEFAULT_SLOT(FArguments, ButtonContent)
+			SLATE_NAMED_SLOT(FArguments, MenuButtonContent)
+		SLATE_END_ARGS()
+
+		void Construct(const FArguments& InArgs);
+
+	private:
+		bool CanExecuteButton() const;
+		FReply OnButtonClicked();
+		bool CanOpenMenu() const;
+		TSharedRef<SWidget> MakeMenuContent();
+
+		TSharedPtr<FUICommandList> CommandList;
+		TSharedPtr<FUICommandInfo> Command;
+		TAttribute<bool> IsButtonEnabled;
+		TAttribute<bool> IsMenuEnabled;
+		FOnClicked OnClicked;
+		FOnGetShMenuContent OnGetMenuContent;
 	};
 
 	class FRAMEWORK_API SShToggleButton : public SCompoundWidget

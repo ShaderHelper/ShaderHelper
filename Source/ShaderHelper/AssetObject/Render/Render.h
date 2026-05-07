@@ -42,5 +42,6 @@ namespace SH
 		void InsertSceneObject(int32 Index, FW::ObjectPtr<SceneObject> InObject, SceneObject* InParent = nullptr, int32 ParentChildIndex = INDEX_NONE);
 
 		TArray<FW::ObjectPtr<SceneObject>> SceneObjects;
+		FW::ObserverObjectPtr<FW::ShObject> SelectedMeshRenderObject;
 	};
 }

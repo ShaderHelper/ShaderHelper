@@ -25,9 +25,7 @@ namespace SH
 	{
 		AssetPtr<ShaderToy> LoadedShaderToy = TSingleton<AssetManager>::Get().LoadAssetByPath<ShaderToy>(InAssetPath);
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-        auto ShProject = TSingleton<ShProjectManager>::Get().GetProject();
-        
-        ShProject->TimelineStop = true;
+  
 		if (ShEditor->OpenGraph(LoadedShaderToy))
 		{
 			ShEditor->SetGraphRenderComp(nullptr);

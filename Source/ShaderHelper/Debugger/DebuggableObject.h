@@ -3,18 +3,47 @@
 
 namespace SH
 {
+	enum class DebugItem
+	{
+		Vertex,
+		Fragment,
+		Compute,
+	};
+
+	struct DebugTargetOutput
+	{
+		FString Name;
+		TRefCountPtr<FW::GpuTexture> Tex;
+	};
+
 	struct DebugTargetInfo
 	{
 		TRefCountPtr<FW::GpuTexture> Tex;
+		TArray<DebugTargetOutput> Outputs;
+		TRefCountPtr<FW::GpuTexture> CoverageMask;
+		int32 SelectedOutputIndex = 0;
+
+		void Normalize()
+		{
+			if (Outputs.IsEmpty() && Tex)
+			{
+				Outputs.Add({ TEXT("RT"), Tex });
+			}
+			if (!Tex && Outputs.IsValidIndex(SelectedOutputIndex))
+			{
+				Tex = Outputs[SelectedOutputIndex].Tex;
+			}
+		}
 	};
 
 	class DebuggableObject
 	{
 	public:
-		virtual DebugTargetInfo OnStartDebugging() = 0;
+		virtual TArray<DebugItem> GetSupportedDebugItems() const = 0;
+		virtual DebugTargetInfo OnStartDebugging(DebugItem Item) = 0;
 		virtual void OnFinalizePixel(const FW::Vector2u& PixelCoord) = 0;
-		virtual ShaderAsset* GetShaderAsset() const = 0;
+		virtual ShaderAsset* GetShaderAsset(DebugItem Item) const = 0;
 		virtual void OnEndDebuggging() = 0;
-		virtual InvocationState GetInvocationState() = 0;
+		virtual InvocationState GetInvocationState(DebugItem Item) = 0;
 	};
 }

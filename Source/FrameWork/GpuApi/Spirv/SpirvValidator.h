@@ -11,7 +11,7 @@ namespace FW
 		{}
 
 		const SpvPatcher& GetPatcher() const { return Patcher; }
-		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections, const TMap<SpvId, SpvExtSet>& InExtSets) override;
+		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections) override;
 
 	public:
 		void Visit(const SpvOpVariable* Inst) override;
@@ -49,6 +49,14 @@ namespace FW
 	protected:
 		void PatchGetAccessFunc(SpvType* Type);
 		void PatchAppendErrorFunc();
+		virtual uint32 GetAppendErrorLocationByteSize() const;
+		virtual void PatchAppendErrorLocation(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvId OriginalValue);
+		uint32 GetPixelAppendErrorLocationByteSize() const;
+		uint32 GetVertexAppendErrorLocationByteSize() const;
+		uint32 GetComputeAppendErrorLocationByteSize() const;
+		void PatchPixelAppendErrorLocation(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvId OriginalValue);
+		void PatchVertexAppendErrorLocation(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvId OriginalValue);
+		void PatchComputeAppendErrorLocation(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvId OriginalValue);
 		void AppendError(TArray<TUniquePtr<SpvInstruction>>& InstList);
 		SpvId GetAccess(SpvType* VarType, const TArray<SpvId>& Indexes, TArray<TUniquePtr<SpvInstruction>>& InstList);
 		int32 ComputeConstantAccess(SpvType* Type, const TArray<SpvId>& Indexes, int32 StartIdx);

@@ -28,7 +28,7 @@ namespace FW
 			Patcher.AddGlobalVariable(MoveTemp(VarOp));
 			Patcher.AddDebugName(MakeUnique<SpvOpName>(Params, "_PreviewerParams_"));
 		}
-		int SetNumber = 0;
+		int SetNumber = DebuggerBindGroupSlot;
 		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(Params, SpvDecorationKind::DescriptorSet, TArray<uint8>{ (uint8*)&SetNumber, sizeof(int) }));
 		int BindingNumber = GetSpirvPatchBindingNumber(PreviewerParamsBindingSlot, BindingType::UniformBuffer, BindingShaderStage::Pixel);
 		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(Params, SpvDecorationKind::Binding, TArray<uint8>{ (uint8*)&BindingNumber, sizeof(int) }));
@@ -463,6 +463,10 @@ namespace FW
 	{
 		//Find the output variable before base patching
 		OutputVarId = FindOutputVariable();
+		if (OutputVarId.IsValid())
+		{
+			PatchFragCoordBuiltIn(Patcher, Context);
+		}
 
 		SpvId FloatType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFloat>(32));
 		SpvId Float4Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(FloatType, 4));

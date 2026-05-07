@@ -321,7 +321,7 @@ namespace FW
 		
 	public:
 		const SpvPatcher& GetPatcher() const { return Patcher; }
-		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections, const TMap<SpvId, SpvExtSet>& InExtSets) override;
+		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections) override;
 		
 	public:
 		void Visit(const SpvDebugLine* Inst) override;
@@ -381,6 +381,8 @@ namespace FW
 		void PatchAppendVarFunc(int32 ValueUIntCount, int32 IndexNum);
 		void PatchAppendValueFunc(int32 ValueUIntCount);
 		void PatchAppendMathFunc(int32 TotalOperandUIntCount);
+		void PatchEntryPointInputVariables();
+		SpvOpFunctionCall* BuildAppendVarInstructions(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvPointer* Pointer, SpvId PackedHeader, SpvId VarId);
 		SpvOpFunctionCall* AppendVar(const TFunction<int32()>& OffsetEval, SpvPointer* Pointer);
 		void AppendAccess(const TFunction<int32()>& OffsetEval, SpvPointer* Pointer);
 		void AppendTag(const TFunction<int32()>& OffsetEval, SpvDebuggerStateType InStateType);
@@ -418,6 +420,9 @@ namespace FW
 	FRAMEWORK_API TValueOrError<std::tuple<SpvType*, int32>, FString> GetAccess(const SpvVariable* Var, const TArray<int32>& Indexes);
 	SpvId PatchDebuggerBuffer(SpvPatcher& Patcher);
 	SpvId PatchDebuggerParams(SpvPatcher& Patcher);
+	SpvId PatchExtSet(SpvPatcher& Patcher, SpvMetaContext& Context, SpvExtSet ExtSet);
+	SpvId PatchFragCoordBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context);
+	SpvId PatchLoadFragCoordXY(SpvPatcher& Patcher, SpvMetaContext& Context, TArray<TUniquePtr<SpvInstruction>>& InstList);
 	int32 GetInstIndex(const TArray<TUniquePtr<SpvInstruction>>* Insts, SpvId Inst);
 
 	// For each OpLoad of a composite type, analyze which init-units are truly consumed
@@ -426,6 +431,7 @@ namespace FW
 	void BuildSpvCFG(const TArray<TUniquePtr<SpvInstruction>>* Insts, const SpvMetaContext& Context, std::unordered_map<SpvId, SpvBasicBlock>& OutBBs, std::unordered_map<SpvId, SpvFunc>& OutFuncs);
 	TSet<SpvId> ComputeStaticallyInitializedVars(const TArray<TUniquePtr<SpvInstruction>>* Insts, const SpvMetaContext& Context, const TMap<SpvId, uint32>& LoadUsedInitUnits, const std::unordered_map<SpvId, SpvBasicBlock>& BBs, const std::unordered_map<SpvId, SpvFunc>& Funcs);
 
+	inline constexpr int DebuggerBindGroupSlot = 7;
 	inline constexpr int DebuggerBufferBindingSlot = 0721;
 	inline constexpr int DebuggerParamsBindingSlot = 0722;
 

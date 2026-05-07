@@ -133,6 +133,8 @@ namespace SH
 		TArray<FW::SpvBinding> SpvBindings;
 		TArray<TRefCountPtr<FW::GpuBindGroup>> PatchedBindGroups;
 		TArray<TRefCountPtr<FW::GpuBindGroupLayout>> PatchedBindGroupLayouts;
+		TArray<TRefCountPtr<FW::GpuBindGroup>> SetupBindGroups;
+		TArray<TRefCountPtr<FW::GpuBindGroupLayout>> SetupBindGroupLayouts;
 		TUniquePtr<FW::SpvDebuggerContext> DebuggerContext;
 		InvocationState Invocation;
 		TRefCountPtr<FW::GpuShader> DebugShader;

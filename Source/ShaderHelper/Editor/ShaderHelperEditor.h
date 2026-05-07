@@ -10,7 +10,8 @@
 #include "ProjectManager/ShProjectManager.h"
 #include "UI/Widgets/Log/SOutputLog.h"
 #include "UI/Widgets/Property/PropertyView/SPropertyView.h"
-#include "UI/Widgets/Debugger/SDebuggerViewport.h"
+#include "UI/Widgets/Debugger/SFragmentDebuggerViewport.h"
+#include "UI/Widgets/Debugger/SVertexDebuggerViewport.h"
 #include "UI/Widgets/Debugger/SDebuggerVariableView.h"
 #include "UI/Widgets/Debugger/SDebuggerCallStackView.h"
 #include "UI/Widgets/Debugger/SDebuggerWatchView.h"
@@ -105,8 +106,11 @@ namespace SH
 		bool IsPropertyLocked() { return PropertyView->IsLocked(); }
 		void AddNavigationInfo(FW::AssetPtr<ShaderAsset> InShader, const FTextLocation& InLocation);
 		
-		DebuggableObject* GetDebuggaleObject() const { return CurDebuggableObject; }
-		void SetDebuggableObject(DebuggableObject* InObject) { CurDebuggableObject = InObject; }
+		DebuggableObject* GetDebuggaleObject() const { return CurDebuggableObject.IsValid() ? dynamic_cast<DebuggableObject*>(CurDebuggableObject.Get()) : nullptr; }
+		bool IsInDebugging() const { return IsDebugging; }
+		void SetDebuggableObject(FW::ShObject* InObject);
+		DebugItem GetCurrentDebugItem() const { return CurrentDebugItem; }
+		void SetCurrentDebugItem(DebugItem InItem);
 		void EndDebugging();
 		//If globalvalidation is true, the validation error location will be automatically selected.
 		void StartDebugging(bool GlobalValidation = false);
@@ -140,6 +144,7 @@ namespace SH
 		void CreateInternalWidgets();
 		void CreateBuiltinAssets();
 		void FillMenu(FMenuBuilder& MenuBuilder, FString MenuName);
+		void NormalizeCurrentDebugItem();
 
 		enum class EActiveUndoContext { None, Graph, Code, Scene };
 		void RefreshActiveUndoContext() const;
@@ -190,13 +195,15 @@ namespace SH
 		TSharedPtr<SDebuggerVariableView> DebuggerGlobalVariableView;
 		TSharedPtr<SDebuggerCallStackView> DebuggerCallStackView;
 		TSharedPtr<SDebuggerWatchView> DebuggerWatchView;
-		TSharedPtr<SDebuggerViewport> DebuggerViewport;
+		TSharedPtr<SFragmentDebuggerViewport> FragmentDebuggerViewport;
+		TSharedPtr<SVertexDebuggerViewport> VertexDebuggerViewport;
 		TSharedPtr<SViewport> LinePreviewWidget;
 		TSharedPtr<FW::PreviewViewPort> LinePreviewViewPort;
 		bool bShowingLinePreview{};
 		DebuggerLocation LinePreviewLocation;
 		TSharedPtr<SWindow> ShaderEditorTipWindow;
-		DebuggableObject* CurDebuggableObject = nullptr;
+		FW::ObserverObjectPtr<FW::ShObject> CurDebuggableObject;
+		DebugItem CurrentDebugItem = DebugItem::Fragment;
 		bool IsDebugging{};
 		ShaderDebugger Debugger;
 

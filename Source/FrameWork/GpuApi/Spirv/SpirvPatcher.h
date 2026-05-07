@@ -26,12 +26,15 @@ namespace FW
 
 		//The result ID is inferred internally
 		SpvId FindOrAddType(TUniquePtr<SpvInstruction> InInst);
+
 		template<typename T>
-		requires requires { T{} + T{}; }
+		requires (!AUX::TIsTUniquePtr<T>::value)
 		SpvId FindOrAddConstant(T InConstant);
 		SpvId FindOrAddConstant(TUniquePtr<SpvInstruction> InInst);
+
 		SpvId FindOrAddTypeDesc(TUniquePtr<SpvInstruction> InInst);
 		SpvId FindOrAddDebugStr(const FString& Str);
+		//
 
 		void AddDebugName(TUniquePtr<SpvInstruction> InInst);
 		void AddAnnotation(TUniquePtr<SpvInstruction> InInst);
@@ -39,6 +42,7 @@ namespace FW
 		void AddFunction(TArray<TUniquePtr<SpvInstruction>>&& Function);
 
 		void AddInstructions(int WordOffset, TArray<TUniquePtr<SpvInstruction>>&& InInsts);
+		void AddInstruction(SpvSectionKind TargetSection, int WordOffset, TUniquePtr<SpvInstruction> InInst);
 		void AddInstruction(int WordOffset, TUniquePtr<SpvInstruction> InInst);
 
 		void OverwriteInstruction(int WordOffset, int OldWordLen, TUniquePtr<SpvInstruction> NewInst);

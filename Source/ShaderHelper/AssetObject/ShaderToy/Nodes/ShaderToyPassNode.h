@@ -66,11 +66,12 @@ namespace SH
         TArray<TSharedRef<FW::PropertyData>> GeneratePropertyDatas() override;
     
 		//ShDebuggableObject
-		InvocationState GetInvocationState() override;
-		DebugTargetInfo OnStartDebugging() override;
+		TArray<DebugItem> GetSupportedDebugItems() const override { return { DebugItem::Fragment }; }
+		InvocationState GetInvocationState(DebugItem Item) override;
+		DebugTargetInfo OnStartDebugging(DebugItem Item) override;
 		void OnFinalizePixel(const FW::Vector2u& PixelCoord) override;
 		void OnEndDebuggging() override;
-		ShaderAsset* GetShaderAsset() const override;
+		ShaderAsset* GetShaderAsset(DebugItem Item) const override;
 
 		std::string GetShaderToyCode() const;
 		

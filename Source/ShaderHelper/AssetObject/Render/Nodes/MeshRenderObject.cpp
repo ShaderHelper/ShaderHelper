@@ -1,4 +1,4 @@
-#include "CommonHeader.h"
+﻿#include "CommonHeader.h"
 #include "MeshRenderObject.h"
 #include "MeshPassNode.h"
 #include "App/App.h"
@@ -8,12 +8,17 @@
 #include "GpuApi/GpuRhi.h"
 #include "GpuApi/GpuResourceHelper.h"
 #include "Renderer/MaterialRenderResources.h"
+#include "Renderer/RenderGraph.h"
+#include "RenderResource/Mesh.h"
+#include "RenderResource/Shader/OutlineShader.h"
 #include "AssetObject/Texture2D.h"
 #include "AssetObject/TextureCube.h"
 #include "AssetObject/Texture3D.h"
 #include "UI/Widgets/Property/PropertyData/PropertyData.h"
 #include "UI/Widgets/Property/PropertyData/PropertyItem.h"
 #include "UI/Widgets/Property/PropertyData/PropertyAssetItem.h"
+#include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
+
 #include <Widgets/Input/SComboButton.h>
 #include <stdexcept>
 
@@ -237,6 +242,30 @@ namespace SH
 			if (IsShaderUintVector4Type(Slot.Type)) return MakeShared<PropertyVector4iItem>(Owner, Label, GetOverrideBytesAs<int32>(Slot));
 			return MakeShared<PropertyItemBase>(Owner, Label);
 		}
+
+		TRefCountPtr<GpuShader> GetMaskPs()
+		{
+			static TRefCountPtr<GpuShader> MaskPs;
+			if (MaskPs)
+			{
+				return MaskPs;
+			}
+
+			MaskPs = GGpuRhi->CreateShaderFromSource({
+				.Name       = TEXT("MeshRenderObject_MaskPs"),
+				.Source     = TEXT("float4 Main() : SV_Target0\n"
+					"{\n"
+					"    return 1.0.xxxx;\n"
+					"}\n"),
+				.Type       = ShaderType::Pixel,
+				.EntryPoint = TEXT("Main"),
+			});
+
+			FString Err, Warn;
+			GGpuRhi->CompileShader(MaskPs, Err, Warn);
+			check(Err.IsEmpty());
+			return MaskPs;
+		}
 	}
 
 	REFLECTION_REGISTER(AddClass<MeshRenderObject>("MeshRenderObject")
@@ -330,6 +359,7 @@ namespace SH
 	void MeshRenderObject::InvalidateRenderResources()
 	{
 		Pipeline.SafeRelease();
+		PipelineDesc = {};
 		BindGroupLayouts.Empty();
 		BindGroups.Empty();
 		UniformBuffers.Empty();
@@ -797,6 +827,269 @@ namespace SH
 		return bAssertFailed;
 	}
 
+	ShaderAsset* MeshRenderObject::GetShaderAsset(DebugItem Item) const
+	{
+		if (!MaterialAsset)
+		{
+			return nullptr;
+		}
+		switch (Item)
+		{
+		case DebugItem::Vertex:
+			return MaterialAsset->VertexShaderAsset.Get();
+		case DebugItem::Fragment:
+			return MaterialAsset->PixelShaderAsset.Get();
+		default:
+			return nullptr;
+		}
+	}
+
+	TArray<BindingBuilder> MeshRenderObject::BuildDebugBindingBuilders() const
+	{
+		TArray<BindingBuilder> Result;
+		TArray<int32> GroupSlots;
+		BindGroupLayouts.GetKeys(GroupSlots);
+		GroupSlots.Sort();
+
+		for (int32 GroupSlot : GroupSlots)
+		{
+			const TRefCountPtr<GpuBindGroupLayout>* LayoutPtr = BindGroupLayouts.Find(GroupSlot);
+			const TRefCountPtr<GpuBindGroup>* BindGroupPtr = BindGroups.Find(GroupSlot);
+			GpuBindGroupLayout* Layout = LayoutPtr ? LayoutPtr->GetReference() : nullptr;
+			GpuBindGroup* BindGroup = BindGroupPtr ? BindGroupPtr->GetReference() : nullptr;
+			if (!Layout || !BindGroup)
+			{
+				continue;
+			}
+
+			BindingBuilder Builder{ GpuBindGroupBuilder{ Layout }, GpuBindGroupLayoutBuilder{ GroupSlot } };
+			for (const auto& [Slot, Binding] : Layout->GetDesc().Layouts)
+			{
+				Builder.LayoutBuilder.AddExistingBinding(Slot.SlotNum, Binding.Type, Binding.Stage);
+			}
+			for (const auto& [Slot, ResourceBindingEntry] : BindGroup->GetDesc().Resources)
+			{
+				Builder.BingGroupBuilder.SetExistingBinding(Slot.SlotNum, Slot.Type, ResourceBindingEntry.Resource.GetReference(), Slot.Stage);
+			}
+			Result.Add(MoveTemp(Builder));
+		}
+		return Result;
+	}
+
+	void MeshRenderObject::UpdateMaterialDrawState(const FMatrix44f& ModelMatrix, const FMatrix44f& ViewMat, const FMatrix44f& ProjMat)
+	{
+		const bool bHasResourceOverride = OverrideSlots.ContainsByPredicate([](const MaterialOverrideSlot& Slot) {
+			return Slot.bIsResource;
+		});
+		if (bHasResourceOverride)
+		{
+			BuildBindGroupFromMaterial(false, false);
+		}
+
+		const FMatrix44f ViewProjMat = ViewMat * ProjMat;
+		const FMatrix44f MVPMat = ModelMatrix * ViewProjMat;
+
+		MaterialUniformBufferUpdateOptions UniformOptions;
+		UniformOptions.ModelMatrix = ModelMatrix;
+		UniformOptions.ViewMatrix = ViewMat;
+		UniformOptions.ProjMatrix = ProjMat;
+		UniformOptions.ViewProjMatrix = ViewProjMat;
+		UniformOptions.MVPMatrix = MVPMat;
+		UniformOptions.UniformOverrideBytesResolver = [this](const MaterialBindingMemberDefault& MemberDefault) -> const uint8* {
+			const MaterialOverrideSlot* Override = OverrideSlots.FindByPredicate([&](const MaterialOverrideSlot& Slot) {
+				return !Slot.bIsResource && Slot.BindingName == MemberDefault.BindingName && Slot.MemberName == MemberDefault.MemberName && Slot.Stage == MemberDefault.Stage;
+			});
+			if (!Override)
+			{
+				return nullptr;
+			}
+
+			if (GraphPin* OverridePin = FindOverridePin(MemberDefault.BindingName, MemberDefault.MemberName, MemberDefault.Stage))
+			{
+				if (auto* BytesPinValue = DynamicCast<BytesPin>(OverridePin))
+				{
+					const TArray<uint8>& PinBytes = BytesPinValue->GetBytes();
+					if (OverridePin->SourcePin.IsValid())
+					{
+						return GetCompleteOverrideBytes(PinBytes, MemberDefault.Type);
+					}
+					if (const uint8* PinData = GetCompleteOverrideBytes(PinBytes, MemberDefault.Type))
+					{
+						return PinData;
+					}
+				}
+			}
+
+			return GetCompleteOverrideBytes(Override->Bytes, MemberDefault.Type);
+		};
+		UpdateMaterialUniformBuffers(*MaterialAsset, UniformBuffers, UniformOptions);
+	}
+
+	TRefCountPtr<GpuTexture> MeshRenderObject::BuildCoverageMask()
+	{
+		const MeshPassNode* OwnerNode = dynamic_cast<MeshPassNode*>(GetOuter());
+		if (!OwnerNode || !MeshSceneObjectRef.IsValid() || !MeshSceneObjectRef.Get() || !MeshSceneObjectRef->ModelAsset)
+		{
+			return nullptr;
+		}
+
+		if (!MaterialAsset || bDrawMaterialError || !Pipeline.IsValid())
+		{
+			return nullptr;
+		}
+		if (!MaterialAsset->VertexShaderAsset)
+		{
+			return nullptr;
+		}
+		GpuShader* MaterialVs = MaterialAsset->VertexShaderAsset->GetCompiledShader(ShaderType::Vertex);
+		if (!MaterialVs)
+		{
+			return nullptr;
+		}
+
+		TRefCountPtr<GpuShader> MaskPs = GetMaskPs();
+
+		Model* ModelAsset = MeshSceneObjectRef->ModelAsset.Get();
+		const TArray<MeshBuffers>& GpuMeshes = ModelAsset->GetGpuMeshes();
+
+		GpuTexture* ReferenceTexture = nullptr;
+		for (const TRefCountPtr<GpuTexture>& ColorRT : OwnerNode->GetLastActiveColorRTs())
+		{
+			if (ColorRT)
+			{
+				ReferenceTexture = ColorRT.GetReference();
+				break;
+			}
+		}
+		if (!ReferenceTexture && OwnerNode->GetLastActiveDepthRT())
+		{
+			ReferenceTexture = OwnerNode->GetLastActiveDepthRT().GetReference();
+		}
+		if (!ReferenceTexture)
+		{
+			return nullptr;
+		}
+
+		TRefCountPtr<GpuTexture> MaskTex = GGpuRhi->CreateTexture({
+			.Width = ReferenceTexture->GetWidth(),
+			.Height = ReferenceTexture->GetHeight(),
+			.Format = GpuFormat::B8G8R8A8_UNORM,
+			.Usage = GpuTextureUsage::RenderTarget | GpuTextureUsage::ShaderResource,
+			.ClearValues = Vector4f(0, 0, 0, 0),
+		}, GpuResourceState::RenderTargetWrite);
+
+		TOptional<Camera> Cam = OwnerNode->GetLastCamera();
+		const FMatrix44f ViewMat = Cam.IsSet() ? Cam.GetValue().GetViewMatrix() : FMatrix44f::Identity;
+		const FMatrix44f ProjMat = Cam.IsSet() ? Cam.GetValue().GetProjectionMatrix() : FMatrix44f::Identity;
+		const FMatrix44f WorldMat = MeshSceneObjectRef->GetWorldMatrix();
+		UpdateMaterialDrawState(WorldMat, ViewMat, ProjMat);
+
+		TArray<GpuBindGroupLayout*> MaskLayoutArray;
+		for (const auto& [_, L] : BindGroupLayouts) MaskLayoutArray.Add(L.GetReference());
+		TArray<GpuBindGroup*> MaskBGArray;
+		for (const auto& [_, BG] : BindGroups) MaskBGArray.Add(BG.GetReference());
+
+		RenderGraph RG;
+		for (int32 MeshIndex = 0; MeshIndex < GpuMeshes.Num(); ++MeshIndex)
+		{
+			const MeshBuffers& Buffers = GpuMeshes[MeshIndex];
+			GpuRenderPassDesc PassDesc;
+			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{
+				MaskTex->GetDefaultView(),
+				MeshIndex == 0 ? RenderTargetLoadAction::Clear : RenderTargetLoadAction::Load,
+				RenderTargetStoreAction::Store
+			});
+
+			GpuRenderPipelineStateDesc MaskPipelineDesc{
+				.Vs = MaterialVs,
+				.Ps = MaskPs.GetReference(),
+				.Targets = {{ .TargetFormat = MaskTex->GetFormat() }},
+				.BindGroupLayouts = MaskLayoutArray,
+				.VertexLayout = { BuildMaterialMeshVertexLayout(*MaterialAsset) },
+				.RasterizerState = { MaterialAsset->FillMode, MaterialAsset->CullMode },
+				.Primitive = MaterialAsset->Primitive,
+			};
+
+			TRefCountPtr<GpuRenderPipelineState> MaskPipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(MaskPipelineDesc);
+
+			RG.AddRenderPass(TEXT("MeshRenderObjectDebugMask"), MoveTemp(PassDesc),
+				[MaskPipeline, MaskBGArray, VB = Buffers.VertexBuffer, IB = Buffers.IndexBuffer, IdxCount = Buffers.IndexCount]
+				(GpuRenderPassRecorder* PassRecorder) {
+					PassRecorder->SetBindGroups(MaskBGArray);
+					PassRecorder->SetRenderPipelineState(MaskPipeline);
+					PassRecorder->SetVertexBuffer(0, VB);
+					PassRecorder->SetIndexBuffer(IB);
+					PassRecorder->DrawIndexed(0, IdxCount);
+				}
+			);
+		}
+		RG.Execute();
+		return MaskTex;
+	}
+
+	DebugTargetInfo MeshRenderObject::OnStartDebugging(DebugItem Item)
+	{
+		ShaderAsset* MainShader = GetShaderAsset(Item);
+		if (!MainShader)
+		{
+			return {};
+		}
+
+		AssetOp::OpenAsset(MainShader);
+		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		if (SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(MainShader))
+		{
+			ShaderEditor->Compile();
+		}
+		TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = true;
+		ShEditor->ForceRender();
+		bDebugging = true;
+
+		if (MeshPassNode* OwnerNode = dynamic_cast<MeshPassNode*>(GetOuter()))
+		{
+			if (Item == DebugItem::Fragment)
+			{
+				return OwnerNode->MakeDebugTargetInfo(BuildCoverageMask());
+			}
+		}
+		return {};
+	}
+
+	InvocationState MeshRenderObject::GetInvocationState(DebugItem Item)
+	{
+		if (Item != DebugItem::Fragment)
+		{
+			return ComputeState{};
+		}
+
+		MeshPassNode* OwnerNode = dynamic_cast<MeshPassNode*>(GetOuter());
+		if (!OwnerNode || !MaterialAsset || !Pipeline.IsValid() || !MeshSceneObjectRef.IsValid() || !MeshSceneObjectRef.Get() || !MeshSceneObjectRef->ModelAsset)
+		{
+			return PixelState{};
+		}
+
+		TArray<MeshBuffers> Meshes = MeshSceneObjectRef->ModelAsset->GetGpuMeshes();
+		return PixelState{
+			.ViewPortDesc = OwnerNode->GetLastViewPortDesc(),
+			.Builders = BuildDebugBindingBuilders(),
+			.PipelineDesc = PipelineDesc,
+			.DrawFunction = [Meshes](GpuRenderPassRecorder* Recorder) {
+				for (const MeshBuffers& MB : Meshes)
+				{
+					Recorder->SetVertexBuffer(0, MB.VertexBuffer);
+					Recorder->SetIndexBuffer(MB.IndexBuffer);
+					Recorder->DrawIndexed(0, MB.IndexCount);
+				}
+			}
+		};
+	}
+
+	void MeshRenderObject::OnFinalizePixel(const Vector2u& PixelCoord)
+	{
+		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->DebugPixel(PixelCoord, GetInvocationState(DebugItem::Fragment));
+	}
+
 	bool MeshRenderObject::UsesTextureAsShaderInput(GpuTexture* Texture, FString& OutBindingName) const
 	{
 		if (!MaterialAsset || bDrawMaterialError)
@@ -899,9 +1192,9 @@ namespace SH
 		GpuRenderPipelineStateDesc Desc{
 			.Vs = Vs,
 			.Ps = Ps,
-			.Targets = MoveTemp(Targets),
-			.BindGroupLayouts = MoveTemp(LayoutArray),
-			.VertexLayout = { MoveTemp(VertexLayoutDesc) },
+			.Targets = Targets,
+			.BindGroupLayouts = LayoutArray,
+			.VertexLayout = { VertexLayoutDesc },
 			.RasterizerState = { .FillMode = MaterialAsset->FillMode, .CullMode = MaterialAsset->CullMode },
 			.Primitive = MaterialAsset->Primitive,
 			.SampleCount = SampleCount,
@@ -912,7 +1205,8 @@ namespace SH
 
 		try
 		{
-			Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(Desc);
+			PipelineDesc = Desc;
+			Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 		}
 		catch (const std::runtime_error& Error)
 		{
@@ -949,8 +1243,7 @@ namespace SH
 		Model* ModelAsset = MSO->ModelAsset.Get();
 		const FMatrix44f ViewMat = InCamera ? InCamera->GetViewMatrix() : FMatrix44f::Identity;
 		const FMatrix44f ProjMat = InCamera ? InCamera->GetProjectionMatrix() : FMatrix44f::Identity;
-		const FMatrix44f ViewProjMat = ViewMat * ProjMat;
-		const FMatrix44f MVPMat = ModelMatrix * ViewProjMat;
+		const FMatrix44f MVPMat = ModelMatrix * (ViewMat * ProjMat);
 
 		if (bDrawMaterialError)
 		{
@@ -967,48 +1260,7 @@ namespace SH
 			return;
 		}
 
-		const bool bHasResourceOverride = OverrideSlots.ContainsByPredicate([](const MaterialOverrideSlot& Slot) {
-			return Slot.bIsResource;
-		});
-		if (bHasResourceOverride)
-		{
-			BuildBindGroupFromMaterial(false, false);
-		}
-
-		MaterialUniformBufferUpdateOptions UniformOptions;
-		UniformOptions.ModelMatrix = ModelMatrix;
-		UniformOptions.ViewMatrix = ViewMat;
-		UniformOptions.ProjMatrix = ProjMat;
-		UniformOptions.ViewProjMatrix = ViewProjMat;
-		UniformOptions.MVPMatrix = MVPMat;
-		UniformOptions.UniformOverrideBytesResolver = [this](const MaterialBindingMemberDefault& MemberDefault) -> const uint8* {
-			const MaterialOverrideSlot* Override = OverrideSlots.FindByPredicate([&](const MaterialOverrideSlot& Slot) {
-				return !Slot.bIsResource && Slot.BindingName == MemberDefault.BindingName && Slot.MemberName == MemberDefault.MemberName && Slot.Stage == MemberDefault.Stage;
-			});
-			if (!Override)
-			{
-				return nullptr;
-			}
-
-			if (GraphPin* OverridePin = FindOverridePin(MemberDefault.BindingName, MemberDefault.MemberName, MemberDefault.Stage))
-			{
-				if (auto* BytesPinValue = DynamicCast<BytesPin>(OverridePin))
-				{
-					const TArray<uint8>& PinBytes = BytesPinValue->GetBytes();
-					if (OverridePin->SourcePin.IsValid())
-					{
-						return GetCompleteOverrideBytes(PinBytes, MemberDefault.Type);
-					}
-					if (const uint8* PinData = GetCompleteOverrideBytes(PinBytes, MemberDefault.Type))
-					{
-						return PinData;
-					}
-				}
-			}
-
-			return GetCompleteOverrideBytes(Override->Bytes, MemberDefault.Type);
-		};
-		UpdateMaterialUniformBuffers(*MaterialAsset, UniformBuffers, UniformOptions);
+		UpdateMaterialDrawState(ModelMatrix, ViewMat, ProjMat);
 
 		TArray<GpuBindGroup*> BGArray;
 		for (auto& [_, BG] : BindGroups) BGArray.Add(BG.GetReference());

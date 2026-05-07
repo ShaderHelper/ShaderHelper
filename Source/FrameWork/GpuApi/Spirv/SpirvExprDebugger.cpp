@@ -97,7 +97,8 @@ namespace FW
 
 			if (IsVarChangeState && AppendVarFuncIds.FindKey(FuncCall->GetFunction()))
 			{
-				AppendExprDummy([&] { return AppendVarCallToStore[FuncCall]->GetWordOffset().value(); });
+				const SpvOpStore* const* Store = AppendVarCallToStore.Find(FuncCall);
+				AppendExprDummy([&] { return Store ? (*Store)->GetWordOffset().value() : FuncCall->GetWordOffset().value(); });
 				break;
 			}
 			else if (IsFuncCallState && FuncCall->GetFunction() == AppendCallFuncId)

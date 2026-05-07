@@ -27,6 +27,10 @@ p.api.register {
 workspaceFolderUUID = {}
 
 function addWorkspaceItemsByFolder(wks, folders, parentFolderUUID)
+    if not folders then
+        return
+    end
+
     for name, subPaths in pairs(folders) do
         local fileSections = {}
         local nextFolders = {}
@@ -40,7 +44,9 @@ function addWorkspaceItemsByFolder(wks, folders, parentFolderUUID)
                 for _, subDirPath in pairs(os.matchdirs(pathValue .. "/*")) do
                     table.insert(nextFolderSubPaths, subDirPath)
                 end
-                nextFolders[folderName] = nextFolderSubPaths                
+                if #nextFolderSubPaths > 0 then
+                    nextFolders[folderName] = nextFolderSubPaths
+                end
             else
                 for _, file in ipairs(os.matchfiles(pathValue)) do
                     file = path.rebase(file, ".", wks.location)

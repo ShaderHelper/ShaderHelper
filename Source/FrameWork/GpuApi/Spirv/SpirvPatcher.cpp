@@ -4,6 +4,8 @@
 #include "ShaderConductor.hpp"
 #include "GpuApi/GpuRhi.h"
 
+#include <Math/Float16.h>
+
 namespace FW
 {
 	int32 GetSpirvPatchBindingNumber(int32 SlotNumber, BindingType Type, BindingShaderStage Stage)
@@ -228,7 +230,7 @@ namespace FW
 		SpvId ResultTypeId;
 		TArray<uint8> ValueBytes;
 
-		if (OpCode == SpvOp::Constant)
+		if (OpCode == SpvOp::Constant || OpCode == SpvOp::ConstantTrue || OpCode == SpvOp::ConstantFalse)
 		{
 			auto* C = static_cast<SpvOpConstant*>(InInst.Get());
 			ResultTypeId = C->GetResultType();
@@ -262,7 +264,7 @@ namespace FW
 	}
 
 	template<typename T>
-	requires requires { T{} + T{}; }
+	requires (!AUX::TIsTUniquePtr<T>::value)
 	SpvId SpvPatcher::FindOrAddConstant(T InConstant)
 	{
 		SpvId ConstantType;
@@ -271,6 +273,18 @@ namespace FW
 		{
 			ConstantType = FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
 			ConstantInst = MakeUnique<SpvOpConstant>(ConstantType, TArray<uint8>{(uint8*)&InConstant, sizeof(T)});
+		}
+		else if constexpr (std::is_same_v<T, uint16>)
+		{
+			ConstantType = FindOrAddType(MakeUnique<SpvOpTypeInt>(16, 0));
+			uint32 Value = InConstant;
+			ConstantInst = MakeUnique<SpvOpConstant>(ConstantType, TArray<uint8>{(uint8*)&Value, sizeof(Value)});
+		}
+		else if constexpr (std::is_same_v<T, uint8>)
+		{
+			ConstantType = FindOrAddType(MakeUnique<SpvOpTypeInt>(8, 0));
+			uint32 Value = InConstant;
+			ConstantInst = MakeUnique<SpvOpConstant>(ConstantType, TArray<uint8>{(uint8*)&Value, sizeof(Value)});
 		}
 		else if constexpr (std::is_same_v<T, uint64>)
 		{
@@ -282,6 +296,18 @@ namespace FW
 			ConstantType = FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 1));
 			ConstantInst = MakeUnique<SpvOpConstant>(ConstantType, TArray<uint8>{(uint8*)&InConstant, sizeof(T)});
 		}
+		else if constexpr (std::is_same_v<T, int16>)
+		{
+			ConstantType = FindOrAddType(MakeUnique<SpvOpTypeInt>(16, 1));
+			uint32 Value = static_cast<uint16>(InConstant);
+			ConstantInst = MakeUnique<SpvOpConstant>(ConstantType, TArray<uint8>{(uint8*)&Value, sizeof(Value)});
+		}
+		else if constexpr (std::is_same_v<T, int8>)
+		{
+			ConstantType = FindOrAddType(MakeUnique<SpvOpTypeInt>(8, 1));
+			uint32 Value = static_cast<uint8>(InConstant);
+			ConstantInst = MakeUnique<SpvOpConstant>(ConstantType, TArray<uint8>{(uint8*)&Value, sizeof(Value)});
+		}
 		else if constexpr (std::is_same_v<T, int64>)
 		{
 			ConstantType = FindOrAddType(MakeUnique<SpvOpTypeInt>(64, 1));
@@ -291,6 +317,29 @@ namespace FW
 		{
 			ConstantType = FindOrAddType(MakeUnique<SpvOpTypeFloat>(32));
 			ConstantInst = MakeUnique<SpvOpConstant>(ConstantType, TArray<uint8>{(uint8*)&InConstant, sizeof(T)});
+		}
+		else if constexpr (std::is_same_v<T, double>)
+		{
+			ConstantType = FindOrAddType(MakeUnique<SpvOpTypeFloat>(64));
+			ConstantInst = MakeUnique<SpvOpConstant>(ConstantType, TArray<uint8>{(uint8*)&InConstant, sizeof(T)});
+		}
+		else if constexpr (std::is_same_v<T, FFloat16>)
+		{
+			ConstantType = FindOrAddType(MakeUnique<SpvOpTypeFloat>(16));
+			uint32 HalfValue = InConstant.Encoded;
+			ConstantInst = MakeUnique<SpvOpConstant>(ConstantType, TArray<uint8>{(uint8*)&HalfValue, sizeof(HalfValue)});
+		}
+		else if constexpr (std::is_same_v<T, bool>)
+		{
+			ConstantType = FindOrAddType(MakeUnique<SpvOpTypeBool>());
+			if (InConstant)
+			{
+				ConstantInst = MakeUnique<SpvOpConstantTrue>(ConstantType);
+			}
+			else
+			{
+				ConstantInst = MakeUnique<SpvOpConstantFalse>(ConstantType);
+			}
 		}
 		else if constexpr (std::is_same_v<T, Vector2u>)
 		{
@@ -310,17 +359,28 @@ namespace FW
 				FindOrAddConstant(InConstant.Y)
 			});
 		}
+		else
+		{
+			AUX::Unreachable();
+		}
 
 		return FindOrAddConstant(MoveTemp(ConstantInst));
 	}
 
-	template SpvId SpvPatcher::FindOrAddConstant<uint32>(uint32);
-	template SpvId SpvPatcher::FindOrAddConstant<uint64>(uint64);
-	template SpvId SpvPatcher::FindOrAddConstant<int32>(int32);
-	template SpvId SpvPatcher::FindOrAddConstant<int64>(int64);
-	template SpvId SpvPatcher::FindOrAddConstant<float>(float);
-	template SpvId SpvPatcher::FindOrAddConstant<Vector2i>(Vector2i);
-	template SpvId SpvPatcher::FindOrAddConstant<Vector2u>(Vector2u);
+	template FRAMEWORK_API SpvId SpvPatcher::FindOrAddConstant<uint32>(uint32);
+	template FRAMEWORK_API SpvId SpvPatcher::FindOrAddConstant<uint16>(uint16);
+	template FRAMEWORK_API SpvId SpvPatcher::FindOrAddConstant<uint8>(uint8);
+	template FRAMEWORK_API SpvId SpvPatcher::FindOrAddConstant<uint64>(uint64);
+	template FRAMEWORK_API SpvId SpvPatcher::FindOrAddConstant<int32>(int32);
+	template FRAMEWORK_API SpvId SpvPatcher::FindOrAddConstant<int16>(int16);
+	template FRAMEWORK_API SpvId SpvPatcher::FindOrAddConstant<int8>(int8);
+	template FRAMEWORK_API SpvId SpvPatcher::FindOrAddConstant<int64>(int64);
+	template FRAMEWORK_API SpvId SpvPatcher::FindOrAddConstant<float>(float);
+	template FRAMEWORK_API SpvId SpvPatcher::FindOrAddConstant<double>(double);
+	template FRAMEWORK_API SpvId SpvPatcher::FindOrAddConstant<FFloat16>(FFloat16);
+	template FRAMEWORK_API SpvId SpvPatcher::FindOrAddConstant<bool>(bool);
+	template FRAMEWORK_API SpvId SpvPatcher::FindOrAddConstant<Vector2i>(Vector2i);
+	template FRAMEWORK_API SpvId SpvPatcher::FindOrAddConstant<Vector2u>(Vector2u);
 
 	void SpvPatcher::AddGlobalVariable(TUniquePtr<SpvInstruction> InInst)
 	{
@@ -348,10 +408,6 @@ namespace FW
 	void SpvPatcher::AddInstruction(int WordOffset, TUniquePtr<SpvInstruction> InInst)
 	{
 		SpvMetaContext& Context = MetaVisitor->GetContext();
-		TArray<uint32> InstBin = InInst->ToBinary();
-		SpvCode.Insert(InstBin, WordOffset);
-		InInst->SetWordOffset(WordOffset);
-		InInst->SetWordLen(InstBin.Num());
 		SpvSectionKind TargetSection{};
 		for (int i = (int)SpvSectionKind::Capability; i < (int)SpvSectionKind::Num; i++)
 		{
@@ -361,6 +417,15 @@ namespace FW
 				break;
 			}
 		}
+		AddInstruction(TargetSection, WordOffset, MoveTemp(InInst));
+	}
+
+	void SpvPatcher::AddInstruction(SpvSectionKind TargetSection, int WordOffset, TUniquePtr<SpvInstruction> InInst)
+	{
+		TArray<uint32> InstBin = InInst->ToBinary();
+		SpvCode.Insert(InstBin, WordOffset);
+		InInst->SetWordOffset(WordOffset);
+		InInst->SetWordLen(InstBin.Num());
 		UpdateSection(TargetSection, InstBin.Num());
 		UpdateInsts(WordOffset, InstBin.Num());
 		if ((int)TargetSection < (int)SpvSectionKind::Function)

@@ -59,7 +59,7 @@ namespace SH
     {
 		ShPropertyOp::OnSelect(InObject);
         auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->SetDebuggableObject(static_cast<ShaderToyPassNode*>(InObject));
+		ShEditor->SetDebuggableObject(InObject);
     }
 
 	void ShaderToyPassNode::InitShaderAsset()
@@ -186,7 +186,7 @@ namespace SH
 		return GetBuiltInBindGroupBuiler(Layout).Build();
 	}
 
-	InvocationState ShaderToyPassNode::GetInvocationState()
+	InvocationState ShaderToyPassNode::GetInvocationState(DebugItem Item)
 	{
 		auto RT = static_cast<GpuTexturePin*>(GetPin("RT"))->GetValue();
 		auto BuiltInLayout = ShaderAssetObj->GetBuiltInBindLayout();
@@ -210,7 +210,7 @@ namespace SH
 		};
 	}
 
-	DebugTargetInfo ShaderToyPassNode::OnStartDebugging()
+	DebugTargetInfo ShaderToyPassNode::OnStartDebugging(DebugItem Item)
 	{
 		AssetOp::OpenAsset(ShaderAssetObj);
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
@@ -230,7 +230,10 @@ namespace SH
 		{
 			IsDebugging = true;
 			auto PassOutput = static_cast<GpuTexturePin*>(GetPin("RT"));
-			return { PassOutput->GetValue() };
+			DebugTargetInfo Target;
+			Target.Tex = PassOutput->GetValue();
+			Target.Outputs.Add({ TEXT("RT"), Target.Tex });
+			return Target;
 		}
 		else
 		{
@@ -241,10 +244,10 @@ namespace SH
 	void ShaderToyPassNode::OnFinalizePixel(const FW::Vector2u& PixelCoord)
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->DebugPixel(PixelCoord, GetInvocationState());
+		ShEditor->DebugPixel(PixelCoord, GetInvocationState(DebugItem::Fragment));
 	}
 
-	ShaderAsset* ShaderToyPassNode::GetShaderAsset() const
+	ShaderAsset* ShaderToyPassNode::GetShaderAsset(DebugItem Item) const
 	{
 		return ShaderAssetObj;
 	}

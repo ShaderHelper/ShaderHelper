@@ -177,6 +177,18 @@ namespace FW
 		Context.DebugStrs.emplace(Inst->GetId().value(), Inst->GetStr());
 	}
 
+	void SpvMetaVisitor::Visit(const SpvOpExtInstImport* Inst)
+	{
+		if (Inst->GetName() == TEXT("GLSL.std.450"))
+		{
+			Context.ExtSets.Add(Inst->GetId().value(), SpvExtSet::GLSLstd450);
+		}
+		else if (Inst->GetName() == TEXT("NonSemantic.Shader.DebugInfo.100"))
+		{
+			Context.ExtSets.Add(Inst->GetId().value(), SpvExtSet::NonSemanticShaderDebugInfo100);
+		}
+	}
+
 	void SpvMetaVisitor::Visit(const SpvOpDecorate* Inst)
 	{
 		const TArray<uint8>& ExtraOperands = Inst->GetExtraOperands();
@@ -477,10 +489,9 @@ namespace FW
 		Context.VariableDescMap.emplace(Inst->GetVarId(), &Context.VariableDescs[Inst->GetId().value()]);
 	}
 
-	void SpvMetaVisitor::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections, const TMap<SpvId, SpvExtSet>& InExtSets)
+	void SpvMetaVisitor::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections)
 	{
 		Context.Sections = InSections;
-		Context.ExtSets = InExtSets;
 		for(const auto& Inst : Insts)
 		{
 			if(const SpvOp* OpKind = std::get_if<SpvOp>(&Inst->GetKind()) ;
@@ -495,7 +506,7 @@ namespace FW
 
 	void SpirvParser::Accept(SpvVisitor* Visitor)
 	{
-		Visitor->Parse(Insts, SpvCode, Sections, ExtSets);
+		Visitor->Parse(Insts, SpvCode, Sections);
 	}
 
 	void SpirvParser::Parse(const TArray<uint32>& SpvCode)
@@ -1498,17 +1509,17 @@ namespace FW
 			{
 				SpvId ResultId = SpvCode[WordOffset + 1];
 				char* Str = (char*)&SpvCode[WordOffset + 2];
-				int32 StrWordLen = InstWordLen - 3;
-				FString ExtSetName = FString(StrWordLen * 4, Str);
-				if(ExtSetName == "NonSemantic.Shader.DebugInfo.100")
+				FString ExtSetName = FString(Str);
+				DecodedInst = MakeUnique<SpvOpExtInstImport>(ExtSetName);
+				DecodedInst->SetId(ResultId);
+				if(ExtSetName == TEXT("NonSemantic.Shader.DebugInfo.100"))
 				{
 					ExtSets.Add(ResultId, SpvExtSet::NonSemanticShaderDebugInfo100);
 				}
-				else if(ExtSetName == "GLSL.std.450")
+				else if(ExtSetName == TEXT("GLSL.std.450"))
 				{
 					ExtSets.Add(ResultId, SpvExtSet::GLSLstd450);
 				}
-				
 				break;
 			}
 			case SpvOp::ExtInst:
