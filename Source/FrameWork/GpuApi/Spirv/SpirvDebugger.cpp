@@ -4,6 +4,124 @@
 
 namespace FW
 {
+	static const SpvBinding* FindRuntimeSpvBinding(const TArray<SpvBinding>& Bindings, const FString& Name, BindingType Type)
+	{
+		const SpvBinding* Match = nullptr;
+		for (const SpvBinding& Binding : Bindings)
+		{
+			if (Binding.Name == Name && Binding.Type == Type)
+			{
+				Match = &Binding;
+			}
+		}
+		return Match;
+	}
+
+	// DXC assigns distinct SPIR-V bindings to HLSL resources implicitly sharing the same slot (e.g. t0/s0 -> binding 0/1).
+	// Remap them back to the runtime slots so SPIRV-Cross retranslation produces matching HLSL registers.
+	void RemapSpvDebuggerBindings(const TArray<TUniquePtr<SpvInstruction>>& Insts, SpvPatcher& Patcher, SpvMetaContext& Context, const TArray<SpvBinding>& Bindings)
+	{
+#if PLATFORM_WINDOWS
+		if (GetGpuRhiBackendType() != GpuRhiBackendType::DX12 || Bindings.IsEmpty())
+		{
+			return;
+		}
+
+		TMap<SpvId, TPair<int32, int32>> RemapTargets;
+		for (const auto& BindingVarPair : Context.GlobalVariables)
+		{
+			SpvId Id = BindingVarPair.first;
+			auto NameIt = Context.Names.find(Id);
+			std::optional<BindingType> ShaderBindingType = GetSpvBindingType(Context, Id);
+			if (NameIt == Context.Names.end() || NameIt->second.IsEmpty() || !ShaderBindingType.has_value())
+			{
+				continue;
+			}
+
+			int32 SetNumber = INDEX_NONE;
+			int32 BindingNumber = INDEX_NONE;
+			TArray<SpvDecoration> Decorations;
+			Context.Decorations.MultiFind(Id, Decorations);
+			for (const SpvDecoration& Decoration : Decorations)
+			{
+				if (Decoration.Kind == SpvDecorationKind::DescriptorSet)
+				{
+					SetNumber = Decoration.DescriptorSet.Number;
+				}
+				else if (Decoration.Kind == SpvDecorationKind::Binding)
+				{
+					BindingNumber = Decoration.Binding.Number;
+				}
+			}
+			if (SetNumber == INDEX_NONE || BindingNumber == INDEX_NONE)
+			{
+				continue;
+			}
+
+			const SpvBinding* RuntimeBinding = FindRuntimeSpvBinding(Bindings, NameIt->second, ShaderBindingType.value());
+			if (!RuntimeBinding)
+			{
+				continue;
+			}
+
+			if (RuntimeBinding->DescriptorSet != SetNumber || RuntimeBinding->Binding != BindingNumber)
+			{
+				RemapTargets.Add(Id, { RuntimeBinding->DescriptorSet, RuntimeBinding->Binding });
+			}
+		}
+
+		if (RemapTargets.IsEmpty())
+		{
+			return;
+		}
+
+		for (const auto& Inst : Insts)
+		{
+			const SpvOp* Op = std::get_if<SpvOp>(&Inst->GetKind());
+			if (!Op || *Op != SpvOp::Decorate)
+			{
+				continue;
+			}
+
+			const SpvOpDecorate* Decorate = static_cast<const SpvOpDecorate*>(Inst.Get());
+			TPair<int32, int32>* Target = RemapTargets.Find(Decorate->GetTargetId());
+			if (!Target || !Inst->GetWordOffset().has_value() || Decorate->GetExtraOperands().Num() < static_cast<int32>(sizeof(uint32)))
+			{
+				continue;
+			}
+
+			if (Decorate->GetKind() == SpvDecorationKind::DescriptorSet)
+			{
+				uint32 SetNumber = static_cast<uint32>(Target->Key);
+				Patcher.OverwriteInstruction(Inst.Get(), MakeUnique<SpvOpDecorate>(Decorate->GetTargetId(), Decorate->GetKind(), TArray<uint8>{ (uint8*)&SetNumber, sizeof(uint32) }));
+			}
+			else if (Decorate->GetKind() == SpvDecorationKind::Binding)
+			{
+				uint32 BindingNumber = static_cast<uint32>(Target->Value);
+				Patcher.OverwriteInstruction(Inst.Get(), MakeUnique<SpvOpDecorate>(Decorate->GetTargetId(), Decorate->GetKind(), TArray<uint8>{ (uint8*)&BindingNumber, sizeof(uint32) }));
+			}
+		}
+
+		for (auto It = Context.Decorations.CreateIterator(); It; ++It)
+		{
+			TPair<int32, int32>* Target = RemapTargets.Find(It.Key());
+			if (!Target)
+			{
+				continue;
+			}
+
+			if (It.Value().Kind == SpvDecorationKind::DescriptorSet)
+			{
+				It.Value().DescriptorSet.Number = Target->Key;
+			}
+			else if (It.Value().Kind == SpvDecorationKind::Binding)
+			{
+				It.Value().Binding.Number = Target->Value;
+			}
+		}
+#endif
+	}
+
 	SpvType* GetAccessedType(const SpvVariable* Var, const TArray<int32>& Indexes)
 	{
 		SpvType* CurType = Var->Type;
@@ -846,6 +964,7 @@ namespace FW
 
 		SpvBuiltIn BuiltIn = SpvBuiltIn::FragCoord;
 		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(FragCoord, SpvDecorationKind::BuiltIn, TArray<uint8>{ (uint8*)&BuiltIn, sizeof(SpvBuiltIn) }));
+		Patcher.AddEntryPointInterface(Context.EntryPoint, FragCoord);
 		return FragCoord;
 	}
 
@@ -2164,6 +2283,7 @@ namespace FW
 	{
 		this->Insts = &Insts;
 		Patcher.SetSpvContext(Insts, SpvCode, &Context);
+		RemapSpvDebuggerBindings(Insts, Patcher, Context, Context.Bindings);
 		PatchExtSet(Patcher, Context, SpvExtSet::GLSLstd450);
 		//Get entry point loc
 		InstIndex = GetInstIndex(this->Insts, Context.EntryPoint);
@@ -2209,8 +2329,9 @@ namespace FW
 					BindingNumber = Decoration.Binding.Number;
 				}
 			}
-			if (SetNumber != INDEX_NONE && BindingNumber != INDEX_NONE;
-				SpvBinding * Binding = Context.Bindings.FindByPredicate([&](const SpvBinding& InItem) { return InItem.Binding == BindingNumber && InItem.DescriptorSet == SetNumber; }))
+			std::optional<BindingType> ShaderBindingType = GetSpvBindingType(Context, Id);
+			if (SetNumber != INDEX_NONE && BindingNumber != INDEX_NONE && ShaderBindingType.has_value();
+				SpvBinding * Binding = Context.Bindings.FindByPredicate([&](const SpvBinding& InItem) { return InItem.Binding == BindingNumber && InItem.DescriptorSet == SetNumber && InItem.Type == ShaderBindingType.value(); }))
 			{
 				auto& Storage = std::get<SpvObject::External>(Var.Storage);
 				Storage.Resource = Binding->Resource;

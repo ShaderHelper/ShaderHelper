@@ -39,14 +39,14 @@ namespace FW
 		void AddDebugName(TUniquePtr<SpvInstruction> InInst);
 		void AddAnnotation(TUniquePtr<SpvInstruction> InInst);
 		void AddGlobalVariable(TUniquePtr<SpvInstruction> InInst);
+		void AddEntryPointInterface(SpvId EntryPoint, SpvId InterfaceId);
 		void AddFunction(TArray<TUniquePtr<SpvInstruction>>&& Function);
 
 		void AddInstructions(int WordOffset, TArray<TUniquePtr<SpvInstruction>>&& InInsts);
 		void AddInstruction(SpvSectionKind TargetSection, int WordOffset, TUniquePtr<SpvInstruction> InInst);
 		void AddInstruction(int WordOffset, TUniquePtr<SpvInstruction> InInst);
 
-		void OverwriteInstruction(int WordOffset, int OldWordLen, TUniquePtr<SpvInstruction> NewInst);
-		void OverwriteWord(int WordOffset, uint32 NewWord);
+		void OverwriteInstruction(const SpvInstruction* Inst, TUniquePtr<SpvInstruction> NewInst);
 
 	private:
 		void UpdateSection(SpvSectionKind DirtySection, int WordSize);

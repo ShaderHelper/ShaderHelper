@@ -222,12 +222,15 @@ namespace FW
 
 	struct SpvBinding
 	{
+		FString Name;
 		int32 DescriptorSet;
 		int32 Binding;
 		BindingType Type;
 
 		TRefCountPtr<GpuResource> Resource;
 	};
+
+	FRAMEWORK_API void RemapSpvDebuggerBindings(const TArray<TUniquePtr<SpvInstruction>>& Insts, SpvPatcher& Patcher, SpvMetaContext& Context, const TArray<SpvBinding>& Bindings);
 
 	struct SpvFuncCall
 	{

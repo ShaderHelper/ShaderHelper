@@ -141,10 +141,7 @@ namespace FW
 		}
 
 		TArray<GpuShaderVertexInput> VertexInputs;
-		if (Type != ShaderType::Vertex || !ByteCode.IsValid())
-		{
-			return VertexInputs;
-		}
+		check(ByteCode.IsValid());
 
 		TRefCountPtr<ID3D12ShaderReflection> Reflection;
 		DxcBuffer DxilBuffer{.Ptr = ByteCode->GetBufferPointer(), .Size = ByteCode->GetBufferSize()};
@@ -213,10 +210,7 @@ namespace FW
 		}
 
 		TArray<GpuShaderStageSemantic> Semantics;
-		if (!ByteCode.IsValid())
-		{
-			return Semantics;
-		}
+		check(ByteCode.IsValid());
 
 		TRefCountPtr<ID3D12ShaderReflection> Reflection;
 		DxcBuffer DxilBuffer{.Ptr = ByteCode->GetBufferPointer(), .Size = ByteCode->GetBufferSize()};
@@ -249,10 +243,7 @@ namespace FW
 		}
 
 		TArray<GpuShaderStageSemantic> Semantics;
-		if (!ByteCode.IsValid())
-		{
-			return Semantics;
-		}
+		check(ByteCode.IsValid());
 
 		TRefCountPtr<ID3D12ShaderReflection> Reflection;
 		DxcBuffer DxilBuffer{.Ptr = ByteCode->GetBufferPointer(), .Size = ByteCode->GetBufferSize()};

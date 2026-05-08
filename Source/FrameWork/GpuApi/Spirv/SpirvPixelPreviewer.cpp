@@ -69,16 +69,15 @@ namespace FW
 		//PostAppendVar splits blocks by inserting SelectionMerge/BranchConditional.
 		//OpPhi parent block references become stale when the original block is split.
 		//Fix them by replacing old block labels with the last continuation label.
-		int Offset = Inst->GetWordOffset().value();
-		int Len = Inst->GetWordLen().value();
-		const TArray<uint32>& Spv = Patcher.GetSpv();
-		// OpPhi binary: Header(1) | ResultType(1) | ResultId(1) | [Value(1) Parent(1)]*
-		for (int i = 4; i < Len; i += 2)
+		TArray<TPair<SpvId, SpvId>> NewOperands = Inst->GetOperands();
+		for (TPair<SpvId, SpvId>& Operand : NewOperands)
 		{
-			SpvId ParentId(Spv[Offset + i]);
-			if (SpvId* Remap = BlockSplitRemaps.Find(ParentId))
+			if (SpvId* Remap = BlockSplitRemaps.Find(Operand.Value))
 			{
-				Patcher.OverwriteWord(Offset + i, Remap->GetValue());
+				Operand.Value = *Remap;
+				auto NewInst = MakeUnique<SpvOpPhi>(Inst->GetResultType(), NewOperands);
+				NewInst->SetId(Inst->GetId().value());
+				Patcher.OverwriteInstruction(Inst, MoveTemp(NewInst));
 			}
 		}
 	}

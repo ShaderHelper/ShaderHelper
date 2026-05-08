@@ -3,6 +3,8 @@
 
 namespace FW
 {
+	enum class BindingType;
+
 	//Info before logical layout section 10
 	struct SpvMetaContext
 	{
@@ -56,6 +58,8 @@ namespace FW
 		TMap<SpvSectionKind, SpvSection> Sections;
 		TMap<SpvId, SpvExtSet> ExtSets;
 	};
+
+	FRAMEWORK_API std::optional<BindingType> GetSpvBindingType(const SpvMetaContext& Context, SpvId VarId);
 
 	class FRAMEWORK_API SpvMetaVisitor : public SpvVisitor
 	{

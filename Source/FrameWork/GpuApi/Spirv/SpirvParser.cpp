@@ -1,8 +1,68 @@
 #include "CommonHeader.h"
 #include "SpirvParser.h"
+#include "GpuApi/GpuBindGroupLayout.h"
 
 namespace FW
 {
+	std::optional<BindingType> GetSpvBindingType(const SpvMetaContext& Context, SpvId VarId)
+	{
+		auto VarIt = Context.GlobalVariables.find(VarId);
+		if (VarIt == Context.GlobalVariables.end() || !VarIt->second.Type)
+		{
+			return std::nullopt;
+		}
+
+		SpvType* Type = VarIt->second.Type;
+		if (Type->GetKind() == SpvTypeKind::Image)
+		{
+			SpvImageType* ImageType = static_cast<SpvImageType*>(Type);
+			if (ImageType->Sampled == 2)
+			{
+				return ImageType->Dim == SpvDim::_3D ? BindingType::RWTexture3D : BindingType::RWTexture;
+			}
+			return ImageType->Dim == SpvDim::Cube ? BindingType::TextureCube :
+				ImageType->Dim == SpvDim::_3D ? BindingType::Texture3D : BindingType::Texture;
+		}
+		else if (Type->GetKind() == SpvTypeKind::SampledImage)
+		{
+			SpvSampledImageType* SampledImageType = static_cast<SpvSampledImageType*>(Type);
+			return SampledImageType->ImageType->Dim == SpvDim::Cube ? BindingType::CombinedTextureCubeSampler :
+				SampledImageType->ImageType->Dim == SpvDim::_3D ? BindingType::CombinedTexture3DSampler : BindingType::CombinedTextureSampler;
+		}
+		else if (Type->GetKind() == SpvTypeKind::Sampler)
+		{
+			return BindingType::Sampler;
+		}
+		else if (Type->GetKind() == SpvTypeKind::Struct)
+		{
+			TArray<SpvDecoration> TypeDecorations;
+			Context.Decorations.MultiFind(Type->GetId(), TypeDecorations);
+			if (TypeDecorations.ContainsByPredicate([](const SpvDecoration& InItem) { return InItem.Kind == SpvDecorationKind::Block; }))
+			{
+				return BindingType::UniformBuffer;
+			}
+
+			if (TypeDecorations.ContainsByPredicate([](const SpvDecoration& InItem) { return InItem.Kind == SpvDecorationKind::BufferBlock; }))
+			{
+				bool Writable = !TypeDecorations.ContainsByPredicate([](const SpvDecoration& InItem) { return InItem.Kind == SpvDecorationKind::NonWritable; });
+				SpvStructType* StructType = static_cast<SpvStructType*>(Type);
+				if (StructType->MemberTypes.Num() == 1 && StructType->MemberTypes[0]->GetKind() == SpvTypeKind::RuntimeArray)
+				{
+					SpvRuntimeArrayType* RuntimeArrayType = static_cast<SpvRuntimeArrayType*>(StructType->MemberTypes[0]);
+					if (RuntimeArrayType->ElementType->GetKind() == SpvTypeKind::Integer &&
+						static_cast<SpvIntegerType*>(RuntimeArrayType->ElementType)->IsSigend() == false &&
+						static_cast<SpvIntegerType*>(RuntimeArrayType->ElementType)->GetWidth() == 32)
+					{
+						return Writable ? BindingType::RWRawBuffer : BindingType::RawBuffer;
+					}
+				}
+
+				return Writable ? BindingType::RWStructuredBuffer : BindingType::StructuredBuffer;
+			}
+		}
+
+		return std::nullopt;
+	}
 
 	void SpvMetaVisitor::Visit(const SpvOpVariable* Inst)
 	{
@@ -571,7 +631,29 @@ namespace FW
 				SpvExecutionModel Model = static_cast<SpvExecutionModel>(SpvCode[WordOffset + 1]);
 				SpvId EntryPoint = SpvCode[WordOffset + 2];
 				FString EntryPointName = (char*)&SpvCode[WordOffset + 3];
-				DecodedInst = MakeUnique<SpvOpEntryPoint>(Model, EntryPoint, EntryPointName);
+
+				const int32 NameWordOffset = WordOffset + 3;
+				const int32 MaxNameBytes = (InstWordLen - 3) * 4;
+				const char* NameData = reinterpret_cast<const char*>(&SpvCode[NameWordOffset]);
+				int32 NameByteLen = 0;
+				while (NameByteLen < MaxNameBytes && NameData[NameByteLen] != '\0')
+				{
+					NameByteLen++;
+				}
+
+				int32 NameWordLen = InstWordLen - 3;
+				if (NameByteLen < MaxNameBytes)
+				{
+					NameWordLen = (NameByteLen + 1 + 3) / 4;
+				}
+
+				TArray<SpvId> Interfaces;
+				for (int32 InterfaceOffset = NameWordOffset + NameWordLen; InterfaceOffset < WordOffset + InstWordLen; InterfaceOffset++)
+				{
+					Interfaces.Add(SpvCode[InterfaceOffset]);
+				}
+
+				DecodedInst = MakeUnique<SpvOpEntryPoint>(Model, EntryPoint, EntryPointName, MoveTemp(Interfaces));
 				break;
 			}
 			case SpvOp::ExecutionMode:

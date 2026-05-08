@@ -6,8 +6,8 @@ namespace FW
 	class FRAMEWORK_API SpvValidator : public SpvVisitor
 	{
 	public:
-		SpvValidator(SpvMetaContext& InContext, bool InEnableUbsan, ShaderType InType)
-			: Context(InContext), EnableUbsan(InEnableUbsan), Type(InType)
+		SpvValidator(SpvMetaContext& InContext, bool InEnableUbsan, ShaderType InType, const TArray<SpvBinding>* InBindings = nullptr)
+			: Context(InContext), EnableUbsan(InEnableUbsan), Type(InType), Bindings(InBindings)
 		{}
 
 		const SpvPatcher& GetPatcher() const { return Patcher; }
@@ -88,6 +88,7 @@ namespace FW
 		SpvMetaContext& Context;
 		bool EnableUbsan;
 		ShaderType Type;
+		const TArray<SpvBinding>* Bindings;
 		const TArray<TUniquePtr<SpvInstruction>>* Insts;
 		SpvId DebuggerBuffer;
 		SpvId HasError;

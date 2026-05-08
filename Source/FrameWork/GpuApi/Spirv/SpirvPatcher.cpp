@@ -388,6 +388,28 @@ namespace FW
 		AddInstruction(Context.Sections[SpvSectionKind::GlobalVar].EndOffset, MoveTemp(InInst));
 	}
 
+	void SpvPatcher::AddEntryPointInterface(SpvId EntryPoint, SpvId InterfaceId)
+	{
+		for (const auto& Inst : *OriginInsts)
+		{
+			const SpvOpEntryPoint* EntryPointInst = dynamic_cast<const SpvOpEntryPoint*>(Inst.Get());
+			if (!EntryPointInst || EntryPointInst->GetEntryPointId() != EntryPoint)
+			{
+				continue;
+			}
+
+			auto NewInst = EntryPointInst->Clone();
+			SpvOpEntryPoint* NewEntryPointInst = static_cast<SpvOpEntryPoint*>(NewInst.Get());
+			if (!NewEntryPointInst->AddInterface(InterfaceId))
+			{
+				return;
+			}
+
+			OverwriteInstruction(EntryPointInst, MoveTemp(NewInst));
+			return;
+		}
+	}
+
 	void SpvPatcher::AddFunction(TArray<TUniquePtr<SpvInstruction>>&& Function)
 	{
 		SpvMetaContext& Context = MetaVisitor->GetContext();
@@ -439,19 +461,41 @@ namespace FW
 		SortedPatchedInsts.Insert(RawPtr, InsertIdx);
 	}
 
-	void SpvPatcher::OverwriteInstruction(int WordOffset, int OldWordLen, TUniquePtr<SpvInstruction> NewInst)
+	void SpvPatcher::OverwriteInstruction(const SpvInstruction* Inst, TUniquePtr<SpvInstruction> NewInst)
 	{
+		int32 WordOffset = Inst->GetWordOffset().value();
+		int32 OldWordLen = Inst->GetWordLen().value();
 		TArray<uint32> NewBin = NewInst->ToBinary();
-		check(NewBin.Num() == OldWordLen);
-		for (int i = 0; i < NewBin.Num(); i++)
-		{
-			SpvCode[WordOffset + i] = NewBin[i];
-		}
-	}
+		const int32 NewWordLen = NewBin.Num();
+		const int32 WordDelta = NewWordLen - OldWordLen;
 
-	void SpvPatcher::OverwriteWord(int WordOffset, uint32 NewWord)
-	{
-		SpvCode[WordOffset] = NewWord;
+		SpvCode.RemoveAt(WordOffset, OldWordLen);
+		SpvCode.Insert(NewBin, WordOffset);
+
+		NewInst->SetWordOffset(WordOffset);
+		NewInst->SetWordLen(NewWordLen);
+		SpvInstruction* MutableInst = const_cast<SpvInstruction*>(Inst);
+		MutableInst->CopyFrom(*NewInst);
+
+		if (WordDelta != 0)
+		{
+			SpvMetaContext& Context = MetaVisitor->GetContext();
+			SpvSectionKind TargetSection = SpvSectionKind::Num;
+			for (int i = (int)SpvSectionKind::Capability; i < (int)SpvSectionKind::Num; i++)
+			{
+				SpvSectionKind SectionKind = SpvSectionKind(i);
+				const SpvSection& Section = Context.Sections[SectionKind];
+				if (WordOffset >= Section.StartOffset && WordOffset < Section.EndOffset)
+				{
+					TargetSection = SectionKind;
+					break;
+				}
+			}
+			check(TargetSection != SpvSectionKind::Num);
+
+			UpdateSection(TargetSection, WordDelta);
+			UpdateInsts(WordOffset + OldWordLen, WordDelta);
+		}
 	}
 
 	void SpvPatcher::UpdateSection(SpvSectionKind DirtySection, int WordSize)

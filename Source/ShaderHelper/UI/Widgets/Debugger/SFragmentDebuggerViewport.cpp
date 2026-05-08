@@ -25,6 +25,11 @@ namespace SH
 		constexpr float MinDebuggerZoom = 1.0f / 32.0f;
 		constexpr float MaxDebuggerZoom = 128.0f;
 		constexpr float DebuggerWheelZoomBase = 1.2f;
+
+		bool IsDepthTexture(const GpuTexture* Texture)
+		{
+			return Texture && IsDepthFormat(Texture->GetFormat());
+		}
 	}
 
 	void SFragmentDebuggerViewport::Construct(const FArguments& InArgs)
@@ -580,7 +585,7 @@ namespace SH
 						FFloat16 Value;
 						FMemory::Memcpy(&Value, Pixel, sizeof(Value));
 						const float FloatValue = Value.GetFloat();
-						TexDatas[y * Width + x] = { FloatValue, FloatValue, FloatValue, 1.0f };
+						TexDatas[y * Width + x] = { FloatValue, 0, 0, 1.0f };
 					}
 					else if (Format == GpuFormat::R16G16B16A16_FLOAT)
 					{
@@ -592,7 +597,7 @@ namespace SH
 					else if (Format == GpuFormat::R32_FLOAT || Format == GpuFormat::D32_FLOAT)
 					{
 						float Value = *reinterpret_cast<const float*>(Pixel);
-						TexDatas[y * Width + x] = { Value, Value, Value, 1.0f };
+						TexDatas[y * Width + x] = { Value, 0, 0, 1.0f };
 					}
 					else if (Format == GpuFormat::R32G32_FLOAT)
 					{
@@ -643,6 +648,7 @@ namespace SH
 
 		TargetInfo.SelectedOutputIndex = OutputIndex;
 		TargetInfo.Tex = TargetInfo.Outputs[OutputIndex].Tex;
+		DrawOutput(TargetInfo.Outputs[OutputIndex].Tex.GetReference(), DebuggerTextures[OutputIndex].GetReference());
 		ViewPort->SetViewPortRenderTexture(DebuggerTextures[OutputIndex].GetReference());
 		ReadCurrentTargetData();
 		PixelCoord = MouseToPixel(MouseLoc);

@@ -107,6 +107,7 @@ namespace FW
 	{
 		this->Insts = &Insts;
 		Patcher.SetSpvContext(Insts, SpvCode, &Context);
+		RemapSpvDebuggerBindings(Insts, Patcher, Context, *Bindings);
 		PatchExtSet(Patcher, Context, SpvExtSet::GLSLstd450);
 
 		// Pre-scan SpvDebugDeclare to populate VariableDescMap
@@ -199,16 +200,15 @@ namespace FW
 		//Block-splitting insertions (SelectionMerge/BranchConditional) make OpPhi
 		//parent block references stale. Fix them by replacing old labels with the
 		//last continuation label from BlockSplitRemaps.
-		int Offset = Inst->GetWordOffset().value();
-		int Len = Inst->GetWordLen().value();
-		const TArray<uint32>& Spv = Patcher.GetSpv();
-		// OpPhi binary: Header(1) | ResultType(1) | ResultId(1) | [Value(1) Parent(1)]*
-		for (int i = 4; i < Len; i += 2)
+		TArray<TPair<SpvId, SpvId>> NewOperands = Inst->GetOperands();
+		for (TPair<SpvId, SpvId>& Operand : NewOperands)
 		{
-			SpvId ParentId(Spv[Offset + i]);
-			if (SpvId* Remap = BlockSplitRemaps.Find(ParentId))
+			if (SpvId* Remap = BlockSplitRemaps.Find(Operand.Value))
 			{
-				Patcher.OverwriteWord(Offset + i, Remap->GetValue());
+				Operand.Value = *Remap;
+				auto NewInst = MakeUnique<SpvOpPhi>(Inst->GetResultType(), NewOperands);
+				NewInst->SetId(Inst->GetId().value());
+				Patcher.OverwriteInstruction(Inst, MoveTemp(NewInst));
 			}
 		}
 	}

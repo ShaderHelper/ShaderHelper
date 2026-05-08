@@ -1042,6 +1042,7 @@ namespace SH
 			ShaderEditor->Compile();
 		}
 		TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = true;
+		TSingleton<ShProjectManager>::Get().GetProject()->bScenePreview = false;
 		ShEditor->ForceRender();
 		bDebugging = true;
 

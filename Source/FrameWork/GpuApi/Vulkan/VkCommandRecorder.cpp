@@ -604,13 +604,15 @@ namespace FW::VK
 	{
 		VulkanBuffer* SrcBuffer = static_cast<VulkanBuffer*>(InBuffer);
 		VulkanTexture* DstTexture = static_cast<VulkanTexture*>(InTexture);
+		const VkImageAspectFlags AspectMask = IsDepthFormat(InTexture->GetFormat())
+			? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
 
 		VkBufferImageCopy Region{
 			.bufferOffset = 0,
 			.bufferRowLength = 0,
 			.bufferImageHeight = 0,
 			.imageSubresource = {
-				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.aspectMask = AspectMask,
 				.mipLevel = MipLevel,
 				.baseArrayLayer = ArrayLayer,
 				.layerCount = 1
@@ -627,13 +629,15 @@ namespace FW::VK
 	{
 		VulkanTexture* SrcTexture = static_cast<VulkanTexture*>(InTexture);
 		VulkanBuffer* DstBuffer = static_cast<VulkanBuffer*>(InBuffer);
+		const VkImageAspectFlags AspectMask = IsDepthFormat(InTexture->GetFormat())
+			? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
 
 		VkBufferImageCopy Region{
 			.bufferOffset = 0,
 			.bufferRowLength = 0,
 			.bufferImageHeight = 0,
 			.imageSubresource = {
-				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.aspectMask = AspectMask,
 				.mipLevel = 0,
 				.baseArrayLayer = 0,
 				.layerCount = 1

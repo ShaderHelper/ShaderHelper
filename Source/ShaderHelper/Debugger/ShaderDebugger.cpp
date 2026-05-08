@@ -5,6 +5,7 @@
 #include "GpuApi/Spirv/SpirvExprDebugger.h"
 #include "GpuApi/Spirv/SpirvPixelPreviewer.h"
 #include "GpuApi/Spirv/SpirvValidator.h"
+#include "GpuApi/GpuRhi.h"
 #include "Editor/AssetEditor/AssetEditor.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 #include "Renderer/RenderGraph.h"
@@ -81,7 +82,20 @@ namespace SH
 		return ExtraArgs;
 	}
 
-	
+	static FString FindSpvBindingName(const TArray<GpuShaderLayoutBinding>& ShaderLayoutBindings, int32 SetNumber, const BindingSlot& Slot)
+	{
+		const GpuShaderLayoutBinding* Match = nullptr;
+		for (const GpuShaderLayoutBinding& ShaderLayoutBinding : ShaderLayoutBindings)
+		{
+			if (ShaderLayoutBinding.Group == SetNumber && ShaderLayoutBinding.Slot == Slot.SlotNum && ShaderLayoutBinding.Type == Slot.Type)
+			{
+				Match = &ShaderLayoutBinding;
+				break;
+			}
+		}
+		return Match ? Match->Name : FString{};
+	}
+
 	static void DumpDebugStatesToFile(const TArray<SpvDebugState>& InDebugStates, const SpvDebuggerContext* InContext, const FString& File)
 	{
 	   FString Dump;
@@ -1617,6 +1631,7 @@ namespace SH
 		PatchedBindGroupLayouts.Empty();
 		SetupBindGroups.Empty();
 		SetupBindGroupLayouts.Empty();
+		const TArray<GpuShaderLayoutBinding> PsLayoutBindings = PsInvocation.PipelineDesc.Ps->GetLayout();
 
 		auto SetupBinding = [&](const BindingBuilder& Builder)
 			{
@@ -1627,6 +1642,7 @@ namespace SH
 				{
 					const auto& LayoutBindingEntry = LayoutDesc.Layouts[Slot];
 					SpvBindings.Add({
+						.Name = FindSpvBindingName(PsLayoutBindings, SetNumber, Slot),
 						.DescriptorSet = SetNumber,
 						.Binding = Slot.SlotNum,
 						.Type = LayoutBindingEntry.Type,
@@ -1692,7 +1708,7 @@ namespace SH
 		FString PatchedSpvAsm;
 		if (GlobalValidation)
 		{
-			SpvValidator Validator{ *PixelDebuggerContext, bEnableUbsan, ShaderType::Pixel };
+			SpvValidator Validator{ *PixelDebuggerContext, bEnableUbsan, ShaderType::Pixel, &SpvBindings };
 			Parser.Accept(&Validator);
 			PatchedSpv = Validator.GetPatcher().GetSpv();
 			PatchedSpvAsm = Validator.GetPatcher().GetAsm();
