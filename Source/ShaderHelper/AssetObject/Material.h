@@ -9,24 +9,46 @@ namespace SH
 {
 	enum class BuiltInMatrix4x4Value : uint8
 	{
-		None,
-		BuiltInModel,
-		BuiltInView,
-		BuiltInProj,
-		BuiltInViewProj,
-		BuiltInMVP,
+		Model,
+		View,
+		Proj,
+		ViewProj,
+		MVP,
+	};
+
+	enum class BuiltInFloatValue : uint8
+	{
+		Time,
+	};
+
+	enum class BuiltInVector2Value : uint8
+	{
+		ViewportSize,
+		MousePos,
+	};
+
+	enum class BuiltInVector3Value : uint8
+	{
+		CameraPos,
+		CameraDir,
+	};
+
+	enum class MaterialBindingValueSource : uint8
+	{
+		Custom,
+		BuiltIn,
 	};
 
 	enum class BuiltInVertexAttribute : uint8
 	{
-		BuiltInPosition,
-		BuiltInNormal,
-		BuiltInUV0,
-		BuiltInUV1,
-		BuiltInUV2,
-		BuiltInUV3,
-		BuiltInColor,
-		BuiltInTangent,
+		Position,
+		Normal,
+		UV0,
+		UV1,
+		UV2,
+		UV3,
+		Color,
+		Tangent,
 	};
 
 	struct MaterialBindingMemberDefault
@@ -35,19 +57,23 @@ namespace SH
 		FString MemberName;
 		FString Type;
 		FW::BindingShaderStage Stage = FW::BindingShaderStage::All;
-		BuiltInMatrix4x4Value MatrixValue = BuiltInMatrix4x4Value::None;
-		union {
-			float Values[4];
-			int32 IntValues[4];
-			uint32 UintValues[4];
-		};
+		MaterialBindingValueSource ValueSource = MaterialBindingValueSource::Custom;
+		BuiltInMatrix4x4Value MatrixValue = BuiltInMatrix4x4Value::Model;
+		BuiltInFloatValue FloatValue = BuiltInFloatValue::Time;
+		BuiltInVector2Value Vector2Value = BuiltInVector2Value::ViewportSize;
+		BuiltInVector3Value Vector3Value = BuiltInVector3Value::CameraPos;
+		uint32 Values[16];
 
-		MaterialBindingMemberDefault() { FMemory::Memzero(Values); }
+		MaterialBindingMemberDefault()
+		{
+			FMemory::Memzero(Values);
+		}
 
 		friend FArchive& operator<<(FArchive& Ar, MaterialBindingMemberDefault& Default)
 		{
-			Ar << Default.BindingName << Default.MemberName << Default.Type << Default.Stage << Default.MatrixValue;
-			for (int i = 0; i < 4; ++i) Ar << Default.UintValues[i];
+			Ar << Default.BindingName << Default.MemberName << Default.Type << Default.Stage;
+			Ar << Default.ValueSource << Default.MatrixValue << Default.FloatValue << Default.Vector2Value << Default.Vector3Value;
+			for (int i = 0; i < 16; ++i) Ar << Default.Values[i];
 			return Ar;
 		}
 	};
@@ -81,7 +107,7 @@ namespace SH
 		FString SemanticName;
 		uint32 SemanticIndex = 0;
 		FString Type;
-		BuiltInVertexAttribute Attribute = BuiltInVertexAttribute::BuiltInPosition;
+		BuiltInVertexAttribute Attribute = BuiltInVertexAttribute::Position;
 
 		friend FArchive& operator<<(FArchive& Ar, MaterialVertexInputDefault& Default)
 		{

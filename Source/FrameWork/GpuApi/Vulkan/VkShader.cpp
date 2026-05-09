@@ -176,12 +176,12 @@ namespace FW::VK
 				if (SpvResult.hasError)
 				{
 					FString ErrorInfo = static_cast<const char*>(SpvResult.errorWarningMsg.Data());
-					OutErrorInfo = MoveTemp(ErrorInfo);
+					OutErrorInfo = "[SpirvCross]" + MoveTemp(ErrorInfo);
 					return false;
 				}
 				else
 				{
-					OutWarnInfo = static_cast<const char*>(SpvResult.errorWarningMsg.Data());
+					OutWarnInfo = FString("[SpirvCross]") + static_cast<const char*>(SpvResult.errorWarningMsg.Data());
 				}
 
 #if DEBUG_SHADER

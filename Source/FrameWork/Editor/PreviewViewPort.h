@@ -41,6 +41,7 @@ namespace FW
 		
 		void SetAssociatedWidget(TWeakPtr<SWidget> InWidget) { AssociatedWidget = MoveTemp(InWidget); }
 		TWeakPtr<SWidget> GetAssociatedWidget() const { return AssociatedWidget; }
+		Vector2f GetMousePos() const { return MousePos; }
 
 		void SetViewPortRenderTexture(GpuTexture* InGpuTex);
 	//	void UpdateViewPortRenderTexture(GpuTexture* InGpuTex);
@@ -79,6 +80,7 @@ namespace FW
 
 		FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
 		{
+			MousePos = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * MyGeometry.Scale);
 			FReply Reply = FReply::Unhandled();
 			if (MouseDownHandler.IsBound())
 			{
@@ -93,6 +95,7 @@ namespace FW
 
 		FReply OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
 		{
+			MousePos = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * MyGeometry.Scale);
 			FReply Reply = FReply::Unhandled();
 			if (MouseUpHandler.IsBound())
 			{
@@ -107,6 +110,7 @@ namespace FW
 
 		FReply OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
 		{
+			MousePos = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * MyGeometry.Scale);
 			if (MouseMoveHandler.IsBound())
 			{
 				return MouseMoveHandler.Execute(MyGeometry, MouseEvent);
@@ -116,6 +120,7 @@ namespace FW
 
 		FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
 		{
+			MousePos = (Vector2f)(MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition()) * MyGeometry.Scale);
 			if (MouseWheelHandler.IsBound())
 			{
 				return MouseWheelHandler.Execute(MyGeometry, MouseEvent);
@@ -139,6 +144,7 @@ namespace FW
 	protected:
 		TWeakPtr<SWidget> AssociatedWidget;
 		TSharedPtr<FSlateUpdatableTexture> ViewPortRT;
+		Vector2f MousePos = Vector2f(0, 0);
 		int32 SizeX;
 		int32 SizeY;
 		FIntPoint PendingSize{0, 0};

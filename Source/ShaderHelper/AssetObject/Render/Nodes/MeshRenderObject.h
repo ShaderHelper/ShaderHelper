@@ -46,7 +46,7 @@ namespace SH
 		bool EnsureRenderResources(const TArray<FW::GpuFormat>& ColorFormats, FW::GpuFormat DepthFormat, uint32 SampleCount);
 
 		// Update UB members with built-in + default values, apply overrides, then draw every submesh.
-		void Draw(FW::GpuRenderPassRecorder* Recorder, const FW::Camera* InCamera, const FMatrix44f& ModelMatrix);
+		void Draw(FW::GpuRenderPassRecorder* Recorder, const FW::Camera* InCamera, const FMatrix44f& ModelMatrix, const FW::Vector2f& ViewportSize, const FW::Vector2f& MousePos, float Time);
 
 		// Called by property panel: add/remove override entries.
 		void AddOverride(const FString& BindingName, const FString& MemberName, const FString& Type, FW::BindingShaderStage Stage, bool bIsResource);
@@ -79,7 +79,7 @@ namespace SH
 		void OnMaterialChanged();
 		void BuildBindGroupFromMaterial(bool bRebuildLayouts = true, bool bRebuildUniformBuffers = true);
 		bool BuildPipeline(const TArray<FW::GpuFormat>& ColorFormats, FW::GpuFormat DepthFormat, uint32 SampleCount);
-		void UpdateMaterialDrawState(const FMatrix44f& ModelMatrix, const FMatrix44f& ViewMat, const FMatrix44f& ProjMat);
+		void UpdateMaterialDrawState(const FMatrix44f& ModelMatrix, const FMatrix44f& ViewMat, const FMatrix44f& ProjMat, const FW::Vector2f& ViewportSize, const FW::Vector2f& MousePos, float Time, const FW::Vector3f& CameraPos, const FW::Vector3f& CameraDir);
 		TArray<BindingBuilder> BuildDebugBindingBuilders() const;
 		TRefCountPtr<FW::GpuTexture> BuildCoverageMask();
 		FW::GraphPin* FindOverridePin(const FString& BindingName, const FString& MemberName, FW::BindingShaderStage Stage) const;

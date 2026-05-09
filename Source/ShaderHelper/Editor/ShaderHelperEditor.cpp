@@ -31,6 +31,7 @@
 #include <DesktopPlatformModule.h>
 #include <Framework/Notifications/NotificationManager.h>
 #include <Widgets/Notifications/SNotificationList.h>
+#include <Widgets/Input/SHyperlink.h>
 #include <Widgets/Input/SSegmentedControl.h>
 
 STEAL_PRIVATE_MEMBER(FTabManager, TArray<TSharedRef<FTabManager::FArea>>, CollapsedDockAreas)
@@ -1593,7 +1594,7 @@ namespace SH
 				})
 				.OnGetMenuContent_Lambda(MakeDebugItemMenuContent)
 				[
-					SNew(SImage)
+					SNew(SImage).ColorAndOpacity(FStyleColors::Foreground)
 					.Image(FShaderHelperStyle::Get().GetBrush("Icons.Validation"))
 				]
 			)
@@ -1699,6 +1700,89 @@ namespace SH
         return MenuBarBuilder;
 	}
 
+	void ShaderHelperEditor::ShowAboutWindow()
+	{
+		if (AboutWindow.IsValid())
+		{
+			AboutWindow.Pin()->BringToFront();
+			return;
+		}
+
+		auto MakeVersionRow = [](const FText& Name, const FString& Version, const FString& Url) -> TSharedRef<SWidget>
+		{
+			return SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				.VAlign(VAlign_Center)
+				[
+					SNew(SHyperlink)
+					.Text(Name)
+					.OnNavigate_Lambda([Url] {
+						FPlatformProcess::LaunchURL(*Url, nullptr, nullptr);
+					})
+				]
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				.Padding(20.0f, 0.0f, 0.0f, 0.0f)
+				.VAlign(VAlign_Center)
+				[
+					SNew(STextBlock)
+					.Text(FText::FromString(Version))
+				];
+		};
+
+		TSharedRef<SShWindow> NewWindow = SNew(SShWindow)
+			.Title_Lambda([] {
+				return FText::FromString(LOCALIZATION("ShaderHelper").ToString() + TEXT("-") + LOCALIZATION("About").ToString());
+			})
+			.SizingRule(ESizingRule::Autosized)
+			.SupportsMaximize(false)
+			.SupportsMinimize(false);
+
+		AboutWindow = NewWindow;
+		FSlateApplication::Get().AddWindowAsNativeChild(NewWindow, MainWindow.ToSharedRef());
+		NewWindow->SetContent(
+			SNew(SBorder)
+			.Padding(16.0f)
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.0f, 0.0f, 0.0f, 6.0f)
+				[
+					MakeVersionRow(LOCALIZATION("ShaderHelper"), TEXT("0.1"), TEXT("https://github.com/ShaderHelper/ShaderHelper/"))
+				]
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.0f, 0.0f, 0.0f, 6.0f)
+				[
+					MakeVersionRow(FText::FromString(TEXT("DirectXShaderCompiler")), TEXT("1.8.2502"), TEXT("https://github.com/ShaderHelper/DirectXShaderCompiler/"))
+				]
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.0f, 0.0f, 0.0f, 12.0f)
+				[
+					MakeVersionRow(FText::FromString(TEXT("glslang")), TEXT("16.1.0"), TEXT("https://github.com/ShaderHelper/glslang"))
+				]
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.HAlign(HAlign_Right)
+				[
+					SNew(SButton)
+					.Text(LOCALIZATION("Ok"))
+					.OnClicked_Lambda([this]
+					{
+						if (AboutWindow.IsValid())
+						{
+							AboutWindow.Pin()->RequestDestroyWindow();
+						}
+						return FReply::Handled();
+					})
+				]
+			]
+		);
+	}
+
 	void ShaderHelperEditor::FillMenu(FMenuBuilder& MenuBuilder, FString MenuName)
 	{
 		auto InvokeTabLambda = [this](const FName& TabId)
@@ -1716,10 +1800,10 @@ namespace SH
 
 		auto IsLiveTabLambda = [this](const FName& TabId)
 		{
-            if(!TabManager) {
-                return false;
-            }
-            
+			if(!TabManager) {
+				return false;
+			}
+			
 			return TabManager->FindExistingLiveTab(TabId).IsValid();
 		};
 
@@ -1834,12 +1918,16 @@ namespace SH
 		}
 		else if (MenuName == "Help")
 		{
-			MenuBuilder.AddMenuEntry(LOCALIZATION("About"), FText::GetEmpty(), FSlateIcon(),
+			MenuBuilder.AddMenuEntry(LOCALIZATION("Document"), FText::GetEmpty(), FSlateIcon(),
 				FUIAction(
 					FExecuteAction::CreateLambda([this] {
 
 						}
 					)));
+			MenuBuilder.AddMenuEntry(LOCALIZATION("About"), FText::GetEmpty(), FSlateIcon(),
+				FUIAction(
+					FExecuteAction::CreateRaw(this, &ShaderHelperEditor::ShowAboutWindow)
+				));
 		}
 
 

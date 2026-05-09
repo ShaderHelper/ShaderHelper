@@ -116,8 +116,6 @@ namespace FW
 
 	void SGraphPanel::AddLink(SGraphPin* Output, SGraphPin* Input)
 	{
-		Input->PinData->Accept(Output->PinData);
-		Input->PinData->SourcePin = Output->PinData;
 		GraphData->AddLink(Output->PinData, Input->PinData);
 		Links.AddUnique(Output, Input);
 	}
@@ -125,10 +123,7 @@ namespace FW
 	void SGraphPanel::RemoveLink(SGraphPin* Output, SGraphPin* Input)
 	{
 		Links.Remove(Output, Input);
-		Output->Owner->RemoveDep(Input->Owner);
-		Output->Owner->NodeData->OutPinToInPin.Remove(Output->PinData, Input->PinData);
-		Input->PinData->SourcePin.Reset();
-		Input->PinData->Refuse();
+		GraphData->RemoveLink(Output->PinData, Input->PinData);
 	}
 
 	Vector2D SGraphPanel::PanelCoordToGraphCoord(const Vector2D& InCoord) const

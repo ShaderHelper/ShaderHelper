@@ -93,10 +93,11 @@ namespace SH
 		uint32 GetLastSampleCount() const { return LastSampleCount; }
 		FW::GpuViewPortDesc GetLastViewPortDesc() const { return LastViewPortDesc; }
 		TOptional<FW::Camera> GetLastCamera() const { return LastCamera; }
+		FW::Vector2f GetLastMousePos() const { return LastMousePos; }
 
 	public:
 		TArray<MeshPassColorRT> ColorRTs;
-		bool bDepthEnabled = true;
+		bool bDepthEnabled = false;
 		MeshPassDepthFormat DepthFormat = MeshPassDepthFormat::D32_FLOAT;
 		FW::ObserverObjectPtr<CameraSceneObject> CameraRef;
 		FW::Vector2u RTSize = {0, 0}; // 0,0 = auto from viewport
@@ -121,6 +122,7 @@ namespace SH
 		FW::GpuFormat LastDepthFormat = FW::GpuFormat::NUM;
 		uint32 LastSampleCount = 1;
 		FW::GpuViewPortDesc LastViewPortDesc;
+		FW::Vector2f LastMousePos = FW::Vector2f(0, 0);
 		TOptional<FW::Camera> LastCamera;
 
 		TArray<FString> GetPreviewOutputNames() const;

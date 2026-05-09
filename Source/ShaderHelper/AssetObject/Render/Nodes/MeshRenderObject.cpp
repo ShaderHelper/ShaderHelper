@@ -11,11 +11,13 @@
 #include "Renderer/RenderGraph.h"
 #include "RenderResource/Mesh.h"
 #include "RenderResource/Shader/OutlineShader.h"
+#include "ProjectManager/ShProjectManager.h"
 #include "AssetObject/Texture2D.h"
 #include "AssetObject/TextureCube.h"
 #include "AssetObject/Texture3D.h"
 #include "UI/Widgets/Property/PropertyData/PropertyData.h"
 #include "UI/Widgets/Property/PropertyData/PropertyItem.h"
+#include "UI/Widgets/Property/PropertyData/PropertyMatrixItem.h"
 #include "UI/Widgets/Property/PropertyData/PropertyAssetItem.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 
@@ -46,19 +48,19 @@ namespace SH
 		{
 			if (IsShaderMatrix4x4Type(Default.Type))
 			{
-				return MakeBytesFromValue(FMatrix44f::Identity);
+				return MakeBytesFromData(Default.Values, sizeof(FMatrix44f));
 			}
 			if (IsShaderFloatType(Default.Type))
 			{
-				return MakeBytesFromValue(Default.Values[0]);
+				return MakeBytesFromValue(*reinterpret_cast<const float*>(Default.Values));
 			}
 			if (IsShaderIntType(Default.Type) || IsShaderBoolType(Default.Type))
 			{
-				return MakeBytesFromValue(Default.IntValues[0]);
+				return MakeBytesFromValue(*reinterpret_cast<const int32*>(Default.Values));
 			}
 			if (IsShaderUintType(Default.Type))
 			{
-				return MakeBytesFromValue(Default.UintValues[0]);
+				return MakeBytesFromValue(Default.Values[0]);
 			}
 			if (IsShaderVector2Type(Default.Type))
 			{
@@ -74,29 +76,35 @@ namespace SH
 			}
 			if (IsShaderIntVector2Type(Default.Type) || IsShaderBoolVector2Type(Default.Type))
 			{
-				return MakeBytesFromData(Default.IntValues, sizeof(int32) * 2);
+				return MakeBytesFromData(Default.Values, sizeof(int32) * 2);
 			}
 			if (IsShaderIntVector3Type(Default.Type) || IsShaderBoolVector3Type(Default.Type))
 			{
-				return MakeBytesFromData(Default.IntValues, sizeof(int32) * 3);
+				return MakeBytesFromData(Default.Values, sizeof(int32) * 3);
 			}
 			if (IsShaderIntVector4Type(Default.Type) || IsShaderBoolVector4Type(Default.Type))
 			{
-				return MakeBytesFromData(Default.IntValues, sizeof(int32) * 4);
+				return MakeBytesFromData(Default.Values, sizeof(int32) * 4);
 			}
 			if (IsShaderUintVector2Type(Default.Type))
 			{
-				return MakeBytesFromData(Default.UintValues, sizeof(uint32) * 2);
+				return MakeBytesFromData(Default.Values, sizeof(Default.Values[0]) * 2);
 			}
 			if (IsShaderUintVector3Type(Default.Type))
 			{
-				return MakeBytesFromData(Default.UintValues, sizeof(uint32) * 3);
+				return MakeBytesFromData(Default.Values, sizeof(Default.Values[0]) * 3);
 			}
 			if (IsShaderUintVector4Type(Default.Type))
 			{
-				return MakeBytesFromData(Default.UintValues, sizeof(uint32) * 4);
+				return MakeBytesFromData(Default.Values, sizeof(Default.Values[0]) * 4);
 			}
 			return {};
+		}
+
+		Vector3f GetCameraDir(const Camera* InCamera)
+		{
+			const Vector4f Forward = InCamera->GetWorldRotationMatrix().TransformFVector4(FVector4f(0.0f, 0.0f, 1.0f, 0.0f));
+			return FVector3f(Forward.X, Forward.Y, Forward.Z).GetSafeNormal();
 		}
 
 		int32 GetOverrideByteSize(const FString& Type)
@@ -198,16 +206,8 @@ namespace SH
 				return;
 			}
 
-			GraphPin* SourcePin = Pin->GetSourcePin();
-			if (SourcePin)
-			{
-				if (GraphNode* SourceNode = SourcePin->GetOwnerNode())
-				{
-					SourceNode->OutPinToInPin.Remove(SourcePin, Pin);
-				}
-			}
-			Pin->SourcePin.Reset();
-			Pin->Refuse();
+			Graph* OwnerGraph = static_cast<Graph*>(Pin->GetOuterMost());
+			OwnerGraph->RemoveLink(Pin->GetSourcePin(), Pin);
 		}
 
 		TSharedRef<PropertyItemBase> MakeBytesPropertyItem(MeshRenderObject* Owner, FText Label, MaterialOverrideSlot& Slot)
@@ -354,6 +354,10 @@ namespace SH
 		EnsureOverridePins();
 		SyncOverridePinsFromSlots();
 		InvalidateRenderResources();
+		if (auto* OwnerNode = dynamic_cast<MeshPassNode*>(GetOuter()))
+		{
+			OwnerNode->RefreshNodeWidget();
+		}
 	}
 
 	void MeshRenderObject::InvalidateRenderResources()
@@ -876,7 +880,7 @@ namespace SH
 		return Result;
 	}
 
-	void MeshRenderObject::UpdateMaterialDrawState(const FMatrix44f& ModelMatrix, const FMatrix44f& ViewMat, const FMatrix44f& ProjMat)
+	void MeshRenderObject::UpdateMaterialDrawState(const FMatrix44f& ModelMatrix, const FMatrix44f& ViewMat, const FMatrix44f& ProjMat, const Vector2f& ViewportSize, const Vector2f& MousePos, float Time, const Vector3f& CameraPos, const Vector3f& CameraDir)
 	{
 		const bool bHasResourceOverride = OverrideSlots.ContainsByPredicate([](const MaterialOverrideSlot& Slot) {
 			return Slot.bIsResource;
@@ -895,6 +899,11 @@ namespace SH
 		UniformOptions.ProjMatrix = ProjMat;
 		UniformOptions.ViewProjMatrix = ViewProjMat;
 		UniformOptions.MVPMatrix = MVPMat;
+		UniformOptions.ViewportSize = ViewportSize;
+		UniformOptions.MousePos = MousePos;
+		UniformOptions.CameraPos = CameraPos;
+		UniformOptions.CameraDir = CameraDir;
+		UniformOptions.Time = Time;
 		UniformOptions.UniformOverrideBytesResolver = [this](const MaterialBindingMemberDefault& MemberDefault) -> const uint8* {
 			const MaterialOverrideSlot* Override = OverrideSlots.FindByPredicate([&](const MaterialOverrideSlot& Slot) {
 				return !Slot.bIsResource && Slot.BindingName == MemberDefault.BindingName && Slot.MemberName == MemberDefault.MemberName && Slot.Stage == MemberDefault.Stage;
@@ -982,7 +991,12 @@ namespace SH
 		const FMatrix44f ViewMat = Cam.IsSet() ? Cam.GetValue().GetViewMatrix() : FMatrix44f::Identity;
 		const FMatrix44f ProjMat = Cam.IsSet() ? Cam.GetValue().GetProjectionMatrix() : FMatrix44f::Identity;
 		const FMatrix44f WorldMat = MeshSceneObjectRef->GetWorldMatrix();
-		UpdateMaterialDrawState(WorldMat, ViewMat, ProjMat);
+		const Vector2f ViewportSize((float)ReferenceTexture->GetWidth(), (float)ReferenceTexture->GetHeight());
+		const Vector2f MousePos = OwnerNode->GetLastMousePos();
+		const Vector3f CameraPos = Cam.IsSet() ? Cam.GetValue().Position : Vector3f(0, 0, 0);
+		const Vector3f CameraDir = Cam.IsSet() ? GetCameraDir(&Cam.GetValue()) : Vector3f(0, 0, 0);
+		const float Time = TSingleton<ShProjectManager>::Get().GetProject()->TimelineCurTime;
+		UpdateMaterialDrawState(WorldMat, ViewMat, ProjMat, ViewportSize, MousePos, Time, CameraPos, CameraDir);
 
 		TArray<GpuBindGroupLayout*> MaskLayoutArray;
 		for (const auto& [_, L] : BindGroupLayouts) MaskLayoutArray.Add(L.GetReference());
@@ -1232,7 +1246,7 @@ namespace SH
 		return true;
 	}
 
-	void MeshRenderObject::Draw(GpuRenderPassRecorder* Recorder, const Camera* InCamera, const FMatrix44f& ModelMatrix)
+	void MeshRenderObject::Draw(GpuRenderPassRecorder* Recorder, const Camera* InCamera, const FMatrix44f& ModelMatrix, const Vector2f& ViewportSize, const Vector2f& MousePos, float Time)
 	{
 		if (!MeshSceneObjectRef.IsValid())
 		{
@@ -1261,7 +1275,9 @@ namespace SH
 			return;
 		}
 
-		UpdateMaterialDrawState(ModelMatrix, ViewMat, ProjMat);
+		const Vector3f CameraPos = InCamera ? InCamera->Position : Vector3f(0, 0, 0);
+		const Vector3f CameraDir = InCamera ? GetCameraDir(InCamera) : Vector3f(0, 0, 0);
+		UpdateMaterialDrawState(ModelMatrix, ViewMat, ProjMat, ViewportSize, MousePos, Time, CameraPos, CameraDir);
 
 		TArray<GpuBindGroup*> BGArray;
 		for (auto& [_, BG] : BindGroups) BGArray.Add(BG.GetReference());

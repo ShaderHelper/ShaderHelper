@@ -197,6 +197,7 @@ namespace SH
 		}
 
 		// Break links on pins that are being removed.
+		Graph* OwnerGraph = static_cast<Graph*>(GetOuterMost());
 		for (auto& OldP : Pins)
 		{
 			bool Kept = NewPins.ContainsByPredicate([&](const ObjectPtr<GraphPin>& NP) { return NP.Get() == OldP.Get(); });
@@ -208,11 +209,9 @@ namespace SH
 					OutPinToInPin.MultiFind(OldP, Targets);
 					for (auto& Target : Targets)
 					{
-						OutPinToInPin.Remove(OldP, Target);
 						if (Target.IsValid())
 						{
-							Target->SourcePin.Reset();
-							Target->Refuse();
+							OwnerGraph->RemoveLink(OldP.Get(), Target.Get());
 						}
 					}
 				}
@@ -220,13 +219,8 @@ namespace SH
 				{
 					if (GraphPin* SourcePin = OldP->GetSourcePin())
 					{
-						if (GraphNode* SourceNode = SourcePin->GetOwnerNode())
-						{
-							SourceNode->OutPinToInPin.Remove(SourcePin, OldP.Get());
-						}
+						OwnerGraph->RemoveLink(SourcePin, OldP.Get());
 					}
-					OldP->SourcePin.Reset();
-					OldP->Refuse();
 				}
 			}
 		}
@@ -269,19 +263,15 @@ namespace SH
 			ShEditor->ShowProperty(this);
 		}
 		// Break any links from override pins before removal.
+		Graph* OwnerGraph = static_cast<Graph*>(GetOuterMost());
 		for (auto& OP : InObject->OverridePins)
 		{
 			if (OP->SourcePin.IsValid())
 			{
 				if (GraphPin* Src = OP->GetSourcePin())
 				{
-					if (GraphNode* SrcNode = Src->GetOwnerNode())
-					{
-						SrcNode->OutPinToInPin.Remove(Src, OP.Get());
-					}
+					OwnerGraph->RemoveLink(Src, OP.Get());
 				}
-				OP->SourcePin.Reset();
-				OP->Refuse();
 			}
 		}
 		MeshRenderObjects.RemoveAll([InObject](const ObjectPtr<MeshRenderObject>& E) { return E.Get() == InObject; });
@@ -622,11 +612,15 @@ namespace SH
 		LastDepthFormat = DepthFormatKey;
 		LastSampleCount = SampleCount;
 		LastViewPortDesc = GpuViewPortDesc{ (float)Width, (float)Height };
+		LastMousePos = Ctx.MousePos;
 		LastCamera = Cam;
 
 		TArray<ObjectPtr<MeshRenderObject>> MROsCopy = MeshRenderObjects;
+		const Vector2f ViewportSize((float)Width, (float)Height);
+		const Vector2f MousePos = Ctx.MousePos;
+		const float Time = Ctx.Time;
 		auto& RenderPass = Ctx.RG->AddRenderPass(ObjectName.ToString(), PassDesc,
-			[MROsCopy, Cam](GpuRenderPassRecorder* Rec) {
+			[MROsCopy, Cam, ViewportSize, MousePos, Time](GpuRenderPassRecorder* Rec) {
 				const Camera* CameraPtr = Cam.IsSet() ? &Cam.GetValue() : nullptr;
 				for (const auto& MRO : MROsCopy)
 				{
@@ -635,7 +629,7 @@ namespace SH
 					{
 						ModelMat = MRO->MeshSceneObjectRef->GetWorldMatrix();
 					}
-					MRO->Draw(Rec, CameraPtr, ModelMat);
+					MRO->Draw(Rec, CameraPtr, ModelMat, ViewportSize, MousePos, Time);
 				}
 			}
 		);

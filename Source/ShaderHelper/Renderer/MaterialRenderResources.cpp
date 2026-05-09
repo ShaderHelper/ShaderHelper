@@ -169,25 +169,96 @@ namespace SH
 					return;
 				}
 
+				if (MemberDefault.ValueSource == MaterialBindingValueSource::Custom)
+				{
+					InOutUniformBuffer.GetMember<FMatrix44f>(MemberDefault.MemberName) = ReadUniformValue<FMatrix44f>(reinterpret_cast<const uint8*>(MemberDefault.Values));
+					return;
+				}
+
 				switch (MemberDefault.MatrixValue)
 				{
-				case BuiltInMatrix4x4Value::BuiltInModel:
+				case BuiltInMatrix4x4Value::Model:
 					InOutUniformBuffer.GetMember<FMatrix44f>(MemberDefault.MemberName) = Options.ModelMatrix;
 					break;
-				case BuiltInMatrix4x4Value::BuiltInView:
+				case BuiltInMatrix4x4Value::View:
 					InOutUniformBuffer.GetMember<FMatrix44f>(MemberDefault.MemberName) = Options.ViewMatrix;
 					break;
-				case BuiltInMatrix4x4Value::BuiltInProj:
+				case BuiltInMatrix4x4Value::Proj:
 					InOutUniformBuffer.GetMember<FMatrix44f>(MemberDefault.MemberName) = Options.ProjMatrix;
 					break;
-				case BuiltInMatrix4x4Value::BuiltInViewProj:
+				case BuiltInMatrix4x4Value::ViewProj:
 					InOutUniformBuffer.GetMember<FMatrix44f>(MemberDefault.MemberName) = Options.ViewProjMatrix;
 					break;
-				case BuiltInMatrix4x4Value::BuiltInMVP:
+				case BuiltInMatrix4x4Value::MVP:
 					InOutUniformBuffer.GetMember<FMatrix44f>(MemberDefault.MemberName) = Options.MVPMatrix;
 					break;
-				default:
-					break;
+				}
+				return;
+			}
+
+			if (IsShaderFloatType(MemberDefault.Type))
+			{
+				if (SourceBytes)
+				{
+					InOutUniformBuffer.GetMember<float>(MemberDefault.MemberName) = ReadUniformValue<float>(SourceBytes);
+				}
+				else if (MemberDefault.ValueSource == MaterialBindingValueSource::BuiltIn)
+				{
+					InOutUniformBuffer.GetMember<float>(MemberDefault.MemberName) = Options.Time;
+				}
+				else
+				{
+					InOutUniformBuffer.GetMember<float>(MemberDefault.MemberName) = ReadUniformValue<float>(reinterpret_cast<const uint8*>(MemberDefault.Values));
+				}
+				return;
+			}
+
+			if (IsShaderVector2Type(MemberDefault.Type))
+			{
+				if (SourceBytes)
+				{
+					InOutUniformBuffer.GetMember<Vector2f>(MemberDefault.MemberName) = ReadUniformValue<Vector2f>(SourceBytes);
+				}
+				else if (MemberDefault.ValueSource == MaterialBindingValueSource::BuiltIn)
+				{
+					switch (MemberDefault.Vector2Value)
+					{
+					case BuiltInVector2Value::ViewportSize:
+						InOutUniformBuffer.GetMember<Vector2f>(MemberDefault.MemberName) = Options.ViewportSize;
+						break;
+					case BuiltInVector2Value::MousePos:
+						InOutUniformBuffer.GetMember<Vector2f>(MemberDefault.MemberName) = Options.MousePos;
+						break;
+					}
+				}
+				else
+				{
+					InOutUniformBuffer.GetMember<Vector2f>(MemberDefault.MemberName) = ReadUniformValue<Vector2f>(reinterpret_cast<const uint8*>(MemberDefault.Values));
+				}
+				return;
+			}
+
+			if (IsShaderVector3Type(MemberDefault.Type))
+			{
+				if (SourceBytes)
+				{
+					InOutUniformBuffer.GetMember<Vector3f>(MemberDefault.MemberName) = ReadUniformValue<Vector3f>(SourceBytes);
+				}
+				else if (MemberDefault.ValueSource == MaterialBindingValueSource::BuiltIn)
+				{
+					switch (MemberDefault.Vector3Value)
+					{
+					case BuiltInVector3Value::CameraPos:
+						InOutUniformBuffer.GetMember<Vector3f>(MemberDefault.MemberName) = Options.CameraPos;
+						break;
+					case BuiltInVector3Value::CameraDir:
+						InOutUniformBuffer.GetMember<Vector3f>(MemberDefault.MemberName) = Options.CameraDir;
+						break;
+					}
+				}
+				else
+				{
+					InOutUniformBuffer.GetMember<Vector3f>(MemberDefault.MemberName) = ReadUniformValue<Vector3f>(reinterpret_cast<const uint8*>(MemberDefault.Values));
 				}
 				return;
 			}
@@ -197,16 +268,10 @@ namespace SH
 				SourceBytes = reinterpret_cast<const uint8*>(MemberDefault.Values);
 			}
 
-			if (IsShaderFloatType(MemberDefault.Type))
-				InOutUniformBuffer.GetMember<float>(MemberDefault.MemberName) = ReadUniformValue<float>(SourceBytes);
-			else if (IsShaderIntType(MemberDefault.Type) || IsShaderBoolType(MemberDefault.Type))
+			if (IsShaderIntType(MemberDefault.Type) || IsShaderBoolType(MemberDefault.Type))
 				InOutUniformBuffer.GetMember<int32>(MemberDefault.MemberName) = ReadUniformValue<int32>(SourceBytes);
 			else if (IsShaderUintType(MemberDefault.Type))
 				InOutUniformBuffer.GetMember<uint32>(MemberDefault.MemberName) = ReadUniformValue<uint32>(SourceBytes);
-			else if (IsShaderVector2Type(MemberDefault.Type))
-				InOutUniformBuffer.GetMember<Vector2f>(MemberDefault.MemberName) = ReadUniformValue<Vector2f>(SourceBytes);
-			else if (IsShaderVector3Type(MemberDefault.Type))
-				InOutUniformBuffer.GetMember<Vector3f>(MemberDefault.MemberName) = ReadUniformValue<Vector3f>(SourceBytes);
 			else if (IsShaderVector4Type(MemberDefault.Type))
 				InOutUniformBuffer.GetMember<Vector4f>(MemberDefault.MemberName) = ReadUniformValue<Vector4f>(SourceBytes);
 			else if (IsShaderIntVector2Type(MemberDefault.Type) || IsShaderBoolVector2Type(MemberDefault.Type))
@@ -237,35 +302,35 @@ namespace SH
 
 			switch (InputDefault.Attribute)
 			{
-			case BuiltInVertexAttribute::BuiltInPosition:
+			case BuiltInVertexAttribute::Position:
 				AttributeDesc.ByteOffset = offsetof(MeshVertex, Position);
 				AttributeDesc.Format = GpuFormat::R32G32B32_FLOAT;
 				break;
-			case BuiltInVertexAttribute::BuiltInNormal:
+			case BuiltInVertexAttribute::Normal:
 				AttributeDesc.ByteOffset = offsetof(MeshVertex, Normal);
 				AttributeDesc.Format = GpuFormat::R32G32B32_FLOAT;
 				break;
-			case BuiltInVertexAttribute::BuiltInUV0:
+			case BuiltInVertexAttribute::UV0:
 				AttributeDesc.ByteOffset = offsetof(MeshVertex, UVs[0]);
 				AttributeDesc.Format = GpuFormat::R32G32_FLOAT;
 				break;
-			case BuiltInVertexAttribute::BuiltInUV1:
+			case BuiltInVertexAttribute::UV1:
 				AttributeDesc.ByteOffset = offsetof(MeshVertex, UVs[1]);
 				AttributeDesc.Format = GpuFormat::R32G32_FLOAT;
 				break;
-			case BuiltInVertexAttribute::BuiltInUV2:
+			case BuiltInVertexAttribute::UV2:
 				AttributeDesc.ByteOffset = offsetof(MeshVertex, UVs[2]);
 				AttributeDesc.Format = GpuFormat::R32G32_FLOAT;
 				break;
-			case BuiltInVertexAttribute::BuiltInUV3:
+			case BuiltInVertexAttribute::UV3:
 				AttributeDesc.ByteOffset = offsetof(MeshVertex, UVs[3]);
 				AttributeDesc.Format = GpuFormat::R32G32_FLOAT;
 				break;
-			case BuiltInVertexAttribute::BuiltInColor:
+			case BuiltInVertexAttribute::Color:
 				AttributeDesc.ByteOffset = offsetof(MeshVertex, Color);
 				AttributeDesc.Format = GpuFormat::R32G32B32A32_FLOAT;
 				break;
-			case BuiltInVertexAttribute::BuiltInTangent:
+			case BuiltInVertexAttribute::Tangent:
 				AttributeDesc.ByteOffset = offsetof(MeshVertex, Tangent);
 				AttributeDesc.Format = GpuFormat::R32G32B32A32_FLOAT;
 				break;

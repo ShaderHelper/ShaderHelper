@@ -6,6 +6,7 @@
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "UI/Widgets/Property/PropertyData/PropertyData.h"
 #include "UI/Widgets/Property/PropertyData/PropertyItem.h"
+#include "UI/Widgets/Property/PropertyData/PropertyMatrixItem.h"
 #include "UI/Widgets/Property/PropertyData/PropertyAssetItem.h"
 #include "GpuApi/GpuSampler.h"
 
@@ -168,8 +169,15 @@ namespace SH
 				if (Old.BindingName == NewDefault.BindingName ||
 					(bSplit && (Left == NewDefault.BindingName || Right == NewDefault.BindingName)))
 				{
-					NewDefault.MatrixValue = Old.MatrixValue;
-					FMemory::Memcpy(NewDefault.Values, Old.Values, sizeof(NewDefault.Values));
+					if (Old.Type == NewDefault.Type)
+					{
+						NewDefault.ValueSource = Old.ValueSource;
+						NewDefault.MatrixValue = Old.MatrixValue;
+						NewDefault.FloatValue = Old.FloatValue;
+						NewDefault.Vector2Value = Old.Vector2Value;
+						NewDefault.Vector3Value = Old.Vector3Value;
+						FMemory::Memcpy(NewDefault.Values, Old.Values, sizeof(NewDefault.Values));
+					}
 					break;
 				}
 			}
@@ -493,6 +501,128 @@ namespace SH
 
 		// UB member defaults - group by (BindingName, Stage)
 		TMap<FString, TSharedRef<PropertyCategory>> UbCategories;
+		auto FindMemberDefault = [this](const FString& BindingName, const FString& MemberName, BindingShaderStage Stage) -> MaterialBindingMemberDefault* {
+			for (auto& D : BindingMemberDefaults)
+			{
+				if (D.BindingName == BindingName && D.MemberName == MemberName && D.Stage == Stage)
+				{
+					return &D;
+				}
+			}
+			return nullptr;
+		};
+		auto AddValueSourceSwitchMenu = [&](const TSharedRef<PropertyItemBase>& Item, const MaterialBindingMemberDefault& Default, bool bShowCustomEntry, bool bShowBuiltInEntry) {
+			FString BindingName = Default.BindingName;
+			FString MemberName = Default.MemberName;
+			BindingShaderStage Stage = Default.Stage;
+			PropertyData* EditProperty = &Item.Get();
+			Item->SetContextMenuExtender([this, BindingName, MemberName, Stage, EditProperty, FindMemberDefault, bShowCustomEntry, bShowBuiltInEntry](FMenuBuilder& MenuBuilder) {
+				auto AddSourceEntry = [&](const FText& Label, MaterialBindingValueSource Source) {
+					MenuBuilder.AddMenuEntry(
+						Label,
+						FText::GetEmpty(),
+						FSlateIcon(),
+						FUIAction(
+							FExecuteAction::CreateLambda([this, BindingName, MemberName, Stage, Source, EditProperty, FindMemberDefault] {
+								if (MaterialBindingMemberDefault* D = FindMemberDefault(BindingName, MemberName, Stage))
+								{
+									if (D->ValueSource != Source)
+									{
+										EditProperty->BeginEdit();
+										D->ValueSource = Source;
+										PostPropertyChanged(EditProperty);
+										EditProperty->EndEdit();
+										static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+									}
+								}
+							}),
+							FCanExecuteAction(),
+							FIsActionChecked::CreateLambda([BindingName, MemberName, Stage, Source, FindMemberDefault] {
+								if (MaterialBindingMemberDefault* D = FindMemberDefault(BindingName, MemberName, Stage))
+								{
+									return D->ValueSource == Source;
+								}
+								return false;
+							})
+						),
+						NAME_None,
+						EUserInterfaceActionType::ToggleButton
+					);
+				};
+				if (bShowCustomEntry)
+				{
+					AddSourceEntry(LOCALIZATION("Custom"), MaterialBindingValueSource::Custom);
+				}
+				if (bShowBuiltInEntry)
+				{
+					AddSourceEntry(LOCALIZATION("Builtin"), MaterialBindingValueSource::BuiltIn);
+				}
+			});
+		};
+		auto MakeBuiltInMatrixItem = [&](const FText& ItemLabel, MaterialBindingMemberDefault& Default) -> TSharedRef<PropertyItemBase> {
+			FString BindingName = Default.BindingName;
+			FString MemberName = Default.MemberName;
+			BindingShaderStage Stage = Default.Stage;
+			auto EnumItem = MakePropertyEnumItem<BuiltInMatrix4x4Value>(
+				this, ItemLabel, Default.MatrixValue,
+				[this, BindingName, MemberName, Stage, FindMemberDefault](BuiltInMatrix4x4Value NewValue) {
+					if (MaterialBindingMemberDefault* D = FindMemberDefault(BindingName, MemberName, Stage))
+					{
+						D->MatrixValue = NewValue;
+					}
+				}
+			);
+			AddValueSourceSwitchMenu(EnumItem, Default, true, true);
+			return EnumItem;
+		};
+		auto MakeBuiltInFloatItem = [&](const FText& ItemLabel, MaterialBindingMemberDefault& Default) -> TSharedRef<PropertyItemBase> {
+			FString BindingName = Default.BindingName;
+			FString MemberName = Default.MemberName;
+			BindingShaderStage Stage = Default.Stage;
+			auto EnumItem = MakePropertyEnumItem<BuiltInFloatValue>(
+				this, ItemLabel, Default.FloatValue,
+				[this, BindingName, MemberName, Stage, FindMemberDefault](BuiltInFloatValue NewValue) {
+					if (MaterialBindingMemberDefault* D = FindMemberDefault(BindingName, MemberName, Stage))
+					{
+						D->FloatValue = NewValue;
+					}
+				}
+			);
+			AddValueSourceSwitchMenu(EnumItem, Default, true, true);
+			return EnumItem;
+		};
+		auto MakeBuiltInVector2Item = [&](const FText& ItemLabel, MaterialBindingMemberDefault& Default) -> TSharedRef<PropertyItemBase> {
+			FString BindingName = Default.BindingName;
+			FString MemberName = Default.MemberName;
+			BindingShaderStage Stage = Default.Stage;
+			auto EnumItem = MakePropertyEnumItem<BuiltInVector2Value>(
+				this, ItemLabel, Default.Vector2Value,
+				[this, BindingName, MemberName, Stage, FindMemberDefault](BuiltInVector2Value NewValue) {
+					if (MaterialBindingMemberDefault* D = FindMemberDefault(BindingName, MemberName, Stage))
+					{
+						D->Vector2Value = NewValue;
+					}
+				}
+			);
+			AddValueSourceSwitchMenu(EnumItem, Default, true, true);
+			return EnumItem;
+		};
+		auto MakeBuiltInVector3Item = [&](const FText& ItemLabel, MaterialBindingMemberDefault& Default) -> TSharedRef<PropertyItemBase> {
+			FString BindingName = Default.BindingName;
+			FString MemberName = Default.MemberName;
+			BindingShaderStage Stage = Default.Stage;
+			auto EnumItem = MakePropertyEnumItem<BuiltInVector3Value>(
+				this, ItemLabel, Default.Vector3Value,
+				[this, BindingName, MemberName, Stage, FindMemberDefault](BuiltInVector3Value NewValue) {
+					if (MaterialBindingMemberDefault* D = FindMemberDefault(BindingName, MemberName, Stage))
+					{
+						D->Vector3Value = NewValue;
+					}
+				}
+			);
+			AddValueSourceSwitchMenu(EnumItem, Default, true, true);
+			return EnumItem;
+		};
 		for (auto& Default : BindingMemberDefaults)
 		{
 			FString CatKey = Default.BindingName;
@@ -512,55 +642,73 @@ namespace SH
 
 			if (IsShaderMatrix4x4Type(Default.Type))
 			{
-				FString BindingName = Default.BindingName;
-				FString MemberName = Default.MemberName;
-				auto EnumItem = MakePropertyEnumItem<BuiltInMatrix4x4Value>(
-					this, ItemLabel, Default.MatrixValue,
-					[this, BindingName, MemberName](BuiltInMatrix4x4Value NewValue) {
-						for (auto& D : BindingMemberDefaults)
-						{
-							if (D.BindingName == BindingName && D.MemberName == MemberName)
-							{
-								D.MatrixValue = NewValue;
-								break;
-							}
-						}
-					}
-				);
-				UbCategory->AddChild(EnumItem);
+				if (Default.ValueSource == MaterialBindingValueSource::BuiltIn)
+				{
+					UbCategory->AddChild(MakeBuiltInMatrixItem(ItemLabel, Default));
+				}
+				else
+				{
+					auto Item = MakeShared<PropertyMatrix4x4fItem>(this, ItemLabel, reinterpret_cast<float*>(Default.Values));
+					AddValueSourceSwitchMenu(Item, Default, true, true);
+					UbCategory->AddChild(Item);
+				}
 			}
 			else if (IsShaderFloatType(Default.Type))
 			{
-				auto Item = MakeShared<PropertyScalarItem<float>>(this, ItemLabel, &Default.Values[0]);
-				UbCategory->AddChild(Item);
+				if (Default.ValueSource == MaterialBindingValueSource::BuiltIn)
+				{
+					UbCategory->AddChild(MakeBuiltInFloatItem(ItemLabel, Default));
+				}
+				else
+				{
+					auto Item = MakeShared<PropertyScalarItem<float>>(this, ItemLabel, reinterpret_cast<float*>(Default.Values));
+					AddValueSourceSwitchMenu(Item, Default, true, true);
+					UbCategory->AddChild(Item);
+				}
 			}
 			else if (IsShaderIntType(Default.Type))
 			{
-				auto Item = MakeShared<PropertyScalarItem<int32>>(this, ItemLabel, &Default.IntValues[0]);
+				auto Item = MakeShared<PropertyScalarItem<int32>>(this, ItemLabel, reinterpret_cast<int32*>(Default.Values));
 				UbCategory->AddChild(Item);
 			}
 			else if (IsShaderUintType(Default.Type))
 			{
-				auto Item = MakeShared<PropertyScalarItem<int32>>(this, ItemLabel, reinterpret_cast<int32*>(&Default.UintValues[0]));
+				auto Item = MakeShared<PropertyScalarItem<int32>>(this, ItemLabel, reinterpret_cast<int32*>(&Default.Values[0]));
 				Item->SetMinValue(0);
 				UbCategory->AddChild(Item);
 			}
 			else if (IsShaderBoolType(Default.Type))
 			{
-				auto Item = MakeShared<PropertyScalarItem<int32>>(this, ItemLabel, &Default.IntValues[0]);
+				auto Item = MakeShared<PropertyScalarItem<int32>>(this, ItemLabel, reinterpret_cast<int32*>(Default.Values));
 				Item->SetMinValue(0);
 				Item->SetMaxValue(1);
 				UbCategory->AddChild(Item);
 			}
 			else if (IsShaderVector2Type(Default.Type))
 			{
-				auto Item = MakeShared<PropertyVector2fItem>(this, ItemLabel, reinterpret_cast<Vector2f*>(Default.Values));
-				UbCategory->AddChild(Item);
+				if (Default.ValueSource == MaterialBindingValueSource::BuiltIn)
+				{
+					UbCategory->AddChild(MakeBuiltInVector2Item(ItemLabel, Default));
+				}
+				else
+				{
+					auto Item = MakeShared<PropertyVector2fItem>(this, ItemLabel, reinterpret_cast<Vector2f*>(Default.Values));
+					AddValueSourceSwitchMenu(Item, Default, true, true);
+					UbCategory->AddChild(Item);
+				}
 			}
 			else if (IsShaderVector3Type(Default.Type))
 			{
-				auto Item = MakeShared<PropertyVector3fItem>(this, ItemLabel, reinterpret_cast<Vector3f*>(Default.Values));
-				UbCategory->AddChild(Item);
+				if (Default.ValueSource == MaterialBindingValueSource::BuiltIn)
+				{
+					UbCategory->AddChild(MakeBuiltInVector3Item(ItemLabel, Default));
+				}
+				else
+				{
+					auto Item = MakeShared<PropertyVector3fItem>(this, ItemLabel, reinterpret_cast<Vector3f*>(Default.Values));
+					AddValueSourceSwitchMenu(Item, Default, false, true);
+					UbCategory->AddChild(Item);
+				}
 			}
 			else if (IsShaderVector4Type(Default.Type))
 			{
@@ -569,32 +717,32 @@ namespace SH
 			}
 			else if (IsShaderIntVector2Type(Default.Type) || IsShaderBoolVector2Type(Default.Type))
 			{
-				auto Item = MakeShared<PropertyVector2iItem>(this, ItemLabel, Default.IntValues);
+				auto Item = MakeShared<PropertyVector2iItem>(this, ItemLabel, reinterpret_cast<int32*>(Default.Values));
 				UbCategory->AddChild(Item);
 			}
 			else if (IsShaderIntVector3Type(Default.Type) || IsShaderBoolVector3Type(Default.Type))
 			{
-				auto Item = MakeShared<PropertyVector3iItem>(this, ItemLabel, Default.IntValues);
+				auto Item = MakeShared<PropertyVector3iItem>(this, ItemLabel, reinterpret_cast<int32*>(Default.Values));
 				UbCategory->AddChild(Item);
 			}
 			else if (IsShaderIntVector4Type(Default.Type) || IsShaderBoolVector4Type(Default.Type))
 			{
-				auto Item = MakeShared<PropertyVector4iItem>(this, ItemLabel, Default.IntValues);
+				auto Item = MakeShared<PropertyVector4iItem>(this, ItemLabel, reinterpret_cast<int32*>(Default.Values));
 				UbCategory->AddChild(Item);
 			}
 			else if (IsShaderUintVector2Type(Default.Type))
 			{
-				auto Item = MakeShared<PropertyVector2iItem>(this, ItemLabel, reinterpret_cast<int32*>(Default.UintValues));
+				auto Item = MakeShared<PropertyVector2iItem>(this, ItemLabel, reinterpret_cast<int32*>(Default.Values));
 				UbCategory->AddChild(Item);
 			}
 			else if (IsShaderUintVector3Type(Default.Type))
 			{
-				auto Item = MakeShared<PropertyVector3iItem>(this, ItemLabel, reinterpret_cast<int32*>(Default.UintValues));
+				auto Item = MakeShared<PropertyVector3iItem>(this, ItemLabel, reinterpret_cast<int32*>(Default.Values));
 				UbCategory->AddChild(Item);
 			}
 			else if (IsShaderUintVector4Type(Default.Type))
 			{
-				auto Item = MakeShared<PropertyVector4iItem>(this, ItemLabel, reinterpret_cast<int32*>(Default.UintValues));
+				auto Item = MakeShared<PropertyVector4iItem>(this, ItemLabel, reinterpret_cast<int32*>(Default.Values));
 				UbCategory->AddChild(Item);
 			}
 		}

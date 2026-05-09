@@ -43,6 +43,11 @@ namespace SH
 		FMatrix44f ProjMatrix = FMatrix44f::Identity;
 		FMatrix44f ViewProjMatrix = FMatrix44f::Identity;
 		FMatrix44f MVPMatrix = FMatrix44f::Identity;
+		FW::Vector2f ViewportSize = FW::Vector2f(0, 0);
+		FW::Vector2f MousePos = FW::Vector2f(0, 0);
+		FW::Vector3f CameraPos = FW::Vector3f(0, 0, 0);
+		FW::Vector3f CameraDir = FW::Vector3f(0, 0, 1);
+		float Time = 0.0f;
 		MaterialUniformOverrideBytesResolver UniformOverrideBytesResolver;
 	};
 

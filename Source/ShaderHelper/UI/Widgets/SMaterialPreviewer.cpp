@@ -1,6 +1,8 @@
 #include "CommonHeader.h"
 #include "SMaterialPreviewer.h"
+#include "App/App.h"
 #include "Renderer/MaterialPreviewRenderer.h"
+#include "Renderer/ShRenderer.h"
 
 namespace SH
 {
@@ -8,9 +10,10 @@ namespace SH
 
 	SMaterialPreviewer::~SMaterialPreviewer()
 	{
+		static_cast<ShRenderer*>(GApp->GetRenderer())->UnRegisterRenderComp(this);
+
 		if (Preview.IsValid())
 		{
-			Preview->ResizeHandler.Remove(ResizeHandlerHandle);
 			Preview->MouseDownHandler.Unbind();
 			Preview->MouseUpHandler.Unbind();
 			Preview->MouseMoveHandler.Unbind();
@@ -69,7 +72,6 @@ namespace SH
 								}
 
 								PreviewPrimitive = *InItem;
-								Render();
 							}
 						})
 						.OnGenerateWidget_Lambda([this](TSharedPtr<MaterialPreviewPrimitive> InItem) {
@@ -115,10 +117,6 @@ namespace SH
 			]
 		];
 
-		ResizeHandlerHandle = Preview->ResizeHandler.AddLambda([this](const Vector2f&) {
-			Render();
-		});
-
 		Preview->MouseDownHandler.BindLambda([this](const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) {
 			if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
 			{
@@ -148,14 +146,12 @@ namespace SH
 			LastMousePos = CurrentMousePos;
 			OrbitYaw += MouseDelta.x * 0.01f;
 			OrbitPitch = FMath::Clamp(OrbitPitch - MouseDelta.y * 0.01f, -1.4f, 1.4f);
-			Render();
 			return FReply::Handled();
 		});
 
 		Preview->MouseWheelHandler.BindLambda([this](const FGeometry&, const FPointerEvent& MouseEvent) {
 			const float ZoomFactor = FMath::Pow(0.9f, MouseEvent.GetWheelDelta());
 			CameraDistance = FMath::Clamp(CameraDistance * ZoomFactor, 1.0f, 10.0f);
-			Render();
 			return FReply::Handled();
 		});
 
@@ -163,11 +159,10 @@ namespace SH
 		{
 			MaterialChangedHandle = MaterialAsset->OnMaterialChanged.AddLambda([this] {
 				Renderer->ResetRenderContext();
-				Render();
 			});
 		}
 
-		Render();
+		static_cast<ShRenderer*>(GApp->GetRenderer())->RegisterRenderComp(this);
 	}
 
 	FReply SMaterialPreviewer::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
@@ -177,6 +172,11 @@ namespace SH
 			return MouseButtonDownHandler.Execute(MyGeometry, MouseEvent);
 		}
 		return FReply::Handled();
+	}
+
+	void SMaterialPreviewer::RenderInternal()
+	{
+		Render();
 	}
 
 	void SMaterialPreviewer::OpenMaterialPreviewer(AssetPtr<Material> InMaterial, const FPointerEventHandler& InOnMouseButtonDown, TSharedPtr<SWindow> InParentWindow)

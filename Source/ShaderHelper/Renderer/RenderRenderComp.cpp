@@ -34,6 +34,9 @@ namespace SH
 			{
 				return;
 			}
+			Context.ViewportSize = Vector2f((float)ViewSize.X, (float)ViewSize.Y);
+			Context.MousePos = Context.ViewPort->GetMousePos();
+			Context.Time = TSingleton<ShProjectManager>::Get().GetProject()->TimelineCurTime;
 
 			RenderGraph Graph;
 			Context.RG = &Graph;

@@ -431,11 +431,25 @@ namespace SH
 
 			if (CenterX >= MinX && CenterX <= MaxX)
 			{
-				FSlateDrawElement::MakeLines(OutDrawElements, CrossLayer, PaintGeometry, { FVector2D(CenterX, MinY), FVector2D(CenterX, MaxY) }, ESlateDrawEffect::None, CrossColor, false, 1.0f);
+				if (Top > MinY)
+				{
+					FSlateDrawElement::MakeLines(OutDrawElements, CrossLayer, PaintGeometry, { FVector2D(CenterX, MinY), FVector2D(CenterX, Top) }, ESlateDrawEffect::None, CrossColor, false, 1.0f);
+				}
+				if (Bottom < MaxY)
+				{
+					FSlateDrawElement::MakeLines(OutDrawElements, CrossLayer, PaintGeometry, { FVector2D(CenterX, Bottom), FVector2D(CenterX, MaxY) }, ESlateDrawEffect::None, CrossColor, false, 1.0f);
+				}
 			}
 			if (CenterY >= MinY && CenterY <= MaxY)
 			{
-				FSlateDrawElement::MakeLines(OutDrawElements, CrossLayer, PaintGeometry, { FVector2D(MinX, CenterY), FVector2D(MaxX, CenterY) }, ESlateDrawEffect::None, CrossColor, false, 1.0f);
+				if (Left > MinX)
+				{
+					FSlateDrawElement::MakeLines(OutDrawElements, CrossLayer, PaintGeometry, { FVector2D(MinX, CenterY), FVector2D(Left, CenterY) }, ESlateDrawEffect::None, CrossColor, false, 1.0f);
+				}
+				if (Right < MaxX)
+				{
+					FSlateDrawElement::MakeLines(OutDrawElements, CrossLayer, PaintGeometry, { FVector2D(Right, CenterY), FVector2D(MaxX, CenterY) }, ESlateDrawEffect::None, CrossColor, false, 1.0f);
+				}
 			}
 
 			const double BorderMinX = FMath::Max(Left, MinX);

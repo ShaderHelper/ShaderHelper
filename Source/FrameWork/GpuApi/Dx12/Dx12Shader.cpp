@@ -466,7 +466,7 @@ namespace FW
 			 }
 			 catch (const std::runtime_error& e)
 			 {
-				 OutErrorInfo =  ANSI_TO_TCHAR(e.what());
+				 OutErrorInfo = FString("[SpirvCross]") + ANSI_TO_TCHAR(e.what());
 				 return false;
 			 }
 		 }
@@ -568,7 +568,6 @@ namespace FW
 				CompileResult->GetStatus(&ResultStatus);
 				if(FAILED(ResultStatus))
 				{
-					//SH_LOG(LogShader, Error, TEXT("Compilation failed: %s"), *DiagnosticInfo);
 					OutErrorInfo = MoveTemp(DiagnosticInfo);
 					IsCompilationSucceeded = false;
 				}

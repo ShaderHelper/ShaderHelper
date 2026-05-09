@@ -144,6 +144,7 @@ namespace SH
 		void CreateInternalWidgets();
 		void CreateBuiltinAssets();
 		void FillMenu(FMenuBuilder& MenuBuilder, FString MenuName);
+		void ShowAboutWindow();
 		void NormalizeCurrentDebugItem();
 
 		enum class EActiveUndoContext { None, Graph, Code, Scene };
@@ -170,6 +171,7 @@ namespace SH
         
 		TSharedPtr<FW::SShWindow> MainWindow;
 		TWeakPtr<FW::SShWindow> PreferenceWindow;
+		TWeakPtr<FW::SShWindow> AboutWindow;
 		TSharedPtr<SPreferenceView> PreferenceView;
 		TSharedPtr<SShViewport> ViewportWidget;
 		TSharedPtr<FW::PreviewViewPort> ViewPort;

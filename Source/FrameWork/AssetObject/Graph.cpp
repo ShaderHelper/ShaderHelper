@@ -23,6 +23,30 @@ namespace FW
 
 	TMap<FString, TArray<MetaType*>> RegisteredNodes;
 
+	void Graph::AddLink(GraphPin* OutputPin, GraphPin* InputPin)
+	{
+		check(OutputPin && InputPin);
+		GraphNode* OutputNode = OutputPin->GetOwnerNode();
+		GraphNode* InputNode = InputPin->GetOwnerNode();
+		check(OutputNode && InputNode);
+		InputPin->Accept(OutputPin);
+		InputPin->SourcePin = OutputPin;
+		OutputNode->OutPinToInPin.AddUnique(OutputPin, InputPin);
+		AddDep(InputNode, OutputNode);
+	}
+
+	void Graph::RemoveLink(GraphPin* OutputPin, GraphPin* InputPin)
+	{
+		check(OutputPin && InputPin);
+		GraphNode* OutputNode = OutputPin->GetOwnerNode();
+		GraphNode* InputNode = InputPin->GetOwnerNode();
+		check(OutputNode && InputNode);
+		OutputNode->OutPinToInPin.Remove(OutputPin, InputPin);
+		InputPin->SourcePin.Reset();
+		InputPin->Refuse();
+		RemoveDep(InputNode, OutputNode);
+	}
+
 	void Graph::Serialize(FArchive& Ar)
 	{
 		AssetObject::Serialize(Ar);

@@ -834,15 +834,9 @@ namespace SH
 			{
 				if (GraphPin* SrcPin = OldPin->GetSourcePin())
 				{
-					if (GraphNode* SrcNode = SrcPin->GetOwnerNode())
-					{
-						SrcNode->OutPinToInPin.Remove(SrcPin, OldPin);
-						Graph* OwnerGraph = static_cast<Graph*>(GetOuter());
-						OwnerGraph->RemoveDep(this, SrcNode);
-					}
+					Graph* OwnerGraph = static_cast<Graph*>(GetOuterMost());
+					OwnerGraph->RemoveLink(SrcPin, OldPin);
 				}
-				OldPin->SourcePin.Reset();
-				OldPin->Refuse();
 			}
 
 			// Create new pin of the correct type

@@ -7,6 +7,7 @@
 #include "RenderResource/Camera.h"
 #include "RenderResource/UniformBuffer.h"
 #include "Common/Util/Math.h"
+#include "ProjectManager/ShProjectManager.h"
 
 #include <stdexcept>
 
@@ -429,6 +430,12 @@ namespace SH
 		Options.ProjMatrix = ProjMatrix;
 		Options.ViewProjMatrix = ViewProjMatrix;
 		Options.MVPMatrix = MVPMatrix;
+		Options.ViewportSize = Vector2f((float)InWidth, (float)InHeight);
+		Options.MousePos = Vector2f(0, 0);
+		Options.CameraPos = ViewCamera.Position;
+		const Vector4f CameraForward = ViewCamera.GetWorldRotationMatrix().TransformFVector4(FVector4f(0.0f, 0.0f, 1.0f, 0.0f));
+		Options.CameraDir = FVector3f(CameraForward.X, CameraForward.Y, CameraForward.Z).GetSafeNormal();
+		Options.Time = TSingleton<ShProjectManager>::Get().GetProject()->TimelineCurTime;
 		UpdateMaterialUniformBuffers(*MaterialAsset, PreviewUniformBuffers, Options);
 	}
 }
