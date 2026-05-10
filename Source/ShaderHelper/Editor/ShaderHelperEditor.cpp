@@ -22,6 +22,7 @@
 #include "AssetObject/Model.h"
 #include "AssetObject/Render/Render.h"
 #include "RenderResource/Mesh.h"
+#include "Renderer/ShRenderer.h"
 #include "UI/Widgets/Misc/MiscWidget.h"
 #include "magic_enum.hpp"
 

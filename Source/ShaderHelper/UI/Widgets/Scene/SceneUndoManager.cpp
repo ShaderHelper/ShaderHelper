@@ -4,7 +4,6 @@
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 
-#include <Serialization/MemoryWriter.h>
 #include <Serialization/MemoryReader.h>
 
 using namespace FW;

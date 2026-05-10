@@ -17,7 +17,6 @@
 
 #include <IImageWrapperModule.h>
 #include <IImageWrapper.h>
-#include <ImageWrapperHelper.h>
 #include <Misc/FileHelper.h>
 
 using namespace FW;

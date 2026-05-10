@@ -40,6 +40,7 @@ namespace SH
 		bool IsCompilable() const override { return true; }
 		bool CompileShader(FString& OutError, FString& OutWarn) override;
 		bool IsCompilationSucceeded() const override { return bCompilationSucceed; }
+		TArray<FW::ShaderType> GetEnabledStageList() const override { return { FW::ShaderType::Pixel }; }
 		FString GetBinding() const;
         FString GetTemplateWithBinding() const;
         

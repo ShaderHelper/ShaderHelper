@@ -3,12 +3,10 @@
 #include "Renderer/MaterialPreviewRenderer.h"
 #include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
-#include "UI/Styles/FShaderHelperStyle.h"
 #include "UI/Widgets/Property/PropertyData/PropertyData.h"
 #include "UI/Widgets/Property/PropertyData/PropertyItem.h"
 #include "UI/Widgets/Property/PropertyData/PropertyMatrixItem.h"
 #include "UI/Widgets/Property/PropertyData/PropertyAssetItem.h"
-#include "GpuApi/GpuSampler.h"
 
 using namespace FW;
 

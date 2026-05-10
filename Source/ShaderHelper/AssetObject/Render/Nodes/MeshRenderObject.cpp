@@ -1,4 +1,4 @@
-﻿#include "CommonHeader.h"
+#include "CommonHeader.h"
 #include "MeshRenderObject.h"
 #include "MeshPassNode.h"
 #include "App/App.h"
@@ -10,7 +10,6 @@
 #include "Renderer/MaterialRenderResources.h"
 #include "Renderer/RenderGraph.h"
 #include "RenderResource/Mesh.h"
-#include "RenderResource/Shader/OutlineShader.h"
 #include "ProjectManager/ShProjectManager.h"
 #include "AssetObject/Texture2D.h"
 #include "AssetObject/TextureCube.h"
@@ -196,6 +195,11 @@ namespace SH
 
 		void BreakOverridePinLink(GraphPin* Pin)
 		{
+			if (!Pin->SourcePin.IsValid())
+			{
+				return;
+			}
+
 			Graph* OwnerGraph = static_cast<Graph*>(Pin->GetOuterMost());
 			OwnerGraph->RemoveLink(Pin->GetSourcePin(), Pin);
 		}

@@ -12,8 +12,8 @@
     #define GPrivate_ENABLE_PRINT 1
 #endif
 
-#ifndef ENABLE_ASSERT
-    #define ENABLE_ASSERT 1
+#ifndef GPrivate_ENABLE_ASSERT
+    #define GPrivate_ENABLE_ASSERT 1
 #endif
 
 #ifdef __cplusplus
@@ -206,7 +206,7 @@ GPrivate_AppendArgFunc(bool)
 
 static uint GPrivate_AssertResult = 1;
 
-#if ENABLE_ASSERT == 1
+#if GPrivate_ENABLE_ASSERT == 1
 //Assert(uv.x > 0.9);
 //Assert(uv.x > 0.9, "uv.x must be greater than 0.9");
 #define Assert(Condition, ...) do {                     \

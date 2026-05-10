@@ -1415,11 +1415,20 @@ namespace FW
 			shaderc::CompileOptions Options;
 			Options.AddMacroDefinition("GPrivate_EDITOR_ISENSE", "1");
 			Options.AddMacroDefinition("GPrivate_ENABLE_PRINT", "0");
-			Options.AddMacroDefinition("ENABLE_ASSERT", "0");
+			Options.AddMacroDefinition("GPrivate_ENABLE_ASSERT", "0");
 			ParseExtraArgs(InShader->CompileExtraArgs, Options);
-			if (!std::regex_search(TCHAR_TO_UTF8(*ShaderSource), std::regex(R"(^\s*#\s*version\s+\d+)")))
+			// Force the GLSL version/profile that glslang uses. Detect the version from the
+			// source's #version directive; if absent, default to 450.
 			{
-				Options.SetForcedVersionProfile(450, shaderc_profile_none);
+				int32 ForcedVersion = 450;
+				std::smatch VersionMatch;
+				const std::string SourceUtf8 = TCHAR_TO_UTF8(*ShaderSource);
+				static const std::regex VersionRegex(R"(^\s*#\s*version\s+(\d+))");
+				if (std::regex_search(SourceUtf8, VersionMatch, VersionRegex))
+				{
+					ForcedVersion = FCString::Atoi(UTF8_TO_TCHAR(VersionMatch[1].str().c_str()));
+				}
+				Options.SetForcedVersionProfile(ForcedVersion, shaderc_profile_none);
 			}
 			Options.SetGenerateDebugInfo();
 			Options.SetVulkanRulesRelaxed(true);

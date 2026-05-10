@@ -1,11 +1,9 @@
 #include "CommonHeader.h"
 #include "SFragmentDebuggerViewport.h"
-#include "UI/Styles/FShaderHelperStyle.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "App/App.h"
 #include "GpuApi/GpuResourceHelper.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
-#include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 #include "RenderResource/RenderPass/BlitPass.h"
 #include "Renderer/RenderGraph.h"
 

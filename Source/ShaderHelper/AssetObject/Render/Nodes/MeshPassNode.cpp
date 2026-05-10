@@ -21,8 +21,6 @@
 #include <Widgets/Views/SListView.h>
 #include <Widgets/SViewport.h>
 #include <Widgets/Input/SComboBox.h>
-#include <Widgets/Input/SButton.h>
-#include <Widgets/Layout/SBox.h>
 
 using namespace FW;
 

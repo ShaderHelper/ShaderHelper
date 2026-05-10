@@ -5,8 +5,8 @@
     #define GPrivate_ENABLE_PRINT 1
 #endif
 
-#ifndef ENABLE_ASSERT
-    #define ENABLE_ASSERT 1
+#ifndef GPrivate_ENABLE_ASSERT
+    #define GPrivate_ENABLE_ASSERT 1
 #endif
 
 #extension GL_EXT_debug_printf : enable
@@ -205,7 +205,7 @@ uint GPrivate_AssertResult = 1u;
 #define Print3(StrArrDecl, Arg1, Arg2, Arg3)
 #endif
 
-#if ENABLE_ASSERT == 1
+#if GPrivate_ENABLE_ASSERT == 1
 #define Assert0(Cond) { \
     GPrivate_AssertResult &= (Cond) ? 1u : 0u; \
     if (GPrivate_AssertResult != 1u) { \

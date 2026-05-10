@@ -8,6 +8,8 @@
 #include "UI/Widgets/Property/PropertyData/PropertyItem.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 
+#include <regex>
+
 using namespace FW;
 
 namespace SH
@@ -85,21 +87,47 @@ void main()
 				: TEXT("#include \"Shared/Print.h\"\n");
 		}
 
+		// Returns true if the GLSL source declares a #version on its first line
+		// at or above 430 (where Print.glsl's SSBO/std430/atomic features are valid).
+		bool ShouldInjectPrintForGlsl(const FString& Content)
+		{
+			int32 FirstLineEnd = INDEX_NONE;
+			if (!Content.FindChar(TEXT('\n'), FirstLineEnd))
+			{
+				FirstLineEnd = Content.Len() - 1;
+			}
+			const FString FirstLine = Content.Left(FirstLineEnd + 1);
+
+			const std::string FirstLineUtf8(TCHAR_TO_UTF8(*FirstLine));
+			static const std::regex VersionRegex(R"(^\s*#\s*version\s+(\d+))");
+			std::smatch Match;
+			if (!std::regex_search(FirstLineUtf8, Match, VersionRegex))
+			{
+				return false;
+			}
+			const int32 VersionNumber = FCString::Atoi(UTF8_TO_TCHAR(Match[1].str().c_str()));
+			return VersionNumber >= 430;
+		}
+
 		FString InjectPrintInclude(const FString& Content, GpuShaderLanguage Language)
 		{
 			const FString Include = GetPrintInclude(Language);
-			if (Language != GpuShaderLanguage::GLSL || !Content.StartsWith(TEXT("#version")))
+			if (Language != GpuShaderLanguage::GLSL)
 			{
 				return Include + Content;
 			}
 
-			int32 FirstLineEnd = INDEX_NONE;
-			if (Content.FindChar(TEXT('\n'), FirstLineEnd))
+			if (!ShouldInjectPrintForGlsl(Content))
 			{
-				return Content.Left(FirstLineEnd + 1) + Include + Content.RightChop(FirstLineEnd + 1);
+				return Content;
 			}
 
-			return Content + TEXT("\n") + Include;
+			int32 FirstLineEnd = INDEX_NONE;
+			if (!Content.FindChar(TEXT('\n'), FirstLineEnd))
+			{
+				FirstLineEnd = Content.Len() - 1;
+			}
+			return Content.Left(FirstLineEnd + 1) + Include + Content.RightChop(FirstLineEnd + 1);
 		}
 
 		const FString& GetDefaultShader(GpuShaderLanguage Language)
@@ -339,6 +367,10 @@ void main()
 
 	int32 Shader::GetExtraLineNum() const
 	{
+		if (Language == GpuShaderLanguage::GLSL && !ShouldInjectPrintForGlsl(EditorContent))
+		{
+			return 0;
+		}
 		return 1;
 	}
 

@@ -12,6 +12,7 @@
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 #include "RenderResource/RenderPass/BlitPass.h"
 #include "Renderer/RenderGraph.h"
+#include "Renderer/ShRenderer.h"
 #include "UI/Widgets/Graph/SGraphPanel.h"
 #include "GpuApi/GpuFeature.h"
 
@@ -357,7 +358,7 @@ namespace SH
 		DxcArgs.Add("-D");
 		DxcArgs.Add("GPrivate_ENABLE_PRINT=0");
 		DxcArgs.Add("-D");
-		DxcArgs.Add("ENABLE_ASSERT=0");
+		DxcArgs.Add("GPrivate_ENABLE_ASSERT=0");
 		ShaderConductor::Compiler::Options SCOptions;
 		SCOptions.DXCArgs = DxcArgs.GetData();
 		SCOptions.numDXCArgs = DxcArgs.Num();

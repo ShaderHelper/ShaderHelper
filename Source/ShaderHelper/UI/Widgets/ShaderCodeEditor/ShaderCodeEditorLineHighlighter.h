@@ -1,5 +1,6 @@
 #pragma once
 #include "App/App.h"
+#include "UI/Styles/FShaderHelperStyle.h"
 
 #include <Widgets/Text/SlateEditableTextTypes.h>
 

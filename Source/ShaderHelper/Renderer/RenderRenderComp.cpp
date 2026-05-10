@@ -1,6 +1,5 @@
 #include "CommonHeader.h"
 #include "RenderRenderComp.h"
-#include "GpuApi/GpuResourceHelper.h"
 #include "GpuApi/GpuRhi.h"
 #include "ProjectManager/ShProjectManager.h"
 
