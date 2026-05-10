@@ -103,7 +103,7 @@ namespace FW
 		LoadUsedInitUnits = ComputeLoadCheckMasks(Insts, Context, Patcher);
 	}
 
-	void SpvValidator::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections)
+	void SpvValidator::Parse(TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections)
 	{
 		this->Insts = &Insts;
 		Patcher.SetSpvContext(Insts, SpvCode, &Context);

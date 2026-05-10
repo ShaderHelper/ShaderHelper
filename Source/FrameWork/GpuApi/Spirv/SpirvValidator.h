@@ -11,7 +11,7 @@ namespace FW
 		{}
 
 		const SpvPatcher& GetPatcher() const { return Patcher; }
-		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections) override;
+		void Parse(TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections) override;
 
 	public:
 		void Visit(const SpvOpVariable* Inst) override;

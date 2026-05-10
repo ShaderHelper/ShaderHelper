@@ -15,7 +15,7 @@ namespace FW
 	class FRAMEWORK_API SpvPatcher
 	{
 	public:
-		void SetSpvContext(const TArray<TUniquePtr<SpvInstruction>>& InInsts, const TArray<uint32>& InSpvCode, SpvMetaContext* InMetaContext);
+		void SetSpvContext(TArray<TUniquePtr<SpvInstruction>>& InInsts, const TArray<uint32>& InSpvCode, SpvMetaContext* InMetaContext);
 		const TArray<uint32>& GetSpv() const { return SpvCode; }
 		const TArray<TUniquePtr<SpvInstruction>>& GetPathcedInsts() const { return PatchedInsts; }
 		FString GetAsm() const;
@@ -53,7 +53,7 @@ namespace FW
 		void UpdateInsts(int WordOffset, int WordSize);
 
 	private:
-		const TArray<TUniquePtr<SpvInstruction>>* OriginInsts;
+		TArray<TUniquePtr<SpvInstruction>>* OriginInsts;
 		TArray<TUniquePtr<SpvInstruction>> PatchedInsts;
 		TArray<uint32> SpvCode;
 		TUniquePtr<SpvMetaVisitor> MetaVisitor;

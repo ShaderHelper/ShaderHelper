@@ -647,15 +647,6 @@ VsOutput MainVS(float3 Position : POSITION0) {
 		const MeshBuffers& MeshBuffers,
 		const FMatrix44f& Transform)
 	{
-		if (!Recorder || !Resources.Pipeline.IsValid() || !Resources.BindGroup.IsValid() || !Resources.UniformBuffer)
-		{
-			return;
-		}
-		if (!MeshBuffers.VertexBuffer.IsValid() || !MeshBuffers.IndexBuffer.IsValid() || MeshBuffers.IndexCount == 0)
-		{
-			return;
-		}
-
 		Resources.UniformBuffer->GetMember<FMatrix44f>("Transform") = Transform;
 
 		Recorder->SetRenderPipelineState(Resources.Pipeline);

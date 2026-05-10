@@ -22,7 +22,7 @@ namespace FW
 
 	auto SpvInstOffsetProjection = [](SpvInstruction* Inst) { return Inst->GetWordOffset().value(); };
 
-	void SpvPatcher::SetSpvContext(const TArray<TUniquePtr<SpvInstruction>>& InInsts, const TArray<uint32>& InSpvCode, SpvMetaContext* InMetaContext)
+	void SpvPatcher::SetSpvContext(TArray<TUniquePtr<SpvInstruction>>& InInsts, const TArray<uint32>& InSpvCode, SpvMetaContext* InMetaContext)
 	{
 		OriginInsts = &InInsts;
 		SpvCode = InSpvCode;
@@ -235,6 +235,12 @@ namespace FW
 			auto* C = static_cast<SpvOpConstant*>(InInst.Get());
 			ResultTypeId = C->GetResultType();
 			ValueBytes = C->GetValue();
+		}
+		else if (OpCode == SpvOp::ConstantNull)
+		{
+			auto* C = static_cast<SpvOpConstantNull*>(InInst.Get());
+			ResultTypeId = C->GetResultType();
+			ValueBytes.SetNumZeroed(GetTypeByteSize(Context.Types.at(ResultTypeId).Get()));
 		}
 		else if (OpCode == SpvOp::ConstantComposite)
 		{
@@ -475,7 +481,23 @@ namespace FW
 		NewInst->SetWordOffset(WordOffset);
 		NewInst->SetWordLen(NewWordLen);
 		SpvInstruction* MutableInst = const_cast<SpvInstruction*>(Inst);
-		MutableInst->CopyFrom(*NewInst);
+		if (MutableInst->GetKind() == NewInst->GetKind())
+		{
+			MutableInst->CopyFrom(*NewInst);
+		}
+		else
+		{
+			SpvInstruction* NewRawPtr = NewInst.Get();
+			int32 OriginIdx = OriginInsts->IndexOfByPredicate([Inst](const TUniquePtr<SpvInstruction>& Item) {
+				return Item.Get() == Inst;
+			});
+			check(OriginIdx != INDEX_NONE);
+			(*OriginInsts)[OriginIdx] = MoveTemp(NewInst);
+
+			int32 SortedIdx = SortedOriginInsts.IndexOfByKey(MutableInst);
+			check(SortedIdx != INDEX_NONE);
+			SortedOriginInsts[SortedIdx] = NewRawPtr;
+		}
 
 		if (WordDelta != 0)
 		{

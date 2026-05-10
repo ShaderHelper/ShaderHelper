@@ -34,6 +34,7 @@ namespace FW
 
 	public:
 		void Visit(const SpvOpPhi* Inst) override;
+		void Visit(const SpvOpKill* Inst) override;
 
 	private:
 		//Create the _PreviewerParams_ uniform buffer (contains uint TargetIteration, TargetPackedHeader, TargetVarId)

@@ -126,7 +126,7 @@ namespace SH
 		void EnsureOverrideBytesStorage(MaterialOverrideSlot& Slot)
 		{
 			const int32 RequiredSize = GetOverrideByteSize(Slot.Type);
-			if (RequiredSize <= 0 || Slot.Bytes.Num() >= RequiredSize)
+			if (Slot.Bytes.Num() >= RequiredSize)
 			{
 				return;
 			}
@@ -188,11 +188,6 @@ namespace SH
 
 		GpuTexture* GetConnectedOverrideTexture(GraphPin* OverridePin)
 		{
-			if (!OverridePin || !OverridePin->SourcePin.IsValid())
-			{
-				return nullptr;
-			}
-
 			if (auto* TexturePin = DynamicCast<GpuTexturePin>(OverridePin)) return TexturePin->GetValue();
 			if (auto* CubemapPin = DynamicCast<GpuCubemapPin>(OverridePin)) return CubemapPin->GetValue();
 			if (auto* Texture3DPin = DynamicCast<GpuTexture3DPin>(OverridePin)) return Texture3DPin->GetValue();
@@ -201,11 +196,6 @@ namespace SH
 
 		void BreakOverridePinLink(GraphPin* Pin)
 		{
-			if (!Pin || !Pin->SourcePin.IsValid())
-			{
-				return;
-			}
-
 			Graph* OwnerGraph = static_cast<Graph*>(Pin->GetOuterMost());
 			OwnerGraph->RemoveLink(Pin->GetSourcePin(), Pin);
 		}
@@ -354,10 +344,7 @@ namespace SH
 		EnsureOverridePins();
 		SyncOverridePinsFromSlots();
 		InvalidateRenderResources();
-		if (auto* OwnerNode = dynamic_cast<MeshPassNode*>(GetOuter()))
-		{
-			OwnerNode->RefreshNodeWidget();
-		}
+		static_cast<MeshPassNode*>(GetOuter())->RefreshNodeWidget();
 	}
 
 	void MeshRenderObject::InvalidateRenderResources()
@@ -538,10 +525,7 @@ namespace SH
 						MenuBuilder.AddMenuEntry(FText::FromString(ResourceDefault.BindingName), FText::GetEmpty(), FSlateIcon(),
 							FUIAction(FExecuteAction::CreateLambda([this, ResourceDefault, TypeStr] {
 								AddOverride(ResourceDefault.BindingName, TEXT(""), TypeStr, ResourceDefault.Stage, true);
-								if (auto* OwnerNode = dynamic_cast<MeshPassNode*>(GetOuter()))
-								{
-									OwnerNode->RefreshNodeWidget();
-								}
+								static_cast<MeshPassNode*>(GetOuter())->RefreshNodeWidget();
 								static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
 							}))
 						);
@@ -580,10 +564,7 @@ namespace SH
 			int32 EntryIndex = Index;
 			Entry->SetOnDelete([this, EntryIndex] {
 				RemoveOverride(EntryIndex);
-				if (auto* OwnerNode = dynamic_cast<MeshPassNode*>(GetOuter()))
-				{
-					OwnerNode->RefreshNodeWidget();
-				}
+				static_cast<MeshPassNode*>(GetOuter())->RefreshNodeWidget();
 				static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
 			});
 			OverrideCat->AddChild(Entry.ToSharedRef());
@@ -596,19 +577,19 @@ namespace SH
 	void MeshRenderObject::PostPropertyChanged(PropertyData* InProperty)
 	{
 		ShObject::PostPropertyChanged(InProperty);
-		if (InProperty && InProperty->GetDisplayName().EqualTo(LOCALIZATION("MeshSceneObject")))
+		if (InProperty->GetDisplayName().EqualTo(LOCALIZATION("MeshSceneObject")))
 		{
-			if (MeshSceneObjectRef.IsValid() && MeshSceneObjectRef.Get())
+			if (MeshSceneObjectRef.IsValid())
 			{
 				ObjectName = MeshSceneObjectRef->ObjectName;
 			}
 		}
-		if (InProperty && InProperty->GetDisplayName().EqualTo(LOCALIZATION("Material")))
+		if (InProperty->GetDisplayName().EqualTo(LOCALIZATION("Material")))
 		{
 			BindMaterialDelegates();
 			InvalidateRenderResources();
 		}
-		if (InProperty && InProperty->IsOfType<PropertyAssetItem>())
+		if (InProperty->IsOfType<PropertyAssetItem>())
 		{
 			const FString DisplayName = InProperty->GetDisplayName().ToString();
 			const bool bOverrideResourceChanged = OverrideSlots.ContainsByPredicate([&](const MaterialOverrideSlot& Slot) {
@@ -620,10 +601,7 @@ namespace SH
 			}
 		}
 		SyncOverridePinsFromSlots();
-		if (auto* OwnerNode = dynamic_cast<MeshPassNode*>(GetOuter()))
-		{
-			OwnerNode->RefreshNodeWidget();
-		}
+		static_cast<MeshPassNode*>(GetOuter())->RefreshNodeWidget();
 	}
 
 	ObjectPtr<GraphPin> MeshRenderObject::CreateOverridePin(ShObject* Outer, const FString& Type, bool bIsResource)
@@ -936,8 +914,8 @@ namespace SH
 
 	TRefCountPtr<GpuTexture> MeshRenderObject::BuildCoverageMask()
 	{
-		const MeshPassNode* OwnerNode = dynamic_cast<MeshPassNode*>(GetOuter());
-		if (!OwnerNode || !MeshSceneObjectRef.IsValid() || !MeshSceneObjectRef.Get() || !MeshSceneObjectRef->ModelAsset)
+		const MeshPassNode* OwnerNode = static_cast<MeshPassNode*>(GetOuter());
+		if (!MeshSceneObjectRef.IsValid() || !MeshSceneObjectRef->ModelAsset)
 		{
 			return nullptr;
 		}
@@ -1060,43 +1038,35 @@ namespace SH
 		ShEditor->ForceRender();
 		bDebugging = true;
 
-		if (MeshPassNode* OwnerNode = dynamic_cast<MeshPassNode*>(GetOuter()))
+		MeshPassNode* OwnerNode = static_cast<MeshPassNode*>(GetOuter());
+		if (Item == DebugItem::Fragment)
 		{
-			if (Item == DebugItem::Fragment)
-			{
-				return OwnerNode->MakeDebugTargetInfo(BuildCoverageMask());
-			}
+			return OwnerNode->MakeDebugTargetInfo(BuildCoverageMask());
 		}
 		return {};
 	}
 
 	InvocationState MeshRenderObject::GetInvocationState(DebugItem Item)
 	{
-		if (Item != DebugItem::Fragment)
+		MeshPassNode* OwnerNode = static_cast<MeshPassNode*>(GetOuter());
+		if (Item == DebugItem::Fragment)
 		{
-			return ComputeState{};
-		}
-
-		MeshPassNode* OwnerNode = dynamic_cast<MeshPassNode*>(GetOuter());
-		if (!OwnerNode || !MaterialAsset || !Pipeline.IsValid() || !MeshSceneObjectRef.IsValid() || !MeshSceneObjectRef.Get() || !MeshSceneObjectRef->ModelAsset)
-		{
-			return PixelState{};
-		}
-
-		TArray<MeshBuffers> Meshes = MeshSceneObjectRef->ModelAsset->GetGpuMeshes();
-		return PixelState{
-			.ViewPortDesc = OwnerNode->GetLastViewPortDesc(),
-			.Builders = BuildDebugBindingBuilders(),
-			.PipelineDesc = PipelineDesc,
-			.DrawFunction = [Meshes](GpuRenderPassRecorder* Recorder) {
-				for (const MeshBuffers& MB : Meshes)
-				{
-					Recorder->SetVertexBuffer(0, MB.VertexBuffer);
-					Recorder->SetIndexBuffer(MB.IndexBuffer);
-					Recorder->DrawIndexed(0, MB.IndexCount);
+			TArray<MeshBuffers> Meshes = MeshSceneObjectRef->ModelAsset->GetGpuMeshes();
+			return PixelState{
+				.ViewPortDesc = OwnerNode->GetLastViewPortDesc(),
+				.Builders = BuildDebugBindingBuilders(),
+				.PipelineDesc = PipelineDesc,
+				.DrawFunction = [Meshes](GpuRenderPassRecorder* Recorder) {
+					for (const MeshBuffers& MB : Meshes)
+					{
+						Recorder->SetVertexBuffer(0, MB.VertexBuffer);
+						Recorder->SetIndexBuffer(MB.IndexBuffer);
+						Recorder->DrawIndexed(0, MB.IndexCount);
+					}
 				}
-			}
-		};
+			};
+		}
+		AUX::Unreachable();
 	}
 
 	void MeshRenderObject::OnFinalizePixel(const Vector2u& PixelCoord)
@@ -1137,8 +1107,8 @@ namespace SH
 
 	bool MeshRenderObject::BuildPipeline(const TArray<GpuFormat>& ColorFormats, GpuFormat DepthFormat, uint32 SampleCount)
 	{
-		const MeshPassNode* OwnerNode = dynamic_cast<MeshPassNode*>(GetOuter());
-		const FString NodeName = OwnerNode ? OwnerNode->ObjectName.ToString() : TEXT("<unknown>");
+		const MeshPassNode* OwnerNode = static_cast<MeshPassNode*>(GetOuter());
+		const FString NodeName = OwnerNode->ObjectName.ToString();
 		const FString RenderObjectName = ObjectName.ToString();
 
 		if (!MaterialAsset)
@@ -1253,7 +1223,7 @@ namespace SH
 			return;
 		}
 		MeshSceneObject* MSO = MeshSceneObjectRef.Get();
-		if (!MSO || !MSO->ModelAsset) return;
+		if (!MSO->ModelAsset) return;
 
 		Model* ModelAsset = MSO->ModelAsset.Get();
 		const FMatrix44f ViewMat = InCamera ? InCamera->GetViewMatrix() : FMatrix44f::Identity;

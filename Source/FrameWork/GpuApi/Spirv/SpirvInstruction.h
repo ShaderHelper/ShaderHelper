@@ -9,7 +9,7 @@ namespace FW
 	{
 	public:
 		virtual ~SpvVisitor() = default;
-		virtual void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections) {}
+		virtual void Parse(TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections) {}
 		virtual void Visit(const SpvInstruction*) {}
 		
 		//Core
@@ -765,6 +765,15 @@ namespace FW
 		, ResultType(InResultType)
 		{}
 		SpvId GetResultType() const { return ResultType; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ConstantNull;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 	private:
 		SpvId ResultType;
 	};

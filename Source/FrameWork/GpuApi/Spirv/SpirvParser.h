@@ -69,7 +69,7 @@ namespace FW
 		SpvMetaContext& GetContext() { return Context; }
 		
 	public:
-		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections) override;
+		void Parse(TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections) override;
 		
 		void Visit(const SpvOpVariable* Inst) override;
 		void Visit(const SpvOpTypeVoid* Inst) override;

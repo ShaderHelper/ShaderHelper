@@ -217,10 +217,7 @@ namespace SH
 				}
 				else if (OldP->SourcePin.IsValid())
 				{
-					if (GraphPin* SourcePin = OldP->GetSourcePin())
-					{
-						OwnerGraph->RemoveLink(SourcePin, OldP.Get());
-					}
+					OwnerGraph->RemoveLink(OldP->GetSourcePin(), OldP.Get());
 				}
 			}
 		}
@@ -268,10 +265,7 @@ namespace SH
 		{
 			if (OP->SourcePin.IsValid())
 			{
-				if (GraphPin* Src = OP->GetSourcePin())
-				{
-					OwnerGraph->RemoveLink(Src, OP.Get());
-				}
+				OwnerGraph->RemoveLink(OP->GetSourcePin(), OP.Get());
 			}
 		}
 		MeshRenderObjects.RemoveAll([InObject](const ObjectPtr<MeshRenderObject>& E) { return E.Get() == InObject; });
@@ -601,7 +595,7 @@ namespace SH
 
 		const float Aspect = (float)Width / (float)Height;
 		TOptional<Camera> Cam;
-		if (CameraRef.IsValid() && CameraRef.Get())
+		if (CameraRef.IsValid())
 		{
 			Cam = CameraRef->ToCamera(Aspect);
 		}
@@ -625,7 +619,7 @@ namespace SH
 				for (const auto& MRO : MROsCopy)
 				{
 					FMatrix44f ModelMat = FMatrix44f::Identity;
-					if (MRO->MeshSceneObjectRef.IsValid() && MRO->MeshSceneObjectRef.Get())
+					if (MRO->MeshSceneObjectRef.IsValid())
 					{
 						ModelMat = MRO->MeshSceneObjectRef->GetWorldMatrix();
 					}
@@ -818,7 +812,7 @@ namespace SH
 									{
 										return FText::GetEmpty();
 									}
-									if (Object->MeshSceneObjectRef.IsValid() && Object->MeshSceneObjectRef.Get())
+									if (Object->MeshSceneObjectRef.IsValid())
 									{
 										return Object->MeshSceneObjectRef->ObjectName;
 									}

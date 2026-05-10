@@ -549,7 +549,7 @@ namespace FW
 		Context.VariableDescMap.emplace(Inst->GetVarId(), &Context.VariableDescs[Inst->GetId().value()]);
 	}
 
-	void SpvMetaVisitor::Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections)
+	void SpvMetaVisitor::Parse(TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections)
 	{
 		Context.Sections = InSections;
 		for(const auto& Inst : Insts)

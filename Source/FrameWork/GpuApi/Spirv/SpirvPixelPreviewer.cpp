@@ -82,6 +82,20 @@ namespace FW
 		}
 	}
 
+	void SpvPixelPreviewerVisitor::Visit(const SpvOpKill* Inst)
+	{
+		SpvType* ReturnType = Context.Types[CurFunc->ReturnType].Get();
+		if (ReturnType->GetKind() == SpvTypeKind::Void)
+		{
+			Patcher.OverwriteInstruction(Inst, MakeUnique<SpvOpReturn>());
+		}
+		else
+		{
+			SpvId ZeroValue = Patcher.FindOrAddConstant(MakeUnique<SpvOpConstantNull>(CurFunc->ReturnType));
+			Patcher.OverwriteInstruction(Inst, MakeUnique<SpvOpReturnValue>(ZeroValue));
+		}
+	}
+
 	void SpvPixelPreviewerVisitor::PostAppendVar(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvPointer* Pointer, SpvId PackedHeaderConst, SpvId VarIdConst)
 	{
 		//Skip constant-value stores — no useful preview
@@ -646,6 +660,16 @@ namespace FW
 					OverrideInsts.Add(MoveTemp(LoadOp));
 					OverrideInsts.Add(MakeUnique<SpvOpStore>(OutputVarId, LoadedPreview));
 					Patcher.AddInstructions(Ret->GetWordOffset().value(), MoveTemp(OverrideInsts));
+				}
+				else if (auto* Kill = dynamic_cast<const SpvOpKill*>((*Insts)[i].Get()))
+				{
+					TArray<TUniquePtr<SpvInstruction>> OverrideInsts;
+					SpvId LoadedPreview = Patcher.NewId();
+					auto LoadOp = MakeUnique<SpvOpLoad>(Float4Type, PreviewOutputVar);
+					LoadOp->SetId(LoadedPreview);
+					OverrideInsts.Add(MoveTemp(LoadOp));
+					OverrideInsts.Add(MakeUnique<SpvOpStore>(OutputVarId, LoadedPreview));
+					Patcher.AddInstructions(Kill->GetWordOffset().value(), MoveTemp(OverrideInsts));
 				}
 			}
 		}
