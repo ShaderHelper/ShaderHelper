@@ -1,10 +1,7 @@
 #pragma once
-#include "GpuApi/Spirv/SpirvParser.h"
-#include "GpuApi/Spirv/SpirvPixelDebugger.h"
-#include "GpuApi/Spirv/SpirvPixelPreviewer.h"
+#include "GpuApi/Spirv/SpirvDebugger.h"
 #include "GpuApi/GpuRhi.h"
-#include "Editor/PreviewViewPort.h"
-#include "RenderResource/Shader/Shader.h"
+
 
 DECLARE_LOG_CATEGORY_EXTERN(LogDebugger, Log, All);
 inline DEFINE_LOG_CATEGORY(LogDebugger);
@@ -20,6 +17,11 @@ namespace SH
 		FW::GpuBindGroupLayoutBuilder LayoutBuilder;
 	};
 
+	struct VertexState
+	{
+
+	};
+
 	struct PixelState
 	{
 		FW::GpuViewPortDesc ViewPortDesc;
@@ -33,7 +35,7 @@ namespace SH
 
 	};
 
-	using InvocationState = std::variant<PixelState, ComputeState>;
+	using InvocationState = std::variant<VertexState, PixelState, ComputeState>;
 
 	//Per-line preview info: a line with exactly one uniquely modified variable
 	struct LinePreviewInfo
@@ -82,9 +84,9 @@ namespace SH
 		bool Continue(StepMode Mode);
 
 		void InvokePixel(bool GlobalValidation = false);
+		void DebugVertex(const FW::Vector3f& InVertPos, const InvocationState& InState);
 		void DebugPixel(const FW::Vector2u& InPixelCoord, const InvocationState& InState);
 		std::optional<FW::Vector2u> ValidatePixel(const InvocationState& InState);
-
 		void DebugCompute(const InvocationState& InState);
 		void Reset();
 
@@ -105,6 +107,11 @@ namespace SH
 		int32 GetExtraLineNumForFile(const FString& FileName) const;
 		void InitDebuggerView();
 		TArray<FW::SpvDebugState> GenDebugStates(uint8* DebuggerData);
+
+		bool EvaluateExpressionVertexlImpl(const FString& InExpression, struct ExpressionNode& OutResult) const;
+		bool EvaluateExpressionPixelImpl(const FString& InExpression, struct ExpressionNode& OutResult) const;
+		bool EvaluateExpressionComputeImpl(const FString& InExpression, struct ExpressionNode& OutResult) const;
+		void BuildPatchedBindings(const TArray<BindingBuilder>& Builders, const TArray<FW::GpuShaderLayoutBinding>& LayoutBindings, FW::BindingShaderStage Stage, bool bIncludeParamsBinding);
 
 	private:
 		ShaderAsset* CurShaderAsset = nullptr;

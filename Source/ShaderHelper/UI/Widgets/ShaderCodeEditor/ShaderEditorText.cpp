@@ -107,10 +107,12 @@ int32 SShaderMultiLineEditableText::OnPaint(const FPaintArgs& Args, const FGeome
         //Draw guide lines
         for (const auto& Scope : GuideLineScopes)
         {
-            int32 StartLineIndex = Scope.Start.X - ExtraLineNum - 1;
+            //Scope coords are in the unfolded source; map back to editor line indices.
+            //Skip the guide line entirely if either endpoint sits inside a folded block.
+            int32 StartLineIndex = Owner->GetLineIndex(Scope.Start.X - ExtraLineNum);
             int32 StartOffset = Scope.Start.Y - 1;
-            int32 EndLineIndex = Scope.End.X - ExtraLineNum - 1;
-            if (StartLineIndex >= 0 && StartLineIndex < EndLineIndex)
+            int32 EndLineIndex = Owner->GetLineIndex(Scope.End.X - ExtraLineNum);
+            if (StartLineIndex != INDEX_NONE && EndLineIndex != INDEX_NONE && StartLineIndex < EndLineIndex)
             {
                 // Calculate position using uniform line height and measure actual text width
                 float LineHeight = Owner->ShaderMarshaller->TextLayout->GetUniformLineHeight();
@@ -367,8 +369,8 @@ void FShaderEditorMarshaller::SetText(const FString& SourceString, FTextLayout& 
 
     FTextSelection UnFoldingRange = FTextSelection{ {0, 0}, {LineModels.Num() - 1, LineModels[LineModels.Num() - 1].Text->Len()} };
     FString TextAfterUnfolding = OwnerWidget->UnFoldText(MoveTemp(UnFoldingRange));
+	OwnerWidget->UpdateLineNumberData();
     OwnerWidget->OnShaderTextChanged(TextAfterUnfolding);
-    OwnerWidget->UpdateLineNumberData();
 
     //To prevent old diag info from obscuring the code.
     if (OwnerWidget->EffectMultiLineEditableText)

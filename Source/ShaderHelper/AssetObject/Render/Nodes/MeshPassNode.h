@@ -3,7 +3,7 @@
 #include "AssetObject/Render/Render.h"
 #include "AssetObject/Render/CameraSceneObject.h"
 #include "Editor/AssetEditor/ShAssetEditor.h"
-#include "MeshRenderObject.h"
+#include "AssetObject/Render/MeshRenderObject.h"
 
 namespace FW
 {
@@ -47,6 +47,12 @@ namespace SH
 		}
 	};
 
+	struct MeshPassDebugFrameState
+	{
+		TOptional<FW::Camera> Camera;
+		FW::Vector2f MousePos = FW::Vector2f(0, 0);
+	};
+
 	class MeshPassNodeOp : public ShPropertyOp
 	{
 		REFLECTION_TYPE(MeshPassNodeOp)
@@ -86,14 +92,10 @@ namespace SH
 		void OnRenderTargetsChanged();
 		void RefreshNodeWidget();
 		DebugTargetInfo MakeDebugTargetInfo(TRefCountPtr<FW::GpuTexture> CoverageMask) const;
-		const TArray<TRefCountPtr<FW::GpuTexture>>& GetLastActiveColorRTs() const { return LastActiveColorRTs; }
-		TRefCountPtr<FW::GpuTexture> GetLastActiveDepthRT() const { return LastActiveDepthRT; }
-		const TArray<FW::GpuFormat>& GetLastColorFormats() const { return LastColorFormats; }
-		FW::GpuFormat GetLastDepthFormat() const { return LastDepthFormat; }
-		uint32 GetLastSampleCount() const { return LastSampleCount; }
-		FW::GpuViewPortDesc GetLastViewPortDesc() const { return LastViewPortDesc; }
-		TOptional<FW::Camera> GetLastCamera() const { return LastCamera; }
-		FW::Vector2f GetLastMousePos() const { return LastMousePos; }
+		const TArray<TRefCountPtr<FW::GpuTexture>>& GetOutputColorRTs() const { return CachedColorRTs; }
+		TRefCountPtr<FW::GpuTexture> GetOutputDepthRT() const { return CachedDepthRT; }
+		FW::GpuViewPortDesc GetOutputViewPortDesc() const { return FW::GpuViewPortDesc{ (float)CachedRTSize.X, (float)CachedRTSize.Y }; }
+		const MeshPassDebugFrameState& GetDebugFrameState() const { return DebugFrameState; }
 
 	public:
 		TArray<MeshPassColorRT> ColorRTs;
@@ -116,14 +118,7 @@ namespace SH
 		MeshPassDepthFormat CachedDepthFormat = MeshPassDepthFormat::D32_FLOAT;
 		TSharedPtr<FW::PreviewViewPort> Preview;
 		TRefCountPtr<FW::GpuQuerySet> TimestampQuerySet;
-		TArray<TRefCountPtr<FW::GpuTexture>> LastActiveColorRTs;
-		TRefCountPtr<FW::GpuTexture> LastActiveDepthRT;
-		TArray<FW::GpuFormat> LastColorFormats;
-		FW::GpuFormat LastDepthFormat = FW::GpuFormat::NUM;
-		uint32 LastSampleCount = 1;
-		FW::GpuViewPortDesc LastViewPortDesc;
-		FW::Vector2f LastMousePos = FW::Vector2f(0, 0);
-		TOptional<FW::Camera> LastCamera;
+		MeshPassDebugFrameState DebugFrameState;
 
 		TArray<FString> GetPreviewOutputNames() const;
 		void NormalizePreviewOutputName();

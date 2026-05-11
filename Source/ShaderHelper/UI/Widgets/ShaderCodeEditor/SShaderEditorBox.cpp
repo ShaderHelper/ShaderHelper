@@ -66,15 +66,10 @@ constexpr int PaddingLineNum = 22;
     {
 		ShaderAssetObj->OnShaderRefreshed.Remove(ShaderRefreshHandle);
 
-		bQuitISense = true;
-		ISenseEvent->Trigger();
-		ISenseThread->Join();
-		FPlatformProcess::ReturnSynchEventToPool(ISenseEvent);
-		
-		bQuitISyntax = true;
-		SyntaxEvent->Trigger();
-		SyntaxThread->Join();
-		FPlatformProcess::ReturnSynchEventToPool(SyntaxEvent);
+		bQuitLang = true;
+		LangEvent->Trigger();
+		LangThread->Join();
+		FPlatformProcess::ReturnSynchEventToPool(LangEvent);
 
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		TSharedPtr<SWindow> ShaderEditorTipWindow = ShEditor->GetShaderEditorTipWindow();
@@ -351,18 +346,19 @@ constexpr int PaddingLineNum = 22;
 
 	void SShaderEditorBox::StartLangServiceThreads()
 	{
-		//Due to code folding altering the editing text, separate IsenseThread and SyntaxThread.
-		ISenseEvent = FPlatformProcess::GetSynchEventFromPool();
-		ISenseThread = MakeUnique<FThread>(TEXT("ISenseThread"), [this] {
-			while (!bQuitISense)
+		//A single language-service thread builds one TU from CurrentShaderSource (unfolded)
+		//and uses it for both code completion/diagnostics and syntax highlighting.
+		LangEvent = FPlatformProcess::GetSynchEventFromPool();
+		LangThread = MakeUnique<FThread>(TEXT("LangThread"), [this] {
+			while (!bQuitLang)
 			{
-				ISenseTask Task;
-				while (ISenseQueue.Dequeue(Task));
+				LangTask Task;
+				while (LangQueue.Dequeue(Task));
 				if (Task.ShaderDesc)
 				{
 					TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(Task.ShaderDesc->SourceDesc);
 					Shader->CompileExtraArgs = Task.ShaderDesc->ExtraArgs;
-					auto TU = ShaderTU::Create( Shader);
+					auto TU = ShaderTU::Create(Shader);
 					DiagnosticInfos = TU->GetDiagnostic();
 
 					CandidateInfos.Reset();
@@ -426,52 +422,31 @@ constexpr int PaddingLineNum = 22;
 						});
 					}
 
-					if (ISenseQueue.IsEmpty())
-					{
-						bRefreshIsense.store(true, std::memory_order_release);
-					}
-				}
-
-				if (ISenseQueue.IsEmpty())
-				{
-					ISenseEvent->Wait();
-				}
-			}
-		});
-
-		SyntaxEvent = FPlatformProcess::GetSynchEventFromPool();
-		SyntaxThread = MakeUnique<FThread>(TEXT("SyntaxThread"), [this]{
-			while(!bQuitISyntax)
-			{
-				SyntaxTask Task;
-				while (SyntaxQueue.Dequeue(Task));
-				if (Task.ShaderDesc)
-				{
-					TRefCountPtr<GpuShader> Shader = GGpuRhi->CreateShaderFromSource(Task.ShaderDesc->SourceDesc);
-					Shader->CompileExtraArgs = Task.ShaderDesc->ExtraArgs;
-					auto TU = ShaderTU::Create(Shader);
 					LineSyntaxHighlightMaps.Reset();
 					LineSyntaxHighlightMaps.SetNum(Task.LineTokens.Num());
 					int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
 					for (int LineIndex = 0; LineIndex < Task.LineTokens.Num(); LineIndex++)
 					{
+						//The TU is parsed from the unfolded source, so use the per-editor-line unfolded
+						//line number captured at submission time to query the correct token type.
+						int32 UnfoldedLineNumber = Task.LineNumbers[LineIndex];
 						for (const ShaderTokenizer::Token& Token : Task.LineTokens[LineIndex])
 						{
-							ShaderTokenType NewTokenType = TU->GetTokenType(Token.Type, ExtraLineNum + LineIndex + 1, Token.BeginOffset + 1, Token.EndOffset - Token.BeginOffset);
+							ShaderTokenType NewTokenType = TU->GetTokenType(Token.Type, ExtraLineNum + UnfoldedLineNumber, Token.BeginOffset + 1, Token.EndOffset - Token.BeginOffset);
 							LineSyntaxHighlightMaps[LineIndex].Add(FTextRange{ Token.BeginOffset, Token.EndOffset }, NewTokenType);
 						}
 					}
 					this->SyntaxTU = MakeShareable(TU.Release());
 
-					if (SyntaxQueue.IsEmpty())
+					if (LangQueue.IsEmpty())
 					{
-						bRefreshSyntax.store(true, std::memory_order_release);
+						bRefreshLang.store(true, std::memory_order_release);
 					}
 				}
 
-				if (SyntaxQueue.IsEmpty())
+				if (LangQueue.IsEmpty())
 				{
-					SyntaxEvent->Wait();
+					LangEvent->Wait();
 				}
 			}
 		});
@@ -1567,7 +1542,9 @@ constexpr int PaddingLineNum = 22;
 		if (SyntaxTUCopy.IsValid())
 		{
 			int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
-			auto Symbol = SyntaxTUCopy->GetSymbolInfo(Location.GetLineIndex() + ExtraLineNum + 1, TokenOffset + 1, TokenEndOffset - TokenOffset);
+			//The TU is built from the unfolded source, so map the editor line back to its unfolded line number.
+			int32 UnfoldedLineNumber = GetLineNumber(Location.GetLineIndex());
+			auto Symbol = SyntaxTUCopy->GetSymbolInfo(UnfoldedLineNumber + ExtraLineNum, TokenOffset + 1, TokenEndOffset - TokenOffset);
 			
 			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 			int32 SymbolExtraLineNum = ExtraLineNum;
@@ -1768,8 +1745,8 @@ constexpr int PaddingLineNum = 22;
 
 	void SShaderEditorBox::SubmitLangServiceTasks()
 	{
-		ISenseTask ITask{};
-		ITask.ShaderDesc = ShaderAssetObj->GetShaderDesc(CurrentShaderSource, SelectedStage);
+		LangTask Task{};
+		Task.ShaderDesc = ShaderAssetObj->GetShaderDesc(CurrentShaderSource, SelectedStage);
 
 		if (bTryComplete)
 		{
@@ -1791,45 +1768,46 @@ constexpr int PaddingLineNum = 22;
 				FString LeftToken2 = CursorLeft.Mid(Token.BeginOffset, Token.EndOffset - Token.BeginOffset);
 				if (LeftToken2 == ".")
 				{
-					ITask.IsMemberAccess = true;
+					Task.IsMemberAccess = true;
 				}
 			}
 			CurToken = LeftToken;
 
-			ITask.Row = GetLineNumber(CursorRow) + AddedLineNum;
+			Task.Row = GetLineNumber(CursorRow) + AddedLineNum;
 			if (LeftToken == ".")
 			{
-				ITask.IsMemberAccess = true;
-				ITask.Col = CursorCol + 1;
+				Task.IsMemberAccess = true;
+				Task.Col = CursorCol + 1;
 			}
 			else
 			{
-				ITask.Col = CursorCol + 1 - LeftToken.Len();
+				Task.Col = CursorCol + 1 - LeftToken.Len();
 			}
-			ITask.CursorToken = MoveTemp(LeftToken);
+			Task.CursorToken = MoveTemp(LeftToken);
 		}
 
-		ISenseQueue.Enqueue(MoveTemp(ITask));
-		ISenseEvent->Trigger();
-
 		auto& LineModels = ShaderMarshaller->TextLayout->GetLineModels();
-		SyntaxTask STask;
-		STask.ShaderDesc = ShaderAssetObj->GetShaderDesc(CurrentShaderSource, SelectedStage);
-		STask.LineTokens.SetNum(LineModels.Num());
+		Task.LineTokens.SetNum(LineModels.Num());
+		Task.LineNumbers.SetNum(LineModels.Num());
 		for (int32 LineIndex = 0; LineIndex < LineModels.Num(); LineIndex++)
 		{
+			//Snapshot the unfolded line number so the worker thread can map editor lines back
+			//to lines in CurrentShaderSource even if the main thread modifies LineNumberData later.
+			int32 UnfoldedLineNumber = GetLineNumber(LineIndex);
+			Task.LineNumbers[LineIndex] = UnfoldedLineNumber;
+
 			ShaderTokenizer::TokenizedLine* CurTokenizedLine = static_cast<ShaderTokenizer::TokenizedLine*>(LineModels[LineIndex].CustomData.Get());
 			if (CurTokenizedLine)
 			{
 				for (const ShaderTokenizer::Token& Token : CurTokenizedLine->Tokens)
 				{
-					STask.LineTokens[LineIndex].Add(Token);
+					Task.LineTokens[LineIndex].Add(Token);
 				}
 			}
 		}
-		bRefreshSyntax.store(false, std::memory_order_relaxed);
-		SyntaxQueue.Enqueue(MoveTemp(STask));
-		SyntaxEvent->Trigger();
+		bRefreshLang.store(false, std::memory_order_relaxed);
+		LangQueue.Enqueue(MoveTemp(Task));
+		LangEvent->Trigger();
 	}
 
 	void SShaderEditorBox::RefreshSyntaxHighlight()
@@ -1837,9 +1815,12 @@ constexpr int PaddingLineNum = 22;
 		TArray<Vector2u> InactiveLineRange = SyntaxTUCopy->GetInactiveRegions();
 		int32 ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
 		
-		// Returns the index of the inactive region the line is in, or INDEX_NONE if not inactive
-		auto GetInactiveRegionIndex = [&InactiveLineRange, ExtraLineNum](int32 LineIndex) -> int32 {
-			int32 LineNumber = LineIndex + 1 + ExtraLineNum;
+		// Returns the index of the inactive region the line is in, or INDEX_NONE if not inactive.
+		// The TU is built from the unfolded source, so map the editor line back to its
+		// unfolded line number via GetLineNumber to compensate for code folding.
+		auto GetInactiveRegionIndex = [this, &InactiveLineRange, ExtraLineNum](int32 LineIndex) -> int32 {
+			int32 UnfoldedLineNumber = GetLineNumber(LineIndex);
+			int32 LineNumber = UnfoldedLineNumber + ExtraLineNum;
 			for (int32 i = 0; i < InactiveLineRange.Num(); i++)
 			{
 				const Vector2u& Range = InactiveLineRange[i];
@@ -2142,21 +2123,16 @@ constexpr int PaddingLineNum = 22;
 		//Which leads to a delay of one frame in the drawing of the list, so here we tick it earlier.
 		ShaderMultiLineEditableTextLayout->Tick(ShaderMultiLineEditableText->GetTickSpaceGeometry(), InCurrentTime, InDeltaTime);
         
-		if (bRefreshIsense.load(std::memory_order_acquire))
-		{
-			RefreshLineNumberToDiagInfo();
-			RefreshScrollBarMarkers();
-			RefreshCodeCompletionTip();
-			bRefreshIsense.store(false, std::memory_order_relaxed);
-		}
-
-		if (bRefreshSyntax.load(std::memory_order_acquire))
+		if (bRefreshLang.load(std::memory_order_acquire))
 		{
 			SyntaxTUCopy = SyntaxTU;
 			LineSyntaxHighlightMapsCopy = LineSyntaxHighlightMaps;
 
+			RefreshLineNumberToDiagInfo();
+			RefreshScrollBarMarkers();
+			RefreshCodeCompletionTip();
 			RefreshSyntaxHighlight();
-			bRefreshSyntax.store(false, std::memory_order_relaxed);
+			bRefreshLang.store(false, std::memory_order_relaxed);
 		}
 
         UpdateEffectText();

@@ -18,6 +18,16 @@ VsOutput MainVS(in uint VertID : SV_VertexID)
 Texture2D InputTex : register(t0, space2);
 SamplerState InputTexSampler : register(s1, space2);
 
+#if DEPTH_OUTPUT
+float MainPS(VsOutput Input) : SV_Depth
+{
+	float2 UV = Input.UV;
+#if FLIP_Y
+	UV.y = 1 - UV.y;
+#endif
+	return InputTex.Sample(InputTexSampler, UV).r;
+}
+#else
 float4 MainPS(VsOutput Input) : SV_Target
 {
 	float2 UV = Input.UV;
@@ -41,3 +51,4 @@ float4 MainPS(VsOutput Input) : SV_Target
 	return color;
 #endif
 }
+#endif

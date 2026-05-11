@@ -1,6 +1,6 @@
 #include "CommonHeader.h"
 #include "MeshRenderObject.h"
-#include "MeshPassNode.h"
+#include "Nodes/MeshPassNode.h"
 #include "App/App.h"
 #include "AssetObject/Pins/Pins.h"
 #include "AssetObject/Render/MeshSceneObject.h"
@@ -944,7 +944,7 @@ namespace SH
 		const TArray<MeshBuffers>& GpuMeshes = ModelAsset->GetGpuMeshes();
 
 		GpuTexture* ReferenceTexture = nullptr;
-		for (const TRefCountPtr<GpuTexture>& ColorRT : OwnerNode->GetLastActiveColorRTs())
+		for (const TRefCountPtr<GpuTexture>& ColorRT : OwnerNode->GetOutputColorRTs())
 		{
 			if (ColorRT)
 			{
@@ -952,9 +952,9 @@ namespace SH
 				break;
 			}
 		}
-		if (!ReferenceTexture && OwnerNode->GetLastActiveDepthRT())
+		if (!ReferenceTexture && OwnerNode->GetOutputDepthRT())
 		{
-			ReferenceTexture = OwnerNode->GetLastActiveDepthRT().GetReference();
+			ReferenceTexture = OwnerNode->GetOutputDepthRT().GetReference();
 		}
 		if (!ReferenceTexture)
 		{
@@ -969,12 +969,13 @@ namespace SH
 			.ClearValues = Vector4f(0, 0, 0, 0),
 		}, GpuResourceState::RenderTargetWrite);
 
-		TOptional<Camera> Cam = OwnerNode->GetLastCamera();
+		const MeshPassDebugFrameState& FrameState = OwnerNode->GetDebugFrameState();
+		const TOptional<Camera>& Cam = FrameState.Camera;
 		const FMatrix44f ViewMat = Cam.IsSet() ? Cam.GetValue().GetViewMatrix() : FMatrix44f::Identity;
 		const FMatrix44f ProjMat = Cam.IsSet() ? Cam.GetValue().GetProjectionMatrix() : FMatrix44f::Identity;
 		const FMatrix44f WorldMat = MeshSceneObjectRef->GetWorldMatrix();
 		const Vector2f ViewportSize((float)ReferenceTexture->GetWidth(), (float)ReferenceTexture->GetHeight());
-		const Vector2f MousePos = OwnerNode->GetLastMousePos();
+		const Vector2f MousePos = FrameState.MousePos;
 		const Vector3f CameraPos = Cam.IsSet() ? Cam.GetValue().Position : Vector3f(0, 0, 0);
 		const Vector3f CameraDir = Cam.IsSet() ? GetCameraDir(&Cam.GetValue()) : Vector3f(0, 0, 0);
 		const float Time = TSingleton<ShProjectManager>::Get().GetProject()->TimelineCurTime;
@@ -1057,7 +1058,7 @@ namespace SH
 		{
 			TArray<MeshBuffers> Meshes = MeshSceneObjectRef->ModelAsset->GetGpuMeshes();
 			return PixelState{
-				.ViewPortDesc = OwnerNode->GetLastViewPortDesc(),
+				.ViewPortDesc = OwnerNode->GetOutputViewPortDesc(),
 				.Builders = BuildDebugBindingBuilders(),
 				.PipelineDesc = PipelineDesc,
 				.DrawFunction = [Meshes](GpuRenderPassRecorder* Recorder) {

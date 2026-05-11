@@ -290,16 +290,16 @@ namespace SH
 	DebugTargetInfo MeshPassNode::MakeDebugTargetInfo(TRefCountPtr<GpuTexture> CoverageMask) const
 	{
 		DebugTargetInfo Target;
-		for (int32 i = 0; i < LastActiveColorRTs.Num(); ++i)
+		for (int32 i = 0; i < CachedColorRTs.Num(); ++i)
 		{
-			if (LastActiveColorRTs[i])
+			if (CachedColorRTs[i])
 			{
-				Target.Outputs.Add({ ColorPinName(i), LastActiveColorRTs[i] });
+				Target.Outputs.Add({ ColorPinName(i), CachedColorRTs[i] });
 			}
 		}
-		if (LastActiveDepthRT)
+		if (CachedDepthRT)
 		{
-			Target.Outputs.Add({ TEXT("Depth"), LastActiveDepthRT });
+			Target.Outputs.Add({ TEXT("Depth"), CachedDepthRT });
 		}
 		for (int32 Index = 0; Index < Target.Outputs.Num(); ++Index)
 		{
@@ -399,13 +399,12 @@ namespace SH
 			CachedDepthFormat = DepthFormat;
 		}
 
-		TArray<TRefCountPtr<GpuTexture>> ActiveColorRTs;
-		ActiveColorRTs.SetNum(CachedColorRTs.Num());
 		TArray<uint8> ColorInputConnected;
 		ColorInputConnected.SetNumZeroed(CachedColorRTs.Num());
+		TArray<TRefCountPtr<GpuTexture>> ColorInputSources;
+		ColorInputSources.SetNum(CachedColorRTs.Num());
 		for (int32 i = 0; i < CachedColorRTs.Num(); ++i)
 		{
-			ActiveColorRTs[i] = CachedColorRTs[i];
 			const FString InputPinName = ColorPinName(i);
 			GpuTexturePin* InputPin = DynamicCast<GpuTexturePin>(GetPin(InputPinName, PinDirection::Input));
 			if (!InputPin || !InputPin->GetSourcePin())
@@ -434,11 +433,11 @@ namespace SH
 				return { true, true };
 			}
 
-			ActiveColorRTs[i] = InputTexture;
+			ColorInputSources[i] = InputTexture;
 			ColorInputConnected[i] = 1;
 		}
 
-		TRefCountPtr<GpuTexture> ActiveDepthRT = CachedDepthRT;
+		TRefCountPtr<GpuTexture> DepthInputSource;
 		bool bHasDepthInput = false;
 		if (bDepthEnabled)
 		{
@@ -465,7 +464,7 @@ namespace SH
 					return { true, true };
 				}
 
-				ActiveDepthRT = InputTexture;
+				DepthInputSource = InputTexture;
 				bHasDepthInput = true;
 			}
 		}
@@ -473,14 +472,14 @@ namespace SH
 		TRefCountPtr<GpuTexture> PreviewSourceTex;
 		if (PreviewOutputName == TEXT("Depth"))
 		{
-			PreviewSourceTex = ActiveDepthRT;
+			PreviewSourceTex = CachedDepthRT;
 		}
 		else if (PreviewOutputName.StartsWith(TEXT("Color")))
 		{
 			const int32 PreviewColorIndex = FCString::Atoi(*PreviewOutputName.RightChop(5));
-			if (ActiveColorRTs.IsValidIndex(PreviewColorIndex))
+			if (CachedColorRTs.IsValidIndex(PreviewColorIndex))
 			{
-				PreviewSourceTex = ActiveColorRTs[PreviewColorIndex];
+				PreviewSourceTex = CachedColorRTs[PreviewColorIndex];
 			}
 		}
 
@@ -508,19 +507,19 @@ namespace SH
 
 		// Build Pass Desc.
 		GpuRenderPassDesc PassDesc;
-		for (int32 i = 0; i < ActiveColorRTs.Num(); ++i)
+		for (int32 i = 0; i < CachedColorRTs.Num(); ++i)
 		{
 			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{
-				ActiveColorRTs[i]->GetDefaultView(),
+				CachedColorRTs[i]->GetDefaultView(),
 				ColorInputConnected[i] ? RenderTargetLoadAction::Load : RenderTargetLoadAction::Clear,
 				RenderTargetStoreAction::Store,
 				ColorRTs[i].ClearValue
 			});
 		}
-		if (ActiveDepthRT.IsValid())
+		if (CachedDepthRT.IsValid())
 		{
 			PassDesc.DepthStencilTarget = GpuDepthStencilTargetInfo{
-				ActiveDepthRT->GetDefaultView(),
+				CachedDepthRT->GetDefaultView(),
 				bHasDepthInput ? RenderTargetLoadAction::Load : RenderTargetLoadAction::Clear,
 				RenderTargetStoreAction::Store,
 				1.0f
@@ -579,14 +578,14 @@ namespace SH
 			return true;
 		};
 
-		for (int32 i = 0; i < ActiveColorRTs.Num(); ++i)
+		for (int32 i = 0; i < CachedColorRTs.Num(); ++i)
 		{
-			if (!ValidateRenderTargetNotShaderInput(ActiveColorRTs[i].GetReference(), ColorPinName(i)))
+			if (!ValidateRenderTargetNotShaderInput(CachedColorRTs[i].GetReference(), ColorPinName(i)))
 			{
 				return { true, true };
 			}
 		}
-		if (!ValidateRenderTargetNotShaderInput(ActiveDepthRT.GetReference(), TEXT("Depth")))
+		if (!ValidateRenderTargetNotShaderInput(CachedDepthRT.GetReference(), TEXT("Depth")))
 		{
 			return { true, true };
 		}
@@ -598,19 +597,40 @@ namespace SH
 			Cam = CameraRef->ToCamera(Aspect);
 		}
 
-		LastActiveColorRTs = ActiveColorRTs;
-		LastActiveDepthRT = ActiveDepthRT;
-		LastColorFormats = ColorFormatKey;
-		LastDepthFormat = DepthFormatKey;
-		LastSampleCount = SampleCount;
-		LastViewPortDesc = GpuViewPortDesc{ (float)Width, (float)Height };
-		LastMousePos = Ctx.MousePos;
-		LastCamera = Cam;
+		DebugFrameState.Camera = Cam;
+		DebugFrameState.MousePos = Ctx.MousePos;
 
 		TArray<ObjectPtr<MeshRenderObject>> MROsCopy = MeshRenderObjects;
 		const Vector2f ViewportSize((float)Width, (float)Height);
 		const Vector2f MousePos = Ctx.MousePos;
 		const float Time = Ctx.Time;
+
+		// Blit connected inputs into the cached internal RTs first. This ensures that
+		// the upstream textures bound on the input pins are not directly used as render
+		// targets, so they remain available as shader resources within this pass.
+		for (int32 i = 0; i < ColorInputSources.Num(); ++i)
+		{
+			if (!ColorInputConnected[i] || !ColorInputSources[i].IsValid())
+			{
+				continue;
+			}
+			BlitPassInput BlitInput;
+			BlitInput.InputView = ColorInputSources[i]->GetDefaultView();
+			BlitInput.InputTexSampler = GpuResourceHelper::GetSampler({});
+			BlitInput.OutputView = CachedColorRTs[i]->GetDefaultView();
+			BlitInput.LoadAction = RenderTargetLoadAction::DontCare;
+			AddBlitPass(*Ctx.RG, BlitInput);
+		}
+		if (bHasDepthInput && DepthInputSource.IsValid() && CachedDepthRT.IsValid())
+		{
+			BlitPassInput DepthBlitInput;
+			DepthBlitInput.InputView = DepthInputSource->GetDefaultView();
+			DepthBlitInput.InputTexSampler = GpuResourceHelper::GetSampler({});
+			DepthBlitInput.DepthOutputView = CachedDepthRT->GetDefaultView();
+			DepthBlitInput.LoadAction = RenderTargetLoadAction::DontCare;
+			AddBlitPass(*Ctx.RG, DepthBlitInput);
+		}
+
 		auto& RenderPass = Ctx.RG->AddRenderPass(ObjectName.ToString(), PassDesc,
 			[MROsCopy, Cam, ViewportSize, MousePos, Time](GpuRenderPassRecorder* Rec) {
 				const Camera* CameraPtr = Cam.IsSet() ? &Cam.GetValue() : nullptr;
@@ -659,18 +679,18 @@ namespace SH
 		}
 
 		// Publish outputs.
-		for (int32 i = 0; i < ActiveColorRTs.Num(); ++i)
+		for (int32 i = 0; i < CachedColorRTs.Num(); ++i)
 		{
 			if (auto* Pin = static_cast<GpuTexturePin*>(GetPin(ColorPinName(i), PinDirection::Output)))
 			{
-				Pin->SetValue(ActiveColorRTs[i]);
+				Pin->SetValue(CachedColorRTs[i]);
 			}
 		}
-		if (ActiveDepthRT.IsValid())
+		if (CachedDepthRT.IsValid())
 		{
 			if (auto* Pin = static_cast<GpuTexturePin*>(GetPin(TEXT("Depth"), PinDirection::Output)))
 			{
-				Pin->SetValue(ActiveDepthRT);
+				Pin->SetValue(CachedDepthRT);
 			}
 		}
 

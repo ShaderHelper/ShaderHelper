@@ -7,13 +7,31 @@ namespace FW
 
 	void AddBlitPass(RenderGraph& Graph, const BlitPassInput& PassInput)
 	{
+		const bool bDepthOutput = PassInput.DepthOutputView.IsValid();
+
 		GpuRenderPassDesc BlitPassDesc;
-		BlitPassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassInput.OutputView, PassInput.LoadAction, RenderTargetStoreAction::Store });
+		if (bDepthOutput)
+		{
+			BlitPassDesc.DepthStencilTarget = GpuDepthStencilTargetInfo{
+				PassInput.DepthOutputView,
+				PassInput.LoadAction,
+				RenderTargetStoreAction::Store,
+				1.0f
+			};
+		}
+		else
+		{
+			BlitPassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassInput.OutputView, PassInput.LoadAction, RenderTargetStoreAction::Store });
+		}
 
 		std::set<FString> VariantDefs = PassInput.VariantDefinitions;
 		if (PassInput.MipLevel >= 0)
 		{
 			VariantDefs.insert(TEXT("USE_MIP_LEVEL"));
+		}
+		if (bDepthOutput)
+		{
+			VariantDefs.insert(TEXT("DEPTH_OUTPUT"));
 		}
 
 		BlitShader* PassShader = GetShader<BlitShader>(VariantDefs);
@@ -24,11 +42,20 @@ namespace FW
 		GpuRenderPipelineStateDesc PipelineDesc{
 			.Vs = PassShader->GetVertexShader(),
 			.Ps = PassShader->GetPixelShader(),
-			.Targets = {
-				{ .TargetFormat = PassInput.OutputView->GetTexture()->GetFormat() }
-			},
 			.BindGroupLayouts = { PassShader->GetBindGroupLayout() },
 		};
+		if (bDepthOutput)
+		{
+			PipelineDesc.DepthStencilState = DepthStencilStateDesc{
+				.DepthFormat = PassInput.DepthOutputView->GetTexture()->GetFormat(),
+				.DepthWriteEnable = true,
+				.DepthCompare = CompareMode::Always,
+			};
+		}
+		else
+		{
+			PipelineDesc.Targets = { { .TargetFormat = PassInput.OutputView->GetTexture()->GetFormat() } };
+		}
 
 		TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
 

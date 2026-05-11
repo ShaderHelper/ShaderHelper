@@ -35,20 +35,19 @@ namespace SH
 		TArray<int32> BreakPointLineNumbers;
     };
 
-	struct ISenseTask
+	struct LangTask
 	{
 		std::optional<ShaderDesc> ShaderDesc;
+
+		//Per editor (visible) line; tokens use offsets relative to the editor line text.
+		TArray<TArray<ShaderTokenizer::Token>> LineTokens;
+		//Unfolded line number (1-based, in CurrentShaderSource) for each editor line, parallel to LineTokens.
+		TArray<int32> LineNumbers;
 
 		FString CursorToken;
 		uint32 Row = 0;
 		uint32 Col = 0;
 		bool IsMemberAccess = false;
-	};
-
-	struct SyntaxTask
-	{
-		std::optional<ShaderDesc> ShaderDesc;
-		TArray<TArray<ShaderTokenizer::Token>> LineTokens;
 	};
 
 	//LineNumber: the line number of the visible shader source in editor
@@ -207,11 +206,6 @@ namespace SH
 		TSharedPtr<FW::ShaderTU> SyntaxTUCopy;
 		TArray<TMap<FTextRange, FW::ShaderTokenType>> LineSyntaxHighlightMaps;
 		TArray<TMap<FTextRange, FW::ShaderTokenType>> LineSyntaxHighlightMapsCopy;
-		TUniquePtr<FThread> SyntaxThread;
-		TQueue<SyntaxTask> SyntaxQueue;
-		std::atomic<bool> bQuitISyntax{};
-		std::atomic<bool> bRefreshSyntax{};
-		FEvent* SyntaxEvent = nullptr;
 		//---------------------------------------
 
 	private:
@@ -247,12 +241,12 @@ namespace SH
 		FCurveSequence FoldingArrowAnim;
         
         //----------CodeComplete and real-time diagnostic----------
-		TUniquePtr<FThread> ISenseThread;
-		TQueue<ISenseTask> ISenseQueue;
+		TUniquePtr<FThread> LangThread;
+		TQueue<LangTask> LangQueue;
 
-		std::atomic<bool> bQuitISense{};
-		std::atomic<bool> bRefreshIsense{};
-		FEvent* ISenseEvent = nullptr;
+		std::atomic<bool> bQuitLang{};
+		std::atomic<bool> bRefreshLang{};
+		FEvent* LangEvent = nullptr;
         TArray<FW::ShaderDiagnosticInfo> DiagnosticInfos;
         FString CurToken;
         TArray<FW::ShaderCandidateInfo> CandidateInfos;
