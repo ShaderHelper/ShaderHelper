@@ -195,6 +195,8 @@ namespace ShaderConductor
             const char* version;
             bool asModule;
 
+            // Target-specific SPIRV-Cross options. HLSL: user_semantic, use_entry_point_interface_order.
+            // MSL: argument_buffers, enable_decoration_binding, force_active_argument_buffer_resources.
             const MacroDefine* options;
             uint32_t numOptions;
         };

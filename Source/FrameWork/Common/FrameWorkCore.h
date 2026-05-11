@@ -93,6 +93,8 @@ namespace FW
 
     public:
 		FGuid GetGuid() const { return Guid; }
+		void RegenerateGuid() { Guid = FGuid::NewGuid(); }
+		void RegenerateGuidRecursive();
 		//Use the serialization system from unreal engine
 		virtual void Serialize(FArchive& Ar);
         virtual void PostLoad();

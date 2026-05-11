@@ -393,6 +393,8 @@ namespace FW
 				FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "GenericCommands.Delete" });
 			MenuBuilder.AddMenuEntry(GraphEditorCommands::Get().Rename, NAME_None, {}, {},
 				FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "GenericCommands.Rename" });
+			MenuBuilder.AddMenuEntry(GraphEditorCommands::Get().Copy, NAME_None, {}, {},
+				FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "GenericCommands.Copy" });
 		}
 		MenuBuilder.EndSection();
 		return MenuBuilder.MakeWidget();

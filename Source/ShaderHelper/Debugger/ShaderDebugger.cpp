@@ -314,8 +314,14 @@ namespace SH
 			Options.force_zero_initialized_variables = true;
 			if (Lang == GpuShaderLanguage::HLSL)
 			{
+				ShaderConductor::MacroDefine SpvHlslOptions[] = {
+				   {"user_semantic", "1"},
+				   {"use_entry_point_interface_order", "1"},
+				};
 				TargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
 				TargetDesc.version = "66";
+				TargetDesc.options = SpvHlslOptions;
+				TargetDesc.numOptions = UE_ARRAY_COUNT(SpvHlslOptions);
 				OutFileExtension = TEXT(".hlsl");
 			}
 			else
@@ -906,54 +912,22 @@ namespace SH
 		Parser.Accept(&MetaVisitor);
 		SpvPixelPreviewerVisitor PreviewVisitor{ PreviewContext, Lang };
 		Parser.Accept(&PreviewVisitor);
-		PreviewVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Preview.spvasm");
 
-		const TArray<uint32>& PatchedSpv = PreviewVisitor.GetPatcher().GetSpv();
+		FString FileExtension = (Lang == GpuShaderLanguage::HLSL) ? TEXT(".hlsl") : TEXT(".glsl");
+		TArray<uint32> PatchedSpv = PreviewVisitor.GetPatcher().GetSpv();
+		FString PatchedSpvAsm = PreviewVisitor.GetPatcher().GetAsm();
+		FFileHelper::SaveStringToFile(PatchedSpvAsm, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Preview" + FileExtension + ".spvasm"));
 
-		ShaderConductor::Compiler::TargetDesc TargetDesc{};
-		ShaderConductor::Compiler::Options Options{};
-		Options.force_zero_initialized_variables = true;
-		FString FileExtension;
 		FString EntryPoint = DebugShader->GetEntryPoint();
-		if (Lang == GpuShaderLanguage::HLSL)
-		{
-			TargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
-			TargetDesc.version = "66";
-			FileExtension = TEXT(".hlsl");
-		}
-		else
-		{
-			Options.vulkanSemantics = true;
-			TargetDesc.language = ShaderConductor::ShadingLanguage::Glsl;
-			TargetDesc.version = "450";
-			FileExtension = TEXT(".glsl");
-		}
-
-		auto EntryPointUTF8 = StringCast<UTF8CHAR>(*EntryPoint);
-		ShaderConductor::Compiler::ResultDesc ShaderResultDesc = ShaderConductor::Compiler::SpvCompile(
-			Options, { PatchedSpv.GetData(), (uint32)PatchedSpv.Num() * 4 },
-			(const char*)EntryPointUTF8.Get(),
-			ShaderConductor::ShaderStage::PixelShader, TargetDesc);
-
-		if (ShaderResultDesc.hasError)
-		{
-			SH_LOG(LogDebugger, Error, TEXT("[Preview] SpvCross error: %s"),
-				*FString(static_cast<const char*>(ShaderResultDesc.errorWarningMsg.Data())));
-			return;
-		}
-
-		FString PatchedSource = { (int32)ShaderResultDesc.target.Size(), static_cast<const char*>(ShaderResultDesc.target.Data()) };
-		FFileHelper::SaveStringToFile(PatchedSource, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / (DebugShader->GetShaderName() + TEXT("Preview") + FileExtension)));
-
 		FString ErrorInfo, WarnInfo;
 		TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
 			.Name = DebugShader->GetShaderName(),
-			.Source = PatchedSource,
+			.Source = PatchedSpvAsm,
 			.Type = DebugShader->GetShaderType(),
 			.EntryPoint = EntryPoint,
-			.Language = Lang,
 		});
-		PatchedShader->CompilerFlag |= GpuShaderCompilerFlag::SkipBindingShift;
+		PatchedShader->SpvCode = MoveTemp(PatchedSpv);
+		PatchedShader->CompilerFlag |= GpuShaderCompilerFlag::CompileFromSpvCode;
 		if (!GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
 		{
 			SH_LOG(LogDebugger, Error, TEXT("[Preview] Compile error: %s"), *ErrorInfo);

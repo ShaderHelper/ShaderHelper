@@ -6,7 +6,7 @@
 #include "RenderResource/Camera.h"
 #include "GpuApi/GpuBindGroupLayout.h"
 #include "GpuApi/GpuBindGroup.h"
-#include "Renderer/MaterialRenderResources.h"
+#include "Renderer/MaterialRenderCommon.h"
 #include "RenderResource/PrintBuffer.h"
 #include "Debugger/DebuggableObject.h"
 
@@ -67,6 +67,8 @@ namespace SH
 		InvocationState GetInvocationState(DebugItem Item) override;
 		void OnFinalizePixel(const FW::Vector2u& PixelCoord) override;
 
+		TRefCountPtr<FW::GpuTexture> BuildCoverageMask();
+
 	public:
 		FW::ObserverObjectPtr<MeshSceneObject> MeshSceneObjectRef;
 		FW::AssetPtr<Material> MaterialAsset;
@@ -81,7 +83,6 @@ namespace SH
 		bool BuildPipeline(const TArray<FW::GpuFormat>& ColorFormats, FW::GpuFormat DepthFormat, uint32 SampleCount);
 		void UpdateMaterialDrawState(const FMatrix44f& ModelMatrix, const FMatrix44f& ViewMat, const FMatrix44f& ProjMat, const FW::Vector2f& ViewportSize, const FW::Vector2f& MousePos, float Time, const FW::Vector3f& CameraPos, const FW::Vector3f& CameraDir);
 		TArray<BindingBuilder> BuildDebugBindingBuilders() const;
-		TRefCountPtr<FW::GpuTexture> BuildCoverageMask();
 		FW::GraphPin* FindOverridePin(const FString& BindingName, const FString& MemberName, FW::BindingShaderStage Stage) const;
 		void EnsureOverridePins();
 		void SyncOverridePinsFromSlots();

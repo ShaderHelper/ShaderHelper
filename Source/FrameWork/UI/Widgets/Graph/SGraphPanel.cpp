@@ -7,6 +7,8 @@
 #include <Widgets/Input/SSearchBox.h>
 #include <Styling/StyleColors.h>
 #include <Fonts/FontMeasure.h>
+#include <Serialization/MemoryReader.h>
+#include <Serialization/MemoryWriter.h>
 
 namespace FW
 {
@@ -48,6 +50,24 @@ namespace FW
 				{
 					SelectedNodes.Last()->HandleRenameAction();
 				}
+			})
+		);
+		UICommandList->MapAction(
+			GraphEditorCommands::Get().Copy,
+			FExecuteAction::CreateLambda([this] {
+				CopySelectedNodes();
+			}),
+			FCanExecuteAction::CreateLambda([this] {
+				return SelectedNodes.Num() > 0;
+			})
+		);
+		UICommandList->MapAction(
+			GraphEditorCommands::Get().Paste,
+			FExecuteAction::CreateLambda([this] {
+				PasteNodes();
+			}),
+			FCanExecuteAction::CreateLambda([this] {
+				return CanPaste();
 			})
 		);
 
@@ -261,23 +281,26 @@ namespace FW
 			}
 			if (MarqueeStart)
 			{
-				Vector2D MarqueeUpperLeft = { FMath::Min((*MarqueeStart).x, MarqueeEnd.x), FMath::Min((*MarqueeStart).y, MarqueeEnd.y) };
-				Vector2D MarqueeBottomRight = { FMath::Max((*MarqueeStart).x, MarqueeEnd.x), FMath::Max((*MarqueeStart).y, MarqueeEnd.y) };
-				TArray<TSharedRef<SGraphNode>> SelectedNodeWidgets;
-				for (int i = 0; i < Nodes.Num(); i++)
+				if (*MarqueeStart != MarqueeEnd)
 				{
-					TSharedRef<SGraphNode> NodeWidget = Nodes[i];
-					Vector2D NodeSize = NodeWidget->GetTickSpaceGeometry().GetLocalSize();
-					Vector2D NodeUpperLeft = MyGeometry.AbsoluteToLocal(NodeWidget->GetTickSpaceGeometry().GetAbsolutePosition());
-					Vector2D NodeBootomRight = NodeUpperLeft + NodeSize;
-					if (FSlateRect::DoRectanglesIntersect({ MarqueeUpperLeft, MarqueeBottomRight }, { NodeUpperLeft, NodeBootomRight }))
+					Vector2D MarqueeUpperLeft = { FMath::Min((*MarqueeStart).x, MarqueeEnd.x), FMath::Min((*MarqueeStart).y, MarqueeEnd.y) };
+					Vector2D MarqueeBottomRight = { FMath::Max((*MarqueeStart).x, MarqueeEnd.x), FMath::Max((*MarqueeStart).y, MarqueeEnd.y) };
+					TArray<TSharedRef<SGraphNode>> SelectedNodeWidgets;
+					for (int i = 0; i < Nodes.Num(); i++)
 					{
-						SelectedNodeWidgets.Add(NodeWidget);
+						TSharedRef<SGraphNode> NodeWidget = Nodes[i];
+						const FGeometry& NodeGeom = NodeWidget->GetTickSpaceGeometry();
+						Vector2D NodeUpperLeft = MyGeometry.AbsoluteToLocal(NodeGeom.GetAbsolutePosition());
+						Vector2D NodeBootomRight = MyGeometry.AbsoluteToLocal(NodeGeom.GetAbsolutePosition() + NodeGeom.GetAbsoluteSize());
+						if (FSlateRect::DoRectanglesIntersect({ MarqueeUpperLeft, MarqueeBottomRight }, { NodeUpperLeft, NodeBootomRight }))
+						{
+							SelectedNodeWidgets.Add(NodeWidget);
+						}
 					}
-				}
-				for (auto NodeWidget : SelectedNodeWidgets)
-				{
-					AddSelectedNode(NodeWidget);
+					for (auto NodeWidget : SelectedNodeWidgets)
+					{
+						AddSelectedNode(NodeWidget);
+					}
 				}
 				MarqueeStart.Reset();
 			}
@@ -742,6 +765,160 @@ namespace FW
 			}
 		}
 		return nullptr;
+	}
+
+	void SGraphPanel::CopySelectedNodes()
+	{
+		if (SelectedNodes.IsEmpty())
+		{
+			return;
+		}
+
+		// Only preserve links between selected nodes. Temporarily strip the
+		// OutPinToInPin map and input-pin SourcePin references that point to
+		// non-selected nodes, then restore them after serialization.
+		TSet<GraphNode*> SelectedNodeSet;
+		for (SGraphNode* Node : SelectedNodes)
+		{
+			SelectedNodeSet.Add(Node->NodeData);
+		}
+
+		auto IsPinInSelection = [&](GraphPin* Pin) {
+			return Pin && SelectedNodeSet.Contains(Pin->GetOwnerNode());
+		};
+
+		TMap<GraphNode*, TMultiMap<ObserverObjectPtr<GraphPin>, ObserverObjectPtr<GraphPin>>> SavedOutMaps;
+		TMap<GraphPin*, ObserverObjectPtr<GraphPin>> SavedSourcePins;
+		for (SGraphNode* Node : SelectedNodes)
+		{
+			GraphNode* NodeData = Node->NodeData;
+			SavedOutMaps.Add(NodeData, NodeData->OutPinToInPin);
+			for (auto It = NodeData->OutPinToInPin.CreateIterator(); It; ++It)
+			{
+				if (!IsPinInSelection(It.Value().Get()))
+				{
+					It.RemoveCurrent();
+				}
+			}
+			for (auto& Pin : NodeData->Pins)
+			{
+				if (Pin->SourcePin.IsValid() && !IsPinInSelection(Pin->SourcePin.Get()))
+				{
+					SavedSourcePins.Add(Pin.Get(), Pin->SourcePin);
+					Pin->SourcePin.Reset();
+				}
+			}
+		}
+
+		ClipboardData.Reset();
+		FMemoryWriter Ar(ClipboardData);
+		int32 Num = SelectedNodes.Num();
+		Ar << Num;
+		for (SGraphNode* Node : SelectedNodes)
+		{
+			FString TypeName = GetRegisteredName(Node->NodeData->DynamicMetaType());
+			Ar << TypeName;
+			Node->NodeData->Serialize(Ar);
+		}
+
+		// Restore.
+		for (auto& [NodeData, SavedMap] : SavedOutMaps)
+		{
+			NodeData->OutPinToInPin = MoveTemp(SavedMap);
+		}
+		for (auto& [Pin, SavedSrc] : SavedSourcePins)
+		{
+			Pin->SourcePin = SavedSrc;
+		}
+	}
+
+	void SGraphPanel::PasteNodes()
+	{
+		if (!CanPaste())
+		{
+			return;
+		}
+
+		FMemoryReader Ar(ClipboardData);
+		int32 Num = 0;
+		Ar << Num;
+
+		TArray<ObjectPtr<GraphNode>> NewNodes;
+		BeginObjectPtrFixup();
+		// Pre-register all currently alive ShObjects in the fixup map so that
+		// external references can still resolve.
+		for (ShObject* LiveObject : GlobalValidShObjects)
+		{
+			RegisterLoadedShObject(LiveObject);
+		}
+		for (int32 i = 0; i < Num; i++)
+		{
+			FString TypeName;
+			Ar << TypeName;
+			MetaType* Mt = GetMetaType(TypeName);
+			auto NewNode = NewShObject<GraphNode>(Mt, GraphData);
+			NewNode->Serialize(Ar);
+			NewNodes.Add(MoveTemp(NewNode));
+		}
+		ResolveObjectPtrFixups();
+		EndObjectPtrFixup();
+
+		// Collect intra-selection link pairs and clear link state on clones
+		// (AddLinkCommand will re-populate it). 
+		struct LinkPair { GraphPin* Out; GraphPin* In; };
+		TArray<LinkPair> LinkPairs;
+		for (auto& NewNode : NewNodes)
+		{
+			for (auto& [OutPtr, InPtr] : NewNode->OutPinToInPin)
+			{
+				if (OutPtr.Get() && InPtr.Get())
+				{
+					LinkPairs.Add({ OutPtr.Get(), InPtr.Get() });
+				}
+			}
+			NewNode->OutPinToInPin.Reset();
+			for (auto& Pin : NewNode->Pins)
+			{
+				Pin->SourcePin.Reset();
+			}
+		}
+
+		// Offset positions so the first pasted node lands at the mouse cursor.
+		const Vector2D MouseGraph = PanelCoordToGraphCoord(MousePos);
+		const Vector2D Offset = MouseGraph - NewNodes[0]->Position;
+
+		// Regenerate Guids on cloned nodes and all their subobjects so they don't collide
+		// with the originals.
+		for (auto& NewNode : NewNodes)
+		{
+			NewNode->RegenerateGuidRecursive();
+			NewNode->Position += Offset;
+		}
+
+		ScopedTransaction Transaction(this);
+		for (auto& NewNode : NewNodes)
+		{
+			DoCommand(MakeShared<AddNodeCommand>(this, NewNode, NewNode->Position));
+		}
+		for (const LinkPair& Pair : LinkPairs)
+		{
+			DoCommand(MakeShared<AddLinkCommand>(this, Pair.Out, Pair.In));
+		}
+
+		// Select all pasted nodes.
+		ClearSelectedNode();
+		TArray<TSharedRef<SGraphNode>> NewWidgets;
+		for (int32 i = 0; i < Nodes.Num(); i++)
+		{
+			if (NewNodes.Contains(Nodes[i]->NodeData))
+			{
+				NewWidgets.Add(Nodes[i]);
+			}
+		}
+		for (auto& Widget : NewWidgets)
+		{
+			AddSelectedNode(Widget);
+		}
 	}
 
 	void RenameNodeCommand::Do()

@@ -1,6 +1,7 @@
 #include "CommonHeader.h"
-#include "Renderer/MaterialRenderResources.h"
+#include "Renderer/MaterialRenderCommon.h"
 #include "RenderResource/Mesh.h"
+#include "RenderResource/Camera.h"
 #include "AssetObject/Texture2D.h"
 #include "AssetObject/TextureCube.h"
 #include "AssetObject/Texture3D.h"
@@ -82,14 +83,6 @@ namespace SH
 			return Value;
 		}
 
-		GpuTexture* GetTextureData(AssetObject* TextureAsset)
-		{
-			if (auto* Texture = dynamic_cast<Texture2D*>(TextureAsset)) return Texture->GetGpuData();
-			if (auto* Texture = dynamic_cast<TextureCube*>(TextureAsset)) return Texture->GetGpuData();
-			if (auto* Texture = dynamic_cast<Texture3D*>(TextureAsset)) return Texture->GetGpuData();
-			return nullptr;
-		}
-
 		GpuResource* GetFallbackTextureView(BindingType InType)
 		{
 			if (InType == BindingType::TextureCube || InType == BindingType::CombinedTextureCubeSampler)
@@ -108,7 +101,7 @@ namespace SH
 			if (OverrideTexture) return OverrideTexture->GetDefaultView();
 			if (ResourceDefault && ResourceDefault->TextureAsset)
 			{
-				if (GpuTexture* Texture = GetTextureData(ResourceDefault->TextureAsset.Get()))
+				if (GpuTexture* Texture = ResolveTextureAssetGpu(ResourceDefault->TextureAsset.Get()))
 				{
 					return Texture->GetDefaultView();
 				}
@@ -654,5 +647,169 @@ VsOutput MainVS(float3 Position : POSITION0) {
 		Recorder->SetVertexBuffer(0, MeshBuffers.VertexBuffer);
 		Recorder->SetIndexBuffer(MeshBuffers.IndexBuffer);
 		Recorder->DrawIndexed(0, MeshBuffers.IndexCount);
+	}
+
+	GpuTexture* ResolveTextureAssetGpu(AssetObject* TextureAsset)
+	{
+		if (auto* Texture = DynamicCast<Texture2D>(TextureAsset)) return Texture->GetGpuData();
+		if (auto* Texture = DynamicCast<TextureCube>(TextureAsset)) return Texture->GetGpuData();
+		if (auto* Texture = DynamicCast<Texture3D>(TextureAsset)) return Texture->GetGpuData();
+		return nullptr;
+	}
+
+	Vector3f GetCameraForwardDir(const Camera& InCamera)
+	{
+		const Vector4f Forward = InCamera.GetWorldRotationMatrix().TransformFVector4(FVector4f(0.0f, 0.0f, 1.0f, 0.0f));
+		return FVector3f(Forward.X, Forward.Y, Forward.Z).GetSafeNormal();
+	}
+
+	MaterialUniformBufferUpdateOptions MakeMaterialUniformOptions(
+		const FMatrix44f& ModelMatrix,
+		const FMatrix44f& ViewMatrix,
+		const FMatrix44f& ProjMatrix,
+		Vector2f ViewportSize,
+		Vector2f MousePos,
+		Vector3f CameraPos,
+		Vector3f CameraDir,
+		float Time)
+	{
+		MaterialUniformBufferUpdateOptions Options;
+		Options.ModelMatrix = ModelMatrix;
+		Options.ViewMatrix = ViewMatrix;
+		Options.ProjMatrix = ProjMatrix;
+		Options.ViewProjMatrix = ViewMatrix * ProjMatrix;
+		Options.MVPMatrix = ModelMatrix * Options.ViewProjMatrix;
+		Options.ViewportSize = ViewportSize;
+		Options.MousePos = MousePos;
+		Options.CameraPos = CameraPos;
+		Options.CameraDir = CameraDir;
+		Options.Time = Time;
+		return Options;
+	}
+
+	bool BuildMaterialPipeline(
+		const Material& InMaterial,
+		const MaterialPipelineBuildOptions& Options,
+		MaterialPipelineBuildResult& OutResult)
+	{
+		OutResult = {};
+
+		if (!InMaterial.VertexShaderAsset)
+		{
+			OutResult.Error = LOCALIZATION("VsNotSpecified");
+			return false;
+		}
+		if (!InMaterial.PixelShaderAsset)
+		{
+			OutResult.Error = LOCALIZATION("PsNotSpecified");
+			return false;
+		}
+
+		GpuShader* Vs = InMaterial.VertexShaderAsset->GetCompiledShader(ShaderType::Vertex);
+		GpuShader* Ps = InMaterial.PixelShaderAsset->GetCompiledShader(ShaderType::Pixel);
+		if (!Vs)
+		{
+			OutResult.Error = LOCALIZATION("VsInvalidShader");
+			return false;
+		}
+		if (!Ps)
+		{
+			OutResult.Error = LOCALIZATION("PsInvalidShader");
+			return false;
+		}
+		if (Vs->GetShaderLanguage() != Ps->GetShaderLanguage())
+		{
+			OutResult.Error = LOCALIZATION("ShaderLanguageMismatch");
+			return false;
+		}
+
+		// VS output / PS input linkage
+		{
+			TArray<GpuShaderStageSemantic> VsOutputs = Vs->GetStageOutputSemantics();
+			TArray<GpuShaderStageSemantic> PsInputs = Ps->GetStageInputSemantics();
+			TArray<FString> MissingSemantics;
+			const bool bHlsl = Vs->GetShaderLanguage() == GpuShaderLanguage::HLSL;
+			for (const auto& PsInput : PsInputs)
+			{
+				if (!PsInput.bRead)
+				{
+					continue;
+				}
+
+				if (bHlsl)
+				{
+					const GpuShaderStageSemantic* MatchingVsOutput = VsOutputs.FindByPredicate([&](const GpuShaderStageSemantic& VsOutput) {
+						return VsOutput.SemanticName.Equals(PsInput.SemanticName, ESearchCase::IgnoreCase)
+							&& VsOutput.SemanticIndex == PsInput.SemanticIndex;
+					});
+					if (!MatchingVsOutput || !MatchingVsOutput->bWritten)
+					{
+						FString SemanticStr = PsInput.SemanticIndex > 0
+							? FString::Printf(TEXT("%s%d"), *PsInput.SemanticName, PsInput.SemanticIndex)
+							: PsInput.SemanticName;
+						MissingSemantics.Add(MoveTemp(SemanticStr));
+					}
+				}
+				else
+				{
+					const GpuShaderStageSemantic* MatchingVsOutput = VsOutputs.FindByPredicate([&](const GpuShaderStageSemantic& VsOutput) {
+						return VsOutput.Location == PsInput.Location;
+					});
+					if (!MatchingVsOutput || !MatchingVsOutput->bWritten)
+					{
+						MissingSemantics.Add(FString::Printf(TEXT("(location %d) %s"), PsInput.Location, *PsInput.Name));
+					}
+					else if (!MatchingVsOutput->Type.IsEmpty() && !PsInput.Type.IsEmpty()
+						&& !MatchingVsOutput->Type.Equals(PsInput.Type, ESearchCase::IgnoreCase))
+					{
+						MissingSemantics.Add(FString::Printf(TEXT("(location %d) %s (type mismatch: VS=%s, PS=%s)"),
+							PsInput.Location, *PsInput.Name, *MatchingVsOutput->Type, *PsInput.Type));
+					}
+				}
+			}
+			if (MissingSemantics.Num() > 0)
+			{
+				FString Joined = FString::Join(MissingSemantics, TEXT(", "));
+				OutResult.Error = FText::Format(LOCALIZATION("SemanticLinkageError"), FText::FromString(Joined));
+				return false;
+			}
+		}
+
+		TArray<PipelineTargetDesc, TFixedAllocator<GpuResourceLimit::MaxRenderTargetNum>> Targets;
+		for (GpuFormat ColorFormat : Options.ColorFormats)
+		{
+			Targets.Add(PipelineTargetDesc{
+				.TargetFormat = ColorFormat,
+				.BlendEnable = InMaterial.BlendEnable,
+				.SrcFactor = InMaterial.SrcBlendFactor,
+				.ColorOp = InMaterial.ColorBlendOp,
+				.DestFactor = InMaterial.DestBlendFactor,
+			});
+		}
+
+		OutResult.Desc = GpuRenderPipelineStateDesc{
+			.Vs = Vs,
+			.Ps = Ps,
+			.Targets = Targets,
+			.BindGroupLayouts = Options.BindGroupLayouts,
+			.VertexLayout = { BuildMaterialMeshVertexLayout(InMaterial) },
+			.RasterizerState = { .FillMode = InMaterial.FillMode, .CullMode = InMaterial.CullMode },
+			.Primitive = InMaterial.Primitive,
+			.SampleCount = Options.SampleCount,
+			.DepthStencilState = (Options.DepthFormat != GpuFormat::NUM && InMaterial.DepthTestEnable)
+				? TOptional<DepthStencilStateDesc>(DepthStencilStateDesc{ .DepthFormat = Options.DepthFormat, .DepthCompare = InMaterial.DepthCompare })
+				: TOptional<DepthStencilStateDesc>(),
+		};
+
+		try
+		{
+			OutResult.Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(OutResult.Desc);
+		}
+		catch (const std::runtime_error& e)
+		{
+			OutResult.Error = FText::FromString(ANSI_TO_TCHAR(e.what()));
+			return false;
+		}
+		return OutResult.Pipeline.IsValid();
 	}
 }

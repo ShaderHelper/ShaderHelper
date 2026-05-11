@@ -9,6 +9,9 @@ namespace FW
 {
 	class PreviewViewPort;
 	class GpuQuerySet;
+	class RenderGraph;
+	struct GpuRenderPassDesc;
+	struct RGRenderPass;
 }
 
 namespace SH
@@ -51,6 +54,7 @@ namespace SH
 	{
 		TOptional<FW::Camera> Camera;
 		FW::Vector2f MousePos = FW::Vector2f(0, 0);
+		float Time = 0.0f;
 	};
 
 	class MeshPassNodeOp : public ShPropertyOp
@@ -91,7 +95,7 @@ namespace SH
 		// Called by property panel after Color RT / Depth target / count changed.
 		void OnRenderTargetsChanged();
 		void RefreshNodeWidget();
-		DebugTargetInfo MakeDebugTargetInfo(TRefCountPtr<FW::GpuTexture> CoverageMask) const;
+		DebugTargetInfo MakeDebugTargetInfo(MeshRenderObject* StopObject);
 		const TArray<TRefCountPtr<FW::GpuTexture>>& GetOutputColorRTs() const { return CachedColorRTs; }
 		TRefCountPtr<FW::GpuTexture> GetOutputDepthRT() const { return CachedDepthRT; }
 		FW::GpuViewPortDesc GetOutputViewPortDesc() const { return FW::GpuViewPortDesc{ (float)CachedRTSize.X, (float)CachedRTSize.Y }; }
@@ -106,6 +110,14 @@ namespace SH
 		TArray<FW::ObjectPtr<MeshRenderObject>> MeshRenderObjects;
 
 	private:
+		struct MeshPassInputState
+		{
+			TArray<uint8> ColorInputConnected;
+			TArray<TRefCountPtr<FW::GpuTexture>> ColorInputSources;
+			TRefCountPtr<FW::GpuTexture> DepthInputSource;
+			bool bHasDepthInput = false;
+		};
+
 		// Cached textures
 		TArray<TRefCountPtr<FW::GpuTexture>> CachedColorRTs;
 		TRefCountPtr<FW::GpuTexture> CachedDepthRT;
@@ -122,6 +134,15 @@ namespace SH
 
 		TArray<FString> GetPreviewOutputNames() const;
 		void NormalizePreviewOutputName();
+		DebugTargetInfo MakeDebugTargetInfoFromRTs(const TArray<TRefCountPtr<FW::GpuTexture>>& ColorRTs, TRefCountPtr<FW::GpuTexture> DepthRT, TRefCountPtr<FW::GpuTexture> CoverageMask) const;
+		MeshPassInputState CollectInputState(uint32 Width, uint32 Height, bool& bOutValid) const;
+		void AddInputBlitPasses(FW::RenderGraph& RG, const MeshPassInputState& InputState, const TArray<TRefCountPtr<FW::GpuTexture>>& TargetColorRTs, TRefCountPtr<FW::GpuTexture> TargetDepthRT) const;
+		FW::GpuRenderPassDesc MakeRenderPassDesc(const TArray<TRefCountPtr<FW::GpuTexture>>& TargetColorRTs, TRefCountPtr<FW::GpuTexture> TargetDepthRT, const TArray<uint8>& ColorInputConnected, bool bHasDepthInput) const;
+		TArray<FW::ObjectPtr<MeshRenderObject>> CollectMeshRenderObjectsThrough(MeshRenderObject* StopObject) const;
+		TArray<FW::GpuFormat> MakeColorFormatKey() const;
+		TRefCountPtr<FW::GpuTexture> CreateColorRT(int32 ColorIndex, uint32 Width, uint32 Height) const;
+		TRefCountPtr<FW::GpuTexture> CreateDepthRT(uint32 Width, uint32 Height) const;
+		FW::RGRenderPass& AddMeshDrawPass(FW::RenderGraph& RG, const FString& Name, FW::GpuRenderPassDesc PassDesc, const TArray<FW::ObjectPtr<MeshRenderObject>>& MROs, const FW::Vector2f& ViewportSize) const;
 		static FW::GpuFormat ToGpuFormat(MeshPassColorFormat F);
 		static FW::GpuFormat ToGpuFormat(MeshPassDepthFormat F);
 		static FString ColorPinName(int32 Idx) { return FString::Printf(TEXT("Color%d"), Idx); }

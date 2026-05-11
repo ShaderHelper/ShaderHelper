@@ -1,6 +1,6 @@
 #pragma once
 #include "AssetObject/Material.h"
-#include "Renderer/MaterialRenderResources.h"
+#include "Renderer/MaterialRenderCommon.h"
 #include "RenderResource/Mesh.h"
 
 namespace FW

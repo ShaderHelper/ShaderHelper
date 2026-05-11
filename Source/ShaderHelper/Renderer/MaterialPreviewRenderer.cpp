@@ -3,13 +3,11 @@
 #include "GpuApi/GpuRhi.h"
 #include "GpuApi/GpuBindGroupLayout.h"
 #include "GpuApi/GpuBindGroup.h"
-#include "Renderer/MaterialRenderResources.h"
+#include "Renderer/MaterialRenderCommon.h"
 #include "RenderResource/Camera.h"
 #include "RenderResource/UniformBuffer.h"
 #include "Common/Util/Math.h"
 #include "ProjectManager/ShProjectManager.h"
-
-#include <stdexcept>
 
 using namespace FW;
 
@@ -210,131 +208,30 @@ namespace SH
 			return true;
 		}
 
-		if (!MaterialAsset->VertexShaderAsset || !MaterialAsset->PixelShaderAsset)
-		{
-			return false;
-		}
-
-		GpuShader* Vs = MaterialAsset->VertexShaderAsset->GetCompiledShader(ShaderType::Vertex);
-		GpuShader* Ps = MaterialAsset->PixelShaderAsset->GetCompiledShader(ShaderType::Pixel);
-		if (!Vs || !Ps)
-		{
-			return false;
-		}
-
-		if (Vs->GetShaderLanguage() != Ps->GetShaderLanguage())
-		{
-			LinkageErrorFunc = []{ return LOCALIZATION("ShaderLanguageMismatch"); };
-			return false;
-		}
-
-		// Validate VS output / PS input linkage before creating pipeline
-		{
-			TArray<GpuShaderStageSemantic> VsOutputs = Vs->GetStageOutputSemantics();
-			TArray<GpuShaderStageSemantic> PsInputs = Ps->GetStageInputSemantics();
-			TArray<FString> MissingSemantics;
-			for (const auto& PsInput : PsInputs)
-			{
-				if (!PsInput.bRead)
-				{
-					continue;
-				}
-
-				if(Vs->GetShaderLanguage() == GpuShaderLanguage::HLSL)
-				{
-					const GpuShaderStageSemantic* MatchingVsOutput = VsOutputs.FindByPredicate([&](const GpuShaderStageSemantic& VsOutput) {
-						return VsOutput.SemanticName.Equals(PsInput.SemanticName, ESearchCase::IgnoreCase)
-							&& VsOutput.SemanticIndex == PsInput.SemanticIndex;
-					});
-					if (!MatchingVsOutput || !MatchingVsOutput->bWritten)
-					{
-						FString SemanticStr = PsInput.SemanticIndex > 0
-							? FString::Printf(TEXT("%s%d"), *PsInput.SemanticName, PsInput.SemanticIndex)
-							: PsInput.SemanticName;
-						MissingSemantics.Add(MoveTemp(SemanticStr));
-					}
-				}
-				else
-				{
-					const GpuShaderStageSemantic* MatchingVsOutput = VsOutputs.FindByPredicate([&](const GpuShaderStageSemantic& VsOutput) {
-						return VsOutput.Location == PsInput.Location;
-					});
-					if (!MatchingVsOutput || !MatchingVsOutput->bWritten)
-					{
-						FString Desc = FString::Printf(TEXT("(location %d) %s"), PsInput.Location, *PsInput.Name);
-						MissingSemantics.Add(MoveTemp(Desc));
-					}
-					else if (!MatchingVsOutput->Type.IsEmpty() && !PsInput.Type.IsEmpty()
-						&& !MatchingVsOutput->Type.Equals(PsInput.Type, ESearchCase::IgnoreCase))
-					{
-						MissingSemantics.Add(FString::Printf(TEXT("(location %d) %s (type mismatch: VS=%s, PS=%s)"),
-							PsInput.Location, *PsInput.Name, *MatchingVsOutput->Type, *PsInput.Type));
-					}
-				}
-			}
-			if (MissingSemantics.Num() > 0)
-			{
-				FString Joined = FString::Join(MissingSemantics, TEXT(", "));
-				LinkageErrorFunc = [Joined]{ return FText::Format(LOCALIZATION("SemanticLinkageError"), FText::FromString(Joined)); };
-				return false;
-			}
-
-			LinkageErrorFunc = nullptr;
-		}
-
 		if (BindGroupLayouts.IsEmpty())
 		{
 			BuildBindGroupFromMaterial();
-			if (LinkageErrorFunc)
-			{
-				return false;
-			}
 		}
 
-		GpuVertexLayoutDesc VertexLayoutDesc = BuildMaterialMeshVertexLayout(*MaterialAsset);
-
-		TArray<GpuBindGroupLayout*> BindGroupLayoutArray;
+		MaterialPipelineBuildOptions Options;
+		Options.ColorFormats.Add(PreviewColorFormat);
+		Options.DepthFormat = PreviewDepthFormat;
+		Options.SampleCount = PreviewSampleCount;
 		for (auto& [_, BindGroupLayout] : BindGroupLayouts)
 		{
-			BindGroupLayoutArray.Add(BindGroupLayout.GetReference());
+			Options.BindGroupLayouts.Add(BindGroupLayout.GetReference());
 		}
 
-		GpuRenderPipelineStateDesc PipelineDesc{
-			.Vs = Vs,
-			.Ps = Ps,
-			.Targets = {
-				{
-					.TargetFormat = PreviewColorFormat,
-					.BlendEnable = MaterialAsset->BlendEnable,
-					.SrcFactor = MaterialAsset->SrcBlendFactor,
-					.ColorOp = MaterialAsset->ColorBlendOp,
-					.DestFactor = MaterialAsset->DestBlendFactor,
-				}
-			},
-			.BindGroupLayouts = MoveTemp(BindGroupLayoutArray),
-			.VertexLayout = { MoveTemp(VertexLayoutDesc) },
-			.RasterizerState = {
-				.FillMode = MaterialAsset->FillMode,
-				.CullMode = MaterialAsset->CullMode,
-			},
-			.Primitive = MaterialAsset->Primitive,
-			.SampleCount = PreviewSampleCount,
-			.DepthStencilState = MaterialAsset->DepthTestEnable ?
-				TOptional<DepthStencilStateDesc>(DepthStencilStateDesc{
-					.DepthFormat = PreviewDepthFormat,
-					.DepthCompare = MaterialAsset->DepthCompare,
-				}) : TOptional<DepthStencilStateDesc>(),
-		};
+		MaterialPipelineBuildResult Result;
+		if (!BuildMaterialPipeline(*MaterialAsset, Options, Result))
+		{
+			FText ErrorText = Result.Error;
+			LinkageErrorFunc = [ErrorText]{ return ErrorText; };
+			return false;
+		}
 
-		try
-		{
-			Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
-		}
-		catch (const std::runtime_error& e)
-		{
-			FString ErrorMsg = ANSI_TO_TCHAR(e.what());
-			LinkageErrorFunc = [ErrorMsg]{ return FText::FromString(ErrorMsg); };
-		}
+		LinkageErrorFunc = nullptr;
+		Pipeline = MoveTemp(Result.Pipeline);
 		return Pipeline.IsValid();
 	}
 
@@ -418,24 +315,15 @@ namespace SH
 		const Vector4f OrbitPos = OrbitRotation.TransformFVector4(FVector4f(0.0f, 0.0f, -CameraDistance, 1.0f));
 		ViewCamera.Position = Vector3f(OrbitPos.X, OrbitPos.Y, OrbitPos.Z);
 
-		const FMatrix44f ModelMatrix = FMatrix44f::Identity;
-		const FMatrix44f ViewMatrix = ViewCamera.GetViewMatrix();
-		const FMatrix44f ProjMatrix = ViewCamera.GetProjectionMatrix();
-		const FMatrix44f ViewProjMatrix = ViewMatrix * ProjMatrix;
-		const FMatrix44f MVPMatrix = ModelMatrix * ViewProjMatrix;
-
-		MaterialUniformBufferUpdateOptions Options;
-		Options.ModelMatrix = ModelMatrix;
-		Options.ViewMatrix = ViewMatrix;
-		Options.ProjMatrix = ProjMatrix;
-		Options.ViewProjMatrix = ViewProjMatrix;
-		Options.MVPMatrix = MVPMatrix;
-		Options.ViewportSize = Vector2f((float)InWidth, (float)InHeight);
-		Options.MousePos = Vector2f(0, 0);
-		Options.CameraPos = ViewCamera.Position;
-		const Vector4f CameraForward = ViewCamera.GetWorldRotationMatrix().TransformFVector4(FVector4f(0.0f, 0.0f, 1.0f, 0.0f));
-		Options.CameraDir = FVector3f(CameraForward.X, CameraForward.Y, CameraForward.Z).GetSafeNormal();
-		Options.Time = TSingleton<ShProjectManager>::Get().GetProject()->TimelineCurTime;
+		MaterialUniformBufferUpdateOptions Options = MakeMaterialUniformOptions(
+			FMatrix44f::Identity,
+			ViewCamera.GetViewMatrix(),
+			ViewCamera.GetProjectionMatrix(),
+			Vector2f((float)InWidth, (float)InHeight),
+			Vector2f(0, 0),
+			ViewCamera.Position,
+			GetCameraForwardDir(ViewCamera),
+			TSingleton<ShProjectManager>::Get().GetProject()->TimelineCurTime);
 		UpdateMaterialUniformBuffers(*MaterialAsset, PreviewUniformBuffers, Options);
 	}
 }

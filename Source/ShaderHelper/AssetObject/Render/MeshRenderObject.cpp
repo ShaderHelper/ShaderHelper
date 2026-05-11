@@ -7,7 +7,7 @@
 #include "Editor/ShaderHelperEditor.h"
 #include "GpuApi/GpuRhi.h"
 #include "GpuApi/GpuResourceHelper.h"
-#include "Renderer/MaterialRenderResources.h"
+#include "Renderer/MaterialRenderCommon.h"
 #include "Renderer/RenderGraph.h"
 #include "RenderResource/Mesh.h"
 #include "ProjectManager/ShProjectManager.h"
@@ -21,7 +21,6 @@
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 
 #include <Widgets/Input/SComboButton.h>
-#include <stdexcept>
 
 using namespace FW;
 
@@ -100,12 +99,6 @@ namespace SH
 			return {};
 		}
 
-		Vector3f GetCameraDir(const Camera* InCamera)
-		{
-			const Vector4f Forward = InCamera->GetWorldRotationMatrix().TransformFVector4(FVector4f(0.0f, 0.0f, 1.0f, 0.0f));
-			return FVector3f(Forward.X, Forward.Y, Forward.Z).GetSafeNormal();
-		}
-
 		int32 GetOverrideByteSize(const FString& Type)
 		{
 			if (IsShaderMatrix4x4Type(Type)) return static_cast<int32>(sizeof(FMatrix44f));
@@ -145,14 +138,6 @@ namespace SH
 		{
 			EnsureOverrideBytesStorage(Slot);
 			return reinterpret_cast<ValueType*>(Slot.Bytes.GetData());
-		}
-
-		GpuTexture* GetTextureData(AssetObject* TextureAsset)
-		{
-			if (auto* Texture = DynamicCast<Texture2D>(TextureAsset)) return Texture->GetGpuData();
-			if (auto* Texture = DynamicCast<TextureCube>(TextureAsset)) return Texture->GetGpuData();
-			if (auto* Texture = DynamicCast<Texture3D>(TextureAsset)) return Texture->GetGpuData();
-			return nullptr;
 		}
 
 		MetaType* GetTextureMetaType(const FString& Type)
@@ -735,7 +720,7 @@ namespace SH
 					return Slot.bIsResource && Slot.BindingName == Binding.Name && Slot.Stage == Binding.Stage;
 				}))
 				{
-					if (GpuTexture* Texture = GetTextureData(Override->TextureAsset.Get())) return Texture;
+					if (GpuTexture* Texture = ResolveTextureAssetGpu(Override->TextureAsset.Get())) return Texture;
 					if (Binding.Type == BindingType::TextureCube || Binding.Type == BindingType::CombinedTextureCubeSampler) return GpuResourceHelper::GetGlobalBlackCubemapTex();
 					if (Binding.Type == BindingType::Texture3D || Binding.Type == BindingType::CombinedTexture3DSampler) return GpuResourceHelper::GetGlobalBlackVolumeTex();
 					return GpuResourceHelper::GetGlobalBlackTex();
@@ -872,20 +857,8 @@ namespace SH
 			BuildBindGroupFromMaterial(false, false);
 		}
 
-		const FMatrix44f ViewProjMat = ViewMat * ProjMat;
-		const FMatrix44f MVPMat = ModelMatrix * ViewProjMat;
-
-		MaterialUniformBufferUpdateOptions UniformOptions;
-		UniformOptions.ModelMatrix = ModelMatrix;
-		UniformOptions.ViewMatrix = ViewMat;
-		UniformOptions.ProjMatrix = ProjMat;
-		UniformOptions.ViewProjMatrix = ViewProjMat;
-		UniformOptions.MVPMatrix = MVPMat;
-		UniformOptions.ViewportSize = ViewportSize;
-		UniformOptions.MousePos = MousePos;
-		UniformOptions.CameraPos = CameraPos;
-		UniformOptions.CameraDir = CameraDir;
-		UniformOptions.Time = Time;
+		MaterialUniformBufferUpdateOptions UniformOptions = MakeMaterialUniformOptions(
+			ModelMatrix, ViewMat, ProjMat, ViewportSize, MousePos, CameraPos, CameraDir, Time);
 		UniformOptions.UniformOverrideBytesResolver = [this](const MaterialBindingMemberDefault& MemberDefault) -> const uint8* {
 			const MaterialOverrideSlot* Override = OverrideSlots.FindByPredicate([&](const MaterialOverrideSlot& Slot) {
 				return !Slot.bIsResource && Slot.BindingName == MemberDefault.BindingName && Slot.MemberName == MemberDefault.MemberName && Slot.Stage == MemberDefault.Stage;
@@ -977,7 +950,7 @@ namespace SH
 		const Vector2f ViewportSize((float)ReferenceTexture->GetWidth(), (float)ReferenceTexture->GetHeight());
 		const Vector2f MousePos = FrameState.MousePos;
 		const Vector3f CameraPos = Cam.IsSet() ? Cam.GetValue().Position : Vector3f(0, 0, 0);
-		const Vector3f CameraDir = Cam.IsSet() ? GetCameraDir(&Cam.GetValue()) : Vector3f(0, 0, 0);
+		const Vector3f CameraDir = Cam.IsSet() ? GetCameraForwardDir(Cam.GetValue()) : Vector3f(0, 0, 0);
 		const float Time = TSingleton<ShProjectManager>::Get().GetProject()->TimelineCurTime;
 		UpdateMaterialDrawState(WorldMat, ViewMat, ProjMat, ViewportSize, MousePos, Time, CameraPos, CameraDir);
 
@@ -1046,7 +1019,7 @@ namespace SH
 		MeshPassNode* OwnerNode = static_cast<MeshPassNode*>(GetOuter());
 		if (Item == DebugItem::Fragment)
 		{
-			return OwnerNode->MakeDebugTargetInfo(BuildCoverageMask());
+			return OwnerNode->MakeDebugTargetInfo(this);
 		}
 		return {};
 	}
@@ -1115,45 +1088,13 @@ namespace SH
 		const MeshPassNode* OwnerNode = static_cast<MeshPassNode*>(GetOuter());
 		const FString NodeName = OwnerNode->ObjectName.ToString();
 		const FString RenderObjectName = ObjectName.ToString();
+		const FString MaterialName = MaterialAsset
+			? (MaterialAsset->GetPath().IsEmpty() ? MaterialAsset->ObjectName.ToString() : MaterialAsset->GetPath())
+			: TEXT("");
 
 		if (!MaterialAsset)
 		{
 			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" MeshRenderObject:\"%s\" cannot build pipeline because no material is assigned."), *NodeName, *RenderObjectName);
-			return false;
-		}
-
-		const FString MaterialPath = MaterialAsset->GetPath();
-		const FString MaterialName = MaterialPath.IsEmpty() ? MaterialAsset->ObjectName.ToString() : MaterialPath;
-		if (!MaterialAsset->VertexShaderAsset)
-		{
-			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" MeshRenderObject:\"%s\" material \"%s\" cannot build pipeline because the vertex shader asset is missing."), *NodeName, *RenderObjectName, *MaterialName);
-			return false;
-		}
-		if (!MaterialAsset->PixelShaderAsset)
-		{
-			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" MeshRenderObject:\"%s\" material \"%s\" cannot build pipeline because the pixel shader asset is missing."), *NodeName, *RenderObjectName, *MaterialName);
-			return false;
-		}
-
-		GpuShader* Vs = MaterialAsset->VertexShaderAsset->GetCompiledShader(ShaderType::Vertex);
-		GpuShader* Ps = MaterialAsset->PixelShaderAsset->GetCompiledShader(ShaderType::Pixel);
-		if (!Vs)
-		{
-			const FString VertexShaderPath = MaterialAsset->VertexShaderAsset->GetPath();
-			const FString VertexShaderName = VertexShaderPath.IsEmpty() ? MaterialAsset->VertexShaderAsset->ObjectName.ToString() : VertexShaderPath;
-			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" MeshRenderObject:\"%s\" material \"%s\" cannot build pipeline because the %s shader is unavailable. Shader asset: %s"), *NodeName, *RenderObjectName, *MaterialName, ANSI_TO_TCHAR(magic_enum::enum_name(ShaderType::Vertex).data()), *VertexShaderName);
-			return false;
-		}
-		if (!Ps)
-		{
-			const FString PixelShaderPath = MaterialAsset->PixelShaderAsset->GetPath();
-			const FString PixelShaderName = PixelShaderPath.IsEmpty() ? MaterialAsset->PixelShaderAsset->ObjectName.ToString() : PixelShaderPath;
-			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" MeshRenderObject:\"%s\" material \"%s\" cannot build pipeline because the %s shader is unavailable. Shader asset: %s"), *NodeName, *RenderObjectName, *MaterialName, ANSI_TO_TCHAR(magic_enum::enum_name(ShaderType::Pixel).data()), *PixelShaderName);
-			return false;
-		}
-		if (Vs->GetShaderLanguage() != Ps->GetShaderLanguage())
-		{
-			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" MeshRenderObject:\"%s\" material \"%s\" cannot build pipeline because shader languages differ (VS=%d, PS=%d)."), *NodeName, *RenderObjectName, *MaterialName, static_cast<int32>(Vs->GetShaderLanguage()), static_cast<int32>(Ps->GetShaderLanguage()));
 			return false;
 		}
 
@@ -1162,51 +1103,22 @@ namespace SH
 			BuildBindGroupFromMaterial();
 		}
 
-		GpuVertexLayoutDesc VertexLayoutDesc = BuildMaterialMeshVertexLayout(*MaterialAsset);
+		MaterialPipelineBuildOptions Options;
+		Options.ColorFormats = ColorFormats;
+		Options.DepthFormat = DepthFormat;
+		Options.SampleCount = SampleCount;
+		for (auto& [_, L] : BindGroupLayouts) Options.BindGroupLayouts.Add(L.GetReference());
 
-		TArray<GpuBindGroupLayout*> LayoutArray;
-		for (auto& [_, L] : BindGroupLayouts) LayoutArray.Add(L.GetReference());
-
-		TArray<PipelineTargetDesc, TFixedAllocator<GpuResourceLimit::MaxRenderTargetNum>> Targets;
-		for (GpuFormat F : ColorFormats)
+		MaterialPipelineBuildResult Result;
+		if (!BuildMaterialPipeline(*MaterialAsset, Options, Result))
 		{
-			Targets.Add(PipelineTargetDesc{
-				.TargetFormat = F,
-				.BlendEnable = MaterialAsset->BlendEnable,
-				.SrcFactor = MaterialAsset->SrcBlendFactor,
-				.ColorOp = MaterialAsset->ColorBlendOp,
-				.DestFactor = MaterialAsset->DestBlendFactor,
-			});
-		}
-
-		GpuRenderPipelineStateDesc Desc{
-			.Vs = Vs,
-			.Ps = Ps,
-			.Targets = Targets,
-			.BindGroupLayouts = LayoutArray,
-			.VertexLayout = { VertexLayoutDesc },
-			.RasterizerState = { .FillMode = MaterialAsset->FillMode, .CullMode = MaterialAsset->CullMode },
-			.Primitive = MaterialAsset->Primitive,
-			.SampleCount = SampleCount,
-			.DepthStencilState = (DepthFormat != GpuFormat::NUM && MaterialAsset->DepthTestEnable)
-				? TOptional<DepthStencilStateDesc>(DepthStencilStateDesc{ .DepthFormat = DepthFormat, .DepthCompare = MaterialAsset->DepthCompare })
-				: TOptional<DepthStencilStateDesc>(),
-		};
-
-		try
-		{
-			PipelineDesc = Desc;
-			Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
-		}
-		catch (const std::runtime_error& Error)
-		{
-			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" MeshRenderObject:\"%s\" material \"%s\" failed to create render pipeline state: %s"), *NodeName, *RenderObjectName, *MaterialName, UTF8_TO_TCHAR(Error.what()));
+			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" MeshRenderObject:\"%s\" material \"%s\" failed to build pipeline: %s"),
+				*NodeName, *RenderObjectName, *MaterialName, *Result.Error.ToString());
 			return false;
 		}
-		if (!Pipeline.IsValid())
-		{
-			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" MeshRenderObject:\"%s\" material \"%s\" failed to create a valid render pipeline state."), *NodeName, *RenderObjectName, *MaterialName);
-		}
+
+		PipelineDesc = MoveTemp(Result.Desc);
+		Pipeline = MoveTemp(Result.Pipeline);
 		return Pipeline.IsValid();
 	}
 
@@ -1251,7 +1163,7 @@ namespace SH
 		}
 
 		const Vector3f CameraPos = InCamera ? InCamera->Position : Vector3f(0, 0, 0);
-		const Vector3f CameraDir = InCamera ? GetCameraDir(InCamera) : Vector3f(0, 0, 0);
+		const Vector3f CameraDir = InCamera ? GetCameraForwardDir(*InCamera) : Vector3f(0, 0, 0);
 		UpdateMaterialDrawState(ModelMatrix, ViewMat, ProjMat, ViewportSize, MousePos, Time, CameraPos, CameraDir);
 
 		TArray<GpuBindGroup*> BGArray;

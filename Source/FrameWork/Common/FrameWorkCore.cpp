@@ -470,7 +470,20 @@ namespace FW
         }
     }
 
-    AssetObject* ShObject::GetOuterMost()
+
+	void ShObject::RegenerateGuidRecursive()
+	{
+		RegenerateGuid();
+		for (auto& SubObject : SubObjects)
+		{
+			if (SubObject.IsValid())
+			{
+				SubObject->RegenerateGuidRecursive();
+			}
+		}
+	}
+
+	AssetObject* ShObject::GetOuterMost()
     {
 		if (IsDefaultObject)
 		{

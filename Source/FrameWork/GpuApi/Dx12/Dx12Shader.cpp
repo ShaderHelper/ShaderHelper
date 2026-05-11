@@ -382,8 +382,14 @@ namespace FW
 		 FString EntryPoint = InShader->GetEntryPoint();
 		 if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::CompileFromSpvCode))
 		 {
+			 ShaderConductor::MacroDefine SpvHlslOptions[] = {
+				{"user_semantic", "1"},
+				{"use_entry_point_interface_order", "1"},
+			 };
 			 ShaderConductor::Compiler::TargetDesc HlslTargetDesc{};
 			 HlslTargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
+			 HlslTargetDesc.options = SpvHlslOptions;
+			 HlslTargetDesc.numOptions = UE_ARRAY_COUNT(SpvHlslOptions);
 			 HlslTargetDesc.version = "66";
 			 ShaderConductor::Compiler::Options Options{};
 			 Options.force_zero_initialized_variables = true;
@@ -428,26 +434,28 @@ namespace FW
 
 			 std::vector<uint32> Spv = { Result.cbegin(), Result.cend() };
 			 TArray<uint32> SpvCode = { Spv.data(), (int)Spv.size() };
+
+#if DEBUG_SHADER
+			 ShaderConductor::Compiler::DisassembleDesc SpvDisassembleDesc{
+				 .language = ShaderConductor::ShadingLanguage::SpirV,
+				 .binary = (uint8*)SpvCode.GetData(),
+				 .binarySize = (uint32_t)SpvCode.Num() * 4,
+			 };
+			 ShaderConductor::Compiler::ResultDesc SpvTextResultDesc = ShaderConductor::Compiler::Disassemble(SpvDisassembleDesc);
+			 FString SpvSourceText = { (int32)SpvTextResultDesc.target.Size(), static_cast<const char*>(SpvTextResultDesc.target.Data()) };
+			 if (SpvTextResultDesc.hasError)
+			 {
+				 FString ErrorInfo = static_cast<const char*>(SpvTextResultDesc.errorWarningMsg.Data());
+				 SpvSourceText = MoveTemp(ErrorInfo);
+			 }
+			 if (!ShaderName.IsEmpty())
+			 {
+				 FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".glsl" + ".spvasm"));
+			 }
+#endif
+
 			 if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
 			 {
-#if DEBUG_SHADER
-				 ShaderConductor::Compiler::DisassembleDesc SpvDisassembleDesc{
-					 .language = ShaderConductor::ShadingLanguage::SpirV,
-					 .binary = (uint8*)SpvCode.GetData(),
-					 .binarySize = (uint32_t)SpvCode.Num() * 4,
-				 };
-				 ShaderConductor::Compiler::ResultDesc SpvTextResultDesc = ShaderConductor::Compiler::Disassemble(SpvDisassembleDesc);
-				 FString SpvSourceText = { (int32)SpvTextResultDesc.target.Size(), static_cast<const char*>(SpvTextResultDesc.target.Data()) };
-				 if (SpvTextResultDesc.hasError)
-				 {
-					 FString ErrorInfo = static_cast<const char*>(SpvTextResultDesc.errorWarningMsg.Data());
-					 SpvSourceText = MoveTemp(ErrorInfo);
-				 }
-				 if (!ShaderName.IsEmpty())
-				 {
-					 FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".glsl" + ".spvasm"));
-				 }
-#endif
 				 InShader->SpvCode = MoveTemp(SpvCode);
 				 return true;
 			 }
@@ -516,7 +524,7 @@ namespace FW
 			Arguments.Add(TEXT("-Vd"));
 			Arguments.Add(TEXT("-fvk-use-dx-layout"));
 			Arguments.Add(TEXT("-fspv-debug=vulkan-with-source"));
-			//Arguments.Add(TEXT("-fspv-reflect"));
+			Arguments.Add(TEXT("-fspv-reflect"));
 		}
 
 		ValidateGpuFeature(GDx12GpuRhi->GetFeature().Support16bitType(), TEXT("Hardware does not support 16bitType, shader model <= 6.2"))

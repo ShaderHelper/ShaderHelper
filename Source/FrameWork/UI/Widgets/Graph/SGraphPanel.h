@@ -230,6 +230,10 @@ namespace FW
 		void DeleteSelectedNodes();
 		void DeleteNode(SGraphNode* Node);
 		SGraphNode* GetNode(GraphNode* NodeData);
+
+		void CopySelectedNodes();
+		void PasteNodes();
+		bool CanPaste() const { return ClipboardData.Num() > 0 && GraphData != nullptr; }
 		
 		SGraphPin* GetGraphPin(FGuid PinId);
 		SGraphPin* GetOuputPin(SGraphPin* InputPin) const;
@@ -267,6 +271,8 @@ namespace FW
 
 		TArray<TSharedPtr<FText>> MenuNodeItems;
 		TSharedPtr<SListView<TSharedPtr<FText>>> MenuNodeList;
+
+		TArray<uint8> ClipboardData;
 
 		//OutputPin to InputPin
 		TMultiMap<SGraphPin*, SGraphPin*> Links;
