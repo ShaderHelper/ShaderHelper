@@ -6,6 +6,7 @@
 namespace SH
 {
 	class SceneObject;
+	class CameraSceneObject;
 	class SSceneView;
 	enum class GizmoMode : int32;
 	enum class GizmoSpace : int32;
@@ -37,6 +38,10 @@ namespace SH
 		void RenderPreview();
 		void RenderGraph();
 		bool IsScenePreviewActive() const;
+		CameraSceneObject* GetGraphPreviewCameraObject() const;
+		bool IsCameraControlActive() const;
+		void SyncPreviewCameraFromGraphCamera();
+		void SyncGraphCameraFromPreviewCamera();
 		void ResetScenePreviewInteractionState();
 
 		FReply OnMouseDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent);

@@ -3,7 +3,6 @@
 #include "MeshSceneObject.h"
 #include "CameraSceneObject.h"
 #include "AssetObject/Render/Nodes/MeshPassNode.h"
-#include "App/App.h"
 #include "AssetManager/AssetManager.h"
 #include "AssetObject/Nodes/Texture2dNode.h"
 #include "AssetObject/Nodes/Texture3dNode.h"
@@ -12,6 +11,7 @@
 #include "AssetObject/Texture3D.h"
 #include "AssetObject/TextureCube.h"
 #include "Editor/ShaderHelperEditor.h"
+#include "UI/Widgets/AssetBrowser/AssetViewItem/AssetViewItem.h"
 #include "UI/Widgets/Graph/SGraphPanel.h"
 
 using namespace FW;
@@ -72,11 +72,8 @@ namespace SH
 
 	REFLECTION_REGISTER(AddClass<Render>("Render")
 		.BaseClass<Graph>()
+		.Data<&Render::PreviewCamera, MetaInfo::Property>(LOCALIZATION("PreviewCamera"))
 	)
-
-	Render::~Render()
-	{
-	}
 
 	FString Render::FileExtension() const
 	{
@@ -88,6 +85,7 @@ namespace SH
 		Graph::Serialize(Ar);
 
 		SerializePolymorphicObjectArray(Ar, SceneObjects, this);
+		Ar << PreviewCamera;
 	}
 
 	void Render::PostLoad()
@@ -106,6 +104,11 @@ namespace SH
 	void Render::RemoveSceneObject(SceneObject* InObject)
 	{
 		RemoveMeshPassReferencesToSceneObject(this, InObject);
+
+		if (PreviewCamera.Get() == InObject)
+		{
+			PreviewCamera.Reset();
+		}
 
 		if (InObject->Parent.IsValid())
 		{

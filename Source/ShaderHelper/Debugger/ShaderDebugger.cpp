@@ -10,6 +10,8 @@
 #include "AssetObject/ShaderAsset.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 #include "UI/Widgets/Debugger/SDebuggerWatchView.h"
+#include "UI/Widgets/Debugger/SDebuggerVariableView.h"
+#include "UI/Widgets/Debugger/SDebuggerCallStackView.h"
 #include "Renderer/RenderGraph.h"
 
 #include <stdexcept>

@@ -1,7 +1,6 @@
 #include "CommonHeader.h"
 #include "MaterialPreviewRenderer.h"
 #include "GpuApi/GpuRhi.h"
-#include "GpuApi/GpuBindGroupLayout.h"
 #include "GpuApi/GpuBindGroup.h"
 #include "Renderer/MaterialRenderCommon.h"
 #include "RenderResource/Camera.h"

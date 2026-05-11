@@ -8,7 +8,6 @@
 #include "UI/Widgets/AssetBrowser/AssetViewItem/AssetViewAssetItem.h"
 #include "UI/Styles/FAppCommonStyle.h"
 #include "Editor/AssetEditor/AssetEditor.h"
-#include "ProjectManager/ProjectManager.h"
 #include "Editor/AssetViewCommands.h"
 #include "App/App.h"
 #include "PluginManager/PluginManager.h"

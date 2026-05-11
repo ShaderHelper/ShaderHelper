@@ -1,12 +1,12 @@
 #include "CommonHeader.h"
 #include "Shader.h"
 #include "AssetManager/AssetManager.h"
-#include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "UI/Widgets/Property/PropertyData/PropertyItem.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
+#include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
 
 #include <regex>
 

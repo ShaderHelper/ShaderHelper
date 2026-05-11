@@ -4,10 +4,8 @@
 #include "AssetObject/Render/CameraSceneObject.h"
 #include "AssetObject/Model.h"
 #include "AssetManager/AssetManager.h"
-#include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "Editor/SceneViewCommands.h"
-#include "UI/Widgets/Misc/MiscWidget.h"
 #include "UI/Widgets/Misc/CommonTableRow.h"
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "UI/Widgets/AssetBrowser/AssetViewItem/AssetViewItem.h"
@@ -181,19 +179,18 @@ namespace SH
 			});
 		}
 
-		FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
+		FReply OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
 		{
-			FReply Reply = SDropTargetTableRow::OnMouseButtonDown(MyGeometry, MouseEvent);
+			FReply Reply = SDropTargetTableRow::OnMouseButtonUp(MyGeometry, MouseEvent);
 
 			if (SceneViewPtr && Item && Item->Object
-				&& MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+				&& MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton
+				&& SceneViewPtr->IsObjectSelected(Item->Object.Get()))
 			{
 				auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-				if (SceneViewPtr->IsObjectSelected(Item->Object.Get()))
-				{
-					ShEditor->ShowProperty(Item->Object.Get());
-				}
+				ShEditor->ShowProperty(Item->Object.Get());
 			}
+
 			return Reply;
 		}
 

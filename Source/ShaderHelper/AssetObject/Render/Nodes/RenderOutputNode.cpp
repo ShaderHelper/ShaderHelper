@@ -1,6 +1,5 @@
 #include "CommonHeader.h"
 #include "RenderOutputNode.h"
-#include "App/App.h"
 #include "AssetObject/Pins/Pins.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "Renderer/RenderRenderComp.h"

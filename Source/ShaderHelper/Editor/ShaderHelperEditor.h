@@ -1,36 +1,49 @@
 #pragma once
+#include "App/App.h"
 #include "Editor/Editor.h"
-#include "Editor/PreviewViewPort.h"
-#include "AssetObject/ShaderAsset.h"
-#include "AssetObject/Graph.h"
 #include "AssetManager/AssetManager.h"
-#include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
-#include "Renderer/RenderComponent.h"
-#include "Renderer/Renderer.h"
-#include "ProjectManager/ShProjectManager.h"
-#include "UI/Widgets/Log/SOutputLog.h"
 #include "UI/Widgets/Property/PropertyView/SPropertyView.h"
-#include "UI/Widgets/Debugger/SFragmentDebuggerViewport.h"
-#include "UI/Widgets/Debugger/SVertexDebuggerViewport.h"
-#include "UI/Widgets/Debugger/SDebuggerVariableView.h"
-#include "UI/Widgets/Debugger/SDebuggerCallStackView.h"
-#include "UI/Widgets/Debugger/SDebuggerWatchView.h"
-#include "UI/Widgets/Preference/SPreferenceView.h"
-#include "UI/Widgets/Scene/SSceneView.h"
-#include "UI/Widgets/Misc/SShWindow.h"
 #include "UI/Widgets/SShViewport.h"
 #include "Debugger/ShaderDebugger.h"
 
 #include <Widgets/SViewport.h>
+#include <Framework/Docking/TabManager.h>
+#include <Framework/Text/TextLayout.h>
+
+class FMenuBarBuilder;
+class FMenuBuilder;
+class FSpawnTabArgs;
+class FToolBarBuilder;
+class FUICommandList;
+class SScrollBox;
 
 namespace FW
 {
+	class Graph;
+	class PreviewViewPort;
+	class RenderComponent;
+	class SAssetBrowser;
 	class SGraphPanel;
+	class SOutputLog;
+	class SShWindow;
 }
 
 namespace SH
 {
+	class DebuggableObject;
+	enum class DebugItem;
+	enum class GizmoMode : int32;
+	enum class GizmoSpace : int32;
+	class SDebuggerCallStackView;
+	class SDebuggerVariableView;
+	class SDebuggerWatchView;
+	class SFragmentDebuggerViewport;
+	class SPreferenceView;
+	class SSceneView;
 	class SShaderEditorBox;
+	class SVertexDebuggerViewport;
+	class ShaderAsset;
+	class ShProject;
 	class ShRenderer;
 
 	const FName PreviewTabId = "Preview";
@@ -66,8 +79,8 @@ namespace SH
 		FW::RenderComponent* GetGraphRenderComp() const { return GraphRenderComp.Get(); }
         FTabManager* GetCodeTabManager() const { return CodeTabManager.Get(); }
 		FTabManager* GetTabManager() const { return TabManager.Get(); }
-		TSharedPtr<SWindow> GetMainWindow() const override { return MainWindow; }
-		TWeakPtr<SWindow> GetPreferenceWindow() const { return PreferenceWindow; }
+		TSharedPtr<SWindow> GetMainWindow() const override;
+		TWeakPtr<SWindow> GetPreferenceWindow() const;
 		FW::PreviewViewPort* GetViewPort() const { return ViewPort.Get(); }
 		FW::ShObject* GetCurPropertyObject() const { 
 			return CurPropertyObject.IsValid() ? CurPropertyObject.Get() : nullptr;
@@ -81,10 +94,10 @@ namespace SH
 		FW::SGraphPanel* GetGraphPanel() const { return GraphPanel.Get(); }
 		FW::SAssetBrowser* GetAssetBrowser() const { return AssetBrowser.Get(); }
 		SSceneView* GetSceneView() const { return SceneView.Get(); }
-		GizmoMode GetGizmoMode() const { return CurProject->GizmoMode; }
-		void SetGizmoMode(GizmoMode Mode) { CurProject->GizmoMode = Mode; }
-		GizmoSpace GetGizmoSpace() const { return CurProject->GizmoSpace; }
-		bool IsScenePreview() const { return CurProject->bScenePreview; }
+		GizmoMode GetGizmoMode() const;
+		void SetGizmoMode(GizmoMode Mode);
+		GizmoSpace GetGizmoSpace() const;
+		bool IsScenePreview() const;
 		ShaderDebugger& GetDebugger() { return Debugger; }
 		void InvokeDebuggerTabs();
 		void CloseDebuggerTabs();
@@ -103,10 +116,10 @@ namespace SH
         void RefreshProperty(bool bClear = false);
 		void ShowProperty(FW::ShObject* InObjectData) override;
         void UpdateShaderPath(const FString& InShaderPath);
-		bool IsPropertyLocked() { return PropertyView->IsLocked(); }
+		bool IsPropertyLocked() const;
 		void AddNavigationInfo(FW::AssetPtr<ShaderAsset> InShader, const FTextLocation& InLocation);
 		
-		DebuggableObject* GetDebuggaleObject() const { return CurDebuggableObject.IsValid() ? dynamic_cast<DebuggableObject*>(CurDebuggableObject.Get()) : nullptr; }
+		DebuggableObject* GetDebuggaleObject() const;
 		bool IsInDebugging() const { return IsDebugging; }
 		void SetDebuggableObject(FW::ShObject* InObject);
 		DebugItem GetCurrentDebugItem() const { return CurrentDebugItem; }
@@ -205,7 +218,7 @@ namespace SH
 		DebuggerLocation LinePreviewLocation;
 		TSharedPtr<SWindow> ShaderEditorTipWindow;
 		FW::ObserverObjectPtr<FW::ShObject> CurDebuggableObject;
-		DebugItem CurrentDebugItem = DebugItem::Fragment;
+		DebugItem CurrentDebugItem;
 		bool IsDebugging{};
 		ShaderDebugger Debugger;
 

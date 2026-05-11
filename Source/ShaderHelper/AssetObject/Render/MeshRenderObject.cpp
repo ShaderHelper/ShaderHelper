@@ -1,7 +1,6 @@
 #include "CommonHeader.h"
 #include "MeshRenderObject.h"
 #include "Nodes/MeshPassNode.h"
-#include "App/App.h"
 #include "AssetObject/Pins/Pins.h"
 #include "AssetObject/Render/MeshSceneObject.h"
 #include "Editor/ShaderHelperEditor.h"
@@ -1140,19 +1139,20 @@ namespace SH
 			return;
 		}
 		MeshSceneObject* MSO = MeshSceneObjectRef.Get();
-		if (!MSO->ModelAsset) return;
 
-		Model* ModelAsset = MSO->ModelAsset.Get();
 		const FMatrix44f ViewMat = InCamera ? InCamera->GetViewMatrix() : FMatrix44f::Identity;
 		const FMatrix44f ProjMat = InCamera ? InCamera->GetProjectionMatrix() : FMatrix44f::Identity;
 		const FMatrix44f MVPMat = ModelMatrix * (ViewMat * ProjMat);
 
 		if (bDrawMaterialError)
 		{
-			const TArray<MeshBuffers>& GpuMeshes = ModelAsset->GetGpuMeshes();
-			for (const MeshBuffers& MeshBuffer : GpuMeshes)
+			if (Model* ErrorModel = MSO->ModelAsset.Get())
 			{
-				DrawMaterialErrorMesh(Recorder, ErrorResources, MeshBuffer, MVPMat);
+				const TArray<MeshBuffers>& GpuMeshes = ErrorModel->GetGpuMeshes();
+				for (const MeshBuffers& MeshBuffer : GpuMeshes)
+				{
+					DrawMaterialErrorMesh(Recorder, ErrorResources, MeshBuffer, MVPMat);
+				}
 			}
 			return;
 		}
@@ -1169,14 +1169,22 @@ namespace SH
 		TArray<GpuBindGroup*> BGArray;
 		for (auto& [_, BG] : BindGroups) BGArray.Add(BG.GetReference());
 
-		const TArray<MeshBuffers>& GpuMeshes = ModelAsset->GetGpuMeshes();
-		for (const MeshBuffers& MB : GpuMeshes)
+		Recorder->SetRenderPipelineState(Pipeline);
+		Recorder->SetBindGroups(BGArray);
+
+		if (Model* ModelAsset = MSO->ModelAsset.Get())
 		{
-			Recorder->SetRenderPipelineState(Pipeline);
-			Recorder->SetBindGroups(BGArray);
-			Recorder->SetVertexBuffer(0, MB.VertexBuffer);
-			Recorder->SetIndexBuffer(MB.IndexBuffer);
-			Recorder->DrawIndexed(0, MB.IndexCount);
+			const TArray<MeshBuffers>& GpuMeshes = ModelAsset->GetGpuMeshes();
+			for (const MeshBuffers& MB : GpuMeshes)
+			{
+				Recorder->SetVertexBuffer(0, MB.VertexBuffer);
+				Recorder->SetIndexBuffer(MB.IndexBuffer);
+				Recorder->DrawIndexed(0, MB.IndexCount);
+			}
+		}
+		else if (MSO->VertexCount > 0)
+		{
+			Recorder->DrawPrimitive(0, MSO->VertexCount, 0, 1);
 		}
 	}
 }

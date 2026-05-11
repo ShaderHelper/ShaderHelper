@@ -1,7 +1,6 @@
 #include "CommonHeader.h"
 #include "ShaderToyPassNode.h"
 #include "Renderer/ShaderToyRenderComp.h"
-#include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/Property/PropertyData/PropertyUniformItem.h"
 #include "RenderResource/PrintBuffer.h"
@@ -14,6 +13,7 @@
 #include "Renderer/RenderGraph.h"
 #include "Renderer/ShRenderer.h"
 #include "UI/Widgets/Graph/SGraphPanel.h"
+#include "PluginManager/ShPluginManager.h"
 #include "GpuApi/GpuFeature.h"
 
 #include <regex>

@@ -3,10 +3,9 @@
 #include "AssetObject/ShaderToy/ShaderToy.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "AssetManager/AssetManager.h"
-#include "App/App.h"
 #include "AssetObject/ShaderToy/Nodes/ShaderToyOutputNode.h"
 #include "Renderer/ShaderToyRenderComp.h"
-#include "UI/Widgets/MessageDialog/SMessageDialog.h"
+#include "ProjectManager/ShProjectManager.h"
 
 using namespace FW;
 

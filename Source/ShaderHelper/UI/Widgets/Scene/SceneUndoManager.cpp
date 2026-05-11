@@ -1,7 +1,6 @@
 #include "CommonHeader.h"
 #include "SceneUndoManager.h"
 #include "SSceneView.h"
-#include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 
 #include <Serialization/MemoryReader.h>

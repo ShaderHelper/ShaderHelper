@@ -1,7 +1,6 @@
 #include "CommonHeader.h"
 #include "Dx12Device.h"
 #include <dxgidebug.h>
-#include "GpuApi/GpuFeature.h"
 
 namespace FW
 {

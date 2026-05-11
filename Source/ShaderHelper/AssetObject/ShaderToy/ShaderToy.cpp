@@ -1,6 +1,5 @@
 #include "CommonHeader.h"
 #include "ShaderToy.h"
-#include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "AssetObject/Texture2D.h"
 #include "AssetObject/TextureCube.h"
@@ -9,6 +8,7 @@
 #include "AssetObject/ShaderToy/StShader.h"
 #include "AssetObject/ShaderToy/Nodes/ShaderToyPassNode.h"
 #include "UI/Widgets/Graph/SGraphPanel.h"
+#include "UI/Widgets/AssetBrowser/AssetViewItem/AssetViewItem.h"
 
 using namespace FW;
 
@@ -18,11 +18,6 @@ namespace SH
 						.BaseClass<Graph>()
 						.Data<&ShaderToy::FlipY, MetaInfo::Property>(LOCALIZATION("FlipY"))
 	)
-
-    ShaderToy::~ShaderToy()
-    {
-
-    }
 
 	void ShaderToy::Serialize(FArchive& Ar)
 	{

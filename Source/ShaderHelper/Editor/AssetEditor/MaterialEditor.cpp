@@ -2,7 +2,6 @@
 #include "MaterialEditor.h"
 #include "AssetObject/Material.h"
 #include "AssetManager/AssetManager.h"
-#include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/SMaterialPreviewer.h"
 

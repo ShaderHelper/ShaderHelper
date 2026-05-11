@@ -13,7 +13,6 @@
 #include "AssetObject/ShaderToy/Nodes/ShaderToyKeyboardNode.h"
 #include "AssetObject/ShaderToy/Nodes/ShaderToyPreviousFrameNode.h"
 #include "AssetObject/Pins/Pins.h"
-#include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "AssetObject/ShaderHeader.h"
 

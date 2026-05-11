@@ -4,11 +4,6 @@
 #include "GLSL.h"
 #include "Spirv/SpirvParser.h"
 
-//ue regex is invalid if disable icu, so use the regex from std.
-//TODO RE2
-#include <regex>
-#include <string>
-
 namespace FW
 {
 	GpuShaderPreProcessor& GpuShaderPreProcessor::ReplacePrintStringLiteral(bool bGlslOnlyRenamePrintFuncs)

@@ -4,6 +4,8 @@
 
 namespace SH
 {
+	class CameraSceneObject;
+
 	enum class RenderFormat
 	{
 		B8G8R8A8_UNORM = (int)FW::GpuFormat::B8G8R8A8_UNORM,
@@ -15,7 +17,6 @@ namespace SH
 		REFLECTION_TYPE(Render)
 	public:
 		Render() = default;
-		~Render();
 
 	public:
 		FString FileExtension() const override;
@@ -43,5 +44,6 @@ namespace SH
 
 		TArray<FW::ObjectPtr<SceneObject>> SceneObjects;
 		FW::ObserverObjectPtr<FW::ShObject> SelectedMeshRenderObject;
+		FW::ObserverObjectPtr<CameraSceneObject> PreviewCamera;
 	};
 }

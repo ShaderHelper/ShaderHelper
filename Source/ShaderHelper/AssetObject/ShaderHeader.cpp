@@ -1,7 +1,6 @@
 #include "CommonHeader.h"
 #include "ShaderHeader.h"
 #include "UI/Styles/FShaderHelperStyle.h"
-#include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "UI/Widgets/Property/PropertyData/PropertyItem.h"

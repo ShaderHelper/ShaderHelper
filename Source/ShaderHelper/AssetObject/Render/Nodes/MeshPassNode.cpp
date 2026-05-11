@@ -1,6 +1,5 @@
 #include "CommonHeader.h"
 #include "MeshPassNode.h"
-#include "App/App.h"
 #include "AssetObject/Pins/Pins.h"
 #include "AssetObject/Render/MeshSceneObject.h"
 #include "Editor/ShaderHelperEditor.h"

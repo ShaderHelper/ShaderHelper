@@ -5,7 +5,6 @@
 #include "Editor/PreviewViewPort.h"
 #include "AssetManager/AssetImporter/AssetImporter.h"
 #include "Editor/ShaderHelperEditor.h"
-#include "App/App.h"
 #include "UI/Widgets/STexturePreviewer.h"
 
 #include <Widgets/SViewport.h>

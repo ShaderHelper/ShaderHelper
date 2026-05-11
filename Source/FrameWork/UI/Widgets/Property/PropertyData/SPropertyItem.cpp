@@ -1,6 +1,5 @@
 #include "CommonHeader.h"
 #include "SPropertyItem.h"
-#include "UI/Styles/FAppCommonStyle.h"
 #include "UI/Widgets/Misc/MiscWidget.h"
 
 namespace FW

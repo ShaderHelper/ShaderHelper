@@ -1,7 +1,6 @@
 #include "CommonHeader.h"
 #include "SFragmentDebuggerViewport.h"
 #include "Editor/ShaderHelperEditor.h"
-#include "App/App.h"
 #include "GpuApi/GpuResourceHelper.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "RenderResource/RenderPass/BlitPass.h"
@@ -13,6 +12,8 @@
 #include <Framework/Notifications/NotificationManager.h>
 #include <Widgets/Notifications/SNotificationList.h>
 #include <Math/Float16Color.h>
+
+#include <stdexcept>
 
 using namespace FW;
 

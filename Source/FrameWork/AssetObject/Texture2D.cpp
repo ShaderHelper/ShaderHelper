@@ -2,7 +2,6 @@
 #include "Texture2D.h"
 #include "Common/Util/Reflection.h"
 #include "GpuApi/GpuRhi.h"
-#include "AssetManager/AssetManager.h"
 #include "Renderer/RenderGraph.h"
 #include "RenderResource/RenderPass/BlitPass.h"
 #include "UI/Widgets/Property/PropertyData/PropertyData.h"

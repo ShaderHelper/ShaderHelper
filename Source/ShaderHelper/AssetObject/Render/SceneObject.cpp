@@ -1,7 +1,6 @@
 #include "CommonHeader.h"
 #include "SceneObject.h"
 #include "Common/Util/Math.h"
-#include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/Scene/SSceneView.h"
 

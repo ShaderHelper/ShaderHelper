@@ -1,6 +1,5 @@
 #include "CommonHeader.h"
 #include "TextureCubeNode.h"
-#include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "AssetObject/Pins/Pins.h"
 

@@ -1,6 +1,5 @@
 #include "CommonHeader.h"
 #include "ShaderToyOutputNode.h"
-#include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "Renderer/ShaderToyRenderComp.h"
 #include "AssetObject/Pins/Pins.h"

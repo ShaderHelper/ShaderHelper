@@ -2,45 +2,19 @@
 
 namespace FW
 {
-	DECLARE_LOG_CATEGORY_EXTERN(LogFrameWorkCore, Log, All);
-	inline DEFINE_LOG_CATEGORY(LogFrameWorkCore);
-
-    class PropertyData;
-    class AssetObject;
+	class PropertyData;
+	class AssetObject;
 	struct MetaType;
 	class ShObject;
-    
-    enum class ObjectOwnerShip
-    {
-        Assign,
-        Retain,
-    };
+	FRAMEWORK_API extern TArray<ShObject*> GlobalValidShObjects;
+}
 
-    template<typename T, ObjectOwnerShip> class ObjectPtr;
+#include "Common/ObjectPtr.h"
 
-    template<typename T>
-    using ObserverObjectPtr = ObjectPtr<T, ObjectOwnerShip::Assign>;
-
-	class ShObjectDragDropOp : public FDragDropOperation
-	{
-	public:
-		DRAG_DROP_OPERATOR_TYPE(ShObjectDragDropOp, FDragDropOperation)
-
-		static TSharedRef<ShObjectDragDropOp> New(ShObject* InObject)
-		{
-			TSharedRef<ShObjectDragDropOp> Operation = MakeShareable(new ShObjectDragDropOp(InObject));
-			Operation->MouseCursor = EMouseCursor::GrabHandClosed;
-			Operation->Construct();
-			return Operation;
-		}
-
-		ShObject* Object = nullptr;
-
-	private:
-		explicit ShObjectDragDropOp(ShObject* InObject)
-			: Object(InObject)
-		{}
-	};
+namespace FW
+{
+	DECLARE_LOG_CATEGORY_EXTERN(LogFrameWorkCore, Log, All);
+	inline DEFINE_LOG_CATEGORY(LogFrameWorkCore);
 
 	struct ObjectPtrFixupRequest
 	{
@@ -192,9 +166,29 @@ namespace FW
 		virtual void OnSelect(ShObject* InObject) {}
 	};
 
-    FRAMEWORK_API ShObjectOp* GetShObjectOp(ShObject* InObject);
+	class ShObjectDragDropOp : public FDragDropOperation
+	{
+	public:
+		DRAG_DROP_OPERATOR_TYPE(ShObjectDragDropOp, FDragDropOperation)
 
-    FRAMEWORK_API extern TArray<ShObject*> GlobalValidShObjects;
+			static TSharedRef<ShObjectDragDropOp> New(ShObject* InObject)
+		{
+			TSharedRef<ShObjectDragDropOp> Operation = MakeShareable(new ShObjectDragDropOp(InObject));
+			Operation->MouseCursor = EMouseCursor::GrabHandClosed;
+			Operation->Construct();
+			return Operation;
+		}
+
+		ShObject* Object = nullptr;
+
+	private:
+		explicit ShObjectDragDropOp(ShObject* InObject)
+			: Object(InObject)
+		{
+		}
+	};
+
+    FRAMEWORK_API ShObjectOp* GetShObjectOp(ShObject* InObject);
 
 	FRAMEWORK_API TArray<TSharedRef<PropertyData>> GeneratePropertyDatas(ShObject* InObject, const MetaMemberData* MetaMemData, void* Instance, bool bForce = false);
 	FRAMEWORK_API TArray<TSharedRef<PropertyData>> GeneratePropertyDatas(ShObject* InObject, MetaType* InMetaType);

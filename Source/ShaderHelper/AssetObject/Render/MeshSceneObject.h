@@ -12,7 +12,10 @@ namespace SH
 		MeshSceneObject();
 
 		void Serialize(FArchive& Ar) override;
+		TArray<TSharedRef<FW::PropertyData>> GeneratePropertyDatas() override;
+		void PostPropertyChanged(FW::PropertyData* InProperty) override;
 
 		FW::AssetPtr<FW::Model> ModelAsset;
+		uint32 VertexCount = 3;
 	};
 }

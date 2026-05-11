@@ -1,7 +1,6 @@
 #include "CommonHeader.h"
 #include "SGraphNode.h"
 #include "AssetObject/Graph.h"
-#include "Styling/StyleColors.h"
 #include "SGraphPanel.h"
 #include "UI/Styles/FAppCommonStyle.h"
 #include "UI/Widgets/Graph/SGraphPin.h"

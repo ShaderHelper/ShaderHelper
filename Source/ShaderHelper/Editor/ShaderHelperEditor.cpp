@@ -1,29 +1,45 @@
 #include "CommonHeader.h"
 #include "ShaderHelperEditor.h"
 #include "App/ShaderHelperApp.h"
-#include "Common/Path/PathHelper.h"
-#include "UI/Styles/FShaderHelperStyle.h"
-#include "UI/Widgets/SShaderTab.h"
-#include "UI/Widgets/Graph/SGraphPanel.h"
-#include "Editor/AssetEditor/AssetEditor.h"
-#include "UI/Widgets/Timeline/STimeline.h"
-#include "CodeEditorCommands.h"
-#include "DebuggerViewCommands.h"
-#include "SceneViewCommands.h"
-#include "Editor/EditorCommands.h"
-#include "PluginManager/ShPluginManager.h"
-#include "Renderer/ShaderToyRenderComp.h"
-#include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
-#include "AssetManager/AssetImporter/AssetImporter.h"
-#include "UI/Widgets/MessageDialog/SMessageDialog.h"
+#include "AssetObject/Graph.h"
+#include "AssetObject/ShaderAsset.h"
 #include "AssetObject/TextureCube.h"
 #include "AssetObject/Texture2D.h"
 #include "AssetObject/Texture3D.h"
 #include "AssetObject/Model.h"
 #include "AssetObject/Render/Render.h"
-#include "RenderResource/Mesh.h"
+#include "AssetManager/AssetImporter/AssetImporter.h"
+#include "Common/Path/PathHelper.h"
+#include "Debugger/DebuggableObject.h"
+#include "Editor/AssetEditor/AssetEditor.h"
+#include "Editor/EditorCommands.h"
+#include "Editor/PreviewViewPort.h"
+#include "CodeEditorCommands.h"
+#include "DebuggerViewCommands.h"
+#include "SceneViewCommands.h"
+#include "PluginManager/ShPluginManager.h"
+#include "ProjectManager/ShProjectManager.h"
+#include "Renderer/RenderComponent.h"
 #include "Renderer/ShRenderer.h"
+#include "Renderer/ShaderToyRenderComp.h"
+#include "RenderResource/Mesh.h"
+#include "UI/Styles/FShaderHelperStyle.h"
+#include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
+#include "UI/Widgets/Debugger/SFragmentDebuggerViewport.h"
+#include "UI/Widgets/Debugger/SVertexDebuggerViewport.h"
+#include "UI/Widgets/Debugger/SDebuggerVariableView.h"
+#include "UI/Widgets/Debugger/SDebuggerCallStackView.h"
+#include "UI/Widgets/Debugger/SDebuggerWatchView.h"
+#include "UI/Widgets/Graph/SGraphPanel.h"
+#include "UI/Widgets/Log/SOutputLog.h"
+#include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "UI/Widgets/Misc/MiscWidget.h"
+#include "UI/Widgets/Misc/SShWindow.h"
+#include "UI/Widgets/Preference/SPreferenceView.h"
+#include "UI/Widgets/Scene/SSceneView.h"
+#include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
+#include "UI/Widgets/SShaderTab.h"
+#include "UI/Widgets/Timeline/STimeline.h"
 #include "magic_enum.hpp"
 
 #include <Serialization/JsonSerializer.h>
@@ -34,6 +50,7 @@
 #include <Widgets/Notifications/SNotificationList.h>
 #include <Widgets/Input/SHyperlink.h>
 #include <Widgets/Input/SSegmentedControl.h>
+#include <Widgets/SViewport.h>
 
 STEAL_PRIVATE_MEMBER(FTabManager, TArray<TSharedRef<FTabManager::FArea>>, CollapsedDockAreas)
 
@@ -53,9 +70,50 @@ namespace SH
 		LocalTabId, GlobalTabId, CallStackTabId, WatchTabId, SceneTabId
     };
 
+	TSharedPtr<SWindow> ShaderHelperEditor::GetMainWindow() const
+	{
+		return StaticCastSharedPtr<SWindow>(MainWindow);
+	}
+
+	TWeakPtr<SWindow> ShaderHelperEditor::GetPreferenceWindow() const
+	{
+		return StaticCastSharedPtr<SWindow>(PreferenceWindow.Pin());
+	}
+
+	GizmoMode ShaderHelperEditor::GetGizmoMode() const
+	{
+		return CurProject->GizmoMode;
+	}
+
+	void ShaderHelperEditor::SetGizmoMode(GizmoMode Mode)
+	{
+		CurProject->GizmoMode = Mode;
+	}
+
+	GizmoSpace ShaderHelperEditor::GetGizmoSpace() const
+	{
+		return CurProject->GizmoSpace;
+	}
+
+	bool ShaderHelperEditor::IsScenePreview() const
+	{
+		return CurProject->bScenePreview;
+	}
+
+	bool ShaderHelperEditor::IsPropertyLocked() const
+	{
+		return PropertyView->IsLocked();
+	}
+
+	DebuggableObject* ShaderHelperEditor::GetDebuggaleObject() const
+	{
+		return CurDebuggableObject.IsValid() ? dynamic_cast<DebuggableObject*>(CurDebuggableObject.Get()) : nullptr;
+	}
+
 	ShaderHelperEditor::ShaderHelperEditor(const Vector2f& InWindowSize, ShRenderer* InRenderer)
 		: Renderer(InRenderer)
 		, WindowSize(InWindowSize)
+		, CurrentDebugItem(DebugItem::Fragment)
 	{
 		CodeEditorCommands::Register();
 		DebuggerViewCommands::Register();

@@ -2,7 +2,6 @@
 #include "ModelEditor.h"
 #include "AssetObject/Model.h"
 #include "Editor/ShaderHelperEditor.h"
-#include "App/App.h"
 #include "UI/Widgets/SModelPreviewer.h"
 
 using namespace FW;
