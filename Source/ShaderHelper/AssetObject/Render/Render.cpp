@@ -3,6 +3,8 @@
 #include "MeshSceneObject.h"
 #include "CameraSceneObject.h"
 #include "AssetObject/Render/Nodes/MeshPassNode.h"
+#include "AssetObject/Render/Nodes/ComputePassNode.h"
+#include "AssetObject/Shader.h"
 #include "AssetManager/AssetManager.h"
 #include "AssetObject/Nodes/Texture2dNode.h"
 #include "AssetObject/Nodes/Texture3dNode.h"
@@ -166,6 +168,15 @@ namespace SH
 					DragDropOp->SetCursorOverride(EMouseCursor::GrabHand);
 					return;
 				}
+				if (DropAssetMetaType->IsType<Shader>())
+				{
+					AssetPtr<Shader> ShaderAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<Shader>(DropFilePath);
+					if (ShaderAsset && ShaderAsset->IsStageEnabled(ShaderType::Compute))
+					{
+						DragDropOp->SetCursorOverride(EMouseCursor::GrabHand);
+						return;
+					}
+				}
 			}
 			DragDropOp->SetCursorOverride(EMouseCursor::SlashedCircle);
 		}
@@ -203,6 +214,18 @@ namespace SH
 					SGraphPanel::ScopedTransaction Transaction(GraphPanel);
 					auto NewTextureNode = NewShObject<TextureCubeNode>(this, MoveTemp(TextureAsset));
 					GraphPanel->DoCommand(MakeShared<AddNodeCommand>(GraphPanel, NewTextureNode, Pos));
+					GraphPanel->SetFocus();
+				}
+				else if (DropAssetMetaType->IsType<Shader>())
+				{
+					AssetPtr<Shader> ShaderAsset = TSingleton<AssetManager>::Get().LoadAssetByPath<Shader>(DropFilePath);
+					if (!ShaderAsset->IsStageEnabled(ShaderType::Compute))
+					{
+						continue;
+					}
+					SGraphPanel::ScopedTransaction Transaction(GraphPanel);
+					auto NewNode = NewShObject<ComputePassNode>(this, MoveTemp(ShaderAsset));
+					GraphPanel->DoCommand(MakeShared<AddNodeCommand>(GraphPanel, NewNode, Pos));
 					GraphPanel->SetFocus();
 				}
 			}

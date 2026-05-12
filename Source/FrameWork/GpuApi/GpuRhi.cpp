@@ -370,10 +370,10 @@ public:
 	{}
 
 public:
-	GpuComputePassRecorder* BeginComputePass(const FString& PassName) override
+	GpuComputePassRecorder* BeginComputePass(const FString& PassName, TOptional<GpuPassTimestampWrites> TimestampWrites = {}) override
 	{
 		check(State == CmdRecorderState::Begin);
-		auto PassRecorderValidation = MakeUnique<GpuComputePassRecorderValidation>(CmdRecorder->BeginComputePass(PassName));
+		auto PassRecorderValidation = MakeUnique<GpuComputePassRecorderValidation>(CmdRecorder->BeginComputePass(PassName, MoveTemp(TimestampWrites)));
 		RequestedComputePassRecorders.Add(MoveTemp(PassRecorderValidation));
 		return RequestedComputePassRecorders.Last().Get();
 	}

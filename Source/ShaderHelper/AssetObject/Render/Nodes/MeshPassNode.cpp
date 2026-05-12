@@ -703,32 +703,7 @@ namespace SH
 		}
 
 		GpuRenderPassDesc PassDesc = MakeRenderPassDesc(CachedColorRTs, CachedDepthRT, InputState.ColorInputConnected, InputState.bHasDepthInput);
-
-		if (!ShowTimestampMs())
-		{
-			GpuTimeMs = 0.0;
-			TimestampQuerySet = nullptr;
-		}
-		else
-		{
-			if (TimestampQuerySet)
-			{
-				TArray<uint64> Timestamps;
-				TimestampQuerySet->ResolveResults(0, 2, Timestamps);
-				double PeriodNs = TimestampQuerySet->GetTimestampPeriodNs();
-				GpuTimeMs = (double)(Timestamps[1] - Timestamps[0]) * PeriodNs / 1e6;
-			}
-
-			if (GGpuRhi->GetFeature().SupportTimestampQuery() && !TimestampQuerySet)
-			{
-				TimestampQuerySet = GGpuRhi->CreateQuerySet(2);
-			}
-		}
-
-		if (TimestampQuerySet)
-		{
-			PassDesc.TimestampWrites = GpuRenderPassTimestampWrites{ TimestampQuerySet, 0, 1 };
-		}
+		PassDesc.TimestampWrites = GpuResourceHelper::PreparePassTimestampWrites(TimestampQuerySet, GpuTimeMs);
 
 		// Ensure render resources for each MRO with the current format key.
 		TArray<GpuFormat> ColorFormatKey = MakeColorFormatKey();

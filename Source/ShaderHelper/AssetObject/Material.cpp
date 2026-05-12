@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "Material.h"
+#include "AssetObject/Render/ShaderOverrideHelper.h"
 #include "Renderer/MaterialPreviewRenderer.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
@@ -248,14 +249,7 @@ namespace SH
 		auto CollectResourceBindings = [&](GpuShader* InShader) {
 			for (const GpuShaderLayoutBinding& Binding : GetShaderBindings(InShader))
 			{
-				switch (Binding.Type)
-				{
-				case BindingType::Texture: case BindingType::TextureCube: case BindingType::Texture3D:
-				case BindingType::Sampler:
-				case BindingType::CombinedTextureSampler: case BindingType::CombinedTextureCubeSampler: case BindingType::CombinedTexture3DSampler:
-					break;
-				default: continue;
-				}
+				if (!IsResourceOverrideBinding(Binding.Type)) continue;
 
 				// Check if already processed a binding at this (Group, Slot, Type)
 				auto* Seen = SeenResBindings.FindByPredicate([&](const GpuShaderLayoutBinding& S) {
@@ -755,10 +749,12 @@ namespace SH
 			case BindingType::Texture:
 			case BindingType::TextureCube:
 			case BindingType::Texture3D:
+			case BindingType::RWTexture:
+			case BindingType::RWTexture3D:
 			{
 				MetaType* TexMetaType = GetMetaType<Texture2D>();
 				if (Default.BindingType == BindingType::TextureCube) TexMetaType = GetMetaType<TextureCube>();
-				else if (Default.BindingType == BindingType::Texture3D) TexMetaType = GetMetaType<Texture3D>();
+				else if (Default.BindingType == BindingType::Texture3D || Default.BindingType == BindingType::RWTexture3D) TexMetaType = GetMetaType<Texture3D>();
 
 				auto Item = MakeShared<PropertyAssetItem>(
 					this,

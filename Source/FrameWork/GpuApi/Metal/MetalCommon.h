@@ -41,6 +41,7 @@ typedef NS::SharedPtr<MTL::Library> MTLLibraryPtr;
 typedef NS::SharedPtr<MTL::Function> MTLFunctionPtr;
 
 typedef NS::SharedPtr<MTL::RenderPassDescriptor> MTLRenderPassDescriptorPtr;
+typedef NS::SharedPtr<MTL::ComputePassDescriptor> MTLComputePassDescriptorPtr;
 typedef NS::SharedPtr<MTL::ArgumentEncoder> MTLArgumentEncoderPtr;
 typedef NS::SharedPtr<MTL::SamplerState> MTLSamplerStatePtr;
 

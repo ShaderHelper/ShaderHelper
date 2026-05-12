@@ -85,9 +85,7 @@ namespace SH
 		bool CanChangeProperty(FW::PropertyData* InProperty) override;
 		void PostPropertyChanged(FW::PropertyData* InProperty) override;
 
-		// Pin management. Preserve existing Guids so links survive where possible.
 		void RebuildPins();
-
 		// Add/remove MeshRenderObject helpers (used by drag-drop + combo button).
 		MeshRenderObject* AddMeshRenderObject(MeshSceneObject* InMeshSceneObject);
 		void RemoveMeshRenderObject(MeshRenderObject* InObject);

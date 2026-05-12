@@ -228,14 +228,30 @@ namespace FW::VK
 			ApplyBindGroup(IsBindGroupDirty[i], CurrentBindGroups[i]);
 		}
 	}
-	GpuComputePassRecorder* VulkanCmdRecorder::BeginComputePass(const FString& PassName)
+	GpuComputePassRecorder* VulkanCmdRecorder::BeginComputePass(const FString& PassName, TOptional<GpuPassTimestampWrites> TimestampWrites)
 	{
+		CurrentTimestampWrites = TimestampWrites;
+		if (CurrentTimestampWrites)
+		{
+			const auto& TsWrites = *CurrentTimestampWrites;
+			VulkanQuerySet* VkQuerySet = static_cast<VulkanQuerySet*>(TsWrites.QuerySet);
+			vkCmdResetQueryPool(CommandBuffer, VkQuerySet->GetPool(), TsWrites.BeginningOfPassWriteIndex, 1);
+			vkCmdWriteTimestamp(CommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VkQuerySet->GetPool(), TsWrites.BeginningOfPassWriteIndex);
+		}
 		ComputePassRecorders.Add(MakeUnique<VulkanComputePassRecorder>(this));
 		return ComputePassRecorders.Last().Get();
 	}
 
 	void VulkanCmdRecorder::EndComputePass(GpuComputePassRecorder* InComputePassRecorder)
 	{
+		if (CurrentTimestampWrites)
+		{
+			const auto& TsWrites = *CurrentTimestampWrites;
+			VulkanQuerySet* VkQuerySet = static_cast<VulkanQuerySet*>(TsWrites.QuerySet);
+			vkCmdResetQueryPool(CommandBuffer, VkQuerySet->GetPool(), TsWrites.EndOfPassWriteIndex, 1);
+			vkCmdWriteTimestamp(CommandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VkQuerySet->GetPool(), TsWrites.EndOfPassWriteIndex);
+			CurrentTimestampWrites.Reset();
+		}
 	}
 
 	GpuRenderPassRecorder* VulkanCmdRecorder::BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName)
@@ -352,7 +368,7 @@ namespace FW::VK
 		{
 			RTViews.Add(PassDesc.ColorRenderTargets[Index].View);
 		}
-		RenderPassRecorders.Add(MakeUnique<VulkanRenderPassRecorder>(this, RenderPass, FrameBuffer, MoveTemp(RTViews), PassDesc.TimestampWrites));
+		RenderPassRecorders.Add(MakeUnique<VulkanRenderPassRecorder>(this, RenderPass, FrameBuffer, MoveTemp(RTViews)));
 
 		VkRenderPassBeginInfo PassBeginInfo{
 			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -366,9 +382,10 @@ namespace FW::VK
 			.pClearValues = ClearValues.GetData()
 		};
 
-		if (PassDesc.TimestampWrites)
+		CurrentTimestampWrites = PassDesc.TimestampWrites;
+		if (CurrentTimestampWrites)
 		{
-			const auto& TsWrites = *PassDesc.TimestampWrites;
+			const auto& TsWrites = *CurrentTimestampWrites;
 			VulkanQuerySet* VkQuerySet = static_cast<VulkanQuerySet*>(TsWrites.QuerySet);
 			vkCmdResetQueryPool(CommandBuffer, VkQuerySet->GetPool(), TsWrites.BeginningOfPassWriteIndex, 1);
 			vkCmdWriteTimestamp(CommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VkQuerySet->GetPool(), TsWrites.BeginningOfPassWriteIndex);
@@ -382,13 +399,13 @@ namespace FW::VK
 	{
 		vkCmdEndRenderPass(CommandBuffer);
 
-		VulkanRenderPassRecorder* VkRecorder = static_cast<VulkanRenderPassRecorder*>(InRenderPassRecorder);
-		if (VkRecorder->TimestampWrites)
+		if (CurrentTimestampWrites)
 		{
-			const auto& TsWrites = *VkRecorder->TimestampWrites;
+			const auto& TsWrites = *CurrentTimestampWrites;
 			VulkanQuerySet* VkQuerySet = static_cast<VulkanQuerySet*>(TsWrites.QuerySet);
 			vkCmdResetQueryPool(CommandBuffer, VkQuerySet->GetPool(), TsWrites.EndOfPassWriteIndex, 1);
 			vkCmdWriteTimestamp(CommandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VkQuerySet->GetPool(), TsWrites.EndOfPassWriteIndex);
+			CurrentTimestampWrites.Reset();
 		}
 	}
 

@@ -1,6 +1,7 @@
 #pragma once
 #include "AssetObject/Graph.h"
 #include "AssetObject/Material.h"
+#include "AssetObject/Render/ShaderOverrideHelper.h"
 #include "AssetObject/Render/MeshSceneObject.h"
 #include "RenderResource/UniformBuffer.h"
 #include "RenderResource/Camera.h"
@@ -12,24 +13,6 @@
 
 namespace SH
 {
-	// Metadata for a single material-binding-member override exposed as a row pin.
-	struct MaterialOverrideSlot
-	{
-		FString BindingName;
-		FString MemberName;        // For UB members. Empty for whole-binding resource overrides.
-		FString Type;              // Type string of the member/resource (e.g. "float4", "Texture2D").
-		FW::BindingShaderStage Stage = FW::BindingShaderStage::All;
-		bool bIsResource = false;
-		FGuid PinGuid;
-		TArray<uint8> Bytes;
-		FW::AssetPtr<FW::AssetObject> TextureAsset;
-
-		friend FArchive& operator<<(FArchive& Ar, MaterialOverrideSlot& S)
-		{
-			Ar << S.BindingName << S.MemberName << S.Type << S.Stage << S.bIsResource << S.PinGuid << S.Bytes << S.TextureAsset;
-			return Ar;
-		}
-	};
 	class MeshRenderObject : public FW::ShObject, public DebuggableObject
 	{
 		REFLECTION_TYPE(MeshRenderObject)
@@ -73,7 +56,7 @@ namespace SH
 		FW::ObserverObjectPtr<MeshSceneObject> MeshSceneObjectRef;
 		FW::AssetPtr<Material> MaterialAsset;
 		TArray<FW::ObjectPtr<FW::GraphPin>> OverridePins;
-		TArray<MaterialOverrideSlot> OverrideSlots;
+		TArray<ShaderOverrideSlot> OverrideSlots;
 
 	private:
 		void BindMaterialDelegates();
@@ -83,10 +66,6 @@ namespace SH
 		bool BuildPipeline(const TArray<FW::GpuFormat>& ColorFormats, FW::GpuFormat DepthFormat, uint32 SampleCount);
 		void UpdateMaterialDrawState(const FMatrix44f& ModelMatrix, const FMatrix44f& ViewMat, const FMatrix44f& ProjMat, const FW::Vector2f& ViewportSize, const FW::Vector2f& MousePos, float Time, const FW::Vector3f& CameraPos, const FW::Vector3f& CameraDir);
 		TArray<BindingBuilder> BuildDebugBindingBuilders() const;
-		FW::GraphPin* FindOverridePin(const FString& BindingName, const FString& MemberName, FW::BindingShaderStage Stage) const;
-		void EnsureOverridePins();
-		void SyncOverridePinsFromSlots();
-		static FW::ObjectPtr<FW::GraphPin> CreateOverridePin(FW::ShObject* Outer, const FString& Type, bool bIsResource);
 
 	private:
 		TMap<int32, TRefCountPtr<FW::GpuBindGroupLayout>> BindGroupLayouts;

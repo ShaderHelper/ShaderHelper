@@ -10,6 +10,7 @@
 #include "AssetObject/Render/CameraSceneObject.h"
 #include "AssetObject/Model.h"
 #include "AssetManager/AssetManager.h"
+#include "ProjectManager/ShProjectManager.h"
 
 using namespace FW;
 
@@ -808,7 +809,17 @@ namespace SH
 			{
 				ResetScenePreviewInteractionState();
 			}
-			RenderGraph();
+
+			//Camera control
+			if (bRightMouseDown)
+			{
+				ScopedTimelineResume TimelineResumeScope;
+				RenderGraph();
+			}
+			else
+			{
+				RenderGraph();
+			}
 		}
 	}
 

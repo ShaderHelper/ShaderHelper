@@ -30,6 +30,7 @@ namespace FW
 		case D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWSTRUCTURED:	return BindingType::RWStructuredBuffer;
 		case D3D_SHADER_INPUT_TYPE::D3D_SIT_BYTEADDRESS:        return BindingType::RawBuffer;
 		case D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWBYTEADDRESS:  return BindingType::RWRawBuffer;
+		case D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWTYPED:        return BindingType::RWTexture;
 		default:
 			AUX::Unreachable();
 		}
@@ -71,6 +72,10 @@ namespace FW
 			else if (BType == BindingType::Texture && BindDesc.Dimension == D3D_SRV_DIMENSION_TEXTURE3D)
 			{
 				BType = BindingType::Texture3D;
+			}
+			else if (BType == BindingType::RWTexture && BindDesc.Dimension == D3D_SRV_DIMENSION_TEXTURE3D)
+			{
+				BType = BindingType::RWTexture3D;
 			}
 			ShaderLayoutBindings.Add({
 				.Name = BindDesc.Name,

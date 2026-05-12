@@ -499,14 +499,9 @@ namespace SH
 			return;
 		}
 		LastForceRenderTime = CurrentTime;
-		
-		bool CacheTimelineStop = TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop;
-		TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = false;
+
+		ScopedTimelineResume TimelineResumeScope;
 		Renderer->Render();
-		if(CacheTimelineStop == true)
-		{
-			TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = true;
-		}
 	}
 
 	void ShaderHelperEditor::InitEditorUI()

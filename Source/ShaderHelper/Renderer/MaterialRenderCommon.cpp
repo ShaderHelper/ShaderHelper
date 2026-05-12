@@ -1,5 +1,6 @@
 #include "CommonHeader.h"
 #include "Renderer/MaterialRenderCommon.h"
+#include "AssetObject/Render/ShaderOverrideHelper.h"
 #include "RenderResource/Mesh.h"
 #include "RenderResource/Camera.h"
 #include "AssetObject/Texture2D.h"
@@ -83,30 +84,16 @@ namespace SH
 			return Value;
 		}
 
-		GpuResource* GetFallbackTextureView(BindingType InType)
-		{
-			if (InType == BindingType::TextureCube || InType == BindingType::CombinedTextureCubeSampler)
-			{
-				return GpuResourceHelper::GetGlobalBlackCubemapTex()->GetDefaultView();
-			}
-			if (InType == BindingType::Texture3D || InType == BindingType::CombinedTexture3DSampler)
-			{
-				return GpuResourceHelper::GetGlobalBlackVolumeTex()->GetDefaultView();
-			}
-			return GpuResourceHelper::GetGlobalBlackTex()->GetDefaultView();
-		}
-
 		GpuResource* GetTextureView(const MaterialBindingResourceDefault* ResourceDefault, BindingType InType, GpuTexture* OverrideTexture)
 		{
 			if (OverrideTexture) return OverrideTexture->GetDefaultView();
+			GpuTexture* Tex = nullptr;
 			if (ResourceDefault && ResourceDefault->TextureAsset)
 			{
-				if (GpuTexture* Texture = ResolveTextureAssetGpu(ResourceDefault->TextureAsset.Get()))
-				{
-					return Texture->GetDefaultView();
-				}
+				Tex = ResolveTextureAssetGpu(ResourceDefault->TextureAsset.Get());
 			}
-			return GetFallbackTextureView(InType);
+			if (!Tex) Tex = GetDefaultOverrideTexture(InType);
+			return Tex->GetDefaultView();
 		}
 
 		GpuSampler* GetSamplerResource(const MaterialBindingResourceDefault* ResourceDefault)
@@ -480,6 +467,8 @@ namespace SH
 				case BindingType::Texture:
 				case BindingType::TextureCube:
 				case BindingType::Texture3D:
+				case BindingType::RWTexture:
+				case BindingType::RWTexture3D:
 					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, GetTextureView(ResourceDefault, Binding.Type, OverrideTexture), Binding.Stage);
 					break;
 				case BindingType::Sampler:

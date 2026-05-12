@@ -88,12 +88,10 @@ namespace FW::VK
 	class VulkanRenderPassRecorder : public GpuRenderPassRecorder
 	{
 	public:
-		VulkanRenderPassRecorder(VulkanCmdRecorder* InOwner, VkRenderPass InRenderPass, VkFramebuffer InFrameBuffer, TArray<GpuTextureView*> InRenderTargetViews,
-			TOptional<GpuRenderPassTimestampWrites> InTimestampWrites = {})
+		VulkanRenderPassRecorder(VulkanCmdRecorder* InOwner, VkRenderPass InRenderPass, VkFramebuffer InFrameBuffer, TArray<GpuTextureView*> InRenderTargetViews)
 			: Owner(InOwner)
 			, RenderPass(InRenderPass), FrameBuffer(InFrameBuffer)
 			, StateCache(InOwner, MoveTemp(InRenderTargetViews))
-			, TimestampWrites(MoveTemp(InTimestampWrites))
 		{}
 		~VulkanRenderPassRecorder() {
 			vkDestroyFramebuffer(GDevice, FrameBuffer, nullptr);
@@ -109,8 +107,6 @@ namespace FW::VK
 		void SetViewPort(const GpuViewPortDesc& InViewPortDesc) override;
 		void SetScissorRect(const GpuScissorRectDesc& InScissorRectDes) override;
 		void SetBindGroups(const TArray<GpuBindGroup*>& BindGroups) override;
-
-		TOptional<GpuRenderPassTimestampWrites> TimestampWrites;
 
 	private:
 		VulkanCmdRecorder* Owner;
@@ -143,7 +139,7 @@ namespace FW::VK
 		const VkCommandBuffer& GetCommandBuffer() const { return CommandBuffer; }
 
 	public:
-		GpuComputePassRecorder* BeginComputePass(const FString& PassName) override;
+		GpuComputePassRecorder* BeginComputePass(const FString& PassName, TOptional<GpuPassTimestampWrites> TimestampWrites = {}) override;
 		void EndComputePass(GpuComputePassRecorder* InComputePassRecorder) override;
 		GpuRenderPassRecorder* BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName) override;
 		void EndRenderPass(GpuRenderPassRecorder* InRenderPassRecorder) override;
@@ -158,5 +154,6 @@ namespace FW::VK
 		VkCommandBuffer CommandBuffer;
 		TArray<TUniquePtr<VulkanRenderPassRecorder>> RenderPassRecorders;
 		TArray<TUniquePtr<VulkanComputePassRecorder>> ComputePassRecorders;
+		TOptional<GpuPassTimestampWrites> CurrentTimestampWrites;
 	};
 }

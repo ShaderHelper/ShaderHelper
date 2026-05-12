@@ -798,6 +798,8 @@ namespace FW
 			, ReadOnly(InReadOnly)
 		{}
 
+		Vector3i GetPendingValue() const { return PendingValue; }
+
 		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
 		{
 			auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
@@ -806,48 +808,15 @@ namespace FW
 				auto ValueWidget = SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot()
 					[
-						SNew(SSpinBox<int32>)
-						.IsEnabled(!ReadOnly)
-						.OnValueCommitted_Lambda([this](int32, ETextCommit::Type) { EndEdit(); })
-						.OnValueChanged_Lambda([this](int32 NewValue) {
-							if (Values[0] != NewValue && Owner->CanChangeProperty(this))
-							{
-								BeginEdit();
-								Values[0] = NewValue;
-								Owner->PostPropertyChanged(this);
-							}
-						})
-						.Value_Lambda([this] { return Values[0]; })
+						MakeSpinBox(0)
 					]
 					+ SHorizontalBox::Slot()
 					[
-						SNew(SSpinBox<int32>)
-						.IsEnabled(!ReadOnly)
-						.OnValueCommitted_Lambda([this](int32, ETextCommit::Type) { EndEdit(); })
-						.OnValueChanged_Lambda([this](int32 NewValue) {
-							if (Values[1] != NewValue && Owner->CanChangeProperty(this))
-							{
-								BeginEdit();
-								Values[1] = NewValue;
-								Owner->PostPropertyChanged(this);
-							}
-						})
-						.Value_Lambda([this] { return Values[1]; })
+						MakeSpinBox(1)
 					]
 					+ SHorizontalBox::Slot()
 					[
-						SNew(SSpinBox<int32>)
-						.IsEnabled(!ReadOnly)
-						.OnValueCommitted_Lambda([this](int32, ETextCommit::Type) { EndEdit(); })
-						.OnValueChanged_Lambda([this](int32 NewValue) {
-							if (Values[2] != NewValue && Owner->CanChangeProperty(this))
-							{
-								BeginEdit();
-								Values[2] = NewValue;
-								Owner->PostPropertyChanged(this);
-							}
-						})
-						.Value_Lambda([this] { return Values[2]; })
+						MakeSpinBox(2)
 					];
 				Item->AddWidget(MoveTemp(ValueWidget));
 			}
@@ -855,8 +824,30 @@ namespace FW
 		}
 
 	private:
+		TSharedRef<SWidget> MakeSpinBox(int32 ComponentIdx)
+		{
+			return SNew(SSpinBox<int32>)
+				.IsEnabled(!ReadOnly)
+				.OnValueCommitted_Lambda([this](int32, ETextCommit::Type) { EndEdit(); })
+				.OnValueChanged_Lambda([this, ComponentIdx](int32 NewValue) {
+					if (Values[ComponentIdx] != NewValue && PendingValue.Data[ComponentIdx] != NewValue)
+					{
+						PendingValue = Vector3i{ Values[0], Values[1], Values[2] };
+						PendingValue.Data[ComponentIdx] = NewValue;
+						if (Owner->CanChangeProperty(this))
+						{
+							BeginEdit();
+							Values[ComponentIdx] = NewValue;
+							Owner->PostPropertyChanged(this);
+						}
+					}
+				})
+				.Value_Lambda([this, ComponentIdx] { return Values[ComponentIdx]; });
+		}
+
 		int32* Values;
 		bool ReadOnly;
+		Vector3i PendingValue{};
 	};
 
 	class PropertyVector4iItem : public PropertyItemBase

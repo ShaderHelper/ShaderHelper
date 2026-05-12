@@ -15,6 +15,7 @@
 #include "UI/Widgets/Graph/SGraphPanel.h"
 #include "PluginManager/ShPluginManager.h"
 #include "GpuApi/GpuFeature.h"
+#include "GpuApi/GpuResourceHelper.h"
 
 #include <regex>
 #include <vector>
@@ -1041,35 +1042,9 @@ namespace SH
                 }
             }
 
-            // Resolve previous frame's timestamps
-            if (!ShowTimestampMs())
-            {
-                GpuTimeMs = 0.0;
-                TimestampQuerySet = nullptr;
-            }
-            else
-            {
-                if (TimestampQuerySet)
-                {
-                    TArray<uint64> Timestamps;
-                    TimestampQuerySet->ResolveResults(0, 2, Timestamps);
-				    double PeriodNs = TimestampQuerySet->GetTimestampPeriodNs();
-				    GpuTimeMs = (double)(Timestamps[1] - Timestamps[0]) * PeriodNs / 1e6;
-                }
-
-				if (GGpuRhi->GetFeature().SupportTimestampQuery() && !TimestampQuerySet)
-                {
-                    TimestampQuerySet = GGpuRhi->CreateQuerySet(2);
-                }
-            }
-
             GpuRenderPassDesc PassDesc;
             PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassOutput->GetValue()->GetDefaultView(), RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
-
-            if (TimestampQuerySet)
-            {
-                PassDesc.TimestampWrites = GpuRenderPassTimestampWrites{TimestampQuerySet, 0, 1 };
-            }
+			PassDesc.TimestampWrites = GpuResourceHelper::PreparePassTimestampWrites(TimestampQuerySet, GpuTimeMs);
 
 			auto BuiltInLayout = ShaderAssetObj->GetBuiltInBindLayout();
 			TRefCountPtr<GpuBindGroup> BuiltInBindGroup = GetBuiltInBindGroup(BuiltInLayout);

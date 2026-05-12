@@ -44,7 +44,7 @@ namespace FW
 		float ClearDepth = 1.0f;
 	};
 
-	struct GpuRenderPassTimestampWrites
+	struct GpuPassTimestampWrites
 	{
 		GpuQuerySet* QuerySet;
 		uint32 BeginningOfPassWriteIndex;
@@ -55,7 +55,7 @@ namespace FW
 	{
 		TArray<GpuRenderTargetInfo, TFixedAllocator<GpuResourceLimit::MaxRenderTargetNum>> ColorRenderTargets;
 		TOptional<GpuDepthStencilTargetInfo> DepthStencilTarget;
-		TOptional<GpuRenderPassTimestampWrites> TimestampWrites;
+		TOptional<GpuPassTimestampWrites> TimestampWrites;
 	};
 
 }
