@@ -92,7 +92,6 @@ namespace FW
 			NodeDatas.Add(InNode);
 			AddNodeHandler.Broadcast(MoveTemp(InNode));
 		}
-		void PostLoad() override;
 		void RemoveNode(FGuid Id) {
 			NodeDatas.RemoveAll([Id](const ObjectPtr<GraphNode>& Element) {
 				return Element->GetGuid() == Id;

@@ -56,6 +56,11 @@ namespace SH
 		void InvalidateRenderResources();
 		bool BuildBindGroups();
 		void UpdateUniformBuffers();
+		// Resolve the input texture for a resource binding:
+		// override pin -> slot's TextureAsset -> default texture for that BindingType.
+		FW::GpuTexture* ResolveBindingTexture(const FW::GpuShaderLayoutBinding& Binding);
+
+		FW::GpuTexture* EnsureRWOutputTexture(const FString& BindingName, FW::BindingType BindingTypeValue, FW::GpuTexture* SrcTex);
 
 		FW::PrintBuffer* GetPrintBuffer();
 		bool FlushPrintBufferLogs(const FString& LogPrefix);
@@ -68,6 +73,9 @@ namespace SH
 		TMap<int32, TRefCountPtr<FW::GpuBindGroupLayout>> BindGroupLayouts;
 		TMap<int32, TRefCountPtr<FW::GpuBindGroup>> BindGroups;
 		TMap<FString, TUniquePtr<FW::UniformBuffer>> UniformBuffers;
+		// Internally-owned output texture for each RW resource binding
+		TMap<FString, TRefCountPtr<FW::GpuTexture>> RWOutputTextures;
+		FW::Vector2f CurrentViewportSize{ 0, 0 };
 		TRefCountPtr<FW::GpuComputePipelineState> Pipeline;
 		TRefCountPtr<FW::GpuQuerySet> TimestampQuerySet;
 		TUniquePtr<FW::PrintBuffer> PrinterBuffer;

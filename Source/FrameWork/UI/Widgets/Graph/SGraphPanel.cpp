@@ -862,6 +862,10 @@ namespace FW
 		}
 		ResolveObjectPtrFixups();
 		EndObjectPtrFixup();
+		for (auto& NewNode : NewNodes)
+		{
+			NewNode->PostLoad();
+		}
 
 		// Collect intra-selection link pairs and clear link state on clones
 		// (AddLinkCommand will re-populate it). 

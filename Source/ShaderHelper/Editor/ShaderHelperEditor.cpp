@@ -611,7 +611,8 @@ namespace SH
 			.Title(TAttribute<FText>::CreateLambda([this] { 
 				FString ProjectPath = CurProject->GetFilePath();
                 int Fps = FMath::RoundToInt(1 / GApp->GetDeltaTime());
-				return FText::FromString(LOCALIZATION("ShaderHelper").ToString() + FString::Printf(TEXT(" [%s] Fps:%d"), *ProjectPath, Fps));
+				return FText::FromString(LOCALIZATION("ShaderHelper").ToString() + "-" + ANSI_TO_TCHAR(magic_enum::enum_name(GetGpuRhiBackendType()).data())
+					+ FString::Printf(TEXT(" [%s] Fps:%d"), *ProjectPath, Fps));
 			}))
 			.ScreenPosition(UsedWindowPos)
 			.AutoCenter(AutoCenterRule)

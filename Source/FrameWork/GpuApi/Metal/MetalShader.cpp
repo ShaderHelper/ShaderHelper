@@ -212,7 +212,7 @@ namespace FW
 				OutErrorInfo = "[SpirvCross]" + MoveTemp(ErrorInfo);
 				return false;
 			}
-			else
+			else if (SpvResult.errorWarningMsg.Size() > 0)
 			{
 				OutWarnInfo = FString("[SpirvCross]") + static_cast<const char*>(SpvResult.errorWarningMsg.Data());
 			}

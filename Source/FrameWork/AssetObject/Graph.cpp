@@ -52,32 +52,8 @@ namespace FW
 		AssetObject::Serialize(Ar);
 
 		SerializePolymorphicObjectArray(Ar, NodeDatas, this);
-	}
 
-	void Graph::PostLoad()
-	{
-		AssetObject::PostLoad();
-
-		NodeDeps.Empty();
-		for (const auto& NodeData : NodeDatas)
-		{
-			for (auto [OutPinPtr, InPinPtr] : NodeData->OutPinToInPin)
-			{
-				GraphPin* OutPin = OutPinPtr.Get();
-				GraphPin* InPin = InPinPtr.Get();
-				if (!OutPin || !InPin)
-				{
-					continue;
-				}
-
-				GraphNode* OutputNode = OutPin->GetOwnerNode();
-				GraphNode* InputNode = InPin->GetOwnerNode();
-				if (OutputNode && InputNode)
-				{
-					AddDep(InputNode, OutputNode);
-				}
-			}
-		}
+		Ar << NodeDeps;
 	}
 
 	const FSlateBrush* Graph::GetImage() const

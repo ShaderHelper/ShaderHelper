@@ -11,6 +11,11 @@
 #include "RenderResource/PrintBuffer.h"
 #include "Debugger/DebuggableObject.h"
 
+namespace FW
+{
+	class RenderGraph;
+}
+
 namespace SH
 {
 	class MeshRenderObject : public FW::ShObject, public DebuggableObject
@@ -42,6 +47,10 @@ namespace SH
 		FW::PrintBuffer* GetPrintBuffer();
 		bool FlushPrintBufferLogs(const FString& LogPrefix);
 
+		void AddRWInputBlitPasses(FW::RenderGraph& RG);
+		// Publish the cached RW output textures to their matching output pins.
+		void PublishRWOutputsToPins();
+
 		// DebuggableObject
 		TArray<DebugItem> GetSupportedDebugItems() const override { return { DebugItem::Vertex, DebugItem::Fragment }; }
 		DebugTargetInfo OnStartDebugging(DebugItem Item) override;
@@ -57,6 +66,7 @@ namespace SH
 		FW::AssetPtr<Material> MaterialAsset;
 		TArray<FW::ObjectPtr<FW::GraphPin>> OverridePins;
 		TArray<ShaderOverrideSlot> OverrideSlots;
+		FW::Vector2f CurrentViewportSize{ 0, 0 };
 
 	private:
 		void BindMaterialDelegates();
@@ -66,6 +76,7 @@ namespace SH
 		bool BuildPipeline(const TArray<FW::GpuFormat>& ColorFormats, FW::GpuFormat DepthFormat, uint32 SampleCount);
 		void UpdateMaterialDrawState(const FMatrix44f& ModelMatrix, const FMatrix44f& ViewMat, const FMatrix44f& ProjMat, const FW::Vector2f& ViewportSize, const FW::Vector2f& MousePos, float Time, const FW::Vector3f& CameraPos, const FW::Vector3f& CameraDir);
 		TArray<BindingBuilder> BuildDebugBindingBuilders() const;
+		FW::GpuTexture* EnsureRWOutputTexture(const FString& Key, FW::BindingType BindingTypeValue, FW::GpuTexture* SrcTex);
 
 	private:
 		TMap<int32, TRefCountPtr<FW::GpuBindGroupLayout>> BindGroupLayouts;
@@ -73,6 +84,8 @@ namespace SH
 		TRefCountPtr<FW::GpuRenderPipelineState> Pipeline;
 		FW::GpuRenderPipelineStateDesc PipelineDesc;
 		TMap<FString, TUniquePtr<FW::UniformBuffer>> UniformBuffers;
+		// Internally-owned output texture for each RW resource binding (keyed by BindingName|Stage).
+		TMap<FString, TRefCountPtr<FW::GpuTexture>> RWOutputTextures;
 		TUniquePtr<FW::PrintBuffer> PrinterBuffer;
 		MaterialErrorRenderResources ErrorResources;
 		FDelegateHandle MaterialChangedHandle;

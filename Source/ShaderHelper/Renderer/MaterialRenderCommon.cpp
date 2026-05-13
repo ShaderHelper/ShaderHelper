@@ -720,11 +720,6 @@ VsOutput MainVS(float3 Position : POSITION0) {
 			const bool bHlsl = Vs->GetShaderLanguage() == GpuShaderLanguage::HLSL;
 			for (const auto& PsInput : PsInputs)
 			{
-				if (!PsInput.bRead)
-				{
-					continue;
-				}
-
 				if (bHlsl)
 				{
 					const GpuShaderStageSemantic* MatchingVsOutput = VsOutputs.FindByPredicate([&](const GpuShaderStageSemantic& VsOutput) {

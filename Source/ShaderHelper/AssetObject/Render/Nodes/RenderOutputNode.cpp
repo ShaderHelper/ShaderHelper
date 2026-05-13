@@ -58,7 +58,7 @@ namespace SH
 		, Layer(0)
 		, AreaFraction(1.0f)
 	{
-		ObjectName = LOCALIZATION("Output");
+		ObjectName = LOCALIZATION("Present");
 	}
 
 	RenderOutputNode::~RenderOutputNode()

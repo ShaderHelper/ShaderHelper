@@ -754,8 +754,15 @@ namespace SH
 		DebugFrameState.Time = Ctx.Time;
 
 		const Vector2f ViewportSize((float)Width, (float)Height);
-
 		AddInputBlitPasses(*Ctx.RG, InputState, CachedColorRTs, CachedDepthRT);
+
+		// For MeshRenderObjects that override RW textures, blit the input texture into the
+		// internally-owned RW output
+		for (const auto& MRO : MeshRenderObjects)
+		{
+			MRO->CurrentViewportSize = ViewportSize;
+			MRO->AddRWInputBlitPasses(*Ctx.RG);
+		}
 
 		AddMeshDrawPass(*Ctx.RG, ObjectName.ToString(), MoveTemp(PassDesc), MeshRenderObjects, ViewportSize);
 
@@ -792,6 +799,11 @@ namespace SH
 			{
 				Pin->SetValue(CachedDepthRT);
 			}
+		}
+
+		for (const auto& MRO : MeshRenderObjects)
+		{
+			MRO->PublishRWOutputsToPins();
 		}
 
 		if (bAssertError)
@@ -1284,8 +1296,8 @@ namespace SH
 				RTCat->AddChild(EnumItem);
 			}
 
-			auto WItem = MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("MeshPassRTWidthAuto"), &RTSize.X);
-			auto HItem = MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("MeshPassRTHeightAuto"), &RTSize.Y);
+			auto WItem = MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("WidthAuto"), &RTSize.X);
+			auto HItem = MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("HeightAuto"), &RTSize.Y);
 			RTCat->AddChild(WItem);
 			RTCat->AddChild(HItem);
 		}

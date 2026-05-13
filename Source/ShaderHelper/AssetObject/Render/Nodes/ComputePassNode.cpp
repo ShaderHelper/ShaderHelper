@@ -13,6 +13,7 @@
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "GpuApi/GpuRhi.h"
 #include "GpuApi/GpuResourceHelper.h"
+#include "RenderResource/RenderPass/BlitPass.h"
 
 using namespace FW;
 
@@ -119,10 +120,8 @@ namespace SH
 					for (const GpuShaderUbMemberInfo& Member : Binding.UbMembers)
 					{
 						ShaderOverrideSlot Slot;
-						Slot.BindingName = Binding.Name;
-						Slot.MemberName = Member.Name;
+						Slot.Key = { Binding.Name, Member.Name, BindingShaderStage::Compute };
 						Slot.Type = Member.Type;
-						Slot.Stage = BindingShaderStage::Compute;
 						Slot.bIsResource = false;
 						NewSlots.Add(MoveTemp(Slot));
 					}
@@ -130,10 +129,8 @@ namespace SH
 				else if (IsPinnableResourceBinding(Binding.Type))
 				{
 					ShaderOverrideSlot Slot;
-					Slot.BindingName = Binding.Name;
-					Slot.MemberName.Empty();
+					Slot.Key = { Binding.Name, TEXT(""), BindingShaderStage::Compute };
 					Slot.Type = GetResourceOverrideType(Binding.Type);
-					Slot.Stage = BindingShaderStage::Compute;
 					Slot.bIsResource = true;
 					NewSlots.Add(MoveTemp(Slot));
 				}
@@ -162,6 +159,51 @@ namespace SH
 		BindGroupLayouts.Empty();
 		BindGroups.Empty();
 		UniformBuffers.Empty();
+		RWOutputTextures.Empty();
+	}
+
+	GpuTexture* ComputePassNode::ResolveBindingTexture(const GpuShaderLayoutBinding& Binding)
+	{
+		const ShaderOverrideKey Key{ Binding.Name, TEXT(""), BindingShaderStage::Compute };
+		return ResolveOverrideTexture(Binding.Type,
+			FindOverrideInputPin(OverrideSlots, Key),
+			FindOverrideSlot(OverrideSlots, Key),
+			CurrentViewportSize);
+	}
+
+	GpuTexture* ComputePassNode::EnsureRWOutputTexture(const FString& BindingName, BindingType BindingTypeValue, GpuTexture* SrcTex)
+	{
+		const uint32 Width = SrcTex->GetWidth();
+		const uint32 Height = SrcTex->GetHeight();
+		const uint32 Depth = SrcTex->GetDepth();
+		const GpuFormat Format = SrcTex->GetFormat();
+		const bool bIs3D = BindingTypeValue == BindingType::RWTexture3D;
+
+		TRefCountPtr<GpuTexture>& Slot = RWOutputTextures.FindOrAdd(BindingName);
+		if (Slot.IsValid()
+			&& Slot->GetWidth() == Width
+			&& Slot->GetHeight() == Height
+			&& Slot->GetFormat() == Format
+			&& (!bIs3D || Slot->GetDepth() == Depth))
+		{
+			return Slot.GetReference();
+		}
+
+		GpuTextureDesc Desc{
+			.Width = Width,
+			.Height = Height,
+			.Format = Format,
+			.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::UnorderedAccess | GpuTextureUsage::RenderTarget,
+		};
+		if (bIs3D)
+		{
+			Desc.Depth = Depth;
+			Desc.Dimension = GpuTextureDimension::Tex3D;
+			Desc.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::UnorderedAccess;
+		}
+		Slot = GGpuRhi->CreateTexture(Desc, GpuResourceState::UnorderedAccess);
+		GGpuRhi->SetResourceName(TCHAR_TO_ANSI(*FString::Printf(TEXT("ComputePass_RWOut_%s"), *BindingName)), Slot);
+		return Slot.GetReference();
 	}
 
 	bool ComputePassNode::CanChangeProperty(PropertyData* InProperty)
@@ -191,6 +233,24 @@ namespace SH
 			RefreshNodeWidget();
 			static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
 		}
+		else if (InProperty->IsOfType<PropertyAssetItem>())
+		{
+			// An RW override slot's texture asset changed: its size/format
+			// children only show when no asset is set, so rebuild the panel.
+			const FString DisplayName = InProperty->GetDisplayName().ToString();
+			const bool bIsRWOverrideAsset = OverrideSlots.ContainsByPredicate([&](const ShaderOverrideSlot& Slot) {
+				return Slot.bIsResource && IsRWResourceType(Slot.Type) && Slot.Key.BindingName == DisplayName;
+			});
+			if (bIsRWOverrideAsset)
+			{
+				InvalidateRenderResources();
+				static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+			}
+		}
+		else if (IsDefaultRWTextureProperty(OverrideSlots, InProperty))
+		{
+			InvalidateRenderResources();
+		}
 	}
 
 	TArray<TSharedRef<PropertyData>> ComputePassNode::GeneratePropertyDatas()
@@ -199,12 +259,11 @@ namespace SH
 
 		auto ThreadCountItem = MakeShared<PropertyVector3iItem>(this, LOCALIZATION("ThreadGroupCount"), reinterpret_cast<int32*>(&ThreadGroupCount.x));
 		Result.Add(ThreadCountItem);
-
+		auto BindingCat = MakeShared<PropertyCategory>(this, LOCALIZATION("Bindings"));	
 		for (ShaderOverrideSlot& Slot : OverrideSlots)
 		{
-			FString Label = Slot.BindingName + (Slot.MemberName.IsEmpty() ? TEXT("") : (TEXT(".") + Slot.MemberName));
-			const FText LabelText = FText::FromString(Label);
-			GraphPin* OverridePin = FindOverridePin(OverrideSlots, Pins, Slot.BindingName, Slot.MemberName, BindingShaderStage::Compute);
+			const FText LabelText = FText::FromString(MakeOverrideSlotLabel(Slot));
+			GraphPin* OverridePin = FindOverrideInputPin(OverrideSlots, Slot.Key);
 			TSharedPtr<PropertyItemBase> Entry;
 			if (OverridePin && OverridePin->SourcePin.IsValid())
 			{
@@ -217,15 +276,20 @@ namespace SH
 			}
 			else if (Slot.bIsResource)
 			{
-				Entry = MakeShared<PropertyAssetItem>(this, LabelText, GetTextureMetaType(Slot.Type), &Slot.TextureAsset);
+				auto AssetItem = MakeShared<PropertyAssetItem>(this, LabelText, GetTextureMetaType(Slot.Type), &Slot.TextureAsset);
+				if (IsRWResourceType(Slot.Type) && !Slot.TextureAsset)
+				{
+					AppendDefaultRWSizeChildren(this, *AssetItem, Slot);
+				}
+				Entry = AssetItem;
 			}
 			else
 			{
 				Entry = MakeBytesPropertyItem(this, LabelText, Slot);
 			}
-			Result.Add(Entry.ToSharedRef());
+			BindingCat->AddChild(Entry.ToSharedRef());
 		}
-
+		Result.Add(BindingCat);
 		return Result;
 	}
 
@@ -286,22 +350,22 @@ namespace SH
 					continue;
 				}
 
-				auto FindSlot = [&] {
-					return OverrideSlots.FindByPredicate([&](const ShaderOverrideSlot& S) {
-						return S.bIsResource && S.BindingName == Binding.Name;
-					});
-				};
-
 				switch (Binding.Type)
 				{
 				case BindingType::Texture:
 				case BindingType::TextureCube:
 				case BindingType::Texture3D:
+				{
+					GpuTexture* Tex = ResolveBindingTexture(Binding);
+					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, Tex->GetDefaultView(), Binding.Stage);
+					break;
+				}
 				case BindingType::RWTexture:
 				case BindingType::RWTexture3D:
 				{
-					GpuTexture* Tex = ResolveOverrideTexture(Binding.Type, FindOverridePin(OverrideSlots, Pins, Binding.Name, TEXT(""), BindingShaderStage::Compute), FindSlot());
-					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, Tex->GetDefaultView(), Binding.Stage);
+					GpuTexture* SrcTex = ResolveBindingTexture(Binding);
+					GpuTexture* OutTex = EnsureRWOutputTexture(Binding.Name, Binding.Type, SrcTex);
+					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, OutTex->GetDefaultView(), Binding.Stage);
 					break;
 				}
 				case BindingType::Sampler:
@@ -314,7 +378,7 @@ namespace SH
 				case BindingType::CombinedTextureCubeSampler:
 				case BindingType::CombinedTexture3DSampler:
 				{
-					GpuTexture* Tex = ResolveOverrideTexture(Binding.Type, FindOverridePin(OverrideSlots, Pins, Binding.Name, TEXT(""), BindingShaderStage::Compute), FindSlot());
+					GpuTexture* Tex = ResolveBindingTexture(Binding);
 					GpuSamplerDesc SamplerDesc;
 					GpuSampler* Sampler = GpuResourceHelper::GetSampler(SamplerDesc);
 					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, new GpuCombinedTextureSampler(Tex->GetDefaultView(), Sampler), Binding.Stage);
@@ -340,13 +404,12 @@ namespace SH
 			if (!UB) continue;
 			for (const auto& [MemberName, MemberInfo] : UB->GetMetaData().Members)
 			{
-				const ShaderOverrideSlot* OverrideSlot = OverrideSlots.FindByPredicate([&](const ShaderOverrideSlot& Slot) {
-					return !Slot.bIsResource && Slot.BindingName == Name && Slot.MemberName == MemberName;
-				});
+				const ShaderOverrideKey Key{ Name, MemberName, BindingShaderStage::Compute };
+				const ShaderOverrideSlot* OverrideSlot = FindOverrideSlot(OverrideSlots, Key);
 				if (!OverrideSlot) continue;
 
 				const uint8* BytesPtr = nullptr;
-				if (GraphPin* Pin = FindOverridePin(OverrideSlots, Pins, Name, MemberName, BindingShaderStage::Compute))
+				if (GraphPin* Pin = FindOverrideInputPin(OverrideSlots, Key))
 				{
 					if (auto* BytesPinValue = DynamicCast<BytesPin>(Pin))
 					{
@@ -381,6 +444,8 @@ namespace SH
 	{
 		auto& Ctx = static_cast<RenderExecContext&>(Context);
 
+		CurrentViewportSize = Ctx.ViewportSize;
+
 		if (!ShaderAsset || !ShaderAsset->IsStageEnabled(ShaderType::Compute))
 		{
 			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" has no compute shader assigned."), *ObjectName.ToString());
@@ -398,6 +463,32 @@ namespace SH
 			return { true, true };
 		}
 		UpdateUniformBuffers();
+
+		// Blit input textures into the internally-owned RW output textures.
+		for (const GpuShaderLayoutBinding& Binding : Cs->GetLayout())
+		{
+			if (Binding.Type != BindingType::RWTexture)
+			{
+				continue;
+			}
+			const TRefCountPtr<GpuTexture>* OutTexPtr = RWOutputTextures.Find(Binding.Name);
+			if (!OutTexPtr || !OutTexPtr->IsValid())
+			{
+				continue;
+			}
+			GpuTexture* SrcTex = ResolveBindingTexture(Binding);
+			if (!SrcTex || SrcTex == OutTexPtr->GetReference())
+			{
+				continue;
+			}
+
+			BlitPassInput BlitInput;
+			BlitInput.InputView = SrcTex->GetDefaultView();
+			BlitInput.InputTexSampler = GpuResourceHelper::GetSampler({});
+			BlitInput.OutputView = OutTexPtr->GetReference()->GetDefaultView();
+			BlitInput.LoadAction = RenderTargetLoadAction::DontCare;
+			AddBlitPass(*Ctx.RG, BlitInput);
+		}
 
 		TArray<GpuBindGroupLayout*> LayoutPtrs;
 		TArray<int32> SortedGroupSlots;
@@ -449,9 +540,7 @@ namespace SH
 			case BindingType::CombinedTextureCubeSampler:
 			case BindingType::CombinedTexture3DSampler:
 			{
-				if (GpuTexture* Tex = ResolveOverrideTexture(Binding.Type,
-					FindOverridePin(OverrideSlots, Pins, Binding.Name, TEXT(""), BindingShaderStage::Compute),
-					OverrideSlots.FindByPredicate([&](const ShaderOverrideSlot& S) { return S.bIsResource && S.BindingName == Binding.Name; })))
+				if (GpuTexture* Tex = ResolveBindingTexture(Binding))
 				{
 					Pass.Read(Tex);
 				}
@@ -460,11 +549,26 @@ namespace SH
 			case BindingType::RWTexture:
 			case BindingType::RWTexture3D:
 			{
-				if (GpuTexture* Tex = ResolveOverrideTexture(Binding.Type,
-					FindOverridePin(OverrideSlots, Pins, Binding.Name, TEXT(""), BindingShaderStage::Compute),
-					OverrideSlots.FindByPredicate([&](const ShaderOverrideSlot& S) { return S.bIsResource && S.BindingName == Binding.Name; })))
+				const TRefCountPtr<GpuTexture>* OutTexPtr = RWOutputTextures.Find(Binding.Name);
+				GpuTexture* OutTex = (OutTexPtr && OutTexPtr->IsValid()) ? OutTexPtr->GetReference() : nullptr;
+				if (!OutTex)
 				{
-					Pass.Write(Tex);
+					break;
+				}
+				Pass.Write(OutTex);
+
+				const ShaderOverrideSlot* MatchingSlot = FindOverrideSlot(OverrideSlots, ShaderOverrideKey{ Binding.Name, TEXT(""), BindingShaderStage::Compute });
+				if (MatchingSlot)
+				{
+					GraphPin* OutputPin = MatchingSlot->OutputPin.IsValid() ? MatchingSlot->OutputPin.Get() : nullptr;
+					if (auto* TexPin = DynamicCast<GpuTexturePin>(OutputPin))
+					{
+						TexPin->SetValue(OutTex);
+					}
+					else if (auto* Tex3DPin = DynamicCast<GpuTexture3DPin>(OutputPin))
+					{
+						Tex3DPin->SetValue(OutTex);
+					}
 				}
 				break;
 			}

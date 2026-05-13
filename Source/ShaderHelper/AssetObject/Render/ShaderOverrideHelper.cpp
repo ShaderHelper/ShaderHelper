@@ -15,6 +15,50 @@ using namespace FW;
 
 namespace SH
 {
+	static GpuFormat ToGpuFormat(RWTextureFormat Format)
+	{
+		switch (Format)
+		{
+		case RWTextureFormat::R8_UNORM:              return GpuFormat::R8_UNORM;
+		case RWTextureFormat::R8G8B8A8_UNORM:        return GpuFormat::R8G8B8A8_UNORM;
+		case RWTextureFormat::R16_UINT:              return GpuFormat::R16_UINT;
+		case RWTextureFormat::R32_UINT:              return GpuFormat::R32_UINT;
+		case RWTextureFormat::R16G16B16A16_UINT:     return GpuFormat::R16G16B16A16_UINT;
+		case RWTextureFormat::R32G32_UINT:           return GpuFormat::R32G32_UINT;
+		case RWTextureFormat::R32G32B32A32_UINT:     return GpuFormat::R32G32B32A32_UINT;
+		case RWTextureFormat::R16_FLOAT:             return GpuFormat::R16_FLOAT;
+		case RWTextureFormat::R32_FLOAT:             return GpuFormat::R32_FLOAT;
+		case RWTextureFormat::R32G32_FLOAT:          return GpuFormat::R32G32_FLOAT;
+		case RWTextureFormat::R16G16B16A16_FLOAT:    return GpuFormat::R16G16B16A16_FLOAT;
+		case RWTextureFormat::R32G32B32A32_FLOAT:    return GpuFormat::R32G32B32A32_FLOAT;
+		case RWTextureFormat::R16G16B16A16_UNORM:    return GpuFormat::R16G16B16A16_UNORM;
+		}
+		AUX::Unreachable();
+	}
+
+	FArchive& operator<<(FArchive& Ar, ShaderOverrideKey& Key)
+	{
+		Ar << Key.BindingName << Key.MemberName << Key.Stage;
+		return Ar;
+	}
+
+	FArchive& operator<<(FArchive& Ar, ShaderOverrideSlot& S)
+	{
+		Ar << S.Key << S.Type << S.bIsResource << S.InputPin << S.Bytes << S.TextureAsset << S.OutputPin;
+		Ar << S.DefaultRWSize << S.DefaultRWFormat;
+		return Ar;
+	}
+
+	FString MakeOverrideKeyLabel(const ShaderOverrideKey& Key)
+	{
+		return Key.MemberName.IsEmpty() ? Key.BindingName : Key.BindingName + TEXT(".") + Key.MemberName;
+	}
+
+	FString MakeOverrideSlotLabel(const ShaderOverrideSlot& Slot)
+	{
+		return MakeOverrideKeyLabel(Slot.Key);
+	}
+
 	int32 GetOverrideByteSize(const FString& Type)
 	{
 		if (IsShaderMatrix4x4Type(Type)) return static_cast<int32>(sizeof(FMatrix44f));
@@ -103,6 +147,11 @@ namespace SH
 		}
 	}
 
+	bool IsRWResourceType(const FString& Type)
+	{
+		return Type.StartsWith(TEXT("RW"));
+	}
+
 	ObjectPtr<GraphPin> CreateOverridePinForType(ShObject* Outer, const FString& Type, bool bIsResource)
 	{
 		if (bIsResource)
@@ -129,24 +178,36 @@ namespace SH
 	{
 		if (BindingTypeValue == BindingType::RWTexture3D)
 		{
-			static TRefCountPtr<GpuTexture> DefaultRWTexture3D = GGpuRhi->CreateTexture({
-				.Width = 1,
-				.Height = 1,
-				.Format = GpuFormat::R8G8B8A8_UNORM,
-				.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::UnorderedAccess,
-				.Depth = 1,
-				.Dimension = GpuTextureDimension::Tex3D,
-			});
+			static TRefCountPtr<GpuTexture> DefaultRWTexture3D = []{
+				constexpr uint32 ByteSize = 1 * 1 * 1 * 4;
+				TArray<uint8> ZeroData;
+				ZeroData.SetNumZeroed(ByteSize);
+				return GGpuRhi->CreateTexture({
+					.Width = 1,
+					.Height = 1,
+					.Format = GpuFormat::R8G8B8A8_UNORM,
+					.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::UnorderedAccess,
+					.InitialData = ZeroData,
+					.Depth = 1,
+					.Dimension = GpuTextureDimension::Tex3D,
+				}, GpuResourceState::UnorderedAccess);
+			}();
 			return DefaultRWTexture3D;
 		}
 		if (BindingTypeValue == BindingType::RWTexture)
 		{
-			static TRefCountPtr<GpuTexture> DefaultRWTexture = GGpuRhi->CreateTexture({
-				.Width = 1,
-				.Height = 1,
-				.Format = GpuFormat::R8G8B8A8_UNORM,
-				.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::UnorderedAccess,
-			}, GpuResourceState::UnorderedAccess);
+			static TRefCountPtr<GpuTexture> DefaultRWTexture = []{
+				constexpr uint32 ByteSize = 1 * 1 * 4;
+				TArray<uint8> ZeroData;
+				ZeroData.SetNumZeroed(ByteSize);
+				return GGpuRhi->CreateTexture({
+					.Width = 1,
+					.Height = 1,
+					.Format = GpuFormat::R8G8B8A8_UNORM,
+					.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::UnorderedAccess,
+					.InitialData = ZeroData,
+				}, GpuResourceState::UnorderedAccess);
+			}();
 			return DefaultRWTexture;
 		}
 		if (BindingTypeValue == BindingType::TextureCube || BindingTypeValue == BindingType::CombinedTextureCubeSampler)
@@ -160,56 +221,130 @@ namespace SH
 		return GpuResourceHelper::GetGlobalBlackTex();
 	}
 
-	GpuTexture* GetConnectedOverrideTexture(GraphPin* OverridePin)
+	GpuTexture* GetConnectedOverrideTexture(GraphPin* InputPin)
 	{
-		if (auto* TexturePin = DynamicCast<GpuTexturePin>(OverridePin)) return TexturePin->GetValue();
-		if (auto* CubemapPin = DynamicCast<GpuCubemapPin>(OverridePin)) return CubemapPin->GetValue();
-		if (auto* Texture3DPin = DynamicCast<GpuTexture3DPin>(OverridePin)) return Texture3DPin->GetValue();
+		GraphPin* SourcePin = InputPin ? InputPin->GetSourcePin() : nullptr;
+		if (auto* TexturePin = DynamicCast<GpuTexturePin>(SourcePin)) return TexturePin->GetValue();
+		if (auto* CubemapPin = DynamicCast<GpuCubemapPin>(SourcePin)) return CubemapPin->GetValue();
+		if (auto* Texture3DPin = DynamicCast<GpuTexture3DPin>(SourcePin)) return Texture3DPin->GetValue();
 		return nullptr;
+	}
+
+	bool IsDefaultRWTextureProperty(const TArray<ShaderOverrideSlot>& Slots, PropertyData* InProperty)
+	{
+		const FText DisplayName = InProperty->GetDisplayName();
+		const bool bDefaultRWChild = DisplayName.EqualTo(LOCALIZATION("WidthAuto"))
+			|| DisplayName.EqualTo(LOCALIZATION("HeightAuto"))
+			|| DisplayName.EqualTo(LOCALIZATION("Depth"))
+			|| DisplayName.EqualTo(LOCALIZATION("Format"));
+		if (!bDefaultRWChild)
+		{
+			return false;
+		}
+
+		for (PropertyData* Parent = InProperty->GetParent(); Parent; Parent = Parent->GetParent())
+		{
+			const FString ParentName = Parent->GetDisplayName().ToString();
+			if (Slots.ContainsByPredicate([&](const ShaderOverrideSlot& Slot) {
+				return Slot.bIsResource && IsRWResourceType(Slot.Type) && MakeOverrideSlotLabel(Slot) == ParentName;
+			}))
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 
 	void BreakOverridePinLink(GraphPin* Pin)
 	{
-		if (!Pin || !Pin->SourcePin.IsValid())
+		if (!Pin)
 		{
 			return;
 		}
 		Graph* OwnerGraph = static_cast<Graph*>(Pin->GetOuterMost());
-		OwnerGraph->RemoveLink(Pin->GetSourcePin(), Pin);
+		if (Pin->SourcePin.IsValid())
+		{
+			OwnerGraph->RemoveLink(Pin->GetSourcePin(), Pin);
+		}
+
+		TArray<GraphPin*> TargetPins = Pin->GetTargetPins();
+		for (GraphPin* TargetPin : TargetPins)
+		{
+			OwnerGraph->RemoveLink(Pin, TargetPin);
+		}
 	}
 
-	GpuTexture* ResolveOverrideTexture(BindingType BindingTypeValue, GraphPin* OverridePin, const ShaderOverrideSlot* MatchingSlot)
+	GpuTexture* ResolveOverrideTexture(BindingType BindingTypeValue, GraphPin* InputPin, ShaderOverrideSlot* MatchingSlot, Vector2f ViewportSize)
 	{
-		if (OverridePin)
+		if (InputPin)
 		{
-			if (GpuTexture* Tex = GetConnectedOverrideTexture(OverridePin)) return Tex;
+			if (GpuTexture* Tex = GetConnectedOverrideTexture(InputPin)) return Tex;
 		}
 		if (MatchingSlot && MatchingSlot->TextureAsset)
 		{
 			if (GpuTexture* Tex = ResolveTextureAssetGpu(MatchingSlot->TextureAsset.Get())) return Tex;
 		}
+		// For RW resources with no asset and no incoming connection
+		if (MatchingSlot && (BindingTypeValue == BindingType::RWTexture || BindingTypeValue == BindingType::RWTexture3D))
+		{
+			const bool bIs3D = BindingTypeValue == BindingType::RWTexture3D;
+			auto ResolveExtent = [](int32 SlotValue, float ViewportValue) -> uint32 {
+				if (SlotValue <= 0 && ViewportValue > 0) return static_cast<uint32>(ViewportValue);
+				return static_cast<uint32>(FMath::Max(1, SlotValue));
+			};
+			const uint32 W = ResolveExtent(MatchingSlot->DefaultRWSize.x, ViewportSize.X);
+			const uint32 H = ResolveExtent(MatchingSlot->DefaultRWSize.y, ViewportSize.Y);
+			const uint32 D = static_cast<uint32>(FMath::Max(1, MatchingSlot->DefaultRWSize.z));
+			const GpuFormat Fmt = ToGpuFormat(MatchingSlot->DefaultRWFormat);
+			GpuTexture* Existing = MatchingSlot->DefaultRWTexture.GetReference();
+			const bool bMatches = Existing
+				&& Existing->GetWidth() == W
+				&& Existing->GetHeight() == H
+				&& Existing->GetFormat() == Fmt
+				&& (!bIs3D || Existing->GetDepth() == D);
+			if (!bMatches)
+			{
+				const uint32 ByteSize = W * H * D * GetFormatByteSize(Fmt);
+				TArray<uint8> ZeroData;
+				ZeroData.SetNumZeroed(static_cast<int32>(ByteSize));
+
+				GpuTextureDesc Desc{
+					.Width = W,
+					.Height = H,
+					.Format = Fmt,
+					.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::UnorderedAccess,
+					.InitialData = ZeroData,
+				};
+				if (bIs3D)
+				{
+					Desc.Depth = D;
+					Desc.Dimension = GpuTextureDimension::Tex3D;
+				}
+				MatchingSlot->DefaultRWTexture = GGpuRhi->CreateTexture(Desc, GpuResourceState::UnorderedAccess);
+			}
+			return MatchingSlot->DefaultRWTexture.GetReference();
+		}
 		return GetDefaultOverrideTexture(BindingTypeValue);
 	}
 
-	GraphPin* FindOverridePin(
-		const TArray<ShaderOverrideSlot>& Slots,
-		const TArray<ObjectPtr<GraphPin>>& Pins,
-		const FString& BindingName,
-		const FString& MemberName,
-		BindingShaderStage Stage)
+	ShaderOverrideSlot* FindOverrideSlot(TArray<ShaderOverrideSlot>& Slots, const ShaderOverrideKey& Key)
 	{
-		for (const ShaderOverrideSlot& Slot : Slots)
-		{
-			if (Slot.BindingName != BindingName || Slot.MemberName != MemberName || Slot.Stage != Stage)
-			{
-				continue;
-			}
-			for (const ObjectPtr<GraphPin>& Pin : Pins)
-			{
-				if (Pin && Pin->GetGuid() == Slot.PinGuid) return Pin.Get();
-			}
-		}
-		return nullptr;
+		return Slots.FindByPredicate([&Key](const ShaderOverrideSlot& Slot) {
+			return Slot.Key == Key;
+		});
+	}
+
+	const ShaderOverrideSlot* FindOverrideSlot(const TArray<ShaderOverrideSlot>& Slots, const ShaderOverrideKey& Key)
+	{
+		return Slots.FindByPredicate([&Key](const ShaderOverrideSlot& Slot) {
+			return Slot.Key == Key;
+		});
+	}
+
+	GraphPin* FindOverrideInputPin(const TArray<ShaderOverrideSlot>& Slots, const ShaderOverrideKey& Key)
+	{
+		const ShaderOverrideSlot* Slot = FindOverrideSlot(Slots, Key);
+		return Slot && Slot->InputPin.IsValid() ? Slot->InputPin.Get() : nullptr;
 	}
 
 	void PreserveOverrideSlotData(TArray<ShaderOverrideSlot>& NewSlots, const TArray<ShaderOverrideSlot>& OldSlots)
@@ -218,8 +353,7 @@ namespace SH
 		{
 			for (const ShaderOverrideSlot& Old : OldSlots)
 			{
-				if (Old.BindingName != NewSlot.BindingName
-					|| Old.MemberName != NewSlot.MemberName
+				if (!(Old.Key == NewSlot.Key)
 					|| Old.bIsResource != NewSlot.bIsResource
 					|| Old.Type != NewSlot.Type)
 				{
@@ -228,12 +362,15 @@ namespace SH
 				if (NewSlot.bIsResource)
 				{
 					NewSlot.TextureAsset = Old.TextureAsset;
+					NewSlot.DefaultRWSize = Old.DefaultRWSize;
+					NewSlot.DefaultRWFormat = Old.DefaultRWFormat;
 				}
 				else
 				{
 					NewSlot.Bytes = Old.Bytes;
 				}
-				NewSlot.PinGuid = Old.PinGuid;
+				NewSlot.InputPin = Old.InputPin;
+				NewSlot.OutputPin = Old.OutputPin;
 				break;
 			}
 		}
@@ -242,48 +379,62 @@ namespace SH
 	void ReconcileOverridePins(ShObject* Owner, TArray<ShaderOverrideSlot>& Slots, TArray<ObjectPtr<GraphPin>>& Pins)
 	{
 		auto MakePinLabel = [](const ShaderOverrideSlot& Slot) {
-			return FText::FromString(Slot.MemberName.IsEmpty() ? Slot.BindingName : Slot.BindingName + TEXT(".") + Slot.MemberName);
+			return FText::FromString(MakeOverrideSlotLabel(Slot));
+		};
+
+		auto ResolveSlotPin = [&Pins](ObserverObjectPtr<GraphPin>& PinRef) -> GraphPin* {
+			if (PinRef.IsValid())
+			{
+				return PinRef.Get();
+			}
+			for (const ObjectPtr<GraphPin>& Pin : Pins)
+			{
+				if (Pin && PinRef == Pin)
+				{
+					PinRef.SetReference(Pin.Get());
+					return Pin.Get();
+				}
+			}
+			PinRef.Reset();
+			return nullptr;
+		};
+
+		auto RemovePin = [&Pins](GraphPin* PinToRemove) {
+			if (!PinToRemove) return;
+			BreakOverridePinLink(PinToRemove);
+			Pins.RemoveAll([PinToRemove](const ObjectPtr<GraphPin>& P) { return P.Get() == PinToRemove; });
 		};
 
 		for (ShaderOverrideSlot& Slot : Slots)
 		{
-			GraphPin* ExistingPin = nullptr;
-			if (Slot.PinGuid.IsValid())
+			GraphPin* ExistingInputPin = ResolveSlotPin(Slot.InputPin);
+
+			if (!IsOverridePinTypeValid(ExistingInputPin, Slot.Type, Slot.bIsResource))
 			{
-				for (const auto& Pin : Pins)
+				RemovePin(ExistingInputPin);
+
+				ObjectPtr<GraphPin> NewInputPin = CreateOverridePinForType(Owner, Slot.Type, Slot.bIsResource);
+				if (!NewInputPin)
 				{
-					if (Pin && Pin->GetGuid() == Slot.PinGuid)
+					Slot.InputPin.Reset();
+				}
+				else
+				{
+					NewInputPin->Direction = PinDirection::Input;
+					NewInputPin->ObjectName = MakePinLabel(Slot);
+					if (auto* BytesPinValue = DynamicCast<BytesPin>(NewInputPin.Get()))
 					{
-						ExistingPin = Pin.Get();
-						break;
+						if (!Slot.Bytes.IsEmpty()) BytesPinValue->SetBytes(Slot.Bytes);
 					}
+					Slot.InputPin.SetReference(NewInputPin.Get());
+					Pins.Add(MoveTemp(NewInputPin));
 				}
-			}
-
-			if (!IsOverridePinTypeValid(ExistingPin, Slot.Type, Slot.bIsResource))
-			{
-				if (ExistingPin)
-				{
-					BreakOverridePinLink(ExistingPin);
-					Pins.RemoveAll([ExistingPin](const ObjectPtr<GraphPin>& P) { return P.Get() == ExistingPin; });
-				}
-
-				ObjectPtr<GraphPin> NewPin = CreateOverridePinForType(Owner, Slot.Type, Slot.bIsResource);
-				if (!NewPin) continue;
-				NewPin->Direction = PinDirection::Input;
-				NewPin->ObjectName = MakePinLabel(Slot);
-				if (auto* BytesPinValue = DynamicCast<BytesPin>(NewPin.Get()))
-				{
-					if (!Slot.Bytes.IsEmpty()) BytesPinValue->SetBytes(Slot.Bytes);
-				}
-				Slot.PinGuid = NewPin->GetGuid();
-				Pins.Add(MoveTemp(NewPin));
 			}
 			else
 			{
-				ExistingPin->Direction = PinDirection::Input;
-				ExistingPin->ObjectName = MakePinLabel(Slot);
-				if (auto* BytesPinValue = DynamicCast<BytesPin>(ExistingPin))
+				ExistingInputPin->Direction = PinDirection::Input;
+				ExistingInputPin->ObjectName = MakePinLabel(Slot);
+				if (auto* BytesPinValue = DynamicCast<BytesPin>(ExistingInputPin))
 				{
 					if (!BytesPinValue->SourcePin.IsValid() && !Slot.Bytes.IsEmpty())
 					{
@@ -291,11 +442,46 @@ namespace SH
 					}
 				}
 			}
+
+			// Output pin: only for RW resource slots; same label as input pin.
+			const bool bNeedsOutputPin = Slot.bIsResource && IsRWResourceType(Slot.Type);
+			GraphPin* ExistingOutputPin = ResolveSlotPin(Slot.OutputPin);
+
+			if (bNeedsOutputPin)
+			{
+				if (!IsOverridePinTypeValid(ExistingOutputPin, Slot.Type, true))
+				{
+					RemovePin(ExistingOutputPin);
+
+					ObjectPtr<GraphPin> NewOutputPin = CreateOverridePinForType(Owner, Slot.Type, true);
+					if (!NewOutputPin)
+					{
+						Slot.OutputPin.Reset();
+					}
+					else
+					{
+						NewOutputPin->Direction = PinDirection::Output;
+						NewOutputPin->ObjectName = MakePinLabel(Slot);
+						Slot.OutputPin.SetReference(NewOutputPin.Get());
+						Pins.Add(MoveTemp(NewOutputPin));
+					}
+				}
+				else
+				{
+					ExistingOutputPin->Direction = PinDirection::Output;
+					ExistingOutputPin->ObjectName = MakePinLabel(Slot);
+				}
+			}
+			else if (ExistingOutputPin)
+			{
+				RemovePin(ExistingOutputPin);
+				Slot.OutputPin.Reset();
+			}
 		}
 
 		Pins.RemoveAll([&Slots](const ObjectPtr<GraphPin>& Pin) {
 			const bool bOrphan = !Pin || !Slots.ContainsByPredicate([&](const ShaderOverrideSlot& Slot) {
-				return Slot.PinGuid.IsValid() && Pin->GetGuid() == Slot.PinGuid;
+				return Slot.InputPin == Pin || Slot.OutputPin == Pin;
 			});
 			if (bOrphan && Pin)
 			{
@@ -336,5 +522,31 @@ namespace SH
 		if (IsShaderUintVector3Type(Slot.Type)) return MakeShared<PropertyVector3iItem>(Owner, Label, GetOverrideBytesAs<int32>(Slot));
 		if (IsShaderUintVector4Type(Slot.Type)) return MakeShared<PropertyVector4iItem>(Owner, Label, GetOverrideBytesAs<int32>(Slot));
 		return MakeShared<PropertyItemBase>(Owner, Label);
+	}
+
+	void AppendDefaultRWSizeChildren(ShObject* Owner, PropertyItemBase& Parent, ShaderOverrideSlot& Slot)
+	{
+		const bool bIs3D = Slot.Type.Contains(TEXT("3D"));
+
+		auto WidthItem = MakeShared<PropertyScalarItem<int32>>(Owner, LOCALIZATION("WidthAuto"), &Slot.DefaultRWSize.x);
+		WidthItem->SetMinValue(0);
+		Parent.AddChild(WidthItem);
+
+		auto HeightItem = MakeShared<PropertyScalarItem<int32>>(Owner, LOCALIZATION("HeightAuto"), &Slot.DefaultRWSize.y);
+		HeightItem->SetMinValue(0);
+		Parent.AddChild(HeightItem);
+
+		if (bIs3D)
+		{
+			auto DepthItem = MakeShared<PropertyScalarItem<int32>>(Owner, LOCALIZATION("Depth"), &Slot.DefaultRWSize.z);
+			DepthItem->SetMinValue(1);
+			Parent.AddChild(DepthItem);
+		}
+
+		auto FormatItem = MakePropertyEnumItem<RWTextureFormat>(
+			Owner, LOCALIZATION("Format"), Slot.DefaultRWFormat,
+			[&Slot](RWTextureFormat NewValue) { Slot.DefaultRWFormat = NewValue; }
+		);
+		Parent.AddChild(FormatItem);
 	}
 }

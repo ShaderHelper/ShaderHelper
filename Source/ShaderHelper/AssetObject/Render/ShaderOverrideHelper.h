@@ -1,34 +1,68 @@
 #pragma once
 #include "AssetManager/AssetManager.h"
 #include "GpuApi/GpuBindGroupLayout.h"
+#include "GpuApi/GpuTexture.h"
 
 namespace FW
 {
 	class GraphPin;
-	class GpuTexture;
 	struct MetaType;
+	class PropertyData;
 	class PropertyItemBase;
 }
 
 namespace SH
 {
-	// Metadata for a single shader-binding override exposed as a row pin.
-	struct ShaderOverrideSlot
+
+	enum class RWTextureFormat
+	{
+		R8_UNORM,
+		R8G8B8A8_UNORM,
+		R16_UINT,
+		R32_UINT,
+		R16G16B16A16_UINT,
+		R32G32_UINT,
+		R32G32B32A32_UINT,
+		R16_FLOAT,
+		R32_FLOAT,
+		R32G32_FLOAT,
+		R16G16B16A16_FLOAT,
+		R32G32B32A32_FLOAT,
+		R16G16B16A16_UNORM,
+	};
+
+	struct ShaderOverrideKey
 	{
 		FString BindingName;
 		FString MemberName;
-		FString Type;
 		FW::BindingShaderStage Stage = FW::BindingShaderStage::All;
+
+		bool operator==(const ShaderOverrideKey& Other) const
+		{
+			return BindingName == Other.BindingName && MemberName == Other.MemberName && Stage == Other.Stage;
+		}
+
+		friend FArchive& operator<<(FArchive& Ar, ShaderOverrideKey& Key);
+	};
+
+	// Metadata for a single shader-binding override exposed as a row pin.
+	struct ShaderOverrideSlot
+	{
+		ShaderOverrideKey Key;
+		FString Type;
 		bool bIsResource = false;
-		FGuid PinGuid;
+		FW::ObserverObjectPtr<FW::GraphPin> InputPin;
+		FW::ObserverObjectPtr<FW::GraphPin> OutputPin; // RW resource result output pin; same label as InputPin
 		TArray<uint8> Bytes;
 		FW::AssetPtr<FW::AssetObject> TextureAsset;
 
-		friend FArchive& operator<<(FArchive& Ar, ShaderOverrideSlot& S)
-		{
-			Ar << S.BindingName << S.MemberName << S.Type << S.Stage << S.bIsResource << S.PinGuid << S.Bytes << S.TextureAsset;
-			return Ar;
-		}
+		// User-editable defaults used to create a default RW texture when no
+		// TextureAsset is assigned and the input override pin is not connected.
+		FW::Vector3i DefaultRWSize = FW::Vector3i{ 1, 1, 1 };
+		RWTextureFormat DefaultRWFormat = RWTextureFormat::R8G8B8A8_UNORM;
+		TRefCountPtr<FW::GpuTexture> DefaultRWTexture;
+
+		friend FArchive& operator<<(FArchive& Ar, ShaderOverrideSlot& S);
 	};
 
 	// Byte-storage helpers for ShaderOverrideSlot scalar/vector/matrix UB members.
@@ -49,22 +83,23 @@ namespace SH
 	bool IsPinnableResourceBinding(FW::BindingType BindingTypeValue);
 
 	FString GetResourceOverrideType(FW::BindingType BindingTypeValue);
+	FString MakeOverrideKeyLabel(const ShaderOverrideKey& Key);
+	FString MakeOverrideSlotLabel(const ShaderOverrideSlot& Slot);
+	// True for shader resource type strings that represent RW (UAV) resources (e.g. RWTexture2D, RWTexture3D).
+	bool IsRWResourceType(const FString& Type);
 	FW::ObjectPtr<FW::GraphPin> CreateOverridePinForType(FW::ShObject* Outer, const FString& Type, bool bIsResource);
 	bool IsOverridePinTypeValid(FW::GraphPin* Pin, const FString& Type, bool bIsResource);
 	FW::GpuTexture* GetDefaultOverrideTexture(FW::BindingType BindingTypeValue);
 	FW::MetaType* GetTextureMetaType(const FString& Type);
-	FW::GpuTexture* GetConnectedOverrideTexture(FW::GraphPin* OverridePin);
+	FW::GpuTexture* GetConnectedOverrideTexture(FW::GraphPin* InputPin);
 	void BreakOverridePinLink(FW::GraphPin* Pin);
+	bool IsDefaultRWTextureProperty(const TArray<ShaderOverrideSlot>& Slots, FW::PropertyData* InProperty);
 
-	FW::GpuTexture* ResolveOverrideTexture(FW::BindingType BindingTypeValue, FW::GraphPin* OverridePin, const ShaderOverrideSlot* MatchingSlot);
+	FW::GpuTexture* ResolveOverrideTexture(FW::BindingType BindingTypeValue, FW::GraphPin* InputPin, ShaderOverrideSlot* MatchingSlot, FW::Vector2f ViewportSize = FW::Vector2f{0, 0});
 
-	// Look up the override pin for a (BindingName, MemberName, Stage) tuple by walking Slots
-	FW::GraphPin* FindOverridePin(
-		const TArray<ShaderOverrideSlot>& Slots,
-		const TArray<FW::ObjectPtr<FW::GraphPin>>& Pins,
-		const FString& BindingName,
-		const FString& MemberName,
-		FW::BindingShaderStage Stage);
+	ShaderOverrideSlot* FindOverrideSlot(TArray<ShaderOverrideSlot>& Slots, const ShaderOverrideKey& Key);
+	const ShaderOverrideSlot* FindOverrideSlot(const TArray<ShaderOverrideSlot>& Slots, const ShaderOverrideKey& Key);
+	FW::GraphPin* FindOverrideInputPin(const TArray<ShaderOverrideSlot>& Slots, const ShaderOverrideKey& Key);
 
 	void PreserveOverrideSlotData(TArray<ShaderOverrideSlot>& NewSlots, const TArray<ShaderOverrideSlot>& OldSlots);
 
@@ -76,4 +111,5 @@ namespace SH
 
 	// Build a property item for a scalar/vector/matrix override slot.
 	TSharedRef<FW::PropertyItemBase> MakeBytesPropertyItem(FW::ShObject* Owner, FText Label, ShaderOverrideSlot& Slot);
+	void AppendDefaultRWSizeChildren(FW::ShObject* Owner, FW::PropertyItemBase& Parent, ShaderOverrideSlot& Slot);
 }
