@@ -1,28 +1,81 @@
-#include "CommonHeader.h"
-#include "SpirvExprDebugger.h"
+#pragma once
+#include "../SpirvPixelDebugger.h"
+#include "../SpirvComputeDebugger.h"
 
 namespace FW
 {
-	void SpvPixelExprDebuggerVisitor::Visit(const SpvDebugDeclare* Inst)
+	struct SpvPixelExprDebuggerContext : SpvPixelDebuggerContext
+	{
+		SpvPixelExprDebuggerContext(const SpvDebugState& InStopDebugState, int32 InStopDebugStateIndex,
+			const Vector2u& InCoord, const TArray<SpvBinding>& InBindings)
+			: SpvPixelDebuggerContext{ InCoord, InBindings }
+			, StopDebugState(InStopDebugState), StopDebugStateIndex(InStopDebugStateIndex)
+		{}
+
+		SpvDebugState StopDebugState;
+		int32 StopDebugStateIndex;
+	};
+
+	struct SpvComputeExprDebuggerContext : SpvComputeDebuggerContext
+	{
+		SpvComputeExprDebuggerContext(const SpvDebugState& InStopDebugState, int32 InStopDebugStateIndex,
+			const Vector3u& InTargetGroupId, const Vector3u& InThreadGroupSize, uint32 InSelectedLocalInvocationIndex,
+			const TArray<SpvBinding>& InBindings)
+			: SpvComputeDebuggerContext{ InTargetGroupId, InThreadGroupSize, InBindings }
+			, StopDebugState(InStopDebugState), StopDebugStateIndex(InStopDebugStateIndex)
+			, SelectedLocalInvocationIndex(InSelectedLocalInvocationIndex)
+		{}
+
+		SpvDebugState StopDebugState;
+		int32 StopDebugStateIndex;
+		uint32 SelectedLocalInvocationIndex;
+	};
+
+	template<typename TBase, typename TContext>
+	class SpvExprDebuggerVisitorImpl : public TBase
+	{
+	public:
+		using TBase::TBase;
+		void Visit(const SpvDebugDeclare* Inst);
+
+	protected:
+		void ParseInternal() override;
+		bool PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) override;
+		virtual void PatchInvocationGate(TArray<TUniquePtr<SpvInstruction>>& InstList) {};
+
+		void PatchBaseTypeAppendExprFunc();
+		void PatchAppendExprFunc(const SpvType* Type, const SpvTypeDesc* TypeDesc);
+		void PatchAppendExprDummyFunc();
+		void AppendExprDummy(const TFunction<int32()>& OffsetEval);
+
+		TMap<const SpvType*, SpvId> AppendExprFuncIds;
+		SpvId DebugStateNum = 0;
+		SpvId DoAppendExpr = 0;
+		SpvId AppendExprDummyFuncId = 0;
+	};
+
+	template<typename TBase, typename TContext>
+	void SpvExprDebuggerVisitorImpl<TBase, TContext>::Visit(const SpvDebugDeclare* Inst)
 	{
 		SpvDebuggerVisitor::Visit(Inst);
 
 		SpvId VarId = Inst->GetVariable();
-		SpvVariable* Var = Context.FindVar(VarId);
+		SpvVariable* Var = this->Context.FindVar(VarId);
 
 		//Insert an extra load instruction to prevent spirv-cross from optimizing away the variable.
-		SpvId LoadedVar = Patcher.NewId();
+		SpvId LoadedVar = this->Patcher.NewId();
 		auto LoadedVarOp = MakeUnique<SpvOpLoad>(Var->Type->GetId(), VarId);
 		LoadedVarOp->SetId(LoadedVar);
-		Patcher.AddInstruction(Inst->GetWordOffset().value(), MoveTemp(LoadedVarOp));
-
+		this->Patcher.AddInstruction(Inst->GetWordOffset().value(), MoveTemp(LoadedVarOp));
 	}
 
-	void SpvPixelExprDebuggerVisitor::ParseInternal()
+	template<typename TBase, typename TContext>
+	void SpvExprDebuggerVisitorImpl<TBase, TContext>::ParseInternal()
 	{
+		auto& Patcher = this->Patcher;
+
 		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
 		SpvId UIntPointerPrivateType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Private, UIntType));
-
 		SpvId ZeroU = Patcher.FindOrAddConstant(0u);
 
 		DebugStateNum = Patcher.NewId();
@@ -40,12 +93,12 @@ namespace FW
 			Patcher.AddDebugName(MakeUnique<SpvOpName>(DoAppendExpr, "_DoAppendExpr_"));
 		}
 
-		SpvPixelDebuggerVisitor::ParseInternal();
+		TBase::ParseInternal();
 
 		PatchBaseTypeAppendExprFunc();
-		for (const auto& [VarId, VarDesc] : Context.VariableDescMap)
+		for (const auto& [VarId, VarDesc] : this->Context.VariableDescMap)
 		{
-			if (SpvVariable* Var = Context.FindVar(VarId) ; Var && !Var->IsExternal())
+			if (SpvVariable* Var = this->Context.FindVar(VarId); Var && !Var->IsExternal())
 			{
 				PatchAppendExprFunc(Var->Type, VarDesc->TypeDesc);
 			}
@@ -53,7 +106,7 @@ namespace FW
 		//Prevent spirv-cross from optimizing away functions that are never called.
 		PatchAppendExprDummyFunc();
 
-		// Helper to unpack Line from PackedHeader constant (always argument[0])
+		auto& Context = this->Context;
 		auto GetLineFromPackedHeader = [&](SpvOpFunctionCall* FuncCall) -> int32 {
 			uint32 PackedHeader = *(uint32*)std::get<SpvObject::Internal>(Context.Constants[FuncCall->GetArguments()[0]].Storage).Value.GetData();
 			SpvDebuggerStateType StateType;
@@ -70,13 +123,12 @@ namespace FW
 			return StateType;
 		};
 
-		// Find a suitable location to insert AppendExprDummy.
-		// StopDebugState is guaranteed to be a GPU-visible state (CPU-only states
-		// like ScopeChange and FuncCallAfterReturn are resolved to the next GPU
-		// state by EvaluateExpression before reaching here).
-		SpvPixelExprDebuggerContext& ExprContext = static_cast<SpvPixelExprDebuggerContext&>(Context);
+		//Find a suitable location to insert AppendExprDummy.
+		//StopDebugState is guaranteed to be a GPU-visible state (CPU-only states
+		//like ScopeChange and FuncCallAfterReturn are resolved to the next GPU
+		//state by EvaluateExpression before reaching here).
+		TContext& ExprContext = static_cast<TContext&>(Context);
 
-		// Extract target line from StopDebugState (all GPU-visible states have .Line)
 		int32 TargetLine = std::visit([](auto&& S) -> int32 {
 			if constexpr (requires { S.Line; }) return S.Line;
 			return 0;
@@ -95,18 +147,18 @@ namespace FW
 			int32 Line = GetLineFromPackedHeader(FuncCall);
 			if (Line != TargetLine) continue;
 
-			if (IsVarChangeState && AppendVarFuncIds.FindKey(FuncCall->GetFunction()))
+			if (IsVarChangeState && this->AppendVarFuncIds.FindKey(FuncCall->GetFunction()))
 			{
-				const SpvOpStore* const* Store = AppendVarCallToStore.Find(FuncCall);
+				const SpvOpStore* const* Store = this->AppendVarCallToStore.Find(FuncCall);
 				AppendExprDummy([&] { return Store ? (*Store)->GetWordOffset().value() : FuncCall->GetWordOffset().value(); });
 				break;
 			}
-			else if (IsFuncCallState && FuncCall->GetFunction() == AppendCallFuncId)
+			else if (IsFuncCallState && FuncCall->GetFunction() == this->AppendCallFuncId)
 			{
 				AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
 				break;
 			}
-			else if (IsTagState && FuncCall->GetFunction() == AppendTagFuncId)
+			else if (IsTagState && FuncCall->GetFunction() == this->AppendTagFuncId)
 			{
 				const auto& State = std::get<SpvDebugState_Tag>(ExprContext.StopDebugState);
 				SpvDebuggerStateType StateType = GetStateTypeFromPackedHeader(FuncCall);
@@ -118,7 +170,7 @@ namespace FW
 					break;
 				}
 			}
-			else if (IsAccessState && AppendAccessFuncIds.FindKey(FuncCall->GetFunction()))
+			else if (IsAccessState && this->AppendAccessFuncIds.FindKey(FuncCall->GetFunction()))
 			{
 				const auto& State = std::get<SpvDebugState_Access>(ExprContext.StopDebugState);
 				SpvId VarId = *(SpvId*)std::get<SpvObject::Internal>(Context.Constants[FuncCall->GetArguments()[1]].Storage).Value.GetData();
@@ -129,17 +181,18 @@ namespace FW
 				}
 			}
 			else if (!IsVarChangeState && !IsFuncCallState && !IsTagState && !IsAccessState
-				&& AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
+				&& this->AppendMathFuncIds.FindKey(FuncCall->GetFunction()))
 			{
 				AppendExprDummy([&] { return FuncCall->GetWordOffset().value(); });
 				break;
 			}
 		}
-	
 	}
 
-	void SpvPixelExprDebuggerVisitor::PatchAppendExprDummyFunc()
+	template<typename TBase, typename TContext>
+	void SpvExprDebuggerVisitorImpl<TBase, TContext>::PatchAppendExprDummyFunc()
 	{
+		auto& Patcher = this->Patcher;
 		AppendExprDummyFuncId = Patcher.NewId();
 		Patcher.AddDebugName(MakeUnique<SpvOpName>(AppendExprDummyFuncId, "_AppendExprDummy_"));
 		TArray<TUniquePtr<SpvInstruction>> AppendExprDummyFuncInsts;
@@ -154,7 +207,7 @@ namespace FW
 			LabelOp->SetId(Patcher.NewId());
 			AppendExprDummyFuncInsts.Add(MoveTemp(LabelOp));
 
-			for (const auto& [_,Id] : AppendExprFuncIds)
+			for (const auto& [_, Id] : AppendExprFuncIds)
 			{
 				auto FuncCallOp = MakeUnique<SpvOpFunctionCall>(VoidType, Id, TArray<SpvId>{DebugStateNum});
 				FuncCallOp->SetId(Patcher.NewId());
@@ -167,8 +220,10 @@ namespace FW
 		Patcher.AddFunction(MoveTemp(AppendExprDummyFuncInsts));
 	}
 
-	void SpvPixelExprDebuggerVisitor::AppendExprDummy(const TFunction<int32()>& OffsetEval)
+	template<typename TBase, typename TContext>
+	void SpvExprDebuggerVisitorImpl<TBase, TContext>::AppendExprDummy(const TFunction<int32()>& OffsetEval)
 	{
+		auto& Patcher = this->Patcher;
 		TArray<TUniquePtr<SpvInstruction>> AppendExprDummyInsts;
 		{
 			SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
@@ -184,10 +239,12 @@ namespace FW
 		Patcher.AddInstructions(OffsetEval(), MoveTemp(AppendExprDummyInsts));
 	}
 
-	bool SpvPixelExprDebuggerVisitor::PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList)
+	template<typename TBase, typename TContext>
+	bool SpvExprDebuggerVisitorImpl<TBase, TContext>::PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList)
 	{
-		SpvPixelDebuggerVisitor::PatchActiveCondition(InstList);
+		PatchInvocationGate(InstList);
 
+		auto& Patcher = this->Patcher;
 		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
 		SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
 
@@ -196,7 +253,7 @@ namespace FW
 		LoadedDoAppendExprOp->SetId(LoadedDoAppendExpr);
 		InstList.Add(MoveTemp(LoadedDoAppendExprOp));
 
-		SpvId IEqual = Patcher.NewId();;
+		SpvId IEqual = Patcher.NewId();
 		auto IEqualOp = MakeUnique<SpvOpIEqual>(BoolType, LoadedDoAppendExpr, Patcher.FindOrAddConstant(0u));
 		IEqualOp->SetId(IEqual);
 		InstList.Add(MoveTemp(IEqualOp));
@@ -228,105 +285,45 @@ namespace FW
 		return false;
 	}
 
-	void SpvPixelExprDebuggerVisitor::PatchBaseTypeAppendExprFunc()
+	template<typename TBase, typename TContext>
+	void SpvExprDebuggerVisitorImpl<TBase, TContext>::PatchBaseTypeAppendExprFunc()
 	{
+		auto& Patcher = this->Patcher;
+		auto& Context = this->Context;
 		SpvId DebugExtSet = *Context.ExtSets.FindKey(SpvExtSet::NonSemanticShaderDebugInfo100);
 		SpvId VoidType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVoid>());
 
-		SpvId FloatType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFloat>(32));
-		SpvId FloatTypeDesc = Patcher.FindOrAddTypeDesc(MakeUnique<SpvDebugTypeBasic>(VoidType, DebugExtSet, 
-			Patcher.FindOrAddDebugStr("float"), Patcher.FindOrAddConstant(32u), 
-			Patcher.FindOrAddConstant((uint32)SpvDebugBasicTypeEncoding::Float), Patcher.FindOrAddConstant(0u)));
-		PatchAppendExprFunc(Context.Types[FloatType].Get(), Context.TypeDescs[FloatTypeDesc].Get());
+		auto PatchBasic = [&](SpvId ScalarType, const char* DebugName, SpvDebugBasicTypeEncoding Encoding)
+		{
+			SpvId TypeDesc = Patcher.FindOrAddTypeDesc(MakeUnique<SpvDebugTypeBasic>(VoidType, DebugExtSet,
+				Patcher.FindOrAddDebugStr(DebugName), Patcher.FindOrAddConstant(32u),
+				Patcher.FindOrAddConstant((uint32)Encoding), Patcher.FindOrAddConstant(0u)));
+			PatchAppendExprFunc(Context.Types[ScalarType].Get(), Context.TypeDescs[TypeDesc].Get());
 
-		SpvId Float2Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(FloatType, 2));
-		SpvId Float2TypeDesc = Patcher.FindOrAddTypeDesc(MakeUnique<SpvDebugTypeVector>(VoidType, DebugExtSet,
-			FloatTypeDesc, Patcher.FindOrAddConstant(2u)));
-		PatchAppendExprFunc(Context.Types[Float2Type].Get(), Context.TypeDescs[Float2TypeDesc].Get());
+			for (uint32 N = 2; N <= 4; ++N)
+			{
+				SpvId VecType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(ScalarType, N));
+				SpvId VecTypeDesc = Patcher.FindOrAddTypeDesc(MakeUnique<SpvDebugTypeVector>(VoidType, DebugExtSet,
+					TypeDesc, Patcher.FindOrAddConstant(N)));
+				PatchAppendExprFunc(Context.Types[VecType].Get(), Context.TypeDescs[VecTypeDesc].Get());
+			}
+		};
 
-		SpvId Float3Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(FloatType, 3));
-		SpvId Float3TypeDesc = Patcher.FindOrAddTypeDesc(MakeUnique<SpvDebugTypeVector>(VoidType, DebugExtSet,
-			FloatTypeDesc, Patcher.FindOrAddConstant(3u)));
-		PatchAppendExprFunc(Context.Types[Float3Type].Get(), Context.TypeDescs[Float3TypeDesc].Get());
-
-		SpvId Float4Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(FloatType, 4));
-		SpvId Float4TypeDesc = Patcher.FindOrAddTypeDesc(MakeUnique<SpvDebugTypeVector>(VoidType, DebugExtSet,
-			FloatTypeDesc, Patcher.FindOrAddConstant(4u)));
-		PatchAppendExprFunc(Context.Types[Float4Type].Get(), Context.TypeDescs[Float4TypeDesc].Get());
-
-		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
-		SpvId UIntTypeDesc = Patcher.FindOrAddTypeDesc(MakeUnique<SpvDebugTypeBasic>(VoidType, DebugExtSet,
-			Patcher.FindOrAddDebugStr("uint"), Patcher.FindOrAddConstant(32u), 
-			Patcher.FindOrAddConstant((uint32)SpvDebugBasicTypeEncoding::Unsigned), Patcher.FindOrAddConstant(0u)));
-		PatchAppendExprFunc(Context.Types[UIntType].Get(), Context.TypeDescs[UIntTypeDesc].Get());
-
-		SpvId UInt2Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, 2));
-		SpvId UInt2TypeDesc = Patcher.FindOrAddTypeDesc(MakeUnique<SpvDebugTypeVector>(VoidType, DebugExtSet,
-			UIntTypeDesc, Patcher.FindOrAddConstant(2u)));
-		PatchAppendExprFunc(Context.Types[UInt2Type].Get(), Context.TypeDescs[UInt2TypeDesc].Get());
-
-		SpvId UInt3Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, 3));
-		SpvId UInt3TypeDesc = Patcher.FindOrAddTypeDesc(MakeUnique<SpvDebugTypeVector>(VoidType, DebugExtSet,
-			UIntTypeDesc, Patcher.FindOrAddConstant(3u)));
-		PatchAppendExprFunc(Context.Types[UInt3Type].Get(), Context.TypeDescs[UInt3TypeDesc].Get());
-
-		SpvId UInt4Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, 4));
-		SpvId UInt4TypeDesc = Patcher.FindOrAddTypeDesc(MakeUnique<SpvDebugTypeVector>(VoidType, DebugExtSet,
-			UIntTypeDesc, Patcher.FindOrAddConstant(4u)));
-		PatchAppendExprFunc(Context.Types[UInt4Type].Get(), Context.TypeDescs[UInt4TypeDesc].Get());
-
-		SpvId BoolType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>());
-		SpvId BoolTypeDesc = Patcher.FindOrAddTypeDesc(MakeUnique<SpvDebugTypeBasic>(VoidType, DebugExtSet,
-			Patcher.FindOrAddDebugStr("bool"), Patcher.FindOrAddConstant(32u), 
-			Patcher.FindOrAddConstant((uint32)SpvDebugBasicTypeEncoding::Boolean), Patcher.FindOrAddConstant(0u)));
-		PatchAppendExprFunc(Context.Types[BoolType].Get(), Context.TypeDescs[BoolTypeDesc].Get());
-
-		SpvId Bool2Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(BoolType, 2));
-		SpvId Bool2TypeDesc = Patcher.FindOrAddTypeDesc(MakeUnique<SpvDebugTypeVector>(VoidType, DebugExtSet,
-			BoolTypeDesc, Patcher.FindOrAddConstant(2u)));
-		PatchAppendExprFunc(Context.Types[Bool2Type].Get(), Context.TypeDescs[Bool2TypeDesc].Get());
-
-		SpvId Bool3Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(BoolType, 3));
-		SpvId Bool3TypeDesc = Patcher.FindOrAddTypeDesc(MakeUnique<SpvDebugTypeVector>(VoidType, DebugExtSet,
-			BoolTypeDesc, Patcher.FindOrAddConstant(3u)));
-		PatchAppendExprFunc(Context.Types[Bool3Type].Get(), Context.TypeDescs[Bool3TypeDesc].Get());
-
-		SpvId Bool4Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(BoolType, 4));
-		SpvId Bool4TypeDesc = Patcher.FindOrAddTypeDesc(MakeUnique<SpvDebugTypeVector>(VoidType, DebugExtSet,
-			BoolTypeDesc, Patcher.FindOrAddConstant(4u)));
-		PatchAppendExprFunc(Context.Types[Bool4Type].Get(), Context.TypeDescs[Bool4TypeDesc].Get());
-
-		SpvId IntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 1));
-		SpvId IntTypeDesc = Patcher.FindOrAddTypeDesc(MakeUnique<SpvDebugTypeBasic>(VoidType, DebugExtSet,
-			Patcher.FindOrAddDebugStr("int"), Patcher.FindOrAddConstant(32u), 
-			Patcher.FindOrAddConstant((uint32)SpvDebugBasicTypeEncoding::Signed), Patcher.FindOrAddConstant(0u)));
-		PatchAppendExprFunc(Context.Types[IntType].Get(), Context.TypeDescs[IntTypeDesc].Get());
-
-		SpvId Int2Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(IntType, 2));
-		SpvId Int2TypeDesc = Patcher.FindOrAddTypeDesc(MakeUnique<SpvDebugTypeVector>(VoidType, DebugExtSet,
-			IntTypeDesc, Patcher.FindOrAddConstant(2u)));
-		PatchAppendExprFunc(Context.Types[Int2Type].Get(), Context.TypeDescs[Int2TypeDesc].Get());
-
-		SpvId Int3Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(IntType, 3));
-		SpvId Int3TypeDesc = Patcher.FindOrAddTypeDesc(MakeUnique<SpvDebugTypeVector>(VoidType, DebugExtSet,
-			IntTypeDesc, Patcher.FindOrAddConstant(3u)));
-		PatchAppendExprFunc(Context.Types[Int3Type].Get(), Context.TypeDescs[Int3TypeDesc].Get());
-
-		SpvId Int4Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(IntType, 4));
-		SpvId Int4TypeDesc = Patcher.FindOrAddTypeDesc(MakeUnique<SpvDebugTypeVector>(VoidType, DebugExtSet,
-			IntTypeDesc, Patcher.FindOrAddConstant(4u)));
-		PatchAppendExprFunc(Context.Types[Int4Type].Get(), Context.TypeDescs[Int4TypeDesc].Get());
-
+		PatchBasic(Patcher.FindOrAddType(MakeUnique<SpvOpTypeFloat>(32)), "float", SpvDebugBasicTypeEncoding::Float);
+		PatchBasic(Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0)), "uint", SpvDebugBasicTypeEncoding::Unsigned);
+		PatchBasic(Patcher.FindOrAddType(MakeUnique<SpvOpTypeBool>()), "bool", SpvDebugBasicTypeEncoding::Boolean);
+		PatchBasic(Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 1)), "int", SpvDebugBasicTypeEncoding::Signed);
 	}
 
-	void SpvPixelExprDebuggerVisitor::PatchAppendExprFunc(const SpvType* Type, const SpvTypeDesc* TypeDesc)
+	template<typename TBase, typename TContext>
+	void SpvExprDebuggerVisitorImpl<TBase, TContext>::PatchAppendExprFunc(const SpvType* Type, const SpvTypeDesc* TypeDesc)
 	{
 		if (!TypeDesc || AppendExprFuncIds.Contains(Type))
 		{
 			return;
 		}
 
-		//Avoid hlsl overload resolution ambiguity between float2x2 and float4
+		//Avoid hlsl overload resolution ambiguity between float2x2 and float4.
 		//TODO glsl
 		if (const SpvMatrixType* MatrixType = dynamic_cast<const SpvMatrixType*>(Type);
 			MatrixType && MatrixType->ElementCount == 2 && MatrixType->ElementType->ElementCount == 2)
@@ -334,7 +331,9 @@ namespace FW
 			return;
 		}
 
-		SpvPixelExprDebuggerContext& ExprContext = static_cast<SpvPixelExprDebuggerContext&>(Context);
+		auto& Patcher = this->Patcher;
+		auto& Context = this->Context;
+		TContext& ExprContext = static_cast<TContext&>(Context);
 
 		SpvId AppendExprFuncId = Patcher.NewId();
 		FString FuncName = "_AppendExpr_";
@@ -362,15 +361,16 @@ namespace FW
 			LabelOp->SetId(Patcher.NewId());
 			AppendExprFuncInsts.Add(MoveTemp(LabelOp));
 
-			SpvPixelDebuggerVisitor::PatchActiveCondition(AppendExprFuncInsts);
+			PatchInvocationGate(AppendExprFuncInsts);
 
 			SpvId LoadedDebugStateNum = Patcher.NewId();
 			auto LoadedDebugStateNumOp = MakeUnique<SpvOpLoad>(UIntType, DebugStateNum);
 			LoadedDebugStateNumOp->SetId(LoadedDebugStateNum);
 			AppendExprFuncInsts.Add(MoveTemp(LoadedDebugStateNumOp));
 
-			SpvId IEqual = Patcher.NewId();;
-			auto IEqualOp = MakeUnique<SpvOpIEqual>(BoolType, LoadedDebugStateNum, Patcher.FindOrAddConstant((uint32)ExprContext.StopDebugStateIndex));
+			SpvId IEqual = Patcher.NewId();
+			auto IEqualOp = MakeUnique<SpvOpIEqual>(BoolType, LoadedDebugStateNum,
+				Patcher.FindOrAddConstant((uint32)ExprContext.StopDebugStateIndex));
 			IEqualOp->SetId(IEqual);
 			AppendExprFuncInsts.Add(MoveTemp(IEqualOp));
 
@@ -386,9 +386,9 @@ namespace FW
 			TrueLabelOp->SetId(TrueLabel);
 			AppendExprFuncInsts.Add(MoveTemp(TrueLabelOp));
 
-			PatchToDebugger(Patcher.FindOrAddConstant(Context.GetTypeDescId(TypeDesc).GetValue()), UIntType, AppendExprFuncInsts);
-			PatchToDebugger(Patcher.FindOrAddConstant((uint32)GetTypeByteSize(Type)), UIntType, AppendExprFuncInsts);
-			PatchToDebugger(ValueParam, Type->GetId(), AppendExprFuncInsts);
+			this->PatchToDebugger(Patcher.FindOrAddConstant(Context.GetTypeDescId(TypeDesc).GetValue()), UIntType, AppendExprFuncInsts);
+			this->PatchToDebugger(Patcher.FindOrAddConstant((uint32)GetTypeByteSize(Type)), UIntType, AppendExprFuncInsts);
+			this->PatchToDebugger(ValueParam, Type->GetId(), AppendExprFuncInsts);
 
 			AppendExprFuncInsts.Add(MakeUnique<SpvOpReturn>());
 			AppendExprFuncInsts.Add(MakeUnique<SpvOpFunctionEnd>());
@@ -413,5 +413,4 @@ namespace FW
 			PatchAppendExprFunc(ArrayType->ElementType, ArrayTypeDesc->GetBaseTypeDesc());
 		}
 	}
-
 }

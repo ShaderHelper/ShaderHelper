@@ -1,6 +1,8 @@
 #pragma once
 #include "Debugger/DebuggableObject.h"
 
+class SButton;
+
 namespace SH
 {
 	class SComputeDebuggerViewport : public SCompoundWidget
@@ -18,8 +20,8 @@ namespace SH
 		FW::Vector3u GetLocalInvocationId() const { return LocalInvocationId; }
 
 	private:
-		void RebuildBody();
 		void OnPickThread(const FW::Vector3u& InLocalId);
+		void UpdateThreadCellStyles();
 
 	private:
 		FW::Vector3u ThreadGroupCount{ 1, 1, 1 };
@@ -32,5 +34,6 @@ namespace SH
 		TSharedPtr<SVerticalBox> RootBox;
 		TSharedPtr<SHorizontalBox> ZSliceRow;
 		TArray<TSharedPtr<FString>> ZSliceOptions;
+		TArray<TSharedPtr<SButton>> ThreadCellButtons; // y * ThreadGroupSize.x + x
 	};
 }

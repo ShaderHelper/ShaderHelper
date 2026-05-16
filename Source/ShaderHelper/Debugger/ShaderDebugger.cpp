@@ -2,7 +2,7 @@
 #include "ShaderDebugger.h"
 #include "ShaderConductor.hpp"
 #include "Editor/ShaderHelperEditor.h"
-#include "GpuApi/Spirv/SpirvExprDebugger.h"
+#include "GpuApi/Spirv/ExprDebugger/SpirvPixelExprDebugger.h"
 #include "GpuApi/Spirv/SpirvPixelPreviewer.h"
 #include "GpuApi/Spirv/SpirvValidator.h"
 #include "GpuApi/GpuRhi.h"
@@ -14,6 +14,7 @@
 #include "UI/Widgets/Debugger/SDebuggerCallStackView.h"
 #include "Renderer/RenderGraph.h"
 #include "GpuApi/Spirv/SpirvComputeDebugger.h"
+#include "GpuApi/Spirv/ExprDebugger/SpirvComputeExprDebugger.h"
 
 #include <stdexcept>
 
@@ -657,13 +658,7 @@ namespace SH
 			});
 		}
 
-		SpvBindings.Empty();
-		PatchedBindGroups.Empty();
-		PatchedBindGroupLayouts.Empty();
-		SetupBindGroups.Empty();
-		SetupBindGroupLayouts.Empty();
 		const TArray<GpuShaderLayoutBinding> PsLayoutBindings = PsInvocation.PipelineDesc.Ps->GetLayout();
-
 		BuildPatchedBindings(PsInvocation.Builders, PsLayoutBindings, BindingShaderStage::Pixel, !GlobalValidation);
 
 		auto PixelDebuggerContext = MakeUnique<SpvPixelDebuggerContext>(PixelCoord, SpvBindings);
@@ -1145,13 +1140,7 @@ namespace SH
 			});
 		}
 
-		SpvBindings.Empty();
-		PatchedBindGroups.Empty();
-		PatchedBindGroupLayouts.Empty();
-		SetupBindGroups.Empty();
-		SetupBindGroupLayouts.Empty();
 		const TArray<GpuShaderLayoutBinding> CsLayoutBindings = CsInvocation.PipelineDesc.Cs->GetLayout();
-
 		BuildPatchedBindings(CsInvocation.Builders, CsLayoutBindings, BindingShaderStage::Compute, true);
 
 		auto ComputeDebuggerContext = MakeUnique<SpvComputeDebuggerContext>(WorkGroupId, CsInvocation.ThreadGroupSize, SpvBindings);
@@ -1371,7 +1360,146 @@ namespace SH
 
 	bool ShaderDebugger::EvaluateExpressionComputeImpl(const FString& InExpression, ExpressionNode& OutResult) const
 	{
-		return false;
+		TArray<FString> ExtraArgs = DebugShader->CompileExtraArgs;
+		FString ErrorInfo, WarnInfo;
+		GpuShaderLanguage Lang = DebugShader->GetShaderLanguage();
+
+		const auto& CsInvocation = std::get<ComputeState>(Invocation);
+		int32 DebugStateIndex = CurDebugStateIndex;
+		if (ActiveCallPoint)
+		{
+			DebugStateIndex = ActiveCallPoint.value().DebugStateIndex;
+		}
+		int32 ExprStateIndex = 0;
+		int32 GpuStateIndex = 0;
+		ComputeExprStateIndices(DebugStates, DebugStateIndex, ExprStateIndex, GpuStateIndex);
+
+		const uint32 SelectedLocalIdx = LocalInvocationId.x
+			+ LocalInvocationId.y * DebuggingThreadGroupSize.x
+			+ LocalInvocationId.z * DebuggingThreadGroupSize.x * DebuggingThreadGroupSize.y;
+
+		SpvComputeExprDebuggerContext ExprContext{ DebugStates[ExprStateIndex], GpuStateIndex,
+			WorkGroupId, DebuggingThreadGroupSize, SelectedLocalIdx, SpvBindings };
+		SpirvParser Parser;
+		Parser.Parse(DebugShader->SpvCode);
+		SpvMetaVisitor MetaVisitor{ ExprContext };
+		Parser.Accept(&MetaVisitor);
+		SpvComputeExprDebuggerVisitor ExprVisitor{ ExprContext, Lang, bEnableUbsan };
+		Parser.Accept(&ExprVisitor);
+		ExprVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "ExprPatched.spvasm");
+
+		const TArray<uint32>& PatchedSpv = ExprVisitor.GetPatcher().GetSpv();
+		FString EntryPoint = DebugShader->GetEntryPoint();
+		FString PatchedSource;
+		FString FileExtension;
+		if (!CrossCompileSpvForDebugger(Lang, ShaderType::Compute, PatchedSpv, EntryPoint, PatchedSource, FileExtension))
+		{
+			return false;
+		}
+
+		if (!PatchExprPlaceholderInSource(PatchedSource, InExpression))
+		{
+			return false;
+		}
+
+		FString FileName = DebugShader->GetShaderName() + TEXT("ExprPatched") + FileExtension;
+		FFileHelper::SaveStringToFile(PatchedSource, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / FileName));
+
+		TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
+			.Source = MoveTemp(PatchedSource),
+			.Type = DebugShader->GetShaderType(),
+			.EntryPoint = EntryPoint,
+			.Language = Lang
+		});
+		PatchedShader->CompilerFlag |= GpuShaderCompilerFlag::SkipBindingShift;
+		if (!GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
+		{
+			return false;
+		}
+
+		GpuComputePipelineStateDesc PatchedPipelineDesc = CsInvocation.PipelineDesc;
+		PatchedPipelineDesc.CheckLayout = false;
+		PatchedPipelineDesc.Cs = PatchedShader;
+		PatchedPipelineDesc.BindGroupLayouts = MakeBindGroupLayoutSlots(PatchedBindGroupLayouts);
+		TRefCountPtr<GpuComputePipelineState> Pipeline = GpuPsoCacheManager::Get().CreateComputePipelineState(PatchedPipelineDesc);
+
+		//Reuse the existing DebugBuffer; expr records are appended past its current cursor.
+		//Snapshot the cursor before dispatch so we can read only the newly appended records.
+		uint8* DebugBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebugBuffer, GpuResourceMapMode::Read_Only);
+		const uint32 StartCursor = *(uint32*)DebugBufferData;
+		GGpuRhi->UnMapGpuBuffer(DebugBuffer);
+
+		auto CmdRecorder = GGpuRhi->BeginRecording();
+		RenderGraph RG(CmdRecorder);
+		auto& ComputePass = RG.AddComputePass(TEXT("ExprDebugger"),
+			[&, BindGroups = PatchedBindGroups, ThreadGroupCount = CsInvocation.ThreadGroupCount](GpuComputePassRecorder* PassRecorder) {
+				PassRecorder->SetComputePipelineState(Pipeline);
+				PassRecorder->SetBindGroups(MakeBindGroupSlots(BindGroups));
+				PassRecorder->Dispatch(ThreadGroupCount.x, ThreadGroupCount.y, ThreadGroupCount.z);
+			}
+		);
+		AddSpvBindingResourceAccessT(ComputePass, SpvBindings);
+		ComputePass.Write(DebugBuffer);
+		RG.Execute();
+
+		//Read records: each PatchToDebugger call from selected thread produces one record.
+		//Record layout: prefix uvec4(LocalIndex, PayloadVec4Count, 0, 0) + payload uvec4s.
+		//Expected sequence: TypeDescId, ByteSize, Value.
+		DebugBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebugBuffer, GpuResourceMapMode::Read_Only);
+		const uint32 CursorBytes = *(uint32*)DebugBufferData;
+		const uint32 BufferEndByte = (uint32)DebugBuffer->GetByteSize();
+		const uint32 EndByte = FMath::Min(CursorBytes, BufferEndByte);
+
+		TArray<TArray<uint8>> SelectedPayloads;
+		uint32 Offset = StartCursor;
+		while (Offset + 16 <= EndByte)
+		{
+			uint32 LocalIndex = *(uint32*)(DebugBufferData + Offset);
+			uint32 PayloadVec4Count = *(uint32*)(DebugBufferData + Offset + 4);
+			Offset += 16;
+			const uint32 PayloadBytes = PayloadVec4Count * 16u;
+			if (Offset + PayloadBytes > EndByte || PayloadVec4Count == 0)
+			{
+				break;
+			}
+			if (LocalIndex == SelectedLocalIdx)
+			{
+				TArray<uint8>& Buf = SelectedPayloads.AddDefaulted_GetRef();
+				Buf.Append(DebugBufferData + Offset, (int32)PayloadBytes);
+			}
+			Offset += PayloadBytes;
+		}
+		GGpuRhi->UnMapGpuBuffer(DebugBuffer);
+		SpvId TypeDescId = *(uint32*)SelectedPayloads[0].GetData();
+		int32 ResultSize = *(int32*)SelectedPayloads[1].GetData();
+		if (SelectedPayloads[2].Num() < ResultSize)
+		{
+			return false;
+		}
+		TArray<uint8> ResultValue = { SelectedPayloads[2].GetData(), ResultSize };
+
+		SpvTypeDesc* ResultTypeDesc = ExprContext.TypeDescs[TypeDescId].Get();
+		if (!ResultTypeDesc || ResultValue.IsEmpty())
+		{
+			return false;
+		}
+
+		FText TypeName = FText::FromString(GetTypeDescStr(ResultTypeDesc, Lang));
+
+		TArray<Vector2i> ResultRange;
+		ResultRange.Add({ 0, ResultValue.Num() });
+		FString ValueStr = GetValueStr(ResultValue, ResultTypeDesc, ResultRange, 0, DebuggerViewHex);
+
+		TArray<TSharedPtr<ExpressionNode>> Children;
+		if (ResultTypeDesc->GetKind() == SpvTypeDescKind::Composite || ResultTypeDesc->GetKind() == SpvTypeDescKind::Array
+			|| ResultTypeDesc->GetKind() == SpvTypeDescKind::Matrix)
+		{
+			Children = AppendChildNodes(Lang, ResultTypeDesc, ResultRange, {}, ResultValue, 0);
+		}
+
+		OutResult = { .Expr = InExpression, .ValueStr = ValueStr,
+			.TypeName = TypeName.ToString(), .Children = MoveTemp(Children) };
+		return true;
 	}
 
 	ExpressionNode ShaderDebugger::EvaluateExpression(const FString& InExpression) const

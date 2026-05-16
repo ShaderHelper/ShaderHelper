@@ -3,6 +3,7 @@
 #include "Editor/ShaderHelperEditor.h"
 #include "App/App.h"
 
+#include <Widgets/SOverlay.h>
 #include <Widgets/Layout/SUniformGridPanel.h>
 #include <Widgets/Layout/SBox.h>
 #include <Widgets/Layout/SScrollBox.h>
@@ -15,24 +16,33 @@ using namespace FW;
 
 namespace SH
 {
+	namespace
+	{
+		const FButtonStyle& GetThreadCellButtonStyle()
+		{
+			static const FButtonStyle Style = FButtonStyle(FAppStyle::Get().GetWidgetStyle<FButtonStyle>("Button"));
+			return Style;
+		}
+
+		const FButtonStyle& GetSelectedThreadCellButtonStyle()
+		{
+			static const FButtonStyle Style = [] {
+				static const FSlateRoundedBoxBrush NormalBrush(FLinearColor::Green, 4.0f);
+				return FButtonStyle(GetThreadCellButtonStyle())
+					.SetNormal(NormalBrush)
+					.SetHovered(NormalBrush)
+					.SetPressed(NormalBrush);
+			}();
+			return Style;
+		}
+	}
+
 	void SComputeDebuggerViewport::Construct(const FArguments& InArgs)
 	{
 		ChildSlot
 		[
 			SAssignNew(RootBox, SVerticalBox)
 		];
-		RebuildBody();
-	}
-
-	void SComputeDebuggerViewport::SetComputeDebugInfo(const Vector3u& InThreadGroupCount, const Vector3u& InThreadGroupSize)
-	{
-		ThreadGroupCount = InThreadGroupCount;
-		ThreadGroupSize = InThreadGroupSize;
-		WorkGroupId = { 0, 0, 0 };
-		LocalInvocationId = { 0, 0, 0 };
-		SelectedZ = 0;
-		bFinalizedThread = false;
-		RebuildBody();
 	}
 
 	void SComputeDebuggerViewport::OnPickThread(const Vector3u& InLocalId)
@@ -46,7 +56,7 @@ namespace SH
 			}
 			LocalInvocationId = InLocalId;
 			ShEditor->SwitchDebugThread(LocalInvocationId);
-			RebuildBody();
+			UpdateThreadCellStyles();
 			return;
 		}
 		LocalInvocationId = InLocalId;
@@ -55,7 +65,7 @@ namespace SH
 		{
 			Debuggable->OnFinalizeCompute(WorkGroupId, LocalInvocationId);
 		}
-		RebuildBody();
+		UpdateThreadCellStyles();
 	}
 
 	FReply SComputeDebuggerViewport::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
@@ -71,17 +81,17 @@ namespace SH
 		return SCompoundWidget::OnMouseButtonDown(MyGeometry, MouseEvent);
 	}
 
-	void SComputeDebuggerViewport::RebuildBody()
+	void SComputeDebuggerViewport::SetComputeDebugInfo(const Vector3u& InThreadGroupCount, const Vector3u& InThreadGroupSize)
 	{
-		if (!RootBox.IsValid())
-		{
-			return;
-		}
-		RootBox->ClearChildren();
+		ThreadGroupCount = InThreadGroupCount;
+		ThreadGroupSize = InThreadGroupSize;
+		WorkGroupId = { 0, 0, 0 };
+		LocalInvocationId = { 0, 0, 0 };
+		SelectedZ = 0;
+		bFinalizedThread = false;
 
-		const FText ThreadInfoLabel = FText::FromString(FString::Printf(TEXT("%s: (%u, %u, %u)  %s: (%u, %u, %u)"),
-			*LOCALIZATION("ThreadGroupCount").ToString(), ThreadGroupCount.x, ThreadGroupCount.y, ThreadGroupCount.z,
-			*LOCALIZATION("ThreadPerGroup").ToString(), ThreadGroupSize.x, ThreadGroupSize.y, ThreadGroupSize.z));
+		RootBox->ClearChildren();
+		ThreadCellButtons.Reset();
 
 		ZSliceOptions.Reset();
 		for (uint32 i = 0; i < ThreadGroupSize.z; ++i)
@@ -89,11 +99,14 @@ namespace SH
 			ZSliceOptions.Add(MakeShared<FString>(FString::Printf(TEXT("%u"), i)));
 		}
 
-		auto MakeAxisSpin = [this](int32 AxisIndex, uint32 MaxExclusive) {
+		auto MakeAxisSpin = [this](int32 AxisIndex) {
 			return SNew(SNumericEntryBox<int32>)
 				.MinDesiredValueWidth(30.f)
 				.MinValue(0)
-				.MaxValue((int32)MaxExclusive - 1)
+				.MaxValue_Lambda([this, AxisIndex]() -> TOptional<int32> {
+					const uint32 Max = (AxisIndex == 0 ? ThreadGroupCount.x : (AxisIndex == 1 ? ThreadGroupCount.y : ThreadGroupCount.z));
+					return (int32)Max - 1;
+				})
 				.Value_Lambda([this, AxisIndex]() -> TOptional<int32> {
 					return (int32)(AxisIndex == 0 ? WorkGroupId.x : (AxisIndex == 1 ? WorkGroupId.y : WorkGroupId.z));
 				})
@@ -104,13 +117,16 @@ namespace SH
 				});
 		};
 
-		// Top strip: thread info + WorkGroupId selectors.
 		RootBox->AddSlot().AutoHeight().Padding(4)
 		[
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(2)
 			[
-				SNew(STextBlock).Text(ThreadInfoLabel)
+				SNew(STextBlock).Text_Lambda([this] {
+					return FText::FromString(FString::Printf(TEXT("%s: (%u, %u, %u)  %s: (%u, %u, %u)"),
+						*LOCALIZATION("ThreadGroupCount").ToString(), ThreadGroupCount.x, ThreadGroupCount.y, ThreadGroupCount.z,
+						*LOCALIZATION("ThreadPerGroup").ToString(), ThreadGroupSize.x, ThreadGroupSize.y, ThreadGroupSize.z));
+				})
 			]
 			+ SHorizontalBox::Slot().FillWidth(1.0f)
 			[
@@ -121,26 +137,19 @@ namespace SH
 				SNew(STextBlock).Text(LOCALIZATION("DebugThreadGroup"))
 			]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(2)[ SNew(STextBlock).Text(FText::FromString(TEXT("X"))) ]
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(2)[ MakeAxisSpin(0, ThreadGroupCount.x) ]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(2)[ MakeAxisSpin(0) ]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(2)[ SNew(STextBlock).Text(FText::FromString(TEXT("Y"))) ]
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(2)[ MakeAxisSpin(1, ThreadGroupCount.y) ]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(2)[ MakeAxisSpin(1) ]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(2)[ SNew(STextBlock).Text(FText::FromString(TEXT("Z"))) ]
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(2)[ MakeAxisSpin(2, ThreadGroupCount.z) ]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(2)[ MakeAxisSpin(2) ]
 			];
 
 		constexpr float ThreadCellSize = 16.0f;
 		TSharedRef<SUniformGridPanel> Grid = SNew(SUniformGridPanel)
 			.SlotPadding(FMargin(2));
 
-		static const FButtonStyle ThreadCellButtonStyle = FButtonStyle(FAppStyle::Get().GetWidgetStyle<FButtonStyle>("Button"));
-
-		static const FButtonStyle SelectedThreadCellButtonStyle = [] {
-			static const FSlateRoundedBoxBrush NormalBrush(FLinearColor::Green, 4.0f);
-			return FButtonStyle(ThreadCellButtonStyle)
-				.SetNormal(NormalBrush)
-				.SetHovered(NormalBrush)
-				.SetPressed(NormalBrush);
-		}();
+		ThreadCellButtons.SetNum(ThreadGroupSize.x * ThreadGroupSize.y);
+		const FText DisabledThreadCellText = FText::FromString(TEXT("x"));
 
 		Grid->AddSlot(0, 0)
 		[
@@ -184,36 +193,50 @@ namespace SH
 
 			for (uint32 x = 0; x < ThreadGroupSize.x; ++x)
 			{
-				Vector3u Local{ x, y, SelectedZ };
-				const uint32 LocalLinear = Local.x + Local.y * ThreadGroupSize.x + Local.z * ThreadGroupSize.x * ThreadGroupSize.y;
-				const bool bSelectedThread = bFinalizedThread
-					&& LocalInvocationId.x == Local.x
-					&& LocalInvocationId.y == Local.y
-					&& LocalInvocationId.z == Local.z;
+				TSharedPtr<SButton> Btn;
 				Grid->AddSlot((int32)x + 1, (int32)y + 1)
 				[
 					SNew(SBox)
 					.WidthOverride(ThreadCellSize)
 					.HeightOverride(ThreadCellSize)
 					[
-						SNew(SButton)
-						.ButtonStyle(bSelectedThread ? &SelectedThreadCellButtonStyle : &ThreadCellButtonStyle)
-						.ContentPadding(FMargin(0))
+						SNew(SOverlay)
+						+ SOverlay::Slot()
+						[
+							SAssignNew(Btn, SButton)
+							.ButtonStyle(&GetThreadCellButtonStyle())
+							.ContentPadding(FMargin(0))
+							.HAlign(HAlign_Center)
+							.VAlign(VAlign_Center)
+							.IsEnabled_Lambda([this, x, y] {
+								const uint32 LocalLinear = x + y * ThreadGroupSize.x + SelectedZ * ThreadGroupSize.x * ThreadGroupSize.y;
+								auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+								return ShEditor->GetDebugger().CanThreadReachStop(LocalLinear);
+							})
+							.OnClicked_Lambda([this, x, y] {
+								OnPickThread(Vector3u{ x, y, SelectedZ });
+								return FReply::Handled().ReleaseMouseLock();
+							})
+							.ToolTipText_Lambda([this, x, y] {
+								return FText::FromString(FString::Printf(TEXT("%s = (%u, %u, %u)"), *LOCALIZATION("GroupThreadID").ToString(), x, y, SelectedZ));
+							})
+						]
+						+ SOverlay::Slot()
 						.HAlign(HAlign_Center)
 						.VAlign(VAlign_Center)
-						.IsEnabled_Lambda([LocalLinear] {
-							auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-							return ShEditor->GetDebugger().CanThreadReachStop(LocalLinear);
-						})
-						.OnClicked_Lambda([this, Local] {
-							OnPickThread(Local);
-							return FReply::Handled().ReleaseMouseLock();
-						})
-						.ToolTipText_Lambda([this, Local] {
-							return FText::FromString(FString::Printf(TEXT("%s = (%u, %u, %u)"), *LOCALIZATION("GroupThreadID").ToString(), Local.x, Local.y, Local.z));
-						})
+						[
+							SNew(STextBlock)
+							.Text(DisabledThreadCellText)
+							.Visibility_Lambda([this, x, y] {
+								const uint32 LocalLinear = x + y * ThreadGroupSize.x + SelectedZ * ThreadGroupSize.x * ThreadGroupSize.y;
+								auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+								return ShEditor->GetDebugger().CanThreadReachStop(LocalLinear) ? EVisibility::Collapsed : EVisibility::HitTestInvisible;
+							})
+							.Justification(ETextJustify::Center)
+						]
 					]
 				];
+				ThreadCellButtons[y * ThreadGroupSize.x + x] = Btn;
 			}
 		}
 
@@ -251,7 +274,7 @@ namespace SH
 								if (Idx != INDEX_NONE)
 								{
 									SelectedZ = (uint32)Idx;
-									RebuildBody();
+									UpdateThreadCellStyles();
 								}
 							}
 						})
@@ -302,5 +325,27 @@ namespace SH
 				]
 			]
 		];
+
+		UpdateThreadCellStyles();
+	}
+
+	void SComputeDebuggerViewport::UpdateThreadCellStyles()
+	{
+		for (uint32 y = 0; y < ThreadGroupSize.y; ++y)
+		{
+			for (uint32 x = 0; x < ThreadGroupSize.x; ++x)
+			{
+				const TSharedPtr<SButton>& Btn = ThreadCellButtons[y * ThreadGroupSize.x + x];
+				if (!Btn.IsValid())
+				{
+					continue;
+				}
+				const bool bSelected = bFinalizedThread
+					&& LocalInvocationId.x == x
+					&& LocalInvocationId.y == y
+					&& LocalInvocationId.z == SelectedZ;
+				Btn->SetButtonStyle(bSelected ? &GetSelectedThreadCellButtonStyle() : &GetThreadCellButtonStyle());
+			}
+		}
 	}
 }
