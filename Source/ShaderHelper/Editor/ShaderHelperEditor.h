@@ -38,6 +38,7 @@ namespace SH
 	class SDebuggerVariableView;
 	class SDebuggerWatchView;
 	class SFragmentDebuggerViewport;
+	class SComputeDebuggerViewport;
 	class SPreferenceView;
 	class SSceneView;
 	class SShaderEditorBox;
@@ -130,6 +131,9 @@ namespace SH
 		void Continue(StepMode Mode = StepMode::Continue);
 		std::optional<FW::Vector2u> ValidatePixel(const InvocationState& InState);
 		void DebugPixel(const FW::Vector2u& InPixelCoord, const InvocationState& InState);
+		void DebugCompute(const FW::Vector3u& InWorkGroupId, const FW::Vector3u& InLocalInvocationId, const InvocationState& InState);
+		void SwitchDebugThread(const FW::Vector3u& InLocalInvocationId);
+		bool IsFinalizedForCurrentItem() const;
 		void ShowLinePreview(const DebuggerLocation& Loc);
 		void DismissLinePreview();
 		bool IsShowingLinePreview() const { return bShowingLinePreview; }
@@ -211,6 +215,7 @@ namespace SH
 		TSharedPtr<SDebuggerCallStackView> DebuggerCallStackView;
 		TSharedPtr<SDebuggerWatchView> DebuggerWatchView;
 		TSharedPtr<SFragmentDebuggerViewport> FragmentDebuggerViewport;
+		TSharedPtr<SComputeDebuggerViewport> ComputeDebuggerViewport;
 		TSharedPtr<SVertexDebuggerViewport> VertexDebuggerViewport;
 		TSharedPtr<SViewport> LinePreviewWidget;
 		TSharedPtr<FW::PreviewViewPort> LinePreviewViewPort;

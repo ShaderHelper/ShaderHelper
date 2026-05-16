@@ -1,6 +1,7 @@
 #pragma once
 #include "AssetObject/Render/MeshRenderObject.h"
 #include "AssetObject/Shader.h"
+#include "Debugger/DebuggableObject.h"
 #include "GpuApi/GpuBindGroup.h"
 #include "GpuApi/GpuBindGroupLayout.h"
 #include "GpuApi/GpuPipelineState.h"
@@ -21,9 +22,11 @@ namespace SH
 	public:
 		ComputePassNodeOp() = default;
 		FW::MetaType* SupportType() override;
+		void OnCancelSelect(FW::ShObject* InObject) override;
+		void OnSelect(FW::ShObject* InObject) override;
 	};
 
-	class ComputePassNode : public FW::GraphNode
+	class ComputePassNode : public FW::GraphNode, public DebuggableObject
 	{
 		REFLECTION_TYPE(ComputePassNode)
 	public:
@@ -39,6 +42,14 @@ namespace SH
 		TArray<TSharedRef<FW::PropertyData>> GeneratePropertyDatas() override;
 		bool CanChangeProperty(FW::PropertyData* InProperty) override;
 		void PostPropertyChanged(FW::PropertyData* InProperty) override;
+
+		// DebuggableObject
+		TArray<DebugItem> GetSupportedDebugItems() const override { return { DebugItem::Compute }; }
+		DebugTargetInfo OnStartDebugging(DebugItem Item) override;
+		void OnEndDebuggging() override { bDebugging = false; }
+		ShaderAsset* GetShaderAsset(DebugItem /*Item*/) const override { return ShaderAsset.Get(); }
+		InvocationState GetInvocationState(DebugItem Item) override;
+		void OnFinalizeCompute(const FW::Vector3u& WorkGroupId, const FW::Vector3u& LocalInvocationId) override;
 
 	public:
 		FW::AssetPtr<Shader> ShaderAsset;
@@ -56,6 +67,8 @@ namespace SH
 		void InvalidateRenderResources();
 		bool BuildBindGroups();
 		void UpdateUniformBuffers();
+		TArray<BindingBuilder> BuildDebugBindingBuilders() const;
+		FW::Vector3u ReflectThreadGroupSize() const;
 		// Resolve the input texture for a resource binding:
 		// override pin -> slot's TextureAsset -> default texture for that BindingType.
 		FW::GpuTexture* ResolveBindingTexture(const FW::GpuShaderLayoutBinding& Binding);
@@ -77,7 +90,9 @@ namespace SH
 		TMap<FString, TRefCountPtr<FW::GpuTexture>> RWOutputTextures;
 		FW::Vector2f CurrentViewportSize{ 0, 0 };
 		TRefCountPtr<FW::GpuComputePipelineState> Pipeline;
+		FW::GpuComputePipelineStateDesc CachedPipelineDesc;
 		TRefCountPtr<FW::GpuQuerySet> TimestampQuerySet;
 		TUniquePtr<FW::PrintBuffer> PrinterBuffer;
+		bool bDebugging = false;
 	};
 }

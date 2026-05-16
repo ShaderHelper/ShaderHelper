@@ -122,7 +122,7 @@ namespace FW
 			}
 		}
 
-		DebuggerBuffer = PatchDebuggerBuffer(Patcher);
+		DebuggerBuffer = PatchDebuggerBuffer(Patcher, BindingShaderStage::Pixel);
 
 		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
 		SpvId UIntPointerPrivateType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Private, UIntType));

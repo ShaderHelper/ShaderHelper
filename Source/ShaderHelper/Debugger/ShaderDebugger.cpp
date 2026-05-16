@@ -13,6 +13,7 @@
 #include "UI/Widgets/Debugger/SDebuggerVariableView.h"
 #include "UI/Widgets/Debugger/SDebuggerCallStackView.h"
 #include "Renderer/RenderGraph.h"
+#include "GpuApi/Spirv/SpirvComputeDebugger.h"
 
 #include <stdexcept>
 
@@ -74,12 +75,44 @@ namespace SH
 			}
 		}
 
-		void AddSpvBindingResourceAccess(RGRenderPass& RenderPass, const TArray<SpvBinding>& Bindings)
+		template<typename TPass>
+		void AddBindingResourceAccessT(TPass& RenderPass, BindingType Type, GpuResource* Resource)
+		{
+			switch (Type)
+			{
+			case BindingType::Texture:
+			case BindingType::TextureCube:
+			case BindingType::Texture3D:
+			case BindingType::CombinedTextureSampler:
+			case BindingType::CombinedTextureCubeSampler:
+			case BindingType::CombinedTexture3DSampler:
+			case BindingType::StructuredBuffer:
+			case BindingType::RawBuffer:
+				RenderPass.Read(Resource);
+				break;
+			case BindingType::RWStructuredBuffer:
+			case BindingType::RWRawBuffer:
+			case BindingType::RWTexture:
+			case BindingType::RWTexture3D:
+				RenderPass.Write(Resource);
+				break;
+			default:
+				break;
+			}
+		}
+
+		template<typename TPass>
+		void AddSpvBindingResourceAccessT(TPass& Pass, const TArray<SpvBinding>& Bindings)
 		{
 			for (const SpvBinding& Binding : Bindings)
 			{
-				AddBindingResourceAccess(RenderPass, Binding.Type, Binding.Resource.GetReference());
+				AddBindingResourceAccessT(Pass, Binding.Type, Binding.Resource.GetReference());
 			}
+		}
+
+		void AddSpvBindingResourceAccess(RGRenderPass& RenderPass, const TArray<SpvBinding>& Bindings)
+		{
+			AddSpvBindingResourceAccessT(RenderPass, Bindings);
 		}
 
 		TArray<FString> MakeDebuggerCompileExtraArgs(const TArray<FString>& InExtraArgs)
@@ -727,6 +760,32 @@ namespace SH
 		RG.Execute();
 	}
 
+	void ShaderDebugger::FinalizeDebugStates()
+	{
+#if !SH_SHIPPING
+		DumpDebugStatesToFile(DebugStates, DebuggerContext.Get(), PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / TEXT("DebugStates.txt"));
+#endif
+
+		InitDebuggerView();
+
+		SortedVariableDescs.clear();
+		AssertResult = nullptr;
+		for (const auto& [VarId, VarDesc] : DebuggerContext->VariableDescMap)
+		{
+			if (VarDesc)
+			{
+				SortedVariableDescs.emplace_back(VarId, VarDesc);
+				if (VarDesc->Name == "GPrivate_AssertResult")
+				{
+					AssertResult = DebuggerContext->FindVar(VarId);
+				}
+			}
+		}
+		std::sort(SortedVariableDescs.begin(), SortedVariableDescs.end(), [](const auto& PairA, const auto& PairB) {
+			return PairA.second->Line > PairB.second->Line;
+		});
+	}
+
 	void ShaderDebugger::DebugPixel(const Vector2u& InPixelCoord, const InvocationState& InState)
 	{
 		PixelCoord = InPixelCoord;
@@ -735,29 +794,9 @@ namespace SH
 
 		InvokePixel();
 		uint8* DebugBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebugBuffer, GpuResourceMapMode::Read_Only);
-		DebugStates = GenDebugStates(DebugBufferData);
+		DebugStates = GenDebugStates(DebugBufferData, (uint32)DebugBuffer->GetByteSize());
 		GGpuRhi->UnMapGpuBuffer(DebugBuffer);
-
-#if !SH_SHIPPING
-		DumpDebugStatesToFile(DebugStates, DebuggerContext.Get(), PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / TEXT("DebugStates.txt"));
-#endif
-
-		InitDebuggerView();
-
-		for (const auto& [VarId, VarDesc] : DebuggerContext->VariableDescMap)
-		{
-			if (VarDesc)
-			{
-				SortedVariableDescs.emplace_back(VarId, VarDesc);
-				if (VarDesc->Name == "GPrivate_AssertResult")
-				{
-					AssertResult = DebuggerContext->FindVar(VarId);;
-				}
-			}
-		}
-		std::sort(SortedVariableDescs.begin(), SortedVariableDescs.end(), [](const auto& PairA, const auto& PairB) {
-			return PairA.second->Line > PairB.second->Line;
-		});
+		FinalizeDebugStates();
 	}
 
 	std::optional<Vector2u> ShaderDebugger::ValidatePixel(const InvocationState& InState)
@@ -1062,8 +1101,272 @@ namespace SH
 		RG.Execute();
 	}
 
-	void ShaderDebugger::DebugCompute(const InvocationState& InState)
+	void ShaderDebugger::InvokeCompute()
 	{
+		const auto& CsInvocation = std::get<ComputeState>(Invocation);
+
+		ShaderDesc DebugShaderDesc = CurShaderAsset->GetShaderDesc(ShaderSourceText, ShaderType::Compute);
+		DebugShader = GGpuRhi->CreateShaderFromSource(DebugShaderDesc.SourceDesc);
+		DebugShader->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
+		GpuShaderLanguage Lang = DebugShader->GetShaderLanguage();
+
+		TArray<FString> ExtraArgs = MakeDebuggerCompileExtraArgs(DebugShaderDesc.ExtraArgs);
+
+		FString ErrorInfo, WarnInfo;
+		if (!GGpuRhi->CompileShader(DebugShader, ErrorInfo, WarnInfo, ExtraArgs))
+		{
+			throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
+		}
+
+		const uint32 NumThreads = CsInvocation.ThreadGroupSize.x * CsInvocation.ThreadGroupSize.y * CsInvocation.ThreadGroupSize.z;
+		//Per-thread budget: ~256 records * 16 bytes/uvec4 * 2(prefix+payload).
+		//Floor at 4 MiB and align to uvec4 (16 bytes).
+		uint32 BufferSize = FMath::Max<uint32>(4u * 1024u * 1024u, NumThreads * 8192u);
+		BufferSize = (BufferSize + 15u) & ~15u;
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(BufferSize);
+		//Initial atomic cursor (bytes) starts at 16: first uvec4 is reserved for the cursor.
+		const uint32 InitialCursor = 16u;
+		FMemory::Memcpy(Datas.GetData(), &InitialCursor, sizeof(uint32));
+		DebugBuffer = GGpuRhi->CreateBuffer({
+			.ByteSize = BufferSize,
+			.Usage = GpuBufferUsage::RWRaw,
+			.InitialData = Datas,
+		});
+
+		{
+			TArray<uint8> ParamsDatas;
+			ParamsDatas.SetNumZeroed(sizeof(Vector3u));
+			FMemory::Memcpy(ParamsDatas.GetData(), &WorkGroupId, sizeof(Vector3u));
+			DebugParamsBuffer = GGpuRhi->CreateBuffer({
+				.ByteSize = sizeof(Vector3u),
+				.Usage = GpuBufferUsage::Uniform,
+				.InitialData = ParamsDatas,
+			});
+		}
+
+		SpvBindings.Empty();
+		PatchedBindGroups.Empty();
+		PatchedBindGroupLayouts.Empty();
+		SetupBindGroups.Empty();
+		SetupBindGroupLayouts.Empty();
+		const TArray<GpuShaderLayoutBinding> CsLayoutBindings = CsInvocation.PipelineDesc.Cs->GetLayout();
+
+		BuildPatchedBindings(CsInvocation.Builders, CsLayoutBindings, BindingShaderStage::Compute, true);
+
+		auto ComputeDebuggerContext = MakeUnique<SpvComputeDebuggerContext>(WorkGroupId, CsInvocation.ThreadGroupSize, SpvBindings);
+
+		FString FileExtension = (Lang == GpuShaderLanguage::HLSL) ? TEXT(".hlsl") : TEXT(".glsl");
+		FString EntryPoint = DebugShader->GetEntryPoint();
+
+		SpirvParser Parser;
+		Parser.Parse(DebugShader->SpvCode);
+		SpvMetaVisitor MetaVisitor{ *ComputeDebuggerContext };
+		Parser.Accept(&MetaVisitor);
+		SpvComputeDebuggerVisitor DebuggerVisitor{ *ComputeDebuggerContext, Lang, bEnableUbsan };
+		Parser.Accept(&DebuggerVisitor);
+		TArray<uint32> PatchedSpv = DebuggerVisitor.GetPatcher().GetSpv();
+		FString PatchedSpvAsm = DebuggerVisitor.GetPatcher().GetAsm();
+		FFileHelper::SaveStringToFile(PatchedSpvAsm, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Patched" + FileExtension + ".spvasm"));
+
+		CurDebugStateIndex = 0;
+		DebuggerContext = MoveTemp(ComputeDebuggerContext);
+
+		TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
+			.Name = DebugShader->GetShaderName(),
+			.Source = PatchedSpvAsm,
+			.Type = DebugShader->GetShaderType(),
+			.EntryPoint = EntryPoint,
+		});
+		PatchedShader->SpvCode = MoveTemp(PatchedSpv);
+		PatchedShader->CompilerFlag |= GpuShaderCompilerFlag::CompileFromSpvCode;
+		if (!GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
+		{
+			throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
+		}
+
+		GpuComputePipelineStateDesc PatchedPipelineDesc = CsInvocation.PipelineDesc;
+		PatchedPipelineDesc.CheckLayout = false;
+		PatchedPipelineDesc.Cs = PatchedShader;
+		PatchedPipelineDesc.BindGroupLayouts = MakeBindGroupLayoutSlots(PatchedBindGroupLayouts);
+		TRefCountPtr<GpuComputePipelineState> Pipeline = GpuPsoCacheManager::Get().CreateComputePipelineState(PatchedPipelineDesc);
+
+		auto CmdRecorder = GGpuRhi->BeginRecording();
+		RenderGraph RG(CmdRecorder);
+		auto& ComputePass = RG.AddComputePass(TEXT("ComputeDebugger"),
+			[&, BindGroups = PatchedBindGroups, ThreadGroupCount = CsInvocation.ThreadGroupCount](GpuComputePassRecorder* PassRecorder) {
+				PassRecorder->SetComputePipelineState(Pipeline);
+				PassRecorder->SetBindGroups(MakeBindGroupSlots(BindGroups));
+				PassRecorder->Dispatch(ThreadGroupCount.x, ThreadGroupCount.y, ThreadGroupCount.z);
+			}
+		);
+		AddSpvBindingResourceAccessT(ComputePass, SpvBindings);
+		ComputePass.Write(DebugBuffer);
+		RG.Execute();
+	}
+
+	void ShaderDebugger::DebugCompute(const Vector3u& InWorkGroupId, const Vector3u& InLocalInvocationId, const InvocationState& InState)
+	{
+		const auto& CsInvocation = std::get<ComputeState>(InState);
+		WorkGroupId = InWorkGroupId;
+		LocalInvocationId = InLocalInvocationId;
+		DebuggingThreadGroupSize = CsInvocation.ThreadGroupSize;
+		Invocation = InState;
+		bEnableUbsan = EnableUbsan();
+
+		InvokeCompute();
+
+		const uint32 NumThreads = DebuggingThreadGroupSize.x * DebuggingThreadGroupSize.y * DebuggingThreadGroupSize.z;
+		PerThreadDebugStates.Reset();
+		PerThreadDebugStates.SetNum(NumThreads);
+
+		uint8* DebugBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebugBuffer, GpuResourceMapMode::Read_Only);
+		const uint32 CursorBytes = *(uint32*)DebugBufferData;
+		const uint32 BufferEndByte = (uint32)DebugBuffer->GetByteSize();
+		const uint32 EndByte = FMath::Min(CursorBytes, BufferEndByte);
+
+		//Per-thread payload scratch buffer; GenDebugStates is bounded by each payload's byte size.
+		TArray<TArray<uint8>> PerThreadPayloads;
+		PerThreadPayloads.SetNum(NumThreads);
+
+		uint32 Offset = 16; //skip the uvec4 cursor header
+		while (Offset + 16 <= EndByte)
+		{
+			//Prefix uvec4: x=LocalInvocationIndex, y=PayloadVec4Count, z/w=reserved.
+			uint32 LocalIndex = *(uint32*)(DebugBufferData + Offset);
+			uint32 PayloadVec4Count = *(uint32*)(DebugBufferData + Offset + 4);
+			Offset += 16;
+			const uint32 PayloadBytes = PayloadVec4Count * 16u;
+			if (Offset + PayloadBytes > EndByte || PayloadVec4Count == 0)
+			{
+				break;
+			}
+			if (LocalIndex < NumThreads)
+			{
+				TArray<uint8>& ThreadBuf = PerThreadPayloads[LocalIndex];
+				int32 OldNum = ThreadBuf.Num();
+				ThreadBuf.SetNumUninitialized(OldNum + (int32)PayloadBytes);
+				FMemory::Memcpy(ThreadBuf.GetData() + OldNum, DebugBufferData + Offset, PayloadBytes);
+			}
+			Offset += PayloadBytes;
+		}
+		GGpuRhi->UnMapGpuBuffer(DebugBuffer);
+
+		for (uint32 i = 0; i < NumThreads; ++i)
+		{
+			TArray<uint8>& Payload = PerThreadPayloads[i];
+			PerThreadDebugStates[i] = GenDebugStates(Payload.GetData(), (uint32)Payload.Num());
+		}
+
+		const uint32 SelectedLocalIdx = LocalInvocationId.x
+			+ LocalInvocationId.y * DebuggingThreadGroupSize.x
+			+ LocalInvocationId.z * DebuggingThreadGroupSize.x * DebuggingThreadGroupSize.y;
+		DebugStates = (SelectedLocalIdx < NumThreads) ? PerThreadDebugStates[SelectedLocalIdx] : TArray<SpvDebugState>{};
+		FinalizeDebugStates();
+	}
+
+	bool ShaderDebugger::CanThreadReachStop(uint32 LocalLinearIndex) const
+	{
+		if (!ThreadsReachingStop.IsValidIndex((int32)LocalLinearIndex))
+		{
+			return true;
+		}
+		return ThreadsReachingStop[(int32)LocalLinearIndex];
+	}
+
+	bool ShaderDebugger::MatchesStopLocation(const SpvDebugState& InState, const DebuggerLocation& InLoc) const
+	{
+		int32 SLine = 0;
+		SpvId SSrc{};
+		if (std::holds_alternative<SpvDebugState_VarChange>(InState)) { SLine = std::get<SpvDebugState_VarChange>(InState).Line; SSrc = std::get<SpvDebugState_VarChange>(InState).Source; }
+		else if (std::holds_alternative<SpvDebugState_FuncCall>(InState)) { SLine = std::get<SpvDebugState_FuncCall>(InState).Line; SSrc = std::get<SpvDebugState_FuncCall>(InState).Source; }
+		else if (std::holds_alternative<SpvDebugState_Tag>(InState)) { SLine = std::get<SpvDebugState_Tag>(InState).Line; SSrc = std::get<SpvDebugState_Tag>(InState).Source; }
+		else { return false; }
+		return (SLine - GetExtraLineNumForSource(SSrc)) == InLoc.LineNumber
+			&& DebuggerContext->GetSourceFileName(SSrc) == InLoc.File;
+	}
+
+	void ShaderDebugger::UpdateThreadsReachingStop()
+	{
+		ThreadsReachingStop.Reset();
+		StopIterationIndex = 0;
+		if (!StopLocation.IsValid() || !DebuggerContext)
+		{
+			return;
+		}
+
+		//Iteration index this (selected) thread is currently on at the stop:
+		const int32 EndExclusive = FMath::Min(CurDebugStateIndex + 1, DebugStates.Num());
+		for (int32 SI = 0; SI < EndExclusive; ++SI)
+		{
+			if (MatchesStopLocation(DebugStates[SI], StopLocation))
+			{
+				StopIterationIndex++;
+			}
+		}
+
+		ThreadsReachingStop.Init(false, PerThreadDebugStates.Num());
+		for (int32 T = 0; T < PerThreadDebugStates.Num(); ++T)
+		{
+			int32 Count = 0;
+			for (const SpvDebugState& S : PerThreadDebugStates[T])
+			{
+				if (MatchesStopLocation(S, StopLocation) && ++Count >= StopIterationIndex)
+				{
+					ThreadsReachingStop[T] = true;
+					break;
+				}
+			}
+		}
+	}
+
+	bool ShaderDebugger::SwitchDebugThread(const Vector3u& InLocalInvocationId)
+	{
+		check(DebugShader->GetShaderType() == ShaderType::Compute);
+		const DebuggerLocation SavedStop = StopLocation;
+		const int32 TargetIteration = StopIterationIndex;
+
+		LocalInvocationId = InLocalInvocationId;
+		const uint32 NumThreads = DebuggingThreadGroupSize.x * DebuggingThreadGroupSize.y * DebuggingThreadGroupSize.z;
+		const uint32 SelectedLocalIdx = LocalInvocationId.x
+			+ LocalInvocationId.y * DebuggingThreadGroupSize.x
+			+ LocalInvocationId.z * DebuggingThreadGroupSize.x * DebuggingThreadGroupSize.y;
+		DebugStates = PerThreadDebugStates[SelectedLocalIdx];
+		CurDebugStateIndex = 0;
+		CallStack.Empty();
+		Scope = nullptr;
+		ActiveCallPoint.reset();
+		ReturnValue.Empty();
+		CurValidLine.reset();
+		DirtyVars.Empty();
+		DebuggerError = {};
+		InitDebuggerView();
+
+		//Walk states until we've reached the TargetIteration-th occurrence of the saved stop.
+		int32 Count = 0;
+		while (CurDebugStateIndex < DebugStates.Num())
+		{
+			const SpvDebugState& Cur = DebugStates[CurDebugStateIndex];
+			if (MatchesStopLocation(Cur, SavedStop))
+			{
+				Count++;
+				if (Count >= TargetIteration)
+				{
+					StopLocation = SavedStop;
+					StopIterationIndex = TargetIteration;
+					return true;
+				}
+			}
+			FString Error;
+			ApplyDebugState(Cur, Error);
+			CurDebugStateIndex++;
+			if (!Error.IsEmpty())
+			{
+				DebuggerError = { MoveTemp(Error), StopLocation };
+				return false;
+			}
+		}
+		return false;
 	}
 
 	bool ShaderDebugger::EvaluateExpressionComputeImpl(const FString& InExpression, ExpressionNode& OutResult) const
@@ -1200,7 +1503,7 @@ namespace SH
 		DebuggerWatchView->Refresh();
 
 		//Compute and render per-line preview thumbnails
-		if (EnableLinePreview())
+		if (EnableLinePreview() && DebugShader->GetShaderType() == ShaderType::Pixel)
 		{
 			ComputeLinePreviewData();
 			InvokePixelPreview();
@@ -1417,6 +1720,7 @@ namespace SH
 						CallStackAtStop = CallStack;
 						StopLocation.File = DebuggerContext->GetSourceFileName(NextSource);
 						StopLocation.LineNumber = NextValidLine.value() - NextSourceExtraLineNum;
+						UpdateThreadsReachingStop();
 						break;
 					}
 				}
@@ -2234,6 +2538,8 @@ namespace SH
 		DebuggerError = {};
 		DirtyVars.Empty();
 		StopLocation.Reset();
+		StopIterationIndex = 0;
+		ThreadsReachingStop.Reset();
 		ReturnValue.Empty();
 		DebugStates.Reset();
 		SortedVariableDescs.clear();
@@ -2338,7 +2644,7 @@ namespace SH
 		};
 	}
 
-	TArray<SpvDebugState> ShaderDebugger::GenDebugStates(uint8* DebuggerData)
+	TArray<SpvDebugState> ShaderDebugger::GenDebugStates(uint8* DebuggerData, uint32 DebuggerDataSize)
 	{
 		TArray<SpvDebugState> States;
 		int Offset = 0;
@@ -2354,7 +2660,7 @@ namespace SH
 		TArray<FuncCallInfo> GenCallStack;
 		bool bJustEnteredCall = false;
 
-		while (StateType != SpvDebuggerStateType::None)
+		while (StateType != SpvDebuggerStateType::None && Offset + sizeof(uint32) <= DebuggerDataSize)
 		{
 			if (SpvId* ScopeIdPtr = DebuggerContext->HeaderToScope.Find(PackedHeader))
 			{
@@ -2692,7 +2998,11 @@ namespace SH
 				AUX::Unreachable();
 			}
 			// Align offset to 16-byte boundary (uvec4 stride)
-			Offset = (Offset + 15) & ~15;
+			Offset = (Offset + 15u) & ~15u;
+			if (Offset + sizeof(uint32) > DebuggerDataSize)
+			{
+				break;
+			}
 			PackedHeader = *(uint32*)(DebuggerData + Offset);
 			UnpackDebugHeader(PackedHeader, StateType, UnpackedSource, UnpackedLine);
 		}

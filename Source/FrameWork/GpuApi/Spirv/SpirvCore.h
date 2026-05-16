@@ -127,6 +127,10 @@ namespace FW
 	{
 		Position = 0,
 		FragCoord = 15,
+		WorkgroupId = 26,
+		LocalInvocationId = 27,
+		GlobalInvocationId = 28,
+		LocalInvocationIndex = 29,
 		VertexIndex = 42,
 		InstanceIndex = 43,
 	};

@@ -490,6 +490,20 @@ namespace FW
 		return ShaderLayoutBindings;
 	}
 
+	Vector3u GpuShader::GetThreadGroupSize() const
+	{
+		check(Type == ShaderType::Compute);
+		check(!SpvCode.IsEmpty());
+
+		SpvMetaContext MetaContext;
+		SpvMetaVisitor MetaVisitor{ MetaContext };
+		SpirvParser Parser;
+		Parser.Parse(SpvCode);
+		Parser.Accept(&MetaVisitor);
+
+		return MetaContext.ThreadGroupSize;
+	}
+
 	TArray<GpuShaderVertexInput> GpuShader::GetVertexInputs() const
 	{
 		TArray<GpuShaderVertexInput> VertexInputs;

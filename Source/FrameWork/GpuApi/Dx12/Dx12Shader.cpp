@@ -271,6 +271,25 @@ namespace FW
 		return Semantics;
 	}
 
+	Vector3u Dx12Shader::GetThreadGroupSize() const
+	{
+		check(Type == ShaderType::Compute);
+		if (!ByteCode.IsValid())
+		{
+			return GpuShader::GetThreadGroupSize();
+		}
+
+		TRefCountPtr<ID3D12ShaderReflection> Reflection;
+		DxcBuffer DxilBuffer{ .Ptr = ByteCode->GetBufferPointer(), .Size = ByteCode->GetBufferSize() };
+		GShaderCompiler.CompilerUitls->CreateReflection(&DxilBuffer, IID_PPV_ARGS(Reflection.GetInitReference()));
+
+		uint32 SizeX = 1;
+		uint32 SizeY = 1;
+		uint32 SizeZ = 1;
+		Reflection->GetThreadGroupSize(&SizeX, &SizeY, &SizeZ);
+		return { SizeX, SizeY, SizeZ };
+	}
+
 	class ShIncludeHandler final : public IDxcIncludeHandler
 	{
 	public:

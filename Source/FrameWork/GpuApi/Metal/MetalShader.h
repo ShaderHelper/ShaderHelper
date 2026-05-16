@@ -27,9 +27,6 @@ namespace FW
             return Bindings;
         }
         
-    public:
-        Vector3u ThreadGroupSize{};
-        
     private:
         MTLFunctionPtr ByteCodeFunc;
         FString MslText;

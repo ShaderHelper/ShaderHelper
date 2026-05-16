@@ -12,7 +12,7 @@ namespace FW
 		PatchFragCoordBuiltIn(Patcher, Context);
 
 		// Patch DebuggerParams uniform buffer before base class processing
-		DebuggerParams = PatchDebuggerParams(Patcher);
+		DebuggerParams = PatchDebuggerParams(Patcher, BindingShaderStage::Pixel);
 		
 		// Call base class implementation
 		SpvDebuggerVisitor::ParseInternal();

@@ -849,11 +849,6 @@ namespace SH
 	DebugTargetInfo MeshRenderObject::OnStartDebugging(DebugItem Item)
 	{
 		ShaderAsset* MainShader = GetShaderAsset(Item);
-		if (!MainShader)
-		{
-			return {};
-		}
-
 		AssetOp::OpenAsset(MainShader);
 		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		if (SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(MainShader))

@@ -239,6 +239,7 @@ namespace FW
 		virtual TArray<GpuShaderVertexInput> GetVertexInputs() const;
 		virtual TArray<GpuShaderStageSemantic> GetStageOutputSemantics() const;
 		virtual TArray<GpuShaderStageSemantic> GetStageInputSemantics() const;
+		virtual Vector3u GetThreadGroupSize() const;
 
 		friend uint32 GetTypeHash(const GpuShader& Shader)
 		{

@@ -41,7 +41,8 @@ namespace SH
 	public:
 		virtual TArray<DebugItem> GetSupportedDebugItems() const = 0;
 		virtual DebugTargetInfo OnStartDebugging(DebugItem Item) = 0;
-		virtual void OnFinalizePixel(const FW::Vector2u& PixelCoord) = 0;
+		virtual void OnFinalizePixel(const FW::Vector2u& PixelCoord) {}
+		virtual void OnFinalizeCompute(const FW::Vector3u& WorkGroupId, const FW::Vector3u& LocalInvocationId) {}
 		virtual ShaderAsset* GetShaderAsset(DebugItem Item) const = 0;
 		virtual void OnEndDebuggging() = 0;
 		virtual InvocationState GetInvocationState(DebugItem Item) = 0;

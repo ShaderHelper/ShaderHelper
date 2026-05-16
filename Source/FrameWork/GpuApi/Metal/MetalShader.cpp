@@ -3,7 +3,6 @@
 #include "MetalDevice.h"
 #include "ShaderConductor.hpp"
 #include "Common/Path/PathHelper.h"
-#include "GpuApi/Spirv/SpirvParser.h"
 #include "GpuApi/GLSL.h"
 
 namespace FW
@@ -235,16 +234,6 @@ namespace FW
 			return true;
 		}
 
-		//Need the meta datas from spirv to abstract gpu api
-		//For example, metal's threadgroupsize is not specified in the shader
-		//and needs to be specified directly by dispatchThreadgroups
-		SpvMetaContext MetaContext;
-		SpvMetaVisitor MetaVisitor{ MetaContext };
-		SpirvParser Parser;
-		Parser.Parse(SpvCode);
-		Parser.Accept(&MetaVisitor);
-		InShader->ThreadGroupSize = MetaContext.ThreadGroupSize;
-		
 		ShaderConductor::MacroDefine SpvMslOptions[] = {
 			{"argument_buffers", "1"},
 			{"enable_decoration_binding", "1"},

@@ -1,0 +1,36 @@
+#pragma once
+#include "Debugger/DebuggableObject.h"
+
+namespace SH
+{
+	class SComputeDebuggerViewport : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SComputeDebuggerViewport) {}
+		SLATE_END_ARGS()
+		void Construct(const FArguments& InArgs);
+		virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+
+		void SetComputeDebugInfo(const FW::Vector3u& InThreadGroupCount, const FW::Vector3u& InThreadGroupSize);
+
+		bool FinalizedThread() const { return bFinalizedThread; }
+		FW::Vector3u GetWorkGroupId() const { return WorkGroupId; }
+		FW::Vector3u GetLocalInvocationId() const { return LocalInvocationId; }
+
+	private:
+		void RebuildBody();
+		void OnPickThread(const FW::Vector3u& InLocalId);
+
+	private:
+		FW::Vector3u ThreadGroupCount{ 1, 1, 1 };
+		FW::Vector3u ThreadGroupSize{ 1, 1, 1 };
+		FW::Vector3u WorkGroupId{ 0, 0, 0 };
+		FW::Vector3u LocalInvocationId{ 0, 0, 0 };
+		uint32 SelectedZ = 0;
+		bool bFinalizedThread = false;
+
+		TSharedPtr<SVerticalBox> RootBox;
+		TSharedPtr<SHorizontalBox> ZSliceRow;
+		TArray<TSharedPtr<FString>> ZSliceOptions;
+	};
+}

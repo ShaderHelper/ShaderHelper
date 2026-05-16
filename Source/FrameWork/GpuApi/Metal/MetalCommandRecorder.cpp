@@ -276,8 +276,9 @@ namespace FW
         StateCache.ApplyComputeState(CmdEncoder.get());
         MetalComputePipelineState* Pipeline = StateCache.GetPipeline();
         MetalShader* Cs = static_cast<MetalShader*>(Pipeline->GetDesc().Cs);
+        Vector3u ThreadGroupSize = Cs->GetThreadGroupSize();
         CmdEncoder->dispatchThreadgroups(MTL::Size{ThreadGroupCountX, ThreadGroupCountY, ThreadGroupCountZ},
-        MTL::Size{Cs->ThreadGroupSize.X, Cs->ThreadGroupSize.Y, Cs->ThreadGroupSize.Z});
+        MTL::Size{ThreadGroupSize.X, ThreadGroupSize.Y, ThreadGroupSize.Z});
     }
 
     void MtlComputePassRecorder::SetComputePipelineState(GpuComputePipelineState* InPipelineState)

@@ -1,6 +1,7 @@
 #pragma once
 #include "SpirvParser.h"
 #include "SpirvPatcher.h"
+#include "GpuApi/GpuBindGroupLayout.h"
 #include <queue>
 
 namespace FW
@@ -379,7 +380,7 @@ namespace FW
 		virtual void ParseInternal();
 		void PatchToDebugger(SpvId InValueId, SpvId InTypeId, TArray<TUniquePtr<SpvInstruction>>& InstList);
 		void FlattenToUInts(SpvId InValueId, SpvId InTypeId, TArray<TUniquePtr<SpvInstruction>>& InstList, TArray<SpvId>& OutUIntValues);
-		void BatchStoreToDebugBuffer(const TArray<SpvId>& UIntValues, TArray<TUniquePtr<SpvInstruction>>& InstList);
+		virtual void BatchStoreToDebugBuffer(const TArray<SpvId>& UIntValues, TArray<TUniquePtr<SpvInstruction>>& InstList);
 		void PatchAppendAccessFunc(int32 IndexNum);
 		void PatchAppendVarFunc(int32 ValueUIntCount, int32 IndexNum);
 		void PatchAppendValueFunc(int32 ValueUIntCount);
@@ -395,6 +396,7 @@ namespace FW
 	protected:
 		SpvDebuggerContext& Context;
 		GpuShaderLanguage Language;
+		BindingShaderStage DebuggerStage = BindingShaderStage::Pixel;
 		int32 InstIndex;
 		SpvLexicalScope* CurScope = nullptr;
 		SpvBasicBlock* CurBlock = nullptr;
@@ -421,11 +423,16 @@ namespace FW
 
 	FRAMEWORK_API SpvType* GetAccessedType(const SpvVariable* Var, const TArray<int32>& Indexes);
 	FRAMEWORK_API TValueOrError<std::tuple<SpvType*, int32>, FString> GetAccess(const SpvVariable* Var, const TArray<int32>& Indexes);
-	SpvId PatchDebuggerBuffer(SpvPatcher& Patcher);
-	SpvId PatchDebuggerParams(SpvPatcher& Patcher);
+	int32 GetDebuggerBufferUVec4BatchCount(int32 UIntValueCount);
+	void StoreDebuggerBufferUVec4Batches(SpvPatcher& Patcher, SpvId DebuggerBuffer, SpvId BaseIndex, const TArray<SpvId>& UIntValues, TArray<TUniquePtr<SpvInstruction>>& InstList);
+	SpvId PatchDebuggerBuffer(SpvPatcher& Patcher, BindingShaderStage Stage);
+	SpvId PatchDebuggerParams(SpvPatcher& Patcher, BindingShaderStage Stage);
 	SpvId PatchExtSet(SpvPatcher& Patcher, SpvMetaContext& Context, SpvExtSet ExtSet);
 	SpvId PatchFragCoordBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context);
 	SpvId PatchLoadFragCoordXY(SpvPatcher& Patcher, SpvMetaContext& Context, TArray<TUniquePtr<SpvInstruction>>& InstList);
+	SpvId PatchWorkgroupIdBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context);
+	SpvId PatchLocalInvocationIdBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context);
+	SpvId PatchLocalInvocationIndexBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context);
 	int32 GetInstIndex(const TArray<TUniquePtr<SpvInstruction>>* Insts, SpvId Inst);
 
 	// For each OpLoad of a composite type, analyze which init-units are truly consumed

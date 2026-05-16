@@ -26,6 +26,7 @@
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
 #include "UI/Widgets/Debugger/SFragmentDebuggerViewport.h"
+#include "UI/Widgets/Debugger/SComputeDebuggerViewport.h"
 #include "UI/Widgets/Debugger/SVertexDebuggerViewport.h"
 #include "UI/Widgets/Debugger/SDebuggerVariableView.h"
 #include "UI/Widgets/Debugger/SDebuggerCallStackView.h"
@@ -143,7 +144,7 @@ namespace SH
 			FExecuteAction::CreateLambda([this] {
 				Continue();
 			}),
-			FCanExecuteAction::CreateLambda([this] { return IsDebugging && FragmentDebuggerViewport->FinalizedPixel(); }),
+			FCanExecuteAction::CreateLambda([this] { return IsDebugging && IsFinalizedForCurrentItem(); }),
 			EUIActionRepeatMode::RepeatEnabled
 		);
 		UICommandList->MapAction(
@@ -151,7 +152,7 @@ namespace SH
 			FExecuteAction::CreateLambda([this]{
 				Continue(StepMode::StepInto);
 			}),
-			FCanExecuteAction::CreateLambda([this] { return IsDebugging && FragmentDebuggerViewport->FinalizedPixel(); }),
+			FCanExecuteAction::CreateLambda([this] { return IsDebugging && IsFinalizedForCurrentItem(); }),
 			EUIActionRepeatMode::RepeatEnabled
 		);
 		UICommandList->MapAction(
@@ -159,7 +160,7 @@ namespace SH
 			FExecuteAction::CreateLambda([this]{
 				Continue(StepMode::StepOver);
 			}),
-			FCanExecuteAction::CreateLambda([this] { return IsDebugging && FragmentDebuggerViewport->FinalizedPixel(); }),
+			FCanExecuteAction::CreateLambda([this] { return IsDebugging && IsFinalizedForCurrentItem(); }),
 			EUIActionRepeatMode::RepeatEnabled
 		);
 		UICommandList->MapAction(
@@ -237,6 +238,10 @@ namespace SH
 		SAssignNew(VertexDebuggerViewport, SVertexDebuggerViewport)
 			.Visibility_Lambda([this]{
 				return (IsDebugging && CurrentDebugItem == DebugItem::Vertex && !bShowingLinePreview) ? EVisibility::Visible : EVisibility::Hidden;
+			});
+		SAssignNew(ComputeDebuggerViewport, SComputeDebuggerViewport)
+			.Visibility_Lambda([this]{
+				return (IsDebugging && CurrentDebugItem == DebugItem::Compute && !bShowingLinePreview) ? EVisibility::Visible : EVisibility::Hidden;
 			});
 		LinePreviewViewPort = MakeShared<FW::PreviewViewPort>();
 		SAssignNew(LinePreviewWidget, SViewport)
@@ -1039,6 +1044,10 @@ namespace SH
 					]
 					+SOverlay::Slot()
 					[
+						ComputeDebuggerViewport.ToSharedRef()
+					]
+					+SOverlay::Slot()
+					[
 						LinePreviewWidget.ToSharedRef()
 					]
                 ]
@@ -1493,6 +1502,82 @@ namespace SH
 		});
 	}
 
+	void ShaderHelperEditor::DebugCompute(const Vector3u& InWorkGroupId, const Vector3u& InLocalInvocationId, const InvocationState& InState)
+	{
+		SShaderEditorBox* ShaderEditor = GetShaderEditor(GetDebuggaleObject()->GetShaderAsset(CurrentDebugItem));
+		Debugger.SetShaderAsset(ShaderEditor->GetShaderAsset());
+		Debugger.SetShaderSource(ShaderEditor->GetCurrentShaderSource());
+
+		GApp->EnqueueBusyTask([=, this](TFunction<void()> Done) {
+			FNotificationInfo Info(LOCALIZATION("StartDebuggerTip"));
+			Info.Image = FAppStyle::Get().GetBrush("NoBrush");
+			Info.bFireAndForget = false;
+			Info.FadeInDuration = 0.0f;
+			Info.FadeOutDuration = 0.0f;
+			auto Notification = FSlateNotificationManager::Get().AddNotification(Info);
+			Notification->SetCompletionState(SNotificationItem::CS_Pending);
+			Async(EAsyncExecution::Thread, [=, this]() {
+				try
+				{
+					Debugger.DebugCompute(InWorkGroupId, InLocalInvocationId, InState);
+				}
+				catch (const std::runtime_error& e)
+				{
+					AsyncTask(ENamedThreads::GameThread, [=, this] {
+						Notification->Fadeout();
+						Done();
+						FText FailureInfo = LOCALIZATION("DebugFailure");
+						SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo.ToString(), UTF8_TO_TCHAR(e.what()));
+						MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GetMainWindow(), FailureInfo);
+						EndDebugging();
+					});
+					return;
+				}
+
+				AsyncTask(ENamedThreads::GameThread, [=, this] {
+					Notification->Fadeout();
+					Done();
+					Continue();
+				});
+			});
+		});
+	}
+
+	void ShaderHelperEditor::SwitchDebugThread(const Vector3u& InLocalInvocationId)
+	{
+		if (Debugger.SwitchDebugThread(InLocalInvocationId))
+		{
+			Debugger.ShowDebuggerResult();
+			FString StopFile = Debugger.GetStopLocation().File;
+			ShaderAsset* MainShader = GetDebuggaleObject()->GetShaderAsset(CurrentDebugItem);
+			AssetPtr<ShaderAsset> StopShader = MainShader->FindIncludeAsset(StopFile);
+			SShaderEditorBox* ShaderEditor = StopShader ? GetShaderEditor(StopShader) : GetShaderEditor(MainShader);
+			if (StopShader)
+			{
+				AssetOp::OpenAsset(StopShader);
+			}
+			ShaderEditor->JumpTo(ShaderEditor->GetLineIndex(Debugger.GetStopLocation().LineNumber));
+			ShaderEditor->UnFold(Debugger.GetStopLocation().LineNumber);
+		}
+	}
+
+	bool ShaderHelperEditor::IsFinalizedForCurrentItem() const
+	{
+		if (!IsDebugging)
+		{
+			return false;
+		}
+		switch (CurrentDebugItem)
+		{
+		case DebugItem::Fragment:
+			return FragmentDebuggerViewport.IsValid() && FragmentDebuggerViewport->FinalizedPixel();
+		case DebugItem::Compute:
+			return ComputeDebuggerViewport.IsValid() && ComputeDebuggerViewport->FinalizedThread();
+		default:
+			return false;
+		}
+	}
+
 	void ShaderHelperEditor::StartDebugging(bool GlobalValidation)
 	{
 		NormalizeCurrentDebugItem();
@@ -1506,22 +1591,33 @@ namespace SH
 		{
 			Debuggable->OnStartDebugging(CurrentDebugItem);
 			IsDebugging = true;
-			return;
 		}
-
-		DebugTargetInfo DebugTarget = Debuggable->OnStartDebugging(CurrentDebugItem);
-		DebugTarget.Normalize();
-		if(DebugTarget.Tex)
+		else if (CurrentDebugItem == DebugItem::Compute)
 		{
+			Debuggable->OnStartDebugging(CurrentDebugItem);
 			IsDebugging = true;
-			FragmentDebuggerViewport->SetDebugTarget(DebugTarget, GlobalValidation);
-			if (!GlobalValidation)
-			{
-				auto User0 = FSlateApplication::Get().GetUser(0);
-				User0->LockCursor(FragmentDebuggerViewport.ToSharedRef());
-			}
-
+			const auto& CState = std::get<ComputeState>(Debuggable->GetInvocationState(DebugItem::Compute));
+			ComputeDebuggerViewport->SetComputeDebugInfo(CState.ThreadGroupCount, CState.ThreadGroupSize);
+			auto User0 = FSlateApplication::Get().GetUser(0);
+			User0->LockCursor(ComputeDebuggerViewport.ToSharedRef());
 		}
+		else if (CurrentDebugItem == DebugItem::Fragment)
+		{
+			DebugTargetInfo DebugTarget = Debuggable->OnStartDebugging(CurrentDebugItem);
+			DebugTarget.Normalize();
+			if (DebugTarget.Tex)
+			{
+				IsDebugging = true;
+				FragmentDebuggerViewport->SetDebugTarget(DebugTarget, GlobalValidation);
+				if (!GlobalValidation)
+				{
+					auto User0 = FSlateApplication::Get().GetUser(0);
+					User0->LockCursor(FragmentDebuggerViewport.ToSharedRef());
+				}
+
+			}
+		}
+		
 	}
 
 	FToolBarBuilder ShaderHelperEditor::CreateToolBarBuilder()

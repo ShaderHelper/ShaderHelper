@@ -13,7 +13,10 @@
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "GpuApi/GpuRhi.h"
 #include "GpuApi/GpuResourceHelper.h"
+#include "ProjectManager/ShProjectManager.h"
 #include "RenderResource/RenderPass/BlitPass.h"
+#include "AssetManager/AssetManager.h"
+#include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 
 using namespace FW;
 
@@ -34,6 +37,26 @@ namespace SH
 		return GetMetaType<ComputePassNode>();
 	}
 
+	void ComputePassNodeOp::OnCancelSelect(ShObject* InObject)
+	{
+		ShPropertyOp::OnCancelSelect(InObject);
+
+		auto* Node = static_cast<ComputePassNode*>(InObject);
+		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		if (!ShEditor->IsInDebugging() && ShEditor->GetDebuggaleObject() == Node)
+		{
+			ShEditor->SetDebuggableObject(nullptr);
+		}
+	}
+
+	void ComputePassNodeOp::OnSelect(ShObject* InObject)
+	{
+		ShPropertyOp::OnSelect(InObject);
+
+		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->SetDebuggableObject(InObject);
+	}
+
 	ComputePassNode::ComputePassNode()
 	{
 		ObjectName = FText::FromString(TEXT("ComputePass"));
@@ -47,6 +70,15 @@ namespace SH
 
 	ComputePassNode::~ComputePassNode()
 	{
+		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		if (ShEditor->GetDebuggaleObject() == this)
+		{
+			if (ShEditor->IsInDebugging())
+			{
+				ShEditor->EndDebugging();
+			}
+			ShEditor->SetDebuggableObject(nullptr);
+		}
 		UnbindShaderDelegates();
 	}
 
@@ -499,6 +531,7 @@ namespace SH
 			LayoutPtrs.Add(BindGroupLayouts[GroupSlot].GetReference());
 		}
 		GpuComputePipelineStateDesc PipelineDesc{ .Cs = Cs, .BindGroupLayouts = LayoutPtrs };
+		CachedPipelineDesc = PipelineDesc;
 		Pipeline = GpuPsoCacheManager::Get().CreateComputePipelineState(PipelineDesc);
 		if (!Pipeline)
 		{
@@ -629,5 +662,75 @@ namespace SH
 
 		PrinterBuffer->Clear();
 		return bAssertFailed;
+	}
+
+	TArray<BindingBuilder> ComputePassNode::BuildDebugBindingBuilders() const
+	{
+		TArray<BindingBuilder> Result;
+		TArray<int32> GroupSlots;
+		BindGroupLayouts.GetKeys(GroupSlots);
+		GroupSlots.Sort();
+
+		for (int32 GroupSlot : GroupSlots)
+		{
+			const TRefCountPtr<GpuBindGroupLayout>* LayoutPtr = BindGroupLayouts.Find(GroupSlot);
+			const TRefCountPtr<GpuBindGroup>* BindGroupPtr = BindGroups.Find(GroupSlot);
+			GpuBindGroupLayout* Layout = LayoutPtr ? LayoutPtr->GetReference() : nullptr;
+			GpuBindGroup* BindGroup = BindGroupPtr ? BindGroupPtr->GetReference() : nullptr;
+			if (!Layout || !BindGroup)
+			{
+				continue;
+			}
+
+			BindingBuilder Builder{ GpuBindGroupBuilder{ Layout }, GpuBindGroupLayoutBuilder{ GroupSlot } };
+			for (const auto& [Slot, Binding] : Layout->GetDesc().Layouts)
+			{
+				Builder.LayoutBuilder.AddExistingBinding(Slot.SlotNum, Binding.Type, Binding.Stage);
+			}
+			for (const auto& [Slot, ResourceBindingEntry] : BindGroup->GetDesc().Resources)
+			{
+				Builder.BingGroupBuilder.SetExistingBinding(Slot.SlotNum, Slot.Type, ResourceBindingEntry.Resource.GetReference(), Slot.Stage);
+			}
+			Result.Add(MoveTemp(Builder));
+		}
+		return Result;
+	}
+
+	Vector3u ComputePassNode::ReflectThreadGroupSize() const
+	{
+		GpuShader* Cs = ShaderAsset->GetCompiledShader(ShaderType::Compute);
+		check(Cs);
+		return Cs->GetThreadGroupSize();
+	}
+
+	DebugTargetInfo ComputePassNode::OnStartDebugging(DebugItem Item)
+	{
+		AssetOp::OpenAsset(ShaderAsset.Get());
+		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		if (SShaderEditorBox* ShaderEditor = ShEditor->GetShaderEditor(ShaderAsset))
+		{
+			ShaderEditor->Compile();
+		}
+		TSingleton<ShProjectManager>::Get().GetProject()->TimelineStop = true;
+		TSingleton<ShProjectManager>::Get().GetProject()->bScenePreview = false;
+		ShEditor->ForceRender();
+		bDebugging = true;
+		return {};
+	}
+
+	InvocationState ComputePassNode::GetInvocationState(DebugItem Item)
+	{
+		return ComputeState{
+			.ThreadGroupCount = ThreadGroupCount,
+			.ThreadGroupSize = ReflectThreadGroupSize(),
+			.Builders = BuildDebugBindingBuilders(),
+			.PipelineDesc = CachedPipelineDesc,
+		};
+	}
+
+	void ComputePassNode::OnFinalizeCompute(const Vector3u& InWorkGroupId, const Vector3u& InLocalInvocationId)
+	{
+		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->DebugCompute(InWorkGroupId, InLocalInvocationId, GetInvocationState(DebugItem::Compute));
 	}
 }
