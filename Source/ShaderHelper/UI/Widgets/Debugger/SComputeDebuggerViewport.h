@@ -13,11 +13,12 @@ namespace SH
 		void Construct(const FArguments& InArgs);
 		virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 
-		void SetComputeDebugInfo(const FW::Vector3u& InThreadGroupCount, const FW::Vector3u& InThreadGroupSize);
+		void SetComputeDebugInfo(const FW::Vector3u& InThreadGroupCount, const FW::Vector3u& InThreadGroupSize, bool GlobalValidation);
 
 		bool FinalizedThread() const { return bFinalizedThread; }
 		FW::Vector3u GetWorkGroupId() const { return WorkGroupId; }
 		FW::Vector3u GetLocalInvocationId() const { return LocalInvocationId; }
+		void SetFinalizedThread(const FW::Vector3u& InWorkGroupId, const FW::Vector3u& InLocalInvocationId);
 
 	private:
 		void OnPickThread(const FW::Vector3u& InLocalId);
@@ -33,6 +34,8 @@ namespace SH
 
 		TSharedPtr<SVerticalBox> RootBox;
 		TSharedPtr<SHorizontalBox> ZSliceRow;
+		TSharedPtr<class SScrollBox> HScrollBox;
+		TSharedPtr<class SScrollBox> VScrollBox;
 		TArray<TSharedPtr<FString>> ZSliceOptions;
 		TArray<TSharedPtr<SButton>> ThreadCellButtons; // y * ThreadGroupSize.x + x
 	};

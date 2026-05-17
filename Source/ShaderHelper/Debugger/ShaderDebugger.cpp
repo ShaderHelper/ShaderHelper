@@ -1096,7 +1096,7 @@ namespace SH
 		RG.Execute();
 	}
 
-	void ShaderDebugger::InvokeCompute()
+	void ShaderDebugger::InvokeCompute(bool GlobalValidation)
 	{
 		const auto& CsInvocation = std::get<ComputeState>(Invocation);
 
@@ -1113,22 +1113,32 @@ namespace SH
 			throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
 		}
 
-		const uint32 NumThreads = CsInvocation.ThreadGroupSize.x * CsInvocation.ThreadGroupSize.y * CsInvocation.ThreadGroupSize.z;
-		//Per-thread budget: ~256 records * 16 bytes/uvec4 * 2(prefix+payload).
-		//Floor at 4 MiB and align to uvec4 (16 bytes).
-		uint32 BufferSize = FMath::Max<uint32>(4u * 1024u * 1024u, NumThreads * 8192u);
-		BufferSize = (BufferSize + 15u) & ~15u;
+		uint32 BufferSize;
 		TArray<uint8> Datas;
-		Datas.SetNumZeroed(BufferSize);
-		//Initial atomic cursor (bytes) starts at 16: first uvec4 is reserved for the cursor.
-		const uint32 InitialCursor = 16u;
-		FMemory::Memcpy(Datas.GetData(), &InitialCursor, sizeof(uint32));
+		if (GlobalValidation)
+		{
+			BufferSize = 1024;
+			Datas.SetNumZeroed(BufferSize);
+		}
+		else
+		{
+			const uint32 NumThreads = CsInvocation.ThreadGroupSize.x * CsInvocation.ThreadGroupSize.y * CsInvocation.ThreadGroupSize.z;
+			//Per-thread budget: ~256 records * 16 bytes/uvec4 * 2(prefix+payload).
+			//Floor at 4 MiB and align to uvec4 (16 bytes).
+			BufferSize = FMath::Max<uint32>(4u * 1024u * 1024u, NumThreads * 8192u);
+			BufferSize = (BufferSize + 15u) & ~15u;
+			Datas.SetNumZeroed(BufferSize);
+			//Initial atomic cursor (bytes) starts at 16: first uvec4 is reserved for the cursor.
+			const uint32 InitialCursor = 16u;
+			FMemory::Memcpy(Datas.GetData(), &InitialCursor, sizeof(uint32));
+		}
 		DebugBuffer = GGpuRhi->CreateBuffer({
 			.ByteSize = BufferSize,
 			.Usage = GpuBufferUsage::RWRaw,
 			.InitialData = Datas,
 		});
 
+		if (!GlobalValidation)
 		{
 			TArray<uint8> ParamsDatas;
 			ParamsDatas.SetNumZeroed(sizeof(Vector3u));
@@ -1141,7 +1151,7 @@ namespace SH
 		}
 
 		const TArray<GpuShaderLayoutBinding> CsLayoutBindings = CsInvocation.PipelineDesc.Cs->GetLayout();
-		BuildPatchedBindings(CsInvocation.Builders, CsLayoutBindings, BindingShaderStage::Compute, true);
+		BuildPatchedBindings(CsInvocation.Builders, CsLayoutBindings, BindingShaderStage::Compute, !GlobalValidation);
 
 		auto ComputeDebuggerContext = MakeUnique<SpvComputeDebuggerContext>(WorkGroupId, CsInvocation.ThreadGroupSize, SpvBindings);
 
@@ -1152,11 +1162,24 @@ namespace SH
 		Parser.Parse(DebugShader->SpvCode);
 		SpvMetaVisitor MetaVisitor{ *ComputeDebuggerContext };
 		Parser.Accept(&MetaVisitor);
-		SpvComputeDebuggerVisitor DebuggerVisitor{ *ComputeDebuggerContext, Lang, bEnableUbsan };
-		Parser.Accept(&DebuggerVisitor);
-		TArray<uint32> PatchedSpv = DebuggerVisitor.GetPatcher().GetSpv();
-		FString PatchedSpvAsm = DebuggerVisitor.GetPatcher().GetAsm();
-		FFileHelper::SaveStringToFile(PatchedSpvAsm, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Patched" + FileExtension + ".spvasm"));
+		TArray<uint32> PatchedSpv;
+		FString PatchedSpvAsm;
+		if (GlobalValidation)
+		{
+			SpvValidator Validator{ *ComputeDebuggerContext, bEnableUbsan, ShaderType::Compute, &SpvBindings };
+			Parser.Accept(&Validator);
+			PatchedSpv = Validator.GetPatcher().GetSpv();
+			PatchedSpvAsm = Validator.GetPatcher().GetAsm();
+			FFileHelper::SaveStringToFile(PatchedSpvAsm, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Validation" + FileExtension + ".spvasm"));
+		}
+		else
+		{
+			SpvComputeDebuggerVisitor DebuggerVisitor{ *ComputeDebuggerContext, Lang, bEnableUbsan };
+			Parser.Accept(&DebuggerVisitor);
+			PatchedSpv = DebuggerVisitor.GetPatcher().GetSpv();
+			PatchedSpvAsm = DebuggerVisitor.GetPatcher().GetAsm();
+			FFileHelper::SaveStringToFile(PatchedSpvAsm, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Patched" + FileExtension + ".spvasm"));
+		}
 
 		CurDebugStateIndex = 0;
 		DebuggerContext = MoveTemp(ComputeDebuggerContext);
@@ -1252,6 +1275,27 @@ namespace SH
 			+ LocalInvocationId.z * DebuggingThreadGroupSize.x * DebuggingThreadGroupSize.y;
 		DebugStates = (SelectedLocalIdx < NumThreads) ? PerThreadDebugStates[SelectedLocalIdx] : TArray<SpvDebugState>{};
 		FinalizeDebugStates();
+	}
+
+	std::optional<TPair<Vector3u, Vector3u>> ShaderDebugger::ValidateCompute(const InvocationState& InState)
+	{
+		Invocation = InState;
+		bEnableUbsan = EnableUbsan();
+
+		InvokeCompute(true);
+
+		std::optional<TPair<Vector3u, Vector3u>> ErrorLoc;
+		uint8* DebugBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebugBuffer, GpuResourceMapMode::Read_Only);
+		uint32 Offset = *(uint32*)(DebugBufferData);
+		if (Offset > 0)
+		{
+			Vector3u WG = *(Vector3u*)(DebugBufferData + 4);
+			Vector3u LID = *(Vector3u*)(DebugBufferData + 16);
+			ErrorLoc = MakeTuple(WG, LID);
+		}
+		GGpuRhi->UnMapGpuBuffer(DebugBuffer);
+
+		return ErrorLoc;
 	}
 
 	bool ShaderDebugger::CanThreadReachStop(uint32 LocalLinearIndex) const

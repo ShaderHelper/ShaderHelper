@@ -2,7 +2,9 @@
 #include "SComputeDebuggerViewport.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "App/App.h"
+#include "UI/Widgets/MessageDialog/SMessageDialog.h"
 
+#include <Framework/Notifications/NotificationManager.h>
 #include <Widgets/SOverlay.h>
 #include <Widgets/Layout/SUniformGridPanel.h>
 #include <Widgets/Layout/SBox.h>
@@ -11,6 +13,9 @@
 #include <Widgets/Input/SNumericEntryBox.h>
 #include <Widgets/Input/SButton.h>
 #include <Widgets/Input/SComboBox.h>
+#include <Widgets/Notifications/SNotificationList.h>
+
+#include <stdexcept>
 
 using namespace FW;
 
@@ -68,6 +73,36 @@ namespace SH
 		UpdateThreadCellStyles();
 	}
 
+	void SComputeDebuggerViewport::SetFinalizedThread(const Vector3u& InWorkGroupId, const Vector3u& InLocalInvocationId)
+	{
+		WorkGroupId = InWorkGroupId;
+		LocalInvocationId = InLocalInvocationId;
+		SelectedZ = LocalInvocationId.z;
+		bFinalizedThread = true;
+		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		if (DebuggableObject* Debuggable = ShEditor->GetDebuggaleObject())
+		{
+			Debuggable->OnFinalizeCompute(WorkGroupId, LocalInvocationId);
+		}
+		UpdateThreadCellStyles();
+
+		const int32 CellIndex = (int32)(LocalInvocationId.y * ThreadGroupSize.x + LocalInvocationId.x);
+		if (ThreadCellButtons.IsValidIndex(CellIndex))
+		{
+			if (TSharedPtr<SButton> Cell = ThreadCellButtons[CellIndex])
+			{
+				if (HScrollBox.IsValid())
+				{
+					HScrollBox->ScrollDescendantIntoView(Cell, false, EDescendantScrollDestination::Center);
+				}
+				if (VScrollBox.IsValid())
+				{
+					VScrollBox->ScrollDescendantIntoView(Cell, false, EDescendantScrollDestination::Center);
+				}
+			}
+		}
+	}
+
 	FReply SComputeDebuggerViewport::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 	{
 		if (MouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
@@ -81,7 +116,7 @@ namespace SH
 		return SCompoundWidget::OnMouseButtonDown(MyGeometry, MouseEvent);
 	}
 
-	void SComputeDebuggerViewport::SetComputeDebugInfo(const Vector3u& InThreadGroupCount, const Vector3u& InThreadGroupSize)
+	void SComputeDebuggerViewport::SetComputeDebugInfo(const Vector3u& InThreadGroupCount, const Vector3u& InThreadGroupSize, bool GlobalValidation)
 	{
 		ThreadGroupCount = InThreadGroupCount;
 		ThreadGroupSize = InThreadGroupSize;
@@ -291,12 +326,12 @@ namespace SH
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot().FillWidth(1.0f)
 					[
-						SNew(SScrollBox)
+						SAssignNew(VScrollBox, SScrollBox)
 						.Orientation(EOrientation::Orient_Vertical)
 						.ExternalScrollbar(VBar)
 						+ SScrollBox::Slot()
 						[
-							SNew(SScrollBox)
+							SAssignNew(HScrollBox, SScrollBox)
 							.Orientation(EOrientation::Orient_Horizontal)
 							.ExternalScrollbar(HBar)						
 							.ConsumeMouseWheel(EConsumeMouseWheel::Never)							
@@ -327,6 +362,54 @@ namespace SH
 		];
 
 		UpdateThreadCellStyles();
+
+		if (GlobalValidation)
+		{
+			auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			auto Invocation = ShEditor->GetDebuggaleObject()->GetInvocationState(DebugItem::Compute);
+			GApp->EnqueueBusyTask([=, this](TFunction<void()> Done) {
+				FNotificationInfo Info(LOCALIZATION("StartValidatorTip"));
+				Info.Image = FAppStyle::Get().GetBrush("NoBrush");
+				Info.bFireAndForget = false;
+				Info.FadeInDuration = 0.0f;
+				Info.FadeOutDuration = 0.0f;
+				auto Notification = FSlateNotificationManager::Get().AddNotification(Info);
+				Notification->SetCompletionState(SNotificationItem::CS_Pending);
+				Async(EAsyncExecution::Thread, [=, this]() {
+					std::optional<TPair<Vector3u, Vector3u>> ErrorLoc;
+					try
+					{
+						ErrorLoc = ShEditor->ValidateCompute(Invocation);
+					}
+					catch (const std::runtime_error& e)
+					{
+						AsyncTask(ENamedThreads::GameThread, [=, this] {
+							Notification->Fadeout();
+							Done();
+							FText FailureInfo = LOCALIZATION("DebugFailure");
+							SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo.ToString(), UTF8_TO_TCHAR(e.what()));
+							MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, ShEditor->GetMainWindow(), FailureInfo);
+							ShEditor->EndDebugging();
+						});
+						return;
+					}
+
+					AsyncTask(ENamedThreads::GameThread, [=, this] {
+						Notification->Fadeout();
+						Done();
+						if (ErrorLoc)
+						{
+							SetFinalizedThread(ErrorLoc->Key, ErrorLoc->Value);
+						}
+						else
+						{
+							MessageDialog::Open(MessageDialog::Ok, MessageDialog::Happy, ShEditor->GetMainWindow(), LOCALIZATION("ValidationTip"));
+							ShEditor->EndDebugging();
+						}
+					});
+				});
+			});
+		}
 	}
 
 	void SComputeDebuggerViewport::UpdateThreadCellStyles()

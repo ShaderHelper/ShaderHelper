@@ -100,9 +100,10 @@ namespace SH
 		//
 
 		//Compute
-		void InvokeCompute();
+		void InvokeCompute(bool GlobalValidation = false);
 		bool CanThreadReachStop(uint32 LocalLinearIndex) const;
 		void DebugCompute(const FW::Vector3u& InWorkGroupId, const FW::Vector3u& InLocalInvocationId, const InvocationState& InState);
+		std::optional<TPair<FW::Vector3u, FW::Vector3u>> ValidateCompute(const InvocationState& InState);
 		bool SwitchDebugThread(const FW::Vector3u& InLocalInvocationId);
 		//
 

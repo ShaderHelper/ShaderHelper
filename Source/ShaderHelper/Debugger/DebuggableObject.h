@@ -6,7 +6,7 @@ namespace SH
 	enum class DebugItem
 	{
 		Vertex,
-		Fragment,
+		Pixel,
 		Compute,
 	};
 

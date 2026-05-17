@@ -66,7 +66,7 @@ namespace SH
         TArray<TSharedRef<FW::PropertyData>> GeneratePropertyDatas() override;
     
 		//ShDebuggableObject
-		TArray<DebugItem> GetSupportedDebugItems() const override { return { DebugItem::Fragment }; }
+		TArray<DebugItem> GetSupportedDebugItems() const override { return { DebugItem::Pixel }; }
 		InvocationState GetInvocationState(DebugItem Item) override;
 		DebugTargetInfo OnStartDebugging(DebugItem Item) override;
 		void OnFinalizePixel(const FW::Vector2u& PixelCoord) override;

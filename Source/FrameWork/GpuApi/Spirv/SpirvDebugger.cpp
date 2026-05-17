@@ -860,8 +860,9 @@ namespace FW
 		return Result;
 	}
 
-	SpvId PatchDebuggerBuffer(SpvPatcher& Patcher, BindingShaderStage Stage)
+	SpvId PatchDebuggerBuffer(SpvPatcher& Patcher, ShaderType Stage)
 	{
+		BindingShaderStage BindingStage = (Stage == ShaderType::Compute) ? BindingShaderStage::Compute : BindingShaderStage::Pixel;
 		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
 		SpvId UVec4Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, 4));
 		SpvId RunTimeArrayType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeRuntimeArray>(UVec4Type));
@@ -883,17 +884,18 @@ namespace FW
 		}
 		int SetNumber = DebuggerBindGroupSlot;
 		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(DebuggerBuffer, SpvDecorationKind::DescriptorSet, TArray<uint8>{ (uint8*)&SetNumber, sizeof(int) }));
-		int BindingNumber = GetSpirvPatchBindingNumber(DebuggerBufferBindingSlot, BindingType::RWRawBuffer, Stage);
+		int BindingNumber = GetSpirvPatchBindingNumber(DebuggerBufferBindingSlot, BindingType::RWRawBuffer, BindingStage);
 		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(DebuggerBuffer, SpvDecorationKind::Binding, TArray<uint8>{ (uint8*)&BindingNumber, sizeof(int) }));
 
 		return DebuggerBuffer;
 	}
 
 	// Creates a uniform buffer containing either uvec2 PixelCoord (Pixel) or uvec3 TargetWorkGroupId (Compute)
-	SpvId PatchDebuggerParams(SpvPatcher& Patcher, BindingShaderStage Stage)
+	SpvId PatchDebuggerParams(SpvPatcher& Patcher, ShaderType Stage)
 	{
+		BindingShaderStage BindingStage = (Stage == ShaderType::Compute) ? BindingShaderStage::Compute : BindingShaderStage::Pixel;
 		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
-		SpvId MemberVecType = Stage == BindingShaderStage::Compute
+		SpvId MemberVecType = Stage == ShaderType::Compute
 			? Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, 3))
 			: Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, 2));
 
@@ -913,7 +915,7 @@ namespace FW
 		}
 		int SetNumber = DebuggerBindGroupSlot;
 		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(DebuggerParams, SpvDecorationKind::DescriptorSet, TArray<uint8>{ (uint8*)&SetNumber, sizeof(int) }));
-		int BindingNumber = GetSpirvPatchBindingNumber(DebuggerParamsBindingSlot, BindingType::UniformBuffer, Stage);
+		int BindingNumber = GetSpirvPatchBindingNumber(DebuggerParamsBindingSlot, BindingType::UniformBuffer, BindingStage);
 		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(DebuggerParams, SpvDecorationKind::Binding, TArray<uint8>{ (uint8*)&BindingNumber, sizeof(int) }));
 
 		return DebuggerParams;

@@ -4,16 +4,15 @@
 namespace FW
 {
 	SpvComputeDebuggerVisitor::SpvComputeDebuggerVisitor(SpvComputeDebuggerContext& InComputeContext, GpuShaderLanguage InLanguage, bool InEnableUbsan)
-		: SpvDebuggerVisitor(InComputeContext, InLanguage, InEnableUbsan)
+		: SpvDebuggerVisitor(InComputeContext, InLanguage, ShaderType::Compute, InEnableUbsan)
 	{
-		DebuggerStage = BindingShaderStage::Compute;
 	}
 
 	void SpvComputeDebuggerVisitor::ParseInternal()
 	{
 		WorkgroupIdVar = PatchWorkgroupIdBuiltIn(Patcher, Context);
 		LocalInvocationIndexVar = PatchLocalInvocationIndexBuiltIn(Patcher, Context);
-		DebuggerParams = PatchDebuggerParams(Patcher, BindingShaderStage::Compute);
+		DebuggerParams = PatchDebuggerParams(Patcher, ShaderType::Compute);
 
 		SpvDebuggerVisitor::ParseInternal();
 	}

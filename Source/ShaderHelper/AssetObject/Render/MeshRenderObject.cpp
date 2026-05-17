@@ -658,7 +658,7 @@ namespace SH
 		{
 		case DebugItem::Vertex:
 			return MaterialAsset->VertexShaderAsset.Get();
-		case DebugItem::Fragment:
+		case DebugItem::Pixel:
 			return MaterialAsset->PixelShaderAsset.Get();
 		default:
 			return nullptr;
@@ -861,7 +861,7 @@ namespace SH
 		bDebugging = true;
 
 		MeshPassNode* OwnerNode = static_cast<MeshPassNode*>(GetOuter());
-		if (Item == DebugItem::Fragment)
+		if (Item == DebugItem::Pixel)
 		{
 			return OwnerNode->MakeDebugTargetInfo(this);
 		}
@@ -871,7 +871,7 @@ namespace SH
 	InvocationState MeshRenderObject::GetInvocationState(DebugItem Item)
 	{
 		MeshPassNode* OwnerNode = static_cast<MeshPassNode*>(GetOuter());
-		if (Item == DebugItem::Fragment)
+		if (Item == DebugItem::Pixel)
 		{
 			TArray<MeshBuffers> Meshes = MeshSceneObjectRef->ModelAsset->GetGpuMeshes();
 			return PixelState{
@@ -894,7 +894,7 @@ namespace SH
 	void MeshRenderObject::OnFinalizePixel(const Vector2u& PixelCoord)
 	{
 		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->DebugPixel(PixelCoord, GetInvocationState(DebugItem::Fragment));
+		ShEditor->DebugPixel(PixelCoord, GetInvocationState(DebugItem::Pixel));
 	}
 
 	bool MeshRenderObject::UsesTextureAsShaderInput(GpuTexture* Texture, FString& OutBindingName) const

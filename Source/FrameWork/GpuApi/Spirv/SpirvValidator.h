@@ -49,6 +49,7 @@ namespace FW
 	protected:
 		void PatchGetAccessFunc(SpvType* Type);
 		void PatchAppendErrorFunc();
+		void PatchAppendErrorIfFunc();
 		virtual uint32 GetAppendErrorLocationByteSize() const;
 		virtual void PatchAppendErrorLocation(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvId OriginalValue);
 		uint32 GetPixelAppendErrorLocationByteSize() const;
@@ -58,6 +59,7 @@ namespace FW
 		void PatchVertexAppendErrorLocation(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvId OriginalValue);
 		void PatchComputeAppendErrorLocation(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvId OriginalValue);
 		void AppendError(TArray<TUniquePtr<SpvInstruction>>& InstList);
+		void AppendErrorIf(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvId Condition);
 		SpvId GetAccess(SpvType* VarType, const TArray<SpvId>& Indexes, TArray<TUniquePtr<SpvInstruction>>& InstList);
 		int32 ComputeConstantAccess(SpvType* Type, const TArray<SpvId>& Indexes, int32 StartIdx);
 		void AppendAnyComparisonZeroError(const TFunction<int32()>& OffsetEval, SpvId ResultTypeId, SpvId ValueId, SpvOp Comparison);
@@ -93,6 +95,7 @@ namespace FW
 		SpvId DebuggerBuffer;
 		SpvId HasError;
 		SpvId AppendErrorFuncId;
+		SpvId AppendErrorIfFuncId;
 		SpvPatcher Patcher;
 		TMap<SpvId, SpvId> VarInitializedRange;//VarId->RangeBitmask (single uint or uint[K])
 		TMap<SpvId, int32> VarInitializedRangeUnitCount;//VarId->NumUnits

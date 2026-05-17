@@ -4,15 +4,16 @@
 namespace FW
 {
 	SpvPixelDebuggerVisitor::SpvPixelDebuggerVisitor(SpvPixelDebuggerContext& InPixelContext, GpuShaderLanguage InLanguage, bool InEnableUbsan)
-	: SpvDebuggerVisitor(InPixelContext, InLanguage, InEnableUbsan)
-	{}
+	: SpvDebuggerVisitor(InPixelContext, InLanguage, ShaderType::Pixel, InEnableUbsan)
+	{
+	}
 
 	void SpvPixelDebuggerVisitor::ParseInternal()
 	{
 		PatchFragCoordBuiltIn(Patcher, Context);
 
 		// Patch DebuggerParams uniform buffer before base class processing
-		DebuggerParams = PatchDebuggerParams(Patcher, BindingShaderStage::Pixel);
+		DebuggerParams = PatchDebuggerParams(Patcher, ShaderType::Pixel);
 		
 		// Call base class implementation
 		SpvDebuggerVisitor::ParseInternal();

@@ -22,7 +22,7 @@ namespace FW
 	{
 	public:
 		SpvPixelPreviewerVisitor(SpvPixelPreviewerContext& InContext, GpuShaderLanguage InLanguage)
-			: SpvDebuggerVisitor(InContext, InLanguage, /*EnableUbsan=*/false)
+			: SpvDebuggerVisitor(InContext, InLanguage, ShaderType::Pixel, /*EnableUbsan=*/false)
 		{}
 
 	protected:

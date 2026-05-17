@@ -735,7 +735,7 @@ namespace SH
 		if (GlobalValidation && GetSelectedOutputTexture())
 		{
 			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-			auto Invocation = ShEditor->GetDebuggaleObject()->GetInvocationState(DebugItem::Fragment);
+			auto Invocation = ShEditor->GetDebuggaleObject()->GetInvocationState(DebugItem::Pixel);
 			if (std::holds_alternative<PixelState>(Invocation))
 			{
 				IsValidating = true;

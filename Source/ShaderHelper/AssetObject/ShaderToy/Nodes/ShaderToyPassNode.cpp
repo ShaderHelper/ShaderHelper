@@ -246,7 +246,7 @@ namespace SH
 	void ShaderToyPassNode::OnFinalizePixel(const FW::Vector2u& PixelCoord)
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->DebugPixel(PixelCoord, GetInvocationState(DebugItem::Fragment));
+		ShEditor->DebugPixel(PixelCoord, GetInvocationState(DebugItem::Pixel));
 	}
 
 	ShaderAsset* ShaderToyPassNode::GetShaderAsset(DebugItem Item) const

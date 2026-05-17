@@ -114,7 +114,7 @@ namespace SH
 	ShaderHelperEditor::ShaderHelperEditor(const Vector2f& InWindowSize, ShRenderer* InRenderer)
 		: Renderer(InRenderer)
 		, WindowSize(InWindowSize)
-		, CurrentDebugItem(DebugItem::Fragment)
+		, CurrentDebugItem(DebugItem::Pixel)
 	{
 		CodeEditorCommands::Register();
 		DebuggerViewCommands::Register();
@@ -233,7 +233,7 @@ namespace SH
 			});
 		SAssignNew(FragmentDebuggerViewport, SFragmentDebuggerViewport)
 			.Visibility_Lambda([this]{
-				return (IsDebugging && CurrentDebugItem == DebugItem::Fragment && !bShowingLinePreview) ? EVisibility::Visible : EVisibility::Hidden;
+				return (IsDebugging && CurrentDebugItem == DebugItem::Pixel && !bShowingLinePreview) ? EVisibility::Visible : EVisibility::Hidden;
 			});
 		SAssignNew(VertexDebuggerViewport, SVertexDebuggerViewport)
 			.Visibility_Lambda([this]{
@@ -1379,7 +1379,7 @@ namespace SH
 		DebuggableObject* Debuggable = GetDebuggaleObject();
 		if (!Debuggable)
 		{
-			CurrentDebugItem = DebugItem::Fragment;
+			CurrentDebugItem = DebugItem::Pixel;
 			return;
 		}
 
@@ -1388,7 +1388,7 @@ namespace SH
 		{
 			return;
 		}
-		CurrentDebugItem = SupportedItems.Num() > 0 ? SupportedItems[0] : DebugItem::Fragment;
+		CurrentDebugItem = SupportedItems.Num() > 0 ? SupportedItems[0] : DebugItem::Pixel;
 	}
 
 	void ShaderHelperEditor::ShowLinePreview(const DebuggerLocation& Loc)
@@ -1459,6 +1459,14 @@ namespace SH
 		Debugger.SetShaderAsset(ShaderEditor->GetShaderAsset());
 		Debugger.SetShaderSource(ShaderEditor->GetCurrentShaderSource());
 		return Debugger.ValidatePixel(InState);
+	}
+
+	std::optional<TPair<Vector3u, Vector3u>> ShaderHelperEditor::ValidateCompute(const InvocationState& InState)
+	{
+		SShaderEditorBox* ShaderEditor = GetShaderEditor(GetDebuggaleObject()->GetShaderAsset(CurrentDebugItem));
+		Debugger.SetShaderAsset(ShaderEditor->GetShaderAsset());
+		Debugger.SetShaderSource(ShaderEditor->GetCurrentShaderSource());
+		return Debugger.ValidateCompute(InState);
 	}
 
 	void ShaderHelperEditor::DebugPixel(const Vector2u& InPixelCoord, const InvocationState& InState)
@@ -1569,7 +1577,7 @@ namespace SH
 		}
 		switch (CurrentDebugItem)
 		{
-		case DebugItem::Fragment:
+		case DebugItem::Pixel:
 			return FragmentDebuggerViewport.IsValid() && FragmentDebuggerViewport->FinalizedPixel();
 		case DebugItem::Compute:
 			return ComputeDebuggerViewport.IsValid() && ComputeDebuggerViewport->FinalizedThread();
@@ -1597,11 +1605,14 @@ namespace SH
 			Debuggable->OnStartDebugging(CurrentDebugItem);
 			IsDebugging = true;
 			const auto& CState = std::get<ComputeState>(Debuggable->GetInvocationState(DebugItem::Compute));
-			ComputeDebuggerViewport->SetComputeDebugInfo(CState.ThreadGroupCount, CState.ThreadGroupSize);
-			auto User0 = FSlateApplication::Get().GetUser(0);
-			User0->LockCursor(ComputeDebuggerViewport.ToSharedRef());
+			ComputeDebuggerViewport->SetComputeDebugInfo(CState.ThreadGroupCount, CState.ThreadGroupSize, GlobalValidation);
+			if (!GlobalValidation)
+			{
+				auto User0 = FSlateApplication::Get().GetUser(0);
+				User0->LockCursor(ComputeDebuggerViewport.ToSharedRef());
+			}
 		}
-		else if (CurrentDebugItem == DebugItem::Fragment)
+		else if (CurrentDebugItem == DebugItem::Pixel)
 		{
 			DebugTargetInfo DebugTarget = Debuggable->OnStartDebugging(CurrentDebugItem);
 			DebugTarget.Normalize();
@@ -1650,7 +1661,7 @@ namespace SH
 			for (DebugItem Item : GetDebuggaleObject()->GetSupportedDebugItems())
 			{
 				MenuBuilder.AddMenuEntry(
-					FText::FromString(ANSI_TO_TCHAR(magic_enum::enum_name(Item).data())),
+					FText::FromStringTable(TEXT("Localization"), ANSI_TO_TCHAR(magic_enum::enum_name(Item).data())),
 					FText::GetEmpty(),
 					FSlateIcon(),
 					FUIAction(
@@ -1737,7 +1748,7 @@ namespace SH
 				SNew(SShSplitButton)
 				.ButtonToolTipText(LOCALIZATION("Validation"))
 				.MenuToolTipText_Lambda([this] { return FText::FromString(ANSI_TO_TCHAR(magic_enum::enum_name(CurrentDebugItem).data())); })
-				.IsButtonEnabled_Lambda([this] { return !IsDebugging && GetDebuggaleObject() != nullptr && CurrentDebugItem == DebugItem::Fragment; })
+				.IsButtonEnabled_Lambda([this] { return !IsDebugging && GetDebuggaleObject() != nullptr && (CurrentDebugItem == DebugItem::Pixel || CurrentDebugItem == DebugItem::Compute); })
 				.IsMenuEnabled_Lambda([this] { return GetDebuggaleObject() != nullptr; })
 				.OnClicked_Lambda([this] {
 					StartDebugging(true);

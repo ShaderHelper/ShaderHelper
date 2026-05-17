@@ -316,10 +316,11 @@ namespace FW
 	class FRAMEWORK_API SpvDebuggerVisitor : public SpvVisitor
 	{
 	public:
-		SpvDebuggerVisitor(SpvDebuggerContext& InContext, GpuShaderLanguage InLanguage, bool InEnableUbsan)
+		SpvDebuggerVisitor(SpvDebuggerContext& InContext, GpuShaderLanguage InLanguage, ShaderType InDebuggerStage, bool InEnableUbsan)
 			: Context(InContext)
 			, Language(InLanguage)
 			, EnableUbsan(InEnableUbsan)
+			, DebuggerStage(InDebuggerStage)
 		{
 		}
 		
@@ -396,7 +397,6 @@ namespace FW
 	protected:
 		SpvDebuggerContext& Context;
 		GpuShaderLanguage Language;
-		BindingShaderStage DebuggerStage = BindingShaderStage::Pixel;
 		int32 InstIndex;
 		SpvLexicalScope* CurScope = nullptr;
 		SpvBasicBlock* CurBlock = nullptr;
@@ -405,7 +405,7 @@ namespace FW
 		SpvFunc* CurFunc{};
 
 		bool EnableUbsan;
-		
+		ShaderType DebuggerStage;
 		const TArray<TUniquePtr<SpvInstruction>>* Insts;
 		SpvId DebuggerBuffer;
 		SpvId DebuggerOffset;
@@ -425,8 +425,8 @@ namespace FW
 	FRAMEWORK_API TValueOrError<std::tuple<SpvType*, int32>, FString> GetAccess(const SpvVariable* Var, const TArray<int32>& Indexes);
 	int32 GetDebuggerBufferUVec4BatchCount(int32 UIntValueCount);
 	void StoreDebuggerBufferUVec4Batches(SpvPatcher& Patcher, SpvId DebuggerBuffer, SpvId BaseIndex, const TArray<SpvId>& UIntValues, TArray<TUniquePtr<SpvInstruction>>& InstList);
-	SpvId PatchDebuggerBuffer(SpvPatcher& Patcher, BindingShaderStage Stage);
-	SpvId PatchDebuggerParams(SpvPatcher& Patcher, BindingShaderStage Stage);
+	SpvId PatchDebuggerBuffer(SpvPatcher& Patcher, ShaderType Stage);
+	SpvId PatchDebuggerParams(SpvPatcher& Patcher, ShaderType Stage);
 	SpvId PatchExtSet(SpvPatcher& Patcher, SpvMetaContext& Context, SpvExtSet ExtSet);
 	SpvId PatchFragCoordBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context);
 	SpvId PatchLoadFragCoordXY(SpvPatcher& Patcher, SpvMetaContext& Context, TArray<TUniquePtr<SpvInstruction>>& InstList);

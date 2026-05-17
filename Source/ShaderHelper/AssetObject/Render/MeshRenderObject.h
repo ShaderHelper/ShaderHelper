@@ -52,7 +52,7 @@ namespace SH
 		void PublishRWOutputsToPins();
 
 		// DebuggableObject
-		TArray<DebugItem> GetSupportedDebugItems() const override { return { DebugItem::Vertex, DebugItem::Fragment }; }
+		TArray<DebugItem> GetSupportedDebugItems() const override { return { DebugItem::Vertex, DebugItem::Pixel }; }
 		DebugTargetInfo OnStartDebugging(DebugItem Item) override;
 		void OnEndDebuggging() override { bDebugging = false; }
 		ShaderAsset* GetShaderAsset(DebugItem Item) const override;
