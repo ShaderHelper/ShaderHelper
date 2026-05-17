@@ -741,7 +741,7 @@ namespace SH
 	TRefCountPtr<GpuTexture> MeshRenderObject::BuildCoverageMask()
 	{
 		const MeshPassNode* OwnerNode = static_cast<MeshPassNode*>(GetOuter());
-		if (!MeshSceneObjectRef.IsValid() || !MeshSceneObjectRef->ModelAsset)
+		if (!MeshSceneObjectRef.IsValid())
 		{
 			return nullptr;
 		}
@@ -762,8 +762,17 @@ namespace SH
 
 		TRefCountPtr<GpuShader> MaskPs = GetMaskPs();
 
-		Model* ModelAsset = MeshSceneObjectRef->ModelAsset.Get();
-		const TArray<MeshBuffers>& GpuMeshes = ModelAsset->GetGpuMeshes();
+		MeshSceneObject* MSO = MeshSceneObjectRef.Get();
+		TArray<MeshBuffers> GpuMeshes;
+		uint32 VertexCount = 0;
+		if (Model* ModelAsset = MSO->ModelAsset.Get())
+		{
+			GpuMeshes = ModelAsset->GetGpuMeshes();
+		}
+		else
+		{
+			VertexCount = MSO->VertexCount;
+		}
 
 		GpuTexture* ReferenceTexture = nullptr;
 		for (const TRefCountPtr<GpuTexture>& ColorRT : OwnerNode->GetOutputColorRTs())
@@ -808,6 +817,18 @@ namespace SH
 		TArray<GpuBindGroup*> MaskBGArray;
 		for (const auto& [_, BG] : BindGroups) MaskBGArray.Add(BG.GetReference());
 
+		GpuRenderPipelineStateDesc MaskPipelineDesc{
+			.Vs = MaterialVs,
+			.Ps = MaskPs.GetReference(),
+			.Targets = {{ .TargetFormat = MaskTex->GetFormat() }},
+			.BindGroupLayouts = MaskLayoutArray,
+			.VertexLayout = { BuildMaterialMeshVertexLayout(*MaterialAsset) },
+			.RasterizerState = { MaterialAsset->FillMode, MaterialAsset->CullMode },
+			.Primitive = MaterialAsset->Primitive,
+		};
+
+		TRefCountPtr<GpuRenderPipelineState> MaskPipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(MaskPipelineDesc);
+
 		RenderGraph RG;
 		for (int32 MeshIndex = 0; MeshIndex < GpuMeshes.Num(); ++MeshIndex)
 		{
@@ -819,18 +840,6 @@ namespace SH
 				RenderTargetStoreAction::Store
 			});
 
-			GpuRenderPipelineStateDesc MaskPipelineDesc{
-				.Vs = MaterialVs,
-				.Ps = MaskPs.GetReference(),
-				.Targets = {{ .TargetFormat = MaskTex->GetFormat() }},
-				.BindGroupLayouts = MaskLayoutArray,
-				.VertexLayout = { BuildMaterialMeshVertexLayout(*MaterialAsset) },
-				.RasterizerState = { MaterialAsset->FillMode, MaterialAsset->CullMode },
-				.Primitive = MaterialAsset->Primitive,
-			};
-
-			TRefCountPtr<GpuRenderPipelineState> MaskPipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(MaskPipelineDesc);
-
 			RG.AddRenderPass(TEXT("MeshRenderObjectDebugMask"), MoveTemp(PassDesc),
 				[MaskPipeline, MaskBGArray, VB = Buffers.VertexBuffer, IB = Buffers.IndexBuffer, IdxCount = Buffers.IndexCount]
 				(GpuRenderPassRecorder* PassRecorder) {
@@ -839,6 +848,23 @@ namespace SH
 					PassRecorder->SetVertexBuffer(0, VB);
 					PassRecorder->SetIndexBuffer(IB);
 					PassRecorder->DrawIndexed(0, IdxCount);
+				}
+			);
+		}
+		if (VertexCount > 0)
+		{
+			GpuRenderPassDesc PassDesc;
+			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{
+				MaskTex->GetDefaultView(),
+				RenderTargetLoadAction::Clear,
+				RenderTargetStoreAction::Store
+			});
+
+			RG.AddRenderPass(TEXT("MeshRenderObjectDebugMask"), MoveTemp(PassDesc),
+				[MaskPipeline, MaskBGArray, VertexCount](GpuRenderPassRecorder* PassRecorder) {
+					PassRecorder->SetBindGroups(MaskBGArray);
+					PassRecorder->SetRenderPipelineState(MaskPipeline);
+					PassRecorder->DrawPrimitive(0, VertexCount, 0, 1);
 				}
 			);
 		}
@@ -873,17 +899,31 @@ namespace SH
 		MeshPassNode* OwnerNode = static_cast<MeshPassNode*>(GetOuter());
 		if (Item == DebugItem::Pixel)
 		{
-			TArray<MeshBuffers> Meshes = MeshSceneObjectRef->ModelAsset->GetGpuMeshes();
+			MeshSceneObject* MSO = MeshSceneObjectRef.Get();
+			TArray<MeshBuffers> Meshes;
+			uint32 VertexCount = 0;
+			if (Model* ModelAsset = MSO->ModelAsset.Get())
+			{
+				Meshes = ModelAsset->GetGpuMeshes();
+			}
+			else
+			{
+				VertexCount = MSO->VertexCount;
+			}
 			return PixelState{
 				.ViewPortDesc = OwnerNode->GetOutputViewPortDesc(),
 				.Builders = BuildDebugBindingBuilders(),
 				.PipelineDesc = PipelineDesc,
-				.DrawFunction = [Meshes](GpuRenderPassRecorder* Recorder) {
-					for (const MeshBuffers& MB : Meshes)
+				.DrawFunction = [Meshes, VertexCount](GpuRenderPassRecorder* Recorder) {
+					for (const MeshBuffers& MeshBuffer : Meshes)
 					{
-						Recorder->SetVertexBuffer(0, MB.VertexBuffer);
-						Recorder->SetIndexBuffer(MB.IndexBuffer);
-						Recorder->DrawIndexed(0, MB.IndexCount);
+						Recorder->SetVertexBuffer(0, MeshBuffer.VertexBuffer);
+						Recorder->SetIndexBuffer(MeshBuffer.IndexBuffer);
+						Recorder->DrawIndexed(0, MeshBuffer.IndexCount);
+					}
+					if (VertexCount > 0)
+					{
+						Recorder->DrawPrimitive(0, VertexCount, 0, 1);
 					}
 				}
 			};
