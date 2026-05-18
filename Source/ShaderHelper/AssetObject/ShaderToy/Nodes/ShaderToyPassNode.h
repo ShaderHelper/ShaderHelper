@@ -7,6 +7,11 @@
 #include "Debugger/DebuggableObject.h"
 #include "AssetObject/ShaderToy/ShaderToy.h"
 
+namespace FW
+{
+	class RenderGraph;
+}
+
 namespace SH
 {
     class ShaderToyPassNodeOp : public ShPropertyOp
@@ -78,6 +83,8 @@ namespace SH
     private:
 		FW::GpuBindGroupBuilder GetBuiltInBindGroupBuiler(FW::GpuBindGroupLayout* Layout);
 		TRefCountPtr<FW::GpuBindGroup> GetBuiltInBindGroup(FW::GpuBindGroupLayout* Layout);
+		bool BuildAssertHighlightPs();
+		void AddAssertHighlightPass(FW::RenderGraph& RG, TRefCountPtr<FW::GpuBindGroup> BuiltInBindGroup, TRefCountPtr<FW::GpuBindGroup> PassBindGroup);
 
 		void InitShaderAsset();
 		void RebuildCustomBindGroup();
@@ -114,6 +121,8 @@ namespace SH
 		//Debugger
 		FW::GpuRenderPipelineStateDesc PipelineDesc;
 		bool AssertError{};
+		TRefCountPtr<FW::GpuShader> AssertHighlightPs;
+		TRefCountPtr<FW::GpuTexture> AssertHighlightDebugTarget;
 
 		TRefCountPtr<FW::GpuQuerySet> TimestampQuerySet;
 	};

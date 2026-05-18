@@ -20,6 +20,10 @@ namespace SH
 		FW::Vector3u GetLocalInvocationId() const { return LocalInvocationId; }
 		void SetFinalizedThread(const FW::Vector3u& InWorkGroupId, const FW::Vector3u& InLocalInvocationId);
 
+		// Populate the set of (workgroup -> failing local thread ids) collected by an
+		// assert-highlight dispatch. Pink cells are shown for the current workgroup/z slice.
+		void SetAssertedThreads(TMap<FW::Vector3u, TSet<FW::Vector3u>> InAsserted);
+
 	private:
 		void OnPickThread(const FW::Vector3u& InLocalId);
 		void UpdateThreadCellStyles();
@@ -38,5 +42,6 @@ namespace SH
 		TSharedPtr<class SScrollBox> VScrollBox;
 		TArray<TSharedPtr<FString>> ZSliceOptions;
 		TArray<TSharedPtr<SButton>> ThreadCellButtons; // y * ThreadGroupSize.x + x
+		TMap<FW::Vector3u, TSet<FW::Vector3u>> AssertedThreads;
 	};
 }

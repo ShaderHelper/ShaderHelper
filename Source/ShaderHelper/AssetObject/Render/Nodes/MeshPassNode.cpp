@@ -578,6 +578,13 @@ namespace SH
 		GpuRenderPassDesc PassDesc = MakeRenderPassDesc(DebugColorRTs, DebugDepthRT, InputState.ColorInputConnected, InputState.bHasDepthInput);
 		const Vector2f ViewportSize((float)CachedRTSize.X, (float)CachedRTSize.Y);
 		AddMeshDrawPass(RG, TEXT("MeshPassDebugTarget"), MoveTemp(PassDesc), MROsToDraw, ViewportSize);
+		{
+			const Camera* CameraPtr = DebugFrameState.Camera.IsSet() ? &DebugFrameState.Camera.GetValue() : nullptr;
+			for (const ObjectPtr<MeshRenderObject>& MRO : MROsToDraw)
+			{
+				MRO->AddAssertHighlightPass(RG, DebugColorRTs, DebugDepthRT, ViewportSize, CameraPtr);
+			}
+		}
 
 		RG.Execute();
 		for (const ObjectPtr<MeshRenderObject>& MRO : MROsToDraw)
@@ -772,7 +779,8 @@ namespace SH
 		for (const auto& MRO : MeshRenderObjects)
 		{
 			const FString LogPrefix = FString::Printf(TEXT("%s:%s"), *ObjectName.ToString(), *MRO->ObjectName.ToString());
-			bAssertError |= MRO->FlushPrintBufferLogs(LogPrefix);
+			MRO->bHadAssertError = MRO->FlushPrintBufferLogs(LogPrefix);
+			bAssertError |= MRO->bHadAssertError;
 		}
 
 		if (PreviewRT.IsValid() && PreviewSourceTex.IsValid())

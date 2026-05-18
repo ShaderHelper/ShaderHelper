@@ -61,6 +61,12 @@ namespace SH
 
 		TRefCountPtr<FW::GpuTexture> BuildCoverageMask();
 
+		// Re-renders the mesh with a SPIR-V-patched PS that writes pink (1,0,1,1) wherever
+		// GPrivate_AssertResult != 1. Skipped when bDrawMaterialError or when no assert was
+		// reported on the previous frame.
+		void AddAssertHighlightPass(FW::RenderGraph& RG, const TArray<TRefCountPtr<FW::GpuTexture>>& ColorRTs, TRefCountPtr<FW::GpuTexture> DepthRT, const FW::Vector2f& ViewportSize, const FW::Camera* Cam);
+		bool bHadAssertError = false;
+
 	public:
 		FW::ObserverObjectPtr<MeshSceneObject> MeshSceneObjectRef;
 		FW::AssetPtr<Material> MaterialAsset;
@@ -77,6 +83,8 @@ namespace SH
 		void UpdateMaterialDrawState(const FMatrix44f& ModelMatrix, const FMatrix44f& ViewMat, const FMatrix44f& ProjMat, const FW::Vector2f& ViewportSize, const FW::Vector2f& MousePos, float Time, const FW::Vector3f& CameraPos, const FW::Vector3f& CameraDir);
 		TArray<BindingBuilder> BuildDebugBindingBuilders() const;
 		FW::GpuTexture* EnsureRWOutputTexture(const FString& Key, FW::BindingType BindingTypeValue, FW::GpuTexture* SrcTex);
+		// Returns false if the material has no PS source or compilation fails.
+		bool BuildAssertHighlightPs();
 
 	private:
 		TMap<int32, TRefCountPtr<FW::GpuBindGroupLayout>> BindGroupLayouts;
@@ -92,5 +100,9 @@ namespace SH
 		Material* BoundMaterial = nullptr;
 		bool bDrawMaterialError = false;
 		bool bDebugging = false;
+
+		// Assert-highlight PS that overlays pink on asserting fragments.
+		// Reuses the original Pipeline's BindGroups (no extra resources are injected).
+		TRefCountPtr<FW::GpuShader> AssertHighlightPs;
 	};
 }

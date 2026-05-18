@@ -6,6 +6,8 @@
 #include "AssetObject/Render/MeshSceneObject.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "GpuApi/GpuRhi.h"
+#include "GpuApi/Spirv/SpirvAssertHighlight.h"
+#include "GpuApi/Spirv/SpirvParser.h"
 #include "Renderer/MaterialRenderCommon.h"
 #include "Renderer/RenderGraph.h"
 #include "RenderResource/Mesh.h"
@@ -18,6 +20,8 @@
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 
 #include <Widgets/Input/SComboButton.h>
+
+#include <stdexcept>
 
 using namespace FW;
 
@@ -223,6 +227,9 @@ namespace SH
 		UniformBuffers.Empty();
 		RWOutputTextures.Empty();
 		bDrawMaterialError = false;
+
+		AssertHighlightPs.SafeRelease();
+		bHadAssertError = false;
 	}
 
 	void MeshRenderObject::Serialize(FArchive& Ar)
@@ -1070,6 +1077,162 @@ namespace SH
 		else if (MSO->VertexCount > 0)
 		{
 			Recorder->DrawPrimitive(0, MSO->VertexCount, 0, 1);
+		}
+	}
+
+	bool MeshRenderObject::BuildAssertHighlightPs()
+	{
+		if (!MaterialAsset || !MaterialAsset->PixelShaderAsset)
+		{
+			return false;
+		}
+
+		Shader* PsAsset = MaterialAsset->PixelShaderAsset.Get();
+		ShaderDesc Desc = PsAsset->GetShaderDesc(PsAsset->EditorContent, ShaderType::Pixel);
+
+		TRefCountPtr<GpuShader> TempPs = GGpuRhi->CreateShaderFromSource(Desc.SourceDesc);
+		TempPs->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
+		TArray<FString> SpvExtraArgs = Desc.ExtraArgs;
+		SpvExtraArgs.Add(TEXT("-D"));
+		SpvExtraArgs.Add(TEXT("GPrivate_ENABLE_PRINT=0"));
+		FString ErrorInfo, WarnInfo;
+		if (!GGpuRhi->CompileShader(TempPs, ErrorInfo, WarnInfo, SpvExtraArgs))
+		{
+			return false;
+		}
+
+		SpirvParser Parser;
+		Parser.Parse(TempPs->SpvCode);
+		SpvMetaContext HlContext;
+		SpvMetaVisitor MetaVisitor{ HlContext };
+		Parser.Accept(&MetaVisitor);
+
+		TArray<SpvBinding> RuntimeBindings;
+		if (GpuShader* RuntimePs = PsAsset->GetCompiledShader(ShaderType::Pixel))
+		{
+			for (const GpuShaderLayoutBinding& Binding : RuntimePs->GetLayout())
+			{
+				RuntimeBindings.Add({
+					.Name = Binding.Name,
+					.DescriptorSet = Binding.Group,
+					.Binding = Binding.Slot,
+					.Type = Binding.Type,
+				});
+			}
+		}
+
+		SpvAssertHighlightVisitor HlVisitor{ HlContext, ShaderType::Pixel, MoveTemp(RuntimeBindings) };
+		Parser.Accept(&HlVisitor);
+
+		TArray<uint32> PatchedSpv = HlVisitor.GetPatcher().GetSpv();
+		FString PatchedAsm = HlVisitor.GetPatcher().GetAsm();
+		const FString DumpName = PsAsset->GetShaderName() + TEXT("_AssertHighlight.spvasm");
+		FFileHelper::SaveStringToFile(PatchedAsm, *(PathHelper::SavedShaderDir() / PsAsset->GetShaderName() / DumpName));
+
+		GpuShaderSourceDesc PatchedDesc = Desc.SourceDesc;
+		PatchedDesc.Source = PatchedAsm;
+		TRefCountPtr<GpuShader> NewAssertHighlightPs = GGpuRhi->CreateShaderFromSource(PatchedDesc);
+		NewAssertHighlightPs->SpvCode = MoveTemp(PatchedSpv);
+		NewAssertHighlightPs->CompilerFlag |= GpuShaderCompilerFlag::CompileFromSpvCode;
+		if (!GGpuRhi->CompileShader(NewAssertHighlightPs, ErrorInfo, WarnInfo, Desc.ExtraArgs))
+		{
+			SH_LOG(LogGraph, Error, TEXT("AssertHighlight: patched PS compile failed: %s"), *ErrorInfo);
+			return false;
+		}
+
+		AssertHighlightPs = MoveTemp(NewAssertHighlightPs);
+		return true;
+	}
+
+	void MeshRenderObject::AddAssertHighlightPass(RenderGraph& RG, const TArray<TRefCountPtr<GpuTexture>>& ColorRTs, TRefCountPtr<GpuTexture> DepthRT, const Vector2f& ViewportSize, const Camera* Cam)
+	{
+		if (bDrawMaterialError || !bHadAssertError) return;
+		if (!MaterialAsset || !MeshSceneObjectRef.IsValid()) return;
+		if (!Pipeline.IsValid()) return;
+		if (!BuildAssertHighlightPs()) return;
+
+		MeshSceneObject* MSO = MeshSceneObjectRef.Get();
+
+		const FMatrix44f WorldMat = MSO->GetWorldMatrix();
+		const FMatrix44f ViewMat = Cam ? Cam->GetViewMatrix() : FMatrix44f::Identity;
+		const FMatrix44f ProjMat = Cam ? Cam->GetProjectionMatrix() : FMatrix44f::Identity;
+		const Vector3f CameraPos = Cam ? Cam->Position : Vector3f(0, 0, 0);
+		const Vector3f CameraDir = Cam ? GetCameraForwardDir(*Cam) : Vector3f(0, 0, 0);
+		const float Time = TSingleton<ShProjectManager>::Get().GetProject()->TimelineCurTime;
+
+		UpdateMaterialDrawState(WorldMat, ViewMat, ProjMat, ViewportSize, Vector2f(0, 0), Time, CameraPos, CameraDir);
+
+		GpuRenderPipelineStateDesc HlDesc = PipelineDesc;
+		HlDesc.Ps = AssertHighlightPs.GetReference();
+		if (HlDesc.DepthStencilState.IsSet())
+		{
+			HlDesc.DepthStencilState->DepthWriteEnable = false;
+			HlDesc.DepthStencilState->DepthCompare = CompareMode::LessEqual;
+		}
+
+		TRefCountPtr<GpuRenderPipelineState> HlPipeline;
+		try
+		{
+			HlPipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(HlDesc);
+		}
+		catch (const std::runtime_error& e)
+		{
+			SH_LOG(LogShader, Error, TEXT("AssertHighlight: PSO create failed: %s"), ANSI_TO_TCHAR(e.what()));
+			return;
+		}
+
+		GpuRenderPassDesc PassDesc;
+		for (const TRefCountPtr<GpuTexture>& Rt : ColorRTs)
+		{
+			if (!Rt) continue;
+			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{
+				Rt->GetDefaultView(),
+				RenderTargetLoadAction::Load,
+				RenderTargetStoreAction::Store
+			});
+		}
+		if (DepthRT.IsValid())
+		{
+			PassDesc.DepthStencilTarget = GpuDepthStencilTargetInfo{
+				DepthRT->GetDefaultView(),
+				RenderTargetLoadAction::Load,
+				RenderTargetStoreAction::Store,
+				1.0f
+			};
+		}
+
+		TArray<GpuBindGroup*> BGArray;
+		for (auto& [_, BG] : BindGroups) BGArray.Add(BG.GetReference());
+
+		ObserverObjectPtr<MeshSceneObject> MsoObs = MeshSceneObjectRef;
+		auto& Pass = RG.AddRenderPass(TEXT("MeshRenderObjectAssertHighlight"), MoveTemp(PassDesc),
+			[HlPipeline, BGArray, MsoObs](GpuRenderPassRecorder* Recorder) {
+				if (!MsoObs.IsValid()) return;
+				MeshSceneObject* InMso = MsoObs.Get();
+				Recorder->SetRenderPipelineState(HlPipeline);
+				Recorder->SetBindGroups(BGArray);
+				if (Model* MdlAsset = InMso->ModelAsset.Get())
+				{
+					const TArray<MeshBuffers>& GpuMeshes = MdlAsset->GetGpuMeshes();
+					for (const MeshBuffers& MB : GpuMeshes)
+					{
+						Recorder->SetVertexBuffer(0, MB.VertexBuffer);
+						Recorder->SetIndexBuffer(MB.IndexBuffer);
+						Recorder->DrawIndexed(0, MB.IndexCount);
+					}
+				}
+				else if (InMso->VertexCount > 0)
+				{
+					Recorder->DrawPrimitive(0, InMso->VertexCount, 0, 1);
+				}
+			}
+		);
+
+		TSet<GpuTexture*> ConnectedOverrideTextures;
+		CollectConnectedOverrideTextures(ConnectedOverrideTextures);
+		for (GpuTexture* Texture : ConnectedOverrideTextures)
+		{
+			Pass.Read(Texture);
 		}
 	}
 }

@@ -433,6 +433,7 @@ namespace FW
 	SpvId PatchWorkgroupIdBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context);
 	SpvId PatchLocalInvocationIdBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context);
 	SpvId PatchLocalInvocationIndexBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context);
+	SpvId PatchGlobalInvocationIdBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context);
 	int32 GetInstIndex(const TArray<TUniquePtr<SpvInstruction>>* Insts, SpvId Inst);
 
 	// For each OpLoad of a composite type, analyze which init-units are truly consumed

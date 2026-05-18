@@ -91,6 +91,7 @@ namespace SH
 		SDebuggerVariableView* GetDebuggerGlobalVariableView() const { return DebuggerGlobalVariableView.Get(); }
 		SDebuggerCallStackView* GetDebuggerCallStackView() const { return DebuggerCallStackView.Get(); }
 		SDebuggerWatchView* GetDebuggerWatchView() const { return DebuggerWatchView.Get(); }
+		SComputeDebuggerViewport* GetComputeDebuggerViewport() const { return ComputeDebuggerViewport.Get(); }
 		TSharedPtr<SWindow> GetShaderEditorTipWindow() const { return ShaderEditorTipWindow; }
 		FW::SGraphPanel* GetGraphPanel() const { return GraphPanel.Get(); }
 		FW::SAssetBrowser* GetAssetBrowser() const { return AssetBrowser.Get(); }

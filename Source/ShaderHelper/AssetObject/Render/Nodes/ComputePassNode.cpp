@@ -11,12 +11,17 @@
 #include "UI/Widgets/Property/PropertyData/PropertyItem.h"
 #include "UI/Widgets/Property/PropertyData/PropertyAssetItem.h"
 #include "UI/Widgets/MessageDialog/SMessageDialog.h"
+#include "UI/Widgets/Debugger/SComputeDebuggerViewport.h"
 #include "GpuApi/GpuRhi.h"
 #include "GpuApi/GpuResourceHelper.h"
+#include "GpuApi/Spirv/SpirvParser.h"
+#include "GpuApi/Spirv/SpirvAssertHighlight.h"
 #include "ProjectManager/ShProjectManager.h"
 #include "RenderResource/RenderPass/BlitPass.h"
 #include "AssetManager/AssetManager.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
+
+#include <stdexcept>
 
 using namespace FW;
 
@@ -530,9 +535,9 @@ namespace SH
 		{
 			LayoutPtrs.Add(BindGroupLayouts[GroupSlot].GetReference());
 		}
-		GpuComputePipelineStateDesc PipelineDesc{ .Cs = Cs, .BindGroupLayouts = LayoutPtrs };
-		CachedPipelineDesc = PipelineDesc;
-		Pipeline = GpuPsoCacheManager::Get().CreateComputePipelineState(PipelineDesc);
+
+		CachedPipelineDesc = GpuComputePipelineStateDesc{ .Cs = Cs, .BindGroupLayouts = LayoutPtrs };
+		Pipeline = GpuPsoCacheManager::Get().CreateComputePipelineState(CachedPipelineDesc);
 		if (!Pipeline)
 		{
 			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" failed to create compute pipeline."), *ObjectName.ToString());
@@ -562,62 +567,18 @@ namespace SH
 			TimestampWrites
 		).Write(GetPrintBuffer()->GetResource());
 
-		for (const GpuShaderLayoutBinding& Binding : Cs->GetLayout())
-		{
-			switch (Binding.Type)
-			{
-			case BindingType::Texture:
-			case BindingType::TextureCube:
-			case BindingType::Texture3D:
-			case BindingType::CombinedTextureSampler:
-			case BindingType::CombinedTextureCubeSampler:
-			case BindingType::CombinedTexture3DSampler:
-			{
-				if (GpuTexture* Tex = ResolveBindingTexture(Binding))
-				{
-					Pass.Read(Tex);
-				}
-				break;
-			}
-			case BindingType::RWTexture:
-			case BindingType::RWTexture3D:
-			{
-				const TRefCountPtr<GpuTexture>* OutTexPtr = RWOutputTextures.Find(Binding.Name);
-				GpuTexture* OutTex = (OutTexPtr && OutTexPtr->IsValid()) ? OutTexPtr->GetReference() : nullptr;
-				if (!OutTex)
-				{
-					break;
-				}
-				Pass.Write(OutTex);
-
-				const ShaderOverrideSlot* MatchingSlot = FindOverrideSlot(OverrideSlots, ShaderOverrideKey{ Binding.Name, TEXT(""), BindingShaderStage::Compute });
-				if (MatchingSlot)
-				{
-					GraphPin* OutputPin = MatchingSlot->OutputPin.IsValid() ? MatchingSlot->OutputPin.Get() : nullptr;
-					if (auto* TexPin = DynamicCast<GpuTexturePin>(OutputPin))
-					{
-						TexPin->SetValue(OutTex);
-					}
-					else if (auto* Tex3DPin = DynamicCast<GpuTexture3DPin>(OutputPin))
-					{
-						Tex3DPin->SetValue(OutTex);
-					}
-				}
-				break;
-			}
-			default:
-				break;
-			}
-		}
+		AddComputePassResourceAccesses(Pass, Cs, true);
 
 		Ctx.RG->Execute();
 
 		const bool bAssertError = FlushPrintBufferLogs(ObjectName.ToString());
 		if (bAssertError)
 		{
+			const uint32 AssertHighlightThreadCount = AddAssertHighlightPass(*Ctx.RG, Cs, SortedGroupSlots, LayoutPtrs);
+			Ctx.RG->Execute();
+			ReadbackAssertedThreads(AssertHighlightThreadCount);
 			return { true, true };
 		}
-
 		return {};
 	}
 
@@ -662,6 +623,62 @@ namespace SH
 
 		PrinterBuffer->Clear();
 		return bAssertFailed;
+	}
+
+	void ComputePassNode::AddComputePassResourceAccesses(RGComputePass& Pass, GpuShader* Cs, bool bUpdateOutputPins)
+	{
+		for (const GpuShaderLayoutBinding& Binding : Cs->GetLayout())
+		{
+			switch (Binding.Type)
+			{
+			case BindingType::Texture:
+			case BindingType::TextureCube:
+			case BindingType::Texture3D:
+			case BindingType::CombinedTextureSampler:
+			case BindingType::CombinedTextureCubeSampler:
+			case BindingType::CombinedTexture3DSampler:
+			{
+				if (GpuTexture* Tex = ResolveBindingTexture(Binding))
+				{
+					Pass.Read(Tex);
+				}
+				break;
+			}
+			case BindingType::RWTexture:
+			case BindingType::RWTexture3D:
+			{
+				const TRefCountPtr<GpuTexture>* OutTexPtr = RWOutputTextures.Find(Binding.Name);
+				GpuTexture* OutTex = (OutTexPtr && OutTexPtr->IsValid()) ? OutTexPtr->GetReference() : nullptr;
+				if (!OutTex)
+				{
+					break;
+				}
+
+				Pass.Write(OutTex);
+				if (!bUpdateOutputPins)
+				{
+					break;
+				}
+
+				const ShaderOverrideSlot* MatchingSlot = FindOverrideSlot(OverrideSlots, ShaderOverrideKey{ Binding.Name, TEXT(""), BindingShaderStage::Compute });
+				if (MatchingSlot)
+				{
+					GraphPin* OutputPin = MatchingSlot->OutputPin.IsValid() ? MatchingSlot->OutputPin.Get() : nullptr;
+					if (auto* TexPin = DynamicCast<GpuTexturePin>(OutputPin))
+					{
+						TexPin->SetValue(OutTex);
+					}
+					else if (auto* Tex3DPin = DynamicCast<GpuTexture3DPin>(OutputPin))
+					{
+						Tex3DPin->SetValue(OutTex);
+					}
+				}
+				break;
+			}
+			default:
+				break;
+			}
+		}
 	}
 
 	TArray<BindingBuilder> ComputePassNode::BuildDebugBindingBuilders() const
@@ -718,6 +735,13 @@ namespace SH
 		return {};
 	}
 
+	void ComputePassNode::OnEndDebuggging()
+	{
+		bDebugging = false;
+		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->GetComputeDebuggerViewport()->SetAssertedThreads({});
+	}
+
 	InvocationState ComputePassNode::GetInvocationState(DebugItem Item)
 	{
 		return ComputeState{
@@ -733,4 +757,168 @@ namespace SH
 		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		ShEditor->DebugCompute(InWorkGroupId, InLocalInvocationId, GetInvocationState(DebugItem::Compute));
 	}
+
+	uint32 ComputePassNode::AddAssertHighlightPass(RenderGraph& RG, GpuShader* Cs, const TArray<int32>& SortedGroupSlots, const TArray<GpuBindGroupLayout*>& BaseLayoutPtrs)
+	{
+		const Vector3u WGSize = Cs->GetThreadGroupSize();
+		const uint32 TotalThreads = ThreadGroupCount.x * ThreadGroupCount.y * ThreadGroupCount.z
+			* WGSize.x * WGSize.y * WGSize.z;
+		if (TotalThreads == 0 || !BuildAssertHighlightCs())
+		{
+			return 0;
+		}
+
+		const uint32 ThreadBufferByteSize = (TotalThreads + 1u) * sizeof(Vector4u);
+		TArray<uint8> ThreadBufferZeros;
+		ThreadBufferZeros.SetNumZeroed(ThreadBufferByteSize);
+		AssertThreadBuffer = GGpuRhi->CreateBuffer({
+			.ByteSize = ThreadBufferByteSize,
+			.Usage = GpuBufferUsage::RWRaw,
+			.InitialData = ThreadBufferZeros,
+		});
+
+		GpuBindGroupLayoutDesc AssertLayoutDesc;
+		AssertLayoutDesc.GroupNumber = AssertHighlightBindGroupSlot;
+		AssertLayoutDesc.Layouts.Add(
+			BindingSlot{ AssertThreadBufferBindingSlot, BindingType::RWRawBuffer, BindingShaderStage::Compute },
+			{ BindingType::RWRawBuffer, BindingShaderStage::Compute });
+		TRefCountPtr<GpuBindGroupLayout> AssertThreadBindGroupLayout = GGpuRhi->CreateBindGroupLayout(AssertLayoutDesc);
+
+		GpuBindGroupDesc AssertGroupDesc;
+		AssertGroupDesc.Layout = AssertThreadBindGroupLayout;
+		AssertGroupDesc.Resources.Add(
+			BindingSlot{ AssertThreadBufferBindingSlot, BindingType::RWRawBuffer, BindingShaderStage::Compute },
+			{ AUX::StaticCastRefCountPtr<GpuResource>(AssertThreadBuffer) });
+		TRefCountPtr<GpuBindGroup> AssertThreadBindGroup = GGpuRhi->CreateBindGroup(AssertGroupDesc);
+
+		TArray<GpuBindGroupLayout*> LayoutPtrs = BaseLayoutPtrs;
+		LayoutPtrs.Add(AssertThreadBindGroupLayout.GetReference());
+		GpuComputePipelineStateDesc PipelineDesc{ .Cs = AssertHighlightCs.GetReference(), .BindGroupLayouts = LayoutPtrs };
+		TRefCountPtr<GpuComputePipelineState> AssertHighlightPipeline;
+		try
+		{
+			AssertHighlightPipeline = GpuPsoCacheManager::Get().CreateComputePipelineState(PipelineDesc);
+		}
+		catch (const std::runtime_error& e)
+		{
+			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" assert-highlight compute pipeline failed: %s"), *ObjectName.ToString(), ANSI_TO_TCHAR(e.what()));
+			return 0;
+		}
+
+		TArray<TRefCountPtr<GpuBindGroup>> GroupRefs;
+		for (int32 GroupSlot : SortedGroupSlots)
+		{
+			GroupRefs.Add(BindGroups[GroupSlot]);
+		}
+		GroupRefs.Add(AssertThreadBindGroup);
+
+		auto& Pass = RG.AddComputePass(ObjectName.ToString() + TEXT("AssertHighlight"),
+			[this, GroupRefs, AssertHighlightPipeline](GpuComputePassRecorder* PassRecorder) {
+				TArray<GpuBindGroup*> Groups;
+				for (const auto& G : GroupRefs)
+				{
+					Groups.Add(G.GetReference());
+				}
+				PassRecorder->SetBindGroups(Groups);
+				PassRecorder->SetComputePipelineState(AssertHighlightPipeline.GetReference());
+				PassRecorder->Dispatch(ThreadGroupCount.x, ThreadGroupCount.y, ThreadGroupCount.z);
+			}
+		).Write(AssertThreadBuffer.GetReference());
+
+		AddComputePassResourceAccesses(Pass, Cs, false);
+
+		return TotalThreads;
+	}
+
+	bool ComputePassNode::BuildAssertHighlightCs()
+	{
+		if (!ShaderAsset || !ShaderAsset->IsStageEnabled(ShaderType::Compute))
+		{
+			return false;
+		}
+		Shader* CsAsset = ShaderAsset.Get();
+		ShaderDesc Desc = CsAsset->GetShaderDesc(CsAsset->EditorContent, ShaderType::Compute);
+
+		TRefCountPtr<GpuShader> TempCs = GGpuRhi->CreateShaderFromSource(Desc.SourceDesc);
+		TempCs->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
+		TArray<FString> SpvExtraArgs = Desc.ExtraArgs;
+		SpvExtraArgs.Add(TEXT("-D"));
+		SpvExtraArgs.Add(TEXT("GPrivate_ENABLE_PRINT=0"));
+		FString ErrorInfo, WarnInfo;
+		if (!GGpuRhi->CompileShader(TempCs, ErrorInfo, WarnInfo, SpvExtraArgs))
+		{
+			return false;
+		}
+
+		SpirvParser Parser;
+		Parser.Parse(TempCs->SpvCode);
+		SpvMetaContext HlContext;
+		SpvMetaVisitor MetaVisitor{ HlContext };
+		Parser.Accept(&MetaVisitor);
+
+		TArray<SpvBinding> RuntimeBindings;
+		if (GpuShader* RuntimeCs = CsAsset->GetCompiledShader(ShaderType::Compute))
+		{
+			for (const GpuShaderLayoutBinding& Binding : RuntimeCs->GetLayout())
+			{
+				RuntimeBindings.Add({
+					.Name = Binding.Name,
+					.DescriptorSet = Binding.Group,
+					.Binding = Binding.Slot,
+					.Type = Binding.Type,
+				});
+			}
+		}
+
+		SpvAssertHighlightVisitor HlVisitor{ HlContext, ShaderType::Compute, MoveTemp(RuntimeBindings) };
+		Parser.Accept(&HlVisitor);
+
+		TArray<uint32> PatchedSpv = HlVisitor.GetPatcher().GetSpv();
+		FString PatchedAsm = HlVisitor.GetPatcher().GetAsm();
+		const FString DumpName = CsAsset->GetShaderName() + TEXT("_AssertHighlight.spvasm");
+		FFileHelper::SaveStringToFile(PatchedAsm, *(PathHelper::SavedShaderDir() / CsAsset->GetShaderName() / DumpName));
+
+		GpuShaderSourceDesc PatchedDesc = Desc.SourceDesc;
+		PatchedDesc.Source = PatchedAsm;
+		TRefCountPtr<GpuShader> NewAssertHighlightCs = GGpuRhi->CreateShaderFromSource(PatchedDesc);
+		NewAssertHighlightCs->SpvCode = MoveTemp(PatchedSpv);
+		NewAssertHighlightCs->CompilerFlag |= GpuShaderCompilerFlag::CompileFromSpvCode;
+		if (!GGpuRhi->CompileShader(NewAssertHighlightCs, ErrorInfo, WarnInfo, Desc.ExtraArgs))
+		{
+			SH_LOG(LogGraph, Error, TEXT("AssertHighlight: patched CS compile failed: %s"), *ErrorInfo);
+			return false;
+		}
+
+		AssertHighlightCs = MoveTemp(NewAssertHighlightCs);
+		return true;
+	}
+
+
+	void ComputePassNode::ReadbackAssertedThreads(uint32 TotalThreads)
+	{
+		if (!AssertThreadBuffer)
+		{
+			return;
+		}
+
+		const Vector3u WGSize = ReflectThreadGroupSize();
+
+		const uint8* Mapped = (const uint8*)GGpuRhi->MapGpuBuffer(AssertThreadBuffer, GpuResourceMapMode::Read_Only);
+		const Vector4u* Records = reinterpret_cast<const Vector4u*>(Mapped);
+		const uint32 RecordCount = FMath::Min(Records[0].x, TotalThreads);
+
+		TMap<Vector3u, TSet<Vector3u>> Asserted;
+		for (uint32 Index = 0; Index < RecordCount; ++Index)
+		{
+			const Vector4u& Record = Records[Index + 1];
+			const Vector3u WG{ Record.x / WGSize.x, Record.y / WGSize.y, Record.z / WGSize.z };
+			const Vector3u Local{ Record.x % WGSize.x, Record.y % WGSize.y, Record.z % WGSize.z };
+			Asserted.FindOrAdd(WG).Add(Local);
+		}
+		GGpuRhi->UnMapGpuBuffer(AssertThreadBuffer);
+
+		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		ShEditor->GetComputeDebuggerViewport()->SetAssertedThreads(MoveTemp(Asserted));
+	}
+
 }

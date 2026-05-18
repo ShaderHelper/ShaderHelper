@@ -1029,6 +1029,11 @@ namespace FW
 		return PatchUInt3BuiltIn(Patcher, Context, SpvBuiltIn::LocalInvocationId);
 	}
 
+	SpvId PatchGlobalInvocationIdBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context)
+	{
+		return PatchUInt3BuiltIn(Patcher, Context, SpvBuiltIn::GlobalInvocationId);
+	}
+
 	SpvId PatchLocalInvocationIndexBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context)
 	{
 		if (Context.BuiltIns.Contains(SpvBuiltIn::LocalInvocationIndex))

@@ -12,6 +12,8 @@
 namespace FW
 {
 	class GpuQuerySet;
+	class RenderGraph;
+	struct RGComputePass;
 }
 
 namespace SH
@@ -46,7 +48,7 @@ namespace SH
 		// DebuggableObject
 		TArray<DebugItem> GetSupportedDebugItems() const override { return { DebugItem::Compute }; }
 		DebugTargetInfo OnStartDebugging(DebugItem Item) override;
-		void OnEndDebuggging() override { bDebugging = false; }
+		void OnEndDebuggging() override;
 		ShaderAsset* GetShaderAsset(DebugItem /*Item*/) const override { return ShaderAsset.Get(); }
 		InvocationState GetInvocationState(DebugItem Item) override;
 		void OnFinalizeCompute(const FW::Vector3u& WorkGroupId, const FW::Vector3u& LocalInvocationId) override;
@@ -77,6 +79,11 @@ namespace SH
 
 		FW::PrintBuffer* GetPrintBuffer();
 		bool FlushPrintBufferLogs(const FString& LogPrefix);
+		void AddComputePassResourceAccesses(FW::RGComputePass& Pass, FW::GpuShader* Cs, bool bUpdateOutputPins);
+
+		uint32 AddAssertHighlightPass(FW::RenderGraph& RG, FW::GpuShader* Cs, const TArray<int32>& SortedGroupSlots, const TArray<FW::GpuBindGroupLayout*>& BaseLayoutPtrs);
+		bool BuildAssertHighlightCs();
+		void ReadbackAssertedThreads(uint32 TotalThreads);
 
 	private:
 		FDelegateHandle ShaderRefreshedHandle;
@@ -94,5 +101,9 @@ namespace SH
 		TRefCountPtr<FW::GpuQuerySet> TimestampQuerySet;
 		TUniquePtr<FW::PrintBuffer> PrinterBuffer;
 		bool bDebugging = false;
+
+		// Assert-highlight resources
+		TRefCountPtr<FW::GpuShader> AssertHighlightCs;
+		TRefCountPtr<FW::GpuBuffer> AssertThreadBuffer;
 	};
 }

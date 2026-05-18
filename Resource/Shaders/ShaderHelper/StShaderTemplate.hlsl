@@ -35,10 +35,6 @@ float4 MainPS(PIn Input) : SV_Target
     GPrivate_fragCoord = fragCoord;
     float4 fragColor;
     mainImage(fragColor, fragCoord);
-    if (GPrivate_AssertResult != 1)
-    {
-        fragColor = float4(1, 0, 1, 1);
-    }
     return fragColor;
 }
 

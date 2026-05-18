@@ -40,6 +40,19 @@ namespace SH
 			}();
 			return Style;
 		}
+
+		const FButtonStyle& GetAssertedThreadCellButtonStyle()
+		{
+			static const FButtonStyle Style = [] {
+				static const FSlateRoundedBoxBrush NormalBrush(FLinearColor(1.0f, 0.0f, 1.0f, 1.0f), 4.0f);
+				static const FSlateRoundedBoxBrush HoverBrush(FLinearColor(0.5f, 0.00f, 0.5f, 1.0f), 4.0f);
+				return FButtonStyle(GetThreadCellButtonStyle())
+					.SetNormal(NormalBrush)
+					.SetHovered(HoverBrush)
+					.SetPressed(NormalBrush);
+			}();
+			return Style;
+		}
 	}
 
 	void SComputeDebuggerViewport::Construct(const FArguments& InArgs)
@@ -149,6 +162,7 @@ namespace SH
 					if (AxisIndex == 0) WorkGroupId.x = (uint32)NewValue;
 					else if (AxisIndex == 1) WorkGroupId.y = (uint32)NewValue;
 					else WorkGroupId.z = (uint32)NewValue;
+					UpdateThreadCellStyles();
 				});
 		};
 
@@ -414,21 +428,29 @@ namespace SH
 
 	void SComputeDebuggerViewport::UpdateThreadCellStyles()
 	{
+		const TSet<Vector3u>* AssertedInWG = AssertedThreads.Find(WorkGroupId);
 		for (uint32 y = 0; y < ThreadGroupSize.y; ++y)
 		{
 			for (uint32 x = 0; x < ThreadGroupSize.x; ++x)
 			{
 				const TSharedPtr<SButton>& Btn = ThreadCellButtons[y * ThreadGroupSize.x + x];
-				if (!Btn.IsValid())
-				{
-					continue;
-				}
 				const bool bSelected = bFinalizedThread
 					&& LocalInvocationId.x == x
 					&& LocalInvocationId.y == y
 					&& LocalInvocationId.z == SelectedZ;
-				Btn->SetButtonStyle(bSelected ? &GetSelectedThreadCellButtonStyle() : &GetThreadCellButtonStyle());
+				const bool bAsserted = !bSelected
+					&& AssertedInWG
+					&& AssertedInWG->Contains(Vector3u{ x, y, SelectedZ });
+				const FButtonStyle* Style = &GetThreadCellButtonStyle();
+				if (bSelected) Style = &GetSelectedThreadCellButtonStyle();
+				else if (bAsserted) Style = &GetAssertedThreadCellButtonStyle();
+				Btn->SetButtonStyle(Style);
 			}
 		}
+	}
+
+	void SComputeDebuggerViewport::SetAssertedThreads(TMap<Vector3u, TSet<Vector3u>> InAsserted)
+	{
+		AssertedThreads = MoveTemp(InAsserted);
 	}
 }
