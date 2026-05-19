@@ -121,6 +121,8 @@ namespace SH
 		void FinalizeDebugStates();
 		void UpdateThreadsReachingStop();
 		bool MatchesStopLocation(const FW::SpvDebugState& InState, const DebuggerLocation& InLoc) const;
+		void SaveDebuggerContextState();
+		void RestoreDebuggerContextState();
 		TArray<FW::SpvDebugState> GenDebugStates(uint8* DebuggerData, uint32 DebuggerDataSize);
 
 		bool EvaluateExpressionVertexlImpl(const FString& InExpression, struct ExpressionNode& OutResult) const;
@@ -153,6 +155,13 @@ namespace SH
 		std::vector<std::pair<FW::SpvId, FW::SpvVariableDesc*>> SortedVariableDescs;
 
 		TArray<FW::SpvBinding> SpvBindings;
+		struct DebuggerVariableState
+		{
+			std::variant<FW::SpvObject::External, FW::SpvObject::Internal> Storage;
+			TArray<FW::Vector2i> InitializedRanges;
+		};
+		TMap<FW::SpvId, DebuggerVariableState> InitialGlobalVariableStates;
+		TMap<FW::SpvId, DebuggerVariableState> InitialLocalVariableStates;
 		TArray<TRefCountPtr<FW::GpuBindGroup>> PatchedBindGroups;
 		TArray<TRefCountPtr<FW::GpuBindGroupLayout>> PatchedBindGroupLayouts;
 		TArray<TRefCountPtr<FW::GpuBindGroup>> SetupBindGroups;

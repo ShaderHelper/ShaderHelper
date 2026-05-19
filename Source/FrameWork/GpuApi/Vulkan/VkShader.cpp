@@ -97,6 +97,7 @@ namespace FW::VK
 				//Storage buffers use the scalar layout instead of vector-relaxed 430
 				//to make it consistent with structuredbuffer, so that user side can unify the struct
 				DxcArgs.Add("-fvk-use-dx-layout");
+				DxcArgs.Add("-fspv-target-env=vulkan1.1");
 				std::string ShiftB, ShiftT, ShiftS, ShiftU;
 				if (!EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::SkipBindingShift))
 				{

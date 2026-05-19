@@ -150,10 +150,14 @@ namespace SH
 		auto MakeAxisSpin = [this](int32 AxisIndex) {
 			return SNew(SNumericEntryBox<int32>)
 				.MinDesiredValueWidth(30.f)
+				.AllowSpin(true)
 				.MinValue(0)
 				.MaxValue_Lambda([this, AxisIndex]() -> TOptional<int32> {
-					const uint32 Max = (AxisIndex == 0 ? ThreadGroupCount.x : (AxisIndex == 1 ? ThreadGroupCount.y : ThreadGroupCount.z));
-					return (int32)Max - 1;
+					const uint32 Count = AxisIndex == 0 ? ThreadGroupCount.x : (AxisIndex == 1 ? ThreadGroupCount.y : ThreadGroupCount.z);
+					return (int32)Count - 1;
+				})
+				.IsEnabled_Lambda([this] {
+					return !bFinalizedThread;
 				})
 				.Value_Lambda([this, AxisIndex]() -> TOptional<int32> {
 					return (int32)(AxisIndex == 0 ? WorkGroupId.x : (AxisIndex == 1 ? WorkGroupId.y : WorkGroupId.z));

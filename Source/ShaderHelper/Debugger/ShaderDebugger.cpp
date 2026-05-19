@@ -691,6 +691,7 @@ namespace SH
 
 		CurDebugStateIndex = 0;
 		DebuggerContext = MoveTemp(PixelDebuggerContext);
+		SaveDebuggerContextState();
 		TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
 			.Name = DebugShader->GetShaderName(),
 			.Source = PatchedSpvAsm,
@@ -1183,6 +1184,7 @@ namespace SH
 
 		CurDebugStateIndex = 0;
 		DebuggerContext = MoveTemp(ComputeDebuggerContext);
+		SaveDebuggerContextState();
 
 		TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
 			.Name = DebugShader->GetShaderName(),
@@ -1373,6 +1375,7 @@ namespace SH
 		CurValidLine.reset();
 		DirtyVars.Empty();
 		DebuggerError = {};
+		RestoreDebuggerContextState();
 		InitDebuggerView();
 
 		//Walk states until we've reached the TargetIteration-th occurrence of the saved stop.
@@ -1918,6 +1921,38 @@ namespace SH
 		bool bEnable = true;
 		Editor::GetEditorConfig()->GetBool(TEXT("Environment"), TEXT("EnableLinePreview"), bEnable);
 		return bEnable;
+	}
+
+	void ShaderDebugger::SaveDebuggerContextState()
+	{
+		auto SaveVariables = [](const auto& Variables, TMap<SpvId, DebuggerVariableState>& OutStates) {
+			OutStates.Empty();
+			for (const auto& [VarId, Var] : Variables)
+			{
+				DebuggerVariableState State{ Var.Storage, Var.InitializedRanges };
+				OutStates.Add(VarId, MoveTemp(State));
+			}
+		};
+
+		SaveVariables(DebuggerContext->GlobalVariables, InitialGlobalVariableStates);
+		SaveVariables(DebuggerContext->LocalVariables, InitialLocalVariableStates);
+	}
+
+	void ShaderDebugger::RestoreDebuggerContextState()
+	{
+		auto RestoreVariables = [](auto& Variables, const TMap<SpvId, DebuggerVariableState>& States) {
+			for (auto& [VarId, Var] : Variables)
+			{
+				if (const DebuggerVariableState* State = States.Find(VarId))
+				{
+					Var.Storage = State->Storage;
+					Var.InitializedRanges = State->InitializedRanges;
+				}
+			}
+		};
+
+		RestoreVariables(DebuggerContext->GlobalVariables, InitialGlobalVariableStates);
+		RestoreVariables(DebuggerContext->LocalVariables, InitialLocalVariableStates);
 	}
 
 	int32 ShaderDebugger::GetExtraLineNumForSource(SpvId Source) const
@@ -2716,6 +2751,8 @@ namespace SH
 		DebugStates.Reset();
 		SortedVariableDescs.clear();
 		SpvBindings.Empty();
+		InitialGlobalVariableStates.Empty();
+		InitialLocalVariableStates.Empty();
 		PatchedBindGroups.Empty();
 		PatchedBindGroupLayouts.Empty();
 		SetupBindGroups.Empty();

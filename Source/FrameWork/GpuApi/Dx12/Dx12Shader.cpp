@@ -549,6 +549,7 @@ namespace FW
 			Arguments.Add(TEXT("-fvk-use-dx-layout"));
 			Arguments.Add(TEXT("-fspv-debug=vulkan-with-source"));
 			Arguments.Add(TEXT("-fspv-reflect"));
+			Arguments.Add(TEXT("-fspv-target-env=vulkan1.1"));
 		}
 
 		ValidateGpuFeature(GDx12GpuRhi->GetFeature().Support16bitType(), TEXT("Hardware does not support 16bitType, shader model <= 6.2"))
