@@ -9,8 +9,6 @@ namespace FW
 	FRAMEWORK_API extern TArray<ShObject*> GlobalValidShObjects;
 }
 
-#include "Common/ObjectPtr.h"
-
 namespace FW
 {
 	DECLARE_LOG_CATEGORY_EXTERN(LogFrameWorkCore, Log, All);
@@ -32,6 +30,15 @@ namespace FW
 	FString GetRegisteredName(MetaType* InMt);
 	MetaType* GetMetaType(const FString& InRegisteredName);
       
+	enum class ObjectOwnerShip
+	{
+		Assign,
+		Retain,
+	};
+	template<typename T, ObjectOwnerShip> class ObjectPtr;
+	template<typename T>
+	using ObserverObjectPtr = ObjectPtr<T, ObjectOwnerShip::Assign>;
+
     //Note: All ShObject must be default constructible.
 	class FRAMEWORK_API ShObject : FNoncopyable
 	{
@@ -193,3 +200,5 @@ namespace FW
 	FRAMEWORK_API TArray<TSharedRef<PropertyData>> GeneratePropertyDatas(ShObject* InObject, const MetaMemberData* MetaMemData, void* Instance, bool bForce = false);
 	FRAMEWORK_API TArray<TSharedRef<PropertyData>> GeneratePropertyDatas(ShObject* InObject, MetaType* InMetaType);
 }
+
+#include "Common/ObjectPtr.h"

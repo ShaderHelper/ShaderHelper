@@ -2,15 +2,6 @@
 
 namespace FW
 {
-	enum class ObjectOwnerShip
-	{
-		Assign,
-		Retain,
-	};
-
-	template<typename T>
-	using ObserverObjectPtr = ObjectPtr<T, ObjectOwnerShip::Assign>;
-
     template <typename T, ObjectOwnerShip OwnerShip = ObjectOwnerShip::Retain>
     class ObjectPtr
     {

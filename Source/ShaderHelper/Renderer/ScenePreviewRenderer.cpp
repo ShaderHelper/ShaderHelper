@@ -59,7 +59,7 @@ namespace SH
 
 	void ScenePreviewRenderer::RenderGrid(RenderGraph& Graph, GpuTextureView* OutputView,
 		GpuTextureView* DepthView,
-		const Camera& Camera, bool bClear, float GridSize, float GridSpacing)
+		const Camera& Camera, float GridSize, float GridSpacing)
 	{
 		SceneGridShader* GridShader = GetShader<SceneGridShader>();
 
@@ -71,10 +71,10 @@ namespace SH
 		{
 			GpuRenderPassDesc PassDesc;
 			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{OutputView, 
-				bClear ? RenderTargetLoadAction::Clear : RenderTargetLoadAction::Load, 
+				RenderTargetLoadAction::Load, 
 				RenderTargetStoreAction::Store});
 			PassDesc.DepthStencilTarget = GpuDepthStencilTargetInfo{DepthView, 
-				bClear ? RenderTargetLoadAction::Clear : RenderTargetLoadAction::Load, 
+				RenderTargetLoadAction::Load, 
 				RenderTargetStoreAction::Store};
 
 			GpuRenderPipelineStateDesc PipelineDesc{
@@ -111,9 +111,9 @@ namespace SH
 
 	}
 
-	bool ScenePreviewRenderer::RenderMeshes(RenderGraph& Graph, GpuTextureView* OutputView,
+	void ScenePreviewRenderer::RenderMeshes(RenderGraph& Graph, GpuTextureView* OutputView,
 		GpuTextureView* DepthView,
-		const Camera& Camera, const TArray<ObjectPtr<SceneObject>>& SceneObjects, bool bClear)
+		const Camera& Camera, const TArray<ObjectPtr<SceneObject>>& SceneObjects)
 	{
 		ScenePreviewShader* MeshShader = GetShader<ScenePreviewShader>();
 		uint32 SampleCount = OutputView->GetTexture()->GetSampleCount();
@@ -124,7 +124,15 @@ namespace SH
 			LightDir = LightDir * (1.0f / Len);
 		}
 
-		bool bFirstDraw = true;
+		struct MeshDrawItem
+		{
+			TRefCountPtr<GpuBindGroup> BindGroup;
+			TRefCountPtr<GpuBuffer> VertexBuffer;
+			TRefCountPtr<GpuBuffer> IndexBuffer;
+			uint32 IndexCount = 0;
+		};
+
+		TArray<MeshDrawItem> DrawItems;
 		for (const auto& Obj : SceneObjects)
 		{
 			MeshSceneObject* MeshObj = dynamic_cast<MeshSceneObject*>(Obj.Get());
@@ -151,51 +159,67 @@ namespace SH
 					continue;
 				}
 
-				GpuRenderPassDesc PassDesc;
-				PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{OutputView, 
-					(bClear && bFirstDraw) ? RenderTargetLoadAction::Clear : RenderTargetLoadAction::Load, 
-					RenderTargetStoreAction::Store});
-				PassDesc.DepthStencilTarget = GpuDepthStencilTargetInfo{DepthView, 
-					(bClear && bFirstDraw) ? RenderTargetLoadAction::Clear : RenderTargetLoadAction::Load, 
-					RenderTargetStoreAction::Store};
-				bFirstDraw = false;
-
-				GpuRenderPipelineStateDesc PipelineDesc{
-					.Vs = MeshShader->GetVertexShader(),
-					.Ps = MeshShader->GetPixelShader(),
-					.Targets = {{ .TargetFormat = OutputView->GetTexture()->GetFormat() }},
-					.BindGroupLayouts = { MeshShader->GetShaderBindGroupLayout() },
-					.VertexLayout = {{
-						.ByteStride = sizeof(MeshVertex),
-						.Attributes = {
-							{0, "POSITION", 0, GpuFormat::R32G32B32_FLOAT, offsetof(MeshVertex, Position)},
-							{1, "NORMAL", 0, GpuFormat::R32G32B32_FLOAT, offsetof(MeshVertex, Normal)},
-							{2, "TEXCOORD", 0, GpuFormat::R32G32_FLOAT, offsetof(MeshVertex, UVs)},
-						},
-					}},
-					.RasterizerState = {RasterizerFillMode::Solid, RasterizerCullMode::Back},
-					.SampleCount = SampleCount,
-					.DepthStencilState = DepthStencilStateDesc{
-						.DepthFormat = DepthView->GetTexture()->GetFormat(),
-						.DepthWriteEnable = true,
-						.DepthCompare = CompareMode::Less,
-					},
-				};
-				TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
-
-				Graph.AddRenderPass("SceneMesh", MoveTemp(PassDesc),
-					[Pipeline, BindGroup, VB = Buffers.VertexBuffer, IB = Buffers.IndexBuffer, IdxCount = Buffers.IndexCount]
-					(GpuRenderPassRecorder* PassRecorder) {
-						PassRecorder->SetBindGroups({ BindGroup.GetReference() });
-						PassRecorder->SetRenderPipelineState(Pipeline);
-						PassRecorder->SetVertexBuffer(0, VB);
-						PassRecorder->SetIndexBuffer(IB);
-						PassRecorder->DrawIndexed(0, IdxCount);
-					}
-				);
+				DrawItems.Add(MeshDrawItem{
+					.BindGroup = BindGroup,
+					.VertexBuffer = Buffers.VertexBuffer,
+					.IndexBuffer = Buffers.IndexBuffer,
+					.IndexCount = Buffers.IndexCount,
+				});
 			}
 		}
-		return !bFirstDraw;
+
+		GpuRenderPassDesc PassDesc;
+		PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{OutputView,
+			RenderTargetLoadAction::Clear,
+			RenderTargetStoreAction::Store});
+		PassDesc.DepthStencilTarget = GpuDepthStencilTargetInfo{DepthView,
+			RenderTargetLoadAction::Clear,
+			RenderTargetStoreAction::Store};
+
+		TRefCountPtr<GpuRenderPipelineState> Pipeline;
+		if (!DrawItems.IsEmpty())
+		{
+			GpuRenderPipelineStateDesc PipelineDesc{
+				.Vs = MeshShader->GetVertexShader(),
+				.Ps = MeshShader->GetPixelShader(),
+				.Targets = {{ .TargetFormat = OutputView->GetTexture()->GetFormat() }},
+				.BindGroupLayouts = { MeshShader->GetShaderBindGroupLayout() },
+				.VertexLayout = {{
+					.ByteStride = sizeof(MeshVertex),
+					.Attributes = {
+						{0, "POSITION", 0, GpuFormat::R32G32B32_FLOAT, offsetof(MeshVertex, Position)},
+						{1, "NORMAL", 0, GpuFormat::R32G32B32_FLOAT, offsetof(MeshVertex, Normal)},
+						{2, "TEXCOORD", 0, GpuFormat::R32G32_FLOAT, offsetof(MeshVertex, UVs)},
+					},
+				}},
+				.RasterizerState = {RasterizerFillMode::Solid, RasterizerCullMode::Back},
+				.SampleCount = SampleCount,
+				.DepthStencilState = DepthStencilStateDesc{
+					.DepthFormat = DepthView->GetTexture()->GetFormat(),
+					.DepthWriteEnable = true,
+					.DepthCompare = CompareMode::Less,
+				},
+			};
+			Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PipelineDesc);
+		}
+
+		Graph.AddRenderPass("SceneMesh", MoveTemp(PassDesc),
+			[Pipeline, DrawItems](GpuRenderPassRecorder* PassRecorder) {
+				if (DrawItems.IsEmpty())
+				{
+					return;
+				}
+
+				PassRecorder->SetRenderPipelineState(Pipeline);
+				for (const MeshDrawItem& DrawItem : DrawItems)
+				{
+					PassRecorder->SetBindGroups({ DrawItem.BindGroup.GetReference() });
+					PassRecorder->SetVertexBuffer(0, DrawItem.VertexBuffer);
+					PassRecorder->SetIndexBuffer(DrawItem.IndexBuffer);
+					PassRecorder->DrawIndexed(0, DrawItem.IndexCount);
+				}
+			}
+		);
 	}
 
 	void ScenePreviewRenderer::RenderOutline(RenderGraph& Graph, GpuTextureView* OutputView,
@@ -669,7 +693,7 @@ namespace SH
 		}
 
 		// Render meshes from the selected camera's perspective
-		RenderMeshes(Graph, CamPreviewRTV, CamPreviewDepthDSV, SelectedCamera, SceneObjects, true);
+		RenderMeshes(Graph, CamPreviewRTV, CamPreviewDepthDSV, SelectedCamera, SceneObjects);
 
 		// Blit preview onto the bottom-right corner of the output
 		float OverlayX = (float)(ViewWidth - PreviewWidth);

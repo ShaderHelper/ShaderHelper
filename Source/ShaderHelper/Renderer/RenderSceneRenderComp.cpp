@@ -900,11 +900,11 @@ namespace SH
 
 		FW::RenderGraph Graph;
 
-		// Render meshes first (clears color + depth on first draw)
-		bool bMeshesDrawn = PreviewRenderer.RenderMeshes(Graph, MsaaRTV, DepthDSV, PreviewCamera, RenderGraphAsset->SceneObjects, true);
+		// Render meshes first; this always clears color + depth even when the scene has no meshes.
+		PreviewRenderer.RenderMeshes(Graph, MsaaRTV, DepthDSV, PreviewCamera, RenderGraphAsset->SceneObjects);
 
-		// Render grid with depth test (clears if no meshes were drawn)
-		PreviewRenderer.RenderGrid(Graph, MsaaRTV, DepthDSV, PreviewCamera, !bMeshesDrawn);
+		// Render grid with depth test
+		PreviewRenderer.RenderGrid(Graph, MsaaRTV, DepthDSV, PreviewCamera);
 
 		// Render camera billboard icons
 		SceneObject* SelObj = GetSelectedSceneObject();

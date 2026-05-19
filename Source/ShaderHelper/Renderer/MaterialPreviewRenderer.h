@@ -66,6 +66,6 @@ namespace SH
 		float CameraDistance = 2.0f;
 		MaterialPreviewPrimitive PreviewPrimitive = MaterialPreviewPrimitive::Sphere;
 		bool bPreviewMeshInitialized = false;
-		TFunction<FText()> LinkageErrorFunc;
+		TFunction<FText()> PipelineErrorFunc;
 	};
 }

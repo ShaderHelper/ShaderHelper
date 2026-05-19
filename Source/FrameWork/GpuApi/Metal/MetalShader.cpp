@@ -36,7 +36,7 @@ namespace FW
 		
 		FString EntryPoint = InShader->GetEntryPoint();
 		//Msl can not call a metal function main
-		if(EntryPoint == "main")
+		if(EntryPoint.Equals("main"))
 		{
 			//spirv-cross default name
 			EntryPoint = "main0";

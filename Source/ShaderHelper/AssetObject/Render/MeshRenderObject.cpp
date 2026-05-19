@@ -115,9 +115,9 @@ namespace SH
 
 			MaskPs = GGpuRhi->CreateShaderFromSource({
 				.Name       = TEXT("MeshRenderObject_MaskPs"),
-				.Source     = TEXT("float4 Main() : SV_Target0\n"
+				.Source     = TEXT("float Main() : SV_Target0\n"
 					"{\n"
-					"    return 1.0.xxxx;\n"
+					"    return 1.0;\n"
 					"}\n"),
 				.Type       = ShaderType::Pixel,
 				.EntryPoint = TEXT("Main"),
@@ -802,7 +802,7 @@ namespace SH
 		TRefCountPtr<GpuTexture> MaskTex = GGpuRhi->CreateTexture({
 			.Width = ReferenceTexture->GetWidth(),
 			.Height = ReferenceTexture->GetHeight(),
-			.Format = GpuFormat::B8G8R8A8_UNORM,
+			.Format = GpuFormat::R8_UNORM,
 			.Usage = GpuTextureUsage::RenderTarget | GpuTextureUsage::ShaderResource,
 			.ClearValues = Vector4f(0, 0, 0, 0),
 		}, GpuResourceState::RenderTargetWrite);

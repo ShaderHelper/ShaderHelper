@@ -32,7 +32,7 @@ namespace SH
 		BindGroupLayouts.Empty();
 		BindGroups.Empty();
 		PreviewUniformBuffers.Empty();
-		LinkageErrorFunc = nullptr;
+		PipelineErrorFunc = nullptr;
 	}
 
 	void MaterialPreviewRenderer::SetPreviewPrimitive(MaterialPreviewPrimitive InPreviewPrimitive)
@@ -169,23 +169,7 @@ namespace SH
 
 	FText MaterialPreviewRenderer::GetErrorReason() const
 	{
-		TArray<FText> Errors;
-		if (!MaterialAsset->VertexShaderAsset)
-			Errors.Add(LOCALIZATION("VsNotSpecified"));
-		else if (!MaterialAsset->VertexShaderAsset->GetCompiledShader(ShaderType::Vertex))
-			Errors.Add(LOCALIZATION("VsInvalidShader"));
-
-		if (!MaterialAsset->PixelShaderAsset)
-			Errors.Add(LOCALIZATION("PsNotSpecified"));
-		else if (!MaterialAsset->PixelShaderAsset->GetCompiledShader(ShaderType::Pixel))
-			Errors.Add(LOCALIZATION("PsInvalidShader"));
-
-		if (LinkageErrorFunc)
-			Errors.Add(LinkageErrorFunc());
-
-		TArray<FString> ErrorStrings;
-		for (const auto& E : Errors) ErrorStrings.Add(E.ToString());
-		return FText::FromString(FString::Join(ErrorStrings, TEXT("\n")));
+		return PipelineErrorFunc ? PipelineErrorFunc() : FText::GetEmpty();
 	}
 
 	TRefCountPtr<GpuTexture> MaterialPreviewRenderer::RenderThumbnail(const Material* InMaterial, uint32 InSize, MaterialPreviewPrimitive InPreviewPrimitive)
@@ -225,11 +209,11 @@ namespace SH
 		if (!BuildMaterialPipeline(*MaterialAsset, Options, Result))
 		{
 			FText ErrorText = Result.Error;
-			LinkageErrorFunc = [ErrorText]{ return ErrorText; };
+			PipelineErrorFunc = [ErrorText]{ return ErrorText; };
 			return false;
 		}
 
-		LinkageErrorFunc = nullptr;
+		PipelineErrorFunc = nullptr;
 		Pipeline = MoveTemp(Result.Pipeline);
 		return Pipeline.IsValid();
 	}

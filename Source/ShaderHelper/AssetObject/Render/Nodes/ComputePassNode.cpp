@@ -70,7 +70,7 @@ namespace SH
 	ComputePassNode::ComputePassNode(AssetPtr<Shader> InShader)
 		: ShaderAsset(MoveTemp(InShader))
 	{
-		ObjectName = FText::FromString(TEXT("ComputePass"));
+		ObjectName = ShaderAsset->ObjectName;
 	}
 
 	ComputePassNode::~ComputePassNode()
