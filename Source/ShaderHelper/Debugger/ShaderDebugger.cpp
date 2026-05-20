@@ -139,6 +139,22 @@ namespace SH
 			return Match ? Match->Name : FString{};
 		}
 
+		uint64 MakeWorkgroupBarrierKey(int32 BarrierIndex, const SpvDebugState_Tag& Tag)
+		{
+			return ((uint64)(uint32)BarrierIndex << 32)
+				| PackDebugHeader(SpvDebuggerStateType::WorkgroupBarrier, Tag.Source.GetValue(), (uint32)Tag.Line);
+		}
+
+		SpvDebugState MakeWorkgroupBarrierUbState(const SpvDebugState_Tag& Tag)
+		{
+			return SpvDebugState{ SpvDebugState_VarChange{
+				.Line = Tag.Line,
+				.Source = Tag.Source,
+				.Error = TEXT("Barrier did not execute for every thread in the thread group."),
+				.bCpuReconstructed = true,
+			} };
+		}
+
 		void DumpDebugStatesToFile(const TArray<SpvDebugState>& InDebugStates, const SpvDebuggerContext* InContext, const FString& File)
 		{
 			FString Dump;
@@ -155,6 +171,7 @@ namespace SH
 					FString SourceFile = InContext->GetSourceFileName(S.Source);
 					FString VarName = InContext->Names.contains(S.Change.VarId) ? InContext->Names.at(S.Change.VarId) : FString::Printf(TEXT("%d"), S.Change.VarId.GetValue());
 					Dump += FString::Printf(TEXT("VarChange  Line=%d Source=%s Var=%s"), S.Line, *SourceFile, *VarName);
+					if (S.bCpuReconstructed) Dump += TEXT(" CpuReconstructed");
 					if (!S.Error.IsEmpty())
 					{
 						Dump += FString::Printf(TEXT(" Error=\"%s\""), *S.Error);
@@ -183,6 +200,7 @@ namespace SH
 					if (S.bFuncCallAfterReturn) Dump += TEXT(" FuncCallAfterReturn");
 					if (S.bReturn) Dump += TEXT(" Return");
 					if (S.bKill) Dump += TEXT(" Kill");
+					if (S.bWorkgroupBarrier) Dump += TEXT(" WorkgroupBarrier");
 				}
 				else if (std::holds_alternative<SpvDebugState_Access>(State))
 				{
@@ -322,6 +340,8 @@ namespace SH
 			auto IsCpuOnlyState = [](const SpvDebugState& State) {
 				if (std::holds_alternative<SpvDebugState_ScopeChange>(State))
 					return true;
+				if (auto* VarChange = std::get_if<SpvDebugState_VarChange>(&State))
+					return VarChange->bCpuReconstructed;
 				if (auto* Tag = std::get_if<SpvDebugState_Tag>(&State))
 					return Tag->bFuncCallAfterReturn;
 				return false;
@@ -1271,12 +1291,160 @@ namespace SH
 			TArray<uint8>& Payload = PerThreadPayloads[i];
 			PerThreadDebugStates[i] = GenDebugStates(Payload.GetData(), (uint32)Payload.Num());
 		}
+		RebuildComputeWorkgroupStates();
 
 		const uint32 SelectedLocalIdx = LocalInvocationId.x
 			+ LocalInvocationId.y * DebuggingThreadGroupSize.x
 			+ LocalInvocationId.z * DebuggingThreadGroupSize.x * DebuggingThreadGroupSize.y;
-		DebugStates = (SelectedLocalIdx < NumThreads) ? PerThreadDebugStates[SelectedLocalIdx] : TArray<SpvDebugState>{};
+		DebugStates = BuildComputeDebugStatesForThread(SelectedLocalIdx);
 		FinalizeDebugStates();
+	}
+
+	void ShaderDebugger::RebuildComputeWorkgroupStates()
+	{
+		ReconstructedWorkgroupStatesByBarrier.Empty();
+		InvalidWorkgroupBarrierKeys.Empty();
+
+		if (bEnableUbsan)
+		{
+			TMap<uint64, int32> WorkgroupBarrierCounts;
+			TMap<uint64, SpvDebugState_Tag> WorkgroupBarrierTags;
+			TArray<uint64> WorkgroupBarrierKeys;
+			for (const TArray<SpvDebugState>& ThreadStates : PerThreadDebugStates)
+			{
+				int32 BarrierIndex = 0;
+				for (const SpvDebugState& State : ThreadStates)
+				{
+					const auto* Tag = std::get_if<SpvDebugState_Tag>(&State);
+					if (!Tag || !Tag->bWorkgroupBarrier)
+					{
+						continue;
+					}
+
+					uint64 Key = MakeWorkgroupBarrierKey(BarrierIndex, *Tag);
+					WorkgroupBarrierCounts.FindOrAdd(Key)++;
+					if (!WorkgroupBarrierTags.Contains(Key))
+					{
+						WorkgroupBarrierTags.Add(Key, *Tag);
+						WorkgroupBarrierKeys.Add(Key);
+					}
+					BarrierIndex++;
+				}
+			}
+
+			for (uint64 Key : WorkgroupBarrierKeys)
+			{
+				if (WorkgroupBarrierCounts[Key] != PerThreadDebugStates.Num())
+				{
+					InvalidWorkgroupBarrierKeys.Add(Key);
+				}
+			}
+		}
+
+		TSet<SpvId> WorkgroupVarIds;
+		for (const auto& [VarId, Var] : DebuggerContext->GlobalVariables)
+		{
+			if (Var.StorageClass == SpvStorageClass::Workgroup)
+			{
+				WorkgroupVarIds.Add(VarId);
+			}
+		}
+		if (WorkgroupVarIds.IsEmpty())
+		{
+			return;
+		}
+
+		auto IsWorkgroupVarChange = [&WorkgroupVarIds](const SpvDebugState& State) -> const SpvDebugState_VarChange* {
+			const auto* VarChange = std::get_if<SpvDebugState_VarChange>(&State);
+			if (!VarChange || VarChange->bCpuReconstructed || !VarChange->Error.IsEmpty())
+			{
+				return nullptr;
+			}
+			return WorkgroupVarIds.Contains(VarChange->Change.VarId) ? VarChange : nullptr;
+		};
+
+		auto MakeReconstructedState = [](const SpvDebugState_VarChange& VarChange) {
+			SpvDebugState_VarChange Reconstructed = VarChange;
+			Reconstructed.Line = 0;
+			Reconstructed.Source = {};
+			Reconstructed.bCpuReconstructed = true;
+			return SpvDebugState{ MoveTemp(Reconstructed) };
+		};
+
+		for (const TArray<SpvDebugState>& ThreadStates : PerThreadDebugStates)
+		{
+			int32 BarrierIndex = 0;
+			for (const SpvDebugState& State : ThreadStates)
+			{
+				if (const SpvDebugState_VarChange* VarChange = IsWorkgroupVarChange(State))
+				{
+					while (ReconstructedWorkgroupStatesByBarrier.Num() <= BarrierIndex)
+					{
+						ReconstructedWorkgroupStatesByBarrier.AddDefaulted();
+					}
+					ReconstructedWorkgroupStatesByBarrier[BarrierIndex].Add(MakeReconstructedState(*VarChange));
+				}
+
+				if (const auto* Tag = std::get_if<SpvDebugState_Tag>(&State); Tag && Tag->bWorkgroupBarrier)
+				{
+					BarrierIndex++;
+				}
+			}
+		}
+	}
+
+	TArray<SpvDebugState> ShaderDebugger::BuildComputeDebugStatesForThread(uint32 LocalLinearIndex) const
+	{
+		check(PerThreadDebugStates.IsValidIndex((int32)LocalLinearIndex));
+		const TArray<SpvDebugState>& ThreadStates = PerThreadDebugStates[(int32)LocalLinearIndex];
+		if (ReconstructedWorkgroupStatesByBarrier.IsEmpty() && InvalidWorkgroupBarrierKeys.IsEmpty())
+		{
+			return ThreadStates;
+		}
+
+		int32 ExtraStateCount = 0;
+		int32 BarrierIndex = 0;
+		for (const SpvDebugState& State : ThreadStates)
+		{
+			if (const auto* Tag = std::get_if<SpvDebugState_Tag>(&State); Tag && Tag->bWorkgroupBarrier)
+			{
+				if (ReconstructedWorkgroupStatesByBarrier.IsValidIndex(BarrierIndex))
+				{
+					ExtraStateCount += ReconstructedWorkgroupStatesByBarrier[BarrierIndex].Num();
+				}
+				if (bEnableUbsan && InvalidWorkgroupBarrierKeys.Contains(MakeWorkgroupBarrierKey(BarrierIndex, *Tag)))
+				{
+					ExtraStateCount++;
+				}
+				BarrierIndex++;
+			}
+		}
+		if (ExtraStateCount == 0)
+		{
+			return ThreadStates;
+		}
+
+		TArray<SpvDebugState> RebuiltStates;
+		RebuiltStates.Reserve(ThreadStates.Num() + ExtraStateCount);
+		BarrierIndex = 0;
+		for (const SpvDebugState& State : ThreadStates)
+		{
+			RebuiltStates.Add(State);
+			if (const auto* Tag = std::get_if<SpvDebugState_Tag>(&State); Tag && Tag->bWorkgroupBarrier)
+			{
+				uint64 BarrierKey = MakeWorkgroupBarrierKey(BarrierIndex, *Tag);
+				if (bEnableUbsan && InvalidWorkgroupBarrierKeys.Contains(BarrierKey))
+				{
+					RebuiltStates.Add(MakeWorkgroupBarrierUbState(*Tag));
+				}
+				if (ReconstructedWorkgroupStatesByBarrier.IsValidIndex(BarrierIndex))
+				{
+					RebuiltStates.Append(ReconstructedWorkgroupStatesByBarrier[BarrierIndex]);
+				}
+				BarrierIndex++;
+			}
+		}
+		return RebuiltStates;
 	}
 
 	std::optional<TPair<Vector3u, Vector3u>> ShaderDebugger::ValidateCompute(const InvocationState& InState)
@@ -1362,11 +1530,10 @@ namespace SH
 		const int32 TargetIteration = StopIterationIndex;
 
 		LocalInvocationId = InLocalInvocationId;
-		const uint32 NumThreads = DebuggingThreadGroupSize.x * DebuggingThreadGroupSize.y * DebuggingThreadGroupSize.z;
 		const uint32 SelectedLocalIdx = LocalInvocationId.x
 			+ LocalInvocationId.y * DebuggingThreadGroupSize.x
 			+ LocalInvocationId.z * DebuggingThreadGroupSize.x * DebuggingThreadGroupSize.y;
-		DebugStates = PerThreadDebugStates[SelectedLocalIdx];
+		DebugStates = BuildComputeDebugStatesForThread(SelectedLocalIdx);
 		CurDebugStateIndex = 0;
 		CallStack.Empty();
 		Scope = nullptr;
@@ -2747,6 +2914,8 @@ namespace SH
 		StopLocation.Reset();
 		StopIterationIndex = 0;
 		ThreadsReachingStop.Reset();
+		ReconstructedWorkgroupStatesByBarrier.Reset();
+		InvalidWorkgroupBarrierKeys.Reset();
 		ReturnValue.Empty();
 		DebugStates.Reset();
 		SortedVariableDescs.clear();
@@ -3200,6 +3369,15 @@ namespace SH
 					.Line = Line,
 					.Source = Source,
 					.bKill = true,
+				});
+				break;
+			}
+			case SpvDebuggerStateType::WorkgroupBarrier:
+			{
+				States.Add(SpvDebugState_Tag{
+					.Line = Line,
+					.Source = Source,
+					.bWorkgroupBarrier = true,
 				});
 				break;
 			}

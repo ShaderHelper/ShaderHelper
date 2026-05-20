@@ -54,6 +54,7 @@ namespace FW
 		Sqrt,
 		InverseSqrt,
 		Atan2,
+		WorkgroupBarrier,
 	};
 
 	// Packed debug header format: StateType(8) | Source(8) | Line(16)
@@ -75,6 +76,7 @@ namespace FW
 		SpvId Source{};
 		SpvVarChange Change;
 		FString Error;
+		bool bCpuReconstructed = false;
 	};
 
 	struct SpvDebugState_ScopeChange
@@ -104,6 +106,7 @@ namespace FW
 		bool bReturn : 1 {};
 		bool bCondition : 1 {};
 		bool bKill : 1{};
+		bool bWorkgroupBarrier : 1{};
 	};
 
 

@@ -1456,33 +1456,54 @@ namespace FW
 			if (MaxIndexNum > 0)
 			{
 				SpvId FirstIndex = IndexParams[0];
+				auto EmitStridedCompositeAccess = [&](SpvType* ElementType, int32 ElementCount)
+				{
+					SpvId InBounds = Patcher.NewId();
+					auto InBoundsOp = MakeUnique<SpvOpULessThan>(BoolType, FirstIndex, Patcher.FindOrAddConstant(ElementCount));
+					InBoundsOp->SetId(InBounds);
+					GetAccessFuncInsts.Add(MoveTemp(InBoundsOp));
+
+					SpvId OutOfBounds = Patcher.NewId();
+					auto OutOfBoundsOp = MakeUnique<SpvOpLogicalNot>(BoolType, InBounds);
+					OutOfBoundsOp->SetId(OutOfBounds);
+					GetAccessFuncInsts.Add(MoveTemp(OutOfBoundsOp));
+					AppendErrorIf(GetAccessFuncInsts, OutOfBounds);
+
+					TArray<SpvId> MemberIndexes;
+					int32 MemberMaxIndexNum = GetMaxIndexNum(ElementType);
+					for (int32 i = 0; i < MemberMaxIndexNum; i++)
+					{
+						MemberIndexes.Add(IndexParams[i + 1]);
+					}
+					SpvId Ret = GetAccess(ElementType, MemberIndexes, GetAccessFuncInsts);
+
+					SpvId StridedOffset = FirstIndex;
+					int32 ElementStride = GetTypeByteSize(ElementType) / 4;
+					if (ElementStride != 1)
+					{
+						StridedOffset = Patcher.NewId();
+						auto MulOp = MakeUnique<SpvOpIMul>(IntType, FirstIndex, Patcher.FindOrAddConstant(ElementStride));
+						MulOp->SetId(StridedOffset);
+						GetAccessFuncInsts.Add(MoveTemp(MulOp));
+					}
+
+					SpvId Offset = Patcher.NewId();
+					auto AddOp = MakeUnique<SpvOpIAdd>(IntType, StridedOffset, Ret);
+					AddOp->SetId(Offset);
+					GetAccessFuncInsts.Add(MoveTemp(AddOp));
+
+					SpvId SafeOffset = Patcher.NewId();
+					auto SelectOp = MakeUnique<SpvOpSelect>(IntType, InBounds, Offset, Patcher.FindOrAddConstant(0));
+					SelectOp->SetId(SafeOffset);
+					GetAccessFuncInsts.Add(MoveTemp(SelectOp));
+
+					GetAccessFuncInsts.Add(MakeUnique<SpvOpReturnValue>(SafeOffset));
+				};
 
 				if (Type->GetKind() == SpvTypeKind::Vector)
 				{
 					SpvVectorType* VectorType = static_cast<SpvVectorType*>(Type);
-					for (int Index = 0; Index < (int)VectorType->ElementCount; Index++)
-					{
-						SpvId IEqual = Patcher.NewId();
-						auto IEqualOp = MakeUnique<SpvOpIEqual>(BoolType, FirstIndex, Patcher.FindOrAddConstant(Index));
-						IEqualOp->SetId(IEqual);
-						GetAccessFuncInsts.Add(MoveTemp(IEqualOp));
-
-						auto TrueLabel = Patcher.NewId();
-						auto FalseLabel = Patcher.NewId();
-						GetAccessFuncInsts.Add(MakeUnique<SpvOpSelectionMerge>(TrueLabel, SpvSelectionControl::None));
-						GetAccessFuncInsts.Add(MakeUnique<SpvOpBranchConditional>(IEqual, TrueLabel, FalseLabel));
-
-						auto TrueLabelOp = MakeUnique<SpvOpLabel>();
-						TrueLabelOp->SetId(TrueLabel);
-						GetAccessFuncInsts.Add(MoveTemp(TrueLabelOp));
-						GetAccessFuncInsts.Add(MakeUnique<SpvOpReturnValue>(Patcher.FindOrAddConstant(Index * GetTypeByteSize(VectorType->ElementType) / 4)));
-
-						auto FalseLabelOp = MakeUnique<SpvOpLabel>();
-						FalseLabelOp->SetId(FalseLabel);
-						GetAccessFuncInsts.Add(MoveTemp(FalseLabelOp));
-					}
-					AppendError(GetAccessFuncInsts);
-					GetAccessFuncInsts.Add(MakeUnique<SpvOpReturnValue>(Patcher.FindOrAddConstant(0)));
+					EmitStridedCompositeAccess(VectorType->ElementType, (int32)VectorType->ElementCount);
 				}
 				else if (Type->GetKind() == SpvTypeKind::Struct)
 				{
@@ -1533,84 +1554,12 @@ namespace FW
 				else if (Type->GetKind() == SpvTypeKind::Array)
 				{
 					SpvArrayType* ArrayType = static_cast<SpvArrayType*>(Type);
-					for (int Index = 0; Index < (int)ArrayType->Length; Index++)
-					{
-						SpvId IEqual = Patcher.NewId();
-						auto IEqualOp = MakeUnique<SpvOpIEqual>(BoolType, FirstIndex, Patcher.FindOrAddConstant(Index));
-						IEqualOp->SetId(IEqual);
-						GetAccessFuncInsts.Add(MoveTemp(IEqualOp));
-
-						auto TrueLabel = Patcher.NewId();
-						auto FalseLabel = Patcher.NewId();
-						GetAccessFuncInsts.Add(MakeUnique<SpvOpSelectionMerge>(TrueLabel, SpvSelectionControl::None));
-						GetAccessFuncInsts.Add(MakeUnique<SpvOpBranchConditional>(IEqual, TrueLabel, FalseLabel));
-
-						auto TrueLabelOp = MakeUnique<SpvOpLabel>();
-						TrueLabelOp->SetId(TrueLabel);
-						GetAccessFuncInsts.Add(MoveTemp(TrueLabelOp));
-
-						TArray<SpvId> MemberIndexes;
-						int32 MemberMaxIndexNum = GetMaxIndexNum(ArrayType->ElementType);
-						for (int i = 0; i < MemberMaxIndexNum; i++)
-						{
-							MemberIndexes.Add(IndexParams[i + 1]);
-						}
-						SpvId Ret = GetAccess(ArrayType->ElementType, MemberIndexes, GetAccessFuncInsts);
-
-						SpvId AddRet = Patcher.NewId();
-						auto AddOp = MakeUnique<SpvOpIAdd>(IntType, Ret, Patcher.FindOrAddConstant(Index * GetTypeByteSize(ArrayType->ElementType) / 4));
-						AddOp->SetId(AddRet);
-						GetAccessFuncInsts.Add(MoveTemp(AddOp));
-
-						GetAccessFuncInsts.Add(MakeUnique<SpvOpReturnValue>(AddRet));
-
-						auto FalseLabelOp = MakeUnique<SpvOpLabel>();
-						FalseLabelOp->SetId(FalseLabel);
-						GetAccessFuncInsts.Add(MoveTemp(FalseLabelOp));
-					}
-					AppendError(GetAccessFuncInsts);
-					GetAccessFuncInsts.Add(MakeUnique<SpvOpReturnValue>(Patcher.FindOrAddConstant(0)));
+					EmitStridedCompositeAccess(ArrayType->ElementType, (int32)ArrayType->Length);
 				}
 				else if (Type->GetKind() == SpvTypeKind::Matrix)
 				{
 					SpvMatrixType* MatrixType = static_cast<SpvMatrixType*>(Type);
-					for (int Index = 0; Index < (int)MatrixType->ElementCount; Index++)
-					{
-						SpvId IEqual = Patcher.NewId();
-						auto IEqualOp = MakeUnique<SpvOpIEqual>(BoolType, FirstIndex, Patcher.FindOrAddConstant(Index));
-						IEqualOp->SetId(IEqual);
-						GetAccessFuncInsts.Add(MoveTemp(IEqualOp));
-
-						auto TrueLabel = Patcher.NewId();
-						auto FalseLabel = Patcher.NewId();
-						GetAccessFuncInsts.Add(MakeUnique<SpvOpSelectionMerge>(TrueLabel, SpvSelectionControl::None));
-						GetAccessFuncInsts.Add(MakeUnique<SpvOpBranchConditional>(IEqual, TrueLabel, FalseLabel));
-
-						auto TrueLabelOp = MakeUnique<SpvOpLabel>();
-						TrueLabelOp->SetId(TrueLabel);
-						GetAccessFuncInsts.Add(MoveTemp(TrueLabelOp));
-
-						TArray<SpvId> MemberIndexes;
-						int32 MemberMaxIndexNum = GetMaxIndexNum(MatrixType->ElementType);
-						for (int i = 0; i < MemberMaxIndexNum; i++)
-						{
-							MemberIndexes.Add(IndexParams[i + 1]);
-						}
-						SpvId Ret = GetAccess(MatrixType->ElementType, MemberIndexes, GetAccessFuncInsts);
-
-						SpvId AddRet = Patcher.NewId();
-						auto AddOp = MakeUnique<SpvOpIAdd>(IntType, Ret, Patcher.FindOrAddConstant(Index * GetTypeByteSize(MatrixType->ElementType) / 4));
-						AddOp->SetId(AddRet);
-						GetAccessFuncInsts.Add(MoveTemp(AddOp));
-
-						GetAccessFuncInsts.Add(MakeUnique<SpvOpReturnValue>(AddRet));
-
-						auto FalseLabelOp = MakeUnique<SpvOpLabel>();
-						FalseLabelOp->SetId(FalseLabel);
-						GetAccessFuncInsts.Add(MoveTemp(FalseLabelOp));
-					}
-					AppendError(GetAccessFuncInsts);
-					GetAccessFuncInsts.Add(MakeUnique<SpvOpReturnValue>(Patcher.FindOrAddConstant(0)));
+					EmitStridedCompositeAccess(MatrixType->ElementType, (int32)MatrixType->ElementCount);
 				}
 			}
 			else

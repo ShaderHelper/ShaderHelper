@@ -46,6 +46,7 @@ namespace FW
 		virtual void Visit(const class SpvOpFunctionCall* Inst) {}
 		virtual void Visit(const class SpvOpVariable* Inst) {}
 		virtual void Visit(const class SpvOpAtomicIAdd* Inst) {}
+		virtual void Visit(const class SpvOpControlBarrier* Inst) {}
 		virtual void Visit(const class SpvOpPhi* Inst) {}
 		virtual void Visit(const class SpvOpLoopMerge* Inst) {}
 		virtual void Visit(const class SpvOpSelectionMerge* Inst) {}
@@ -1056,6 +1057,34 @@ namespace FW
 		SpvId Memory;
 		SpvId Semantics;
 		SpvId Value;
+	};
+
+	class SpvOpControlBarrier : public SpvInstructionBase<SpvOpControlBarrier>
+	{
+	public:
+		SpvOpControlBarrier(SpvId InExecution, SpvId InMemory, SpvId InSemantics)
+			: SpvInstructionBase(SpvOp::ControlBarrier)
+			, Execution(InExecution), Memory(InMemory), Semantics(InSemantics)
+		{}
+
+		SpvId GetExecution() const { return Execution; }
+		SpvId GetMemory() const { return Memory; }
+		SpvId GetSemantics() const { return Semantics; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(Execution.GetValue());
+			Bin.Add(Memory.GetValue());
+			Bin.Add(Semantics.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ControlBarrier;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
+
+	private:
+		SpvId Execution;
+		SpvId Memory;
+		SpvId Semantics;
 	};
 
 	class SpvOpPhi : public SpvInstructionBase<SpvOpPhi>

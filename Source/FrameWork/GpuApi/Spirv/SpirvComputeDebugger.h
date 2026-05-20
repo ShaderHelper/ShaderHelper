@@ -20,6 +20,9 @@ namespace FW
 	public:
 		SpvComputeDebuggerVisitor(SpvComputeDebuggerContext& InComputeContext, GpuShaderLanguage InLanguage, bool InEnableUbsan);
 
+	public:
+		void Visit(const SpvOpControlBarrier* Inst) override;
+
 	protected:
 		bool PatchActiveCondition(TArray<TUniquePtr<SpvInstruction>>& InstList) override;
 		void ParseInternal() override;

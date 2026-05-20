@@ -124,6 +124,8 @@ namespace SH
 		void SaveDebuggerContextState();
 		void RestoreDebuggerContextState();
 		TArray<FW::SpvDebugState> GenDebugStates(uint8* DebuggerData, uint32 DebuggerDataSize);
+		void RebuildComputeWorkgroupStates();
+		TArray<FW::SpvDebugState> BuildComputeDebugStatesForThread(uint32 LocalLinearIndex) const;
 
 		bool EvaluateExpressionVertexlImpl(const FString& InExpression, struct ExpressionNode& OutResult) const;
 		bool EvaluateExpressionPixelImpl(const FString& InExpression, struct ExpressionNode& OutResult) const;
@@ -192,6 +194,8 @@ namespace SH
 		FW::Vector3u LocalInvocationId;
 		FW::Vector3u DebuggingThreadGroupSize{ 1, 1, 1 };
 		TArray<TArray<FW::SpvDebugState>> PerThreadDebugStates;
+		TArray<TArray<FW::SpvDebugState>> ReconstructedWorkgroupStatesByBarrier;
+		TSet<uint64> InvalidWorkgroupBarrierKeys;
 		int32 StopIterationIndex{};
 		TBitArray<> ThreadsReachingStop;
 		//

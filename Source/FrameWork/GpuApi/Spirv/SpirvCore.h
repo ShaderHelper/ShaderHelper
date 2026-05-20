@@ -804,6 +804,7 @@ namespace FW
 		DPdx = 207,
 		DPdy = 208,
 		Fwidth = 209,
+		ControlBarrier = 224,
 		AtomicIAdd = 234,
 		Phi = 245,
 		LoopMerge = 246,

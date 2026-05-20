@@ -152,4 +152,9 @@ namespace FW
 
 		StoreDebuggerBufferUVec4Batches(Patcher, DebuggerBuffer, PayloadBaseIndex, UIntValues, InstList);
 	}
+
+	void SpvComputeDebuggerVisitor::Visit(const SpvOpControlBarrier* Inst)
+	{
+		AppendTag([&] { return Inst->GetWordOffset().value() + Inst->GetWordLen().value(); }, SpvDebuggerStateType::WorkgroupBarrier);
+	}
 }

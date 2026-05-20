@@ -926,6 +926,14 @@ namespace FW
 				DecodedInst->SetId(ResultId);
 				break;
 			}
+			case SpvOp::ControlBarrier:
+			{
+				SpvId Execution = SpvCode[WordOffset + 1];
+				SpvId Memory = SpvCode[WordOffset + 2];
+				SpvId Semantics = SpvCode[WordOffset + 3];
+				DecodedInst = MakeUnique<SpvOpControlBarrier>(Execution, Memory, Semantics);
+				break;
+			}
 			case SpvOp::Phi:
 			{
 				SpvId ResultType = SpvCode[WordOffset + 1];
