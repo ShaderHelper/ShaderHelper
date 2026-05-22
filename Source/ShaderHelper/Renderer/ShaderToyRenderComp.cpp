@@ -2,9 +2,6 @@
 #include "ShaderToyRenderComp.h"
 #include "GpuApi/GpuRhi.h"
 #include "ProjectManager/ShProjectManager.h"
-#include "GpuApi/GpuResourceHelper.h"
-#include "AssetObject/ShaderToy/StShader.h"
-#include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "AssetObject/ShaderToy/Nodes/ShaderToyKeyboardNode.h"
 

@@ -34,6 +34,7 @@ namespace SH
 		virtual bool CompileShader(FString& OutError, FString& OutWarn) { return false; }
 		//Query overall compilation success status
 		virtual bool IsCompilationSucceeded() const { return false; }
+		virtual TArray<FW::ShaderType> GetEnabledStageList() const { return {}; }
 
 		static FString LoadIncludeFile(const FString& IncludePath);
 

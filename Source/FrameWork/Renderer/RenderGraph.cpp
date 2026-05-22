@@ -24,22 +24,54 @@ namespace FW
 		return InResource;
 	}
 
-	RGRenderPass& RGRenderPass::Read(GpuResource* InResource)
+	void RGPassBase::AddResourceState(GpuResource* InResource, GpuResourceState InState)
 	{
 		if (GpuResource* Resource = ResolveBarrierResource(InResource))
 		{
-			PassResourceStates.Add(Resource, GpuResourceState::ShaderResourceRead);
+			PassResourceStates.Add(Resource, InState);
 		}
+	}
+
+	RGRenderPass& RGRenderPass::Read(GpuResource* InResource)
+	{
+		AddResourceState(InResource, GpuResourceState::ShaderResourceRead);
 		return *this;
 	}
 
 	RGRenderPass& RGRenderPass::Write(GpuResource* InResource)
 	{
-		if (GpuResource* Resource = ResolveBarrierResource(InResource))
-		{
-			PassResourceStates.Add(Resource, GpuResourceState::UnorderedAccess);
-		}
+		AddResourceState(InResource, GpuResourceState::UnorderedAccess);
 		return *this;
+	}
+
+	void RGRenderPass::Execute(GpuCmdRecorder* CmdRecorder)
+	{
+		auto PassRecorder = CmdRecorder->BeginRenderPass(Desc, Name);
+		{
+			Execution(PassRecorder);
+		}
+		CmdRecorder->EndRenderPass(PassRecorder);
+	}
+
+	RGComputePass& RGComputePass::Read(GpuResource* InResource)
+	{
+		AddResourceState(InResource, GpuResourceState::ShaderResourceRead);
+		return *this;
+	}
+
+	RGComputePass& RGComputePass::Write(GpuResource* InResource)
+	{
+		AddResourceState(InResource, GpuResourceState::UnorderedAccess);
+		return *this;
+	}
+
+	void RGComputePass::Execute(GpuCmdRecorder* CmdRecorder)
+	{
+		auto PassRecorder = CmdRecorder->BeginComputePass(Name, TimestampWrites);
+		{
+			Execution(PassRecorder);
+		}
+		CmdRecorder->EndComputePass(PassRecorder);
 	}
 
 	RenderGraph::RenderGraph()
@@ -52,7 +84,7 @@ namespace FW
 
 	}
 
-	void RenderGraph::SetupPass(RGRenderPass& InOutPass)
+	void RenderGraph::SetupRenderPass(RGRenderPass& InOutPass)
 	{
 		uint32 PassRtNum = InOutPass.Desc.ColorRenderTargets.Num();
 		for (uint32 i = 0; i < PassRtNum; i++)
@@ -66,7 +98,7 @@ namespace FW
 		}
 	}
 
-	void RenderGraph::CreatePassBarriers(const RGRenderPass& InPass)
+	void RenderGraph::CreatePassBarriers(const RGPassBase& InPass)
 	{
 		TArray<GpuBarrierInfo> BarrierInfos;
 		for (auto [Res, DesiredState] : InPass.PassResourceStates)
@@ -76,36 +108,41 @@ namespace FW
 		CmdRecorder->Barriers(BarrierInfos);
 	}
 
-	void RenderGraph::ExecutePass(RGRenderPass& InPass)
-	{
-		auto PassRecorder = CmdRecorder->BeginRenderPass(InPass.Desc, InPass.Name);
-		{
-			InPass.Execution(PassRecorder);
-		}
-		CmdRecorder->EndRenderPass(PassRecorder);
-	}
-
 	RGRenderPass& RenderGraph::AddRenderPass(const FString& PassName, GpuRenderPassDesc PassInfo, const RenderPassExecution& InExecution)
 	{
-		RGRenderPass NewPass{ PassName, MoveTemp(PassInfo), InExecution };
-		SetupPass(NewPass);
-		int32 PassIndex = RGRenderPasses.Num();
-        RGRenderPasses.Add(MoveTemp(NewPass));
-		return RGRenderPasses[PassIndex];
+		auto NewPass = MakeUnique<RGRenderPass>();
+		NewPass->Name = PassName;
+		NewPass->Desc = MoveTemp(PassInfo);
+		NewPass->Execution = InExecution;
+		SetupRenderPass(*NewPass);
+		RGRenderPass& Ref = *NewPass;
+		RGPasses.Add(MoveTemp(NewPass));
+		return Ref;
+	}
+
+	RGComputePass& RenderGraph::AddComputePass(const FString& PassName, const ComputePassExecution& InExecution, TOptional<GpuPassTimestampWrites> TimestampWrites)
+	{
+		auto NewPass = MakeUnique<RGComputePass>();
+		NewPass->Name = PassName;
+		NewPass->Execution = InExecution;
+		NewPass->TimestampWrites = MoveTemp(TimestampWrites);
+		RGComputePass& Ref = *NewPass;
+		RGPasses.Add(MoveTemp(NewPass));
+		return Ref;
 	}
 
 	void RenderGraph::Execute()
 	{
-		for (auto& RenderPass: RGRenderPasses)
+		for (auto& Pass : RGPasses)
 		{
-			CreatePassBarriers(RenderPass);
-			ExecutePass(RenderPass);
+			CreatePassBarriers(*Pass);
+			Pass->Execute(CmdRecorder);
 		}
 		GGpuRhi->EndRecording(CmdRecorder);
 		GGpuRhi->Submit({CmdRecorder});
 		
 		//Allow multiple executions?
-		RGRenderPasses.Empty();
+		RGPasses.Empty();
 		CmdRecorder = GGpuRhi->BeginRecording();
 	}
 

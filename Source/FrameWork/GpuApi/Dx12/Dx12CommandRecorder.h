@@ -142,7 +142,7 @@ namespace FW
 		ID3D12GraphicsCommandList* GetCommandList() const { return CmdList; }
 
 	public:
-		GpuComputePassRecorder* BeginComputePass(const FString& PassName) override;
+		GpuComputePassRecorder* BeginComputePass(const FString& PassName, TOptional<GpuPassTimestampWrites> TimestampWrites = {}) override;
 		void EndComputePass(GpuComputePassRecorder* InComputePassRecorder) override;
 		GpuRenderPassRecorder* BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName) override;
 		void EndRenderPass(GpuRenderPassRecorder* InRenderPassRecorder) override;
@@ -189,7 +189,7 @@ namespace FW
 		TRefCountPtr<ID3D12Fence> Fence;
 		bool IsEnd = false;
 		TOptional<GpuRenderPassDesc> CurrentRenderPassDesc;
-		TOptional<GpuRenderPassTimestampWrites> CurrentTimestampWrites;
+		TOptional<GpuPassTimestampWrites> CurrentTimestampWrites;
 	};
 
 	class Dx12CmdRecorderPool

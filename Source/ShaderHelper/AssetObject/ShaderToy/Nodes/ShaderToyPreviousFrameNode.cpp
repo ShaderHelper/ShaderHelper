@@ -2,8 +2,6 @@
 #include "ShaderToyPreviousFrameNode.h"
 #include "AssetObject/Pins/Pins.h"
 #include "Renderer/ShaderToyRenderComp.h"
-#include "App/App.h"
-#include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/Property/PropertyData/PropertyItem.h"
 
 using namespace FW;
@@ -32,11 +30,6 @@ namespace SH
 		: PassNode(InPassNode)
 	{
 		ObjectName = LOCALIZATION("PreviousFrame");
-	}
-
-	ShaderToyPreviousFrameNode::~ShaderToyPreviousFrameNode()
-	{
-
 	}
 
 	void ShaderToyPreviousFrameNode::Init()

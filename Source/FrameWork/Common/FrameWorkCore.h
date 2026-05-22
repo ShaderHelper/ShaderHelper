@@ -2,45 +2,17 @@
 
 namespace FW
 {
-	DECLARE_LOG_CATEGORY_EXTERN(LogFrameWorkCore, Log, All);
-	inline DEFINE_LOG_CATEGORY(LogFrameWorkCore);
-
-    class PropertyData;
-    class AssetObject;
+	class PropertyData;
+	class AssetObject;
 	struct MetaType;
 	class ShObject;
-    
-    enum class ObjectOwnerShip
-    {
-        Assign,
-        Retain,
-    };
+	FRAMEWORK_API extern TArray<ShObject*> GlobalValidShObjects;
+}
 
-    template<typename T, ObjectOwnerShip> class ObjectPtr;
-
-    template<typename T>
-    using ObserverObjectPtr = ObjectPtr<T, ObjectOwnerShip::Assign>;
-
-	class ShObjectDragDropOp : public FDragDropOperation
-	{
-	public:
-		DRAG_DROP_OPERATOR_TYPE(ShObjectDragDropOp, FDragDropOperation)
-
-		static TSharedRef<ShObjectDragDropOp> New(ShObject* InObject)
-		{
-			TSharedRef<ShObjectDragDropOp> Operation = MakeShareable(new ShObjectDragDropOp(InObject));
-			Operation->MouseCursor = EMouseCursor::GrabHandClosed;
-			Operation->Construct();
-			return Operation;
-		}
-
-		ShObject* Object = nullptr;
-
-	private:
-		explicit ShObjectDragDropOp(ShObject* InObject)
-			: Object(InObject)
-		{}
-	};
+namespace FW
+{
+	DECLARE_LOG_CATEGORY_EXTERN(LogFrameWorkCore, Log, All);
+	inline DEFINE_LOG_CATEGORY(LogFrameWorkCore);
 
 	struct ObjectPtrFixupRequest
 	{
@@ -58,6 +30,15 @@ namespace FW
 	FString GetRegisteredName(MetaType* InMt);
 	MetaType* GetMetaType(const FString& InRegisteredName);
       
+	enum class ObjectOwnerShip
+	{
+		Assign,
+		Retain,
+	};
+	template<typename T, ObjectOwnerShip> class ObjectPtr;
+	template<typename T>
+	using ObserverObjectPtr = ObjectPtr<T, ObjectOwnerShip::Assign>;
+
     //Note: All ShObject must be default constructible.
 	class FRAMEWORK_API ShObject : FNoncopyable
 	{
@@ -93,6 +74,8 @@ namespace FW
 
     public:
 		FGuid GetGuid() const { return Guid; }
+		void RegenerateGuid() { Guid = FGuid::NewGuid(); }
+		void RegenerateGuidRecursive();
 		//Use the serialization system from unreal engine
 		virtual void Serialize(FArchive& Ar);
         virtual void PostLoad();
@@ -190,10 +173,32 @@ namespace FW
 		virtual void OnSelect(ShObject* InObject) {}
 	};
 
-    FRAMEWORK_API ShObjectOp* GetShObjectOp(ShObject* InObject);
+	class ShObjectDragDropOp : public FDragDropOperation
+	{
+	public:
+		DRAG_DROP_OPERATOR_TYPE(ShObjectDragDropOp, FDragDropOperation)
 
-    FRAMEWORK_API extern TArray<ShObject*> GlobalValidShObjects;
+			static TSharedRef<ShObjectDragDropOp> New(ShObject* InObject)
+		{
+			TSharedRef<ShObjectDragDropOp> Operation = MakeShareable(new ShObjectDragDropOp(InObject));
+			Operation->MouseCursor = EMouseCursor::GrabHandClosed;
+			Operation->Construct();
+			return Operation;
+		}
+
+		ShObject* Object = nullptr;
+
+	private:
+		explicit ShObjectDragDropOp(ShObject* InObject)
+			: Object(InObject)
+		{
+		}
+	};
+
+    FRAMEWORK_API ShObjectOp* GetShObjectOp(ShObject* InObject);
 
 	FRAMEWORK_API TArray<TSharedRef<PropertyData>> GeneratePropertyDatas(ShObject* InObject, const MetaMemberData* MetaMemData, void* Instance, bool bForce = false);
 	FRAMEWORK_API TArray<TSharedRef<PropertyData>> GeneratePropertyDatas(ShObject* InObject, MetaType* InMetaType);
 }
+
+#include "Common/ObjectPtr.h"

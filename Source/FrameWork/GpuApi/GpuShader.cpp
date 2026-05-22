@@ -4,11 +4,6 @@
 #include "GLSL.h"
 #include "Spirv/SpirvParser.h"
 
-//ue regex is invalid if disable icu, so use the regex from std.
-//TODO RE2
-#include <regex>
-#include <string>
-
 namespace FW
 {
 	GpuShaderPreProcessor& GpuShaderPreProcessor::ReplacePrintStringLiteral(bool bGlslOnlyRenamePrintFuncs)
@@ -441,7 +436,8 @@ namespace FW
 		for (auto& [Id, ShaderLayoutBinding] : SpvReflectionBindings)
 		{
 			SpvType* Type = MetaContext.GlobalVariables[Id].Type;
-			std::optional<BindingType> ShaderBindingType;
+			std::optional<BindingType> ShaderBindingType = GetSpvBindingType(MetaContext, Id);
+			check(ShaderBindingType.has_value());
 
 			// Tag binding with the shader stage it comes from
 			switch (this->Type)
@@ -452,108 +448,67 @@ namespace FW
 			default: break;
 			}
 
-			ON_SCOPE_EXIT
-			{
-				check(ShaderBindingType.has_value());
-				ShaderLayoutBinding.Type = ShaderBindingType.value();
-				ShaderLayoutBindings.Add(MoveTemp(ShaderLayoutBinding));
-			};
-
-			if (Type->GetKind() == SpvTypeKind::Image)
-			{
-				SpvImageType* ImageType = static_cast<SpvImageType*>(Type);
-				ShaderBindingType = ImageType->Dim == SpvDim::Cube ? BindingType::TextureCube :
-					ImageType->Dim == SpvDim::_3D ? BindingType::Texture3D : BindingType::Texture;
-			}
-			else if (Type->GetKind() == SpvTypeKind::SampledImage)
-			{
-				SpvSampledImageType* SampledImageType = static_cast<SpvSampledImageType*>(Type);
-				ShaderBindingType = SampledImageType->ImageType->Dim == SpvDim::Cube ? BindingType::CombinedTextureCubeSampler :
-					SampledImageType->ImageType->Dim == SpvDim::_3D ? BindingType::CombinedTexture3DSampler : BindingType::CombinedTextureSampler;
-			}
-			else if (Type->GetKind() == SpvTypeKind::Sampler)
-			{
-				ShaderBindingType = BindingType::Sampler;
-			}
-			else if (Type->GetKind() == SpvTypeKind::Struct)
+			ShaderLayoutBinding.Type = ShaderBindingType.value();
+			if (ShaderLayoutBinding.Type == BindingType::UniformBuffer && Type->GetKind() == SpvTypeKind::Struct)
 			{
 				SpvStructType* StructType = static_cast<SpvStructType*>(Type);
-				TArray<SpvDecoration> TypeDecorations;
-				MetaContext.Decorations.MultiFind(Type->GetId(), TypeDecorations);
-				if (TypeDecorations.ContainsByPredicate([&](const SpvDecoration& InItem) {
-					return InItem.Kind == SpvDecorationKind::Block;
-				}))
+				auto BlockNameIt = MetaContext.Names.find(Type->GetId());
+				if (ShaderLanguage == GpuShaderLanguage::GLSL && BlockNameIt != MetaContext.Names.end())
 				{
-					ShaderBindingType = BindingType::UniformBuffer;
-					auto BlockNameIt = MetaContext.Names.find(Type->GetId());
-					if (ShaderLanguage == GpuShaderLanguage::GLSL && BlockNameIt != MetaContext.Names.end())
-					{
-						ShaderLayoutBinding.Name = BlockNameIt->second;
-					}
-
-					auto MemberNamesIt = MetaContext.MemberNames.find(Type->GetId());
-					TArray<SpvDecoration> MemberDecorations;
-					MetaContext.Decorations.MultiFind(Type->GetId(), MemberDecorations);
-
-					for (int32 MemberIdx = 0; MemberIdx < StructType->MemberTypes.Num(); MemberIdx++)
-					{
-						GpuShaderUbMemberInfo MemberInfo;
-						if (MemberNamesIt != MetaContext.MemberNames.end() && MemberNamesIt->second.Contains(MemberIdx))
-						{
-							MemberInfo.Name = MemberNamesIt->second[MemberIdx];
-						}
-						MemberInfo.Type = GetTypeStr(StructType->MemberTypes[MemberIdx], ShaderLanguage);
-						MemberInfo.Size = GetTypeByteSize(StructType->MemberTypes[MemberIdx]);
-
-						for (const SpvDecoration& Dec : MemberDecorations)
-						{
-							if (Dec.Kind == SpvDecorationKind::Offset && Dec.Offset.MemberIndex == (uint32)MemberIdx)
-							{
-								MemberInfo.Offset = Dec.Offset.ByteOffset;
-								break;
-							}
-						}
-
-						ShaderLayoutBinding.UbMembers.Add(MoveTemp(MemberInfo));
-					}
+					ShaderLayoutBinding.Name = BlockNameIt->second;
 				}
-				else
+
+				auto MemberNamesIt = MetaContext.MemberNames.find(Type->GetId());
+				TArray<SpvDecoration> MemberDecorations;
+				MetaContext.Decorations.MultiFind(Type->GetId(), MemberDecorations);
+
+				for (int32 MemberIdx = 0; MemberIdx < StructType->MemberTypes.Num(); MemberIdx++)
 				{
-					if (TypeDecorations.ContainsByPredicate([&](const SpvDecoration& InItem) {
-						return InItem.Kind == SpvDecorationKind::BufferBlock;
-					}))
+					GpuShaderUbMemberInfo MemberInfo;
+					if (MemberNamesIt != MetaContext.MemberNames.end() && MemberNamesIt->second.Contains(MemberIdx))
 					{
-						bool Writable = !TypeDecorations.ContainsByPredicate([&](const SpvDecoration& InItem) {
-							return InItem.Kind == SpvDecorationKind::NonWritable;
-						});
-
-						if (StructType->MemberTypes.Num() == 1 && StructType->MemberTypes[0]->GetKind() == SpvTypeKind::RuntimeArray)
-						{
-							SpvRuntimeArrayType* RuntimeArrayType = static_cast<SpvRuntimeArrayType*>(StructType->MemberTypes[0]);
-							if(RuntimeArrayType->ElementType->GetKind() == SpvTypeKind::Integer &&
-							   static_cast<SpvIntegerType*>(RuntimeArrayType->ElementType)->IsSigend() == false &&
-							   static_cast<SpvIntegerType*>(RuntimeArrayType->ElementType)->GetWidth() == 32)
-							{
-								ShaderBindingType = Writable ? BindingType::RWRawBuffer : BindingType::RawBuffer;
-								continue;
-							}
-						}
-
-						ShaderBindingType = Writable ? BindingType::RWStructuredBuffer : BindingType::StructuredBuffer;
+						MemberInfo.Name = MemberNamesIt->second[MemberIdx];
 					}
+					MemberInfo.Type = GetTypeStr(StructType->MemberTypes[MemberIdx], ShaderLanguage);
+					MemberInfo.Size = GetTypeByteSize(StructType->MemberTypes[MemberIdx]);
+
+					for (const SpvDecoration& Dec : MemberDecorations)
+					{
+						if (Dec.Kind == SpvDecorationKind::Offset && Dec.Offset.MemberIndex == (uint32)MemberIdx)
+						{
+							MemberInfo.Offset = Dec.Offset.ByteOffset;
+							break;
+						}
+					}
+
+					ShaderLayoutBinding.UbMembers.Add(MoveTemp(MemberInfo));
 				}
 			}
+
+			ShaderLayoutBindings.Add(MoveTemp(ShaderLayoutBinding));
 		}
 		return ShaderLayoutBindings;
+	}
+
+	Vector3u GpuShader::GetThreadGroupSize() const
+	{
+		check(Type == ShaderType::Compute);
+		check(!SpvCode.IsEmpty());
+
+		SpvMetaContext MetaContext;
+		SpvMetaVisitor MetaVisitor{ MetaContext };
+		SpirvParser Parser;
+		Parser.Parse(SpvCode);
+		Parser.Accept(&MetaVisitor);
+
+		return MetaContext.ThreadGroupSize;
 	}
 
 	TArray<GpuShaderVertexInput> GpuShader::GetVertexInputs() const
 	{
 		TArray<GpuShaderVertexInput> VertexInputs;
-		if (Type != ShaderType::Vertex || SpvCode.IsEmpty())
-		{
-			return VertexInputs;
-		}
+		check(!SpvCode.IsEmpty());
+		check(Type == ShaderType::Vertex);
 
 		SpvMetaContext MetaContext;
 		SpvMetaVisitor MetaVisitor{ MetaContext };

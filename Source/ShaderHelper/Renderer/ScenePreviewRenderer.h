@@ -13,11 +13,11 @@ namespace SH
 		void InitResources();
 
 		void RenderGrid(FW::RenderGraph& Graph, FW::GpuTextureView* OutputView, FW::GpuTextureView* DepthView,
-			const FW::Camera& Camera, bool bClear = false, float GridSize = 50.0f, float GridSpacing = 1.0f);
+			const FW::Camera& Camera, float GridSize = 50.0f, float GridSpacing = 1.0f);
 
-		bool RenderMeshes(FW::RenderGraph& Graph, FW::GpuTextureView* OutputView,
+		void RenderMeshes(FW::RenderGraph& Graph, FW::GpuTextureView* OutputView,
 			FW::GpuTextureView* DepthView,
-			const FW::Camera& Camera, const TArray<FW::ObjectPtr<SceneObject>>& SceneObjects, bool bClear = false);
+			const FW::Camera& Camera, const TArray<FW::ObjectPtr<SceneObject>>& SceneObjects);
 
 		void RenderOutline(FW::RenderGraph& Graph, FW::GpuTextureView* OutputView,
 			FW::GpuTextureView* MaskView,

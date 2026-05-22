@@ -3,7 +3,6 @@
 #include "MetalDevice.h"
 #include "ShaderConductor.hpp"
 #include "Common/Path/PathHelper.h"
-#include "GpuApi/Spirv/SpirvParser.h"
 #include "GpuApi/GLSL.h"
 
 namespace FW
@@ -37,7 +36,7 @@ namespace FW
 		
 		FString EntryPoint = InShader->GetEntryPoint();
 		//Msl can not call a metal function main
-		if(EntryPoint == "main")
+		if(EntryPoint.Equals("main"))
 		{
 			//spirv-cross default name
 			EntryPoint = "main0";
@@ -132,6 +131,7 @@ namespace FW
 			//Storage buffers use the scalar layout instead of vector-relaxed 430
 			//to make it consistent with structuredbuffer, so that user side can unify the struct
 			DxcArgs.Add("-fvk-use-dx-layout");
+			DxcArgs.Add("-fspv-target-env=vulkan1.1");
 			std::string ShiftB, ShiftT, ShiftS, ShiftU;
 			if (!EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::SkipBindingShift))
 			{
@@ -209,13 +209,12 @@ namespace FW
 			if(SpvResult.hasError)
 			{
 				FString ErrorInfo = static_cast<const char*>(SpvResult.errorWarningMsg.Data());
-				//SH_LOG(LogShader, Error, TEXT("Compilation failed: %s"), *ErrorInfo);
-				OutErrorInfo = MoveTemp(ErrorInfo);
+				OutErrorInfo = "[SpirvCross]" + MoveTemp(ErrorInfo);
 				return false;
 			}
-			else
+			else if (SpvResult.errorWarningMsg.Size() > 0)
 			{
-				OutWarnInfo = static_cast<const char*>(SpvResult.errorWarningMsg.Data());
+				OutWarnInfo = FString("[SpirvCross]") + static_cast<const char*>(SpvResult.errorWarningMsg.Data());
 			}
 			
 #if DEBUG_SHADER
@@ -236,16 +235,6 @@ namespace FW
 			return true;
 		}
 
-		//Need the meta datas from spirv to abstract gpu api
-		//For example, metal's threadgroupsize is not specified in the shader
-		//and needs to be specified directly by dispatchThreadgroups
-		SpvMetaContext MetaContext;
-		SpvMetaVisitor MetaVisitor{ MetaContext };
-		SpirvParser Parser;
-		Parser.Parse(SpvCode);
-		Parser.Accept(&MetaVisitor);
-		InShader->ThreadGroupSize = MetaContext.ThreadGroupSize;
-		
 		ShaderConductor::MacroDefine SpvMslOptions[] = {
 			{"argument_buffers", "1"},
 			{"enable_decoration_binding", "1"},

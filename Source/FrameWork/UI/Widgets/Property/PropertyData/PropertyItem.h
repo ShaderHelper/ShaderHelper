@@ -26,6 +26,7 @@ namespace FW
 		void SetOnDisplayNameChanged(const TFunction<void(const FText&)>& DisplayNameChanged) { OnDisplayNameChanged = DisplayNameChanged; }
 		void SetEmbedWidget(TSharedPtr<SWidget> InWidget, bool bAutoWidth = false) { EmbedWidget = MoveTemp(InWidget); bEmbedWidgetAutoWidth = bAutoWidth; }
         void SetOnDelete(const TFunction<void()>& OnDeleteFunc) { OnDelete = OnDeleteFunc;}
+		void SetContextMenuExtender(TFunction<void(FMenuBuilder&)> InContextMenuExtender) { ContextMenuExtender = MoveTemp(InContextMenuExtender); }
         
         virtual TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
         {
@@ -44,6 +45,8 @@ namespace FW
                     .CanApplyName(CanApplyName)
                     .DisplayName(&DisplayName)
                     .OnDisplayNameChanged(OnDisplayNameChanged)
+					.HasChildren(GetChildrenNum() > 0)
+					.TableRow(Row)
                     .Indent(!!Parent);
             
             if(EmbedWidget)
@@ -105,10 +108,28 @@ namespace FW
         }
         
     protected:
-		virtual TSharedPtr<SWidget> CreateContextMenu() { return nullptr; }
+		void AppendContextMenuExtender(FMenuBuilder& MenuBuilder)
+		{
+			if (ContextMenuExtender)
+			{
+				ContextMenuExtender(MenuBuilder);
+			}
+		}
+
+		virtual TSharedPtr<SWidget> CreateContextMenu()
+		{
+			if (!ContextMenuExtender)
+			{
+				return nullptr;
+			}
+			FMenuBuilder MenuBuilder(true, nullptr);
+			AppendContextMenuExtender(MenuBuilder);
+			return MenuBuilder.MakeWidget();
+		}
 
         bool IsEnabled = true;
         TFunction<void()> OnDelete;
+		TFunction<void(FMenuBuilder&)> ContextMenuExtender;
 		TSharedPtr<SWidget> EmbedWidget;
 		bool bEmbedWidgetAutoWidth = false;
         TSharedPtr<SPropertyItem> Item;
@@ -427,12 +448,12 @@ namespace FW
 		{
 			if (!ValueRef)
 			{
-				return nullptr;
+				return PropertyItemBase::CreateContextMenu();
 			}
 
 			FMenuBuilder MenuBuilder(true, nullptr);
 			MenuBuilder.AddMenuEntry(
-				FText::FromString(TEXT("SpinBox")),
+				LOCALIZATION("Value"),
 				FText::GetEmpty(),
 				FSlateIcon(),
 				FUIAction(
@@ -444,7 +465,7 @@ namespace FW
 				EUserInterfaceActionType::ToggleButton
 			);
 			MenuBuilder.AddMenuEntry(
-				FText::FromString(TEXT("Color Picker")),
+				LOCALIZATION("Color"),
 				FText::GetEmpty(),
 				FSlateIcon(),
 				FUIAction(
@@ -455,6 +476,7 @@ namespace FW
 				NAME_None,
 				EUserInterfaceActionType::ToggleButton
 			);
+			AppendContextMenuExtender(MenuBuilder);
 			return MenuBuilder.MakeWidget();
 		}
 
@@ -586,12 +608,12 @@ namespace FW
 		{
 			if (!ValueRef)
 			{
-				return nullptr;
+				return PropertyItemBase::CreateContextMenu();
 			}
 
 			FMenuBuilder MenuBuilder(true, nullptr);
 			MenuBuilder.AddMenuEntry(
-				FText::FromString(TEXT("SpinBox")),
+				LOCALIZATION("Value"),
 				FText::GetEmpty(),
 				FSlateIcon(),
 				FUIAction(
@@ -603,7 +625,7 @@ namespace FW
 				EUserInterfaceActionType::ToggleButton
 			);
 			MenuBuilder.AddMenuEntry(
-				FText::FromString(TEXT("Color Picker")),
+				LOCALIZATION("Color"),
 				FText::GetEmpty(),
 				FSlateIcon(),
 				FUIAction(
@@ -614,6 +636,7 @@ namespace FW
 				NAME_None,
 				EUserInterfaceActionType::ToggleButton
 			);
+			AppendContextMenuExtender(MenuBuilder);
 			return MenuBuilder.MakeWidget();
 		}
 
@@ -711,66 +734,6 @@ namespace FW
 		TFunction<bool()> ValueEnabled;
 	};
 
-	class PropertyMatrix4x4fItem : public PropertyItemBase
-	{
-		MANUAL_RTTI_TYPE(PropertyMatrix4x4fItem, PropertyItemBase)
-	public:
-		PropertyMatrix4x4fItem(ShObject* InOwner, const FString& InName, float* InValues = nullptr, bool InReadOnly = false)
-			: PropertyMatrix4x4fItem(InOwner, FText::FromString(InName), InValues, InReadOnly)
-		{}
-		PropertyMatrix4x4fItem(ShObject* InOwner, FText InName, float* InValues = nullptr, bool InReadOnly = false)
-			: PropertyItemBase(InOwner, MoveTemp(InName))
-			, Values(InValues)
-			, ReadOnly(InReadOnly)
-		{}
-		PropertyMatrix4x4fItem(ShObject* InOwner, const FString& InName, FMatrix44f* InValueRef, bool InReadOnly = false)
-			: PropertyMatrix4x4fItem(InOwner, FText::FromString(InName), InValueRef, InReadOnly)
-		{}
-		PropertyMatrix4x4fItem(ShObject* InOwner, FText InName, FMatrix44f* InValueRef, bool InReadOnly = false)
-			: PropertyMatrix4x4fItem(InOwner, MoveTemp(InName), reinterpret_cast<float*>(InValueRef), InReadOnly)
-		{}
-
-		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
-		{
-			auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
-			if (Values)
-			{
-				auto ValueWidget = SNew(SVerticalBox);
-				for (int32 RowIndex = 0; RowIndex < 4; ++RowIndex)
-				{
-					auto RowWidget = SNew(SHorizontalBox);
-					for (int32 ColumnIndex = 0; ColumnIndex < 4; ++ColumnIndex)
-					{
-						const int32 ValueIndex = RowIndex * 4 + ColumnIndex;
-						RowWidget->AddSlot()
-						[
-							SNew(SSpinBox<float>)
-							.IsEnabled(!ReadOnly)
-							.OnValueCommitted_Lambda([this](float, ETextCommit::Type) { EndEdit(); })
-							.OnValueChanged_Lambda([this, ValueIndex](float NewValue) {
-								if (Values[ValueIndex] != NewValue && Owner->CanChangeProperty(this))
-								{
-									BeginEdit();
-									Values[ValueIndex] = NewValue;
-									Owner->PostPropertyChanged(this);
-								}
-							})
-							.Value_Lambda([this, ValueIndex] { return Values[ValueIndex]; })
-						];
-					}
-					ValueWidget->AddSlot().AutoHeight()[RowWidget];
-				}
-				Item->AddWidget(MoveTemp(ValueWidget));
-			}
-
-			return Row;
-		}
-
-	private:
-		float* Values;
-		bool ReadOnly;
-	};
-
 	class PropertyVector2iItem : public PropertyItemBase
 	{
 		MANUAL_RTTI_TYPE(PropertyVector2iItem, PropertyItemBase)
@@ -837,6 +800,8 @@ namespace FW
 			, ReadOnly(InReadOnly)
 		{}
 
+		Vector3i GetPendingValue() const { return PendingValue; }
+
 		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
 		{
 			auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
@@ -845,48 +810,15 @@ namespace FW
 				auto ValueWidget = SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot()
 					[
-						SNew(SSpinBox<int32>)
-						.IsEnabled(!ReadOnly)
-						.OnValueCommitted_Lambda([this](int32, ETextCommit::Type) { EndEdit(); })
-						.OnValueChanged_Lambda([this](int32 NewValue) {
-							if (Values[0] != NewValue && Owner->CanChangeProperty(this))
-							{
-								BeginEdit();
-								Values[0] = NewValue;
-								Owner->PostPropertyChanged(this);
-							}
-						})
-						.Value_Lambda([this] { return Values[0]; })
+						MakeSpinBox(0)
 					]
 					+ SHorizontalBox::Slot()
 					[
-						SNew(SSpinBox<int32>)
-						.IsEnabled(!ReadOnly)
-						.OnValueCommitted_Lambda([this](int32, ETextCommit::Type) { EndEdit(); })
-						.OnValueChanged_Lambda([this](int32 NewValue) {
-							if (Values[1] != NewValue && Owner->CanChangeProperty(this))
-							{
-								BeginEdit();
-								Values[1] = NewValue;
-								Owner->PostPropertyChanged(this);
-							}
-						})
-						.Value_Lambda([this] { return Values[1]; })
+						MakeSpinBox(1)
 					]
 					+ SHorizontalBox::Slot()
 					[
-						SNew(SSpinBox<int32>)
-						.IsEnabled(!ReadOnly)
-						.OnValueCommitted_Lambda([this](int32, ETextCommit::Type) { EndEdit(); })
-						.OnValueChanged_Lambda([this](int32 NewValue) {
-							if (Values[2] != NewValue && Owner->CanChangeProperty(this))
-							{
-								BeginEdit();
-								Values[2] = NewValue;
-								Owner->PostPropertyChanged(this);
-							}
-						})
-						.Value_Lambda([this] { return Values[2]; })
+						MakeSpinBox(2)
 					];
 				Item->AddWidget(MoveTemp(ValueWidget));
 			}
@@ -894,8 +826,30 @@ namespace FW
 		}
 
 	private:
+		TSharedRef<SWidget> MakeSpinBox(int32 ComponentIdx)
+		{
+			return SNew(SSpinBox<int32>)
+				.IsEnabled(!ReadOnly)
+				.OnValueCommitted_Lambda([this](int32, ETextCommit::Type) { EndEdit(); })
+				.OnValueChanged_Lambda([this, ComponentIdx](int32 NewValue) {
+					if (Values[ComponentIdx] != NewValue && PendingValue.Data[ComponentIdx] != NewValue)
+					{
+						PendingValue = Vector3i{ Values[0], Values[1], Values[2] };
+						PendingValue.Data[ComponentIdx] = NewValue;
+						if (Owner->CanChangeProperty(this))
+						{
+							BeginEdit();
+							Values[ComponentIdx] = NewValue;
+							Owner->PostPropertyChanged(this);
+						}
+					}
+				})
+				.Value_Lambda([this, ComponentIdx] { return Values[ComponentIdx]; });
+		}
+
 		int32* Values;
 		bool ReadOnly;
+		Vector3i PendingValue{};
 	};
 
 	class PropertyVector4iItem : public PropertyItemBase

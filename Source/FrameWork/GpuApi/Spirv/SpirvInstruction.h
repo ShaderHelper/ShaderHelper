@@ -9,12 +9,13 @@ namespace FW
 	{
 	public:
 		virtual ~SpvVisitor() = default;
-		virtual void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections, const TMap<SpvId, SpvExtSet>& InExtSets) {}
+		virtual void Parse(TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections) {}
 		virtual void Visit(const SpvInstruction*) {}
 		
 		//Core
 		virtual void Visit(const class SpvOpEntryPoint* Inst) {}
 		virtual void Visit(const class SpvOpExecutionMode* Inst) {}
+		virtual void Visit(const class SpvOpExtInstImport* Inst) {}
 		virtual void Visit(const class SpvOpName* Inst) {}
 		virtual void Visit(const class SpvOpMemberName* Inst) {}
 		virtual void Visit(const class SpvOpString* Inst) {}
@@ -45,6 +46,7 @@ namespace FW
 		virtual void Visit(const class SpvOpFunctionCall* Inst) {}
 		virtual void Visit(const class SpvOpVariable* Inst) {}
 		virtual void Visit(const class SpvOpAtomicIAdd* Inst) {}
+		virtual void Visit(const class SpvOpControlBarrier* Inst) {}
 		virtual void Visit(const class SpvOpPhi* Inst) {}
 		virtual void Visit(const class SpvOpLoopMerge* Inst) {}
 		virtual void Visit(const class SpvOpSelectionMerge* Inst) {}
@@ -214,6 +216,7 @@ namespace FW
 		void SetWordLen(uint32 InWordLen) { WordLen = InWordLen; };
 
 		virtual TUniquePtr<SpvInstruction> Clone() const = 0;
+		virtual void CopyFrom(const SpvInstruction& Other) = 0;
 		virtual void Accept(SpvVisitor* Visitor) const = 0;
 		virtual TArray<uint32> ToBinary() const { check(false);  return {}; }
 		
@@ -233,6 +236,13 @@ namespace FW
 		TUniquePtr<SpvInstruction> Clone() const override
 		{
 			return MakeUnique<T>(static_cast<const T&>(*this));
+		}
+
+		void CopyFrom(const SpvInstruction& Other) override
+		{
+			const T* TypedOther = dynamic_cast<const T*>(&Other);
+			check(TypedOther);
+			*static_cast<T*>(this) = *TypedOther;
 		}
 		
 		void Accept(SpvVisitor* Visitor) const override
@@ -265,17 +275,59 @@ namespace FW
 	class SpvOpEntryPoint : public SpvInstructionBase<SpvOpEntryPoint>
 	{
 	public:
-		SpvOpEntryPoint(SpvExecutionModel InModel, SpvId InEntryPoint, const FString& InEntryPointName)
+		SpvOpEntryPoint(SpvExecutionModel InModel, SpvId InEntryPoint, const FString& InEntryPointName, TArray<SpvId> InInterfaces = {})
 		: SpvInstructionBase(SpvOp::EntryPoint)
 		, Model(InModel)
 		, EntryPoint(InEntryPoint)
 		, EntryPointName(InEntryPointName)
+		, Interfaces(MoveTemp(InInterfaces))
 		{}
+
+		SpvExecutionModel GetModel() const { return Model; }
+		SpvId GetEntryPointId() const { return EntryPoint; }
+		const FString& GetEntryPointName() const { return EntryPointName; }
+		const TArray<SpvId>& GetInterfaces() const { return Interfaces; }
+		bool AddInterface(SpvId Interface)
+		{
+			if (Interfaces.Contains(Interface))
+			{
+				return false;
+			}
+			Interfaces.Add(Interface);
+			return true;
+		}
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add((uint32)Model);
+			Bin.Add(EntryPoint.GetValue());
+
+			std::string Utf8Name(TCHAR_TO_UTF8(*EntryPointName));
+			int32 NameWordCount = ((int32)Utf8Name.size() + 1 + 3) / 4;
+			TArray<uint32> NameWords;
+			NameWords.SetNumZeroed(NameWordCount);
+			char* NameData = reinterpret_cast<char*>(NameWords.GetData());
+			for (int32 Index = 0; Index < (int32)Utf8Name.size(); Index++)
+			{
+				NameData[Index] = Utf8Name[Index];
+			}
+			Bin.Append(NameWords);
+
+			for (SpvId Interface : Interfaces)
+			{
+				Bin.Add(Interface.GetValue());
+			}
+
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::EntryPoint;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		SpvExecutionModel Model;
 		SpvId EntryPoint;
 		FString EntryPointName;
+		TArray<SpvId> Interfaces;
 	};
 
 	class SpvOpDecorate : public SpvInstructionBase<SpvOpDecorate>
@@ -350,6 +402,15 @@ namespace FW
 		, Width(InWidth)
 		{}
 		uint32 GetWidth() const { return Width; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(GetId().value().GetValue());
+			Bin.Add(Width);
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::TypeFloat;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 		
 	private:
 		uint32 Width;
@@ -436,6 +497,14 @@ namespace FW
 	{
 	public:
 		SpvOpTypeBool() : SpvInstructionBase(SpvOp::TypeBool) {}
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(GetId().value().GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::TypeBool;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 	};
 
 	class SpvOpTypePointer : public SpvInstructionBase<SpvOpTypePointer>
@@ -634,6 +703,16 @@ namespace FW
 		SpvOpConstantTrue(SpvId InResultType)
 		: SpvOpConstant(InResultType, {(uint8*)new uint32{1}, 4}, SpvOp::ConstantTrue)
 		{}
+
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(GetResultType().GetValue());
+			Bin.Add(GetId().value().GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ConstantTrue;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 	};
 
 	class SpvOpConstantFalse : public SpvOpConstant
@@ -642,6 +721,16 @@ namespace FW
 		SpvOpConstantFalse(SpvId InResultType)
 		: SpvOpConstant(InResultType, {(uint8*)new uint32{0}, 4}, SpvOp::ConstantFalse)
 		{}
+
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(GetResultType().GetValue());
+			Bin.Add(GetId().value().GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ConstantFalse;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 	};
 
 	class SpvOpConstantComposite : public SpvInstructionBase<SpvOpConstantComposite>
@@ -677,6 +766,15 @@ namespace FW
 		, ResultType(InResultType)
 		{}
 		SpvId GetResultType() const { return ResultType; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ConstantNull;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 	private:
 		SpvId ResultType;
 	};
@@ -761,6 +859,40 @@ namespace FW
 		
 	private:
 		FString Str;
+	};
+
+	class SpvOpExtInstImport : public SpvInstructionBase<SpvOpExtInstImport>
+	{
+	public:
+		SpvOpExtInstImport(const FString& InName)
+		: SpvInstructionBase(SpvOp::ExtInstImport)
+		, Name(InName)
+		{}
+		
+		const FString& GetName() const { return Name; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(GetId().value().GetValue());
+
+			std::string Utf8Name(TCHAR_TO_UTF8(*Name));
+			int32 NameWordCount = ((int32)Utf8Name.size() + 1 + 3) / 4;
+			TArray<uint32> NameWords;
+			NameWords.SetNumZeroed(NameWordCount);
+			char* NameData = reinterpret_cast<char*>(NameWords.GetData());
+			for (int32 Index = 0; Index < (int32)Utf8Name.size(); Index++)
+			{
+				NameData[Index] = Utf8Name[Index];
+			}
+			Bin.Append(NameWords);
+
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ExtInstImport;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
+		
+	private:
+		FString Name;
 	};
 
 	class SpvOpFunction : public SpvInstructionBase<SpvOpFunction>
@@ -927,6 +1059,34 @@ namespace FW
 		SpvId Value;
 	};
 
+	class SpvOpControlBarrier : public SpvInstructionBase<SpvOpControlBarrier>
+	{
+	public:
+		SpvOpControlBarrier(SpvId InExecution, SpvId InMemory, SpvId InSemantics)
+			: SpvInstructionBase(SpvOp::ControlBarrier)
+			, Execution(InExecution), Memory(InMemory), Semantics(InSemantics)
+		{}
+
+		SpvId GetExecution() const { return Execution; }
+		SpvId GetMemory() const { return Memory; }
+		SpvId GetSemantics() const { return Semantics; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(Execution.GetValue());
+			Bin.Add(Memory.GetValue());
+			Bin.Add(Semantics.GetValue());
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::ControlBarrier;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
+
+	private:
+		SpvId Execution;
+		SpvId Memory;
+		SpvId Semantics;
+	};
+
 	class SpvOpPhi : public SpvInstructionBase<SpvOpPhi>
 	{
 	public:
@@ -936,6 +1096,20 @@ namespace FW
 
 		SpvId GetResultType() const { return ResultType; }
 		const TArray<TPair<SpvId, SpvId>>& GetOperands() const { return Operands; }
+		TArray<uint32> ToBinary() const override
+		{
+			TArray<uint32> Bin;
+			Bin.Add(ResultType.GetValue());
+			Bin.Add(GetId().value().GetValue());
+			for (const TPair<SpvId, SpvId>& Operand : Operands)
+			{
+				Bin.Add(Operand.Key.GetValue());
+				Bin.Add(Operand.Value.GetValue());
+			}
+			uint32 Header = ((Bin.Num() + 1) << 16) | (uint32)SpvOp::Phi;
+			Bin.Insert(Header, 0);
+			return Bin;
+		}
 
 	private:
 		SpvId ResultType;

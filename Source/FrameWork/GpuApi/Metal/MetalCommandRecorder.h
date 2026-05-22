@@ -98,8 +98,6 @@ namespace FW
     private:
         MTLRenderCommandEncoderPtr CmdEncoder;
         MtlRenderStateCache StateCache;
-        MTL::CounterSampleBuffer* TimestampSampleBuffer = nullptr;
-        NS::UInteger EndOfPassSampleIndex = 0;
     };
 
 	class MtlComputePassRecorder: public GpuComputePassRecorder
@@ -130,7 +128,7 @@ namespace FW
         MTL::CommandBuffer* GetCommandBuffer() const { return CmdBuffer.get(); }
         
     public:
-		GpuComputePassRecorder* BeginComputePass(const FString& PassName) override;
+        GpuComputePassRecorder* BeginComputePass(const FString& PassName, TOptional<GpuPassTimestampWrites> TimestampWrites = {}) override;
 		void EndComputePass(GpuComputePassRecorder* InComputePassRecorder) override;
         GpuRenderPassRecorder* BeginRenderPass(const GpuRenderPassDesc& PassDesc, const FString& PassName) override;
         void EndRenderPass(GpuRenderPassRecorder* InRenderPassRecorder) override;
@@ -145,6 +143,8 @@ namespace FW
         MTLCommandBufferPtr CmdBuffer;
         TArray<TUniquePtr<MtlRenderPassRecorder>> RenderPassRecorders;
         TArray<TUniquePtr<MtlComputePassRecorder>> ComputePassRecorders;
+        MTL::CounterSampleBuffer* CurrentTimestampSampleBuffer = nullptr;
+        NS::UInteger CurrentEndOfPassSampleIndex = 0;
     };
     
     inline MtlCmdRecorder* LastSubmittedCmdRecorder;

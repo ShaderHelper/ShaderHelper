@@ -2,12 +2,13 @@
 #include "Editor/PreviewViewPort.h"
 #include "AssetObject/Material.h"
 #include "Renderer/MaterialPreviewRenderer.h"
+#include "Renderer/RenderComponent.h"
 
 #include <Widgets/SViewport.h>
 
 namespace SH
 {
-	class SMaterialPreviewer : public SCompoundWidget
+	class SMaterialPreviewer : public SCompoundWidget, public FW::RenderComponent
 	{
 	public:
 		SLATE_BEGIN_ARGS(SMaterialPreviewer) {}
@@ -19,6 +20,7 @@ namespace SH
 		void Construct(const FArguments& InArgs);
 
 		virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+		void RenderInternal() override;
 
 		static void OpenMaterialPreviewer(FW::AssetPtr<Material> InMaterial, const FPointerEventHandler& InOnMouseButtonDown = {}, TSharedPtr<SWindow> InParentWindow = nullptr);
 
@@ -32,7 +34,6 @@ namespace SH
 		TArray<TSharedPtr<MaterialPreviewPrimitive>> PreviewPrimitiveOptions;
 		TUniquePtr<MaterialPreviewRenderer> Renderer;
 		TSharedPtr<STextBlock> ErrorText;
-		FDelegateHandle ResizeHandlerHandle;
 		FDelegateHandle MaterialChangedHandle;
 		bool bDragging = false;
 		FW::Vector2f LastMousePos = { 0.0f, 0.0f };

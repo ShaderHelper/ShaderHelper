@@ -25,6 +25,36 @@ namespace FW::GpuResourceHelper
 		return NewSampler;
 	}
 
+	TOptional<GpuPassTimestampWrites> PreparePassTimestampWrites(TRefCountPtr<GpuQuerySet>& InOutTimestampQuerySet, double& OutGpuTimeMs)
+	{
+		if (!ShowTimestampMs())
+		{
+			OutGpuTimeMs = 0.0;
+			InOutTimestampQuerySet = nullptr;
+			return {};
+		}
+
+		if (InOutTimestampQuerySet)
+		{
+			TArray<uint64> Timestamps;
+			InOutTimestampQuerySet->ResolveResults(0, 2, Timestamps);
+			double PeriodNs = InOutTimestampQuerySet->GetTimestampPeriodNs();
+			OutGpuTimeMs = (double)(Timestamps[1] - Timestamps[0]) * PeriodNs / 1e6;
+		}
+
+		if (GGpuRhi->GetFeature().SupportTimestampQuery() && !InOutTimestampQuerySet)
+		{
+			InOutTimestampQuerySet = GGpuRhi->CreateQuerySet(2);
+		}
+
+		if (!InOutTimestampQuerySet)
+		{
+			return {};
+		}
+
+		return GpuPassTimestampWrites{ InOutTimestampQuerySet, 0, 1 };
+	}
+
 	GpuTexture* GetGlobalBlackTex()
 	{
         TArray<uint8> RawData = {0,0,0,255};

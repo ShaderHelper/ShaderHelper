@@ -1,7 +1,7 @@
 #include "CommonHeader.h"
 #include "ShAssetEditor.h"
 #include "Editor/ShaderHelperEditor.h"
-#include "App/App.h"
+#include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
 
 using namespace FW;
 

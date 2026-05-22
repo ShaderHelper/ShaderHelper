@@ -31,88 +31,15 @@ namespace FW
 			auto& FixupStack = GetObjectPtrFixupStack();
 			return FixupStack.IsEmpty() ? nullptr : FixupStack.Last().Get();
 		}
-	}
 
-	void BeginObjectPtrFixup()
-	{
-		GetObjectPtrFixupStack().Add(MakeUnique<ObjectPtrFixupContext>());
-	}
-
-	void ResolveObjectPtrFixups()
-	{
-		ObjectPtrFixupContext* Context = GetCurrentObjectPtrFixupContext();
-		if (!Context)
-		{
-			return;
-		}
-
-		for (const ObjectPtrFixupRequest& Request : Context->Requests)
-		{
-			if (!Request.Guid.IsValid())
-			{
-				continue;
-			}
-
-			ShObject** ResolvedObjectPtr = Context->GuidToObject.Find(Request.Guid);
-			if (!ResolvedObjectPtr || !*ResolvedObjectPtr)
-			{
-				SH_LOG(LogFrameWorkCore, Warning, TEXT("Failed to resolve object pointer guid: %s"), *Request.Guid.ToString());
-				continue;
-			}
-
-			bool bTypeMatched = false;
-			for (MetaType* CurMetaType = (*ResolvedObjectPtr)->DynamicMetaType(); CurMetaType; CurMetaType = CurMetaType->GetBaseClass())
-			{
-				if (CurMetaType == Request.TargetMetaType)
-				{
-					bTypeMatched = true;
-					break;
-				}
-			}
-
-			if (!bTypeMatched)
-			{
-				SH_LOG(LogFrameWorkCore, Warning, TEXT("Resolved guid %s with mismatched type."), *Request.Guid.ToString());
-				continue;
-			}
-
-			Request.AssignResolvedObject(Request.ObjectPtrAddress, *ResolvedObjectPtr);
-		}
-	}
-
-	void EndObjectPtrFixup()
-	{
-		auto& FixupStack = GetObjectPtrFixupStack();
-		check(!FixupStack.IsEmpty());
-		FixupStack.Pop();
-	}
-
-	void RegisterLoadedShObject(ShObject* InObject)
-	{
-		if (ObjectPtrFixupContext* Context = GetCurrentObjectPtrFixupContext())
-		{
-			Context->GuidToObject.FindOrAdd(InObject->GetGuid()) = InObject;
-		}
-	}
-
-	void RegisterObjectPtrFixup(const ObjectPtrFixupRequest& InRequest)
-	{
-		if (ObjectPtrFixupContext* Context = GetCurrentObjectPtrFixupContext())
-		{
-			Context->Requests.Add(InRequest);
-		}
-	}
-
-	namespace
-	{
 		struct PropertyValueAccess
 		{
 			FText DisplayName;
 			FString TypeName;
 			void* ValuePtr = nullptr;
 			TFunction<void(void*)> SetValue;
-			TFunction<MetaType*()> GetMetaType;
-			TFunction<ShObject*()> GetReferencedShObject;
+			TFunction<MetaType* ()> GetMetaType;
+			TFunction<ShObject* ()> GetReferencedShObject;
 			TFunction<void(ShObject*)> SetReferencedShObject;
 			TFunction<FString()> GetEnumValueName;
 			TMap<FString, TSharedPtr<void>> EnumEntries;
@@ -259,7 +186,77 @@ namespace FW
 			return Item;
 		}
 	}
-	
+
+	void BeginObjectPtrFixup()
+	{
+		GetObjectPtrFixupStack().Add(MakeUnique<ObjectPtrFixupContext>());
+	}
+
+	void ResolveObjectPtrFixups()
+	{
+		ObjectPtrFixupContext* Context = GetCurrentObjectPtrFixupContext();
+		if (!Context)
+		{
+			return;
+		}
+
+		for (const ObjectPtrFixupRequest& Request : Context->Requests)
+		{
+			if (!Request.Guid.IsValid())
+			{
+				continue;
+			}
+
+			ShObject** ResolvedObjectPtr = Context->GuidToObject.Find(Request.Guid);
+			if (!ResolvedObjectPtr || !*ResolvedObjectPtr)
+			{
+				SH_LOG(LogFrameWorkCore, Warning, TEXT("Failed to resolve object pointer guid: %s"), *Request.Guid.ToString());
+				continue;
+			}
+
+			bool bTypeMatched = false;
+			for (MetaType* CurMetaType = (*ResolvedObjectPtr)->DynamicMetaType(); CurMetaType; CurMetaType = CurMetaType->GetBaseClass())
+			{
+				if (CurMetaType == Request.TargetMetaType)
+				{
+					bTypeMatched = true;
+					break;
+				}
+			}
+
+			if (!bTypeMatched)
+			{
+				SH_LOG(LogFrameWorkCore, Warning, TEXT("Resolved guid %s with mismatched type."), *Request.Guid.ToString());
+				continue;
+			}
+
+			Request.AssignResolvedObject(Request.ObjectPtrAddress, *ResolvedObjectPtr);
+		}
+	}
+
+	void EndObjectPtrFixup()
+	{
+		auto& FixupStack = GetObjectPtrFixupStack();
+		check(!FixupStack.IsEmpty());
+		FixupStack.Pop();
+	}
+
+	void RegisterLoadedShObject(ShObject* InObject)
+	{
+		if (ObjectPtrFixupContext* Context = GetCurrentObjectPtrFixupContext())
+		{
+			Context->GuidToObject.FindOrAdd(InObject->GetGuid()) = InObject;
+		}
+	}
+
+	void RegisterObjectPtrFixup(const ObjectPtrFixupRequest& InRequest)
+	{
+		if (ObjectPtrFixupContext* Context = GetCurrentObjectPtrFixupContext())
+		{
+			Context->Requests.Add(InRequest);
+		}
+	}
+
 	TArray<TSharedRef<PropertyData>> GeneratePropertyDatas(ShObject* InObject, const MetaMemberData* MetaMemData, void* Instance, bool bForce)
 	{
 		if (!bForce && !EnumHasAnyFlags(MetaMemData->InfoType, MetaInfo::Property))
@@ -470,7 +467,20 @@ namespace FW
         }
     }
 
-    AssetObject* ShObject::GetOuterMost()
+
+	void ShObject::RegenerateGuidRecursive()
+	{
+		RegenerateGuid();
+		for (auto& SubObject : SubObjects)
+		{
+			if (SubObject.IsValid())
+			{
+				SubObject->RegenerateGuidRecursive();
+			}
+		}
+	}
+
+	AssetObject* ShObject::GetOuterMost()
     {
 		if (IsDefaultObject)
 		{

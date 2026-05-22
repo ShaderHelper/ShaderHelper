@@ -1,10 +1,7 @@
 #pragma once
-#include "GpuApi/Spirv/SpirvParser.h"
-#include "GpuApi/Spirv/SpirvPixelDebugger.h"
-#include "GpuApi/Spirv/SpirvPixelPreviewer.h"
+#include "GpuApi/Spirv/SpirvDebugger.h"
 #include "GpuApi/GpuRhi.h"
-#include "Editor/PreviewViewPort.h"
-#include "RenderResource/Shader/Shader.h"
+
 
 DECLARE_LOG_CATEGORY_EXTERN(LogDebugger, Log, All);
 inline DEFINE_LOG_CATEGORY(LogDebugger);
@@ -20,6 +17,11 @@ namespace SH
 		FW::GpuBindGroupLayoutBuilder LayoutBuilder;
 	};
 
+	struct VertexState
+	{
+
+	};
+
 	struct PixelState
 	{
 		FW::GpuViewPortDesc ViewPortDesc;
@@ -30,10 +32,13 @@ namespace SH
 
 	struct ComputeState
 	{
-
+		FW::Vector3u ThreadGroupCount{ 1, 1, 1 };
+		FW::Vector3u ThreadGroupSize{ 1, 1, 1 };
+		TArray<BindingBuilder> Builders;
+		FW::GpuComputePipelineStateDesc PipelineDesc;
 	};
 
-	using InvocationState = std::variant<PixelState, ComputeState>;
+	using InvocationState = std::variant<VertexState, PixelState, ComputeState>;
 
 	//Per-line preview info: a line with exactly one uniquely modified variable
 	struct LinePreviewInfo
@@ -81,18 +86,26 @@ namespace SH
 		struct ExpressionNode EvaluateExpression(const FString& InExpression) const;
 		bool Continue(StepMode Mode);
 
+		void DebugVertex(const FW::Vector3f& InVertPos, const InvocationState& InState);
+		void Reset();
+
+		//Pixel
 		void InvokePixel(bool GlobalValidation = false);
 		void DebugPixel(const FW::Vector2u& InPixelCoord, const InvocationState& InState);
 		std::optional<FW::Vector2u> ValidatePixel(const InvocationState& InState);
-
-		void DebugCompute(const InvocationState& InState);
-		void Reset();
-
-		//Compute per-line preview data and render preview textures
-		void ComputeLinePreviewData();
+		void ComputeLinePreviewData();//Compute per-line preview data and render preview textures
 		void InvokePixelPreview();
 		const TMap<DebuggerLocation, TRefCountPtr<FW::GpuTexture>>& GetLinePreviewTextures() const { return LinePreviewTextures; }
 		const TMap<DebuggerLocation, LinePreviewInfo>& GetLinePreviewData() const { return LinePreviewData; }
+		//
+
+		//Compute
+		void InvokeCompute(bool GlobalValidation = false);
+		bool CanThreadReachStop(uint32 LocalLinearIndex) const;
+		void DebugCompute(const FW::Vector3u& InWorkGroupId, const FW::Vector3u& InLocalInvocationId, const InvocationState& InState);
+		std::optional<TPair<FW::Vector3u, FW::Vector3u>> ValidateCompute(const InvocationState& InState);
+		bool SwitchDebugThread(const FW::Vector3u& InLocalInvocationId);
+		//
 
 		TPair<FString, DebuggerLocation> GetDebuggerError() const { return DebuggerError; }
 		const DebuggerLocation& GetStopLocation() const { return StopLocation; }
@@ -100,11 +113,24 @@ namespace SH
 		void MarkEditDuringDebugging() { bEditDuringDebugging = true; }
 		bool HasEditDuringDebugging() const { return bEditDuringDebugging; }
 		void ClearEditDuringDebugging() { bEditDuringDebugging = false; }
+
 	private:
 		int32 GetExtraLineNumForSource(FW::SpvId Source) const;
 		int32 GetExtraLineNumForFile(const FString& FileName) const;
 		void InitDebuggerView();
-		TArray<FW::SpvDebugState> GenDebugStates(uint8* DebuggerData);
+		void FinalizeDebugStates();
+		void UpdateThreadsReachingStop();
+		bool MatchesStopLocation(const FW::SpvDebugState& InState, const DebuggerLocation& InLoc) const;
+		void SaveDebuggerContextState();
+		void RestoreDebuggerContextState();
+		TArray<FW::SpvDebugState> GenDebugStates(uint8* DebuggerData, uint32 DebuggerDataSize);
+		void RebuildComputeWorkgroupStates();
+		TArray<FW::SpvDebugState> BuildComputeDebugStatesForThread(uint32 LocalLinearIndex) const;
+
+		bool EvaluateExpressionVertexlImpl(const FString& InExpression, struct ExpressionNode& OutResult) const;
+		bool EvaluateExpressionPixelImpl(const FString& InExpression, struct ExpressionNode& OutResult) const;
+		bool EvaluateExpressionComputeImpl(const FString& InExpression, struct ExpressionNode& OutResult) const;
+		void BuildPatchedBindings(const TArray<BindingBuilder>& Builders, const TArray<FW::GpuShaderLayoutBinding>& LayoutBindings, FW::BindingShaderStage Stage, bool bIncludeParamsBinding);
 
 	private:
 		ShaderAsset* CurShaderAsset = nullptr;
@@ -131,8 +157,17 @@ namespace SH
 		std::vector<std::pair<FW::SpvId, FW::SpvVariableDesc*>> SortedVariableDescs;
 
 		TArray<FW::SpvBinding> SpvBindings;
+		struct DebuggerVariableState
+		{
+			std::variant<FW::SpvObject::External, FW::SpvObject::Internal> Storage;
+			TArray<FW::Vector2i> InitializedRanges;
+		};
+		TMap<FW::SpvId, DebuggerVariableState> InitialGlobalVariableStates;
+		TMap<FW::SpvId, DebuggerVariableState> InitialLocalVariableStates;
 		TArray<TRefCountPtr<FW::GpuBindGroup>> PatchedBindGroups;
 		TArray<TRefCountPtr<FW::GpuBindGroupLayout>> PatchedBindGroupLayouts;
+		TArray<TRefCountPtr<FW::GpuBindGroup>> SetupBindGroups;
+		TArray<TRefCountPtr<FW::GpuBindGroupLayout>> SetupBindGroupLayouts;
 		TUniquePtr<FW::SpvDebuggerContext> DebuggerContext;
 		InvocationState Invocation;
 		TRefCountPtr<FW::GpuShader> DebugShader;
@@ -142,8 +177,8 @@ namespace SH
 		bool bEnableUbsan = false;
 		bool bEditDuringDebugging = false;
 
+		//Pixel
 		FW::Vector2u PixelCoord;
-
 		//Per-line preview: maps DebuggerLocation -> info/texture
 		TMap<DebuggerLocation, LinePreviewInfo> LinePreviewData;
 		TSet<DebuggerLocation> DirtyLinePreviewLocs;
@@ -152,5 +187,17 @@ namespace SH
 		FW::SpvLexicalScope* PrevPreviewScope = nullptr;
 		uint32 PrevPreviewCallStackHash = 0;
 		TArray<FW::SpvId> PrevPreviewCallIdStack;
+		//
+
+		//Compute
+		FW::Vector3u WorkGroupId;
+		FW::Vector3u LocalInvocationId;
+		FW::Vector3u DebuggingThreadGroupSize{ 1, 1, 1 };
+		TArray<TArray<FW::SpvDebugState>> PerThreadDebugStates;
+		TArray<TArray<FW::SpvDebugState>> ReconstructedWorkgroupStatesByBarrier;
+		TSet<uint64> InvalidWorkgroupBarrierKeys;
+		int32 StopIterationIndex{};
+		TBitArray<> ThreadsReachingStop;
+		//
 	};
 }

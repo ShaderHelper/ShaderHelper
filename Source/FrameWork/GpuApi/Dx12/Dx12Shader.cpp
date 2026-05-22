@@ -30,6 +30,7 @@ namespace FW
 		case D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWSTRUCTURED:	return BindingType::RWStructuredBuffer;
 		case D3D_SHADER_INPUT_TYPE::D3D_SIT_BYTEADDRESS:        return BindingType::RawBuffer;
 		case D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWBYTEADDRESS:  return BindingType::RWRawBuffer;
+		case D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWTYPED:        return BindingType::RWTexture;
 		default:
 			AUX::Unreachable();
 		}
@@ -72,13 +73,23 @@ namespace FW
 			{
 				BType = BindingType::Texture3D;
 			}
-			ShaderLayoutBindings.Add({
+			else if (BType == BindingType::RWTexture && BindDesc.Dimension == D3D_SRV_DIMENSION_TEXTURE3D)
+			{
+				BType = BindingType::RWTexture3D;
+			}
+
+			GpuShaderLayoutBinding Binding = {
 				.Name = BindDesc.Name,
 				.Slot = (int)BindDesc.BindPoint,
 				.Group = (int)BindDesc.Space,
 				.Type = BType,
 				.Stage = ShaderStage
-			});
+			};
+			if (BType == BindingType::StructuredBuffer || BType == BindingType::RWStructuredBuffer)
+			{
+				Binding.StructuredStride = BindDesc.NumSamples;
+			}
+			ShaderLayoutBindings.Add(MoveTemp(Binding));
 
 			if (BType == BindingType::UniformBuffer)
 			{
@@ -141,10 +152,7 @@ namespace FW
 		}
 
 		TArray<GpuShaderVertexInput> VertexInputs;
-		if (Type != ShaderType::Vertex || !ByteCode.IsValid())
-		{
-			return VertexInputs;
-		}
+		check(ByteCode.IsValid());
 
 		TRefCountPtr<ID3D12ShaderReflection> Reflection;
 		DxcBuffer DxilBuffer{.Ptr = ByteCode->GetBufferPointer(), .Size = ByteCode->GetBufferSize()};
@@ -213,10 +221,7 @@ namespace FW
 		}
 
 		TArray<GpuShaderStageSemantic> Semantics;
-		if (!ByteCode.IsValid())
-		{
-			return Semantics;
-		}
+		check(ByteCode.IsValid());
 
 		TRefCountPtr<ID3D12ShaderReflection> Reflection;
 		DxcBuffer DxilBuffer{.Ptr = ByteCode->GetBufferPointer(), .Size = ByteCode->GetBufferSize()};
@@ -249,10 +254,7 @@ namespace FW
 		}
 
 		TArray<GpuShaderStageSemantic> Semantics;
-		if (!ByteCode.IsValid())
-		{
-			return Semantics;
-		}
+		check(ByteCode.IsValid());
 
 		TRefCountPtr<ID3D12ShaderReflection> Reflection;
 		DxcBuffer DxilBuffer{.Ptr = ByteCode->GetBufferPointer(), .Size = ByteCode->GetBufferSize()};
@@ -273,6 +275,25 @@ namespace FW
 			Semantics.Add(MoveTemp(Semantic));
 		}
 		return Semantics;
+	}
+
+	Vector3u Dx12Shader::GetThreadGroupSize() const
+	{
+		check(Type == ShaderType::Compute);
+		if (!ByteCode.IsValid())
+		{
+			return GpuShader::GetThreadGroupSize();
+		}
+
+		TRefCountPtr<ID3D12ShaderReflection> Reflection;
+		DxcBuffer DxilBuffer{ .Ptr = ByteCode->GetBufferPointer(), .Size = ByteCode->GetBufferSize() };
+		GShaderCompiler.CompilerUitls->CreateReflection(&DxilBuffer, IID_PPV_ARGS(Reflection.GetInitReference()));
+
+		uint32 SizeX = 1;
+		uint32 SizeY = 1;
+		uint32 SizeZ = 1;
+		Reflection->GetThreadGroupSize(&SizeX, &SizeY, &SizeZ);
+		return { SizeX, SizeY, SizeZ };
 	}
 
 	class ShIncludeHandler final : public IDxcIncludeHandler
@@ -391,8 +412,14 @@ namespace FW
 		 FString EntryPoint = InShader->GetEntryPoint();
 		 if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::CompileFromSpvCode))
 		 {
+			 ShaderConductor::MacroDefine SpvHlslOptions[] = {
+				{"user_semantic", "1"},
+				{"use_entry_point_interface_order", "1"},
+			 };
 			 ShaderConductor::Compiler::TargetDesc HlslTargetDesc{};
 			 HlslTargetDesc.language = ShaderConductor::ShadingLanguage::Hlsl;
+			 HlslTargetDesc.options = SpvHlslOptions;
+			 HlslTargetDesc.numOptions = UE_ARRAY_COUNT(SpvHlslOptions);
 			 HlslTargetDesc.version = "66";
 			 ShaderConductor::Compiler::Options Options{};
 			 Options.force_zero_initialized_variables = true;
@@ -437,26 +464,28 @@ namespace FW
 
 			 std::vector<uint32> Spv = { Result.cbegin(), Result.cend() };
 			 TArray<uint32> SpvCode = { Spv.data(), (int)Spv.size() };
+
+#if DEBUG_SHADER
+			 ShaderConductor::Compiler::DisassembleDesc SpvDisassembleDesc{
+				 .language = ShaderConductor::ShadingLanguage::SpirV,
+				 .binary = (uint8*)SpvCode.GetData(),
+				 .binarySize = (uint32_t)SpvCode.Num() * 4,
+			 };
+			 ShaderConductor::Compiler::ResultDesc SpvTextResultDesc = ShaderConductor::Compiler::Disassemble(SpvDisassembleDesc);
+			 FString SpvSourceText = { (int32)SpvTextResultDesc.target.Size(), static_cast<const char*>(SpvTextResultDesc.target.Data()) };
+			 if (SpvTextResultDesc.hasError)
+			 {
+				 FString ErrorInfo = static_cast<const char*>(SpvTextResultDesc.errorWarningMsg.Data());
+				 SpvSourceText = MoveTemp(ErrorInfo);
+			 }
+			 if (!ShaderName.IsEmpty())
+			 {
+				 FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".glsl" + ".spvasm"));
+			 }
+#endif
+
 			 if (EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::GenSpvForDebugging))
 			 {
-#if DEBUG_SHADER
-				 ShaderConductor::Compiler::DisassembleDesc SpvDisassembleDesc{
-					 .language = ShaderConductor::ShadingLanguage::SpirV,
-					 .binary = (uint8*)SpvCode.GetData(),
-					 .binarySize = (uint32_t)SpvCode.Num() * 4,
-				 };
-				 ShaderConductor::Compiler::ResultDesc SpvTextResultDesc = ShaderConductor::Compiler::Disassemble(SpvDisassembleDesc);
-				 FString SpvSourceText = { (int32)SpvTextResultDesc.target.Size(), static_cast<const char*>(SpvTextResultDesc.target.Data()) };
-				 if (SpvTextResultDesc.hasError)
-				 {
-					 FString ErrorInfo = static_cast<const char*>(SpvTextResultDesc.errorWarningMsg.Data());
-					 SpvSourceText = MoveTemp(ErrorInfo);
-				 }
-				 if (!ShaderName.IsEmpty())
-				 {
-					 FFileHelper::SaveStringToFile(SpvSourceText, *(PathHelper::SavedShaderDir() / ShaderName / ShaderName + ".glsl" + ".spvasm"));
-				 }
-#endif
 				 InShader->SpvCode = MoveTemp(SpvCode);
 				 return true;
 			 }
@@ -475,7 +504,7 @@ namespace FW
 			 }
 			 catch (const std::runtime_error& e)
 			 {
-				 OutErrorInfo =  ANSI_TO_TCHAR(e.what());
+				 OutErrorInfo = FString("[SpirvCross]") + ANSI_TO_TCHAR(e.what());
 				 return false;
 			 }
 		 }
@@ -525,7 +554,8 @@ namespace FW
 			Arguments.Add(TEXT("-Vd"));
 			Arguments.Add(TEXT("-fvk-use-dx-layout"));
 			Arguments.Add(TEXT("-fspv-debug=vulkan-with-source"));
-			//Arguments.Add(TEXT("-fspv-reflect"));
+			Arguments.Add(TEXT("-fspv-reflect"));
+			Arguments.Add(TEXT("-fspv-target-env=vulkan1.1"));
 		}
 
 		ValidateGpuFeature(GDx12GpuRhi->GetFeature().Support16bitType(), TEXT("Hardware does not support 16bitType, shader model <= 6.2"))
@@ -577,7 +607,6 @@ namespace FW
 				CompileResult->GetStatus(&ResultStatus);
 				if(FAILED(ResultStatus))
 				{
-					//SH_LOG(LogShader, Error, TEXT("Compilation failed: %s"), *DiagnosticInfo);
 					OutErrorInfo = MoveTemp(DiagnosticInfo);
 					IsCompilationSucceeded = false;
 				}

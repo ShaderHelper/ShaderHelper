@@ -2,7 +2,6 @@
 #include "Texture2dEditor.h"
 #include "AssetObject/Texture2D.h"
 #include "Editor/ShaderHelperEditor.h"
-#include "App/App.h"
 #include "UI/Widgets/STexturePreviewer.h"
 
 using namespace FW;

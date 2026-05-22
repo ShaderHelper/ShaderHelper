@@ -1,15 +1,12 @@
 #pragma once
 #include "UI/Widgets/ShaderCodeEditor/ShaderCodeTokenizer.h"
-#include "Renderer/ShRenderer.h"
+#include "UI/Widgets/ShaderCodeEditor/ShaderEditorText.h"
 #include "GpuApi/GpuShader.h"
 #include "AssetObject/ShaderAsset.h"
 #include "SCodeSearchWidget.h"
 #include "SMarkerScrollBar.h"
 
-#include <Framework/Text/BaseTextLayoutMarshaller.h>
 #include <Widgets/Views/SListView.h>
-#include <Widgets/Text/SMultiLineEditableText.h>
-#include <Internationalization/IBreakIterator.h>
 #include <Widgets/SCanvas.h>
 #include <Widgets/Text/SlateEditableTextLayout.h>
 
@@ -38,129 +35,19 @@ namespace SH
 		TArray<int32> BreakPointLineNumbers;
     };
 
-	class FShaderEditorMarshaller : public FBaseTextLayoutMarshaller
-	{
-	public:
-		FShaderEditorMarshaller(SShaderEditorBox* InOwnerWidget, TSharedPtr<ShaderTokenizer> InTokenizer);
-		
-	public:
-		virtual void SetText(const FString& SourceString, FTextLayout& TargetTextLayout, TArray<FTextLayout::FLineModel>&& OldLineModels) override;
-		virtual void GetText(FString& TargetString, const FTextLayout& SourceTextLayout) override;
-
-		//ReTokenize when the text changed.
-		bool RequiresLiveUpdate() const override
-		{
-			return true;
-		}
-		
-	public:
-        SShaderEditorBox* OwnerWidget;
-		FTextLayout* TextLayout;
-		TSharedPtr<ShaderTokenizer> Tokenizer;
-		TArray<ShaderTokenizer::TokenizedLine> TokenizedLines;
-		//Key: The line index of Left Brace in MultiLineEditableText
-		TMap<int32, ShaderTokenizer::BracketGroup> FoldingBraceGroups;
-		TArray<ShaderTokenizer::BracketGroup> BracketGroups;
-		int32 FontSize{};
-	};
-
-    class TokenBreakIterator : public IBreakIterator
-    {
-    public:
-        TokenBreakIterator(FShaderEditorMarshaller* InMarshaller);
-
-        virtual void SetString(FString&& InString) override;
-        virtual void SetStringRef(FStringView InString) override;
-
-        virtual int32 GetCurrentPosition() const override;
-
-        virtual int32 ResetToBeginning() override;
-        virtual int32 ResetToEnd() override;
-
-        virtual int32 MoveToPrevious() override;
-        virtual int32 MoveToNext() override;
-        virtual int32 MoveToCandidateBefore(const int32 InIndex) override;
-        virtual int32 MoveToCandidateAfter(const int32 InIndex) override;
-		
-		bool IngoreWhitespace() override { return false; }
-
-    private:
-        FString InternalString;
-        int32 CurrentPosition{};
-        FShaderEditorMarshaller* Marshaller;
-    };
-
-    class ShaderTextLayout : public FSlateTextLayout
-    {
-    public:
-        ShaderTextLayout(SWidget* InOwner, FTextBlockStyle InDefaultTextStyle, FShaderEditorMarshaller* Marshaller)
-            :FSlateTextLayout(InOwner, InDefaultTextStyle)
-        {
-            WordBreakIterator = MakeShared<TokenBreakIterator>(Marshaller);
-        }
-    };
-
-	class FShaderEditorEffectMarshaller : public FBaseTextLayoutMarshaller
-	{
-	public:
-		FShaderEditorEffectMarshaller(SShaderEditorBox* InOwnerWidget) 
-			: OwnerWidget(InOwnerWidget)
-			, TextLayout(nullptr) 
-		{}
-
-	public:
-		virtual void SetText(const FString& SourceString, FTextLayout& TargetTextLayout, TArray<FTextLayout::FLineModel>&& OldLineModels) override;
-		virtual void GetText(FString& TargetString, const FTextLayout& SourceTextLayout) override;
-		
-		void SubmitEffectText();
-        
-    public:
-        struct DiagEffectInfo
-        {
-			bool IsError{};
-			bool IsWarn{};
-            FTextRange DummyRange;
-            FTextRange InfoRange;
-            FString TotalInfo;
-        };
-		
-	public:
-		SShaderEditorBox* OwnerWidget;
-		FTextLayout* TextLayout;
-		TMap<int32, DiagEffectInfo> LineNumberToDiagInfo;
-	};
-
-	struct ISenseTask
+	struct LangTask
 	{
 		std::optional<ShaderDesc> ShaderDesc;
+
+		//Per editor (visible) line; tokens use offsets relative to the editor line text.
+		TArray<TArray<ShaderTokenizer::Token>> LineTokens;
+		//Unfolded line number (1-based, in CurrentShaderSource) for each editor line, parallel to LineTokens.
+		TArray<int32> LineNumbers;
 
 		FString CursorToken;
 		uint32 Row = 0;
 		uint32 Col = 0;
 		bool IsMemberAccess = false;
-	};
-
-	struct SyntaxTask
-	{
-		std::optional<ShaderDesc> ShaderDesc;
-		TArray<TArray<ShaderTokenizer::Token>> LineTokens;
-	};
-
-	class SShaderMultiLineEditableText : public SMultiLineEditableText
-	{
-	public:
-		void Construct(const FArguments& InArgs, SShaderEditorBox* InOwner)
-		{
-			Owner = InOwner;
-			SMultiLineEditableText::Construct(InArgs);
-		}
-		virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
-		virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
-		virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
-		virtual FReply OnMouseButtonDoubleClick(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
-		virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
-	private:
-		SShaderEditorBox* Owner = nullptr;
 	};
 
 	//LineNumber: the line number of the visible shader source in editor
@@ -284,6 +171,16 @@ namespace SH
 		void UpdateEffectText();
 		void HandleAutoIndent();
         TSharedRef<SWidget> BuildInfoBar();
+		FText InitializeEditorSource();
+		void InitializeScrollBars();
+		void InitializeMarshalling();
+		void StartLangServiceThreads();
+		void BuildEditorWidget(const FText& InitialShaderText);
+		void ConfigureEditableTextLayout();
+		bool TryMergeInsertUndoState(SlateEditableTextTypes::FUndoState* InUndoState);
+		void BindCommands();
+		void MoveSelectedLines(int32 Direction);
+		void InitializeCursorHighlighter();
 
 		FReply OnFold(int32 LineNumber);
 		void RemoveFoldMarker(int32 InIndex);
@@ -309,11 +206,6 @@ namespace SH
 		TSharedPtr<FW::ShaderTU> SyntaxTUCopy;
 		TArray<TMap<FTextRange, FW::ShaderTokenType>> LineSyntaxHighlightMaps;
 		TArray<TMap<FTextRange, FW::ShaderTokenType>> LineSyntaxHighlightMapsCopy;
-		TUniquePtr<FThread> SyntaxThread;
-		TQueue<SyntaxTask> SyntaxQueue;
-		std::atomic<bool> bQuitISyntax{};
-		std::atomic<bool> bRefreshSyntax{};
-		FEvent* SyntaxEvent = nullptr;
 		//---------------------------------------
 
 	private:
@@ -349,12 +241,12 @@ namespace SH
 		FCurveSequence FoldingArrowAnim;
         
         //----------CodeComplete and real-time diagnostic----------
-		TUniquePtr<FThread> ISenseThread;
-		TQueue<ISenseTask> ISenseQueue;
+		TUniquePtr<FThread> LangThread;
+		TQueue<LangTask> LangQueue;
 
-		std::atomic<bool> bQuitISense{};
-		std::atomic<bool> bRefreshIsense{};
-		FEvent* ISenseEvent = nullptr;
+		std::atomic<bool> bQuitLang{};
+		std::atomic<bool> bRefreshLang{};
+		FEvent* LangEvent = nullptr;
         TArray<FW::ShaderDiagnosticInfo> DiagnosticInfos;
         FString CurToken;
         TArray<FW::ShaderCandidateInfo> CandidateInfos;

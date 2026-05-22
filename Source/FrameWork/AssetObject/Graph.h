@@ -92,7 +92,6 @@ namespace FW
 			NodeDatas.Add(InNode);
 			AddNodeHandler.Broadcast(MoveTemp(InNode));
 		}
-		void PostLoad() override;
 		void RemoveNode(FGuid Id) {
 			NodeDatas.RemoveAll([Id](const ObjectPtr<GraphNode>& Element) {
 				return Element->GetGuid() == Id;
@@ -110,14 +109,8 @@ namespace FW
 			return nullptr;
 		}
 
-		void AddLink(GraphPin* OutputPin, GraphPin* InputPin)
-		{
-			GraphNode* OutputNode = OutputPin->GetOwnerNode();
-			GraphNode* InputNode = InputPin->GetOwnerNode();
-			check(OutputNode && InputNode);
-			OutputNode->OutPinToInPin.AddUnique(OutputPin, InputPin);
-			AddDep(InputNode, OutputNode);
-		}
+		void AddLink(GraphPin* OutputPin, GraphPin* InputPin);
+		void RemoveLink(GraphPin* OutputPin, GraphPin* InputPin);
 
 		const TArray<ObjectPtr<GraphNode>>& GetNodes() const { return NodeDatas; }
 		void AddDep(GraphNode* DependentNode, GraphNode* DependencyNode) { NodeDeps.AddUnique(DependentNode, DependencyNode); }

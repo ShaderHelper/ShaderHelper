@@ -8,7 +8,11 @@ namespace FW
 {
 namespace AUX
 {
-        
+    template<typename T>
+	struct TIsTUniquePtr : std::false_type {};
+	template<typename T, typename D>
+	struct TIsTUniquePtr<TUniquePtr<T, D>> : std::true_type {};
+
     //Support Arithmetic operations on two objects that have the subscript operator via the parameter pack provided by TIntegerSequence
     template<typename LeftSeq, typename RightSeq>
     struct Op;

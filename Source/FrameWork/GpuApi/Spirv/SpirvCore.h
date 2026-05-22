@@ -127,6 +127,11 @@ namespace FW
 	{
 		Position = 0,
 		FragCoord = 15,
+		NumWorkgroups = 24,
+		WorkgroupId = 26,
+		LocalInvocationId = 27,
+		GlobalInvocationId = 28,
+		LocalInvocationIndex = 29,
 		VertexIndex = 42,
 		InstanceIndex = 43,
 	};
@@ -799,6 +804,7 @@ namespace FW
 		DPdx = 207,
 		DPdy = 208,
 		Fwidth = 209,
+		ControlBarrier = 224,
 		AtomicIAdd = 234,
 		Phi = 245,
 		LoopMerge = 246,

@@ -1,7 +1,6 @@
 #pragma once
 #include "Editor/AssetEditor/ShAssetEditor.h"
 #include "AssetObject/Graph.h"
-#include "AssetObject/ShaderToy/ShaderToy.h"
 
 namespace SH
 {

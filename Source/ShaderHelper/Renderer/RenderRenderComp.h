@@ -19,6 +19,9 @@ namespace SH
 		FW::RenderGraph* RG = nullptr;
 		TRefCountPtr<FW::GpuTexture> FinalRT;
 		FW::PreviewViewPort* ViewPort = nullptr;
+		FW::Vector2f ViewportSize = FW::Vector2f(0, 0);
+		FW::Vector2f MousePos = FW::Vector2f(0, 0);
+		float Time = 0.0f;
 		TArray<RenderOutputDesc> Outputs;
 		const TArray<FW::ObjectPtr<SceneObject>>* SceneObjects = nullptr;
 	};

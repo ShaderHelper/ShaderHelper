@@ -40,7 +40,7 @@ namespace SH
 
 		bool IsStageEnabled(FW::ShaderType InStage) const;
 		FW::GpuShader* GetCompiledShader(FW::ShaderType InStage) const;
-		TArray<FW::ShaderType> GetEnabledStageList() const;
+		TArray<FW::ShaderType> GetEnabledStageList() const override;
 
 		static ShaderStageFlag StageToFlag(FW::ShaderType InStage);
 

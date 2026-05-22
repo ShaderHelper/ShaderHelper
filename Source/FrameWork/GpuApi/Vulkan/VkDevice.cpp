@@ -2,8 +2,6 @@
 #define VOLK_IMPLEMENTATION
 #define VMA_IMPLEMENTATION
 #include "VkDevice.h"
-#include "VkUtil.h"
-#include "GpuApi/GpuFeature.h"
 
 namespace FW::VK
 {

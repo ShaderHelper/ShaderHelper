@@ -1,6 +1,5 @@
 #include "CommonHeader.h"
 #include "AssetManager.h"
-#include "GpuApi/GpuResource.h"
 
 namespace FW
 {

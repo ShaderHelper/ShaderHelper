@@ -1,7 +1,6 @@
 #include "CommonHeader.h"
 #include "ShaderToyPassNode.h"
 #include "Renderer/ShaderToyRenderComp.h"
-#include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/Property/PropertyData/PropertyUniformItem.h"
 #include "RenderResource/PrintBuffer.h"
@@ -12,11 +11,17 @@
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
 #include "RenderResource/RenderPass/BlitPass.h"
 #include "Renderer/RenderGraph.h"
+#include "Renderer/ShRenderer.h"
 #include "UI/Widgets/Graph/SGraphPanel.h"
+#include "PluginManager/ShPluginManager.h"
 #include "GpuApi/GpuFeature.h"
+#include "GpuApi/GpuResourceHelper.h"
+#include "GpuApi/Spirv/SpirvAssertHighlight.h"
+#include "GpuApi/Spirv/SpirvParser.h"
+#include "Common/Path/PathHelper.h"
 
 #include <regex>
-#include <vector>
+#include <stdexcept>
 
 using namespace FW;
 
@@ -59,7 +64,7 @@ namespace SH
     {
 		ShPropertyOp::OnSelect(InObject);
         auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->SetDebuggableObject(static_cast<ShaderToyPassNode*>(InObject));
+		ShEditor->SetDebuggableObject(InObject);
     }
 
 	void ShaderToyPassNode::InitShaderAsset()
@@ -186,7 +191,116 @@ namespace SH
 		return GetBuiltInBindGroupBuiler(Layout).Build();
 	}
 
-	InvocationState ShaderToyPassNode::GetInvocationState()
+	bool ShaderToyPassNode::BuildAssertHighlightPs()
+	{
+		if (!ShaderAssetObj || !ShaderAssetObj->GetPixelShader())
+		{
+			return false;
+		}
+
+		ShaderDesc Desc = ShaderAssetObj->GetShaderDesc(ShaderAssetObj->EditorContent, ShaderType::Pixel);
+		TRefCountPtr<GpuShader> TempPs = GGpuRhi->CreateShaderFromSource(Desc.SourceDesc);
+		TempPs->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
+
+		TArray<FString> SpvExtraArgs = Desc.ExtraArgs;
+		SpvExtraArgs.Add(TEXT("-D"));
+		SpvExtraArgs.Add(TEXT("GPrivate_ENABLE_PRINT=0"));
+
+		FString ErrorInfo, WarnInfo;
+		if (!GGpuRhi->CompileShader(TempPs, ErrorInfo, WarnInfo, SpvExtraArgs))
+		{
+			return false;
+		}
+
+		SpirvParser Parser;
+		Parser.Parse(TempPs->SpvCode);
+		SpvMetaContext HlContext;
+		SpvMetaVisitor MetaVisitor{ HlContext };
+		Parser.Accept(&MetaVisitor);
+
+		TArray<SpvBinding> RuntimeBindings;
+		for (const GpuShaderLayoutBinding& Binding : ShaderAssetObj->GetPixelShader()->GetLayout())
+		{
+			RuntimeBindings.Add({
+				.Name = Binding.Name,
+				.DescriptorSet = Binding.Group,
+				.Binding = Binding.Slot,
+				.Type = Binding.Type,
+			});
+		}
+
+		SpvAssertHighlightVisitor HlVisitor{ HlContext, ShaderType::Pixel, MoveTemp(RuntimeBindings) };
+		Parser.Accept(&HlVisitor);
+
+		TArray<uint32> PatchedSpv = HlVisitor.GetPatcher().GetSpv();
+		FString PatchedAsm = HlVisitor.GetPatcher().GetAsm();
+		const FString DumpName = ShaderAssetObj->GetShaderName() + TEXT("_AssertHighlight.spvasm");
+		FFileHelper::SaveStringToFile(PatchedAsm, *(PathHelper::SavedShaderDir() / ShaderAssetObj->GetShaderName() / DumpName));
+
+		GpuShaderSourceDesc PatchedDesc = Desc.SourceDesc;
+		PatchedDesc.Source = PatchedAsm;
+		TRefCountPtr<GpuShader> NewAssertHighlightPs = GGpuRhi->CreateShaderFromSource(PatchedDesc);
+		NewAssertHighlightPs->SpvCode = MoveTemp(PatchedSpv);
+		NewAssertHighlightPs->CompilerFlag |= GpuShaderCompilerFlag::CompileFromSpvCode;
+		if (!GGpuRhi->CompileShader(NewAssertHighlightPs, ErrorInfo, WarnInfo, Desc.ExtraArgs))
+		{
+			SH_LOG(LogShader, Error, TEXT("ShaderToy assert-highlight patched PS compile failed: %s"), *ErrorInfo);
+			return false;
+		}
+
+		AssertHighlightPs = MoveTemp(NewAssertHighlightPs);
+		return true;
+	}
+
+	void ShaderToyPassNode::AddAssertHighlightPass(RenderGraph& RG, TRefCountPtr<GpuBindGroup> BuiltInBindGroup, TRefCountPtr<GpuBindGroup> PassBindGroup)
+	{
+		if (!BuildAssertHighlightPs())
+		{
+			return;
+		}
+
+		GpuRenderPipelineStateDesc HlDesc = PipelineDesc;
+		HlDesc.Ps = AssertHighlightPs.GetReference();
+
+		TRefCountPtr<GpuRenderPipelineState> HlPipeline;
+		try
+		{
+			HlPipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(HlDesc);
+		}
+		catch (const std::runtime_error& e)
+		{
+			SH_LOG(LogShader, Error, TEXT("ShaderToy assert-highlight PSO failed: %s"), ANSI_TO_TCHAR(e.what()));
+			return;
+		}
+
+		GpuRenderPassDesc PassDesc;
+		PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ AssertHighlightDebugTarget->GetDefaultView(), RenderTargetLoadAction::Load, RenderTargetStoreAction::Store });
+
+		auto& RenderPass = RG.AddRenderPass(ObjectName.ToString() + TEXT("AssertHighlight"), MoveTemp(PassDesc),
+			[HlPipeline, BuiltInBindGroup, PassBindGroup](GpuRenderPassRecorder* PassRecorder) {
+				PassRecorder->SetBindGroups({ BuiltInBindGroup.GetReference(), PassBindGroup.GetReference() });
+				PassRecorder->SetRenderPipelineState(HlPipeline);
+				PassRecorder->DrawPrimitive(0, 3, 0, 1);
+			}
+		);
+
+		for (int i = 0; i < 4; i++)
+		{
+			FString ChannelName = FString::Printf(TEXT("iChannel%d"), i);
+			GpuTexture* ChannelTexture = nullptr;
+			if (FlippedChannelTextures[i].IsValid())
+			{
+				ChannelTexture = FlippedChannelTextures[i].GetReference();
+			}
+			else if (ShaderAssetObj->ChannelSlotTypes[i] == ShaderToySlotType::Texture2D)
+			{
+				ChannelTexture = static_cast<GpuTexturePin*>(GetPin(ChannelName))->GetValue();
+			}
+			RenderPass.Read(ChannelTexture);
+		}
+	}
+
+	InvocationState ShaderToyPassNode::GetInvocationState(DebugItem Item)
 	{
 		auto RT = static_cast<GpuTexturePin*>(GetPin("RT"))->GetValue();
 		auto BuiltInLayout = ShaderAssetObj->GetBuiltInBindLayout();
@@ -210,7 +324,7 @@ namespace SH
 		};
 	}
 
-	DebugTargetInfo ShaderToyPassNode::OnStartDebugging()
+	DebugTargetInfo ShaderToyPassNode::OnStartDebugging(DebugItem Item)
 	{
 		AssetOp::OpenAsset(ShaderAssetObj);
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
@@ -230,7 +344,10 @@ namespace SH
 		{
 			IsDebugging = true;
 			auto PassOutput = static_cast<GpuTexturePin*>(GetPin("RT"));
-			return { PassOutput->GetValue() };
+			DebugTargetInfo Target;
+			Target.Tex = AssertError ? AssertHighlightDebugTarget.GetReference() : PassOutput->GetValue();
+			Target.Outputs.Add({ TEXT("RT"), Target.Tex });
+			return Target;
 		}
 		else
 		{
@@ -241,10 +358,10 @@ namespace SH
 	void ShaderToyPassNode::OnFinalizePixel(const FW::Vector2u& PixelCoord)
 	{
 		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->DebugPixel(PixelCoord, GetInvocationState());
+		ShEditor->DebugPixel(PixelCoord, GetInvocationState(DebugItem::Pixel));
 	}
 
-	ShaderAsset* ShaderToyPassNode::GetShaderAsset() const
+	ShaderAsset* ShaderToyPassNode::GetShaderAsset(DebugItem Item) const
 	{
 		return ShaderAssetObj;
 	}
@@ -354,7 +471,7 @@ namespace SH
 		DxcArgs.Add("-D");
 		DxcArgs.Add("GPrivate_ENABLE_PRINT=0");
 		DxcArgs.Add("-D");
-		DxcArgs.Add("ENABLE_ASSERT=0");
+		DxcArgs.Add("GPrivate_ENABLE_ASSERT=0");
 		ShaderConductor::Compiler::Options SCOptions;
 		SCOptions.DXCArgs = DxcArgs.GetData();
 		SCOptions.numDXCArgs = DxcArgs.Num();
@@ -831,15 +948,9 @@ namespace SH
 			{
 				if (GraphPin* SrcPin = OldPin->GetSourcePin())
 				{
-					if (GraphNode* SrcNode = SrcPin->GetOwnerNode())
-					{
-						SrcNode->OutPinToInPin.Remove(SrcPin, OldPin);
-						Graph* OwnerGraph = static_cast<Graph*>(GetOuter());
-						OwnerGraph->RemoveDep(this, SrcNode);
-					}
+					Graph* OwnerGraph = static_cast<Graph*>(GetOuterMost());
+					OwnerGraph->RemoveLink(SrcPin, OldPin);
 				}
-				OldPin->SourcePin.Reset();
-				OldPin->Refuse();
 			}
 
 			// Create new pin of the correct type
@@ -1043,35 +1154,9 @@ namespace SH
                 }
             }
 
-            // Resolve previous frame's timestamps
-            if (!ShowTimestampMs())
-            {
-                GpuTimeMs = 0.0;
-                TimestampQuerySet = nullptr;
-            }
-            else
-            {
-                if (TimestampQuerySet)
-                {
-                    TArray<uint64> Timestamps;
-                    TimestampQuerySet->ResolveResults(0, 2, Timestamps);
-				    double PeriodNs = TimestampQuerySet->GetTimestampPeriodNs();
-				    GpuTimeMs = (double)(Timestamps[1] - Timestamps[0]) * PeriodNs / 1e6;
-                }
-
-				if (GGpuRhi->GetFeature().SupportTimestampQuery() && !TimestampQuerySet)
-                {
-                    TimestampQuerySet = GGpuRhi->CreateQuerySet(2);
-                }
-            }
-
             GpuRenderPassDesc PassDesc;
             PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{ PassOutput->GetValue()->GetDefaultView(), RenderTargetLoadAction::DontCare, RenderTargetStoreAction::Store });
-
-            if (TimestampQuerySet)
-            {
-                PassDesc.TimestampWrites = GpuRenderPassTimestampWrites{TimestampQuerySet, 0, 1 };
-            }
+			PassDesc.TimestampWrites = GpuResourceHelper::PreparePassTimestampWrites(TimestampQuerySet, GpuTimeMs);
 
 			auto BuiltInLayout = ShaderAssetObj->GetBuiltInBindLayout();
 			TRefCountPtr<GpuBindGroup> BuiltInBindGroup = GetBuiltInBindGroup(BuiltInLayout);
@@ -1129,6 +1214,7 @@ namespace SH
 			int ExtraLineNum = ShaderAssetObj->GetExtraLineNum();
 			if(AssertInfo.AssertString.IsEmpty())
 			{
+				AssertError = false;
 				for (const ShaderPrintInfo& PrintLog : ShaderPrintLogs)
 				{
 					//TODO Header print
@@ -1153,6 +1239,21 @@ namespace SH
 					SH_LOG(LogShader, Error, TEXT("%s:%s"), *ObjectName.ToString(), *AssertInfo.AssertString);
 				}
 				AssertError = true;
+
+				AssertHighlightDebugTarget = GGpuRhi->CreateTexture({
+					.Width = PassOutput->GetValue()->GetWidth(),
+					.Height = PassOutput->GetValue()->GetHeight(),
+					.Format = PassOutput->GetValue()->GetFormat(),
+					.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::RenderTarget | GpuTextureUsage::Shared,
+				}, GpuResourceState::RenderTargetWrite);
+
+				BlitPassInput DebugTargetInput;
+				DebugTargetInput.InputView = PassOutput->GetValue()->GetDefaultView();
+				DebugTargetInput.InputTexSampler = GpuResourceHelper::GetSampler({});
+				DebugTargetInput.OutputView = AssertHighlightDebugTarget->GetDefaultView();
+				DebugTargetInput.LoadAction = RenderTargetLoadAction::DontCare;
+				AddBlitPass(*ShaderToyContext.RG, MoveTemp(DebugTargetInput));
+				AddAssertHighlightPass(*ShaderToyContext.RG, BuiltInBindGroup, PassBindGroup);
 				return {true, true};
 			}
         }

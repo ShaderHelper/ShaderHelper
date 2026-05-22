@@ -1,18 +1,16 @@
 #include "CommonHeader.h"
 #include "RenderSceneRenderComp.h"
 #include "GpuApi/GpuRhi.h"
-#include "GpuApi/GpuResourceHelper.h"
-#include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "Editor/SceneViewCommands.h"
 #include "UI/Widgets/Scene/SSceneView.h"
 #include "UI/Widgets/Scene/SceneUndoManager.h"
 #include "UI/Widgets/AssetBrowser/AssetViewItem/AssetViewItem.h"
-#include "Common/Util/Math.h"
 #include "AssetObject/Render/MeshSceneObject.h"
 #include "AssetObject/Render/CameraSceneObject.h"
 #include "AssetObject/Model.h"
 #include "AssetManager/AssetManager.h"
+#include "ProjectManager/ShProjectManager.h"
 
 using namespace FW;
 
@@ -168,6 +166,39 @@ namespace SH
 		return ShEditor->IsScenePreview();
 	}
 
+	CameraSceneObject* RenderSceneRenderComp::GetGraphPreviewCameraObject() const
+	{
+		return RenderGraphAsset ? RenderGraphAsset->PreviewCamera.Get() : nullptr;
+	}
+
+	bool RenderSceneRenderComp::IsCameraControlActive() const
+	{
+		return IsScenePreviewActive() || GetGraphPreviewCameraObject() != nullptr;
+	}
+
+	void RenderSceneRenderComp::SyncPreviewCameraFromGraphCamera()
+	{
+		CameraSceneObject* CamObj = GetGraphPreviewCameraObject();
+		if (!CamObj)
+		{
+			return;
+		}
+		PreviewCamera = CamObj->ToCamera(PreviewCamera.AspectRatio);
+	}
+
+	void RenderSceneRenderComp::SyncGraphCameraFromPreviewCamera()
+	{
+		CameraSceneObject* CamObj = GetGraphPreviewCameraObject();
+		if (!CamObj)
+		{
+			return;
+		}
+		CamObj->Position = PreviewCamera.Position;
+		CamObj->Rotation.X = FMath::RadiansToDegrees(PreviewCamera.Pitch);
+		CamObj->Rotation.Y = FMath::RadiansToDegrees(PreviewCamera.Yaw);
+		CamObj->Rotation.Z = FMath::RadiansToDegrees(PreviewCamera.Roll);
+	}
+
 	void RenderSceneRenderComp::ResetScenePreviewInteractionState()
 	{
 		bRightMouseDown = false;
@@ -196,7 +227,7 @@ namespace SH
 
 	FReply RenderSceneRenderComp::OnMouseDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 	{
-		if (!IsScenePreviewActive())
+		if (!IsCameraControlActive())
 		{
 			ResetScenePreviewInteractionState();
 			return FReply::Unhandled();
@@ -214,7 +245,7 @@ namespace SH
 			LastMousePos = MouseEvent.GetScreenSpacePosition();
 			return FReply::Handled();
 		}
-		if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+		if (IsScenePreviewActive() && MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
 		{
 			FVector2D LocalPos = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
 			FVector2D VpSize = MyGeometry.GetLocalSize();
@@ -328,7 +359,7 @@ namespace SH
 
 	FReply RenderSceneRenderComp::OnMouseUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 	{
-		if (!IsScenePreviewActive())
+		if (!IsCameraControlActive())
 		{
 			ResetScenePreviewInteractionState();
 			return FReply::Unhandled();
@@ -344,7 +375,7 @@ namespace SH
 			bMiddleMouseDown = false;
 			return FReply::Handled();
 		}
-		if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+		if (IsScenePreviewActive() && MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
 		{
 			if (DraggingAxis != GizmoAxis::None)
 			{
@@ -405,7 +436,7 @@ namespace SH
 
 	FReply RenderSceneRenderComp::OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 	{
-		if (!IsScenePreviewActive())
+		if (!IsCameraControlActive())
 		{
 			ResetScenePreviewInteractionState();
 			return FReply::Unhandled();
@@ -417,9 +448,11 @@ namespace SH
 			FVector2D Delta = CurrentPos - LastMousePos;
 			LastMousePos = CurrentPos;
 
+			SyncPreviewCameraFromGraphCamera();
 			PreviewCamera.Yaw += (float)Delta.X * CameraRotateSpeed;
 			PreviewCamera.Pitch -= (float)Delta.Y * CameraRotateSpeed;
 			PreviewCamera.Pitch = FMath::Clamp(PreviewCamera.Pitch, -PI * 0.49f, PI * 0.49f);
+			SyncGraphCameraFromPreviewCamera();
 			return FReply::Handled();
 		}
 
@@ -429,13 +462,20 @@ namespace SH
 			FVector2D Delta = CurrentPos - LastMousePos;
 			LastMousePos = CurrentPos;
 
+			SyncPreviewCameraFromGraphCamera();
 			FMatrix44f RotMat = PreviewCamera.GetWorldRotationMatrix();
 			Vector3f Right = Vector3f(RotMat.M[0][0], RotMat.M[0][1], RotMat.M[0][2]);
 			Vector3f Up = Vector3f(RotMat.M[1][0], RotMat.M[1][1], RotMat.M[1][2]);
 
 			PreviewCamera.Position -= Right * (float)Delta.X * CameraPanSpeed;
 			PreviewCamera.Position += Up * (float)Delta.Y * CameraPanSpeed;
+			SyncGraphCameraFromPreviewCamera();
 			return FReply::Handled();
+		}
+
+		if (!IsCameraControlActive())
+		{
+			return FReply::Unhandled();
 		}
 
 		FVector2D LocalPos = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
@@ -607,7 +647,7 @@ namespace SH
 	int32 RenderSceneRenderComp::DrawViewportOverlay(const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect,
 		FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 	{
-		if (!IsScenePreviewActive() || !bBoxSelecting)
+		if (!IsCameraControlActive() || !bBoxSelecting)
 		{
 			return LayerId;
 		}
@@ -646,28 +686,30 @@ namespace SH
 
 	FReply RenderSceneRenderComp::OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 	{
-		if (!IsScenePreviewActive())
+		if (!IsCameraControlActive())
 		{
 			ResetScenePreviewInteractionState();
 			return FReply::Unhandled();
 		}
 
 		float WheelDelta = MouseEvent.GetWheelDelta();
+		SyncPreviewCameraFromGraphCamera();
 		FMatrix44f RotMat = PreviewCamera.GetWorldRotationMatrix();
 		Vector3f Forward = Vector3f(RotMat.M[2][0], RotMat.M[2][1], RotMat.M[2][2]);
 		PreviewCamera.Position += Forward * WheelDelta * CameraScrollSpeed;
+		SyncGraphCameraFromPreviewCamera();
 		return FReply::Handled();
 	}
 
 	void RenderSceneRenderComp::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& KeyEvent)
 	{
-		if (!IsScenePreviewActive())
+		if (!IsCameraControlActive())
 		{
 			ResetScenePreviewInteractionState();
 			return;
 		}
 
-		if (!bRightMouseDown)
+		if (IsScenePreviewActive() && !bRightMouseDown)
 		{
 			if (SceneCommandList->ProcessCommandBindings(KeyEvent))
 			{
@@ -691,7 +733,7 @@ namespace SH
 
 	void RenderSceneRenderComp::OnKeyUp(const FGeometry& MyGeometry, const FKeyEvent& KeyEvent)
 	{
-		if (!IsScenePreviewActive())
+		if (!IsCameraControlActive())
 		{
 			ResetScenePreviewInteractionState();
 			return;
@@ -713,6 +755,7 @@ namespace SH
 			return;
 		}
 
+		SyncPreviewCameraFromGraphCamera();
 		FMatrix44f RotMat = PreviewCamera.GetWorldRotationMatrix();
 		// Left-handed: X-right, Y-up, Z-forward
 		Vector3f Forward = Vector3f(RotMat.M[2][0], RotMat.M[2][1], RotMat.M[2][2]);
@@ -732,6 +775,7 @@ namespace SH
 			float Len = FMath::Sqrt(MoveDir.X * MoveDir.X + MoveDir.Y * MoveDir.Y + MoveDir.Z * MoveDir.Z);
 			MoveDir = MoveDir * (1.0f / Len);
 			PreviewCamera.Position += MoveDir * CameraMoveSpeed * DeltaTime;
+			SyncGraphCameraFromPreviewCamera();
 		}
 	}
 
@@ -745,14 +789,37 @@ namespace SH
 
 	void RenderSceneRenderComp::RenderInternal()
 	{
+		double CurrentTime = FPlatformTime::Seconds();
+		float DeltaTime = (float)(CurrentTime - LastFrameTime);
+		LastFrameTime = CurrentTime;
+		DeltaTime = FMath::Clamp(DeltaTime, 0.0f, 0.1f);
+
 		if (IsScenePreviewActive())
 		{
+			UpdateCamera(DeltaTime);
 			RenderPreview();
 		}
 		else
 		{
-			ResetScenePreviewInteractionState();
-			RenderGraph();
+			if (GetGraphPreviewCameraObject())
+			{
+				UpdateCamera(DeltaTime);
+			}
+			else
+			{
+				ResetScenePreviewInteractionState();
+			}
+
+			//Camera control
+			if (bRightMouseDown)
+			{
+				ScopedTimelineResume TimelineResumeScope;
+				RenderGraph();
+			}
+			else
+			{
+				RenderGraph();
+			}
 		}
 	}
 
@@ -771,6 +838,8 @@ namespace SH
 			return;
 		}
 
+		SyncPreviewCameraFromGraphCamera();
+
 		PreviewRenderer.InitResources();
 
 		FIntPoint ViewSize = ViewPort->GetSize();
@@ -778,13 +847,6 @@ namespace SH
 		{
 			return;
 		}
-
-		double CurrentTime = FPlatformTime::Seconds();
-		float DeltaTime = (float)(CurrentTime - LastFrameTime);
-		LastFrameTime = CurrentTime;
-		DeltaTime = FMath::Clamp(DeltaTime, 0.0f, 0.1f);
-
-		UpdateCamera(DeltaTime);
 
 		PreviewCamera.AspectRatio = (float)ViewSize.X / (float)ViewSize.Y;
 
@@ -838,11 +900,11 @@ namespace SH
 
 		FW::RenderGraph Graph;
 
-		// Render meshes first (clears color + depth on first draw)
-		bool bMeshesDrawn = PreviewRenderer.RenderMeshes(Graph, MsaaRTV, DepthDSV, PreviewCamera, RenderGraphAsset->SceneObjects, true);
+		// Render meshes first; this always clears color + depth even when the scene has no meshes.
+		PreviewRenderer.RenderMeshes(Graph, MsaaRTV, DepthDSV, PreviewCamera, RenderGraphAsset->SceneObjects);
 
-		// Render grid with depth test (clears if no meshes were drawn)
-		PreviewRenderer.RenderGrid(Graph, MsaaRTV, DepthDSV, PreviewCamera, !bMeshesDrawn);
+		// Render grid with depth test
+		PreviewRenderer.RenderGrid(Graph, MsaaRTV, DepthDSV, PreviewCamera);
 
 		// Render camera billboard icons
 		SceneObject* SelObj = GetSelectedSceneObject();
@@ -959,6 +1021,15 @@ namespace SH
 		if (!SelObj)
 		{
 			return GizmoAxis::None;
+		}
+
+		// Gizmo is suppressed for the graph's preview camera, so don't hit-test it either.
+		if (CameraSceneObject* SelCam = dynamic_cast<CameraSceneObject*>(SelObj))
+		{
+			if (SelCam == GetGraphPreviewCameraObject())
+			{
+				return GizmoAxis::None;
+			}
 		}
 
 		Vector3f Center = GetGizmoPivot();
@@ -1252,10 +1323,15 @@ namespace SH
 			return Result;
 		}
 
+		CameraSceneObject* GraphPreviewCam = GetGraphPreviewCameraObject();
 		FVector2D RectMin(FMath::Min(RectStart.X, RectEnd.X), FMath::Min(RectStart.Y, RectEnd.Y));
 		FVector2D RectMax(FMath::Max(RectStart.X, RectEnd.X), FMath::Max(RectStart.Y, RectEnd.Y));
 		for (const auto& Obj : RenderGraphAsset->SceneObjects)
 		{
+			if (Obj.Get() == GraphPreviewCam)
+			{
+				continue;
+			}
 			FVector2D ObjMin, ObjMax;
 			if (GetSceneObjectScreenRect(Obj.Get(), ViewportSize, ObjMin, ObjMax) &&
 				ObjMax.X >= RectMin.X && ObjMin.X <= RectMax.X &&
@@ -1272,16 +1348,19 @@ namespace SH
 		Vector3f BoundsMin, BoundsMax;
 		if (MeshSceneObject* MeshObj = dynamic_cast<MeshSceneObject*>(Obj))
 		{
-			Model* Mdl = MeshObj->ModelAsset.Get();
-			if (!Mdl)
+			if (Model* Mdl = MeshObj->ModelAsset.Get())
 			{
-				return false;
+				Vector3f Center;
+				float Radius;
+				Mdl->ComputeBounds(Center, Radius);
+				BoundsMin = Center - Vector3f(Radius);
+				BoundsMax = Center + Vector3f(Radius);
 			}
-			Vector3f Center;
-			float Radius;
-			Mdl->ComputeBounds(Center, Radius);
-			BoundsMin = Center - Vector3f(Radius);
-			BoundsMax = Center + Vector3f(Radius);
+			else
+			{
+				BoundsMin = Vector3f(-0.3f);
+				BoundsMax = Vector3f(0.3f);
+			}
 		}
 		else
 		{
@@ -1334,24 +1413,34 @@ namespace SH
 		SceneObject* ClosestObj = nullptr;
 		float ClosestT = FLT_MAX;
 
+		CameraSceneObject* GraphPreviewCam = GetGraphPreviewCameraObject();
 		for (const auto& Obj : RenderGraphAsset->SceneObjects)
 		{
+			if (Obj.Get() == GraphPreviewCam)
+			{
+				continue;
+			}
+
 			// Compute AABB for the object
 			Vector3f BoundsMin, BoundsMax;
 
 			if (MeshSceneObject* MeshObj = dynamic_cast<MeshSceneObject*>(Obj.Get()))
 			{
-				Model* Mdl = MeshObj->ModelAsset.Get();
-				if (!Mdl)
+				if (Model* Mdl = MeshObj->ModelAsset.Get())
 				{
-					continue;
+					Vector3f Center;
+					float Radius;
+					Mdl->ComputeBounds(Center, Radius);
+					// Use bounding sphere as AABB approximation in local space
+					BoundsMin = Center - Vector3f(Radius);
+					BoundsMax = Center + Vector3f(Radius);
 				}
-				Vector3f Center;
-				float Radius;
-				Mdl->ComputeBounds(Center, Radius);
-				// Use bounding sphere as AABB approximation in local space
-				BoundsMin = Center - Vector3f(Radius);
-				BoundsMax = Center + Vector3f(Radius);
+				else
+				{
+					// MeshSceneObject without a model (uses DrawPrimitive(VertexCount))
+					BoundsMin = Vector3f(-0.3f);
+					BoundsMax = Vector3f(0.3f);
+				}
 			}
 			else
 			{

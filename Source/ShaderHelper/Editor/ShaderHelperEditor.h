@@ -1,35 +1,50 @@
 #pragma once
+#include "App/App.h"
 #include "Editor/Editor.h"
-#include "Editor/PreviewViewPort.h"
-#include "AssetObject/ShaderAsset.h"
-#include "AssetObject/Graph.h"
 #include "AssetManager/AssetManager.h"
-#include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
-#include "Renderer/RenderComponent.h"
-#include "Renderer/Renderer.h"
-#include "ProjectManager/ShProjectManager.h"
-#include "UI/Widgets/Log/SOutputLog.h"
 #include "UI/Widgets/Property/PropertyView/SPropertyView.h"
-#include "UI/Widgets/Debugger/SDebuggerViewport.h"
-#include "UI/Widgets/Debugger/SDebuggerVariableView.h"
-#include "UI/Widgets/Debugger/SDebuggerCallStackView.h"
-#include "UI/Widgets/Debugger/SDebuggerWatchView.h"
-#include "UI/Widgets/Preference/SPreferenceView.h"
-#include "UI/Widgets/Scene/SSceneView.h"
-#include "UI/Widgets/Misc/SShWindow.h"
 #include "UI/Widgets/SShViewport.h"
 #include "Debugger/ShaderDebugger.h"
 
 #include <Widgets/SViewport.h>
+#include <Framework/Docking/TabManager.h>
+#include <Framework/Text/TextLayout.h>
+
+class FMenuBarBuilder;
+class FMenuBuilder;
+class FSpawnTabArgs;
+class FToolBarBuilder;
+class FUICommandList;
+class SScrollBox;
 
 namespace FW
 {
+	class Graph;
+	class PreviewViewPort;
+	class RenderComponent;
+	class SAssetBrowser;
 	class SGraphPanel;
+	class SOutputLog;
+	class SShWindow;
 }
 
 namespace SH
 {
+	class DebuggableObject;
+	enum class DebugItem;
+	enum class GizmoMode : int32;
+	enum class GizmoSpace : int32;
+	class SDebuggerCallStackView;
+	class SDebuggerVariableView;
+	class SDebuggerWatchView;
+	class SFragmentDebuggerViewport;
+	class SComputeDebuggerViewport;
+	class SPreferenceView;
+	class SSceneView;
 	class SShaderEditorBox;
+	class SVertexDebuggerViewport;
+	class ShaderAsset;
+	class ShProject;
 	class ShRenderer;
 
 	const FName PreviewTabId = "Preview";
@@ -65,8 +80,8 @@ namespace SH
 		FW::RenderComponent* GetGraphRenderComp() const { return GraphRenderComp.Get(); }
         FTabManager* GetCodeTabManager() const { return CodeTabManager.Get(); }
 		FTabManager* GetTabManager() const { return TabManager.Get(); }
-		TSharedPtr<SWindow> GetMainWindow() const override { return MainWindow; }
-		TWeakPtr<SWindow> GetPreferenceWindow() const { return PreferenceWindow; }
+		TSharedPtr<SWindow> GetMainWindow() const override;
+		TWeakPtr<SWindow> GetPreferenceWindow() const;
 		FW::PreviewViewPort* GetViewPort() const { return ViewPort.Get(); }
 		FW::ShObject* GetCurPropertyObject() const { 
 			return CurPropertyObject.IsValid() ? CurPropertyObject.Get() : nullptr;
@@ -76,14 +91,15 @@ namespace SH
 		SDebuggerVariableView* GetDebuggerGlobalVariableView() const { return DebuggerGlobalVariableView.Get(); }
 		SDebuggerCallStackView* GetDebuggerCallStackView() const { return DebuggerCallStackView.Get(); }
 		SDebuggerWatchView* GetDebuggerWatchView() const { return DebuggerWatchView.Get(); }
+		SComputeDebuggerViewport* GetComputeDebuggerViewport() const { return ComputeDebuggerViewport.Get(); }
 		TSharedPtr<SWindow> GetShaderEditorTipWindow() const { return ShaderEditorTipWindow; }
 		FW::SGraphPanel* GetGraphPanel() const { return GraphPanel.Get(); }
 		FW::SAssetBrowser* GetAssetBrowser() const { return AssetBrowser.Get(); }
 		SSceneView* GetSceneView() const { return SceneView.Get(); }
-		GizmoMode GetGizmoMode() const { return CurProject->GizmoMode; }
-		void SetGizmoMode(GizmoMode Mode) { CurProject->GizmoMode = Mode; }
-		GizmoSpace GetGizmoSpace() const { return CurProject->GizmoSpace; }
-		bool IsScenePreview() const { return CurProject->bScenePreview; }
+		GizmoMode GetGizmoMode() const;
+		void SetGizmoMode(GizmoMode Mode);
+		GizmoSpace GetGizmoSpace() const;
+		bool IsScenePreview() const;
 		ShaderDebugger& GetDebugger() { return Debugger; }
 		void InvokeDebuggerTabs();
 		void CloseDebuggerTabs();
@@ -102,17 +118,24 @@ namespace SH
         void RefreshProperty(bool bClear = false);
 		void ShowProperty(FW::ShObject* InObjectData) override;
         void UpdateShaderPath(const FString& InShaderPath);
-		bool IsPropertyLocked() { return PropertyView->IsLocked(); }
+		bool IsPropertyLocked() const;
 		void AddNavigationInfo(FW::AssetPtr<ShaderAsset> InShader, const FTextLocation& InLocation);
 		
-		DebuggableObject* GetDebuggaleObject() const { return CurDebuggableObject; }
-		void SetDebuggableObject(DebuggableObject* InObject) { CurDebuggableObject = InObject; }
+		DebuggableObject* GetDebuggaleObject() const;
+		bool IsInDebugging() const { return IsDebugging; }
+		void SetDebuggableObject(FW::ShObject* InObject);
+		DebugItem GetCurrentDebugItem() const { return CurrentDebugItem; }
+		void SetCurrentDebugItem(DebugItem InItem);
 		void EndDebugging();
 		//If globalvalidation is true, the validation error location will be automatically selected.
 		void StartDebugging(bool GlobalValidation = false);
 		void Continue(StepMode Mode = StepMode::Continue);
 		std::optional<FW::Vector2u> ValidatePixel(const InvocationState& InState);
+		std::optional<TPair<FW::Vector3u, FW::Vector3u>> ValidateCompute(const InvocationState& InState);
 		void DebugPixel(const FW::Vector2u& InPixelCoord, const InvocationState& InState);
+		void DebugCompute(const FW::Vector3u& InWorkGroupId, const FW::Vector3u& InLocalInvocationId, const InvocationState& InState);
+		void SwitchDebugThread(const FW::Vector3u& InLocalInvocationId);
+		bool IsFinalizedForCurrentItem() const;
 		void ShowLinePreview(const DebuggerLocation& Loc);
 		void DismissLinePreview();
 		bool IsShowingLinePreview() const { return bShowingLinePreview; }
@@ -140,6 +163,8 @@ namespace SH
 		void CreateInternalWidgets();
 		void CreateBuiltinAssets();
 		void FillMenu(FMenuBuilder& MenuBuilder, FString MenuName);
+		void ShowAboutWindow();
+		void NormalizeCurrentDebugItem();
 
 		enum class EActiveUndoContext { None, Graph, Code, Scene };
 		void RefreshActiveUndoContext() const;
@@ -165,6 +190,7 @@ namespace SH
         
 		TSharedPtr<FW::SShWindow> MainWindow;
 		TWeakPtr<FW::SShWindow> PreferenceWindow;
+		TWeakPtr<FW::SShWindow> AboutWindow;
 		TSharedPtr<SPreferenceView> PreferenceView;
 		TSharedPtr<SShViewport> ViewportWidget;
 		TSharedPtr<FW::PreviewViewPort> ViewPort;
@@ -190,13 +216,16 @@ namespace SH
 		TSharedPtr<SDebuggerVariableView> DebuggerGlobalVariableView;
 		TSharedPtr<SDebuggerCallStackView> DebuggerCallStackView;
 		TSharedPtr<SDebuggerWatchView> DebuggerWatchView;
-		TSharedPtr<SDebuggerViewport> DebuggerViewport;
+		TSharedPtr<SFragmentDebuggerViewport> FragmentDebuggerViewport;
+		TSharedPtr<SComputeDebuggerViewport> ComputeDebuggerViewport;
+		TSharedPtr<SVertexDebuggerViewport> VertexDebuggerViewport;
 		TSharedPtr<SViewport> LinePreviewWidget;
 		TSharedPtr<FW::PreviewViewPort> LinePreviewViewPort;
 		bool bShowingLinePreview{};
 		DebuggerLocation LinePreviewLocation;
 		TSharedPtr<SWindow> ShaderEditorTipWindow;
-		DebuggableObject* CurDebuggableObject = nullptr;
+		FW::ObserverObjectPtr<FW::ShObject> CurDebuggableObject;
+		DebugItem CurrentDebugItem;
 		bool IsDebugging{};
 		ShaderDebugger Debugger;
 

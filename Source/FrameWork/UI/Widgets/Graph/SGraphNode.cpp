@@ -1,7 +1,6 @@
 #include "CommonHeader.h"
 #include "SGraphNode.h"
 #include "AssetObject/Graph.h"
-#include "Styling/StyleColors.h"
 #include "SGraphPanel.h"
 #include "UI/Styles/FAppCommonStyle.h"
 #include "UI/Widgets/Graph/SGraphPin.h"
@@ -393,6 +392,8 @@ namespace FW
 				FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "GenericCommands.Delete" });
 			MenuBuilder.AddMenuEntry(GraphEditorCommands::Get().Rename, NAME_None, {}, {},
 				FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "GenericCommands.Rename" });
+			MenuBuilder.AddMenuEntry(GraphEditorCommands::Get().Copy, NAME_None, {}, {},
+				FSlateIcon{ FAppStyle::Get().GetStyleSetName(), "GenericCommands.Copy" });
 		}
 		MenuBuilder.EndSection();
 		return MenuBuilder.MakeWidget();

@@ -1,6 +1,5 @@
 #include "CommonHeader.h"
 #include "MeshPassNode.h"
-#include "App/App.h"
 #include "AssetObject/Pins/Pins.h"
 #include "AssetObject/Render/MeshSceneObject.h"
 #include "Editor/ShaderHelperEditor.h"
@@ -21,8 +20,6 @@
 #include <Widgets/Views/SListView.h>
 #include <Widgets/SViewport.h>
 #include <Widgets/Input/SComboBox.h>
-#include <Widgets/Input/SButton.h>
-#include <Widgets/Layout/SBox.h>
 
 using namespace FW;
 
@@ -45,6 +42,48 @@ namespace SH
 	MetaType* MeshPassNodeOp::SupportType()
 	{
 		return GetMetaType<MeshPassNode>();
+	}
+
+	void MeshPassNodeOp::OnCancelSelect(ShObject* InObject)
+	{
+		ShPropertyOp::OnCancelSelect(InObject);
+
+		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		auto* Node = static_cast<MeshPassNode*>(InObject);
+		auto* RenderAsset = static_cast<Render*>(Node->GetOuterMost());
+		if (RenderAsset->SelectedMeshRenderObject)
+		{
+			MeshRenderObject* SelectedMeshRenderObject = static_cast<MeshRenderObject*>(RenderAsset->SelectedMeshRenderObject.Get());
+			if (Node->MeshRenderObjects.ContainsByPredicate([SelectedMeshRenderObject](const ObjectPtr<MeshRenderObject>& Object) { return Object.Get() == SelectedMeshRenderObject; }))
+			{
+				RenderAsset->SelectedMeshRenderObject.Reset();
+				if (!ShEditor->IsInDebugging() && ShEditor->GetDebuggaleObject() == SelectedMeshRenderObject)
+				{
+					ShEditor->SetDebuggableObject(nullptr);
+				}
+			}
+		}
+	}
+
+	void MeshPassNodeOp::OnSelect(ShObject* InObject)
+	{
+		ShPropertyOp::OnSelect(InObject);
+
+		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		auto* Node = static_cast<MeshPassNode*>(InObject);
+		auto* RenderAsset = static_cast<Render*>(Node->GetOuterMost());
+		if (RenderAsset->SelectedMeshRenderObject)
+		{
+			MeshRenderObject* SelectedMeshRenderObject = static_cast<MeshRenderObject*>(RenderAsset->SelectedMeshRenderObject.Get());
+			if (Node->MeshRenderObjects.ContainsByPredicate([SelectedMeshRenderObject](const ObjectPtr<MeshRenderObject>& Object) { return Object.Get() == SelectedMeshRenderObject; }))
+			{
+				RenderAsset->SelectedMeshRenderObject.Reset();
+				if (!ShEditor->IsInDebugging() && ShEditor->GetDebuggaleObject() == SelectedMeshRenderObject)
+				{
+					ShEditor->SetDebuggableObject(nullptr);
+				}
+			}
+		}
 	}
 
 	MeshPassNode::MeshPassNode()
@@ -155,6 +194,7 @@ namespace SH
 		}
 
 		// Break links on pins that are being removed.
+		Graph* OwnerGraph = static_cast<Graph*>(GetOuterMost());
 		for (auto& OldP : Pins)
 		{
 			bool Kept = NewPins.ContainsByPredicate([&](const ObjectPtr<GraphPin>& NP) { return NP.Get() == OldP.Get(); });
@@ -166,25 +206,15 @@ namespace SH
 					OutPinToInPin.MultiFind(OldP, Targets);
 					for (auto& Target : Targets)
 					{
-						OutPinToInPin.Remove(OldP, Target);
 						if (Target.IsValid())
 						{
-							Target->SourcePin.Reset();
-							Target->Refuse();
+							OwnerGraph->RemoveLink(OldP.Get(), Target.Get());
 						}
 					}
 				}
 				else if (OldP->SourcePin.IsValid())
 				{
-					if (GraphPin* SourcePin = OldP->GetSourcePin())
-					{
-						if (GraphNode* SourceNode = SourcePin->GetOwnerNode())
-						{
-							SourceNode->OutPinToInPin.Remove(SourcePin, OldP.Get());
-						}
-					}
-					OldP->SourcePin.Reset();
-					OldP->Refuse();
+					OwnerGraph->RemoveLink(OldP->GetSourcePin(), OldP.Get());
 				}
 			}
 		}
@@ -210,24 +240,29 @@ namespace SH
 	{
 		if (!InObject) return;
 		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+		if (ShEditor->GetDebuggaleObject() == InObject)
+		{
+			if (ShEditor->IsInDebugging())
+			{
+				ShEditor->EndDebugging();
+			}
+			ShEditor->SetDebuggableObject(nullptr);
+		}
+		if (auto* RenderAsset = static_cast<Render*>(GetOuterMost()); RenderAsset->SelectedMeshRenderObject.Get() == InObject)
+		{
+			RenderAsset->SelectedMeshRenderObject.Reset();
+		}
 		if (ShEditor->GetCurPropertyObject() == InObject)
 		{
 			ShEditor->ShowProperty(this);
 		}
 		// Break any links from override pins before removal.
+		Graph* OwnerGraph = static_cast<Graph*>(GetOuterMost());
 		for (auto& OP : InObject->OverridePins)
 		{
 			if (OP->SourcePin.IsValid())
 			{
-				if (GraphPin* Src = OP->GetSourcePin())
-				{
-					if (GraphNode* SrcNode = Src->GetOwnerNode())
-					{
-						SrcNode->OutPinToInPin.Remove(Src, OP.Get());
-					}
-				}
-				OP->SourcePin.Reset();
-				OP->Refuse();
+				OwnerGraph->RemoveLink(OP->GetSourcePin(), OP.Get());
 			}
 		}
 		MeshRenderObjects.RemoveAll([InObject](const ObjectPtr<MeshRenderObject>& E) { return E.Get() == InObject; });
@@ -249,6 +284,315 @@ namespace SH
 		{
 			if (auto* NodeWidget = Panel->GetNode(this)) NodeWidget->RebuildPins();
 		}
+	}
+
+	DebugTargetInfo MeshPassNode::MakeDebugTargetInfoFromRTs(const TArray<TRefCountPtr<GpuTexture>>& ColorRTs, TRefCountPtr<GpuTexture> DepthRT, TRefCountPtr<GpuTexture> CoverageMask) const
+	{
+		DebugTargetInfo Target;
+		for (int32 ColorIndex = 0; ColorIndex < ColorRTs.Num(); ++ColorIndex)
+		{
+			if (ColorRTs[ColorIndex])
+			{
+				Target.Outputs.Add({ ColorPinName(ColorIndex), ColorRTs[ColorIndex] });
+			}
+		}
+		if (DepthRT)
+		{
+			Target.Outputs.Add({ TEXT("Depth"), DepthRT });
+		}
+		for (int32 Index = 0; Index < Target.Outputs.Num(); ++Index)
+		{
+			if (Target.Outputs[Index].Name == PreviewOutputName)
+			{
+				Target.SelectedOutputIndex = Index;
+				break;
+			}
+		}
+		Target.CoverageMask = CoverageMask;
+		Target.Normalize();
+		return Target;
+	}
+
+	MeshPassNode::MeshPassInputState MeshPassNode::CollectInputState(uint32 Width, uint32 Height, bool& bOutValid) const
+	{
+		bOutValid = true;
+		MeshPassInputState InputState;
+		InputState.ColorInputConnected.SetNumZeroed(ColorRTs.Num());
+		InputState.ColorInputSources.SetNum(ColorRTs.Num());
+		for (int32 ColorIndex = 0; ColorIndex < ColorRTs.Num(); ++ColorIndex)
+		{
+			const FString InputPinName = ColorPinName(ColorIndex);
+			GpuTexturePin* InputPin = DynamicCast<GpuTexturePin>(GetPin(InputPinName, PinDirection::Input));
+			if (!InputPin->GetSourcePin())
+			{
+				continue;
+			}
+
+			GpuTexture* InputTexture = InputPin->GetValue();
+			const FString& SlotName = InputPinName;
+			const GpuFormat ExpectedFormat = ToGpuFormat(ColorRTs[ColorIndex].Format);
+
+			if (InputTexture->GetSampleCount() != 1)
+			{
+				SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because %s sample count must be 1."), *ObjectName.ToString(), *SlotName);
+				bOutValid = false;
+				return InputState;
+			}
+			if (InputTexture->GetWidth() != Width || InputTexture->GetHeight() != Height)
+			{
+				SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because %s size is %u x %u, expected %u x %u."), *ObjectName.ToString(), *SlotName, InputTexture->GetWidth(), InputTexture->GetHeight(), Width, Height);
+				bOutValid = false;
+				return InputState;
+			}
+			if (InputTexture->GetFormat() != ExpectedFormat)
+			{
+				SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because %s format is %s, expected %s."), *ObjectName.ToString(), *SlotName,
+					ANSI_TO_TCHAR(magic_enum::enum_name(InputTexture->GetFormat()).data()), ANSI_TO_TCHAR(magic_enum::enum_name(ExpectedFormat).data()));
+				bOutValid = false;
+				return InputState;
+			}
+
+			InputState.ColorInputSources[ColorIndex] = InputTexture;
+			InputState.ColorInputConnected[ColorIndex] = 1;
+		}
+
+		if (bDepthEnabled)
+		{
+			GpuTexturePin* InputPin = DynamicCast<GpuTexturePin>(GetPin(TEXT("Depth"), PinDirection::Input));
+			if (InputPin->GetSourcePin())
+			{
+				GpuTexture* InputTexture = InputPin->GetValue();
+				const FString SlotName = TEXT("Depth");
+				const GpuFormat ExpectedFormat = ToGpuFormat(DepthFormat);
+
+				if (InputTexture->GetSampleCount() != 1)
+				{
+					SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because %s sample count must be 1."), *ObjectName.ToString(), *SlotName);
+					bOutValid = false;
+					return InputState;
+				}
+				if (InputTexture->GetWidth() != Width || InputTexture->GetHeight() != Height)
+				{
+					SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because %s size is %u x %u, expected %u x %u."), *ObjectName.ToString(), *SlotName, InputTexture->GetWidth(), InputTexture->GetHeight(), Width, Height);
+					bOutValid = false;
+					return InputState;
+				}
+				if (InputTexture->GetFormat() != ExpectedFormat)
+				{
+					SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because %s format is %s, expected %s."), *ObjectName.ToString(), *SlotName,
+						ANSI_TO_TCHAR(magic_enum::enum_name(InputTexture->GetFormat()).data()), ANSI_TO_TCHAR(magic_enum::enum_name(ExpectedFormat).data()));
+					bOutValid = false;
+					return InputState;
+				}
+
+				InputState.DepthInputSource = InputTexture;
+				InputState.bHasDepthInput = true;
+			}
+		}
+
+		return InputState;
+	}
+
+	void MeshPassNode::AddInputBlitPasses(RenderGraph& RG, const MeshPassInputState& InputState, const TArray<TRefCountPtr<GpuTexture>>& TargetColorRTs, TRefCountPtr<GpuTexture> TargetDepthRT) const
+	{
+		for (int32 ColorIndex = 0; ColorIndex < InputState.ColorInputSources.Num(); ++ColorIndex)
+		{
+			if (!InputState.ColorInputConnected[ColorIndex] || !InputState.ColorInputSources[ColorIndex].IsValid() || !TargetColorRTs.IsValidIndex(ColorIndex) || !TargetColorRTs[ColorIndex].IsValid())
+			{
+				continue;
+			}
+
+			BlitPassInput BlitInput;
+			BlitInput.InputView = InputState.ColorInputSources[ColorIndex]->GetDefaultView();
+			BlitInput.InputTexSampler = GpuResourceHelper::GetSampler({});
+			BlitInput.OutputView = TargetColorRTs[ColorIndex]->GetDefaultView();
+			BlitInput.LoadAction = RenderTargetLoadAction::DontCare;
+			AddBlitPass(RG, BlitInput);
+		}
+
+		if (InputState.bHasDepthInput && InputState.DepthInputSource.IsValid() && TargetDepthRT.IsValid())
+		{
+			BlitPassInput DepthBlitInput;
+			DepthBlitInput.InputView = InputState.DepthInputSource->GetDefaultView();
+			DepthBlitInput.InputTexSampler = GpuResourceHelper::GetSampler({});
+			DepthBlitInput.DepthOutputView = TargetDepthRT->GetDefaultView();
+			DepthBlitInput.LoadAction = RenderTargetLoadAction::DontCare;
+			AddBlitPass(RG, DepthBlitInput);
+		}
+	}
+
+	GpuRenderPassDesc MeshPassNode::MakeRenderPassDesc(const TArray<TRefCountPtr<GpuTexture>>& TargetColorRTs, TRefCountPtr<GpuTexture> TargetDepthRT, const TArray<uint8>& ColorInputConnected, bool bHasDepthInput) const
+	{
+		GpuRenderPassDesc PassDesc;
+		for (int32 ColorIndex = 0; ColorIndex < TargetColorRTs.Num(); ++ColorIndex)
+		{
+			if (!TargetColorRTs[ColorIndex])
+			{
+				continue;
+			}
+
+			const bool bLoadColorInput = ColorInputConnected.IsValidIndex(ColorIndex) && ColorInputConnected[ColorIndex];
+			const Vector4f ClearValue = ColorRTs.IsValidIndex(ColorIndex) ? ColorRTs[ColorIndex].ClearValue : TargetColorRTs[ColorIndex]->GetResourceDesc().ClearValues;
+			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{
+				TargetColorRTs[ColorIndex]->GetDefaultView(),
+				bLoadColorInput ? RenderTargetLoadAction::Load : RenderTargetLoadAction::Clear,
+				RenderTargetStoreAction::Store,
+				ClearValue
+			});
+		}
+		if (TargetDepthRT.IsValid())
+		{
+			PassDesc.DepthStencilTarget = GpuDepthStencilTargetInfo{
+				TargetDepthRT->GetDefaultView(),
+				bHasDepthInput ? RenderTargetLoadAction::Load : RenderTargetLoadAction::Clear,
+				RenderTargetStoreAction::Store,
+				1.0f
+			};
+		}
+		return PassDesc;
+	}
+
+	TArray<ObjectPtr<MeshRenderObject>> MeshPassNode::CollectMeshRenderObjectsThrough(MeshRenderObject* StopObject) const
+	{
+		TArray<ObjectPtr<MeshRenderObject>> Result;
+		for (const ObjectPtr<MeshRenderObject>& MRO : MeshRenderObjects)
+		{
+			Result.Add(MRO);
+			if (MRO.Get() == StopObject)
+			{
+				break;
+			}
+		}
+		return Result;
+	}
+
+	TArray<GpuFormat> MeshPassNode::MakeColorFormatKey() const
+	{
+		TArray<GpuFormat> Result;
+		for (const MeshPassColorRT& ColorRT : ColorRTs)
+		{
+			Result.Add(ToGpuFormat(ColorRT.Format));
+		}
+		return Result;
+	}
+
+	TRefCountPtr<GpuTexture> MeshPassNode::CreateColorRT(int32 ColorIndex, uint32 Width, uint32 Height) const
+	{
+		if (!ColorRTs.IsValidIndex(ColorIndex))
+		{
+			return nullptr;
+		}
+		return GGpuRhi->CreateTexture({
+			.Width = Width, .Height = Height,
+			.Format = ToGpuFormat(ColorRTs[ColorIndex].Format),
+			.Usage = GpuTextureUsage::RenderTarget | GpuTextureUsage::ShaderResource,
+			.ClearValues = ColorRTs[ColorIndex].ClearValue,
+		}, GpuResourceState::RenderTargetWrite);
+	}
+
+	TRefCountPtr<GpuTexture> MeshPassNode::CreateDepthRT(uint32 Width, uint32 Height) const
+	{
+		if (!bDepthEnabled)
+		{
+			return nullptr;
+		}
+		return GGpuRhi->CreateTexture({
+			.Width = Width, .Height = Height,
+			.Format = ToGpuFormat(DepthFormat),
+			.Usage = GpuTextureUsage::DepthStencil | GpuTextureUsage::ShaderResource,
+		}, GpuResourceState::DepthStencilWrite);
+	}
+
+	RGRenderPass& MeshPassNode::AddMeshDrawPass(RenderGraph& RG, const FString& Name, GpuRenderPassDesc PassDesc, const TArray<ObjectPtr<MeshRenderObject>>& MROs, const Vector2f& ViewportSize) const
+	{
+		const TOptional<Camera> Cam = DebugFrameState.Camera;
+		const Vector2f MousePos = DebugFrameState.MousePos;
+		const float Time = DebugFrameState.Time;
+		auto& RenderPass = RG.AddRenderPass(Name, MoveTemp(PassDesc),
+			[MROs, Cam, ViewportSize, MousePos, Time](GpuRenderPassRecorder* Rec) {
+				const Camera* CameraPtr = Cam.IsSet() ? &Cam.GetValue() : nullptr;
+				for (const ObjectPtr<MeshRenderObject>& MRO : MROs)
+				{
+					FMatrix44f ModelMat = FMatrix44f::Identity;
+					if (MRO->MeshSceneObjectRef.IsValid())
+					{
+						ModelMat = MRO->MeshSceneObjectRef->GetWorldMatrix();
+					}
+					MRO->Draw(Rec, CameraPtr, ModelMat, ViewportSize, MousePos, Time);
+				}
+			}
+		);
+
+		TSet<GpuTexture*> ConnectedOverrideTextures;
+		for (const ObjectPtr<MeshRenderObject>& MRO : MROs)
+		{
+			MRO->CollectConnectedOverrideTextures(ConnectedOverrideTextures);
+			RenderPass.Write(MRO->GetPrintBuffer()->GetResource());
+		}
+		for (GpuTexture* Texture : ConnectedOverrideTextures)
+		{
+			RenderPass.Read(Texture);
+		}
+		return RenderPass;
+	}
+
+	DebugTargetInfo MeshPassNode::MakeDebugTargetInfo(MeshRenderObject* StopObject)
+	{
+		TRefCountPtr<GpuTexture> CoverageMask = StopObject ? StopObject->BuildCoverageMask() : nullptr;
+		const bool bStopObjectInList = StopObject && MeshRenderObjects.ContainsByPredicate(
+			[StopObject](const ObjectPtr<MeshRenderObject>& MRO) { return MRO.Get() == StopObject; });
+		if (!bStopObjectInList || (CachedColorRTs.IsEmpty() && !CachedDepthRT))
+		{
+			return MakeDebugTargetInfoFromRTs(CachedColorRTs, CachedDepthRT, CoverageMask);
+		}
+
+		bool bInputStateValid = true;
+		MeshPassInputState InputState = CollectInputState(CachedRTSize.X, CachedRTSize.Y, bInputStateValid);
+		if (!bInputStateValid)
+		{
+			return MakeDebugTargetInfoFromRTs(CachedColorRTs, CachedDepthRT, CoverageMask);
+		}
+
+		TArray<TRefCountPtr<GpuTexture>> DebugColorRTs;
+		DebugColorRTs.SetNum(CachedColorRTs.Num());
+		for (int32 ColorIndex = 0; ColorIndex < CachedColorRTs.Num(); ++ColorIndex)
+		{
+			if (CachedColorRTs[ColorIndex])
+			{
+				DebugColorRTs[ColorIndex] = CreateColorRT(ColorIndex, CachedRTSize.X, CachedRTSize.Y);
+			}
+		}
+		TRefCountPtr<GpuTexture> DebugDepthRT = CreateDepthRT(CachedRTSize.X, CachedRTSize.Y);
+
+		TArray<ObjectPtr<MeshRenderObject>> MROsToDraw = CollectMeshRenderObjectsThrough(StopObject);
+		const TArray<GpuFormat> ColorFormatKey = MakeColorFormatKey();
+		const GpuFormat DepthFormatKey = DebugDepthRT ? DebugDepthRT->GetFormat() : GpuFormat::NUM;
+		for (const ObjectPtr<MeshRenderObject>& MRO : MROsToDraw)
+		{
+			MRO->EnsureRenderResources(ColorFormatKey, DepthFormatKey, 1);
+		}
+
+		RenderGraph RG;
+		AddInputBlitPasses(RG, InputState, DebugColorRTs, DebugDepthRT);
+
+		GpuRenderPassDesc PassDesc = MakeRenderPassDesc(DebugColorRTs, DebugDepthRT, InputState.ColorInputConnected, InputState.bHasDepthInput);
+		const Vector2f ViewportSize((float)CachedRTSize.X, (float)CachedRTSize.Y);
+		AddMeshDrawPass(RG, TEXT("MeshPassDebugTarget"), MoveTemp(PassDesc), MROsToDraw, ViewportSize);
+		{
+			const Camera* CameraPtr = DebugFrameState.Camera.IsSet() ? &DebugFrameState.Camera.GetValue() : nullptr;
+			for (const ObjectPtr<MeshRenderObject>& MRO : MROsToDraw)
+			{
+				MRO->AddAssertHighlightPass(RG, DebugColorRTs, DebugDepthRT, ViewportSize, CameraPtr);
+			}
+		}
+
+		RG.Execute();
+		for (const ObjectPtr<MeshRenderObject>& MRO : MROsToDraw)
+		{
+			MRO->GetPrintBuffer()->Clear();
+		}
+
+		return MakeDebugTargetInfoFromRTs(DebugColorRTs, DebugDepthRT, CoverageMask);
 	}
 
 	void MeshPassNode::Serialize(FArchive& Ar)
@@ -313,111 +657,33 @@ namespace SH
 			CachedDepthRT.SafeRelease();
 			for (int32 i = 0; i < ColorRTs.Num(); ++i)
 			{
-				GpuTextureDesc D{
-					.Width = Width, .Height = Height,
-					.Format = ToGpuFormat(ColorRTs[i].Format),
-					.Usage = GpuTextureUsage::RenderTarget | GpuTextureUsage::ShaderResource,
-					.ClearValues = ColorRTs[i].ClearValue,
-				};
-				CachedColorRTs.Add(GGpuRhi->CreateTexture(D, GpuResourceState::RenderTargetWrite));
+				CachedColorRTs.Add(CreateColorRT(i, Width, Height));
 			}
-			if (bDepthEnabled)
-			{
-				GpuTextureDesc D{
-					.Width = Width, .Height = Height,
-					.Format = ToGpuFormat(DepthFormat),
-					.Usage = GpuTextureUsage::DepthStencil | GpuTextureUsage::ShaderResource,
-				};
-				CachedDepthRT = GGpuRhi->CreateTexture(D, GpuResourceState::DepthStencilWrite);
-			}
+			CachedDepthRT = CreateDepthRT(Width, Height);
 			CachedRTSize = FW::Vector2u(Width, Height);
 			CachedColorRTSettings = ColorRTs;
 			bCachedDepthEnabled = bDepthEnabled;
 			CachedDepthFormat = DepthFormat;
 		}
 
-		TArray<TRefCountPtr<GpuTexture>> ActiveColorRTs;
-		ActiveColorRTs.SetNum(CachedColorRTs.Num());
-		TArray<uint8> ColorInputConnected;
-		ColorInputConnected.SetNumZeroed(CachedColorRTs.Num());
-		for (int32 i = 0; i < CachedColorRTs.Num(); ++i)
+		bool bInputStateValid = true;
+		MeshPassInputState InputState = CollectInputState(Width, Height, bInputStateValid);
+		if (!bInputStateValid)
 		{
-			ActiveColorRTs[i] = CachedColorRTs[i];
-			const FString InputPinName = ColorPinName(i);
-			GpuTexturePin* InputPin = DynamicCast<GpuTexturePin>(GetPin(InputPinName, PinDirection::Input));
-			if (!InputPin || !InputPin->GetSourcePin())
-			{
-				continue;
-			}
-
-			GpuTexture* InputTexture = InputPin->GetValue();
-			const FString& SlotName = InputPinName;
-			const GpuFormat ExpectedFormat = ToGpuFormat(ColorRTs[i].Format);
-
-			const GpuTextureDesc& InputDesc = InputTexture->GetResourceDesc();
-			if (InputTexture->GetSampleCount() != 1)
-			{
-				SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because %s sample count must be 1."), *ObjectName.ToString(), *SlotName);
-				return { true, true };
-			}
-			if (InputTexture->GetWidth() != Width || InputTexture->GetHeight() != Height)
-			{
-				SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because %s size is %u x %u, expected %u x %u."), *ObjectName.ToString(), *SlotName, InputTexture->GetWidth(), InputTexture->GetHeight(), Width, Height);
-				return { true, true };
-			}
-			if (InputTexture->GetFormat() != ExpectedFormat)
-			{
-				SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because %s format is %d, expected %d."), *ObjectName.ToString(), *SlotName, static_cast<int32>(InputTexture->GetFormat()), static_cast<int32>(ExpectedFormat));
-				return { true, true };
-			}
-
-			ActiveColorRTs[i] = InputTexture;
-			ColorInputConnected[i] = 1;
-		}
-
-		TRefCountPtr<GpuTexture> ActiveDepthRT = CachedDepthRT;
-		bool bHasDepthInput = false;
-		if (bDepthEnabled)
-		{
-			GpuTexturePin* InputPin = DynamicCast<GpuTexturePin>(GetPin(TEXT("Depth"), PinDirection::Input));
-			if (InputPin && InputPin->GetSourcePin())
-			{
-				GpuTexture* InputTexture = InputPin->GetValue();
-				const FString SlotName = TEXT("Depth");
-				const GpuFormat ExpectedFormat = ToGpuFormat(DepthFormat);
-
-				if (InputTexture->GetSampleCount() != 1)
-				{
-					SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because %s sample count must be 1."), *ObjectName.ToString(), *SlotName);
-					return { true, true };
-				}
-				if (InputTexture->GetWidth() != Width || InputTexture->GetHeight() != Height)
-				{
-					SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because %s size is %u x %u, expected %u x %u."), *ObjectName.ToString(), *SlotName, InputTexture->GetWidth(), InputTexture->GetHeight(), Width, Height);
-					return { true, true };
-				}
-				if (InputTexture->GetFormat() != ExpectedFormat)
-				{
-					SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because %s format is %d, expected %d."), *ObjectName.ToString(), *SlotName, static_cast<int32>(InputTexture->GetFormat()), static_cast<int32>(ExpectedFormat));
-					return { true, true };
-				}
-
-				ActiveDepthRT = InputTexture;
-				bHasDepthInput = true;
-			}
+			return { true, true };
 		}
 
 		TRefCountPtr<GpuTexture> PreviewSourceTex;
 		if (PreviewOutputName == TEXT("Depth"))
 		{
-			PreviewSourceTex = ActiveDepthRT;
+			PreviewSourceTex = CachedDepthRT;
 		}
 		else if (PreviewOutputName.StartsWith(TEXT("Color")))
 		{
 			const int32 PreviewColorIndex = FCString::Atoi(*PreviewOutputName.RightChop(5));
-			if (ActiveColorRTs.IsValidIndex(PreviewColorIndex))
+			if (CachedColorRTs.IsValidIndex(PreviewColorIndex))
 			{
-				PreviewSourceTex = ActiveColorRTs[PreviewColorIndex];
+				PreviewSourceTex = CachedColorRTs[PreviewColorIndex];
 			}
 		}
 
@@ -443,56 +709,11 @@ namespace SH
 			Preview->Clear();
 		}
 
-		// Build Pass Desc.
-		GpuRenderPassDesc PassDesc;
-		for (int32 i = 0; i < ActiveColorRTs.Num(); ++i)
-		{
-			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{
-				ActiveColorRTs[i]->GetDefaultView(),
-				ColorInputConnected[i] ? RenderTargetLoadAction::Load : RenderTargetLoadAction::Clear,
-				RenderTargetStoreAction::Store,
-				ColorRTs[i].ClearValue
-			});
-		}
-		if (ActiveDepthRT.IsValid())
-		{
-			PassDesc.DepthStencilTarget = GpuDepthStencilTargetInfo{
-				ActiveDepthRT->GetDefaultView(),
-				bHasDepthInput ? RenderTargetLoadAction::Load : RenderTargetLoadAction::Clear,
-				RenderTargetStoreAction::Store,
-				1.0f
-			};
-		}
-
-		if (!ShowTimestampMs())
-		{
-			GpuTimeMs = 0.0;
-			TimestampQuerySet = nullptr;
-		}
-		else
-		{
-			if (TimestampQuerySet)
-			{
-				TArray<uint64> Timestamps;
-				TimestampQuerySet->ResolveResults(0, 2, Timestamps);
-				double PeriodNs = TimestampQuerySet->GetTimestampPeriodNs();
-				GpuTimeMs = (double)(Timestamps[1] - Timestamps[0]) * PeriodNs / 1e6;
-			}
-
-			if (GGpuRhi->GetFeature().SupportTimestampQuery() && !TimestampQuerySet)
-			{
-				TimestampQuerySet = GGpuRhi->CreateQuerySet(2);
-			}
-		}
-
-		if (TimestampQuerySet)
-		{
-			PassDesc.TimestampWrites = GpuRenderPassTimestampWrites{ TimestampQuerySet, 0, 1 };
-		}
+		GpuRenderPassDesc PassDesc = MakeRenderPassDesc(CachedColorRTs, CachedDepthRT, InputState.ColorInputConnected, InputState.bHasDepthInput);
+		PassDesc.TimestampWrites = GpuResourceHelper::PreparePassTimestampWrites(TimestampQuerySet, GpuTimeMs);
 
 		// Ensure render resources for each MRO with the current format key.
-		TArray<GpuFormat> ColorFormatKey;
-		for (const MeshPassColorRT& ColorRT : ColorRTs) ColorFormatKey.Add(ToGpuFormat(ColorRT.Format));
+		TArray<GpuFormat> ColorFormatKey = MakeColorFormatKey();
 		GpuFormat DepthFormatKey = bDepthEnabled ? ToGpuFormat(DepthFormat) : GpuFormat::NUM;
 		const uint32 SampleCount = 1;
 
@@ -516,61 +737,50 @@ namespace SH
 			return true;
 		};
 
-		for (int32 i = 0; i < ActiveColorRTs.Num(); ++i)
+		for (int32 i = 0; i < CachedColorRTs.Num(); ++i)
 		{
-			if (!ValidateRenderTargetNotShaderInput(ActiveColorRTs[i].GetReference(), ColorPinName(i)))
+			if (!ValidateRenderTargetNotShaderInput(CachedColorRTs[i].GetReference(), ColorPinName(i)))
 			{
 				return { true, true };
 			}
 		}
-		if (!ValidateRenderTargetNotShaderInput(ActiveDepthRT.GetReference(), TEXT("Depth")))
+		if (!ValidateRenderTargetNotShaderInput(CachedDepthRT.GetReference(), TEXT("Depth")))
 		{
 			return { true, true };
 		}
 
 		const float Aspect = (float)Width / (float)Height;
 		TOptional<Camera> Cam;
-		if (CameraRef.IsValid() && CameraRef.Get())
+		if (CameraRef.IsValid())
 		{
 			Cam = CameraRef->ToCamera(Aspect);
 		}
 
-		TArray<ObjectPtr<MeshRenderObject>> MROsCopy = MeshRenderObjects;
-		auto& RenderPass = Ctx.RG->AddRenderPass(ObjectName.ToString(), PassDesc,
-			[MROsCopy, Cam](GpuRenderPassRecorder* Rec) {
-				const Camera* CameraPtr = Cam.IsSet() ? &Cam.GetValue() : nullptr;
-				for (const auto& MRO : MROsCopy)
-				{
-					FMatrix44f ModelMat = FMatrix44f::Identity;
-					if (MRO->MeshSceneObjectRef.IsValid() && MRO->MeshSceneObjectRef.Get())
-					{
-						ModelMat = MRO->MeshSceneObjectRef->GetWorldMatrix();
-					}
-					MRO->Draw(Rec, CameraPtr, ModelMat);
-				}
-			}
-		);
-		TSet<GpuTexture*> ConnectedOverrideTextures;
+		DebugFrameState.Camera = Cam;
+		DebugFrameState.MousePos = Ctx.MousePos;
+		DebugFrameState.Time = Ctx.Time;
+
+		const Vector2f ViewportSize((float)Width, (float)Height);
+		AddInputBlitPasses(*Ctx.RG, InputState, CachedColorRTs, CachedDepthRT);
+
+		// For MeshRenderObjects that override RW textures, blit the input texture into the
+		// internally-owned RW output
 		for (const auto& MRO : MeshRenderObjects)
 		{
-			MRO->CollectConnectedOverrideTextures(ConnectedOverrideTextures);
-			RenderPass.Write(MRO->GetPrintBuffer()->GetResource());
+			MRO->CurrentViewportSize = ViewportSize;
+			MRO->AddRWInputBlitPasses(*Ctx.RG);
 		}
-		for (GpuTexture* Texture : ConnectedOverrideTextures)
-		{
-			RenderPass.Read(Texture);
-		}
+
+		AddMeshDrawPass(*Ctx.RG, ObjectName.ToString(), MoveTemp(PassDesc), MeshRenderObjects, ViewportSize);
 
 		Ctx.RG->Execute();
 
 		bool bAssertError = false;
 		for (const auto& MRO : MeshRenderObjects)
 		{
-			if (MRO)
-			{
-				const FString LogPrefix = FString::Printf(TEXT("%s:%s"), *ObjectName.ToString(), *MRO->ObjectName.ToString());
-				bAssertError |= MRO->FlushPrintBufferLogs(LogPrefix);
-			}
+			const FString LogPrefix = FString::Printf(TEXT("%s:%s"), *ObjectName.ToString(), *MRO->ObjectName.ToString());
+			MRO->bHadAssertError = MRO->FlushPrintBufferLogs(LogPrefix);
+			bAssertError |= MRO->bHadAssertError;
 		}
 
 		if (PreviewRT.IsValid() && PreviewSourceTex.IsValid())
@@ -584,19 +794,24 @@ namespace SH
 		}
 
 		// Publish outputs.
-		for (int32 i = 0; i < ActiveColorRTs.Num(); ++i)
+		for (int32 i = 0; i < CachedColorRTs.Num(); ++i)
 		{
 			if (auto* Pin = static_cast<GpuTexturePin*>(GetPin(ColorPinName(i), PinDirection::Output)))
 			{
-				Pin->SetValue(ActiveColorRTs[i]);
+				Pin->SetValue(CachedColorRTs[i]);
 			}
 		}
-		if (ActiveDepthRT.IsValid())
+		if (CachedDepthRT.IsValid())
 		{
 			if (auto* Pin = static_cast<GpuTexturePin*>(GetPin(TEXT("Depth"), PinDirection::Output)))
 			{
-				Pin->SetValue(ActiveDepthRT);
+				Pin->SetValue(CachedDepthRT);
 			}
+		}
+
+		for (const auto& MRO : MeshRenderObjects)
+		{
+			MRO->PublishRWOutputsToPins();
 		}
 
 		if (bAssertError)
@@ -647,7 +862,7 @@ namespace SH
 						SAssignNew(ListView, SListView<FMeshRenderObjectListItemPtr>)
 						.AllowOverscroll(EAllowOverscroll::No)
 						.ListItemsSource(&Items)
-						.SelectionMode(ESelectionMode::Single)
+						.SelectionMode(ESelectionMode::None)
 						.OnGenerateRow(this, &SMeshRenderObjectList::GenerateRowForItem)
 						.OnSelectionChanged(this, &SMeshRenderObjectList::OnSelectionChanged)
 						.OnContextMenuOpening(this, &SMeshRenderObjectList::CreateContextMenu)
@@ -672,15 +887,6 @@ namespace SH
 						]
 					]
 				];
-
-				for (const auto& Item : Items)
-				{
-					if (Item->Object && static_cast<ShaderHelperEditor*>(GApp->GetEditor())->GetCurPropertyObject() == Item->Object)
-					{
-						ListView->SetSelection(Item, ESelectInfo::Direct);
-						break;
-					}
-				}
 			}
 
 			void OnMouseEnter(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
@@ -704,12 +910,23 @@ namespace SH
 				TSharedPtr<SVerticalBox> OverridePinBox;
 				Row->SetContent(
 						SNew(SBorder)
-						.BorderImage(FAppStyle::Get().GetBrush("NoBrush"))
+						.BorderImage(FAppStyle::Get().GetBrush("WhiteBrush"))
+						.BorderBackgroundColor_Lambda([this, Object] {
+							auto& SelectedMeshRenderObject = static_cast<Render*>(Node->GetOuterMost())->SelectedMeshRenderObject;
+							if (!SelectedMeshRenderObject || SelectedMeshRenderObject.Get() != Object)
+							{
+								return FLinearColor::Transparent;
+							}
+							return HasKeyboardFocus() || HasFocusedDescendants()
+								? FStyleColors::Select.GetSpecifiedColor()
+								: FStyleColors::SelectInactive.GetSpecifiedColor();
+						})
 						.Padding(0.0f)
-						.OnMouseButtonDown_Lambda([this, Row, Item](const FGeometry&, const FPointerEvent& MouseEvent) {
-							if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && Row->IsSelected())
+						.OnMouseButtonDown_Lambda([this, Item](const FGeometry&, const FPointerEvent& MouseEvent) {
+							if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
 							{
 								OnSelectionChanged(Item, ESelectInfo::OnMouseClick);
+								return FReply::Handled();
 							}
 							return FReply::Unhandled();
 						})
@@ -733,7 +950,7 @@ namespace SH
 									{
 										return FText::GetEmpty();
 									}
-									if (Object->MeshSceneObjectRef.IsValid() && Object->MeshSceneObjectRef.Get())
+									if (Object->MeshSceneObjectRef.IsValid())
 									{
 										return Object->MeshSceneObjectRef->ObjectName;
 									}
@@ -855,7 +1072,28 @@ namespace SH
 				}
 				if (SelectedItem && SelectedItem->Object)
 				{
+					if (OwnerWidget && OwnerWidget->Owner && !OwnerWidget->Owner->IsSelectedNode(OwnerWidget))
+					{
+						OwnerWidget->Owner->ClearSelectedNode();
+						OwnerWidget->Owner->AddSelectedNode(StaticCastSharedRef<SGraphNode>(OwnerWidget->AsShared()));
+					}
+
+					auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+					static_cast<Render*>(Node->GetOuterMost())->SelectedMeshRenderObject = SelectedItem->Object;
+					if (!ShEditor->IsInDebugging())
+					{
+						ShEditor->SetDebuggableObject(SelectedItem->Object);
+					}
 					GApp->GetEditor()->ShowProperty(SelectedItem->Object);
+				}
+				else if (MeshRenderObject* SelectedObject = GetSelectedObject())
+				{
+					auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+					static_cast<Render*>(Node->GetOuterMost())->SelectedMeshRenderObject.Reset();
+					if (!ShEditor->IsInDebugging() && ShEditor->GetDebuggaleObject() == SelectedObject)
+					{
+						ShEditor->SetDebuggableObject(nullptr);
+					}
 				}
 			}
 
@@ -878,21 +1116,34 @@ namespace SH
 		private:
 			bool HasSelectedObject() const
 			{
-				const TArray<FMeshRenderObjectListItemPtr> SelectedItems = ListView->GetSelectedItems();
-				return SelectedItems.Num() > 0 && SelectedItems[0]->Object;
+				return GetSelectedObject() != nullptr;
 			}
 
 			bool DeleteSelected()
 			{
-				const TArray<FMeshRenderObjectListItemPtr> SelectedItems = ListView->GetSelectedItems();
-				if (SelectedItems.Num() == 0 || !SelectedItems[0]->Object)
+				MeshRenderObject* SelectedObject = GetSelectedObject();
+				if (!SelectedObject)
 				{
 					return false;
 				}
 
-				Node->RemoveMeshRenderObject(SelectedItems[0]->Object);
+				Node->RemoveMeshRenderObject(SelectedObject);
 				Node->RefreshNodeWidget();
 				return true;
+			}
+
+			MeshRenderObject* GetSelectedObject() const
+			{
+				auto& SelectedMeshRenderObjectPtr = static_cast<Render*>(Node->GetOuterMost())->SelectedMeshRenderObject;
+				MeshRenderObject* SelectedMeshRenderObject = SelectedMeshRenderObjectPtr ? static_cast<MeshRenderObject*>(SelectedMeshRenderObjectPtr.Get()) : nullptr;
+				for (const auto& Item : Items)
+				{
+					if (Item->Object && Item->Object == SelectedMeshRenderObject)
+					{
+						return Item->Object;
+					}
+				}
+				return nullptr;
 			}
 
 			MeshPassNode* Node = nullptr;
@@ -1053,8 +1304,8 @@ namespace SH
 				RTCat->AddChild(EnumItem);
 			}
 
-			auto WItem = MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("MeshPassRTWidthAuto"), &RTSize.X);
-			auto HItem = MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("MeshPassRTHeightAuto"), &RTSize.Y);
+			auto WItem = MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("WidthAuto"), &RTSize.X);
+			auto HItem = MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("HeightAuto"), &RTSize.Y);
 			RTCat->AddChild(WItem);
 			RTCat->AddChild(HItem);
 		}
@@ -1068,10 +1319,10 @@ namespace SH
 		if (InProperty->IsOfType<PropertyArrayItem>() && InProperty->GetDisplayName().EqualTo(LOCALIZATION("ColorRT")))
 		{
 			const int32 NewNum = static_cast<PropertyArrayItem*>(InProperty)->GetPendingNum();
-			if (NewNum != INDEX_NONE && NewNum > 8)
+			if (NewNum < 1 || NewNum > 8)
 			{
 				auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-				MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, ShEditor->GetMainWindow(), LOCALIZATION("MeshPassColorRTMaxCountTip"));
+				MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, ShEditor->GetMainWindow(), LOCALIZATION("MeshPassColorRTCountTip"));
 				return false;
 			}
 		}

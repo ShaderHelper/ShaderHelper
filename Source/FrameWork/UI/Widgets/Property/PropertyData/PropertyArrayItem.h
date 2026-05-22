@@ -5,7 +5,7 @@
 #include "UI/Styles/FAppCommonStyle.h"
 #include "UI/Widgets/Misc/MiscWidget.h"
 
-#include <Widgets/Input/SSpinBox.h>
+#include <Widgets/Input/SNumericEntryBox.h>
 #include <Widgets/Views/STreeView.h>
 
 namespace FW
@@ -75,42 +75,6 @@ namespace FW
 		TFunction<void()> Add;
 		TFunction<void()> Remove;
 		TFunction<bool()> CanRemove;
-	};
-
-	class STextOnlyIntSpinBox : public SSpinBox<int32>
-	{
-	public:
-		using FArguments = SSpinBox<int32>::FArguments;
-
-		void Construct(const FArguments& InArgs)
-		{
-			SSpinBox<int32>::Construct(InArgs);
-		}
-
-		FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
-		{
-			if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
-			{
-				EnterTextMode();
-				return FReply::Handled().SetUserFocus(SharedThis(this), EFocusCause::SetDirectly);
-			}
-			return SSpinBox<int32>::OnMouseButtonDown(MyGeometry, MouseEvent);
-		}
-
-		FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override
-		{
-			const FKey Key = InKeyEvent.GetKey();
-			if (Key == EKeys::Up || Key == EKeys::Right || Key == EKeys::Down || Key == EKeys::Left)
-			{
-				return FReply::Handled();
-			}
-			return SSpinBox<int32>::OnKeyDown(MyGeometry, InKeyEvent);
-		}
-
-		FCursorReply OnCursorQuery(const FGeometry& MyGeometry, const FPointerEvent& CursorEvent) const override
-		{
-			return FCursorReply::Unhandled();
-		}
 	};
 
 	class PropertyArrayItem : public PropertyData
@@ -238,10 +202,11 @@ namespace FW
 						.VAlign(VAlign_Center)
 						.Padding(4.0f, 1.0f)
 						[
-							SNew(STextOnlyIntSpinBox)
+							SNew(SNumericEntryBox<int32>)
 							.IsEnabled(!ReadOnly)
+							.AllowSpin(false)
 							.MinValue(0)
-							.MinDesiredWidth(58.0f)
+							.MinDesiredValueWidth(58.0f)
 							.Value_Lambda([this] { return GetNum(); })
 							.OnValueCommitted_Lambda([this](int32 NewNum, ETextCommit::Type) {
 								ApplyNum(NewNum);

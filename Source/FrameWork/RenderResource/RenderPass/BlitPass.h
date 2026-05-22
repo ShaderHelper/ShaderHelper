@@ -10,8 +10,10 @@ namespace FW
 		TRefCountPtr<GpuTextureView> InputView;
 		TRefCountPtr<GpuSampler> InputTexSampler;
 
+		// One of OutputView (color) or DepthOutputView (depth) should be set.
 		TRefCountPtr<GpuTextureView> OutputView;
-		
+		TRefCountPtr<GpuTextureView> DepthOutputView;
+
 		TOptional<GpuScissorRectDesc> Scissor;
 		TOptional<GpuViewPortDesc> Viewport;
 		RenderTargetLoadAction LoadAction = RenderTargetLoadAction::DontCare;

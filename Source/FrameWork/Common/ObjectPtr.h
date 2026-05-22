@@ -9,7 +9,7 @@ namespace FW
         friend class ObjectPtr;
         
     public:
-        ObjectPtr(T* InReference = nullptr)
+        ObjectPtr(ShObject* InReference = nullptr)
         {
             SetReference(InReference);
         }
@@ -52,34 +52,28 @@ namespace FW
         T* operator->() const
         {
 			check(IsValid());
-            return Reference;
+            return Get();
         }
 
-		T* Get() const { return Reference; }
+		T* Get() const { return static_cast<T*>(Reference); }
 
         FGuid GetGuid() const
         {
             return Reference ? Reference->GetGuid() : Guid;
         }
 
-        void SetReference(T* InReference)
+        void SetReference(ShObject* InReference)
         {
-            if (Reference == InReference)
-            {
-                Guid = Reference ? Reference->GetGuid() : FGuid{};
-                return;
-            }
+			if (Reference == InReference)
+			{
+				Guid = Reference ? Reference->GetGuid() : FGuid{};
+				return;
+			}
 
-            ReleaseReference();
-            Reference = InReference;
-            if (OwnerShip != ObjectOwnerShip::Assign)
-            {
-                if (Reference)
-                {
-                    Reference->Add();
-                }
-            }
-            Guid = Reference ? Reference->GetGuid() : FGuid{};
+			ReleaseReference();
+			Reference = InReference;
+			AddReference();
+			Guid = Reference ? Reference->GetGuid() : FGuid{};
         }
 
         void Reset()
@@ -97,7 +91,7 @@ namespace FW
 
         operator T*() const
         {
-            return Reference;
+            return Get();
         }
         
         bool IsValid() const
@@ -121,9 +115,20 @@ namespace FW
         }
                 
     private:
+		void AddReference()
+		{
+			if constexpr (OwnerShip != ObjectOwnerShip::Assign)
+			{
+				if (Reference)
+				{
+					Reference->Add();
+				}
+			}
+		}
+
         void ReleaseReference()
         {
-            if (OwnerShip != ObjectOwnerShip::Assign)
+			if constexpr (OwnerShip != ObjectOwnerShip::Assign)
             {
                 if (IsValid())
                 {
@@ -132,7 +137,7 @@ namespace FW
             }
         }
 
-        T* Reference = nullptr;
+        ShObject* Reference = nullptr;
         FGuid Guid{};
     };
 }

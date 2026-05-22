@@ -1,7 +1,6 @@
 #include "CommonHeader.h"
 #include "ShaderHeaderEditor.h"
 #include "AssetObject/ShaderHeader.h"
-#include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "AssetManager/AssetManager.h"
 

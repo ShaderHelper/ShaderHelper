@@ -59,10 +59,6 @@ void main()
     GPrivate_fragCoord = fragCoord;
     vec4 fragColor;
     mainImage(fragColor, fragCoord);
-    if (GPrivate_AssertResult != 1)
-    {
-        fragColor = vec4(1,0,1,1);
-    }
     outColor = fragColor;
 }
 

@@ -3,10 +3,8 @@
 #include "UI/Widgets/Misc/MiscWidget.h"
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "UI/Styles/FAppCommonStyle.h"
-#include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "UI/Widgets/ShaderCodeEditor/SShaderEditorBox.h"
-#include "UI/Widgets/Misc/MiscWidget.h"
 #include "GpuApi/GpuRhi.h"
 
 #include <Styling/StyleColors.h>

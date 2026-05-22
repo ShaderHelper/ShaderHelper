@@ -40,4 +40,25 @@ namespace SH
 	};
 
 	using ShProjectManager = FW::ProjectManager<ShProject>;
+
+	class ScopedTimelineResume
+	{
+	public:
+		ScopedTimelineResume()
+		{
+			TargetProject = FW::TSingleton<ShProjectManager>::Get().GetProject().Get();
+			PrevStop = TargetProject->TimelineStop;
+			TargetProject->TimelineStop = false;
+		}
+		~ScopedTimelineResume()
+		{
+			TargetProject->TimelineStop = PrevStop;
+		}
+		ScopedTimelineResume(const ScopedTimelineResume&) = delete;
+		ScopedTimelineResume& operator=(const ScopedTimelineResume&) = delete;
+
+	private:
+		ShProject* TargetProject = nullptr;
+		bool PrevStop = true;
+	};
 }

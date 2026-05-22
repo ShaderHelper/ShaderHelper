@@ -3,6 +3,7 @@
 #include "UI/Widgets/ColorPicker/SColorPicker.h"
 
 #include <Widgets/Layout/SScaleBox.h>
+#include <Widgets/Input/SComboButton.h>
 
 namespace FW
 {
@@ -133,6 +134,103 @@ namespace FW
 				
 			]
 		);
+	}
+
+	void SShSplitButton::Construct(const FArguments& InArgs)
+	{
+		CommandList = InArgs._CommandList;
+		Command = InArgs._Command;
+		IsButtonEnabled = InArgs._IsButtonEnabled;
+		IsMenuEnabled = InArgs._IsMenuEnabled;
+		OnClicked = InArgs._OnClicked;
+		OnGetMenuContent = InArgs._OnGetMenuContent;
+
+		const FButtonStyle* ButtonStyle = &FAppCommonStyle::Get().GetWidgetStyle<FButtonStyle>("SuperSimpleButton");
+		if (InArgs._ButtonStyle)
+		{
+			ButtonStyle = InArgs._ButtonStyle;
+		}
+
+		ChildSlot
+		[
+			SNew(SBorder)
+			.Padding(0.0f)
+			.BorderImage(FAppCommonStyle::Get().GetBrush("Effect.Toggle"))
+			.BorderBackgroundColor_Lambda([this] {
+				return IsHovered() ? FStyleColors::Hover.GetSpecifiedColor() : FLinearColor::Transparent;
+			})
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				.VAlign(VAlign_Center)
+				[
+					SNew(SButton)
+					.ButtonStyle(ButtonStyle)
+					.ContentPadding(InArgs._ButtonContentPadding)
+					.ToolTipText(InArgs._ButtonToolTipText)
+					.IsEnabled(this, &SShSplitButton::CanExecuteButton)
+					.OnClicked(this, &SShSplitButton::OnButtonClicked)
+					[
+						InArgs._ButtonContent.Widget
+					]
+				]
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				.VAlign(VAlign_Center)
+				[
+					SNew(SComboButton)
+					.ButtonStyle(ButtonStyle)
+					.ContentPadding(InArgs._MenuContentPadding)
+					.ToolTipText(InArgs._MenuToolTipText)
+					.IsEnabled(this, &SShSplitButton::CanOpenMenu)
+					.ButtonContent()
+					[
+						InArgs._MenuButtonContent.Widget
+					]
+					.OnGetMenuContent(this, &SShSplitButton::MakeMenuContent)
+				]
+			]
+		];
+	}
+
+	bool SShSplitButton::CanExecuteButton() const
+	{
+		if (!IsButtonEnabled.Get())
+		{
+			return false;
+		}
+
+		if (CommandList.IsValid() && Command.IsValid())
+		{
+			return CommandList->CanExecuteAction(Command.ToSharedRef());
+		}
+		return OnClicked.IsBound();
+	}
+
+	FReply SShSplitButton::OnButtonClicked()
+	{
+		if (CommandList.IsValid() && Command.IsValid())
+		{
+			CommandList->ExecuteAction(Command.ToSharedRef());
+			return FReply::Handled();
+		}
+
+		if (OnClicked.IsBound())
+		{
+			return OnClicked.Execute();
+		}
+		return FReply::Handled();
+	}
+
+	bool SShSplitButton::CanOpenMenu() const
+	{
+		return IsMenuEnabled.Get() && OnGetMenuContent.IsBound();
+	}
+
+	TSharedRef<SWidget> SShSplitButton::MakeMenuContent()
+	{
+		return OnGetMenuContent.Execute();
 	}
 
 	void SShColorBlockPicker::Construct(const FArguments& InArgs, TWeakPtr<SWindow> InParentWindow)

@@ -1,6 +1,6 @@
 #pragma once
 #include "AssetObject/Material.h"
-#include "Renderer/MaterialRenderResources.h"
+#include "Renderer/MaterialRenderCommon.h"
 #include "RenderResource/Mesh.h"
 
 namespace FW
@@ -66,6 +66,6 @@ namespace SH
 		float CameraDistance = 2.0f;
 		MaterialPreviewPrimitive PreviewPrimitive = MaterialPreviewPrimitive::Sphere;
 		bool bPreviewMeshInitialized = false;
-		TFunction<FText()> LinkageErrorFunc;
+		TFunction<FText()> PipelineErrorFunc;
 	};
 }

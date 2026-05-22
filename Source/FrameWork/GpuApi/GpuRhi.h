@@ -67,7 +67,7 @@ public:
 	virtual ~GpuComputeCmdRecorder() = default;
 
 public:
-	virtual GpuComputePassRecorder* BeginComputePass(const FString& PassName) = 0;
+	virtual GpuComputePassRecorder* BeginComputePass(const FString& PassName, TOptional<GpuPassTimestampWrites> TimestampWrites = {}) = 0;
 	virtual void EndComputePass(GpuComputePassRecorder* InComputePassRecorder) = 0;
 };
 

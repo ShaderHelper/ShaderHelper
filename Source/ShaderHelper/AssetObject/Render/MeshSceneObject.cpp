@@ -1,5 +1,7 @@
 #include "CommonHeader.h"
 #include "MeshSceneObject.h"
+#include "Editor/ShaderHelperEditor.h"
+#include "UI/Widgets/Property/PropertyData/PropertyItem.h"
 
 using namespace FW;
 
@@ -19,5 +21,25 @@ namespace SH
 	{
 		SceneObject::Serialize(Ar);
 		Ar << ModelAsset;
+		Ar << VertexCount;
+	}
+
+	TArray<TSharedRef<PropertyData>> MeshSceneObject::GeneratePropertyDatas()
+	{
+		TArray<TSharedRef<PropertyData>> Result = ShObject::GeneratePropertyDatas();
+		if (!ModelAsset)
+		{
+			Result.Add(MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("VertexCount"), &VertexCount));
+		}
+		return Result;
+	}
+
+	void MeshSceneObject::PostPropertyChanged(PropertyData* InProperty)
+	{
+		SceneObject::PostPropertyChanged(InProperty);
+		if (InProperty->GetDisplayName().EqualTo(LOCALIZATION("Model")))
+		{
+			static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+		}
 	}
 }

@@ -2,7 +2,6 @@
 #include "ShaderEditor.h"
 #include "AssetManager/AssetManager.h"
 #include "AssetObject/Shader.h"
-#include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
 
 using namespace FW;

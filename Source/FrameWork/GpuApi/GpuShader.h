@@ -204,6 +204,7 @@ namespace FW
 		BindingGroupSlot Group;
 		BindingType Type;
 		BindingShaderStage Stage;
+		uint32 StructuredStride = 1;
 		TArray<GpuShaderUbMemberInfo> UbMembers;
 	};
 
@@ -239,6 +240,7 @@ namespace FW
 		virtual TArray<GpuShaderVertexInput> GetVertexInputs() const;
 		virtual TArray<GpuShaderStageSemantic> GetStageOutputSemantics() const;
 		virtual TArray<GpuShaderStageSemantic> GetStageInputSemantics() const;
+		virtual Vector3u GetThreadGroupSize() const;
 
 		friend uint32 GetTypeHash(const GpuShader& Shader)
 		{

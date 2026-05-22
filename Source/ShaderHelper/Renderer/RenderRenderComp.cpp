@@ -1,6 +1,5 @@
 #include "CommonHeader.h"
 #include "RenderRenderComp.h"
-#include "GpuApi/GpuResourceHelper.h"
 #include "GpuApi/GpuRhi.h"
 #include "ProjectManager/ShProjectManager.h"
 
@@ -34,6 +33,9 @@ namespace SH
 			{
 				return;
 			}
+			Context.ViewportSize = Vector2f((float)ViewSize.X, (float)ViewSize.Y);
+			Context.MousePos = Context.ViewPort->GetMousePos();
+			Context.Time = TSingleton<ShProjectManager>::Get().GetProject()->TimelineCurTime;
 
 			RenderGraph Graph;
 			Context.RG = &Graph;

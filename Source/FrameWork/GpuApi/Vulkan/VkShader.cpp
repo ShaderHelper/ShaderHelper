@@ -97,6 +97,7 @@ namespace FW::VK
 				//Storage buffers use the scalar layout instead of vector-relaxed 430
 				//to make it consistent with structuredbuffer, so that user side can unify the struct
 				DxcArgs.Add("-fvk-use-dx-layout");
+				DxcArgs.Add("-fspv-target-env=vulkan1.1");
 				std::string ShiftB, ShiftT, ShiftS, ShiftU;
 				if (!EnumHasAnyFlags(InShader->CompilerFlag, GpuShaderCompilerFlag::SkipBindingShift))
 				{
@@ -176,12 +177,12 @@ namespace FW::VK
 				if (SpvResult.hasError)
 				{
 					FString ErrorInfo = static_cast<const char*>(SpvResult.errorWarningMsg.Data());
-					OutErrorInfo = MoveTemp(ErrorInfo);
+					OutErrorInfo = "[SpirvCross]" + MoveTemp(ErrorInfo);
 					return false;
 				}
-				else
+				else if(SpvResult.errorWarningMsg.Size() > 0)
 				{
-					OutWarnInfo = static_cast<const char*>(SpvResult.errorWarningMsg.Data());
+					OutWarnInfo = FString("[SpirvCross]") + static_cast<const char*>(SpvResult.errorWarningMsg.Data());
 				}
 
 #if DEBUG_SHADER

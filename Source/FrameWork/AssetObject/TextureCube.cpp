@@ -1,6 +1,5 @@
 #include "CommonHeader.h"
 #include "TextureCube.h"
-#include "AssetManager/AssetManager.h"
 #include "Common/Util/Reflection.h"
 #include "GpuApi/GpuRhi.h"
 #include "UI/Widgets/Property/PropertyData/PropertyData.h"

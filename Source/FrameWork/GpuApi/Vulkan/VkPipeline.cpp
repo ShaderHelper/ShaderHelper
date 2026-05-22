@@ -2,7 +2,6 @@
 #include "VkPipeline.h"
 #include "VkShader.h"
 #include "VkMap.h"
-#include "VkGpuRhiBackend.h"
 #include "VkUtil.h"
 #include "VkDescriptorSet.h"
 #include "GpuApi/GpuApiValidation.h"

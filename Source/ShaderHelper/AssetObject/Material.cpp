@@ -1,13 +1,13 @@
 #include "CommonHeader.h"
 #include "Material.h"
+#include "AssetObject/Render/ShaderOverrideHelper.h"
 #include "Renderer/MaterialPreviewRenderer.h"
-#include "App/App.h"
 #include "Editor/ShaderHelperEditor.h"
-#include "UI/Styles/FShaderHelperStyle.h"
+#include "UI/Widgets/AssetBrowser/SAssetBrowser.h"
 #include "UI/Widgets/Property/PropertyData/PropertyData.h"
 #include "UI/Widgets/Property/PropertyData/PropertyItem.h"
+#include "UI/Widgets/Property/PropertyData/PropertyMatrixItem.h"
 #include "UI/Widgets/Property/PropertyData/PropertyAssetItem.h"
-#include "GpuApi/GpuSampler.h"
 
 using namespace FW;
 
@@ -87,6 +87,17 @@ namespace SH
 		else
 		{
 			NotifyMaterialChanged();
+			if (InProperty->IsOfType<PropertyAssetItem>())
+			{
+				const FString DisplayName = InProperty->GetDisplayName().ToString();
+				const bool bIsRWResourceAsset = BindingResourceDefaults.ContainsByPredicate([&](const MaterialBindingResourceDefault& Default) {
+					return IsRWResourceType(GetResourceOverrideType(Default.BindingType)) && Default.BindingName == DisplayName;
+				});
+				if (bIsRWResourceAsset)
+				{
+					static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+				}
+			}
 		}
 	}
 
@@ -168,8 +179,15 @@ namespace SH
 				if (Old.BindingName == NewDefault.BindingName ||
 					(bSplit && (Left == NewDefault.BindingName || Right == NewDefault.BindingName)))
 				{
-					NewDefault.MatrixValue = Old.MatrixValue;
-					FMemory::Memcpy(NewDefault.Values, Old.Values, sizeof(NewDefault.Values));
+					if (Old.Type == NewDefault.Type)
+					{
+						NewDefault.ValueSource = Old.ValueSource;
+						NewDefault.MatrixValue = Old.MatrixValue;
+						NewDefault.FloatValue = Old.FloatValue;
+						NewDefault.Vector2Value = Old.Vector2Value;
+						NewDefault.Vector3Value = Old.Vector3Value;
+						FMemory::Memcpy(NewDefault.Values, Old.Values, sizeof(NewDefault.Values));
+					}
 					break;
 				}
 			}
@@ -242,14 +260,11 @@ namespace SH
 		auto CollectResourceBindings = [&](GpuShader* InShader) {
 			for (const GpuShaderLayoutBinding& Binding : GetShaderBindings(InShader))
 			{
-				switch (Binding.Type)
+				if (Binding.Name == TEXT("GPrivate_Printer") && Binding.Type == BindingType::RWRawBuffer)
 				{
-				case BindingType::Texture: case BindingType::TextureCube: case BindingType::Texture3D:
-				case BindingType::Sampler:
-				case BindingType::CombinedTextureSampler: case BindingType::CombinedTextureCubeSampler: case BindingType::CombinedTexture3DSampler:
-					break;
-				default: continue;
+					continue;
 				}
+				if (!IsResourceOverrideBinding(Binding.Type)) continue;
 
 				// Check if already processed a binding at this (Group, Slot, Type)
 				auto* Seen = SeenResBindings.FindByPredicate([&](const GpuShaderLayoutBinding& S) {
@@ -263,6 +278,7 @@ namespace SH
 						if (D.BindingName == Seen->Name && D.BindingType == Seen->Type)
 						{
 							D.Stage = D.Stage | Binding.Stage;
+							D.StructuredStride = Binding.StructuredStride;
 							if (Seen->Name != Binding.Name)
 								D.BindingName = Seen->Name + TEXT("/") + Binding.Name;
 							break;
@@ -279,17 +295,17 @@ namespace SH
 				NewDefault.BindingName = Binding.Name;
 				NewDefault.BindingType = Binding.Type;
 				NewDefault.Stage = Binding.Stage;
+				NewDefault.StructuredStride = Binding.StructuredStride;
 
 				// Preserve old values if existed
 				for (const auto& Old : OldDefaults)
 				{
 					FString Left, Right;
 					bool bMergedName = Old.BindingName.Split(TEXT("/"), &Left, &Right);
-					if (Old.BindingName == Binding.Name || (bMergedName && (Left == Binding.Name || Right == Binding.Name)))
+					bool MatchedName = Old.BindingName == Binding.Name || (bMergedName && (Left == Binding.Name || Right == Binding.Name));
+					if (Old.BindingType == Binding.Type && MatchedName)
 					{
-						NewDefault.TextureAsset = Old.TextureAsset;
-						NewDefault.Filter = Old.Filter;
-						NewDefault.AddressMode = Old.AddressMode;
+						CopyShaderResourceBindingState(NewDefault, Old);
 						break;
 					}
 				}
@@ -493,6 +509,128 @@ namespace SH
 
 		// UB member defaults - group by (BindingName, Stage)
 		TMap<FString, TSharedRef<PropertyCategory>> UbCategories;
+		auto FindMemberDefault = [this](const FString& BindingName, const FString& MemberName, BindingShaderStage Stage) -> MaterialBindingMemberDefault* {
+			for (auto& D : BindingMemberDefaults)
+			{
+				if (D.BindingName == BindingName && D.MemberName == MemberName && D.Stage == Stage)
+				{
+					return &D;
+				}
+			}
+			return nullptr;
+		};
+		auto AddValueSourceSwitchMenu = [&](const TSharedRef<PropertyItemBase>& Item, const MaterialBindingMemberDefault& Default, bool bShowCustomEntry, bool bShowBuiltInEntry) {
+			FString BindingName = Default.BindingName;
+			FString MemberName = Default.MemberName;
+			BindingShaderStage Stage = Default.Stage;
+			PropertyData* EditProperty = &Item.Get();
+			Item->SetContextMenuExtender([this, BindingName, MemberName, Stage, EditProperty, FindMemberDefault, bShowCustomEntry, bShowBuiltInEntry](FMenuBuilder& MenuBuilder) {
+				auto AddSourceEntry = [&](const FText& Label, MaterialBindingValueSource Source) {
+					MenuBuilder.AddMenuEntry(
+						Label,
+						FText::GetEmpty(),
+						FSlateIcon(),
+						FUIAction(
+							FExecuteAction::CreateLambda([this, BindingName, MemberName, Stage, Source, EditProperty, FindMemberDefault] {
+								if (MaterialBindingMemberDefault* D = FindMemberDefault(BindingName, MemberName, Stage))
+								{
+									if (D->ValueSource != Source)
+									{
+										EditProperty->BeginEdit();
+										D->ValueSource = Source;
+										PostPropertyChanged(EditProperty);
+										EditProperty->EndEdit();
+										static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+									}
+								}
+							}),
+							FCanExecuteAction(),
+							FIsActionChecked::CreateLambda([BindingName, MemberName, Stage, Source, FindMemberDefault] {
+								if (MaterialBindingMemberDefault* D = FindMemberDefault(BindingName, MemberName, Stage))
+								{
+									return D->ValueSource == Source;
+								}
+								return false;
+							})
+						),
+						NAME_None,
+						EUserInterfaceActionType::ToggleButton
+					);
+				};
+				if (bShowCustomEntry)
+				{
+					AddSourceEntry(LOCALIZATION("Custom"), MaterialBindingValueSource::Custom);
+				}
+				if (bShowBuiltInEntry)
+				{
+					AddSourceEntry(LOCALIZATION("Builtin"), MaterialBindingValueSource::BuiltIn);
+				}
+			});
+		};
+		auto MakeBuiltInMatrixItem = [&](const FText& ItemLabel, MaterialBindingMemberDefault& Default) -> TSharedRef<PropertyItemBase> {
+			FString BindingName = Default.BindingName;
+			FString MemberName = Default.MemberName;
+			BindingShaderStage Stage = Default.Stage;
+			auto EnumItem = MakePropertyEnumItem<BuiltInMatrix4x4Value>(
+				this, ItemLabel, Default.MatrixValue,
+				[this, BindingName, MemberName, Stage, FindMemberDefault](BuiltInMatrix4x4Value NewValue) {
+					if (MaterialBindingMemberDefault* D = FindMemberDefault(BindingName, MemberName, Stage))
+					{
+						D->MatrixValue = NewValue;
+					}
+				}
+			);
+			AddValueSourceSwitchMenu(EnumItem, Default, true, true);
+			return EnumItem;
+		};
+		auto MakeBuiltInFloatItem = [&](const FText& ItemLabel, MaterialBindingMemberDefault& Default) -> TSharedRef<PropertyItemBase> {
+			FString BindingName = Default.BindingName;
+			FString MemberName = Default.MemberName;
+			BindingShaderStage Stage = Default.Stage;
+			auto EnumItem = MakePropertyEnumItem<BuiltInFloatValue>(
+				this, ItemLabel, Default.FloatValue,
+				[this, BindingName, MemberName, Stage, FindMemberDefault](BuiltInFloatValue NewValue) {
+					if (MaterialBindingMemberDefault* D = FindMemberDefault(BindingName, MemberName, Stage))
+					{
+						D->FloatValue = NewValue;
+					}
+				}
+			);
+			AddValueSourceSwitchMenu(EnumItem, Default, true, true);
+			return EnumItem;
+		};
+		auto MakeBuiltInVector2Item = [&](const FText& ItemLabel, MaterialBindingMemberDefault& Default) -> TSharedRef<PropertyItemBase> {
+			FString BindingName = Default.BindingName;
+			FString MemberName = Default.MemberName;
+			BindingShaderStage Stage = Default.Stage;
+			auto EnumItem = MakePropertyEnumItem<BuiltInVector2Value>(
+				this, ItemLabel, Default.Vector2Value,
+				[this, BindingName, MemberName, Stage, FindMemberDefault](BuiltInVector2Value NewValue) {
+					if (MaterialBindingMemberDefault* D = FindMemberDefault(BindingName, MemberName, Stage))
+					{
+						D->Vector2Value = NewValue;
+					}
+				}
+			);
+			AddValueSourceSwitchMenu(EnumItem, Default, true, true);
+			return EnumItem;
+		};
+		auto MakeBuiltInVector3Item = [&](const FText& ItemLabel, MaterialBindingMemberDefault& Default) -> TSharedRef<PropertyItemBase> {
+			FString BindingName = Default.BindingName;
+			FString MemberName = Default.MemberName;
+			BindingShaderStage Stage = Default.Stage;
+			auto EnumItem = MakePropertyEnumItem<BuiltInVector3Value>(
+				this, ItemLabel, Default.Vector3Value,
+				[this, BindingName, MemberName, Stage, FindMemberDefault](BuiltInVector3Value NewValue) {
+					if (MaterialBindingMemberDefault* D = FindMemberDefault(BindingName, MemberName, Stage))
+					{
+						D->Vector3Value = NewValue;
+					}
+				}
+			);
+			AddValueSourceSwitchMenu(EnumItem, Default, true, true);
+			return EnumItem;
+		};
 		for (auto& Default : BindingMemberDefaults)
 		{
 			FString CatKey = Default.BindingName;
@@ -512,55 +650,73 @@ namespace SH
 
 			if (IsShaderMatrix4x4Type(Default.Type))
 			{
-				FString BindingName = Default.BindingName;
-				FString MemberName = Default.MemberName;
-				auto EnumItem = MakePropertyEnumItem<BuiltInMatrix4x4Value>(
-					this, ItemLabel, Default.MatrixValue,
-					[this, BindingName, MemberName](BuiltInMatrix4x4Value NewValue) {
-						for (auto& D : BindingMemberDefaults)
-						{
-							if (D.BindingName == BindingName && D.MemberName == MemberName)
-							{
-								D.MatrixValue = NewValue;
-								break;
-							}
-						}
-					}
-				);
-				UbCategory->AddChild(EnumItem);
+				if (Default.ValueSource == MaterialBindingValueSource::BuiltIn)
+				{
+					UbCategory->AddChild(MakeBuiltInMatrixItem(ItemLabel, Default));
+				}
+				else
+				{
+					auto Item = MakeShared<PropertyMatrix4x4fItem>(this, ItemLabel, reinterpret_cast<float*>(Default.Values));
+					AddValueSourceSwitchMenu(Item, Default, true, true);
+					UbCategory->AddChild(Item);
+				}
 			}
 			else if (IsShaderFloatType(Default.Type))
 			{
-				auto Item = MakeShared<PropertyScalarItem<float>>(this, ItemLabel, &Default.Values[0]);
-				UbCategory->AddChild(Item);
+				if (Default.ValueSource == MaterialBindingValueSource::BuiltIn)
+				{
+					UbCategory->AddChild(MakeBuiltInFloatItem(ItemLabel, Default));
+				}
+				else
+				{
+					auto Item = MakeShared<PropertyScalarItem<float>>(this, ItemLabel, reinterpret_cast<float*>(Default.Values));
+					AddValueSourceSwitchMenu(Item, Default, true, true);
+					UbCategory->AddChild(Item);
+				}
 			}
 			else if (IsShaderIntType(Default.Type))
 			{
-				auto Item = MakeShared<PropertyScalarItem<int32>>(this, ItemLabel, &Default.IntValues[0]);
+				auto Item = MakeShared<PropertyScalarItem<int32>>(this, ItemLabel, reinterpret_cast<int32*>(Default.Values));
 				UbCategory->AddChild(Item);
 			}
 			else if (IsShaderUintType(Default.Type))
 			{
-				auto Item = MakeShared<PropertyScalarItem<int32>>(this, ItemLabel, reinterpret_cast<int32*>(&Default.UintValues[0]));
+				auto Item = MakeShared<PropertyScalarItem<int32>>(this, ItemLabel, reinterpret_cast<int32*>(&Default.Values[0]));
 				Item->SetMinValue(0);
 				UbCategory->AddChild(Item);
 			}
 			else if (IsShaderBoolType(Default.Type))
 			{
-				auto Item = MakeShared<PropertyScalarItem<int32>>(this, ItemLabel, &Default.IntValues[0]);
+				auto Item = MakeShared<PropertyScalarItem<int32>>(this, ItemLabel, reinterpret_cast<int32*>(Default.Values));
 				Item->SetMinValue(0);
 				Item->SetMaxValue(1);
 				UbCategory->AddChild(Item);
 			}
 			else if (IsShaderVector2Type(Default.Type))
 			{
-				auto Item = MakeShared<PropertyVector2fItem>(this, ItemLabel, reinterpret_cast<Vector2f*>(Default.Values));
-				UbCategory->AddChild(Item);
+				if (Default.ValueSource == MaterialBindingValueSource::BuiltIn)
+				{
+					UbCategory->AddChild(MakeBuiltInVector2Item(ItemLabel, Default));
+				}
+				else
+				{
+					auto Item = MakeShared<PropertyVector2fItem>(this, ItemLabel, reinterpret_cast<Vector2f*>(Default.Values));
+					AddValueSourceSwitchMenu(Item, Default, true, true);
+					UbCategory->AddChild(Item);
+				}
 			}
 			else if (IsShaderVector3Type(Default.Type))
 			{
-				auto Item = MakeShared<PropertyVector3fItem>(this, ItemLabel, reinterpret_cast<Vector3f*>(Default.Values));
-				UbCategory->AddChild(Item);
+				if (Default.ValueSource == MaterialBindingValueSource::BuiltIn)
+				{
+					UbCategory->AddChild(MakeBuiltInVector3Item(ItemLabel, Default));
+				}
+				else
+				{
+					auto Item = MakeShared<PropertyVector3fItem>(this, ItemLabel, reinterpret_cast<Vector3f*>(Default.Values));
+					AddValueSourceSwitchMenu(Item, Default, false, true);
+					UbCategory->AddChild(Item);
+				}
 			}
 			else if (IsShaderVector4Type(Default.Type))
 			{
@@ -569,32 +725,32 @@ namespace SH
 			}
 			else if (IsShaderIntVector2Type(Default.Type) || IsShaderBoolVector2Type(Default.Type))
 			{
-				auto Item = MakeShared<PropertyVector2iItem>(this, ItemLabel, Default.IntValues);
+				auto Item = MakeShared<PropertyVector2iItem>(this, ItemLabel, reinterpret_cast<int32*>(Default.Values));
 				UbCategory->AddChild(Item);
 			}
 			else if (IsShaderIntVector3Type(Default.Type) || IsShaderBoolVector3Type(Default.Type))
 			{
-				auto Item = MakeShared<PropertyVector3iItem>(this, ItemLabel, Default.IntValues);
+				auto Item = MakeShared<PropertyVector3iItem>(this, ItemLabel, reinterpret_cast<int32*>(Default.Values));
 				UbCategory->AddChild(Item);
 			}
 			else if (IsShaderIntVector4Type(Default.Type) || IsShaderBoolVector4Type(Default.Type))
 			{
-				auto Item = MakeShared<PropertyVector4iItem>(this, ItemLabel, Default.IntValues);
+				auto Item = MakeShared<PropertyVector4iItem>(this, ItemLabel, reinterpret_cast<int32*>(Default.Values));
 				UbCategory->AddChild(Item);
 			}
 			else if (IsShaderUintVector2Type(Default.Type))
 			{
-				auto Item = MakeShared<PropertyVector2iItem>(this, ItemLabel, reinterpret_cast<int32*>(Default.UintValues));
+				auto Item = MakeShared<PropertyVector2iItem>(this, ItemLabel, reinterpret_cast<int32*>(Default.Values));
 				UbCategory->AddChild(Item);
 			}
 			else if (IsShaderUintVector3Type(Default.Type))
 			{
-				auto Item = MakeShared<PropertyVector3iItem>(this, ItemLabel, reinterpret_cast<int32*>(Default.UintValues));
+				auto Item = MakeShared<PropertyVector3iItem>(this, ItemLabel, reinterpret_cast<int32*>(Default.Values));
 				UbCategory->AddChild(Item);
 			}
 			else if (IsShaderUintVector4Type(Default.Type))
 			{
-				auto Item = MakeShared<PropertyVector4iItem>(this, ItemLabel, reinterpret_cast<int32*>(Default.UintValues));
+				auto Item = MakeShared<PropertyVector4iItem>(this, ItemLabel, reinterpret_cast<int32*>(Default.Values));
 				UbCategory->AddChild(Item);
 			}
 		}
@@ -606,124 +762,55 @@ namespace SH
 
 			switch (Default.BindingType)
 			{
+			case BindingType::StructuredBuffer:
+			case BindingType::RWStructuredBuffer:
+			case BindingType::RawBuffer:
+			case BindingType::RWRawBuffer:
+			{
+				auto Item = MakeBufferPropertyItem(
+					this,
+					FText::FromString(Default.BindingName),
+					Default.BindingType,
+					Default.StructuredStride,
+					Default.BufferByteSize
+				);
+				Parent->AddChild(Item);
+				break;
+			}
 			case BindingType::Texture:
 			case BindingType::TextureCube:
 			case BindingType::Texture3D:
+			case BindingType::RWTexture:
+			case BindingType::RWTexture3D:
 			{
-				MetaType* TexMetaType = GetMetaType<Texture2D>();
-				if (Default.BindingType == BindingType::TextureCube) TexMetaType = GetMetaType<TextureCube>();
-				else if (Default.BindingType == BindingType::Texture3D) TexMetaType = GetMetaType<Texture3D>();
-
-				auto Item = MakeShared<PropertyAssetItem>(
+				auto Item = MakeTextureResourcePropertyItem(
 					this,
 					FText::FromString(Default.BindingName),
-					TexMetaType,
-					&Default.TextureAsset
+					Default,
+					GetResourceOverrideType(Default.BindingType),
+					false
 				);
 				Parent->AddChild(Item);
 				break;
 			}
 			case BindingType::Sampler:
 			{
-				auto SamplerCategory = MakeShared<PropertyCategory>(this, Default.BindingName);
-				Parent->AddChild(SamplerCategory);
-
-				// Filter mode
-				{
-					FString BindingName = Default.BindingName;
-					auto FilterItem = MakePropertyEnumItem<SamplerFilter>(
-						this, LOCALIZATION("FilterMode"), Default.Filter,
-						[this, BindingName](SamplerFilter NewFilter) {
-							for (auto& D : BindingResourceDefaults)
-							{
-								if (D.BindingName == BindingName)
-								{
-									D.Filter = NewFilter;
-									break;
-								}
-							}
-						}
-					);
-					SamplerCategory->AddChild(FilterItem);
-				}
-
-				// Address mode
-				{
-					FString BindingName = Default.BindingName;
-					auto AddrItem = MakePropertyEnumItem<SamplerAddressMode>(
-						this, LOCALIZATION("WrapMode"), Default.AddressMode,
-						[this, BindingName](SamplerAddressMode NewMode) {
-							for (auto& D : BindingResourceDefaults)
-							{
-								if (D.BindingName == BindingName)
-								{
-									D.AddressMode = NewMode;
-									break;
-								}
-							}
-						}
-					);
-					SamplerCategory->AddChild(AddrItem);
-				}
+				Parent->AddChild(MakeSamplerPropertyItem(this, FText::FromString(Default.BindingName), Default));
 				break;
 			}
 			case BindingType::CombinedTextureSampler:
 			case BindingType::CombinedTextureCubeSampler:
 			case BindingType::CombinedTexture3DSampler:
 			{
-				auto CombinedCategory = MakeShared<PropertyCategory>(this, Default.BindingName);
-				Parent->AddChild(CombinedCategory);
-
-				// Texture asset
-				MetaType* TexMetaType = GetMetaType<Texture2D>();
-				if (Default.BindingType == BindingType::CombinedTextureCubeSampler) TexMetaType = GetMetaType<TextureCube>();
-				else if (Default.BindingType == BindingType::CombinedTexture3DSampler) TexMetaType = GetMetaType<Texture3D>();
-
-				auto TexItem = MakeShared<PropertyAssetItem>(
+				auto TexItem = MakeTextureResourcePropertyItem(
 					this,
-					LOCALIZATION("Texture"),
-					TexMetaType,
-					&Default.TextureAsset
+					FText::FromString(Default.BindingName),
+					Default,
+					GetResourceOverrideType(Default.BindingType),
+					false
 				);
-				CombinedCategory->AddChild(TexItem);
-
-				// Filter mode
-				{
-					FString BindingName = Default.BindingName;
-					auto FilterItem = MakePropertyEnumItem<SamplerFilter>(
-						this, LOCALIZATION("FilterMode"), Default.Filter,
-						[this, BindingName](SamplerFilter NewFilter) {
-							for (auto& D : BindingResourceDefaults)
-							{
-								if (D.BindingName == BindingName)
-								{
-									D.Filter = NewFilter;
-									break;
-								}
-							}
-						}
-					);
-					CombinedCategory->AddChild(FilterItem);
-				}
-
-				// Address mode
-				{
-					FString BindingName = Default.BindingName;
-					auto AddrItem = MakePropertyEnumItem<SamplerAddressMode>(
-						this, LOCALIZATION("WrapMode"), Default.AddressMode,
-						[this, BindingName](SamplerAddressMode NewMode) {
-							for (auto& D : BindingResourceDefaults)
-							{
-								if (D.BindingName == BindingName)
-								{
-									D.AddressMode = NewMode;
-									break;
-								}
-							}
-						}
-					);
-					CombinedCategory->AddChild(AddrItem);
-				}
+				Parent->AddChild(TexItem);
+				AppendSamplerPropertyChildren(this, *TexItem, Default);
 				break;
 			}
 			default:

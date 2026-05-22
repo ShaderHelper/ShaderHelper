@@ -1,11 +1,11 @@
 #include "CommonHeader.h"
 #include "RenderEditor.h"
-#include "App/App.h"
 #include "AssetManager/AssetManager.h"
 #include "AssetObject/Render/Nodes/RenderOutputNode.h"
 #include "AssetObject/Render/Render.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "Renderer/RenderSceneRenderComp.h"
+#include "ProjectManager/ShProjectManager.h"
 
 using namespace FW;
 

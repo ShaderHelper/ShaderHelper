@@ -2,7 +2,6 @@
 #include "MetalCommon.h"
 #include "GpuApi/GpuResource.h"
 #include "MetalTexture.h"
-#include "MetalDevice.h"
 namespace FW
 {
     inline MTLColorWriteMask MapWriteMask(BlendMask InMask)
@@ -103,17 +102,6 @@ namespace FW
             RawPassDesc.depthAttachment.loadAction = MapLoadAction(DepthInfo.LoadAction);
             RawPassDesc.depthAttachment.storeAction = MapStoreAction(DepthInfo.StoreAction);
             RawPassDesc.depthAttachment.clearDepth = DepthInfo.ClearDepth;
-        }
-
-        if (PassDesc.TimestampWrites && GSupportStageBoundaryCounter)
-        {
-            const GpuRenderPassTimestampWrites& TsWrites = *PassDesc.TimestampWrites;
-            MetalQuerySet* MtlQuerySet = static_cast<MetalQuerySet*>(TsWrites.QuerySet);
-            RawPassDesc.sampleBufferAttachments[0].sampleBuffer = (id<MTLCounterSampleBuffer>)MtlQuerySet->GetSampleBuffer();
-            RawPassDesc.sampleBufferAttachments[0].startOfVertexSampleIndex = TsWrites.BeginningOfPassWriteIndex;
-            RawPassDesc.sampleBufferAttachments[0].endOfFragmentSampleIndex = TsWrites.EndOfPassWriteIndex;
-            RawPassDesc.sampleBufferAttachments[0].startOfFragmentSampleIndex = MTLCounterDontSample;
-            RawPassDesc.sampleBufferAttachments[0].endOfVertexSampleIndex = MTLCounterDontSample;
         }
 
         return [RawPassDesc autorelease];

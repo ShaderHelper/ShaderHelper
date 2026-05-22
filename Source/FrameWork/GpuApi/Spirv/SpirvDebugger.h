@@ -1,6 +1,7 @@
 #pragma once
 #include "SpirvParser.h"
 #include "SpirvPatcher.h"
+#include "GpuApi/GpuBindGroupLayout.h"
 #include <queue>
 
 namespace FW
@@ -53,6 +54,7 @@ namespace FW
 		Sqrt,
 		InverseSqrt,
 		Atan2,
+		WorkgroupBarrier,
 	};
 
 	// Packed debug header format: StateType(8) | Source(8) | Line(16)
@@ -74,6 +76,7 @@ namespace FW
 		SpvId Source{};
 		SpvVarChange Change;
 		FString Error;
+		bool bCpuReconstructed = false;
 	};
 
 	struct SpvDebugState_ScopeChange
@@ -103,6 +106,7 @@ namespace FW
 		bool bReturn : 1 {};
 		bool bCondition : 1 {};
 		bool bKill : 1{};
+		bool bWorkgroupBarrier : 1{};
 	};
 
 
@@ -222,12 +226,15 @@ namespace FW
 
 	struct SpvBinding
 	{
+		FString Name;
 		int32 DescriptorSet;
 		int32 Binding;
 		BindingType Type;
 
 		TRefCountPtr<GpuResource> Resource;
 	};
+
+	FRAMEWORK_API void RemapSpvDebuggerBindings(const TArray<TUniquePtr<SpvInstruction>>& Insts, SpvPatcher& Patcher, SpvMetaContext& Context, const TArray<SpvBinding>& Bindings);
 
 	struct SpvFuncCall
 	{
@@ -312,16 +319,17 @@ namespace FW
 	class FRAMEWORK_API SpvDebuggerVisitor : public SpvVisitor
 	{
 	public:
-		SpvDebuggerVisitor(SpvDebuggerContext& InContext, GpuShaderLanguage InLanguage, bool InEnableUbsan)
+		SpvDebuggerVisitor(SpvDebuggerContext& InContext, GpuShaderLanguage InLanguage, ShaderType InDebuggerStage, bool InEnableUbsan)
 			: Context(InContext)
 			, Language(InLanguage)
 			, EnableUbsan(InEnableUbsan)
+			, DebuggerStage(InDebuggerStage)
 		{
 		}
 		
 	public:
 		const SpvPatcher& GetPatcher() const { return Patcher; }
-		void Parse(const TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections, const TMap<SpvId, SpvExtSet>& InExtSets) override;
+		void Parse(TArray<TUniquePtr<SpvInstruction>>& Insts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections) override;
 		
 	public:
 		void Visit(const SpvDebugLine* Inst) override;
@@ -376,11 +384,13 @@ namespace FW
 		virtual void ParseInternal();
 		void PatchToDebugger(SpvId InValueId, SpvId InTypeId, TArray<TUniquePtr<SpvInstruction>>& InstList);
 		void FlattenToUInts(SpvId InValueId, SpvId InTypeId, TArray<TUniquePtr<SpvInstruction>>& InstList, TArray<SpvId>& OutUIntValues);
-		void BatchStoreToDebugBuffer(const TArray<SpvId>& UIntValues, TArray<TUniquePtr<SpvInstruction>>& InstList);
+		virtual void BatchStoreToDebugBuffer(const TArray<SpvId>& UIntValues, TArray<TUniquePtr<SpvInstruction>>& InstList);
 		void PatchAppendAccessFunc(int32 IndexNum);
 		void PatchAppendVarFunc(int32 ValueUIntCount, int32 IndexNum);
 		void PatchAppendValueFunc(int32 ValueUIntCount);
 		void PatchAppendMathFunc(int32 TotalOperandUIntCount);
+		void PatchEntryPointInputVariables();
+		SpvOpFunctionCall* BuildAppendVarInstructions(TArray<TUniquePtr<SpvInstruction>>& InstList, SpvPointer* Pointer, SpvId PackedHeader, SpvId VarId);
 		SpvOpFunctionCall* AppendVar(const TFunction<int32()>& OffsetEval, SpvPointer* Pointer);
 		void AppendAccess(const TFunction<int32()>& OffsetEval, SpvPointer* Pointer);
 		void AppendTag(const TFunction<int32()>& OffsetEval, SpvDebuggerStateType InStateType);
@@ -398,7 +408,7 @@ namespace FW
 		SpvFunc* CurFunc{};
 
 		bool EnableUbsan;
-		
+		ShaderType DebuggerStage;
 		const TArray<TUniquePtr<SpvInstruction>>* Insts;
 		SpvId DebuggerBuffer;
 		SpvId DebuggerOffset;
@@ -416,8 +426,17 @@ namespace FW
 
 	FRAMEWORK_API SpvType* GetAccessedType(const SpvVariable* Var, const TArray<int32>& Indexes);
 	FRAMEWORK_API TValueOrError<std::tuple<SpvType*, int32>, FString> GetAccess(const SpvVariable* Var, const TArray<int32>& Indexes);
-	SpvId PatchDebuggerBuffer(SpvPatcher& Patcher);
-	SpvId PatchDebuggerParams(SpvPatcher& Patcher);
+	int32 GetDebuggerBufferUVec4BatchCount(int32 UIntValueCount);
+	void StoreDebuggerBufferUVec4Batches(SpvPatcher& Patcher, SpvId DebuggerBuffer, SpvId BaseIndex, const TArray<SpvId>& UIntValues, TArray<TUniquePtr<SpvInstruction>>& InstList);
+	SpvId PatchDebuggerBuffer(SpvPatcher& Patcher, ShaderType Stage);
+	SpvId PatchDebuggerParams(SpvPatcher& Patcher, ShaderType Stage);
+	SpvId PatchExtSet(SpvPatcher& Patcher, SpvMetaContext& Context, SpvExtSet ExtSet);
+	SpvId PatchFragCoordBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context);
+	SpvId PatchLoadFragCoordXY(SpvPatcher& Patcher, SpvMetaContext& Context, TArray<TUniquePtr<SpvInstruction>>& InstList);
+	SpvId PatchWorkgroupIdBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context);
+	SpvId PatchLocalInvocationIdBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context);
+	SpvId PatchLocalInvocationIndexBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context);
+	SpvId PatchGlobalInvocationIdBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context);
 	int32 GetInstIndex(const TArray<TUniquePtr<SpvInstruction>>* Insts, SpvId Inst);
 
 	// For each OpLoad of a composite type, analyze which init-units are truly consumed
@@ -426,6 +445,7 @@ namespace FW
 	void BuildSpvCFG(const TArray<TUniquePtr<SpvInstruction>>* Insts, const SpvMetaContext& Context, std::unordered_map<SpvId, SpvBasicBlock>& OutBBs, std::unordered_map<SpvId, SpvFunc>& OutFuncs);
 	TSet<SpvId> ComputeStaticallyInitializedVars(const TArray<TUniquePtr<SpvInstruction>>* Insts, const SpvMetaContext& Context, const TMap<SpvId, uint32>& LoadUsedInitUnits, const std::unordered_map<SpvId, SpvBasicBlock>& BBs, const std::unordered_map<SpvId, SpvFunc>& Funcs);
 
+	inline constexpr int DebuggerBindGroupSlot = 7;
 	inline constexpr int DebuggerBufferBindingSlot = 0721;
 	inline constexpr int DebuggerParamsBindingSlot = 0722;
 

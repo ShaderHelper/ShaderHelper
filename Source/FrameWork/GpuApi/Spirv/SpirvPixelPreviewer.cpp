@@ -1,6 +1,5 @@
 #include "CommonHeader.h"
 #include "SpirvPixelPreviewer.h"
-#include "GpuApi/GpuRhi.h"
 
 namespace FW
 {
@@ -28,7 +27,7 @@ namespace FW
 			Patcher.AddGlobalVariable(MoveTemp(VarOp));
 			Patcher.AddDebugName(MakeUnique<SpvOpName>(Params, "_PreviewerParams_"));
 		}
-		int SetNumber = 0;
+		int SetNumber = DebuggerBindGroupSlot;
 		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(Params, SpvDecorationKind::DescriptorSet, TArray<uint8>{ (uint8*)&SetNumber, sizeof(int) }));
 		int BindingNumber = GetSpirvPatchBindingNumber(PreviewerParamsBindingSlot, BindingType::UniformBuffer, BindingShaderStage::Pixel);
 		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(Params, SpvDecorationKind::Binding, TArray<uint8>{ (uint8*)&BindingNumber, sizeof(int) }));
@@ -69,17 +68,30 @@ namespace FW
 		//PostAppendVar splits blocks by inserting SelectionMerge/BranchConditional.
 		//OpPhi parent block references become stale when the original block is split.
 		//Fix them by replacing old block labels with the last continuation label.
-		int Offset = Inst->GetWordOffset().value();
-		int Len = Inst->GetWordLen().value();
-		const TArray<uint32>& Spv = Patcher.GetSpv();
-		// OpPhi binary: Header(1) | ResultType(1) | ResultId(1) | [Value(1) Parent(1)]*
-		for (int i = 4; i < Len; i += 2)
+		TArray<TPair<SpvId, SpvId>> NewOperands = Inst->GetOperands();
+		for (TPair<SpvId, SpvId>& Operand : NewOperands)
 		{
-			SpvId ParentId(Spv[Offset + i]);
-			if (SpvId* Remap = BlockSplitRemaps.Find(ParentId))
+			if (SpvId* Remap = BlockSplitRemaps.Find(Operand.Value))
 			{
-				Patcher.OverwriteWord(Offset + i, Remap->GetValue());
+				Operand.Value = *Remap;
+				auto NewInst = MakeUnique<SpvOpPhi>(Inst->GetResultType(), NewOperands);
+				NewInst->SetId(Inst->GetId().value());
+				Patcher.OverwriteInstruction(Inst, MoveTemp(NewInst));
 			}
+		}
+	}
+
+	void SpvPixelPreviewerVisitor::Visit(const SpvOpKill* Inst)
+	{
+		SpvType* ReturnType = Context.Types[CurFunc->ReturnType].Get();
+		if (ReturnType->GetKind() == SpvTypeKind::Void)
+		{
+			Patcher.OverwriteInstruction(Inst, MakeUnique<SpvOpReturn>());
+		}
+		else
+		{
+			SpvId ZeroValue = Patcher.FindOrAddConstant(MakeUnique<SpvOpConstantNull>(CurFunc->ReturnType));
+			Patcher.OverwriteInstruction(Inst, MakeUnique<SpvOpReturnValue>(ZeroValue));
 		}
 	}
 
@@ -463,6 +475,10 @@ namespace FW
 	{
 		//Find the output variable before base patching
 		OutputVarId = FindOutputVariable();
+		if (OutputVarId.IsValid())
+		{
+			PatchFragCoordBuiltIn(Patcher, Context);
+		}
 
 		SpvId FloatType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeFloat>(32));
 		SpvId Float4Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(FloatType, 4));
@@ -643,6 +659,16 @@ namespace FW
 					OverrideInsts.Add(MoveTemp(LoadOp));
 					OverrideInsts.Add(MakeUnique<SpvOpStore>(OutputVarId, LoadedPreview));
 					Patcher.AddInstructions(Ret->GetWordOffset().value(), MoveTemp(OverrideInsts));
+				}
+				else if (auto* Kill = dynamic_cast<const SpvOpKill*>((*Insts)[i].Get()))
+				{
+					TArray<TUniquePtr<SpvInstruction>> OverrideInsts;
+					SpvId LoadedPreview = Patcher.NewId();
+					auto LoadOp = MakeUnique<SpvOpLoad>(Float4Type, PreviewOutputVar);
+					LoadOp->SetId(LoadedPreview);
+					OverrideInsts.Add(MoveTemp(LoadOp));
+					OverrideInsts.Add(MakeUnique<SpvOpStore>(OutputVarId, LoadedPreview));
+					Patcher.AddInstructions(Kill->GetWordOffset().value(), MoveTemp(OverrideInsts));
 				}
 			}
 		}

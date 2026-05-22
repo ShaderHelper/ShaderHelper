@@ -25,6 +25,8 @@ namespace FW
 			UI_COMMAND_SH(Rename, LOCALIZATION("Rename"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EKeys::F2));
 			UI_COMMAND_SH(Save, LOCALIZATION("Save"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::S));
 			UI_COMMAND_SH(CutLine, LOCALIZATION("CutLine"), FText::GetEmpty(), EUserInterfaceActionType::None, FInputChord(EModifierKey::Control, EKeys::RightMouseButton));
+			UI_COMMAND_SH(Copy, LOCALIZATION("Copy"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::C));
+			UI_COMMAND_SH(Paste, LOCALIZATION("Paste"), FText::GetEmpty(), EUserInterfaceActionType::Button, FInputChord(EModifierKey::Control, EKeys::V));
 #undef LOCTEXT_NAMESPACE
 		}
 
@@ -32,5 +34,7 @@ namespace FW
 		TSharedPtr<FUICommandInfo> Rename;
 		TSharedPtr<FUICommandInfo> Save;
 		TSharedPtr<FUICommandInfo> CutLine;
+		TSharedPtr<FUICommandInfo> Copy;
+		TSharedPtr<FUICommandInfo> Paste;
 	};
 }

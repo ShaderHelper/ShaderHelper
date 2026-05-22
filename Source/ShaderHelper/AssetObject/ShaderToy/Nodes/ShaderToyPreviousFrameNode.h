@@ -1,7 +1,6 @@
 #pragma once
 #include "Editor/AssetEditor/ShAssetEditor.h"
 #include "AssetObject/Graph.h"
-#include "AssetObject/ShaderToy/ShaderToy.h"
 #include "AssetObject/ShaderToy/Nodes/ShaderToyPassNode.h"
 
 namespace SH
@@ -21,7 +20,6 @@ namespace SH
 	public:
 		ShaderToyPreviousFrameNode();
 		ShaderToyPreviousFrameNode(ShaderToyPassNode* InPassNode);
-		~ShaderToyPreviousFrameNode();
 		void Init() override;
 
 	public:

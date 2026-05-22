@@ -2,7 +2,6 @@
 #include "SCodeSearchWidget.h"
 #include "UI/Styles/FShaderHelperStyle.h"
 #include "UI/Widgets/Misc/MiscWidget.h"
-#include "Editor/CodeEditorCommands.h"
 
 using namespace FW;
 

@@ -23,37 +23,37 @@ namespace FW
 
 	TMap<FString, TArray<MetaType*>> RegisteredNodes;
 
+	void Graph::AddLink(GraphPin* OutputPin, GraphPin* InputPin)
+	{
+		check(OutputPin && InputPin);
+		GraphNode* OutputNode = OutputPin->GetOwnerNode();
+		GraphNode* InputNode = InputPin->GetOwnerNode();
+		check(OutputNode && InputNode);
+		InputPin->Accept(OutputPin);
+		InputPin->SourcePin = OutputPin;
+		OutputNode->OutPinToInPin.AddUnique(OutputPin, InputPin);
+		AddDep(InputNode, OutputNode);
+	}
+
+	void Graph::RemoveLink(GraphPin* OutputPin, GraphPin* InputPin)
+	{
+		check(OutputPin && InputPin);
+		GraphNode* OutputNode = OutputPin->GetOwnerNode();
+		GraphNode* InputNode = InputPin->GetOwnerNode();
+		check(OutputNode && InputNode);
+		OutputNode->OutPinToInPin.Remove(OutputPin, InputPin);
+		InputPin->SourcePin.Reset();
+		InputPin->Refuse();
+		RemoveDep(InputNode, OutputNode);
+	}
+
 	void Graph::Serialize(FArchive& Ar)
 	{
 		AssetObject::Serialize(Ar);
 
 		SerializePolymorphicObjectArray(Ar, NodeDatas, this);
-	}
 
-	void Graph::PostLoad()
-	{
-		AssetObject::PostLoad();
-
-		NodeDeps.Empty();
-		for (const auto& NodeData : NodeDatas)
-		{
-			for (auto [OutPinPtr, InPinPtr] : NodeData->OutPinToInPin)
-			{
-				GraphPin* OutPin = OutPinPtr.Get();
-				GraphPin* InPin = InPinPtr.Get();
-				if (!OutPin || !InPin)
-				{
-					continue;
-				}
-
-				GraphNode* OutputNode = OutPin->GetOwnerNode();
-				GraphNode* InputNode = InPin->GetOwnerNode();
-				if (OutputNode && InputNode)
-				{
-					AddDep(InputNode, OutputNode);
-				}
-			}
-		}
+		Ar << NodeDeps;
 	}
 
 	const FSlateBrush* Graph::GetImage() const

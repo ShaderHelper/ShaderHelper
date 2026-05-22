@@ -18,7 +18,7 @@ namespace FW
 		{
 			if (IDirectoryWatcher* DirectoryWatcher = Module->Get())
 			{
-				DirectoryWatcher->UnregisterDirectoryChangedCallback_Handle(FPaths::GetPath(ContentPathShowed), DirectoryWatcherHandle);
+				DirectoryWatcher->UnregisterDirectoryChangedCallback_Handle(ContentPathShowed, DirectoryWatcherHandle);
 			}
 		}
 	}

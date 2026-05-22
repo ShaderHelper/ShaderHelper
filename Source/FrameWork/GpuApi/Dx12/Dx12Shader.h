@@ -14,6 +14,7 @@ namespace FW
 		TArray<GpuShaderVertexInput> GetVertexInputs() const override;
 		TArray<GpuShaderStageSemantic> GetStageOutputSemantics() const override;
 		TArray<GpuShaderStageSemantic> GetStageInputSemantics() const override;
+		Vector3u GetThreadGroupSize() const override;
     public:
 		IDxcBlob* GetCompilationResult() const { return ByteCode; }
 		virtual bool IsCompiled() const override { return ByteCode.IsValid(); }
