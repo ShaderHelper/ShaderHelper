@@ -1,8 +1,10 @@
 #pragma once
+#include "AssetObject/Render/ShaderOverrideHelper.h"
 #include "AssetObject/Shader.h"
 #include "AssetObject/Texture2D.h"
 #include "AssetObject/TextureCube.h"
 #include "AssetObject/Texture3D.h"
+#include "GpuApi/GpuBuffer.h"
 #include "GpuApi/GpuSampler.h"
 
 namespace SH
@@ -78,24 +80,15 @@ namespace SH
 		}
 	};
 
-	struct MaterialBindingResourceDefault
+	struct MaterialBindingResourceDefault : ShaderResourceBindingState
 	{
 		FString BindingName;
-		FW::BindingType BindingType = FW::BindingType::Texture;
 		FW::BindingShaderStage Stage = FW::BindingShaderStage::All;
-
-		// Texture/RWTexture
-		FW::AssetPtr<FW::AssetObject> TextureAsset;
-
-		// Sampler
-		FW::SamplerFilter Filter = FW::SamplerFilter::Bilinear;
-		FW::SamplerAddressMode AddressMode = FW::SamplerAddressMode::Wrap;
 
 		friend FArchive& operator<<(FArchive& Ar, MaterialBindingResourceDefault& Default)
 		{
-			Ar << Default.BindingName << Default.BindingType << Default.Stage;
-			Ar << Default.TextureAsset;
-			Ar << Default.Filter << Default.AddressMode;
+			Ar << Default.BindingName << Default.Stage;
+			Ar << static_cast<ShaderResourceBindingState&>(Default);
 			return Ar;
 		}
 	};

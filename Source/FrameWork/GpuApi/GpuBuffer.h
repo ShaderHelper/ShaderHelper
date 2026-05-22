@@ -30,6 +30,7 @@ namespace FW
 
 		GpuBufferUsage GetUsage() const { return Desc.Usage; }
 		uint32 GetByteSize() const { return Desc.ByteSize; }
+		uint32 GetStructuredStride() const { return Desc.StructuredInit.Stride; }
 
 		GpuResourceState State;
 

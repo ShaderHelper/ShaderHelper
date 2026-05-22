@@ -33,6 +33,8 @@ namespace SH
 	struct MaterialBindGroupBuildOptions
 	{
 		MaterialTextureOverrideResolver TextureOverrideResolver;
+		TArray<MaterialBindingResourceDefault>* BindingResourceDefaults = nullptr;
+		FW::Vector2f DefaultResourceViewportSize = FW::Vector2f{ 0, 0 };
 		FW::GpuBuffer* PrinterBuffer = nullptr;
 		bool bRebuildLayouts = true;
 		bool bRebuildUniformBuffers = true;

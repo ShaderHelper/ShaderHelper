@@ -76,6 +76,7 @@ namespace SH
 		FW::GpuTexture* ResolveBindingTexture(const FW::GpuShaderLayoutBinding& Binding);
 
 		FW::GpuTexture* EnsureRWOutputTexture(const FString& BindingName, FW::BindingType BindingTypeValue, FW::GpuTexture* SrcTex);
+		FW::GpuBuffer* ResolveBindingBuffer(const FW::GpuShaderLayoutBinding& Binding);
 
 		FW::PrintBuffer* GetPrintBuffer();
 		bool FlushPrintBufferLogs(const FString& LogPrefix);

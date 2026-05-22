@@ -204,6 +204,7 @@ namespace FW
 		BindingGroupSlot Group;
 		BindingType Type;
 		BindingShaderStage Stage;
+		uint32 StructuredStride = 1;
 		TArray<GpuShaderUbMemberInfo> UbMembers;
 	};
 

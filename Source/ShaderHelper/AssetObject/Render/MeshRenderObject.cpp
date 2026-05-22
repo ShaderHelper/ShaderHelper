@@ -187,6 +187,8 @@ namespace SH
 						{
 							bExists = true;
 							Slot.Type = GetResourceOverrideType(R.BindingType);
+							Slot.BindingType = R.BindingType;
+							Slot.StructuredStride = R.StructuredStride;
 							break;
 						}
 					}
@@ -284,7 +286,7 @@ namespace SH
 
 					for (const auto& ResourceDefault : Mat->BindingResourceDefaults)
 					{
-						if (!IsPinnableResourceBinding(ResourceDefault.BindingType))
+						if (!IsResourceOverrideBinding(ResourceDefault.BindingType))
 						{
 							continue;
 						}
@@ -316,38 +318,14 @@ namespace SH
 		for (int32 Index = 0; Index < OverrideSlots.Num(); ++Index)
 		{
 			ShaderOverrideSlot& Slot = OverrideSlots[Index];
-			const FText LabelText = FText::FromString(MakeOverrideSlotLabel(Slot));
-			GraphPin* OverridePin = FindOverrideInputPin(OverrideSlots, Slot.Key);
-			TSharedPtr<PropertyItemBase> Entry;
-			if (OverridePin && OverridePin->SourcePin.IsValid())
-			{
-				Entry = MakeShared<PropertyItemBase>(this, LabelText);
-				Entry->SetEmbedWidget(
-					SNew(STextBlock)
-					.TextStyle(&FAppCommonStyle::Get().GetWidgetStyle<FTextBlockStyle>("MinorText"))
-					.Text(FText::FromString(Slot.Type))
-				);
-			}
-			else if (Slot.bIsResource)
-			{
-				auto AssetItem = MakeShared<PropertyAssetItem>(this, LabelText, GetTextureMetaType(Slot.Type), &Slot.TextureAsset);
-				if (IsRWResourceType(Slot.Type) && !Slot.TextureAsset)
-				{
-					AppendDefaultRWSizeChildren(this, *AssetItem, Slot);
-				}
-				Entry = AssetItem;
-			}
-			else
-			{
-				Entry = MakeBytesPropertyItem(this, LabelText, Slot);
-			}
+			TSharedRef<PropertyItemBase> Entry = MakeOverrideSlotPropertyItem(this, OverrideSlots, Slot);
 			int32 EntryIndex = Index;
 			Entry->SetOnDelete([this, EntryIndex] {
 				RemoveOverride(EntryIndex);
 				static_cast<MeshPassNode*>(GetOuter())->RefreshNodeWidget();
 				static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
 			});
-			OverrideCat->AddChild(Entry.ToSharedRef());
+			OverrideCat->AddChild(Entry);
 		}
 		Result.Add(OverrideCat);
 
@@ -391,6 +369,14 @@ namespace SH
 		{
 			InvalidateRenderResources();
 		}
+		else if (IsDefaultBufferProperty(OverrideSlots, InProperty))
+		{
+			InvalidateRenderResources();
+		}
+		else if (IsSamplerResourceProperty(OverrideSlots, InProperty))
+		{
+			InvalidateRenderResources();
+		}
 		ReconcileOverridePins(this, OverrideSlots, OverridePins);
 		static_cast<MeshPassNode*>(GetOuter())->RefreshNodeWidget();
 	}
@@ -410,7 +396,8 @@ namespace SH
 					return ShaderOverrideKey{ Default.BindingName, TEXT(""), Default.Stage } == Slot.Key;
 				}))
 				{
-					Slot.TextureAsset = ResourceDefault->TextureAsset;
+					CopyShaderResourceBindingState(Slot, *ResourceDefault);
+					Slot.StructuredStride = ResourceDefault->StructuredStride;
 				}
 			}
 			else
@@ -469,27 +456,45 @@ namespace SH
 	{
 		if (!MaterialAsset) return;
 
+		//use override slot state info
+		TArray<MaterialBindingResourceDefault> EffectiveResourceDefaults = MaterialAsset->BindingResourceDefaults;
+		for (MaterialBindingResourceDefault& ResourceDefault : EffectiveResourceDefaults)
+		{
+			const ShaderOverrideKey Key{ ResourceDefault.BindingName, TEXT(""), ResourceDefault.Stage };
+			ShaderOverrideSlot* MatchingSlot = FindOverrideSlot(OverrideSlots, Key);
+			if (!MatchingSlot)
+			{
+				continue;
+			}
+
+			CopyShaderResourceBindingState(ResourceDefault, *MatchingSlot);
+		}
+
 		MaterialBindGroupBuildOptions Options;
 		Options.bRebuildLayouts = bRebuildLayouts;
 		Options.bRebuildUniformBuffers = bRebuildUniformBuffers;
 		Options.PrinterBuffer = GetPrintBuffer()->GetResource();
-		Options.TextureOverrideResolver = [this](const GpuShaderLayoutBinding& Binding) -> GpuTexture* {
-				const ShaderOverrideKey Key{ Binding.Name, TEXT(""), Binding.Stage };
-				GraphPin* OverridePin = FindOverrideInputPin(OverrideSlots, Key);
-				ShaderOverrideSlot* MatchingSlot = FindOverrideSlot(OverrideSlots, Key);
+		Options.DefaultResourceViewportSize = CurrentViewportSize;
+		Options.BindingResourceDefaults = &EffectiveResourceDefaults;
+		Options.TextureOverrideResolver = [this, &EffectiveResourceDefaults](const GpuShaderLayoutBinding& Binding) -> GpuTexture* {
+			const ShaderOverrideKey Key{ Binding.Name, TEXT(""), Binding.Stage };
+			GraphPin* OverridePin = FindOverrideInputPin(OverrideSlots, Key);
+			MaterialBindingResourceDefault* ResourceDefault = EffectiveResourceDefaults.FindByPredicate([&](const MaterialBindingResourceDefault& Default) {
+				return ShaderOverrideKey{ Default.BindingName, TEXT(""), Default.Stage } == Key;
+			});
 
-				// For RW resources, bind the internally-owned output texture;
-				if (Binding.Type == BindingType::RWTexture || Binding.Type == BindingType::RWTexture3D)
-				{
-					GpuTexture* SrcTex = ResolveOverrideTexture(Binding.Type, OverridePin, MatchingSlot, CurrentViewportSize);
-					return EnsureRWOutputTexture(MakeRWOutputKey(Binding.Name, Binding.Stage), Binding.Type, SrcTex);
-				}
+			// For RW resources, bind the internally-owned output texture;
+			if (Binding.Type == BindingType::RWTexture || Binding.Type == BindingType::RWTexture3D)
+			{
+				GpuTexture* SrcTex = ResolveOverrideTexture(Binding.Type, OverridePin, ResourceDefault, CurrentViewportSize);
+				return EnsureRWOutputTexture(MakeRWOutputKey(Binding.Name, Binding.Stage), Binding.Type, SrcTex);
+			}
 
-				// nullptr signals to BuildMaterialBindGroups to fall back to ResourceDefault's texture asset
-				// rather than the default override texture.
-				if (!OverridePin && !MatchingSlot) return nullptr;
-				return ResolveOverrideTexture(Binding.Type, OverridePin, MatchingSlot, CurrentViewportSize);
-			};
+			// nullptr signals to BuildMaterialBindGroups to fall back to ResourceDefault's texture asset
+			// rather than the default override texture.
+			if (!OverridePin) return nullptr;
+			return ResolveOverrideTexture(Binding.Type, OverridePin, ResourceDefault, CurrentViewportSize);
+		};
 
 		BuildMaterialBindGroups(*MaterialAsset, BindGroupLayouts, BindGroups, UniformBuffers, Options);
 	}
@@ -537,24 +542,20 @@ namespace SH
 			return;
 		}
 
-		for (ShaderOverrideSlot& Slot : OverrideSlots)
+		for (MaterialBindingResourceDefault& ResourceDefault : MaterialAsset->BindingResourceDefaults)
 		{
-			if (!Slot.bIsResource) continue;
+			if (ResourceDefault.BindingType != BindingType::RWTexture) continue;
 
-			const MaterialBindingResourceDefault* ResourceDefault = MaterialAsset->BindingResourceDefaults.FindByPredicate(
-				[&](const MaterialBindingResourceDefault& Default) {
-					return ShaderOverrideKey{ Default.BindingName, TEXT(""), Default.Stage } == Slot.Key;
-				});
-			if (!ResourceDefault) continue;
-			if (ResourceDefault->BindingType != BindingType::RWTexture) continue;
-
-			GraphPin* OverridePin = FindOverrideInputPin(OverrideSlots, Slot.Key);
-			GpuTexture* SrcTex = ResolveOverrideTexture(ResourceDefault->BindingType, OverridePin, &Slot, CurrentViewportSize);
+			const ShaderOverrideKey Key{ ResourceDefault.BindingName, TEXT(""), ResourceDefault.Stage };
+			ShaderOverrideSlot* Slot = FindOverrideSlot(OverrideSlots, Key);
+			GraphPin* OverridePin = FindOverrideInputPin(OverrideSlots, Key);
+			ShaderResourceBindingState* ResourceState = Slot ? static_cast<ShaderResourceBindingState*>(Slot) : static_cast<ShaderResourceBindingState*>(&ResourceDefault);
+			GpuTexture* SrcTex = ResolveOverrideTexture(ResourceDefault.BindingType, OverridePin, ResourceState, CurrentViewportSize);
 
 			// Ensure cache is sized to the current input before the blit (the bind-group rebuild
 			// inside the draw closure will pick up the same texture, since size/format match).
-			const FString OutputKey = MakeRWOutputKey(Slot.Key.BindingName, Slot.Key.Stage);
-			GpuTexture* OutTex = EnsureRWOutputTexture(OutputKey, ResourceDefault->BindingType, SrcTex);
+			const FString OutputKey = MakeRWOutputKey(Key.BindingName, Key.Stage);
+			GpuTexture* OutTex = EnsureRWOutputTexture(OutputKey, ResourceDefault.BindingType, SrcTex);
 			if (!OutTex || OutTex == SrcTex) continue;
 
 			BlitPassInput BlitInput;

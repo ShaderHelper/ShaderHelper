@@ -9,6 +9,8 @@
 #include "GpuApi/GpuResourceHelper.h"
 #include "GpuApi/GpuRhi.h"
 #include "GpuApi/GpuShader.h"
+#include "UI/Styles/FAppCommonStyle.h"
+#include "UI/Widgets/Property/PropertyData/PropertyAssetItem.h"
 #include "UI/Widgets/Property/PropertyData/PropertyMatrixItem.h"
 
 using namespace FW;
@@ -42,10 +44,19 @@ namespace SH
 		return Ar;
 	}
 
+	FArchive& operator<<(FArchive& Ar, ShaderResourceBindingState& State)
+	{
+		Ar << State.BindingType << State.TextureAsset;
+		Ar << State.Filter << State.AddressMode;
+		Ar << State.DefaultRWSize << State.DefaultRWFormat;
+		Ar << State.BufferByteSize << State.StructuredStride << State.BufferFormat;
+		return Ar;
+	}
+
 	FArchive& operator<<(FArchive& Ar, ShaderOverrideSlot& S)
 	{
-		Ar << S.Key << S.Type << S.bIsResource << S.InputPin << S.Bytes << S.TextureAsset << S.OutputPin;
-		Ar << S.DefaultRWSize << S.DefaultRWFormat;
+		Ar << S.Key << S.Type << S.bIsResource << S.InputPin << S.Bytes << S.OutputPin;
+		Ar << static_cast<ShaderResourceBindingState&>(S);
 		return Ar;
 	}
 
@@ -115,6 +126,10 @@ namespace SH
 		case BindingType::CombinedTexture3DSampler:
 		case BindingType::RWTexture:
 		case BindingType::RWTexture3D:
+		case BindingType::StructuredBuffer:
+		case BindingType::RWStructuredBuffer:
+		case BindingType::RawBuffer:
+		case BindingType::RWRawBuffer:
 			return true;
 		default:
 			return false;
@@ -124,6 +139,68 @@ namespace SH
 	bool IsPinnableResourceBinding(BindingType BindingTypeValue)
 	{
 		return IsResourceOverrideBinding(BindingTypeValue) && BindingTypeValue != BindingType::Sampler;
+	}
+
+	bool IsSamplerResourceBinding(BindingType BindingTypeValue)
+	{
+		return BindingTypeValue == BindingType::Sampler
+			|| BindingTypeValue == BindingType::CombinedTextureSampler
+			|| BindingTypeValue == BindingType::CombinedTextureCubeSampler
+			|| BindingTypeValue == BindingType::CombinedTexture3DSampler;
+	}
+
+	bool IsBufferBinding(BindingType BindingTypeValue)
+	{
+		return IsStructuredBufferBinding(BindingTypeValue)
+			|| BindingTypeValue == BindingType::RawBuffer
+			|| BindingTypeValue == BindingType::RWRawBuffer;
+	}
+
+	bool IsRWBufferBinding(BindingType BindingTypeValue)
+	{
+		return BindingTypeValue == BindingType::RWStructuredBuffer || BindingTypeValue == BindingType::RWRawBuffer;
+	}
+
+	bool IsStructuredBufferBinding(BindingType BindingTypeValue)
+	{
+		return BindingTypeValue == BindingType::StructuredBuffer || BindingTypeValue == BindingType::RWStructuredBuffer;
+	}
+
+	bool IsBufferType(const FString& Type)
+	{
+		return IsStructuredBufferType(Type) || Type == TEXT("RawBuffer") || Type == TEXT("RWRawBuffer");
+	}
+
+	bool IsStructuredBufferType(const FString& Type)
+	{
+		return Type == TEXT("StructuredBuffer") || Type == TEXT("RWStructuredBuffer");
+	}
+
+	bool IsRWBufferType(const FString& Type)
+	{
+		return Type == TEXT("RWStructuredBuffer") || Type == TEXT("RWRawBuffer");
+	}
+
+	bool IsRWStructuredBufferType(const FString& Type)
+	{
+		return Type == TEXT("RWStructuredBuffer");
+	}
+
+	uint32 GetMinBufferByteSize(BindingType BindingTypeValue, uint32 StructuredStride)
+	{
+		return IsStructuredBufferBinding(BindingTypeValue) ? FMath::Max(1u, StructuredStride) : 1u;
+	}
+
+	void CopyShaderResourceBindingState(ShaderResourceBindingState& Dst, const ShaderResourceBindingState& Src)
+	{
+		Dst.BindingType = Src.BindingType;
+		Dst.TextureAsset = Src.TextureAsset;
+		Dst.Filter = Src.Filter;
+		Dst.AddressMode = Src.AddressMode;
+		Dst.DefaultRWSize = Src.DefaultRWSize;
+		Dst.DefaultRWFormat = Src.DefaultRWFormat;
+		Dst.BufferByteSize = Src.BufferByteSize;
+		Dst.BufferFormat = Src.BufferFormat;
 	}
 
 	FString GetResourceOverrideType(BindingType BindingTypeValue)
@@ -140,6 +217,14 @@ namespace SH
 			return TEXT("RWTexture3D");
 		case BindingType::RWTexture:
 			return TEXT("RWTexture2D");
+		case BindingType::StructuredBuffer:
+			return TEXT("StructuredBuffer");
+		case BindingType::RWStructuredBuffer:
+			return TEXT("RWStructuredBuffer");
+		case BindingType::RawBuffer:
+			return TEXT("RawBuffer");
+		case BindingType::RWRawBuffer:
+			return TEXT("RWRawBuffer");
 		case BindingType::Sampler:
 			return TEXT("Sampler");
 		default:
@@ -157,6 +242,7 @@ namespace SH
 		if (bIsResource)
 		{
 			if (Type == TEXT("Sampler")) return nullptr;
+			if (IsBufferType(Type)) return NewShObject<BytesPin>(Outer);
 			if (Type.Contains(TEXT("Cube"))) return NewShObject<GpuCubemapPin>(Outer);
 			if (Type.Contains(TEXT("3D"))) return NewShObject<GpuTexture3DPin>(Outer);
 			return NewShObject<GpuTexturePin>(Outer);
@@ -167,7 +253,7 @@ namespace SH
 	bool IsOverridePinTypeValid(GraphPin* Pin, const FString& Type, bool bIsResource)
 	{
 		if (!Pin) return false;
-		if (!bIsResource) return DynamicCast<BytesPin>(Pin) != nullptr;
+		if (!bIsResource || IsBufferType(Type)) return DynamicCast<BytesPin>(Pin) != nullptr;
 		if (Type == TEXT("Sampler")) return false;
 		return Type.Contains(TEXT("Cube")) ? DynamicCast<GpuCubemapPin>(Pin) != nullptr
 			: Type.Contains(TEXT("3D")) ? DynamicCast<GpuTexture3DPin>(Pin) != nullptr
@@ -255,6 +341,49 @@ namespace SH
 		return false;
 	}
 
+	bool IsDefaultBufferProperty(const TArray<ShaderOverrideSlot>& Slots, PropertyData* InProperty)
+	{
+		if (!InProperty->GetDisplayName().EqualTo(LOCALIZATION("ByteSize")))
+		{
+			return false;
+		}
+
+		for (PropertyData* Parent = InProperty->GetParent(); Parent; Parent = Parent->GetParent())
+		{
+			const FString ParentName = Parent->GetDisplayName().ToString();
+			if (Slots.ContainsByPredicate([&](const ShaderOverrideSlot& Slot) {
+				return Slot.bIsResource && IsRWBufferType(Slot.Type) && MakeOverrideSlotLabel(Slot) == ParentName;
+			}))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	bool IsSamplerResourceProperty(const TArray<ShaderOverrideSlot>& Slots, PropertyData* InProperty)
+	{
+		const FText DisplayName = InProperty->GetDisplayName();
+		const bool bSamplerChild = DisplayName.EqualTo(LOCALIZATION("FilterMode"))
+			|| DisplayName.EqualTo(LOCALIZATION("WrapMode"));
+		if (!bSamplerChild)
+		{
+			return false;
+		}
+
+		for (PropertyData* Parent = InProperty->GetParent(); Parent; Parent = Parent->GetParent())
+		{
+			const FString ParentName = Parent->GetDisplayName().ToString();
+			if (Slots.ContainsByPredicate([&](const ShaderOverrideSlot& Slot) {
+				return Slot.bIsResource && IsSamplerResourceBinding(Slot.BindingType) && MakeOverrideSlotLabel(Slot) == ParentName;
+			}))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
 	void BreakOverridePinLink(GraphPin* Pin)
 	{
 		if (!Pin)
@@ -274,29 +403,29 @@ namespace SH
 		}
 	}
 
-	GpuTexture* ResolveOverrideTexture(BindingType BindingTypeValue, GraphPin* InputPin, ShaderOverrideSlot* MatchingSlot, Vector2f ViewportSize)
+	GpuTexture* ResolveOverrideTexture(BindingType BindingTypeValue, GraphPin* InputPin, ShaderResourceBindingState* MatchingResource, Vector2f ViewportSize)
 	{
 		if (InputPin)
 		{
 			if (GpuTexture* Tex = GetConnectedOverrideTexture(InputPin)) return Tex;
 		}
-		if (MatchingSlot && MatchingSlot->TextureAsset)
+		if (MatchingResource && MatchingResource->TextureAsset)
 		{
-			if (GpuTexture* Tex = ResolveTextureAssetGpu(MatchingSlot->TextureAsset.Get())) return Tex;
+			if (GpuTexture* Tex = ResolveTextureAssetGpu(MatchingResource->TextureAsset.Get())) return Tex;
 		}
 		// For RW resources with no asset and no incoming connection
-		if (MatchingSlot && (BindingTypeValue == BindingType::RWTexture || BindingTypeValue == BindingType::RWTexture3D))
+		if (MatchingResource && (BindingTypeValue == BindingType::RWTexture || BindingTypeValue == BindingType::RWTexture3D))
 		{
 			const bool bIs3D = BindingTypeValue == BindingType::RWTexture3D;
 			auto ResolveExtent = [](int32 SlotValue, float ViewportValue) -> uint32 {
 				if (SlotValue <= 0 && ViewportValue > 0) return static_cast<uint32>(ViewportValue);
 				return static_cast<uint32>(FMath::Max(1, SlotValue));
 			};
-			const uint32 W = ResolveExtent(MatchingSlot->DefaultRWSize.x, ViewportSize.X);
-			const uint32 H = ResolveExtent(MatchingSlot->DefaultRWSize.y, ViewportSize.Y);
-			const uint32 D = static_cast<uint32>(FMath::Max(1, MatchingSlot->DefaultRWSize.z));
-			const GpuFormat Fmt = ToGpuFormat(MatchingSlot->DefaultRWFormat);
-			GpuTexture* Existing = MatchingSlot->DefaultRWTexture.GetReference();
+			const uint32 W = ResolveExtent(MatchingResource->DefaultRWSize.x, ViewportSize.X);
+			const uint32 H = ResolveExtent(MatchingResource->DefaultRWSize.y, ViewportSize.Y);
+			const uint32 D = static_cast<uint32>(FMath::Max(1, MatchingResource->DefaultRWSize.z));
+			const GpuFormat Fmt = ToGpuFormat(MatchingResource->DefaultRWFormat);
+			GpuTexture* Existing = MatchingResource->DefaultRWTexture.GetReference();
 			const bool bMatches = Existing
 				&& Existing->GetWidth() == W
 				&& Existing->GetHeight() == H
@@ -320,11 +449,69 @@ namespace SH
 					Desc.Depth = D;
 					Desc.Dimension = GpuTextureDimension::Tex3D;
 				}
-				MatchingSlot->DefaultRWTexture = GGpuRhi->CreateTexture(Desc, GpuResourceState::UnorderedAccess);
+				MatchingResource->DefaultRWTexture = GGpuRhi->CreateTexture(Desc, GpuResourceState::UnorderedAccess);
 			}
-			return MatchingSlot->DefaultRWTexture.GetReference();
+			return MatchingResource->DefaultRWTexture.GetReference();
 		}
 		return GetDefaultOverrideTexture(BindingTypeValue);
+	}
+
+	GpuSampler* ResolveResourceSampler(const ShaderResourceBindingState* ResourceState)
+	{
+		GpuSamplerDesc Desc;
+		if (ResourceState)
+		{
+			Desc.Filter = ResourceState->Filter;
+			Desc.AddressU = ResourceState->AddressMode;
+			Desc.AddressV = ResourceState->AddressMode;
+			Desc.AddressW = ResourceState->AddressMode;
+		}
+		return GpuResourceHelper::GetSampler(Desc);
+	}
+
+	void ResolveDefaultBuffer(uint32& BufferByteSize, uint32 StructuredStride, BindingType BindingTypeValue, TRefCountPtr<GpuBuffer>& InOutBuffer)
+	{
+		check(IsBufferBinding(BindingTypeValue));
+
+		BufferByteSize = FMath::Max(BufferByteSize, GetMinBufferByteSize(BindingTypeValue, StructuredStride));
+
+		GpuBufferUsage Usage = GpuBufferUsage::Structured;
+		switch (BindingTypeValue)
+		{
+		case BindingType::StructuredBuffer:
+			Usage = GpuBufferUsage::Structured;
+			break;
+		case BindingType::RWStructuredBuffer:
+			Usage = GpuBufferUsage::RWStructured;
+			break;
+		case BindingType::RawBuffer:
+			Usage = GpuBufferUsage::Raw;
+			break;
+		case BindingType::RWRawBuffer:
+			Usage = GpuBufferUsage::RWRaw;
+			break;
+		default:
+			AUX::Unreachable();
+		}
+		const bool bMatches = InOutBuffer.IsValid()
+			&& InOutBuffer->GetUsage() == Usage
+			&& InOutBuffer->GetByteSize() == BufferByteSize
+			&& (!IsStructuredBufferBinding(BindingTypeValue) || InOutBuffer->GetStructuredStride() == StructuredStride);
+		if (!bMatches)
+		{
+			TArray<uint8> ZeroData;
+			ZeroData.SetNumZeroed(static_cast<int32>(BufferByteSize));
+			GpuBufferDesc Desc{
+				.ByteSize = BufferByteSize,
+				.Usage = Usage,
+				.InitialData = ZeroData,
+			};
+			if (IsStructuredBufferBinding(BindingTypeValue))
+			{
+				Desc.StructuredInit.Stride = StructuredStride;
+			}
+			InOutBuffer = GGpuRhi->CreateBuffer(Desc, GetBufferState(Usage));
+		}
 	}
 
 	ShaderOverrideSlot* FindOverrideSlot(TArray<ShaderOverrideSlot>& Slots, const ShaderOverrideKey& Key)
@@ -355,15 +542,13 @@ namespace SH
 			{
 				if (!(Old.Key == NewSlot.Key)
 					|| Old.bIsResource != NewSlot.bIsResource
-					|| Old.Type != NewSlot.Type)
+					|| Old.Type != NewSlot.Type || Old.BindingType != NewSlot.BindingType)
 				{
 					continue;
 				}
 				if (NewSlot.bIsResource)
 				{
-					NewSlot.TextureAsset = Old.TextureAsset;
-					NewSlot.DefaultRWSize = Old.DefaultRWSize;
-					NewSlot.DefaultRWFormat = Old.DefaultRWFormat;
+					CopyShaderResourceBindingState(NewSlot, Old);
 				}
 				else
 				{
@@ -524,29 +709,133 @@ namespace SH
 		return MakeShared<PropertyItemBase>(Owner, Label);
 	}
 
-	void AppendDefaultRWSizeChildren(ShObject* Owner, PropertyItemBase& Parent, ShaderOverrideSlot& Slot)
+	void AppendDefaultRWSizeChildren(ShObject* Owner, PropertyItemBase& Parent, ShaderResourceBindingState& ResourceState, const FString& Type)
 	{
-		const bool bIs3D = Slot.Type.Contains(TEXT("3D"));
+		const bool bIs3D = Type.Contains(TEXT("3D"));
 
-		auto WidthItem = MakeShared<PropertyScalarItem<int32>>(Owner, LOCALIZATION("WidthAuto"), &Slot.DefaultRWSize.x);
+		auto WidthItem = MakeShared<PropertyScalarItem<int32>>(Owner, LOCALIZATION("WidthAuto"), &ResourceState.DefaultRWSize.x);
 		WidthItem->SetMinValue(0);
 		Parent.AddChild(WidthItem);
 
-		auto HeightItem = MakeShared<PropertyScalarItem<int32>>(Owner, LOCALIZATION("HeightAuto"), &Slot.DefaultRWSize.y);
+		auto HeightItem = MakeShared<PropertyScalarItem<int32>>(Owner, LOCALIZATION("HeightAuto"), &ResourceState.DefaultRWSize.y);
 		HeightItem->SetMinValue(0);
 		Parent.AddChild(HeightItem);
 
 		if (bIs3D)
 		{
-			auto DepthItem = MakeShared<PropertyScalarItem<int32>>(Owner, LOCALIZATION("Depth"), &Slot.DefaultRWSize.z);
+			auto DepthItem = MakeShared<PropertyScalarItem<int32>>(Owner, LOCALIZATION("Depth"), &ResourceState.DefaultRWSize.z);
 			DepthItem->SetMinValue(1);
 			Parent.AddChild(DepthItem);
 		}
 
 		auto FormatItem = MakePropertyEnumItem<RWTextureFormat>(
-			Owner, LOCALIZATION("Format"), Slot.DefaultRWFormat,
-			[&Slot](RWTextureFormat NewValue) { Slot.DefaultRWFormat = NewValue; }
+			Owner, LOCALIZATION("Format"), ResourceState.DefaultRWFormat,
+			[&ResourceState](RWTextureFormat NewValue) { ResourceState.DefaultRWFormat = NewValue; }
 		);
 		Parent.AddChild(FormatItem);
+	}
+
+	void AppendDefaultRWSizeChildren(ShObject* Owner, PropertyItemBase& Parent, ShaderOverrideSlot& Slot)
+	{
+		AppendDefaultRWSizeChildren(Owner, Parent, Slot, Slot.Type);
+	}
+
+	void AppendSamplerPropertyChildren(ShObject* Owner, PropertyItemBase& Parent, ShaderResourceBindingState& ResourceState)
+	{
+		auto FilterItem = MakePropertyEnumItem<SamplerFilter>(
+			Owner, LOCALIZATION("FilterMode"), ResourceState.Filter,
+			[&ResourceState](SamplerFilter NewFilter) { ResourceState.Filter = NewFilter; }
+		);
+		Parent.AddChild(FilterItem);
+
+		auto AddrItem = MakePropertyEnumItem<SamplerAddressMode>(
+			Owner, LOCALIZATION("WrapMode"), ResourceState.AddressMode,
+			[&ResourceState](SamplerAddressMode NewMode) { ResourceState.AddressMode = NewMode; }
+		);
+		Parent.AddChild(AddrItem);
+	}
+
+	TSharedRef<PropertyItemBase> MakeSamplerPropertyItem(ShObject* Owner, FText Label, ShaderResourceBindingState& ResourceState)
+	{
+		auto Item = MakeShared<PropertyItemBase>(Owner, Label);
+		AppendSamplerPropertyChildren(Owner, *Item, ResourceState);
+		return Item;
+	}
+
+	TSharedRef<PropertyItemBase> MakeTextureResourcePropertyItem(ShObject* Owner, FText Label, ShaderResourceBindingState& ResourceState, const FString& Type, bool bIncludeSamplerSettings)
+	{
+		auto AssetItem = MakeShared<PropertyAssetItem>(Owner, Label, GetTextureMetaType(Type), &ResourceState.TextureAsset);
+		if (IsRWResourceType(Type) && !ResourceState.TextureAsset)
+		{
+			AppendDefaultRWSizeChildren(Owner, *AssetItem, ResourceState, Type);
+		}
+		if (bIncludeSamplerSettings)
+		{
+			AppendSamplerPropertyChildren(Owner, *AssetItem, ResourceState);
+		}
+		return AssetItem;
+	}
+
+	TSharedRef<PropertyItemBase> MakeOverrideSlotPropertyItem(ShObject* Owner, const TArray<ShaderOverrideSlot>& Slots, ShaderOverrideSlot& Slot)
+	{
+		const FText Label = FText::FromString(MakeOverrideSlotLabel(Slot));
+		GraphPin* OverridePin = FindOverrideInputPin(Slots, Slot.Key);
+		if (OverridePin && OverridePin->SourcePin.IsValid())
+		{
+			auto Item = MakeShared<PropertyItemBase>(Owner, Label);
+			Item->SetEmbedWidget(
+				SNew(STextBlock)
+				.TextStyle(&FAppCommonStyle::Get().GetWidgetStyle<FTextBlockStyle>("MinorText"))
+				.Text(FText::FromString(Slot.Type))
+			);
+			if (Slot.bIsResource && IsSamplerResourceBinding(Slot.BindingType))
+			{
+				AppendSamplerPropertyChildren(Owner, *Item, Slot);
+			}
+			return Item;
+		}
+
+		if (!Slot.bIsResource)
+		{
+			return MakeBytesPropertyItem(Owner, Label, Slot);
+		}
+
+		if (Slot.BindingType == BindingType::Sampler)
+		{
+			return MakeSamplerPropertyItem(Owner, Label, Slot);
+		}
+		if (IsBufferType(Slot.Type))
+		{
+			return MakeBufferPropertyItem(Owner, Label, Slot);
+		}
+		return MakeTextureResourcePropertyItem(Owner, Label, Slot, Slot.Type, IsSamplerResourceBinding(Slot.BindingType));
+	}
+
+	static TSharedRef<PropertyItemBase> MakeBufferPropertyItemImpl(ShObject* Owner, FText Label, BindingType BindingTypeValue, uint32 StructuredStride, uint32& BufferByteSize)
+	{
+		BufferByteSize = FMath::Max(BufferByteSize, GetMinBufferByteSize(BindingTypeValue, StructuredStride));
+		if (!IsRWBufferBinding(BindingTypeValue))
+		{
+			return MakeShared<PropertyItemBase>(
+				Owner,
+				FText::FromString(FString::Printf(TEXT("%s"), *Label.ToString()))
+			);
+		}
+
+		auto Item = MakeShared<PropertyItemBase>(Owner, Label);
+		auto ByteSizeItem = MakeShared<PropertyScalarItem<int32>>(Owner, LOCALIZATION("ByteSize"), reinterpret_cast<int32*>(&BufferByteSize));
+		ByteSizeItem->SetMinValue(GetMinBufferByteSize(BindingTypeValue, StructuredStride));
+		Item->AddChild(ByteSizeItem);
+		return Item;
+	}
+
+	TSharedRef<PropertyItemBase> MakeBufferPropertyItem(ShObject* Owner, FText Label, BindingType BindingTypeValue, uint32 StructuredStride, uint32& BufferByteSize)
+	{
+		return MakeBufferPropertyItemImpl(Owner, Label, BindingTypeValue, StructuredStride, BufferByteSize);
+	}
+
+	TSharedRef<PropertyItemBase> MakeBufferPropertyItem(ShObject* Owner, FText Label, ShaderOverrideSlot& Slot)
+	{
+		return MakeBufferPropertyItemImpl(Owner, Label, Slot.BindingType, Slot.StructuredStride, Slot.BufferByteSize);
 	}
 }

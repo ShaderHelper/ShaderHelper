@@ -84,34 +84,16 @@ namespace SH
 			return Value;
 		}
 
-		GpuResource* GetTextureView(const MaterialBindingResourceDefault* ResourceDefault, BindingType InType, GpuTexture* OverrideTexture)
+		GpuResource* GetTextureView(ShaderResourceBindingState* ResourceState, BindingType InType, GpuTexture* OverrideTexture, Vector2f ViewportSize)
 		{
 			if (OverrideTexture) return OverrideTexture->GetDefaultView();
-			GpuTexture* Tex = nullptr;
-			if (ResourceDefault && ResourceDefault->TextureAsset)
-			{
-				Tex = ResolveTextureAssetGpu(ResourceDefault->TextureAsset.Get());
-			}
-			if (!Tex) Tex = GetDefaultOverrideTexture(InType);
+			GpuTexture* Tex = ResolveOverrideTexture(InType, nullptr, ResourceState, ViewportSize);
 			return Tex->GetDefaultView();
 		}
 
-		GpuSampler* GetSamplerResource(const MaterialBindingResourceDefault* ResourceDefault)
+		MaterialBindingResourceDefault* FindResourceDefault(TArray<MaterialBindingResourceDefault>& ResourceDefaults, const FString& BindingName, BindingShaderStage Stage)
 		{
-			GpuSamplerDesc Desc;
-			if (ResourceDefault)
-			{
-				Desc.Filter = ResourceDefault->Filter;
-				Desc.AddressU = ResourceDefault->AddressMode;
-				Desc.AddressV = ResourceDefault->AddressMode;
-				Desc.AddressW = ResourceDefault->AddressMode;
-			}
-			return GpuResourceHelper::GetSampler(Desc);
-		}
-
-		const MaterialBindingResourceDefault* FindResourceDefault(const Material& InMaterial, const FString& BindingName, BindingShaderStage Stage)
-		{
-			for (const auto& ResourceDefault : InMaterial.BindingResourceDefaults)
+			for (auto& ResourceDefault : ResourceDefaults)
 			{
 				if (ResourceDefault.BindingName == BindingName && ResourceDefault.Stage == Stage)
 				{
@@ -119,6 +101,25 @@ namespace SH
 				}
 			}
 			return nullptr;
+		}
+
+		bool IsTextureSamplerStateBinding(BindingType BindingTypeValue)
+		{
+			switch (BindingTypeValue)
+			{
+			case BindingType::Texture:
+			case BindingType::TextureCube:
+			case BindingType::Texture3D:
+			case BindingType::Sampler:
+			case BindingType::CombinedTextureSampler:
+			case BindingType::CombinedTextureCubeSampler:
+			case BindingType::CombinedTexture3DSampler:
+			case BindingType::RWTexture:
+			case BindingType::RWTexture3D:
+				return true;
+			default:
+				return false;
+			}
 		}
 
 		void ParseUniformBufferKey(const FString& InKey, FString& OutBindingName, BindingShaderStage& OutStage)
@@ -379,6 +380,9 @@ namespace SH
 			OutBindGroupLayouts.Empty();
 		}
 		OutBindGroups.Empty();
+		TArray<MaterialBindingResourceDefault>& BindingResourceDefaults = Options.BindingResourceDefaults
+			? *Options.BindingResourceDefaults
+			: InMaterial.BindingResourceDefaults;
 
 		TArray<GpuShaderLayoutBinding> AllBindings;
 		GpuShader* Vs = InMaterial.VertexShaderAsset ? InMaterial.VertexShaderAsset->GetCompiledShader(ShaderType::Vertex) : nullptr;
@@ -407,6 +411,10 @@ namespace SH
 				{
 					if (Existing->Name != Binding->Name) Existing->Name = Existing->Name + TEXT("/") + Binding->Name;
 					Existing->Stage = Existing->Stage | Binding->Stage;
+					if (Existing->StructuredStride == 0)
+					{
+						Existing->StructuredStride = Binding->StructuredStride;
+					}
 				}
 				else
 				{
@@ -459,27 +467,39 @@ namespace SH
 					continue;
 				}
 
-				GpuTexture* OverrideTexture = Options.TextureOverrideResolver ? Options.TextureOverrideResolver(Binding) : nullptr;
-				const MaterialBindingResourceDefault* ResourceDefault = FindResourceDefault(InMaterial, Binding.Name, Binding.Stage);
+				const bool bUsesTextureSamplerState = IsTextureSamplerStateBinding(Binding.Type);
+				GpuTexture* OverrideTexture = (bUsesTextureSamplerState && Binding.Type != BindingType::Sampler && Options.TextureOverrideResolver) ? Options.TextureOverrideResolver(Binding) : nullptr;
+				MaterialBindingResourceDefault* ResourceDefault = FindResourceDefault(BindingResourceDefaults, Binding.Name, Binding.Stage);
+				check(ResourceDefault);
+				ShaderResourceBindingState* ResourceState = ResourceDefault;
 
 				switch (Binding.Type)
 				{
+				case BindingType::StructuredBuffer:
+				case BindingType::RWStructuredBuffer:
+				case BindingType::RawBuffer:
+				case BindingType::RWRawBuffer:
+				{
+					ResolveDefaultBuffer(ResourceDefault->BufferByteSize, Binding.StructuredStride, Binding.Type, ResourceDefault->Buffer);
+					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, ResourceDefault->Buffer, Binding.Stage);
+					break;
+				}
 				case BindingType::Texture:
 				case BindingType::TextureCube:
 				case BindingType::Texture3D:
 				case BindingType::RWTexture:
 				case BindingType::RWTexture3D:
-					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, GetTextureView(ResourceDefault, Binding.Type, OverrideTexture), Binding.Stage);
+					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, GetTextureView(ResourceState, Binding.Type, OverrideTexture, Options.DefaultResourceViewportSize), Binding.Stage);
 					break;
 				case BindingType::Sampler:
-					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, GetSamplerResource(ResourceDefault), Binding.Stage);
+					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, ResolveResourceSampler(ResourceState), Binding.Stage);
 					break;
 				case BindingType::CombinedTextureSampler:
 				case BindingType::CombinedTextureCubeSampler:
 				case BindingType::CombinedTexture3DSampler:
 				{
-					GpuResource* TextureView = GetTextureView(ResourceDefault, Binding.Type, OverrideTexture);
-					GpuSampler* Sampler = GetSamplerResource(ResourceDefault);
+					GpuResource* TextureView = GetTextureView(ResourceState, Binding.Type, OverrideTexture, Options.DefaultResourceViewportSize);
+					GpuSampler* Sampler = ResolveResourceSampler(ResourceState);
 					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, new GpuCombinedTextureSampler(TextureView, Sampler), Binding.Stage);
 					break;
 				}

@@ -77,13 +77,19 @@ namespace FW
 			{
 				BType = BindingType::RWTexture3D;
 			}
-			ShaderLayoutBindings.Add({
+
+			GpuShaderLayoutBinding Binding = {
 				.Name = BindDesc.Name,
 				.Slot = (int)BindDesc.BindPoint,
 				.Group = (int)BindDesc.Space,
 				.Type = BType,
 				.Stage = ShaderStage
-			});
+			};
+			if (BType == BindingType::StructuredBuffer || BType == BindingType::RWStructuredBuffer)
+			{
+				Binding.StructuredStride = BindDesc.NumSamples;
+			}
+			ShaderLayoutBindings.Add(MoveTemp(Binding));
 
 			if (BType == BindingType::UniformBuffer)
 			{

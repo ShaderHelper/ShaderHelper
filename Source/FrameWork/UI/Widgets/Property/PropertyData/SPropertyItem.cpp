@@ -60,15 +60,30 @@ namespace FW
 				})
 			.Font(FAppStyle::Get().GetFontStyle("NormalFont"));
         
-        float Indent = InArgs._Indent ? 22.0f : 4.0f;
-		HBox = SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot()
+		HBox = SNew(SHorizontalBox);
+
+		if (InArgs._Indent || InArgs._HasChildren)
+		{
+			HBox->AddSlot()
+			.AutoWidth()
 			.VAlign(VAlign_Center)
-			.Padding(Indent, 0.0f, 0.0f, 0.0f)
-			.FillWidth(0.45f)
 			[
-                ItemTextBlock
-            ];
+				SNew(SBox)
+				.Visibility(InArgs._HasChildren ? EVisibility::Visible : EVisibility::Hidden)
+				[
+					SNew(SExpanderArrow, InArgs._TableRow)
+					.IndentAmount(0)
+				]
+			];
+		}
+
+		HBox->AddSlot()
+		.VAlign(VAlign_Center)
+		.Padding(4.0f, 0.0f, 0.0f, 0.0f)
+		.FillWidth(0.45f)
+		[
+			ItemTextBlock
+		];
 
 		ChildSlot
 		[

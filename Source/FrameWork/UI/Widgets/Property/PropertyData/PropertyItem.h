@@ -45,6 +45,8 @@ namespace FW
                     .CanApplyName(CanApplyName)
                     .DisplayName(&DisplayName)
                     .OnDisplayNameChanged(OnDisplayNameChanged)
+					.HasChildren(GetChildrenNum() > 0)
+					.TableRow(Row)
                     .Indent(!!Parent);
             
             if(EmbedWidget)

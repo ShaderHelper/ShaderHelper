@@ -163,12 +163,18 @@ namespace SH
 						NewSlots.Add(MoveTemp(Slot));
 					}
 				}
-				else if (IsPinnableResourceBinding(Binding.Type))
+				else if (Binding.Name == TEXT("GPrivate_Printer") && Binding.Type == BindingType::RWRawBuffer)
+				{
+					continue;
+				}
+				else if (IsResourceOverrideBinding(Binding.Type))
 				{
 					ShaderOverrideSlot Slot;
 					Slot.Key = { Binding.Name, TEXT(""), BindingShaderStage::Compute };
 					Slot.Type = GetResourceOverrideType(Binding.Type);
 					Slot.bIsResource = true;
+					Slot.BindingType = Binding.Type;
+					Slot.StructuredStride = Binding.StructuredStride;
 					NewSlots.Add(MoveTemp(Slot));
 				}
 			}
@@ -206,6 +212,19 @@ namespace SH
 			FindOverrideInputPin(OverrideSlots, Key),
 			FindOverrideSlot(OverrideSlots, Key),
 			CurrentViewportSize);
+	}
+
+	GpuBuffer* ComputePassNode::ResolveBindingBuffer(const GpuShaderLayoutBinding& Binding)
+	{
+		const ShaderOverrideKey Key{ Binding.Name, TEXT(""), BindingShaderStage::Compute };
+		if (ShaderOverrideSlot* MatchingSlot = FindOverrideSlot(OverrideSlots, Key))
+		{
+			MatchingSlot->StructuredStride = Binding.StructuredStride;
+			ResolveDefaultBuffer(MatchingSlot->BufferByteSize, Binding.StructuredStride, Binding.Type, MatchingSlot->Buffer);
+			return MatchingSlot->Buffer;
+		}
+
+		return nullptr;
 	}
 
 	GpuTexture* ComputePassNode::EnsureRWOutputTexture(const FString& BindingName, BindingType BindingTypeValue, GpuTexture* SrcTex)
@@ -288,6 +307,14 @@ namespace SH
 		{
 			InvalidateRenderResources();
 		}
+		else if (IsDefaultBufferProperty(OverrideSlots, InProperty))
+		{
+			InvalidateRenderResources();
+		}
+		else if (IsSamplerResourceProperty(OverrideSlots, InProperty))
+		{
+			InvalidateRenderResources();
+		}
 	}
 
 	TArray<TSharedRef<PropertyData>> ComputePassNode::GeneratePropertyDatas()
@@ -299,32 +326,7 @@ namespace SH
 		auto BindingCat = MakeShared<PropertyCategory>(this, LOCALIZATION("Bindings"));	
 		for (ShaderOverrideSlot& Slot : OverrideSlots)
 		{
-			const FText LabelText = FText::FromString(MakeOverrideSlotLabel(Slot));
-			GraphPin* OverridePin = FindOverrideInputPin(OverrideSlots, Slot.Key);
-			TSharedPtr<PropertyItemBase> Entry;
-			if (OverridePin && OverridePin->SourcePin.IsValid())
-			{
-				Entry = MakeShared<PropertyItemBase>(this, LabelText);
-				Entry->SetEmbedWidget(
-					SNew(STextBlock)
-					.TextStyle(&FAppCommonStyle::Get().GetWidgetStyle<FTextBlockStyle>("MinorText"))
-					.Text(FText::FromString(Slot.Type))
-				);
-			}
-			else if (Slot.bIsResource)
-			{
-				auto AssetItem = MakeShared<PropertyAssetItem>(this, LabelText, GetTextureMetaType(Slot.Type), &Slot.TextureAsset);
-				if (IsRWResourceType(Slot.Type) && !Slot.TextureAsset)
-				{
-					AppendDefaultRWSizeChildren(this, *AssetItem, Slot);
-				}
-				Entry = AssetItem;
-			}
-			else
-			{
-				Entry = MakeBytesPropertyItem(this, LabelText, Slot);
-			}
-			BindingCat->AddChild(Entry.ToSharedRef());
+			BindingCat->AddChild(MakeOverrideSlotPropertyItem(this, OverrideSlots, Slot));
 		}
 		Result.Add(BindingCat);
 		return Result;
@@ -389,6 +391,17 @@ namespace SH
 
 				switch (Binding.Type)
 				{
+				case BindingType::StructuredBuffer:
+				case BindingType::RWStructuredBuffer:
+				case BindingType::RawBuffer:
+				case BindingType::RWRawBuffer:
+				{
+					if (GpuBuffer* Buffer = ResolveBindingBuffer(Binding))
+					{
+						GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, Buffer, Binding.Stage);
+					}
+					break;
+				}
 				case BindingType::Texture:
 				case BindingType::TextureCube:
 				case BindingType::Texture3D:
@@ -407,17 +420,17 @@ namespace SH
 				}
 				case BindingType::Sampler:
 				{
-					GpuSamplerDesc SamplerDesc;
-					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, GpuResourceHelper::GetSampler(SamplerDesc), Binding.Stage);
+					const ShaderOverrideKey Key{ Binding.Name, TEXT(""), BindingShaderStage::Compute };
+					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, ResolveResourceSampler(FindOverrideSlot(OverrideSlots, Key)), Binding.Stage);
 					break;
 				}
 				case BindingType::CombinedTextureSampler:
 				case BindingType::CombinedTextureCubeSampler:
 				case BindingType::CombinedTexture3DSampler:
 				{
+					const ShaderOverrideKey Key{ Binding.Name, TEXT(""), BindingShaderStage::Compute };
 					GpuTexture* Tex = ResolveBindingTexture(Binding);
-					GpuSamplerDesc SamplerDesc;
-					GpuSampler* Sampler = GpuResourceHelper::GetSampler(SamplerDesc);
+					GpuSampler* Sampler = ResolveResourceSampler(FindOverrideSlot(OverrideSlots, Key));
 					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, new GpuCombinedTextureSampler(Tex->GetDefaultView(), Sampler), Binding.Stage);
 					break;
 				}
@@ -631,6 +644,24 @@ namespace SH
 		{
 			switch (Binding.Type)
 			{
+			case BindingType::StructuredBuffer:
+			case BindingType::RawBuffer:
+			{
+				if (GpuBuffer* Buffer = ResolveBindingBuffer(Binding))
+				{
+					Pass.Read(Buffer);
+				}
+				break;
+			}
+			case BindingType::RWStructuredBuffer:
+			case BindingType::RWRawBuffer:
+			{
+				if (GpuBuffer* Buffer = ResolveBindingBuffer(Binding))
+				{
+					Pass.Write(Buffer);
+				}
+				break;
+			}
 			case BindingType::Texture:
 			case BindingType::TextureCube:
 			case BindingType::Texture3D:

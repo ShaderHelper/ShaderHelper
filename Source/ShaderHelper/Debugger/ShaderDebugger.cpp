@@ -1308,7 +1308,6 @@ namespace SH
 		if (bEnableUbsan)
 		{
 			TMap<uint64, int32> WorkgroupBarrierCounts;
-			TMap<uint64, SpvDebugState_Tag> WorkgroupBarrierTags;
 			TArray<uint64> WorkgroupBarrierKeys;
 			for (const TArray<SpvDebugState>& ThreadStates : PerThreadDebugStates)
 			{
@@ -1323,11 +1322,7 @@ namespace SH
 
 					uint64 Key = MakeWorkgroupBarrierKey(BarrierIndex, *Tag);
 					WorkgroupBarrierCounts.FindOrAdd(Key)++;
-					if (!WorkgroupBarrierTags.Contains(Key))
-					{
-						WorkgroupBarrierTags.Add(Key, *Tag);
-						WorkgroupBarrierKeys.Add(Key);
-					}
+					WorkgroupBarrierKeys.AddUnique(Key);
 					BarrierIndex++;
 				}
 			}

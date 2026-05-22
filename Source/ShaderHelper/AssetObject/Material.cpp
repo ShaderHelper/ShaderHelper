@@ -87,6 +87,17 @@ namespace SH
 		else
 		{
 			NotifyMaterialChanged();
+			if (InProperty->IsOfType<PropertyAssetItem>())
+			{
+				const FString DisplayName = InProperty->GetDisplayName().ToString();
+				const bool bIsRWResourceAsset = BindingResourceDefaults.ContainsByPredicate([&](const MaterialBindingResourceDefault& Default) {
+					return IsRWResourceType(GetResourceOverrideType(Default.BindingType)) && Default.BindingName == DisplayName;
+				});
+				if (bIsRWResourceAsset)
+				{
+					static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+				}
+			}
 		}
 	}
 
@@ -249,6 +260,10 @@ namespace SH
 		auto CollectResourceBindings = [&](GpuShader* InShader) {
 			for (const GpuShaderLayoutBinding& Binding : GetShaderBindings(InShader))
 			{
+				if (Binding.Name == TEXT("GPrivate_Printer") && Binding.Type == BindingType::RWRawBuffer)
+				{
+					continue;
+				}
 				if (!IsResourceOverrideBinding(Binding.Type)) continue;
 
 				// Check if already processed a binding at this (Group, Slot, Type)
@@ -263,6 +278,7 @@ namespace SH
 						if (D.BindingName == Seen->Name && D.BindingType == Seen->Type)
 						{
 							D.Stage = D.Stage | Binding.Stage;
+							D.StructuredStride = Binding.StructuredStride;
 							if (Seen->Name != Binding.Name)
 								D.BindingName = Seen->Name + TEXT("/") + Binding.Name;
 							break;
@@ -279,17 +295,17 @@ namespace SH
 				NewDefault.BindingName = Binding.Name;
 				NewDefault.BindingType = Binding.Type;
 				NewDefault.Stage = Binding.Stage;
+				NewDefault.StructuredStride = Binding.StructuredStride;
 
 				// Preserve old values if existed
 				for (const auto& Old : OldDefaults)
 				{
 					FString Left, Right;
 					bool bMergedName = Old.BindingName.Split(TEXT("/"), &Left, &Right);
-					if (Old.BindingName == Binding.Name || (bMergedName && (Left == Binding.Name || Right == Binding.Name)))
+					bool MatchedName = Old.BindingName == Binding.Name || (bMergedName && (Left == Binding.Name || Right == Binding.Name));
+					if (Old.BindingType == Binding.Type && MatchedName)
 					{
-						NewDefault.TextureAsset = Old.TextureAsset;
-						NewDefault.Filter = Old.Filter;
-						NewDefault.AddressMode = Old.AddressMode;
+						CopyShaderResourceBindingState(NewDefault, Old);
 						break;
 					}
 				}
@@ -746,126 +762,55 @@ namespace SH
 
 			switch (Default.BindingType)
 			{
+			case BindingType::StructuredBuffer:
+			case BindingType::RWStructuredBuffer:
+			case BindingType::RawBuffer:
+			case BindingType::RWRawBuffer:
+			{
+				auto Item = MakeBufferPropertyItem(
+					this,
+					FText::FromString(Default.BindingName),
+					Default.BindingType,
+					Default.StructuredStride,
+					Default.BufferByteSize
+				);
+				Parent->AddChild(Item);
+				break;
+			}
 			case BindingType::Texture:
 			case BindingType::TextureCube:
 			case BindingType::Texture3D:
 			case BindingType::RWTexture:
 			case BindingType::RWTexture3D:
 			{
-				MetaType* TexMetaType = GetMetaType<Texture2D>();
-				if (Default.BindingType == BindingType::TextureCube) TexMetaType = GetMetaType<TextureCube>();
-				else if (Default.BindingType == BindingType::Texture3D || Default.BindingType == BindingType::RWTexture3D) TexMetaType = GetMetaType<Texture3D>();
-
-				auto Item = MakeShared<PropertyAssetItem>(
+				auto Item = MakeTextureResourcePropertyItem(
 					this,
 					FText::FromString(Default.BindingName),
-					TexMetaType,
-					&Default.TextureAsset
+					Default,
+					GetResourceOverrideType(Default.BindingType),
+					false
 				);
 				Parent->AddChild(Item);
 				break;
 			}
 			case BindingType::Sampler:
 			{
-				auto SamplerCategory = MakeShared<PropertyCategory>(this, Default.BindingName);
-				Parent->AddChild(SamplerCategory);
-
-				// Filter mode
-				{
-					FString BindingName = Default.BindingName;
-					auto FilterItem = MakePropertyEnumItem<SamplerFilter>(
-						this, LOCALIZATION("FilterMode"), Default.Filter,
-						[this, BindingName](SamplerFilter NewFilter) {
-							for (auto& D : BindingResourceDefaults)
-							{
-								if (D.BindingName == BindingName)
-								{
-									D.Filter = NewFilter;
-									break;
-								}
-							}
-						}
-					);
-					SamplerCategory->AddChild(FilterItem);
-				}
-
-				// Address mode
-				{
-					FString BindingName = Default.BindingName;
-					auto AddrItem = MakePropertyEnumItem<SamplerAddressMode>(
-						this, LOCALIZATION("WrapMode"), Default.AddressMode,
-						[this, BindingName](SamplerAddressMode NewMode) {
-							for (auto& D : BindingResourceDefaults)
-							{
-								if (D.BindingName == BindingName)
-								{
-									D.AddressMode = NewMode;
-									break;
-								}
-							}
-						}
-					);
-					SamplerCategory->AddChild(AddrItem);
-				}
+				Parent->AddChild(MakeSamplerPropertyItem(this, FText::FromString(Default.BindingName), Default));
 				break;
 			}
 			case BindingType::CombinedTextureSampler:
 			case BindingType::CombinedTextureCubeSampler:
 			case BindingType::CombinedTexture3DSampler:
 			{
-				auto CombinedCategory = MakeShared<PropertyCategory>(this, Default.BindingName);
-				Parent->AddChild(CombinedCategory);
-
-				// Texture asset
-				MetaType* TexMetaType = GetMetaType<Texture2D>();
-				if (Default.BindingType == BindingType::CombinedTextureCubeSampler) TexMetaType = GetMetaType<TextureCube>();
-				else if (Default.BindingType == BindingType::CombinedTexture3DSampler) TexMetaType = GetMetaType<Texture3D>();
-
-				auto TexItem = MakeShared<PropertyAssetItem>(
+				auto TexItem = MakeTextureResourcePropertyItem(
 					this,
-					LOCALIZATION("Texture"),
-					TexMetaType,
-					&Default.TextureAsset
+					FText::FromString(Default.BindingName),
+					Default,
+					GetResourceOverrideType(Default.BindingType),
+					false
 				);
-				CombinedCategory->AddChild(TexItem);
-
-				// Filter mode
-				{
-					FString BindingName = Default.BindingName;
-					auto FilterItem = MakePropertyEnumItem<SamplerFilter>(
-						this, LOCALIZATION("FilterMode"), Default.Filter,
-						[this, BindingName](SamplerFilter NewFilter) {
-							for (auto& D : BindingResourceDefaults)
-							{
-								if (D.BindingName == BindingName)
-								{
-									D.Filter = NewFilter;
-									break;
-								}
-							}
-						}
-					);
-					CombinedCategory->AddChild(FilterItem);
-				}
-
-				// Address mode
-				{
-					FString BindingName = Default.BindingName;
-					auto AddrItem = MakePropertyEnumItem<SamplerAddressMode>(
-						this, LOCALIZATION("WrapMode"), Default.AddressMode,
-						[this, BindingName](SamplerAddressMode NewMode) {
-							for (auto& D : BindingResourceDefaults)
-							{
-								if (D.BindingName == BindingName)
-								{
-									D.AddressMode = NewMode;
-									break;
-								}
-							}
-						}
-					);
-					CombinedCategory->AddChild(AddrItem);
-				}
+				Parent->AddChild(TexItem);
+				AppendSamplerPropertyChildren(this, *TexItem, Default);
 				break;
 			}
 			default:
