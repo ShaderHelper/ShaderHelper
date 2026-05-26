@@ -33,10 +33,12 @@ namespace FW
 		case BindingType::CombinedTexture3DSampler:
 		case BindingType::StructuredBuffer:
 		case BindingType::RawBuffer:
+		case BindingType::TypedBuffer:
 			return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 		case BindingType::Sampler:			return D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
 		case BindingType::RWStructuredBuffer:
 		case BindingType::RWRawBuffer:
+		case BindingType::RWTypedBuffer:
 		case BindingType::RWTexture:
 		case BindingType::RWTexture3D:
 			return D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
@@ -81,6 +83,7 @@ namespace FW
 				else if (LayoutBindingEntry.Type == BindingType::Texture || LayoutBindingEntry.Type == BindingType::TextureCube || LayoutBindingEntry.Type == BindingType::Texture3D ||
 					LayoutBindingEntry.Type == BindingType::RWStructuredBuffer || LayoutBindingEntry.Type == BindingType::StructuredBuffer ||
 					LayoutBindingEntry.Type == BindingType::RWRawBuffer || LayoutBindingEntry.Type == BindingType::RawBuffer ||
+					LayoutBindingEntry.Type == BindingType::TypedBuffer || LayoutBindingEntry.Type == BindingType::RWTypedBuffer ||
 					LayoutBindingEntry.Type == BindingType::RWTexture || LayoutBindingEntry.Type == BindingType::RWTexture3D)
 				{
 					DescriptorTableRanges_CbvSrvUav.FindOrAdd(BindingVisibility).Add(MoveTemp(Range));
@@ -180,11 +183,11 @@ namespace FW
 			else if (BindingResource->GetType() == GpuResourceType::Buffer)
 			{
 				Dx12Buffer* Buffer = static_cast<Dx12Buffer*>(BindingResource);
-				if (EnumHasAnyFlags(Buffer->GetUsage(), GpuBufferUsage::RWStructured | GpuBufferUsage::RWRaw))
+				if (EnumHasAnyFlags(Buffer->GetUsage(), GpuBufferUsage::RWStructured | GpuBufferUsage::RWRaw | GpuBufferUsage::RWTyped))
 				{
 					SrcDescriptorRange_CbvSrvUav.FindOrAdd(BindingVisibility).Add(Buffer->UAV->GetHandle());
 				}
-				else if (EnumHasAnyFlags(Buffer->GetUsage(), GpuBufferUsage::Structured | GpuBufferUsage::Raw))
+				else if (EnumHasAnyFlags(Buffer->GetUsage(), GpuBufferUsage::Structured | GpuBufferUsage::Raw | GpuBufferUsage::Typed))
 				{
 					SrcDescriptorRange_CbvSrvUav.FindOrAdd(BindingVisibility).Add(Buffer->SRV->GetHandle());
 				}

@@ -53,11 +53,11 @@ namespace FW
 	GpuResourceState GetBufferState(GpuBufferUsage Usage)
 	{
 		GpuResourceState Result = GpuResourceState::Unknown;
-		if (EnumHasAnyFlags(Usage, GpuBufferUsage::RWStructured | GpuBufferUsage::RWRaw))
+		if (EnumHasAnyFlags(Usage, GpuBufferUsage::RWStructured | GpuBufferUsage::RWRaw | GpuBufferUsage::RWTyped))
 		{
 			Result |= GpuResourceState::UnorderedAccess;
 		}
-		if (EnumHasAnyFlags(Usage, GpuBufferUsage::Structured | GpuBufferUsage::Raw))
+		if (EnumHasAnyFlags(Usage, GpuBufferUsage::Structured | GpuBufferUsage::Raw | GpuBufferUsage::Typed))
 		{
 			Result |= GpuResourceState::ShaderResourceRead;
 		}

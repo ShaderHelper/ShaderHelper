@@ -32,6 +32,8 @@ namespace FW
 		RWStructuredBuffer,
 		RawBuffer,
 		RWRawBuffer,
+		TypedBuffer,
+		RWTypedBuffer,
 		RWTexture,
 		RWTexture3D,
 	};
@@ -222,11 +224,13 @@ namespace FW
 		case BindingType::Texture3D:
 		case BindingType::StructuredBuffer:
 		case BindingType::RawBuffer:
+		case BindingType::TypedBuffer:
 			return BindingShift_Texture;
 		case BindingType::Sampler:
 			return BindingShift_Sampler;
 		case BindingType::RWStructuredBuffer:
 		case BindingType::RWRawBuffer:
+		case BindingType::RWTypedBuffer:
 		case BindingType::RWTexture:
 		case BindingType::RWTexture3D:
 			return BindingShift_UAV;

@@ -270,8 +270,13 @@ namespace SH
 		}
 	}
 
-	GpuVertexLayoutDesc BuildMaterialMeshVertexLayout(const Material& InMaterial)
+	TOptional<GpuVertexLayoutDesc> BuildMaterialMeshVertexLayout(const Material& InMaterial)
 	{
+		if (InMaterial.VertexInputDefaults.IsEmpty())
+		{
+			return {};
+		}
+
 		GpuVertexLayoutDesc VertexLayoutDesc;
 		VertexLayoutDesc.ByteStride = sizeof(MeshVertex);
 		for (const auto& InputDefault : InMaterial.VertexInputDefaults)
@@ -479,8 +484,10 @@ namespace SH
 				case BindingType::RWStructuredBuffer:
 				case BindingType::RawBuffer:
 				case BindingType::RWRawBuffer:
+				case BindingType::TypedBuffer:
+				case BindingType::RWTypedBuffer:
 				{
-					ResolveDefaultBuffer(ResourceDefault->BufferByteSize, Binding.StructuredStride, Binding.Type, ResourceDefault->Buffer);
+					ResolveDefaultBuffer(ResourceDefault->BufferByteSize, Binding.StructuredStride, ResourceDefault->BufferFormat, Binding.Type, ResourceDefault->Buffer);
 					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, ResourceDefault->Buffer, Binding.Stage);
 					break;
 				}
@@ -791,12 +798,18 @@ VsOutput MainVS(float3 Position : POSITION0) {
 			});
 		}
 
+		TArray<GpuVertexLayoutDesc> VertexLayouts;
+		if (TOptional<GpuVertexLayoutDesc> VertexLayout = BuildMaterialMeshVertexLayout(InMaterial))
+		{
+			VertexLayouts.Add(MoveTemp(*VertexLayout));
+		}
+
 		OutResult.Desc = GpuRenderPipelineStateDesc{
 			.Vs = Vs,
 			.Ps = Ps,
 			.Targets = Targets,
 			.BindGroupLayouts = Options.BindGroupLayouts,
-			.VertexLayout = { BuildMaterialMeshVertexLayout(InMaterial) },
+			.VertexLayout = MoveTemp(VertexLayouts),
 			.RasterizerState = { .FillMode = InMaterial.FillMode, .CullMode = InMaterial.CullMode },
 			.Primitive = InMaterial.Primitive,
 			.SampleCount = Options.SampleCount,

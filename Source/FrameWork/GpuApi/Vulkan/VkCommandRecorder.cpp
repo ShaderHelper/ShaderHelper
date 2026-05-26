@@ -28,6 +28,7 @@ namespace FW::VK
 		{
 			CurrentRenderPipelineState = InPipelineState;
 			IsRenderPipelineDirty = true;
+			IsVertexBufferDirty = true;
 		}
 	}
 
@@ -140,11 +141,7 @@ namespace FW::VK
 			for (int32 BufferSlot = 0; BufferSlot < CurrentRenderPipelineState->GetDesc().VertexLayout.Num(); ++BufferSlot)
 			{
 				const VertexBufferBinding& Binding = CurrentVertexBuffers[BufferSlot];
-				if (!Binding.Buffer)
-				{
-					continue;
-				}
-				VkBuffer VkBuffers[] = { static_cast<VulkanBuffer*>(Binding.Buffer)->GetBuffer() };
+				VkBuffer VkBuffers[] = { Binding.Buffer ? static_cast<VulkanBuffer*>(Binding.Buffer)->GetBuffer() : VK_NULL_HANDLE };
 				VkDeviceSize Offsets[] = { Binding.Offset };
 				vkCmdBindVertexBuffers(CmdBuffer, BufferSlot, 1, VkBuffers, Offsets);
 			}

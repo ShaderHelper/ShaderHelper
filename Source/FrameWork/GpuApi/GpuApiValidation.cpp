@@ -198,6 +198,19 @@ namespace FW
 				return false;
 			}
 		}
+		else if (EnumHasAnyFlags(InBufferDesc.Usage, GpuBufferUsage::Typed | GpuBufferUsage::RWTyped))
+		{
+			if (InBufferDesc.TypedInit.Format == GpuFormat::NUM || IsDepthFormat(InBufferDesc.TypedInit.Format))
+			{
+				SH_LOG(LogRhiValidation, Error, TEXT("CreateBuffer Error(Invalid Format for typed buffer) for GpuBufferUsage(%s)"), ANSI_TO_TCHAR(magic_enum::enum_name(InBufferDesc.Usage).data()));
+				return false;
+			}
+			if (InBufferDesc.ByteSize < GetFormatByteSize(InBufferDesc.TypedInit.Format))
+			{
+				SH_LOG(LogRhiValidation, Error, TEXT("CreateBuffer Error(ByteSize(%d) must be >= format byte size(%d) for typed buffer)"), InBufferDesc.ByteSize, GetFormatByteSize(InBufferDesc.TypedInit.Format));
+				return false;
+			}
+		}
 		return ValidateGpuResourceState(InitState);
 	}
 

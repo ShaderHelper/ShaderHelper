@@ -2,6 +2,7 @@
 #include "VkBuffer.h"
 #include "VkGpuRhiBackend.h"
 #include "VkUtil.h"
+#include "VkMap.h"
 
 namespace FW::VK
 {
@@ -26,6 +27,22 @@ namespace FW::VK
 		if (EnumHasAnyFlags(InBufferDesc.Usage, GpuBufferUsage::RWStructured | GpuBufferUsage::Structured | GpuBufferUsage::Raw | GpuBufferUsage::RWRaw))
 		{
 			BufferInfo.usage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+			if (bHasInitialData)
+			{
+				BufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+			}
+		}
+		if (EnumHasAnyFlags(InBufferDesc.Usage, GpuBufferUsage::Typed))
+		{
+			BufferInfo.usage |= VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+			if (bHasInitialData)
+			{
+				BufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+			}
+		}
+		if (EnumHasAnyFlags(InBufferDesc.Usage, GpuBufferUsage::RWTyped))
+		{
+			BufferInfo.usage |= VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 			if (bHasInitialData)
 			{
 				BufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -68,6 +85,20 @@ namespace FW::VK
 		VkCheck(vmaCreateBuffer(GAllocator, &BufferInfo, &AllocInfo, &Buffer, &Allocation, nullptr));
 
 		TRefCountPtr<VulkanBuffer> RetBuffer = new VulkanBuffer(InBufferDesc, InResourceState, Buffer, Allocation);
+
+		if (EnumHasAnyFlags(InBufferDesc.Usage, GpuBufferUsage::Typed | GpuBufferUsage::RWTyped))
+		{
+			VkBufferViewCreateInfo ViewInfo{
+				.sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO,
+				.buffer = Buffer,
+				.format = MapTextureFormat(InBufferDesc.TypedInit.Format),
+				.offset = 0,
+				.range = InBufferDesc.ByteSize,
+			};
+			VkBufferView BufferView = VK_NULL_HANDLE;
+			VkCheck(vkCreateBufferView(GDevice, &ViewInfo, nullptr, &BufferView));
+			RetBuffer->SetView(BufferView);
+		}
 
 		if (bHasInitialData)
 		{

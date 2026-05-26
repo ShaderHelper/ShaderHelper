@@ -766,13 +766,16 @@ namespace SH
 			case BindingType::RWStructuredBuffer:
 			case BindingType::RawBuffer:
 			case BindingType::RWRawBuffer:
+			case BindingType::TypedBuffer:
+			case BindingType::RWTypedBuffer:
 			{
 				auto Item = MakeBufferPropertyItem(
 					this,
 					FText::FromString(Default.BindingName),
 					Default.BindingType,
 					Default.StructuredStride,
-					Default.BufferByteSize
+					Default.BufferByteSize,
+					Default.BufferFormat
 				);
 				Parent->AddChild(Item);
 				break;

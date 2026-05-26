@@ -90,8 +90,10 @@ namespace FW
 		RWRaw = 1u << 7,
 		Vertex = 1u << 8,
 		Index = 1u << 9,
+		Typed = 1u << 10,
+		RWTyped = 1u << 11,
 
-		StaticMask = RWStructured | Structured | Raw | RWRaw | Vertex | Index, //Only Gpu r/w
+		StaticMask = RWStructured | Structured | Raw | RWRaw | Vertex | Index | Typed | RWTyped, //Only Gpu r/w
 		DynamicMask = Upload | ReadBack | Uniform, //Cpu can r/w
 	};
 	ENUM_CLASS_FLAGS(GpuBufferUsage);

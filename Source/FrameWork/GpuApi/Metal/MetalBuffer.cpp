@@ -2,6 +2,7 @@
 #include "MetalBuffer.h"
 #include "MetalDevice.h"
 #include "MetalGpuRhiBackend.h"
+#include "MetalMap.h"
 
 namespace FW
 {
@@ -10,6 +11,28 @@ namespace FW
     , Buffer(MoveTemp(InBuffer))
     {
         GMtlDeferredReleaseManager.AddResource(this);
+    }
+
+    static MTLTexturePtr CreateMetalTypedBufferView(MTL::Buffer* InBuffer, const GpuBufferDesc& InBufferDesc)
+    {
+        MTL::PixelFormat Format = MapTextureFormat(InBufferDesc.TypedInit.Format);
+        NS::UInteger FormatSize = GetFormatByteSize(InBufferDesc.TypedInit.Format);
+        NS::UInteger NumElements = InBufferDesc.ByteSize / FormatSize;
+
+        MTLTextureDescriptorPtr Desc = NS::TransferPtr(MTL::TextureDescriptor::alloc()->init());
+        Desc->setTextureType(MTL::TextureTypeTextureBuffer);
+        Desc->setPixelFormat(Format);
+        Desc->setWidth(NumElements);
+        Desc->setHeight(1);
+        Desc->setStorageMode(InBuffer->storageMode());
+        MTL::TextureUsage TexUsage = MTL::TextureUsageShaderRead;
+        if (EnumHasAnyFlags(InBufferDesc.Usage, GpuBufferUsage::RWTyped))
+        {
+            TexUsage |= MTL::TextureUsageShaderWrite;
+        }
+        Desc->setUsage(TexUsage);
+
+        return NS::TransferPtr(InBuffer->newTexture(Desc.get(), 0, InBufferDesc.ByteSize));
     }
 
     TRefCountPtr<MetalBuffer> CreateMetalBuffer(const GpuBufferDesc& InBufferDesc, GpuResourceState InResourceState)
@@ -36,7 +59,7 @@ namespace FW
 			{
 				Buffer = new MetalBuffer(NS::TransferPtr(GDevice->newBuffer(InBufferDesc.ByteSize, MTL::ResourceStorageModePrivate)), InBufferDesc, InResourceState);
 			}
-            
+
         }
         else
         {
@@ -48,7 +71,12 @@ namespace FW
 			{
 				Buffer = new MetalBuffer(NS::TransferPtr(GDevice->newBuffer(InBufferDesc.ByteSize, MTL::ResourceStorageModeShared)), InBufferDesc, InResourceState);
 			}
-            
+
+        }
+
+        if (EnumHasAnyFlags(InBufferDesc.Usage, GpuBufferUsage::Typed | GpuBufferUsage::RWTyped))
+        {
+            Buffer->SetTypedView(CreateMetalTypedBufferView(Buffer->GetResource(), InBufferDesc));
         }
         return Buffer;
     }

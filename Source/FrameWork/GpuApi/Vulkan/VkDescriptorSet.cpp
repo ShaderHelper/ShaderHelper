@@ -43,6 +43,10 @@ namespace FW::VK
 		case BindingType::RawBuffer:
 		case BindingType::RWRawBuffer:
 			return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		case BindingType::TypedBuffer:
+			return VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+		case BindingType::RWTypedBuffer:
+			return VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
 		case BindingType::RWTexture:
 		case BindingType::RWTexture3D:
 			return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
@@ -135,8 +139,12 @@ namespace FW::VK
 			VkDescriptorPoolSize PoolSizes[] = {
 						{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 256 },
 						{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 256 },
-						{ VK_DESCRIPTOR_TYPE_SAMPLER, 256 },					{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 256 },						{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 256 },
+						{ VK_DESCRIPTOR_TYPE_SAMPLER, 256 },
+						{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 256 },
+						{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 256 },
 						{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 256 },
+						{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 256 },
+						{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 256 },
 			};
 			VkDescriptorPoolCreateInfo PoolInfo{
 				.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
@@ -166,10 +174,14 @@ namespace FW::VK
 		TArray<VkDescriptorBufferInfo> BufferInfos;
 		TArray<VkDescriptorImageInfo> ImageInfos;
 
+		BufferInfos.Reserve(Desc.Resources.Num());
+		ImageInfos.Reserve(Desc.Resources.Num());
+
 		for (const auto& [Slot, ResourceBindingEntry] : Desc.Resources)
 		{
 			GpuResource* Resource = ResourceBindingEntry.Resource;
-			VkDescriptorType DescType = MapBindingType(LayoutDesc.GetBindingType(Slot));
+			BindingType SlotBindingType = LayoutDesc.GetBindingType(Slot);
+			VkDescriptorType DescType = MapBindingType(SlotBindingType);
 
 			VkWriteDescriptorSet Write{
 				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -183,17 +195,23 @@ namespace FW::VK
 			if (Resource->GetType() == GpuResourceType::Buffer)
 			{
 				VulkanBuffer* Buffer = static_cast<VulkanBuffer*>(Resource);
-				BufferInfos.Add({
-					.buffer = Buffer->GetBuffer(),
-					.offset = 0,
-					.range = VK_WHOLE_SIZE
-				});
-				Write.pBufferInfo = &BufferInfos.Last();
+				if (SlotBindingType == BindingType::TypedBuffer || SlotBindingType == BindingType::RWTypedBuffer)
+				{
+					Write.pTexelBufferView = &Buffer->GetView();
+				}
+				else
+				{
+					BufferInfos.Add({
+						.buffer = Buffer->GetBuffer(),
+						.offset = 0,
+						.range = VK_WHOLE_SIZE
+					});
+					Write.pBufferInfo = &BufferInfos.Last();
+				}
 			}
 			else if (Resource->GetType() == GpuResourceType::Texture)
 			{
 				VulkanTexture* Texture = static_cast<VulkanTexture*>(Resource);
-				BindingType SlotBindingType = LayoutDesc.GetBindingType(Slot);
 				VkImageLayout ImageLayout = (SlotBindingType == BindingType::Texture || SlotBindingType == BindingType::TextureCube || SlotBindingType == BindingType::Texture3D
 					|| SlotBindingType == BindingType::CombinedTextureSampler || SlotBindingType == BindingType::CombinedTextureCubeSampler || SlotBindingType == BindingType::CombinedTexture3DSampler)
 					? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
@@ -207,7 +225,6 @@ namespace FW::VK
 			else if (Resource->GetType() == GpuResourceType::TextureView)
 			{
 				VulkanTextureView* View = static_cast<VulkanTextureView*>(Resource);
-				BindingType SlotBindingType = LayoutDesc.GetBindingType(Slot);
 				VkImageLayout ImageLayout = (SlotBindingType == BindingType::Texture || SlotBindingType == BindingType::TextureCube || SlotBindingType == BindingType::Texture3D
 					|| SlotBindingType == BindingType::CombinedTextureSampler || SlotBindingType == BindingType::CombinedTextureCubeSampler || SlotBindingType == BindingType::CombinedTexture3DSampler)
 					? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL

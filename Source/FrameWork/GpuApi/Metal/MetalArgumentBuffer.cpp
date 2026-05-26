@@ -44,7 +44,9 @@ namespace FW
                 RenderStages.Add(Slot, MapShaderVisibility(LayoutBindingEntry.Stage));
             }
 
-            if (LayoutBindingEntry.Type == BindingType::RWStructuredBuffer || LayoutBindingEntry.Type == BindingType::RWRawBuffer)
+            if (LayoutBindingEntry.Type == BindingType::RWStructuredBuffer
+                || LayoutBindingEntry.Type == BindingType::RWRawBuffer
+                || LayoutBindingEntry.Type == BindingType::RWTypedBuffer)
             {
                 ResourceUsages.Add(Slot, MTLResourceUsageRead | MTLResourceUsageWrite);
             }
@@ -59,7 +61,7 @@ namespace FW
         : GpuBindGroup(InDesc)
     {
         GMtlDeferredReleaseManager.AddResource(this);
-        
+
         MetalBindGroupLayout* BindGroupLayout = static_cast<MetalBindGroupLayout*>(InDesc.Layout.GetReference());
         auto Layouts = BindGroupLayout->GetDesc().Layouts;
 
@@ -68,7 +70,15 @@ namespace FW
             if (ResourceBindingEntry.Resource->GetType() == GpuResourceType::Buffer)
             {
                 MetalBuffer* Buffer = static_cast<MetalBuffer*>(ResourceBindingEntry.Resource.GetReference());
-                BindGroupResources.Add(Slot, Buffer->GetResource());
+                BindingType SlotType = Layouts[Slot].Type;
+                if (SlotType == BindingType::TypedBuffer || SlotType == BindingType::RWTypedBuffer)
+                {
+                    BindGroupResources.Add(Slot, Buffer->GetTypedView());
+                }
+                else
+                {
+                    BindGroupResources.Add(Slot, Buffer->GetResource());
+                }
             }
             else if (ResourceBindingEntry.Resource->GetType() == GpuResourceType::Texture)
             {
@@ -131,7 +141,15 @@ namespace FW
             if (ResourceBindingEntry.Resource->GetType() == GpuResourceType::Buffer)
             {
                 MetalBuffer* Buffer = static_cast<MetalBuffer*>(ResourceBindingEntry.Resource.GetReference());
-                ArgEncoder->setBuffer(Buffer->GetResource(), 0, ArgIdx);
+                BindingType SlotType = LayoutDescs[Slot].Type;
+                if (SlotType == BindingType::TypedBuffer || SlotType == BindingType::RWTypedBuffer)
+                {
+                    ArgEncoder->setTexture(Buffer->GetTypedView(), ArgIdx);
+                }
+                else
+                {
+                    ArgEncoder->setBuffer(Buffer->GetResource(), 0, ArgIdx);
+                }
             }
             else if (ResourceBindingEntry.Resource->GetType() == GpuResourceType::Texture)
             {

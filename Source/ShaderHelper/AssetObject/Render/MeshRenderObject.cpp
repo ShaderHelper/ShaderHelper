@@ -279,7 +279,6 @@ namespace SH
 						MenuBuilder.AddMenuEntry(FText::FromString(Label), FText::GetEmpty(), FSlateIcon(),
 							FUIAction(FExecuteAction::CreateLambda([this, MemberDefault] {
 								AddOverride(MemberDefault.BindingName, MemberDefault.MemberName, MemberDefault.Type, MemberDefault.Stage, false);
-								static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
 							}))
 						);
 					}
@@ -304,8 +303,6 @@ namespace SH
 						MenuBuilder.AddMenuEntry(FText::FromString(ResourceDefault.BindingName), FText::GetEmpty(), FSlateIcon(),
 							FUIAction(FExecuteAction::CreateLambda([this, ResourceDefault, TypeStr] {
 								AddOverride(ResourceDefault.BindingName, TEXT(""), TypeStr, ResourceDefault.Stage, true);
-								static_cast<MeshPassNode*>(GetOuter())->RefreshNodeWidget();
-								static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
 							}))
 						);
 					}
@@ -430,6 +427,9 @@ namespace SH
 			InvalidateRenderResources();
 		}
 		if (auto* OuterMost = GetOuterMost()) OuterMost->MarkDirty();
+
+		static_cast<MeshPassNode*>(GetOuter())->RefreshNodeWidget();
+		static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
 	}
 
 	void MeshRenderObject::RemoveOverride(int32 SlotIndex)
@@ -825,12 +825,18 @@ namespace SH
 		TArray<GpuBindGroup*> MaskBGArray;
 		for (const auto& [_, BG] : BindGroups) MaskBGArray.Add(BG.GetReference());
 
+		TArray<GpuVertexLayoutDesc> MaskVertexLayouts;
+		if (TOptional<GpuVertexLayoutDesc> VertexLayout = BuildMaterialMeshVertexLayout(*MaterialAsset))
+		{
+			MaskVertexLayouts.Add(MoveTemp(*VertexLayout));
+		}
+
 		GpuRenderPipelineStateDesc MaskPipelineDesc{
 			.Vs = MaterialVs,
 			.Ps = MaskPs.GetReference(),
 			.Targets = {{ .TargetFormat = MaskTex->GetFormat() }},
 			.BindGroupLayouts = MaskLayoutArray,
-			.VertexLayout = { BuildMaterialMeshVertexLayout(*MaterialAsset) },
+			.VertexLayout = MoveTemp(MaskVertexLayouts),
 			.RasterizerState = { MaterialAsset->FillMode, MaterialAsset->CullMode },
 			.Primitive = MaterialAsset->Primitive,
 		};

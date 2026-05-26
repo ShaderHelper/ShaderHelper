@@ -170,22 +170,19 @@ namespace SH
 				});
 		};
 
-		RootBox->AddSlot().AutoHeight().Padding(4)
+		RootBox->AddSlot().AutoHeight().Padding(4, 4, 4, 2)
+		[
+			SNew(STextBlock).Text_Lambda([this] {
+				return FText::FromString(FString::Printf(TEXT("%s: (%u, %u, %u)  %s: (%u, %u, %u)"),
+					*LOCALIZATION("ThreadGroupCount").ToString(), ThreadGroupCount.x, ThreadGroupCount.y, ThreadGroupCount.z,
+					*LOCALIZATION("ThreadPerGroup").ToString(), ThreadGroupSize.x, ThreadGroupSize.y, ThreadGroupSize.z));
+			})
+		];
+
+		RootBox->AddSlot().AutoHeight().Padding(4, 2, 4, 4)
 		[
 			SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(2)
-			[
-				SNew(STextBlock).Text_Lambda([this] {
-					return FText::FromString(FString::Printf(TEXT("%s: (%u, %u, %u)  %s: (%u, %u, %u)"),
-						*LOCALIZATION("ThreadGroupCount").ToString(), ThreadGroupCount.x, ThreadGroupCount.y, ThreadGroupCount.z,
-						*LOCALIZATION("ThreadPerGroup").ToString(), ThreadGroupSize.x, ThreadGroupSize.y, ThreadGroupSize.z));
-				})
-			]
-			+ SHorizontalBox::Slot().FillWidth(1.0f)
-			[
-				SNullWidget::NullWidget
-			]
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(8, 2, 2, 2)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 			[
 				SNew(STextBlock).Text(LOCALIZATION("DebugThreadGroup"))
 			]
@@ -195,7 +192,7 @@ namespace SH
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(2)[ MakeAxisSpin(1) ]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(2)[ SNew(STextBlock).Text(FText::FromString(TEXT("Z"))) ]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(2)[ MakeAxisSpin(2) ]
-			];
+		];
 
 		constexpr float ThreadCellSize = 16.0f;
 		TSharedRef<SUniformGridPanel> Grid = SNew(SUniformGridPanel)

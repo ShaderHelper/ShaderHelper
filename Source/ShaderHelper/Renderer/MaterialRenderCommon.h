@@ -55,7 +55,7 @@ namespace SH
 		MaterialUniformOverrideBytesResolver UniformOverrideBytesResolver;
 	};
 
-	FW::GpuVertexLayoutDesc BuildMaterialMeshVertexLayout(const Material& InMaterial);
+	TOptional<FW::GpuVertexLayoutDesc> BuildMaterialMeshVertexLayout(const Material& InMaterial);
 	TUniquePtr<FW::UniformBuffer> BuildMaterialUniformBufferFromReflection(const TArray<FW::GpuShaderUbMemberInfo>& Members);
 	FString MakeMaterialUniformBufferKey(const FString& Name, FW::BindingShaderStage Stage);
 

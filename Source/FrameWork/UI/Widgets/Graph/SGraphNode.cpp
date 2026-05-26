@@ -111,6 +111,12 @@ namespace FW
 				[
 					SNew(STextBlock)
 						.Text(Pin->ObjectName)
+						.OverflowPolicy(ETextOverflowPolicy::Ellipsis)
+						.ToolTipText_Lambda([Pin] {
+							return FText::FromString(FString::Printf(TEXT("%s(%s)"),
+								*Pin->ObjectName.ToString(),
+								*GetRegisteredName(Pin->DynamicMetaType())));
+						})
 				];
 		};
 
@@ -124,7 +130,8 @@ namespace FW
 				]
 				+ SHorizontalBox::Slot()
 				.Padding(2.0f, 0.0f, 0.0f, 0.0f)
-				.AutoWidth()
+				.FillWidth(1.0f)
+				.VAlign(VAlign_Center)
 				[
 					MakePinDesc(Pin, HAlign_Left)
 				];
@@ -134,7 +141,8 @@ namespace FW
 			return SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot()
 				.Padding(0.0f, 0.0f, 2.0f, 0.0f)
-				.AutoWidth()
+				.FillWidth(1.0f)
+				.VAlign(VAlign_Center)
 				[
 					MakePinDesc(Pin, HAlign_Right)
 				]
@@ -164,29 +172,17 @@ namespace FW
 		for (int32 RowIndex = 0; RowIndex < RowCount; ++RowIndex)
 		{
 			TSharedRef<SHorizontalBox> RowContent = SNew(SHorizontalBox);
-			if (RowIndex < InputPins.Num())
-			{
-				RowContent->AddSlot()
-				.AutoWidth()
-				[
-					MakeInputPinContent(InputPins[RowIndex])
-				];
-			}
-
 			RowContent->AddSlot()
-			.FillWidth(1.0f)
+			.FillWidth(0.5f)
 			[
-				SNullWidget::NullWidget
+				RowIndex < InputPins.Num() ? MakeInputPinContent(InputPins[RowIndex]) : SNullWidget::NullWidget
 			];
 
-			if (RowIndex < OutputPins.Num())
-			{
-				RowContent->AddSlot()
-				.AutoWidth()
-				[
-					MakeOutputPinContent(OutputPins[RowIndex])
-				];
-			}
+			RowContent->AddSlot()
+			.FillWidth(0.5f)
+			[
+				RowIndex < OutputPins.Num() ? MakeOutputPinContent(OutputPins[RowIndex]) : SNullWidget::NullWidget
+			];
 
 			PinContainer->AddSlot()
 			.AutoHeight()

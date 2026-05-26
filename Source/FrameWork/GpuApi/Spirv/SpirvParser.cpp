@@ -18,8 +18,10 @@ namespace FW
 			SpvImageType* ImageType = static_cast<SpvImageType*>(Type);
 			if (ImageType->Sampled == 2)
 			{
+				if (ImageType->Dim == SpvDim::Buffer) return BindingType::RWTypedBuffer;
 				return ImageType->Dim == SpvDim::_3D ? BindingType::RWTexture3D : BindingType::RWTexture;
 			}
+			if (ImageType->Dim == SpvDim::Buffer) return BindingType::TypedBuffer;
 			return ImageType->Dim == SpvDim::Cube ? BindingType::TextureCube :
 				ImageType->Dim == SpvDim::_3D ? BindingType::Texture3D : BindingType::Texture;
 		}

@@ -38,6 +38,18 @@ namespace SH
 		AUX::Unreachable();
 	}
 
+	static GpuFormat ToGpuFormat(TypedBufferFormat Format)
+	{
+		switch (Format)
+		{
+		case TypedBufferFormat::R32_FLOAT:             return GpuFormat::R32_FLOAT;
+		case TypedBufferFormat::R32_UINT:              return GpuFormat::R32_UINT;
+		case TypedBufferFormat::R16G16B16A16_UINT:     return GpuFormat::R16G16B16A16_UINT;
+		case TypedBufferFormat::R32G32B32A32_UINT:     return GpuFormat::R32G32B32A32_UINT;
+		}
+		AUX::Unreachable();
+	}
+
 	FArchive& operator<<(FArchive& Ar, ShaderOverrideKey& Key)
 	{
 		Ar << Key.BindingName << Key.MemberName << Key.Stage;
@@ -128,6 +140,8 @@ namespace SH
 		case BindingType::RWTexture3D:
 		case BindingType::StructuredBuffer:
 		case BindingType::RWStructuredBuffer:
+		case BindingType::TypedBuffer:
+		case BindingType::RWTypedBuffer:
 		case BindingType::RawBuffer:
 		case BindingType::RWRawBuffer:
 			return true;
@@ -152,13 +166,16 @@ namespace SH
 	bool IsBufferBinding(BindingType BindingTypeValue)
 	{
 		return IsStructuredBufferBinding(BindingTypeValue)
+			|| IsTypedBufferBinding(BindingTypeValue)
 			|| BindingTypeValue == BindingType::RawBuffer
 			|| BindingTypeValue == BindingType::RWRawBuffer;
 	}
 
 	bool IsRWBufferBinding(BindingType BindingTypeValue)
 	{
-		return BindingTypeValue == BindingType::RWStructuredBuffer || BindingTypeValue == BindingType::RWRawBuffer;
+		return BindingTypeValue == BindingType::RWStructuredBuffer
+			|| BindingTypeValue == BindingType::RWRawBuffer
+			|| BindingTypeValue == BindingType::RWTypedBuffer;
 	}
 
 	bool IsStructuredBufferBinding(BindingType BindingTypeValue)
@@ -166,9 +183,14 @@ namespace SH
 		return BindingTypeValue == BindingType::StructuredBuffer || BindingTypeValue == BindingType::RWStructuredBuffer;
 	}
 
+	bool IsTypedBufferBinding(BindingType BindingTypeValue)
+	{
+		return BindingTypeValue == BindingType::TypedBuffer || BindingTypeValue == BindingType::RWTypedBuffer;
+	}
+
 	bool IsBufferType(const FString& Type)
 	{
-		return IsStructuredBufferType(Type) || Type == TEXT("RawBuffer") || Type == TEXT("RWRawBuffer");
+		return IsStructuredBufferType(Type) || IsTypedBufferType(Type) || Type == TEXT("RawBuffer") || Type == TEXT("RWRawBuffer");
 	}
 
 	bool IsStructuredBufferType(const FString& Type)
@@ -176,9 +198,14 @@ namespace SH
 		return Type == TEXT("StructuredBuffer") || Type == TEXT("RWStructuredBuffer");
 	}
 
+	bool IsTypedBufferType(const FString& Type)
+	{
+		return Type == TEXT("TypedBuffer") || Type == TEXT("RWTypedBuffer");
+	}
+
 	bool IsRWBufferType(const FString& Type)
 	{
-		return Type == TEXT("RWStructuredBuffer") || Type == TEXT("RWRawBuffer");
+		return Type == TEXT("RWStructuredBuffer") || Type == TEXT("RWRawBuffer") || Type == TEXT("RWTypedBuffer");
 	}
 
 	bool IsRWStructuredBufferType(const FString& Type)
@@ -186,9 +213,13 @@ namespace SH
 		return Type == TEXT("RWStructuredBuffer");
 	}
 
-	uint32 GetMinBufferByteSize(BindingType BindingTypeValue, uint32 StructuredStride)
+	uint32 GetMinBufferByteSize(BindingType BindingTypeValue, uint32 StructuredStride, TypedBufferFormat BufferFormat)
 	{
-		return IsStructuredBufferBinding(BindingTypeValue) ? FMath::Max(1u, StructuredStride) : 1u;
+		if (IsStructuredBufferBinding(BindingTypeValue))
+			return FMath::Max(1u, StructuredStride);
+		if (IsTypedBufferBinding(BindingTypeValue))
+			return FMath::Max(1u, GetFormatByteSize(ToGpuFormat(BufferFormat)));
+		return 1u;
 	}
 
 	void CopyShaderResourceBindingState(ShaderResourceBindingState& Dst, const ShaderResourceBindingState& Src)
@@ -225,6 +256,10 @@ namespace SH
 			return TEXT("RawBuffer");
 		case BindingType::RWRawBuffer:
 			return TEXT("RWRawBuffer");
+		case BindingType::TypedBuffer:
+			return TEXT("TypedBuffer");
+		case BindingType::RWTypedBuffer:
+			return TEXT("RWTypedBuffer");
 		case BindingType::Sampler:
 			return TEXT("Sampler");
 		default:
@@ -469,11 +504,11 @@ namespace SH
 		return GpuResourceHelper::GetSampler(Desc);
 	}
 
-	void ResolveDefaultBuffer(uint32& BufferByteSize, uint32 StructuredStride, BindingType BindingTypeValue, TRefCountPtr<GpuBuffer>& InOutBuffer)
+	void ResolveDefaultBuffer(uint32& BufferByteSize, uint32 StructuredStride, TypedBufferFormat BufferFormat, BindingType BindingTypeValue, TRefCountPtr<GpuBuffer>& InOutBuffer)
 	{
 		check(IsBufferBinding(BindingTypeValue));
 
-		BufferByteSize = FMath::Max(BufferByteSize, GetMinBufferByteSize(BindingTypeValue, StructuredStride));
+		BufferByteSize = FMath::Max(BufferByteSize, GetMinBufferByteSize(BindingTypeValue, StructuredStride, BufferFormat));
 
 		GpuBufferUsage Usage = GpuBufferUsage::Structured;
 		switch (BindingTypeValue)
@@ -490,13 +525,21 @@ namespace SH
 		case BindingType::RWRawBuffer:
 			Usage = GpuBufferUsage::RWRaw;
 			break;
+		case BindingType::TypedBuffer:
+			Usage = GpuBufferUsage::Typed;
+			break;
+		case BindingType::RWTypedBuffer:
+			Usage = GpuBufferUsage::RWTyped;
+			break;
 		default:
 			AUX::Unreachable();
 		}
+		const GpuFormat TypedFormat = ToGpuFormat(BufferFormat);
 		const bool bMatches = InOutBuffer.IsValid()
 			&& InOutBuffer->GetUsage() == Usage
 			&& InOutBuffer->GetByteSize() == BufferByteSize
-			&& (!IsStructuredBufferBinding(BindingTypeValue) || InOutBuffer->GetStructuredStride() == StructuredStride);
+			&& (!IsStructuredBufferBinding(BindingTypeValue) || InOutBuffer->GetStructuredStride() == StructuredStride)
+			&& (!IsTypedBufferBinding(BindingTypeValue) || InOutBuffer->GetTypedFormat() == TypedFormat);
 		if (!bMatches)
 		{
 			TArray<uint8> ZeroData;
@@ -509,6 +552,10 @@ namespace SH
 			if (IsStructuredBufferBinding(BindingTypeValue))
 			{
 				Desc.StructuredInit.Stride = StructuredStride;
+			}
+			else if (IsTypedBufferBinding(BindingTypeValue))
+			{
+				Desc.TypedInit.Format = TypedFormat;
 			}
 			InOutBuffer = GGpuRhi->CreateBuffer(Desc, GetBufferState(Usage));
 		}
@@ -811,31 +858,38 @@ namespace SH
 		return MakeTextureResourcePropertyItem(Owner, Label, Slot, Slot.Type, IsSamplerResourceBinding(Slot.BindingType));
 	}
 
-	static TSharedRef<PropertyItemBase> MakeBufferPropertyItemImpl(ShObject* Owner, FText Label, BindingType BindingTypeValue, uint32 StructuredStride, uint32& BufferByteSize)
+	static TSharedRef<PropertyItemBase> MakeBufferPropertyItemImpl(ShObject* Owner, FText Label, BindingType BindingTypeValue, uint32 StructuredStride, uint32& BufferByteSize, TypedBufferFormat& BufferFormat)
 	{
-		BufferByteSize = FMath::Max(BufferByteSize, GetMinBufferByteSize(BindingTypeValue, StructuredStride));
-		if (!IsRWBufferBinding(BindingTypeValue))
+		BufferByteSize = FMath::Max(BufferByteSize, GetMinBufferByteSize(BindingTypeValue, StructuredStride, BufferFormat));
+		auto Item = MakeShared<PropertyItemBase>(Owner, Label);
+
+		if (IsRWBufferBinding(BindingTypeValue))
 		{
-			return MakeShared<PropertyItemBase>(
-				Owner,
-				FText::FromString(FString::Printf(TEXT("%s"), *Label.ToString()))
-			);
+			auto ByteSizeItem = MakeShared<PropertyScalarItem<int32>>(Owner, LOCALIZATION("ByteSize"), reinterpret_cast<int32*>(&BufferByteSize));
+			ByteSizeItem->SetMinValue(GetMinBufferByteSize(BindingTypeValue, StructuredStride, BufferFormat));
+			Item->AddChild(ByteSizeItem);
 		}
 
-		auto Item = MakeShared<PropertyItemBase>(Owner, Label);
-		auto ByteSizeItem = MakeShared<PropertyScalarItem<int32>>(Owner, LOCALIZATION("ByteSize"), reinterpret_cast<int32*>(&BufferByteSize));
-		ByteSizeItem->SetMinValue(GetMinBufferByteSize(BindingTypeValue, StructuredStride));
-		Item->AddChild(ByteSizeItem);
+		if (IsTypedBufferBinding(BindingTypeValue))
+		{
+			TypedBufferFormat* FormatPtr = &BufferFormat;
+			auto FormatItem = MakePropertyEnumItem<TypedBufferFormat>(
+				Owner, LOCALIZATION("Format"), BufferFormat,
+				[FormatPtr](TypedBufferFormat NewValue) { *FormatPtr = NewValue; }
+			);
+			Item->AddChild(FormatItem);
+		}
+
 		return Item;
 	}
 
-	TSharedRef<PropertyItemBase> MakeBufferPropertyItem(ShObject* Owner, FText Label, BindingType BindingTypeValue, uint32 StructuredStride, uint32& BufferByteSize)
+	TSharedRef<PropertyItemBase> MakeBufferPropertyItem(ShObject* Owner, FText Label, BindingType BindingTypeValue, uint32 StructuredStride, uint32& BufferByteSize, TypedBufferFormat& BufferFormat)
 	{
-		return MakeBufferPropertyItemImpl(Owner, Label, BindingTypeValue, StructuredStride, BufferByteSize);
+		return MakeBufferPropertyItemImpl(Owner, Label, BindingTypeValue, StructuredStride, BufferByteSize, BufferFormat);
 	}
 
 	TSharedRef<PropertyItemBase> MakeBufferPropertyItem(ShObject* Owner, FText Label, ShaderOverrideSlot& Slot)
 	{
-		return MakeBufferPropertyItemImpl(Owner, Label, Slot.BindingType, Slot.StructuredStride, Slot.BufferByteSize);
+		return MakeBufferPropertyItemImpl(Owner, Label, Slot.BindingType, Slot.StructuredStride, Slot.BufferByteSize, Slot.BufferFormat);
 	}
 }

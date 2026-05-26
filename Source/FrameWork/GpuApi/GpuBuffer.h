@@ -16,6 +16,10 @@ namespace FW
 				//dx structured buffer have a stride limit of 2048 bytes.
 				uint32 Stride = 0;
 			} StructuredInit;
+			struct
+			{
+				GpuFormat Format;
+			} TypedInit;
 		};
 	};
 
@@ -31,6 +35,7 @@ namespace FW
 		GpuBufferUsage GetUsage() const { return Desc.Usage; }
 		uint32 GetByteSize() const { return Desc.ByteSize; }
 		uint32 GetStructuredStride() const { return Desc.StructuredInit.Stride; }
+		GpuFormat GetTypedFormat() const { return Desc.TypedInit.Format; }
 
 		GpuResourceState State;
 

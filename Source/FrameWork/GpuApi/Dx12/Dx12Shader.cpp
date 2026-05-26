@@ -73,9 +73,17 @@ namespace FW
 			{
 				BType = BindingType::Texture3D;
 			}
+			else if (BType == BindingType::Texture && BindDesc.Dimension == D3D_SRV_DIMENSION_BUFFER)
+			{
+				BType = BindingType::TypedBuffer;
+			}
 			else if (BType == BindingType::RWTexture && BindDesc.Dimension == D3D_SRV_DIMENSION_TEXTURE3D)
 			{
 				BType = BindingType::RWTexture3D;
+			}
+			else if (BType == BindingType::RWTexture && BindDesc.Dimension == D3D_SRV_DIMENSION_BUFFER)
+			{
+				BType = BindingType::RWTypedBuffer;
 			}
 
 			GpuShaderLayoutBinding Binding = {

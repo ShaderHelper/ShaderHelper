@@ -220,7 +220,7 @@ namespace SH
 		if (ShaderOverrideSlot* MatchingSlot = FindOverrideSlot(OverrideSlots, Key))
 		{
 			MatchingSlot->StructuredStride = Binding.StructuredStride;
-			ResolveDefaultBuffer(MatchingSlot->BufferByteSize, Binding.StructuredStride, Binding.Type, MatchingSlot->Buffer);
+			ResolveDefaultBuffer(MatchingSlot->BufferByteSize, Binding.StructuredStride, MatchingSlot->BufferFormat, Binding.Type, MatchingSlot->Buffer);
 			return MatchingSlot->Buffer;
 		}
 
@@ -395,6 +395,8 @@ namespace SH
 				case BindingType::RWStructuredBuffer:
 				case BindingType::RawBuffer:
 				case BindingType::RWRawBuffer:
+				case BindingType::TypedBuffer:
+				case BindingType::RWTypedBuffer:
 				{
 					if (GpuBuffer* Buffer = ResolveBindingBuffer(Binding))
 					{

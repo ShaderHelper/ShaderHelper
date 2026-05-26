@@ -36,6 +36,10 @@ namespace SH
 	enum class TypedBufferFormat
 	{
 		R32_FLOAT,
+		R32_UINT,
+		R8G8B8A8_UINT,
+		R16G16B16A16_UINT,
+		R32G32B32A32_UINT,
 	};
 
 	struct ShaderResourceBindingState
@@ -106,11 +110,13 @@ namespace SH
 	bool IsBufferBinding(FW::BindingType BindingTypeValue);
 	bool IsRWBufferBinding(FW::BindingType BindingTypeValue);
 	bool IsStructuredBufferBinding(FW::BindingType BindingTypeValue);
+	bool IsTypedBufferBinding(FW::BindingType BindingTypeValue);
 	bool IsBufferType(const FString& Type);
 	bool IsStructuredBufferType(const FString& Type);
+	bool IsTypedBufferType(const FString& Type);
 	bool IsRWBufferType(const FString& Type);
 	bool IsRWStructuredBufferType(const FString& Type);
-	uint32 GetMinBufferByteSize(FW::BindingType BindingTypeValue, uint32 StructuredStride);
+	uint32 GetMinBufferByteSize(FW::BindingType BindingTypeValue, uint32 StructuredStride, TypedBufferFormat BufferFormat = TypedBufferFormat::R32_FLOAT);
 
 	void CopyShaderResourceBindingState(ShaderResourceBindingState& Dst, const ShaderResourceBindingState& Src);
 	FString GetResourceOverrideType(FW::BindingType BindingTypeValue);
@@ -130,7 +136,7 @@ namespace SH
 
 	FW::GpuTexture* ResolveOverrideTexture(FW::BindingType BindingTypeValue, FW::GraphPin* InputPin, ShaderResourceBindingState* MatchingResource, FW::Vector2f ViewportSize = FW::Vector2f{0, 0});
 	FW::GpuSampler* ResolveResourceSampler(const ShaderResourceBindingState* ResourceState);
-	void ResolveDefaultBuffer(uint32& BufferByteSize, uint32 StructuredStride, FW::BindingType BindingTypeValue, TRefCountPtr<FW::GpuBuffer>& InOutBuffer);
+	void ResolveDefaultBuffer(uint32& BufferByteSize, uint32 StructuredStride, TypedBufferFormat BufferFormat, FW::BindingType BindingTypeValue, TRefCountPtr<FW::GpuBuffer>& InOutBuffer);
 
 	ShaderOverrideSlot* FindOverrideSlot(TArray<ShaderOverrideSlot>& Slots, const ShaderOverrideKey& Key);
 	const ShaderOverrideSlot* FindOverrideSlot(const TArray<ShaderOverrideSlot>& Slots, const ShaderOverrideKey& Key);
@@ -153,6 +159,6 @@ namespace SH
 	TSharedRef<FW::PropertyItemBase> MakeTextureResourcePropertyItem(FW::ShObject* Owner, FText Label, ShaderResourceBindingState& ResourceState, const FString& Type, bool bIncludeSamplerSettings);
 	TSharedRef<FW::PropertyItemBase> MakeOverrideSlotPropertyItem(FW::ShObject* Owner, const TArray<ShaderOverrideSlot>& Slots, ShaderOverrideSlot& Slot);
 	// Build a property item for StructuredBuffer/RWStructuredBuffer/RawBuffer/RWRawBuffer bindings.
-	TSharedRef<FW::PropertyItemBase> MakeBufferPropertyItem(FW::ShObject* Owner, FText Label, FW::BindingType BindingTypeValue, uint32 StructuredStride, uint32& BufferByteSize);
+	TSharedRef<FW::PropertyItemBase> MakeBufferPropertyItem(FW::ShObject* Owner, FText Label, FW::BindingType BindingTypeValue, uint32 StructuredStride, uint32& BufferByteSize, TypedBufferFormat& BufferFormat);
 	TSharedRef<FW::PropertyItemBase> MakeBufferPropertyItem(FW::ShObject* Owner, FText Label, ShaderOverrideSlot& Slot);
 }
