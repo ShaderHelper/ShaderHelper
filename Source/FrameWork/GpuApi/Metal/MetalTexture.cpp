@@ -100,9 +100,8 @@ namespace FW
         }
         else
         {
-            MTL::PixelFormat TexFormat = (MTL::PixelFormat)MapTextureFormat(InTexDesc.Format);
             const bool bIsMultisampled = InTexDesc.SampleCount > 1;
-            MTL::TextureDescriptor* TexDesc = MTL::TextureDescriptor::texture2DDescriptor(TexFormat, InTexDesc.Width, InTexDesc.Height, InTexDesc.NumMips > 1);
+            MTL::TextureDescriptor* TexDesc = MTL::TextureDescriptor::texture2DDescriptor((MTL::PixelFormat)MapTextureFormat(InTexDesc.Format), InTexDesc.Width, InTexDesc.Height, InTexDesc.NumMips > 1);
             TexDesc->setMipmapLevelCount(InTexDesc.NumMips);
             if (bIsMultisampled)
             {

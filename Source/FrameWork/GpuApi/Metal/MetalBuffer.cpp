@@ -15,13 +15,12 @@ namespace FW
 
     static MTLTexturePtr CreateMetalTypedBufferView(MTL::Buffer* InBuffer, const GpuBufferDesc& InBufferDesc)
     {
-        MTL::PixelFormat Format = MapTextureFormat(InBufferDesc.TypedInit.Format);
         NS::UInteger FormatSize = GetFormatByteSize(InBufferDesc.TypedInit.Format);
         NS::UInteger NumElements = InBufferDesc.ByteSize / FormatSize;
 
         MTLTextureDescriptorPtr Desc = NS::TransferPtr(MTL::TextureDescriptor::alloc()->init());
         Desc->setTextureType(MTL::TextureTypeTextureBuffer);
-        Desc->setPixelFormat(Format);
+        Desc->setPixelFormat((MTL::PixelFormat)MapTextureFormat(InBufferDesc.TypedInit.Format));
         Desc->setWidth(NumElements);
         Desc->setHeight(1);
         Desc->setStorageMode(InBuffer->storageMode());
