@@ -561,6 +561,84 @@ namespace SH
 		}
 	}
 
+	GpuTexture* EnsureRWOutputTexture(ShaderOverrideSlot& Slot, BindingType BindingTypeValue, GpuTexture* SrcTex, const FString& DebugName)
+	{
+		if (!SrcTex) return nullptr;
+		const uint32 Width = SrcTex->GetWidth();
+		const uint32 Height = SrcTex->GetHeight();
+		const uint32 Depth = SrcTex->GetDepth();
+		const GpuFormat Format = SrcTex->GetFormat();
+		const bool bIs3D = BindingTypeValue == BindingType::RWTexture3D;
+
+		GpuTexture* Existing = Slot.RWOutputTexture.GetReference();
+		if (Existing
+			&& Existing->GetWidth() == Width
+			&& Existing->GetHeight() == Height
+			&& Existing->GetFormat() == Format
+			&& (!bIs3D || Existing->GetDepth() == Depth))
+		{
+			return Existing;
+		}
+
+		GpuTextureDesc Desc{
+			.Width = Width,
+			.Height = Height,
+			.Format = Format,
+			.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::UnorderedAccess | GpuTextureUsage::RenderTarget,
+		};
+		if (bIs3D)
+		{
+			Desc.Depth = Depth;
+			Desc.Dimension = GpuTextureDimension::Tex3D;
+			// 3D textures can't be Blit destinations (no render pass support); drop RenderTarget usage.
+			Desc.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::UnorderedAccess;
+		}
+		Slot.RWOutputTexture = GGpuRhi->CreateTexture(Desc, GpuResourceState::UnorderedAccess);
+		if (!DebugName.IsEmpty())
+		{
+			GGpuRhi->SetResourceName(TCHAR_TO_ANSI(*DebugName), Slot.RWOutputTexture);
+		}
+		return Slot.RWOutputTexture.GetReference();
+	}
+
+	void PublishRWOutputsToPins(TArray<ShaderOverrideSlot>& Slots)
+	{
+		for (ShaderOverrideSlot& Slot : Slots)
+		{
+			if (!Slot.bIsResource || !IsRWResourceType(Slot.Type)) continue;
+			GraphPin* OutputPin = Slot.OutputPin.IsValid() ? Slot.OutputPin.Get() : nullptr;
+			if (!OutputPin) continue;
+
+			if (IsBufferType(Slot.Type))
+			{
+				auto* BytesPinValue = DynamicCast<BytesPin>(OutputPin);
+				if (!BytesPinValue) continue;
+				if (BytesPinValue->GetTargetPins().Num() == 0) continue;
+
+				GpuBuffer* Buffer = Slot.Buffer.GetReference();
+				const uint32 ByteSize = Buffer->GetByteSize();
+				const uint8* Mapped = (const uint8*)GGpuRhi->MapGpuBuffer(Buffer, GpuResourceMapMode::Read_Only);
+				TArray<uint8> Out;
+				Out.SetNumUninitialized(static_cast<int32>(ByteSize));
+				FMemory::Memcpy(Out.GetData(), Mapped, ByteSize);
+				GGpuRhi->UnMapGpuBuffer(Buffer);
+				BytesPinValue->SetBytes(MoveTemp(Out));
+				continue;
+			}
+
+			GpuTexture* OutTex = Slot.RWOutputTexture.GetReference();
+			if (!OutTex) continue;
+			if (auto* TexPin = DynamicCast<GpuTexturePin>(OutputPin))
+			{
+				TexPin->SetValue(OutTex);
+			}
+			else if (auto* Tex3DPin = DynamicCast<GpuTexture3DPin>(OutputPin))
+			{
+				Tex3DPin->SetValue(OutTex);
+			}
+		}
+	}
+
 	ShaderOverrideSlot* FindOverrideSlot(TArray<ShaderOverrideSlot>& Slots, const ShaderOverrideKey& Key)
 	{
 		return Slots.FindByPredicate([&Key](const ShaderOverrideSlot& Slot) {

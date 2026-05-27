@@ -202,7 +202,10 @@ namespace SH
 		BindGroupLayouts.Empty();
 		BindGroups.Empty();
 		UniformBuffers.Empty();
-		RWOutputTextures.Empty();
+		for (ShaderOverrideSlot& Slot : OverrideSlots)
+		{
+			Slot.RWOutputTexture.SafeRelease();
+		}
 	}
 
 	GpuTexture* ComputePassNode::ResolveBindingTexture(const GpuShaderLayoutBinding& Binding)
@@ -225,41 +228,6 @@ namespace SH
 		}
 
 		return nullptr;
-	}
-
-	GpuTexture* ComputePassNode::EnsureRWOutputTexture(const FString& BindingName, BindingType BindingTypeValue, GpuTexture* SrcTex)
-	{
-		const uint32 Width = SrcTex->GetWidth();
-		const uint32 Height = SrcTex->GetHeight();
-		const uint32 Depth = SrcTex->GetDepth();
-		const GpuFormat Format = SrcTex->GetFormat();
-		const bool bIs3D = BindingTypeValue == BindingType::RWTexture3D;
-
-		TRefCountPtr<GpuTexture>& Slot = RWOutputTextures.FindOrAdd(BindingName);
-		if (Slot.IsValid()
-			&& Slot->GetWidth() == Width
-			&& Slot->GetHeight() == Height
-			&& Slot->GetFormat() == Format
-			&& (!bIs3D || Slot->GetDepth() == Depth))
-		{
-			return Slot.GetReference();
-		}
-
-		GpuTextureDesc Desc{
-			.Width = Width,
-			.Height = Height,
-			.Format = Format,
-			.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::UnorderedAccess | GpuTextureUsage::RenderTarget,
-		};
-		if (bIs3D)
-		{
-			Desc.Depth = Depth;
-			Desc.Dimension = GpuTextureDimension::Tex3D;
-			Desc.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::UnorderedAccess;
-		}
-		Slot = GGpuRhi->CreateTexture(Desc, GpuResourceState::UnorderedAccess);
-		GGpuRhi->SetResourceName(TCHAR_TO_ANSI(*FString::Printf(TEXT("ComputePass_RWOut_%s"), *BindingName)), Slot);
-		return Slot.GetReference();
 	}
 
 	bool ComputePassNode::CanChangeProperty(PropertyData* InProperty)
@@ -415,8 +383,12 @@ namespace SH
 				case BindingType::RWTexture:
 				case BindingType::RWTexture3D:
 				{
+					const ShaderOverrideKey Key{ Binding.Name, TEXT(""), BindingShaderStage::Compute };
+					ShaderOverrideSlot* MatchingSlot = FindOverrideSlot(OverrideSlots, Key);
+
 					GpuTexture* SrcTex = ResolveBindingTexture(Binding);
-					GpuTexture* OutTex = EnsureRWOutputTexture(Binding.Name, Binding.Type, SrcTex);
+					GpuTexture* OutTex = EnsureRWOutputTexture(*MatchingSlot, Binding.Type, SrcTex, Binding.Name);
+
 					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, OutTex->GetDefaultView(), Binding.Stage);
 					break;
 				}
@@ -523,13 +495,11 @@ namespace SH
 			{
 				continue;
 			}
-			const TRefCountPtr<GpuTexture>* OutTexPtr = RWOutputTextures.Find(Binding.Name);
-			if (!OutTexPtr || !OutTexPtr->IsValid())
-			{
-				continue;
-			}
+			const ShaderOverrideKey Key{ Binding.Name, TEXT(""), BindingShaderStage::Compute };
+			ShaderOverrideSlot* MatchingSlot = FindOverrideSlot(OverrideSlots, Key);
+			GpuTexture* OutTex = MatchingSlot->RWOutputTexture.GetReference();
 			GpuTexture* SrcTex = ResolveBindingTexture(Binding);
-			if (!SrcTex || SrcTex == OutTexPtr->GetReference())
+			if (!SrcTex || SrcTex == OutTex)
 			{
 				continue;
 			}
@@ -537,7 +507,7 @@ namespace SH
 			BlitPassInput BlitInput;
 			BlitInput.InputView = SrcTex->GetDefaultView();
 			BlitInput.InputTexSampler = GpuResourceHelper::GetSampler({});
-			BlitInput.OutputView = OutTexPtr->GetReference()->GetDefaultView();
+			BlitInput.OutputView = OutTex->GetDefaultView();
 			BlitInput.LoadAction = RenderTargetLoadAction::DontCare;
 			AddBlitPass(*Ctx.RG, BlitInput);
 		}
@@ -582,9 +552,11 @@ namespace SH
 			TimestampWrites
 		).Write(GetPrintBuffer()->GetResource());
 
-		AddComputePassResourceAccesses(Pass, Cs, true);
+		AddComputePassResourceAccesses(Pass, Cs);
 
 		Ctx.RG->Execute();
+
+		PublishRWOutputsToPins(OverrideSlots);
 
 		const bool bAssertError = FlushPrintBufferLogs(ObjectName.ToString());
 		if (bAssertError)
@@ -640,7 +612,7 @@ namespace SH
 		return bAssertFailed;
 	}
 
-	void ComputePassNode::AddComputePassResourceAccesses(RGComputePass& Pass, GpuShader* Cs, bool bUpdateOutputPins)
+	void ComputePassNode::AddComputePassResourceAccesses(RGComputePass& Pass, GpuShader* Cs)
 	{
 		for (const GpuShaderLayoutBinding& Binding : Cs->GetLayout())
 		{
@@ -657,6 +629,7 @@ namespace SH
 			}
 			case BindingType::RWStructuredBuffer:
 			case BindingType::RWRawBuffer:
+			case BindingType::RWTypedBuffer:
 			{
 				if (GpuBuffer* Buffer = ResolveBindingBuffer(Binding))
 				{
@@ -680,32 +653,9 @@ namespace SH
 			case BindingType::RWTexture:
 			case BindingType::RWTexture3D:
 			{
-				const TRefCountPtr<GpuTexture>* OutTexPtr = RWOutputTextures.Find(Binding.Name);
-				GpuTexture* OutTex = (OutTexPtr && OutTexPtr->IsValid()) ? OutTexPtr->GetReference() : nullptr;
-				if (!OutTex)
-				{
-					break;
-				}
-
-				Pass.Write(OutTex);
-				if (!bUpdateOutputPins)
-				{
-					break;
-				}
-
-				const ShaderOverrideSlot* MatchingSlot = FindOverrideSlot(OverrideSlots, ShaderOverrideKey{ Binding.Name, TEXT(""), BindingShaderStage::Compute });
-				if (MatchingSlot)
-				{
-					GraphPin* OutputPin = MatchingSlot->OutputPin.IsValid() ? MatchingSlot->OutputPin.Get() : nullptr;
-					if (auto* TexPin = DynamicCast<GpuTexturePin>(OutputPin))
-					{
-						TexPin->SetValue(OutTex);
-					}
-					else if (auto* Tex3DPin = DynamicCast<GpuTexture3DPin>(OutputPin))
-					{
-						Tex3DPin->SetValue(OutTex);
-					}
-				}
+				const ShaderOverrideKey Key{ Binding.Name, TEXT(""), BindingShaderStage::Compute };
+				const ShaderOverrideSlot* MatchingSlot = FindOverrideSlot(OverrideSlots, Key);
+				Pass.Write(MatchingSlot->RWOutputTexture.GetReference());
 				break;
 			}
 			default:
@@ -858,7 +808,7 @@ namespace SH
 			}
 		).Write(AssertThreadBuffer.GetReference());
 
-		AddComputePassResourceAccesses(Pass, Cs, false);
+		AddComputePassResourceAccesses(Pass, Cs);
 
 		return TotalThreads;
 	}

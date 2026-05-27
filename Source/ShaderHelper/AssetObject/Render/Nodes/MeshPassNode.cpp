@@ -523,15 +523,10 @@ namespace SH
 			}
 		);
 
-		TSet<GpuTexture*> ConnectedOverrideTextures;
 		for (const ObjectPtr<MeshRenderObject>& MRO : MROs)
 		{
-			MRO->CollectConnectedOverrideTextures(ConnectedOverrideTextures);
 			RenderPass.Write(MRO->GetPrintBuffer()->GetResource());
-		}
-		for (GpuTexture* Texture : ConnectedOverrideTextures)
-		{
-			RenderPass.Read(Texture);
+			MRO->AddRenderPassResourceAccesses(RenderPass);
 		}
 		return RenderPass;
 	}
@@ -811,7 +806,7 @@ namespace SH
 
 		for (const auto& MRO : MeshRenderObjects)
 		{
-			MRO->PublishRWOutputsToPins();
+			PublishRWOutputsToPins(MRO->OverrideSlots);
 		}
 
 		if (bAssertError)

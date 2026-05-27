@@ -75,12 +75,11 @@ namespace SH
 		// override pin -> slot's TextureAsset -> default texture for that BindingType.
 		FW::GpuTexture* ResolveBindingTexture(const FW::GpuShaderLayoutBinding& Binding);
 
-		FW::GpuTexture* EnsureRWOutputTexture(const FString& BindingName, FW::BindingType BindingTypeValue, FW::GpuTexture* SrcTex);
 		FW::GpuBuffer* ResolveBindingBuffer(const FW::GpuShaderLayoutBinding& Binding);
 
 		FW::PrintBuffer* GetPrintBuffer();
 		bool FlushPrintBufferLogs(const FString& LogPrefix);
-		void AddComputePassResourceAccesses(FW::RGComputePass& Pass, FW::GpuShader* Cs, bool bUpdateOutputPins);
+		void AddComputePassResourceAccesses(FW::RGComputePass& Pass, FW::GpuShader* Cs);
 
 		uint32 AddAssertHighlightPass(FW::RenderGraph& RG, FW::GpuShader* Cs, const TArray<int32>& SortedGroupSlots, const TArray<FW::GpuBindGroupLayout*>& BaseLayoutPtrs);
 		bool BuildAssertHighlightCs();
@@ -94,8 +93,6 @@ namespace SH
 		TMap<int32, TRefCountPtr<FW::GpuBindGroupLayout>> BindGroupLayouts;
 		TMap<int32, TRefCountPtr<FW::GpuBindGroup>> BindGroups;
 		TMap<FString, TUniquePtr<FW::UniformBuffer>> UniformBuffers;
-		// Internally-owned output texture for each RW resource binding
-		TMap<FString, TRefCountPtr<FW::GpuTexture>> RWOutputTextures;
 		FW::Vector2f CurrentViewportSize{ 0, 0 };
 		TRefCountPtr<FW::GpuComputePipelineState> Pipeline;
 		FW::GpuComputePipelineStateDesc CachedPipelineDesc;

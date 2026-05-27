@@ -29,11 +29,6 @@ namespace SH
 {
 	namespace
 	{
-		FString MakeRWOutputKey(const FString& BindingName, BindingShaderStage Stage)
-		{
-			return FString::Printf(TEXT("%s|%u"), *BindingName, (uint32)Stage);
-		}
-
 		TArray<uint8> MakeBytesFromData(const void* Data, size_t Size)
 		{
 			TArray<uint8> Result;
@@ -227,7 +222,10 @@ namespace SH
 		BindGroupLayouts.Empty();
 		BindGroups.Empty();
 		UniformBuffers.Empty();
-		RWOutputTextures.Empty();
+		for (ShaderOverrideSlot& Slot : OverrideSlots)
+		{
+			Slot.RWOutputTexture.SafeRelease();
+		}
 		bDrawMaterialError = false;
 
 		AssertHighlightPs.SafeRelease();
@@ -486,53 +484,20 @@ namespace SH
 			// For RW resources, bind the internally-owned output texture;
 			if (Binding.Type == BindingType::RWTexture || Binding.Type == BindingType::RWTexture3D)
 			{
+				ShaderOverrideSlot* MatchingSlot = FindOverrideSlot(OverrideSlots, Key);
 				GpuTexture* SrcTex = ResolveOverrideTexture(Binding.Type, OverridePin, ResourceDefault, CurrentViewportSize);
-				return EnsureRWOutputTexture(MakeRWOutputKey(Binding.Name, Binding.Stage), Binding.Type, SrcTex);
+				if (!MatchingSlot) return SrcTex;
+				return EnsureRWOutputTexture(
+					*MatchingSlot,
+					Binding.Type,
+					SrcTex,
+					FString::Printf(TEXT("MRO_RWOut_%s"), *Binding.Name));
 			}
 
-			// nullptr signals to BuildMaterialBindGroups to fall back to ResourceDefault's texture asset
-			// rather than the default override texture.
-			if (!OverridePin) return nullptr;
 			return ResolveOverrideTexture(Binding.Type, OverridePin, ResourceDefault, CurrentViewportSize);
 		};
 
 		BuildMaterialBindGroups(*MaterialAsset, BindGroupLayouts, BindGroups, UniformBuffers, Options);
-	}
-
-	GpuTexture* MeshRenderObject::EnsureRWOutputTexture(const FString& Key, BindingType BindingTypeValue, GpuTexture* SrcTex)
-	{
-		const uint32 Width = SrcTex->GetWidth();
-		const uint32 Height = SrcTex->GetHeight();
-		const uint32 Depth = SrcTex->GetDepth();
-		const GpuFormat Format = SrcTex->GetFormat();
-		const bool bIs3D = BindingTypeValue == BindingType::RWTexture3D;
-
-		TRefCountPtr<GpuTexture>& Slot = RWOutputTextures.FindOrAdd(Key);
-		if (Slot.IsValid()
-			&& Slot->GetWidth() == Width
-			&& Slot->GetHeight() == Height
-			&& Slot->GetFormat() == Format
-			&& (!bIs3D || Slot->GetDepth() == Depth))
-		{
-			return Slot.GetReference();
-		}
-
-		GpuTextureDesc Desc{
-			.Width = Width,
-			.Height = Height,
-			.Format = Format,
-			.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::UnorderedAccess | GpuTextureUsage::RenderTarget,
-		};
-		if (bIs3D)
-		{
-			Desc.Depth = Depth;
-			Desc.Dimension = GpuTextureDimension::Tex3D;
-			// 3D textures can't be Blit destinations (no render pass support); drop RenderTarget usage.
-			Desc.Usage = GpuTextureUsage::ShaderResource | GpuTextureUsage::UnorderedAccess;
-		}
-		Slot = GGpuRhi->CreateTexture(Desc, GpuResourceState::UnorderedAccess);
-		GGpuRhi->SetResourceName(TCHAR_TO_ANSI(*FString::Printf(TEXT("MRO_RWOut_%s"), *Key)), Slot);
-		return Slot.GetReference();
 	}
 
 	void MeshRenderObject::AddRWInputBlitPasses(RenderGraph& RG)
@@ -548,14 +513,19 @@ namespace SH
 
 			const ShaderOverrideKey Key{ ResourceDefault.BindingName, TEXT(""), ResourceDefault.Stage };
 			ShaderOverrideSlot* Slot = FindOverrideSlot(OverrideSlots, Key);
+			if (!Slot) continue;
+
 			GraphPin* OverridePin = FindOverrideInputPin(OverrideSlots, Key);
-			ShaderResourceBindingState* ResourceState = Slot ? static_cast<ShaderResourceBindingState*>(Slot) : static_cast<ShaderResourceBindingState*>(&ResourceDefault);
+			ShaderResourceBindingState* ResourceState = static_cast<ShaderResourceBindingState*>(Slot);
 			GpuTexture* SrcTex = ResolveOverrideTexture(ResourceDefault.BindingType, OverridePin, ResourceState, CurrentViewportSize);
 
 			// Ensure cache is sized to the current input before the blit (the bind-group rebuild
 			// inside the draw closure will pick up the same texture, since size/format match).
-			const FString OutputKey = MakeRWOutputKey(Key.BindingName, Key.Stage);
-			GpuTexture* OutTex = EnsureRWOutputTexture(OutputKey, ResourceDefault.BindingType, SrcTex);
+			GpuTexture* OutTex = EnsureRWOutputTexture(
+				*Slot,
+				ResourceDefault.BindingType,
+				SrcTex,
+				FString::Printf(TEXT("MRO_RWOut_%s"), *Key.BindingName));
 			if (!OutTex || OutTex == SrcTex) continue;
 
 			BlitPassInput BlitInput;
@@ -567,48 +537,135 @@ namespace SH
 		}
 	}
 
-	void MeshRenderObject::PublishRWOutputsToPins()
+	GpuTexture* MeshRenderObject::ResolveBindingTexture(const GpuShaderLayoutBinding& Binding)
 	{
-		for (const ShaderOverrideSlot& Slot : OverrideSlots)
+		if (!MaterialAsset || bDrawMaterialError)
 		{
-			if (!Slot.bIsResource) continue;
-
-			const TRefCountPtr<GpuTexture>* OutTexPtr = RWOutputTextures.Find(MakeRWOutputKey(Slot.Key.BindingName, Slot.Key.Stage));
-			if (!OutTexPtr || !OutTexPtr->IsValid()) continue;
-			GpuTexture* OutTex = OutTexPtr->GetReference();
-
-			GraphPin* OutputPin = Slot.OutputPin.IsValid() ? Slot.OutputPin.Get() : nullptr;
-			if (auto* TexPin = DynamicCast<GpuTexturePin>(OutputPin))
-			{
-				TexPin->SetValue(OutTex);
-			}
-			else if (auto* Tex3DPin = DynamicCast<GpuTexture3DPin>(OutputPin))
-			{
-				Tex3DPin->SetValue(OutTex);
-			}
+			return nullptr;
 		}
+
+		const ShaderOverrideKey Key{ Binding.Name, TEXT(""), Binding.Stage };
+		GraphPin* OverridePin = FindOverrideInputPin(OverrideSlots, Key);
+		ShaderResourceBindingState* ResourceState = FindOverrideSlot(OverrideSlots, Key);
+		if (!ResourceState)
+		{
+			ResourceState = MaterialAsset->BindingResourceDefaults.FindByPredicate([&](const MaterialBindingResourceDefault& Default) {
+				return Default.BindingName == Binding.Name && Default.Stage == Binding.Stage;
+			});
+		}
+
+		return ResolveOverrideTexture(Binding.Type, OverridePin, ResourceState, CurrentViewportSize);
 	}
 
-	void MeshRenderObject::CollectConnectedOverrideTextures(TSet<GpuTexture*>& OutTextures) const
+	GpuBuffer* MeshRenderObject::ResolveBindingBuffer(const GpuShaderLayoutBinding& Binding)
+	{
+		if (!MaterialAsset || bDrawMaterialError)
+		{
+			return nullptr;
+		}
+
+		const ShaderOverrideKey Key{ Binding.Name, TEXT(""), Binding.Stage };
+		ShaderResourceBindingState* ResourceState = FindOverrideSlot(OverrideSlots, Key);
+		if (!ResourceState)
+		{
+			ResourceState = MaterialAsset->BindingResourceDefaults.FindByPredicate([&](const MaterialBindingResourceDefault& Default) {
+				return Default.BindingName == Binding.Name && Default.Stage == Binding.Stage;
+			});
+		}
+		if (!ResourceState)
+		{
+			return nullptr;
+		}
+
+		ResourceState->StructuredStride = Binding.StructuredStride;
+		ResolveDefaultBuffer(ResourceState->BufferByteSize, Binding.StructuredStride, ResourceState->BufferFormat, Binding.Type, ResourceState->Buffer);
+		return ResourceState->Buffer.GetReference();
+	}
+
+	void MeshRenderObject::AddRenderPassResourceAccesses(RGRenderPass& Pass)
 	{
 		if (!MaterialAsset || bDrawMaterialError)
 		{
 			return;
 		}
 
-		for (const ShaderOverrideSlot& Slot : OverrideSlots)
+		TArray<GpuShaderLayoutBinding> AllBindings;
+		if (MaterialAsset->VertexShaderAsset)
 		{
-			if (!Slot.bIsResource)
+			if (GpuShader* Vs = MaterialAsset->VertexShaderAsset->GetCompiledShader(ShaderType::Vertex))
 			{
-				continue;
+				AllBindings.Append(Vs->GetLayout());
 			}
-
-			if (GraphPin* OverridePin = FindOverrideInputPin(OverrideSlots, Slot.Key))
+		}
+		if (MaterialAsset->PixelShaderAsset)
+		{
+			if (GpuShader* Ps = MaterialAsset->PixelShaderAsset->GetCompiledShader(ShaderType::Pixel))
 			{
-				if (GpuTexture* Texture = GetConnectedOverrideTexture(OverridePin))
+				AllBindings.Append(Ps->GetLayout());
+			}
+		}
+
+		for (const GpuShaderLayoutBinding& Binding : AllBindings)
+		{
+			switch (Binding.Type)
+			{
+			case BindingType::StructuredBuffer:
+			case BindingType::RawBuffer:
+			case BindingType::TypedBuffer:
+			{
+				if (GpuBuffer* Buffer = ResolveBindingBuffer(Binding))
 				{
-					OutTextures.Add(Texture);
+					Pass.Read(Buffer);
 				}
+				break;
+			}
+			case BindingType::RWStructuredBuffer:
+			case BindingType::RWRawBuffer:
+			case BindingType::RWTypedBuffer:
+			{
+				if (GpuBuffer* Buffer = ResolveBindingBuffer(Binding))
+				{
+					Pass.Write(Buffer);
+				}
+				break;
+			}
+			case BindingType::Texture:
+			case BindingType::TextureCube:
+			case BindingType::Texture3D:
+			case BindingType::CombinedTextureSampler:
+			case BindingType::CombinedTextureCubeSampler:
+			case BindingType::CombinedTexture3DSampler:
+			{
+				if (GpuTexture* Tex = ResolveBindingTexture(Binding))
+				{
+					Pass.Read(Tex);
+				}
+				break;
+			}
+			case BindingType::RWTexture:
+			case BindingType::RWTexture3D:
+			{
+				const ShaderOverrideKey Key{ Binding.Name, TEXT(""), Binding.Stage };
+				if (ShaderOverrideSlot* MatchingSlot = FindOverrideSlot(OverrideSlots, Key))
+				{
+					GpuTexture* SrcTex = ResolveBindingTexture(Binding);
+					if (GpuTexture* OutTex = EnsureRWOutputTexture(
+						*MatchingSlot,
+						Binding.Type,
+						SrcTex,
+						FString::Printf(TEXT("MRO_RWOut_%s"), *Binding.Name)))
+					{
+						Pass.Write(OutTex);
+					}
+				}
+				else if (GpuTexture* Tex = ResolveBindingTexture(Binding))
+				{
+					Pass.Write(Tex);
+				}
+				break;
+			}
+			default:
+				break;
 			}
 		}
 	}
@@ -1235,11 +1292,6 @@ namespace SH
 			}
 		);
 
-		TSet<GpuTexture*> ConnectedOverrideTextures;
-		CollectConnectedOverrideTextures(ConnectedOverrideTextures);
-		for (GpuTexture* Texture : ConnectedOverrideTextures)
-		{
-			Pass.Read(Texture);
-		}
+		AddRenderPassResourceAccesses(Pass);
 	}
 }

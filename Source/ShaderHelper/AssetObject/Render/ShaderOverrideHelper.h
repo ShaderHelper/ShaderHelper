@@ -60,6 +60,9 @@ namespace SH
 		TRefCountPtr<FW::GpuBuffer> Buffer;
 		TypedBufferFormat BufferFormat = TypedBufferFormat::R32_FLOAT;
 
+		// Pass-internally-owned output texture for RW resource bindings.
+		TRefCountPtr<FW::GpuTexture> RWOutputTexture;
+
 		friend FArchive& operator<<(FArchive& Ar, ShaderResourceBindingState& State);
 	};
 
@@ -135,6 +138,12 @@ namespace SH
 	bool IsSamplerResourceProperty(const TArray<ShaderOverrideSlot>& Slots, FW::PropertyData* InProperty);
 
 	FW::GpuTexture* ResolveOverrideTexture(FW::BindingType BindingTypeValue, FW::GraphPin* InputPin, ShaderResourceBindingState* MatchingResource, FW::Vector2f ViewportSize = FW::Vector2f{0, 0});
+
+	// Publishes each slot's RW resource (Slot.RWOutputTexture / Slot.Buffer) to its connected output pin.
+	void PublishRWOutputsToPins(TArray<ShaderOverrideSlot>& Slots);
+
+	// Returns Slot.RWOutputTexture, (re)creating it to match SrcTex's size/format when stale.
+	FW::GpuTexture* EnsureRWOutputTexture(ShaderOverrideSlot& Slot, FW::BindingType BindingTypeValue, FW::GpuTexture* SrcTex, const FString& DebugName);
 	FW::GpuSampler* ResolveResourceSampler(const ShaderResourceBindingState* ResourceState);
 	void ResolveDefaultBuffer(uint32& BufferByteSize, uint32 StructuredStride, TypedBufferFormat BufferFormat, FW::BindingType BindingTypeValue, TRefCountPtr<FW::GpuBuffer>& InOutBuffer);
 

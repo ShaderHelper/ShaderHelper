@@ -14,6 +14,7 @@
 namespace FW
 {
 	class RenderGraph;
+	struct RGRenderPass;
 }
 
 namespace SH
@@ -43,13 +44,11 @@ namespace SH
 		// Invalidate material-derived render resources.
 		void InvalidateRenderResources();
 		bool UsesTextureAsShaderInput(FW::GpuTexture* Texture, FString& OutBindingName) const;
-		void CollectConnectedOverrideTextures(TSet<FW::GpuTexture*>& OutTextures) const;
 		FW::PrintBuffer* GetPrintBuffer();
 		bool FlushPrintBufferLogs(const FString& LogPrefix);
 
 		void AddRWInputBlitPasses(FW::RenderGraph& RG);
-		// Publish the cached RW output textures to their matching output pins.
-		void PublishRWOutputsToPins();
+		void AddRenderPassResourceAccesses(FW::RGRenderPass& Pass);
 
 		// DebuggableObject
 		TArray<DebugItem> GetSupportedDebugItems() const override { return { DebugItem::Vertex, DebugItem::Pixel }; }
@@ -82,18 +81,16 @@ namespace SH
 		bool BuildPipeline(const TArray<FW::GpuFormat>& ColorFormats, FW::GpuFormat DepthFormat, uint32 SampleCount);
 		void UpdateMaterialDrawState(const FMatrix44f& ModelMatrix, const FMatrix44f& ViewMat, const FMatrix44f& ProjMat, const FW::Vector2f& ViewportSize, const FW::Vector2f& MousePos, float Time, const FW::Vector3f& CameraPos, const FW::Vector3f& CameraDir);
 		TArray<BindingBuilder> BuildDebugBindingBuilders() const;
-		FW::GpuTexture* EnsureRWOutputTexture(const FString& Key, FW::BindingType BindingTypeValue, FW::GpuTexture* SrcTex);
 		// Returns false if the material has no PS source or compilation fails.
 		bool BuildAssertHighlightPs();
+		FW::GpuTexture* ResolveBindingTexture(const FW::GpuShaderLayoutBinding& Binding);
+		FW::GpuBuffer* ResolveBindingBuffer(const FW::GpuShaderLayoutBinding& Binding);
 
-	private:
 		TMap<int32, TRefCountPtr<FW::GpuBindGroupLayout>> BindGroupLayouts;
 		TMap<int32, TRefCountPtr<FW::GpuBindGroup>> BindGroups;
 		TRefCountPtr<FW::GpuRenderPipelineState> Pipeline;
 		FW::GpuRenderPipelineStateDesc PipelineDesc;
 		TMap<FString, TUniquePtr<FW::UniformBuffer>> UniformBuffers;
-		// Internally-owned output texture for each RW resource binding (keyed by BindingName|Stage).
-		TMap<FString, TRefCountPtr<FW::GpuTexture>> RWOutputTextures;
 		TUniquePtr<FW::PrintBuffer> PrinterBuffer;
 		MaterialErrorRenderResources ErrorResources;
 		FDelegateHandle MaterialChangedHandle;
