@@ -32,6 +32,18 @@ static uint32 GetDx12MaxSupportedSampleCount(DXGI_FORMAT InFormat)
 	}
 	return 1;
 }
+
+static D3D12_FEATURE_DATA_FORMAT_SUPPORT QueryDx12FormatSupport(DXGI_FORMAT InFormat)
+{
+	D3D12_FEATURE_DATA_FORMAT_SUPPORT FormatSupport{ InFormat, D3D12_FORMAT_SUPPORT1_NONE, D3D12_FORMAT_SUPPORT2_NONE };
+	if (FAILED(GDevice->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &FormatSupport, sizeof(FormatSupport))))
+	{
+		FormatSupport.Support1 = D3D12_FORMAT_SUPPORT1_NONE;
+		FormatSupport.Support2 = D3D12_FORMAT_SUPPORT2_NONE;
+	}
+	return FormatSupport;
+}
+
 class Dx12GpuFeature final : public GpuFeature
 {
 public:
@@ -48,6 +60,29 @@ public:
 	uint32 GetMaxSampleCount(GpuFormat Format) const override
 	{
 		return GetDx12MaxSupportedSampleCount(MapTextureFormat(Format));
+	}
+
+	bool SupportRWTextureFormat(GpuFormat Format) const override
+	{
+		const D3D12_FEATURE_DATA_FORMAT_SUPPORT FS = QueryDx12FormatSupport(MapTextureFormat(Format));
+		const D3D12_FORMAT_SUPPORT2 UavMask = D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE;
+		return (FS.Support1 & D3D12_FORMAT_SUPPORT1_TEXTURE2D) != 0
+			&& (FS.Support2 & UavMask) == UavMask;
+	}
+
+	bool SupportTypedBufferFormat(GpuFormat Format) const override
+	{
+		const D3D12_FEATURE_DATA_FORMAT_SUPPORT FS = QueryDx12FormatSupport(MapTextureFormat(Format));
+		return (FS.Support1 & D3D12_FORMAT_SUPPORT1_BUFFER) != 0
+			&& (FS.Support1 & D3D12_FORMAT_SUPPORT1_SHADER_LOAD) != 0;
+	}
+
+	bool SupportRWTypedBufferFormat(GpuFormat Format) const override
+	{
+		const D3D12_FEATURE_DATA_FORMAT_SUPPORT FS = QueryDx12FormatSupport(MapTextureFormat(Format));
+		const D3D12_FORMAT_SUPPORT2 UavMask = D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE;
+		return (FS.Support1 & D3D12_FORMAT_SUPPORT1_BUFFER) != 0
+			&& (FS.Support2 & UavMask) == UavMask;
 	}
 };
 

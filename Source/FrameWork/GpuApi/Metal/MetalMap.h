@@ -128,6 +128,7 @@ namespace FW
         case GpuFormat::R16_FLOAT:             return MTLPixelFormatR16Float;
         case GpuFormat::R32_FLOAT:             return MTLPixelFormatR32Float;
         case GpuFormat::D32_FLOAT:             return MTLPixelFormatDepth32Float;
+		case GpuFormat::R8G8B8A8_UINT:         return MTLPixelFormatRGBA8Uint;
         default:
 			AUX::Unreachable();
         }

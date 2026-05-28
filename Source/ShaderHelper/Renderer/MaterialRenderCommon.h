@@ -26,7 +26,7 @@ namespace SH
 		TRefCountPtr<FW::GpuRenderPipelineState> Pipeline;
 		TUniquePtr<FW::UniformBuffer> UniformBuffer;
 		TArray<FW::GpuFormat> ColorFormats;
-		FW::GpuFormat DepthFormat = FW::GpuFormat::NUM;
+		TOptional<FW::GpuFormat> DepthFormat;
 		uint32 SampleCount = 0;
 	};
 
@@ -75,7 +75,7 @@ namespace SH
 	struct MaterialPipelineBuildOptions
 	{
 		TArray<FW::GpuFormat> ColorFormats;
-		FW::GpuFormat DepthFormat = FW::GpuFormat::NUM;
+		TOptional<FW::GpuFormat> DepthFormat;
 		uint32 SampleCount = 1;
 		TArray<FW::GpuBindGroupLayout*> BindGroupLayouts;
 	};
@@ -107,7 +107,7 @@ namespace SH
 	bool EnsureMaterialErrorRenderResources(
 		MaterialErrorRenderResources& InOutResources,
 		const TArray<FW::GpuFormat>& ColorFormats,
-		FW::GpuFormat DepthFormat,
+		TOptional<FW::GpuFormat> DepthFormat,
 		uint32 SampleCount);
 
 	void DrawMaterialErrorMesh(

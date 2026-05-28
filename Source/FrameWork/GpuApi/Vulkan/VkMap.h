@@ -41,6 +41,7 @@ namespace FW::VK
 		case GpuFormat::R16_FLOAT:             return VK_FORMAT_R16_SFLOAT;
 		case GpuFormat::R32_FLOAT:             return VK_FORMAT_R32_SFLOAT;
 		case GpuFormat::D32_FLOAT:             return VK_FORMAT_D32_SFLOAT;
+		case GpuFormat::R8G8B8A8_UINT:         return VK_FORMAT_R8G8B8A8_UINT;
 		default:
 			AUX::Unreachable();
 		}

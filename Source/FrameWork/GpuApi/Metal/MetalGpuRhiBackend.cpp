@@ -43,6 +43,66 @@ public:
 	{
 		return GetMetalMaxSupportedSampleCount();
 	}
+
+	bool SupportRWTextureFormat(GpuFormat Format) const override
+	{
+		switch (Format)
+		{
+		case GpuFormat::R8_UNORM:
+		case GpuFormat::R8G8B8A8_UNORM:
+		case GpuFormat::B8G8R8A8_UNORM:
+		case GpuFormat::R10G10B10A2_UNORM:
+		case GpuFormat::R16G16B16A16_UNORM:
+		case GpuFormat::R16_UINT:
+		case GpuFormat::R32_UINT:
+		case GpuFormat::R16G16B16A16_UINT:
+		case GpuFormat::R32G32_UINT:
+		case GpuFormat::R32G32B32A32_UINT:
+		case GpuFormat::R16_FLOAT:
+		case GpuFormat::R32_FLOAT:
+		case GpuFormat::R32G32_FLOAT:
+		case GpuFormat::R16G16B16A16_FLOAT:
+		case GpuFormat::R32G32B32A32_FLOAT:
+		case GpuFormat::R11G11B10_FLOAT:
+		case GpuFormat::R8G8B8A8_UINT:
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	bool SupportTypedBufferFormat(GpuFormat Format) const override
+	{
+		switch (Format)
+		{
+		case GpuFormat::R8_UNORM:
+		case GpuFormat::R8G8B8A8_UNORM:
+		case GpuFormat::B8G8R8A8_UNORM:
+		case GpuFormat::R10G10B10A2_UNORM:
+		case GpuFormat::R16G16B16A16_UNORM:
+		case GpuFormat::R16_UINT:
+		case GpuFormat::R32_UINT:
+		case GpuFormat::R16G16B16A16_UINT:
+		case GpuFormat::R32G32_UINT:
+		case GpuFormat::R32G32B32A32_UINT:
+		case GpuFormat::R16_FLOAT:
+		case GpuFormat::R32_FLOAT:
+		case GpuFormat::R32G32_FLOAT:
+		case GpuFormat::R16G16B16A16_FLOAT:
+		case GpuFormat::R32G32B32A32_FLOAT:
+		case GpuFormat::R11G11B10_FLOAT:
+		case GpuFormat::R8G8B8A8_UINT:
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	bool SupportRWTypedBufferFormat(GpuFormat Format) const override
+	{
+		if (Format == GpuFormat::B8G8R8A8_UNORM) return false;
+		return SupportTypedBufferFormat(Format);
+	}
 };
 
 MetalGpuRhiBackend::MetalGpuRhiBackend() { GMtlGpuRhi = this; }

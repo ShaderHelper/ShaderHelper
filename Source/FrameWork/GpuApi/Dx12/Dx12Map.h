@@ -127,6 +127,7 @@ namespace FW
         case GpuFormat::R16_FLOAT:             return DXGI_FORMAT_R16_FLOAT;
         case GpuFormat::R32_FLOAT:             return DXGI_FORMAT_R32_FLOAT;
         case GpuFormat::D32_FLOAT:             return DXGI_FORMAT_D32_FLOAT;
+        case GpuFormat::R8G8B8A8_UINT:         return DXGI_FORMAT_R8G8B8A8_UINT;
 		default:
 			AUX::Unreachable();
         }

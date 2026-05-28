@@ -17,37 +17,13 @@ using namespace FW;
 
 namespace SH
 {
-	static GpuFormat ToGpuFormat(RWTextureFormat Format)
+	static void EnsureSupportedFormat(GpuFormat& Value, const TFunction<bool(GpuFormat)>& IsSupported)
 	{
-		switch (Format)
+		if (IsSupported(Value)) return;
+		for (const auto& [V, _] : magic_enum::enum_entries<GpuFormat>())
 		{
-		case RWTextureFormat::R8_UNORM:              return GpuFormat::R8_UNORM;
-		case RWTextureFormat::R8G8B8A8_UNORM:        return GpuFormat::R8G8B8A8_UNORM;
-		case RWTextureFormat::R16_UINT:              return GpuFormat::R16_UINT;
-		case RWTextureFormat::R32_UINT:              return GpuFormat::R32_UINT;
-		case RWTextureFormat::R16G16B16A16_UINT:     return GpuFormat::R16G16B16A16_UINT;
-		case RWTextureFormat::R32G32_UINT:           return GpuFormat::R32G32_UINT;
-		case RWTextureFormat::R32G32B32A32_UINT:     return GpuFormat::R32G32B32A32_UINT;
-		case RWTextureFormat::R16_FLOAT:             return GpuFormat::R16_FLOAT;
-		case RWTextureFormat::R32_FLOAT:             return GpuFormat::R32_FLOAT;
-		case RWTextureFormat::R32G32_FLOAT:          return GpuFormat::R32G32_FLOAT;
-		case RWTextureFormat::R16G16B16A16_FLOAT:    return GpuFormat::R16G16B16A16_FLOAT;
-		case RWTextureFormat::R32G32B32A32_FLOAT:    return GpuFormat::R32G32B32A32_FLOAT;
-		case RWTextureFormat::R16G16B16A16_UNORM:    return GpuFormat::R16G16B16A16_UNORM;
+			if (IsSupported(V)) { Value = V; return; }
 		}
-		AUX::Unreachable();
-	}
-
-	static GpuFormat ToGpuFormat(TypedBufferFormat Format)
-	{
-		switch (Format)
-		{
-		case TypedBufferFormat::R32_FLOAT:             return GpuFormat::R32_FLOAT;
-		case TypedBufferFormat::R32_UINT:              return GpuFormat::R32_UINT;
-		case TypedBufferFormat::R16G16B16A16_UINT:     return GpuFormat::R16G16B16A16_UINT;
-		case TypedBufferFormat::R32G32B32A32_UINT:     return GpuFormat::R32G32B32A32_UINT;
-		}
-		AUX::Unreachable();
 	}
 
 	FArchive& operator<<(FArchive& Ar, ShaderOverrideKey& Key)
@@ -60,8 +36,9 @@ namespace SH
 	{
 		Ar << State.BindingType << State.TextureAsset;
 		Ar << State.Filter << State.AddressMode;
-		Ar << State.DefaultRWSize << State.DefaultRWFormat;
-		Ar << State.BufferByteSize << State.StructuredStride << State.BufferFormat;
+		Ar << State.DefaultRWSize;
+		Ar << State.BufferByteSize << State.StructuredStride;
+		Ar << State.Format;
 		return Ar;
 	}
 
@@ -213,12 +190,12 @@ namespace SH
 		return Type == TEXT("RWStructuredBuffer");
 	}
 
-	uint32 GetMinBufferByteSize(BindingType BindingTypeValue, uint32 StructuredStride, TypedBufferFormat BufferFormat)
+	uint32 GetMinBufferByteSize(BindingType BindingTypeValue, uint32 StructuredStride, GpuFormat Format)
 	{
 		if (IsStructuredBufferBinding(BindingTypeValue))
 			return FMath::Max(1u, StructuredStride);
 		if (IsTypedBufferBinding(BindingTypeValue))
-			return FMath::Max(1u, GetFormatByteSize(ToGpuFormat(BufferFormat)));
+			return FMath::Max(1u, GetFormatByteSize(Format));
 		return 1u;
 	}
 
@@ -229,9 +206,8 @@ namespace SH
 		Dst.Filter = Src.Filter;
 		Dst.AddressMode = Src.AddressMode;
 		Dst.DefaultRWSize = Src.DefaultRWSize;
-		Dst.DefaultRWFormat = Src.DefaultRWFormat;
 		Dst.BufferByteSize = Src.BufferByteSize;
-		Dst.BufferFormat = Src.BufferFormat;
+		Dst.Format = Src.Format;
 	}
 
 	FString GetResourceOverrideType(BindingType BindingTypeValue)
@@ -459,7 +435,7 @@ namespace SH
 			const uint32 W = ResolveExtent(MatchingResource->DefaultRWSize.x, ViewportSize.X);
 			const uint32 H = ResolveExtent(MatchingResource->DefaultRWSize.y, ViewportSize.Y);
 			const uint32 D = static_cast<uint32>(FMath::Max(1, MatchingResource->DefaultRWSize.z));
-			const GpuFormat Fmt = ToGpuFormat(MatchingResource->DefaultRWFormat);
+			const GpuFormat Fmt = MatchingResource->Format;
 			GpuTexture* Existing = MatchingResource->DefaultRWTexture.GetReference();
 			const bool bMatches = Existing
 				&& Existing->GetWidth() == W
@@ -504,11 +480,11 @@ namespace SH
 		return GpuResourceHelper::GetSampler(Desc);
 	}
 
-	void ResolveDefaultBuffer(uint32& BufferByteSize, uint32 StructuredStride, TypedBufferFormat BufferFormat, BindingType BindingTypeValue, TRefCountPtr<GpuBuffer>& InOutBuffer)
+	void ResolveDefaultBuffer(uint32& BufferByteSize, uint32 StructuredStride, GpuFormat Format, BindingType BindingTypeValue, TRefCountPtr<GpuBuffer>& InOutBuffer)
 	{
 		check(IsBufferBinding(BindingTypeValue));
 
-		BufferByteSize = FMath::Max(BufferByteSize, GetMinBufferByteSize(BindingTypeValue, StructuredStride, BufferFormat));
+		BufferByteSize = FMath::Max(BufferByteSize, GetMinBufferByteSize(BindingTypeValue, StructuredStride, Format));
 
 		GpuBufferUsage Usage = GpuBufferUsage::Structured;
 		switch (BindingTypeValue)
@@ -534,12 +510,11 @@ namespace SH
 		default:
 			AUX::Unreachable();
 		}
-		const GpuFormat TypedFormat = ToGpuFormat(BufferFormat);
 		const bool bMatches = InOutBuffer.IsValid()
 			&& InOutBuffer->GetUsage() == Usage
 			&& InOutBuffer->GetByteSize() == BufferByteSize
 			&& (!IsStructuredBufferBinding(BindingTypeValue) || InOutBuffer->GetStructuredStride() == StructuredStride)
-			&& (!IsTypedBufferBinding(BindingTypeValue) || InOutBuffer->GetTypedFormat() == TypedFormat);
+			&& (!IsTypedBufferBinding(BindingTypeValue) || InOutBuffer->GetTypedFormat() == Format);
 		if (!bMatches)
 		{
 			TArray<uint8> ZeroData;
@@ -555,7 +530,7 @@ namespace SH
 			}
 			else if (IsTypedBufferBinding(BindingTypeValue))
 			{
-				Desc.TypedInit.Format = TypedFormat;
+				Desc.TypedInit.Format = Format;
 			}
 			InOutBuffer = GGpuRhi->CreateBuffer(Desc, GetBufferState(Usage));
 		}
@@ -853,9 +828,15 @@ namespace SH
 			Parent.AddChild(DepthItem);
 		}
 
-		auto FormatItem = MakePropertyEnumItem<RWTextureFormat>(
-			Owner, LOCALIZATION("Format"), ResourceState.DefaultRWFormat,
-			[&ResourceState](RWTextureFormat NewValue) { ResourceState.DefaultRWFormat = NewValue; }
+		TFunction<bool(GpuFormat)> IsRWTexFmtSupported = [](GpuFormat F) {
+			return GGpuRhi->GetFeature().SupportRWTextureFormat(F);
+		};
+		EnsureSupportedFormat(ResourceState.Format, IsRWTexFmtSupported);
+		auto FormatItem = MakePropertyEnumItem<GpuFormat>(
+			Owner, LOCALIZATION("Format"), ResourceState.Format,
+			[&ResourceState](GpuFormat NewValue) { ResourceState.Format = NewValue; },
+			/*ReadOnly*/ false,
+			IsRWTexFmtSupported
 		);
 		Parent.AddChild(FormatItem);
 	}
@@ -936,24 +917,32 @@ namespace SH
 		return MakeTextureResourcePropertyItem(Owner, Label, Slot, Slot.Type, IsSamplerResourceBinding(Slot.BindingType));
 	}
 
-	static TSharedRef<PropertyItemBase> MakeBufferPropertyItemImpl(ShObject* Owner, FText Label, BindingType BindingTypeValue, uint32 StructuredStride, uint32& BufferByteSize, TypedBufferFormat& BufferFormat)
+	static TSharedRef<PropertyItemBase> MakeBufferPropertyItemImpl(ShObject* Owner, FText Label, BindingType BindingTypeValue, uint32 StructuredStride, uint32& BufferByteSize, GpuFormat& Format)
 	{
-		BufferByteSize = FMath::Max(BufferByteSize, GetMinBufferByteSize(BindingTypeValue, StructuredStride, BufferFormat));
+		BufferByteSize = FMath::Max(BufferByteSize, GetMinBufferByteSize(BindingTypeValue, StructuredStride, Format));
 		auto Item = MakeShared<PropertyItemBase>(Owner, Label);
 
 		if (IsRWBufferBinding(BindingTypeValue))
 		{
 			auto ByteSizeItem = MakeShared<PropertyScalarItem<int32>>(Owner, LOCALIZATION("ByteSize"), reinterpret_cast<int32*>(&BufferByteSize));
-			ByteSizeItem->SetMinValue(GetMinBufferByteSize(BindingTypeValue, StructuredStride, BufferFormat));
+			ByteSizeItem->SetMinValue(GetMinBufferByteSize(BindingTypeValue, StructuredStride, Format));
 			Item->AddChild(ByteSizeItem);
 		}
 
 		if (IsTypedBufferBinding(BindingTypeValue))
 		{
-			TypedBufferFormat* FormatPtr = &BufferFormat;
-			auto FormatItem = MakePropertyEnumItem<TypedBufferFormat>(
-				Owner, LOCALIZATION("Format"), BufferFormat,
-				[FormatPtr](TypedBufferFormat NewValue) { *FormatPtr = NewValue; }
+			GpuFormat* FormatPtr = &Format;
+			const bool bIsRW = IsRWBufferBinding(BindingTypeValue);
+			TFunction<bool(GpuFormat)> IsTypedFmtSupported = [bIsRW](GpuFormat F) {
+				const GpuFeature& Feat = GGpuRhi->GetFeature();
+				return bIsRW ? Feat.SupportRWTypedBufferFormat(F) : Feat.SupportTypedBufferFormat(F);
+			};
+			EnsureSupportedFormat(Format, IsTypedFmtSupported);
+			auto FormatItem = MakePropertyEnumItem<GpuFormat>(
+				Owner, LOCALIZATION("Format"), Format,
+				[FormatPtr](GpuFormat NewValue) { *FormatPtr = NewValue; },
+				/*ReadOnly*/ false,
+				IsTypedFmtSupported
 			);
 			Item->AddChild(FormatItem);
 		}
@@ -961,13 +950,13 @@ namespace SH
 		return Item;
 	}
 
-	TSharedRef<PropertyItemBase> MakeBufferPropertyItem(ShObject* Owner, FText Label, BindingType BindingTypeValue, uint32 StructuredStride, uint32& BufferByteSize, TypedBufferFormat& BufferFormat)
+	TSharedRef<PropertyItemBase> MakeBufferPropertyItem(ShObject* Owner, FText Label, BindingType BindingTypeValue, uint32 StructuredStride, uint32& BufferByteSize, GpuFormat& Format)
 	{
-		return MakeBufferPropertyItemImpl(Owner, Label, BindingTypeValue, StructuredStride, BufferByteSize, BufferFormat);
+		return MakeBufferPropertyItemImpl(Owner, Label, BindingTypeValue, StructuredStride, BufferByteSize, Format);
 	}
 
 	TSharedRef<PropertyItemBase> MakeBufferPropertyItem(ShObject* Owner, FText Label, ShaderOverrideSlot& Slot)
 	{
-		return MakeBufferPropertyItemImpl(Owner, Label, Slot.BindingType, Slot.StructuredStride, Slot.BufferByteSize, Slot.BufferFormat);
+		return MakeBufferPropertyItemImpl(Owner, Label, Slot.BindingType, Slot.StructuredStride, Slot.BufferByteSize, Slot.Format);
 	}
 }

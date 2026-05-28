@@ -54,6 +54,27 @@ namespace FW
 			}
 			return GetVkMaxSupportedSampleCount(ImageFormatProperties.sampleCounts);
 		}
+
+		bool SupportRWTextureFormat(GpuFormat Format) const override
+		{
+			VkFormatProperties Props{};
+			vkGetPhysicalDeviceFormatProperties(GPhysicalDevice, MapTextureFormat(Format), &Props);
+			return (Props.optimalTilingFeatures & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) != 0;
+		}
+
+		bool SupportTypedBufferFormat(GpuFormat Format) const override
+		{
+			VkFormatProperties Props{};
+			vkGetPhysicalDeviceFormatProperties(GPhysicalDevice, MapTextureFormat(Format), &Props);
+			return (Props.bufferFeatures & VK_FORMAT_FEATURE_UNIFORM_TEXEL_BUFFER_BIT) != 0;
+		}
+
+		bool SupportRWTypedBufferFormat(GpuFormat Format) const override
+		{
+			VkFormatProperties Props{};
+			vkGetPhysicalDeviceFormatProperties(GPhysicalDevice, MapTextureFormat(Format), &Props);
+			return (Props.bufferFeatures & VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_BIT) != 0;
+		}
 	};
 
 	VkGpuRhiBackend::VkGpuRhiBackend() { GVkGpuRhi = this; }

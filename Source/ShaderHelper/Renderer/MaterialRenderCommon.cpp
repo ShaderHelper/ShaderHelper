@@ -487,7 +487,7 @@ namespace SH
 				case BindingType::TypedBuffer:
 				case BindingType::RWTypedBuffer:
 				{
-					ResolveDefaultBuffer(ResourceDefault->BufferByteSize, Binding.StructuredStride, ResourceDefault->BufferFormat, Binding.Type, ResourceDefault->Buffer);
+					ResolveDefaultBuffer(ResourceDefault->BufferByteSize, Binding.StructuredStride, ResourceDefault->Format, Binding.Type, ResourceDefault->Buffer);
 					GroupBuilder.SetExistingBinding(Binding.Slot, Binding.Type, ResourceDefault->Buffer, Binding.Stage);
 					break;
 				}
@@ -545,7 +545,7 @@ namespace SH
 	bool EnsureMaterialErrorRenderResources(
 		MaterialErrorRenderResources& InOutResources,
 		const TArray<GpuFormat>& ColorFormats,
-		GpuFormat DepthFormat,
+		TOptional<GpuFormat> DepthFormat,
 		uint32 SampleCount)
 	{
 		if (InOutResources.Pipeline.IsValid()
@@ -558,7 +558,7 @@ namespace SH
 
 		InOutResources.Pipeline.SafeRelease();
 		InOutResources.ColorFormats.Empty();
-		InOutResources.DepthFormat = GpuFormat::NUM;
+		InOutResources.DepthFormat.Reset();
 		InOutResources.SampleCount = 0;
 
 		if (!EnsureMaterialErrorBindGroup(InOutResources))
@@ -625,8 +625,8 @@ VsOutput MainVS(float3 Position : POSITION0) {
 				.CullMode = RasterizerCullMode::Back,
 			},
 			.SampleCount = SampleCount,
-			.DepthStencilState = DepthFormat != GpuFormat::NUM
-				? TOptional<DepthStencilStateDesc>(DepthStencilStateDesc{ .DepthFormat = DepthFormat })
+			.DepthStencilState = DepthFormat.IsSet()
+				? TOptional<DepthStencilStateDesc>(DepthStencilStateDesc{ .DepthFormat = *DepthFormat })
 				: TOptional<DepthStencilStateDesc>(),
 		};
 
@@ -813,8 +813,8 @@ VsOutput MainVS(float3 Position : POSITION0) {
 			.RasterizerState = { .FillMode = InMaterial.FillMode, .CullMode = InMaterial.CullMode },
 			.Primitive = InMaterial.Primitive,
 			.SampleCount = Options.SampleCount,
-			.DepthStencilState = (Options.DepthFormat != GpuFormat::NUM && InMaterial.DepthTestEnable)
-				? TOptional<DepthStencilStateDesc>(DepthStencilStateDesc{ .DepthFormat = Options.DepthFormat, .DepthCompare = InMaterial.DepthCompare })
+			.DepthStencilState = (Options.DepthFormat.IsSet() && InMaterial.DepthTestEnable)
+				? TOptional<DepthStencilStateDesc>(DepthStencilStateDesc{ .DepthFormat = *Options.DepthFormat, .DepthCompare = InMaterial.DepthCompare })
 				: TOptional<DepthStencilStateDesc>(),
 		};
 

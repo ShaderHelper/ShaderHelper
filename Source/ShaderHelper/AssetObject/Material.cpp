@@ -775,7 +775,7 @@ namespace SH
 					Default.BindingType,
 					Default.StructuredStride,
 					Default.BufferByteSize,
-					Default.BufferFormat
+					Default.Format
 				);
 				Parent->AddChild(Item);
 				break;

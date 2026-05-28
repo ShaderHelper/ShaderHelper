@@ -53,8 +53,7 @@ namespace FW
 		R32_FLOAT,
 
 		D32_FLOAT,
-
-		NUM,
+		R8G8B8A8_UINT,
 	};
 
 	enum class GpuTextureDimension

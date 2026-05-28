@@ -578,7 +578,7 @@ namespace SH
 		}
 
 		ResourceState->StructuredStride = Binding.StructuredStride;
-		ResolveDefaultBuffer(ResourceState->BufferByteSize, Binding.StructuredStride, ResourceState->BufferFormat, Binding.Type, ResourceState->Buffer);
+		ResolveDefaultBuffer(ResourceState->BufferByteSize, Binding.StructuredStride, ResourceState->Format, Binding.Type, ResourceState->Buffer);
 		return ResourceState->Buffer.GetReference();
 	}
 
@@ -1038,7 +1038,7 @@ namespace SH
 		return false;
 	}
 
-	bool MeshRenderObject::BuildPipeline(const TArray<GpuFormat>& ColorFormats, GpuFormat DepthFormat, uint32 SampleCount)
+	bool MeshRenderObject::BuildPipeline(const TArray<GpuFormat>& ColorFormats, TOptional<GpuFormat> DepthFormat, uint32 SampleCount)
 	{
 		const MeshPassNode* OwnerNode = static_cast<MeshPassNode*>(GetOuter());
 		const FString NodeName = OwnerNode->ObjectName.ToString();
@@ -1077,7 +1077,7 @@ namespace SH
 		return Pipeline.IsValid();
 	}
 
-	bool MeshRenderObject::EnsureRenderResources(const TArray<GpuFormat>& ColorFormats, GpuFormat DepthFormat, uint32 SampleCount)
+	bool MeshRenderObject::EnsureRenderResources(const TArray<GpuFormat>& ColorFormats, TOptional<GpuFormat> DepthFormat, uint32 SampleCount)
 	{
 		BindMaterialDelegates();
 		bDrawMaterialError = !BuildPipeline(ColorFormats, DepthFormat, SampleCount);

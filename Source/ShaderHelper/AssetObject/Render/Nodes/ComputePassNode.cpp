@@ -223,7 +223,7 @@ namespace SH
 		if (ShaderOverrideSlot* MatchingSlot = FindOverrideSlot(OverrideSlots, Key))
 		{
 			MatchingSlot->StructuredStride = Binding.StructuredStride;
-			ResolveDefaultBuffer(MatchingSlot->BufferByteSize, Binding.StructuredStride, MatchingSlot->BufferFormat, Binding.Type, MatchingSlot->Buffer);
+			ResolveDefaultBuffer(MatchingSlot->BufferByteSize, Binding.StructuredStride, MatchingSlot->Format, Binding.Type, MatchingSlot->Buffer);
 			return MatchingSlot->Buffer;
 		}
 

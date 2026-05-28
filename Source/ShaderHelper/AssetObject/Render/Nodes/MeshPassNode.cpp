@@ -561,7 +561,7 @@ namespace SH
 
 		TArray<ObjectPtr<MeshRenderObject>> MROsToDraw = CollectMeshRenderObjectsThrough(StopObject);
 		const TArray<GpuFormat> ColorFormatKey = MakeColorFormatKey();
-		const GpuFormat DepthFormatKey = DebugDepthRT ? DebugDepthRT->GetFormat() : GpuFormat::NUM;
+		const TOptional<GpuFormat> DepthFormatKey = DebugDepthRT ? TOptional<GpuFormat>(DebugDepthRT->GetFormat()) : TOptional<GpuFormat>();
 		for (const ObjectPtr<MeshRenderObject>& MRO : MROsToDraw)
 		{
 			MRO->EnsureRenderResources(ColorFormatKey, DepthFormatKey, 1);
@@ -709,7 +709,7 @@ namespace SH
 
 		// Ensure render resources for each MRO with the current format key.
 		TArray<GpuFormat> ColorFormatKey = MakeColorFormatKey();
-		GpuFormat DepthFormatKey = bDepthEnabled ? ToGpuFormat(DepthFormat) : GpuFormat::NUM;
+		TOptional<GpuFormat> DepthFormatKey = bDepthEnabled ? TOptional<GpuFormat>(ToGpuFormat(DepthFormat)) : TOptional<GpuFormat>();
 		const uint32 SampleCount = 1;
 
 		for (auto& MRO : MeshRenderObjects)

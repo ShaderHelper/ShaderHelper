@@ -154,7 +154,9 @@ namespace FW
 				EnumItems.Add(MakeShared<FString>(EntryStr));
 			}
 		}
-		
+
+		void SetDisabledEntries(TSet<FString> InDisabled) { DisabledEnumEntries = MoveTemp(InDisabled); }
+
 		TSharedRef<ITableRow> GenerateWidgetForTableView(const TSharedRef<STableViewBase>& OwnerTable) override
 		{
 			auto Row = PropertyItemBase::GenerateWidgetForTableView(OwnerTable);
@@ -164,6 +166,11 @@ namespace FW
 			.OnSelectionChanged_Lambda([this](TSharedPtr<FString> InItem, ESelectInfo::Type){
 				if(InItem && *InItem != *EnumValueName)
 				{
+					if (DisabledEnumEntries.Contains(*InItem))
+					{
+						ValueWidget->SetSelectedItem(EnumValueName);
+						return;
+					}
 					if (Owner->CanChangeProperty(this))
 					{
 						BeginEdit();
@@ -178,8 +185,10 @@ namespace FW
 					}
 				}
 			})
-			.OnGenerateWidget_Lambda([](TSharedPtr<FString> InItem){
-				return SNew(STextBlock).Text(LOCALIZATION(*InItem));
+			.OnGenerateWidget_Lambda([this](TSharedPtr<FString> InItem){
+				return SNew(STextBlock)
+					.Text(LOCALIZATION(*InItem))
+					.IsEnabled(!DisabledEnumEntries.Contains(*InItem));
 			})
 			[
 				SNew(STextBlock).Text_Lambda([this] {
@@ -191,7 +200,7 @@ namespace FW
 		}
 
 		void* GetEnum() const { return EnumEntries[*EnumValueName].Get(); }
-		
+
 	private:
 		TSharedPtr<SComboBox<TSharedPtr<FString>> > ValueWidget;
 		TSharedPtr<FString> EnumValueName;
@@ -199,6 +208,7 @@ namespace FW
 		TFunction<void(void*)> Setter;
 		bool ReadOnly;
 		TArray<TSharedPtr<FString>> EnumItems;
+		TSet<FString> DisabledEnumEntries;
 	};
 
 	template<typename EnumType>
@@ -220,9 +230,10 @@ namespace FW
 
 	template<typename EnumType>
 	TSharedRef<PropertyEnumItem> MakePropertyEnumItem(ShObject* InOwner, const FText& InName, EnumType Value,
-		const TFunction<void(EnumType)>& InSetter, bool InReadOnly = false)
+		const TFunction<void(EnumType)>& InSetter, bool InReadOnly = false,
+		const TFunction<bool(EnumType)>& IsEntrySupported = {})
 	{
-		return MakeShared<PropertyEnumItem>(
+		auto Item = MakeShared<PropertyEnumItem>(
 			InOwner,
 			InName,
 			MakePropertyEnumValueName(Value),
@@ -231,6 +242,20 @@ namespace FW
 				InSetter(*static_cast<EnumType*>(InValue));
 			},
 			InReadOnly);
+
+		if (IsEntrySupported)
+		{
+			TSet<FString> Disabled;
+			for (const auto& [EntryValue, EntryStr] : magic_enum::enum_entries<EnumType>())
+			{
+				if (!IsEntrySupported(EntryValue))
+				{
+					Disabled.Add(ANSI_TO_TCHAR(EntryStr.data()));
+				}
+			}
+			Item->SetDisabledEntries(MoveTemp(Disabled));
+		}
+		return Item;
 	}
 
 	template<typename T>

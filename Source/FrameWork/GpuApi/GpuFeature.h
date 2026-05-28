@@ -21,5 +21,8 @@ namespace FW
 		virtual bool Support16bitType() const = 0;
 		virtual bool SupportTimestampQuery() const = 0;
 		virtual uint32 GetMaxSampleCount(GpuFormat Format) const = 0;
+		virtual bool SupportRWTextureFormat(GpuFormat Format) const = 0;
+		virtual bool SupportTypedBufferFormat(GpuFormat Format) const = 0;
+		virtual bool SupportRWTypedBufferFormat(GpuFormat Format) const = 0;
 	};
 }

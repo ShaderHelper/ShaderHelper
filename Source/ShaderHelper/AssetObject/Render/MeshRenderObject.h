@@ -32,7 +32,7 @@ namespace SH
 		void PostPropertyChanged(FW::PropertyData* InProperty) override;
 
 		// Ensure pipeline + bind groups are valid for the given RT formats / depth / sample count.
-		bool EnsureRenderResources(const TArray<FW::GpuFormat>& ColorFormats, FW::GpuFormat DepthFormat, uint32 SampleCount);
+		bool EnsureRenderResources(const TArray<FW::GpuFormat>& ColorFormats, TOptional<FW::GpuFormat> DepthFormat, uint32 SampleCount);
 
 		// Update UB members with built-in + default values, apply overrides, then draw every submesh.
 		void Draw(FW::GpuRenderPassRecorder* Recorder, const FW::Camera* InCamera, const FMatrix44f& ModelMatrix, const FW::Vector2f& ViewportSize, const FW::Vector2f& MousePos, float Time);
@@ -78,7 +78,7 @@ namespace SH
 		void UnbindMaterialDelegates();
 		void OnMaterialChanged();
 		void BuildBindGroupFromMaterial(bool bRebuildLayouts = true, bool bRebuildUniformBuffers = true);
-		bool BuildPipeline(const TArray<FW::GpuFormat>& ColorFormats, FW::GpuFormat DepthFormat, uint32 SampleCount);
+		bool BuildPipeline(const TArray<FW::GpuFormat>& ColorFormats, TOptional<FW::GpuFormat> DepthFormat, uint32 SampleCount);
 		void UpdateMaterialDrawState(const FMatrix44f& ModelMatrix, const FMatrix44f& ViewMat, const FMatrix44f& ProjMat, const FW::Vector2f& ViewportSize, const FW::Vector2f& MousePos, float Time, const FW::Vector3f& CameraPos, const FW::Vector3f& CameraDir);
 		TArray<BindingBuilder> BuildDebugBindingBuilders() const;
 		// Returns false if the material has no PS source or compilation fails.
