@@ -255,7 +255,7 @@ namespace SH
 			SyncOverridesFromReflection();
 			InvalidateRenderResources();
 			RefreshNodeWidget();
-			static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+			GApp->GetEditor()->RefreshProperty();
 		}
 		else if (InProperty->IsOfType<PropertyAssetItem>())
 		{
@@ -268,7 +268,7 @@ namespace SH
 			if (bIsRWOverrideAsset)
 			{
 				InvalidateRenderResources();
-				static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+				GApp->GetEditor()->RefreshProperty();
 			}
 		}
 		else if (IsDefaultRWTextureProperty(OverrideSlots, InProperty))

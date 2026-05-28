@@ -318,7 +318,7 @@ namespace SH
 			Entry->SetOnDelete([this, EntryIndex] {
 				RemoveOverride(EntryIndex);
 				static_cast<MeshPassNode*>(GetOuter())->RefreshNodeWidget();
-				static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+				GApp->GetEditor()->RefreshProperty();
 			});
 			OverrideCat->AddChild(Entry);
 		}
@@ -356,7 +356,7 @@ namespace SH
 				});
 				if (bIsRWOverrideAsset)
 				{
-					static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+					GApp->GetEditor()->RefreshProperty();
 				}
 			}
 		}
@@ -427,7 +427,7 @@ namespace SH
 		if (auto* OuterMost = GetOuterMost()) OuterMost->MarkDirty();
 
 		static_cast<MeshPassNode*>(GetOuter())->RefreshNodeWidget();
-		static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+		GApp->GetEditor()->RefreshProperty();
 	}
 
 	void MeshRenderObject::RemoveOverride(int32 SlotIndex)

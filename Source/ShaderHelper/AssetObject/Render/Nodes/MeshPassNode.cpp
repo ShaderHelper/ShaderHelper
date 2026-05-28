@@ -1182,7 +1182,7 @@ namespace SH
 						.SetObject([this](ShObject* Object) {
 							CameraRef = static_cast<CameraSceneObject*>(Object);
 							if (auto* OM = GetOuterMost()) OM->MarkDirty();
-							static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+							GApp->GetEditor()->RefreshProperty();
 						})
 					]
 				]

@@ -95,7 +95,7 @@ namespace SH
 				});
 				if (bIsRWResourceAsset)
 				{
-					static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+					GApp->GetEditor()->RefreshProperty();
 				}
 			}
 		}
@@ -123,8 +123,7 @@ namespace SH
 		RebuildBindingMemberDefaults();
 		RebuildBindingResourceDefaults();
 		RebuildVertexInputDefaults();
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->RefreshProperty();
+		GApp->GetEditor()->RefreshProperty();
 		NotifyMaterialChanged();
 	}
 
@@ -540,7 +539,7 @@ namespace SH
 										D->ValueSource = Source;
 										PostPropertyChanged(EditProperty);
 										EditProperty->EndEdit();
-										static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+										GApp->GetEditor()->RefreshProperty();
 									}
 								}
 							}),

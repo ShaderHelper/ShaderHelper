@@ -3,6 +3,7 @@
 #include "AssetObject/Graph.h"
 #include "Editor/GraphEditorCommands.h"
 #include "Common/Util/Math.h"
+#include "App/App.h"
 
 #include <Widgets/Input/SSearchBox.h>
 #include <Styling/StyleColors.h>
@@ -138,12 +139,14 @@ namespace FW
 	{
 		GraphData->AddLink(Output->PinData, Input->PinData);
 		Links.AddUnique(Output, Input);
+		GApp->GetEditor()->RefreshProperty();
 	}
 
 	void SGraphPanel::RemoveLink(SGraphPin* Output, SGraphPin* Input)
 	{
 		Links.Remove(Output, Input);
 		GraphData->RemoveLink(Output->PinData, Input->PinData);
+		GApp->GetEditor()->RefreshProperty();
 	}
 
 	Vector2D SGraphPanel::PanelCoordToGraphCoord(const Vector2D& InCoord) const

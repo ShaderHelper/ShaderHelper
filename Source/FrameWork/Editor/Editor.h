@@ -29,6 +29,7 @@ namespace FW {
 
         virtual void Update(double DeltaTime) {}
 		virtual TSharedPtr<SWindow> GetMainWindow() const { return {}; }
+		virtual void RefreshProperty(bool bClear = false) {}
 		virtual void ShowProperty(ShObject* InObjectData) {}
 		static FConfigFile* GetEditorConfig() { return EditorConfig.Get(); }
 		static void SaveEditorConfig();

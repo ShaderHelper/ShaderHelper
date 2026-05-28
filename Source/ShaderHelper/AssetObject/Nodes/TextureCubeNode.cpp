@@ -106,7 +106,7 @@ namespace SH
 		ResultPin->SetValue(nullptr);
 		Preview->Clear();
 		GetOuterMost()->MarkDirty();
-		static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+		GApp->GetEditor()->RefreshProperty();
 	}
 
 	void TextureCubeNode::PostPropertyChanged(PropertyData* InProperty)
@@ -116,7 +116,7 @@ namespace SH
 		if (InProperty->GetDisplayName().EqualTo(LOCALIZATION("Texture")))
 		{
 			InitTexture();
-			static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+			GApp->GetEditor()->RefreshProperty();
 		}
 	}
 

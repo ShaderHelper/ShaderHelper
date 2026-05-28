@@ -39,7 +39,7 @@ namespace SH
 		SceneObject::PostPropertyChanged(InProperty);
 		if (InProperty->GetDisplayName().EqualTo(LOCALIZATION("Model")))
 		{
-			static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+			GApp->GetEditor()->RefreshProperty();
 		}
 	}
 }

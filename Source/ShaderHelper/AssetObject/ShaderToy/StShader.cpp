@@ -352,7 +352,7 @@ R"(void MainVS(in uint VertID : SV_VertexID, out float4 Pos : SV_Position)
             }
             RefreshBuilder();
             MarkDirty();
-            static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+			GApp->GetEditor()->RefreshProperty();
         });
         
         return NewUniformProperty;
