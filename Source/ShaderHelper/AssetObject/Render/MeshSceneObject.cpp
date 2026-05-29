@@ -30,9 +30,13 @@ namespace SH
 		TArray<TSharedRef<PropertyData>> Result = ShObject::GeneratePropertyDatas();
 		if (!ModelAsset)
 		{
-			Result.Add(MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("VertexCount"), &VertexCount));
+			auto VertexCountItem = MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("VertexCount"), &VertexCount);
+			VertexCountItem->SetMinValue(1u);
+			Result.Add(MoveTemp(VertexCountItem));
 		}
-		Result.Add(MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("InstanceCount"), &InstanceCount));
+		auto InstanceCountItem = MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("InstanceCount"), &InstanceCount);
+		InstanceCountItem->SetMinValue(1u);
+		Result.Add(MoveTemp(InstanceCountItem));
 		return Result;
 	}
 

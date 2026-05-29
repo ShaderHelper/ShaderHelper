@@ -880,16 +880,6 @@ namespace SH
 		TRefCountPtr<GpuShader> MaskPs = GetMaskPs();
 
 		MeshSceneObject* MSO = MeshSceneObjectRef.Get();
-		TArray<MeshBuffers> GpuMeshes;
-		uint32 VertexCount = 0;
-		if (Model* ModelAsset = MSO->ModelAsset.Get())
-		{
-			GpuMeshes = ModelAsset->GetGpuMeshes();
-		}
-		else
-		{
-			VertexCount = MSO->VertexCount;
-		}
 
 		GpuTexture* ReferenceTexture = nullptr;
 		for (const TRefCountPtr<GpuTexture>& ColorRT : OwnerNode->GetOutputColorRTs())
@@ -952,45 +942,40 @@ namespace SH
 
 		TRefCountPtr<GpuRenderPipelineState> MaskPipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(MaskPipelineDesc);
 
+		const uint32 InstanceCount = MSO->InstanceCount;
+		TFunction<void(GpuRenderPassRecorder*)> DrawFunction;
+		if (Model* ModelAsset = MSO->ModelAsset.Get())
+		{
+			TArray<MeshBuffers> GpuMeshes = ModelAsset->GetGpuMeshes();
+			DrawFunction = [MaskPipeline, MaskBGArray, GpuMeshes, InstanceCount](GpuRenderPassRecorder* PassRecorder) {
+				PassRecorder->SetBindGroups(MaskBGArray);
+				PassRecorder->SetRenderPipelineState(MaskPipeline);
+				for (const MeshBuffers& MB : GpuMeshes)
+				{
+					PassRecorder->SetVertexBuffer(0, MB.VertexBuffer);
+					PassRecorder->SetIndexBuffer(MB.IndexBuffer);
+					PassRecorder->DrawIndexed(0, MB.IndexCount, 0, 0, InstanceCount);
+				}
+			};
+		}
+		else
+		{
+			DrawFunction = [MaskPipeline, MaskBGArray, VertexCount = MSO->VertexCount, InstanceCount](GpuRenderPassRecorder* PassRecorder) {
+				PassRecorder->SetBindGroups(MaskBGArray);
+				PassRecorder->SetRenderPipelineState(MaskPipeline);
+				PassRecorder->DrawPrimitive(0, VertexCount, 0, InstanceCount);
+			};
+		}
+
+		GpuRenderPassDesc PassDesc;
+		PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{
+			MaskTex->GetDefaultView(),
+			RenderTargetLoadAction::Clear,
+			RenderTargetStoreAction::Store
+		});
+
 		RenderGraph RG;
-		for (int32 MeshIndex = 0; MeshIndex < GpuMeshes.Num(); ++MeshIndex)
-		{
-			const MeshBuffers& Buffers = GpuMeshes[MeshIndex];
-			GpuRenderPassDesc PassDesc;
-			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{
-				MaskTex->GetDefaultView(),
-				MeshIndex == 0 ? RenderTargetLoadAction::Clear : RenderTargetLoadAction::Load,
-				RenderTargetStoreAction::Store
-			});
-
-			RG.AddRenderPass(TEXT("MeshRenderObjectDebugMask"), MoveTemp(PassDesc),
-				[MaskPipeline, MaskBGArray, VB = Buffers.VertexBuffer, IB = Buffers.IndexBuffer, IdxCount = Buffers.IndexCount]
-				(GpuRenderPassRecorder* PassRecorder) {
-					PassRecorder->SetBindGroups(MaskBGArray);
-					PassRecorder->SetRenderPipelineState(MaskPipeline);
-					PassRecorder->SetVertexBuffer(0, VB);
-					PassRecorder->SetIndexBuffer(IB);
-					PassRecorder->DrawIndexed(0, IdxCount);
-				}
-			);
-		}
-		if (VertexCount > 0)
-		{
-			GpuRenderPassDesc PassDesc;
-			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{
-				MaskTex->GetDefaultView(),
-				RenderTargetLoadAction::Clear,
-				RenderTargetStoreAction::Store
-			});
-
-			RG.AddRenderPass(TEXT("MeshRenderObjectDebugMask"), MoveTemp(PassDesc),
-				[MaskPipeline, MaskBGArray, VertexCount](GpuRenderPassRecorder* PassRecorder) {
-					PassRecorder->SetBindGroups(MaskBGArray);
-					PassRecorder->SetRenderPipelineState(MaskPipeline);
-					PassRecorder->DrawPrimitive(0, VertexCount, 0, 1);
-				}
-			);
-		}
+		RG.AddRenderPass(TEXT("MeshRenderObjectDebugMask"), MoveTemp(PassDesc), MoveTemp(DrawFunction));
 		RG.Execute();
 		return MaskTex;
 	}
@@ -1023,32 +1008,31 @@ namespace SH
 		if (Item == DebugItem::Pixel)
 		{
 			MeshSceneObject* MSO = MeshSceneObjectRef.Get();
-			TArray<MeshBuffers> Meshes;
-			uint32 VertexCount = 0;
+			const uint32 InstanceCount = MSO->InstanceCount;
+			TFunction<void(GpuRenderPassRecorder*)> DrawFunction;
 			if (Model* ModelAsset = MSO->ModelAsset.Get())
 			{
-				Meshes = ModelAsset->GetGpuMeshes();
+				TArray<MeshBuffers> Meshes = ModelAsset->GetGpuMeshes();
+				DrawFunction = [Meshes, InstanceCount](GpuRenderPassRecorder* Recorder) {
+					for (const MeshBuffers& MeshBuffer : Meshes)
+					{
+						Recorder->SetVertexBuffer(0, MeshBuffer.VertexBuffer);
+						Recorder->SetIndexBuffer(MeshBuffer.IndexBuffer);
+						Recorder->DrawIndexed(0, MeshBuffer.IndexCount, 0, 0, InstanceCount);
+					}
+				};
 			}
 			else
 			{
-				VertexCount = MSO->VertexCount;
+				DrawFunction = [VertexCount = MSO->VertexCount, InstanceCount](GpuRenderPassRecorder* Recorder) {
+					Recorder->DrawPrimitive(0, VertexCount, 0, InstanceCount);
+				};
 			}
 			return PixelState{
 				.ViewPortDesc = OwnerNode->GetOutputViewPortDesc(),
 				.Builders = BuildDebugBindingBuilders(),
 				.PipelineDesc = PipelineDesc,
-				.DrawFunction = [Meshes, VertexCount](GpuRenderPassRecorder* Recorder) {
-					for (const MeshBuffers& MeshBuffer : Meshes)
-					{
-						Recorder->SetVertexBuffer(0, MeshBuffer.VertexBuffer);
-						Recorder->SetIndexBuffer(MeshBuffer.IndexBuffer);
-						Recorder->DrawIndexed(0, MeshBuffer.IndexCount);
-					}
-					if (VertexCount > 0)
-					{
-						Recorder->DrawPrimitive(0, VertexCount, 0, 1);
-					}
-				}
+				.DrawFunction = MoveTemp(DrawFunction)
 			};
 		}
 		AUX::Unreachable();
@@ -1161,7 +1145,6 @@ namespace SH
 		Recorder->SetRenderPipelineState(Pipeline);
 		Recorder->SetBindGroups(BGArray);
 
-		const uint32 InstanceCount = FMath::Max(1u, MSO->InstanceCount);
 		if (Model* ModelAsset = MSO->ModelAsset.Get())
 		{
 			const TArray<MeshBuffers>& GpuMeshes = ModelAsset->GetGpuMeshes();
@@ -1169,12 +1152,12 @@ namespace SH
 			{
 				Recorder->SetVertexBuffer(0, MB.VertexBuffer);
 				Recorder->SetIndexBuffer(MB.IndexBuffer);
-				Recorder->DrawIndexed(0, MB.IndexCount, 0, 0, InstanceCount);
+				Recorder->DrawIndexed(0, MB.IndexCount, 0, 0, MSO->InstanceCount);
 			}
 		}
-		else if (MSO->VertexCount > 0)
+		else
 		{
-			Recorder->DrawPrimitive(0, MSO->VertexCount, 0, InstanceCount);
+			Recorder->DrawPrimitive(0, MSO->VertexCount, 0, MSO->InstanceCount);
 		}
 	}
 
@@ -1316,12 +1299,12 @@ namespace SH
 					{
 						Recorder->SetVertexBuffer(0, MB.VertexBuffer);
 						Recorder->SetIndexBuffer(MB.IndexBuffer);
-						Recorder->DrawIndexed(0, MB.IndexCount);
+						Recorder->DrawIndexed(0, MB.IndexCount, 0, 0, InMso->InstanceCount);
 					}
 				}
-				else if (InMso->VertexCount > 0)
+				else
 				{
-					Recorder->DrawPrimitive(0, InMso->VertexCount, 0, 1);
+					Recorder->DrawPrimitive(0, InMso->VertexCount, 0, InMso->InstanceCount);
 				}
 			}
 		);

@@ -104,7 +104,7 @@ namespace SH
 		bool bDepthEnabled = false;
 		MeshPassDepthFormat DepthFormat = MeshPassDepthFormat::D32_FLOAT;
 		FW::ObserverObjectPtr<CameraSceneObject> CameraRef;
-		FW::Vector2u RTSize = {0, 0}; // 0,0 = auto from viewport
+		FW::Vector2u RTSize = {1, 1};
 		TArray<FW::ObjectPtr<MeshRenderObject>> MeshRenderObjects;
 
 	private:

@@ -613,13 +613,8 @@ namespace SH
 			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because render graph or final render target is invalid."), *ObjectName.ToString());
 			return { true, true };
 		}
-		uint32 Width  = (RTSize.X > 0) ? RTSize.X : Ctx.FinalRT->GetWidth();
-		uint32 Height = (RTSize.Y > 0) ? RTSize.Y : Ctx.FinalRT->GetHeight();
-		if (Width == 0 || Height == 0)
-		{
-			SH_LOG(LogGraph, Error, TEXT("Node:\"%s\" execution failed because render target size is invalid (%u x %u)."), *ObjectName.ToString(), Width, Height);
-			return { true, true };
-		}
+		uint32 Width  = RTSize.X;
+		uint32 Height = RTSize.Y;
 
 		NormalizePreviewOutputName();
 
@@ -1309,6 +1304,8 @@ namespace SH
 
 			auto WItem = MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("Width"), &RTSize.X);
 			auto HItem = MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("Height"), &RTSize.Y);
+			WItem->SetMinValue(1);
+			HItem->SetMinValue(1);
 			RTCat->AddChild(WItem);
 			RTCat->AddChild(HItem);
 		}
