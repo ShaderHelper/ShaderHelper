@@ -1029,29 +1029,64 @@ namespace SH
 			SpawnedTab->SetContent(
                 SNew(SBorder)
                 [
-					SNew(SOverlay)
-					+SOverlay::Slot()
+					SNew(SVerticalBox)
+					+SVerticalBox::Slot()
+					.FillHeight(1.0f)
 					[
-						ViewportWidget.ToSharedRef()
+						SNew(SOverlay)
+						+SOverlay::Slot()
+						[
+							ViewportWidget.ToSharedRef()
+						]
+						+SOverlay::Slot()
+						[
+							FragmentDebuggerViewport.ToSharedRef()
+						]
+						+SOverlay::Slot()
+						[
+							VertexDebuggerViewport.ToSharedRef()
+						]
+						+SOverlay::Slot()
+						[
+							ComputeDebuggerViewport.ToSharedRef()
+						]
+						+SOverlay::Slot()
+						[
+							LinePreviewWidget.ToSharedRef()
+						]
 					]
-					+SOverlay::Slot()
+					+SVerticalBox::Slot()
+					.AutoHeight()
 					[
-						FragmentDebuggerViewport.ToSharedRef()
-					]
-					+SOverlay::Slot()
-					[
-						VertexDebuggerViewport.ToSharedRef()
-					]
-					+SOverlay::Slot()
-					[
-						ComputeDebuggerViewport.ToSharedRef()
-					]
-					+SOverlay::Slot()
-					[
-						LinePreviewWidget.ToSharedRef()
+						SNew(SBorder)
+						.Padding(FMargin(6, 1))
+						[
+							SNew(SHorizontalBox)
+							+SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							[
+								SNew(STextBlock)
+								.Text_Lambda([this] {
+									FIntPoint Size = ViewPort->GetSize();
+									return FText::FromString(FString::Printf(TEXT("%s: %d x %d"), *LOCALIZATION("ViewportSize").ToString(), Size.X, Size.Y));
+								})
+							]
+							+SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							.Padding(FMargin(12, 0, 0, 0))
+							[
+								SNew(STextBlock)
+								.Text_Lambda([this] {
+									Vector2f Pos = ViewPort->GetMousePos();
+									return FText::FromString(FString::Printf(TEXT("%s: %d, %d"), *LOCALIZATION("MousePos").ToString(), (int32)Pos.x, (int32)Pos.y));
+								})
+							]
+						]
 					]
                 ]
-			
+
 			);
 		}
 		else if (TabId == SceneTabId)

@@ -291,10 +291,16 @@ namespace SH
 
 		auto ThreadCountItem = MakeShared<PropertyVector3iItem>(this, LOCALIZATION("ThreadGroupCount"), reinterpret_cast<int32*>(&ThreadGroupCount.x));
 		Result.Add(ThreadCountItem);
-		auto BindingCat = MakeShared<PropertyCategory>(this, LOCALIZATION("Bindings"));	
+
+		OverrideBuiltInFactories BuiltInFactories{
+			.MakeFloatBuiltInItem   = MakeOverrideBuiltInFactory<ComputeBuiltInFloatValue>(&ShaderOverrideSlot::FloatBuiltInRaw),
+			.MakeVector2BuiltInItem = MakeOverrideBuiltInFactory<ComputeBuiltInVector2Value>(&ShaderOverrideSlot::Vector2BuiltInRaw),
+		};
+
+		auto BindingCat = MakeShared<PropertyCategory>(this, LOCALIZATION("Bindings"));
 		for (ShaderOverrideSlot& Slot : OverrideSlots)
 		{
-			BindingCat->AddChild(MakeOverrideSlotPropertyItem(this, OverrideSlots, Slot));
+			BindingCat->AddChild(MakeOverrideSlotPropertyItem(this, OverrideSlots, Slot, BuiltInFactories));
 		}
 		Result.Add(BindingCat);
 		return Result;
@@ -419,7 +425,7 @@ namespace SH
 		return true;
 	}
 
-	void ComputePassNode::UpdateUniformBuffers()
+	void ComputePassNode::UpdateUniformBuffers(const RenderExecContext& Ctx)
 	{
 		if (UniformBuffers.IsEmpty()) return;
 
@@ -429,7 +435,7 @@ namespace SH
 			for (const auto& [MemberName, MemberInfo] : UB->GetMetaData().Members)
 			{
 				const ShaderOverrideKey Key{ Name, MemberName, BindingShaderStage::Compute };
-				const ShaderOverrideSlot* OverrideSlot = FindOverrideSlot(OverrideSlots, Key);
+				ShaderOverrideSlot* OverrideSlot = FindOverrideSlot(OverrideSlots, Key);
 				if (!OverrideSlot) continue;
 
 				const uint8* BytesPtr = nullptr;
@@ -446,6 +452,28 @@ namespace SH
 						{
 							BytesPtr = P;
 						}
+					}
+				}
+				if (!BytesPtr && OverrideSlot->ValueSource == MaterialBindingValueSource::BuiltIn)
+				{
+					if (IsShaderFloatType(OverrideSlot->Type))
+					{
+						float* Out = GetOverrideBytesAs<float>(*OverrideSlot);
+						switch (static_cast<ComputeBuiltInFloatValue>(OverrideSlot->FloatBuiltInRaw))
+						{
+						case ComputeBuiltInFloatValue::Time: *Out = Ctx.Time; break;
+						}
+						BytesPtr = reinterpret_cast<const uint8*>(Out);
+					}
+					else if (IsShaderVector2Type(OverrideSlot->Type))
+					{
+						Vector2f* Out = GetOverrideBytesAs<Vector2f>(*OverrideSlot);
+						switch (static_cast<ComputeBuiltInVector2Value>(OverrideSlot->Vector2BuiltInRaw))
+						{
+						case ComputeBuiltInVector2Value::ViewportSize: *Out = Ctx.ViewportSize; break;
+						case ComputeBuiltInVector2Value::MousePos:     *Out = Ctx.MousePos;     break;
+						}
+						BytesPtr = reinterpret_cast<const uint8*>(Out);
 					}
 				}
 				if (!BytesPtr)
@@ -486,7 +514,7 @@ namespace SH
 		{
 			return { true, true };
 		}
-		UpdateUniformBuffers();
+		UpdateUniformBuffers(Ctx);
 
 		// Blit input textures into the internally-owned RW output textures.
 		for (const GpuShaderLayoutBinding& Binding : Cs->GetLayout())

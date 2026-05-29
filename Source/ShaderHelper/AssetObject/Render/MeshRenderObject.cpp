@@ -226,7 +226,6 @@ namespace SH
 		{
 			Slot.RWOutputTexture.SafeRelease();
 		}
-		bDrawMaterialError = false;
 
 		AssertHighlightPs.SafeRelease();
 		bHadAssertError = false;
@@ -310,10 +309,17 @@ namespace SH
 			})
 		);
 
+		OverrideBuiltInFactories BuiltInFactories{
+			.MakeMatrixBuiltInItem  = MakeOverrideBuiltInFactory<BuiltInMatrix4x4Value>(&ShaderOverrideSlot::MatrixBuiltInRaw),
+			.MakeFloatBuiltInItem   = MakeOverrideBuiltInFactory<BuiltInFloatValue>(&ShaderOverrideSlot::FloatBuiltInRaw),
+			.MakeVector2BuiltInItem = MakeOverrideBuiltInFactory<BuiltInVector2Value>(&ShaderOverrideSlot::Vector2BuiltInRaw),
+			.MakeVector3BuiltInItem = MakeOverrideBuiltInFactory<BuiltInVector3Value>(&ShaderOverrideSlot::Vector3BuiltInRaw),
+		};
+
 		for (int32 Index = 0; Index < OverrideSlots.Num(); ++Index)
 		{
 			ShaderOverrideSlot& Slot = OverrideSlots[Index];
-			TSharedRef<PropertyItemBase> Entry = MakeOverrideSlotPropertyItem(this, OverrideSlots, Slot);
+			TSharedRef<PropertyItemBase> Entry = MakeOverrideSlotPropertyItem(this, OverrideSlots, Slot, BuiltInFactories);
 			int32 EntryIndex = Index;
 			Entry->SetOnDelete([this, EntryIndex] {
 				RemoveOverride(EntryIndex);
@@ -502,7 +508,7 @@ namespace SH
 
 	void MeshRenderObject::AddRWInputBlitPasses(RenderGraph& RG)
 	{
-		if (!MaterialAsset || bDrawMaterialError)
+		if (!MaterialAsset)
 		{
 			return;
 		}
@@ -539,7 +545,7 @@ namespace SH
 
 	GpuTexture* MeshRenderObject::ResolveBindingTexture(const GpuShaderLayoutBinding& Binding)
 	{
-		if (!MaterialAsset || bDrawMaterialError)
+		if (!MaterialAsset)
 		{
 			return nullptr;
 		}
@@ -559,7 +565,7 @@ namespace SH
 
 	GpuBuffer* MeshRenderObject::ResolveBindingBuffer(const GpuShaderLayoutBinding& Binding)
 	{
-		if (!MaterialAsset || bDrawMaterialError)
+		if (!MaterialAsset)
 		{
 			return nullptr;
 		}
@@ -584,7 +590,7 @@ namespace SH
 
 	void MeshRenderObject::AddRenderPassResourceAccesses(RGRenderPass& Pass)
 	{
-		if (!MaterialAsset || bDrawMaterialError)
+		if (!MaterialAsset)
 		{
 			return;
 		}
@@ -774,9 +780,9 @@ namespace SH
 
 		MaterialUniformBufferUpdateOptions UniformOptions = MakeMaterialUniformOptions(
 			ModelMatrix, ViewMat, ProjMat, ViewportSize, MousePos, CameraPos, CameraDir, Time);
-		UniformOptions.UniformOverrideBytesResolver = [this](const MaterialBindingMemberDefault& MemberDefault) -> const uint8* {
+		UniformOptions.UniformOverrideBytesResolver = [this, &UniformOptions](const MaterialBindingMemberDefault& MemberDefault) -> const uint8* {
 			const ShaderOverrideKey Key{ MemberDefault.BindingName, MemberDefault.MemberName, MemberDefault.Stage };
-			const ShaderOverrideSlot* Override = FindOverrideSlot(OverrideSlots, Key);
+			ShaderOverrideSlot* Override = FindOverrideSlot(OverrideSlots, Key);
 			if (!Override)
 			{
 				return nullptr;
@@ -798,6 +804,52 @@ namespace SH
 				}
 			}
 
+			if (Override->ValueSource == MaterialBindingValueSource::BuiltIn)
+			{
+				if (IsShaderMatrix4x4Type(Override->Type))
+				{
+					FMatrix44f* Out = GetOverrideBytesAs<FMatrix44f>(*Override);
+					switch (static_cast<BuiltInMatrix4x4Value>(Override->MatrixBuiltInRaw))
+					{
+					case BuiltInMatrix4x4Value::Model:    *Out = UniformOptions.ModelMatrix;    break;
+					case BuiltInMatrix4x4Value::View:     *Out = UniformOptions.ViewMatrix;     break;
+					case BuiltInMatrix4x4Value::Proj:     *Out = UniformOptions.ProjMatrix;     break;
+					case BuiltInMatrix4x4Value::ViewProj: *Out = UniformOptions.ViewProjMatrix; break;
+					case BuiltInMatrix4x4Value::MVP:      *Out = UniformOptions.MVPMatrix;      break;
+					}
+					return reinterpret_cast<const uint8*>(Out);
+				}
+				if (IsShaderFloatType(Override->Type))
+				{
+					float* Out = GetOverrideBytesAs<float>(*Override);
+					switch (static_cast<BuiltInFloatValue>(Override->FloatBuiltInRaw))
+					{
+					case BuiltInFloatValue::Time: *Out = UniformOptions.Time; break;
+					}
+					return reinterpret_cast<const uint8*>(Out);
+				}
+				if (IsShaderVector2Type(Override->Type))
+				{
+					Vector2f* Out = GetOverrideBytesAs<Vector2f>(*Override);
+					switch (static_cast<BuiltInVector2Value>(Override->Vector2BuiltInRaw))
+					{
+					case BuiltInVector2Value::ViewportSize: *Out = UniformOptions.ViewportSize; break;
+					case BuiltInVector2Value::MousePos:     *Out = UniformOptions.MousePos;     break;
+					}
+					return reinterpret_cast<const uint8*>(Out);
+				}
+				if (IsShaderVector3Type(Override->Type))
+				{
+					Vector3f* Out = GetOverrideBytesAs<Vector3f>(*Override);
+					switch (static_cast<BuiltInVector3Value>(Override->Vector3BuiltInRaw))
+					{
+					case BuiltInVector3Value::CameraPos: *Out = UniformOptions.CameraPos; break;
+					case BuiltInVector3Value::CameraDir: *Out = UniformOptions.CameraDir; break;
+					}
+					return reinterpret_cast<const uint8*>(Out);
+				}
+			}
+
 			return GetCompleteOverrideBytes(Override->Bytes, MemberDefault.Type);
 		};
 		UpdateMaterialUniformBuffers(*MaterialAsset, UniformBuffers, UniformOptions);
@@ -811,7 +863,7 @@ namespace SH
 			return nullptr;
 		}
 
-		if (!MaterialAsset || bDrawMaterialError || !Pipeline.IsValid())
+		if (!MaterialAsset || !Pipeline.IsValid())
 		{
 			return nullptr;
 		}
@@ -1010,7 +1062,7 @@ namespace SH
 
 	bool MeshRenderObject::UsesTextureAsShaderInput(GpuTexture* Texture, FString& OutBindingName) const
 	{
-		if (!MaterialAsset || bDrawMaterialError)
+		if (!MaterialAsset)
 		{
 			return false;
 		}
@@ -1080,12 +1132,7 @@ namespace SH
 	bool MeshRenderObject::EnsureRenderResources(const TArray<GpuFormat>& ColorFormats, TOptional<GpuFormat> DepthFormat, uint32 SampleCount)
 	{
 		BindMaterialDelegates();
-		bDrawMaterialError = !BuildPipeline(ColorFormats, DepthFormat, SampleCount);
-		if (bDrawMaterialError)
-		{
-			return EnsureMaterialErrorRenderResources(ErrorResources, ColorFormats, DepthFormat, SampleCount);
-		}
-		return true;
+		return BuildPipeline(ColorFormats, DepthFormat, SampleCount);
 	}
 
 	void MeshRenderObject::Draw(GpuRenderPassRecorder* Recorder, const Camera* InCamera, const FMatrix44f& ModelMatrix, const Vector2f& ViewportSize, const Vector2f& MousePos, float Time)
@@ -1098,20 +1145,6 @@ namespace SH
 
 		const FMatrix44f ViewMat = InCamera ? InCamera->GetViewMatrix() : FMatrix44f::Identity;
 		const FMatrix44f ProjMat = InCamera ? InCamera->GetProjectionMatrix() : FMatrix44f::Identity;
-		const FMatrix44f MVPMat = ModelMatrix * (ViewMat * ProjMat);
-
-		if (bDrawMaterialError)
-		{
-			if (Model* ErrorModel = MSO->ModelAsset.Get())
-			{
-				const TArray<MeshBuffers>& GpuMeshes = ErrorModel->GetGpuMeshes();
-				for (const MeshBuffers& MeshBuffer : GpuMeshes)
-				{
-					DrawMaterialErrorMesh(Recorder, ErrorResources, MeshBuffer, MVPMat);
-				}
-			}
-			return;
-		}
 
 		if (!MaterialAsset || !Pipeline.IsValid())
 		{
@@ -1210,7 +1243,7 @@ namespace SH
 
 	void MeshRenderObject::AddAssertHighlightPass(RenderGraph& RG, const TArray<TRefCountPtr<GpuTexture>>& ColorRTs, TRefCountPtr<GpuTexture> DepthRT, const Vector2f& ViewportSize, const Camera* Cam)
 	{
-		if (bDrawMaterialError || !bHadAssertError) return;
+		if (!bHadAssertError) return;
 		if (!MaterialAsset || !MeshSceneObjectRef.IsValid()) return;
 		if (!Pipeline.IsValid()) return;
 		if (!BuildAssertHighlightPs()) return;

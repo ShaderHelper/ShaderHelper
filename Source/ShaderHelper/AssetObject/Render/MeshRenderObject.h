@@ -61,8 +61,7 @@ namespace SH
 		TRefCountPtr<FW::GpuTexture> BuildCoverageMask();
 
 		// Re-renders the mesh with a SPIR-V-patched PS that writes pink (1,0,1,1) wherever
-		// GPrivate_AssertResult != 1. Skipped when bDrawMaterialError or when no assert was
-		// reported on the previous frame.
+		// GPrivate_AssertResult != 1. Skipped when no assert was reported on the previous frame.
 		void AddAssertHighlightPass(FW::RenderGraph& RG, const TArray<TRefCountPtr<FW::GpuTexture>>& ColorRTs, TRefCountPtr<FW::GpuTexture> DepthRT, const FW::Vector2f& ViewportSize, const FW::Camera* Cam);
 		bool bHadAssertError = false;
 
@@ -92,10 +91,8 @@ namespace SH
 		FW::GpuRenderPipelineStateDesc PipelineDesc;
 		TMap<FString, TUniquePtr<FW::UniformBuffer>> UniformBuffers;
 		TUniquePtr<FW::PrintBuffer> PrinterBuffer;
-		MaterialErrorRenderResources ErrorResources;
 		FDelegateHandle MaterialChangedHandle;
 		Material* BoundMaterial = nullptr;
-		bool bDrawMaterialError = false;
 		bool bDebugging = false;
 
 		// Assert-highlight PS that overlays pink on asserting fragments.

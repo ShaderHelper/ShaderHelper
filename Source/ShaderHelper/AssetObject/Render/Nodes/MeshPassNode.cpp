@@ -714,7 +714,10 @@ namespace SH
 
 		for (auto& MRO : MeshRenderObjects)
 		{
-			MRO->EnsureRenderResources(ColorFormatKey, DepthFormatKey, SampleCount);
+			if (!MRO->EnsureRenderResources(ColorFormatKey, DepthFormatKey, SampleCount))
+			{
+				return { true, true };
+			}
 		}
 
 		auto ValidateRenderTargetNotShaderInput = [this](GpuTexture* RenderTarget, const FString& RenderTargetName) -> bool {
@@ -1299,8 +1302,8 @@ namespace SH
 				RTCat->AddChild(EnumItem);
 			}
 
-			auto WItem = MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("WidthAuto"), &RTSize.X);
-			auto HItem = MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("HeightAuto"), &RTSize.Y);
+			auto WItem = MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("Width"), &RTSize.X);
+			auto HItem = MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("Height"), &RTSize.Y);
 			RTCat->AddChild(WItem);
 			RTCat->AddChild(HItem);
 		}

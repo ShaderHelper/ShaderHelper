@@ -5,12 +5,14 @@
 #include "AssetObject/Texture2D.h"
 #include "AssetObject/Texture3D.h"
 #include "AssetObject/TextureCube.h"
+#include "Editor/ShaderHelperEditor.h"
 #include "Renderer/MaterialRenderCommon.h"
 #include "GpuApi/GpuResourceHelper.h"
 #include "GpuApi/GpuRhi.h"
 #include "GpuApi/GpuShader.h"
 #include "UI/Styles/FAppCommonStyle.h"
 #include "UI/Widgets/Property/PropertyData/PropertyAssetItem.h"
+#include "UI/Widgets/Property/PropertyData/PropertyItem.h"
 #include "UI/Widgets/Property/PropertyData/PropertyMatrixItem.h"
 
 using namespace FW;
@@ -46,6 +48,8 @@ namespace SH
 	{
 		Ar << S.Key << S.Type << S.bIsResource << S.InputPin << S.Bytes << S.OutputPin;
 		Ar << static_cast<ShaderResourceBindingState&>(S);
+		Ar << S.ValueSource;
+		Ar << S.MatrixBuiltInRaw << S.FloatBuiltInRaw << S.Vector2BuiltInRaw << S.Vector3BuiltInRaw;
 		return Ar;
 	}
 
@@ -330,8 +334,8 @@ namespace SH
 	bool IsDefaultRWTextureProperty(const TArray<ShaderOverrideSlot>& Slots, PropertyData* InProperty)
 	{
 		const FText DisplayName = InProperty->GetDisplayName();
-		const bool bDefaultRWChild = DisplayName.EqualTo(LOCALIZATION("WidthAuto"))
-			|| DisplayName.EqualTo(LOCALIZATION("HeightAuto"))
+		const bool bDefaultRWChild = DisplayName.EqualTo(LOCALIZATION("Width"))
+			|| DisplayName.EqualTo(LOCALIZATION("Height"))
 			|| DisplayName.EqualTo(LOCALIZATION("Depth"))
 			|| DisplayName.EqualTo(LOCALIZATION("Format"));
 		if (!bDefaultRWChild)
@@ -428,12 +432,8 @@ namespace SH
 		if (MatchingResource && (BindingTypeValue == BindingType::RWTexture || BindingTypeValue == BindingType::RWTexture3D))
 		{
 			const bool bIs3D = BindingTypeValue == BindingType::RWTexture3D;
-			auto ResolveExtent = [](int32 SlotValue, float ViewportValue) -> uint32 {
-				if (SlotValue <= 0 && ViewportValue > 0) return static_cast<uint32>(ViewportValue);
-				return static_cast<uint32>(FMath::Max(1, SlotValue));
-			};
-			const uint32 W = ResolveExtent(MatchingResource->DefaultRWSize.x, ViewportSize.X);
-			const uint32 H = ResolveExtent(MatchingResource->DefaultRWSize.y, ViewportSize.Y);
+			const uint32 W = static_cast<uint32>(FMath::Max(1, MatchingResource->DefaultRWSize.x));
+			const uint32 H = static_cast<uint32>(FMath::Max(1, MatchingResource->DefaultRWSize.y));
 			const uint32 D = static_cast<uint32>(FMath::Max(1, MatchingResource->DefaultRWSize.z));
 			const GpuFormat Fmt = MatchingResource->Format;
 			GpuTexture* Existing = MatchingResource->DefaultRWTexture.GetReference();
@@ -776,8 +776,87 @@ namespace SH
 		});
 	}
 
-	TSharedRef<PropertyItemBase> MakeBytesPropertyItem(ShObject* Owner, FText Label, ShaderOverrideSlot& Slot)
+	void AttachValueSourceSwitchMenu(
+		const TSharedRef<PropertyItemBase>& Item,
+		ShObject* Owner,
+		MaterialBindingValueSource& ValueSource,
+		bool bShowCustomEntry,
+		bool bShowBuiltInEntry)
 	{
+		PropertyData* EditProperty = &Item.Get();
+		Item->SetContextMenuExtender([EditProperty, Owner, &ValueSource, bShowCustomEntry, bShowBuiltInEntry](FMenuBuilder& MenuBuilder) {
+			auto AddSourceEntry = [&](const FText& Label, MaterialBindingValueSource Source) {
+				MenuBuilder.AddMenuEntry(
+					Label,
+					FText::GetEmpty(),
+					FSlateIcon(),
+					FUIAction(
+						FExecuteAction::CreateLambda([EditProperty, Owner, &ValueSource, Source] {
+							if (ValueSource == Source)
+							{
+								return;
+							}
+							EditProperty->BeginEdit();
+							ValueSource = Source;
+							Owner->PostPropertyChanged(EditProperty);
+							EditProperty->EndEdit();
+							static_cast<ShaderHelperEditor*>(GApp->GetEditor())->RefreshProperty();
+						}),
+						FCanExecuteAction(),
+						FIsActionChecked::CreateLambda([&ValueSource, Source] { return ValueSource == Source; })
+					),
+					NAME_None,
+					EUserInterfaceActionType::ToggleButton
+				);
+			};
+			if (bShowCustomEntry)
+			{
+				AddSourceEntry(LOCALIZATION("Custom"), MaterialBindingValueSource::Custom);
+			}
+			if (bShowBuiltInEntry)
+			{
+				AddSourceEntry(LOCALIZATION("Builtin"), MaterialBindingValueSource::BuiltIn);
+			}
+		});
+	}
+
+	static TSharedRef<PropertyItemBase> MakeSwitchableBytesPropertyItem(
+		ShObject* Owner,
+		FText Label,
+		ShaderOverrideSlot& Slot,
+		const OverrideBuiltInFactories::ItemFactory& BuiltInFactory,
+		TFunction<TSharedRef<PropertyItemBase>()> MakeCustom)
+	{
+		TSharedRef<PropertyItemBase> Item = (Slot.ValueSource == MaterialBindingValueSource::BuiltIn)
+			? BuiltInFactory(Owner, Label, Slot)
+			: MakeCustom();
+		AttachValueSourceSwitchMenu(Item, Owner, Slot.ValueSource);
+		return Item;
+	}
+
+	TSharedRef<PropertyItemBase> MakeBytesPropertyItem(ShObject* Owner, FText Label, TArray<ShaderOverrideSlot>& Slots, ShaderOverrideSlot& Slot, const OverrideBuiltInFactories& Factories)
+	{
+		if (IsShaderMatrix4x4Type(Slot.Type) && Factories.MakeMatrixBuiltInItem)
+		{
+			return MakeSwitchableBytesPropertyItem(Owner, Label, Slot, Factories.MakeMatrixBuiltInItem,
+				[&] { return StaticCastSharedRef<PropertyItemBase>(MakeShared<PropertyMatrix4x4fItem>(Owner, Label, GetOverrideBytesAs<FMatrix44f>(Slot))); });
+		}
+		if (IsShaderFloatType(Slot.Type) && Factories.MakeFloatBuiltInItem)
+		{
+			return MakeSwitchableBytesPropertyItem(Owner, Label, Slot, Factories.MakeFloatBuiltInItem,
+				[&] { return StaticCastSharedRef<PropertyItemBase>(MakeShared<PropertyScalarItem<float>>(Owner, Label, GetOverrideBytesAs<float>(Slot))); });
+		}
+		if (IsShaderVector2Type(Slot.Type) && Factories.MakeVector2BuiltInItem)
+		{
+			return MakeSwitchableBytesPropertyItem(Owner, Label, Slot, Factories.MakeVector2BuiltInItem,
+				[&] { return StaticCastSharedRef<PropertyItemBase>(MakeShared<PropertyVector2fItem>(Owner, Label, GetOverrideBytesAs<Vector2f>(Slot))); });
+		}
+		if (IsShaderVector3Type(Slot.Type) && Factories.MakeVector3BuiltInItem)
+		{
+			return MakeSwitchableBytesPropertyItem(Owner, Label, Slot, Factories.MakeVector3BuiltInItem,
+				[&] { return StaticCastSharedRef<PropertyItemBase>(MakeShared<PropertyVector3fItem>(Owner, Label, GetOverrideBytesAs<Vector3f>(Slot))); });
+		}
+
 		if (IsShaderMatrix4x4Type(Slot.Type))
 		{
 			return MakeShared<PropertyMatrix4x4fItem>(Owner, Label, GetOverrideBytesAs<FMatrix44f>(Slot));
@@ -811,21 +890,17 @@ namespace SH
 
 	void AppendDefaultRWSizeChildren(ShObject* Owner, PropertyItemBase& Parent, ShaderResourceBindingState& ResourceState, const FString& Type)
 	{
-		const bool bIs3D = Type.Contains(TEXT("3D"));
+		auto AddExtent = [&](const FText& Label, int32* Field) {
+			auto Item = MakeShared<PropertyScalarItem<int32>>(Owner, Label, Field);
+			Item->SetMinValue(1);
+			Parent.AddChild(Item);
+		};
 
-		auto WidthItem = MakeShared<PropertyScalarItem<int32>>(Owner, LOCALIZATION("WidthAuto"), &ResourceState.DefaultRWSize.x);
-		WidthItem->SetMinValue(0);
-		Parent.AddChild(WidthItem);
-
-		auto HeightItem = MakeShared<PropertyScalarItem<int32>>(Owner, LOCALIZATION("HeightAuto"), &ResourceState.DefaultRWSize.y);
-		HeightItem->SetMinValue(0);
-		Parent.AddChild(HeightItem);
-
-		if (bIs3D)
+		AddExtent(LOCALIZATION("Width"), &ResourceState.DefaultRWSize.x);
+		AddExtent(LOCALIZATION("Height"), &ResourceState.DefaultRWSize.y);
+		if (Type.Contains(TEXT("3D")))
 		{
-			auto DepthItem = MakeShared<PropertyScalarItem<int32>>(Owner, LOCALIZATION("Depth"), &ResourceState.DefaultRWSize.z);
-			DepthItem->SetMinValue(1);
-			Parent.AddChild(DepthItem);
+			AddExtent(LOCALIZATION("Depth"), &ResourceState.DefaultRWSize.z);
 		}
 
 		TFunction<bool(GpuFormat)> IsRWTexFmtSupported = [](GpuFormat F) {
@@ -882,7 +957,7 @@ namespace SH
 		return AssetItem;
 	}
 
-	TSharedRef<PropertyItemBase> MakeOverrideSlotPropertyItem(ShObject* Owner, const TArray<ShaderOverrideSlot>& Slots, ShaderOverrideSlot& Slot)
+	TSharedRef<PropertyItemBase> MakeOverrideSlotPropertyItem(ShObject* Owner, TArray<ShaderOverrideSlot>& Slots, ShaderOverrideSlot& Slot, const OverrideBuiltInFactories& Factories)
 	{
 		const FText Label = FText::FromString(MakeOverrideSlotLabel(Slot));
 		GraphPin* OverridePin = FindOverrideInputPin(Slots, Slot.Key);
@@ -903,7 +978,7 @@ namespace SH
 
 		if (!Slot.bIsResource)
 		{
-			return MakeBytesPropertyItem(Owner, Label, Slot);
+			return MakeBytesPropertyItem(Owner, Label, Slots, Slot, Factories);
 		}
 
 		if (Slot.BindingType == BindingType::Sampler)

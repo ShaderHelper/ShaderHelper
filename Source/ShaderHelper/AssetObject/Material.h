@@ -35,12 +35,6 @@ namespace SH
 		CameraDir,
 	};
 
-	enum class MaterialBindingValueSource : uint8
-	{
-		Custom,
-		BuiltIn,
-	};
-
 	enum class BuiltInVertexAttribute : uint8
 	{
 		Position,

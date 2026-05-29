@@ -4,6 +4,7 @@
 #include "GpuApi/GpuBuffer.h"
 #include "GpuApi/GpuSampler.h"
 #include "GpuApi/GpuTexture.h"
+#include "UI/Widgets/Property/PropertyData/PropertyItem.h"
 
 namespace FW
 {
@@ -15,6 +16,11 @@ namespace FW
 
 namespace SH
 {
+	enum class MaterialBindingValueSource : uint8
+	{
+		Custom,
+		BuiltIn,
+	};
 
 	struct ShaderResourceBindingState
 	{
@@ -63,6 +69,12 @@ namespace SH
 		FW::ObserverObjectPtr<FW::GraphPin> InputPin;
 		FW::ObserverObjectPtr<FW::GraphPin> OutputPin; // RW resource result output pin; same label as InputPin
 		TArray<uint8> Bytes;
+
+		MaterialBindingValueSource ValueSource = MaterialBindingValueSource::Custom;
+		uint8 MatrixBuiltInRaw = 0;
+		uint8 FloatBuiltInRaw = 0;
+		uint8 Vector2BuiltInRaw = 0;
+		uint8 Vector3BuiltInRaw = 0;
 
 		friend FArchive& operator<<(FArchive& Ar, ShaderOverrideSlot& S);
 	};
@@ -133,14 +145,44 @@ namespace SH
 	//   - update direction/label
 	void ReconcileOverridePins(FW::ShObject* Owner, TArray<ShaderOverrideSlot>& Slots, TArray<FW::ObjectPtr<FW::GraphPin>>& Pins);
 
+	struct OverrideBuiltInFactories
+	{
+		using ItemFactory = TFunction<TSharedRef<FW::PropertyItemBase>(
+			FW::ShObject* Owner, FText Label, ShaderOverrideSlot& Slot)>;
+
+		ItemFactory MakeMatrixBuiltInItem;
+		ItemFactory MakeFloatBuiltInItem;
+		ItemFactory MakeVector2BuiltInItem;
+		ItemFactory MakeVector3BuiltInItem;
+	};
+
+	template<typename EnumType>
+	OverrideBuiltInFactories::ItemFactory MakeOverrideBuiltInFactory(uint8 ShaderOverrideSlot::* RawField)
+	{
+		return [RawField](FW::ShObject* Owner, FText Label, ShaderOverrideSlot& Slot) -> TSharedRef<FW::PropertyItemBase> {
+			return FW::MakePropertyEnumItem<EnumType>(
+				Owner, Label, static_cast<EnumType>(Slot.*RawField),
+				[&Slot, RawField](EnumType v) {
+					Slot.*RawField = static_cast<uint8>(v);
+				});
+		};
+	}
+
+	void AttachValueSourceSwitchMenu(
+		const TSharedRef<FW::PropertyItemBase>& Item,
+		FW::ShObject* Owner,
+		MaterialBindingValueSource& ValueSource,
+		bool bShowCustomEntry = true,
+		bool bShowBuiltInEntry = true);
+
 	// Build a property item for a scalar/vector/matrix override slot.
-	TSharedRef<FW::PropertyItemBase> MakeBytesPropertyItem(FW::ShObject* Owner, FText Label, ShaderOverrideSlot& Slot);
+	TSharedRef<FW::PropertyItemBase> MakeBytesPropertyItem(FW::ShObject* Owner, FText Label, TArray<ShaderOverrideSlot>& Slots, ShaderOverrideSlot& Slot, const OverrideBuiltInFactories& Factories = {});
 	void AppendDefaultRWSizeChildren(FW::ShObject* Owner, FW::PropertyItemBase& Parent, ShaderResourceBindingState& ResourceState, const FString& Type);
 	void AppendDefaultRWSizeChildren(FW::ShObject* Owner, FW::PropertyItemBase& Parent, ShaderOverrideSlot& Slot);
 	void AppendSamplerPropertyChildren(FW::ShObject* Owner, FW::PropertyItemBase& Parent, ShaderResourceBindingState& ResourceState);
 	TSharedRef<FW::PropertyItemBase> MakeSamplerPropertyItem(FW::ShObject* Owner, FText Label, ShaderResourceBindingState& ResourceState);
 	TSharedRef<FW::PropertyItemBase> MakeTextureResourcePropertyItem(FW::ShObject* Owner, FText Label, ShaderResourceBindingState& ResourceState, const FString& Type, bool bIncludeSamplerSettings);
-	TSharedRef<FW::PropertyItemBase> MakeOverrideSlotPropertyItem(FW::ShObject* Owner, const TArray<ShaderOverrideSlot>& Slots, ShaderOverrideSlot& Slot);
+	TSharedRef<FW::PropertyItemBase> MakeOverrideSlotPropertyItem(FW::ShObject* Owner, TArray<ShaderOverrideSlot>& Slots, ShaderOverrideSlot& Slot, const OverrideBuiltInFactories& Factories = {});
 	// Build a property item for StructuredBuffer/RWStructuredBuffer/RawBuffer/RWRawBuffer bindings.
 	TSharedRef<FW::PropertyItemBase> MakeBufferPropertyItem(FW::ShObject* Owner, FText Label, FW::BindingType BindingTypeValue, uint32 StructuredStride, uint32& BufferByteSize, FW::GpuFormat& Format);
 	TSharedRef<FW::PropertyItemBase> MakeBufferPropertyItem(FW::ShObject* Owner, FText Label, ShaderOverrideSlot& Slot);

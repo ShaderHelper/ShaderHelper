@@ -18,6 +18,17 @@ namespace FW
 
 namespace SH
 {
+	enum class ComputeBuiltInFloatValue : uint8
+	{
+		Time,
+	};
+
+	enum class ComputeBuiltInVector2Value : uint8
+	{
+		ViewportSize,
+		MousePos,
+	};
+
 	class ComputePassNodeOp : public ShPropertyOp
 	{
 		REFLECTION_TYPE(ComputePassNodeOp)
@@ -68,7 +79,7 @@ namespace SH
 
 		void InvalidateRenderResources();
 		bool BuildBindGroups();
-		void UpdateUniformBuffers();
+		void UpdateUniformBuffers(const struct RenderExecContext& Ctx);
 		TArray<BindingBuilder> BuildDebugBindingBuilders() const;
 		FW::Vector3u ReflectThreadGroupSize() const;
 		// Resolve the input texture for a resource binding:

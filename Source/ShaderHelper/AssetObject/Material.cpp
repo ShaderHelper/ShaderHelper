@@ -518,54 +518,6 @@ namespace SH
 			}
 			return nullptr;
 		};
-		auto AddValueSourceSwitchMenu = [&](const TSharedRef<PropertyItemBase>& Item, const MaterialBindingMemberDefault& Default, bool bShowCustomEntry, bool bShowBuiltInEntry) {
-			FString BindingName = Default.BindingName;
-			FString MemberName = Default.MemberName;
-			BindingShaderStage Stage = Default.Stage;
-			PropertyData* EditProperty = &Item.Get();
-			Item->SetContextMenuExtender([this, BindingName, MemberName, Stage, EditProperty, FindMemberDefault, bShowCustomEntry, bShowBuiltInEntry](FMenuBuilder& MenuBuilder) {
-				auto AddSourceEntry = [&](const FText& Label, MaterialBindingValueSource Source) {
-					MenuBuilder.AddMenuEntry(
-						Label,
-						FText::GetEmpty(),
-						FSlateIcon(),
-						FUIAction(
-							FExecuteAction::CreateLambda([this, BindingName, MemberName, Stage, Source, EditProperty, FindMemberDefault] {
-								if (MaterialBindingMemberDefault* D = FindMemberDefault(BindingName, MemberName, Stage))
-								{
-									if (D->ValueSource != Source)
-									{
-										EditProperty->BeginEdit();
-										D->ValueSource = Source;
-										PostPropertyChanged(EditProperty);
-										EditProperty->EndEdit();
-										GApp->GetEditor()->RefreshProperty();
-									}
-								}
-							}),
-							FCanExecuteAction(),
-							FIsActionChecked::CreateLambda([BindingName, MemberName, Stage, Source, FindMemberDefault] {
-								if (MaterialBindingMemberDefault* D = FindMemberDefault(BindingName, MemberName, Stage))
-								{
-									return D->ValueSource == Source;
-								}
-								return false;
-							})
-						),
-						NAME_None,
-						EUserInterfaceActionType::ToggleButton
-					);
-				};
-				if (bShowCustomEntry)
-				{
-					AddSourceEntry(LOCALIZATION("Custom"), MaterialBindingValueSource::Custom);
-				}
-				if (bShowBuiltInEntry)
-				{
-					AddSourceEntry(LOCALIZATION("Builtin"), MaterialBindingValueSource::BuiltIn);
-				}
-			});
-		};
 		auto MakeBuiltInMatrixItem = [&](const FText& ItemLabel, MaterialBindingMemberDefault& Default) -> TSharedRef<PropertyItemBase> {
 			FString BindingName = Default.BindingName;
 			FString MemberName = Default.MemberName;
@@ -579,7 +531,7 @@ namespace SH
 					}
 				}
 			);
-			AddValueSourceSwitchMenu(EnumItem, Default, true, true);
+			AttachValueSourceSwitchMenu(EnumItem, this, Default.ValueSource);
 			return EnumItem;
 		};
 		auto MakeBuiltInFloatItem = [&](const FText& ItemLabel, MaterialBindingMemberDefault& Default) -> TSharedRef<PropertyItemBase> {
@@ -595,7 +547,7 @@ namespace SH
 					}
 				}
 			);
-			AddValueSourceSwitchMenu(EnumItem, Default, true, true);
+			AttachValueSourceSwitchMenu(EnumItem, this, Default.ValueSource);
 			return EnumItem;
 		};
 		auto MakeBuiltInVector2Item = [&](const FText& ItemLabel, MaterialBindingMemberDefault& Default) -> TSharedRef<PropertyItemBase> {
@@ -611,7 +563,7 @@ namespace SH
 					}
 				}
 			);
-			AddValueSourceSwitchMenu(EnumItem, Default, true, true);
+			AttachValueSourceSwitchMenu(EnumItem, this, Default.ValueSource);
 			return EnumItem;
 		};
 		auto MakeBuiltInVector3Item = [&](const FText& ItemLabel, MaterialBindingMemberDefault& Default) -> TSharedRef<PropertyItemBase> {
@@ -627,7 +579,7 @@ namespace SH
 					}
 				}
 			);
-			AddValueSourceSwitchMenu(EnumItem, Default, true, true);
+			AttachValueSourceSwitchMenu(EnumItem, this, Default.ValueSource);
 			return EnumItem;
 		};
 		for (auto& Default : BindingMemberDefaults)
@@ -656,7 +608,7 @@ namespace SH
 				else
 				{
 					auto Item = MakeShared<PropertyMatrix4x4fItem>(this, ItemLabel, reinterpret_cast<float*>(Default.Values));
-					AddValueSourceSwitchMenu(Item, Default, true, true);
+					AttachValueSourceSwitchMenu(Item, this, Default.ValueSource);
 					UbCategory->AddChild(Item);
 				}
 			}
@@ -669,7 +621,7 @@ namespace SH
 				else
 				{
 					auto Item = MakeShared<PropertyScalarItem<float>>(this, ItemLabel, reinterpret_cast<float*>(Default.Values));
-					AddValueSourceSwitchMenu(Item, Default, true, true);
+					AttachValueSourceSwitchMenu(Item, this, Default.ValueSource);
 					UbCategory->AddChild(Item);
 				}
 			}
@@ -700,7 +652,7 @@ namespace SH
 				else
 				{
 					auto Item = MakeShared<PropertyVector2fItem>(this, ItemLabel, reinterpret_cast<Vector2f*>(Default.Values));
-					AddValueSourceSwitchMenu(Item, Default, true, true);
+					AttachValueSourceSwitchMenu(Item, this, Default.ValueSource);
 					UbCategory->AddChild(Item);
 				}
 			}
@@ -713,7 +665,7 @@ namespace SH
 				else
 				{
 					auto Item = MakeShared<PropertyVector3fItem>(this, ItemLabel, reinterpret_cast<Vector3f*>(Default.Values));
-					AddValueSourceSwitchMenu(Item, Default, false, true);
+					AttachValueSourceSwitchMenu(Item, this, Default.ValueSource, false, true);
 					UbCategory->AddChild(Item);
 				}
 			}
