@@ -1161,6 +1161,7 @@ namespace SH
 		Recorder->SetRenderPipelineState(Pipeline);
 		Recorder->SetBindGroups(BGArray);
 
+		const uint32 InstanceCount = FMath::Max(1u, MSO->InstanceCount);
 		if (Model* ModelAsset = MSO->ModelAsset.Get())
 		{
 			const TArray<MeshBuffers>& GpuMeshes = ModelAsset->GetGpuMeshes();
@@ -1168,12 +1169,12 @@ namespace SH
 			{
 				Recorder->SetVertexBuffer(0, MB.VertexBuffer);
 				Recorder->SetIndexBuffer(MB.IndexBuffer);
-				Recorder->DrawIndexed(0, MB.IndexCount);
+				Recorder->DrawIndexed(0, MB.IndexCount, 0, 0, InstanceCount);
 			}
 		}
 		else if (MSO->VertexCount > 0)
 		{
-			Recorder->DrawPrimitive(0, MSO->VertexCount, 0, 1);
+			Recorder->DrawPrimitive(0, MSO->VertexCount, 0, InstanceCount);
 		}
 	}
 

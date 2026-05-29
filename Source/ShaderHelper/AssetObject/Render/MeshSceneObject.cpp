@@ -22,6 +22,7 @@ namespace SH
 		SceneObject::Serialize(Ar);
 		Ar << ModelAsset;
 		Ar << VertexCount;
+		Ar << InstanceCount;
 	}
 
 	TArray<TSharedRef<PropertyData>> MeshSceneObject::GeneratePropertyDatas()
@@ -31,6 +32,7 @@ namespace SH
 		{
 			Result.Add(MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("VertexCount"), &VertexCount));
 		}
+		Result.Add(MakeShared<PropertyScalarItem<uint32>>(this, LOCALIZATION("InstanceCount"), &InstanceCount));
 		return Result;
 	}
 

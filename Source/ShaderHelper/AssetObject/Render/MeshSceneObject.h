@@ -17,5 +17,6 @@ namespace SH
 
 		FW::AssetPtr<FW::Model> ModelAsset;
 		uint32 VertexCount = 3;
+		uint32 InstanceCount = 1;
 	};
 }

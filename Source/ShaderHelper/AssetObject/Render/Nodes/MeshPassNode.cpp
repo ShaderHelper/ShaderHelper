@@ -926,6 +926,11 @@ namespace SH
 								OnSelectionChanged(Item, ESelectInfo::OnMouseClick);
 								return FReply::Handled();
 							}
+							if (MouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
+							{
+								OnSelectionChanged(Item, ESelectInfo::OnMouseClick);
+								return FReply::Handled();
+							}
 							return FReply::Unhandled();
 						})
 						[
