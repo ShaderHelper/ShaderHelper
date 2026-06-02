@@ -128,6 +128,19 @@ namespace SH
 	REFLECTION_REGISTER(AddClass<MeshRenderObject>("MeshRenderObject")
 		.BaseClass<ShObject>()
 		.Data<&MeshRenderObject::MeshSceneObjectRef, MetaInfo::Property | MetaInfo::ReadOnly>(LOCALIZATION("MeshSceneObject"))
+		.Data<&MeshRenderObject::SubMeshIndex, MetaInfo::Property>(LOCALIZATION("SubMeshIndex"), {
+			.Min = [](const MeshRenderObject*) -> int32 { return 0; },
+			.Max = [](const MeshRenderObject* Obj) -> int32 {
+				if (Obj->MeshSceneObjectRef.IsValid())
+				{
+					if (Model* Mdl = Obj->MeshSceneObjectRef->ModelAsset.Get())
+					{
+						return FMath::Max(0, Mdl->GetSubMeshes().Num() - 1);
+					}
+				}
+				return 0;
+			}
+		})
 		.Data<&MeshRenderObject::MaterialAsset, MetaInfo::Property>(LOCALIZATION("Material"))
 	)
 
@@ -235,6 +248,7 @@ namespace SH
 	{
 		ShObject::Serialize(Ar);
 		Ar << MeshSceneObjectRef;
+		Ar << SubMeshIndex;
 		Ar << MaterialAsset;
 		Ar << OverrideSlots;
 
@@ -936,7 +950,7 @@ namespace SH
 			.Targets = {{ .TargetFormat = MaskTex->GetFormat() }},
 			.BindGroupLayouts = MaskLayoutArray,
 			.VertexLayout = MoveTemp(MaskVertexLayouts),
-			.RasterizerState = { MaterialAsset->FillMode, MaterialAsset->CullMode },
+			.RasterizerState = { MaterialAsset->FillMode, MaterialAsset->CullMode, MaterialAsset->FrontFace },
 			.Primitive = MaterialAsset->Primitive,
 		};
 
@@ -947,15 +961,14 @@ namespace SH
 		if (Model* ModelAsset = MSO->ModelAsset.Get())
 		{
 			TArray<MeshBuffers> GpuMeshes = ModelAsset->GetGpuMeshes();
-			DrawFunction = [MaskPipeline, MaskBGArray, GpuMeshes, InstanceCount](GpuRenderPassRecorder* PassRecorder) {
+			DrawFunction = [MaskPipeline, MaskBGArray, GpuMeshes, InstanceCount, SubMeshIdx = SubMeshIndex](GpuRenderPassRecorder* PassRecorder) {
+				if (!GpuMeshes.IsValidIndex(SubMeshIdx)) return;
 				PassRecorder->SetBindGroups(MaskBGArray);
 				PassRecorder->SetRenderPipelineState(MaskPipeline);
-				for (const MeshBuffers& MB : GpuMeshes)
-				{
-					PassRecorder->SetVertexBuffer(0, MB.VertexBuffer);
-					PassRecorder->SetIndexBuffer(MB.IndexBuffer);
-					PassRecorder->DrawIndexed(0, MB.IndexCount, 0, 0, InstanceCount);
-				}
+				const MeshBuffers& MB = GpuMeshes[SubMeshIdx];
+				PassRecorder->SetVertexBuffer(0, MB.VertexBuffer);
+				PassRecorder->SetIndexBuffer(MB.IndexBuffer);
+				PassRecorder->DrawIndexed(0, MB.IndexCount, 0, 0, InstanceCount);
 			};
 		}
 		else
@@ -1005,6 +1018,53 @@ namespace SH
 	InvocationState MeshRenderObject::GetInvocationState(DebugItem Item)
 	{
 		MeshPassNode* OwnerNode = static_cast<MeshPassNode*>(GetOuter());
+		if (Item == DebugItem::Vertex)
+		{
+			MeshSceneObject* MSO = MeshSceneObjectRef.Get();
+			VertexState VState;
+			VState.ViewPortDesc = OwnerNode->GetOutputViewPortDesc();
+			VState.Builders = BuildDebugBindingBuilders();
+			VState.PipelineDesc = PipelineDesc;
+			const TOptional<Camera>& Cam = OwnerNode->GetDebugFrameState().Camera;
+			if (Cam.IsSet())
+			{
+				const Camera& DebugCamera = Cam.GetValue();
+				VState.DebugCamera = DebugCamera;
+				VState.ClipToWorld = DebugCamera.GetViewProjectionMatrix().Inverse();
+			}
+			const uint32 InstanceCount = MSO->InstanceCount;
+			VState.InstanceCount = InstanceCount;
+			if (Model* ModelAsset = MSO->ModelAsset.Get())
+			{
+				const TArray<MeshBuffers>& GpuMeshes = ModelAsset->GetGpuMeshes();
+				const TArray<MeshData>& SubMeshes = ModelAsset->GetSubMeshes();
+				if (GpuMeshes.IsValidIndex(SubMeshIndex))
+				{
+					const MeshBuffers& MeshBuffer = GpuMeshes[SubMeshIndex];
+					VState.DrawFunction = [MeshBuffer, InstanceCount](GpuRenderPassRecorder* Recorder) {
+						Recorder->SetVertexBuffer(0, MeshBuffer.VertexBuffer);
+						Recorder->SetIndexBuffer(MeshBuffer.IndexBuffer);
+						Recorder->DrawIndexed(0, MeshBuffer.IndexCount, 0, 0, InstanceCount);
+					};
+					VState.VertexCount = MeshBuffer.VertexCount;
+					VState.Indices = SubMeshes[SubMeshIndex].Indices;
+				}
+			}
+			else
+			{
+				const uint32 VertexCount = MSO->VertexCount;
+				VState.DrawFunction = [VertexCount, InstanceCount](GpuRenderPassRecorder* Recorder) {
+					Recorder->DrawPrimitive(0, VertexCount, 0, InstanceCount);
+				};
+				VState.VertexCount = VertexCount;
+				VState.Indices.SetNumUninitialized(VertexCount);
+				for (uint32 VertexIndex = 0; VertexIndex < VertexCount; VertexIndex++)
+				{
+					VState.Indices[VertexIndex] = VertexIndex;
+				}
+			}
+			return VState;
+		}
 		if (Item == DebugItem::Pixel)
 		{
 			MeshSceneObject* MSO = MeshSceneObjectRef.Get();
@@ -1013,13 +1073,12 @@ namespace SH
 			if (Model* ModelAsset = MSO->ModelAsset.Get())
 			{
 				TArray<MeshBuffers> Meshes = ModelAsset->GetGpuMeshes();
-				DrawFunction = [Meshes, InstanceCount](GpuRenderPassRecorder* Recorder) {
-					for (const MeshBuffers& MeshBuffer : Meshes)
-					{
-						Recorder->SetVertexBuffer(0, MeshBuffer.VertexBuffer);
-						Recorder->SetIndexBuffer(MeshBuffer.IndexBuffer);
-						Recorder->DrawIndexed(0, MeshBuffer.IndexCount, 0, 0, InstanceCount);
-					}
+				DrawFunction = [Meshes, InstanceCount, SubMeshIdx = SubMeshIndex](GpuRenderPassRecorder* Recorder) {
+					if (!Meshes.IsValidIndex(SubMeshIdx)) return;
+					const MeshBuffers& MeshBuffer = Meshes[SubMeshIdx];
+					Recorder->SetVertexBuffer(0, MeshBuffer.VertexBuffer);
+					Recorder->SetIndexBuffer(MeshBuffer.IndexBuffer);
+					Recorder->DrawIndexed(0, MeshBuffer.IndexCount, 0, 0, InstanceCount);
 				};
 			}
 			else
@@ -1148,8 +1207,9 @@ namespace SH
 		if (Model* ModelAsset = MSO->ModelAsset.Get())
 		{
 			const TArray<MeshBuffers>& GpuMeshes = ModelAsset->GetGpuMeshes();
-			for (const MeshBuffers& MB : GpuMeshes)
+			if (GpuMeshes.IsValidIndex(SubMeshIndex))
 			{
+				const MeshBuffers& MB = GpuMeshes[SubMeshIndex];
 				Recorder->SetVertexBuffer(0, MB.VertexBuffer);
 				Recorder->SetIndexBuffer(MB.IndexBuffer);
 				Recorder->DrawIndexed(0, MB.IndexCount, 0, 0, MSO->InstanceCount);
@@ -1287,7 +1347,7 @@ namespace SH
 
 		ObserverObjectPtr<MeshSceneObject> MsoObs = MeshSceneObjectRef;
 		auto& Pass = RG.AddRenderPass(TEXT("MeshRenderObjectAssertHighlight"), MoveTemp(PassDesc),
-			[HlPipeline, BGArray, MsoObs](GpuRenderPassRecorder* Recorder) {
+			[HlPipeline, BGArray, MsoObs, SubMeshIdx = SubMeshIndex](GpuRenderPassRecorder* Recorder) {
 				if (!MsoObs.IsValid()) return;
 				MeshSceneObject* InMso = MsoObs.Get();
 				Recorder->SetRenderPipelineState(HlPipeline);
@@ -1295,8 +1355,9 @@ namespace SH
 				if (Model* MdlAsset = InMso->ModelAsset.Get())
 				{
 					const TArray<MeshBuffers>& GpuMeshes = MdlAsset->GetGpuMeshes();
-					for (const MeshBuffers& MB : GpuMeshes)
+					if (GpuMeshes.IsValidIndex(SubMeshIdx))
 					{
+						const MeshBuffers& MB = GpuMeshes[SubMeshIdx];
 						Recorder->SetVertexBuffer(0, MB.VertexBuffer);
 						Recorder->SetIndexBuffer(MB.IndexBuffer);
 						Recorder->DrawIndexed(0, MB.IndexCount, 0, 0, InMso->InstanceCount);

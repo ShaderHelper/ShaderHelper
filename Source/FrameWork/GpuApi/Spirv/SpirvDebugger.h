@@ -436,6 +436,8 @@ namespace FW
 	SpvId PatchWorkgroupIdBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context);
 	SpvId PatchLocalInvocationIdBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context);
 	SpvId PatchLocalInvocationIndexBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context);
+	SpvId PatchVertexIndexBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context);
+	SpvId PatchInstanceIndexBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context);
 	SpvId PatchGlobalInvocationIdBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context);
 	int32 GetInstIndex(const TArray<TUniquePtr<SpvInstruction>>* Insts, SpvId Inst);
 

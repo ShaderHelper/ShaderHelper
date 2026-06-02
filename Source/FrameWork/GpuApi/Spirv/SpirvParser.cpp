@@ -212,9 +212,13 @@ namespace FW
 		Context.Types.emplace(ResultId, MakeUnique<SpvRuntimeArrayType>(ResultId, ElementType));
 	}
 
-	void SpvMetaVisitor::Visit(const SpvOpExecutionMode* Inst)
+	void SpvMetaVisitor::Visit(const SpvOpEntryPoint* Inst)
 	{
 		Context.EntryPoint = Inst->GetEntryPointId();
+	}
+
+	void SpvMetaVisitor::Visit(const SpvOpExecutionMode* Inst)
+	{
 		if(Inst->GetMode() == SpvExecutionMode::LocalSize)
 		{
 			const TArray<uint8>& Operands = Inst->GetExtraOperands();
@@ -613,7 +617,8 @@ namespace FW
 			{
 				Sections.FindOrAdd(SpvSectionKind::DebugName, { WordOffset });
 			}
-			else if (OpCode == SpvOp::Decorate || OpCode == SpvOp::MemberDecorate)
+			else if (OpCode == SpvOp::Decorate || OpCode == SpvOp::MemberDecorate ||
+				OpCode == SpvOp::DecorateString || OpCode == SpvOp::MemberDecorateString)
 			{
 				Sections.FindOrAdd(SpvSectionKind::Annotation, { WordOffset });
 			}

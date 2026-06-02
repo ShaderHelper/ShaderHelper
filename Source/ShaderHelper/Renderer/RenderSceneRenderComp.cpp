@@ -98,7 +98,7 @@ namespace SH
 		PreviewCamera.Pitch = -0.5f;
 		PreviewCamera.VerticalFov = FMath::DegreesToRadians(60.0f);
 		PreviewCamera.NearPlane = 0.1f;
-		PreviewCamera.FarPlane = 1000.0f;
+		PreviewCamera.FarPlane = 100.0f;
 		LastFrameTime = FPlatformTime::Seconds();
 
 		// Setup input delegates

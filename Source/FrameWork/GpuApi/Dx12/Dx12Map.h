@@ -95,11 +95,23 @@ namespace FW
         }
     }
 
+	inline bool MapRasterizerFrontFace(RasterizerFrontFace InFrontFace)
+	{
+		switch (InFrontFace)
+		{
+		case RasterizerFrontFace::Clockwise:         return false;
+		case RasterizerFrontFace::CounterClockwise:  return true;
+		default:
+			AUX::Unreachable();
+		}
+	}
+
 	inline D3D12_RASTERIZER_DESC MapRasterizerState(RasterizerStateDesc InDesc)
 	{
 		CD3DX12_RASTERIZER_DESC Desc = CD3DX12_RASTERIZER_DESC(CD3DX12_DEFAULT{});
 		Desc.FillMode = MapRasterizerFillMode(InDesc.FillMode);
 		Desc.CullMode = MapRasterizerCullMode(InDesc.CullMode);
+		Desc.FrontCounterClockwise = MapRasterizerFrontFace(InDesc.FrontFace);
 		return Desc;
 	}
 

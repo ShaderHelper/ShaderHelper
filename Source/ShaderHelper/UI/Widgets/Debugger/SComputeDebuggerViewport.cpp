@@ -120,11 +120,7 @@ namespace SH
 	{
 		if (MouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
 		{
-			if (auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor()))
-			{
-				ShEditor->EndDebugging();
-			}
-			return FReply::Handled().ReleaseMouseCapture().ReleaseMouseLock();
+			return FReply::Handled();
 		}
 		return SCompoundWidget::OnMouseButtonDown(MyGeometry, MouseEvent);
 	}
@@ -265,7 +261,7 @@ namespace SH
 							})
 							.OnClicked_Lambda([this, x, y] {
 								OnPickThread(Vector3u{ x, y, SelectedZ });
-								return FReply::Handled().ReleaseMouseLock();
+								return FReply::Handled();
 							})
 							.ToolTipText_Lambda([this, x, y] {
 								return FText::FromString(FString::Printf(TEXT("%s = (%u, %u, %u)"), *LOCALIZATION("GroupThreadID").ToString(), x, y, SelectedZ));

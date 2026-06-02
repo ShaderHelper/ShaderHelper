@@ -103,7 +103,7 @@ namespace FW::VK
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
 			.polygonMode = MapRasterizerFillMode(InPipelineStateDesc.RasterizerState.FillMode),
 			.cullMode = MapRasterizerCullMode(InPipelineStateDesc.RasterizerState.CullMode),
-			.frontFace = VK_FRONT_FACE_CLOCKWISE,
+			.frontFace = MapRasterizerFrontFace(InPipelineStateDesc.RasterizerState.FrontFace),
 			.lineWidth = 1.0f
 		};
 		VkPipelineMultisampleStateCreateInfo MultisampleInfo = {

@@ -1,6 +1,7 @@
 #pragma once
 #include "GpuApi/Spirv/SpirvDebugger.h"
 #include "GpuApi/GpuRhi.h"
+#include "RenderResource/Camera.h"
 
 
 DECLARE_LOG_CATEGORY_EXTERN(LogDebugger, Log, All);
@@ -19,7 +20,15 @@ namespace SH
 
 	struct VertexState
 	{
-
+		FW::GpuViewPortDesc ViewPortDesc;
+		TArray<BindingBuilder> Builders;
+		FW::GpuRenderPipelineStateDesc PipelineDesc;
+		TFunction<void(FW::GpuRenderPassRecorder*)> DrawFunction;
+		uint32 VertexCount = 0;   // per-instance vertex count
+		uint32 InstanceCount = 1;
+		TArray<uint32> Indices;   // per-instance triangle index list (for the geometry viewer / picking)
+		FMatrix44f ClipToWorld = FMatrix44f::Identity;
+		TOptional<FW::Camera> DebugCamera;
 	};
 
 	struct PixelState
@@ -86,8 +95,14 @@ namespace SH
 		struct ExpressionNode EvaluateExpression(const FString& InExpression) const;
 		bool Continue(StepMode Mode);
 
-		void DebugVertex(const FW::Vector3f& InVertPos, const InvocationState& InState);
 		void Reset();
+
+		//Vertex
+		// Returns the captured clip-space positions, indexed by vertex id.
+		TArray<FW::Vector4f> CaptureVertex(const InvocationState& InState);
+		void InvokeVertex();
+		void DebugVertex(uint32 InVertexIndex, uint32 InInstanceIndex, const InvocationState& InState);
+		//
 
 		//Pixel
 		void InvokePixel(bool GlobalValidation = false);
@@ -176,6 +191,10 @@ namespace SH
 		TRefCountPtr<FW::GpuBuffer> DebugParamsBuffer;
 		bool bEnableUbsan = false;
 		bool bEditDuringDebugging = false;
+
+		//Vertex
+		uint32 TargetVertexIndex{};
+		uint32 TargetInstanceIndex{};
 
 		//Pixel
 		FW::Vector2u PixelCoord;

@@ -140,6 +140,7 @@ namespace FW
 	{
 		CommandList = InArgs._CommandList;
 		Command = InArgs._Command;
+		ButtonToolTipText = InArgs._ButtonToolTipText;
 		IsButtonEnabled = InArgs._IsButtonEnabled;
 		IsMenuEnabled = InArgs._IsMenuEnabled;
 		OnClicked = InArgs._OnClicked;
@@ -168,7 +169,7 @@ namespace FW
 					SNew(SButton)
 					.ButtonStyle(ButtonStyle)
 					.ContentPadding(InArgs._ButtonContentPadding)
-					.ToolTipText(InArgs._ButtonToolTipText)
+					.ToolTipText(this, &SShSplitButton::GetButtonToolTipText)
 					.IsEnabled(this, &SShSplitButton::CanExecuteButton)
 					.OnClicked(this, &SShSplitButton::OnButtonClicked)
 					[
@@ -192,6 +193,33 @@ namespace FW
 				]
 			]
 		];
+	}
+
+	FText SShSplitButton::GetButtonToolTipText() const
+	{
+		FText ToolTipText = ButtonToolTipText.Get();
+		if (!Command.IsValid())
+		{
+			return ToolTipText;
+		}
+
+		const TSharedPtr<const FInputChord> ActiveChord = Command->GetActiveChord(EMultipleKeyBindingIndex::Primary);
+		if (!ActiveChord.IsValid() || ActiveChord->Key == EKeys::Invalid)
+		{
+			return ToolTipText;
+		}
+
+		const FText InputText = ActiveChord->GetInputText(false);
+		if (InputText.IsEmpty())
+		{
+			return ToolTipText;
+		}
+
+		if (ToolTipText.IsEmpty())
+		{
+			return InputText;
+		}
+		return FText::Format(FText::FromString(TEXT("{0} ({1})")), ToolTipText, InputText);
 	}
 
 	bool SShSplitButton::CanExecuteButton() const

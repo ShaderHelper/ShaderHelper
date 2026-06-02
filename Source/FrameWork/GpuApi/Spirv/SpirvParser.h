@@ -89,6 +89,7 @@ namespace FW
 		void Visit(const SpvOpDecorate* Inst) override;
 		void Visit(const SpvOpMemberDecorate* Inst) override;
 		void Visit(const SpvOpMemberName* Inst) override;
+		void Visit(const SpvOpEntryPoint* Inst) override;
 		void Visit(const SpvOpExecutionMode* Inst) override;
 		void Visit(const SpvOpName* Inst) override;
 		void Visit(const SpvOpString* Inst) override;

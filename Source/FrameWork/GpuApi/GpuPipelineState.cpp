@@ -64,6 +64,7 @@ namespace FW
 		// Hash rasterizer state
 		Hash = HashCombine(Hash, ::GetTypeHash(Desc.RasterizerState.FillMode));
 		Hash = HashCombine(Hash, ::GetTypeHash(Desc.RasterizerState.CullMode));
+		Hash = HashCombine(Hash, ::GetTypeHash(Desc.RasterizerState.FrontFace));
 
 		Hash = HashCombine(Hash, ::GetTypeHash(Desc.VertexLayout.Num()));
 		for (const auto& BufferLayout : Desc.VertexLayout)

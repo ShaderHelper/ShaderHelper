@@ -14,7 +14,9 @@
 #include "UI/Widgets/Debugger/SDebuggerCallStackView.h"
 #include "Renderer/RenderGraph.h"
 #include "GpuApi/Spirv/SpirvComputeDebugger.h"
+#include "GpuApi/Spirv/SpirvVertexDebugger.h"
 #include "GpuApi/Spirv/ExprDebugger/SpirvComputeExprDebugger.h"
+#include "GpuApi/GpuResourceHelper.h"
 
 #include <stdexcept>
 
@@ -49,6 +51,43 @@ namespace SH
 				}
 			}
 			return Slots;
+		}
+
+		struct VertexDebugPipelinePass
+		{
+			TRefCountPtr<GpuRenderPipelineState> Pipeline;
+			TRefCountPtr<GpuTexture> RenderTarget;
+			GpuRenderPassDesc PassDesc;
+		};
+
+		VertexDebugPipelinePass MakeVertexDebugPipelinePass(
+			const VertexState& VsInvocation,
+			GpuShader* PatchedShader,
+			const TArray<TRefCountPtr<GpuBindGroupLayout>>& PatchedBindGroupLayouts)
+		{
+			const GpuRenderPipelineStateDesc& SourcePipelineDesc = VsInvocation.PipelineDesc;
+			GpuRenderPipelineStateDesc PatchedPipelineDesc;
+			PatchedPipelineDesc.CheckLayout = false;
+			PatchedPipelineDesc.Vs = PatchedShader;
+			PatchedPipelineDesc.Ps = nullptr;
+			PatchedPipelineDesc.Targets.Add({ .TargetFormat = GpuFormat::R8G8B8A8_UNORM });
+			PatchedPipelineDesc.BindGroupLayouts = MakeBindGroupLayoutSlots(PatchedBindGroupLayouts);
+			PatchedPipelineDesc.VertexLayout = SourcePipelineDesc.VertexLayout;
+			PatchedPipelineDesc.RasterizerState = SourcePipelineDesc.RasterizerState;
+			PatchedPipelineDesc.Primitive = SourcePipelineDesc.Primitive;
+			PatchedPipelineDesc.SampleCount = 1;
+			TRefCountPtr<GpuRenderPipelineState> Pipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(PatchedPipelineDesc);
+
+			TRefCountPtr<GpuTexture> DummyRenderTarget = GGpuRhi->CreateTexture({
+				.Width = (uint32)VsInvocation.ViewPortDesc.Width,
+				.Height = (uint32)VsInvocation.ViewPortDesc.Height,
+				.Format = GpuFormat::R8G8B8A8_UNORM,
+				.Usage = GpuTextureUsage::RenderTarget
+			});
+
+			GpuRenderPassDesc PassDesc;
+			PassDesc.ColorRenderTargets.Add({ DummyRenderTarget->GetDefaultView() });
+			return { MoveTemp(Pipeline), MoveTemp(DummyRenderTarget), MoveTemp(PassDesc) };
 		}
 
 		void AddBindingResourceAccess(RGRenderPass& RenderPass, BindingType Type, GpuResource* Resource)
@@ -495,9 +534,177 @@ namespace SH
 		PatchedBindGroupLayouts.Add(DebuggerBindGroupLayout);
 	}
 
-	void ShaderDebugger::DebugVertex(const Vector3f& InVertPos, const InvocationState& InState)
+	void ShaderDebugger::InvokeVertex()
 	{
+		const auto& VsInvocation = std::get<VertexState>(Invocation);
 
+		ShaderDesc DebugShaderDesc = CurShaderAsset->GetShaderDesc(ShaderSourceText, ShaderType::Vertex);
+		DebugShader = GGpuRhi->CreateShaderFromSource(DebugShaderDesc.SourceDesc);
+		DebugShader->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
+		GpuShaderLanguage Lang = DebugShader->GetShaderLanguage();
+		TArray<FString> ExtraArgs = MakeDebuggerCompileExtraArgs(DebugShaderDesc.ExtraArgs);
+
+		FString ErrorInfo, WarnInfo;
+		if (!GGpuRhi->CompileShader(DebugShader, ErrorInfo, WarnInfo, ExtraArgs))
+		{
+			throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
+		}
+
+		uint32 BufferSize = 1024 * 1024 * 4;
+		TArray<uint8> Datas;
+		Datas.SetNumZeroed(BufferSize);
+		DebugBuffer = GGpuRhi->CreateBuffer({ .ByteSize = BufferSize, .Usage = GpuBufferUsage::RWRaw, .InitialData = Datas });
+
+		Vector2u TargetParams(TargetVertexIndex, TargetInstanceIndex);
+		TArray<uint8> ParamsDatas;
+		ParamsDatas.SetNumZeroed(sizeof(Vector2u));
+		FMemory::Memcpy(ParamsDatas.GetData(), &TargetParams, sizeof(Vector2u));
+		DebugParamsBuffer = GGpuRhi->CreateBuffer({ .ByteSize = sizeof(Vector2u), .Usage = GpuBufferUsage::Uniform, .InitialData = ParamsDatas });
+
+		const TArray<GpuShaderLayoutBinding> VsLayoutBindings = VsInvocation.PipelineDesc.Vs->GetLayout();
+		BuildPatchedBindings(VsInvocation.Builders, VsLayoutBindings, BindingShaderStage::Vertex, /*bIncludeParamsBinding=*/true);
+
+		auto VertexContext = MakeUnique<SpvVertexDebuggerContext>(TargetVertexIndex, TargetInstanceIndex, SpvBindings);
+		FString FileExtension = (Lang == GpuShaderLanguage::HLSL) ? TEXT(".hlsl") : TEXT(".glsl");
+		FString EntryPoint = DebugShader->GetEntryPoint();
+
+		SpirvParser Parser;
+		Parser.Parse(DebugShader->SpvCode);
+		SpvMetaVisitor MetaVisitor{ *VertexContext };
+		Parser.Accept(&MetaVisitor);
+		SpvVertexDebuggerVisitor DebuggerVisitor{ *VertexContext, Lang, bEnableUbsan };
+		Parser.Accept(&DebuggerVisitor);
+		TArray<uint32> PatchedSpv = DebuggerVisitor.GetPatcher().GetSpv();
+		FString PatchedSpvAsm = DebuggerVisitor.GetPatcher().GetAsm();
+		FFileHelper::SaveStringToFile(PatchedSpvAsm, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "VertexPatched" + FileExtension + ".spvasm"));
+
+		CurDebugStateIndex = 0;
+		DebuggerContext = MoveTemp(VertexContext);
+		SaveDebuggerContextState();
+
+		TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
+			.Name = DebugShader->GetShaderName(),
+			.Source = PatchedSpvAsm,
+			.Type = ShaderType::Vertex,
+			.EntryPoint = EntryPoint,
+		});
+		PatchedShader->SpvCode = MoveTemp(PatchedSpv);
+		PatchedShader->CompilerFlag |= GpuShaderCompilerFlag::CompileFromSpvCode;
+		if (!GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
+		{
+			throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
+		}
+
+		VertexDebugPipelinePass DebugDraw = MakeVertexDebugPipelinePass(VsInvocation, PatchedShader, PatchedBindGroupLayouts);
+
+		auto CmdRecorder = GGpuRhi->BeginRecording();
+		RenderGraph RG(CmdRecorder);
+		const auto& DrawFunction = VsInvocation.DrawFunction;
+		auto& RenderPass = RG.AddRenderPass(TEXT("VertexDebugger"), MoveTemp(DebugDraw.PassDesc),
+			[&, BindGroups = PatchedBindGroups, Pipeline = DebugDraw.Pipeline](GpuRenderPassRecorder* PassRecorder) {
+				PassRecorder->SetViewPort(VsInvocation.ViewPortDesc);
+				PassRecorder->SetRenderPipelineState(Pipeline);
+				PassRecorder->SetBindGroups(MakeBindGroupSlots(BindGroups));
+				DrawFunction(PassRecorder);
+			}
+		);
+		AddSpvBindingResourceAccess(RenderPass, SpvBindings);
+		RenderPass.Write(DebugBuffer);
+		RG.Execute();
+	}
+
+	void ShaderDebugger::DebugVertex(uint32 InVertexIndex, uint32 InInstanceIndex, const InvocationState& InState)
+	{
+		TargetVertexIndex = InVertexIndex;
+		TargetInstanceIndex = InInstanceIndex;
+		Invocation = InState;
+		bEnableUbsan = EnableUbsan();
+
+		InvokeVertex();
+		uint8* DebugBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebugBuffer, GpuResourceMapMode::Read_Only);
+		DebugStates = GenDebugStates(DebugBufferData, (uint32)DebugBuffer->GetByteSize());
+		GGpuRhi->UnMapGpuBuffer(DebugBuffer);
+		FinalizeDebugStates();
+	}
+
+	TArray<Vector4f> ShaderDebugger::CaptureVertex(const InvocationState& InState)
+	{
+		Invocation = InState;
+		bEnableUbsan = false;
+		const auto& VsInvocation = std::get<VertexState>(InState);
+
+		const uint32 VertexCount = VsInvocation.VertexCount;
+		const uint32 InstanceCount = VsInvocation.InstanceCount;
+
+		ShaderDesc DebugShaderDesc = CurShaderAsset->GetShaderDesc(ShaderSourceText, ShaderType::Vertex);
+		DebugShader = GGpuRhi->CreateShaderFromSource(DebugShaderDesc.SourceDesc);
+		DebugShader->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
+		GpuShaderLanguage Lang = DebugShader->GetShaderLanguage();
+		TArray<FString> ExtraArgs = MakeDebuggerCompileExtraArgs(DebugShaderDesc.ExtraArgs);
+
+		FString ErrorInfo, WarnInfo;
+		if (!GGpuRhi->CompileShader(DebugShader, ErrorInfo, WarnInfo, ExtraArgs))
+		{
+			throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
+		}
+
+		uint32 BufferSize = VertexCount * InstanceCount * sizeof(Vector4f);
+		DebugBuffer = GGpuRhi->CreateBuffer({
+			.ByteSize = BufferSize,
+			.Usage = GpuBufferUsage::RWRaw,
+		});
+
+		const TArray<GpuShaderLayoutBinding> VsLayoutBindings = VsInvocation.PipelineDesc.Vs->GetLayout();
+		BuildPatchedBindings(VsInvocation.Builders, VsLayoutBindings, BindingShaderStage::Vertex, /*bIncludeParamsBinding=*/false);
+
+		SpvVertexCaptureContext VertexContext{ SpvBindings };
+		SpirvParser Parser;
+		Parser.Parse(DebugShader->SpvCode);
+		SpvMetaVisitor MetaVisitor{ VertexContext };
+		Parser.Accept(&MetaVisitor);
+		SpvVertexCaptureVisitor DebuggerVisitor{ VertexContext, VertexCount };
+		Parser.Accept(&DebuggerVisitor);
+		TArray<uint32> PatchedSpv = DebuggerVisitor.GetPatcher().GetSpv();
+		FString PatchedSpvAsm = DebuggerVisitor.GetPatcher().GetAsm();
+		FString FileExtension = (Lang == GpuShaderLanguage::HLSL) ? TEXT(".hlsl") : TEXT(".glsl");
+		FFileHelper::SaveStringToFile(PatchedSpvAsm, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "CaptureVertex" + FileExtension + ".spvasm"));
+
+		TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
+			.Name = DebugShader->GetShaderName(),
+			.Source = PatchedSpvAsm,
+			.Type = ShaderType::Vertex,
+			.EntryPoint = DebugShader->GetEntryPoint(),
+		});
+		PatchedShader->SpvCode = MoveTemp(PatchedSpv);
+		PatchedShader->CompilerFlag |= GpuShaderCompilerFlag::CompileFromSpvCode;
+		if (!GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
+		{
+			throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
+		}
+
+		VertexDebugPipelinePass DebugDraw = MakeVertexDebugPipelinePass(VsInvocation, PatchedShader, PatchedBindGroupLayouts);
+
+		auto CmdRecorder = GGpuRhi->BeginRecording();
+		GpuResourceHelper::ClearRWResource(CmdRecorder, DebugBuffer);
+		RenderGraph RG(CmdRecorder);
+		auto& RenderPass = RG.AddRenderPass(TEXT("VertexCapture"), MoveTemp(DebugDraw.PassDesc),
+			[&, BindGroups = PatchedBindGroups, Pipeline = DebugDraw.Pipeline](GpuRenderPassRecorder* PassRecorder) {
+				PassRecorder->SetViewPort(VsInvocation.ViewPortDesc);
+				PassRecorder->SetRenderPipelineState(Pipeline);
+				PassRecorder->SetBindGroups(MakeBindGroupSlots(BindGroups));
+				VsInvocation.DrawFunction(PassRecorder);
+			}
+		);
+		AddSpvBindingResourceAccess(RenderPass, SpvBindings);
+		RenderPass.Write(DebugBuffer);
+		RG.Execute();
+
+		TArray<Vector4f> Result;
+		uint8* DebugBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebugBuffer, GpuResourceMapMode::Read_Only);
+		Result.SetNumUninitialized(VertexCount * InstanceCount);
+		FMemory::Memcpy(Result.GetData(), DebugBufferData, VertexCount * InstanceCount * sizeof(Vector4f));
+		GGpuRhi->UnMapGpuBuffer(DebugBuffer);
+		return Result;
 	}
 
 	bool ShaderDebugger::EvaluateExpressionVertexlImpl(const FString& InExpression, ExpressionNode& OutResult) const

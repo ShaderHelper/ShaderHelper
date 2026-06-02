@@ -222,18 +222,32 @@ namespace SH
 		Pins = MoveTemp(NewPins);
 	}
 
-	MeshRenderObject* MeshPassNode::AddMeshRenderObject(MeshSceneObject* InMeshSceneObject)
+	void MeshPassNode::AddMeshRenderObject(MeshSceneObject* InMeshSceneObject)
 	{
-		auto MRO = NewShObject<MeshRenderObject>(this);
-		MRO->MeshSceneObjectRef = InMeshSceneObject;
+		// One MeshRenderObject per submesh so each submesh can be assigned its own material.
+		int32 SubMeshCount = 1;
 		if (InMeshSceneObject)
 		{
-			MRO->ObjectName = InMeshSceneObject->ObjectName;
+			if (FW::Model* Mdl = InMeshSceneObject->ModelAsset.Get())
+			{
+				SubMeshCount = Mdl->GetSubMeshes().Num();
+			}
 		}
-		MeshRenderObject* Result = MRO.Get();
-		MeshRenderObjects.Add(MoveTemp(MRO));
+
+		for (int32 Index = 0; Index < SubMeshCount; ++Index)
+		{
+			auto MRO = NewShObject<MeshRenderObject>(this);
+			MRO->MeshSceneObjectRef = InMeshSceneObject;
+			MRO->SubMeshIndex = Index;
+			if (InMeshSceneObject)
+			{
+				MRO->ObjectName = (SubMeshCount > 1)
+					? FText::FromString(FString::Printf(TEXT("%s_SubMesh%d"), *InMeshSceneObject->ObjectName.ToString(), Index))
+					: InMeshSceneObject->ObjectName;
+			}
+			MeshRenderObjects.Add(MoveTemp(MRO));
+		}
 		if (auto* OM = GetOuterMost()) OM->MarkDirty();
-		return Result;
 	}
 
 	void MeshPassNode::RemoveMeshRenderObject(MeshRenderObject* InObject)

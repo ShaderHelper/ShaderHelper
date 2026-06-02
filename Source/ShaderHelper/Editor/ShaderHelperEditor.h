@@ -134,6 +134,7 @@ namespace SH
 		std::optional<TPair<FW::Vector3u, FW::Vector3u>> ValidateCompute(const InvocationState& InState);
 		void DebugPixel(const FW::Vector2u& InPixelCoord, const InvocationState& InState);
 		void DebugCompute(const FW::Vector3u& InWorkGroupId, const FW::Vector3u& InLocalInvocationId, const InvocationState& InState);
+		void DebugVertex(uint32 InVertexIndex, uint32 InInstanceIndex);
 		void SwitchDebugThread(const FW::Vector3u& InLocalInvocationId);
 		bool IsFinalizedForCurrentItem() const;
 		void ShowLinePreview(const DebuggerLocation& Loc);

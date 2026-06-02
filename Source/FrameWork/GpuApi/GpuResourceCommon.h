@@ -153,6 +153,12 @@ namespace FW
 		Solid,
 	};
 
+	enum class RasterizerFrontFace
+	{
+		Clockwise,
+		CounterClockwise,
+	};
+
 	enum class BlendFactor
 	{
 		Zero,

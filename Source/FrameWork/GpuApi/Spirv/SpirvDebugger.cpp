@@ -860,9 +860,22 @@ namespace FW
 		return Result;
 	}
 
+	BindingShaderStage GetDebuggerBindingStage(ShaderType Stage)
+	{
+		if (Stage == ShaderType::Compute)
+		{
+			return BindingShaderStage::Compute;
+		}
+		if (Stage == ShaderType::Vertex)
+		{
+			return BindingShaderStage::Vertex;
+		}
+		return BindingShaderStage::Pixel;
+	}
+
 	SpvId PatchDebuggerBuffer(SpvPatcher& Patcher, ShaderType Stage)
 	{
-		BindingShaderStage BindingStage = (Stage == ShaderType::Compute) ? BindingShaderStage::Compute : BindingShaderStage::Pixel;
+		const BindingShaderStage BindingStage = GetDebuggerBindingStage(Stage);
 		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
 		SpvId UVec4Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, 4));
 		SpvId RunTimeArrayType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeRuntimeArray>(UVec4Type));
@@ -890,14 +903,13 @@ namespace FW
 		return DebuggerBuffer;
 	}
 
-	// Creates a uniform buffer containing either uvec2 PixelCoord (Pixel) or uvec3 TargetWorkGroupId (Compute)
+	// Creates a uniform buffer containing either uvec2 PixelCoord (Pixel), uvec3 TargetWorkGroupId
+	// (Compute), or uvec2 (TargetVertexIndex, TargetInstanceIndex) (Vertex).
 	SpvId PatchDebuggerParams(SpvPatcher& Patcher, ShaderType Stage)
 	{
-		BindingShaderStage BindingStage = (Stage == ShaderType::Compute) ? BindingShaderStage::Compute : BindingShaderStage::Pixel;
+		const BindingShaderStage BindingStage = GetDebuggerBindingStage(Stage);
 		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
-		SpvId MemberVecType = Stage == ShaderType::Compute
-			? Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, 3))
-			: Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, 2));
+		SpvId MemberVecType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, Stage == ShaderType::Compute ? 3 : 2));
 
 		SpvId DebuggerParamsType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeStruct>(TArray<SpvId>{MemberVecType}));
 		SpvId DebuggerParamsPointerType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Uniform, DebuggerParamsType));
@@ -1050,6 +1062,50 @@ namespace FW
 		Patcher.AddGlobalVariable(MoveTemp(VarOp));
 
 		SpvBuiltIn BuiltIn = SpvBuiltIn::LocalInvocationIndex;
+		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(Var, SpvDecorationKind::BuiltIn, TArray<uint8>{ (uint8*)&BuiltIn, sizeof(SpvBuiltIn) }));
+		Patcher.AddEntryPointInterface(Context.EntryPoint, Var);
+		Context.BuiltIns.Add(BuiltIn, Var);
+		return Var;
+	}
+
+	SpvId PatchVertexIndexBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context)
+	{
+		if (Context.BuiltIns.Contains(SpvBuiltIn::VertexIndex))
+		{
+			return Context.BuiltIns[SpvBuiltIn::VertexIndex];
+		}
+
+		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
+		SpvId UIntPointerInputType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Input, UIntType));
+
+		SpvId Var = Patcher.NewId();
+		auto VarOp = MakeUnique<SpvOpVariable>(UIntPointerInputType, SpvStorageClass::Input);
+		VarOp->SetId(Var);
+		Patcher.AddGlobalVariable(MoveTemp(VarOp));
+
+		SpvBuiltIn BuiltIn = SpvBuiltIn::VertexIndex;
+		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(Var, SpvDecorationKind::BuiltIn, TArray<uint8>{ (uint8*)&BuiltIn, sizeof(SpvBuiltIn) }));
+		Patcher.AddEntryPointInterface(Context.EntryPoint, Var);
+		Context.BuiltIns.Add(BuiltIn, Var);
+		return Var;
+	}
+
+	SpvId PatchInstanceIndexBuiltIn(SpvPatcher& Patcher, SpvMetaContext& Context)
+	{
+		if (Context.BuiltIns.Contains(SpvBuiltIn::InstanceIndex))
+		{
+			return Context.BuiltIns[SpvBuiltIn::InstanceIndex];
+		}
+
+		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
+		SpvId UIntPointerInputType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Input, UIntType));
+
+		SpvId Var = Patcher.NewId();
+		auto VarOp = MakeUnique<SpvOpVariable>(UIntPointerInputType, SpvStorageClass::Input);
+		VarOp->SetId(Var);
+		Patcher.AddGlobalVariable(MoveTemp(VarOp));
+
+		SpvBuiltIn BuiltIn = SpvBuiltIn::InstanceIndex;
 		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(Var, SpvDecorationKind::BuiltIn, TArray<uint8>{ (uint8*)&BuiltIn, sizeof(SpvBuiltIn) }));
 		Patcher.AddEntryPointInterface(Context.EntryPoint, Var);
 		Context.BuiltIns.Add(BuiltIn, Var);

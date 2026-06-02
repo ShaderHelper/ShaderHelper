@@ -736,6 +736,8 @@ namespace FW
 		AccessChain = 65,
 		Decorate = 71,
 		MemberDecorate = 72,
+		DecorateString = 5632,
+		MemberDecorateString = 5633,
 		VectorShuffle = 79,
 		CompositeConstruct = 80,
 		CompositeExtract = 81,

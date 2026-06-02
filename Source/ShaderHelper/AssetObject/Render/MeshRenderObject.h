@@ -68,6 +68,7 @@ namespace SH
 	public:
 		FW::ObserverObjectPtr<MeshSceneObject> MeshSceneObjectRef;
 		FW::AssetPtr<Material> MaterialAsset;
+		int32 SubMeshIndex = 0;
 		TArray<FW::ObjectPtr<FW::GraphPin>> OverridePins;
 		TArray<ShaderOverrideSlot> OverrideSlots;
 		FW::Vector2f CurrentViewportSize{ 0, 0 };

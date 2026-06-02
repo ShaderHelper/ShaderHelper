@@ -27,7 +27,7 @@ namespace FW
 		ViewCamera.VerticalFov = FMath::DegreesToRadians(45.0f);
 		ViewCamera.AspectRatio = 1.0f;
 		ViewCamera.NearPlane = 0.01f;
-		ViewCamera.FarPlane = 1000.0f;
+		ViewCamera.FarPlane = 100.0f;
 
 		InitRenderResources();
 
