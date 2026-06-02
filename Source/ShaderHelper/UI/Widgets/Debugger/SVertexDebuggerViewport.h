@@ -20,7 +20,9 @@ namespace SH
 
 		// ClipPositions: per (instance,vertex) flat clip-space xyzw (instance*VertexCount+vertex).
 		// Indices: this submesh's per-instance triangle list. VertexCount/InstanceCount: capture dims.
-		void SetDebugData(const TArray<FW::Vector4f>& InClipPositions, const TArray<uint32>& InIndices, uint32 InVertexCount, uint32 InInstanceCount, const FMatrix44f& ClipToWorld, const TOptional<FW::Camera>& InDebugCamera);
+		void SetDebugData(const TArray<FW::Vector4f>& InClipPositions, const TArray<uint32>& InIndices, 
+			uint32 InVertexCount, uint32 InInstanceCount, const FMatrix44f& ClipToWorld, const TOptional<FW::Camera>& InDebugCamera, bool GlobalValidation = false);
+		void SetFinalizedVertex(uint32 InVertexIndex, uint32 InInstanceIndex);
 		void Clear();
 		bool FinalizedVertex() const { return bVertexFinalized; }
 
@@ -103,6 +105,7 @@ namespace SH
 
 		// Selection
 		bool bVertexFinalized = false;
+		bool bIsValidating = false;
 		uint32 PerInstanceVertexCount = 0; // to decode picked flat id back into (instance, localVertex)
 		TRefCountPtr<FW::GpuBuffer> HighlightVertexBuffer; // 6 verts of a selected-vertex billboard point
 

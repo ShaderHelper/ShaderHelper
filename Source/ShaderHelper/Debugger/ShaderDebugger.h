@@ -100,8 +100,9 @@ namespace SH
 		//Vertex
 		// Returns the captured clip-space positions, indexed by vertex id.
 		TArray<FW::Vector4f> CaptureVertex(const InvocationState& InState);
-		void InvokeVertex();
+		void InvokeVertex(bool GlobalValidation = false);
 		void DebugVertex(uint32 InVertexIndex, uint32 InInstanceIndex, const InvocationState& InState);
+		std::optional<FW::Vector2u> ValidateVertex(const InvocationState& InState);
 		//
 
 		//Pixel

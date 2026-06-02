@@ -1489,6 +1489,14 @@ namespace SH
 		}
 	}
 
+	std::optional<Vector2u> ShaderHelperEditor::ValidateVertex(const InvocationState& InState)
+	{
+		SShaderEditorBox* ShaderEditor = GetShaderEditor(GetDebuggaleObject()->GetShaderAsset(CurrentDebugItem));
+		Debugger.SetShaderAsset(ShaderEditor->GetShaderAsset());
+		Debugger.SetShaderSource(ShaderEditor->GetCurrentShaderSource());
+		return Debugger.ValidateVertex(InState);
+	}
+
 	std::optional<Vector2u> ShaderHelperEditor::ValidatePixel(const InvocationState& InState)
 	{
 		SShaderEditorBox* ShaderEditor = GetShaderEditor(GetDebuggaleObject()->GetShaderAsset(CurrentDebugItem));
@@ -1689,7 +1697,7 @@ namespace SH
 				TArray<Vector4f> ClipPositions = Debugger.CaptureVertex(Invocation);
 				IsDebugging = true;
 				const auto& VState = std::get<VertexState>(Invocation);
-				VertexDebuggerViewport->SetDebugData(ClipPositions, VState.Indices, VState.VertexCount, VState.InstanceCount, VState.ClipToWorld, VState.DebugCamera);
+				VertexDebuggerViewport->SetDebugData(ClipPositions, VState.Indices, VState.VertexCount, VState.InstanceCount, VState.ClipToWorld, VState.DebugCamera, GlobalValidation);
 			}
 			catch (const std::runtime_error& e)
 			{
@@ -1837,7 +1845,7 @@ namespace SH
 				SNew(SShSplitButton)
 				.ButtonToolTipText(LOCALIZATION("Validation"))
 				.MenuToolTipText_Lambda([this] { return FText::FromString(ANSI_TO_TCHAR(magic_enum::enum_name(CurrentDebugItem).data())); })
-				.IsButtonEnabled_Lambda([this] { return !IsDebugging && GetDebuggaleObject() != nullptr && (CurrentDebugItem == DebugItem::Pixel || CurrentDebugItem == DebugItem::Compute); })
+				.IsButtonEnabled_Lambda([this] { return !IsDebugging && GetDebuggaleObject() != nullptr; })
 				.IsMenuEnabled_Lambda([this] { return GetDebuggaleObject() != nullptr; })
 				.OnClicked_Lambda([this] {
 					StartDebugging(true);

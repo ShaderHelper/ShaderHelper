@@ -1,10 +1,16 @@
 #include "CommonHeader.h"
 #include "SVertexDebuggerViewport.h"
+#include "Debugger/DebuggableObject.h"
+#include "UI/Widgets/MessageDialog/SMessageDialog.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "Common/Util/Math.h"
 #include "GpuApi/GpuRhi.h"
 
 #include <Widgets/SViewport.h>
+#include <Framework/Notifications/NotificationManager.h>
+#include <Widgets/Notifications/SNotificationList.h>
+
+#include <stdexcept>
 
 using namespace FW;
 
@@ -413,10 +419,11 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 		FrustumPipeline = MakePipeline(WireVs, WirePs, PositionLayout, RasterizerCullMode::None, PrimitiveType::LineList, GpuFormat::B8G8R8A8_UNORM, 4, false, CompareMode::LessEqual);
 	}
 
-	void SVertexDebuggerViewport::SetDebugData(const TArray<Vector4f>& InClipPositions, const TArray<uint32>& InIndices, uint32 InVertexCount, uint32 InInstanceCount, const FMatrix44f& ClipToWorld, const TOptional<Camera>& InDebugCamera)
+	void SVertexDebuggerViewport::SetDebugData(const TArray<Vector4f>& InClipPositions, const TArray<uint32>& InIndices, uint32 InVertexCount, uint32 InInstanceCount, const FMatrix44f& ClipToWorld, const TOptional<Camera>& InDebugCamera, bool GlobalValidation)
 	{
 		SubMeshes.Empty();
 		bVertexFinalized = false;
+		bIsValidating = false;
 		HighlightVertexBuffer.SafeRelease();
 		PerInstanceVertexCount = InVertexCount;
 		FrustumVertexBuffer.SafeRelease();
@@ -545,6 +552,60 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 
 		FrameCamera(InDebugCamera, FrustumPositions);
 		Render();
+
+		if (GlobalValidation)
+		{
+			auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			auto Invocation = ShEditor->GetDebuggaleObject()->GetInvocationState(DebugItem::Vertex);
+			if (std::holds_alternative<VertexState>(Invocation))
+			{
+				bIsValidating = true;
+				GApp->EnqueueBusyTask([=, this](TFunction<void()> Done) {
+					FNotificationInfo Info(LOCALIZATION("StartValidatorTip"));
+					Info.Image = FAppStyle::Get().GetBrush("NoBrush");
+					Info.bFireAndForget = false;
+					Info.FadeInDuration = 0.0f;
+					Info.FadeOutDuration = 0.0f;
+					auto Notification = FSlateNotificationManager::Get().AddNotification(Info);
+					Notification->SetCompletionState(SNotificationItem::CS_Pending);
+					Async(EAsyncExecution::Thread, [=, this]() {
+						std::optional<Vector2u> ErrorVertex;
+						try
+						{
+							ErrorVertex = ShEditor->ValidateVertex(Invocation);
+						}
+						catch (const std::runtime_error& e)
+						{
+							AsyncTask(ENamedThreads::GameThread, [=, this] {
+								bIsValidating = false;
+								Notification->Fadeout();
+								Done();
+								FText FailureInfo = LOCALIZATION("DebugFailure");
+								SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo.ToString(), UTF8_TO_TCHAR(e.what()));
+								MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, ShEditor->GetMainWindow(), FailureInfo);
+								ShEditor->EndDebugging();
+							});
+							return;
+						}
+
+						AsyncTask(ENamedThreads::GameThread, [=, this] {
+							bIsValidating = false;
+							Notification->Fadeout();
+							Done();
+							if (ErrorVertex)
+							{
+								SetFinalizedVertex(ErrorVertex->x, ErrorVertex->y);
+							}
+							else
+							{
+								MessageDialog::Open(MessageDialog::Ok, MessageDialog::Happy, ShEditor->GetMainWindow(), LOCALIZATION("ValidationTip"));
+								ShEditor->EndDebugging();
+							}
+						});
+					});
+				});
+			}
+		}
 	}
 
 	void SVertexDebuggerViewport::FrameCamera(const TOptional<Camera>& InDebugCamera, const TArray<Vector3f>& InFrustumPositions)
@@ -766,7 +827,7 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 
 	void SVertexDebuggerViewport::OnPick()
 	{
-		if (bVertexFinalized)
+		if (bVertexFinalized || bIsValidating)
 		{
 			return;
 		}
@@ -844,11 +905,41 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 		ShEditor->DebugVertex(LocalVertex, Instance);
 	}
 
+	void SVertexDebuggerViewport::SetFinalizedVertex(uint32 InVertexIndex, uint32 InInstanceIndex)
+	{
+		const uint32 FlatVertexIndex = InInstanceIndex * FMath::Max(1u, PerInstanceVertexCount) + InVertexIndex;
+		for (const SubMeshRender& Sub : SubMeshes)
+		{
+			if (!Sub.WorldPositions.IsValidIndex((int32)FlatVertexIndex))
+			{
+				continue;
+			}
+
+			const Vector3f VertexPos = Sub.WorldPositions[(int32)FlatVertexIndex];
+			const OverlayPointVertex MarkerVerts[6] = {
+				{ VertexPos, Vector2f(-1.0f, -1.0f) }, { VertexPos, Vector2f( 1.0f, -1.0f) }, { VertexPos, Vector2f( 1.0f,  1.0f) },
+				{ VertexPos, Vector2f(-1.0f, -1.0f) }, { VertexPos, Vector2f( 1.0f,  1.0f) }, { VertexPos, Vector2f(-1.0f,  1.0f) },
+			};
+			TArray<uint8> MarkerBytes;
+			MarkerBytes.SetNumUninitialized(sizeof(MarkerVerts));
+			FMemory::Memcpy(MarkerBytes.GetData(), MarkerVerts, sizeof(MarkerVerts));
+			HighlightVertexBuffer = GGpuRhi->CreateBuffer({ .ByteSize = (uint32)MarkerBytes.Num(), .Usage = GpuBufferUsage::Vertex, .InitialData = MarkerBytes });
+
+			bVertexFinalized = true;
+			Render();
+
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			ShEditor->DebugVertex(InVertexIndex, InInstanceIndex);
+			return;
+		}
+	}
+
 	void SVertexDebuggerViewport::Clear()
 	{
 		SubMeshes.Empty();
 		bUseDebugCameraAspect = false;
 		bVertexFinalized = false;
+		bIsValidating = false;
 		HighlightVertexBuffer.SafeRelease();
 		FrustumVertexBuffer.SafeRelease();
 		Preview->Clear();

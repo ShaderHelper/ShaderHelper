@@ -3,6 +3,7 @@
 #include "ShaderConductor.hpp"
 #include "Editor/ShaderHelperEditor.h"
 #include "GpuApi/Spirv/ExprDebugger/SpirvPixelExprDebugger.h"
+#include "GpuApi/Spirv/ExprDebugger/SpirvVertexExprDebugger.h"
 #include "GpuApi/Spirv/SpirvPixelPreviewer.h"
 #include "GpuApi/Spirv/SpirvValidator.h"
 #include "GpuApi/GpuRhi.h"
@@ -534,7 +535,7 @@ namespace SH
 		PatchedBindGroupLayouts.Add(DebuggerBindGroupLayout);
 	}
 
-	void ShaderDebugger::InvokeVertex()
+	void ShaderDebugger::InvokeVertex(bool GlobalValidation)
 	{
 		const auto& VsInvocation = std::get<VertexState>(Invocation);
 
@@ -550,19 +551,22 @@ namespace SH
 			throw std::runtime_error(TCHAR_TO_UTF8(*ErrorInfo));
 		}
 
-		uint32 BufferSize = 1024 * 1024 * 4;
+		uint32 BufferSize = GlobalValidation ? 1024 : 1024 * 1024 * 4;
 		TArray<uint8> Datas;
 		Datas.SetNumZeroed(BufferSize);
 		DebugBuffer = GGpuRhi->CreateBuffer({ .ByteSize = BufferSize, .Usage = GpuBufferUsage::RWRaw, .InitialData = Datas });
 
-		Vector2u TargetParams(TargetVertexIndex, TargetInstanceIndex);
-		TArray<uint8> ParamsDatas;
-		ParamsDatas.SetNumZeroed(sizeof(Vector2u));
-		FMemory::Memcpy(ParamsDatas.GetData(), &TargetParams, sizeof(Vector2u));
-		DebugParamsBuffer = GGpuRhi->CreateBuffer({ .ByteSize = sizeof(Vector2u), .Usage = GpuBufferUsage::Uniform, .InitialData = ParamsDatas });
+		if (!GlobalValidation)
+		{
+			Vector2u TargetParams(TargetVertexIndex, TargetInstanceIndex);
+			TArray<uint8> ParamsDatas;
+			ParamsDatas.SetNumZeroed(sizeof(Vector2u));
+			FMemory::Memcpy(ParamsDatas.GetData(), &TargetParams, sizeof(Vector2u));
+			DebugParamsBuffer = GGpuRhi->CreateBuffer({ .ByteSize = sizeof(Vector2u), .Usage = GpuBufferUsage::Uniform, .InitialData = ParamsDatas });
+		}
 
 		const TArray<GpuShaderLayoutBinding> VsLayoutBindings = VsInvocation.PipelineDesc.Vs->GetLayout();
-		BuildPatchedBindings(VsInvocation.Builders, VsLayoutBindings, BindingShaderStage::Vertex, /*bIncludeParamsBinding=*/true);
+		BuildPatchedBindings(VsInvocation.Builders, VsLayoutBindings, BindingShaderStage::Vertex, !GlobalValidation);
 
 		auto VertexContext = MakeUnique<SpvVertexDebuggerContext>(TargetVertexIndex, TargetInstanceIndex, SpvBindings);
 		FString FileExtension = (Lang == GpuShaderLanguage::HLSL) ? TEXT(".hlsl") : TEXT(".glsl");
@@ -572,11 +576,24 @@ namespace SH
 		Parser.Parse(DebugShader->SpvCode);
 		SpvMetaVisitor MetaVisitor{ *VertexContext };
 		Parser.Accept(&MetaVisitor);
-		SpvVertexDebuggerVisitor DebuggerVisitor{ *VertexContext, Lang, bEnableUbsan };
-		Parser.Accept(&DebuggerVisitor);
-		TArray<uint32> PatchedSpv = DebuggerVisitor.GetPatcher().GetSpv();
-		FString PatchedSpvAsm = DebuggerVisitor.GetPatcher().GetAsm();
-		FFileHelper::SaveStringToFile(PatchedSpvAsm, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "VertexPatched" + FileExtension + ".spvasm"));
+		TArray<uint32> PatchedSpv;
+		FString PatchedSpvAsm;
+		if (GlobalValidation)
+		{
+			SpvValidator Validator{ *VertexContext, bEnableUbsan, ShaderType::Vertex, &SpvBindings };
+			Parser.Accept(&Validator);
+			PatchedSpv = Validator.GetPatcher().GetSpv();
+			PatchedSpvAsm = Validator.GetPatcher().GetAsm();
+			FFileHelper::SaveStringToFile(PatchedSpvAsm, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "Validation" + FileExtension + ".spvasm"));
+		}
+		else
+		{
+			SpvVertexDebuggerVisitor DebuggerVisitor{ *VertexContext, Lang, bEnableUbsan };
+			Parser.Accept(&DebuggerVisitor);
+			PatchedSpv = DebuggerVisitor.GetPatcher().GetSpv();
+			PatchedSpvAsm = DebuggerVisitor.GetPatcher().GetAsm();
+			FFileHelper::SaveStringToFile(PatchedSpvAsm, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "VertexPatched" + FileExtension + ".spvasm"));
+		}
 
 		CurDebugStateIndex = 0;
 		DebuggerContext = MoveTemp(VertexContext);
@@ -625,6 +642,25 @@ namespace SH
 		DebugStates = GenDebugStates(DebugBufferData, (uint32)DebugBuffer->GetByteSize());
 		GGpuRhi->UnMapGpuBuffer(DebugBuffer);
 		FinalizeDebugStates();
+	}
+
+	std::optional<Vector2u> ShaderDebugger::ValidateVertex(const InvocationState& InState)
+	{
+		Invocation = InState;
+		bEnableUbsan = EnableUbsan();
+
+		InvokeVertex(true);
+
+		std::optional<Vector2u> ErrorVertex;
+		uint8* DebugBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebugBuffer, GpuResourceMapMode::Read_Only);
+		uint32 Offset = *(uint32*)(DebugBufferData);
+		if (Offset > 0)
+		{
+			ErrorVertex = *(Vector2u*)(DebugBufferData + 4);
+		}
+		GGpuRhi->UnMapGpuBuffer(DebugBuffer);
+
+		return ErrorVertex;
 	}
 
 	TArray<Vector4f> ShaderDebugger::CaptureVertex(const InvocationState& InState)
@@ -709,7 +745,103 @@ namespace SH
 
 	bool ShaderDebugger::EvaluateExpressionVertexlImpl(const FString& InExpression, ExpressionNode& OutResult) const
 	{
-		return false;
+		TArray<FString> ExtraArgs = DebugShader->CompileExtraArgs;
+		FString ErrorInfo, WarnInfo;
+		GpuShaderLanguage Lang = DebugShader->GetShaderLanguage();
+
+		const auto& VsInvocation = std::get<VertexState>(Invocation);
+		int32 DebugStateIndex = CurDebugStateIndex;
+		if (ActiveCallPoint)
+		{
+			DebugStateIndex = ActiveCallPoint.value().DebugStateIndex;
+		}
+		int32 ExprStateIndex = 0;
+		int32 GpuStateIndex = 0;
+		ComputeExprStateIndices(DebugStates, DebugStateIndex, ExprStateIndex, GpuStateIndex);
+		SpvVertexExprDebuggerContext ExprContext{ DebugStates[ExprStateIndex], GpuStateIndex,
+			TargetVertexIndex, TargetInstanceIndex, SpvBindings };
+		SpirvParser Parser;
+		Parser.Parse(DebugShader->SpvCode);
+		SpvMetaVisitor MetaVisitor{ ExprContext };
+		Parser.Accept(&MetaVisitor);
+		SpvVertexExprDebuggerVisitor ExprVisitor{ ExprContext, Lang, bEnableUbsan };
+		Parser.Accept(&ExprVisitor);
+		ExprVisitor.GetPatcher().Dump(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / DebugShader->GetShaderName() + "ExprPatched.spvasm");
+
+		const TArray<uint32>& PatchedSpv = ExprVisitor.GetPatcher().GetSpv();
+		FString EntryPoint = DebugShader->GetEntryPoint();
+		FString PatchedSource;
+		FString FileExtension;
+		if (!CrossCompileSpvForDebugger(Lang, ShaderType::Vertex, PatchedSpv, EntryPoint, PatchedSource, FileExtension))
+		{
+			return false;
+		}
+
+		if (!PatchExprPlaceholderInSource(PatchedSource, InExpression))
+		{
+			return false;
+		}
+
+		FString FileName = DebugShader->GetShaderName() + TEXT("ExprPatched") + FileExtension;
+		FFileHelper::SaveStringToFile(PatchedSource, *(PathHelper::SavedShaderDir() / DebugShader->GetShaderName() / FileName));
+
+		TRefCountPtr<GpuShader> PatchedShader = GGpuRhi->CreateShaderFromSource({
+			.Source = MoveTemp(PatchedSource),
+			.Type = DebugShader->GetShaderType(),
+			.EntryPoint = EntryPoint,
+			.Language = Lang
+		});
+		PatchedShader->CompilerFlag |= GpuShaderCompilerFlag::SkipBindingShift;
+		if (!GGpuRhi->CompileShader(PatchedShader, ErrorInfo, WarnInfo, ExtraArgs))
+		{
+			return false;
+		}
+
+		VertexDebugPipelinePass DebugDraw = MakeVertexDebugPipelinePass(VsInvocation, PatchedShader, PatchedBindGroupLayouts);
+
+		auto CmdRecorder = GGpuRhi->BeginRecording();
+		GpuResourceHelper::ClearRWResource(CmdRecorder, DebugBuffer);
+		RenderGraph RG(CmdRecorder);
+		auto& RenderPass = RG.AddRenderPass(TEXT("ExprDebugger"), MoveTemp(DebugDraw.PassDesc),
+			[&, BindGroups = PatchedBindGroups, Pipeline = DebugDraw.Pipeline](GpuRenderPassRecorder* PassRecorder) {
+				PassRecorder->SetViewPort(VsInvocation.ViewPortDesc);
+				PassRecorder->SetRenderPipelineState(Pipeline);
+				PassRecorder->SetBindGroups(MakeBindGroupSlots(BindGroups));
+				VsInvocation.DrawFunction(PassRecorder);
+			}
+		);
+		AddSpvBindingResourceAccess(RenderPass, SpvBindings);
+		RenderPass.Write(DebugBuffer);
+		RG.Execute();
+
+		uint8* DebugBufferData = (uint8*)GGpuRhi->MapGpuBuffer(DebugBuffer, GpuResourceMapMode::Read_Only);
+		SpvId TypeDescId = *(uint32*)(DebugBufferData);
+		int32 ResultSize = *(int32*)(DebugBufferData + 16);
+		TArray<uint8> ResultValue = { DebugBufferData + 32, ResultSize };
+		GGpuRhi->UnMapGpuBuffer(DebugBuffer);
+
+		SpvTypeDesc* ResultTypeDesc = ExprContext.TypeDescs[TypeDescId].Get();
+		if (!ResultTypeDesc || ResultValue.IsEmpty())
+		{
+			return false;
+		}
+
+		FText TypeName = FText::FromString(GetTypeDescStr(ResultTypeDesc, Lang));
+
+		TArray<Vector2i> ResultRange;
+		ResultRange.Add({ 0, ResultValue.Num() });
+		FString ValueStr = GetValueStr(ResultValue, ResultTypeDesc, ResultRange, 0, DebuggerViewHex);
+
+		TArray<TSharedPtr<ExpressionNode>> Children;
+		if (ResultTypeDesc->GetKind() == SpvTypeDescKind::Composite || ResultTypeDesc->GetKind() == SpvTypeDescKind::Array
+			|| ResultTypeDesc->GetKind() == SpvTypeDescKind::Matrix)
+		{
+			Children = AppendChildNodes(Lang, ResultTypeDesc, ResultRange, {}, ResultValue, 0);
+		}
+
+		OutResult = { .Expr = InExpression, .ValueStr = ValueStr,
+			.TypeName = TypeName.ToString(), .Children = MoveTemp(Children) };
+		return true;
 	}
 
 	bool ShaderDebugger::EvaluateExpressionPixelImpl(const FString& InExpression, ExpressionNode& OutResult) const
