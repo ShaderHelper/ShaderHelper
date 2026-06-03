@@ -1406,12 +1406,20 @@ namespace SH
 
 	void ShaderHelperEditor::SetCurrentDebugItem(DebugItem InItem)
 	{
+		if (IsDebugging)
+		{
+			return;
+		}
 		CurrentDebugItem = InItem;
 		NormalizeCurrentDebugItem();
 	}
 
 	void ShaderHelperEditor::NormalizeCurrentDebugItem()
 	{
+		if (IsDebugging)
+		{
+			return;
+		}
 		DebuggableObject* Debuggable = GetDebuggaleObject();
 		if (!Debuggable)
 		{
@@ -1763,7 +1771,7 @@ namespace SH
 					FSlateIcon(),
 					FUIAction(
 						FExecuteAction::CreateLambda([this, Item] { SetCurrentDebugItem(Item); }),
-						FCanExecuteAction(),
+						FCanExecuteAction::CreateLambda([this] { return !IsDebugging; }),
 						FIsActionChecked::CreateLambda([this, Item] { return Item == CurrentDebugItem; })
 					),
 					NAME_None,
@@ -1781,7 +1789,7 @@ namespace SH
 			.Command(CodeEditorCommands::Get().Debug)
 			.ButtonToolTipText(LOCALIZATION("Debug"))
 			.MenuToolTipText_Lambda([this] { return FText::FromString(ANSI_TO_TCHAR(magic_enum::enum_name(CurrentDebugItem).data())); })
-			.IsMenuEnabled_Lambda([this] { return GetDebuggaleObject() != nullptr; })
+			.IsMenuEnabled_Lambda([this] { return !IsDebugging && GetDebuggaleObject() != nullptr; })
 			.OnGetMenuContent_Lambda(MakeDebugItemMenuContent)
 			[
 				SNew(SImage)
@@ -1846,7 +1854,7 @@ namespace SH
 				.ButtonToolTipText(LOCALIZATION("Validation"))
 				.MenuToolTipText_Lambda([this] { return FText::FromString(ANSI_TO_TCHAR(magic_enum::enum_name(CurrentDebugItem).data())); })
 				.IsButtonEnabled_Lambda([this] { return !IsDebugging && GetDebuggaleObject() != nullptr; })
-				.IsMenuEnabled_Lambda([this] { return GetDebuggaleObject() != nullptr; })
+				.IsMenuEnabled_Lambda([this] { return !IsDebugging && GetDebuggaleObject() != nullptr; })
 				.OnClicked_Lambda([this] {
 					StartDebugging(true);
 					return FReply::Handled();

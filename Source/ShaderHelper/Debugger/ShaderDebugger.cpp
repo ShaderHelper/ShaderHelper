@@ -2364,7 +2364,12 @@ namespace SH
 					
 					MatchBreakPoint = SourceBreakPoints.ContainsByPredicate([&](int32 InEntry) {
 						int32 BreakPointLine = InEntry + NextSourceExtraLineNum;
-						int32 BreakPointValidLine = ValidLines[Algo::UpperBound(ValidLines, BreakPointLine - 1)];
+						int32 Index = Algo::UpperBound(ValidLines, BreakPointLine - 1);
+						if (!ValidLines.IsValidIndex(Index))
+						{
+							return false;
+						}
+						int32 BreakPointValidLine = ValidLines[Index];
 						for (const auto& [_, BB] : DebuggerContext->BBs)
 						{
 							if (BB.ValidLines.Contains(BreakPointValidLine) && BB.ValidLines.Contains(NextValidLine))
