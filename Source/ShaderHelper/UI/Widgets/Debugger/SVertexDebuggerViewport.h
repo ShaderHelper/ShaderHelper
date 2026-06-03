@@ -48,8 +48,10 @@ namespace SH
 		void FrameCamera(const TOptional<FW::Camera>& InDebugCamera, const TArray<FW::Vector3f>& InFrustumPositions);
 		void UpdateCamera(float DeltaTime);
 		void Render();
+		uint32 RenderPickIdAtMouse();
 		void OnPick();
 		void SetFinalizedAssertedVertex(uint32 InVertexIndex, uint32 InInstanceIndex);
+		void BuildHighlightEdgeBuffer(int32 SubMeshIndex, int32 VertexIndex);
 		void BuildAssertedVertexBuffer(const TSet<FW::Vector2u>& InAssertedVertices);
 
 	private:
@@ -58,8 +60,11 @@ namespace SH
 		TRefCountPtr<FW::GpuTexture> RenderTarget;
 		TRefCountPtr<FW::GpuTexture> MsaaRenderTarget;
 		TRefCountPtr<FW::GpuTexture> DepthTarget;
+		TRefCountPtr<FW::GpuTexture> PickTarget;
+		TRefCountPtr<FW::GpuTexture> PickDepthTarget;
 
 		TArray<SubMeshRender> SubMeshes;
+		TArray<FW::Vector2i> PickIdToVertex;
 		FW::Vector3f SceneCenter{ 0, 0, 0 };
 		float SceneRadius = 1.0f;
 
@@ -101,10 +106,18 @@ namespace SH
 		TRefCountPtr<FW::GpuShader> OverlayLineVs;
 		TRefCountPtr<FW::GpuShader> OverlayPointVs;
 		TRefCountPtr<FW::GpuShader> OverlayPs;
+		TRefCountPtr<FW::GpuShader> HighlightLineVs;
+		TRefCountPtr<FW::GpuShader> HighlightLinePs;
 		TRefCountPtr<FW::GpuShader> OverlayPointPs;
+		TRefCountPtr<FW::GpuShader> PickSolidPs;
+		TRefCountPtr<FW::GpuShader> PickPointVs;
+		TRefCountPtr<FW::GpuShader> PickPointPs;
 		TRefCountPtr<FW::GpuRenderPipelineState> SolidPipeline;       // TriangleList, shaded solid fill
 		TRefCountPtr<FW::GpuRenderPipelineState> WirePipeline;        // TriangleList, thick screen-space edge quads
 		TRefCountPtr<FW::GpuRenderPipelineState> PointPipeline;       // TriangleList, green screen-space point quads
+		TRefCountPtr<FW::GpuRenderPipelineState> HighlightEdgePipeline; // TriangleList, blue gradient edge quads
+		TRefCountPtr<FW::GpuRenderPipelineState> PickSolidPipeline;   // TriangleList, depth prepass for GPU picking
+		TRefCountPtr<FW::GpuRenderPipelineState> PickPointPipeline;   // TriangleList, depth-tested vertex-id point quads
 		TRefCountPtr<FW::GpuRenderPipelineState> FrustumPipeline;     // LineList
 		TRefCountPtr<FW::GpuBuffer> FrustumVertexBuffer;
 
@@ -113,6 +126,8 @@ namespace SH
 		bool bIsValidating = false;
 		uint32 PerInstanceVertexCount = 0; // to decode picked flat id back into (instance, localVertex)
 		TRefCountPtr<FW::GpuBuffer> HighlightVertexBuffer; // 6 verts of a selected-vertex billboard point
+		TRefCountPtr<FW::GpuBuffer> HighlightEdgeBuffer;   // blue gradient quads for edges connected to selection
+		uint32 HighlightEdgeVertexCount = 0;
 		TRefCountPtr<FW::GpuBuffer> AssertedVertexBuffer;  // pink billboards for assert-failing vertices
 		uint32 AssertedVertexPointCount = 0;
 

@@ -55,6 +55,11 @@ float4 MainPS_Solid(SolidVsOutput Input) : SV_Target
 	float Shade = 0.25 + 0.55 * abs(dot(Normal, LightDir));
 	return float4(WireColor.rgb * Shade, 1.0);
 }
+
+uint MainPS_PickSolid(SolidVsOutput Input) : SV_Target
+{
+	return 0;
+}
 )");
 
 		const TCHAR GVertexDebuggerOverlayHlsl[] = TEXT(R"(
@@ -69,12 +74,26 @@ struct PointVsInput
 {
 	float3 Position : POSITION0;
 	float2 Offset : TEXCOORD0;
+	uint PickId : TEXCOORD1;
 };
 
 struct PointVsOutput
 {
 	float4 Position : SV_POSITION;
 	float2 Local : TEXCOORD0;
+};
+
+struct HighlightLineVsOutput
+{
+	float4 Position : SV_POSITION;
+	float LineT : TEXCOORD0;
+};
+
+struct PickPointVsOutput
+{
+	float4 Position : SV_POSITION;
+	float2 Local : TEXCOORD0;
+	nointerpolation uint PickId : TEXCOORD1;
 };
 
 float4 MainVS_Line(LineVsInput Input) : SV_POSITION
@@ -92,6 +111,24 @@ float4 MainVS_Line(LineVsInput Input) : SV_POSITION
 	return Clip;
 }
 
+HighlightLineVsOutput MainVS_HighlightLine(LineVsInput Input)
+{
+	HighlightLineVsOutput Output;
+	float4 ClipA = mul(float4(Input.StartPos, 1.0), Transform);
+	float4 ClipB = mul(float4(Input.EndPos, 1.0), Transform);
+	float2 NdcA = ClipA.xy / max(abs(ClipA.w), 1e-6);
+	float2 NdcB = ClipB.xy / max(abs(ClipB.w), 1e-6);
+	float2 DirPx = (NdcB - NdcA) * ViewportSize;
+	float LenSq = max(dot(DirPx, DirPx), 1e-6);
+	float2 NormalPx = float2(-DirPx.y, DirPx.x) * rsqrt(LenSq);
+	float4 Clip = lerp(ClipA, ClipB, Input.Param.x);
+	float2 OffsetNdc = NormalPx * Input.Param.y * LineThicknessPx * 2.0 / ViewportSize;
+	Clip.xy += OffsetNdc * Clip.w;
+	Output.Position = Clip;
+	Output.LineT = Input.Param.x;
+	return Output;
+}
+
 PointVsOutput MainVS_Point(PointVsInput Input)
 {
 	PointVsOutput Output;
@@ -102,15 +139,40 @@ PointVsOutput MainVS_Point(PointVsInput Input)
 	return Output;
 }
 
+PickPointVsOutput MainVS_PickPoint(PointVsInput Input)
+{
+	PickPointVsOutput Output;
+	Output.Position = mul(float4(Input.Position, 1.0), Transform);
+	float2 OffsetNdc = Input.Offset * PointRadiusPx * 2.0 / ViewportSize;
+	Output.Position.xy += OffsetNdc * Output.Position.w;
+	Output.Local = Input.Offset;
+	Output.PickId = Input.PickId;
+	return Output;
+}
+
 float4 MainPS_Overlay(float4 Position : SV_POSITION) : SV_Target
 {
 	return WireColor;
+}
+
+float4 MainPS_HighlightLine(HighlightLineVsOutput Input) : SV_Target
+{
+	float Fade = smoothstep(0.0, 1.0, saturate(Input.LineT));
+	float Alpha = WireColor.a * lerp(1.0, 0.12, Fade);
+	float3 Color = lerp(WireColor.rgb, WireColor.rgb * 0.35, Fade);
+	return float4(Color, Alpha);
 }
 
 float4 MainPS_Point(PointVsOutput Input) : SV_Target
 {
 	clip(1.0 - dot(Input.Local, Input.Local));
 	return WireColor;
+}
+
+uint MainPS_PickPoint(PickPointVsOutput Input) : SV_Target
+{
+	clip(1.0 - dot(Input.Local, Input.Local));
+	return Input.PickId;
 }
 )");
 
@@ -125,9 +187,10 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 		{
 			Vector3f Position;
 			Vector2f Offset;
+			uint32 PickId = 0;
 		};
 
-		void AppendPointBillboard(TArray<OverlayPointVertex>& OutPoints, const Vector3f& Position)
+		void AppendPointBillboard(TArray<OverlayPointVertex>& OutPoints, const Vector3f& Position, uint32 PickId = 0)
 		{
 			const Vector2f PointOffsets[6] = {
 				{-1.0f, -1.0f}, { 1.0f, -1.0f}, { 1.0f,  1.0f},
@@ -135,8 +198,31 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 			};
 			for (const Vector2f& Offset : PointOffsets)
 			{
-				OutPoints.Add({ Position, Offset });
+				OutPoints.Add({ Position, Offset, PickId });
 			}
+		}
+
+		void AppendLineQuad(TArray<OverlayLineVertex>& OutLines, const Vector3f& StartPos, const Vector3f& EndPos)
+		{
+			OutLines.Add({ StartPos, EndPos, Vector2f(0.0f, -1.0f) });
+			OutLines.Add({ StartPos, EndPos, Vector2f(1.0f, -1.0f) });
+			OutLines.Add({ StartPos, EndPos, Vector2f(1.0f,  1.0f) });
+			OutLines.Add({ StartPos, EndPos, Vector2f(0.0f, -1.0f) });
+			OutLines.Add({ StartPos, EndPos, Vector2f(1.0f,  1.0f) });
+			OutLines.Add({ StartPos, EndPos, Vector2f(0.0f,  1.0f) });
+		}
+
+		TRefCountPtr<GpuBuffer> CreateOverlayLineBuffer(const TArray<OverlayLineVertex>& Lines)
+		{
+			if (Lines.IsEmpty())
+			{
+				return {};
+			}
+
+			TArray<uint8> LineBytes;
+			LineBytes.SetNumUninitialized(Lines.Num() * sizeof(OverlayLineVertex));
+			FMemory::Memcpy(LineBytes.GetData(), Lines.GetData(), LineBytes.Num());
+			return GGpuRhi->CreateBuffer({ .ByteSize = (uint32)LineBytes.Num(), .Usage = GpuBufferUsage::Vertex, .InitialData = LineBytes });
 		}
 
 		TRefCountPtr<GpuBuffer> CreateOverlayPointBuffer(const TArray<OverlayPointVertex>& Points)
@@ -349,8 +435,8 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 			Ub->GetMember<FMatrix44f>("Transform") = FMatrix44f::Identity;
 			Ub->GetMember<Vector4f>("WireColor") = Color;
 			Ub->GetMember<Vector2f>("ViewportSize") = Vector2f(1.0f, 1.0f);
-			Ub->GetMember<float>("LineThicknessPx") = 1.5f;
-			Ub->GetMember<float>("PointRadiusPx") = 4.0f;
+			Ub->GetMember<float>("LineThicknessPx") = 0.7f;
+			Ub->GetMember<float>("PointRadiusPx") = 3.3f;
 			return Ub;
 		};
 		WireUb = MakeUb(Vector4f(0.0f, 1.0f, 0.25f, 1.0f));
@@ -358,7 +444,8 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 		HighlightUb = MakeUb(Vector4f(0.20f, 0.55f, 1.0f, 1.0f));
 		AssertedUb = MakeUb(Vector4f(1.0f, 0.0f, 1.0f, 1.0f));
 		SolidUb = MakeUb(Vector4f(0.64f, 0.68f, 0.72f, 1.0f));
-		HighlightUb->GetMember<float>("PointRadiusPx") = 6.0f;
+		HighlightUb->GetMember<float>("LineThicknessPx") = 1.0f;
+		HighlightUb->GetMember<float>("PointRadiusPx") = 3.7f;
 
 		auto MakeBindGroup = [this](UniformBuffer* Ub)
 		{
@@ -381,10 +468,15 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 		WirePs = GGpuRhi->CreateShaderFromSource({ .Name = TEXT("VertexDebuggerWirePS"), .Source = ShaderSource, .Type = ShaderType::Pixel, .EntryPoint = TEXT("MainPS") });
 		SolidVs = GGpuRhi->CreateShaderFromSource({ .Name = TEXT("VertexDebuggerSolidVS"), .Source = ShaderSource, .Type = ShaderType::Vertex, .EntryPoint = TEXT("MainVS_Solid") });
 		SolidPs = GGpuRhi->CreateShaderFromSource({ .Name = TEXT("VertexDebuggerSolidPS"), .Source = ShaderSource, .Type = ShaderType::Pixel, .EntryPoint = TEXT("MainPS_Solid") });
+		PickSolidPs = GGpuRhi->CreateShaderFromSource({ .Name = TEXT("VertexDebuggerPickSolidPS"), .Source = ShaderSource, .Type = ShaderType::Pixel, .EntryPoint = TEXT("MainPS_PickSolid") });
 		OverlayLineVs = GGpuRhi->CreateShaderFromSource({ .Name = TEXT("VertexDebuggerOverlayLineVS"), .Source = OverlayShaderSource, .Type = ShaderType::Vertex, .EntryPoint = TEXT("MainVS_Line") });
 		OverlayPointVs = GGpuRhi->CreateShaderFromSource({ .Name = TEXT("VertexDebuggerOverlayPointVS"), .Source = OverlayShaderSource, .Type = ShaderType::Vertex, .EntryPoint = TEXT("MainVS_Point") });
 		OverlayPs = GGpuRhi->CreateShaderFromSource({ .Name = TEXT("VertexDebuggerOverlayPS"), .Source = OverlayShaderSource, .Type = ShaderType::Pixel, .EntryPoint = TEXT("MainPS_Overlay") });
+		HighlightLineVs = GGpuRhi->CreateShaderFromSource({ .Name = TEXT("VertexDebuggerHighlightLineVS"), .Source = OverlayShaderSource, .Type = ShaderType::Vertex, .EntryPoint = TEXT("MainVS_HighlightLine") });
+		HighlightLinePs = GGpuRhi->CreateShaderFromSource({ .Name = TEXT("VertexDebuggerHighlightLinePS"), .Source = OverlayShaderSource, .Type = ShaderType::Pixel, .EntryPoint = TEXT("MainPS_HighlightLine") });
 		OverlayPointPs = GGpuRhi->CreateShaderFromSource({ .Name = TEXT("VertexDebuggerOverlayPointPS"), .Source = OverlayShaderSource, .Type = ShaderType::Pixel, .EntryPoint = TEXT("MainPS_Point") });
+		PickPointVs = GGpuRhi->CreateShaderFromSource({ .Name = TEXT("VertexDebuggerPickPointVS"), .Source = OverlayShaderSource, .Type = ShaderType::Vertex, .EntryPoint = TEXT("MainVS_PickPoint") });
+		PickPointPs = GGpuRhi->CreateShaderFromSource({ .Name = TEXT("VertexDebuggerPickPointPS"), .Source = OverlayShaderSource, .Type = ShaderType::Pixel, .EntryPoint = TEXT("MainPS_PickPoint") });
 
 		FString ErrorInfo, WarnInfo;
 		GGpuRhi->CompileShader(WireVs, ErrorInfo, WarnInfo);
@@ -395,13 +487,23 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 		check(ErrorInfo.IsEmpty());
 		GGpuRhi->CompileShader(SolidPs, ErrorInfo, WarnInfo);
 		check(ErrorInfo.IsEmpty());
+		GGpuRhi->CompileShader(PickSolidPs, ErrorInfo, WarnInfo);
+		check(ErrorInfo.IsEmpty());
 		GGpuRhi->CompileShader(OverlayLineVs, ErrorInfo, WarnInfo);
 		check(ErrorInfo.IsEmpty());
 		GGpuRhi->CompileShader(OverlayPointVs, ErrorInfo, WarnInfo);
 		check(ErrorInfo.IsEmpty());
 		GGpuRhi->CompileShader(OverlayPs, ErrorInfo, WarnInfo);
 		check(ErrorInfo.IsEmpty());
+		GGpuRhi->CompileShader(HighlightLineVs, ErrorInfo, WarnInfo);
+		check(ErrorInfo.IsEmpty());
+		GGpuRhi->CompileShader(HighlightLinePs, ErrorInfo, WarnInfo);
+		check(ErrorInfo.IsEmpty());
 		GGpuRhi->CompileShader(OverlayPointPs, ErrorInfo, WarnInfo);
+		check(ErrorInfo.IsEmpty());
+		GGpuRhi->CompileShader(PickPointVs, ErrorInfo, WarnInfo);
+		check(ErrorInfo.IsEmpty());
+		GGpuRhi->CompileShader(PickPointPs, ErrorInfo, WarnInfo);
 		check(ErrorInfo.IsEmpty());
 
 		const GpuVertexLayoutDesc PositionLayout{
@@ -421,15 +523,26 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 			.Attributes = {
 				{ .Location = 0, .SemanticName = "POSITION", .SemanticIndex = 0, .Format = GpuFormat::R32G32B32_FLOAT, .ByteOffset = offsetof(OverlayPointVertex, Position) },
 				{ .Location = 1, .SemanticName = "TEXCOORD", .SemanticIndex = 0, .Format = GpuFormat::R32G32_FLOAT, .ByteOffset = offsetof(OverlayPointVertex, Offset) },
+				{ .Location = 2, .SemanticName = "TEXCOORD", .SemanticIndex = 1, .Format = GpuFormat::R32_UINT, .ByteOffset = offsetof(OverlayPointVertex, PickId) },
 			}
 		};
 
-		auto MakePipeline = [&](GpuShader* Vs, GpuShader* Ps, const GpuVertexLayoutDesc& Layout, RasterizerCullMode CullMode, PrimitiveType Primitive, GpuFormat ColorFormat, uint32 SampleCount, bool bDepthWrite, CompareMode DepthCompare)
+		auto MakePipeline = [&](GpuShader* Vs, GpuShader* Ps, const GpuVertexLayoutDesc& Layout, RasterizerCullMode CullMode, PrimitiveType Primitive, GpuFormat ColorFormat, uint32 SampleCount, bool bDepthWrite, CompareMode DepthCompare, bool bBlend = false)
 		{
+			PipelineTargetDesc TargetDesc{ .TargetFormat = ColorFormat };
+			if (bBlend)
+			{
+				TargetDesc.BlendEnable = true;
+				TargetDesc.SrcFactor = BlendFactor::SrcAlpha;
+				TargetDesc.DestFactor = BlendFactor::InvSrcAlpha;
+				TargetDesc.SrcAlphaFactor = BlendFactor::One;
+				TargetDesc.DestAlphaFactor = BlendFactor::InvSrcAlpha;
+			}
+
 			GpuRenderPipelineStateDesc Desc{
 				.Vs = Vs,
 				.Ps = Ps,
-				.Targets = { { .TargetFormat = ColorFormat } },
+				.Targets = { TargetDesc },
 				.BindGroupLayouts = { WireBindGroupLayout },
 				.VertexLayout = { Layout },
 				.RasterizerState = { .FillMode = RasterizerFillMode::Solid, .CullMode = CullMode },
@@ -441,17 +554,23 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 		};
 
 		SolidPipeline = MakePipeline(SolidVs, SolidPs, PositionLayout, RasterizerCullMode::None, PrimitiveType::TriangleList, GpuFormat::B8G8R8A8_UNORM, 4, true, CompareMode::Less);
-		WirePipeline = MakePipeline(OverlayLineVs, OverlayPs, LineLayout, RasterizerCullMode::None, PrimitiveType::TriangleList, GpuFormat::B8G8R8A8_UNORM, 4, false, CompareMode::Always);
-		PointPipeline = MakePipeline(OverlayPointVs, OverlayPointPs, PointLayout, RasterizerCullMode::None, PrimitiveType::TriangleList, GpuFormat::B8G8R8A8_UNORM, 4, false, CompareMode::Always);
+		WirePipeline = MakePipeline(OverlayLineVs, OverlayPs, LineLayout, RasterizerCullMode::None, PrimitiveType::TriangleList, GpuFormat::B8G8R8A8_UNORM, 4, false, CompareMode::LessEqual);
+		PointPipeline = MakePipeline(OverlayPointVs, OverlayPointPs, PointLayout, RasterizerCullMode::None, PrimitiveType::TriangleList, GpuFormat::B8G8R8A8_UNORM, 4, false, CompareMode::LessEqual);
+		HighlightEdgePipeline = MakePipeline(HighlightLineVs, HighlightLinePs, LineLayout, RasterizerCullMode::None, PrimitiveType::TriangleList, GpuFormat::B8G8R8A8_UNORM, 4, false, CompareMode::LessEqual, true);
+		PickSolidPipeline = MakePipeline(SolidVs, PickSolidPs, PositionLayout, RasterizerCullMode::None, PrimitiveType::TriangleList, GpuFormat::R32_UINT, 1, true, CompareMode::Less);
+		PickPointPipeline = MakePipeline(PickPointVs, PickPointPs, PointLayout, RasterizerCullMode::None, PrimitiveType::TriangleList, GpuFormat::R32_UINT, 1, false, CompareMode::LessEqual);
 		FrustumPipeline = MakePipeline(WireVs, WirePs, PositionLayout, RasterizerCullMode::None, PrimitiveType::LineList, GpuFormat::B8G8R8A8_UNORM, 4, false, CompareMode::LessEqual);
 	}
 
 	void SVertexDebuggerViewport::SetDebugData(const TArray<Vector4f>& InClipPositions, const TArray<uint32>& InIndices, uint32 InVertexCount, uint32 InInstanceCount, const FMatrix44f& ClipToWorld, const TOptional<Camera>& InDebugCamera, bool GlobalValidation, TSet<Vector2u> InAssertedVertices)
 	{
 		SubMeshes.Empty();
+		PickIdToVertex.Empty();
 		bVertexFinalized = false;
 		bIsValidating = false;
 		HighlightVertexBuffer.SafeRelease();
+		HighlightEdgeBuffer.SafeRelease();
+		HighlightEdgeVertexCount = 0;
 		AssertedVertexBuffer.SafeRelease();
 		AssertedVertexPointCount = 0;
 		PerInstanceVertexCount = InVertexCount;
@@ -485,6 +604,7 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 		if (!InClipPositions.IsEmpty())
 		{
 			SubMeshRender Sub;
+			const int32 SubMeshIndex = SubMeshes.Num();
 			Sub.WorldPositions.SetNumUninitialized(InClipPositions.Num());
 			for (int32 v = 0; v < InClipPositions.Num(); ++v)
 			{
@@ -556,16 +676,11 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 
 			TArray<OverlayPointVertex> OverlayPoints;
 			OverlayPoints.Reserve(Sub.WorldPositions.Num() * 6);
-			const Vector2f PointOffsets[6] = {
-				{-1.0f, -1.0f}, { 1.0f, -1.0f}, { 1.0f,  1.0f},
-				{-1.0f, -1.0f}, { 1.0f,  1.0f}, {-1.0f,  1.0f},
-			};
-			for (const Vector3f& P : Sub.WorldPositions)
+			for (int32 VertexIndex = 0; VertexIndex < Sub.WorldPositions.Num(); ++VertexIndex)
 			{
-				for (const Vector2f& Offset : PointOffsets)
-				{
-					OverlayPoints.Add({ P, Offset });
-				}
+				const uint32 PickId = (uint32)PickIdToVertex.Num() + 1u;
+				PickIdToVertex.Add(Vector2i(SubMeshIndex, VertexIndex));
+				AppendPointBillboard(OverlayPoints, Sub.WorldPositions[VertexIndex], PickId);
 			}
 			if (!OverlayPoints.IsEmpty())
 			{
@@ -754,6 +869,11 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 		DepthTarget = GGpuRhi->CreateTexture({ .Width = Width, .Height = Height, .Format = GpuFormat::D32_FLOAT,
 			.Usage = GpuTextureUsage::DepthStencil, .SampleCount = 4 });
 
+		PickTarget = GGpuRhi->CreateTexture({ .Width = Width, .Height = Height, .Format = GpuFormat::R32_UINT,
+			.Usage = GpuTextureUsage::RenderTarget, .ClearValues = Vector4f(0.0f, 0.0f, 0.0f, 0.0f) });
+		PickDepthTarget = GGpuRhi->CreateTexture({ .Width = Width, .Height = Height, .Format = GpuFormat::D32_FLOAT,
+			.Usage = GpuTextureUsage::DepthStencil });
+
 		if (!bUseDebugCameraAspect)
 		{
 			ViewCamera.AspectRatio = (float)Width / (float)Height;
@@ -818,7 +938,7 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 					PassRecorder->DrawPrimitive(0, 24, 0, 1);
 				}
 
-				// Thick green overlay edges and vertex dots.
+				// Depth-tested green overlay edges and vertex dots.
 				PassRecorder->SetRenderPipelineState(WirePipeline);
 				PassRecorder->SetBindGroups({ WireBindGroup });
 				for (const SubMeshRender& Sub : SubMeshes)
@@ -828,6 +948,14 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 						PassRecorder->SetVertexBuffer(0, Sub.OverlayLineBuffer);
 						PassRecorder->DrawPrimitive(0, Sub.OverlayLineVertexCount, 0, 1);
 					}
+				}
+
+				if (HighlightEdgeBuffer && HighlightEdgeVertexCount > 0)
+				{
+					PassRecorder->SetRenderPipelineState(HighlightEdgePipeline);
+					PassRecorder->SetBindGroups({ HighlightBindGroup });
+					PassRecorder->SetVertexBuffer(0, HighlightEdgeBuffer);
+					PassRecorder->DrawPrimitive(0, HighlightEdgeVertexCount, 0, 1);
 				}
 
 				PassRecorder->SetRenderPipelineState(PointPipeline);
@@ -865,6 +993,111 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 		Preview->SetViewPortRenderTexture(RenderTarget);
 	}
 
+	uint32 SVertexDebuggerViewport::RenderPickIdAtMouse()
+	{
+		ResizeRenderTargetIfNeeded();
+		if (SubMeshes.IsEmpty() || !PickTarget || !PickDepthTarget)
+		{
+			return 0;
+		}
+
+		const FMatrix44f Transform = ViewCamera.GetViewProjectionMatrix();
+		WireUb->GetMember<FMatrix44f>("Transform") = Transform;
+		SolidUb->GetMember<FMatrix44f>("Transform") = Transform;
+		const FIntPoint ViewSize = Preview->GetSize();
+		const uint32 Width = FMath::Max(1, ViewSize.X);
+		const uint32 Height = FMath::Max(1, ViewSize.Y);
+		const Vector2f ViewportSize((float)Width, (float)Height);
+		WireUb->GetMember<Vector2f>("ViewportSize") = ViewportSize;
+		SolidUb->GetMember<Vector2f>("ViewportSize") = ViewportSize;
+
+		GpuRenderPassDesc PassDesc;
+		PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{
+			PickTarget->GetDefaultView(), RenderTargetLoadAction::Clear, RenderTargetStoreAction::Store,
+			Vector4f(0.0f, 0.0f, 0.0f, 0.0f) });
+		PassDesc.DepthStencilTarget = GpuDepthStencilTargetInfo{ PickDepthTarget->GetDefaultView(),
+			RenderTargetLoadAction::Clear, RenderTargetStoreAction::DontCare, 1.0f };
+
+		auto CmdRecorder = GGpuRhi->BeginRecording("VertexDebuggerPick");
+		{
+			auto PassRecorder = CmdRecorder->BeginRenderPass(PassDesc, "VertexDebuggerPick");
+			{
+				PassRecorder->SetRenderPipelineState(PickSolidPipeline);
+				PassRecorder->SetBindGroups({ SolidBindGroup });
+				for (const SubMeshRender& Sub : SubMeshes)
+				{
+					PassRecorder->SetVertexBuffer(0, Sub.VertexBuffer);
+					if (Sub.IndexBuffer)
+					{
+						PassRecorder->SetIndexBuffer(Sub.IndexBuffer);
+						PassRecorder->DrawIndexed(0, Sub.IndexCount, 0, 0, 1);
+					}
+					else
+					{
+						PassRecorder->DrawPrimitive(0, Sub.WorldPositions.Num(), 0, 1);
+					}
+				}
+
+				PassRecorder->SetRenderPipelineState(PickPointPipeline);
+				PassRecorder->SetBindGroups({ WireBindGroup });
+				for (const SubMeshRender& Sub : SubMeshes)
+				{
+					if (Sub.OverlayPointBuffer && Sub.OverlayPointVertexCount > 0)
+					{
+						PassRecorder->SetVertexBuffer(0, Sub.OverlayPointBuffer);
+						PassRecorder->DrawPrimitive(0, Sub.OverlayPointVertexCount, 0, 1);
+					}
+				}
+			}
+			CmdRecorder->EndRenderPass(PassRecorder);
+		}
+		GGpuRhi->EndRecording(CmdRecorder);
+		GGpuRhi->Submit({ CmdRecorder });
+
+		const Vector2f Pixel = Preview->GetMousePos();
+		constexpr float PickRadiusPx = 8.0f;
+		const int32 CenterX = FMath::Clamp(FMath::RoundToInt(Pixel.x), 0, (int32)Width - 1);
+		const int32 CenterY = FMath::Clamp(FMath::RoundToInt(Pixel.y), 0, (int32)Height - 1);
+		const int32 Radius = (int32)PickRadiusPx;
+		const float PickRadiusSq = PickRadiusPx * PickRadiusPx;
+
+		uint32 PaddedRowPitch = 0;
+		const uint8* PaddedData = (const uint8*)GGpuRhi->MapGpuTexture(PickTarget, GpuResourceMapMode::Read_Only, PaddedRowPitch);
+		uint32 BestPickId = 0;
+		float BestDistSq = PickRadiusSq;
+		if (PaddedData)
+		{
+			const int32 MinY = FMath::Max(0, CenterY - Radius);
+			const int32 MaxY = FMath::Min((int32)Height - 1, CenterY + Radius);
+			const int32 MinX = FMath::Max(0, CenterX - Radius);
+			const int32 MaxX = FMath::Min((int32)Width - 1, CenterX + Radius);
+			for (int32 Y = MinY; Y <= MaxY; ++Y)
+			{
+				const uint32* Row = reinterpret_cast<const uint32*>(PaddedData + (uint32)Y * PaddedRowPitch);
+				for (int32 X = MinX; X <= MaxX; ++X)
+				{
+					const uint32 PickId = Row[X];
+					if (PickId == 0)
+					{
+						continue;
+					}
+
+					const float Dx = (float)X - Pixel.x;
+					const float Dy = (float)Y - Pixel.y;
+					const float DistSq = Dx * Dx + Dy * Dy;
+					if (DistSq <= BestDistSq)
+					{
+						BestPickId = PickId;
+						BestDistSq = DistSq;
+					}
+				}
+			}
+		}
+		GGpuRhi->UnMapGpuTexture(PickTarget);
+
+		return BestPickId;
+	}
+
 	void SVertexDebuggerViewport::OnPick()
 	{
 		if (bVertexFinalized || bIsValidating)
@@ -872,61 +1105,30 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 			return;
 		}
 
-		const Vector2f Pixel = Preview->GetMousePos();
-		const FIntPoint ViewSize = Preview->GetSize();
-		const float Width = (float)FMath::Max(1, ViewSize.X);
-		const float Height = (float)FMath::Max(1, ViewSize.Y);
-		const FMatrix44f Transform = ViewCamera.GetViewProjectionMatrix();
-		constexpr float PickRadiusPx = 8.0f;
-		const float PickRadiusSq = PickRadiusPx * PickRadiusPx;
-
-		int32 BestSubMesh = -1;
-		int32 BestVertex = -1;
-		float BestDistSq = PickRadiusSq;
-		float BestDepth = FLT_MAX;
-
-		for (int32 SubMeshIndex = 0; SubMeshIndex < SubMeshes.Num(); ++SubMeshIndex)
+		const uint32 PickId = RenderPickIdAtMouse();
+		if (PickId == 0 || !PickIdToVertex.IsValidIndex((int32)PickId - 1))
 		{
-			const SubMeshRender& Sub = SubMeshes[SubMeshIndex];
-			for (int32 VertexIndex = 0; VertexIndex < Sub.WorldPositions.Num(); ++VertexIndex)
-			{
-				const Vector3f& P = Sub.WorldPositions[VertexIndex];
-				const FVector4f Clip = Transform.TransformFVector4(FVector4f(P.x, P.y, P.z, 1.0f));
-				if (Clip.W <= 1e-6f)
-				{
-					continue;
-				}
-				const float NdcX = Clip.X / Clip.W;
-				const float NdcY = Clip.Y / Clip.W;
-				const float NdcZ = Clip.Z / Clip.W;
-				if (NdcX < -1.0f || NdcX > 1.0f || NdcY < -1.0f || NdcY > 1.0f || NdcZ < 0.0f || NdcZ > 1.0f)
-				{
-					continue;
-				}
-
-				const Vector2f Screen((NdcX * 0.5f + 0.5f) * Width, (1.0f - (NdcY * 0.5f + 0.5f)) * Height);
-				const float Dx = Screen.x - Pixel.x;
-				const float Dy = Screen.y - Pixel.y;
-				const float DistSq = Dx * Dx + Dy * Dy;
-				if (DistSq <= BestDistSq && (DistSq < BestDistSq || NdcZ < BestDepth))
-				{
-					BestSubMesh = SubMeshIndex;
-					BestVertex = VertexIndex;
-					BestDistSq = DistSq;
-					BestDepth = NdcZ;
-				}
-			}
+			return;
 		}
 
-		if (BestSubMesh < 0 || BestVertex < 0)
+		const Vector2i PickedVertex = PickIdToVertex[(int32)PickId - 1];
+		const int32 BestSubMesh = PickedVertex.x;
+		const int32 BestVertex = PickedVertex.y;
+		if (!SubMeshes.IsValidIndex(BestSubMesh))
 		{
 			return;
 		}
 
 		const SubMeshRender& Sub = SubMeshes[BestSubMesh];
+		if (!Sub.WorldPositions.IsValidIndex(BestVertex))
+		{
+			return;
+		}
+
 		TArray<OverlayPointVertex> MarkerVerts;
 		AppendPointBillboard(MarkerVerts, Sub.WorldPositions[BestVertex]);
 		HighlightVertexBuffer = CreateOverlayPointBuffer(MarkerVerts);
+		BuildHighlightEdgeBuffer(BestSubMesh, BestVertex);
 
 		Render();
 
@@ -942,8 +1144,9 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 	void SVertexDebuggerViewport::SetFinalizedVertex(uint32 InVertexIndex, uint32 InInstanceIndex)
 	{
 		const uint32 FlatVertexIndex = InInstanceIndex * FMath::Max(1u, PerInstanceVertexCount) + InVertexIndex;
-		for (const SubMeshRender& Sub : SubMeshes)
+		for (int32 SubMeshIndex = 0; SubMeshIndex < SubMeshes.Num(); ++SubMeshIndex)
 		{
+			const SubMeshRender& Sub = SubMeshes[SubMeshIndex];
 			if (!Sub.WorldPositions.IsValidIndex((int32)FlatVertexIndex))
 			{
 				continue;
@@ -952,6 +1155,7 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 			TArray<OverlayPointVertex> MarkerVerts;
 			AppendPointBillboard(MarkerVerts, Sub.WorldPositions[(int32)FlatVertexIndex]);
 			HighlightVertexBuffer = CreateOverlayPointBuffer(MarkerVerts);
+			BuildHighlightEdgeBuffer(SubMeshIndex, (int32)FlatVertexIndex);
 
 			bVertexFinalized = true;
 			Render();
@@ -973,6 +1177,8 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 			}
 
 			HighlightVertexBuffer.SafeRelease();
+			HighlightEdgeBuffer.SafeRelease();
+			HighlightEdgeVertexCount = 0;
 			TSet<Vector2u> Asserted;
 			Asserted.Add(Vector2u{ InVertexIndex, InInstanceIndex });
 			BuildAssertedVertexBuffer(Asserted);
@@ -984,6 +1190,77 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 			ShEditor->DebugVertex(InVertexIndex, InInstanceIndex);
 			return;
 		}
+	}
+
+	void SVertexDebuggerViewport::BuildHighlightEdgeBuffer(int32 SubMeshIndex, int32 VertexIndex)
+	{
+		HighlightEdgeBuffer.SafeRelease();
+		HighlightEdgeVertexCount = 0;
+		if (!SubMeshes.IsValidIndex(SubMeshIndex))
+		{
+			return;
+		}
+
+		const SubMeshRender& Sub = SubMeshes[SubMeshIndex];
+		if (!Sub.WorldPositions.IsValidIndex(VertexIndex) || Sub.TriangleCount == 0)
+		{
+			return;
+		}
+
+		const Vector3f& SelectedPos = Sub.WorldPositions[VertexIndex];
+		const uint32 VtxPerInstance = FMath::Max(1u, PerInstanceVertexCount);
+		const uint32 Instance = (uint32)VertexIndex / VtxPerInstance;
+		const int32 InstanceStart = (int32)(Instance * VtxPerInstance);
+		const int32 InstanceEnd = FMath::Min(InstanceStart + (int32)VtxPerInstance, Sub.WorldPositions.Num());
+		const float PosEpsilonSq = FMath::Square(FMath::Max(SceneRadius * 1e-5f, 1e-6f));
+
+		auto IsSameVisualVertex = [&](uint32 CandidateVertex)
+		{
+			if (CandidateVertex >= (uint32)InstanceStart && CandidateVertex < (uint32)InstanceEnd
+				&& Sub.WorldPositions.IsValidIndex((int32)CandidateVertex))
+			{
+				const Vector3f Delta = Sub.WorldPositions[(int32)CandidateVertex] - SelectedPos;
+				return FVector3f(Delta).SizeSquared() <= PosEpsilonSq;
+			}
+			return false;
+		};
+
+		TSet<uint32> ConnectedVertices;
+		for (int32 Tri = 0; Tri < (int32)Sub.TriangleCount; ++Tri)
+		{
+			const uint32 I0 = Sub.Indices[Tri * 3 + 0];
+			const uint32 I1 = Sub.Indices[Tri * 3 + 1];
+			const uint32 I2 = Sub.Indices[Tri * 3 + 2];
+			const bool bI0Selected = IsSameVisualVertex(I0);
+			const bool bI1Selected = IsSameVisualVertex(I1);
+			const bool bI2Selected = IsSameVisualVertex(I2);
+			if (!bI0Selected && !bI1Selected && !bI2Selected)
+			{
+				continue;
+			}
+
+			if (!bI0Selected) ConnectedVertices.Add(I0);
+			if (!bI1Selected) ConnectedVertices.Add(I1);
+			if (!bI2Selected) ConnectedVertices.Add(I2);
+		}
+
+		if (ConnectedVertices.IsEmpty())
+		{
+			return;
+		}
+
+		TArray<OverlayLineVertex> HighlightEdges;
+		HighlightEdges.Reserve(ConnectedVertices.Num() * 6);
+		for (uint32 ConnectedVertex : ConnectedVertices)
+		{
+			if (!IsSameVisualVertex(ConnectedVertex) && Sub.WorldPositions.IsValidIndex((int32)ConnectedVertex))
+			{
+				AppendLineQuad(HighlightEdges, SelectedPos, Sub.WorldPositions[(int32)ConnectedVertex]);
+			}
+		}
+
+		HighlightEdgeVertexCount = (uint32)HighlightEdges.Num();
+		HighlightEdgeBuffer = CreateOverlayLineBuffer(HighlightEdges);
 	}
 
 	void SVertexDebuggerViewport::BuildAssertedVertexBuffer(const TSet<Vector2u>& InAssertedVertices)
@@ -1017,10 +1294,13 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 	void SVertexDebuggerViewport::Clear()
 	{
 		SubMeshes.Empty();
+		PickIdToVertex.Empty();
 		bUseDebugCameraAspect = false;
 		bVertexFinalized = false;
 		bIsValidating = false;
 		HighlightVertexBuffer.SafeRelease();
+		HighlightEdgeBuffer.SafeRelease();
+		HighlightEdgeVertexCount = 0;
 		AssertedVertexBuffer.SafeRelease();
 		AssertedVertexPointCount = 0;
 		FrustumVertexBuffer.SafeRelease();
