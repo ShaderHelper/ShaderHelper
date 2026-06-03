@@ -547,6 +547,10 @@ namespace SH
 
 	DebugTargetInfo MeshPassNode::MakeDebugTargetInfo(MeshRenderObject* StopObject)
 	{
+		if (StopObject)
+		{
+			StopObject->ClearAssertedVertices();
+		}
 		TRefCountPtr<GpuTexture> CoverageMask = StopObject ? StopObject->BuildCoverageMask() : nullptr;
 		const bool bStopObjectInList = StopObject && MeshRenderObjects.ContainsByPredicate(
 			[StopObject](const ObjectPtr<MeshRenderObject>& MRO) { return MRO.Get() == StopObject; });
@@ -596,12 +600,14 @@ namespace SH
 		}
 
 		RG.Execute();
+		DebugTargetInfo TargetInfo = MakeDebugTargetInfoFromRTs(DebugColorRTs, DebugDepthRT, CoverageMask);
+		TargetInfo.AssertedVertices = StopObject->ReadbackAssertedVertices();
 		for (const ObjectPtr<MeshRenderObject>& MRO : MROsToDraw)
 		{
 			MRO->GetPrintBuffer()->Clear();
 		}
 
-		return MakeDebugTargetInfoFromRTs(DebugColorRTs, DebugDepthRT, CoverageMask);
+		return TargetInfo;
 	}
 
 	void MeshPassNode::Serialize(FArchive& Ar)

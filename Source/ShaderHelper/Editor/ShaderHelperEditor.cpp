@@ -1686,7 +1686,7 @@ namespace SH
 
 		if (CurrentDebugItem == DebugItem::Vertex)
 		{
-			Debuggable->OnStartDebugging(CurrentDebugItem);
+			DebugTargetInfo DebugTarget = Debuggable->OnStartDebugging(CurrentDebugItem);
 			SShaderEditorBox* ShaderEditor = GetShaderEditor(Debuggable->GetShaderAsset(DebugItem::Vertex));
 			Debugger.SetShaderAsset(ShaderEditor->GetShaderAsset());
 			Debugger.SetShaderSource(ShaderEditor->GetCurrentShaderSource());
@@ -1697,7 +1697,7 @@ namespace SH
 				TArray<Vector4f> ClipPositions = Debugger.CaptureVertex(Invocation);
 				IsDebugging = true;
 				const auto& VState = std::get<VertexState>(Invocation);
-				VertexDebuggerViewport->SetDebugData(ClipPositions, VState.Indices, VState.VertexCount, VState.InstanceCount, VState.ClipToWorld, VState.DebugCamera, GlobalValidation);
+				VertexDebuggerViewport->SetDebugData(ClipPositions, VState.Indices, VState.VertexCount, VState.InstanceCount, VState.ClipToWorld, VState.DebugCamera, GlobalValidation, MoveTemp(DebugTarget.AssertedVertices));
 			}
 			catch (const std::runtime_error& e)
 			{
@@ -1710,10 +1710,10 @@ namespace SH
 		}
 		else if (CurrentDebugItem == DebugItem::Compute)
 		{
-			Debuggable->OnStartDebugging(CurrentDebugItem);
+			DebugTargetInfo DebugTarget = Debuggable->OnStartDebugging(CurrentDebugItem);
 			IsDebugging = true;
 			const auto& CState = std::get<ComputeState>(Debuggable->GetInvocationState(DebugItem::Compute));
-			ComputeDebuggerViewport->SetComputeDebugInfo(CState.ThreadGroupCount, CState.ThreadGroupSize, GlobalValidation);
+			ComputeDebuggerViewport->SetComputeDebugInfo(CState.ThreadGroupCount, CState.ThreadGroupSize, GlobalValidation, MoveTemp(DebugTarget.AssertedThreads));
 		}
 		else if (CurrentDebugItem == DebugItem::Pixel)
 		{

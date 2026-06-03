@@ -127,6 +127,31 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 			Vector2f Offset;
 		};
 
+		void AppendPointBillboard(TArray<OverlayPointVertex>& OutPoints, const Vector3f& Position)
+		{
+			const Vector2f PointOffsets[6] = {
+				{-1.0f, -1.0f}, { 1.0f, -1.0f}, { 1.0f,  1.0f},
+				{-1.0f, -1.0f}, { 1.0f,  1.0f}, {-1.0f,  1.0f},
+			};
+			for (const Vector2f& Offset : PointOffsets)
+			{
+				OutPoints.Add({ Position, Offset });
+			}
+		}
+
+		TRefCountPtr<GpuBuffer> CreateOverlayPointBuffer(const TArray<OverlayPointVertex>& Points)
+		{
+			if (Points.IsEmpty())
+			{
+				return {};
+			}
+
+			TArray<uint8> PointBytes;
+			PointBytes.SetNumUninitialized(Points.Num() * sizeof(OverlayPointVertex));
+			FMemory::Memcpy(PointBytes.GetData(), Points.GetData(), PointBytes.Num());
+			return GGpuRhi->CreateBuffer({ .ByteSize = (uint32)PointBytes.Num(), .Usage = GpuBufferUsage::Vertex, .InitialData = PointBytes });
+		}
+
 		Vector3f GetOrbitCameraPosition(float InDistance, float InYaw, float InPitch)
 		{
 			const FMatrix44f OrbitRotation = RotationMatrix(InYaw, InPitch);
@@ -331,6 +356,7 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 		WireUb = MakeUb(Vector4f(0.0f, 1.0f, 0.25f, 1.0f));
 		FrustumUb = MakeUb(Vector4f(0.45f, 0.45f, 0.52f, 1.0f));
 		HighlightUb = MakeUb(Vector4f(0.20f, 0.55f, 1.0f, 1.0f));
+		AssertedUb = MakeUb(Vector4f(1.0f, 0.0f, 1.0f, 1.0f));
 		SolidUb = MakeUb(Vector4f(0.64f, 0.68f, 0.72f, 1.0f));
 		HighlightUb->GetMember<float>("PointRadiusPx") = 6.0f;
 
@@ -343,6 +369,7 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 		WireBindGroup = MakeBindGroup(WireUb.Get());
 		FrustumBindGroup = MakeBindGroup(FrustumUb.Get());
 		HighlightBindGroup = MakeBindGroup(HighlightUb.Get());
+		AssertedBindGroup = MakeBindGroup(AssertedUb.Get());
 		SolidBindGroup = MakeBindGroup(SolidUb.Get());
 
 		FString ShaderSource = WireBindGroupLayout->GetCodegenDeclaration(GpuShaderLanguage::HLSL);
@@ -419,12 +446,14 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 		FrustumPipeline = MakePipeline(WireVs, WirePs, PositionLayout, RasterizerCullMode::None, PrimitiveType::LineList, GpuFormat::B8G8R8A8_UNORM, 4, false, CompareMode::LessEqual);
 	}
 
-	void SVertexDebuggerViewport::SetDebugData(const TArray<Vector4f>& InClipPositions, const TArray<uint32>& InIndices, uint32 InVertexCount, uint32 InInstanceCount, const FMatrix44f& ClipToWorld, const TOptional<Camera>& InDebugCamera, bool GlobalValidation)
+	void SVertexDebuggerViewport::SetDebugData(const TArray<Vector4f>& InClipPositions, const TArray<uint32>& InIndices, uint32 InVertexCount, uint32 InInstanceCount, const FMatrix44f& ClipToWorld, const TOptional<Camera>& InDebugCamera, bool GlobalValidation, TSet<Vector2u> InAssertedVertices)
 	{
 		SubMeshes.Empty();
 		bVertexFinalized = false;
 		bIsValidating = false;
 		HighlightVertexBuffer.SafeRelease();
+		AssertedVertexBuffer.SafeRelease();
+		AssertedVertexPointCount = 0;
 		PerInstanceVertexCount = InVertexCount;
 		FrustumVertexBuffer.SafeRelease();
 
@@ -550,6 +579,7 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 			SubMeshes.Add(MoveTemp(Sub));
 		}
 
+		BuildAssertedVertexBuffer(InAssertedVertices);
 		FrameCamera(InDebugCamera, FrustumPositions);
 		Render();
 
@@ -594,7 +624,7 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 							Done();
 							if (ErrorVertex)
 							{
-								SetFinalizedVertex(ErrorVertex->x, ErrorVertex->y);
+								SetFinalizedAssertedVertex(ErrorVertex->x, ErrorVertex->y);
 							}
 							else
 							{
@@ -743,12 +773,14 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 		WireUb->GetMember<FMatrix44f>("Transform") = Transform;
 		FrustumUb->GetMember<FMatrix44f>("Transform") = Transform;
 		HighlightUb->GetMember<FMatrix44f>("Transform") = Transform;
+		AssertedUb->GetMember<FMatrix44f>("Transform") = Transform;
 		SolidUb->GetMember<FMatrix44f>("Transform") = Transform;
 		const FIntPoint ViewSize = Preview->GetSize();
 		const Vector2f ViewportSize((float)FMath::Max(1, ViewSize.X), (float)FMath::Max(1, ViewSize.Y));
 		WireUb->GetMember<Vector2f>("ViewportSize") = ViewportSize;
 		FrustumUb->GetMember<Vector2f>("ViewportSize") = ViewportSize;
 		HighlightUb->GetMember<Vector2f>("ViewportSize") = ViewportSize;
+		AssertedUb->GetMember<Vector2f>("ViewportSize") = ViewportSize;
 		SolidUb->GetMember<Vector2f>("ViewportSize") = ViewportSize;
 
 		GpuRenderPassDesc PassDesc;
@@ -807,6 +839,14 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 						PassRecorder->SetVertexBuffer(0, Sub.OverlayPointBuffer);
 						PassRecorder->DrawPrimitive(0, Sub.OverlayPointVertexCount, 0, 1);
 					}
+				}
+
+				if (AssertedVertexBuffer && AssertedVertexPointCount > 0)
+				{
+					PassRecorder->SetRenderPipelineState(PointPipeline);
+					PassRecorder->SetBindGroups({ AssertedBindGroup });
+					PassRecorder->SetVertexBuffer(0, AssertedVertexBuffer);
+					PassRecorder->DrawPrimitive(0, AssertedVertexPointCount, 0, 1);
 				}
 
 				if (HighlightVertexBuffer)
@@ -884,15 +924,9 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 		}
 
 		const SubMeshRender& Sub = SubMeshes[BestSubMesh];
-		const Vector3f VertexPos = Sub.WorldPositions[BestVertex];
-		const OverlayPointVertex MarkerVerts[6] = {
-			{ VertexPos, Vector2f(-1.0f, -1.0f) }, { VertexPos, Vector2f( 1.0f, -1.0f) }, { VertexPos, Vector2f( 1.0f,  1.0f) },
-			{ VertexPos, Vector2f(-1.0f, -1.0f) }, { VertexPos, Vector2f( 1.0f,  1.0f) }, { VertexPos, Vector2f(-1.0f,  1.0f) },
-		};
-		TArray<uint8> MarkerBytes;
-		MarkerBytes.SetNumUninitialized(sizeof(MarkerVerts));
-		FMemory::Memcpy(MarkerBytes.GetData(), MarkerVerts, sizeof(MarkerVerts));
-		HighlightVertexBuffer = GGpuRhi->CreateBuffer({ .ByteSize = (uint32)MarkerBytes.Num(), .Usage = GpuBufferUsage::Vertex, .InitialData = MarkerBytes });
+		TArray<OverlayPointVertex> MarkerVerts;
+		AppendPointBillboard(MarkerVerts, Sub.WorldPositions[BestVertex]);
+		HighlightVertexBuffer = CreateOverlayPointBuffer(MarkerVerts);
 
 		Render();
 
@@ -915,15 +949,9 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 				continue;
 			}
 
-			const Vector3f VertexPos = Sub.WorldPositions[(int32)FlatVertexIndex];
-			const OverlayPointVertex MarkerVerts[6] = {
-				{ VertexPos, Vector2f(-1.0f, -1.0f) }, { VertexPos, Vector2f( 1.0f, -1.0f) }, { VertexPos, Vector2f( 1.0f,  1.0f) },
-				{ VertexPos, Vector2f(-1.0f, -1.0f) }, { VertexPos, Vector2f( 1.0f,  1.0f) }, { VertexPos, Vector2f(-1.0f,  1.0f) },
-			};
-			TArray<uint8> MarkerBytes;
-			MarkerBytes.SetNumUninitialized(sizeof(MarkerVerts));
-			FMemory::Memcpy(MarkerBytes.GetData(), MarkerVerts, sizeof(MarkerVerts));
-			HighlightVertexBuffer = GGpuRhi->CreateBuffer({ .ByteSize = (uint32)MarkerBytes.Num(), .Usage = GpuBufferUsage::Vertex, .InitialData = MarkerBytes });
+			TArray<OverlayPointVertex> MarkerVerts;
+			AppendPointBillboard(MarkerVerts, Sub.WorldPositions[(int32)FlatVertexIndex]);
+			HighlightVertexBuffer = CreateOverlayPointBuffer(MarkerVerts);
 
 			bVertexFinalized = true;
 			Render();
@@ -934,6 +962,58 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 		}
 	}
 
+	void SVertexDebuggerViewport::SetFinalizedAssertedVertex(uint32 InVertexIndex, uint32 InInstanceIndex)
+	{
+		const uint32 FlatVertexIndex = InInstanceIndex * FMath::Max(1u, PerInstanceVertexCount) + InVertexIndex;
+		for (const SubMeshRender& Sub : SubMeshes)
+		{
+			if (!Sub.WorldPositions.IsValidIndex((int32)FlatVertexIndex))
+			{
+				continue;
+			}
+
+			HighlightVertexBuffer.SafeRelease();
+			TSet<Vector2u> Asserted;
+			Asserted.Add(Vector2u{ InVertexIndex, InInstanceIndex });
+			BuildAssertedVertexBuffer(Asserted);
+
+			bVertexFinalized = true;
+			Render();
+
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
+			ShEditor->DebugVertex(InVertexIndex, InInstanceIndex);
+			return;
+		}
+	}
+
+	void SVertexDebuggerViewport::BuildAssertedVertexBuffer(const TSet<Vector2u>& InAssertedVertices)
+	{
+		AssertedVertexBuffer.SafeRelease();
+		AssertedVertexPointCount = 0;
+		if (InAssertedVertices.IsEmpty())
+		{
+			return;
+		}
+
+		TArray<OverlayPointVertex> MarkerVerts;
+		const uint32 VtxPerInstance = FMath::Max(1u, PerInstanceVertexCount);
+		for (const Vector2u& AssertedVertex : InAssertedVertices)
+		{
+			const uint32 FlatVertexIndex = AssertedVertex.y * VtxPerInstance + AssertedVertex.x;
+			for (const SubMeshRender& Sub : SubMeshes)
+			{
+				if (Sub.WorldPositions.IsValidIndex((int32)FlatVertexIndex))
+				{
+					AppendPointBillboard(MarkerVerts, Sub.WorldPositions[(int32)FlatVertexIndex]);
+					break;
+				}
+			}
+		}
+
+		AssertedVertexPointCount = (uint32)MarkerVerts.Num();
+		AssertedVertexBuffer = CreateOverlayPointBuffer(MarkerVerts);
+	}
+
 	void SVertexDebuggerViewport::Clear()
 	{
 		SubMeshes.Empty();
@@ -941,6 +1021,8 @@ float4 MainPS_Point(PointVsOutput Input) : SV_Target
 		bVertexFinalized = false;
 		bIsValidating = false;
 		HighlightVertexBuffer.SafeRelease();
+		AssertedVertexBuffer.SafeRelease();
+		AssertedVertexPointCount = 0;
 		FrustumVertexBuffer.SafeRelease();
 		Preview->Clear();
 	}

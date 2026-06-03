@@ -125,7 +125,7 @@ namespace SH
 		return SCompoundWidget::OnMouseButtonDown(MyGeometry, MouseEvent);
 	}
 
-	void SComputeDebuggerViewport::SetComputeDebugInfo(const Vector3u& InThreadGroupCount, const Vector3u& InThreadGroupSize, bool GlobalValidation)
+	void SComputeDebuggerViewport::SetComputeDebugInfo(const Vector3u& InThreadGroupCount, const Vector3u& InThreadGroupSize, bool GlobalValidation, TMap<Vector3u, TSet<Vector3u>> InAssertedThreads)
 	{
 		ThreadGroupCount = InThreadGroupCount;
 		ThreadGroupSize = InThreadGroupSize;
@@ -133,6 +133,7 @@ namespace SH
 		LocalInvocationId = { 0, 0, 0 };
 		SelectedZ = 0;
 		bFinalizedThread = false;
+		AssertedThreads = MoveTemp(InAssertedThreads);
 
 		RootBox->ClearChildren();
 		ThreadCellButtons.Reset();
@@ -446,8 +447,4 @@ namespace SH
 		}
 	}
 
-	void SComputeDebuggerViewport::SetAssertedThreads(TMap<Vector3u, TSet<Vector3u>> InAsserted)
-	{
-		AssertedThreads = MoveTemp(InAsserted);
-	}
 }

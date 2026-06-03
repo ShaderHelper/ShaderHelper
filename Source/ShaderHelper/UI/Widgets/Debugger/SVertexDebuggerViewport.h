@@ -21,7 +21,8 @@ namespace SH
 		// ClipPositions: per (instance,vertex) flat clip-space xyzw (instance*VertexCount+vertex).
 		// Indices: this submesh's per-instance triangle list. VertexCount/InstanceCount: capture dims.
 		void SetDebugData(const TArray<FW::Vector4f>& InClipPositions, const TArray<uint32>& InIndices, 
-			uint32 InVertexCount, uint32 InInstanceCount, const FMatrix44f& ClipToWorld, const TOptional<FW::Camera>& InDebugCamera, bool GlobalValidation = false);
+			uint32 InVertexCount, uint32 InInstanceCount, const FMatrix44f& ClipToWorld, const TOptional<FW::Camera>& InDebugCamera, bool GlobalValidation = false,
+			TSet<FW::Vector2u> InAssertedVertices = {});
 		void SetFinalizedVertex(uint32 InVertexIndex, uint32 InInstanceIndex);
 		void Clear();
 		bool FinalizedVertex() const { return bVertexFinalized; }
@@ -48,6 +49,8 @@ namespace SH
 		void UpdateCamera(float DeltaTime);
 		void Render();
 		void OnPick();
+		void SetFinalizedAssertedVertex(uint32 InVertexIndex, uint32 InInstanceIndex);
+		void BuildAssertedVertexBuffer(const TSet<FW::Vector2u>& InAssertedVertices);
 
 	private:
 		TSharedPtr<FW::PreviewViewPort> Preview;
@@ -83,11 +86,13 @@ namespace SH
 		TUniquePtr<FW::UniformBuffer> WireUb;        // green wire/point overlay
 		TUniquePtr<FW::UniformBuffer> FrustumUb;     // gray pass camera frustum
 		TUniquePtr<FW::UniformBuffer> HighlightUb;   // blue selection
+		TUniquePtr<FW::UniformBuffer> AssertedUb;    // pink assert marker
 		TUniquePtr<FW::UniformBuffer> SolidUb;       // shaded solid mesh
 		TRefCountPtr<FW::GpuBindGroupLayout> WireBindGroupLayout;
 		TRefCountPtr<FW::GpuBindGroup> WireBindGroup;
 		TRefCountPtr<FW::GpuBindGroup> FrustumBindGroup;
 		TRefCountPtr<FW::GpuBindGroup> HighlightBindGroup;
+		TRefCountPtr<FW::GpuBindGroup> AssertedBindGroup;
 		TRefCountPtr<FW::GpuBindGroup> SolidBindGroup;
 		TRefCountPtr<FW::GpuShader> WireVs;
 		TRefCountPtr<FW::GpuShader> WirePs;
@@ -108,6 +113,8 @@ namespace SH
 		bool bIsValidating = false;
 		uint32 PerInstanceVertexCount = 0; // to decode picked flat id back into (instance, localVertex)
 		TRefCountPtr<FW::GpuBuffer> HighlightVertexBuffer; // 6 verts of a selected-vertex billboard point
+		TRefCountPtr<FW::GpuBuffer> AssertedVertexBuffer;  // pink billboards for assert-failing vertices
+		uint32 AssertedVertexPointCount = 0;
 
 		FDelegateHandle ResizeHandlerHandle;
 		FDelegateHandle KeyDownHandlerHandle;

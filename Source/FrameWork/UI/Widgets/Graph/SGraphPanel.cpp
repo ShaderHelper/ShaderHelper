@@ -539,7 +539,7 @@ namespace FW
 				);
 			}
 
-			if (CurNodeWidget->NodeData->GpuTimeMs > 0.0)
+			if (CurNodeWidget->NodeData->GpuTimeMs >= 0.0)
 			{
 				FString TimeText = FString::Printf(TEXT("%.2f ms"), CurNodeWidget->NodeData->GpuTimeMs);
 				FSlateFontInfo Font = FCoreStyle::GetDefaultFontStyle("Regular", 8);

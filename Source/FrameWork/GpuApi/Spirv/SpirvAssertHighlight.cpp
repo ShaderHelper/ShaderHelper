@@ -281,6 +281,102 @@ namespace FW
 		PatchAssertTerminator(Term, &SpvAssertHighlightVisitor::AppendComputeFailReport);
 	}
 
+	SpvId SpvAssertHighlightVisitor::DeclareAssertVertexBuffer()
+	{
+		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
+		SpvId UVec4Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, 4));
+		SpvId RunTimeArrayType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeRuntimeArray>(UVec4Type));
+		SpvId BufferType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeStruct>(TArray<SpvId>{RunTimeArrayType}));
+		SpvId BufferPointerType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Uniform, BufferType));
+
+		int ArrayStride = 16;
+		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(RunTimeArrayType, SpvDecorationKind::ArrayStride, TArray<uint8>{ (uint8*)&ArrayStride, sizeof(int) }));
+		int MemberOffset = 0;
+		Patcher.AddAnnotation(MakeUnique<SpvOpMemberDecorate>(BufferType, 0, SpvDecorationKind::Offset, TArray<uint8>{ (uint8*)&MemberOffset, sizeof(int) }));
+		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(BufferType, SpvDecorationKind::BufferBlock));
+
+		SpvId Var = Patcher.NewId();
+		auto VarOp = MakeUnique<SpvOpVariable>(BufferPointerType, SpvStorageClass::Uniform);
+		VarOp->SetId(Var);
+		Patcher.AddGlobalVariable(MoveTemp(VarOp));
+		Patcher.AddDebugName(MakeUnique<SpvOpName>(Var, "_AssertVertexBuffer_"));
+
+		int SetNumber = AssertHighlightBindGroupSlot;
+		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(Var, SpvDecorationKind::DescriptorSet, TArray<uint8>{ (uint8*)&SetNumber, sizeof(int) }));
+		int BindingNumber = GetSpirvPatchBindingNumber(AssertVertexBufferBindingSlot, BindingType::RWRawBuffer, BindingShaderStage::Vertex);
+		Patcher.AddAnnotation(MakeUnique<SpvOpDecorate>(Var, SpvDecorationKind::Binding, TArray<uint8>{ (uint8*)&BindingNumber, sizeof(int) }));
+		return Var;
+	}
+
+	void SpvAssertHighlightVisitor::AppendVertexFailReport(TArray<TUniquePtr<SpvInstruction>>& InstList)
+	{
+		SpvId UIntType = Patcher.FindOrAddType(MakeUnique<SpvOpTypeInt>(32, 0));
+		SpvId UInt4Type = Patcher.FindOrAddType(MakeUnique<SpvOpTypeVector>(UIntType, 4));
+		SpvId UIntPointerUniformType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Uniform, UIntType));
+		SpvId UVec4PointerUniformType = Patcher.FindOrAddType(MakeUnique<SpvOpTypePointer>(SpvStorageClass::Uniform, UInt4Type));
+		SpvId Zero = Patcher.FindOrAddConstant(0u);
+
+		SpvId LoadedVertexIndex = Patcher.NewId();
+		{
+			auto Op = MakeUnique<SpvOpLoad>(UIntType, VertexIndexVar);
+			Op->SetId(LoadedVertexIndex);
+			InstList.Add(MoveTemp(Op));
+		}
+
+		SpvId LoadedInstanceIndex = Patcher.NewId();
+		{
+			auto Op = MakeUnique<SpvOpLoad>(UIntType, InstanceIndexVar);
+			Op->SetId(LoadedInstanceIndex);
+			InstList.Add(MoveTemp(Op));
+		}
+
+		SpvId CounterPtr = Patcher.NewId();
+		{
+			auto Op = MakeUnique<SpvOpAccessChain>(UIntPointerUniformType, AssertVertexBufferVar, TArray<SpvId>{Zero, Zero, Zero});
+			Op->SetId(CounterPtr);
+			InstList.Add(MoveTemp(Op));
+		}
+
+		SpvId RecordIndex = Patcher.NewId();
+		{
+			auto Op = MakeUnique<SpvOpAtomicIAdd>(UIntType, CounterPtr,
+				Patcher.FindOrAddConstant((uint32)SpvMemoryScope::Device),
+				Patcher.FindOrAddConstant((uint32)SpvMemorySemantics::None),
+				Patcher.FindOrAddConstant(1u));
+			Op->SetId(RecordIndex);
+			InstList.Add(MoveTemp(Op));
+		}
+
+		SpvId RecordStoreIndex = Patcher.NewId();
+		{
+			auto Op = MakeUnique<SpvOpIAdd>(UIntType, RecordIndex, Patcher.FindOrAddConstant(1u));
+			Op->SetId(RecordStoreIndex);
+			InstList.Add(MoveTemp(Op));
+		}
+
+		SpvId RecordValue = Patcher.NewId();
+		{
+			auto Op = MakeUnique<SpvOpCompositeConstruct>(UInt4Type, TArray<SpvId>{LoadedVertexIndex, LoadedInstanceIndex, Zero, Zero});
+			Op->SetId(RecordValue);
+			InstList.Add(MoveTemp(Op));
+		}
+
+		SpvId RecordPtr = Patcher.NewId();
+		{
+			auto Op = MakeUnique<SpvOpAccessChain>(UVec4PointerUniformType, AssertVertexBufferVar, TArray<SpvId>{Zero, RecordStoreIndex});
+			Op->SetId(RecordPtr);
+			InstList.Add(MoveTemp(Op));
+		}
+		InstList.Add(MakeUnique<SpvOpStore>(RecordPtr, RecordValue));
+
+		InstList.Add(MakeUnique<SpvOpReturn>());
+	}
+
+	void SpvAssertHighlightVisitor::PatchVertexTerminator(SpvInstruction* Term)
+	{
+		PatchAssertTerminator(Term, &SpvAssertHighlightVisitor::AppendVertexFailReport);
+	}
+
 	void SpvAssertHighlightVisitor::Parse(TArray<TUniquePtr<SpvInstruction>>& InInsts, const TArray<uint32>& SpvCode, const TMap<SpvSectionKind, SpvSection>& InSections)
 	{
 		Insts = &InInsts;
@@ -307,6 +403,12 @@ namespace FW
 		{
 			AssertThreadBufferVar = DeclareAssertThreadBuffer();
 			GlobalInvocationIdVar = PatchGlobalInvocationIdBuiltIn(Patcher, Context);
+		}
+		else if (Stage == ShaderType::Vertex)
+		{
+			AssertVertexBufferVar = DeclareAssertVertexBuffer();
+			VertexIndexVar = PatchVertexIndexBuiltIn(Patcher, Context);
+			InstanceIndexVar = PatchInstanceIndexBuiltIn(Patcher, Context);
 		}
 		else
 		{
@@ -339,9 +441,13 @@ namespace FW
 			{
 				PatchPixelTerminator(Inst);
 			}
-			else
+			else if (Stage == ShaderType::Compute)
 			{
 				PatchComputeTerminator(Inst);
+			}
+			else
+			{
+				PatchVertexTerminator(Inst);
 			}
 		}
 	}

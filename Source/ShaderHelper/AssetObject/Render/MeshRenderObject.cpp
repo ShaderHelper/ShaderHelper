@@ -241,6 +241,9 @@ namespace SH
 		}
 
 		AssertHighlightPs.SafeRelease();
+		AssertHighlightVs.SafeRelease();
+		AssertVertexBuffer.SafeRelease();
+		AssertedVertices.Empty();
 		bHadAssertError = false;
 	}
 
@@ -1008,7 +1011,7 @@ namespace SH
 		bDebugging = true;
 
 		MeshPassNode* OwnerNode = static_cast<MeshPassNode*>(GetOuter());
-		if (Item == DebugItem::Pixel)
+		if (Item == DebugItem::Pixel || Item == DebugItem::Vertex)
 		{
 			return OwnerNode->MakeDebugTargetInfo(this);
 		}
@@ -1285,14 +1288,79 @@ namespace SH
 		return true;
 	}
 
+	bool MeshRenderObject::BuildAssertHighlightVs()
+	{
+		if (!MaterialAsset || !MaterialAsset->VertexShaderAsset)
+		{
+			return false;
+		}
+
+		Shader* VsAsset = MaterialAsset->VertexShaderAsset.Get();
+		ShaderDesc Desc = VsAsset->GetShaderDesc(VsAsset->EditorContent, ShaderType::Vertex);
+
+		TRefCountPtr<GpuShader> TempVs = GGpuRhi->CreateShaderFromSource(Desc.SourceDesc);
+		TempVs->CompilerFlag |= GpuShaderCompilerFlag::GenSpvForDebugging;
+		TArray<FString> SpvExtraArgs = Desc.ExtraArgs;
+		SpvExtraArgs.Add(TEXT("-D"));
+		SpvExtraArgs.Add(TEXT("GPrivate_ENABLE_PRINT=0"));
+		FString ErrorInfo, WarnInfo;
+		if (!GGpuRhi->CompileShader(TempVs, ErrorInfo, WarnInfo, SpvExtraArgs))
+		{
+			return false;
+		}
+
+		SpirvParser Parser;
+		Parser.Parse(TempVs->SpvCode);
+		SpvMetaContext HlContext;
+		SpvMetaVisitor MetaVisitor{ HlContext };
+		Parser.Accept(&MetaVisitor);
+
+		TArray<SpvBinding> RuntimeBindings;
+		if (GpuShader* RuntimeVs = VsAsset->GetCompiledShader(ShaderType::Vertex))
+		{
+			for (const GpuShaderLayoutBinding& Binding : RuntimeVs->GetLayout())
+			{
+				RuntimeBindings.Add({
+					.Name = Binding.Name,
+					.DescriptorSet = Binding.Group,
+					.Binding = Binding.Slot,
+					.Type = Binding.Type,
+				});
+			}
+		}
+
+		SpvAssertHighlightVisitor HlVisitor{ HlContext, ShaderType::Vertex, MoveTemp(RuntimeBindings) };
+		Parser.Accept(&HlVisitor);
+
+		TArray<uint32> PatchedSpv = HlVisitor.GetPatcher().GetSpv();
+		FString PatchedAsm = HlVisitor.GetPatcher().GetAsm();
+		const FString DumpName = VsAsset->GetShaderName() + TEXT("_AssertHighlight.spvasm");
+		FFileHelper::SaveStringToFile(PatchedAsm, *(PathHelper::SavedShaderDir() / VsAsset->GetShaderName() / DumpName));
+
+		GpuShaderSourceDesc PatchedDesc = Desc.SourceDesc;
+		PatchedDesc.Source = PatchedAsm;
+		TRefCountPtr<GpuShader> NewAssertHighlightVs = GGpuRhi->CreateShaderFromSource(PatchedDesc);
+		NewAssertHighlightVs->SpvCode = MoveTemp(PatchedSpv);
+		NewAssertHighlightVs->CompilerFlag |= GpuShaderCompilerFlag::CompileFromSpvCode;
+		if (!GGpuRhi->CompileShader(NewAssertHighlightVs, ErrorInfo, WarnInfo, Desc.ExtraArgs))
+		{
+			SH_LOG(LogGraph, Error, TEXT("AssertHighlight: patched VS compile failed: %s"), *ErrorInfo);
+			return false;
+		}
+
+		AssertHighlightVs = MoveTemp(NewAssertHighlightVs);
+		return true;
+	}
+
 	void MeshRenderObject::AddAssertHighlightPass(RenderGraph& RG, const TArray<TRefCountPtr<GpuTexture>>& ColorRTs, TRefCountPtr<GpuTexture> DepthRT, const Vector2f& ViewportSize, const Camera* Cam)
 	{
 		if (!bHadAssertError) return;
 		if (!MaterialAsset || !MeshSceneObjectRef.IsValid()) return;
 		if (!Pipeline.IsValid()) return;
-		if (!BuildAssertHighlightPs()) return;
 
 		MeshSceneObject* MSO = MeshSceneObjectRef.Get();
+		AssertVertexBuffer.SafeRelease();
+		AssertedVertices.Empty();
 
 		const FMatrix44f WorldMat = MSO->GetWorldMatrix();
 		const FMatrix44f ViewMat = Cam ? Cam->GetViewMatrix() : FMatrix44f::Identity;
@@ -1303,73 +1371,210 @@ namespace SH
 
 		UpdateMaterialDrawState(WorldMat, ViewMat, ProjMat, ViewportSize, Vector2f(0, 0), Time, CameraPos, CameraDir);
 
-		GpuRenderPipelineStateDesc HlDesc = PipelineDesc;
-		HlDesc.Ps = AssertHighlightPs.GetReference();
-		if (HlDesc.DepthStencilState.IsSet())
-		{
-			HlDesc.DepthStencilState->DepthWriteEnable = false;
-			HlDesc.DepthStencilState->DepthCompare = CompareMode::LessEqual;
-		}
-
-		TRefCountPtr<GpuRenderPipelineState> HlPipeline;
-		try
-		{
-			HlPipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(HlDesc);
-		}
-		catch (const std::runtime_error& e)
-		{
-			SH_LOG(LogShader, Error, TEXT("AssertHighlight: PSO create failed: %s"), ANSI_TO_TCHAR(e.what()));
-			return;
-		}
-
-		GpuRenderPassDesc PassDesc;
-		for (const TRefCountPtr<GpuTexture>& Rt : ColorRTs)
-		{
-			if (!Rt) continue;
-			PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{
-				Rt->GetDefaultView(),
-				RenderTargetLoadAction::Load,
-				RenderTargetStoreAction::Store
-			});
-		}
-		if (DepthRT.IsValid())
-		{
-			PassDesc.DepthStencilTarget = GpuDepthStencilTargetInfo{
-				DepthRT->GetDefaultView(),
-				RenderTargetLoadAction::Load,
-				RenderTargetStoreAction::Store,
-				1.0f
-			};
-		}
-
-		TArray<GpuBindGroup*> BGArray;
-		for (auto& [_, BG] : BindGroups) BGArray.Add(BG.GetReference());
+		TArray<TRefCountPtr<GpuBindGroup>> BaseGroupRefs;
+		for (auto& [_, BG] : BindGroups) BaseGroupRefs.Add(BG);
 
 		ObserverObjectPtr<MeshSceneObject> MsoObs = MeshSceneObjectRef;
-		auto& Pass = RG.AddRenderPass(TEXT("MeshRenderObjectAssertHighlight"), MoveTemp(PassDesc),
-			[HlPipeline, BGArray, MsoObs, SubMeshIdx = SubMeshIndex](GpuRenderPassRecorder* Recorder) {
-				if (!MsoObs.IsValid()) return;
-				MeshSceneObject* InMso = MsoObs.Get();
-				Recorder->SetRenderPipelineState(HlPipeline);
-				Recorder->SetBindGroups(BGArray);
-				if (Model* MdlAsset = InMso->ModelAsset.Get())
+		auto SetGroupRefs = [](GpuRenderPassRecorder* Recorder, const TArray<TRefCountPtr<GpuBindGroup>>& GroupRefs) {
+			TArray<GpuBindGroup*> Groups;
+			for (const TRefCountPtr<GpuBindGroup>& Group : GroupRefs)
+			{
+				Groups.Add(Group.GetReference());
+			}
+			Recorder->SetBindGroups(Groups);
+		};
+		auto DrawMesh = [MsoObs, SubMeshIdx = SubMeshIndex](GpuRenderPassRecorder* Recorder) {
+			if (!MsoObs.IsValid()) return;
+			MeshSceneObject* InMso = MsoObs.Get();
+			if (Model* MdlAsset = InMso->ModelAsset.Get())
+			{
+				const TArray<MeshBuffers>& GpuMeshes = MdlAsset->GetGpuMeshes();
+				if (GpuMeshes.IsValidIndex(SubMeshIdx))
 				{
-					const TArray<MeshBuffers>& GpuMeshes = MdlAsset->GetGpuMeshes();
-					if (GpuMeshes.IsValidIndex(SubMeshIdx))
-					{
-						const MeshBuffers& MB = GpuMeshes[SubMeshIdx];
-						Recorder->SetVertexBuffer(0, MB.VertexBuffer);
-						Recorder->SetIndexBuffer(MB.IndexBuffer);
-						Recorder->DrawIndexed(0, MB.IndexCount, 0, 0, InMso->InstanceCount);
-					}
-				}
-				else
-				{
-					Recorder->DrawPrimitive(0, InMso->VertexCount, 0, InMso->InstanceCount);
+					const MeshBuffers& MB = GpuMeshes[SubMeshIdx];
+					Recorder->SetVertexBuffer(0, MB.VertexBuffer);
+					Recorder->SetIndexBuffer(MB.IndexBuffer);
+					Recorder->DrawIndexed(0, MB.IndexCount, 0, 0, InMso->InstanceCount);
 				}
 			}
-		);
+			else
+			{
+				Recorder->DrawPrimitive(0, InMso->VertexCount, 0, InMso->InstanceCount);
+			}
+		};
 
-		AddRenderPassResourceAccesses(Pass);
+		uint32 VertexInvocationCapacity = 0;
+		if (Model* MdlAsset = MSO->ModelAsset.Get())
+		{
+			const TArray<MeshBuffers>& GpuMeshes = MdlAsset->GetGpuMeshes();
+			if (GpuMeshes.IsValidIndex(SubMeshIndex))
+			{
+				const MeshBuffers& MB = GpuMeshes[SubMeshIndex];
+				VertexInvocationCapacity = FMath::Max(MB.IndexCount, MB.VertexCount) * MSO->InstanceCount;
+			}
+		}
+		else
+		{
+			VertexInvocationCapacity = MSO->VertexCount * MSO->InstanceCount;
+		}
+
+		if (VertexInvocationCapacity > 0 && BuildAssertHighlightVs())
+		{
+			const uint32 VertexBufferByteSize = (VertexInvocationCapacity + 1u) * sizeof(Vector4u);
+			TArray<uint8> VertexBufferZeros;
+			VertexBufferZeros.SetNumZeroed(VertexBufferByteSize);
+			AssertVertexBuffer = GGpuRhi->CreateBuffer({
+				.ByteSize = VertexBufferByteSize,
+				.Usage = GpuBufferUsage::RWRaw,
+				.InitialData = VertexBufferZeros,
+			});
+
+			GpuBindGroupLayoutDesc AssertLayoutDesc;
+			AssertLayoutDesc.GroupNumber = AssertHighlightBindGroupSlot;
+			AssertLayoutDesc.Layouts.Add(
+				BindingSlot{ AssertVertexBufferBindingSlot, BindingType::RWRawBuffer, BindingShaderStage::Vertex },
+				{ BindingType::RWRawBuffer, BindingShaderStage::Vertex });
+			TRefCountPtr<GpuBindGroupLayout> AssertVertexBindGroupLayout = GGpuRhi->CreateBindGroupLayout(AssertLayoutDesc);
+
+			GpuBindGroupDesc AssertGroupDesc;
+			AssertGroupDesc.Layout = AssertVertexBindGroupLayout;
+			AssertGroupDesc.Resources.Add(
+				BindingSlot{ AssertVertexBufferBindingSlot, BindingType::RWRawBuffer, BindingShaderStage::Vertex },
+				{ AUX::StaticCastRefCountPtr<GpuResource>(AssertVertexBuffer) });
+			TRefCountPtr<GpuBindGroup> AssertVertexBindGroup = GGpuRhi->CreateBindGroup(AssertGroupDesc);
+
+			TArray<TRefCountPtr<GpuBindGroup>> VertexGroupRefs = BaseGroupRefs;
+			VertexGroupRefs.Add(AssertVertexBindGroup);
+
+			const uint32 DummyWidth = FMath::Max(1u, (uint32)ViewportSize.x);
+			const uint32 DummyHeight = FMath::Max(1u, (uint32)ViewportSize.y);
+			TRefCountPtr<GpuTexture> DummyRT = GGpuRhi->CreateTexture({
+				.Width = DummyWidth,
+				.Height = DummyHeight,
+				.Format = GpuFormat::R8G8B8A8_UNORM,
+				.Usage = GpuTextureUsage::RenderTarget,
+			});
+
+			GpuRenderPipelineStateDesc VertexHlDesc = PipelineDesc;
+			VertexHlDesc.CheckLayout = false;
+			VertexHlDesc.Vs = AssertHighlightVs.GetReference();
+			VertexHlDesc.Ps = nullptr;
+			VertexHlDesc.Targets.Empty();
+			VertexHlDesc.Targets.Add({ .TargetFormat = DummyRT->GetFormat() });
+			VertexHlDesc.BindGroupLayouts.Add(AssertVertexBindGroupLayout.GetReference());
+			VertexHlDesc.SampleCount = 1;
+			VertexHlDesc.DepthStencilState.Reset();
+
+			TRefCountPtr<GpuRenderPipelineState> VertexHlPipeline;
+			try
+			{
+				VertexHlPipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(VertexHlDesc);
+			}
+			catch (const std::runtime_error& e)
+			{
+				SH_LOG(LogShader, Error, TEXT("AssertHighlight: VS PSO create failed: %s"), ANSI_TO_TCHAR(e.what()));
+				AssertVertexBuffer.SafeRelease();
+			}
+
+			if (VertexHlPipeline.IsValid())
+			{
+				GpuRenderPassDesc VertexPassDesc;
+				VertexPassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{
+					DummyRT->GetDefaultView(),
+					RenderTargetLoadAction::Clear,
+					RenderTargetStoreAction::DontCare
+				});
+
+				auto& VertexPass = RG.AddRenderPass(TEXT("MeshRenderObjectAssertVertexHighlight"), MoveTemp(VertexPassDesc),
+					[VertexHlPipeline, VertexGroupRefs = MoveTemp(VertexGroupRefs), SetGroupRefs, DrawMesh](GpuRenderPassRecorder* Recorder) {
+						Recorder->SetRenderPipelineState(VertexHlPipeline);
+						SetGroupRefs(Recorder, VertexGroupRefs);
+						DrawMesh(Recorder);
+					}
+				);
+
+				AddRenderPassResourceAccesses(VertexPass);
+				VertexPass.Write(AssertVertexBuffer.GetReference());
+			}
+		}
+
+		if (BuildAssertHighlightPs())
+		{
+			GpuRenderPipelineStateDesc HlDesc = PipelineDesc;
+			HlDesc.Ps = AssertHighlightPs.GetReference();
+			if (HlDesc.DepthStencilState.IsSet())
+			{
+				HlDesc.DepthStencilState->DepthWriteEnable = false;
+				HlDesc.DepthStencilState->DepthCompare = CompareMode::LessEqual;
+			}
+
+			TRefCountPtr<GpuRenderPipelineState> HlPipeline;
+			try
+			{
+				HlPipeline = GpuPsoCacheManager::Get().CreateRenderPipelineState(HlDesc);
+			}
+			catch (const std::runtime_error& e)
+			{
+				SH_LOG(LogShader, Error, TEXT("AssertHighlight: PSO create failed: %s"), ANSI_TO_TCHAR(e.what()));
+				return;
+			}
+
+			GpuRenderPassDesc PassDesc;
+			for (const TRefCountPtr<GpuTexture>& Rt : ColorRTs)
+			{
+				if (!Rt) continue;
+				PassDesc.ColorRenderTargets.Add(GpuRenderTargetInfo{
+					Rt->GetDefaultView(),
+					RenderTargetLoadAction::Load,
+					RenderTargetStoreAction::Store
+				});
+			}
+			if (DepthRT.IsValid())
+			{
+				PassDesc.DepthStencilTarget = GpuDepthStencilTargetInfo{
+					DepthRT->GetDefaultView(),
+					RenderTargetLoadAction::Load,
+					RenderTargetStoreAction::Store,
+					1.0f
+				};
+			}
+
+			auto& Pass = RG.AddRenderPass(TEXT("MeshRenderObjectAssertHighlight"), MoveTemp(PassDesc),
+				[HlPipeline, BaseGroupRefs, SetGroupRefs, DrawMesh](GpuRenderPassRecorder* Recorder) {
+					Recorder->SetRenderPipelineState(HlPipeline);
+					SetGroupRefs(Recorder, BaseGroupRefs);
+					DrawMesh(Recorder);
+				}
+			);
+
+			AddRenderPassResourceAccesses(Pass);
+		}
+	}
+
+	const TSet<Vector2u>& MeshRenderObject::ReadbackAssertedVertices()
+	{
+		AssertedVertices.Empty();
+		if (!AssertVertexBuffer)
+		{
+			return AssertedVertices;
+		}
+
+		const uint8* Mapped = (const uint8*)GGpuRhi->MapGpuBuffer(AssertVertexBuffer, GpuResourceMapMode::Read_Only);
+		const Vector4u* Records = reinterpret_cast<const Vector4u*>(Mapped);
+		const uint32 RecordCapacity = FMath::Max(1u, (uint32)(AssertVertexBuffer->GetByteSize() / sizeof(Vector4u))) - 1u;
+		const uint32 RecordCount = FMath::Min(Records[0].x, RecordCapacity);
+		for (uint32 Index = 0; Index < RecordCount; ++Index)
+		{
+			const Vector4u& Record = Records[Index + 1];
+			AssertedVertices.Add(Vector2u{ Record.x, Record.y });
+		}
+		GGpuRhi->UnMapGpuBuffer(AssertVertexBuffer);
+		return AssertedVertices;
+	}
+
+	void MeshRenderObject::ClearAssertedVertices()
+	{
+		AssertedVertices.Empty();
+		AssertVertexBuffer.SafeRelease();
 	}
 }

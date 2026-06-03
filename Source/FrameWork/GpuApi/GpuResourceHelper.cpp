@@ -29,7 +29,7 @@ namespace FW::GpuResourceHelper
 	{
 		if (!ShowTimestampMs())
 		{
-			OutGpuTimeMs = 0.0;
+			OutGpuTimeMs = -1.0;
 			InOutTimestampQuerySet = nullptr;
 			return {};
 		}
@@ -49,6 +49,7 @@ namespace FW::GpuResourceHelper
 
 		if (!InOutTimestampQuerySet)
 		{
+			OutGpuTimeMs = -1.0;
 			return {};
 		}
 

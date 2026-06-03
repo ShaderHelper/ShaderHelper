@@ -92,6 +92,7 @@ namespace SH
 		bool FlushPrintBufferLogs(const FString& LogPrefix);
 		void AddComputePassResourceAccesses(FW::RGComputePass& Pass, FW::GpuShader* Cs);
 
+		DebugTargetInfo MakeDebugTargetInfo();
 		uint32 AddAssertHighlightPass(FW::RenderGraph& RG, FW::GpuShader* Cs, const TArray<int32>& SortedGroupSlots, const TArray<FW::GpuBindGroupLayout*>& BaseLayoutPtrs);
 		bool BuildAssertHighlightCs();
 		void ReadbackAssertedThreads(uint32 TotalThreads);
@@ -110,9 +111,11 @@ namespace SH
 		TRefCountPtr<FW::GpuQuerySet> TimestampQuerySet;
 		TUniquePtr<FW::PrintBuffer> PrinterBuffer;
 		bool bDebugging = false;
+		bool bHadAssertError = false;
 
 		// Assert-highlight resources
 		TRefCountPtr<FW::GpuShader> AssertHighlightCs;
 		TRefCountPtr<FW::GpuBuffer> AssertThreadBuffer;
+		TMap<FW::Vector3u, TSet<FW::Vector3u>> AssertedThreads;
 	};
 }
