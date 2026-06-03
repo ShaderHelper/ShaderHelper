@@ -278,14 +278,9 @@ namespace SH
 			return FReply::Unhandled();
 		}
 		
-		auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		if(MouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
+		if(MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
 		{
-			ShEditor->EndDebugging();
-			return FReply::Handled().ReleaseMouseLock();
-		}
-		else if(MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
-		{
+			auto ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 			PixelCoord = MouseToPixel(MouseLoc);
 			if (!IsPixelDebuggable(PixelCoord))
 			{
@@ -293,7 +288,6 @@ namespace SH
 			}
 			bFinalizePixel = true;
 			ShEditor->GetDebuggaleObject()->OnFinalizePixel(Vector2u(uint32(PixelCoord.x), uint32(PixelCoord.y)));
-			return FReply::Handled().ReleaseMouseLock();
 		}
 		return FReply::Handled();
 	}

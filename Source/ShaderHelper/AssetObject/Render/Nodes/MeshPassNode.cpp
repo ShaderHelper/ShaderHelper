@@ -222,18 +222,32 @@ namespace SH
 		Pins = MoveTemp(NewPins);
 	}
 
-	MeshRenderObject* MeshPassNode::AddMeshRenderObject(MeshSceneObject* InMeshSceneObject)
+	void MeshPassNode::AddMeshRenderObject(MeshSceneObject* InMeshSceneObject)
 	{
-		auto MRO = NewShObject<MeshRenderObject>(this);
-		MRO->MeshSceneObjectRef = InMeshSceneObject;
+		// One MeshRenderObject per submesh so each submesh can be assigned its own material.
+		int32 SubMeshCount = 1;
 		if (InMeshSceneObject)
 		{
-			MRO->ObjectName = InMeshSceneObject->ObjectName;
+			if (FW::Model* Mdl = InMeshSceneObject->ModelAsset.Get())
+			{
+				SubMeshCount = Mdl->GetSubMeshes().Num();
+			}
 		}
-		MeshRenderObject* Result = MRO.Get();
-		MeshRenderObjects.Add(MoveTemp(MRO));
+
+		for (int32 Index = 0; Index < SubMeshCount; ++Index)
+		{
+			auto MRO = NewShObject<MeshRenderObject>(this);
+			MRO->MeshSceneObjectRef = InMeshSceneObject;
+			MRO->SubMeshIndex = Index;
+			if (InMeshSceneObject)
+			{
+				MRO->ObjectName = (SubMeshCount > 1)
+					? FText::FromString(FString::Printf(TEXT("%s_SubMesh%d"), *InMeshSceneObject->ObjectName.ToString(), Index))
+					: InMeshSceneObject->ObjectName;
+			}
+			MeshRenderObjects.Add(MoveTemp(MRO));
+		}
 		if (auto* OM = GetOuterMost()) OM->MarkDirty();
-		return Result;
 	}
 
 	void MeshPassNode::RemoveMeshRenderObject(MeshRenderObject* InObject)
@@ -533,6 +547,10 @@ namespace SH
 
 	DebugTargetInfo MeshPassNode::MakeDebugTargetInfo(MeshRenderObject* StopObject)
 	{
+		if (StopObject)
+		{
+			StopObject->ClearAssertedVertices();
+		}
 		TRefCountPtr<GpuTexture> CoverageMask = StopObject ? StopObject->BuildCoverageMask() : nullptr;
 		const bool bStopObjectInList = StopObject && MeshRenderObjects.ContainsByPredicate(
 			[StopObject](const ObjectPtr<MeshRenderObject>& MRO) { return MRO.Get() == StopObject; });
@@ -582,12 +600,14 @@ namespace SH
 		}
 
 		RG.Execute();
+		DebugTargetInfo TargetInfo = MakeDebugTargetInfoFromRTs(DebugColorRTs, DebugDepthRT, CoverageMask);
+		TargetInfo.AssertedVertices = StopObject->ReadbackAssertedVertices();
 		for (const ObjectPtr<MeshRenderObject>& MRO : MROsToDraw)
 		{
 			MRO->GetPrintBuffer()->Clear();
 		}
 
-		return MakeDebugTargetInfoFromRTs(DebugColorRTs, DebugDepthRT, CoverageMask);
+		return TargetInfo;
 	}
 
 	void MeshPassNode::Serialize(FArchive& Ar)

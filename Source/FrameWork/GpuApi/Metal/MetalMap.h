@@ -171,6 +171,17 @@ namespace FW
         }
     }
 
+	inline MTLWinding MapRasterizerFrontFace(RasterizerFrontFace InFrontFace)
+	{
+		switch (InFrontFace)
+		{
+		case RasterizerFrontFace::Clockwise:         return MTLWindingClockwise;
+		case RasterizerFrontFace::CounterClockwise:  return MTLWindingCounterClockwise;
+		default:
+			AUX::Unreachable();
+		}
+	}
+
 	inline MTLVertexFormat MapVertexFormat(GpuFormat InFormat)
     {
         switch (InFormat)

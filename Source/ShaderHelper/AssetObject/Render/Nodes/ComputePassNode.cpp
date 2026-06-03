@@ -206,6 +206,10 @@ namespace SH
 		{
 			Slot.RWOutputTexture.SafeRelease();
 		}
+		AssertHighlightCs.SafeRelease();
+		AssertThreadBuffer.SafeRelease();
+		AssertedThreads.Empty();
+		bHadAssertError = false;
 	}
 
 	GpuTexture* ComputePassNode::ResolveBindingTexture(const GpuShaderLayoutBinding& Binding)
@@ -497,6 +501,8 @@ namespace SH
 		auto& Ctx = static_cast<RenderExecContext&>(Context);
 
 		CurrentViewportSize = Ctx.ViewportSize;
+		bHadAssertError = false;
+		AssertedThreads.Empty();
 
 		if (!ShaderAsset || !ShaderAsset->IsStageEnabled(ShaderType::Compute))
 		{
@@ -586,12 +592,9 @@ namespace SH
 
 		PublishRWOutputsToPins(OverrideSlots);
 
-		const bool bAssertError = FlushPrintBufferLogs(ObjectName.ToString());
-		if (bAssertError)
+		bHadAssertError = FlushPrintBufferLogs(ObjectName.ToString());
+		if (bHadAssertError)
 		{
-			const uint32 AssertHighlightThreadCount = AddAssertHighlightPass(*Ctx.RG, Cs, SortedGroupSlots, LayoutPtrs);
-			Ctx.RG->Execute();
-			ReadbackAssertedThreads(AssertHighlightThreadCount);
 			return { true, true };
 		}
 		return {};
@@ -743,14 +746,12 @@ namespace SH
 		TSingleton<ShProjectManager>::Get().GetProject()->bScenePreview = false;
 		ShEditor->ForceRender();
 		bDebugging = true;
-		return {};
+		return MakeDebugTargetInfo();
 	}
 
 	void ComputePassNode::OnEndDebuggging()
 	{
 		bDebugging = false;
-		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->GetComputeDebuggerViewport()->SetAssertedThreads({});
 	}
 
 	InvocationState ComputePassNode::GetInvocationState(DebugItem Item)
@@ -767,6 +768,43 @@ namespace SH
 	{
 		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
 		ShEditor->DebugCompute(InWorkGroupId, InLocalInvocationId, GetInvocationState(DebugItem::Compute));
+	}
+
+	DebugTargetInfo ComputePassNode::MakeDebugTargetInfo()
+	{
+		AssertedThreads.Empty();
+		if (!bHadAssertError)
+		{
+			return {};
+		}
+
+		GpuShader* Cs = ShaderAsset ? ShaderAsset->GetCompiledShader(ShaderType::Compute) : nullptr;
+		if (!Cs)
+		{
+			return {};
+		}
+
+		TArray<int32> SortedGroupSlots;
+		BindGroupLayouts.GetKeys(SortedGroupSlots);
+		SortedGroupSlots.Sort();
+
+		TArray<GpuBindGroupLayout*> LayoutPtrs;
+		for (int32 GroupSlot : SortedGroupSlots)
+		{
+			LayoutPtrs.Add(BindGroupLayouts[GroupSlot].GetReference());
+		}
+
+		RenderGraph RG;
+		const uint32 AssertHighlightThreadCount = AddAssertHighlightPass(RG, Cs, SortedGroupSlots, LayoutPtrs);
+		RG.Execute();
+		if (AssertHighlightThreadCount > 0)
+		{
+			ReadbackAssertedThreads(AssertHighlightThreadCount);
+		}
+
+		DebugTargetInfo TargetInfo;
+		TargetInfo.AssertedThreads = AssertedThreads;
+		return TargetInfo;
 	}
 
 	uint32 ComputePassNode::AddAssertHighlightPass(RenderGraph& RG, GpuShader* Cs, const TArray<int32>& SortedGroupSlots, const TArray<GpuBindGroupLayout*>& BaseLayoutPtrs)
@@ -907,6 +945,7 @@ namespace SH
 
 	void ComputePassNode::ReadbackAssertedThreads(uint32 TotalThreads)
 	{
+		AssertedThreads.Empty();
 		if (!AssertThreadBuffer)
 		{
 			return;
@@ -918,18 +957,14 @@ namespace SH
 		const Vector4u* Records = reinterpret_cast<const Vector4u*>(Mapped);
 		const uint32 RecordCount = FMath::Min(Records[0].x, TotalThreads);
 
-		TMap<Vector3u, TSet<Vector3u>> Asserted;
 		for (uint32 Index = 0; Index < RecordCount; ++Index)
 		{
 			const Vector4u& Record = Records[Index + 1];
 			const Vector3u WG{ Record.x / WGSize.x, Record.y / WGSize.y, Record.z / WGSize.z };
 			const Vector3u Local{ Record.x % WGSize.x, Record.y % WGSize.y, Record.z % WGSize.z };
-			Asserted.FindOrAdd(WG).Add(Local);
+			AssertedThreads.FindOrAdd(WG).Add(Local);
 		}
 		GGpuRhi->UnMapGpuBuffer(AssertThreadBuffer);
-
-		auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor());
-		ShEditor->GetComputeDebuggerViewport()->SetAssertedThreads(MoveTemp(Asserted));
 	}
 
 }

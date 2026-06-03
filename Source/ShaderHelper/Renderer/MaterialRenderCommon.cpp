@@ -810,7 +810,7 @@ VsOutput MainVS(float3 Position : POSITION0) {
 			.Targets = Targets,
 			.BindGroupLayouts = Options.BindGroupLayouts,
 			.VertexLayout = MoveTemp(VertexLayouts),
-			.RasterizerState = { .FillMode = InMaterial.FillMode, .CullMode = InMaterial.CullMode },
+			.RasterizerState = { .FillMode = InMaterial.FillMode, .CullMode = InMaterial.CullMode, .FrontFace = InMaterial.FrontFace },
 			.Primitive = InMaterial.Primitive,
 			.SampleCount = Options.SampleCount,
 			.DepthStencilState = (Options.DepthFormat.IsSet() && InMaterial.DepthTestEnable)

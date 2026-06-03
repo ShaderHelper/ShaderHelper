@@ -44,7 +44,7 @@ namespace SH
 		Ar << BindingMemberDefaults;
 		Ar << BindingResourceDefaults;
 		Ar << VertexInputDefaults;
-		Ar << FillMode << CullMode << Primitive;
+		Ar << FillMode << CullMode << FrontFace << Primitive;
 		Ar << BlendEnable << SrcBlendFactor << DestBlendFactor << ColorBlendOp;
 		Ar << DepthTestEnable << DepthCompare;
 	}
@@ -373,6 +373,13 @@ namespace SH
 			{
 				auto Item = MakePropertyEnumItem<RasterizerCullMode>(this, LOCALIZATION("CullMode"), CullMode,
 					[this](RasterizerCullMode InValue) { CullMode = InValue; });
+				RasterizerCategory->AddChild(Item);
+			}
+
+			// FrontFace
+			{
+				auto Item = MakePropertyEnumItem<RasterizerFrontFace>(this, LOCALIZATION("FrontFace"), FrontFace,
+					[this](RasterizerFrontFace InValue) { FrontFace = InValue; });
 				RasterizerCategory->AddChild(Item);
 			}
 

@@ -31,6 +31,11 @@ namespace FW
 		void PatchComputeTerminator(SpvInstruction* Term);
 		void AppendComputeFailReport(TArray<TUniquePtr<SpvInstruction>>& InstList);
 
+		// Vertex path
+		SpvId DeclareAssertVertexBuffer();
+		void PatchVertexTerminator(SpvInstruction* Term);
+		void AppendVertexFailReport(TArray<TUniquePtr<SpvInstruction>>& InstList);
+
 	private:
 		SpvMetaContext& Context;
 		ShaderType Stage;
@@ -41,9 +46,13 @@ namespace FW
 		TArray<SpvId> LocationOutputs;
 		SpvId AssertThreadBufferVar;
 		SpvId GlobalInvocationIdVar;
+		SpvId AssertVertexBufferVar;
+		SpvId VertexIndexVar;
+		SpvId InstanceIndexVar;
 	};
 
-	// Compute assert-highlight injects an RWByteAddressBuffer at this fixed set/binding.
+	// Assert-highlight injects RWByteAddressBuffers at these fixed set/bindings.
 	inline constexpr int AssertHighlightBindGroupSlot = 7;
 	inline constexpr int AssertThreadBufferBindingSlot = 0731;
+	inline constexpr int AssertVertexBufferBindingSlot = 0732;
 }

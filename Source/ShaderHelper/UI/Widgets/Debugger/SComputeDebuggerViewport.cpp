@@ -120,16 +120,12 @@ namespace SH
 	{
 		if (MouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
 		{
-			if (auto* ShEditor = static_cast<ShaderHelperEditor*>(GApp->GetEditor()))
-			{
-				ShEditor->EndDebugging();
-			}
-			return FReply::Handled().ReleaseMouseCapture().ReleaseMouseLock();
+			return FReply::Handled();
 		}
 		return SCompoundWidget::OnMouseButtonDown(MyGeometry, MouseEvent);
 	}
 
-	void SComputeDebuggerViewport::SetComputeDebugInfo(const Vector3u& InThreadGroupCount, const Vector3u& InThreadGroupSize, bool GlobalValidation)
+	void SComputeDebuggerViewport::SetComputeDebugInfo(const Vector3u& InThreadGroupCount, const Vector3u& InThreadGroupSize, bool GlobalValidation, TMap<Vector3u, TSet<Vector3u>> InAssertedThreads)
 	{
 		ThreadGroupCount = InThreadGroupCount;
 		ThreadGroupSize = InThreadGroupSize;
@@ -137,6 +133,7 @@ namespace SH
 		LocalInvocationId = { 0, 0, 0 };
 		SelectedZ = 0;
 		bFinalizedThread = false;
+		AssertedThreads = MoveTemp(InAssertedThreads);
 
 		RootBox->ClearChildren();
 		ThreadCellButtons.Reset();
@@ -265,7 +262,7 @@ namespace SH
 							})
 							.OnClicked_Lambda([this, x, y] {
 								OnPickThread(Vector3u{ x, y, SelectedZ });
-								return FReply::Handled().ReleaseMouseLock();
+								return FReply::Handled();
 							})
 							.ToolTipText_Lambda([this, x, y] {
 								return FText::FromString(FString::Printf(TEXT("%s = (%u, %u, %u)"), *LOCALIZATION("GroupThreadID").ToString(), x, y, SelectedZ));
@@ -450,8 +447,4 @@ namespace SH
 		}
 	}
 
-	void SComputeDebuggerViewport::SetAssertedThreads(TMap<Vector3u, TSet<Vector3u>> InAsserted)
-	{
-		AssertedThreads = MoveTemp(InAsserted);
-	}
 }

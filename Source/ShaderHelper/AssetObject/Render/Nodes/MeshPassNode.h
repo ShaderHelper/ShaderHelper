@@ -87,7 +87,7 @@ namespace SH
 
 		void RebuildPins();
 		// Add/remove MeshRenderObject helpers (used by drag-drop + combo button).
-		MeshRenderObject* AddMeshRenderObject(MeshSceneObject* InMeshSceneObject);
+		void AddMeshRenderObject(MeshSceneObject* InMeshSceneObject);
 		void RemoveMeshRenderObject(MeshRenderObject* InObject);
 
 		// Called by property panel after Color RT / Depth target / count changed.

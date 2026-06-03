@@ -28,8 +28,9 @@ namespace FW
 
     struct RasterizerStateDesc
     {
-        RasterizerFillMode FillMode;
-        RasterizerCullMode CullMode;
+        RasterizerFillMode FillMode = RasterizerFillMode::Solid;
+        RasterizerCullMode CullMode = RasterizerCullMode::None;
+		RasterizerFrontFace FrontFace = RasterizerFrontFace::Clockwise;
     };
 
     struct PipelineTargetDesc
@@ -76,7 +77,7 @@ namespace FW
 		// Each element describes one vertex buffer.
 		TArray<GpuVertexLayoutDesc> VertexLayout;
 
-		RasterizerStateDesc RasterizerState{ RasterizerFillMode::Solid, RasterizerCullMode::None };
+		RasterizerStateDesc RasterizerState;
 		PrimitiveType Primitive = PrimitiveType::TriangleList;
 		uint32 SampleCount = 1;
 
@@ -139,6 +140,7 @@ namespace FW
 				&& VertexLayout == Other.VertexLayout
 				&& RasterizerState.FillMode == Other.RasterizerState.FillMode
 				&& RasterizerState.CullMode == Other.RasterizerState.CullMode
+				&& RasterizerState.FrontFace == Other.RasterizerState.FrontFace
 				&& Primitive == Other.Primitive
 				&& SampleCount == Other.SampleCount
 				&& Targets == Other.Targets

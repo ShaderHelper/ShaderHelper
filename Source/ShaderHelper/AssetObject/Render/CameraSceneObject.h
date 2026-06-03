@@ -18,6 +18,6 @@ namespace SH
 		float OrthoSize = 10.0f;
 		float VerticalFov = 60.0f;
 		float NearPlane = 0.1f;
-		float FarPlane = 1000.0f;
+		float FarPlane = 100.0f;
 	};
 }

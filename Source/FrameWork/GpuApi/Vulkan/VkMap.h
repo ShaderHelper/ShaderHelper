@@ -135,6 +135,17 @@ namespace FW::VK
 		}
 	}
 
+	inline VkFrontFace MapRasterizerFrontFace(RasterizerFrontFace InFrontFace)
+	{
+		switch (InFrontFace)
+		{
+		case RasterizerFrontFace::Clockwise:         return VK_FRONT_FACE_CLOCKWISE;
+		case RasterizerFrontFace::CounterClockwise:  return VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		default:
+			AUX::Unreachable();
+		}
+	}
+
 	inline VkPrimitiveTopology MapPrimitiveType(PrimitiveType InType)
 	{
 		switch (InType)

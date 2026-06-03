@@ -60,14 +60,17 @@ namespace SH
 
 		TRefCountPtr<FW::GpuTexture> BuildCoverageMask();
 
-		// Re-renders the mesh with a SPIR-V-patched PS that writes pink (1,0,1,1) wherever
-		// GPrivate_AssertResult != 1. Skipped when no assert was reported on the previous frame.
+		// Re-renders the mesh with SPIR-V-patched assert helpers. Pixel asserts overlay pink;
+		// vertex asserts are recorded as (vertex, instance) pairs for the vertex debugger.
 		void AddAssertHighlightPass(FW::RenderGraph& RG, const TArray<TRefCountPtr<FW::GpuTexture>>& ColorRTs, TRefCountPtr<FW::GpuTexture> DepthRT, const FW::Vector2f& ViewportSize, const FW::Camera* Cam);
+		const TSet<FW::Vector2u>& ReadbackAssertedVertices();
+		void ClearAssertedVertices();
 		bool bHadAssertError = false;
 
 	public:
 		FW::ObserverObjectPtr<MeshSceneObject> MeshSceneObjectRef;
 		FW::AssetPtr<Material> MaterialAsset;
+		int32 SubMeshIndex = 0;
 		TArray<FW::ObjectPtr<FW::GraphPin>> OverridePins;
 		TArray<ShaderOverrideSlot> OverrideSlots;
 		FW::Vector2f CurrentViewportSize{ 0, 0 };
@@ -82,6 +85,7 @@ namespace SH
 		TArray<BindingBuilder> BuildDebugBindingBuilders() const;
 		// Returns false if the material has no PS source or compilation fails.
 		bool BuildAssertHighlightPs();
+		bool BuildAssertHighlightVs();
 		FW::GpuTexture* ResolveBindingTexture(const FW::GpuShaderLayoutBinding& Binding);
 		FW::GpuBuffer* ResolveBindingBuffer(const FW::GpuShaderLayoutBinding& Binding);
 
@@ -98,5 +102,8 @@ namespace SH
 		// Assert-highlight PS that overlays pink on asserting fragments.
 		// Reuses the original Pipeline's BindGroups (no extra resources are injected).
 		TRefCountPtr<FW::GpuShader> AssertHighlightPs;
+		TRefCountPtr<FW::GpuShader> AssertHighlightVs;
+		TRefCountPtr<FW::GpuBuffer> AssertVertexBuffer;
+		TSet<FW::Vector2u> AssertedVertices;
 	};
 }

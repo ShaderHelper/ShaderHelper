@@ -89,6 +89,7 @@ namespace FW
 		void Construct(const FArguments& InArgs);
 
 	private:
+		FText GetButtonToolTipText() const;
 		bool CanExecuteButton() const;
 		FReply OnButtonClicked();
 		bool CanOpenMenu() const;
@@ -96,6 +97,7 @@ namespace FW
 
 		TSharedPtr<FUICommandList> CommandList;
 		TSharedPtr<FUICommandInfo> Command;
+		TAttribute<FText> ButtonToolTipText;
 		TAttribute<bool> IsButtonEnabled;
 		TAttribute<bool> IsMenuEnabled;
 		FOnClicked OnClicked;

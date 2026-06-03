@@ -1386,6 +1386,7 @@ namespace SH
 		IsDebugging = false;
 		GetDebuggaleObject()->OnEndDebuggging();
 		Debugger.Reset();
+		VertexDebuggerViewport->Clear();
 		CloseDebuggerTabs();
 	}
 
@@ -1405,12 +1406,20 @@ namespace SH
 
 	void ShaderHelperEditor::SetCurrentDebugItem(DebugItem InItem)
 	{
+		if (IsDebugging)
+		{
+			return;
+		}
 		CurrentDebugItem = InItem;
 		NormalizeCurrentDebugItem();
 	}
 
 	void ShaderHelperEditor::NormalizeCurrentDebugItem()
 	{
+		if (IsDebugging)
+		{
+			return;
+		}
 		DebuggableObject* Debuggable = GetDebuggaleObject();
 		if (!Debuggable)
 		{
@@ -1486,6 +1495,14 @@ namespace SH
 		{
 			EndDebugging();
 		}
+	}
+
+	std::optional<Vector2u> ShaderHelperEditor::ValidateVertex(const InvocationState& InState)
+	{
+		SShaderEditorBox* ShaderEditor = GetShaderEditor(GetDebuggaleObject()->GetShaderAsset(CurrentDebugItem));
+		Debugger.SetShaderAsset(ShaderEditor->GetShaderAsset());
+		Debugger.SetShaderSource(ShaderEditor->GetCurrentShaderSource());
+		return Debugger.ValidateVertex(InState);
 	}
 
 	std::optional<Vector2u> ShaderHelperEditor::ValidatePixel(const InvocationState& InState)
@@ -1586,6 +1603,49 @@ namespace SH
 		});
 	}
 
+	void ShaderHelperEditor::DebugVertex(uint32 InVertexIndex, uint32 InInstanceIndex)
+	{
+		SShaderEditorBox* ShaderEditor = GetShaderEditor(GetDebuggaleObject()->GetShaderAsset(CurrentDebugItem));
+		Debugger.SetShaderAsset(ShaderEditor->GetShaderAsset());
+		Debugger.SetShaderSource(ShaderEditor->GetCurrentShaderSource());
+
+		InvocationState Invocation = GetDebuggaleObject()->GetInvocationState(DebugItem::Vertex);
+
+		GApp->EnqueueBusyTask([=, this](TFunction<void()> Done) {
+			FNotificationInfo Info(LOCALIZATION("StartDebuggerTip"));
+			Info.Image = FAppStyle::Get().GetBrush("NoBrush");
+			Info.bFireAndForget = false;
+			Info.FadeInDuration = 0.0f;
+			Info.FadeOutDuration = 0.0f;
+			auto Notification = FSlateNotificationManager::Get().AddNotification(Info);
+			Notification->SetCompletionState(SNotificationItem::CS_Pending);
+			Async(EAsyncExecution::Thread, [=, this]() {
+				try
+				{
+					Debugger.DebugVertex(InVertexIndex, InInstanceIndex, Invocation);
+				}
+				catch (const std::runtime_error& e)
+				{
+					AsyncTask(ENamedThreads::GameThread, [=, this] {
+						Notification->Fadeout();
+						Done();
+						FText FailureInfo = LOCALIZATION("DebugFailure");
+						SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo.ToString(), UTF8_TO_TCHAR(e.what()));
+						MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GetMainWindow(), FailureInfo);
+						EndDebugging();
+					});
+					return;
+				}
+
+				AsyncTask(ENamedThreads::GameThread, [=, this] {
+					Notification->Fadeout();
+					Done();
+					Continue();
+				});
+			});
+		});
+	}
+
 	void ShaderHelperEditor::SwitchDebugThread(const Vector3u& InLocalInvocationId)
 	{
 		if (Debugger.SwitchDebugThread(InLocalInvocationId))
@@ -1612,10 +1672,12 @@ namespace SH
 		}
 		switch (CurrentDebugItem)
 		{
+		case DebugItem::Vertex:
+			return VertexDebuggerViewport->FinalizedVertex();
 		case DebugItem::Pixel:
-			return FragmentDebuggerViewport.IsValid() && FragmentDebuggerViewport->FinalizedPixel();
+			return FragmentDebuggerViewport->FinalizedPixel();
 		case DebugItem::Compute:
-			return ComputeDebuggerViewport.IsValid() && ComputeDebuggerViewport->FinalizedThread();
+			return ComputeDebuggerViewport->FinalizedThread();
 		default:
 			return false;
 		}
@@ -1632,20 +1694,34 @@ namespace SH
 
 		if (CurrentDebugItem == DebugItem::Vertex)
 		{
-			Debuggable->OnStartDebugging(CurrentDebugItem);
-			IsDebugging = true;
+			DebugTargetInfo DebugTarget = Debuggable->OnStartDebugging(CurrentDebugItem);
+			SShaderEditorBox* ShaderEditor = GetShaderEditor(Debuggable->GetShaderAsset(DebugItem::Vertex));
+			Debugger.SetShaderAsset(ShaderEditor->GetShaderAsset());
+			Debugger.SetShaderSource(ShaderEditor->GetCurrentShaderSource());
+
+			InvocationState Invocation = Debuggable->GetInvocationState(DebugItem::Vertex);
+			try
+			{
+				TArray<Vector4f> ClipPositions = Debugger.CaptureVertex(Invocation);
+				IsDebugging = true;
+				const auto& VState = std::get<VertexState>(Invocation);
+				VertexDebuggerViewport->SetDebugData(ClipPositions, VState.Indices, VState.VertexCount, VState.InstanceCount, VState.ClipToWorld, VState.DebugCamera, GlobalValidation, MoveTemp(DebugTarget.AssertedVertices));
+			}
+			catch (const std::runtime_error& e)
+			{
+				Debuggable->OnEndDebuggging();
+				Debugger.Reset();
+				FText FailureInfo = LOCALIZATION("DebugFailure");
+				SH_LOG(LogDebugger, Error, TEXT("%s:\n\n%s"), *FailureInfo.ToString(), UTF8_TO_TCHAR(e.what()));
+				MessageDialog::Open(MessageDialog::Ok, MessageDialog::Sad, GetMainWindow(), FailureInfo);
+			}
 		}
 		else if (CurrentDebugItem == DebugItem::Compute)
 		{
-			Debuggable->OnStartDebugging(CurrentDebugItem);
+			DebugTargetInfo DebugTarget = Debuggable->OnStartDebugging(CurrentDebugItem);
 			IsDebugging = true;
 			const auto& CState = std::get<ComputeState>(Debuggable->GetInvocationState(DebugItem::Compute));
-			ComputeDebuggerViewport->SetComputeDebugInfo(CState.ThreadGroupCount, CState.ThreadGroupSize, GlobalValidation);
-			if (!GlobalValidation)
-			{
-				auto User0 = FSlateApplication::Get().GetUser(0);
-				User0->LockCursor(ComputeDebuggerViewport.ToSharedRef());
-			}
+			ComputeDebuggerViewport->SetComputeDebugInfo(CState.ThreadGroupCount, CState.ThreadGroupSize, GlobalValidation, MoveTemp(DebugTarget.AssertedThreads));
 		}
 		else if (CurrentDebugItem == DebugItem::Pixel)
 		{
@@ -1655,12 +1731,6 @@ namespace SH
 			{
 				IsDebugging = true;
 				FragmentDebuggerViewport->SetDebugTarget(DebugTarget, GlobalValidation);
-				if (!GlobalValidation)
-				{
-					auto User0 = FSlateApplication::Get().GetUser(0);
-					User0->LockCursor(FragmentDebuggerViewport.ToSharedRef());
-				}
-
 			}
 		}
 		
@@ -1701,7 +1771,7 @@ namespace SH
 					FSlateIcon(),
 					FUIAction(
 						FExecuteAction::CreateLambda([this, Item] { SetCurrentDebugItem(Item); }),
-						FCanExecuteAction(),
+						FCanExecuteAction::CreateLambda([this] { return !IsDebugging; }),
 						FIsActionChecked::CreateLambda([this, Item] { return Item == CurrentDebugItem; })
 					),
 					NAME_None,
@@ -1719,7 +1789,7 @@ namespace SH
 			.Command(CodeEditorCommands::Get().Debug)
 			.ButtonToolTipText(LOCALIZATION("Debug"))
 			.MenuToolTipText_Lambda([this] { return FText::FromString(ANSI_TO_TCHAR(magic_enum::enum_name(CurrentDebugItem).data())); })
-			.IsMenuEnabled_Lambda([this] { return GetDebuggaleObject() != nullptr; })
+			.IsMenuEnabled_Lambda([this] { return !IsDebugging && GetDebuggaleObject() != nullptr; })
 			.OnGetMenuContent_Lambda(MakeDebugItemMenuContent)
 			[
 				SNew(SImage)
@@ -1783,8 +1853,8 @@ namespace SH
 				SNew(SShSplitButton)
 				.ButtonToolTipText(LOCALIZATION("Validation"))
 				.MenuToolTipText_Lambda([this] { return FText::FromString(ANSI_TO_TCHAR(magic_enum::enum_name(CurrentDebugItem).data())); })
-				.IsButtonEnabled_Lambda([this] { return !IsDebugging && GetDebuggaleObject() != nullptr && (CurrentDebugItem == DebugItem::Pixel || CurrentDebugItem == DebugItem::Compute); })
-				.IsMenuEnabled_Lambda([this] { return GetDebuggaleObject() != nullptr; })
+				.IsButtonEnabled_Lambda([this] { return !IsDebugging && GetDebuggaleObject() != nullptr; })
+				.IsMenuEnabled_Lambda([this] { return !IsDebugging && GetDebuggaleObject() != nullptr; })
 				.OnClicked_Lambda([this] {
 					StartDebugging(true);
 					return FReply::Handled();

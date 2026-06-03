@@ -21,6 +21,8 @@ namespace SH
 		TRefCountPtr<FW::GpuTexture> Tex;
 		TArray<DebugTargetOutput> Outputs;
 		TRefCountPtr<FW::GpuTexture> CoverageMask;
+		TSet<FW::Vector2u> AssertedVertices;
+		TMap<FW::Vector3u, TSet<FW::Vector3u>> AssertedThreads;
 		int32 SelectedOutputIndex = 0;
 
 		void Normalize()

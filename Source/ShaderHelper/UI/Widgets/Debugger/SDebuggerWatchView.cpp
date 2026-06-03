@@ -133,7 +133,7 @@ namespace SH
 						Owner->ExpressionNodeDatas.Add(MakeShared<ExpressionNode>());
 						Owner->ExpressionTreeView->RequestTreeRefresh();
 					}
-					if(Owner->OnWatch && NewText.ToString() != Data->Expr)
+					if(Owner->OnWatch && !NewText.ToString().Equals(Data->Expr))
 					{
 						Data->Expr = NewText.ToString();
 						Owner->EvalExpressionAsync(Data);

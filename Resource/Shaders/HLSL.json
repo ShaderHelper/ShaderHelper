@@ -495,7 +495,11 @@
         {
             "label": "nointerpolation",
             "stages": [
-                "PS"
+                "VS",
+                "PS",
+                "GS",
+                "HS",
+                "DS"
             ],
             "desc": "No interpolation modifier"
         },
