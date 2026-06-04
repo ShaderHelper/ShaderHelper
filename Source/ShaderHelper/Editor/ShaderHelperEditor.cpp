@@ -60,6 +60,8 @@ using namespace FW;
 namespace SH 
 {
 	static const FString WindowLayoutFileName = PathHelper::SavedDir() / TEXT("WindowLayout.json");
+	static constexpr const TCHAR* ChineseDocumentUrl = TEXT("https://github.com/SjMxr233/ShaderHelper/blob/main/docs/UserGuide.md");
+	static constexpr const TCHAR* EnglishDocumentUrl = TEXT("https://github.com/SjMxr233/ShaderHelper/blob/main/docs/UserGuide.en.md");
 
 	const TArray<FName> TabIds{
 		PreviewTabId, PropretyTabId, CodeTabId, AssetTabId, GraphTabId, LogTabId,
@@ -2187,10 +2189,10 @@ namespace SH
 		{
 			MenuBuilder.AddMenuEntry(LOCALIZATION("Document"), FText::GetEmpty(), FSlateIcon(),
 				FUIAction(
-					FExecuteAction::CreateLambda([this] {
-
-						}
-					)));
+					FExecuteAction::CreateLambda([] {
+						const TCHAR* DocumentUrl = Editor::GetLanguage() == SupportedLanguage::Chinese ? ChineseDocumentUrl : EnglishDocumentUrl;
+						FPlatformProcess::LaunchURL(DocumentUrl, nullptr, nullptr);
+					})));
 			MenuBuilder.AddMenuEntry(LOCALIZATION("About"), FText::GetEmpty(), FSlateIcon(),
 				FUIAction(
 					FExecuteAction::CreateRaw(this, &ShaderHelperEditor::ShowAboutWindow)
