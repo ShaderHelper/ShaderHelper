@@ -1146,11 +1146,6 @@ namespace FW
 			{
 				Vector2i StartLoc = { Node->getStartLoc().line, Node->getStartLoc().column };
 				Vector2i EndLoc = { Node->getEndLoc().line, Node->getEndLoc().column }; 
-				ShaderScope FuncScope = { StartLoc, EndLoc };
-				if (Op == glslang::EOpFunction && Node->getLoc().getFilenameStr() == ShaderFile)
-				{
-					Context.GuideLineScopes.Emplace(FuncScope);
-				}
 
 				FString ParamsTypeName;
 				TArray<ShaderParameter> Params;
@@ -1270,7 +1265,13 @@ namespace FW
 					.File = Node->getLoc().getFilenameStr(),
 					.Location = {Node->getLoc().line, Node->getLoc().column}
 				});
-				ScopeStack.Push(FuncScope);
+
+				if (Op == glslang::EOpFunction && Node->getLoc().getFilenameStr() == ShaderFile)
+				{
+					ShaderScope FuncScope = { StartLoc, EndLoc };
+					Context.GuideLineScopes.Emplace(FuncScope);
+					ScopeStack.Push(FuncScope);
+				}
 			}
 			else if (Op == glslang::EOpParameters)
 			{
