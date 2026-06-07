@@ -705,7 +705,8 @@ namespace FW
 		default: break;
 		}
 
-		return Qualifier + " " + TypeName.TrimStartAndEnd();
+		FString TrimmedTypeName = TypeName.TrimStartAndEnd();
+		return Qualifier.IsEmpty() ? TrimmedTypeName : Qualifier + " " + TrimmedTypeName;
 	}
 
 	inline TMap<glslang::TOperator, FString> BuiltInOps = {
@@ -2072,9 +2073,17 @@ namespace FW
 
 			int32 LineStart = LineRanges[Row - 1].BeginIndex;
 			int32 CursorPos = LineStart + Col - 1;
-			// Look for '.' before cursor to determine if we need member completion
 			FString LineBeforeCursor = ShaderSource.Mid(LineStart, Col - 1);
-			int32 DotPos = LineBeforeCursor.Find(TEXT("."), ESearchCase::CaseSensitive, ESearchDir::FromEnd);
+			auto FindMemberAccessDot = [&LineBeforeCursor]() -> int32 {
+				int32 ScanPos = LineBeforeCursor.Len() - 1;
+				while (ScanPos >= 0 && FChar::IsIdentifier(LineBeforeCursor[ScanPos]))
+				{
+					ScanPos--;
+				}
+
+				return (ScanPos >= 0 && LineBeforeCursor[ScanPos] == TEXT('.')) ? ScanPos : INDEX_NONE;
+			};
+			int32 DotPos = FindMemberAccessDot();
 
 			auto StructMemberComplete = [&] {
 				TArray<ShaderCandidateInfo> Candidates;

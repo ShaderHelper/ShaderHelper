@@ -2198,9 +2198,11 @@ constexpr int PaddingLineNum = 22;
 			return;
 		}
 
+		int32 ReplaceLen = CurToken.Len();
         if(CurToken == ".")
         {
             InsertCol += 1;
+			ReplaceLen = 0;
         }
         
         bTryComplete = false;
@@ -2209,7 +2211,7 @@ constexpr int PaddingLineNum = 22;
 		
 		//TextLayout->RemoveAt does not handle the cursor, so manually call the goto function.
 		//However, directly call SelectText and DeleteSelectedText also can do it.
-		ShaderTextLayout->RemoveAt({CursorRow, InsertCol}, CurToken.Len());
+		ShaderTextLayout->RemoveAt({CursorRow, InsertCol}, ReplaceLen);
         ShaderMultiLineEditableText->GoTo(NewCursorLocation);
 		
 		FString InsertedText = InItem->Text;
