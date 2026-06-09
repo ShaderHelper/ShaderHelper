@@ -33,7 +33,7 @@ namespace SH
 		//Compile the shader. Subclass implements its own compilation logic.
 		virtual bool CompileShader(FString& OutError, FString& OutWarn) { return false; }
 		//Query overall compilation success status
-		virtual bool IsCompilationSucceeded() const { return false; }
+		virtual bool IsCompilationSuccessful() const { return false; }
 		virtual TArray<FW::ShaderType> GetEnabledStageList() const { return {}; }
 
 		static FString LoadIncludeFile(const FString& IncludePath);

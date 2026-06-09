@@ -253,7 +253,7 @@ void main()
 		return bAllSucceeded;
 	}
 
-	bool Shader::IsCompilationSucceeded() const
+	bool Shader::IsCompilationSuccessful() const
 	{
 		for (ShaderType Stage : magic_enum::enum_values<ShaderType>())
 		{

@@ -73,6 +73,9 @@ void RegisterPyFW(py::module_& m, py::module_& m_slate)
 	py::class_<FW::Texture2D, FW::AssetObject, FW::ObjectPtr<FW::Texture2D>>(m, "Texture2D");
 	py::class_<FW::TextureCube, FW::AssetObject, FW::ObjectPtr<FW::TextureCube>>(m, "TextureCube");
 	py::class_<FW::Texture3D, FW::AssetObject, FW::ObjectPtr<FW::Texture3D>>(m, "Texture3D");
+	py::enum_<FW::PinDirection>(m, "PinDirection")
+		.value("Input", FW::PinDirection::Input)
+		.value("Output", FW::PinDirection::Output);
 	py::class_<FW::Graph, FW::AssetObject, FW::ObjectPtr<FW::Graph>>(m, "Graph")
 		.def("AddNode", &FW::Graph::AddNode)
 		.def("AddLink", &FW::Graph::AddLink)
@@ -86,6 +89,9 @@ void RegisterPyFW(py::module_& m, py::module_& m_slate)
 		});
 	py::class_<FW::GraphNode, FW::ShObject, FW::ObjectPtr<FW::GraphNode>>(m, "GraphNode")
 		.def("GetPin", [](FW::GraphNode& Self, const std::string& InName) { return Self.GetPin(UTF8_TO_TCHAR(InName.c_str())); })
+		.def("GetPin", [](FW::GraphNode& Self, const std::string& InName, FW::PinDirection InDirection) {
+			return Self.GetPin(UTF8_TO_TCHAR(InName.c_str()), InDirection);
+		})
 		.def_property_readonly("InputPins", [](const FW::GraphNode& Self) {
 			std::vector<FW::GraphPin*> RetPins;
 			for (const auto& Pin : Self.Pins)
@@ -96,8 +102,20 @@ void RegisterPyFW(py::module_& m, py::module_& m_slate)
 				}
 			}
 			return RetPins;
+		})
+		.def_property_readonly("OutputPins", [](const FW::GraphNode& Self) {
+			std::vector<FW::GraphPin*> RetPins;
+			for (const auto& Pin : Self.Pins)
+			{
+				if (Pin->Direction == FW::PinDirection::Output)
+				{
+					RetPins.push_back(Pin);
+				}
+			}
+			return RetPins;
 		});
 	py::class_<FW::GraphPin, FW::ShObject, FW::ObjectPtr<FW::GraphPin>>(m, "GraphPin")
+		.def_property_readonly("Direction", [](const FW::GraphPin& Self) { return Self.Direction; })
 		.def_property_readonly("SourceNode", [](const FW::GraphPin& Self) { return Self.GetSourceNode(); });
 
 	m.def("RegisterExt", [](py::object ClassType) {
@@ -239,9 +257,12 @@ void RegisterPyFW(py::module_& m, py::module_& m_slate)
 			if (InAsset)
 			{
 				FString SavedFilePath = FilePath.c_str();
-				TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFilePath));
 				InAsset->ObjectName = FText::FromString(FPaths::GetBaseFilename(SavedFilePath));
-				InAsset->Serialize(*Ar);
+				{
+					TUniquePtr<FArchive> Ar(IFileManager::Get().CreateFileWriter(*SavedFilePath));
+					InAsset->Serialize(*Ar);
+				}
+				FW::TSingleton<FW::AssetManager>::Get().UpdateGuidToPath(SavedFilePath);
 			}
 	});
 	m_asset.def("GetImporter", [](const std::string& InPath) { return FW::GetAssetImporter(InPath.c_str()); }, py::return_value_policy::reference);
@@ -291,10 +312,13 @@ sys.stderr = ShRedirector.RedirectorStderr()
 
 		FString AddPluginPackagePath = FString::Printf(TEXT("sys.path.append('%s')"), *PathHelper::PluginDir());
 		py::exec(TCHAR_TO_UTF8(*AddPluginPackagePath));
+
+		PyEval_SaveThread();
 	}
 
 	bool PyMenuEntryExt::CanExecute()
 	{
+		py::gil_scoped_acquire Acquire;
 		try
 		{
 			PYBIND11_OVERRIDE(bool, MenuEntryExt, CanExecute);
@@ -309,6 +333,7 @@ sys.stderr = ShRedirector.RedirectorStderr()
 
 	void PyMenuEntryExt::OnExecute()
 	{
+		py::gil_scoped_acquire Acquire;
 		try
 		{
 			PYBIND11_OVERRIDE(void, MenuEntryExt, OnExecute);
@@ -322,6 +347,7 @@ sys.stderr = ShRedirector.RedirectorStderr()
 
 	std::unique_ptr<Widget> PyPropertyExt::CreateWidget()
 	{
+		py::gil_scoped_acquire Acquire;
 		try
 		{
 			PYBIND11_OVERRIDE(std::unique_ptr<Widget>, PropertyExt, CreateWidget);

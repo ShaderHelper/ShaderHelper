@@ -185,6 +185,7 @@ namespace FW {
 			else
 			{
 				FSlateApplication::Get().PumpMessages();
+				FTaskGraphInterface::Get().ProcessThreadUntilIdle(ENamedThreads::GameThread);
 			}
             
             double CurrentRealTime = FPlatformTime::Seconds();

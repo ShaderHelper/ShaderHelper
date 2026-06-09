@@ -1,0 +1,6 @@
+{
+    "author": "ShaderHelper",
+    "version": "0.1",
+    "shaderhelper": "0.1",
+    "description": "Expose ShaderHelper authoring tools through a local bridge for an external MCP server"
+}

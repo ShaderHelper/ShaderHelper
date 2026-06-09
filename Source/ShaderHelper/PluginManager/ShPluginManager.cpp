@@ -1,5 +1,8 @@
 #include "CommonHeader.h"
 #include "AssetObject/Shader.h"
+#include "AssetObject/Material.h"
+#include "AssetObject/Render/Nodes/ComputePassNode.h"
+#include "AssetObject/Render/Nodes/MeshPassNode.h"
 #include "AssetObject/Render/Nodes/RenderOutputNode.h"
 #include "AssetObject/Render/Render.h"
 #include "ShPluginManager.h"
@@ -15,17 +18,67 @@
 #include "AssetObject/Pins/Pins.h"
 #include "Editor/ShaderHelperEditor.h"
 #include "AssetObject/ShaderHeader.h"
+#include <Async/Async.h>
+#include <future>
+#include <stdexcept>
+
+namespace
+{
+	SH::ShaderStageFlag ShaderStageFlagFromTypes(const std::vector<FW::ShaderType>& InStages)
+	{
+		SH::ShaderStageFlag Result = SH::ShaderStageFlag::None;
+		for (FW::ShaderType Stage : InStages)
+		{
+			Result |= SH::Shader::StageToFlag(Stage);
+		}
+		return Result;
+	}
+
+}
 
 PYBIND11_EMBEDDED_MODULE(ShaderHelper, m)
 {
 	auto m_slate = m.def_submodule("Slate");
 	RegisterPyFW(m, m_slate);
+	m.def("Run", [](py::object Callable) -> py::object {
+		auto CallableObject = std::make_shared<py::object>(MoveTemp(Callable));
+		auto Promise = std::make_shared<std::promise<std::shared_ptr<py::object>>>();
+		std::future<std::shared_ptr<py::object>> Future = Promise->get_future();
+		AsyncTask(ENamedThreads::GameThread, [CallableObject, Promise]() mutable {
+			py::gil_scoped_acquire Acquire;
+			try
+			{
+				py::object Result = (*CallableObject)();
+				CallableObject.reset();
+				Promise->set_value(std::make_shared<py::object>(MoveTemp(Result)));
+			}
+			catch (...)
+			{
+				CallableObject.reset();
+				Promise->set_exception(std::current_exception());
+			}
+		});
+
+		std::shared_ptr<py::object> ResultObject;
+		{
+			py::gil_scoped_release Release;
+			ResultObject = Future.get();
+		}
+		py::object Result = MoveTemp(*ResultObject);
+		ResultObject.reset();
+		return Result;
+	}, "Run a Python callable on ShaderHelper's main thread and return its result.");
 
 	py::class_<SH::ShaderToy, FW::Graph, FW::ObjectPtr<SH::ShaderToy>>(m, "ShaderToy")
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::ShaderToy>(Outer); }), py::arg("Outer") = nullptr)
 		.def_readwrite("FlipY", &SH::ShaderToy::FlipY);
 	py::class_<SH::Render, FW::Graph, FW::ObjectPtr<SH::Render>>(m, "Render")
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::Render>(Outer); }), py::arg("Outer") = nullptr);
+	py::native_enum<FW::ShaderType>(m, "ShaderType", "enum.Enum")
+		.value("Vertex", FW::ShaderType::Vertex)
+		.value("Pixel", FW::ShaderType::Pixel)
+		.value("Compute", FW::ShaderType::Compute)
+		.finalize();
 	py::class_<SH::ShaderAsset, FW::AssetObject, FW::ObjectPtr<SH::ShaderAsset>>(m, "ShaderAsset")
 		.def_property("EditorContent", 
 		[](const SH::ShaderAsset& Self) -> std::string {
@@ -33,6 +86,29 @@ PYBIND11_EMBEDDED_MODULE(ShaderHelper, m)
 		}, 
 		[](SH::ShaderAsset& Self, const std::string& InContent) {
 			Self.EditorContent = UTF8_TO_TCHAR(InContent.c_str());
+		})
+		.def("IsCompilationSuccessful", &SH::ShaderAsset::IsCompilationSuccessful)
+		.def("GetEnabledStages", [](const SH::ShaderAsset& Self) {
+			std::vector<FW::ShaderType> Result;
+			for (FW::ShaderType Stage : Self.GetEnabledStageList())
+			{
+				Result.push_back(Stage);
+			}
+			return Result;
+		})
+		.def("GetFullContent", [](const SH::ShaderAsset& Self) {
+			return std::string(TCHAR_TO_UTF8(*Self.GetFullContent()));
+		})
+		.def("GetExtraLineNum", &SH::ShaderAsset::GetExtraLineNum)
+		.def("CompileShader", [](SH::ShaderAsset& Self) {
+			FString ErrorInfo;
+			FString WarnInfo;
+			bool bSucceeded = Self.CompileShader(ErrorInfo, WarnInfo);
+			py::dict Result;
+			Result["success"] = bSucceeded;
+			Result["error"] = std::string(TCHAR_TO_UTF8(*ErrorInfo));
+			Result["warning"] = std::string(TCHAR_TO_UTF8(*WarnInfo));
+			return Result;
 		});
 	py::class_<SH::StShader, SH::ShaderAsset, FW::ObjectPtr<SH::StShader>>(m, "StShader")
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::StShader>(Outer); }), py::arg("Outer") = nullptr)
@@ -47,10 +123,47 @@ PYBIND11_EMBEDDED_MODULE(ShaderHelper, m)
 			});
 	py::class_<SH::Shader, SH::ShaderAsset, FW::ObjectPtr<SH::Shader>>(m, "Shader")
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::Shader>(Outer); }), py::arg("Outer") = nullptr)
-		.def_readwrite("Language", &SH::Shader::Language);
+		.def_readwrite("Language", &SH::Shader::Language)
+		.def("SetStages", [](SH::Shader& Self, const std::vector<FW::ShaderType>& InStages) {
+			Self.EnabledStages = ShaderStageFlagFromTypes(InStages);
+		})
+		.def("GetStages", [](const SH::Shader& Self) {
+			std::vector<FW::ShaderType> Result;
+			for (FW::ShaderType Stage : Self.GetEnabledStageList())
+			{
+				Result.push_back(Stage);
+			}
+			return Result;
+		})
+		.def("SetEntryPoint", [](SH::Shader& Self, FW::ShaderType InStage, const std::string& InEntryPoint) {
+			Self.EntryPoints[(int32)InStage] = UTF8_TO_TCHAR(InEntryPoint.c_str());
+		})
+		.def("SetStageMacros", [](SH::Shader& Self, FW::ShaderType InStage, const std::vector<std::string>& InMacros) {
+			TArray<FString>& Macros = Self.StageMacros[(int32)InStage];
+			Macros.Empty();
+			for (const std::string& Macro : InMacros)
+			{
+				Macros.Add(UTF8_TO_TCHAR(Macro.c_str()));
+			}
+		});
 	py::class_<SH::ShaderHeader, SH::ShaderAsset, FW::ObjectPtr<SH::ShaderHeader>>(m, "ShaderHeader")
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::ShaderHeader>(Outer); }), py::arg("Outer") = nullptr)
 		.def_readwrite("Language", &SH::ShaderHeader::Language);
+	py::class_<SH::Material, FW::AssetObject, FW::ObjectPtr<SH::Material>>(m, "Material")
+		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::Material>(Outer); }), py::arg("Outer") = nullptr)
+		.def_property("VertexShaderAsset",
+			[](const SH::Material& Self) { return Self.VertexShaderAsset.Get(); },
+			[](SH::Material& Self, SH::Shader* InShader) {
+				Self.VertexShaderAsset = InShader;
+				Self.RefreshShaderBindings();
+			})
+		.def_property("PixelShaderAsset",
+			[](const SH::Material& Self) { return Self.PixelShaderAsset.Get(); },
+			[](SH::Material& Self, SH::Shader* InShader) {
+				Self.PixelShaderAsset = InShader;
+				Self.RefreshShaderBindings();
+			})
+		.def("RefreshShaderBindings", &SH::Material::RefreshShaderBindings);
 	py::native_enum<SH::ShaderToySlotType>(m, "ShaderToySlotType", "enum.Enum")
 		.value("Texture2D", SH::ShaderToySlotType::Texture2D)
 		.value("TextureCube", SH::ShaderToySlotType::TextureCube)
@@ -79,7 +192,32 @@ PYBIND11_EMBEDDED_MODULE(ShaderHelper, m)
 	py::class_<SH::ShaderToyOutputNode, FW::GraphNode, FW::ObjectPtr<SH::ShaderToyOutputNode>>(m, "ShaderToyOutputNode")
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::ShaderToyOutputNode>(Outer); }), py::arg("Outer") = nullptr);
 	py::class_<SH::RenderOutputNode, FW::GraphNode, FW::ObjectPtr<SH::RenderOutputNode>>(m, "RenderOutputNode")
-		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::RenderOutputNode>(Outer); }), py::arg("Outer") = nullptr);
+		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::RenderOutputNode>(Outer); }), py::arg("Outer") = nullptr)
+		.def_readwrite("Layer", &SH::RenderOutputNode::Layer)
+		.def_readwrite("AreaFraction", &SH::RenderOutputNode::AreaFraction);
+	py::class_<SH::MeshPassNode, FW::GraphNode, FW::ObjectPtr<SH::MeshPassNode>>(m, "MeshPassNode")
+		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::MeshPassNode>(Outer); }), py::arg("Outer") = nullptr)
+		.def_readwrite("DepthEnabled", &SH::MeshPassNode::bDepthEnabled)
+		.def("SetRenderTargetSize", [](SH::MeshPassNode& Self, uint32 Width, uint32 Height) {
+			Self.RTSize = { Width, Height };
+			Self.OnRenderTargetsChanged();
+		})
+		.def("SetColorTargetCount", [](SH::MeshPassNode& Self, int32 Count) {
+			Self.ColorRTs.SetNum(FMath::Max(Count, 0));
+			Self.OnRenderTargetsChanged();
+		});
+	py::class_<SH::ComputePassNode, FW::GraphNode, FW::ObjectPtr<SH::ComputePassNode>>(m, "ComputePassNode")
+		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::ComputePassNode>(Outer); }), py::arg("Outer") = nullptr)
+		.def(py::init([](FW::ShObject* Outer, FW::AssetPtr<SH::Shader> InShader) { return NewShObject<SH::ComputePassNode>(Outer, InShader); }))
+		.def_property("ShaderAsset",
+			[](const SH::ComputePassNode& Self) { return Self.ShaderAsset.Get(); },
+			[](SH::ComputePassNode& Self, SH::Shader* InShader) {
+				Self.ShaderAsset = InShader;
+				Self.Init();
+			})
+		.def("SetThreadGroupCount", [](SH::ComputePassNode& Self, uint32 X, uint32 Y, uint32 Z) {
+			Self.ThreadGroupCount = { X, Y, Z };
+		});
 	py::class_<SH::ShaderToyKeyboardNode, FW::GraphNode, FW::ObjectPtr<SH::ShaderToyKeyboardNode>>(m, "ShaderToyKeyboardNode")
 		.def(py::init([](FW::ShObject* Outer) { return NewShObject<SH::ShaderToyKeyboardNode>(Outer); }), py::arg("Outer") = nullptr);
 	py::class_<SH::ShaderToyPreviousFrameNode, FW::GraphNode, FW::ObjectPtr<SH::ShaderToyPreviousFrameNode>>(m, "ShaderToyPreviousFrameNode")
@@ -133,4 +271,3 @@ namespace SH
 		return Window;
 	}
 }
-

@@ -1258,7 +1258,7 @@ namespace SH
 			}
         }
         
-        if(!ShaderAssetObj->IsCompilationSucceeded())
+        if(!ShaderAssetObj->IsCompilationSuccessful())
         {
             return {true, false};
         }

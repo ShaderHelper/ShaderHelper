@@ -36,7 +36,7 @@ namespace SH
 
 		bool IsCompilable() const override { return EnabledStages != ShaderStageFlag::None; }
 		bool CompileShader(FString& OutError, FString& OutWarn) override;
-		bool IsCompilationSucceeded() const override;
+		bool IsCompilationSuccessful() const override;
 
 		bool IsStageEnabled(FW::ShaderType InStage) const;
 		FW::GpuShader* GetCompiledShader(FW::ShaderType InStage) const;

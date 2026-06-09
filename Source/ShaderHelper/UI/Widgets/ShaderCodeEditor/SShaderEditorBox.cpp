@@ -309,7 +309,7 @@ constexpr int PaddingLineNum = 22;
         FoldingArrowAnim.AddCurve(0, 0.25f, ECurveEaseFunction::Linear);
 		InitializeCursorHighlighter();
 
-        CurEditState = !ShaderAssetObj->IsCompilable() || ShaderAssetObj->IsCompilationSucceeded() ? EditState::Succeed : EditState::Failed;
+        CurEditState = !ShaderAssetObj->IsCompilable() || ShaderAssetObj->IsCompilationSuccessful() ? EditState::Succeed : EditState::Failed;
 
 		RefreshFont();
 		SyncStageSelectorOptions(ShaderAssetObj->GetEnabledStageList());
