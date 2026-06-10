@@ -42,13 +42,14 @@ namespace FW
 		void SetAssociatedWidget(TWeakPtr<SWidget> InWidget) { AssociatedWidget = MoveTemp(InWidget); }
 		TWeakPtr<SWidget> GetAssociatedWidget() const { return AssociatedWidget; }
 		Vector2f GetMousePos() const { return MousePos; }
+		GpuTexture* GetViewPortGpuTexture() const { return ViewPortGpuTex.GetReference(); }
 
 		void SetViewPortRenderTexture(GpuTexture* InGpuTex);
 	//	void UpdateViewPortRenderTexture(GpuTexture* InGpuTex);
 		void OnDrawViewport(const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) override;
 		TFunction<int32(const FGeometry&, const FSlateRect&, FSlateWindowElementList&, int32, const FWidgetStyle&, bool)> DrawOverlayHandler;
         
-        void Clear() { ViewPortRT.Reset(); }
+        void Clear() { ViewPortRT.Reset(); ViewPortGpuTex = nullptr; }
 
 		void OnFocusLost(const FFocusEvent& InFocusEvent) override 
 		{
@@ -144,6 +145,7 @@ namespace FW
 	protected:
 		TWeakPtr<SWidget> AssociatedWidget;
 		TSharedPtr<FSlateUpdatableTexture> ViewPortRT;
+		TRefCountPtr<GpuTexture> ViewPortGpuTex;
 		Vector2f MousePos = Vector2f(0, 0);
 		int32 SizeX;
 		int32 SizeY;

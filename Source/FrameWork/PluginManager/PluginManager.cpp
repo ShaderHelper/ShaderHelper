@@ -52,7 +52,8 @@ void RegisterPyFW(py::module_& m, py::module_& m_slate)
 {
 	py::class_<FW::PathHelper>(m, "PathHelper")
 		.def_property_readonly_static("BuiltinDir", [](py::object) { return std::string(TCHAR_TO_UTF8(*FW::PathHelper::BuiltinDir())); })
-		.def_property_readonly_static("ResourceDir", [](py::object) { return std::string(TCHAR_TO_UTF8(*FW::PathHelper::ResourceDir())); });
+		.def_property_readonly_static("ResourceDir", [](py::object) { return std::string(TCHAR_TO_UTF8(*FW::PathHelper::ResourceDir())); })
+		.def_property_readonly_static("SavedCaptureDir", [](py::object) { return std::string(TCHAR_TO_UTF8(*FW::PathHelper::SavedCaptureDir())); });
 
 	py::class_< FW::MenuEntryExt, FW::PyMenuEntryExt >(m, "MenuEntryExt")
 		.def(py::init<>())
@@ -69,7 +70,8 @@ void RegisterPyFW(py::module_& m, py::module_& m_slate)
 		.def_property_readonly("Name", [](const FW::ShObject& Self) { return std::string(TCHAR_TO_UTF8(*Self.ObjectName.ToString())); });
 	py::class_<FW::AssetObject, FW::ShObject, FW::ObjectPtr<FW::AssetObject>>(m, "AssetObject")
 		.def_property_readonly("FileName", [](const FW::AssetObject& Self) { return std::string(TCHAR_TO_UTF8(*Self.GetFileName())); })
-		.def_property_readonly("FileExtension", [](const FW::AssetObject& Self) { return std::string(TCHAR_TO_UTF8(*Self.FileExtension())); });
+		.def_property_readonly("FileExtension", [](const FW::AssetObject& Self) { return std::string(TCHAR_TO_UTF8(*Self.FileExtension())); })
+		.def("Save", &FW::AssetObject::Save);
 	py::class_<FW::Texture2D, FW::AssetObject, FW::ObjectPtr<FW::Texture2D>>(m, "Texture2D");
 	py::class_<FW::TextureCube, FW::AssetObject, FW::ObjectPtr<FW::TextureCube>>(m, "TextureCube");
 	py::class_<FW::Texture3D, FW::AssetObject, FW::ObjectPtr<FW::Texture3D>>(m, "Texture3D");

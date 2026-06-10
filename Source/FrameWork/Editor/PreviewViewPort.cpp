@@ -33,6 +33,7 @@ namespace FW
 
 	void PreviewViewPort::SetViewPortRenderTexture(GpuTexture* InGpuTex)
 	{
+		ViewPortGpuTex = InGpuTex;
 		FSlateRenderer* UIRenderer = FSlateApplication::Get().GetRenderer();
 		void* SharedHandle = GGpuRhi->GetSharedHandle(InGpuTex);
 		FSlateUpdatableTexture* UpdatableTexture;

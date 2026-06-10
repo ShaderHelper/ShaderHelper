@@ -93,19 +93,41 @@ def register_tools(mcp, bridge: BridgeClient):
     def create_render_graph(
         name: str,
         target_dir: str | None = None,
+        scene_objects: list[dict[str, Any]] | None = None,
         nodes: list[dict[str, Any]] | None = None,
         links: list[dict[str, Any]] | None = None,
         overwrite: bool = False,
     ) -> Any:
-        """Create a native Render graph with texture, mesh pass, compute pass, output nodes, and directional pin links."""
+        """Create a native Render graph with scene objects, texture, mesh pass, compute pass, output nodes, and directional pin links."""
         arguments = {
             "name": name,
             "target_dir": target_dir,
+            "scene_objects": scene_objects,
             "nodes": nodes,
             "links": links,
             "overwrite": overwrite,
         }
         return bridge.call_tool("create_render_graph", {key: value for key, value in arguments.items() if value is not None})
+
+    @mcp.tool()
+    def render_graph_feedback(
+        graph_path: str,
+        frames: int = 1,
+        time_step: float = 1.0 / 60.0,
+        capture_viewport: bool = True,
+        output_dir: str | None = None,
+        overwrite: bool = False,
+    ) -> Any:
+        """Open a graph, render frames, capture viewport output, and return render diagnostics plus per-pass GPU times."""
+        arguments = {
+            "graph_path": graph_path,
+            "frames": frames,
+            "time_step": time_step,
+            "capture_viewport": capture_viewport,
+            "output_dir": output_dir,
+            "overwrite": overwrite,
+        }
+        return bridge.call_tool("render_graph_feedback", {key: value for key, value in arguments.items() if value is not None})
 
     @mcp.tool()
     def read_shader_asset(path: str) -> Any:
@@ -123,7 +145,7 @@ def register_tools(mcp, bridge: BridgeClient):
         channel_slot_types: list[str] | None = None,
         compile: bool = False,
     ) -> Any:
-        """Replace a ShaderAsset's visible editor code and save it back to disk."""
+        """Replace a ShaderAsset's visible editor code, save it through the AssetObject save path, and optionally compile it."""
         arguments = {
             "path": path,
             "code": code,

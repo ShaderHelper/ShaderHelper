@@ -1,6 +1,7 @@
 import os
 import re
 import threading
+import time
 
 import ShaderHelper as Sh
 
@@ -58,6 +59,29 @@ def _unique_path(directory, stem, extension, overwrite=False):
         if not os.path.exists(path):
             return path
         index += 1
+
+
+def _resolve_feedback_dir(output_dir=None):
+    base_dir = os.path.abspath(getattr(Sh.PathHelper, "SavedCaptureDir", os.path.join(_current_asset_dir(), "MCPFeedback")))
+    if output_dir:
+        candidate = output_dir
+        if not os.path.isabs(candidate):
+            candidate = os.path.join(base_dir, candidate)
+        candidate = os.path.abspath(candidate)
+    else:
+        candidate = os.path.join(base_dir, "MCP")
+
+    base_cmp = os.path.normcase(base_dir)
+    candidate_cmp = os.path.normcase(candidate)
+    try:
+        common = os.path.commonpath([base_cmp, candidate_cmp])
+    except ValueError:
+        common = ""
+    if common != base_cmp:
+        raise ValueError("output_dir must be inside ShaderHelper's saved capture directory.")
+
+    os.makedirs(candidate, exist_ok=True)
+    return candidate
 
 
 def _language_from_string(value):
@@ -192,8 +216,6 @@ def _stage_name(value):
 
 def _stage_enum(value):
     stage = _stage_name(value)
-    if not hasattr(Sh, "ShaderType"):
-        return stage
     if stage == "vertex":
         return Sh.ShaderType.Vertex
     if stage == "pixel":
@@ -224,31 +246,23 @@ def _default_stage_macro(stage, language):
 def _asset_compile_summary(asset, do_compile=False):
     result = {
         "isShaderAsset": isinstance(asset, Sh.ShaderAsset),
-        "isCompilable": False,
         "isCompilationSuccessful": None,
         "enabledStages": [],
     }
     if not isinstance(asset, Sh.ShaderAsset):
         return result
 
-    if hasattr(asset, "IsCompilable"):
-        result["isCompilable"] = bool(asset.IsCompilable())
-    if hasattr(asset, "IsCompilationSuccessful"):
-        result["isCompilationSuccessful"] = bool(asset.IsCompilationSuccessful())
-    if hasattr(asset, "GetEnabledStages"):
-        result["enabledStages"] = [_stage_name(stage) for stage in asset.GetEnabledStages()]
+    result["isCompilationSuccessful"] = bool(asset.IsCompilationSuccessful())
+    result["enabledStages"] = [_stage_name(stage) for stage in asset.GetEnabledStages()]
 
     if do_compile:
-        if not hasattr(asset, "CompileShader"):
-            raise ValueError("ShaderAsset.CompileShader is not exposed by the running ShaderHelper build.")
         compile_result = dict(asset.CompileShader())
         result["compile"] = {
             "success": bool(compile_result["success"]),
             "error": str(compile_result["error"]),
             "warning": str(compile_result["warning"]),
         }
-        if hasattr(asset, "IsCompilationSuccessful"):
-            result["isCompilationSuccessful"] = bool(asset.IsCompilationSuccessful())
+        result["isCompilationSuccessful"] = bool(asset.IsCompilationSuccessful())
     return result
 
 
@@ -258,18 +272,13 @@ def _set_native_shader_options(shader, arguments, language):
 
     stages = [_stage_name(stage) for stage in _as_list(arguments.get("stages"), ["vertex", "pixel"])]
     stage_values = [_stage_enum(stage) for stage in stages]
-    if hasattr(shader, "SetStages"):
-        shader.SetStages(stage_values)
-    elif arguments.get("stages"):
-        raise ValueError("Shader.SetStages is not exposed by the running ShaderHelper build.")
+    shader.SetStages(stage_values)
 
     entry_points = arguments.get("entry_points") or {}
     stage_macros = arguments.get("stage_macros") or {}
     for stage, stage_value in zip(stages, stage_values):
-        if hasattr(shader, "SetEntryPoint"):
-            shader.SetEntryPoint(stage_value, entry_points.get(stage, _default_entry_point(stage, language)))
-        if hasattr(shader, "SetStageMacros"):
-            shader.SetStageMacros(stage_value, stage_macros.get(stage, _default_stage_macro(stage, language)))
+        shader.SetEntryPoint(stage_value, entry_points.get(stage, _default_entry_point(stage, language)))
+        shader.SetStageMacros(stage_value, stage_macros.get(stage, _default_stage_macro(stage, language)))
 
 
 def _create_shader_asset(arguments, asset_type):
@@ -291,8 +300,7 @@ def _create_shader_asset(arguments, asset_type):
 
     shader = Sh.Asset.CreateAsset(base_name, class_type)
     shader.EditorContent = code
-    if hasattr(shader, "Language"):
-        shader.Language = language
+    shader.Language = language
     if isinstance(shader, Sh.StShader):
         slot_values = list(arguments.get("channel_slot_types") or ["Texture2D"] * 4)
         while len(slot_values) < 4:
@@ -323,6 +331,210 @@ def _load_typed_asset(path, class_type, label):
     if not isinstance(asset, class_type):
         raise ValueError(f"Asset is not a {label}: {path}")
     return asset
+
+
+def _require_attrs(names, feature):
+    missing = [name for name in names if not hasattr(Sh, name)]
+    if missing:
+        raise ValueError(f"{feature} requires ShaderHelper bindings that are not exposed yet: {', '.join(missing)}. Rebuild ShaderHelper.")
+
+
+def _vec3(value, label):
+    if value is None:
+        return None
+    if not isinstance(value, (list, tuple)) or len(value) < 3:
+        raise ValueError(f"{label} must contain x, y, and z.")
+    return (float(value[0]), float(value[1]), float(value[2]))
+
+
+def _set_scene_transform(scene_object, spec):
+    position = _vec3(spec.get("position"), "position")
+    rotation = _vec3(spec.get("rotation"), "rotation")
+    scale = _vec3(spec.get("scale"), "scale")
+    if position is not None:
+        scene_object.Position = position
+    if rotation is not None:
+        scene_object.Rotation = rotation
+    if scale is not None:
+        scene_object.Scale = scale
+
+
+def _scene_object_key(spec, index):
+    key = spec.get("id") or spec.get("name") or f"SceneObject{index}"
+    return _sanitize_name(key, f"SceneObject{index}")
+
+
+def _scene_object_type(value):
+    kind = str(value or "scene").strip().lower()
+    if kind in ("scene", "scene_object", "object", "empty", "null"):
+        return "scene"
+    if kind in ("mesh", "mesh_scene_object", "meshsceneobject"):
+        return "mesh"
+    if kind in ("camera", "camera_scene_object", "camerasceneobject"):
+        return "camera"
+    raise ValueError(f"Unsupported scene object type: {value}")
+
+
+def _create_scene_objects(graph, scene_specs):
+    scene_specs = list(scene_specs or [])
+    if not scene_specs:
+        return {}, []
+
+    _require_attrs(["SceneObject", "MeshSceneObject", "CameraSceneObject", "Model"], "scene_objects")
+    for method in ("AddSceneObject", "AddMeshSceneObject", "AddCameraSceneObject"):
+        if not hasattr(graph, method):
+            raise ValueError(f"scene_objects requires Render.{method}. Rebuild ShaderHelper.")
+    scene_objects = {}
+    summaries = []
+
+    for index, spec in enumerate(scene_specs):
+        if not isinstance(spec, dict):
+            raise ValueError("scene_objects entries must be objects.")
+
+        key = _scene_object_key(spec, index)
+        if key in scene_objects:
+            raise ValueError(f"Duplicate scene object id/name: {key}")
+
+        parent_name = spec.get("parent") or spec.get("parent_id")
+        parent = None
+        if parent_name:
+            parent_key = _sanitize_name(parent_name)
+            if parent_key not in scene_objects:
+                raise ValueError(f"Scene object parent does not exist or appears later: {parent_name}")
+            parent = scene_objects[parent_key]
+
+        kind = _scene_object_type(spec.get("type"))
+        if kind == "mesh":
+            scene_object = graph.AddMeshSceneObject(parent)
+        elif kind == "camera":
+            scene_object = graph.AddCameraSceneObject(parent)
+        else:
+            scene_object = graph.AddSceneObject(parent)
+
+        display_name = spec.get("name") or key
+        if hasattr(scene_object, "SetName"):
+            scene_object.SetName(str(display_name))
+        _set_scene_transform(scene_object, spec)
+
+        item = {
+            "id": key,
+            "name": scene_object.Name,
+            "type": type(scene_object).__name__,
+            "parent": parent_name,
+        }
+
+        if kind == "mesh":
+            model_path = spec.get("model_path") or spec.get("model")
+            if model_path:
+                scene_object.ModelAsset = _load_typed_asset(model_path, Sh.Model, "Model")
+                item["model"] = os.path.abspath(model_path)
+            if spec.get("vertex_count") is not None:
+                scene_object.VertexCount = int(spec["vertex_count"])
+            if spec.get("instance_count") is not None:
+                scene_object.InstanceCount = int(spec["instance_count"])
+            item["vertexCount"] = int(scene_object.VertexCount)
+            item["instanceCount"] = int(scene_object.InstanceCount)
+
+        if kind == "camera":
+            if spec.get("orthographic") is not None:
+                scene_object.Orthographic = bool(spec["orthographic"])
+            if spec.get("ortho_size") is not None:
+                scene_object.OrthoSize = float(spec["ortho_size"])
+            if spec.get("vertical_fov") is not None:
+                scene_object.VerticalFov = float(spec["vertical_fov"])
+            if spec.get("near_plane") is not None:
+                scene_object.NearPlane = float(spec["near_plane"])
+            if spec.get("far_plane") is not None:
+                scene_object.FarPlane = float(spec["far_plane"])
+            if bool(spec.get("preview", False)):
+                graph.PreviewCamera = scene_object
+            item["orthographic"] = bool(scene_object.Orthographic)
+
+        scene_objects[key] = scene_object
+        summaries.append(item)
+
+    return scene_objects, summaries
+
+
+def _mesh_binding_specs(spec):
+    bindings = spec.get("meshes") or spec.get("mesh_objects") or spec.get("render_objects")
+    if bindings is None:
+        mesh_ref = spec.get("mesh") or spec.get("scene_object") or spec.get("mesh_scene_object")
+        if mesh_ref:
+            bindings = [{
+                "scene_object": mesh_ref,
+                "material_path": spec.get("material_path"),
+                "material_paths": spec.get("material_paths"),
+            }]
+    result = []
+    for binding in bindings or []:
+        if isinstance(binding, str):
+            result.append({"scene_object": binding})
+        elif isinstance(binding, dict):
+            result.append(binding)
+        else:
+            raise ValueError("mesh pass meshes entries must be objects or scene object names.")
+    return result
+
+
+def _material_paths_from_binding(binding, fallback_path=None):
+    paths = binding.get("material_paths") or binding.get("materials")
+    if paths is not None:
+        if isinstance(paths, str):
+            return [paths] if paths else []
+        return [path for path in paths if path]
+    path = binding.get("material_path") or binding.get("material") or fallback_path
+    return [path] if path else []
+
+
+def _bind_mesh_pass_scene(node, spec, scene_objects):
+    if not scene_objects and not _mesh_binding_specs(spec) and not spec.get("camera"):
+        return []
+
+    _require_attrs(["MeshSceneObject", "CameraSceneObject", "Material"], "mesh pass scene binding")
+    if not hasattr(node, "AddMeshRenderObject") or not hasattr(node, "CameraRef"):
+        raise ValueError("mesh pass scene binding requires MeshPassNode.CameraRef and AddMeshRenderObject. Rebuild ShaderHelper.")
+
+    camera_name = spec.get("camera") or spec.get("camera_ref") or spec.get("camera_object")
+    if camera_name:
+        camera_key = _sanitize_name(camera_name)
+        camera = scene_objects.get(camera_key)
+        if camera is None:
+            raise ValueError(f"Mesh pass camera scene object does not exist: {camera_name}")
+        if not isinstance(camera, Sh.CameraSceneObject):
+            raise ValueError(f"Mesh pass camera must reference a CameraSceneObject: {camera_name}")
+        node.CameraRef = camera
+
+    bindings = []
+    fallback_material = spec.get("material_path") or spec.get("material")
+    for binding in _mesh_binding_specs(spec):
+        mesh_name = binding.get("scene_object") or binding.get("mesh") or binding.get("object") or binding.get("name")
+        if not mesh_name:
+            raise ValueError("mesh pass mesh binding is missing scene_object.")
+
+        mesh_key = _sanitize_name(mesh_name)
+        mesh_object = scene_objects.get(mesh_key)
+        if mesh_object is None:
+            raise ValueError(f"Mesh scene object does not exist: {mesh_name}")
+        if not isinstance(mesh_object, Sh.MeshSceneObject):
+            raise ValueError(f"Mesh binding must reference a MeshSceneObject: {mesh_name}")
+
+        render_objects = list(node.AddMeshRenderObject(mesh_object))
+        material_paths = _material_paths_from_binding(binding, fallback_material)
+        material_assets = [_load_typed_asset(path, Sh.Material, "Material") for path in material_paths if path]
+
+        for index, render_object in enumerate(render_objects):
+            if material_assets:
+                material = material_assets[index] if index < len(material_assets) else material_assets[-1]
+                render_object.MaterialAsset = material
+            bindings.append({
+                "mesh": mesh_key,
+                "meshRenderObject": render_object.Name,
+                "subMeshIndex": int(render_object.SubMeshIndex),
+                "material": os.path.abspath(material_paths[min(index, len(material_paths) - 1)]) if material_paths else None,
+            })
+
+    return bindings
 
 
 def _pin_name(value, default):
@@ -390,7 +602,7 @@ def tool_shaderhelper_status(arguments):
         "tools": bridge["tools"],
         "shaderDebuggingHint": (
             "Native Shader assets can use Print/PrintAtMouse/Assert in HLSL or GLSL. "
-            "Compile, render, then inspect ShaderHelper logs and screenshots to debug visual output."
+            "Compile, then call render_graph_feedback to inspect viewport output, shader logs, prints, and asserts."
         ),
     })
 
@@ -424,7 +636,7 @@ def tool_create_shader_asset(arguments):
         return text_result({
             "path": shader_path,
             "assetType": type(shader).__name__,
-            "language": getattr(shader, "Language", None).name if hasattr(shader, "Language") else None,
+            "language": shader.Language.name,
             "compile": compile_info,
             "message": "Shader asset created.",
         })
@@ -524,7 +736,7 @@ def tool_compile_shader_asset(arguments):
             "path": os.path.abspath(path),
             "fileName": asset.FileName,
             "fileExtension": asset.FileExtension,
-            "language": getattr(asset, "Language", None).name if hasattr(asset, "Language") else None,
+            "language": asset.Language.name,
             **compile_info,
         })
 
@@ -545,8 +757,7 @@ def tool_create_material_asset(arguments):
             material.VertexShaderAsset = _load_typed_asset(vertex_shader_path, Sh.Shader, "Shader")
         if pixel_shader_path:
             material.PixelShaderAsset = _load_typed_asset(pixel_shader_path, Sh.Shader, "Shader")
-        if hasattr(material, "RefreshShaderBindings"):
-            material.RefreshShaderBindings()
+        material.RefreshShaderBindings()
 
         material_path = _unique_path(target_dir, base_name, material.FileExtension, overwrite)
         Sh.Asset.SaveToFile(material, material_path)
@@ -568,8 +779,10 @@ def tool_create_render_graph(arguments):
         target_dir = _resolve_target_dir(arguments.get("target_dir"))
         overwrite = bool(arguments.get("overwrite", False))
         graph = Sh.Asset.CreateAsset(base_name, Sh.Render)
+        scene_objects_by_name, scene_object_summaries = _create_scene_objects(graph, arguments.get("scene_objects") or arguments.get("scene"))
 
         nodes_by_name = {}
+        mesh_bindings = []
         output_node = _find_render_output_node(graph)
         nodes_by_name["Output"] = output_node
 
@@ -615,6 +828,9 @@ def tool_create_render_graph(arguments):
                         raise ValueError("rt_size must contain width and height.")
                     node.SetRenderTargetSize(int(size[0]), int(size[1]))
                 graph.AddNode(node)
+                for binding in _bind_mesh_pass_scene(node, spec, scene_objects_by_name):
+                    binding["node"] = node_name
+                    mesh_bindings.append(binding)
             else:
                 raise ValueError(f"Unsupported render node type: {spec.get('type')}")
 
@@ -654,7 +870,85 @@ def tool_create_render_graph(arguments):
         return text_result({
             "graph": render_path,
             "nodes": list(nodes_by_name.keys()),
+            "sceneObjects": scene_object_summaries,
+            "meshBindings": mesh_bindings,
             "message": "Render graph asset created.",
+        })
+
+
+def _diagnostics_from_render_logs(logs):
+    diagnostics = {
+        "errors": [],
+        "warnings": [],
+        "prints": [],
+        "asserts": [],
+    }
+    for log in logs:
+        category = str(log.get("category", ""))
+        verbosity = str(log.get("verbosity", "")).lower()
+        message = str(log.get("message", ""))
+        lower_message = message.lower()
+
+        if verbosity in ("error", "fatal"):
+            diagnostics["errors"].append(log)
+        elif verbosity == "warning":
+            diagnostics["warnings"].append(log)
+
+        if category == "LogShader" and verbosity in ("display", "log"):
+            diagnostics["prints"].append(log)
+
+        if "assert failed" in lower_message or (verbosity in ("error", "fatal") and "assert" in lower_message):
+            diagnostics["asserts"].append(log)
+
+    return diagnostics
+
+
+def tool_render_graph_feedback(arguments):
+    with _state_lock:
+        if not hasattr(Sh, "RenderGraphFeedback"):
+            raise ValueError("RenderGraphFeedback is not exposed by the running ShaderHelper build. Rebuild and restart ShaderHelper.")
+
+        graph_path = arguments.get("graph_path") or arguments.get("path")
+        if not graph_path:
+            raise ValueError("graph_path is required.")
+
+        abs_graph_path = os.path.abspath(graph_path)
+        frames = max(1, int(arguments.get("frames", 1)))
+        time_step = float(arguments.get("time_step", 1.0 / 60.0))
+        capture_viewport = bool(arguments.get("capture_viewport", True))
+
+        capture_path = ""
+        if capture_viewport:
+            output_dir = _resolve_feedback_dir(arguments.get("output_dir"))
+            graph_stem = _sanitize_name(os.path.splitext(os.path.basename(abs_graph_path))[0], "Graph")
+            stamp = time.strftime("%Y%m%d_%H%M%S")
+            capture_path = _unique_path(output_dir, f"{graph_stem}_{stamp}", "png", bool(arguments.get("overwrite", False)))
+
+        feedback = dict(Sh.RenderGraphFeedback(abs_graph_path, frames, capture_path, time_step))
+        logs = [dict(item) for item in feedback.get("logs", [])]
+        viewport = feedback.get("viewport")
+        if viewport is not None:
+            viewport = dict(viewport)
+        performance = feedback.get("performance")
+        pass_times = []
+        if performance is not None:
+            performance = dict(performance)
+            pass_times = [dict(item) for item in performance.get("passes", [])]
+            performance["passes"] = pass_times
+
+        return text_result({
+            "success": bool(feedback.get("success", False)),
+            "graph": abs_graph_path,
+            "framesRendered": feedback.get("framesRendered", 0),
+            "viewport": viewport,
+            "viewportImage": viewport.get("path") if viewport else None,
+            "error": feedback.get("error") or None,
+            "viewportError": feedback.get("viewportError") or None,
+            "passTimes": pass_times,
+            "performance": performance,
+            "diagnostics": _diagnostics_from_render_logs(logs),
+            "logs": logs,
+            "message": "Graph rendered and feedback captured.",
         })
 
 
@@ -671,7 +965,7 @@ def tool_read_shader_asset(arguments):
         "path": os.path.abspath(path),
         "fileName": asset.FileName,
         "fileExtension": asset.FileExtension,
-        "language": getattr(asset, "Language", None).name if hasattr(asset, "Language") else None,
+        "language": asset.Language.name,
         "editorContent": asset.EditorContent,
         **_asset_compile_summary(asset),
     })
@@ -714,9 +1008,9 @@ def tool_update_shader_asset(arguments):
         if isinstance(asset, Sh.Shader):
             _set_native_shader_options(asset, arguments, getattr(asset, "Language", Sh.GpuShaderLanguage.HLSL))
 
-        Sh.Asset.SaveToFile(asset, abs_path)
-        _created_assets[abs_path] = asset
+        asset.Save()
         compile_info = _asset_compile_summary(asset, do_compile=bool(arguments.get("compile", False)))
+        asset.RefreshShader()
         return text_result({
             "path": abs_path,
             "compile": compile_info,
@@ -729,6 +1023,29 @@ def tool_inspect_current_graph(arguments):
     if graph is None:
         raise ValueError("No graph is currently open.")
 
+    scene_objects = []
+    if hasattr(Sh, "Render") and isinstance(graph, Sh.Render) and hasattr(graph, "SceneObjects"):
+        for scene_object in graph.SceneObjects:
+            item = {
+                "id": scene_object.Id,
+                "name": scene_object.Name,
+                "type": type(scene_object).__name__,
+                "position": list(scene_object.Position) if hasattr(scene_object, "Position") else None,
+                "rotation": list(scene_object.Rotation) if hasattr(scene_object, "Rotation") else None,
+                "scale": list(scene_object.Scale) if hasattr(scene_object, "Scale") else None,
+            }
+            if hasattr(Sh, "MeshSceneObject") and isinstance(scene_object, Sh.MeshSceneObject):
+                item["vertexCount"] = int(scene_object.VertexCount)
+                item["instanceCount"] = int(scene_object.InstanceCount)
+                model = scene_object.ModelAsset
+                item["model"] = model.Name if model is not None else None
+            if hasattr(Sh, "CameraSceneObject") and isinstance(scene_object, Sh.CameraSceneObject):
+                item["orthographic"] = bool(scene_object.Orthographic)
+                item["verticalFov"] = float(scene_object.VerticalFov)
+                item["nearPlane"] = float(scene_object.NearPlane)
+                item["farPlane"] = float(scene_object.FarPlane)
+            scene_objects.append(item)
+
     nodes = []
     for node in graph.Nodes:
         item = {
@@ -740,6 +1057,19 @@ def tool_inspect_current_graph(arguments):
         }
         if isinstance(node, Sh.ShaderToyPassNode):
             item["shaderToyCode"] = node.GetShaderToyCode()
+        if hasattr(Sh, "MeshPassNode") and isinstance(node, Sh.MeshPassNode):
+            camera = node.CameraRef
+            item["camera"] = camera.Name if camera is not None else None
+            item["meshRenderObjects"] = []
+            for render_object in node.MeshRenderObjects:
+                mesh_object = render_object.MeshSceneObjectRef
+                material = render_object.MaterialAsset
+                item["meshRenderObjects"].append({
+                    "name": render_object.Name,
+                    "mesh": mesh_object.Name if mesh_object is not None else None,
+                    "subMeshIndex": int(render_object.SubMeshIndex),
+                    "material": material.Name if material is not None else None,
+                })
         for pin in node.InputPins:
             source = pin.SourceNode
             item["inputs"].append({
@@ -765,5 +1095,6 @@ def tool_inspect_current_graph(arguments):
             "name": graph.Name,
             "type": type(graph).__name__,
         },
+        "sceneObjects": scene_objects,
         "nodes": nodes,
     })

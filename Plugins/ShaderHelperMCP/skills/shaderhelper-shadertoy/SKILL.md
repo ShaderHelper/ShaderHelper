@@ -13,8 +13,9 @@ Always start with `shaderhelper_status` to verify the bridge, active asset brows
 2. Use `list_builtin_shadertoy_resources` before referencing built-in texture, cubemap, or volume names.
 3. Connect passes and channels with `create_shadertoy_graph`.
 4. Compile created or updated pass shaders when validation matters.
-5. Use `inspect_current_graph` when debugging the currently open ShaderToy graph.
-6. Report created asset paths, graph path, output pass, and compile status.
+5. Use `render_graph_feedback` to open the graph, render frames, capture the viewport, and inspect logs.
+6. Use `inspect_current_graph` when debugging the currently open ShaderToy graph.
+7. Report created asset paths, graph path, output pass, viewport capture path, and compile/render status.
 
 `target_dir` must stay inside ShaderHelper's current asset browser directory. Prefer a relative `target_dir` for generated Shadertoy assets. Leave `overwrite` as `false` unless the user asked to replace an asset.
 
@@ -78,9 +79,9 @@ For feedback, set `previous_frame: true`; self-sourcing a pass is treated as pre
 
 ## Debugging
 
-For existing pass edits, use `read_shader_asset`, then `update_shader_asset` with `compile: true`. If wiring is suspect, call `inspect_current_graph` to see nodes, channel inputs, and Shadertoy pass code.
+For existing pass edits, use `read_shader_asset`, then `update_shader_asset` with `compile: true`. After graph creation or edits, call `render_graph_feedback` to render and capture viewport output. If wiring is suspect, call `inspect_current_graph` to see nodes, channel inputs, and Shadertoy pass code.
 
-Native ShaderHelper shader-side `Print`, `PrintAtMouse`, and `Assert` helpers can be used where supported by the running shader path. Add focused probes, compile, render, then inspect ShaderHelper logs and screenshots.
+Native ShaderHelper shader-side `Print`, `PrintAtMouse`, and `Assert` helpers can be used where supported by the running shader path. Add focused probes, compile, then use `render_graph_feedback` to inspect print/assert/error logs and screenshots.
 
 ## Tool Guide
 
@@ -88,6 +89,7 @@ Native ShaderHelper shader-side `Print`, `PrintAtMouse`, and `Assert` helpers ca
 - `list_builtin_shadertoy_resources`: discover built-in Shadertoy channel resources.
 - `create_shader_asset`: create one StShader pass with `asset_type: "st_shader"`.
 - `create_shadertoy_graph`: wire passes, built-ins, asset textures, pass outputs, feedback, and output.
+- `render_graph_feedback`: open a graph, render frames, capture the viewport image, and return render diagnostics.
 - `compile_shader_asset`: compile a pass shader and read compile status.
 - `read_shader_asset`: load visible editor code from an existing pass.
 - `update_shader_asset`: replace pass code, update channel slot types, and optionally compile.

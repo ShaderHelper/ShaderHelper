@@ -7,6 +7,7 @@ from .shader_tools import (
     tool_inspect_current_graph,
     tool_list_builtin_shadertoy_resources,
     tool_read_shader_asset,
+    tool_render_graph_feedback,
     tool_shaderhelper_status,
     tool_update_shader_asset,
 )
@@ -106,15 +107,25 @@ TOOLS = {
     "create_render_graph": {
         "handler": tool_create_render_graph,
         "title": "Create native render graph",
-        "description": "Create a Render graph asset with texture, mesh pass, compute pass, and output nodes. Use links to connect node pins.",
+        "description": "Create a Render graph asset with scene objects, texture nodes, mesh pass nodes, compute pass nodes, output nodes, and pin links.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "name": {"type": "string"},
                 "target_dir": {"type": "string"},
+                "scene_objects": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "description": "{id,name,type,parent,position,rotation,scale,model_path,vertex_count,instance_count,orthographic,ortho_size,vertical_fov,near_plane,far_plane,preview}",
+                    },
+                },
                 "nodes": {
                     "type": "array",
-                    "items": {"type": "object", "description": "{name,type,asset_path|shader_path,rt_size,color_target_count,depth_enabled,thread_group_count}"},
+                    "items": {
+                        "type": "object",
+                        "description": "{name,type,asset_path|shader_path,rt_size,color_target_count,depth_enabled,thread_group_count,camera,meshes}; mesh pass meshes use {scene_object,material_path|material_paths}",
+                    },
                 },
                 "links": {
                     "type": "array",
@@ -123,6 +134,23 @@ TOOLS = {
                 "overwrite": {"type": "boolean", "default": False},
             },
             "required": ["name"],
+        },
+    },
+    "render_graph_feedback": {
+        "handler": tool_render_graph_feedback,
+        "title": "Render graph feedback",
+        "description": "Open a Render or ShaderToy graph, render frames, capture the viewport image, and return render logs plus per-pass GPU times.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "graph_path": {"type": "string"},
+                "frames": {"type": "integer", "default": 1},
+                "time_step": {"type": "number", "default": 0.016666667},
+                "capture_viewport": {"type": "boolean", "default": True},
+                "output_dir": {"type": "string", "description": "Relative to ShaderHelper's saved capture directory."},
+                "overwrite": {"type": "boolean", "default": False},
+            },
+            "required": ["graph_path"],
         },
     },
     "read_shader_asset": {
@@ -138,7 +166,7 @@ TOOLS = {
     "update_shader_asset": {
         "handler": tool_update_shader_asset,
         "title": "Update shader asset",
-        "description": "Replace a ShaderAsset's visible editor code and save it back to disk.",
+        "description": "Replace a ShaderAsset's visible editor code, save it through the AssetObject save path, and optionally compile it.",
         "inputSchema": {
             "type": "object",
             "properties": {

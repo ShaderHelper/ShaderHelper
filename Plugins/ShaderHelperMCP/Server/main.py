@@ -22,7 +22,7 @@ def create_server(argv: list[str] | None = None):
             "Start ShaderHelper with the ShaderHelperMCP plugin enabled first. "
             "Use create_shader_asset with asset_type='st_shader' plus create_shadertoy_graph for Shadertoy effects. "
             "Use create_shader_asset, create_material_asset, and create_render_graph for native HLSL/GLSL workflows. "
-            "Native shaders may use Print, PrintAtMouse, and Assert; compile and render, then inspect ShaderHelper logs and screenshots."
+            "Use render_graph_feedback after creating a graph to inspect viewport output, shader logs, prints, and asserts."
         ),
     )
     register_tools(mcp, bridge)

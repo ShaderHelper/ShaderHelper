@@ -90,6 +90,7 @@ Available MCP tools:
 - `compile_shader_asset`
 - `create_material_asset`
 - `create_render_graph`
+- `render_graph_feedback`
 - `read_shader_asset`
 - `update_shader_asset`
 - `inspect_current_graph`
