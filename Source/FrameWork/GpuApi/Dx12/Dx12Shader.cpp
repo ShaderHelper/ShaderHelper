@@ -601,7 +601,7 @@ namespace FW
 			IID_PPV_ARGS(CompileResult.GetInitReference()))
 		);
 
-		bool IsCompilationSucceeded = IsApiSucceeded;
+		bool IsCompilationSuccessful = IsApiSucceeded;
 
 		if (IsApiSucceeded)
 		{
@@ -616,7 +616,7 @@ namespace FW
 				if(FAILED(ResultStatus))
 				{
 					OutErrorInfo = MoveTemp(DiagnosticInfo);
-					IsCompilationSucceeded = false;
+					IsCompilationSuccessful = false;
 				}
 				else
 				{
@@ -625,7 +625,7 @@ namespace FW
 			
 			}
 
-			if (IsCompilationSucceeded)
+			if (IsCompilationSuccessful)
 			{
 				TRefCountPtr<IDxcBlob> ShaderBlob;
 				DxCheck(CompileResult->GetResult(ShaderBlob.GetInitReference()));
@@ -673,6 +673,6 @@ namespace FW
 			}
 		}
 		
-		return IsCompilationSucceeded;
+		return IsCompilationSuccessful;
 	 }
 }

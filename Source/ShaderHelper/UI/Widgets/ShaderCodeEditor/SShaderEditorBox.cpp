@@ -292,6 +292,7 @@ constexpr int PaddingLineNum = 22;
     {
 		ShaderAssetObj = InArgs._ShaderAssetObj;
 		ShaderRefreshHandle = ShaderAssetObj->OnShaderRefreshed.AddLambda([this]{
+			SyncFromShaderAsset();
 			SubmitLangServiceTasks();
 		});
 
@@ -309,7 +310,7 @@ constexpr int PaddingLineNum = 22;
         FoldingArrowAnim.AddCurve(0, 0.25f, ECurveEaseFunction::Linear);
 		InitializeCursorHighlighter();
 
-        CurEditState = !ShaderAssetObj->IsCompilable() || ShaderAssetObj->IsCompilationSucceeded() ? EditState::Succeed : EditState::Failed;
+        CurEditState = !ShaderAssetObj->IsCompilable() || ShaderAssetObj->IsCompilationSuccessful() ? EditState::Succeed : EditState::Failed;
 
 		RefreshFont();
 		SyncStageSelectorOptions(ShaderAssetObj->GetEnabledStageList());
@@ -318,12 +319,40 @@ constexpr int PaddingLineNum = 22;
 	FText SShaderEditorBox::InitializeEditorSource()
 	{
 		CurrentEditorSource = ShaderAssetObj->EditorContent;
-		CurrentShaderSource = CurrentEditorSource;
 
 		FString TabSpace;
 		for (int i = 0; i < GetTabSize(); i++) { TabSpace += " "; }
 		CurrentEditorSource = CurrentEditorSource.Replace(TEXT("\t"), *TabSpace);
+		CurrentShaderSource = CurrentEditorSource.Replace(TEXT("\r\n"), TEXT("\n"));
 		return FText::FromString(CurrentEditorSource);
+	}
+
+	void SShaderEditorBox::SyncFromShaderAsset()
+	{
+		if (!ShaderAssetObj)
+		{
+			return;
+		}
+
+		FString NewEditorSource = ShaderAssetObj->EditorContent;
+		FString TabSpace;
+		for (int i = 0; i < GetTabSize(); i++) { TabSpace += " "; }
+		NewEditorSource = NewEditorSource.Replace(TEXT("\t"), *TabSpace);
+		FString NewShaderSource = NewEditorSource.Replace(TEXT("\r\n"), TEXT("\n"));
+
+		if (NewEditorSource == CurrentEditorSource && NewShaderSource == CurrentShaderSource)
+		{
+			return;
+		}
+
+		CurrentEditorSource = NewEditorSource;
+		CurrentShaderSource = NewShaderSource;
+		if (ShaderMultiLineEditableText)
+		{
+			SetText(FText::FromString(CurrentEditorSource));
+		}
+		CurEditState = !ShaderAssetObj->IsCompilable() || ShaderAssetObj->IsCompilationSuccessful() ? EditState::Succeed : EditState::Failed;
+		SyncStageSelectorOptions(ShaderAssetObj->GetEnabledStageList());
 	}
 
 	void SShaderEditorBox::InitializeScrollBars()
@@ -2454,6 +2483,7 @@ constexpr int PaddingLineNum = 22;
 			ShaderAssetObj->MarkDirty(NewShaderSource != ShaderAssetObj->SavedEditorContent);
         }
         
+		CurrentEditorSource = NewShaderSource;
         CurrentShaderSource = NewShaderSource;
 
 		SubmitLangServiceTasks();

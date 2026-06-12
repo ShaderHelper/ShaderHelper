@@ -343,6 +343,7 @@ namespace FW
 
 		void RegisterPlugin(ShPlugin& InPlugin)
 		{
+			py::gil_scoped_acquire Acquire;
 			try
 			{
 				py::module_ PluginModule = py::module_::import(TCHAR_TO_UTF8(*InPlugin.Name));
@@ -359,6 +360,7 @@ namespace FW
 		}
 		void UnregisterPlugin(ShPlugin& InPlugin)
 		{
+			py::gil_scoped_acquire Acquire;
 			try
 			{
 				py::module_ PluginModule = py::module_::import(TCHAR_TO_UTF8(*InPlugin.Name));

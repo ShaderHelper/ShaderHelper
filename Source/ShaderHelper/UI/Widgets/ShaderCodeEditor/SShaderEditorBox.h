@@ -177,6 +177,7 @@ namespace SH
 		void StartLangServiceThreads();
 		void BuildEditorWidget(const FText& InitialShaderText);
 		void ConfigureEditableTextLayout();
+		void SyncFromShaderAsset();
 		bool TryMergeInsertUndoState(SlateEditableTextTypes::FUndoState* InUndoState);
 		void BindCommands();
 		void MoveSelectedLines(int32 Direction);

@@ -39,7 +39,7 @@ namespace SH
 		ShaderDesc GetShaderDesc(const FString& InContent, FW::ShaderType InStage = FW::ShaderType::Vertex) const override;
 		bool IsCompilable() const override { return true; }
 		bool CompileShader(FString& OutError, FString& OutWarn) override;
-		bool IsCompilationSucceeded() const override { return bCompilationSucceed; }
+		bool IsCompilationSuccessful() const override { return bCompilationSucceed; }
 		TArray<FW::ShaderType> GetEnabledStageList() const override { return { FW::ShaderType::Pixel }; }
 		FString GetBinding() const;
         FString GetTemplateWithBinding() const;
