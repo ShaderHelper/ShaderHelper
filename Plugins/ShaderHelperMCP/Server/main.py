@@ -1,9 +1,6 @@
 import sys
 
-try:
-    from fastmcp import FastMCP
-except ImportError:  # Compatibility with the official MCP Python SDK package.
-    from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 from bridge import BridgeClient
 from config import parse_args

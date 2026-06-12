@@ -1,3 +1,5 @@
+import json
+
 from .shader_tools import (
     tool_compile_shader_asset,
     tool_create_material_asset,
@@ -11,6 +13,66 @@ from .shader_tools import (
     tool_shaderhelper_status,
     tool_update_shader_asset,
 )
+
+_PATH_KEYS = {
+    "assetBrowserDir",
+    "asset_path",
+    "graph",
+    "graph_path",
+    "material_path",
+    "material_paths",
+    "material",
+    "materials",
+    "model",
+    "model_path",
+    "output_dir",
+    "path",
+    "pixelShader",
+    "pixel_shader_path",
+    "shader_path",
+    "target_dir",
+    "vertexShader",
+    "vertex_shader_path",
+    "viewportImage",
+}
+
+
+def _is_path_key(key):
+    if not isinstance(key, str):
+        return False
+
+    key_lower = key.lower()
+    return key in _PATH_KEYS or key_lower.endswith("path") or key_lower.endswith("paths") or key_lower.endswith("dir")
+
+
+def _normalize_path_separators(value, key=None):
+    if isinstance(value, dict):
+        return {
+            child_key: _normalize_path_separators(child_value, child_key)
+            for child_key, child_value in value.items()
+        }
+
+    if isinstance(value, list):
+        return [_normalize_path_separators(item, key) for item in value]
+
+    if isinstance(value, str) and key and _is_path_key(key):
+        return value.replace("\\", "/")
+
+    return value
+
+
+def _normalize_tool_result(result):
+    if not isinstance(result, dict) or "structuredContent" not in result:
+        return result
+
+    structured = _normalize_path_separators(result["structuredContent"])
+    normalized = dict(result)
+    normalized["structuredContent"] = structured
+    normalized["content"] = [{
+        "type": "text",
+        "text": json.dumps(structured, ensure_ascii=False, indent=2, sort_keys=True),
+    }]
+    return normalized
 
 
 TOOLS = {
@@ -212,4 +274,5 @@ def tool_definitions():
 
 
 def call_tool(name, arguments):
-    return TOOLS[name]["handler"](arguments or {})
+    arguments = _normalize_path_separators(arguments or {})
+    return _normalize_tool_result(TOOLS[name]["handler"](arguments))

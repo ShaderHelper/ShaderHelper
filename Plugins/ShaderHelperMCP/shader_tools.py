@@ -9,7 +9,6 @@ from . import text_result
 
 
 _state_lock = threading.RLock()
-_created_assets = {}
 
 
 def _sanitize_name(name, fallback="GeneratedEffect"):
@@ -62,7 +61,7 @@ def _unique_path(directory, stem, extension, overwrite=False):
 
 
 def _resolve_feedback_dir(output_dir=None):
-    base_dir = os.path.abspath(getattr(Sh.PathHelper, "SavedCaptureDir", os.path.join(_current_asset_dir(), "MCPFeedback")))
+    base_dir = os.path.abspath(Sh.PathHelper.SavedCaptureDir)
     if output_dir:
         candidate = output_dir
         if not os.path.isabs(candidate):
@@ -132,12 +131,7 @@ def _set_channel_desc(pass_node, channel_index, channel):
 
 def _asset_from_path(path):
     abs_path = os.path.abspath(path)
-    if abs_path in _created_assets:
-        return _created_assets[abs_path]
-    asset = Sh.Asset.LoadAsset(abs_path)
-    if asset is not None:
-        _created_assets[abs_path] = asset
-    return asset
+    return Sh.Asset.LoadAsset(abs_path)
 
 
 def _find_output_node(graph):
@@ -195,8 +189,6 @@ def _as_list(value, fallback=None):
 
 
 def _enum_token(value):
-    if hasattr(value, "name"):
-        value = value.name
     text = str(value or "").strip()
     if "." in text:
         text = text.rsplit(".", 1)[-1]
@@ -310,14 +302,13 @@ def _create_shader_asset(arguments, asset_type):
 
     shader_path = _unique_path(target_dir, base_name, shader.FileExtension, overwrite)
     Sh.Asset.SaveToFile(shader, shader_path)
-    _created_assets[os.path.abspath(shader_path)] = shader
     compile_info = _asset_compile_summary(shader, do_compile=bool(arguments.get("compile", False)))
     return shader, shader_path, compile_info
 
 
 def _find_render_output_node(graph):
     for node in graph.Nodes:
-        if hasattr(Sh, "RenderOutputNode") and isinstance(node, Sh.RenderOutputNode):
+        if isinstance(node, Sh.RenderOutputNode):
             return node
     output_node = Sh.RenderOutputNode(graph)
     graph.AddNode(output_node)
@@ -331,12 +322,6 @@ def _load_typed_asset(path, class_type, label):
     if not isinstance(asset, class_type):
         raise ValueError(f"Asset is not a {label}: {path}")
     return asset
-
-
-def _require_attrs(names, feature):
-    missing = [name for name in names if not hasattr(Sh, name)]
-    if missing:
-        raise ValueError(f"{feature} requires ShaderHelper bindings that are not exposed yet: {', '.join(missing)}. Rebuild ShaderHelper.")
 
 
 def _vec3(value, label):
@@ -380,10 +365,6 @@ def _create_scene_objects(graph, scene_specs):
     if not scene_specs:
         return {}, []
 
-    _require_attrs(["SceneObject", "MeshSceneObject", "CameraSceneObject", "Model"], "scene_objects")
-    for method in ("AddSceneObject", "AddMeshSceneObject", "AddCameraSceneObject"):
-        if not hasattr(graph, method):
-            raise ValueError(f"scene_objects requires Render.{method}. Rebuild ShaderHelper.")
     scene_objects = {}
     summaries = []
 
@@ -412,8 +393,7 @@ def _create_scene_objects(graph, scene_specs):
             scene_object = graph.AddSceneObject(parent)
 
         display_name = spec.get("name") or key
-        if hasattr(scene_object, "SetName"):
-            scene_object.SetName(str(display_name))
+        scene_object.SetName(str(display_name))
         _set_scene_transform(scene_object, spec)
 
         item = {
@@ -491,10 +471,6 @@ def _bind_mesh_pass_scene(node, spec, scene_objects):
     if not scene_objects and not _mesh_binding_specs(spec) and not spec.get("camera"):
         return []
 
-    _require_attrs(["MeshSceneObject", "CameraSceneObject", "Material"], "mesh pass scene binding")
-    if not hasattr(node, "AddMeshRenderObject") or not hasattr(node, "CameraRef"):
-        raise ValueError("mesh pass scene binding requires MeshPassNode.CameraRef and AddMeshRenderObject. Rebuild ShaderHelper.")
-
     camera_name = spec.get("camera") or spec.get("camera_ref") or spec.get("camera_object")
     if camera_name:
         camera_key = _sanitize_name(camera_name)
@@ -542,19 +518,10 @@ def _pin_name(value, default):
 
 
 def _pin_direction(value, default):
-    explicit = value is not None
     direction = _enum_token(value or default)
     if direction in ("input", "in", "target", "to"):
-        if not hasattr(Sh, "PinDirection"):
-            if explicit:
-                raise ValueError("The running ShaderHelper build does not expose PinDirection. Rebuild ShaderHelper.")
-            return None, "input"
         return Sh.PinDirection.Input, "input"
     if direction in ("output", "out", "source", "from"):
-        if not hasattr(Sh, "PinDirection"):
-            if explicit:
-                raise ValueError("The running ShaderHelper build does not expose PinDirection. Rebuild ShaderHelper.")
-            return None, "output"
         return Sh.PinDirection.Output, "output"
     raise ValueError(f"Unsupported pin direction: {value}")
 
@@ -567,20 +534,7 @@ def _pin_direction_name(value, default="output"):
 def _node_pin(node, pin_name, direction, default_direction, node_name):
     name = _pin_name(pin_name, "RT")
     pin_direction, pin_direction_name = _pin_direction(direction, default_direction)
-    if pin_direction is None:
-        pin = node.GetPin(name)
-        if pin is None:
-            raise ValueError(f"Node {node_name} has no pin named {name}.")
-        return pin
-    try:
-        pin = node.GetPin(name, pin_direction)
-    except TypeError as exc:
-        if direction is not None:
-            raise ValueError(
-                "The running ShaderHelper build does not expose directional GraphNode.GetPin. "
-                "Rebuild ShaderHelper or omit explicit pin direction."
-            ) from exc
-        pin = node.GetPin(name)
+    pin = node.GetPin(name, pin_direction)
     if pin is None:
         raise ValueError(f"Node {node_name} has no {pin_direction_name} pin named {name}.")
     return pin
@@ -716,7 +670,6 @@ def tool_create_shadertoy_graph(arguments):
 
         graph_path = _unique_path(target_dir, base_name, graph.FileExtension, overwrite)
         Sh.Asset.SaveToFile(graph, graph_path)
-        _created_assets[os.path.abspath(graph_path)] = graph
         return text_result({
             "graph": graph_path,
             "passes": pass_paths,
@@ -743,9 +696,6 @@ def tool_compile_shader_asset(arguments):
 
 def tool_create_material_asset(arguments):
     with _state_lock:
-        if not hasattr(Sh, "Material"):
-            raise ValueError("Material is not exposed by the running ShaderHelper build.")
-
         base_name = _sanitize_name(arguments.get("name"), "Material")
         target_dir = _resolve_target_dir(arguments.get("target_dir"))
         overwrite = bool(arguments.get("overwrite", False))
@@ -761,7 +711,6 @@ def tool_create_material_asset(arguments):
 
         material_path = _unique_path(target_dir, base_name, material.FileExtension, overwrite)
         Sh.Asset.SaveToFile(material, material_path)
-        _created_assets[os.path.abspath(material_path)] = material
         return text_result({
             "path": material_path,
             "vertexShader": os.path.abspath(vertex_shader_path) if vertex_shader_path else None,
@@ -772,9 +721,6 @@ def tool_create_material_asset(arguments):
 
 def tool_create_render_graph(arguments):
     with _state_lock:
-        if not hasattr(Sh, "Render"):
-            raise ValueError("Render is not exposed by the running ShaderHelper build.")
-
         base_name = _sanitize_name(arguments.get("name"), "RenderGraph")
         target_dir = _resolve_target_dir(arguments.get("target_dir"))
         overwrite = bool(arguments.get("overwrite", False))
@@ -800,8 +746,6 @@ def tool_create_render_graph(arguments):
                     raise ValueError(f"Texture node {node_name} is missing asset_path.")
                 node = _make_texture_node(graph, source_path)
             elif node_type in ("compute", "compute_pass", "computepassnode"):
-                if not hasattr(Sh, "ComputePassNode"):
-                    raise ValueError("ComputePassNode is not exposed by the running ShaderHelper build.")
                 shader_path = spec.get("shader_path")
                 shader = _load_typed_asset(shader_path, Sh.Shader, "Shader") if shader_path else None
                 if shader is not None:
@@ -815,8 +759,6 @@ def tool_create_render_graph(arguments):
                     node.SetThreadGroupCount(int(count[0]), int(count[1]), int(count[2]))
                 graph.AddNode(node)
             elif node_type in ("mesh", "mesh_pass", "meshpassnode"):
-                if not hasattr(Sh, "MeshPassNode"):
-                    raise ValueError("MeshPassNode is not exposed by the running ShaderHelper build.")
                 node = Sh.MeshPassNode(graph)
                 if spec.get("color_target_count") is not None:
                     node.SetColorTargetCount(int(spec["color_target_count"]))
@@ -866,7 +808,6 @@ def tool_create_render_graph(arguments):
 
         render_path = _unique_path(target_dir, base_name, graph.FileExtension, overwrite)
         Sh.Asset.SaveToFile(graph, render_path)
-        _created_assets[os.path.abspath(render_path)] = graph
         return text_result({
             "graph": render_path,
             "nodes": list(nodes_by_name.keys()),
@@ -905,9 +846,6 @@ def _diagnostics_from_render_logs(logs):
 
 def tool_render_graph_feedback(arguments):
     with _state_lock:
-        if not hasattr(Sh, "RenderGraphFeedback"):
-            raise ValueError("RenderGraphFeedback is not exposed by the running ShaderHelper build. Rebuild and restart ShaderHelper.")
-
         graph_path = arguments.get("graph_path") or arguments.get("path")
         if not graph_path:
             raise ValueError("graph_path is required.")
@@ -1006,7 +944,7 @@ def tool_update_shader_asset(arguments):
                 slot_values.append("Texture2D")
             asset.ChannelSlotTypes = tuple(_slot_type_from_string(slot_values[i]) for i in range(4))
         if isinstance(asset, Sh.Shader):
-            _set_native_shader_options(asset, arguments, getattr(asset, "Language", Sh.GpuShaderLanguage.HLSL))
+            _set_native_shader_options(asset, arguments, asset.Language)
 
         asset.Save()
         compile_info = _asset_compile_summary(asset, do_compile=bool(arguments.get("compile", False)))
@@ -1024,22 +962,22 @@ def tool_inspect_current_graph(arguments):
         raise ValueError("No graph is currently open.")
 
     scene_objects = []
-    if hasattr(Sh, "Render") and isinstance(graph, Sh.Render) and hasattr(graph, "SceneObjects"):
+    if isinstance(graph, Sh.Render):
         for scene_object in graph.SceneObjects:
             item = {
                 "id": scene_object.Id,
                 "name": scene_object.Name,
                 "type": type(scene_object).__name__,
-                "position": list(scene_object.Position) if hasattr(scene_object, "Position") else None,
-                "rotation": list(scene_object.Rotation) if hasattr(scene_object, "Rotation") else None,
-                "scale": list(scene_object.Scale) if hasattr(scene_object, "Scale") else None,
+                "position": list(scene_object.Position),
+                "rotation": list(scene_object.Rotation),
+                "scale": list(scene_object.Scale),
             }
-            if hasattr(Sh, "MeshSceneObject") and isinstance(scene_object, Sh.MeshSceneObject):
+            if isinstance(scene_object, Sh.MeshSceneObject):
                 item["vertexCount"] = int(scene_object.VertexCount)
                 item["instanceCount"] = int(scene_object.InstanceCount)
                 model = scene_object.ModelAsset
                 item["model"] = model.Name if model is not None else None
-            if hasattr(Sh, "CameraSceneObject") and isinstance(scene_object, Sh.CameraSceneObject):
+            if isinstance(scene_object, Sh.CameraSceneObject):
                 item["orthographic"] = bool(scene_object.Orthographic)
                 item["verticalFov"] = float(scene_object.VerticalFov)
                 item["nearPlane"] = float(scene_object.NearPlane)
@@ -1057,7 +995,7 @@ def tool_inspect_current_graph(arguments):
         }
         if isinstance(node, Sh.ShaderToyPassNode):
             item["shaderToyCode"] = node.GetShaderToyCode()
-        if hasattr(Sh, "MeshPassNode") and isinstance(node, Sh.MeshPassNode):
+        if isinstance(node, Sh.MeshPassNode):
             camera = node.CameraRef
             item["camera"] = camera.Name if camera is not None else None
             item["meshRenderObjects"] = []
@@ -1078,14 +1016,10 @@ def tool_inspect_current_graph(arguments):
                 "sourceNodeName": source.Name if source is not None else None,
                 "sourceNodeType": type(source).__name__ if source is not None else None,
             })
-        try:
-            output_pins = node.OutputPins
-        except AttributeError:
-            output_pins = []
-        for pin in output_pins:
+        for pin in node.OutputPins:
             item["outputs"].append({
                 "name": pin.Name,
-                "direction": _pin_direction_name(getattr(pin, "Direction", None), "output"),
+                "direction": _pin_direction_name(pin.Direction, "output"),
             })
         nodes.append(item)
 
